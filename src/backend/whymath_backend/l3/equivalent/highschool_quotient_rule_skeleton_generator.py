@@ -1,9 +1,13 @@
 """고등 미적분Ⅱ 몫의 미분법 결정론 스켈레톤 생성기 — W2 Phase2 #5·최종(결정론·LLM 0).
 
 `calculus_chain_quotient_rule_skeleton_generator`(대학 CALC1 축·`[CALC1-02-03]`)의 몫의
-미분법 설계를 K-12 고등학교 미적분Ⅱ 축(`[12미적Ⅱ-02-04]`)으로 그대로 재적용한다 — 수학
-실체는 완전히 동일(둘 다 (f/g)'=(f'g−fg')/g²)하고 성취기준 축만 다르다. `[12미적Ⅱ-02-04]`
-가 0건이었다 — 이 생성기가 첫 코퍼스를 확보한다.
+미분법 설계를 K-12 고등학교 미적분Ⅱ 축(`[12미적Ⅱ-02-04]`)으로 재적용한다 — 규칙 자체는
+동일(둘 다 (f/g)'=(f'g−fg')/g²)하고 성취기준 축이 다르다. `[12미적Ⅱ-02-04]`가 0건이었다 —
+이 생성기가 첫 코퍼스를 확보한다.
+
+**정정(QUAL-07·2026-09-12)**: 초판은 설계를 "그대로 재적용"해 파라미터 공간까지 글자 그대로
+같았고(시드도 동일), 그 결과 두 코퍼스가 같은 문항을 공유했다(수학 실체 138건·발문 동일
+71건 — 실측). 지금은 계수 공간이 대학 축과 **서로소**다(아래 `_MAX_ABS_COEFFICIENT` 주석).
 
 **대학 축과의 차이(중요)**: 대학 축 형제는 대학 원자가 구 437 legacy 개념그래프 경로로
 해석되지 않아 `concept_tags=()`로 비워야 했지만(정직 회계), 이 K-12 개념(`H:12미적Ⅱ02-04`
@@ -56,9 +60,21 @@ _TEMPLATES: tuple[str, ...] = (
     "함수 f(x) = {f}의 도함수 f'(x)에 대하여 f'({k}){eul_k} 구하시오.",
 )
 
-_A_RANGE = tuple(v for v in range(-4, 5) if v != 0)
-_BC_RANGE = range(-5, 6)
-_D_RANGE = tuple(v for v in range(-4, 5) if v != 0)
+# ── 파라미터 공간: 대학 CALC1 몫의 미분법 축과 **서로소**(QUAL-07·2026-09-12) ──────────
+# 두 생성기는 원래 계수 범위가 글자 그대로 같았고 시드까지 같아(`random.Random(20260807)`),
+# 대학 몫의 미분법 풀 260개가 이 풀 300개의 **부분집합**이었다(실측). 그 결과 두 코퍼스가
+# 수학 실체 138건·발문 동일 71건을 공유했다. 문항만 은퇴시키면 재생성 때 그대로 재발하므로
+# 공간 자체를 갈랐다 —
+#   · 고교 미적분Ⅱ(여기, 난이도 3.7): 계수 4종 전부 절댓값 3 이하(교과서 도입 수준).
+#   · 대학 CALC1(`calculus_chain_quotient_rule_skeleton_generator`, 난이도 3.9):
+#     계수 4종 중 **최소 하나가 절댓값 4 이상**(`_quotient_band_admits`).
+# 두 술어는 서로의 부정이므로 교집합이 정의상 공집합이다(전수 열거 동결:
+# `tests/backend/l3/equivalent/test_quotient_rule_space_disjointness.py`).
+# 대입점 `k`는 좁히지 않는다 — 음수 대입 연습은 고교 축에서도 성취기준 요구다.
+_MAX_ABS_COEFFICIENT = 3
+_A_RANGE = tuple(v for v in range(-_MAX_ABS_COEFFICIENT, _MAX_ABS_COEFFICIENT + 1) if v != 0)
+_BC_RANGE = range(-_MAX_ABS_COEFFICIENT, _MAX_ABS_COEFFICIENT + 1)
+_D_RANGE = tuple(v for v in range(-_MAX_ABS_COEFFICIENT, _MAX_ABS_COEFFICIENT + 1) if v != 0)
 _K_RANGE = range(-3, 4)
 _POOL_TARGET = 300
 
