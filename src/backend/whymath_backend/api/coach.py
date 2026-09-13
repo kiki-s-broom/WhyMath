@@ -387,6 +387,19 @@ class CoachResponse(BaseModel):
             "미제공(None)이면 항상 False(기존 동작 불변)."
         ),
     )
+    match_attribution_unclear: bool = Field(
+        default=False,
+        description=(
+            "MISC-28 게이트 ③ — 학생 풀이에 정정 어구가 있으나 그것이 top-1 오개념을 가리키는지 "
+            "판정할 수 없을 때 True. 앞쪽 정정에는 정당한 반박(`틀린 풀이: <오개념>`)과 무관한 "
+            "정정(`부호를 잘못 옮겨 적었지만 <오개념>`)이 **위치로 구별되지 않게** 섞여 있어, "
+            "어느 쪽으로 단정해도 학생에게 *틀린 확신*이 나간다(실측 교환표: 억제하면 오억제 "
+            "66/66, 무시하면 선행정정 사각 66/66). 그래서 매칭은 *유지*하되 L5/LLM이 단정 대신 "
+            "**확인 질문**('이 부분을 정정한 것인가요?')을 내라는 신호다 — `match_low_quality`와 "
+            "같은 좌석이며 출처만 다르다(그쪽=입력 OCR 품질·이쪽=L4 귀속 판정). 정정 어구가 "
+            "신호 *뒤*면 귀속이 어순으로 확정돼 후보에서 아예 빠지므로 이 플래그로 오지 않는다."
+        ),
+    )
     no_confident_match: bool = Field(
         default=False,
         description=(
@@ -738,6 +751,25 @@ class _MatchOutcome(NamedTuple):
     matches: list[MisconceptionMatch]
     low_quality: bool
     no_confident_match: bool
+    # MISC-28 게이트 ③ — top-1의 정정 귀속 불명. `low_quality`와 같은 처분(매칭 유지 + 보류)이라
+    # 기본값을 두지 않고 나란히 thread한다. 기본값을 주면 새 생성 지점이 조용히 False로 서서
+    # "플래그가 안 붙는 경로"가 무증상으로 생긴다.
+    attribution_unclear: bool
+
+    @property
+    def verdict_withheld(self) -> bool:
+        """확신 진단을 **영속 계층에서 보류**해야 하는가 — 게이트 ②·③의 합집합.
+
+        두 게이트는 출처가 다르지만(② 입력 OCR 품질 · ③ 정정 어구의 귀속) 처분이 같다:
+        응답에는 후보를 그대로 싣되 학습자 모델에는 확정 진단으로 넣지 않는다. 응답 플래그는
+        DB 쓰기를 되돌리지 못하기 때문이다(MISC-17의 근거를 MISC-28이 그대로 물려받는다).
+
+        **+1과 −1을 함께 보류하는 것이 핵심이다.** 보류된 매칭을 빈 리스트로 넘기면 하류의
+        `_log_refutation_evidence`가 그것을 "clean 풀이(no-match)"로 읽어 활성 가설을 −1로
+        *반박*한다 — 즉 `모른다`가 `아니다`로 뒤집힌다(CLAUDE.md "모른다 ≠ 아니다"). 귀속
+        불명은 오개념이 없다는 증거가 아니므로 어느 방향으로도 증거를 만들지 않는다.
+        """
+        return self.low_quality or self.attribution_unclear
 
 
 class _JudgeSeamDeps(NamedTuple):
@@ -920,6 +952,7 @@ async def _compute_matches(
             matches=result.matches,
             low_quality=result.low_quality,
             no_confident_match=result.no_confident_match,
+            attribution_unclear=result.attribution_unclear,
         )
 
     substr = diagnose(student_input, top_k=_FANOUT)
@@ -2228,6 +2261,7 @@ async def coach_decide(
         entry_socratic_category=entry_category,
         solution_coaching=solution_coaching,
         match_low_quality=outcome.low_quality,
+        match_attribution_unclear=outcome.attribution_unclear,
         no_confident_match=outcome.no_confident_match,
     )
 
@@ -2291,7 +2325,10 @@ async def create_session(
     # 후보·`match_low_quality`·개입 결정은 종전 그대로(§3.3 "intervention은 여기서 안 바꾼다"·
     # acceptance ⑤ 준수).
     # 새 임계 0 — 기존 게이트 ②의 플래그를 소비할 뿐이다.
-    persisted_matches: list[MisconceptionMatch] = [] if outcome.low_quality else outcome.matches
+    # MISC-28: 게이트 ③(정정 귀속 불명)도 같은 집행 지점을 공유한다 — `verdict_withheld` 주석 참조.
+    persisted_matches: list[MisconceptionMatch] = (
+        [] if outcome.verdict_withheld else outcome.matches
+    )
     active_hypotheses = await _apply_hypotheses(session, user.user_id, persisted_matches)
     # S1-b: WH-1 하네스 *shadow 관측*(비노출·비블로킹·무영속). 플래그 ON일 때만 하네스를 병렬로
     # 돌려 '하네스가 어떤 도구를 골랐는지·verify 판정이 무엇인지'만 서버 로그로 남긴다 — 학생 응답은
@@ -2564,8 +2601,9 @@ async def create_session(
     )
     # WH-1 §2.3 — 이번 턴 확정 매치를 +1 지지 증거로 적재(#268 소비측의 짝·생산측 좌석). curate
     # *뒤*에 둬 이번 턴 지지가 같은 턴 반박을 순환 차단 안 함(미래 net_support 반영). 같은 트랜잭션.
-    # MISC-17: 미확인 전사(low_quality)는 +1 지지도 −1 반박도 생산하지 않는다 — 빈 매칭만 넘기면
-    # 반박 헬퍼가 no-match 게이트를 통과해 clean 검산으로 −1을 쓰므로 반박은 호출 자체를 보류한다.
+    # MISC-17/MISC-28: 미확인 전사(low_quality)·귀속 불명(attribution_unclear)은 +1 지지도 −1
+    # 반박도 생산하지 않는다 — 빈 매칭만 넘기면 반박 헬퍼가 no-match 게이트를 통과해 clean
+    # 검산으로 −1을 쓰므로 반박은 호출 자체를 보류한다.
     await _log_match_evidence(
         session,
         session_id=dialogue.dialogue_id,
@@ -2574,7 +2612,7 @@ async def create_session(
     )
     # WH-1 §2.3 짝 — clean 검증 풀이(no-match)면 현재 active 가설을 약하게 −1 반박(낙인 방지·#268
     # archived 가드 라이브 발동). +1 생산 뒤·no-match 게이트로 한 턴은 지지/반박 중 하나(상호배타).
-    if not outcome.low_quality:
+    if not outcome.verdict_withheld:
         await _log_refutation_evidence(
             session,
             session_id=dialogue.dialogue_id,
@@ -2597,6 +2635,7 @@ async def create_session(
         solution_coaching=solution_coaching,
         prerequisite_coaching=prereq,
         match_low_quality=outcome.low_quality,
+        match_attribution_unclear=outcome.attribution_unclear,
         no_confident_match=outcome.no_confident_match,
         active_hypotheses=active_hypotheses,
         dialogue_id=dialogue.dialogue_id,
@@ -2689,8 +2728,10 @@ async def append_turns(
     # 멀티턴이라 직전 턴들의 가설 위에 누적되어 감쇠·강화가 실제로 가동된다(2단계 메커니즘).
     # 결정 *앞에서* 적용한다 — 누적 가설 세트를 _build_response_payload로 넘겨 소크라테스 카테고리
     # (ASSUMPTION 가정 표면화)까지 구동(개입 채널과 동일한 post-apply 세트·단일 진실원천).
-    # MISC-17: create_session과 동형 — 게이트 ② low_quality면 영속 계층에 빈 매칭(주석은 위 참조).
-    persisted_matches: list[MisconceptionMatch] = [] if outcome.low_quality else outcome.matches
+    # MISC-17/MISC-28: create_session과 동형 — 게이트 ②·③이면 영속 계층에 빈 매칭(주석은 위 참조).
+    persisted_matches: list[MisconceptionMatch] = (
+        [] if outcome.verdict_withheld else outcome.matches
+    )
     active_hypotheses = await _apply_hypotheses(session, user.user_id, persisted_matches)
     # S1-11(flip-없는 수렴 잔여): 멀티턴에도 WH-1 shadow 관측 배선 — create_session(위 :1191)과
     # 동형. verdict가 실제 발생하는 곳은 멀티턴(풀이 단계 제출)이라, 여기 배선이 없으면 shadow
@@ -2941,7 +2982,7 @@ async def append_turns(
         persona=event_persona,
     )
     # WH-1 §2.3 — create_session과 동형. 이번 턴 확정 매치를 +1 지지 증거로 적재(생산측·curate 뒤).
-    # MISC-17: create_session과 동형 — low_quality면 +1·−1 모두 보류.
+    # MISC-17/MISC-28: create_session과 동형 — 게이트 ②·③이면 +1·−1 모두 보류.
     await _log_match_evidence(
         session,
         session_id=dialogue_id,
@@ -2949,7 +2990,7 @@ async def append_turns(
         matches=persisted_matches,
     )
     # WH-1 §2.3 짝 — create_session과 동형. clean 풀이(no-match)면 active 가설 약한 −1 반박.
-    if not outcome.low_quality:
+    if not outcome.verdict_withheld:
         await _log_refutation_evidence(
             session,
             session_id=dialogue_id,
@@ -2972,6 +3013,7 @@ async def append_turns(
         solution_coaching=solution_coaching,
         prerequisite_coaching=prereq,
         match_low_quality=outcome.low_quality,
+        match_attribution_unclear=outcome.attribution_unclear,
         no_confident_match=outcome.no_confident_match,
         active_hypotheses=active_hypotheses,
         student_turn_id=student_turn.turn_id,

@@ -165,6 +165,11 @@ class TestHelp:
         assert result.exit_code == 0
         assert "transform-v1" in result.stdout.lower()
 
+    def test_help_lists_merge_behavior_skills(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "merge-behavior-skills" in result.stdout.lower()
+
 
 class TestTransformV1:
     def test_validates_synthetic(self, tmp_path: Path) -> None:
@@ -257,6 +262,114 @@ class TestTransformV1:
         result = runner.invoke(app, ["transform-v1", "--source", str(xlsx), "--standards", "none"])
         assert result.exit_code == 1
         assert "prerequisite_cycle" in result.stdout
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
+    path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+
+
+def _merge_fixture(tmp_path: Path) -> dict[str, Path]:
+    """merge-behavior-skills CLI용 최소 합성 코퍼스 4종(graph·crosswalk·legacy-graph·legacy-concepts)."""
+    graph = tmp_path / "graph.json"
+    graph.write_text(
+        json.dumps(
+            {
+                "source_citation": "x",
+                "concepts": [
+                    {"code": "A1", "level": "세부개념"},
+                    {"code": "A2", "level": "세부개념"},
+                    {"code": "U1", "level": "단원"},
+                ],
+                "edges": [],
+                "narrative_edges_raw": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "_provenance.json").write_text(json.dumps({"existing": "kept"}), encoding="utf-8")
+    crosswalk = tmp_path / "crosswalk.jsonl"
+    _write_jsonl(crosswalk, [{"concept_id": "math.a", "atom_codes": ["A1", "A2"]}])
+    legacy_graph = tmp_path / "legacy_graph.json"
+    legacy_graph.write_text(
+        json.dumps({"concepts": [{"concept_id": "math.a", "source_id": "N1"}]}), encoding="utf-8"
+    )
+    legacy_concepts = tmp_path / "legacy_concepts.jsonl"
+    _write_jsonl(legacy_concepts, [{"src_id": "N1", "behavior_skills": ["skill.b", "skill.a"]}])
+    return {
+        "graph": graph,
+        "crosswalk": crosswalk,
+        "legacy_graph": legacy_graph,
+        "legacy_concepts": legacy_concepts,
+    }
+
+
+class TestMergeBehaviorSkills:
+    def _invoke(self, paths: dict[str, Path], *extra: str) -> object:
+        return runner.invoke(
+            app,
+            [
+                "merge-behavior-skills",
+                "--graph",
+                str(paths["graph"]),
+                "--crosswalk",
+                str(paths["crosswalk"]),
+                "--legacy-graph",
+                str(paths["legacy_graph"]),
+                "--legacy-concepts",
+                str(paths["legacy_concepts"]),
+                *extra,
+            ],
+        )
+
+    def test_in_place_merge_writes_graph_and_provenance(self, tmp_path: Path) -> None:
+        paths = _merge_fixture(tmp_path)
+        result = self._invoke(paths)
+        assert result.exit_code == 0, result.output
+        assert "원자 2건 매핑" in result.stdout
+        assert "비어있지 않음 2건" in result.stdout
+
+        graph = json.loads(paths["graph"].read_text(encoding="utf-8"))
+        by_code = {n["code"]: n["behavior_skills"] for n in graph["concepts"]}
+        assert by_code == {"A1": ["skill.a", "skill.b"], "A2": ["skill.a", "skill.b"], "U1": []}
+
+        prov = json.loads((tmp_path / "_provenance.json").read_text(encoding="utf-8"))
+        assert prov["existing"] == "kept"
+        assert prov["behavior_skills_merge"]["atoms_nonempty"] == 2
+
+    def test_dry_run_does_not_write(self, tmp_path: Path) -> None:
+        paths = _merge_fixture(tmp_path)
+        before = paths["graph"].read_text(encoding="utf-8")
+        result = self._invoke(paths, "--dry-run")
+        assert result.exit_code == 0, result.output
+        assert "dry-run" in result.stdout
+        assert paths["graph"].read_text(encoding="utf-8") == before  # 무변경
+
+    def test_output_dir_leaves_original_untouched(self, tmp_path: Path) -> None:
+        paths = _merge_fixture(tmp_path)
+        before = paths["graph"].read_text(encoding="utf-8")
+        out = tmp_path / "out"
+        result = self._invoke(paths, "--output-dir", str(out))
+        assert result.exit_code == 0, result.output
+        assert paths["graph"].read_text(encoding="utf-8") == before  # 원본 무변경
+        merged = json.loads((out / "graph.json").read_text(encoding="utf-8"))
+        by_code = {n["code"]: n["behavior_skills"] for n in merged["concepts"]}
+        assert by_code["A1"] == ["skill.a", "skill.b"]
+        prov = json.loads((out / "_provenance.json").read_text(encoding="utf-8"))
+        assert prov["behavior_skills_merge"]["atoms_nonempty"] == 2
+
+    def test_missing_graph_exits_2(self, tmp_path: Path) -> None:
+        paths = _merge_fixture(tmp_path)
+        paths["graph"] = tmp_path / "nope.json"
+        result = self._invoke(paths)
+        assert result.exit_code == 2
+
+    def test_corpus_join_failure_exits_1(self, tmp_path: Path) -> None:
+        paths = _merge_fixture(tmp_path)
+        # crosswalk가 legacy-graph 다리에 없는 concept_id를 가리키게 해 조인 실패를 유발.
+        _write_jsonl(paths["crosswalk"], [{"concept_id": "math.missing", "atom_codes": ["A1"]}])
+        result = self._invoke(paths)
+        assert result.exit_code == 1
+        assert "조인 실패" in result.stdout or "조인 실패" in (result.output or "")
 
 
 @pytest.fixture(autouse=True)

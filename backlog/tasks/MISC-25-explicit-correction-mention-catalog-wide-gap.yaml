@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,11 +16,12 @@ acceptance:
   - "② 카탈로그 전체(800+항목)에서 이 사각이 얼마나 광범위한지 실측한다 — signals(substring) 또는 regex_signals가 있는 모든 항목에 대해 'canonical_statement를 인용하며 틀렸다고 명시한 문장'을 결정론 생성해 diagnose()에 넣고 confidence>=0.65(서빙 도달) 비율을 측정하는 스크립트(anchor_detection_channel_eval.py 패턴 참고)를 작성한다. 전수 대비 비율이 나와야 '몇 건'이 아니라 '전체의 몇 %'로 우선순위를 매길 수 있다"
   - "③ 해소 방향을 정한다 — MISC-22가 도입한 EXPLICIT_CORRECTION_MENTION(catalog.py, 명시적 정정 언급 정규식)을 재사용해 root-loss-by-dividing을 포함한 대상 항목들에 refuting_regex로 부여하거나(MISC-23 선례), _match_one 자체에 전역 반박 축으로 통합하는 방안(diagnose() 시그니처·confidence 계약 변경 필요 — 영향 범위가 크므로 pedagogy-designer 검토 대상)을 저울질한다. 후자를 택하면 카탈로그 개별 부여 부담이 사라지지만 '반박 언급이 있으면 그 오개념은 절대 성립 안 함'이라는 전역 규칙이 맞는지 교수학적으로 검증해야 한다(예: 학생이 남의 오답을 인용해 비웃는 경우 등 edge case)"
   - "④ 회귀 테스트: anchor_detection_channel_eval 또는 test_misconception_diagnose.py에 이 반박 축을 동결하는 케이스를 추가한다"
-artifacts: []
+artifacts:
+  - "PR #1075 · commit cbc37b07 — 절 경계 근접 반박 축. 사각 100%(66/66) → 0% · CI 게이트 explicit_correction_gap_eval 신설 · 전체 백엔드 12,218 passed · 뮤테이션 12/12 RED"
 paths:
   - src/backend/whymath_backend/l4/misconception/catalog.py
   - src/backend/whymath_backend/l4/misconception/diagnose.py
   - docs/prompts/misconception_diagnosis.md
 session: null
 notes: "출처: MISC-22(PR #1071) Codex P1 리뷰 대응 중 발견. MISC-22는 자신이 새로 노출시킨 5개 regex 채널(factor-sign-flip·distribution-over-power·square-root-positivity·fraction-cancellation·log-distribution)만 EXPLICIT_CORRECTION_MENTION으로 방어하고 그 상수를 catalog.py에 신설했다(재사용 가능). root-loss-by-dividing은 정규식이 아니라 substring 두 신호가 이미 confidence 1.0을 만들어 이번 정정과 무관하게 이전부터 노출돼 있었다 — 범위가 카탈로그 전체로 열려 있어 별도 조사 태스크로 분리한다. MISC-24(extremum-value-vs-point-confused)는 다른 축(우연의 일치·원리상 구별 불가)이라 겹치지 않는다."
-updated: 2026-09-08
+updated: 2026-09-10

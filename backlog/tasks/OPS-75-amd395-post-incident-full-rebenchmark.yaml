@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-75-amd395-post-incident-full-rebenchmark
+title: "AMD395 로컬 LLM 성능 전면 재측정 — 채굴 감염기간(추정 3주) 오염 가능 벤치마크 전건 재실측"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - SEC-34-phaiakes9-cryptominer-incident-response
+requires_gates: []
+acceptance:
+  - "SEC-34가 완결(백신 전체 검사·보안 예외 원복·자동시작 잔존물 전수·자격증명 로테이션)된 뒤에만 착수 — 감염 잔존 상태에서 재측정하면 같은 오염이 재현된다"
+  - "tune_and_bench.ps1 -Presets baseline,rocm,vulkan,resident,power140(별도 실행 2회) 전건 재실행 — clean 상태의 새 evidence_*.txt·bench_*.csv 생성"
+  - "★확정 결론 7항 각각을 새 실측과 대조 — 20% 규칙(§ '하지 말 것')으로 유의미한 차이만 결론 갱신, 나머지는 '재검증 완료·불변'으로 표기 전환"
+  - "OPS-49(QUALITY 티어 MoE 채택 결정)의 전제인 왕복 지연 12.4s→2.3s가 clean 상태에서도 유지되는지 재확인 — 무너지면 라우터 LOCAL_LATENCY_MS[QUALITY] 재조정 태스크로 별도 등재"
+  - "게이트 G-amd395-perf-baseline의 evidence를 감염기간 데이터 인용에서 clean 재측정 데이터 인용으로 교체(gates.yaml amend)"
+  - "docs/ops/amd395_local_llm_performance.md·.claude/commands/llm-perf-doctor.md의 OPS-74 정정 박스('잠정치로 읽는다')를 재측정 완료 문구로 갱신"
+artifacts: []
+paths:
+  - docs/ops/amd395_local_llm_performance.md
+  - ".claude/commands/llm-perf-doctor.md"
+  - scripts/ops/tune_and_bench.ps1
+  - backlog/gates.yaml
+session: null
+notes: "OPS-74가 남긴 후속 — 문서 §5 09-10 정정 박스의 '이 문서의 성능 수치들도 감염 기간과 겹치는 구간은 재측정 대상이다'라는 산문 선언을 대장에 집행한다(CLAUDE.md '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지' 준수). Kiki 머신(Phaiakes9) 실물 실행이 필수라 세션이 대신 측정할 수 없다 — 착수 시 6항목 브리핑·자가검증 동봉 런북을 세션이 새로 작성해 제공한다(기존 §1 브리핑 재사용 가능, 단 '침해 정리 후 첫 측정'이라는 전제를 §1에 추가). depends_on을 SEC-34 전체로 걸었다 — SEC-34 acceptance 중 미완인 자격증명 로테이션·백신 전체 검사·보안 예외 원복이 남아 있는 한(2026-09-10 notes 최신 상태 기준) 이 태스크는 audit-deps상 착수 후보가 되지 않는다(HARN-52)."
+updated: 2026-09-12

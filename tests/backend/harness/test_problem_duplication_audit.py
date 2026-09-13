@@ -13,8 +13,10 @@
   - 실중복 발견 시 exit 1을 내면 게이트가 아니라는 동결이 깨진다.
   - dict/튜플 삽입 순서에 의존해 렌더하면 역순 입력 동일성 테스트가 실패한다.
 
-마지막 절(§실제 코퍼스 스냅샷)은 유일하게 실 코퍼스(`data/corpus/`)를 읽는 통합 테스트다 — 이번
-QUAL-01 실측(T1 해소·T2 신규 발견 8쌍)을 회귀 고정한다.
+마지막 절(§실제 코퍼스 스냅샷)은 유일하게 실 코퍼스(`data/corpus/`)를 읽는 통합 테스트다 —
+QUAL-01 실측(T1 해소·T2 신규 발견)에서 시작해 QUAL-02 은퇴·PB-13 회수(71쌍 재발)·QUAL-07 처분
+(0쌍)까지의 현행 수치를 회귀 고정한다. 두 코퍼스의 파라미터 공간 서로소 분리 자체는
+`tests/backend/l3/equivalent/test_quotient_rule_space_disjointness.py`가 따로 동결한다.
 """
 
 from __future__ import annotations
@@ -834,16 +836,23 @@ def test_cli_qual03_section_present_and_graceful_without_target_corpus(
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 실제 코퍼스 스냅샷 — QUAL-01 실측 회귀 고정 (2026-08-10)
+# 실제 코퍼스 스냅샷 — QUAL-01(2026-08-10) → QUAL-02 → PB-13 회수 → QUAL-07(2026-09-12) 실측 고정
 # ──────────────────────────────────────────────────────────────────────────
-def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual02() -> None:
-    """실제 `data/corpus/` 전수 스캔 — QUAL-01 실측(9쌍) → QUAL-02 은퇴 반영 후 상태를 동결한다.
+def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> None:
+    """실제 `data/corpus/` 전수 스캔 — QUAL-01(9쌍)→QUAL-02 은퇴→PB-13 회수(71쌍)→QUAL-07
+    처분까지의 현행 상태를 동결한다.
 
     T1: 원 설계 문서(미병합 브랜치, 2026-08-03)의 392건이 QUAL-01 재측정에서 0건(해소됨·원인 미조사).
-    T2: QUAL-01이 확정한 실중복 9쌍(원 문서 지목 1쌍 `wm-quad-eq-larger-root`/`wm-skel-92cd1ba2bbf5`
-    + 스켈레톤 트윈×재서술 무변화 교차 8쌍)을 QUAL-02(2026-08-11)가 쌍별 개별 판정해 9레코드를
-    은퇴(rephrased_v0 8건 + generated_v0 1건 제거, 2647→2638) — 반영 후 확정 실중복 0쌍·데모 풀
-    동시노출 0쌍이 이 코퍼스의 현행 상태다(판정 기록: docs/data/problem_duplicate_disposition_2026-08.md).
+    T2 이력:
+      · QUAL-01(2026-08-10) 실중복 9쌍 확정 → QUAL-02(2026-08-11) 쌍별 판정·9레코드 은퇴 → 0쌍.
+      · PB-13(2026-09-01) 고립 저작분 회수로 신규 코퍼스 2종이 들어오며 **71쌍**으로 재발
+        (problem_bank_highschool_quotient_rule_v0 ↔ problem_bank_university_calc1_chain_quotient_v0).
+      · QUAL-07(2026-09-12) 처분 → **0쌍**. 처분 수단은 레코드 은퇴가 아니라 **생성기 파라미터
+        공간의 서로소 분리 + 전건 재생성**이다 — 71쌍은 두 결정론 생성기가 같은 계수 범위·같은
+        시드를 써서 대학 풀이 고교 풀의 부분집합이던 데서 왔고(실측), 문항만 은퇴시키면 재생성
+        때 그대로 재발했을 자리다. 발문 동일 71쌍 밑에 **조건식(수학 실체) 동일 138건**이
+        깔려 있었다는 것도 그때 드러났다 — 은퇴는 그 중 71건만 지웠을 것이다.
+        (판정 기록: docs/data/problem_duplicate_disposition_2026-09.md)
     코퍼스 내용이 바뀌면(의도된 콘텐츠 작업) 이 테스트가 깨진다 — 그때는 값을 재실측해 갱신한다.
     """
     loads, problems = pda._resolve_loads(pda.DEFAULT_CORPUS_ROOT, None)
@@ -860,28 +869,21 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual02() -> No
     assert len(report.slug_collisions) == 0
     assert report.corpus_pairs_scanned == 666  # C(37,2) — PB-13 회수로 7종→37종
 
-    # T2 — PB-13 회수로 실중복 0쌍 → 71쌍. **처분 대기 상태를 동결한다**(은폐 금지).
+    # ── T2 감시 축 2종(QUAL-07이 acceptance ④로 **유지**를 지시한 단언) ─────────────
+    # 이 둘은 현재 0쌍 상태에서 **공허 참**이다(빈 목록 위의 전칭·부분집합). 숨기지 않고
+    # 적는다 — 목적이 "지금 무언가를 재는 것"이 아니라 **재발 시 성격을 즉시 가르는 것**이기
+    # 때문이다. 71쌍 시절 이 두 축은 "기존 콘텐츠 무오염 · 학생 노출 0"을 뜻했고, 그래서
+    # 시급도가 낮다고 판정할 수 있었다.
     #
-    # 성격 실측(2026-09-01):
-    #   · 71쌍 전부 same_format · diff_format 0
-    #   · 71쌍 전부 **신규↔신규** — 기존 main 코퍼스와의 교차 중복 0(회수가 기존 콘텐츠를 오염시키지 않았다)
-    #   · 71쌍 전부 **단 두 코퍼스 사이**:
-    #     problem_bank_highschool_quotient_rule_v0 ↔ problem_bank_university_calc1_chain_quotient_v0
-    #     (몫미분이 고교·대학 양쪽 과정에 있어 결정론 생성기가 동일 문항을 만들어 냈다)
-    #   · **데모 풀 동시노출 0/71** — 두 코퍼스 모두 데모 풀 밖이라 학생 노출 위험은 현재 0이다
-    #     (데모 풀 = generated_v0 · misconception_mc_v0 · problem_bank_v1)
-    #
-    # 0이 아닌 값을 동결하는 이유: QUAL-01이 9쌍을 발견하고 QUAL-02가 쌍별 개별 판정으로
-    # 은퇴시킨 선례를 따른다. 처분 전까지 수치를 숨기지 않고 계약으로 노출해 둔다 —
-    # 처분 태스크가 이 수를 줄이면 그 개선이 기계로 증명된다.
-    assert report.duplicate_pair_count == 71
-    assert len(report.duplicate_pairs_same_format) == 71
-    assert len(report.duplicate_pairs_diff_format) == 0
-    # 기존 콘텐츠 무오염 + 학생 노출 0 — 이 두 축이 깨지면 처분이 시급해진다는 신호다.
-    assert all(not pair.demo_pool_co_exposed for pair in report.duplicate_pairs_same_format)
-    assert {
-        frozenset((pair.corpus_a, pair.corpus_b)) for pair in report.duplicate_pairs_same_format
-    } == {
+    # **아래 `== 0`보다 먼저 둔 것은 의도다**: 재발 시 세 단언이 전부 깨지는데, 순서가
+    # 반대면 "몇 쌍인가"만 보이고 "어느 축으로 번졌는가"는 보이지 않는다. 감시 축을 앞에
+    # 두어야 실패 메시지가 성격을 지목한다.
+    #   · 변별력 실측(QUAL-07 뮤테이션 M8·M9 — 둘 다 이 자리에서 RED):
+    #     데모 풀 코퍼스 2종에 같은 발문을 심으면 첫 단언이, 고교 코퍼스와 제3 코퍼스가
+    #     겹치게 심으면 둘째 단언이 각각 먼저 터진다.
+    # 데모 풀 = generated_v0 · misconception_mc_v0 · problem_bank_v1.
+    assert not any(pair.demo_pool_co_exposed for pair in report.duplicate_pairs)
+    assert {frozenset((pair.corpus_a, pair.corpus_b)) for pair in report.duplicate_pairs} <= {
         frozenset(
             (
                 "problem_bank_highschool_quotient_rule_v0",
@@ -889,6 +891,11 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual02() -> No
             )
         )
     }
+
+    # T2 수치 — QUAL-07 처분 반영 후 71쌍 → 0쌍.
+    assert report.duplicate_pair_count == 0
+    assert len(report.duplicate_pairs_same_format) == 0
+    assert len(report.duplicate_pairs_diff_format) == 0
 
     # 은퇴한 9레코드가 실제로 코퍼스에서 사라졌는지 슬러그 단위로 재확인(재유입 가드).
     all_slugs = {record.slug for load in loads for record in load.records}

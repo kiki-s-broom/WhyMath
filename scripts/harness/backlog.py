@@ -59,6 +59,7 @@ from models import (
     GATE_KINDS,
     OWNERS,
     STATUS_TRANSITIONS,
+    TASK_ID_RE,
     TERMINAL_STATUSES,
     Backlog,
     Gate,
@@ -1963,6 +1964,111 @@ def _active_p0(backlog: Backlog) -> list[str]:
     )
 
 
+def _id_number_conflict(
+    root: Path, backlog: object, new_id: str, *, verb: str = "add"
+) -> tuple[str | None, bool]:
+    """`new_id`의 `<PREFIX>-<번호>`가 이미 점유돼 있으면 **거부 문구**를 돌려준다 (HARN-10).
+
+    반환: `(거부 문구 또는 None, 원격_조회_성공)`. 문구가 `None`이면 통과다.
+
+    왜 함수로 빼는가 — 이 판정은 이제 `add`(신규 등재)와 `rename`(개명) **두 곳**이 쓴다.
+    같은 판정을 두 벌로 두면 한쪽만 고쳐지고, 그때 갈라지는 것은 *번호 충돌을 막는 규칙*
+    자체다(HARN-100). `verb`는 거부 문구 안의 재실행 안내에만 쓴다 — 판정 자체는 동일하다.
+    """
+    # 규약 밖 ID(번호 없음)는 검사 대상이 아니다 — 그 경우에도 반환 계약은 지켜야 하므로
+    # 루프 밖에서 초기화한다(안 하면 `return None, remote_ok`가 NameError로 터진다).
+    remote_ok = True
+
+    def _no(message: str) -> tuple[str, bool]:
+        """거부 문구를 반환 계약 `(문구, 원격_조회_성공)`에 맞춰 싣는다.
+
+        `remote_ok`를 클로저로 읽는다 — 거부 시점에는 이미 확정돼 있다. 이 래퍼가
+        없으면 각 거부 지점이 문자열만 돌려주고, 호출부의 튜플 언패킹이 문자열을
+        글자 단위로 풀어 `ValueError`가 난다(추출 중 실제로 이 형태로 6건 RED).
+        """
+        return message, remote_ok
+
+    remote_ok = True
+    number = store.id_number_of(new_id)
+    if number:
+        policy, _ = store.load_policy(root)
+        try:
+            taken = _taken_id_numbers(root, backlog, policy)
+            remote_ok = True
+        except Exception as exc:  # 원격 조회 실패는 등재를 막지 않는다 — 단 침묵 금지
+            taken = _taken_id_numbers(root, backlog, None)
+            remote_ok = False
+            print(
+                f"  ⚠ 원격 claim 대장 조회 실패({type(exc).__name__}) — 번호 충돌 검사가 "
+                "로컬 백로그로 축소됨(병렬 세션의 인플라이트 번호는 못 본다)",
+                file=sys.stderr,
+            )
+        owner, source = taken.get(number, ("", ""))
+        # 같은 full ID의 재등재(다른 클론에서의 시딩 등)는 충돌이 아니다 — 슬러그가
+        # 다를 때만 번호 참조가 모호해진다.
+        if owner and owner != new_id:
+            prefix = number.rsplit("-", 1)[0]
+            verdict = _suggest_number(prefix, taken, lambda p: _historically_used_numbers(root, p))
+            base = f"태스크 ID 번호 충돌: '{number}' 는 이미 {owner}({source}) 가 쓰고 있다. "
+            tail = "(같은 번호를 나눠 쓰면 문서·커밋의 번호 참조가 결정 불가가 된다 — HARN-10)"
+            if verdict.suggestion is not None and verdict.history == "not_needed":
+                return _no(base + f"다음 빈 번호 제안: {verdict.suggestion}. " + tail)
+            top = f"{prefix}-{verdict.max_used:02d}"
+            if verdict.suggestion is not None and verdict.history == "extended":
+                # 하위(01~99) 재사용도 없다 — 3자리(100~999)로 확장 제안(HARN-97).
+                usable = len(verdict.free_lower) - len(verdict.retired)
+                return _no(
+                    base + f"상위 2자리 번호 소진(최대 {top}) · 미사용 하위 번호 {usable}개도 "
+                    f"없음 — 3자리로 확장해 {verdict.suggestion} 제안(HARN-97). " + tail
+                )
+            if verdict.suggestion is not None:
+                # 상위(최대+1)는 막혔지만 한 번도 쓰인 적 없는 하위 번호가 있다(HARN-73).
+                usable = len(verdict.free_lower) - len(verdict.retired)
+                return _no(
+                    base + f"상위 번호 소진(최대 {top}) — 미사용 하위 번호 {usable}개 중 가장 낮은 "
+                    f"{verdict.suggestion} 제안(이력상 쓰였다 사라진 {len(verdict.retired)}개는 "
+                    "제외 — HARN-73). " + tail
+                )
+            if verdict.history == "unavailable":
+                # 후보는 있으나 "한 번도 쓰인 적 없음"을 확인할 수 없다 — 모른다를 없다로
+                # 접지 않고, **원인을 해소한 뒤 같은 명령을 다시 돌리게** 한다(fail-closed).
+                # shallow 클론에 `git log`를 손으로 돌리라고 안내하면 방금 거부한 것과 같은
+                # 불완전 이력을 재탐색할 뿐이므로(PR #1002 Codex P2) 수동 --id 추론은
+                # 안내하지 않는다 — 배정은 도구가 확인할 수 있을 때까지 막힌 채로 둔다.
+                preview = ", ".join(f"{prefix}-{n:02d}" for n in verdict.free_lower[:10])
+                if len(verdict.free_lower) > 10:
+                    preview += " …"
+                if verdict.history_reason == "shallow":
+                    remedy = (
+                        "이 클론은 shallow(이력 일부 없음)라 로컬 이력 조회로도 확인할 수 없다 — "
+                        "`git fetch --unshallow origin`으로 전체 이력을 받은 뒤 같은 "
+                        f"{verb} 명령을 다시 실행하라"
+                    )
+                else:
+                    remedy = (
+                        f"사유 {verdict.history_reason} — 원인을 해소한 뒤 같은 {verb} 명령을 "
+                        "다시 실행하라"
+                    )
+                return _no(
+                    base
+                    + f"상위 번호 소진(최대 {top}) · 미사용 하위 후보 {len(verdict.free_lower)}개"
+                    f"({preview}) — git 이력 조회 불가로 '한 번도 쓰인 적 없음'을 확인할 수 "
+                    f"없어 제안하지 않는다. {remedy}. 번호를 손으로 추론해 --id로 넣지 말 것"
+                    "(HARN-73). " + tail
+                )
+            # 정말 다 찼다 — 001~999(HARN-97 확장 상한) 전부가 지금 점유돼 있거나
+            # 이력상 쓰였다 사라진 번호다. TASK_ID_RE(2~3자리, 999 상한)를 지키는 다음
+            # 번호를 더 이상 제안할 수 없다 — 이 규모(접두당 999개)에 실제로 도달하는
+            # 것은 이 저장소 관측 이력상 전무하므로 사람의 결정이 필요하다(HARN-97).
+            return _no(
+                base + f"게다가 프리픽스 '{prefix}'는 001~999번을 모두 소진했다(번호 공간은 01부터 "
+                f"센다 · 미사용 0개 · 이력상 쓰였다 사라진 {len(verdict.retired)}개는 재사용 "
+                "금지) — TASK_ID_RE(2~3자리 숫자, 999 상한)를 지키는 다음 번호를 더 이상 제안할 "
+                "수 없다. 새 프리픽스로 분리하는 등 사람의 결정이 필요하다(HARN-97). " + tail
+            )
+    return None, remote_ok
+
+
 def cmd_add(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     if args.id in backlog.tasks:
@@ -1984,84 +2090,9 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
             f"(허용: {list(EOS_PRIORITIES)})"
         )
 
-    # ID 번호 충돌 차단 (HARN-10 — ARCH-13·OPS-15 2회 실측 후 등재)
-    number = store.id_number_of(args.id)
-    if number:
-        policy, _ = store.load_policy(root)
-        try:
-            taken = _taken_id_numbers(root, backlog, policy)
-            remote_ok = True
-        except Exception as exc:  # 원격 조회 실패는 등재를 막지 않는다 — 단 침묵 금지
-            taken = _taken_id_numbers(root, backlog, None)
-            remote_ok = False
-            print(
-                f"  ⚠ 원격 claim 대장 조회 실패({type(exc).__name__}) — 번호 충돌 검사가 "
-                "로컬 백로그로 축소됨(병렬 세션의 인플라이트 번호는 못 본다)",
-                file=sys.stderr,
-            )
-        owner, source = taken.get(number, ("", ""))
-        # 같은 full ID의 재등재(다른 클론에서의 시딩 등)는 충돌이 아니다 — 슬러그가
-        # 다를 때만 번호 참조가 모호해진다.
-        if owner and owner != args.id:
-            prefix = number.rsplit("-", 1)[0]
-            verdict = _suggest_number(prefix, taken, lambda p: _historically_used_numbers(root, p))
-            base = f"태스크 ID 번호 충돌: '{number}' 는 이미 {owner}({source}) 가 쓰고 있다. "
-            tail = "(같은 번호를 나눠 쓰면 문서·커밋의 번호 참조가 결정 불가가 된다 — HARN-10)"
-            if verdict.suggestion is not None and verdict.history == "not_needed":
-                return _fail(base + f"다음 빈 번호 제안: {verdict.suggestion}. " + tail)
-            top = f"{prefix}-{verdict.max_used:02d}"
-            if verdict.suggestion is not None and verdict.history == "extended":
-                # 하위(01~99) 재사용도 없다 — 3자리(100~999)로 확장 제안(HARN-97).
-                usable = len(verdict.free_lower) - len(verdict.retired)
-                return _fail(
-                    base + f"상위 2자리 번호 소진(최대 {top}) · 미사용 하위 번호 {usable}개도 "
-                    f"없음 — 3자리로 확장해 {verdict.suggestion} 제안(HARN-97). " + tail
-                )
-            if verdict.suggestion is not None:
-                # 상위(최대+1)는 막혔지만 한 번도 쓰인 적 없는 하위 번호가 있다(HARN-73).
-                usable = len(verdict.free_lower) - len(verdict.retired)
-                return _fail(
-                    base + f"상위 번호 소진(최대 {top}) — 미사용 하위 번호 {usable}개 중 가장 낮은 "
-                    f"{verdict.suggestion} 제안(이력상 쓰였다 사라진 {len(verdict.retired)}개는 "
-                    "제외 — HARN-73). " + tail
-                )
-            if verdict.history == "unavailable":
-                # 후보는 있으나 "한 번도 쓰인 적 없음"을 확인할 수 없다 — 모른다를 없다로
-                # 접지 않고, **원인을 해소한 뒤 같은 명령을 다시 돌리게** 한다(fail-closed).
-                # shallow 클론에 `git log`를 손으로 돌리라고 안내하면 방금 거부한 것과 같은
-                # 불완전 이력을 재탐색할 뿐이므로(PR #1002 Codex P2) 수동 --id 추론은
-                # 안내하지 않는다 — 배정은 도구가 확인할 수 있을 때까지 막힌 채로 둔다.
-                preview = ", ".join(f"{prefix}-{n:02d}" for n in verdict.free_lower[:10])
-                if len(verdict.free_lower) > 10:
-                    preview += " …"
-                if verdict.history_reason == "shallow":
-                    remedy = (
-                        "이 클론은 shallow(이력 일부 없음)라 로컬 이력 조회로도 확인할 수 없다 — "
-                        "`git fetch --unshallow origin`으로 전체 이력을 받은 뒤 같은 add 명령을 "
-                        "다시 실행하라"
-                    )
-                else:
-                    remedy = (
-                        f"사유 {verdict.history_reason} — 원인을 해소한 뒤 같은 add 명령을 "
-                        "다시 실행하라"
-                    )
-                return _fail(
-                    base
-                    + f"상위 번호 소진(최대 {top}) · 미사용 하위 후보 {len(verdict.free_lower)}개"
-                    f"({preview}) — git 이력 조회 불가로 '한 번도 쓰인 적 없음'을 확인할 수 "
-                    f"없어 제안하지 않는다. {remedy}. 번호를 손으로 추론해 --id로 넣지 말 것"
-                    "(HARN-73). " + tail
-                )
-            # 정말 다 찼다 — 001~999(HARN-97 확장 상한) 전부가 지금 점유돼 있거나
-            # 이력상 쓰였다 사라진 번호다. TASK_ID_RE(2~3자리, 999 상한)를 지키는 다음
-            # 번호를 더 이상 제안할 수 없다 — 이 규모(접두당 999개)에 실제로 도달하는
-            # 것은 이 저장소 관측 이력상 전무하므로 사람의 결정이 필요하다(HARN-97).
-            return _fail(
-                base + f"게다가 프리픽스 '{prefix}'는 001~999번을 모두 소진했다(번호 공간은 01부터 "
-                f"센다 · 미사용 0개 · 이력상 쓰였다 사라진 {len(verdict.retired)}개는 재사용 "
-                "금지) — TASK_ID_RE(2~3자리 숫자, 999 상한)를 지키는 다음 번호를 더 이상 제안할 "
-                "수 없다. 새 프리픽스로 분리하는 등 사람의 결정이 필요하다(HARN-97). " + tail
-            )
+    err, remote_ok = _id_number_conflict(root, backlog, args.id)
+    if err:
+        return _fail(err)
         if not remote_ok:
             print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")
     task = Task(
@@ -2866,6 +2897,116 @@ def _stage_outliers_on_gated_tracks(backlog: Backlog) -> list[str]:
                     f"정정: backlog.py amend {task.id} --track <올바른 트랙> --reason ..."
                 )
     return out
+
+
+def cmd_rename(root: Path, args: argparse.Namespace) -> int:
+    """태스크 ID 개명 — 번호 충돌의 **유일한 정정 경로** (HARN-100).
+
+    왜 필요한가: `validate`의 번호 충돌 remedy는 "하나를 다음 빈 번호로 개명하라"인데
+    그 개명을 수행할 명령이 없었다. 실제로 충돌이 났을 때(2026-09-12 `OPS-73`)
+    `add`(새 번호) + 구 파일 `git rm` + `start` 재claim으로 우회했고, 그 과정에서 구
+    태스크의 이벤트 이력과 원격 claim이 새 ID로 이어지지 않았다. **고칠 수 없는 위반을
+    지적하는 게이트는 사람이 게이트를 끄게 만든다**(`EOS-62`의 `amend --depends` 부재와
+    같은 형태).
+
+    무엇을 함께 옮기는가 — 옮기는 것과 **옮기지 않는 것**을 둘 다 stdout에 낸다
+    (조용한 부분 이행 금지):
+
+      옮긴다   ① 태스크 YAML 파일명과 `id` 필드
+               ② 다른 태스크의 `depends_on` 안의 구 ID (전수 · 건수 출력)
+               ③ 원격 claim — 구 ID 해제, `in_progress`면 새 ID로 재claim
+      안 옮긴다 ④ **과거 이벤트 기록**. 이벤트 대장은 append-only이고(HARN-20 사고 이후의
+                 설계), 과거 기록의 ID를 고쳐 쓰면 "그때 무엇이 일어났는가"가 사라진다.
+                 대신 `rename` 이벤트 한 건을 append해 구↔신을 잇는다 — 추적은 그 링크로
+                 하고, 이 사실을 실행 때마다 화면에 적는다.
+
+    프리픽스 변경은 막지 않는다(`OPS-73-x` → `HARN-100-y` 허용). 번호 충돌 검사는
+    `add`와 **같은 함수**(`_id_number_conflict`)를 거치므로 판정이 갈라지지 않는다.
+    """
+    backlog, _ = _load(root)
+    old = backlog.tasks.get(args.old_id)
+    if old is None:
+        return _fail(f"태스크 '{args.old_id}' 없음 — 개명할 대상이 없다")
+    if args.new_id == args.old_id:
+        return _fail("구 ID와 새 ID가 같다 — 개명할 것이 없다")
+    if args.new_id in backlog.tasks:
+        return _fail(
+            f"새 ID '{args.new_id}' 가 이미 존재한다 — 개명은 빈 ID로만 간다"
+            "(기존 태스크와 합치려면 한쪽을 cancel하라)"
+        )
+    if not TASK_ID_RE.match(args.new_id):
+        return _fail(
+            f"새 ID '{args.new_id}' 가 ID 규약을 벗어난다 — " f"형식: {TASK_ID_RE.pattern}"
+        )
+    err, remote_ok = _id_number_conflict(root, backlog, args.new_id, verb="rename")
+    if err:
+        return _fail(err)
+
+    old_path = store.backlog_dir(root) / "tasks" / f"{old.id}.yaml"
+    prev_session, prev_status = old.session, old.status
+
+    # ② 구 ID를 선행으로 가리키는 다른 태스크 — 전수 갱신. 여기서 빠뜨리면 `audit-deps`가
+    #    존재하지 않는 선행을 지목하고, 그 태스크는 영원히 착수 후보에서 빠진다.
+    updated_dependents: list[str] = []
+    for other in backlog.tasks.values():
+        if other.id == old.id or old.id not in other.depends_on:
+            continue
+        other.depends_on = [args.new_id if d == old.id else d for d in other.depends_on]
+        other.updated = _today()
+        store.save_task(root, other)
+        updated_dependents.append(other.id)
+
+    # ① 태스크 자신 — 새 파일을 먼저 쓰고 구 파일을 지운다. 순서가 반대면 중간에 죽었을 때
+    #    태스크가 통째로 사라진다(새 파일도 구 파일도 없는 상태). 이 순서면 최악이 중복이고,
+    #    중복은 validate가 번호 충돌로 즉시 잡는다 — 소실보다 낫다.
+    old.id = args.new_id
+    old.notes = _append_note(old.notes, f"{args.old_id} → {args.new_id}: {args.reason}", "개명")
+    old.updated = _today()
+    new_path = store.save_task(root, old)
+    old_path.unlink(missing_ok=True)
+
+    store.append_event(
+        root,
+        "rename",
+        args.new_id,
+        previous_id=args.old_id,
+        reason=args.reason,
+        updated_dependents=updated_dependents,
+    )
+
+    # ③ 원격 claim — 구 ID의 claim은 이제 존재하지 않는 태스크를 가리킨다.
+    _release_remote_claim(root, args.old_id, prev_session)
+    reclaimed = ""
+    if prev_status == "in_progress":
+        result = remote_claims.claim(root, args.new_id, prev_session or store.current_branch(root))
+        reclaimed = result.status
+        if result.status not in ("ok", "offline"):
+            print(
+                f"⚠ 새 ID 원격 claim 실패({result.status}): {result.message} — "
+                f"`backlog.py start {args.new_id}`로 다시 잡으라",
+                file=sys.stderr,
+            )
+
+    print(f"✎ {args.old_id} → {args.new_id} 개명 — {args.reason}")
+    print(f"  · 태스크 파일: {old_path.name} → {new_path.name}")
+    if updated_dependents:
+        print(f"  · depends_on 갱신 {len(updated_dependents)}건: {', '.join(updated_dependents)}")
+    else:
+        print("  · depends_on 갱신 0건 (이 태스크를 선행으로 가리킨 태스크 없음)")
+    if prev_status == "in_progress":
+        print(f"  · 원격 claim: 구 ID 해제 + 새 ID 재claim({reclaimed or '미시도'})")
+    # 안 옮긴 것을 반드시 말한다 — 조용한 부분 이행이 이 CLI의 최대 실패 모드다.
+    print(
+        f"  ⚠ 과거 이벤트 기록의 '{args.old_id}' 참조는 **옮기지 않았다**(append-only 대장 — "
+        f"고쳐 쓰면 그때의 사실이 사라진다). `rename` 이벤트가 구↔신을 잇는다."
+    )
+    print(
+        f"  ⚠ 문서·커밋 메시지·PR 본문의 '{args.old_id}' 참조도 옮기지 않았다 — "
+        f"이 CLI 범위 밖이다. 필요하면 손으로 확인하라: git grep -n {args.old_id}"
+    )
+    if not remote_ok:
+        print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")
+    return 0
 
 
 def cmd_audit_deps(root: Path, args: argparse.Namespace) -> int:
@@ -3729,6 +3870,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--reason", required=True)
     p.set_defaults(func=cmd_cancel)
+
+    p = sub.add_parser("rename", help="태스크 ID 개명 — 번호 충돌 정정 경로 (HARN-100)")
+    p.add_argument("old_id")
+    p.add_argument("new_id")
+    p.add_argument("--reason", required=True)
+    p.set_defaults(func=cmd_rename)
 
     p = sub.add_parser("gates", help="사람 게이트 대장")
     p.add_argument("gate_action", nargs="?", choices=["list", "add", "clear", "waive", "show"])

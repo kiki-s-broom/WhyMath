@@ -69,7 +69,12 @@ v1(`eos_feature_inventory.py`)은 모집단을 *라우터 1개 = 기능 1개*(23
 
 사용법:
     python3 scripts/analysis/eos_feature_inventory_v2.py            # 대시보드 + 마크다운 표
-    python3 scripts/analysis/eos_feature_inventory_v2.py --write    # yaml·csv 장부 갱신
+    python3 scripts/analysis/eos_feature_inventory_v2.py --write    # yaml·csv 장부 생성
+
+`--write`가 내는 두 파일은 **저장소에 커밋하지 않는다**(`.gitignore` · OPS-76). 이 생성기의
+입력에 백로그 대장과 소스 LOC가 들어가므로 백로그를 건드리는 거의 모든 PR이 전 행을 재생성하고,
+그 결과는 자동 병합이 안 된다 — 그리고 충돌한 PR은 GitHub이 `refs/pull/N/merge`를 만들지 못해
+CI가 아예 발화하지 않는다. 필요할 때 각자 만들어 보는 산출물로 다룬다.
 
 종료코드: 0 측정 성공 · 1 측정 실패(전수성 위반·모집단 붕괴 — 빈 장부를 성공으로 위장 금지).
 """

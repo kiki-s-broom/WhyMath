@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SKB-02-atom-graph-behavior-skills-merge
+title: "atom_graph_v1 graph.json에 behavior_skills 필드 병합 배선 — SKB-01 acceptance② 스코프 전환분"
+track: math-completion
+stage: S3
+subject: math
+layer: data-pipeline
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 확인된 사실(2026-09-11 실측): data/corpus/atom_graph_v1/graph.json(원자 백본·2,683 concepts — concept 테이블 런타임 정본)에는 behavior_skills 필드가 전무(0/2683). 반면 legacy_snapshot 격하된 구 437 코퍼스 data/corpus/concept_graph_v1/graph.json에는 404/437건에 값이 저작돼 있다(#419 저작 좌석 concepts.jsonl이 원천)."
+  - "② atom_graph_v1 생성 파이프라인(data_pipeline/atom_graph/{transform,load}.py)에 behavior_skills 병합 단계를 배선한다 — S0-2 크로스워크 전파 규칙(l1/concept_atom_crosswalk/transfer.py: crosswalk 행의 atom_codes 전체에 union+dedup+사전순 전파, primary 귀속 아님)과 동일 의미론을 재사용한다. 입력은 이미 존재(concept_atom_crosswalk_v1/crosswalk.jsonl·concept_graph_v1/concepts.jsonl 404/437) — DB 쓰기가 아니라 corpus 산출물(graph.json) 재생성 스코프이며 prod 접근 불요(세션이 직접 실행 가능)."
+  - "③ 재생성된 atom_graph_v1/graph.json의 behavior_skills 커버리지를 실측 검증(크로스워크가 닿는 원자 수 이상 — crosswalk 비接촉 원자는 빈 배열 허용)하는 회귀 테스트 신설. _provenance.json 갱신(재생성 출처·일시)."
+  - "④ 본 태스크가 done된 뒤에야 skill_node·concept.behavior_skills prod 브릿지 적재(Kiki 게이트 실행)가 실제 효과를 낸다 — 소비처 태스크 쪽에서 본 태스크를 depends_on으로 집행한다."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1127 — atom_graph_v1/graph.json에 behavior_skills 병합(크로스워크 437행 unmapped 0 → 원자 1,311건 매핑·1,198건 nonempty). data-pipeline 전체 스위트 913 passed·ruff/black/mypy --strict green. 뮤테이션 검증: 원자 1건 behavior_skills 손상 → test_committed_corpus_behavior_skills_merged RED(정확한 원자·기대값 지목) 확인 후 git checkout으로 원복(트리 클린 상태에서 실행)."
+paths:
+  - "src/data-pipeline/data_pipeline/atom_graph/**"
+  - "data/corpus/atom_graph_v1/**"
+  - "tests/data_pipeline/atom_graph/**"
+session: null
+notes: "출처: 게이트 점검 중 발견(2026-09-11) — atom_graph_v1/graph.json에 behavior_skills 키 0/2683 실측 확인. Kiki에게 prod populate 실행을 안내하기 전 '검증 없는 실행 안내 금지' 규칙에 따라 선차단, 이 파이프라인 배선 작업을 분리 등재."
+updated: 2026-09-11

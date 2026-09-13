@@ -429,6 +429,34 @@ jobs:
             --n-defective 150 --n-clean 150 --seed 20260810 \
             --min-detection-lower 0.95 --max-false-alarm-upper 0.02
 
+      # MISC-25: 학생이 오개념을 **명시적으로 부정**했는데도 확신 진단이 학생에게 도달하는
+      # 비율. 착지 직전 실측은 측정 가능 66종 중 **66종(100%)**이었다 — 항목별 결함이 아니라
+      # substring 공출현(AND)에 부정 조건이 없던 구조적 공백이었고, 절 경계 근접 반박 축으로
+      # 0%가 됐다. 상한을 0.0으로 두는 이유: 이 사각은 "줄이는" 성질이 아니라 카탈로그에
+      # 항목이 새로 들어올 때 **다시 생기는** 성질이라 신규 항목이 회귀를 끌고 들어온다.
+      # 단위 테스트(`TestExplicitCorrectionNearSignals`)는 대표 항목만 밟으므로 전수는 여기다.
+      # hermetic·1.4초(DB 0·LLM 0·네트워크 0). 측정 불가(대조군 전멸)는 exit 2로 따로 낸다 —
+      # 기준 미달과 측정 실패를 같은 코드로 내면 무엇을 고쳐야 하는지가 사라진다.
+      - name: 게이트 — 명시적 정정 언급 사각 (explicit_correction_gap·사각 상한 0%)
+        run: |
+          python -m whymath_backend.harness.explicit_correction_gap_eval \
+            --max-gap-ratio 0.0
+
+      # MISC-27: **올바른 산문**(자체생성 정답 해설 7,644건)에 오개념 진단이 확신 수준으로
+      # 나가는 비율. 맞게 쓴 글에 틀렸다고 말하는 것이라 의사결정 우선순위 #1에 직접 닿는다.
+      #
+      # 상한 7%는 **ratchet**이다 — 실측 6.5%(497건) 바로 위. 0을 요구하지 않는 이유는
+      # 상시 red인 게이트가 사람이 게이트를 끄게 만들기 때문이고(MISC-27 acceptance④),
+      # 그렇다고 임계를 안 걸면 회귀가 조용히 들어온다. 그래서 "지금보다 나빠지면 red"로
+      # 잡는다. 수치가 내려가면 이 값도 함께 내려 잠근다(계층별 커버리지 floor와 같은 관례).
+      #
+      # 이력: MISC-25 착지 전 885건(11.6%) → 착지 후 497건(6.5%). 명시적 정정 언급 축이
+      # 388건을 걷어 낸 몫이다. hermetic 9초(DB 0·LLM 0·네트워크 0).
+      - name: 게이트 — 정답 해설 오진단 ratchet (misconception_false_positive·상한 7%)
+        run: |
+          python -m whymath_backend.harness.misconception_false_positive_eval \
+            --max-fp-ratio 0.07
+
       - name: 게이트 — 코치 프로즈 유출 (coach_prose_leak·노출 상한 0.05·오차단 상한 0.2)
         run: |
           python -m whymath_backend.harness.coach_prose_leak_eval \

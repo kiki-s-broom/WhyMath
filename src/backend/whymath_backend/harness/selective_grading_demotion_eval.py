@@ -6,17 +6,29 @@ Kiki 결정 2026-08-09 — 채점 권위 이관 여부(`REC-07`)를 REC-05의 *�
 판단한다(옵션 C). 이 모듈이 그 측정을 낸다.
 
 REC-05(`attempt_grading_shadow_report.classify_gradability`)가 "코퍼스에 채점할 **재료**가
-있는가"(A 선택형 1,612 · B 수치 단답 1,026 · C 조건 파생 0)를 쟀다면, 이 모듈은 "그 재료로
-채점하면 **실제로 맞히는가**"를 잰다. 둘은 분리된 질문이고 REC-05는 폐기되지 않는다 —
+있는가"(NLP-09 이후 실측 — A 선택형 1,612 · B 수치 단답 154 · C 조건 파생 12,268)를 쟀다면,
+이 모듈은 "그 재료로 채점하면 **실제로 맞히는가**"를 잰다. 둘은 분리된 질문이고 REC-05는
+폐기되지 않는다 —
 이 강등전의 모집단 정의(A/B 버킷)를 `classify_gradability`가 그대로 공급한다(재정의 0).
 
   *수치 현행화(REC-09 회수 시점 2026-08-11)*: 원 구현(2026-08-10)은 A 1,616 · B 1,031로
   적었다. `QUAL-02`(PR #777)의 실중복 9레코드 은퇴로 코퍼스가 2,647→2,638이 되면서 두
-  모집단도 A −4 · B −5 만큼 줄었다(회수 세션 실측). 모집단 크기는 **게이트 표본 산정에
-  영향을 주지 않는다** — 표본 n=150은 코퍼스 크기가 아니라 규약(오검출 상한 2%)에서
-  역산된 값이고, 두 버킷 모두 여전히 n=75를 압도적으로 넘는 풀이다(풀 소진 예외 미발생).
-  회수 세션 재실측 결과도 원 실측과 동일하다(150/150 · 하한 0.982 · 오검출 0/150 · 상한
-  0.018 · undecidable 0).
+  모집단도 A −4 · B −5 만큼 줄었다(회수 세션 실측).
+
+  *수치 재현행화 및 전제 정정(NLP-10 · 2026-09-10)*: 위 문단은 이어서 "모집단 크기는 게이트
+  표본 산정에 영향을 주지 않는다 — 두 버킷 모두 n=75를 압도적으로 넘는 풀이다"라고 적었다.
+  **두 군데가 틀렸다.**
+    ① 버킷당 소비는 n=75가 아니라 **150**이다. 결함 단계와 무결함 단계가 커서를 공유하므로
+       각 단계가 75건씩 따로 먹는다(`_bucket_demand` 참조).
+    ② "압도적"이 더 이상 성립하지 않는다. `NLP-09`가 파생 게이트를 미지수 이름에서 개수로
+       옮기면서 분류 우선순위 A→C→B에 따라 6,976문항이 B에서 C로 승격됐다 —
+       **B 7,130 → 154**(실측 2026-09-10). 요구 150에 대해 여유는 **4건**이다.
+  즉 모집단 크기는 게이트의 *통과 여부*가 아니라 **실행 가능 여부**를 좌우한다. 표본 n=150은
+  여전히 코퍼스가 아니라 규약(오검출 상한 2%)에서 역산된 값이므로 줄일 수 없다 — 줄이면
+  Wilson 상한이 규약을 증명하지 못해 게이트가 공허해진다. 그러므로 부족은 "요청을 줄여" 해소할
+  것이 아니라 **판정 불가(exit 2)로 표면화**하고 모집단 쪽에서 푼다. 후속 설계는 `NLP-10`.
+  검출 성능 자체는 무변화다(NLP-09 이후 재실측: 150/150 · 하한 0.982 · 오검출 0/150 ·
+  상한 0.018 · undecidable 0).
 
 ────────────────────────────────────────────────────────────────────────────
 왜 결함 주입인가 — 인간 라벨 0건으로 정답지가 성립한다
@@ -102,11 +114,15 @@ from whymath_backend.schema.problem import Problem
 
 __all__ = [
     "SELECTIVE_DEFECT_CLASSES",
+    "BucketHeadroom",
+    "InsufficientPoolError",
     "SelectiveDefectClass",
     "SelectiveDemotionReport",
     "SelectiveGrade",
     "SelectiveTrial",
     "build_selective_demotion_set",
+    "bucket_headroom",
+    "format_headroom",
     "format_report",
     "grade_selective",
     "load_corpus_problems",
@@ -117,6 +133,18 @@ __all__ = [
 
 _EXIT_OK = 0
 _EXIT_GATE_FAIL = 1
+
+# 측정 실패는 기준 미달과 **다른 종료 코드**다(NLP-10).
+#
+# 왜 나누는가: 이 둘은 CI에서 똑같이 red지만 요구하는 대응이 정반대다.
+#   · exit 1(기준 미달) = 채점기가 결함을 놓쳤거나 맞은 답을 틀렸다고 했다 → 채점기를 고친다.
+#   · exit 2(측정 실패) = 표본을 못 모아 **판정 자체를 못 했다** → 통과도 실패도 아니다.
+# 같은 코드로 뭉치면 표본 부족이 "채점기 회귀"로 읽히고, 자연스러운 처방은 `--n-*`를
+# 낮추는 것이 된다 — 그런데 그 수치는 오검출 상한 0.02 규약에서 **역산된 값**이라(n=100이면
+# 0건이어도 상한 0.026으로 규약을 증명하지 못한다) 낮추는 순간 게이트가 공허해진다.
+# 즉 신호를 구분하지 않으면 가장 그럴듯한 오답이 게이트를 망가뜨리는 쪽이다.
+# 선례: `ops/live_preflight.py`의 `_EXIT_ERROR = 2`("조용히 대체하지 않고 측정 실패로 표면화").
+_EXIT_UNMEASURABLE = 2
 
 # 무결함 오검출(정답을 오답으로 오판) Wilson 상한의 프로젝트 규약 초기값 —
 # `docs/standards/superhuman_verification_standard.md` §2 S5("보증된 오류 상한 ≤ 2%").
@@ -218,6 +246,111 @@ def _substitute_distractor(problem: Problem, rng: random.Random) -> tuple[str, s
     return picked, f"answer {correct!r} → distractor {picked!r}"
 
 
+class InsufficientPoolError(ValueError):
+    """버킷 풀이 요청 표본을 못 채운다 — 기준 미달이 아니라 **판정 불가**다(NLP-10).
+
+    `ValueError`를 상속하는 이유는 호출자 호환이다(기존 계약은 "풀이 모자라면 ValueError").
+    타입을 따로 두는 이유는 `main()`이 이 실패만 exit 2로 갈라내기 위해서다 — 코퍼스 파싱
+    오류와 표본 부족을 같은 코드로 내면 무엇을 고쳐야 하는지가 사라진다.
+    """
+
+    def __init__(self, bucket: str, available: int) -> None:
+        self.bucket = bucket
+        self.available = available
+        super().__init__(
+            f"{bucket} 풀 소진 — 요청 수를 줄이거나 코퍼스를 늘려야 한다(가용 {available}건)."
+        )
+
+
+@dataclass(frozen=True)
+class BucketHeadroom:
+    """한 버킷의 표본 수급 — 가용·최소 요구·여유(NLP-10 acceptance①②)."""
+
+    bucket: GradabilityBucket
+    available: int
+    required: int
+
+    @property
+    def headroom(self) -> int:
+        return self.available - self.required
+
+    @property
+    def sufficient(self) -> bool:
+        return self.headroom >= 0
+
+    @property
+    def tight(self) -> bool:
+        """여유가 요구량의 `_HEADROOM_WARN_RATIO` 미만인가 — 아직 되지만 곧 안 될 상태."""
+        return self.sufficient and self.headroom < self.required * _HEADROOM_WARN_RATIO
+
+
+# 여유 경고선 — 요구 표본의 10%.
+#
+# 임의값이 아니라 "다음 한 번의 분류 개선이 게이트를 깨뜨릴 수 있는가"를 대략 재는 선이다.
+# NLP-09 한 건이 B버킷을 7,130 → 154로 줄였고(요구 150 · 여유 4 = 2.7%), 그 변경은 게이트를
+# 깨뜨리려는 의도가 전혀 없는 정상 개선이었다. 경고가 없으면 다음 개선은 예고 없이 깬다.
+_HEADROOM_WARN_RATIO = 0.10
+
+
+def _bucket_demand(n_defective: int, n_clean: int) -> dict[GradabilityBucket, int]:
+    """버킷별 **최소** 요구 표본 수 — 아래 셋 구성의 짝/홀 배분과 같은 산식.
+
+    `build_selective_demotion_set`은 index 짝수를 A, 홀수를 B에 배정하고, 결함 단계와
+    무결함 단계가 **커서를 공유**한다(같은 문항을 두 번 쓰지 않는다). 그래서 한 버킷의
+    총 소비는 `결함분 + 무결함분`이다 — 이 합산을 빠뜨리면 여유를 2배로 착각한다.
+
+    "최소"인 이유: 결함 단계는 변조 불가 문항을 건너뛰므로(무변조 결함 trial 금지) 실제
+    소비가 이보다 클 수 있다. 그러므로 이 값으로 충분하다고 판정하지 않는다 — 실제 부족은
+    `InsufficientPoolError`가 잡고, 이 값은 *경고와 진단*을 위한 하한선이다.
+    """
+    demand: dict[GradabilityBucket, int] = {
+        "selectable_exact_match": 0,
+        "numeric_short_answer_candidate": 0,
+    }
+    for total in (n_defective, n_clean):
+        for index in range(total):
+            key: GradabilityBucket = (
+                "selectable_exact_match" if index % 2 == 0 else "numeric_short_answer_candidate"
+            )
+            demand[key] += 1
+    return demand
+
+
+def bucket_headroom(
+    problems: Sequence[Problem], *, n_defective: int, n_clean: int
+) -> list[BucketHeadroom]:
+    """버킷별 표본 수급을 잰다 — 셋을 만들기 **전에** 판정 가능성을 확인하기 위함.
+
+    풀 산정 조건은 `build_selective_demotion_set`과 같아야 한다(`answer`·`slug` 보유).
+    다르면 "여유 있다고 했는데 터진다"가 되어 경고 자체가 위장이 된다.
+    """
+    demand = _bucket_demand(n_defective, n_clean)
+    available: dict[GradabilityBucket, int] = dict.fromkeys(demand, 0)
+    for problem in problems:
+        classified = classify_gradability(problem)
+        if classified in available and problem.answer and problem.slug:
+            # `classify_gradability`가 이미 `GradabilityBucket`을 반환한다 — cast는 중복이고
+            # mypy strict의 `redundant-cast`가 이를 오류로 낸다(CI 실측 2026-09-10).
+            available[classified] += 1
+    return [
+        BucketHeadroom(bucket=bucket, available=available[bucket], required=demand[bucket])
+        for bucket in demand
+    ]
+
+
+def format_headroom(rows: Sequence[BucketHeadroom]) -> str:
+    """표본 수급을 항상 낸다 — 0건도 값으로 읽히게(CLAUDE.md 분모 표기 원칙)."""
+    lines = ["[표본 수급 — 버킷별 가용/요구]"]
+    for row in rows:
+        mark = "✔" if row.sufficient else "✖"
+        note = " ← 여유 부족(곧 판정 불가)" if row.tight else ""
+        lines.append(
+            f"  {mark} {row.bucket:<32} 가용 {row.available:>5} · 최소요구 {row.required:>4}"
+            f" · 여유 {row.headroom:>+5}{note}"
+        )
+    return "\n".join(lines)
+
+
 def build_selective_demotion_set(
     problems: Sequence[Problem],
     *,
@@ -251,9 +384,7 @@ def build_selective_demotion_set(
         index = cursor[bucket]
         pool = by_bucket[bucket]
         if index >= len(pool):
-            raise ValueError(
-                f"{bucket} 풀 소진 — 요청 수를 줄이거나 코퍼스를 늘려야 한다(가용 {len(pool)}건)."
-            )
+            raise InsufficientPoolError(bucket, len(pool))
         cursor[bucket] = index + 1
         return pool[index]
 
@@ -540,12 +671,39 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         problems = load_corpus_problems()
+    except Exception as exc:  # noqa: BLE001 — 코퍼스를 못 읽으면 잰 것이 없다(측정 실패)
+        print(f"코퍼스 적재 실패({type(exc).__name__}): {exc}", file=sys.stderr)
+        return _EXIT_UNMEASURABLE
+
+    # 표본 수급을 **셋 구성 전에** 낸다 — 터진 뒤에 보이면 진단이지 예방이 아니다(NLP-10).
+    headroom = bucket_headroom(problems, n_defective=args.n_defective, n_clean=args.n_clean)
+    print(format_headroom(headroom))
+    for row in headroom:
+        if row.tight:
+            sys.stderr.write(
+                f"[표본 여유 부족] {row.bucket} — 가용 {row.available} · 최소요구 "
+                f"{row.required} · 여유 {row.headroom}. 아직 판정은 되지만, 분류가 조금만 더 "
+                "정확해지면 이 게이트는 통과가 아니라 판정 불가가 된다(NLP-10)\n"
+            )
+
+    try:
         trials = build_selective_demotion_set(
             problems, n_defective=args.n_defective, n_clean=args.n_clean, seed=args.seed
         )
-    except Exception as exc:  # noqa: BLE001 — 코퍼스 문제는 타입명과 함께 보고 후 게이트 실패
-        print(f"코퍼스/셋 구성 오류({type(exc).__name__}): {exc}", file=sys.stderr)
-        return _EXIT_GATE_FAIL
+    except InsufficientPoolError as exc:
+        # 기준 미달이 아니라 **판정 불가**다 — 처방이 다르므로 종료 코드도 다르다.
+        print(
+            f"[표본 부족 — 판정 불가] {exc}\n"
+            "  이것은 게이트 실패가 아니다(통과도 아니다). 채점기를 의심하기 전에 표본을 본다.\n"
+            f"  --n-defective/--n-clean을 낮추지 말 것 — 그 수치는 오검출 상한 "
+            f"{FALSE_ALARM_UPPER_CONVENTION} 규약에서 역산된 값이라 낮추면 게이트가 공허해진다.\n"
+            "  해소: 이 버킷의 모집단을 늘리거나(코퍼스·분류 정의) 표본 배분을 재설계한다.",
+            file=sys.stderr,
+        )
+        return _EXIT_UNMEASURABLE
+    except Exception as exc:  # noqa: BLE001 — 그 밖의 셋 구성 실패도 잰 것이 없다
+        print(f"셋 구성 실패({type(exc).__name__}): {exc}", file=sys.stderr)
+        return _EXIT_UNMEASURABLE
 
     report = summarize(trials)
     print(format_report(report, confidence=args.confidence))

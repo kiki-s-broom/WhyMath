@@ -17,6 +17,7 @@ acceptance:
   - "③ P0 이벤트 배선: role_grant_cli(iam.role.*), problems CUD, l3/router AI 생성/승인"
   - "④ append-only 회귀 테스트, PII 미저장 테스트, AI 해시/모델 추적 테스트 통과"
   - "⑤ GET /v1/admin/audit-events 조회 API(역할 기반 접근 제어) 및 CMS 검색 UI 연동"
+  - "⑥-겹침정정(2026-09-12, PR #880 close 근거): SEC-29(PR #1135) 병합으로 ③의 'problems CUD' 축은 이미 privacy_audit.event_kind=content_mutation로 배선 완료(api/concepts.py·api/problems.py CUD 6라우터). '역할 변경'도 ADMIN-01의 record_role_change_audit로 기존 커버. 재착수 시 남은 진짜 갭은 ③의 'AI 생성/승인'(l3/router) 축 + ⑤ 관리자 조회 API/CMS UI뿐 — audit_event 신규 테이블로 콘텐츠CUD·역할변경을 중복 구현하지 않는다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/schema/audit.py
@@ -29,5 +30,5 @@ paths:
   - "tests/backend/db/test_audit_event_*.py"
   - "tests/backend/ops/test_role_grant_cli*.py"
 session: null
-notes: "90_감사(Audit) 로그 설계 검토 산출물. 세 결정사항: 1) 기존 privacy_audit/deletion_audit 유지 + audit_event 병존 2) before_version/after_version은 version_id 참조만, 원본은 version store 3) AI Trace는 별도 저장소 신규 금지, Langfuse trace_id 참조 + input/output hash. 2026-08-25: main 세션과 NLP-05의 중복 claim 해소를 위해 session을 null로 변경하고 status를 todo로 되돌림.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "90_감사(Audit) 로그 설계 검토 산출물. 세 결정사항: 1) 기존 privacy_audit/deletion_audit 유지 + audit_event 병존 2) before_version/after_version은 version_id 참조만, 원본은 version store 3) AI Trace는 별도 저장소 신규 금지, Langfuse trace_id 참조 + input/output hash. 2026-08-25: main 세션과 NLP-05의 중복 claim 해소를 위해 session을 null로 변경하고 status를 todo로 되돌림.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-12] PR #880(40+커밋 뒤처진 stale 스냅샷) close 근거 문서화 — 겹침 축 확인·향후 재착수 시 중복 구현 방지"
+updated: 2026-09-12

@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-26-correction-vocabulary-coverage
+title: "정정 어휘 인식률 — EXPLICIT_CORRECTION_MENTION이 '아닌가·맞지 않다·착각했다' 등을 못 잡는다 (MISC-25 스코프 축소가 선행 조건)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - MISC-25-explicit-correction-mention-catalog-wide-gap
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — `catalog.EXPLICIT_CORRECTION_MENTION`은 흔한 정정 표현을 못 잡는다. 실측 미매치: `아닌가`·`아닐까`·`맞지 않다`·`성립하지 않는다`·`옳지 않다`·`안 된다`·`실수했다`·`착각했다`·`고쳤다`·`다시 하면`. 한글 활용형은 substring 분해가 안 되므로(`아니`가 `아닌`을 포함하지 않는다) 어간 나열 방식은 구조적으로 새는데, 이미 같은 이유로 한 번 정정된 적이 있다(`틀리|틀렸`가 `틀린`을 놓쳐 활용형을 나열한 PR #1071 후속). 이번엔 `아니` 계열이 같은 상태다.\n② 선행 조건 — **스코프 축소가 먼저다**. `MISC-25`가 substring 경로에 절 경계 근접 축(`has_explicit_correction_near_signals`)을 넣기 전까지, 이 패턴은 5개 정규식 채널의 **텍스트 전체** 전방탐색(`\\A(?!.*...)`)에만 쓰였다. 텍스트 전체 스코프에서 어휘를 넓히면 오억제가 같은 비율로 커진다 — 교수학 판정 실측: 전체 스코프는 정탐 66/66을 침묵시켰다. MISC-25가 착지한 지금은 좁은 스코프가 생겼으므로 그 축에서만 안전하게 넓힐 수 있다.\n③ 두 어휘의 관계를 정한다 — 현재 `EXPLICIT_CORRECTION_MENTION`(전체 스코프·5채널)과 `_CORRECTION_NEAR_SIGNAL`(절 근접·전 항목)이 **의도적으로 다르다**(후자는 연결형 `아니`를 빼고 종결형만 둔다 — 대조 표지를 정정으로 오인하면 `test_negated_zero_root_is_not_a_refutation`이 지키던 진짜 오개념을 놓친다). 넓힐 때 이 분기를 유지할지, 스코프별 어휘 2종으로 정본화할지 정한다. 두 곳에 같은 개념을 적었다가 한쪽만 넓혀 갈라진 선례가 이미 있다(PR #1032 Codex P1).\n④ 집행 지점(정본화와 별항) — 넓힌 뒤 `harness/explicit_correction_gap_eval.py`의 `CORRECTION_PHRASES`에 새 표현을 추가해 사각 비율이 0%를 유지하는지 재측정하고, **동시에** 기존 정탐이 살아 있는지 `tests/backend/l4/test_misconception_diagnose.py::TestExplicitCorrectionNearSignals`의 대조군 6종이 green인지 확인한다. 한쪽만 보면 과잉 억제가 \"사각 0%\"로 위장한다."
+artifacts:
+  - "PR #1075 · commit 6c9a8d3c — 어휘 확장 기각(후보 13/13 오억제 실측). 대신 MISC-25 결함 2건 수정: 연결어미 -고 절 경계(인용격 제외) · 약한 신호 창 배제. 전체 백엔드 12,223 passed · 뮤테이션 14/14 RED · 잔여는 MISC-28"
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - src/backend/whymath_backend/l4/misconception/diagnose.py
+session: null
+notes: "발단: MISC-25 구현 중 교수학 검토가 실측으로 지적. 선행 의존을 대장에 집행한다(notes 산문만으로는 selector가 안 읽는다 — CLAUDE.md 2026-09-01)."
+updated: 2026-09-10

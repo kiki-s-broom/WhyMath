@@ -2,13 +2,24 @@
 
 여기서 막는 것은 셋이다.
 
-1. **드리프트** — `backlog/inventory/feature_inventory_v2.{yaml,csv}`가 생성기 출력과 다르다.
-   장부만 손으로 고치거나 카탈로그만 고치고 `--write`를 안 돌리면 이중 진실 원천이 된다.
-2. **전수성 붕괴** — 백엔드 모듈·엔드포인트·Flutter feature 중 어느 행에도 귀속되지 않은 것이
+1. **전수성 붕괴** — 백엔드 모듈·엔드포인트·Flutter feature 중 어느 행에도 귀속되지 않은 것이
    생겼는데 생성기가 조용히 통과한다. 모듈이 하나 추가되면 이 테스트가 RED가 되어야 한다.
-3. **위장 가드** — 전수성 검사가 *모든* 입력에서 초록인 것(CLAUDE.md 2026-09-01 "실패 주입 없이
+2. **위장 가드** — 전수성 검사가 *모든* 입력에서 초록인 것(CLAUDE.md 2026-09-01 "실패 주입 없이
    보호 있음 선언 금지"). 그래서 카탈로그를 실제로 깨뜨려(모듈 중복 귀속·엔드포인트 미귀속·
    플래그 오타) 각각이 exit 1을 내는지 확인한다.
+3. **장부의 재커밋** — 산출물이 다시 저장소에 들어오는 것(OPS-76).
+
+**장부는 더 이상 커밋하지 않는다 (OPS-76 · 2026-09-12).** 예전에는
+`backlog/inventory/feature_inventory_v2.{yaml,csv}`를 체크인해 두고 "장부 == 생성기 출력"을
+여기서 비교했다. 그 비교는 *생성물이 자기 생성기와 같은지* 묻는 순환 검사였던 데 비해,
+대가는 상시 충돌이었다 — 생성기의 입력에 백로그 대장과 소스 LOC가 들어가므로 백로그를
+건드리는 거의 모든 PR이 두 파일을 전 행 재생성하고, 그러면 자동 병합이 실패한다. 그리고
+**충돌한 PR은 GitHub이 `refs/pull/N/merge`를 못 만들어 CI를 아예 발화시키지 않으므로**
+낡은 결과가 화면에 남는다(PR #1075 실측: 30일간 40커밋·CI 이틀 정지).
+
+전수성이라는 *진짜* 보호는 장부 파일이 아니라 **생성기를 실제 저장소에 돌려 `info["errors"]`를
+보는 것**이다 — 귀속되지 않은 모듈은 장부 파일이 있든 없든 거기서 잡힌다. 아래
+`test_real_repo_population_is_complete`가 그 보호를 이름 있는 검사로 드러낸다.
 
 생성기의 *판정 자체*(6축 점수)는 여기서 재현하지 않는다 — 임계는 v1에서 import되고 v1의 규칙은
 `eos_feature_inventory_migration_map.md`가 소유한다. 이 파일은 v2가 **올바른 모집단을 전부
@@ -27,12 +38,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _REPO_ROOT / "scripts" / "analysis" / "eos_feature_inventory_v2.py"
 _V1_SCRIPT = _REPO_ROOT / "scripts" / "analysis" / "eos_feature_inventory.py"
-_LEDGER_YAML = _REPO_ROOT / "backlog" / "inventory" / "feature_inventory_v2.yaml"
-_LEDGER_CSV = _REPO_ROOT / "backlog" / "inventory" / "feature_inventory_v2.csv"
 _DOC = _REPO_ROOT / "docs" / "reviews" / "eos_feature_inventory_v2_2026-09-03.md"
 _V1_DOC = _REPO_ROOT / "docs" / "reviews" / "eos_feature_inventory_migration_map.md"
 
@@ -81,34 +91,74 @@ def measured(gen: Any) -> tuple[list[Any], dict[str, Any]]:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# ① 드리프트 — 장부 == 생성기 출력
+# ① 장부는 생성물이다 — 커밋되지 않고, 매 실행 만들어진다 (OPS-76)
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_yaml_ledger_matches_generator_output(gen: Any, measured: Any) -> None:
+def test_generated_ledger_is_not_tracked_by_git() -> None:
+    """장부가 저장소로 되돌아오지 않게 한다 — OPS-76이 없앤 상시 충돌원.
+
+    `.gitignore`만으로는 부족하다: 이미 추적 중인 파일은 무시 규칙이 덮지 않고,
+    `git add -f`도 있다. 그러므로 *무시 규칙*이 아니라 **실제 추적 목록**을 본다
+    (CLAUDE.md 2026-09-01 "금지 패턴 열거 대신 산출물 검사").
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", "backlog/inventory/feature_inventory_v2.yaml",
+         "backlog/inventory/feature_inventory_v2.csv"],  # fmt: skip
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert tracked == [], (
+        f"생성 장부가 다시 추적되고 있다: {tracked} — 이 파일들은 백로그를 건드리는 거의 모든 "
+        "PR이 전 행 재생성하므로 커밋하면 상시 병합 충돌을 만들고, 충돌한 PR은 CI가 아예 "
+        "발화하지 않는다(OPS-76). `git rm --cached <경로>`로 추적에서 빼라"
+    )
+
+
+def test_real_repo_population_is_complete(gen: Any) -> None:
+    """전수성 보호를 이름 있는 검사로 드러낸다 — 장부 파일 없이도 남는 방어선.
+
+    어느 행에도 귀속되지 않은 백엔드 모듈·엔드포인트·Flutter feature가 생기면 여기서 RED가
+    된다. 예전에는 이 사실이 "장부가 낡았다"는 드리프트 실패로 *간접* 노출됐다 — 원인과
+    증상이 한 칸 어긋나 있었다. 이제 직접 말한다.
+
+    `measured` 픽스처를 쓰지 않고 `measure()`를 **직접** 부르는 것이 핵심이다. 픽스처가 같은
+    단언을 이미 하므로 그것에 기대면 이 테스트의 본문은 영원히 실행되지 않고, 실패는 이름이
+    다른 `ERROR`로 뜬다 — 즉 "이름 있는 검사로 드러낸다"는 주장이 반만 참이 된다(주입 M2
+    실측에서 그 상태를 확인하고 고쳤다).
+    """
+    logs: list[str] = []
+    _rows, info = gen.measure(logs.append)
+    errors = info["errors"]
+    assert (
+        not errors
+    ), (
+        "어느 기능 행에도 귀속되지 않은 대상이 있다 — 카탈로그에 편입하거나 "
+        "제외 사유를 명시하라:\n" + "\n".join(errors)
+    )
+
+
+def test_generated_ledger_round_trips_as_yaml_and_bom_csv(gen: Any, measured: Any) -> None:
+    """생성기가 *지금* 내는 산출물이 읽을 수 있는 형식인지 본다.
+
+    커밋된 파일과 비교하던 자리를 대신한다. 비교 대상이 사라졌으므로 검사 대상은
+    "같은가"가 아니라 "쓸 수 있는 것을 내는가"다 — YAML이 파싱되고, CSV가 한국어 Windows
+    Excel이 요구하는 BOM으로 시작하는지.
+    """
     rows, info = measured
-    expected = gen.to_yaml(rows, gen.dashboard(rows, info))
-    assert _LEDGER_YAML.read_text(encoding="utf-8") == expected, (
-        "feature_inventory_v2.yaml이 생성기 출력과 다르다 — "
-        "`python3 scripts/analysis/eos_feature_inventory_v2.py --write`로 재생성"
-    )
+    parsed = yaml.safe_load(gen.to_yaml(rows, gen.dashboard(rows, info)))
+    assert isinstance(parsed, dict) and parsed, "YAML 산출물이 비었거나 매핑이 아니다"
+
+    csv_text = gen.to_csv(rows)
+    assert csv_text.encode("utf-8-sig").startswith(b"\xef\xbb\xbf")
+    assert len(list(csv.reader(io.StringIO(csv_text)))) == len(rows) + 1, "CSV 행 수 ≠ 헤더+행"
 
 
-def test_csv_ledger_matches_generator_output_and_has_bom(gen: Any, measured: Any) -> None:
+def test_csv_has_every_required_field_as_a_column(gen: Any, measured: Any) -> None:
     rows, _ = measured
-    raw = _LEDGER_CSV.read_bytes()
-    assert raw.startswith(b"\xef\xbb\xbf"), "CSV는 utf-8-sig(BOM) — 한국어 Windows Excel 호환"
-    # 메시지 없이 두면 실패가 5만 자짜리 diff로만 나온다 — 짝인 YAML 테스트와 같은 안내를
-    # 붙여 "무엇을 하면 되는지"를 실패 화면에서 바로 읽게 한다(2026-09-07 PR #1042에서
-    # 이 테스트가 두 번 red를 냈고, 두 번 다 답은 재생성 한 줄이었다).
-    assert raw.decode("utf-8-sig") == gen.to_csv(rows), (
-        "feature_inventory_v2.csv가 생성기 출력과 다르다 — "
-        "`python3 scripts/analysis/eos_feature_inventory_v2.py --write`로 재생성"
-    )
-
-
-def test_csv_has_every_required_field_as_a_column(gen: Any) -> None:
-    header = next(csv.reader(io.StringIO(_LEDGER_CSV.read_text(encoding="utf-8-sig"))))
+    header = next(csv.reader(io.StringIO(gen.to_csv(rows))))
     for col in ("Feature ID", "기능명", "현재 위치", "사용자", "Domain", "EOS Ownership",
                 "EOS 대상", "상태", "결합도", "테스트", "Migration Action", "출시 우선도(제안)",
                 "Migration Risk"):  # fmt: skip

@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-14
+title: Misconception hypothesis/evidence와 event store 연결
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - misconception_hypothesis 또는 별도 misconception_evidence에 event_id FK 추가
+  - "event_id는 legacy용 nullable, 신규 생성 시 채움"
+  - "관계/마이그레이션 + 테스트"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/db/models/misconception_hypothesis.py
+  - src/backend/whymath_backend/schema/misconception_hypothesis.py
+session: null
+notes: "검토 문서 §12·§61 반영. 감사 추적 및 개인정보 분리.\n\n[정정 2026-09-12] eos_priority null → P3: PR #893 회수 시점 백필 — 오개념 관측성(hypothesis/evidence↔event store 연결) 장기 과제, P3"
+updated: 2026-09-12

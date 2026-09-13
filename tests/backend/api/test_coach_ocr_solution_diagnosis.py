@@ -301,6 +301,77 @@ class TestLowQualityOcrDoesNotPersist:
         assert _evidence_rows(captured) != []
 
 
+class TestAttributionUnclearDoesNotPersist:
+    """MISC-28 ⓒ 게이트 ③의 *집행 지점* — 귀속 불명은 학생 상태를 바꾸지 않는다.
+
+    게이트 ②(`low_quality`)와 **같은 좌석**이다: 응답에는 후보를 그대로 싣되 학습자 모델에는
+    확정 진단으로 넣지 않는다. 응답 플래그는 DB 쓰기를 되돌리지 못하기 때문이다(MISC-17의
+    근거를 그대로 물려받는다).
+
+    여기서 쓰는 형상은 **전치 정정 라벨**이다 — 남의 오답을 인용해 비판하는 학생. 정정이
+    신호 *뒤*였다면 귀속이 어순으로 확정돼 후보에서 아예 빠지므로(MISC-25) 이 경로를 밟지
+    않는다. 그 구별이 이 클래스가 고정하는 계약이다.
+    """
+
+    #: 전치 정정 라벨 — `잘못`류 어휘가 신호 lookbehind 창(12자) 안에 있어야 이 분기를 밟는다.
+    _HELD_SOLUTION = "틀린 풀이: (a+b)² = a² + b²"
+    _HELD_BODY: dict[str, Any] = {
+        "student_input": "",
+        "student_solution": _HELD_SOLUTION,
+        "ocr_confidence": 0.95,  # 게이트 ②는 dormant — 이 클래스는 게이트 ③만 본다
+    }
+
+    def test_create_session_attribution_unclear_flags_but_does_not_persist(self) -> None:
+        client, captured = _session_client()
+        resp = client.post("/v1/coach/sessions", json=self._HELD_BODY)
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        # 응답은 후보를 유지한다 — 보류는 억제가 아니다(억제하면 오억제 100%로 회귀).
+        assert _MID in [m["misconception"]["id"] for m in body["misconceptions"]]
+        assert body["match_attribution_unclear"] is True
+        assert body["match_low_quality"] is False, "게이트 ②가 아니라 ③이 발동해야 한다"
+        # 영속은 0 — 귀속이 불명한 매칭을 확정 진단으로 학습자 모델에 넣지 않는다.
+        assert _hypothesis_rows(captured) == [], "귀속 불명 매칭이 가설로 영속됐다"
+        assert _evidence_rows(captured) == [], "귀속 불명 매칭이 증거로 영속됐다"
+
+    def test_append_turns_attribution_unclear_flags_but_does_not_persist(self) -> None:
+        did = uuid.uuid4()
+        key, dialogue = _preloaded_dialogue(did)
+        client, captured = _session_client(preload={key: dialogue})
+        resp = client.post(f"/v1/coach/sessions/{did}/turns", json=self._HELD_BODY)
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert _MID in [m["misconception"]["id"] for m in body["misconceptions"]]
+        assert body["match_attribution_unclear"] is True
+        assert _hypothesis_rows(captured) == []
+        assert _evidence_rows(captured) == []
+
+    def test_clear_attribution_control_still_persists(self) -> None:
+        """[대조군] 정정_어구가_없으면_종전대로_영속된다 — 위 두 검사의 변별력 근거
+
+        이 대조군이 없으면 "전부 보류"라는 과잉 수정이 초록을 낸다.
+        """
+        client, captured = _session_client()
+        resp = client.post("/v1/coach/sessions", json=_OCR_BODY)
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["match_attribution_unclear"] is False
+        assert _hypothesis_rows(captured) != []
+        assert _evidence_rows(captured) != []
+
+    def test_refutation_evidence_is_withheld_not_inverted(self) -> None:
+        """보류가_−1_반박으로_뒤집히지_않는다 — "모른다 ≠ 아니다"
+
+        보류된 매칭을 빈 리스트로 넘기면 하류 `_log_refutation_evidence`가 그것을 "clean
+        풀이(no-match)"로 읽어 활성 가설을 **−1로 반박**한다. 즉 판정 보류가 조용히
+        "이 오개념은 아니다"라는 **반대 방향 확신**이 된다. 증거 행이 0이어야 하는 이유는
+        영속 억제만이 아니라 이것이다 — 위 두 검사가 `== []`를 요구하는 진짜 근거.
+        """
+        client, captured = _session_client()
+        resp = client.post("/v1/coach/sessions", json=self._HELD_BODY)
+        assert resp.status_code == 201, resp.text
+        assert _evidence_rows(captured) == [], "보류가 −1 반박 증거를 만들었다(모른다→아니다)"
+
+
 class TestTextTurnUnchanged:
     """acceptance ② — `student_solution=None`인 텍스트 턴은 `or` 폴백으로 종전과 동일."""
 

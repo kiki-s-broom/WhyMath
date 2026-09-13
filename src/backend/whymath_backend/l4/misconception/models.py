@@ -145,6 +145,18 @@ class MisconceptionMatch(BaseModel):
             "분리해 보관하므로 기존 소비자의 matched_signals 단언은 불변."
         ),
     )
+    attribution_unclear: bool = Field(
+        default=False,
+        description=(
+            "MISC-28 — 학생 풀이에 정정 어구가 있으나 그것이 **이 오개념을 가리키는지** 판정할 "
+            "수 없을 때 True(신호 *앞*의 정정). 두 가지가 위치로 구별되지 않기 때문이다: "
+            "정당한 반박(`틀린 풀이: <오개념>` — 라벨 후 인용)과 무관한 정정"
+            "(`부호를 잘못 옮겨 적었지만 <오개념>`). **매칭은 유지하되**(억제하면 후자를 통째로 "
+            "미검출) 확신 진단은 보류한다 — `MatchGateResult.low_quality`와 같은 좌석이다. "
+            "정정 어구가 신호 *뒤*면 귀속이 어순으로 확정돼 `_match_one`이 아예 None을 내므로 "
+            "이 플래그가 붙은 결과로 오지 않는다. 기본 False(정정 어구 없음·기존 동작 불변)."
+        ),
+    )
     semantic_similarity: float | None = Field(
         default=None,
         description=(

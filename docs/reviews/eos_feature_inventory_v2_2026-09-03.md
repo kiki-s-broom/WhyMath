@@ -6,9 +6,17 @@
 >
 > **장부 정본은 이 문서가 아니라 기계다** — 생성기 `scripts/analysis/eos_feature_inventory_v2.py`
 > (카탈로그·규칙의 단일 진실 원천) → 장부 `backlog/inventory/feature_inventory_v2.yaml`(기계가
-> 읽는 표) + `feature_inventory_v2.csv`(Excel용·UTF-8 BOM). 본 문서는 전사·해설이다. 재생성:
-> `python3 scripts/analysis/eos_feature_inventory_v2.py --write`. 장부↔생성기 드리프트·전수성·
-> 결함 주입은 `tests/infra/test_eos_feature_inventory_v2.py`가 CI(infra-contracts 잡)에서 동결한다.
+> 읽는 표) + `feature_inventory_v2.csv`(Excel용·UTF-8 BOM). 본 문서는 전사·해설이다. 생성:
+> `python3 scripts/analysis/eos_feature_inventory_v2.py --write`. 전수성·결함 주입은
+> `tests/infra/test_eos_feature_inventory_v2.py`가 CI(infra-contracts 잡)에서 동결한다.
+>
+> ⚠️ **장부 두 파일은 저장소에 커밋되지 않는다 (OPS-76 · 2026-09-12)** — `.gitignore` 대상이며,
+> 필요할 때 위 명령으로 각자 만든다. 예전에는 체크인해 두고 "장부 == 생성기 출력"을 비교했으나,
+> 생성기의 입력에 백로그 대장과 소스 LOC가 들어가 **백로그를 건드리는 거의 모든 PR이 두 파일을
+> 전 행 재생성**했다(30일간 40커밋). 그 재생성분은 자동 병합이 안 되고, **충돌한 PR은 GitHub이
+> `refs/pull/N/merge`를 계산하지 못해 CI를 아예 발화시키지 않는다** — 낡은 결과가 화면에 남아
+> "CI가 안 돈다"가 "CI가 실패했다"로 보인다(PR #1075에서 이틀). 전수성이라는 진짜 보호는
+> 파일이 아니라 생성기를 실제 저장소에 돌리는 테스트가 지키므로, 파일을 빼도 보호는 줄지 않는다.
 >
 > **v1과의 관계**: `eos_feature_inventory_migration_map.md`(EOS-68)는 *라우터 단위* 23행이며
 > 스스로 "행 수는 하한"이라 적었다. v2는 그 하한을 **기능 단위**로 내린 것이다. 두 장부는

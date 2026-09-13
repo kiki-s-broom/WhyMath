@@ -202,3 +202,10 @@ data/audit/
 # reports/eos63_reach_report.json). 머신·시점 종속 실측치라 커밋 대상이 아니다 —
 # 확정 수치는 게이트 evidence나 문서로 옮긴다.
 /reports/
+
+# EOS 기능 인벤토리 v2 장부 — 생성물이므로 커밋하지 않는다 (OPS-76).
+# 생성기가 백로그 대장·소스 LOC를 입력으로 삼아 전 행을 재생성하므로, 커밋하면
+# 백로그를 건드리는 거의 모든 PR이 충돌하고 충돌한 PR은 CI가 아예 발화하지 않는다.
+# 재생성: python3 scripts/analysis/eos_feature_inventory_v2.py --write
+backlog/inventory/feature_inventory_v2.yaml
+backlog/inventory/feature_inventory_v2.csv

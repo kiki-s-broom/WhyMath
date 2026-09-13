@@ -368,7 +368,7 @@ GitHub 웹 UI: `Settings → Environments → New environment`에서 `staging`·
 # [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 gh auth status
-gh api repos/doldori7/WhyMath/environments --jq '.environments[] | {name, rules: [.protection_rules[]?.type]}'
+gh api repos/kiki-s-broom/WhyMath/environments --jq '.environments[] | {name, rules: [.protection_rules[]?.type]}'
 ```
 
 - **성공**: `staging`·`prod` 두 줄이 나오고, **`prod`의 `rules`에 `required_reviewers`가 포함**된다.
@@ -393,10 +393,10 @@ gh api repos/doldori7/WhyMath/environments --jq '.environments[] | {name, rules:
 ```powershell
 # [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-'{"can_admins_bypass":false,"reviewers":[{"type":"User","id":178589964}]}' | gh api -X PUT repos/doldori7/WhyMath/environments/prod --input -
+'{"can_admins_bypass":false,"reviewers":[{"type":"User","id":178589964}]}' | gh api -X PUT repos/kiki-s-broom/WhyMath/environments/prod --input -
 
 # 자가검증: false 여야 함
-gh api repos/doldori7/WhyMath/environments/prod --jq '{can_admins_bypass, rules: [.protection_rules[]?.type]}'
+gh api repos/kiki-s-broom/WhyMath/environments/prod --jq '{can_admins_bypass, rules: [.protection_rules[]?.type]}'
 ```
 
 - **성공**: `{"can_admins_bypass":false,"rules":["required_reviewers"]}`.

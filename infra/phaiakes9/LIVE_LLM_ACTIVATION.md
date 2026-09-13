@@ -82,7 +82,7 @@ ollama pull qwen3-vl:8b
 
 레포 준비(새 PC 최초 1회):
 ```powershell
-git clone https://github.com/doldori7/WhyMath.git
+git clone https://github.com/kiki-s-broom/WhyMath.git
 cd WhyMath\src\backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1

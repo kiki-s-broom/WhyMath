@@ -34,7 +34,7 @@
 
 ## 진입 경로
 
-1. https://github.com/doldori7/WhyMath 접속
+1. https://github.com/kiki-s-broom/WhyMath 접속
 2. 우상단 **Settings** 탭 → 좌측 사이드바 **Branches**
 3. *Branch protection rules* 섹션 → **Add branch protection rule** 또는 **Add rule** 클릭
 
@@ -148,7 +148,7 @@ Test-Path scripts\harness\ruleset_drift.py
 ```powershell
 # Windows PowerShell — 위 자가검증이 True일 때만
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-gh api repos/doldori7/WhyMath/rules/branches/main | Out-File -Encoding utf8 ruleset.json
+gh api repos/kiki-s-broom/WhyMath/rules/branches/main | Out-File -Encoding utf8 ruleset.json
 python scripts\harness\ruleset_drift.py ruleset.json --record
 echo "EXIT=$LASTEXITCODE"
 ```
@@ -395,7 +395,7 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 ```bash
 # 어디서든(claude 세션 포함) 실행 가능 — 토큰만 있으면 된다
 curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
-  "https://api.github.com/repos/doldori7/WhyMath/branches/main" |
+  "https://api.github.com/repos/kiki-s-broom/WhyMath/branches/main" |
   python3 -c "import sys,json;p=json.load(sys.stdin)['protection']['required_status_checks'];print(p['enforcement_level'], len(p['checks']), sorted(c['context'] for c in p['checks']))"
 ```
 
@@ -487,7 +487,7 @@ Actions pin" 외에는 아무것도 바꾸지 않음을 코드가 집행하고 �
 # Windows PowerShell (= Phaiakes9)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 Test-Path scripts\harness\ruleset_pin_plan.py
-gh api repos/doldori7/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
+gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
 Test-Path ruleset-backup.json
 ```
 첫 `Test-Path`가 `False`면 변경안 도구가 이 체크아웃에 없다 — 위 §"판정기 파일이 없다"와 같은
@@ -517,7 +517,7 @@ Test-Path ruleset-rollback.json
 하나라도 없으면 **PUT을 보내지 않는다**)
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-plan.json | Out-Null; "PUT_EXIT=$LASTEXITCODE" } else { "중단 — 변경안 또는 롤백 본문이 없다. ②를 먼저 성공시킨다." }
+if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh api -X PUT repos/kiki-s-broom/WhyMath/rulesets/16623542 --input ruleset-plan.json | Out-Null; "PUT_EXIT=$LASTEXITCODE" } else { "중단 — 변경안 또는 롤백 본문이 없다. ②를 먼저 성공시킨다." }
 ```
 
 **④ 재검증** — 위 §재발 탐지 실행법의 조회+판정 블록을 다시 돌린다. `EXIT=0`이면 완료
@@ -528,7 +528,7 @@ if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh a
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $v = if (Test-Path .github\ruleset-check-state.json) { (Get-Content .github\ruleset-check-state.json -Raw | ConvertFrom-Json).verdict } else { 'unknown' }
-if ($v -ne 'ok') { gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-rollback.json | Out-Null; "ROLLBACK_EXIT=$LASTEXITCODE" } else { "중단 — 마지막 판정이 정합(ok)이라 되돌릴 이유가 없다. ④가 실패했을 때만 실행한다." }
+if ($v -ne 'ok') { gh api -X PUT repos/kiki-s-broom/WhyMath/rulesets/16623542 --input ruleset-rollback.json | Out-Null; "ROLLBACK_EXIT=$LASTEXITCODE" } else { "중단 — 마지막 판정이 정합(ok)이라 되돌릴 이유가 없다. ④가 실패했을 때만 실행한다." }
 ```
 > **왜 가드가 필요한가 (2026-09-05 실측)**: ③ `PUT_EXIT=0` → ④ **위반 0·권고 0·정합** → 그런데
 > 같은 메시지에 있던 ⑤가 그대로 붙여넣기되어 `ROLLBACK_EXIT=0` — 방금 닫힌 게이트가 다시

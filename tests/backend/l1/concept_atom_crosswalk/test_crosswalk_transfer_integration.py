@@ -6,8 +6,9 @@
 
 검증:
   ① atom_node.behavior_skills 갱신 — 값·이전 외 컬럼 무접촉·재실행 멱등
-  ② concept_content.atom_codes(K-12) 갱신 — 값·대학 행 '{}' 불변(scope 필터)
-  ③ 대상 행 부재 → missing 보고(조용히 넘기지 않음)
+  ② concept.behavior_skills 갱신(SKB-01) — atom_node와 같은 mapping·대상 행 부재 missing 보고
+  ③ concept_content.atom_codes(K-12) 갱신 — 값·대학 행 '{}' 불변(scope 필터)
+  ④ 대상 행 부재 → missing 보고(조용히 넘기지 않음)
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from whymath_backend.config import Settings
 from whymath_backend.l1.concept_atom_crosswalk.transfer import (
     CrosswalkTransferStore,
     transfer_atom_behavior_skills,
+    transfer_concept_behavior_skills,
     transfer_k12_content_atom_codes,
 )
 
@@ -25,6 +27,7 @@ pytestmark = pytest.mark.integration
 
 _ATOM_CODE = "S02IT-A1"
 _ATOM_CODE_2 = "S02IT-A2"
+_CONCEPT_CODE = "S02IT-C1"
 _K12_CODE = "S02IT-N1"
 _UNIV_CODE = "S02IT-U1"
 
@@ -80,6 +83,13 @@ def _seed() -> None:
             )
             conn.execute(
                 text(
+                    "INSERT INTO concept (code, name_ko, level) "
+                    "VALUES (:c, :n, '세부개념') ON CONFLICT (code) DO NOTHING"
+                ),
+                [{"c": _CONCEPT_CODE, "n": "S0-2 통합 합성 concept 1"}],
+            )
+            conn.execute(
+                text(
                     "INSERT INTO concept_content (code, scope, name, subject, review_status) "
                     "VALUES (:c, :s, :n, '통합테스트', 'ai_estimated') "
                     "ON CONFLICT (code) DO NOTHING"
@@ -102,6 +112,10 @@ def _cleanup() -> None:
             conn.execute(
                 text("DELETE FROM atom_node WHERE code = ANY(:k)"),
                 {"k": [_ATOM_CODE, _ATOM_CODE_2]},
+            )
+            conn.execute(
+                text("DELETE FROM concept WHERE code = ANY(:k)"),
+                {"k": [_CONCEPT_CODE]},
             )
             conn.execute(
                 text("DELETE FROM concept_content WHERE code = ANY(:k)"),
@@ -132,7 +146,15 @@ class TestCrosswalkTransferEndToEnd:
             assert atom_report.updated == 2
             assert atom_report.missing == ("S02IT-NOPE",)
 
-            # ② K-12 atom_codes 갱신 — 대학 code는 scope 필터로 차단(missing 보고·행 불변).
+            # ② concept.behavior_skills 갱신(SKB-01) — atom_node와 같은 mapping 재사용.
+            concept_report = transfer_concept_behavior_skills(
+                {_CONCEPT_CODE: ("skill.s1", "skill.s2"), "S02IT-NOPE": ("skill.s9",)},
+                store=store,
+            )
+            assert concept_report.updated == 1
+            assert concept_report.missing == ("S02IT-NOPE",)
+
+            # ③ K-12 atom_codes 갱신 — 대학 code는 scope 필터로 차단(missing 보고·행 불변).
             content_report = transfer_k12_content_atom_codes(
                 {_K12_CODE: (_ATOM_CODE, _ATOM_CODE_2), _UNIV_CODE: (_ATOM_CODE,)},
                 store=store,
@@ -160,6 +182,12 @@ class TestCrosswalkTransferEndToEnd:
                     ).one()
                     assert row.name_ko == "S0-2 통합 합성 원자 1"
                     assert row.review_status == "ai_estimated"
+
+                    concept_skills = conn.execute(
+                        text("SELECT behavior_skills FROM concept WHERE code = :c"),
+                        {"c": _CONCEPT_CODE},
+                    ).scalar_one()
+                    assert concept_skills == ["skill.s1", "skill.s2"]
 
                     k12_atoms = conn.execute(
                         text("SELECT atom_codes FROM concept_content WHERE code = :c"),

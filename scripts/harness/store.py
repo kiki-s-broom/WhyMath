@@ -548,6 +548,12 @@ def _eos_priority_grandfather_errors(backlog: Backlog) -> list[str]:
 # 모두 **병렬 세션이 서로의 브랜치를 못 봐서** 났다 — 로컬 백로그만 보는 검사로는 애초에
 # 예방할 수 없다. 그래서 예방의 본체는 `add` 시점의 *원격 claim 대장* 조회이고(backlog.py),
 # 이 함수는 머지 후 잔존을 막는 2선 방어다.
+# ⚠ **이 표에는 CLI 쓰기 경로가 없다 (HARN-100 실측 2026-09-12)** — `scripts/` 전체에서
+# 이 상수를 참조하는 곳은 이 파일뿐이고, 등재하려면 이 소스를 직접 고치는 수밖에 없다.
+# "대장 손편집 금지" 원칙과 어긋나 보이지만 의도적이다: 그랜드파더는 *번호 충돌을 영구히
+# 면제*하는 결정이라 코드 리뷰를 반드시 거쳐야 하고, CLI로 열면 리뷰 없이 게이트를 끄는
+# 길이 생긴다. 대신 **개명이 가능한 경우에는 이 표를 쓰지 않는다** — `backlog.py rename`
+# 이 그 경로다(HARN-100). 이 표는 양쪽이 이미 머지돼 개명이 불가능할 때만 쓴다.
 _GRANDFATHERED_ID_NUMBERS: dict[str, str] = {
     # 이미 main에 머지된 과거 충돌 — 개명하면 MEMORY·커밋·PR의 기존 참조가 끊긴다.
     "ARCH-13": (
@@ -593,7 +599,9 @@ def _id_number_collisions(task_ids: object) -> list[str]:
             continue
         errors.append(
             f"태스크 ID 번호 충돌 '{number}': {sorted(ids)} — 사람·문서·커밋의 "
-            f"'{number}' 참조가 결정 불가가 된다. 하나를 다음 빈 번호로 개명하거나, "
-            "이미 머지돼 개명이 불가능하면 store._GRANDFATHERED_ID_NUMBERS에 사유와 함께 등재하라."
+            f"'{number}' 참조가 결정 불가가 된다. 미머지인 쪽을 개명하라: "
+            f"`backlog.py rename <구 full-id> <새 full-id> --reason ...`(HARN-100). "
+            "양쪽이 이미 머지돼 개명이 불가능할 때만 "
+            "store._GRANDFATHERED_ID_NUMBERS에 사유와 함께 등재한다."
         )
     return errors

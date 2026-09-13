@@ -2382,3 +2382,118 @@ class TestCrlfSanitization:
         assert result.returncode == 0
         assert isinstance(captured.get("input"), bytes)  # str이면 Windows에서 \n→\r\n
         assert "encoding" not in captured  # encoding 지정 = text 모드 stdin의 입구
+
+
+class TestProxyBlockedAttribution:
+    """정책 거부를 "응답 형식 이상"으로 오귀속하지 않는다 (HARN-04).
+
+    왜 이 테스트가 있나 — 프록시가 막은 응답도 `{"message": ...}` 모양이라 기존
+    `"state" not in data` 분기에 함께 떨어졌고, 거기 붙은 문구가 "응답 형식 이상"이었다.
+    형식 결함(우리 코드가 고칠 것)과 환경 차단(이 세션에서 못 고칠 것)은 처방이 정반대인데
+    한 글자로 보였고, 그래서 **같은 조사가 세 세션 반복**됐다(2026-09-11·09-12 ×2 비재현
+    기록이 태스크 acceptance에 쌓여 있다).
+
+    각 절마다 *그 절이 없으면 통과해 버리는* 입력을 픽스처로 둔다 — 그리고 마지막 두 건은
+    **대조군**이다: 진짜 형식 이상은 여전히 형식 이상으로 남아야 하고(과잉 수정 방지),
+    정상 응답은 아무 영향도 받지 않아야 한다.
+    """
+
+    _NUMERIC = {
+        "message": (
+            "Numeric-ID repository paths (repositories/{id}/...) are not supported "
+            "through this proxy. Use repos/{owner}/{repo}/..."
+        )
+    }
+    _SCOPE = {
+        "message": (
+            "GitHub access to this repository is not enabled for this session. "
+            "Use the add_repo tool."
+        )
+    }
+
+    def test_numeric_path_rejection_is_attributed_not_called_malformed(self):
+        """숫자경로_거부는_전용_사유로_귀속된다 — '형식 이상'이 아니다"""
+        reason = remote_claims._attribute_api_failure(self._NUMERIC)
+        assert reason is not None
+        assert reason.startswith("ProxyNumericPathBlocked")
+        assert "형식" not in reason
+
+    def test_numeric_path_reason_says_renaming_does_not_help(self):
+        """이름을_고치면_된다고_말하지_않는다 — 실측이 반대이기 때문
+
+        2026-09-12 실측: 정본 이름(`kiki-s-broom/WhyMath`)은 리다이렉트 없이 '세션 미활성'
+        403을 받는다. 즉 origin 이름을 바꾸면 실패 *문구*만 바뀌고 조회는 그대로 실패한다.
+        이 단언이 없으면 미래의 누군가가 친절한 마음으로 "origin을 정본으로 바꾸세요"를
+        넣게 되고, 그건 태스크 acceptance ④가 이름 붙인 함정 그 자체다.
+        """
+        reason = remote_claims._attribute_api_failure(self._NUMERIC)
+        assert reason is not None and "뚫리지 않는다" in reason
+        # 주장만 있고 근거가 없으면 다음 세션이 그것을 믿을지 말지 판단할 수 없다 —
+        # 그래서 *실측했다는 사실 자체*도 문면에 남는지 본다. 이 단언이 없으면 근거 절만
+        # 지우는 변경이 조용히 통과한다(뮤테이션 M3 생존으로 실제로 확인하고 추가했다).
+        assert (
+            "실측" in reason
+        ), "판정 근거(실측) 표기가 사라졌다 — 주장만 남으면 재검증이 불가능하다"
+
+    def test_session_scope_rejection_is_attributed_separately(self):
+        """세션_미활성은_숫자경로와_다른_사유로_갈린다 — 둘을 한 글자로 뭉치지 않는다"""
+        reason = remote_claims._attribute_api_failure(self._SCOPE)
+        assert reason is not None
+        assert reason.startswith("SessionScopeBlocked")
+
+    def test_genuinely_malformed_payload_keeps_the_shape_error(self):
+        """[대조군] 진짜_형식_이상은_여전히_None을_돌려준다 — 과잉 수정 방지
+
+        이 대조군이 없으면 "무엇이든 정책 거부로 귀속"이라는 과잉 수정이 통과한다.
+        그러면 우리 코드의 진짜 결함이 '환경 탓'으로 위장된다.
+        """
+        assert remote_claims._attribute_api_failure({"unexpected": "payload"}) is None
+        assert remote_claims._attribute_api_failure([1, 2, 3]) is None
+        assert remote_claims._attribute_api_failure({"message": 42}) is None
+
+    def test_unrelated_api_message_is_not_swallowed(self):
+        """[대조군] 다른_message는_귀속하지_않는다 — rate limit·404를 정책 거부로 접지 않는다"""
+        assert remote_claims._attribute_api_failure({"message": "Not Found"}) is None
+        assert remote_claims._attribute_api_failure({"message": "API rate limit exceeded"}) is None
+
+    def test_state_lookup_surfaces_the_attributed_reason(self, tmp_path, monkeypatch):
+        """[집행 지점] `_fetch_pr_states`가 실제로 그 사유를 낸다 — 계약만 두지 않는다"""
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+        monkeypatch.setattr(
+            remote_claims,
+            "_git",
+            lambda root, *a, **k: subprocess.CompletedProcess(
+                a, 0, stdout="https://github.com/doldori7/WhyMath.git\n", stderr=""
+            ),
+        )
+        monkeypatch.setattr(
+            remote_claims.subprocess,
+            "run",
+            lambda argv, **kw: subprocess.CompletedProcess(
+                argv, 0, stdout=json.dumps(self._NUMERIC), stderr=""
+            ),
+        )
+        result, error = remote_claims._fetch_pr_states(tmp_path, [675])
+        assert result is None
+        assert "ProxyNumericPathBlocked" in error and "#675" in error
+
+    def test_label_lookup_surfaces_the_attributed_reason(self, tmp_path, monkeypatch):
+        """[집행 지점] 라벨_조회도_같은_귀속을_낸다 — 한쪽만 고치면 다른 쪽이 조사를 재생산한다"""
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+        monkeypatch.setattr(
+            remote_claims,
+            "_git",
+            lambda root, *a, **k: subprocess.CompletedProcess(
+                a, 0, stdout="https://github.com/doldori7/WhyMath.git\n", stderr=""
+            ),
+        )
+        monkeypatch.setattr(
+            remote_claims.subprocess,
+            "run",
+            lambda argv, **kw: subprocess.CompletedProcess(
+                argv, 0, stdout=json.dumps(self._SCOPE), stderr=""
+            ),
+        )
+        result, error = remote_claims._fetch_pr_labels(tmp_path, [675])
+        assert result is None
+        assert "SessionScopeBlocked" in error and "#675" in error

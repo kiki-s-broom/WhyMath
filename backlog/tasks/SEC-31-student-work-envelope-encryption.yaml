@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,13 +18,14 @@ acceptance:
   - "④ export 복호 표면 확장: /v1/me/export가 복호 평문을 반환하되 복호 실패는 침묵 아닌 타입명 로그(침묵 실패 금지) — privacy 3종 플랜은 테이블 단위라 무변경 확인"
   - "⑤ 집행 지점: 3테이블 전건 동시 배선(부분 배선 = 보호 비대칭 재생산 금지 — EOS-32 §4-6 유보 판정의 해소가 이 태스크의 존재 이유)·평문 컬럼 잔존 여부를 스캔 테스트로 동결"
   - "[실행 증적 2026-09-12] 대상 전수(①) — problem_attempt(student_answer·handwriting_uri·ocr_result)·answer_submission(raw_response·latex·canonical_ast)·student_solution_step(expression·canonical_ast) 8축 전부 봉투 암호화 배선 완료.\n\n구현(②) — dialogue_turn(SEC-01) 선례 그대로: *_encrypted+*_nonce(LargeBinary) 8쌍 16컬럼, AESGCM(api/_crypto.py), dual-read 폴백, JSONB는 sort_keys=True 결정론 직렬화 후 암호화, _NON_SCHEMA_COLUMNS로 schema/export 밖 유지, 백필 CLI(privacy/student_work_backfill.py — dialogue_content_backfill.py 미러, SEC-04 none_as_null 함정 회피). student_solution_step.expression은 원본 NOT NULL이라 마이그레이션에서 nullable로 완화하고, resolve_stored_secret 계약(둘 다 없으면 RuntimeError)을 재사용하는 전용 헬퍼를 신설(다른 7축은 nullable 3-튜플 계약 그대로 재사용).\n\n키 정책(③) — 신규 키 student_work_encryption_key(+decryption_fallback_keys)를 발급해 dialogue·evidence·device secret 키와 분리(폭발 반경 격리). 3테이블 내부는 이 키 하나를 공유(같은 데이터 주체·같은 답안 제출 흐름 — dialogue_turn 내부 3축 공유 논리의 확장. 근거는 MEMORY.md 2026-09-12 SEC-31 결정 로그).\n\nexport 복호 표면(④) — /v1/me/export(privacy/export.py::_student_work_row_json)가 복호 평문을 반환. 복호 실패(cipher 미설정인데 암호화 행)는 각 resolve 헬퍼가 RuntimeError로 노출(침묵 실패 금지). privacy 3종 플랜(export/consent/erasure)은 이미 테이블 단위로 3테이블을 포함 중이라 무변경.\n\n집행 지점(⑤) — 3테이블 8축 한 마이그레이션(3f5c83f51246, down=4c6dfb1527a9)에 일괄 배선(부분 배선 금지). api/me.py::submit_attempt·api/coach.py::_complete_problem 두 ProblemAttempt 쓰기 경로 배선(부분 배선 방지). answer_submission·student_solution_step은 현재 코드베이스에 살아있는 HTTP 쓰기 경로가 없어(erasure/export/retention만 참조) 암복호·백필·export 표면만 우선 갖춤(evidence_payload 선례 동형). 평문 잔존 스캔은 db/models 컬럼 nullable·_NON_SCHEMA_COLUMNS 전수 테스트(test_student_work_envelope_encryption.py)로 동결.\n\nRED-before-fix(cp 백업/복원, git 원복 미사용, diff 바이트 동일 확인 — 세션이 직접 3건 재현): ①api/me.py 암호화 호출 제거 → test_me.py 1건 RED(193건 무회귀) ②_crypto.py expression 복호 헬퍼 훼손 → 5건 RED(fail-loud·tamper 검출 테스트 포함, 12건 무회귀) ③export.py 복호 루프 우회 → 2건 RED(fail-loud 테스트 포함, 7건 무회귀). 구현을 위임한 서브에이전트도 별도로 4건의 뮤테이션을 자체 수행해 교차 검증(다른 지점에서 동일 결론).\n\n검증: ruff·black·mypy 대상 파일 전건 clean. 전체 백엔드 스위트 12856 passed·340 skipped·1 xfailed(0 failed, 18분33초 — 안정된 트리 재실행, RED-before-fix 도중 트리 변경으로 폐기된 1차 실행은 결과 미채택). tests/infra 1303 passed·1 skipped(신규 privacy.student_work_backfill 모듈을 eos_feature_inventory_v2.py WM-O-902 좌석에 귀속 후 재생성·재확인 — 귀속 누락 시 전수성 위반 21건 ERROR 실측).\n\n범위 경계: problem_attempt.handwriting_uri/ocr_result는 AttemptSubmitRequest에 필드가 아직 없어 암호화 경로는 배선됐으나 현재 항상 None을 암호화(API 계약 확장은 범위 밖). record_admin_access_audit류 별개 갭 없음(SEC-31은 본 태스크 범위만)."
-artifacts: []
+artifacts:
+  - "#1138"
 paths:
   - "src/backend/whymath_backend/db/models/**"
   - src/backend/whymath_backend/api/_crypto.py
   - "src/backend/whymath_backend/privacy/**"
   - "src/backend/alembic/versions/**"
   - "tests/backend/**"
-session: claude/sec-29-done-marker
+session: null
 notes: "출처: PR #903 Codex P1 지적 → 실측 판정 (a). 봉투 암호화 장치는 실재(dialogue 계열 SEC-01 집행 중)하나 답안 계열은 EOS-32 §4-6이 '일괄 후속'으로 유보한 채 좌석이 없었다 — docstring 계획은 백로그를 대신하지 못한다. 단일 테이블 선행 암호화는 보호 비대칭이라 EOS-46(student_solution_step)에서도 미적용 유지, 이 태스크가 3테이블을 일괄 해소한다. CLAUDE.md '학생 데이터=민감 정보 암호화 저장' 원칙 축\n\n[정정 2026-09-01] eos_priority null → P1: 미성년 PII 불변 계약 — 답안 본문 평문 유보 해소. EOS-80 일괄 백필\n\n[정정 2026-09-12] SEC-31 실행 완료 — 키 정책 결정·구현·RED-before-fix·전체 검증 증적 등재"
 updated: 2026-09-12

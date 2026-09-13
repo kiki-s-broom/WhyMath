@@ -1,8 +1,8 @@
 """서버측 답안 채점 shadow 리포트 테스트(NLP-02) — acceptance①~⑤ 대응.
 
 구성:
-  - `derive_verify_inputs` 단위 테스트(파생 정확성 위험 — y를 x로 오인하지 않는지 등, 순수·
-    DB 0)
+  - `derive_verify_inputs` 단위 테스트(파생 정확성 위험 — 학생 답을 엉뚱한 변수에 대입하지
+    않는지 등, 순수·DB 0). NLP-09 이후 게이트는 미지수의 *이름*이 아니라 *개수*를 본다.
   - `build_report` 회귀 테스트(unverifiable이 mismatch로 새지 않음 — 순수·DB 0)
   - `submit_attempt` BKT 입력 동결 구조 테스트(소스 레벨 — api/me.py 무변경 증명)
   - 변별력 discriminating 테스트(acceptance⑤) — 실 PostgreSQL 필요(`pytest.mark.integration`,
@@ -26,6 +26,7 @@ from whymath_backend.db.models.problem import Problem as ProblemORM
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.harness.attempt_grading_shadow_report import (
     AttemptRecord,
+    _derive_from_conditions_parsed,
     _derive_from_corpus,
     _load_corpus_verify_blocks,
     build_gradability_ceiling_report,
@@ -98,14 +99,41 @@ class TestDeriveVerifyInputs:
         assert conditions == ["2*x - 6"]
         assert answer_map == {"x": "3"}
 
-    def test_unknown_is_y_not_x_returns_none(self) -> None:
-        """조건의 실제 미지수가 y(≠x) → None(비파생·verify_answer 호출 안 함).
+    def test_unknown_is_y_not_x_derives_with_key_y(self) -> None:
+        """조건의 미지수가 y(≠x)여도 **하나뿐이면** 파생한다 — 키는 `y`다(NLP-09).
 
-        이것이 이 태스크의 핵심 위험 시나리오다: {"x": problem.answer}를 순진하게 만들면
-        엉뚱한 변수에 값을 대입한 거짓 결과를 낼 수 있으므로, y를 발견하면 파생을 포기해야
-        한다.
+        이 테스트는 원래 `... _returns_none`이었다. 당시 위험 시나리오는 "`{"x": answer}`를
+        순진하게 만들어 엉뚱한 변수에 대입"이었고, 이름을 `x`로 못 박는 것이 그 방어였다.
+        NLP-09가 방어를 이름에서 **개수**로 옮기면서 그 위험은 뿌리에서 사라졌다 — 답산맵
+        키를 조건식의 자유기호에서 읽어 오므로, 대입할 자리가 애초에 하나뿐이다.
+
+        그래서 여기서 확인할 것은 두 가지다: ①파생이 되는가 ②키가 `x`로 **바뀌어 있지
+        않은가**. ②가 없으면 "이름을 y로 넓혔다"와 "전부 x로 이름을 갈아 끼웠다"가 같은
+        초록을 낸다 — 후자는 `y`가 미결 자유기호로 남는 바로 그 사고다.
         """
         problem = _problem(conditions=[_cond("2*y - 6")], answer="3")
+        result = derive_verify_inputs(problem)
+        assert result is not None
+        conditions, answer_map = result
+        assert conditions == ["2*y - 6"]
+        assert answer_map == {"y": "3"}
+
+    def test_two_unknowns_still_return_none(self) -> None:
+        """미지수가 둘이면 여전히 비파생 — 개수 게이트가 남아 있음을 고정한다.
+
+        NLP-09가 이름 게이트를 걷어냈으므로, 개수 게이트가 실제로 남았는지 별도로 밟아야
+        한다. 이 픽스처가 없으면 "게이트를 통째로 없앴다"도 초록으로 통과한다.
+        """
+        problem = _problem(conditions=[_cond("2*y - 6"), _cond("t - 1")], answer="3")
+        assert derive_verify_inputs(problem) is None
+
+    def test_no_unknown_at_all_returns_none(self) -> None:
+        """자유기호가 0개(상수식)여도 비파생 — 학생 답을 대입할 자리가 없다.
+
+        `len(free_symbols) != 1`의 **아래쪽** 경계다. `> 1`만 막는 구현으로 바꿔도
+        위 두 테스트는 통과하므로, 이 픽스처가 그 절의 반례를 맡는다.
+        """
+        problem = _problem(conditions=[_cond("2 - 2")], answer="0")
         assert derive_verify_inputs(problem) is None
 
     def test_no_formal_at_all_returns_none(self) -> None:
@@ -113,10 +141,33 @@ class TestDeriveVerifyInputs:
         problem = _problem(conditions=[_cond(None)], answer="3")
         assert derive_verify_inputs(problem) is None
 
+    def test_formal_parsing_to_bare_bool_returns_none(self) -> None:
+        """파싱 결과에 자유기호를 물을 수 없으면(파이썬 `bool`) 비파생 — 모른다 ≠ 0개.
+
+        `sympy.sympify("True")`는 SymPy 식이 아니라 파이썬 `True`를 돌려주므로
+        `free_symbols` 속성 자체가 없다. `_free_symbol_names`가 이때 빈 집합을 돌려주면
+        "미지수 0개"라는 *확정* 신호가 되어 아래쪽 경계와 구분이 사라진다 — 그래서
+        `None`(모름)으로 돌려주고 보수적으로 후퇴한다.
+
+        이 픽스처가 없으면 `names is None` 절을 통째로 지워도 전건 초록이다(실제 코퍼스에
+        이 형태가 0건이라 모집단 테스트도 안 밟는다). CLAUDE.md "전건 RED ≠ 커버리지".
+
+        **사유까지 단언하는 이유**: 처음엔 `is None`만 봤는데 뮤테이션 M7이 살아남았다 —
+        절을 `_free_symbol_names(parsed) or set()`으로 바꿔도 자유기호가 빈 집합이 되어
+        개수 게이트에 걸리므로 반환값은 똑같이 `None`이었다. 달라지는 것은 **사유**뿐이다
+        (`parse_error` → `multi_symbol`). 결과만 보는 단언은 그 절을 밟고도 변별하지 못한다.
+        """
+        problem = _problem(conditions=[_cond("True")], answer="3")
+        assert derive_verify_inputs(problem) is None
+        # 사유는 "미지수가 0개"가 아니라 "물어볼 수 없었다"여야 한다.
+        assert _derive_from_conditions_parsed(problem) == "parse_error"
+
     def test_multiple_conditions_combined_symbols_not_exactly_x_returns_none(self) -> None:
-        """여러 조건의 자유기호 합집합이 {"x"}가 아님(다중 변수) → None(비파생).
+        """여러 조건의 자유기호 **합집합 크기가 1이 아님**(다중 변수) → None(비파생).
 
         이 슬라이스는 단일 미지수 문항만 지원한다(모듈 docstring 명시 스코프 밖).
+        NLP-09 이후 판정은 "합집합이 {"x"}인가"가 아니라 "합집합이 한 개인가"다 —
+        조건별로는 미지수가 하나씩이어도 합쳐서 둘이면 걸린다는 축은 그대로다.
         """
         problem = _problem(
             conditions=[_cond("x + y - 3"), _cond("x - y - 1")],
@@ -178,7 +229,9 @@ class TestGradeAttempt:
         assert grade_attempt(problem, "   ") is None
 
     def test_non_derivable_problem_returns_none(self) -> None:
-        problem = _problem(conditions=[_cond("2*y - 6")], answer="3")
+        # NLP-09: 비파생 픽스처를 `2*y - 6`(단일 미지수 y — 이제 파생된다)에서
+        # 미지수 2개로 바꿨다. 이름이 아니라 개수가 게이트이므로.
+        problem = _problem(conditions=[_cond("2*y - 6"), _cond("t - 1")], answer="3")
         assert grade_attempt(problem, "3") is None
 
     def test_unverifiable_via_singularity(self) -> None:
@@ -234,7 +287,8 @@ class TestBuildReportRegression:
     def test_not_derivable_and_unverifiable_are_disjoint_buckets(self) -> None:
         """비파생(재료 없음)과 unverifiable(검증기 결과)은 겹치지 않는 별개 분모."""
         derivable_but_unverifiable = _problem(conditions=[_cond("1/(x-3)")], answer="3")
-        non_derivable = _problem(conditions=[_cond("2*y - 6")], answer="3")
+        # NLP-09: 단일 미지수 y는 이제 파생되므로 비파생 대역은 미지수 2개가 맡는다.
+        non_derivable = _problem(conditions=[_cond("2*y - 6"), _cond("t - 1")], answer="3")
         records = [
             AttemptRecord(
                 attempt_id=uuid.uuid4(),
@@ -273,7 +327,8 @@ class TestBuildReportRegression:
 
     def test_zero_verifiable_denominator_is_not_bare_zero(self) -> None:
         """분모(verifiable_count)가 0이면 rate 프로퍼티는 None(0%로 위장 금지)."""
-        problem = _problem(conditions=[_cond("2*y - 6")], answer="3")  # 비파생
+        # NLP-09: 비파생은 이제 미지수 2개다(단일 y는 파생된다).
+        problem = _problem(conditions=[_cond("2*y - 6"), _cond("t - 1")], answer="3")
         records = [
             AttemptRecord(
                 attempt_id=uuid.uuid4(),
@@ -835,16 +890,21 @@ class TestCorpusVerifyBlockSupply:
         assert answer_map == expected_answer_map
 
     def test_multi_symbol_population_is_frozen(self) -> None:
-        """파생 불가 블록은 전량 `multi_symbol` 7,048건 — PB-13 회수분의 실측 한계.
+        """파생 불가 블록 **0건** — NLP-09가 7,048건을 전량 회수했다.
 
-        기존 main 코퍼스 2,124블록은 파생 성공률 **100%**인데, PB-13이 회수한 11,446블록은
-        **38.0%**(성공 4,348 · 실패 7,048)다. 실패 사유는 단일 코드 `multi_symbol`뿐이며
-        `no_verify_block`·`parse_error`는 0이다 — 데이터 손상이 아니라 파생기가 다루지 못하는
-        형태라는 뜻이다(예: conditions `["4*1/5 = y"]`).
+        경위(이 테스트가 개선을 수치로 증명하는 계량기다 · NLP-09 acceptance④):
+          · NLP-05 시점 — 코퍼스 2,124블록, 파생 성공률 100%.
+          · PB-13 회수 후 — 13,520블록 중 6,472건만 파생(47.9%). 실패 7,048건은 전량
+            단일 사유 `multi_symbol`이었고 `no_verify_block`·`parse_error`는 0이었다.
+          · NLP-09 실측 — 그 7,048건 중 **진짜 다중 미지수는 0건**이었다. 전량 단일
+            미지수이고 이름이 `y`일 뿐이다(`4*1/5 = y`). 즉 데이터 결함이 아니라
+            파생기가 미지수 이름을 `x`로 못 박은 것이 원인이었다.
+          · 파생 게이트를 이름에서 개수로 옮긴 뒤 → **13,520/13,520 (100.0%)**.
 
-        이 수치를 동결하는 이유: 회수분의 62%가 섀도 채점 경로에서 소비되지 않는다는 사실이
-        조용히 묻히면 "11,446문 회수 완료"가 실제보다 큰 성과로 읽힌다. 해소는 후속 태스크
-        소관이고, 그때 이 테스트가 개선을 수치로 증명한다.
+        0을 동결하는 이유는 7,048을 동결했던 이유와 같다. 그때는 "회수분의 62%가 섀도 채점
+        경로에서 소비되지 않는다"가 조용히 묻히는 것을 막았고, 지금은 그 62%가 **다시**
+        비파생으로 돌아가는 회귀를 막는다. 사유 딕셔너리 자체를 비교하므로, 새 실패 사유가
+        하나라도 생기면 건수와 무관하게 red다.
         """
         blocks = _load_corpus_verify_blocks()
         reasons: dict[str, int] = {}
@@ -853,7 +913,94 @@ class TestCorpusVerifyBlockSupply:
             if derive_verify_inputs(problem) is None:
                 reason = _derive_from_corpus(problem)
                 reasons[reason] = reasons.get(reason, 0) + 1
-        assert reasons == {"multi_symbol": 7048}
+        assert reasons == {}
+
+    def test_corpus_answer_map_key_must_match_condition_symbol(self) -> None:
+        """답산맵 키가 조건식의 자유기호와 **다르면** 비파생 — NLP-09가 새로 닫은 구멍.
+
+        이전 코퍼스 경로는 자유기호를 아예 보지 않고 키가 `{"x"}`인지만 봤다. 그래서
+        `answer_map {"x": ...}` + `conditions "y + 1 = 0"` 같은 어긋난 짝이 통과했고,
+        학생 답은 `x`에 들어가는데 `y`는 미결 자유기호로 남았다 — 모듈 docstring이
+        경고하는 "엉뚱한 변수" 사고가 정확히 이 형태다.
+
+        실측상 현재 코퍼스에는 이런 블록이 0건이지만, 0건이라는 것은 **이 절이 실제로
+        밟히는 픽스처가 없다**는 뜻이기도 하다. 그러면 절을 지워도 전건 초록이 나온다.
+        그래서 이 픽스처가 그 반례를 직접 만든다.
+        """
+        from whymath_backend.harness import attempt_grading_shadow_report as mod
+
+        fake_blocks = {"wm-key-symbol-mismatch": (["y + 1 = 0"], {"x": "-1"})}
+        mod._load_corpus_verify_blocks.cache_clear()
+        try:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(mod, "_load_corpus_verify_blocks", lambda: fake_blocks)
+                problem = _problem(conditions=[], answer="-1", slug="wm-key-symbol-mismatch")
+                assert derive_verify_inputs(problem) is None
+                assert _derive_from_corpus(problem) == "multi_symbol"
+        finally:
+            mod._load_corpus_verify_blocks.cache_clear()
+
+    def test_corpus_condition_parsing_to_bare_bool_is_not_derivable(self) -> None:
+        """코퍼스 경로에서도 자유기호를 물을 수 없는 조건은 비파생이다.
+
+        DB 경로 쪽 짝은 `test_formal_parsing_to_bare_bool_returns_none`이다. 두 경로가
+        `_free_symbol_names`의 `None`을 각각 따로 처리하므로 픽스처도 각각 필요하다 —
+        한쪽만 두면 다른 쪽 절이 뮤테이션에서 살아남는다.
+        """
+        from whymath_backend.harness import attempt_grading_shadow_report as mod
+
+        fake_blocks = {"wm-bare-bool": (["True"], {"x": "1"})}
+        mod._load_corpus_verify_blocks.cache_clear()
+        try:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(mod, "_load_corpus_verify_blocks", lambda: fake_blocks)
+                problem = _problem(conditions=[], answer="1", slug="wm-bare-bool")
+                assert derive_verify_inputs(problem) is None
+                assert _derive_from_corpus(problem) == "multi_symbol"
+        finally:
+            mod._load_corpus_verify_blocks.cache_clear()
+
+    def test_corpus_unparseable_condition_is_parse_error_not_absence(self) -> None:
+        """코퍼스 조건이 파싱 불가면 사유는 `parse_error` — 부재(`no_verify_block`)가 아니다.
+
+        둘의 차이는 "블록이 없다"(정상·데이터 상태)와 "블록은 있는데 우리가 못 읽었다"
+        (측정 실패)다. 후자를 전자로 접으면 파서 결함이 사유 집계에서 사라진다.
+
+        기존 `test_parse_error_reason_counted`는 **DB 경로**(`conditions_parsed`)를 밟으므로
+        코퍼스 경로의 같은 절을 대신 검사하지 못한다 — 뮤테이션 M9이 그 공백에서 살아남아
+        드러났다. 경로가 둘이면 픽스처도 둘이다.
+        """
+        from whymath_backend.harness import attempt_grading_shadow_report as mod
+
+        fake_blocks = {"wm-unparseable": (["2*x +* 6"], {"x": "1"})}
+        mod._load_corpus_verify_blocks.cache_clear()
+        try:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(mod, "_load_corpus_verify_blocks", lambda: fake_blocks)
+                problem = _problem(conditions=[], answer="1", slug="wm-unparseable")
+                assert derive_verify_inputs(problem) is None
+                assert _derive_from_corpus(problem) == "parse_error"
+        finally:
+            mod._load_corpus_verify_blocks.cache_clear()
+
+    def test_corpus_non_x_unknown_derives_with_its_own_key(self) -> None:
+        """코퍼스 블록의 미지수가 `y`여도 파생하고, 키는 코퍼스가 적어 둔 `y` 그대로다.
+
+        회수 7,048건의 대표 형태(`4*1/5 = y`)를 단위 수준에서 고정한다 — 모집단 동결
+        테스트는 "몇 건인가"를, 이 테스트는 "무엇이 나오는가"를 잰다.
+        """
+        from whymath_backend.harness import attempt_grading_shadow_report as mod
+
+        fake_blocks = {"wm-single-y": (["4*1/5 = y"], {"y": "4/5"})}
+        mod._load_corpus_verify_blocks.cache_clear()
+        try:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(mod, "_load_corpus_verify_blocks", lambda: fake_blocks)
+                problem = _problem(conditions=[], answer="4/5", slug="wm-single-y")
+                result = derive_verify_inputs(problem)
+                assert result == (["4*1/5 = y"], {"y": "4/5"})
+        finally:
+            mod._load_corpus_verify_blocks.cache_clear()
 
     def test_unknown_slug_returns_no_verify_block(self) -> None:
         """코퍼스에 없는 slug는 verify 블록 공급 없이 비파생이다."""
@@ -915,7 +1062,13 @@ class TestCorpusCeilingReportDiscriminates:
         assert after_remove.bucket_counts["condition_formal_derivable"] == 0
 
     def test_full_corpus_snapshot_has_nonzero_c_bucket(self) -> None:
-        """실제 코퍼스 7개 bank를 Problem 스키마로 읽어 ceiling 리포트를 돌리면 C > 0."""
+        """실제 코퍼스 전 bank를 Problem 스키마로 읽어 ceiling 리포트를 돌리면 C > 0.
+
+        C버킷(조건 기반 symbolic 파생) 스냅샷: **5,220 → 12,268**(NLP-09 · +7,048).
+        증분은 파생 게이트가 미지수 이름 `x` 하드코딩을 버리고 개수로 판정하게 되면서
+        회수된 단일 미지수 `y` 블록 수와 **정확히 일치**한다(우연한 드리프트가 아니라
+        `test_multi_symbol_population_is_frozen`이 7,048 → 0으로 간 것의 산술 결과).
+        """
         import json
         from pathlib import Path
 
@@ -947,4 +1100,4 @@ class TestCorpusCeilingReportDiscriminates:
         report = build_gradability_ceiling_report(problems)
         assert report.total_problems == 14034
         assert report.bucket_counts["condition_formal_derivable"] > 0
-        assert report.bucket_counts["condition_formal_derivable"] == 5220
+        assert report.bucket_counts["condition_formal_derivable"] == 12268

@@ -270,6 +270,16 @@ gates:
     evidence: "2026-09-07 **정정** — 최초 판정(같은 날)은 '1) merge queue 도입'이었으나 **전제가 반증**됐다. 실측: GET /repos/doldori7/WhyMath → visibility=public이지만 owner.type=**User**(개인 계정). GitHub merge queue는 **조직(Organization) 소유 저장소 전용**이라 이 저장소에서는 UI 항목 자체가 없다(Kiki가 룰셋 편집 화면에서 'Require merge queue'를 찾지 못한 것이 그 결과 — UI 경로 문제 아님). 결함 원인: 결정을 올리기 전 **계정 유형을 확인하지 않았다** — 라이브 룰셋 실측은 '지금 꺼져 있다'만 말하고 '켤 수 있다'를 말하지 않는데 부재를 미설정으로 읽었다.\\n\\n**재판정 = D) 자동 재동기화 워크플로우**(Kiki 선택). 예약 워크플로우가 열린 PR 중 behind + auto-merge 켜진 것을 찾아 update-branch API로 자동 최신화한다. strict(up-to-date 강제)는 **유지** — 보호를 낮추지 않고 충족을 자동화한다는 원 취지는 그대로다. 2)strict 해제는 실측 반례(#931의 ReviewStatus.quarantined 추가가 #935 단언을 red로 만듦)로 계속 배제, 3)현행 유지는 OPS-58 단축 후에도 main 전진 간격을 못 이겨 배제, A)조직 이관은 이관 부수효과 미실측이라 보류.\\n\\n판정 기준: origin/main 79b0cc4d (PR #1040 브랜치가 병합한 base). 승계 태스크 = **HARN-85-pr-auto-resync-workflow**(최초 기재의 'HARN-81'은 번호 충돌로 CLI가 재배정한 것을 반영하지 못한 오기 — PR #1040 Codex P2 지적·정정). 집행 게이트 G-merge-queue-enable-ruleset은 실행 불가라 waive, 대신 G-pr-auto-resync-token이 신설됐다."
     cleared_by: kiki
     notes: "[문제] PR 하나를 머지하는 데 재동기화가 4회 필요했다(2026-08-31 PR #935 실측).\n  원인은 실패가 아니라 구조적 경합이다:\n    ⓐ 브랜치 보호에 `Require branches to be up to date before merging`이 켜져 있다\n       (.github/branch-protection-setup.md:52). main이 움직이면 무조건 재동기화 → CI 재시작.\n    ⓑ 그 게이트가 29분 41초다. main은 지금 15~30분마다 전진한다(병렬 세션 다수).\n  30분짜리 게이트가 15~30분 간격의 전진을 이길 수 없다 — 산술적으로 진다.\n\n[이미 한 것 — OPS-58] ⓑ를 줄였다. pytest 병렬화로 실측 1.60배(직렬 100.1s → -n 4 62.7s,\n  커버리지 총계 완전 일치). CI 잡 예상 29분 41초 → 약 19~20분. 경합 *창*은 줄지만\n  경합 자체는 남는다 — main이 20분 안에 또 전진하면 같은 일이 반복된다.\n\n[결정이 필요한 것 — ⓐ] 셋 중 하나. 전부 저장소 관리자 설정이라 세션이 못 바꾼다.\n  1) GitHub **merge queue** 도입 (권장) — 이 문제를 풀려고 만들어진 기능이다. 큐가\n     PR을 main 최신 위에 순서대로 얹어 검증하고 통과분만 넣는다. up-to-date 보장을\n     유지하면서 사람이 재동기화할 필요가 없어진다. 비용: ci.yml에 `merge_group` 트리거\n     추가 + 브랜치 보호에 큐 활성화. 계약(required checks)은 그대로 유지된다.\n  2) `Require branches to be up to date` 해제 — 즉시 경합이 사라지지만, main의 최신\n     변경과 이 PR의 조합이 검증되지 않은 채 들어간다. 이번 세션에서 그 검증이 실제로\n     일한 사례가 있다(#931이 ReviewStatus에 quarantined를 추가하자 #935의 단언이 red —\n     동기화하지 않았으면 머지 후 main에서 터졌다). **비권장** 근거가 실측으로 있다.\n  3) 현행 유지 + OPS-58 단축만으로 감내 — 경합 빈도는 줄지만 0이 되진 않는다.\n\n[판단 재료] 2)를 배제할 근거가 이번 세션에 실측으로 남았다는 점이 핵심이다. 즉 선택은\n  실질적으로 1) vs 3)이고, 1)은 설정 작업 1회로 반복 비용을 없앤다.\n\n[세션이 대행 가능한 범위] 결정이 1)이면 ci.yml의 `merge_group` 트리거 추가는 세션이\n  PR로 낼 수 있다. 브랜치 보호에서 큐를 켜는 것만 Kiki 작업이다."
+  - id: G-misc28-attribution-seat
+    title: "정정 어구 귀속 판정 좌석 선택 — LLM-judge / 의미경로 / 3-state 강등 중 택1 (오억제 100% vs 선행정정 사각 100%의 교환을 어디서 끊을지)"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-09-12
+    remind_after_days: 7
+    evidence: "Kiki 판정 2026-09-12 (대화) — 후보 ⓒ 3-state 강등 채택. 근거(원문 취지): \"이 문제의 목표가 정답률 최대화가 아니라 학생에게 잘못된 확신을 주는 오류를 최소화하는 것이다. 오억제 100% ↔ 선행정정 사각 100%의 교환관계라면, 귀속이 불명확한 상황에서 바로 '네가 틀렸다'고 판정하는 것보다 판정을 보류하고 한 번 확인하는 상태를 두는 편이 교육적으로 안전하다.\" 이 판정은 의사결정 우선순위 #1(학생 안전·웰빙)·#3(교수학적 정확성)에 정합하며, models.py::refuting_regex docstring의 기존 선언(\"맞게 안 학생에게 틀렸다고 말하는 쪽이 놓치는 쪽보다 해롭다\")과 같은 축이다. 근거 수치 = MISC-28 acceptance ⓒ의 교환표(현행 lookbehind=12: 오억제 66/66 · 선행정정 사각 0/66 // lookbehind=0: 오억제 2/66 · 선행정정 사각 66/66)."
+    cleared_by: kiki
+    notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
   - id: G-operator-seat-first-grant
     title: "운영자 좌석 1호 발급 (whymath-pg) — 1~3단계 완료(2026-08-31 원본 볼륨 복귀·stamp 확정 a9b8c7d6e5f4·백업 확보). 4단계 실행 대기: stamp→upgrade head→운영자 부트스트랩→content_admin grant — 복붙 블록은 notes에 전문 수록"
     kind: human
@@ -414,8 +424,18 @@ gates:
     title: "SKB-01 skill_node·concept.behavior_skills 브릿지 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(populate CLI 2종)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-10
+    remind_after_days: 7
+    evidence: "판정 기준: main 8201d018 (git log --oneline -1 출력 그대로)\nKiki 실행(Phaiakes9, 2026-09-12) — docs/ops/g_skb01_skill_node_populate_runbook.md 런북 그대로:\nTABLE_EXISTS=t\nBEFORE_COUNT=0\nPOPULATE_EXIT=0\nAFTER_COUNT=27\n(참고: 1차 db_host_reachability는 Docker Desktop 미기동으로 UNKNOWN exit 2였고, Docker 기동 후 재실행에서 REACHABLE exit 0으로 정상 전환 확인 — 이후 적재 실행)\nskill_node 27건 최초 적재 성공. concept.behavior_skills(SKB-01 acceptance③-보정)는 이 게이트 범위 밖 — 별도 코드 작업 필요."
+    cleared_by: claude
+    notes: ""
+  - id: G-skb01-concept-behavior-skills-populate
+    title: "SKB-01 concept.behavior_skills 채우기 실행 — Phaiakes9 whymath-pg 쓰기(crosswalk populate CLI 재실행, PR 병합 후)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-12
     remind_after_days: 7
     evidence: null
     cleared_by: null

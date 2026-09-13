@@ -1813,6 +1813,48 @@ _PR_STATE_TIMEOUT = 20
 # 전부-또는-전무 계약이므로, 예산 초과도 같은 모양의 실패일 뿐 새 분기를 만들지 않는다.
 _PR_STATE_SCAN_BUDGET_SECONDS = 60.0
 
+
+def _attribute_api_failure(data: object) -> str | None:
+    """API 응답이 *정책 거부*면 그 사유를 귀속해 돌려준다 — 아니면 `None`(HARN-04).
+
+    왜 필요한가: 프록시가 막은 응답도 `{"message": ...}` 모양이라 `"state" not in data`
+    분기에 함께 떨어지고, 거기 붙은 문구는 **"응답 형식 이상"**이었다. 형식이 이상한 게
+    아니라 정책이 막은 것이며, 둘은 처방이 완전히 다르다 — 전자는 코드 결함이고 후자는
+    **이 세션에서는 고칠 수 없는 환경 조건**이다. 그 구분이 없어서 같은 조사가 세 세션
+    반복됐다(2026-09-11·09-12 ×2 비재현 기록이 이 태스크 acceptance에 쌓여 있다).
+
+    실측(2026-09-12 · 이 컨테이너)이 확정한 것은 **이름을 고쳐도 안 뚫린다**는 사실이다.
+    두 이름을 각각 `curl -w '%{http_code} %{url_effective}'`로 재 본 결과(원문 수치는
+    `HARN-04` acceptance에 있다 — 여기에 옛 owner 리터럴을 적으면 정본 참조 가드가
+    실행 표면 위반으로 잡는다):
+
+      이관 *전* 이름 → 301 → 숫자 ID 경로   → 403 (프록시가 숫자 경로를 막는다)
+      **정본** 이름  → 리다이렉트 없음      → 403 (이 세션 스코프에 저장소가 없다)
+
+    그러므로 이 함수는 해법을 권하지 않고 **무엇이 막았는지만** 정확히 말한다. 여기서
+    "origin을 정본으로 바꾸라"고 안내하면 실패 문구만 바뀌고 결과는 그대로다 — 이 태스크
+    acceptance ④가 이름 붙인 함정("오류 문구가 바뀌었다는 해결의 증거가 아니다")이다.
+    """
+    if not isinstance(data, dict):
+        return None
+    message = data.get("message")
+    if not isinstance(message, str):
+        return None
+    if "Numeric-ID repository paths" in message:
+        return (
+            "ProxyNumericPathBlocked: 저장소 이관으로 요청이 숫자 ID 경로로 301 리다이렉트되고 "
+            "에이전트 프록시가 그 경로를 막는다. **정본 이름으로 바꿔도 뚫리지 않는다**"
+            "(실측 2026-09-12: 정본 이름은 리다이렉트 없이 '세션 미활성' 403) — "
+            "정본 이름을 스코프에 포함하는 세션에서만 조회된다"
+        )
+    if "not enabled for this session" in message:
+        return (
+            "SessionScopeBlocked: 이 세션 스코프에 이 저장소가 없다 — "
+            "세션 시작 시 소스로 부착된 저장소만 API로 조회된다"
+        )
+    return None
+
+
 # 에이전트 프록시 CA (있을 때만 사용) — 모듈 상수여야 거버넌스 테스트가
 # `monkeypatch.setattr(mod, "_CA_PATH", ...)`로 갈아끼울 수 있다.
 _CA_PATH = "/root/.ccr/ca-bundle.crt"
@@ -1933,6 +1975,9 @@ def _fetch_pr_states(
         except json.JSONDecodeError as exc:
             return None, f"JSONDecodeError: {exc} — 본문 {proc.stdout[:120]!r} (PR #{number})"
         if not isinstance(data, dict) or "state" not in data:
+            blocked = _attribute_api_failure(data)
+            if blocked:
+                return None, f"{blocked} (PR #{number})"
             return None, f"APIError: PR #{number} 응답 형식 이상 — {str(data)[:120]}"
         states[number] = (str(data["state"]), bool(data.get("merged", False)))
     return states, ""
@@ -2019,6 +2064,9 @@ def _fetch_pr_labels(
         except json.JSONDecodeError as exc:
             return None, f"JSONDecodeError: {exc} — 본문 {proc.stdout[:120]!r} (PR #{number})"
         if not isinstance(data, dict) or "labels" not in data:
+            blocked = _attribute_api_failure(data)
+            if blocked:
+                return None, f"{blocked} (PR #{number})"
             return None, f"APIError: PR #{number} 응답 형식 이상 — {str(data)[:120]}"
         names = tuple(
             item["name"]
