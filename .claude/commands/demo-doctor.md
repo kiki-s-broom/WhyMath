@@ -80,6 +80,12 @@ $env:PYTHONPATH = (Resolve-Path "src\backend").Path
 판정(`exit 0` 도달 가능 / `1` 도달 불가 / `2` 측정 불가)과 상태별 대책이 함께 출력된다.
 `NOT_PUBLISHED`(설정은 있는데 게시가 성립하지 않음)면 아래로 간다.
 
+> **`UNKNOWN`(exit 2)은 고장 판정이 아니다.** Docker Desktop이 꺼져 있으면 `docker inspect`가
+> `npipe:////./pipe/dockerDesktopLinuxEngine`에 붙지 못해 설정·실현 두 신호가 **모름**이 되고
+> 도구는 3상태 규율대로 `UNKNOWN`을 낸다(2026-09-12 실측). 아래 ②단계는 Docker Desktop을
+> *끈 상태*에서 도는 절차이므로 그 구간의 `UNKNOWN`은 **정상**이다 — 최종 판정은 ③에서 Docker를
+> 다시 켠 뒤에 한다.
+
 ```powershell
 # [Windows PowerShell · Phaiakes9] — 예약 구간에 그 포트가 있는지 확인
 netsh interface ipv4 show excludedportrange protocol=tcp
@@ -89,23 +95,27 @@ netsh interface ipv4 show excludedportrange protocol=tcp
 반납되고, 그 틈에 포트를 *관리 포트 제외*로 등록하면 다음에 Hyper-V가 그 대역을 다시 잡을 때
 건너뛴다(지정 예약은 동적 할당에서만 빼는 것이라 명시적 bind는 그대로 된다).
 
-> **창**: 관리자 권한 PowerShell **새 창**. **선행**: Docker Desktop 종료(트레이 → Quit).
+> **창**: **창 A 그대로** — 아래 블록이 UAC로 스스로 승격한다(관리자 창을 사람이 여는 단계를
+> 없앴다 · 아래 「스스로 승격한다」 참조). **선행**: Docker Desktop 종료(트레이 → Quit).
 > **영향**: `winnat`은 이 PC의 NAT 전반이라 내렸다 올리는 몇 초간 WSL·Docker 네트워크가 끊긴다.
 
 ```powershell
-# [관리자 권한 Windows PowerShell · Phaiakes9 · 새 창]
-$IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-"IS_ADMIN=$IsAdmin"
+# [Windows PowerShell · Phaiakes9 · 창 A · 일반 권한에서 실행 — UAC 승인 팝업이 뜬다]
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Script = Join-Path $env:TEMP "winnat_reserve_5433.ps1"
+Set-Content -Path $Script -Encoding UTF8 -Value @'
+Start-Transcript -Path (Join-Path $env:TEMP "winnat_reserve_5433.log") -Force
+$Admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+"IS_ADMIN=$Admin"
 $Docker = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
 "DOCKER_DESKTOP_RUNNING=" + [bool]$Docker
-if ($IsAdmin -and -not $Docker) {
+if ($Admin -and -not $Docker) {
   net stop winnat
-  $StopExit = $LASTEXITCODE
-  "STOP_EXIT=$StopExit"
+  "STOP_EXIT=$LASTEXITCODE"
   netsh int ipv4 add excludedportrange protocol=tcp startport=5433 numberofports=1 store=persistent
-  $ReserveExit = $LASTEXITCODE
-  "RESERVE_PERSISTENT_EXIT=$ReserveExit"
-  if ($ReserveExit -ne 0) {
+  $Reserve = $LASTEXITCODE
+  "RESERVE_PERSISTENT_EXIT=$Reserve"
+  if ($Reserve -ne 0) {
     netsh int ipv4 add excludedportrange protocol=tcp startport=5433 numberofports=1
     "RESERVE_ACTIVE_FALLBACK_EXIT=$LASTEXITCODE"
   }
@@ -113,12 +123,29 @@ if ($IsAdmin -and -not $Docker) {
   "START_EXIT=$LASTEXITCODE"
   netsh interface ipv4 show excludedportrange protocol=tcp
 }
+Stop-Transcript
+'@
+$Ready = [bool](Select-String -Path $Script -Pattern "excludedportrange" -Quiet)
+"SCRIPT_READY=$Ready"
+if ($Ready) { Start-Process powershell -Verb RunAs -ArgumentList "-NoExit","-ExecutionPolicy","Bypass","-File","`"$Script`"" }
 ```
 
-**자가검증**: `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` · `STOP_EXIT`·`START_EXIT`가 0 ·
-`RESERVE_PERSISTENT_EXIT=0` · 마지막 표에 `5433  5433  *`(관리 지정)이 보이고 그 포트를 삼키던
-구간이 사라짐. 조건이 안 맞으면 블록은 **아무것도 하지 않는다**(의도) — 권한 경고를 산문으로만
-두면 일반 창에 붙여넣어진다(실측).
+**스스로 승격한다 (2026-09-12 실측 보강)**: 이전 판은 "관리자 권한 PowerShell 새 창을 여세요"를
+산문으로 지시하고 블록은 `IS_ADMIN` 가드만 뒀다. 라이브에서 그 단계가 **생략돼** 블록이 일반
+창에서 돌았고 `IS_ADMIN=False`로 **아무것도 하지 않았다** — 가드는 설계대로 작동했지만 절차는
+공전했고 왕복이 1회 늘었다. 사람이 창을 여는 단계 자체가 실패 지점이므로 블록이 `-Verb RunAs`로
+승격을 가져간다. `-NoExit`이라 승격된 창이 열린 채 남아 출력을 읽을 수 있고, `Start-Transcript`가
+같은 내용을 `%TEMP%\winnat_reserve_5433.log`에 남긴다.
+
+**자가검증**: 승격된 창(또는 위 로그 파일)에서 `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` ·
+`STOP_EXIT`·`START_EXIT`가 0 · `RESERVE_PERSISTENT_EXIT=0` · 마지막 표에 `5433  5433  *`(관리
+지정)이 보이고 그 포트를 삼키던 구간이 사라짐. 조건이 안 맞으면 스크립트는 **아무것도 하지
+않는다**(의도). 창 A에서 로그만 다시 읽으려면:
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A]
+Get-Content (Join-Path $env:TEMP "winnat_reserve_5433.log")
+```
 
 **`store=persistent`가 핵심이다 (2026-09-12 보강)**: 이 절의 존재 이유가 "재부팅·WSL 재시작마다
 재발한다"를 끝내는 것인데, `store` 없이 등록한 제외는 **active 저장소에만 들어가 재부팅에서
