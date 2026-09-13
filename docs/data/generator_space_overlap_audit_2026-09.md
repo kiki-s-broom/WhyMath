@@ -234,7 +234,7 @@ MC 적격 뼈대를 배제하지 않아 그 선언은 집행된 적이 없다.
 
 ## 5. 승계 (산문에만 남기지 않는다)
 
-- **`QUAL-09`** — 극값 단답형·객관식 **뼈대 공간 파티션**과 코퍼스 처분. 입력 수치는 이 문서
+- **`QUAL-09-extremum-skeleton-format-partition`** — 극값 단답형·객관식 **뼈대 공간 파티션**과 코퍼스 처분. 입력 수치는 이 문서
   §3.2·§3.3에 있다(공유 뼈대 140쌍 · 코퍼스 70건 · rephrased 자식 246건 · 선례
   `skeleton_generator._MC_PARTITION_MOD`). 착지하면
   `test_skeleton_space_is_still_shared_and_that_is_recorded`의 기대값 140을 0으로 갱신한다.
