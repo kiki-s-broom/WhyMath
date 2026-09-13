@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - "src/backend/whymath_backend/l3/equivalent/**"
   - "tests/backend/l3/equivalent/**"
   - "docs/data/**"
-session: null
+session: main
 notes: "QUAL-07(PR #1151) 완료 보고에서 남긴 정직한 공백의 승계다. Kiki가 \"등재\" 지시(2026-09-12).\n\nQUAL-07의 근본 원인은 문항이 아니라 **생성기의 파라미터 공간 공유**였다 — 고교 몫미분 생성기가 대학 CALC1 생성기의 설계를 그대로 재적용했고 계수·평가점 범위 4개가 동일해 대학 풀(260)이 고교 풀(300)의 진부분집합이었다. 발문 동일 71쌍 아래에 조건식 동일 138건이 깔려 있었으므로, 문항만 은퇴했다면 감사가 0쌍을 보고하는 동안 67건이 남고 배치 재실행 시 전부 재생됐을 것이다.\n\n`l3/equivalent/`에는 같은 관례(\"형제 생성기 설계를 그대로 재적용\")로 만들어진 생성기가 수십 종 있다. **같은 형태가 남아 있는지는 미확인**이며, QUAL-07 세션이 그것을 범위 밖으로 명시하고 남겼다.\n\n난이도: 이 태스크의 어려움은 스캔이 아니라 **판정 기준**이다. 조건식 축은 오탐 228건이 압도해 그대로는 게이트가 되지 못한다(QUAL-07 §7 표). 그래서 acceptance ②를 본체로 두었다.\n\n선행 없음 — QUAL-07이 main에 착지했으므로 바로 착수 가능하다.\n\n[트리거 면제] 미래 트리거 오탐 — acceptance ③의 '나오면'·'재생성'은 이 태스크 **내부**의 조건 분기(겹침 검출 시 처분 방식)이지 다른 태스크·게이트에 대한 의존이 아니다. 선행 없음: QUAL-07이 main 착지 완료(PR #1151)."
-updated: 2026-09-12
+updated: 2026-09-13
