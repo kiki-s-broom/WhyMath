@@ -1,1 +1,0 @@
-{"branch": "claude/status-38gu4d", "harness": "2.0", "kind": "block", "reason": "acceptance ④ '적용 후 열림/닫힘 판정' 미충족 — 4회차에서 재현·원인 확정하고 해법 ⓐⓑⓒ(이름 고치기)를 실측 반증했으나, 남은 해법은 프록시 정책(ⓓ) 또는 세션 스코프가 정본 이름을 포함하는 것이고 후자는 HARN-96 소유. 귀속 개선분은 PR #1148로 착지. depends_on HARN-96 집행 완료", "task": "HARN-04-transfer-redirect-target-unreachable-via-proxy", "ts": "2026-09-12T06:58:00Z"}
