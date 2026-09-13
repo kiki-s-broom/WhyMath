@@ -9,7 +9,8 @@ status: todo
 priority: 2
 eos_priority: P2
 owner: claude
-depends_on: []
+depends_on:
+  - QUAL-08-sibling-generator-space-overlap-audit
 requires_gates: []
 acceptance:
   - "① 뼈대 분할 설계 — `calculus_skeleton_generator`의 `_build_value_pool()`(150)과 `_build_mc_pool()`(146)이 같은 `(m, n, kind)` 뼈대를 **140쌍 공유**한다(QUAL-08 실측). 같은 삼차함수가 단답형·객관식으로 각각 출제될 수 있다는 뜻이다. 선례는 이미 저장소에 있다 — 기본 `skeleton_generator.py`의 `_MC_PARTITION_MOD = 3` 해시 파티션이 *\"같은 뼈대는 정확히 한 형식에만 배정\"*하고 그 이유를 *\"단답형·객관식 중복 시 dedup 충돌 — 원천 차단\"*이라 적어 두었다. `_build_mc_pool` docstring도 4지선다 부적격 뼈대가 \"단답형 풀에 남는다\"고 **분할 의도를 선언**했으나 값 풀이 MC 적격 뼈대를 배제하지 않아 집행된 적이 없다. 그 선언을 코드로 만든다. 주의: MC 적격(4값 상이)을 값 풀에서 단순 배제하면 값 풀이 150→10으로 붕괴한다(실측) — 해시 파티션이어야 한다."
@@ -23,5 +24,5 @@ paths:
   - "data/corpus/problem_bank_generated_v0/**"
   - "docs/data/**"
 session: null
-notes: "QUAL-08 승계. 입력 수치·선례·닫지 않은 이유 전문 = docs/data/generator_space_overlap_audit_2026-09.md 3.2~3.3절·5절. QUAL-08은 발문 축(템플릿 서로소화)만 닫았고 뼈대 축은 코퍼스 처분 규모(70건+rephrased 246건) 때문에 분리했다."
+notes: "QUAL-08 승계. 입력 수치·선례·닫지 않은 이유 전문 = docs/data/generator_space_overlap_audit_2026-09.md 3.2~3.3절·5절. QUAL-08은 발문 축(템플릿 서로소화)만 닫았고 뼈대 축은 코퍼스 처분 규모(70건+rephrased 246건) 때문에 분리했다.\n\n[정정 2026-09-13] QUAL-09 acceptance ④가 갱신 대상으로 지목하는 tests/backend/l3/equivalent/test_calculus_extremum_format_disjointness.py 자체가 QUAL-08 산출물이다(PR #1153·미머지). 착지 전 착수하면 존재하지 않는 파일을 대상으로 작업하게 된다. notes 산문('QUAL-08 승계')만으로는 selector가 읽지 않으므로 대장에 집행한다."
 updated: 2026-09-13
