@@ -102,7 +102,8 @@ WITH expected(seq, revision, obj_table, obj_column, polarity, obj_kind) AS (
         (95, '19149e92d368', 'problem_attempt',        'ingested_at',               '+', 'default'),
         (96, 'f2662166a661', 'job_ownership',          '',                          '+', 'object'),
         (97, '4c6dfb1527a9', 'privacy_audit',          'resource_type',             '+', 'object'),
-        (98, '3f5c83f51246', 'problem_attempt',        'student_answer_encrypted',  '+', 'object')
+        (98, '3f5c83f51246', 'problem_attempt',        'student_answer_encrypted',  '+', 'object'),
+        (99, '67cf48ad3bce', 'concept_version',        '',                          '+', 'object')
 )
 SELECT
     e.seq,
