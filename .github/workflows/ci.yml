@@ -487,6 +487,14 @@ jobs:
           python -m whymath_backend.harness.analogy_fidelity_eval \
             --n-per-cell 12 --max-miss-upper 0.05 --max-false-alarm-upper 0.2
 
+      # EOS-98 ④: 연령별(학교급 4개) 설명 언어 수준(F7) 결함주입 강등전 — analogy_fidelity와
+      # 동형 관례(고정 그리드·Wilson 상한·--control 대조군은 하네스 단위테스트가 봉인). 초등 8축·
+      # 중등 6축 violating 셀 미검출 0 · clean 셀(중등 root/trig 경계 포함) 오검출 0을 상시 회귀로
+      # 강제한다 — 이 스텝이 없으면 F7 검출기는 "저장소에 존재함"일 뿐 매 PR 회귀로 강제되지
+      # 않는다(OPS-22 declared-unwired 감사가 그 미도달을 실측했다).
+      - name: 게이트 — 연령별 설명 언어 수준 검출기 (explanation_f7·미검출 상한 0.05·오검출 상한 0.2)
+        run: python -m whymath_backend.harness.explanation_f7_eval
+
       # NS-03 — 코퍼스 표기 ⊆ 지원 표기(data/notation_support_manifest.json) 커버리지 게이트.
       # hermetic(LLM 0·DB 0)·결정론. 신규 누락 심볼 발견 시 exit 1(베이스라인 래칫) — 변별력은
       # tests/backend/l3/test_notation_coverage_eval.py의 --control-empty-support 대조군이 봉인.
