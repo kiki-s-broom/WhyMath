@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l1/atom_graph/**"
-session: null
+session: claude/quirky-cori-x91nld
 notes: "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). 그 게이트의 목표(concept.behavior_skills)는 달성됐고(AFTER_NONEMPTY=1198) 이 태스크는 같은 실행이 드러낸 별개 공백이다. SKB-01 notes의 \"atom_node.behavior_skills는 이미 크로스워크로 정상 채워져 있으므로(S0-2)\"라는 전제가 prod에서 성립하지 않음을 이 실측이 뒤집었다 — S0-2는 UPDATE 코드를 만들었을 뿐 대상 행을 적재하지 않는다."
 updated: 2026-09-14
