@@ -787,6 +787,9 @@ CATALOG: tuple[Spec, ...] = (
        "초인간 검증 기준 v1 — 기계 게이트 승격 절차", "harness.qa_pipeline", "harness.wilson",
        "harness.*_eval", "harness.*_battle", "harness.corpus_reverify",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
+       # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
+       # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
+       "harness.generator_space_overlap_audit",
        "harness.prompt_asset_audit", "harness.generation_seed_replay_probe",
        "harness.batch_safety"),
     _o("WM-O-913", "커버리지·도달률 관측 리포트 가족", "Admin", "Analytics", "P1",
