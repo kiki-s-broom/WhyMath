@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SKB-03-atom-node-projection-cli-and-prod-populate
+title: "atom_node prod 미적재 + 적재 CLI 부재 — L2 약개념 추천 메타 enrich가 조용히 0건"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main b810388b) 중 concept_atom_crosswalk.populate가 \"atom_node 대상 행 부재 1311건 (예: 10공수1-01-01-1, 10공수1-01-01-2, 10공수1-01-01-3)\"을 보고했다 — atom_node.behavior_skills 갱신 0건. 같은 실행에서 concept 축은 1311/1311 전건 매칭됐으므로 code 키 자체는 정상이고 atom_node 테이블에 그 행들이 없다는 뜻이다. 착수 시 atom_node 전체 행수를 직접 실측해 \"1311개 code 부재\"인지 \"테이블 전량 공백\"인지 범위를 확정한다(이 등재 시점에는 전자만 확인됨).\n② 적재 경로 부재 확정: l1/atom_graph/atom_node_projection.py는 atom_node 멱등 upsert 구현을 갖고 있으나 CLI 진입점이 없다(__main__ 블록 0건·argparse 0건 — main b810388b 실측). 즉 prod에 적재할 실행 경로 자체가 없다. l1/atom_graph/populate.py는 concept/concept_edge 적재기라 atom_node를 건드리지 않는다(docstring 명시). 해법은 SKB-01과 동형: 적재 CLI를 신설하고 게이트로 prod 1회 실행을 위임한다.\n③ 소비처 영향 명시: atom_node는 L2 weak_concept_recommendation(약개념 추천 메타 enrich·S0-4d)이 소비한다 — 비어 있으면 그 경로가 \"메타 누락\"이 아니라 \"원자 축 밖\"으로 읽어 조용히 enrich 0건이 된다(모듈 docstring 24행). 작동한 비율 원칙에 따라 적재 후 enrich 성립 비율을 리포트로 확인할 수 있어야 한다.\n④ prod 적재는 human gate로 위임(prod DB 쓰기라 세션 직접 실행 불가) — 게이트 등재는 CLI 신설 PR 병합 후."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l1/atom_graph/**"
+session: null
+notes: "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). 그 게이트의 목표(concept.behavior_skills)는 달성됐고(AFTER_NONEMPTY=1198) 이 태스크는 같은 실행이 드러낸 별개 공백이다. SKB-01 notes의 \"atom_node.behavior_skills는 이미 크로스워크로 정상 채워져 있으므로(S0-2)\"라는 전제가 prod에서 성립하지 않음을 이 실측이 뒤집었다 — S0-2는 UPDATE 코드를 만들었을 뿐 대상 행을 적재하지 않는다."
+updated: 2026-09-14

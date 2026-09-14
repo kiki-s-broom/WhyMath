@@ -454,8 +454,18 @@ gates:
     title: "SKB-01 concept.behavior_skills 채우기 실행 — Phaiakes9 whymath-pg 쓰기(crosswalk populate CLI 재실행, PR 병합 후)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-12
+    remind_after_days: 7
+    evidence: "판정 기준: main b810388b (게이트 의존 코드는 c7e21f86 PR #1141에 착지). Kiki가 2026-09-14 Phaiakes9 whymath-pg(5433)에서 실행 — BEFORE_NONEMPTY=0 -> POPULATE_EXIT=0 -> AFTER_NONEMPTY=1198. CLI 출력 \"concept.behavior_skills 갱신: 1311건 (비어있지 않은 스킬 1198건·대상 1311건)\"의 nonempty 1198과 AFTER_NONEMPTY 1198 일치(런북 §4 내부 정합성 자가검증 통과). 실행 트리는 체크아웃 대신 동등성 판정으로 대체 — PATHS_MATCH_MAIN=True(git diff --quiet origin/main으로 l1/concept_atom_crosswalk + 코퍼스 3종이 main과 바이트 동일함을 확인, HEAD는 0367fce4). 도달성 REACH_EXIT=0(db_host_reachability 3신호 전부 예). 예상 밖 경고 2건 동반 관측: atom_node 대상 행 부재 1311건(atom_node_projection prod 미적재)·concept_content K-12 대상 행 부재 437건 — 이 게이트 목표(concept.behavior_skills)와 무관하게 달성됐으나 별도 태스크로 등재."
+    cleared_by: kiki
+    notes: ""
+  - id: G-skb01-resolution-remeasure
+    title: "SKB-01 acceptance④ 해소율 재측정 — concept.behavior_skills 적재 후 EOS-63 스킬 이벤트 도달 재실행(Phaiakes9 whymath-pg 읽기). 선행 완료: G-skb01-concept-behavior-skills-populate가 2026-09-14 cleared(AFTER_NONEMPTY=1198·main b810388b 기준). 실행 대상 = docs/ops/eos63_skill_event_reach_sample_runbook.md의 attempt_skill_reach_probe + attempt_skill_event_reach_report 재실행. 목적 = 2026-09-10 측정의 resolution=0%(0/20)가 0%를 벗어났는지 실측하는 것이며, 그 수치가 EOS-63 acceptance②의 전환 가능 판정 재료가 된다. 주의(등재 시점 고지): 같은 실행에서 atom_node 1311행·concept_content K-12 437행이 prod 미적재로 드러났고(SKB-03·SKB-04로 등재) 그 두 테이블이 해소 경로에 관여하면 이번 재측정도 0%가 나올 수 있다 — 그 경우는 실패가 아니라 다음 원인의 실측이므로 수치를 그대로 기록한다. 세션이 런북 선결조건(측정 코드의 main 실재·Kiki 체크아웃 도달)을 실측 확인한 뒤 실행 블록을 안내한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-14
     remind_after_days: 7
     evidence: null
     cleared_by: null
