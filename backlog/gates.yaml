@@ -84,12 +84,12 @@ gates:
     title: "클래식 브랜치 보호 규칙 삭제 실행 — G-strict-policy-and-classic-cleanup 결정(2026-09-14 Kiki: strict 해제 + 클래식 삭제)의 물리적 집행. 세션 GitHub 토큰은 /branches/main/protection 조회조차 403(admin 권한 필요)이라 대행 불가 — Settings→Branches→main 규칙 Delete. 6항목 브리핑·자가검증 = .github/branch-protection-setup.md '### strict 해제 확정 + 클래식 브랜치 보호 삭제'"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-14
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
-    notes: ""
+    evidence: "이 게이트는 **신설 시점에 이미 충족돼 있었다.** PR #1157(main b810388b · 2026-09-14T11:33Z)이 \"세션 토큰이 /branches/main/protection에 403이라 대행 불가\"로 판단해 이 게이트를 승계로 신설했으나, 같은 날 그보다 앞서 병렬 세션(PR #1154)에서 Kiki가 자신의 gh 토큰으로 삭제를 직접 실행했다.\n\n[실측] Kiki 머신 PowerShell: `gh api -X DELETE repos/kiki-s-broom/WhyMath/branches/main/protection` 실행 후 재조회가 `HTTP 404 Branch not protected`. 삭제 **직전** 같은 조회 명령은 JSON 2,512자를 반환했으므로(백업 덤프로 확보) 이 404는 변별력 있는 확인이다 — 성공/실패 양쪽에서 같은 값을 내는 검사가 아니다. 직후 `python scripts\\harness\\ruleset_drift.py ruleset.json --record`가 EXIT=0(위반 0 · 유예 3건, 전부 만료 전 승인 축)으로 클래식 부재 상태에서도 룰셋 단독이 문서 선언을 충족함을 기계 판정했다.\n\n[삭제 전 12축 소실 대조] 클래식 원문을 덤프해 룰셋과 축별 대조했다. required_linear_history / allow_force_pushes(→non_fast_forward) / allow_deletions(→deletion) / required_conversation_resolution(→required_review_thread_resolution)은 룰셋이 덮고, required_signatures·block_creations·lock_branch·allow_fork_syncing은 원래 false였으며 restrictions는 키 자체가 부재했다. 필수 체크 13건은 룰셋 16건의 부분집합. 전문은 .github/branch-protection-setup.md \"삭제 직전 실측\" 표(백업 JSON은 Git 밖이라 사라지므로 저장소에 남겼다).\n\n[잔여 1건 — 이 게이트가 묻지 않은 축] enforce_admins=true만 룰셋 대응이 미확인이다. 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이는데 세션 토큰은 양쪽 다 403이다. 최악의 경우 관리자 우회 금지가 조용히 풀린 상태일 수 있으므로 이 clear를 \"소실 0 확인\"으로 읽으면 안 된다. 승계 = HARN-102-ruleset-bypass-actors-unverified + 게이트 G-ruleset-bypass-actors-read.\n\n[병렬 중복의 경위] 원 게이트 G-strict-policy-and-classic-cleanup이 4일 연속 독촉 초과 상태였고 두 세션이 같은 리마인드를 보고 동시에 착수했다. 결과물은 판정(strict 해제)에서 일치하고 집행 사실(삭제 완료 여부)에서만 갈렸으며, 병합 시 집행된 현실을 담은 쪽을 정본으로 삼고 양쪽 경위를 문서·게이트 evidence에 함께 남겼다."
+    cleared_by: claude
+    notes: "[판정기준 없음 2026-09-14] GitHub 저장소 설정(클래식 브랜치 보호) 삭제라 커밋 기반 판정 근거가 없다. 실측 증적은 API 응답(404 Branch not protected)과 판정기 EXIT=0이며, 저장소 몫의 기록은 PR #1154가 담는다."
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
