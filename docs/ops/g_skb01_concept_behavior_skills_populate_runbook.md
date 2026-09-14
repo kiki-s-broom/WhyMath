@@ -4,11 +4,19 @@
 > 실행 절차를 다룬다. `docs/ops/g_skb01_skill_node_populate_runbook.md`(skill_node 최초 적재)의
 > **후속** 런북이다 — 그 게이트는 이미 clear됐다(2026-09-12, `AFTER_COUNT=27`).
 >
-> **판정 기준: main `c7e21f86`** — 이 런북이 의존하는 코드는 **main에 착지 완료**다.
-> SKB-01 PR [#1141](https://github.com/kiki-s-broom/WhyMath/pull/1141)이 2026-09-12에
-> 병합됐다(세션 `claude/friendly-hypatia-hlqsqf` · 커밋
-> `c7e21f86cda951208b6815d4e258c04b453654b5`). 즉 **지금 실행 가능하다** — 아래 실행 블록을
-> 그대로 진행하면 된다.
+> **✅ 실행 완료 — 게이트 cleared (2026-09-14 · 판정 기준 main `b810388b`)**
+> Kiki가 Phaiakes9 `whymath-pg`(5433)에서 실행했다. 실측: `BEFORE_NONEMPTY=0` →
+> `POPULATE_EXIT=0` → `AFTER_NONEMPTY=1198`. CLI 출력
+> `concept.behavior_skills 갱신: 1311건 (비어있지 않은 스킬 1198건·대상 1311건)`의 nonempty와
+> `AFTER_NONEMPTY`가 일치해 §4 내부 정합성 자가검증을 통과했다.
+> **이 문서는 이제 재실행용이 아니라 기록이다** — 같은 형태의 런북을 새로 쓸 사람은 §9를 먼저 읽는다.
+>
+> 부수 관측 2건(이 게이트 목표와 무관하게 드러남): `atom_node` 대상 행 부재 1311건 ·
+> `concept_content` K-12 대상 행 부재 437건 → `SKB-03`·`SKB-04`로 분리 등재.
+> 해소율 재측정(SKB-01 acceptance④)은 후속 게이트 `G-skb01-resolution-remeasure`로 승계.
+>
+> 의존 코드는 SKB-01 PR [#1141](https://github.com/kiki-s-broom/WhyMath/pull/1141)(2026-09-12
+> 병합 · 커밋 `c7e21f86cda951208b6815d4e258c04b453654b5`)로 main에 착지해 있었다.
 >
 > main 실측(2026-09-14 · `git show origin/main:<경로>`로 확인):
 > `l1/concept_atom_crosswalk/populate.py`에 `transfer_concept_behavior_skills` 2건(import 33행·
@@ -187,3 +195,65 @@ git status --short --branch
   실제로 그 개념들을 평가했는지는 이 실행과 무관하다.
 - **크로스워크 커버리지 자체는 이 실행으로 넓어지지 않는다** — #419가 저작한 404/437 매핑을
   그대로 전파할 뿐, 33개 미매핑 개념·크로스워크가 안 닿는 원자는 여전히 빈 배열이다.
+
+---
+
+## 9. 이 런북이 실전에서 드러낸 결함 3건 — 다음 런북 작성자에게
+
+2026-09-14 실행은 **네 번의 왕복**을 썼다. 세 번은 Kiki의 조작 실수가 아니라 **런북·안내 블록 자신의
+결함**이었다. 같은 형태의 prod 적재 런북(`SKB-03`·`SKB-04`가 곧 필요로 한다)을 쓸 사람은 아래를
+그대로 피한다.
+
+### ① 가드가 조용히 건너뛰면 그것은 가드가 아니다
+
+[1단계]는 `if (-not $Dirty) { …체크아웃… }`로 감싸여 있었다. Kiki의 클론에 타 세션의 미커밋 변경
+3건이 있어 **블록 전체가 건너뛰어졌고, 화면에는 `TRACKED_DIRTY=True` 한 줄 말고 아무것도 나오지
+않았다.** 건너뛴 사실이 출력되지 않으니 다음 단계로 넘어가는 것이 자연스러웠다.
+
+**규칙**: 가드에는 반드시 "건너뛰었다 + 왜 + 무엇을 하라"를 출력하는 반대 가지를 둔다. 침묵하는
+`if`는 보호가 아니라 위장이다(CLAUDE.md 「변별력 없는 검증 스텝 금지」의 런북 축).
+
+### ② 블록 간 선행 조건은 자동 가드로 잇지 말고 사람 판정 지점으로 끊는다
+
+[2단계]가 `REACH_EXIT=2`(Docker 미가동)를 냈는데 [3~5단계]가 그대로 실행됐다. 블록마다 앞 단계
+결과를 검사하는 코드가 없었기 때문이다. 다행히 DB에 붙지 못해 쓰기는 0건이었다 — **설계가 아니라
+운이었다.**
+
+그렇다고 자동 가드를 넣으면 ③의 함정에 빠진다. **답은 블록을 끊고 판정을 사람에게 넘기는 것**이다:
+블록 끝에 판정값을 출력하고, 다음 블록 앞에 "이 값이 0인 것을 눈으로 확인한 다음에만 붙여넣으세요"를
+한 줄로 적는다. 붙여넣기 단위가 곧 판정 단위가 된다.
+
+### ③ PowerShell 대화형 붙여넣기에서 최상위 `if`/`elseif`/`else` 분기는 깨진다
+
+②를 고치려고 넣은 자동 가드가 바로 실패했다:
+
+> 「실측」 `elseif : 'elseif' 용어가 cmdlet, 함수, 스크립트 파일 또는 실행할 수 있는 프로그램 이름으로 인식되지 않습니다.`
+
+PowerShell 프롬프트는 `if (…) { … }`가 **닫히는 순간 그 문장을 실행**한다. 그래서 다음 줄에 오는
+`elseif`·`else`는 이어지는 절이 아니라 **별개의 명령**으로 해석돼 `CommandNotFoundException`이 난다.
+이때 `else` 안에 있던 환경 변수 설정·`$Py` 정의가 통째로 실행되지 않고, 뒤 블록은 초기값
+(`$false`)을 보고 `SKIP`한다 — 증상이 원인에서 멀다.
+
+**규칙**: Kiki 머신 명령 블록에서 최상위 제어 흐름은 **단일 `if (…) { … }`까지만** 쓴다
+(`} else {`처럼 같은 줄에 이어 붙이면 파서가 계속 읽으므로 *한 덩어리 안에서는* 동작한다 — [A] 블록이
+그 예다). `elseif` 체인과, 닫힌 뒤 새 줄에서 시작하는 `else`는 쓰지 않는다. 분기가 필요하면 ②처럼
+블록을 끊는다.
+
+### ④ (보너스) 공유 클론에서 "체크아웃"보다 "동등성 판정"이 견고하다
+
+Kiki 머신의 클론은 여러 세션이 공유하는 **단일 작업 사본**이라 미커밋 변경이 상시 존재할 수 있다.
+`git checkout --detach origin/main`은 그 상태에서 위험하거나(변경을 들고 이동) 가드에 막힌다.
+
+실제로 필요한 것은 "HEAD가 main인가"가 아니라 **"이 CLI가 읽는 코드·코퍼스가 main과 같은가"**뿐이다.
+그것을 직접 판정하면 체크아웃 없이 끝난다:
+
+```powershell
+# [Windows PowerShell · Phaiakes9] — 체크아웃 대신 동등성 판정
+git fetch origin main
+git diff --quiet origin/main -- "src/backend/whymath_backend/l1/concept_atom_crosswalk" "data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl" "data/corpus/concept_graph_v1/graph.json" "data/corpus/concept_graph_v1/concepts.jsonl"
+"PATHS_MATCH_MAIN=" + ($LASTEXITCODE -eq 0)
+```
+
+`git diff`는 작업 트리와 비교하므로 미커밋 변경까지 포함해 판정한다 — 무관한 파일이 더러워도 통과하고,
+실행 입력이 다르면 막는다. 변별력이 정확히 필요한 자리에 있다. 판정 기준 해시는
+`git rev-parse --short origin/main`으로 함께 남긴다(HARN-68).
