@@ -338,6 +338,19 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-14 (실행·사고·재발방지 · 게이트 G-skb01-concept-behavior-skills-populate): **concept.behavior_skills 적재 완료(1198행) — 그리고 그 실행이 런북 결함 3건과 prod 공백 2건을 함께 드러냈다** (Kiki 실행, claude 진단·등재) — 판정 기준 main `b810388b`
+
+**① 게이트 목표는 달성됐다.** Phaiakes9 `whymath-pg`(5433)에서 `concept_atom_crosswalk.populate` 1회 실행 — `BEFORE_NONEMPTY=0` → `POPULATE_EXIT=0` → `AFTER_NONEMPTY=1198`. CLI가 보고한 nonempty 1198과 사후 카운트가 일치해 런북 §4 내부 정합성 자가검증을 통과했다. EOS-63이 2026-09-10에 측정한 "기록 100%·해소 0%"의 두 원인 중 둘째(`concept.behavior_skills` 2683/2683 전량 빈 배열)가 이로써 해소됐다. 첫째(`skill_node` 미적재)는 PR #1108로 이미 해소됐다.
+
+**② 같은 실행이 acceptance 전제 하나를 뒤집었다.** SKB-01은 "`atom_node.behavior_skills`는 이미 크로스워크로 정상 채워져 있다(S0-2)"를 전제했으나, CLI가 `atom_node 대상 행 부재 1311건`·`concept_content K-12 대상 행 부재 437건`을 보고했다 — 두 이전 모두 갱신 0건. concept 축은 1311/1311 전건 매칭됐으므로 code 키는 정상이고 **두 테이블에 행이 없다**. S0-2는 UPDATE 코드를 만들었을 뿐 대상 행을 적재하지 않는다. 둘 다 서빙 소비처가 실재한다(atom_node → L2 `weak_concept_recommendation` enrich · concept_content → L4 `content_supply`·`age_band_explanation`·API `concepts.py`) — 비어 있으면 조용히 빈 결과를 낸다(「작동한 비율」 원칙 위반 상태). 해법 축이 달라 분리 등재: **SKB-03**(`atom_node_projection.py`에 CLI 진입점이 아예 없다 — `__main__`·argparse 0건, 코드 신설 필요) · **SKB-04**(`concept_content/populate.py`는 CLI가 있다 — 미실행이 1차 가설). 이 게이트의 목표는 두 테이블과 무관하게 달성됐다(concept 축은 `atom_skills` 매핑을 직접 재사용해 atom_node를 경유하지 않는다).
+
+**③ 사고 — 4회 왕복 중 3회가 런북·안내 블록 자신의 결함이었다.** ⓐ 1단계 `if (-not $Dirty) { …체크아웃… }`이 Kiki 클론의 타 세션 미커밋 변경 3건 때문에 **침묵하며 건너뛰었다** — 화면에 `TRACKED_DIRTY=True` 한 줄뿐이라 통과로 읽혔고, main이 아닌 트리에서 계속 진행됐다 ⓑ 블록 간 가드가 없어 `REACH_EXIT=2`(Docker Desktop 미가동)인데 적재 단계가 그대로 실행됐다 — DB에 붙지 못해 쓰기 0건이었던 것은 **설계가 아니라 운**이다 ⓒ ⓑ를 고치려 넣은 자동 가드가 파서에서 깨졌다: PowerShell 프롬프트는 `if (…) { … }`가 닫히는 순간 실행하므로 다음 줄의 `elseif`·`else`는 **별개 명령**이 되고(`CommandNotFoundException`), `else` 안의 환경 설정·`$Py` 정의가 통째로 미실행돼 뒤 블록이 초기값을 보고 `SKIP`했다.
+
+**④ 대책.** CLAUDE.md v0.2.23 — 2026-09-06 규칙이 처방한 `if ($값) { … }` 가드가 바로 그 처방대로 써서 실패했으므로 **그 처방을 정정**했다: ①최상위 제어 흐름은 단일 `if (…) { … }`까지만(`elseif` 체인·새 줄 `else` 금지) ②가드는 침묵하지 않는다 — 건너뛸 때 이유와 다음 행동을 출력하는 반대 가지 필수 ③블록 간 선행 조건은 자동 가드가 아니라 **사람 판정 지점**으로 끊는다(붙여넣기 단위 = 판정 단위). 부수로, 공유 클론에서는 `git checkout --detach`보다 **동등성 판정**(`git diff --quiet origin/main -- <실행이 읽는 경로들>`)이 견고함을 실증했다 — 이번 성공 실행이 실제로 그 경로를 썼다(`PATHS_MATCH_MAIN=True`). 런북 §9에 같은 교훈을 기록했고, SKB-03·SKB-04가 곧 같은 형태의 런북을 필요로 한다.
+
+**⑤ 승계.** acceptance④(해소율 재측정)는 후속 게이트 `G-skb01-resolution-remeasure`로 넘겼다 — ②의 두 공백이 해소 경로에 관여하면 재측정도 0%가 나올 수 있고, 그 경우는 실패가 아니라 다음 원인의 실측이다.
+
+
 ### 2026-09-12 (실측 · MISC-28): **정정 어구 귀속 — 오억제 100% 재현 · "창을 방향으로 바꾼다"는 값싼 해법 반증** — 판정 기준: 브랜치 `9200d244` 위 · base main `60bdd59b`
 
 - **오억제 전수 재현**: `<다른 것을 정정하는 앞절> <연결어미> <이 오개념 주장>` 형태로 카탈로그 전수를 재니 `-지만`·`-어서`·`-는데` **3종 전부 66/66(100%)** 억제됐다(대조군 미발화 `exponent-zero` 1종 제외). 즉 "부호를 잘못 옮겨 적었지만 …"으로 시작한 학생은 **어떤 오개념도 진단받지 못한다**. 정정 어휘가 없는 대조군은 0%로, 억제의 원인이 연결어미가 아니라 **정정 어휘**임을 보인다.
