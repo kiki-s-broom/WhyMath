@@ -457,6 +457,17 @@ jobs:
           python -m whymath_backend.harness.misconception_false_positive_eval \
             --max-fp-ratio 0.07
 
+      # QUAL-08: 형제 스켈레톤 생성기의 **파라미터 공간** 겹침. `problem_duplication_audit`이
+      # 코퍼스(공간의 *표본*)를 보는 반면 이 게이트는 생성기 풀을 전수 소진해 공간 자체를 본다 —
+      # 코퍼스가 깨끗해도 공간이 겹치면 재생성·증량에서 그대로 재발하기 때문이다(QUAL-07이 그
+      # 형태였다: 대학 풀 260이 고교 풀 300의 진부분집합 → 코퍼스 71쌍).
+      # 판정 축은 **발문 공간 교집합** 하나다. 조건식 축은 오탐 지배(10쌍 전건 오탐)라 리포트
+      # 진단으로만 내고, 조건식+단원코드 AND 축은 QUAL-07 양성 대조군에서 **0건 검출**이라
+      # 기각했다(모든 입력에서 초록인 가드 — 근거는 모듈 docstring 축 비교표).
+      # 실측: 생성기 구성 64개·58,368문항 전수 열거 2,016쌍 비교, 겹침 0. hermetic 약 10초.
+      - name: 게이트 — 생성기 공간 겹침 (generator_space_overlap·발문 공간 교집합 0)
+        run: python -m whymath_backend.harness.generator_space_overlap_audit
+
       - name: 게이트 — 코치 프로즈 유출 (coach_prose_leak·노출 상한 0.05·오차단 상한 0.2)
         run: |
           python -m whymath_backend.harness.coach_prose_leak_eval \
