@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - "src/backend/whymath_backend/l4/**"
   - "tests/backend/l3/**"
   - "tests/backend/l4/**"
-session: null
+session: claude/gifted-cori-lr8vdz
 notes: "출처: docs/reviews/eos_plan52_crosswalk_2026-09.md 갭 후보 #16(C9) — 계열 EOS-5x·T2·W3+, F7 측정 계약 동반, S4-05·PRES-02와 경계 명문 필수. 등재 계기(2026-09-06 PR #994 Codex P2): EOS-70을 blocked로 두면 C9 좌석이 없어 자동 해금 경로가 없다는 지적 — 이 태스크가 EOS-70의 depends_on 대상이 되어 done 시 selector가 EOS-70을 자동으로 후보에 올린다. 범위는 crosswalk 원문에 한정해 적었고 4개 언어 수준의 정의·인접 태스크와의 3분립은 착수 시 확정한다(여기서 지어내지 않는다). 번호는 CLI 배정"
-updated: 2026-09-06
+updated: 2026-09-14
