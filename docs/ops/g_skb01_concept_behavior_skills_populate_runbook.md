@@ -4,13 +4,25 @@
 > 실행 절차를 다룬다. `docs/ops/g_skb01_skill_node_populate_runbook.md`(skill_node 최초 적재)의
 > **후속** 런북이다 — 그 게이트는 이미 clear됐다(2026-09-12, `AFTER_COUNT=27`).
 >
-> **판정 기준: 이 런북이 의존하는 코드는 아직 main에 없다** — SKB-01 PR(2026-09-12, 세션
-> `claude/friendly-hypatia-hlqsqf`)이 병합된 **이후에만** 실행한다. 병합 전에 실행하면
-> [1단계]의 `HAS_CONCEPT_TRANSFER` 자가검증이 `False`를 내고 멈추도록 설계했다. 아래
-> 명령·플래그·기본값·경로는 `whymath_backend.l1.concept_atom_crosswalk.populate.main()`과
+> **판정 기준: main `c7e21f86`** — 이 런북이 의존하는 코드는 **main에 착지 완료**다.
+> SKB-01 PR [#1141](https://github.com/kiki-s-broom/WhyMath/pull/1141)이 2026-09-12에
+> 병합됐다(세션 `claude/friendly-hypatia-hlqsqf` · 커밋
+> `c7e21f86cda951208b6815d4e258c04b453654b5`). 즉 **지금 실행 가능하다** — 아래 실행 블록을
+> 그대로 진행하면 된다.
+>
+> main 실측(2026-09-14 · `git show origin/main:<경로>`로 확인):
+> `l1/concept_atom_crosswalk/populate.py`에 `transfer_concept_behavior_skills` 2건(import 33행·
+> 호출 107행), `transfer.py`에 `update_concept_behavior_skills`(295행)·
+> `transfer_concept_behavior_skills`(367행) 실재.
+>
+> 따라서 [1단계]의 `HAS_CONCEPT_TRANSFER` 자가검증은 이제 **`True`가 정상**이다. 이 자가검증은
+> 변별력을 잃지 않았다 — 의미만 바뀐다: 이전에는 "PR 미병합"을 잡았고, 지금은 "체크아웃이
+> `origin/main`에 닿지 않았다"(fetch 실패·낡은 사본·다른 브랜치)를 잡는다. `False`면 그 자리에서
+> 멈추고 세션에 알린다.
+>
+> 아래 명령·플래그·기본값·경로는 `whymath_backend.l1.concept_atom_crosswalk.populate.main()`과
 > `transfer.CrosswalkTransferStore.update_concept_behavior_skills()`의 실제 인자 정의에서
-> 확인했다(2026-09-12 hermetic 단위테스트 44건 통과로 배선 검증 — PR 머지 후 커밋 해시로
-> 게이트 clear 시 갱신).
+> 확인했다(2026-09-12 hermetic 단위테스트 44건 통과로 배선 검증).
 >
 > **왜 이 게이트가 새로 필요한가**: 이전 skill_node 런북 §8("이 런북이 답하지 못하는 것")이
 > 명시했듯, `concept_graph.populate` 재실행으로는 `concept.behavior_skills`를 채울 수
@@ -107,8 +119,11 @@ if (-not $Dirty) {
 ```
 
 **자가검증**: `TRACKED_DIRTY=False` · `CROSSWALK_FILE_OK=True` · **`HAS_CONCEPT_TRANSFER=True`**.
-- 세 번째 값이 `False`면 이 런북이 기대하는 코드(SKB-01 PR)가 아직 main에 없다는 뜻 — 다음
-  단계로 가지 말고 세션에 알린다.
+- 세 번째 값은 SKB-01 PR #1141 병합(main `c7e21f86`)으로 **이제 `True`가 정상**이다. `False`면
+  체크아웃이 그 커밋에 닿지 않았다는 뜻(`git fetch origin main` 실패·낡은 사본·detached 이동
+  실패) — 다음 단계로 가지 말고 바로 앞 줄의 `git log --oneline -1` 출력과 함께 세션에 알린다.
+- `TRACKED_DIRTY=True`면 블록 전체가 통째로 건너뛰어진다(`if` 가드) — 추적 중인 파일에
+  미커밋 변경이 있다는 뜻이므로, 강제로 진행하지 말고 세션에 알린다.
 
 ### [2단계] 환경 — UTF-8 + prod DB + 도달성 판정
 
