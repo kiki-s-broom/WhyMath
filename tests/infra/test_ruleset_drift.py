@@ -71,6 +71,9 @@ def _load_backlog() -> Any:
 def _rules(
     checks: list[tuple[str, int | None]],
     *,
+    # 기본값은 **문서 선언을 따라간다**. 둘이 어긋나면 *정상* 입력이 위반으로 판정돼
+    # 이 파일 전체가 red가 된다 — 2026-09-14에 실제로 그렇게 발각됐다(선언을 false로
+    # 고치자 기본값 True인 픽스처가 10건 RED).
     strict: bool = False,
     approvals: int = 0,
     dismiss: bool = False,
@@ -168,6 +171,9 @@ def test_strict_policy_true_is_violation(tmp_path: Path) -> None:
     바뀌었다(merge queue가 이미 최신 base 재검증을 하므로 'up to date 요구'가 구조적으로
     중복 — `.github/branch-protection-setup.md` '### strict 해제 확정' 참조). 그래서 드리프트
     방향도 반대가 됐다 — 이제는 누가 strict를 **다시 켜는 것**이 문서 선언과의 불일치다.
+
+    **이 테스트가 사라지지 않는 것이 핵심이다** — 축을 감시하지 않게 된 것이 아니라
+    감시 방향이 바뀐 것뿐이다. 누가 strict를 되켜면 여기서 걸린다.
     """
     assert _run(_rules(_healthy_checks(), strict=True), tmp_path) == 1
 
@@ -664,12 +670,23 @@ def test_measurement_failure_is_recorded_and_surfaced(tmp_path: Path) -> None:
 
 
 def _powershell_incompatibilities(command: str) -> list[str]:
-    """PS 5.1에서 그대로 붙여넣었을 때 깨지는 표기를 찾는다."""
+    """PS 5.1에서 그대로 붙여넣었을 때 깨지거나 **손상된 파일을 만드는** 표기를 찾는다."""
     problems = []
     if "&&" in command:
         problems.append("`&&` — Windows PowerShell 5.1이 받지 않는다")
     if "python3 " in command:
         problems.append("`python3` — 이 저장소의 Windows 안내는 `python`이다")
+    for line in command.splitlines():
+        if "gh api" not in line or "cmd /c" in line:
+            continue
+        # 손상 축은 **출력을 파일로 받아 되읽을 때**만 성립한다. `| Out-Null`처럼 버리는
+        # 호출(쓰기 API의 응답 등)은 파싱 대상이 아니므로 경유해도 무해하다 — 여기서
+        # 좁히지 않으면 정상 블록이 위반으로 잡혀 사람이 이 가드를 끄게 된다.
+        if any(sink in line for sink in ("Out-File", "Set-Content", "Tee-Object", ">")):
+            problems.append(
+                f'gh 출력을 PowerShell로 받아 파일에 쓴다 — `cmd /c "gh api ... > file"`로 '
+                f"감싼다: {line.strip()}"
+            )
     return problems
 
 
@@ -681,13 +698,57 @@ def test_reminder_command_runs_on_windows_powershell() -> None:
     """
     runbook = ruleset_drift.POWERSHELL_FETCH_RUNBOOK
     assert not _powershell_incompatibilities(runbook), _powershell_incompatibilities(runbook)
-    assert (
-        "Out-File -Encoding utf8" in runbook
-    ), "PS 5.1의 `>`는 UTF-16LE로 쓴다 — 산출 인코딩을 명시해야 한다"
+    assert "cmd /c" in runbook, (
+        "gh 출력이 PowerShell 파이프라인을 거치면 cp949 디코딩 왕복에서 JSON 구조 문자가 "
+        "유실된다(2026-09-14 실측 41자) — `cmd /c` 안에서 파일로 바로 받아야 한다"
+    )
     assert "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath" in runbook, "고정 작업 디렉터리 누락"
 
     # 리마인드 3종 전부가 그 명령을 그대로 실어야 한다(한 곳만 고치고 나머지가 새는 것 방지).
     assert runbook in (ruleset_drift.state_reminder(Path("/존재하지-않는-루트"), _TODAY) or "")
+
+
+@pytest.mark.parametrize(
+    "label,command,should_flag",
+    [
+        # 2026-09-14 실측 축 — 인코딩은 명시됐으나 디코딩 경유가 남아 41자가 유실됐다.
+        (
+            "파이프 경유(Out-File)",
+            "gh api repos/o/r/rules/branches/main | Out-File -Encoding utf8 x.json",
+            True,
+        ),
+        # 2026-09-05 실측 축 — PS 5.1의 `>`는 UTF-16LE로 쓴다.
+        ("bare 리다이렉트", "gh api repos/o/r/rules/branches/main > x.json", True),
+        # 현행 정본 — 바이트가 PowerShell을 통과하지 않는다.
+        ("cmd /c 경유", 'cmd /c "gh api repos/o/r/rules/branches/main > x.json"', False),
+        # 성공 방향 대조군: gh를 쓰지 않는 줄은 이 절이 건드리지 않는다.
+        ("gh 무관 명령", "python scripts\\harness\\ruleset_drift.py x.json --record", False),
+        # 대조군 — 출력을 *버리는* 쓰기 호출. 파싱 대상이 아니므로 경유해도 무해하다.
+        # (실제 오탐이었다: 첫 구현이 문서의 룰셋 PUT 블록을 위반으로 잡았다.)
+        (
+            "출력 폐기(Out-Null)",
+            "gh api -X PUT repos/o/r/rulesets/1 --input p.json | Out-Null",
+            False,
+        ),
+    ],
+)
+def test_gh_output_must_not_pass_through_powershell(
+    label: str, command: str, should_flag: bool
+) -> None:
+    """수집 명령의 *형태*를 동결한다 — 산출물이 깨지는 축은 인코딩 관용으로 못 막는다.
+
+    왜 읽기측이 아니라 여기인가: `read_json_text`의 폴백은 **인코딩**만 가린다. cp949 왕복은
+    바이트를 실제로 *유실*시키므로 결과 파일은 UTF-8로 멀쩡히 디코딩되고 JSON 단계에서야
+    깨진다(`Expecting ',' delimiter`). 즉 산출측 형태가 유일한 방어선이다.
+
+    픽스처 4종은 각각 다른 절을 밟는다 — 파이프 축·리다이렉트 축·정본 축·무관 축. 앞의 둘은
+    이 저장소에서 **실제로 exit 2를 낸** 형태이고, 뒤의 둘은 과잉 탐지(모든 명령을 위반으로
+    계상하는 수정)를 잡는 대조군이다(CLAUDE.md 2026-09-08 — 성공 방향 대조군 없이는 과잉
+    수정이 전건 RED로 통과한다).
+    """
+    problems = _powershell_incompatibilities(command)
+    gh_problems = [p for p in problems if "PowerShell로 받아 파일에 쓴다" in p]
+    assert bool(gh_problems) is should_flag, f"[{label}] 탐지 결과가 기대와 다르다: {problems}"
 
 
 def test_doc_runbook_selfcheck_precedes_the_run_command() -> None:
@@ -752,6 +813,10 @@ def test_doc_runbook_block_runs_on_windows_powershell() -> None:
     assert blocks, "문서에 powershell 블록이 없다 — 실행 경로가 사라졌다"
     for block in blocks:
         assert not _powershell_incompatibilities(block), _powershell_incompatibilities(block)
+    # 위 루프가 *나쁜 형태*를 막는다. 여기서는 **정본 형태가 실재하는지**를 따로 본다 —
+    # 조회 블록을 통째로 지워도 위 루프는 조용히 통과하기 때문이다(스캔 0건은 공허한 통과).
+    # 규칙 자체는 `_powershell_incompatibilities` 한 곳에만 둔다: 여기에 사본을 두었더니
+    # 출력을 버리는 PUT 블록까지 위반으로 잡혔다(2026-09-14 오탐).
     assert any(
-        "Out-File -Encoding utf8" in b for b in blocks
-    ), "조회 블록이 `>`로 리다이렉트하면 UTF-16LE가 나와 판정기가 읽지 못한다"
+        "cmd /c" in b and "gh api" in b and ">" in b for b in blocks
+    ), "gh 결과를 파일로 받는 정본 조회 블록이 문서에서 사라졌다 — 실행 경로가 없다"

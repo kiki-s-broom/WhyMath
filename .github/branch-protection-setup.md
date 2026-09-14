@@ -63,7 +63,10 @@ main
   - [x] Require review from Code Owners *(CODEOWNERS 파일 활용)*
 
 - [x] **Require status checks to pass before merging**
-  - [x] Require branches to be up to date before merging
+  - [ ] ~~Require branches to be up to date before merging~~ — **끈다**
+    (2026-09-14 Kiki 결정 · 게이트 `G-strict-policy-and-classic-cleanup`).
+    merge queue가 큐 브랜치를 최신 `main` 위에 얹어 재검증하므로 이 요구는 구조적으로
+    중복이고, 실제 마찰이 관측됐다 — 아래 「## 머지 경합」 절 참조.
   - **Status checks that are required** — 아래 블록의 이름을 *그대로* 검색해 전부 추가:
 
 <!-- REQUIRED_CHECKS_BEGIN — 이 블록은 tests/infra/test_required_checks_doc.py가 ci.yml과 대조해 동결한다. 잡 추가·개명 시 여기도 갱신해야 CI가 통과한다. -->
@@ -120,6 +123,14 @@ main
 - `merge_queue` = `true`
 <!-- RULESET_POLICY_END -->
 
+**`strict_required_status_checks_policy`가 `false`인 이유** (2026-09-14 Kiki 결정 · A안):
+merge queue가 켜져 있으면 큐가 PR을 최신 `main` 위에 얹어 **전건 재검증**한 뒤에만
+머지하므로, 개별 PR에 up-to-date를 따로 요구하는 것은 같은 보장을 두 번 사는 것이다.
+그리고 그 중복은 공짜가 아니다 — 2026-09-10에 PR #1063·#1092·#1094가 전부 `behind`로
+막혀 `main` 수동 병합을 3회 반복했고 그때마다 CI가 처음부터 다시 돌았다(실측).
+**보호를 낮춘 것이 아니라 집행 지점을 큐로 옮긴 것이다**: 낡은 base에서 통과한 CI로
+머지되는 일은 큐가 막는다. 이 선언이 `true`로 되돌아가면 그 마찰도 함께 돌아온다.
+
 `required_check_integration_id`는 GitHub Actions 앱의 id다 — required check 항목을 이 앱으로
 pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고해도 충족되지 않는다.
 
@@ -157,22 +168,33 @@ Test-Path scripts\harness\ruleset_drift.py
 ```powershell
 # Windows PowerShell — 위 자가검증이 True일 때만
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-gh api repos/kiki-s-broom/WhyMath/rules/branches/main | Out-File -Encoding utf8 ruleset.json
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rules/branches/main > ruleset.json"
 python scripts\harness\ruleset_drift.py ruleset.json --record
 echo "EXIT=$LASTEXITCODE"
 ```
 
-> **`>` 대신 `Out-File -Encoding utf8`을 쓰는 이유**: Windows PowerShell 5.1의 `>`는 네이티브
-> 명령 출력을 **UTF-16LE**로 씁니다. 그러면 판정기가 읽다가 `UnicodeDecodeError`로 죽어
-> exit 0/1/2 어느 것도 나오지 않습니다(2026-09-05 실측). 읽기측도 UTF-16·BOM을 관용하도록
-> 고쳤지만(`read_json_text`), 산출측에서 먼저 맞추는 것이 정본입니다 —
-> CLAUDE.md "외부 도구가 읽는 파일은 그 도구의 읽기 인코딩에 맞춘다".
+> **`cmd /c`로 감싸는 이유 — gh 출력을 PowerShell에 통과시키지 않는다**: PS 5.1은 네이티브
+> 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본 **cp949**)으로 디코딩한 뒤
+> 다시 인코딩합니다. 필수 체크 이름의 `—`·`·`는 UTF-8 3바이트인데 cp949는 2바이트 조합이라
+> 경계가 어긋나고, 선행바이트가 뒤따르는 `"`(0x22)를 트레일로 삼켜 **JSON 구조 문자가
+> 소실됩니다.** `cmd /c`는 바이트를 그대로 파일로 보내 이 경유 자체를 없앱니다.
+>
+> **실측(2026-09-14)**: `| Out-File -Encoding utf8`로 받은 파일이 `...가드","app_id"` →
+> `...媛??,"app_id"`가 되어 2,659→2,618자로 41자 유실됐고, 판정기가
+> `Expecting ',' delimiter: line 1 column 1828`로 **exit 2**를 냈습니다. 같은 회차에
+> `cmd /c`로 다시 받자 즉시 `EXIT=0`.
+>
+> **이전 처방이 왜 부족했나**: `Out-File -Encoding utf8`은 2026-09-05에 `>`의 UTF-16LE를
+> 피하려고 도입됐고 그 축에서는 옳았습니다. 다만 **디코딩 경유는 그대로 남겨** 이번 축을
+> 못 막았습니다 — *인코딩을 명시해도 이미 깨진 문자열을 명시한 인코딩으로 쓸 뿐입니다.*
+> 읽기측 관용(`read_json_text`)도 인코딩만 가리므로 이 축에는 무력합니다.
+> (CLAUDE.md HARN-19 — Windows 로케일 디코딩 붕괴의 *산출측* 대응.)
 
 | EXIT | 판정 | 다음 행동 |
 |---|---|---|
 | `0` | 정합 (권고만 있어도 0) | 없음 — 기록 갱신됨 |
 | `1` | **드리프트 위반** | 출력의 "시정 순서"를 위에서부터 따른다 |
-| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재) | 통과가 아니다 — `gh auth status`부터 확인 |
+| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재·**수집 손상**) | 통과가 아니다. `JSON 파싱 불가`면 위 `cmd /c` 형태로 재수집(cp949 유실) · 그 외는 `gh auth status`부터 확인 |
 
 기록 파일(`.github/ruleset-check-state.json`)은 `--record`가 쓴다. **손편집 금지** — 확인하지
 않고 날짜만 미루면 리마인드가 위장이 된다.
@@ -204,6 +226,10 @@ echo "EXIT=$LASTEXITCODE"
 > **문서와 정합한 항목**(참고): `strict_required_status_checks_policy: true`(= up to date 요구) ·
 > `required_review_thread_resolution: true` · `required_linear_history: true` · deletion·
 > non_fast_forward 보호.
+>
+> *[후속 2026-09-14] `strict_required_status_checks_policy`는 이후 `false`로 정정됐다
+> (Kiki 결정 A안 · merge queue 도입으로 중복). 위 줄은 2026-09-03 시점 실측 기록이므로
+> 그대로 둔다 — 현행 선언은 「정책 파라미터 선언」 블록이 정본이다.*
 >
 > #### ✅ 시정 완료 (같은 날 2026-09-03 · 게이트 `G-required-checks-live-drift-fix`)
 >
@@ -297,9 +323,14 @@ echo "EXIT=$LASTEXITCODE"
 
 ## 머지 경합 — merge queue **사용 중** (2026-09-09 전환)
 
-> **현행 사실**: `main` 룰셋에 merge queue가 켜져 있다. 큐가 PR을 최신 `main` 위에 얹어
-> 재검증하므로 `Require branches to be up to date`를 **유지한 채** 재동기화가 자동화된다 —
-> 보호를 낮추지 않고 충족만 자동화한다는 원 취지 그대로다.
+> **현행 사실**: `main` 룰셋에 merge queue가 켜져 있고, `Require branches to be up to date`는
+> **꺼져 있다**(2026-09-14 Kiki 결정 A안 · 게이트 `G-strict-policy-and-classic-cleanup`).
+> 큐가 PR을 최신 `main` 위에 얹어 재검증하므로 up-to-date 요구는 구조적 중복이었고,
+> 실제로 마찰만 남겼다(2026-09-10 PR 3건이 `behind`로 막혀 수동 병합 3회).
+>
+> ⚠️ 이 절은 2026-09-09~09-13 동안 "`strict`를 **유지한 채** 재동기화를 자동화한다"고
+> 적고 있었다. 그 서술은 큐 도입 *직후*의 과도기 사실이었고, 09-10 마찰 실측으로 뒤집혔다.
+> 아래 「대신 하는 것」 절도 같은 전제 위에 쓰였으므로 함께 읽는다.
 >
 > 이 절은 2026-09-07~09-08에 정반대 내용("이 저장소에서는 쓸 수 없다")을 담고 있었다.
 > **그때는 그 판정이 옳았다** — 아래 「전제가 바뀐 이력」이 왜 바뀌었는지를 기록한다.
@@ -350,6 +381,16 @@ merge queue는 **조직(Organization) 소유 저장소 전용**이다 — 공개
 > 판정기가 모른다.
 
 ### 대신 하는 것 — 자동 재동기화 (`pr-auto-resync.yml` · HARN-85)
+
+> **⚠️ 이 절의 전제는 2026-09-14에 소멸했다.** 아래 본문은 `strict`가 *켜져 있던* 동안
+> 그 충족을 자동화하려고 쓰인 것이다. `strict`가 꺼진 지금은 `behind`가 더 이상 머지를
+> 막지 않으므로 이 워크플로는 **머지 경로의 필수 요소가 아니다**(돌아도 해롭지 않지만
+> CI를 소모한다). 존치·폐기 판정은 `HARN-101`이 소유한다 — 그 전까지 아래 서술은
+> *동작 설명*으로만 유효하고 *근거*로는 유효하지 않다.
+>
+> 본문이 근거로 든 #931/#935 사례(낡은 base에서 통과한 CI가 머지 후 `main`을 깨는 일)는
+> 사라진 위험이 아니다 — **집행 주체가 바뀌었을 뿐이다**. 이제 merge queue가 큐 브랜치에서
+> 최신 base 위로 전건 재검증하며 같은 일을 막는다.
 
 보호를 낮추는 대신(=`strict` 해제) **충족을 자동화**한다. `Require branches to be up to date`는
 그대로 유지된다 — 그 게이트는 실제로 일하고 있다(#931이 `ReviewStatus`에 `quarantined`를
@@ -413,33 +454,67 @@ PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **�
 클래식이 살려 두던 것은 **실질 strict=true**뿐이었고, 그 축을 해제하기로 결정했으므로 클래식은
 더 지킬 것이 없는 낡은 사본이다.
 
-**집행 범위(한계 — 명시)**: 이 정정은 **문서 축**만 처리한다. 클래식 브랜치 보호 규칙
-*삭제*는 GitHub Settings UI에서 저장소 admin 권한으로만 가능하고, 이 세션의 GitHub 토큰은
-`/branches/main/protection` 조회조차 403(`Resource not accessible by integration` —
-2026-09-14 재확인, 2026-07-26 실측과 동일)이라 **세션이 대행할 수 없다**. 실행은 아래
-브리핑을 따라 Kiki가 하고, 추적은 별도 게이트 `G-classic-branch-protection-delete`가 한다.
+**부수 근거 — 관측 도구가 정본을 보게 된다**: `ruleset_drift.py`·`pr_delivery_audit.py`·`ruleset_pin_plan.py`
+   **3종이 전부 룰셋만 읽는다.** 게다가 `GITHUB_TOKEN`은 클래식 브랜치 보호에 **403**이라 CI
+   안에서는 갈라진 쪽을 볼 수단 자체가 없다 — 집행이 두 벌인 동안 이 도구들의 "정합" 판정은
+   *실제 집행*이 아니라 *한쪽 소스*에 대한 판정이었다. 한 벌로 줄이면 판정이 다시 집행을
+   가리킨다. (CLAUDE.md 「변별력 없는 검증 스텝 금지」의 *소스 축* — 검사는 멀쩡한데 보는
+   곳이 정본이 아니게 된 상태였다.)
 
-#### 📋 사전 브리핑 (Kiki 직접 수행 과제) — 클래식 브랜치 보호 규칙 삭제
+#### 집행 결과 — ✅ 완료 (2026-09-14)
 
-1. **과제 명칭** — `main`의 **클래식** 브랜치 보호 규칙(legacy branch protection rule) 삭제
-2. **목적** — 룰셋(rulesets)이 이미 필수체크 16건·merge queue·승인 정책을 전부 담당하고
-   있어 클래식은 낡은 부분집합 사본으로만 남아 있다. 클래식의 `strict=true`가 룰셋의
-   `strict=false` 선언과 충돌해 실질적으로 "up to date 요구"를 계속 살려 두고 있으므로,
-   strict 해제 결정을 완성하려면 클래식을 지워야 한다.
-3. **구체적 절차** — Settings → Branches → *Branch protection rules* 목록에서 `main` 규칙을
-   찾아 편집 화면 진입 → 페이지 하단 **Delete** 클릭 → 확인. 소요 약 1분. **룰셋(Rulesets)
-   쪽은 건드리지 않는다** — 삭제 대상은 "Branch protection rules" 섹션의 항목이다(Rules →
-   Rulesets 섹션과 다른 화면).
-4. **성공 기준** — 자가검증: 삭제 후 `Settings → Branches → Branch protection rules` 목록에
-   `main` 항목이 더 이상 없어야 한다. 부수 확인(선택): PR을 하나 열어 머지 버튼이 `main`이
-   `behind` 상태에서도(다음 push 전까지) 비활성화되지 **않는** 것을 관찰하면 strict 해제가
-   실제로 효과를 낸 것이다 — 단, merge queue가 여전히 최신 base 위에서 재검증하므로 실제
-   위험은 없다.
-5. **실행 환경** — 웹 브라우저(GitHub). PowerShell·리포 클론 불요. 저장소 admin 권한 필요.
-6. **창 구분** — 브라우저 탭 1개. 서버·프로세스 점유 없음, 이후 조작 제약 없음.
+> **실측**: `DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection` 실행 후 재조회가
+> `HTTP 404 Branch not protected`. 삭제 **전** 같은 명령은 JSON 2,512자를 돌려줬으므로
+> **변별력 있는 확인**이다(성공/실패 양쪽에서 같은 값을 내는 검사가 아니다). 직후
+> `ruleset_drift.py --record`가 `EXIT=0`(위반 0 · 유예 3건, 전부 만료 전 승인 축) —
+> 클래식이 사라진 뒤에도 **룰셋 단독으로 문서 선언을 충족**함을 기계가 판정했다.
+>
+> **병렬 처리 기록**: 이 게이트는 두 세션이 동시에 처리했다. PR #1157은 세션 토큰이
+> `/branches/main/protection`에 403이라 대행 불가로 판단하고 Kiki 실행 브리핑 + 후속 게이트
+> `G-classic-branch-protection-delete`를 실었다. 그 판단은 *그 세션의 토큰 기준으로는* 옳았고,
+> 실제로는 같은 시각 이 세션에서 **Kiki가 자신의 `gh` 토큰으로 직접 실행**했다. 브리핑은
+> 역할을 다했으므로 위 실행 결과로 대체하고, 후속 게이트는 신설 시점에 이미 충족된
+> 상태였으므로 같은 근거로 clear한다.
 
-삭제 후에는 게이트 `G-classic-branch-protection-delete`를 `backlog.py gates clear`로 닫는다
-(증적: 위 성공 기준의 "목록에 없음" 확인).
+#### 삭제 직전 실측 (2026-09-14 · 백업 JSON은 Git 밖이라 여기 남긴다)
+
+| 클래식 축 | 값 | 룰셋의 대응 |
+|---|---|---|
+| `required_status_checks.strict` | `true` | 없음 — **이것이 실질 strict였다**(의도적 제거) |
+| `required_status_checks.contexts` | 13건 | 룰셋 16건이 상위집합 |
+| `required_linear_history` | `true` | `required_linear_history` ✔ |
+| `allow_force_pushes` | `false` | `non_fast_forward` ✔ |
+| `allow_deletions` | `false` | `deletion` ✔ |
+| `required_conversation_resolution` | `true` | `required_review_thread_resolution` ✔ |
+| `required_approving_review_count` | `0` | `0` (동일·유예 중) |
+| `require_code_owner_reviews` | `false` | `false` (동일·유예 중) |
+| `required_signatures` | `false` | 원래 꺼져 있었다 — 소실 없음 |
+| `block_creations` · `lock_branch` · `allow_fork_syncing` | `false` | 전부 꺼져 있었다 |
+| `restrictions` | **키 자체 부재** | 없었으므로 소실 없음 |
+| `enforce_admins` | `true` | `bypass_actors: []` ✔ **(2026-09-14 확인)** — 우회 주체 0명이므로
+  관리자에게도 규칙이 그대로 적용된다. 소실 없음 |
+
+`dismiss_stale_reviews`만 클래식 `true` vs 룰셋 `false`인데, 승인 요구가 0인 상태에서는
+단독으로 의미가 없다(문서의 유예 3건 중 하나가 같은 축을 이미 다룬다).
+
+**12축 대조 결과: 소실 0.** 마지막 미확인 칸(`enforce_admins`)은 게이트
+`G-ruleset-bypass-actors-read`로 분리해 Kiki 머신에서 1회 조회로 닫았다.
+
+> 「실측」 2026-09-14 · `cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json"`
+> → `bypass_actors 건수: 0` · 배열 `[]`.
+> 빈 배열은 룰셋을 우회할 수 있는 주체가 없다는 뜻이고, 이는 클래식의 `enforce_admins: true`와 등가다.
+> 파이프(`| Out-File`)를 쓰지 않은 이유는 아래 "수집 명령" 절 참조 — cp949 왕복으로 JSON이 손상된다.
+
+**다만 지금 안전한 것과 그 상태가 감시되는 것은 다르다.** `ruleset_drift.py`는
+`/rules/branches/main`만 읽고 그 응답에는 `bypass_actors`가 없다 — 즉 **선언 축에도 판정기에도
+없으므로, 나중에 누군가 `bypass_actors`를 채워도 기계는 조용하다.** 선언 편입 여부(편입하면
+어느 엔드포인트를 정본으로 할지까지)는 `HARN-102`가 소유한다. 편입하지 않기로 결론나면
+그 이유를 여기에 적는다 — 감시하지 않는 축을 조용히 두면 다음 사람이 감시되는 줄 안다.
+
+**되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
+되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
+정본으로 복사한다 — 낡은 13건을 복원하지 않는다).
+
 
 ## 저장 후 확인
 
@@ -547,7 +622,7 @@ Actions pin" 외에는 아무것도 바꾸지 않음을 코드가 집행하고 �
 # Windows PowerShell (= Phaiakes9)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 Test-Path scripts\harness\ruleset_pin_plan.py
-gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-backup.json"
 Test-Path ruleset-backup.json
 ```
 첫 `Test-Path`가 `False`면 변경안 도구가 이 체크아웃에 없다 — 위 §"판정기 파일이 없다"와 같은
