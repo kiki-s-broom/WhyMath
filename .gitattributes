@@ -48,6 +48,22 @@ backlog/events.ndjson   merge=union
 # GitHub 서버는 merge driver를 적용하지 않는다는 사실(사고 원인)은 변하지 않는다.
 backlog/events/*.ndjson   merge=union
 
+# 라이선스 약관 스냅샷 — **바이트 그대로가 증거다** (변환 금지)
+#
+#   이 파일들은 외부 사이트가 그 시점에 서빙한 약관 원문이며 meta.json의 sha256이
+#   그것을 증명한다. Git 기본 `text auto`는 .html을 텍스트로 판단해 CRLF를 LF로
+#   정규화하는데, 그러면 바이트가 바뀌어 **해시 검증이 깨진다**.
+#
+#   실측(2026-09-14): 스냅샷 20건 중 5건의 sha256이 기록과 어긋나 있었다. ncic는
+#   차이 1,975바이트 = LF 1,975개, schoolinfo는 19바이트 = LF 19개로 정확히
+#   일치해 원인이 CRLF 정규화임이 확정됐다(CRLF 복원 시 기록 해시와 바이트 동일).
+#   나머지 3건은 원본이 혼합 줄바꿈이라 어느 줄이 CRLF였는지 알 수 없어 복원 불가다.
+#
+#   `-text`는 어떤 방향으로도 변환하지 않는다는 뜻이다. 인코딩(euc-kr 등)도 그대로
+#   보존되며, 그 정당성은 meta의 charset 선언과 대조해 `scripts/ops/cp949_guard.py`가
+#   판정한다.
+data/licenses/snapshots/**   -text
+
 # 바이너리 — 변환·diff 금지
 *.png       binary
 *.jpg       binary

@@ -1,0 +1,42 @@
+# WhyMath — 편집기 인코딩·줄바꿈 통일
+#
+# 왜: 한국어 Windows(cp949 로케일) + Linux CI + 여러 IDE가 섞인 환경에서 파일마다
+#     인코딩이 달라지면 mojibake가 커밋으로 굳는다. 그 손상은 U+FFFD나 `?`로 치환된
+#     순간 복구 불가 등급이 된다 — 등급표와 사례는 docs/standards/encoding_safety.md.
+#
+# 이것은 `.gitattributes`와 역할이 다르다:
+#   .gitattributes  = Git이 저장·체크아웃할 때의 변환 정책 (저장소 축)
+#   .editorconfig   = 편집기가 파일을 열고 저장할 때의 정책 (사람 축)
+# 둘 다 있어야 "IDE가 cp949로 저장 → Git이 그대로 커밋" 경로가 막힌다.
+#
+# 기계 집행은 scripts/ops/cp949_guard.py 가 한다 — .editorconfig는 편집기가
+# 존중해 줄 때만 유효한 *예방*이고, 가드는 무엇이 들어왔는지 보는 *탐지*다.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Windows 배치 파일은 CRLF가 아니면 cmd.exe가 오작동할 수 있다.
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# PowerShell — .gitattributes가 CRLF로 고정하는 것과 맞춘다(Windows 실행 환경).
+[*.ps1]
+end_of_line = crlf
+
+# Markdown은 줄 끝 공백 2칸이 강제 개행 문법이라 trim하지 않는다.
+[*.md]
+trim_trailing_whitespace = false
+
+# 라이선스 약관 스냅샷 — 바이트 그대로가 증거다. 편집기가 손대지 않게 한다.
+#   (.gitattributes의 -text와 같은 취지. 이 파일들은 애초에 사람이 열어 편집할
+#    대상이 아니지만, 실수로 열어 저장하는 경로를 막아 둔다.)
+[data/licenses/snapshots/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = false
+trim_trailing_whitespace = false

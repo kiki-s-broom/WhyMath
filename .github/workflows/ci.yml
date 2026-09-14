@@ -1277,6 +1277,15 @@ jobs:
           fi
           echo "OK — 하드코딩된 시크릿 패턴 없음"
 
+      # 인코딩·바이트 무결성 — cp949/UTF-8 혼용이 만드는 손상을 전수 차단 (OPS-78).
+      #   축 A U+FFFD(복구 불가·면제 없음) / B 선언 없는 비-UTF-8 / C mojibake /
+      #   D 선언↔실측 불일치 / E 라이선스 스냅샷 sha256 무결성.
+      #   이 잡에 붙인 이유: 신규 잡을 만들면 필수 체크 목록과 문서 REQUIRED_CHECKS
+      #   블록까지 함께 고쳐야 하고, 성격도 'CLAUDE.md 금기 가드'와 같은 계열이다.
+      #   정본 문서 = docs/standards/encoding_safety.md
+      - name: 인코딩 무결성 가드 (U+FFFD·비-UTF-8·mojibake·스냅샷 해시)
+        run: python3 scripts/ops/cp949_guard.py
+
   # ─────────────────────────────────────────────────────────────────
   # 빌드 하네스 무결성 + 원격 claim 교차 검증 (항상 실행 — 초 단위)
   # 병렬 세션 중복작업 방지: backlog 무결성·stale claim을 PR마다 감시

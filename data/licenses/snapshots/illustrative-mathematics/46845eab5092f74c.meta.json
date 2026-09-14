@@ -4,9 +4,11 @@
   "first_fetched_at": "2026-08-31T00:55:08Z",
   "first_run_id": "20260831T005458Z-b0b14e",
   "http_status": 200,
+  "integrity_note": "2026-09-14 실측: 저장된 바이트가 first_fetched_at 시점의 sha256과 다르다. 원인은 .gitattributes에 스냅샷 경로 규칙이 없어 Git 기본 text auto가 CRLF를 LF로 정규화한 것이다(기록 412464B → 저장 410549B). 같은 사고의 ncic·schoolinfo는 차이가 LF 개수와 정확히 일치해 CRLF 복원으로 원본 해시를 되찾았으나, 이 파일은 원본이 혼합 줄바꿈이라 어느 줄이 CRLF였는지 결정할 수 없어 바이트 복원이 불가능하다. sha256은 원 수집 시점의 값을 그대로 두고(증거의 기준값이므로 덮어쓰지 않는다) 현재 바이트의 해시를 stored_sha256에 병기한다. 재수집은 원 사이트 내용이 그 사이 바뀌었을 수 있어 해시가 어차피 달라지므로 자동 해결이 아니다 — 재수집 판정은 OPS-79가 소유한다. 재발 차단은 data/licenses/snapshots/** -text (같은 커밋).",
   "license_label": "CC BY 4.0",
   "name_ko": "Illustrative Math",
   "sha256": "46845eab5092f74cb358ddb8e820c10311369e905ba7dc60c3d6b397e4b3b2df",
   "source_id": "illustrative-mathematics",
+  "stored_sha256": "1abc761b5091f0296c9852c0fa7818e0beb755723e5a72f2040f99612f5ab5d0",
   "url": "https://illustrativemathematics.org/terms-of-use/"
 }

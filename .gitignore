@@ -48,7 +48,13 @@ devtools_options.yaml
 node_modules/
 
 # IDE
-.vscode/
+.vscode/*
+# .vscode 예외 — 인코딩 정책만 공유한다 (OPS-78).
+#   개인 상태(launch.json·tasks.json·확장 설정)는 계속 무시하고, 저장소 전체가 지켜야
+#   하는 인코딩 규칙만 추적한다. 한국어 Windows에서 VS Code가 파일을 cp949로 추측해
+#   열고 그대로 저장하면 mojibake가 커밋으로 굳는데, 그 방어는 개인 취향이 아니라
+#   저장소 정책이다. 기계 집행은 scripts/ops/cp949_guard.py.
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
