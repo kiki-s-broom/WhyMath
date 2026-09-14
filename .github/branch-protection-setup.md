@@ -42,6 +42,15 @@
 
 ## 적용할 설정 (체크 박스 그대로 따라가기)
 
+> **[2026-09-14 — 이 섹션은 클래식(legacy) 브랜치 보호 규칙의 역사적 설정 기록이다]** 이
+> 섹션이 기술하는 클래식 규칙은 `G-strict-policy-and-classic-cleanup` 결정으로 **삭제
+> 대상**이 됐다(§"strict 해제 확정 + 클래식 브랜치 보호 삭제" 참조) — 룰셋(Rulesets)이
+> 이미 이 내용 전체(필수체크 16건·승인 정책·linear history 등)를 포함해 더 넓게 담당한다.
+> 지우지 않고 남겨 두는 이유는 클래식이 왜 존재했고 무엇을 담당했는지의 기록이 필요하기
+> 때문이다 — 아래 "Require branches to be up to date before merging" 체크는 특히 룰셋의
+> `strict_required_status_checks_policy = false` 선언과 **의도적으로 어긋나 있던** 축이며,
+> 클래식 삭제로 그 어긋남이 해소된다.
+
 ### Branch name pattern
 ```
 main
@@ -100,7 +109,7 @@ main
 
 <!-- RULESET_POLICY_BEGIN — scripts/harness/ruleset_drift.py가 라이브 JSON과 대조한다. tests/infra/test_ruleset_drift.py가 이 블록의 실재를 동결한다. -->
 - `required_check_integration_id` = `15368`
-- `strict_required_status_checks_policy` = `true`
+- `strict_required_status_checks_policy` = `false`
 - `required_approving_review_count` = `1`
 - `dismiss_stale_reviews_on_push` = `true`
 - `require_code_owner_review` = `true`
@@ -380,6 +389,57 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 **수동 확인**: Actions 탭 → `pr-auto-resync` → Run workflow → `dry_run` = `1`. 읽기 전용이라
 **PAT 없이도 돈다** — 쓰기 자격 검사를 통과해 후보와 분모(스캔 N건 · BEHIND+auto-merge M건)만
 출력한다. 배선 확인 경로를 일부러 열어 둔 것이다.
+
+### strict 해제 확정 + 클래식 브랜치 보호 삭제 (2026-09-14 · 게이트 `G-strict-policy-and-classic-cleanup`)
+
+**결정 (Kiki · 대화 중 즉석 결정)**: ① `strict_required_status_checks_policy`를 **해제**(문서
+선언을 `true`→`false`로 정정, 위 RULESET_POLICY 블록에 반영됨) ② 클래식 브랜치 보호 규칙을
+**삭제**.
+
+**strict 해제 근거** — 위 `## 머지 경합` 섹션이 이미 현재 사실을 담고 있다: merge queue가
+PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **구조적으로 중복**이다. 게다가
+2026-09-10 이 세션의 PR #1063·#1092·#1094가 전부 `behind`로 막혀 main 수동 병합을 3회
+반복했고, 그때마다 CI가 처음부터 다시 돌았다 — 실제 마찰이 관측됐다. 기존 게이트
+`G-merge-queue-or-strict-relax`(2026-09-01)가 애초에 "merge queue 도입 **또는** strict
+해제"를 택일로 물었고, merge queue 쪽이 이미 채택돼 있으니 strict 해제가 남은 반쪽을
+마무리하는 것이다. **판정 기준(라이브 실측)**: `gh api repos/kiki-s-broom/WhyMath/rules/branches/main`
+조회 결과 룰셋 자체는 이미 `strict_required_status_checks_policy: false`였다(2026-09-14
+세션 내 재확인) — 문서만 뒤처져 있었다. 이 정정으로 `ruleset_drift.py`의 strict 축
+드리프트가 해소된다.
+
+**클래식 삭제 근거** — 클래식 필수체크 13건은 룰셋 16건의 **부분집합**(부족분: `concept-reach`·
+`declared-unwired-audit`·`corpus-authoring`)이고 `required_merge_queue`가 없어, 삭제해도
+큐는 죽지 않고 필수 체크도 줄지 않는다(`G-required-checks-source-of-truth` 선행 확인 실측).
+클래식이 살려 두던 것은 **실질 strict=true**뿐이었고, 그 축을 해제하기로 결정했으므로 클래식은
+더 지킬 것이 없는 낡은 사본이다.
+
+**집행 범위(한계 — 명시)**: 이 정정은 **문서 축**만 처리한다. 클래식 브랜치 보호 규칙
+*삭제*는 GitHub Settings UI에서 저장소 admin 권한으로만 가능하고, 이 세션의 GitHub 토큰은
+`/branches/main/protection` 조회조차 403(`Resource not accessible by integration` —
+2026-09-14 재확인, 2026-07-26 실측과 동일)이라 **세션이 대행할 수 없다**. 실행은 아래
+브리핑을 따라 Kiki가 하고, 추적은 별도 게이트 `G-classic-branch-protection-delete`가 한다.
+
+#### 📋 사전 브리핑 (Kiki 직접 수행 과제) — 클래식 브랜치 보호 규칙 삭제
+
+1. **과제 명칭** — `main`의 **클래식** 브랜치 보호 규칙(legacy branch protection rule) 삭제
+2. **목적** — 룰셋(rulesets)이 이미 필수체크 16건·merge queue·승인 정책을 전부 담당하고
+   있어 클래식은 낡은 부분집합 사본으로만 남아 있다. 클래식의 `strict=true`가 룰셋의
+   `strict=false` 선언과 충돌해 실질적으로 "up to date 요구"를 계속 살려 두고 있으므로,
+   strict 해제 결정을 완성하려면 클래식을 지워야 한다.
+3. **구체적 절차** — Settings → Branches → *Branch protection rules* 목록에서 `main` 규칙을
+   찾아 편집 화면 진입 → 페이지 하단 **Delete** 클릭 → 확인. 소요 약 1분. **룰셋(Rulesets)
+   쪽은 건드리지 않는다** — 삭제 대상은 "Branch protection rules" 섹션의 항목이다(Rules →
+   Rulesets 섹션과 다른 화면).
+4. **성공 기준** — 자가검증: 삭제 후 `Settings → Branches → Branch protection rules` 목록에
+   `main` 항목이 더 이상 없어야 한다. 부수 확인(선택): PR을 하나 열어 머지 버튼이 `main`이
+   `behind` 상태에서도(다음 push 전까지) 비활성화되지 **않는** 것을 관찰하면 strict 해제가
+   실제로 효과를 낸 것이다 — 단, merge queue가 여전히 최신 base 위에서 재검증하므로 실제
+   위험은 없다.
+5. **실행 환경** — 웹 브라우저(GitHub). PowerShell·리포 클론 불요. 저장소 admin 권한 필요.
+6. **창 구분** — 브라우저 탭 1개. 서버·프로세스 점유 없음, 이후 조작 제약 없음.
+
+삭제 후에는 게이트 `G-classic-branch-protection-delete`를 `backlog.py gates clear`로 닫는다
+(증적: 위 성공 기준의 "목록에 없음" 확인).
 
 ## 저장 후 확인
 

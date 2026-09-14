@@ -80,6 +80,16 @@ gates:
     evidence: "2026-09-09 Kiki가 이 세션과의 대화에서 3안 중 \"새 정본 저장소로 전환 (시나리오 A)\"을 직접 선택 — doldori7/WhyMath는 유지만 하고 향후 개발·PR·머지를 kiki-s-broom/WhyMath로 옮기기로 결정. 판정 기준(커밋)은 없음 — 대화 중 즉석 결정이라 --no-base 처리. 집행 상세·실행 범위 한계·개방 질문은 HARN-96-canonical-repo-migration-kiki-s-broom 및 G-canonical-repo-cutover-kiki-s-broom 참조."
     cleared_by: claude
     notes: "[판정기준 없음 2026-09-09] 커밋 없는 대화 중 즉석 결정 — Kiki가 이 세션에서 직접 시나리오 A(전환)를 선택"
+  - id: G-classic-branch-protection-delete
+    title: "클래식 브랜치 보호 규칙 삭제 실행 — G-strict-policy-and-classic-cleanup 결정(2026-09-14 Kiki: strict 해제 + 클래식 삭제)의 물리적 집행. 세션 GitHub 토큰은 /branches/main/protection 조회조차 403(admin 권한 필요)이라 대행 불가 — Settings→Branches→main 규칙 Delete. 6항목 브리핑·자가검증 = .github/branch-protection-setup.md '### strict 해제 확정 + 클래식 브랜치 보호 삭제'"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-14
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
@@ -454,9 +464,9 @@ gates:
     title: "strict 정책 축 결정 + 클래식 브랜치 보호 정리 — 필수 체크 16건은 룰셋에 복원됐으나(`G-required-checks-source-of-truth` cleared) 두 축이 남았다. **① strict**: 룰셋 `strict_required_status_checks_policy=false` vs 문서 선언 `true` — `ruleset_drift.py` 위반 1건. 현재 실질 strict는 클래식의 `strict=true`가 살려 두고 있어 클래식을 지우면 실질도 false가 된다. **② 클래식**: 필수체크 13건(룰셋 16건의 부분집합·2026-09-03 이전 낡은 사본)·`required_merge_queue` 없음 → 지워도 큐는 죽지 않고 필수 체크도 줄지 않는다(실측). **권고 = strict를 해제하고(문서 선언을 `false`로 정정) 클래식을 삭제한다.** 근거 3: ⓐ merge queue는 최신 base 위에 큐 브랜치를 만들어 CI를 돌리므로 'up to date 요구'가 구조적으로 중복이다 ⓑ 실제 마찰이 관측됐다 — 2026-09-10 이 세션의 PR #1063·#1092·#1094가 전부 `behind`로 막혀 main 수동 병합을 3회 반복했고, 그때마다 CI가 처음부터 다시 돌았다 ⓒ 기존 게이트 `G-merge-queue-or-strict-relax`가 애초에 이 둘을 **택일**로 물었고(merge queue 도입 **또는** strict 해제) merge queue 쪽이 이미 채택됐다. **대안**: strict를 유지하려면 룰셋에서 `Require branches to be up to date before merging`을 켜고 문서는 그대로 둔다 — 이 경우 위 마찰이 계속된다. 어느 쪽이든 클래식 삭제는 별개로 안전하다. 문서(`.github/branch-protection-setup.md` RULESET_POLICY 블록) 정정과 `ruleset_drift.py` 재검증은 결정 후 claude가 수행한다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-10
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
-    notes: ""
+    evidence: "Kiki가 이 세션과의 AskUserQuestion 대화에서 두 질문 모두 권고안 선택: ① strict 해제 ② 클래식 삭제. 문서 정정(.github/branch-protection-setup.md RULESET_POLICY strict_required_status_checks_policy: true→false)·ruleset_drift.py 재검증(라이브 JSON 재조회 EXIT=0, strict 위반 해소·유예 3건만 잔존)은 claude가 수행. 클래식 실제 삭제 실행은 세션 GitHub 토큰이 /branches/main/protection 403(admin 권한 필요)이라 대행 불가 — 후속 게이트 G-classic-branch-protection-delete로 승계"
+    cleared_by: kiki
+    notes: "[판정기준 없음 2026-09-14] 대화 중 즉석 결정(2026-09-14) — strict 해제 + 클래식 삭제 두 축 모두 권고안 채택. 저장소 설정(GitHub 룰셋/클래식 브랜치 보호) 결정이라 커밋 판정 기준 없음"
