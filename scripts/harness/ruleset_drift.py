@@ -66,13 +66,20 @@ STALE_AFTER_DAYS = 30
 # Kiki 머신(Windows PowerShell) 그대로 복사-실행 가능한 조회 명령. 세 가지가 강제된다:
 #   · `;` 구분 — Windows PowerShell 5.1은 `&&`를 받지 않는다
 #   · `python` — 이 저장소의 Windows 안내는 `python3`가 아니다
-#   · `Out-File -Encoding utf8` — PS 5.1의 `>`는 **UTF-16LE**로 쓴다. 그러면 판정기가
-#     읽다가 UnicodeDecodeError로 죽는다(2026-09-05 실측). 읽기측도 관용하지만
-#     (`_read_json_text`) 산출측에서 먼저 맞춘다 — CLAUDE.md 인코딩 정합 규칙.
+#   · `cmd /c "gh api ... > file"` — gh의 출력 바이트를 **PowerShell에 통과시키지 않는다**.
+#     PS 5.1은 네이티브 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본
+#     **cp949**)으로 디코딩한 뒤 다시 인코딩한다. 필수 체크 이름의 `—`·`·`는 UTF-8
+#     3바이트인데 cp949는 2바이트 조합이라 경계가 어긋나고, 선행바이트가 뒤따르는
+#     `"`(0x22)를 트레일로 삼켜 **JSON 구조 문자가 소실된다**. 2026-09-14 실측:
+#     `...가드","app_id"`가 `...媛??,"app_id"`가 되어 2,659→2,618자로 41자 유실,
+#     판정기는 `Expecting ',' delimiter: line 1 column 1828`로 exit 2.
+#
+#     이전 세대(`| Out-File -Encoding utf8`)는 `>`의 UTF-16LE만 피했을 뿐 디코딩
+#     경유는 그대로였다 — **인코딩을 명시해도 이미 깨진 문자열을 명시한 인코딩으로
+#     쓸 뿐이다.** `cmd /c`는 그 경유 자체를 없앤다.
 POWERSHELL_FETCH_RUNBOOK = (
     "cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath; "
-    "gh api repos/{owner}/{repo}/rules/branches/main | "
-    "Out-File -Encoding utf8 ruleset.json; "
+    'cmd /c "gh api repos/{owner}/{repo}/rules/branches/main > ruleset.json"; '
     "python scripts\\harness\\ruleset_drift.py ruleset.json --record"
 )
 
@@ -457,6 +464,11 @@ def read_json_text(path: Path) -> str:
     *우리가 읽는 쪽* 대응이다(HARN-19 서브프로세스 디코딩과 같은 축). 산출측도 런북에서
     UTF-8로 맞추지만(`POWERSHELL_FETCH_RUNBOOK`), 읽기측이 관용해야 실수 한 번이 판정
     자체를 죽이지 않는다.
+
+    **관용의 한계(2026-09-14 실측)**: 이 폴백은 *인코딩*만 가린다. gh 출력을 PowerShell
+    파이프라인에 태우면 cp949 디코딩 왕복에서 바이트가 실제로 **유실**되는데, 그 결과물은
+    UTF-8로 멀쩡히 디코딩되고 JSON 단계에서야 깨진다. 즉 산출측을 `cmd /c`로 고치는 것이
+    유일한 방어이고 읽기측 관용은 그 축을 막지 못한다.
     """
     raw = path.read_bytes()  # OSError는 호출부가 잡는다
     for encoding in ("utf-8-sig", "utf-16"):  # utf-16은 BOM으로 LE/BE를 스스로 가린다
@@ -466,7 +478,8 @@ def read_json_text(path: Path) -> str:
             continue
     raise RulesetInputError(
         f"{path}: 텍스트로 디코딩하지 못했다(시도: utf-8/utf-8-sig/utf-16). "
-        "PowerShell에서는 `> file` 대신 `| Out-File -Encoding utf8 file`을 쓴다."
+        "PowerShell에서는 gh 출력을 파이프에 태우지 말고 "
+        '`cmd /c "gh api ... > file"`로 받는다.'
     )
 
 
@@ -616,7 +629,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
-        return _measurement_failed(f"JSON 파싱 불가: {exc}\n앞 200자: {raw[:200]}")
+        return _measurement_failed(
+            f"JSON 파싱 불가: {exc}\n앞 200자: {raw[:200]}\n"
+            "흔한 원인 — PowerShell 경유 수집(cp949 디코딩)으로 구조 문자가 유실됐다. "
+            f"재수집: {POWERSHELL_FETCH_RUNBOOK}"
+        )
 
     try:
         doc = parse_doc(doc_path)

@@ -159,22 +159,33 @@ Test-Path scripts\harness\ruleset_drift.py
 ```powershell
 # Windows PowerShell — 위 자가검증이 True일 때만
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-gh api repos/kiki-s-broom/WhyMath/rules/branches/main | Out-File -Encoding utf8 ruleset.json
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rules/branches/main > ruleset.json"
 python scripts\harness\ruleset_drift.py ruleset.json --record
 echo "EXIT=$LASTEXITCODE"
 ```
 
-> **`>` 대신 `Out-File -Encoding utf8`을 쓰는 이유**: Windows PowerShell 5.1의 `>`는 네이티브
-> 명령 출력을 **UTF-16LE**로 씁니다. 그러면 판정기가 읽다가 `UnicodeDecodeError`로 죽어
-> exit 0/1/2 어느 것도 나오지 않습니다(2026-09-05 실측). 읽기측도 UTF-16·BOM을 관용하도록
-> 고쳤지만(`read_json_text`), 산출측에서 먼저 맞추는 것이 정본입니다 —
-> CLAUDE.md "외부 도구가 읽는 파일은 그 도구의 읽기 인코딩에 맞춘다".
+> **`cmd /c`로 감싸는 이유 — gh 출력을 PowerShell에 통과시키지 않는다**: PS 5.1은 네이티브
+> 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본 **cp949**)으로 디코딩한 뒤
+> 다시 인코딩합니다. 필수 체크 이름의 `—`·`·`는 UTF-8 3바이트인데 cp949는 2바이트 조합이라
+> 경계가 어긋나고, 선행바이트가 뒤따르는 `"`(0x22)를 트레일로 삼켜 **JSON 구조 문자가
+> 소실됩니다.** `cmd /c`는 바이트를 그대로 파일로 보내 이 경유 자체를 없앱니다.
+>
+> **실측(2026-09-14)**: `| Out-File -Encoding utf8`로 받은 파일이 `...가드","app_id"` →
+> `...媛??,"app_id"`가 되어 2,659→2,618자로 41자 유실됐고, 판정기가
+> `Expecting ',' delimiter: line 1 column 1828`로 **exit 2**를 냈습니다. 같은 회차에
+> `cmd /c`로 다시 받자 즉시 `EXIT=0`.
+>
+> **이전 처방이 왜 부족했나**: `Out-File -Encoding utf8`은 2026-09-05에 `>`의 UTF-16LE를
+> 피하려고 도입됐고 그 축에서는 옳았습니다. 다만 **디코딩 경유는 그대로 남겨** 이번 축을
+> 못 막았습니다 — *인코딩을 명시해도 이미 깨진 문자열을 명시한 인코딩으로 쓸 뿐입니다.*
+> 읽기측 관용(`read_json_text`)도 인코딩만 가리므로 이 축에는 무력합니다.
+> (CLAUDE.md HARN-19 — Windows 로케일 디코딩 붕괴의 *산출측* 대응.)
 
 | EXIT | 판정 | 다음 행동 |
 |---|---|---|
 | `0` | 정합 (권고만 있어도 0) | 없음 — 기록 갱신됨 |
 | `1` | **드리프트 위반** | 출력의 "시정 순서"를 위에서부터 따른다 |
-| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재) | 통과가 아니다 — `gh auth status`부터 확인 |
+| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재·**수집 손상**) | 통과가 아니다. `JSON 파싱 불가`면 위 `cmd /c` 형태로 재수집(cp949 유실) · 그 외는 `gh auth status`부터 확인 |
 
 기록 파일(`.github/ruleset-check-state.json`)은 `--record`가 쓴다. **손편집 금지** — 확인하지
 않고 날짜만 미루면 리마인드가 위장이 된다.
@@ -413,9 +424,11 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 
 ## 클래식 브랜치 보호 — 삭제 (룰셋 단일 정본)
 
-> **집행 상태**: ⏳ Kiki 실행 대기 (게이트 `G-strict-policy-and-classic-cleanup`).
-> 결정은 2026-09-14에 났고(A안), 실제 삭제 후 이 줄을 `✅ 완료 (YYYY-MM-DD)`로 갱신한다.
-> — *결정과 집행을 같은 줄에 적지 않는다: 미집행을 완료로 읽으면 그 뒤 판정이 전부 어긋난다.*
+> **집행 상태**: ✅ **완료 (2026-09-14)** — 게이트 `G-strict-policy-and-classic-cleanup`.
+> 실측: `DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection` 후 재조회가
+> `HTTP 404 Branch not protected`. 삭제 전 같은 명령은 JSON 2,512자를 돌려줬으므로
+> **변별력 있는 확인**이다. 직후 `ruleset_drift.py --record`가 `EXIT=0`(위반 0 · 유예 3건)
+> — 룰셋 단독 집행이 문서 선언과 정합함을 기계가 판정했다.
 
 이 저장소는 한동안 **룰셋과 클래식 브랜치 보호 두 벌**이 동시에 `main`을 지켰다. 2026-09-10
 실측으로 드러난 갈라짐이다(MEMORY 2026-09-10 · 게이트 `G-required-checks-source-of-truth`):
@@ -438,6 +451,27 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
    *실제 집행*이 아니라 *한쪽 소스*에 대한 판정이었다. 한 벌로 줄이면 판정이 다시 집행을
    가리킨다. (CLAUDE.md 「변별력 없는 검증 스텝 금지」의 *소스 축* — 검사는 멀쩡한데 보는
    곳이 정본이 아니게 된 상태였다.)
+
+### 삭제 직전 실측 (2026-09-14 · 백업 JSON은 Git 밖이라 여기 남긴다)
+
+| 클래식 축 | 값 | 룰셋의 대응 |
+|---|---|---|
+| `required_status_checks.strict` | `true` | 없음 — **이것이 실질 strict였다**(의도적 제거) |
+| `required_status_checks.contexts` | 13건 | 룰셋 16건이 상위집합 |
+| `required_linear_history` | `true` | `required_linear_history` ✔ |
+| `allow_force_pushes` | `false` | `non_fast_forward` ✔ |
+| `allow_deletions` | `false` | `deletion` ✔ |
+| `required_conversation_resolution` | `true` | `required_review_thread_resolution` ✔ |
+| `required_approving_review_count` | `0` | `0` (동일·유예 중) |
+| `require_code_owner_reviews` | `false` | `false` (동일·유예 중) |
+| `required_signatures` | `false` | 원래 꺼져 있었다 — 소실 없음 |
+| `block_creations` · `lock_branch` · `allow_fork_syncing` | `false` | 전부 꺼져 있었다 |
+| `restrictions` | **키 자체 부재** | 없었으므로 소실 없음 |
+| `enforce_admins` | `true` | ⚠️ **미확인** — 룰셋의 대응 축은 `bypass_actors`이고 그것은
+  `/rules/branches/main`에 나오지 않는다. `HARN-102`가 소유한다 |
+
+`dismiss_stale_reviews`만 클래식 `true` vs 룰셋 `false`인데, 승인 요구가 0인 상태에서는
+단독으로 의미가 없다(문서의 유예 3건 중 하나가 같은 축을 이미 다룬다).
 
 **되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
 되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
@@ -549,7 +583,7 @@ Actions pin" 외에는 아무것도 바꾸지 않음을 코드가 집행하고 �
 # Windows PowerShell (= Phaiakes9)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 Test-Path scripts\harness\ruleset_pin_plan.py
-gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-backup.json"
 Test-Path ruleset-backup.json
 ```
 첫 `Test-Path`가 `False`면 변경안 도구가 이 체크아웃에 없다 — 위 §"판정기 파일이 없다"와 같은
