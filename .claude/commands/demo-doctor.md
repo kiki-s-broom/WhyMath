@@ -137,10 +137,34 @@ if ($Ready) { Start-Process powershell -Verb RunAs -ArgumentList "-NoExit","-Exe
 승격을 가져간다. `-NoExit`이라 승격된 창이 열린 채 남아 출력을 읽을 수 있고, `Start-Transcript`가
 같은 내용을 `%TEMP%\winnat_reserve_5433.log`에 남긴다.
 
-**자가검증**: 승격된 창(또는 위 로그 파일)에서 `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` ·
-`STOP_EXIT`·`START_EXIT`가 0 · `RESERVE_PERSISTENT_EXIT=0` · 마지막 표에 `5433  5433  *`(관리
-지정)이 보이고 그 포트를 삼키던 구간이 사라짐. 조건이 안 맞으면 스크립트는 **아무것도 하지
-않는다**(의도). 창 A에서 로그만 다시 읽으려면:
+**자가검증 — 판정은 `netsh`의 종료 코드가 아니라 *표*로 한다 (2026-09-14 실측 보강)**: 승격된
+창(또는 위 로그 파일)에서 `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` ·
+`STOP_EXIT`·`START_EXIT`가 0 · **마지막 표에 `5433  5433  *`(관리 지정)이 보이고 그 포트를
+삼키던 구간이 사라짐**. 조건이 안 맞으면 스크립트는 **아무것도 하지 않는다**(의도).
+
+> **`netsh add excludedportrange`는 실패 종료 코드를 내면서 등록에 성공할 수 있다.** 실측
+> (2026-09-14 Phaiakes9): `RESERVE_PERSISTENT_EXIT=1`·`RESERVE_ACTIVE_FALLBACK_EXIT=1`로 두 시도가
+> 모두 "다른 프로세스가 파일을 사용 중" 오류를 냈는데, 같은 실행의 마지막 표에는
+> `5433  5433  *`가 **등록돼 있었다**(동시에 동적 구간 3개가 반납됐다). 읽어서 그렇게 보이는
+> 설명은 persistent 저장소 쓰기는 성립하고 *active* 적용만 실패했다가 `net start winnat`이
+> 반영했다는 것이지만 **미측정**이다. 그러므로 이 절의 판정 기준은 표이며, 종료 코드는 **불일치
+> 신호**로만 읽는다 — 표에 있는데 코드가 비0이면 아래 저장소 확인으로 넘어간다.
+
+**저장소 확인 (재부팅 생존 여부의 결정적 검사)** — 위 표는 *지금* 적용된 상태만 말한다.
+재부팅을 넘기려면 persistent 저장소에 있어야 한다:
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A]
+netsh interface ipv4 show excludedportrange protocol=tcp store=persistent
+"PERSISTENT_QUERY_EXIT=$LASTEXITCODE"
+netsh interface ipv4 show excludedportrange protocol=tcp
+"ACTIVE_QUERY_EXIT=$LASTEXITCODE"
+```
+
+persistent 조회에 `5433`이 있으면 영구 조치 성립. 없거나 조회가 거부되면(`store` 인자 미지원
+빌드일 수 있다 — 미측정) **임시 조치**로 간주하고 다음 재부팅 뒤 active 표를 다시 확인한다.
+
+창 A에서 승격 실행 로그만 다시 읽으려면:
 
 ```powershell
 # [Windows PowerShell · Phaiakes9 · 창 A]
