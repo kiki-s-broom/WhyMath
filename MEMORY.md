@@ -10088,3 +10088,35 @@ PR #1081의 조치 자체(r6 내용 복원)는 결과적으로 옳았고 이미 
 검사를 같은 화면에서 읽지 않는다")의 첫 적용이며, 실제로 값을 냈다 — mypy가 `format_report`의
 변수 재사용을 타입 오류로 잡았고 그것은 pytest만 돌렸으면 CI 7번째 스텝에서 red가 되어
 뒤 스텝 20개를 skipped로 만들었을 것이다.
+
+## 2026-09-14: G-strict-policy-and-classic-cleanup — strict 해제 + 클래식 브랜치 보호 삭제 결정 (Kiki 선택)
+
+**결정**: ① `strict_required_status_checks_policy` 문서 선언을 `true`→`false`로 정정
+(`.github/branch-protection-setup.md` RULESET_POLICY 블록) ② 클래식 브랜치 보호 규칙 삭제.
+두 축 모두 게이트가 제시한 권고안 그대로 Kiki가 채택(대화 중 즉석 결정 — 판정 기준 커밋 없음,
+`--no-base` 처리).
+
+**근거**: merge queue가 이미 PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가
+구조적으로 중복이고, 2026-09-10 PR #1063·#1092·#1094에서 `behind` 마찰이 실측됐다. 기존
+`G-merge-queue-or-strict-relax`(2026-09-01)의 원래 택일(merge queue **또는** strict 해제)에서
+merge queue 쪽만 채택돼 있었던 것을 이제 마무리한다. 클래식 필수체크 13건은 룰셋 16건의
+부분집합(`concept-reach`·`declared-unwired-audit`·`corpus-authoring` 부족)이고
+`required_merge_queue`가 없어 삭제해도 큐·필수체크 어느 쪽도 약해지지 않음이 선행 게이트
+`G-required-checks-source-of-truth`에서 실측됐다 — 클래식이 살려 두던 유일한 것은 실질
+strict=true였고, 그 축을 해제하기로 했으므로 클래식은 더 지킬 게 없다.
+
+**세션이 한 것**: 이 세션의 GitHub 토큰으로 `gh api repos/kiki-s-broom/WhyMath/rules/branches/main`을
+직접 재조회(EXIT=0, curl+Bearer) — 룰셋은 이미 `strict_required_status_checks_policy: false`
+였다(문서만 뒤처져 있었다). 문서 정정 후 그 라이브 JSON으로 `ruleset_drift.py`를 재실행해
+strict 위반이 해소됐음을 확인(위반 0·유예 3건만 잔존·EXIT=0) → `--record`로
+`.github/ruleset-check-state.json` 갱신(`last_checked=2026-09-14·verdict=ok`).
+
+**세션이 못 한 것(한계)**: 클래식 브랜치 보호 규칙 *삭제* 자체는 저장소 admin 권한이 필요한
+GitHub Settings UI 작업이다 — 세션 토큰은 `/branches/main/protection` 조회조차 403
+(`Resource not accessible by integration`, 2026-07-26 실측과 동일 재확인)이라 대행 불가.
+6항목 브리핑을 문서에 추가하고 후속 게이트 `G-classic-branch-protection-delete`(kind=human·
+assignee=kiki)로 승계했다.
+
+**정정 지점**: `G-strict-policy-and-classic-cleanup`은 cleared(kiki) — 이 게이트의 스코프는
+"결정"이었고 결정은 완료됐다. 물리적 삭제 실행 여부와 무관하게 결정 자체는 닫힌다(패턴 =
+`G-canonical-repo-migrate-decision` 2026-09-09 선례 — 결정 게이트와 집행 게이트를 분리).

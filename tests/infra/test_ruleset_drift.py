@@ -71,7 +71,7 @@ def _load_backlog() -> Any:
 def _rules(
     checks: list[tuple[str, int | None]],
     *,
-    strict: bool = True,
+    strict: bool = False,
     approvals: int = 0,
     dismiss: bool = False,
     codeowner: bool = False,
@@ -161,9 +161,15 @@ def test_all_documented_checks_are_individually_detectable(tmp_path: Path) -> No
         assert _run(_rules(checks), tmp_path) == 1, f"{name} 제거가 탐지되지 않았다"
 
 
-def test_strict_policy_false_is_violation(tmp_path: Path) -> None:
-    """결함 주입: strict(=브랜치 최신화 요구)를 끈다. 체크 목록만 보면 놓치는 축."""
-    assert _run(_rules(_healthy_checks(), strict=False), tmp_path) == 1
+def test_strict_policy_true_is_violation(tmp_path: Path) -> None:
+    """결함 주입: strict(=브랜치 최신화 요구)를 켠다. 체크 목록만 보면 놓치는 축.
+
+    2026-09-14 `G-strict-policy-and-classic-cleanup` 결정으로 문서 선언이 `true`→`false`로
+    바뀌었다(merge queue가 이미 최신 base 재검증을 하므로 'up to date 요구'가 구조적으로
+    중복 — `.github/branch-protection-setup.md` '### strict 해제 확정' 참조). 그래서 드리프트
+    방향도 반대가 됐다 — 이제는 누가 strict를 **다시 켜는 것**이 문서 선언과의 불일치다.
+    """
+    assert _run(_rules(_healthy_checks(), strict=True), tmp_path) == 1
 
 
 def test_thread_resolution_false_is_violation(tmp_path: Path) -> None:
@@ -358,7 +364,9 @@ def test_as_found_2026_09_03_state_is_reported_exactly(tmp_path: Path) -> None:
     """
     checks = _healthy_checks() + [(name, None) for name in _UNPINNED_WITH_TWIN]
     checks = [c for c in checks if c != (_GRADE_A, 15368)] + [(_GRADE_A, None)]
-    payload = _rules(checks)
+    # strict=True를 그 시점 실측대로 고정한다 — `_rules`의 기본값은 2026-09-14 이후
+    # 문서 선언(false)을 따라가므로, 이 역사적 스냅숏은 기본값 변화와 무관하게 유지해야 한다.
+    payload = _rules(checks, strict=True)
 
     assert _run(payload, tmp_path) == 1
     report = _report(payload)
