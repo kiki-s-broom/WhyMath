@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-79-license-snapshot-recollect-judgement
+title: CRLF 정규화로 해시가 깨진 라이선스 스냅샷 3건의 재수집 판정
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재수집 가치 판정 — 3건(illustrative-mathematics·kogl-license-types·omnimath)의 약관 페이지를 지금 다시 받아 내용이 2026-08-31 수집분과 실질적으로 같은지 본다. 같으면 재수집본으로 교체하고 meta를 갱신한다(그때의 sha256이 새 기준이 된다). 다르면 교체하지 않는다 — 그 경우 우리가 가진 것은 '그 시점 약관'의 유일한 사본이고, 바이트가 정규화됐어도 본문 텍스트는 보존돼 있으므로 증거 가치가 0은 아니다.\n② 텍스트 동일성 확인 — 바이트가 달라도 CRLF/LF 차이뿐이면 본문은 같다. 현재 저장분을 LF 정규화 기준으로 재수집본과 비교해 '줄바꿈 외 차이 0'인지 실측한다. 차이가 있으면 그것은 사이트가 약관을 고쳤다는 뜻이고, 그 사실 자체가 기록 가치가 있다.\n③ 판정 결과를 meta에 반영 — 교체하든 안 하든 integrity_note를 결론으로 갱신한다. '조사했고 이렇게 판정했다'가 남아야 다음 사람이 같은 조사를 반복하지 않는다.\n④ 접근 제약 명시 — 이 3곳이 샌드박스 egress에서 차단되는지 먼저 확인한다. 게이트 G-license-snapshot-blocked-sources가 14곳을 403으로 기록했으므로 이 3곳도 세션에서 못 받을 수 있다. 그러면 Kiki 머신 실행이 필요하며, 명령 블록은 cmd /c 경유로 준다(2026-09-14 cp949 유실 사고).\n⑤ 정직한 공백 — 재수집으로 원 sha256을 되찾을 수는 없다. 사이트 내용이 1바이트라도 바뀌면 해시가 달라지기 때문이다. 이 태스크가 회복하는 것은 '해시 검증 가능한 증거'이지 '2026-08-31의 바이트'가 아니다. 그 구분을 결론에 적는다."
+artifacts: []
+paths:
+  - "data/licenses/snapshots/**"
+session: null
+notes: "분리 경위(2026-09-14): OPS-78이 저장소 전수 인코딩 가드를 만들며 라이선스 스냅샷 20건 중 5건의 sha256이 meta 기록과 어긋난 것을 발견했다. 원인은 .gitattributes에 스냅샷 경로 규칙이 없어 Git 기본 text auto가 CRLF를 LF로 정규화한 것이며, 재발 차단(-text)과 복원 가능분 2건(ncic·schoolinfo — 차이가 LF 개수와 정확히 일치해 CRLF 복원 시 기록 해시와 바이트 동일)은 OPS-78이 처리했다.\n\n이 태스크가 받는 것은 복원 불가 3건이다: illustrative-mathematics(차이 1,915 vs LF 2,667) · kogl-license-types(105 vs 2,646) · omnimath(10 vs 995). 차이가 LF 개수와 맞지 않는다 = 원본이 혼합 줄바꿈이었다 = 어느 줄이 CRLF였는지 결정할 수 없다. 전건 복원은 오버슈트하고 부분 복원은 조합 폭발이라 바이트 복원이 원리적으로 불가능하다.\n\n왜 OPS-78에서 분리했는가: 재수집은 외부 사이트 접근이 필요하고(샌드박스 egress 제약 가능성), 무엇보다 원 sha256을 되찾지 못한다 — 사이트가 그 사이 약관을 고쳤으면 해시가 달라지기 때문이다. 즉 '가드를 만든다'와 성격이 다른 판단이 필요하다. OPS-78은 그 3건에 stored_sha256과 integrity_note를 기록해 훼손 사실을 남기고 통과시키며, 가드는 그 기록이 있는 경우에만 예외로 인정한다(기록 없는 통과는 위장이고, 무조건 위반은 고칠 수 없는 위반을 상시 보고해 사람이 가드를 끄게 만든다).\n\n인접: 게이트 G-license-snapshot-blocked-sources(cleared)가 14곳의 미수집을 다뤘고, 이 3곳은 그때 수집에 성공한 쪽이다."
+updated: 2026-09-14
