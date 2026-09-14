@@ -145,6 +145,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     "4c6dfb1527a9",  # SEC-29: privacy_audit.resource_type/resource_id/action — 콘텐츠CUD 감사
     "3f5c83f51246",  # SEC-31: 학생 답안/풀이 3테이블 봉투 암호화(problem_attempt·
     # answer_submission·student_solution_step 8쌍 16컬럼 + expression nullable 완화)
+    "67cf48ad3bce",  # EOS-49: concept_version 테이블(Concept 좌석 4번째) + concept.
+    # current_published_version_id(§6.4) + PUBLISHED 불변성 트리거(§7)
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

@@ -175,7 +175,9 @@ class TestMigrationFileChain:
         # resource_id/action)를 얹어 head를 이동.
         # SEC-31이 4c6dfb1527a9 위에 3f5c83f51246(학생 답안/풀이 3테이블 봉투 암호화)를 얹어
         # head를 다시 이동.
-        assert heads == {"3f5c83f51246"}
+        # EOS-49가 3f5c83f51246 위에 67cf48ad3bce(concept_version 테이블 + PUBLISHED
+        # 불변성 트리거)를 얹어 head를 다시 이동.
+        assert heads == {"67cf48ad3bce"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

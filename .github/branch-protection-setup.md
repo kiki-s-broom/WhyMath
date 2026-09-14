@@ -42,6 +42,15 @@
 
 ## 적용할 설정 (체크 박스 그대로 따라가기)
 
+> **[2026-09-14 — 이 섹션은 클래식(legacy) 브랜치 보호 규칙의 역사적 설정 기록이다]** 이
+> 섹션이 기술하는 클래식 규칙은 `G-strict-policy-and-classic-cleanup` 결정으로 **삭제
+> 대상**이 됐다(§"strict 해제 확정 + 클래식 브랜치 보호 삭제" 참조) — 룰셋(Rulesets)이
+> 이미 이 내용 전체(필수체크 16건·승인 정책·linear history 등)를 포함해 더 넓게 담당한다.
+> 지우지 않고 남겨 두는 이유는 클래식이 왜 존재했고 무엇을 담당했는지의 기록이 필요하기
+> 때문이다 — 아래 "Require branches to be up to date before merging" 체크는 특히 룰셋의
+> `strict_required_status_checks_policy = false` 선언과 **의도적으로 어긋나 있던** 축이며,
+> 클래식 삭제로 그 어긋남이 해소된다.
+
 ### Branch name pattern
 ```
 main
@@ -422,37 +431,52 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 **PAT 없이도 돈다** — 쓰기 자격 검사를 통과해 후보와 분모(스캔 N건 · BEHIND+auto-merge M건)만
 출력한다. 배선 확인 경로를 일부러 열어 둔 것이다.
 
-## 클래식 브랜치 보호 — 삭제 (룰셋 단일 정본)
+### strict 해제 확정 + 클래식 브랜치 보호 삭제 (2026-09-14 · 게이트 `G-strict-policy-and-classic-cleanup`)
 
-> **집행 상태**: ✅ **완료 (2026-09-14)** — 게이트 `G-strict-policy-and-classic-cleanup`.
-> 실측: `DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection` 후 재조회가
-> `HTTP 404 Branch not protected`. 삭제 전 같은 명령은 JSON 2,512자를 돌려줬으므로
-> **변별력 있는 확인**이다. 직후 `ruleset_drift.py --record`가 `EXIT=0`(위반 0 · 유예 3건)
-> — 룰셋 단독 집행이 문서 선언과 정합함을 기계가 판정했다.
+**결정 (Kiki · 대화 중 즉석 결정)**: ① `strict_required_status_checks_policy`를 **해제**(문서
+선언을 `true`→`false`로 정정, 위 RULESET_POLICY 블록에 반영됨) ② 클래식 브랜치 보호 규칙을
+**삭제**.
 
-이 저장소는 한동안 **룰셋과 클래식 브랜치 보호 두 벌**이 동시에 `main`을 지켰다. 2026-09-10
-실측으로 드러난 갈라짐이다(MEMORY 2026-09-10 · 게이트 `G-required-checks-source-of-truth`):
+**strict 해제 근거** — 위 `## 머지 경합` 섹션이 이미 현재 사실을 담고 있다: merge queue가
+PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **구조적으로 중복**이다. 게다가
+2026-09-10 이 세션의 PR #1063·#1092·#1094가 전부 `behind`로 막혀 main 수동 병합을 3회
+반복했고, 그때마다 CI가 처음부터 다시 돌았다 — 실제 마찰이 관측됐다. 기존 게이트
+`G-merge-queue-or-strict-relax`(2026-09-01)가 애초에 "merge queue 도입 **또는** strict
+해제"를 택일로 물었고, merge queue 쪽이 이미 채택돼 있으니 strict 해제가 남은 반쪽을
+마무리하는 것이다. **판정 기준(라이브 실측)**: `gh api repos/kiki-s-broom/WhyMath/rules/branches/main`
+조회 결과 룰셋 자체는 이미 `strict_required_status_checks_policy: false`였다(2026-09-14
+세션 내 재확인) — 문서만 뒤처져 있었다. 이 정정으로 `ruleset_drift.py`의 strict 축
+드리프트가 해소된다.
 
-| 축 | 룰셋 (ID `16623542`) | 클래식 브랜치 보호 |
-|---|---|---|
-| 필수 체크 | **16건** (현행) | 13건 — 룰셋의 **부분집합**, 2026-09-03 이전 낡은 사본 |
-| up-to-date 요구 | `false` | `true` ← **실질 strict를 이쪽이 혼자 살려 두고 있었다** |
-| merge queue | 활성 | 없음 |
+**클래식 삭제 근거** — 클래식 필수체크 13건은 룰셋 16건의 **부분집합**(부족분: `concept-reach`·
+`declared-unwired-audit`·`corpus-authoring`)이고 `required_merge_queue`가 없어, 삭제해도
+큐는 죽지 않고 필수 체크도 줄지 않는다(`G-required-checks-source-of-truth` 선행 확인 실측).
+클래식이 살려 두던 것은 **실질 strict=true**뿐이었고, 그 축을 해제하기로 결정했으므로 클래식은
+더 지킬 것이 없는 낡은 사본이다.
 
-**왜 지우는가** — 세 가지가 전부 같은 방향을 가리킨다:
-
-1. **보호가 줄지 않는다.** 클래식의 13건은 룰셋 16건의 부분집합이므로, 지워도 필수 체크는
-   16건 그대로다. 큐도 룰셋 쪽에 있어 죽지 않는다.
-2. **없어져야 할 것만 없어진다.** 클래식의 `strict=true`가 바로 2026-09-14에 해제하기로 한
-   그 축이다. 삭제가 곧 그 결정의 집행이다.
-3. **관측 도구가 정본을 본다.** `ruleset_drift.py`·`pr_delivery_audit.py`·`ruleset_pin_plan.py`
+**부수 근거 — 관측 도구가 정본을 보게 된다**: `ruleset_drift.py`·`pr_delivery_audit.py`·`ruleset_pin_plan.py`
    **3종이 전부 룰셋만 읽는다.** 게다가 `GITHUB_TOKEN`은 클래식 브랜치 보호에 **403**이라 CI
    안에서는 갈라진 쪽을 볼 수단 자체가 없다 — 집행이 두 벌인 동안 이 도구들의 "정합" 판정은
    *실제 집행*이 아니라 *한쪽 소스*에 대한 판정이었다. 한 벌로 줄이면 판정이 다시 집행을
    가리킨다. (CLAUDE.md 「변별력 없는 검증 스텝 금지」의 *소스 축* — 검사는 멀쩡한데 보는
    곳이 정본이 아니게 된 상태였다.)
 
-### 삭제 직전 실측 (2026-09-14 · 백업 JSON은 Git 밖이라 여기 남긴다)
+#### 집행 결과 — ✅ 완료 (2026-09-14)
+
+> **실측**: `DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection` 실행 후 재조회가
+> `HTTP 404 Branch not protected`. 삭제 **전** 같은 명령은 JSON 2,512자를 돌려줬으므로
+> **변별력 있는 확인**이다(성공/실패 양쪽에서 같은 값을 내는 검사가 아니다). 직후
+> `ruleset_drift.py --record`가 `EXIT=0`(위반 0 · 유예 3건, 전부 만료 전 승인 축) —
+> 클래식이 사라진 뒤에도 **룰셋 단독으로 문서 선언을 충족**함을 기계가 판정했다.
+>
+> **병렬 처리 기록**: 이 게이트는 두 세션이 동시에 처리했다. PR #1157은 세션 토큰이
+> `/branches/main/protection`에 403이라 대행 불가로 판단하고 Kiki 실행 브리핑 + 후속 게이트
+> `G-classic-branch-protection-delete`를 실었다. 그 판단은 *그 세션의 토큰 기준으로는* 옳았고,
+> 실제로는 같은 시각 이 세션에서 **Kiki가 자신의 `gh` 토큰으로 직접 실행**했다. 브리핑은
+> 역할을 다했으므로 위 실행 결과로 대체하고, 후속 게이트는 신설 시점에 이미 충족된
+> 상태였으므로 같은 근거로 clear한다.
+
+#### 삭제 직전 실측 (2026-09-14 · 백업 JSON은 Git 밖이라 여기 남긴다)
 
 | 클래식 축 | 값 | 룰셋의 대응 |
 |---|---|---|
@@ -476,6 +500,7 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 **되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
 되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
 정본으로 복사한다 — 낡은 13건을 복원하지 않는다).
+
 
 ## 저장 후 확인
 

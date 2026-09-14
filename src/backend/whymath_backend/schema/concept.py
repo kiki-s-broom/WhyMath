@@ -206,6 +206,16 @@ class Concept(BaseModel):
     # `embedding_id`(구 pgvector 참조 잔재·슬98)는 소비처 0·전량 NULL·로더 미설정이라
     # ORM·스키마 양쪽에서 제거했다(마이그레이션 동반). 실 벡터는 code 키 별 테이블이 소유.
 
+    # ===== 판 관리(EOS-49 §6.4) — 현재 발행 버전 포인터 =====
+    # `concept_version`(Concept 좌석 4번째 테이블)의 PUBLISHED 행을 가리키는 느슨 포인터.
+    # schema↔ORM 필드 정합(`test_concept_orm.py::test_schema_orm_field_parity_frozen`)을
+    # 위해 ORM 컬럼과 짝을 맞춘다 — from_schema/to_schema 교집합 필터가 이 필드 없이는
+    # ORM 컬럼값을 조용히 유실한다(§ 모듈 docstring 변환 헬퍼 메커니즘).
+    current_published_version_id: uuid.UUID | None = Field(
+        default=None,
+        description="현재 발행(PUBLISHED) 버전의 concept_version.version_id(없으면 미발행).",
+    )
+
     # ===== 운영 메타 =====
     created_at: datetime | None = Field(default=None, description="생성 시각")
 

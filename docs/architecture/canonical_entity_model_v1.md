@@ -14,6 +14,10 @@
 테이블로 늘었다 — 위 "전수 귀속" 원칙 자체는 그대로다(핵심-외 §2-B에 편입, 신규 좌석 아님).
 §2 표·합계·아래 ① 행을 79로 갱신했다.
 
+※ [갱신 2026-09-14] `EOS-49`가 `concept_version` 테이블을 Concept 좌석의 4번째 테이블로
+추가해 79→80 테이블로 늘었다(§3-D "판정 2026-09-06"이 이미 이 배정을 예고했다 — 새 엔티티가
+아니라 기존 Concept 좌석 편입) — §2 표·합계·아래 ① 행을 80으로 갱신했다.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -25,7 +29,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 | # | 검사 | 깨지면 |
 |---|---|---|
-| ① | 79테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
+| ① | 80테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
 | ③ | **좌석 부재 4종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `hints`는 물론 `hint_content` 같은 우회 이름으로 좌석을 등재해도 **RED** |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
@@ -78,6 +82,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
      (Concept Purity — 8대 구조 원칙 ①). 그 6종은 전부 핵심-외 테이블로 외부화돼 있다(§2-B).
    - ⚠ **혼재 3좌석**: `concept`(관계형) · `concept_node`(그래프 프로젝션) · `atom_node`(원자 백본).
      판정 불가라 **그대로 적는다** — 통합 여부는 §5 후속 판단.
+   - **버전 축**: `concept_version`(4번째 좌석·`EOS-49`·게이트 `G-eos49-content-version-seat`
+     D안 판정 — 새 엔티티가 아니라 이 좌석의 버전 테이블. §3-D 참조).
 
 6. **Skill** — 개념을 **실행**하는 능력 단위(`skill.<slug>`).
    - *이다*: 숙련도 추적의 단위이자 증거가 귀속되는 대상.
@@ -159,7 +165,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 41테이블
+### §2-A. 좌석 배정 — 42테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -167,7 +173,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 2 | **Curriculum** | `curriculum_framework` · `curriculum_version` | 2 |
 | 3 | **CurriculumNode** | `curriculum_entry` · `achievement_standard` · `achievement_level_unit` · `textbook_unit` · `textbook_mapping` | 5 |
 | 4 | **LearningObjective** | `learning_objective` · `unit_spec` | 2 |
-| 5 | **Concept** | `concept` · `concept_node` · `atom_node` | 3 |
+| 5 | **Concept** | `concept` · `concept_node` · `atom_node` · `concept_version` | 4 |
 | 6 | **Skill** | `skill_node` | 1 |
 | 7 | **Misconception** | `misconception_catalog` | 1 |
 | 8 | **Problem** | `problem` · `problem_step` | 2 |
@@ -183,7 +189,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 41**
+**좌석 합계 = 42**
 
 ### §2-B. 핵심 외 — 37테이블
 
@@ -232,7 +238,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 41 + 38 = **79** ✓(SEC-27 `job_ownership` 추가 — 2026-09-11)
+**핵심-외 합계 = 38** · 42 + 38 = **80** ✓(EOS-49 `concept_version` 추가 — 2026-09-14,
+이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
 
 ### §2-C. 판정 보류 1건 — 날조 금지
 

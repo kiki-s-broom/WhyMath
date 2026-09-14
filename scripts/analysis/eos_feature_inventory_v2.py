@@ -572,6 +572,9 @@ CATALOG: tuple[Spec, ...] = (
        "05 §5.2 선언적 명세", "l3.visualization", "l3.viz_eval"),
     _e("WM-E-314", "프롬프트 자산 레지스트리", "Platform", "Versioning", "P0",
        "OPS-16 — docs/prompts 단일 진실 원천", "l3.prompt_assets"),
+    _e("WM-E-315", "연령별 설명 생성기·언어수준(F7) 결함 검출기", "Platform", "Pedagogy", "P2",
+       "C9 — EOS-98(EOS-53 crosswalk 갭 #16)", "l3.pedagogy.explanation_generator",
+       "l3.pedagogy.explanation_checker"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",
@@ -661,6 +664,9 @@ CATALOG: tuple[Spec, ...] = (
        "schema.subject_adapter"),
     _e("WM-E-420", "L4 공용 모델·인터페이스", "Platform", "Pedagogy", "P0",
        "Pydantic·Protocol", "l4.models"),
+    _e("WM-E-421", "연령별 설명 공개 진입점(EOS-70 explain 위임 대상)", "Student", "Pedagogy", "P2",
+       "C9 — EOS-98, 저장(영속화) 축은 미착수(EOS-70 explain 계약 확정 후 판단)",
+       "l4.pedagogy.age_band_explanation"),
     # ════════════════════ E — L5·L6 ════════════════════
     _e("WM-E-501", "OCR 파이프라인(검출→라우팅→인식→조립·검증)", "Student", "Math Engine", "P2",
        "PaddleOCR+Qwen3-VL — 라이브 정확도 미검증", "l5.ocr", "api.ocr_handoff",
@@ -781,6 +787,9 @@ CATALOG: tuple[Spec, ...] = (
        "초인간 검증 기준 v1 — 기계 게이트 승격 절차", "harness.qa_pipeline", "harness.wilson",
        "harness.*_eval", "harness.*_battle", "harness.corpus_reverify",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
+       # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
+       # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
+       "harness.generator_space_overlap_audit",
        "harness.prompt_asset_audit", "harness.generation_seed_replay_probe",
        "harness.batch_safety"),
     _o("WM-O-913", "커버리지·도달률 관측 리포트 가족", "Admin", "Analytics", "P1",

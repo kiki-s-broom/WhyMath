@@ -149,6 +149,16 @@ class Concept(Base):
     # 코퍼스 부재였다(위 Phase 1b 4컬럼 청산 선례 동형). 실 벡터는 code 키 별 테이블
     # (`concept_embedding` 등)이 소유하므로 이 참조 컬럼은 불필요 — 마이그레이션 동반 제거.
 
+    # ===== 판 관리(EOS-49 §6.4) — 현재 발행 버전 포인터 =====
+    # `concept_version`(Concept 좌석 4번째 테이블 — canonical_entity_model_v1.md §3-D
+    # 판정 D안)의 PUBLISHED 행을 가리키는 느슨 포인터. nullable·기본값 없음 — 기존 행
+    # 무영향(비파괴, 44_eos_version_management.md §6.4 "Entity 상태와 Version 상태는
+    # 분리"). 이 컬럼 자체는 어떤 전이 규칙도 강제하지 않는다 — PUBLISHED 불변·
+    # PUBLISHED→DRAFT 금지는 `concept_version` BEFORE UPDATE 트리거가 강제한다.
+    current_published_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid, sa.ForeignKey("concept_version.version_id")
+    )
+
     # ===== 운영 메타 =====
     created_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
