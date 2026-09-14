@@ -10120,3 +10120,67 @@ assignee=kiki)로 승계했다.
 **정정 지점**: `G-strict-policy-and-classic-cleanup`은 cleared(kiki) — 이 게이트의 스코프는
 "결정"이었고 결정은 완료됐다. 물리적 삭제 실행 여부와 무관하게 결정 자체는 닫힌다(패턴 =
 `G-canonical-repo-migrate-decision` 2026-09-09 선례 — 결정 게이트와 집행 게이트를 분리).
+---
+
+## EOS-98 — 연령별(학교급 4개) 개념 설명 생성 좌석 신설 + F7 측정 계약 (2026-09-14)
+
+**착수 시 재실측(acceptance ①)**: `data/corpus/concept_content_v1/content.json` 437건 전량이
+개념당 `explanation` 1건뿐(학년 필드 없음) + 저장소 전수 `explain*` 공개 함수 0건 재확인
+(EOS-70 2026-09-06 판정과 동일) — 0건 그대로라 흡수·cancel 대상 아님, 착수 확정.
+
+**경계 명문(acceptance ② — 4분립, S4-05·PRES-02·KG-06 + 발견된 5번째 인접축 ANALOGY_REGISTERS)**:
+- **S4-05**(`concept_definition` Overlay) — 축=정의의 **종류**(kind: rigorous/informal 등 폐쇄
+  4종). 같은 개념이라도 kind가 다르면 다른 정의고, L4는 그중 하나를 코칭 상황에 맞게 *선택*할
+  뿐 생성하지 않는다. EOS-98은 정의 종류가 아니라 **같은 내용을 다른 어휘 수준으로 재표현**하는
+  축이라 겹치지 않는다.
+- **PRES-02**(대상층×디바이스 표출 프로파일) — acceptance 자체에 "범위 밖 명시: 콘텐츠 자체의
+  대상층별 생성(교수학 엔진 축)은 L4/L6 책임"이라 적혀 있다. PRES-02는 *이미 생성된 콘텐츠*의
+  서체·위젯·TTS 분기(렌더 축)만 다루고 생성은 명시적으로 자기 범위 밖으로 뺐다 — EOS-98이 그
+  빠진 축을 채운다.
+- **KG-06**(concept_content 심화 스코핑) — 축=*정적 코퍼스*의 단일 explanation 품질(길이·구조)
+  향상 스코핑(실행은 별도 후속). EOS-98은 스코핑이 아니라 **온디맨드 다수준 생성 엔진**이라
+  겹치지 않는다(KG-06이 심화한 원문을 EOS-98이 재료로 재표현할 수는 있으나 그 자체가 KG-06의
+  범위는 아니다).
+- **ANALOGY_REGISTERS**(`l3/pedagogy/analogy_generator.py`, 착수 중 발견한 5번째 인접축 —
+  crosswalk 원문에 없던 가장 가까운 선례) — 같은 4단계 학년 레지스터로 LLM 생성·라우터 경유·
+  검수 게이트를 갖췄지만, 결정적으로 **레지스터는 파라미터이고 개념당 착지는 1건**(상한
+  불변식 04e §6.4 — `concept_content.metaphor` 단일 컬럼). EOS-98은 반대로 **같은 개념을 4개
+  레지스터 전부에 대해 동시에 필요로 한다**("동일 개념 다수준 설명 생성")라 착지 좌석이 없다
+  (이 슬라이스는 온디맨드 생성까지만 — 저장 축은 EOS-70이 explain 계약을 확정한 뒤 판단).
+  또한 어휘 표기가 "중학"(analogy) vs "중등"(`SpeechGradeBand`)으로 갈려 있던 것을 EOS-98은
+  후자로 통일해 **세 번째 표기를 새로 만들지 않았다**(analogy_generator.py 자체는 손대지
+  않음 — 별도 태스크 범위).
+
+**설계 결정**:
+- 4개 밴드는 지어내지 않고 기존 `SpeechGradeBand`(초등/중등/고등/대학 — `schema/speech.py`)를
+  그대로 재사용. 성취기준 `school_type`은 3값(초/중/고)뿐이라 "대학"은 성취기준 밖 페르소나
+  확장(B/E)이며 `SpeechGradeBand.대학` 문서화 근거와 동일선상.
+- 환각 방지: `ExplanationTarget`은 재표현할 원문(`concept_content.explanation`)을 **필수**로
+  받는다(공백 생성기 초기화 자체를 거부 — `__post_init__` ValueError). LLM은 "재표현만" 하고
+  새 사실을 창작하지 않는다(EOS-89 rephrase 설계 동형).
+- F7 판정: `l3/pedagogy/explanation_checker.py`가 `l4/speech/profiles.py::PROFILES`의
+  `introduced_constructs`(낭독 프로파일과 **단일 진실 원천 공유**)를 함수 인자로 주입받아,
+  그 밴드에 미도입된 구조 어휘(미분·적분·극한·로그·시그마·조합 등)가 본문에 등장하면
+  `GenerationFailureCode.F7`(동결 8코드 — 새 코드 발명 없음)로 판정. 문장 난이도(가독성) 축은
+  규칙 판정 불가라 `DEFERRED_DEFECT_AXES`로 명시(정직한 커버리지).
+- 측정 계약(acceptance ④): `harness/explanation_f7_eval.py`가 analogy_fidelity_eval 선례를
+  그대로 미러 — 밴드별 미도입 구조 어휘 결함주입 시험지(초등 8축·중등 6축, 고등/대학은 전
+  구조 도입 상태라 violating 셀 구조적으로 0)를 Wilson 상한 게이트(`--control` 대조군 포함)로
+  검증했고, 실제 생성 배치용 `measure_generated_f7_rate()`(dense 8코드 dict·trials=0 명시 거부)
+  도 같은 PR에 동반.
+- 아키텍처 버그 발견·수정: L4 진입점(`explain_concept_at_age_band`)은 `async def`인데
+  `ExplanationGenerator.generate_draft`(analogy_generator 미러)는 내부에서 `run_until_complete`
+  로 **새 이벤트 루프를 여는 sync 래퍼**라, 이미 실행 중인 루프(FastAPI 요청 핸들러·pytest-
+  asyncio) 안에서 부르면 `RuntimeError: Cannot run the event loop while another loop is
+  running`가 난다(테스트가 실측). `agenerate_draft`(진짜 async — provider를 직접 await)를
+  신설해 L4는 이쪽만 쓰도록 배선했다 — analogy_generator 자신은 배치 스크립트 전용이라 이
+  버그가 없었지만, EOS-98처럼 API 서빙 경로에 놓이는 생성기는 이 축을 반드시 갖춰야 한다.
+
+**착지 좌석**: 온디맨드 생성 진입점까지(`l4/pedagogy/age_band_explanation.py::
+explain_concept_at_age_band`/`explain_concept_all_bands`). 영속화(저장 테이블)는 미착수 —
+EOS-70이 SubjectAdapter.explain 계약을 확정한 뒤 별도 태스크로 판단(정직한 공백).
+
+**검증**: 신규 테스트 4파일(checker·generator·L4 진입점·harness eval) 전건 통과(hermetic·
+FakeProvider·라이브 LLM 0) + ruff·black·mypy --strict·lint-imports(7계층 계약 KEPT) 개별 확인.
+전체 스위트는 미실행(data_pipeline 패키지 미설치 환경 — 기존 무관 컬렉션 에러 7건, 이 PR
+이전부터 존재) — CI가 전체 판정.

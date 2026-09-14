@@ -36,6 +36,9 @@ _SEMANTIC_COLUMNS = frozenset(
     }
 )
 _OPS_COLUMNS = frozenset({"created_at"})
+# 판 관리 포인터(EOS-49 §6.4) — `concept_version.version_id`를 가리키는 느슨 참조일 뿐
+# 버전 payload 자체를 내장하지 않는다(behavior_skills와 동형 축 — 참조 키, 내장 아님).
+_VERSIONING_COLUMNS = frozenset({"current_published_version_id"})
 
 # 알려진 순수성 부채 — 저작 게이트 기준 금칙 축이나 런타임에 잔존하는 컬럼. **현재 0건**:
 # 과거 2건(embedding_id·recommended_visual_styles)은 ARCH-14로 모두 청산됐다(전자=죽은 컬럼 제거·
@@ -44,7 +47,12 @@ _OPS_COLUMNS = frozenset({"created_at"})
 _KNOWN_PURITY_DEBT: frozenset[str] = frozenset()
 
 _EXPECTED_COLUMNS = (
-    _IDENTITY_COLUMNS | _HIERARCHY_COLUMNS | _SEMANTIC_COLUMNS | _OPS_COLUMNS | _KNOWN_PURITY_DEBT
+    _IDENTITY_COLUMNS
+    | _HIERARCHY_COLUMNS
+    | _SEMANTIC_COLUMNS
+    | _OPS_COLUMNS
+    | _VERSIONING_COLUMNS
+    | _KNOWN_PURITY_DEBT
 )
 
 # 절대 금칙 — 재유입 시 즉시 red(저작 게이트 `_FORBIDDEN_NODE_FIELDS`와 동일 축 + 런타임
