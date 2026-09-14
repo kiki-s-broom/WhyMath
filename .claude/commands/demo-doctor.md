@@ -80,40 +80,172 @@ $env:PYTHONPATH = (Resolve-Path "src\backend").Path
 판정(`exit 0` 도달 가능 / `1` 도달 불가 / `2` 측정 불가)과 상태별 대책이 함께 출력된다.
 `NOT_PUBLISHED`(설정은 있는데 게시가 성립하지 않음)면 아래로 간다.
 
+> **`UNKNOWN`(exit 2)은 고장 판정이 아니다.** Docker Desktop이 꺼져 있으면 `docker inspect`가
+> `npipe:////./pipe/dockerDesktopLinuxEngine`에 붙지 못해 설정·실현 두 신호가 **모름**이 되고
+> 도구는 3상태 규율대로 `UNKNOWN`을 낸다(2026-09-12 실측). 아래 ②단계는 Docker Desktop을
+> *끈 상태*에서 도는 절차이므로 그 구간의 `UNKNOWN`은 **정상**이다 — 최종 판정은 ③에서 Docker를
+> 다시 켠 뒤에 한다.
+
 ```powershell
 # [Windows PowerShell · Phaiakes9] — 예약 구간에 그 포트가 있는지 확인
 netsh interface ipv4 show excludedportrange protocol=tcp
 ```
 
-포트를 포함하는 구간이 보이면 **영구 조치**를 한다. `winnat`을 내렸다 올리면 동적 예약이
-반납되고, 그 틈에 포트를 *관리 포트 제외*로 등록하면 다음에 Hyper-V가 그 대역을 다시 잡을 때
-건너뛴다(지정 예약은 동적 할당에서만 빼는 것이라 명시적 bind는 그대로 된다).
+포트를 포함하는 구간이 보이면 조치를 한다. `winnat`을 내렸다 올리면 동적 예약이 반납되고,
+그 틈에 포트를 *관리 포트 제외*로 등록하면 다음에 Hyper-V가 그 대역을 다시 잡을 때 건너뛴다.
 
-> **창**: 관리자 권한 PowerShell **새 창**. **선행**: Docker Desktop 종료(트레이 → Quit).
+> **메커니즘 2축 모두 실측됐다 (2026-09-14 Phaiakes9 · 이전 판은 둘 다 추론이었다)**:
+> ⓐ **지정 예약은 명시적 bind를 막지 않는다** — 5433이 관리 지정 제외로 박힌 상태에서
+> `docker restart whymath-pg`가 `0.0.0.0:5433->5432/tcp`로 정상 게시했고 진단 CLI가
+> `REACHABLE`(exit 0)을 냈다. ⓑ **재할당이 그 포트를 건너뛴다** — 같은 조회에서 동적 구간
+> `11723~12315` 5개가 새로 잡혀 있었는데 5433은 그 어디에도 없었다. 이 절이 하는 일이
+> 실제로 일어나는 장면이다.
+
+> **창**: **창 A 그대로** — 아래 블록이 UAC로 스스로 승격한다(관리자 창을 사람이 여는 단계를
+> 없앴다 · 아래 「스스로 승격한다」 참조). **선행**: Docker Desktop 종료(트레이 → Quit).
 > **영향**: `winnat`은 이 PC의 NAT 전반이라 내렸다 올리는 몇 초간 WSL·Docker 네트워크가 끊긴다.
 
 ```powershell
-# [관리자 권한 Windows PowerShell · Phaiakes9 · 새 창]
-$IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-"IS_ADMIN=$IsAdmin"
+# [Windows PowerShell · Phaiakes9 · 창 A · 일반 권한에서 실행 — UAC 승인 팝업이 뜬다]
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Script = Join-Path $env:TEMP "winnat_reserve_5433.ps1"
+Set-Content -Path $Script -Encoding UTF8 -Value @'
+Start-Transcript -Path (Join-Path $env:TEMP "winnat_reserve_5433.log") -Force
+$Admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+"IS_ADMIN=$Admin"
 $Docker = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
 "DOCKER_DESKTOP_RUNNING=" + [bool]$Docker
-if ($IsAdmin -and -not $Docker) {
+if ($Admin -and -not $Docker) {
   net stop winnat
   "STOP_EXIT=$LASTEXITCODE"
-  netsh int ipv4 add excludedportrange protocol=tcp startport=5433 numberofports=1
-  "RESERVE_EXIT=$LASTEXITCODE"
+  netsh int ipv4 add excludedportrange protocol=tcp startport=5433 numberofports=1 store=persistent
+  $Reserve = $LASTEXITCODE
+  "RESERVE_PERSISTENT_EXIT=$Reserve"
+  if ($Reserve -ne 0) {
+    netsh int ipv4 add excludedportrange protocol=tcp startport=5433 numberofports=1
+    "RESERVE_ACTIVE_FALLBACK_EXIT=$LASTEXITCODE"
+  }
   net start winnat
   "START_EXIT=$LASTEXITCODE"
   netsh interface ipv4 show excludedportrange protocol=tcp
 }
+Stop-Transcript
+'@
+$Ready = [bool](Select-String -Path $Script -Pattern "excludedportrange" -Quiet)
+"SCRIPT_READY=$Ready"
+if ($Ready) { Start-Process powershell -Verb RunAs -ArgumentList "-NoExit","-ExecutionPolicy","Bypass","-File","`"$Script`"" }
 ```
 
-**자가검증**: `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` · 세 `*_EXIT`가 0 · 마지막 표에
-`5433  5433  *`(관리 지정)이 보이고 그 포트를 삼키던 구간이 사라짐. 조건이 안 맞으면 블록은
-**아무것도 하지 않는다**(의도) — 권한 경고를 산문으로만 두면 일반 창에 붙여넣어진다(실측).
+**스스로 승격한다 (2026-09-12 실측 보강)**: 이전 판은 "관리자 권한 PowerShell 새 창을 여세요"를
+산문으로 지시하고 블록은 `IS_ADMIN` 가드만 뒀다. 라이브에서 그 단계가 **생략돼** 블록이 일반
+창에서 돌았고 `IS_ADMIN=False`로 **아무것도 하지 않았다** — 가드는 설계대로 작동했지만 절차는
+공전했고 왕복이 1회 늘었다. 사람이 창을 여는 단계 자체가 실패 지점이므로 블록이 `-Verb RunAs`로
+승격을 가져간다. `-NoExit`이라 승격된 창이 열린 채 남아 출력을 읽을 수 있고, `Start-Transcript`가
+같은 내용을 `%TEMP%\winnat_reserve_5433.log`에 남긴다.
 
-Docker Desktop 재실행 후 `docker restart whymath-pg` → 위 진단 CLI를 다시 돌려 `exit 0` 확인.
+**자가검증 — 판정은 `netsh`의 종료 코드가 아니라 *표*로 한다 (2026-09-14 실측 보강)**: 승격된
+창(또는 위 로그 파일)에서 `IS_ADMIN=True` · `DOCKER_DESKTOP_RUNNING=False` ·
+`STOP_EXIT`·`START_EXIT`가 0 · **마지막 표에 `5433  5433  *`(관리 지정)이 보이고 그 포트를
+삼키던 구간이 사라짐**. 조건이 안 맞으면 스크립트는 **아무것도 하지 않는다**(의도).
+
+> **`netsh add excludedportrange`는 실패 종료 코드를 내면서 등록에 성공할 수 있다.** 실측
+> (2026-09-14 Phaiakes9): `RESERVE_PERSISTENT_EXIT=1`·`RESERVE_ACTIVE_FALLBACK_EXIT=1`로 두 시도가
+> 모두 "다른 프로세스가 파일을 사용 중" 오류를 냈는데, 같은 실행의 마지막 표에는
+> `5433  5433  *`가 **등록돼 있었다**(동시에 동적 구간 3개가 반납됐다). 읽어서 그렇게 보이는
+> 설명은 persistent 저장소 쓰기는 성립하고 *active* 적용만 실패했다가 `net start winnat`이
+> 반영했다는 것이지만 **미측정**이다. 그러므로 이 절의 판정 기준은 표이며, 종료 코드는 **불일치
+> 신호**로만 읽는다 — 표에 있는데 코드가 비0이면 아래 저장소 확인으로 넘어간다.
+
+**저장소 확인 (재부팅 생존 여부의 결정적 검사)** — 위 표는 *지금* 적용된 상태만 말한다.
+재부팅을 넘기려면 persistent 저장소에 있어야 한다:
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A] — 두 저장소를 같은 형태로 물어 변별력을 확보한다
+netsh interface ipv4 show excludedportrange protocol=tcp store=active
+"ACTIVE_STORE_QUERY_EXIT=$LASTEXITCODE"
+netsh interface ipv4 show excludedportrange protocol=tcp store=persistent
+"PERSISTENT_STORE_QUERY_EXIT=$LASTEXITCODE"
+```
+
+**두 조회를 같은 형태로 하는 이유**: persistent 조회만 돌려서 비어 있으면 *정말 비었는지*
+*그 인자를 이 빌드가 무시했는지* 구분할 수 없다 — 부재와 미지원이 같은 화면을 낸다(CLAUDE.md
+「모른다 ≠ 아니다」). active 조회가 **표를 내는데** persistent 조회가 **비면** 인자는 이해된
+것이고 persistent 저장소가 실제로 빈 것이다.
+
+> **실측 (2026-09-14 Phaiakes9 · 변별 확보)**: `store=active` 조회는 `5433  5433  *`를 포함한
+> 표를 냈고 `store=persistent` 조회는 **출력 없이 exit 0**이었다. 두 조회가 같은 형태였으므로
+> 인자는 이해된 것이고 **persistent 저장소가 실제로 비었다** — 부재와 미지원이 갈렸다. 따라서
+> 이 PC의 5433 제외는 **active 전용 — 재부팅에서 사라진다**(위 `RESERVE_PERSISTENT_EXIT=1`과
+> 정합). 즉 §W1의 `store=persistent` 경로는 이 환경에서 **실패했고**, 남은 것은 임시 조치다.
+> 실패 사유("다른 프로세스가 파일을 사용 중")의 원인은 **규명되지 않았다** — winnat을 내린
+> 상태였고 동적 구간도 반납된 뒤였다. 추측을 적지 않는다.
+
+persistent에 `5433`이 있으면 영구 조치 성립. 비어 있으면 **임시 조치**이며 재부팅·WSL
+재시작마다 이 절차를 다시 밟아야 한다.
+
+**영구화는 하지 않기로 결정했다 (2026-09-14 Kiki 판단)**. 후보였던 부팅 시 자동 재등록(작업
+스케줄러 `AtStartup` + 최고 권한 netsh add)은 **채택하지 않는다** — 근거 3: ⓐ 충돌은 확률적이다
+(9-08에 5433을 삼킨 구간은 `5368~5467`, 9-14에 잡힌 구간은 `11723~12315`로 무관) ⓑ 이 절차는
+이제 전부 자가 구동이라 재발 시 블록 2개·2분이면 복구된다 ⓒ 부팅 시점에 WinNAT이 먼저 5433을
+잡으면 자동 작업도 경합하므로, 자동화 자체가 별도 검증을 요구한다. **재확인 지점**(만료 없는
+유예 금지): 증상이 스스로 신고한다 — `WinError 1225`·`bind ... forbidden`이 다시 보이면 이 절을
+처음부터 다시 밟고, **재발이 잦아지면(같은 달 2회+) 그때 자동화를 재검토**한다.
+
+창 A에서 승격 실행 로그만 다시 읽으려면:
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A]
+Get-Content (Join-Path $env:TEMP "winnat_reserve_5433.log")
+```
+
+**`store=persistent`가 핵심이다 (2026-09-12 보강)**: 이 절의 존재 이유가 "재부팅·WSL 재시작마다
+재발한다"를 끝내는 것인데, `store` 없이 등록한 제외는 **active 저장소에만 들어가 재부팅에서
+사라진다** — 그러면 이 절차 자체가 아래 「주의」가 경계하는 *운*과 같아진다. 이 netsh 빌드가
+`store=persistent`를 받는지는 **미측정**이므로 블록이 거부(비0 종료)를 감지해 인자 없는 형태로
+폴백한다. `RESERVE_ACTIVE_FALLBACK_EXIT` 줄이 출력됐다면 **영구 조치가 아니라 임시 조치**이며,
+다음 재부팅 뒤 `netsh interface ipv4 show excludedportrange protocol=tcp`로 `5433`이 남아 있는지
+반드시 재확인한다.
+
+**③ 최종 판정 — Docker 기동도 블록이 가져간다 (2026-09-14 실측 보강 · 동일 유형 2회차)**:
+"Docker Desktop을 켜고 오세요"를 산문으로 지시했더니 **두 회차 연속** 그 단계가 빠진 채 다음
+블록이 실행돼 `RESTART_EXIT=1`·진단 `UNKNOWN`만 반복됐다. 위 ②의 관리자 창과 **같은 형태**이므로
+같은 대책을 쓴다 — 블록이 실행 파일을 스스로 찾아 띄우고 데몬이 실제로 응답할 때까지 기다린다.
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A] — Docker 기동 대기 포함(최대 4분)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Dd = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+        "${env:ProgramFiles(x86)}\Docker\Docker\Docker Desktop.exe",
+        "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe") |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+"DOCKER_DESKTOP_EXE=$Dd"
+if ($Dd -and -not (Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue)) { Start-Process $Dd }
+$Deadline = (Get-Date).AddMinutes(4)
+do {
+  Start-Sleep -Seconds 10
+  docker info *> $null
+  $Ready = ($LASTEXITCODE -eq 0)
+  "WAITING ready=$Ready at $(Get-Date -Format HH:mm:ss)"
+} until ($Ready -or (Get-Date) -gt $Deadline)
+"DAEMON_READY=$Ready"
+if ($Ready) {
+  docker restart whymath-pg
+  "RESTART_EXIT=$LASTEXITCODE"
+  docker ps --filter name=whymath-pg --format "{{.Names}} | {{.Status}} | {{.Ports}}"
+  $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+  $env:PYTHONPATH = (Resolve-Path "src\backend").Path
+  & src\backend\.venv\Scripts\python.exe -m whymath_backend.ops.db_host_reachability
+  "DIAG_EXIT=$LASTEXITCODE"
+}
+```
+
+**성공 기준**: `docker ps` 줄에 `0.0.0.0:5433->5432/tcp`(화살표가 있어야 한다) · `DIAG_EXIT=0`.
+`DAEMON_READY=False`면 Docker가 4분 안에 안 올라온 것이므로 **진단이 아니라 기동 문제**다.
+
+> **이 단계가 곧 "관리 지정 제외가 Docker의 bind를 막지 않는다"의 검증이다.** 그 명제는 읽어서
+> 그렇게 보이는 것이지 이 PC에서 측정된 적이 없다(위 §W1 서두의 괄호 설명). 만약 여기서
+> `NOT_PUBLISHED`가 나오면 제외 등록이 원인이므로 관리자 창에서 되돌린다:
+> `netsh int ipv4 delete excludedportrange protocol=tcp startport=5433 numberofports=1`
 
 **주의 — 재시작만으로 붙는 수가 있다(그리고 그것은 해결이 아니다)**: 동적 예약은 스스로
 반납되기도 해서, Docker Desktop 재기동만으로 포트가 열릴 수 있다. 2026-09-09에 실제로 그랬다.
