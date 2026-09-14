@@ -424,12 +424,12 @@ gates:
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-14
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
-    notes: ""
+    evidence: "[실측 2026-09-14 · Kiki 머신 Windows PowerShell · C:\\Users\\kiki\\Desktop\\__AI\\WhyMath]\n수집: cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" (파이프 미경유 — cp949 디코딩 왕복 회피)\n판정: python -c \"... json.load ... len(d.get('bypass_actors',[]))\" → **bypass_actors 건수: 0 · 배열 [] **\n\n[판정] 빈 배열 = 룰셋을 우회할 수 있는 주체가 0명 = 저장소 관리자에게도 규칙이 그대로 적용된다. 이는 클래식 브랜치 보호의 enforce_admins=true와 등가다. 따라서 2026-09-14 클래식 삭제로 **소실된 보호 축은 0개**이며, 12축 대조표의 마지막 미확인 칸이 닫혔다. 되돌림(룰셋 재설정·클래식 복원)은 불요하며 HARN-102 acceptance ②(비어 있지 않을 때의 되돌림 판정)는 전제 미성립으로 해당 없음이 됐다.\n\n[변별력] 이 검사는 성공/실패 양쪽에서 같은 값을 내지 않는다 — bypass_actors에 항목이 있으면 건수가 0이 아닌 정수로 나오고 actor_type·bypass_mode가 출력된다. 앞선 같은 조회가 세션 토큰에서는 403이었고 Kiki 토큰에서는 200을 반환한 것도 조회 자체가 실제로 도달했다는 증거다.\n\n[범위 명시 — 추론으로 채운 칸] 룰셋의 enforcement 필드 값은 이번 출력에 담기지 않았다. 다만 앞서 수집한 GET /repos/{owner}/{repo}/rules/branches/main 이 규칙 16건을 반환했고 그 엔드포인트는 **활성(active) 룰셋의 규칙만** 돌려주므로 enforcement=active는 성립한다 — 단, 이는 필드를 직접 읽은 것이 아니라 **API 의미를 읽어 추론한 것**이다. 직접 확인이 필요해지면 같은 ruleset-full.json의 enforcement 키를 보면 된다(재수집 불요).\n\n[남는 것 — 이 게이트가 닫아도 닫히지 않는 축] 지금 상태가 안전하다는 것과 그 상태가 **감시된다**는 것은 다르다. ruleset_drift.py 는 /rules/branches/main 만 읽으므로 bypass_actors 는 선언 축에도 판정기에도 없다 — 누군가 나중에 bypass_actors 를 채워도 기계는 조용하다. 편입 여부 판정은 HARN-102 acceptance ③~⑤가 그대로 소유한다(이 게이트 clear로 그 태스크의 requires_gates 가 풀려 착수 가능해진다)."
+    cleared_by: claude
+    notes: "[판정기준 없음 2026-09-14] GitHub 룰셋 API 조회 결과라 커밋 기반 판정 근거가 없다. 증적은 Kiki 머신 gh 응답(bypass_actors=[])이며 저장소 몫의 기록은 PR #1161이 담는다."
   - id: G-s5-subject-expansion
     title: "S5 타과목 확장 게이트 — E축 착수 판정 체크리스트 전부 충족 (e_axis_v1 §5)"
     kind: decision

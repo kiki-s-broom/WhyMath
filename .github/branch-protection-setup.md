@@ -491,11 +491,25 @@ PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **�
 | `required_signatures` | `false` | 원래 꺼져 있었다 — 소실 없음 |
 | `block_creations` · `lock_branch` · `allow_fork_syncing` | `false` | 전부 꺼져 있었다 |
 | `restrictions` | **키 자체 부재** | 없었으므로 소실 없음 |
-| `enforce_admins` | `true` | ⚠️ **미확인** — 룰셋의 대응 축은 `bypass_actors`이고 그것은
-  `/rules/branches/main`에 나오지 않는다. `HARN-102`가 소유한다 |
+| `enforce_admins` | `true` | `bypass_actors: []` ✔ **(2026-09-14 확인)** — 우회 주체 0명이므로
+  관리자에게도 규칙이 그대로 적용된다. 소실 없음 |
 
 `dismiss_stale_reviews`만 클래식 `true` vs 룰셋 `false`인데, 승인 요구가 0인 상태에서는
 단독으로 의미가 없다(문서의 유예 3건 중 하나가 같은 축을 이미 다룬다).
+
+**12축 대조 결과: 소실 0.** 마지막 미확인 칸(`enforce_admins`)은 게이트
+`G-ruleset-bypass-actors-read`로 분리해 Kiki 머신에서 1회 조회로 닫았다.
+
+> 「실측」 2026-09-14 · `cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json"`
+> → `bypass_actors 건수: 0` · 배열 `[]`.
+> 빈 배열은 룰셋을 우회할 수 있는 주체가 없다는 뜻이고, 이는 클래식의 `enforce_admins: true`와 등가다.
+> 파이프(`| Out-File`)를 쓰지 않은 이유는 아래 "수집 명령" 절 참조 — cp949 왕복으로 JSON이 손상된다.
+
+**다만 지금 안전한 것과 그 상태가 감시되는 것은 다르다.** `ruleset_drift.py`는
+`/rules/branches/main`만 읽고 그 응답에는 `bypass_actors`가 없다 — 즉 **선언 축에도 판정기에도
+없으므로, 나중에 누군가 `bypass_actors`를 채워도 기계는 조용하다.** 선언 편입 여부(편입하면
+어느 엔드포인트를 정본으로 할지까지)는 `HARN-102`가 소유한다. 편입하지 않기로 결론나면
+그 이유를 여기에 적는다 — 감시하지 않는 축을 조용히 두면 다음 사람이 감시되는 줄 안다.
 
 **되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
 되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
