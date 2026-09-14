@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -17,7 +17,8 @@ acceptance:
   - "③ 생성 좌석: 같은 개념에 대해 학교급 4개 언어 수준(수준 정의는 착수 시 확정·성취기준 학교급과 정합)의 설명을 내는 공개 진입점을 L3 또는 L4에 신설한다 — LLM 호출은 라우터 경유, 학생 제공 전 PRM 또는 도구 검증 필수(CLAUDE.md). 이 진입점이 EOS-70(SubjectAdapter explain 능력 판정)이 위임 대상으로 삼는 것이다"
   - "④ F7 실패율 측정 계약 동반: 생성물의 언어 수준 부적합(GenerationFailureCode.F7) 판정 경로와 측정 산출(비율·Wilson 단측 경계)을 생성기와 같은 PR에서 착지시킨다 — 측정 없는 생성기는 완료가 아니다(작동한 비율 원칙)"
   - "⑤ 시점: crosswalk가 W3+(폭 앵커 착수 시)로 둔 T2 항목이다 — 별도 게이트 없이 priority 3·P2로 두어 selector 순서에 맡긴다. 앞당길 근거가 생기면 amend --priority로 재배정한다"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1155"
 paths:
   - "src/backend/whymath_backend/l3/**"
   - "src/backend/whymath_backend/l4/**"
@@ -25,4 +26,4 @@ paths:
   - "tests/backend/l4/**"
 session: null
 notes: "출처: docs/reviews/eos_plan52_crosswalk_2026-09.md 갭 후보 #16(C9) — 계열 EOS-5x·T2·W3+, F7 측정 계약 동반, S4-05·PRES-02와 경계 명문 필수. 등재 계기(2026-09-06 PR #994 Codex P2): EOS-70을 blocked로 두면 C9 좌석이 없어 자동 해금 경로가 없다는 지적 — 이 태스크가 EOS-70의 depends_on 대상이 되어 done 시 selector가 EOS-70을 자동으로 후보에 올린다. 범위는 crosswalk 원문에 한정해 적었고 4개 언어 수준의 정의·인접 태스크와의 3분립은 착수 시 확정한다(여기서 지어내지 않는다). 번호는 CLI 배정"
-updated: 2026-09-06
+updated: 2026-09-14

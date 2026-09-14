@@ -166,10 +166,17 @@ SOFT_DECLARED: dict[tuple[str, str], SoftDeclaration] = {
         quotes=("blocked)가 참조할 대장이 없다. ADMIN-02 (c)(school_region·gen",),
     ),
     ("EOS-50-publish-gate-pipeline", "ARCH-31"): SoftDeclaration(
-        "DISJUNCTIVE",
-        "notes '선행: ARCH-31 **또는** EOS-49의 버전 테이블 실체화' — 택일이라 depends_on"
-        "(AND)으로 표현하면 둘 다 기다리게 되어 실제보다 강하게 막는다. 둘 중 하나가 done이 "
-        "되는 시점에 그때 남은 쪽을 부착하는 것이 정답이다.",
+        "HISTORICAL",
+        "[재분류 2026-09-14] 원 분류는 DISJUNCTIVE였다 — notes '선행: ARCH-31 **또는** "
+        "EOS-49의 버전 테이블 실체화'가 택일이라 depends_on(AND)으로 걸면 둘 다 기다리게 "
+        "되므로, 택일의 한쪽(EOS-49)만 하드로 부착해 막아 두었다(PR #994). 그 EOS-49가 "
+        "PR #1156으로 done이 되어 택일 조건이 실제로 충족됐다 — depends_on=[EOS-49]가 "
+        "이미 그 해소를 반영해 EOS-50을 정당하게 후보로 노출한다(audit-deps 실측: "
+        "EOS-49 done 직후 DISJUNCTIVE 유지 시 '제외되지 않는다' 위반 — 이 재분류로 해소, "
+        "test_dep_declaration.py 설계 의도 그대로 '의존이 done이면 재노출'을 반영). 이제 "
+        "이 notes 문장은 앞으로의 순서 제약이 아니라 이미 해소된 과거 사실이다. ARCH-31 "
+        "자체는 착수되지 않았다 — 이 재분류가 뜻하는 것은 '택일 조건 충족'이지 "
+        "'ARCH-31 완료'가 아니다.",
         quotes=("on') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화",),
     ),
     ("LIC-03-provenance-enforcement-layer-decision", "LIC-01"): SoftDeclaration(
