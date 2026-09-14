@@ -71,7 +71,11 @@ def _load_backlog() -> Any:
 def _rules(
     checks: list[tuple[str, int | None]],
     *,
-    strict: bool = True,
+    # 2026-09-14 Kiki 결정(A안·게이트 G-strict-policy-and-classic-cleanup)으로 정상 상태의
+    # strict는 false다 — merge queue가 최신 base 위에서 전건 재검증하므로 개별 PR의
+    # up-to-date 요구는 중복이다. 기본값은 *문서 선언*을 따라간다(둘이 어긋나면 정상
+    # 입력이 위반으로 나와 이 파일 전체가 red가 된다 — 실제로 그렇게 발각됐다).
+    strict: bool = False,
     approvals: int = 0,
     dismiss: bool = False,
     codeowner: bool = False,
@@ -161,9 +165,18 @@ def test_all_documented_checks_are_individually_detectable(tmp_path: Path) -> No
         assert _run(_rules(checks), tmp_path) == 1, f"{name} 제거가 탐지되지 않았다"
 
 
-def test_strict_policy_false_is_violation(tmp_path: Path) -> None:
-    """결함 주입: strict(=브랜치 최신화 요구)를 끈다. 체크 목록만 보면 놓치는 축."""
-    assert _run(_rules(_healthy_checks(), strict=False), tmp_path) == 1
+def test_strict_policy_true_is_violation(tmp_path: Path) -> None:
+    """결함 주입: strict(=브랜치 최신화 요구)를 **켠다**. 체크 목록만 보면 놓치는 축.
+
+    주입 방향이 2026-09-14에 뒤집혔다. 그 전에는 strict=true가 정상이라 끄는 것이 결함
+    주입이었다. 지금은 merge queue가 같은 보장을 큐에서 집행하므로 개별 PR의 up-to-date
+    요구는 중복이고, 그 중복이 실제 마찰을 냈다(2026-09-10 PR #1063·#1092·#1094가 전부
+    behind로 막혀 main 수동 병합 3회 · 그때마다 CI 재시작).
+
+    **이 테스트가 사라지지 않는 것이 핵심이다** — 축을 감시하지 않게 된 것이 아니라
+    감시 방향이 바뀐 것뿐이다. 누가 strict를 되켜면 여기서 걸린다.
+    """
+    assert _run(_rules(_healthy_checks(), strict=True), tmp_path) == 1
 
 
 def test_thread_resolution_false_is_violation(tmp_path: Path) -> None:

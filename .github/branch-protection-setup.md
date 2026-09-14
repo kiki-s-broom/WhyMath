@@ -54,7 +54,10 @@ main
   - [x] Require review from Code Owners *(CODEOWNERS 파일 활용)*
 
 - [x] **Require status checks to pass before merging**
-  - [x] Require branches to be up to date before merging
+  - [ ] ~~Require branches to be up to date before merging~~ — **끈다**
+    (2026-09-14 Kiki 결정 · 게이트 `G-strict-policy-and-classic-cleanup`).
+    merge queue가 큐 브랜치를 최신 `main` 위에 얹어 재검증하므로 이 요구는 구조적으로
+    중복이고, 실제 마찰이 관측됐다 — 아래 「## 머지 경합」 절 참조.
   - **Status checks that are required** — 아래 블록의 이름을 *그대로* 검색해 전부 추가:
 
 <!-- REQUIRED_CHECKS_BEGIN — 이 블록은 tests/infra/test_required_checks_doc.py가 ci.yml과 대조해 동결한다. 잡 추가·개명 시 여기도 갱신해야 CI가 통과한다. -->
@@ -100,7 +103,7 @@ main
 
 <!-- RULESET_POLICY_BEGIN — scripts/harness/ruleset_drift.py가 라이브 JSON과 대조한다. tests/infra/test_ruleset_drift.py가 이 블록의 실재를 동결한다. -->
 - `required_check_integration_id` = `15368`
-- `strict_required_status_checks_policy` = `true`
+- `strict_required_status_checks_policy` = `false`
 - `required_approving_review_count` = `1`
 - `dismiss_stale_reviews_on_push` = `true`
 - `require_code_owner_review` = `true`
@@ -110,6 +113,14 @@ main
 - `non_fast_forward` = `true`
 - `merge_queue` = `true`
 <!-- RULESET_POLICY_END -->
+
+**`strict_required_status_checks_policy`가 `false`인 이유** (2026-09-14 Kiki 결정 · A안):
+merge queue가 켜져 있으면 큐가 PR을 최신 `main` 위에 얹어 **전건 재검증**한 뒤에만
+머지하므로, 개별 PR에 up-to-date를 따로 요구하는 것은 같은 보장을 두 번 사는 것이다.
+그리고 그 중복은 공짜가 아니다 — 2026-09-10에 PR #1063·#1092·#1094가 전부 `behind`로
+막혀 `main` 수동 병합을 3회 반복했고 그때마다 CI가 처음부터 다시 돌았다(실측).
+**보호를 낮춘 것이 아니라 집행 지점을 큐로 옮긴 것이다**: 낡은 base에서 통과한 CI로
+머지되는 일은 큐가 막는다. 이 선언이 `true`로 되돌아가면 그 마찰도 함께 돌아온다.
 
 `required_check_integration_id`는 GitHub Actions 앱의 id다 — required check 항목을 이 앱으로
 pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고해도 충족되지 않는다.
@@ -195,6 +206,10 @@ echo "EXIT=$LASTEXITCODE"
 > **문서와 정합한 항목**(참고): `strict_required_status_checks_policy: true`(= up to date 요구) ·
 > `required_review_thread_resolution: true` · `required_linear_history: true` · deletion·
 > non_fast_forward 보호.
+>
+> *[후속 2026-09-14] `strict_required_status_checks_policy`는 이후 `false`로 정정됐다
+> (Kiki 결정 A안 · merge queue 도입으로 중복). 위 줄은 2026-09-03 시점 실측 기록이므로
+> 그대로 둔다 — 현행 선언은 「정책 파라미터 선언」 블록이 정본이다.*
 >
 > #### ✅ 시정 완료 (같은 날 2026-09-03 · 게이트 `G-required-checks-live-drift-fix`)
 >
@@ -288,9 +303,14 @@ echo "EXIT=$LASTEXITCODE"
 
 ## 머지 경합 — merge queue **사용 중** (2026-09-09 전환)
 
-> **현행 사실**: `main` 룰셋에 merge queue가 켜져 있다. 큐가 PR을 최신 `main` 위에 얹어
-> 재검증하므로 `Require branches to be up to date`를 **유지한 채** 재동기화가 자동화된다 —
-> 보호를 낮추지 않고 충족만 자동화한다는 원 취지 그대로다.
+> **현행 사실**: `main` 룰셋에 merge queue가 켜져 있고, `Require branches to be up to date`는
+> **꺼져 있다**(2026-09-14 Kiki 결정 A안 · 게이트 `G-strict-policy-and-classic-cleanup`).
+> 큐가 PR을 최신 `main` 위에 얹어 재검증하므로 up-to-date 요구는 구조적 중복이었고,
+> 실제로 마찰만 남겼다(2026-09-10 PR 3건이 `behind`로 막혀 수동 병합 3회).
+>
+> ⚠️ 이 절은 2026-09-09~09-13 동안 "`strict`를 **유지한 채** 재동기화를 자동화한다"고
+> 적고 있었다. 그 서술은 큐 도입 *직후*의 과도기 사실이었고, 09-10 마찰 실측으로 뒤집혔다.
+> 아래 「대신 하는 것」 절도 같은 전제 위에 쓰였으므로 함께 읽는다.
 >
 > 이 절은 2026-09-07~09-08에 정반대 내용("이 저장소에서는 쓸 수 없다")을 담고 있었다.
 > **그때는 그 판정이 옳았다** — 아래 「전제가 바뀐 이력」이 왜 바뀌었는지를 기록한다.
@@ -342,6 +362,16 @@ merge queue는 **조직(Organization) 소유 저장소 전용**이다 — 공개
 
 ### 대신 하는 것 — 자동 재동기화 (`pr-auto-resync.yml` · HARN-85)
 
+> **⚠️ 이 절의 전제는 2026-09-14에 소멸했다.** 아래 본문은 `strict`가 *켜져 있던* 동안
+> 그 충족을 자동화하려고 쓰인 것이다. `strict`가 꺼진 지금은 `behind`가 더 이상 머지를
+> 막지 않으므로 이 워크플로는 **머지 경로의 필수 요소가 아니다**(돌아도 해롭지 않지만
+> CI를 소모한다). 존치·폐기 판정은 `HARN-101`이 소유한다 — 그 전까지 아래 서술은
+> *동작 설명*으로만 유효하고 *근거*로는 유효하지 않다.
+>
+> 본문이 근거로 든 #931/#935 사례(낡은 base에서 통과한 CI가 머지 후 `main`을 깨는 일)는
+> 사라진 위험이 아니다 — **집행 주체가 바뀌었을 뿐이다**. 이제 merge queue가 큐 브랜치에서
+> 최신 base 위로 전건 재검증하며 같은 일을 막는다.
+
 보호를 낮추는 대신(=`strict` 해제) **충족을 자동화**한다. `Require branches to be up to date`는
 그대로 유지된다 — 그 게이트는 실제로 일하고 있다(#931이 `ReviewStatus`에 `quarantined`를
 추가하자 #935의 단언이 red가 됐다. 동기화하지 않았으면 머지 후 `main`에서 터졌다).
@@ -380,6 +410,38 @@ PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Updat
 **수동 확인**: Actions 탭 → `pr-auto-resync` → Run workflow → `dry_run` = `1`. 읽기 전용이라
 **PAT 없이도 돈다** — 쓰기 자격 검사를 통과해 후보와 분모(스캔 N건 · BEHIND+auto-merge M건)만
 출력한다. 배선 확인 경로를 일부러 열어 둔 것이다.
+
+## 클래식 브랜치 보호 — 삭제 (룰셋 단일 정본)
+
+> **집행 상태**: ⏳ Kiki 실행 대기 (게이트 `G-strict-policy-and-classic-cleanup`).
+> 결정은 2026-09-14에 났고(A안), 실제 삭제 후 이 줄을 `✅ 완료 (YYYY-MM-DD)`로 갱신한다.
+> — *결정과 집행을 같은 줄에 적지 않는다: 미집행을 완료로 읽으면 그 뒤 판정이 전부 어긋난다.*
+
+이 저장소는 한동안 **룰셋과 클래식 브랜치 보호 두 벌**이 동시에 `main`을 지켰다. 2026-09-10
+실측으로 드러난 갈라짐이다(MEMORY 2026-09-10 · 게이트 `G-required-checks-source-of-truth`):
+
+| 축 | 룰셋 (ID `16623542`) | 클래식 브랜치 보호 |
+|---|---|---|
+| 필수 체크 | **16건** (현행) | 13건 — 룰셋의 **부분집합**, 2026-09-03 이전 낡은 사본 |
+| up-to-date 요구 | `false` | `true` ← **실질 strict를 이쪽이 혼자 살려 두고 있었다** |
+| merge queue | 활성 | 없음 |
+
+**왜 지우는가** — 세 가지가 전부 같은 방향을 가리킨다:
+
+1. **보호가 줄지 않는다.** 클래식의 13건은 룰셋 16건의 부분집합이므로, 지워도 필수 체크는
+   16건 그대로다. 큐도 룰셋 쪽에 있어 죽지 않는다.
+2. **없어져야 할 것만 없어진다.** 클래식의 `strict=true`가 바로 2026-09-14에 해제하기로 한
+   그 축이다. 삭제가 곧 그 결정의 집행이다.
+3. **관측 도구가 정본을 본다.** `ruleset_drift.py`·`pr_delivery_audit.py`·`ruleset_pin_plan.py`
+   **3종이 전부 룰셋만 읽는다.** 게다가 `GITHUB_TOKEN`은 클래식 브랜치 보호에 **403**이라 CI
+   안에서는 갈라진 쪽을 볼 수단 자체가 없다 — 집행이 두 벌인 동안 이 도구들의 "정합" 판정은
+   *실제 집행*이 아니라 *한쪽 소스*에 대한 판정이었다. 한 벌로 줄이면 판정이 다시 집행을
+   가리킨다. (CLAUDE.md 「변별력 없는 검증 스텝 금지」의 *소스 축* — 검사는 멀쩡한데 보는
+   곳이 정본이 아니게 된 상태였다.)
+
+**되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
+되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
+정본으로 복사한다 — 낡은 13건을 복원하지 않는다).
 
 ## 저장 후 확인
 
