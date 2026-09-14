@@ -91,9 +91,15 @@ $env:PYTHONPATH = (Resolve-Path "src\backend").Path
 netsh interface ipv4 show excludedportrange protocol=tcp
 ```
 
-포트를 포함하는 구간이 보이면 **영구 조치**를 한다. `winnat`을 내렸다 올리면 동적 예약이
-반납되고, 그 틈에 포트를 *관리 포트 제외*로 등록하면 다음에 Hyper-V가 그 대역을 다시 잡을 때
-건너뛴다(지정 예약은 동적 할당에서만 빼는 것이라 명시적 bind는 그대로 된다).
+포트를 포함하는 구간이 보이면 조치를 한다. `winnat`을 내렸다 올리면 동적 예약이 반납되고,
+그 틈에 포트를 *관리 포트 제외*로 등록하면 다음에 Hyper-V가 그 대역을 다시 잡을 때 건너뛴다.
+
+> **메커니즘 2축 모두 실측됐다 (2026-09-14 Phaiakes9 · 이전 판은 둘 다 추론이었다)**:
+> ⓐ **지정 예약은 명시적 bind를 막지 않는다** — 5433이 관리 지정 제외로 박힌 상태에서
+> `docker restart whymath-pg`가 `0.0.0.0:5433->5432/tcp`로 정상 게시했고 진단 CLI가
+> `REACHABLE`(exit 0)을 냈다. ⓑ **재할당이 그 포트를 건너뛴다** — 같은 조회에서 동적 구간
+> `11723~12315` 5개가 새로 잡혀 있었는데 5433은 그 어디에도 없었다. 이 절이 하는 일이
+> 실제로 일어나는 장면이다.
 
 > **창**: **창 A 그대로** — 아래 블록이 UAC로 스스로 승격한다(관리자 창을 사람이 여는 단계를
 > 없앴다 · 아래 「스스로 승격한다」 참조). **선행**: Docker Desktop 종료(트레이 → Quit).
@@ -166,10 +172,13 @@ netsh interface ipv4 show excludedportrange protocol=tcp store=persistent
 「모른다 ≠ 아니다」). active 조회가 **표를 내는데** persistent 조회가 **비면** 인자는 이해된
 것이고 persistent 저장소가 실제로 빈 것이다.
 
-> **실측 (2026-09-14 Phaiakes9)**: `store=persistent` 조회가 **출력 없이 exit 0**이었다. 같은
-> 실행에서 인자 없는 조회는 `5433  5433  *`를 포함한 표를 냈다. 따라서 이 PC의 5433 제외는
-> **active 전용 — 재부팅에서 사라진다**(위 `RESERVE_PERSISTENT_EXIT=1`과 정합). 즉 §W1의
-> `store=persistent` 경로는 이 환경에서 **실패했고**, 남은 것은 임시 조치다.
+> **실측 (2026-09-14 Phaiakes9 · 변별 확보)**: `store=active` 조회는 `5433  5433  *`를 포함한
+> 표를 냈고 `store=persistent` 조회는 **출력 없이 exit 0**이었다. 두 조회가 같은 형태였으므로
+> 인자는 이해된 것이고 **persistent 저장소가 실제로 비었다** — 부재와 미지원이 갈렸다. 따라서
+> 이 PC의 5433 제외는 **active 전용 — 재부팅에서 사라진다**(위 `RESERVE_PERSISTENT_EXIT=1`과
+> 정합). 즉 §W1의 `store=persistent` 경로는 이 환경에서 **실패했고**, 남은 것은 임시 조치다.
+> 실패 사유("다른 프로세스가 파일을 사용 중")의 원인은 **규명되지 않았다** — winnat을 내린
+> 상태였고 동적 구간도 반납된 뒤였다. 추측을 적지 않는다.
 
 persistent에 `5433`이 있으면 영구 조치 성립. 비어 있으면 **임시 조치**이며 재부팅·WSL 재시작마다
 이 절차를 다시 밟아야 한다 — 그 반복을 없애려면 부팅 시 자동 재등록(작업 스케줄러 `AtStartup`
