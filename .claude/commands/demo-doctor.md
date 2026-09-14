@@ -154,15 +154,26 @@ if ($Ready) { Start-Process powershell -Verb RunAs -ArgumentList "-NoExit","-Exe
 재부팅을 넘기려면 persistent 저장소에 있어야 한다:
 
 ```powershell
-# [Windows PowerShell · Phaiakes9 · 창 A]
+# [Windows PowerShell · Phaiakes9 · 창 A] — 두 저장소를 같은 형태로 물어 변별력을 확보한다
+netsh interface ipv4 show excludedportrange protocol=tcp store=active
+"ACTIVE_STORE_QUERY_EXIT=$LASTEXITCODE"
 netsh interface ipv4 show excludedportrange protocol=tcp store=persistent
-"PERSISTENT_QUERY_EXIT=$LASTEXITCODE"
-netsh interface ipv4 show excludedportrange protocol=tcp
-"ACTIVE_QUERY_EXIT=$LASTEXITCODE"
+"PERSISTENT_STORE_QUERY_EXIT=$LASTEXITCODE"
 ```
 
-persistent 조회에 `5433`이 있으면 영구 조치 성립. 없거나 조회가 거부되면(`store` 인자 미지원
-빌드일 수 있다 — 미측정) **임시 조치**로 간주하고 다음 재부팅 뒤 active 표를 다시 확인한다.
+**두 조회를 같은 형태로 하는 이유**: persistent 조회만 돌려서 비어 있으면 *정말 비었는지*
+*그 인자를 이 빌드가 무시했는지* 구분할 수 없다 — 부재와 미지원이 같은 화면을 낸다(CLAUDE.md
+「모른다 ≠ 아니다」). active 조회가 **표를 내는데** persistent 조회가 **비면** 인자는 이해된
+것이고 persistent 저장소가 실제로 빈 것이다.
+
+> **실측 (2026-09-14 Phaiakes9)**: `store=persistent` 조회가 **출력 없이 exit 0**이었다. 같은
+> 실행에서 인자 없는 조회는 `5433  5433  *`를 포함한 표를 냈다. 따라서 이 PC의 5433 제외는
+> **active 전용 — 재부팅에서 사라진다**(위 `RESERVE_PERSISTENT_EXIT=1`과 정합). 즉 §W1의
+> `store=persistent` 경로는 이 환경에서 **실패했고**, 남은 것은 임시 조치다.
+
+persistent에 `5433`이 있으면 영구 조치 성립. 비어 있으면 **임시 조치**이며 재부팅·WSL 재시작마다
+이 절차를 다시 밟아야 한다 — 그 반복을 없애려면 부팅 시 자동 재등록(작업 스케줄러 `AtStartup`
++ 최고 권한으로 위 netsh add 실행)이 필요하다. **이 자동화는 아직 이 저장소에 없다.**
 
 창 A에서 승격 실행 로그만 다시 읽으려면:
 
@@ -179,7 +190,46 @@ Get-Content (Join-Path $env:TEMP "winnat_reserve_5433.log")
 다음 재부팅 뒤 `netsh interface ipv4 show excludedportrange protocol=tcp`로 `5433`이 남아 있는지
 반드시 재확인한다.
 
-Docker Desktop 재실행 후 `docker restart whymath-pg` → 위 진단 CLI를 다시 돌려 `exit 0` 확인.
+**③ 최종 판정 — Docker 기동도 블록이 가져간다 (2026-09-14 실측 보강 · 동일 유형 2회차)**:
+"Docker Desktop을 켜고 오세요"를 산문으로 지시했더니 **두 회차 연속** 그 단계가 빠진 채 다음
+블록이 실행돼 `RESTART_EXIT=1`·진단 `UNKNOWN`만 반복됐다. 위 ②의 관리자 창과 **같은 형태**이므로
+같은 대책을 쓴다 — 블록이 실행 파일을 스스로 찾아 띄우고 데몬이 실제로 응답할 때까지 기다린다.
+
+```powershell
+# [Windows PowerShell · Phaiakes9 · 창 A] — Docker 기동 대기 포함(최대 4분)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Dd = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+        "${env:ProgramFiles(x86)}\Docker\Docker\Docker Desktop.exe",
+        "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe") |
+      Where-Object { Test-Path $_ } | Select-Object -First 1
+"DOCKER_DESKTOP_EXE=$Dd"
+if ($Dd -and -not (Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue)) { Start-Process $Dd }
+$Deadline = (Get-Date).AddMinutes(4)
+do {
+  Start-Sleep -Seconds 10
+  docker info *> $null
+  $Ready = ($LASTEXITCODE -eq 0)
+  "WAITING ready=$Ready at $(Get-Date -Format HH:mm:ss)"
+} until ($Ready -or (Get-Date) -gt $Deadline)
+"DAEMON_READY=$Ready"
+if ($Ready) {
+  docker restart whymath-pg
+  "RESTART_EXIT=$LASTEXITCODE"
+  docker ps --filter name=whymath-pg --format "{{.Names}} | {{.Status}} | {{.Ports}}"
+  $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+  $env:PYTHONPATH = (Resolve-Path "src\backend").Path
+  & src\backend\.venv\Scripts\python.exe -m whymath_backend.ops.db_host_reachability
+  "DIAG_EXIT=$LASTEXITCODE"
+}
+```
+
+**성공 기준**: `docker ps` 줄에 `0.0.0.0:5433->5432/tcp`(화살표가 있어야 한다) · `DIAG_EXIT=0`.
+`DAEMON_READY=False`면 Docker가 4분 안에 안 올라온 것이므로 **진단이 아니라 기동 문제**다.
+
+> **이 단계가 곧 "관리 지정 제외가 Docker의 bind를 막지 않는다"의 검증이다.** 그 명제는 읽어서
+> 그렇게 보이는 것이지 이 PC에서 측정된 적이 없다(위 §W1 서두의 괄호 설명). 만약 여기서
+> `NOT_PUBLISHED`가 나오면 제외 등록이 원인이므로 관리자 창에서 되돌린다:
+> `netsh int ipv4 delete excludedportrange protocol=tcp startport=5433 numberofports=1`
 
 **주의 — 재시작만으로 붙는 수가 있다(그리고 그것은 해결이 아니다)**: 동적 예약은 스스로
 반납되기도 해서, Docker Desktop 재기동만으로 포트가 열릴 수 있다. 2026-09-09에 실제로 그랬다.
