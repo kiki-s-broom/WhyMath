@@ -490,6 +490,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
+  - id: G-skb04-concept-content-populate
+    title: "SKB-04 concept_content prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(concept_content.populate 1회 실행). 배경: 이 CLI는 완비돼 있으나 prod에서 한 번도 실행되지 않았다(2026-09-14 실측: 크로스워크 이전이 \"concept_content K-12 대상 행 부재 437건\" 보고). 2026-09-15 착수 검증에서 코드 공백이 아님을 확정했다 — 코퍼스 실재(K-12 437건·대학 409건)·CLI 진입점 실재(main(argv)->int·__main__)·크로스워크가 부재로 지목한 code 3건이 코퍼스에 전건 포함(10기수1-01-01/-02/-03)·concept_content는 FK가 없고 code가 PK라 선행 적재 불요. 즉 실행만 하면 해소된다. 기대 적재: K-12 437 + 대학 409 = 846건. 런북: docs/ops/skb04_concept_content_populate_runbook.md. SKB-03 게이트(G-skb03-atom-node-populate)와 같은 창에서 연달아 실행 가능하며 순서 의존은 없다(두 테이블은 서로 참조하지 않는다)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-state-machine-deferral-recheck
     title: "8상태 학습 상태 머신 보류의 재확인 (재확인 지점 = G4 2026-12-13) — 2026-09-03 Kiki 결정으로 '신설 보류'했고 재개 조건은 '실 운영 데이터에서 상태 기반 제어가 필요하다는 증거'다. 판정 3택: ①보류 유지(증거 없음 — 기본값) ②ADR로 채택(증거 있음 — *MasteryHistory와의 진실 원천 중복 해소안을 ADR에 포함해야 한다) ③영구 미채택으로 종결. 근거 문서 = docs/reviews/eos_phase2_plan_300_gap_review_2026-09-03.md §5-A·§11.1 · MEMORY 2026-09-03 결정 로그. 등재 이유: '만료 없는 유예·제외 금지'(CLAUDE.md 2026-08-03) — 보류에 재확인 지점을 못박았으나 그 지점에 알려 줄 장치가 없어 산문으로만 남아 있었다. remind-after-days=101은 2026-09-03 기준 G4(12/13)까지의 일수이며, 그 시점부터 SessionStart 브리핑에 뜬다"
     kind: decision

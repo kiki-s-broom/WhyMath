@@ -5,17 +5,19 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-skb04-concept-content-populate
 acceptance:
   - "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main b810388b) 중 concept_atom_crosswalk.populate가 \"concept_content K-12 대상 행 부재 437건 (예: 10기수1-01-01, 10기수1-01-02, 10기수1-01-03)\"을 보고했다 — concept_content.atom_codes 갱신 0건(대상 437건 전건 부재·대학 행 무변경). 착수 시 concept_content 전체 행수를 직접 실측해 \"K-12 437행 부재\"인지 \"테이블 전량 공백\"인지 범위를 확정한다(이 등재 시점에는 전자만 확인됨 — 대학 행의 존재 여부는 미측정).\n② SKB-03과 다른 점 명시: 이쪽은 적재 CLI가 이미 있다 — l1/concept_content/populate.py에 main(argv)->int와 __main__ 진입점 실재(main b810388b 실측 37행·88행). 즉 코드 공백이 아니라 \"prod에서 한 번도 실행되지 않았다\"가 1차 가설이다. 착수 시 그 가설을 먼저 검증한다(실행했는데 실패한 흔적이 있는지·코퍼스 커버리지가 K-12를 포함하는지).\n③ 소비처 영향 명시: concept_content는 L4 content_supply.py·l4/pedagogy/age_band_explanation.py·api/concepts.py가 소비한다 — 비어 있으면 그 경로들이 조용히 빈 콘텐츠를 낸다. 작동한 비율 원칙에 따라 적재 후 공급 성립 비율을 확인할 수 있어야 한다.\n④ prod 적재는 human gate로 위임(prod DB 쓰기라 세션 직접 실행 불가). ②의 가설이 맞으면 이 태스크의 산출물은 코드가 아니라 검증된 실행 런북 + 게이트다."
+  - "②-확정(2026-09-15 착수 검증): 1차 가설 \"코드 공백이 아니라 prod에서 한 번도 실행되지 않았다\"가 맞다. 실측 4건 — ⓐ CLI 진입점 실재(l1/concept_content/populate.py의 main(argv)->int 37행·__main__ 88행, argparse·파일 부재 return 2·stdout 보고까지 완비) ⓑ 코퍼스 실재(data/corpus/concept_content_v1/content.json의 content 배열 437건 + concept_content_university_v1 409건 = 846건) ⓒ 키 공간 일치 — 크로스워크가 \"대상 행 부재\"로 지목한 code 3건(10기수1-01-01·-02·-03)이 K-12 코퍼스에 전건 포함되고 437 code 전건 유일 ⓓ 선행 적재 불요 — concept_content는 FK가 없고 code가 PK다(db/models/concept_content.py 67행, 주석에 \"FK는 두지 않는다\" 명시). 따라서 이 태스크의 산출물은 코드가 아니라 검증된 런북 + 게이트다(acceptance ④의 예고대로 성립).\n③-충족확인(2026-09-15): 이 항이 요구한 \"작동한 비율\" 신호는 이미 배선돼 있었다 — l4/content_supply.py가 dsl_render_rate를 점추정과 Wilson 하한으로 함께 노출하고 어댑터별로 분해하며(118~121행), 렌더가 아닌 경로로 간 이유를 fallback_reason·gate_reason_code로 남긴다(97·105·106행). SKB-03의 off_atom_axis와 같은 형태다. 다만 그 비율이 적재 후 실제로 올라가는지는 학생 요청을 흘려야 알 수 있어 이 태스크 범위 밖이다(런북 §8 고지).\n①-부분충족·표현정정(2026-09-15): 기대 적재 건수를 코퍼스에서 직접 셌다(K-12 437·대학 409·총 846). 다만 prod의 concept_content 전체 행수는 prod DB 읽기라 세션이 못 한다 — 런북 [B]단계의 BEFORE_TOTAL/BEFORE_K12/BEFORE_UNIV가 그 답을 내며, 특히 대학 409행의 존재 여부는 한 번도 확인된 적이 없다(크로스워크는 K-12 축만 건드렸다). 아울러 등재 시 제목·acceptance의 \"조용히 빈 결과\" 표현을 정정한다 — 실측 결과 소비처 2곳의 행동이 다르다: content_supply.py는 행이 없으면 로그 없이 None을 반환하지만(256행) age_band_explanation.py는 경고 로그를 남기고 None을 반환한다(79행). \"조용히\"는 전자 축에만 정확하다.\n④-집행(2026-09-15): prod 적재 게이트 G-skb04-concept-content-populate 등재 + 런북 docs/ops/skb04_concept_content_populate_runbook.md 작성. 런북은 SKB-01 런북 §9의 교훈(최상위 elseif/else 금지·침묵 가드 금지·블록 간 사람 판정·체크아웃 대신 동등성 판정)을 적용했고, SKB-03 게이트와 같은 창에서 순서 무관하게 연달아 실행 가능함을 명시했다(두 테이블은 서로 참조하지 않는다). 이 게이트가 clear되고 AFTER_TOTAL=846이 확인되기 전까지 이 태스크는 미완이다.\n⑤-후속발견(2026-09-15): SKB-03과 공통 후속이 있다 — 두 적재로 행이 생긴 뒤 concept_atom_crosswalk.populate를 한 번 더 돌리면 atom_node.behavior_skills와 concept_content.atom_codes가 함께 채워진다(2026-09-14 실행은 양쪽 모두 대상 행 부재로 0건이었다). 두 게이트를 모두 실행한 뒤 크로스워크 재실행 1회로 두 축이 동시 해소되므로, 그 재실행은 별도 게이트로 묶는 것이 왕복을 줄인다. 런북 §8에 상호 참조를 남겼다."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l1/concept_content/**"
-session: null
-notes: "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). SKB-03(atom_node 미적재)과 같은 실행에서 함께 드러난 별개 공백이며, SKB-03은 적재 CLI 자체가 없는 반면 이쪽은 CLI가 있어 해법 축이 다르다 — 그래서 분리 등재한다."
-updated: 2026-09-14
+session: claude/quirky-cori-x91nld
+notes: "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). SKB-03(atom_node 미적재)과 같은 실행에서 함께 드러난 별개 공백이며, SKB-03은 적재 CLI 자체가 없는 반면 이쪽은 CLI가 있어 해법 축이 다르다 — 그래서 분리 등재한다.\n\n[정정 2026-09-15] 착수 검증으로 가설② 확정(코드 공백 아님·실측 4건) + acceptance③ 기배선 확인 + 기대 건수 846 실측 + '조용히' 표현 정정 + 게이트/런북 집행"
+updated: 2026-09-15
