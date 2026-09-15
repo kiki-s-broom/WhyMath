@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-104-pr-template-eos-blocks
+title: "PR 템플릿 EOS 3블록 부재 — Release Classification·Layer·Contract impact 칸이 없다(선행 유예 사유는 이미 소멸)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 (판정 기준 main 4b33d243 · 2026-09-15): `.github/pull_request_template.md`는 '무엇을·왜 / 검증 / 변별력 / 정직한 공백 / 영향 범위·롤백' 5절이며 **Release Classification·Layer·Contract impact 블록은 0건**이다."
+  - "② **유예 사유 소멸 확인** — 갭리뷰는 \"분류 체계(EOS-68·B급 1)가 선행돼야 빈 칸이 되지 않는다\"며 유예했다. 판정 기준 main에서 `EOS-68`(기능 인벤토리·Migration Matrix)과 `HARN-55`(eos_priority P0~P3 필드 집행)는 **둘 다 done**이다. 선행이 해소됐으므로 유예 근거가 없다."
+  - "③ 빈 칸 방지 — 각 블록은 **대장에 실재하는 값 어휘**로 채운다: 등급은 `eos_priority` P0~P3, 계층은 7계층 L1~L7, 계약 영향은 유무 + 해당 계약 문서 참조. 자유 서술 칸을 늘리면 기존 5절과 중복이 되고, 중복된 칸은 채워지지 않는다."
+  - "④ 정본화≠집행 별항 — 템플릿에 칸을 *추가*하는 것과 그 칸이 *채워지는* 것은 다르다. 이 태스크는 채움 강제를 약속하지 않는다(약속하면 집행 없는 정본화가 된다). 기계 강제가 필요하다고 판단되면 별도 태스크로 분리하고, 여기서는 강제 여부를 **판정해 적는 것**까지가 범위다."
+  - "⑤ 중복 금지 — `OPS-10`(변별력 증빙 템플릿)과 `OPS-73`(실행용 코드펜스 증거 혼입 가드)이 이미 소유한 절은 건드리지 않는다. 특히 '변별력' 절은 이 저장소가 가장 비싸게 얻은 칸이므로 축소·통합하지 않는다."
+artifacts: []
+paths:
+  - ".github/pull_request_template.md"
+session: null
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B6 · §5 B급 미등재 후보 8. 갭리뷰의 유예 사유(분류 체계 선행)는 2026-09-15 재대조 시점에 EOS-68·HARN-55 done으로 소멸했다 — 유예가 산문에만 있었기 때문에 그 소멸을 아무도 검사하지 않았다(CLAUDE.md '만료 없는 유예·제외 금지'의 전형). Gate D 집행 등재. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(PR 템플릿·pull_request_template·Release Classification·Contract impact) → 히트 2건(OPS-10·OPS-73) 모두 다른 절 소유·이 3블록 미포함."
+updated: 2026-09-15
