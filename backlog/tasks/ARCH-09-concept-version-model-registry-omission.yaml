@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -24,6 +24,6 @@ paths:
   - src/backend/whymath_backend/db/models/__init__.py
   - src/backend/whymath_backend/db/models/concept_version.py
   - tests/backend/api/test_e2e_vertical_slice_integration.py
-session: null
+session: claude/wonderful-dirac-bgvw0o
 notes: "출처: 2026-09-15 Phase 0 Gate A~E 재판정(판정 기준 main 4b33d243) E축 실측. 재판정이 이전 판정의 유보였던 \"배선은 쟀고 실행 이력은 재지 않았다\"를 처음으로 실측하다가 발견했다 — 배선은 멀쩡한데 그 잡이 red였다.\n\n소유자 부재 확인(역할 기반 검색 · CLAUDE.md \"식별자 부재를 기능 부재로 단정 금지\" 절차): `models/__init__`·`메타데이터 등록`·`모델 레지스트리`·`NoReferencedTable`로 backlog/tasks 검색 → 이 결함을 소유한 미완 태스크 0건. EOS-49는 done(2026-09-14).\n\n범위 밖: Gate 0-E 판정 자체는 이 태스크에 종속되지 않는다. 앵커 두 개의 *존재와 내용*은 판정 기준에서 확인됐고(뒤 절반 연장 포함), 이 태스크가 고치는 것은 그 앵커를 상시로 돌리는 **야간 잡의 red**다."
 updated: 2026-09-15
