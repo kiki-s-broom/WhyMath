@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-09-concept-version-model-registry-omission
+title: "concept_version ORM이 모델 레지스트리에 미등록 — e2e-nightly 관통 잡이 FK 미해소로 상시 red (전체 스위트에서는 통과해 가려진다)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 먼저 — CI 실측(run 34898025896 · job 104156890006 · 2026-09-14T21:19:33Z)의 실패를 로컬에서 재현한다: `python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_e2e_vertical_slice_integration.py` 단독 실행 → `sqlalchemy.exc.NoReferencedTableError: Foreign key associated with column 'concept.current_published_version_id' could not find table 'concept_version'`. 전체 스위트에서는 통과하므로(같은 회차 「backend — 전체 스위트 직렬」 success) **선택 범위에 따라 갈리는 실패**임을 먼저 확정한다 — 재현 없이 고치지 않는다"
+  - "② 원인 확정 — `src/backend/whymath_backend/db/models/__init__.py`는 자기 docstring에 \"모든 테이블을 import해 Base.metadata에 등록한다\"고 적지만 `concept_version`을 import하지 않는다(판정 기준 main 4b33d243 실측: 해당 파일에서 concept_version 0건). ORM 모듈 `db/models/concept_version.py`는 EOS-49(ce557c30 · PR #1156)로 착지했고, 그것을 import하는 곳은 자기 테스트뿐이라 좁은 선택에서는 메타데이터에 등록되지 않아 `concept.current_published_version_id`의 문자열 FK 타깃이 해소되지 않는다"
+  - "③ 수정 — 레지스트리에 편입한다(다른 모델과 같은 관례). 수정 후 ②의 단독 실행이 통과하는지 확인한다"
+  - "④ 파급 축 별항 — 같은 docstring이 alembic autogenerate 근거를 겸한다(env.py의 target_metadata = Base.metadata). 등록 누락 상태에서 autogenerate를 돌리면 실재하는 테이블을 **drop 제안**할 수 있다. 이 축이 실제로 그런지 확인하고, 참이면 그 사실을 기록한다(무해하면 무해하다고 적는다 — 단정하지 않는다)"
+  - "⑤ 변별력 — 레지스트리 등록을 되돌리는 뮤테이션에서 RED가 나는 검사를 둔다. 정상 상태에서 초록인 것은 보호의 증거가 아니다. 특히 **좁은 선택에서 도는 검사**여야 한다 — 전체 스위트만 보는 검사는 이 회귀를 구조적으로 못 잡는다(그것이 이번 결함이 전체 스위트 green 아래에서 살아남은 이유다)"
+  - "⑥ 전수 축 — 같은 형태(모델 파일은 있는데 `db/models/__init__.py` 미등록)가 다른 모델에도 있는지 전수 확인한다. 1건이면 고치고 끝내되, 복수면 그 사실을 적고 전수 가드를 둘지 판정한다"
+  - "⑦ 실행 실재성 — 수정 착지 후 다음 야간 회차(schedule 이벤트)에서 「e2e-nightly — 관통 슬라이스 (실 PG·야간)」 잡이 success인지 실측으로 확인하고 회차 id를 증적에 남긴다. \"고쳤다\"가 아니라 \"그 잡이 실제로 초록이었다\"까지가 완료다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/db/models/__init__.py
+  - src/backend/whymath_backend/db/models/concept_version.py
+  - tests/backend/api/test_e2e_vertical_slice_integration.py
+session: null
+notes: "출처: 2026-09-15 Phase 0 Gate A~E 재판정(판정 기준 main 4b33d243) E축 실측. 재판정이 이전 판정의 유보였던 \"배선은 쟀고 실행 이력은 재지 않았다\"를 처음으로 실측하다가 발견했다 — 배선은 멀쩡한데 그 잡이 red였다.\n\n소유자 부재 확인(역할 기반 검색 · CLAUDE.md \"식별자 부재를 기능 부재로 단정 금지\" 절차): `models/__init__`·`메타데이터 등록`·`모델 레지스트리`·`NoReferencedTable`로 backlog/tasks 검색 → 이 결함을 소유한 미완 태스크 0건. EOS-49는 done(2026-09-14).\n\n범위 밖: Gate 0-E 판정 자체는 이 태스크에 종속되지 않는다. 앵커 두 개의 *존재와 내용*은 판정 기준에서 확인됐고(뒤 절반 연장 포함), 이 태스크가 고치는 것은 그 앵커를 상시로 돌리는 **야간 잡의 red**다."
+updated: 2026-09-15
