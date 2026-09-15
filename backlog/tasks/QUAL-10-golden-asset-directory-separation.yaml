@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-10-golden-asset-directory-separation
+title: "골든 자산 미분리 — tests/golden/ 부재로 골든이 테스트 파일 내부에 산재(모델·프롬프트 변경의 회귀 축이 없다)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 (판정 기준 main 4b33d243 · 2026-09-15): `tests/` 하위는 `backend`·`data_pipeline`·`harness`·`infra` 4개이며 **`tests/golden/`은 없다**. 골든 관련 코드는 `harness/golden_benchmark.py`·`harness/golden_promotion_gate.py`와 그 테스트 2건이고, 기대 산출(골든 자산)이 테스트 파일 내부에 산재한다."
+  - "② **EOS-60·EOS-64(둘 다 done)와 축이 다르다** — 그쪽은 혼동행렬 계약과 nightly 관통·승격 게이트다. 이쪽은 **자산의 물리 분리**다. 중복 등재 금지에 따라 두 태스크가 이미 판정한 행은 재판정하지 않으며, 계약 정본 `docs/standards/golden_benchmark_contract.md`를 수정하지 않는다."
+  - "③ 분리의 목적은 회귀 축이다 — 모델·프롬프트가 바뀌었을 때 *무엇이 달라졌는지*가 diff로 보여야 한다. 자산이 코드 안에 있으면 그 diff가 테스트 수정과 섞여 구분되지 않는다."
+  - "④ 정본화≠집행 별항 — 디렉터리를 만드는 것과 **CI 잡이 그 경로를 실제로 읽는 것**은 다르다. 이동 후 그 자산을 읽는 잡이 실재하는지 `tests/infra` 배선 동결로 대조한다(OPS-10·OPS-03 선례: `tests/infra` 199건이 어떤 잡도 실행하지 않던 상태)."
+  - "⑤ 변별력 — 자산 1건을 훼손한 상태에서 실제로 RED가 나는지 뮤테이션으로 실측하고, **주입이 적용됐는지**(치환 대상 count)와 원복이 바이트 동일한지를 각각 단언한다(2026-09-06 '주입 자체의 실재'). 원복은 `cp` 백업으로만 한다 — `git checkout --`·`git restore`·`git stash` 금지(2026-08-10 사고)."
+  - "⑥ 승격 경로 불변 — 골든 승격은 워크리스트 검수 → `review_status` 백필 → Wilson 게이트 CLI 경유만 허용된다(EOS-64 ③). 디렉터리 이동이 그 경로를 우회하는 **새 승격 통로**를 만들지 않는다. 자산 파일 추가만으로 골든이 되는 구조는 AI 자기승인 금지 위반이다."
+artifacts: []
+paths:
+  - "tests/golden/**"
+  - "tests/backend/harness/test_golden_*.py"
+  - "src/backend/whymath_backend/harness/golden_*.py"
+session: null
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B5 · §5 B급 미등재 후보 4. 갭리뷰는 \"EOS-64(nightly 골든·todo)가 인접 소유\"라고 적었으나, 2026-09-15 재대조 시점에 EOS-64는 done이고 그 acceptance 4항(nightly 배선·작동 비율·승격 경로·무진전 알람) 어디에도 자산 디렉터리 분리가 없다. 즉 인접 소유자가 완료되면서 이 축의 소유자가 소멸했다 — 완료된 태스크는 소유할 수 없다(2026-09-06 판정 규칙). Gate D 집행 등재. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(tests/golden·골든 자산·골든 데이터셋·Golden Dataset) → 0건."
+updated: 2026-09-15
