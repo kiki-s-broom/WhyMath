@@ -121,6 +121,9 @@ main
 - `deletion` = `true`
 - `non_fast_forward` = `true`
 - `merge_queue` = `true`
+- `ruleset_id` = `16623542`
+- `ruleset_enforcement` = `active`
+- `ruleset_bypass_actor_count` = `0`
 <!-- RULESET_POLICY_END -->
 
 **`strict_required_status_checks_policy`가 `false`인 이유** (2026-09-14 Kiki 결정 · A안):
@@ -133,6 +136,40 @@ merge queue가 켜져 있으면 큐가 PR을 최신 `main` 위에 얹어 **전�
 
 `required_check_integration_id`는 GitHub Actions 앱의 id다 — required check 항목을 이 앱으로
 pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고해도 충족되지 않는다.
+
+#### 뒤 3줄은 **다른 엔드포인트**에서 온다 (HARN-102 · 2026-09-15 편입)
+
+`ruleset_id`·`ruleset_enforcement`·`ruleset_bypass_actor_count`는 위 축들과 달리
+`/rules/branches/main` 응답에 **없다**. 그래서 판정기는 입력을 둘 받는다.
+
+| 선언 | 정본 엔드포인트 | 무엇을 묻는가 |
+|---|---|---|
+| 체크 목록 · 정책 파라미터 · 규칙 타입 | `GET /repos/{owner}/{repo}/rules/branches/main` | main에 **지금 적용되는** 규칙은 무엇인가 |
+| `ruleset_enforcement` · `ruleset_bypass_actor_count` | `GET /repos/{owner}/{repo}/rulesets/16623542` | 그 룰셋 **자체**는 어떻게 정의돼 있는가 |
+
+**왜 둘을 합치지 않는가**: 앞 엔드포인트는 여러 룰셋이 겹친 *적용 결과*라 체크 목록의 정본으로
+정확하고, 뒤 엔드포인트는 한 룰셋의 *정의*라 "누가 이 규칙을 건너뛸 수 있는가"를 담는다. 질문이
+다르므로 한쪽으로 다른 쪽을 대신할 수 없다.
+
+**`ruleset_bypass_actor_count` = `0`의 뜻**: 우회 주체가 0명 = 관리자에게도 규칙이 그대로
+적용된다 = 삭제된 클래식 브랜치 보호의 `enforce_admins: true`와 등가다. 여기에 한 건이라도
+들어오면 그 주체는 required check 16건·리뷰·linear history를 **전부 건너뛰고** `main`에 쓸 수
+있다. 2026-09-14 실측이 `[]`임을 확인했지만 그것은 *한 시점의 스냅샷*이었다 — 판정기가 읽지
+않는 축은 나중에 채워져도 조용하다. **지금 안전한 것과 그 상태가 감시되는 것은 다르다**는 것이
+이 선언을 만든 이유다.
+
+**`ruleset_id`는 대조 축이 아니라 신원 확인용**이다(`required_check_integration_id`와 같은
+취급). 라이브 값이 다르면 "정책이 어긋났다"가 아니라 "엉뚱한 룰셋의 덤프를 줬다"이므로 판정기가
+위반(exit 1)이 아니라 **측정 실패(exit 2)**로 올린다.
+
+> **id 하드코딩의 취약성과 그 처리**: 룰셋을 지웠다 다시 만들면 id가 바뀐다. 그때 수집 명령은
+> `404`를 받고, gh는 오류 본문을 그대로 파일에 쓰므로 판정기가 `id`가 없는 객체를 보고 exit 2를
+> 낸다 — **틀린 답이 아니라 침묵 없는 실패**다. `/rulesets` 목록에서 이름으로 찾는 방식도
+> 검토했으나, 그러려면 `cmd /c` 안에서 `--jq`를 중첩 따옴표로 감싸야 해 런북 자체가 깨지기 쉽고,
+> 얻는 것은 "id가 바뀌어도 조용히 동작"뿐이다. 이 저장소에서 더 위험한 것은 *조용한 오답*이므로
+> 하드코딩 + 시끄러운 실패를 택했다. id가 바뀌면 고칠 곳은 **세 곳**이다:
+> 위 `ruleset_id` 선언 · 아래 런북 블록 · `scripts/harness/ruleset_drift.py`의 `RULESET_ID`
+> (셋의 일치는 `tests/infra/test_ruleset_drift.py`가 기계로 동결한다).
 
 ### 알면서 유예한 축 (만료 필수)
 
@@ -169,9 +206,15 @@ Test-Path scripts\harness\ruleset_drift.py
 # Windows PowerShell — 위 자가검증이 True일 때만
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 cmd /c "gh api repos/kiki-s-broom/WhyMath/rules/branches/main > ruleset.json"
-python scripts\harness\ruleset_drift.py ruleset.json --record
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json"
+python scripts\harness\ruleset_drift.py ruleset.json --ruleset-full ruleset-full.json --record
 echo "EXIT=$LASTEXITCODE"
 ```
+
+> **수집이 두 줄인 이유**: 두 번째 줄이 `bypass_actors`(= 클래식 `enforce_admins`의 대응 축)와
+> `enforcement`를 가져옵니다. 첫 줄의 응답에는 그 필드가 없습니다. 두 번째 줄을 빼면 판정기가
+> **exit 2(측정 실패)**를 냅니다 — 빠진 입력을 "위반 0"으로 접지 않습니다. 자세한 근거는 위
+> 「뒤 3줄은 다른 엔드포인트에서 온다」 절.
 
 > **`cmd /c`로 감싸는 이유 — gh 출력을 PowerShell에 통과시키지 않는다**: PS 5.1은 네이티브
 > 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본 **cp949**)으로 디코딩한 뒤
@@ -194,10 +237,16 @@ echo "EXIT=$LASTEXITCODE"
 |---|---|---|
 | `0` | 정합 (권고만 있어도 0) | 없음 — 기록 갱신됨 |
 | `1` | **드리프트 위반** | 출력의 "시정 순서"를 위에서부터 따른다 |
-| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재·**수집 손상**) | 통과가 아니다. `JSON 파싱 불가`면 위 `cmd /c` 형태로 재수집(cp949 유실) · 그 외는 `gh auth status`부터 확인 |
+| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재·**수집 손상**·**룰셋 전문 미수집/불일치**) | 통과가 아니다. `JSON 파싱 불가`면 위 `cmd /c` 형태로 재수집(cp949 유실) · `--ruleset-full 입력이 없다`면 수집 두 번째 줄을 빠뜨린 것 · `다른 룰셋의 덤프다`면 룰셋 id가 바뀐 것(위 「id 하드코딩」 참조) · 그 외는 `gh auth status`부터 확인 |
 
 기록 파일(`.github/ruleset-check-state.json`)은 `--record`가 쓴다. **손편집 금지** — 확인하지
 않고 날짜만 미루면 리마인드가 위장이 된다.
+
+> **첫 2입력 회차는 게이트로 추적한다** (`G-ruleset-bypass-actors-live-watch`). 기록 파일의
+> 마지막 `verdict: ok`는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, **지금은 실제로 측정하지
+> 않은 축까지 통과로 읽힌다.** 손편집으로 고칠 수 없는(그리고 고쳐선 안 되는) 범위 불일치이므로
+> 실행 1회로 닫는다 — 그 회차가 기록을 올바른 범위로 덮어쓴다. 30일 리마인드는 그다음부터
+> 제 역할을 한다.
 
 ---
 
@@ -505,11 +554,21 @@ PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **�
 > 빈 배열은 룰셋을 우회할 수 있는 주체가 없다는 뜻이고, 이는 클래식의 `enforce_admins: true`와 등가다.
 > 파이프(`| Out-File`)를 쓰지 않은 이유는 아래 "수집 명령" 절 참조 — cp949 왕복으로 JSON이 손상된다.
 
-**다만 지금 안전한 것과 그 상태가 감시되는 것은 다르다.** `ruleset_drift.py`는
-`/rules/branches/main`만 읽고 그 응답에는 `bypass_actors`가 없다 — 즉 **선언 축에도 판정기에도
-없으므로, 나중에 누군가 `bypass_actors`를 채워도 기계는 조용하다.** 선언 편입 여부(편입하면
-어느 엔드포인트를 정본으로 할지까지)는 `HARN-102`가 소유한다. 편입하지 않기로 결론나면
-그 이유를 여기에 적는다 — 감시하지 않는 축을 조용히 두면 다음 사람이 감시되는 줄 안다.
+**다만 지금 안전한 것과 그 상태가 감시되는 것은 다르다.** 위 실측 시점의 `ruleset_drift.py`는
+`/rules/branches/main`만 읽었고 그 응답에는 `bypass_actors`가 없다 — 즉 **선언 축에도 판정기에도
+없어서, 나중에 누군가 `bypass_actors`를 채워도 기계는 조용했다.**
+
+> **판정 — 편입한다 (HARN-102 ③ · 2026-09-15)**. 이 저장소가 겪은 사고 3회(2026-07-26 ×2 ·
+> 2026-09-03)는 전부 *보호가 없는데 화면이 초록인* 형태였다. 감시하지 않는 축을 남기면 같은
+> 형태를 하나 더 만드는 것이고, 하필 그 축은 **다른 모든 축을 한 번에 무력화**한다(우회 주체는
+> required check·리뷰·linear history를 전부 건너뛴다). 그래서 스냅샷을 상시 판정으로 승격시킨다:
+> `ruleset_bypass_actor_count` = `0`·`ruleset_enforcement` = `active`를 선언 축으로 넣고,
+> 판정기가 `/rulesets/16623542`를 **두 번째 입력**으로 받는다(위 「뒤 3줄은 다른 엔드포인트에서
+> 온다」·「재발 탐지 실행법」).
+>
+> 덤으로 `enforcement` 축의 추론도 닫혔다. 위 12축 대조 당시 "`/rules/branches/main`이 규칙
+> 16건을 돌려줬으니 룰셋은 active다"는 **API 의미를 읽은 추론**이었지 필드를 읽은 것이 아니었다.
+> 이제 같은 입력에 그 필드가 실제로 들어 있으므로 직접 대조한다.
 
 **되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
 되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
