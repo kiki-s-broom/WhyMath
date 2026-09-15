@@ -14,6 +14,7 @@ import pytest
 
 from whymath_backend.l1.atom_graph.atom_backend_concept import AtomBackendConceptStore
 from whymath_backend.l1.atom_graph.atom_backend_edge import AtomBackendEdgeStore
+from whymath_backend.l1.atom_graph.atom_node_projection import AtomNodeRecord
 from whymath_backend.l1.atom_graph.populate import (
     AtomBackboneCycleError,
     AtomBackbonePopulateReport,
@@ -216,3 +217,124 @@ def test_populate_atom_backbone_self_loop_not_in_records(tmp_path: Path) -> None
     report = populate_atom_backbone(path, concept_store=c_store, edge_store=e_store)
     assert report.edges_loaded == 0
     assert report.edges_skipped == 0  # 레코드 0건(self-edge는 로딩에서 이미 제외)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SKB-03 — `atom_node` 메타 프로젝션 적재 배선
+#
+# 이 디렉터리의 `atom_node_projection.py`는 적재 구현을 갖고도 **어느 CLI도 부르지 않아** prod에
+# 한 번도 적재된 적이 없었다(2026-09-14 실측: 크로스워크 이전이 "atom_node 대상 행 부재 1311건"을
+# 보고). 아래 테스트는 ①opt-in이 실제로 적재한다 ②기본값은 적재하지 않는다(대조군 — 기존 단위
+# 테스트 계약 보존) ③**CLI가 기본 ON으로 부른다**(배선 동결 — 여기가 이 태스크의 본체다)를 가른다.
+# ③이 없으면 "코드에 존재함"과 "실제로 돌아감"을 구분하지 못한다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class _RecordingAtomNodeStore:
+    """`AtomNodeStore.upsert`만 흉내 내는 기록용 가짜(PG 불요)."""
+
+    def __init__(self) -> None:
+        self.upserted: list[AtomNodeRecord] = []
+
+    def upsert(self, record: AtomNodeRecord) -> None:
+        self.upserted.append(record)
+
+
+def test_atom_node_meta_is_populated_when_opted_in(tmp_path: Path) -> None:
+    path = _write_corpus(tmp_path)
+    n_store = _RecordingAtomNodeStore()
+    report = populate_atom_backbone(
+        path,
+        concept_store=AtomBackendConceptStore(engine=_FakeEngine()),  # type: ignore[arg-type]
+        edge_store=AtomBackendEdgeStore(engine=_FakeEngine()),  # type: ignore[arg-type]
+        populate_node_meta=True,
+        atom_node_store=n_store,  # type: ignore[arg-type]
+    )
+    # 코퍼스 4노드(단원·소단원·원자 2)가 전량 투영된다 — 메타 프로젝션은 전 노드 적재가 계약이다.
+    assert report.atom_nodes_loaded == 4
+    assert len(n_store.upserted) == 4
+    assert {r.code for r in n_store.upserted} == {_UNIT, _SUBUNIT, _ATOM_A, _ATOM_B}
+
+
+def test_atom_node_meta_is_skipped_by_default(tmp_path: Path) -> None:
+    # 대조군 — 기본값은 건드리지 않는다(PG 없는 기존 단위테스트가 그대로 통과하는 이유).
+    # 이 테스트가 없으면 "항상 적재"라는 과잉 수정이 위 테스트만으로 통과한다.
+    path = _write_corpus(tmp_path)
+    n_store = _RecordingAtomNodeStore()
+    report = populate_atom_backbone(
+        path,
+        concept_store=AtomBackendConceptStore(engine=_FakeEngine()),  # type: ignore[arg-type]
+        edge_store=AtomBackendEdgeStore(engine=_FakeEngine()),  # type: ignore[arg-type]
+        atom_node_store=n_store,  # type: ignore[arg-type]
+    )
+    assert report.atom_nodes_loaded == 0
+    assert n_store.upserted == []
+
+
+def test_cli_populates_atom_node_meta_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """배선 동결 — CLI가 `populate_node_meta=True`로 부른다(SKB-03의 본체).
+
+    이 단언이 없으면 함수에 파라미터만 생기고 CLI가 그대로 빠뜨려도 위 두 테스트는 초록이다
+    (`atom_node_projection.py`가 구현을 갖고도 호출되지 않던 원래 상태와 같은 형태).
+    """
+    from whymath_backend.l1.atom_graph import populate as populate_module
+
+    captured: dict[str, object] = {}
+
+    def _fake_populate(graph_path: Path, **kwargs: object) -> AtomBackbonePopulateReport:
+        captured["graph_path"] = graph_path
+        captured.update(kwargs)
+        return AtomBackbonePopulateReport(
+            concepts_loaded=0,
+            parents_skipped=0,
+            edges_loaded=0,
+            edges_skipped=0,
+            visual_styles_loaded=0,
+            visualization_loaded=0,
+            atom_nodes_loaded=0,
+        )
+
+    monkeypatch.setattr(populate_module, "populate_atom_backbone", _fake_populate)
+    monkeypatch.setattr(
+        "sys.argv", ["populate", "--graph", str(tmp_path / "g.json"), "--visual-style-corpus", ""]
+    )
+    populate_module._main()
+    assert captured["populate_node_meta"] is True
+
+
+def test_cli_skip_flag_opts_out_of_atom_node_meta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--skip-atom-node`가 실제로 끈다 — 플래그가 장식이 아님을 가른다."""
+    from whymath_backend.l1.atom_graph import populate as populate_module
+
+    captured: dict[str, object] = {}
+
+    def _fake_populate(graph_path: Path, **kwargs: object) -> AtomBackbonePopulateReport:
+        captured.update(kwargs)
+        return AtomBackbonePopulateReport(
+            concepts_loaded=0,
+            parents_skipped=0,
+            edges_loaded=0,
+            edges_skipped=0,
+            visual_styles_loaded=0,
+            visualization_loaded=0,
+            atom_nodes_loaded=0,
+        )
+
+    monkeypatch.setattr(populate_module, "populate_atom_backbone", _fake_populate)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "populate",
+            "--graph",
+            str(tmp_path / "g.json"),
+            "--visual-style-corpus",
+            "",
+            "--skip-atom-node",
+        ],
+    )
+    populate_module._main()
+    assert captured["populate_node_meta"] is False

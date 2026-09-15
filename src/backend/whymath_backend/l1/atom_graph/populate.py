@@ -1,4 +1,4 @@
-"""원자 백본 코퍼스 → backend `concept`/`concept_edge` 적재 진입점(원자 Phase 1).
+"""원자 백본 코퍼스 → backend `concept`/`concept_edge`/`atom_node` 적재 진입점(원자 Phase 1).
 
 구 개념그래프 `populate.py`와 *별개* 진입점이다(원자 백본 전용·기존 적재 경로 무변경). 순서:
   ① concept 노드 전량 upsert(parent 없이) → ② parent_concept_id 2-pass 해소 → ③ 선수엣지 적재
@@ -11,11 +11,17 @@
   단위테스트(`tests/backend/l1/atom_graph/test_populate.py`)가 tmp_path 그래프만 주입하고 오버레이
   코퍼스 경로를 모르므로, 무조건 기본 상대경로를 시도하면 CWD에 따라 부수적으로 실패한다.
   프로덕션 CLI(`_main()`)는 기본값으로 두 코퍼스를 항상 로드해 실제 배포에서는 상시 적재된다.
+  ⑥ `atom_node` 메타 프로젝션 적재 — **SKB-03**: 이 디렉터리의 `atom_node_projection.py`가
+  적재 구현을 갖고도 어느 CLI에서도 호출되지 않아 prod에 한 번도 적재된 적이 없었다(형제 모듈을
+  부르는 저장소 관례에서 atom_graph만 빠져 있었다). L2 약개념 추천의 메타 enrich가 그만큼 조용히
+  `off_atom_axis`로 계상돼 왔다. ④⑤와 같이 *opt-in*이되 스위치는 경로가 아니라 불린이다
+  (같은 `graph.json`을 읽으므로 별도 경로 인자가 없다).
 
 멱등: 재실행 시 갱신(노드 UUID·엣지 edge_id 보존, Overlay는 code PK upsert). sync 엔진은 슬3
 좌석 재사용(신규 seam 0).
 
 CLI: `python -m whymath_backend.l1.atom_graph.populate --graph data/corpus/atom_graph_v1/graph.json`
+(atom_node 적재는 CLI 기본 ON — `--skip-atom-node`로 opt-out)
 (접속은 `Settings.sync_database_url` env·자격증명 하드코딩 0). `--visual-style-corpus`·
 `--visualization-corpus`로 오버레이 코퍼스 경로를 바꿀 수 있고, 빈 문자열(`""`)을 주면 해당
 오버레이 적재를 건너뛴다.
@@ -38,6 +44,11 @@ from whymath_backend.l1.atom_graph.atom_backend_edge import (
     AtomBackendEdgeStore,
     load_atom_edges_from_graph_json,
     populate_atom_edges,
+)
+from whymath_backend.l1.atom_graph.atom_node_projection import (
+    AtomNodeStore,
+    load_atom_nodes_from_graph_json,
+    populate_atom_nodes,
 )
 from whymath_backend.l1.concept_visual_style import (
     ConceptVisualStyleStore,
@@ -125,6 +136,9 @@ class AtomBackbonePopulateReport:
     # 시점에 어느 경로를 썼는지 함께 찍어 보완한다).
     visual_styles_loaded: int
     visualization_loaded: int
+    # SKB-03 — `atom_node` 메타 프로젝션 적재 행 수(opt-out이면 0). 위 Overlay 2종과 같은 한계를
+    # 공유한다(0이 "코퍼스가 비었다"와 "건너뛰었다"를 구분 못 함) — CLI stdout이 어느 쪽인지 찍는다.
+    atom_nodes_loaded: int
 
 
 def populate_atom_backbone(
@@ -137,6 +151,8 @@ def populate_atom_backbone(
     visual_style_store: ConceptVisualStyleStore | None = None,
     visualization_path: Path | None = None,
     visualization_store: ConceptVisualizationStore | None = None,
+    populate_node_meta: bool = False,
+    atom_node_store: AtomNodeStore | None = None,
 ) -> AtomBackbonePopulateReport:
     """원자 코퍼스 graph.json을 backend `concept`/`concept_edge`에 멱등 적재(노드→parent→엣지).
 
@@ -196,6 +212,25 @@ def populate_atom_backbone(
             visualization_records, settings=resolved, store=vz_store
         )
 
+    # ── SKB-03 — `atom_node` 메타 프로젝션 적재(opt-in·같은 graph.json 재파싱) ──────────────
+    # 이 디렉터리의 `atom_node_projection.py`는 적재 구현을 갖고도 **어느 CLI도 부르지 않아**
+    # prod에 한 번도 적재된 적이 없었다(2026-09-14 실측: 크로스워크 이전이 "atom_node 대상 행 부재
+    # 1311건"을 보고). 저장소 관례상 `<dir>/populate.py`가 형제 `*_node_projection.py`를 부르는데
+    # (`skill_graph`·`problem_type_graph`·`concept_content` 전부 그렇다) atom_graph만 그 연결이
+    # 없었다 — 이 스텝이 그 공백을 메운다.
+    #
+    # Overlay 2종과 달리 **경로 인자가 없다**(같은 `graph_path`를 읽으므로). 그래서 opt-in 스위치는
+    # `None` 경로가 아니라 불린 플래그다 — 기존 단위테스트가 tmp_path 그래프만 주고 PG 없이 도는
+    # 계약을 그대로 보존하려면 기본값이 False여야 한다(VIZ-01 D1이 같은 이유로 opt-in을 택했다).
+    # 프로덕션 CLI(`_main()`)는 True로 호출하므로 실제 배포 적재에서는 항상 함께 적재된다.
+    atom_nodes_loaded = 0
+    if populate_node_meta:
+        n_store = (
+            atom_node_store if atom_node_store is not None else AtomNodeStore(settings=resolved)
+        )
+        atom_node_records = load_atom_nodes_from_graph_json(graph_path)
+        atom_nodes_loaded = populate_atom_nodes(atom_node_records, settings=resolved, store=n_store)
+
     return AtomBackbonePopulateReport(
         concepts_loaded=concepts_loaded,
         parents_skipped=len(parent_skipped),
@@ -203,6 +238,7 @@ def populate_atom_backbone(
         edges_skipped=len(edge_records) - edges_loaded,
         visual_styles_loaded=visual_styles_loaded,
         visualization_loaded=visualization_loaded,
+        atom_nodes_loaded=atom_nodes_loaded,
     )
 
 
@@ -212,7 +248,7 @@ def _main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "원자 백본 코퍼스 → backend concept/concept_edge 멱등 적재 "
-            "(+ 시각화 Overlay 2종 — VIZ-01 D1)"
+            "(+ 시각화 Overlay 2종 — VIZ-01 D1 · + atom_node 메타 프로젝션 — SKB-03)"
         )
     )
     parser.add_argument(
@@ -239,6 +275,14 @@ def _main() -> None:
             f"{DEFAULT_VISUALIZATION_CORPUS}). 빈 문자열('')이면 이 Overlay 적재를 건너뛴다."
         ),
     )
+    parser.add_argument(
+        "--skip-atom-node",
+        action="store_true",
+        help=(
+            "atom_node 메타 프로젝션 적재를 건너뛴다(SKB-03). 기본은 적재 — 이 CLI가 그것을 "
+            "부르지 않아 prod에 한 번도 적재된 적이 없었다."
+        ),
+    )
     args = parser.parse_args()
     visual_style_path = Path(args.visual_style_corpus) if args.visual_style_corpus else None
     visualization_path = Path(args.visualization_corpus) if args.visualization_corpus else None
@@ -246,6 +290,7 @@ def _main() -> None:
         args.graph,
         visual_style_path=visual_style_path,
         visualization_path=visualization_path,
+        populate_node_meta=not args.skip_atom_node,
     )
     print(
         f"[원자 백본 적재] concepts={report.concepts_loaded} "
@@ -254,7 +299,9 @@ def _main() -> None:
         f"visual_styles={report.visual_styles_loaded}"
         f"({visual_style_path if visual_style_path else '스킵'}) "
         f"visualizability={report.visualization_loaded}"
-        f"({visualization_path if visualization_path else '스킵'})"
+        f"({visualization_path if visualization_path else '스킵'}) "
+        f"atom_nodes={report.atom_nodes_loaded}"
+        f"({'스킵' if args.skip_atom_node else args.graph})"
     )
 
 
