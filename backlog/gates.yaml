@@ -430,6 +430,16 @@ gates:
     evidence: "2026-07-28 Kiki가 Phaiakes9 whymath-pg(docker·5433)에서 실행. ①재적재: populate 2,683 concepts·2,210 edges(parent_skip 0·edge_skip 0 — 병합 코퍼스·재배선 엣지 prod 반영) ②cleanup --retired-from-ledger dry-run·--confirm·재확인 dry-run 3회 모두 전 5테이블 0건(스캔 실패 0 — 스키마 실재 확인). 은퇴 원자 14행 '잔존' 가정은 실측 반증 — prod 이전 적재가 기수/NUMER 트랙 코퍼스 편입 이전이라 애초 미적재(S2-04 공집합 충족 동형). 정리 대상 부재로 삭제 0이 정답."
     cleared_by: null
     notes: "S4-07 병합 후속. 당초 '재적재는 upsert-only라 은퇴 원자 14행 잔존' 가정으로 요청 — 실측 결과 가정 반증(evidence 참조·잔존 0). 재적재+공집합 확인으로 목적 달성"
+  - id: G-ruleset-bypass-actors-live-watch
+    title: "룰셋 전문(bypass_actors) 첫 2입력 라이브 판정 1회 — HARN-102가 감시 축을 넓힌 뒤 처음 도는 회차다. 기록 파일 .github/ruleset-check-state.json의 마지막 verdict=ok는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, 지금은 실제로 측정하지 않은 축(bypass_actors·enforcement)까지 통과로 읽힌다 — 그 범위 불일치를 닫는 것이 이 게이트의 목적이다. 실행: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북(수집 2줄 + --ruleset-full 판정 1줄). 기대 = EXIT 0(2026-09-14 실측 bypass_actors=[] 이 그대로면). EXIT 1이면 우회 주체가 생겼거나 enforcement가 active가 아니라는 뜻이고 출력의 \"시정 순서\"를 따른다. EXIT 2면 수집이 한 줄 빠졌거나 룰셋 id가 바뀐 것(문서 \"id 하드코딩의 취약성과 그 처리\" 참조). 선행 조건: 이 PR이 main에 머지된 뒤에 실행한다 — 런북과 판정기 양쪽이 미머지 상태면 Kiki 체크아웃에 --ruleset-full 인자 자체가 없어 argparse 오류가 난다. 세션이 머지 확인 후 6항목 브리핑과 함께 실행 블록을 안내한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-ruleset-bypass-actors-read
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
     kind: human
