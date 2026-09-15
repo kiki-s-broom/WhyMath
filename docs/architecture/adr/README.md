@@ -54,7 +54,7 @@ python3 scripts/harness/adr_number_check.py
 
 ---
 
-## 현재 계열 (2026-09-05)
+## 현재 계열 (2026-09-15)
 
 | 번호 | 주제 | 상태 | 소재 |
 |---|---|---|---|
@@ -62,8 +62,9 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-002](./ADR-002-student-solution-step-entity.md) | 학생 풀이 step = 별도 정규 엔티티 | 채택 | main |
 | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 노드 ID의 과목 접두사는 규약이지 Subject 엔티티 참조가 아니다 | 채택 | main |
 | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Provisional** (target 2026-09-27) | main |
+| [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
 
-**다음 빈 번호: ADR-005** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
+**다음 빈 번호: ADR-006** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
 
 ---
 
@@ -79,7 +80,7 @@ python3 scripts/harness/adr_number_check.py
 | ADR-004 Event Model | | 미확인 |
 | ADR-005 LearnerState | | 미확인 |
 | ADR-006 Content Version | | 미확인 |
-| ADR-007 AI Gateway | | 미확인 |
+| ADR-007 AI Gateway | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | 충족 — 기존 결정의 정본화(ARCH-45). 주제의 실질(`l3/router.py`·`03a_l3_router_design.md`)은 이미 있었고 ADR 형식의 단일 기록만 없었다 |
 | ADR-008 Knowledge Graph | | 미확인 |
 | ADR-009 Assessment Architecture | | 미확인 |
 | ADR-010 Math AST | | 미확인 |
@@ -88,8 +89,8 @@ python3 scripts/harness/adr_number_check.py
 계획서 ADR-002(Subject Adapter)가 저장소 ADR-004에 있고, 계획서 ADR-003(Entity ID)이 저장소
 ADR-003에 있는 것은 **우연**이다(후자는 두 계열이 같은 번호에서 우연히 만난 경우다).
 
-**검색 범위 명시(부재 판정 절차)**: "미확인" 7칸은 *조사하지 않았다*는 뜻이지 *대응 문서가
-없다*는 뜻이 아니다. 위 3칸은 각각 실측(`eos_source_docs_gap_review_2026-08-31.md` §7.3-④·§319
+**검색 범위 명시(부재 판정 절차)**: "미확인" 6칸은 *조사하지 않았다*는 뜻이지 *대응 문서가
+없다*는 뜻이 아니다. 채워진 4칸은 각각 실측(`eos_source_docs_gap_review_2026-08-31.md` §7.3-④·§319
 인용, 원격 브랜치 파일 실측)에 근거한다. 계획서 100 원본은 Kiki 보유이며 저장소에 반입돼 있지
 않다(`grep -rln "계획서 100"` = 인용 문서 6건, 원본 0건).
 
