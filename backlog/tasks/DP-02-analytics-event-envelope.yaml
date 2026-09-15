@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P2
 owner: claude
@@ -14,11 +14,12 @@ depends_on:
 requires_gates: []
 acceptance:
   - "event_uuid·schema_version·occurred_at/received_at·source/session/correlation 계약과 타입별 payload allowlist를 구현·테스트; 원문 채팅·풀이/수식·이미지·URL query·정밀 좌표·영구 기기 ID를 거부; PII 등급·보존/삭제 소유자 문서화"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1170 — acceptance 15절 전수 재대조 완료(절14 PII 등급표 4종 누락을 이 PR에서 상환). 구현 3산출물의 원 착지는 97890d56 (#828, 2026-08-14)."
 paths:
   - "src/backend/whymath_backend/schema/**"
   - "docs/data/**"
   - "tests/backend/schema/**"
 session: null
 notes: "EOS #84/#85 수정 계획 P0-2. 새 producer보다 먼저 완료해야 하는 개인정보·계약 게이트.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-15
