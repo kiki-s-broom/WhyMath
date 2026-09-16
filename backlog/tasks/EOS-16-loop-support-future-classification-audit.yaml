@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-16-loop-support-future-classification-audit
+title: "기존 기능 LOOP/SUPPORT/FUTURE 3분류 감사 (계획서 300 §14) — FUTURE∩진행중 교차표 + 동결 권고"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 서빙 기능 표면 전수 열거 — 열거 방법과 그 방법이 놓치는 범위를 함께 기록(부재 판정 절차 준수). 기존 장부 feature_inventory_v2(기계 생성 162행)를 모집단으로 재사용하고 추가 열거분을 명시한다.\n② 각 행을 계획서 300 §14 기준 LOOP / SUPPORT / FUTURE로 전수 분류. 분류 규칙은 산문이 아니라 재현 가능한 판정 기준으로 적는다(어느 루프 테이블·어느 표면에 닿는가).\n③ FUTURE ∩ 진행중(열린 PR · in_progress 태스크) 교차표를 별도로 낸다 — 원 문서가 \"가장 위험\"이라 지목한 상태.\n④ 동결 권고 목록 + 집행 방법 제시. 태스크 block 처리 여부는 Kiki 판단으로 남긴다(세션이 집행하지 않는다).\n⑤ 조사 전용 — production code 0줄 변경. 산출은 docs/ 아래 분류표 문서 1건.\n⑥ 판정 문서 상단에 판정 기준 커밋 해시를 박는다(판정 시점 규칙)."
+artifacts:
+  - "aff4e9b1 · PR #1179 (https://github.com/kiki-s-broom/WhyMath/pull/1179) · 판정 기준 main c4f8c9fb · 산출 docs/reviews/eos_loop_support_future_classification_2026-09-16.md — 166/166 분류(LOOP 92·SUPPORT 72·FUTURE 2) · 주입 7종 exit 0 · FUTURE∩진행중 0건"
+paths:
+  - "docs/reviews/eos_loop_support_future_classification_*.md"
+session: null
+notes: "계획서 300 §14 집행 지시문 P-00b. 조사 전용(코드 동결). 모집단은 EOS-83 feature_inventory_v2(기계 생성 162행)를 재사용 — 새 장부를 만들지 않는다(이중 진실원천 방지). 분류 축은 기존 EOS Ownership·Migration Action·출시 우선도와 직교한다."
+updated: 2026-09-16
