@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-13-operator-learner-state-view
+title: "운영자의 특정 학생 학습 상태 조회 표면 — 숙달·오개념·진단 (현행 /v1/admin/* 라우터 0건 · 유일 표면은 self-scoped) + 조회 감사·PII 마스킹·권한 등급 분리"
+track: math-completion
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 운영자의 타 학생 학습 상태 조회 축 — 계획서 §22 P2 \"관리자 관찰 기능\". 운영자가 **특정 학생**의 숙달·오개념·진단 상태를 보는 표면이다.\n② 현행 부재의 정확한 형태 — `/v1/admin/*` 라우터가 **0건**(`grep -rn \"v1/admin\" api/ app.py` = 0). 유일한 운영자 게이트 학습 표면 `GET /v1/me/harness-metrics`(`api/me.py:3304-3311`, `RequireContentAdmin`)는 docstring이 \"**본인 스코핑 유지 · 코호트 전체 조회는 admin auth 범위 밖 · user_id는 인증에서 주입**\"을 명시해 **self-scoped**다. `RequireContentAdmin` 소비처 6곳은 전부 콘텐츠 CUD다.\n③ 인접 태스크와의 경계 — ADMIN-05(todo·read-only BFF)의 acceptance '사용자 조회'는 **계정 조회**이지 학습 상태 조회로 특정돼 있지 않다. 이 태스크는 그 구분을 acceptance에 명시하고, ADMIN-05 착수 세션과 표면을 조율한다(중복 라우터 금지).\n④ 미성년 PII 경계가 이 태스크의 본체다 — 학생 학습 상태는 민감 정보다. 반드시 ①조회 감사 로그(누가·언제·누구를) ②PII 마스킹 기준 ③권한 등급(콘텐츠 admin ≠ 학생 데이터 admin)을 함께 설계한다. `docs/standards/security_privacy.md`가 정본이며, 권한 등급 분리 없이 기존 `RequireContentAdmin`을 재사용하면 **콘텐츠 검수자가 전교생 학습 이력을 보게 된다**.\n⑤ 교사·부모 노출은 범위 밖 — COLLAB-03 acceptance ⑦이 명시 제외했다. 이 태스크는 **내부 운영자**만 다룬다.\n⑥ 법령 경계 — 미성년자 개인정보의 분석·마케팅 외부 공유 금지(CLAUDE.md). 이 표면의 데이터가 외부로 나가는 경로가 없음을 확인한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/api/admin*.py"
+session: null
+notes: "출처: 계획서 300 §22 P2(관리자 관찰 기능) — 대조표 §5 단위7. 분류(§14): SUPPORT.\n\n실측(판정 기준 main 2e1220b4): \"운영자가 특정 학생의 학습 상태를 조회\"는 내가 찾은 방법으로는 0건이다 — 검색어 admin/운영자/관리자/교사/모니터/관측 좌석, 역할 검색 \"타인 학습 상태 read\", 소비자 역추적 `RequireContentAdmin` 소비처 6곳 전수(전부 콘텐츠 CUD). ADMIN-04/05/06/07/12가 todo로 등재돼 있으나 코드는 0건이고, 그중 학습 상태 조회를 acceptance로 특정한 것은 없다.\n\npriority 3 이유: 계획서 §22가 P2로 배정했고, 저장소 12월 검증 경로(G2 앵커 콘텐츠 생산)에 이 표면이 필요하지 않다. 다만 PII 설계가 선행돼야 하므로 착수 시 보안 표준 대조가 필수다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
+updated: 2026-09-16
