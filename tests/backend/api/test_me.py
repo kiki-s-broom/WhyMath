@@ -156,6 +156,13 @@ class FakeSession:
     async def commit(self) -> None:
         self.commits += 1
 
+    async def flush(self) -> None:
+        """EOS-103: 진단 캡처가 같은 트랜잭션 안에서 LearnerState 행을 flush한다.
+
+        commit과 달리 회계하지 않는다 — 이 대역이 재는 것은 "몇 번 커밋했는가"이고
+        flush는 그 안의 중간 단계다.
+        """
+
     async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
         # PK로 찾아 get_map에서도 제거(후속 get은 None 반환·idempotent 검증용)
@@ -3135,7 +3142,16 @@ class TestAssessmentCaptureEndpoint:
         assert set(body["assessment"]) & STUDENT_HIDDEN_PREDICTION_FIELDS == set()
         # 실제로 Assessment ORM 행 1건 add + commit 1회(실 적재 발생).
         assert fake.commits == 1
-        assert len(fake.added) == 1
+        # EOS-103: 이 분기가 진단 완료 경계이므로 **같은 트랜잭션**에서 두 행이 적재된다 —
+        # Assessment(진단 결과) + LearnerStateRecord(학습자 상태 자동 생성). 개수만 세지
+        # 않고 타입으로 대조한다: 개수 단언은 한쪽이 다른 쪽으로 바뀌어도 통과한다.
+        assert [type(row).__name__ for row in fake.added] == [
+            "Assessment",
+            "LearnerStateRecord",
+        ], f"적재 구성이 바뀌었다: {[type(r).__name__ for r in fake.added]}"
+        provisioned = fake.added[1]
+        assert provisioned.learner_id == _UID
+        assert provisioned.provisioned_by == "diagnosis_capture"
         assert isinstance(fake.added[0], Assessment)
         # 적재된 *내부* 정본에는 5필드가 그대로 있고 값은 None이다 — 봉인은 노출 축이지
         # 영속 축이 아니다(필드 폐기는 ASM-02에서 (d) 미채택).

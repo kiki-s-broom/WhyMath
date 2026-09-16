@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-103-learner-state-persistence-and-provisioning
+title: "LearnerState 영속·자동생성 축 — user_state_snapshot 좌석 writer 0 배선(또는 폐기) + 진단 완료 시 자동 생성 + 단일 쓰기 경로 + 부재 시 명시적 실패"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 영속 좌석 배선 또는 폐기 — 정본 `docs/architecture/canonical_entity_model_v1.md`가 LearnerState 좌석으로 배정한 `user_state_snapshot`(`src/backend/whymath_backend/db/models/user.py`)은 **writer 0**이다(대조표 `docs/strategy/plan300_phase2_backlog_crosswalk.md` §4 단위2 실측). 이 태스크는 그 좌석에 **단일 writer를 배선**하거나, 조립 즉시 계산을 정본으로 확정하고 좌석을 **폐기 판정**한다(EOS-72 \"배선 또는 폐기\" 선례 동형). 판정 결과를 정본 문서에 반영한다.\n② 자동 생성(provision) 경로 — 진단 완료 시점에 LearnerState 영속 레코드가 **자동 생성**되어야 한다. 운영자가 DB에 행을 직접 만들 필요가 없음을 테스트로 동결한다. 생성 트리거 지점(진단 완료 핸들러)을 acceptance 본문에 실경로로 적는다.\n③ 단일 쓰기 경로 — LearnerState 영속 레코드를 **변경하는 함수가 하나**임을 기계로 고정한다(전수 가드: 모델에 대한 쓰기 호출이 그 함수 밖에 없음을 AST 또는 전수 스캔으로 검사). 산문 규약이 아니라 테스트다.\n④ 부재 시 명시적 실패 — LearnerState 없이 학습 루프에 진입하려 할 때 **조용히 기본값으로 진행하지 않고 명시적 예외/에러 응답**을 낸다. 결함 주입으로 RED를 확인한다(정상 입력 초록은 증거가 아님 — CLAUDE.md 실패 주입 규칙).\n⑤ 확장 가능성을 타입으로 — BKT/DKT/Knowledge Tracing이 나중에 채울 축(증거·추정치·모델 버전)을 **필드 추가만으로** 수용하도록 스키마를 설계한다. 지금 그 추정기를 구현하지 않는다(§15 동결 준수).\n⑥ 읽기 축 비침범 — 단일 조회 표면과 결손 3필드 조립은 `EOS-10`이 소유한다. 이 태스크는 `l2/learner_state.py`의 조립기 시그니처와 `api/me.py` 조회 표면을 **신설·변경하지 않는다**. 겹침이 불가피하면 EOS-10 완료를 기다린다."
+  - "[범위 정정 — 착수 후 실측 반영] acceptance ①은 등재 시점에 \"user_state_snapshot 좌석에 단일 writer를 배선하거나 폐기 판정한다\"로 적혔으나, 실측 결과 그 판정은 EOS-10(읽기 축·타 세션 claim)의 acceptance ③과 같은 판정이므로 **이 태스크에서 수행하지 않았다**. 대신 그 좌석을 읽지도 쓰지도 않고 남겨 둔 채, LearnerState 좌석에 두 번째 테이블 learner_state를 편입했다(정본 갱신 경유 — concept_version 선례 동형). 미이행 사유와 소유자를 정본 문서 변경이력에 명시했다.\n\n[실측 판정 — 판정 기준 main 265a4106]\n· user_state_snapshot: writer 0 확인. 카디널리티가 학생당 N행(append-only 시점 사진)이고 컬럼 구성이 종합 학력 추정·시간관리·멘탈 신호라 \"현재 어느 교육과정의 어느 목표에 서 있는가\"를 담을 자리가 없다.\n· user_profile.diagnostic_completed / diagnostic_completed_at: **writer 0**(백엔드 전수 grep — 소비처도 0). 즉 이 저장소에 \"진단 완료\"를 기록하는 코드가 없었다. 이 태스크는 그 불리언을 배선하지 않고, 실재하는 완료 경계(POST /v1/me/assessments/capture의 measurement_sufficient 신규 적재 분기)를 생성 트리거로 삼았다. 불리언 배선 여부는 별건이다.\n\n[집행 지점 — 정본화와 별항]\n· 자동 생성: api/me.py capture_measurement_assessment의 신규 적재 분기 → provision_learner_state(reason=\"diagnosis_capture\"), Assessment 적재와 같은 commit.\n· 루프 진입 게이트: api/study.py post_study_unit → require_learner_state → 부재 시 HTTP 409(supply 호출 전·처치 기록 전).\n· 단일 쓰기 경로: tests/backend/db/test_learner_state_single_writer.py — AST 전수 스캔(별칭 import 추적·스캔 0건 실패·ORM 컬럼 대조).\n\n[뮤테이션 실측 12종 전건 RED] M1 게이트 제거 / M2 게이트를 supply 뒤로 이동 / M3 자동생성 호출 제거 / M4 require가 기본값 반환 / M5 provision 비멱등 / M6 mutation이 조용히 생성 / M7 UNSET을 None 취급 / M8 revision 미증가 / M9 파생축 복제 / M10 백필 요구 NOT NULL 추가 / M11 대리키 도입 / M12 store 밖 쓰기. 하네스는 순수 Python(셸 배제)이며 주입 적용(mutated != original)과 원복 바이트 동일을 각각 단언한다.\n\n[의도적 미이행] concept_mastery·skill_mastery·misconceptions는 learner_state에 저장하지 않는다 — 세 축 모두 정본 테이블이 이미 있어 복제하면 두 번째 진실 원천이 된다. 계획서가 말하는 \"LearnerState 최소 형태\"의 그 세 필드는 **읽기 합성 표면**의 몫이며 그 표면은 EOS-10이 소유한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/db/models/*"
+  - "src/backend/alembic/versions/*"
+session: claude/pensive-bardeen-xnptwb
+notes: "출처: Phase 2 마스터 프리앰블 항목 P-03(LearnerState v1 · 계획서 300 §4 작업1)의 **쓰기·영속 축**. 대조표 §4 단위2가 기록한 갭 중 `EOS-10`(읽기 축 — 단일 조회 표면 + 결손 3필드 조립)이 덮지 않는 잔여다.\n\n분해 근거(판정 기준 main 265a4106): 백로그 655건 전수에서 `user_state_snapshot`·learner.?state 검색 결과 이 좌석의 **writer 배선을 소유한 태스크는 0건**이다. `EOS-10` acceptance ③은 \"좌석을 쓰는지 명시한다 / 안 쓸 거면 폐기 판정한다\"까지만 요구하며 자동 생성·단일 쓰기 경로·부재 시 명시적 실패(P-03 항목 4·5)는 그 acceptance에 없다. `PED-05`(done)는 조립기 실체화까지만 소유했다.\n\n병렬 충돌 회피: `EOS-10`은 2026-09-16T14:16:53Z에 `claude/phase2-master-preamble-kdjfi4`가 원격 claim했다. 파일 범위를 분리한다 — EOS-10 = `l2/learner_state.py`·`api/me.py`, 본 태스크 = `db/models/`·마이그레이션·진단 완료 경로.\n\n동결 준수(§15): 상태 머신 8상태 신설·Digital Twin·성장 경로 예측·추정기 교체 구현은 범위 밖이다. 이 태스크는 **영속 계약과 생성 시점**만 다룬다.\n\n[정정 2026-09-16] 착수 후 실측 반영 — 좌석 판정 범위 축소(EOS-10 소유) + 집행 지점·뮤테이션 결과 기록"
+updated: 2026-09-16
