@@ -200,9 +200,20 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "whs": ("INFRA", "WH-S 솔버 하네스 — 동상"),
 }
 
+# 계획서 200 §5가 "Core 내부에 등장하면 경고" 예시로 든 7어휘 중 `desmos`·`equation_solver`가
+# 빠져 있었다(실측 2026-09-16). 추가하면서 **기준선이 얼마나 올라가는지 먼저 쟀다** — CORE
+# 적중 +3(`schema.visualization` 2·`l3.visualization` 1), MIXED +1(`schema.enums`). 네 건 전부
+# **docstring 산문**이며 "렌더는 D3/Plotly/Desmos가 한다"고 *설명하는* 문장이다(=렌더러를
+# 플러그인으로 미는 설계를 기술한 것이지 Core가 수학을 아는 코드가 아니다).
+#
+# 그래도 세는 이유: 이 정규식은 **배정의 근거 자료**이고, ratchet 게이트는 *증가*를 잡는다.
+# Core 모듈이 새로 특정 렌더러 이름을 말하기 시작하는 것은 사람이 한 번 볼 가치가 있는
+# 신호다(플레이북 8대 원칙 ④ "Renderer는 Plugin — 구현체 이름을 노드에 넣지 않는다").
+# 산문이라 무해한 건은 기준선에 그대로 실려 유예되며, 무엇이 산문인지는
+# `tests/infra/test_core_math_vocabulary_ratchet.py`의 기준선 주석이 건별로 적는다.
 MATH_TOKEN_RE = re.compile(
     r"\b(sympy|latex|polynomial|quadratic|factoriz\w*|derivative|integral|"
-    r"inequality|geometry|theorem|proof)\b",
+    r"inequality|geometry|theorem|proof|desmos|equation_solver)\b",
     re.IGNORECASE,
 )
 SYMPY_IMPORT_RE = re.compile(r"(?m)^\s*(?:from\s+sympy|import\s+sympy)")

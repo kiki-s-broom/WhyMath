@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - scripts/analysis/eos_core_adapter_boundary_scan.py
   - tests/infra/test_core_math_vocabulary_ratchet.py
   - ".github/workflows/ci.yml"
-session: null
+session: claude/eager-euler-6ct5d3
 notes: "출처: 계획서 200 §5 재대조(2026-09-16). 실측 — 경계 스캔은 계측기이고 docstring이 스스로 게이트가 아니라고 적는다. 대체 게이트 2종(eos_core_boundary_probe·eos_opaque_payload_gate)은 리터럴 비교·payload 해석 축이라 어휘 밀도 축을 덮지 않는다"
 updated: 2026-09-16
