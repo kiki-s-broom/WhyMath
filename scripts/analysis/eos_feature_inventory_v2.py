@@ -391,6 +391,9 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-016", "개념·스킬 숙달 곡선 조회", "Student", "Learning Model", "P0",
        "E4 mastery 조회 — G2 ⑧", "me",
        "GET /mastery", "GET /skill-mastery", "GET /mastery/current"),
+    _s("WM-S-051", "내 학습 과정 시간선 조회(Event Trace)", "Student", "Event", "P1",
+       "EOS-11 — 계획서 300 §17 역추적 축. 본인 스코프 고정·원천 3상태(produced/dormant/"
+       "unjoinable) 동반 노출", "me", "GET /learning-trace"),
     _s("WM-S-017", "IRT 능력(θ) 추정·스냅샷·성장 곡선", "Student", "Learning Model", "P0",
        "E4 — θ 추정·시계열", "me",
        "GET /ability", "POST /ability/snapshots", "GET /ability/snapshots",
@@ -401,9 +404,11 @@ CATALOG: tuple[Spec, ...] = (
     # *합성*하므로 하나에 귀속시키면 나머지 둘의 귀속이 거짓이 된다. 계획서 300 §12가 요구한
     # 12종 중 유일하게 대응물이 없던 축이며, 사용자에게 의미 있는 능력으로도 별개다
     # ("숙달을 본다"·"능력을 본다"가 아니라 "내 학습 상태를 한 번에 본다").
-    # P1인 이유: 조각 3표면(P0)이 이미 같은 사실을 공급하므로 12월 검증 G1~G5의 차단 조건이
+    # 번호 주의: 초판은 WM-S-051이었으나 EOS-11(PR #1182)이 같은 번호를 먼저 썼다 —
+# git이 충돌 마커 없이 자동 병합해 같은 id 두 행이 되는 조용한 충돌이었다(2026-09-16).
+# P1인 이유: 조각 3표면(P0)이 이미 같은 사실을 공급하므로 12월 검증 G1~G5의 차단 조건이
     # 아니다 — 우회 가능하되 합성 규칙을 서버에 두는 품질 이득이 크다(EOS-10 eos_priority와 일치).
-    _s("WM-S-051", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
+    _s("WM-S-052", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
        "Student", "Learning Model", "P1",
        "계획서 300 §12 LearnerState — 조각 3표면 합성(EOS-10)", "me", "GET /learner-state"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
@@ -551,6 +556,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
        "COLLAB-03 시계열 3테이블", "l2.learning_metrics_rollup",
        "harness.learning_metrics_rollup_cli"),
+    _e("WM-E-209", "학습 이벤트 시간선 투영(읽기 축·쓰기 0)", "Student", "Event", "P1",
+       "EOS-11 — 5원천을 한 학습자 시간선으로 투영. 적재는 WM-E-206 소유이고 이 행은 "
+       "읽기 전용 projection(session.add·commit 0건)·원천 가용성 3상태 대장",
+       "l2.learning_event_trace"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",

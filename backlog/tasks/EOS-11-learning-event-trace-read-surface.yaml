@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P2
 owner: claude
@@ -13,10 +13,14 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① per-learner 시계열 조회 신설 — 한 학생의 학습 과정을 시간순으로 재구성하는 표면(또는 리포트)을 만든다. 계획서 §17 예시 형태: `diagnostic_started` → `learner_state_created` → `concept_selected` → `content_viewed` → `problem_attempted` → `assessment_failed` → `misconception_detected` → `mastery_updated(0.54→0.43)` → `recommendation_generated`.\n② 적재는 이미 충족 — 신규 이벤트 타입·신규 테이블을 만들지 않는다. `db/models/activity.py:311 AttemptEvent`(hypertable)와 `schema/enums.py:1223-1262` EventType 11종, `schema/event_data_contract.py`가 이미 있다. 이 태스크는 **읽기 축**이다.\n③ 부재 근거의 범위 — 현행 소비처는 집계 롤업(`l2/learning_metrics_rollup.py:301`)·기록률 리포트(`harness/attempt_skill_event_reach_report.py:149`)·`harness/wh1_evaluation.py`뿐이며 전부 **집계**다. per-learner 시계열 조회는 내가 찾은 방법으로는 0건이다(검색어 trace/timeline/시간순/이력/chronolog × 인덱스+docs+api, 역할 \"학생 단위 이벤트 조회\", 소비자 역추적 AttemptEvent import처 전수).\n④ 미성년 PII 경계 — 학습 이벤트 열람은 학생 본인 스코프를 기본값으로 한다. 운영자·교사 열람은 이 태스크 범위 밖이며 별건(`ADMIN-05` 계열)에 둔다. 학생 원문 답안·수식은 트레이스에 싣지 않는다(DP-02 payload allowlist 준수).\n⑤ 휴면 EventType 고지 — EventType 11종 중 생산 6종·휴면 5종이다. 트레이스가 휴면 타입을 \"없음\"으로 표기하는지 \"미생산\"으로 표기하는지 구분한다. 미측정이 무활동으로 읽히면 안 된다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1182 — 읽기 축 신설(l2/learning_event_trace.py + GET /v1/me/learning-trace). 판정 기준 main c4f8c9fb. 전체 스위트 12647 passed(PYTEST_EXIT=0) · mypy --strict 0 · lint-imports 3 kept 0 broken · 계층 커버리지 전 계층 PASS(l2 98.1% · 신규 모듈 97%) · 게이트 CLI 7종 EXIT=0. 뮤테이션 21종 전건 RED 생존 0(M17 1차 생존분은 가용성 거버넌스를 양방향으로 고쳐 해소·반대 방향 M20 추가)."
 paths:
   - "src/backend/whymath_backend/l2/*event*.py"
   - "src/backend/whymath_backend/ops/*trace*.py"
+  - src/backend/whymath_backend/api/me.py
+  - tests/backend/l2/test_learning_event_trace.py
+  - tests/backend/api/test_me_learning_trace.py
 session: null
-notes: "출처: 계획서 300 §4 작업2(Attempt Event) + §17(Event Trace — \"매우 중요한 추가 항목\") — 대조표 §4 단위3. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): 이벤트 **적재**는 충족(S3-16·EOS-57·DP-02·EOS-48 done). 빠진 것은 **읽기 축**이다. 인접 todo 3건(DP-03 멱등성·DP-04 계약 거버넌스·S4-22 신호 소비 배선)은 전부 적재·계약 축이라 per-learner 시계열 조회를 소유하지 않는다.\n\n주의: EOS-63(attempt_skill_event 소비 전환)은 다른 세션이 claim 중이므로 이 태스크와 파일이 겹치면 조율이 필요하다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
+notes: "출처: 계획서 300 §4 작업2(Attempt Event) + §17(Event Trace — \"매우 중요한 추가 항목\") — 대조표 §4 단위3. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): 이벤트 **적재**는 충족(S3-16·EOS-57·DP-02·EOS-48 done). 빠진 것은 **읽기 축**이다. 인접 todo 3건(DP-03 멱등성·DP-04 계약 거버넌스·S4-22 신호 소비 배선)은 전부 적재·계약 축이라 per-learner 시계열 조회를 소유하지 않는다.\n\n주의: EOS-63(attempt_skill_event 소비 전환)은 다른 세션이 claim 중이므로 이 태스크와 파일이 겹치면 조율이 필요하다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신.\n\n[정정 2026-09-16] paths ['src/backend/whymath_backend/l2/*event*.py', 'src/backend/whymath_backend/ops/*trace*.py'] → ['src/backend/whymath_backend/l2/*event*.py', 'src/backend/whymath_backend/ops/*trace*.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/l2/test_learning_event_trace.py', 'tests/backend/api/test_me_learning_trace.py']: 읽기 표면이 api/me.py의 GET /v1/me/learning-trace로 착지하고 테스트가 tests/backend/l2·api에 생기는데, 등재 당시 paths가 l2/*event*.py·ops/*trace*.py만 덮고 있었다. paths는 병렬 세션 겹침 탐지의 유일한 입력이라 좁으면 미탐이 되므로(CLAUDE.md), 실제로 건드린 범위를 실측에 맞춰 넓힌다."
 updated: 2026-09-16
