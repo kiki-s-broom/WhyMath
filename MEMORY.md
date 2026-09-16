@@ -10278,7 +10278,7 @@ FakeProvider·라이브 LLM 0) + ruff·black·mypy --strict·lint-imports(7계�
   쓰지 않고 **자신이 선행 판정값을 재검사해 거부**한다(단일 최상위 `if` + 같은 줄 `} else {` 형태.
   그 형태가 대화형 붙여넣기에서 정상 파싱됨을 이번에 실측). 축 ③은 폐기가 아니라 읽기 전용
   블록에서 계속 유효하다.
-- **기계 집행** = `HARN-103` 신규 등재 — `docs/ops/*runbook*.md`의 powershell 펜스를 스캔해
+- **기계 집행** = `HARN-106` 신규 등재 — `docs/ops/*runbook*.md`의 powershell 펜스를 스캔해
   쓰기 동사를 담은 블록에 가드가 없으면 exit 1, CI 차단 스텝 배선. 가드 없음·else 가지 없음·
   판정 변수 미참조 위장 가드 3종 주입으로 변별력 검증, 스캔 0건은 실패 처리.
   (CLAUDE.md "동일 유형 텍스트 규칙 2회 실패 후 코드 착지" 선례 적용 — PB-02 그랜드파더 만료
@@ -10298,3 +10298,16 @@ FakeProvider·라이브 LLM 0) + ruff·black·mypy --strict·lint-imports(7계�
 재실행이 필요하다 ⓑ L2 enrich가 실제로 살아나는지는 별도 측정이다(적재는 전제일 뿐 증명이 아님)
 ⓒ `concept_content` 공백은 `SKB-04` 소유 ⓓ `review_status`는 전량 `ai_estimated`(코드 상수)라
 `reviewed_only=True` 경로에서는 적재 후에도 게이팅될 수 있다.
+
+**머지 과정 부기 — 태스크 번호 충돌 1건 (등재→착지 사이)**: 위 대책의 기계 집행 태스크를
+`HARN-103`으로 등재했는데, 같은 시각 다른 세션의 `HARN-103-feature-code-freeze-rules`가
+미머지 상태라 `add` 시점 번호 검사에 보이지 않았다. 그쪽이 PR #1171로 먼저 착지하면서
+'HARN-103' 참조가 결정 불가가 됐고, **머지 큐의 `harness-integrity`가 exit 1로 검출**해
+이 PR을 큐에서 뺐다(`removed_from_merge_queue` · reason=CI_FAILURE). 미머지인 이쪽을
+`HARN-106-runbook-write-guard-enforcement`로 개명해 해소했다(`backlog.py rename` — HARN-100이
+만든 경로). 개명 시 CLI가 **원격 인플라이트까지 검사해** `HARN-105`(타 세션 `claude/intelligent-planck-ujtlki`)를
+거부하고 `HARN-106`을 제안했다 — 번호 직접 배정 금지 규칙(HARN-10)이 이 자리에서 작동했다.
+즉 이 사건은 방어 실패가 아니라 **설계대로 잡힌 것**이다: `add` 시점에는 미머지 인플라이트를
+볼 수 없고(그 축은 타 세션 `HARN-105-human-gate-inflight-visibility`가 소유), 머지 큐가
+최종 관문으로 기능했다. CLAUDE.md 본문의 'ARCH-13·OPS-15 동번호 중복' 선례와 같은 형태이며,
+그때와 달리 이번에는 **사람이 아니라 기계가 먼저 발견**했다.
