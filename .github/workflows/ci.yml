@@ -144,7 +144,12 @@ jobs:
           # 가드가 tests/backend/** 전건을 훑어 FROZEN_INPUT_PATHS를 선언한 동결 테스트 **전부**를
           # 대상으로 삼고(선언 0건이면 통과가 아니라 RED), test_canonical_entity_model_freeze.py도
           # 그 상수를 선언한다. 새 동결 테스트는 상수만 선언하면 이 필터 편입이 자동으로 강제된다.
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|\.github/workflows/ci\.yml$)'; then
+          # **루프 계약 동결 입력 1건 편입**(EOS-100 · 2026-09-16) — 같은 형태의 다섯 번째다.
+          # `learning_loop_contract_v1.md`는 tests/backend/schema/test_learning_loop_contract.py
+          # 의 검사 ⑤⑧이 읽는 입력이다(§2 관계표·§3 귀속표를 파싱해 상수와 1:1 대조). 필터 밖이면
+          # 그 문서만 고치는 PR에서 backend 잡이 SKIP돼 **관계표를 조용히 고쳐도 검사 ⑧이 실행되지
+          # 않는다**. 위 AST 가드가 그 테스트의 FROZEN_INPUT_PATHS를 읽어 이 편입을 강제한다.
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
             be=true
           fi
           if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|\.github/workflows/ci\.yml$)'; then

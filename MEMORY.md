@@ -360,6 +360,28 @@
 
 **⑩ 정직한 공백.** ⓐ 증거 조립이 채점 경로에 SELECT 2~3건을 추가한다(writer가 이미 하는 것과 같은 조회다 — 사본 통합 시 `EOS-13`에서 함께 사라진다) ⓑ 실 PG 왕복은 hermetic이 못 본다 ⓒ Flutter 클라이언트는 새 필드를 아직 읽지 않는다(추가 필드라 비파괴).
 
+### 2026-09-16 (Kiki 판정·집행 · EOS-102): **`Assessment` 이름 충돌 — A안 채택(계획서 쪽을 `AssessmentEvidence`로 개명) + `EOS-100` 문서 결함 2건 정정** (Kiki 판정, claude 집행) — 판정 기준 main `14ef34d0`
+
+- **판정**: 계획서 300 §5.1의 per-answer 채점 산출 = **`AssessmentEvidence`**, 저장소 정본 `Assessment`(진단 평가 세션·`ARCH-37` #15) = **이름 유지**. `EOS-100`이 미판정으로 남기고(`semantic_collision=True`) `EOS-12` acceptance ⑤에 소유자를 박아 둔 유예를 같은 날 닫았다.
+- **Kiki 근거 2**: ⓐ 두 객체의 의미가 실제로 다르다(채점 결과/근거 ↔ 평가 세션 자체) ⓑ 저장소 `Assessment`가 이미 ORM·테이블·테스트에 연결돼 B안은 DB/ORM/API/테스트까지 파급된다.
+- **파급 실측(그 전제의 확인)**: ORM `Assessment` → 테이블 `assessment` · 백엔드 **29파일** · 테스트 **18파일** · 마이그레이션 **4건** 참조. B안은 `ARCH-37` 검사 ②(좌석 개명 시 RED)를 정면으로 건드린다. A안은 소비자 0인 계약층 이름만 바꾸므로 파급이 문서+모듈 안에서 닫힌다.
+- **독립 뒷받침 — `EOS-79`**: 4층 경계 정본이 이미 *"이름이 층을 정하지 않는다 — `assessment` 테이블은 Assessment 층이 **아니다**"*를 적어 뒀고, 그 문서의 **Assessment 층** 정의("어느 Skill·오개념의 어떤 증거인가")가 정확히 이 객체다. 즉 A안은 새 어휘 발명이 아니라 **이미 있던 층 구분에 루프 어휘를 맞춘 것**이다.
+- **좌석 재귀속**: `AssessmentEvidence` → `absorbed` / `LearningEvent`(전용 좌석 없음 — `attempt_event`·`answer_submission`·`evidence_event`에 혼재, `EOS-79` 실측). 정본 `Assessment`는 루프 어휘 **밖**으로 이동(§3-2).
+- **`EOS-100` 문서 결함 2건 동시 정정**: ⓐ §3-2 "루프 어휘 밖" 목록에 `LearningEvent`를 잘못 넣었다 — `Attempt`·`LearningSession`이 이미 그 엔티티에 귀속되므로 밖이 아니다(8종이 아니라 **7종**이 맞았다) ⓑ 그 목록이 "하드코딩이 아니다 — 검사 ⑤가 계산한다"고 적었으나 **검사 ⑤는 그 집합을 계산하지 않았다**. 전형적인 "정본화를 집행으로 착각한 표기"이며, 검사 ⑩을 신설해 주장을 참으로 만들었다. **뮤테이션 M29가 그 원 결함을 재주입해 RED를 확인** — 종전에는 같은 결함을 다시 넣어도 초록이었다.
+- **하네스 준수**: `EOS-100`이 `done`(종결 상태·나가는 전이 없음)이라 `review` 전이가 **거부**됐고, 대장 손편집으로 우회하지 않고 후속 태스크 `EOS-102`를 등재·claim했다(거부 우회 금지).
+- **검증**: 뮤테이션 **8종 추가 전건 RED · 생존 0**(누적 33종). 축: 개명 회귀 · 충돌 되살림 · 좌석 오귀속 · §3-2 목록 조작 2종 · 절 삭제(파서 0건) · 문서 드리프트 2종.
+
+### 2026-09-16 (결정·구현 · EOS-100): **Learning Loop Contract v1 코드 고정 — `EOS-09` §9-② "등재 제외" 판정을 Kiki 지시로 갱신, 단 좌석 축은 건드리지 않는다** (Kiki 지시 `P-01`, claude 구현) — 판정 기준 main `c4f8c9fb`
+
+- **선행 판정과의 관계**: `docs/strategy/plan300_phase2_backlog_crosswalk.md` §9-②(`EOS-09` · 같은 날 작성)는 이 축을 **등재 제외**로 판정했다 — "`ARCH-37`(done)이 엣지 테이블을 '핵심 외'로 명시 배제했으므로 관계 계약 등재는 그 판정을 조용히 뒤집는다. 필요한 것은 **결정**이지 착수 단위가 아니다." 2026-09-16 Kiki 지시(계획서 300 집행 지시문 `P-01`)가 그 결정에 해당하므로 착수했다.
+- **충돌 회피 설계 — 축을 나눴다**: `ARCH-37`이 배제한 것은 **저장 좌석**(관계를 담는 *테이블*)이고, `EOS-100`이 고정한 것은 **호출 어휘**(관계의 *이름과 방향*)다. 신규 테이블·신규 좌석 **0건**이며, 좌석 없는 객체(`Recommendation`)는 `no_seat`으로 적고 끝낸다 — 20번째 엔티티를 만들면 `ARCH-37` 검사 ②가 RED다. 좌석 축의 정본은 여전히 `canonical_entity_model_v1.md` 하나다.
+- **산출**: 코드 정본 `schema/learning_loop_contract.py`(14객체 enum · 16엣지 enum · 18관계 삼중항 레지스트리 · 14건 좌석 귀속 · DAG primitive) · 문서 정본 `docs/architecture/learning_loop_contract_v1.md` · 기계 집행 `tests/backend/schema/test_learning_loop_contract.py` 37건 · CI 경로 필터 편입(다섯 번째 동결 입력).
+- **실측 정정 2건**: ⓐ 지시문 `P-01`은 "13개 객체"라고 적었으나 **열거된 이름은 14개**다(목록이 정본·개수 표기가 오기) ⓑ 계획서 §1 관계도는 `Curriculum`·`Mastery`·`LearningSession` **3종을 한 번도 쓰지 않는다** — 없는 관계를 지어내지 않고 고립 사실 그대로 적었다(엣지 `mastery`와 객체 `Mastery`는 다른 것).
+- **미해결 1건(Kiki 판정 대기)**: `Assessment` **이름 충돌** — 계획서 §5.1의 `Assessment`는 *한 답안의 채점 산출(Evidence 묶음)*이고 `ARCH-37` #15의 `Assessment`는 *진단 평가 세션 컨테이너*다. 같은 글자, 다른 것. 약칭 문제(`Objective`·`Mastery`)와 달리 자동 정정이 불가능하므로 **임의 개명하지 않고** `semantic_collision=True`로 충돌을 데이터에 남겼다. 3택은 정본 문서 §5.
+- **정직한 공백**: ⓐ 서빙 배선 **0건** — 오늘 이 상수를 읽는 API·엔진은 없다("루프의 어휘가 닫혔다"까지만 말한다). 배선은 `EOS-10`·`EOS-12`·`EOS-13`·`EOS-14` 소관 ⓑ 순환 탐지 구현이 2벌 → **3벌**이 됐다. 통합 판정은 `EOS-101`로 분리 등재했고, 그때까지 조용한 분기는 판정 일치 대조 테스트가 막는다.
+- **검증**: 뮤테이션 **25종 전건 RED · 생존 0**(순수 Python 하네스 · 회차마다 `mutated != original`·sha256 변화·바이트 동일 원복 단언). 위음성(M12 항상 `None`)과 위양성(M13 항상 순환)을 **쌍으로** 주입하고 성공 방향 대조군(깨끗한 DAG 4종·깊은 체인 5,000노드)을 함께 뒀다.
+
+- **부수 수정(반복 실수 2회차 상환)**: `LoopEdge.TRIGGERS`가 `EOS-84` 경계 프로브의 ratchet을 깨뜨렸는데 원인은 계약이 아니라 **탐지기**였다 — `scripts/analysis/eos_core_boundary_probe.py`의 `trig\w*`가 `trigger`를 부분매치한다. **이 오탐은 2026-09-06 `EOS-86`에서 이미 관측됐고 그때 대책이 "오탐을 baseline에 등재"였다**(데이터로 덮음) — 그래서 2회차를 못 막았다. CLAUDE.md 반복 실수 규칙 + "동일 유형 텍스트 규칙 2회 실패 후 코드 착지" 선례에 따라 **코드**로 옮겼다: `trig(?!ger)\w*`(2곳) + 회귀 테스트 2종(`test_trigger_family_is_not_math`·성공 방향 대조군) + 은퇴한 baseline 엔트리 제거. 관계명 개명은 선택지가 아니었다 — `triggers`는 계획서 §1 어휘이고 **탐지기가 틀렸을 때 피검체를 고치지 않는다**.
 ### 2026-09-16 (구현 · EOS-11): **Learning Event Trace 읽기 축 신설 — 새 store 0, 대신 "0건의 의미"를 3상태로 말하는 투영 계약** (claude 구현) — 판정 기준 main `c4f8c9fb`
 
 **① 무엇이 없었나.** 학습 이벤트의 *적재*는 이미 충족돼 있었다(`attempt_event` hypertable·`problem_attempt`·`concept_mastery_history`·`misconception_hypothesis`·`assessment`). 없던 것은 그것들을 **한 학습자의 하나의 시간선으로 합치는 조회**다 — 실측상 기존 소비처 3곳(`l2/learning_metrics_rollup` 일별 롤업 · `harness/attempt_skill_event_reach_report` 기록률 · `harness/wh1_evaluation` 지표)이 전부 *집계*였고, per-learner 시계열 조회는 내가 찾은 방법으로는 0건이었다. 집계는 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답하지 못하고, 그 답이 없으면 역추적(왜 이 추천이 나왔는가)이 불가능하다.
