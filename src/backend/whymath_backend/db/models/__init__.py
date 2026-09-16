@@ -77,6 +77,7 @@ from whymath_backend.db.models.concept_content import (
 from whymath_backend.db.models.concept_embedding import ConceptEmbedding
 from whymath_backend.db.models.concept_node import ConceptNode
 from whymath_backend.db.models.concept_standard_link import ConceptStandardLink
+from whymath_backend.db.models.concept_version import ConceptVersion
 from whymath_backend.db.models.concept_visual_style import ConceptVisualStyle
 from whymath_backend.db.models.concept_visualization import ConceptVisualization
 from whymath_backend.db.models.curriculum_entry import CurriculumEntry
@@ -117,6 +118,7 @@ from whymath_backend.db.models.problem import (
     ProblemRelation,
     ProblemStep,
 )
+from whymath_backend.db.models.problem_embedding import ProblemEmbedding
 from whymath_backend.db.models.problem_type_node import (
     PROBLEM_TYPE_REVIEW_STATUS_DEFAULT,
     ProblemTypeNode,
@@ -312,4 +314,10 @@ __all__ = [
     "AchievementLevelUnit",
     # SEC-27: JobOwnership (비동기 QUALITY 작업 소유권·job_id(String) PK = Celery 태스크 id)
     "JobOwnership",
+    # EOS-49: ConceptVersion (Concept 좌석 4번째 테이블 — concept.current_published_version_id
+    # 의 FK 타깃이라 여기 없으면 좁은 선택에서 FK가 해소되지 않는다 · ARCH-09)
+    "ConceptVersion",
+    # S2-c: ProblemEmbedding (L1 자체생성 동등문제 dedup pgvector 백킹·problem_id PK·
+    # 하드 FK 없음 — 여기 없으면 autogenerate가 실재 테이블을 drop 제안한다 · ARCH-09)
+    "ProblemEmbedding",
 ]
