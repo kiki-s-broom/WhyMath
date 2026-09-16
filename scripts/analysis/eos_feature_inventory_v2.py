@@ -448,6 +448,11 @@ CATALOG: tuple[Spec, ...] = (
        "GET /curricula", "GET /curricula/{framework_id}", "GET /curricula/{framework_id}/nodes"),
     _s("WM-S-038", "성취기준(학습 성과) 단건 조회", "Admin", "Curriculum", "P0",
        "B1 성취기준 895", "curricula", "GET /learning-outcomes/{norm_id}"),
+    _s("WM-S-050", "성취기준 학습맵 단일 조회(개념·스킬·문제·오개념 4홉)",
+       "Admin", "Curriculum", "P1",
+       "계획서 200 §18 Week 2 핵심 질의 — EOS-05. 단건 조회(WM-S-038)와 별 행인 이유: 그쪽은 "
+       "성취기준 *본문* 표면이고 이쪽은 지식 그래프 4홉 조합이라 소비처·실패 모드가 다르다",
+       "curricula", "GET /learning-outcomes/{norm_id}/learning-map"),
     _s("WM-S-039", "개념↔성취기준 정렬 통합 조회", "Admin", "Curriculum", "P0",
        "B2·F1 앵커 매핑 조회", "alignments", "GET /"),
     _s("WM-S-040", "권리(저작권) 판정 게이트웨이", "Platform", "Content", "P0",
