@@ -149,7 +149,7 @@ $Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe
 $Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
 git fetch origin main
 git worktree prune
-if (Test-Path $WT) { git worktree remove --force $WT } else { "WT_PREEXISTING=False — 새로 만든다" }
+if (Test-Path $WT) { git worktree remove --force $WT; if (Test-Path $WT) { Remove-Item -Recurse -Force $WT } } else { "WT_PREEXISTING=False — 새로 만든다" }
 git worktree add --detach $WT origin/main
 cd $WT
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
@@ -166,6 +166,9 @@ git log --oneline -1
 - `PY_OK=False`면 venv 경로가 다르다 — 세션에 알린다(원 클론의 venv를 쓰는 것이 의도다.
   worktree에는 `.venv`가 없다).
 - `WT_HEAD`가 다르면 `git fetch`가 실패한 것이다 — 그 숫자를 세션에 전달한다.
+- 첫 줄의 중첩 가드는 *이전 회차가 중간에 죽어 폴더만 남은* 경우를 처리한다 — `worktree remove`가
+  등록되지 않은 폴더를 지우지 못하면 `worktree add`가 "폴더가 비어 있지 않다"로 실패하기 때문이다.
+  지우는 대상은 두 줄 위에서 이 블록이 직접 정한 전용 경로뿐이다.
 
 ### [B] 환경 + 도달성 + 사슬 진단 (읽기 전용 — DB에 아무것도 쓰지 않는다)
 
