@@ -536,6 +536,16 @@ jobs:
       - name: 게이트 — 라우터 우회 결정 (check_routing_decision_bypass·클라우드 직접 생성 0건)
         run: python ../../scripts/ops/check_routing_decision_bypass.py
 
+      # ARCH-46: 프로바이더 좌석 계약 스캔 — 위 두 게이트가 *라우팅 자료구조*(RoutingRequest·
+      # RoutingDecision)를 볼 때, 이 게이트는 **프로바이더를 쥐고 부르는 자리**를 본다. 새
+      # 프로바이더를 붙이며 라우터를 통하지 않고 `SomeProvider().generate(...)`를 부르면 그
+      # 경로엔 RoutingDecision이 아예 없어 위 둘은 조용히 통과한다(D1의 사각). 임포트 좌석마다
+      # 라우터 경유의 증거(Router().route 또는 l3.pipeline)를 요구하고, generate 호출의 인자
+      # 목록에 결정이 실렸는지 본다. 유예는 만료·unmatched를 exit 1로 강제한다. hermetic.
+      # 변별력은 tests/infra/test_provider_seat_contract.py의 결함 주입이 봉인.
+      - name: 게이트 — 프로바이더 좌석 계약 (check_provider_seat_contract·라우터 미경유 0건)
+        run: python ../../scripts/ops/check_provider_seat_contract.py
+
       # OPS-16: L3 생성 프롬프트 정본(docs/prompts/l3_*.md)의 3레일 감사 —
       # ⓐ 저작권(평가원·EBS·교과서 본문 복제 금지 지시문) ⓑ 봉인(rephrase 수치·정답 불변)
       # ⓒ 독립성(cross_verify에 생성자 문맥 미주입). 위반 시 exit 1. hermetic(LLM 0·DB 0).

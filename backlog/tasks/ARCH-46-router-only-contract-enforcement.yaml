@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - src/backend/pyproject.toml
   - "tests/infra/**"
   - "docs/architecture/adr/**"
-session: null
+session: claude/clever-bell-8lh19k
 notes: "출처: ARCH-45(PR #1166) ADR-005 집행 지점 표·열린 질문 1번. 실측 근거 = import-linter 계약 3건(7계층 단방향 1 + EOS Core 에 Math Adapter 금지 2) 중 프로바이더 소비자를 제한하는 계약 0건. CLAUDE.md 절대 원칙 중 기계 집행이 없는 항목이라는 점이 등재 사유다. 주의: 정오 판정 없이 계약부터 걸면 상시 실패하는 fail-open 보호를 하나 더 만드는 것이므로 acceptance 1번이 3번의 선행이다."
-updated: 2026-09-15
+updated: 2026-09-16
