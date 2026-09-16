@@ -19,10 +19,13 @@ alembic autogenerate(env.py의 `target_metadata = Base.metadata`)가 테이블�
     UserBehaviorMetrics.
   - v1.1 CurriculumEntry (다국 커리큘럼 매트릭스 셀).
   - v1.1 TextbookMapping·TextbookUnit (교과서 매핑 — 중첩 → 관계형 2테이블).
+  - EOS-49 ConceptVersion (개념 버전 테이블 — `concept.current_published_version_id`의 FK
+    타깃. 이 등록이 빠지면 autogenerate가 실재하는 테이블을 **삭제 대상으로 본다**).
   - 슬105 MisconceptionEmbedding (L4 오개념 의미 매칭 pgvector 영속 — `vector` 컬럼 소유).
   - 슬3(개념그래프 아크) ConceptEmbedding (L1 개념 의미검색 pgvector 영속 — UC 키·`vector` 컬럼).
   - 개념그래프 소비 슬1 ConceptNode (L1 개념 메타 PG 프로젝션 — UC 키·검색 enrichment 백킹).
   - 원자 Phase 2b AtomEmbedding (L1 원자 의미검색 pgvector 영속 — code 키·`vector` 컬럼).
+  - S2-c ProblemEmbedding (자체생성 동등문제 dedup pgvector 백킹 — AtomEmbedding의 문제 짝).
   - P1-2 AchievementStandard·ConceptStandardLink (NCIC 성취기준 영속 + 개념↔성취기준 N:M 링크).
   - CUR-07 AchievementLevelUnit (단원 단위 성취수준 등급 커버리지 — FK 없음·독립 테이블).
   - PIPA §22-2 ParentalConsent (14세 미만 법정대리인 동의 GRANT 감사 — user_profile FK).
@@ -77,6 +80,7 @@ from whymath_backend.db.models.concept_content import (
 from whymath_backend.db.models.concept_embedding import ConceptEmbedding
 from whymath_backend.db.models.concept_node import ConceptNode
 from whymath_backend.db.models.concept_standard_link import ConceptStandardLink
+from whymath_backend.db.models.concept_version import ConceptVersion
 from whymath_backend.db.models.concept_visual_style import ConceptVisualStyle
 from whymath_backend.db.models.concept_visualization import ConceptVisualization
 from whymath_backend.db.models.curriculum_entry import CurriculumEntry
@@ -117,6 +121,7 @@ from whymath_backend.db.models.problem import (
     ProblemRelation,
     ProblemStep,
 )
+from whymath_backend.db.models.problem_embedding import ProblemEmbedding
 from whymath_backend.db.models.problem_type_node import (
     PROBLEM_TYPE_REVIEW_STATUS_DEFAULT,
     ProblemTypeNode,
@@ -256,6 +261,7 @@ __all__ = [
     "ConceptContent",
     "ConceptVisualization",
     # ARCH-14 ③: ConceptVisualStyle (권장 시각화 양식 Overlay·code 키·슬88 컬럼 이관·Concept Purity)
+    "ConceptVersion",
     "ConceptVisualStyle",
     "CONTENT_REVIEW_STATUS_AI_ESTIMATED",
     "CONTENT_SCOPE_K12",
@@ -268,6 +274,7 @@ __all__ = [
     "ATOM_PROBE_REVIEW_STATUS_AI_ESTIMATED",
     # 원자 마이그레이션 Phase 2b: AtomEmbedding (L1 원자 의미검색 pgvector 영속·code 키·vector 컬럼)
     "AtomEmbedding",
+    "ProblemEmbedding",
     # WH-S S1: SolutionNode (풀이 경로 트리 노드·§2.1·오프라인 솔버 상태) + 검증 상태 enum
     "SolutionNode",
     "NodeVerifyStatus",

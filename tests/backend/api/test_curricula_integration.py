@@ -27,14 +27,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+# 전 모델 등록 — `Concept.current_published_version_id`가 `concept_version`을 FK로
+# 참조하므로 개별 import만으로는 Base.metadata가 불완전해 NoReferencedTableError가 난다
+# (모델 패키지 `__init__`이 전 테이블 등록의 정본 경로다 — env.py도 이것을 쓴다).
+import whymath_backend.db.models  # noqa: F401
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings
 from whymath_backend.db.models.achievement_standard import AchievementStandard
 from whymath_backend.db.models.atom_node import AtomNode
+from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.concept_standard_link import ConceptStandardLink
 from whymath_backend.db.models.curriculum_entry import CurriculumEntry
 from whymath_backend.db.models.curriculum_framework import CurriculumFramework
 from whymath_backend.db.models.curriculum_version import CurriculumVersion
+from whymath_backend.db.models.misconception_catalog import MisconceptionCatalog
+from whymath_backend.db.models.skill_node import SkillNode
 from whymath_backend.schema.curriculum_entry import CurriculumEntry as CurriculumEntrySchema
 from whymath_backend.schema.curriculum_framework import (
     CurriculumFramework as CurriculumFrameworkSchema,
@@ -42,7 +49,7 @@ from whymath_backend.schema.curriculum_framework import (
 from whymath_backend.schema.curriculum_version import (
     CurriculumVersion as CurriculumVersionSchema,
 )
-from whymath_backend.schema.enums import CurriculumLicense
+from whymath_backend.schema.enums import BehaviorArea, ConceptLevel, CurriculumLicense
 from whymath_backend.schema.standard import (
     AchievementStandard as AchievementStandardSchema,
 )
@@ -81,6 +88,14 @@ class _Seed:
         self.norm_id = f"IT_{sfx}_STD"
         self.concept_code = f"IT.UC.{sfx}"
         self.atom_code = f"it-atom-{sfx}"
+        # ── 학습맵 체인(EOS-05) ──
+        self.concept_uuid = uuid.uuid4()
+        self.skill_id = f"skill.it-{sfx}"
+        self.problem_uuid = uuid.uuid4()
+        self.mis_id = f"ITM{sfx[:6]}"
+        # 오개념은 **두 경로**로 걸린다(concept_src_id / behavior_skills). 한쪽만 심으면
+        # 다른 절을 픽스처가 한 번도 밟지 않아 그 절은 검증된 적 없이 초록이 된다.
+        self.mis_id_by_skill = f"ITS{sfx[:6]}"
 
 
 async def _insert_seed(seed: _Seed) -> None:
@@ -174,7 +189,58 @@ async def _insert_seed(seed: _Seed) -> None:
             )
             await session.commit()
 
+            # ── 학습맵 체인(EOS-05) — 1축(concept_standard_link)부터 오개념까지 ──
+            # 1축은 norm_id 어휘를 쓰고 2·3축은 고시코드를 쓴다. 두 어휘를 다 심어야
+            # "핸들러가 축별로 나눠 묻는가"가 실 SQL에서 판정된다(hermetic이 못 보는 축).
+            session.add(
+                Concept(
+                    concept_id=seed.concept_uuid,
+                    code=seed.concept_code,
+                    name_ko="통합테스트 개념",
+                    level=ConceptLevel.세부개념,
+                    behavior_skills=[seed.skill_id],
+                    created_at=_NOW,
+                )
+            )
+            session.add(
+                SkillNode(
+                    skill_id=seed.skill_id,
+                    name_ko="통합테스트 스킬",
+                    behavior_area=BehaviorArea.TRANSFORM,
+                    family="it-family",
+                    mastery_estimable=True,
+                    prerequisite_skill_ids=[],
+                    standard_codes=[],
+                    review_status="ai_estimated",
+                    updated_at=_NOW,
+                )
+            )
+            session.add(
+                MisconceptionCatalog(
+                    mis_id=seed.mis_id,
+                    canonical_statement="통합테스트 오개념",
+                    error_type="절차",
+                    severity="high",
+                    concept_src_id=seed.concept_code,
+                    behavior_skills=[],
+                )
+            )
+            # behavior_skills ARRAY overlap 경로 전용 — concept_src_id는 **일부러 다른 값**이라
+            # 이 행은 overlap 절이 없으면 결과에서 사라진다(그 절의 반례).
+            session.add(
+                MisconceptionCatalog(
+                    mis_id=seed.mis_id_by_skill,
+                    canonical_statement="통합테스트 오개념(스킬 경로)",
+                    error_type="절차",
+                    severity="low",
+                    concept_src_id=f"{seed.concept_code}.무관",
+                    behavior_skills=[seed.skill_id],
+                )
+            )
+            await session.commit()
+
             # 링크는 성취기준 FK가 선행돼야 하므로 마지막에.
+            # (EOS-05 학습맵 1축도 이 링크를 그대로 쓴다 — 같은 행을 두 번 심지 않는다.)
             session.add(
                 ConceptStandardLink.from_schema(
                     ConceptStandardLinkSchema(
@@ -217,6 +283,23 @@ async def _delete_seed(seed: _Seed) -> None:
             await conn.execute(
                 text("DELETE FROM atom_node WHERE code = :code"),
                 {"code": seed.atom_code},
+            )
+            # ── 학습맵 체인(EOS-05) — 역FK 순서: problem_concept → problem/concept ──
+            await conn.execute(
+                text("DELETE FROM problem_concept WHERE concept_id = :cid"),
+                {"cid": seed.concept_uuid},
+            )
+            await conn.execute(
+                text("DELETE FROM misconception_catalog WHERE mis_id = ANY(:mids)"),
+                {"mids": [seed.mis_id, seed.mis_id_by_skill]},
+            )
+            await conn.execute(
+                text("DELETE FROM concept WHERE concept_id = :cid"),
+                {"cid": seed.concept_uuid},
+            )
+            await conn.execute(
+                text("DELETE FROM skill_node WHERE skill_id = :sid"),
+                {"sid": seed.skill_id},
             )
     finally:
         await engine.dispose()
@@ -336,3 +419,70 @@ def test_alignments_three_axes_on_live_pg(seed: _Seed) -> None:
         assert (
             client.get("/v1/alignments", params={"concept_key": seed.concept_ids[1]}).json() == []
         )
+
+
+def test_learning_map_chain_roundtrip_on_live_pg(seed: _Seed) -> None:
+    """계획서 200 §18의 단일 질의가 실 PG에서 4홉 전부 관통한다 (EOS-05).
+
+    hermetic(`test_curricula.py`·`tests/backend/l1/standards/test_learning_map.py`)이 못 보는
+    **SQL 실체**를 본다:
+      - 1축(`concept_standard_link`)은 **norm_id 어휘**로, 3축(`atom_node.standard_codes`)은
+        **고시코드 어휘**로 각각 걸린다 — 한 어휘로 3축을 다 물으면 한쪽이 조용히 0이 된다.
+      - `concept.code` ↔ `atom_node.code` 두 키 공간 조회가 실제 `in_` 대조로 성립한다.
+      - `behavior_skills` 참조 배열 → `skill_node` 조인(신규 엣지 타입 0 설계).
+      - `problem_concept` N:M 조인.
+      - 오개념의 `concept_src_id` 느슨참조(FK 없음) 대조.
+    """
+    with TestClient(create_app()) as client:
+        response = client.get(f"/v1/learning-outcomes/{seed.norm_id}/learning-map")
+        assert response.status_code == 200, response.text
+        body = response.json()
+
+        assert body["norm_id"] == seed.norm_id
+        assert body["official_code"] == seed.official_code
+
+        # 1홉 — 두 어휘가 각자의 축에서 걸렸는가. concept_code는 1축(norm_id)에서,
+        # atom_code는 3축(고시코드)에서만 나올 수 있다 — 둘 다 있으면 어휘 분기가 작동했다.
+        keys = {c["concept_key"]: c for c in body["concepts"]}
+        assert seed.concept_code in keys, "1축(norm_id 어휘)이 걸리지 않았다"
+        assert seed.atom_code in keys, "3축(고시코드 어휘)이 걸리지 않았다"
+        assert keys[seed.concept_code]["axes"] == ["concept_standard_link"]
+        assert keys[seed.atom_code]["axes"] == ["atom_node"]
+
+        # 키 공간 두 곳 — 각자 자기 테이블에서 해소됐는가.
+        assert keys[seed.concept_code]["resolved_from"] == ["concept"]
+        assert keys[seed.atom_code]["resolved_from"] == ["atom_node"]
+        assert keys[seed.concept_code]["concept_id"] == str(seed.concept_uuid)
+        assert body["concept_stats"]["resolved"] == 2
+        assert body["concept_stats"]["join_blackout"] is False
+
+        # 2홉 — behavior_skills 배열이 skill_node에 조인됐는가.
+        skills = {s["skill_id"]: s for s in body["skills"]}
+        assert seed.skill_id in skills, "behavior_skills → skill_node 조인이 성립하지 않았다"
+        assert skills[seed.skill_id]["behavior_area"] == "TRANSFORM"
+        assert skills[seed.skill_id]["via_concept_keys"] == [seed.concept_code]
+
+        # 4홉 — 오개념의 concept_src_id 느슨참조(FK 없음)가 개념 키로 대조됐는가.
+        mis = {m["mis_id"]: m for m in body["misconceptions"]}
+        assert seed.mis_id in mis, "concept_src_id 대조가 성립하지 않았다"
+        assert mis[seed.mis_id]["matched_by"] == ["concept_src_id"]
+        # ARRAY overlap 경로 — 이 행의 concept_src_id는 개념 키와 다르므로 overlap 절이
+        # 없으면 아예 나오지 않는다(절의 반례를 픽스처가 실제로 밟는다).
+        assert seed.mis_id_by_skill in mis, "behavior_skills ARRAY overlap이 성립하지 않았다"
+        assert mis[seed.mis_id_by_skill]["matched_by"] == ["behavior_skills"]
+
+        # 3홉 — 이 시드는 문제를 심지 않았다. 그 0은 "없음"이지 "안 봄"이 아니어야 한다
+        # (미측정 ≠ 0 — scanned>0이 그것을 증명한다).
+        assert body["problems"] == []
+        assert (
+            body["problem_stats"]["scanned"] == 1
+        ), "개념 UUID 1건을 훑었는데 scanned가 0이면 '없음'과 '안 봄'이 구분되지 않는다"
+        assert body["problem_stats"]["produced"] == 0
+
+
+def test_learning_map_unknown_standard_returns_404_on_live_pg(seed: _Seed) -> None:
+    """없는 성취기준은 404 — 실 PG에서도 조기 반환이 성립한다(seed는 PG 도달성 게이트용)."""
+    assert seed.norm_id  # 픽스처가 PG 도달을 보장한다는 사실의 명시적 사용
+    with TestClient(create_app()) as client:
+        missing = f"IT_NOPE_{uuid.uuid4().hex[:8]}"
+        assert client.get(f"/v1/learning-outcomes/{missing}/learning-map").status_code == 404
