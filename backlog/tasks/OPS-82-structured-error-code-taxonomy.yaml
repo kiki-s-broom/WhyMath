@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-82-structured-error-code-taxonomy
+title: "구조화 에러코드 체계 부재 — 예외 클래스 34종이 코드 축 없이 산다(12월 판정의 장애 분석 근거 0)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 4
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 (판정 기준 main 4b33d243 · 2026-09-15): `src/backend`에 예외 클래스 **34종** 실재, `error_code` 식별자 **0건**(`grep -rn \"error_code\" src/backend --include=*.py` → 0). 예외는 20+ 모듈에 흩어져 있다."
+  - "② **`GenerationFailureCode`(F1~F8)와 합치지 않는다** — 그쪽은 *콘텐츠* 생성 실패 분류이고 이쪽은 *시스템* 에러코드다. 두 축을 한 이름으로 묶으면 검증설계서가 동결한 실패코드 의미가 오염된다(EOS-51 동결 대상)."
+  - "③ 목적은 12월 판정 시 **장애 분석의 변별력**이다 — 서로 다른 8개의 실패가 같은 글자로 보이면 실패가 정보가 되지 못한다(2026-08-22 '측정·수집 도구를 성공 경로만 보고 설계 금지' ②: 예외 타입명만으로는 원인이 구분되지 않는다)."
+  - "④ 침묵 실패 금지와의 접점 — never-break 경로가 예외를 삼킬 때 **예외 타입명을 로그에 포함**하는 현행 계약은 유지된다. 코드 축이 생기면 그 식별자가 타입명에서 코드로 승격될 수 있으나, **시크릿·필드값은 여전히 제외**한다(2026-07-16 langfuse 8일 전멸 교훈)."
+  - "⑤ 정본화≠집행 별항 — 코드 체계를 *정의*하는 것과 API 응답·로그가 그 코드를 *싣는* 것은 다르다. 소비 지점(응답 스키마 필드·로그 포맷·관측 대시보드)을 별항으로 명시하고, 경유 배선이 0인 채로 완료하지 않는다."
+  - "⑥ 범위 경계 — 34종 **전건 소급 부여가 아니다**. 부여 규칙(네이밍·계열·안정성 보증)과 적용 범위(신규 예외 + 학생 대면 경로)를 먼저 정하고, 전건 소급은 별도 후속으로 분리한다. 범위를 먼저 접지 않으면 이 태스크는 끝나지 않는다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/api/**"
+  - "docs/standards/error_code*.md"
+session: null
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B3 · §5 B급 미등재 후보 6. 갭리뷰 §5는 이 항목을 \"11월 권고\"로 유예하며 \"지금 등재하면 만료 없는 유예 없이 떠 있는 todo만 늘린다\"고 적었는데, **산문 유예는 대장에 집행되지 않으므로 소유자 0인 상태 그 자체**다(CLAUDE.md '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'·'만료 없는 유예·제외 금지'). 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재하며, 시점 유예는 priority로 표현한다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(에러코드·error code·error_code·장애 분석·오류 응답·ProblemDetail) → 관련 0건."
+updated: 2026-09-15

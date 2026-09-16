@@ -430,6 +430,16 @@ gates:
     evidence: "2026-07-28 Kiki가 Phaiakes9 whymath-pg(docker·5433)에서 실행. ①재적재: populate 2,683 concepts·2,210 edges(parent_skip 0·edge_skip 0 — 병합 코퍼스·재배선 엣지 prod 반영) ②cleanup --retired-from-ledger dry-run·--confirm·재확인 dry-run 3회 모두 전 5테이블 0건(스캔 실패 0 — 스키마 실재 확인). 은퇴 원자 14행 '잔존' 가정은 실측 반증 — prod 이전 적재가 기수/NUMER 트랙 코퍼스 편입 이전이라 애초 미적재(S2-04 공집합 충족 동형). 정리 대상 부재로 삭제 0이 정답."
     cleared_by: null
     notes: "S4-07 병합 후속. 당초 '재적재는 upsert-only라 은퇴 원자 14행 잔존' 가정으로 요청 — 실측 결과 가정 반증(evidence 참조·잔존 0). 재적재+공집합 확인으로 목적 달성"
+  - id: G-ruleset-bypass-actors-live-watch
+    title: "룰셋 전문(bypass_actors) 첫 2입력 라이브 판정 1회 — HARN-102가 감시 축을 넓힌 뒤 처음 도는 회차다. 기록 파일 .github/ruleset-check-state.json의 마지막 verdict=ok는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, 지금은 실제로 측정하지 않은 축(bypass_actors·enforcement)까지 통과로 읽힌다 — 그 범위 불일치를 닫는 것이 이 게이트의 목적이다. 실행: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북(수집 2줄 + --ruleset-full 판정 1줄). 기대 = EXIT 0(2026-09-14 실측 bypass_actors=[] 이 그대로면). EXIT 1이면 우회 주체가 생겼거나 enforcement가 active가 아니라는 뜻이고 출력의 \"시정 순서\"를 따른다. EXIT 2면 수집이 한 줄 빠졌거나 룰셋 id가 바뀐 것(문서 \"id 하드코딩의 취약성과 그 처리\" 참조). 선행 조건: 이 PR이 main에 머지된 뒤에 실행한다 — 런북과 판정기 양쪽이 미머지 상태면 Kiki 체크아웃에 --ruleset-full 인자 자체가 없어 argparse 오류가 난다. 세션이 머지 확인 후 6항목 브리핑과 함께 실행 블록을 안내한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-ruleset-bypass-actors-read
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
     kind: human
@@ -499,6 +509,16 @@ gates:
     remind_after_days: 7
     evidence: null
     cleared_by: null
+    notes: ""
+  - id: G-skb04-concept-content-populate
+    title: "SKB-04 concept_content prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(concept_content.populate 1회 실행). 배경: 이 CLI는 완비돼 있으나 prod에서 한 번도 실행되지 않았다(2026-09-14 실측: 크로스워크 이전이 \"concept_content K-12 대상 행 부재 437건\" 보고). 2026-09-15 착수 검증에서 코드 공백이 아님을 확정했다 — 코퍼스 실재(K-12 437건·대학 409건)·CLI 진입점 실재(main(argv)->int·__main__)·크로스워크가 부재로 지목한 code 3건이 코퍼스에 전건 포함(10기수1-01-01/-02/-03)·concept_content는 FK가 없고 code가 PK라 선행 적재 불요. 즉 실행만 하면 해소된다. 기대 적재: K-12 437 + 대학 409 = 846건. 런북: docs/ops/skb04_concept_content_populate_runbook.md. SKB-03 게이트(G-skb03-atom-node-populate)와 같은 창에서 연달아 실행 가능하며 순서 의존은 없다(두 테이블은 서로 참조하지 않는다)."
+    kind: human
+    assignee: kiki
+    status: cleared
+    requested: 2026-09-15
+    remind_after_days: 7
+    evidence: "판정 기준: 측정 시점 main 4b33d243 (Kiki 실행 블록의 JUDGED_AGAINST_MAIN 출력) · 게이트 항목 착지 main 460cad84 (PR #1165 머지 큐 경유 병합)\nKiki 실행(Phaiakes9 whymath-pg 5433, 2026-09-15) — docs/ops/skb04_concept_content_populate_runbook.md 런북:\nDOCKER_OK=True (whymath-pg Up 18h · 0.0.0.0:5433->5432/tcp)\nTABLE_EXISTS=t\nPATHS_MATCH_MAIN=True\nBEFORE_TOTAL=0 BEFORE_K12=0 BEFORE_UNIV=0\nREACH_EXIT=0\nPOPULATE_EXIT=0\nCLI stdout: 콘텐츠 적재 437건(scope=K-12) · 409건(scope=대학) · 완료 총 846건\nAFTER_TOTAL=846 AFTER_K12=437 AFTER_UNIV=409\nAFTER_WITH_ATOMS=0 (예고대로 정상 — 크로스워크 미재실행)\n\n3자 교차 확인 통과: 코퍼스 실측(437/409/846) = CLI 보고 = DB AFTER 카운트. 서로 다른 세 경로의 값이 전건 일치하므로 \"적재기 반환값만 맞고 DB는 비어 있는\" 상태가 배제된다.\n\nSKB-04 acceptance ① 의 답 (등재 시점 미측정분 확정): BEFORE_TOTAL=0 — 이 테이블은 K-12 437행만 부재한 것이 아니라 전량 공백이었다. 한 번도 확인된 적 없던 대학 409행도 존재하지 않았다. 즉 이 CLI는 prod에서 단 한 번도 실행된 적이 없다는 1차 가설이 양쪽 scope 모두에서 확정됐고, \"실행했는데 실패한 흔적\" 가설은 기각된다.\n\n런북 관측 2건 (PR #1165 코멘트로 소유 세션에 전달):\n① 실행 시 TABLE_EXISTS 검사 1줄을 추가했다. 원 런북대로면 테이블 부재 시 BEFORE_TOTAL이 빈 문자열이 되어 \"0건\"과 \"테이블 없음\"이 같은 화면이 된다(psql 오류는 stderr라 변수에 안 담긴다). 변별력 축 보강 제안.\n② 실행 순서가 A-B-D-C-E로, [D](적재)가 [C](환경 주입)보다 먼저 돌았는데도 통과했다. 같은 창의 선행 G-skb03 런북이 남긴 환경이 살아 있었기 때문이다. 결과 자체는 안전하다 — whymath-pg가 0에서 846으로 바뀐 것을 docker exec 직접 측정으로 확인했으므로 쓰기의 prod 착지는 측정으로 증명됐다. 다만 [D]는 자기 목적지를 출력하지 않고, config.py 65행의 database_url 기본값은 포트 5432(CLAUDE.md가 타 프로젝트 점유로 사용 금지한 포트)다. 환경변수 없는 새 창에서 [D]만 실행하면 적재 대상이 조용히 바뀐다 — 이번에 맞은 것은 설계 보장이 아니라 선행 실행의 잔여 효과였다.\n\n후속 (미해소·이 게이트 범위 밖): AFTER_WITH_ATOMS=0은 정상이며, G-skb03-atom-node-populate 실행까지 마친 뒤 concept_atom_crosswalk.populate 1회 재실행으로 atom_node.behavior_skills와 concept_content.atom_codes 두 축이 함께 채워진다. L4 콘텐츠 공급의 실제 소생 여부(dsl_render_rate)는 학생 요청을 흘려야 알 수 있는 별도 측정이다."
+    cleared_by: claude
     notes: ""
   - id: G-state-machine-deferral-recheck
     title: "8상태 학습 상태 머신 보류의 재확인 (재확인 지점 = G4 2026-12-13) — 2026-09-03 Kiki 결정으로 '신설 보류'했고 재개 조건은 '실 운영 데이터에서 상태 기반 제어가 필요하다는 증거'다. 판정 3택: ①보류 유지(증거 없음 — 기본값) ②ADR로 채택(증거 있음 — *MasteryHistory와의 진실 원천 중복 해소안을 ADR에 포함해야 한다) ③영구 미채택으로 종결. 근거 문서 = docs/reviews/eos_phase2_plan_300_gap_review_2026-09-03.md §5-A·§11.1 · MEMORY 2026-09-03 결정 로그. 등재 이유: '만료 없는 유예·제외 금지'(CLAUDE.md 2026-08-03) — 보류에 재확인 지점을 못박았으나 그 지점에 알려 줄 장치가 없어 산문으로만 남아 있었다. remind-after-days=101은 2026-09-03 기준 G4(12/13)까지의 일수이며, 그 시점부터 SessionStart 브리핑에 뜬다"

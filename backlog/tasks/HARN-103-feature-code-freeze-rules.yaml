@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-103-feature-code-freeze-rules
+title: "Feature/Code Freeze 라벨·규칙 미준비 — release-blocker 라벨 부재 + 동결 규칙 문서 0건(11/30 시점 작업)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 4
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 (판정 기준 main 4b33d243 · 2026-09-15): 저장소 전체에서 `release-blocker`·`Code Freeze`·`기능 동결` 어구는 갭리뷰 문서 1건에만 있고 **규칙 문서·워크플로·라벨 정의는 0건**이다."
+  - "② 기준(EOS 계획서 ①§29·§30)은 \"코드/프로세스로 **실제** 적용\"이다 — 규칙 문서만 쓰고 완료로 치지 않는다(정본화≠집행). 문서 축과 집행 축을 별항으로 분리해 적는다."
+  - "③ **가용성 확인 선행** — 라벨·룰셋·필수 체크 등 저장소 설정으로 집행하려면, 그 기능이 이 저장소의 계정 유형·가시성에서 제공되는지 먼저 실측한다(`GET /repos/{owner}/{repo}`의 `owner.type`·`visibility`). 2026-09-07 merge queue 사고: **설정 부재를 미설정으로 읽고** 제공되지도 않는 기능을 결정으로 올려 PR 1건을 폐기했다. 확인 못 했으면 \"제공 여부 미확인\"이라고 범위를 밝혀 적는다."
+  - "④ 되돌리기 어려운 행위 분리 — 라벨 생성·브랜치 보호 변경 등 저장소 설정 조작은 Kiki 소유다. 세션은 규칙 문안과 기계 검사까지 만들고, 설정 집행은 게이트로 넘긴다(HARN-42 ④ 선례)."
+  - "⑤ **동결에 만료를 붙인다** — Freeze 규칙 자체가 12월 판정 종료 후 해제 지점을 갖는다. 만료 없는 동결은 이 저장소가 금지한 유예 그 자체이며(2026-08-03 결정), 해제 지점이 없으면 규칙이 습관화되어 무력해진다."
+  - "⑥ 착수 시점 — 11/30 전후 작업이다. 그 전에 착수하면 대상(무엇을 동결하는가)이 확정되지 않아 빈 규칙이 된다. 그래서 `priority`를 낮춰 등재하되 **대장에는 올린다** — 산문 유예는 소유자 0과 구별되지 않기 때문이다."
+artifacts: []
+paths:
+  - "docs/standards/release_freeze*.md"
+  - ".github/workflows/**"
+session: null
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B7 · §5 B급 미등재 후보 7. 갭리뷰 §5는 \"11/30 시점 작업이라 지금 등재하지 않는다\"고 적었으나, 그 유예는 대장에 집행되지 않아 소유자 0 상태와 구별되지 않았다(CLAUDE.md '만료 없는 유예·제외 금지'·'선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'). 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재하며, 시점 유예는 priority 4로 표현한다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(release-blocker·Code Freeze·코드 프리즈·기능 동결 라벨·Feature Freeze) → 관련 0건(HARN-42는 EOS 처분 라벨 축으로 별건)."
+updated: 2026-09-15
