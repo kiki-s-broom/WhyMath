@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/ops/**"
-session: null
+session: claude/eager-euler-6ct5d3
 notes: "출처: 계획서 200 §36 재대조(2026-09-16). 5개 중 Data integrity만 충족(OPS-55)·EOS migration %와 Broken dependency는 축이 다른 부분 대응·Contract coverage와 Vertical Slice pass %는 산출 도구 0건. 선행 EOS-07이 검사 2종을 세우면 Contract coverage의 분모가 정해진다"
 updated: 2026-09-16
