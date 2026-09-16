@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MOB-22-learner-state-client-consumption
+title: "Flutter 학생 앱의 LearnerState 단일 표면 소비 — 조각 3개 조회 대체"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-10-learner-state-single-surface
+requires_gates: []
+acceptance:
+  - "① 클라이언트 소비 배선 — Flutter 학생 앱이 `GET /v1/me/learner-state`를 실제로 호출한다. 현재 앱은 학습 상태를 조각 3개(`/v1/me/mastery/current`·`/v1/me/ability`·`/v1/me/diagnosis/summary`)로 각각 불러 화면에서 합친다. 그 합성 규칙이 클라에 있는 한 소비처마다 달라질 수 있고, CLAUDE.md \"수학 로직을 클라에 넣지 않는다\"(슬라이스 89)의 경계에 걸린다.\n② 도달 판정 해소 — `ops/declared_unwired_audit.py`의 `http_routes` 축에서 이 라우트가 `reached`가 되어야 한다. 그 시점에 `_CLASSIFICATION` 대장의 `pending-task:` 선언을 **걷는다**(유예는 자동 해제되지 않는다 — 걷는 것이 이 태스크의 산출물이다).\n③ 조각 3표면의 처분 명시 — 단일 표면으로 옮긴 뒤 기존 3개를 유지할지 폐기할지 적는다. 유지가 기본이나(다른 소비처가 있을 수 있다) \"그냥 둔다\"가 아니라 판정으로 적는다.\n④ `origins` 소비 — 응답의 `origins`를 클라가 읽어 `no_producer` 필드를 UI에서 \"아직 없는 기능\"으로, `no_data`를 \"풀이를 더 하면 채워짐\"으로 **구별해** 표시한다. 둘을 같은 빈칸으로 그리면 서버가 애써 가른 구분이 화면에서 소실된다."
+artifacts: []
+paths:
+  - "src/mobile/lib/features/profile/**"
+  - src/mobile/lib/core/api_client.dart
+session: null
+notes: "출처: EOS-10(LearnerState 단일 조회 표면) acceptance ④ — \"표면을 만들었다와 무언가가 그것을 쓴다는 다르다\". EOS-10이 서버 표면을 만들었고 소비처는 현재 0이다.\n\n분류(계획서 300 §14): LOOP — 학습 폐쇄루프의 학생 대면 진입 축.\n\n이 태스크가 존재해야 하는 기계적 이유: `declared_unwired_audit`의 `http_routes` 축이 신규 라우트에 의도 선언을 요구하고, EOS-10은 `pending-task:MOB-22-learner-state-client-consumption`으로 선언했다. 그랜드파더 만료 계약상 이 태스크가 사라지거나 done이 되면 그 선언이 expired-waiver로 exit 1이 되므로, done 처리 전에 ② 절차(선언 걷기)를 반드시 수행한다.\n\n[정정 2026-09-16] paths ['src/mobile/**'] → ['src/mobile/lib/features/profile/**', 'src/mobile/lib/core/api_client.dart']: 초판 src/mobile/** 는 모바일 전체라 겹침 경고 10건을 상시 켜 변별력을 죽인다(EOS-16 §8이 LIC-01에서 지적한 형태). LearnerState 소비의 실제 작업면은 프로필·내 탭과 api_client다\npaths 제거 1건: ['src/mobile/**']"
+updated: 2026-09-16

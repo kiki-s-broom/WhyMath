@@ -400,6 +400,17 @@ CATALOG: tuple[Spec, ...] = (
        "GET /ability/by-concept", "GET /ability/history"),
     _s("WM-S-018", "개념 진단(BKT↔IRT 교차검증)·요약", "Student", "Assessment", "P0",
        "계획서 300 Gate2 ②진단 완료", "me", "GET /diagnosis/concepts", "GET /diagnosis/summary"),
+    # EOS-10(2026-09-16 신설). **016·017·018 중 어디에도 접지 않는다** — 이 표면은 그 셋을
+    # *합성*하므로 하나에 귀속시키면 나머지 둘의 귀속이 거짓이 된다. 계획서 300 §12가 요구한
+    # 12종 중 유일하게 대응물이 없던 축이며, 사용자에게 의미 있는 능력으로도 별개다
+    # ("숙달을 본다"·"능력을 본다"가 아니라 "내 학습 상태를 한 번에 본다").
+    # 번호 주의: 초판은 WM-S-051이었으나 EOS-11(PR #1182)이 같은 번호를 먼저 썼다 —
+# git이 충돌 마커 없이 자동 병합해 같은 id 두 행이 되는 조용한 충돌이었다(2026-09-16).
+# P1인 이유: 조각 3표면(P0)이 이미 같은 사실을 공급하므로 12월 검증 G1~G5의 차단 조건이
+    # 아니다 — 우회 가능하되 합성 규칙을 서버에 두는 품질 이득이 크다(EOS-10 eos_priority와 일치).
+    _s("WM-S-052", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
+       "Student", "Learning Model", "P1",
+       "계획서 300 §12 LearnerState — 조각 3표면 합성(EOS-10)", "me", "GET /learner-state"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",

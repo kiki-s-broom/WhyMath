@@ -48,6 +48,7 @@ from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole
 __all__ = [
     "MasteryRecord",
     "compute_mastery_record",
+    "get_all_current_skill_mastery",
     "get_current_skill_mastery",
     "record_problem_attempt_skill_mastery",
 ]
@@ -79,6 +80,39 @@ async def get_current_skill_mastery(
     """
     row = await _latest_skill_mastery(session, user_id, skill_id)
     return float(row.mastery) if row is not None and row.mastery is not None else None
+
+
+async def get_all_current_skill_mastery(
+    session: AsyncSession, user_id: uuid.UUID
+) -> dict[str, float]:
+    """한 학생의 **스킬별 최신** 숙달 전건 — `{skill_id: mastery}`(읽기 전용·측정된 것만).
+
+    `get_current_skill_mastery`가 (user, skill) **1건**을 보는 것의 벌크 판이다. 조립기
+    (`l2/learner_state.py`)가 스킬 축을 담으려면 스킬 수만큼 왕복하거나(N+1) 자기 안에서
+    "최신 1건" 규칙을 다시 써야 하는데, 후자는 **같은 규칙의 두 번째 진실 원천**이 된다
+    (붕괴 연쇄 "유지보수 지옥"). 그래서 규칙의 소유 모듈인 여기에 벌크 좌석을 둔다.
+
+    "최신"의 정의는 `_latest_skill_mastery`와 **같아야 한다** — 그쪽이 `measured_at DESC`
+    LIMIT 1이므로 여기도 `DISTINCT ON (skill_id) ORDER BY skill_id, measured_at DESC`다
+    (개념 축 `l2/concept_diagnosis.py:96`·`l2/review_queue.py:156`과 동일 관용어). 두 함수가
+    같은 (user, skill)에 대해 다른 행을 고르면 그 자체가 결함이므로
+    `test_skill_mastery_tracking.py`가 일치를 계약으로 동결한다.
+
+    `mastery`가 NULL인 행은 **키 자체를 만들지 않는다**(`get_current_skill_mastery`가 그런
+    행에 None을 돌려주는 것과 같은 의미 — "측정 없음"이지 "숙달 0"이 아니다). 측정 이력이
+    전혀 없으면 빈 dict.
+    """
+    stmt = (
+        select(SkillMasteryHistory.skill_id, SkillMasteryHistory.mastery)
+        .where(SkillMasteryHistory.user_id == user_id)
+        .distinct(SkillMasteryHistory.skill_id)
+        .order_by(
+            SkillMasteryHistory.skill_id,
+            SkillMasteryHistory.measured_at.desc(),
+        )
+    )
+    result = await session.execute(stmt)
+    return {skill_id: float(mastery) for skill_id, mastery in result.all() if mastery is not None}
 
 
 async def _assessed_skill_ids(session: AsyncSession, concept_ids: Sequence[uuid.UUID]) -> list[str]:
