@@ -44,6 +44,16 @@ def _student_work_key_env(key_b64: str | None) -> Iterator[None]:
         get_settings.cache_clear()
 
 
+class _EmptyResult:
+    """모든 조회가 0행 — 문항-개념 미매핑 상태(이 파일의 관심은 암호화이지 매핑이 아니다)."""
+
+    def all(self) -> list[Any]:
+        return []
+
+    def scalars(self) -> "_EmptyResult":
+        return self
+
+
 class _FakeSession:
     def __init__(self) -> None:
         self.added: list[Any] = []
@@ -54,6 +64,14 @@ class _FakeSession:
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def execute(self, _stmt: Any) -> _EmptyResult:
+        """EOS-12 증거 조립이 개념·스킬을 조회한다 — 스텁하지 않고 *실제로* 돌린다.
+
+        스텁하면 이 경로가 증거를 만드는지 아닌지를 이 파일이 말할 수 없게 된다. 0행을
+        돌려주면 "문항-개념 미매핑" 상태의 증거가 나오고, 그것으로 충분하다.
+        """
+        return _EmptyResult()
 
 
 async def _noop_mastery(*_args: Any, **_kwargs: Any) -> list[Any]:
@@ -76,7 +94,7 @@ def test_plaintext_when_key_unset() -> None:
     """키 미설정(기존 동작) — student_answer는 평문·암호화 컬럼은 None."""
     session = _FakeSession()
     with _student_work_key_env(None):
-        attempt_id = asyncio.run(
+        attempt_id, evidence = asyncio.run(
             coach_module._complete_problem(
                 session,  # type: ignore[arg-type]
                 user_id=uuid.uuid4(),
@@ -86,6 +104,13 @@ def test_plaintext_when_key_unset() -> None:
             )
         )
     assert attempt_id is not None
+    # EOS-12: 완료 채점이 증거를 함께 낸다. 이 픽스처는 문항-개념 미매핑이라 증거는 비지만,
+    # 그 0건이 "보지 않았다"로 정직하게 표기되는지까지가 계약이다.
+    assert evidence is not None
+    assert evidence.attempt_id == attempt_id
+    assert evidence.correct is True
+    assert evidence.coverage.concept.value == "not_measured"
+    assert evidence.coverage.misconception_scan.value == "not_run"
     assert len(session.added) == 1
     attempt = session.added[0]
     assert attempt.student_answer == "x=3"
@@ -102,7 +127,7 @@ def test_encrypts_when_key_configured() -> None:
     session = _FakeSession()
     key_b64 = base64.b64encode(os.urandom(32)).decode()
     with _student_work_key_env(key_b64):
-        attempt_id = asyncio.run(
+        attempt_id, evidence = asyncio.run(
             coach_module._complete_problem(
                 session,  # type: ignore[arg-type]
                 user_id=uuid.uuid4(),

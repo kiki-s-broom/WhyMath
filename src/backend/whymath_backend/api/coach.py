@@ -100,6 +100,7 @@ from whymath_backend.l2 import (
     get_primary_concept_id,
     theta_to_mastery_proxy,
 )
+from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import recommend_prerequisite_gaps
@@ -177,6 +178,7 @@ from whymath_backend.l4.turn_meta import (
     stage_to_targeted_step,
 )
 from whymath_backend.schema.answer_form import FormVerdict
+from whymath_backend.schema.assessment_evidence import AssessmentEvidence
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
 from whymath_backend.schema.dialogue import DialogueTurn as DialogueTurnSchema
 from whymath_backend.schema.enums import ContentType, EventType, Persona, StepType, TurnRole
@@ -472,6 +474,12 @@ _AWAITING_REFLECTION_DESC = (
     "나왔는지' 설명을 요청한 상태다. True면 이번 턴은 완료가 아니며(problem_complete=False) 학생의 "
     "근거 응답 다음 턴에 완료된다(MVP=1턴). 클라는 이 신호로 '돌아보기 1턴' UX(진행 보류)를 표시."
 )
+_COMPLETION_EVIDENCE_DESC = (
+    "완료 시(problem_complete=True) 그 채점이 만들어 낸 **증거 묶음**(EOS-12) — 개념·스킬·오개념 "
+    "후보 3종과 작동 비율(`coverage`). 완료가 아니면 None. 이 경로의 완료는 항상 서버 판정 정답"
+    "이므로 증거 방향은 전부 `supporting`이고 오개념 후보는 `scan=not_run`이다 — 그 0건은 "
+    '"오개념이 없었다"가 아니라 "이 경로는 보지 않았다"는 뜻이다. `coverage`를 함께 읽어라.'
+)
 _COMPLETED_ATTEMPT_ID_DESC = (
     "완료 시(problem_complete=True) 서버가 적재한 ProblemAttempt PK. 완료가 아니면 None. 클라가 "
     "필요 시 이 attempt를 참조할 수 있게 노출한다(적재 자체는 서버가 이미 수행·클라 재적재 불요)."
@@ -504,6 +512,9 @@ class SessionCreateResponse(CoachResponse):
     awaiting_reflection: bool = Field(default=False, description=_AWAITING_REFLECTION_DESC)
     completed_attempt_id: uuid.UUID | None = Field(
         default=None, description=_COMPLETED_ATTEMPT_ID_DESC
+    )
+    completion_evidence: AssessmentEvidence | None = Field(
+        default=None, description=_COMPLETION_EVIDENCE_DESC
     )
     answer_form: FormVerdict = Field(
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
@@ -539,6 +550,9 @@ class TurnAppendResponse(CoachResponse):
     awaiting_reflection: bool = Field(default=False, description=_AWAITING_REFLECTION_DESC)
     completed_attempt_id: uuid.UUID | None = Field(
         default=None, description=_COMPLETED_ATTEMPT_ID_DESC
+    )
+    completion_evidence: AssessmentEvidence | None = Field(
+        default=None, description=_COMPLETION_EVIDENCE_DESC
     )
     answer_form: FormVerdict = Field(
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
@@ -1078,7 +1092,7 @@ async def _complete_problem(
     problem_id: uuid.UUID | None,
     final_answer: str | None,
     started_at: datetime | None,
-) -> uuid.UUID | None:
+) -> tuple[uuid.UUID | None, AssessmentEvidence | None]:
     """완료 확정 — ProblemAttempt(is_correct=True) 적재 + 숙달 전파(L2 헬퍼 재사용·중복 로직 0).
 
     돌아보기(메타인지) 1턴이 끝나 완료가 확정된 순간에만 호출한다. `submit_attempt`(me.py)와 *동일*
@@ -1107,7 +1121,7 @@ async def _complete_problem(
     되므로, 값이 *있을 때* 채우는 것이 이 인자의 존재 이유다.
     """
     if problem_id is None:
-        return None  # 방어 — 완료는 problem_id가 있을 때만 진입(도달 안 함).
+        return None, None  # 방어 — 완료는 problem_id가 있을 때만 진입(도달 안 함).
     # 한 번만 읽어 ended_at·ingested_at에 같은 값을 쓴다 — 두 번 호출하면 마이크로초가 갈려
     # "종료가 수신보다 앞선다"는 사실이 아닌 시차가 데이터에 남는다.
     received_at = datetime.now(timezone.utc)
@@ -1138,6 +1152,19 @@ async def _complete_problem(
     )
     session.add(attempt)
     await session.commit()  # attempt 우선 durable(submit_attempt 패턴).
+    # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다(읽기 전용·session.add·commit 0). 이 순서가
+    # Answer → Evidence → State를 호출 지점에서 성립시킨다 — 뒤에 두면 증거가 갱신 결과의 사후
+    # 요약이 되고, 아래 전파가 실패했을 때 증거까지 함께 사라진다. 이 경로의 완료는 서버 판정
+    # 정답이므로 방향은 전부 supporting이고, 오개념은 대화 턴에서 진단되지 완료 채점에 합류하지
+    # 않으므로 scan=not_run이 사실이다(빈 리스트를 "없었다"로 내보내지 않는다).
+    completion_evidence = await collect_assessment_evidence(
+        session,
+        learner_id=user_id,
+        problem_id=problem_id,
+        correct=True,
+        attempt_id=attempt.attempt_id,
+        observed_at=received_at,
+    )
     # 숙달 전파(개념·스킬 축) — 서버 판정 is_correct=True. 매핑 없으면 빈 리스트(graceful).
     await record_problem_attempt_mastery(session, user_id, problem_id, True)
     skill_records = await record_problem_attempt_skill_mastery(session, user_id, problem_id, True)
@@ -1152,7 +1179,7 @@ async def _complete_problem(
         skill_ids=[r.skill_id for r in skill_records],
         source=AttemptSource.coach_completion,
     )
-    return attempt.attempt_id
+    return attempt.attempt_id, completion_evidence
 
 
 class _CompletionResult(NamedTuple):
@@ -1173,6 +1200,9 @@ class _CompletionResult(NamedTuple):
     review_turns_remaining_after: int
     attempt_id: uuid.UUID | None
     handled: bool
+    completion_evidence: AssessmentEvidence | None = None
+    """완료 시 조립된 채점 증거(EOS-12) — 완료가 아니면 None. 응답 노출 전용(영속 0)."""
+
     answer_form: FormVerdict = FormVerdict.not_required
     """이 턴 제출답의 형태 지시 준수 판정(EOS-28) — 응답 노출 전용.
 
@@ -1272,10 +1302,11 @@ async def _resolve_completion(
         }
     )
     attempt_id: uuid.UUID | None = None
+    completion_evidence: AssessmentEvidence | None = None
     if cd.action is CompletionAction.COMPLETE:
         # 완료 확정 — attempt 적재·숙달 전파(L2 헬퍼 재사용). 완료 턴에 재제출된 마지막 단계가
         # 있으면 그 값을 student_answer로 기록(없으면 None — 정답은 이전 턴에서 이미 서버 확인).
-        attempt_id = await _complete_problem(
+        attempt_id, completion_evidence = await _complete_problem(
             session,
             user_id=user_id,
             problem_id=problem_id,
@@ -1289,6 +1320,7 @@ async def _resolve_completion(
         review_turns_remaining_after=cd.review_turns_remaining_after,
         attempt_id=attempt_id,
         handled=True,
+        completion_evidence=completion_evidence,
         answer_form=answer_form,
     )
 
@@ -2648,6 +2680,7 @@ async def create_session(
         answer_form=completion.answer_form,
         awaiting_reflection=completion.awaiting_reflection,
         completed_attempt_id=completion.attempt_id,
+        completion_evidence=completion.completion_evidence,
     )
 
 
@@ -3027,6 +3060,7 @@ async def append_turns(
         answer_form=completion.answer_form,
         awaiting_reflection=completion.awaiting_reflection,
         completed_attempt_id=completion.attempt_id,
+        completion_evidence=completion.completion_evidence,
     )
 
 

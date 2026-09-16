@@ -549,6 +549,12 @@ CATALOG: tuple[Spec, ...] = (
        "EOS-11 — 5원천을 한 학습자 시간선으로 투영. 적재는 WM-E-206 소유이고 이 행은 "
        "읽기 전용 projection(session.add·commit 0건)·원천 가용성 3상태 대장",
        "l2.learning_event_trace"),
+    _e("WM-E-210", "채점 Evidence 조립(Answer→Evidence 중간 객체·읽기 전용)", "Student",
+       "Assessment", "P1",
+       "EOS-12 — 계획서 300 §5.1. 개념·스킬·오개념 후보 3종을 묶고 작동 비율을 함께 낸다. "
+       "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
+       "schema/assessment_evidence.py가 소유",
+       "l2.assessment_evidence"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",

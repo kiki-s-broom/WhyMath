@@ -123,6 +123,7 @@ from whymath_backend.l2.ability_estimation import (
     estimate_global_ability,
     resolve_item_difficulty_b,
 )
+from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
@@ -200,6 +201,7 @@ from whymath_backend.schema.assessment import (
     SkillMasteryHistory as SkillMasteryHistorySchema,
 )
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
+from whymath_backend.schema.assessment_evidence import AssessmentEvidence
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
@@ -752,6 +754,16 @@ class AttemptSubmitResponse(BaseModel):
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
     )
+    evidence: AssessmentEvidence | None = Field(
+        default=None,
+        description=(
+            "이 채점이 만들어 낸 **증거 묶음**(EOS-12) — 개념·스킬·오개념 후보 3종과 작동 비율. "
+            "`mastery_updates`가 *쓰기 이후*의 결과라면 이 필드는 *쓰기 이전*의 관측이라, 둘을 "
+            "나란히 실어 두 단계가 각각 보이게 한다(부분 쓰기 구조를 한 트랜잭션처럼 가리지 "
+            "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
+            "거기에만 적혀 있다."
+        ),
+    )
 
 
 @router.post(
@@ -850,6 +862,20 @@ async def submit_attempt(
     )
     session.add(attempt)
     await session.commit()
+    # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다 — Answer → Evidence → State 순서가 호출
+    # 지점에서 실제로 성립해야 증거가 "갱신 결과의 사후 요약"으로 전락하지 않는다. 읽기 전용이라
+    # (session.add·commit 0) 이 호출이 아래 적재의 성공/실패를 바꾸지 않고, 반대로 아래가 실패해도
+    # 증거는 남는다 — 두 단계가 각각 관측 가능하다(EOS-81 ⑦ 부분 쓰기 구조를 가리지 않는다).
+    # 이 경로는 오개념 매칭을 돌리지 않는다(진단은 coach 대화 경로 전용) → scan=not_run이 기본이며,
+    # 그 0건은 "오개념이 없었다"가 아니라 "보지 않았다"로 응답에 표기된다.
+    evidence = await collect_assessment_evidence(
+        session,
+        learner_id=user.user_id,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        attempt_id=attempt.attempt_id,
+        observed_at=received_at,
+    )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     records = await record_problem_attempt_mastery(
         session, user.user_id, body.problem_id, body.is_correct
@@ -899,6 +925,7 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        evidence=evidence,
     )
 
 
