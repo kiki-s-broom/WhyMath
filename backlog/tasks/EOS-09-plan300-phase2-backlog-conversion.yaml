@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-09-plan300-phase2-backlog-conversion
+title: "계획서 300(Phase 2 EOS Closed Learning Loop) → 빌드 하네스 백로그 전건 변환 및 대조표"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 분해 기준의 실측 정정: 지시문이 기준으로 지목한 \"§3의 P-01~P-16 목록\"은 원 문서에 존재하지 않는다(§3은 \"Phase 2의 핵심 상태 머신\"). 항목 목록의 실체는 §22 우선순위 20건(P0 7·P1 5·P2 3·P3 5)이며 이것을 분해 기준으로 삼는다. §1(Learning Loop Contract 14객체)·§13(EOS 내부 경계)·§16(SCENARIO-001~010)·§17(Event Trace)을 §22가 덮지 않는 축으로 추가 분해한다.\n② 분해 단위마다 중복을 실측한다 — 기존 654건 전수 조회 + `git log --all --grep=<ID>`(shallow 해제 후). 겹치면 신규 등재 금지, 기존 태스크에 `amend`로 acceptance를 덧붙인다. 다른 세션이 claim 중인 태스크(EOS-63 등)는 amend 대상에서 제외한다.\n③ §14 분류(LOOP/SUPPORT/FUTURE)를 등재·수정한 각 태스크 notes에 명시한다. FUTURE 분류분은 등재하되 10월 착수 금지를 notes에 적고 priority를 낮춘다.\n④ §15 동결 13종은 production code 태스크로 등재하지 않는다. 등재 제외분과 근거를 대조표 ③절에 전건 열거한다(설계 문서는 허용이라는 원 문서 단서 포함).\n⑤ 2026-09-03 Kiki 결정과의 관계를 대조표 상단에 명시한다 — 선언 정본이 계획서 300의 4주 Phase 2를 \"실행하지 않고 참고 문서로 강등\"하고 10월 공식 목표를 G2(앵커 콘텐츠 생산)로 유지했으며, 그때의 변환 결과가 MOB-20·EOS-81·HARN-61 3건이었다. 본 변환은 그 결정을 뒤집는 실행 지시가 아니라 더 높은 해상도의 대조 기록이다. 결정을 바꾸려면 Kiki 결정이 선행한다.\n⑥ 판정 시점 규칙 준수 — 대조표 상단에 판정 기준 커밋 해시를 박는다. 미머지 근거가 섞이면 main 기준과 브랜치 포함 기준을 열을 나눠 적는다.\n⑦ 부재 판정 절차 준수 — 어떤 항목을 \"미구현\"으로 적기 전에 역할 기반 재검색·소비자 역추적을 거치고, 그래도 0건이면 \"내가 찾은 방법으로는 0건\"이라고 범위를 밝혀 적는다."
+artifacts: []
+paths:
+  - "docs/strategy/plan300_phase2_backlog_crosswalk*.md"
+session: claude/elegant-archimedes-4422t6
+notes: "출처: Kiki 제공 외부 문서 `300_Phase 2 — EOS Closed Learning Loop 실행계획`(2026-09-28~10-25 · §1~§22) — 2026-09-16 세션에 .docx로 첨부·본문 전량 확보. 저장소는 이 문서를 `docs/reviews/eos_phase2_plan_300_gap_review_2026-09-03.md`로 한 차례 대조했고 Kiki가 강등 결정을 내렸으나, 그 대조는 Gate 2 조건·API·경계 축에 집중해 §22 우선순위 20건 전건 분해는 하지 않았다. 본 태스크는 그 잔여를 착수 단위로 변환한다.\n\n분류(§14): SUPPORT — 폐쇄루프 자체가 아니라 그 계획을 대장에 싣는 지원 작업.\n\n주의 1 — 이 변환은 실행 승인이 아니다. 선언 `docs/strategy/eos_transition_declaration_2026-08-30.md` §1.3이 2026-09-03 Kiki 결정으로 \"계획서 300의 4주 Phase 2는 실행하지 않고 참고 문서로 강등 · 10월 공식 목표는 G2 앵커 콘텐츠 생산 유지 · 8상태 학습 상태 머신 신설은 보류(재확인 지점 = G4 12/13)\"를 정본화했다. 등재된 태스크의 착수는 그 결정의 갱신을 전제로 한다.\n\n주의 2 — 원 문서 §3의 8상태 상태 머신(NEW→DIAGNOSING→READY→LEARNING→PRACTICING→ASSESSING→REMEDIATING→ADVANCING)은 09-03 결정이 명시적으로 보류한 항목이다. 저장소는 상태를 머신이 아니라 이력으로 모델링한다(*MasteryHistory append-only + attempt_event 시계열) — 8상태를 세우면 같은 사실의 두 번째 진실 원천이 생긴다(붕괴 연쇄 \"유지보수 지옥\"). 등재 제외 후보이며 대조표 ③절에 근거를 적는다."
+updated: 2026-09-16
