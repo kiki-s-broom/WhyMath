@@ -1,4 +1,4 @@
-"""데이터 무결성 게이트 — orphan·dangling·duplicate 6종 단일 CLI (OPS-55).
+"""데이터 무결성 게이트 — orphan·dangling·duplicate·발행포인터 7종 단일 CLI (OPS-55·EOS-07).
 
 배경
 ----
@@ -9,7 +9,7 @@ hypertable·cross-dataset·오프라인 독립성 등의 이유로 다수 참조
 참조하는 행은 조용히 고아가 된다 — 실측 선례 = `scripts/diagnose_atom_orphans.py`(S2-04, "prod
 미적분 raw 129건 orphan"). 이 CLI가 그 점검을 **6종 단일 지점**으로 정례화한다(주간 지표 #4 산출원).
 
-6종 판정 항목
+7종 판정 항목
 ------------
 ① ORPHAN_CONCEPT           — `concept_node.concept_id`(검색 투영) 중 `concept.code`(런타임
   그래프, 동일 UC 키공간 — `concept.py` 주석 "code = concept_id(개념그래프 UC)")에 없는 것.
@@ -30,10 +30,26 @@ hypertable·cross-dataset·오프라인 독립성 등의 이유로 다수 참조
   계약으로 재검증(`model_validate`)했을 때 실패하는 것(invariant ⑫ "event_data 자유 JSONB 금지·
   타입별 계약"의 사후 감사 — 생산 좌석은 `build_event_data`가 이미 강제하나, 이 게이트는 과거
   적재분·생산 좌석 우회분의 드리프트를 잡는다).
+⑦ PUBLISHED_VERSION_INVALID — `concept.current_published_version_id`가 가리키는
+  `concept_version` 행이 **발행본이 아닌** 경우(status ≠ PUBLISHED) 또는 **다른 개념의 버전**을
+  가리키는 경우(`concept_version.concept_id` ≠ `concept.code`). 계획서 200 §27 검사 ⑤
+  ("모든 published entity의 version이 존재하는가")의 이 스키마에서의 형태다 — `EOS-07`.
+
+  *행의 존재*는 FK(`fk_concept_current_published_version_id_concept_version`)가 이미 막으므로
+  여기서 다시 세지 않는다. DB가 막지 못하는 축은 **가리킨 버전의 상태와 귀속** 둘이며, 그것이
+  깨지면 "발행됐다"는 표시가 DRAFT 본문을 가리키거나 남의 개념을 가리킨다.
+
+  이 kind는 **참된 0-불변식**이다(현재 `concept_version` 좌석이 비어 있어 0이고, 채워져도
+  올바른 발행 경로를 지나면 0으로 남는다). 반면 계획서 §27 검사 ①("모든 Problem이 최소 1개
+  Skill과 연결")은 여기 넣지 않았다 — 실측(2026-09-16·코퍼스 전수) 결과 문제 14,034건 중
+  **89.5%만** 스킬까지 해소되므로, 차단 kind로 넣으면 prod에서 상시 red가 되어 사람이 게이트를
+  끄게 만든다(CLAUDE.md "상시 실패하는 fail-open 보호를 '보호 있음'으로 신뢰 금지"가 겨냥하는
+  상태를 새로 만드는 셈). 그 축은 커버리지 지표이지 무결성 위반이 아니므로 `--skill-coverage`
+  리포트로 분리했다(아래 「사용」).
 
 종료 코드
 --------
-- 0 : 6종 전부 위반 0건.
+- 0 : 7종 전부 위반 0건.
 - 1 : 위반 ≥1건.
 
 스캔 대상 개수를 모든 kind에 함께 출력한다(CLAUDE.md "절단 출력을 부재 판정에 쓰지 않는다" —
@@ -83,6 +99,7 @@ __all__ = [
     "Violation",
     "main",
     "scan_integrity",
+    "skill_coverage",
 ]
 
 _EXIT_OK = 0
@@ -94,6 +111,7 @@ KIND_ORPHAN_PROBLEM = "ORPHAN_PROBLEM"
 KIND_DANGLING_CURRICULUM_REF = "DANGLING_CURRICULUM_REF"
 KIND_DUPLICATE_CANONICAL_ID = "DUPLICATE_CANONICAL_ID"
 KIND_EVENT_SCHEMA_INVALID = "EVENT_SCHEMA_INVALID"
+KIND_PUBLISHED_VERSION_INVALID = "PUBLISHED_VERSION_INVALID"
 
 ALL_KINDS: tuple[str, ...] = (
     KIND_ORPHAN_CONCEPT,
@@ -102,6 +120,7 @@ ALL_KINDS: tuple[str, ...] = (
     KIND_DANGLING_CURRICULUM_REF,
     KIND_DUPLICATE_CANONICAL_ID,
     KIND_EVENT_SCHEMA_INVALID,
+    KIND_PUBLISHED_VERSION_INVALID,
 )
 
 # WH-S 솔버 자산 5테이블 — 전부 모듈 docstring이 "problem_id는 FK 아닌 느슨참조(WH-S 오프라인
@@ -332,10 +351,97 @@ async def _check_event_schema_invalid(
     return int(scanned), violations
 
 
+@dataclass(slots=True, frozen=True)
+class SkillCoverage:
+    """문제 → 스킬 해소 커버리지 — **지표이지 위반이 아니다** (계획서 200 §27 검사 ①).
+
+    왜 게이트 kind가 아닌가: 실측(2026-09-16·코퍼스 전수) 결과 문제 14,034건 중 개념 연결은
+    95.7%, **스킬까지 해소는 89.5%**다. 나머지 10.5%는 참조가 깨진 것이 아니라 *아직 스킬이
+    붙지 않은* 것이며(Skill 27건 대 개념 437건), 그것을 차단 kind로 넣으면 prod에서 상시 red가
+    되어 사람이 게이트 자체를 끄게 만든다 — 보호를 하나 세우는 대신 있던 보호까지 잃는다.
+
+    그래서 이 리포트는 **exit code에 영향을 주지 않는다.** 차단 kind로의 승격 조건은 prod 실측
+    기준선이며, 그것은 이 코드가 아니라 사람이 정한다(게이트 `G-eos07-skill-coverage-baseline`).
+
+    세 수는 서로 다른 사태를 가리킨다(2분류로 접으면 뭉개진다):
+      total          문제 전체
+      with_concept   `problem_concept` 행이 하나라도 있는 문제
+      with_skill     그 개념들 중 하나라도 `behavior_skills`가 실재 `skill_node`를 가리키는 문제
+    """
+
+    total: int
+    with_concept: int
+    with_skill: int
+
+    @property
+    def concept_ratio(self) -> float:
+        return 0.0 if not self.total else self.with_concept / self.total
+
+    @property
+    def skill_ratio(self) -> float:
+        return 0.0 if not self.total else self.with_skill / self.total
+
+
+async def skill_coverage(session: AsyncSession) -> SkillCoverage:
+    """문제 → 개념 → 스킬 해소 커버리지 측정 — 판정이 아니라 관측이다."""
+    row = (await session.execute(text("""
+            SELECT
+              (SELECT count(*) FROM problem) AS total,
+              (SELECT count(DISTINCT pc.problem_id) FROM problem_concept pc) AS with_concept,
+              (SELECT count(DISTINCT pc.problem_id)
+                 FROM problem_concept pc
+                 JOIN concept c ON c.concept_id = pc.concept_id
+                WHERE EXISTS (
+                        SELECT 1 FROM skill_node sn
+                         WHERE sn.skill_id = ANY(c.behavior_skills)
+                      )) AS with_skill
+            """))).one()
+    return SkillCoverage(total=int(row[0]), with_concept=int(row[1]), with_skill=int(row[2]))
+
+
+async def _check_published_version_invalid(
+    session: AsyncSession,
+) -> tuple[int, list[Violation]]:
+    """발행 포인터의 **상태·귀속** 검사 (계획서 200 §27 검사 ⑤ · EOS-07).
+
+    행의 존재는 FK가 막으므로 세지 않는다. 여기서 보는 것은 DB가 못 막는 둘이다:
+      · 가리킨 버전의 `status`가 PUBLISHED가 아니다 → "발행됐다"가 DRAFT 본문을 가리킨다.
+      · 가리킨 버전의 `concept_id`가 이 개념의 `code`가 아니다 → 남의 개념 버전을 가리킨다.
+
+    `scanned`는 **발행 포인터가 설정된 개념 수**다(전체 개념 수가 아니다) — 포인터가 없는
+    개념은 이 불변식의 대상이 아니므로 분모에 넣으면 "위반률"이 실제보다 작아 보인다.
+    """
+    scanned = (
+        await session.execute(
+            text("SELECT count(*) FROM concept WHERE current_published_version_id IS NOT NULL")
+        )
+    ).scalar_one()
+    rows = await session.execute(text("""
+            SELECT c.code, cv.status::text, cv.concept_id
+              FROM concept c
+              JOIN concept_version cv ON cv.version_id = c.current_published_version_id
+             WHERE cv.status <> 'PUBLISHED' OR cv.concept_id <> c.code
+             ORDER BY c.code
+            """))
+    violations = [
+        Violation(
+            kind=KIND_PUBLISHED_VERSION_INVALID,
+            identifier=code,
+            detail=(
+                f"concept.code={code!r} 의 발행 포인터가 "
+                f"status={status!r}·concept_id={owner!r} 인 버전을 가리킨다 "
+                f"(요구: status='PUBLISHED' 이고 concept_id={code!r})."
+            ),
+        )
+        for (code, status, owner) in rows
+    ]
+    return int(scanned), violations
+
+
 async def scan_integrity(
     session: AsyncSession, *, event_since_days: int | None = None
 ) -> IntegrityReport:
-    """6종 전부를 실 세션으로 스캔해 `IntegrityReport`를 합성한다."""
+    """7종 전부를 실 세션으로 스캔해 `IntegrityReport`를 합성한다."""
     report = IntegrityReport()
 
     checks: list[tuple[str, Callable[[], Awaitable[tuple[int, list[Violation]]]]]] = [
@@ -348,6 +454,7 @@ async def scan_integrity(
             KIND_EVENT_SCHEMA_INVALID,
             lambda: _check_event_schema_invalid(session, since_days=event_since_days),
         ),
+        (KIND_PUBLISHED_VERSION_INVALID, lambda: _check_published_version_invalid(session)),
     ]
     for kind, check in checks:
         scanned, violations = await check()
@@ -396,10 +503,37 @@ def _write_json(report: IntegrityReport, path: str) -> None:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
+async def _run_skill_coverage(scan_fn: ScanFn | None) -> SkillCoverage | None:
+    """커버리지 측정 — 주입된 scan_fn 테스트에서는 DB를 열지 않는다(None으로 건너뛴다)."""
+    if scan_fn is not None:
+        return None
+    sessionmaker = get_sessionmaker()
+    try:
+        async with sessionmaker() as session:
+            return await skill_coverage(session)
+    finally:
+        await dispose_engine()
+
+
+def _render_skill_coverage(coverage: SkillCoverage | None) -> str:
+    if coverage is None:
+        return "※ 스킬 커버리지: 측정 생략(주입 세션) — 0%가 아니라 **미측정**이다."
+    return "\n".join(
+        [
+            "-" * 60,
+            "스킬 커버리지 (계획서 200 §27 ① — 지표이지 위반이 아니다·exit code 무영향)",
+            f"  문제 전체              : {coverage.total}",
+            f"  개념 연결 보유          : {coverage.with_concept} ({coverage.concept_ratio:.1%})",
+            f"  스킬까지 해소 가능       : {coverage.with_skill} ({coverage.skill_ratio:.1%})",
+            "  ※ 스캔 대상 0이면 위 비율 0%는 '커버리지 0'이 아니라 '측정 대상 없음'이다.",
+        ]
+    )
+
+
 def main(argv: list[str] | None = None, *, scan_fn: ScanFn | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.ops.integrity_violations_gate",
-        description="데이터 무결성 게이트 — orphan·dangling·duplicate 6종 단일 CLI.",
+        description="데이터 무결성 게이트 — orphan·dangling·duplicate·발행포인터 7종 단일 CLI.",
     )
     parser.add_argument(
         "--json",
@@ -415,6 +549,16 @@ def main(argv: list[str] | None = None, *, scan_fn: ScanFn | None = None) -> int
         help=(
             "⑥ EVENT_SCHEMA_INVALID 스캔을 최근 N일로 제한(기본 None=전건). attempt_event가 "
             "큰 prod에서 스캔 비용을 줄이되, 제한 시 그 범위만 판정함을 stdout에 명시한다."
+        ),
+    )
+    parser.add_argument(
+        "--skill-coverage",
+        dest="skill_coverage",
+        action="store_true",
+        help=(
+            "문제 → 개념 → 스킬 해소 커버리지를 함께 출력(계획서 200 §27 검사 ①). "
+            "**exit code에 영향을 주지 않는다** — 지표이지 위반이 아니다(SkillCoverage docstring). "
+            "차단 kind 승격은 prod 기준선 실측 후 사람이 정한다."
         ),
     )
     args = parser.parse_args(argv)
@@ -436,6 +580,8 @@ def main(argv: list[str] | None = None, *, scan_fn: ScanFn | None = None) -> int
     if args.event_since_days is not None:
         print(f"※ EVENT_SCHEMA_INVALID 스캔 범위: 최근 {args.event_since_days}일만(전건 아님).")
     print(_render_stdout(report))
+    if args.skill_coverage:
+        print(_render_skill_coverage(asyncio.run(_run_skill_coverage(scan_fn))))
     if args.json_path is not None:
         _write_json(report, args.json_path)
         print(f"JSON 리포트 저장: {args.json_path}")

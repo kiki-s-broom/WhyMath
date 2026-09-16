@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/integrity_violations_gate.py
   - "tests/backend/ops/**"
-session: null
+session: claude/eager-euler-6ct5d3
 notes: "출처: 계획서 200 §27 재대조(2026-09-16). 6검사 중 ②③④⑥은 충족 또는 부분 충족이고 ①⑤만 강제 검사 0건이다. OPS-55가 세운 6종 게이트에 얹을지 별도로 세울지는 acceptance ③의 판정 대상"
 updated: 2026-09-16
