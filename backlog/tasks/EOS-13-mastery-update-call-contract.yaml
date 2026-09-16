@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-13-mastery-update-call-contract
+title: "Mastery 갱신 호출 계약 분리 — update_mastery(state, evidence) 형태 + 추정기 Protocol (현행은 스칼라 입력·구현 1종·DKT 교체 시 호출부 전수 수정)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 계약 시그니처 분리 — 계획서 §6의 `update_mastery(learner_state, assessment_evidence) -> mastery_update` 형태로 호출 계약을 세운다. 현행 `l2/mastery_tracking.py:52 compute_mastery_record(prior_mastery, prior_sample_size, correct, model, elapsed_days)`는 입력이 **스칼라**라 상태·증거를 받지 않는다.\n② 교체 가능성을 타입으로 표현한다 — 주석이 아니라 Protocol(또는 동등한 타입)로 추정기를 추상화한다. 현행은 `l2/bkt.py:135 BktModel` 클래스 수준까지만 분리돼 있고 **Protocol·레지스트리가 없으며 구현이 1종**이라, DKT로 교체하려면 호출부를 전수 수정해야 한다. 그 수정 규모가 0에 수렴하는 것이 이 태스크의 성공 판정이다.\n③ 개념 축·스킬 축 통합 — 현행은 `l2/mastery_tracking.py`(개념)와 `l2/skill_mastery_tracking.py:148`(스킬) 두 함수로 갈라져 있다. 계약을 하나로 세우되 **내부 구현은 갈라둬도 된다**. 통합이 재계산을 낳으면 안 된다.\n④ 행동 동결 — 계약만 바꾸고 **숙달 수치는 바뀌지 않아야 한다**. 기존 숙달 전파 테스트가 계약 교체 전후로 같은 값을 내는지 대조한다. 값이 바뀌면 그것은 리팩터가 아니라 정책 변경이므로 별건으로 분리한다.\n⑤ 변별력 — 계약이 실제로 교체 가능한지 **가짜 2번째 구현을 주입해 확인**한다(예: 항상 0.5를 반환하는 스텁을 레지스트리에 꽂아 호출부 수정 0으로 동작이 바뀌는지). 정상 입력에서 초록인 것은 교체 가능성의 증거가 아니다.\n⑥ EOS-63 회피 — 스킬 축 소비 전환은 `EOS-63`(다른 세션 claim 중·선행 SKB-01에 차단)이 소유한다. 이 태스크는 **계약 형태**만 다루고 소비 전환에 손대지 않는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/mastery_tracking.py
+session: null
+notes: "출처: 계획서 300 §6(Mastery Engine v1 — \"반드시 엔진 인터페이스를 분리합니다\") + §2(알고리즘보다 Contract) — 대조표 §4 단위6. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): 계약 분리 0건. 현행 입력은 스칼라이고 `assessment_evidence` 타입 자체가 없다. 인접 태스크 MISC-06(todo)은 acceptance가 \"BKT/DKT 비결합 유지\"를 명시하고, SKB-01·PED-14(todo)는 적재·정규화 축이라 계약 형태를 소유하지 않는다.\n\n주의(구현 금지 경계): 이 태스크는 **계약**이지 BKT/DKT 구현이 아니다. §15 동결 13종의 \"복잡한 ML 추천\"에 해당하는 실제 모델 도입은 이 태스크 범위 밖이다 — 계약을 세우되 v1 내부 구현은 현행 heuristic을 그대로 둔다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
+updated: 2026-09-16
