@@ -150,7 +150,7 @@ _EXPECTED_OBJECTS: frozenset[str] = frozenset(
         "Content",
         "Problem",
         "Attempt",
-        "Assessment",
+        "AssessmentEvidence",
         "Misconception",
         "Mastery",
         "Recommendation",
@@ -190,8 +190,8 @@ _EXPECTED_RELATIONS: frozenset[tuple[str, str, str]] = frozenset(
         ("Problem", "triggers", "Misconception"),
         ("Attempt", "made_by", "Learner"),
         ("Attempt", "on", "Problem"),
-        ("Attempt", "produces", "Assessment"),
-        ("Assessment", "updates", "LearnerState"),
+        ("Attempt", "produces", "AssessmentEvidence"),
+        ("AssessmentEvidence", "updates", "LearnerState"),
         ("LearnerState", "feeds", "Recommendation"),
     }
 )
@@ -293,13 +293,95 @@ def test_no_new_entity_seat_is_introduced() -> None:
     assert named <= canonical, f"정본 19종 밖의 엔티티를 신설했다: {sorted(named - canonical)}"
 
 
-def test_assessment_name_collision_is_recorded_not_silently_resolved() -> None:
-    """이름 충돌은 임의 개명하지 않고 **데이터로 기록**한다(§3-1 · Kiki 판정 대기)."""
+def test_no_semantic_name_collisions_remain() -> None:
+    """이름 충돌은 **0건**이어야 한다 — 2026-09-16 Kiki 판정(A안)으로 해소됐다(§3-1).
+
+    유일한 충돌이던 `Assessment`를 계획서 쪽에서 `AssessmentEvidence`로 개명했다. 저장소 정본
+    `Assessment`(진단 평가 세션·`ARCH-37` #15)는 이름을 유지한다 — ORM `Assessment`→테이블
+    `assessment`가 백엔드 29파일·테스트 18파일·마이그레이션 4건에 물려 있어 정본 개명(B안)은
+    파급이 크다는 실측이 근거다.
+
+    충돌이 새로 생기면 이 검사가 RED다. 즉 **조용히 늘어날 수 없다** — 새 충돌은 판정을 거쳐
+    상수에 적히거나, 개명으로 해소되거나 둘 중 하나다.
+    """
     collisions = {b.loop_object for b in CANONICAL_SEAT_BINDINGS if b.semantic_collision}
-    assert collisions == {LoopObject.ASSESSMENT}, (
-        "의미 충돌 표기가 바뀌었다. 충돌을 지우려면 §3-1 판정(A/B/C)이 선행이다. "
-        f"현재={sorted(o.value for o in collisions)}"
+    assert collisions == set(), (
+        "이름 충돌이 되살아났다. 같은 글자가 서로 다른 것을 가리키는 상태는 판정 없이 두지 "
+        f"않는다(§3-1). 현재={sorted(o.value for o in collisions)}"
     )
+
+
+def test_plan_side_assessment_is_renamed_not_the_canonical_entity() -> None:
+    """A안의 방향을 동결한다 — 개명된 쪽은 **계획서 어휘**이지 정본 엔티티가 아니다.
+
+    반대 방향(정본 `Assessment`를 건드리는 것)은 `ARCH-37` 좌석 동결이 별도로 막지만, 루프
+    어휘가 `Assessment`라는 글자를 **다시 쓰기 시작하는 것**은 여기서만 막힌다.
+    """
+    names = {o.value for o in LoopObject}
+    assert "AssessmentEvidence" in names
+    assert "Assessment" not in names, (
+        "루프 어휘가 'Assessment'를 다시 쓴다 — 정본 엔티티(진단 세션)와 글자가 겹쳐 "
+        "2026-09-16에 해소한 충돌이 되살아난다."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 검사 ⑩ — 루프 어휘 밖 엔티티 목록은 계산값과 일치한다
+# ══════════════════════════════════════════════════════════════════════════
+
+#: `| `Subject` · `CurriculumNode` · ...` 꼴 §3-2 산문 목록의 백틱 이름.
+_BACKTICK_NAME = re.compile(r"`([A-Za-z]+)`")
+
+
+def _parse_doc_outside_entities(text: str) -> frozenset[str]:
+    """정본 §3-2가 "루프 어휘 밖"으로 적은 엔티티 이름 집합."""
+    marker = "### 3-2."
+    if marker not in text:
+        raise LoopContractDocParseError(
+            f"{CONTRACT_DOC_PATH} §3-2 절을 찾지 못했다 — 스캔 0건은 실패다."
+        )
+    section = text.split(marker, 1)[1].split("\n---", 1)[0]
+    # 목록은 "> 이 목록은" 로 시작하는 해설 앞까지다(해설의 백틱까지 세면 오염된다).
+    listing = section.split("\n>", 1)[0]
+    names = frozenset(_BACKTICK_NAME.findall(listing))
+    if not names:
+        raise LoopContractDocParseError(
+            f"{CONTRACT_DOC_PATH} §3-2 목록에서 엔티티 이름을 한 건도 파싱하지 못했다."
+        )
+    return names
+
+
+def test_doc_outside_entity_list_matches_the_computed_set() -> None:
+    """§3-2 목록 = (`ARCH-37` 19종) − (귀속표가 지목한 엔티티). **하드코딩 두 벌 금지.**
+
+    `EOS-100`이 이 목록을 손으로 적으면서 `LearningEvent`를 잘못 포함시켰다 —
+    `Attempt`·`LearningSession`이 이미 그 엔티티에 귀속되므로 '밖'이 아니다(8종이 아니라 7종이
+    맞았다). 그리고 문서는 "이 목록은 하드코딩이 아니다 — 검사 ⑤가 계산한다"고 적었는데
+    **검사 ⑤는 그 집합을 계산하지 않았다**(정본화를 집행으로 착각한 표기). 이 검사가 그 주장을
+    비로소 참으로 만든다.
+    """
+    canonical = frozenset(_parse_canonical_entities(_read(CANONICAL_ENTITY_DOC_PATH)))
+    named = frozenset(b.canonical_entity for b in CANONICAL_SEAT_BINDINGS if b.canonical_entity)
+    computed = canonical - named
+    documented = _parse_doc_outside_entities(_read(CONTRACT_DOC_PATH))
+    assert documented == computed, (
+        f"{CONTRACT_DOC_PATH} §3-2 목록이 계산값과 다르다. "
+        f"문서만={sorted(documented - computed)} 계산만={sorted(computed - documented)}"
+    )
+
+
+def test_canonical_assessment_entity_is_outside_the_loop_vocabulary() -> None:
+    """A안의 귀결 — 정본 `Assessment`(진단 세션)는 루프 어휘 밖이다.
+
+    개명 전에는 루프 객체 `Assessment`가 이 엔티티를 좌석으로 지목해 **안쪽**에 있었다.
+    A안으로 그 지목이 끊겼으므로 밖으로 이동해야 하며, 이 검사가 그 이동을 동결한다.
+    """
+    named = {b.canonical_entity for b in CANONICAL_SEAT_BINDINGS if b.canonical_entity}
+    assert "Assessment" not in named, (
+        "정본 Assessment(진단 세션)를 루프 객체가 다시 좌석으로 지목한다 — "
+        "AssessmentEvidence는 LearningEvent에 흡수되지 진단 세션에 앉지 않는다."
+    )
+    assert "Assessment" in _parse_doc_outside_entities(_read(CONTRACT_DOC_PATH))
 
 
 # ══════════════════════════════════════════════════════════════════════════

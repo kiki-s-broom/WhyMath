@@ -78,7 +78,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 계획서 300 §1 EOS Kernel 그대로다. **이 목록에 없는 객체는 루프 어휘가 아니다.**
 
 `Learner` · `LearnerState` · `Curriculum` · `Objective` · `Concept` · `Skill` · `Content` ·
-`Problem` · `Attempt` · `Assessment` · `Misconception` · `Mastery` · `Recommendation` ·
+`Problem` · `Attempt` · `AssessmentEvidence` · `Misconception` · `Mastery` · `Recommendation` ·
 `LearningSession`
 
 > **실측 정정**: 집행 지시문 `P-01`은 이 목록을 "13개 객체"라고 적었으나 **열거된 이름은 14개**다.
@@ -108,8 +108,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 13 | `Problem` | `triggers` | `Misconception` |
 | 14 | `Attempt` | `made_by` | `Learner` |
 | 15 | `Attempt` | `on` | `Problem` |
-| 16 | `Attempt` | `produces` | `Assessment` |
-| 17 | `Assessment` | `updates` | `LearnerState` |
+| 16 | `Attempt` | `produces` | `AssessmentEvidence` |
+| 17 | `AssessmentEvidence` | `updates` | `LearnerState` |
 | 18 | `LearnerState` | `feeds` | `Recommendation` |
 
 ### 2-1. DAG 제약
@@ -155,44 +155,71 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `Content` | `Content` | `seated` | 아니오 | 좌석 `concept_content`·`pedagogy_content_slot` |
 | `Problem` | `Problem` | `seated` | 아니오 | 좌석 `problem`·`problem_step` |
 | `Attempt` | `LearningEvent` | `absorbed` | 아니오 | `problem_attempt`·`attempt_event`·`answer_submission` |
-| `Assessment` | `Assessment` | `seated` | 예 | ⚠ 같은 글자, 다른 것 — §3-1 |
+| `AssessmentEvidence` | `LearningEvent` | `absorbed` | 아니오 | `attempt_event`·`answer_submission`·`evidence_event`에 혼재 — §3-1 |
 | `Misconception` | `Misconception` | `seated` | 아니오 | 좌석 `misconception_catalog` |
 | `Mastery` | `MasteryState` | `seated_alias` | 아니오 | 좌석 `*_mastery_history`·`ability_snapshot` |
 | `Recommendation` | — | `no_seat` | 아니오 | 19종에 대응 없음 — 좌석 신설 안 함 |
 | `LearningSession` | `LearningEvent` | `absorbed` | 아니오 | 좌석 `learning_session` — writer 0 |
 
-**합계**: `seated` 9 · `seated_alias` 2 · `absorbed` 2 · `no_seat` 1 = **14**.
-이 중 **이름충돌 1건**(`Assessment`)은 귀속 축과 독립된 별개 축이다 — 좌석은 있는데 *뜻*이 다르다.
+**합계**: `seated` 8 · `seated_alias` 2 · `absorbed` 3 · `no_seat` 1 = **14**.
+**이름충돌 0건** — 2026-09-16 Kiki 판정(A안)으로 유일한 충돌이 해소됐다(§3-1).
 
-### 3-1. 미해결 — `Assessment` 이름 충돌 (Kiki 판정 대기)
+### 3-1. 해소됨 — `Assessment` 이름 충돌 (2026-09-16 Kiki 판정 · **A안**)
 
-**같은 이름이 두 가지 다른 것을 가리킨다.** 이것은 약칭 문제(`Objective`·`Mastery`)가 아니라
-**의미 충돌**이라 자동 정정이 불가능하다.
+**같은 이름이 두 가지 다른 것을 가리켰다.** 약칭 문제(`Objective`·`Mastery`)와 달리 **의미 충돌**이라
+자동 정정이 불가능했고, `EOS-100`은 임의 개명 대신 `semantic_collision=True`로 기록만 해 뒀다.
 
-| | 계획서 300 §5.1의 `Assessment` | `ARCH-37` #15의 `Assessment` |
+| | 계획서 300 §5.1 | `ARCH-37` #15 |
 |---|---|---|
 | 뜻 | **한 답안의 채점 산출** — `concept_evidence{}`·`skill_evidence{}`·`possible_misconceptions[]` 묶음 | **진단 평가 세션 컨테이너** — "언제 무엇을 진단했는가" |
 | 단위 | per-answer (제출 1건마다) | per-session (CAT 진단 1회) |
-| 좌석 | 없음 | `assessment` 테이블 |
-| 루프 위치 | `Attempt --produces--> Assessment --updates--> LearnerState` | 루프 밖(진단 세션) |
+| 루프 위치 | `Attempt --produces--> … --updates--> LearnerState` | 루프 밖(§3-2) |
+| **판정 후 이름** | **`AssessmentEvidence`** (개명) | `Assessment` (유지) |
 
-**임의 개명하지 않았다.** 현재 코드·문서는 두 뜻을 같은 이름으로 적되 `semantic_collision=True`로
-**충돌을 데이터로 기록**한다. 판정 3택은 §5에 있다.
+**판정: A안 — 계획서 쪽을 개명한다.** 근거 2가지:
+
+1. **의미가 실제로 다르다.** 한쪽은 *채점·판정의 결과와 근거*이고 다른 쪽은 *평가 세션 그 자체*다.
+   한 이름에 두 뜻을 얹는 것은 붕괴 연쇄 "유지보수 지옥 ← truth source가 하나가 아님"의 이름 축이다.
+2. **파급 비대칭(실측).** 정본 `Assessment`는 ORM 모델 → 테이블 `assessment`로 이미 물려 있다 —
+   **백엔드 29파일 · 테스트 18파일 · 마이그레이션 4건**이 참조한다(2026-09-16 실측). B안(정본 개명)은
+   DB·ORM·API·테스트까지 파급되고 `ARCH-37` 검사 ②(좌석 개명 시 RED)를 정면으로 건드린다.
+   A안은 아직 소비자가 0인 계약층 이름만 바꾸므로 파급이 **이 문서와 그 짝 모듈 안에서 닫힌다**.
+
+**`EOS-79`가 이 판정을 독립으로 뒷받침한다.** 4층 경계 정본(`evidence_layer_boundary.md`)은 이미
+*"이름이 층을 정하지 않는다 — `assessment` 테이블은 Assessment 층이 **아니다**"*를 적어 뒀고, 그
+문서가 정의한 **Assessment 층**("그 결과가 *어느 Skill·오개념의 어떤 증거인가*")이 바로 이 객체다.
+즉 A안은 새 어휘를 발명한 것이 아니라 **이미 있던 층 구분에 루프 어휘를 맞춘 것**이다.
+
+**좌석 재귀속.** 개명으로 `ARCH-37` `Assessment`는 더 이상 이 객체의 좌석이 아니다. `EOS-79`에 따르면
+Assessment 층은 `attempt_event`(`skill_ids`)·`answer_submission`(`error_analysis`)·`evidence_event`에
+**혼재**하며 셋 모두 `LearningEvent` 좌석이다 → `absorbed` / `LearningEvent`. 전용 좌석은 **없다**.
+
+**기계 집행**: 이름충돌 0건 강제(`test_no_semantic_name_collisions_remain`) · 개명 *방향* 동결
+(`test_plan_side_assessment_is_renamed_not_the_canonical_entity` — 루프 어휘가 `Assessment`를 다시
+쓰면 RED) · 정본 `Assessment`의 루프 밖 이동 동결
+(`test_canonical_assessment_entity_is_outside_the_loop_vocabulary`).
 
 ### 3-2. 루프 어휘 밖의 핵심 엔티티 8종
 
 `ARCH-37` 19종 중 계획서 §1 루프 어휘에 **대응이 없는** 것들이다. 갭이 아니라 **범위 차이**다 —
 루프 어휘는 학습 루프가 도는 데 필요한 최소 집합이고, 19종은 저장 좌석의 전수 집합이다.
 
-`Subject` · `CurriculumNode` · `Solution` · `Hint` · `AssessmentResult` · `LearningEvent` ·
+`Subject` · `CurriculumNode` · `Solution` · `Hint` · `Assessment` · `AssessmentResult` ·
 `PedagogyStrategy` · `ContentVersion`
 
-> 이 목록은 **하드코딩이 아니다** — 검사 ⑤가 `ARCH-37` §2-A 표를 파싱해 19종을 읽고, 귀속표가
-> 지목한 엔티티를 뺀 나머지로 계산한다. `ARCH-37`이 엔티티를 추가·개명하면 자동으로 따라온다.
+> **이 목록은 하드코딩이 아니다** — 검사 ⑩(`test_doc_outside_entity_list_matches_the_computed_set`)이
+> `ARCH-37` §2-A 표를 파싱해 19종을 읽고, **귀속표가 지목한 엔티티를 뺀 나머지**로 계산해 위 목록과
+> 1:1 대조한다. `ARCH-37`이 엔티티를 추가·개명하거나 귀속이 바뀌면 자동으로 따라온다.
+>
+> **정정(2026-09-16 · `EOS-102`)**: `EOS-100`이 적은 최초 목록은 **두 곳이 틀렸다**.
+> ⓐ `LearningEvent`를 밖에 넣었는데 `Attempt`·`LearningSession`이 이미 그 엔티티에 귀속되므로
+> 밖이 아니다(그래서 실제로는 8종이 아니라 **7종**이 맞았다) ⓑ "검사 ⑤가 계산한다"고 적었으나
+> **검사 ⑤는 그 집합을 계산하지 않았다** — 정본화를 집행으로 착각한 표기다. 검사 ⑩을 신설해
+> 그 주장을 비로소 참으로 만들었다. A안 적용으로 `Assessment`가 밖으로 이동해 지금은 8종이다.
 
 ---
 
-## §4. 뮤테이션 검증 결과 — 25종 전건 RED · 생존 0
+## §4. 뮤테이션 검증 결과 — 33종 전건 RED · 생존 0
 
 정상 입력에서 초록인 것은 보호의 증거가 아니므로(CLAUDE.md "보호 장치를 실패 주입 없이 '보호
 있음'으로 선언 금지"), **막으려는 상태를 실제로 주입해** 각 검사가 RED를 내는지 확인했다.
@@ -259,35 +286,46 @@ backend 잡이 깨어나는지를 그 가드가 기계로 강제한다.
 M24가 **성공 방향 대조군**이다 — 부정 전방탐색이 진짜 삼각함수 어휘까지 끄면 과잉 수정이고,
 그 상태도 RED여야 한다.
 
+### 4-2. `EOS-102` — A안 집행 + `EOS-100` 문서 결함 정정 (뮤테이션 8종 추가)
+
+| # | 주입 | 노린 검사 | exit | 판정 |
+|---|---|---|---|---|
+| M26 | 개명 회귀 — 루프 어휘가 `Assessment`를 다시 씀 | A안 방향 동결 | 1 | RED |
+| M27 | 이름충돌 되살림(`semantic_collision=True`) | 충돌 0건 강제 | 1 | RED |
+| M28 | 좌석 오귀속 — 정본 `Assessment`(진단 세션)를 다시 지목 | 루프 밖 이동 동결 | 1 | RED |
+| M29 | §3-2 목록에 `LearningEvent` 재삽입(**`EOS-100`의 원 결함 복원**) | ⑩ | 1 | RED |
+| M30 | §3-2 목록에서 `Assessment` 누락(A안 귀결 은폐) | ⑩ | 1 | RED |
+| M31 | §3-2 절 자체 삭제(파서 0건) | ⑨ | 1 | RED |
+| M32 | §2 관계표가 옛 이름 유지 | ⑧ | 1 | RED |
+| M33 | §3 귀속표가 옛 좌석 유지 | ⑧ | 1 | RED |
+
+**M29가 이 회차의 핵심이다.** `EOS-100`이 실제로 저질렀던 결함(`LearningEvent`를 '루프 어휘 밖'
+목록에 잘못 넣은 것)을 그대로 재주입했고, 신설한 검사 ⑩이 RED를 냈다 — 즉 **그 결함은 이제
+기계가 막는다**. 종전에는 문서가 "검사 ⑤가 계산한다"고 *주장만* 했고 실제로 계산하는 코드는
+없었으므로, 같은 결함을 다시 넣어도 초록이었다.
+
 재현: `python3 scripts/harness/mutate_eos100.py` 는 **없다** — 하네스는 세션 스크래치패드에서
 1회성으로 돌렸고 저장소에 커밋하지 않았다. 재현이 필요하면 위 표의 주입 문자열을 그대로 쓰면 된다.
 
 ---
 
-## §5. Kiki 판정 대기 1건
+## §5. Kiki 판정 — 완료 (대기 0건)
 
-| # | 판정 | 3택 |
-|---|---|---|
-| ① | `Assessment` 이름 충돌(§3-1) | **(A)** 계획서 쪽을 `AssessmentEvidence`로 부른다(정본 이름 보존·`EOS-12`가 그 이름으로 계약을 만든다) / **(B)** 정본 `Assessment`를 `DiagnosticSession`으로 개명한다(좌석·ORM·문서 3곳 동시 변경·비용 큼) / **(C)** 충돌을 기록만 하고 유지한다(현 상태 — 두 뜻이 계속 같은 글자를 쓴다) |
+| # | 판정 | 결과 | 집행 |
+|---|---|---|---|
+| ① | `Assessment` 이름 충돌(§3-1) | **A안 채택**(2026-09-16 Kiki) — 계획서 쪽을 `AssessmentEvidence`로 개명, 정본 `Assessment`(진단 세션)는 유지 | `EOS-102` · 이 문서 §3-1 · 검사 3종 |
 
-판정 전까지 코드는 **(C)** 상태이며, 그 사실이 `semantic_collision=True`로 기계에 남아 있다.
-
-**만료 없는 유예가 아니다** — 판정 소유자는 `EOS-12-assessment-evidence-contract`이며, 그 태스크
-acceptance ⑤가 이 3택을 **대장에 집행**한다(2026-09-16 `amend`). 산문 유예가 아니라 착수 조건이다:
-`EOS-12`가 Evidence 계약의 이름을 정하는 순간이 곧 이 충돌의 판정 시점이고, `(C)`를 고르더라도
-**다음 재확인 지점을 명시**해야 한다.
-
-> **세션 기록(2026-09-16)**: 이 3택을 Kiki에게 직접 물었으나 응답 없이 진행하기로 했다. 따라서
-> 위 `(C)`는 *선택된 판정*이 아니라 **미판정 상태의 정직한 표기**다 — 둘을 섞어 적지 않는다.
-
----
+**경위(정직한 기록)**: `EOS-100`이 3택(A/B/C)을 제시했고 세션이 직접 물었으나 그 자리에서는 응답이
+없어 **미판정 상태로 착지**시켰다(`semantic_collision=True`). 만료 없는 유예를 막으려고 판정 소유자를
+`EOS-12` acceptance ⑤로 대장에 집행해 뒀고, 같은 날 Kiki가 **A안**으로 판정해 `EOS-102`가 집행했다.
+지금 이 문서에 미판정 항목은 **없다**.
 
 ## §6. 후속
 
 | 태스크 | 몫 |
 |---|---|
 | `EOS-10` | `LearnerState` 단일 조회 표면 — 이 계약의 첫 배선 지점 |
-| `EOS-12` | `Assessment` Evidence 3종 묶음 계약 — §3-1 판정의 소비자 |
+| `EOS-12` | `AssessmentEvidence` 3종 묶음 계약 — §3-1 A안이 정한 이름으로 만든다(판정은 끝났고 구현만 남음) |
 | `EOS-13` | `update_mastery(state, evidence)` 호출 계약 |
 | `EOS-14` | `recommend(state, context)` 호출 계약 — `Recommendation`의 `no_seat` 상태를 전제로 설계 |
 | `EOS-101` | 순환 탐지 3벌 통합 판정(§2-1 정직한 공백) |

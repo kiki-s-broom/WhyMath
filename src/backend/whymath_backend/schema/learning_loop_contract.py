@@ -56,7 +56,7 @@ class LoopObject(StrEnum):
     CONTENT = "Content"
     PROBLEM = "Problem"
     ATTEMPT = "Attempt"
-    ASSESSMENT = "Assessment"
+    ASSESSMENT_EVIDENCE = "AssessmentEvidence"
     MISCONCEPTION = "Misconception"
     MASTERY = "Mastery"
     RECOMMENDATION = "Recommendation"
@@ -127,12 +127,12 @@ LOOP_RELATIONS: tuple[LoopRelation, ...] = (
     LoopRelation(LoopObject.PROBLEM, LoopEdge.ASSESSES, LoopObject.CONCEPT),
     LoopRelation(LoopObject.PROBLEM, LoopEdge.ASSESSES, LoopObject.SKILL),
     LoopRelation(LoopObject.PROBLEM, LoopEdge.TRIGGERS, LoopObject.MISCONCEPTION),
-    # Attempt: made_by→Learner, on→Problem, produces→Assessment
+    # Attempt: made_by→Learner, on→Problem, produces→AssessmentEvidence
     LoopRelation(LoopObject.ATTEMPT, LoopEdge.MADE_BY, LoopObject.LEARNER),
     LoopRelation(LoopObject.ATTEMPT, LoopEdge.ON, LoopObject.PROBLEM),
-    LoopRelation(LoopObject.ATTEMPT, LoopEdge.PRODUCES, LoopObject.ASSESSMENT),
-    # Assessment updates→ LearnerState
-    LoopRelation(LoopObject.ASSESSMENT, LoopEdge.UPDATES, LoopObject.LEARNER_STATE),
+    LoopRelation(LoopObject.ATTEMPT, LoopEdge.PRODUCES, LoopObject.ASSESSMENT_EVIDENCE),
+    # AssessmentEvidence updates→ LearnerState
+    LoopRelation(LoopObject.ASSESSMENT_EVIDENCE, LoopEdge.UPDATES, LoopObject.LEARNER_STATE),
     # LearnerState feeds→ Recommendation
     LoopRelation(LoopObject.LEARNER_STATE, LoopEdge.FEEDS, LoopObject.RECOMMENDATION),
 )
@@ -174,6 +174,9 @@ class SeatBinding:
     canonical_entity: str | None
     status: SeatStatus
     #: 같은 이름인데 **뜻이 다른** 경우 True. 이름 축(`SEATED_ALIAS`)과 독립된 축이다.
+    #: 2026-09-16 Kiki 판정(A안)으로 현재 **전건 False**다 — 계획서 쪽을
+    #: `AssessmentEvidence`로 개명해 유일한 충돌을 해소했다. 필드는 남겨 둔다:
+    #: 새 충돌이 생기면 여기 적어야 하고, 검사가 "0건"을 강제하므로 조용히 늘 수 없다.
     semantic_collision: bool
     note: str
 
@@ -246,13 +249,15 @@ CANONICAL_SEAT_BINDINGS: tuple[SeatBinding, ...] = (
         "answer_submission). 루프 어휘에서는 1급 객체이나 저장 축에서는 아니다.",
     ),
     SeatBinding(
-        LoopObject.ASSESSMENT,
-        "Assessment",
-        SeatStatus.SEATED,
-        True,
-        "⚠ 이름 충돌 — 계획서의 Assessment는 '한 답안의 채점 산출(Evidence 묶음)'이고 정본 "
-        "ARCH-37 #15의 Assessment는 '진단 평가 세션 컨테이너'다. 같은 글자, 다른 것. "
-        "판정은 Kiki 몫이며 미해결 상태로 적는다(날조 금지). 채점 Evidence 계약은 EOS-12 소관.",
+        LoopObject.ASSESSMENT_EVIDENCE,
+        "LearningEvent",
+        SeatStatus.ABSORBED,
+        False,
+        "독립 좌석이 없고 LearningEvent 좌석에 혼재 흡수(attempt_event의 skill_ids · "
+        "answer_submission의 error_analysis · evidence_event). EOS-79 4층 경계가 이미 "
+        "'이름이 층을 정하지 않는다 — assessment 테이블은 Assessment 층이 아니다'를 정본화했고, "
+        "그 문서의 Assessment 층 정의('어느 Skill·오개념의 어떤 증거인가')가 이 객체다. "
+        "ARCH-37 #15의 Assessment(진단 세션)는 이 객체가 아니며 루프 어휘 밖이다(§3-2).",
     ),
     SeatBinding(
         LoopObject.MISCONCEPTION,

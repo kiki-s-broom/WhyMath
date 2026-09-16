@@ -281,3 +281,16 @@ grep -h "^eos_priority:" backlog/tasks/*.yaml | sort | uniq -c
 `canonical_entity_model_v1.md` 하나다. 상세는 `docs/architecture/learning_loop_contract_v1.md` §0.
 
 §9-②의 표는 이 정정으로 **1행이 줄어** ①③④ 3건이 남는다(②는 해소).
+
+### §11.5. `P-05` 어휘 정정 (2026-09-16 · `EOS-102`)
+
+`P-05`(Assessment Engine v1 → `EOS-12`)가 만들 객체의 이름이 **`AssessmentEvidence`로 확정**됐다.
+계획서 300 §5.1의 per-answer 채점 산출과 이 저장소 정본 `Assessment`(진단 평가 세션·`ARCH-37` #15)가
+같은 글자로 다른 것을 가리키던 충돌을 Kiki가 **A안**(계획서 쪽 개명)으로 판정했다 — 근거는 의미
+차이와 파급 비대칭(정본 `Assessment`는 ORM·테이블로 백엔드 29파일·테스트 18파일·마이그레이션 4건에
+연결). 상세는 `docs/architecture/learning_loop_contract_v1.md` §3-1.
+
+따라서 위 §4 대조표 단위 5의 "3종 묶음(`concept_evidence{}`·`skill_evidence{}`·
+`possible_misconceptions[]`)"은 `AssessmentEvidence` 타입으로 만든다. 좌석은 **신설하지 않는다** —
+`EOS-79` 4층 경계에 따라 `LearningEvent`(`attempt_event`·`answer_submission`·`evidence_event`)에
+혼재 흡수다.
