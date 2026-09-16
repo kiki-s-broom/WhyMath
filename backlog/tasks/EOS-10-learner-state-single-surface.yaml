@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/learner_state.py
   - src/backend/whymath_backend/api/me.py
-session: null
+session: claude/phase2-master-preamble-kdjfi4
 notes: "출처: 계획서 300 §4 작업1(LearnerState 7필드) + §12(GET /learner-state) — 대조표 `docs/strategy/plan300_phase2_backlog_crosswalk.md` §4 단위2·§6 단위4. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): 계획서 §12 API 12종 중 **유일한 미대응**이 이 축이다(11/12 대응). 조립기 `l2/learner_state.py:150 get_state()`는 실재하나 HTTP 표면이 없다. 선행 `PED-05-learner-state-assembly`(done)가 조립기 실체화까지만 소유했고 단일 표면 축은 그 acceptance에 없다 — 즉 **소유자 0건**이다(검색 범위: backlog 655건 전수 × learner.?state/learnerstate, 역할 검색 \"학습자 상태 단일 조회\", 소비자 역추적 get_state import처 전수).\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3)이 계획서 300의 4주 Phase 2를 참고 문서로 강등했다. 이 태스크의 등재는 대장 기록이며 착수는 그 결정의 갱신을 전제로 한다."
 updated: 2026-09-16
