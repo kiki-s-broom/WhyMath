@@ -75,10 +75,6 @@ MATH_FIELD_NAME_BASELINE: frozenset[tuple[str, str]] = frozenset(
         ("schema.visualization", "integral_region"),
         ("schema.visualization", "show_extrema"),
         ("schema.visualization", "number_line"),
-        # [EOS-86·2026-09-06] 거짓 양성 — `MATH_TOKEN_RX`의 `trig\w*`가 "trigger"를 부분매치한다
-        # (수학 무관 — CoachingTrigger 필드명). l4.solution_coaching이 MIXED→CORE로 재배정되며
-        # 처음 CORE 스캔 대상에 들어와 드러났다(필드 자체는 EOS-86 이전부터 존재·변경 없음).
-        ("l4.solution_coaching", "trigger"),
     }
 )
 
@@ -175,6 +171,38 @@ def test_every_non_residual_reach_passes_the_designed_seam(result: dict[str, Any
 def test_math_removal_leaves_most_of_core_standing(result: dict[str, Any]) -> None:
     """'수학을 제거했을 때 무엇이 남는가' — CORE의 90% 이상이 ADAPTER 없이도 import 가능해야 한다."""
     assert result["survivors_after_math_removal"] / result["core"] >= 0.90, result["core"]
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    ["trigger", "triggers", "TRIGGERS", "triggered", "coaching_trigger", "LoopEdge.TRIGGERS"],
+)
+def test_trigger_family_is_not_math(probe: Any, identifier: str) -> None:
+    """`trigger` 계열은 수학이 아니다 — 종전 `trig\\w*`가 부분매치하던 거짓 양성(2회차).
+
+    1회차(EOS-86·2026-09-06)는 오탐을 **baseline에 등재해** 덮었고, 그래서 2회차
+    (EOS-100·2026-09-16 · `LoopEdge.TRIGGERS`)를 못 막았다. 대책을 데이터가 아니라 코드에
+    둔 것이 `trig(?!ger)\\w*`이며, 이 테스트가 그 음성 판정을 동결한다.
+    """
+    assert probe._identifier_is_math(identifier.split(".")[-1]) is None
+    assert probe.MATH_TYPE_RX.match(identifier.split(".")[-1]) is None
+
+
+@pytest.mark.parametrize(
+    ("identifier", "why"),
+    [
+        ("trig", "trig"),
+        ("TRIG", "TRIG"),
+        ("trigonometric", "trigonometric"),
+        ("trig_identity", "trig"),
+        ("_TRIG", "TRIG"),
+    ],
+)
+def test_real_trigonometry_identifiers_still_detected(
+    probe: Any, identifier: str, why: str
+) -> None:
+    """성공 방향 대조군 — 부정 전방탐색이 삼각함수 어휘까지 끄면 과잉 수정이다."""
+    assert probe._identifier_is_math(identifier) == why
 
 
 def test_subject_enum_members_in_core_are_frozen(result: dict[str, Any]) -> None:
