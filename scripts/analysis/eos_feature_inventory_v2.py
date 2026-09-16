@@ -391,6 +391,9 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-016", "개념·스킬 숙달 곡선 조회", "Student", "Learning Model", "P0",
        "E4 mastery 조회 — G2 ⑧", "me",
        "GET /mastery", "GET /skill-mastery", "GET /mastery/current"),
+    _s("WM-S-051", "내 학습 과정 시간선 조회(Event Trace)", "Student", "Event", "P1",
+       "EOS-11 — 계획서 300 §17 역추적 축. 본인 스코프 고정·원천 3상태(produced/dormant/"
+       "unjoinable) 동반 노출", "me", "GET /learning-trace"),
     _s("WM-S-017", "IRT 능력(θ) 추정·스냅샷·성장 곡선", "Student", "Learning Model", "P0",
        "E4 — θ 추정·시계열", "me",
        "GET /ability", "POST /ability/snapshots", "GET /ability/snapshots",
@@ -542,6 +545,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
        "COLLAB-03 시계열 3테이블", "l2.learning_metrics_rollup",
        "harness.learning_metrics_rollup_cli"),
+    _e("WM-E-209", "학습 이벤트 시간선 투영(읽기 축·쓰기 0)", "Student", "Event", "P1",
+       "EOS-11 — 5원천을 한 학습자 시간선으로 투영. 적재는 WM-E-206 소유이고 이 행은 "
+       "읽기 전용 projection(session.add·commit 0건)·원천 가용성 3상태 대장",
+       "l2.learning_event_trace"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",

@@ -360,6 +360,30 @@
 - **검증**: 뮤테이션 **25종 전건 RED · 생존 0**(순수 Python 하네스 · 회차마다 `mutated != original`·sha256 변화·바이트 동일 원복 단언). 위음성(M12 항상 `None`)과 위양성(M13 항상 순환)을 **쌍으로** 주입하고 성공 방향 대조군(깨끗한 DAG 4종·깊은 체인 5,000노드)을 함께 뒀다.
 
 - **부수 수정(반복 실수 2회차 상환)**: `LoopEdge.TRIGGERS`가 `EOS-84` 경계 프로브의 ratchet을 깨뜨렸는데 원인은 계약이 아니라 **탐지기**였다 — `scripts/analysis/eos_core_boundary_probe.py`의 `trig\w*`가 `trigger`를 부분매치한다. **이 오탐은 2026-09-06 `EOS-86`에서 이미 관측됐고 그때 대책이 "오탐을 baseline에 등재"였다**(데이터로 덮음) — 그래서 2회차를 못 막았다. CLAUDE.md 반복 실수 규칙 + "동일 유형 텍스트 규칙 2회 실패 후 코드 착지" 선례에 따라 **코드**로 옮겼다: `trig(?!ger)\w*`(2곳) + 회귀 테스트 2종(`test_trigger_family_is_not_math`·성공 방향 대조군) + 은퇴한 baseline 엔트리 제거. 관계명 개명은 선택지가 아니었다 — `triggers`는 계획서 §1 어휘이고 **탐지기가 틀렸을 때 피검체를 고치지 않는다**.
+### 2026-09-16 (구현 · EOS-11): **Learning Event Trace 읽기 축 신설 — 새 store 0, 대신 "0건의 의미"를 3상태로 말하는 투영 계약** (claude 구현) — 판정 기준 main `c4f8c9fb`
+
+**① 무엇이 없었나.** 학습 이벤트의 *적재*는 이미 충족돼 있었다(`attempt_event` hypertable·`problem_attempt`·`concept_mastery_history`·`misconception_hypothesis`·`assessment`). 없던 것은 그것들을 **한 학습자의 하나의 시간선으로 합치는 조회**다 — 실측상 기존 소비처 3곳(`l2/learning_metrics_rollup` 일별 롤업 · `harness/attempt_skill_event_reach_report` 기록률 · `harness/wh1_evaluation` 지표)이 전부 *집계*였고, per-learner 시계열 조회는 내가 찾은 방법으로는 0건이었다. 집계는 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답하지 못하고, 그 답이 없으면 역추적(왜 이 추천이 나왔는가)이 불가능하다.
+
+**② 새 store를 만들지 않는다 — 판단 근거.** 계획서 §4가 이벤트 스키마를 제시하지만 이 저장소에는 이미 그 자리가 있다. 새 이벤트 테이블을 세우면 같은 사실이 두 곳에 적혀 truth source가 둘이 되고(붕괴 연쇄 ④ "유지보수 지옥"), DP-01 ADR("PostgreSQL 우선")과 pgvector 선례의 "6번째 store 회피" 원칙을 동시에 뒤집는다. 그래서 `l2/learning_event_trace.py`는 **투영(projection)**이다 — `session.add` 0건·commit 0건이고, 질의 계층(교체 가능)과 투영 계층(순수 함수·의미 고정)을 타입으로 갈라 뒀다. 나중에 행동 로그가 ClickHouse로 가도 바뀌는 것은 `_collect_*` 내부이고 소비자가 보는 `LearningEventTrace`는 그대로다.
+
+**③ 이 태스크의 실제 산출은 "0건의 의미"다.** §17이 이름을 붙인 10종을 실측 배정해 보니 **6종만 생산·결합 가능**이었다. 그래서 응답이 행만 내면 거짓말이 된다 — 3상태 대장(`coverage`)을 함께 낸다:
+  - `DORMANT`(생산자 0건) 3종 — `learner_state_created`(`user_state_snapshot` writer 0) · `concept_selected`(`learning_session` writer 0 — 조회·종료·삭제 표면만 있고 **생성 경로가 없다**) · `content_viewed`(학습자별 열람 로그 테이블 자체가 없다).
+  - `UNJOINABLE`(생산자는 있으나 학습자 축 조인 불가) 1종 — `recommendation_generated`. `evidence_event`에 `user_id` 컬럼이 없고 `session_id`는 `record_recommendation_treatment`가 매 호출 `uuid4()` placeholder로 채운다. **추천은 쌓이는데 이 학생 것을 집어낼 키가 없다.**
+  이 셋을 "없음"과 같은 글자로 쓰면 미측정이 무활동으로 읽힌다(「작동한 비율」 원칙의 데이터 축).
+
+**④ 배정을 산문이 아니라 기계가 판정한다.** 위 배정은 주석이 아니라 **양방향 거버넌스 테스트**가 지킨다 — 저장소 AST 전수 스캔(별칭 해소 포함)으로 writer 실재를 세어 `bool(writer) == (배정 == PRODUCED)`를 단언한다. 한 방향만 보면 *writer가 생겼는데 DORMANT로 남은* 은폐는 잡아도 *writer가 없는데 PRODUCED로 선언한* 날조는 못 잡는다 — 실제로 뮤테이션 M17이 그 구멍으로 **생존했고**, 가드를 양방향으로 고친 뒤 RED가 됐다. `UNJOINABLE` 주장도 `EvidenceEvent.__table__`에 `user_id`가 없음을 직접 읽어 동결한다(생기면 깨져서 대장을 고치게 한다).
+
+**⑤ 전후 값은 lag로 복원하되, 창 필터보다 먼저 계산한다.** `mastery_updated(0.54→0.43)`의 "이전 값"은 같은 `(user, concept)` 파티션의 직전 행이다. 시간창 *안에서만* 직전 값을 구하면 창 시작 직전의 측정을 못 봐 **첫 행이 늘 '첫 측정'으로 둔갑**한다 — 그래서 `_mastery_stmt`는 학습자 전 구간에서 `lag`를 계산한 뒤 바깥에서 창을 건다. 첫 측정의 `mastery_before`는 `None`이고 0.0으로 접지 않는다(S3-07 None≠0 — 접으면 첫 채점이 항상 "0.0에서 올랐다"는 없는 상승이 된다).
+
+**⑥ 읽기 축은 실패를 삼키지 않는다.** 적재 경로(`l2/attempt_skill_event`)는 "전파해도 기록이 안 남는다 + 유실이 비율로 계측된다"는 근거로 흡수를 택했지만, **읽기에는 그 근거가 없다** — 조용히 빠진 원천은 그 학생이 그 행동을 *안 한 것처럼* 보인다. `build_trace`에는 부분 결과를 성공으로 포장하는 경로 자체를 두지 않았고, 원천 7개 각각에 실패를 주입해 전건 전파를 확인했다(M19 = 삼킴 주입 → RED).
+
+**⑦ PII 경계 — 계획서 §4의 `answer`는 의도적으로 뺐다.** 미성년 학생 원문 답안·풀이·수식은 트레이스에 싣지 않는다(DP-02 allowlist 승계). 봉투에 답안 슬롯 자체가 없고(구조적 차단), `attempt_id` 포인터만 남겨 권한 있는 기존 표면으로 되짚게 한다. `attempt_event.event_data`도 통째로 싣지 않고 타입별 **비식별 스칼라 키 allowlist + 값 타입 화이트리스트** 2겹을 통과한 것만 옮긴다 — 특히 `시각화조작.payload`는 계약상 자유형이라 정밀 좌표가 들어올 수 있어 통째 제외다. 키 이름만 막으면 같은 이름 아래 dict가 들어와 자유형이 부활하므로 값 타입 축이 별도로 필요하다(M6가 그 축을 지킨다).
+
+**⑧ 변별력 = 뮤테이션 21종 전건 RED**(셸 배제 순수 Python 하네스 — 주입 적용 단언 + 원복 sha256 동일 단언, 2026-09-06 규칙). **하네스 1차 시도가 전건 rc=4(usage error)를 RED로 오독할 뻔했다** — `cwd=src/backend`에 상대 노드 id를 준 탓에 pytest가 파일을 못 찾아 뮤테이션과 무관하게 항상 비-0이었다. 무뮤테이션 상태의 rc=0을 먼저 확인하는 `sanity_check`를 넣어 변별력의 전제를 고정했다(2026-09-08 "전건 RED는 커버리지의 증거가 아니다"의 인접 축 — 그쪽은 *안 본 절*을, 이쪽은 *종료코드의 출처*를 묻는다).
+
+**⑨ 남긴 범위(명시).** ⓐ 세션 축은 표면에 노출하지 않았다 — `learning_session` writer가 0건이라 `session_id` 필터를 열면 항상 빈 결과를 내는 **충족 불가 파라미터**가 된다(계획서 §17이 "세션 단위"를 말하지만 그 전제가 이 저장소에 아직 없다). 지금은 `problem_attempt.session_id`가 클라 신고분만 실리므로 봉투에 값으로만 운반한다. ⓑ 운영자·교사 열람은 범위 밖(`ADMIN-05` 계열). ⓒ 실 PG 통합(window function `lag` SQL 왕복)은 hermetic으로 못 보므로 CI 통합 잡이 최종 판정한다.
+
+**⑩ 전체 스위트가 기존 가드 2건을 깨웠다 — 둘 다 실제 신호였다.** ⓐ `test_assessment_result_verdict_premise`가 ORM `Assessment`의 새 임포터로 RED. 가드 자신이 "사유 없이 허용목록에 추가해 초록을 만들지 않는다"고 적어 둔 자리라 **재판정 트리거 1·3을 먼저 대조했다** — 이 모듈은 W8 경로가 아니고(쓰기 0건·채점 런타임 미호출), 읽는 컬럼은 `started_at`·`completed_at`·`assessment_type`뿐이라 예측 5필드를 건드리지 않는다(§3-C가 "직렬화는 소비가 아니다"라고 못 박은 축). 둘 다 미발동이므로 근거를 명기한 허용목록 항목으로 등재했다. ⓑ `declared_unwired_audit`가 새 라우트를 `unclassified`(미도달·의도 선언 없음)로 RED. 원인은 내 테스트가 `_client(...).get(...)` 형태라 감사기의 도달 정규식(식별자 뒤 `.get(`만 인식)에 안 보였던 것이다 — **유예로 덮지 않고** 테스트를 `client = _client(...)` 바인딩으로 바꿔 도달을 정적으로 보이게 했다(2026-08-10 OPS-25가 "유예 대신 탐지기를 고친다"로 세운 선례의 반대 방향 적용: 이번엔 *내 코드*가 탐지기에 맞췄다). 판정이 실제로 그 변경에서 왔는지도 주입으로 확인했다(12개 호출을 `(client).get(`으로 되돌리면 `unclassified`·exit 1 복귀). **정직한 잔여**: 여기서 말하는 "도달"은 백엔드 테스트의 HTTP 관통이고 이 라우트를 소비하는 **모바일 클라이언트는 0건**이다(`/v1/study/*` 선례와 동형 표기).
 
 ### 2026-09-15 (판정·집행 · HARN-102): **bypass_actors를 스냅샷에서 상시 판정으로 승격 — 판정기가 두 엔드포인트를 읽는다** (claude 구현) — 판정 기준 main `4b33d243`
 

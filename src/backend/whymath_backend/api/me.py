@@ -133,6 +133,12 @@ from whymath_backend.l2.irt import (
     learning_band_weight,
     select_weighted_item,
 )
+from whymath_backend.l2.learning_event_trace import (
+    DEFAULT_TRACE_LIMIT,
+    MAX_TRACE_LIMIT,
+    LearningEventTrace,
+    build_trace,
+)
 from whymath_backend.l2.learning_path import (
     LearningPath,
     build_learning_path,
@@ -1016,6 +1022,55 @@ class ConceptMasterySnapshotItem(BaseModel):
     confidence: float | None = None
     sample_size: int | None = None
     measured_at: datetime
+
+
+TraceLimit = Annotated[
+    int,
+    Query(
+        ge=1,
+        le=MAX_TRACE_LIMIT,
+        description=(
+            "시간선 전역 상한. 초과분은 **오래된 쪽부터** 잘리고 응답의 `truncated`가 true가 된다."
+        ),
+    ),
+]
+
+
+@router.get(
+    "/learning-trace",
+    response_model=LearningEventTrace,
+    summary="내 학습 과정 시간선(Event Trace — 여러 원천을 하나의 시간순으로 재구성)",
+)
+async def get_my_learning_trace(
+    user: ConsentedUser,
+    session: SessionDep,
+    since: SinceParam = None,
+    until: UntilParam = None,
+    limit: TraceLimit = DEFAULT_TRACE_LIMIT,
+) -> LearningEventTrace:
+    """본인 학습 이벤트를 **시간순으로** 재구성한다(EOS-11 · 계획서 300 §17).
+
+    진단·문제 시도·채점·오개념 가설·숙달 변경(전후 값 포함)·θ 측정·코치 행동 이벤트를 한 줄로
+    합친 시간선이다. 집계 리포트와 달리 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답한다.
+
+    **스코프**: `user_id`는 인증 주체로 고정한다 — 경로·쿼리 어디에도 타인 id를 넣을 자리가
+    없다(구조적 차단). 운영자·교사 열람은 이 표면의 범위가 아니다(`ADMIN-05` 계열 별건).
+
+    **응답을 `entries`만 보고 읽지 말 것**: `coverage`가 원천별 가용성을 3상태로 말한다.
+    `dormant`(생산자 0건)·`unjoinable`(학습자 축 결합 불가)인 원천의 0건은 *이 학생이 안 했다*는
+    뜻이 아니라 *우리가 재지 않고 있다*는 뜻이다(미측정을 무활동으로 읽지 않기 — CLAUDE.md
+    "작동한 비율" 원칙).
+
+    원문 답안·풀이·수식은 싣지 않는다(미성년 PII 경계). 답안이 필요하면 `attempt_id`로
+    기존 본인 표면을 경유한다.
+    """
+    return await build_trace(
+        session,
+        learner_id=user.user_id,
+        since=since,
+        until=until,
+        limit=limit,
+    )
 
 
 @router.get(
