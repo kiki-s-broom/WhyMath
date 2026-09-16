@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-101-prerequisite-cycle-detector-consolidation
+title: "prerequisite 순환 탐지 3벌 통합 판정 — 진실 원천 단일화 또는 3자 대조 확장"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-100-learning-loop-relation-contract
+requires_gates: []
+acceptance:
+  - "① 3벌 실측 기록 — data_pipeline/atom_graph/validate.py::_find_prerequisite_cycle · l1/atom_graph/populate.py::_find_prerequisite_cycle_in_records · schema/learning_loop_contract.py::find_prerequisite_cycle 의 알고리즘·입력형·반환형 차이를 표로 적는다\n② 통합/유지 판정 — 통합하면 어느 계층에 두는가(schema는 최하위라 l1·data-pipeline 양쪽이 import 가능한 유일 지점) / 유지하면 왜인가(별 패키지 경계). 판정 근거를 적고 하나를 고른다\n③ 통합 시: 단일 구현으로 수렴하고 나머지는 호출로 대체. 유지 시: 판정 일치 대조 테스트(현행 tests/backend/schema/test_learning_loop_contract.py::test_contract_primitive_agrees_with_the_existing_l1_enforcer)를 data-pipeline 구현까지 3자 대조로 확장\n④ 뮤테이션 검증 — 한 구현만 무력화했을 때 대조 테스트가 RED를 내는지 전건 확인"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/atom_graph/populate.py
+session: null
+notes: "EOS-100(Learning Loop Contract v1)이 계약층 순환 탐지 primitive를 추가하면서 저장소의 prerequisite 순환 탐지 구현이 2벌 → 3벌이 됐다. EOS-100은 이것을 '정직한 공백'으로 문서 §2-1에 적고 조용한 분기만 기계로 막았다(l1 ↔ 계약층 판정 일치 대조). 통합 여부 판정은 이 태스크가 소유한다. CLAUDE.md 붕괴 연쇄 '유지보수 지옥 ← truth source가 하나가 아님' 축."
+updated: 2026-09-16

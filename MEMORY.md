@@ -338,6 +338,18 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-16 (결정·구현 · EOS-100): **Learning Loop Contract v1 코드 고정 — `EOS-09` §9-② "등재 제외" 판정을 Kiki 지시로 갱신, 단 좌석 축은 건드리지 않는다** (Kiki 지시 `P-01`, claude 구현) — 판정 기준 main `c4f8c9fb`
+
+- **선행 판정과의 관계**: `docs/strategy/plan300_phase2_backlog_crosswalk.md` §9-②(`EOS-09` · 같은 날 작성)는 이 축을 **등재 제외**로 판정했다 — "`ARCH-37`(done)이 엣지 테이블을 '핵심 외'로 명시 배제했으므로 관계 계약 등재는 그 판정을 조용히 뒤집는다. 필요한 것은 **결정**이지 착수 단위가 아니다." 2026-09-16 Kiki 지시(계획서 300 집행 지시문 `P-01`)가 그 결정에 해당하므로 착수했다.
+- **충돌 회피 설계 — 축을 나눴다**: `ARCH-37`이 배제한 것은 **저장 좌석**(관계를 담는 *테이블*)이고, `EOS-100`이 고정한 것은 **호출 어휘**(관계의 *이름과 방향*)다. 신규 테이블·신규 좌석 **0건**이며, 좌석 없는 객체(`Recommendation`)는 `no_seat`으로 적고 끝낸다 — 20번째 엔티티를 만들면 `ARCH-37` 검사 ②가 RED다. 좌석 축의 정본은 여전히 `canonical_entity_model_v1.md` 하나다.
+- **산출**: 코드 정본 `schema/learning_loop_contract.py`(14객체 enum · 16엣지 enum · 18관계 삼중항 레지스트리 · 14건 좌석 귀속 · DAG primitive) · 문서 정본 `docs/architecture/learning_loop_contract_v1.md` · 기계 집행 `tests/backend/schema/test_learning_loop_contract.py` 37건 · CI 경로 필터 편입(다섯 번째 동결 입력).
+- **실측 정정 2건**: ⓐ 지시문 `P-01`은 "13개 객체"라고 적었으나 **열거된 이름은 14개**다(목록이 정본·개수 표기가 오기) ⓑ 계획서 §1 관계도는 `Curriculum`·`Mastery`·`LearningSession` **3종을 한 번도 쓰지 않는다** — 없는 관계를 지어내지 않고 고립 사실 그대로 적었다(엣지 `mastery`와 객체 `Mastery`는 다른 것).
+- **미해결 1건(Kiki 판정 대기)**: `Assessment` **이름 충돌** — 계획서 §5.1의 `Assessment`는 *한 답안의 채점 산출(Evidence 묶음)*이고 `ARCH-37` #15의 `Assessment`는 *진단 평가 세션 컨테이너*다. 같은 글자, 다른 것. 약칭 문제(`Objective`·`Mastery`)와 달리 자동 정정이 불가능하므로 **임의 개명하지 않고** `semantic_collision=True`로 충돌을 데이터에 남겼다. 3택은 정본 문서 §5.
+- **정직한 공백**: ⓐ 서빙 배선 **0건** — 오늘 이 상수를 읽는 API·엔진은 없다("루프의 어휘가 닫혔다"까지만 말한다). 배선은 `EOS-10`·`EOS-12`·`EOS-13`·`EOS-14` 소관 ⓑ 순환 탐지 구현이 2벌 → **3벌**이 됐다. 통합 판정은 `EOS-101`로 분리 등재했고, 그때까지 조용한 분기는 판정 일치 대조 테스트가 막는다.
+- **검증**: 뮤테이션 **25종 전건 RED · 생존 0**(순수 Python 하네스 · 회차마다 `mutated != original`·sha256 변화·바이트 동일 원복 단언). 위음성(M12 항상 `None`)과 위양성(M13 항상 순환)을 **쌍으로** 주입하고 성공 방향 대조군(깨끗한 DAG 4종·깊은 체인 5,000노드)을 함께 뒀다.
+
+- **부수 수정(반복 실수 2회차 상환)**: `LoopEdge.TRIGGERS`가 `EOS-84` 경계 프로브의 ratchet을 깨뜨렸는데 원인은 계약이 아니라 **탐지기**였다 — `scripts/analysis/eos_core_boundary_probe.py`의 `trig\w*`가 `trigger`를 부분매치한다. **이 오탐은 2026-09-06 `EOS-86`에서 이미 관측됐고 그때 대책이 "오탐을 baseline에 등재"였다**(데이터로 덮음) — 그래서 2회차를 못 막았다. CLAUDE.md 반복 실수 규칙 + "동일 유형 텍스트 규칙 2회 실패 후 코드 착지" 선례에 따라 **코드**로 옮겼다: `trig(?!ger)\w*`(2곳) + 회귀 테스트 2종(`test_trigger_family_is_not_math`·성공 방향 대조군) + 은퇴한 baseline 엔트리 제거. 관계명 개명은 선택지가 아니었다 — `triggers`는 계획서 §1 어휘이고 **탐지기가 틀렸을 때 피검체를 고치지 않는다**.
+
 ### 2026-09-15 (판정·집행 · HARN-102): **bypass_actors를 스냅샷에서 상시 판정으로 승격 — 판정기가 두 엔드포인트를 읽는다** (claude 구현) — 판정 기준 main `4b33d243`
 
 - **닫은 것**: 2026-09-14 클래식 브랜치 보호 삭제 때 12축을 대조해 `enforce_admins: true`의 룰셋 대응이 `bypass_actors: []`임을 실측했다(소실 0). **그러나 그 실측은 한 시점의 스냅샷이었다** — `ruleset_drift.py`는 `/rules/branches/main`만 읽고 그 응답에 `bypass_actors`가 없으므로, 나중에 누가 채워 넣어도 기계는 조용했다. *지금 안전한 것*과 *그 상태가 감시되는 것*의 차이가 이 태스크였다.
