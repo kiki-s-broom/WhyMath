@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-08-phase1-five-numbers-reporter
+title: "계획서 200 §36 해소 — Phase 1 구조 지표 5종 단일 화면 리포터 (판정기 아님·미측정≠0)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-07-contract-test-problem-skill-and-published-version
+requires_gates: []
+acceptance:
+  - "① 계획서 200 §36 해소 — 5개 숫자(Contract coverage · EOS migration % · Broken dependency count · Data integrity violations · Vertical Slice pass %)를 한 화면에 내는 단일 CLI를 만든다. 오늘 실측 기준 5개 중 Data integrity 1개만 산출 도구가 있고 단일 화면 도구는 0건이다\n② 판정기가 아니라 리포터임을 명시 — 12/31 판정의 유일한 재료는 ops/validation_scorecard.py(선언 Hard Gate + KPI 12종)이고 이 도구는 그것을 대체하지 않는다. 축이 다르다는 것을 모듈 docstring과 출력 양쪽에 적는다. 두 도구가 서로 다른 합격을 말하면 어느 쪽이 판정인지 결정 불가가 된다\n③ 미측정과 0을 구분 — 산출 불가한 지표는 0이 아니라 측정 불가로 낸다(weekly_metrics_report의 measured=False 선례를 그대로 따른다). 인프라가 죽으면 측정 실패가 보여야지 0건 통과로 위장되면 안 된다\n④ 산출식 재발명 금지 — 기존 생산자를 호출한다(integrity_violations_gate·eos_feature_inventory_v2·dep_declaration·import-linter 계약). 같은 숫자를 두 곳에서 다르게 계산하지 않는다\n⑤ 정의를 먼저 적고 센다 — Contract coverage와 Vertical Slice pass %는 저장소에 정의가 없다. 무엇을 분모로 무엇을 분자로 세는지 모듈에 판정 가능한 정의로 적은 뒤에 구현한다. 정의 없는 비율은 숫자처럼 보이는 인상이다\n⑥ 집행 별항 — CI 또는 스케줄 배선 실재 확인"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/ops/**"
+  - "tests/backend/ops/**"
+session: null
+notes: "출처: 계획서 200 §36 재대조(2026-09-16). 5개 중 Data integrity만 충족(OPS-55)·EOS migration %와 Broken dependency는 축이 다른 부분 대응·Contract coverage와 Vertical Slice pass %는 산출 도구 0건. 선행 EOS-07이 검사 2종을 세우면 Contract coverage의 분모가 정해진다"
+updated: 2026-09-16

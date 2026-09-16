@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-05-standard-learning-map-single-query
+title: "계획서 200 §18 해소 — 성취기준 1건 → Concept·Skill·Problem·Misconception 단일 조회 API (학습맵 체인)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 계획서 200 §18 Week 2 핵심 테스트의 해소 — 성취기준 하나를 입력으로 Concept[] → Skill[] → Problem[] → Misconception[]을 한 번의 호출로 반환하는 읽기 전용 엔드포인트를 만든다. 현행은 최소 4회 조합이 필요하고 Concept→Skill·→Misconception 두 홉은 공개 API 자체가 없다(실측 2026-09-16: 라우트 97개 전건 확인)\n② 조회 로직 복제 0 — 기존 L1 조회 좌석을 재사용한다(get_alignments·skill_graph 조인·problem_concept·misconception_catalog). 새 SQL을 각 홉마다 다시 쓰지 않는다\n③ 작동한 비율 원칙 — 응답이 각 홉의 해소 결과를 스스로 말한다. 홉별 스캔 대상 수와 해소 수를 함께 실어, 빈 배열이 없음인지 안 봄인지 구분 가능해야 한다. 200 응답은 체인이 작동했다는 증거가 아니다\n④ 계층 경계 준수 — api는 조회를 조합만 하고 수학 의미론을 해석하지 않는다. Core→Adapter 경계 계약(EOS-67 import-linter 3건)을 깨지 않는다\n⑤ 집행 별항 — 테스트가 CI에서 실행되는 경로에 놓였는지 배선 실재를 확인한다. 실 PG 통합 테스트는 기존 integration 마커 규약을 따른다"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/api/**"
+  - "src/backend/whymath_backend/l1/**"
+  - "tests/backend/api/**"
+session: null
+notes: "출처: 계획서 200 §18 재대조(2026-09-16). 계획서가 Week 2의 성공 기준으로 지목한 단 하나의 질의이며 오늘 실측에서 유일하게 미충족인 구조 항목이다. 5홉 전부 재사용 가능한 L1 좌석이 이미 있다 — get_alignments(3축)·skill_graph resolve·problem_concept·misconception_catalog"
+updated: 2026-09-16

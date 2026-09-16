@@ -34,8 +34,8 @@ _ROOT_PACKAGE = "whymath_backend"
 _CONTRACT_NAME_PREFIX = "EOS Core → Math Adapter 금지"
 
 
-def _load_boundary_map() -> dict[str, tuple[str, str]]:
-    """배정 정본을 스크립트에서 직접 읽는다 — 목록을 여기 복사하면 진실이 셋이 된다."""
+def _load_scan_module() -> Any:
+    """경계 스캔 스크립트를 모듈로 적재한다 — 배정·리포트 양쪽의 단일 진실 원천."""
     name = "_eos_boundary_scan"
     spec = importlib.util.spec_from_file_location(name, _SCAN_SCRIPT)
     assert spec is not None and spec.loader is not None, f"스캔 스크립트 로드 불가: {_SCAN_SCRIPT}"
@@ -47,7 +47,12 @@ def _load_boundary_map() -> dict[str, tuple[str, str]]:
         spec.loader.exec_module(module)
     finally:
         sys.modules.pop(name, None)
-    boundary_map: dict[str, tuple[str, str]] = module.BOUNDARY_MAP
+    return module
+
+
+def _load_boundary_map() -> dict[str, tuple[str, str]]:
+    """배정 정본을 스크립트에서 직접 읽는다 — 목록을 여기 복사하면 진실이 셋이 된다."""
+    boundary_map: dict[str, tuple[str, str]] = _load_scan_module().BOUNDARY_MAP
     return boundary_map
 
 
@@ -180,3 +185,75 @@ def test_boundary_map_loader_actually_returns_the_real_assignment() -> None:
     assert boundary["l2"][0] == "CORE"
     assert boundary["l3.equivalent"][0] == "ADAPTER"
     assert boundary["l5.ocr"][0] == "ADAPTER"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ④ 집행 사실의 stale 방지 (EOS-03) — "아무도 막고 있지 않다"로 되돌아가지 않는가
+# ──────────────────────────────────────────────────────────────────────
+#
+# 사고 경위: `EOS-67`이 2026-08-31에 집행을 붙였는데, 경계 스캔의 docstring과 위반 0건 출력
+# 문안은 그 이전 상태("CI에 붙기 전까지 … 아무도 막고 있지 않다 — 집행은 EOS-67")를 2주 넘게
+# 그대로 말했다. 방향은 안전한 쪽(집행을 *과소* 보고)이지만, G1 판정 근거로 인용되면 "집행
+# 장치가 없다"는 잘못된 전제를 만든다. 실제로 2026-09-16 재대조에서 두 서브에이전트가 이
+# 문안을 근거로 "게이트 아님"을 보고했다.
+#
+# 이 검사가 막는 것은 **문안이 과거 시제로 되돌아가는 것**이지 문안의 문학적 형태가 아니다.
+# 그래서 금지 문자열 열거가 아니라 *구성된 산출물*(실제 렌더된 리포트)을 본다.
+
+
+def _render_scan_report() -> str:
+    """스캔을 실제로 돌려 리포트 문자열을 얻는다 — 소스 grep이 아니라 *구성된 산출물* 검사.
+
+    금지 문자열 열거는 표기 변형에서 뚫린다(CLAUDE.md "금지 패턴 열거 대신 산출물 검사").
+    그래서 사람이 실제로 읽게 되는 markdown을 만들어 놓고 본다.
+    """
+    module = _load_scan_module()
+    source = _REPO_ROOT / module.DEFAULT_SOURCE
+    facts, errors = module.scan(source, lambda *_: None)
+    return str(
+        module.render_markdown(facts, module.violations(facts), module.summarize(facts), errors)
+    )
+
+
+def test_scan_report_does_not_claim_the_boundary_is_unenforced() -> None:
+    """위반 0건 문안이 "아무도 막고 있지 않다"로 되돌아가면 적색.
+
+    `EOS-67` 계약 2건은 CI `backend` 잡의 `lint-imports`가 매 PR 판정한다(위 §②가 그 배선
+    실재를 따로 동결한다). 그 사실이 선 뒤에도 스캔이 "미집행"을 말하면 두 기계가 서로 다른
+    현실을 보고하는 것이다.
+    """
+    report = _render_scan_report()
+    assert "아무도 막고 있지 않" not in report, (
+        "경계 스캔 리포트가 여전히 '아무도 막고 있지 않다'고 말한다 — "
+        "EOS-67(2026-08-31 done)이 import-linter 계약으로 집행을 붙인 뒤로 이 문안은 거짓이다"
+    )
+
+
+def test_scan_report_names_the_enforcing_contract_and_its_blind_spot() -> None:
+    """정정된 문안이 갖춰야 할 두 가지 — 집행 주체와 그 집행의 사각.
+
+    "집행이 있다"만 적으면 이번엔 반대 방향으로 틀린다(경유 의존·MIXED는 계약이 보지 않는다).
+    과소 보고를 고치면서 과대 보고를 만들지 않도록 둘 다 요구한다.
+    """
+    report = _render_scan_report()
+    assert "EOS-67" in report, "집행 주체를 지목하지 않는다"
+    assert "lint-imports" in report, "집행이 실제로 도는 스텝 이름이 없다"
+    # `or`로 묶지 않는다 — 한쪽만 남아도 통과하면 나머지 절은 검증된 적이 없는 채로
+    # "검증된 가드"에 계상된다(뮤테이션 M3 생존으로 실측: 2026-09-16).
+    assert (
+        "직접 import" in report
+    ), "0건이 무엇을 센 0인지 적지 않는다 — 범위를 안 적은 0은 '전부 막혔다'로 오독된다"
+    assert "allow_indirect_imports" in report, (
+        "계약의 사각을 그 설정 키 이름으로 지목하지 않는다 — "
+        "'경유는 안 센다'는 산문만으로는 어느 계약의 어느 설정이 그렇게 만드는지 추적 불가다"
+    )
+
+
+def test_scan_module_docstring_records_that_enforcement_landed() -> None:
+    """모듈 docstring도 같은 사실을 말하는가 — 리포트만 고치고 소스 주석을 두면 다시 갈린다."""
+    module = _load_scan_module()
+    doc = module.__doc__ or ""
+    assert (
+        "CI에 붙기 전까지" not in doc
+    ), "docstring이 아직 '집행 전' 조건문으로 적혀 있다 — 그 조건은 2026-08-31에 충족됐다"
+    assert "EOS-67" in doc and "lint-imports" in doc

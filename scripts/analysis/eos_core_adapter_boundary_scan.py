@@ -6,8 +6,15 @@
 여기를 고친다.
 
 ⚠️ **정본화 ≠ 집행** — 이 스크립트는 *측정*만 한다. 배정을 기계가 강제하는 지점은
-`EOS-67`(import-linter forbidden 계약)이며, 이 파일만으로는 어떤 import도 차단되지 않는다.
-CI에 붙기 전까지 "위반 0"은 "위반이 없다"가 아니라 "아무도 막고 있지 않다"를 뜻한다.
+`EOS-67`(import-linter forbidden 계약 2건)이며, 이 파일만으로는 어떤 import도 차단되지 않는다.
+
+**집행은 2026-08-31에 붙었다**(`EOS-67` done). 계약은 `src/backend/pyproject.toml`에 있고 CI
+`backend` 잡의 `lint-imports` 스텝이 매 PR 판정하며, 그 배선 자체를
+`tests/infra/test_eos_boundary_contract_wiring.py`가 동결한다. 따라서 아래 "위반 0"은 더 이상
+"아무도 막고 있지 않다"가 아니다 — **다만 여전히 "전부 막혔다"도 아니다.** 이 스캔도 계약도
+세는 것은 **AST 직접 import**이고, 계약은 `allow_indirect_imports=true`라 *경유* 의존을 보지
+않는다(합성 루트를 통해 어댑터에 닿는 간선은 계약의 `ignore_imports`에 간선 단위로 적혀 있으며
+재확인 지점은 G1 2026-09-27이다). 또한 MIXED 배정 모듈은 위반 계산에서 빠진다.
 
 판정 규칙 (doc-100 §3.7 — "Core가 이차방정식을 알게 만들면 안 된다"):
   CORE    — Physics를 붙일 때 **고치지 않아도 되는** 모듈. 과목 의미론을 모른다.
@@ -343,7 +350,13 @@ def render_markdown(facts, viols, summary, errors) -> str:
         for v in viols:
             lines.append(f"| `{v['from']}` | `{v['to']}` |")
     else:
-        lines.append("없음. ⚠️ 단 이는 *아무도 막고 있지 않은 상태에서의* 0이다 — 집행은 EOS-67.")
+        lines.append(
+            "없음. ⚠️ 단 이 0의 범위를 좁게 읽을 것 — **AST 직접 import 기준**이며 "
+            "`allow_indirect_imports=true`인 계약과 마찬가지로 *경유* 의존(합성 루트 등)은 "
+            "세지 않는다. 집행은 `EOS-67`(import-linter 계약 2건 · CI `backend` 잡 "
+            "`lint-imports`)이 2026-08-31부터 맡고 있고, 경유 잔여 간선은 그 계약의 "
+            "`ignore_imports`에 간선 단위로 적혀 있다(재확인 지점 = G1 2026-09-27)."
+        )
     lines += ["", f"## 스캔 오류: {len(errors)}건", ""]
     lines += [f"- `{e}`" for e in errors] or ["- 없음"]
     return "\n".join(lines) + "\n"
