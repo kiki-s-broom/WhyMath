@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -14,10 +14,11 @@ depends_on:
 requires_gates: []
 acceptance:
   - "①실측 근거 확보(CLAUDE.md 프로바이더 채택 조건 ②) — DeepSeek V4(`deepseek-v4-flash`·`deepseek-v4-pro`)를 현행 클라우드 핀(`claude-sonnet-4-6`)과 품질·지연·비용 3축으로 비교 측정한다. 측정 대상은 *학생 데이터가 없는 저작 경로*의 실제 프롬프트(코퍼스 문항 저작·개념 추출)이며, 정확도 축은 결함 주입 강등전으로 판정한다(`docs/standards/superhuman_verification_standard.md`). 점추정 금지 — Wilson 단측 경계.\n②법적 축의 선결 판정 — DeepSeek API는 중국 본토 서버 전용이고 데이터 레지던시 선택지가 없다(2026-09 실측). `l3/data_export_policy.py`는 `CLOUD_MID`/`CLOUD_HIGH`를 국외 이전으로 판정하므로, 새 티어를 그 집합에 넣을지·별도 관할 축을 만들지를 먼저 결정하고 코드로 집행한다. 미성년자 학생 저작이 실린 요청(`STUDENT_SUBMITTED_WITH_CORPUS` 등급)은 이 프로바이더로 나가지 않아야 한다 — 그 불변식을 기계가 판정하게 한다.\n③라우터 경유 배선(채택 조건 ①) — `l3/providers/deepseek.py`를 추가하고 `CompositeProvider` 디스패치를 확장한다. 새 프로바이더도 `scripts/ops/check_provider_seat_contract.py`(ARCH-46)를 통과해야 한다 — 그 게이트가 이 태스크의 안전장치다.\n④MEMORY 결정 로그 기재(채택 조건 ③) — 실측 수치·비교 조건·채택 여부를 적는다. 미채택도 결론이다.\n⑤저비용 티어의 기본 경로는 건드리지 않는다 — `CostTier.LOCAL`(Phaiakes9)은 학생 대면 경로의 기본값으로 유지한다. 이 태스크는 *클라우드 티어의 선택지를 넓히는 것*이지 로컬 우선 원칙을 뒤집는 것이 아니다."
+  - "⑥비용 축의 시간대 구분 — DeepSeek은 피크(01:00-04:00·06:00-10:00 UTC 월~금)와 오프피크의 단가가 정확히 2배 차이다(2026-08-16 개정). 측정 리포트는 각 호출의 요금 구간(peak/off_peak)을 기록하고 두 구간을 분리 집계한다. **시간축 라우팅은 이 태스크에서 만들지 않는다** — 한국시간 환산 결과 피크가 10:00-13:00·15:00-19:00 KST라 학생 사용 피크(평일 저녁·주말)가 오프피크와 겹치고, OpenRouter 경유는 카드 충전 5.5% 수수료가 붙어 피크 회피용으로도 절감이 아니라 증가다(2026-09-16 Kiki 제안에 대한 실측 대조). 필요 여부는 ①의 실측 수치로 판정하며, 대신 *저작 배치의 오프피크 스케줄링*과 *프롬프트 캐싱*을 절감 후보로 리포트에 명시한다."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/providers/**"
   - src/backend/whymath_backend/config.py
-session: null
-notes: "착수 배경: 2026-09-16 Kiki 요청(\"오케스트레이션 시스템 — high=Fable 5.1 / main·low=DeepSeek\"). 실측 조사 결과 오케스트레이션 뼈대(3축 라우터·CompositeProvider·역외 반출 게이트·비용 회계)는 이미 완비되어 새 프로바이더 추가는 파일 1개+config 3필드 규모다. 막는 것은 기술이 아니라 ①실측 근거 부재(채택 조건 ②) ②학생 데이터의 국외 이전이다. 선행 게이트 ARCH-46(프로바이더 좌석 계약)은 착지했다. 상세 대조 = docs/reviews/eos_micro_project_orchestration_v1_gap_review_2026-09-05.md 3-C."
+session: claude/clever-bell-8lh19k
+notes: "착수 배경: 2026-09-16 Kiki 요청(\"오케스트레이션 시스템 — high=Fable 5.1 / main·low=DeepSeek\"). 실측 조사 결과 오케스트레이션 뼈대(3축 라우터·CompositeProvider·역외 반출 게이트·비용 회계)는 이미 완비되어 새 프로바이더 추가는 파일 1개+config 3필드 규모다. 막는 것은 기술이 아니라 ①실측 근거 부재(채택 조건 ②) ②학생 데이터의 국외 이전이다. 선행 게이트 ARCH-46(프로바이더 좌석 계약)은 착지했다. 상세 대조 = docs/reviews/eos_micro_project_orchestration_v1_gap_review_2026-09-05.md 3-C.\n\n[정정 2026-09-16] Kiki 시간대별 프로바이더 전환 제안(2026-09-16)에 대한 실측 대조 — 피크 시간대 KST 환산과 OpenRouter 수수료 구조를 확인한 결과 시간축 라우팅은 절감 효과가 없어 측정 항목으로만 편입"
 updated: 2026-09-16
