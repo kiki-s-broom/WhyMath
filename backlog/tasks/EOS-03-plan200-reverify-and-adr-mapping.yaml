@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,12 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 재대조 문서 산출 — docs/reviews/eos_phase1_plan_200_reverify_2026-09-16.md. 상단에 판정 기준 커밋 해시를 박고(main 기준), 계획서 200의 Gate 1 10조건 + Week1~3 게이트 + §21~§36 횡단 항목을 오늘 기준으로 재판정한다. 2026-09-01 초판(eos_phase1_plan_200_gap_review_2026-09-01.md) 대비 변동분(EOS-49/78/79/OPS-55 착지 등)을 변동 열로 분리 표기\n② ADR 매핑표 확장 — docs/architecture/adr/README.md에 계획서 200 §31의 ADR 10주제 매핑표를 신설한다. 기존 표는 계획서 100 §3.16 축이라 주제 목록이 다르다(200은 Entity Versioning·Curriculum Mapping·Concept/Skill separation·Problem/Answer·Misconception Model을 갖고, 100은 AI Gateway·Math AST·Knowledge Graph·Content Version·Assessment Architecture를 갖는다). 각 칸은 실측으로 확인한 저장소 정본 경로만 적고 확인 못 한 칸은 비워 둔다\n③ stale 사실 정정 — scripts/analysis/eos_core_adapter_boundary_scan.py의 위반 0건 출력 문안이 집행은 EOS-67이라며 아무도 막고 있지 않다고 말하는데 EOS-67은 2026-08-31 done이고 import-linter 계약 3건이 CI backend 잡에서 매 PR 판정한다. 실측 기준으로 문안을 고치고 회귀 테스트로 동결한다\n④ 집행 별항 — ③의 문안 정정이 실제로 동결되는지 확인한다. 테스트가 CI에서 실행되는 경로(tests/infra 또는 tests/backend)에 놓였는지 배선 실재를 확인한 것까지가 완료다"
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1175"
 paths:
   - "docs/reviews/**"
   - "docs/architecture/adr/**"
   - "scripts/analysis/**"
   - "tests/infra/**"
-session: claude/eager-euler-6ct5d3
+session: null
 notes: "출처: Kiki가 계획서 200 원본(docx)을 세션에 반입하며 항목별 반영여부 확인 + 순차 도입 완성을 지시(2026-09-16). 초판 대조는 2026-09-01 eos_phase1_plan_200_gap_review_2026-09-01.md이고 Kiki 결정(지향성 참고본)이 이미 반영돼 있다. 이 태스크는 그 이후 2주간의 착지를 반영한 재판정 + 원본 반입으로 비로소 채울 수 있게 된 ADR 매핑 공백 해소"
 updated: 2026-09-16

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 계획서 200 §5 금지어 축의 집행 — CORE 배정 모듈에서 수학 어휘가 늘어나면 CI가 적색이 되는 ratchet 게이트를 세운다. 현재 eos_core_adapter_boundary_scan.py는 계측기일 뿐 exit 1을 내지 않고 CI에서 호출되지도 않는다(실측 2026-09-16: grep eos_core_adapter_boundary_scan .github/ = 0건)\n② 어휘 집합 정합 — 계획서 §5가 든 7어휘 중 desmos·equation_solver가 현행 MATH_TOKEN_RE에 없다. 어휘를 추가하되 추가가 기존 CORE 배정에 미치는 영향을 실측한 뒤 기준선을 확정한다(어휘 추가로 기준선이 올라가면 그 자체를 기록한다 — 조용한 상향 금지)\n③ 실패 주입 검증 — CORE 모듈에 수학 어휘를 주입해 게이트가 실제로 RED를 내는지 확인한다. 정상 입력 초록은 보호의 증거가 아니다. 주입 자체가 적용됐는지도 단언한다(mutated != original)\n④ 집행 별항 — 게이트가 CI 잡에서 실제로 실행되는지 배선 실재를 확인한다. 저장소에 존재함과 돌아감은 다르다(OPS-10 선례). 배선 자체를 tests/infra가 동결한다"
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1175"
 paths:
   - scripts/analysis/eos_core_adapter_boundary_scan.py
   - tests/infra/test_core_math_vocabulary_ratchet.py
   - ".github/workflows/ci.yml"
-session: claude/eager-euler-6ct5d3
+session: null
 notes: "출처: 계획서 200 §5 재대조(2026-09-16). 실측 — 경계 스캔은 계측기이고 docstring이 스스로 게이트가 아니라고 적는다. 대체 게이트 2종(eos_core_boundary_probe·eos_opaque_payload_gate)은 리터럴 비교·payload 해석 축이라 어휘 밀도 축을 덮지 않는다"
 updated: 2026-09-16
