@@ -22,6 +22,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from whymath_backend.api import curricula
 from whymath_backend.app import create_app
 from whymath_backend.db.models.achievement_standard import AchievementStandard
 from whymath_backend.db.models.curriculum_entry import CurriculumEntry
@@ -397,3 +398,165 @@ class TestSubjectNeutralPaths:
             if path.startswith(("/v1/curricula", "/v1/learning-outcomes", "/v1/alignments")):
                 for seg in forbidden_segments:
                     assert seg not in path, f"과목 특화 경로 금지 위반: {path}"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# GET /v1/learning-outcomes/{norm_id}/learning-map — 학습맵 (EOS-05)
+#
+# 계획서 200 §18의 단일 질의. 조회 조립은 L1(`build_learning_map`)이 하고 그 로직은
+# `tests/backend/l1/standards/test_learning_map.py`가 동결한다 — 여기서 보는 것은
+# **엔드포인트 결선**이다(404 조기 반환·L1에 넘기는 인자·응답 직렬화·회계 필드 노출).
+# ──────────────────────────────────────────────────────────────────────────
+class TestLearningMap:
+    def test_unknown_norm_id_returns_404_without_touching_the_chain(self) -> None:
+        """없는 성취기준이면 404이고 **뒤 홉 조회를 시작하지 않는다**.
+
+        404인데 체인이 돌면 없는 성취기준에 대해 DB를 4번 훑는다 — 조기 반환 결선의 회귀 검증.
+        """
+        fake = FakeSession(get_map={})
+        response = _client(fake).get("/v1/learning-outcomes/없는코드/learning-map")
+
+        assert response.status_code == 404
+        assert fake.execute_calls == 0, "404인데 학습맵 체인이 조회를 시작했다"
+
+    def test_passes_both_standard_vocabularies_down_to_l1(self, monkeypatch: Any) -> None:
+        """핸들러가 norm_id와 official_code를 **둘 다** 내려주는가.
+
+        L1이 축별로 다른 어휘로 묻는 것은 두 값을 다 받기 때문이다 — 핸들러가 한쪽만 넘기면
+        L1의 어휘 분기가 조용히 무력해진다(2·3축이 전건 0이 되고 그 0은 '없음'으로 읽힌다).
+        """
+        standard = _standard()
+        captured: dict[str, Any] = {}
+
+        async def _stub(_session: Any, **kwargs: Any) -> Any:
+            captured.update(kwargs)
+            return _empty_learning_map(kwargs["norm_id"], kwargs["official_code"])
+
+        monkeypatch.setattr(curricula, "build_learning_map", _stub)
+        fake = FakeSession(get_map={(AchievementStandard, standard.norm_id): standard})
+        response = _client(fake).get(
+            f"/v1/learning-outcomes/{standard.norm_id}/learning-map?concept_limit=7"
+        )
+
+        assert response.status_code == 200
+        assert captured["norm_id"] == standard.norm_id
+        assert captured["official_code"] == standard.official_code
+        assert captured["concept_limit"] == 7, "쿼리 상한이 L1까지 전달되지 않았다"
+
+    def test_response_carries_per_hop_accounting_not_just_items(self, monkeypatch: Any) -> None:
+        """빈 배열만 주고 회계를 빼면 소비처가 '없음'과 '안 봄'을 구분할 수 없다."""
+        standard = _standard()
+
+        async def _stub(_session: Any, **kwargs: Any) -> Any:
+            return _empty_learning_map(kwargs["norm_id"], kwargs["official_code"])
+
+        monkeypatch.setattr(curricula, "build_learning_map", _stub)
+        fake = FakeSession(get_map={(AchievementStandard, standard.norm_id): standard})
+        body = _client(fake).get(f"/v1/learning-outcomes/{standard.norm_id}/learning-map").json()
+
+        for hop in ("concept_stats", "skill_stats", "problem_stats", "misconception_stats"):
+            assert hop in body, f"{hop} 회계가 응답에 없다 — 빈 배열의 원인을 알 수 없다"
+            assert set(body[hop]) == {"scanned", "resolved", "produced", "join_blackout"}
+        assert body["official_code"] == standard.official_code
+
+    def test_serializes_chain_items_with_provenance(self, monkeypatch: Any) -> None:
+        """항목 4종이 직렬화되고 유래(via_*·matched_by·resolved_from)가 살아 나오는가."""
+        standard = _standard()
+        concept_id, problem_id = uuid.uuid4(), uuid.uuid4()
+
+        async def _stub(_session: Any, **kwargs: Any) -> Any:
+            from whymath_backend.l1.standards import learning_map as lm
+
+            return lm.LearningMap(
+                norm_id=kwargs["norm_id"],
+                official_code=kwargs["official_code"],
+                concepts=(
+                    lm.LearningMapConcept(
+                        concept_key="UC.poly",
+                        axes=("concept_standard_link",),
+                        concept_id=concept_id,
+                        name_ko="다항식",
+                        resolved_from=("concept",),
+                    ),
+                ),
+                skills=(
+                    lm.LearningMapSkill(
+                        skill_id="skill.factor",
+                        name_ko="인수분해",
+                        behavior_area="계산",
+                        family="algebra",
+                        mastery_estimable=True,
+                        via_concept_keys=("UC.poly",),
+                    ),
+                ),
+                problems=(
+                    lm.LearningMapProblem(
+                        problem_id=problem_id,
+                        question_format="단답형",
+                        answer_format="수식",
+                        difficulty_overall=3.0,
+                        via_concept_ids=(concept_id,),
+                    ),
+                ),
+                misconceptions=(
+                    lm.LearningMapMisconception(
+                        mis_id="M0425",
+                        canonical_statement="영곱규칙 오적용",
+                        error_type="절차",
+                        severity="high",
+                        matched_by=("concept_src_id",),
+                    ),
+                ),
+                concept_stats=lm.HopStats(1, 1, 1),
+                skill_stats=lm.HopStats(1, 1, 1),
+                problem_stats=lm.HopStats(1, 1, 1),
+                misconception_stats=lm.HopStats(1, 1, 1),
+                alignment_stats=(),
+            )
+
+        monkeypatch.setattr(curricula, "build_learning_map", _stub)
+        fake = FakeSession(get_map={(AchievementStandard, standard.norm_id): standard})
+        body = _client(fake).get(f"/v1/learning-outcomes/{standard.norm_id}/learning-map").json()
+
+        assert body["concepts"][0]["resolved_from"] == ["concept"]
+        assert body["skills"][0]["via_concept_keys"] == ["UC.poly"]
+        assert body["problems"][0]["via_concept_ids"] == [str(concept_id)]
+        assert body["misconceptions"][0]["matched_by"] == ["concept_src_id"]
+        # 회계는 **값이 통과**해야 한다 — 필드 이름만 보면 상수로 위장한 핸들러가 통과한다
+        # (뮤테이션 M10 생존으로 실측: 2026-09-16). scanned=0은 "안 봄"을 뜻하므로,
+        # 실제로 1건을 훑은 응답이 0을 말하면 소비처가 정반대로 읽는다.
+        assert body["concept_stats"] == {
+            "scanned": 1,
+            "resolved": 1,
+            "produced": 1,
+            "join_blackout": False,
+        }
+        assert body["skill_stats"]["scanned"] == 1
+        assert body["problem_stats"]["produced"] == 1
+        assert body["misconception_stats"]["resolved"] == 1
+        # 저작권 레일 — 문제 **본문**은 이 응답에 담지 않는다(구조 메타데이터만).
+        assert "question_text" not in body["problems"][0]
+
+    def test_learning_map_path_is_subject_neutral_and_registered(self) -> None:
+        """경로가 등록돼 있고 과목 특화 세그먼트가 없다 — 이 파일의 subject-neutral 계약 계승."""
+        paths = _all_route_paths(create_app())
+        assert "/v1/learning-outcomes/{norm_id}/learning-map" in paths
+
+
+def _empty_learning_map(norm_id: str, official_code: str) -> Any:
+    from whymath_backend.l1.standards import learning_map as lm
+
+    zero = lm.HopStats(0, 0, 0)
+    return lm.LearningMap(
+        norm_id=norm_id,
+        official_code=official_code,
+        concepts=(),
+        skills=(),
+        problems=(),
+        misconceptions=(),
+        concept_stats=zero,
+        skill_stats=zero,
+        problem_stats=zero,
+        misconception_stats=zero,
+        alignment_stats=(),
+    )

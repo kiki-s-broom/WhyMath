@@ -36,6 +36,7 @@ Subject-neutral 원칙(CUR-11 acceptance ②):
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
@@ -48,6 +49,10 @@ from whymath_backend.db.models.curriculum_entry import CurriculumEntry
 from whymath_backend.db.models.curriculum_framework import CurriculumFramework
 from whymath_backend.db.models.curriculum_version import CurriculumVersion
 from whymath_backend.db.session import get_session
+from whymath_backend.l1.standards.learning_map import (
+    HopStats,
+    build_learning_map,
+)
 from whymath_backend.schema.curriculum_framework import (
     CurriculumFramework as CurriculumFrameworkSchema,
 )
@@ -304,3 +309,192 @@ async def read_learning_outcome(
             detail=f"학습 성과(성취기준)를 찾을 수 없습니다: {norm_id}",
         )
     return orm.to_schema()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 학습맵 — 성취기준 1건의 Concept → Skill → Problem → Misconception (EOS-05)
+#
+# 계획서 200 §18이 "Week 2의 핵심 테스트"로 지목한 단 하나의 질의를 한 호출로 답한다.
+# 실측(2026-09-16·라우트 97개 전건) 이전까지 이 체인은 최소 4회 조합이 필요했고,
+# `Concept→Skill[]`·`→Misconception[]` 두 홉은 공개 표면 자체가 없었다.
+#
+# 조회 로직은 전부 L1(`l1/standards/learning_map.build_learning_map`)에 있다 — 이 핸들러는
+# 404 판정과 HTTP 모델 변환만 한다(조회 SQL 복제 0 · 기존 핸들러들과 같은 규약).
+# ──────────────────────────────────────────────────────────────────────────
+class LearningMapHopStats(BaseModel):
+    """한 홉의 조인 회계 — 빈 배열이 "없음"인지 "안 봄"인지 구분하게 하는 3분류.
+
+    정상 응답 200은 체인이 작동했다는 증거가 아니다(CLAUDE.md "작동한 비율" 원칙). 소비처는
+    빈 배열을 보기 전에 이 숫자를 봐야 한다.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    scanned: int = Field(description="입력 키 수. 0 = 앞 홉이 비어 이 홉은 돌지 않았다")
+    resolved: int = Field(description="DB 행이 붙은 키 수. scanned>0·resolved=0 = 조인 이상 의심")
+    produced: int = Field(description="산출 항목 수. resolved>0·produced=0 = 매핑이 비어 있다")
+    join_blackout: bool = Field(description="훑었는데 전건 조인 실패 — '없음'이 아니라 '안 붙음'")
+
+
+class LearningMapConceptItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    concept_key: str = Field(description="개념 측 식별자 — 축별 어휘 그대로(가짜 통일 금지)")
+    axes: list[str] = Field(description="이 키를 낸 정렬 축들")
+    concept_id: uuid.UUID | None = Field(description="`concept.code`로 해소된 UUID(없으면 null)")
+    name_ko: str | None = None
+    resolved_from: list[str] = Field(
+        description="실물을 찾은 테이블 — 'concept'/'atom_node'. 비면 어느 쪽에도 없다"
+    )
+
+
+class LearningMapSkillItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    skill_id: str
+    name_ko: str
+    behavior_area: str
+    family: str
+    mastery_estimable: bool
+    via_concept_keys: list[str] = Field(description="이 스킬을 요구한 개념 키 — 유래 추적용")
+
+
+class LearningMapProblemItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    problem_id: uuid.UUID
+    question_format: str | None = None
+    answer_format: str | None = None
+    difficulty_overall: float | None = None
+    via_concept_ids: list[uuid.UUID]
+
+
+class LearningMapMisconceptionItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    mis_id: str
+    canonical_statement: str | None = None
+    error_type: str | None = None
+    severity: str | None = None
+    matched_by: list[str] = Field(
+        description="걸린 경로 — 'concept_src_id'/'behavior_skills'. 두 경로는 의미가 다르다"
+    )
+
+
+class LearningMapResponse(BaseModel):
+    """성취기준 1건의 학습맵 — 항목 4종 + 홉별 회계. 회계 없이 항목만 주지 않는다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    norm_id: str
+    official_code: str = Field(description="고시코드 — 2·3축이 쓰는 어휘(1축은 norm_id)")
+    concepts: list[LearningMapConceptItem]
+    skills: list[LearningMapSkillItem]
+    problems: list[LearningMapProblemItem]
+    misconceptions: list[LearningMapMisconceptionItem]
+    concept_stats: LearningMapHopStats
+    skill_stats: LearningMapHopStats
+    problem_stats: LearningMapHopStats
+    misconception_stats: LearningMapHopStats
+
+
+def _hop(stats: HopStats) -> LearningMapHopStats:
+    return LearningMapHopStats(
+        scanned=stats.scanned,
+        resolved=stats.resolved,
+        produced=stats.produced,
+        join_blackout=stats.join_blackout,
+    )
+
+
+@router.get(
+    "/learning-outcomes/{norm_id}/learning-map",
+    response_model=LearningMapResponse,
+    summary="성취기준 학습맵 — Concept·Skill·Problem·Misconception 단일 조회",
+)
+async def read_learning_map(
+    norm_id: NormIdPath,
+    session: SessionDep,
+    concept_limit: Annotated[int, Query(ge=1, le=200, description="개념 인출 상한")] = 100,
+    problem_limit: Annotated[int, Query(ge=1, le=200, description="문제 산출 상한")] = 50,
+    misconception_limit: Annotated[int, Query(ge=1, le=200, description="오개념 산출 상한")] = 50,
+) -> LearningMapResponse:
+    """성취기준 X → Concept[] → Skill[] → Problem[] → Misconception[] 를 한 번에.
+
+    계획서 200 §18의 질문("이 성취기준을 학습하려면 어떤 개념·Skill이 필요하며, 무엇으로
+    평가하고 어떤 오개념을 발견할 수 있는가")에 대한 단일 응답이다.
+
+    **빈 배열을 보기 전에 `*_stats`를 보라.** `scanned=0`은 앞 홉이 비어 그 홉이 아예 돌지
+    않았다는 뜻이고, `join_blackout=true`는 훑었는데 조인이 전건 실패했다는 뜻이다 — 둘 다
+    "해당 항목이 없다"와 다르다(미측정 ≠ 0).
+
+    저작권 레일: 반환되는 것은 구조 메타데이터와 식별자이며, 문제 **본문**은 담지 않는다
+    (`question_text` 미포함 — 본문 노출은 `/v1/problems` 계약의 소관이고 그 레일을 여기서
+    우회하지 않는다). 성취기준 본문은 이 응답에 없다(단건 조회 `/learning-outcomes/{norm_id}`가
+    NCIC 공공누리 1유형 근거로 제공한다).
+
+    인가: 이 파일의 다른 GET과 같은 공개 카탈로그 축이다 — 학생 데이터·PII가 없다.
+    """
+    standard = await session.get(AchievementStandard, norm_id)
+    if standard is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"학습 성과(성취기준)를 찾을 수 없습니다: {norm_id}",
+        )
+    learning_map = await build_learning_map(
+        session,
+        norm_id=standard.norm_id,
+        official_code=standard.official_code,
+        concept_limit=concept_limit,
+        problem_limit=problem_limit,
+        misconception_limit=misconception_limit,
+    )
+    return LearningMapResponse(
+        norm_id=learning_map.norm_id,
+        official_code=learning_map.official_code,
+        concepts=[
+            LearningMapConceptItem(
+                concept_key=c.concept_key,
+                axes=list(c.axes),
+                concept_id=c.concept_id,
+                name_ko=c.name_ko,
+                resolved_from=list(c.resolved_from),
+            )
+            for c in learning_map.concepts
+        ],
+        skills=[
+            LearningMapSkillItem(
+                skill_id=s.skill_id,
+                name_ko=s.name_ko,
+                behavior_area=s.behavior_area,
+                family=s.family,
+                mastery_estimable=s.mastery_estimable,
+                via_concept_keys=list(s.via_concept_keys),
+            )
+            for s in learning_map.skills
+        ],
+        problems=[
+            LearningMapProblemItem(
+                problem_id=p.problem_id,
+                question_format=p.question_format,
+                answer_format=p.answer_format,
+                difficulty_overall=p.difficulty_overall,
+                via_concept_ids=list(p.via_concept_ids),
+            )
+            for p in learning_map.problems
+        ],
+        misconceptions=[
+            LearningMapMisconceptionItem(
+                mis_id=m.mis_id,
+                canonical_statement=m.canonical_statement,
+                error_type=m.error_type,
+                severity=m.severity,
+                matched_by=list(m.matched_by),
+            )
+            for m in learning_map.misconceptions
+        ],
+        concept_stats=_hop(learning_map.concept_stats),
+        skill_stats=_hop(learning_map.skill_stats),
+        problem_stats=_hop(learning_map.problem_stats),
+        misconception_stats=_hop(learning_map.misconception_stats),
+    )

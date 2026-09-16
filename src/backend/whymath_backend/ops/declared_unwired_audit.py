@@ -1106,6 +1106,18 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "전에는 전 지표 미측정(exit 1)이 설계값. G5(12/31) 판정 시점에 운영자가 "
             "`--hit-cu-json`·`--qa-matrix-json`으로 생산자 산출을 직접 먹여 돌린다"
         ),
+        # EOS-08(2026-09-16): Phase 1 구조 지표 5종 리포터 — **판정기가 아니라 리포터**라
+        # CI 차단 스텝에 넣지 않는다(넣으면 그 모듈이 스스로 못박은 "지표 값으로 합격을
+        # 선언하지 않는다"를 배선이 배신한다 — 두 도구가 서로 다른 합격을 말하면 무엇을
+        # 통과했는지가 결정 불가가 된다). 지표 산출 로직(미측정≠0·분모 동결·근거 유일성)은
+        # backend 잡이 수집하는 tests/backend/ops/test_phase1_structure_report.py가 뮤테이션
+        # 9종으로 상시 검증한다 — "안 도는 코드"가 아니라 "사람이 볼 때 돌리는 대시보드"다.
+        "ops.phase1_structure_report": (
+            "by-design:Phase 1 구조 지표 5종 리포터(EOS-08·계획서 200 §36) — 판정기가 아니라 "
+            "관측 도구라 CI 차단 스텝 비대상이다. 지표가 나빠도 exit 0이므로 게이트로 배선하면 "
+            "의미가 없고, 반대로 exit 1을 내게 바꾸면 validation_scorecard와 합격 판정이 갈린다. "
+            "산출 로직은 tests/backend/ops/test_phase1_structure_report.py가 상시 검증"
+        ),
         "ops.hit_cu_metrics": (
             "by-design:검수 타이머 실표본 의존 판독기(EOS-54) — 계측 이벤트 축적 전에는 입력 0이 "
             "측정 실패(exit 1)로 설계돼 CI 상시 실행 비대상. G2/G5 KPI 판정 시점에 운영자가 돌린다"

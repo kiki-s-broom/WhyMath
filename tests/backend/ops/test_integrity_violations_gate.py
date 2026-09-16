@@ -82,10 +82,20 @@ class TestIntegrityReport:
         assert _clean_report().exit_code == 0
         assert _dirty_report().exit_code == 1
 
-    def test_all_kinds_has_six_entries(self) -> None:
-        # OPS-55 acceptance ①의 "6종" 단언 — 카테고리 개수 자체를 회귀 봉인.
-        assert len(gate.ALL_KINDS) == 6
-        assert len(set(gate.ALL_KINDS)) == 6
+    def test_all_kinds_has_seven_entries(self) -> None:
+        """카테고리 개수 자체를 회귀 봉인 — 조용한 확장·축소를 둘 다 막는다.
+
+        OPS-55는 6종으로 시작했고 **EOS-07이 ⑦ PUBLISHED_VERSION_INVALID를 더해 7종**이 됐다
+        (계획서 200 §27 검사 ⑤ — 발행 포인터의 상태·귀속). 이 단언이 그 확장을 실제로 잡아
+        근거를 적게 만들었다(2026-09-16: 6→7 변경이 여기서 RED로 걸렸다) — 봉인이 작동한
+        사례이므로 숫자만 올리지 않고 경위를 남긴다.
+
+        늘릴 때 요구되는 것: kind 상수 + 검사 함수 + `scan_integrity` 디스패처 등록 +
+        실 PG 3단 왕복 변별력 테스트(주입 → 검출 → 원복). 그 넷이 없는 kind는 추가하지 않는다.
+        """
+        assert len(gate.ALL_KINDS) == 7
+        assert len(set(gate.ALL_KINDS)) == 7
+        assert gate.KIND_PUBLISHED_VERSION_INVALID in gate.ALL_KINDS
 
 
 async def _async_return(report: gate.IntegrityReport) -> gate.IntegrityReport:

@@ -284,3 +284,128 @@ class TestCleanDatabaseExitsZeroForGateScopedRows:
         report = await gate.scan_integrity(db_session)
         all_identifiers = {v.identifier for v in report.violations}
         assert sentinel not in all_identifiers
+
+
+class TestPublishedVersionInvalidDiscrimination:
+    """⑦ PUBLISHED_VERSION_INVALID — 계획서 200 §27 검사 ⑤ (EOS-07).
+
+    행의 *존재*는 FK가 막으므로 여기서 세지 않는다. DB가 못 막는 두 축을 각각 주입한다:
+      A. 발행 포인터가 **DRAFT** 버전을 가리킨다 → "발행됐다"가 미발행 본문을 가리킨다.
+      B. 발행 포인터가 **다른 개념**의 버전을 가리킨다 → 귀속이 어긋난다.
+
+    **대조군이 핵심이다**: A를 고친 직후(status만 PUBLISHED로) 미검출로 돌아오는지 본다.
+    대조군이 없으면 "전부 위반으로 계상"하는 과잉 검출도 통과한다.
+
+    실측 메모(2026-09-16): `concept_version.concept_id`에는 `concept`로의 FK가 있어 B의 대상
+    개념이 **실재해야** 주입된다. 첫 시도는 그것을 모르고 가짜 코드를 넣어 주입이 조용히
+    실패했고, 빈 테이블의 0건이 '미검출'로 보였다 — 그래서 아래는 주입 직후 *스캔 대상 수*가
+    늘었는지도 함께 단언한다(주입 자체의 실재).
+    """
+
+    async def _scanned(self, session: AsyncSession) -> int:
+        report = await gate.scan_integrity(session)
+        return report.scanned.get(gate.KIND_PUBLISHED_VERSION_INVALID, 0)
+
+    async def test_pointer_to_draft_and_to_another_concept_are_detected(
+        self, db_session: AsyncSession
+    ) -> None:
+        code_a = f"it.pv.{_RUN_TAG}.a"
+        code_b = f"it.pv.{_RUN_TAG}.b"
+        cid_a, cid_b, ver = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        kind = gate.KIND_PUBLISHED_VERSION_INVALID
+
+        assert code_a not in await _kind_identifiers(db_session, kind)
+        scanned_before = await self._scanned(db_session)
+        try:
+            await db_session.execute(
+                text(
+                    "INSERT INTO concept (concept_id, code, name_ko, level, created_at) "
+                    "VALUES (:a, :ca, '주입개념A', '세부개념', now()), "
+                    "       (:b, :cb, '주입개념B', '세부개념', now())"
+                ),
+                {"a": cid_a, "ca": code_a, "b": cid_b, "cb": code_b},
+            )
+            await db_session.execute(
+                text(
+                    "INSERT INTO concept_version "
+                    "  (version_id, concept_id, version_no, schema_version, status, payload, "
+                    "   created_at) "
+                    "VALUES (:v, :ca, 1, 'concept-schema@1', 'DRAFT', '{}'::jsonb, now())"
+                ),
+                {"v": ver, "ca": code_a},
+            )
+            await db_session.execute(
+                text("UPDATE concept SET current_published_version_id = :v WHERE concept_id = :a"),
+                {"v": ver, "a": cid_a},
+            )
+            await db_session.commit()
+
+            # 주입 자체의 실재 — 스캔 대상이 늘지 않았으면 아래 판정은 전부 무의미하다.
+            assert await self._scanned(db_session) == scanned_before + 1
+
+            # A. DRAFT를 가리킴 → 검출
+            assert code_a in await _kind_identifiers(db_session, kind)
+
+            # 대조군 — status만 고치면 미검출로 돌아와야 한다(과잉 검출 배제)
+            await db_session.execute(
+                text("UPDATE concept_version SET status = 'PUBLISHED' WHERE version_id = :v"),
+                {"v": ver},
+            )
+            await db_session.commit()
+            assert code_a not in await _kind_identifiers(
+                db_session, kind
+            ), "발행 포인터가 올바른 PUBLISHED 버전을 가리키는데도 위반으로 계상됐다 — 과잉 검출"
+
+            # B. 남의 개념 버전을 가리킴 → 검출
+            await db_session.execute(
+                text("UPDATE concept_version SET concept_id = :cb WHERE version_id = :v"),
+                {"cb": code_b, "v": ver},
+            )
+            await db_session.commit()
+            assert code_a in await _kind_identifiers(db_session, kind)
+        finally:
+            await db_session.execute(
+                text("UPDATE concept SET current_published_version_id = NULL WHERE code = :ca"),
+                {"ca": code_a},
+            )
+            await db_session.execute(
+                text("DELETE FROM concept_version WHERE version_id = :v"), {"v": ver}
+            )
+            await db_session.execute(
+                text("DELETE FROM concept WHERE code = ANY(:codes)"), {"codes": [code_a, code_b]}
+            )
+            await db_session.commit()
+        assert code_a not in await _kind_identifiers(db_session, kind)
+        assert await self._scanned(db_session) == scanned_before
+
+
+class TestSkillCoverageIsAnIndicatorNotAVerdict:
+    """계획서 200 §27 검사 ① — 커버리지는 **지표이지 위반이 아니다** (EOS-07).
+
+    차단 kind로 넣지 않은 근거는 실측이다: 코퍼스 전수에서 문제 14,034건 중 스킬까지 해소되는
+    것이 89.5%다. 나머지 10.5%는 참조 깨짐이 아니라 *아직 스킬이 안 붙은* 것이며, 차단 kind로
+    만들면 prod에서 상시 red가 되어 사람이 게이트 자체를 끄게 된다.
+
+    그래서 이 테스트가 동결하는 것은 두 가지다 — ① 커버리지가 실제로 계산된다 ② 그 값이
+    **exit code를 바꾸지 않는다**(지표가 조용히 게이트가 되는 회귀 차단).
+    """
+
+    async def test_coverage_counts_are_computed_and_ordered(self, db_session: AsyncSession) -> None:
+        coverage = await gate.skill_coverage(db_session)
+        assert coverage.total >= 0
+        assert coverage.with_concept <= coverage.total, "개념 연결이 전체보다 많을 수 없다"
+        assert (
+            coverage.with_skill <= coverage.with_concept
+        ), "스킬 해소는 개념 연결의 부분집합이다 — 더 크면 조인이 잘못됐다"
+        if coverage.total == 0:
+            # 미측정 ≠ 0 — 대상이 없으면 비율 0%는 '커버리지 0'이 아니다.
+            assert coverage.skill_ratio == 0.0
+
+    async def test_coverage_does_not_participate_in_the_exit_code(
+        self, db_session: AsyncSession
+    ) -> None:
+        """커버리지가 낮아도 게이트 판정은 kind 위반만 본다 — 지표가 게이트가 되면 안 된다."""
+        report = await gate.scan_integrity(db_session)
+        assert gate.KIND_PUBLISHED_VERSION_INVALID in gate.ALL_KINDS
+        assert "SKILL_COVERAGE" not in gate.ALL_KINDS
+        assert not any(v.kind == "SKILL_COVERAGE" for v in report.violations)

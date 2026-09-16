@@ -448,6 +448,11 @@ CATALOG: tuple[Spec, ...] = (
        "GET /curricula", "GET /curricula/{framework_id}", "GET /curricula/{framework_id}/nodes"),
     _s("WM-S-038", "성취기준(학습 성과) 단건 조회", "Admin", "Curriculum", "P0",
        "B1 성취기준 895", "curricula", "GET /learning-outcomes/{norm_id}"),
+    _s("WM-S-050", "성취기준 학습맵 단일 조회(개념·스킬·문제·오개념 4홉)",
+       "Admin", "Curriculum", "P1",
+       "계획서 200 §18 Week 2 핵심 질의 — EOS-05. 단건 조회(WM-S-038)와 별 행인 이유: 그쪽은 "
+       "성취기준 *본문* 표면이고 이쪽은 지식 그래프 4홉 조합이라 소비처·실패 모드가 다르다",
+       "curricula", "GET /learning-outcomes/{norm_id}/learning-map"),
     _s("WM-S-039", "개념↔성취기준 정렬 통합 조회", "Admin", "Curriculum", "P0",
        "B2·F1 앵커 매핑 조회", "alignments", "GET /"),
     _s("WM-S-040", "권리(저작권) 판정 게이트웨이", "Platform", "Content", "P0",
@@ -760,10 +765,15 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-906", "콘텐츠 출처·라이선스 감사 게이트·사이드카", "Admin", "Content", "P0",
        "ARCH-20·PB-11 — 저작권 레일 · EOS-97 리콜(genlog 사이드카 선별·처분)",
        "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall"),
-    _o("WM-O-907", "선언≠배선 감사·추천/슬롯 도달 리포트", "Admin", "QA", "P1",
+    _o("WM-O-907", "선언≠배선 감사·추천/슬롯 도달 리포트·Phase 1 구조 지표", "Admin", "QA", "P1",
        "OPS-22·REC-01/06·PED-06 — '작동한 비율'", "ops.declared_unwired_audit",
        "ops.recommendation_reach_report", "ops.repeat_recommendation_report",
-       "ops.pedagogy_content_slot_reach_report"),
+       "ops.pedagogy_content_slot_reach_report",
+       # EOS-08: 계획서 200 §36 구조 지표 5종 리포터 — 같은 좌석에 귀속하는 이유는 성격이
+       # 같아서다. 셋 다 **판정이 아니라 관측**이고("작동한 비율" 축), 전부 exit code로
+       # 합격을 선언하지 않는다. 별 좌석으로 떼면 같은 성격이 두 행으로 갈려 이 장부가
+       # 재는 '기능'의 입자가 흔들린다.
+       "ops.phase1_structure_report"),
     _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·shadow 합성 트래픽", "Admin", "Operations",
        "P1", "ADMIN-01/11", "ops.account_bootstrap_cli", "ops.role_grant_cli",
        "ops.wh1_shadow_probe"),
