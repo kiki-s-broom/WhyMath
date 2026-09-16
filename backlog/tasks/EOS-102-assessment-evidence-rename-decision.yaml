@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① Kiki 판정(2026-09-16 · A안) 적용 — 계획서 300 §5.1의 per-answer 채점 산출을 AssessmentEvidence로 개명한다. 저장소 정본 Assessment(진단 평가 세션·ARCH-37 #15)는 이름을 유지한다. B안(정본 개명)은 실측 파급이 커서 기각됐다: ORM Assessment→테이블 assessment, 백엔드 29파일·테스트 18파일·마이그레이션 4건 참조\n② 루프 어휘에서 semantic_collision이 0건이 된다 — 충돌 기록 상수가 비고, 그 사실을 기계가 강제한다(충돌을 되살리면 RED)\n③ AssessmentEvidence의 좌석 귀속을 재판정한다. ARCH-37 Assessment(진단 세션)는 더 이상 이 객체의 좌석이 아니므로 다시 귀속해야 한다. 근거는 EOS-79 evidence_layer_boundary.md — 그 문서가 이미 \"이름이 층을 정하지 않는다 · assessment 테이블은 Assessment 층이 아니다\"를 정본화했고, Assessment 층(어느 Skill·오개념의 어떤 증거인가)은 attempt_event·answer_submission·evidence_event에 혼재한다. 셋 모두 LearningEvent 좌석이다\n④ EOS-100이 남긴 문서 결함 2건 동시 정정: ⓐ §3.2 \"루프 어휘 밖 8종\" 목록에 LearningEvent가 잘못 포함돼 있었다(Attempt·LearningSession이 이미 그 엔티티에 귀속되므로 밖이 아니다 — 실제로는 7종이었다) ⓑ 그 목록이 \"하드코딩이 아니다 — 검사 ⑤가 계산한다\"고 적었으나 검사 ⑤는 그 집합을 계산하지 않는다(정본화를 집행으로 착각한 표기). 계산·대조하는 검사를 실제로 신설해 주장을 참으로 만든다\n⑤ EOS-12 acceptance ⑤가 이 판정의 소유자로 등재돼 있으므로, 판정이 내려진 사실과 결론을 EOS-12에 반영해 미판정 유예를 닫는다\n⑥ 뮤테이션 검증 — 개명 회귀(AssessmentEvidence를 Assessment로 되돌림)·충돌 되살림·좌석 오귀속·§3.2 목록 조작을 주입해 전건 RED 확인. 주입 적용 자체(mutated != original)와 바이트 동일 원복도 단언"
-artifacts: []
+artifacts:
+  - "PR #1180 https://github.com/kiki-s-broom/WhyMath/pull/1180 · 커밋 94a64032 · Kiki A안 판정 집행 — LoopObject.ASSESSMENT_EVIDENCE 개명 + 좌석 재귀속(absorbed/LearningEvent · EOS-79 4층 경계 근거) + 정본 Assessment 루프 밖 이동 · EOS-100 문서 결함 2건 정정(§3-2 목록의 LearningEvent 오포함 · 검사 ⑤가 계산한다는 거짓 주장 → 검사 ⑩ 신설로 참으로 만듦) · EOS-12 acceptance ⑥로 판정 결과 반영 · 뮤테이션 8종 전건 RED 생존 0(M29가 EOS-100 원 결함 재주입 검출·누적 33종) · 계약 스위트 40 passed · 전체 백엔드 12604 passed EXIT=0 커버리지 90.40% · 계층 커버리지 PASS · ruff/black/mypy --strict/lint-imports 전건 EXIT=0 · tests/infra 1411 + tests/harness 831 passed · validate/audit-deps green"
 paths:
   - src/backend/whymath_backend/schema/learning_loop_contract.py
-session: claude/compassionate-knuth-a0ks7u
+session: null
 notes: "EOS-100이 미판정으로 남긴 Assessment 이름 충돌을 Kiki가 2026-09-16 A안으로 판정했다(근거: 두 객체의 의미가 실제로 다르며, 저장소 Assessment가 ORM·테이블·테스트에 이미 연결돼 B안은 DB/ORM/API/테스트까지 파급). 이 태스크는 그 판정의 집행이다. EOS-100은 done(종결 상태·전이 없음)이라 후속을 새 태스크로 등재한다 — 대장 손편집 우회 금지 규칙 준수. 산출은 EOS-100과 같은 열린 PR #1180에 얹는다."
 updated: 2026-09-16
