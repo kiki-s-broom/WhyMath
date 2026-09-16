@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-104-misconception-evidence-producer
+title: "채점 Evidence의 오개념 후보 생산자 배선 — 현행 두 채점 경로 모두 scan=not_run(계약 슬롯만 존재)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 채점 Evidence의 possible_misconceptions에 실제 생산자를 배선한다 — 현행은 계약 슬롯만 있고 두 채점 경로 모두 scan=not_run이다(EOS-12가 3상태로 고지만 함). ② 후보 출처는 coach 대화 턴에서 이미 계산된 게이트 통과 매칭(apply_match_quality_gate 결과)이며, 새로 diagnose를 한 번 더 돌리지 않는다(중복 계산 0). ③ 귀속 단위를 먼저 판정한다 — 게이트 매칭은 *턴* 단위이고 Evidence는 *attempt* 단위라 그대로 옮기면 오귀속이다. 학습자 단위 활성 가설(get_active_hypotheses)을 답안 증거로 부착하는 것도 같은 이유로 금지한다. ④ 이중 적재 금지 — Evidence는 관측이므로 curate_hypothesis를 다시 부르지 않는다(확정·영속은 기존 coach 경로가 유일 소유). ⑤ LLM·매처 비권위 유지 — gate_passed=False 후보는 계약이 이미 ValueError로 거부하므로 그 경계를 우회하지 않는다. ⑥ 배선 후 scan 상태가 실제로 ran_with_candidates / ran_no_candidate로 갈리는지 주입으로 확인한다(전부 not_run이면 배선이 안 된 것이다)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/l2/assessment_evidence.py
+session: null
+notes: "출처: EOS-12 구현 중 실측 발견. EOS-12는 채점 Evidence 3종 계약을 세우고 개념·스킬 2종의 생산자를 배선했으나, 세 번째(오개념)는 **두 채점 경로 어디에도 생산자가 없다** — api/me.py submit_attempt는 오개념 매칭을 돌리지 않고, api/coach.py _complete_problem은 완료가 항상 서버 판정 정답이라 오개념이 성립하지 않는다. 그래서 EOS-12는 빈 리스트를 내보내는 대신 MisconceptionScan.NOT_RUN으로 \"보지 않았다\"를 고지하는 데서 멈췄다(0건을 \"오개념이 없었다\"로 읽히게 하지 않기 위함).\n\n실측 근거(판정 기준 main ab1fdc82 + EOS-12 브랜치): diagnose 호출처는 api/coach.py 2곳(대화 턴)뿐이고 둘 다 attempt를 만들지 않는다. 게이트 결과(MatchGateResult)는 하류 가설 저장소로 가고 채점 응답에 합류하지 않는다.\n\n주의: 귀속 단위 불일치가 이 태스크의 핵심 난점이다(acceptance ③). 턴 단위 매칭을 attempt 증거로 그대로 옮기면 \"이 답안의 오개념 후보\"라는 거짓 주장이 된다."
+updated: 2026-09-16

@@ -282,6 +282,15 @@ class TestAppendTurnsCompletesAfterReflection:
         assert attempt.problem_id == pid
         assert attempt.used_socratic is True
         assert str(attempt.attempt_id) == body["completed_attempt_id"]
+        # EOS-12: 완료 채점이 만든 증거가 **응답 조립까지** 이어지는지 — 만들어 놓고 안 싣는
+        # 배선 누락을 여기서 잡는다(계약이 있어도 도달하지 않으면 없는 것과 같다).
+        evidence = body["completion_evidence"]
+        assert evidence is not None
+        assert evidence["attempt_id"] == body["completed_attempt_id"]
+        assert evidence["correct"] is True  # 이 경로의 완료는 서버 판정 정답이다
+        # 이 경로는 오개념을 보지 않는다 — 0건이 "없었다"로 읽히면 안 된다.
+        assert evidence["coverage"]["misconception_scan"] == "not_run"
+        assert "misconception" in evidence["coverage"]["unmeasured_kinds"]
 
     def test_completed_attempt_inherits_dialogue_started_at(self) -> None:
         """PED-37: 완료 attempt의 `started_at`은 대화 시작 시각을 *이관*받는다(추정 아님).

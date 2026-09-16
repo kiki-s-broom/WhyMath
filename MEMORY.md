@@ -338,6 +338,28 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
+
+**① 무엇이 없었나(acceptance ② 실측).** 채점은 개념·스킬을 *증거*가 아니라 **이미 갱신된 mastery delta**로 반환하고 있었다. 즉 "이 답이 무엇의 증거인가"는 `record_problem_attempt_mastery` 안에서 계산돼 밖으로 나오지 않았고, 나오는 것은 결과뿐이라 **왜 그 개념이 선택됐는지(역할·귀속 근거)를 아무도 볼 수 없었다**. 오개념은 채점에 합류하지 않고 coach 대화 경로에서만 갱신되며, Assessment 조립은 per-answer가 아니라 CAT 중단 경계 배치다. `concept_evidence|skill_evidence|possible_misconceptions` 백엔드 전수 grep 0건.
+
+**② 계약은 `schema/`에, 조회는 `l2/`에.** 태스크 선언 paths가 `schema/assessment*.py`이고 `l2/mastery_tracking.py`는 **EOS-13이 소유**하므로 그 파일은 손대지 않았다. 그래서 `schema/assessment_evidence.py`(순수 타입 + 순수 선택 규칙)와 `l2/assessment_evidence.py`(DB 조회, 쓰기 0)로 갈랐다. `schema`는 최하위 계층이라 DB·상위 계층 import가 구조적으로 불가능하고, 그것이 "증거는 관측이지 상태가 아니다"를 타입으로 강제한다.
+
+**③ 가장 잃기 쉬운 정보는 delta가 아니라 *귀속 근거*였다.** `AttributionBasis` 3종(`joint_support`·`primary_attribution`·`tested_fallback`)을 증거에 남긴다 — 숙달 delta만 반환하면 "왜 이 개념이 내려갔는가"에 답할 수 없다. 봉투에 mastery·delta 슬롯을 **두지 않은 것이 의도**다: 추정기를 BKT→DKT/IRT로 갈아 끼워도 증거 모양은 그대로여야 하고, 그 모양이 곧 `EOS-13`의 `update_mastery(state, evidence)` 입력이다.
+
+**④ 세 번째 종(오개념)은 생산자가 없다 — 빈 리스트 대신 3상태로 고지했다.** 두 채점 경로 모두 오개념을 만들지 않는다(`submit_attempt`는 매칭을 돌리지 않고, coach `_complete_problem`은 완료가 항상 서버 판정 정답이라 성립하지 않는다). 빈 리스트를 그냥 내보내면 "오개념이 없었다"는 거짓이 되므로 `MisconceptionScan.NOT_RUN`으로 **"보지 않았다"**를 표기한다(`EOS-11`의 원천 가용성 3상태와 같은 규약). 생산자 배선은 `EOS-104`로 등재했고, 그 태스크의 핵심 난점은 **귀속 단위 불일치**다 — 게이트 매칭은 *턴* 단위, Evidence는 *attempt* 단위라 그대로 옮기면 오귀속이고, 학습자 단위 활성 가설을 답안 증거로 붙이는 것도 같은 이유로 금지했다.
+
+**⑤ 모델 B 사본이 셋이 됐다 — 그래서 합치를 기계가 동결한다.** 역할 비대칭 선택은 이제 정본(`select_concept_evidence`)과 두 writer 인라인 사본에 산다. 통합은 `EOS-13`의 몫이라 이번엔 **셋이 같은 개념을 고르는지**를 테스트가 잰다(정/오답/폴백/미매핑 4조합). 드리프트하면 증거가 가리키는 개념과 실제 갱신 대상이 갈라지고, 그 순간 ③의 답이 거짓이 된다.
+
+**⑥ 순서가 계약의 일부다.** 증거는 두 경로 모두에서 **숙달 전파보다 먼저** 조립된다. 뒤에 두면 (가) 증거가 갱신 결과의 사후 요약으로 전락하고 (나) 전파가 실패했을 때 증거까지 사라진다. 응답은 증거(쓰기 *전*)와 `mastery_updates`(쓰기 *후*)를 나란히 실어 **부분 쓰기 구조를 한 트랜잭션처럼 가리지 않는다**(EOS-81 ⑦ 정직 표기 승계·acceptance ⑤). 순서 역전을 주입하면 RED가 난다(M14).
+
+**⑦ LLM·매처 비권위는 계약이 집행한다.** `gate_passed=False` 후보는 `build_assessment_evidence`가 `ValueError`로 거부하고, `misconception_scan`↔건수 불일치도 거부한다 — 산문이 아니라 생성자에서 막는다. 확정·영속은 여전히 게이트와 가설 저장소의 몫이고 이 객체는 판정을 **옮길 뿐 내리지 않는다**.
+
+**⑧ 변별력 = 뮤테이션 18종 전건 RED·생존 0**(순수 Python 하네스 — 주입 적용·원복 sha256 단언, 무뮤테이션 rc=0 sanity check 선행). **그중 M17이 내 테스트 하네스 자신의 결함을 잡았다**: fake session이 `in_()`의 리스트 바인드(`role_1: [ConceptRole.TESTED]`)를 평탄화하지 않아 role을 한 건도 못 읽었고, 그 상태에서 합치 테스트는 **정상·드리프트 양쪽에서 똑같이 통과**할 뻔했다(변별력 0). 실측으로 파라미터 모양을 확인해 고쳤고, 그 사실을 픽스처 주석에 못 박았다. 또 M16(코치 완료 경로에서 증거 조립 제거)이 처음에 **하네스 결함으로 판정 불가**였는데, 그것을 고치는 과정에서 *코치 응답 조립 배선을 덮는 테스트가 없다*는 진짜 공백이 드러나 `test_coach_completion.py`에 응답 수준 단언을 추가했다 — 뮤테이션이 코드가 아니라 **테스트 커버리지의 구멍**을 가리킨 사례다.
+
+**⑨ 부수 발견 — 기존 픽스처가 UUID를 skill_id로 먹이고 있었다.** `test_me.py`의 FakeSession이 모든 조회에 같은 rows를 돌려주는 탓에 스킬 해소 조회가 개념 UUID를 받았고, ORM이 관대해 아무도 몰랐다. 새 계약의 `SkillEvidence.skill_id: str`이 그것을 즉시 잡았다 — 타입 계약이 잠재 픽스처 부정확을 드러낸 형태다.
+
+**⑩ 정직한 공백.** ⓐ 증거 조립이 채점 경로에 SELECT 2~3건을 추가한다(writer가 이미 하는 것과 같은 조회다 — 사본 통합 시 `EOS-13`에서 함께 사라진다) ⓑ 실 PG 왕복은 hermetic이 못 본다 ⓒ Flutter 클라이언트는 새 필드를 아직 읽지 않는다(추가 필드라 비파괴).
+
 ### 2026-09-16 (Kiki 판정·집행 · EOS-102): **`Assessment` 이름 충돌 — A안 채택(계획서 쪽을 `AssessmentEvidence`로 개명) + `EOS-100` 문서 결함 2건 정정** (Kiki 판정, claude 집행) — 판정 기준 main `14ef34d0`
 
 - **판정**: 계획서 300 §5.1의 per-answer 채점 산출 = **`AssessmentEvidence`**, 저장소 정본 `Assessment`(진단 평가 세션·`ARCH-37` #15) = **이름 유지**. `EOS-100`이 미판정으로 남기고(`semantic_collision=True`) `EOS-12` acceptance ⑤에 소유자를 박아 둔 유예를 같은 날 닫았다.
