@@ -524,9 +524,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-118", "그래프 분석 유틸(ETL 측)", "Platform", "Knowledge Graph", "P2",
        "data_pipeline 분석 — backend 대응 없음", pipelines=("graph_analytics",)),
     # ════════════════════ E — L2 학습자 모델 ════════════════════
-    _e("WM-E-201", "BKT 숙달 추정·개념/스킬 숙달 이력 영속", "Student", "Learning Model", "P0",
-       "Gate2 ⑧ Mastery 자동 갱신", "l2.bkt", "l2.mastery_tracking",
-       "l2.skill_mastery_tracking"),
+    _e("WM-E-201", "BKT 숙달 추정·갱신 호출 계약·개념/스킬 숙달 이력 영속", "Student",
+       "Learning Model", "P0",
+       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리)", "l2.bkt",
+       "l2.mastery_contract", "l2.mastery_tracking", "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",

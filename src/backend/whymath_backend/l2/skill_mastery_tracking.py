@@ -6,8 +6,14 @@ DB 래퍼만 새로 둔다. 채점 attempt가 평가하는 개념을 concept→s
 숙달을 append-only 적재한다.
 
 설계 분리(mastery_tracking.py 동형):
-  - **순수 계산 재사용** — `compute_mastery_record`·`MasteryRecord`를 `mastery_tracking`에서 import
-    한다(중복 0·엔티티-무관). 스킬도 개념과 동일한 다음-측정 수학을 쓴다.
+  - **호출 계약 공유**(EOS-13) — 다음-측정 계산은 개념 축과 **같은 함수**
+    `l2/mastery_contract.update_mastery(learner_state, assessment_evidence)`를 쓴다. 축은
+    `LearnerMasteryState.axis`(`MasteryAxis.SKILL`)가 들고 있을 뿐 계산을 가르지 않는다 —
+    "계약은 하나, 내부 구현(조회·적재 좌석)은 갈라둔다". 통합이 재계산을 낳지 않는 이유는
+    계산이 원래 한 벌이었고(`compute_mastery_record` 공유) 그 한 벌을 계약 뒤로 옮겼을 뿐이기
+    때문이다.
+  - **순수 계산 재사용** — `compute_mastery_record`·`MasteryRecord`는 하위호환 재노출이다
+    (EOS-13에서 정의가 `l2/mastery_contract.py`로 이동).
   - **얇은 async 래퍼** — `_latest_skill_mastery`/`_stage_skill_attempt_mastery`/
     `record_problem_attempt_skill_mastery`는 `SkillMasteryHistory`를 skill_id(str)로 조회·적재.
 
@@ -38,14 +44,21 @@ from whymath_backend.l2.bkt import BktModel
 
 # 순수 커널·개념 해소는 개념 축 모듈에서 재사용(엔티티-무관·중복 0). `_assessed_concept_ids`는
 # `problem_concept` 조회라 스킬 축과 무관하게 동일한 "문제가 평가하는 개념" 집합을 준다.
-from whymath_backend.l2.mastery_tracking import (
+from whymath_backend.l2.mastery_contract import (
+    AttemptOutcomeEvidence,
+    BktMasteryEstimator,
     MasteryRecord,
-    _assessed_concept_ids,
     compute_mastery_record,
+    resolve_estimator,
+    state_from_history,
+    update_mastery,
 )
+from whymath_backend.l2.mastery_tracking import _assessed_concept_ids
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole
+from whymath_backend.schema.mastery_contract import MasteryAxis, MasteryEstimator
 
 __all__ = [
+    "AttemptOutcomeEvidence",
     "MasteryRecord",
     "compute_mastery_record",
     "get_current_skill_mastery",
@@ -105,19 +118,30 @@ async def _assessed_skill_ids(session: AsyncSession, concept_ids: Sequence[uuid.
     return list(result.scalars().all())
 
 
+def _resolve_estimator(model: BktModel | None) -> MasteryEstimator:
+    """이 적재 경로가 쓸 추정기 — 개념 축 `mastery_tracking._resolve_estimator`와 동형.
+
+    두 축이 **같은 레지스트리**를 본다(별도 기본값을 두지 않는다) — 추정기를 갈아 끼우면 개념·
+    스킬이 함께 바뀐다. 한 축만 바꾸는 것은 정책 결정이라 계약이 아니라 호출부가 명시해야 한다.
+    """
+    return BktMasteryEstimator(model) if model is not None else resolve_estimator()
+
+
 async def _stage_skill_attempt_mastery(
     session: AsyncSession,
     user_id: uuid.UUID,
     skill_id: str,
     correct: bool,
     *,
-    model: BktModel,
+    estimator: MasteryEstimator,
     measured_at: datetime,
 ) -> SkillMasteryHistory:
     """풀이 관측 1건을 (user, skill) 학습 곡선에 반영해 새 측정 행을 *세션에 add*한다(커밋 0).
 
-    `_stage_attempt_mastery`(개념) 스킬판 — 직전 측정을 prior로 읽어 순수 커널로 갱신 후 새
-    `skill_mastery_history` 행을 add만 한다. **commit은 호출자 책임**(다스킬 원자 갱신 공유).
+    `_stage_attempt_mastery`(개념) 스킬판 — 직전 측정을 prior로 읽어 **같은 호출 계약**
+    (`update_mastery`)에 넘기고 산출을 새 `skill_mastery_history` 행으로 add만 한다.
+    **commit은 호출자 책임**(다스킬 원자 갱신 공유). 경과일 계산은 계약이 소유한다(EOS-13 —
+    두 축이 복제하던 식 제거).
     """
     prior_row = await _latest_skill_mastery(session, user_id, skill_id)
     prior_mastery = (
@@ -125,21 +149,25 @@ async def _stage_skill_attempt_mastery(
         if prior_row is not None and prior_row.mastery is not None
         else None
     )
-    prior_sample = prior_row.sample_size if prior_row is not None else None
-    # 직전 측정 이후 경과일(망각 감쇠 입력·mastery_tracking 동형). 직전 없으면 0.
-    elapsed_days = (
-        (measured_at - prior_row.measured_at).total_seconds() / 86400.0
-        if prior_row is not None
-        else 0.0
+    state = state_from_history(
+        MasteryAxis.SKILL,
+        skill_id,
+        mastery=prior_mastery,
+        sample_size=prior_row.sample_size if prior_row is not None else None,
+        measured_at=prior_row.measured_at if prior_row is not None else None,
     )
-    rec = compute_mastery_record(prior_mastery, prior_sample, correct, model, elapsed_days)
+    update = update_mastery(
+        state,
+        AttemptOutcomeEvidence(correct=correct, observed_at=measured_at),
+        estimator=estimator,
+    )
     row = SkillMasteryHistory(
         user_id=user_id,
         skill_id=skill_id,
         measured_at=measured_at,
-        mastery=rec.mastery,
-        confidence=rec.confidence,
-        sample_size=rec.sample_size,
+        mastery=update.mastery,
+        confidence=update.confidence,
+        sample_size=update.sample_size,
     )
     session.add(row)
     return row
@@ -169,7 +197,7 @@ async def record_problem_attempt_skill_mastery(
     원자성). 매핑/해소가 없으면 빈 리스트(커밋 0). 모든 스킬은 *같은 measured_at*(생략 시 현재)을
     공유한다. 순수 커널·bkt/irt는 엔티티-무관 재사용이라 mastery 수학은 회귀 0.
     """
-    model = model or BktModel()
+    estimator = _resolve_estimator(model)
     timestamp = measured_at or datetime.now(UTC)
     if correct:
         # 정답: 평가 개념 전체(합동 증거)의 스킬.
@@ -183,7 +211,7 @@ async def record_problem_attempt_skill_mastery(
     records: list[SkillMasteryHistory] = []
     for skill_id in skill_ids:
         record = await _stage_skill_attempt_mastery(
-            session, user_id, skill_id, correct, model=model, measured_at=timestamp
+            session, user_id, skill_id, correct, estimator=estimator, measured_at=timestamp
         )
         records.append(record)
     if records:  # 빈 스킬셋은 커밋 0(개념 축 동작 보존)
