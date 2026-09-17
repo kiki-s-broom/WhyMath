@@ -416,6 +416,21 @@
 **⑩ 미이행 — 라이브 측정은 남았다.** acceptance ①(품질·지연·비용 3축 강등전)·⑥(피크/오프피크 분리 집계)은 **Kiki 머신의 라이브 키가 필요해 이 세션에서 할 수 없다**. 이 PR이 착지시킨 것은 *측정을 돌릴 수 있는 배선*이며(CN 기본 설정으로 합성 프로브 경로가 열린다), 측정 자체와 채택 여부 판정은 `ARCH-53`으로 승계했다. **즉 이 시점의 채택 결론은 "미판정"이다** — 코드가 있다는 것이 채택했다는 뜻이 아니고, 기본 라우팅은 여전히 Anthropic이다(`CompositeProvider(cloud=AnthropicProvider())` 15곳 무변경).
 
 **⑪ 정직한 공백.** ⓐ DeepSeek이 유료 API 입력을 학습에 쓰는지 **미확정**(2차 자료가 서로 반대·1차 약관 프록시 차단) — `deepseek_allow_internal_corpus` 기본 OFF의 이유이며 확정 시 재평가한다 ⓑ OpenRouter 엔드포인트 16곳 중 8곳의 법인 국적 미확인 ⓒ `openrouter_model_high`(`deepseek/deepseek-v4-pro`)는 가격을 실측하지 않았다 — MID만 2026-09-16에 확인했다 ⓓ 관할 게이트는 `decision.data_licenses` **선언을 믿는다**(선언이 실제 프롬프트 내용과 맞는지는 `check_routing_data_grade.py`가 입력 축에서 따로 본다) ⓔ ~~두 provider 모두 라이브 호출 0건~~ **정정(2026-09-17)**: DeepSeek 공식 API는 라이브 1회차가 성공했다(위 실측 항목 참조 — 3,438ms·88/420 토큰). OpenRouter 경유는 아직 라이브 호출 0건이다.
+### 2026-09-17 (구현 · EOS-14): **추천에 "왜 이 문항인가"를 필수로 붙였다 — 근거 없음을 근거로 위장하지 않는 3상태, 그리고 선택은 한 줄도 건드리지 않는 구조** (claude 구현) — 판정 기준 main `27df076e`
+
+**① 현행 '이유'는 이유가 아니었다(acceptance ③ 실측).** `NextProblemResponse`의 5필드(`weight_axes_applied`·`candidate_pool_size`·`weak_concept_signal_count`·`candidate_zero_reason`·`band_calibrated`)는 **관측 메타**다 — *어느 축이 적용됐나*·*후보가 왜 0인가*를 말한다. 그것은 추천기가 어떻게 돌았는지의 기록이지 **선택된 문항의 근거**가 아니다. "어느 개념이 약해서 이 문항인가"는 어디에도 없었다. 그래서 둘을 합치지 않고 `reason`을 **추가**했다(기존 5필드 불변·회귀 0).
+
+**② "분산된 3모듈"은 셋이 같은 값이 아니었다 — acceptance ⑤를 실측으로 정정했다.** 착수 지시는 임계가 3모듈에 분산돼 있으니 단일 정책 함수로 모으라고 했다. 실측하니 **둘만 같은 축**이었다: `weak_concept_recommendation`·`prerequisite_recommendation`의 0.7(약점 판정 컷)은 같은 질문에 답하므로 `WEAK_CONCEPT_MASTERY_CEILING` 하나로 모았고, `learner_state`의 0.4/**0.8**은 L4 LTHC 밴드의 미러라 **다른 축**이어서 합치지 않았다. 값이 같다고 합치면 두 개념이 한 상수로 접혀 한쪽을 고칠 때 다른 쪽이 조용히 움직인다 — 그 판단을 `test_lthc_band_is_not_folded_into_the_weak_cut`이 기계로 남긴다(0.4는 같지만 상한이 0.8 vs 0.7).
+
+**③ 근거 없음을 3상태로 갈랐다(EOS-11·EOS-12의 같은 규약).** `basis`가 셋이다 — `MEASURED_MASTERY`(실측) / `COLD_START`(개념은 매핑됐는데 숙달 이력 없음 = 학생의 상태) / `CONCEPT_UNMAPPED`(문항-개념 매핑 자체가 없음 = **우리 쪽 데이터 공백**). 뒤의 둘을 `PREREQUISITE_GAP`으로 접으면 **측정된 적 없는 학생이 전부 "선수개념이 막혔다"로 분류된다** — 없는 약점을 만들어 내는 형태다. `confidence`도 근거가 없으면 0.5가 아니라 **0.0**이다("모른다"가 "반쯤 안다"로 읽히지 않게).
+
+**④ 선택 알고리즘은 한 줄도 건드리지 않았다(acceptance ⑥의 *구조적* 보장).** 근거 조립은 `chosen_index`/`best`가 확정된 **뒤에만** 호출되고, 조회기는 어떤 선택기도 import하지 않는다(`test_module_does_not_import_a_selector`가 동결 — import하면 언젠가 부른다). 그래서 "계약 도입이 추천을 바꾸지 않았다"가 대조가 아니라 배치로 증명된다. 대조도 함께 뒀다: 같은 후보 풀에 저숙달·고숙달·미매핑 세 근거 재료를 물려도 같은 문항이 나온다.
+
+**⑤ 영속은 새 좌석 없이 기존 REC-11 좌석에 실었다(acceptance ④).** `record_recommendation_treatment`에 `reason` 선택 인자를 더해 처치 meta에 같은 값을 남긴다 — **응답과 영속이 하나의 값**이다(두 번 계산하면 언젠가 갈라지고, 갈라진 뒤에는 어느 쪽이 그때 학생이 본 근거인지 아무도 모른다). 그 동일성을 API 테스트가 직접 단언한다.
+
+**⑥ 정직한 공백**: `RecommendationPolicy`·`LearningContext`·`Recommendation` 세 타입은 착지 시점에 **소비처 0건**이다 — Kiki 지시 범위("근거 배선까지")에 따라 핸들러의 `learner_state` 입력 전환은 열어 뒀고 소유자를 **`EOS-19`**로 등재했다. 구현체 없는 Protocol은 아무 테스트도 건드리지 않아 조용히 표류하므로 `TestPolicyProtocolShape`가 시그니처를 동결한다(입력 2개·반환 `Recommendation`·컨텍스트 필드 5종).
+
+**⑦ 검증**: 뮤테이션 25종 전건 RED + 대조군 1건 GREEN(무해 편집에 RED를 내지 않음). 하네스는 순수 Python이고 주입 적용(`mutated != original`)·원복 바이트 동일(sha256)·무뮤테이션 sanity(rc=0)를 각각 단언한다. **다만 전건 RED는 커버리지의 증거가 아니다**(2026-09-08 규칙) — 1차 19종 실행 뒤 "내가 주입 목록에 안 올린 절"을 되짚어 6종(부재 표기·null 경로·개념 id 누락·영속 절단·응답↔영속 불일치 2종)을 추가했고, 그 과정에서 M17/M18의 치환 대상이 1건에서 2건으로 늘어난 것(응답·영속 두 자리)을 사전 대조가 잡았다.
 
 ### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
 
