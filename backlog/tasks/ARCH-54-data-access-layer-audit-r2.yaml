@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-54-data-access-layer-audit-r2
+title: "데이터 접근 계층 감사 2회차 — baseline 델타 재측정 + Repository 도입 재판정"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - ARCH-48-data-access-layer-audit
+requires_gates: []
+acceptance:
+  - "① 재측정 — scripts/analysis/data_access_layer_audit.py를 돌려 118파일 507호출 대비 델타를 낸다. baseline이 관측과 정확히 일치하는 상태가 유지됐는지(가드가 상시 green이었는지) 확인하고, 늘었다면 어느 계층에서 왜 늘었는지 지목한다\n② Repository 계층 도입 재판정 — ARCH-48이 (b)를 고른 이유는 118건이 만료 없는 유예를 부르기 때문이었다. 그 수치가 줄었는지 보고 (a) 승격 가능 여부를 다시 판정한다. 여전히 불가면 그 사실과 근거를 적고 다음 재확인 지점을 설정한다(만료 없는 유예 금지)\n③ 날짜 만료 → 기계 만료 전환 — ARCH-48은 BASELINE_REVIEW_BY=2027-01-31 날짜 만료를 썼고 스스로 그것을 차선이라 적었다(저장소 표준은 해소 태스크·게이트 종결이 면제를 만료시키는 기계 만료다). 이행 태스크가 등재됐으면 만료를 그 id에 묶고 날짜를 걷는다\n④ api 축 판정 — ARCH-48이 남긴 진짜 분기는 'api 14파일(172호출·전체의 34%)을 리팩터할 것인가'다. 리팩터하면 처분을 (c) 계층별 차등으로 승격할 수 있다. 판정하고 근거를 적는다\n⑤ 사각 축 점검 — 동적 getattr 호출·타입 주석 없는 세션 수신자는 현행 가드가 못 본다(ARCH-48 정직한 공백 1·2). 그 사이 그 형태가 생겼는지 별도 방법으로 확인하고, 생겼으면 가드를 보강한다\n⑥ 변별력 — 가드를 바꿨으면 금지 상태를 주입해 RED를 확인하고 성공 방향 대조군을 함께 둔다. 바꾸지 않았으면 기존 뮤테이션 19회차가 여전히 전건 RED인지 재실행으로 확인한다"
+artifacts: []
+paths:
+  - scripts/analysis/data_access_layer_audit.py
+session: null
+notes: "ARCH-48(2026-09-17 done)의 다음 회차. /drive 안전장치 'ARCH-* 감사 태스크 완료 시 다음 회차를 재생성(감시 끊김 방지)'에 따른 등재다. ARCH-48이 baseline에 박은 재확인 지점 BASELINE_REVIEW_BY=2027-01-31이 이 태스크의 기한이며, 그 날짜가 지나면 tests/infra 가드가 RED를 낸다(M14가 검증). 즉 이 태스크는 방치되면 CI가 먼저 알려 준다."
+updated: 2026-09-17
