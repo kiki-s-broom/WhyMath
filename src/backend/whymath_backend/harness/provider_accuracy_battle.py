@@ -54,7 +54,10 @@ DeepSeek 공식 API는 피크/오프피크 단가가 정확히 2배 차이다. �
     python -m whymath_backend.harness.provider_accuracy_battle \
         --arm anthropic --arm deepseek --n-defective 40 --n-clean 40 \
         --audit-out data/audit/arch-55
-종료: 0 통과 / 1 게이트 미달·측정 실패 / 2 인자 오류
+먼저 호출 없이 준비 상태만 볼 수 있다(키가 없으면 회차를 태우지 않고 멈춘다):
+    python -m whymath_backend.harness.provider_accuracy_battle \
+        --arm anthropic --arm deepseek --check-only
+종료: 0 통과 / 1 게이트 미달·측정 실패 / 2 인자 오류·arm 준비 미비
 """
 
 from __future__ import annotations
@@ -69,6 +72,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from whymath_backend.config import get_settings
 
 # OPS-48과 **같은** 시험지·프롬프트·파서를 쓴다 — 갈라지면 두 강등전을 나란히 놓을 수 없다.
 # 사적 이름을 import하는 것은 그 공유를 의도적으로 못박기 위함이며, 계약은
@@ -96,6 +101,45 @@ _EXIT_INPUT_ERROR = 2
 
 ARMS = ("anthropic", "deepseek", "openrouter")
 """대조군 이름 — `anthropic`이 baseline(현행 핀)이고 나머지가 후보다."""
+
+
+_ARM_KEY_ENV = {
+    "anthropic": "WHYMATH_ANTHROPIC_API_KEY",
+    "deepseek": "WHYMATH_DEEPSEEK_API_KEY 또는 DEEPSEEK_API_KEY",
+    "openrouter": "WHYMATH_OPENROUTER_API_KEY 또는 OPENROUTER_API_KEY",
+}
+"""arm별로 이 머신에 있어야 하는 환경변수 이름(값이 아니라 *이름*만 출력한다)."""
+
+
+def arm_readiness(arm: str) -> tuple[bool, str]:
+    """arm을 지금 이 머신에서 호출할 수 있는가 — **부르기 전에** 판정한다.
+
+    키가 없으면 회차가 전부 `unresolved`로 쌓이는데, 그것은 "정확도가 낮다"와 같은 자리에
+    앉는 숫자가 아니라 **측정이 성립하지 않았다**는 뜻이다. 그런데도 실행은 끝까지 돌아
+    회차(와 다른 arm의 과금)를 태운다. 그래서 측정 전에 멈춘다(CLAUDE.md "측정·수집 도구를
+    성공 경로만 보고 설계 금지").
+
+    OpenRouter는 키만으로 부족하다 — 허용목록이 비면 `build_provider_block`이 거부하므로
+    그 비어 있음도 미비로 본다(빈 허용목록은 '아무나 허용'이 아니라 '차단'이다).
+    키 값 자체는 어떤 경로로도 출력하지 않는다.
+    """
+    settings = get_settings()
+    if arm == "anthropic":
+        ready = settings.anthropic_configured
+        detail = "" if ready else f"키 미설정({_ARM_KEY_ENV[arm]})"
+    elif arm == "deepseek":
+        ready = settings.deepseek_configured
+        detail = "" if ready else f"키 미설정({_ARM_KEY_ENV[arm]})"
+    elif arm == "openrouter":
+        if not settings.openrouter_configured:
+            return False, f"키 미설정({_ARM_KEY_ENV[arm]})"
+        allowed = tuple(settings.openrouter_allowed_providers)
+        if not allowed:
+            return False, "허용 공급사 목록이 비어 있음(WHYMATH_OPENROUTER_ALLOWED_PROVIDERS)"
+        return True, f"허용 공급사 {', '.join(allowed)}"
+    else:
+        raise ValueError(f"알 수 없는 arm: {arm!r} (가능: {', '.join(ARMS)})")
+    return ready, detail
 
 
 class _ProviderTap:
@@ -393,6 +437,11 @@ def main(argv: list[str] | None = None) -> int:
         default="deepinfra",
         help="OpenRouter arm에서 응답해야 하는 공급사 slug(불일치 회차는 집계 제외)",
     )
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="호출 없이 arm별 준비 상태(키·허용목록)만 판정하고 종료",
+    )
     parser.add_argument("--min-detection-lower", type=float, default=None)
     parser.add_argument("--max-false-alarm-upper", type=float, default=None)
     args = parser.parse_args(argv)
@@ -401,6 +450,26 @@ def main(argv: list[str] | None = None) -> int:
     if args.n_defective < 1 or args.n_clean < 1:
         print("[인자 오류] --n-defective·--n-clean은 1 이상이어야 한다", file=sys.stderr)
         return _EXIT_INPUT_ERROR
+
+    # 사전점검 — 못 부를 arm이 하나라도 있으면 **아무것도 부르지 않고** 멈춘다.
+    # 여기서 멈추지 않으면 그 arm은 unresolved만 쌓고, 나머지 arm은 과금된 뒤
+    # 비교 불가능한 표가 남는다.
+    not_ready: list[str] = []
+    for arm in arms:
+        ready, detail = arm_readiness(arm)
+        mark = "OK  " if ready else "미비"
+        print(f"[준비] {mark} {arm}{(' — ' + detail) if detail else ''}")
+        if not ready:
+            not_ready.append(arm)
+    if not_ready:
+        print(
+            f"[중단] 준비되지 않은 arm: {', '.join(not_ready)} — 호출을 하나도 하지 않았다.",
+            file=sys.stderr,
+        )
+        return _EXIT_INPUT_ERROR
+    if args.check_only:
+        print("[준비] 요청한 arm 전부 호출 가능 — --check-only이므로 여기서 끝낸다.")
+        return _EXIT_OK
 
     try:
         items = build_defect_seeded_set(

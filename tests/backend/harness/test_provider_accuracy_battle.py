@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pytest
 
+from whymath_backend import config
 from whymath_backend.harness import provider_accuracy_battle as battle
 from whymath_backend.harness.quality_tier_moe_accuracy_battle import (
     _SYSTEM_PROMPT,
@@ -201,3 +202,110 @@ class TestArmConstruction:
 def test_cli_rejects_bad_sample_size() -> None:
     """인자 오류(2)와 게이트 미달(1)을 구분한다 — 섞으면 실패 원인이 사라진다."""
     assert battle.main(["--n-defective", "0"]) == 2
+
+
+class TestArmReadinessPreflight:
+    """호출 전 준비 판정 — 키가 없으면 회차를 태우지 않고 멈추는가.
+
+    각 절이 *실제로 밟히는* 픽스처를 둔다(CLAUDE.md "픽스처가 그 절을 실제로 밟는가"):
+    anthropic은 키 부재, openrouter는 키는 있는데 **허용목록이 빈** 상태를 따로 만든다 —
+    후자가 없으면 `and bool(allowed)` 절이 뮤테이션에서 살아남는다.
+    """
+
+    @staticmethod
+    def _settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> None:
+        """이 테스트가 보는 Settings를 환경변수로 구성하고 캐시를 비운다."""
+        for name in (
+            "WHYMATH_ANTHROPIC_API_KEY",
+            "WHYMATH_DEEPSEEK_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "WHYMATH_OPENROUTER_API_KEY",
+            "OPENROUTER_API_KEY",
+            "WHYMATH_OPENROUTER_ALLOWED_PROVIDERS",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        config.get_settings.cache_clear()
+
+    def test_missing_anthropic_key_is_not_ready(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._settings(monkeypatch)
+        ready, detail = battle.arm_readiness("anthropic")
+        assert ready is False
+        assert "WHYMATH_ANTHROPIC_API_KEY" in detail
+        config.get_settings.cache_clear()
+
+    def test_present_deepseek_key_is_ready(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._settings(monkeypatch, DEEPSEEK_API_KEY="sk-test-not-a-real-key")
+        ready, _ = battle.arm_readiness("deepseek")
+        assert ready is True
+        config.get_settings.cache_clear()
+
+    def test_openrouter_key_without_allowlist_is_not_ready(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """키는 있는데 허용목록이 빈 상태 — 빈 허용목록은 '아무나 허용'이 아니라 '차단'이다."""
+        self._settings(
+            monkeypatch,
+            OPENROUTER_API_KEY="sk-or-test-not-a-real-key",
+            WHYMATH_OPENROUTER_ALLOWED_PROVIDERS="[]",
+        )
+        ready, detail = battle.arm_readiness("openrouter")
+        assert ready is False
+        assert "허용 공급사" in detail
+        config.get_settings.cache_clear()
+
+    def test_openrouter_with_key_and_allowlist_is_ready(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._settings(
+            monkeypatch,
+            OPENROUTER_API_KEY="sk-or-test-not-a-real-key",
+            WHYMATH_OPENROUTER_ALLOWED_PROVIDERS='["deepinfra"]',
+        )
+        ready, detail = battle.arm_readiness("openrouter")
+        assert ready is True
+        assert "deepinfra" in detail
+        config.get_settings.cache_clear()
+
+    def test_unknown_arm_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._settings(monkeypatch)
+        with pytest.raises(ValueError, match="알 수 없는 arm"):
+            battle.arm_readiness("gemini")
+        config.get_settings.cache_clear()
+
+    def test_check_only_refuses_when_key_absent(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """미비 arm이 있으면 시험지 생성도 호출도 하지 않고 exit 2."""
+        self._settings(monkeypatch)
+        called: list[str] = []
+
+        def _never_built(**_kwargs: object) -> list[object]:
+            called.append("built")
+            return []
+
+        monkeypatch.setattr(battle, "build_defect_seeded_set", _never_built)
+        code = battle.main(["--arm", "anthropic", "--check-only"])
+        assert code == 2
+        assert called == []
+        assert "미비" in capsys.readouterr().out
+        config.get_settings.cache_clear()
+
+    def test_check_only_passes_and_makes_no_call(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """준비된 arm만 있으면 exit 0 — 그러나 평가는 한 회차도 돌지 않는다."""
+        self._settings(monkeypatch, DEEPSEEK_API_KEY="sk-test-not-a-real-key")
+        evaluated: list[str] = []
+
+        def _never_evaluated(*_a: object, **_k: object) -> list[object]:
+            evaluated.append("ran")
+            return []
+
+        monkeypatch.setattr(battle, "evaluate_arm", _never_evaluated)
+        code = battle.main(["--arm", "deepseek", "--check-only"])
+        assert code == 0
+        assert evaluated == []
+        assert "호출 가능" in capsys.readouterr().out
+        config.get_settings.cache_clear()
