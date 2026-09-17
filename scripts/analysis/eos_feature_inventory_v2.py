@@ -400,6 +400,17 @@ CATALOG: tuple[Spec, ...] = (
        "GET /ability/by-concept", "GET /ability/history"),
     _s("WM-S-018", "개념 진단(BKT↔IRT 교차검증)·요약", "Student", "Assessment", "P0",
        "계획서 300 Gate2 ②진단 완료", "me", "GET /diagnosis/concepts", "GET /diagnosis/summary"),
+    # EOS-10(2026-09-16 신설). **016·017·018 중 어디에도 접지 않는다** — 이 표면은 그 셋을
+    # *합성*하므로 하나에 귀속시키면 나머지 둘의 귀속이 거짓이 된다. 계획서 300 §12가 요구한
+    # 12종 중 유일하게 대응물이 없던 축이며, 사용자에게 의미 있는 능력으로도 별개다
+    # ("숙달을 본다"·"능력을 본다"가 아니라 "내 학습 상태를 한 번에 본다").
+    # 번호 주의: 초판은 WM-S-051이었으나 EOS-11(PR #1182)이 같은 번호를 먼저 썼다 —
+# git이 충돌 마커 없이 자동 병합해 같은 id 두 행이 되는 조용한 충돌이었다(2026-09-16).
+# P1인 이유: 조각 3표면(P0)이 이미 같은 사실을 공급하므로 12월 검증 G1~G5의 차단 조건이
+    # 아니다 — 우회 가능하되 합성 규칙을 서버에 두는 품질 이득이 크다(EOS-10 eos_priority와 일치).
+    _s("WM-S-052", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
+       "Student", "Learning Model", "P1",
+       "계획서 300 §12 LearnerState — 조각 3표면 합성(EOS-10)", "me", "GET /learner-state"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -550,6 +561,12 @@ CATALOG: tuple[Spec, ...] = (
        "EOS-11 — 5원천을 한 학습자 시간선으로 투영. 적재는 WM-E-206 소유이고 이 행은 "
        "읽기 전용 projection(session.add·commit 0건)·원천 가용성 3상태 대장",
        "l2.learning_event_trace"),
+    _e("WM-E-210", "채점 Evidence 조립(Answer→Evidence 중간 객체·읽기 전용)", "Student",
+       "Assessment", "P1",
+       "EOS-12 — 계획서 300 §5.1. 개념·스킬·오개념 후보 3종을 묶고 작동 비율을 함께 낸다. "
+       "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
+       "schema/assessment_evidence.py가 소유",
+       "l2.assessment_evidence"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",

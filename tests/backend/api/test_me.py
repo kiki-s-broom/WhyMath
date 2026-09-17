@@ -922,7 +922,18 @@ class TestSubmitAttempt:
         cid = uuid.uuid4()
         # 개념 숙달: execute#1=개념 [cid]·#2=개념 prior 없음.
         # 스킬 숙달(Phase 2b-2): #3=개념 [cid]·#4=스킬 해소 [](미매핑 → 스킬행 0).
-        session = _QueueSession([_AQResult([cid]), _AQResult([]), _AQResult([cid]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY·#2=TESTED·#3=스킬 해소.
+        session = _QueueSession(
+            [
+                _AQResult([cid]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([cid]),
+                _AQResult([]),
+                _AQResult([cid]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -954,7 +965,18 @@ class TestSubmitAttempt:
     def test_submit_no_mapped_concepts(self) -> None:
         """문제↔개념 매핑 없으면 attempt만 적재·mastery/skill 갱신 빈 리스트."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED 폴백→[]. 스킬(Phase 2b-2): PRIMARY→[]·TESTED→[].
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -970,7 +992,18 @@ class TestSubmitAttempt:
     def test_submit_overconfident_returns_coaching(self) -> None:
         """과신 제출(틀림 + 확신≥0.7) → calibration_coaching.focus==overconfident(§11.4)."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED→[]·스킬 PRIMARY→[]·TESTED→[](매핑 없음).
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -990,8 +1023,10 @@ class TestSubmitAttempt:
 
     def test_submit_well_calibrated_no_coaching(self) -> None:
         """잘 보정됨(맞음 + 확신 높음) → calibration_coaching==null."""
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
         # 정답: 개념 assessed→[]·스킬 assessed→[](매핑 없음·둘 다 갱신 0).
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1007,7 +1042,18 @@ class TestSubmitAttempt:
     def test_submit_no_confidence_no_coaching(self) -> None:
         """확신 미제출(confidence 없음) → calibration_coaching==null(보정 평가 불가)."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED→[]·스킬 PRIMARY→[]·TESTED→[](매핑 없음).
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1018,7 +1064,18 @@ class TestSubmitAttempt:
 
     def test_submit_stores_student_answer_plaintext_when_key_unset(self) -> None:
         """SEC-31: 키 미설정(기존 동작) — student_answer는 평문 그대로·암호화 컬럼은 None."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         with _student_work_key_env(None):
             resp = client.post(
@@ -1039,7 +1096,18 @@ class TestSubmitAttempt:
     def test_submit_encrypts_student_answer_when_key_configured(self) -> None:
         """SEC-31: 키 설정 시 — student_answer는 NULL·암호화 컬럼에 ciphertext/nonce가 실리고
         그 ciphertext를 같은 키로 복호하면 원문이 그대로 나온다(dialogue_turn 선례 계약 미러)."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         key_b64 = base64.b64encode(os.urandom(32)).decode()
         with _student_work_key_env(key_b64):
@@ -1071,7 +1139,18 @@ class TestSubmitAttempt:
         `started_at != ingested_at` 단언이 "서버 now 폴백 부재"의 증거다(같으면 폴백 잔존).
         """
         reported = datetime(2026, 3, 2, 9, 30, tzinfo=UTC)
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1093,7 +1172,18 @@ class TestSubmitAttempt:
 
     def test_submit_without_started_at_leaves_null(self) -> None:
         """PED-37: 미신고면 NULL=미측정으로 남긴다 — 서버 now로 메우지 않는다(날조 금지)."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1111,7 +1201,18 @@ class TestSubmitAttempt:
         `tzinfo=None`으로 수용됐다. 프로덕션 컨테이너가 UTC이므로 한국 로컬 시각이 **9시간
         어긋나** 저장되고, 그러면 PED-37이 되살리려던 시간창 귀속이 오히려 조용히 망가진다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1134,7 +1235,18 @@ class TestSubmitAttempt:
         이 PR *이전*에는 started_at이 항상 NULL이라 조작할 값 자체가 없었다 — 통로를 여는
         변경이 공격 표면도 함께 만들었으므로 여는 쪽에서 닫는다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         far_future = datetime.now(UTC) + timedelta(days=365 * 50)
         resp = client.post(
@@ -1156,7 +1268,18 @@ class TestSubmitAttempt:
         거부하면 정직한 제출이 튕겨 학습 기록이 통째로 유실된다 — 막아야 할 것은 시계 오차가
         아니라 보존기한 회피다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         slightly_ahead = datetime.now(UTC) + timedelta(seconds=30)
         resp = client.post(
@@ -3179,3 +3302,108 @@ class TestAssessmentCaptureEndpoint:
         # 재적재 없음 — 커밋 0·add 0(이중 계상 방지가 실제로 동작함을 확인).
         assert fake.commits == 0
         assert fake.added == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-10 — GET /v1/me/learner-state (LearnerState 단일 조회 표면)
+# ──────────────────────────────────────────────────────────────────────────
+class _LearnerStateSession(_QueueSession):
+    """`_QueueSession` + `get()` — `get_state()`는 `session.get(UserProfile, ...)`도 부른다.
+
+    execute 큐 순서(조립기 계약): ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬 숙달.
+    """
+
+    def __init__(self, results: list[_AQResult], profile: Any = None) -> None:
+        super().__init__(results)
+        self._profile = profile
+
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        return self._profile
+
+
+def _learner_state_client(
+    *,
+    mastery_rows: list[Any] | None = None,
+    irt_rows: list[Any] | None = None,
+    theta_rows: list[Any] | None = None,
+    misconception_rows: list[Any] | None = None,
+    skill_rows: list[Any] | None = None,
+    profile: Any = None,
+) -> TestClient:
+    session = _LearnerStateSession(
+        [
+            _AQResult(mastery_rows or []),
+            _AQResult(irt_rows or []),
+            _AQResult(theta_rows or []),
+            _AQResult(misconception_rows or []),
+            _AQResult(skill_rows or []),
+        ],
+        profile=profile,
+    )
+    return _attempts_client(cast(_QueueSession, session))
+
+
+class TestLearnerStateSurface:
+    """EOS-10: 조각 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)의 **합성 표면**."""
+
+    def test_requires_auth(self) -> None:
+        app = create_app()
+
+        async def _sess() -> AsyncIterator[_LearnerStateSession]:
+            yield _LearnerStateSession([_AQResult([]) for _ in range(5)])
+
+        app.dependency_overrides[get_session] = _sess
+        assert TestClient(app).get("/v1/me/learner-state").status_code == 401
+
+    def test_returns_all_fields_for_new_student(self) -> None:
+        """진단·오개념·프로필이 전부 없는 신규 학생도 200 — 빈 값이지 오류가 아니다."""
+        resp = _learner_state_client().get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["student_id"] == str(_UID)
+        assert body["mastery"] == {}
+        assert body["skill_mastery"] == {}
+        assert body["curriculum_id"] is None
+        assert body["current_objective_id"] is None
+
+    def test_assembles_concept_and_skill_axes_in_one_call(self) -> None:
+        """한 호출로 개념 축(BKT)과 행동 축(스킬)이 함께 온다 — 조각 조회의 이유가 사라진다."""
+        cid = uuid.uuid4()
+        resp = _learner_state_client(
+            mastery_rows=[(cid, "C-1", "개념", 0.85)],
+            skill_rows=[("skill.factorize", 0.72)],
+            theta_rows=[1.2],
+        ).get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mastery"] == {"C-1": 0.85}
+        assert body["skill_mastery"] == {"skill.factorize": 0.72}
+        assert body["recent_successes"] == ["C-1"]  # 0.85 >= 숙달 임계 0.8
+
+    def test_origins_exposes_no_producer_distinctly_from_no_data(self) -> None:
+        """응답이 '이력이 없다'와 '생산자가 없다'를 구별해 말하는가 — 이 표면의 핵심 계약."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        origins = body["origins"]
+        assert origins["skill_mastery"]["status"] == "measured"
+        assert origins["mastery"]["status"] == "no_data"  # 생산자는 있으나 이력 없음
+        assert origins["curriculum_id"]["status"] == "no_producer"
+        assert origins["current_objective_id"]["status"] == "no_producer"
+
+    def test_origins_reports_estimator_for_swap_visibility(self) -> None:
+        """추정기가 응답에 실린다 — BKT→DKT 교체가 소비처에 보이게 하는 축(계획서 §2)."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+                theta_rows=[0.3],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        assert body["origins"]["skill_mastery"]["estimator"] == "bkt.v1"
+        assert body["origins"]["general_ability"]["estimator"] == "irt.2pl"
