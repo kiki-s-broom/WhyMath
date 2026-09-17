@@ -184,6 +184,11 @@ class TestThresholdSingleSource:
         """`learner_state`의 LTHC 밴드는 **다른 축**이다 — 상한이 0.8이라 합치면 한쪽이 움직인다.
 
         값이 같다고 합치지 않는다는 판단을 기계로 남긴다: 0.4는 두 곳에서 같지만 상한이 다르다.
+
+        **`ARCH-53`이 이 두 상수를 `schema`로 내릴 때 이 테스트가 깨진다 — 그것이 의도다.**
+        그 이동은 `learner_state`↔`l4/lthc/adapt.py`의 *복제*를 없애는 작업이고, 이 테스트가
+        지키는 것은 그 밴드가 **약점 컷과 섞이지 않는다**는 별개 축이다. 위치를 옮기되 두 축을
+        한 상수로 접지 않았다는 것을 그 시점에 다시 확인하라는 신호로 남긴다.
         """
         from whymath_backend.l2 import learner_state
 
