@@ -338,6 +338,34 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-17 (실측 · ARCH-49 → ARCH-55): **DeepSeek 공식 API 첫 라이브 호출 성공 — 배선이 실제로 돈다** (Kiki 실행, claude 도구·기록) — 판정 기준 main `6d1d9d10` + PR #1191 브랜치
+
+**① 무엇이 확인됐나.** ARCH-49가 만든 경로로 **DeepSeek이 실제로 응답했다**. 그 전까지 이 저장소가 가진 것은 "부를 수 있는 배선"뿐이었고 그것이 도는지는 아무도 몰랐다 — 개발 컨테이너는 키가 없고 egress가 `api.deepseek.com`에 `CONNECT 403`을 낸다(2026-09-17 실측). Kiki가 Phaiakes9에서 `harness.deepseek_live_probe`를 돌려 그 간극을 닫았다.
+
+**② 실측값 (1회차 · n=1).**
+
+| 항목 | 값 |
+|---|---|
+| 시각 | 2026-09-17T07:56:14Z (요금 구간 **peak**) |
+| 경로 | DeepSeek 공식 API (`api.deepseek.com`·CN 관할) |
+| 라우터 결정 | `cloud_mid` → 모델 `deepseek-flash` |
+| 반출 판정 | `EXPORT_ALLOWED` (게이트 발동 False) |
+| 선언 등급 | `WHYMATH_GENERATED` (CN 기본 허용 등급 — opt-in 불요) |
+| 입력/출력 토큰 | 88 / 420 |
+| 캐시 적중 | 0 (None이 아니라 0 — **읽었는데 적중 없음**이 실측) |
+| 실측 지연 | **3,438 ms** |
+| 종료 코드 | 0 |
+
+**③ 라우터를 경유했다는 것이 함께 확인됐다.** 프로브는 티어를 손으로 박지 않고 입력 신호를 골라 라우터가 스스로 `CLOUD_MID`를 내게 한다. 그래서 이 성공은 모델 응답만이 아니라 **라우팅 → 법적 게이트(`guard_data_export`) → 관할 게이트(`provider_jurisdiction`) → 프로바이더**가 한 줄로 이어져 있다는 관통 증거다.
+
+**④ 응답 품질(1건 · 인상 판정임을 명시).** "1~100 합" 문항에 가우스 짝짓기(50×101=5050)로 답하고, **왜 성립하는지를 교환법칙·결합법칙으로** 설명했다 — 답보다 이유를 먼저 말하라는 system 프롬프트를 따랐다. 다만 이것은 **1건 인상 판정이지 강등전이 아니다.** 정확도 축은 결함 주입 강등전으로 판정해야 하며(초인간 검증 기준 §3.1-3.2·Wilson 단측 경계) 그것은 `ARCH-55`의 몫이다.
+
+**⑤ 비용 — 기록 단가 기반 산술이며 청구서로 확인하지 않았다.** 이 회차 토큰(88/420)에 단가를 곱하면 DeepSeek 피크 $0.000530 · 오프피크 $0.000265 · 현행 CLOUD_MID 핀(Sonnet 4.6) $0.006564다 → **피크에도 12.4배, 오프피크면 24.8배 저렴**하다. 단가 출처는 ARCH-49 acceptance ⑨(공식 오프피크 $0.15/$0.60 per 1M)·⑥(피크=정확히 2배)와 `models.py`의 CLOUD_MID 주석($3/$15 per 1M)이며, **실제 청구 금액을 대조하지 않았다** — 배율의 자릿수는 신뢰하되 소수점은 신뢰하지 않는다.
+
+**⑥ 그럼에도 채택은 아직 미판정이다.** 이 회차가 답한 것은 "도는가"(예)와 "지연이 얼마인가"(3.4초)뿐이다. 남은 것: 품질 강등전 · OpenRouter 경유 대조(같은 모델·다른 관할·다른 단가) · 피크/오프피크 분리 집계 · 반복 표본. 기본 라우팅은 여전히 Anthropic이고 이 실측 하나로 바꾸지 않는다.
+
+**⑦ 도구가 CI에서 못 도는 것은 의도이며 선언돼 있다.** `harness.deepseek_live_probe`는 `declared_unwired_audit`에 `_LIVE_DEPENDENT`로, `eos_feature_inventory_v2`에 `WM-O-904`로 귀속돼 있다. 두 게이트가 **각각 red로 잡아냈고**(선언 누락·귀속 누락) 그것이 옳은 지적이었다 — 도구를 만들고 배선 확인 없이 넘어가려던 것을 기계가 막았다.
+
 ### 2026-09-17 (구현 · ARCH-49): **DeepSeek 경로 2종 배선 — 그리고 "어느 나라 법인인가"를 `CostTier`가 아니라 *프로바이더*가 말하게 했다** (claude 구현) — 판정 기준 main `6d1d9d10`
 
 **① 티어를 늘리지 않았다(acceptance ⑧의 답).** DeepSeek 공식 API는 중국 본토 서버 전용이라 "CN 티어를 만들자"가 먼저 떠오르지만, 그러면 `OFFSHORE_TIERS`·세 축 불변식·`LOCAL_MODEL_MATRIX`·라우터 결정표를 전부 손대야 한다(붕괴 연쇄 ② 축 버전). 대신 **관할을 프로바이더 메타데이터로 분리**했다 — `CostTier`는 계속 "얼마나 비싼가·어디서 도는가"만 말하고, `Jurisdiction`(`l3/provider_jurisdiction.py`)이 "어느 나라 법인인가"를 말한다. 같은 `CLOUD_MID` 결정이 Anthropic(US)으로도 DeepSeek(CN)으로도 나가며, 비용 등급은 같고 관할이 다르다.
@@ -360,7 +388,7 @@
 
 **⑩ 미이행 — 라이브 측정은 남았다.** acceptance ①(품질·지연·비용 3축 강등전)·⑥(피크/오프피크 분리 집계)은 **Kiki 머신의 라이브 키가 필요해 이 세션에서 할 수 없다**. 이 PR이 착지시킨 것은 *측정을 돌릴 수 있는 배선*이며(CN 기본 설정으로 합성 프로브 경로가 열린다), 측정 자체와 채택 여부 판정은 `ARCH-53`으로 승계했다. **즉 이 시점의 채택 결론은 "미판정"이다** — 코드가 있다는 것이 채택했다는 뜻이 아니고, 기본 라우팅은 여전히 Anthropic이다(`CompositeProvider(cloud=AnthropicProvider())` 15곳 무변경).
 
-**⑪ 정직한 공백.** ⓐ DeepSeek이 유료 API 입력을 학습에 쓰는지 **미확정**(2차 자료가 서로 반대·1차 약관 프록시 차단) — `deepseek_allow_internal_corpus` 기본 OFF의 이유이며 확정 시 재평가한다 ⓑ OpenRouter 엔드포인트 16곳 중 8곳의 법인 국적 미확인 ⓒ `openrouter_model_high`(`deepseek/deepseek-v4-pro`)는 가격을 실측하지 않았다 — MID만 2026-09-16에 확인했다 ⓓ 관할 게이트는 `decision.data_licenses` **선언을 믿는다**(선언이 실제 프롬프트 내용과 맞는지는 `check_routing_data_grade.py`가 입력 축에서 따로 본다) ⓔ 두 provider 모두 라이브 호출 0건 — 전송 시임으로만 검증했다.
+**⑪ 정직한 공백.** ⓐ DeepSeek이 유료 API 입력을 학습에 쓰는지 **미확정**(2차 자료가 서로 반대·1차 약관 프록시 차단) — `deepseek_allow_internal_corpus` 기본 OFF의 이유이며 확정 시 재평가한다 ⓑ OpenRouter 엔드포인트 16곳 중 8곳의 법인 국적 미확인 ⓒ `openrouter_model_high`(`deepseek/deepseek-v4-pro`)는 가격을 실측하지 않았다 — MID만 2026-09-16에 확인했다 ⓓ 관할 게이트는 `decision.data_licenses` **선언을 믿는다**(선언이 실제 프롬프트 내용과 맞는지는 `check_routing_data_grade.py`가 입력 축에서 따로 본다) ⓔ ~~두 provider 모두 라이브 호출 0건~~ **정정(2026-09-17)**: DeepSeek 공식 API는 라이브 1회차가 성공했다(위 실측 항목 참조 — 3,438ms·88/420 토큰). OpenRouter 경유는 아직 라이브 호출 0건이다.
 
 ### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
 
