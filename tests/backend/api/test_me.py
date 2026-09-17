@@ -3318,3 +3318,108 @@ class TestAssessmentCaptureEndpoint:
         # 재적재 없음 — 커밋 0·add 0(이중 계상 방지가 실제로 동작함을 확인).
         assert fake.commits == 0
         assert fake.added == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-10 — GET /v1/me/learner-state (LearnerState 단일 조회 표면)
+# ──────────────────────────────────────────────────────────────────────────
+class _LearnerStateSession(_QueueSession):
+    """`_QueueSession` + `get()` — `get_state()`는 `session.get(UserProfile, ...)`도 부른다.
+
+    execute 큐 순서(조립기 계약): ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬 숙달.
+    """
+
+    def __init__(self, results: list[_AQResult], profile: Any = None) -> None:
+        super().__init__(results)
+        self._profile = profile
+
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        return self._profile
+
+
+def _learner_state_client(
+    *,
+    mastery_rows: list[Any] | None = None,
+    irt_rows: list[Any] | None = None,
+    theta_rows: list[Any] | None = None,
+    misconception_rows: list[Any] | None = None,
+    skill_rows: list[Any] | None = None,
+    profile: Any = None,
+) -> TestClient:
+    session = _LearnerStateSession(
+        [
+            _AQResult(mastery_rows or []),
+            _AQResult(irt_rows or []),
+            _AQResult(theta_rows or []),
+            _AQResult(misconception_rows or []),
+            _AQResult(skill_rows or []),
+        ],
+        profile=profile,
+    )
+    return _attempts_client(cast(_QueueSession, session))
+
+
+class TestLearnerStateSurface:
+    """EOS-10: 조각 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)의 **합성 표면**."""
+
+    def test_requires_auth(self) -> None:
+        app = create_app()
+
+        async def _sess() -> AsyncIterator[_LearnerStateSession]:
+            yield _LearnerStateSession([_AQResult([]) for _ in range(5)])
+
+        app.dependency_overrides[get_session] = _sess
+        assert TestClient(app).get("/v1/me/learner-state").status_code == 401
+
+    def test_returns_all_fields_for_new_student(self) -> None:
+        """진단·오개념·프로필이 전부 없는 신규 학생도 200 — 빈 값이지 오류가 아니다."""
+        resp = _learner_state_client().get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["student_id"] == str(_UID)
+        assert body["mastery"] == {}
+        assert body["skill_mastery"] == {}
+        assert body["curriculum_id"] is None
+        assert body["current_objective_id"] is None
+
+    def test_assembles_concept_and_skill_axes_in_one_call(self) -> None:
+        """한 호출로 개념 축(BKT)과 행동 축(스킬)이 함께 온다 — 조각 조회의 이유가 사라진다."""
+        cid = uuid.uuid4()
+        resp = _learner_state_client(
+            mastery_rows=[(cid, "C-1", "개념", 0.85)],
+            skill_rows=[("skill.factorize", 0.72)],
+            theta_rows=[1.2],
+        ).get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mastery"] == {"C-1": 0.85}
+        assert body["skill_mastery"] == {"skill.factorize": 0.72}
+        assert body["recent_successes"] == ["C-1"]  # 0.85 >= 숙달 임계 0.8
+
+    def test_origins_exposes_no_producer_distinctly_from_no_data(self) -> None:
+        """응답이 '이력이 없다'와 '생산자가 없다'를 구별해 말하는가 — 이 표면의 핵심 계약."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        origins = body["origins"]
+        assert origins["skill_mastery"]["status"] == "measured"
+        assert origins["mastery"]["status"] == "no_data"  # 생산자는 있으나 이력 없음
+        assert origins["curriculum_id"]["status"] == "no_producer"
+        assert origins["current_objective_id"]["status"] == "no_producer"
+
+    def test_origins_reports_estimator_for_swap_visibility(self) -> None:
+        """추정기가 응답에 실린다 — BKT→DKT 교체가 소비처에 보이게 하는 축(계획서 §2)."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+                theta_rows=[0.3],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        assert body["origins"]["skill_mastery"]["estimator"] == "bkt.v1"
+        assert body["origins"]["general_ability"]["estimator"] == "irt.2pl"

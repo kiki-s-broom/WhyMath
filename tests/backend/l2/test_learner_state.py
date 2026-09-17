@@ -21,7 +21,7 @@ from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from whymath_backend.l2.learner_state import get_state
+from whymath_backend.l2.learner_state import FieldStatus, LearnerState, get_state
 
 _UID = uuid.uuid4()
 
@@ -69,7 +69,12 @@ class _QueueSession:
     ②IRT abilities(`compute_concept_diagnoses` → `compute_concept_abilities`)
     ③전과목 θ(`get_current_theta`)
     ④활성 오개념 id(`_get_active_misconception_ids`)
+    ⑤스킬별 최신 숙달(`get_all_current_skill_mastery` — EOS-10)
     그 뒤 `session.get(UserProfile, user_id)` 1회(execute 큐와 별개).
+
+    **순서가 계약이다** — 큐가 위치로 결과를 돌려주므로 `get_state()`가 호출 순서를 바꾸면
+    이 하네스가 엉뚱한 행을 먹인다. 큐가 마르면 `IndexError`가 나므로 호출이 *늘어나는* 것은
+    반드시 발각된다(조용히 통과하지 않는다).
     """
 
     def __init__(self, results: list[list[Any]], profile: _FakeProfile | None) -> None:
@@ -89,6 +94,7 @@ def _session(
     ability_rows: list[Any] | None = None,
     theta_rows: list[Any] | None = None,
     misconception_rows: list[Any] | None = None,
+    skill_rows: list[Any] | None = None,
     profile: _FakeProfile | None = None,
 ) -> AsyncSession:
     return cast(
@@ -99,6 +105,7 @@ def _session(
                 ability_rows or [],
                 theta_rows or [],
                 misconception_rows or [],
+                skill_rows or [],
             ],
             profile,
         ),
@@ -226,3 +233,164 @@ def test_learner_state_module_has_no_l4_import() -> None:
                 if alias.name.startswith("whymath_backend.l4")
             )
     assert not offending, f"{module}에 L4 역방향 import 발견:\n" + "\n".join(offending)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-10 — 결손 3필드(curriculum_id·current_objective_id·skill_mastery) + 유래 축
+# ──────────────────────────────────────────────────────────────────────────
+class TestSkillMasteryAssembly:
+    """스킬 축은 *조립*이다 — 값은 소유 모듈의 벌크 좌석이 내고 여기서 재계산하지 않는다."""
+
+    async def test_skill_mastery_assembled_from_bulk_seat(self) -> None:
+        session = _session(
+            skill_rows=[("skill.factorize", 0.72), ("skill.substitute", 0.31)],
+        )
+        state = await get_state(session, _UID)
+        assert state.skill_mastery == {"skill.factorize": 0.72, "skill.substitute": 0.31}
+        assert state.origins["skill_mastery"].status is FieldStatus.MEASURED
+        # 좌석이 응답에 드러난다 — 교체 시 바뀌는 곳이 어디인지 소비처가 알 수 있다.
+        assert state.origins["skill_mastery"].seat == (
+            "l2.skill_mastery_tracking.get_all_current_skill_mastery"
+        )
+
+    async def test_skill_mastery_empty_marks_no_data_not_no_producer(self) -> None:
+        """측정 이력이 없는 것과 생산자가 없는 것은 다르다 — 스킬 축은 전자다."""
+        state = await get_state(_session(), _UID)
+        assert state.skill_mastery == {}
+        assert state.origins["skill_mastery"].status is FieldStatus.NO_DATA
+
+
+class TestNoProducerFields:
+    """생산자 0건인 두 필드는 **항상 None이고 그 사실을 말한다**(착시 금지)."""
+
+    async def test_curriculum_and_objective_are_none_with_no_producer_origin(self) -> None:
+        state = await get_state(_session(), _UID)
+        for field in ("curriculum_id", "current_objective_id"):
+            assert getattr(state, field) is None, f"{field}는 생산자가 없으므로 None이어야 한다"
+            assert state.origins[field].status is FieldStatus.NO_PRODUCER, (
+                f"{field}의 부재는 NO_DATA가 아니라 NO_PRODUCER다 — 학생이 무엇을 해도 "
+                "채워지지 않는다는 뜻이며, 둘을 같은 값으로 접으면 소비처가 "
+                "'고칠 수 있는 것'과 '고칠 수 없는 것'을 구별하지 못한다"
+            )
+            # 생산자가 없으므로 추정기·좌석도 없어야 한다(있다면 그 자체가 모순이다).
+            assert state.origins[field].estimator is None
+            assert state.origins[field].seat is None
+
+    async def test_no_producer_fields_stay_none_even_with_full_data(self) -> None:
+        """다른 축이 전부 측정돼도 이 둘은 채워지지 않는다 — 데이터 문제가 아니기 때문이다."""
+        session = _session(
+            theta_rows=[0.8],
+            misconception_rows=["mis.sign-flip"],
+            skill_rows=[("skill.factorize", 0.9)],
+            profile=_FakeProfile(grade=3, target_grade=1),
+        )
+        state = await get_state(session, _UID)
+        assert state.origins["grade"].status is FieldStatus.MEASURED  # 대조군
+        assert state.curriculum_id is None
+        assert state.current_objective_id is None
+
+
+class TestOriginsCompleteness:
+    """`origins`는 데이터 필드 **전건**을 덮어야 한다 — 이 가드가 없으면 필드만 늘고 유래가 빈다."""
+
+    _META_FIELDS = frozenset({"student_id", "timestamp", "origins"})
+
+    async def test_origins_covers_every_data_field(self) -> None:
+        state = await get_state(_session(), _UID)
+        data_fields = set(LearnerState.model_fields) - self._META_FIELDS
+        missing = data_fields - set(state.origins)
+        extra = set(state.origins) - data_fields
+        assert not missing, (
+            f"유래 없는 데이터 필드: {sorted(missing)} — 필드를 추가했으면 `get_state()`의 "
+            "`origins` dict에도 항을 추가하라. 유래 없는 필드는 '작동한 비율'을 셀 수 없게 만든다"
+        )
+        assert not extra, f"존재하지 않는 필드의 유래: {sorted(extra)}"
+
+    async def test_measured_ratio_is_computable_from_origins(self) -> None:
+        """소비처가 '이 조립이 실제로 작동한 비율'을 셀 수 있어야 한다(CLAUDE.md 작동한 비율)."""
+        session = _session(
+            theta_rows=[0.5],
+            skill_rows=[("skill.factorize", 0.6)],
+            profile=_FakeProfile(grade=2),
+        )
+        state = await get_state(session, _UID)
+        measured = [k for k, o in state.origins.items() if o.status is FieldStatus.MEASURED]
+        assert sorted(measured) == [
+            "general_ability",
+            "grade",
+            "skill_mastery",
+        ], "측정된 필드만 MEASURED여야 한다 — 빈 컬렉션이 MEASURED로 새면 비율이 부풀려진다"
+
+    async def test_estimator_is_a_value_not_a_comment(self) -> None:
+        """추정기 교체(BKT→DKT)가 스키마 모양이 아니라 **값**만 바꾸도록 타입에 실려 있는가."""
+        session = _session(theta_rows=[0.5], skill_rows=[("skill.factorize", 0.6)])
+        state = await get_state(session, _UID)
+        assert state.origins["skill_mastery"].estimator == "bkt.v1"
+        assert state.origins["general_ability"].estimator == "irt.2pl"
+        # 추정이 아닌 경로(프로필 조회)는 추정기가 없어야 한다 — 아무 데나 붙이면 의미가 죽는다.
+        assert state.origins["grade"].estimator is None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 좌석 판정 가드 (EOS-10 acceptance ③) — 이 조립기는 `user_state_snapshot`을 경유하지 않는다
+# ──────────────────────────────────────────────────────────────────────────
+def _strip_docstrings(tree: ast.AST) -> None:
+    """모듈·클래스·함수의 docstring 노드만 제거 — 나머지 문자열 리터럴은 남긴다.
+
+    남기는 것이 중요하다: 좌석 이름을 **코드의 문자열 리터럴**로 쓰는 우회
+    (`getattr(models, "UserStateSnapshot")`·`text("select … from user_state_snapshot")`)는
+    여전히 검출돼야 한다. docstring만 정확히 지운다.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        body = node.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            node.body = body[1:] or [ast.Pass()]
+
+
+def test_get_state_does_not_touch_user_state_snapshot_seat() -> None:
+    """`UserStateSnapshot`(writer 0·축이 다름)을 읽거나 쓰지 않음을 AST로 동결.
+
+    판정 근거는 `get_state()` docstring의 "좌석 판정" 절에 있다. 이 가드는 그 판정이 나중에
+    조용히 뒤집히는 것을 막는다 — 스냅샷을 읽기 시작하면 `concept_mastery`가 같은 사실의 두
+    번째 진실 원천이 되고(붕괴 연쇄 "유지보수 지옥"), 게다가 writer가 0이라 항상 빈 상태를
+    돌려준다. 좌석을 쓰기로 **결정을 바꾸는** 것은 가능하지만, 그때는 이 테스트를 지우는 것이
+    그 결정의 명시적 기록이 된다(조용한 표류 금지).
+    """
+    module = "whymath_backend.l2.learner_state"
+    spec = importlib.util.find_spec(module)
+    assert spec is not None and spec.origin is not None, f"모듈 경로 해석 실패: {module}"
+    with open(spec.origin, encoding="utf-8") as fh:
+        source = fh.read()
+    tree = ast.parse(source, filename=spec.origin)
+
+    # ① import 축 — 심볼을 끌어오지 않는다.
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            imported.extend(
+                f"{node.module}.{alias.name} (line {node.lineno})"
+                for alias in node.names
+                if alias.name == "UserStateSnapshot"
+            )
+    assert not imported, f"{module}이 좌석 심볼을 import한다:\n" + "\n".join(imported)
+
+    # ② 이름 축 — import 없이 문자열·속성으로 닿는 경로도 막는다.
+    #
+    # **docstring은 반드시 걷어낸다.** 이 모듈의 docstring은 좌석 판정을 *기록*하므로 그 이름을
+    # 정당하게 담고 있다 — 걷어내지 않으면 판정을 적었다는 이유로 가드가 터진다(초판이 실제로
+    # 그랬다). 걷어낸 뒤에도 코드에 이름이 남으면 그것은 진짜 참조다.
+    _strip_docstrings(tree)
+    code_only = ast.unparse(tree)
+    for needle in ("UserStateSnapshot", "user_state_snapshot"):
+        assert needle not in code_only, (
+            f"{module}의 **코드**에 좌석 참조 `{needle}`가 있다 — 판정은 '이 표면은 그 좌석을 "
+            "쓰지 않는다'이며, 쓰기로 결정을 바꿨다면 docstring의 좌석 판정 절과 이 가드를 "
+            "함께 갱신하라"
+        )

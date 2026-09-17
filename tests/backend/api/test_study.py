@@ -60,7 +60,14 @@ def _session(
     ability_rows: list[Any] | None = None,
     theta_rows: list[Any] | None = None,
     misconception_rows: list[Any] | None = None,
+    skill_rows: list[Any] | None = None,
 ) -> AsyncSession:
+    """`_build_signals` → `get_state()`의 execute 큐 — 순서가 조립기 계약이다.
+
+    ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬별 최신 숙달(EOS-10).
+    큐가 마르면 `IndexError`가 나므로 조립기의 쿼리가 *늘어나면* 반드시 발각된다 —
+    실제로 EOS-10이 ⑤를 추가했을 때 이 하네스가 그렇게 잡았다.
+    """
     return cast(
         AsyncSession,
         _QueueSession(
@@ -69,6 +76,7 @@ def _session(
                 ability_rows or [],
                 theta_rows or [],
                 misconception_rows or [],
+                skill_rows or [],
             ]
         ),
     )

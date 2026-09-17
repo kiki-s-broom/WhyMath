@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 단일 조회 표면 신설 — LearnerState를 한 번에 돌려주는 학생 표면을 만든다. 현행은 조각 3개(`GET /v1/me/mastery/current`·`/v1/me/ability`·`/v1/me/diagnosis/summary`)로 분산돼 있고 합성 표면이 0건이다(계획서 §12 12종 중 유일한 미대응).\n② 결손 3필드 보강 — `l2/learner_state.py:53` LearnerState v0는 8필드이나 `curriculum_id`·`current_objective_id`·`skill_mastery{}`가 없다. 스킬 축은 `l2/skill_mastery_tracking.py`에 분리돼 있으므로 **재계산이 아니라 조립**으로 합친다(두 번째 진실 원천 금지).\n③ 좌석 판정 별항(정본화≠집행) — 정본이 배정한 좌석 테이블 `user_state_snapshot`(`db/models/user.py:294`)은 **writer 0**이다. 이 표면이 그 좌석을 쓰는지, 아니면 조립 즉시 계산인지 명시한다. 안 쓸 거면 좌석을 폐기 판정한다(EOS-72 \"배선 또는 폐기\" 선례 동형).\n④ 소비처 확장 실측 — 현재 `get_state()` 소비처는 `api/study.py:173` 1곳뿐이다. 이 태스크 후 소비처가 몇 곳이 되는지 적는다. \"표면을 만들었다\"와 \"무언가가 그것을 쓴다\"는 다르다.\n⑤ 교체 가능성을 타입으로 — 반환 스키마는 나중에 BKT/DKT/IRT가 채워도 형태가 유지되도록 **증거·추정치를 필드로 분리**한다. 주석이 아니라 타입으로 표현한다(계획서 §2)."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1184 (커밋 0e70bb6b) — GET /v1/me/learner-state 신설 + 결손 3필드(skill_mastery 조립 · curriculum_id/current_objective_id 생산자 0건) + 유래 축(FieldStatus/FieldOrigin) + 좌석 판정 AST 동결. 후속 등재 MOB-22(클라 소비·유예 걷기)·ARCH-51(좌석 처분). 검증: 전체 스위트 12582 passed exit 0 · 계층 커버리지 전건 PASS(l2 98.1%) · tests/infra 1400 passed exit 0 · mypy --strict 663 files exit 0 · lint-imports 3 kept 0 broken · 게이트 CLI 8종 exit 0 · 결함주입 13종 RED + 대조군 2종 GREEN"
 paths:
   - src/backend/whymath_backend/l2/learner_state.py
   - src/backend/whymath_backend/api/me.py
