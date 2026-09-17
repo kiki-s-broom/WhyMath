@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-52-inventory-schema-attribution-blindspot
+title: "전수 귀속 스캔의 schema 패키지 사각 — '분류율 166/166' 주장의 실제 범위 확정"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 사각 범위 실측 — schema 외에 어느 패키지가 전수 귀속 검사에서 빠지는지 패키지별로 프로브 모듈을 주입해 전수 판정한다(읽어서 추론 금지·주입으로 판정). 2026-09-16 실측: schema/에 신규 모듈을 넣으면 test_real_repo_population_is_complete가 GREEN, l2/에 넣으면 RED\n② 원인 규명 — WM-E-801이 modules에 'schema'를 패밀리로 선언하고 '-schema.subject_adapter'로 예외까지 두는데도 신규 schema 모듈이 미귀속으로 잡히지 않는 이유를 코드에서 지목한다\n③ 판정 — 사각을 닫을지(전수 검사에 편입) 유지할지(사유 명시) 정한다. 닫는다면 기존 schema 모듈 전건이 즉시 귀속돼야 하므로 만료 없는 그랜드파더가 생기지 않게 한다\n④ 뮤테이션 — 닫은 뒤 각 패키지에 프로브를 주입해 전건 RED를 확인하고, 정상 상태 GREEN 대조군을 함께 둔다. 사각이 남는 패키지가 있으면 그 목록을 사유와 함께 코드 상수로 고정한다"
+artifacts: []
+paths:
+  - scripts/analysis/eos_feature_inventory_v2.py
+session: null
+notes: "EOS-13 구현 중 발견. 전수 귀속 주장('분류율 166/166')이 schema 패키지에는 미치지 않는다 — 신규 schema 모듈이 아무 EOS 행에도 귀속되지 않은 채 검사를 통과한다. 즉 스캔이 '전수'라고 말하지만 실제 범위는 더 좁다. 발견 경위: EOS-13이 schema/mastery_contract.py와 l2/mastery_contract.py를 동시에 신설했는데 l2 쪽만 RED가 났고, 프로브 주입으로 재현했다(schema 주입 GREEN · l2 주입 RED)."
+updated: 2026-09-16

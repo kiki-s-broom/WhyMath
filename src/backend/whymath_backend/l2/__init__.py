@@ -12,6 +12,10 @@
 이름 충돌 메모: `bkt`·`irt` 모두 `probability_correct`를 정의한다(서로 다른 모델). 패키지
 레벨에선 BKT의 것만 재노출하고, IRT 정답확률은 `whymath_backend.l2.irt.probability_correct`로
 명시 접근한다(모델 혼동 방지).
+
+같은 이유로 `mastery_contract.update_mastery`(호출 계약 — 상태+증거 → 갱신)는 패키지 레벨에
+재노출하지 **않는다**. 여기 있는 `update_mastery`는 `bkt`의 것(수식 한 스텝)이며, 호출 계약은
+`whymath_backend.l2.mastery_contract.update_mastery`로 명시 접근한다(EOS-13).
 """
 
 from __future__ import annotations
@@ -64,6 +68,17 @@ from whymath_backend.l2.learning_path import (
     fetch_internal_prerequisite_edges,
     order_learning_path,
 )
+from whymath_backend.l2.mastery_contract import (
+    BKT_ESTIMATOR_ID,
+    AttemptOutcomeEvidence,
+    BktMasteryEstimator,
+    UnknownMasteryEstimatorError,
+    active_estimator_id,
+    register_estimator,
+    registered_estimator_ids,
+    resolve_estimator,
+    use_estimator,
+)
 from whymath_backend.l2.mastery_tracking import (
     MasteryRecord,
     compute_mastery_record,
@@ -74,9 +89,12 @@ from whymath_backend.l2.mastery_tracking import (
 )
 
 __all__ = [
+    "BKT_ESTIMATOR_ID",
     "DEFAULT_BKT_PARAMETERS",
     "AbilityReading",
     "Agreement",
+    "AttemptOutcomeEvidence",
+    "BktMasteryEstimator",
     "BktModel",
     "BktParameters",
     "ConceptAbilityItem",
@@ -85,7 +103,9 @@ __all__ = [
     "LearningPath",
     "LearningStep",
     "MasteryRecord",
+    "UnknownMasteryEstimatorError",
     "ability_standard_error",
+    "active_estimator_id",
     "apply_forgetting",
     "apply_learning",
     "build_learning_path",
@@ -112,8 +132,12 @@ __all__ = [
     "probability_correct",
     "record_attempt_mastery",
     "record_problem_attempt_mastery",
+    "register_estimator",
+    "registered_estimator_ids",
+    "resolve_estimator",
     "resolve_item_difficulty_b",
     "theta_to_mastery_proxy",
     "total_information",
     "update_mastery",
+    "use_estimator",
 ]
