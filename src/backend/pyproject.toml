@@ -214,6 +214,9 @@ warn_required_dynamic_aliases = true
 # privacy는 횡단 인프라다. `lint-imports`(CI lint 잡)가 위반을 차단한다.
 [tool.importlinter]
 root_package = "whymath_backend"
+# ARCH-48: 외부 패키지(`sqlalchemy`)를 forbidden 대상으로 쓰려면 필수다. 기존 3계약의 판정은
+# 바뀌지 않는다(전부 whymath_backend 내부 간선만 본다 — 도입 전후 KEPT 동일, 실측 2026-09-16).
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "7계층 단방향 (L_n → L_{n-1}, 역방향 금지)"
@@ -435,6 +438,43 @@ ignore_imports = [
     # ⚠️ **0은 "아무도 막지 않는 0"이 아니다** — 위 세 계약이 지금 이 목록을 강제한다.
     #    다만 스캔(`eos_core_adapter_boundary_scan.py`)의 0과 이 계약의 0은 *다른 측정*이다:
     #    스캔은 AST 직접 import를, 계약은 체인을 본다. 둘이 어긋나면 스캔이 정본이다.
+]
+
+# ──────────────────────────────────────────────────────────────────────
+# 데이터 접근 계층 (ARCH-48) — 7계층 축·EOS 경계 축과 **또 다른 축**이다.
+#
+# 처분 정본: `docs/architecture/data_access_layer_disposition.md`
+# 계측·baseline: `scripts/analysis/data_access_layer_audit.py` (`CLEAN_LAYERS`가 아래 목록의 정본)
+# 정합 동결:    `tests/infra/test_data_access_layer_contract.py`
+#
+# 왜 앞의 두 축으로 부족한가: 7계층 계약은 `l6 -> l1` 같은 *계층 간 방향*을 보고, EOS 계약은
+# Core가 수학 어댑터를 아는지를 본다. 둘 다 "이 모듈이 DB를 직접 잡는가"를 표현하지 못한다.
+#
+# **한계(명시)**: import-linter는 import 그래프 도구라 `session.execute(...)` 같은 **메서드 호출**
+# 을 볼 수 없다. 그래서 이 계약이 막는 것은 *아직 sqlalchemy를 한 줄도 안 쓴* 4계층이 그것을
+# 끌어오기 시작하는 순간뿐이다. 이미 잡고 있는 118파일(호출 축)은
+# `tests/infra/test_data_access_layer_contract.py`가 집합으로 동결한다 — 두 장치는 상보다.
+# ──────────────────────────────────────────────────────────────────────
+
+[[tool.importlinter.contracts]]
+name = "데이터 접근 금지 (baseline 0 — 아직 DB를 모르는 구역)"
+type = "forbidden"
+# 2026-09-16 실측(main 0f12e76a): 이 넷은 sqlalchemy import 0건 · `whymath_backend.db` import
+# 0건 · 세션 호출 0건이다(74파일). 유예 없이 그 상태를 동결한다 — 새로 DB를 끌어오면 즉시 적색.
+# `schema`는 Pydantic 계약, `lang`은 한국어 처리, `l5`는 상호작용, `l6`은 응용 모드다.
+source_modules = [
+    "whymath_backend.schema",
+    "whymath_backend.lang",
+    "whymath_backend.l5",
+    "whymath_backend.l6",
+]
+# 직접 import만 판정한다 — EOS 계약과 같은 이유다(스캔이 AST 직접 import를 세므로 계약과
+# 문서가 서로 다른 숫자를 말하지 않게 한다). 경유 의존(`l6 -> l4 -> session`)은 잡지 않으며,
+# 그 축은 호출 축 가드가 파일 단위로 본다.
+allow_indirect_imports = true
+forbidden_modules = [
+    "sqlalchemy",
+    "whymath_backend.db",
 ]
 
 # ──────────────────────────────────────────────────────────────────────
