@@ -177,7 +177,9 @@ class TestMigrationFileChain:
         # head를 다시 이동.
         # EOS-49가 3f5c83f51246 위에 67cf48ad3bce(concept_version 테이블 + PUBLISHED
         # 불변성 트리거)를 얹어 head를 다시 이동.
-        assert heads == {"67cf48ad3bce"}
+        # EOS-105가 67cf48ad3bce 위에 5a7c31d9e0b4(learning_state_transition 원장 +
+        # 상태·트리거 enum 2종)를 얹어 head를 다시 이동.
+        assert heads == {"5a7c31d9e0b4"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

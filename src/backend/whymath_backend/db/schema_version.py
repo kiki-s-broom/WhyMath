@@ -147,6 +147,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # answer_submission·student_solution_step 8쌍 16컬럼 + expression nullable 완화)
     "67cf48ad3bce",  # EOS-49: concept_version 테이블(Concept 좌석 4번째) + concept.
     # current_published_version_id(§6.4) + PUBLISHED 불변성 트리거(§7)
+    "5a7c31d9e0b4",  # EOS-105: learning_state_transition(학습 상태 전이 append-only
+    # 원장 · LearnerState 좌석 2번째 테이블) + learning_state_enum·learning_state_trigger_enum
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

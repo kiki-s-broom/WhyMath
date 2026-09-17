@@ -70,7 +70,11 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
     "Hint": (),
     "Content": ("concept_content", "pedagogy_content_slot"),
     "Learner": ("user_profile",),
-    "LearnerState": ("user_state_snapshot",),
+    # EOS-105: `learning_state_transition`은 LearnerState 좌석의 **2번째 테이블**이다
+    # (`curriculum_version`이 Curriculum 좌석의 2번째인 선례와 동형). 상태의 *사진*은
+    # `user_state_snapshot`, 상태의 *전이 사건*은 전이 원장이 담는다 — 현재 상태는 원장
+    # 최신 행에서 파생되므로 같은 사실을 두 곳에 두는 것이 아니다.
+    "LearnerState": ("user_state_snapshot", "learning_state_transition"),
     "MasteryState": ("concept_mastery_history", "skill_mastery_history", "ability_snapshot"),
     "Assessment": ("assessment",),
     "AssessmentResult": (),

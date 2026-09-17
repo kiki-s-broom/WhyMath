@@ -127,9 +127,14 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
     - *이다*: 신원과 프로필. **미성년 민감정보**로 분류돼 암호화 저장 대상.
     - *아니다*: 학습 상태가 아니다(LearnerState). 인증 자격도 아니다(핵심-외).
 
-13. **LearnerState** — 한 시점의 학습 **상태 스냅샷**.
-    - *이다*: "지금 이 학생은 어떤 상태인가"의 시점 사진(개념·패턴 숙련 맵, 평균 풀이시간 등).
-    - *아니다*: 숙련도의 **시계열 이력**이 아니다(MasteryState). 프로필 변경 이력도 아니다.
+13. **LearnerState** — 학생의 학습 **상태**(시점 사진 + 국면 전이).
+    - *이다*: "지금 이 학생은 어떤 상태인가"의 시점 사진(개념·패턴 숙련 맵, 평균 풀이시간 등)과,
+      **학습 국면의 전이 사건**(EOS-105 — NEW/DIAGNOSING/READY/LEARNING/PRACTICING/ASSESSING/
+      REMEDIATING/ADVANCING 8상태 간 이동). 좌석이 2테이블인 이유는 두 표현이 같은 사실의
+      복제가 아니기 때문이다 — **현재 국면은 전이 원장의 최신 행에서 파생**되고(가변 상태
+      컬럼 0), 스냅샷은 그와 독립인 학력 추정 사진이다.
+    - *아니다*: 숙련도의 **시계열 이력**이 아니다(MasteryState — 전이 원장은 숙달값을 담지
+      않는다). 프로필 변경 이력도 아니다.
 
 14. **MasteryState** — Skill·Concept별 **숙련도**와 그 변화 이력.
     - *이다*: 누적 증거를 반영한 현재 숙련 + append-only 이력.
@@ -171,7 +176,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 42테이블
+### §2-A. 좌석 배정 — 43테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -187,7 +192,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 10 | **Hint** | — **좌석 부재**(§3) | 0 |
 | 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
 | 12 | **Learner** | `user_profile` | 1 |
-| 13 | **LearnerState** | `user_state_snapshot` | 1 |
+| 13 | **LearnerState** | `user_state_snapshot` · `learning_state_transition` | 2 |
 | 14 | **MasteryState** | `concept_mastery_history` · `skill_mastery_history` · `ability_snapshot` | 3 |
 | 15 | **Assessment** | `assessment` | 1 |
 | 16 | **AssessmentResult** | — **좌석 부재**(§3) | 0 |
@@ -195,7 +200,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 42**
+**좌석 합계 = 43**
 
 ### §2-B. 핵심 외 — 37테이블
 
@@ -244,8 +249,9 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 42 + 38 = **80** ✓(EOS-49 `concept_version` 추가 — 2026-09-14,
-이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
+**핵심-외 합계 = 38** · 43 + 38 = **81** ✓(EOS-105 `learning_state_transition`을 LearnerState
+좌석 2번째 테이블로 추가 — 2026-09-16. 이전 42 + 38 = 80은 EOS-49 `concept_version` 추가
+— 2026-09-14, 그 이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
 
 ### §2-C. 판정 보류 1건 — 날조 금지
 

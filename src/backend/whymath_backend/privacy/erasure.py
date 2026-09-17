@@ -75,6 +75,9 @@ from whymath_backend.db.models.dialogue import Dialogue
 from whymath_backend.db.models.evidence_link import EvidenceLink
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
+from whymath_backend.db.models.learning_state_transition import (
+    LearningStateTransition,
+)
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
 from whymath_backend.db.models.parental_consent import ParentalConsent
 from whymath_backend.db.models.refresh_token_session import RefreshTokenSession
@@ -126,6 +129,10 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
     (UserTrackHistory, "user_id"),
     (UserPersonaHistory, "user_id"),
     (UserStateSnapshot, "user_id"),
+    # EOS-105: 학습 상태 전이 원장 — 학생의 학습 국면 이력(느슨참조·user_id 실 FK).
+    # 삭제권 대상인 이유: "이 학생이 언제 교정 국면에 있었는가"는 미성년 학습자의 학습
+    # 기록 그 자체이며, 익명 통계가 아니라 user_id로 직접 지목되는 행이다.
+    (LearningStateTransition, "user_id"),
 )
 
 # COLLAB-02 방향 역전 — 소유 컬럼(user_id·student_id·target_user_id)을 가졌지만 *정당하게*
