@@ -411,6 +411,18 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-052", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
        "Student", "Learning Model", "P1",
        "계획서 300 §12 LearnerState — 조각 3표면 합성(EOS-10)", "me", "GET /learner-state"),
+    # EOS-105 — WM-S-052(learner-state)와 **다른 기능**이다. 052는 숙달·능력·오개념을 합성한
+    # *요약 상태*를 보여 주고, 이 행은 8상태 *학습 국면과 그 전이 이력*을 보여 준다. 경로가
+    # 한 글자 차이(learner-state ↔ learning-state)라 혼동하기 쉬우므로 여기 명시한다 —
+    # 어휘 정리는 별건(MISC-32)이 소유한다.
+    # 번호: 전 원격 브랜치 41개 전수 스캔에서 미사용 확인(WM-S-051 조용한 충돌 선례 대응).
+    # P1인 이유: 상태 머신은 루프를 *게이팅하지 않으며*(거부를 값으로 노출할 뿐) 기존 학습
+    # 경로가 그대로 작동하므로 12월 검증 G1~G5의 차단 조건이 아니다.
+    _s("WM-S-053", "학습 국면 상태·전이 이력 조회 + 생애주기 전이 적재(8상태 머신)",
+       "Student", "Learning Model", "P1",
+       "계획서 300 §3 학습 상태 머신 — EOS-105. 미정의 전이는 409로 거부하고 정책 소유 "
+       "트리거는 422로 거부한다(클라가 정책을 우회해 임의 상태로 점프하지 못한다)",
+       "me", "GET /learning-state", "POST /learning-state/transitions"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -566,6 +578,18 @@ CATALOG: tuple[Spec, ...] = (
        "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
        "schema/assessment_evidence.py가 소유",
        "l2.assessment_evidence"),
+    # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
+    # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
+    # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
+    # 전이표 계약 자체는 schema/learning_state.py가 소유한다.
+    # 번호: 전 원격 브랜치 41개 전수 스캔에서 미사용 확인.
+    _e("WM-E-211", "학습 상태 머신(전이표 판정·정책 결정·전이 원장 적재)", "Student",
+       "Learning Model", "P1",
+       "EOS-105 — 계획서 300 §3. 허용 전이를 데이터(frozenset)로 선언하고 미정의 전이를 "
+       "예외로 거부한다. 현재 상태는 저장하지 않고 append-only 원장 최신 행에서 파생하므로 "
+       "*MasteryHistory와 진실 원천이 겹치지 않는다(ADR-006). 정책은 교체 가능한 Protocol이고 "
+       "v1 규칙 6종은 if/else다",
+       "l2.learning_state_machine", "l2.learning_state_policy", "l2.learning_state_evidence"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",
