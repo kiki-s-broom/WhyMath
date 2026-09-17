@@ -543,8 +543,12 @@ CATALOG: tuple[Spec, ...] = (
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items", status="Batch"),
-    _e("WM-E-204", "개념 진단(BKT↔IRT 교차)·LearnerState 조립", "Student", "Assessment", "P0",
-       "Gate2 ②·③ — LearnerState 단일 API는 갭", "l2.concept_diagnosis", "l2.learner_state"),
+    # EOS-103: 영속 축(l2.learner_state_store)을 **같은 기능번호**에 귀속시킨다 — §15가
+    # 신규 EOS 기능번호 추가를 동결했고, 조립(파생)과 영속(생산자 부재 축)은 같은 기능의
+    # 두 축이지 별개 기능이 아니다. *단일 조회 API*는 여전히 갭이며 EOS-10이 소유한다.
+    _e("WM-E-204", "개념 진단(BKT↔IRT 교차)·LearnerState 조립·영속", "Student", "Assessment", "P0",
+       "Gate2 ②·③ — 영속·자동생성은 EOS-103 착지, 단일 조회 API는 여전히 갭",
+       "l2.concept_diagnosis", "l2.learner_state", "l2.learner_state_store"),
     _e("WM-E-205", "약·강·선수개념 추천·학습 경로·복습 큐", "Student", "Recommendation", "P0",
        "Gate2 ④·⑨ — ASM-13 강개념(strong_points) 편입", "l2.weak_concept_recommendation",
        "l2.strong_concept_recommendation", "l2.prerequisite_recommendation",

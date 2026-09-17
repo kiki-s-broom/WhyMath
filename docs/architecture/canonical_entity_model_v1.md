@@ -24,6 +24,13 @@
 저기 §3의 귀속표는 1:1로 대조되며(그쪽 검사 ⑤가 이 문서 §2-A 표를 파싱한다), 이 문서가 엔티티를
 추가·개명하면 그 검사가 자동으로 따라온다.
 
+※ [갱신 2026-09-16] `EOS-103`이 `learner_state` 테이블을 **LearnerState 좌석의 2번째
+테이블**로 추가해 80→81 테이블로 늘었다(새 엔티티가 아니라 기존 좌석 편입 — `concept_version`
+선례와 동형) — §2 표·합계·위 ① 행을 81로 갱신했다. 두 좌석의 역할 분담은 §1 정의 13번 참조:
+`learner_state`는 학생당 1행의 **현재 상태**, `user_state_snapshot`은 학생당 N행의 **시점
+사진**이다. `user_state_snapshot`의 writer 0 상태(배선 또는 폐기)는 `EOS-103`이 판정하지
+않았다 — 그 판정은 `EOS-10`이 소유한다.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -35,7 +42,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 | # | 검사 | 깨지면 |
 |---|---|---|
-| ① | 80테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
+| ① | 81테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
 | ③ | **좌석 부재 4종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `hints`는 물론 `hint_content` 같은 우회 이름으로 좌석을 등재해도 **RED** |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
@@ -127,9 +134,14 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
     - *이다*: 신원과 프로필. **미성년 민감정보**로 분류돼 암호화 저장 대상.
     - *아니다*: 학습 상태가 아니다(LearnerState). 인증 자격도 아니다(핵심-외).
 
-13. **LearnerState** — 한 시점의 학습 **상태 스냅샷**.
-    - *이다*: "지금 이 학생은 어떤 상태인가"의 시점 사진(개념·패턴 숙련 맵, 평균 풀이시간 등).
+13. **LearnerState** — "지금 이 학생은 어떤 상태인가".
+    - *이다*: 학습 루프가 학생을 어디에 놓을지 정하는 상태. 좌석이 둘이며 **역할이 다르다** —
+      `learner_state`는 학생당 1행의 **현재 상태**(교육과정·현재 학습목표·생성 계보),
+      `user_state_snapshot`은 학생당 N행의 **시점 사진**(숙련 맵, 평균 풀이시간 등).
     - *아니다*: 숙련도의 **시계열 이력**이 아니다(MasteryState). 프로필 변경 이력도 아니다.
+      숙련·오개념 맵을 `learner_state`에 복제하지 않는다 — 그 축의 정본은 각각
+      `concept_mastery_history`·`skill_mastery_history`·`misconception_hypothesis`이고,
+      복제하는 순간 같은 사실의 두 번째 진실 원천이 된다(EOS-103 판정).
 
 14. **MasteryState** — Skill·Concept별 **숙련도**와 그 변화 이력.
     - *이다*: 누적 증거를 반영한 현재 숙련 + append-only 이력.
@@ -171,7 +183,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 42테이블
+### §2-A. 좌석 배정 — 43테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -187,7 +199,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 10 | **Hint** | — **좌석 부재**(§3) | 0 |
 | 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
 | 12 | **Learner** | `user_profile` | 1 |
-| 13 | **LearnerState** | `user_state_snapshot` | 1 |
+| 13 | **LearnerState** | `user_state_snapshot` · `learner_state` | 2 |
 | 14 | **MasteryState** | `concept_mastery_history` · `skill_mastery_history` · `ability_snapshot` | 3 |
 | 15 | **Assessment** | `assessment` | 1 |
 | 16 | **AssessmentResult** | — **좌석 부재**(§3) | 0 |
@@ -195,7 +207,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 42**
+**좌석 합계 = 43**
 
 ### §2-B. 핵심 외 — 37테이블
 
@@ -244,7 +256,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 42 + 38 = **80** ✓(EOS-49 `concept_version` 추가 — 2026-09-14,
+**핵심-외 합계 = 38** · 43 + 38 = **81** ✓(EOS-49 `concept_version` 추가 — 2026-09-14,
 이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
 
 ### §2-C. 판정 보류 1건 — 날조 금지

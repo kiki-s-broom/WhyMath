@@ -1,10 +1,10 @@
 """핵심 엔티티 19종 동결 — 정본 `docs/architecture/canonical_entity_model_v1.md`의 기계 집행.
 
 이 파일이 **강제하는 것**(정본화≠집행 — CLAUDE.md):
-  ① 80테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
+  ① 81테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
   ② 좌석 실재 — 19종의 좌석 테이블이 사라지거나 개명되면 RED.
   ③ 좌석 부재 4종 — Subject·Hint·AssessmentResult·ContentVersion용 테이블이 생기면 RED.
-  ④ 문서 정합 — 정본 문서가 80테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
+  ④ 문서 정합 — 정본 문서가 81테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
 
 이 파일이 **강제하지 않는 것**(있는 척 금지):
   · 컬럼 수준 스키마(어떤 필드를 갖는지)는 각 모델의 기존 ORM 테스트 소관이다.
@@ -47,7 +47,8 @@ def _load_all_models() -> None:
 
 # ──────────────────────────────────────────────────────────────────────────
 # 동결 상수 — 정본 §1·§2 표와 1:1 (실측 2026-09-05·78테이블, SEC-27 job_ownership 추가로 79테이블,
-# EOS-49가 concept_version을 Concept 좌석 4번째 테이블로 추가해 2026-09-14 80테이블로 늘었다)
+# EOS-49가 concept_version을 Concept 좌석 4번째 테이블로 추가해 2026-09-14 80테이블로,
+# EOS-103이 learner_state를 LearnerState 좌석 2번째 테이블로 추가해 2026-09-16 81테이블로 늘었다)
 # ──────────────────────────────────────────────────────────────────────────
 
 # 핵심 19종 → 좌석 테이블. 빈 tuple = **좌석 부재 동결**(정본 §3).
@@ -70,7 +71,7 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
     "Hint": (),
     "Content": ("concept_content", "pedagogy_content_slot"),
     "Learner": ("user_profile",),
-    "LearnerState": ("user_state_snapshot",),
+    "LearnerState": ("user_state_snapshot", "learner_state"),
     "MasteryState": ("concept_mastery_history", "skill_mastery_history", "ability_snapshot"),
     "Assessment": ("assessment",),
     "AssessmentResult": (),
