@@ -117,6 +117,55 @@ if ($FromWorktree -and $Arms.Count -gt 0) { & $Py -m whymath_backend.harness.pro
 - `CHECK_EXIT=` · `SMOKE_EXIT=` 또는 `WRITE_REFUSED=`
 - arm별 결과 표
 
+## 스모크 실측 결과 (2026-09-17 · `0d0bc934`)
+
+| 축 | anthropic (baseline) | deepseek |
+|---|---|---|
+| 검출 | 6/10 (Wilson 하한 0.3516) | 8/10 (하한 0.5408) |
+| 오경보 | 1/10 (Wilson 상한 0.3477) | 3/10 (상한 0.5583) |
+| 지연 p50 | 2,988ms | 6,523ms |
+| 지연 p95 | 12,459ms | 39,148ms |
+| 입력 토큰(20회) | 11,461 | 9,298 |
+| 출력 토큰(20회) | 4,177 | **39,697** |
+| 집계 제외 | 0건 | 0건 |
+
+`SMOKE_EXIT=0` · `FROM_WORKTREE=True` · 전 회차 `off_peak`.
+
+**파이프라인은 생존했다** — 40회 호출 전건이 라우팅·관할 게이트를 통과했고 집계 제외 0건이다.
+정확도 수치는 n=10이라 Wilson 구간이 0.35~0.56로 벌어져 **판정에 쓸 수 없다**(그래서 본
+강등전이 필요하다).
+
+스모크가 잡아낸 것: **DeepSeek의 출력 토큰이 9.5배다.** 추론 토큰이 과금에 포함되므로
+"입력·출력 단가가 싸다"만으로 계산한 비용 우위는 이 배율만큼 깎인다. ARCH-49에서 계산한
+12.4배 우위는 **양쪽 토큰 수가 비슷하다는 가정** 위에 있었고, 그 가정이 틀렸다.
+
+## [F] 본 강등전 (스모크가 통과한 뒤)
+
+arm당 80문항. `--seed`는 스모크와 다른 값을 써서 시험지를 겹치지 않게 한다.
+`--concurrency 2`는 그대로 둔다(높이면 공급사 rate limit이 지연 측정을 오염시킨다).
+
+```powershell
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
+$Source = (& $Py -c "import whymath_backend.harness.provider_accuracy_battle as m; print(m.__file__)")
+$FromWorktree = ($Source -like "*WhyMath-arch55*")
+"FROM_WORKTREE=$FromWorktree ($Source)"
+& $Py -m whymath_backend.harness.provider_accuracy_battle --arm anthropic --arm deepseek --check-only | Out-Null
+$Ready = ($LASTEXITCODE -eq 0)
+"READY=$Ready"
+if ($FromWorktree -and $Ready) { & $Py -m whymath_backend.harness.provider_accuracy_battle --arm anthropic --arm deepseek --n-defective 40 --n-clean 40 --seed 20260917 --concurrency 2 --audit-out C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-full; "FULL_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — FromWorktree=$FromWorktree Ready=$Ready · 호출 0건" }
+```
+
+소요: arm당 약 8~20분(스모크 지연 p50 기준 외삽). 비용은 스모크의 4배 규모.
+
+### 피크 구간을 함께 받으려면
+
+DeepSeek 공식 API의 피크 구간은 UTC 01–04시·06–10시, **한국시간 10–13시·15–19시**(주말은
+항상 오프피크)다. 위 [F]를 그 시간대에 **한 번 더** 돌리면 acceptance ②(피크/오프피크 분리
+집계)의 양쪽 표본이 모인다. 오프피크만으로도 정확도·지연 판정은 성립하지만, 단가가 정확히
+2배 차이라 비용 축은 양쪽이 있어야 말이 된다.
+
 ## [E] 정리 (스모크가 끝난 뒤에만)
 
 본 강등전까지 마친 다음 실행한다. 워크트리만 지우며 커밋·브랜치는 건드리지 않는다.

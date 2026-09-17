@@ -40,9 +40,11 @@ DeepSeek 공식 API는 피크/오프피크 단가가 정확히 2배 차이다. �
 이 하네스는 **토큰 수만 측정값으로 보고**하고 원화·달러 환산을 하지 않는다. ARCH-49에서
 "실측"이라 기록된 단가 4건이 나중에 전부 틀린 것으로 드러났고(모델 slug·엔드포인트 수·
 최저가 공급사·단가), 그 숫자가 코드에 핀돼 있었다. 단가는 공급사·시점·할인에 따라 바뀌는
-**외부 사실**이므로 측정 도구가 품고 있으면 안 된다. 환산이 필요하면 `--price-in`·
-`--price-out`으로 그 회차에 쓴 단가를 **명시적으로 주입**하고, 리포트는 그 값을 출처와 함께
-되받아 적는다. 주지 않으면 비용 절은 "단가 미지정"이라고 말한다.
+**외부 사실**이므로 측정 도구가 품고 있으면 안 된다. 환산이 필요하면
+`--price ARM[:WINDOW]=입력/출력`(1M 토큰당 USD)으로 그 회차에 쓴 단가를
+**명시적으로 주입**하고, `--price-source`로 출처를 함께 남긴다 — 출처 없이는
+거부한다(출처 없는 숫자가 나중에 '실측'으로 오인된다).
+주지 않으면 비용 절은 "단가 미지정"이라고 말한다.
 
 실패해도 증거가 남는다
 --------------------
@@ -378,8 +380,95 @@ async def evaluate_arm(
     return outcomes
 
 
-def render_arm(arm: str, outcomes: list[RoundOutcome], *, confidence: float) -> list[str]:
-    """한 arm의 리포트 — 요금 구간을 **분리 집계**한다."""
+class PriceRate(BaseModel):
+    """1M 토큰당 USD 단가 — **주입받은 값**이지 이 도구가 아는 값이 아니다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    input_per_mtok: float = Field(ge=0.0)
+    output_per_mtok: float = Field(ge=0.0)
+
+    def usd_for(self, *, input_tokens: int, output_tokens: int) -> float:
+        """이 단가로 환산한 USD. 반올림은 표시 단계에서 한다(중간 반올림 금지)."""
+        return (
+            input_tokens * self.input_per_mtok + output_tokens * self.output_per_mtok
+        ) / 1_000_000
+
+
+def parse_price_arg(raw: str) -> tuple[str, PriceRate]:
+    """`arm[:window]=IN/OUT` → (키, 단가). IN·OUT은 **1M 토큰당 USD**.
+
+    구간별 단가를 따로 줄 수 있다(`deepseek:peak=...`) — DeepSeek 공식 API는 피크/오프피크가
+    정확히 2배 차이라 한 값으로 뭉뚱그리면 그 2배가 평균에 녹는다. 구간 없이 주면 그 arm의
+    모든 구간에 적용된다.
+
+    형식이 틀리면 **조용히 무시하지 않고 거부한다** — 잘못 읽힌 단가는 없는 단가보다 나쁘다.
+    """
+    if "=" not in raw:
+        raise ValueError(f"단가 형식 오류: {raw!r} — `arm[:window]=입력/출력` 형태여야 한다")
+    key, _, value = raw.partition("=")
+    if "/" not in value:
+        raise ValueError(f"단가 형식 오류: {raw!r} — 값은 `입력/출력`(1M 토큰당 USD)이다")
+    in_raw, _, out_raw = value.partition("/")
+    try:
+        rate = PriceRate(input_per_mtok=float(in_raw), output_per_mtok=float(out_raw))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"단가 값 오류: {raw!r} — {type(exc).__name__}: {exc}") from exc
+    key = key.strip()
+    if not key:
+        raise ValueError(f"단가 형식 오류: {raw!r} — arm 이름이 비었다")
+    return key, rate
+
+
+def rate_for(prices: dict[str, PriceRate], arm: str, window: str | None) -> PriceRate | None:
+    """구간 단가가 있으면 그것을, 없으면 arm 단가를, 그것도 없으면 None.
+
+    None은 0이 아니라 **모른다**는 뜻이고, 리포트는 그 차이를 글자로 구분해 적는다.
+    """
+    if window is not None:
+        scoped = prices.get(f"{arm}:{window}")
+        if scoped is not None:
+            return scoped
+    return prices.get(arm)
+
+
+def cost_line(
+    outcomes: list[RoundOutcome],
+    *,
+    arm: str,
+    window: str | None,
+    prices: dict[str, PriceRate],
+) -> str:
+    """토큰 합계 → USD 한 줄. 단가가 없으면 그렇게 말한다(0으로 위장하지 않는다)."""
+    tok = token_summary(outcomes)
+    rate = rate_for(prices, arm, window)
+    if rate is None:
+        return "단가 미지정(토큰만 측정)"
+    if tok["input_total"] is None or tok["output_total"] is None:
+        return "토큰 미측정 — 환산 불가"
+    total = rate.usd_for(input_tokens=tok["input_total"], output_tokens=tok["output_total"])
+    n = tok["n_measured"] or 0
+    per_call = total / n if n else None
+    per_call_text = "회당 미산출" if per_call is None else f"회당 ${per_call:.6f}"
+    return (
+        f"${total:.6f} ({per_call_text} · 단가 "
+        f"in ${rate.input_per_mtok}/M · out ${rate.output_per_mtok}/M)"
+    )
+
+
+def render_arm(
+    arm: str,
+    outcomes: list[RoundOutcome],
+    *,
+    confidence: float,
+    prices: dict[str, PriceRate] | None = None,
+) -> list[str]:
+    """한 arm의 리포트 — 요금 구간을 **분리 집계**한다.
+
+    `prices`는 호출자가 주입한 단가표다. 비면 비용 절이 "단가 미지정"이라고 말한다 —
+    이 도구는 단가를 알지 못하고, 모르는 것을 0으로 적지 않는다.
+    """
+    prices = prices or {}
     lines: list[str] = [f"── {arm} ──"]
     overall = summarize(outcomes)
     lower = overall.detection_lower_bound(confidence)
@@ -392,21 +481,30 @@ def render_arm(arm: str, outcomes: list[RoundOutcome], *, confidence: float) -> 
         f"집계 제외 {overall.unresolved}건"
     )
     lat = latency_summary(outcomes)
-    lines.append(f"  지연 n={lat['n']} p50={lat['p50_ms']} p95={lat['p95_ms']}")
+    p50 = lat["p50_ms"]
+    p95 = lat["p95_ms"]
+    lines.append(
+        f"  지연 n={lat['n']} p50={p50 if p50 is None else round(p50, 1)}ms "
+        f"p95={p95 if p95 is None else round(p95, 1)}ms"
+    )
     tok = token_summary(outcomes)
     lines.append(
         f"  토큰 측정 {tok['n_measured']}회 · 입력 {tok['input_total']} · "
         f"출력 {tok['output_total']}"
     )
+    lines.append(f"  비용 {cost_line(outcomes, arm=arm, window=None, prices=prices)}")
     for window in ("peak", "off_peak"):
         subset = [o for o in outcomes if o.pricing_window == window]
         if not subset:
             continue
         sub = summarize(subset)
         sub_lat = latency_summary(subset)
+        sub_p50 = sub_lat["p50_ms"]
         lines.append(
             f"  [{window}] 회차 {len(subset)} · 검출 {sub.true_positives}/{sub.defective_total} "
-            f"· 오경보 {sub.false_positives}/{sub.clean_total} · p50={sub_lat['p50_ms']}"
+            f"· 오경보 {sub.false_positives}/{sub.clean_total} · "
+            f"p50={sub_p50 if sub_p50 is None else round(sub_p50, 1)}ms · "
+            f"비용 {cost_line(subset, arm=arm, window=window, prices=prices)}"
         )
     errors = [o for o in outcomes if o.call_error]
     if errors:
@@ -438,6 +536,18 @@ def main(argv: list[str] | None = None) -> int:
         help="OpenRouter arm에서 응답해야 하는 공급사 slug(불일치 회차는 집계 제외)",
     )
     parser.add_argument(
+        "--price",
+        action="append",
+        default=None,
+        metavar="ARM[:WINDOW]=IN/OUT",
+        help="1M 토큰당 USD 단가 주입 (예: anthropic=3/15 · deepseek:off_peak=0.14/0.28)",
+    )
+    parser.add_argument(
+        "--price-source",
+        default=None,
+        help="그 단가를 어디서 봤는지 — 리포트에 그대로 되받아 적는다(출처 없는 숫자 금지)",
+    )
+    parser.add_argument(
         "--check-only",
         action="store_true",
         help="호출 없이 arm별 준비 상태(키·허용목록)만 판정하고 종료",
@@ -449,6 +559,22 @@ def main(argv: list[str] | None = None) -> int:
     arms = args.arm or ["anthropic"]
     if args.n_defective < 1 or args.n_clean < 1:
         print("[인자 오류] --n-defective·--n-clean은 1 이상이어야 한다", file=sys.stderr)
+        return _EXIT_INPUT_ERROR
+
+    prices: dict[str, PriceRate] = {}
+    for raw in args.price or []:
+        try:
+            key, rate = parse_price_arg(raw)
+        except ValueError as exc:
+            print(f"[인자 오류] {exc}", file=sys.stderr)
+            return _EXIT_INPUT_ERROR
+        prices[key] = rate
+    if prices and not args.price_source:
+        print(
+            "[인자 오류] --price를 줬으면 --price-source도 준다 — 출처 없는 단가는 "
+            "나중에 '실측'으로 오인된다(ARCH-49 선례).",
+            file=sys.stderr,
+        )
         return _EXIT_INPUT_ERROR
 
     # 사전점검 — 못 부를 arm이 하나라도 있으면 **아무것도 부르지 않고** 멈춘다.
@@ -513,12 +639,20 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     for arm, outcomes in reports.items():
-        for line in render_arm(arm, outcomes, confidence=args.confidence):
+        for line in render_arm(arm, outcomes, confidence=args.confidence, prices=prices):
             print(line)
-    print(
-        "\n※ 비용은 토큰만 보고한다 — 단가는 공급사·시점·할인에 따라 바뀌는 외부 사실이라\n"
-        "   측정 도구가 품지 않는다(ARCH-49에서 코드에 핀된 '실측' 단가 4건이 틀렸다)."
-    )
+    if prices:
+        print(f"\n※ 단가 출처(주입값): {args.price_source}")
+        print(
+            "   이 도구는 단가를 알지 못한다 — 위 USD는 주입된 값으로 곱한 것이며,\n"
+            "   청구서로 검증한 값이 아니다."
+        )
+    else:
+        print(
+            "\n※ 비용은 토큰만 보고한다 — 단가는 공급사·시점·할인에 따라 바뀌는 외부 사실이라\n"
+            "   측정 도구가 품지 않는다(ARCH-49에서 코드에 핀된 '실측' 단가 4건이 틀렸다).\n"
+            "   환산하려면 --price ARM[:WINDOW]=IN/OUT 와 --price-source 를 함께 준다."
+        )
 
     failed = False
     for arm, outcomes in reports.items():

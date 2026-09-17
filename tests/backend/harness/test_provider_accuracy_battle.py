@@ -309,3 +309,75 @@ class TestArmReadinessPreflight:
         assert evaluated == []
         assert "호출 가능" in capsys.readouterr().out
         config.get_settings.cache_clear()
+
+
+class TestPriceInjection:
+    """단가는 주입받는다 — 이 도구는 단가를 알지 못한다 (ARCH-55 ①·비용 축).
+
+    ARCH-49에서 "실측"이라 기록된 단가 4건이 전부 틀렸고 그 숫자가 코드에 핀돼 있었다.
+    그래서 단가를 품지 않고, 주입받되 **출처 없이는 거부**한다.
+    """
+
+    def test_parses_arm_rate(self) -> None:
+        key, rate = battle.parse_price_arg("anthropic=3/15")
+        assert key == "anthropic"
+        assert rate.input_per_mtok == 3.0
+        assert rate.output_per_mtok == 15.0
+
+    def test_parses_window_scoped_rate(self) -> None:
+        key, rate = battle.parse_price_arg("deepseek:off_peak=0.14/0.28")
+        assert key == "deepseek:off_peak"
+        assert rate.output_per_mtok == 0.28
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("anthropic", "arm\\[:window\\]=입력/출력"),
+            ("anthropic=3", "값은 `입력/출력`"),
+            ("=3/15", "arm 이름이 비었다"),
+            ("anthropic=x/15", "단가 값 오류"),
+        ],
+    )
+    def test_malformed_rate_is_refused(self, raw: str, expected: str) -> None:
+        """조용히 무시하지 않는다 — 잘못 읽힌 단가는 없는 단가보다 나쁘다.
+
+        메시지까지 대조하는 이유: 어느 형태든 결국 `float("")`가 터지므로 **거부되는지만**
+        보면 절을 하나 지워도 여전히 통과한다(실측: 슬래시 검사 제거 뮤테이션 생존).
+        어느 절이 잡았는지는 메시지로만 구분된다 — 그리고 그 메시지가 사용자가 받는 안내다.
+        """
+        with pytest.raises(ValueError, match=expected):
+            battle.parse_price_arg(raw)
+
+    def test_window_rate_wins_over_arm_rate(self) -> None:
+        prices = {
+            "deepseek": battle.PriceRate(input_per_mtok=1.0, output_per_mtok=2.0),
+            "deepseek:peak": battle.PriceRate(input_per_mtok=8.0, output_per_mtok=9.0),
+        }
+        assert battle.rate_for(prices, "deepseek", "peak").output_per_mtok == 9.0  # type: ignore[union-attr]
+        assert battle.rate_for(prices, "deepseek", "off_peak").output_per_mtok == 2.0  # type: ignore[union-attr]
+        assert battle.rate_for(prices, "anthropic", "peak") is None
+
+    def test_cost_line_says_unknown_rather_than_zero(self) -> None:
+        """단가가 없으면 0이 아니라 '모른다'고 말한다."""
+        line = battle.cost_line([_outcome()], arm="anthropic", window=None, prices={})
+        assert "단가 미지정" in line
+        assert "$0" not in line
+
+    def test_cost_line_converts_with_injected_rate(self) -> None:
+        outcomes = [
+            _outcome(input_tokens=1_000_000, output_tokens=1_000_000, latency_ms=10.0),
+        ]
+        prices = {"anthropic": battle.PriceRate(input_per_mtok=3.0, output_per_mtok=15.0)}
+        line = battle.cost_line(outcomes, arm="anthropic", window=None, prices=prices)
+        assert "$18.000000" in line
+
+    def test_price_without_source_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """출처 없는 단가는 나중에 '실측'으로 오인된다 — 그래서 호출 전에 거부한다."""
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-not-a-real-key")
+        config.get_settings.cache_clear()
+        code = battle.main(["--arm", "deepseek", "--check-only", "--price", "deepseek=1/2"])
+        assert code == 2
+        assert "--price-source" in capsys.readouterr().err
+        config.get_settings.cache_clear()
