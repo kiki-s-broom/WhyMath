@@ -107,9 +107,17 @@ def _build_async_payload(
 ) -> dict[str, object]:
     """비동기 큐 payload(JSON-safe dict) 구성 — 워커 태스크 스키마와 일치.
 
-    RoutingDecision은 use_enum_values=True라 model_dump()가 enum을 문자열로 내놓아
-    JSON 직렬화·Celery 전송에 안전하다(pickle 미사용). 워커는 이 dict에서
-    RoutingDecision을 다시 검증·재구성한다(queue/tasks.py PAYLOAD_* 키와 동일).
+    RoutingDecision은 use_enum_values=True라 enum이 문자열로 나오고, `mode="json"`이
+    나머지 타입까지 JSON 네이티브로 낮춘다 — Celery 전송에 안전하다(pickle 미사용).
+    워커는 이 dict에서 RoutingDecision을 다시 검증·재구성한다(queue/tasks.py PAYLOAD_* 키와 동일).
+
+    **`mode="json"`을 명시하는 이유**(ARCH-49 실측): 기본 `model_dump()`는 파이썬 타입을
+    그대로 남긴다 — `tuple` 필드는 tuple로 나오고, `json.dumps`를 거치면 list가 되어
+    **왕복이 동치가 아니게 된다**. 직렬화 자체는 성공하므로 이 결함은 조용하다: 큐에 넣기
+    전 payload와 워커가 받은 payload를 비교하는 쪽에서만 드러난다. `data_licenses`
+    (tuple) 추가가 그 상태를 실제로 만들었고 `test_enqueued_payload_is_json_safe_and_complete`
+    가 잡았다. 여기서 JSON 네이티브로 낮추면 앞으로 어떤 비-JSON 타입 필드가 늘어도
+    같은 함정을 다시 밟지 않는다(docstring이 약속하는 "JSON-safe"가 실제로 참이 된다).
 
     `training_allowed`는 AI 학습/개선에 데이터 사용 동의 여부(EOS §48)로, enqueue
     시점과 워커 생성 완료 시점 모두 Langfuse trace 메타데이터로 남긴다.
@@ -117,7 +125,7 @@ def _build_async_payload(
     return {
         "prompt": prompt,
         "system": system,
-        "decision": decision.model_dump(),
+        "decision": decision.model_dump(mode="json"),
         "training_allowed": training_allowed,
     }
 

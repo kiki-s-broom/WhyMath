@@ -21,6 +21,7 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.router import (
     LOCAL_MODEL_MATRIX,
     QUALITY_MODEL_ID,
@@ -244,6 +245,17 @@ class OllamaProvider:
         if self._settings is None:
             self._settings = get_settings()
         return self._settings
+
+    @property
+    def jurisdiction(self) -> Jurisdiction:
+        """항상 `DOMESTIC` — Phaiakes9 온프레미스라 국외 이전 자체가 없다 (ARCH-49 관할 축).
+
+        디스패처의 관할 게이트는 클라우드 위임에만 선다(로컬은 반출이 아니다). 그래도
+        선언하는 이유는 거버넌스 테스트가 `l3/providers/`의 모든 실제 제공자에 관할
+        선언을 요구하기 때문이다 — "이 제공자는 어디 관할인가"에 답이 없는 좌석을 남기지
+        않는다.
+        """
+        return Jurisdiction.DOMESTIC
 
     def _get_client(self) -> _OllamaClient:
         """클라이언트 지연 해석 — 주입 우선, 없으면 기본 AsyncClient 생성."""

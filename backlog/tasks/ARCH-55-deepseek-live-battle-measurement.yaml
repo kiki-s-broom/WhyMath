@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-55-deepseek-live-battle-measurement
+title: "DeepSeek 경로 강등전 실측과 채택 판정 — ARCH-49 acceptance ①·⑥ 승계"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - ARCH-49-deepseek-provider-evaluation
+requires_gates: []
+acceptance:
+  - "① 강등전 실측(ARCH-49 acceptance ① 승계) — DeepSeek 경로 2종(공식 API `deepseek-flash` · OpenRouter `deepseek/deepseek-v4-flash`)과 현행 클라우드 핀(`claude-sonnet-4-6`)을 품질·지연·비용 3축으로 비교한다. 측정 대상은 *학생 데이터가 없는 저작 경로*(코퍼스 문항 저작·개념 추출)이며, 정확도 축은 결함 주입 강등전으로 판정한다(`docs/standards/superhuman_verification_standard.md`). 점추정 금지 — Wilson 단측 경계.\n② 요금 구간 분리 집계(ARCH-49 acceptance ⑥ 승계) — 각 호출의 요금 구간을 `l3/providers/deepseek.pricing_window`로 라벨링해 peak/off_peak를 **분리 집계**한다. 단가가 정확히 2배 차이라 한 통에 넣으면 평균에 녹아 비교가 무의미해진다. 시간축 라우팅은 만들지 않는다(ARCH-49 ⑥ 판정 유지) — 대신 저작 배치의 오프피크 스케줄링과 프롬프트 캐싱을 절감 후보로 리포트에 명시한다.\n③ 공급사 고정 확인 — OpenRouter 경유 측정은 응답의 공급사·양자화가 허용목록 1곳으로 고정됐는지 회차마다 기록한다. 고정되지 않은 회차는 폐기한다(양자화가 섞이면 모델이 아니라 잡음을 재는 것이다).\n④ 채택 판정과 MEMORY 결정 로그 — 실측 수치·비교 조건·채택 여부를 적는다. **미채택도 결론이다.** 채택 시에도 기본 라우팅 변경은 별건 판정으로 남긴다(이 태스크는 측정과 판정까지다).\n⑤ 미확정 사실의 재평가 — DeepSeek이 유료 API 입력을 학습에 쓰는지 1차 자료(`cdn.deepseek.com` 약관)로 확인되면 `deepseek_allow_internal_corpus` 기본값(현재 False)을 그 근거와 함께 재평가한다. 확인하지 못하면 \"미확인\"이라고 범위를 밝혀 적고 기본값을 유지한다."
+  - "[정정 2026-09-17 · ARCH-49 acceptance ⑨⑩] OpenRouter 축 기록 4건이 전부 틀렸음이 Kiki의 화면 대조로 드러났다 — 모델 slug는 `deepseek/deepseek-v4.1-flash`(점 있음)이고, 엔드포인트는 19곳이며, `open-inference`는 **이 모델을 서빙하지 않는다**(⑩의 배제 논거가 실재하지 않는 사례였다). `deepinfra` 단가도 $0.09/$0.18이 아니라 $0.20/$0.60이다. DeepSeek 공식 단가 축(피크=오프피크 2배)은 맞았으므로 라이브 1회차의 비용 산술은 그대로 유효하다.\n[공급사 근거 2026-09-17] OpenRouter 공급사 패널의 `Provider info › Headquarters`로 US 5곳 확정: deepinfra·fireworks·together·gmicloud(패널 표기) + baseten(표 배지). 같은 패널이 `Prompt training`·`Retention`을 함께 주며, gmicloud는 US인데 Retention=Unknown이라 기본 허용목록에서 제외했다. digitalocean은 재확인 실패로 표에서 뺐다(UNKNOWN=전건 차단). 미확인 9곳: relace(최저가 $0.15/$0.60)·morph·makora·modal·parasail·novitaai·phala·venice·reka.\n[측정 설정 주의] `provider.only`는 **1곳만** 지정한다 — 여러 곳이면 OpenRouter가 골라 주고 양자화가 공급사마다 달라(deepinfra=FP8·다수 미표기) 품질 비교가 성립하지 않는다. config 기본 3곳은 운영 가용성용이다.\n[도구] `harness.deepseek_live_probe`(호출·usage·요금 구간) · `harness.openrouter_endpoints_probe`(--search로 slug 확정 · --model로 공급사·양자화·단가 표). 둘 다 CI 미도달이 의도로 선언돼 있다(키·egress 부재)."
+  - "[정밀도 축 2026-09-17 · Kiki 지적] 공급사 패널의 `Specifications › Precision`이 세 번째 축이다 — 관할·데이터 정책과 **서로를 함의하지 않는다**. 실측: `deepinfra`=FP8 · `gmicloud`=FP8 · `fireworks`=`--`(미표기) · `together`=`--`. 즉 ⓐ정밀도를 아는 곳(deepinfra·gmicloud) ⓑ보존 정책이 깨끗한 곳(deepinfra·fireworks·together)의 **교집합은 `deepinfra` 하나**다. 그래서 `openrouter_allowed_providers` 기본값을 `(\"deepinfra\",)` 단일로 좁혔다 — 초판 3곳은 FP8 1곳 + 정밀도 미상 2곳을 섞은 상태였고, 그것이 acceptance ⑨(d)가 경고한 양자화 혼재를 그대로 만들었다(`allow_fallbacks=false`라도 `only`에 여럿이면 어느 곳이 응답할지는 OpenRouter가 정한다).\n집행: `l3/providers/openrouter.PROVIDER_PRECISION` + `precision_of_slugs()`(하나라도 모르거나 섞이면 None) + 회귀 `test_default_allowlist_is_precision_homogeneous`. **`--`는 \"표준 정밀도\"가 아니라 \"미표기\"로 읽는다** — 모름은 같음의 근거가 아니다.\n가용성 비용 명시: 1곳 + `allow_fallbacks=false`면 그곳이 죽을 때 호출이 실패한다(`deepinfra` uptime 99.64%). 채택 미판정 단계에서는 조용한 품질 변동보다 명확한 실패가 낫다는 판단이며, 운영 도입 시 **정밀도가 같은** 곳으로만 이중화한다.\n측정 시 추가 확인 대상: `deepinfra` 패널의 `Max output`이 모델 표기(1.05M)와 달리 131.1K로 보였다(`:exacto` 변형 페이지 기준) — 출력 길이 상한이 공급사마다 다를 수 있으므로 장문 생성 비교 전에 확인한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/harness/**"
+  - "docs/ops/**"
+session: null
+notes: "ARCH-49 회수 분리(CLAUDE.md 「회수로 태스크 done 선언 시 acceptance 전수 재대조 생략 금지」): ARCH-49가 착지시킨 것은 *측정을 돌릴 수 있는 배선*이고, acceptance ①·⑥이 요구한 **라이브 측정 자체**는 Kiki 머신의 유효 키가 필요해 그 세션에서 수행할 수 없었다. 미이행분을 여기로 승계한다 — 산문에만 남기면 만료 없는 유예가 된다.\n\n착수 전제(ARCH-49에서 이미 성립): 키 2종이 Phaiakes9 User 환경변수에 등록·라이브 확인됨(2026-09-16, 벤더 표준 이름 `DEEPSEEK_API_KEY`/`OPENROUTER_API_KEY` — `config.py`가 `WHYMATH_` 접두 이름과 함께 읽는다) · CN 관할 기본 정책이 합성 프로브(`WHYMATH_GENERATED`)를 허용하므로 **추가 opt-in 없이 측정 가능** · OpenRouter 기본 허용목록은 `deepinfra`/`digitalocean` 2곳.\n\n실행 축이 Kiki 머신이므로 런북에는 CLAUDE.md 「Kiki 직접 수행 과제의 사전 브리핑 템플릿」 6항목과 쓰기 블록 자가거부 가드(HARN-106)를 적용한다.\n\n미채택도 결론이다 — 판정은 exit code와 Wilson 경계로 하고 인상 판정을 금한다.\n\n[실측 1회차 2026-09-17 · Kiki 실행 Phaiakes9] DeepSeek 공식 API 라이브 호출 성공 — PROBE_EXIT=0. cloud_mid→`deepseek-flash` · 입력 88 / 출력 420 토큰 · 캐시 적중 0(미측정 아님) · 실측 지연 3,438ms · 요금 구간 peak(07:56:14Z) · 반출 판정 EXPORT_ALLOWED · 선언 등급 WHYMATH_GENERATED. 응답은 가우스 짝짓기로 5050을 내고 교환·결합법칙으로 근거를 댔다(1건 인상 판정 — 강등전 아님). 기록 단가 기반 산술: 피크 $0.000530 · 오프피크 $0.000265 vs Sonnet 4.6 $0.006564 → 12.4~24.8배 저렴(청구서 미대조). 도구 = `harness.deepseek_live_probe`, 실행 블록은 세션이 제공한 [A]/[B]/[C] 형태(worktree --detach로 Kiki 작업 사본 무접촉 · [B]가 FROM_WORKTREE·HAS_KEY를 재검사해 자가거부).\n남은 축: ①품질 강등전(Wilson) ②OpenRouter 경유 대조(--route openrouter) ③피크/오프피크 분리 집계 ④반복 표본. 이 1회차는 \"도는가\"와 \"지연\"만 답했다.\n\n[정정 2026-09-17] notes 치환 — 라이브 1회차 실측 등재 — 도구가 실제로 돌았고 지연·토큰·요금 구간이 나왔다(2026-09-17 Kiki 실행)\n\n[정정 2026-09-17] OpenRouter 축 기록 4건 정정(Kiki 화면 대조) + 공급사 국적 근거 확보 + 측정 시 단일 공급사 고정 요구 명시\n\n[정정 2026-09-17] 정밀도 축 편입 — 관할·데이터 정책과 독립된 세 번째 축이며 교집합이 deepinfra 1곳뿐임이 실측으로 확정"
+updated: 2026-09-17

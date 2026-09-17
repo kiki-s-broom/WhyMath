@@ -187,3 +187,67 @@ def test_trusted_hosts_parsed_from_csv(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WHYMATH_TRUSTED_HOSTS_ALLOWLIST", "api.whymath.kr, api2.whymath.kr")
     s = Settings()
     assert s.trusted_hosts_list == ["api.whymath.kr", "api2.whymath.kr"]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ARCH-49 — 벤더 표준 키 이름 병행 수용 (DEEPSEEK_API_KEY / OPENROUTER_API_KEY)
+#
+# 왜 별칭을 두는가: 두 키는 Phaiakes9 User 환경변수에 **벤더 표준 이름으로 이미 등록돼
+# 라이브 확인**됐다(2026-09-16). `WHYMATH_` 접두만 읽으면 Kiki에게 재등록 왕복을 요구하게
+# 되는데, 그 왕복은 이 저장소가 반복해서 대가를 치른 부류다.
+# ──────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    ("env_name", "field_name"),
+    [
+        ("DEEPSEEK_API_KEY", "deepseek_api_key"),
+        ("OPENROUTER_API_KEY", "openrouter_api_key"),
+        ("WHYMATH_DEEPSEEK_API_KEY", "deepseek_api_key"),
+        ("WHYMATH_OPENROUTER_API_KEY", "openrouter_api_key"),
+    ],
+)
+def test_provider_keys_read_both_vendor_and_prefixed_names(
+    monkeypatch: pytest.MonkeyPatch, env_name: str, field_name: str
+) -> None:
+    """네 이름 전부가 읽힌다 — 한쪽만 읽히면 이 격자의 절반이 RED."""
+    monkeypatch.setenv(env_name, "key-from-env")
+    assert getattr(Settings(), field_name).get_secret_value() == "key-from-env"
+
+
+def test_prefixed_name_wins_when_both_are_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """둘 다 있으면 `WHYMATH_` 접두가 이긴다 — 저장소 규약이 벤더 관례를 덮는다.
+
+    우선순위 절이 없으면 어느 쪽이 이길지 알 수 없고, 운영자가 접두 이름으로 덮어쓰려 해도
+    조용히 무시될 수 있다(그 상태는 증상이 원인에서 멀다).
+    """
+    monkeypatch.setenv("WHYMATH_DEEPSEEK_API_KEY", "prefixed")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "vendor")
+    assert Settings().deepseek_api_key.get_secret_value() == "prefixed"
+
+
+def test_unset_provider_keys_report_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """미설정이면 `*_configured`가 False — 키가 없는데 있다고 말하지 않는다."""
+    for name in (
+        "DEEPSEEK_API_KEY",
+        "WHYMATH_DEEPSEEK_API_KEY",
+        "OPENROUTER_API_KEY",
+        "WHYMATH_OPENROUTER_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    settings = Settings()
+    assert settings.deepseek_configured is False
+    assert settings.openrouter_configured is False
+
+
+def test_alias_does_not_disturb_prefixed_only_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`populate_by_name` 도입이 별칭 없는 기존 필드의 환경변수 규약을 바꾸지 않는가.
+
+    접두 없는 `OLLAMA_HOST`는 **읽히지 않아야** 한다 — 별칭을 연 것은 두 필드뿐이고,
+    모델 전역 설정이 다른 필드까지 벤더 이름에 열었다면 이 단언이 실패한다.
+    """
+    monkeypatch.delenv("WHYMATH_OLLAMA_HOST", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", "http://should-not-be-read:1")
+    assert Settings().ollama_host != "http://should-not-be-read:1"
+    monkeypatch.setenv("WHYMATH_OLLAMA_HOST", "http://read-me:2")
+    assert Settings().ollama_host == "http://read-me:2"
