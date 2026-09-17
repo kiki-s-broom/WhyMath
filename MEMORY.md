@@ -338,6 +338,22 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-17 (구현 · EOS-14): **추천에 "왜 이 문항인가"를 필수로 붙였다 — 근거 없음을 근거로 위장하지 않는 3상태, 그리고 선택은 한 줄도 건드리지 않는 구조** (claude 구현) — 판정 기준 main `27df076e`
+
+**① 현행 '이유'는 이유가 아니었다(acceptance ③ 실측).** `NextProblemResponse`의 5필드(`weight_axes_applied`·`candidate_pool_size`·`weak_concept_signal_count`·`candidate_zero_reason`·`band_calibrated`)는 **관측 메타**다 — *어느 축이 적용됐나*·*후보가 왜 0인가*를 말한다. 그것은 추천기가 어떻게 돌았는지의 기록이지 **선택된 문항의 근거**가 아니다. "어느 개념이 약해서 이 문항인가"는 어디에도 없었다. 그래서 둘을 합치지 않고 `reason`을 **추가**했다(기존 5필드 불변·회귀 0).
+
+**② "분산된 3모듈"은 셋이 같은 값이 아니었다 — acceptance ⑤를 실측으로 정정했다.** 착수 지시는 임계가 3모듈에 분산돼 있으니 단일 정책 함수로 모으라고 했다. 실측하니 **둘만 같은 축**이었다: `weak_concept_recommendation`·`prerequisite_recommendation`의 0.7(약점 판정 컷)은 같은 질문에 답하므로 `WEAK_CONCEPT_MASTERY_CEILING` 하나로 모았고, `learner_state`의 0.4/**0.8**은 L4 LTHC 밴드의 미러라 **다른 축**이어서 합치지 않았다. 값이 같다고 합치면 두 개념이 한 상수로 접혀 한쪽을 고칠 때 다른 쪽이 조용히 움직인다 — 그 판단을 `test_lthc_band_is_not_folded_into_the_weak_cut`이 기계로 남긴다(0.4는 같지만 상한이 0.8 vs 0.7).
+
+**③ 근거 없음을 3상태로 갈랐다(EOS-11·EOS-12의 같은 규약).** `basis`가 셋이다 — `MEASURED_MASTERY`(실측) / `COLD_START`(개념은 매핑됐는데 숙달 이력 없음 = 학생의 상태) / `CONCEPT_UNMAPPED`(문항-개념 매핑 자체가 없음 = **우리 쪽 데이터 공백**). 뒤의 둘을 `PREREQUISITE_GAP`으로 접으면 **측정된 적 없는 학생이 전부 "선수개념이 막혔다"로 분류된다** — 없는 약점을 만들어 내는 형태다. `confidence`도 근거가 없으면 0.5가 아니라 **0.0**이다("모른다"가 "반쯤 안다"로 읽히지 않게).
+
+**④ 선택 알고리즘은 한 줄도 건드리지 않았다(acceptance ⑥의 *구조적* 보장).** 근거 조립은 `chosen_index`/`best`가 확정된 **뒤에만** 호출되고, 조회기는 어떤 선택기도 import하지 않는다(`test_module_does_not_import_a_selector`가 동결 — import하면 언젠가 부른다). 그래서 "계약 도입이 추천을 바꾸지 않았다"가 대조가 아니라 배치로 증명된다. 대조도 함께 뒀다: 같은 후보 풀에 저숙달·고숙달·미매핑 세 근거 재료를 물려도 같은 문항이 나온다.
+
+**⑤ 영속은 새 좌석 없이 기존 REC-11 좌석에 실었다(acceptance ④).** `record_recommendation_treatment`에 `reason` 선택 인자를 더해 처치 meta에 같은 값을 남긴다 — **응답과 영속이 하나의 값**이다(두 번 계산하면 언젠가 갈라지고, 갈라진 뒤에는 어느 쪽이 그때 학생이 본 근거인지 아무도 모른다). 그 동일성을 API 테스트가 직접 단언한다.
+
+**⑥ 정직한 공백**: `RecommendationPolicy`·`LearningContext`·`Recommendation` 세 타입은 착지 시점에 **소비처 0건**이다 — Kiki 지시 범위("근거 배선까지")에 따라 핸들러의 `learner_state` 입력 전환은 열어 뒀고 소유자를 **`EOS-19`**로 등재했다. 구현체 없는 Protocol은 아무 테스트도 건드리지 않아 조용히 표류하므로 `TestPolicyProtocolShape`가 시그니처를 동결한다(입력 2개·반환 `Recommendation`·컨텍스트 필드 5종).
+
+**⑦ 검증**: 뮤테이션 25종 전건 RED + 대조군 1건 GREEN(무해 편집에 RED를 내지 않음). 하네스는 순수 Python이고 주입 적용(`mutated != original`)·원복 바이트 동일(sha256)·무뮤테이션 sanity(rc=0)를 각각 단언한다. **다만 전건 RED는 커버리지의 증거가 아니다**(2026-09-08 규칙) — 1차 19종 실행 뒤 "내가 주입 목록에 안 올린 절"을 되짚어 6종(부재 표기·null 경로·개념 id 누락·영속 절단·응답↔영속 불일치 2종)을 추가했고, 그 과정에서 M17/M18의 치환 대상이 1건에서 2건으로 늘어난 것(응답·영속 두 자리)을 사전 대조가 잡았다.
+
 ### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
 
 **① 무엇이 없었나(acceptance ② 실측).** 채점은 개념·스킬을 *증거*가 아니라 **이미 갱신된 mastery delta**로 반환하고 있었다. 즉 "이 답이 무엇의 증거인가"는 `record_problem_attempt_mastery` 안에서 계산돼 밖으로 나오지 않았고, 나오는 것은 결과뿐이라 **왜 그 개념이 선택됐는지(역할·귀속 근거)를 아무도 볼 수 없었다**. 오개념은 채점에 합류하지 않고 coach 대화 경로에서만 갱신되며, Assessment 조립은 per-answer가 아니라 CAT 중단 경계 배치다. `concept_evidence|skill_evidence|possible_misconceptions` 백엔드 전수 grep 0건.
