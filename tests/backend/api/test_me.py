@@ -870,15 +870,30 @@ class _AQResult:
 
 class _QueueSession:
     """execute 호출마다 큐잉 결과를 순서대로 반환 — 채점 엔드포인트의 다중 쿼리(개념 조회 →
-    개념별 prior) 시뮬. add/commit 캡처."""
+    개념별 prior) 시뮬. add/commit 캡처.
+
+    EOS-105 이후: 큐가 **소진된 뒤의 호출은 빈 결과**를 돌려준다(IndexError로 죽지 않는다).
+    `submit_attempt`가 학습 상태 머신을 경유하면서 뒤쪽에 질의가 붙었는데, 이 파일의 시나리오들은
+    *채점·숙달·보정 코칭*을 재는 것이라 그 뒤 질의의 내용에 관심이 없기 때문이다. 빈 결과는
+    "이력이 없는 학생"이라는 정합한 상태이며, 상태 머신이 실제로 무엇을 하는지는
+    `tests/backend/api/test_me_learning_state.py`·`tests/backend/l2/test_learning_state_machine.py`가
+    전담한다.
+
+    **소진 호출 수를 세어 두는 이유**: 조용히 빈 결과를 주면 *앞쪽* 시나리오 큐가 잘못 짜여
+    엉뚱하게 소진된 경우까지 통과한다. `overflow`를 노출해 필요하면 단언할 수 있게 남긴다.
+    """
 
     def __init__(self, results: list[_AQResult]) -> None:
         self._results = results
         self._i = 0
         self.added: list[Any] = []
         self.commits = 0
+        self.overflow = 0
 
     async def execute(self, _stmt: Any) -> _AQResult:
+        if self._i >= len(self._results):
+            self.overflow += 1
+            return _AQResult([])
         result = self._results[self._i]
         self._i += 1
         return result

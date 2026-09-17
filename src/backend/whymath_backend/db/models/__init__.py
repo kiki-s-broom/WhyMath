@@ -21,6 +21,8 @@ alembic autogenerate(env.py의 `target_metadata = Base.metadata`)가 테이블�
   - v1.1 TextbookMapping·TextbookUnit (교과서 매핑 — 중첩 → 관계형 2테이블).
   - EOS-49 ConceptVersion (개념 버전 테이블 — `concept.current_published_version_id`의 FK
     타깃. 이 등록이 빠지면 autogenerate가 실재하는 테이블을 **삭제 대상으로 본다**).
+  - EOS-105 LearningStateTransition (학습 상태 전이 append-only 원장 — 현재 상태는
+    이 원장의 최신 행에서 파생된다. 여기 없으면 autogenerate가 실재 테이블을 drop 제안).
   - 슬105 MisconceptionEmbedding (L4 오개념 의미 매칭 pgvector 영속 — `vector` 컬럼 소유).
   - 슬3(개념그래프 아크) ConceptEmbedding (L1 개념 의미검색 pgvector 영속 — UC 키·`vector` 컬럼).
   - 개념그래프 소비 슬1 ConceptNode (L1 개념 메타 PG 프로젝션 — UC 키·검색 enrichment 백킹).
@@ -101,6 +103,9 @@ from whymath_backend.db.models.formula_node import (
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
 from whymath_backend.db.models.learner_state import LearnerStateRecord
+from whymath_backend.db.models.learning_state_transition import (
+    LearningStateTransition,
+)
 from whymath_backend.db.models.misconception_catalog import MisconceptionCatalog
 from whymath_backend.db.models.misconception_crosslink import MisconceptionCrosslink
 from whymath_backend.db.models.misconception_embedding import MisconceptionEmbedding
@@ -327,6 +332,9 @@ __all__ = [
     # EOS-49: ConceptVersion (Concept 좌석 4번째 테이블 — concept.current_published_version_id
     # 의 FK 타깃이라 여기 없으면 좁은 선택에서 FK가 해소되지 않는다 · ARCH-09)
     "ConceptVersion",
+    # EOS-105: LearningStateTransition (학습 상태 전이 append-only 원장 — 현재 상태의
+    # 정본. 여기 없으면 autogenerate가 실재 테이블을 drop 제안한다 · ARCH-09)
+    "LearningStateTransition",
     # S2-c: ProblemEmbedding (L1 자체생성 동등문제 dedup pgvector 백킹·problem_id PK·
     # 하드 FK 없음 — 여기 없으면 autogenerate가 실재 테이블을 drop 제안한다 · ARCH-09)
     "ProblemEmbedding",

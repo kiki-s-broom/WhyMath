@@ -210,6 +210,17 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/learning_event_trace.py",
             "l2/learning_metrics_rollup.py",
             "l2/learning_path.py",
+            # EOS-105(학습 상태 머신) — 이 두 모듈은 ARCH-48 baseline 확정과 **병렬로** 만들어져
+            # 실측 118파일에 잡히지 않았다(PR #1189가 #1188과 같은 창에서 열려 있었다). 처분 (b)의
+            # ② 경로로 편입한다 — ①(기존 조회 함수 재사용)이 불가한 이유는 각각 다르다:
+            #   · learning_state_machine: `learning_state_transition`이 이 PR이 신설한 테이블이라
+            #     재사용할 기존 reader가 존재하지 않는다(유일 writer·유일 reader가 이 모듈이다).
+            #   · learning_state_evidence: `problem_attempt` 연속 오답 계수와 활성 오개념 조회는
+            #     `l2/learner_state.py`(이미 baseline)와 같은 모양의 SELECT를 쓰지만, L2는 L4의
+            #     `hypothesis_store`를 import할 수 없어(역방향 의존 금지) 그 모듈도 같은 이유로
+            #     직접 쿼리한다 — 즉 이 편입은 기존 선례의 연장이지 새 관행이 아니다.
+            "l2/learning_state_evidence.py",
+            "l2/learning_state_machine.py",
             "l2/mastery_tracking.py",
             "l2/pedagogy_evidence.py",
             "l2/prerequisite_recommendation.py",

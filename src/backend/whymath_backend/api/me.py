@@ -146,6 +146,13 @@ from whymath_backend.l2.learning_path import (
     LearningPath,
     build_learning_path,
 )
+from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
+from whymath_backend.l2.learning_state_machine import (
+    advance_on_attempt,
+    get_current_state,
+    list_transitions,
+    record_transition,
+)
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import (
     MAX_PREREQUISITE_DEPTH,
@@ -217,6 +224,13 @@ from whymath_backend.schema.enums import (
     Persona,
     Resolution,
     ReviewStatus,
+)
+from whymath_backend.schema.learning_state import (
+    LearningState,
+    NextActionKind,
+    TransitionTrigger,
+    UndefinedTransitionError,
+    allowed_targets,
 )
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.timeseries import (
@@ -737,8 +751,108 @@ class SkillMasteryUpdate(BaseModel):
     sample_size: int
 
 
+# EOS-105 학습 상태 머신 — 정책이 소유하는 트리거(클라이언트가 이 표면으로 적재 금지).
+#
+# 집합으로 두는 이유: `POST /learning-state/transitions`가 문자열 접두사(`startswith("POLICY_")`)
+# 로 걸러도 되지만, 그러면 **이름 규약이 곧 보안 경계**가 된다. 규약은 리팩터링으로 조용히
+# 깨지고 그때 이 게이트도 함께 열린다. 열거된 집합은 트리거를 추가한 사람이 여기 한 줄을
+# 넣도록 강제하며, 그 강제는 테스트가 동결한다(누락 시 RED).
+_POLICY_OWNED_TRIGGERS: frozenset[TransitionTrigger] = frozenset(
+    {
+        TransitionTrigger.ATTEMPT_SUBMITTED,
+        TransitionTrigger.POLICY_ADVANCE,
+        TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE,
+        TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+        TransitionTrigger.POLICY_PREREQUISITE_GAP,
+        TransitionTrigger.POLICY_REPEATED_FAILURE,
+        TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED,
+    }
+)
+
+
+class LearningStateTransitionView(BaseModel):
+    """전이 이력 1건 — "왜 지금 이 상태인가"의 재구성 자료."""
+
+    from_state: LearningState
+    to_state: LearningState
+    trigger: TransitionTrigger
+    rule_id: str | None = Field(
+        default=None, description="정책이 낸 전이면 규칙 id, 생애주기 전이면 null."
+    )
+    concept_id: str | None = Field(default=None, description="전이가 일어난 맥락 개념 id.")
+    occurred_at: datetime
+
+
+class LearningStateView(BaseModel):
+    """`GET /v1/me/learning-state` 응답 — 현재 상태 + 가능한 다음 상태 + 최근 이력."""
+
+    current_state: LearningState = Field(
+        description="현재 학습 상태. 전이 이력이 없으면 `NEW`(상태 미상이라는 값은 없다)."
+    )
+    allowed_next_states: list[str] = Field(
+        description=(
+            "현재 상태에서 전이표가 허용하는 다음 상태 목록(정렬). 클라이언트가 전이 규칙을 "
+            "복제하지 않도록 서버가 내려 준다 — 규칙의 진실 원천은 서버 전이표 하나다."
+        )
+    )
+    transitions: list[LearningStateTransitionView] = Field(description="최근 전이 이력(최신순).")
+
+
+class LearningStateTransitionRequest(BaseModel):
+    """`POST /v1/me/learning-state/transitions` 요청 — 생애주기 전이 1건.
+
+    `from_state`를 받지 않는다: 클라이언트가 출발 상태를 지어내면 원장이 실제 이력과 어긋난다.
+    출발 상태는 서버가 원장에서 직접 읽는다.
+    """
+
+    to_state: LearningState = Field(description="전이할 목표 상태.")
+    trigger: TransitionTrigger = Field(
+        description=(
+            "전이 사유. 정책 소유 트리거(`ATTEMPT_SUBMITTED`·`POLICY_*`)는 422로 거부된다 "
+            "— 그 전이는 `POST /v1/me/attempts`만 적재할 수 있다."
+        )
+    )
+    concept_id: str | None = Field(default=None, description="맥락 개념 id(선택).")
+
+
+class LearningStateBlock(BaseModel):
+    """응답에 실리는 학습 상태 머신의 결과 — EOS-105.
+
+    **`rejected_transition`이 이 모델의 존재 이유다.** 미정의 전이를 예외로만 흘리면 호출부가
+    `except`로 잡는 순간 사라지고, 사라지면 "조용히 통과"가 된다. 값으로 만들어 학생 응답까지
+    올려 보내 거부가 관측 가능하게 한다(CLAUDE.md 침묵 실패 금지).
+
+    `rule_id`는 "어느 규칙이 실제로 돌았는가"를 매 요청 노출한다 — 알고리즘을 붙였으면 그것이
+    작동한 비율을 응답이 말해야 한다는 원칙(CLAUDE.md "작동한 비율")의 집행 지점이다.
+    """
+
+    from_state: LearningState = Field(description="응답 제출 시점의 학습 상태.")
+    to_state: LearningState = Field(description="이 처리가 끝난 뒤의 학습 상태.")
+    rule_id: str | None = Field(
+        default=None,
+        description="결정을 낸 정책 규칙 id. 전이가 거부돼 정책이 돌지 않았으면 null.",
+    )
+    next_action: NextActionKind | None = Field(
+        default=None, description="정책이 지시한 다음 행동의 종류. 정책 미실행이면 null."
+    )
+    target_concept_id: str | None = Field(
+        default=None, description="다음 행동의 대상 개념 id(선수 개념 복귀 등). 없으면 null."
+    )
+    target_misconception_id: str | None = Field(
+        default=None, description="교정 대상 오개념 id. 없으면 null."
+    )
+    rejected_transition: str | None = Field(
+        default=None,
+        description=(
+            "거부된 전이의 설명(예: 'NEW → ASSESSING'). null이면 거부 없음. 값이 있으면 "
+            "상태 머신은 아무 전이도 적재하지 않았다 — 응답 적재·숙달 전파는 그와 무관하게 "
+            "성공한다(이 슬라이스는 기존 학습 경로를 막지 않는다)."
+        ),
+    )
+
+
 class AttemptSubmitResponse(BaseModel):
-    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록."""
+    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록 + 학습 상태."""
 
     attempt_id: uuid.UUID
     is_correct: bool
@@ -767,6 +881,12 @@ class AttemptSubmitResponse(BaseModel):
             "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
             "거기에만 적혀 있다."
         ),
+    )
+    learning_state: LearningStateBlock = Field(
+        description=(
+            "학습 상태 머신(EOS-105) 처리 결과 — Event→LearnerState→Policy→NextAction. "
+            "전이가 거부된 경우에도 null이 아니라 `rejected_transition`이 채워진 블록이 온다."
+        )
     )
 
 
@@ -907,6 +1027,46 @@ async def submit_attempt(
     calibration_coaching = recommend_calibration_coaching(
         body.confidence_self_reported, body.is_correct
     )
+    # EOS-105 학습 상태 머신 — Event → LearnerState → Policy → Next Action.
+    #
+    # 여기가 이 슬라이스의 **집행 지점**이다(정본화≠집행). 전이표·정책을 만든 것만으로는
+    # 아무 학생의 상태도 움직이지 않는다 — 서빙 경로가 그것을 실제로 부르는 이 줄이 계약을
+    # 집행으로 바꾼다.
+    #
+    # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
+    # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
+    #
+    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
+    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
+    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
+    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
+    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
+    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
+    policy_evidence = await build_attempt_evidence(
+        session,
+        user_id=user.user_id,
+        is_correct=body.is_correct,
+        confidence=body.confidence_self_reported,
+    )
+    transition = await advance_on_attempt(
+        session,
+        user_id=user.user_id,
+        evidence=policy_evidence,
+        attempt_id=attempt.attempt_id,
+    )
+    decision = transition.decision
+    learning_state_block = LearningStateBlock(
+        from_state=transition.from_state,
+        to_state=transition.final_state,
+        rule_id=decision.rule_id if decision is not None else None,
+        next_action=decision.next_action.kind if decision is not None else None,
+        target_concept_id=(decision.next_action.target_concept_id if decision else None),
+        target_misconception_id=(
+            decision.next_action.target_misconception_id if decision else None
+        ),
+        rejected_transition=transition.rejected_transition,
+    )
     return AttemptSubmitResponse(
         attempt_id=attempt.attempt_id,
         is_correct=body.is_correct,
@@ -930,7 +1090,93 @@ async def submit_attempt(
         ],
         calibration_coaching=calibration_coaching,
         evidence=evidence,
+        learning_state=learning_state_block,
     )
+
+
+@router.get(
+    "/learning-state",
+    response_model=LearningStateView,
+    summary="내 현재 학습 상태 + 전이 이력(학습 상태 머신)",
+)
+async def get_my_learning_state(
+    user: ConsentedUser,
+    session: SessionDep,
+    limit: Limit = 50,
+) -> LearningStateView:
+    """본인 학습 상태 — 현재 상태·거기서 갈 수 있는 상태·최근 전이 이력.
+
+    `allowed_next_states`를 함께 내는 이유: 클라이언트가 전이 규칙을 자기 코드에 복제하지
+    않게 하기 위해서다. 규칙을 클라에 넣으면 전이표의 진실 원천이 둘이 된다(서버 표 + 클라
+    분기) — CLAUDE.md "수학 로직을 클라에 넣지 않는다"의 제어 평면 판이다.
+    """
+    current = await get_current_state(session, user.user_id)
+    transitions = await list_transitions(session, user.user_id, limit=limit)
+    return LearningStateView(
+        current_state=current,
+        allowed_next_states=sorted(s.value for s in allowed_targets(current)),
+        transitions=[
+            LearningStateTransitionView(
+                from_state=t.from_state,
+                to_state=t.to_state,
+                trigger=t.trigger,
+                rule_id=t.rule_id,
+                concept_id=t.concept_id,
+                occurred_at=t.occurred_at,
+            )
+            for t in transitions
+        ],
+    )
+
+
+@router.post(
+    "/learning-state/transitions",
+    response_model=LearningStateView,
+    status_code=status.HTTP_201_CREATED,
+    summary="학습 상태 전이 1건 적재(생애주기 전이 — 진단 시작·학습 시작 등)",
+)
+async def post_my_learning_state_transition(
+    body: LearningStateTransitionRequest,
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearningStateView:
+    """생애주기 전이를 명시적으로 적재한다 — 진단 시작·완료·학습 시작 같은 사건.
+
+    응답 제출로 일어나는 평가 전이(`ATTEMPT_SUBMITTED` 및 정책 전이)는 이 표면이 아니라
+    `POST /v1/me/attempts`가 적재한다. 여기서 그 트리거를 허용하면 클라이언트가 정책을
+    우회해 임의 상태로 점프할 수 있다 — 그래서 **거부한다**(422).
+
+    미정의 전이는 409로 거부한다. 200에 "실패했음" 플래그를 실어 보내지 않는다 — 그 형태는
+    호출부가 플래그를 안 읽는 순간 조용한 통과가 된다.
+    """
+    if body.trigger in _POLICY_OWNED_TRIGGERS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"`{body.trigger.value}`는 정책 엔진이 소유하는 트리거입니다 — 이 표면으로 "
+                f"적재할 수 없습니다. 평가 전이는 `POST /v1/me/attempts`가 적재합니다."
+            ),
+        )
+    try:
+        await record_transition(
+            session,
+            user_id=user.user_id,
+            to_state=body.to_state,
+            trigger=body.trigger,
+            concept_id=body.concept_id,
+        )
+    except UndefinedTransitionError as exc:
+        # 예외 타입명을 detail에 포함한다(CLAUDE.md 침묵 실패 금지 — 무타입 경고 금지).
+        current = await get_current_state(session, user.user_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{type(exc).__name__}: {exc.from_state.value} → {exc.to_state.value}는 "
+                f"정의되지 않은 전이입니다. {current.value}에서 갈 수 있는 상태: "
+                f"{sorted(s.value for s in allowed_targets(current)) or '없음'}."
+            ),
+        ) from exc
+    return await get_my_learning_state(user, session)
 
 
 @router.get(

@@ -338,6 +338,50 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-16 (Kiki 결정·EOS-105): **8상태 학습 상태 머신 보류를 번복해 신설 — 진실 원천 중복은 "역할 분리 + 대조 경로"로 처리** (Kiki "원문 그대로 전면 구현" 선택, claude 구현) — 판정 기준 main `0f12e76a`
+
+**계기**: Phase 2 마스터 프리앰블 항목 `P-04`(계획서 300 §3 「Phase 2의 핵심 상태 머신」)가 세션에 투입됐다. 그런데 이 항목은 **2026-09-03 Kiki 결정으로 이미 "신설 보류"**였다(재확인 지점 G4 2026-12-13 · 게이트 `G-state-machine-deferral-recheck` · 대조표 `plan300_phase2_backlog_crosswalk.md` 231행 "등재 제외"). 세션이 착수 전에 그 보류 사실과 사유를 실측으로 제시하고 3택을 물었다 — ①파생 전용 머신 ②보류 유지·ADR 초안만 ③원문 그대로 전면 구현. **Kiki가 ③을 선택**했다.
+
+**번복의 명시적 기록**(이 블록이 그 기록이다 — 결정을 덮어쓰는 것과 덮어썼다고 적는 것은 다르다):
+- 09-03 결정의 사유는 **"`*MasteryHistory`와 같은 사실의 두 번째 진실 원천"**이었고, 그 위험은 번복으로 사라지지 않는다. 그래서 위험을 없앴다고 주장하는 대신 **두 가지 처치**를 코드에 넣었다.
+
+**처치 ① 역할을 겹치지 않게 갈랐다 (좌석 판정 — 실측 기준 main `0f12e76a`)**
+| 담는 사실 | 좌석 | 이 슬라이스와의 관계 |
+|---|---|---|
+| 무슨 일이 있었는가(측정·증거) | `ConceptMasteryHistory`·`SkillMasteryHistory`·`AttemptEvent` | **복제하지 않는다** — 숙달값·정답률·이벤트를 상태 머신에 저장하지 않음 |
+| 시점별 종합 학력 사진 | `user_state_snapshot`(writer 0) | **건드리지 않는다** — 컬럼 추가 0 |
+| 학생당 1행 현재 학습 좌표 | `learner_state`(EOS-103·PR #1185 **미머지**) | **건드리지 않는다** — main에 테이블 부재 실측(`git cat-file -e origin/main:.../db/models/learner_state.py` → 부재) |
+| 학습 국면의 **전이 사건** | `learning_state_transition`(신설·append-only) | 이 슬라이스가 소유. 어느 기존 테이블도 이 사실을 담고 있지 않았다(어휘 3종 `DIAGNOSING`·`REMEDIATING`·`ADVANCING` src/ 코드 0건) |
+
+현재 상태는 **저장하지 않고 원장 최신 행에서 파생**한다(`get_current_state`). 가변 상태 컬럼을 두지 않았으므로 "현재 상태"라는 사실의 원천은 원장 하나다. 이것이 09-03 사유에 대한 1차 처치다.
+
+**처치 ② 어긋남을 검출 가능하게 만들었다** — `reconcile_state`가 영속 상태와 증거 재계산 상태를 대조해 불일치를 **보고**한다. **자동 정정하지 않는다**: 어느 쪽이 옳은지(정책이 바뀌었나, 적재가 누락됐나) 기계가 알 수 없기 때문이다. 조용히 덮어쓰면 그 순간 대조가 위장이 된다(뮤테이션 M15가 이 성질을 동결).
+
+**설계 결정 4건**
+1. **전이는 코드 분기가 아니라 데이터다** — `ALLOWED_TRANSITIONS: frozenset[tuple[LearningState, LearningState]]` 17쌍이 단일 진실 원천이고, 판정 함수는 이 집합만 읽는다. 판정 함수 본문에 상태 리터럴이 있으면 **AST 가드가 RED**(`test_transition_verdict_reads_only_the_table_never_a_state_branch` — 문자열 검색이 아니라 AST인 이유는 표기 변형에서 뚫리기 때문).
+2. **미정의 전이는 거부한다** — 8×8=64쌍 전수 파라미터화 테스트가 "표에 있는 쌍만 통과"를 판정한다. 테스트가 표를 **복제하지 않고 참조**하므로 표에 쌍을 더하면 그 케이스가 자동으로 반대편으로 이동한다(진실 원천이 셋이 되는 것을 막는다).
+3. **정책은 Protocol** — `LearningStatePolicy.decide(state, evidence) -> PolicyDecision`. v1 내부는 if/else 규칙 6종이지만 BKT/DKT/IRT/LLM으로 교체해도 호출부 수정 0. 규칙을 `PolicyRule` dataclass 시퀀스로 둔 이유는 확장이 아니라 **검증**이다 — 규칙을 하나씩 뺀 집합을 주입할 수 있어야 "규칙 하나당 반례 하나"가 기계로 성립한다.
+4. **미매치는 폴백이 아니라 예외** — `NoMatchingPolicyRuleError`. 폴백이 있으면 규칙을 지워도 조용히 통과해 위 ③의 변별력이 0이 된다.
+
+**규칙 우선순위와 그 근거**(뒤집으면 뮤테이션 M9가 RED): `R5 반복실패 > R3 오개념 > R4 선수결손 > R1 정답·고확신 > R2 정답·저확신 > R6 원인미상 오답`. R5가 앞선 이유는 CLAUDE.md 의사결정 우선순위(1 학생 정서·웰빙 > 3 교수학적 정확성)다 — 3연속 막힌 학생에게 원인 분류를 정밀하게 하는 것보다 막힌 지점을 푸는 것이 앞선다. R3가 R4보다 앞선 이유는 오개념을 남긴 채 선수 개념을 다시 가르치면 그 오개념이 따라오기 때문이다.
+
+**집행 지점 (정본화 ≠ 집행 — 별항)**
+- 서빙: `api/me.py::submit_attempt` → `build_attempt_evidence` → `advance_on_attempt`. 이 호출이 없으면 전이표·정책이 다 있어도 **아무 학생의 상태도 움직이지 않는다**(PED-06 선례). AST 가드 `test_submit_attempt_actually_calls_the_state_machine`이 동결하며, 호출을 지우면 뮤테이션 M19가 RED.
+- 표면: `GET /v1/me/learning-state`(현재 상태 + `allowed_next_states` + 이력) · `POST /v1/me/learning-state/transitions`(생애주기 전이·미정의 전이 **409**·정책 소유 트리거 **422**).
+- 응답: `AttemptSubmitResponse.learning_state`는 **필수 필드**다(Optional이면 누락이 관측되지 않는다 — M20이 RED).
+
+**명시한 한계 3건 (숨기지 않는다)**
+1. **기존 학생 전원이 `NEW`라 첫 응답 제출의 평가 진입 전이가 거부된다**(`NEW → ASSESSING`은 표에 없다). 거부를 없애려 그 쌍을 표에 넣는 선택도 있었으나 **넣지 않았다** — "무엇 대비 평가인가"가 없는 평가를 합법으로 만들면 머신이 보증하는 것이 사라진다. 대신 거부는 응답 `learning_state.rejected_transition`에 **값으로** 실린다(예외 타입명 포함). **이 슬라이스는 기존 학습 경로를 막지 않는다** — attempt 적재·숙달 전파는 그대로 성공한다. 상태 머신이 루프를 *게이팅*하는 것은 별건이다.
+2. **규칙 R4(선수결손)는 서빙 경로에서 매치되지 않는다** — `prerequisite_gap_concept_ids`의 생산자(`recommend_prerequisite_gaps`)가 개념 그래프 재귀 CTE 순회라 응답 제출마다 돌리기에 무겁다. 그래서 `build_attempt_evidence`가 **인자로 받도록** 열어 두고 이 경로에서는 비운다. "규칙은 있는데 영원히 안 도는" 상태를 숨기지 않으려고 모듈 docstring에 생산자 배선 현황 표를 박고 테스트로 못 박았다(`test_prerequisite_gaps_come_from_the_caller_not_from_this_module`). 어느 규칙이 실제로 돌았는지는 `PolicyDecision.rule_id`가 응답에 실려 **매 요청 관측**된다(CLAUDE.md "작동한 비율").
+3. **동시 제출 TOCTOU 창이 남는다** — `record_transition`이 현재 상태를 읽고 적재하는 사이. append-only라 어긋난 행이 과거를 훼손하지는 않으며, 어긋남은 `reconcile_state`가 검출한다.
+
+**뮤테이션 22종 전건 RED** — 하네스는 **순수 Python**(셸 배제·2026-09-06 규칙)이며 주입 적용(`mutated != original`)과 원복 바이트 동일(sha256)을 각각 단언한다. M1 판정 항상 True / M2 침묵 통과 / M3 `(NEW,ADVANCING)` 추가 / M4 `(ASSESSING,ADVANCING)` 제거 / M5 `(NEW,NEW)` 자기전이 / M6 None을 고확신 / M7·M8 경계 `>=`→`>` / M9 규칙 우선순위 뒤집기 / M10 미매치 폴백 / M11 적재가 판정보다 앞섬 / M12 거부를 조용히 삼킴 / M13 정책 불법 상태 삼킴 / M14 `INITIAL_STATE`=READY / M15 대조 항상 일치 / M16 미채점을 실패로 계상 / M17 스캔 LIMIT 제거 / M18 정답에도 오개념 preload / M19 서빙 호출 제거 / M20 응답 필드 Optional화 / M21 정책 트리거 차단 해제 / M22 409→200.
+
+**자진 공개 1건** — 초회 실행에서 M13이 구문 오류(`try:` 짝 없음)로 RED였다. **구문 오류 RED는 검출이 아니다**(어떤 가드가 있어도 RED다). 하네스를 고쳐 구문 유효한 주입(`try/except UndefinedTransitionError: pass`)으로 바꾸고 `ast.parse`로 유효성을 선단언한 뒤 재실행해 진짜 RED를 확인했다. 이것을 적는 이유는 "22종 전건 RED"라는 숫자가 한 칸이라도 위장을 포함하면 나머지 21칸의 신뢰도 함께 떨어지기 때문이다.
+
+**게이트 처분** — `G-state-machine-deferral-recheck`(재확인 지점 G4 12/13·판정 3택)는 **선택지 ②(ADR로 채택)로 처분**한다. 그 게이트가 ②에 요구한 "`*MasteryHistory`와의 진실 원천 중복 해소안"은 위 처치 ①②이며 `schema/learning_state.py` 모듈 docstring·`db/models/learning_state_transition.py` 좌석 판정에 정본화돼 있다.
+
+**crosswalk 정정** — `docs/strategy/plan300_phase2_backlog_crosswalk.md`의 §3 표(89행)·§12 16행(132행)·§부록 231행이 P-04를 "등재 제외 / 보류"로 적고 있었다. 세 자리 전부 이 번복으로 정정했다(원 판정을 지우지 않고 **번복 사실과 날짜를 병기**한다 — 판정은 시점에 종속되므로 09-03 판정 자체는 그 시점에 옳았다).
 ### 2026-09-17 (구현 · EOS-14): **추천에 "왜 이 문항인가"를 필수로 붙였다 — 근거 없음을 근거로 위장하지 않는 3상태, 그리고 선택은 한 줄도 건드리지 않는 구조** (claude 구현) — 판정 기준 main `27df076e`
 
 **① 현행 '이유'는 이유가 아니었다(acceptance ③ 실측).** `NextProblemResponse`의 5필드(`weight_axes_applied`·`candidate_pool_size`·`weak_concept_signal_count`·`candidate_zero_reason`·`band_calibrated`)는 **관측 메타**다 — *어느 축이 적용됐나*·*후보가 왜 0인가*를 말한다. 그것은 추천기가 어떻게 돌았는지의 기록이지 **선택된 문항의 근거**가 아니다. "어느 개념이 약해서 이 문항인가"는 어디에도 없었다. 그래서 둘을 합치지 않고 `reason`을 **추가**했다(기존 5필드 불변·회귀 0).

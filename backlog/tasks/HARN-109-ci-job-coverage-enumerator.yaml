@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-109-ci-job-coverage-enumerator
+title: "로컬 재현의 CI *잡* 커버리지 기계 대조 — 스텝 목록은 맞췄는데 잡을 통째로 빠뜨리는 축(같은 계열 3회차)"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 잡 전수 열거 — .github/workflows/ci.yml의 잡 이름을 파싱해 전량 내놓는 도구를 만든다. 열거 0건이면 통과가 아니라 exit 1이다(스캔 0건은 실패 — CLAUDE.md 2026-09-01 축 ④). 파싱 대상이 YAML이므로 정규식이 아니라 yaml.safe_load로 읽는다.\n② 변경 대상 잡 판정 — 이번 변경(git diff 경로)이 닿는 잡을 계산해 낸다. ci.yml의 changes 잡(path filter)이 이미 그 매핑을 갖고 있으면 그것을 정본으로 읽고, 없는 잡은 \"판정 불가\"로 내놓는다 — 조용히 \"안 닿음\"으로 접지 않는다(모른다 != 아니다).\n③ 로컬 재현 커버리지 대조 — 세션이 실제로 돌린 잡 집합과 ②의 결과를 대조해, 빠진 잡을 이름으로 지목한다. 이 도구의 출력이 곧 \"내가 무엇을 안 봤는가\"의 답이어야 한다.\n④ 변별력 주입 검증 — 잡을 하나 빼고 돌렸을 때 실제로 그 잡을 지목하는지 주입으로 확인한다(정상 입력에서 초록인 것은 증거가 아니다). 주입이 실제 적용됐는지(mutated != original)도 단언한다.\n⑤ 잡 경계의 환경 차 이관 — 잡마다 working-directory와 설치 패키지가 다르다는 사실을 도구가 함께 내놓는다(backend 잡은 src/backend에서 전체 의존성, infra-contracts는 레포 루트에서 7종만). 이것을 안 내놓으면 사람이 재현 스크립트를 짜다가 같은 자리에서 또 틀린다.\n⑥ 범위 명시 — 이 태스크는 *열거와 대조*만 한다. 잡을 대신 실행해 주는 러너는 만들지 않는다(로컬에서 재현 불가한 잡 — docker-build 등 — 이 있고, 그것을 \"실행했다\"로 위장하는 것이 더 나쁘다). 재현 불가 잡은 \"재현 불가\"로 명시 출력한다."
+artifacts: []
+paths:
+  - scripts/harness/ci_job_coverage.py
+  - tests/infra/test_ci_job_coverage.py
+session: null
+notes: "출처: 2026-09-17 PR #1189(EOS-105) CI red. CLAUDE.md '검사 판정 무효화' 계열의 3회차이며, 그 규칙 본문이 이 태스크를 기계 집행으로 지목한다.\n\n3회차 경위(같은 규칙이 세 번 다른 입구로 뚫렸다):\n· 2026-08-09 — 검사 대상 *경로*를 좁혔다(black --check -q | tail).\n· 2026-09-10 — 한 잡 안에서 검사 *종류*를 빠뜨렸다(pytest만 돌리고 mypy·lint-imports·게이트 CLI 미실행). 대책은 산문 규칙(\"로컬 검증은 CI 잡의 스텝 목록을 열어 놓고 맞춘다\").\n· 2026-09-17 — 그 산문 규칙을 충실히 따랐는데도 뚫렸다. backend 잡 16스텝을 전건 exit 0으로 재현했으나 infra-contracts 잡이 통째로 미실행이었다. 그 규칙 문장이 \"잡\"을 단수로 전제하기 때문이다.\n\n왜 코드여야 하는가: 잡 누락은 로컬 화면에 실패 스텝도 skipped 스텝도 남기지 않는다 — 그냥 없다. 사람이 \"내가 무엇을 안 봤는가\"를 눈으로 알아내려면 워크플로 전체를 매번 다시 읽어야 하고, 그 읽기를 건너뛴 것이 정확히 이번 사고다. 텍스트 규칙 2회 실패 후 코드 착지 선례(PB-02 그랜드파더 만료 계약)를 따른다.\n\n실측 참고(판정 기준 main 27df076e): ci.yml의 잡 중 이번 PR이 실제로 닿았던 것은 backend와 infra-contracts 두 개였고, infra-contracts에서만 도는 검사가 EOS 기능 인벤토리 전수 귀속(test_eos_feature_inventory_v2.py)과 prod 스키마 프로브(test_prod_schema_probe.py)다. 둘 다 \"신규 자산을 대장에 귀속시켰는가\"를 묻는 부류라 새 모듈·새 마이그레이션을 추가하는 PR이면 반드시 닿는다."
+updated: 2026-09-17
