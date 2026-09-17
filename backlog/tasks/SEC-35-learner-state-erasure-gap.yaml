@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-35-learner-state-erasure-gap
+title: "learner_state GDPR 파기 누락 + 완충 가드 소유컬럼 열거 사각 (learner_id 별칭을 전수 스윕이 못 본다)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `learner_state`가 GDPR 삭제 경로에 편입된다 — `privacy/erasure.py`의 `_ERASURE_PLAN`에 등재하거나(소유 컬럼 `learner_id`), `_ERASURE_PLAN_EXEMPTIONS`에 사유와 함께 등재한다. 어느 쪽이든 \"아무 데도 없음\" 상태는 해소한다.\n② 파기 순서 검증 — `erase_user()`는 마지막에 `delete(UserProfile)`을 실행하는데 `learner_state.learner_id`는 `user_profile.user_id`를 FK로 물고 `ondelete`가 없다. 실 PG 통합 테스트로 **삭제 요청이 FK 위반으로 실패하지 않는지** 확인한다(조용한 누락이 아니라 요청 자체가 터지는 축).\n③ 완충 가드의 사각 해소 — `tests/backend/privacy/test_erasure_plan_completeness.py`의 `OWNER_COLUMN_NAMES`는 `user_id`·`student_id`·`target_user_id` **3종 고정 열거**라 `learner_id` 같은 별칭을 구조적으로 못 본다. 이름 열거 대신 **산출물 검사**로 바꾼다 — 예: `user_profile.user_id`를 참조하는 FK를 가진 테이블을 전수 스윕(컬럼명 무관). CLAUDE.md 「금지 패턴 열거 대신 산출물 검사」 축.\n④ 실패 주입 — `learner_id` 형태의 소유 컬럼을 가진 더미 테이블을 주입해 가드가 RED를 내는지 확인한다(현행 가드는 이 주입에서 GREEN이다 = 변별력 0). 주입 적용 단언(`mutated != original`) 포함."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/privacy/erasure.py
+  - tests/backend/privacy/test_erasure_plan_completeness.py
+session: null
+notes: "발견 경위: 2026-09-17 EOS-105(학습 상태 머신) 브랜치에 main(EOS-103 PR #1185)을 병합하던 중, 내 `learning_state_transition`은 `_ERASURE_PLAN`에 넣었는데 같은 병합으로 들어온 `learner_state`는 어디에도 없다는 것을 발견했다. 전체 privacy 스위트 117건이 GREEN이었다 — 가드가 통과한 이유는 소유 컬럼명이 `learner_id`라 `OWNER_COLUMN_NAMES` 3종 열거에 안 걸리기 때문이다(가드가 관대한 게 아니라 이 자리를 아예 안 본다).\n\n범위 규율에 따라 EOS-105 세션에서 고치지 않고 등재만 한다 — 남의 태스크(EOS-103)가 만든 표면이고, \"김에 같이\" 고치면 이 PR의 판정 범위가 흐려진다.\n\n실측 근거(main 6d1d9d10 기준):\n- `grep -rn \"learner_state\" src/backend/whymath_backend/privacy/` → 0건\n- `Base.metadata.tables[\"learner_state\"]` 컬럼: learner_id(PK) · curriculum_id · current_objective_id · provisioned_at · provisioned_by · updated_at · revision\n- `db/models/learner_state.py:68` → `sa.ForeignKey(\"user_profile.user_id\")` · ondelete 지정 없음"
+updated: 2026-09-17

@@ -86,7 +86,7 @@ grep -h "^eos_priority:" backlog/tasks/*.yaml | sort | uniq -c
 
 | 원 문서 항목 | 처분 | 근거 |
 |---|---|---|
-| **§3 학습 상태 머신 8상태**<br>(NEW→DIAGNOSING→READY→LEARNING→PRACTICING→ASSESSING→REMEDIATING→ADVANCING) | **보류 — 등재 제외** | 2026-09-03 Kiki 결정(선언 §1.3). 저장소는 상태를 *머신*이 아니라 *이력*으로 모델링한다(`*MasteryHistory` append-only + `attempt_event` 시계열) — 8상태를 세우면 **같은 사실의 두 번째 진실 원천**이 생긴다(붕괴 연쇄 "유지보수 지옥 ← truth source가 하나가 아님"). **만료 없는 유예가 아니다**: 재확인 게이트가 대장에 실재하며(`remind-after-days=101` → G4 2026-12-13 SessionStart 브리핑 노출) 판정 3택(보류 유지 / ADR 채택 / 영구 미채택)까지 적혀 있다 |
+| **§3 학습 상태 머신 8상태**<br>(NEW→DIAGNOSING→READY→LEARNING→PRACTICING→ASSESSING→REMEDIATING→ADVANCING) | **보류 — 등재 제외** | 2026-09-03 Kiki 결정(선언 §1.3). 저장소는 상태를 *머신*이 아니라 *이력*으로 모델링한다(`*MasteryHistory` append-only + `attempt_event` 시계열) — 8상태를 세우면 **같은 사실의 두 번째 진실 원천**이 생긴다(붕괴 연쇄 "유지보수 지옥 ← truth source가 하나가 아님"). **만료 없는 유예가 아니다**: 재확인 게이트가 대장에 실재하며(`remind-after-days=101` → G4 2026-12-13 SessionStart 브리핑 노출) 판정 3택(보류 유지 / ADR 채택 / 영구 미채택)까지 적혀 있다 <br><br>**[정정 2026-09-16 — 번복]** Kiki가 이 보류를 번복하고 "원문 그대로 전면 구현"을 지시해 `EOS-105`로 등재·구현했다(PR 참조는 MEMORY 2026-09-16 결정 로그). 09-03 판정 자체는 그 시점에 옳았으므로 지우지 않고 병기한다 — **판정은 시점에 종속된다**. 진실 원천 중복 사유는 ①역할 분리(전이 원장은 숙달값·이벤트를 복제하지 않고, 현재 상태는 가변 컬럼이 아니라 원장 최신 행에서 *파생*된다) ②대조 경로(`reconcile_state` — 검출만 하고 자동 정정하지 않는다)로 처리했다. 게이트 `G-state-machine-deferral-recheck`는 판정 3택 중 ②(ADR로 채택)로 처분. |
 | **§18 계획서 300 Gate 2** | **명칭 폐기** | 선언 §1.3-②: `G2` = Anchor Content Production 한 뜻으로만 쓴다. 계획서 300의 `Gate 2`는 사용하지 않는다(이름 충돌 3회차) |
 | **CL-WIRING 2건** | **이미 완료** | `MOB-20` done · `EOS-81` done (09-03 결정의 즉시 수행분) |
 
@@ -129,7 +129,7 @@ grep -h "^eos_priority:" backlog/tasks/*.yaml | sort | uniq -c
 
 | # | 축 | 판정 | 근거 | 잔여 갭 |
 |---|---|---|---|---|
-| 16 | **§3 8상태 상태 머신** | **등재 제외**(신규필요이나 보류 결정) | 어휘 5종 전수 검색 → `src/`·`schemas/` **코드 0건**. 대응물 실재: `ConceptMasteryHistory`·`SkillMasteryHistory`(append-only) · `AttemptEvent` hypertable · `l2/learner_state.py:53` | §3 참조 — 09-03 보류 + G4 재확인 게이트 |
+| 16 | **§3 8상태 상태 머신** | **등재 제외**(신규필요이나 보류 결정) | 어휘 5종 전수 검색 → `src/`·`schemas/` **코드 0건**. 대응물 실재: `ConceptMasteryHistory`·`SkillMasteryHistory`(append-only) · `AttemptEvent` hypertable · `l2/learner_state.py:53` | §3 참조 — 09-03 보류 + G4 재확인 게이트 <br><br>**[정정 2026-09-16 — 번복]** Kiki가 이 보류를 번복하고 "원문 그대로 전면 구현"을 지시해 `EOS-105`로 등재·구현했다(PR 참조는 MEMORY 2026-09-16 결정 로그). 09-03 판정 자체는 그 시점에 옳았으므로 지우지 않고 병기한다 — **판정은 시점에 종속된다**. 진실 원천 중복 사유는 ①역할 분리(전이 원장은 숙달값·이벤트를 복제하지 않고, 현재 상태는 가변 컬럼이 아니라 원장 최신 행에서 *파생*된다) ②대조 경로(`reconcile_state` — 검출만 하고 자동 정정하지 않는다)로 처리했다. 게이트 `G-state-machine-deferral-recheck`는 판정 3택 중 ②(ADR로 채택)로 처분. |
 | 17 | **§13 EOS 내부 경계** | **기존충족** | `EOS-65·66·67·69·84·85·86·88·89·90`(전건 done·main 도달). import-linter **3계약**(`src/backend/pyproject.toml:215~`) + CI 상시 `lint-imports`(`ci.yml:373-374`) + 위험신호 AST 스캐너 `scripts/analysis/eos_core_boundary_probe.py:47`(`SUBJECT_LITERALS`) + 동결 테스트 4종 | 합성 루트 경유 면제 1건(`l4.solution_coaching -> composition`) — `ARCH-99` 소유·G1 재확인. **계획서가 위험신호로 지목한 `if subject == "math"`는 이미 기계가 감시 중** |
 | 18 | **§16 SCENARIO-001~010** | 기존부분 | 관통 테스트 2종 각 13단계(`test_e2e_vertical_slice_integration.py:455` · `e2e_loop_flow_test.dart:296-464`) | SCENARIO 식별자 집합 **0건**. 미커버 6종(002·004·005·008·009·010) — 009·010의 공통 원인은 **`LearningSession` writer 0**이고 테스트가 `session_id is None`을 단언해 공백을 계약으로 동결 중. **"CI 상시" 미충족** — nightly(`ci.yml:1566` `if: schedule`) 전용이라 PR·push에서 안 돈다 |
 | 19 | **§12 API 12종** | **11/12 대응 · 1 갭** | 107 엔드포인트/22 라우터 전수 추출 후 역할 대조 | 유일 갭 = **`GET /learner-state` 합성 표면**(소유자 0건). 나머지 11종은 경로 이름이 달라도 역할 대응물 실재 |
@@ -228,7 +228,7 @@ grep -h "^eos_priority:" backlog/tasks/*.yaml | sort | uniq -c
 | `P-01` Learning Loop Contract v1 | §1·§2 | ~~등재 제외~~ → **신규 등재**(2026-09-16 정정 — 아래 §11.4) | `EOS-100` |
 | `P-02` Learning Event 정본화 | §4-작업2·§17 | 신규 등재 | `EOS-11` |
 | `P-03` LearnerState v1 | §4-작업1 | 신규 등재 | `EOS-10` |
-| `P-04` 학습 상태 머신 | §3 | **등재 제외** — 09-03 보류 + G4 재확인 게이트 실재 | §3 표 |
+| `P-04` 학습 상태 머신 | §3 | **등재 제외** — 09-03 보류 + G4 재확인 게이트 실재 | §3 표 <br><br>**[정정 2026-09-16 — 번복]** Kiki가 이 보류를 번복하고 "원문 그대로 전면 구현"을 지시해 `EOS-105`로 등재·구현했다(PR 참조는 MEMORY 2026-09-16 결정 로그). 09-03 판정 자체는 그 시점에 옳았으므로 지우지 않고 병기한다 — **판정은 시점에 종속된다**. 진실 원천 중복 사유는 ①역할 분리(전이 원장은 숙달값·이벤트를 복제하지 않고, 현재 상태는 가변 컬럼이 아니라 원장 최신 행에서 *파생*된다) ②대조 경로(`reconcile_state` — 검출만 하고 자동 정정하지 않는다)로 처리했다. 게이트 `G-state-machine-deferral-recheck`는 판정 3택 중 ②(ADR로 채택)로 처분. |
 | `P-05` Assessment Engine v1 | §5 | 신규 등재 | `EOS-12` |
 | `P-06` Mastery Engine v1 | §6 | 신규 등재 | `EOS-13` |
 | `P-07` Misconception 연결 | §7 | **기존충족** — 텍스트 입력축 완비. 잔여(distractor)는 `ASM-06`(blocked) 소유 | §5 단위8 |
