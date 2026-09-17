@@ -159,11 +159,13 @@ from whymath_backend.l2.prerequisite_recommendation import (
     PrerequisiteGap,
     recommend_prerequisite_gaps,
 )
+from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
     POLICY_VERSION_SUNEUNG,
     record_recommendation_treatment,
 )
+from whymath_backend.l2.recommendation_reason import collect_recommendation_reason
 from whymath_backend.l2.review_queue import ReviewQueue, fetch_review_queue
 from whymath_backend.l2.skill_mastery_tracking import (
     record_problem_attempt_skill_mastery,
@@ -2531,6 +2533,15 @@ class NextProblemResponse(BaseModel):
             "대기). purpose=diagnosis(기본)에서는 밴드 자체가 적용되지 않으므로 null."
         ),
     )
+    reason: RecommendationReason = Field(
+        description=(
+            "EOS-14: **왜 이 문항인가** — 선택된 문항의 대표 개념·그 개념의 실측 숙달로 판정한 "
+            "추천 근거. 위 5필드(weight_axes_applied·candidate_pool_size·"
+            "weak_concept_signal_count·candidate_zero_reason·band_calibrated)가 *추천기가 "
+            "어떻게 돌았나*의 관측 메타라면, 이 필드는 *선택된 문항의 근거*다 — 둘은 다른 질문에 "
+            "답하므로 합치지 않는다. `problem_id`가 null이어도 비지 않는다(type=no_candidate)."
+        ),
+    )
 
 
 @router.get(
@@ -2723,6 +2734,10 @@ async def recommend_next_problem(
                 weak_concept_signal_count=weak_concept_signal_count,
                 candidate_zero_reason=zero_reason,
                 band_calibrated=band_calibrated,
+                # EOS-14: 추천이 없어도 이유는 있다 — 조회 0건(없는 문항의 개념을 묻지 않는다).
+                reason=await collect_recommendation_reason(
+                    session, learner_id=user.user_id, problem_id=None
+                ),
             )
         picked = candidates[chosen_index]
         # REC-11: candidates[] 관측 — recommend_suneung_index 내부 공식(적격 게이트 × 정보량
@@ -2742,6 +2757,13 @@ async def recommend_next_problem(
             candidate_scores.append((p.problem_id, score))
         # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — null 분기(위)는
         # 호출하지 않는다.
+        # EOS-14: 근거는 **선택이 끝난 뒤**(picked 확정 이후) 조립된다 — 이 호출이 위
+        # chosen_index에 영향을 줄 수 없는 위치이므로 근거 배선이 추천 결과를 바꾸지
+        # 않는다(acceptance ⑥의 구조적 보장). 처치 기록보다 앞에 두는 것은 같은 근거를
+        # 응답과 영속 양쪽에 **하나의 값으로** 싣기 위해서다(두 번 계산하면 갈라진다).
+        suneung_reason = await collect_recommendation_reason(
+            session, learner_id=user.user_id, problem_id=picked.problem_id
+        )
         await record_recommendation_treatment(
             session,
             problem_id=picked.problem_id,
@@ -2751,6 +2773,7 @@ async def recommend_next_problem(
             mode=mode,
             candidates=candidate_scores,
             policy_version=POLICY_VERSION_SUNEUNG,
+            reason=suneung_reason,
         )
         await session.commit()
         return NextProblemResponse(
@@ -2767,6 +2790,7 @@ async def recommend_next_problem(
             weak_concept_signal_count=weak_concept_signal_count,
             candidate_zero_reason=None,
             band_calibrated=band_calibrated,
+            reason=suneung_reason,
         )
 
     # 후보를 θ 근방(|b-θ| 최소)으로 SQL 정렬 — 보정 b(irt_difficulty_b) 우선·없으면 전문가
@@ -2837,6 +2861,10 @@ async def recommend_next_problem(
             weak_concept_signal_count=weak_concept_signal_count,
             candidate_zero_reason=CANDIDATE_ZERO_NO_POOL,
             band_calibrated=band_calibrated,
+            # EOS-14: 후보 0건도 이유다(조회 0건).
+            reason=await collect_recommendation_reason(
+                session, learner_id=user.user_id, problem_id=None
+            ),
         )
     chosen_id, chosen_difficulty, _chosen_b = candidate_rows[best]
     # REC-11: candidates[] 관측 — select_weighted_item과 *같은* 점수 공식(정보량×가중)을
@@ -2847,6 +2875,10 @@ async def recommend_next_problem(
     ]
     # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — 위 null 분기는
     # 호출하지 않는다.
+    # EOS-14: 선택 확정(chosen_id) 이후에 근거 조립 — 수능 분기와 동일 위치 규약.
+    cat_reason = await collect_recommendation_reason(
+        session, learner_id=user.user_id, problem_id=chosen_id
+    )
     await record_recommendation_treatment(
         session,
         problem_id=chosen_id,
@@ -2856,6 +2888,7 @@ async def recommend_next_problem(
         mode=mode,
         candidates=cat_candidate_scores,
         policy_version=POLICY_VERSION_CAT,
+        reason=cat_reason,
     )
     await session.commit()
     return NextProblemResponse(
@@ -2869,6 +2902,7 @@ async def recommend_next_problem(
         weak_concept_signal_count=weak_concept_signal_count,
         candidate_zero_reason=None,
         band_calibrated=band_calibrated,
+        reason=cat_reason,
     )
 
 

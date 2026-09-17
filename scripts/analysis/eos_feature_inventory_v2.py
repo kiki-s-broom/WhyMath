@@ -583,12 +583,21 @@ CATALOG: tuple[Spec, ...] = (
        "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
        "schema/assessment_evidence.py가 소유",
        "l2.assessment_evidence"),
+    _e("WM-E-211", "추천 호출 계약·추천 근거 조립(Recommendation + 필수 Reason)", "Student",
+       "Recommendation", "P1",
+       "EOS-14 — 계획서 300 §8. `recommend(learner_state, context)` 시그니처와 필수 "
+       "`RecommendationReason`(구간·basis 3상태)을 정본화하고, 이미 선택된 문항에 근거를 "
+       "붙인다. 선택 알고리즘은 WM-E-205·WM-E-202 좌석이 유일 권위이고 이 행은 선택 *뒤에* "
+       "돌아 결과를 바꾸지 않는다(session.add·commit 0건)",
+       "l2.recommendation_contract", "l2.recommendation_reason"),
     # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
     # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
     # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
     # 전이표 계약 자체는 schema/learning_state.py가 소유한다.
-    # 번호: 전 원격 브랜치 41개 전수 스캔에서 미사용 확인.
-    _e("WM-E-211", "학습 상태 머신(전이표 판정·정책 결정·전이 원장 적재)", "Student",
+    # 번호 주의: 초판은 WM-E-211이었으나 EOS-14(PR #1190)가 같은 번호를 먼저 썼다 — 머지
+    # 큐가 이 PR을 MERGE_CONFLICT로 뱉어내며 드러났다(WM-S-051 선례의 2회차이고, 이번엔
+    # 텍스트 충돌로 보였다). 212는 원격 브랜치 41개 전수 스캔에서 미사용 확인.
+    _e("WM-E-212", "학습 상태 머신(전이표 판정·정책 결정·전이 원장 적재)", "Student",
        "Learning Model", "P1",
        "EOS-105 — 계획서 300 §3. 허용 전이를 데이터(frozenset)로 선언하고 미정의 전이를 "
        "예외로 거부한다. 현재 상태는 저장하지 않고 append-only 원장 최신 행에서 파생하므로 "
