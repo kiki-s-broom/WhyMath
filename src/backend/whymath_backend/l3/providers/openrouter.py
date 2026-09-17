@@ -66,11 +66,13 @@ from whymath_backend.l3.router import _as_cost_tier
 
 __all__ = [
     "PROVIDER_JURISDICTIONS",
+    "PROVIDER_PRECISION",
     "DATA_COLLECTION_DENY",
     "OpenRouterProvider",
     "OpenRouterStatus",
     "build_provider_block",
     "jurisdiction_of_slugs",
+    "precision_of_slugs",
     "provider_slug_from_tag",
 ]
 
@@ -118,6 +120,38 @@ PROVIDER_JURISDICTIONS: Final[Mapping[str, Jurisdiction]] = {
     # 이번 실측으로 재확인되지 않았고(패널 미확인), 그 세션의 다른 기록 4건이 모두 틀린
     # 것으로 드러났다(아래 모듈 주석). 근거를 다시 확보할 때까지 UNKNOWN으로 둔다.
 }
+
+
+# 공급사 slug → 우리가 **확인한** 양자화 정밀도. 여기 없으면 "모른다"이며, 모르는 것은
+# 같은 정밀도라고 가정할 근거가 되지 못한다(관할 표와 같은 규약).
+#
+# 왜 별도 축인가: 관할은 *법적* 질문이고 정밀도는 *품질 비교 성립* 질문이다. 둘은 서로를
+# 함의하지 않는다 — `gmicloud`는 정밀도를 알지만 보존 정책을 모르고, `fireworks`·`together`는
+# 보존 정책을 알지만 정밀도를 모른다. 한 축만 보고 목록을 짜면 다른 축에서 샌다.
+#
+# 근거(2026-09-17 Kiki 화면): 공급사 패널 `Specifications › Precision`.
+#   deepinfra=FP8 · gmicloud=FP8 · fireworks=`--` · together=`--`
+# `--`는 "미표기"이지 "표준 정밀도"가 아니다 — 그래서 표에 넣지 않는다.
+PROVIDER_PRECISION: Final[Mapping[str, str]] = {
+    "deepinfra": "fp8",
+    "gmicloud": "fp8",
+}
+
+
+def precision_of_slugs(slugs: Sequence[str]) -> str | None:
+    """허용 공급사 목록의 **공통 정밀도** — 하나라도 모르거나 섞이면 None.
+
+    None이면 "이 목록으로는 품질을 비교할 수 없다"는 뜻이다(ARCH-49 acceptance ⑨(d)).
+    `allow_fallbacks=false`라도 `only`에 여러 곳이 있으면 **어느 곳이 응답할지는 OpenRouter가
+    정하므로**, 정밀도가 섞인 목록은 매 호출마다 다른 모델을 부르는 것과 같다 — 그 상태에서
+    잰 정확도 차이는 모델의 것이 아니라 잡음이다.
+    """
+    if not slugs:
+        return None
+    seen = {PROVIDER_PRECISION.get(provider_slug_from_tag(slug)) for slug in slugs if slug.strip()}
+    if len(seen) != 1:
+        return None
+    return seen.pop()
 
 
 def provider_slug_from_tag(tag: str) -> str:

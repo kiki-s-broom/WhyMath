@@ -31,9 +31,11 @@ from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers.openrouter import (
     DATA_COLLECTION_DENY,
     PROVIDER_JURISDICTIONS,
+    PROVIDER_PRECISION,
     OpenRouterProvider,
     build_provider_block,
     jurisdiction_of_slugs,
+    precision_of_slugs,
     provider_slug_from_tag,
 )
 
@@ -80,7 +82,7 @@ def _ok_response() -> dict[str, Any]:
 def _settings(**overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "openrouter_api_key": SecretStr("sk-or-test"),
-        "openrouter_allowed_providers": ("deepinfra", "fireworks"),
+        "openrouter_allowed_providers": ("deepinfra", "gmicloud"),
     }
     base.update(overrides)
     return Settings(**base)
@@ -166,7 +168,7 @@ class TestGeneratePayload:
         await provider.generate("프롬프트", "시스템", _cloud_decision(cost))
         block = transport.last_payload["provider"]
         assert block == {
-            "only": ["deepinfra", "fireworks"],
+            "only": ["deepinfra", "gmicloud"],
             "allow_fallbacks": False,
             "data_collection": "deny",
         }
@@ -357,20 +359,41 @@ class TestJurisdictionDerivation:
         assert jurisdiction_of_slugs([]) is Jurisdiction.UNKNOWN
 
     def test_provider_jurisdiction_follows_settings(self) -> None:
-        known = OpenRouterProvider(settings=_settings())  # noqa: F841 — 아래에서 쓴다
+        known = OpenRouterProvider(settings=_settings())
         polluted = OpenRouterProvider(
             settings=_settings(openrouter_allowed_providers=("mystery-host",))
         )
         assert known.jurisdiction is Jurisdiction.US
         assert polluted.jurisdiction is Jurisdiction.UNKNOWN
 
-    def test_default_allowlist_is_only_hq_and_retention_verified_providers(self) -> None:
-        """기본 허용목록 동결 — 세 조건을 **함께** 만족한 곳만(2026-09-17 공급사 패널 실측).
+    def test_default_allowlist_is_the_single_fully_known_provider(self) -> None:
+        """기본 허용목록 동결 — **세 축을 함께 아는** 곳만(2026-09-17 공급사 패널 실측).
 
-        조건: `Headquarters: US` · `Prompt training: No` · `Retention: Zero retention`.
+        관할(`Headquarters: US`) · 데이터 정책(`Prompt training: No` + `Retention: Zero`) ·
+        양자화(`Precision: FP8`). 셋을 다 아는 곳은 `deepinfra` 하나뿐이다.
         """
         defaults = Settings()
-        assert defaults.openrouter_allowed_providers == ("deepinfra", "fireworks", "together")
+        assert defaults.openrouter_allowed_providers == ("deepinfra",)
+
+    def test_default_allowlist_is_precision_homogeneous(self) -> None:
+        """기본 목록의 **공통 정밀도가 확정**되는가 — 섞이면 품질 비교가 성립하지 않는다.
+
+        이 단언이 없으면 "US에 보존 정책이 깨끗하니까" 하나만 보고 정밀도 미상 공급사를
+        추가하게 된다(2026-09-17 실측: 초판 3곳이 정확히 그 상태였다 — FP8 1곳 + 미상 2곳).
+        """
+        assert precision_of_slugs(Settings().openrouter_allowed_providers) == "fp8"
+
+    def test_mixing_known_and_unknown_precision_is_not_comparable(self) -> None:
+        """정밀도를 *아는* 곳과 *모르는* 곳을 섞으면 None — 모름은 같음의 근거가 아니다."""
+        assert precision_of_slugs(["deepinfra", "fireworks"]) is None
+        assert precision_of_slugs(["fireworks", "together"]) is None
+        # 픽스처가 그 절을 실제로 밟는지 자가검증 — 한쪽은 알려진 값이어야 한다.
+        assert PROVIDER_PRECISION["deepinfra"] == "fp8"
+        assert "fireworks" not in PROVIDER_PRECISION
+
+    def test_same_precision_providers_stay_comparable(self) -> None:
+        """green 축 — 같은 정밀도끼리는 묶을 수 있다(운영 이중화 경로가 막히면 안 된다)."""
+        assert precision_of_slugs(["deepinfra", "gmicloud"]) == "fp8"
 
     def test_us_provider_with_unknown_retention_is_not_in_the_default_allowlist(self) -> None:
         """`gmicloud`는 **US인데도** 기본 허용목록에 없다 — 보존 정책이 `Unknown`이다.
@@ -382,6 +405,8 @@ class TestJurisdictionDerivation:
         defaults = Settings()
         assert "gmicloud" not in defaults.openrouter_allowed_providers
         assert PROVIDER_JURISDICTIONS["gmicloud"] is Jurisdiction.US
+        # 정밀도는 *알고 있다* — 그래서 제외 사유가 정밀도가 아니라 보존 정책임이 분명하다.
+        assert PROVIDER_PRECISION["gmicloud"] == "fp8"
 
     def test_cheapest_provider_is_not_auto_included(self) -> None:
         """최저가(`relace` $0.15/$0.60)는 국적 미확인이라 들어가지 않는다 — 가격은 근거가 아니다."""

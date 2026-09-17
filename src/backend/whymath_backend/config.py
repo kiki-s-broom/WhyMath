@@ -606,23 +606,30 @@ class Settings(BaseSettings):
         ),
     )
     openrouter_allowed_providers: tuple[str, ...] = Field(
-        default=("deepinfra", "fireworks", "together"),
+        default=("deepinfra",),
         description=(
             "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 알고 "
             "데이터 정책이 깨끗한 곳만**. slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
             "(`deepinfra/fp8`→`deepinfra`). 이 목록이 `data_collection=deny`와 **독립된 두 "
             "번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). 빈 목록은 "
             "허용이 아니라 **차단**이다.\n"
-            "기본 3곳은 2026-09-17 실측에서 공급사 패널이 `Headquarters: US` · "
-            "`Prompt training: No` · `Retention: Zero retention`을 함께 만족한 곳이다. "
-            "**`gmicloud`는 US인데도 제외했다** — 같은 패널이 `Retention: Unknown`이라 "
-            "'국적은 알지만 보존 정책을 모른다'이고, 모르는 것은 허용 사유가 아니다. "
-            "**`digitalocean`은 뺐다** — 이전 세션이 US로 적었으나 이번 실측으로 재확인되지 "
+            "기본값이 **1곳뿐인 이유**: 세 축을 *함께* 아는 공급사가 그것뿐이다"
+            "(2026-09-17 공급사 패널 실측).\n"
+            "  · 관할 — `Headquarters: US`\n"
+            "  · 데이터 정책 — `Prompt training: No` + `Retention: Zero retention`\n"
+            "  · 양자화 — `Precision: FP8`\n"
+            "`gmicloud`는 FP8이지만 `Retention: Unknown`이고, `fireworks`·`together`는 보존 "
+            "정책이 깨끗하지만 `Precision: --`(미표기)다. 즉 **어느 한 축씩만 아는 곳을 섞으면 "
+            "다른 축에서 샌다** — 정밀도가 섞인 목록은 `allow_fallbacks=false`라도 매 호출마다 "
+            "다른 모델을 부르는 것과 같고(어느 곳이 응답할지는 OpenRouter가 정한다), 그 "
+            "상태에서 잰 정확도 차이는 모델의 것이 아니라 잡음이다(acceptance ⑨(d)).\n"
+            "`digitalocean`은 뺐다 — 이전 세션이 US로 적었으나 이번 실측으로 재확인되지 "
             "않았고 그 세션의 OpenRouter 기록 4건이 전부 틀렸다(모델 slug·엔드포인트 수·"
             "최저가 공급사·단가). 근거를 다시 확보하면 되돌린다.\n"
-            "⚠️ **측정(ARCH-55)에는 1곳만 지정한다** — 여러 곳을 허용하면 OpenRouter가 그중 "
-            "하나를 고르고 양자화가 공급사마다 달라(`deepinfra`=FP8·다수 미표기) 품질 비교가 "
-            "성립하지 않는다. 이 기본값은 *운영 가용성*을 위한 것이지 측정용이 아니다."
+            "**가용성 비용을 명시한다**: 1곳 + `allow_fallbacks=false`면 그곳이 죽을 때 호출이 "
+            "실패한다(`deepinfra` uptime 99.64%). 지금은 채택 미판정이라 조용한 품질 변동보다 "
+            "명확한 실패가 낫다는 판단이며, 운영 도입 시 **정밀도가 같은** 곳을 추가해 "
+            "이중화한다(정밀도가 다른 곳으로 늘리는 것은 이중화가 아니라 오염이다)."
         ),
     )
     openrouter_max_tokens: int = Field(
