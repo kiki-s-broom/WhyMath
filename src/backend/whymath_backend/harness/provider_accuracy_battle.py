@@ -93,6 +93,10 @@ from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_boun
 from whymath_backend.l3.equivalent.defect_seeder import DefectClass, build_defect_seeded_set
 from whymath_backend.l3.interfaces import LLMProvider
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, RoutingRequest
+from whymath_backend.l3.providers._openai_compat import (
+    reset_retry_count,
+    retries_in_current_call,
+)
 from whymath_backend.l3.providers.anthropic import AnthropicProvider
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.deepseek import DeepSeekProvider, pricing_window
@@ -197,6 +201,14 @@ class RoundOutcome(BaseModel):
     )
     provider_mismatch: bool = Field(
         default=False, description="허용목록 1곳과 다른 공급사가 응답했는가(집계 제외 사유)."
+    )
+    retry_count: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "이 회차에서 일어난 재시도 횟수(429·5xx). 재시도는 실패를 성공으로 바꾸므로 "
+            "세어 두지 않으면 '성공률 100%'가 상류를 몇 번 두드려 얻은 것인지 알 수 없다."
+        ),
     )
 
     @property
@@ -333,12 +345,13 @@ async def evaluate_arm(
             "성립하지 않는다. 등급·구독·예산 입력을 확인하라."
         )
     semaphore = asyncio.Semaphore(concurrency)
-    outcomes: list[RoundOutcome] = []
 
     async def _one(item: Any) -> RoundOutcome:
         prompt = "다음 문항을 검수하세요.\n\n" + _format_item(item)
         window = pricing_window(datetime.now(UTC))
         async with semaphore:
+            # 이 태스크의 재시도 카운터를 0으로 두고 시작한다 — ContextVar라 회차마다 독립.
+            reset_retry_count()
             try:
                 result: GenerationResult = await provider.generate(
                     prompt, _SYSTEM_PROMPT, decision, temperature=0.0
@@ -352,6 +365,7 @@ async def evaluate_arm(
                     parsed=False,
                     call_error=f"{type(exc).__name__}: {exc}",
                     pricing_window=window,
+                    retry_count=retries_in_current_call(),
                 )
         verdict, parsed, parse_error = _parse_response(result.text)
         served = tap.last_provider if tap is not None else None
@@ -372,16 +386,23 @@ async def evaluate_arm(
             pricing_window=window,
             served_provider=served,
             provider_mismatch=mismatch,
+            retry_count=retries_in_current_call(),
         )
 
-    for item in items:
+    async def _one_and_record(item: Any) -> RoundOutcome:
         outcome = await _one(item)
-        outcomes.append(outcome)
         if audit_path is not None:
             # 회차마다 즉시 append — 중간에 멈춰도 여기까지의 증거는 남는다.
+            # 락은 두지 않는다: open~write~close 사이에 await 지점이 없어 다른 태스크가
+            # 끼어들 수 없다(뮤테이션으로 확인 — 락을 지워도 줄이 깨지지 않는다).
+            # 정당화할 수 없는 보호는 "보호가 있다"는 착각만 남긴다.
             with audit_path.open("a", encoding="utf-8") as handle:
                 handle.write(outcome.model_dump_json() + "\n")
-    return outcomes
+        return outcome
+
+    # `concurrency`는 세마포어로만 있고 실행은 직렬이던 결함을 고친다(2026-09-17) —
+    # 플래그가 아무것도 하지 않으면 리포트의 "동시 2"는 거짓 기록이 된다.
+    return list(await asyncio.gather(*(_one_and_record(item) for item in items)))
 
 
 class PriceRate(BaseModel):
@@ -537,6 +558,12 @@ def render_arm(
             f"· 오경보 {sub.false_positives}/{sub.clean_total} · "
             f"p50={sub_p50 if sub_p50 is None else round(sub_p50, 1)}ms · "
             f"비용 {cost_line(subset, arm=arm, window=window, prices=prices)}"
+        )
+    retried = [o for o in outcomes if o.retry_count]
+    if retried:
+        lines.append(
+            f"  재시도 {sum(o.retry_count for o in retried)}회 (회차 {len(retried)}건) — "
+            "성공률은 재시도를 포함한 값이다"
         )
     errors = [o for o in outcomes if o.call_error]
     if errors:

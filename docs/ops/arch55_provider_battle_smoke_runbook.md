@@ -192,8 +192,32 @@ if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
 "CHECK_EXIT=$LASTEXITCODE"
 ```
 
-**그다음 소표본 10+10**으로 공급사 고정이 실제로 되는지부터 본다(`집계 제외`가 0이어야
-한다 — 0이 아니면 허용목록 1곳이 응답하지 않은 것이고, 그 상태로 80회를 돌리면 잡음을 잰다):
+### 1회차 실측 (2026-09-17 · `de28e842` · 재시도 배선 이전)
+
+`OR_EXIT=0` · 20회 중 **14회 성공 / 6회 429 실패(30%)**.
+
+| 축 | 값 |
+|---|---|
+| 공급사 고정 | **성립** — 불일치 0건(집계 제외 6건은 전부 호출 실패) |
+| 실패 원인 | `429 engine_overloaded` · `limit_source=upstream_provider_shared_pool` · `is_byok=false` |
+| 지연 p50 / p95 | 14,044ms / **138,420ms** |
+| 토큰 (14회) | 입력 6,330 / 출력 8,873 → 회당 452 / 634 |
+
+관측: 같은 시험지인데 **출력 토큰이 공식 API의 1/3**이다(634 vs 1,985). 입력은 거의 같으므로
+(452 vs 465) 같은 문제를 푼 것은 맞고 차이는 추론 쪽이다. 셋 중 하나이며 아직 미확정 —
+ⓐ 다른 모델/설정 ⓑ deepinfra가 추론 길이를 제한 ⓒ OpenRouter가 추론 토큰을 usage에 안 실음.
+ⓒ면 실제 과금이 더 크므로 **OpenRouter Activity의 실제 청구액과 대조해야 확정된다.**
+
+### 재시도 배선 이후 재측정
+
+429는 "다시 걸라"는 뜻인데 1회차의 전송기에는 재시도가 없었다. 그래서 그 30%는 공급사의
+성질이 아니라 **우리 전송기의 성질**을 잰 숫자다. 지수 백오프(429·5xx · `Retry-After` 우선)를
+배선했고, 재시도 횟수는 회차마다 기록돼 리포트에 뜬다(가려지지 않는다).
+
+`--concurrency 1`을 쓴다 — 1회차의 `--concurrency 2`는 세마포어만 있고 실행은 직렬이던
+결함 때문에 **실제로는 1이었다**(그 결함도 같이 고쳤다). 변수를 하나만 바꾸려면 1이 맞다.
+
+**소표본 10+10**으로 공급사 고정과 실패율을 다시 본다:
 
 ```powershell
 $env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
@@ -205,7 +229,7 @@ $FromWorktree = ($Source -like "*WhyMath-arch55*")
 & $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --check-only | Out-Null
 $Ready = ($LASTEXITCODE -eq 0)
 "READY=$Ready"
-if ($FromWorktree -and $Ready) { & $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --n-defective 10 --n-clean 10 --seed 20260708 --concurrency 2 --expected-provider deepinfra --audit-out C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-or-smoke; "OR_SMOKE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — FromWorktree=$FromWorktree Ready=$Ready · 호출 0건" }
+if ($FromWorktree -and $Ready) { & $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --n-defective 10 --n-clean 10 --seed 20260708 --concurrency 1 --expected-provider deepinfra --audit-out C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-or-retry; "OR_RETRY_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — FromWorktree=$FromWorktree Ready=$Ready · 호출 0건" }
 ```
 
 **소표본에서 `집계 제외 0건`을 확인한 뒤** 본 회차:

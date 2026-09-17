@@ -511,3 +511,219 @@ class TestWindowAwareTotalCost:
     def test_no_rate_at_all_is_unknown(self) -> None:
         line = battle.total_cost_line(self._mixed(), arm="deepseek", prices={})
         assert "단가 미지정" in line
+
+
+class _StubProvider:
+    """지연을 흉내 내는 최소 provider — 동시 실행이 실제로 겹치는지 보기 위해."""
+
+    def __init__(self, delay_s: float = 0.01) -> None:
+        self._delay_s = delay_s
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    async def generate(self, *_a: object, **_k: object) -> object:
+        import asyncio
+
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        try:
+            await asyncio.sleep(self._delay_s)
+        finally:
+            self.in_flight -= 1
+        from whymath_backend.l3.models import GenerationResult, Usage
+
+        return GenerationResult(
+            text="판정: 결함 없음",
+            usage=Usage(input_tokens=10, output_tokens=20, latency_ms=1.0),
+        )
+
+
+class TestConcurrencyIsActuallyApplied:
+    """`--concurrency`가 세마포어로만 있고 실행은 직렬이던 결함의 회귀 (2026-09-17).
+
+    플래그가 아무것도 하지 않으면 리포트의 "동시 2"는 **거짓 기록**이다. 그리고 동시 실행을
+    켜면 증거 파일 쓰기가 겹치므로, 같은 테스트가 ndjson이 깨지지 않는지도 함께 본다.
+    """
+
+    @staticmethod
+    def _patch(monkeypatch: pytest.MonkeyPatch, provider: _StubProvider) -> None:
+        from whymath_backend.l3.models import CostTier, RoutingDecision
+
+        monkeypatch.setattr(battle, "build_arm", lambda _arm, _tap: (provider, "stub"))
+
+        class _StubRouter:
+            def route(self, _req: object) -> RoutingDecision:
+                return RoutingDecision(
+                    cost_tier=CostTier.CLOUD_MID,
+                    reason="테스트 고정",
+                    est_latency_ms=1,
+                    est_cost_krw=0.0,
+                )
+
+        monkeypatch.setattr(battle, "Router", _StubRouter)
+
+    @staticmethod
+    def _items(n: int) -> list[object]:
+        return battle.build_defect_seeded_set(n_defective=n, n_clean=n, seed=1)
+
+    async def test_two_rounds_overlap_when_concurrency_is_two(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        provider = _StubProvider()
+        self._patch(monkeypatch, provider)
+        outcomes = await battle.evaluate_arm(
+            "deepseek",
+            self._items(3),
+            grade=LicenseType.WHYMATH_GENERATED,
+            concurrency=2,
+            audit_path=tmp_path / "deepseek.ndjson",
+            expected_provider=None,
+        )
+        assert len(outcomes) == 6
+        assert provider.max_in_flight == 2, "동시 실행이 안 겹쳤다 — 플래그가 무효인 상태"
+
+    async def test_serial_when_concurrency_is_one(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """대조군 — 1이면 절대 겹치지 않아야 한다(위 단언이 항상 참이면 무의미하다)."""
+        provider = _StubProvider()
+        self._patch(monkeypatch, provider)
+        await battle.evaluate_arm(
+            "deepseek",
+            self._items(3),
+            grade=LicenseType.WHYMATH_GENERATED,
+            concurrency=1,
+            audit_path=None,
+            expected_provider=None,
+        )
+        assert provider.max_in_flight == 1
+
+    async def test_audit_lines_are_not_interleaved(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """동시 쓰기가 섞이면 ndjson 줄이 깨진다 — 전 줄이 파싱돼야 한다."""
+        provider = _StubProvider(delay_s=0.0)
+        self._patch(monkeypatch, provider)
+        path = tmp_path / "deepseek.ndjson"
+        await battle.evaluate_arm(
+            "deepseek",
+            self._items(5),
+            grade=LicenseType.WHYMATH_GENERATED,
+            concurrency=4,
+            audit_path=path,
+            expected_provider=None,
+        )
+        loaded = battle.load_audit(tmp_path, "deepseek")
+        assert len(loaded) == 10
+
+
+class _RetryingStubProvider(_StubProvider):
+    """전송기가 재시도했을 때처럼 ContextVar를 올린다 — 회차가 그 값을 집는지 보기 위해.
+
+    실제 재시도는 `_openai_compat` 전송기 안에서 일어나는데 여기 스텁은 그 아래를 대체하므로,
+    같은 부수효과(카운터 증가)를 직접 만들어 **회차→RoundOutcome 경로만** 검사한다.
+    """
+
+    def __init__(self, retries: int, *, fail: bool = False) -> None:
+        super().__init__(delay_s=0.0)
+        self._retries = retries
+        self._fail = fail
+
+    async def generate(self, *a: object, **k: object) -> object:
+        from whymath_backend.l3.providers import _openai_compat
+
+        for _ in range(self._retries):
+            _openai_compat._RETRY_COUNT.set(_openai_compat._RETRY_COUNT.get() + 1)
+        if self._fail:
+            raise RuntimeError("upstream busy (시도 3회)")
+        return await super().generate(*a, **k)
+
+
+class TestRetryCountIsCollectedFromTheCall:
+    """`retries_in_current_call()`이 실제로 회차에 실리는가 (뮤테이션 C4·C5·C6 대응).
+
+    `_outcome(retry_count=...)`로 필드만 채우는 테스트는 **그 경로를 한 번도 밟지 않는다** —
+    수집 코드를 지워도 통과한다(CLAUDE.md 「픽스처가 그 절을 실제로 밟는가」).
+    """
+
+    @staticmethod
+    def _items(n: int) -> list[object]:
+        return battle.build_defect_seeded_set(n_defective=n, n_clean=n, seed=1)
+
+    async def test_success_path_records_retries(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        provider = _RetryingStubProvider(retries=2)
+        TestConcurrencyIsActuallyApplied._patch(monkeypatch, provider)
+        outcomes = await battle.evaluate_arm(
+            "deepseek",
+            self._items(1),
+            grade=LicenseType.WHYMATH_GENERATED,
+            concurrency=1,
+            audit_path=None,
+            expected_provider=None,
+        )
+        assert [o.retry_count for o in outcomes] == [2, 2]
+        assert [o.call_error for o in outcomes] == [None, None]
+
+    async def test_failure_path_records_retries(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """끝내 실패한 회차야말로 '몇 번 두드렸는지'가 필요하다."""
+        provider = _RetryingStubProvider(retries=2, fail=True)
+        TestConcurrencyIsActuallyApplied._patch(monkeypatch, provider)
+        outcomes = await battle.evaluate_arm(
+            "deepseek",
+            self._items(1),
+            grade=LicenseType.WHYMATH_GENERATED,
+            concurrency=1,
+            audit_path=None,
+            expected_provider=None,
+        )
+        assert [o.retry_count for o in outcomes] == [2, 2]
+        assert all(o.call_error is not None for o in outcomes)
+
+    async def test_counter_does_not_leak_in_from_the_caller(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """호출자 컨텍스트의 값이 새어 들어오면 재시도 0인 회차가 N으로 보고된다."""
+        from whymath_backend.l3.providers import _openai_compat
+
+        _openai_compat._RETRY_COUNT.set(5)
+        try:
+            provider = _StubProvider(delay_s=0.0)
+            TestConcurrencyIsActuallyApplied._patch(monkeypatch, provider)
+            outcomes = await battle.evaluate_arm(
+                "deepseek",
+                self._items(1),
+                grade=LicenseType.WHYMATH_GENERATED,
+                concurrency=1,
+                audit_path=None,
+                expected_provider=None,
+            )
+            assert [o.retry_count for o in outcomes] == [0, 0]
+        finally:
+            _openai_compat.reset_retry_count()
+
+
+class TestRetryVisibility:
+    """재시도는 실패를 성공으로 바꾸므로 **세어서 보고**한다."""
+
+    def test_retry_count_round_trips_through_the_audit(self) -> None:
+        outcome = _outcome(retry_count=3)
+        assert battle.RoundOutcome.model_validate_json(outcome.model_dump_json()).retry_count == 3
+
+    def test_negative_retry_count_is_refused(self) -> None:
+        with pytest.raises(ValueError):
+            _outcome(retry_count=-1)
+
+    def test_report_names_the_retries(self) -> None:
+        lines = battle.render_arm(
+            "openrouter",
+            [_outcome(retry_count=2), _outcome(slug="b", retry_count=1)],
+            confidence=0.95,
+        )
+        joined = "\n".join(lines)
+        assert "재시도 3회" in joined
+        assert "회차 2건" in joined
+
+    def test_report_is_silent_when_no_retry_happened(self) -> None:
+        """재시도가 없으면 그 줄이 없어야 한다 — 항상 찍히면 그 줄은 정보가 아니다."""
+        lines = battle.render_arm("openrouter", [_outcome()], confidence=0.95)
+        assert "재시도" not in "\n".join(lines)
