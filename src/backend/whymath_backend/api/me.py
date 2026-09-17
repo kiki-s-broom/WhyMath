@@ -123,6 +123,7 @@ from whymath_backend.l2.ability_estimation import (
     estimate_global_ability,
     resolve_item_difficulty_b,
 )
+from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
@@ -133,6 +134,7 @@ from whymath_backend.l2.irt import (
     learning_band_weight,
     select_weighted_item,
 )
+from whymath_backend.l2.learner_state import LearnerState, get_state
 from whymath_backend.l2.learning_event_trace import (
     DEFAULT_TRACE_LIMIT,
     MAX_TRACE_LIMIT,
@@ -207,6 +209,7 @@ from whymath_backend.schema.assessment import (
     SkillMasteryHistory as SkillMasteryHistorySchema,
 )
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
+from whymath_backend.schema.assessment_evidence import AssessmentEvidence
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
@@ -866,6 +869,16 @@ class AttemptSubmitResponse(BaseModel):
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
     )
+    evidence: AssessmentEvidence | None = Field(
+        default=None,
+        description=(
+            "이 채점이 만들어 낸 **증거 묶음**(EOS-12) — 개념·스킬·오개념 후보 3종과 작동 비율. "
+            "`mastery_updates`가 *쓰기 이후*의 결과라면 이 필드는 *쓰기 이전*의 관측이라, 둘을 "
+            "나란히 실어 두 단계가 각각 보이게 한다(부분 쓰기 구조를 한 트랜잭션처럼 가리지 "
+            "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
+            "거기에만 적혀 있다."
+        ),
+    )
     learning_state: LearningStateBlock = Field(
         description=(
             "학습 상태 머신(EOS-105) 처리 결과 — Event→LearnerState→Policy→NextAction. "
@@ -970,6 +983,20 @@ async def submit_attempt(
     )
     session.add(attempt)
     await session.commit()
+    # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다 — Answer → Evidence → State 순서가 호출
+    # 지점에서 실제로 성립해야 증거가 "갱신 결과의 사후 요약"으로 전락하지 않는다. 읽기 전용이라
+    # (session.add·commit 0) 이 호출이 아래 적재의 성공/실패를 바꾸지 않고, 반대로 아래가 실패해도
+    # 증거는 남는다 — 두 단계가 각각 관측 가능하다(EOS-81 ⑦ 부분 쓰기 구조를 가리지 않는다).
+    # 이 경로는 오개념 매칭을 돌리지 않는다(진단은 coach 대화 경로 전용) → scan=not_run이 기본이며,
+    # 그 0건은 "오개념이 없었다"가 아니라 "보지 않았다"로 응답에 표기된다.
+    evidence = await collect_assessment_evidence(
+        session,
+        learner_id=user.user_id,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        attempt_id=attempt.attempt_id,
+        observed_at=received_at,
+    )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     records = await record_problem_attempt_mastery(
         session, user.user_id, body.problem_id, body.is_correct
@@ -1009,7 +1036,11 @@ async def submit_attempt(
     # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
     # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
     # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
-    evidence = await build_attempt_evidence(
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
+    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
+    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
+    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
+    policy_evidence = await build_attempt_evidence(
         session,
         user_id=user.user_id,
         is_correct=body.is_correct,
@@ -1018,7 +1049,7 @@ async def submit_attempt(
     transition = await advance_on_attempt(
         session,
         user_id=user.user_id,
-        evidence=evidence,
+        evidence=policy_evidence,
         attempt_id=attempt.attempt_id,
     )
     decision = transition.decision
@@ -1055,6 +1086,7 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        evidence=evidence,
         learning_state=learning_state_block,
     )
 
@@ -1782,6 +1814,44 @@ async def get_my_diagnosis_summary(
         weakest_concept_id=weakest.concept_id if weakest else None,
         weakest_concept_name=weakest.concept_name if weakest else None,
     )
+
+
+# ── EOS-10: GET /v1/me/learner-state (LearnerState 단일 조회 표면) ────────────────
+# 계획서 300 §12가 요구한 12종 중 유일하게 대응물이 없던 축. 기존에 학습 상태를 알려면 조각
+# 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)를 각각 불러 클라이언트가 합쳐야
+# 했고, 그 "합치는 규칙"이 서버 밖에 있어 소비처마다 달라질 수 있었다. 이 표면이 L2 조립기
+# (`l2/learner_state.py::get_state`)를 그대로 노출해 합성 규칙을 서버 안에 둔다.
+#
+# **L5는 표면일 뿐이다** — 조립·계산은 전부 L2가 소유하고 여기서는 user_id 스코핑과 직렬화만
+# 한다(다른 /me GET과 동일 규약·읽기 전용·마이그레이션 0).
+
+
+@router.get(
+    "/learner-state",
+    response_model=LearnerState,
+    summary="내 학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬을 한 번에)",
+)
+async def get_my_learner_state(
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearnerState:
+    """본인의 `LearnerState`를 **한 호출로** 반환 — 조각 3개를 각각 부르던 것의 합성 표면.
+
+    담는 것: 개념 숙달(BKT)·전과목 및 개념별 능력(IRT θ)·활성 오개념·약/강 개념·스킬 숙달
+    (행동 축)·학년·목표. 전부 **기존 좌석 재사용**이며 이 엔드포인트가 새로 계산하는 값은 없다.
+
+    **`origins`를 함께 읽어라.** 값이 비어 있는 것은 두 가지 뜻일 수 있고 이 응답은 그것을
+    구별해 말한다 — `no_data`는 이 학생의 이력이 없다는 뜻(풀이가 쌓이면 채워진다)이고,
+    `no_producer`는 저장소에 생산자가 없다는 뜻(학생이 무엇을 해도 채워지지 않는다)이다.
+    현재 `curriculum_id`·`current_objective_id` 둘이 후자이며, 각 필드 description에 그
+    실측 근거가 있다. `origins`에서 `status == "measured"`인 비율이 곧 **이 조립이 실제로
+    작동한 비율**이다(CLAUDE.md "작동한 비율" 원칙).
+
+    **PII 주의**: `goals`는 목표 등급·점수·대학을 담는다. 이 표면은 학생 **본인**에게만
+    응답하며(`ConsentedUser` + user_id 스코핑), 여기서 나온 값을 학생 대면 프롬프트에 그대로
+    넣는 것은 별개로 금지다(`LearnerState.goals` description 참조).
+    """
+    return await get_state(session, user.user_id)
 
 
 # ── 원자그래프 소비 슬2: GET /v1/me/weak-concepts (약개념 추천 — 진단 약점 + code 메타 enrich) ──
