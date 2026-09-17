@@ -21,7 +21,7 @@ FK 판단: `user_id`만 실 FK(`user_profile.user_id`)다. `concept_id`·`attemp
 하며(append-only 원장의 요건), FK는 그 보존을 CASCADE 또는 삭제 실패로 깨뜨린다.
 
 Revision ID: 5a7c31d9e0b4
-Revises: 67cf48ad3bce
+Revises: a7d41c9e0b52
 Create Date: 2026-09-16 00:00:00.000000
 """
 
@@ -35,7 +35,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "5a7c31d9e0b4"
-down_revision: str | None = "67cf48ad3bce"
+down_revision: str | None = "a7d41c9e0b52"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

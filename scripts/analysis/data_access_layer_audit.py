@@ -202,6 +202,11 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/evidence_event_store.py",
             "l2/item_calibration.py",
             "l2/learner_state.py",
+            # EOS-103: learner_state 테이블의 단일 읽기·쓰기 경로. 재사용할 기존 조회
+            # 함수가 없는 신규 테이블이라 새 접근점이 맞다. 대신 이 모듈이 **유일 writer**
+            # 임을 tests/backend/db/test_learner_state_single_writer.py가 AST 전수 스캔으로
+            # 동결한다 — baseline 한 줄이 느는 대신 그 테이블 접근점은 영구히 1개다.
+            "l2/learner_state_store.py",
             "l2/learning_event_trace.py",
             "l2/learning_metrics_rollup.py",
             "l2/learning_path.py",

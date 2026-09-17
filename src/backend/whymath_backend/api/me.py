@@ -135,6 +135,7 @@ from whymath_backend.l2.irt import (
     select_weighted_item,
 )
 from whymath_backend.l2.learner_state import LearnerState, get_state
+from whymath_backend.l2.learner_state_store import provision_learner_state
 from whymath_backend.l2.learning_event_trace import (
     DEFAULT_TRACE_LIMIT,
     MAX_TRACE_LIMIT,
@@ -3303,6 +3304,12 @@ async def capture_measurement_assessment(
     schema = await _assemble_measurement_assessment(session, user.user_id, now=now)
     # 적재는 내부 정본(예측 5필드 포함 · 값은 항상 None)으로, 응답은 학생 대면 정본으로.
     session.add(Assessment.from_schema(schema))
+    # EOS-103: 이 분기가 **진단 완료 경계**다(CAT 중단 규칙 measurement_sufficient가 True이고
+    # 이번 창에 아직 캡처가 없는, 즉 진단 결과가 처음으로 확정되는 지점). 여기서 LearnerState
+    # 영속 행을 자동 생성해, 운영자가 DB에 행을 직접 만들 필요가 없게 한다(멱등 — 이미 있으면
+    # 그 행을 그대로 두고 `provisioned_at`·`provisioned_by`를 덮어쓰지 않는다).
+    # 같은 commit 안에 두어 "진단은 적재됐는데 상태는 없다"는 반쪽 성공이 생기지 않게 한다.
+    await provision_learner_state(session, user.user_id, reason="diagnosis_capture")
     await session.commit()
     return AssessmentCaptureResponse(
         written=True,

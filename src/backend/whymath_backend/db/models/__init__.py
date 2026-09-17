@@ -102,6 +102,7 @@ from whymath_backend.db.models.formula_node import (
 )
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
+from whymath_backend.db.models.learner_state import LearnerStateRecord
 from whymath_backend.db.models.learning_state_transition import (
     LearningStateTransition,
 )
@@ -324,6 +325,10 @@ __all__ = [
     "AchievementLevelUnit",
     # SEC-27: JobOwnership (비동기 QUALITY 작업 소유권·job_id(String) PK = Celery 태스크 id)
     "JobOwnership",
+    # EOS-103: LearnerStateRecord (학습자 현재 상태 1행 — LearnerState 좌석 2번째 테이블.
+    # 숙련·오개념 맵은 담지 않는다(각자 정본 보유) — 생산자가 없던 curriculum/objective 축과
+    # 생성 시점만 영속한다).
+    "LearnerStateRecord",
     # EOS-49: ConceptVersion (Concept 좌석 4번째 테이블 — concept.current_published_version_id
     # 의 FK 타깃이라 여기 없으면 좁은 선택에서 FK가 해소되지 않는다 · ARCH-09)
     "ConceptVersion",

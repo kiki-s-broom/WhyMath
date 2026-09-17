@@ -24,6 +24,13 @@
 저기 §3의 귀속표는 1:1로 대조되며(그쪽 검사 ⑤가 이 문서 §2-A 표를 파싱한다), 이 문서가 엔티티를
 추가·개명하면 그 검사가 자동으로 따라온다.
 
+※ [갱신 2026-09-16] `EOS-103`이 `learner_state` 테이블을 **LearnerState 좌석의 2번째
+테이블**로 추가해 80→81 테이블로 늘었다(새 엔티티가 아니라 기존 좌석 편입 — `concept_version`
+선례와 동형) — §2 표·합계·위 ① 행을 81로 갱신했다. 두 좌석의 역할 분담은 §1 정의 13번 참조:
+`learner_state`는 학생당 1행의 **현재 상태**, `user_state_snapshot`은 학생당 N행의 **시점
+사진**이다. `user_state_snapshot`의 writer 0 상태(배선 또는 폐기)는 `EOS-103`이 판정하지
+않았다 — 그 판정은 `EOS-10`이 소유한다.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -35,7 +42,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 | # | 검사 | 깨지면 |
 |---|---|---|
-| ① | 80테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
+| ① | 81테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
 | ③ | **좌석 부재 4종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `hints`는 물론 `hint_content` 같은 우회 이름으로 좌석을 등재해도 **RED** |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
@@ -127,14 +134,19 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
     - *이다*: 신원과 프로필. **미성년 민감정보**로 분류돼 암호화 저장 대상.
     - *아니다*: 학습 상태가 아니다(LearnerState). 인증 자격도 아니다(핵심-외).
 
-13. **LearnerState** — 학생의 학습 **상태**(시점 사진 + 국면 전이).
-    - *이다*: "지금 이 학생은 어떤 상태인가"의 시점 사진(개념·패턴 숙련 맵, 평균 풀이시간 등)과,
-      **학습 국면의 전이 사건**(EOS-105 — NEW/DIAGNOSING/READY/LEARNING/PRACTICING/ASSESSING/
-      REMEDIATING/ADVANCING 8상태 간 이동). 좌석이 2테이블인 이유는 두 표현이 같은 사실의
-      복제가 아니기 때문이다 — **현재 국면은 전이 원장의 최신 행에서 파생**되고(가변 상태
-      컬럼 0), 스냅샷은 그와 독립인 학력 추정 사진이다.
+13. **LearnerState** — "지금 이 학생은 어떤 상태인가".
+    - *이다*: 학습 루프가 학생을 어디에 놓을지 정하는 상태. 좌석이 셋이며 **역할이 다르다** —
+      `learner_state`는 학생당 1행의 **현재 배치**(교육과정·현재 학습목표·생성 계보),
+      `user_state_snapshot`은 학생당 N행의 **시점 사진**(숙련 맵, 평균 풀이시간 등),
+      `learning_state_transition`은 학습 **국면의 전이 원장**(EOS-105 — NEW/DIAGNOSING/READY/
+      LEARNING/PRACTICING/ASSESSING/REMEDIATING/ADVANCING 8상태 간 이동). 셋이 같은 사실의
+      복제가 아닌 이유: 전이 원장에는 가변 상태 컬럼이 없고 **현재 국면은 최신 행에서 파생**되며,
+      `learner_state`가 담는 것은 국면이 아니라 배치다.
     - *아니다*: 숙련도의 **시계열 이력**이 아니다(MasteryState — 전이 원장은 숙달값을 담지
-      않는다). 프로필 변경 이력도 아니다.
+      않는다). 프로필 변경 이력도 아니다. 숙련·오개념 맵을 `learner_state`에 복제하지 않는다 —
+      그 축의 정본은 각각 `concept_mastery_history`·`skill_mastery_history`·
+      `misconception_hypothesis`이고, 복제하는 순간 같은 사실의 두 번째 진실 원천이 된다
+      (EOS-103 판정).
 
 14. **MasteryState** — Skill·Concept별 **숙련도**와 그 변화 이력.
     - *이다*: 누적 증거를 반영한 현재 숙련 + append-only 이력.
@@ -171,12 +183,12 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 ---
 
-## §2. 현행 79테이블 전수 귀속표
+## §2. 현행 82테이블 전수 귀속표
 
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 43테이블
+### §2-A. 좌석 배정 — 44테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -192,7 +204,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 10 | **Hint** | — **좌석 부재**(§3) | 0 |
 | 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
 | 12 | **Learner** | `user_profile` | 1 |
-| 13 | **LearnerState** | `user_state_snapshot` · `learning_state_transition` | 2 |
+| 13 | **LearnerState** | `user_state_snapshot` · `learner_state` · `learning_state_transition` | 3 |
 | 14 | **MasteryState** | `concept_mastery_history` · `skill_mastery_history` · `ability_snapshot` | 3 |
 | 15 | **Assessment** | `assessment` | 1 |
 | 16 | **AssessmentResult** | — **좌석 부재**(§3) | 0 |
@@ -200,9 +212,9 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 43**
+**좌석 합계 = 44**
 
-### §2-B. 핵심 외 — 37테이블
+### §2-B. 핵심 외 — 38테이블
 
 핵심 19종에 **배정하지 않는다**. 사유를 값으로 강제해(테스트 상수) "일단 여기 던져 넣기"를
 비싸게 만든다. 이 목록 자체가 **8대 구조 원칙의 외부화 증거**다 — 임베딩·렌더러·관계·오개념이
@@ -249,8 +261,9 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 43 + 38 = **81** ✓(EOS-105 `learning_state_transition`을 LearnerState
-좌석 2번째 테이블로 추가 — 2026-09-16. 이전 42 + 38 = 80은 EOS-49 `concept_version` 추가
+**핵심-외 합계 = 38** · 44 + 38 = **82** ✓(EOS-103 `learner_state` + EOS-105
+`learning_state_transition`을 LearnerState 좌석에 추가 — 둘은 서로 다른 브랜치에서 각각 +1로
+착지해 병합 시 43이 아니라 **44**가 된다. 이전 42 + 38 = 80은 EOS-49 `concept_version` 추가
 — 2026-09-14, 그 이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
 
 ### §2-C. 판정 보류 1건 — 날조 금지
