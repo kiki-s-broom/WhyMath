@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from whymath_backend import config
@@ -381,3 +383,87 @@ class TestPriceInjection:
         assert code == 2
         assert "--price-source" in capsys.readouterr().err
         config.get_settings.cache_clear()
+
+
+class TestReplay:
+    """증거를 되읽어 **호출 없이** 다시 집계한다 (ARCH-55 ①·비용 축).
+
+    증거를 append로 남긴 이유가 이것이다 — 단가는 나중에 알려지는데, 그때 라이브를 다시
+    돌리면 그건 새 측정이라 앞 회차와 비교할 수 없다(시험지·시각·모델이 다르다).
+    """
+
+    @staticmethod
+    def _write_audit(tmp_path: Path, arm: str, outcomes: list[battle.RoundOutcome]) -> Path:
+        path = tmp_path / f"{arm}.ndjson"
+        path.write_text("".join(o.model_dump_json() + "\n" for o in outcomes), encoding="utf-8")
+        return path
+
+    def test_loads_rounds_from_ndjson(self, tmp_path: Path) -> None:
+        written = [_outcome(slug="a"), _outcome(slug="b", detected=True)]
+        self._write_audit(tmp_path, "deepseek", written)
+        loaded = battle.load_audit(tmp_path, "deepseek")
+        assert [o.slug for o in loaded] == ["a", "b"]
+
+    def test_broken_line_is_counted_not_silently_dropped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """조용히 버리면 분모가 줄어든 표가 정상으로 보인다."""
+        path = self._write_audit(tmp_path, "deepseek", [_outcome(slug="a")])
+        path.write_text(path.read_text(encoding="utf-8") + "{깨진 줄\n", encoding="utf-8")
+        loaded = battle.load_audit(tmp_path, "deepseek")
+        assert len(loaded) == 1
+        assert "해석 불가 1줄" in capsys.readouterr().out
+
+    def test_missing_arm_file_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError):
+            battle.load_audit(tmp_path, "anthropic")
+
+    def test_replay_makes_no_call_and_needs_no_key(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """키가 하나도 없어도 재생은 성립한다 — 부르지 않으니까."""
+        for name in ("WHYMATH_ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "WHYMATH_DEEPSEEK_API_KEY"):
+            monkeypatch.delenv(name, raising=False)
+        config.get_settings.cache_clear()
+        self._write_audit(
+            tmp_path,
+            "deepseek",
+            [
+                _outcome(slug="a", ground_truth="answer_error", detected=True),
+                _outcome(slug="b", input_tokens=1_000_000, output_tokens=1_000_000),
+            ],
+        )
+        evaluated: list[str] = []
+
+        def _never(*_a: object, **_k: object) -> list[object]:
+            evaluated.append("ran")
+            return []
+
+        monkeypatch.setattr(battle, "evaluate_arm", _never)
+        code = battle.main(
+            [
+                "--replay",
+                str(tmp_path),
+                "--arm",
+                "deepseek",
+                "--price",
+                "deepseek=1/2",
+                "--price-source",
+                "테스트 고정값",
+            ]
+        )
+        out = capsys.readouterr().out
+        assert code == 0
+        assert evaluated == []
+        assert "호출 0건" in out
+        assert "$3.000000" in out
+        assert "테스트 고정값" in out
+        config.get_settings.cache_clear()
+
+    def test_replay_of_missing_dir_is_input_error(self, tmp_path: Path) -> None:
+        code = battle.main(["--replay", str(tmp_path / "없는폴더"), "--arm", "deepseek"])
+        assert code == 2
+
+    def test_replay_with_no_evidence_is_not_a_pass(self, tmp_path: Path) -> None:
+        """증거가 하나도 없으면 exit 0이 아니다 — '0건 통과'로 위장하지 않는다."""
+        assert battle.main(["--replay", str(tmp_path), "--arm", "anthropic"]) == 1

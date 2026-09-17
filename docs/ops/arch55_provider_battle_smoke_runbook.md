@@ -166,6 +166,37 @@ DeepSeek 공식 API의 피크 구간은 UTC 01–04시·06–10시, **한국시�
 집계)의 양쪽 표본이 모인다. 오프피크만으로도 정확도·지연 판정은 성립하지만, 단가가 정확히
 2배 차이라 비용 축은 양쪽이 있어야 말이 된다.
 
+## 본 강등전 실측 결과 (2026-09-17 · `2f9b9457` · off_peak)
+
+| 축 | anthropic (baseline) | deepseek |
+|---|---|---|
+| 검출 | 23/40 (Wilson 하한 0.4457) | 33/40 (하한 0.7066) |
+| 오경보 | 1/40 (Wilson 상한 0.1046) | 8/40 (상한 0.3215) |
+| 지연 p50 | 2,804.3ms | 4,243.4ms |
+| 지연 p95 | 9,411.4ms | 29,548.6ms |
+| 입력 토큰(80회) | 45,963 | 37,335 |
+| 출력 토큰(80회) | 16,243 | **149,174** |
+| 집계 제외 | 0건 | 0건 |
+
+`FULL_EXIT=0` · 160회 호출 전건 통과 · 전 회차 `off_peak`(피크 표본 미수집).
+
+## [G] 단가 재환산 (호출 0건 · 비용 축)
+
+단가를 확인한 뒤 **같은 회차 증거를 다시 읽어** USD로 환산한다. 라이브를 다시 돌리면 그건
+새 측정이라(시험지·시각·모델이 다르다) 위 표와 나란히 놓을 수 없다.
+
+아래 블록의 단가는 **주입값**이며 출처 문자열이 리포트에 그대로 찍힌다. Anthropic 단가는
+확인된 값이고, DeepSeek 단가는 공식 페이지를 이 세션에서 열지 못해 **미확인**이다 —
+확인되면 그 숫자로 바꿔 다시 돌리면 된다(호출이 없으므로 몇 번이든 무료다).
+
+```powershell
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
+& $Py -m whymath_backend.harness.provider_accuracy_battle --replay C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-full --arm anthropic --arm deepseek --price anthropic=3/15 --price deepseek=0.15/0.60 --price-source "Anthropic=확인된 claude-sonnet-4-6 단가 / DeepSeek=오프피크 추정치 미확인"
+"REPLAY_EXIT=$LASTEXITCODE"
+```
+
 ## [E] 정리 (스모크가 끝난 뒤에만)
 
 본 강등전까지 마친 다음 실행한다. 워크트리만 지우며 커밋·브랜치는 건드리지 않는다.

@@ -59,6 +59,10 @@ DeepSeek 공식 API는 피크/오프피크 단가가 정확히 2배 차이다. �
 먼저 호출 없이 준비 상태만 볼 수 있다(키가 없으면 회차를 태우지 않고 멈춘다):
     python -m whymath_backend.harness.provider_accuracy_battle \
         --arm anthropic --arm deepseek --check-only
+단가를 나중에 알았으면 **호출 없이** 그 회차를 다시 환산한다:
+    python -m whymath_backend.harness.provider_accuracy_battle \\
+        --replay data/audit/arch-55 --arm anthropic --arm deepseek \\
+        --price anthropic=3/15 --price deepseek=0.15/0.60 --price-source "<출처>"
 종료: 0 통과 / 1 게이트 미달·측정 실패 / 2 인자 오류·arm 준비 미비
 """
 
@@ -518,6 +522,33 @@ def render_arm(
     return lines
 
 
+def load_audit(audit_dir: Path, arm: str) -> list[RoundOutcome]:
+    """`--audit-out`이 남긴 회차 증거를 되읽는다 — **호출 없이** 다시 집계하기 위해.
+
+    증거를 남긴 이유가 이것이다. 단가는 나중에 바뀌고 나중에 알려지는데, 그때마다 라이브를
+    다시 돌리면 그 자체가 새 측정이라 앞 회차와 비교할 수 없다(시험지·시각·모델이 다르다).
+    같은 회차를 다른 단가로 다시 읽는 것만이 "그 측정의 비용"을 말한다.
+
+    깨진 줄은 **건너뛰지 않고 세어서 보고한다** — 조용히 버리면 분모가 줄어든 표가 정상으로
+    보인다.
+    """
+    path = audit_dir / f"{arm}.ndjson"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} — 그 arm의 회차 증거가 없다")
+    outcomes: list[RoundOutcome] = []
+    broken = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            outcomes.append(RoundOutcome.model_validate_json(line))
+        except ValueError:
+            broken += 1
+    if broken:
+        print(f"[{arm}] ⚠ 해석 불가 {broken}줄 — 집계에서 빠졌다(분모 {len(outcomes)})")
+    return outcomes
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="provider_accuracy_battle",
@@ -534,6 +565,12 @@ def main(argv: list[str] | None = None) -> int:
         "--expected-provider",
         default="deepinfra",
         help="OpenRouter arm에서 응답해야 하는 공급사 slug(불일치 회차는 집계 제외)",
+    )
+    parser.add_argument(
+        "--replay",
+        default=None,
+        metavar="AUDIT_DIR",
+        help="호출 없이 기존 --audit-out 증거를 되읽어 다시 집계(단가 재환산용)",
     )
     parser.add_argument(
         "--price",
@@ -576,6 +613,33 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return _EXIT_INPUT_ERROR
+
+    if args.replay:
+        replay_dir = Path(args.replay)
+        if not replay_dir.is_dir():
+            print(f"[인자 오류] --replay 경로가 디렉터리가 아니다: {replay_dir}", file=sys.stderr)
+            return _EXIT_INPUT_ERROR
+        replayed: dict[str, list[RoundOutcome]] = {}
+        for arm in arms:
+            try:
+                replayed[arm] = load_audit(replay_dir, arm)
+            except FileNotFoundError as exc:
+                print(f"[{arm}] 재생 불가 — {exc}", file=sys.stderr)
+        if not replayed:
+            print("재생할 증거가 없다 — 0건 통과로 읽지 않는다.", file=sys.stderr)
+            return _EXIT_GATE_FAIL
+        print(f"재생 — {replay_dir} (호출 0건)")
+        print()
+        for arm, outcomes in replayed.items():
+            for line in render_arm(arm, outcomes, confidence=args.confidence, prices=prices):
+                print(line)
+        if prices:
+            print(f"\n※ 단가 출처(주입값): {args.price_source}")
+            print(
+                "   이 도구는 단가를 알지 못한다 — 위 USD는 주입된 값으로 곱한 것이며,\n"
+                "   청구서로 검증한 값이 아니다."
+            )
+        return _EXIT_OK
 
     # 사전점검 — 못 부를 arm이 하나라도 있으면 **아무것도 부르지 않고** 멈춘다.
     # 여기서 멈추지 않으면 그 arm은 unresolved만 쌓고, 나머지 arm은 과금된 뒤
