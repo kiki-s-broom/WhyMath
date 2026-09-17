@@ -586,32 +586,43 @@ class Settings(BaseSettings):
         description="OpenRouter API 베이스 URL(OpenAI 호환). 시크릿 아님.",
     )
     openrouter_model_mid: str = Field(
-        default="deepseek/deepseek-v4-flash",
+        default="deepseek/deepseek-v4.1-flash",
         description=(
-            "CLOUD_MID 티어에 대응하는 OpenRouter 모델 slug. **실측 핀**(2026-09-16) — "
-            "$0.0886/$0.1772 per 1M. 공식 API의 `deepseek-flash`와 **이름이 다르다**: "
-            "OpenRouter는 오픈웨이트 제품명을 쓰고 공식 API는 자기 id를 쓴다."
+            "CLOUD_MID 티어에 대응하는 OpenRouter 모델 slug. **정정 2026-09-17** — "
+            "`deepseek-v4-flash`(점 없음)가 아니라 `deepseek-v4.1-flash`다. Kiki가 "
+            "openrouter.ai 모델 페이지를 열어 확인했다(URL·복사 버튼의 정본 id). "
+            "list price $0.15/$0.60 per 1M · 컨텍스트 1.0M · 출시 2026-09-10. "
+            "공식 API의 `deepseek-flash`와 이름이 다르다 — OpenRouter는 제품명을, "
+            "공식 API는 자기 id를 쓴다. 최종 확정은 `/models` 조회다"
+            "(`harness.openrouter_endpoints_probe --search`)."
         ),
     )
     openrouter_model_high: str = Field(
         default="deepseek/deepseek-v4-pro",
         description=(
-            "CLOUD_HIGH 티어에 대응하는 OpenRouter 모델 slug. 라이브 가격 미실측 — "
-            "MID만 2026-09-16에 확인했다. 쓰기 전에 실측한다."
+            "CLOUD_HIGH 티어에 대응하는 OpenRouter 모델 slug. **미확인 핀** — "
+            "MID가 `v4.1`로 정정된 만큼 이 slug도 같은 오류일 수 있다"
+            "(`v4.1-pro`일 가능성). 쓰기 전에 `--search`로 확정한다."
         ),
     )
     openrouter_allowed_providers: tuple[str, ...] = Field(
-        default=("deepinfra", "digitalocean"),
+        default=("deepinfra", "fireworks", "together"),
         description=(
-            "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 아는 "
-            "곳만**. 기본 2곳은 둘 다 미국 법인이고 `data_collection=deny` 필터를 통과하는 "
-            "것이 실호출로 확인됐다(2026-09-16). slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
-            "(`deepinfra/fp8`→`deepinfra`). "
-            "**`open-inference`는 최저가($0.05/$0.14)지만 넣지 않는다** — 2차 자료가 그곳을 "
-            "'프롬프트를 학습에 쓰는 대가로 rate limit을 푸는 공급사'로 설명해 deny 통과와 "
-            "정면 충돌하는데 1차 자료로 확정하지 못했다. 이 목록이 `data_collection=deny`와 "
-            "**독립된 두 번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). "
-            "빈 목록은 허용이 아니라 **차단**이다(provider.only가 빈 채로 호출되지 않는다)."
+            "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 알고 "
+            "데이터 정책이 깨끗한 곳만**. slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
+            "(`deepinfra/fp8`→`deepinfra`). 이 목록이 `data_collection=deny`와 **독립된 두 "
+            "번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). 빈 목록은 "
+            "허용이 아니라 **차단**이다.\n"
+            "기본 3곳은 2026-09-17 실측에서 공급사 패널이 `Headquarters: US` · "
+            "`Prompt training: No` · `Retention: Zero retention`을 함께 만족한 곳이다. "
+            "**`gmicloud`는 US인데도 제외했다** — 같은 패널이 `Retention: Unknown`이라 "
+            "'국적은 알지만 보존 정책을 모른다'이고, 모르는 것은 허용 사유가 아니다. "
+            "**`digitalocean`은 뺐다** — 이전 세션이 US로 적었으나 이번 실측으로 재확인되지 "
+            "않았고 그 세션의 OpenRouter 기록 4건이 전부 틀렸다(모델 slug·엔드포인트 수·"
+            "최저가 공급사·단가). 근거를 다시 확보하면 되돌린다.\n"
+            "⚠️ **측정(ARCH-55)에는 1곳만 지정한다** — 여러 곳을 허용하면 OpenRouter가 그중 "
+            "하나를 고르고 양자화가 공급사마다 달라(`deepinfra`=FP8·다수 미표기) 품질 비교가 "
+            "성립하지 않는다. 이 기본값은 *운영 가용성*을 위한 것이지 측정용이 아니다."
         ),
     )
     openrouter_max_tokens: int = Field(

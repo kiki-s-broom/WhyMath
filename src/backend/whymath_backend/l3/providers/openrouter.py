@@ -94,11 +94,29 @@ DATA_COLLECTION_DENY: Final[str] = "deny"
 #     차단이다. 둘을 같은 칸에 접으면 나중에 근거를 되짚을 수 없다.
 # 목록을 늘리려면 법인 국적의 근거를 등급과 함께 남긴다.
 PROVIDER_JURISDICTIONS: Final[Mapping[str, Jurisdiction]] = {
-    "deepinfra": Jurisdiction.US,
-    "digitalocean": Jurisdiction.US,
+    # ── 근거 A — OpenRouter 공급사 패널의 `Provider info › Headquarters` 표기 ──
+    # 2026-09-17 Kiki가 `openrouter.ai/deepseek/deepseek-v4.1-flash`의 공급사 상세를 열어
+    # 확인했다. API가 주는 값이 아니라 **웹 UI가 명시하는 본사 소재지**이며, 회사에 대한
+    # 우리 인상이 아니라 OpenRouter가 게시한 사실이라는 점에서 아래 근거 C보다 강하다.
+    "deepinfra": Jurisdiction.US,  # Zero retention · Prompt training No
+    "fireworks": Jurisdiction.US,  # Zero retention · Prompt training No
+    "together": Jurisdiction.US,  # Zero retention · Prompt training No
+    "gmicloud": Jurisdiction.US,  # ⚠ Retention **Unknown** — 기본 허용목록 제외 사유
+    # ── 근거 B — 공급사 표의 국기 배지 ──
+    "baseten": Jurisdiction.US,  # 표에 🇺🇸 배지. 패널 미확인이라 A보다 약하다
+    # ── 근거 C — 회사로 아는 것(1차 자료 아님) ──
+    # 판정 결과는 차단에 가깝지만 UNKNOWN과 **다른 사실**이다: CN은 코퍼스 opt-in이라는
+    # 경로가 있고 UNKNOWN은 전건 차단이다. 둘을 같은 칸에 넣으면 근거를 되짚을 수 없다.
     "siliconflow": Jurisdiction.CN,
     "alibaba": Jurisdiction.CN,
     "baidu": Jurisdiction.CN,
+    # ── 미등재(= UNKNOWN = 전건 차단) ──
+    # `relace`(최저가 $0.15/$0.60) · `morph` · `makora` · `modal` · `parasail` · `novitaai` ·
+    # `phala` · `venice` · `reka` — 2026-09-17 시점 국적 미확인. 넓히려면 같은 방식으로
+    # 공급사 패널의 Headquarters를 확인하고 근거 등급과 함께 이 표에 적는다.
+    # `digitalocean`은 **여기서 의도적으로 뺐다** — 이전 세션이 US로 적었으나 그 근거가
+    # 이번 실측으로 재확인되지 않았고(패널 미확인), 그 세션의 다른 기록 4건이 모두 틀린
+    # 것으로 드러났다(아래 모듈 주석). 근거를 다시 확보할 때까지 UNKNOWN으로 둔다.
 }
 
 

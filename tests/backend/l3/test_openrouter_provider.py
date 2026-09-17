@@ -30,6 +30,7 @@ from whymath_backend.l3.models import CostTier, LocalModelTier, ModelFamily, Rou
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers.openrouter import (
     DATA_COLLECTION_DENY,
+    PROVIDER_JURISDICTIONS,
     OpenRouterProvider,
     build_provider_block,
     jurisdiction_of_slugs,
@@ -79,7 +80,7 @@ def _ok_response() -> dict[str, Any]:
 def _settings(**overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "openrouter_api_key": SecretStr("sk-or-test"),
-        "openrouter_allowed_providers": ("deepinfra", "digitalocean"),
+        "openrouter_allowed_providers": ("deepinfra", "fireworks"),
     }
     base.update(overrides)
     return Settings(**base)
@@ -116,8 +117,8 @@ class TestThreeParameterContract:
         — 즉 고정이 조용히 무효가 된다. 그래서 픽스처가 **양자화 접미사를 포함한** tag를
         일부러 밟는다(정규화 절이 없으면 이 단언이 실패한다).
         """
-        block = build_provider_block(["deepinfra/fp8", " digitalocean "])
-        assert block["only"] == ["deepinfra", "digitalocean"]
+        block = build_provider_block(["deepinfra/fp8", " fireworks "])
+        assert block["only"] == ["deepinfra", "fireworks"]
 
     def test_payload_forbids_fallbacks(self) -> None:
         """`allow_fallbacks`가 있고 **False**다 — 조용한 우회 금지."""
@@ -165,7 +166,7 @@ class TestGeneratePayload:
         await provider.generate("프롬프트", "시스템", _cloud_decision(cost))
         block = transport.last_payload["provider"]
         assert block == {
-            "only": ["deepinfra", "digitalocean"],
+            "only": ["deepinfra", "fireworks"],
             "allow_fallbacks": False,
             "data_collection": "deny",
         }
@@ -182,10 +183,16 @@ class TestGeneratePayload:
         await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_HIGH))
         assert transport.last_payload["model"] == "deepseek/deepseek-v4-pro"
 
-    async def test_default_model_pin_is_the_measured_openrouter_slug(self) -> None:
-        """실측 핀(2026-09-16) — 공식 API id와 **다른 문자열**임을 동결한다."""
+    async def test_default_model_pin_is_the_corrected_openrouter_slug(self) -> None:
+        """정정된 핀(2026-09-17) — `v4.1`이며 공식 API id와 **다른 문자열**임을 동결한다.
+
+        초판은 `deepseek/deepseek-v4-flash`(점 없음)로 적혀 있었고, 그것은 OpenRouter
+        모델 페이지의 실제 id와 달랐다. 같은 세션의 OpenRouter 기록 4건이 전부 틀린
+        것으로 드러난 사고의 일부다 — 그래서 문자열 자체를 동결한다.
+        """
         defaults = Settings()
-        assert defaults.openrouter_model_mid == "deepseek/deepseek-v4-flash"
+        assert defaults.openrouter_model_mid == "deepseek/deepseek-v4.1-flash"
+        assert defaults.openrouter_model_mid != defaults.deepseek_model_mid
 
     async def test_messages_carry_system_and_user_roles(self) -> None:
         transport = _RecordingTransport()
@@ -299,7 +306,18 @@ class TestJurisdictionDerivation:
         assert provider_slug_from_tag("digitalocean") == "digitalocean"
 
     def test_known_us_providers_resolve_to_us(self) -> None:
-        assert jurisdiction_of_slugs(["deepinfra", "digitalocean"]) is Jurisdiction.US
+        """패널에서 `Headquarters: US`가 확인된 곳들은 US로 해소된다."""
+        assert jurisdiction_of_slugs(["deepinfra", "fireworks", "together"]) is Jurisdiction.US
+        assert jurisdiction_of_slugs(["gmicloud", "baseten"]) is Jurisdiction.US
+
+    def test_provider_dropped_for_lack_of_evidence_is_unknown(self) -> None:
+        """`digitalocean`은 근거 재확인 실패로 표에서 빠졌다 — 그래서 UNKNOWN이다.
+
+        "전에 US라고 적었다"는 근거가 아니다: 그것을 적은 세션의 OpenRouter 기록 4건이
+        전부 틀린 것으로 드러났으므로, 같은 출처의 다른 항목도 재확인 전까지는 모른다.
+        """
+        assert "digitalocean" not in PROVIDER_JURISDICTIONS
+        assert jurisdiction_of_slugs(["digitalocean"]) is Jurisdiction.UNKNOWN
 
     def test_unknown_slug_makes_the_whole_call_unknown(self) -> None:
         """국적 미확인이 하나만 섞여도 전체가 UNKNOWN — `open-inference`가 그 사례다."""
@@ -339,22 +357,37 @@ class TestJurisdictionDerivation:
         assert jurisdiction_of_slugs([]) is Jurisdiction.UNKNOWN
 
     def test_provider_jurisdiction_follows_settings(self) -> None:
-        known = OpenRouterProvider(settings=_settings())
+        known = OpenRouterProvider(settings=_settings())  # noqa: F841 — 아래에서 쓴다
         polluted = OpenRouterProvider(
             settings=_settings(openrouter_allowed_providers=("mystery-host",))
         )
         assert known.jurisdiction is Jurisdiction.US
         assert polluted.jurisdiction is Jurisdiction.UNKNOWN
 
-    def test_default_allowlist_is_the_two_verified_us_providers(self) -> None:
-        """기본 허용목록 동결 — `open-inference`(최저가)가 **들어 있지 않음**을 함께 단언한다.
+    def test_default_allowlist_is_only_hq_and_retention_verified_providers(self) -> None:
+        """기본 허용목록 동결 — 세 조건을 **함께** 만족한 곳만(2026-09-17 공급사 패널 실측).
 
-        가격만 보면 그곳이 최적이지만 데이터 정책 논쟁이 1차 자료로 해소되지 않았다
-        (ARCH-49 ⑩). 기본값이 조용히 바뀌면 이 단언이 실패한다.
+        조건: `Headquarters: US` · `Prompt training: No` · `Retention: Zero retention`.
         """
         defaults = Settings()
-        assert defaults.openrouter_allowed_providers == ("deepinfra", "digitalocean")
-        assert "open-inference" not in defaults.openrouter_allowed_providers
+        assert defaults.openrouter_allowed_providers == ("deepinfra", "fireworks", "together")
+
+    def test_us_provider_with_unknown_retention_is_not_in_the_default_allowlist(self) -> None:
+        """`gmicloud`는 **US인데도** 기본 허용목록에 없다 — 보존 정책이 `Unknown`이다.
+
+        국적을 아는 것과 데이터 정책을 아는 것은 다른 축이고, 모르는 것은 허용 사유가
+        아니다. 관할 표에는 US로 들어 있으므로(설정으로 켤 수는 있다) 이 단언이 없으면
+        "US니까 넣자"로 조용히 되돌아간다.
+        """
+        defaults = Settings()
+        assert "gmicloud" not in defaults.openrouter_allowed_providers
+        assert PROVIDER_JURISDICTIONS["gmicloud"] is Jurisdiction.US
+
+    def test_cheapest_provider_is_not_auto_included(self) -> None:
+        """최저가(`relace` $0.15/$0.60)는 국적 미확인이라 들어가지 않는다 — 가격은 근거가 아니다."""
+        defaults = Settings()
+        assert "relace" not in defaults.openrouter_allowed_providers
+        assert "relace" not in PROVIDER_JURISDICTIONS
 
 
 class TestStatusReporting:
