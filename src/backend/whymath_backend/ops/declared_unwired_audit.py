@@ -1102,6 +1102,9 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 비교하는 것은 `ARCH-55-deepseek-live-battle-measurement`가 소유하며, 그
         # 실행처는 CI가 아니라 키가 있는 Phaiakes9다.
         "harness.deepseek_live_probe": _LIVE_DEPENDENT,
+        # ARCH-49 ⑨ — OpenRouter 엔드포인트 조회(공급사 slug·양자화·단가). 위와 같은 이유로
+        # CI에서 못 돈다(키 + `openrouter.ai` egress). 목록을 넓히는 판정은 `ARCH-55`.
+        "harness.openrouter_endpoints_probe": _LIVE_DEPENDENT,
         # EOS-54(2026-08-30): HIT·CU 생산 계측 판독기 — 검수 타이머 *실이벤트*(JSONL) 의존.
         # 계측 표본이 쌓이기 전에는 입력 0 = 측정 실패(exit 1)가 설계값(미측정≠0 승격)이라 CI
         # 상시 배선 비대상 — G2(10/25) 기준선·G5 판정 시점에 운영자가 돌린다(answer_distribution_
