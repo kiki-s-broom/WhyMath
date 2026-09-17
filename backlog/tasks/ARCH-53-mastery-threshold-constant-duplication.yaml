@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-53-mastery-threshold-constant-duplication
+title: "숙달 임계값 상수가 L2·L4에 복제 — schema 이동 선행 조건 성립"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 복제 실측 — l2/learner_state.py의 _DEVELOPING_THRESHOLD·_MASTERED_THRESHOLD와 l4/lthc/adapt.py의 복제본을 대조해 값이 일치하는지 확인한다(이미 갈라져 있으면 그 자체가 사고다)\n② 이동 — 그 주석이 명시한 선행 조건('schema 등 더 낮은 위치로 상수가 이동하기 전까지')이 이제 성립한다(schema/mastery_contract.py 선례). 상수를 schema로 내리고 L2·L4가 함께 읽게 한다\n③ 계층 확인 — schema는 최하위라 L2·L4 양쪽이 아래로 호출하므로 import-linter 3계약이 그대로 유지돼야 한다\n④ 변별력 — 한쪽 값만 바꾸는 주입에서 RED가 나는지 확인한다(복제가 남아 있으면 조용히 통과한다). 정상 상태 GREEN 대조군을 함께 둔다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learner_state.py
+session: null
+notes: "EOS-13 구현 중 발견. l2/learner_state.py의 숙달 임계값 2개가 l4/lthc/adapt.py에 값으로 복제돼 있고, 원 주석이 'schema 등 더 낮은 위치로 상수가 이동하기 전까지'를 유예 조건으로 적어 뒀다. EOS-13이 schema/mastery_contract.py를 만들며 그 조건이 성립했다. 진실 원천 두 벌 축(붕괴 연쇄 '유지보수 지옥')."
+updated: 2026-09-16
