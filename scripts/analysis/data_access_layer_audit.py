@@ -19,10 +19,12 @@
 이 스크립트는 **측정만** 한다(계측기). 어떤 코드도 이 파일 때문에 차단되지 않는다.
 집행 지점은 둘이며 축이 다르다:
 
-| 축 | 집행 장치 | 무엇을 막나 |
-|---|---|---|
-| **호출 축** | `tests/infra/test_data_access_layer_contract.py` (CI `backend` 잡 pytest) | baseline 밖 파일이 세션·연결을 직접 조작하는 것 |
-| **import 축** | `src/backend/pyproject.toml` forbidden 계약 (CI `backend` 잡 `lint-imports`) | 깨끗한 4계층(`schema`·`lang`·`l5`·`l6`)이 `sqlalchemy`·`whymath_backend.db`를 import하는 것 |
+**호출 축** — 집행 장치 `tests/infra/test_data_access_layer_contract.py`
+(CI `backend` 잡 pytest). 막는 것: baseline 밖 파일이 세션·연결을 직접 조작하는 것.
+
+**import 축** — 집행 장치 `src/backend/pyproject.toml` forbidden 계약
+(CI `backend` 잡 `lint-imports`). 막는 것: 아직 깨끗한 4계층
+(`schema`·`lang`·`l5`·`l6`)이 `sqlalchemy`·`whymath_backend.db`를 import하는 것.
 
 import-linter만으로는 호출 축을 볼 수 없다 — import 그래프 도구라 `session.execute(...)`라는
 **메서드 호출**을 표현할 문법이 없다. 반대로 AST 가드만으로는 "아직 한 줄도 안 쓴 계층이
