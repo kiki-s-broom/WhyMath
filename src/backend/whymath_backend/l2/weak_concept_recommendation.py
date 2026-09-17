@@ -62,6 +62,7 @@ from whymath_backend.l2.concept_diagnosis import (
     ConceptDiagnosis,
     compute_concept_diagnoses,
 )
+from whymath_backend.l2.recommendation_contract import WEAK_CONCEPT_MASTERY_CEILING
 
 # 검수 게이팅 비교 리터럴 — `atom_node.review_status`가 싣는 reviewed 값(원자 검색 좌석과 동일
 # 규약). 단, 원자 메타 적재는 review_status를 상수 'ai_estimated'로 박으므로(원자 메타는 AI 추정·
@@ -149,7 +150,7 @@ async def recommend_weak_concepts_detailed(
     user_id: uuid.UUID,
     *,
     limit: int = 10,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
     diagnoses: list[ConceptDiagnosis] | None = None,
 ) -> WeakConceptResult:
@@ -255,7 +256,7 @@ async def recommend_weak_concepts(
     user_id: uuid.UUID,
     *,
     limit: int = 10,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
     diagnoses: list[ConceptDiagnosis] | None = None,
 ) -> list[WeakConceptRecommendation]:

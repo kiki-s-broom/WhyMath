@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -17,6 +17,10 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l2/*recommendation*.py"
-session: null
-notes: "출처: 계획서 300 §8(Recommendation Engine v1 — \"Recommendation + Reason을 처음부터 설계\") + §2 — 대조표 §4 단위7. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): `recommend(learner_state, learning_context)` 형태의 호출 계약 0건. 추천 관측·영속·정직 표기는 REC-01/03/04/06/11·PATH-02/09/10(done)으로 두텁게 서 있으나 전부 **응답 필드**축이고 호출 계약축이 아니다. REC-10(todo)은 클라 렌더 축이다.\n\n이 계약의 입력이 LearnerState이므로 그 단일 조회 표면 태스크를 depends_on에 걸어 대장으로 집행했다(산문 아님 · HARN-52).\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
-updated: 2026-09-16
+  - src/backend/whymath_backend/api/me.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - "tests/backend/l2/test_recommendation_*.py"
+  - tests/backend/api/test_me.py
+session: claude/zen-keller-yun5lz
+notes: "출처: 계획서 300 §8(Recommendation Engine v1 — \"Recommendation + Reason을 처음부터 설계\") + §2 — 대조표 §4 단위7. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): `recommend(learner_state, learning_context)` 형태의 호출 계약 0건. 추천 관측·영속·정직 표기는 REC-01/03/04/06/11·PATH-02/09/10(done)으로 두텁게 서 있으나 전부 **응답 필드**축이고 호출 계약축이 아니다. REC-10(todo)은 클라 렌더 축이다.\n\n이 계약의 입력이 LearnerState이므로 그 단일 조회 표면 태스크를 depends_on에 걸어 대장으로 집행했다(산문 아님 · HARN-52).\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신.\n\n[정정 2026-09-17] paths ['src/backend/whymath_backend/l2/*recommendation*.py'] → ['src/backend/whymath_backend/l2/*recommendation*.py', 'src/backend/whymath_backend/api/me.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'tests/backend/l2/test_recommendation_*.py', 'tests/backend/api/test_me.py']: 실제 접촉 파일 반영 — 근거를 응답에 싣는 집행 지점이 api/me.py이고(정본화≠집행), 계약 소유 모듈은 인벤토리 귀속이 필요하다(WM-E-211). l2/mastery_tracking.py는 EOS-13 소유라 읽기만 하고 범위에 넣지 않는다."
+updated: 2026-09-17

@@ -566,6 +566,13 @@ CATALOG: tuple[Spec, ...] = (
        "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
        "schema/assessment_evidence.py가 소유",
        "l2.assessment_evidence"),
+    _e("WM-E-211", "추천 호출 계약·추천 근거 조립(Recommendation + 필수 Reason)", "Student",
+       "Recommendation", "P1",
+       "EOS-14 — 계획서 300 §8. `recommend(learner_state, context)` 시그니처와 필수 "
+       "`RecommendationReason`(구간·basis 3상태)을 정본화하고, 이미 선택된 문항에 근거를 "
+       "붙인다. 선택 알고리즘은 WM-E-205·WM-E-202 좌석이 유일 권위이고 이 행은 선택 *뒤에* "
+       "돌아 결과를 바꾸지 않는다(session.add·commit 0건)",
+       "l2.recommendation_contract", "l2.recommendation_reason"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",

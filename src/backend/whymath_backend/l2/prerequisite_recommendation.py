@@ -101,6 +101,7 @@ from whymath_backend.l2.concept_diagnosis import (
     ConceptDiagnosis,
     compute_concept_diagnoses,
 )
+from whymath_backend.l2.recommendation_contract import WEAK_CONCEPT_MASTERY_CEILING
 from whymath_backend.schema.enums import EdgeType
 
 if TYPE_CHECKING:
@@ -382,7 +383,7 @@ async def recommend_prerequisite_gaps_detailed(
     user_id: uuid.UUID,
     concept_id: uuid.UUID,
     *,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
     weak_only: bool = True,
     max_depth: int = 1,
@@ -492,7 +493,7 @@ async def recommend_prerequisite_gaps(
     user_id: uuid.UUID,
     concept_id: uuid.UUID,
     *,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
     weak_only: bool = True,
     max_depth: int = 1,
