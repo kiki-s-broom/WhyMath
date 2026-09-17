@@ -436,6 +436,34 @@ def rate_for(prices: dict[str, PriceRate], arm: str, window: str | None) -> Pric
     return prices.get(arm)
 
 
+def total_cost_line(outcomes: list[RoundOutcome], *, arm: str, prices: dict[str, PriceRate]) -> str:
+    """전체(구간 혼합) 비용 한 줄.
+
+    arm 단가가 주어졌으면 그것으로 한 번에 곱한다. 없고 **구간 단가만** 있으면 구간별로
+    나눠 곱해 더한다 — 피크/오프피크 단가가 정확히 2배 차이라 한 값으로 뭉뚱그리면 그 2배가
+    평균에 녹기 때문이다. 어느 쪽도 없으면 "단가 미지정"이라고 말한다(0으로 위장 금지).
+
+    한 구간이라도 단가가 없으면 합계를 내지 않는다 — **일부만 더한 합계는 합계가 아니다.**
+    """
+    if prices.get(arm) is not None:
+        return cost_line(outcomes, arm=arm, window=None, prices=prices)
+    windows = sorted({o.pricing_window for o in outcomes})
+    if not windows or any(rate_for(prices, arm, w) is None for w in windows):
+        return "단가 미지정(토큰만 측정)"
+    total = 0.0
+    measured = 0
+    for window in windows:
+        subset = [o for o in outcomes if o.pricing_window == window]
+        tok = token_summary(subset)
+        rate = rate_for(prices, arm, window)
+        if rate is None or tok["input_total"] is None or tok["output_total"] is None:
+            return "토큰 미측정 구간이 있어 합계 불가"
+        total += rate.usd_for(input_tokens=tok["input_total"], output_tokens=tok["output_total"])
+        measured += tok["n_measured"] or 0
+    per_call = f"회당 ${total / measured:.6f}" if measured else "회당 미산출"
+    return f"${total:.6f} ({per_call} · 구간별 단가 합산: {', '.join(windows)})"
+
+
 def cost_line(
     outcomes: list[RoundOutcome],
     *,
@@ -496,7 +524,7 @@ def render_arm(
         f"  토큰 측정 {tok['n_measured']}회 · 입력 {tok['input_total']} · "
         f"출력 {tok['output_total']}"
     )
-    lines.append(f"  비용 {cost_line(outcomes, arm=arm, window=None, prices=prices)}")
+    lines.append(f"  비용 {total_cost_line(outcomes, arm=arm, prices=prices)}")
     for window in ("peak", "off_peak"):
         subset = [o for o in outcomes if o.pricing_window == window]
         if not subset:

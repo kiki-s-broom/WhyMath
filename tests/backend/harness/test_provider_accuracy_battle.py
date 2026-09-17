@@ -467,3 +467,47 @@ class TestReplay:
     def test_replay_with_no_evidence_is_not_a_pass(self, tmp_path: Path) -> None:
         """증거가 하나도 없으면 exit 0이 아니다 — '0건 통과'로 위장하지 않는다."""
         assert battle.main(["--replay", str(tmp_path), "--arm", "anthropic"]) == 1
+
+
+class TestWindowAwareTotalCost:
+    """구간 단가만 있을 때 전체 비용을 어떻게 내는가.
+
+    피크/오프피크가 정확히 2배 차이라 한 값으로 뭉뚱그리면 그 2배가 평균에 녹는다.
+    그래서 구간별로 나눠 곱해 더한다 — 다만 **한 구간이라도 단가가 없으면 합계를 내지 않는다**
+    (일부만 더한 합계는 합계가 아니다).
+    """
+
+    @staticmethod
+    def _mixed() -> list[battle.RoundOutcome]:
+        return [
+            _outcome(slug="p", pricing_window="peak", input_tokens=1_000_000, output_tokens=0),
+            _outcome(slug="o", pricing_window="off_peak", input_tokens=1_000_000, output_tokens=0),
+        ]
+
+    def test_sums_per_window_rates(self) -> None:
+        prices = {
+            "deepseek:peak": battle.PriceRate(input_per_mtok=0.30, output_per_mtok=1.20),
+            "deepseek:off_peak": battle.PriceRate(input_per_mtok=0.15, output_per_mtok=0.60),
+        }
+        line = battle.total_cost_line(self._mixed(), arm="deepseek", prices=prices)
+        assert "$0.450000" in line  # 0.30 + 0.15
+        assert "구간별 단가 합산" in line
+
+    def test_arm_rate_wins_when_present(self) -> None:
+        prices = {
+            "deepseek": battle.PriceRate(input_per_mtok=1.0, output_per_mtok=0.0),
+            "deepseek:peak": battle.PriceRate(input_per_mtok=99.0, output_per_mtok=0.0),
+        }
+        line = battle.total_cost_line(self._mixed(), arm="deepseek", prices=prices)
+        assert "$2.000000" in line
+
+    def test_partial_window_coverage_is_not_summed(self) -> None:
+        """피크 단가만 주고 오프피크를 안 줬으면 합계가 아니라 '미지정'이다."""
+        prices = {"deepseek:peak": battle.PriceRate(input_per_mtok=0.30, output_per_mtok=1.20)}
+        line = battle.total_cost_line(self._mixed(), arm="deepseek", prices=prices)
+        assert "단가 미지정" in line
+        assert "$" not in line
+
+    def test_no_rate_at_all_is_unknown(self) -> None:
+        line = battle.total_cost_line(self._mixed(), arm="deepseek", prices={})
+        assert "단가 미지정" in line

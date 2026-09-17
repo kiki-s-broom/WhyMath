@@ -180,22 +180,86 @@ DeepSeek 공식 API의 피크 구간은 UTC 01–04시·06–10시, **한국시�
 
 `FULL_EXIT=0` · 160회 호출 전건 통과 · 전 회차 `off_peak`(피크 표본 미수집).
 
-## [G] 단가 재환산 (호출 0건 · 비용 축)
+## [H] OpenRouter arm (acceptance ① 2종 중 나머지 · ③ 공급사 고정 확인)
 
-단가를 확인한 뒤 **같은 회차 증거를 다시 읽어** USD로 환산한다. 라이브를 다시 돌리면 그건
-새 측정이라(시험지·시각·모델이 다르다) 위 표와 나란히 놓을 수 없다.
+acceptance ①은 DeepSeek 경로를 **2종** 요구한다 — 공식 API와 OpenRouter 경유. 위 [F]는
+공식 API만 돌렸다. ③(공급사·양자화 고정 확인)은 **OpenRouter arm에만 존재하는 축**이라
+이 블록 없이는 ①③ 둘 다 미충족이다.
 
-아래 블록의 단가는 **주입값**이며 출처 문자열이 리포트에 그대로 찍힌다. Anthropic 단가는
-확인된 값이고, DeepSeek 단가는 공식 페이지를 이 세션에서 열지 못해 **미확인**이다 —
-확인되면 그 숫자로 바꿔 다시 돌리면 된다(호출이 없으므로 몇 번이든 무료다).
+`--seed 20260917`을 [F]와 **같은 값으로** 둔다 — 같은 시험지를 풀어야 나란히 놓을 수 있다.
+`--audit-out`도 같은 폴더라 `openrouter.ndjson`이 옆에 쌓이고 [G] 재생이 3개 arm을 함께 읽는다.
+
+**먼저 slug 확인**(모델 이름이 틀리면 전 회차가 호출 실패로 끝난다 — ARCH-49에서 실제로
+틀렸던 축이다):
 
 ```powershell
 $env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
 $Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
 if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
-& $Py -m whymath_backend.harness.provider_accuracy_battle --replay C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-full --arm anthropic --arm deepseek --price anthropic=3/15 --price deepseek=0.15/0.60 --price-source "Anthropic=확인된 claude-sonnet-4-6 단가 / DeepSeek=오프피크 추정치 미확인"
+& $Py -m whymath_backend.harness.openrouter_endpoints_probe --search deepseek
+"SEARCH_EXIT=$LASTEXITCODE"
+& $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --check-only
+"CHECK_EXIT=$LASTEXITCODE"
+```
+
+**그다음 소표본 10+10**으로 공급사 고정이 실제로 되는지부터 본다(`집계 제외`가 0이어야
+한다 — 0이 아니면 허용목록 1곳이 응답하지 않은 것이고, 그 상태로 80회를 돌리면 잡음을 잰다):
+
+```powershell
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
+$Source = (& $Py -c "import whymath_backend.harness.provider_accuracy_battle as m; print(m.__file__)")
+$FromWorktree = ($Source -like "*WhyMath-arch55*")
+"FROM_WORKTREE=$FromWorktree ($Source)"
+& $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --check-only | Out-Null
+$Ready = ($LASTEXITCODE -eq 0)
+"READY=$Ready"
+if ($FromWorktree -and $Ready) { & $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --n-defective 10 --n-clean 10 --seed 20260708 --concurrency 2 --expected-provider deepinfra --audit-out C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-or-smoke; "OR_SMOKE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — FromWorktree=$FromWorktree Ready=$Ready · 호출 0건" }
+```
+
+**소표본에서 `집계 제외 0건`을 확인한 뒤** 본 회차:
+
+```powershell
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
+$Source = (& $Py -c "import whymath_backend.harness.provider_accuracy_battle as m; print(m.__file__)")
+$FromWorktree = ($Source -like "*WhyMath-arch55*")
+$SmokeClean = (Test-Path C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-or-smoke\openrouter.ndjson)
+"FROM_WORKTREE=$FromWorktree SMOKE_EVIDENCE=$SmokeClean"
+if ($FromWorktree -and $SmokeClean) { & $Py -m whymath_backend.harness.provider_accuracy_battle --arm openrouter --n-defective 40 --n-clean 40 --seed 20260917 --concurrency 2 --expected-provider deepinfra --audit-out C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-full; "OR_FULL_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — FromWorktree=$FromWorktree SmokeEvidence=$SmokeClean · 호출 0건" }
+```
+
+
+## [G] 단가 재환산 (호출 0건 · 비용 축)
+
+단가를 확인한 뒤 **같은 회차 증거를 다시 읽어** USD로 환산한다. 라이브를 다시 돌리면 그건
+새 측정이라(시험지·시각·모델이 다르다) 위 표와 나란히 놓을 수 없다.
+
+아래 블록의 단가는 **주입값**이며 출처 문자열이 리포트에 그대로 찍힌다. 두 단가 모두
+1차 자료로 확인됐다:
+
+- **Anthropic `claude-sonnet-4-6`** = $3 / $15 per 1M (입력 / 출력)
+- **DeepSeek Flash 계열** = 오프피크 $0.15(입력 캐시 미스) / $0.60(출력) · 캐시 히트 입력
+  $0.003 · **피크는 정확히 2배**($0.30 / $1.20). 출처 = DeepSeek 플랫폼 Usage 페이지의
+  공급사 공지 배너(2026-09-10 12:00 베이징 시각 발효 · 2026-09-17 확인)
+
+**청구서 교차검증(2026-09-17)**: 이 계정의 `deepseek-flash` 30일 사용량이
+**101 requests · 236,012 tokens · $0.11 USD**로 찍혔고, 이는 우리가 부른 라이브 프로브 1회
++ 스모크 20회 + 본 강등전 80회 = **101회**와 토큰 합계(508 + 48,995 + 186,509 =
+**236,012**)에 **정확히 일치**한다. 즉 아래 환산은 단가 곱셈이면서 동시에 **청구 총액으로
+검산된** 값이다(역산: 입력 46,721 x $0.15 + 출력 189,291 x $0.60 = $0.121 → 청구 $0.11,
+차액은 입력 캐시 히트분).
+
+```powershell
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-arch55\src\backend"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
+& $Py -m whymath_backend.harness.provider_accuracy_battle --replay C:\Users\kiki\Desktop\__AI\WhyMath-arch55\data\audit\arch-55-full --arm anthropic --arm deepseek --price anthropic=3/15 --price deepseek:off_peak=0.15/0.60 --price deepseek:peak=0.30/1.20 --price-source "Anthropic 공식 단가표 / DeepSeek 플랫폼 Usage 공지 배너 2026-09-17 - 청구서 101req 236012tok 0.11USD 교차검증"
 "REPLAY_EXIT=$LASTEXITCODE"
 ```
+
 
 ## [E] 정리 (스모크가 끝난 뒤에만)
 
