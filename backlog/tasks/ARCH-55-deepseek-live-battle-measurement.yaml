@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/harness/**"
   - "docs/ops/**"
-session: null
+session: claude/friendly-wright-x6wp2y
 notes: "ARCH-49 회수 분리(CLAUDE.md 「회수로 태스크 done 선언 시 acceptance 전수 재대조 생략 금지」): ARCH-49가 착지시킨 것은 *측정을 돌릴 수 있는 배선*이고, acceptance ①·⑥이 요구한 **라이브 측정 자체**는 Kiki 머신의 유효 키가 필요해 그 세션에서 수행할 수 없었다. 미이행분을 여기로 승계한다 — 산문에만 남기면 만료 없는 유예가 된다.\n\n착수 전제(ARCH-49에서 이미 성립): 키 2종이 Phaiakes9 User 환경변수에 등록·라이브 확인됨(2026-09-16, 벤더 표준 이름 `DEEPSEEK_API_KEY`/`OPENROUTER_API_KEY` — `config.py`가 `WHYMATH_` 접두 이름과 함께 읽는다) · CN 관할 기본 정책이 합성 프로브(`WHYMATH_GENERATED`)를 허용하므로 **추가 opt-in 없이 측정 가능** · OpenRouter 기본 허용목록은 `deepinfra`/`digitalocean` 2곳.\n\n실행 축이 Kiki 머신이므로 런북에는 CLAUDE.md 「Kiki 직접 수행 과제의 사전 브리핑 템플릿」 6항목과 쓰기 블록 자가거부 가드(HARN-106)를 적용한다.\n\n미채택도 결론이다 — 판정은 exit code와 Wilson 경계로 하고 인상 판정을 금한다.\n\n[실측 1회차 2026-09-17 · Kiki 실행 Phaiakes9] DeepSeek 공식 API 라이브 호출 성공 — PROBE_EXIT=0. cloud_mid→`deepseek-flash` · 입력 88 / 출력 420 토큰 · 캐시 적중 0(미측정 아님) · 실측 지연 3,438ms · 요금 구간 peak(07:56:14Z) · 반출 판정 EXPORT_ALLOWED · 선언 등급 WHYMATH_GENERATED. 응답은 가우스 짝짓기로 5050을 내고 교환·결합법칙으로 근거를 댔다(1건 인상 판정 — 강등전 아님). 기록 단가 기반 산술: 피크 $0.000530 · 오프피크 $0.000265 vs Sonnet 4.6 $0.006564 → 12.4~24.8배 저렴(청구서 미대조). 도구 = `harness.deepseek_live_probe`, 실행 블록은 세션이 제공한 [A]/[B]/[C] 형태(worktree --detach로 Kiki 작업 사본 무접촉 · [B]가 FROM_WORKTREE·HAS_KEY를 재검사해 자가거부).\n남은 축: ①품질 강등전(Wilson) ②OpenRouter 경유 대조(--route openrouter) ③피크/오프피크 분리 집계 ④반복 표본. 이 1회차는 \"도는가\"와 \"지연\"만 답했다.\n\n[정정 2026-09-17] notes 치환 — 라이브 1회차 실측 등재 — 도구가 실제로 돌았고 지연·토큰·요금 구간이 나왔다(2026-09-17 Kiki 실행)\n\n[정정 2026-09-17] OpenRouter 축 기록 4건 정정(Kiki 화면 대조) + 공급사 국적 근거 확보 + 측정 시 단일 공급사 고정 요구 명시\n\n[정정 2026-09-17] 정밀도 축 편입 — 관할·데이터 정책과 독립된 세 번째 축이며 교집합이 deepinfra 1곳뿐임이 실측으로 확정"
 updated: 2026-09-17

@@ -826,6 +826,9 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
        "P0",
        "단위비용 KPI(≤250원) 판독기 · ARCH-49 프로바이더 경로 실측(라우터 경유·ARCH-55 입력)",
+       # `harness.provider_accuracy_battle`은 여기가 아니라 **WM-O-912**(강등전 게이트)가
+       # `harness.*_battle` 글롭으로 귀속한다 — 이 행은 *프로바이더 경로 프로브*이고 그쪽은
+       # *Wilson·결함주입 강등전*이다. 중복 귀속은 인벤토리가 거부한다(2026-09-17 실측).
        "ops.cost_probe", "ops.cost_report", "harness.deepseek_live_probe",
        "harness.openrouter_endpoints_probe"),
     _o("WM-O-905", "12월 검증 스코어카드·QA 혼동행렬·HIT/CU 계측", "Admin", "QA", "P0",

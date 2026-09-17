@@ -1105,6 +1105,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # ARCH-49 ⑨ — OpenRouter 엔드포인트 조회(공급사 slug·양자화·단가). 위와 같은 이유로
         # CI에서 못 돈다(키 + `openrouter.ai` egress). 목록을 넓히는 판정은 `ARCH-55`.
         "harness.openrouter_endpoints_probe": _LIVE_DEPENDENT,
+        # ARCH-55 — 프로바이더 3축 강등전. 클라우드 키 3종이 필요하고 회차마다 실호출을
+        # 하므로 CI에서 돌 수 없다(자격증명 부재 + 과금). 계약 회귀는
+        # `tests/backend/harness/test_provider_accuracy_battle.py`가 CI에서 돈다 —
+        # 즉 *라이브에 갔을 때 옳은 것을 재는가*는 검사되고, *라이브에서 도는가*만 미도달이다.
+        "harness.provider_accuracy_battle": _LIVE_DEPENDENT,
         # EOS-54(2026-08-30): HIT·CU 생산 계측 판독기 — 검수 타이머 *실이벤트*(JSONL) 의존.
         # 계측 표본이 쌓이기 전에는 입력 0 = 측정 실패(exit 1)가 설계값(미측정≠0 승격)이라 CI
         # 상시 배선 비대상 — G2(10/25) 기준선·G5 판정 시점에 운영자가 돌린다(answer_distribution_
