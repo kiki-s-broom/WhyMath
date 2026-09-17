@@ -22,7 +22,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +38,14 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",  # 다른 슬라이스(DB·결제 등) 환경변수와 공존 — 모르는 키 무시
+        # ARCH-49: 일부 키는 `WHYMATH_` 접두 이름과 **벤더 표준 이름**을 둘 다 읽어야 해서
+        # `validation_alias=AliasChoices(...)`를 쓴다(예 `DEEPSEEK_API_KEY` — Phaiakes9
+        # User 환경변수에 그 이름으로 이미 등록돼 있다). alias가 붙은 필드는 기본적으로
+        # **필드 이름으로 생성할 수 없게** 되는데, 이 클래스는 테스트·DI가
+        # `Settings(deepseek_api_key=...)` 형태로 생성하므로 필드 이름 경로를 함께 연다.
+        # (mypy `pydantic.mypy` 플러그인의 `warn_required_dynamic_aliases`도 이것을 요구한다.)
+        # alias가 없는 기존 필드의 동작은 바뀌지 않는다 — 원래 필드 이름으로만 생성한다.
+        populate_by_name=True,
     )
 
     # ── Ollama (로컬 LLM, Phaiakes9) ──
@@ -482,6 +490,139 @@ class Settings(BaseSettings):
             "기본 False(현 동작 유지) — 적중은 라이브 키로만 검증 가능하고 system 프롬프트가 "
             "L4/L5 미확정이라 효과 잠정. 짧은 프리픽스는 최소 토큰 미만이라 무효(silent no-op)."
         ),
+    )
+
+    # ── DeepSeek 공식 API (CN 관할, ARCH-49 — 03a 클라우드 선택지 확장) ──
+    # 모델 ID는 **실측값만** 쓴다. 2026-09-16 Kiki 머신에서 유효 키로 `GET
+    # https://api.deepseek.com/models`를 조회한 결과 반환된 id는 정확히 두 개다:
+    # `deepseek-flash`·`deepseek-v4-pro`. 웹 자료 3곳이 일치해 적고 있는
+    # `deepseek-v4-flash`는 **API가 받지 않는 이름**이다(제품 표기 ≠ API id).
+    # 새 ID를 핀할 때도 같은 방식으로 실 API 조회를 먼저 한다
+    # (CLAUDE.md 「환경 사실의 추론 등재 금지」).
+    #
+    # 관할: 공식 API는 중국 본토 서버 전용이고 데이터 레지던시 선택지가 없다(2026-09 실측).
+    # 따라서 `Jurisdiction.CN`이며, 기본 허용 등급은 합성 프로브(`WHYMATH_GENERATED`)뿐이다
+    # (`l3.provider_jurisdiction`). 자체 저작 코퍼스를 태우려면 아래 opt-in이 필요하다.
+    deepseek_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("WHYMATH_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"),
+        description=(
+            "DeepSeek 공식 API 키(sk-...). SecretStr — repr/로그에 평문 노출 안 됨. "
+            "기본값 없음(빈 = 미설정). `WHYMATH_DEEPSEEK_API_KEY` 또는 벤더 표준 이름 "
+            "`DEEPSEEK_API_KEY` 둘 다 읽는다 — 후자가 Phaiakes9 User 환경변수에 이미 "
+            "등록돼 있어(2026-09-16 라이브 확인) 재등록을 요구하지 않기 위함이다. "
+            "하드코딩 금지(CLAUDE.md 보안 금기)."
+        ),
+    )
+    deepseek_base_url: str = Field(
+        default="https://api.deepseek.com",
+        description=(
+            "DeepSeek 공식 API 베이스 URL(OpenAI 호환 `/chat/completions`). 시크릿 아님. "
+            "WHYMATH_DEEPSEEK_BASE_URL로 오버라이드."
+        ),
+    )
+    deepseek_model_mid: str = Field(
+        default="deepseek-flash",
+        description=(
+            "CLOUD_MID 티어에 대응하는 DeepSeek 모델 ID. **실측 핀**(2026-09-16 /models 조회) — "
+            "`deepseek-v4-flash`가 아니다. WHYMATH_DEEPSEEK_MODEL_MID로 오버라이드."
+        ),
+    )
+    deepseek_model_high: str = Field(
+        default="deepseek-v4-pro",
+        description=(
+            "CLOUD_HIGH 티어에 대응하는 DeepSeek 모델 ID. **실측 핀**(2026-09-16 /models 조회). "
+            "WHYMATH_DEEPSEEK_MODEL_HIGH로 오버라이드."
+        ),
+    )
+    deepseek_max_tokens: int = Field(
+        default=16000,
+        ge=1,
+        description="DeepSeek chat/completions의 max_tokens. anthropic_max_tokens 미러.",
+    )
+    deepseek_request_timeout_s: float = Field(
+        default=60.0,
+        ge=0.0,
+        description="DeepSeek 단일 호출 타임아웃(초). anthropic_request_timeout_s 미러.",
+    )
+    deepseek_allow_internal_corpus: bool = Field(
+        default=False,
+        description=(
+            "True면 CN 관할 프로바이더에 자체 저작 코퍼스(`INTERNAL_OWNED`) 등급을 실은 요청도 "
+            "허용한다. **기본 False** — 라이선스상 `INTERNAL_OWNED.export=True`라 *법적으로는* "
+            "반출 가능하지만, 개념 그래프·오개념 카탈로그·교수학 프롬프트는 영업자산이고 "
+            "DeepSeek이 유료 API 입력을 학습에 쓰는지가 **미확정**이다(2차 자료가 서로 반대로 "
+            "적고 1차 약관은 조사 세션의 egress 프록시가 차단). 확정되면 그 근거와 함께 "
+            "기본값을 재평가한다. 학생 저작(`USER_GENERATED`)은 이 플래그와 무관하게 "
+            "**어떤 값으로도 열리지 않는다**(export=False라 허용 집합에 들어올 수 없다)."
+        ),
+    )
+
+    # ── OpenRouter 경유 (서방 공급사가 서빙하는 오픈웨이트, ARCH-49 acceptance ⑨⑩) ──
+    # DeepSeek V4는 MIT 오픈웨이트라 서방 공급사도 서빙한다 — 즉 "DeepSeek = CN 관할"은
+    # *경로에 따라* 다르다. OpenRouter의 `deepseek/deepseek-v4-flash` 엔드포인트는 16곳이고
+    # 공급사마다 국적·양자화·데이터 정책이 다르다(2026-09-16 Kiki 머신 실측).
+    #
+    # 채택 계약(코드에 박는다 — `l3/providers/openrouter.py`): 모든 호출이
+    # `provider.only`·`provider.allow_fallbacks=false`·`provider.data_collection="deny"`
+    # 세 파라미터를 **항상** 동반한다. 옵션이 아니라 계약이며, 누락 시 테스트가 RED다.
+    # 셋이 각각 막는 것: only=국적 미상 공급사, allow_fallbacks=조용한 우회,
+    # data_collection=학습 수집. `only` 없이 fallback이 열리면 매 호출마다 다른 정밀도
+    # (fp8/fp4/unknown)가 응답해 품질 비교 자체가 성립하지 않는다.
+    #
+    # Preset 기능은 쓰지 않는다 — 설정이 웹 UI에 있으면 저장소 게이트가 검사할 수 없어
+    # 이중 진실 원천이 된다(요청의 명시 파라미터가 Preset을 덮어쓰므로 코드가 항상 이긴다).
+    openrouter_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("WHYMATH_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
+        description=(
+            "OpenRouter API 키(sk-or-...). SecretStr — repr/로그에 평문 노출 안 됨. "
+            "`WHYMATH_OPENROUTER_API_KEY` 또는 벤더 표준 `OPENROUTER_API_KEY` 둘 다 읽는다 "
+            "(후자가 Phaiakes9에 이미 등록·2026-09-16 라이브 확인). 하드코딩 금지."
+        ),
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API 베이스 URL(OpenAI 호환). 시크릿 아님.",
+    )
+    openrouter_model_mid: str = Field(
+        default="deepseek/deepseek-v4-flash",
+        description=(
+            "CLOUD_MID 티어에 대응하는 OpenRouter 모델 slug. **실측 핀**(2026-09-16) — "
+            "$0.0886/$0.1772 per 1M. 공식 API의 `deepseek-flash`와 **이름이 다르다**: "
+            "OpenRouter는 오픈웨이트 제품명을 쓰고 공식 API는 자기 id를 쓴다."
+        ),
+    )
+    openrouter_model_high: str = Field(
+        default="deepseek/deepseek-v4-pro",
+        description=(
+            "CLOUD_HIGH 티어에 대응하는 OpenRouter 모델 slug. 라이브 가격 미실측 — "
+            "MID만 2026-09-16에 확인했다. 쓰기 전에 실측한다."
+        ),
+    )
+    openrouter_allowed_providers: tuple[str, ...] = Field(
+        default=("deepinfra", "digitalocean"),
+        description=(
+            "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 아는 "
+            "곳만**. 기본 2곳은 둘 다 미국 법인이고 `data_collection=deny` 필터를 통과하는 "
+            "것이 실호출로 확인됐다(2026-09-16). slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
+            "(`deepinfra/fp8`→`deepinfra`). "
+            "**`open-inference`는 최저가($0.05/$0.14)지만 넣지 않는다** — 2차 자료가 그곳을 "
+            "'프롬프트를 학습에 쓰는 대가로 rate limit을 푸는 공급사'로 설명해 deny 통과와 "
+            "정면 충돌하는데 1차 자료로 확정하지 못했다. 이 목록이 `data_collection=deny`와 "
+            "**독립된 두 번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). "
+            "빈 목록은 허용이 아니라 **차단**이다(provider.only가 빈 채로 호출되지 않는다)."
+        ),
+    )
+    openrouter_max_tokens: int = Field(
+        default=16000,
+        ge=1,
+        description="OpenRouter chat/completions의 max_tokens. anthropic_max_tokens 미러.",
+    )
+    openrouter_request_timeout_s: float = Field(
+        default=60.0,
+        ge=0.0,
+        description="OpenRouter 단일 호출 타임아웃(초). anthropic_request_timeout_s 미러.",
     )
 
     # ── 인증(JWT 집행 계층, L5) ──
@@ -1417,6 +1558,25 @@ class Settings(BaseSettings):
         SecretStr는 `get_secret_value()`로만 평문을 꺼내며, 여기서는 *비어 있는지*만 본다.
         """
         return bool(self.anthropic_api_key.get_secret_value())
+
+    @property
+    def deepseek_configured(self) -> bool:
+        """DeepSeek 공식 API 키가 채워졌는가(CN 관할 직행 경로 가능 여부, ARCH-49).
+
+        `anthropic_configured`와 같은 형태 — 비어 있으면 DeepSeekProvider가 명확한 오류를
+        던진다(조용한 강등 금지). 값은 로그에 남기지 않는다.
+        """
+        return bool(self.deepseek_api_key.get_secret_value())
+
+    @property
+    def openrouter_configured(self) -> bool:
+        """OpenRouter 키가 채워졌는가(서방 공급사 경유 가능 여부, ARCH-49).
+
+        키만으로는 부족하다 — 호출은 `openrouter_allowed_providers`가 **비어 있지 않을**
+        때만 성립한다(빈 허용목록은 '아무나 허용'이 아니라 '차단'이다). 그 검사는
+        provider 쪽 계약이고, 여기서는 전송 가능 여부(키 존재)만 본다.
+        """
+        return bool(self.openrouter_api_key.get_secret_value())
 
     @property
     def jwt_configured(self) -> bool:

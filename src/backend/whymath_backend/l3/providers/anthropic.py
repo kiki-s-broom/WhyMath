@@ -31,6 +31,7 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.router import _as_cost_tier
 
 
@@ -268,6 +269,17 @@ class AnthropicProvider:
         if self._settings is None:
             self._settings = get_settings()
         return self._settings
+
+    @property
+    def jurisdiction(self) -> Jurisdiction:
+        """항상 `US` — Anthropic PBC는 미국 법인이다 (ARCH-49 관할 축).
+
+        관할은 1차 법적 게이트(`l3.data_export_policy`)보다 좁히지 않는다 — 즉 이 경로에
+        대해 관할 축은 아무 판정도 추가하지 않으며, 디스패치 동작은 종전과 같다. 그래도
+        *선언*하는 이유는 기본값(`composite.DEFAULT_CLOUD_JURISDICTION`)에 기대지 않기
+        위해서다: 기본값은 테스트 가짜를 위한 것이고, 프로덕션 좌석은 자기 관할을 말한다.
+        """
+        return Jurisdiction.US
 
     @property
     def configured(self) -> bool:

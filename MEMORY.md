@@ -338,6 +338,30 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-17 (구현 · ARCH-49): **DeepSeek 경로 2종 배선 — 그리고 "어느 나라 법인인가"를 `CostTier`가 아니라 *프로바이더*가 말하게 했다** (claude 구현) — 판정 기준 main `6d1d9d10`
+
+**① 티어를 늘리지 않았다(acceptance ⑧의 답).** DeepSeek 공식 API는 중국 본토 서버 전용이라 "CN 티어를 만들자"가 먼저 떠오르지만, 그러면 `OFFSHORE_TIERS`·세 축 불변식·`LOCAL_MODEL_MATRIX`·라우터 결정표를 전부 손대야 한다(붕괴 연쇄 ② 축 버전). 대신 **관할을 프로바이더 메타데이터로 분리**했다 — `CostTier`는 계속 "얼마나 비싼가·어디서 도는가"만 말하고, `Jurisdiction`(`l3/provider_jurisdiction.py`)이 "어느 나라 법인인가"를 말한다. 같은 `CLOUD_MID` 결정이 Anthropic(US)으로도 DeepSeek(CN)으로도 나가며, 비용 등급은 같고 관할이 다르다.
+
+**② 상한을 표가 아니라 *교집합*이 정한다.** 관할 허용 등급은 `_BASE_POLICY[j] & EXPORT_PERMITTED_LICENSES`로 만든다. `EXPORT_PERMITTED_LICENSES`는 `permission_map`에서 `allows(EXPORT) is True`인 등급만 유도한 것이라, **정책 표에 실수로 무엇을 적어도 반출 금지 등급은 통과하지 못한다.** 그래서 학생 저작(`USER_GENERATED.export=False`)은 어떤 관할·어떤 opt-in 조합으로도 허용 집합에 들어오지 않는다(전수 격자 8조합 단언) — acceptance ②가 요구한 불변식의 기계 판정이며, 1차 게이트(`guard_data_export`가 LOCAL로 강등)와 **두 겹**을 이룬다.
+
+**③ 집행 지점은 provider가 아니라 디스패처다.** 관할 판정을 provider 안에 두면 provider를 직접 쥐고 부르는 경로(D1 위반)가 게이트까지 함께 우회한다. `CompositeProvider`가 위임 **직전**에 판정하고, 직접 호출은 `check_provider_seat_contract.py`(ARCH-46)가 따로 막는다 — 두 게이트가 서로의 사각을 덮는다. 판정 재료를 나르려고 `RoutingDecision.data_licenses`(기본 빈 튜플)를 신설해 `router.route`가 요청 선언을 승계한다. **빈 튜플은 "자료 없음"이 아니라 "미선언"**이며, 좁히는 관할은 미선언을 차단한다 — 손으로 조립한 결정이 중국 서버로 새지 않는 기본값이다.
+
+**④ 기존 클라우드 경로는 바이트 단위로 무변경이다.** 게이트는 관할이 1차 법적 게이트보다 **진부분집합일 때만** 발동한다(`narrows_beyond_export_gate`). `US`·`DOMESTIC`은 좁히지 않으므로 현행 Anthropic 경로에 이 축은 아무 판정도 추가하지 않는다. 좁힘이 없는 관할에서 등급 선언을 요구했다면 1차 게이트를 이미 통과한 호출부 15곳이 전부 막혔을 것이다 — 이 축은 *겹치는 2차 좁힘*이지 1차 게이트의 재구현이 아니다.
+
+**⑤ 관할 기본값은 넓은 쪽이고, 그 구멍은 거버넌스가 막는다.** 선언 없는 클라우드 제공자는 `US`로 취급된다(역사적 좌석이 Anthropic이므로). 그 기본값만으로는 fail-closed가 아니라서, `tests/infra/test_provider_jurisdiction_declaration.py`가 `l3/providers/`의 실제 제공자 클래스마다 `jurisdiction` 선언을 **AST로 전수 확인**한다(문자열 grep이 아니라 클래스 멤버 판정). 기본값을 좁은 쪽으로 뒤집으면 관할과 무관한 테스트 가짜 수십 개가 전부 막히므로, 기본값은 넓게 두고 프로덕션에만 기계로 요구한다. 그 스캐너가 **첫 실행에서 `FixedModelOllamaProvider`(측정 전용 서브클래스)를 잡아냈고**, 그것이 상속 해석 절을 만들게 했다 — 본문 선언만 요구하면 정당한 좌석이 무의미한 중복 선언을 강요받고, 그 강요가 쌓이면 사람이 게이트를 끈다.
+
+**⑥ OpenRouter 세 파라미터는 옵션이 아니라 계약이다.** `provider.only`·`allow_fallbacks=false`·`data_collection="deny"`가 **항상 함께** 실린다(`build_provider_block` 단일 좌석). 셋이 각각 다른 것을 막는다: `only`=국적 미상 공급사, `allow_fallbacks`=조용한 우회, `data_collection`=학습 수집. 그리고 `only`가 없으면 **양자화가 매 호출 달라져 품질 비교 자체가 성립하지 않는다**(fp8/fp4/unknown 혼재 — 강등전이 모델이 아니라 잡음을 재게 된다). `openai` SDK 대신 얇은 httpx 시임을 쓴 이유가 여기다 — SDK를 끼우면 셋이 `extra_body`로 삼켜져 테스트가 *전송된 결과*를 볼 수 없다.
+
+**⑦ `deny`를 안전의 단일 근거로 쓰지 않는다(이중 방어).** 2026-09-16 실측에서 5개 공급사가 deny 필터를 통과했지만 **그것은 OpenRouter의 분류이지 우리가 검증한 사실이 아니다.** 같은 날 제시된 2차 자료는 `open-inference`를 "프롬프트를 학습에 쓰는 대가로 rate limit을 푸는 공급사"로 설명해 정면 충돌하는데, 1차 자료는 프록시 차단으로 확정하지 못했다. 그래서 `provider.only`=우리가 국적을 아는 곳만이 **독립된 두 번째 방어층**이며, 어느 쪽이 참이어도 계약이 유지된다(langfuse v2 무증상 전멸 2026-07-16 교훈의 프로바이더 축). `open-inference`는 최저가($0.05/$0.14)이나 기본 허용목록에 **없다**.
+
+**⑧ "모른다"와 "중국계로 안다"를 같은 칸에 넣지 않았다.** `PROVIDER_JURISDICTIONS`에 US 2곳(실호출 확인)과 CN 3곳(`siliconflow`·`alibaba`·`baidu` — **회사로 아는 것**이지 API가 말해 주는 값이 아니다)을 **근거 등급을 표기해** 적었다. 판정 결과는 둘 다 차단에 가깝지만 CN은 코퍼스 opt-in이라는 경로가 있고 UNKNOWN은 전건 차단이다. 이 구분을 넣게 만든 것은 뮤테이션이다 — M10(관할 혼재 절 제거)이 **생존**했고, 원인은 내 픽스처가 `["deepinfra","open-inference"]`라 절을 지워도 집합 pop이 UNKNOWN을 낼 수 있었던 것이었다(변별력 0). 서로 다른 *아는* 관할 조합이 필요했다. CLAUDE.md 「픽스처가 그 절을 실제로 밟는가」의 실제 발생 1건.
+
+**⑨ 변별력 = 뮤테이션 25종 전건 RED·생존 0·하네스 고장 0**(순수 Python 하네스 — 셸 배제, 치환 1건 단언·원복 sha256 동일 단언, 무뮤테이션 기준선 rc=0 선행). 다만 **전건 RED는 커버리지의 증거가 아니다**(CLAUDE.md 2026-09-08) — 이 25종은 *내가 실패 모드를 상상한* 절만 검사한다. 상상하지 못한 절은 주입 목록에 오르지도 않았다.
+
+**⑩ 미이행 — 라이브 측정은 남았다.** acceptance ①(품질·지연·비용 3축 강등전)·⑥(피크/오프피크 분리 집계)은 **Kiki 머신의 라이브 키가 필요해 이 세션에서 할 수 없다**. 이 PR이 착지시킨 것은 *측정을 돌릴 수 있는 배선*이며(CN 기본 설정으로 합성 프로브 경로가 열린다), 측정 자체와 채택 여부 판정은 `ARCH-53`으로 승계했다. **즉 이 시점의 채택 결론은 "미판정"이다** — 코드가 있다는 것이 채택했다는 뜻이 아니고, 기본 라우팅은 여전히 Anthropic이다(`CompositeProvider(cloud=AnthropicProvider())` 15곳 무변경).
+
+**⑪ 정직한 공백.** ⓐ DeepSeek이 유료 API 입력을 학습에 쓰는지 **미확정**(2차 자료가 서로 반대·1차 약관 프록시 차단) — `deepseek_allow_internal_corpus` 기본 OFF의 이유이며 확정 시 재평가한다 ⓑ OpenRouter 엔드포인트 16곳 중 8곳의 법인 국적 미확인 ⓒ `openrouter_model_high`(`deepseek/deepseek-v4-pro`)는 가격을 실측하지 않았다 — MID만 2026-09-16에 확인했다 ⓓ 관할 게이트는 `decision.data_licenses` **선언을 믿는다**(선언이 실제 프롬프트 내용과 맞는지는 `check_routing_data_grade.py`가 입력 축에서 따로 본다) ⓔ 두 provider 모두 라이브 호출 0건 — 전송 시임으로만 검증했다.
+
 ### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
 
 **① 무엇이 없었나(acceptance ② 실측).** 채점은 개념·스킬을 *증거*가 아니라 **이미 갱신된 mastery delta**로 반환하고 있었다. 즉 "이 답이 무엇의 증거인가"는 `record_problem_attempt_mastery` 안에서 계산돼 밖으로 나오지 않았고, 나오는 것은 결과뿐이라 **왜 그 개념이 선택됐는지(역할·귀속 근거)를 아무도 볼 수 없었다**. 오개념은 채점에 합류하지 않고 coach 대화 경로에서만 갱신되며, Assessment 조립은 per-answer가 아니라 CAT 중단 경계 배치다. `concept_evidence|skill_evidence|possible_misconceptions` 백엔드 전수 grep 0건.
