@@ -294,9 +294,9 @@ def test_allowances_carry_reasons(scanner: ModuleType) -> None:
     """모든 면제에 **이유**가 적혀 있다 — 이유 없는 면제는 리뷰 대상이 되지 못한다."""
     for allowance in scanner.ALLOWANCES:
         assert allowance.reason.strip(), f"{allowance.path}::{allowance.scope} 면제에 이유가 없다"
-        assert len(allowance.reason) > 20, (
-            f"{allowance.path}::{allowance.scope} 면제 이유가 한 줄도 안 된다"
-        )
+        assert (
+            len(allowance.reason) > 20
+        ), f"{allowance.path}::{allowance.scope} 면제 이유가 한 줄도 안 된다"
 
 
 def test_allowance_axes_are_known(scanner: ModuleType) -> None:
@@ -312,9 +312,9 @@ def test_scanner_is_wired_into_ci(scanner: ModuleType) -> None:
     `infra-contracts` 잡은 `needs: changes` 게이팅이 없어 어떤 PR에서도 실행된다.
     """
     ci = (_REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "scripts/analysis/mastery_write_path_scan.py" in ci, (
-        "스캐너를 실행하는 CI 스텝이 없다 — 가드가 저장소에만 있고 돌지 않는다"
-    )
+    assert (
+        "scripts/analysis/mastery_write_path_scan.py" in ci
+    ), "스캐너를 실행하는 CI 스텝이 없다 — 가드가 저장소에만 있고 돌지 않는다"
     # 비차단(`|| true`·continue-on-error)으로 붙이면 실패해도 PR을 막지 못한다.
     step_line = next(
         line for line in ci.splitlines() if "mastery_write_path_scan.py" in line and "run:" in line

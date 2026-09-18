@@ -679,16 +679,25 @@ class TestSubmitAttemptUnchanged:
         assert "build_gradability_ceiling_report" not in source
 
     def test_mastery_propagation_still_takes_client_is_correct(self) -> None:
-        """두 mastery 전파 콜사이트가 여전히 body.is_correct를 그대로 넘김(권위 이관 아님)."""
+        """두 mastery 전파 콜사이트가 여전히 body.is_correct를 그대로 넘김(권위 이관 아님).
+
+        EOS-108 메모: 두 콜사이트에 `attempt_id=` 키워드 인자가 붙었다(멱등 키). 그래서 호출이
+        `body.is_correct` 에서 *끝나는지*를 보던 원래 정규식은 성립하지 않는다 — 그러나 이
+        가드가 지키는 것은 "호출이 여기서 끝난다"가 아니라 **채점 권위가 클라이언트 신고값
+        그대로인가**다. 그래서 위치 인자 4개(`session`·`user.user_id`·`body.problem_id`·
+        `body.is_correct`)까지만 고정하고, **그 뒤의 키워드 인자만** 허용한다
+        (공백·단어문자·`=`·`.`·`,`만 — 표현식·호출은 못 들어온다). 서버 판정으로 갈아치우는 변경
+        (`graded.is_correct` 등)은 여전히 RED다.
+        """
         submit_source = inspect.getsource(api_me.submit_attempt)
         concept_call = re.search(
             r"record_problem_attempt_mastery\(\s*session,\s*user\.user_id,\s*"
-            r"body\.problem_id,\s*body\.is_correct\s*\)",
+            r"body\.problem_id,\s*body\.is_correct\s*,?[\s\w=.,]*\)",
             submit_source,
         )
         skill_call = re.search(
             r"record_problem_attempt_skill_mastery\(\s*session,\s*user\.user_id,\s*"
-            r"body\.problem_id,\s*body\.is_correct\s*\)",
+            r"body\.problem_id,\s*body\.is_correct\s*,?[\s\w=.,]*\)",
             submit_source,
         )
         assert concept_call is not None, "개념 숙달 전파 콜사이트가 body.is_correct를 넘기지 않음"

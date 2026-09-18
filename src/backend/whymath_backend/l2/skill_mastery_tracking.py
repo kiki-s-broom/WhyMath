@@ -219,9 +219,7 @@ async def _stage_skill_attempt_mastery(
     )
     update = update_mastery(
         state,
-        AttemptOutcomeEvidence(
-            correct=correct, observed_at=measured_at, attempt_id=attempt_id
-        ),
+        AttemptOutcomeEvidence(correct=correct, observed_at=measured_at, attempt_id=attempt_id),
         estimator=estimator,
     )
     row = SkillMasteryHistory(

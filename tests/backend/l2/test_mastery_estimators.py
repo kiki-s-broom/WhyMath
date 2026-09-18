@@ -44,6 +44,7 @@ from whymath_backend.schema.mastery_contract import (
     MasteryContractError,
     MasteryEstimator,
     MasteryUpdate,
+    clamp_unit,
 )
 
 _T0 = datetime(2026, 1, 1, tzinfo=UTC)
@@ -97,9 +98,7 @@ class TestPlanRulesAreCode:
 
     def test_hint_scales_the_gain(self) -> None:
         """③ 힌트를 쓰고 맞히면 이득에 x0.7."""
-        update = AdditiveMasteryEstimator().estimate(
-            _state(0.50), _evidence(True, hint_used=True)
-        )
+        update = AdditiveMasteryEstimator().estimate(_state(0.50), _evidence(True, hint_used=True))
         assert update.mastery == pytest.approx(round(0.50 + CORRECT_GAIN * HINT_GAIN_FACTOR, 2))
         assert HINT_GAIN_FACTOR == 0.7
 
@@ -309,3 +308,17 @@ class TestContractDoesNotTrustEstimators:
             update_mastery(
                 _state(), _evidence(True), estimator=_OutOfRangeEstimator(mastery=math.nan)
             )
+
+    def test_clamp_unit_itself_rejects_nan(self) -> None:
+        """`clamp_unit`의 NaN 절을 **직접** 밟는다 — 위 테스트는 이 절을 밟지 않는다.
+
+        뮤테이션 실측(2026-09-18): `clamp_unit`의 NaN 검사를 제거해도 위
+        `test_nan_is_rejected_not_clamped`는 **통과했다**. NaN이 그대로 반환되면
+        `nan == nan`이 False라 `_enforce_bounds`가 클램프 분기로 들어가고, 거기서
+        `MasteryUpdate.__post_init__`의 범위 검사가 대신 터지기 때문이다 — 즉 그 테스트는
+        *다른 절* 덕에 초록이었고 NaN 절의 생존을 덮고 있었다(CLAUDE.md 「픽스처가 그 절을
+        실제로 밟는가」). 이 테스트가 그 절의 반례를 직접 준다.
+        """
+        assert clamp_unit(1.8) == 1.0  # 대조군 — 정상 클램프는 여전히 동작한다
+        with pytest.raises(MasteryContractError):
+            clamp_unit(math.nan)
