@@ -1099,15 +1099,17 @@ class TestSubmitAttempt:
     def test_submit_with_assessed_concept(self) -> None:
         """채점 제출 → ProblemAttempt 적재 + 평가 개념 숙달 갱신 응답."""
         cid = uuid.uuid4()
-        # 개념 숙달: execute#1=개념 [cid]·#2=개념 prior 없음.
-        # 스킬 숙달(Phase 2b-2): #3=개념 [cid]·#4=스킬 해소 [](미매핑 → 스킬행 0).
         # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY·#2=TESTED·#3=스킬 해소.
+        # 개념 숙달: #4=개념 [cid]·#5=EOS-108 멱등 조회(미반영)·#6=개념 prior 없음.
+        # 스킬 숙달(Phase 2b-2): #7=개념 [cid]·#8=스킬 해소 [](미매핑 → 스킬행 0).
+        #   스킬 해소가 0건이라 스킬 축 멱등 조회는 돌지 않는다(빈 집합 조기 반환).
         session = _QueueSession(
             [
                 _AQResult([cid]),
                 _AQResult([]),
                 _AQResult([]),
                 _AQResult([cid]),
+                _AQResult([]),
                 _AQResult([]),
                 _AQResult([cid]),
                 _AQResult([]),

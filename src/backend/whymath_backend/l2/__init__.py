@@ -78,6 +78,10 @@ from whymath_backend.l2.mastery_contract import (
     resolve_estimator,
     use_estimator,
 )
+from whymath_backend.l2.mastery_estimators import (
+    ADDITIVE_ESTIMATOR_ID,
+    AdditiveMasteryEstimator,
+)
 from whymath_backend.l2.mastery_tracking import (
     MasteryRecord,
     compute_mastery_record,
@@ -88,9 +92,11 @@ from whymath_backend.l2.mastery_tracking import (
 )
 
 __all__ = [
+    "ADDITIVE_ESTIMATOR_ID",
     "BKT_ESTIMATOR_ID",
     "DEFAULT_BKT_PARAMETERS",
     "AbilityReading",
+    "AdditiveMasteryEstimator",
     "Agreement",
     "BktMasteryEstimator",
     "BktModel",

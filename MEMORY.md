@@ -10594,6 +10594,98 @@ FakeProvider·라이브 LLM 0) + ruff·black·mypy --strict·lint-imports(7계�
 
 ---
 
+## 2026-09-18: EOS-108 — Mastery Engine v1 (계획서 §6 값 축) · 가산 규칙 정본화 + Attempt 멱등 + 단일 쓰기 경로
+
+> 판정 기준: main `a34d31d4`. 아래 배선은 본 브랜치(`claude/ecstatic-bardeen-0ahg5h`) 기준이며 미머지다.
+
+**왜 새 태스크였나**: 대조표 §11.2가 계획서 `P-06`(Mastery Engine v1)을 `EOS-13`에 매핑했지만,
+`EOS-13`은 acceptance ④에서 "계약만 바꾸고 숙달 수치는 바뀌지 않아야 한다 — 값이 바뀌면
+리팩터가 아니라 정책 변경이므로 **별건으로 분리한다**"로 값 축을 의도적으로 제외했다. 즉 P-06
+지시문 7항목 중 EOS-13이 이행한 것은 1번(인터페이스)뿐이고 2~7번(v1 규칙 값·클램프·멱등·변경
+이벤트·단일 경로 가드·주입 3종)은 **소유자가 없었다**. `EOS-108`이 그 잔여를 소유한다.
+
+### 결정 ① 가산 규칙은 코드로 정본화하되 **기본 추정기는 `bkt-v1` 유지**
+
+계획서 §6의 네 규칙(정답 +0.10 / 오답 -0.08 / 힌트 x0.7 / 연속 정답 confidence↑)을
+`l2/mastery_estimators.py::AdditiveMasteryEstimator`(id `simple-additive-v1`)로 정본화했다.
+**기본값으로 올리지 않은 근거 3건**:
+
+1. **격하다** — BKT는 사후 확률 갱신이고 가산 규칙은 그보다 단순하다. 기본을 바꾸면 전 학생의
+   숙달 궤적이 측정 근거 없이 달라진다(의사결정 우선순위 4 「학습 효과」).
+2. **EOS-13 acceptance ④가 요구하는 값 변화 전수 열거를 아직 할 수 없다** — 비교 측정이
+   선행해야 하고, 측정은 이 태스크 범위 밖이다.
+3. **선행 조건 미충족** — §6 규칙 중 둘(힌트·연속 정답)은 생산자가 배선돼 있지 않다. 그 상태로
+   기본을 바꾸면 규칙 4개 중 2개가 상시 미발화인 채로 돈다.
+
+전환은 `use_estimator(ADDITIVE_ESTIMATOR_ID)` 한 줄이며 **호출부는 한 글자도 바뀌지 않는다** —
+그것이 EOS-13 계약의 요점이고, 이번에 *가짜 스텁이 아닌 진짜 두 번째 구현*으로 실증됐다.
+Kiki가 기본 전환을 원하면 되돌리기 쉬운 한 줄이다.
+
+### 결정 ② 멱등의 권위는 **DB**, 애플리케이션 조회는 보조
+
+착수 시점 실측: 숙달 적재 경로에 시도 식별자가 **아예 없었다**(중복을 못 막은 것이 아니라
+중복인지 판정할 재료가 없었다). `l2/attempt_skill_event.py` docstring이 그 결과를 이미
+기술하고 있었다 — "재시도하면 새 attempt가 생기고 숙달이 한 번 더 적용된다".
+
+마이그레이션 `c1f5a8b2d740`: `concept/skill_mastery_history.attempt_id`(NULL 허용) + **부분
+유니크 인덱스**(`WHERE attempt_id IS NOT NULL`). 사전 조회는 check-then-act라 경합을 못
+막으므로 권위는 DB에 둔다. 경합에서 진 쪽은 rollback 후 승자 행을 반환하고, **멱등 키 없는
+`IntegrityError`는 그대로 전파**한다(삼키면 다른 무결성 오류의 원인을 잃는다).
+`attempt_id=None`인 관측은 **멱등 보호를 받지 않으며 그 사실을 숨기지 않는다**.
+
+신규 테이블 0건(ARCH-37 엔티티 동결 불변)·FK 0건(보존기한 파기로 attempt가 사라져도 학습
+곡선은 남아야 한다 — `learning_state_transition`과 같은 판단).
+
+### 결정 ③ 변경 이벤트는 **새로 만들지 않았다**
+
+계획서의 "mastery 변경은 항상 이벤트로 남긴다(전후 값 포함)"는 이 저장소에서 **이미 구조로
+충족**돼 있다 — 숙달 좌석이 append-only라 행 자체가 이벤트이고,
+`learning_event_trace.project_mastery_rows`가 SQL `lag`로 `mastery_before`를 채워
+`mastery_updated` 이벤트로 투영한다. 새 스토어를 만들면 같은 사실이 두 곳에 적히고 truth
+source가 둘이 된다(DP-01 ADR·붕괴 연쇄 ④). EOS-108이 더한 것은 그 이벤트의 **신원**
+(`attempt_id`)이다.
+
+### 결정 ④ 경계는 예외가 아니라 클램프 — 단 사실은 남긴다
+
+`update_mastery`가 반환 직전 `_enforce_bounds`로 0~1을 다시 잰다. 생성자 검사
+(`MasteryUpdate.__post_init__`)는 저자의 실수를 막고, 이쪽은 **신뢰하지 않는 구현**을 막는다
+(frozen dataclass도 `object.__setattr__`로 사후 변조가 되고, 레지스트리는 임의 구현이 꽂히는
+표면이다). 예외를 던지면 결함 있는 추정기 하나가 *채점 자체를 실패시켜* 학생의 학습을 멈추므로
+값은 자르되 `bounds_clamped=True` + 경고 로그로 사실을 남긴다. **NaN만 예외**(비교가 전부
+False라 클램프를 조용히 통과한다).
+
+### 검증 — 주입 25종 전건 RED (대조군 GREEN · 원복 바이트 동일)
+
+| 하네스 | 주입 | 결과 |
+|---|---|---|
+| 실 PG 인덱스 | 부분 유니크 인덱스 제거 / 전체 유니크로 과잉 제약 | 2/2 RED |
+| 엔진(멱등·경계) | 이중 반영 5종 + 클램프 5종 | 10/10 RED |
+| 단일 경로 스캐너 | 절 제거 10종(별칭·AugAssign·튜플·모듈별칭 일괄·공허면제·스코프한정·import게이트·생성·AnnAssign·순회) | 10/10 RED |
+| 권위 가드 정규식 | 서버 판정 치환 2종 + 임의 표현식 인자 1종 | 3/3 RED |
+
+**뮤테이션이 실제로 결함을 하나 잡았다**: `clamp_unit`의 NaN 절을 제거했는데
+`test_nan_is_rejected_not_clamped`가 **통과했다**. NaN이 그대로 반환되면 `nan == nan`이 False라
+`_enforce_bounds`가 클램프 분기로 들어가고 거기서 `MasteryUpdate.__post_init__`의 범위 검사가
+대신 터지기 때문이다 — 그 테스트는 *다른 절* 덕에 초록이었고 NaN 절의 생존을 덮고 있었다
+(CLAUDE.md 2026-09-07 「픽스처가 그 절을 실제로 밟는가」의 실사례). `clamp_unit(math.nan)`을
+직접 부르는 반례를 추가해 해소했다.
+
+### 부수 — `infra-contracts` 잡이 다시 잡았다 (CLAUDE.md v0.2.27의 실증)
+
+신규 모듈 `l2.mastery_estimators`가 EOS 기능 인벤토리에 미귀속이라 `infra-contracts`가 RED였다.
+backend 잡만 봤다면 놓쳤을 잡이며, v0.2.27이 등재한 "스텝 목록을 맞추기 전에 **잡 목록**을
+맞춘다"가 그대로 적용됐다. §15 신규 기능번호 동결에 따라 같은 계약에 꽂히는 두 번째 구현을
+**같은 기능번호 `WM-E-201`에 귀속**시켰다(EOS-103의 영속 축 귀속과 같은 논리).
+
+### 후속에 넘기는 것
+
+- `EOS-18`(임시 어댑터 폐기) — 이번에 길이 **넓어졌다**: `AssessmentEvidenceInput`이 이제
+  `attempt_id`까지 읽고, 착지한 `AssessmentEvidence`가 그 세 속성을 전부 가진다. 선택 확장
+  2종(`HintUsageSignal`·`StreakSignal`)을 본 Protocol에 넣지 **않은 것**도 그 길을 막지 않기
+  위해서다.
+- **힌트·연속 정답 생산자 배선** — 두 서빙 호출부가 그 둘을 채우지 않는다(`None`). 기본
+  추정기는 그 축을 읽지 않으므로 오늘의 값에는 영향 0이지만, `simple-additive-v1`을 기본으로
+  올리려면 선행한다. 신호 자체는 `EOS-45`·`l2/learning_state_evidence.py`가 이미 갖고 있다.
 ## 2026-09-18: 미머지 브랜치 전수 감사 12회차 — 8월 PR 일괄 종료가 만든 신규 고립 5건 · 회수 1건 · 삭제 11차 배치 4건
 
 **판정 기준: main `86733521`**. 세션 시작 시 shallow(`rev-list --count` 44)였고

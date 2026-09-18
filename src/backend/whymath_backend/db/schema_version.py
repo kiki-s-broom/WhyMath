@@ -154,6 +154,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 병합 정정(2026-09-17): 두 PR이 같은 부모(67cf48ad3bce) 위에 각자 리비전을 얹어 head가
     # 둘이 될 뻔했다 — EOS-103이 먼저 머지됐으므로 이 리비전의 down_revision을 a7d41c9e0b52로
     # 재지정해 체인을 직렬로 되돌렸다(단일 head 유지).
+    "c1f5a8b2d740",  # EOS-108: concept/skill_mastery_history.attempt_id(멱등 키) + 부분 유니크
+    # 인덱스 2종. 같은 시도의 숙달 이중 반영을 DB가 막는다(KPI 2 State Integrity).
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

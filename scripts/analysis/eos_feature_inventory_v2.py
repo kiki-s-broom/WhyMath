@@ -551,10 +551,15 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-118", "그래프 분석 유틸(ETL 측)", "Platform", "Knowledge Graph", "P2",
        "data_pipeline 분석 — backend 대응 없음", pipelines=("graph_analytics",)),
     # ════════════════════ E — L2 학습자 모델 ════════════════════
+    # EOS-108: 추정기 구현 축(l2.mastery_estimators)을 **같은 기능번호**에 귀속시킨다 — §15가
+    # 신규 EOS 기능번호 추가를 동결했고, 같은 계약(update_mastery)에 꽂히는 두 번째 구현은
+    # 같은 기능의 다른 추정기이지 별개 기능이 아니다(EOS-103의 영속 축 귀속과 같은 논리).
     _e("WM-E-201", "BKT 숙달 추정·갱신 호출 계약·개념/스킬 숙달 이력 영속", "Student",
        "Learning Model", "P0",
-       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리)", "l2.bkt",
-       "l2.mastery_contract", "l2.mastery_tracking", "l2.skill_mastery_tracking"),
+       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리) · "
+       "EOS-108 §6 가산 규칙 추정기·Attempt 멱등·단일 쓰기 경로", "l2.bkt",
+       "l2.mastery_contract", "l2.mastery_estimators", "l2.mastery_tracking",
+       "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",

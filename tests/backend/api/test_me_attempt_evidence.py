@@ -124,9 +124,11 @@ def _mapped_session(**kw: Any) -> _QueueSession:
             [],  # 증거 #3 스킬 해소(브리지 없음)
             *misconception_queries,  # 오개념 가설 조회·영속(훑기가 도는 경우에만)
             [_CONCEPT],  # 개념 writer — 평가 개념
+            [],  # 개념 writer — EOS-108 멱등 조회(이 시도는 아직 미반영)
             [],  # 개념 writer — prior 없음
             [_CONCEPT],  # 스킬 writer — 평가 개념
             [],  # 스킬 writer — 스킬 해소 0
+            # 스킬 축은 해소 0건이라 멱등 조회가 아예 돌지 않는다(빈 집합 조기 반환).
         ],
         **kw,
     )
@@ -181,7 +183,9 @@ class TestEvidenceOnResponse:
 
     def test_correct_answer_yields_supporting_joint_evidence(self) -> None:
         session = _QueueSession(
-            [[_CONCEPT], [], [], [_CONCEPT], [], [_CONCEPT], []],
+            # 증거 3조회 → 개념 writer(평가 개념·EOS-108 멱등 조회·prior) → 스킬 writer(평가
+            # 개념·스킬 해소 0 → 멱등 조회 없음).
+            [[_CONCEPT], [], [], [_CONCEPT], [], [], [_CONCEPT], []],
         )
         evidence = _post(_client(session), correct=True).json()["evidence"]
         (concept,) = evidence["concept_evidence"]
