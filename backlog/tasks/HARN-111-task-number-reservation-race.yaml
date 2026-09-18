@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-111-task-number-reservation-race
+title: "태스크 번호 배정의 24초 경합 — add가 배정한 번호가 push 전까지 다른 세션에 안 보여 EOS-108이 두 태스크에 중복 배정됐다 (동일 유형 3회차 · 기계 집행 필요)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `backlog.py add`가 배정한 번호가 **push 전까지 다른 세션에 보이지 않는** 사각을 닫는다. 현행 `add`는 그 사각을 stderr로 정직하게 경고하지만(경고 문면 실재), 경고는 경합을 막지 못한다 — 실측된 경합 창은 24초였다.\n② 대책 후보를 **측정 근거와 함께 판정**한다(하나를 고르고 사유를 남긴다): ⓐ`add` 시점에 번호를 원격에 예약한다(`start`가 `refs/claims/*`에 쓰는 것과 같은 방식의 경량 ref — 예약이 실패하면 fail-open이 아니라 번호를 다시 고른다) ⓑ `scripts/harness/adr_number_check.py`가 이미 하는 **원격 전 브랜치 스캔**을 태스크 번호로 확장해 `harness-integrity` 잡이 교차 브랜치 충돌을 CI에서 잡는다(사후 검출) ⓒ 둘 다. ⓐ는 사전 예방이고 ⓑ는 사후 검출이라 성질이 다르다 — ⓑ만 채택하면 충돌은 계속 나고 CI가 알려 줄 뿐이다.\n③ **검출 변별력을 주입으로 확인한다** — 같은 번호를 서로 다른 브랜치에 심어 검사가 RED를 내는지 보고, 정상 상태(번호 전건 유일)에서 GREEN인지 대조군으로 확인한다. 스캔 0건(브랜치를 하나도 못 찾음)은 실패로 계상한다.\n④ **개명 경로의 사후 정정 범위를 문서화한다** — `rename`은 이벤트 대장·문서·커밋 메시지·PR 본문의 구 번호 참조를 옮기지 않는다고 스스로 경고한다(실측). 그 경고가 지시하는 수동 작업(`git grep -n <구번호>`)의 표준 절차와, 되돌릴 수 없는 표면(머지된 커밋 메시지·게시된 PR 코멘트)에 대한 교차 참조 노트 관례를 적는다.\n⑤ 기존 `_GRANDFATHERED_ID_NUMBERS`(이미 중복된 과거 번호 면제 목록)를 늘리지 않는다 — 이 태스크의 목적은 신규 충돌 차단이고, 과거 면제는 만료 없는 유예 금지 규칙의 대상이다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/store.py
+  - "tests/harness/*.py"
+session: null
+notes: "사고 경위(2026-09-18 · EOS-106 판정 세션): 후속 태스크를 `add --id EOS-108`로 등재했고(이벤트 대장 06:28:11Z), 24초 뒤 다른 세션이 같은 번호를 `EOS-108-mastery-engine-v1-single-write-path`로 claim했다(06:28:35Z). 두 태스크가 같은 번호를 나눠 쓰게 돼 문서·커밋의 `EOS-108` 참조가 결정 불가가 됐다 — CLAUDE.md가 ARCH-13(2026-07-18/25)·OPS-15(2026-07-29) 선례로 이미 등재한 형태의 3회차다.\n\n원인 규명(실측): `add`의 번호 충돌 검사 자체는 건전하다 — `store.id_number_of`가 슬러그를 떼고 번호만 비교하므로 `EOS-108`과 `EOS-108-mastery-...`는 같은 번호로 잡힌다. 문제는 **타이밍**이다: 내 add 시점에 상대 claim이 대장에 없었고, 상대 start 시점에 내 태스크 파일은 아직 push되지 않았다. 즉 검사가 못 본 게 아니라 **볼 것이 없었다.** `add` 출력이 그 사각을 명시적으로 경고한다(\"이 번호는 push 전까지 다른 세션에 보이지 않는다\") — 즉 알려진 사각이고, 경고는 경합을 막지 못한다.\n\n해소(이 세션): 내 쪽을 `EOS-109-oauth-created-learner-profile-read`로 개명했다(상대가 그 번호로 이미 착수·구현 중이라 피해 최소화 선택 — 선착은 오히려 내 쪽이었다). 문서·테스트의 구 번호 참조 11건을 옮기고, 되돌릴 수 없는 표면(커밋 메시지·게시된 PR 코멘트)을 위해 판정 문서에 교차 참조 노트를 넣었다.\n\n이 태스크는 그 사각 자체를 닫는다. CLAUDE.md 「실수 관리」(시스템 실수 또는 동일 유형 2회 이상 → 재발방지대책 등재 의무)에 따른 등재이며, 동일 유형 3회차이므로 산문 규칙이 아니라 **기계 집행**이어야 한다."
+updated: 2026-09-18

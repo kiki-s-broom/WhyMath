@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-110
+title: "pypi 차단 환경의 포맷·린트 오라클 확보 절차 정본화 — 추측 기반 포맷 수정으로 CI red 2회 (Black은 문자 수가 아니라 표시 폭으로 잰다)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① pypi 도달 불가(503·오프라인) 환경에서 포맷·린트 오라클을 확보하는 절차를 저장소 문서로 고정한다 — GitHub 소스에서 black과 순수 파이썬 의존성(click·packaging·pathspec·platformdirs·mypy_extensions·pytokens)을 받아 PYTHONPATH로 조립하는 절차, 그리고 생성이 필요한 스텁 2종(_black_version.version · platformdirs.version).\n② 버전 특정 절차를 함께 적는다 — pyproject의 핀 범위에서 CI가 받을 버전은 최신이므로 git ls-remote --tags로 그것을 고른다. 추측 금지.\n③ **오라클 정합 확인을 필수 스텝으로 적는다** — 조립한 도구로 CI 명령을 그대로 돌려 기존 파일에 차이가 0건인지 본다. 0건이 아니면 그 도구는 CI와 다른 버전이며 그것으로 고치면 다음 회차도 red다(실측: 25.9.0은 기존 11파일을 재포맷하려 했고 26.5.1은 CI 로그와 글자까지 일치했다).\n④ Black의 줄 길이 판정이 **문자 수가 아니라 표시 폭**(한글·CJK 폭 2)이라는 사실을 명기한다. 한국어 주석·메시지가 많은 이 저장소에서 사람이 손으로 계산한 '100자 이내'는 Black 판정과 어긋난다.\n⑤ ruff는 Rust 바이너리라 같은 방법이 통하지 않는다는 한계를 적는다 — 대안(있으면)과 없으면 '없음'을 명시한다.\n⑥ 회귀 동결: 이 절차 문서가 위 4축(조립·버전 특정·정합 확인·표시 폭)을 담고 있는지 tests/infra의 문서 계약 테스트로 검사한다."
+artifacts: []
+paths:
+  - "docs/standards/*.md"
+  - "tests/infra/*.py"
+session: null
+notes: "사고 경위(2026-09-18 · EOS-106 Week 1 Gate 판정 세션): CCR 컨테이너에서 pypi가 상시 503이라 black 설치가 불가했고, 세션이 Black의 동작을 추측해 두 번 연속 CI red를 냈다. 1회차는 원인 미파악, 2회차는 '조각이 95자니까 한 줄에 들어간다'는 계산이 틀렸다(Black은 표시 폭으로 재므로 한글이 폭 2). 두 회차 모두 Black 스텝이 7번째라 뒤 20스텝이 skipped가 되어 검증 표면 전체가 미실행이었다.\n해결은 포맷 수정이 아니라 오라클 확보였다 — GitHub 소스 조립으로 실물 black 26.5.1을 돌려 CI 실패를 글자까지 재현한 뒤 고쳤다. 먼저 조립한 25.9.0은 기존 11파일을 재포맷하려 해 CI와 불일치였고, 그 버전으로 고쳤으면 3회차 red였다 — 즉 '오라클 정합 확인' 스텝이 실제로 사고를 한 번 막았다.\n이 태스크는 그 절차를 저장소에 고정한다. CLAUDE.md 실수 관리(시스템 실수 또는 동일 유형 2회 이상 → 재발방지대책 등재 의무)에 따른 등재다."
+updated: 2026-09-18
