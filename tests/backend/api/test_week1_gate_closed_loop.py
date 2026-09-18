@@ -284,9 +284,9 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             uid = after_users[0]
 
             # 토큰↔행 연결(`GET /v1/users/me`)은 여기서 단언하지 않는다 — 그 표면이 지금
-            # **깨져 있고**(EOS-108), 그 사실은 아래 전용 테스트가 xfail(strict=True)로
+            # **깨져 있고**(EOS-109), 그 사실은 아래 전용 테스트가 xfail(strict=True)로
             # 동결한다. 여기에 두면 1단계에서 멈춰 2~7단계가 아예 판정되지 않는다.
-            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} (읽기 축은 EOS-108)")
+            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} (읽기 축은 EOS-109)")
 
             # ── 2) 진단 — 요약 조회 + CAT 출제(진단 목적). ─────────────────────────────
             summary = client.get("/v1/me/diagnosis/summary", headers=auth)
@@ -478,7 +478,7 @@ def test_mastery_step_assertion_is_discriminating() -> None:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "EOS-108 — OAuth 콜백(`resolve_user`)이 만든 학습자는 `GET /v1/users/me`가 500이다. "
+        "EOS-109 — OAuth 콜백(`resolve_user`)이 만든 학습자는 `GET /v1/users/me`가 500이다. "
         "ORM 컬럼은 nullable(`list[...] | None`)인데 스키마 필드는 비옵셔널 `list[...]`이고, "
         "`to_schema()`가 키를 명시적으로 None으로 넘겨 default_factory가 적용되지 않는다. "
         "해소되면 이 xfail이 XPASS로 *실패*해서 표식을 지우라고 알린다."

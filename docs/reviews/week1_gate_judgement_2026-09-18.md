@@ -9,7 +9,16 @@
 
 ## 1. 판정
 
-> **통과 (PASS)** — 단, 인접 결함 1건(`EOS-108`)을 함께 보고한다.
+> **번호 교차 참조 (2026-09-18 개명)**: 이 문서가 `EOS-109`로 부르는 후속 태스크는 **처음 `EOS-108`로
+> 등재**됐다. 다른 세션이 같은 번호를 `EOS-108-mastery-engine-v1-single-write-path`로 쓰고 있어 내 쪽을
+> `EOS-109-oauth-created-learner-profile-read`로 옮겼다. 그러므로 **이 PR의 커밋 메시지와 코멘트에 적힌
+> `EOS-108`은 전부 지금의 `EOS-109`를 가리킨다**(그것들은 되돌려 쓸 수 없다). 충돌은 누구의 잘못도 아닌
+> **24초 경합**이다 — 내 add가 `06:28:11Z`, 상대 claim이 `06:28:35Z`이고, 그 24초 동안 서로의 번호가
+> 상대에게 보이지 않았다(내 add는 push 전까지 안 보이고, 상대 claim은 내 add 시점에 아직 없었다).
+> 재발방지대책은 별건으로 등재했다.
+
+
+> **통과 (PASS)** — 단, 인접 결함 1건(`EOS-109`)을 함께 보고한다.
 
 완료 판정 문면은 *"1사이클(사용자 생성→진단→개념 선택→문제 풀이→오답→mastery 변경→다음 문제 추천)이
 DB 직접 수정 없이 완주"* 다. **완주했다.**
@@ -17,7 +26,7 @@ DB 직접 수정 없이 완주"* 다. **완주했다.**
 「실측」 CI run `35315225642` 잡 `105505403023` (`backend — 마이그레이션·통합 (실 PG)`) pytest 스텝:
 
 > `= 322 passed, 13 skipped, 10332 deselected, 1 xfailed, 2 warnings in 293.44s (0:04:53) =` · 스텝 **exit 0**
-> `XFAIL api/test_week1_gate_closed_loop.py::test_oauth_created_learner_can_read_own_profile - EOS-108 …`
+> `XFAIL api/test_week1_gate_closed_loop.py::test_oauth_created_learner_can_read_own_profile - EOS-109 …`
 
 통과한 322건에 `test_week1_gate_one_cycle_without_direct_db_writes`(7단계 관통)와
 `test_mastery_step_assertion_is_discriminating`(음성 대조군)이 포함된다. 판정은 exit code로 냈다.
@@ -31,7 +40,7 @@ DB 직접 수정 없이 완주"* 다. **완주했다.**
 제품이 아니라 내 하네스의 과도한 단언**이었다.
 
 끊긴 지점을 `xfail(strict=True)`로 분리하자 2~7단계가 처음 실행되어 전건 통과했다. 판정을
-**통과**로 정정한다. 결함 자체는 그대로 실재하고 `EOS-108`이 소유한다 — 다만 그것은 게이트의
+**통과**로 정정한다. 결함 자체는 그대로 실재하고 `EOS-109`이 소유한다 — 다만 그것은 게이트의
 합격 여부가 아니라 온보딩 표면의 문제다(§3).
 
 이 정정이 남기는 교훈: **판정 기준을 원 문서의 문면보다 넓게 잡으면 판정이 제품 대신 판정자를
@@ -61,7 +70,7 @@ DB 직접 수정 없이 완주"* 다. **완주했다.**
 | ⑥ mastery 변경 | 응답 `mastery_updates` + `GET /v1/me/mastery/current` | **통과** — 갱신 목록에 책임귀속 개념 포함 · 스냅샷 0건→N건(값 비-null) |
 | ⑦ 다음 문제 추천 | `GET /v1/me/next-problem` | **통과** — 시도 문항 제외 · 표준오차 null→산출 |
 
-**인접 표면(7단계 밖)**: `GET/PATCH /v1/users/me` — **깨져 있다**(§3 · `EOS-108` · `xfail(strict=True)`로 동결).
+**인접 표면(7단계 밖)**: `GET/PATCH /v1/users/me` — **깨져 있다**(§3 · `EOS-109` · `xfail(strict=True)`로 동결).
 
 위 7건은 **한 회차에서 순서대로 실제 실행된 결과**다(간접 추론이 아니다). 각 단계는 status code가
 아니라 산출물을 단언한다 — "API 200"을 통과 근거로 쓰는 단계는 없다.
@@ -94,14 +103,14 @@ DB 직접 수정 없이 완주"* 다. **완주했다.**
 있었고 이 PR이 건드린 코드가 아니다 — 기존 관통 테스트가 `from_schema`로 시딩해 `[]`가 채워졌기
 때문에 그 경로를 한 번도 지나가지 않았다.
 
-**후속 태스크**: `EOS-108` (이 지점만 고친다). 고치는 축은 셋(생성측 `from_schema` 경유 / 읽기측
+**후속 태스크**: `EOS-109` (이 지점만 고친다). 고치는 축은 셋(생성측 `from_schema` 경유 / 읽기측
 NULL→`[]` 강제 / 컬럼 server_default + 백필)이고 파급이 서로 달라 **판정과 사유 기록을
 acceptance가 요구한다**. 기존 NULL 행 축과 인접 표면 전수 확인도 별항으로 분리했다.
 
 저장소에는 `xfail(strict=True)`로 동결했다(`test_oauth_created_learner_can_read_own_profile`).
 `skip`이 아닌 이유는 저장소 선례(`test_notation_evidence_integrity.py`)와 같다 — skip은 "검사가
 없는 것"과 구별되지 않아 침묵 실패가 되고, strict xfail은 고쳐지는 순간 **XPASS로 빨강**이 되어
-표식 제거를 강제한다. `EOS-108` acceptance ④가 그 제거를 함께 요구한다.
+표식 제거를 강제한다. `EOS-109` acceptance ④가 그 제거를 함께 요구한다.
 
 ---
 
@@ -226,7 +235,7 @@ docstring의 "upsert"를 SQL 쓰기 동사로 읽어 **정상 상태에서 RED**
 1. **게이트 통과를 인정할 것인가** — 통과 근거는 7단계 전건이고, 판정 범위 밖으로 선언한 것은
    §6의 두 축(저작 콘텐츠 ORM 시딩 · 외부 IdP 스텁)이다. 그 두 선언을 받아들이지 않으면 판정은
    달라진다 — 그 판단은 이 문서가 대신하지 않는다.
-2. **`EOS-108`을 지금 착수시킬 것인가.** 게이트를 막지는 않지만 신규 가입 계정의 프로필 조회·수정이
+2. **`EOS-109`을 지금 착수시킬 것인가.** 게이트를 막지는 않지만 신규 가입 계정의 프로필 조회·수정이
    둘 다 500이므로 폐쇄루프 시연이 성립하지 않는다. acceptance ②의 세 축(생성측 `from_schema`
    경유 / 읽기측 NULL→`[]` / 컬럼 server_default + 백필) 중 무엇을 고를지는 그 태스크 세션이
    판정해 사유를 남기게 해 뒀다 — 미리 지정하고 싶으면 그 태스크 notes에 지시를 남기면 된다.
