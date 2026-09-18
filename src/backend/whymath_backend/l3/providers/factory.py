@@ -36,7 +36,7 @@ from whymath_backend.config import Settings, get_settings
 if TYPE_CHECKING:  # pragma: no cover - 타입 전용(런타임 import 비용·순환 회피)
     from whymath_backend.l3.interfaces import LLMProvider
 
-__all__ = ["build_cloud_provider", "cloud_provider_name"]
+__all__ = ["build_cloud_provider", "cloud_model_pins", "cloud_provider_name"]
 
 
 def build_cloud_provider(settings: Settings | None = None) -> LLMProvider:
@@ -73,6 +73,31 @@ def build_cloud_provider(settings: Settings | None = None) -> LLMProvider:
     raise ValueError(
         f"알 수 없는 cloud_provider: {name!r} — build_cloud_provider에 분기를 추가하라 "
         "(Literal에 값만 늘리고 팩토리를 안 고치면 여기서 멈춘다)."
+    )
+
+
+def cloud_model_pins(settings: Settings | None = None) -> tuple[str, str]:
+    """선택된 클라우드 좌석의 (CLOUD_MID, CLOUD_HIGH) 모델 핀 — 좌석→핀 매핑의 **단일 근거**.
+
+    두 곳이 이 매핑을 각자 들고 있으면 반드시 갈라진다(`ARCH-58`이 정확히 그 형태였다 —
+    좌석은 셀렉터로 바뀌는데 기록은 anthropic 핀을 적었다). 그래서 여기 한 번만 적고
+    `l3/pregenerate/provenance_bridge.model_name_for_decision()`과 좌석 집계
+    (`EOS-111`)가 **같은 함수를 부른다**.
+
+    알 수 없는 좌석은 기본 좌석으로 접지 않고 raise한다 — 접으면 "새 좌석을 골랐는데
+    기본 좌석 핀이 기록되는" 침묵 실패가 되고, 그것이 ARCH-58이 상환한 사고다.
+    """
+    resolved = settings if settings is not None else get_settings()
+    seat = resolved.cloud_provider
+    if seat == "openrouter":
+        return resolved.openrouter_model_mid, resolved.openrouter_model_high
+    if seat == "deepseek":
+        return resolved.deepseek_model_mid, resolved.deepseek_model_high
+    if seat == "anthropic":
+        return resolved.anthropic_model_mid, resolved.anthropic_model_high
+    raise ValueError(
+        f"알 수 없는 cloud_provider: {seat!r} — cloud_model_pins에 분기를 추가하라 "
+        "(build_cloud_provider와 같은 셀렉터를 읽는다)."
     )
 
 

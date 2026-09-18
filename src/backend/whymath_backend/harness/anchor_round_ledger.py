@@ -53,7 +53,7 @@ import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, Final, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -64,7 +64,9 @@ __all__ = [
     "ACCEPTED_STATUSES",
     "OUTCOME_STATUSES",
     "PROMPT_CACHE_STATES",
+    "SEAT_STATES",
     "PromptCacheTally",
+    "SeatTally",
     "RoundRecord",
     "StagnationVerdict",
     "append_round_ledger",
@@ -73,6 +75,7 @@ __all__ = [
     "load_round_ledger",
     "operating_rates",
     "prompt_cache_rates",
+    "seat_operating_rates",
 ]
 
 # outcome 어휘는 **오케스트레이터의 Literal에서 파생**한다(재선언 금지) — 여기 손으로 6종을
@@ -680,3 +683,153 @@ def judge_stagnation(
         measured=True,
         message=message,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 좌석 작동 신호 (EOS-111) — "셀렉터가 지목한 좌석이 실제로 돌았는가"
+#
+# `PromptCacheTally`/`prompt_cache_rates`와 **동형**이다(두 벌 산식 금지): 같은
+# genlog 행에서 모으고, 같은 미측정 규약(`measured`·`unmeasured_reason`·`state`)을
+# 쓰며, 리포트와 대장에 같은 dict를 싣는다.
+#
+# 왜 필요한가(실사고 2026-09-18): OpenRouter 좌석으로 돌린 저작 회차가 `EXIT=0`·5/5
+# 저장으로 끝났는데 **그 좌석이 실제로 서빙했는지 요약만으로 판정할 수 없었다**.
+# `prompt_cache`의 `calls_with_cache_telemetry: 0`은 "이 provider가 캐시 필드를
+# 노출하지 않는다"와 "LOCAL 경로만 돌았다" 양쪽에서 같은 값이라 변별력이 0이었고,
+# genlog 사이드카를 따로 열어야 알 수 있었다. 요약이 스스로 말했다면 왕복이 없었다.
+# ──────────────────────────────────────────────────────────────────────────
+
+SEAT_STATES: Final[frozenset[str]] = frozenset(
+    {"not_measured", "all_on_selected_seat", "none_on_selected_seat", "mixed"}
+)
+"""좌석 작동 상태 어휘 — 측정 가능성을 먼저 보고, 그다음에 좌석 일치를 본다."""
+
+
+@dataclass(slots=True, frozen=True)
+class SeatTally:
+    """회차 안 genlog 행에서 모은 좌석 원장(불변·순수·파일 I/O 0).
+
+    `observe`는 **새 인스턴스를 돌려준다**(`PromptCacheTally` 동형) — 싱크가 회차 도중
+    누적하되 중간 상태가 다른 곳에서 조용히 바뀌지 않게 한다.
+
+    **`model_name`이 없는 행은 분모에 넣지 않는다.** 미기록과 "다른 모델이 돌았다"를
+    구분하는 것이 이 집계의 급소다 — 미기록 행을 '좌석 밖'으로 계상하면 기록이 빠진
+    회차가 "좌석이 안 돌았다"로 위장된다(미측정 ≠ 0).
+    """
+
+    calls_total: int = 0
+    """관측한 genlog 행 수(전체) — 분모가 아니라 *관측 규모*다."""
+
+    calls_with_model_name: int = 0
+    """`model_name`이 실린 행 수 — 이 값이 0이면 좌석 판정이 정의되지 않는다."""
+
+    by_model: tuple[tuple[str, int], ...] = ()
+    """(모델명, 건수) 오름차순 튜플 — dict가 아니라 튜플인 것은 불변성 때문이다."""
+
+    succeeded: int = 0
+    """`success is True`인 행 수."""
+
+    failed: int = 0
+    """`success is False`인 행 수. `success`가 None인 행은 어느 쪽도 아니다."""
+
+    cost_usd_total: float = 0.0
+    """`cost_usd`가 실린 행의 합 — **단가 곱셈이며 청구서 미대조**다(EOS-111 범위 밖)."""
+
+    calls_with_cost: int = 0
+    """`cost_usd`가 실린 행 수 — 합이 0.0인 것과 '아무도 안 실었다'를 구분한다."""
+
+    def observe(
+        self,
+        *,
+        model_name: str | None,
+        success: bool | None,
+        cost_usd: float | None,
+    ) -> SeatTally:
+        """genlog 행 1건을 반영한 새 원장을 돌려준다(원본 불변).
+
+        None은 **더하지 않는다**(0으로 접지 않는다) — 미기록과 실측 0의 구분이 이 집계의
+        전부이기 때문이다.
+        """
+        counts = dict(self.by_model)
+        with_model = self.calls_with_model_name
+        if model_name:
+            counts[model_name] = counts.get(model_name, 0) + 1
+            with_model += 1
+        return replace(
+            self,
+            calls_total=self.calls_total + 1,
+            calls_with_model_name=with_model,
+            by_model=tuple(sorted(counts.items())),
+            succeeded=self.succeeded + (1 if success is True else 0),
+            failed=self.failed + (1 if success is False else 0),
+            cost_usd_total=self.cost_usd_total + (cost_usd if cost_usd is not None else 0.0),
+            calls_with_cost=self.calls_with_cost + (1 if cost_usd is not None else 0),
+        )
+
+
+def seat_operating_rates(
+    tally: SeatTally,
+    *,
+    selected_seat: str,
+    seat_model_pins: tuple[str, ...],
+) -> dict[str, Any]:
+    """회차의 좌석 '작동한 비율' + 판정(순수·파일 I/O 0).
+
+    `selected_seat`는 이 회차가 돌 때의 `settings.cloud_provider`, `seat_model_pins`는
+    그 좌석의 모델 핀들(`l3/providers/factory.cloud_model_pins()`)이다. 관측 모델이 그
+    핀에 속하면 "선택한 좌석이 돌았다", 아니면 "다른 것이 돌았다"(대개 LOCAL)이다.
+
+    **이 판정은 선언값 기반이다**(`ARCH-58`): genlog의 `model_name`은 *설정이 지목한*
+    모델이지 *응답이 온* 모델이 아니다. 따라서 provider 측 대체·폴백은 이 신호로 보이지
+    않는다 — 그 축은 `EOS-112`가 소유한다. 여기서 답하는 질문은 "라우팅이 클라우드로
+    갔고 그 좌석이 선택한 것과 같은가"까지다.
+
+    상태 어휘(`SEAT_STATES`):
+      - `not_measured` — `model_name`이 실린 행 0건. 좌석 판정 불가(0%가 아니다).
+      - `all_on_selected_seat` — 측정된 행이 전부 선택 좌석의 핀이다.
+      - `none_on_selected_seat` — 측정된 행 중 선택 좌석의 핀이 **0건**. 셀렉터를
+        openrouter로 두고도 LOCAL만 돈 회차가 여기 걸린다 — 이 함수가 존재하는 이유다.
+        회차가 원래 LOCAL로 라우팅될 조건이었다면 정상이며, 그 판단은 읽는 사람 몫이다
+        (도구는 사실만 적는다).
+      - `mixed` — 일부만 선택 좌석. 클라우드·로컬 혼재 회차.
+    """
+    pins = frozenset(seat_model_pins)
+    on_seat = sum(count for model, count in tally.by_model if model in pins)
+    off_seat = tally.calls_with_model_name - on_seat
+    measured = tally.calls_with_model_name > 0
+    unmeasured_reason: str | None = None
+    if not measured:
+        state = "not_measured"
+        unmeasured_reason = (
+            f"model_name이 실린 호출 0건(관측 {tally.calls_total}건) — 좌석 판정이 "
+            "정의되지 않는다. '선택 좌석이 안 돌았다'가 아니다(미측정)."
+        )
+    elif off_seat == 0:
+        state = "all_on_selected_seat"
+    elif on_seat == 0:
+        state = "none_on_selected_seat"
+    else:
+        state = "mixed"
+    return {
+        "selected_seat": selected_seat,
+        "seat_model_pins": list(seat_model_pins),
+        "calls_total": tally.calls_total,
+        "calls_with_model_name": tally.calls_with_model_name,
+        "calls_on_selected_seat": on_seat,
+        "calls_off_selected_seat": off_seat,
+        "observed_models": {model: count for model, count in tally.by_model},
+        "succeeded": tally.succeeded,
+        "failed": tally.failed,
+        # 비용은 **단가 곱셈이며 청구서 미대조**다(EOS-111 acceptance ⑥ — 정확도 향상은
+        # 이 태스크 밖). 실은 행이 0건이면 합 0.0을 '0원 확정'으로 읽지 않도록 건수를 함께 낸다.
+        "cost_usd_total": tally.cost_usd_total if tally.calls_with_cost else None,
+        "calls_with_cost": tally.calls_with_cost,
+        "cost_note": "단가 곱셈·청구서 미대조",
+        "measured": measured,
+        "unmeasured_reason": unmeasured_reason,
+        "declared_not_observed": (
+            "model_name은 설정 유래 선언값이다(ARCH-58) — provider 측 대체·폴백은 이 "
+            "신호로 보이지 않는다(관측 축 = EOS-112)."
+        ),
+        "state": state,
+    }

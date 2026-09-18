@@ -91,12 +91,14 @@ from whymath_backend.harness.anchor_round_ledger import (
     DEFAULT_STAGNATION_WINDOW,
     PromptCacheTally,
     RoundRecord,
+    SeatTally,
     append_round_ledger,
     default_round_ledger_path,
     judge_stagnation,
     load_round_ledger,
     operating_rates,
     prompt_cache_rates,
+    seat_operating_rates,
 )
 from whymath_backend.harness.batch_safety import (
     DEFAULT_ABORT_THRESHOLD,
@@ -129,6 +131,7 @@ from whymath_backend.l3.equivalent.orchestrator import (
     _to_record as _candidate_to_record,
 )
 from whymath_backend.l3.pregenerate.provenance_bridge import append_generation_log_jsonl
+from whymath_backend.l3.providers.factory import cloud_model_pins, cloud_provider_name
 from whymath_backend.schema.provenance import GenerationLog
 
 __all__ = [
@@ -730,9 +733,13 @@ def main(argv: list[str] | None = None) -> int:
     # "이 회차가 실제로 무엇으로 돌았는가"이고, 셋 다 genlog에 *적재된 행*에서만 나와야
     # 대장이 파일에 없는 값을 주장하지 않는다.
     cache_tally = PromptCacheTally()
+    # 좌석 원장(EOS-111) — 캐시 원장과 **같은 자리**에서 모은다. 셋 다 "이 회차가 실제로
+    # 무엇으로 돌았는가"이고, genlog에 *적재된 행*에서만 나와야 대장이 파일에 없는 값을
+    # 주장하지 않는다.
+    seat_tally = SeatTally()
 
     def _genlog_sink(log: GenerationLog) -> None:
-        nonlocal cache_tally
+        nonlocal cache_tally, seat_tally
         stamped = append_generation_log_jsonl(genlog_path, log, run_id=run_id)
         if stamped.model_name:
             observed_models.add(stamped.model_name)
@@ -742,6 +749,11 @@ def main(argv: list[str] | None = None) -> int:
             input_tokens=stamped.input_tokens,
             cache_read_input_tokens=stamped.cache_read_input_tokens,
             cache_creation_input_tokens=stamped.cache_creation_input_tokens,
+        )
+        seat_tally = seat_tally.observe(
+            model_name=stamped.model_name,
+            success=stamped.success,
+            cost_usd=stamped.cost_usd,
         )
 
     # 내구 검수 큐(EOS-58 codex P1-1/P2) — 비수용 outcome 발생 즉시 행 append+flush. 경로는
@@ -826,6 +838,24 @@ def main(argv: list[str] | None = None) -> int:
             "프롬프트 캐시 플래그 판독 실패(%s) — 판정을 미상으로 둔다", type(exc).__name__
         )
     payload["prompt_cache"] = prompt_cache_rates(cache_tally, caching_enabled=caching_enabled)
+    # 좌석 작동 신호(EOS-111) — "셀렉터가 지목한 좌석이 실제로 돌았는가". 셀렉터·핀은 이
+    # 회차를 돌린 설정에서 읽으며, 판독 실패는 False로 접지 않고 **미상**으로 남긴다
+    # (모르는 것을 '기본 좌석'으로 적으면 이 신호 자체가 거짓이 된다 — ARCH-58 형태).
+    selected_seat: str
+    seat_pins: tuple[str, ...]
+    try:
+        _seat_settings = get_settings()
+        selected_seat = cloud_provider_name(_seat_settings)
+        seat_pins = cloud_model_pins(_seat_settings)
+    except Exception as exc:  # noqa: BLE001 — 설정 판독 실패는 회차 비차단(타입명 남김)
+        selected_seat = "unknown"
+        seat_pins = ()
+        _LOGGER.warning(
+            "클라우드 좌석 설정 판독 실패(%s) — 좌석 판정을 미상으로 둔다", type(exc).__name__
+        )
+    payload["cloud_seat"] = seat_operating_rates(
+        seat_tally, selected_seat=selected_seat, seat_model_pins=seat_pins
+    )
     ledger_path: Path = default_round_ledger_path(args.out)
     ledger_error: str | None = None
     # 회차 매니페스트(MP-04) — 카나리 관측 3종은 판정이 **있었을 때만** 값이 있다. 판정이
