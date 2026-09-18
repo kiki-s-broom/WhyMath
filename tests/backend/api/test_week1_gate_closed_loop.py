@@ -283,10 +283,10 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             assert len(after_users) == 1, f"user_profile이 1건이 아니다: {after_users}"
             uid = after_users[0]
 
-            # 발급된 토큰이 그 사용자로 인증된다(토큰↔행 연결 — 남의 계정이 아니다).
-            me = client.get("/v1/users/me", headers=auth)
-            assert me.status_code == 200, me.text
-            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} · /v1/users/me 200")
+            # 토큰↔행 연결(`GET /v1/users/me`)은 여기서 단언하지 않는다 — 그 표면이 지금
+            # **깨져 있고**(EOS-108), 그 사실은 아래 전용 테스트가 xfail(strict=True)로
+            # 동결한다. 여기에 두면 1단계에서 멈춰 2~7단계가 아예 판정되지 않는다.
+            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} (읽기 축은 EOS-108)")
 
             # ── 2) 진단 — 요약 조회 + CAT 출제(진단 목적). ─────────────────────────────
             summary = client.get("/v1/me/diagnosis/summary", headers=auth)
@@ -473,3 +473,40 @@ def test_mastery_step_assertion_is_discriminating() -> None:
         print("WEEK1_GATE_CONTROL=OK :: 매핑 없음 → 숙달 전파 0 (6단계 단언의 변별력 확인)")
     finally:
         asyncio.run(_cleanup_content(problem_ids=problem_ids, concept_ids=[]))
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "EOS-108 — OAuth 콜백(`resolve_user`)이 만든 학습자는 `GET /v1/users/me`가 500이다. "
+        "ORM 컬럼은 nullable(`list[...] | None`)인데 스키마 필드는 비옵셔널 `list[...]`이고, "
+        "`to_schema()`가 키를 명시적으로 None으로 넘겨 default_factory가 적용되지 않는다. "
+        "해소되면 이 xfail이 XPASS로 *실패*해서 표식을 지우라고 알린다."
+    ),
+)
+def test_oauth_created_learner_can_read_own_profile() -> None:
+    """**Week 1 Gate가 지목한 끊긴 지점** — API로 만든 학습자가 자기 프로필을 읽는가.
+
+    `skip`이 아니라 `xfail(strict=True)`를 쓴다(`test_notation_evidence_integrity.py` 선례):
+    skip은 "검사가 없는 것"과 구별되지 않아 침묵 실패가 되고, strict xfail은 ①지금 깨져 있음을
+    기계로 남기며 ②고쳐지는 순간 XPASS로 빨강이 되어 표식 제거를 강제한다.
+
+    이 결함은 main에 이미 있던 것이고 이 PR이 건드린 코드가 아니다 — 기존 관통 테스트가 학습자를
+    `UserProfile.from_schema(...)`로 시딩해 배열 4컬럼에 `[]`가 채워졌기 때문에 이 경로를 한 번도
+    지나가지 않았다. 사용자 생성을 API로 옮기자 즉시 드러났다.
+    """
+    if not asyncio.run(_pg_reachable()):
+        pytest.skip("PostgreSQL 미도달 — 판정 불가. 통과가 아니다.")
+
+    asyncio.run(reset_store())
+    with _client() as client:
+        _erase_learner(client)
+        auth = _login(client)
+        created = asyncio.run(_demo_user_ids())
+        assert len(created) == 1, f"사용자 생성이 1건이 아니다: {created}"
+        try:
+            me = client.get("/v1/users/me", headers=auth)
+            assert me.status_code == 200, me.text
+            assert me.json()["user_id"] == str(created[0]), me.json()
+        finally:
+            _erase_learner(client)
