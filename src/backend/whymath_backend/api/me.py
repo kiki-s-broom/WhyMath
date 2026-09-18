@@ -77,6 +77,7 @@ from whymath_backend.api._query_filters import (
     time_window_conditions,
 )
 from whymath_backend.api._rate_limit import _client_ip
+from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
 
 # ASM-04: 청사진 조립 후보 조회는 게이팅 라우터(같은 L5 레이어)의 헬퍼를 *재사용*한다 —
 # 후보 조회(절단 경고 포함)와 성취기준 원자 축 조인을 두 번 구현하지 않는다(단일 진실 원천).
@@ -180,7 +181,10 @@ from whymath_backend.l4.calibration_coaching import recommend_calibration_coachi
 from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
-from whymath_backend.l4.misconception.hypothesis_store import get_active_hypotheses
+from whymath_backend.l4.misconception.hypothesis_store import (
+    apply_candidates,
+    get_active_hypotheses,
+)
 from whymath_backend.l4.prerequisite_coaching import recommend_prerequisite_coaching
 from whymath_backend.l6.blueprint import (
     AssembledTestSet,
@@ -212,7 +216,11 @@ from whymath_backend.schema.assessment import (
     SkillMasteryHistory as SkillMasteryHistorySchema,
 )
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
-from whymath_backend.schema.assessment_evidence import AssessmentEvidence
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    MisconceptionCandidate,
+    MisconceptionScan,
+)
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
@@ -236,6 +244,7 @@ from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.timeseries import (
     DailyLearningMetrics as DailyLearningMetricsSchema,
 )
+from whymath_backend.schema.verification_capabilities import AttemptMisconceptionDetector
 
 router = APIRouter(prefix="/v1/me", tags=["me"])
 
@@ -692,6 +701,66 @@ async def list_my_privacy_audit(
 _STARTED_AT_SKEW_TOLERANCE = timedelta(minutes=5)
 
 
+@dataclass(frozen=True)
+class _AttemptMisconceptionScan:
+    """`_scan_attempt_misconceptions`의 결과 — 훑기 3상태 + 게이트 통과 후보.
+
+    능력 구현이 돌려주는 리치 타입을 Core 안에 들이지 않으려는 좌석이다. Core가 읽는 것은
+    `scan`·`candidates` 둘뿐이므로(능력 Protocol이 노출하는 것과 동일) 여기서 그 둘만 고정한다.
+    """
+
+    scan: MisconceptionScan
+    candidates: tuple[MisconceptionCandidate, ...]
+
+
+_NOT_SCANNED = _AttemptMisconceptionScan(scan=MisconceptionScan.NOT_RUN, candidates=())
+"""훑지 않음 — 정답·답안 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**"""
+
+
+async def _scan_attempt_misconceptions(
+    session: AsyncSession,
+    detector: AttemptMisconceptionDetector,
+    *,
+    problem_id: uuid.UUID,
+    correct: bool,
+    answer: str | None,
+) -> _AttemptMisconceptionScan:
+    """채점 1건에서 오개념 후보를 훑는다 — 재료가 없으면 훑지 않았다고 말한다.
+
+    훑지 않는 조건 4종(전부 `NOT_RUN`): 킬 스위치 OFF · 정답 시도 · 답안 미제출 · 문항 지문
+    부재. 이 넷을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면 하류가 *미측정*을 *측정된
+    0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
+
+    정답 시도를 제외하는 것은 성능이 아니라 정직 때문이다 — 오개념은 *틀린 방식*의 이름이라
+    정답에 붙일 대상이 아니고, 붙지 않은 것과 보지 않은 것은 다른 사실이다.
+    """
+    if not get_settings().l4_attempt_misconception_scan_enabled:
+        return _NOT_SCANNED
+    if correct or answer is None:
+        return _NOT_SCANNED
+    question_text = await session.scalar(
+        select(Problem.question_text).where(Problem.problem_id == problem_id)
+    )
+    if not question_text:
+        return _NOT_SCANNED
+    # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를 이름으로
+    # 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
+    try:
+        result = detector.scan_attempt_answer(question_text=question_text, student_answer=answer)
+    except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
+        # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로 여기서 터지면
+        # 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측 실패가 채점 실패를 만드는 셈.
+        # 그래서 삼키되, **예외 타입명을 반드시 남긴다**(CLAUDE.md 침묵 실패 금지 — 무타입 경고가
+        # langfuse v2 쓰기 8일 무증상 전멸의 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
+        _logger.warning(
+            "오개념 훑기 실패 — 채점은 계속한다(scan=not_run). exc_type=%s problem_id=%s",
+            type(exc).__name__,
+            problem_id,
+        )
+        return _NOT_SCANNED
+    return _AttemptMisconceptionScan(scan=result.scan, candidates=tuple(result.candidates))
+
+
 class AttemptSubmitRequest(BaseModel):
     """본인 풀이 채점 결과 제출 — `POST /v1/me/attempts` 요청 본문.
 
@@ -900,6 +969,9 @@ async def submit_attempt(
     body: AttemptSubmitRequest,
     user: ConsentedUser,
     session: SessionDep,
+    misconception_detector: Annotated[
+        AttemptMisconceptionDetector, Depends(get_attempt_misconception_detector)
+    ],
 ) -> AttemptSubmitResponse:
     """본인 풀이 채점 1건 제출 — `ProblemAttempt` 적재 후 문제의 평가 개념 BKT 숙달 자동 전파.
 
@@ -990,8 +1062,20 @@ async def submit_attempt(
     # 지점에서 실제로 성립해야 증거가 "갱신 결과의 사후 요약"으로 전락하지 않는다. 읽기 전용이라
     # (session.add·commit 0) 이 호출이 아래 적재의 성공/실패를 바꾸지 않고, 반대로 아래가 실패해도
     # 증거는 남는다 — 두 단계가 각각 관측 가능하다(EOS-81 ⑦ 부분 쓰기 구조를 가리지 않는다).
-    # 이 경로는 오개념 매칭을 돌리지 않는다(진단은 coach 대화 경로 전용) → scan=not_run이 기본이며,
-    # 그 0건은 "오개념이 없었다"가 아니라 "보지 않았다"로 응답에 표기된다.
+    # EOS-104: 오답 1건의 오개념 훑기 — 이 슬라이스의 **집행 지점**이다(정본화≠집행).
+    # 과목 어댑터가 문항 지문·제출 답안을 이어 오류 서명을 읽고, 품질 게이트를 통과한 후보만
+    # 돌려준다. Core는 두 문자열을 *불투명 페이로드*로 넘길 뿐 해석하지 않는다(경계 규칙).
+    #
+    # 귀속(핵심): 후보의 재료가 **이 attempt에서만** 나오므로 attempt 귀속이 정의상 성립한다.
+    # 대화 턴의 게이트 매칭을 옮겨 오지 않는 이유가 이것이다 — 그쪽은 *턴* 단위라 옮기면
+    # "이 답안의 오개념 후보"가 거짓 주장이 된다(EOS-104 acceptance ③).
+    misconception_scan_result = await _scan_attempt_misconceptions(
+        session,
+        misconception_detector,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        answer=body.student_answer,
+    )
     evidence = await collect_assessment_evidence(
         session,
         learner_id=user.user_id,
@@ -999,7 +1083,19 @@ async def submit_attempt(
         correct=body.is_correct,
         attempt_id=attempt.attempt_id,
         observed_at=received_at,
+        possible_misconceptions=misconception_scan_result.candidates,
+        misconception_scan=misconception_scan_result.scan,
     )
+    # 학습자 상태 반영 — 증거 조립(읽기 전용)과 **분리된 단계**다. 증거는 관측이고 상태 변경은
+    # 엔진의 몫이라, 둘을 한 함수에 넣으면 "한 트랜잭션처럼 보이기" 문제가 생긴다(EOS-12 ⑤).
+    #
+    # 훑은 회차에만 부른다. 후보가 0건이어도 부르는 것이 중요하다 — 그 호출이 이번 회차에
+    # 증거를 못 받은 기존 가설을 감쇠시킨다(Persona C: 오개념이 재관측되지 않으면 confidence가
+    # *내려가야* 한다). 반대로 훑지 않은 회차(정답·답안 없음·능력 부재)에 부르면 관측하지도
+    # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
+    if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
+        await apply_candidates(session, user.user_id, misconception_scan_result.candidates)
+        await session.commit()
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     records = await record_problem_attempt_mastery(
         session, user.user_id, body.problem_id, body.is_correct

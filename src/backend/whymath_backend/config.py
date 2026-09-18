@@ -323,6 +323,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_attempt_misconception_scan_enabled: bool = Field(
+        default=True,
+        description=(
+            "채점된 **오답 1건**에서 오개념 후보를 훑을지(EOS-104·정식기능). True(기본)면 "
+            "POST /v1/me/attempts가 is_correct=false일 때 과목 어댑터의 오답 서명 검출기"
+            "(`AttemptMisconceptionDetector`)에 문항 지문·제출 답안을 넘겨, 품질 게이트를 "
+            "통과한 후보만 채점 증거(`possible_misconceptions`)에 싣고 활성 가설을 갱신한다. "
+            "정답 시도·답안 미제출은 애초에 훑지 않는다(scan=not_run). False면 이 경로가 통째로 "
+            "not_run이 되어 **'훑지 않았다'로 정직하게 표기된다** — 0건을 '오개념 없음'으로 "
+            "위장하지 않는다. 킬 스위치 용도이며 끄면 감쇠도 함께 멈춘다(관측이 없으면 감쇠할 "
+            "근거도 없다). WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_server_theta_enabled: bool = Field(
         default=True,
         description=(
