@@ -1166,8 +1166,11 @@ async def _complete_problem(
         observed_at=received_at,
     )
     # 숙달 전파(개념·스킬 축) — 서버 판정 is_correct=True. 매핑 없으면 빈 리스트(graceful).
-    await record_problem_attempt_mastery(session, user_id, problem_id, True)
-    skill_records = await record_problem_attempt_skill_mastery(session, user_id, problem_id, True)
+    # EOS-18: 두 축이 위에서 조립한 **같은 증거**를 받는다(정오답·관측시각의 사본 0).
+    await record_problem_attempt_mastery(session, evidence=completion_evidence)
+    skill_records = await record_problem_attempt_skill_mastery(
+        session, evidence=completion_evidence
+    )
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속 — submit_attempt와 *같은 writer*
     # (중복 구현 0). `source`가 두 채점 경로를 가르므로 기록률 리포트가 경로별 분모로 본다.
     await record_attempt_skill_event(

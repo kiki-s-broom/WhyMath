@@ -24,10 +24,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.assessment import ConceptMasteryHistory, SkillMasteryHistory
+from whymath_backend.l2 import mastery_contract as mastery_contract_mod
+from whymath_backend.l2 import mastery_tracking as mastery_tracking_mod
+from whymath_backend.l2 import skill_mastery_tracking as skill_mastery_tracking_mod
 from whymath_backend.l2.bkt import BktModel, BktParameters
 from whymath_backend.l2.mastery_contract import (
     BKT_ESTIMATOR_ID,
-    AttemptOutcomeEvidence,
     BktMasteryEstimator,
     UnknownMasteryEstimatorError,
     active_estimator_id,
@@ -44,6 +46,10 @@ from whymath_backend.l2.mastery_tracking import (
     record_problem_attempt_mastery,
 )
 from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 from whymath_backend.schema.enums import ConceptRole
 from whymath_backend.schema.learning_loop_contract import (
     LOOP_RELATIONS,
@@ -64,6 +70,7 @@ from whymath_backend.schema.mastery_contract import (
 
 _UID = uuid.uuid4()
 _CID = uuid.uuid4()
+_PID = uuid.uuid4()
 _SID = "skill.compute-fraction"
 _T0 = datetime(2026, 1, 1, tzinfo=UTC)
 _T1 = datetime(2026, 1, 8, tzinfo=UTC)
@@ -92,8 +99,23 @@ def _state(
     )
 
 
-def _evidence(correct: bool, observed_at: datetime = _T1) -> AttemptOutcomeEvidence:
-    return AttemptOutcomeEvidence(correct=correct, observed_at=observed_at)
+def _evidence(correct: bool, observed_at: datetime = _T1) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 계약이 받는 **바로 그 타입**(대역 아님).
+
+    어댑터(`AttemptOutcomeEvidence`)가 폐기됐으므로 여기서 대역을 만들면 계약이 실제로
+    무엇을 받는지 테스트가 더 이상 말하지 못한다. 증거 세 종은 비우되 `coverage`는
+    `build_assessment_evidence`가 계산한 것을 그대로 쓴다(빈 것과 안 본 것의 구분 보존).
+    """
+    return build_assessment_evidence(
+        learner_id=_UID,
+        problem_id=_PID,
+        correct=correct,
+        observed_at=observed_at,
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
 
 
 # ── 가짜 구현들(교체 가능성·계약 위반 검출용) ─────────────────────────────────
@@ -153,20 +175,6 @@ class _WrongTargetEstimator:
             elapsed_days=None,
             estimator_id=self.estimator_id,
         )
-
-
-@dataclass(frozen=True, slots=True)
-class _FutureAssessmentEvidence:
-    """`EOS-12`가 착지시킬 `AssessmentEvidence`의 대역 — **상속 없이** Protocol을 만족한다.
-
-    이 테스트가 지키는 이음매: EOS-12의 구체 타입은 `correct`·`observed_at` 두 속성만 있으면
-    이 계약에 그대로 꽂힌다(필드를 더 들고 있어도 무방하다 — 계약은 그것을 읽지 않는다).
-    """
-
-    correct: bool
-    observed_at: datetime
-    # 계약이 읽지 않는 부가 필드(EOS-12가 들고 올 법한 것) — 있어도 계약은 무관심하다.
-    misconception_ids: tuple[str, ...] = ()
 
 
 # ── DB 시뮬(기존 테스트 패턴 재사용) ──────────────────────────────────────────
@@ -278,29 +286,153 @@ class TestContractShape:
 class TestEvidenceProtocolSeam:
     """`AssessmentEvidenceInput` 이음매 — `EOS-12`의 구체 타입이 만족해야 하는 최소 계약."""
 
-    def test_adapter_satisfies_protocol(self) -> None:
-        assert isinstance(_evidence(True), AssessmentEvidenceInput)
+    def test_real_assessment_evidence_satisfies_without_inheritance(self) -> None:
+        """실 `AssessmentEvidence`가 **상속 없이**(구조적으로) 계약에 꽂힌다 — EOS-18 ②.
 
-    def test_future_assessment_evidence_satisfies_without_inheritance(self) -> None:
-        """EOS-12가 상속 없이(구조적으로) 이 계약에 꽂힌다 — 두 번째 진실 원천 불요."""
-        evidence = _FutureAssessmentEvidence(
-            correct=True, observed_at=_T1, misconception_ids=("M-1",)
-        )
+        EOS-13 시절 이 자리에는 대역 dataclass가 있었다. EOS-12가 착지했으므로 대역을 걷고
+        실 타입으로 잰다 — 대역이 만족한다는 것은 실 타입이 만족한다는 증거가 아니었다.
+        `AssessmentEvidence`는 `BaseModel`이고 `AssessmentEvidenceInput`을 상속하지 않는다.
+        """
+        evidence = _evidence(True)
+        assert isinstance(evidence, AssessmentEvidence)
+        assert AssessmentEvidenceInput not in type(evidence).__mro__  # 상속 0(구조적 만족)
         assert isinstance(evidence, AssessmentEvidenceInput)
-        update = update_mastery(_state(), evidence)
-        assert update.mastery == update_mastery(_state(), _evidence(True)).mastery
+
+    def test_real_evidence_extra_fields_do_not_reach_the_estimator(self) -> None:
+        """계약이 읽지 않는 필드(귀속·coverage 등)는 산출을 바꾸지 않는다.
+
+        실 타입은 대역보다 훨씬 많은 필드를 든다. 그 필드들이 추정에 새 나가면 "증거를 바꾸면
+        숙달이 달라진다"가 성립해 행동 동결이 무너진다.
+        """
+        lean = build_assessment_evidence(
+            learner_id=uuid.uuid4(),  # 다른 학습자·다른 문항
+            problem_id=uuid.uuid4(),
+            correct=True,
+            observed_at=_T1,
+            concept_evidence=(),
+            skill_evidence=(),
+            concept_mapping_present=True,  # coverage가 달라진다
+            skill_bridge_present=True,
+        )
+        assert lean.coverage != _evidence(True).coverage  # 대조군: 입력이 실제로 다르다
+        assert update_mastery(_state(), lean) == update_mastery(_state(), _evidence(True))
 
     def test_protocol_reads_exactly_two_attributes(self) -> None:
         """**필드 증식 방어선** — 계약이 읽는 속성이 늘면 이 테스트가 RED다.
 
-        evidence의 구체 타입 좌석은 EOS-12가 소유한다. 여기서 속성을 늘리는 것은 두 번째
-        진실 원천을 만드는 일이므로, 늘리려면 이 동결을 의식적으로 깨야 한다.
+        EOS-18 ④ 재판정(실 타입 연결 후에도 **2개 유지**): 후보는 `learner_id`·`problem_id`를
+        더해 4개로 넓히는 안이었다. 채택하지 않은 이유는 그 둘이 *추정 입력*이 아니라 **귀속
+        식별자**이기 때문이다 — 추정기(BKT·후속 DKT)는 "누구의 어느 문항인가"를 읽지 않고
+        "맞았는가·언제인가"만 읽는다. 귀속은 이미 두 자리가 소유한다: 대상축은
+        `LearnerMasteryState.axis`/`target_id`(계약이 불일치를 `MasteryContractError`로 막는다),
+        학습자·문항은 공개 writer가 `evidence`에서 직접 읽는다(EOS-18 ③ — 인자로 받지 않으므로
+        어긋날 수 없다). 여기에 또 실으면 귀속의 세 번째 진실 원천이 되고, 추정기 Protocol이
+        추정과 무관한 것을 요구하게 된다(Concept Purity·계층 분리).
         """
         members = {
             name
             for name in AssessmentEvidenceInput.__protocol_attrs__  # type: ignore[attr-defined]
         }
         assert members == {"correct", "observed_at"}
+
+
+# ── ⑤ 어댑터 폐기의 변별력(EOS-18) ────────────────────────────────────────────
+
+
+class TestAdapterRetirementIsEnforced:
+    """어댑터가 *돌아오면* RED가 되는가 — 폐기는 "지웠다"가 아니라 "못 돌아온다"여야 한다.
+
+    정상 입력에서 초록인 것은 보호의 증거가 아니므로(CLAUDE.md 「보호 장치를 실패 주입 없이
+    보호 있음 선언 금지」), 폐기된 어댑터와 **같은 모양**을 실제로 주입해 막히는지 잰다.
+    성공 방향 대조군을 함께 둔다 — 대조군이 없으면 "전부 거부"라는 과잉 수정도 통과한다.
+    """
+
+    async def test_two_attribute_adapter_no_longer_reaches_the_writer(self) -> None:
+        """폐기된 `AttemptOutcomeEvidence`와 동형(2속성)인 운반체는 공개 writer에 꽂히지 않는다.
+
+        Protocol(`AssessmentEvidenceInput`)은 여전히 만족한다 — 그것이 핵심이다. 계약이 읽는
+        관측 2속성만으로는 **귀속(학습자·문항)을 말할 수 없고**, EOS-18 이후 공개 writer는 그
+        귀속을 인자가 아니라 증거에서 읽는다. 그래서 어댑터를 되살려 넘기면 조용히 통과하지 않고
+        `AttributeError`로 터진다.
+        """
+
+        @dataclass(frozen=True, slots=True)
+        class _AdapterLike:
+            correct: bool
+            observed_at: datetime
+
+        revived = _AdapterLike(correct=True, observed_at=_T1)
+        # 주입이 실제로 적용됐는지 먼저 단언한다 — Protocol을 만족하지 못하면 이 테스트가
+        # 재는 것은 "어댑터가 막힌다"가 아니라 "아무 객체나 막힌다"가 된다(변별력 0).
+        assert isinstance(revived, AssessmentEvidenceInput)
+
+        with pytest.raises(AttributeError):
+            await record_problem_attempt_mastery(
+                _as_session(_QueueSession([_Result([_CID]), _Result([])])),
+                evidence=cast(Any, revived),
+            )
+
+    @pytest.mark.parametrize("missing", ["learner_id", "problem_id", "correct", "observed_at"])
+    async def test_writer_refuses_evidence_missing_any_required_axis(self, missing: str) -> None:
+        """증거가 필수 축 하나라도 말하지 못하면 **터진다** — 기본값으로 메우지 않는다.
+
+        위 어댑터 테스트가 "2속성 운반체가 막히는가"를 묻는다면 이것은 축을 **하나씩** 뺀다.
+        한 축에만 폴백(`getattr(evidence, "problem_id", uuid4())` 같은)이 생기면 위 테스트는
+        *다른* 축에서 터지며 여전히 통과한다 — 통과의 이유가 바뀐 것을 아무도 모른다.
+        실패가 왜 위험한가: 문항을 임의값으로 메우면 평가 개념이 0건이 되어 숙달 전파가
+        **무증상으로 사라진다**(CLAUDE.md 침묵 실패 금지).
+        """
+        full = _evidence(True)
+        axes = ("learner_id", "problem_id", "correct", "observed_at")
+        partial = type(
+            "_PartialEvidence",
+            (),
+            {name: getattr(full, name) for name in axes if name != missing},
+        )()
+        # 주입 실재 단언 — 뺀 축만 없고 나머지는 그대로다(주입이 헛돌면 변별력 0).
+        assert not hasattr(partial, missing)
+        assert all(hasattr(partial, name) for name in axes if name != missing)
+
+        with pytest.raises(AttributeError):
+            await record_problem_attempt_mastery(
+                _as_session(_QueueSession([_Result([_CID]), _Result([])])),
+                evidence=cast(Any, partial),
+            )
+
+    async def test_real_evidence_control_group_still_writes(self) -> None:
+        """대조군 — 실 타입은 같은 경로에서 정상 적재된다(위 거부가 과잉이 아니다)."""
+        records = await record_problem_attempt_mastery(
+            _as_session(_QueueSession([_Result([_CID]), _Result([])])),
+            evidence=_evidence(True),
+        )
+        assert [r.concept_id for r in records] == [_CID]
+
+    def test_no_module_defines_a_second_evidence_type(self) -> None:
+        """숙달 모듈 어디에도 **증거를 자칭하는 두 번째 타입**이 없다 — 산출물 검사.
+
+        이름 열거(`AttemptOutcomeEvidence`가 없는가)로 잡으면 이름만 바꾼 재도입에 뚫린다
+        (CLAUDE.md 「금지 패턴 열거 대신 산출물 검사」). 그래서 모듈이 *정의한* 클래스를 전수로
+        훑어 계약이 읽는 속성 집합을 갖춘 것이 있는지 본다 — 이름과 무관하게 걸린다.
+
+        여기서 막는 재도입은 "증거를 만들어 내는 좌석"이다. 증거의 생산자는
+        `l2/assessment_evidence.collect_assessment_evidence` 하나이며, 숙달 writer가 스스로
+        증거를 조립하면 coverage(무엇을 실제로 봤는가)를 지어내게 된다.
+        """
+        modules = [mastery_contract_mod, mastery_tracking_mod, skill_mastery_tracking_mod]
+        read_attrs = set(AssessmentEvidenceInput.__protocol_attrs__)  # type: ignore[attr-defined]
+        scanned = 0
+        offenders: list[str] = []
+        for module in modules:
+            for name, obj in vars(module).items():
+                if not isinstance(obj, type) or obj.__module__ != module.__name__:
+                    continue
+                scanned += 1
+                declared = set(dir(obj)) | set(getattr(obj, "__annotations__", {}))
+                if read_attrs <= declared:
+                    offenders.append(f"{module.__name__}.{name}")
+        # 스캔 0건은 공허한 통과다 — 대상을 하나도 못 찾았으면 이 가드는 아무것도 모른다.
+        assert scanned > 0, "숙달 모듈에서 클래스를 하나도 찾지 못했다 — 스캔 자체가 무효다"
+        assert offenders == [], f"증거 어댑터 재도입 의심: {offenders}"
 
 
 class TestLoopVocabularyBinding:
@@ -386,7 +518,9 @@ class TestBehaviourFrozen:
             sample_size=4,
         )
         session = _QueueSession([_Result([prior])])
-        row = await record_attempt_mastery(_as_session(session), _UID, _CID, True, measured_at=_T0)
+        row = await record_attempt_mastery(
+            _as_session(session), _CID, evidence=_evidence(True, _T0)
+        )
         expected = compute_mastery_record(0.6, 4, True, BktModel(), 0.0)
         assert (row.mastery, row.confidence, row.sample_size) == expected
 
@@ -474,14 +608,14 @@ class TestSwappableWithoutCallsiteEdits:
         )
         baseline_session = _QueueSession([_Result([prior])])
         baseline = await record_attempt_mastery(
-            _as_session(baseline_session), _UID, _CID, True, measured_at=_T1
+            _as_session(baseline_session), _CID, evidence=_evidence(True)
         )
         assert baseline.mastery != _STUB_MASTERY  # 대조군: 기본 추정기는 0.5를 내지 않는다
 
         swapped_session = _QueueSession([_Result([prior])])
         with use_estimator(_STUB_ID):
             swapped = await record_attempt_mastery(
-                _as_session(swapped_session), _UID, _CID, True, measured_at=_T1
+                _as_session(swapped_session), _CID, evidence=_evidence(True)
             )
         assert swapped.mastery == _STUB_MASTERY
         assert swapped.sample_size == 5
@@ -491,7 +625,7 @@ class TestSwappableWithoutCallsiteEdits:
         session = _QueueSession([_Result([_CID]), _Result([])])
         with use_estimator(_STUB_ID):
             records = await record_problem_attempt_mastery(
-                _as_session(session), _UID, uuid.uuid4(), True, measured_at=_T1
+                _as_session(session), evidence=_evidence(True)
             )
         assert [r.mastery for r in records] == [_STUB_MASTERY]
 
@@ -500,7 +634,7 @@ class TestSwappableWithoutCallsiteEdits:
         session = _QueueSession([_Result([_CID]), _Result([_SID]), _Result([])])
         with use_estimator(_STUB_ID):
             records = await record_problem_attempt_skill_mastery(
-                _as_session(session), _UID, uuid.uuid4(), True, measured_at=_T1
+                _as_session(session), evidence=_evidence(True)
             )
         assert [(r.skill_id, r.mastery) for r in records] == [(_SID, _STUB_MASTERY)]
 
@@ -510,7 +644,7 @@ class TestSwappableWithoutCallsiteEdits:
         session = _QueueSession([_Result([])])
         with use_estimator(_STUB_ID):
             row = await record_attempt_mastery(
-                _as_session(session), _UID, _CID, True, model=model, measured_at=_T1
+                _as_session(session), _CID, evidence=_evidence(True), model=model
             )
         expected = compute_mastery_record(None, None, True, model, 0.0)
         assert (row.mastery, row.confidence, row.sample_size) == expected
@@ -523,10 +657,7 @@ class TestSwappableWithoutCallsiteEdits:
         with use_estimator(_STUB_ID):
             records = await record_problem_attempt_mastery(
                 _as_session(session),
-                _UID,
-                uuid.uuid4(),
-                False,
-                measured_at=_T1,
+                evidence=_evidence(False),
                 assessed_roles=[ConceptRole.PRIMARY],
             )
         assert [r.mastery for r in records] == [_STUB_MASTERY]
@@ -546,7 +677,7 @@ class TestStagedRowsCarryUpdateFields:
         )
         session = _QueueSession([_Result([_CID]), _Result([_SID]), _Result([prior])])
         records = await record_problem_attempt_skill_mastery(
-            _as_session(session), _UID, uuid.uuid4(), True, measured_at=_T0
+            _as_session(session), evidence=_evidence(True, _T0)
         )
         expected = update_mastery(
             _state(MasteryAxis.SKILL, mastery=0.45, sample_size=2, measured_at=_T0),

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import SecretStr
@@ -22,6 +23,10 @@ from whymath_backend.db.models.concept import Concept, ProblemConcept
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.skill_node import SkillNode
 from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 from whymath_backend.schema.concept import Concept as ConceptSchema
 from whymath_backend.schema.concept import ProblemConcept as ProblemConceptSchema
 from whymath_backend.schema.enums import (
@@ -37,6 +42,29 @@ from whymath_backend.schema.problem import Problem as ProblemSchema
 pytestmark = pytest.mark.integration
 
 _SECRET = "integration-jwt-secret-0123456789abcdef"
+
+
+def _ev(
+    learner_id: uuid.UUID,
+    problem_id: uuid.UUID,
+    correct: bool,
+    observed_at: datetime | None = None,
+) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 적재 writer가 받는 타입(어댑터 폐기).
+
+    증거는 순수 관측 객체라 DB 제약을 지지 않는다(영속 0) — 여기서는 적재 경로에 넘길
+    최소 재료만 싣는다.
+    """
+    return build_assessment_evidence(
+        learner_id=learner_id,
+        problem_id=problem_id,
+        correct=correct,
+        observed_at=observed_at or datetime.now(UTC),
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
 
 
 def _settings() -> Settings:
@@ -180,7 +208,9 @@ def test_attempt_resolves_skills_and_gates_non_estimable_on_live_pg() -> None:
         try:
             sm = async_sessionmaker(engine, expire_on_commit=False)
             async with sm() as session:
-                records = await record_problem_attempt_skill_mastery(session, uid, pid, True)
+                records = await record_problem_attempt_skill_mastery(
+                    session, evidence=_ev(uid, pid, True)
+                )
             updated = {r.skill_id for r in records}
             # mastery-estimable 스킬만·비추정(s_nonest) 게이트 제외.
             assert updated == {s_est, s_est2}
@@ -258,7 +288,9 @@ def test_incorrect_blames_primary_skills_only_on_live_pg() -> None:
         try:
             sm = async_sessionmaker(engine, expire_on_commit=False)
             async with sm() as session:
-                records = await record_problem_attempt_skill_mastery(session, uid, pid, False)
+                records = await record_problem_attempt_skill_mastery(
+                    session, evidence=_ev(uid, pid, False)
+                )
             updated = {r.skill_id for r in records}
             assert updated == {s_primary}  # PRIMARY 개념 스킬만
             assert s_tested not in updated  # TESTED 스킬은 거짓 약점 방지로 미갱신

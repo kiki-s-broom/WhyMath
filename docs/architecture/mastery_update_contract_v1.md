@@ -106,21 +106,46 @@ with use_estimator("dkt-v1"):                          # 기본 교체(블록 �
   경계"·§15 동결 13종), 여기서 증명한 것은 *꽂을 자리가 열려 있다*는 것이다 — 테스트 스텁으로
   실제 교체를 실증했다.
 
-## 6. `EOS-12`와의 이음매 (가장 중요한 경계)
+## 6. `EOS-12`와의 이음매 — **착지 완료**(EOS-18, 2026-09-18)
 
-`AssessmentEvidence` **구체 타입의 좌석은 `EOS-12`가 소유**하며 아직 착지하지 않았다. 그래서
-EOS-13은 evidence의 *구조적 입력 계약*만 정의한다.
+EOS-13 시점에는 `AssessmentEvidence` 구체 타입이 아직 없어 이 계약이 *구조적 입력 계약*만
+정의하고, `l2/mastery_contract.py::AttemptOutcomeEvidence`(2속성 최소 어댑터)를 임시 좌석으로
+두었다. **EOS-12(PR #1187)가 착지하고 EOS-18이 그 어댑터를 폐기**해 이음매가 닫혔다.
 
-- **EOS-12가 착지하면 그 `AssessmentEvidence`가 `AssessmentEvidenceInput`을 만족해야 한다** —
-  필요한 것은 `correct: bool`·`observed_at: datetime` 두 속성뿐이며, 상속은 필요 없다(구조적
-  타이핑). 다른 필드를 얼마든지 더 들고 있어도 이 계약은 그것을 읽지 않는다.
-  `TestEvidenceProtocolSeam::test_future_assessment_evidence_satisfies_without_inheritance`가
-  그 상황을 미리 재현해 둔다.
-- 그때 `l2/mastery_contract.py::AttemptOutcomeEvidence`(임시 최소 어댑터)는 **폐기 대상**이다.
-  호출부 시그니처는 바뀌지 않는다.
-- **Protocol의 속성을 늘리지 마라** — evidence의 두 번째 진실 원천이 된다.
-  `test_protocol_reads_exactly_two_attributes`가 속성 집합을 동결해, 늘리려면 의식적으로 깨야
-  한다.
+- **실 `AssessmentEvidence`가 상속 없이 `AssessmentEvidenceInput`을 만족한다**(구조적 타이핑).
+  `AssessmentEvidence`는 `BaseModel`이고 이 Protocol을 상속하지 않는다. 계약은 `correct`·
+  `observed_at` 두 속성만 읽으므로 나머지 필드(귀속·coverage·오개념 후보)는 산출에 닿지 않는다.
+  검증 = `TestEvidenceProtocolSeam::test_real_assessment_evidence_satisfies_without_inheritance`
+  와 `test_real_evidence_extra_fields_do_not_reach_the_estimator`.
+- **어댑터는 폐기됐다.** EOS-13이 예고한 "호출부 시그니처는 바뀌지 않는다"는 **실현되지
+  않았다** — 어댑터를 지우려면 실 증거가 적재 경로까지 내려와야 하고, 그러려면 증거를 조립하는
+  서빙 경로가 그것을 넘겨야 하기 때문이다. 공개 writer의 진입 인자가 바뀌었다:
+
+  | | EOS-13 | EOS-18 이후 |
+  |---|---|---|
+  | `record_problem_attempt_mastery` | `(session, user_id, problem_id, correct, *, measured_at=…)` | `(session, *, evidence)` |
+  | `record_problem_attempt_skill_mastery` | 〃 | `(session, *, evidence)` |
+  | `record_attempt_mastery` | `(session, user_id, concept_id, correct, *, measured_at=…)` | `(session, concept_id, *, evidence)` |
+  | `_stage_*_attempt_mastery`(내부) | `(…, correct, *, estimator, measured_at)` | `(…, *, evidence, estimator)` |
+
+  귀속(학습자·문항)을 인자로도 받으면 같은 사실의 사본이 둘이 되고, 증거와 다른 학습자를 넘겨도
+  아무도 막지 못한다. 인자를 없애 그 실패를 *구조적으로* 불가능하게 만들었다(가드보다 강하다).
+- **행동 변화 1건(명시)**: 적재 행의 `measured_at`이 적재 시점 `datetime.now(UTC)`가 아니라
+  관측 시각 `evidence.observed_at`이다. 증거와 숙달 행이 같은 채점 1건에 대해 서로 다른 시각을
+  말하던 상태가 해소된다. **숙달 수치는 불변**이다 — `observed_at`은 망각 감쇠 입력으로만 쓰이고
+  기본 `p_forget=0.0`이 감쇠를 끈다(`l2/bkt.py::_DEFAULT_P_FORGET`).
+- **Protocol 속성은 2개로 유지한다**(EOS-18 ④ 재판정). 후보는 `learner_id`·`problem_id`를 더해
+  4개로 넓히는 안이었고, 채택하지 않았다: 그 둘은 *추정 입력*이 아니라 **귀속 식별자**다 —
+  추정기(BKT·후속 DKT)는 "누구의 어느 문항인가"를 읽지 않고 "맞았는가·언제인가"만 읽는다.
+  귀속은 이미 두 자리가 소유한다(대상축 = `LearnerMasteryState.axis`/`target_id`, 계약이 불일치를
+  `MasteryContractError`로 차단 · 학습자·문항 = 공개 writer가 증거에서 직접 읽음). 여기에 또
+  실으면 귀속의 세 번째 진실 원천이 되고 추정기 Protocol이 추정과 무관한 것을 요구하게 된다.
+  `test_protocol_reads_exactly_two_attributes`가 이 판정을 동결한다.
+- **어댑터 재도입 방어**(EOS-18 ⑤): 이름 열거가 아니라 **산출물 검사**다 —
+  `TestAdapterRetirementIsEnforced::test_no_module_defines_a_second_evidence_type`이 숙달 모듈이
+  *정의한* 클래스를 전수로 훑어 계약이 읽는 속성 집합을 갖춘 것이 있는지 본다(이름을 바꿔
+  되살려도 걸린다). 스캔 0건은 실패로 처리한다. 뮤테이션 5종 전건 RED로 변별력을 확인했다
+  (어댑터 재도입·귀속 폴백·측정시각 분리·정오답 고정·스캔 대상 전멸).
 - 이름 근거: 2026-09-16 Kiki 판정(A안)으로 계획서 쪽 per-answer 채점 산출의 이름이
   **`AssessmentEvidence`** 로 확정됐다. 저장소 정본 `schema/assessment.py::Assessment`(진단
   세션)와는 다른 객체다 — `schema/learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석이

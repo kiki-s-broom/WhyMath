@@ -244,8 +244,10 @@ class TestModelBAgreement:
         expected = {e.concept_id for e in evidence.concept_evidence}
 
         writer_session = _RoleSession(primary=primary, tested=tested)
+        # EOS-18: writer가 **그 증거 객체 자체**를 소비한다 — 정답 여부를 따로 넘기지
+        # 않으므로 조립과 적재가 어긋날 여지가 구조적으로 없다(사본 0).
         rows = await record_problem_attempt_mastery(
-            cast(AsyncSession, writer_session), _LEARNER, _PROBLEM, correct
+            cast(AsyncSession, writer_session), evidence=evidence
         )
         assert {row.concept_id for row in rows} == expected
 
@@ -267,7 +269,7 @@ class TestModelBAgreement:
 
         writer_session = _RoleSession(primary=primary, tested=tested, skills=["skill.slope"])
         await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, writer_session), _LEARNER, _PROBLEM, correct
+            cast(AsyncSession, writer_session), evidence=evidence
         )
         # writer가 개념 조회에 쓴 role 필터를 재생해 같은 집합인지 본다.
         selected: set[uuid.UUID] = set()

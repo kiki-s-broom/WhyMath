@@ -20,9 +20,15 @@
   - `l2/mastery_tracking.py::_stage_attempt_mastery` (개념 축 적재)
   - `l2/skill_mastery_tracking.py::_stage_skill_attempt_mastery` (스킬 축 적재)
 그 위의 서빙 진입점(`POST /v1/me/attempts` → `record_problem_attempt_mastery` ·
-`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. **API·L3·L4가 이
-계약 타입을 직접 읽는 배선은 아직 없다** — `LearnerState` 단일 조회 표면(`EOS-10`)·
-`AssessmentEvidence` 구체 타입(`EOS-12`)·추천 계약(`EOS-14`)이 각자 소유한다.
+`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. `LearnerState` 단일
+조회 표면(`EOS-10`)·추천 계약(`EOS-14`)은 각자 소유한다.
+
+**EOS-18(2026-09-18)**: 증거 축의 이음매가 닫혔다. EOS-13이 두었던 임시 어댑터
+`AttemptOutcomeEvidence`(2속성)를 폐기하고, 서빙 경로가 `collect_assessment_evidence`로 조립한
+**실 `AssessmentEvidence`가 적재 경로까지 그대로 내려온다**. 그래서 이제 API가 이 계약의 입력
+타입을 *직접* 만든다 — 정오답·관측시각·학습자·문항의 사본이 0이고, 조립과 적재가 어긋날 여지가
+구조적으로 없다. 이 모듈은 여전히 구체 타입을 import하지 않는다(추정기가 읽는 것은
+`AssessmentEvidenceInput` 2속성뿐 — 귀속은 추정 입력이 아니다).
 """
 
 from __future__ import annotations
@@ -30,7 +36,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
 from datetime import datetime
 from typing import NamedTuple
 
@@ -46,7 +51,6 @@ from whymath_backend.schema.mastery_contract import (
 
 __all__ = [
     "BKT_ESTIMATOR_ID",
-    "AttemptOutcomeEvidence",
     "BktMasteryEstimator",
     "MasteryEstimatorFactory",
     "MasteryRecord",
@@ -109,24 +113,6 @@ def compute_mastery_record(
     sample_size = (prior_sample_size or 0) + 1
     confidence = round(sample_size / (sample_size + _CONFIDENCE_HALFLIFE), _MASTERY_DECIMALS)
     return MasteryRecord(mastery=mastery, confidence=confidence, sample_size=sample_size)
-
-
-# ── 증거 어댑터(EOS-12 착지 전 임시 좌석) ─────────────────────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptOutcomeEvidence:
-    """`AssessmentEvidenceInput`을 만족하는 **최소** 어댑터 — 채점 결과 1건.
-
-    ⚠️ **이것은 `AssessmentEvidence`가 아니다.** 구체 evidence 타입의 좌석은 `EOS-12`가
-    소유하며 아직 착지하지 않았다. 계약이 실제로 읽는 두 속성만 담은 임시 운반체이며,
-    **필드를 늘리면 evidence의 두 번째 진실 원천이 된다** — 늘리지 마라. `EOS-12`가 착지하면
-    그 타입이 같은 Protocol을 만족하므로 호출부는 이 클래스 대신 그것을 넘기면 되고, 이
-    어댑터는 그때 폐기 대상이다(호출부 시그니처는 그대로).
-    """
-
-    correct: bool
-    observed_at: datetime
 
 
 # ── ② BKT 추정기 어댑터 ───────────────────────────────────────────────────────

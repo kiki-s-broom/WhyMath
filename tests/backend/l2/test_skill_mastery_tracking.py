@@ -23,9 +23,31 @@ from whymath_backend.l2.skill_mastery_tracking import (
     get_current_skill_mastery,
     record_problem_attempt_skill_mastery,
 )
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 
 _M = BktModel()
 _UID = uuid.uuid4()
+_PID = uuid.uuid4()
+_T = datetime(2026, 1, 8, tzinfo=UTC)
+
+
+def _evidence(correct: bool, observed_at: datetime = _T) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 스킬 적재 경로가 받는 타입(어댑터 폐기)."""
+    return build_assessment_evidence(
+        learner_id=_UID,
+        problem_id=_PID,
+        correct=correct,
+        observed_at=observed_at,
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
+
+
 _SID = "skill.compute-fraction"
 
 
@@ -131,7 +153,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[c1,c2] → #2 스킬[s1,s2] → #3 s1 prior[] → #4 s2 prior[]
         fake = _QueueSession([_QResult([c1, c2]), _QResult([s1, s2]), _QResult([]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M, measured_at=ts
+            cast(AsyncSession, fake), evidence=_evidence(True, ts), model=_M
         )
         assert [r.skill_id for r in records] == [s1, s2]
         assert all(float(r.mastery) == 0.69 for r in records)  # 정답·첫 관측
@@ -146,7 +168,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 PRIMARY[c_p] → #2 스킬[s1] → #3 s1 prior[]
         fake = _QueueSession([_QResult([c_p]), _QResult([s1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.skill_id for r in records] == [s1]
         assert records[0].mastery == 0.15  # 오답·첫 관측
@@ -159,7 +181,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 PRIMARY[] → #2 TESTED[c_t] → #3 스킬[s1] → #4 s1 prior[]
         fake = _QueueSession([_QResult([]), _QResult([c_t]), _QResult([s1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.skill_id for r in records] == [s1]
         assert fake.commits == 1
@@ -169,7 +191,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[] — 이후 _assessed_skill_ids는 빈 입력이라 쿼리 없음.
         fake = _QueueSession([_QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True
+            cast(AsyncSession, fake), evidence=_evidence(True)
         )
         assert records == []
         assert fake.added == []
@@ -181,7 +203,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[c1] → #2 스킬[] (해소 0)
         fake = _QueueSession([_QResult([c1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True
+            cast(AsyncSession, fake), evidence=_evidence(True)
         )
         assert records == []
         assert fake.added == []
@@ -193,7 +215,7 @@ class TestRecordProblemAttemptSkillMastery:
         s1 = "skill.a"
         fake = _QueueSession([_QResult([c1]), _QResult([s1]), _QResult([_prior_row(0.69, 1)])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(True), model=_M
         )
         assert records[0].mastery == 0.92
         assert records[0].sample_size == 2
