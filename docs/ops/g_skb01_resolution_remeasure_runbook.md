@@ -120,7 +120,7 @@
 | 2 | DB 미도달 | [C]의 `REACH_EXIT`가 먼저 잡는다 — [D]는 그 상태에서 **스스로 거부**한다 |
 | 3 | 스키마 뒤처짐(`attempt_event.skill_ids` 부재) | §7-1 마이그레이션 1회 후 [D] 재실행 |
 | 4 | 후보 문제 0건 | 1회차에 1,704건이 적재됐으므로 정상이면 나오지 않는다 — 나오면 세션에 전달 |
-| 5 | 제출 전건 실패 | 화면의 「실패 사유」 표(예외 타입명)를 그대로 세션에 전달 |
+| 5 | 제출 전건 실패 | 「실패 사유」 표의 예외 타입명이 가른다. `UndefinedColumnError`면 **스키마 드리프트**이므로 §7-1로 간다(exit 3은 `attempt_event.skill_ids` 한 컬럼만 보므로 다른 컬럼의 드리프트는 여기로 온다 — 2026-09-18 실측). 그 외 타입명은 그대로 세션에 전달 |
 
 ## 5. 실행 환경
 
@@ -300,18 +300,51 @@ git status --short --branch
 
 ## 7. 보조 블록 (필요할 때만)
 
-### 7-1. 프로브 exit 3(스키마 뒤처짐)이 났을 때 — 마이그레이션 1회
+### 7-1. 프로브가 스키마 뒤처짐으로 실패했을 때 — 현재 리비전 확인 후 마이그레이션
+
+> **2026-09-18 실측으로 드러난 경로다.** 프로브가 `PROBE_EXIT=5`(제출 전건 실패)로 끝나고 실패
+> 사유가 `UndefinedColumnError: column "..." of relation "problem_attempt" does not exist`면,
+> 라우트·인증 문제가 아니라 **prod DB 스키마가 main보다 뒤처진 것**이다. 프로브의 exit 3 검사는
+> `attempt_event.skill_ids` 한 컬럼만 보므로 **다른 컬럼의 드리프트는 exit 5로 나타난다**(§4-4).
+
+**[7-1a] 현재 리비전 조회 (읽기 전용 — DB를 바꾸지 않는다)**
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
-& $Py -m whymath_backend.ops.db_host_reachability
-$ReachOk = ($LASTEXITCODE -eq 0)
-$IniOk = Test-Path "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\alembic.ini"
-"REACH_OK=$ReachOk  INI_OK=$IniOk"
-if ($ReachOk -and $IniOk) { cd C:\Users\kiki\Desktop\__AI\WhyMath\src\backend; & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; cd $WT } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk. DB에 못 붙는 상태에서 upgrade가 실패하면 그 실패가 스키마 문제처럼 보여 원인을 가린다." }
+docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT version_num FROM alembic_version;"
+"PROD_REVISION_EXIT=$LASTEXITCODE"
+cd "$WT\src\backend"
+& $Py -m alembic -c alembic.ini current
+"ALEMBIC_CURRENT_EXIT=$LASTEXITCODE"
+& $Py -m alembic -c alembic.ini heads
+"ALEMBIC_HEADS_EXIT=$LASTEXITCODE"
+cd $WT
 ```
 
-`ALEMBIC_EXIT=0`을 확인한 뒤 [D]를 다시 붙여넣는다.
+출력 3종(prod 리비전 · `current` · `heads`)을 **세션에 전달하고 멈춘다.** 세션이 그 리비전과 head
+사이의 마이그레이션을 열거해 파괴적 연산 유무를 판정한 뒤 [7-1b] 실행 여부를 답한다 —
+`upgrade head`는 스키마를 바꾸므로 "몇 칸 뒤처졌는지 모르는 채" 돌리지 않는다.
+
+**[7-1b] 마이그레이션 (세션이 [7-1a] 판정을 회신한 뒤에만)**
+
+`alembic.ini`와 `versions/`를 **worktree**(main tip)에서 읽는다 — 공유 클론은 타 세션 브랜치에
+있을 수 있어 그쪽 `versions/`를 쓰면 *어느 트리의 마이그레이션인지 모르는 채* 스키마가 바뀐다.
+
+```powershell
+# [Windows PowerShell · Phaiakes9] 같은 창
+cd "$WT\src\backend"
+& $Py -m whymath_backend.ops.db_host_reachability
+$ReachOk = ($LASTEXITCODE -eq 0)
+$IniOk = Test-Path "$WT\src\backend\alembic.ini"
+$Confirm = Read-Host "세션이 [7-1b] 실행을 승인했습니까? 마이그레이션하려면 UPGRADE 를 입력하세요"
+$Approved = ($Confirm -ceq "UPGRADE")
+"REACH_OK=$ReachOk  INI_OK=$IniOk  APPROVED=$Approved"
+if ($ReachOk -and $IniOk -and $Approved) { & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; & $Py -m alembic -c alembic.ini current } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk APPROVED=$Approved. 스키마는 그대로다." }
+cd $WT
+```
+
+`ALEMBIC_EXIT=0`과 `current`가 head로 바뀐 것을 확인한 뒤 **[D]를 다시 붙여넣는다**(프로브는
+이미 시도한 문항을 제외하므로 새 표본 20건이 뽑힌다).
 
 ### 7-2. 표본 정리 (선택 — **증적을 세션에 전달한 뒤에만**)
 
