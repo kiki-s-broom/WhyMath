@@ -4,11 +4,18 @@
 > 게이트가 풀리면 `SKB-01-skill-concept-bridge-prod-populate` acceptance ④가 닫히고,
 > 그 수치가 `EOS-63-attempt-skill-event-consumption` acceptance ②의 전환 판정 재료가 된다.
 >
-> **판정 기준: main `265a4106`** — 아래 명령·경로·인자·기본값은 전부 그 커밋의 코드에서 실측
+> **판정 기준: main `eb048e20`**(최초 검증 `265a4106` · 2026-09-16 회차 이후 재확인) — 아래 명령·
+> 경로·인자·기본값은 전부 그 커밋의 코드에서 실측
 > 확인했다(`attempt_skill_reach_probe.main()`·`attempt_skill_event_reach_report.main()`의
 > argparse 정의 · `probe_to_json()` 키 · `db_host_reachability` 실재 · `concept`/`problem_concept`/
 > `skill_node` 테이블·컬럼명).
 >
+> **재확인(2026-09-16 → `eb048e20`, 10커밋 진행)**: 그 사이 `EOS-13` 숙달 계약 리팩터가 착지해
+> `skill_mastery_tracking.py`(+100줄)·`api/me.py`(+410줄)가 바뀌었으나, **해소 쿼리
+> `_assessed_skill_ids`는 실질 무변경**이고(여전히 `Concept.behavior_skills` ∩ `skill_node`
+> estimable) writer 배선(`skill_records` → `record_attempt_skill_event(skill_ids=...)`)도 그대로다.
+> 프로브·리포트·도달성 CLI 3종은 파일 자체가 무변경. 즉 이 회차의 설계는 그대로 유효하다.
+
 > **1회차(2026-09-10)와의 차이**: 그때는 `RESOLUTION=0.0`이었고 원인이 브리지 데이터 공백이었다.
 > 그 공백은 두 게이트가 닫아 해소됐다(`skill_node` 0→27 · `concept.behavior_skills` 0→1,198
 > nonempty). 이 회차는 **그 해소가 해소율로 나타나는지**를 잰다.
@@ -54,17 +61,18 @@
 
 | 단계 | 무엇이 일어나는가 | 기대 출력 | 소요 |
 |---|---|---|---|
-| A | 임시 worktree를 main에 detach로 만든다(공유 클론 무변경) | `WT_HEAD=265a4106` · `PROBE_FILE_OK=True` | ~30초 |
-| B | 환경 주입 + 도달성 + **사슬 진단**(읽기 전용·쓰기 0) | `REACH_EXIT=0` + 진단 7행 | ~30초 |
-| C | 표본 20건 제출 + 사후 측정 + 증적 (**여기서만 DB에 쓴다**) | 증적 8줄 | 1~3분 |
-| D | worktree 정리 + 원래 자리 복귀 | `WT_REMOVED=True` | ~10초 |
+| A | **Docker Desktop 기동 + prod DB 도달 확인** | `DOCKER_OK=True` | ~10초 (꺼져 있으면 최대 3분) |
+| B | 임시 worktree를 main에 detach로 만든다(공유 클론 무변경) | `WT_IS_MAIN_TIP=True` · `PROBE_FILE_OK=True` | ~30초 |
+| C | 환경 주입 + 도달성 + **사슬 진단**(읽기 전용·쓰기 0) | `REACH_EXIT=0` + 진단 7행 | ~30초 |
+| D | 표본 20건 제출 + 사후 측정 + 증적 (**여기서만 DB에 쓴다**) | 증적 8줄 | 1~3분 |
+| E | worktree 정리 + 원래 자리 복귀 | `WT_REMOVED=True` | ~10초 |
 
-**[A]가 worktree를 쓰는 이유**: Kiki 클론은 여러 세션이 공유하는 단일 작업 사본이라 타 세션의
+**[B]가 worktree를 쓰는 이유**: Kiki 클론은 여러 세션이 공유하는 단일 작업 사본이라 타 세션의
 브랜치·미커밋 변경이 상시 존재한다. 2026-09-14·09-15 두 회차가 연달아 그것에 걸렸고, 09-15에는
 정지 신호가 켜졌는데도 옛 CLI가 돌아 적재가 0건으로 끝났다. worktree는 원 작업 사본의 브랜치도
 미커밋 변경도 **건드리지 않으면서** main 코드를 돌린다(CLAUDE.md 2026-09-15 등재 기법 ⓑ).
 
-**쓰기가 남는다(의도)**: [C]는 prod DB에 채점 20건을 남긴다 — 남지 않으면 잴 것이 없다. 전부
+**쓰기가 남는다(의도)**: [D]는 prod DB에 채점 20건을 남긴다 — 남지 않으면 잴 것이 없다. 전부
 프로브 전용 고정 사용자 `c5de83b3-9143-58e8-a7a8-cf378801c065` 소유라 정리가 user_id 하나로
 끝난다(§6).
 
@@ -84,7 +92,7 @@
 
 ### 4-3. `RESOLUTION=0`일 때 어느 고리가 끊겼는가 (이 회차의 핵심 설계)
 
-1회차는 0%를 얻고도 원인 확인에 **별도 쿼리 왕복**이 필요했다. 이번엔 [B]의 진단과 [C]의
+1회차는 0%를 얻고도 원인 확인에 **별도 쿼리 왕복**이 필요했다. 이번엔 [C]의 진단과 [D]의
 `CONCEPT_UPDATED_ATTEMPTS`가 같은 회차 안에서 고리를 가른다:
 
 | 진단 값 | 뜻 | 다음 행동 |
@@ -99,7 +107,7 @@
 개념 skills 전건 채움에서 `D`가 1→2, 전건 비움에서 `D`·`E`가 0, 링크 전멸에서 `B`·`C`·`D`가 0이되
 `E`는 1로 남았다. 즉 위 표의 2행("링크가 없다")과 3행("링크는 있는데 skills가 비었다")은 **실제로
 서로 다른 값 패턴을 낸다**. 범위 고지: 검증한 것은 *쿼리가 도는가와 무엇을 가르는가*이며, prod의
-실제 행 수는 [B]가 처음 잰다.
+실제 행 수는 [C]가 처음 잰다.
 
 `G_concept_with_source_id`는 위 2행의 가설을 가르는 보조 값이다 — 원자 백본 적재기
 (`atom_backend_concept.py`)는 `source_id`를 채우지 않으므로(grep 0건 실측), 이 값이 0이면
@@ -109,8 +117,8 @@
 
 | exit | 뜻 | 대처 |
 |---:|---|---|
-| 2 | DB 미도달 | [B]의 `REACH_EXIT`가 먼저 잡는다 — [C]는 그 상태에서 **스스로 거부**한다 |
-| 3 | 스키마 뒤처짐(`attempt_event.skill_ids` 부재) | §7-1 마이그레이션 1회 후 [C] 재실행 |
+| 2 | DB 미도달 | [C]의 `REACH_EXIT`가 먼저 잡는다 — [D]는 그 상태에서 **스스로 거부**한다 |
+| 3 | 스키마 뒤처짐(`attempt_event.skill_ids` 부재) | §7-1 마이그레이션 1회 후 [D] 재실행 |
 | 4 | 후보 문제 0건 | 1회차에 1,704건이 적재됐으므로 정상이면 나오지 않는다 — 나오면 세션에 전달 |
 | 5 | 제출 전건 실패 | 화면의 「실패 사유」 표(예외 타입명)를 그대로 세션에 전달 |
 
@@ -118,7 +126,7 @@
 
 - **머신**: Phaiakes9(= Kiki의 작업 PC 그 자체 · 별도 접속 없음)
 - **시스템**: Windows PowerShell (WSL 아님)
-- **작업 디렉터리**: `C:\Users\kiki\Desktop\__AI\WhyMath` — [A]가 임시 worktree로 옮긴다
+- **작업 디렉터리**: `C:\Users\kiki\Desktop\__AI\WhyMath` — [B]가 임시 worktree로 옮긴다
 - **선행 조건**: Docker Desktop 실행 중 · `whymath-pg` 컨테이너(호스트 포트 **5433**) 가동 ·
   `src\backend\.venv` 세팅 완료
 - **DB**: prod DB = docker `whymath-pg` (5433). 데모용 55432·타 프로젝트 5432와 혼동 금지.
@@ -126,10 +134,10 @@
 ## 6. 창 구분
 
 **전 단계가 새 PowerShell 창 하나에서 끝난다.** 서버(uvicorn)를 띄우지 않으므로 점유 창이 없다.
-새 창을 열고 [A]→[B]→[C]→[D]를 **하나씩** 붙여넣는다.
+새 창을 열고 [A]→[B]→[C]→[D]→[E]를 **하나씩** 붙여넣는다.
 
-> **[B]와 [C] 사이에서 한 번 멈춘다.** [B]의 `REACH_EXIT`와 진단 7행을 눈으로 본 뒤 [C]로 간다.
-> 보지 않고 넘어가도 [C]가 스스로 거부하므로 DB는 안전하지만, 거부 사유를 읽으려면 [B]의 출력이
+> **[C]와 [D] 사이에서 한 번 멈춘다.** [C]의 `REACH_EXIT`와 진단 7행을 눈으로 본 뒤 [D]로 간다.
+> 보지 않고 넘어가도 [D]가 스스로 거부하므로 DB는 안전하지만, 거부 사유를 읽으려면 [C]의 출력이
 > 화면에 있어야 한다.
 
 ---
@@ -138,7 +146,45 @@
 
 > 자리표시자가 하나도 없다. 각 블록을 **통째로** 붙여넣으면 된다.
 
-### [A] 임시 worktree — main 코드를 공유 클론과 분리해 확보
+### [A] Docker Desktop 기동 + prod DB 도달 확인
+
+> **이 블록이 이 런북의 1회차 결함이다.** 2026-09-16 회차가 Docker 미가동으로 공전했다 —
+> §5가 "선행 조건: Docker Desktop 실행 중"이라고 *적기만* 하고 블록이 그것을 **확인하지
+> 않았다**. 산문에 적힌 선행 조건은 집행이 아니다. 형태는 `skb04_concept_content_populate_runbook.md`
+> [A]에서 그대로 가져왔다(그 런북은 이 단계 덕에 1회에 성립했다).
+
+```powershell
+# [Windows PowerShell · Phaiakes9] 새 창
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+docker info *> $null
+if ($LASTEXITCODE -ne 0) {
+  "DOCKER_DAEMON=down — Docker Desktop 기동을 시도합니다(최대 180초)."
+  $DockerExe = @(
+    "C:\Program Files\Docker\Docker\Docker Desktop.exe",
+    "$env:LOCALAPPDATA\Docker\Docker Desktop.exe"
+  ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+  "DOCKER_EXE_FOUND=" + [bool]$DockerExe
+  if ($DockerExe) { Start-Process $DockerExe }
+  for ($i = 1; $i -le 36; $i++) {
+    Start-Sleep -Seconds 5
+    docker info *> $null
+    if ($LASTEXITCODE -eq 0) { "DOCKER_UP_AFTER_SEC=" + ($i * 5); break }
+  }
+}
+docker start whymath-pg *> $null
+docker ps --filter "name=whymath-pg" --format "{{.Names}} | {{.Status}} | {{.Ports}}"
+$Probe = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT 1;"
+"DOCKER_OK=" + ($LASTEXITCODE -eq 0 -and $null -ne $Probe)
+```
+
+**자가검증**: `DOCKER_OK=True`. `whymath-pg` 줄에 `0.0.0.0:5433->5432/tcp`가 보여야 한다.
+- `DOCKER_EXE_FOUND=False`면 두 후보 경로에 Docker Desktop이 없다 — 설치 위치를 세션에 알린다.
+- 180초 안에 안 뜨면 `DOCKER_UP_AFTER_SEC`이 찍히지 않는다. 그 경우 Docker Desktop을 직접 띄우고
+  트레이 아이콘이 안정될 때까지 기다린 뒤 이 블록을 다시 붙여넣는다(멱등하다).
+- `DOCKER_OK=False`인데 컨테이너 줄은 보이면 컨테이너는 살아 있고 psql이 실패한 것이다 —
+  화면의 오류 줄을 세션에 전달한다.
+
+### [B] 임시 worktree — main 코드를 공유 클론과 분리해 확보
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 새 창
@@ -155,22 +201,27 @@ cd $WT
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 Remove-Item "$Out\probe.json", "$Out\report.json" -ErrorAction SilentlyContinue
 git log --oneline -1
-"WT_HEAD=" + (git rev-parse --short HEAD)
+"WT_HEAD=" + (git rev-parse --short HEAD) + "  MAIN_TIP=" + (git rev-parse --short origin/main)
+"WT_IS_MAIN_TIP=" + ((git rev-parse HEAD) -eq (git rev-parse origin/main))
 "PROBE_FILE_OK=" + (Test-Path "src\backend\whymath_backend\harness\attempt_skill_reach_probe.py")
 "PY_OK=" + (Test-Path $Py)
 "CWD=" + (Get-Location).Path
 ```
 
-**자가검증**: `WT_HEAD=265a4106` · `PROBE_FILE_OK=True` · `PY_OK=True` · `CWD`가 `whymath-wt-remeasure`로
+**자가검증**: `WT_IS_MAIN_TIP=True` · `PROBE_FILE_OK=True` · `PY_OK=True` · `CWD`가 `whymath-wt-remeasure`로
 끝난다. 이 블록은 원 클론의 브랜치·미커밋 변경을 **전혀 건드리지 않는다**.
 - `PY_OK=False`면 venv 경로가 다르다 — 세션에 알린다(원 클론의 venv를 쓰는 것이 의도다.
   worktree에는 `.venv`가 없다).
-- `WT_HEAD`가 다르면 `git fetch`가 실패한 것이다 — 그 숫자를 세션에 전달한다.
+- `WT_IS_MAIN_TIP=False`면 fetch가 실패했거나 엉뚱한 커밋을 잡은 것이다 — `WT_HEAD`·`MAIN_TIP` 두
+  값을 세션에 전달한다. **특정 해시를 기대값으로 적지 않는 이유**: main은 이 런북과 무관하게
+  계속 움직이므로, 고정 해시 기대값은 정상 상태에서 상시 불일치를 내 사람이 검증 스텝 자체를
+  무시하게 만든다(2026-09-16 실측 — 이 런북 1회차가 `WT_HEAD=265a4106`을 기대값으로 적었고
+  실제로는 정상적으로 `eb048e20`이 나왔다). 비교 대상은 *그때의 origin/main*이지 과거의 한 점이 아니다.
 - 첫 줄의 중첩 가드는 *이전 회차가 중간에 죽어 폴더만 남은* 경우를 처리한다 — `worktree remove`가
   등록되지 않은 폴더를 지우지 못하면 `worktree add`가 "폴더가 비어 있지 않다"로 실패하기 때문이다.
   지우는 대상은 두 줄 위에서 이 블록이 직접 정한 전용 경로뿐이다.
 
-### [B] 환경 + 도달성 + 사슬 진단 (읽기 전용 — DB에 아무것도 쓰지 않는다)
+### [C] 환경 + 도달성 + 사슬 진단 (읽기 전용 — DB에 아무것도 쓰지 않는다)
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
@@ -190,15 +241,15 @@ docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "SELE
 **자가검증**: `MODULE_FROM`이 `whymath-wt-remeasure` 경로로 시작 · `REACH_EXIT=0` · `DIAG_EXIT=0` ·
 진단 7행 출력.
 - `MODULE_FROM`이 원 클론(`Desktop\__AI\WhyMath\src`) 경로면 **worktree 코드가 아니라 설치된
-  패키지가 돌고 있다** — [C]가 거부한다. 그 줄을 세션에 전달한다.
+  패키지가 돌고 있다** — [D]가 거부한다. 그 줄을 세션에 전달한다.
 - `REACH_EXIT=1`이면 DB에 못 붙는다(CLI가 상태와 대책을 함께 출력한다). `REACH_EXIT=2`는 고장이
   아니라 **측정 불가**(docker 미가동 등)다 — 화면의 `측정 사유 기록`을 먼저 해소한다.
 - 기대값: `E_concept_nonempty_skills=1198` · `F_skill_node_estimable=27`. 이 둘이 다르면 앞선 두
-  게이트의 적재가 이후 뒤집혔다는 뜻이므로 **[C]로 가지 말고** 세션에 알린다.
+  게이트의 적재가 이후 뒤집혔다는 뜻이므로 **[D]로 가지 말고** 세션에 알린다.
 
-**여기서 한 번 멈춘다.** 위 값들을 눈으로 확인한 뒤 [C]로 간다.
+**여기서 한 번 멈춘다.** 위 값들을 눈으로 확인한 뒤 [D]로 간다.
 
-### [C] 표본 20건 + 사후 측정 + 증적 (**여기서만 DB에 쓴다** · 선행 미충족이면 스스로 거부)
+### [D] 표본 20건 + 사후 측정 + 증적 (**여기서만 DB에 쓴다** · 선행 미충족이면 스스로 거부)
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
@@ -244,7 +295,7 @@ if ($ModuleOk -and $ReachOk) {
 블록이 선행 판정을 **다시 계산해** 거부한다(CLAUDE.md 2026-09-15 등재). `WRITE_REFUSED=True`가
 뜨면 DB는 안전하다 — 아무것도 쓰지 않았다.
 
-### [D] 정리 — worktree 제거 + 원래 자리 복귀
+### [E] 정리 — worktree 제거 + 원래 자리 복귀
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
@@ -257,7 +308,7 @@ git status --short --branch
 
 **자가검증**: `WT_REMOVED=True`. 산출물(`probe.json`·`report.json`)은 원 클론의
 `work\skb01-remeasure\`에 남아 worktree 제거와 무관하게 보존된다(`/work/`는 gitignore 대상).
-`git status`가 [A] 이전과 같아야 한다 — 이 회차는 원 클론의 브랜치·미커밋 변경을 건드리지 않았다.
+`git status`가 [B] 이전과 같아야 한다 — 이 회차는 원 클론의 브랜치·미커밋 변경을 건드리지 않았다.
 
 ---
 
@@ -273,7 +324,7 @@ cd C:\Users\kiki\Desktop\__AI\WhyMath\src\backend
 cd C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure
 ```
 
-`ALEMBIC_EXIT=0`을 확인한 뒤 [C]를 다시 붙여넣는다.
+`ALEMBIC_EXIT=0`을 확인한 뒤 [D]를 다시 붙여넣는다.
 
 ### 7-2. 표본 정리 (선택 — **증적을 세션에 전달한 뒤에만**)
 
@@ -299,10 +350,10 @@ docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "DELE
 그 적재기 `atom_backend_concept.py`는 `source_id`를 **채우지 않는다**(grep 0건 실측). 그래서
 "구 체인이 아무것도 해소하지 못해 `problem_concept`이 비어 있을" 가능성이 있다 — 다만 그 테이블의
 실제 행 수는 **prod 사실이라 저장소에서 판정할 수 없다**. 소스를 읽어 그렇게 보인다는 범위까지가
-세션이 말할 수 있는 전부이며, [B]의 진단이 그것을 잰다.
+세션이 말할 수 있는 전부이며, [C]의 진단이 그것을 잰다.
 
 해소 경로(`problem_bank.populate` 재실행 + reconcile로 구 437 잔재 자동 청소)는 코드에 이미
-있으나(populate.py §76), 그 실행은 이 게이트의 범위가 아니다 — [B]가 `B_problem_concept_rows=0`을
+있으나(populate.py §76), 그 실행은 이 게이트의 범위가 아니다 — [C]가 `B_problem_concept_rows=0`을
 내면 별도 태스크로 등재한다.
 
 ## 9. 이 회차가 답하지 못하는 것 (정직 고지)
@@ -319,9 +370,9 @@ docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "DELE
 
 ## 10. 게이트 clear 방법
 
-**Kiki가 할 일은 §[C]의 증적 8줄(+ [B]의 진단 7행)을 세션에 전달하는 것까지다.** 대장 조작
+**Kiki가 할 일은 §[D]의 증적 8줄(+ [C]의 진단 7행)을 세션에 전달하는 것까지다.** 대장 조작
 (`backlog.py gates clear`)은 세션이 가져간다 — 증적 문자열이 자리표시자를 포함할 수밖에 없어
 그대로 실행되면 잘못된 증적이 대장에 박히기 때문이다.
 
 세션 쪽 참고: `--evidence`에는 판정 기준(커밋 해시 또는 PR 참조)이 반드시 들어가야 한다
-(HARN-68 — 없으면 CLI가 exit 1로 거부한다). 증적 본문은 [B] 진단 7행 + [C] 증적 8줄로 구성한다.
+(HARN-68 — 없으면 CLI가 exit 1로 거부한다). 증적 본문은 [C] 진단 7행 + [D] 증적 8줄로 구성한다.
