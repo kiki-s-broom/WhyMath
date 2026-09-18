@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/api/me.py
   - src/backend/whymath_backend/l2/recommendation_contract.py
-session: null
+session: claude/epic-faraday-dz38gd
 notes: "출처: EOS-14(추천 호출 계약 분리) acceptance ① 중 **미이행분**의 승계. EOS-14는 Kiki 지시 범위(\"근거 배선까지\")에 따라 계약 타입 + reason 산출·응답 노출·영속까지 집행하고, 핸들러의 learner_state 입력 전환은 의도적으로 열어 뒀다(선택 알고리즘 무변경 = 결과 불변의 구조적 보장을 유지하기 위함).\n\n정직 표기(판정 기준 main 27df076e + EOS-14 브랜치): `RecommendationPolicy`·`LearningContext`·`Recommendation` 세 타입은 EOS-14 착지 시점에 **소비처 0건**이다. reason 축만 배선됐다. 이 태스크가 그 셋의 첫 소비처다.\n\n선행: EOS-14 착지 후 착수(대장 depends_on으로 집행 — 산문 아님)."
-updated: 2026-09-17
+updated: 2026-09-18

@@ -599,6 +599,22 @@ CATALOG: tuple[Spec, ...] = (
        "붙인다. 선택 알고리즘은 WM-E-205·WM-E-202 좌석이 유일 권위이고 이 행은 선택 *뒤에* "
        "돌아 결과를 바꾸지 않는다(session.add·commit 0건)",
        "l2.recommendation_contract", "l2.recommendation_reason"),
+    # EOS-19 — WM-E-211(계약)의 **첫 소비처**라 행을 나눈다: 그쪽은 "근거를 붙인다"이고 이쪽은
+    # "정책이 결정한다"이며, 사용자에게 의미 있는 능력 단위가 다르다(계약은 교체돼도 남고 정책은
+    # 교체 대상이다). 세 모듈이 한 행인 이유는 한 흐름의 세 구간이기 때문이다 — 후보 조회 배선
+    # (l2.next_problem_selection) → 기본 CAT 정책(l2.recommendation_policy) → 수능 정책
+    # (api._next_problem_policy). 수능 정책만 `api`에 사는 이유는 그 모듈 docstring 참조
+    # (L6 게이팅 + DB를 동시에 쓰는 유일한 합법 합성 지점).
+    # 번호: main + 원격 39 ref 전수 스캔에서 WM-E-213 미사용 확인(2026-09-18). 클론이 shallow라
+    # 그 39개 밖의 ref는 보지 못했다 — "내가 찾은 방법으로는 0건"이다.
+    _e("WM-E-213", "추천 정책 v1 — recommend(learner_state, learning_context) 실호출", "Student",
+       "Recommendation", "P1",
+       "EOS-19 — 계획서 300 §8. 핸들러가 고르던 문항을 정책 함수가 고른다: LearnerState를 "
+       "입력으로 받고 `Recommendation`(필수 reason + 파생 action + 목표 개념)을 돌려주며, "
+       "핸들러는 그것을 HTTP 응답으로 옮기기만 한다. 알고리즘은 전환 전과 같아 추천 결과가 "
+       "바뀌지 않는다(회귀 0). 개념 그래프 조회는 depth<=2·nodes<=20·visited·timeout 예산 "
+       "안에서만 돌며 그 천장은 생성 시점에 강제된다",
+       "l2.next_problem_selection", "l2.recommendation_policy", "api._next_problem_policy"),
     # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
     # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
     # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
