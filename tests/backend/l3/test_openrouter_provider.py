@@ -367,13 +367,45 @@ class TestJurisdictionDerivation:
         assert polluted.jurisdiction is Jurisdiction.UNKNOWN
 
     def test_default_allowlist_is_the_single_fully_known_provider(self) -> None:
-        """기본 허용목록 동결 — **세 축을 함께 아는** 곳만(2026-09-17 공급사 패널 실측).
+        """기본 허용목록 동결 — **네 축을 함께 아는** 곳만(2026-09-18 공급사 패널 실측).
 
-        관할(`Headquarters: US`) · 데이터 정책(`Prompt training: No` + `Retention: Zero`) ·
-        양자화(`Precision: FP8`). 셋을 다 아는 곳은 `deepinfra` 하나뿐이다.
+        관할(`Headquarters: US` · `Region: US`) · 데이터 정책(`Prompt training: No` +
+        `Retention: Zero retention`) · 양자화(`Precision: FP8`) · 가용성(`Uptime 100.00%`).
+
+        **네 번째 축이 `deepinfra`에서 `baseten`으로 옮긴 이유다.** 앞 셋은 deepinfra도
+        충족했지만 라이브에서 `429 engine_overloaded`가 20회 중 6회(재시도 없음)·3회(재시도
+        3회 소진) 났고 지연이 p50 40초까지 무너졌다 — 공유 풀(`is_byok=false`)이라 rate
+        limit을 다른 사용자와 나눈다. 재시도로 덮을 문제가 아니었다.
         """
         defaults = Settings()
-        assert defaults.openrouter_allowed_providers == ("deepinfra",)
+        assert defaults.openrouter_allowed_providers == ("baseten",)
+
+    def test_moving_the_default_did_not_lose_an_axis(self) -> None:
+        """옮긴 뒤에도 앞 세 축이 유지되는가 — 가용성만 보고 옮기면 다른 축에서 샌다.
+
+        이 단언이 없으면 "429가 안 나니까"만으로 관할·정밀도 미확인 공급사로 갈아탈 수 있다.
+        대조군으로 *옮기기 전* 공급사도 같은 세 축을 만족했음을 함께 확인한다 — 그래야 이
+        테스트가 'baseten이 특별하다'가 아니라 '축을 잃지 않았다'를 재는 것이 된다.
+        """
+        default = Settings().openrouter_allowed_providers
+        assert jurisdiction_of_slugs(default) is Jurisdiction.US
+        assert precision_of_slugs(default) == "fp8"
+        # 대조군 — 이전 기본값도 같은 세 축을 만족했다(달라진 것은 가용성뿐이다).
+        assert jurisdiction_of_slugs(["deepinfra"]) is Jurisdiction.US
+        assert precision_of_slugs(["deepinfra"]) == "fp8"
+
+    def test_both_baseten_endpoints_share_one_precision(self) -> None:
+        """`only: ["baseten"]`이 정밀도를 섞지 않는가 (2026-09-18 엔드포인트 응답 실측).
+
+        이 모델의 Baseten 엔드포인트는 **둘**인데 tag가 둘 다 `baseten/fp8`이다 — 두 행은
+        리전/배포 차이일 뿐이다. 그래서 양자화를 강제하는 네 번째 파라미터를 도입하지
+        않았다. 그 판단의 근거를 계약으로 동결한다: 두 tag가 같은 slug로 접히고, 그 slug의
+        정밀도가 확정된다.
+        """
+        tags = ["baseten/fp8", "baseten/fp8"]
+        slugs = [provider_slug_from_tag(t) for t in tags]
+        assert slugs == ["baseten", "baseten"]
+        assert precision_of_slugs(slugs) == "fp8"
 
     def test_default_allowlist_is_precision_homogeneous(self) -> None:
         """기본 목록의 **공통 정밀도가 확정**되는가 — 섞이면 품질 비교가 성립하지 않는다.

@@ -606,18 +606,27 @@ class Settings(BaseSettings):
         ),
     )
     openrouter_allowed_providers: tuple[str, ...] = Field(
-        default=("deepinfra",),
+        default=("baseten",),
         description=(
             "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 알고 "
             "데이터 정책이 깨끗한 곳만**. slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
             "(`deepinfra/fp8`→`deepinfra`). 이 목록이 `data_collection=deny`와 **독립된 두 "
             "번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). 빈 목록은 "
             "허용이 아니라 **차단**이다.\n"
-            "기본값이 **1곳뿐인 이유**: 세 축을 *함께* 아는 공급사가 그것뿐이다"
-            "(2026-09-17 공급사 패널 실측).\n"
-            "  · 관할 — `Headquarters: US`\n"
+            "기본값이 **`baseten` 1곳인 이유**: 네 축을 *함께* 아는 공급사가 그것뿐이다"
+            "(2026-09-18 공급사 패널 실측).\n"
+            "  · 관할 — `Headquarters: US` · `Region: US`\n"
             "  · 데이터 정책 — `Prompt training: No` + `Retention: Zero retention`\n"
             "  · 양자화 — `Precision: FP8`\n"
+            "  · 가용성 — `Uptime 100.00%`(9/15~9/18) · latency 0.43s · 79 tps\n"
+            "**`deepinfra`에서 옮긴 이유는 네 번째 축이다.** 앞 셋은 deepinfra도 충족했지만 "
+            "라이브에서 `429 engine_overloaded`가 20회 중 6회(재시도 없음)·3회(재시도 3회 "
+            "소진) 났다 — `is_byok=false`·`limit_source=upstream_provider_shared_pool`, 즉 "
+            "공유 풀이라 다른 사용자와 rate limit을 나눈다. 지연도 p50 40초·p95 332초로 "
+            "무너졌다(2026-09-17~18 실측 2회). 재시도로 덮을 문제가 아니라 접속 구조 문제다.\n"
+            "Baseten 엔드포인트는 2곳이지만 **둘 다 tag가 `baseten/fp8`**이라(엔드포인트 응답 "
+            "실측) `only`가 둘을 모두 허용해도 정밀도가 섞이지 않는다 — 두 행은 리전/배포 "
+            "차이다. 그래서 양자화 강제 파라미터를 따로 두지 않는다.\n"
             "`gmicloud`는 FP8이지만 `Retention: Unknown`이고, `fireworks`·`together`는 보존 "
             "정책이 깨끗하지만 `Precision: --`(미표기)다. 즉 **어느 한 축씩만 아는 곳을 섞으면 "
             "다른 축에서 샌다** — 정밀도가 섞인 목록은 `allow_fallbacks=false`라도 매 호출마다 "
@@ -627,9 +636,14 @@ class Settings(BaseSettings):
             "않았고 그 세션의 OpenRouter 기록 4건이 전부 틀렸다(모델 slug·엔드포인트 수·"
             "최저가 공급사·단가). 근거를 다시 확보하면 되돌린다.\n"
             "**가용성 비용을 명시한다**: 1곳 + `allow_fallbacks=false`면 그곳이 죽을 때 호출이 "
-            "실패한다(`deepinfra` uptime 99.64%). 지금은 채택 미판정이라 조용한 품질 변동보다 "
-            "명확한 실패가 낫다는 판단이며, 운영 도입 시 **정밀도가 같은** 곳을 추가해 "
-            "이중화한다(정밀도가 다른 곳으로 늘리는 것은 이중화가 아니라 오염이다)."
+            "실패한다. 지금은 채택 미판정이라 조용한 품질 변동보다 명확한 실패가 낫다는 "
+            "판단이며, 운영 도입 시 **정밀도가 같은** 곳을 추가해 이중화한다(정밀도가 다른 "
+            "곳으로 늘리는 것은 이중화가 아니라 오염이다).\n"
+            "**비용 영향**: deepinfra $0.20/$0.60 → baseten $0.30/$1.20. 실측 토큰(회당 입력 "
+            "460·출력 1,518) 기준 회당 $0.00100 → $0.00196으로 약 2배지만, `claude-sonnet-4-6` "
+            "($0.004767)의 여전히 **2.4배 저렴**이며 그 대가로 100% 가용성과 3배 빠른 응답을 "
+            "산다. 단 `Cache read`는 $0.006 → $0.03으로 5배다 — 프롬프트 캐시 재사용이 큰 "
+            "워크로드에서는 이 축을 다시 재야 한다."
         ),
     )
     openrouter_max_tokens: int = Field(
