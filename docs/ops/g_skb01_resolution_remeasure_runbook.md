@@ -452,6 +452,25 @@ if ($EvidenceSent -and $ReportExists) { docker exec -i whymath-pg psql -U whymat
 있으나(populate.py §76), 그 실행은 이 게이트의 범위가 아니다 — [C]가 `B_problem_concept_rows=0`을
 내면 별도 태스크로 등재한다.
 
+## 8-2. 회차 이력 (2026-09-18 — 다시 쓰는 세션이 먼저 읽을 것)
+
+| 회차 | 결과 | 원인·대책 |
+|---|---|---|
+| 1 | `REACH_EXIT=2` | Docker Desktop 미가동. 런북이 선행 조건을 §5 산문에만 적고 블록이 확인하지 않았다 → [A] Docker 기동 블록 신설 |
+| 2 | `PROBE_EXIT=5` | prod 스키마가 head보다 6건 뒤처짐(`UndefinedColumnError`) → §7-1 재작성(리비전 조회 선행 + worktree 기준 마이그레이션) |
+| 3 | 마이그레이션 미적용 | §7-1b의 `Read-Host` 승인 가드가 다음 블록 첫 줄을 삼킨 것으로 보인다 → 가드를 기계 계산(`BEHIND`·`URL_OK`)으로 전환 |
+| 4 | **성립** | `ATTEMPTS=20 EVENTS=20 WRITER_REACH=1.0 RESOLUTION=1.0 E2E=1.0 CONCEPT_UPDATED_ATTEMPTS=20`(main `d99a4828`) |
+
+그 밖에 Kiki가 직접 발견한 결함 1건 — 블록들이 앞 블록의 변수·환경·CWD를 상속해 CLAUDE.md
+「실행 시스템 진입 경로 완전 명시」를 위반했다. `config.py`의 `database_url` 기본값이 포트 **5432**
+(타 프로젝트 점유·사용 금지)라 새 창 실행 시 마이그레이션이 다른 DB를 겨냥할 수 있었다. 전 8블록
+자기완결화로 해소했고, 기계 집행 부재는 `HARN-110`으로 등재했다.
+
+**결론(2026-09-18)**: 브리지 데이터 적재는 해소율로 이어진다. 사슬 진단이 표본 생성 전에
+`D_candidates_resolvable=1655`(후보 1,703 중 97.2%)를 예고했고 실측이 그대로 100%로 나왔다.
+
+---
+
 ## 9. 이 회차가 답하지 못하는 것 (정직 고지)
 
 - **유기적 트래픽의 도달률이 아니다.** 표본을 프로브가 만들었으므로 배선이 살아 있으면
