@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 갱신 규칙 정본화 — 계획서 300 §6의 v1 규칙(정답 +0.10 / 오답 -0.08 / 힌트 사용 시 이득 x0.7 / 연속 정답 시 confidence 증가)을 MasteryEstimator 구현 1종으로 코드에 정본화한다. EOS-13이 세운 계약(update_mastery(learner_state, assessment_evidence) -> mastery_update)의 시그니처는 손대지 않는다 — 이 태스크는 EOS-13 acceptance ④가 \"정책 변경이므로 별건으로 분리한다\"고 명시한 그 별건이다.\n② 기본 추정기 처분 — 현행 BKT 기본값을 교체할지 병존시킬지는 실측 후 결정하되, 결정과 근거를 notes와 정본 문서에 남긴다. 값이 바뀌는 경로가 생기면 기존 숙달 전파 테스트의 기대값 변화를 전수 열거한다(조용한 값 변경 금지).\n③ 경계 처리 — 0.0~1.0 클램프를 계약 계층에서 집행한다. 추정기 구현이 범위를 벗어난 값을 돌려줘도 학습자 상태에는 범위 안 값만 들어간다(추정기 신뢰 금지).\n④ 멱등 — 같은 Attempt(시도 식별자)가 두 번 반영되지 않는다. 재시도·중복 제출·동시 갱신에서 mastery가 두 번 움직이면 KPI 2(State Integrity 1퍼센트 미만)가 즉시 깨진다. 동시 갱신은 DB 수준 제약 또는 행 잠금으로 처리하고, 어느 수단인지 명시한다.\n⑤ 변경 이벤트 — mastery 변경은 항상 이벤트로 남긴다. 변경 전값·변경 후값·적용된 규칙 식별자·attempt 식별자를 담는다(P-02 = EOS-11 학습 이벤트 정본과 같은 축). 이벤트 기록 실패가 조용히 삼켜지지 않는다.\n⑥ 단일 경로 가드 — mastery 필드를 바꾸는 코드 경로가 이 엔진 하나임을 기계로 동결한다. AST 전수 스캔으로 다른 모듈의 직접 대입·직접 UPDATE를 검출한다. 문자열 금지 목록이 아니라 구성된 결과(AST)를 본다.\n⑦ 주입 검증 3종 전건 RED — (가) 같은 Attempt 이중 반영 (나) 클램프 우회(범위 밖 값 반환 추정기) (다) 우회 경로(다른 모듈이 mastery 직접 수정). 각 주입이 실제로 적용됐는지(mutated != original)도 단언한다. 정상 입력에서 초록인 것은 증거가 아니다.\n⑧ 범위 밖 — EOS-18(임시 증거 어댑터 폐기)·EOS-17(None 대 0.0 응답 경계)·ARCH-53(임계값 상수 복제)·EOS-63(스킬 축 소비 전환)은 각자 소유자가 있다. 손대지 않는다."
-artifacts: []
+artifacts:
+  - "PR #1197 https://github.com/kiki-s-broom/WhyMath/pull/1197 · 커밋 08b428c8(구현)·d5ceb750(검증 반영) · 판정 기준 main a34d31d4 · 정본 docs/architecture/mastery_update_contract_v1.md §8~§12 + l2/mastery_estimators.py(simple-additive-v1·기본 아님) + schema/mastery_contract.py(clamp_unit·HintUsageSignal·StreakSignal·attempt_id) + 마이그레이션 c1f5a8b2d740(attempt_id 컬럼 2 + 부분 유니크 인덱스 2·신규 테이블 0·FK 0) + scripts/analysis/mastery_write_path_scan.py(AST 3축) + infra-contracts 차단 스텝 · 신규 테스트 53건(estimators 26·idempotency 9·single-write-path 18) + 실 PG 통합 1건 · 주입 25종 전건 RED(실 PG 인덱스 2·엔진 10·스캐너 10·권위 가드 3) 대조군 GREEN·원복 바이트 동일 · 뮤테이션이 실결함 1건 검출(clamp_unit NaN 절 미접촉 픽스처)·반례 추가로 해소 · 전체 백엔드 13289 passed EXIT=0 커버리지 90% 계층 floor 전건 PASS · tests/infra 1479 passed EXIT=0 · ruff/black/mypy --strict(686)/lint-imports(4 kept 0 broken)/cp949_guard/validate/audit-deps 전건 EXIT=0 · alembic upgrade·downgrade 왕복 EXIT=0 · 통합 10건 실패는 origin/main 클린 워크트리에서 동일 재현(event loop·Redis 환경축)"
 paths:
   - src/backend/whymath_backend/l2/mastery_contract.py
   - "src/backend/whymath_backend/l2/mastery_estimators*.py"
@@ -22,6 +23,6 @@ paths:
   - tests/infra/test_mastery_single_write_path.py
   - scripts/analysis/mastery_write_path_scan.py
   - docs/architecture/mastery_update_contract_v1.md
-session: claude/ecstatic-bardeen-0ahg5h
+session: null
 notes: "출처: 계획서 300 §6(Mastery Engine v1) — Phase 2 EOS 지시문 세트 P-06. 대조표 §11.2가 P-06을 EOS-13에 매핑했으나, EOS-13은 acceptance ④에서 \"계약만 바꾸고 숙달 수치는 바뀌지 않아야 한다 — 값이 바뀌면 정책 변경이므로 별건으로 분리한다\"로 값 축을 의도적으로 제외했다. 즉 P-06 지시문 6항목 중 EOS-13이 이행한 것은 1번(인터페이스)뿐이고 2~7번(v1 규칙 값·클램프·멱등·변경 이벤트·단일 경로 가드·주입 3종)은 소유자가 없었다. 이 태스크가 그 잔여를 소유한다.\n분류(§14): LOOP."
 updated: 2026-09-18
