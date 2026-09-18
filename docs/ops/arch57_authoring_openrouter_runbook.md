@@ -67,20 +67,36 @@ Phaiakes9 User 환경변수에만 있고 컨테이너·CI에는 egress가 없다
 
 ## [A] 좌석 왕복 확인 (호출 0건)
 
+> **선행 조건 — 이 런북이 읽는 코드는 어디 있는가**
+> `l3/providers/factory.py`는 ARCH-57이 **신설한 파일**이다. PR #1202가 머지되기 전에는
+> `origin/main`에 없으므로, main 체크아웃에서 [A]를 돌리면 `ModuleNotFoundError`가 난다
+> (2026-09-18 실측 — 이 런북의 초판이 그 상태로 안내해 1회 공전시켰다).
+> 아래 블록은 **전용 worktree**를 만들어 그 안에서 실행한다: Kiki 클론은 여러 세션이
+> 공유하는 단일 작업 사본이라 브랜치를 옮기면 다른 세션의 실행이 깨진다. worktree는
+> 원 작업 사본의 브랜치·미커밋 변경을 하나도 건드리지 않는다.
+> 머지 이후라면 `$Ref`를 `origin/main`으로 바꾸면 된다 — 블록은 그대로 동작한다.
+
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-git fetch origin main
-git log -1 --oneline origin/main
+$Ref = "origin/claude/exciting-allen-5dkjb0"
+$Tree = "C:\Users\kiki\Desktop\__AI\WhyMath-arch57"
+git fetch origin
+if (-not (Test-Path $Tree)) { git worktree add --detach $Tree $Ref } else { git -C $Tree fetch origin; git -C $Tree checkout --detach $Ref }
+git -C $Tree log -1 --oneline
 $Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
 if (Test-Path $Py) { "PY=venv" } else { $Py = "python"; "PY=system" }
-$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend"
+$env:PYTHONPATH = "$Tree\src\backend"
+$Source = (& $Py -c "import whymath_backend.l3.providers.factory as m; print(m.__file__)")
+"SOURCE=$Source"
+$FromTree = ($Source -like "*WhyMath-arch57*")
+"FROM_TREE=$FromTree"
 $Default = (& $Py -c "from whymath_backend.l3.providers.factory import build_cloud_provider; print(type(build_cloud_provider()).__name__)")
 "SEAT_DEFAULT=$Default"
 $env:WHYMATH_CLOUD_PROVIDER = "openrouter"
 $WithEnv = (& $Py -c "from whymath_backend.l3.providers.factory import build_cloud_provider; print(type(build_cloud_provider()).__name__)")
 "SEAT_WITH_ENV=$WithEnv"
-$SeatOk = ($WithEnv -eq "OpenRouterProvider") -and ($Default -eq "AnthropicProvider")
-"SEAT_OK=$SeatOk"
+$SeatOk = $FromTree -and ($WithEnv -eq "OpenRouterProvider") -and ($Default -eq "AnthropicProvider")
+if ($SeatOk) { "SEAT_OK=True" } else { "SEAT_OK=False — FROM_TREE=$FromTree SEAT_DEFAULT=$Default SEAT_WITH_ENV=$WithEnv. 셋 다 채워져야 합니다. SEAT_DEFAULT/SEAT_WITH_ENV가 비어 있으면 factory 모듈을 못 찾은 것이니 위 worktree 생성 줄의 출력을 회신해 주십시오." }
 ```
 
 **`SEAT_OK=True`를 눈으로 확인한 다음에만 [B]를 붙여넣으십시오.**
@@ -99,6 +115,7 @@ $env:WHYMATH_CLOUD_PROVIDER = "openrouter"
 
 이 블록은 [A][B]의 판정을 **스스로 다시 계산해** 실행을 거부한다. 앞을 건너뛰었거나 앞이
 미비를 냈어도 안전하다 — 조건이 맞지 않으면 호출을 하나도 하지 않는다.
+`$Py`·`$env:PYTHONPATH`는 [A]가 같은 창에 설정한 값을 물려받는다(창을 바꾸지 마십시오).
 
 ```powershell
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
