@@ -75,6 +75,7 @@ from whymath_backend.db.models.dialogue import Dialogue
 from whymath_backend.db.models.evidence_link import EvidenceLink
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
+from whymath_backend.db.models.learner_state import LearnerStateRecord
 from whymath_backend.db.models.learning_state_transition import (
     LearningStateTransition,
 )
@@ -133,14 +134,29 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
     # 삭제권 대상인 이유: "이 학생이 언제 교정 국면에 있었는가"는 미성년 학습자의 학습
     # 기록 그 자체이며, 익명 통계가 아니라 user_id로 직접 지목되는 행이다.
     (LearningStateTransition, "user_id"),
+    # SEC-35: 학습자 현재 상태 1행 — 소유 컬럼이 `user_id`가 아니라 **`learner_id`**다.
+    # 이 별칭이 정확히 이 테이블을 완전성 가드의 사각으로 만들었다(아래 허용목록 주석 참조).
+    # 파기 누락이 아니라 **삭제 불능**이었다: `learner_id`는 `user_profile.user_id`를
+    # `ondelete` 없이(=NO ACTION) 물고 있어, 행이 하나라도 있으면 마지막의
+    # `delete(UserProfile)`이 ForeignKeyViolationError로 터지고 단일 트랜잭션 전체가
+    # 롤백된다 — 진단을 완료한 학생(= 이 행을 가진 학생)은 삭제권 행사가 *항상* 실패했다
+    # (실 PG 실측 2026-09-18 · `tests/backend/privacy/test_erasure_learner_state_integration.py`
+    # 가 그 전제와 수정 후 성립을 양방향으로 동결한다).
+    (LearnerStateRecord, "learner_id"),
 )
 
-# COLLAB-02 방향 역전 — 소유 컬럼(user_id·student_id·target_user_id)을 가졌지만 *정당하게*
-# `_ERASURE_PLAN` 밖에 있어야 하는 테이블의 사유 명시 허용목록. 무사유 예외는 금지(CLAUDE.md).
+# COLLAB-02 방향 역전 — 소유 축을 가졌지만 *정당하게* `_ERASURE_PLAN` 밖에 있어야 하는
+# 테이블의 사유 명시 허용목록. 무사유 예외는 금지(CLAUDE.md).
 # `tests/backend/privacy/test_erasure_plan_completeness.py`가 `Base.metadata.tables` 전수에서
-# 소유 컬럼 보유 테이블을 스윕해 이 두 집합(_ERASURE_PLAN ∪ 아래 허용목록) 밖의 테이블을 red로
+# 소유 테이블을 스윕해 이 두 집합(_ERASURE_PLAN ∪ 아래 허용목록) 밖의 테이블을 red로
 # 잡는다 — 기존 test_erasure.py:94 `test_covers_all_planned_tables`(계획→실행, planned <= order)의
 # *역방향*(실행→계획, 소유 테이블 중 계획 누락 검출)이다.
+#
+# 소유 판정(SEC-35, 2026-09-18): **`user_profile.user_id` FK 보유(컬럼명 무관) ∪ `_ERASURE_PLAN`이
+# 쓰는 컬럼명 보유**의 합집합이다. 종전에는 컬럼명 3종(user_id·student_id·target_user_id) 고정
+# 열거 하나였고, 그래서 `learner_state`(소유 컬럼 `learner_id`)가 스윕에 한 번도 들어오지
+# 않았다 — 가드는 초록인데 테이블은 계획 밖이었다. 판정 로직·남는 사각은 그 테스트 파일의
+# `_owner_tables` 위 주석이 정본이다.
 #
 # 분류 근거: `docs/architecture/collaboration_landing_design.md` §2.2(소유 축 5분류) — 여기 등재된
 # 모든 테이블은 **E형(감사)** 또는 `user_profile`(별도 명시 삭제) 둘 중 하나다. 미래 협업 스키마가
