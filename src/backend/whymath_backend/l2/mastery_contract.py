@@ -20,19 +20,24 @@
   - `l2/mastery_tracking.py::_stage_attempt_mastery` (개념 축 적재)
   - `l2/skill_mastery_tracking.py::_stage_skill_attempt_mastery` (스킬 축 적재)
 그 위의 서빙 진입점(`POST /v1/me/attempts` → `record_problem_attempt_mastery` ·
-`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. **API·L3·L4가 이
-계약 타입을 직접 읽는 배선은 아직 없다** — `LearnerState` 단일 조회 표면(`EOS-10`)·
-`AssessmentEvidence` 구체 타입(`EOS-12`)·추천 계약(`EOS-14`)이 각자 소유한다.
+`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. `LearnerState` 단일
+조회 표면(`EOS-10`)·추천 계약(`EOS-14`)은 각자 소유한다.
+
+**EOS-18(2026-09-18)**: 증거 축의 이음매가 닫혔다. EOS-13이 두었던 임시 어댑터
+`AttemptOutcomeEvidence`(2속성)를 폐기하고, 서빙 경로가 `collect_assessment_evidence`로 조립한
+**실 `AssessmentEvidence`가 적재 경로까지 그대로 내려온다**. 그래서 이제 API가 이 계약의 입력
+타입을 *직접* 만든다 — 정오답·관측시각·학습자·문항의 사본이 0이고, 조립과 적재가 어긋날 여지가
+구조적으로 없다. 이 모듈은 여전히 구체 타입을 import하지 않는다(추정기가 읽는 것은
+`AssessmentEvidenceInput` 2속성뿐 — 귀속은 추정 입력이 아니다).
 """
 
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime
 from typing import NamedTuple
 
@@ -51,7 +56,6 @@ logger = logging.getLogger("whymath.l2.mastery_contract")
 
 __all__ = [
     "BKT_ESTIMATOR_ID",
-    "AttemptOutcomeEvidence",
     "BktMasteryEstimator",
     "MasteryEstimatorFactory",
     "MasteryRecord",
@@ -116,40 +120,6 @@ def compute_mastery_record(
     return MasteryRecord(mastery=mastery, confidence=confidence, sample_size=sample_size)
 
 
-# ── 증거 어댑터(EOS-12 착지 전 임시 좌석) ─────────────────────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptOutcomeEvidence:
-    """`AssessmentEvidenceInput`을 만족하는 **최소** 어댑터 — 채점 결과 1건.
-
-    ⚠️ **이것은 `AssessmentEvidence`가 아니다.** 구체 evidence 타입의 좌석은 `EOS-12`가
-    소유한다(2026-09-16 착지). 계약이 실제로 읽는 속성만 담은 임시 운반체이며, 폐기는
-    `EOS-18`이 소유한다(호출부 시그니처는 그대로).
-
-    EOS-108이 더한 3필드 — **전부 `AssessmentEvidenceInput`(또는 그 선택 확장)이 읽는 축**이고,
-    계약이 읽지 않는 속성은 여기에도 두지 않는다:
-      · `attempt_id` — 멱등 키. `AssessmentEvidence`가 이미 가진 속성이라 `EOS-18` 폐기 시
-        그대로 승계된다.
-      · `hint_used` — `HintUsageSignal`(선택 Protocol). **`None`은 "모른다"**이며 "안 썼다"가
-        아니다. `AssessmentEvidence`에는 아직 이 축이 없어 선택 Protocol로 분리돼 있다.
-      · `consecutive_correct` — `StreakSignal`(선택 Protocol). 같은 이유로 선택이다.
-
-    **정직 표기(집행 지점)**: 2026-09-18 현재 두 서빙 호출부(`_stage_attempt_mastery`·
-    `_stage_skill_attempt_mastery`)가 채우는 것은 `correct`·`observed_at`·`attempt_id` 셋이고,
-    `hint_used`·`consecutive_correct`는 **아무도 채우지 않는다**(둘 다 None). 기본 추정기
-    `bkt-v1`은 그 두 축을 읽지 않으므로 오늘의 숙달 값에는 영향이 0이며, 그 축을 읽는
-    `simple-additive-v1`이 기본이 되려면 생산자 배선이 선행 조건이다 — 그 사실을 감추지 않고
-    적어 둔다(CLAUDE.md 「작동한 비율」 원칙).
-    """
-
-    correct: bool
-    observed_at: datetime
-    attempt_id: uuid.UUID | None = None
-    hint_used: bool | None = None
-    consecutive_correct: int | None = None
-
-
 # ── ② BKT 추정기 어댑터 ───────────────────────────────────────────────────────
 
 #: 기본 추정기 식별자. 값을 바꾸면 산출의 출처 표기가 바뀌므로 상수로 고정한다.
@@ -202,8 +172,6 @@ class BktMasteryEstimator:
             prior_mastery=learner_state.mastery,
             elapsed_days=elapsed_days,
             estimator_id=self.estimator_id,
-            # 멱등 키는 *계산 입력이 아니라 신원*이다 — 추정기가 만들지 않고 그대로 옮긴다.
-            attempt_id=assessment_evidence.attempt_id,
         )
 
 
@@ -366,7 +334,7 @@ def update_mastery(
 
 
 def _enforce_bounds(update: MasteryUpdate, estimator_id: str) -> MasteryUpdate:
-    """추정기 산출의 0~1 경계를 **계약이 다시 잰다** — 추정기를 신뢰하지 않는다.
+    """추정기 산출의 0~1 경계를 **계약이 다시 잰다** — 추정기를 신뢰하지 않는다(EOS-108).
 
     `MasteryUpdate.__post_init__`이 이미 범위를 검사하지 않느냐는 물음의 답: 그 검사는
     *정상적으로 생성자를 통과한* 객체만 막는다. frozen dataclass도 `object.__setattr__`로

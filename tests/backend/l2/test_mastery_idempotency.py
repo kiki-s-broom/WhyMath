@@ -33,12 +33,35 @@ from whymath_backend.l2.mastery_tracking import (
     record_attempt_mastery,
     record_problem_attempt_mastery,
 )
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 
 _UID = uuid.uuid4()
 _CID = uuid.uuid4()
 _PID = uuid.uuid4()
 _ATTEMPT = uuid.uuid4()
 _NOW = datetime(2026, 9, 18, tzinfo=UTC)
+
+
+def _evidence(correct: bool, *, attempt_id: uuid.UUID | None) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 공개 writer가 받는 **바로 그 타입**.
+
+    `attempt_id`는 이 증거가 이미 들고 있는 속성이며(EOS-12 착지분), 공개 writer가 그것을
+    읽어 staging에 명시 인자로 넘긴다. `None`은 시도에서 유래하지 않은 관측이다.
+    """
+    return build_assessment_evidence(
+        learner_id=_UID,
+        problem_id=_PID,
+        correct=correct,
+        observed_at=_NOW,
+        attempt_id=attempt_id,
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
 
 
 def _row(attempt_id: uuid.UUID | None, mastery: float = 0.62) -> ConceptMasteryHistory:
@@ -134,7 +157,7 @@ class TestReplayIsNotApplied:
         applied = _row(_ATTEMPT)
         session = _Session(already_applied=[applied])
         records = await record_problem_attempt_mastery(
-            _as_session(session), _UID, _PID, True, attempt_id=_ATTEMPT
+            _as_session(session), evidence=_evidence(True, attempt_id=_ATTEMPT)
         )
         assert session.added == [], "재시도가 새 측정 행을 만들었다 — 학습 곡선이 왜곡된다"
         assert session.commits == 0, "쓸 것이 없는데 커밋했다"
@@ -145,7 +168,7 @@ class TestReplayIsNotApplied:
         applied = _row(_ATTEMPT)
         session = _Session(already_applied=[applied])
         row = await record_attempt_mastery(
-            _as_session(session), _UID, _CID, True, attempt_id=_ATTEMPT
+            _as_session(session), _CID, evidence=_evidence(True, attempt_id=_ATTEMPT)
         )
         assert session.added == []
         assert session.commits == 0
@@ -158,7 +181,7 @@ class TestReplayIsNotApplied:
         """
         session = _Session()
         records = await record_problem_attempt_mastery(
-            _as_session(session), _UID, _PID, True, attempt_id=_ATTEMPT
+            _as_session(session), evidence=_evidence(True, attempt_id=_ATTEMPT)
         )
         assert len(session.added) == 1
         assert session.commits == 1
@@ -173,7 +196,7 @@ class TestReplayIsNotApplied:
         other = uuid.uuid4()
         session = _Session(assessed=[_CID, other], already_applied=[_row(_ATTEMPT)])
         records = await record_problem_attempt_mastery(
-            _as_session(session), _UID, _PID, True, attempt_id=_ATTEMPT
+            _as_session(session), evidence=_evidence(True, attempt_id=_ATTEMPT)
         )
         assert len(session.added) == 1
         assert session.added[0].concept_id == other
@@ -185,7 +208,9 @@ class TestNoAttemptIdMeansNoProtection:
 
     async def test_without_attempt_id_no_idempotency_query_runs(self) -> None:
         session = _Session()
-        await record_problem_attempt_mastery(_as_session(session), _UID, _PID, True)
+        await record_problem_attempt_mastery(
+            _as_session(session), evidence=_evidence(True, attempt_id=None)
+        )
         assert session.idempotency_queries == 0
         assert len(session.added) == 1
         assert session.added[0].attempt_id is None
@@ -193,8 +218,12 @@ class TestNoAttemptIdMeansNoProtection:
     async def test_without_attempt_id_two_calls_write_twice(self) -> None:
         """멱등 키 없는 두 호출은 두 번 쓴다 — 그것이 사실이고, 숨기면 관측이 사라진다."""
         session = _Session()
-        await record_problem_attempt_mastery(_as_session(session), _UID, _PID, True)
-        await record_problem_attempt_mastery(_as_session(session), _UID, _PID, True)
+        await record_problem_attempt_mastery(
+            _as_session(session), evidence=_evidence(True, attempt_id=None)
+        )
+        await record_problem_attempt_mastery(
+            _as_session(session), evidence=_evidence(True, attempt_id=None)
+        )
         assert len(session.added) == 2
 
 
@@ -206,7 +235,7 @@ class TestConcurrentConflictRecovery:
         winner = _row(_ATTEMPT, mastery=0.71)
         session = _Session(commit_raises_once=True, applied_after_conflict=[winner])
         records = await record_problem_attempt_mastery(
-            _as_session(session), _UID, _PID, True, attempt_id=_ATTEMPT
+            _as_session(session), evidence=_evidence(True, attempt_id=_ATTEMPT)
         )
         assert session.rollbacks == 1
         assert records == [winner]
@@ -215,12 +244,14 @@ class TestConcurrentConflictRecovery:
         """멱등 키가 없으면 그 `IntegrityError`는 **멱등 위반이 아니다** — 삼키면 원인을 잃는다."""
         session = _Session(commit_raises_once=True)
         with pytest.raises(IntegrityError):
-            await record_problem_attempt_mastery(_as_session(session), _UID, _PID, True)
+            await record_problem_attempt_mastery(
+                _as_session(session), evidence=_evidence(True, attempt_id=None)
+            )
 
     async def test_unrelated_integrity_error_propagates(self) -> None:
         """멱등 키가 있어도 **승자가 없으면** 다른 무결성 오류다 — 그대로 올린다."""
         session = _Session(commit_raises_once=True, applied_after_conflict=[])
         with pytest.raises(IntegrityError):
             await record_problem_attempt_mastery(
-                _as_session(session), _UID, _PID, True, attempt_id=_ATTEMPT
+                _as_session(session), evidence=_evidence(True, attempt_id=_ATTEMPT)
             )

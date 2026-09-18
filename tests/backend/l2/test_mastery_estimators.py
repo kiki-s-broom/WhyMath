@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import math
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -22,7 +23,6 @@ import pytest
 from whymath_backend.l2.bkt import BktParameters
 from whymath_backend.l2.mastery_contract import (
     BKT_ESTIMATOR_ID,
-    AttemptOutcomeEvidence,
     resolve_estimator,
     update_mastery,
     use_estimator,
@@ -39,6 +39,7 @@ from whymath_backend.l2.mastery_estimators import (
     AdditiveMasteryEstimator,
 )
 from whymath_backend.schema.mastery_contract import (
+    AssessmentEvidenceInput,
     LearnerMasteryState,
     MasteryAxis,
     MasteryContractError,
@@ -62,16 +63,33 @@ def _state(mastery: float | None = 0.50, sample_size: int | None = 4) -> Learner
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _SignalEvidence:
+    """선택 신호(`HintUsageSignal`·`StreakSignal`)를 실은 **테스트 전용** 증거.
+
+    왜 실 `AssessmentEvidence`가 아닌가: 그 타입에는 `hint_used`·`consecutive_correct`가
+    **아직 없다**(생산자 미배선 — `l2/mastery_estimators` 모듈 docstring). 두 축을 읽는 것은
+    선택 Protocol이며 구조적 만족이므로 상속도 등록도 필요 없다 — 그 *구조적 만족 자체*가
+    여기서 검증되는 계약이다. 두 축이 `AssessmentEvidence`에 편입되면 이 대역은 폐기된다.
+
+    기본 두 속성(`correct`·`observed_at`)은 `AssessmentEvidenceInput`을 그대로 만족한다.
+    """
+
+    correct: bool
+    observed_at: datetime
+    hint_used: bool | None = None
+    consecutive_correct: int | None = None
+
+
 def _evidence(
     correct: bool,
     *,
     hint_used: bool | None = None,
     consecutive_correct: int | None = None,
-) -> AttemptOutcomeEvidence:
-    return AttemptOutcomeEvidence(
+) -> _SignalEvidence:
+    return _SignalEvidence(
         correct=correct,
         observed_at=_T1,
-        attempt_id=uuid.uuid4(),
         hint_used=hint_used,
         consecutive_correct=consecutive_correct,
     )
@@ -218,11 +236,14 @@ class TestSwappabilityIsReal:
         """상속 없이 구조적으로 만족한다 — Protocol이 계약이지 기반 클래스가 아니다."""
         assert isinstance(AdditiveMasteryEstimator(), MasteryEstimator)
 
-    def test_carries_attempt_id_through(self) -> None:
-        """멱등 키는 추정기가 만들지 않고 **옮긴다**."""
-        evidence = _evidence(True)
-        update = AdditiveMasteryEstimator().estimate(_state(), evidence)
-        assert update.attempt_id == evidence.attempt_id
+    def test_estimator_output_carries_no_identity(self) -> None:
+        """추정 산출에는 **신원이 없다** — 멱등 키는 적재 writer의 관심사다(EOS-18 ④ 동형).
+
+        `MasteryUpdate`에 `attempt_id`를 실으면 추정기 계약이 추정과 무관한 것을 요구하게
+        되고, 그러면 DKT·IRT 구현체가 쓰지도 않는 식별자를 옮기는 코드를 갖게 된다.
+        """
+        update = AdditiveMasteryEstimator().estimate(_state(), _evidence(True))
+        assert not hasattr(update, "attempt_id")
 
     def test_reports_elapsed_days_even_though_unused(self) -> None:
         """감쇠를 쓰지 않아도 경과일은 산출에 남는다 — 두 추정기를 나란히 비교하기 위해서."""
@@ -252,7 +273,7 @@ class _OutOfRangeEstimator:
     def estimate(
         self,
         learner_state: LearnerMasteryState,
-        assessment_evidence: AttemptOutcomeEvidence,
+        assessment_evidence: AssessmentEvidenceInput,
     ) -> MasteryUpdate:
         update = MasteryUpdate(
             axis=learner_state.axis,

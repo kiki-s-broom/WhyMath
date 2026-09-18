@@ -679,29 +679,31 @@ class TestSubmitAttemptUnchanged:
         assert "build_gradability_ceiling_report" not in source
 
     def test_mastery_propagation_still_takes_client_is_correct(self) -> None:
-        """두 mastery 전파 콜사이트가 여전히 body.is_correct를 그대로 넘김(권위 이관 아님).
+        """두 mastery 전파가 여전히 **클라이언트 제출 `body.is_correct`** 를 근거로 돈다.
 
-        EOS-108 메모: 두 콜사이트에 `attempt_id=` 키워드 인자가 붙었다(멱등 키). 그래서 호출이
-        `body.is_correct` 에서 *끝나는지*를 보던 원래 정규식은 성립하지 않는다 — 그러나 이
-        가드가 지키는 것은 "호출이 여기서 끝난다"가 아니라 **채점 권위가 클라이언트 신고값
-        그대로인가**다. 그래서 위치 인자 4개(`session`·`user.user_id`·`body.problem_id`·
-        `body.is_correct`)까지만 고정하고, **그 뒤의 키워드 인자만** 허용한다
-        (공백·단어문자·`=`·`.`·`,`만 — 표현식·호출은 못 들어온다). 서버 판정으로 갈아치우는 변경
-        (`graded.is_correct` 등)은 여전히 RED다.
+        불변식은 그대로다 — 서버가 다시 채점해 권위를 가져가지 않는다(shadow 채점기는 미배선).
+        바뀐 것은 *어디서 재는가*다: `EOS-18`이 어댑터를 폐기하면서 콜사이트가 네 인자를 풀어
+        넘기는 대신 `collect_assessment_evidence`가 조립한 **증거 하나**를 넘기게 됐다. 그래서
+        정오답의 출처는 증거 조립 지점으로 옮겨갔고 이 테스트도 두 구간을 이어서 잰다:
+        ① 증거가 `body.is_correct`로 조립되는가 ② 두 전파가 *그 증거*를 받는가. 한쪽만 보면
+        서버 재채점이 ①에 끼어들어도 ②는 그대로라 통과한다.
         """
         submit_source = inspect.getsource(api_me.submit_attempt)
+        evidence_build = re.search(
+            r"collect_assessment_evidence\([^)]*correct=body\.is_correct",
+            submit_source,
+        )
         concept_call = re.search(
-            r"record_problem_attempt_mastery\(\s*session,\s*user\.user_id,\s*"
-            r"body\.problem_id,\s*body\.is_correct\s*,?[\s\w=.,]*\)",
+            r"record_problem_attempt_mastery\(\s*session,\s*evidence=evidence\s*\)",
             submit_source,
         )
         skill_call = re.search(
-            r"record_problem_attempt_skill_mastery\(\s*session,\s*user\.user_id,\s*"
-            r"body\.problem_id,\s*body\.is_correct\s*,?[\s\w=.,]*\)",
+            r"record_problem_attempt_skill_mastery\(\s*session,\s*evidence=evidence\s*\)",
             submit_source,
         )
-        assert concept_call is not None, "개념 숙달 전파 콜사이트가 body.is_correct를 넘기지 않음"
-        assert skill_call is not None, "스킬 숙달 전파 콜사이트가 body.is_correct를 넘기지 않음"
+        assert evidence_build is not None, "증거 조립이 body.is_correct를 쓰지 않음(권위 이관 의심)"
+        assert concept_call is not None, "개념 숙달 전파가 그 증거를 받지 않음"
+        assert skill_call is not None, "스킬 숙달 전파가 그 증거를 받지 않음"
 
 
 # ──────────────────────────────────────────────────────────────────────────

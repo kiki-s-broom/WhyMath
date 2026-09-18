@@ -146,7 +146,6 @@ class AdditiveMasteryEstimator:
             prior_mastery=learner_state.mastery,
             elapsed_days=learner_state.elapsed_days_until(assessment_evidence.observed_at),
             estimator_id=self.estimator_id,
-            attempt_id=assessment_evidence.attempt_id,
         )
 
 

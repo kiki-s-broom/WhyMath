@@ -1,9 +1,12 @@
-# Mastery 갱신 호출 계약 v1 (EOS-13 · EOS-108)
+# Mastery 갱신 호출 계약 v1 (EOS-13 · EOS-18 · EOS-108)
 
-> 판정 기준(§1~§7, EOS-13): main `c77efb0f` + 당시 브랜치 작업분. 그 작업분은 이후 `a5d9c80f`
+> 판정 기준(§1~§5, EOS-13): main `c77efb0f` + 당시 브랜치 작업분. 그 작업분은 이후 `a5d9c80f`
 > (PR #1188)로 main에 착지했다.
 >
-> 판정 기준(§8~§11, EOS-108): main `a34d31d4` + 본 브랜치 작업분(**미머지**). 그 절들이 기술하는
+> 판정 기준(§6~§7, EOS-18): main `a34d31d4` + 당시 브랜치 작업분. 그 작업분은 이후 `54f9af58`
+> (PR #1196)으로 main에 착지했다.
+>
+> 판정 기준(§8~§12, EOS-108): main `a036fa6b` + 본 브랜치 작업분(**미머지**). 그 절들이 기술하는
 > 배선은 이 브랜치 기준이며 main 기준으로는 아직 존재하지 않는다.
 
 출처: 계획서 300 §6(Mastery Engine v1 — "반드시 엔진 인터페이스를 분리합니다") + §2(알고리즘보다
@@ -111,11 +114,13 @@ with use_estimator("dkt-v1"):                          # 기본 교체(블록 �
   **[EOS-108 정정]** 이 진술은 더 이상 사실이 아니다 — 계획서 §6 가산 규칙을 구현한
   `simple-additive-v1`이 두 번째 *진짜* 구현으로 등록됐다(§8). 기본값은 여전히 `bkt-v1`이다.
 
-## 6. `EOS-12`와의 이음매 (가장 중요한 경계)
+## 6. `EOS-12`와의 이음매 — **착지 완료**(EOS-18, 2026-09-18)
 
-`AssessmentEvidence` **구체 타입의 좌석은 `EOS-12`가 소유**하며 아직 착지하지 않았다. 그래서
-EOS-13은 evidence의 *구조적 입력 계약*만 정의한다.
+EOS-13 시점에는 `AssessmentEvidence` 구체 타입이 아직 없어 이 계약이 *구조적 입력 계약*만
+정의하고, `l2/mastery_contract.py::AttemptOutcomeEvidence`(2속성 최소 어댑터)를 임시 좌석으로
+두었다. **EOS-12(PR #1187)가 착지하고 EOS-18이 그 어댑터를 폐기**해 이음매가 닫혔다.
 
+<<<<<<< HEAD
 - **EOS-12가 착지하면 그 `AssessmentEvidence`가 `AssessmentEvidenceInput`을 만족해야 한다** —
   필요한 것은 `correct: bool`·`observed_at: datetime` 두 속성뿐이며, 상속은 필요 없다(구조적
   타이핑). 다른 필드를 얼마든지 더 들고 있어도 이 계약은 그것을 읽지 않는다.
@@ -130,6 +135,42 @@ EOS-13은 evidence의 *구조적 입력 계약*만 정의한다.
   두 번째 진실 원천이 아닌 이유는 §9에 있다. 동결 테스트 이름도
   `test_protocol_reads_exactly_three_attributes`로 바뀌었고, 같은 클래스의
   `test_landed_assessment_evidence_satisfies_protocol`이 **착지한 실물**로 이음매를 대조한다.
+=======
+- **실 `AssessmentEvidence`가 상속 없이 `AssessmentEvidenceInput`을 만족한다**(구조적 타이핑).
+  `AssessmentEvidence`는 `BaseModel`이고 이 Protocol을 상속하지 않는다. 계약은 `correct`·
+  `observed_at` 두 속성만 읽으므로 나머지 필드(귀속·coverage·오개념 후보)는 산출에 닿지 않는다.
+  검증 = `TestEvidenceProtocolSeam::test_real_assessment_evidence_satisfies_without_inheritance`
+  와 `test_real_evidence_extra_fields_do_not_reach_the_estimator`.
+- **어댑터는 폐기됐다.** EOS-13이 예고한 "호출부 시그니처는 바뀌지 않는다"는 **실현되지
+  않았다** — 어댑터를 지우려면 실 증거가 적재 경로까지 내려와야 하고, 그러려면 증거를 조립하는
+  서빙 경로가 그것을 넘겨야 하기 때문이다. 공개 writer의 진입 인자가 바뀌었다:
+
+  | | EOS-13 | EOS-18 이후 |
+  |---|---|---|
+  | `record_problem_attempt_mastery` | `(session, user_id, problem_id, correct, *, measured_at=…)` | `(session, *, evidence)` |
+  | `record_problem_attempt_skill_mastery` | 〃 | `(session, *, evidence)` |
+  | `record_attempt_mastery` | `(session, user_id, concept_id, correct, *, measured_at=…)` | `(session, concept_id, *, evidence)` |
+  | `_stage_*_attempt_mastery`(내부) | `(…, correct, *, estimator, measured_at)` | `(…, *, evidence, estimator)` |
+
+  귀속(학습자·문항)을 인자로도 받으면 같은 사실의 사본이 둘이 되고, 증거와 다른 학습자를 넘겨도
+  아무도 막지 못한다. 인자를 없애 그 실패를 *구조적으로* 불가능하게 만들었다(가드보다 강하다).
+- **행동 변화 1건(명시)**: 적재 행의 `measured_at`이 적재 시점 `datetime.now(UTC)`가 아니라
+  관측 시각 `evidence.observed_at`이다. 증거와 숙달 행이 같은 채점 1건에 대해 서로 다른 시각을
+  말하던 상태가 해소된다. **숙달 수치는 불변**이다 — `observed_at`은 망각 감쇠 입력으로만 쓰이고
+  기본 `p_forget=0.0`이 감쇠를 끈다(`l2/bkt.py::_DEFAULT_P_FORGET`).
+- **Protocol 속성은 2개로 유지한다**(EOS-18 ④ 재판정). 후보는 `learner_id`·`problem_id`를 더해
+  4개로 넓히는 안이었고, 채택하지 않았다: 그 둘은 *추정 입력*이 아니라 **귀속 식별자**다 —
+  추정기(BKT·후속 DKT)는 "누구의 어느 문항인가"를 읽지 않고 "맞았는가·언제인가"만 읽는다.
+  귀속은 이미 두 자리가 소유한다(대상축 = `LearnerMasteryState.axis`/`target_id`, 계약이 불일치를
+  `MasteryContractError`로 차단 · 학습자·문항 = 공개 writer가 증거에서 직접 읽음). 여기에 또
+  실으면 귀속의 세 번째 진실 원천이 되고 추정기 Protocol이 추정과 무관한 것을 요구하게 된다.
+  `test_protocol_reads_exactly_two_attributes`가 이 판정을 동결한다.
+- **어댑터 재도입 방어**(EOS-18 ⑤): 이름 열거가 아니라 **산출물 검사**다 —
+  `TestAdapterRetirementIsEnforced::test_no_module_defines_a_second_evidence_type`이 숙달 모듈이
+  *정의한* 클래스를 전수로 훑어 계약이 읽는 속성 집합을 갖춘 것이 있는지 본다(이름을 바꿔
+  되살려도 걸린다). 스캔 0건은 실패로 처리한다. 뮤테이션 5종 전건 RED로 변별력을 확인했다
+  (어댑터 재도입·귀속 폴백·측정시각 분리·정오답 고정·스캔 대상 전멸).
+>>>>>>> origin/main
 - 이름 근거: 2026-09-16 Kiki 판정(A안)으로 계획서 쪽 per-answer 채점 산출의 이름이
   **`AssessmentEvidence`** 로 확정됐다. 저장소 정본 `schema/assessment.py::Assessment`(진단
   세션)와는 다른 객체다 — `schema/learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석이
@@ -192,6 +233,24 @@ EOS-13은 evidence의 *구조적 입력 계약*만 정의한다.
 바뀌지 않는다**. 그것이 계약의 요점이고, `test_swapping_default_changes_the_math_without_
 touching_callers`가 그 사실을 실증한다(두 구현이 **다른 값**을 낸다는 단언 포함 — 같은 값을
 내면 교체가 증명되지 않는다).
+
+## 8-b. `attempt_id`를 **계약 Protocol에 두지 않은** 이유 (EOS-18 ④와의 정합)
+
+초안은 `AssessmentEvidenceInput`에 `attempt_id`를 편입하려 했다. 채택하지 않았다 — `EOS-18` ④가
+`learner_id`·`problem_id`를 배제한 것과 **같은 근거**가 그대로 적용되기 때문이다: 추정기는
+"맞았는가·언제인가"만 읽고 "어느 시도였는가"는 읽지 않는다. 멱등 키는 *추정 입력*이 아니라
+**적재 writer의 관심사**이며, 여기에 실으면 DKT·IRT 구현체가 쓰지도 않는 식별자를 옮기는 코드를
+갖게 된다(Concept Purity·계층 분리).
+
+그래서 경로를 이렇게 둔다 — `user_id`가 이미 그 형태다:
+
+| 자리 | 무엇을 받는가 | 왜 |
+|---|---|---|
+| 공개 writer (`record_problem_attempt_mastery`) | `evidence: AssessmentEvidence` | `attempt_id`를 **증거에서 직접 읽는다** — 사본이 생기지 않는다 |
+| staging (`_stage_attempt_mastery`) | `evidence` + `user_id` + **`attempt_id`** 명시 인자 | 식별자는 writer가 해소해 넘긴다(EOS-18 ③의 규약) |
+| 추정기 (`MasteryEstimator`) | `AssessmentEvidenceInput` 2속성만 | 신원을 모른다 — `MasteryUpdate`에도 `attempt_id`가 없다 |
+
+`test_estimator_output_carries_no_identity`가 마지막 행을 계약으로 동결한다.
 
 ## 9. 경계 — 계약은 추정기를 신뢰하지 않는다
 
@@ -297,11 +356,10 @@ import에서 뚫린다. AST는 그 표기 변형을 같은 노드로 본다.
 
 ## 12. 범위 밖 (EOS-108이 손대지 않은 것)
 
-- **임시 증거 어댑터 폐기** — `EOS-18` 소유. EOS-108은 그 길을 *넓혔다*:
-  `AssessmentEvidenceInput`이 이제 `attempt_id`까지 읽고, 착지한 `AssessmentEvidence`가 그
-  세 속성을 전부 가지므로 어댑터를 그 타입으로 바꾸기만 하면 된다. 선택 확장 2종
-  (`HintUsageSignal`·`StreakSignal`)을 본 Protocol에 **넣지 않은 것**도 그 길을 막지 않기
-  위해서다.
+- **임시 증거 어댑터 폐기** — `EOS-18`이 `54f9af58`(PR #1196)로 **먼저 착지했다**. EOS-108은
+  그 위에 얹혔다: 공개 writer가 이미 실 `AssessmentEvidence`를 받으므로 멱등 키는 새 인자 없이
+  `evidence.attempt_id` 한 줄로 해소된다. 선택 확장 2종(`HintUsageSignal`·`StreakSignal`)을
+  본 Protocol에 **넣지 않은 것**도 EOS-18이 확정한 2속성 경계를 되돌리지 않기 위해서다.
 - **힌트·연속 정답 생산자 배선** — 두 서빙 호출부는 `hint_used`·`consecutive_correct`를 채우지
   않는다(둘 다 `None`). 기본 추정기 `bkt-v1`은 그 축을 읽지 않으므로 오늘의 숙달 값에는 영향이
   0이지만, `simple-additive-v1`을 기본으로 올리려면 이 배선이 선행한다. **감추지 않고 적어

@@ -28,8 +28,8 @@ import-linter 7계층 계약에서 `schema`는 최하위(어느 계층도 import
 이 모듈이 **하지 않는 것** (있는 척 금지)
 -----------------------------------------
 - **`AssessmentEvidence` 구체 타입을 정의하지 않는다.** 그 좌석은 `EOS-12`가 소유한다(2026-09-16
-  착지). 여기 있는 것은 *구조적 입력 계약*(Protocol)뿐이며, **그 타입이 이미 가진 속성만**
-  읽는다(`correct` · `observed_at` · `attempt_id` 세 속성). 이름은 2026-09-16 Kiki 판정(A안)으로
+  착지). 여기 있는 것은 *구조적 입력 계약*(Protocol)뿐이며, **추정기가 실제로 읽는 2속성만**
+  담는다(`correct` · `observed_at` — EOS-18 ④ 재판정). 이름은 2026-09-16 Kiki 판정(A안)으로
   확정된 `AssessmentEvidence`이며, 저장소 정본 `schema/assessment.py::Assessment`(진단 세션)와는
   **다른 객체**다 (`learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석 참조).
 - **신규 DB 테이블·좌석을 만들지 않는다.** 숙달 좌석은 `concept_mastery_history`·
@@ -43,7 +43,6 @@ import-linter 7계층 계약에서 `schema`는 최하위(어느 계층도 import
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -175,17 +174,14 @@ class AssessmentEvidenceInput(Protocol):
     조건은 **`EOS-12`의 `AssessmentEvidence`가 이미 그 속성을 가지고 있는 것**이다 — 그때는
     두 정의가 갈라지는 것이 아니라 계약이 이미 있는 사실을 읽기 시작하는 것뿐이다.
 
-    `attempt_id` 편입 근거 (EOS-108 · 2026-09-18)
-    ---------------------------------------------
-    `EOS-12`가 착지하면서 `AssessmentEvidence.attempt_id: uuid.UUID | None`이 실재하게 됐다.
-    그것을 계약이 읽지 않으면 **같은 시도가 두 번 반영돼도 알 방법이 없다** — 숙달 갱신은
-    관측 1건당 정확히 1회여야 하고(KPI 2 State Integrity), 그 "1건"의 동일성을 말해 주는
-    것은 시도 식별자뿐이다. 즉 이 속성은 값을 계산하는 입력이 아니라 **멱등 키**다.
-
-    `None`을 허용하는 이유: 시도에서 유래하지 않은 관측(진단 세션 배치·백필)이 실재하고,
-    그것을 가짜 UUID로 채우면 서로 다른 관측이 같은 시도인 척하게 된다. `None`은 "이 관측에는
-    시도 식별자가 없다"는 사실이며, 그런 관측은 멱등 보호를 받지 않는다(아래
-    `l2/mastery_tracking`의 적재 규약이 그 사실을 숨기지 않고 기록한다).
+    `attempt_id`를 **여기에 두지 않은 이유** (EOS-108 · 2026-09-18)
+    ------------------------------------------------------------
+    멱등 키(`attempt_id`)는 숙달 이중 반영을 막는 데 반드시 필요하지만, 그것은 *추정 입력*이
+    아니라 **적재 writer의 관심사**다. 추정기(BKT·후속 DKT)는 "맞았는가·언제인가"만 읽고
+    "어느 시도였는가"는 읽지 않는다 — 여기에 실으면 추정기 Protocol이 추정과 무관한 것을
+    요구하게 된다(EOS-18 ④가 `learner_id`·`problem_id`를 같은 이유로 배제한 것과 동형).
+    그래서 `l2/mastery_tracking`의 공개 writer가 `AssessmentEvidence.attempt_id`를 직접 읽어
+    staging에 **명시 인자로** 넘긴다(`user_id`를 넘기는 것과 같은 자리·같은 이유).
 
     읽기 전용 property로 선언한 이유: 그래야 frozen dataclass·Pydantic 모델·평범한 속성 어느
     쪽으로 구현해도 구조적으로 만족한다(가변 속성으로 선언하면 읽기 전용 구현이 탈락한다).
@@ -198,10 +194,6 @@ class AssessmentEvidenceInput(Protocol):
     @property
     def observed_at(self) -> datetime:
         """관측 시각(= 새 측정의 `measured_at`). 경과일 계산의 종점."""
-
-    @property
-    def attempt_id(self) -> uuid.UUID | None:
-        """이 관측을 낳은 시도의 식별자 — **멱등 키**. 시도 유래가 아니면 None."""
 
 
 @runtime_checkable
@@ -297,12 +289,13 @@ class MasteryUpdate:
       이상, 산출이 자기 출처를 말하지 않으면 "무엇이 돌았는지 모르는 상태"가 된다
       (CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").
 
-    EOS-108이 더한 2필드 — 둘 다 *사실을 잃지 않기 위한* 것이다:
-    - `attempt_id`: 이 갱신을 낳은 시도(멱등 키). 적재 좌석의 같은 이름 컬럼에 그대로 간다.
-      `None`이면 시도 유래가 아니며 **멱등 보호를 받지 않는다**(그 사실이 값으로 남는다).
+    EOS-108이 더한 1필드 — *사실을 잃지 않기 위한* 것이다:
     - `bounds_clamped`: 추정기 산출이 0~1을 벗어나 계약이 **잘랐는가**. 자른 값만 남기고 자른
       사실을 버리면, 결함 있는 추정기가 정상 추정기와 구별되지 않는다(위장). 기본 False이며
       True는 언제나 추정기 결함의 신고다.
+
+    멱등 키(`attempt_id`)는 **여기에 없다** — 추정 산출이 아니라 적재 writer의 관심사다
+    (위 `AssessmentEvidenceInput` docstring의 같은 항목 참조).
     """
 
     axis: MasteryAxis
@@ -313,7 +306,6 @@ class MasteryUpdate:
     prior_mastery: float | None
     elapsed_days: float | None
     estimator_id: str
-    attempt_id: uuid.UUID | None = None
     bounds_clamped: bool = False
 
     def __post_init__(self) -> None:

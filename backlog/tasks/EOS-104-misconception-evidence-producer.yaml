@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,10 +13,20 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 채점 Evidence의 possible_misconceptions에 실제 생산자를 배선한다 — 현행은 계약 슬롯만 있고 두 채점 경로 모두 scan=not_run이다(EOS-12가 3상태로 고지만 함). ② 후보 출처는 coach 대화 턴에서 이미 계산된 게이트 통과 매칭(apply_match_quality_gate 결과)이며, 새로 diagnose를 한 번 더 돌리지 않는다(중복 계산 0). ③ 귀속 단위를 먼저 판정한다 — 게이트 매칭은 *턴* 단위이고 Evidence는 *attempt* 단위라 그대로 옮기면 오귀속이다. 학습자 단위 활성 가설(get_active_hypotheses)을 답안 증거로 부착하는 것도 같은 이유로 금지한다. ④ 이중 적재 금지 — Evidence는 관측이므로 curate_hypothesis를 다시 부르지 않는다(확정·영속은 기존 coach 경로가 유일 소유). ⑤ LLM·매처 비권위 유지 — gate_passed=False 후보는 계약이 이미 ValueError로 거부하므로 그 경계를 우회하지 않는다. ⑥ 배선 후 scan 상태가 실제로 ran_with_candidates / ran_no_candidate로 갈리는지 주입으로 확인한다(전부 not_run이면 배선이 안 된 것이다)."
-artifacts: []
+artifacts:
+  - "a612ee84 (#1195) — https://github.com/kiki-s-broom/WhyMath/pull/1195 · 판정 기준 main d99a4828"
 paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/l2/assessment_evidence.py
+  - src/backend/whymath_backend/l4/misconception/answer_signature.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - src/backend/whymath_backend/l4/subject_adapter_math.py
+  - src/backend/whymath_backend/schema/verification_capabilities.py
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/api/_subject_capability_state.py
+  - src/backend/whymath_backend/app.py
+  - src/backend/whymath_backend/composition.py
+  - src/backend/whymath_backend/config.py
 session: null
-notes: "출처: EOS-12 구현 중 실측 발견. EOS-12는 채점 Evidence 3종 계약을 세우고 개념·스킬 2종의 생산자를 배선했으나, 세 번째(오개념)는 **두 채점 경로 어디에도 생산자가 없다** — api/me.py submit_attempt는 오개념 매칭을 돌리지 않고, api/coach.py _complete_problem은 완료가 항상 서버 판정 정답이라 오개념이 성립하지 않는다. 그래서 EOS-12는 빈 리스트를 내보내는 대신 MisconceptionScan.NOT_RUN으로 \"보지 않았다\"를 고지하는 데서 멈췄다(0건을 \"오개념이 없었다\"로 읽히게 하지 않기 위함).\n\n실측 근거(판정 기준 main ab1fdc82 + EOS-12 브랜치): diagnose 호출처는 api/coach.py 2곳(대화 턴)뿐이고 둘 다 attempt를 만들지 않는다. 게이트 결과(MatchGateResult)는 하류 가설 저장소로 가고 채점 응답에 합류하지 않는다.\n\n주의: 귀속 단위 불일치가 이 태스크의 핵심 난점이다(acceptance ③). 턴 단위 매칭을 attempt 증거로 그대로 옮기면 \"이 답안의 오개념 후보\"라는 거짓 주장이 된다."
-updated: 2026-09-16
+notes: "출처: EOS-12 구현 중 실측 발견. EOS-12는 채점 Evidence 3종 계약을 세우고 개념·스킬 2종의 생산자를 배선했으나, 세 번째(오개념)는 **두 채점 경로 어디에도 생산자가 없다** — api/me.py submit_attempt는 오개념 매칭을 돌리지 않고, api/coach.py _complete_problem은 완료가 항상 서버 판정 정답이라 오개념이 성립하지 않는다. 그래서 EOS-12는 빈 리스트를 내보내는 대신 MisconceptionScan.NOT_RUN으로 \"보지 않았다\"를 고지하는 데서 멈췄다(0건을 \"오개념이 없었다\"로 읽히게 하지 않기 위함).\n\n실측 근거(판정 기준 main ab1fdc82 + EOS-12 브랜치): diagnose 호출처는 api/coach.py 2곳(대화 턴)뿐이고 둘 다 attempt를 만들지 않는다. 게이트 결과(MatchGateResult)는 하류 가설 저장소로 가고 채점 응답에 합류하지 않는다.\n\n주의: 귀속 단위 불일치가 이 태스크의 핵심 난점이다(acceptance ③). 턴 단위 매칭을 attempt 증거로 그대로 옮기면 \"이 답안의 오개념 후보\"라는 거짓 주장이 된다.\n\n[정정 2026-09-18] paths ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/l2/assessment_evidence.py'] → ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/l2/assessment_evidence.py', 'src/backend/whymath_backend/l4/misconception/answer_signature.py', 'src/backend/whymath_backend/l4/misconception/hypothesis_store.py', 'src/backend/whymath_backend/l4/subject_adapter_math.py', 'src/backend/whymath_backend/schema/verification_capabilities.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/api/_subject_capability_state.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/composition.py', 'src/backend/whymath_backend/config.py']: acceptance ②의 후보 출처 규정을 attempt 단위 검출기로 대체 판정했다. 근거: ②가 지목한 \"coach 대화 턴의 게이트 통과 매칭\"은 오답이 실제로 도착하는 경로(POST /v1/me/attempts)에서 **재료 자체가 존재하지 않는다** — 그 요청에는 학생 서술이 없고 student_answer 하나뿐이며, 그 핸들러는 coach 세션과 무관하다. 따라서 ②를 문면대로 이행하면 턴 단위 매칭을 attempt 증거로 옮기게 되는데 그것은 ③이 명시적으로 금지한 오귀속이다. ③이 \"귀속 단위를 먼저 판정한다\"고 적은 것을 판정 요구로 읽고, 판정 결과를 여기 남긴다.\n\n대체 출처: 문항 지문에서 추출한 식과 제출 답안을 이어 만든 주장 등식((x+2)² = x²+4)을 canonical_wrong_form에 SymPy Wild 정합시킨다. 재료가 전부 이 attempt에서만 나오므로 attempt 귀속이 정의상 성립한다. 탐지 알고리즘은 새로 쓰지 않았다 — 기존 wrong_form_match.matches_wrong_form에 위임한다(재구현 0). ②의 취지인 \"중복 계산 0\"은 유지된다: diagnose를 다시 돌리지 않으며, coach 경로는 이 변경으로 호출이 늘지 않는다.\n\n④ 준수: curate_hypothesis를 부르지 않는다. 대신 apply_matches(반박·캡 없는 매치 반영)를 얇게 감싼 apply_candidates를 쓴다. 확정·반박 권위는 coach 경로가 그대로 단독 소유한다.\n⑤ 준수: 게이트 통과분만 gate_passed=True로 싣는다. 주입 검증으로 floor 미만이면 RAN_NO_CANDIDATE로 바뀜을 확인했다(test_gate_floor_actually_gates).\n⑥ 준수: 3상태가 실제로 갈린다 — API 레벨 테스트 4종이 ran_with_candidates / ran_no_candidate / not_run(정답·답안없음·킬스위치OFF)을 각각 단언한다.\n\n경계: 검출기는 ADAPTER 배정(l4.misconception.answer_signature)이고 Core는 선택층 Protocol(schema.verification_capabilities.AttemptMisconceptionDetector)만 안다. 배선은 EOS-89 push 형태(app.state 7번째 능력)를 따른다. Core가 어댑터를 직접 import하면 import-linter가 RED임을 주입으로 확인했다.\n\npaths 확장: 구현이 계약층·어댑터·합성 루트·서빙 핸들러에 걸치므로 등재 당시 paths(api/coach.py·l2/assessment_evidence.py) 밖으로 나간다. 실제 변경 경로를 paths에 반영한다. 등재 당시 지목된 api/coach.py는 결과적으로 건드리지 않았다 — 그 경로의 완료는 항상 서버 판정 정답이라 오개념이 성립하지 않는다는 원 notes의 실측이 그대로 유효했기 때문이다."
+updated: 2026-09-18

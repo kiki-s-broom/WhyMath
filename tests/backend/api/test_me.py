@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.api import me as me_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._crypto import SecretCipher
+from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
 from whymath_backend.api.me import (
     ConceptAbilityItem,
     _add_ability_snapshot_if_attempts,
@@ -883,12 +884,26 @@ class _QueueSession:
     엉뚱하게 소진된 경우까지 통과한다. `overflow`를 노출해 필요하면 단언할 수 있게 남긴다.
     """
 
-    def __init__(self, results: list[_AQResult]) -> None:
+    def __init__(self, results: list[_AQResult], *, question_text: str | None = None) -> None:
         self._results = results
         self._i = 0
         self.added: list[Any] = []
         self.commits = 0
         self.overflow = 0
+        # EOS-104: 오답 오개념 훑기가 문항 지문을 단일 스칼라로 조회한다(`session.scalar`).
+        # 기본 None은 "지문 없음" → `MisconceptionScan.NOT_RUN`이라 기존 시나리오의 동작이
+        # 그대로 유지된다(훑지 않음 = 이 파일의 다른 단언과 무관).
+        self.question_text = question_text
+        self.flushes = 0
+
+    async def scalar(self, _stmt: Any) -> Any:
+        return self.question_text
+
+    async def flush(self) -> None:
+        # EOS-104: 가설 영속(`_persist_active_set`)이 같은 트랜잭션 가시화로 flush를 부른다.
+        # 이 대역이 없으면 오개념 훑기가 배선된 시나리오가 AttributeError로 죽는다 — 즉 이
+        # 메서드의 존재 자체가 "서빙 경로가 정말 영속까지 간다"는 증거다.
+        self.flushes += 1
 
     async def execute(self, _stmt: Any) -> _AQResult:
         if self._i >= len(self._results):
@@ -969,6 +984,115 @@ def _student_work_key_env(key_b64: str | None) -> Iterator[None]:
         else:
             os.environ[var] = prev
         get_settings.cache_clear()
+
+
+class TestAttemptMisconceptionScan:
+    """EOS-104 — 오답 1건이 오개념 후보로 이어지는 **서빙 경로**의 집행 지점.
+
+    여기서 재는 것은 탐지 품질이 아니라 *배선*이다: 핸들러가 실제로 과목 능력을 불러 그 결과를
+    채점 증거에 싣는가. 탐지 자체는 `tests/backend/l4/misconception/test_answer_signature.py`가
+    본다. 둘을 나누는 이유는, 배선이 끊겨도 탐지 테스트는 초록이기 때문이다.
+    """
+
+    @staticmethod
+    def _post(*, is_correct: bool, answer: str | None, question: str | None) -> dict[str, Any]:
+        session = _QueueSession([], question_text=question)
+        client = _attempts_client(session)
+        payload: dict[str, Any] = {"problem_id": str(uuid.uuid4()), "is_correct": is_correct}
+        if answer is not None:
+            payload["student_answer"] = answer
+        resp = client.post("/v1/me/attempts", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body
+
+    def test_wrong_answer_pattern_reaches_evidence_as_candidate(self) -> None:
+        """오답 `x²+4` → 증거의 `possible_misconceptions`에 게이트 통과 후보가 실린다."""
+        body = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        evidence = body["evidence"]
+        assert evidence["coverage"]["misconception_scan"] == "ran_with_candidates"
+        candidates = evidence["possible_misconceptions"]
+        assert [c["misconception_id"] for c in candidates] == ["distribution-over-power"]
+        # P-07 산출 형태 — {misconception_id, confidence}.
+        assert 0.0 < candidates[0]["confidence"] <= 1.0
+        assert candidates[0]["gate_passed"] is True
+
+    def test_wrong_answer_without_pattern_is_measured_zero_not_unmeasured(self) -> None:
+        """훑었는데 없었다 — 빈 후보와 `not_run`을 구별해 응답한다."""
+        body = self._post(is_correct=False, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["evidence"]["possible_misconceptions"] == []
+
+    def test_correct_answer_is_not_scanned(self) -> None:
+        """정답 시도는 훑지 않는다 — 오개념은 *틀린 방식*의 이름이다."""
+        body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_missing_answer_is_not_scanned(self) -> None:
+        """답안 미제출은 재료 부족 — 0건을 '오개념 없음'으로 위장하지 않는다."""
+        body = self._post(is_correct=False, answer=None, question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_detector_failure_does_not_break_grading(self) -> None:
+        """검출기가 터져도 채점은 성사된다 — 관측 실패가 채점 실패를 만들지 않는다.
+
+        이 시점에 attempt는 **이미 commit됐다**. 여기서 예외가 새어 나가면 기록된 제출이 500으로
+        돌아가 학생이 같은 문제를 다시 푼다. 그래서 삼키되 `not_run`으로 정직하게 표기한다.
+
+        변별력: 반드시 터지는 검출기를 *주입*해 확인한다. 정상 검출기로는 이 경로가 한 번도
+        실행되지 않으므로, 주입 없는 초록은 이 가드의 증거가 아니다.
+        """
+
+        class _ExplodingDetector:
+            def scan_attempt_answer(self, *, question_text: str, student_answer: str | None) -> Any:
+                raise RuntimeError("의도적 주입 — 검출기 내부 실패 시뮬")
+
+        session = _QueueSession([], question_text="(x+2)²을 전개하시오.")
+        app = create_app()
+        app.dependency_overrides[get_consented_user] = _user
+
+        async def _sess() -> AsyncIterator[_QueueSession]:
+            yield session
+
+        app.dependency_overrides[get_session] = _sess
+        app.dependency_overrides[get_attempt_misconception_detector] = _ExplodingDetector
+        client = TestClient(app)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "student_answer": "x²+4",
+            },
+        )
+        # 채점은 성사된다(500이 아니다).
+        assert resp.status_code == 201, resp.text
+        # 그리고 실패를 "오개념 없음"으로 위장하지 않는다.
+        assert resp.json()["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_kill_switch_off_reports_not_run_not_empty(self) -> None:
+        """킬 스위치를 끄면 **훑지 않았다**로 표기된다 — 끈 것과 없는 것을 섞지 않는다.
+
+        변별력 주입: 같은 입력이 ON에서 `ran_with_candidates`, OFF에서 `not_run`이어야 한다.
+        둘이 같으면 이 스위치는 아무것도 하지 않는 것이다.
+        """
+        on = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert on["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+
+        var = "WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED"
+        prev = os.environ.get(var)
+        os.environ[var] = "false"
+        get_settings.cache_clear()
+        try:
+            off = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        finally:
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+            get_settings.cache_clear()
+        assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert off["evidence"]["possible_misconceptions"] == []
 
 
 class TestSubmitAttempt:
