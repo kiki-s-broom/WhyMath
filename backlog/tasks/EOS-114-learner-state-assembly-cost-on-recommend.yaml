@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-114-learner-state-assembly-cost-on-recommend
+title: "추천 경로의 LearnerState 조립 비용 실측 — 계약을 지키느라 생긴 과조회가 유의한지 먼저 잰다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측이 먼저다 — `GET /v1/me/next-problem`의 쿼리 수·지연을 전환 전후로 비교해 `get_state` 조립분(execute 5 + get 1)이 실제로 유의한 비용인지 판정한다. 유의하지 않으면 **아무것도 바꾸지 않고** 그 판정을 근거와 함께 적고 닫는다(추측 최적화 금지).\n② 유의하면 계약을 깨지 않는 방법만 쓴다 — `RecommendationPolicy.__call__(learner_state, learning_context)` 시그니처는 불변이다. 지연 조립(필요한 필드만 실제 접근 시 조회)·요청 스코프 캐시 중에서 고르되, 그 선택이 `LearnerState`의 `origins` 정직 표기를 훼손하지 않는지 확인한다(측정 안 한 필드를 `no_data`로 적으면 안 된다).\n③ 정책이 실제로 읽는 필드를 실측으로 열거한다 — EOS-19 시점에는 `mastery`·`student_id` 둘뿐이다. 나중에 정책이 더 읽게 되면 이 태스크의 전제가 바뀌므로, 판정문에 기준 커밋 해시를 박는다.\n④ 변별력 — 최적화를 넣었으면 그것이 *꺼진* 상태에서 쿼리 수가 늘어나는지 주입으로 확인한다. 정상 경로만 재고 \"줄었다\"고 적지 않는다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: EOS-19(추천 핸들러의 정책 함수 전환) PR #1204 본문의 '정직한 공백' 중 후속 후보로 남긴 축.\n\n배경: EOS-19 acceptance ①이 \"핸들러가 LearnerState를 입력으로 받는다\"를 요구해 핸들러가 매 호출 `l2.learner_state.get_state`를 부른다. 그 조립은 execute 5회 + session.get 1회를 쓰는데(2026-09-18 계수 대역 실측), 정책이 실제로 읽는 것은 `mastery`와 `student_id`뿐이다. 즉 계약을 지키느라 생긴 과조회이며, 계약 자체는 옳다(정책의 입력은 학습자 상태다 — 그래야 BKT를 DKT로 갈 때 시그니처가 안 바뀐다).\n\n정직 표기: 실 트래픽 지연은 측정하지 않았다. 이 태스크는 \"최적화를 하라\"가 아니라 \"잴 만한 비용인지 먼저 재라\"다 — 측정 없이 캐시를 넣으면 `LearnerState`의 origins 정직 표기와 캐시 무효화라는 두 축의 위험만 새로 생긴다.\n\n판정 기준: main e5d80a8e(PR #1204 머지 시점)."
+updated: 2026-09-18
