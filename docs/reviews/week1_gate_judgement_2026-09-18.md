@@ -9,19 +9,33 @@
 
 ## 1. 판정
 
-> **미통과 (FAIL)**
+> **통과 (PASS)** — 단, 인접 결함 1건(`EOS-108`)을 함께 보고한다.
 
 완료 판정 문면은 *"1사이클(사용자 생성→진단→개념 선택→문제 풀이→오답→mastery 변경→다음 문제 추천)이
-DB 직접 수정 없이 완주"* 다. **완주하지 못했다** — 1단계에서 끊겼다.
+DB 직접 수정 없이 완주"* 다. **완주했다.**
 
-판정은 exit code로 냈다. 위 잡의 pytest 스텝 결과:
+「실측」 CI run `35315225642` 잡 `105505403023` (`backend — 마이그레이션·통합 (실 PG)`) pytest 스텝:
 
-> 「실측」 `1 failed, 321 passed, 13 skipped, 10332 deselected, 2 warnings in 412.29s` · 스텝 exit code 1
-> 유일한 실패: `test_week1_gate_one_cycle_without_direct_db_writes`
+> `= 322 passed, 13 skipped, 10332 deselected, 1 xfailed, 2 warnings in 293.44s (0:04:53) =` · 스텝 **exit 0**
+> `XFAIL api/test_week1_gate_closed_loop.py::test_oauth_created_learner_can_read_own_profile - EOS-108 …`
 
-인상 판정이 아니다 — 실패는 단계 단언에서 났고 예외와 위치가 특정된다(§3).
+통과한 322건에 `test_week1_gate_one_cycle_without_direct_db_writes`(7단계 관통)와
+`test_mastery_step_assertion_is_discriminating`(음성 대조군)이 포함된다. 판정은 exit code로 냈다.
 
----
+### 1-1. **정정 — 이 문서의 최초 판정은 "미통과"였고, 그것은 내 범위 오류였다**
+
+지우지 않고 병기한다. 최초 회차(CI run `35313156085` 잡 `105499238372`)에서 판정 하네스는
+`1 failed`였고 나는 이 문서에 **미통과**로 적었다. 그 실패는 실재했으나(§3의 결함) **그 단언은
+게이트의 7단계에 없는 것이었다** — 나는 1단계 "사용자 생성"의 증거로 `GET /v1/users/me`
+읽기까지 요구했고, 그 읽기가 깨져 있어 2~7단계가 아예 실행되지 못했다. 즉 **게이트를 막은 것은
+제품이 아니라 내 하네스의 과도한 단언**이었다.
+
+끊긴 지점을 `xfail(strict=True)`로 분리하자 2~7단계가 처음 실행되어 전건 통과했다. 판정을
+**통과**로 정정한다. 결함 자체는 그대로 실재하고 `EOS-108`이 소유한다 — 다만 그것은 게이트의
+합격 여부가 아니라 온보딩 표면의 문제다(§3).
+
+이 정정이 남기는 교훈: **판정 기준을 원 문서의 문면보다 넓게 잡으면 판정이 제품 대신 판정자를
+잰다.** 7단계에 없는 것을 1단계의 증거로 요구한 것이 그것이다.
 
 ## 2. 무엇을 판정했는가 — 그리고 이 판정이 기존 관통 증명과 다른 점
 
@@ -39,25 +53,27 @@ DB 직접 수정 없이 완주"* 다. **완주하지 못했다** — 1단계에�
 
 | 단계 | 표면 | 판정 |
 |---|---|---|
-| ① 사용자 생성 | `GET /v1/auth/demo/state` → `POST /v1/auth/demo/callback` | **생성은 통과** (user_profile 0건→1건) · **읽기에서 끊김** |
-| ② 진단 | `GET /v1/me/diagnosis/summary` · `GET /v1/me/next-problem?purpose=diagnosis` | ①에서 멈춰 **미도달** |
-| ③ 개념 선택 | `GET /v1/concepts/{id}` · `GET /v1/me/weak-concepts` | 미도달 |
-| ④ 문제 풀이 | `GET /v1/problems/{id}` (정답 비노출 동시 확인) | 미도달 |
-| ⑤ 오답 | `POST /v1/me/attempts` | **간접 통과** — 대조군이 같은 회차에 통과시켰다 |
-| ⑥ mastery 변경 | 응답 `mastery_updates` + `GET /v1/me/mastery/current` | **간접 통과** — 같음 |
-| ⑦ 다음 문제 추천 | `GET /v1/me/next-problem` | 미도달 |
+| ① 사용자 생성 | `GET /v1/auth/demo/state` → `POST /v1/auth/demo/callback` | **통과** — user_profile 0건→1건(호출 전 0건을 선행 삭제권 정리로 확보) |
+| ② 진단 | `GET /v1/me/diagnosis/summary` · `GET /v1/me/next-problem?purpose=diagnosis` | **통과** — CAT이 문항을 골랐다(problem_id 비-null) |
+| ③ 개념 선택 | `GET /v1/concepts/{id}` · `GET /v1/me/weak-concepts` | **통과** — 대상 개념 반환 · 약점 표면 호출 가능(콜드스타트 0건은 정당) |
+| ④ 문제 풀이 | `GET /v1/problems/{id}` | **통과** — 200 + 정답 sentinel 비노출 |
+| ⑤ 오답 | `POST /v1/me/attempts` | **통과** — 201 · `is_correct=False` · attempt_id 발급 |
+| ⑥ mastery 변경 | 응답 `mastery_updates` + `GET /v1/me/mastery/current` | **통과** — 갱신 목록에 책임귀속 개념 포함 · 스냅샷 0건→N건(값 비-null) |
+| ⑦ 다음 문제 추천 | `GET /v1/me/next-problem` | **통과** — 시도 문항 제외 · 표준오차 null→산출 |
 
-⑤⑥의 "간접 통과"는 추측이 아니다. 같은 회차에서 음성 대조군
-(`test_mastery_step_assertion_is_discriminating`)이 **OAuth로 만든 학습자**로
-`POST /v1/me/attempts`·`GET /v1/me/mastery/current`를 실제로 통과했다(321 passed에 포함).
-그러므로 `ConsentedUser` 의존성은 이 결함에 걸리지 않으며, ②③④⑦은 **아직 판정되지 않은 것**이지
-실패한 것이 아니다 — 그 구분을 유지한다.
+**인접 표면(7단계 밖)**: `GET/PATCH /v1/users/me` — **깨져 있다**(§3 · `EOS-108` · `xfail(strict=True)`로 동결).
+
+위 7건은 **한 회차에서 순서대로 실제 실행된 결과**다(간접 추론이 아니다). 각 단계는 status code가
+아니라 산출물을 단언한다 — "API 200"을 통과 근거로 쓰는 단계는 없다.
 
 ---
 
-## 3. 끊긴 지점 — 하나
+## 3. 인접 결함 1건 — 게이트를 막지는 않지만 온보딩을 막는다
 
 > **OAuth 로그인으로 생성된 학습자를 `GET/PATCH /v1/users/me`가 읽지 못한다(500).**
+
+이것은 게이트의 7단계에 없는 표면이다(그러므로 판정은 통과다). 그러나 **신규 가입 계정의 프로필
+조회·수정이 둘 다 500**이므로 실제 온보딩은 성립하지 않는다 — 게이트 합격과 별개로 P0로 다룬다.
 
 「실측」 실패 예외:
 
@@ -167,8 +183,10 @@ docstring의 "upsert"를 SQL 쓰기 동사로 읽어 **정상 상태에서 RED**
 
 ## 7. 정직한 공백
 
-1. **②③④⑦은 아직 판정되지 않았다.** ①에서 멈췄기 때문이다. `xfail` 재구성 이후 회차가 그 네
-   단계를 처음 실행한다 — 이 문서는 그 결과를 선취하지 않는다.
+1. **②③④⑦은 단 한 회차만 실행됐다.** `xfail` 재구성 이후 회차(`35315225642`)가 그 네 단계를
+   처음 실행해 전건 통과했다. 1회 실증은 "그때 됐다"이지 "지금도 된다"가 아니다 — 상시성은 이
+   하네스가 `backend-migrations` 잡(PR 상시)에 들어가 있는 것으로 확보된다. 다만 `EOS-81` 관통이
+   `e2e-nightly`에서 추가로 도는 것과 달리 이 하네스는 **야간 회차가 없다**(필요 판정은 별건).
 2. **이 판정 하네스는 판정 환경에서 한 번도 로컬 실행되지 못했다.** CCR 컨테이너는 pypi가 상시
    503이라 `pip install`이 불가하다(직접·프록시 모두 15초 후 503). 라이브 실행은 전부 CI다.
 3. **ruff·pytest를 로컬에서 못 돌렸다.** black은 GitHub 소스 조립으로 확보해 CI 명령을 그대로
@@ -203,15 +221,15 @@ docstring의 "upsert"를 SQL 쓰기 동사로 읽어 **정상 상태에서 RED**
 
 ## 9. Kiki가 할 판정
 
-이 문서는 **게이트가 미통과라는 사실**과 **끊긴 지점 하나**를 확정한다. 남은 결정은 Kiki 몫이다:
+이 문서는 **게이트가 통과라는 사실**과 **인접 결함 1건**을 확정한다. 남은 결정은 Kiki 몫이다:
 
-1. `EOS-108`을 지금 착수시킬 것인가(P0로 등재했다 — Week 1 Gate를 막고 있으므로).
-2. `EOS-108` acceptance ②의 세 축(생성측·읽기측·컬럼 기본값+백필) 중 어느 것을 고를지는 그 태스크
-   세션이 판정해 사유를 남기게 해 뒀다 — Kiki가 미리 지정하고 싶다면 그 태스크 notes에 지시를 남기면
-   된다.
-3. 게이트 재판정 시점 — `EOS-108` 착지 후 이 하네스를 다시 돌려 ②③④⑦까지 완주하는지 본다.
-   그때가 Week 1 Gate의 진짜 재판정이다.
-
----
+1. **게이트 통과를 인정할 것인가** — 통과 근거는 7단계 전건이고, 판정 범위 밖으로 선언한 것은
+   §6의 두 축(저작 콘텐츠 ORM 시딩 · 외부 IdP 스텁)이다. 그 두 선언을 받아들이지 않으면 판정은
+   달라진다 — 그 판단은 이 문서가 대신하지 않는다.
+2. **`EOS-108`을 지금 착수시킬 것인가.** 게이트를 막지는 않지만 신규 가입 계정의 프로필 조회·수정이
+   둘 다 500이므로 폐쇄루프 시연이 성립하지 않는다. acceptance ②의 세 축(생성측 `from_schema`
+   경유 / 읽기측 NULL→`[]` / 컬럼 server_default + 백필) 중 무엇을 고를지는 그 태스크 세션이
+   판정해 사유를 남기게 해 뒀다 — 미리 지정하고 싶으면 그 태스크 notes에 지시를 남기면 된다.
+3. **이 PR을 머지할 것인가.** 머지하지 않았다 — CI green이고 충돌 없으나 머지는 Kiki 몫이다.
 
 **작성**: 2026-09-18 · `EOS-106` · 판정 기준 main `d99a482807e0bf31d8cc3d43097ac279f95881ac`
