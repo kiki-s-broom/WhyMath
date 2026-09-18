@@ -211,3 +211,38 @@ class TestEscalationLadderReader:
     def test_held_diagnosis_still_yields_no_decision(self) -> None:
         """신뢰도 보류(<0.5)는 등급과 무관하게 여전히 보류다 — 사다리가 보류를 뚫지 않는다."""
         assert select_intervention_from_hypotheses([_hyp(0.3, evidence_count=9)]) is None
+
+
+class TestEscalationRungNeverReachesTheWire:
+    """등급이 **HTTP 응답에 실리지 않는다** — PG 없이 통합 실패를 재현하는 좌석.
+
+    사고 경위(2026-09-18 PR #1203): `escalation_rung`을 `InterventionDecision`에 그냥 추가했더니
+    `api/coach.py`의 `CoachResponse.intervention`이 이 모델을 **그대로 직렬화**하는 탓에 내부
+    라우팅 신호가 학생-대면 응답에 실렸다. 그 순간 응답이 *누적 증거의 함수*가 되어, 같은 입력을
+    두 번 보낸 두 응답이 서로 달라졌다 — `tests/backend/api/test_coach_wh1_shadow.py`의 shadow
+    ON/OFF 노출 비트동일 단언 2건이 RED가 났다.
+
+    그 단언은 실 PG를 요구해 로컬·`backend` 잡에서 전부 skip된다(`backend-migrations` 잡에서만
+    돈다). 그래서 **같은 불변식을 순수하게** 여기서 다시 잰다 — 이 클래스가 RED면 저 통합 테스트도
+    RED다. 계약: 등급의 관측 좌석은 HTTP가 아니라 `TurnOutcome.escalation_rung`이다.
+    """
+
+    def test_dump_carries_no_escalation_key(self) -> None:
+        decision = select_intervention_from_hypotheses([_hyp(0.9, evidence_count=4)])
+        assert decision is not None
+        assert decision.escalation_rung is EscalationRung.PREREQUISITE_CONCEPT  # 파이썬 속성엔 있다
+        assert "escalation_rung" not in decision.model_dump()
+        assert "escalation_rung" not in decision.model_dump_json()
+
+    def test_repeat_count_does_not_change_the_serialized_response(self) -> None:
+        """통합 실패의 재현 — 반복 횟수만 다른 두 결정의 *직렬화*가 비트동일해야 한다.
+
+        `test_coach_wh1_shadow.py`가 같은 학생에게 같은 입력을 두 번 보내 응답을 대조하는데,
+        두 번째 호출에서는 가설의 `evidence_count`가 1 늘어 있다. 그 차이가 직렬화에 새면
+        저 대조가 깨진다.
+        """
+        dumps = {
+            select_intervention_from_hypotheses([_hyp(0.9, evidence_count=n)]).model_dump_json()  # type: ignore[union-attr]
+            for n in range(1, 10)
+        }
+        assert len(dumps) == 1, f"반복 횟수가 직렬화를 바꿨다: {dumps}"

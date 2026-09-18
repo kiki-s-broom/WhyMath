@@ -198,6 +198,7 @@ class InterventionDecision(BaseModel):
     misconception_id: str = Field(description="진단된 misconception.id — 텔레메트리.")
     escalation_rung: EscalationRung | None = Field(
         default=None,
+        exclude=True,
         description=(
             "반복 오류 개입 강도 등급(`l2/remediation_policy.py` 정본). **3상태다** — "
             "`None`은 반복 신호를 입력받지 못한 경로(단일 턴 raw 매치), `NONE`은 "
@@ -205,6 +206,12 @@ class InterventionDecision(BaseModel):
             "둘을 접으면 '사다리가 한 번도 안 탔다'와 '사다리를 볼 수 없었다'가 "
             "같은 글자가 된다(작동 비율의 분모가 사라진다). "
             "**학생 비노출** — 강도는 콘텐츠 난이도·스캐폴드 밀도로만 표현하고 "
-            "반복 횟수를 발화에 싣지 않는다(정서적 낙인 금지)."
+            "반복 횟수를 발화에 싣지 않는다(정서적 낙인 금지). 그래서 `exclude=True`다: "
+            "이 모델은 `api/coach.py`의 `CoachResponse.intervention`으로 **그대로 직렬화**되므로, "
+            "필드를 그냥 추가하면 내부 라우팅 신호가 HTTP 응답에 실린다. 그것은 MISC-30의 범위가 "
+            "아니고(노출 필드 신설은 별건), 학생-대면 응답을 *누적 증거의 함수*로 만들어 "
+            "동일 입력의 응답 비트동일성을 깬다 — 실제로 `test_coach_wh1_shadow.py`의 "
+            "shadow ON/OFF 노출 비트동일 단언 2건이 그렇게 RED가 났다(2026-09-18 PR #1203). "
+            "등급의 관측 좌석은 HTTP가 아니라 `harness/wh1_loop.TurnOutcome.escalation_rung`이다."
         ),
     )
