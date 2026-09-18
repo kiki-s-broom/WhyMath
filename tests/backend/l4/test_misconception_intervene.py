@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 
+from whymath_backend.l2.remediation_policy import EscalationRung
 from whymath_backend.l4.misconception import (
     CATALOG_BY_ID,
     InterventionPattern,
@@ -22,13 +23,15 @@ def _match(
 
 
 def _hyp(
-    confidence: float, misconception_id: str = "distribution-over-power"
+    confidence: float,
+    misconception_id: str = "distribution-over-power",
+    evidence_count: int = 1,
 ) -> MisconceptionHypothesis:
     return MisconceptionHypothesis(
         misconception_id=misconception_id,
         confidence=confidence,
         turns_since_evidence=0,
-        evidence_count=1,
+        evidence_count=evidence_count,
     )
 
 
@@ -142,3 +145,69 @@ class TestNoForbiddenLabeling:
                 assert "흔한 오개념" not in decision.prompt
                 assert "다시 풀어와" not in decision.prompt
                 assert "틀렸" not in decision.prompt
+
+
+class TestEscalationLadderReader:
+    """MISC-30 — focus 가설의 `evidence_count`가 개입 강도 등급으로 읽히는가.
+
+    이 좌석이 사다리의 **유일한 reader**다. 배선이 끊기면 정책 모듈은 초록인데 서빙
+    경로에서는 등급이 영영 `NONE`으로 남는다 — "정본화를 집행으로 착각한 완료 선언 금지".
+    """
+
+    def test_raw_match_has_no_repeat_signal(self) -> None:
+        """단일 턴 매치에는 반복 횟수라는 사실 자체가 없다 → `None`(미관측).
+
+        `NONE`(미발동)으로 채우면 작동 비율의 분모에 raw 매치가 섞여 비율이 희석된다.
+        """
+        decision = select_intervention(_match(0.9))
+        assert decision is not None
+        assert decision.escalation_rung is None
+
+    def test_single_evidence_reads_as_not_escalated(self) -> None:
+        """증거 1회는 반복이 아니다 — 읽었고 미발동(`NONE`)이다."""
+        decision = select_intervention_from_hypotheses([_hyp(0.9, evidence_count=1)])
+        assert decision is not None
+        assert decision.escalation_rung is EscalationRung.NONE
+
+    def test_ladder_rungs_are_wired_through(self) -> None:
+        """2·3·4회가 각각 제 등급으로 올라오는가 — 경계 그대로."""
+        expected = {
+            1: EscalationRung.NONE,
+            2: EscalationRung.CORRECTIVE_EXPLANATION,
+            3: EscalationRung.EASIER_PROBLEM,
+            4: EscalationRung.PREREQUISITE_CONCEPT,
+            9: EscalationRung.PREREQUISITE_CONCEPT,
+        }
+        for count, rung in expected.items():
+            decision = select_intervention_from_hypotheses([_hyp(0.9, evidence_count=count)])
+            assert decision is not None, count
+            assert decision.escalation_rung is rung, count
+
+    def test_escalation_does_not_change_the_pattern(self) -> None:
+        """강도와 패턴은 직교 축이다 — 반복이 쌓여도 발화 패턴은 신뢰도가 정한다."""
+        low, high = (
+            select_intervention_from_hypotheses([_hyp(0.65, evidence_count=1)]),
+            select_intervention_from_hypotheses([_hyp(0.65, evidence_count=9)]),
+        )
+        assert low is not None and high is not None
+        assert low.pattern is high.pattern is InterventionPattern.REVERSE_REASONING
+        assert low.prompt == high.prompt
+
+    def test_escalation_never_reaches_the_student_utterance(self) -> None:
+        """정서 안전 — 반복 횟수·등급 어휘가 학생 발화에 실리면 안 된다.
+
+        문자열 금지 목록이 아니라 *산출물*을 본다: 같은 가설에서 횟수만 바꾼 발화가
+        **바이트 동일**해야 한다. 어떤 표현으로 새어 나가든 이 대조에 걸린다.
+        """
+        prompts = {
+            select_intervention_from_hypotheses([_hyp(0.9, evidence_count=n)]).prompt  # type: ignore[union-attr]
+            for n in range(1, 10)
+        }
+        assert len(prompts) == 1, f"반복 횟수가 발화를 바꿨다: {prompts}"
+        only = prompts.pop()
+        for leak in ("번째", "반복", "또", "계속", "다시"):
+            assert leak not in only, leak
+
+    def test_held_diagnosis_still_yields_no_decision(self) -> None:
+        """신뢰도 보류(<0.5)는 등급과 무관하게 여전히 보류다 — 사다리가 보류를 뚫지 않는다."""
+        assert select_intervention_from_hypotheses([_hyp(0.3, evidence_count=9)]) is None

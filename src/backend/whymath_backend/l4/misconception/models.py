@@ -14,6 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from whymath_backend.l2.remediation_policy import EscalationRung
+
 MisconceptionDomain = Literal[
     "대수", "기하", "확률통계", "함수", "미적분", "수열", "삼각함수", "벡터"
 ]
@@ -194,3 +196,15 @@ class InterventionDecision(BaseModel):
     pattern: InterventionPattern
     prompt: str = Field(description="학생에게 노출할 어셈블된 발화(자각 유도형).")
     misconception_id: str = Field(description="진단된 misconception.id — 텔레메트리.")
+    escalation_rung: EscalationRung | None = Field(
+        default=None,
+        description=(
+            "반복 오류 개입 강도 등급(`l2/remediation_policy.py` 정본). **3상태다** — "
+            "`None`은 반복 신호를 입력받지 못한 경로(단일 턴 raw 매치), `NONE`은 "
+            "신호를 읽었고 사다리 첫 칸에 못 미친 상태, 나머지는 발동한 등급이다. "
+            "둘을 접으면 '사다리가 한 번도 안 탔다'와 '사다리를 볼 수 없었다'가 "
+            "같은 글자가 된다(작동 비율의 분모가 사라진다). "
+            "**학생 비노출** — 강도는 콘텐츠 난이도·스캐폴드 밀도로만 표현하고 "
+            "반복 횟수를 발화에 싣지 않는다(정서적 낙인 금지)."
+        ),
+    )

@@ -62,6 +62,7 @@ from typing import Annotated, Literal, Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.config import get_settings
+from whymath_backend.l2.remediation_policy import EscalationRung
 from whymath_backend.l3.verify_solution import SolutionVerificationResult, verify_solution
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.crosslink_shadow import observe_crosslink_shadow
@@ -262,6 +263,7 @@ class TurnState:
     utterance: str | None = None
     utterance_source: UtteranceSource | None = None
     end_action_type: EndTurnType | None = None
+    escalation_rung: EscalationRung | None = None
     history: list[ToolResult] = field(default_factory=list)
 
 
@@ -295,6 +297,16 @@ class TurnOutcome(BaseModel):
         description=(
             "발화 출처 — policy(정책 명시 발화 존중)·derived(하네스 파생 템플릿). "
             "프로즈 계층(S4-04)의 라우팅 신호(ended일 때만·기본 None=하위호환)."
+        ),
+    )
+    escalation_rung: EscalationRung | None = Field(
+        default=None,
+        description=(
+            "이 턴 개입의 반복 오류 강도 등급(`l2/remediation_policy.py` 정본). "
+            "**3상태다** — `None`은 이 턴에 개입 결정이 없었다(사다리의 분모 밖), "
+            "`NONE`은 개입했으나 사다리가 미발동, 나머지는 발동한 등급이다. "
+            "사다리가 *실제로 발동한 비율*은 이 필드의 분포로만 셀 수 있다 "
+            '(CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").'
         ),
     )
     hypotheses: list[MisconceptionHypothesis] = Field(
@@ -388,6 +400,11 @@ def _end_turn_utterance(state: TurnState, action: EndTurnAction) -> str:
         # 개입 발화 결선(#237) — 누적 가설 세트가 소크라테스 발화를 구동.
         decision = select_intervention_from_hypotheses(state.hypotheses)
         if decision is not None:
+            # 반복 오류 사다리 등급을 작업 메모리에 남긴다(MISC-30 ⑥ 작동 비율의 원자료).
+            # *발화에는 싣지 않는다* — 학생에게 반복 횟수를 말하지 않는다(정서적 낙인 금지).
+            # 보류(None)일 때 덮어쓰지 않는 이유: 개입 자체가 없었던 턴은 사다리의 분모가
+            # 아니다(미발동과 미관측을 섞으면 비율이 희석된다).
+            state.escalation_rung = decision.escalation_rung
             return decision.prompt
         return NEUTRAL_GUIDE_UTTERANCE  # 보류 시 중립 유도
     if action.action_type == "출제" and state.last_probe is not None:
@@ -554,6 +571,7 @@ async def run_tutoring_turn(
             action_type=state.end_action_type,
             utterance=state.utterance,
             utterance_source=state.utterance_source,
+            escalation_rung=state.escalation_rung,
             hypotheses=state.hypotheses,
             evidence=list(state.evidence),
             tool_calls=state.tool_calls,
