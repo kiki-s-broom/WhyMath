@@ -199,7 +199,6 @@ if (Test-Path $WT) { git worktree remove --force $WT; if (Test-Path $WT) { Remov
 git worktree add --detach $WT origin/main
 cd $WT
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
-Remove-Item "$Out\probe.json", "$Out\report.json" -ErrorAction SilentlyContinue
 git log --oneline -1
 "WT_HEAD=" + (git rev-parse --short HEAD) + "  MAIN_TIP=" + (git rev-parse --short origin/main)
 "WT_IS_MAIN_TIP=" + ((git rev-parse HEAD) -eq (git rev-parse origin/main))
@@ -260,30 +259,17 @@ $ModuleOk = ($ModuleFrom -like "$WT*")
 $ReachOk = ($LASTEXITCODE -eq 0)
 "MODULE_OK=$ModuleOk  REACH_OK=$ReachOk"
 if ($ModuleOk -and $ReachOk) {
+  Remove-Item "$Out\probe.json", "$Out\report.json" -ErrorAction SilentlyContinue
   "===== 표본 생성 20건 ====="
   & $Py -m whymath_backend.harness.attempt_skill_reach_probe --count 20 --json "$Out\probe.json"
   "PROBE_EXIT=$LASTEXITCODE"
-  if (Test-Path "$Out\probe.json") {
-    $P = Get-Content "$Out\probe.json" -Raw | ConvertFrom-Json
-    $Since = $P.started_at
-    "SINCE=$Since"
-    "===== 사후 측정 ====="
-    & $Py -m whymath_backend.harness.attempt_skill_event_reach_report --since $Since --json "$Out\report.json"
-    "REPORT_EXIT=$LASTEXITCODE"
-    if (Test-Path "$Out\report.json") {
-      $R = Get-Content "$Out\report.json" -Raw | ConvertFrom-Json
-      $CU = @($P.outcomes | Where-Object { $_.concept_updates -gt 0 }).Count
-      "===== 증적 ====="
-      "WINDOW=$($R.since)"
-      "ATTEMPTS=$($R.attempts_total)  EVENTS=$($R.events_total)"
-      "EMPTY=$($R.events_empty_skill_ids)  NONEMPTY=$($R.events_nonempty_skill_ids)  NULL=$($R.events_null_skill_ids)"
-      "WRITER_REACH=$($R.writer_reach_rate)  RESOLUTION=$($R.resolution_rate)  E2E=$($R.end_to_end_rate)"
-      "PROBE_ACCEPTED=$($P.accepted)  PROBE_FAILED=$($P.failed)"
-      "CONCEPT_UPDATED_ATTEMPTS=$CU"
-      "JUDGED_AGAINST_MAIN=" + (git rev-parse --short HEAD)
-      "MODULE_FROM=$ModuleFrom"
-    } else { "REPORT_JSON_MISSING=True — 사후 측정 실패. 화면의 예외 타입명을 세션에 전달한다" }
-  } else { "PROBE_JSON_MISSING=True — 표본 생성 실패. 위 PROBE_EXIT 숫자를 §4-4 표와 대조해 전달한다" }
+  $ProbeOk = Test-Path "$Out\probe.json"
+  "PROBE_JSON_OK=$ProbeOk"
+  if ($ProbeOk) { $P = Get-Content "$Out\probe.json" -Raw | ConvertFrom-Json; $Since = $P.started_at; "SINCE=$Since"; & $Py -m whymath_backend.harness.attempt_skill_event_reach_report --since $Since --json "$Out\report.json"; "REPORT_EXIT=$LASTEXITCODE" } else { "PROBE_JSON_MISSING=True — 표본 생성 실패. 위 PROBE_EXIT 숫자를 §4-4 표와 대조해 전달한다" }
+  $ReportOk = Test-Path "$Out\report.json"
+  "REPORT_JSON_OK=$ReportOk"
+  if ($ReportOk) { $R = Get-Content "$Out\report.json" -Raw | ConvertFrom-Json; $CU = @($P.outcomes | Where-Object { $_.concept_updates -gt 0 }).Count; "===== 증적 ====="; "WINDOW=$($R.since)"; "ATTEMPTS=$($R.attempts_total)  EVENTS=$($R.events_total)"; "EMPTY=$($R.events_empty_skill_ids)  NONEMPTY=$($R.events_nonempty_skill_ids)  NULL=$($R.events_null_skill_ids)"; "WRITER_REACH=$($R.writer_reach_rate)  RESOLUTION=$($R.resolution_rate)  E2E=$($R.end_to_end_rate)"; "PROBE_ACCEPTED=$($P.accepted)  PROBE_FAILED=$($P.failed)"; "CONCEPT_UPDATED_ATTEMPTS=$CU"; "JUDGED_AGAINST_MAIN=" + (git rev-parse --short HEAD); "MODULE_FROM=$ModuleFrom" } else { "REPORT_JSON_MISSING=True — 사후 측정 실패. 화면의 예외 타입명을 세션에 전달한다" }
+  "BLOCK_D_COMPLETE=True"
 } else { "WRITE_REFUSED=True — 쓰기를 거부했다. MODULE_OK=$ModuleOk(worktree 코드인가) REACH_OK=$ReachOk(DB 도달하는가). DB는 건드리지 않았다. 두 값과 위 화면을 세션에 전달한다." }
 ```
 
@@ -318,10 +304,11 @@ git status --short --branch
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
-cd C:\Users\kiki\Desktop\__AI\WhyMath\src\backend
-& .\.venv\Scripts\python.exe -m alembic -c alembic.ini upgrade head
-"ALEMBIC_EXIT=$LASTEXITCODE"
-cd C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure
+& $Py -m whymath_backend.ops.db_host_reachability
+$ReachOk = ($LASTEXITCODE -eq 0)
+$IniOk = Test-Path "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\alembic.ini"
+"REACH_OK=$ReachOk  INI_OK=$IniOk"
+if ($ReachOk -and $IniOk) { cd C:\Users\kiki\Desktop\__AI\WhyMath\src\backend; & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; cd $WT } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk. DB에 못 붙는 상태에서 upgrade가 실패하면 그 실패가 스키마 문제처럼 보여 원인을 가린다." }
 ```
 
 `ALEMBIC_EXIT=0`을 확인한 뒤 [D]를 다시 붙여넣는다.
@@ -333,8 +320,12 @@ cd C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
-docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "DELETE FROM attempt_event WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM skill_mastery_history WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM concept_mastery_history WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM problem_attempt WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM user_profile WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065';"
-"CLEANUP_EXIT=$LASTEXITCODE"
+$ReportExists = Test-Path "$Out\report.json"
+"REPORT_EXISTS=$ReportExists"
+$Confirm = Read-Host "증적 8줄을 이미 세션에 전달했습니까? 표본을 지우려면 DELETE 를 입력하세요"
+$EvidenceSent = ($Confirm -ceq "DELETE")
+"EVIDENCE_SENT=$EvidenceSent"
+if ($EvidenceSent -and $ReportExists) { docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "DELETE FROM attempt_event WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM skill_mastery_history WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM concept_mastery_history WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM problem_attempt WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065'; DELETE FROM user_profile WHERE user_id='c5de83b3-9143-58e8-a7a8-cf378801c065';"; "CLEANUP_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — 표본을 지우지 않았다. EVIDENCE_SENT=$EvidenceSent REPORT_EXISTS=$ReportExists. 증적을 먼저 전달하고, 지울 때 DELETE 를 정확히 입력한다." }
 ```
 
 ---
