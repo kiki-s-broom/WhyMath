@@ -368,6 +368,16 @@ cd $WT
 
 **[7-1b] 마이그레이션 (세션이 [7-1a] 판정을 회신한 뒤에만)**
 
+> **`Read-Host`를 쓰지 않는다(2026-09-18 실측 교훈).** 초판은 사람 승인을 `Read-Host`로 받았는데,
+> 두 블록을 연달아 붙여넣으면 **`Read-Host`가 다음 블록의 첫 줄을 입력값으로 삼킨다** — 승인이
+> 자동으로 실패하고(`WRITE_REFUSED`), 삼켜진 줄을 잃은 다음 블록이 그대로 이어 실행된다. 즉
+> 붙여넣기 흐름에서 `Read-Host`는 사람을 멈추는 대신 **자기 블록을 무력화하고 다음 블록을 손상**시킨다.
+> 그래서 이 블록의 가드는 전부 기계가 계산한다 — 도달성·ini 실재·목적지 URL·`BEHIND`(현재 리비전이
+> head와 다른가). 멱등하므로 이미 head면 스스로 거부한다.
+>
+> (CLAUDE.md 「붙여넣기 블록의 자리표시자 전면 금지」가 `Read-Host`를 정지 수단으로 권하지만,
+> 그것은 **블록이 하나일 때** 성립한다. 뒤에 다른 블록이 붙는 순간 성질이 바뀐다.)
+
 `alembic.ini`와 `versions/`를 **worktree**(main tip)에서 읽는다 — 공유 클론은 타 세션 브랜치에
 있을 수 있어 그쪽 `versions/`를 쓰면 *어느 트리의 마이그레이션인지 모르는 채* 스키마가 바뀐다.
 
@@ -389,10 +399,13 @@ $env:PYTHONPATH = (Resolve-Path "$WT\src\backend").Path
 $ReachOk = ($LASTEXITCODE -eq 0)
 $IniOk = Test-Path "$WT\src\backend\alembic.ini"
 $UrlOk = ($env:WHYMATH_DATABASE_URL -like "*:5433/whymath*")
-$Confirm = Read-Host "세션이 [7-1b] 실행을 승인했습니까? 마이그레이션하려면 UPGRADE 를 입력하세요"
-$Approved = ($Confirm -ceq "UPGRADE")
-"REACH_OK=$ReachOk  INI_OK=$IniOk  URL_OK=$UrlOk  APPROVED=$Approved"
-if ($ReachOk -and $IniOk -and $UrlOk -and $Approved) { & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; & $Py -m alembic -c alembic.ini current } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk URL_OK=$UrlOk(5433 prod를 겨냥하는가) APPROVED=$Approved. 스키마는 그대로다." }
+$Before = ((docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT version_num FROM alembic_version;") + "").Trim()
+$HeadLine = (& $Py -m alembic -c alembic.ini heads | Where-Object { $_ -match '^[0-9a-f]{8,}' } | Select-Object -First 1)
+$Head = (($HeadLine + "") -split '\s+')[0]
+$Behind = ($Before -ne $Head)
+"BEFORE_REVISION=$Before  HEAD=$Head  BEHIND=$Behind"
+"REACH_OK=$ReachOk  INI_OK=$IniOk  URL_OK=$UrlOk"
+if ($ReachOk -and $IniOk -and $UrlOk -and $Behind) { & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; $After = ((docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT version_num FROM alembic_version;") + "").Trim(); "AFTER_REVISION=$After"; "AT_HEAD=" + ($After -eq $Head) } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk URL_OK=$UrlOk(5433 prod를 겨냥하는가) BEHIND=$Behind(뒤처져 있는가 — False면 이미 head이므로 할 일이 없다). 스키마는 그대로다." }
 cd $WT
 ```
 
@@ -402,6 +415,8 @@ cd $WT
 ### 7-2. 표본 정리 (선택 — **증적을 세션에 전달한 뒤에만**)
 
 > ⚠ 이 블록은 측정한 표본을 지운다. 증적 8줄을 전달하기 *전에* 돌리면 재측정해야 한다.
+> ⚠ **이 블록만 단독으로 붙여넣는다** — `Read-Host`가 있어서, 뒤에 다른 블록을 이어 붙이면
+>    그 블록의 첫 줄이 입력값으로 삼켜진다(2026-09-18 실측).
 > 지우지 않아도 무해하다 — 프로브 사용자 한 명의 행일 뿐이다.
 
 ```powershell
