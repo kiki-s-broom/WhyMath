@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-106
+title: "계획서 300 Phase 2 Week 1 Gate 판정 — 1사이클(사용자 생성→진단→개념 선택→풀이→오답→mastery→추천) DB 직접 수정 없이 완주 여부를 exit code로 판정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P0
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 1사이클(사용자 생성 → 진단 → 개념 선택 → 문제 풀이 → 오답 → mastery 변경 → 다음 문제 추천)을 실제 실행해 통과/미통과를 exit code로 내는 판정 하네스가 실재한다 (인상 판정 금지 · 점추정 금지).\n② 판정은 사람의 DB 직접 수정(INSERT/UPDATE를 psql·ORM 스크립트로 직접 쓰는 행위) 없이 공개 API 표면만으로 완주하는지를 본다. 단계 사이에 DB 손대기가 필요하면 그 지점이 곧 끊긴 지점이다.\n③ 판정 하네스 자신의 변별력을 뮤테이션 주입으로 확인한다 — 사이클의 각 단계를 하나씩 끊어 주입했을 때 하네스가 RED를 내는지, 주입이 실제 적용됐는지(mutated != original)를 단언한다.\n④ 보고 상단에 판정 기준 커밋 해시(main)를 박는다.\n⑤ 미통과면 끊긴 지점 하나를 지목하고 그 지점만 고치는 후속 태스크를 등재한다. 통과면 후속 태스크 0건.\n⑥ AI 품질·추천 품질·UI는 판정 대상이 아니다 — 연결성(호출 가능성·상태 전파)만 본다."
+artifacts: []
+paths: []
+session: claude/cool-volta-xn09eg
+notes: "계획서 300 Phase 2 §4 Week 1 Gate 판정 세션 (집행 지시문 세트 07/21 GATE-W1). 구현이 아니라 판정이다.\n선행 P-01~P-04 = EOS-100(관계 계약) · EOS-11(Event Trace) · EOS-10(LearnerState 단일 표면) · EOS-105(상태 머신) 전건 done.\n주의: plan300_phase2_backlog_crosswalk.md §9-⑤가 이 게이트를 \"등재 불필요 — 이미 돈다\"로 처분하며 tests/backend/api/test_e2e_vertical_slice_integration.py 13단계를 근거로 든다. 그 판정의 사각은 (a) 테스트 픽스처가 DB를 직접 쓰는지 (b) nightly 전용이라 PR에서 도는지 두 축이므로 판정은 그 둘을 실측해야 한다."
+updated: 2026-09-18
