@@ -19,17 +19,51 @@ payload dict가 시임(`_ChatTransport`)에 그대로 넘어오므로, 뮤테이
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+import random
+from collections.abc import Awaitable, Callable, Mapping
+from contextvars import ContextVar
 from typing import Any, Protocol, runtime_checkable
 
 from whymath_backend.l3.models import Usage
 
 __all__ = [
+    "RETRYABLE_STATUS",
     "ChatTransport",
     "HttpxChatTransport",
     "extract_text",
     "extract_usage",
+    "reset_retry_count",
+    "retries_in_current_call",
 ]
+
+RETRYABLE_STATUS: frozenset[int] = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+"""다시 걸면 성립할 수 있는 상태코드.
+
+**429가 여기 있는 이유**: 2026-09-17 OpenRouter 실측에서 20회 중 6회(30%)가
+`429 engine_overloaded · limit_source=upstream_provider_shared_pool`로 죽었다. 재시도가
+없으면 그 회차를 그냥 버리고, 그러면 "가용성 70%"라는 숫자가 **공급사의 성질이 아니라
+우리 전송기의 성질**을 재게 된다. 400·401·403·404는 다시 걸어도 같으므로 뺀다 —
+모델 ID 오타·키 오류·공급사 필터 거부가 전부 그쪽이고, 그것들은 즉시 실패해야 한다.
+"""
+
+_RETRY_COUNT: ContextVar[int] = ContextVar("openai_compat_retry_count", default=0)
+
+
+def reset_retry_count() -> None:
+    """이번 호출의 재시도 카운터를 0으로 — 회차 시작 시 호출한다."""
+    _RETRY_COUNT.set(0)
+
+
+def retries_in_current_call() -> int:
+    """이번 호출에서 실제로 일어난 재시도 횟수.
+
+    재시도는 **측정을 가린다** — 30% 실패를 재시도로 덮으면 리포트가 100% 성공으로 보이고,
+    운영에서 같은 부하를 만났을 때 지연과 쿼터 소모가 설명되지 않는다. 그래서 횟수를
+    노출해 리포트가 "몇 번 다시 걸어서 얻은 성공인지"를 말할 수 있게 한다.
+    `ContextVar`라 asyncio 태스크마다 독립이다(동시 실행 회차끼리 섞이지 않는다).
+    """
+    return _RETRY_COUNT.get()
 
 
 @runtime_checkable
@@ -58,7 +92,47 @@ class HttpxChatTransport:
     응답 본문이 없어 "왜 거절당했는지"가 사라지므로(공급사 필터 거부·모델 ID 오타·쿼터는
     전부 4xx다), 본문을 붙인 `RuntimeError`로 바꿔 던진다 — CLAUDE.md 「측정·수집 도구를
     성공 경로만 보고 설계 금지」 ②(실패 *원인*이 남는가).
+
+    재시도 (2026-09-17 실측 대응)
+    ---------------------------
+    `RETRYABLE_STATUS`에 한해 지수 백오프로 다시 건다. 공급사가 `Retry-After`를 주면
+    **그 값을 우선**하고(공급사가 우리보다 자기 부하를 잘 안다), 없으면
+    `base_delay * 2**n`에 지터를 얹는다 — 동시 실행 회차가 같은 순간에 몰려 재시도하면
+    상류를 다시 밀어 버리기 때문이다.
+
+    재시도는 조용하지 않다: 횟수가 `retries_in_current_call()`로 노출되고, 최종 실패
+    메시지에 **몇 번 시도했는지**가 들어간다. 재시도가 보이지 않으면 "성공률 100%"가
+    상류를 몇 번 두드려 얻은 것인지 리포트가 말할 수 없다.
     """
+
+    def __init__(
+        self,
+        *,
+        max_attempts: int = 3,
+        base_delay_s: float = 1.0,
+        max_delay_s: float = 20.0,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
+        jitter: Callable[[], float] | None = None,
+    ) -> None:
+        """`max_attempts`는 **총 시도 횟수**다(1이면 재시도 없음).
+
+        `sleep`·`jitter`는 테스트 주입점이다 — 실제로 기다리면 회귀 테스트가 느려지고,
+        지터가 난수면 대기 시간을 단언할 수 없다.
+        """
+        if max_attempts < 1:
+            raise ValueError("max_attempts는 1 이상이어야 합니다(1 = 재시도 없음).")
+        self._max_attempts = max_attempts
+        self._base_delay_s = base_delay_s
+        self._max_delay_s = max_delay_s
+        self._sleep = sleep or asyncio.sleep
+        self._jitter = jitter or random.random
+
+    def _backoff_s(self, attempt: int, retry_after: float | None) -> float:
+        """이번 재시도 전에 기다릴 초. 공급사의 `Retry-After`가 있으면 그것을 쓴다."""
+        if retry_after is not None:
+            return min(retry_after, self._max_delay_s)
+        exponential: float = self._base_delay_s * float(2**attempt)
+        return min(exponential, self._max_delay_s) + self._jitter() * self._base_delay_s
 
     async def post_chat(
         self,
@@ -68,22 +142,47 @@ class HttpxChatTransport:
         payload: Mapping[str, Any],
         timeout_s: float,
     ) -> Any:
-        """httpx로 POST. 비-2xx면 상태코드 + 응답 본문을 담은 RuntimeError."""
+        """httpx로 POST. 재시도 가능 상태면 백오프 후 재시도, 최종 실패는 본문 포함 오류."""
         try:
             import httpx
         except ImportError as exc:  # pragma: no cover — 환경 의존(라이브러리 미설치)
             raise RuntimeError(
                 "httpx가 설치되지 않아 OpenAI 호환 호출을 할 수 없습니다 " "(`pip install httpx`)."
             ) from exc
-        async with httpx.AsyncClient(timeout=timeout_s) as client:
-            response = await client.post(url, headers=dict(headers), json=dict(payload))
-            if response.status_code >= 400:
+        last_error = ""
+        for attempt in range(self._max_attempts):
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
+                response = await client.post(url, headers=dict(headers), json=dict(payload))
+                if response.status_code < 400:
+                    parsed: Any = response.json()
+                    return parsed
                 # 본문을 그대로 싣는다 — 키 값은 요청 헤더에만 있고 응답 본문에는 없다.
-                raise RuntimeError(
+                last_error = (
                     f"OpenAI 호환 호출 실패 HTTP {response.status_code}: {response.text[:2000]}"
                 )
-            parsed: Any = response.json()
-            return parsed
+                retryable = response.status_code in RETRYABLE_STATUS
+                retry_after = _parse_retry_after(response.headers.get("retry-after"))
+            if not retryable or attempt == self._max_attempts - 1:
+                break
+            _RETRY_COUNT.set(_RETRY_COUNT.get() + 1)
+            await self._sleep(self._backoff_s(attempt, retry_after))
+        raise RuntimeError(f"{last_error} (시도 {self._max_attempts}회)")
+
+
+def _parse_retry_after(raw: str | None) -> float | None:
+    """`Retry-After` 헤더를 초로. 숫자가 아니면(HTTP-date 형식 등) None.
+
+    날짜 형식을 파싱하지 않는 것은 의도다 — 시계 오차가 붙으면 음수 대기나 과대 대기가
+    나오고, 그때는 우리 백오프가 더 안전하다. **모르면 모른다고 하고 기본 경로로 간다.**
+    음수·비정상 값도 None으로 떨어뜨린다(지어내지 않는다).
+    """
+    if raw is None:
+        return None
+    try:
+        seconds = float(raw.strip())
+    except (AttributeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
 
 
 def _first_choice_message(payload: Any) -> Any:

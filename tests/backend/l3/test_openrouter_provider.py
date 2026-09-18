@@ -366,14 +366,49 @@ class TestJurisdictionDerivation:
         assert known.jurisdiction is Jurisdiction.US
         assert polluted.jurisdiction is Jurisdiction.UNKNOWN
 
-    def test_default_allowlist_is_the_single_fully_known_provider(self) -> None:
-        """기본 허용목록 동결 — **세 축을 함께 아는** 곳만(2026-09-17 공급사 패널 실측).
+    def test_default_allowlist_is_the_cheapest_fully_known_provider(self) -> None:
+        """기본 허용목록 동결 — **검증 가능한 세 축을 함께 아는 곳 중 가장 싼 곳**.
 
-        관할(`Headquarters: US`) · 데이터 정책(`Prompt training: No` + `Retention: Zero`) ·
-        양자화(`Precision: FP8`). 셋을 다 아는 곳은 `deepinfra` 하나뿐이다.
+        관할(`Headquarters: US`) · 데이터 정책(`Prompt training: No` +
+        `Retention: Zero retention`) · 양자화(`Precision: FP8`).
+
+        **가용성은 의도적으로 축에서 뺐다.** 2026-09-17~18 네 회차 실측에서 같은 공급사·같은
+        시험지의 `429` 실패율이 **30% → 15% → 0%**로 흔들렸고, 마지막(0%)이 가장 붐빌 것이라던
+        peak 구간이었다 — 시간대로 설명되지 않는다. 20회 표본으로는 공급사를 가를 수 없으며,
+        실제로 이 분산을 근거로 기본값을 `baseten`으로 옮겼다가 되돌렸다. 실패 원인이
+        `limit_source=upstream_provider_shared_pool`·`is_byok=false`(공유 풀)이라 BYOK을
+        붙이면 이 축 자체가 사라진다 — 그때까지의 가용성 수치는 *우리가 쓰지 않을 구성*의 것이다.
         """
         defaults = Settings()
         assert defaults.openrouter_allowed_providers == ("deepinfra",)
+
+    def test_the_documented_alternative_satisfies_the_same_axes(self) -> None:
+        """대안(`baseten`)이 같은 세 축을 만족하는가 — 갈아 끼울 때 근거를 다시 모으지 않도록.
+
+        기본값만 단언하면 "왜 그것이냐"는 답해도 "바꿔도 되느냐"는 답하지 못한다. 두 곳이
+        **같은 축을 통과한다**는 것이 계약이고, 그래서 선택 근거가 비용·지연으로 좁혀진다.
+        대조군으로 *축을 통과하지 못하는* 곳도 함께 확인한다 — 그래야 이 단언이 'US면 다
+        된다'가 아니라 '세 축을 다 본다'를 재는 것이 된다.
+        """
+        for known in (["deepinfra"], ["baseten"]):
+            assert jurisdiction_of_slugs(known) is Jurisdiction.US
+            assert precision_of_slugs(known) == "fp8"
+        # 대조군 — `together`는 US지만 정밀도 미표기라 축을 통과하지 못한다.
+        assert jurisdiction_of_slugs(["together"]) is Jurisdiction.US
+        assert precision_of_slugs(["together"]) is None
+
+    def test_both_baseten_endpoints_share_one_precision(self) -> None:
+        """`only: ["baseten"]`이 정밀도를 섞지 않는가 (2026-09-18 엔드포인트 응답 실측).
+
+        이 모델의 Baseten 엔드포인트는 **둘**인데 tag가 둘 다 `baseten/fp8`이다 — 두 행은
+        리전/배포 차이일 뿐이다. 그래서 양자화를 강제하는 네 번째 파라미터를 도입하지
+        않았다. 그 판단의 근거를 계약으로 동결한다: 두 tag가 같은 slug로 접히고, 그 slug의
+        정밀도가 확정된다.
+        """
+        tags = ["baseten/fp8", "baseten/fp8"]
+        slugs = [provider_slug_from_tag(t) for t in tags]
+        assert slugs == ["baseten", "baseten"]
+        assert precision_of_slugs(slugs) == "fp8"
 
     def test_default_allowlist_is_precision_homogeneous(self) -> None:
         """기본 목록의 **공통 정밀도가 확정**되는가 — 섞이면 품질 비교가 성립하지 않는다.
