@@ -366,33 +366,36 @@ class TestJurisdictionDerivation:
         assert known.jurisdiction is Jurisdiction.US
         assert polluted.jurisdiction is Jurisdiction.UNKNOWN
 
-    def test_default_allowlist_is_the_single_fully_known_provider(self) -> None:
-        """기본 허용목록 동결 — **네 축을 함께 아는** 곳만(2026-09-18 공급사 패널 실측).
+    def test_default_allowlist_is_the_cheapest_fully_known_provider(self) -> None:
+        """기본 허용목록 동결 — **검증 가능한 세 축을 함께 아는 곳 중 가장 싼 곳**.
 
-        관할(`Headquarters: US` · `Region: US`) · 데이터 정책(`Prompt training: No` +
-        `Retention: Zero retention`) · 양자화(`Precision: FP8`) · 가용성(`Uptime 100.00%`).
+        관할(`Headquarters: US`) · 데이터 정책(`Prompt training: No` +
+        `Retention: Zero retention`) · 양자화(`Precision: FP8`).
 
-        **네 번째 축이 `deepinfra`에서 `baseten`으로 옮긴 이유다.** 앞 셋은 deepinfra도
-        충족했지만 라이브에서 `429 engine_overloaded`가 20회 중 6회(재시도 없음)·3회(재시도
-        3회 소진) 났고 지연이 p50 40초까지 무너졌다 — 공유 풀(`is_byok=false`)이라 rate
-        limit을 다른 사용자와 나눈다. 재시도로 덮을 문제가 아니었다.
+        **가용성은 의도적으로 축에서 뺐다.** 2026-09-17~18 네 회차 실측에서 같은 공급사·같은
+        시험지의 `429` 실패율이 **30% → 15% → 0%**로 흔들렸고, 마지막(0%)이 가장 붐빌 것이라던
+        peak 구간이었다 — 시간대로 설명되지 않는다. 20회 표본으로는 공급사를 가를 수 없으며,
+        실제로 이 분산을 근거로 기본값을 `baseten`으로 옮겼다가 되돌렸다. 실패 원인이
+        `limit_source=upstream_provider_shared_pool`·`is_byok=false`(공유 풀)이라 BYOK을
+        붙이면 이 축 자체가 사라진다 — 그때까지의 가용성 수치는 *우리가 쓰지 않을 구성*의 것이다.
         """
         defaults = Settings()
-        assert defaults.openrouter_allowed_providers == ("baseten",)
+        assert defaults.openrouter_allowed_providers == ("deepinfra",)
 
-    def test_moving_the_default_did_not_lose_an_axis(self) -> None:
-        """옮긴 뒤에도 앞 세 축이 유지되는가 — 가용성만 보고 옮기면 다른 축에서 샌다.
+    def test_the_documented_alternative_satisfies_the_same_axes(self) -> None:
+        """대안(`baseten`)이 같은 세 축을 만족하는가 — 갈아 끼울 때 근거를 다시 모으지 않도록.
 
-        이 단언이 없으면 "429가 안 나니까"만으로 관할·정밀도 미확인 공급사로 갈아탈 수 있다.
-        대조군으로 *옮기기 전* 공급사도 같은 세 축을 만족했음을 함께 확인한다 — 그래야 이
-        테스트가 'baseten이 특별하다'가 아니라 '축을 잃지 않았다'를 재는 것이 된다.
+        기본값만 단언하면 "왜 그것이냐"는 답해도 "바꿔도 되느냐"는 답하지 못한다. 두 곳이
+        **같은 축을 통과한다**는 것이 계약이고, 그래서 선택 근거가 비용·지연으로 좁혀진다.
+        대조군으로 *축을 통과하지 못하는* 곳도 함께 확인한다 — 그래야 이 단언이 'US면 다
+        된다'가 아니라 '세 축을 다 본다'를 재는 것이 된다.
         """
-        default = Settings().openrouter_allowed_providers
-        assert jurisdiction_of_slugs(default) is Jurisdiction.US
-        assert precision_of_slugs(default) == "fp8"
-        # 대조군 — 이전 기본값도 같은 세 축을 만족했다(달라진 것은 가용성뿐이다).
-        assert jurisdiction_of_slugs(["deepinfra"]) is Jurisdiction.US
-        assert precision_of_slugs(["deepinfra"]) == "fp8"
+        for known in (["deepinfra"], ["baseten"]):
+            assert jurisdiction_of_slugs(known) is Jurisdiction.US
+            assert precision_of_slugs(known) == "fp8"
+        # 대조군 — `together`는 US지만 정밀도 미표기라 축을 통과하지 못한다.
+        assert jurisdiction_of_slugs(["together"]) is Jurisdiction.US
+        assert precision_of_slugs(["together"]) is None
 
     def test_both_baseten_endpoints_share_one_precision(self) -> None:
         """`only: ["baseten"]`이 정밀도를 섞지 않는가 (2026-09-18 엔드포인트 응답 실측).
