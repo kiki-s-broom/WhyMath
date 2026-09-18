@@ -333,17 +333,17 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             target_pid = str(pid_a)
             problem = client.get(f"/v1/problems/{target_pid}", headers=auth)
             assert problem.status_code == 200, problem.text
-            assert _ANSWER_SENTINEL not in problem.text, (
-                "학생 대면 문항 조회 응답에 정답이 노출됐다 — CLAUDE.md 금기(바로 정답 제공)."
-            )
+            assert (
+                _ANSWER_SENTINEL not in problem.text
+            ), "학생 대면 문항 조회 응답에 정답이 노출됐다 — CLAUDE.md 금기(바로 정답 제공)."
             _step("4-problem-fetched", f"GET /v1/problems/{target_pid} 200 · 정답 비노출 확인")
 
             # ── 5) 오답 제출 ───────────────────────────────────────────────────────────
             mastery_before = client.get("/v1/me/mastery/current", headers=auth)
             assert mastery_before.status_code == 200, mastery_before.text
-            assert mastery_before.json() == [], (
-                f"신규 사용자인데 숙달 스냅샷이 비어 있지 않다: {mastery_before.json()}"
-            )
+            assert (
+                mastery_before.json() == []
+            ), f"신규 사용자인데 숙달 스냅샷이 비어 있지 않다: {mastery_before.json()}"
 
             attempt = client.post(
                 "/v1/me/attempts",
@@ -368,7 +368,9 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             updates = attempt_body["mastery_updates"]
             assert updates, "오답인데 mastery_updates가 비었다 — 채점이 숙달로 전파되지 않았다."
             updated_ids = {u["concept_id"] for u in updates}
-            assert str(cid) in updated_ids, f"책임귀속 개념(PRIMARY)이 갱신 목록에 없다: {updated_ids}"
+            assert (
+                str(cid) in updated_ids
+            ), f"책임귀속 개념(PRIMARY)이 갱신 목록에 없다: {updated_ids}"
 
             mastery_after = client.get("/v1/me/mastery/current", headers=auth)
             assert mastery_after.status_code == 200, mastery_after.text
@@ -393,13 +395,14 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             )
             # 상태 전파의 증거: 방금 시도한 문항이 후보에서 빠진다(미시도 필터가 attempt를 본다).
             assert nxt_body["problem_id"] != target_pid, (
-                f"시도한 문항이 다시 추천됐다 — 미시도 필터가 5단계의 attempt를 보지 못했다: " f"{nxt_body['problem_id']}"
+                f"시도한 문항이 다시 추천됐다 — 미시도 필터가 5단계의 attempt를 보지 못했다: "
+                f"{nxt_body['problem_id']}"
             )
             # 표준오차는 채점 이력이 생겨야 산출된다(콜드스타트엔 null) — 추천이 *갱신된*
             # 학습자 상태를 읽었다는 두 번째 신호다.
-            assert nxt_body["standard_error"] is not None, (
-                f"채점 1건 뒤에도 표준오차가 null이다 — 추천이 갱신된 상태를 읽지 않았다: {nxt_body}"
-            )
+            assert (
+                nxt_body["standard_error"] is not None
+            ), f"채점 1건 뒤에도 표준오차가 null이다 — 추천이 갱신된 상태를 읽지 않았다: {nxt_body}"
             same_seed = nxt_body["problem_id"] == str(pid_b)
             _step(
                 "7-next-problem-recommended",
@@ -462,7 +465,8 @@ def test_mastery_step_assertion_is_discriminating() -> None:
             snapshot = client.get("/v1/me/mastery/current", headers=auth)
             assert snapshot.status_code == 200, snapshot.text
             assert snapshot.json() == [], (
-                "책임귀속 개념이 없는데 숙달 스냅샷이 생겼다 — 6단계 조회측 단언도 변별력이 " f"없다: {snapshot.json()}"
+                "책임귀속 개념이 없는데 숙달 스냅샷이 생겼다 — 6단계 조회측 단언도 변별력이 "
+                f"없다: {snapshot.json()}"
             )
             _erase_learner(client)
 
