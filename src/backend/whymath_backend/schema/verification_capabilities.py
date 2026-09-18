@@ -36,9 +36,12 @@ from enum import Enum
 from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
 
 from whymath_backend.schema.answer_form import FormVerdict
+from whymath_backend.schema.assessment_evidence import MisconceptionCandidate, MisconceptionScan
 
 __all__ = [
     "AnswerFormVerifier",
+    "AttemptMisconceptionDetector",
+    "AttemptMisconceptionScan",
     "VerificationOutcome",
     "EquivalenceOutcome",
     "StepOutcome",
@@ -297,4 +300,49 @@ class ExpressionEquivalence(Protocol):
 
     def identity_status(self, lhs: str, rhs: str) -> EquivalenceOutcome:
         """4상태 판정 — `undecidable`/`parse_error`를 합치지 않는다."""
+        ...
+
+
+class AttemptMisconceptionScan(Protocol):
+    """시도 1건의 오개념 훑기 결과 — Core가 읽는 **두 가지만**(규칙 2).
+
+    구조적 Protocol이라 어댑터의 리치 타입이 그대로 이것을 만족한다(규칙 1 — 변환 객체 금지).
+    Core는 후보의 *내용*(정의·반례·개입 전략)을 모른다 — 코드와 신뢰도만 받고, 내용이 필요하면
+    reactive하게 조회한다(구축 플레이북: 오개념 preload 금지).
+    """
+
+    @property
+    def scan(self) -> MisconceptionScan:
+        """훑었는가 — 0건이 *미측정*인지 *측정된 0*인지 구별하는 3상태."""
+        ...
+
+    @property
+    def candidates(self) -> Sequence[MisconceptionCandidate]:
+        """품질 게이트를 통과한 후보. 게이트 미통과분은 여기 실릴 수 없다(계약)."""
+        ...
+
+
+class AttemptMisconceptionDetector(Protocol):
+    """채점된 **오답 1건**에서 오개념 후보를 뽑는 능력 — **선택적**.
+
+    왜 `SubjectAdapter` 필수 3종이 아닌가: 필수층의 `detect_misconception`은 *학생이 쓴 서술*을
+    본다. 그런데 서술 없이 답만 제출되는 채점 경로가 있고, 거기서 오개념을 읽으려면 **문항과 답을
+    함께** 봐야 한다. "문항과 답을 이어 오류 구조를 읽는" 능력이 Physics·Chemistry·History에도
+    *반드시* 있다고 단언할 수 없으므로(역사 서술형에 그런 구조가 있는가?), 필수층을 넓히는 대신
+    선택층에 좁게 둔다 — `subject_adapter.py`의 (나) Core 확장 금지가 가리키는 자리다.
+
+    Core는 이 능력이 **없을 때의 경로를 반드시 갖는다**: 구현이 없으면 훑지 않은 것이므로
+    `MisconceptionScan.NOT_RUN`이고, 그것은 "오개념이 없었다"가 아니다.
+    """
+
+    def scan_attempt_answer(
+        self, *, question_text: str, student_answer: str | None
+    ) -> AttemptMisconceptionScan:
+        """오답 1건을 훑어 게이트 통과 후보를 3상태와 함께 돌려준다.
+
+        `question_text`·`student_answer`는 Core에게 **불투명 문자열**이다 — Core는 이 값을
+        해석하거나 분기 기준으로 쓰지 않고 그대로 전달만 한다(불투명 페이로드 원칙).
+
+        후보 0건은 정상 응답이다. **없는 오개념을 지어내지 않는다.**
+        """
         ...

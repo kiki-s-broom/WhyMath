@@ -300,6 +300,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -359,6 +360,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -384,6 +386,11 @@ ignore_imports = [
     # ADAPTER→ADAPTER라 위반이 아니다(위 5줄과 동형).
     "whymath_backend.l4.subject_adapter_math -> whymath_backend.l3.verify_solution",
     "whymath_backend.l4.misconception.wrong_form_match -> whymath_backend.l3.symbolic_equivalence",
+    # EOS-104: 오답 서명 검출기(ADAPTER)가 거짓형 정합기(ADAPTER)에 위임한다 — 탐지 알고리즘을
+    # 다시 쓰지 않는 것이 요점이라 이 간선이 곧 "재구현 0"의 증거다. ADAPTER→ADAPTER라 위반이 아니다.
+    "whymath_backend.l4.misconception.answer_signature -> whymath_backend.l4.misconception.wrong_form_match",
+    # 수학 어댑터가 그 검출기를 선택층 능력(AttemptMisconceptionDetector)으로 노출한다.
+    "whymath_backend.l4.subject_adapter_math -> whymath_backend.l4.misconception.answer_signature",
     #   MIXED 출발 (해소 경로 = 모듈 분할. api.verify/speech/ocr는 표면이 중립·페이로드가 수식):
     "whymath_backend.api.verify -> whymath_backend.l3.verify_answer",
     "whymath_backend.api.verify -> whymath_backend.l3.verify_solution",

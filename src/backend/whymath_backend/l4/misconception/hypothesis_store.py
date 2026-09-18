@@ -48,6 +48,7 @@ from whymath_backend.config import get_settings
 from whymath_backend.db.models.misconception_hypothesis import (
     MisconceptionHypothesisRecord,
 )
+from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.crosslink_shadow import observe_crosslink_shadow_async
 from whymath_backend.l4.misconception.evidence_store import (
     net_support,
@@ -59,6 +60,7 @@ from whymath_backend.l4.misconception.hypothesis import (
     curate_with_reasons,
 )
 from whymath_backend.l4.misconception.models import MisconceptionMatch
+from whymath_backend.schema.assessment_evidence import MisconceptionCandidate
 
 __all__ = [
     "apply_matches",
@@ -146,6 +148,44 @@ async def apply_matches(
 
     # 4. 이번 턴 활성 세트(순수) 반환.
     return updated
+
+
+async def apply_candidates(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    candidates: Sequence[MisconceptionCandidate],
+    *,
+    turns_elapsed: int = 1,
+) -> list[MisconceptionHypothesis]:
+    """채점 증거의 오개념 **후보**를 가설 세트에 반영·영속한다 — `apply_matches` 얇은 래퍼.
+
+    왜 별도 진입점인가: 채점 경로(Core)가 들고 있는 것은 계약 DTO(`MisconceptionCandidate` —
+    id·신뢰도·게이트 플래그)이고, 가설 갱신 로직이 요구하는 것은 L4 리치 타입
+    (`MisconceptionMatch` — 카탈로그 객체 포함)이다. 그 간극을 Core에서 메우려면 Core가
+    카탈로그를 뒤져야 하고, 그러면 같은 변환이 호출처마다 복제된다. 여기서 **한 번만** 한다.
+
+    감쇠·강화·가지치기는 전부 `apply_matches`가 한다(재구현 0). 특히 **후보가 비어 있어도
+    호출은 유효하다** — 그 경우 이번 회차에 증거를 못 받은 기존 가설이 `turns_elapsed`만큼
+    감쇠하고, 임계 미만이면 비활성화된다. "오개념이 관측되지 않은 시도"가 신뢰를 *내리는*
+    경로가 바로 이것이다.
+
+    `gate_passed=False` 후보는 **무시한다**(가설로 승격하지 않는다). 계약상 그런 후보는
+    증거에 실릴 수 없고, 저장소가 그 경계를 느슨하게 하면 게이트가 우회 가능해진다.
+    카탈로그에 없는 id도 무시한다 — 알 수 없는 오개념으로 학생 상태를 바꾸지 않는다.
+
+    `curate_hypothesis`(증거 그래프 반박·최대 N 캡)를 부르지 *않는다*: 반박 판정과 확정은
+    코치 경로가 소유하고, 채점 증거는 관측이라 그 권위를 갖지 않는다(EOS-104 acceptance ④).
+    """
+    matches = [
+        MisconceptionMatch(
+            misconception=CATALOG_BY_ID[c.misconception_id],
+            confidence=c.confidence,
+            attribution_unclear=c.attribution_unclear,
+        )
+        for c in candidates
+        if c.gate_passed and c.misconception_id in CATALOG_BY_ID
+    ]
+    return await apply_matches(session, user_id, matches, turns_elapsed=turns_elapsed)
 
 
 async def persist_hypotheses(
