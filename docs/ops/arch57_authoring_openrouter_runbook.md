@@ -75,6 +75,14 @@ Phaiakes9 User 환경변수에만 있고 컨테이너·CI에는 egress가 없다
 > 공유하는 단일 작업 사본이라 브랜치를 옮기면 다른 세션의 실행이 깨진다. worktree는
 > 원 작업 사본의 브랜치·미커밋 변경을 하나도 건드리지 않는다.
 > 머지 이후라면 `$Ref`를 `origin/main`으로 바꾸면 된다 — 블록은 그대로 동작한다.
+>
+> **왜 기본값을 잴 때 자식 프로세스에서 변수를 제거하는가**: PowerShell 창은 앞서
+> 붙여넣은 블록이 설정한 `$env:` 값을 계속 들고 있다. 그 상태에서 "설정 전에 재면
+> 기본값"이라고 가정하면, 재실행·부분 실행한 창에서는 **남아 있는 값을 기본값으로
+> 오독한다**(2026-09-18 실측 — `SEAT_DEFAULT=OpenRouterProvider`가 나왔고 그것은
+> 코드가 아니라 창의 상태였다). 그래서 부재를 *가정*하지 않고 자식 프로세스에서
+> `os.environ.pop`으로 **만들어** 잰다. `PRE_SHELL_VAR`·`PRE_USER_VAR`를 함께 찍는
+> 것은 오염이 창 한정인지 User 환경변수에 영구 등록된 것인지 구분하기 위해서다.
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
@@ -90,7 +98,9 @@ $Source = (& $Py -c "import whymath_backend.l3.providers.factory as m; print(m._
 "SOURCE=$Source"
 $FromTree = ($Source -like "*WhyMath-arch57*")
 "FROM_TREE=$FromTree"
-$Default = (& $Py -c "from whymath_backend.l3.providers.factory import build_cloud_provider; print(type(build_cloud_provider()).__name__)")
+"PRE_SHELL_VAR=$($env:WHYMATH_CLOUD_PROVIDER)"
+"PRE_USER_VAR=$([Environment]::GetEnvironmentVariable('WHYMATH_CLOUD_PROVIDER','User'))"
+$Default = (& $Py -c "import os; os.environ.pop('WHYMATH_CLOUD_PROVIDER', None); from whymath_backend.l3.providers.factory import build_cloud_provider; print(type(build_cloud_provider()).__name__)")
 "SEAT_DEFAULT=$Default"
 $env:WHYMATH_CLOUD_PROVIDER = "openrouter"
 $WithEnv = (& $Py -c "from whymath_backend.l3.providers.factory import build_cloud_provider; print(type(build_cloud_provider()).__name__)")
