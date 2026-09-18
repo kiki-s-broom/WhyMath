@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-58-generation-log-model-name-selector-regression
+title: "회귀 — genlog의 model_name이 셀렉터를 무시하고 항상 anthropic 핀을 적는다 (ARCH-57이 깬 전제)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P2
+owner: claude
+depends_on:
+  - ARCH-57-cloud-provider-selector-authoring-wiring
+requires_gates: []
+acceptance:
+  - "① 회귀 수정 — `l3/pregenerate/provenance_bridge.model_name_for_decision()`이 CLOUD_MID/HIGH에서 `anthropic_model_mid`/`anthropic_model_high`를 무조건 읽는다. ARCH-57이 클라우드 좌석을 셀렉터로 만들기 전에는 그 전제가 참이었으나(슬롯이 항상 Anthropic), 지금은 거짓이다. `settings.cloud_provider`를 보고 해당 좌석의 모델 핀(`openrouter_model_*`·`deepseek_model_*`·`anthropic_model_*`)을 돌려주도록 고친다.\n② 왜 급한가 — 이것은 필드 누락이 아니라 **출처 로그가 조용히 틀린 값을 적는** 상태다. `GenerationLog`는 재현·감사 자산이며, 틀린 기록은 없는 기록보다 나쁘다(읽는 사람이 믿는다). 실측 2026-09-18: OpenRouter 좌석으로 돈 회차의 genlog가 `model_name=claude-sonnet-4-6` 5건을 적었다.\n③ 관측 vs 선언의 경계 명시 — 이 태스크는 **선언값을 설정과 정합하게** 만드는 데까지다. 응답에서 관측한 실제 모델을 싣는 축(provider가 돌려준 model id)은 `EOS-111`이 소유한다. docstring이 \"실제 호출될 모델 ID\"라고 단정하지 않도록 고쳐 **설정 유래 선언값**임을 적고, 관측 축의 소유자를 가리킨다. 모르는 것을 아는 척하지 않는다.\n④ 실패 주입 — 뮤테이션으로 RED를 확인한 것만 보호로 친다. 최소 3종: ⓐ 셀렉터 openrouter인데 anthropic 핀을 돌려주기(이번 회귀 재현) ⓑ 셀렉터 deepseek인데 anthropic 핀 ⓒ CLOUD_HIGH 축 누락(mid만 고치고 high를 방치). 기본값(anthropic) 대조군을 함께 둔다 — 대조군이 없으면 \"전부 openrouter로 계상\"이라는 과잉 수정이 통과한다.\n⑤ 호출처 정합 — `l3/pregenerate/prewarmer.py:145`는 `settings` 인자 없이 부른다(프로세스 설정 사용). 그 경로도 셀렉터를 따르는지 확인하고, 따르지 않아야 할 이유가 있으면 그 사유를 코드에 적는다. 기존 회귀 `tests/backend/l3/test_generation_log_wiring.py`가 `model_name_for_decision`을 기대값 계산에 그대로 쓰므로(동어반복 위험) 셀렉터별 실값을 단언하는 검사를 별도로 둔다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/pregenerate/provenance_bridge.py
+  - tests/backend/l3/test_generation_log_model_name_selector.py
+session: claude/exciting-allen-5dkjb0
+notes: "실측 2026-09-18 Kiki 실행 Phaiakes9 — ARCH-57 라이브 1회차의 genlog 대조에서 발각. OpenRouter 좌석 회차와 Anthropic 회차의 model_name이 **둘 다** claude-sonnet-4-6 5건으로 같았다. 실행 자체는 정상이었다는 증거: 캐시 텔레메트리가 OR=0/5 · AN=5/5로 갈렸고(AnthropicProvider가 양쪽을 서빙했다면 양쪽 다 실렸어야 한다), RECHECK_SEAT=OpenRouterProvider였으며, dedup 결과도 5/5 저장 vs 1/5 저장으로 달랐다. 즉 OpenRouter가 실제로 서빙했고 기록만 거짓이다. 원인은 model_name_for_decision이 CLOUD 티어에서 anthropic 설정 좌석을 하드코딩해 읽는 것이고, 그 전제는 ARCH-57 이전에는 참이었다 — 슬롯을 셀렉터로 바꾸면서 이 함수를 같이 고치지 않은 것이 이 세션의 누락이다. 이번 회차의 '어느 좌석이 서빙했는가' 판정이 genlog로는 불가능했던 이유이기도 하다(캐시 텔레메트리라는 간접 신호로만 추론했다)."
+updated: 2026-09-18
