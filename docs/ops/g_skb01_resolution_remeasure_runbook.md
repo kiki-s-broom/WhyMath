@@ -154,8 +154,13 @@
 > [A]에서 그대로 가져왔다(그 런북은 이 단계 덕에 1회에 성립했다).
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 새 창
-cd C:\Users\kiki\Desktop\__AI\WhyMath
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $Repo
+"CWD=" + (Get-Location).Path
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
   "DOCKER_DAEMON=down — Docker Desktop 기동을 시도합니다(최대 180초)."
@@ -187,12 +192,13 @@ $Probe = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT 1
 ### [B] 임시 worktree — main 코드를 공유 클론과 분리해 확보
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 새 창
-cd C:\Users\kiki\Desktop\__AI\WhyMath
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
 $Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
 $WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
 $Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
 $Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $Repo
+"CWD=" + (Get-Location).Path
 git fetch origin main
 git worktree prune
 if (Test-Path $WT) { git worktree remove --force $WT; if (Test-Path $WT) { Remove-Item -Recurse -Force $WT } } else { "WT_PREEXISTING=False — 새로 만든다" }
@@ -202,7 +208,7 @@ New-Item -ItemType Directory -Force -Path $Out | Out-Null
 git log --oneline -1
 "WT_HEAD=" + (git rev-parse --short HEAD) + "  MAIN_TIP=" + (git rev-parse --short origin/main)
 "WT_IS_MAIN_TIP=" + ((git rev-parse HEAD) -eq (git rev-parse origin/main))
-"PROBE_FILE_OK=" + (Test-Path "src\backend\whymath_backend\harness\attempt_skill_reach_probe.py")
+"PROBE_FILE_OK=" + (Test-Path "$WT\src\backend\whymath_backend\harness\attempt_skill_reach_probe.py")
 "PY_OK=" + (Test-Path $Py)
 "CWD=" + (Get-Location).Path
 ```
@@ -223,12 +229,19 @@ git log --oneline -1
 ### [C] 환경 + 도달성 + 사슬 진단 (읽기 전용 — DB에 아무것도 쓰지 않는다)
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $WT
+"CWD=" + (Get-Location).Path
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
 $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
-$env:PYTHONPATH = (Resolve-Path "src\backend").Path
+$env:PYTHONPATH = (Resolve-Path "$WT\src\backend").Path
+"DB_TARGET=$env:WHYMATH_DATABASE_URL"
 & $Py -c "import whymath_backend.harness.attempt_skill_reach_probe as m; print('MODULE_FROM=' + m.__file__)"
 & $Py -m whymath_backend.ops.db_host_reachability
 "REACH_EXIT=$LASTEXITCODE"
@@ -251,7 +264,19 @@ docker exec -i whymath-pg psql -U whymath -d whymath -v ON_ERROR_STOP=1 -c "SELE
 ### [D] 표본 20건 + 사후 측정 + 증적 (**여기서만 DB에 쓴다** · 선행 미충족이면 스스로 거부)
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $WT
+"CWD=" + (Get-Location).Path
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+$env:PYTHONPATH = (Resolve-Path "$WT\src\backend").Path
+"DB_TARGET=$env:WHYMATH_DATABASE_URL"
 & $Py -c "import whymath_backend.harness.attempt_skill_reach_probe as m; print(m.__file__)" > "$Out\module_from.txt" 2>&1
 $ModuleFrom = ((Get-Content "$Out\module_from.txt" -Raw) + "").Trim()
 $ModuleOk = ($ModuleFrom -like "$WT*")
@@ -284,11 +309,16 @@ if ($ModuleOk -and $ReachOk) {
 ### [E] 정리 — worktree 제거 + 원래 자리 복귀
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
-cd C:\Users\kiki\Desktop\__AI\WhyMath
-if (Test-Path "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure") { git worktree remove --force "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure" } else { "WT_ALREADY_GONE=True — 제거할 worktree가 없다" }
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $Repo
+"CWD=" + (Get-Location).Path
+if (Test-Path $WT) { git worktree remove --force $WT } else { "WT_ALREADY_GONE=True — 제거할 worktree가 없다" }
 git worktree prune
-"WT_REMOVED=" + (-not (Test-Path "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"))
+"WT_REMOVED=" + (-not (Test-Path $WT))
 git status --short --branch
 ```
 
@@ -310,10 +340,21 @@ git status --short --branch
 **[7-1a] 현재 리비전 조회 (읽기 전용 — DB를 바꾸지 않는다)**
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd "$WT\src\backend"
+"CWD=" + (Get-Location).Path
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+$env:PYTHONPATH = (Resolve-Path "$WT\src\backend").Path
+"DB_TARGET=$env:WHYMATH_DATABASE_URL"
 docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT version_num FROM alembic_version;"
 "PROD_REVISION_EXIT=$LASTEXITCODE"
-cd "$WT\src\backend"
 & $Py -m alembic -c alembic.ini current
 "ALEMBIC_CURRENT_EXIT=$LASTEXITCODE"
 & $Py -m alembic -c alembic.ini heads
@@ -331,15 +372,27 @@ cd $WT
 있을 수 있어 그쪽 `versions/`를 쓰면 *어느 트리의 마이그레이션인지 모르는 채* 스키마가 바뀐다.
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$WT   = "C:\Users\kiki\Desktop\__AI\whymath-wt-remeasure"
+$Py   = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
 cd "$WT\src\backend"
+"CWD=" + (Get-Location).Path
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+$env:PYTHONPATH = (Resolve-Path "$WT\src\backend").Path
+"DB_TARGET=$env:WHYMATH_DATABASE_URL"
 & $Py -m whymath_backend.ops.db_host_reachability
 $ReachOk = ($LASTEXITCODE -eq 0)
 $IniOk = Test-Path "$WT\src\backend\alembic.ini"
+$UrlOk = ($env:WHYMATH_DATABASE_URL -like "*:5433/whymath*")
 $Confirm = Read-Host "세션이 [7-1b] 실행을 승인했습니까? 마이그레이션하려면 UPGRADE 를 입력하세요"
 $Approved = ($Confirm -ceq "UPGRADE")
-"REACH_OK=$ReachOk  INI_OK=$IniOk  APPROVED=$Approved"
-if ($ReachOk -and $IniOk -and $Approved) { & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; & $Py -m alembic -c alembic.ini current } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk APPROVED=$Approved. 스키마는 그대로다." }
+"REACH_OK=$ReachOk  INI_OK=$IniOk  URL_OK=$UrlOk  APPROVED=$Approved"
+if ($ReachOk -and $IniOk -and $UrlOk -and $Approved) { & $Py -m alembic -c alembic.ini upgrade head; "ALEMBIC_EXIT=$LASTEXITCODE"; & $Py -m alembic -c alembic.ini current } else { "WRITE_REFUSED=True — 마이그레이션을 돌리지 않았다. REACH_OK=$ReachOk INI_OK=$IniOk URL_OK=$UrlOk(5433 prod를 겨냥하는가) APPROVED=$Approved. 스키마는 그대로다." }
 cd $WT
 ```
 
@@ -352,7 +405,11 @@ cd $WT
 > 지우지 않아도 무해하다 — 프로브 사용자 한 명의 행일 뿐이다.
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 같은 창
+# [Windows PowerShell · Phaiakes9] — 이 블록은 자기완결형이다(앞 블록의 변수·현재 위치에 의존하지 않는다)
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+$Out  = "C:\Users\kiki\Desktop\__AI\WhyMath\work\skb01-remeasure"
+cd $Repo
+"CWD=" + (Get-Location).Path
 $ReportExists = Test-Path "$Out\report.json"
 "REPORT_EXISTS=$ReportExists"
 $Confirm = Read-Host "증적 8줄을 이미 세션에 전달했습니까? 표본을 지우려면 DELETE 를 입력하세요"
