@@ -32,7 +32,7 @@ PED-03(`l2/pedagogy_evidence.py`)이 이미 세운 `evidence_event` 좌석(sessi
 지금은 "이 추천이 실제로 나갔다"는 처치 존재 자체만 관측한다(acceptance④ 범위 밖 동결).
 
 B1(미성년 원문 발화 평문 저장 금지): `meta`에는 problem_id·theta·pool_size·applied_weights·
-mode·gate_reason·candidates·policy_version 등 비민감 메타만 넣는다. 이 모듈의 함수
+mode·gate_reason·candidates·policy_version·reason 등 비민감 메타만 넣는다. 이 모듈의 함수
 시그니처에는 학생 원문·풀이·user_id 슬롯이 아예 없다(구조적 차단 — 나중에 실수로 채울 여지
 자체가 없다).
 
@@ -66,6 +66,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.evidence_event import EvidenceEvent
+from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.schema.enums import KnowledgeType
 
 EVENT_TYPE_RECOMMENDATION_TREATMENT: str = "recommendation_render"
@@ -80,6 +81,7 @@ META_KEY_MODE: str = "mode"
 META_KEY_GATE_REASON: str = "gate_reason"
 META_KEY_CANDIDATES: str = "candidates"
 META_KEY_POLICY_VERSION: str = "policy_version"
+META_KEY_REASON: str = "reason"
 
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
@@ -116,6 +118,7 @@ async def record_recommendation_treatment(
     gate_reason: str | None = None,
     candidates: list[tuple[uuid.UUID, float]] | None = None,
     policy_version: str | None = None,
+    reason: RecommendationReason | None = None,
     occurred_at: datetime | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
@@ -134,6 +137,13 @@ async def record_recommendation_treatment(
     `policy_version`: 이 추천을 만든 후보생성·선택 알고리즘의 식별자(`POLICY_VERSION_CAT`/
     `POLICY_VERSION_SUNEUNG`). 둘 다 선택 인자다 — 호출자가 아직 준비되지 않았으면
     생략해도 기존 동작과 완전히 동일(회귀 0).
+
+    `reason`(EOS-14): `l2.recommendation_contract.RecommendationReason` — *왜 이 문항인가*.
+    영속 좌석을 **새로 만들지 않고** 이 좌석에 싣는다(EOS-14 acceptance ④ "재구현하지
+    않는다"). `candidates`가 *무엇과 비교해 골랐나*를 남긴다면 이 키는 *어느 개념의 어떤
+    숙달 때문에 골랐나*를 남긴다 — 소급 평가에서 두 질문은 다르다. 직렬화는 계약 모델의
+    `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
+    (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
     """
     meta: dict[str, Any] = {
         META_KEY_PROBLEM_ID: str(problem_id),
@@ -153,6 +163,8 @@ async def record_recommendation_treatment(
         ]
     if policy_version is not None:
         meta[META_KEY_POLICY_VERSION] = policy_version
+    if reason is not None:
+        meta[META_KEY_REASON] = reason.model_dump(mode="json")
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
@@ -176,6 +188,7 @@ __all__ = [
     "META_KEY_POLICY_VERSION",
     "META_KEY_POOL_SIZE",
     "META_KEY_PROBLEM_ID",
+    "META_KEY_REASON",
     "META_KEY_THETA",
     "POLICY_VERSION_CAT",
     "POLICY_VERSION_SUNEUNG",

@@ -67,6 +67,21 @@ _ALLOWED_IMPORTERS: dict[str, str] = {
     "privacy/export.py": "본인 반출 직렬화(_STUDENT_FACING_SERIALIZERS)",
     "privacy/retention.py": "보존기간 파기 계획 — 기준 컬럼 started_at",
     "harness/assessment_seat_reach_report.py": "오프라인 도달 관측 리포트(게이트 아님·CLI)",
+    # EOS-11(2026-09-16): 학습 시간선 투영의 읽기 전용 원천 하나. 추가 시 재판정 트리거 1·3을
+    # 둘 다 대조했고 **어느 쪽도 발동하지 않았다**:
+    #   · 트리거 1(W8 경로 접촉) — 이 모듈은 채점→오개념→Mastery 경로가 아니다. 쓰기 0건
+    #     (session.add·commit 0)이고, W8 런타임 어디에서도 호출되지 않는 조회 표면이다.
+    #   · 트리거 3(5필드를 값으로 읽어 판단) — 읽는 컬럼은 `started_at`·`completed_at`·
+    #     `assessment_type` 뿐이며 예측 5필드(estimated_grade·estimated_score·
+    #     estimated_percentile·target_university_id·admission_probability)를 건드리지 않는다.
+    #     읽은 값은 시간선 항목으로 **직렬화**될 뿐 판단에 쓰이지 않는다(§3-C가 "응답에 실어
+    #     보내는 직렬화는 소비가 아니다"라고 명시한 축).
+    # 즉 판정 근거 ①·③은 그대로 성립한다 — 초록을 만들려고 넣은 예외가 아니라, 근거를
+    # 대조한 뒤의 등재다. 5필드를 읽기 시작하면 `ARCH-40` 재판정 대상이 된다.
+    "l2/learning_event_trace.py": (
+        "학습 시간선 읽기 투영(EOS-11) — started_at·completed_at·assessment_type만 읽는 "
+        "읽기 전용 원천. W8 경로 아님·쓰기 0건·예측 5필드 미접촉"
+    ),
 }
 
 # 판정 근거 ①이 "접촉 0"이라고 단언한 채점→오개념→Mastery 경로.

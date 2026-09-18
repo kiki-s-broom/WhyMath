@@ -144,7 +144,12 @@ jobs:
           # 가드가 tests/backend/** 전건을 훑어 FROZEN_INPUT_PATHS를 선언한 동결 테스트 **전부**를
           # 대상으로 삼고(선언 0건이면 통과가 아니라 RED), test_canonical_entity_model_freeze.py도
           # 그 상수를 선언한다. 새 동결 테스트는 상수만 선언하면 이 필터 편입이 자동으로 강제된다.
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|\.github/workflows/ci\.yml$)'; then
+          # **루프 계약 동결 입력 1건 편입**(EOS-100 · 2026-09-16) — 같은 형태의 다섯 번째다.
+          # `learning_loop_contract_v1.md`는 tests/backend/schema/test_learning_loop_contract.py
+          # 의 검사 ⑤⑧이 읽는 입력이다(§2 관계표·§3 귀속표를 파싱해 상수와 1:1 대조). 필터 밖이면
+          # 그 문서만 고치는 PR에서 backend 잡이 SKIP돼 **관계표를 조용히 고쳐도 검사 ⑧이 실행되지
+          # 않는다**. 위 AST 가드가 그 테스트의 FROZEN_INPUT_PATHS를 읽어 이 편입을 강제한다.
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
             be=true
           fi
           if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|\.github/workflows/ci\.yml$)'; then
@@ -1005,6 +1010,15 @@ jobs:
 
       - name: Black --check (tests/infra + infra + conftest.py)
         run: python3 -m black --check --line-length 100 tests/infra infra conftest.py
+
+      # HARN-106 — 런북 쓰기 블록 자가거부 가드. 이 잡에 붙이는 이유: 검사 대상이
+      # `docs/ops/*runbook*.md`(마크다운)이라 백엔드 설치가 불요하고, 이 잡은
+      # `needs: changes` 게이팅이 없어 **docs만 바뀐 PR에서도 반드시 돈다** — 런북은
+      # 정확히 그런 PR에서 바뀌므로 backend 잡에 붙이면 그 경우를 통째로 놓친다.
+      # 변별력은 `tests/infra/test_runbook_write_guard.py`의 결함 주입 7종이 봉인한다
+      # (위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 런북 쓰기 블록 자가거부 가드 (HARN-106)
+        run: python3 scripts/ops/check_runbook_blocks.py
 
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q

@@ -123,6 +123,7 @@ from whymath_backend.l2.ability_estimation import (
     estimate_global_ability,
     resolve_item_difficulty_b,
 )
+from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
@@ -133,9 +134,24 @@ from whymath_backend.l2.irt import (
     learning_band_weight,
     select_weighted_item,
 )
+from whymath_backend.l2.learner_state import LearnerState, get_state
+from whymath_backend.l2.learner_state_store import provision_learner_state
+from whymath_backend.l2.learning_event_trace import (
+    DEFAULT_TRACE_LIMIT,
+    MAX_TRACE_LIMIT,
+    LearningEventTrace,
+    build_trace,
+)
 from whymath_backend.l2.learning_path import (
     LearningPath,
     build_learning_path,
+)
+from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
+from whymath_backend.l2.learning_state_machine import (
+    advance_on_attempt,
+    get_current_state,
+    list_transitions,
+    record_transition,
 )
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import (
@@ -143,11 +159,13 @@ from whymath_backend.l2.prerequisite_recommendation import (
     PrerequisiteGap,
     recommend_prerequisite_gaps,
 )
+from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
     POLICY_VERSION_SUNEUNG,
     record_recommendation_treatment,
 )
+from whymath_backend.l2.recommendation_reason import collect_recommendation_reason
 from whymath_backend.l2.review_queue import ReviewQueue, fetch_review_queue
 from whymath_backend.l2.skill_mastery_tracking import (
     record_problem_attempt_skill_mastery,
@@ -194,6 +212,7 @@ from whymath_backend.schema.assessment import (
     SkillMasteryHistory as SkillMasteryHistorySchema,
 )
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
+from whymath_backend.schema.assessment_evidence import AssessmentEvidence
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
@@ -205,6 +224,13 @@ from whymath_backend.schema.enums import (
     Persona,
     Resolution,
     ReviewStatus,
+)
+from whymath_backend.schema.learning_state import (
+    LearningState,
+    NextActionKind,
+    TransitionTrigger,
+    UndefinedTransitionError,
+    allowed_targets,
 )
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.timeseries import (
@@ -725,8 +751,108 @@ class SkillMasteryUpdate(BaseModel):
     sample_size: int
 
 
+# EOS-105 학습 상태 머신 — 정책이 소유하는 트리거(클라이언트가 이 표면으로 적재 금지).
+#
+# 집합으로 두는 이유: `POST /learning-state/transitions`가 문자열 접두사(`startswith("POLICY_")`)
+# 로 걸러도 되지만, 그러면 **이름 규약이 곧 보안 경계**가 된다. 규약은 리팩터링으로 조용히
+# 깨지고 그때 이 게이트도 함께 열린다. 열거된 집합은 트리거를 추가한 사람이 여기 한 줄을
+# 넣도록 강제하며, 그 강제는 테스트가 동결한다(누락 시 RED).
+_POLICY_OWNED_TRIGGERS: frozenset[TransitionTrigger] = frozenset(
+    {
+        TransitionTrigger.ATTEMPT_SUBMITTED,
+        TransitionTrigger.POLICY_ADVANCE,
+        TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE,
+        TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+        TransitionTrigger.POLICY_PREREQUISITE_GAP,
+        TransitionTrigger.POLICY_REPEATED_FAILURE,
+        TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED,
+    }
+)
+
+
+class LearningStateTransitionView(BaseModel):
+    """전이 이력 1건 — "왜 지금 이 상태인가"의 재구성 자료."""
+
+    from_state: LearningState
+    to_state: LearningState
+    trigger: TransitionTrigger
+    rule_id: str | None = Field(
+        default=None, description="정책이 낸 전이면 규칙 id, 생애주기 전이면 null."
+    )
+    concept_id: str | None = Field(default=None, description="전이가 일어난 맥락 개념 id.")
+    occurred_at: datetime
+
+
+class LearningStateView(BaseModel):
+    """`GET /v1/me/learning-state` 응답 — 현재 상태 + 가능한 다음 상태 + 최근 이력."""
+
+    current_state: LearningState = Field(
+        description="현재 학습 상태. 전이 이력이 없으면 `NEW`(상태 미상이라는 값은 없다)."
+    )
+    allowed_next_states: list[str] = Field(
+        description=(
+            "현재 상태에서 전이표가 허용하는 다음 상태 목록(정렬). 클라이언트가 전이 규칙을 "
+            "복제하지 않도록 서버가 내려 준다 — 규칙의 진실 원천은 서버 전이표 하나다."
+        )
+    )
+    transitions: list[LearningStateTransitionView] = Field(description="최근 전이 이력(최신순).")
+
+
+class LearningStateTransitionRequest(BaseModel):
+    """`POST /v1/me/learning-state/transitions` 요청 — 생애주기 전이 1건.
+
+    `from_state`를 받지 않는다: 클라이언트가 출발 상태를 지어내면 원장이 실제 이력과 어긋난다.
+    출발 상태는 서버가 원장에서 직접 읽는다.
+    """
+
+    to_state: LearningState = Field(description="전이할 목표 상태.")
+    trigger: TransitionTrigger = Field(
+        description=(
+            "전이 사유. 정책 소유 트리거(`ATTEMPT_SUBMITTED`·`POLICY_*`)는 422로 거부된다 "
+            "— 그 전이는 `POST /v1/me/attempts`만 적재할 수 있다."
+        )
+    )
+    concept_id: str | None = Field(default=None, description="맥락 개념 id(선택).")
+
+
+class LearningStateBlock(BaseModel):
+    """응답에 실리는 학습 상태 머신의 결과 — EOS-105.
+
+    **`rejected_transition`이 이 모델의 존재 이유다.** 미정의 전이를 예외로만 흘리면 호출부가
+    `except`로 잡는 순간 사라지고, 사라지면 "조용히 통과"가 된다. 값으로 만들어 학생 응답까지
+    올려 보내 거부가 관측 가능하게 한다(CLAUDE.md 침묵 실패 금지).
+
+    `rule_id`는 "어느 규칙이 실제로 돌았는가"를 매 요청 노출한다 — 알고리즘을 붙였으면 그것이
+    작동한 비율을 응답이 말해야 한다는 원칙(CLAUDE.md "작동한 비율")의 집행 지점이다.
+    """
+
+    from_state: LearningState = Field(description="응답 제출 시점의 학습 상태.")
+    to_state: LearningState = Field(description="이 처리가 끝난 뒤의 학습 상태.")
+    rule_id: str | None = Field(
+        default=None,
+        description="결정을 낸 정책 규칙 id. 전이가 거부돼 정책이 돌지 않았으면 null.",
+    )
+    next_action: NextActionKind | None = Field(
+        default=None, description="정책이 지시한 다음 행동의 종류. 정책 미실행이면 null."
+    )
+    target_concept_id: str | None = Field(
+        default=None, description="다음 행동의 대상 개념 id(선수 개념 복귀 등). 없으면 null."
+    )
+    target_misconception_id: str | None = Field(
+        default=None, description="교정 대상 오개념 id. 없으면 null."
+    )
+    rejected_transition: str | None = Field(
+        default=None,
+        description=(
+            "거부된 전이의 설명(예: 'NEW → ASSESSING'). null이면 거부 없음. 값이 있으면 "
+            "상태 머신은 아무 전이도 적재하지 않았다 — 응답 적재·숙달 전파는 그와 무관하게 "
+            "성공한다(이 슬라이스는 기존 학습 경로를 막지 않는다)."
+        ),
+    )
+
+
 class AttemptSubmitResponse(BaseModel):
-    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록."""
+    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록 + 학습 상태."""
 
     attempt_id: uuid.UUID
     is_correct: bool
@@ -745,6 +871,22 @@ class AttemptSubmitResponse(BaseModel):
             "과신(틀렸으나 확신↑)·과소신(맞았으나 확신↓) 구간에서만 채워지고, 잘 보정됐거나 "
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
+    )
+    evidence: AssessmentEvidence | None = Field(
+        default=None,
+        description=(
+            "이 채점이 만들어 낸 **증거 묶음**(EOS-12) — 개념·스킬·오개념 후보 3종과 작동 비율. "
+            "`mastery_updates`가 *쓰기 이후*의 결과라면 이 필드는 *쓰기 이전*의 관측이라, 둘을 "
+            "나란히 실어 두 단계가 각각 보이게 한다(부분 쓰기 구조를 한 트랜잭션처럼 가리지 "
+            "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
+            "거기에만 적혀 있다."
+        ),
+    )
+    learning_state: LearningStateBlock = Field(
+        description=(
+            "학습 상태 머신(EOS-105) 처리 결과 — Event→LearnerState→Policy→NextAction. "
+            "전이가 거부된 경우에도 null이 아니라 `rejected_transition`이 채워진 블록이 온다."
+        )
     )
 
 
@@ -844,6 +986,20 @@ async def submit_attempt(
     )
     session.add(attempt)
     await session.commit()
+    # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다 — Answer → Evidence → State 순서가 호출
+    # 지점에서 실제로 성립해야 증거가 "갱신 결과의 사후 요약"으로 전락하지 않는다. 읽기 전용이라
+    # (session.add·commit 0) 이 호출이 아래 적재의 성공/실패를 바꾸지 않고, 반대로 아래가 실패해도
+    # 증거는 남는다 — 두 단계가 각각 관측 가능하다(EOS-81 ⑦ 부분 쓰기 구조를 가리지 않는다).
+    # 이 경로는 오개념 매칭을 돌리지 않는다(진단은 coach 대화 경로 전용) → scan=not_run이 기본이며,
+    # 그 0건은 "오개념이 없었다"가 아니라 "보지 않았다"로 응답에 표기된다.
+    evidence = await collect_assessment_evidence(
+        session,
+        learner_id=user.user_id,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        attempt_id=attempt.attempt_id,
+        observed_at=received_at,
+    )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     records = await record_problem_attempt_mastery(
         session, user.user_id, body.problem_id, body.is_correct
@@ -871,6 +1027,46 @@ async def submit_attempt(
     calibration_coaching = recommend_calibration_coaching(
         body.confidence_self_reported, body.is_correct
     )
+    # EOS-105 학습 상태 머신 — Event → LearnerState → Policy → Next Action.
+    #
+    # 여기가 이 슬라이스의 **집행 지점**이다(정본화≠집행). 전이표·정책을 만든 것만으로는
+    # 아무 학생의 상태도 움직이지 않는다 — 서빙 경로가 그것을 실제로 부르는 이 줄이 계약을
+    # 집행으로 바꾼다.
+    #
+    # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
+    # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
+    #
+    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
+    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
+    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
+    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
+    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
+    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
+    policy_evidence = await build_attempt_evidence(
+        session,
+        user_id=user.user_id,
+        is_correct=body.is_correct,
+        confidence=body.confidence_self_reported,
+    )
+    transition = await advance_on_attempt(
+        session,
+        user_id=user.user_id,
+        evidence=policy_evidence,
+        attempt_id=attempt.attempt_id,
+    )
+    decision = transition.decision
+    learning_state_block = LearningStateBlock(
+        from_state=transition.from_state,
+        to_state=transition.final_state,
+        rule_id=decision.rule_id if decision is not None else None,
+        next_action=decision.next_action.kind if decision is not None else None,
+        target_concept_id=(decision.next_action.target_concept_id if decision else None),
+        target_misconception_id=(
+            decision.next_action.target_misconception_id if decision else None
+        ),
+        rejected_transition=transition.rejected_transition,
+    )
     return AttemptSubmitResponse(
         attempt_id=attempt.attempt_id,
         is_correct=body.is_correct,
@@ -893,7 +1089,94 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        evidence=evidence,
+        learning_state=learning_state_block,
     )
+
+
+@router.get(
+    "/learning-state",
+    response_model=LearningStateView,
+    summary="내 현재 학습 상태 + 전이 이력(학습 상태 머신)",
+)
+async def get_my_learning_state(
+    user: ConsentedUser,
+    session: SessionDep,
+    limit: Limit = 50,
+) -> LearningStateView:
+    """본인 학습 상태 — 현재 상태·거기서 갈 수 있는 상태·최근 전이 이력.
+
+    `allowed_next_states`를 함께 내는 이유: 클라이언트가 전이 규칙을 자기 코드에 복제하지
+    않게 하기 위해서다. 규칙을 클라에 넣으면 전이표의 진실 원천이 둘이 된다(서버 표 + 클라
+    분기) — CLAUDE.md "수학 로직을 클라에 넣지 않는다"의 제어 평면 판이다.
+    """
+    current = await get_current_state(session, user.user_id)
+    transitions = await list_transitions(session, user.user_id, limit=limit)
+    return LearningStateView(
+        current_state=current,
+        allowed_next_states=sorted(s.value for s in allowed_targets(current)),
+        transitions=[
+            LearningStateTransitionView(
+                from_state=t.from_state,
+                to_state=t.to_state,
+                trigger=t.trigger,
+                rule_id=t.rule_id,
+                concept_id=t.concept_id,
+                occurred_at=t.occurred_at,
+            )
+            for t in transitions
+        ],
+    )
+
+
+@router.post(
+    "/learning-state/transitions",
+    response_model=LearningStateView,
+    status_code=status.HTTP_201_CREATED,
+    summary="학습 상태 전이 1건 적재(생애주기 전이 — 진단 시작·학습 시작 등)",
+)
+async def post_my_learning_state_transition(
+    body: LearningStateTransitionRequest,
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearningStateView:
+    """생애주기 전이를 명시적으로 적재한다 — 진단 시작·완료·학습 시작 같은 사건.
+
+    응답 제출로 일어나는 평가 전이(`ATTEMPT_SUBMITTED` 및 정책 전이)는 이 표면이 아니라
+    `POST /v1/me/attempts`가 적재한다. 여기서 그 트리거를 허용하면 클라이언트가 정책을
+    우회해 임의 상태로 점프할 수 있다 — 그래서 **거부한다**(422).
+
+    미정의 전이는 409로 거부한다. 200에 "실패했음" 플래그를 실어 보내지 않는다 — 그 형태는
+    호출부가 플래그를 안 읽는 순간 조용한 통과가 된다.
+    """
+    if body.trigger in _POLICY_OWNED_TRIGGERS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"`{body.trigger.value}`는 정책 엔진이 소유하는 트리거입니다 — 이 표면으로 "
+                f"적재할 수 없습니다. 평가 전이는 `POST /v1/me/attempts`가 적재합니다."
+            ),
+        )
+    try:
+        await record_transition(
+            session,
+            user_id=user.user_id,
+            to_state=body.to_state,
+            trigger=body.trigger,
+            concept_id=body.concept_id,
+        )
+    except UndefinedTransitionError as exc:
+        # 예외 타입명을 detail에 포함한다(CLAUDE.md 침묵 실패 금지 — 무타입 경고 금지).
+        current = await get_current_state(session, user.user_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{type(exc).__name__}: {exc.from_state.value} → {exc.to_state.value}는 "
+                f"정의되지 않은 전이입니다. {current.value}에서 갈 수 있는 상태: "
+                f"{sorted(s.value for s in allowed_targets(current)) or '없음'}."
+            ),
+        ) from exc
+    return await get_my_learning_state(user, session)
 
 
 @router.get(
@@ -1016,6 +1299,55 @@ class ConceptMasterySnapshotItem(BaseModel):
     confidence: float | None = None
     sample_size: int | None = None
     measured_at: datetime
+
+
+TraceLimit = Annotated[
+    int,
+    Query(
+        ge=1,
+        le=MAX_TRACE_LIMIT,
+        description=(
+            "시간선 전역 상한. 초과분은 **오래된 쪽부터** 잘리고 응답의 `truncated`가 true가 된다."
+        ),
+    ),
+]
+
+
+@router.get(
+    "/learning-trace",
+    response_model=LearningEventTrace,
+    summary="내 학습 과정 시간선(Event Trace — 여러 원천을 하나의 시간순으로 재구성)",
+)
+async def get_my_learning_trace(
+    user: ConsentedUser,
+    session: SessionDep,
+    since: SinceParam = None,
+    until: UntilParam = None,
+    limit: TraceLimit = DEFAULT_TRACE_LIMIT,
+) -> LearningEventTrace:
+    """본인 학습 이벤트를 **시간순으로** 재구성한다(EOS-11 · 계획서 300 §17).
+
+    진단·문제 시도·채점·오개념 가설·숙달 변경(전후 값 포함)·θ 측정·코치 행동 이벤트를 한 줄로
+    합친 시간선이다. 집계 리포트와 달리 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답한다.
+
+    **스코프**: `user_id`는 인증 주체로 고정한다 — 경로·쿼리 어디에도 타인 id를 넣을 자리가
+    없다(구조적 차단). 운영자·교사 열람은 이 표면의 범위가 아니다(`ADMIN-05` 계열 별건).
+
+    **응답을 `entries`만 보고 읽지 말 것**: `coverage`가 원천별 가용성을 3상태로 말한다.
+    `dormant`(생산자 0건)·`unjoinable`(학습자 축 결합 불가)인 원천의 0건은 *이 학생이 안 했다*는
+    뜻이 아니라 *우리가 재지 않고 있다*는 뜻이다(미측정을 무활동으로 읽지 않기 — CLAUDE.md
+    "작동한 비율" 원칙).
+
+    원문 답안·풀이·수식은 싣지 않는다(미성년 PII 경계). 답안이 필요하면 `attempt_id`로
+    기존 본인 표면을 경유한다.
+    """
+    return await build_trace(
+        session,
+        learner_id=user.user_id,
+        since=since,
+        until=until,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -1485,6 +1817,44 @@ async def get_my_diagnosis_summary(
         weakest_concept_id=weakest.concept_id if weakest else None,
         weakest_concept_name=weakest.concept_name if weakest else None,
     )
+
+
+# ── EOS-10: GET /v1/me/learner-state (LearnerState 단일 조회 표면) ────────────────
+# 계획서 300 §12가 요구한 12종 중 유일하게 대응물이 없던 축. 기존에 학습 상태를 알려면 조각
+# 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)를 각각 불러 클라이언트가 합쳐야
+# 했고, 그 "합치는 규칙"이 서버 밖에 있어 소비처마다 달라질 수 있었다. 이 표면이 L2 조립기
+# (`l2/learner_state.py::get_state`)를 그대로 노출해 합성 규칙을 서버 안에 둔다.
+#
+# **L5는 표면일 뿐이다** — 조립·계산은 전부 L2가 소유하고 여기서는 user_id 스코핑과 직렬화만
+# 한다(다른 /me GET과 동일 규약·읽기 전용·마이그레이션 0).
+
+
+@router.get(
+    "/learner-state",
+    response_model=LearnerState,
+    summary="내 학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬을 한 번에)",
+)
+async def get_my_learner_state(
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearnerState:
+    """본인의 `LearnerState`를 **한 호출로** 반환 — 조각 3개를 각각 부르던 것의 합성 표면.
+
+    담는 것: 개념 숙달(BKT)·전과목 및 개념별 능력(IRT θ)·활성 오개념·약/강 개념·스킬 숙달
+    (행동 축)·학년·목표. 전부 **기존 좌석 재사용**이며 이 엔드포인트가 새로 계산하는 값은 없다.
+
+    **`origins`를 함께 읽어라.** 값이 비어 있는 것은 두 가지 뜻일 수 있고 이 응답은 그것을
+    구별해 말한다 — `no_data`는 이 학생의 이력이 없다는 뜻(풀이가 쌓이면 채워진다)이고,
+    `no_producer`는 저장소에 생산자가 없다는 뜻(학생이 무엇을 해도 채워지지 않는다)이다.
+    현재 `curriculum_id`·`current_objective_id` 둘이 후자이며, 각 필드 description에 그
+    실측 근거가 있다. `origins`에서 `status == "measured"`인 비율이 곧 **이 조립이 실제로
+    작동한 비율**이다(CLAUDE.md "작동한 비율" 원칙).
+
+    **PII 주의**: `goals`는 목표 등급·점수·대학을 담는다. 이 표면은 학생 **본인**에게만
+    응답하며(`ConsentedUser` + user_id 스코핑), 여기서 나온 값을 학생 대면 프롬프트에 그대로
+    넣는 것은 별개로 금지다(`LearnerState.goals` description 참조).
+    """
+    return await get_state(session, user.user_id)
 
 
 # ── 원자그래프 소비 슬2: GET /v1/me/weak-concepts (약개념 추천 — 진단 약점 + code 메타 enrich) ──
@@ -2163,6 +2533,15 @@ class NextProblemResponse(BaseModel):
             "대기). purpose=diagnosis(기본)에서는 밴드 자체가 적용되지 않으므로 null."
         ),
     )
+    reason: RecommendationReason = Field(
+        description=(
+            "EOS-14: **왜 이 문항인가** — 선택된 문항의 대표 개념·그 개념의 실측 숙달로 판정한 "
+            "추천 근거. 위 5필드(weight_axes_applied·candidate_pool_size·"
+            "weak_concept_signal_count·candidate_zero_reason·band_calibrated)가 *추천기가 "
+            "어떻게 돌았나*의 관측 메타라면, 이 필드는 *선택된 문항의 근거*다 — 둘은 다른 질문에 "
+            "답하므로 합치지 않는다. `problem_id`가 null이어도 비지 않는다(type=no_candidate)."
+        ),
+    )
 
 
 @router.get(
@@ -2355,6 +2734,10 @@ async def recommend_next_problem(
                 weak_concept_signal_count=weak_concept_signal_count,
                 candidate_zero_reason=zero_reason,
                 band_calibrated=band_calibrated,
+                # EOS-14: 추천이 없어도 이유는 있다 — 조회 0건(없는 문항의 개념을 묻지 않는다).
+                reason=await collect_recommendation_reason(
+                    session, learner_id=user.user_id, problem_id=None
+                ),
             )
         picked = candidates[chosen_index]
         # REC-11: candidates[] 관측 — recommend_suneung_index 내부 공식(적격 게이트 × 정보량
@@ -2374,6 +2757,13 @@ async def recommend_next_problem(
             candidate_scores.append((p.problem_id, score))
         # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — null 분기(위)는
         # 호출하지 않는다.
+        # EOS-14: 근거는 **선택이 끝난 뒤**(picked 확정 이후) 조립된다 — 이 호출이 위
+        # chosen_index에 영향을 줄 수 없는 위치이므로 근거 배선이 추천 결과를 바꾸지
+        # 않는다(acceptance ⑥의 구조적 보장). 처치 기록보다 앞에 두는 것은 같은 근거를
+        # 응답과 영속 양쪽에 **하나의 값으로** 싣기 위해서다(두 번 계산하면 갈라진다).
+        suneung_reason = await collect_recommendation_reason(
+            session, learner_id=user.user_id, problem_id=picked.problem_id
+        )
         await record_recommendation_treatment(
             session,
             problem_id=picked.problem_id,
@@ -2383,6 +2773,7 @@ async def recommend_next_problem(
             mode=mode,
             candidates=candidate_scores,
             policy_version=POLICY_VERSION_SUNEUNG,
+            reason=suneung_reason,
         )
         await session.commit()
         return NextProblemResponse(
@@ -2399,6 +2790,7 @@ async def recommend_next_problem(
             weak_concept_signal_count=weak_concept_signal_count,
             candidate_zero_reason=None,
             band_calibrated=band_calibrated,
+            reason=suneung_reason,
         )
 
     # 후보를 θ 근방(|b-θ| 최소)으로 SQL 정렬 — 보정 b(irt_difficulty_b) 우선·없으면 전문가
@@ -2469,6 +2861,10 @@ async def recommend_next_problem(
             weak_concept_signal_count=weak_concept_signal_count,
             candidate_zero_reason=CANDIDATE_ZERO_NO_POOL,
             band_calibrated=band_calibrated,
+            # EOS-14: 후보 0건도 이유다(조회 0건).
+            reason=await collect_recommendation_reason(
+                session, learner_id=user.user_id, problem_id=None
+            ),
         )
     chosen_id, chosen_difficulty, _chosen_b = candidate_rows[best]
     # REC-11: candidates[] 관측 — select_weighted_item과 *같은* 점수 공식(정보량×가중)을
@@ -2479,6 +2875,10 @@ async def recommend_next_problem(
     ]
     # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — 위 null 분기는
     # 호출하지 않는다.
+    # EOS-14: 선택 확정(chosen_id) 이후에 근거 조립 — 수능 분기와 동일 위치 규약.
+    cat_reason = await collect_recommendation_reason(
+        session, learner_id=user.user_id, problem_id=chosen_id
+    )
     await record_recommendation_treatment(
         session,
         problem_id=chosen_id,
@@ -2488,6 +2888,7 @@ async def recommend_next_problem(
         mode=mode,
         candidates=cat_candidate_scores,
         policy_version=POLICY_VERSION_CAT,
+        reason=cat_reason,
     )
     await session.commit()
     return NextProblemResponse(
@@ -2501,6 +2902,7 @@ async def recommend_next_problem(
         weak_concept_signal_count=weak_concept_signal_count,
         candidate_zero_reason=None,
         band_calibrated=band_calibrated,
+        reason=cat_reason,
     )
 
 
@@ -2936,6 +3338,12 @@ async def capture_measurement_assessment(
     schema = await _assemble_measurement_assessment(session, user.user_id, now=now)
     # 적재는 내부 정본(예측 5필드 포함 · 값은 항상 None)으로, 응답은 학생 대면 정본으로.
     session.add(Assessment.from_schema(schema))
+    # EOS-103: 이 분기가 **진단 완료 경계**다(CAT 중단 규칙 measurement_sufficient가 True이고
+    # 이번 창에 아직 캡처가 없는, 즉 진단 결과가 처음으로 확정되는 지점). 여기서 LearnerState
+    # 영속 행을 자동 생성해, 운영자가 DB에 행을 직접 만들 필요가 없게 한다(멱등 — 이미 있으면
+    # 그 행을 그대로 두고 `provisioned_at`·`provisioned_by`를 덮어쓰지 않는다).
+    # 같은 commit 안에 두어 "진단은 적재됐는데 상태는 없다"는 반쪽 성공이 생기지 않게 한다.
+    await provision_learner_state(session, user.user_id, reason="diagnosis_capture")
     await session.commit()
     return AssessmentCaptureResponse(
         written=True,

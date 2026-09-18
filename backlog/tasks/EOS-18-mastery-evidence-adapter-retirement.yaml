@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-18-mastery-evidence-adapter-retirement
+title: "임시 증거 어댑터 폐기 — EOS-13 계약을 실 AssessmentEvidence에 연결"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 임시 어댑터 폐기 — EOS-13이 EOS-12 착지를 기다리며 l2/mastery_contract.py에 둔 AttemptOutcomeEvidence를 제거한다. 그 어댑터는 AssessmentEvidenceInput Protocol(속성 2개: correct·observed_at)을 만족하는 최소 스텁이었고, EOS-12가 PR #1187로 착지해 schema/assessment_evidence.py::AssessmentEvidence가 실재하므로 존재 이유가 사라졌다\n② 이음매 실증 — main의 AssessmentEvidence가 correct: bool·observed_at: datetime을 갖는다(2026-09-17 실측). 상속 없이 Protocol을 만족하는지 실제 인스턴스로 확인하고, EOS-13이 미리 넣어 둔 test_future_assessment_evidence_satisfies_without_inheritance를 실 타입으로 교체한다\n③ 호출부 전환 — 숙달 적재 경로(_stage_attempt_mastery·_stage_skill_attempt_mastery)가 어댑터 대신 실 AssessmentEvidence를 받도록 잇는다. 단 숙달 수치는 바뀌지 않아야 한다(EOS-13 acceptance ④ 행동 동결 승계) — 기존 숙달 전파 테스트가 값을 그대로 내는지 대조한다\n④ Protocol 속성 집합 재판정 — test_protocol_reads_exactly_two_attributes가 속성 2개를 동결하고 있다. 실 타입 연결 후에도 2개로 충분한지, 아니면 계약이 더 읽어야 하는지 정한다. 늘린다면 계약 변경이므로 docs/architecture/mastery_update_contract_v1.md도 함께 고친다\n⑤ 변별력 — 어댑터를 지운 뒤 실 타입이 꽂히지 않는 상태를 주입해 RED를 확인한다. 성공 방향 대조군(정상 연결 시 GREEN)을 함께 둔다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/mastery_contract.py
+session: null
+notes: "EOS-13이 남긴 임시 어댑터의 폐기 축. 원래 EOS-12 acceptance ⑦로 집행했으나, 병합 시점에 EOS-12가 타 세션 PR #1187로 이미 done임이 드러났다(하네스상 done은 종결 상태라 나가는 전이가 없다) — 그래서 후속 태스크로 분리한다. 두 세션이 독립적으로 같은 이음매에 수렴한 것이 확인됐다: EOS-13 Protocol이 요구한 correct·observed_at 2속성을 EOS-12의 AssessmentEvidence가 그대로 갖는다."
+updated: 2026-09-17

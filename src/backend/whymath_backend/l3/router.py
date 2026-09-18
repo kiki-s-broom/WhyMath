@@ -581,6 +581,7 @@ class Router:
                 # 반출 가능했다"는 다른 사실이다).
                 data_export_blocked=False,
                 data_export_reason=judgment.reason,
+                data_licenses=req.data_licenses,  # 관할 축(ARCH-49)이 읽는 등급 승계
             )
         desired = business_cost_tier(req)  # 게이트 전 희망 티어(작동 신호의 분모)
         cost_tier = guard_data_export(desired, req.data_licenses)  # 법적 축 — 독립 적용
@@ -600,6 +601,7 @@ class Router:
                 est_cost_krw=cloud_cost(req, cost_tier),
                 data_export_blocked=False,  # 여기 도달했다는 것 자체가 게이트 통과다
                 data_export_reason=judgment.reason,
+                data_licenses=req.data_licenses,  # 관할 축(ARCH-49)이 읽는 등급 승계
             )
 
         # LOCAL 경로 → 축3(패밀리) 먼저, 그다음 축2(크기)
@@ -629,6 +631,7 @@ class Router:
             est_cost_krw=0.0,  # 로컬은 0원
             data_export_blocked=export_blocked,
             data_export_reason=judgment.reason,
+            data_licenses=req.data_licenses,  # 관할 축(ARCH-49)이 읽는 등급 승계
         )
 
     # ── 축1: 비용·위치 (03a §C.1 결정표 6규칙) + 데이터 등급 게이트(EOS-59) ──

@@ -46,7 +46,7 @@ DESIGNED_SEAMS: frozenset[str] = frozenset({"composition"})
 # 금지 규칙 어휘 — 비교문의 *문자열 리터럴*만 본다(변수명·docstring은 대상 아님)
 SUBJECT_LITERALS: frozenset[str] = frozenset({"math", "mathematics", "수학", "physics", "물리"})
 MATH_TYPE_RX = re.compile(
-    r"^(quadratic|linear|polynomial|trig\w*|calculus|geometry|probability|sequence|exponential|"
+    r"^(quadratic|linear|polynomial|trig(?!ger)\w*|calculus|geometry|probability|sequence|exponential|"
     r"logarithm|vector|matrix|integral|derivative|equation|inequality|fraction|algebra|statistics|"
     r"combinatorics|number_theory)(_[a-z_]+)?$",
     re.I,
@@ -69,10 +69,17 @@ VOCAB_EN = re.compile(
 # 경계가 서지 않는다) 토큰으로 쪼개 정확 일치로 본다.
 MATH_TOKEN_RX = re.compile(
     r"^(tangent|extrema|extremum|integral|derivative|differential|quadratic|polynomial|"
-    r"trig\w*|sympy|latex|asymptote|vertex|radian|logarithm|factorial|permutation|"
+    r"trig(?!ger)\w*|sympy|latex|asymptote|vertex|radian|logarithm|factorial|permutation|"
     r"combination|monomial|binomial|numerator|denominator|sine|cosine|tangential)$",
     re.I,
 )
+# `trig(?!ger)\w*` — `trigger`/`triggers`/`triggered`는 수학이 아니다. 종전 `trig\w*`가
+# 그것들을 부분매치해 거짓 양성을 냈고, 2026-09-06(EOS-86)에는 그 오탐을 **baseline에
+# 등재하는 것으로 덮었다**(`l4.solution_coaching / trigger`). 2026-09-16 `EOS-100`이
+# 같은 오탐을 다시 맞았다(`LoopEdge.TRIGGERS` — 계획서 300 §1의 `Problem triggers→
+# Misconception` 관계명이라 개명 불가). 동일 유형 2회차이므로 대책을 데이터(baseline)가
+# 아니라 **코드**에 둔다 — CLAUDE.md '동일 유형 텍스트 규칙 2회 실패 후 코드 착지' 선례.
+# 회귀 동결: tests/infra/test_eos_core_boundary_probe.py::test_trigger_family_is_not_math.
 # 토큰 단독으로는 일반어지만 붙으면 수학인 복합어(number+line은 각각 일반어다).
 MATH_PHRASE_RX = re.compile(r"(number_line|unit_circle|coordinate_plane|solution_set)", re.I)
 

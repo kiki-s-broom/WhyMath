@@ -286,6 +286,20 @@ class RoutingDecision(BaseModel):
             "결정)이며 '허용'이 아니다 — 미상과 통과를 구분한다."
         ),
     )
+    # ── 관할 축(ARCH-49)이 읽는 등급 *승계* 필드 ──
+    data_licenses: tuple[LicenseType, ...] = Field(
+        default=(),
+        description=(
+            "이 결정이 판정 대상으로 삼은 자료 등급 목록 — `RoutingRequest.data_licenses`를 "
+            "그대로 승계한다. 반출 *가부*(`data_export_reason`)만으로는 답할 수 없는 질문이 "
+            "있어서 싣는다: `l3.provider_jurisdiction`은 '반출해도 되는가'가 아니라 '**어느 "
+            "관할로** 반출해도 되는가'를 묻고, 그 답은 등급별로 다르다(CN은 합성 프로브만). "
+            "빈 튜플은 '자료 없음'이 아니라 **'미선언'**이며, 추가 좁힘이 있는 관할(CN·미확인 "
+            "공급사)은 미선언을 fail-closed로 차단한다 — 라우터를 거치지 않고 손으로 조립된 "
+            "결정이 중국 서버로 새어 나가지 않게 하는 기본값이다. 좁힘이 없는 관할(US·현행 "
+            "Anthropic 경로)은 이 필드를 요구하지 않아 **기존 호출부 동작은 무변경**이다."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_axis_invariants(self) -> RoutingDecision:

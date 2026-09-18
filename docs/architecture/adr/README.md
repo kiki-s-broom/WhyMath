@@ -55,7 +55,7 @@ python3 scripts/harness/adr_number_check.py
 
 ---
 
-## 현재 계열 (2026-09-15)
+## 현재 계열 (2026-09-16)
 
 | 번호 | 주제 | 상태 | 소재 |
 |---|---|---|---|
@@ -64,8 +64,9 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 노드 ID의 과목 접두사는 규약이지 Subject 엔티티 참조가 아니다 | 채택 | main |
 | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Provisional** (target 2026-09-27) | main |
 | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
+| [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) | 학습 상태 머신 8상태 채택 · 상태를 저장하지 않고 전이 원장에서 파생 | 채택 (2026-09-03 보류의 번복 · 게이트 판정 ②) | main |
 
-**다음 빈 번호: ADR-006** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
+**다음 빈 번호: ADR-007** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
 
 ---
 
@@ -79,7 +80,7 @@ python3 scripts/harness/adr_number_check.py
 | ADR-002 Subject Adapter | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | 오늘 작성 — Provisional |
 | ADR-003 Entity ID | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 주제 일치 확인 — 노드 ID 접두사 규약 축 |
 | ADR-004 Event Model | | 미확인 |
-| ADR-005 LearnerState | | 미확인 |
+| ADR-005 LearnerState | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) (학습 국면 축) + `l2/learner_state.py`(요약 상태 조립기 축) | **부분** — 학습 *국면*의 상태·전이 계약은 ADR-006이 덮는다. 요약 LearnerState의 단일 조회 표면·영속 좌석은 `EOS-10`·`EOS-103`이 소유하며 아직 ADR 형식의 기록이 없다 |
 | ADR-006 Content Version | | 미확인 |
 | ADR-007 AI Gateway | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | 충족 — 기존 결정의 정본화(ARCH-45). 주제의 실질(`l3/router.py`·`03a_l3_router_design.md`)은 이미 있었고 ADR 형식의 단일 기록만 없었다 |
 | ADR-008 Knowledge Graph | | 미확인 |

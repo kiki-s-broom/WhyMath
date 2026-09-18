@@ -338,6 +338,213 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-17 (정정 · ARCH-49 acceptance ⑨⑩): **"실측"이라 적힌 OpenRouter 기록 4건이 전부 틀렸다 — 공급사 국적은 API가 아니라 웹 패널에 있다** (Kiki 실측 제시, claude 정정) — 판정 기준 PR #1191 브랜치
+
+**① 무엇이 틀렸나.** acceptance ⑨는 OpenRouter 경유 정보를 "2026-09-16 Kiki 머신 실측"으로 기록했다. 2026-09-17에 Kiki가 같은 모델 페이지를 열어 보인 화면과 대조하니 **네 항목이 전부 어긋난다**.
+
+| 항목 | ⑨ 기록 | 2026-09-17 화면 |
+|---|---|---|
+| 모델 slug | `deepseek/deepseek-v4-flash` | **`deepseek/deepseek-v4.1-flash`** (점이 있다) |
+| 엔드포인트 수 | 16곳 | **19곳** |
+| 최저가 공급사 | `open-inference` $0.05/$0.14 | **목록에 없다.** 최저는 `relace` $0.15/$0.60 |
+| `deepinfra` 단가 | $0.09/$0.18 | **$0.20/$0.60** |
+
+**② 그래서 ⑩의 논거 전체가 공중에 떠 있었다.** acceptance ⑩은 `open-inference`를 기본 허용목록에서 빼는 이유를 길게 적었다(2차 자료 충돌·1차 자료 프록시 차단). 그런데 **그 공급사는 이 모델을 서빙하지 않는다.** 결론(이중 방어·허용목록을 독립 방어층으로)은 옳지만, 그것을 떠받친 사례가 실재하지 않았다.
+
+**③ 반면 DeepSeek 공식 단가는 맞았다.** 목록의 DeepSeek 자체 행이 $0.30/$1.20이고 모델 list price가 $0.15/$0.60인데, 이는 acceptance ⑥이 기록한 피크/오프피크(정확히 2배)와 일치한다. 그래서 라이브 1회차의 비용 산술(피크 12.4배·오프피크 24.8배 저렴)은 **그대로 성립한다** — 틀린 것은 OpenRouter 축이지 공식 API 축이 아니다.
+
+**④ 교훈 — "실측"이라는 단어가 근거 등급을 만들지 않는다.** ⑨는 스스로를 "실측 4건"이라 부르고 숫자까지 적었기에 뒤 세션(나)이 그것을 그대로 코드에 핀했다. 틀린 slug가 기본값이 됐고, `--route openrouter`를 돌렸다면 404로 실패했을 것이다. CLAUDE.md 「환경 사실의 추론 등재 금지」가 *추론*을 막는다면 이 사고는 **잘못 읽은 실측**이 같은 자리에 들어오는 축이다. 대책: 외부 서비스의 식별자·단가는 **그 서비스가 돌려주는 값**으로만 핀하고(`--search`), 화면에서 옮겨 적은 값은 "화면에서 읽었다"로 등급을 밝혀 적는다.
+
+**⑤ 국적은 API가 말해 주지 않는다 — 웹 패널이 말한다.** Kiki가 공급사를 눌러 연 상세 패널에 `Provider info › Headquarters`가 있다. 그것으로 **US 5곳을 확정**했다: `deepinfra`·`fireworks`·`together`·`gmicloud`(전부 패널 표기) + `baseten`(표의 🇺🇸 배지). 근거 등급이 다르므로 코드 주석에 A(패널)·B(배지)·C(회사로 앎)로 나눠 적었다.
+
+**⑥ 그 패널이 두 번째 축을 함께 준다 — 데이터 정책.** `Prompt training`과 `Retention`이 공급사마다 다르다. `gmicloud`는 **US인데 `Retention: Unknown`**이라 기본 허용목록에서 뺐다 — 국적을 아는 것과 보존 정책을 아는 것은 다른 축이고, 모르는 것은 허용 사유가 아니다. 기본 허용목록은 세 조건(`Headquarters: US` + `Prompt training: No` + `Retention: Zero`)을 **함께** 만족한 3곳이다: `deepinfra`·`fireworks`·`together`.
+
+**⑦ `digitalocean`을 뺐다.** 이전 세션이 US로 적었으나 이번 화면에서 그 패널을 확인하지 않았다. 같은 세션의 다른 기록 4건이 전부 틀렸으므로 **같은 출처의 항목을 재확인 없이 신뢰하지 않는다** — 근거를 다시 확보할 때까지 UNKNOWN(전건 차단)이다. 되돌리는 것은 패널 한 번 확인이면 된다.
+
+**⑧ 측정용 설정은 운영용과 다르다(명시).** `provider.only`에 여러 곳을 넣으면 OpenRouter가 그중 하나를 고르고 **양자화가 공급사마다 다르다**(`deepinfra`=FP8·다수 미표기). 품질 비교를 하려면 1곳만 지정해야 한다 — 기본 3곳은 *운영 가용성*을 위한 값이며 `ARCH-55` 측정은 1곳으로 고정한다. 이 구분을 config 설명에 못 박았다.
+
+**⑨ 남은 미확인.** `relace`(최저가) · `morph` · `makora` · `modal` · `parasail` · `novitaai` · `phala` · `venice` · `reka` — 국적 미확인이라 UNKNOWN(전건 차단)이다. 넓히려면 같은 방식으로 패널의 Headquarters를 확인해 근거 등급과 함께 표에 적는다. `alibaba`·`siliconflow`는 이 모델을 실제로 서빙하며 우리 표에 CN으로 있다.
+
+### 2026-09-17 (실측 · ARCH-49 → ARCH-55): **DeepSeek 공식 API 첫 라이브 호출 성공 — 배선이 실제로 돈다** (Kiki 실행, claude 도구·기록) — 판정 기준 main `6d1d9d10` + PR #1191 브랜치
+
+**① 무엇이 확인됐나.** ARCH-49가 만든 경로로 **DeepSeek이 실제로 응답했다**. 그 전까지 이 저장소가 가진 것은 "부를 수 있는 배선"뿐이었고 그것이 도는지는 아무도 몰랐다 — 개발 컨테이너는 키가 없고 egress가 `api.deepseek.com`에 `CONNECT 403`을 낸다(2026-09-17 실측). Kiki가 Phaiakes9에서 `harness.deepseek_live_probe`를 돌려 그 간극을 닫았다.
+
+**② 실측값 (1회차 · n=1).**
+
+| 항목 | 값 |
+|---|---|
+| 시각 | 2026-09-17T07:56:14Z (요금 구간 **peak**) |
+| 경로 | DeepSeek 공식 API (`api.deepseek.com`·CN 관할) |
+| 라우터 결정 | `cloud_mid` → 모델 `deepseek-flash` |
+| 반출 판정 | `EXPORT_ALLOWED` (게이트 발동 False) |
+| 선언 등급 | `WHYMATH_GENERATED` (CN 기본 허용 등급 — opt-in 불요) |
+| 입력/출력 토큰 | 88 / 420 |
+| 캐시 적중 | 0 (None이 아니라 0 — **읽었는데 적중 없음**이 실측) |
+| 실측 지연 | **3,438 ms** |
+| 종료 코드 | 0 |
+
+**③ 라우터를 경유했다는 것이 함께 확인됐다.** 프로브는 티어를 손으로 박지 않고 입력 신호를 골라 라우터가 스스로 `CLOUD_MID`를 내게 한다. 그래서 이 성공은 모델 응답만이 아니라 **라우팅 → 법적 게이트(`guard_data_export`) → 관할 게이트(`provider_jurisdiction`) → 프로바이더**가 한 줄로 이어져 있다는 관통 증거다.
+
+**④ 응답 품질(1건 · 인상 판정임을 명시).** "1~100 합" 문항에 가우스 짝짓기(50×101=5050)로 답하고, **왜 성립하는지를 교환법칙·결합법칙으로** 설명했다 — 답보다 이유를 먼저 말하라는 system 프롬프트를 따랐다. 다만 이것은 **1건 인상 판정이지 강등전이 아니다.** 정확도 축은 결함 주입 강등전으로 판정해야 하며(초인간 검증 기준 §3.1-3.2·Wilson 단측 경계) 그것은 `ARCH-55`의 몫이다.
+
+**⑤ 비용 — 기록 단가 기반 산술이며 청구서로 확인하지 않았다.** 이 회차 토큰(88/420)에 단가를 곱하면 DeepSeek 피크 $0.000530 · 오프피크 $0.000265 · 현행 CLOUD_MID 핀(Sonnet 4.6) $0.006564다 → **피크에도 12.4배, 오프피크면 24.8배 저렴**하다. 단가 출처는 ARCH-49 acceptance ⑨(공식 오프피크 $0.15/$0.60 per 1M)·⑥(피크=정확히 2배)와 `models.py`의 CLOUD_MID 주석($3/$15 per 1M)이며, **실제 청구 금액을 대조하지 않았다** — 배율의 자릿수는 신뢰하되 소수점은 신뢰하지 않는다.
+
+**⑥ 그럼에도 채택은 아직 미판정이다.** 이 회차가 답한 것은 "도는가"(예)와 "지연이 얼마인가"(3.4초)뿐이다. 남은 것: 품질 강등전 · OpenRouter 경유 대조(같은 모델·다른 관할·다른 단가) · 피크/오프피크 분리 집계 · 반복 표본. 기본 라우팅은 여전히 Anthropic이고 이 실측 하나로 바꾸지 않는다.
+
+**⑦ 도구가 CI에서 못 도는 것은 의도이며 선언돼 있다.** `harness.deepseek_live_probe`는 `declared_unwired_audit`에 `_LIVE_DEPENDENT`로, `eos_feature_inventory_v2`에 `WM-O-904`로 귀속돼 있다. 두 게이트가 **각각 red로 잡아냈고**(선언 누락·귀속 누락) 그것이 옳은 지적이었다 — 도구를 만들고 배선 확인 없이 넘어가려던 것을 기계가 막았다.
+
+### 2026-09-17 (구현 · ARCH-49): **DeepSeek 경로 2종 배선 — 그리고 "어느 나라 법인인가"를 `CostTier`가 아니라 *프로바이더*가 말하게 했다** (claude 구현) — 판정 기준 main `6d1d9d10`
+
+**① 티어를 늘리지 않았다(acceptance ⑧의 답).** DeepSeek 공식 API는 중국 본토 서버 전용이라 "CN 티어를 만들자"가 먼저 떠오르지만, 그러면 `OFFSHORE_TIERS`·세 축 불변식·`LOCAL_MODEL_MATRIX`·라우터 결정표를 전부 손대야 한다(붕괴 연쇄 ② 축 버전). 대신 **관할을 프로바이더 메타데이터로 분리**했다 — `CostTier`는 계속 "얼마나 비싼가·어디서 도는가"만 말하고, `Jurisdiction`(`l3/provider_jurisdiction.py`)이 "어느 나라 법인인가"를 말한다. 같은 `CLOUD_MID` 결정이 Anthropic(US)으로도 DeepSeek(CN)으로도 나가며, 비용 등급은 같고 관할이 다르다.
+
+**② 상한을 표가 아니라 *교집합*이 정한다.** 관할 허용 등급은 `_BASE_POLICY[j] & EXPORT_PERMITTED_LICENSES`로 만든다. `EXPORT_PERMITTED_LICENSES`는 `permission_map`에서 `allows(EXPORT) is True`인 등급만 유도한 것이라, **정책 표에 실수로 무엇을 적어도 반출 금지 등급은 통과하지 못한다.** 그래서 학생 저작(`USER_GENERATED.export=False`)은 어떤 관할·어떤 opt-in 조합으로도 허용 집합에 들어오지 않는다(전수 격자 8조합 단언) — acceptance ②가 요구한 불변식의 기계 판정이며, 1차 게이트(`guard_data_export`가 LOCAL로 강등)와 **두 겹**을 이룬다.
+
+**③ 집행 지점은 provider가 아니라 디스패처다.** 관할 판정을 provider 안에 두면 provider를 직접 쥐고 부르는 경로(D1 위반)가 게이트까지 함께 우회한다. `CompositeProvider`가 위임 **직전**에 판정하고, 직접 호출은 `check_provider_seat_contract.py`(ARCH-46)가 따로 막는다 — 두 게이트가 서로의 사각을 덮는다. 판정 재료를 나르려고 `RoutingDecision.data_licenses`(기본 빈 튜플)를 신설해 `router.route`가 요청 선언을 승계한다. **빈 튜플은 "자료 없음"이 아니라 "미선언"**이며, 좁히는 관할은 미선언을 차단한다 — 손으로 조립한 결정이 중국 서버로 새지 않는 기본값이다.
+
+**④ 기존 클라우드 경로는 바이트 단위로 무변경이다.** 게이트는 관할이 1차 법적 게이트보다 **진부분집합일 때만** 발동한다(`narrows_beyond_export_gate`). `US`·`DOMESTIC`은 좁히지 않으므로 현행 Anthropic 경로에 이 축은 아무 판정도 추가하지 않는다. 좁힘이 없는 관할에서 등급 선언을 요구했다면 1차 게이트를 이미 통과한 호출부 15곳이 전부 막혔을 것이다 — 이 축은 *겹치는 2차 좁힘*이지 1차 게이트의 재구현이 아니다.
+
+**⑤ 관할 기본값은 넓은 쪽이고, 그 구멍은 거버넌스가 막는다.** 선언 없는 클라우드 제공자는 `US`로 취급된다(역사적 좌석이 Anthropic이므로). 그 기본값만으로는 fail-closed가 아니라서, `tests/infra/test_provider_jurisdiction_declaration.py`가 `l3/providers/`의 실제 제공자 클래스마다 `jurisdiction` 선언을 **AST로 전수 확인**한다(문자열 grep이 아니라 클래스 멤버 판정). 기본값을 좁은 쪽으로 뒤집으면 관할과 무관한 테스트 가짜 수십 개가 전부 막히므로, 기본값은 넓게 두고 프로덕션에만 기계로 요구한다. 그 스캐너가 **첫 실행에서 `FixedModelOllamaProvider`(측정 전용 서브클래스)를 잡아냈고**, 그것이 상속 해석 절을 만들게 했다 — 본문 선언만 요구하면 정당한 좌석이 무의미한 중복 선언을 강요받고, 그 강요가 쌓이면 사람이 게이트를 끈다.
+
+**⑥ OpenRouter 세 파라미터는 옵션이 아니라 계약이다.** `provider.only`·`allow_fallbacks=false`·`data_collection="deny"`가 **항상 함께** 실린다(`build_provider_block` 단일 좌석). 셋이 각각 다른 것을 막는다: `only`=국적 미상 공급사, `allow_fallbacks`=조용한 우회, `data_collection`=학습 수집. 그리고 `only`가 없으면 **양자화가 매 호출 달라져 품질 비교 자체가 성립하지 않는다**(fp8/fp4/unknown 혼재 — 강등전이 모델이 아니라 잡음을 재게 된다). `openai` SDK 대신 얇은 httpx 시임을 쓴 이유가 여기다 — SDK를 끼우면 셋이 `extra_body`로 삼켜져 테스트가 *전송된 결과*를 볼 수 없다.
+
+**⑦ `deny`를 안전의 단일 근거로 쓰지 않는다(이중 방어).** 2026-09-16 실측에서 5개 공급사가 deny 필터를 통과했지만 **그것은 OpenRouter의 분류이지 우리가 검증한 사실이 아니다.** 같은 날 제시된 2차 자료는 `open-inference`를 "프롬프트를 학습에 쓰는 대가로 rate limit을 푸는 공급사"로 설명해 정면 충돌하는데, 1차 자료는 프록시 차단으로 확정하지 못했다. 그래서 `provider.only`=우리가 국적을 아는 곳만이 **독립된 두 번째 방어층**이며, 어느 쪽이 참이어도 계약이 유지된다(langfuse v2 무증상 전멸 2026-07-16 교훈의 프로바이더 축). `open-inference`는 최저가($0.05/$0.14)이나 기본 허용목록에 **없다**.
+
+**⑧ "모른다"와 "중국계로 안다"를 같은 칸에 넣지 않았다.** `PROVIDER_JURISDICTIONS`에 US 2곳(실호출 확인)과 CN 3곳(`siliconflow`·`alibaba`·`baidu` — **회사로 아는 것**이지 API가 말해 주는 값이 아니다)을 **근거 등급을 표기해** 적었다. 판정 결과는 둘 다 차단에 가깝지만 CN은 코퍼스 opt-in이라는 경로가 있고 UNKNOWN은 전건 차단이다. 이 구분을 넣게 만든 것은 뮤테이션이다 — M10(관할 혼재 절 제거)이 **생존**했고, 원인은 내 픽스처가 `["deepinfra","open-inference"]`라 절을 지워도 집합 pop이 UNKNOWN을 낼 수 있었던 것이었다(변별력 0). 서로 다른 *아는* 관할 조합이 필요했다. CLAUDE.md 「픽스처가 그 절을 실제로 밟는가」의 실제 발생 1건.
+
+**⑨ 변별력 = 뮤테이션 25종 전건 RED·생존 0·하네스 고장 0**(순수 Python 하네스 — 셸 배제, 치환 1건 단언·원복 sha256 동일 단언, 무뮤테이션 기준선 rc=0 선행). 다만 **전건 RED는 커버리지의 증거가 아니다**(CLAUDE.md 2026-09-08) — 이 25종은 *내가 실패 모드를 상상한* 절만 검사한다. 상상하지 못한 절은 주입 목록에 오르지도 않았다.
+
+**⑩ 미이행 — 라이브 측정은 남았다.** acceptance ①(품질·지연·비용 3축 강등전)·⑥(피크/오프피크 분리 집계)은 **Kiki 머신의 라이브 키가 필요해 이 세션에서 할 수 없다**. 이 PR이 착지시킨 것은 *측정을 돌릴 수 있는 배선*이며(CN 기본 설정으로 합성 프로브 경로가 열린다), 측정 자체와 채택 여부 판정은 `ARCH-53`으로 승계했다. **즉 이 시점의 채택 결론은 "미판정"이다** — 코드가 있다는 것이 채택했다는 뜻이 아니고, 기본 라우팅은 여전히 Anthropic이다(`CompositeProvider(cloud=AnthropicProvider())` 15곳 무변경).
+
+**⑪ 정직한 공백.** ⓐ DeepSeek이 유료 API 입력을 학습에 쓰는지 **미확정**(2차 자료가 서로 반대·1차 약관 프록시 차단) — `deepseek_allow_internal_corpus` 기본 OFF의 이유이며 확정 시 재평가한다 ⓑ OpenRouter 엔드포인트 16곳 중 8곳의 법인 국적 미확인 ⓒ `openrouter_model_high`(`deepseek/deepseek-v4-pro`)는 가격을 실측하지 않았다 — MID만 2026-09-16에 확인했다 ⓓ 관할 게이트는 `decision.data_licenses` **선언을 믿는다**(선언이 실제 프롬프트 내용과 맞는지는 `check_routing_data_grade.py`가 입력 축에서 따로 본다) ⓔ ~~두 provider 모두 라이브 호출 0건~~ **정정(2026-09-17)**: DeepSeek 공식 API는 라이브 1회차가 성공했다(위 실측 항목 참조 — 3,438ms·88/420 토큰). OpenRouter 경유는 아직 라이브 호출 0건이다.
+### 2026-09-16 (Kiki 결정·EOS-105): **8상태 학습 상태 머신 보류를 번복해 신설 — 진실 원천 중복은 "역할 분리 + 대조 경로"로 처리** (Kiki "원문 그대로 전면 구현" 선택, claude 구현) — 판정 기준 main `0f12e76a`
+
+**계기**: Phase 2 마스터 프리앰블 항목 `P-04`(계획서 300 §3 「Phase 2의 핵심 상태 머신」)가 세션에 투입됐다. 그런데 이 항목은 **2026-09-03 Kiki 결정으로 이미 "신설 보류"**였다(재확인 지점 G4 2026-12-13 · 게이트 `G-state-machine-deferral-recheck` · 대조표 `plan300_phase2_backlog_crosswalk.md` 231행 "등재 제외"). 세션이 착수 전에 그 보류 사실과 사유를 실측으로 제시하고 3택을 물었다 — ①파생 전용 머신 ②보류 유지·ADR 초안만 ③원문 그대로 전면 구현. **Kiki가 ③을 선택**했다.
+
+**번복의 명시적 기록**(이 블록이 그 기록이다 — 결정을 덮어쓰는 것과 덮어썼다고 적는 것은 다르다):
+- 09-03 결정의 사유는 **"`*MasteryHistory`와 같은 사실의 두 번째 진실 원천"**이었고, 그 위험은 번복으로 사라지지 않는다. 그래서 위험을 없앴다고 주장하는 대신 **두 가지 처치**를 코드에 넣었다.
+
+**처치 ① 역할을 겹치지 않게 갈랐다 (좌석 판정 — 실측 기준 main `0f12e76a`)**
+| 담는 사실 | 좌석 | 이 슬라이스와의 관계 |
+|---|---|---|
+| 무슨 일이 있었는가(측정·증거) | `ConceptMasteryHistory`·`SkillMasteryHistory`·`AttemptEvent` | **복제하지 않는다** — 숙달값·정답률·이벤트를 상태 머신에 저장하지 않음 |
+| 시점별 종합 학력 사진 | `user_state_snapshot`(writer 0) | **건드리지 않는다** — 컬럼 추가 0 |
+| 학생당 1행 현재 학습 좌표 | `learner_state`(EOS-103·PR #1185 **미머지**) | **건드리지 않는다** — main에 테이블 부재 실측(`git cat-file -e origin/main:.../db/models/learner_state.py` → 부재) |
+| 학습 국면의 **전이 사건** | `learning_state_transition`(신설·append-only) | 이 슬라이스가 소유. 어느 기존 테이블도 이 사실을 담고 있지 않았다(어휘 3종 `DIAGNOSING`·`REMEDIATING`·`ADVANCING` src/ 코드 0건) |
+
+현재 상태는 **저장하지 않고 원장 최신 행에서 파생**한다(`get_current_state`). 가변 상태 컬럼을 두지 않았으므로 "현재 상태"라는 사실의 원천은 원장 하나다. 이것이 09-03 사유에 대한 1차 처치다.
+
+**처치 ② 어긋남을 검출 가능하게 만들었다** — `reconcile_state`가 영속 상태와 증거 재계산 상태를 대조해 불일치를 **보고**한다. **자동 정정하지 않는다**: 어느 쪽이 옳은지(정책이 바뀌었나, 적재가 누락됐나) 기계가 알 수 없기 때문이다. 조용히 덮어쓰면 그 순간 대조가 위장이 된다(뮤테이션 M15가 이 성질을 동결).
+
+**설계 결정 4건**
+1. **전이는 코드 분기가 아니라 데이터다** — `ALLOWED_TRANSITIONS: frozenset[tuple[LearningState, LearningState]]` 17쌍이 단일 진실 원천이고, 판정 함수는 이 집합만 읽는다. 판정 함수 본문에 상태 리터럴이 있으면 **AST 가드가 RED**(`test_transition_verdict_reads_only_the_table_never_a_state_branch` — 문자열 검색이 아니라 AST인 이유는 표기 변형에서 뚫리기 때문).
+2. **미정의 전이는 거부한다** — 8×8=64쌍 전수 파라미터화 테스트가 "표에 있는 쌍만 통과"를 판정한다. 테스트가 표를 **복제하지 않고 참조**하므로 표에 쌍을 더하면 그 케이스가 자동으로 반대편으로 이동한다(진실 원천이 셋이 되는 것을 막는다).
+3. **정책은 Protocol** — `LearningStatePolicy.decide(state, evidence) -> PolicyDecision`. v1 내부는 if/else 규칙 6종이지만 BKT/DKT/IRT/LLM으로 교체해도 호출부 수정 0. 규칙을 `PolicyRule` dataclass 시퀀스로 둔 이유는 확장이 아니라 **검증**이다 — 규칙을 하나씩 뺀 집합을 주입할 수 있어야 "규칙 하나당 반례 하나"가 기계로 성립한다.
+4. **미매치는 폴백이 아니라 예외** — `NoMatchingPolicyRuleError`. 폴백이 있으면 규칙을 지워도 조용히 통과해 위 ③의 변별력이 0이 된다.
+
+**규칙 우선순위와 그 근거**(뒤집으면 뮤테이션 M9가 RED): `R5 반복실패 > R3 오개념 > R4 선수결손 > R1 정답·고확신 > R2 정답·저확신 > R6 원인미상 오답`. R5가 앞선 이유는 CLAUDE.md 의사결정 우선순위(1 학생 정서·웰빙 > 3 교수학적 정확성)다 — 3연속 막힌 학생에게 원인 분류를 정밀하게 하는 것보다 막힌 지점을 푸는 것이 앞선다. R3가 R4보다 앞선 이유는 오개념을 남긴 채 선수 개념을 다시 가르치면 그 오개념이 따라오기 때문이다.
+
+**집행 지점 (정본화 ≠ 집행 — 별항)**
+- 서빙: `api/me.py::submit_attempt` → `build_attempt_evidence` → `advance_on_attempt`. 이 호출이 없으면 전이표·정책이 다 있어도 **아무 학생의 상태도 움직이지 않는다**(PED-06 선례). AST 가드 `test_submit_attempt_actually_calls_the_state_machine`이 동결하며, 호출을 지우면 뮤테이션 M19가 RED.
+- 표면: `GET /v1/me/learning-state`(현재 상태 + `allowed_next_states` + 이력) · `POST /v1/me/learning-state/transitions`(생애주기 전이·미정의 전이 **409**·정책 소유 트리거 **422**).
+- 응답: `AttemptSubmitResponse.learning_state`는 **필수 필드**다(Optional이면 누락이 관측되지 않는다 — M20이 RED).
+
+**명시한 한계 3건 (숨기지 않는다)**
+1. **기존 학생 전원이 `NEW`라 첫 응답 제출의 평가 진입 전이가 거부된다**(`NEW → ASSESSING`은 표에 없다). 거부를 없애려 그 쌍을 표에 넣는 선택도 있었으나 **넣지 않았다** — "무엇 대비 평가인가"가 없는 평가를 합법으로 만들면 머신이 보증하는 것이 사라진다. 대신 거부는 응답 `learning_state.rejected_transition`에 **값으로** 실린다(예외 타입명 포함). **이 슬라이스는 기존 학습 경로를 막지 않는다** — attempt 적재·숙달 전파는 그대로 성공한다. 상태 머신이 루프를 *게이팅*하는 것은 별건이다.
+2. **규칙 R4(선수결손)는 서빙 경로에서 매치되지 않는다** — `prerequisite_gap_concept_ids`의 생산자(`recommend_prerequisite_gaps`)가 개념 그래프 재귀 CTE 순회라 응답 제출마다 돌리기에 무겁다. 그래서 `build_attempt_evidence`가 **인자로 받도록** 열어 두고 이 경로에서는 비운다. "규칙은 있는데 영원히 안 도는" 상태를 숨기지 않으려고 모듈 docstring에 생산자 배선 현황 표를 박고 테스트로 못 박았다(`test_prerequisite_gaps_come_from_the_caller_not_from_this_module`). 어느 규칙이 실제로 돌았는지는 `PolicyDecision.rule_id`가 응답에 실려 **매 요청 관측**된다(CLAUDE.md "작동한 비율").
+3. **동시 제출 TOCTOU 창이 남는다** — `record_transition`이 현재 상태를 읽고 적재하는 사이. append-only라 어긋난 행이 과거를 훼손하지는 않으며, 어긋남은 `reconcile_state`가 검출한다.
+
+**뮤테이션 22종 전건 RED** — 하네스는 **순수 Python**(셸 배제·2026-09-06 규칙)이며 주입 적용(`mutated != original`)과 원복 바이트 동일(sha256)을 각각 단언한다. M1 판정 항상 True / M2 침묵 통과 / M3 `(NEW,ADVANCING)` 추가 / M4 `(ASSESSING,ADVANCING)` 제거 / M5 `(NEW,NEW)` 자기전이 / M6 None을 고확신 / M7·M8 경계 `>=`→`>` / M9 규칙 우선순위 뒤집기 / M10 미매치 폴백 / M11 적재가 판정보다 앞섬 / M12 거부를 조용히 삼킴 / M13 정책 불법 상태 삼킴 / M14 `INITIAL_STATE`=READY / M15 대조 항상 일치 / M16 미채점을 실패로 계상 / M17 스캔 LIMIT 제거 / M18 정답에도 오개념 preload / M19 서빙 호출 제거 / M20 응답 필드 Optional화 / M21 정책 트리거 차단 해제 / M22 409→200.
+
+**자진 공개 1건** — 초회 실행에서 M13이 구문 오류(`try:` 짝 없음)로 RED였다. **구문 오류 RED는 검출이 아니다**(어떤 가드가 있어도 RED다). 하네스를 고쳐 구문 유효한 주입(`try/except UndefinedTransitionError: pass`)으로 바꾸고 `ast.parse`로 유효성을 선단언한 뒤 재실행해 진짜 RED를 확인했다. 이것을 적는 이유는 "22종 전건 RED"라는 숫자가 한 칸이라도 위장을 포함하면 나머지 21칸의 신뢰도 함께 떨어지기 때문이다.
+
+**게이트 처분** — `G-state-machine-deferral-recheck`(재확인 지점 G4 12/13·판정 3택)는 **선택지 ②(ADR로 채택)로 처분**한다. 그 게이트가 ②에 요구한 "`*MasteryHistory`와의 진실 원천 중복 해소안"은 위 처치 ①②이며 `schema/learning_state.py` 모듈 docstring·`db/models/learning_state_transition.py` 좌석 판정에 정본화돼 있다.
+
+**crosswalk 정정** — `docs/strategy/plan300_phase2_backlog_crosswalk.md`의 §3 표(89행)·§12 16행(132행)·§부록 231행이 P-04를 "등재 제외 / 보류"로 적고 있었다. 세 자리 전부 이 번복으로 정정했다(원 판정을 지우지 않고 **번복 사실과 날짜를 병기**한다 — 판정은 시점에 종속되므로 09-03 판정 자체는 그 시점에 옳았다).
+### 2026-09-17 (구현 · EOS-14): **추천에 "왜 이 문항인가"를 필수로 붙였다 — 근거 없음을 근거로 위장하지 않는 3상태, 그리고 선택은 한 줄도 건드리지 않는 구조** (claude 구현) — 판정 기준 main `27df076e`
+
+**① 현행 '이유'는 이유가 아니었다(acceptance ③ 실측).** `NextProblemResponse`의 5필드(`weight_axes_applied`·`candidate_pool_size`·`weak_concept_signal_count`·`candidate_zero_reason`·`band_calibrated`)는 **관측 메타**다 — *어느 축이 적용됐나*·*후보가 왜 0인가*를 말한다. 그것은 추천기가 어떻게 돌았는지의 기록이지 **선택된 문항의 근거**가 아니다. "어느 개념이 약해서 이 문항인가"는 어디에도 없었다. 그래서 둘을 합치지 않고 `reason`을 **추가**했다(기존 5필드 불변·회귀 0).
+
+**② "분산된 3모듈"은 셋이 같은 값이 아니었다 — acceptance ⑤를 실측으로 정정했다.** 착수 지시는 임계가 3모듈에 분산돼 있으니 단일 정책 함수로 모으라고 했다. 실측하니 **둘만 같은 축**이었다: `weak_concept_recommendation`·`prerequisite_recommendation`의 0.7(약점 판정 컷)은 같은 질문에 답하므로 `WEAK_CONCEPT_MASTERY_CEILING` 하나로 모았고, `learner_state`의 0.4/**0.8**은 L4 LTHC 밴드의 미러라 **다른 축**이어서 합치지 않았다. 값이 같다고 합치면 두 개념이 한 상수로 접혀 한쪽을 고칠 때 다른 쪽이 조용히 움직인다 — 그 판단을 `test_lthc_band_is_not_folded_into_the_weak_cut`이 기계로 남긴다(0.4는 같지만 상한이 0.8 vs 0.7).
+
+**③ 근거 없음을 3상태로 갈랐다(EOS-11·EOS-12의 같은 규약).** `basis`가 셋이다 — `MEASURED_MASTERY`(실측) / `COLD_START`(개념은 매핑됐는데 숙달 이력 없음 = 학생의 상태) / `CONCEPT_UNMAPPED`(문항-개념 매핑 자체가 없음 = **우리 쪽 데이터 공백**). 뒤의 둘을 `PREREQUISITE_GAP`으로 접으면 **측정된 적 없는 학생이 전부 "선수개념이 막혔다"로 분류된다** — 없는 약점을 만들어 내는 형태다. `confidence`도 근거가 없으면 0.5가 아니라 **0.0**이다("모른다"가 "반쯤 안다"로 읽히지 않게).
+
+**④ 선택 알고리즘은 한 줄도 건드리지 않았다(acceptance ⑥의 *구조적* 보장).** 근거 조립은 `chosen_index`/`best`가 확정된 **뒤에만** 호출되고, 조회기는 어떤 선택기도 import하지 않는다(`test_module_does_not_import_a_selector`가 동결 — import하면 언젠가 부른다). 그래서 "계약 도입이 추천을 바꾸지 않았다"가 대조가 아니라 배치로 증명된다. 대조도 함께 뒀다: 같은 후보 풀에 저숙달·고숙달·미매핑 세 근거 재료를 물려도 같은 문항이 나온다.
+
+**⑤ 영속은 새 좌석 없이 기존 REC-11 좌석에 실었다(acceptance ④).** `record_recommendation_treatment`에 `reason` 선택 인자를 더해 처치 meta에 같은 값을 남긴다 — **응답과 영속이 하나의 값**이다(두 번 계산하면 언젠가 갈라지고, 갈라진 뒤에는 어느 쪽이 그때 학생이 본 근거인지 아무도 모른다). 그 동일성을 API 테스트가 직접 단언한다.
+
+**⑥ 정직한 공백**: `RecommendationPolicy`·`LearningContext`·`Recommendation` 세 타입은 착지 시점에 **소비처 0건**이다 — Kiki 지시 범위("근거 배선까지")에 따라 핸들러의 `learner_state` 입력 전환은 열어 뒀고 소유자를 **`EOS-19`**로 등재했다. 구현체 없는 Protocol은 아무 테스트도 건드리지 않아 조용히 표류하므로 `TestPolicyProtocolShape`가 시그니처를 동결한다(입력 2개·반환 `Recommendation`·컨텍스트 필드 5종).
+
+**⑦ 검증**: 뮤테이션 25종 전건 RED + 대조군 1건 GREEN(무해 편집에 RED를 내지 않음). 하네스는 순수 Python이고 주입 적용(`mutated != original`)·원복 바이트 동일(sha256)·무뮤테이션 sanity(rc=0)를 각각 단언한다. **다만 전건 RED는 커버리지의 증거가 아니다**(2026-09-08 규칙) — 1차 19종 실행 뒤 "내가 주입 목록에 안 올린 절"을 되짚어 6종(부재 표기·null 경로·개념 id 누락·영속 절단·응답↔영속 불일치 2종)을 추가했고, 그 과정에서 M17/M18의 치환 대상이 1건에서 2건으로 늘어난 것(응답·영속 두 자리)을 사전 대조가 잡았다.
+
+### 2026-09-16 (구현 · EOS-12): **채점 Evidence 계약 신설 — Answer→Evidence→State의 *중간 객체*, 그리고 "왜 이 개념인가"를 잃지 않기** (claude 구현) — 판정 기준 main `ab1fdc82`
+
+**① 무엇이 없었나(acceptance ② 실측).** 채점은 개념·스킬을 *증거*가 아니라 **이미 갱신된 mastery delta**로 반환하고 있었다. 즉 "이 답이 무엇의 증거인가"는 `record_problem_attempt_mastery` 안에서 계산돼 밖으로 나오지 않았고, 나오는 것은 결과뿐이라 **왜 그 개념이 선택됐는지(역할·귀속 근거)를 아무도 볼 수 없었다**. 오개념은 채점에 합류하지 않고 coach 대화 경로에서만 갱신되며, Assessment 조립은 per-answer가 아니라 CAT 중단 경계 배치다. `concept_evidence|skill_evidence|possible_misconceptions` 백엔드 전수 grep 0건.
+
+**② 계약은 `schema/`에, 조회는 `l2/`에.** 태스크 선언 paths가 `schema/assessment*.py`이고 `l2/mastery_tracking.py`는 **EOS-13이 소유**하므로 그 파일은 손대지 않았다. 그래서 `schema/assessment_evidence.py`(순수 타입 + 순수 선택 규칙)와 `l2/assessment_evidence.py`(DB 조회, 쓰기 0)로 갈랐다. `schema`는 최하위 계층이라 DB·상위 계층 import가 구조적으로 불가능하고, 그것이 "증거는 관측이지 상태가 아니다"를 타입으로 강제한다.
+
+**③ 가장 잃기 쉬운 정보는 delta가 아니라 *귀속 근거*였다.** `AttributionBasis` 3종(`joint_support`·`primary_attribution`·`tested_fallback`)을 증거에 남긴다 — 숙달 delta만 반환하면 "왜 이 개념이 내려갔는가"에 답할 수 없다. 봉투에 mastery·delta 슬롯을 **두지 않은 것이 의도**다: 추정기를 BKT→DKT/IRT로 갈아 끼워도 증거 모양은 그대로여야 하고, 그 모양이 곧 `EOS-13`의 `update_mastery(state, evidence)` 입력이다.
+
+**④ 세 번째 종(오개념)은 생산자가 없다 — 빈 리스트 대신 3상태로 고지했다.** 두 채점 경로 모두 오개념을 만들지 않는다(`submit_attempt`는 매칭을 돌리지 않고, coach `_complete_problem`은 완료가 항상 서버 판정 정답이라 성립하지 않는다). 빈 리스트를 그냥 내보내면 "오개념이 없었다"는 거짓이 되므로 `MisconceptionScan.NOT_RUN`으로 **"보지 않았다"**를 표기한다(`EOS-11`의 원천 가용성 3상태와 같은 규약). 생산자 배선은 `EOS-104`로 등재했고, 그 태스크의 핵심 난점은 **귀속 단위 불일치**다 — 게이트 매칭은 *턴* 단위, Evidence는 *attempt* 단위라 그대로 옮기면 오귀속이고, 학습자 단위 활성 가설을 답안 증거로 붙이는 것도 같은 이유로 금지했다.
+
+**⑤ 모델 B 사본이 셋이 됐다 — 그래서 합치를 기계가 동결한다.** 역할 비대칭 선택은 이제 정본(`select_concept_evidence`)과 두 writer 인라인 사본에 산다. 통합은 `EOS-13`의 몫이라 이번엔 **셋이 같은 개념을 고르는지**를 테스트가 잰다(정/오답/폴백/미매핑 4조합). 드리프트하면 증거가 가리키는 개념과 실제 갱신 대상이 갈라지고, 그 순간 ③의 답이 거짓이 된다.
+
+**⑥ 순서가 계약의 일부다.** 증거는 두 경로 모두에서 **숙달 전파보다 먼저** 조립된다. 뒤에 두면 (가) 증거가 갱신 결과의 사후 요약으로 전락하고 (나) 전파가 실패했을 때 증거까지 사라진다. 응답은 증거(쓰기 *전*)와 `mastery_updates`(쓰기 *후*)를 나란히 실어 **부분 쓰기 구조를 한 트랜잭션처럼 가리지 않는다**(EOS-81 ⑦ 정직 표기 승계·acceptance ⑤). 순서 역전을 주입하면 RED가 난다(M14).
+
+**⑦ LLM·매처 비권위는 계약이 집행한다.** `gate_passed=False` 후보는 `build_assessment_evidence`가 `ValueError`로 거부하고, `misconception_scan`↔건수 불일치도 거부한다 — 산문이 아니라 생성자에서 막는다. 확정·영속은 여전히 게이트와 가설 저장소의 몫이고 이 객체는 판정을 **옮길 뿐 내리지 않는다**.
+
+**⑧ 변별력 = 뮤테이션 18종 전건 RED·생존 0**(순수 Python 하네스 — 주입 적용·원복 sha256 단언, 무뮤테이션 rc=0 sanity check 선행). **그중 M17이 내 테스트 하네스 자신의 결함을 잡았다**: fake session이 `in_()`의 리스트 바인드(`role_1: [ConceptRole.TESTED]`)를 평탄화하지 않아 role을 한 건도 못 읽었고, 그 상태에서 합치 테스트는 **정상·드리프트 양쪽에서 똑같이 통과**할 뻔했다(변별력 0). 실측으로 파라미터 모양을 확인해 고쳤고, 그 사실을 픽스처 주석에 못 박았다. 또 M16(코치 완료 경로에서 증거 조립 제거)이 처음에 **하네스 결함으로 판정 불가**였는데, 그것을 고치는 과정에서 *코치 응답 조립 배선을 덮는 테스트가 없다*는 진짜 공백이 드러나 `test_coach_completion.py`에 응답 수준 단언을 추가했다 — 뮤테이션이 코드가 아니라 **테스트 커버리지의 구멍**을 가리킨 사례다.
+
+**⑨ 부수 발견 — 기존 픽스처가 UUID를 skill_id로 먹이고 있었다.** `test_me.py`의 FakeSession이 모든 조회에 같은 rows를 돌려주는 탓에 스킬 해소 조회가 개념 UUID를 받았고, ORM이 관대해 아무도 몰랐다. 새 계약의 `SkillEvidence.skill_id: str`이 그것을 즉시 잡았다 — 타입 계약이 잠재 픽스처 부정확을 드러낸 형태다.
+
+**⑩ 정직한 공백.** ⓐ 증거 조립이 채점 경로에 SELECT 2~3건을 추가한다(writer가 이미 하는 것과 같은 조회다 — 사본 통합 시 `EOS-13`에서 함께 사라진다) ⓑ 실 PG 왕복은 hermetic이 못 본다 ⓒ Flutter 클라이언트는 새 필드를 아직 읽지 않는다(추가 필드라 비파괴).
+
+### 2026-09-16 (Kiki 판정·집행 · EOS-102): **`Assessment` 이름 충돌 — A안 채택(계획서 쪽을 `AssessmentEvidence`로 개명) + `EOS-100` 문서 결함 2건 정정** (Kiki 판정, claude 집행) — 판정 기준 main `14ef34d0`
+
+- **판정**: 계획서 300 §5.1의 per-answer 채점 산출 = **`AssessmentEvidence`**, 저장소 정본 `Assessment`(진단 평가 세션·`ARCH-37` #15) = **이름 유지**. `EOS-100`이 미판정으로 남기고(`semantic_collision=True`) `EOS-12` acceptance ⑤에 소유자를 박아 둔 유예를 같은 날 닫았다.
+- **Kiki 근거 2**: ⓐ 두 객체의 의미가 실제로 다르다(채점 결과/근거 ↔ 평가 세션 자체) ⓑ 저장소 `Assessment`가 이미 ORM·테이블·테스트에 연결돼 B안은 DB/ORM/API/테스트까지 파급된다.
+- **파급 실측(그 전제의 확인)**: ORM `Assessment` → 테이블 `assessment` · 백엔드 **29파일** · 테스트 **18파일** · 마이그레이션 **4건** 참조. B안은 `ARCH-37` 검사 ②(좌석 개명 시 RED)를 정면으로 건드린다. A안은 소비자 0인 계약층 이름만 바꾸므로 파급이 문서+모듈 안에서 닫힌다.
+- **독립 뒷받침 — `EOS-79`**: 4층 경계 정본이 이미 *"이름이 층을 정하지 않는다 — `assessment` 테이블은 Assessment 층이 **아니다**"*를 적어 뒀고, 그 문서의 **Assessment 층** 정의("어느 Skill·오개념의 어떤 증거인가")가 정확히 이 객체다. 즉 A안은 새 어휘 발명이 아니라 **이미 있던 층 구분에 루프 어휘를 맞춘 것**이다.
+- **좌석 재귀속**: `AssessmentEvidence` → `absorbed` / `LearningEvent`(전용 좌석 없음 — `attempt_event`·`answer_submission`·`evidence_event`에 혼재, `EOS-79` 실측). 정본 `Assessment`는 루프 어휘 **밖**으로 이동(§3-2).
+- **`EOS-100` 문서 결함 2건 동시 정정**: ⓐ §3-2 "루프 어휘 밖" 목록에 `LearningEvent`를 잘못 넣었다 — `Attempt`·`LearningSession`이 이미 그 엔티티에 귀속되므로 밖이 아니다(8종이 아니라 **7종**이 맞았다) ⓑ 그 목록이 "하드코딩이 아니다 — 검사 ⑤가 계산한다"고 적었으나 **검사 ⑤는 그 집합을 계산하지 않았다**. 전형적인 "정본화를 집행으로 착각한 표기"이며, 검사 ⑩을 신설해 주장을 참으로 만들었다. **뮤테이션 M29가 그 원 결함을 재주입해 RED를 확인** — 종전에는 같은 결함을 다시 넣어도 초록이었다.
+- **하네스 준수**: `EOS-100`이 `done`(종결 상태·나가는 전이 없음)이라 `review` 전이가 **거부**됐고, 대장 손편집으로 우회하지 않고 후속 태스크 `EOS-102`를 등재·claim했다(거부 우회 금지).
+- **검증**: 뮤테이션 **8종 추가 전건 RED · 생존 0**(누적 33종). 축: 개명 회귀 · 충돌 되살림 · 좌석 오귀속 · §3-2 목록 조작 2종 · 절 삭제(파서 0건) · 문서 드리프트 2종.
+
+### 2026-09-16 (결정·구현 · EOS-100): **Learning Loop Contract v1 코드 고정 — `EOS-09` §9-② "등재 제외" 판정을 Kiki 지시로 갱신, 단 좌석 축은 건드리지 않는다** (Kiki 지시 `P-01`, claude 구현) — 판정 기준 main `c4f8c9fb`
+
+- **선행 판정과의 관계**: `docs/strategy/plan300_phase2_backlog_crosswalk.md` §9-②(`EOS-09` · 같은 날 작성)는 이 축을 **등재 제외**로 판정했다 — "`ARCH-37`(done)이 엣지 테이블을 '핵심 외'로 명시 배제했으므로 관계 계약 등재는 그 판정을 조용히 뒤집는다. 필요한 것은 **결정**이지 착수 단위가 아니다." 2026-09-16 Kiki 지시(계획서 300 집행 지시문 `P-01`)가 그 결정에 해당하므로 착수했다.
+- **충돌 회피 설계 — 축을 나눴다**: `ARCH-37`이 배제한 것은 **저장 좌석**(관계를 담는 *테이블*)이고, `EOS-100`이 고정한 것은 **호출 어휘**(관계의 *이름과 방향*)다. 신규 테이블·신규 좌석 **0건**이며, 좌석 없는 객체(`Recommendation`)는 `no_seat`으로 적고 끝낸다 — 20번째 엔티티를 만들면 `ARCH-37` 검사 ②가 RED다. 좌석 축의 정본은 여전히 `canonical_entity_model_v1.md` 하나다.
+- **산출**: 코드 정본 `schema/learning_loop_contract.py`(14객체 enum · 16엣지 enum · 18관계 삼중항 레지스트리 · 14건 좌석 귀속 · DAG primitive) · 문서 정본 `docs/architecture/learning_loop_contract_v1.md` · 기계 집행 `tests/backend/schema/test_learning_loop_contract.py` 37건 · CI 경로 필터 편입(다섯 번째 동결 입력).
+- **실측 정정 2건**: ⓐ 지시문 `P-01`은 "13개 객체"라고 적었으나 **열거된 이름은 14개**다(목록이 정본·개수 표기가 오기) ⓑ 계획서 §1 관계도는 `Curriculum`·`Mastery`·`LearningSession` **3종을 한 번도 쓰지 않는다** — 없는 관계를 지어내지 않고 고립 사실 그대로 적었다(엣지 `mastery`와 객체 `Mastery`는 다른 것).
+- **미해결 1건(Kiki 판정 대기)**: `Assessment` **이름 충돌** — 계획서 §5.1의 `Assessment`는 *한 답안의 채점 산출(Evidence 묶음)*이고 `ARCH-37` #15의 `Assessment`는 *진단 평가 세션 컨테이너*다. 같은 글자, 다른 것. 약칭 문제(`Objective`·`Mastery`)와 달리 자동 정정이 불가능하므로 **임의 개명하지 않고** `semantic_collision=True`로 충돌을 데이터에 남겼다. 3택은 정본 문서 §5.
+- **정직한 공백**: ⓐ 서빙 배선 **0건** — 오늘 이 상수를 읽는 API·엔진은 없다("루프의 어휘가 닫혔다"까지만 말한다). 배선은 `EOS-10`·`EOS-12`·`EOS-13`·`EOS-14` 소관 ⓑ 순환 탐지 구현이 2벌 → **3벌**이 됐다. 통합 판정은 `EOS-101`로 분리 등재했고, 그때까지 조용한 분기는 판정 일치 대조 테스트가 막는다.
+- **검증**: 뮤테이션 **25종 전건 RED · 생존 0**(순수 Python 하네스 · 회차마다 `mutated != original`·sha256 변화·바이트 동일 원복 단언). 위음성(M12 항상 `None`)과 위양성(M13 항상 순환)을 **쌍으로** 주입하고 성공 방향 대조군(깨끗한 DAG 4종·깊은 체인 5,000노드)을 함께 뒀다.
+
+- **부수 수정(반복 실수 2회차 상환)**: `LoopEdge.TRIGGERS`가 `EOS-84` 경계 프로브의 ratchet을 깨뜨렸는데 원인은 계약이 아니라 **탐지기**였다 — `scripts/analysis/eos_core_boundary_probe.py`의 `trig\w*`가 `trigger`를 부분매치한다. **이 오탐은 2026-09-06 `EOS-86`에서 이미 관측됐고 그때 대책이 "오탐을 baseline에 등재"였다**(데이터로 덮음) — 그래서 2회차를 못 막았다. CLAUDE.md 반복 실수 규칙 + "동일 유형 텍스트 규칙 2회 실패 후 코드 착지" 선례에 따라 **코드**로 옮겼다: `trig(?!ger)\w*`(2곳) + 회귀 테스트 2종(`test_trigger_family_is_not_math`·성공 방향 대조군) + 은퇴한 baseline 엔트리 제거. 관계명 개명은 선택지가 아니었다 — `triggers`는 계획서 §1 어휘이고 **탐지기가 틀렸을 때 피검체를 고치지 않는다**.
+### 2026-09-16 (구현 · EOS-11): **Learning Event Trace 읽기 축 신설 — 새 store 0, 대신 "0건의 의미"를 3상태로 말하는 투영 계약** (claude 구현) — 판정 기준 main `c4f8c9fb`
+
+**① 무엇이 없었나.** 학습 이벤트의 *적재*는 이미 충족돼 있었다(`attempt_event` hypertable·`problem_attempt`·`concept_mastery_history`·`misconception_hypothesis`·`assessment`). 없던 것은 그것들을 **한 학습자의 하나의 시간선으로 합치는 조회**다 — 실측상 기존 소비처 3곳(`l2/learning_metrics_rollup` 일별 롤업 · `harness/attempt_skill_event_reach_report` 기록률 · `harness/wh1_evaluation` 지표)이 전부 *집계*였고, per-learner 시계열 조회는 내가 찾은 방법으로는 0건이었다. 집계는 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답하지 못하고, 그 답이 없으면 역추적(왜 이 추천이 나왔는가)이 불가능하다.
+
+**② 새 store를 만들지 않는다 — 판단 근거.** 계획서 §4가 이벤트 스키마를 제시하지만 이 저장소에는 이미 그 자리가 있다. 새 이벤트 테이블을 세우면 같은 사실이 두 곳에 적혀 truth source가 둘이 되고(붕괴 연쇄 ④ "유지보수 지옥"), DP-01 ADR("PostgreSQL 우선")과 pgvector 선례의 "6번째 store 회피" 원칙을 동시에 뒤집는다. 그래서 `l2/learning_event_trace.py`는 **투영(projection)**이다 — `session.add` 0건·commit 0건이고, 질의 계층(교체 가능)과 투영 계층(순수 함수·의미 고정)을 타입으로 갈라 뒀다. 나중에 행동 로그가 ClickHouse로 가도 바뀌는 것은 `_collect_*` 내부이고 소비자가 보는 `LearningEventTrace`는 그대로다.
+
+**③ 이 태스크의 실제 산출은 "0건의 의미"다.** §17이 이름을 붙인 10종을 실측 배정해 보니 **6종만 생산·결합 가능**이었다. 그래서 응답이 행만 내면 거짓말이 된다 — 3상태 대장(`coverage`)을 함께 낸다:
+  - `DORMANT`(생산자 0건) 3종 — `learner_state_created`(`user_state_snapshot` writer 0) · `concept_selected`(`learning_session` writer 0 — 조회·종료·삭제 표면만 있고 **생성 경로가 없다**) · `content_viewed`(학습자별 열람 로그 테이블 자체가 없다).
+  - `UNJOINABLE`(생산자는 있으나 학습자 축 조인 불가) 1종 — `recommendation_generated`. `evidence_event`에 `user_id` 컬럼이 없고 `session_id`는 `record_recommendation_treatment`가 매 호출 `uuid4()` placeholder로 채운다. **추천은 쌓이는데 이 학생 것을 집어낼 키가 없다.**
+  이 셋을 "없음"과 같은 글자로 쓰면 미측정이 무활동으로 읽힌다(「작동한 비율」 원칙의 데이터 축).
+
+**④ 배정을 산문이 아니라 기계가 판정한다.** 위 배정은 주석이 아니라 **양방향 거버넌스 테스트**가 지킨다 — 저장소 AST 전수 스캔(별칭 해소 포함)으로 writer 실재를 세어 `bool(writer) == (배정 == PRODUCED)`를 단언한다. 한 방향만 보면 *writer가 생겼는데 DORMANT로 남은* 은폐는 잡아도 *writer가 없는데 PRODUCED로 선언한* 날조는 못 잡는다 — 실제로 뮤테이션 M17이 그 구멍으로 **생존했고**, 가드를 양방향으로 고친 뒤 RED가 됐다. `UNJOINABLE` 주장도 `EvidenceEvent.__table__`에 `user_id`가 없음을 직접 읽어 동결한다(생기면 깨져서 대장을 고치게 한다).
+
+**⑤ 전후 값은 lag로 복원하되, 창 필터보다 먼저 계산한다.** `mastery_updated(0.54→0.43)`의 "이전 값"은 같은 `(user, concept)` 파티션의 직전 행이다. 시간창 *안에서만* 직전 값을 구하면 창 시작 직전의 측정을 못 봐 **첫 행이 늘 '첫 측정'으로 둔갑**한다 — 그래서 `_mastery_stmt`는 학습자 전 구간에서 `lag`를 계산한 뒤 바깥에서 창을 건다. 첫 측정의 `mastery_before`는 `None`이고 0.0으로 접지 않는다(S3-07 None≠0 — 접으면 첫 채점이 항상 "0.0에서 올랐다"는 없는 상승이 된다).
+
+**⑥ 읽기 축은 실패를 삼키지 않는다.** 적재 경로(`l2/attempt_skill_event`)는 "전파해도 기록이 안 남는다 + 유실이 비율로 계측된다"는 근거로 흡수를 택했지만, **읽기에는 그 근거가 없다** — 조용히 빠진 원천은 그 학생이 그 행동을 *안 한 것처럼* 보인다. `build_trace`에는 부분 결과를 성공으로 포장하는 경로 자체를 두지 않았고, 원천 7개 각각에 실패를 주입해 전건 전파를 확인했다(M19 = 삼킴 주입 → RED).
+
+**⑦ PII 경계 — 계획서 §4의 `answer`는 의도적으로 뺐다.** 미성년 학생 원문 답안·풀이·수식은 트레이스에 싣지 않는다(DP-02 allowlist 승계). 봉투에 답안 슬롯 자체가 없고(구조적 차단), `attempt_id` 포인터만 남겨 권한 있는 기존 표면으로 되짚게 한다. `attempt_event.event_data`도 통째로 싣지 않고 타입별 **비식별 스칼라 키 allowlist + 값 타입 화이트리스트** 2겹을 통과한 것만 옮긴다 — 특히 `시각화조작.payload`는 계약상 자유형이라 정밀 좌표가 들어올 수 있어 통째 제외다. 키 이름만 막으면 같은 이름 아래 dict가 들어와 자유형이 부활하므로 값 타입 축이 별도로 필요하다(M6가 그 축을 지킨다).
+
+**⑧ 변별력 = 뮤테이션 21종 전건 RED**(셸 배제 순수 Python 하네스 — 주입 적용 단언 + 원복 sha256 동일 단언, 2026-09-06 규칙). **하네스 1차 시도가 전건 rc=4(usage error)를 RED로 오독할 뻔했다** — `cwd=src/backend`에 상대 노드 id를 준 탓에 pytest가 파일을 못 찾아 뮤테이션과 무관하게 항상 비-0이었다. 무뮤테이션 상태의 rc=0을 먼저 확인하는 `sanity_check`를 넣어 변별력의 전제를 고정했다(2026-09-08 "전건 RED는 커버리지의 증거가 아니다"의 인접 축 — 그쪽은 *안 본 절*을, 이쪽은 *종료코드의 출처*를 묻는다).
+
+**⑨ 남긴 범위(명시).** ⓐ 세션 축은 표면에 노출하지 않았다 — `learning_session` writer가 0건이라 `session_id` 필터를 열면 항상 빈 결과를 내는 **충족 불가 파라미터**가 된다(계획서 §17이 "세션 단위"를 말하지만 그 전제가 이 저장소에 아직 없다). 지금은 `problem_attempt.session_id`가 클라 신고분만 실리므로 봉투에 값으로만 운반한다. ⓑ 운영자·교사 열람은 범위 밖(`ADMIN-05` 계열). ⓒ 실 PG 통합(window function `lag` SQL 왕복)은 hermetic으로 못 보므로 CI 통합 잡이 최종 판정한다.
+
+**⑩ 전체 스위트가 기존 가드 2건을 깨웠다 — 둘 다 실제 신호였다.** ⓐ `test_assessment_result_verdict_premise`가 ORM `Assessment`의 새 임포터로 RED. 가드 자신이 "사유 없이 허용목록에 추가해 초록을 만들지 않는다"고 적어 둔 자리라 **재판정 트리거 1·3을 먼저 대조했다** — 이 모듈은 W8 경로가 아니고(쓰기 0건·채점 런타임 미호출), 읽는 컬럼은 `started_at`·`completed_at`·`assessment_type`뿐이라 예측 5필드를 건드리지 않는다(§3-C가 "직렬화는 소비가 아니다"라고 못 박은 축). 둘 다 미발동이므로 근거를 명기한 허용목록 항목으로 등재했다. ⓑ `declared_unwired_audit`가 새 라우트를 `unclassified`(미도달·의도 선언 없음)로 RED. 원인은 내 테스트가 `_client(...).get(...)` 형태라 감사기의 도달 정규식(식별자 뒤 `.get(`만 인식)에 안 보였던 것이다 — **유예로 덮지 않고** 테스트를 `client = _client(...)` 바인딩으로 바꿔 도달을 정적으로 보이게 했다(2026-08-10 OPS-25가 "유예 대신 탐지기를 고친다"로 세운 선례의 반대 방향 적용: 이번엔 *내 코드*가 탐지기에 맞췄다). 판정이 실제로 그 변경에서 왔는지도 주입으로 확인했다(12개 호출을 `(client).get(`으로 되돌리면 `unclassified`·exit 1 복귀). **정직한 잔여**: 여기서 말하는 "도달"은 백엔드 테스트의 HTTP 관통이고 이 라우트를 소비하는 **모바일 클라이언트는 0건**이다(`/v1/study/*` 선례와 동형 표기).
+
 ### 2026-09-15 (판정·집행 · HARN-102): **bypass_actors를 스냅샷에서 상시 판정으로 승격 — 판정기가 두 엔드포인트를 읽는다** (claude 구현) — 판정 기준 main `4b33d243`
 
 - **닫은 것**: 2026-09-14 클래식 브랜치 보호 삭제 때 12축을 대조해 `enforce_admins: true`의 룰셋 대응이 `bypass_actors: []`임을 실측했다(소실 0). **그러나 그 실측은 한 시점의 스냅샷이었다** — `ruleset_drift.py`는 `/rules/branches/main`만 읽고 그 응답에 `bypass_actors`가 없으므로, 나중에 누가 채워 넣어도 기계는 조용했다. *지금 안전한 것*과 *그 상태가 감시되는 것*의 차이가 이 태스크였다.

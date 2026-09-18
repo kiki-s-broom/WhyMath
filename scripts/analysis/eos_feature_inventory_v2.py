@@ -177,6 +177,10 @@ INVARIANT_MODULE_PREFIXES: tuple[str, ...] = (
     "l1.rights",
     "l3.data_export_policy",
     "l3.data_grade_defaults",
+    # ARCH-49 — 관할 축. `data_export_policy`(반출 가부)의 형제이며 같은 레일을 집행한다:
+    # 허용 집합을 항상 반출 허용 상한과 교집합해 학생 저작(USER_GENERATED)이 어떤 관할로도
+    # 나가지 못하게 한다. 도달성과 무관하게 P0인 이유가 그것이다(불변 계약).
+    "l3.provider_jurisdiction",
     "l3.trace",
     "ops.log_scrubber",
 )
@@ -391,12 +395,38 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-016", "개념·스킬 숙달 곡선 조회", "Student", "Learning Model", "P0",
        "E4 mastery 조회 — G2 ⑧", "me",
        "GET /mastery", "GET /skill-mastery", "GET /mastery/current"),
+    _s("WM-S-051", "내 학습 과정 시간선 조회(Event Trace)", "Student", "Event", "P1",
+       "EOS-11 — 계획서 300 §17 역추적 축. 본인 스코프 고정·원천 3상태(produced/dormant/"
+       "unjoinable) 동반 노출", "me", "GET /learning-trace"),
     _s("WM-S-017", "IRT 능력(θ) 추정·스냅샷·성장 곡선", "Student", "Learning Model", "P0",
        "E4 — θ 추정·시계열", "me",
        "GET /ability", "POST /ability/snapshots", "GET /ability/snapshots",
        "GET /ability/by-concept", "GET /ability/history"),
     _s("WM-S-018", "개념 진단(BKT↔IRT 교차검증)·요약", "Student", "Assessment", "P0",
        "계획서 300 Gate2 ②진단 완료", "me", "GET /diagnosis/concepts", "GET /diagnosis/summary"),
+    # EOS-10(2026-09-16 신설). **016·017·018 중 어디에도 접지 않는다** — 이 표면은 그 셋을
+    # *합성*하므로 하나에 귀속시키면 나머지 둘의 귀속이 거짓이 된다. 계획서 300 §12가 요구한
+    # 12종 중 유일하게 대응물이 없던 축이며, 사용자에게 의미 있는 능력으로도 별개다
+    # ("숙달을 본다"·"능력을 본다"가 아니라 "내 학습 상태를 한 번에 본다").
+    # 번호 주의: 초판은 WM-S-051이었으나 EOS-11(PR #1182)이 같은 번호를 먼저 썼다 —
+# git이 충돌 마커 없이 자동 병합해 같은 id 두 행이 되는 조용한 충돌이었다(2026-09-16).
+# P1인 이유: 조각 3표면(P0)이 이미 같은 사실을 공급하므로 12월 검증 G1~G5의 차단 조건이
+    # 아니다 — 우회 가능하되 합성 규칙을 서버에 두는 품질 이득이 크다(EOS-10 eos_priority와 일치).
+    _s("WM-S-052", "학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬 + 유래)",
+       "Student", "Learning Model", "P1",
+       "계획서 300 §12 LearnerState — 조각 3표면 합성(EOS-10)", "me", "GET /learner-state"),
+    # EOS-105 — WM-S-052(learner-state)와 **다른 기능**이다. 052는 숙달·능력·오개념을 합성한
+    # *요약 상태*를 보여 주고, 이 행은 8상태 *학습 국면과 그 전이 이력*을 보여 준다. 경로가
+    # 한 글자 차이(learner-state ↔ learning-state)라 혼동하기 쉬우므로 여기 명시한다 —
+    # 어휘 정리는 별건(MISC-32)이 소유한다.
+    # 번호: 전 원격 브랜치 41개 전수 스캔에서 미사용 확인(WM-S-051 조용한 충돌 선례 대응).
+    # P1인 이유: 상태 머신은 루프를 *게이팅하지 않으며*(거부를 값으로 노출할 뿐) 기존 학습
+    # 경로가 그대로 작동하므로 12월 검증 G1~G5의 차단 조건이 아니다.
+    _s("WM-S-053", "학습 국면 상태·전이 이력 조회 + 생애주기 전이 적재(8상태 머신)",
+       "Student", "Learning Model", "P1",
+       "계획서 300 §3 학습 상태 머신 — EOS-105. 미정의 전이는 409로 거부하고 정책 소유 "
+       "트리거는 422로 거부한다(클라가 정책을 우회해 임의 상태로 점프하지 못한다)",
+       "me", "GET /learning-state", "POST /learning-state/transitions"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -521,15 +551,20 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-118", "그래프 분석 유틸(ETL 측)", "Platform", "Knowledge Graph", "P2",
        "data_pipeline 분석 — backend 대응 없음", pipelines=("graph_analytics",)),
     # ════════════════════ E — L2 학습자 모델 ════════════════════
-    _e("WM-E-201", "BKT 숙달 추정·개념/스킬 숙달 이력 영속", "Student", "Learning Model", "P0",
-       "Gate2 ⑧ Mastery 자동 갱신", "l2.bkt", "l2.mastery_tracking",
-       "l2.skill_mastery_tracking"),
+    _e("WM-E-201", "BKT 숙달 추정·갱신 호출 계약·개념/스킬 숙달 이력 영속", "Student",
+       "Learning Model", "P0",
+       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리)", "l2.bkt",
+       "l2.mastery_contract", "l2.mastery_tracking", "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items", status="Batch"),
-    _e("WM-E-204", "개념 진단(BKT↔IRT 교차)·LearnerState 조립", "Student", "Assessment", "P0",
-       "Gate2 ②·③ — LearnerState 단일 API는 갭", "l2.concept_diagnosis", "l2.learner_state"),
+    # EOS-103: 영속 축(l2.learner_state_store)을 **같은 기능번호**에 귀속시킨다 — §15가
+    # 신규 EOS 기능번호 추가를 동결했고, 조립(파생)과 영속(생산자 부재 축)은 같은 기능의
+    # 두 축이지 별개 기능이 아니다. *단일 조회 API*는 여전히 갭이며 EOS-10이 소유한다.
+    _e("WM-E-204", "개념 진단(BKT↔IRT 교차)·LearnerState 조립·영속", "Student", "Assessment", "P0",
+       "Gate2 ②·③ — 영속·자동생성은 EOS-103 착지, 단일 조회 API는 여전히 갭",
+       "l2.concept_diagnosis", "l2.learner_state", "l2.learner_state_store"),
     _e("WM-E-205", "약·강·선수개념 추천·학습 경로·복습 큐", "Student", "Recommendation", "P0",
        "Gate2 ④·⑨ — ASM-13 강개념(strong_points) 편입", "l2.weak_concept_recommendation",
        "l2.strong_concept_recommendation", "l2.prerequisite_recommendation",
@@ -542,20 +577,54 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
        "COLLAB-03 시계열 3테이블", "l2.learning_metrics_rollup",
        "harness.learning_metrics_rollup_cli"),
+    _e("WM-E-209", "학습 이벤트 시간선 투영(읽기 축·쓰기 0)", "Student", "Event", "P1",
+       "EOS-11 — 5원천을 한 학습자 시간선으로 투영. 적재는 WM-E-206 소유이고 이 행은 "
+       "읽기 전용 projection(session.add·commit 0건)·원천 가용성 3상태 대장",
+       "l2.learning_event_trace"),
+    _e("WM-E-210", "채점 Evidence 조립(Answer→Evidence 중간 객체·읽기 전용)", "Student",
+       "Assessment", "P1",
+       "EOS-12 — 계획서 300 §5.1. 개념·스킬·오개념 후보 3종을 묶고 작동 비율을 함께 낸다. "
+       "숙달 전파보다 *먼저* 돌고 session.add·commit 0건(관측이지 상태가 아니다). 계약 자체는 "
+       "schema/assessment_evidence.py가 소유",
+       "l2.assessment_evidence"),
+    _e("WM-E-211", "추천 호출 계약·추천 근거 조립(Recommendation + 필수 Reason)", "Student",
+       "Recommendation", "P1",
+       "EOS-14 — 계획서 300 §8. `recommend(learner_state, context)` 시그니처와 필수 "
+       "`RecommendationReason`(구간·basis 3상태)을 정본화하고, 이미 선택된 문항에 근거를 "
+       "붙인다. 선택 알고리즘은 WM-E-205·WM-E-202 좌석이 유일 권위이고 이 행은 선택 *뒤에* "
+       "돌아 결과를 바꾸지 않는다(session.add·commit 0건)",
+       "l2.recommendation_contract", "l2.recommendation_reason"),
+    # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
+    # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
+    # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
+    # 전이표 계약 자체는 schema/learning_state.py가 소유한다.
+    # 번호 주의: 초판은 WM-E-211이었으나 EOS-14(PR #1190)가 같은 번호를 먼저 썼다 — 머지
+    # 큐가 이 PR을 MERGE_CONFLICT로 뱉어내며 드러났다(WM-S-051 선례의 2회차이고, 이번엔
+    # 텍스트 충돌로 보였다). 212는 원격 브랜치 41개 전수 스캔에서 미사용 확인.
+    _e("WM-E-212", "학습 상태 머신(전이표 판정·정책 결정·전이 원장 적재)", "Student",
+       "Learning Model", "P1",
+       "EOS-105 — 계획서 300 §3. 허용 전이를 데이터(frozenset)로 선언하고 미정의 전이를 "
+       "예외로 거부한다. 현재 상태는 저장하지 않고 append-only 원장 최신 행에서 파생하므로 "
+       "*MasteryHistory와 진실 원천이 겹치지 않는다(ADR-006). 정책은 교체 가능한 Protocol이고 "
+       "v1 규칙 6종은 if/else다",
+       "l2.learning_state_machine", "l2.learning_state_policy", "l2.learning_state_evidence"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",
        "l3.generation_seed"),
-    _e("WM-E-302", "LLM 제공자(Ollama·Anthropic·복합)", "Platform", "AI Orchestration", "P0",
-       "A5 — 로컬 우선", "l3.providers"),
+    _e("WM-E-302", "LLM 제공자(Ollama·Anthropic·DeepSeek·OpenRouter·복합)", "Platform",
+       "AI Orchestration", "P0",
+       "A5 — 로컬 우선. DeepSeek 2경로는 ARCH-49 배선이며 채택은 미판정(ARCH-55 실측 대기)",
+       "l3.providers"),
     _e("WM-E-303", "생성 파이프라인·Redis 캐시·Langfuse 관측", "Platform", "AI Orchestration",
        "P0", "C1 사슬 골격 — 캐싱·추적 불변 계약", "l3.pipeline", "l3.cache", "l3.interfaces",
        "l3.trace"),
     _e("WM-E-304", "QUALITY 티어 비동기 큐(Celery)", "Platform", "AI Orchestration", "P1",
        "OPS-27 워커 미배포 — 202 영구 pending", "l3.queue"),
-    _e("WM-E-305", "데이터 등급 → 국외 반출 게이트", "Platform", "Security", "P0",
-       "EOS-59 — AI Hub 반출 무해화(선언 §6-3)", "l3.data_export_policy",
-       "l3.data_grade_defaults"),
+    _e("WM-E-305", "데이터 등급 → 국외 반출 게이트 + 프로바이더 관할 축", "Platform",
+       "Security", "P0",
+       "EOS-59 — AI Hub 반출 무해화(선언 §6-3) · ARCH-49 — 관할별 허용 등급(CN 합성 프로브 한정)",
+       "l3.data_export_policy", "l3.data_grade_defaults", "l3.provider_jurisdiction"),
     _e("WM-E-306", "빌드타임 캐시 사전생성(pre-warm)·시드 검증", "Admin", "AI Orchestration",
        "P1", "S1 비용 게이트 재료", "l3.pregenerate", status="Batch"),
     _e("WM-E-307", "DSL 콘텐츠 생성기(컴파일·검증·복구·변수 엔진)", "Admin", "Content", "P0",
@@ -754,8 +823,11 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability", status="Production"),
-    _o("WM-O-904", "LLM 비용 프로브·비용 리포트", "Admin", "Analytics", "P0",
-       "단위비용 KPI(≤250원) 판독기", "ops.cost_probe", "ops.cost_report"),
+    _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
+       "P0",
+       "단위비용 KPI(≤250원) 판독기 · ARCH-49 프로바이더 경로 실측(라우터 경유·ARCH-55 입력)",
+       "ops.cost_probe", "ops.cost_report", "harness.deepseek_live_probe",
+       "harness.openrouter_endpoints_probe"),
     _o("WM-O-905", "12월 검증 스코어카드·QA 혼동행렬·HIT/CU 계측", "Admin", "QA", "P0",
        "EOS-54/60/61 — Go/No-Go 판정기", "ops.validation_scorecard",
        "ops.qa_confusion_matrix", "ops.hit_cu_metrics",

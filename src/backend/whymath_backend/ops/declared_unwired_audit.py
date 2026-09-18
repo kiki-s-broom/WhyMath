@@ -937,6 +937,14 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "by-design:api/me.py list_my_skill_mastery — Phase 2b-2로 명시된 신규 축, 개념 축 "
             "/v1/me/mastery는 이미 클라·테스트가 호출한다(reached) — 스킬 축 화면만 후속"
         ),
+        # LearnerState 단일 조회 표면(EOS-10·2026-09-16 신설) — 계획서 300 §12의 유일 미대응 축.
+        # **by-design이 아니라 pending-task다**: 소비자가 없는 것이 설계 의도인 위 항목들과 달리,
+        # 이 표면은 *학생 앱이 부르라고* 만들었다. 현재 앱은 조각 3개(/v1/me/mastery/current·
+        # /v1/me/ability·/v1/me/diagnosis/summary)를 각각 불러 화면에서 합치며, 그 합성 규칙을
+        # 서버로 옮기는 것이 이 표면의 존재 이유다. 소비 배선은 MOB-22가 소유하고, 그 태스크의
+        # acceptance ②가 **완료 시 이 선언을 걷는 것**을 명시한다(유예는 자동 해제되지 않는다).
+        # 그랜드파더 만료 계약상 MOB-22가 done이 되면 이 항목은 expired-waiver로 exit 1이 된다.
+        "GET /v1/me/learner-state": ("pending-task:MOB-22-learner-state-client-consumption"),
         # 성장 증거 노출 계약 유일 경로(구 PED-15 유예) — 2026-08-10 유예 해제.
         # 정직 표기: PED-15의 전제("부르는 테스트 0건")는 **실측상 사실이 아니었다** —
         # `test_me_growth_evidence.py`가 처음부터 TestClient로 이 라우트를 때리고 있었고,
@@ -1088,6 +1096,15 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
         "harness.residue_cross_verify_eval": _LIVE_DEPENDENT,
+        # ARCH-49 — DeepSeek/OpenRouter 라이브 프로브. CI에서 원리적으로 못 도는 것이
+        # *실측*됐다(2026-09-17 개발 컨테이너: 키 부재 + egress 프록시가
+        # api.deepseek.com·openrouter.ai에 CONNECT 403). 이 CLI를 실제로 돌려 3축을
+        # 비교하는 것은 `ARCH-55-deepseek-live-battle-measurement`가 소유하며, 그
+        # 실행처는 CI가 아니라 키가 있는 Phaiakes9다.
+        "harness.deepseek_live_probe": _LIVE_DEPENDENT,
+        # ARCH-49 ⑨ — OpenRouter 엔드포인트 조회(공급사 slug·양자화·단가). 위와 같은 이유로
+        # CI에서 못 돈다(키 + `openrouter.ai` egress). 목록을 넓히는 판정은 `ARCH-55`.
+        "harness.openrouter_endpoints_probe": _LIVE_DEPENDENT,
         # EOS-54(2026-08-30): HIT·CU 생산 계측 판독기 — 검수 타이머 *실이벤트*(JSONL) 의존.
         # 계측 표본이 쌓이기 전에는 입력 0 = 측정 실패(exit 1)가 설계값(미측정≠0 승격)이라 CI
         # 상시 배선 비대상 — G2(10/25) 기준선·G5 판정 시점에 운영자가 돌린다(answer_distribution_
