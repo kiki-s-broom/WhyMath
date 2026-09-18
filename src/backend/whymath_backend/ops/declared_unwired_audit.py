@@ -937,14 +937,15 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "by-design:api/me.py list_my_skill_mastery — Phase 2b-2로 명시된 신규 축, 개념 축 "
             "/v1/me/mastery는 이미 클라·테스트가 호출한다(reached) — 스킬 축 화면만 후속"
         ),
-        # LearnerState 단일 조회 표면(EOS-10·2026-09-16 신설) — 계획서 300 §12의 유일 미대응 축.
-        # **by-design이 아니라 pending-task다**: 소비자가 없는 것이 설계 의도인 위 항목들과 달리,
-        # 이 표면은 *학생 앱이 부르라고* 만들었다. 현재 앱은 조각 3개(/v1/me/mastery/current·
-        # /v1/me/ability·/v1/me/diagnosis/summary)를 각각 불러 화면에서 합치며, 그 합성 규칙을
-        # 서버로 옮기는 것이 이 표면의 존재 이유다. 소비 배선은 MOB-22가 소유하고, 그 태스크의
-        # acceptance ②가 **완료 시 이 선언을 걷는 것**을 명시한다(유예는 자동 해제되지 않는다).
-        # 그랜드파더 만료 계약상 MOB-22가 done이 되면 이 항목은 expired-waiver로 exit 1이 된다.
-        "GET /v1/me/learner-state": ("pending-task:MOB-22-learner-state-client-consumption"),
+        # LearnerState 단일 조회 표면(EOS-10·2026-09-16 신설) — 구 MOB-22 유예. 2026-09-18 유예 해제.
+        # `tests/backend/api/test_week2_gate_wrong_answer_propagation.py`(EOS-110 · Week 2 Gate 판정
+        # 하네스)가 오답 전후 스냅샷을 이 라우트로 찍으므로 리터럴 호출로 reached가 됐다. 도달했으므로
+        # 유예를 남기면 `stale-waiver`로 exit 1이다 — 위 MOB-12·MOB-18·PED-15 해제와 같은 대응이다.
+        #
+        # **정직한 잔여**: 이 축의 `reached`는 "dart 클라 호출 ∪ 백엔드 테스트 호출"이므로, reached는
+        # *판정 하네스가 관통한다*는 뜻이지 *학생 앱이 쓴다*는 뜻이 아니다. **모바일 소비는 여전히
+        # 0건**이고 그 배선은 `MOB-22`가 계속 소유한다 — 다만 그 태스크의 acceptance ②("완료 시 이
+        # 선언을 걷는다")는 이 해제로 **이미 충족**됐으니, MOB-22 완료 시 다시 걷을 항목은 없다.
         # 성장 증거 노출 계약 유일 경로(구 PED-15 유예) — 2026-08-10 유예 해제.
         # 정직 표기: PED-15의 전제("부르는 테스트 0건")는 **실측상 사실이 아니었다** —
         # `test_me_growth_evidence.py`가 처음부터 TestClient로 이 라우트를 때리고 있었고,
