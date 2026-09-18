@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/privacy/erasure.py
   - tests/backend/privacy/test_erasure_plan_completeness.py
-session: null
+session: claude/exciting-allen-5dkjb0
 notes: "발견 경위: 2026-09-17 EOS-105(학습 상태 머신) 브랜치에 main(EOS-103 PR #1185)을 병합하던 중, 내 `learning_state_transition`은 `_ERASURE_PLAN`에 넣었는데 같은 병합으로 들어온 `learner_state`는 어디에도 없다는 것을 발견했다. 전체 privacy 스위트 117건이 GREEN이었다 — 가드가 통과한 이유는 소유 컬럼명이 `learner_id`라 `OWNER_COLUMN_NAMES` 3종 열거에 안 걸리기 때문이다(가드가 관대한 게 아니라 이 자리를 아예 안 본다).\n\n범위 규율에 따라 EOS-105 세션에서 고치지 않고 등재만 한다 — 남의 태스크(EOS-103)가 만든 표면이고, \"김에 같이\" 고치면 이 PR의 판정 범위가 흐려진다.\n\n실측 근거(main 6d1d9d10 기준):\n- `grep -rn \"learner_state\" src/backend/whymath_backend/privacy/` → 0건\n- `Base.metadata.tables[\"learner_state\"]` 컬럼: learner_id(PK) · curriculum_id · current_objective_id · provisioned_at · provisioned_by · updated_at · revision\n- `db/models/learner_state.py:68` → `sa.ForeignKey(\"user_profile.user_id\")` · ondelete 지정 없음"
-updated: 2026-09-17
+updated: 2026-09-18

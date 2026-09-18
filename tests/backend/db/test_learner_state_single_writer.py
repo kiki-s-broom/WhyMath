@@ -133,6 +133,16 @@ def test_writer_module_is_the_only_one_importing_the_orm_for_writes() -> None:
     allowed = {
         Path("src/backend/whymath_backend/l2/learner_state_store.py"),
         Path("src/backend/whymath_backend/db/models/__init__.py"),
+        # SEC-35 사람 판정(2026-09-18) — GDPR 삭제권 오케스트레이터. **쓰기가 아니라 파기**다:
+        # `_ERASURE_PLAN`이 (모델, 소유 컬럼) 튜플이라 `delete(model).where(...)`를 구성하려면
+        # ORM 클래스 자체가 필요하고, 읽기 계약(`PersistedLearnerState`)으로는 대체되지 않는다
+        # (지울 대상은 값이 아니라 행이다). 이 모듈이 상태를 *만들거나 고치지* 않는다는 것은
+        # 위 `test_no_writes_outside_writer_module`이 같은 AST 스캔으로 계속 강제한다 —
+        # 생성·컬럼 대입이 들어오는 순간 그쪽이 red가 되므로 이 면제가 그 축을 열어 주지 않는다.
+        # 계획에서 빼는 대안은 채택하지 않았다: learner_state.learner_id가 user_profile을
+        # NO ACTION FK로 물고 있어 명시 삭제가 없으면 삭제권 요청 자체가 전면 실패한다
+        # (`tests/backend/privacy/test_erasure_learner_state_integration.py` 실 PG 실측).
+        Path("src/backend/whymath_backend/privacy/erasure.py"),
     }
     importers: set[Path] = set()
     for path in _python_sources():
