@@ -56,20 +56,43 @@ def model_name_for_decision(
     *,
     settings: Settings | None = None,
 ) -> str:
-    """라우터 결정 → *실제 호출될* 모델 ID 문자열 (GenerationLog.model_name 좌석용).
+    """라우터 결정 → 이 설정에서 *호출 대상이 되는* 모델 ID (GenerationLog.model_name 좌석용).
 
-    LOCAL은 라우터 매트릭스 해석(`resolve_model` — 예 'qwen2.5:7b'), CLOUD_MID/HIGH는
-    Anthropic provider의 모델 해석과 동일한 설정 좌석(`anthropic_model_mid/high` — 예
-    'claude-sonnet-4-6')을 읽는다(`l3/providers/anthropic.py` §해석과 단일 근거). 이
-    함수는 이름만 해석한다 — 호출 자체·검증 계약과 무관한 순수 조회다.
+    LOCAL은 라우터 매트릭스 해석(`resolve_model` — 예 'qwen2.5:7b'). CLOUD_MID/HIGH는
+    **클라우드 좌석 셀렉터(`settings.cloud_provider`)가 지목한 제공자의 모델 핀**을 읽는다 —
+    그 제공자를 실제로 만드는 `l3/providers/factory.build_cloud_provider()`와 같은 설정을
+    보므로 둘이 갈라지지 않는다.
+
+    **선언값이지 관측값이 아니다**(ARCH-58): 이 함수는 설정을 읽어 "이 구성이면 무엇이
+    불릴 것인가"를 답한다. 응답이 실제로 어느 모델에서 왔는지(provider가 돌려준 model id)를
+    싣는 축은 `EOS-111`이 소유한다. 그래서 docstring이 "실제 호출된"이라고 단정하지 않는다 —
+    설정과 실제가 어긋나는 경로(폴백·프록시 라우팅)를 이 함수는 볼 수 없다.
+
+    **회귀 이력**: 종전 판은 CLOUD_*에서 `anthropic_model_mid/high`를 **무조건** 읽었다.
+    클라우드 슬롯이 항상 Anthropic이던 시절에는 참이었으나 `ARCH-57`이 셀렉터를 도입하며
+    그 전제가 깨졌고, 그 사이 OpenRouter 좌석으로 돈 회차의 genlog가 `claude-sonnet-4-6`을
+    적었다(2026-09-18 실측 · Phaiakes9 라이브 1회차). 출처 로그가 조용히 틀린 값을 적는
+    상태였고 — 없는 기록보다 나쁘다, 읽는 사람이 믿기 때문이다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     if cost is CostTier.LOCAL:
         return resolve_model(decision.local_family, decision.local_model)
     resolved = settings if settings is not None else get_settings()
-    if cost is CostTier.CLOUD_MID:
-        return resolved.anthropic_model_mid
-    return resolved.anthropic_model_high
+    seat = resolved.cloud_provider
+    if seat == "openrouter":
+        mid, high = resolved.openrouter_model_mid, resolved.openrouter_model_high
+    elif seat == "deepseek":
+        mid, high = resolved.deepseek_model_mid, resolved.deepseek_model_high
+    elif seat == "anthropic":
+        mid, high = resolved.anthropic_model_mid, resolved.anthropic_model_high
+    else:
+        # Literal에 값이 늘었는데 여기 분기를 안 붙인 경우. anthropic으로 접지 않는다 —
+        # 그러면 출처 로그가 또 조용히 틀린 값을 적는다(이 태스크가 상환한 바로 그 형태).
+        raise ValueError(
+            f"알 수 없는 cloud_provider: {seat!r} — model_name_for_decision에 분기를 "
+            "추가하라(build_cloud_provider와 같은 셀렉터를 읽는다)."
+        )
+    return mid if cost is CostTier.CLOUD_MID else high
 
 
 def actual_cost_usd_or_none(decision: RoutingDecision, usage: Usage | None) -> float | None:
