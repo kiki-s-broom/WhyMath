@@ -393,8 +393,7 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             )
             # 상태 전파의 증거: 방금 시도한 문항이 후보에서 빠진다(미시도 필터가 attempt를 본다).
             assert nxt_body["problem_id"] != target_pid, (
-                f"시도한 문항이 다시 추천됐다 — 미시도 필터가 5단계의 attempt를 보지 못했다: "
-                f"{nxt_body['problem_id']}"
+                f"시도한 문항이 다시 추천됐다 — 미시도 필터가 5단계의 attempt를 보지 못했다: " f"{nxt_body['problem_id']}"
             )
             # 표준오차는 채점 이력이 생겨야 산출된다(콜드스타트엔 null) — 추천이 *갱신된*
             # 학습자 상태를 읽었다는 두 번째 신호다.
@@ -463,8 +462,7 @@ def test_mastery_step_assertion_is_discriminating() -> None:
             snapshot = client.get("/v1/me/mastery/current", headers=auth)
             assert snapshot.status_code == 200, snapshot.text
             assert snapshot.json() == [], (
-                "책임귀속 개념이 없는데 숙달 스냅샷이 생겼다 — 6단계 조회측 단언도 변별력이 "
-                f"없다: {snapshot.json()}"
+                "책임귀속 개념이 없는데 숙달 스냅샷이 생겼다 — 6단계 조회측 단언도 변별력이 " f"없다: {snapshot.json()}"
             )
             _erase_learner(client)
 
