@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,10 +14,11 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 핸들러가 LearnerState를 **입력으로 받는다** — 현행 `recommend_next_problem`은 `user_id` + 쿼리 파라미터로 θ·숙달·약점을 핸들러 안에서 재계산한다. `EOS-10`이 세운 단일 조회 표면(`l2/learner_state.py`)을 읽어 `RecommendationPolicy.__call__(learner_state, learning_context)` 형태로 넘긴다.\n② `LearningContext`가 실제로 조립된다 — 현재 `l2/recommendation_contract.LearningContext`는 **구현체 0건**(EOS-14가 시그니처만 세우고 닫았다). 핸들러의 `mode`·`persona`·`purpose`·`prioritize_weak_concepts`를 이 타입으로 옮긴다.\n③ `Recommendation`이 반환 타입이 된다 — 현행은 `NextProblemResponse`가 곧 선택 결과다. 정책 함수가 `Recommendation(problem_id, reason, policy_version)`을 돌려주고 핸들러는 그것을 HTTP 응답으로 **옮기기만** 한다(선택 로직이 핸들러에서 빠진다).\n④ 회귀 0 — 전환 전후 같은 입력에서 같은 문항이 나온다. EOS-14가 남긴 `TestNextProblemReason::test_reason_does_not_change_the_selected_problem`과 같은 형태의 대조를 전환 뒤에도 유지한다.\n⑤ EOS-14가 남긴 Protocol 동결 테스트(`TestPolicyProtocolShape`)가 이 구현을 실제로 제약하는지 확인한다 — 구현체가 생기는 시점이 그 동결의 첫 소비처다."
-artifacts: []
+artifacts:
+  - "PR #1204 · https://github.com/kiki-s-broom/WhyMath/pull/1204 · e5d80a8e"
 paths:
   - src/backend/whymath_backend/api/me.py
   - src/backend/whymath_backend/l2/recommendation_contract.py
-session: claude/epic-faraday-dz38gd
+session: null
 notes: "출처: EOS-14(추천 호출 계약 분리) acceptance ① 중 **미이행분**의 승계. EOS-14는 Kiki 지시 범위(\"근거 배선까지\")에 따라 계약 타입 + reason 산출·응답 노출·영속까지 집행하고, 핸들러의 learner_state 입력 전환은 의도적으로 열어 뒀다(선택 알고리즘 무변경 = 결과 불변의 구조적 보장을 유지하기 위함).\n\n정직 표기(판정 기준 main 27df076e + EOS-14 브랜치): `RecommendationPolicy`·`LearningContext`·`Recommendation` 세 타입은 EOS-14 착지 시점에 **소비처 0건**이다. reason 축만 배선됐다. 이 태스크가 그 셋의 첫 소비처다.\n\n선행: EOS-14 착지 후 착수(대장 depends_on으로 집행 — 산문 아님)."
 updated: 2026-09-18
