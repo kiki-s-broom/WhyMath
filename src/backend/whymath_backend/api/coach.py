@@ -1166,8 +1166,15 @@ async def _complete_problem(
         observed_at=received_at,
     )
     # 숙달 전파(개념·스킬 축) — 서버 판정 is_correct=True. 매핑 없으면 빈 리스트(graceful).
-    await record_problem_attempt_mastery(session, user_id, problem_id, True)
-    skill_records = await record_problem_attempt_skill_mastery(session, user_id, problem_id, True)
+    # EOS-108: `attempt_id`가 멱등 키다. 이 경로는 코치 대화 완료 시 attempt를 새로 만들므로
+    # 정상 흐름에서 중복이 나기 어렵지만, 그 "어렵다"는 **호출 순서에 대한 가정**이지 보장이
+    # 아니다 — 두 채점 경로가 같은 보호를 받아야 한 쪽만 왜곡되는 일이 없다.
+    await record_problem_attempt_mastery(
+        session, user_id, problem_id, True, attempt_id=attempt.attempt_id
+    )
+    skill_records = await record_problem_attempt_skill_mastery(
+        session, user_id, problem_id, True, attempt_id=attempt.attempt_id
+    )
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속 — submit_attempt와 *같은 writer*
     # (중복 구현 0). `source`가 두 채점 경로를 가르므로 기록률 리포트가 경로별 분모로 본다.
     await record_attempt_skill_event(

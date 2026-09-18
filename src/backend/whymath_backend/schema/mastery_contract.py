@@ -20,24 +20,30 @@ import-linter 7계층 계약에서 `schema`는 최하위(어느 계층도 import
 ③ `MasteryUpdate` — 갱신 산출. *어느 추정기가 실제로 작동했는지*(`estimator_id`)를 함께 낸다
    (CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").
 ④ `MasteryEstimator` — 추정기 교체 가능성을 **주석이 아니라 타입으로** 표현하는 Protocol.
+⑤ `clamp_unit` — 0~1 경계 강제(EOS-108). 추정기를 **신뢰하지 않는다**: 갈아 끼울 수 있게
+   만든 순간, 범위를 지키지 않는 구현이 들어올 수 있는 표면이 생겼다.
+⑥ `HintUsageSignal`·`hint_used_of` — 힌트 사용 여부의 **선택적** 3상태 축(EOS-108). 계획서
+   §6 v1 규칙의 "힌트 사용 → 이득 x0.7"이 읽는 자리이며, `None`은 "안 썼다"가 아니라 "모른다"다.
 
 이 모듈이 **하지 않는 것** (있는 척 금지)
 -----------------------------------------
-- **`AssessmentEvidence` 구체 타입을 정의하지 않는다.** 그 좌석은 `EOS-12`가 소유하며 아직
-  착지하지 않았다. 여기 있는 것은 *구조적 입력 계약*(Protocol)뿐이고, 필드를 늘리지 않는다 —
-  두 번째 진실 원천을 만들지 않기 위해서다. **`EOS-12`가 착지하면 그 `AssessmentEvidence`가
-  이 Protocol을 만족해야 한다**(`correct: bool` · `observed_at: datetime` 두 속성).
-  이름은 2026-09-16 Kiki 판정(A안)으로 확정된 `AssessmentEvidence`이며, 저장소 정본
-  `schema/assessment.py::Assessment`(진단 세션)와는 **다른 객체**다
-  (`learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석 참조).
+- **`AssessmentEvidence` 구체 타입을 정의하지 않는다.** 그 좌석은 `EOS-12`가 소유한다(2026-09-16
+  착지). 여기 있는 것은 *구조적 입력 계약*(Protocol)뿐이며, **그 타입이 이미 가진 속성만**
+  읽는다(`correct` · `observed_at` · `attempt_id` 세 속성). 이름은 2026-09-16 Kiki 판정(A안)으로
+  확정된 `AssessmentEvidence`이며, 저장소 정본 `schema/assessment.py::Assessment`(진단 세션)와는
+  **다른 객체**다 (`learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석 참조).
 - **신규 DB 테이블·좌석을 만들지 않는다.** 숙달 좌석은 `concept_mastery_history`·
-  `skill_mastery_history`(ARCH-37 `MasteryState`) 그대로다. 여기서 고정하는 것은 *호출 어휘*다.
-- **숙달 수치를 바꾸지 않는다.** 계약 경유 전후로 같은 값이 나오는지는
-  `tests/backend/l2/test_mastery_contract.py`의 행동 동결 축이 대조한다.
+  `skill_mastery_history`(ARCH-37 `MasteryState`) 그대로다. EOS-108은 그 두 테이블에 멱등 키
+  컬럼 1개(`attempt_id`)를 더할 뿐 **좌석을 늘리지 않는다**(엔티티 동결 불변).
+- **기본 추정기의 숙달 수치를 바꾸지 않는다.** EOS-108이 계획서 §6의 가산 규칙을 두 번째
+  추정기(`simple-additive-v1`)로 정본화했지만 **기본값은 `bkt-v1` 그대로**다 — 기본을 바꾸는
+  것은 리팩터가 아니라 전 학생에게 적용되는 정책 변경이며, 측정 없이 할 일이 아니다
+  (`docs/architecture/mastery_update_contract_v1.md` §추정기 처분).
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,11 +61,16 @@ __all__ = [
     "CONTRACT_RELATION",
     "MASTERY_AXIS_LOOP_OBJECT",
     "AssessmentEvidenceInput",
+    "HintUsageSignal",
+    "StreakSignal",
     "LearnerMasteryState",
     "MasteryAxis",
     "MasteryContractError",
     "MasteryEstimator",
     "MasteryUpdate",
+    "clamp_unit",
+    "consecutive_correct_of",
+    "hint_used_of",
 ]
 
 #: 이 계약이 집행하는 루프 관계 — `AssessmentEvidence --updates--> LearnerState`.
@@ -159,10 +170,22 @@ class LearnerMasteryState:
 class AssessmentEvidenceInput(Protocol):
     """이 계약이 **실제로 읽는** 증거 속성만 담은 구조적 입력(nominal 상속 불요).
 
-    **필드를 늘리지 마라.** 구체 타입 `AssessmentEvidence`의 좌석은 `EOS-12`가 소유한다
-    (이 모듈 docstring "하지 않는 것" 참조). 여기에 속성을 추가하는 순간 evidence의 두 번째
-    진실 원천이 생기고, `EOS-12`가 착지할 때 두 정의를 맞추는 비용이 발생한다. 반대로 계약이
-    새 속성을 *정말* 읽어야 하게 되면 그때 `EOS-12`의 타입과 함께 한 번에 넓힌다.
+    **필드를 함부로 늘리지 마라.** 구체 타입 `AssessmentEvidence`의 좌석은 `EOS-12`가 소유한다.
+    여기에 속성을 추가하는 순간 evidence의 두 번째 진실 원천이 생긴다. 넓혀도 되는 유일한
+    조건은 **`EOS-12`의 `AssessmentEvidence`가 이미 그 속성을 가지고 있는 것**이다 — 그때는
+    두 정의가 갈라지는 것이 아니라 계약이 이미 있는 사실을 읽기 시작하는 것뿐이다.
+
+    `attempt_id` 편입 근거 (EOS-108 · 2026-09-18)
+    ---------------------------------------------
+    `EOS-12`가 착지하면서 `AssessmentEvidence.attempt_id: uuid.UUID | None`이 실재하게 됐다.
+    그것을 계약이 읽지 않으면 **같은 시도가 두 번 반영돼도 알 방법이 없다** — 숙달 갱신은
+    관측 1건당 정확히 1회여야 하고(KPI 2 State Integrity), 그 "1건"의 동일성을 말해 주는
+    것은 시도 식별자뿐이다. 즉 이 속성은 값을 계산하는 입력이 아니라 **멱등 키**다.
+
+    `None`을 허용하는 이유: 시도에서 유래하지 않은 관측(진단 세션 배치·백필)이 실재하고,
+    그것을 가짜 UUID로 채우면 서로 다른 관측이 같은 시도인 척하게 된다. `None`은 "이 관측에는
+    시도 식별자가 없다"는 사실이며, 그런 관측은 멱등 보호를 받지 않는다(아래
+    `l2/mastery_tracking`의 적재 규약이 그 사실을 숨기지 않고 기록한다).
 
     읽기 전용 property로 선언한 이유: 그래야 frozen dataclass·Pydantic 모델·평범한 속성 어느
     쪽으로 구현해도 구조적으로 만족한다(가변 속성으로 선언하면 읽기 전용 구현이 탈락한다).
@@ -175,6 +198,89 @@ class AssessmentEvidenceInput(Protocol):
     @property
     def observed_at(self) -> datetime:
         """관측 시각(= 새 측정의 `measured_at`). 경과일 계산의 종점."""
+
+    @property
+    def attempt_id(self) -> uuid.UUID | None:
+        """이 관측을 낳은 시도의 식별자 — **멱등 키**. 시도 유래가 아니면 None."""
+
+
+@runtime_checkable
+class HintUsageSignal(Protocol):
+    """힌트 사용 여부를 **선택적으로** 싣는 증거 — `AssessmentEvidenceInput`의 확장 축.
+
+    왜 본 Protocol이 아니라 별도인가: `EOS-12`의 `AssessmentEvidence`에는 `hint_used`가
+    **아직 없다**. 본 Protocol에 넣으면 그 타입이 계약을 만족하지 못하게 되어, 임시 어댑터를
+    폐기하려는 `EOS-18`의 길을 이 태스크가 막는다. 그래서 *가진 증거만 만족하는* 좁은
+    Protocol로 분리하고, 소비자는 `hint_used_of()`로 3상태를 받는다.
+
+    계획서 300 §6의 v1 규칙 중 "힌트 사용 → 이득 x0.7"이 읽는 유일한 축이다.
+    """
+
+    @property
+    def hint_used(self) -> bool | None:
+        """이 관측에서 힌트를 썼는가. **`None`은 "모른다"**(안 썼다가 아니다)."""
+
+
+def hint_used_of(assessment_evidence: object) -> bool | None:
+    """증거에서 힌트 사용 여부를 3상태로 읽는다 — True / False / **None=미측정**.
+
+    `None`을 `False`로 접지 않는다(CLAUDE.md "모른다 ≠ 아니다" — 3상태를 truthiness로
+    2상태로 접으면 *모르는* 데이터로 확정 신호를 낸다). 힌트 축을 읽는 추정기는 `None`을
+    받았을 때 감액을 적용하지 **않되**, 적용하지 않은 이유가 "힌트를 안 썼기 때문"이 아니라
+    "모르기 때문"임을 자기 산출에 남겨야 한다.
+    """
+    if not isinstance(assessment_evidence, HintUsageSignal):
+        return None
+    value = assessment_evidence.hint_used
+    return None if value is None else bool(value)
+
+
+@runtime_checkable
+class StreakSignal(Protocol):
+    """연속 정답 횟수를 **선택적으로** 싣는 증거 — 계획서 §6 "연속 정답 → confidence 증가"의 입력.
+
+    `HintUsageSignal`과 같은 이유로 본 Protocol에서 분리했다(`EOS-12`의 `AssessmentEvidence`가
+    아직 이 축을 갖지 않는다). 세는 것은 **이번 관측을 포함하지 않은 직전까지의 연속 정답**이다
+    — 이번 관측의 정오답은 `correct`가 이미 말하므로 두 번 세면 규칙이 한 칸씩 밀린다.
+    """
+
+    @property
+    def consecutive_correct(self) -> int | None:
+        """직전까지의 연속 정답 횟수. **`None`은 "모른다"**(0회가 아니다)."""
+
+
+def consecutive_correct_of(assessment_evidence: object) -> int | None:
+    """증거에서 연속 정답 횟수를 3상태로 읽는다 — 값 / 0 / **None=미측정**.
+
+    `hint_used_of`와 같은 규율이다: `None`을 0으로 접지 않는다. 음수는 계약 위반이므로
+    `None`으로 떨어뜨리지 않고 **예외**로 드러낸다(조용한 정정은 관측을 날조한다).
+    """
+    if not isinstance(assessment_evidence, StreakSignal):
+        return None
+    value = assessment_evidence.consecutive_correct
+    if value is None:
+        return None
+    if value < 0:
+        raise MasteryContractError(f"consecutive_correct는 음수일 수 없습니다(받음: {value}).")
+    return int(value)
+
+
+def clamp_unit(value: float) -> float:
+    """0.0~1.0 단위구간 클램프 — 숙달·신뢰도가 학습자 상태에 들어가기 전 마지막 관문.
+
+    **왜 예외가 아니라 클램프인가**: 범위를 벗어난 산출은 추정기의 결함이지 학생의 사실이
+    아니다. 여기서 예외를 던지면 결함 있는 추정기 하나가 *채점 자체를 실패시켜* 학생의 학습을
+    멈춘다(의사결정 우선순위 1 "학생 안전·웰빙"이 6 "개발 편의"보다 앞선다). 그래서 값은
+    자르되, **자른 사실은 절대 잃지 않는다** — `MasteryUpdate.bounds_clamped`가 그것을 싣고
+    호출 계약이 경고 로그를 남긴다(침묵 실패 금지).
+
+    NaN은 클램프할 수 없다 — 비교가 전부 False라 조용히 통과한다. 그래서 여기서만 예외다.
+    """
+    if value != value:  # NaN — 자기 자신과 같지 않은 유일한 float
+        raise MasteryContractError(
+            "숙달·신뢰도 값이 NaN입니다 — 클램프로 구제할 수 없는 산출입니다(추정기 결함)."
+        )
+    return 0.0 if value < 0.0 else 1.0 if value > 1.0 else value
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +296,13 @@ class MasteryUpdate:
     - `estimator_id`: **어느 추정기가 실제로 작동했는가.** 알고리즘을 갈아 끼울 수 있게 만든
       이상, 산출이 자기 출처를 말하지 않으면 "무엇이 돌았는지 모르는 상태"가 된다
       (CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").
+
+    EOS-108이 더한 2필드 — 둘 다 *사실을 잃지 않기 위한* 것이다:
+    - `attempt_id`: 이 갱신을 낳은 시도(멱등 키). 적재 좌석의 같은 이름 컬럼에 그대로 간다.
+      `None`이면 시도 유래가 아니며 **멱등 보호를 받지 않는다**(그 사실이 값으로 남는다).
+    - `bounds_clamped`: 추정기 산출이 0~1을 벗어나 계약이 **잘랐는가**. 자른 값만 남기고 자른
+      사실을 버리면, 결함 있는 추정기가 정상 추정기와 구별되지 않는다(위장). 기본 False이며
+      True는 언제나 추정기 결함의 신고다.
     """
 
     axis: MasteryAxis
@@ -200,6 +313,8 @@ class MasteryUpdate:
     prior_mastery: float | None
     elapsed_days: float | None
     estimator_id: str
+    attempt_id: uuid.UUID | None = None
+    bounds_clamped: bool = False
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.mastery <= 1.0:

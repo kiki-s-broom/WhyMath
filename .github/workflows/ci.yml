@@ -1020,6 +1020,14 @@ jobs:
       - name: 게이트 — 런북 쓰기 블록 자가거부 가드 (HARN-106)
         run: python3 scripts/ops/check_runbook_blocks.py
 
+      # EOS-108 — 숙달 단일 쓰기 경로 AST 전수 스캔. 이 잡에 붙이는 이유: 스캐너가 stdlib만
+      # 쓰고 백엔드 소스를 *텍스트로* 읽으므로 백엔드 설치가 불요하며, 이 잡은 `needs: changes`
+      # 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — 우회 경로는 정확히 "숙달과 무관해 보이는"
+      # PR에서 생긴다. 변별력은 `tests/infra/test_mastery_single_write_path.py`의 결함 주입
+      # 9종이 봉인한다(위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 숙달 단일 쓰기 경로 (EOS-108)
+        run: python3 scripts/analysis/mastery_write_path_scan.py
+
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q
 

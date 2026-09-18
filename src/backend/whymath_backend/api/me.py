@@ -1001,13 +1001,24 @@ async def submit_attempt(
         observed_at=received_at,
     )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
+    # EOS-108: `attempt_id`를 넘겨 **이 시도가 정확히 한 번만 반영**되게 한다. 이 인자가 없으면
+    # 재시도·재처리가 같은 학생의 같은 개념에 두 번째 측정을 찍어 학습 곡선을 왜곡한다
+    # (KPI 2 State Integrity). 권위는 DB 부분 유니크 인덱스이고 이 인자는 그 키다.
     records = await record_problem_attempt_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
+        session,
+        user.user_id,
+        body.problem_id,
+        body.is_correct,
+        attempt_id=attempt.attempt_id,
     )
     # 스킬 숙달 전파(Phase 2b-2·행동 축) — 같은 모델 B로 concept→skill 해소 후 스킬별 측정 적재.
     # 개념 전파와 독립 트랜잭션(자체 단일 commit)·concept→skill 매핑/해소 없으면 빈 리스트.
     skill_records = await record_problem_attempt_skill_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
+        session,
+        user.user_id,
+        body.problem_id,
+        body.is_correct,
+        attempt_id=attempt.attempt_id,
     )
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속(소급 불가 축 — W2 스키마 ①).
     # 숙달 전파는 "스킬 값이 언제 변했는가"만 남기고 "이 시도가 어떤 스킬을 건드렸는가"는 남기지

@@ -29,12 +29,14 @@ DB 래퍼만 새로 둔다. 채점 attempt가 평가하는 개념을 concept→s
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.assessment import SkillMasteryHistory
@@ -56,6 +58,8 @@ from whymath_backend.l2.mastery_contract import (
 from whymath_backend.l2.mastery_tracking import _assessed_concept_ids
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole
 from whymath_backend.schema.mastery_contract import MasteryAxis, MasteryEstimator
+
+logger = logging.getLogger("whymath.l2.skill_mastery_tracking")
 
 __all__ = [
     "AttemptOutcomeEvidence",
@@ -152,6 +156,28 @@ async def _assessed_skill_ids(session: AsyncSession, concept_ids: Sequence[uuid.
     return list(result.scalars().all())
 
 
+async def _applied_skills_for_attempt(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    skill_ids: Sequence[str],
+    attempt_id: uuid.UUID,
+) -> dict[str, SkillMasteryHistory]:
+    """이 시도가 **이미 반영된** (user, skill) 측정 행 — 개념 축 `_applied_for_attempt` 동형.
+
+    쓰기측 권위는 DB 부분 유니크 인덱스(`uq_skill_mastery_history_attempt`)이고 이 조회는
+    *정상 재시도*가 예외를 거치지 않게 할 뿐이다(경합은 인덱스가 막는다).
+    """
+    if not skill_ids:
+        return {}
+    stmt = select(SkillMasteryHistory).where(
+        SkillMasteryHistory.user_id == user_id,
+        SkillMasteryHistory.skill_id.in_(list(skill_ids)),
+        SkillMasteryHistory.attempt_id == attempt_id,
+    )
+    result = await session.execute(stmt)
+    return {row.skill_id: row for row in result.scalars().all()}
+
+
 def _resolve_estimator(model: BktModel | None) -> MasteryEstimator:
     """이 적재 경로가 쓸 추정기 — 개념 축 `mastery_tracking._resolve_estimator`와 동형.
 
@@ -169,6 +195,7 @@ async def _stage_skill_attempt_mastery(
     *,
     estimator: MasteryEstimator,
     measured_at: datetime,
+    attempt_id: uuid.UUID | None = None,
 ) -> SkillMasteryHistory:
     """풀이 관측 1건을 (user, skill) 학습 곡선에 반영해 새 측정 행을 *세션에 add*한다(커밋 0).
 
@@ -192,7 +219,9 @@ async def _stage_skill_attempt_mastery(
     )
     update = update_mastery(
         state,
-        AttemptOutcomeEvidence(correct=correct, observed_at=measured_at),
+        AttemptOutcomeEvidence(
+            correct=correct, observed_at=measured_at, attempt_id=attempt_id
+        ),
         estimator=estimator,
     )
     row = SkillMasteryHistory(
@@ -202,6 +231,8 @@ async def _stage_skill_attempt_mastery(
         mastery=update.mastery,
         confidence=update.confidence,
         sample_size=update.sample_size,
+        # EOS-108 멱등 키 — 개념 축 동형(계약 산출이 들고 온 것을 그대로 적재).
+        attempt_id=update.attempt_id,
     )
     session.add(row)
     return row
@@ -216,6 +247,7 @@ async def record_problem_attempt_skill_mastery(
     model: BktModel | None = None,
     measured_at: datetime | None = None,
     assessed_roles: Sequence[ConceptRole] = ASSESSED_ROLES,
+    attempt_id: uuid.UUID | None = None,
 ) -> list[SkillMasteryHistory]:
     """채점된 풀이(정/오답)를 문제가 평가하는 개념의 *스킬* 숙달 갱신으로 전파.
 
@@ -242,12 +274,51 @@ async def record_problem_attempt_skill_mastery(
         if not concept_ids:
             concept_ids = await _assessed_concept_ids(session, problem_id, [ConceptRole.TESTED])
     skill_ids = await _assessed_skill_ids(session, concept_ids)
+    # EOS-108 멱등 ①(읽기측·정상 재시도) — 개념 축 `record_problem_attempt_mastery` 동형.
+    already = (
+        await _applied_skills_for_attempt(session, user_id, skill_ids, attempt_id)
+        if attempt_id is not None
+        else {}
+    )
+    if already:
+        logger.info(
+            "MasteryUpdateAlreadyApplied: 시도 %s의 스킬 축 숙달 %d건이 이미 반영돼 있어 "
+            "재적재를 건너뜁니다.",
+            attempt_id,
+            len(already),
+        )
     records: list[SkillMasteryHistory] = []
+    staged = 0
     for skill_id in skill_ids:
+        if skill_id in already:
+            records.append(already[skill_id])
+            continue
         record = await _stage_skill_attempt_mastery(
-            session, user_id, skill_id, correct, estimator=estimator, measured_at=timestamp
+            session,
+            user_id,
+            skill_id,
+            correct,
+            estimator=estimator,
+            measured_at=timestamp,
+            attempt_id=attempt_id,
         )
         records.append(record)
-    if records:  # 빈 스킬셋은 커밋 0(개념 축 동작 보존)
-        await session.commit()
+        staged += 1
+    if staged:  # 빈 스킬셋·전건 이미반영은 커밋 0(개념 축 동작 보존)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # EOS-108 멱등 ②(쓰기측·경합) — 부분 유니크 인덱스가 정확히 한 건만 살렸다.
+            await session.rollback()
+            logger.info(
+                "IntegrityError: 시도 %s의 스킬 축 숙달이 동시 갱신 경합에서 이미 반영됐습니다 "
+                "— DB 유니크 인덱스가 이중 반영을 막았습니다.",
+                attempt_id,
+            )
+            if attempt_id is None:
+                raise
+            winners = await _applied_skills_for_attempt(session, user_id, skill_ids, attempt_id)
+            if not winners:
+                raise
+            return [winners[sid] for sid in skill_ids if sid in winners]
     return records

@@ -22,11 +22,13 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
@@ -46,6 +48,8 @@ from whymath_backend.l2.mastery_contract import (
 )
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole
 from whymath_backend.schema.mastery_contract import MasteryAxis, MasteryEstimator
+
+logger = logging.getLogger("whymath.l2.mastery_tracking")
 
 # slice 3: 채점된 풀이 정/오답이 *직접 평가*하는 개념 역할은 `ASSESSED_ROLES`(PRIMARY·TESTED·
 # `schema.enums` 단일 출처). SUPPORTING(계산 부수)·IMPLICIT(무의식 사용)는 정/오답이 그 개념
@@ -67,6 +71,33 @@ async def _latest_mastery(
     )
     result = await session.execute(stmt)
     return result.scalars().first()
+
+
+async def _applied_for_attempt(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    concept_ids: Sequence[uuid.UUID],
+    attempt_id: uuid.UUID,
+) -> dict[uuid.UUID, ConceptMasteryHistory]:
+    """이 시도가 **이미 반영된** (user, concept) 측정 행 — 개념 id로 색인해 돌려준다.
+
+    멱등의 *읽기측*이다. 쓰기측 권위는 DB 부분 유니크 인덱스
+    (`uq_concept_mastery_history_attempt`)이며 이 조회는 그것을 대신하지 않는다 — 조회와 INSERT
+    사이에 다른 트랜잭션이 끼어드는 check-then-act 경합을 조회만으로는 막을 수 없기 때문이다
+    (막는 것은 인덱스고, 이 함수는 *정상 재시도*가 예외를 거치지 않고 조용히 끝나게 한다).
+
+    `attempt_id`가 없는 측정은 애초에 이 함수를 거치지 않는다(호출부가 분기) — NULL끼리는
+    같은 시도인지 알 방법이 없으므로 "이미 반영됨"을 판정할 수 없다.
+    """
+    if not concept_ids:
+        return {}
+    stmt = select(ConceptMasteryHistory).where(
+        ConceptMasteryHistory.user_id == user_id,
+        ConceptMasteryHistory.concept_id.in_(list(concept_ids)),
+        ConceptMasteryHistory.attempt_id == attempt_id,
+    )
+    result = await session.execute(stmt)
+    return {row.concept_id: row for row in result.scalars().all()}
 
 
 async def get_current_mastery(
@@ -99,6 +130,7 @@ async def _stage_attempt_mastery(
     *,
     estimator: MasteryEstimator,
     measured_at: datetime,
+    attempt_id: uuid.UUID | None = None,
 ) -> ConceptMasteryHistory:
     """풀이 관측 1건을 (user, concept) 학습 곡선에 반영해 새 측정 행을 *세션에 add*한다(커밋 0).
 
@@ -109,6 +141,11 @@ async def _stage_attempt_mastery(
 
     EOS-13: 경과일(망각 감쇠 입력) 계산이 여기서 사라졌다 — `LearnerMasteryState`가 직전 측정
     시각을 들고 있고 계약이 계산한다(개념 축·스킬 축이 각자 복제하던 식을 한 자리로 모았다).
+
+    EOS-108: `attempt_id`(멱등 키)를 증거에 실어 계약에 넘기고, 산출이 들고 나온 그 값을 새 행에
+    적재한다. **이 함수 자체는 중복을 판정하지 않는다** — 판정은 호출부(`record_*`)의 사전 조회와
+    DB 부분 유니크 인덱스가 한다. staging이 판정까지 하면 "add만 한다"는 이 함수의 유일한 계약이
+    무너지고, 커밋 경계를 소유하지 않은 자리에서 경합을 다루게 된다.
     """
     prior_row = await _latest_mastery(session, user_id, concept_id)
     prior_mastery = (
@@ -125,7 +162,9 @@ async def _stage_attempt_mastery(
     )
     update = update_mastery(
         state,
-        AttemptOutcomeEvidence(correct=correct, observed_at=measured_at),
+        AttemptOutcomeEvidence(
+            correct=correct, observed_at=measured_at, attempt_id=attempt_id
+        ),
         estimator=estimator,
     )
     row = ConceptMasteryHistory(
@@ -135,6 +174,8 @@ async def _stage_attempt_mastery(
         mastery=update.mastery,
         confidence=update.confidence,
         sample_size=update.sample_size,
+        # EOS-108 멱등 키 — 계약 산출이 들고 온 것을 그대로 적재한다(여기서 새로 만들지 않는다).
+        attempt_id=update.attempt_id,
     )
     session.add(row)
     return row
@@ -148,19 +189,61 @@ async def record_attempt_mastery(
     *,
     model: BktModel | None = None,
     measured_at: datetime | None = None,
+    attempt_id: uuid.UUID | None = None,
 ) -> ConceptMasteryHistory:
     """풀이 관측 1건을 (user, concept) 학습 곡선에 반영 — 새 측정 행 적재·반환.
 
     `_stage_attempt_mastery`로 새 행을 세션에 add한 뒤 **단일 개념 단위로 commit**한다(공개 계약·
     하위호환). `measured_at` 생략 시 현재. 다개념 원자 갱신은 `record_problem_attempt_mastery`가
     staging을 직접 묶어 한 번만 커밋한다.
+
+    EOS-108 멱등: `attempt_id`를 주면 **그 시도는 정확히 한 번만 반영된다**. 이미 반영됐으면
+    새 행을 만들지 않고 기존 행을 그대로 돌려준다(호출자가 보기에 결과는 같고, 학습 곡선에는
+    점이 하나만 찍힌다). `attempt_id`가 없으면 멱등 보호가 **없다** — 그것은 결함이 아니라
+    "이 관측에는 신원이 없다"는 사실이며, 신원 없는 관측을 조용히 중복 제거하면 서로 다른 두
+    관측이 하나로 합쳐진다.
     """
     estimator = _resolve_estimator(model)
     now = measured_at or datetime.now(UTC)
+    if attempt_id is not None:
+        applied = await _applied_for_attempt(session, user_id, [concept_id], attempt_id)
+        if concept_id in applied:
+            logger.info(
+                "MasteryUpdateAlreadyApplied: 시도 %s의 개념 축 숙달이 이미 반영돼 있어 "
+                "재적재를 건너뜁니다(concept=%s).",
+                attempt_id,
+                concept_id,
+            )
+            return applied[concept_id]
     row = await _stage_attempt_mastery(
-        session, user_id, concept_id, correct, estimator=estimator, measured_at=now
+        session,
+        user_id,
+        concept_id,
+        correct,
+        estimator=estimator,
+        measured_at=now,
+        attempt_id=attempt_id,
     )
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # 경합 — 사전 조회 이후 다른 트랜잭션이 같은 시도를 반영했다. DB 인덱스가 정확히 한 건만
+        # 살렸고 진 쪽이 여기다. 예외 타입명을 로그에 남기고(침묵 실패 금지) 승자의 행을 돌려준다.
+        await session.rollback()
+        logger.info(
+            "IntegrityError: 시도 %s의 개념 축 숙달이 동시 갱신 경합에서 이미 반영됐습니다"
+            "(concept=%s) — DB 유니크 인덱스가 이중 반영을 막았습니다.",
+            attempt_id,
+            concept_id,
+        )
+        if attempt_id is None:
+            raise
+        applied = await _applied_for_attempt(session, user_id, [concept_id], attempt_id)
+        winner = applied.get(concept_id)
+        if winner is None:
+            # 멱등 위반이 아닌 다른 무결성 오류였다 — 삼키면 원인을 잃는다.
+            raise
+        return winner
     return row
 
 
@@ -205,6 +288,7 @@ async def record_problem_attempt_mastery(
     model: BktModel | None = None,
     measured_at: datetime | None = None,
     assessed_roles: Sequence[ConceptRole] = ASSESSED_ROLES,
+    attempt_id: uuid.UUID | None = None,
 ) -> list[ConceptMasteryHistory]:
     """채점된 풀이(정/오답)를 문제가 평가하는 개념의 숙달 갱신으로 전파 — 풀이 채점 파이프라인의
     자동 결선 진입점. **역할 가중 부분 크레딧(모델 B·무파라미터 비대칭)**.
@@ -234,14 +318,55 @@ async def record_problem_attempt_mastery(
         concept_ids = await _assessed_concept_ids(session, problem_id, [ConceptRole.PRIMARY])
         if not concept_ids:
             concept_ids = await _assessed_concept_ids(session, problem_id, [ConceptRole.TESTED])
+    # EOS-108 멱등 ①(읽기측·정상 재시도) — 이미 반영된 개념은 다시 계산하지도 적재하지도 않는다.
+    already = (
+        await _applied_for_attempt(session, user_id, concept_ids, attempt_id)
+        if attempt_id is not None
+        else {}
+    )
+    if already:
+        logger.info(
+            "MasteryUpdateAlreadyApplied: 시도 %s의 개념 축 숙달 %d건이 이미 반영돼 있어 "
+            "재적재를 건너뜁니다.",
+            attempt_id,
+            len(already),
+        )
     records: list[ConceptMasteryHistory] = []
+    staged = 0
     for concept_id in concept_ids:
+        if concept_id in already:
+            records.append(already[concept_id])
+            continue
         record = await _stage_attempt_mastery(
-            session, user_id, concept_id, correct, estimator=estimator, measured_at=timestamp
+            session,
+            user_id,
+            concept_id,
+            correct,
+            estimator=estimator,
+            measured_at=timestamp,
+            attempt_id=attempt_id,
         )
         records.append(record)
-    if records:  # 빈 개념셋은 커밋 0(현 동작 보존)
-        await session.commit()
+        staged += 1
+    if staged:  # 빈 개념셋·전건 이미반영은 커밋 0(현 동작 보존)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # EOS-108 멱등 ②(쓰기측·경합) — 사전 조회 이후 다른 트랜잭션이 같은 시도를 반영했다.
+            # 부분 유니크 인덱스가 정확히 한 건만 살렸다. 승자의 행을 다시 읽어 돌려준다.
+            await session.rollback()
+            logger.info(
+                "IntegrityError: 시도 %s의 개념 축 숙달이 동시 갱신 경합에서 이미 반영됐습니다 "
+                "— DB 유니크 인덱스가 이중 반영을 막았습니다.",
+                attempt_id,
+            )
+            if attempt_id is None:
+                raise
+            winners = await _applied_for_attempt(session, user_id, concept_ids, attempt_id)
+            if not winners:
+                # 멱등 위반이 아닌 다른 무결성 오류였다 — 삼키면 원인을 잃는다.
+                raise
+            return [winners[cid] for cid in concept_ids if cid in winners]
     return records
 
 

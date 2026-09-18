@@ -44,6 +44,12 @@ from whymath_backend.l2.mastery_tracking import (
     record_problem_attempt_mastery,
 )
 from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    EvidenceCoverage,
+    EvidenceKindState,
+    MisconceptionScan,
+)
 from whymath_backend.schema.enums import ConceptRole
 from whymath_backend.schema.learning_loop_contract import (
     LOOP_RELATIONS,
@@ -159,13 +165,17 @@ class _WrongTargetEstimator:
 class _FutureAssessmentEvidence:
     """`EOS-12`가 착지시킬 `AssessmentEvidence`의 대역 — **상속 없이** Protocol을 만족한다.
 
-    이 테스트가 지키는 이음매: EOS-12의 구체 타입은 `correct`·`observed_at` 두 속성만 있으면
-    이 계약에 그대로 꽂힌다(필드를 더 들고 있어도 무방하다 — 계약은 그것을 읽지 않는다).
+    이 테스트가 지키는 이음매: EOS-12의 구체 타입은 `correct`·`observed_at`·`attempt_id` 세
+    속성만 있으면 이 계약에 그대로 꽂힌다(필드를 더 들고 있어도 무방하다 — 계약은 그것을 읽지
+    않는다). `attempt_id`는 EOS-108이 더한 **멱등 키**이며, EOS-12의 실 타입
+    (`schema/assessment_evidence.AssessmentEvidence`)이 이미 가지고 있는 속성이다 — 그 실재는
+    아래 `test_landed_assessment_evidence_satisfies_protocol`이 실물로 대조한다.
     """
 
     correct: bool
     observed_at: datetime
-    # 계약이 읽지 않는 부가 필드(EOS-12가 들고 올 법한 것) — 있어도 계약은 무관심하다.
+    attempt_id: uuid.UUID | None = None
+    # 계약이 읽지 않는 부가 필드(EOS-12가 들고 온 것) — 있어도 계약은 무관심하다.
     misconception_ids: tuple[str, ...] = ()
 
 
@@ -290,17 +300,51 @@ class TestEvidenceProtocolSeam:
         update = update_mastery(_state(), evidence)
         assert update.mastery == update_mastery(_state(), _evidence(True)).mastery
 
-    def test_protocol_reads_exactly_two_attributes(self) -> None:
+    def test_protocol_reads_exactly_three_attributes(self) -> None:
         """**필드 증식 방어선** — 계약이 읽는 속성이 늘면 이 테스트가 RED다.
 
         evidence의 구체 타입 좌석은 EOS-12가 소유한다. 여기서 속성을 늘리는 것은 두 번째
         진실 원천을 만드는 일이므로, 늘리려면 이 동결을 의식적으로 깨야 한다.
+
+        **EOS-108이 이 동결을 한 번 의식적으로 깼다**(2→3). 넓힌 근거는 `attempt_id`가 EOS-12의
+        실 타입에 *이미 있는* 속성이라는 것이다 — 즉 두 정의가 갈라진 것이 아니라 계약이 이미
+        있는 사실을 읽기 시작했다. 그 근거가 성립하는지는 바로 아래 실물 대조 테스트가 지킨다.
+        선택 확장(`HintUsageSignal`·`StreakSignal`)은 **본 Protocol에 넣지 않았다** — 그것들은
+        EOS-12의 타입에 없으므로, 넣었다면 그 타입이 계약을 만족하지 못하게 되어 `EOS-18`의
+        어댑터 폐기를 막았을 것이다.
         """
         members = {
             name
             for name in AssessmentEvidenceInput.__protocol_attrs__  # type: ignore[attr-defined]
         }
-        assert members == {"correct", "observed_at"}
+        assert members == {"correct", "observed_at", "attempt_id"}
+
+    def test_landed_assessment_evidence_satisfies_protocol(self) -> None:
+        """**착지한** `EOS-12` 타입이 이 계약을 구조적으로 만족한다 — 대역이 아니라 실물.
+
+        이 테스트가 이 슬라이스에서 가장 중요한 이음매다: `EOS-18`(임시 어댑터 폐기)은 바로 이
+        객체를 `AttemptOutcomeEvidence` 자리에 넣는 일이고, 여기서 RED면 그 길이 막힌다.
+        """
+        evidence = AssessmentEvidence(
+            learner_id=uuid.uuid4(),
+            problem_id=uuid.uuid4(),
+            attempt_id=uuid.uuid4(),
+            correct=True,
+            observed_at=_T1,
+            coverage=EvidenceCoverage(
+                concept=EvidenceKindState.EMPTY_MEASURED,
+                skill=EvidenceKindState.EMPTY_MEASURED,
+                misconception=EvidenceKindState.NOT_MEASURED,
+                misconception_scan=MisconceptionScan.NOT_RUN,
+                concept_count=0,
+                skill_count=0,
+                misconception_count=0,
+            ),
+        )
+        assert isinstance(evidence, AssessmentEvidenceInput)
+        # 계약 경유가 실제로 되는지까지 본다(isinstance만으로는 호출이 성립하는지 모른다).
+        update = update_mastery(_state(), evidence)
+        assert update.attempt_id == evidence.attempt_id
 
 
 class TestLoopVocabularyBinding:
