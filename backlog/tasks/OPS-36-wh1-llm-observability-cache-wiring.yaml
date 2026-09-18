@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: review
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - src/backend/whymath_backend/harness/wh1_primary.py
   - src/backend/whymath_backend/l3/equivalent/rephrase.py
   - "tests/backend/harness/**"
-session: null
+session: claude/pensive-maxwell-42n3i7
 notes: "ai_integration_gap_review.md D1(2026-08-10). wh1_primary.py:37이 스스로 '범위 밖(후속)'으로 선언한 항목 — primary 기본 ON(GA) 전환으로 유보 발화 조건 기충족(ai_tutor_module_gap_review §5-④ 동계열). 03a §H-4 클라우드 실측 수치 보정의 선행 조건(표본 공급). 프라이버시 설계(S1-a 사적 필드)는 유지한 채 관측·캐시만 결선한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/비용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-18
