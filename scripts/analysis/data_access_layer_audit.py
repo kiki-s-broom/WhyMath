@@ -119,6 +119,10 @@ BASELINE: dict[str, frozenset[str]] = {
         {
             "api/_auth.py",
             "api/_concept_orchestration.py",
+            # EOS-19 — `api/me.py`의 수능 분기가 정책 구현체로 이동한 것이다(신규 접근점
+            # 아님·같은 쿼리). L6 게이팅 + DB를 동시에 쓰는 정책이라 `l2`(l6 import 불가)에도
+            # `l6`(DB 접근 불가 — 이 파일 상단 "import 축")에도 둘 수 없어 합성 지점에 산다.
+            "api/_next_problem_policy.py",
             "api/_device_store.py",
             "api/auth.py",
             "api/coach.py",
@@ -202,6 +206,9 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/evidence_event_store.py",
             "l2/item_calibration.py",
             "l2/learner_state.py",
+            # EOS-19 — `api/me.py`의 후보 조회·가중 배선이 그대로 내려온 것이다(신규 접근점
+            # 아님). 애초에 후보 조회는 학습자 모델(L2)의 일이지 HTTP 경계(L5)의 일이 아니었다.
+            "l2/next_problem_selection.py",
             # EOS-103: learner_state 테이블의 단일 읽기·쓰기 경로. 재사용할 기존 조회
             # 함수가 없는 신규 테이블이라 새 접근점이 맞다. 대신 이 모듈이 **유일 writer**
             # 임을 tests/backend/db/test_learner_state_single_writer.py가 AST 전수 스캔으로

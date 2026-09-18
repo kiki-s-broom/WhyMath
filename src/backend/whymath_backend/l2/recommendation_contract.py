@@ -76,19 +76,22 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Final, Protocol
+from typing import Final, Protocol, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "PREREQUISITE_MASTERY_CEILING",
     "WEAK_CONCEPT_MASTERY_CEILING",
+    "LearnerStateT",
     "LearningContext",
     "Recommendation",
+    "RecommendationAction",
     "RecommendationPolicy",
     "RecommendationReason",
     "ReasonBasis",
     "ReasonType",
+    "action_for",
     "build_reason",
     "no_candidate_reason",
     "select_reason_type",
@@ -186,35 +189,152 @@ class LearningContext(BaseModel):
     requested_at: datetime | None = None
 
 
+class RecommendationAction(str, Enum):
+    """**무엇을 하라는 추천인가** — 계획서 §8의 `action`(예: `PRACTICE_PREREQUISITE`).
+
+    `ReasonType`이 *왜*를 말한다면 이것은 *무엇을*을 말한다. 둘은 1:1 대응이지만 같은 필드가
+    아니다 — 근거의 종류가 늘어도(예: 오개념 기반 근거) 행위는 기존 다섯 중 하나일 수 있고,
+    반대로 같은 근거에서 행위가 갈라질 수도 있다(EOS-19 시점에는 갈라지지 않는다).
+
+    **지금은 파생값이다**(`action_for`가 정본). 그 사실을 주석이 아니라 **검증기**로 못 박아
+    (`Recommendation`의 model_validator) 근거와 행위가 어긋난 추천은 *만들어지지 않는다* —
+    나중에 대응이 1:1이 아니게 되면 그때 `action_for`가 더 많은 입력을 받게 된다.
+    """
+
+    PRACTICE_PREREQUISITE = "practice_prerequisite"
+    """막힌 선수개념을 먼저 연습한다(`PREREQUISITE_GAP`)."""
+
+    PRACTICE_CURRENT = "practice_current"
+    """현재 개념을 계속 연습한다(`CURRENT_CONCEPT`)."""
+
+    ADVANCE_NEXT = "advance_next"
+    """다음 개념으로 넘어간다(`NEXT_CONCEPT`)."""
+
+    DIAGNOSE = "diagnose"
+    """구간을 판정할 측정이 없다 — 측정을 먼저 한다(`UNMEASURED`).
+
+    "아무거나 풀린다"가 아니라 *진단이 목적인 출제*라는 뜻이다. 콜드스타트를 연습 행위로
+    적으면 측정이 목적인 출제가 학습으로 위장된다.
+    """
+
+    NONE = "none"
+    """추천할 것이 없다(`NO_CANDIDATE`) — 부재도 행위 공간의 한 값이다."""
+
+
+#: `ReasonType` → `RecommendationAction` 전사표. `action_for`의 유일한 출처이며, `ReasonType`에
+#: 값이 늘면 이 dict가 비어 `action_for`가 **KeyError로 터진다** — 조용히 기본값을 주지 않는다
+#: (근거 종류가 늘었는데 행위가 자동으로 "연습"이 되면 그 순간 추천이 근거와 무관해진다).
+_ACTION_BY_REASON: Final[dict["ReasonType", "RecommendationAction"]] = {}
+
+
+def action_for(reason_type: ReasonType) -> RecommendationAction:
+    """근거 종류 → 추천 행위(순수·전사표 정본).
+
+    미등록 `ReasonType`은 `KeyError`다. 기본값 폴백을 두지 않는 이유는 CLAUDE.md의 "모르면
+    모른다고"와 같다 — 대응을 정하지 않은 근거에 임의의 행위를 붙이면, 틀린 추천이 조용히
+    학생에게 나간다. 새 근거를 만든 사람이 그 자리에서 행위도 정하게 한다.
+    """
+    return _ACTION_BY_REASON[reason_type]
+
+
 class Recommendation(BaseModel):
     """추천 1건 — 결과와 **근거가 함께** 나간다(계획서 §8의 요지).
 
     `problem_id`가 None이어도 `reason`은 있다. 그 경우 `type=NO_CANDIDATE`이며, 왜 후보가
     없었는지는 기존 관측 메타(`candidate_zero_reason`)가 따로 말한다 — 둘은 다른 질문에
     답하므로 합치지 않는다.
+
+    **`action`은 근거에서 파생되며 손으로 넣을 수 없다**(EOS-19). 생략하면 `reason`에서
+    채워지고, 어긋나는 값을 주면 생성이 **실패한다** — "근거 없는 추천을 구조적으로 만들 수
+    없게 한다"의 짝이다(근거는 있는데 행위가 그 근거와 다른 추천도 같은 종류의 거짓말이다).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     problem_id: uuid.UUID | None = None
     reason: RecommendationReason
+    action: RecommendationAction = Field(
+        description="이 추천이 요구하는 학습 행위. `reason.type`에서 파생된다(손 입력 불가)."
+    )
+    target_concept: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "학생이 **다음에 다뤄야 할 개념**. `reason.concept_id`(선택된 문항의 대표 개념)와 "
+            "다르다: 선수개념이 막혔으면(`PREREQUISITE_GAP`) 이 값은 *막힌 선수개념*이고 "
+            "문항의 개념이 아니다. 근거를 댈 개념 자체가 없으면(미매핑·후보 0) None."
+        ),
+    )
     policy_version: str | None = Field(
         default=None, description="이 추천을 만든 선택 알고리즘 식별자(소급 평가용)."
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_action(cls, data: object) -> object:
+        """`action` 미지정 시 `reason`에서 채운다 — 호출부가 파생값을 손으로 옮기지 않게.
 
-class RecommendationPolicy(Protocol):
+        `mode="before"`인 것은 필수 필드의 *부재*를 채우려면 검증 전이어야 하기 때문이다.
+        여기서 채우지 않으면 `action`이 옵셔널이 되어야 하고, 옵셔널이면 비는 경로가 생긴다.
+        """
+        if not isinstance(data, dict) or "action" in data:
+            return data
+        reason = data.get("reason")
+        reason_type = getattr(reason, "type", None) or (
+            reason.get("type") if isinstance(reason, dict) else None
+        )
+        if reason_type is None:
+            return data  # reason 자체가 없다 — 필수 필드 검증이 그 사실을 말하게 둔다.
+        return {**data, "action": action_for(ReasonType(reason_type))}
+
+    @model_validator(mode="after")
+    def _action_matches_reason(self) -> "Recommendation":
+        """근거와 행위의 불일치를 **생성 시점에** 막는다 — 주입된 불일치는 여기서 죽는다."""
+        expected = action_for(self.reason.type)
+        if self.action is not expected:
+            raise ValueError(
+                f"action({self.action.value})이 reason.type({self.reason.type.value})의 "
+                f"행위({expected.value})와 다릅니다 — 근거와 행위는 갈라질 수 없습니다."
+            )
+        return self
+
+
+#: 학습자 상태의 타입 변수 — **반변(contravariant)**. 구현체는 계약보다 *좁은* 상태 타입을
+#: 요구할 수 있고(예: `LearnerState`), 그때도 `RecommendationPolicy[LearnerState]`로서 계약에
+#: 적합하다. 이 모듈이 `l2.learner_state`를 구체 import하지 않는 이유는 순환 회피이며(그쪽이
+#: 이 상수들을 참조하게 될 자리다), 타입 변수는 그 제약 없이 정확한 계약을 표현한다.
+LearnerStateT = TypeVar("LearnerStateT", contravariant=True)
+
+
+class RecommendationPolicy(Protocol[LearnerStateT]):
     """추천 정책의 호출 계약 — **v1 내부가 규칙이어도 이 시그니처는 바뀌지 않는다**.
 
     입력이 `learner_state`와 `learning_context` 둘뿐인 것이 핵심이다: 정책이 학습자 상태를
     *받아서* 결정하므로, 상태를 어떻게 추정하는가(BKT/DKT/IRT)는 정책 바깥의 관심사가 된다.
-    `learner_state`를 `object`로 둔 것은 이 모듈이 `l2.learner_state`를 import하면 순환이
-    생기기 때문이다(그쪽이 이 상수들을 참조하게 될 자리다) — 구현체가 구체 타입을 좁힌다.
+
+    **제네릭인 이유**(EOS-19 정정): 원래 `learner_state: object`였는데, 그러면 구체 타입을
+    요구하는 구현체(`LearnerState`를 받는 v1 정책)가 이 Protocol에 **적합하지 않다**(매개변수는
+    반변이라 좁히면 어긋난다). 즉 동결 테스트는 모양을 지키고 있었지만 정작 구현체를 제약하지는
+    못하는 상태였다 — 구현체가 생기는 시점에야 드러나는 종류의 공백이다. 타입 변수로 바꿔
+    "상태 타입은 구현체가 고른다"를 정확히 표현하고, 그 적합성은 mypy가 CI에서 판정한다.
     """
 
     async def __call__(
-        self, learner_state: object, learning_context: LearningContext
+        self, learner_state: LearnerStateT, learning_context: LearningContext
     ) -> Recommendation: ...
+
+
+# 전사표 채우기 — 정의는 `RecommendationAction` 선언 위에 두되(참조 위치 명시) 값은 두 Enum이
+# 모두 존재한 뒤에 넣는다. `ReasonType` 전 5값을 여기서 소진하며, 빠진 값은 `action_for`에서
+# KeyError로 드러난다(아래 거버넌스 테스트가 전수성을 동결한다).
+_ACTION_BY_REASON.update(
+    {
+        ReasonType.PREREQUISITE_GAP: RecommendationAction.PRACTICE_PREREQUISITE,
+        ReasonType.CURRENT_CONCEPT: RecommendationAction.PRACTICE_CURRENT,
+        ReasonType.NEXT_CONCEPT: RecommendationAction.ADVANCE_NEXT,
+        ReasonType.UNMEASURED: RecommendationAction.DIAGNOSE,
+        ReasonType.NO_CANDIDATE: RecommendationAction.NONE,
+    }
+)
 
 
 def select_reason_type(mastery: float | None) -> ReasonType:
