@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - ".claude/hooks/fence_guard.py"
   - ".claude/settings.json"
   - tests/infra/test_fence_guard.py
-session: null
+session: claude/exciting-allen-5dkjb0
 notes: "사고 경위: CLAUDE.md 「실행용 블록과 증거 블록의 분리」(2026-08-31 신설 · 2026-09-10 v0.2.20 확장)가 **3회 뚫렸다**. 1회차 HARN-38(증거 인용이 복사-실행돼 CommandNotFound 2건) · 2회차 OPS-72(커밋 해시+메시지 줄과 명령+결과 주석을 펜스에 담아 ParserError 1건 + fatal 2건) · 3회차 2026-09-18 이 세션(저작 요약 예상 JSON을 펜스에 담아 ParserError). 셋 다 읽기 전용이라 피해 0이지만 파괴적 명령이었다면 달랐다.\\n\\n세션이 처음에 '채팅 축은 코드가 닿지 않으니 태스크 등재는 알리바이'라고 판단했는데 **그 전제가 틀렸다** — Kiki 지적으로 정정. Stop 훅은 transcript_path로 대화 기록을 읽을 수 있고, 이 저장소는 이미 Stop 훅(backlog.py check-stop)·SessionStart·PostToolUse를 운영 중이다(실측). 즉 측정 가능한 게이트를 만들 수 있으므로 CLAUDE.md '동일 유형 텍스트 규칙 2회 실패 후 코드 착지' 선례가 그대로 적용된다.\\n\\n세션이 제안 설계에서 정정한 축(acceptance ⑤): 탐지 기준을 '펜스 유무'로 잡으면 Kiki께 드리는 런북 실행 블록이 전부 막힌다 — 규칙 본문이 '펜스는 실행용 전용'이라 실행 블록은 허용 대상이다. 실행 언어 태그 유무로 갈라야 하며, 3회 위반은 전부 태그 없는 펜스였다.\\n\\n실패 지점의 공통 형태(세션 관찰): 세 번 다 '결과가 이렇게 보입니다'를 보여주려던 순간이다. 그래서 금지형이 아니라 대체형 규칙이 필요하다."
 updated: 2026-09-18
