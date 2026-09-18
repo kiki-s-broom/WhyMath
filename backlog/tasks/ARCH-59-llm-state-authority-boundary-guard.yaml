@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① LLM 발화 승격의 쓰기 범위 동결 — api/coach.py `_wh1_primary_decision_or`가 `decision.model_copy(update=...)`로 바꾸는 키가 학생 대면 발화 필드 하나뿐임을 AST로 전수 검사한다. 키를 하나라도 늘리면(hint_level·transition·socratic_category 등 구조화 결정) RED. 문자열 grep이 아니라 *구성된 dict 리터럴의 키 집합*을 본다(2026-09-01 규칙: 금지 패턴 열거 대신 산출물 검사).\n② 하네스→mastery writer 호출 부재 동결 — harness/**·l3/** 프로덕션 소스가 l2 mastery writer(`l2.mastery_contract`·`l2.mastery_tracking`·`l2.skill_mastery_tracking`·`update_mastery`·`record_*_mastery`)를 import·호출하지 않음을 AST로 전수 검사. 7계층 import 계약은 l3→l2를 *허용*하므로 이 축은 import-linter가 막지 못한다(실측: tests/infra에 mastery 문자열 0건). 지연 import(함수 안 import)도 본다.\n③ LLM 출력 타입의 상태 필드 부재 동결 — wh1_loop `Action` 판별 유니온 8종의 필드명 집합을 baseline으로 동결한다. mastery·theta·ability 등 학습 상태 축 필드가 하나라도 생기면 RED. LLM이 고를 수 있는 것은 도구 kind와 비민감 스칼라뿐이라는 계약(wh1_llm_policy docstring ④)을 산문에서 코드로 옮긴다.\n④ 스캔 0건 실패 — ①②③ 각각 대상을 하나도 못 찾으면 exit 1/RED. 전수 가드가 공허하게 통과하는 상태를 금지한다(test_proxy_ca_optional.py 선례).\n⑤ 결함 주입 실증 — ①②③ 각각에 대해 막으려는 상태를 실제로 주입해 RED를 확인하고, 주입이 실제 적용됐는지(mutated != original)·원복이 바이트 동일한지를 하네스가 단언한다. 정상 입력에서 초록인 것은 보호의 증거가 아니다(2026-09-01·2026-09-06 규칙).\n⑥ CI 배선 실재 확인 — tests/infra는 infra-contracts 잡이 항상 실행한다(needs 게이팅 없음). 이 파일이 그 잡에서 실제로 수집·실행되는지 확인한 것까지가 완료다(OPS-03·OPS-10).\n⑦ 범위 밖 동결 — LLM 출력에 provenance 필드 신설 0(AssessmentEvidenceInput 확장은 EOS-12 소유) · Assessment/Mastery 엔진 로직 변경 0 · 신규 Agent 계층 0(Phase 2 원문 §15 동결) · 산문 docstring 추가만으로 완료 선언 금지."
-artifacts: []
+artifacts:
+  - "8cd46b04 · https://github.com/kiki-s-broom/WhyMath/pull/1207 — AST 전수 가드 3축 착지(tests/infra/test_llm_state_authority_boundary.py 9건). 주입 M1~M7b 8종 전건 RED·생존 0(원복 바이트 동일 단언). infra-contracts 잡이 수집·실행함을 실측(1470 passed, 1 skipped)."
 paths:
   - "tests/infra/**"
-session: claude/pensive-maxwell-42n3i7
+session: null
 notes: "Phase 2 실행계획 P-10(AI Tutor v1)의 완료 판정 '튜터가 답하고, LLM이 상태를 못 바꾸는 것이 주입으로 증명됐다'의 집행 지점. 실측(2026-09-18 main 46cc23cc): 이 경계는 저장소에 docstring 산문 3곳(l2/learning_state_policy.py:20-22 · schema/learning_state.py:247-249 · l2/assessment_evidence.py:75-76)으로만 있고 검사하는 테스트는 0건이다(tests/infra에 mastery 문자열 0건). 인접 가드는 축이 다르다 — test_eos_dependency_direction·test_eos_boundary_contract_wiring은 Core to Math Adapter 축이고, build_assessment_evidence의 gate_passed 거부는 오개념 후보 축 한정이다(correct·observed_at에는 게이트 없음). 7계층 import 계약은 l3 to l2 방향을 허용하므로 import-linter로는 이 축이 성립하지 않는다. 실제 경계는 코드에 있다: api/coach.py _wh1_primary_decision_or가 model_copy로 발화 필드 하나만 갈아끼우고 구조화 결정은 결정론 경로가 유지한다 — 그 사실이 지금 아무 검사에도 걸려 있지 않다. 경계: OPS-36은 같은 경로의 관측·캐시 결선(라우터 경유)이고 이 태스크는 권위 경계 — 겹치지 않는다. eos P1 판정 근거: 경계 자체는 코드에 이미 있고 이 태스크는 그것을 검증 가능하게 만든다."
 updated: 2026-09-18
