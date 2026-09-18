@@ -40,7 +40,7 @@ from whymath_backend.l3.provider_jurisdiction import (
     Jurisdiction,
     jurisdiction_judgment,
 )
-from whymath_backend.l3.providers.anthropic import AnthropicStatus
+from whymath_backend.l3.providers.cloud_status import CloudStatus
 from whymath_backend.l3.providers.ollama import OllamaStatus
 from whymath_backend.l3.router import _as_cost_tier
 
@@ -206,16 +206,25 @@ class CompositeProvider:
         status: OllamaStatus = await check()
         return status
 
-    async def check_cloud_status(self) -> AnthropicStatus | None:
-        """클라우드 제공자의 구성·도달성 보고 — /status 클라우드 필드용.
+    async def check_cloud_status(self) -> CloudStatus | None:
+        """클라우드 제공자의 구성(·가능하면 도달성) 보고 — /status 클라우드 필드용.
 
         클라우드 제공자가 없거나(cloud=None) 상태 점검을 노출하지 않으면 None을 돌려준다
         (앱은 None이면 클라우드 필드를 채우지 않는다 → 기존 로컬 전용 응답과 호환).
+
+        **반환 타입이 `AnthropicStatus`가 아닌 이유**(ARCH-57): 클라우드 좌석이 셀렉터로
+        바뀔 수 있게 되면서 여기에 `OpenRouterStatus`도 올 수 있는데, 그 타입에는
+        `reachable`이 **의도적으로 없다** — OpenRouter의 조회 엔드포인트는 라우팅 계약(세
+        파라미터)을 거치지 않아 "닿았다"를 보고하면 *계약을 통과한 경로가 살아 있다*는 뜻으로
+        오독되기 때문이다(`openrouter.OpenRouterStatus` docstring). 그래서 공통 표면은
+        `configured`·`error` 둘뿐이고, `reachable`은 보고하는 제공자만 싣는다. 읽는 쪽은
+        없음을 **False가 아니라 None(미측정)**으로 다룬다 — 모름을 아님으로 접으면 도달
+        불가와 미측정이 같은 화면이 된다.
         """
         if self._cloud is None:
             return None
         check = getattr(self._cloud, "check_status", None)
         if check is None:
             return None
-        status: AnthropicStatus = await check()
+        status: CloudStatus = await check()
         return status

@@ -33,11 +33,11 @@ from whymath_backend.schema.provenance import GenerationLog
 
 def _build_default_provider() -> LLMProvider:
     """표준 provider 조립(라이브 전용) — 지연 import·지연 연결(구성만으로 네트워크 0)."""
-    from whymath_backend.l3.providers.anthropic import AnthropicProvider
     from whymath_backend.l3.providers.composite import CompositeProvider
+    from whymath_backend.l3.providers.factory import build_cloud_provider
     from whymath_backend.l3.providers.ollama import OllamaProvider
 
-    return CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+    return CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
 
 
 def _build_default_cache() -> CacheBackend:

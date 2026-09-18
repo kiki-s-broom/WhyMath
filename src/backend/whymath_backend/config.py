@@ -506,6 +506,30 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── 클라우드 슬롯 셀렉터 (ARCH-57 — ARCH-55 채택 판정의 집행 지점) ──
+    # `CompositeProvider`의 cloud 슬롯에 어떤 프로바이더가 앉는가. 종전에는 호출자가
+    # `AnthropicProvider()`를 **하드코딩**해 8곳에 흩어져 있었고, 그래서 ARCH-55가 채택한
+    # OpenRouter 경로를 프로브만 쓰고 실제 저작 작업은 쓸 수 없었다(채택은 났는데 집행이
+    # 없는 상태 — CLAUDE.md 「정본화를 집행으로 착각한 완료 선언 금지」).
+    #
+    # **기본값 `anthropic`은 불변이다.** ARCH-55 채택 판정문이 "선택지를 넓힌 것이지 기본값을
+    # 옮긴 것이 아니다"라고 명시했고, 판정 기준 (d) 지연·가용성이 `ARCH-56`으로 보류 중이라
+    # 미판정 구성이 기본값이 되면 안 된다. 이 기본값을 바꾸는 것은 코드 변경이 아니라 판정이다
+    # (`tests/backend/l3/test_cloud_provider_selector.py`가 계약으로 동결한다).
+    #
+    # 적용 범위는 **저작 경로 한정**이다 — 학생 대면 서빙(`app.py`)은 이 셀렉터를 타지 않는다.
+    # 그쪽을 옮기는 것은 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 트래픽 투입
+    # 결정)를 실현시키는 행위라 Kiki 판정 사안이다.
+    cloud_provider: Literal["anthropic", "openrouter", "deepseek"] = Field(
+        default="anthropic",
+        description=(
+            "저작 경로의 클라우드 슬롯 제공자. `anthropic`(기본·불변 핀 claude-sonnet-4-6) / "
+            "`openrouter`(ARCH-55 채택 — deepseek/deepseek-v4.1-flash·공급사 deepinfra 고정) / "
+            "`deepseek`(공식 API·CN 관할). 좌석 선택만이고 클라이언트 생성은 지연된다. "
+            "학생 대면 서빙은 이 값과 무관하게 항상 anthropic이다(ARCH-56 게이트)."
+        ),
+    )
+
     # ── DeepSeek 공식 API (CN 관할, ARCH-49 — 03a 클라우드 선택지 확장) ──
     # 모델 ID는 **실측값만** 쓴다. 2026-09-16 Kiki 머신에서 유효 키로 `GET
     # https://api.deepseek.com/models`를 조회한 결과 반환된 id는 정확히 두 개다:
