@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l2/mastery_contract.py
-session: null
+session: claude/sec-35-learner-state-erasure-g75ne8
 notes: "EOS-13이 남긴 임시 어댑터의 폐기 축. 원래 EOS-12 acceptance ⑦로 집행했으나, 병합 시점에 EOS-12가 타 세션 PR #1187로 이미 done임이 드러났다(하네스상 done은 종결 상태라 나가는 전이가 없다) — 그래서 후속 태스크로 분리한다. 두 세션이 독립적으로 같은 이음매에 수렴한 것이 확인됐다: EOS-13 Protocol이 요구한 correct·observed_at 2속성을 EOS-12의 AssessmentEvidence가 그대로 갖는다."
-updated: 2026-09-17
+updated: 2026-09-18

@@ -24,6 +24,10 @@ from whymath_backend.l2.mastery_tracking import (
     record_attempt_mastery,
     record_problem_attempt_mastery,
 )
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 from whymath_backend.schema.concept import Concept as ConceptSchema
 from whymath_backend.schema.concept import ProblemConcept as ProblemConceptSchema
 from whymath_backend.schema.enums import (
@@ -38,6 +42,29 @@ from whymath_backend.schema.problem import Problem as ProblemSchema
 pytestmark = pytest.mark.integration
 
 _SECRET = "integration-jwt-secret-0123456789abcdef"
+
+
+def _ev(
+    learner_id: uuid.UUID,
+    problem_id: uuid.UUID,
+    correct: bool,
+    observed_at: datetime | None = None,
+) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 적재 writer가 받는 타입(어댑터 폐기).
+
+    증거는 순수 관측 객체라 DB 제약을 지지 않는다(영속 0) — 여기서는 적재 경로에 넘길
+    최소 재료만 싣는다.
+    """
+    return build_assessment_evidence(
+        learner_id=learner_id,
+        problem_id=problem_id,
+        correct=correct,
+        observed_at=observed_at or datetime.now(UTC),
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
 
 
 def _settings() -> Settings:
@@ -86,13 +113,13 @@ def test_record_attempt_mastery_appends_and_reads_prior_on_live_pg() -> None:
             async with sm() as session:
                 # 첫 관측(정답): P(L0)=0.3 → 0.69·표본 1
                 r1 = await record_attempt_mastery(
-                    session, uid, cid, True, model=model, measured_at=t1
+                    session, cid, evidence=_ev(uid, uuid.uuid4(), True, t1), model=model
                 )
                 assert float(r1.mastery) == 0.69
                 assert r1.sample_size == 1
                 # 둘째 관측(정답): 직전 0.69를 prior로 → 0.92·표본 2
                 r2 = await record_attempt_mastery(
-                    session, uid, cid, True, model=model, measured_at=t2
+                    session, cid, evidence=_ev(uid, uuid.uuid4(), True, t2), model=model
                 )
                 assert float(r2.mastery) == 0.92
                 assert r2.sample_size == 2
@@ -220,7 +247,9 @@ def test_record_problem_attempt_mastery_only_assessed_roles_on_live_pg() -> None
         try:
             sm = async_sessionmaker(engine, expire_on_commit=False)
             async with sm() as session:
-                records = await record_problem_attempt_mastery(session, uid, pid, True)
+                records = await record_problem_attempt_mastery(
+                    session, evidence=_ev(uid, pid, True)
+                )
             # PRIMARY·TESTED 2개만 갱신·SUPPORTING 제외
             updated = {r.concept_id for r in records}
             assert updated == {c_primary, c_tested}
@@ -309,13 +338,17 @@ def test_incorrect_blames_primary_only_on_live_pg() -> None:
             sm = async_sessionmaker(engine, expire_on_commit=False)
             # 오답: PRIMARY만 갱신(TESTED 미갱신 — 거짓 약점 0).
             async with sm() as session:
-                rec_wrong = await record_problem_attempt_mastery(session, uid, pid, False)
+                rec_wrong = await record_problem_attempt_mastery(
+                    session, evidence=_ev(uid, pid, False)
+                )
             assert {r.concept_id for r in rec_wrong} == {c_primary}
             assert await _mastery_row_count(uid, c_primary) == 1
             assert await _mastery_row_count(uid, c_tested) == 0  # ★ TESTED 거짓 약점 0
             # 정답: 전체 지지 — TESTED도 행 생성(비대칭의 반대편).
             async with sm() as session:
-                rec_right = await record_problem_attempt_mastery(session, uid, pid, True)
+                rec_right = await record_problem_attempt_mastery(
+                    session, evidence=_ev(uid, pid, True)
+                )
             assert {r.concept_id for r in rec_right} == {c_primary, c_tested}
             assert await _mastery_row_count(uid, c_tested) == 1
         finally:

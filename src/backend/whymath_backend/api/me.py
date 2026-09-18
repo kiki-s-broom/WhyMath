@@ -1001,14 +1001,12 @@ async def submit_attempt(
         observed_at=received_at,
     )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
-    records = await record_problem_attempt_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
-    )
+    # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
+    # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
+    records = await record_problem_attempt_mastery(session, evidence=evidence)
     # 스킬 숙달 전파(Phase 2b-2·행동 축) — 같은 모델 B로 concept→skill 해소 후 스킬별 측정 적재.
     # 개념 전파와 독립 트랜잭션(자체 단일 commit)·concept→skill 매핑/해소 없으면 빈 리스트.
-    skill_records = await record_problem_attempt_skill_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
-    )
+    skill_records = await record_problem_attempt_skill_mastery(session, evidence=evidence)
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속(소급 불가 축 — W2 스키마 ①).
     # 숙달 전파는 "스킬 값이 언제 변했는가"만 남기고 "이 시도가 어떤 스킬을 건드렸는가"는 남기지
     # 않는다 — 매핑이 이후 바뀌면 재구성 불가라 채점 순간에 기록한다. 빈 해소도 `[]`로 적재
