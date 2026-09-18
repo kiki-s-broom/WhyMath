@@ -629,6 +629,18 @@ CATALOG: tuple[Spec, ...] = (
        "*MasteryHistory와 진실 원천이 겹치지 않는다(ADR-006). 정책은 교체 가능한 Protocol이고 "
        "v1 규칙 6종은 if/else다",
        "l2.learning_state_machine", "l2.learning_state_policy", "l2.learning_state_evidence"),
+    # MISC-30 — WM-E-212(상태 전이)와 **다른 행**인 이유: 그쪽은 "학생이 어느 국면에
+    # 있는가"를 정하고 이 행은 "막힌 학생에게 무엇을, 얼마나 세게 줄 것인가"를 정한다.
+    # 반복 축의 입력도 다르다(그쪽 R5 = 원인 무관 연속 오답, 이쪽 = 같은 오개념 누적 증거).
+    # 번호 주의: 213은 원격 브랜치가 선점해 214를 쓴다(전수 스캔 2026-09-18).
+    _e("WM-E-214", "보정 정책 표(경로 선택 + 반복 오류 개입 사다리)", "Student",
+       "Learning Model", "P1",
+       "MISC-30 — 계획서 300 §9. 임계값을 코드에 흩뿌리지 않고 주입 가능한 표 하나"
+       "(`REMEDIATION_POLICY_V1`)로 모은다. 사다리(≥2 교정설명·≥3 쉬운문제·≥4 선수개념)는 "
+       "`l4/misconception/intervene.py`가 focus 가설의 evidence_count로 읽어 배선돼 있고, "
+       "경로 선택(`select_route`)은 아직 소비처 0건이다 — 숙달 축은 WM-E-211의 "
+       "`select_reason_type`에 위임하므로 재구현이 아니다",
+       "l2.remediation_policy"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",
