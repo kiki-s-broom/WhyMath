@@ -1200,12 +1200,14 @@ async def _default_run(
         if config.fake_provider:
             provider = DeterministicFakeProvider.for_seeds(seeds)
         else:
-            # 표준 구성 재사용(llm_generator·app.py 동형) — 지연 연결이라 구성만으로 네트워크 0.
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
+            # 표준 저작 구성 — 지연 연결이라 구성만으로 네트워크 0. 클라우드 좌석은
+            # `settings.cloud_provider`가 정한다(ARCH-57). **app.py와는 의도적으로
+            # 다르다** — 학생 대면 서빙은 셀렉터를 타지 않는다(ARCH-56 게이트 ⓐ).
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
 
         trace = LangfuseSink()

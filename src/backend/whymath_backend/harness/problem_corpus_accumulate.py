@@ -548,7 +548,10 @@ def _build_live_generator(
         routing_overrides["budget_krw"] = budget_krw
 
     return LLMEquivalentProblemGenerator(
-        None,  # 표준 CompositeProvider(Ollama+Anthropic) 지연 구성 — 라이브 환경 전제
+        # 표준 CompositeProvider 지연 구성 — 라이브 환경 전제. 클라우드 좌석은
+        # `settings.cloud_provider` 셀렉터가 정한다(ARCH-57) — 이 배치는 그 선택을
+        # llm_generator의 지연 조립에서 **상속**하므로 여기 제공자 이름이 박히지 않는다.
+        None,
         misconception_catalog={mid: m.name_kr for mid, m in CATALOG_BY_ID.items()},
         topic_hint=topic_hint,
         subject=Subject.공통,

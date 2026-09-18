@@ -197,7 +197,8 @@ from whymath_backend.l3.pregenerate.validator import (
     default_seed_validator,
     validate_response,
 )
-from whymath_backend.l3.providers.anthropic import AnthropicProvider, AnthropicStatus
+from whymath_backend.l3.providers.anthropic import AnthropicProvider
+from whymath_backend.l3.providers.cloud_status import CloudStatus
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.ollama import OllamaProvider, OllamaStatus
 from whymath_backend.l3.queue import CeleryJobQueue
@@ -1119,11 +1120,14 @@ def create_app(
         cloud_error: str | None = None
         cloud_check = getattr(provider, "check_cloud_status", None)
         if cloud_check is not None:
-            cloud_status: AnthropicStatus | None = await cloud_check()
+            cloud_status: CloudStatus | None = await cloud_check()
             if cloud_status is not None:
                 cloud_configured = cloud_status.configured
-                cloud_reachable = cloud_status.reachable
                 cloud_error = cloud_status.error
+                # `reachable`은 공통 표면이 아니다(ARCH-57) — 보고하는 제공자만 자기 Status에
+                # 둔다. 없을 때 False로 접으면 "도달 불가"와 "미측정"이 같은 화면이 되므로
+                # None으로 남긴다(응답 필드가 이미 `bool | None`이라 구분이 보존된다).
+                cloud_reachable = getattr(cloud_status, "reachable", None)
 
         return StatusBody(
             ready=ollama_status.all_present,
