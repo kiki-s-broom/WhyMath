@@ -294,9 +294,7 @@ def _render(result: ScanResult) -> list[str]:
             "면제가 가리키는 코드가 없습니다(면제를 지우거나 스코프를 고치십시오)."
         )
     if not result.violations and not result.unused_allowances:
-        lines.append(
-            "  ✓ 숙달 좌석에 쓰는 지점이 Mastery Engine 계약 경로뿐입니다."
-        )
+        lines.append("  ✓ 숙달 좌석에 쓰는 지점이 Mastery Engine 계약 경로뿐입니다.")
     else:
         lines.append(
             "  → 숙달 변경은 `l2/mastery_contract.update_mastery` 계약을 경유해야 합니다. "
