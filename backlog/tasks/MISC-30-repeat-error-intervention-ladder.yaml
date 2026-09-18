@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,9 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 반복 횟수 사다리 신설 — 계획서 §9: `same error >= 2` → 교정 설명 / `>= 3` → 더 쉬운 문제 / `>= 4` → 선수 개념. 같은 오류가 쌓일수록 개입 강도가 올라가는 분기다.\n② 신호 원천은 이미 있다 — `l4/misconception/hypothesis.py:79 evidence_count`·`db/models/misconception_hypothesis.py:90`이 반복 횟수를 이미 센다. **새 카운터를 만들지 않는다.** 이 태스크는 그 값을 읽는 **reader**를 만드는 것이다(현행 reader 0건).\n③ 좌석 충돌 확인 — MISC-06(todo)이 인접하나 그 acceptance는 \"select_probe 우선순위 신호 **전용** · 코칭 강도 결정엔 미사용\"으로 이 사다리를 **명시 제외**한다. 따라서 중복이 아니다. 착수 시 MISC-06과 같은 파일을 건드리면 조율한다.\n④ 임계 단일화 — 현행 임계가 3모듈에 분산돼 있다(`l4/misconception/match_gate.py:44 _DEFAULT_CONFIDENCE_FLOOR=0.65` · `l2/weak_concept_recommendation.py:152 mastery_threshold=0.7` · `l2/learner_state.py:49-50 0.4/0.8`). 계획서가 말한 0.7과도 어긋난다. 사다리를 넣기 전에 **어느 임계가 정본인지 먼저 적는다** — 분산된 채 사다리를 얹으면 분기가 4모듈이 된다.\n⑤ 정서 안전 — 개입 강도 상승이 학생에게 \"너는 계속 틀린다\"로 읽히면 안 된다(CLAUDE.md 교수학 금기: 부정적 피드백의 정서적 강화 금지). 강도 상승은 **콘텐츠 난이도·스캐폴드 밀도**로 표현하고 실패 횟수를 학생에게 숫자로 노출하지 않는다.\n⑥ 작동 비율 — 사다리가 실제로 발동한 비율을 리포트가 말해야 한다. 분기를 붙였는데 한 번도 타지 않는 상태(현행 reader 0과 구별 불가)를 정상으로 보고하지 않는다."
-artifacts: []
+  - "[착지 정정 2026-09-18 · PR #1203 · 판정 기준 main a036fa6b] ④가 요구한 \"어느 임계가 정본인가\"의 답:\n(a) 숙달 0.4/0.7 = `l2/recommendation_contract.py`가 정본이고 신설 표는 **미러**다 — 분기 판정은 `select_reason_type`에 위임해 재구현 0(진실 원천 둘 방지). 미러-원본 일치는 테스트가 동결.\n(b) 오개념 교정 하한 0.7과 사다리 2·3·4회 = **신설 표(`REMEDIATION_POLICY_V1`)가 정본**.\n(c) `match_gate` 0.65(매칭 품질)·`intervene` 0.8/0.5(발화 패턴)·`schema/learning_state` 3회(원인 무관 연속 오답)는 **다른 질문에 답하므로 미통합**. 값이 가깝다고 합치면 한쪽을 고칠 때 다른 쪽이 조용히 따라 움직인다.\n④의 \"분기가 4모듈이 된다\"는 우려는 위임(a)으로 해소했다 — 분기 코드는 늘지 않았다.\n\n[same error 정의 · P-09 항목 4] **같은 오개념 가설의 누적 증거 수**(`MisconceptionHypothesis.evidence_count`). 같은 문제(재시도가 드물어 사실상 미발동)·같은 error signature(숫자가 다르면 쪼개져 2에 못 닿음)를 배제. 부수 이점: 가설은 감쇠·가지치기되므로 강도 상승도 자동으로 되돌아온다(⑤ 낙인 방지).\n\n[배선 범위 · 정직 표기] 사다리는 `intervene` → `InterventionDecision.escalation_rung` → `TurnOutcome.escalation_rung`까지 배선됐다(⑥ 작동 비율의 원자료 — 3상태: None=미관측 / NONE=미발동 / 나머지=발동). **경로 선택 `select_route`는 소비처 0건**이다: 숙달 축은 이미 추천 경로가 쓰고 있어 중복 배선이 되고, 오개념 축은 `learning_state_policy` R3와 겹치는 구간이라 별도 판단이 필요하다. 그 전환은 승계 대상이며 이 태스크는 표와 판정 함수까지다.\n\n[⑥ 작동 비율 한계] 배선 실재는 뮤테이션(reader 절단·리포트 절단 각 RED)으로 확인했으나 **라이브 발동 비율은 아직 미측정**(실 트래픽 없음). 3상태 분리가 그 측정의 분모·분자를 구별하기 위한 준비다.\n\n[검증] 경계 이동 뮤테이션 17종 전건 RED·대조군 GREEN. 1차 실행에서 5종이 생존했고 원인은 픽스처가 임계 상수를 import해 파생한 **자기참조**였다(경계가 움직이면 픽스처도 함께 움직여 검출 불가). 규칙 id 단언도 같은 형태였다. 둘 다 리터럴로 고정해 해소.\n\n[③ 좌석 조율] MISC-06(select_probe 우선순위 전용)과 파일 교집합 0 — 건드리지 않았다.\n\n[부수] EOS 기능 인벤토리에 `WM-E-214` 신설(신규 모듈 전수 귀속 — `infra-contracts` 잡이 RED로 지목)."
+artifacts:
+  - "PR #1203 https://github.com/kiki-s-broom/WhyMath/pull/1203 · commit d6a95b3e"
 paths:
   - src/backend/whymath_backend/l4/misconception/intervene.py
-session: claude/dazzling-einstein-5c0o2b
-notes: "출처: 계획서 300 §9(Remediation Engine — 반복 오류 사다리) — 대조표 §5 단위2. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): mastery·confidence 축 분기는 실재하나(`l4/misconception/intervene.py:59 select_intervention` · `l4/prerequisite_coaching.py:32` ← `api/me.py:1674-1720`이 막힌 선수를 최우선 반환), **반복 횟수 기반 강도 상승 분기는 reader 0건**이다. `evidence_count`를 읽어 개입 강도를 올리는 코드 grep 0. MISC-06이 그 값을 쓰지만 우선순위 신호 전용으로 범위를 좁혀 두어 이 사다리는 어느 태스크도 소유하지 않는다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
+session: null
+notes: "출처: 계획서 300 §9(Remediation Engine — 반복 오류 사다리) — 대조표 §5 단위2. 분류(§14): LOOP.\n\n실측(판정 기준 main 2e1220b4): mastery·confidence 축 분기는 실재하나(`l4/misconception/intervene.py:59 select_intervention` · `l4/prerequisite_coaching.py:32` ← `api/me.py:1674-1720`이 막힌 선수를 최우선 반환), **반복 횟수 기반 강도 상승 분기는 reader 0건**이다. `evidence_count`를 읽어 개입 강도를 올리는 코드 grep 0. MISC-06이 그 값을 쓰지만 우선순위 신호 전용으로 범위를 좁혀 두어 이 사다리는 어느 태스크도 소유하지 않는다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신.\n\n[정정 2026-09-18] ④ 임계 정본 판정 결과와 배선 범위·검증 결과를 대장에 고정 (PR #1203 착지)"
 updated: 2026-09-18
