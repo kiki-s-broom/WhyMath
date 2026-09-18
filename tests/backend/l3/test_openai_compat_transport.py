@@ -22,17 +22,30 @@ from typing import Any
 import pytest
 
 from whymath_backend.l3.providers._openai_compat import (
+    RETRYABLE_STATUS,
     HttpxChatTransport,
     extract_text,
     extract_usage,
+    reset_retry_count,
+    retries_in_current_call,
 )
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, *, payload: Any = None, text: str = "") -> None:
+    def __init__(
+        self,
+        status_code: int,
+        *,
+        payload: Any = None,
+        text: str = "",
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.status_code = status_code
         self._payload = payload
         self.text = text
+        # 실제 httpx.Response는 항상 headers를 가진다 — 전송기가 `Retry-After`를 읽으므로
+        # 시임도 그 표면을 갖춰야 한다(없으면 시임만 통과하는 거짓 계약이 된다).
+        self.headers: dict[str, str] = headers or {}
 
     def json(self) -> Any:
         return self._payload
@@ -43,6 +56,8 @@ class _FakeAsyncClient:
 
     last_init: dict[str, Any] = {}
     last_post: dict[str, Any] = {}
+
+    post_count: int = 0
 
     def __init__(self, response: _FakeResponse, **kwargs: Any) -> None:
         self._response = response
@@ -56,6 +71,7 @@ class _FakeAsyncClient:
 
     async def post(self, url: str, *, headers: Any, json: Any) -> _FakeResponse:
         type(self).last_post = {"url": url, "headers": headers, "json": json}
+        type(self).post_count += 1
         return self._response
 
 
@@ -190,3 +206,231 @@ class TestResponseNormalization:
         )
         assert usage.cache_read_input_tokens == 6
         assert usage.cache_creation_input_tokens is None
+
+
+class _SequenceClient:
+    """응답을 순서대로 내는 시임 — 재시도 경로는 *여러 번* 응답해야 밟을 수 있다.
+
+    단일 응답만 내는 `_FakeAsyncClient`로는 "첫 번째는 429, 두 번째는 200" 상태를 만들 수
+    없고, 그러면 '재시도해서 성공한다'는 절을 한 번도 지나가지 않는다
+    (CLAUDE.md 「픽스처가 그 절을 실제로 밟는가」).
+    """
+
+    posts: int = 0
+    _queue: list[_FakeResponse] = []
+
+    def __init__(self, **kwargs: Any) -> None:
+        self._kwargs = kwargs
+
+    async def __aenter__(self) -> _SequenceClient:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    async def post(self, url: str, *, headers: Any, json: Any) -> _FakeResponse:
+        type(self).posts += 1
+        index = min(type(self).posts - 1, len(type(self)._queue) - 1)
+        return type(self)._queue[index]
+
+
+@pytest.fixture
+def sequenced_httpx(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """응답 시퀀스를 주는 httpx 시임."""
+
+    def _install(responses: list[_FakeResponse]) -> type[_SequenceClient]:
+        _SequenceClient.posts = 0
+        _SequenceClient._queue = responses
+        module = types.ModuleType("httpx")
+        module.AsyncClient = _SequenceClient  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "httpx", module)
+        return _SequenceClient
+
+    return _install
+
+
+async def _no_sleep(_seconds: float) -> None:
+    """테스트는 실제로 기다리지 않는다 — 대기 시간은 `_backoff_s`로 따로 단언한다."""
+    return None
+
+
+class TestRetryOnTransientFailure:
+    """429·5xx 재시도 (2026-09-17 OpenRouter 실측 대응).
+
+    실측: 20회 중 6회(30%)가 `429 engine_overloaded`로 죽었고 우리 전송기에 재시도가
+    없었다. 재시도가 없으면 "가용성 70%"가 공급사의 성질이 아니라 **우리 전송기의 성질**을
+    재는 숫자가 된다.
+    """
+
+    @pytest.mark.parametrize("status", [429, 500, 502, 503, 504, 408])
+    async def test_retries_then_succeeds(self, sequenced_httpx: Any, status: int) -> None:
+        client = sequenced_httpx(
+            [
+                _FakeResponse(status, text="upstream busy"),
+                _FakeResponse(200, payload={"ok": True}),
+            ]
+        )
+        reset_retry_count()
+        result = await HttpxChatTransport(sleep=_no_sleep, jitter=lambda: 0.0).post_chat(
+            "https://example.test/v1/chat/completions",
+            headers={},
+            payload={"model": "m"},
+            timeout_s=1.0,
+        )
+        assert result == {"ok": True}
+        assert client.posts == 2
+        assert retries_in_current_call() == 1
+
+    @pytest.mark.parametrize("status", [400, 401, 402, 403, 404, 422])
+    async def test_permanent_errors_are_not_retried(
+        self, sequenced_httpx: Any, status: int
+    ) -> None:
+        """모델 ID 오타·키 오류·공급사 필터 거부는 다시 걸어도 같다 — 즉시 실패해야 한다."""
+        client = sequenced_httpx([_FakeResponse(status, text="nope")])
+        reset_retry_count()
+        with pytest.raises(RuntimeError, match=str(status)):
+            await HttpxChatTransport(sleep=_no_sleep, jitter=lambda: 0.0).post_chat(
+                "https://example.test/v1/chat/completions",
+                headers={},
+                payload={"model": "m"},
+                timeout_s=1.0,
+            )
+        assert client.posts == 1
+        assert retries_in_current_call() == 0
+
+    async def test_gives_up_after_max_attempts_and_says_how_many(
+        self, sequenced_httpx: Any
+    ) -> None:
+        """포기할 때 **몇 번 시도했는지**가 메시지에 남는다 — 없으면 1회 실패와 구분 안 된다."""
+        client = sequenced_httpx([_FakeResponse(429, text="still busy")])
+        reset_retry_count()
+        with pytest.raises(RuntimeError, match="시도 3회"):
+            await HttpxChatTransport(max_attempts=3, sleep=_no_sleep, jitter=lambda: 0.0).post_chat(
+                "https://example.test/v1/chat/completions",
+                headers={},
+                payload={"model": "m"},
+                timeout_s=1.0,
+            )
+        assert client.posts == 3
+        assert retries_in_current_call() == 2
+
+    async def test_max_attempts_one_means_no_retry(self, sequenced_httpx: Any) -> None:
+        client = sequenced_httpx([_FakeResponse(429, text="busy")])
+        reset_retry_count()
+        with pytest.raises(RuntimeError):
+            await HttpxChatTransport(max_attempts=1, sleep=_no_sleep, jitter=lambda: 0.0).post_chat(
+                "https://example.test/v1/chat/completions",
+                headers={},
+                payload={"model": "m"},
+                timeout_s=1.0,
+            )
+        assert client.posts == 1
+
+    def test_zero_attempts_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="1 이상"):
+            HttpxChatTransport(max_attempts=0)
+
+    async def test_the_retried_request_is_byte_identical(self, sequenced_httpx: Any) -> None:
+        """재시도가 payload를 바꾸면 공급사 3파라미터 계약이 두 번째 요청에서 깨질 수 있다."""
+        seen: list[Any] = []
+
+        class _Recording(_SequenceClient):
+            async def post(self, url: str, *, headers: Any, json: Any) -> _FakeResponse:
+                seen.append(json)
+                return await super().post(url, headers=headers, json=json)
+
+        _SequenceClient.posts = 0
+        _SequenceClient._queue = [_FakeResponse(429), _FakeResponse(200, payload={"ok": 1})]
+        module = types.ModuleType("httpx")
+        module.AsyncClient = _Recording  # type: ignore[attr-defined]
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setitem(sys.modules, "httpx", module)
+            await HttpxChatTransport(sleep=_no_sleep, jitter=lambda: 0.0).post_chat(
+                "https://example.test/v1/chat/completions",
+                headers={},
+                payload={"model": "m", "provider": {"only": ["deepinfra"]}},
+                timeout_s=1.0,
+            )
+        assert len(seen) == 2
+        assert seen[0] == seen[1]
+
+
+class TestBackoffSchedule:
+    """대기 시간 — 공급사의 `Retry-After`가 있으면 그것을 쓴다."""
+
+    def test_exponential_with_jitter(self) -> None:
+        transport = HttpxChatTransport(base_delay_s=2.0, max_delay_s=100.0, jitter=lambda: 0.5)
+        assert transport._backoff_s(0, None) == pytest.approx(2.0 + 1.0)
+        assert transport._backoff_s(1, None) == pytest.approx(4.0 + 1.0)
+        assert transport._backoff_s(2, None) == pytest.approx(8.0 + 1.0)
+
+    def test_capped_by_max_delay(self) -> None:
+        transport = HttpxChatTransport(base_delay_s=1.0, max_delay_s=5.0, jitter=lambda: 0.0)
+        assert transport._backoff_s(10, None) == pytest.approx(5.0)
+
+    def test_retry_after_header_wins(self) -> None:
+        transport = HttpxChatTransport(base_delay_s=1.0, max_delay_s=60.0, jitter=lambda: 0.0)
+        assert transport._backoff_s(0, 7.5) == pytest.approx(7.5)
+
+    def test_retry_after_is_still_capped(self) -> None:
+        """공급사가 1시간을 요구해도 우리 상한을 넘기지 않는다."""
+        transport = HttpxChatTransport(base_delay_s=1.0, max_delay_s=20.0, jitter=lambda: 0.0)
+        assert transport._backoff_s(0, 3600.0) == pytest.approx(20.0)
+
+    async def test_retry_after_header_is_read_from_the_response(self, sequenced_httpx: Any) -> None:
+        """헤더를 실제로 읽는가 — 읽지 않으면 위 단위 테스트는 전부 통과하면서 무의미하다."""
+        slept: list[float] = []
+
+        async def _record(seconds: float) -> None:
+            slept.append(seconds)
+
+        sequenced_httpx(
+            [
+                _FakeResponse(429, text="busy", headers={"retry-after": "9"}),
+                _FakeResponse(200, payload={"ok": 1}),
+            ]
+        )
+        await HttpxChatTransport(sleep=_record, jitter=lambda: 0.0, max_delay_s=60.0).post_chat(
+            "https://example.test/v1/chat/completions",
+            headers={},
+            payload={"model": "m"},
+            timeout_s=1.0,
+        )
+        assert slept == [pytest.approx(9.0)]
+
+    @pytest.mark.parametrize("raw", ["Wed, 21 Oct 2026 07:28:00 GMT", "", "-3", "abc", None])
+    async def test_unparsable_retry_after_falls_back_to_backoff(
+        self, sequenced_httpx: Any, raw: str | None
+    ) -> None:
+        """HTTP-date·음수·쓰레기 값은 **모른다**로 떨어뜨리고 우리 백오프로 간다."""
+        slept: list[float] = []
+
+        async def _record(seconds: float) -> None:
+            slept.append(seconds)
+
+        headers = {} if raw is None else {"retry-after": raw}
+        sequenced_httpx(
+            [
+                _FakeResponse(429, text="busy", headers=headers),
+                _FakeResponse(200, payload={"ok": 1}),
+            ]
+        )
+        await HttpxChatTransport(
+            sleep=_record, jitter=lambda: 0.0, base_delay_s=1.0, max_delay_s=60.0
+        ).post_chat(
+            "https://example.test/v1/chat/completions",
+            headers={},
+            payload={"model": "m"},
+            timeout_s=1.0,
+        )
+        assert slept == [pytest.approx(1.0)]
+
+
+class TestRetryableStatusSet:
+    def test_permanent_client_errors_are_absent(self) -> None:
+        for status in (400, 401, 402, 403, 404, 422):
+            assert status not in RETRYABLE_STATUS
+
+    def test_the_status_we_actually_hit_is_present(self) -> None:
+        """2026-09-17 OpenRouter 실측에서 실제로 맞은 코드."""
+        assert 429 in RETRYABLE_STATUS

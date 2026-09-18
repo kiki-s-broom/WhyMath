@@ -104,8 +104,12 @@ PROVIDER_JURISDICTIONS: Final[Mapping[str, Jurisdiction]] = {
     "fireworks": Jurisdiction.US,  # Zero retention · Prompt training No
     "together": Jurisdiction.US,  # Zero retention · Prompt training No
     "gmicloud": Jurisdiction.US,  # ⚠ Retention **Unknown** — 기본 허용목록 제외 사유
-    # ── 근거 B — 공급사 표의 국기 배지 ──
-    "baseten": Jurisdiction.US,  # 표에 🇺🇸 배지. 패널 미확인이라 A보다 약하다
+    # 2026-09-18 추가 실측(Kiki 화면) — `baseten/fp8` 패널 전문:
+    #   Headquarters US · Region US · Precision FP8 · Prompt training No ·
+    #   Retention **Zero retention** · Uptime 100.00%(9/15~9/18) · BYOK supported
+    # 근거 등급이 B(표의 국기 배지)에서 **A(패널)**로 올라갔고, 네 축을 모두 아는 유일한
+    # 공급사가 됐다(deepinfra는 가용성 축에서 막혔다 — 아래 기본 허용목록 주석).
+    "baseten": Jurisdiction.US,
     # ── 근거 C — 회사로 아는 것(1차 자료 아님) ──
     # 판정 결과는 차단에 가깝지만 UNKNOWN과 **다른 사실**이다: CN은 코퍼스 opt-in이라는
     # 경로가 있고 UNKNOWN은 전건 차단이다. 둘을 같은 칸에 넣으면 근거를 되짚을 수 없다.
@@ -132,9 +136,16 @@ PROVIDER_JURISDICTIONS: Final[Mapping[str, Jurisdiction]] = {
 # 근거(2026-09-17 Kiki 화면): 공급사 패널 `Specifications › Precision`.
 #   deepinfra=FP8 · gmicloud=FP8 · fireworks=`--` · together=`--`
 # `--`는 "미표기"이지 "표준 정밀도"가 아니다 — 그래서 표에 넣지 않는다.
+#
+# 2026-09-18 추가(같은 방식): `baseten` 패널 `Precision: FP8`. 엔드포인트 응답으로도
+# 교차확인했다 — 이 모델의 Baseten 엔드포인트는 **둘 다 tag가 `baseten/fp8`**이라
+# `only: ["baseten"]`이 두 곳을 모두 허용해도 **정밀도가 섞이지 않는다**(두 행은 리전/배포
+# 차이일 뿐이다). 그래서 양자화를 강제하는 네 번째 파라미터를 도입하지 않는다 — 축은
+# 필요할 때만 늘린다(CLAUDE.md 관계 타입 폭발 금지의 같은 취지).
 PROVIDER_PRECISION: Final[Mapping[str, str]] = {
     "deepinfra": "fp8",
     "gmicloud": "fp8",
+    "baseten": "fp8",
 }
 
 
