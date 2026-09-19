@@ -219,3 +219,6 @@ backlog/inventory/feature_inventory_v2.csv
 # ARCH-57 저작 배치 산출(런북 docs/ops/arch57_authoring_openrouter_runbook.md)
 # — LLM 생성 문항 JSONL. 로컬 실행 결과이지 저장소 자산이 아니다.
 .arch57-out/
+
+# EOS-121 좌석별 생성 다양성 실측 회차 산출물 (라이브 회차 전용·저장소에 넣지 않는다)
+.eos121-out/
