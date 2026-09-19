@@ -738,12 +738,42 @@ class SeatTally:
     calls_with_cost: int = 0
     """`cost_usd`가 실린 행 수 — 합이 0.0인 것과 '아무도 안 실었다'를 구분한다."""
 
+    # ── 관측 축 (EOS-112) — 위 필드들이 *선언값*(설정이 지목한 모델)을 센다면 아래는
+    # *관측값*(응답이 온 모델)을 센다. 둘을 같은 원장에서 세는 이유는 **대조가 목적**이라
+    # 따로 순회하면 같은 행을 두 번 읽으며 갈라질 수 있기 때문이다.
+    calls_with_served_model: int = 0
+    """`served_model`이 실린 행 수 — 0이면 관측 자체가 없었다(어긋남 0건이 아니다)."""
+
+    by_served_model: tuple[tuple[str, int], ...] = ()
+    """(관측 모델명, 건수) 오름차순 튜플 — `by_model`(선언)과 짝을 이룬다."""
+
+    declared_served_comparable: int = 0
+    """선언·관측이 **둘 다** 실린 행 수 — 대조의 분모. 한쪽만 있으면 비교가 성립하지 않는다."""
+
+    declared_served_differs: int = 0
+    """대조 가능한 행 중 두 값이 다른 행 수 — 분자."""
+
+    differing_pairs: tuple[tuple[str, str, int], ...] = ()
+    """(선언값, 관측값, 건수) 오름차순 — 어긋남의 *내용*. 건수만으로는 별칭 해소와 진짜
+    폴백을 구분할 수 없어서 쌍 자체를 남긴다."""
+
+    calls_with_retries: int = 0
+    """`retries`가 실린 행 수(계측된 행). Anthropic·Ollama 경로는 여기 들어오지 않는다."""
+
+    retries_total: int = 0
+    """계측된 행의 재시도 합."""
+
+    calls_with_any_retry: int = 0
+    """재시도가 1회 이상 일어난 행 수 — 합이 큰 것이 한 행 탓인지 여러 행 탓인지 가른다."""
+
     def observe(
         self,
         *,
         model_name: str | None,
         success: bool | None,
         cost_usd: float | None,
+        served_model: str | None = None,
+        retries: int | None = None,
     ) -> SeatTally:
         """genlog 행 1건을 반영한 새 원장을 돌려준다(원본 불변).
 
@@ -755,6 +785,22 @@ class SeatTally:
         if model_name:
             counts[model_name] = counts.get(model_name, 0) + 1
             with_model += 1
+        served_counts = dict(self.by_served_model)
+        with_served = self.calls_with_served_model
+        if served_model:
+            served_counts[served_model] = served_counts.get(served_model, 0) + 1
+            with_served += 1
+        # 대조는 **둘 다 실린 행에서만** 성립한다 — 한쪽이 없는 행을 '일치'로도 '어긋남'
+        # 으로도 계상하면 미관측이 판정으로 둔갑한다(모른다 ≠ 아니다).
+        comparable = self.declared_served_comparable
+        differs = self.declared_served_differs
+        pairs = {(d, s): n for d, s, n in self.differing_pairs}
+        if model_name and served_model:
+            comparable += 1
+            if model_name != served_model:
+                differs += 1
+                key = (model_name, served_model)
+                pairs[key] = pairs.get(key, 0) + 1
         return replace(
             self,
             calls_total=self.calls_total + 1,
@@ -764,6 +810,18 @@ class SeatTally:
             failed=self.failed + (1 if success is False else 0),
             cost_usd_total=self.cost_usd_total + (cost_usd if cost_usd is not None else 0.0),
             calls_with_cost=self.calls_with_cost + (1 if cost_usd is not None else 0),
+            calls_with_served_model=with_served,
+            by_served_model=tuple(sorted(served_counts.items())),
+            declared_served_comparable=comparable,
+            declared_served_differs=differs,
+            differing_pairs=tuple((d, s, n) for (d, s), n in sorted(pairs.items())),
+            # `retries`는 None(미계측)과 0(계측·재시도 없음)이 다른 사실이다. None은
+            # 분모에도 들어가지 않는다 — 들어가면 계측 없는 경로가 '재시도 0%'로 보인다.
+            calls_with_retries=self.calls_with_retries + (1 if retries is not None else 0),
+            retries_total=self.retries_total + (retries if retries is not None else 0),
+            calls_with_any_retry=(
+                self.calls_with_any_retry + (1 if retries is not None and retries > 0 else 0)
+            ),
         )
 
 
@@ -828,8 +886,63 @@ def seat_operating_rates(
         "measured": measured,
         "unmeasured_reason": unmeasured_reason,
         "declared_not_observed": (
-            "model_name은 설정 유래 선언값이다(ARCH-58) — provider 측 대체·폴백은 이 "
-            "신호로 보이지 않는다(관측 축 = EOS-112)."
+            "위 state·on/off 판정은 선언값(model_name · 설정 유래 · ARCH-58) 기반이다. "
+            "응답에서 읽은 관측값은 아래 observation 블록에 따로 싣는다(EOS-112) — 두 값을 "
+            "한 필드로 합치지 않는 이유는 provider가 모델 식별자를 안 돌려주는 회차에서 "
+            "'관측 실패'가 '선언값과 일치'로 위장되기 때문이다."
         ),
+        "observation": _observation_block(tally),
         "state": state,
+    }
+
+
+_DIFFERING_PAIR_LIMIT: Final[int] = 20
+"""요약에 싣는 (선언, 관측) 어긋남 쌍의 상한 — 넘치면 잘렸다는 사실을 함께 적는다."""
+
+
+def _observation_block(tally: SeatTally) -> dict[str, Any]:
+    """'누가 실제로 답했나' 축 (EOS-112) — 선언 축과 **분리된** 블록으로 낸다.
+
+    세 가지를 각각 말한다:
+      ① **관측 규모** — `served_model`이 실린 행 수. 0이면 어긋남 0건이 아니라 *관측
+         자체가 없었다*이다(provider가 모델 식별자를 안 싣거나 호출이 없었던 회차).
+      ② **대조 결과** — 선언·관측이 둘 다 있는 행에서만 비교한다. `differs`가 0보다 크면
+         provider 측 대체·폴백·프록시 라우팅이 **일어났을 수 있다**. 다만 별칭→버전 해소
+         (`claude-sonnet-4-6` → 날짜 붙은 ID, `qwen2-math` → `qwen2-math:7b`)도 같은
+         차이로 나타나므로 이것은 *판정*이 아니라 **볼 자리**다 — 그래서 건수만이 아니라
+         쌍 자체를 싣는다(쌍을 보면 사람이 한눈에 가른다). 상시 발화하는 경보로 만들면
+         사람이 꺼 버리므로 boolean 알람을 두지 않는다.
+      ③ **재시도** — 재시도는 측정을 가린다. 계측된 행 수를 분모로 함께 내어, 합 0이
+         '재시도 없었다'인지 '아무도 계측 안 했다'인지 구분되게 한다.
+    """
+    pairs = [
+        {"declared": declared, "served": served, "count": count}
+        for declared, served, count in tally.differing_pairs[:_DIFFERING_PAIR_LIMIT]
+    ]
+    return {
+        "calls_with_served_model": tally.calls_with_served_model,
+        "observed_models": {model: count for model, count in tally.by_served_model},
+        "declared_vs_served": {
+            "comparable": tally.declared_served_comparable,
+            "matched": tally.declared_served_comparable - tally.declared_served_differs,
+            "differs": tally.declared_served_differs,
+            "differing_pairs": pairs,
+            "differing_pairs_truncated": len(tally.differing_pairs) > _DIFFERING_PAIR_LIMIT,
+            "note": (
+                "차이가 곧 이상은 아니다 — 별칭→버전 해소도 같은 차이로 나타난다. "
+                "쌍을 보고 사람이 가른다(자동 판정 아님)."
+            ),
+        },
+        "retries": {
+            "calls_with_retries_measured": tally.calls_with_retries,
+            # 계측 행이 0건이면 합을 0으로 내지 않는다 — '재시도 없었다'로 읽히기 때문이다.
+            "retries_total": tally.retries_total if tally.calls_with_retries else None,
+            "calls_with_any_retry": (
+                tally.calls_with_any_retry if tally.calls_with_retries else None
+            ),
+            "note": (
+                "None=이 회차에 재시도를 계측한 호출이 0건(Anthropic SDK·Ollama는 우리 "
+                "전송기를 타지 않아 카운터가 없다). 0=계측했고 재시도 없었다."
+            ),
+        },
     }

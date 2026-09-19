@@ -184,7 +184,11 @@ class TestMigrationFileChain:
         # 뻔했고, 병합 시 EOS-105의 down_revision을 재지정해 직렬로 되돌렸다.
         # EOS-108이 그 위에 c1f5a8b2d740(concept/skill_mastery_history.attempt_id 멱등 키 +
         # 부분 유니크 인덱스 2종)을 얹어 head를 다시 이동.
-        assert heads == {"c1f5a8b2d740"}
+        # EOS-112가 그 위에 d2a9e4b71c35(generation_log.served_model·retries 관측 좌석)를
+        # 얹어 head를 다시 이동. 이 리터럴은 head를 고정하는 **세 번째** 좌석이다
+        # (schema_version.KNOWN_REVISIONS·probe_prod_schema_revision.sql이 나머지 둘) —
+        # 손으로 유지하는 사본이 셋이라 마이그레이션마다 전부 갱신해야 한다(= MISC-31).
+        assert heads == {"d2a9e4b71c35"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

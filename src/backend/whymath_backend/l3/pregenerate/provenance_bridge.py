@@ -193,6 +193,10 @@ def generation_log_from_result(
         cache_creation_input_tokens=(
             usage.cache_creation_input_tokens if usage is not None else None
         ),
+        # 관측 좌석(EOS-112) — 같은 usage에서 그대로. 인제스트 모드처럼 호출이 없었던
+        # 항목은 usage 자체가 None이라 둘 다 None=미관측이다.
+        served_model=usage.served_model if usage is not None else None,
+        retries=usage.retries if usage is not None else None,
         cost_usd=cost_usd,
         latency_ms=latency_ms,
         success=result.status in _SUCCESS_STATUSES,

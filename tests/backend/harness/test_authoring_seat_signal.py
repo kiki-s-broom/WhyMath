@@ -192,8 +192,14 @@ def test_every_reachable_state_is_in_the_vocabulary() -> None:
 def test_report_states_that_model_name_is_declared_not_observed() -> None:
     """요약이 **선언값임을 스스로 밝힌다** — 읽는 사람이 이 신호를 과신하지 않게.
 
-    이 문구가 사라지면 다음 사람이 "OpenRouter가 답했다"로 읽는데, 실제로는 "설정이
-    OpenRouter를 지목했고 라우팅이 클라우드로 갔다"까지만 아는 것이다(`EOS-112`).
+    이 문구가 사라지면 다음 사람이 "OpenRouter가 답했다"로 읽는데, 이 `state`가 아는
+    것은 "설정이 OpenRouter를 지목했고 라우팅이 클라우드로 갔다"까지다.
+
+    2026-09-19 갱신: `EOS-112`가 착지해 관측 축이 **실재한다** — 응답에서 읽은 값은
+    같은 요약의 `observation` 블록에 따로 실린다. 두 값을 한 필드로 합치지 않는 이유는
+    provider가 모델 식별자를 안 돌려주는 회차에서 '관측 실패'가 '선언값과 일치'로
+    위장되기 때문이다. 그래서 이 문구는 여전히 필요하다(축이 생겼다고 없앨 것이 아니라,
+    어느 축이 무엇을 아는지를 계속 말해야 한다).
     """
     rates = seat_operating_rates(
         _tally((_OR_MID, True, None)), selected_seat="openrouter", seat_model_pins=_PINS
