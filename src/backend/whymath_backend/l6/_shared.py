@@ -27,9 +27,12 @@ validator 패턴 답습). `normalize_enum_value`가 그 정규화의 공용 진�
 import하지 않는다 — 이 모듈은 기존 `Problem` 필드의 *존재·값*만 본다. L6은 아무도 import하지
 않는 최상위 소비자다(역방향 의존 부재).
 
-설계 메모: `schema.problem._METADATA_ONLY_SOURCES`는 *private*이라 import하지 않고 L6에서
-같은 집합을 명시적으로 재정의한다(레이어 경계 — L6는 L1의 *공개* 계약만 의존). 두 정의가
-어긋나지 않게, 값은 L1 enum(`SourceType.평가원/EBS/교과서`)을 그대로 가리킨다.
+설계 메모(2026-09-18 정정 · EOS-19): 이 집합은 한때 여기서 *재정의*됐다 — 사유는
+"`schema.problem._METADATA_ONLY_SOURCES`가 private이라 import할 수 없다"였다. 그 사유가
+사라졌으므로(그쪽이 공개 이름 `METADATA_ONLY_SOURCES`가 됐다) 재정의를 걷고 **같은 객체를
+재노출**한다. 저작권 차단 집합이 두 벌이면 한쪽만 고쳐지는 날 노출 게이트가 갈라지는데,
+그것은 법적 축에서 가장 위험한 드리프트다. 기존 import 경로
+(`l6.retake.gating.METADATA_ONLY_SOURCES` 등)는 그대로 동작한다.
 """
 
 from __future__ import annotations
@@ -38,15 +41,16 @@ from enum import Enum
 
 # `ReviewStatus` 자체는 더 이상 여기서 비교하지 않는다 — 값 판정을
 # `is_review_status_cleared`(L1, 단일 권위)에 위임했기 때문이다(CONT-01).
-from whymath_backend.schema.enums import Persona, SourceType, is_review_status_cleared
+from whymath_backend.schema.enums import Persona, is_review_status_cleared
+from whymath_backend.schema.problem import METADATA_ONLY_SOURCES as _SCHEMA_METADATA_ONLY_SOURCES
 from whymath_backend.schema.problem import Problem
 
 # ──────────────────────────────────────────────────────────────────────────
 # 게이팅 상수
 # ──────────────────────────────────────────────────────────────────────────
-METADATA_ONLY_SOURCES: frozenset[SourceType] = frozenset(
-    {SourceType.평가원, SourceType.EBS, SourceType.교과서}
-)
+#: 학생에게 *본문 노출이 불가*한 출처 — 저작권 노출 게이트의 차단 집합(L6 공용).
+#: 정의는 `schema.problem`이 소유한다(아래 docstring의 배경 참조) — 여기서는 재노출만 한다.
+METADATA_ONLY_SOURCES = _SCHEMA_METADATA_ONLY_SOURCES
 """학생에게 *본문 노출이 불가*한 출처 — 저작권 노출 게이트의 차단 집합(L6 공용).
 
 평가원·EBS·검정교과서는 *본문·문항 미보유*(WhyMath는 구조 메타데이터만 보유). 이 출처의

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-32-learner-state-vs-learning-state-vocabulary
+title: "API 어휘 혼동 — /v1/me/learner-state(EOS-10 요약 상태) ↔ /v1/me/learning-state(EOS-105 학습 국면)가 한 글자 차이. 담는 사실은 다른데 이름이 그 차이를 말하지 않는다"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 혼동 실측 기록 — 두 표면이 담는 사실이 실제로 다름을 먼저 적는다. GET /v1/me/learner-state(EOS-10)는 숙달 맵·능력치·오개념을 합성한 요약 상태를, GET /v1/me/learning-state(EOS-105)는 8상태 학습 국면과 전이 이력을 준다. 경로는 한 글자 차이인데 의미는 겹치지 않는다.\n② 판정 — 셋 중 하나를 고른다: (a) 한쪽 개명 (b) 둘 다 개명해 의미를 드러내는 어휘로 교체 (c) 현행 유지 + 혼동 방지 장치만(OpenAPI summary·docstring 상호 참조). (c)를 고르면 그 근거를 적는다 — \"고치기 번거롭다\"는 근거가 아니다.\n③ 소비자 실측이 선결 — 개명 비용은 소비자 수에 비례한다. 판정 전에 두 경로의 소비자를 전수 확인한다(Flutter src/mobile/lib 전수 grep · 웹 · 테스트 · 문서). 지금은 둘 다 소비자 0에 가까우므로 개명 창이 열려 있고, 이 창은 닫힌다.\n④ 기계 집행 — 판정이 (a)(b)면 개명 후 구 경로의 잔존 참조 0건을 전수 스캔으로 확인한다. (c)면 두 엔드포인트의 docstring이 서로를 명시적으로 지목하는지 회귀 테스트로 동결한다(산문 규약은 리팩터링으로 조용히 사라진다).\n⑤ 범위 밖 명시 — 이 태스크는 어휘만 다룬다. 두 표면의 기능·계약·소유 좌석은 각각 EOS-10과 EOS-105가 소유하며 이 태스크가 바꾸지 않는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/me.py
+session: null
+notes: "출처: 2026-09-17 EOS-105 착지 중 발견. PR #1189(EOS-105)가 GET /v1/me/learning-state를 추가하려는 시점에 main이 EOS-10(PR #1184)의 GET /v1/me/learner-state를 이미 머지한 상태였다. 병합 과정에서 두 경로가 한 글자 차이임을 실측으로 확인했다(api/me.py 1095행 learning-state · 1830행 learner-state).\n\n라우팅 충돌은 없다 — 경로가 다르므로 FastAPI는 정상 분기한다. 문제는 사람이다: 클라 개발자·리뷰어·미래 세션이 둘을 혼동할 표면이 열렸다.\n\n등재만 하고 고치지 않은 이유: EOS-105 세션의 범위 밖이며(마스터 프리앰블 \"이번 항목 밖의 코드를 김에 같이 고치지 않는다\"), 상대 표면 EOS-10은 방금 머지된 타 세션 산출물이라 일방 개명이 부적절하다. 어느 쪽을 어떻게 바꿀지는 Kiki 판정 사안에 가깝다.\n\n착수 시점 권고: 소비자가 생기기 전이 가장 싸다. 두 표면 모두 현재 클라 소비자가 없는 것으로 보이나 그 자체를 acceptance ③이 실측으로 요구한다(\"내가 찾은 방법으로는 0건\" 범위 명시 포함)."
+updated: 2026-09-17

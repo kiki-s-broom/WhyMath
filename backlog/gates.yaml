@@ -20,6 +20,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
+  - id: G-arch56-availability-trigger
+    title: "ARCH-56 착수 트리거 확인 — OpenRouter 가용성 축을 지금 재는 것이 맞는가 (ARCH-55 판정 기준 (d) 보류분). 배경: 4회차 429 실패율이 30%→15%→0%로 흔들렸고 실패 원인이 전부 limit_source=upstream_provider_shared_pool·is_byok=false(공유 풀)다 — 공유 풀은 배포 대상 구성이 아니므로 그 대기열 통계는 채택 후를 대표하지 않는다. 2026-09-18 Kiki 판단으로 BYOK을 개발 단계에서 미채택했다(\"우리는 일단 개발과정에 사용할건데 byok까지 할 거 있나?\"). 판정 3택: ①보류 유지(트리거 미발동 — 기본값. 이 게이트를 재생성해 감시 지속) ②착수(발동 조건 중 하나가 실현됨) ③영구 종결(이 경로를 쓰지 않기로 결정). 발동 조건 3종 중 먼저 오는 것: ⓐ OpenRouter 경로가 학생 대면 또는 상시 배치 트래픽을 받기로 결정된 때 ⓑ openrouter_allowed_providers 기본값을 바꾸려는 판정이 생긴 때 ⓒ 개발 단계 측정에서 429 실패율이 한 회차 50% 이상으로 오른 때. 등재 이유: 발동 조건을 태스크 acceptance 산문에만 두면 selector.py가 그것을 읽지 않아(depends_on만 본다) ARCH-55 완료 즉시 착수 후보로 계산된다 — 실측으로 확인했다(backlog.py done 출력이 \"ARCH-56 착수 가능\"을 냈다). G-arch38-verdict-recheck 선례 동형"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-18
+    remind_after_days: 90
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-attempt-retention-purge-backfill-decision
     title: "Kiki 결정: ProblemAttempt PII 보존기한 파기 대상 소급 확인 — started_at 상시 NULL 버그로 지금까지 파기 0건 (원 PED-16이 7n9n72에 고립·main ID 충돌로 유실 → 2026-09-07 감사가 게이트로 재등재). 배경: privacy/retention.py:80이 ProblemAttempt 파기 기준 컬럼으로 started_at을 쓰는데 두 writer(api/coach.py·api/me.py) 어디서도 채우지 않아 상시 NULL — 근본수정은 PED-37(회수 태스크)이 소유하며 착지 후 신규 행부터 정상. 결정 3항(claude가 판단할 사안 아님 — 법령 유래 절차의 기계 대체 금지): (a) 이 컨테이너·개발 환경·Phaiakes9 prod DB(whymath-pg 5433)에 실제 학생 개인정보가 쌓인 적이 있는가(2026-09-03 복구 리허설 실측 problem_attempt 0행·user_profile 1행이면 실무 영향 0 가능성 높음) (b) 있다면 기존 NULL 행의 소급 파기 기준을 무엇으로 볼 것인가(ended_at 대체 등) (c) 소급 파기 스크립트가 필요하면 별도 태스크로 claude에게 위임. clear evidence에 (a)의 실측 행수와 (b)(c)의 결정을 적는다"
     kind: decision
@@ -80,6 +90,16 @@ gates:
     evidence: "2026-09-09 Kiki가 이 세션과의 대화에서 3안 중 \"새 정본 저장소로 전환 (시나리오 A)\"을 직접 선택 — doldori7/WhyMath는 유지만 하고 향후 개발·PR·머지를 kiki-s-broom/WhyMath로 옮기기로 결정. 판정 기준(커밋)은 없음 — 대화 중 즉석 결정이라 --no-base 처리. 집행 상세·실행 범위 한계·개방 질문은 HARN-96-canonical-repo-migration-kiki-s-broom 및 G-canonical-repo-cutover-kiki-s-broom 참조."
     cleared_by: claude
     notes: "[판정기준 없음 2026-09-09] 커밋 없는 대화 중 즉석 결정 — Kiki가 이 세션에서 직접 시나리오 A(전환)를 선택"
+  - id: G-canonical-repo-residual-kiki-checks
+    title: "정본 저장소 전환 잔여 확인 3건 (HARN-96 ②⑦⑭) — 전부 Kiki 화면·머신 전용이라 세션 대체 경로가 없음이 3개 세션에서 재확인됐다. ① 시크릿 승계: 저장소 Settings → Secrets and variables → Actions 에서 DEPLOY_SSH_HOST·DEPLOY_SSH_USER·DEPLOY_SSH_KEY·DEPLOY_SSH_KNOWN_HOSTS·DEPLOY_SSH_PATH 5개 이름의 존재 확인(값 불요·이름만). GitHub API는 시크릿 이름 목록 조회를 제공하지 않고(의도된 설계) deploy.yml 실행 이력도 total_count=0이라 간접 증거 경로도 없다. ② 구 저장소 처분: github.com/doldori7?tab=repositories 에서 WhyMath 가 보이는지 확인 — 안 보이면 전환으로 이미 사라진 것이라 조치 불필요로 종결, 보이면 그 저장소 Settings → Archive this repository 실행(2026-09-12 Kiki 결정=아카이브). ③ 로컬 클론 origin 교체: Kiki 머신 클론이 아직 옛 주소를 가리킨다(2026-09-14 실측 — push 시 This repository moved 경고). cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath 후 git remote set-url origin https://github.com/kiki-s-broom/WhyMath.git 실행하고 git remote get-url origin 으로 새 주소 확인(변별력: 실행 전 doldori7 → 후 kiki-s-broom). 셋 다 확인되면 HARN-96을 done으로 닫을 수 있다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-classic-branch-protection-delete
     title: "클래식 브랜치 보호 규칙 삭제 실행 — G-strict-policy-and-classic-cleanup 결정(2026-09-14 Kiki: strict 해제 + 클래식 삭제)의 물리적 집행. 세션 GitHub 토큰은 /branches/main/protection 조회조차 403(admin 권한 필요)이라 대행 불가 — Settings→Branches→main 규칙 Delete. 6항목 브리핑·자가검증 = .github/branch-protection-setup.md '### strict 해제 확정 + 클래식 브랜치 보호 삭제'"
     kind: human
@@ -206,6 +226,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-07
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-eos118-seat-signal-live-run
+    title: "EOS-118 라이브 관측 회차 2건 실행 (Phaiakes9) — 좌석 신호가 실제로 좌석을 말하는지 확인. 실행 대상 = docs/ops/arch57_authoring_openrouter_runbook.md. ① openrouter 좌석 회차 1건 ② 기본값(anthropic) 대조군 회차 1건. 회신 = 두 회차의 요약 cloud_seat 블록 전문(state · observation.calls_with_served_model · observation.declared_vs_served{comparable,differs,differing_pairs} · observation.retries.calls_with_retries_measured). 판정 기준(한 신호로 두 축을 판정하지 않는다): state가 not_measured가 아닐 것 **그리고** declared_vs_served.comparable > 0일 것 **그리고** 두 회차의 observed_models가 서로 다를 것. 셋 중 하나라도 어긋나면 통과가 아니라 원인 규명 대상이다 — 실패 회차도 그대로 기록한다(폐기 금지). 세션이 실행 전에 6항목 브리핑과 함께 명령 블록을 안내하며, 런북·측정 코드가 Kiki 체크아웃에 실재하는지(main 도달) 먼저 실측 확인한다. 전제: Phaiakes9 · OpenRouter 키 등록됨(ARCH-57 라이브 1회차 선례) · Docker Postgres 가동."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-19
     remind_after_days: 14
     evidence: null
     cleared_by: null
@@ -420,6 +450,16 @@ gates:
     evidence: "2026-07-28 Kiki가 Phaiakes9 whymath-pg(docker·5433)에서 실행. ①재적재: populate 2,683 concepts·2,210 edges(parent_skip 0·edge_skip 0 — 병합 코퍼스·재배선 엣지 prod 반영) ②cleanup --retired-from-ledger dry-run·--confirm·재확인 dry-run 3회 모두 전 5테이블 0건(스캔 실패 0 — 스키마 실재 확인). 은퇴 원자 14행 '잔존' 가정은 실측 반증 — prod 이전 적재가 기수/NUMER 트랙 코퍼스 편입 이전이라 애초 미적재(S2-04 공집합 충족 동형). 정리 대상 부재로 삭제 0이 정답."
     cleared_by: null
     notes: "S4-07 병합 후속. 당초 '재적재는 upsert-only라 은퇴 원자 14행 잔존' 가정으로 요청 — 실측 결과 가정 반증(evidence 참조·잔존 0). 재적재+공집합 확인으로 목적 달성"
+  - id: G-ruleset-bypass-actors-live-watch
+    title: "룰셋 전문(bypass_actors) 첫 2입력 라이브 판정 1회 — HARN-102가 감시 축을 넓힌 뒤 처음 도는 회차다. 기록 파일 .github/ruleset-check-state.json의 마지막 verdict=ok는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, 지금은 실제로 측정하지 않은 축(bypass_actors·enforcement)까지 통과로 읽힌다 — 그 범위 불일치를 닫는 것이 이 게이트의 목적이다. 실행: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북(수집 2줄 + --ruleset-full 판정 1줄). 기대 = EXIT 0(2026-09-14 실측 bypass_actors=[] 이 그대로면). EXIT 1이면 우회 주체가 생겼거나 enforcement가 active가 아니라는 뜻이고 출력의 \"시정 순서\"를 따른다. EXIT 2면 수집이 한 줄 빠졌거나 룰셋 id가 바뀐 것(문서 \"id 하드코딩의 취약성과 그 처리\" 참조). 선행 조건: 이 PR이 main에 머지된 뒤에 실행한다 — 런북과 판정기 양쪽이 미머지 상태면 Kiki 체크아웃에 --ruleset-full 인자 자체가 없어 argparse 오류가 난다. 세션이 머지 확인 후 6항목 브리핑과 함께 실행 블록을 안내한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-ruleset-bypass-actors-read
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
     kind: human
@@ -464,31 +504,51 @@ gates:
     title: "SKB-01 acceptance④ 해소율 재측정 — concept.behavior_skills 적재 후 EOS-63 스킬 이벤트 도달 재실행(Phaiakes9 whymath-pg 읽기). 선행 완료: G-skb01-concept-behavior-skills-populate가 2026-09-14 cleared(AFTER_NONEMPTY=1198·main b810388b 기준). 실행 대상 = docs/ops/eos63_skill_event_reach_sample_runbook.md의 attempt_skill_reach_probe + attempt_skill_event_reach_report 재실행. 목적 = 2026-09-10 측정의 resolution=0%(0/20)가 0%를 벗어났는지 실측하는 것이며, 그 수치가 EOS-63 acceptance②의 전환 가능 판정 재료가 된다. 주의(등재 시점 고지): 같은 실행에서 atom_node 1311행·concept_content K-12 437행이 prod 미적재로 드러났고(SKB-03·SKB-04로 등재) 그 두 테이블이 해소 경로에 관여하면 이번 재측정도 0%가 나올 수 있다 — 그 경우는 실패가 아니라 다음 원인의 실측이므로 수치를 그대로 기록한다. 세션이 런북 선결조건(측정 코드의 main 실재·Kiki 체크아웃 도달)을 실측 확인한 뒤 실행 블록을 안내한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-14
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main d99a4828 (Kiki 실행 블록의 JUDGED_AGAINST_MAIN 출력 · worktree detached origin/main) · 런북 PR #1183\n\nKiki 실행(Phaiakes9 whymath-pg 5433, 2026-09-18) — docs/ops/g_skb01_resolution_remeasure_runbook.md:\n\n증적 8줄:\nWINDOW=2026-09-18T05:57:41.637359+00:00\nATTEMPTS=20  EVENTS=20\nEMPTY=0  NONEMPTY=20  NULL=0\nWRITER_REACH=1.0  RESOLUTION=1.0  E2E=1.0\nPROBE_ACCEPTED=20  PROBE_FAILED=0\nCONCEPT_UPDATED_ATTEMPTS=20\nJUDGED_AGAINST_MAIN=d99a4828\nMODULE_FROM=C:\\Users\\kiki\\Desktop\\__AI\\whymath-wt-remeasure\\src\\backend\\whymath_backend\\harness\\attempt_skill_reach_probe.py\n\n판정: SKB-01 acceptance 4 충족. 해소율이 0%를 벗어났다 — 2026-09-10 회차의 RESOLUTION=0.0(0/20)에서 2026-09-18 RESOLUTION=1.0(20/20)으로 전환. 런북 4-2 판정표의 \"해소 >=1이 다수\" 행이며 EOS-63에 주는 판정은 \"전환 가능\"이다. 경로별로도 attempt_submit 20/20 100%다(coach_completion은 이 회차가 태우지 않아 분모 0 — 죽은 것이 아니라 미측정).\n\n사슬 진단 7행 (읽기 전용, 표본 생성 전):\nA_problem_candidates=1703 · B_problem_concept_rows=1705 · C_problems_linked=1703 · D_candidates_resolvable=1655 · E_concept_nonempty_skills=1198 · F_skill_node_estimable=27 · G_concept_with_source_id=0\n\n이 진단이 게이트 등재 시점의 두 미지수를 함께 확정했다:\n(1) 등재 시점 고지(\"atom_node 1311행·concept_content K-12 437행이 해소 경로에 관여하면 이번 재측정도 0%가 나올 수 있다\")는 성립하지 않는다. 해소는 l2/skill_mastery_tracking.py 의 _assessed_skill_ids 이며 Concept.behavior_skills 와 skill_node(mastery_estimable=True)의 조인이다 — 두 테이블은 그 사슬에 등장하지 않는다. 따라서 G-skb03-behavior-skills-repropagate 가 pending 인 것은 이 측정의 선행 조건이 아니었다.\n(2) 세션이 사전에 세운 가설(\"problem_concept 이 비어 있을 수 있다 — 원자 재연결이 2026-09-11 착지인데 문항 시드는 09-10\")은 측정으로 반증됐다. 링크는 1705행 실재하고 후보 문항의 97.2%(1655/1703)가 해소 가능 상태였다. 그 가설의 전제(원자 백본 행에 source_id 없음)는 맞았으나(G=0) 결론이 틀렸다.\n\n부수 실측 — prod 스키마 드리프트 (OPS-39 소유 축의 라이브 재확인):\n1·2회차 프로브가 PROBE_EXIT=5 로 전건 실패했고 사유는 UndefinedColumnError: problem_attempt.student_answer_encrypted 부재였다. prod alembic 리비전이 19149e92d368(2026-09-07)로 head 5a7c31d9e0b4(2026-09-16)보다 6건 뒤처져 있었다. 미적용 6건을 AST 로 전수 분석해 upgrade 파괴적 연산 0건·데이터 변경 SQL 0건·기존 테이블에 기본값 없는 NOT NULL 추가 0건을 확인한 뒤 런북 7-1b 로 적용했다: BEFORE_REVISION=19149e92d368 -> ALEMBIC_EXIT=0 -> AFTER_REVISION=5a7c31d9e0b4 · AT_HEAD=True (f2662166a661 job_ownership / 4c6dfb1527a9 privacy_audit / 3f5c83f51246 학생 답안 봉투 암호화 SEC-31 / 67cf48ad3bce concept_version EOS-49 / a7d41c9e0b52 learner_state EOS-103 / 5a7c31d9e0b4 learning_state_transition EOS-105).\n범위 고지: 이 마이그레이션은 게이트 문면의 \"읽기\" 범위를 넘는 prod 스키마 변경이다. 런북 4-4 가 스키마 뒤처짐을 보조 블록으로 예정한 경로이고 그것 없이는 측정 자체가 불가능해 세션이 안전성을 실측 판정한 뒤 실행했다.\n\n회차 이력 (같은 게이트 4회 실행 — 매번 다른 원인):\n1회차 Docker Desktop 미가동(REACH_EXIT=2) — 런북이 선행 조건을 산문에만 적고 블록이 확인하지 않았다. 대책 = Docker 기동 블록 신설.\n2회차 prod 스키마 드리프트(PROBE_EXIT=5) — 위 부수 실측.\n3회차 마이그레이션 미적용 — 세션이 7-1b 에 넣은 Read-Host 승인 가드가 원인으로 보인다(붙여넣기 흐름에서 Read-Host 는 다음 블록의 첫 줄을 입력값으로 삼켜 승인이 자동 실패한다). 대책 = 가드를 기계 계산으로 전환(BEHIND·URL_OK 등).\n4회차 성립.\n그 밖에 Kiki 가 직접 발견한 런북 결함 1건: 블록들이 앞 블록의 변수·환경·CWD 를 상속해 CLAUDE.md 「실행 시스템 진입 경로 완전 명시」를 위반했다. config.py 의 database_url 기본값이 포트 5432(타 프로젝트 점유·CLAUDE.md 사용 금지)라 새 창 실행 시 마이그레이션이 다른 DB 를 겨냥할 수 있었다. 전 8블록 자기완결화로 해소했고 기계 집행 부재는 HARN-110 으로 등재했다.\n\n미정리: 프로브 표본 20건이 prod 에 남아 있다(고정 사용자 c5de83b3-9143-58e8-a7a8-cf378801c065 소유 · 런북 7-2 로 정리 가능). 지우지 않아도 무해하다."
+    cleared_by: claude
     notes: ""
   - id: G-skb03-atom-node-populate
     title: "SKB-03 atom_node 메타 프로젝션 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(atom_graph.populate 재실행, PR 병합 후). 배경: atom_node_projection.py가 멱등 upsert 구현을 갖고도 어느 CLI에서도 호출되지 않아 prod에 한 번도 적재된 적이 없었다(2026-09-14 실측: 크로스워크 이전이 \"atom_node 대상 행 부재 1311건\" 보고). SKB-03이 atom_graph/populate.py에 그 적재를 배선했고(CLI 기본 ON·--skip-atom-node로 opt-out) 이 게이트는 그 CLI를 prod에서 1회 실행한다. 부수 효과 주의: 같은 CLI가 concept·concept_edge·시각화 Overlay 2종도 함께 멱등 재적재한다(신규 행 생성이 아니라 upsert 갱신) — 그것이 원래 이 CLI의 본업이고 atom_node는 여섯 번째 스텝으로 얹혔다. 실행 전 BEFORE 카운트, 실행 후 AFTER 카운트를 읽어 적재 성립을 확인하며, acceptance ①이 요구하는 \"테이블 전량 공백인지 일부 code 부재인지\"의 실측도 이 게이트의 BEFORE 단계에서 함께 확정한다. 런북: docs/ops/skb03_atom_node_populate_runbook.md"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-14
+    remind_after_days: 7
+    evidence: "판정 기준: main 4b33d243 (SKB-03 병합 6d34e607은 그 조상 — merge-base 실측). 실행: Kiki/Phaiakes9 2026-09-15, docs/ops/skb03_atom_node_populate_runbook.md.\n결과: BEFORE_TOTAL=0 -> AFTER_TOTAL=2683. CLI 출력 [원자 백본 적재] concepts=2683 parent_skip=0 edges=2210 edge_skip=0 visual_styles=127 visualizability=1 atom_nodes=2683(data/corpus/atom_graph_v1/graph.json). POPULATE_EXIT=0. AFTER_WITH_SKILLS=0(정상 — behavior_skills는 크로스워크 이전 소관).\n이중 대조: 적재기 반환값 2683과 DB count(*) 2683이 서로 다른 경로에서 일치. 코퍼스 graph.json concepts=2683(세부개념 1823+단원 217+소단원 643, name/level 결손 0 -> skip 0)과도 일치.\nSKB-03 acceptance 1 실측 확정: atom_node는 일부 code 부재가 아니라 전량 공백이었다(BEFORE=0). 해당 쿼리가 오류 없이 0을 반환했으므로 테이블/마이그레이션은 prod 적용 상태.\n1차 실행 폐기 기록: 같은 날 첫 시도는 Kiki 클론이 타 세션 브랜치(claude/adoring-mccarthy-sle0uj HEAD 0367fce4)에 있어 SKB-03 미포함 코드가 돌았다 — PATHS_MATCH_MAIN=False/HAS_SKIP_FLAG=False가 켜졌으나 붙여넣기가 계속돼 옛 CLI가 concept/edge/Overlay만 멱등 재적재하고 종료(출력에 atom_nodes 필드 부재가 증거, AFTER=0). DB 손상 없음. 성립 실행은 git worktree --detach origin/main에서 수행했고 MODULE_FROM이 worktree 경로임을 확인해 실행 코드 출처를 동결했다. 런북 결함 재발방지는 별도 등재."
+    cleared_by: claude
+    notes: ""
+  - id: G-skb03-behavior-skills-repropagate
+    title: "atom_node.behavior_skills 재전파 (크로스워크 이전 재실행)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-15
     remind_after_days: 7
     evidence: null
     cleared_by: null
+    notes: ""
+  - id: G-skb04-concept-content-populate
+    title: "SKB-04 concept_content prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(concept_content.populate 1회 실행). 배경: 이 CLI는 완비돼 있으나 prod에서 한 번도 실행되지 않았다(2026-09-14 실측: 크로스워크 이전이 \"concept_content K-12 대상 행 부재 437건\" 보고). 2026-09-15 착수 검증에서 코드 공백이 아님을 확정했다 — 코퍼스 실재(K-12 437건·대학 409건)·CLI 진입점 실재(main(argv)->int·__main__)·크로스워크가 부재로 지목한 code 3건이 코퍼스에 전건 포함(10기수1-01-01/-02/-03)·concept_content는 FK가 없고 code가 PK라 선행 적재 불요. 즉 실행만 하면 해소된다. 기대 적재: K-12 437 + 대학 409 = 846건. 런북: docs/ops/skb04_concept_content_populate_runbook.md. SKB-03 게이트(G-skb03-atom-node-populate)와 같은 창에서 연달아 실행 가능하며 순서 의존은 없다(두 테이블은 서로 참조하지 않는다)."
+    kind: human
+    assignee: kiki
+    status: cleared
+    requested: 2026-09-15
+    remind_after_days: 7
+    evidence: "판정 기준: 측정 시점 main 4b33d243 (Kiki 실행 블록의 JUDGED_AGAINST_MAIN 출력) · 게이트 항목 착지 main 460cad84 (PR #1165 머지 큐 경유 병합)\nKiki 실행(Phaiakes9 whymath-pg 5433, 2026-09-15) — docs/ops/skb04_concept_content_populate_runbook.md 런북:\nDOCKER_OK=True (whymath-pg Up 18h · 0.0.0.0:5433->5432/tcp)\nTABLE_EXISTS=t\nPATHS_MATCH_MAIN=True\nBEFORE_TOTAL=0 BEFORE_K12=0 BEFORE_UNIV=0\nREACH_EXIT=0\nPOPULATE_EXIT=0\nCLI stdout: 콘텐츠 적재 437건(scope=K-12) · 409건(scope=대학) · 완료 총 846건\nAFTER_TOTAL=846 AFTER_K12=437 AFTER_UNIV=409\nAFTER_WITH_ATOMS=0 (예고대로 정상 — 크로스워크 미재실행)\n\n3자 교차 확인 통과: 코퍼스 실측(437/409/846) = CLI 보고 = DB AFTER 카운트. 서로 다른 세 경로의 값이 전건 일치하므로 \"적재기 반환값만 맞고 DB는 비어 있는\" 상태가 배제된다.\n\nSKB-04 acceptance ① 의 답 (등재 시점 미측정분 확정): BEFORE_TOTAL=0 — 이 테이블은 K-12 437행만 부재한 것이 아니라 전량 공백이었다. 한 번도 확인된 적 없던 대학 409행도 존재하지 않았다. 즉 이 CLI는 prod에서 단 한 번도 실행된 적이 없다는 1차 가설이 양쪽 scope 모두에서 확정됐고, \"실행했는데 실패한 흔적\" 가설은 기각된다.\n\n런북 관측 2건 (PR #1165 코멘트로 소유 세션에 전달):\n① 실행 시 TABLE_EXISTS 검사 1줄을 추가했다. 원 런북대로면 테이블 부재 시 BEFORE_TOTAL이 빈 문자열이 되어 \"0건\"과 \"테이블 없음\"이 같은 화면이 된다(psql 오류는 stderr라 변수에 안 담긴다). 변별력 축 보강 제안.\n② 실행 순서가 A-B-D-C-E로, [D](적재)가 [C](환경 주입)보다 먼저 돌았는데도 통과했다. 같은 창의 선행 G-skb03 런북이 남긴 환경이 살아 있었기 때문이다. 결과 자체는 안전하다 — whymath-pg가 0에서 846으로 바뀐 것을 docker exec 직접 측정으로 확인했으므로 쓰기의 prod 착지는 측정으로 증명됐다. 다만 [D]는 자기 목적지를 출력하지 않고, config.py 65행의 database_url 기본값은 포트 5432(CLAUDE.md가 타 프로젝트 점유로 사용 금지한 포트)다. 환경변수 없는 새 창에서 [D]만 실행하면 적재 대상이 조용히 바뀐다 — 이번에 맞은 것은 설계 보장이 아니라 선행 실행의 잔여 효과였다.\n\n후속 (미해소·이 게이트 범위 밖): AFTER_WITH_ATOMS=0은 정상이며, G-skb03-atom-node-populate 실행까지 마친 뒤 concept_atom_crosswalk.populate 1회 재실행으로 atom_node.behavior_skills와 concept_content.atom_codes 두 축이 함께 채워진다. L4 콘텐츠 공급의 실제 소생 여부(dsl_render_rate)는 학생 요청을 흘려야 알 수 있는 별도 측정이다."
+    cleared_by: claude
     notes: ""
   - id: G-state-machine-deferral-recheck
     title: "8상태 학습 상태 머신 보류의 재확인 (재확인 지점 = G4 2026-12-13) — 2026-09-03 Kiki 결정으로 '신설 보류'했고 재개 조건은 '실 운영 데이터에서 상태 기반 제어가 필요하다는 증거'다. 판정 3택: ①보류 유지(증거 없음 — 기본값) ②ADR로 채택(증거 있음 — *MasteryHistory와의 진실 원천 중복 해소안을 ADR에 포함해야 한다) ③영구 미채택으로 종결. 근거 문서 = docs/reviews/eos_phase2_plan_300_gap_review_2026-09-03.md §5-A·§11.1 · MEMORY 2026-09-03 결정 로그. 등재 이유: '만료 없는 유예·제외 금지'(CLAUDE.md 2026-08-03) — 보류에 재확인 지점을 못박았으나 그 지점에 알려 줄 장치가 없어 산문으로만 남아 있었다. remind-after-days=101은 2026-09-03 기준 G4(12/13)까지의 일수이며, 그 시점부터 SessionStart 브리핑에 뜬다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-03
     remind_after_days: 101
-    evidence: null
-    cleared_by: null
+    evidence: "판정 3택 중 ②(ADR로 채택). 판정 주체 = Kiki (2026-09-16 세션에서 3택을 제시받고 \"원문 그대로 전면 구현\"을 선택). 집행 = claude.\n\n판정 기준: main 0f12e76a · 집행 PR https://github.com/kiki-s-broom/WhyMath/pull/1189 (커밋 238611b0).\n\n게이트가 ②에 요구한 \"*MasteryHistory와의 진실 원천 중복 해소안을 ADR에 포함\"의 이행:\ndocs/architecture/adr/ADR-006-learning-state-machine-without-stored-state.md (번호는 adr_number_check.py가 배정 · README 현재 계열 표 등재). 해소안 3건이 그 ADR에 적혀 있고 전부 코드로 집행된다.\n ① 역할 분리 — 전이 원장(learning_state_transition)은 숙달값·정답률·이벤트를 컬럼으로 갖지 않는다. 좌석 실측: 8상태 어휘 3종의 src/ 코드 0건이었으므로 이 머신이 만드는 것은 기존 사실의 사본이 아니라 기록된 적 없는 사실이다. user_state_snapshot(writer 0)과 EOS-103의 learner_state(main 부재 실측)는 둘 다 건드리지 않았다.\n ② 현재 상태를 저장하지 않는다 — append-only 원장 최신 행에서 파생하므로(get_current_state) 가변 상태 컬럼이 0건이고, \"현재 상태\"의 쓰기 지점은 record_transition 하나다.\n ③ 남는 어긋남은 검출 가능 — reconcile_state가 영속 상태와 증거 재계산 상태를 대조해 보고하되 자동 정정하지 않는다. 뮤테이션 M15(diverged를 항상 False로)가 RED로 이 성질을 동결한다.\n\n재개 조건(\"실 운영 데이터에서 상태 기반 제어가 필요하다는 증거\")과의 관계 — 명시: 그 증거는 확보되지 않았다. 이 처분은 증거 충족이 아니라 Kiki의 우선순위 결정에 따른 번복이며, 그 사실을 MEMORY.md 2026-09-16 결정 로그와 PR 본문 상단에 각각 적었다. 재검토 조건 4건(불일치 비율 유의미 / 전이표 25쌍 초과 / 루프 게이팅 요구 발생 / learner_state 머지 후 역할 경계 혼탁)은 ADR-006 말미에 명문화했다.\n\n정정한 곳: docs/strategy/plan300_phase2_backlog_crosswalk.md 3곳(89·132·231행)에 번복 사실을 병기했다 — 원 \"등재 제외\" 판정을 지우지 않았다(판정은 시점에 종속되므로 09-03 판정 자체는 그 시점에 옳았다)."
+    cleared_by: kiki
     notes: ""
   - id: G-strict-policy-and-classic-cleanup
     title: "strict 정책 축 결정 + 클래식 브랜치 보호 정리 — 필수 체크 16건은 룰셋에 복원됐으나(`G-required-checks-source-of-truth` cleared) 두 축이 남았다. **① strict**: 룰셋 `strict_required_status_checks_policy=false` vs 문서 선언 `true` — `ruleset_drift.py` 위반 1건. 현재 실질 strict는 클래식의 `strict=true`가 살려 두고 있어 클래식을 지우면 실질도 false가 된다. **② 클래식**: 필수체크 13건(룰셋 16건의 부분집합·2026-09-03 이전 낡은 사본)·`required_merge_queue` 없음 → 지워도 큐는 죽지 않고 필수 체크도 줄지 않는다(실측). **권고 = strict를 해제하고(문서 선언을 `false`로 정정) 클래식을 삭제한다.** 근거 3: ⓐ merge queue는 최신 base 위에 큐 브랜치를 만들어 CI를 돌리므로 'up to date 요구'가 구조적으로 중복이다 ⓑ 실제 마찰이 관측됐다 — 2026-09-10 이 세션의 PR #1063·#1092·#1094가 전부 `behind`로 막혀 main 수동 병합을 3회 반복했고, 그때마다 CI가 처음부터 다시 돌았다 ⓒ 기존 게이트 `G-merge-queue-or-strict-relax`가 애초에 이 둘을 **택일**로 물었고(merge queue 도입 **또는** strict 해제) merge queue 쪽이 이미 채택됐다. **대안**: strict를 유지하려면 룰셋에서 `Require branches to be up to date before merging`을 켜고 문서는 그대로 둔다 — 이 경우 위 마찰이 계속된다. 어느 쪽이든 클래식 삭제는 별개로 안전하다. 문서(`.github/branch-protection-setup.md` RULESET_POLICY 블록) 정정과 `ruleset_drift.py` 재검증은 결정 후 claude가 수행한다"

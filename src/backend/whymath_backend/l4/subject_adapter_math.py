@@ -49,6 +49,10 @@ from whymath_backend.l3.verify_answer import AnswerVerdict, verify_answer
 from whymath_backend.l3.verify_answer_form import form_verdict_for
 from whymath_backend.l3.verify_final_answer import FinalAnswerResult, verify_final_answer
 from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l4.misconception.answer_signature import (
+    AttemptMisconceptionScanResult,
+    scan_attempt_answer,
+)
 from whymath_backend.l4.misconception.diagnose import diagnose
 from whymath_backend.schema.answer_form import FormVerdict
 from whymath_backend.schema.enums import StepType
@@ -62,6 +66,7 @@ from whymath_backend.schema.subject_adapter import (
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
     AssessmentAnswerVerifier,
+    AttemptMisconceptionDetector,
     ChainVerificationCounts,
     EquivalenceOutcome,
     ExpressionEquivalence,
@@ -281,6 +286,28 @@ def math_step_chain_verifier() -> MathStepChainVerifier:
     return MathStepChainVerifier()
 
 
+class MathAttemptMisconceptionDetector:
+    """`AttemptMisconceptionDetector` 수학 구현 — `l4.misconception.answer_signature`로 위임.
+
+    "문항 식과 제출 답을 이어 거짓 항등식을 읽는다"는 것이 **수학 고유의 독법**임을 아는 곳이
+    여기 하나다. Core는 `question_text`·`student_answer`를 불투명 문자열로 넘길 뿐이다.
+
+    변환 없음(설계 규칙 1): `AttemptMisconceptionScanResult`가 `scan`·`candidates`를 그대로
+    갖고 있어 Protocol을 **구조적으로** 만족한다 — 중간 변환 객체를 두지 않는다.
+    """
+
+    def scan_attempt_answer(
+        self, *, question_text: str, student_answer: str | None
+    ) -> AttemptMisconceptionScanResult:
+        """오답 1건의 오개념 훑기 — 판정·게이트는 전부 위임(재구현 0)."""
+        return scan_attempt_answer(question_text=question_text, student_answer=student_answer)
+
+
+def math_attempt_misconception_detector() -> MathAttemptMisconceptionDetector:
+    """기본 주입용 팩토리."""
+    return MathAttemptMisconceptionDetector()
+
+
 if TYPE_CHECKING:
     # 구조적 적합성 증명 — SubjectAdapter와 동일 패턴(mypy --strict가 검사).
     _EQUIVALENCE_CONFORMANCE: ExpressionEquivalence = MathExpressionEquivalence()
@@ -289,3 +316,6 @@ if TYPE_CHECKING:
     _SEAL_CONFORMANCE: ExpressionSeal = MathExpressionSeal()
     _ANSWER_FORM_CONFORMANCE: AnswerFormVerifier = MathAnswerFormVerifier()
     _STEP_CHAIN_CONFORMANCE: StepChainVerifier = MathStepChainVerifier()
+    _ATTEMPT_MISCONCEPTION_CONFORMANCE: AttemptMisconceptionDetector = (
+        MathAttemptMisconceptionDetector()
+    )

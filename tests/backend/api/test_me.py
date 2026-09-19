@@ -24,8 +24,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.api import me as me_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._crypto import SecretCipher
+from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
 from whymath_backend.api.me import (
     ConceptAbilityItem,
+    NextProblemResponse,
     _add_ability_snapshot_if_attempts,
     _AttemptHistoryState,
     _weak_concept_weights,
@@ -56,6 +58,7 @@ from whymath_backend.l2.recommendation_evidence import (
     META_KEY_POLICY_VERSION,
     META_KEY_POOL_SIZE,
     META_KEY_PROBLEM_ID,
+    META_KEY_REASON,
     POLICY_VERSION_CAT,
     POLICY_VERSION_SUNEUNG,
 )
@@ -155,6 +158,13 @@ class FakeSession:
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def flush(self) -> None:
+        """EOS-103: 진단 캡처가 같은 트랜잭션 안에서 LearnerState 행을 flush한다.
+
+        commit과 달리 회계하지 않는다 — 이 대역이 재는 것은 "몇 번 커밋했는가"이고
+        flush는 그 안의 중간 단계다.
+        """
 
     async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
@@ -862,15 +872,52 @@ class _AQResult:
 
 class _QueueSession:
     """execute 호출마다 큐잉 결과를 순서대로 반환 — 채점 엔드포인트의 다중 쿼리(개념 조회 →
-    개념별 prior) 시뮬. add/commit 캡처."""
+    개념별 prior) 시뮬. add/commit 캡처.
 
-    def __init__(self, results: list[_AQResult]) -> None:
+    EOS-105 이후: 큐가 **소진된 뒤의 호출은 빈 결과**를 돌려준다(IndexError로 죽지 않는다).
+    `submit_attempt`가 학습 상태 머신을 경유하면서 뒤쪽에 질의가 붙었는데, 이 파일의 시나리오들은
+    *채점·숙달·보정 코칭*을 재는 것이라 그 뒤 질의의 내용에 관심이 없기 때문이다. 빈 결과는
+    "이력이 없는 학생"이라는 정합한 상태이며, 상태 머신이 실제로 무엇을 하는지는
+    `tests/backend/api/test_me_learning_state.py`·`tests/backend/l2/test_learning_state_machine.py`가
+    전담한다.
+
+    **소진 호출 수를 세어 두는 이유**: 조용히 빈 결과를 주면 *앞쪽* 시나리오 큐가 잘못 짜여
+    엉뚱하게 소진된 경우까지 통과한다. `overflow`를 노출해 필요하면 단언할 수 있게 남긴다.
+    """
+
+    def __init__(self, results: list[_AQResult], *, question_text: str | None = None) -> None:
         self._results = results
         self._i = 0
         self.added: list[Any] = []
         self.commits = 0
+        self.overflow = 0
+        # EOS-104: 오답 오개념 훑기가 문항 지문을 단일 스칼라로 조회한다(`session.scalar`).
+        # 기본 None은 "지문 없음" → `MisconceptionScan.NOT_RUN`이라 기존 시나리오의 동작이
+        # 그대로 유지된다(훑지 않음 = 이 파일의 다른 단언과 무관).
+        self.question_text = question_text
+        self.flushes = 0
+
+    async def scalar(self, _stmt: Any) -> Any:
+        return self.question_text
+
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        """EOS-19: `get_state`가 `user_profile`을 단건 조회한다(`session.get`).
+
+        None은 "프로필 없음"이라는 정합한 상태이며 `LearnerState.grade`·`goals`가 비는 것이
+        전부다 — 이 파일의 시나리오들은 추천 *선택*을 재므로 그 둘에 관심이 없다.
+        """
+        return None
+
+    async def flush(self) -> None:
+        # EOS-104: 가설 영속(`_persist_active_set`)이 같은 트랜잭션 가시화로 flush를 부른다.
+        # 이 대역이 없으면 오개념 훑기가 배선된 시나리오가 AttributeError로 죽는다 — 즉 이
+        # 메서드의 존재 자체가 "서빙 경로가 정말 영속까지 간다"는 증거다.
+        self.flushes += 1
 
     async def execute(self, _stmt: Any) -> _AQResult:
+        if self._i >= len(self._results):
+            self.overflow += 1
+            return _AQResult([])
         result = self._results[self._i]
         self._i += 1
         return result
@@ -880,6 +927,81 @@ class _QueueSession:
 
     async def commit(self) -> None:
         self.commits += 1
+
+
+# ── EOS-14: 추천 근거(`reason`) 조립이 소비하는 조회 ────────────────────────────
+#: 근거 없음(`type=unmeasured`·`basis=concept_unmapped`)의 직렬화 모양 — 아래 hermetic
+#: 픽스처들은 `problem_concept` 행을 두지 않으므로 대표 개념이 잡히지 않는다. 그 상태를
+#: "측정했는데 0"이 아니라 **우리 쪽 데이터 공백**으로 표기하는 것이 계약이다.
+_REASON_UNMAPPED: dict[str, Any] = {
+    "type": "unmeasured",
+    "confidence": 0.0,
+    "basis": "concept_unmapped",
+    "concept_id": None,
+    "mastery": None,
+}
+#: 추천 자체가 없을 때의 근거 — 부재도 이유를 가진다(조회 0건).
+_REASON_NO_CANDIDATE: dict[str, Any] = {
+    "type": "no_candidate",
+    "confidence": 0.0,
+    "basis": "no_candidate_pool",
+    "concept_id": None,
+    "mastery": None,
+}
+
+
+def _reason_results() -> list[_AQResult]:
+    """추천이 **나간** 경로에서 근거 조립이 추가로 소비하는 결과 2건.
+
+    `get_primary_concept_id`가 PRIMARY→TESTED 순으로 두 번 묻고 둘 다 비면 거기서 끝난다
+    (숙달 조회까지 가지 않는다) — 그래서 2건이다. 큐 소진 IndexError를 검증 수단으로 쓰는
+    테스트들(`test_sibling_filter_unset_skips_extra_queries` 등)의 변별력을 유지하려고
+    tolerant fake로 바꾸지 않고 **실제로 소비되는 만큼만** 큐에 넣는다.
+    """
+    return [_AQResult([]), _AQResult([])]
+
+
+def _learner_state_results() -> list[_AQResult]:
+    """EOS-19: 핸들러가 정책을 부르기 **전에** 조립하는 `LearnerState`가 소비하는 결과 5건.
+
+    내역(2026-09-18 실측 — `get_state`를 계수 대역으로 호출해 셈): 개념 진단(`compute_concept_
+    diagnoses`) 2건 · 전과목 θ 1건 · 활성 오개념 1건 · 스킬 숙달 1건. 프로필은 `execute`가
+    아니라 `session.get`이라 이 큐를 소비하지 않는다(위 `_QueueSession.get` 대역).
+
+    전부 빈 결과인 것은 이 파일의 시나리오가 **선택**을 재기 때문이다 — 이력 없는 학생의
+    `LearnerState`는 빈 숙달·θ None이고, 그 상태에서 추천 결과는 이동 전과 같아야 한다
+    (회귀 0의 관측 지점이기도 하다). 숙달이 실린 `LearnerState`가 목표 개념 판정에 어떻게
+    쓰이는지는 `tests/backend/l2/test_recommendation_policy.py`가 전담한다.
+
+    **개수가 틀리면 조용히 통과하지 않는다**: 큐가 앞에서 어긋나면 후보 풀 결과가 θ 추정
+    자리로 들어가 시나리오가 깨진다(실제로 EOS-19 전환 시 45건이 그렇게 깨졌다).
+    """
+    return [_AQResult([]) for _ in range(5)]
+
+
+def _next_problem_session(
+    results: list[_AQResult], *, question_text: str | None = None
+) -> _QueueSession:
+    """`GET /v1/me/next-problem` 시나리오용 큐 — 앞에 LearnerState 조회 5건을 채운다.
+
+    시나리오 쪽 큐는 이동 전과 **똑같이** 쓴다(①채점 이력 ②후보 풀 …) — 이 생성기가 앞단만
+    책임지므로 각 테스트의 의미가 바뀌지 않는다.
+    """
+    return _QueueSession(_learner_state_results() + results, question_text=question_text)
+
+
+def _next_problem_recording_session(results: list[_AQResult]) -> "_RecordingQueueSession":
+    """`_next_problem_session`의 stmt 캡처판 — 캡처 인덱스도 5만큼 밀린다.
+
+    그래서 이 생성기를 쓰는 테스트는 `statements[_NP_STMT_BASE + n]`으로 읽는다(생 인덱스를
+    박아 두면 LearnerState 조회가 하나 늘 때 엉뚱한 stmt를 단언하게 된다).
+    """
+    return _RecordingQueueSession(_learner_state_results() + results)
+
+
+#: `_next_problem_recording_session`이 캡처한 stmt에서 *시나리오 첫 쿼리*의 인덱스.
+#: 앞의 5건은 LearnerState 조립분이다(`_learner_state_results` 참조).
+_NP_STMT_BASE = 5
 
 
 def _attempts_client(session: _QueueSession) -> TestClient:
@@ -916,13 +1038,135 @@ def _student_work_key_env(key_b64: str | None) -> Iterator[None]:
         get_settings.cache_clear()
 
 
+class TestAttemptMisconceptionScan:
+    """EOS-104 — 오답 1건이 오개념 후보로 이어지는 **서빙 경로**의 집행 지점.
+
+    여기서 재는 것은 탐지 품질이 아니라 *배선*이다: 핸들러가 실제로 과목 능력을 불러 그 결과를
+    채점 증거에 싣는가. 탐지 자체는 `tests/backend/l4/misconception/test_answer_signature.py`가
+    본다. 둘을 나누는 이유는, 배선이 끊겨도 탐지 테스트는 초록이기 때문이다.
+    """
+
+    @staticmethod
+    def _post(*, is_correct: bool, answer: str | None, question: str | None) -> dict[str, Any]:
+        session = _QueueSession([], question_text=question)
+        client = _attempts_client(session)
+        payload: dict[str, Any] = {"problem_id": str(uuid.uuid4()), "is_correct": is_correct}
+        if answer is not None:
+            payload["student_answer"] = answer
+        resp = client.post("/v1/me/attempts", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body
+
+    def test_wrong_answer_pattern_reaches_evidence_as_candidate(self) -> None:
+        """오답 `x²+4` → 증거의 `possible_misconceptions`에 게이트 통과 후보가 실린다."""
+        body = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        evidence = body["evidence"]
+        assert evidence["coverage"]["misconception_scan"] == "ran_with_candidates"
+        candidates = evidence["possible_misconceptions"]
+        assert [c["misconception_id"] for c in candidates] == ["distribution-over-power"]
+        # P-07 산출 형태 — {misconception_id, confidence}.
+        assert 0.0 < candidates[0]["confidence"] <= 1.0
+        assert candidates[0]["gate_passed"] is True
+
+    def test_wrong_answer_without_pattern_is_measured_zero_not_unmeasured(self) -> None:
+        """훑었는데 없었다 — 빈 후보와 `not_run`을 구별해 응답한다."""
+        body = self._post(is_correct=False, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["evidence"]["possible_misconceptions"] == []
+
+    def test_correct_answer_is_not_scanned(self) -> None:
+        """정답 시도는 훑지 않는다 — 오개념은 *틀린 방식*의 이름이다."""
+        body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_missing_answer_is_not_scanned(self) -> None:
+        """답안 미제출은 재료 부족 — 0건을 '오개념 없음'으로 위장하지 않는다."""
+        body = self._post(is_correct=False, answer=None, question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_detector_failure_does_not_break_grading(self) -> None:
+        """검출기가 터져도 채점은 성사된다 — 관측 실패가 채점 실패를 만들지 않는다.
+
+        이 시점에 attempt는 **이미 commit됐다**. 여기서 예외가 새어 나가면 기록된 제출이 500으로
+        돌아가 학생이 같은 문제를 다시 푼다. 그래서 삼키되 `not_run`으로 정직하게 표기한다.
+
+        변별력: 반드시 터지는 검출기를 *주입*해 확인한다. 정상 검출기로는 이 경로가 한 번도
+        실행되지 않으므로, 주입 없는 초록은 이 가드의 증거가 아니다.
+        """
+
+        class _ExplodingDetector:
+            def scan_attempt_answer(self, *, question_text: str, student_answer: str | None) -> Any:
+                raise RuntimeError("의도적 주입 — 검출기 내부 실패 시뮬")
+
+        session = _QueueSession([], question_text="(x+2)²을 전개하시오.")
+        app = create_app()
+        app.dependency_overrides[get_consented_user] = _user
+
+        async def _sess() -> AsyncIterator[_QueueSession]:
+            yield session
+
+        app.dependency_overrides[get_session] = _sess
+        app.dependency_overrides[get_attempt_misconception_detector] = _ExplodingDetector
+        client = TestClient(app)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "student_answer": "x²+4",
+            },
+        )
+        # 채점은 성사된다(500이 아니다).
+        assert resp.status_code == 201, resp.text
+        # 그리고 실패를 "오개념 없음"으로 위장하지 않는다.
+        assert resp.json()["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_kill_switch_off_reports_not_run_not_empty(self) -> None:
+        """킬 스위치를 끄면 **훑지 않았다**로 표기된다 — 끈 것과 없는 것을 섞지 않는다.
+
+        변별력 주입: 같은 입력이 ON에서 `ran_with_candidates`, OFF에서 `not_run`이어야 한다.
+        둘이 같으면 이 스위치는 아무것도 하지 않는 것이다.
+        """
+        on = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert on["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+
+        var = "WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED"
+        prev = os.environ.get(var)
+        os.environ[var] = "false"
+        get_settings.cache_clear()
+        try:
+            off = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        finally:
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+            get_settings.cache_clear()
+        assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert off["evidence"]["possible_misconceptions"] == []
+
+
 class TestSubmitAttempt:
     def test_submit_with_assessed_concept(self) -> None:
         """채점 제출 → ProblemAttempt 적재 + 평가 개념 숙달 갱신 응답."""
         cid = uuid.uuid4()
-        # 개념 숙달: execute#1=개념 [cid]·#2=개념 prior 없음.
-        # 스킬 숙달(Phase 2b-2): #3=개념 [cid]·#4=스킬 해소 [](미매핑 → 스킬행 0).
-        session = _QueueSession([_AQResult([cid]), _AQResult([]), _AQResult([cid]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY·#2=TESTED·#3=스킬 해소.
+        # 개념 숙달: #4=개념 [cid]·#5=EOS-108 멱등 조회(미반영)·#6=개념 prior 없음.
+        # 스킬 숙달(Phase 2b-2): #7=개념 [cid]·#8=스킬 해소 [](미매핑 → 스킬행 0).
+        #   스킬 해소가 0건이라 스킬 축 멱등 조회는 돌지 않는다(빈 집합 조기 반환).
+        session = _QueueSession(
+            [
+                _AQResult([cid]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([cid]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([cid]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -938,14 +1182,25 @@ class TestSubmitAttempt:
         assert upd["mastery"] == 0.69  # 첫 관측·정답
         assert upd["sample_size"] == 1
         assert body["skill_mastery_updates"] == []  # 스킬 해소 0(미매핑)
-        # ProblemAttempt + 개념 숙달행 + EOS-57 `문제시도` 이벤트(스킬행 0).
+        # ProblemAttempt + 개념 숙달행 + EOS-57 `문제시도` 이벤트(스킬행 0)
+        # + EOS-115 학습 진입 전이 1건.
         # 카운트만 세면 신규 축이 숫자에 묻히므로 *종류*로 고정한다.
+        #
+        # 왜 전이가 **1건**인가(이 가짜 세션 한정): `_QueueSession`은 적재분을 되읽지 않아
+        # 현재 상태 질의가 언제나 빈 결과(= `NEW`)를 돌려준다. 그래서 학습 진입 전이는
+        # 적재되지만 뒤따르는 평가 전이는 다시 `NEW → ASSESSING`으로 판정돼 거부된다.
+        # 실 DB에서는 3건이 남는다(`test_week3_gate_remediation_loop.py` 실측). 이 파일이
+        # 재는 것은 채점·숙달·보정 코칭이므로 그 차이를 여기서 메우지 않는다 —
+        # 상태 머신의 실제 동작은 `test_me_learning_state.py`·`test_learning_state_machine.py`가 잰다.
         assert [type(o).__name__ for o in session.added] == [
             "ProblemAttempt",
             "ConceptMasteryHistory",
             "AttemptEvent",
+            "LearningStateTransition",
         ]
-        event = session.added[-1]
+        # 위치가 아니라 **종류**로 집는다 — 뒤에 새 적재 축이 붙어도 이 단언이 엉뚱한
+        # 객체를 보지 않는다(EOS-115가 전이 1건을 뒤에 붙이며 실제로 그 일이 일어났다).
+        event = next(o for o in session.added if type(o).__name__ == "AttemptEvent")
         assert event.event_type is EventType.문제시도
         # 해소 0건은 `[]`로 적재된다 — None(미기록)으로 접히지 않는다(EOS-57 핵심 계약).
         assert event.skill_ids == []
@@ -954,7 +1209,18 @@ class TestSubmitAttempt:
     def test_submit_no_mapped_concepts(self) -> None:
         """문제↔개념 매핑 없으면 attempt만 적재·mastery/skill 갱신 빈 리스트."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED 폴백→[]. 스킬(Phase 2b-2): PRIMARY→[]·TESTED→[].
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -964,13 +1230,32 @@ class TestSubmitAttempt:
         assert resp.json()["mastery_updates"] == []
         assert resp.json()["skill_mastery_updates"] == []
         # attempt + EOS-57 `문제시도` 이벤트(숙달행 0 — 개념 매핑 없음).
-        assert [type(o).__name__ for o in session.added] == ["ProblemAttempt", "AttemptEvent"]
-        assert session.added[-1].skill_ids == []  # 해소 0건도 기록된다(미기록 None과 구분)
+        # 끝의 `LearningStateTransition`은 EOS-115 학습 진입 전이 1건이다(위 상세 주석 참조 —
+        # 이 가짜 세션은 적재분을 되읽지 않아 평가 전이는 거부되고 진입 전이만 남는다).
+        assert [type(o).__name__ for o in session.added] == [
+            "ProblemAttempt",
+            "AttemptEvent",
+            "LearningStateTransition",
+        ]
+        # 위치가 아니라 종류로 집는다(위와 같은 이유 — 뒤에 전이 축이 붙었다).
+        _event = next(o for o in session.added if type(o).__name__ == "AttemptEvent")
+        assert _event.skill_ids == []  # 해소 0건도 기록된다(미기록 None과 구분)
 
     def test_submit_overconfident_returns_coaching(self) -> None:
         """과신 제출(틀림 + 확신≥0.7) → calibration_coaching.focus==overconfident(§11.4)."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED→[]·스킬 PRIMARY→[]·TESTED→[](매핑 없음).
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -986,12 +1271,20 @@ class TestSubmitAttempt:
         assert coaching["focus"] == "calibration_overconfident"
         assert coaching["socratic_category"] == "assumption"
         # 적재 로직 불변 — attempt + EOS-57 `문제시도` 이벤트(개념 매핑 없어 숙달행 0).
-        assert [type(o).__name__ for o in session.added] == ["ProblemAttempt", "AttemptEvent"]
+        # 끝의 `LearningStateTransition`은 EOS-115 학습 진입 전이 1건이다(위 상세 주석 참조 —
+        # 이 가짜 세션은 적재분을 되읽지 않아 평가 전이는 거부되고 진입 전이만 남는다).
+        assert [type(o).__name__ for o in session.added] == [
+            "ProblemAttempt",
+            "AttemptEvent",
+            "LearningStateTransition",
+        ]
 
     def test_submit_well_calibrated_no_coaching(self) -> None:
         """잘 보정됨(맞음 + 확신 높음) → calibration_coaching==null."""
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
         # 정답: 개념 assessed→[]·스킬 assessed→[](매핑 없음·둘 다 갱신 0).
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1007,7 +1300,18 @@ class TestSubmitAttempt:
     def test_submit_no_confidence_no_coaching(self) -> None:
         """확신 미제출(confidence 없음) → calibration_coaching==null(보정 평가 불가)."""
         # 오답(모델 B): 개념 PRIMARY→[]·TESTED→[]·스킬 PRIMARY→[]·TESTED→[](매핑 없음).
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1018,7 +1322,18 @@ class TestSubmitAttempt:
 
     def test_submit_stores_student_answer_plaintext_when_key_unset(self) -> None:
         """SEC-31: 키 미설정(기존 동작) — student_answer는 평문 그대로·암호화 컬럼은 None."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         with _student_work_key_env(None):
             resp = client.post(
@@ -1039,7 +1354,18 @@ class TestSubmitAttempt:
     def test_submit_encrypts_student_answer_when_key_configured(self) -> None:
         """SEC-31: 키 설정 시 — student_answer는 NULL·암호화 컬럼에 ciphertext/nonce가 실리고
         그 ciphertext를 같은 키로 복호하면 원문이 그대로 나온다(dialogue_turn 선례 계약 미러)."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         key_b64 = base64.b64encode(os.urandom(32)).decode()
         with _student_work_key_env(key_b64):
@@ -1071,7 +1397,18 @@ class TestSubmitAttempt:
         `started_at != ingested_at` 단언이 "서버 now 폴백 부재"의 증거다(같으면 폴백 잔존).
         """
         reported = datetime(2026, 3, 2, 9, 30, tzinfo=UTC)
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1093,7 +1430,18 @@ class TestSubmitAttempt:
 
     def test_submit_without_started_at_leaves_null(self) -> None:
         """PED-37: 미신고면 NULL=미측정으로 남긴다 — 서버 now로 메우지 않는다(날조 금지)."""
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1111,7 +1459,18 @@ class TestSubmitAttempt:
         `tzinfo=None`으로 수용됐다. 프로덕션 컨테이너가 UTC이므로 한국 로컬 시각이 **9시간
         어긋나** 저장되고, 그러면 PED-37이 되살리려던 시간창 귀속이 오히려 조용히 망가진다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         resp = client.post(
             "/v1/me/attempts",
@@ -1134,7 +1493,18 @@ class TestSubmitAttempt:
         이 PR *이전*에는 started_at이 항상 NULL이라 조작할 값 자체가 없었다 — 통로를 여는
         변경이 공격 표면도 함께 만들었으므로 여는 쪽에서 닫는다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         far_future = datetime.now(UTC) + timedelta(days=365 * 50)
         resp = client.post(
@@ -1156,7 +1526,18 @@ class TestSubmitAttempt:
         거부하면 정직한 제출이 튕겨 학습 기록이 통째로 유실된다 — 막아야 할 것은 시계 오차가
         아니라 보존기한 회피다.
         """
-        session = _QueueSession([_AQResult([]), _AQResult([]), _AQResult([]), _AQResult([])])
+        # EOS-12 증거 조립(숙달 전파 *앞*): #1=PRIMARY []·#2=TESTED [] —
+        # 개념 0건이면 스킬 해소는 조회 없이 빈 목록이라 큐를 쓰지 않는다.
+        session = _QueueSession(
+            [
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+                _AQResult([]),
+            ]
+        )
         client = _attempts_client(session)
         slightly_ahead = datetime.now(UTC) + timedelta(seconds=30)
         resp = client.post(
@@ -1648,7 +2029,7 @@ class TestNextProblem:
 
     def test_no_candidates_null(self) -> None:
         """이력 없음(θ=0)·후보 없음 → 추천 null."""
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _next_problem_session([_AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
         assert body == {
@@ -1663,13 +2044,18 @@ class TestNextProblem:
             "weak_concept_signal_count": 0,
             "candidate_zero_reason": "no_candidate_pool",
             "band_calibrated": None,  # REC-04: purpose 기본(diagnosis)은 밴드 미적용
+            # EOS-14: 추천이 없어도 **이유는 있다** — 근거 필드가 비는 경로를 만들지 않는다.
+            "reason": _REASON_NO_CANDIDATE,
+            # EOS-19: 부재도 행위 공간의 한 값이다(none) — 목표 개념은 댈 대상이 없어 null.
+            "action": "none",
+            "target_concept": None,
         }
 
     def test_requires_auth(self) -> None:
         app = create_app()
 
         async def _sess() -> AsyncIterator[_QueueSession]:
-            yield _QueueSession([_AQResult([]), _AQResult([])])
+            yield _next_problem_session([_AQResult([]), _AQResult([])])
 
         app.dependency_overrides[get_session] = _sess
         assert TestClient(app).get("/v1/me/next-problem").status_code == 401
@@ -1677,11 +2063,12 @@ class TestNextProblem:
     def test_recommends_nearest_difficulty(self) -> None:
         """이력 없음(θ=0) → 난이도 2·3·5 후보 중 b=0(난이도 3)이 정보량 최대로 추천."""
         pid_easy, pid_mid, pid_hard = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),
                 _AQResult([(pid_easy, 2.0, None), (pid_mid, 3.0, None), (pid_hard, 5.0, None)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -1696,11 +2083,12 @@ class TestNextProblem:
         휴리스틱이면 B(난이도3→b0)가 θ=0 정보량 최대지만, 보정 b를 쓰면 A(b=0)가 선택된다.
         """
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),  # 이력 없음 → θ=0
                 _AQResult([(pid_a, 5.0, 0.0), (pid_b, 3.0, 2.0)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -1710,11 +2098,12 @@ class TestNextProblem:
     def test_skips_attempt_without_b_source(self) -> None:
         """slice 81: 난이도·보정 b 둘 다 없는 풀이는 θ 추정에서 제외(θ=0)."""
         cand = uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([(uuid.uuid4(), True, None, None)]),  # b 소스 없음 → 제외
                 _AQResult([(cand, 3.0, None)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -1725,11 +2114,12 @@ class TestNextProblem:
         """전부 정답 → θ 상한(4.0). 난이도 3·5 후보 중 b=2(난이도 5)가 정보량 최대."""
         pid_mid, pid_hard = uuid.uuid4(), uuid.uuid4()
         attempts = [(uuid.uuid4(), True, 5.0, None), (uuid.uuid4(), True, 4.0, None)]
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult(attempts),
                 _AQResult([(pid_mid, 3.0, None), (pid_hard, 5.0, None)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -1744,7 +2134,9 @@ class TestNextProblem:
         """난이도3(b=0) 46건 절반 정답 → θ=0·SE=2/√46≈0.295 ≤ 0.3 → 중단 권고."""
         attempts = [(uuid.uuid4(), i % 2 == 0, 3.0, None) for i in range(46)]
         cand = uuid.uuid4()
-        session = _QueueSession([_AQResult(attempts), _AQResult([(cand, 3.0, None)])])
+        session = _next_problem_session(
+            [_AQResult(attempts), _AQResult([(cand, 3.0, None)])] + _reason_results()
+        )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
         assert body["theta"] == 0.0
@@ -1756,7 +2148,9 @@ class TestNextProblem:
     def test_no_responses_se_null_not_sufficient(self) -> None:
         """응답 없음 → SE null·measurement_sufficient=False(측정 불가)."""
         cand = uuid.uuid4()
-        session = _QueueSession([_AQResult([]), _AQResult([(cand, 3.0, None)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(cand, 3.0, None)])] + _reason_results()
+        )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
         assert body["standard_error"] is None
@@ -1770,13 +2164,14 @@ class TestNextProblem:
         """
         c_strong, c_weak = uuid.uuid4(), uuid.uuid4()
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),  # 채점 이력 없음 → θ=0
                 _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)]),  # 동일 난이도(b=0)
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),  # 숙달: 강·약
                 _AQResult([(pid_a, c_strong), (pid_b, c_weak)]),  # 개념 매핑
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?prioritize_weak_concepts=true").json()
@@ -1787,8 +2182,8 @@ class TestNextProblem:
     def test_default_ignores_weak_concepts(self) -> None:
         """기본(flag 미지정) → 가중 쿼리 없이 동률은 낮은 인덱스(slice 12 동작 보존)."""
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
-            [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)])]
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)])] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -1797,14 +2192,14 @@ class TestNextProblem:
     def test_weak_priority_no_candidates_skips_weight_queries(self) -> None:
         """후보 없으면 flag=true라도 가중 쿼리 생략(2쿼리만)·problem_id null."""
         # _QueueSession에 2건만 제공 — 가중 쿼리를 돌리면 IndexError(가드 검증)
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _next_problem_session([_AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?prioritize_weak_concepts=true").json()
         assert body["problem_id"] is None
 
     def test_no_candidates_does_not_record_treatment(self) -> None:
         """REC-03 — 가짜 처치 금지: problem_id=null이면 evidence_event를 기록하지 않는다."""
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _next_problem_session([_AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         client.get("/v1/me/next-problem")
         assert session.added == []
@@ -1813,7 +2208,9 @@ class TestNextProblem:
     def test_recommendation_records_treatment_evidence(self) -> None:
         """REC-03 — 추천이 실제로 반환되면 evidence_event 처치 1건이 기록·commit된다."""
         pid = uuid.uuid4()
-        session = _QueueSession([_AQResult([]), _AQResult([(pid, 3.0, None)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
         assert body["problem_id"] == str(pid)
@@ -1830,7 +2227,9 @@ class TestNextProblem:
     def test_recommendation_records_candidates_and_policy_version(self) -> None:
         """REC-11 — 기본 CAT 처치 기록에 candidates[]·policy_version=cat_v1이 함께 실린다."""
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession([_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, 1.0)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, 1.0)])] + _reason_results()
+        )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem")
         assert len(session.added) == 1
@@ -1847,13 +2246,14 @@ class TestNextProblem:
     ) -> None:
         c_strong, c_weak = uuid.uuid4(), uuid.uuid4()
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),
                 _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)]),
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),
                 _AQResult([(pid_a, c_strong), (pid_b, c_weak)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?prioritize_weak_concepts=true")
@@ -1866,11 +2266,12 @@ class TestNextProblem:
         """REC-04 — purpose=learning은 밴드(70~85%) 안 후보를 고르고 band_calibrated=false."""
         pid_mid, pid_band = uuid.uuid4(), uuid.uuid4()
         band_b = -math.log(0.8 / 0.2)  # θ=0에서 P=0.8(밴드 안)
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),  # 이력 없음 → θ=0
                 _AQResult([(pid_mid, 3.0, 0.0), (pid_band, 3.0, band_b)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?purpose=learning").json()
@@ -1881,11 +2282,12 @@ class TestNextProblem:
         """대조군 — 명시적 diagnosis는 기본과 동일하게 정보량 최대(P≈0.5) 후보를 고른다."""
         pid_mid, pid_band = uuid.uuid4(), uuid.uuid4()
         band_b = -math.log(0.8 / 0.2)
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),
                 _AQResult([(pid_mid, 3.0, 0.0), (pid_band, 3.0, band_b)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?purpose=diagnosis").json()
@@ -1894,7 +2296,7 @@ class TestNextProblem:
 
     def test_purpose_invalid_value_returns_422(self) -> None:
         """값 공간이 Literal로 닫혀 있어 오타는 422(mode 선례와 동형)."""
-        session = _QueueSession([_AQResult([]), _AQResult([])])
+        session = _next_problem_session([_AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         resp = client.get("/v1/me/next-problem?purpose=bogus")
         assert resp.status_code == 422
@@ -1904,13 +2306,14 @@ class TestNextProblem:
         c_strong, c_weak = uuid.uuid4(), uuid.uuid4()
         pid_mid_strong, pid_band_weak = uuid.uuid4(), uuid.uuid4()
         band_b = -math.log(0.8 / 0.2)
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),
                 _AQResult([(pid_mid_strong, 3.0, 0.0), (pid_band_weak, 3.0, band_b)]),
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),
                 _AQResult([(pid_mid_strong, c_strong), (pid_band_weak, c_weak)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get(
@@ -1923,7 +2326,9 @@ class TestNextProblem:
     def test_sibling_filter_unset_skips_extra_queries(self) -> None:
         """미지정(기본) → 형제 조회 자체를 생략 — 쿼리 2회만(회귀 0 — 큐 소진 시 IndexError)."""
         pid = uuid.uuid4()
-        session = _QueueSession([_AQResult([]), _AQResult([(pid, 3.0, None)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
         assert body["problem_id"] == str(pid)
@@ -1931,12 +2336,13 @@ class TestNextProblem:
     def test_sibling_filter_set_but_no_prior_incorrect_skips_sibling_query(self) -> None:
         """직전 오답이 없으면(2번째 쿼리가 None) 형제 조회 자체를 생략 — 쿼리 3회만."""
         pid = uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),  # ① 채점 이력 없음
                 _AQResult([]),  # ② _last_incorrect_problem_id → None(오답 이력 없음)
                 _AQResult([(pid, 3.0, None)]),  # ③ 후보(형제 조회 생략 — 4번째 큐 없음)
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?sibling_filter=exclude").json()
@@ -1951,7 +2357,7 @@ class TestNextProblem:
         """
         pid_wrong = uuid.uuid4()
         pid_sibling, pid_other = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([(pid_wrong, False, 3.0, None)]),  # ① 오답 이력(θ 추정 겸용)
                 _AQResult([pid_wrong]),  # ② 직전 오답 문항 id
@@ -1960,6 +2366,7 @@ class TestNextProblem:
                     [(pid_other, 3.0, None), (pid_sibling, 3.0, None)]
                 ),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?sibling_filter=include").json()
@@ -1973,7 +2380,7 @@ class TestNextProblem:
         pid_wrong = uuid.uuid4()
         pid_sibling_weak, pid_plain = uuid.uuid4(), uuid.uuid4()
         c_weak = uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([(pid_wrong, False, 3.0, None)]),
                 _AQResult([pid_wrong]),
@@ -1982,6 +2389,7 @@ class TestNextProblem:
                 _AQResult([(c_weak, 0.0)]),  # 숙달 스냅샷 — 저숙달
                 _AQResult([(pid_sibling_weak, c_weak)]),  # 후보 개념 매핑(pid_plain은 매핑 없음)
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get(
@@ -1994,13 +2402,14 @@ class TestNextProblem:
         통합테스트가 검증. 여기선 쿼리 배선(4회)과 무크래시만 스모크."""
         pid_wrong = uuid.uuid4()
         pid_sibling = uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([(pid_wrong, False, 3.0, None)]),
                 _AQResult([pid_wrong]),
                 _AQResult([(pid_wrong, pid_sibling)]),
                 _AQResult([(pid_sibling, 3.0, None)]),
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         resp = client.get("/v1/me/next-problem?sibling_filter=exclude")
@@ -2048,18 +2457,20 @@ class TestCandidatePoolOrdering:
     def test_default_cat_query_carries_secondary_key(self) -> None:
         """핸들러가 실제로 실행하는 후보 stmt에 2차 키가 실린다(헬퍼만 고쳐 놓고 미사용 방지)."""
         pid = uuid.uuid4()
-        session = _RecordingQueueSession([_AQResult([]), _AQResult([(pid, 3.0, None)])])
+        session = _next_problem_recording_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
         client = _attempts_client(session)
         assert client.get("/v1/me/next-problem").status_code == 200
-        tail = _order_by_tail(session.statements[1])
+        tail = _order_by_tail(session.statements[_NP_STMT_BASE + 1])
         assert tail.index("abs(") < tail.index("problem.problem_id")
 
     def test_suneung_query_carries_same_secondary_key(self) -> None:
         """수능 분기의 후보 조회도 같은 동률 결함을 갖고 있었다 — 같은 동결을 적용한다."""
-        session = _RecordingQueueSession([_AQResult([]), _AQResult([])])
+        session = _next_problem_recording_session([_AQResult([]), _AQResult([])])
         client = _attempts_client(session)
         assert client.get("/v1/me/next-problem?mode=suneung").status_code == 200
-        tail = _order_by_tail(session.statements[1])
+        tail = _order_by_tail(session.statements[_NP_STMT_BASE + 1])
         assert tail.index("abs(") < tail.index("problem.problem_id")
 
     def test_exposure_gate_conditions_are_single_sourced(self) -> None:
@@ -2081,7 +2492,7 @@ class TestCandidatePoolOrdering:
         picks = set()
         for rotation in range(len(pool)):
             rotated = pool[rotation:] + pool[:rotation]
-            session = _QueueSession([_AQResult([]), _AQResult(rotated)])
+            session = _next_problem_session([_AQResult([]), _AQResult(rotated)] + _reason_results())
             body = _attempts_client(session).get("/v1/me/next-problem").json()
             picks.add(body["problem_id"])
         assert len(picks) == 1  # 순서를 어떻게 흔들어도 같은 문항(θ=0 → 난이도 3.0)
@@ -2098,9 +2509,11 @@ class TestCandidatePoolOrdering:
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()  # 둘 다 난이도 3.0(θ=0 동률)
 
         def _call(attempts: list[Any], pool: list[Any]) -> tuple[str | None, str]:
-            session = _RecordingQueueSession([_AQResult(attempts), _AQResult(pool)])
+            session = _next_problem_recording_session(
+                [_AQResult(attempts), _AQResult(pool)] + _reason_results()
+            )
             body = _attempts_client(session).get("/v1/me/next-problem").json()
-            return body["problem_id"], str(session.statements[1])
+            return body["problem_id"], str(session.statements[_NP_STMT_BASE + 1])
 
         # ① attempt 0행 — NOT IN 없음·풀 첫 문항 반환
         before_id, before_sql = _call([], [(pid_a, 3.0, None), (pid_b, 3.0, None)])
@@ -2156,12 +2569,24 @@ class TestNextProblemSuneungMode:
     못 거른 행도 게이트가 차단함을 그대로 보여준다(설계 계약).
     """
 
+    def test_response_reason_field_is_required_not_optional(self) -> None:
+        """EOS-19: 응답 경계에서도 `reason`은 **필수**다 — 옵셔널이면 비는 경로가 생긴다.
+
+        키 집합 단언(`set(body)`)만으로는 이것을 못 잡는다: 기본값 None을 준 옵셔널 필드도
+        키는 그대로 실리기 때문이다(뮤테이션 M2 생존으로 실측 · 2026-09-18). 계획서 §8 KPI 3
+        ("reason 없이 생성된 추천 = 0")을 응답 스키마에서 지키는 것은 이 단언이다.
+        """
+        assert NextProblemResponse.model_fields["reason"].is_required() is True
+        assert NextProblemResponse.model_fields["action"].is_required() is True
+
     def test_recommends_signature_item_same_response_schema(self) -> None:
         """시그니처 보유 자체생성 문항 추천 — 응답 스키마는 기본 CAT과 동일(회귀 0 계약)."""
         problem = _suneung_problem(
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES],
         )
-        session = _QueueSession([_AQResult([]), _AQResult([_OrmProblemRow(problem)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+        )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         # 응답 모델(NextProblemResponse) — 기존 5필드 + REC-01 4필드 + REC-04 band_calibrated.
@@ -2176,6 +2601,9 @@ class TestNextProblemSuneungMode:
             "weak_concept_signal_count",
             "candidate_zero_reason",
             "band_calibrated",
+            "reason",  # EOS-14: 추천 근거 — 기존 관측 메타와 별개 축(옵셔널 아님)
+            "action",  # EOS-19: 근거에서 파생된 학습 행위(근거와 어긋나면 생성 자체가 실패)
+            "target_concept",  # EOS-19: 다음에 다뤄야 할 개념(선수 막힘이면 막힌 선수)
         }
         assert body["problem_id"] == str(problem.problem_id)
         assert body["difficulty"] == 3.0
@@ -2190,7 +2618,9 @@ class TestNextProblemSuneungMode:
     def test_recommendation_records_mode_suneung_in_treatment_meta(self) -> None:
         """REC-03 — 수능 모드 추천도 처치로 기록되며 meta.mode="suneung"이 남는다."""
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
-        session = _QueueSession([_AQResult([]), _AQResult([_OrmProblemRow(problem)])])
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+        )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
         assert len(session.added) == 1
@@ -2207,8 +2637,9 @@ class TestNextProblemSuneungMode:
         """
         eligible = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         ineligible = _suneung_problem()  # 수능 신호 전무 → is_suneung_eligible=False
-        session = _QueueSession(
+        session = _next_problem_session(
             [_AQResult([]), _AQResult([_OrmProblemRow(eligible), _OrmProblemRow(ineligible)])]
+            + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
@@ -2227,8 +2658,9 @@ class TestNextProblemSuneungMode:
         banded = _suneung_problem(
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES], irt_difficulty_b=band_b
         )
-        session = _QueueSession(
+        session = _next_problem_session(
             [_AQResult([]), _AQResult([_OrmProblemRow(mid), _OrmProblemRow(banded)])]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung&purpose=learning").json()
@@ -2239,7 +2671,7 @@ class TestNextProblemSuneungMode:
         """적격 0 → problem_id null(기본 CAT과 동일한 null 응답 계약)."""
         # 수능 신호 전무(기출 아님·시그니처 없음·적합도 없음) → 진실 게이트에서 탈락.
         no_signal = _suneung_problem()
-        session = _QueueSession([_AQResult([]), _AQResult([_OrmProblemRow(no_signal)])])
+        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(no_signal)])])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body == {
@@ -2255,6 +2687,11 @@ class TestNextProblemSuneungMode:
             "weak_concept_signal_count": 0,
             "candidate_zero_reason": "all_candidates_gated_ineligible",
             "band_calibrated": None,  # REC-04: purpose 기본(diagnosis)은 밴드 미적용
+            # EOS-14: 전부 부적격도 "후보 없음"의 한 형태 — 이유가 비지 않는다.
+            "reason": _REASON_NO_CANDIDATE,
+            # EOS-19: 부재의 행위는 none이고 목표 개념은 없다(지어내지 않는다).
+            "action": "none",
+            "target_concept": None,
         }
         assert session.added == []  # REC-03: null 응답은 처치가 아니다(가짜 처치 금지)
         assert session.commits == 0
@@ -2265,7 +2702,7 @@ class TestNextProblemSuneungMode:
         수능 모드 핵심 저작권 계약 — 평가원 기출 본문 절대 노출 불가(자체생성 동등문제만).
         """
         blocked = _suneung_problem(source_type=SourceType.평가원, exam_type=ExamType.수능)
-        session = _QueueSession([_AQResult([]), _AQResult([_OrmProblemRow(blocked)])])
+        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(blocked)])])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body["problem_id"] is None
@@ -2273,7 +2710,7 @@ class TestNextProblemSuneungMode:
     def test_persona_d_blocks_all(self) -> None:
         """persona=D_학종고2(비응시) → 적격 후보가 있어도 전부 차단 → null."""
         eligible = _suneung_problem(exam_type=ExamType.수능)
-        session = _QueueSession([_AQResult([]), _AQResult([_OrmProblemRow(eligible)])])
+        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(eligible)])])
         client = _attempts_client(session)
         body = client.get(
             "/v1/me/next-problem", params={"mode": "suneung", "persona": "D_학종고2"}
@@ -2288,13 +2725,14 @@ class TestNextProblemSuneungMode:
         strong = _suneung_problem(exam_type=ExamType.수능)
         weak = _suneung_problem(exam_type=ExamType.수능)
         c_strong, c_weak = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
+        session = _next_problem_session(
             [
                 _AQResult([]),  # 채점 이력 없음 → θ=0
                 _AQResult([_OrmProblemRow(strong), _OrmProblemRow(weak)]),  # 동률 후보
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),  # 숙달: 강·약
                 _AQResult([(strong.problem_id, c_strong), (weak.problem_id, c_weak)]),  # 개념 매핑
             ]
+            + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung&prioritize_weak_concepts=true").json()
@@ -2304,8 +2742,8 @@ class TestNextProblemSuneungMode:
     def test_mode_unspecified_regression_preserved(self) -> None:
         """mode 미지정 → 기존 기본 CAT 경로 그대로(튜플 행 후보·동률은 낮은 인덱스·회귀 0)."""
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
-        session = _QueueSession(
-            [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)])]
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)])] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem").json()
@@ -2316,11 +2754,195 @@ class TestNextProblemSuneungMode:
         app = create_app()
 
         async def _sess() -> AsyncIterator[_QueueSession]:
-            yield _QueueSession([_AQResult([]), _AQResult([])])
+            yield _next_problem_session([_AQResult([]), _AQResult([])])
 
         app.dependency_overrides[get_session] = _sess
         resp = TestClient(app).get("/v1/me/next-problem?mode=suneung")
         assert resp.status_code == 401
+
+
+# ── EOS-14: 추천 근거(`reason`)가 응답에 **실제로** 실리는가 ────────────────────────
+class _MasteryRow:
+    """`_latest_mastery`가 돌려주는 ORM 행의 최소 시뮬 — 근거가 읽는 두 필드만 가진다."""
+
+    def __init__(self, mastery: float | None, confidence: float | None) -> None:
+        self.mastery = mastery
+        self.confidence = confidence
+
+
+def _reason_results_measured(concept_id: uuid.UUID, row: _MasteryRow | None) -> list[_AQResult]:
+    """대표 개념이 **잡히는** 경로의 근거 조회 2건 — ①PRIMARY 히트 ②최신 숙달(없으면 빈 행).
+
+    PRIMARY가 비지 않으므로 TESTED 폴백 조회는 일어나지 않는다(그래서 2건) — 이 개수 자체가
+    `get_primary_concept_id`의 단락 동작을 동결한다.
+    """
+    return [_AQResult([concept_id]), _AQResult([row] if row is not None else [])]
+
+
+class TestNextProblemReason:
+    """`GET /v1/me/next-problem`의 `reason` — 계약이 응답 표면까지 도달했는가(집행 지점).
+
+    계약·규칙 자체는 `tests/backend/l2/test_recommendation_contract.py`가, 조회기는
+    `test_recommendation_reason.py`가 검증한다. 여기서 보는 것은 **핸들러 4경로가 모두
+    근거를 싣는가** 하나다 — "모듈은 있는데 아무도 안 부른다"(CLAUDE.md 정본화≠집행)를 막는다.
+    """
+
+    @staticmethod
+    def _measured(mastery: float, confidence: float = 0.5) -> tuple[uuid.UUID, dict[str, object]]:
+        """숙달 실측이 있는 CAT 경로 1건을 돌려 실행하고 `reason`을 꺼낸다."""
+        pid, cid = uuid.uuid4(), uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])]
+            + _reason_results_measured(cid, _MasteryRow(mastery, confidence))
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem").json()
+        assert body["problem_id"] == str(pid)
+        return cid, body["reason"]
+
+    def test_low_mastery_reports_prerequisite_gap_with_measured_basis(self) -> None:
+        """숙달 0.2(<0.4) → 선수개념으로 돌아가라 · 근거는 실측이고 개념·숙달이 함께 실린다."""
+        cid, reason = self._measured(0.2)
+        assert reason == {
+            "type": "prerequisite_gap",
+            "confidence": 0.5,
+            "basis": "measured_mastery",
+            "concept_id": str(cid),
+            "mastery": 0.2,
+        }
+
+    def test_mid_mastery_reports_current_concept(self) -> None:
+        _, reason = self._measured(0.55)
+        assert reason["type"] == "current_concept"
+        assert reason["basis"] == "measured_mastery"
+
+    def test_high_mastery_reports_next_concept(self) -> None:
+        _, reason = self._measured(0.9)
+        assert reason["type"] == "next_concept"
+
+    def test_cold_start_is_not_reported_as_prerequisite_gap(self) -> None:
+        """개념은 매핑됐는데 숙달 이력이 없다 → `cold_start`.
+
+        이 갈래를 `prerequisite_gap`으로 접으면 **측정된 적 없는 학생이 전부 "선수개념이
+        막혔다"로 분류된다** — 없는 약점을 만들어 내는 형태라 따로 본다.
+        """
+        pid, cid = uuid.uuid4(), uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results_measured(cid, None)
+        )
+        reason = _attempts_client(session).get("/v1/me/next-problem").json()["reason"]
+        assert reason["type"] == "unmeasured"
+        assert reason["basis"] == "cold_start"
+        assert reason["concept_id"] == str(cid)
+        assert reason["mastery"] is None  # 0.0으로 접지 않는다(S3-07 None≠0)
+
+    def test_unmapped_problem_is_reported_as_our_data_gap(self) -> None:
+        """문항-개념 매핑이 없으면 학생 상태가 아니라 **우리 쪽 공백**으로 표기된다."""
+        pid = uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
+        reason = _attempts_client(session).get("/v1/me/next-problem").json()["reason"]
+        assert reason == _REASON_UNMAPPED
+
+    def test_suneung_branch_carries_reason_too(self) -> None:
+        """수능 분기도 같은 근거를 싣는다 — 한쪽 분기만 배선하면 그 경로가 조용히 빈다."""
+        problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
+        cid = uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            + _reason_results_measured(cid, _MasteryRow(0.2, 0.75))
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
+        assert body["problem_id"] == str(problem.problem_id)
+        assert body["reason"] == {
+            "type": "prerequisite_gap",
+            "confidence": 0.75,
+            "basis": "measured_mastery",
+            "concept_id": str(cid),
+            "mastery": 0.2,
+        }
+
+    def test_absent_recommendation_asks_nothing(self) -> None:
+        """추천이 없으면 근거 조회 0건 — 소비된 쿼리 수를 변별력으로 쓴다.
+
+        EOS-19 이후 기준선은 `_NP_STMT_BASE`(LearnerState 조립 5건)이다. 시나리오가 쓰는 것은
+        그 뒤의 2건(①채점 이력 ②후보 풀)뿐이고, 근거가 한 건이라도 물었으면 그보다 커진다.
+        """
+        session = _next_problem_session([_AQResult([]), _AQResult([])])
+        body = _attempts_client(session).get("/v1/me/next-problem").json()
+        assert body["reason"] == _REASON_NO_CANDIDATE
+        assert session._i == _NP_STMT_BASE + 2
+
+    def test_learning_purpose_alone_still_records_applied_weights(self) -> None:
+        """EOS-19 회귀 가드 — `purpose=learning`만 준 요청도 '가중 적용됨'으로 기록된다.
+
+        전환 중 처치 기록의 `applied_weights`를 응답의 `weight_axes_applied`(정직 표기)에서
+        유도했다가 이 경우가 갈라졌다: 정직 표기는 약점·수능 축만 싣고 학습 밴드 축은 싣지
+        않으므로, 밴드 가중만 적용된 요청이 **가중 미적용(False)**으로 기록됐다. 전환 전
+        핸들러는 `weights is not None`이라 True였다 — 스위트는 이 조합을 재는 시나리오가
+        없어 초록이었고, 적대적 diff 재검토가 잡았다(2026-09-18).
+        """
+        pid = uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
+        client = _attempts_client(session)
+        # prioritize_weak_concepts 미지정(기본 false) + purpose=learning → 밴드 가중만 적용.
+        body = client.get("/v1/me/next-problem?purpose=learning").json()
+        assert body["problem_id"] == str(pid)
+        assert body["weight_axes_applied"] == []  # 정직 표기에는 밴드 축이 없다(기존 계약)
+        treatment = [row for row in session.added if hasattr(row, "meta") and row.meta is not None]
+        assert treatment, "처치 기록이 없다 — 이 단언이 공허해진다"
+        assert treatment[0].meta[META_KEY_APPLIED_WEIGHTS] is True
+
+    def test_persisted_treatment_carries_the_same_reason_as_the_response(self) -> None:
+        """acceptance ④ — 근거가 응답에만 있고 로그에는 없으면 소급 평가에서 사라진다.
+
+        같은 값이어야 한다는 점이 핵심이다: 응답용·영속용을 각자 계산하면 언젠가 갈라지고,
+        갈라진 뒤에는 어느 쪽이 그때 학생이 본 근거인지 아무도 모른다.
+        """
+        pid, cid = uuid.uuid4(), uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])]
+            + _reason_results_measured(cid, _MasteryRow(0.2, 0.5))
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem").json()
+        assert len(session.added) == 1
+        assert session.added[0].meta[META_KEY_REASON] == body["reason"]
+        assert body["reason"]["type"] == "prerequisite_gap"
+
+    def test_suneung_persisted_treatment_carries_reason_too(self) -> None:
+        problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
+        cid = uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            + _reason_results_measured(cid, _MasteryRow(0.9, 0.6))
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
+        assert len(session.added) == 1
+        assert session.added[0].meta[META_KEY_REASON] == body["reason"]
+        assert body["reason"]["type"] == "next_concept"
+
+    def test_reason_does_not_change_the_selected_problem(self) -> None:
+        """acceptance⑥ — 근거를 붙여도 선택은 그대로다.
+
+        같은 후보 풀에 서로 다른 근거 재료(저숙달 · 고숙달 · 매핑 없음)를 물려도 선택된
+        문항이 바뀌지 않는지 본다. 근거 조립이 선택 *뒤에* 오는 구조라 그럴 수밖에 없지만,
+        그 구조가 깨지면(예: 근거를 먼저 계산해 가중에 쓰면) 여기서 먼저 드러난다.
+        """
+        pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
+        cid = uuid.uuid4()
+        picks = set()
+        for tail in (
+            _reason_results_measured(cid, _MasteryRow(0.0, 1.0)),
+            _reason_results_measured(cid, _MasteryRow(1.0, 1.0)),
+            _reason_results(),
+        ):
+            session = _next_problem_session(
+                [_AQResult([]), _AQResult([(pid_a, 3.0, None), (pid_b, 3.0, None)])] + tail
+            )
+            picks.add(_attempts_client(session).get("/v1/me/next-problem").json()["problem_id"])
+        assert picks == {str(pid_a)}
 
 
 class TestWeakConceptWeights:
@@ -3135,7 +3757,16 @@ class TestAssessmentCaptureEndpoint:
         assert set(body["assessment"]) & STUDENT_HIDDEN_PREDICTION_FIELDS == set()
         # 실제로 Assessment ORM 행 1건 add + commit 1회(실 적재 발생).
         assert fake.commits == 1
-        assert len(fake.added) == 1
+        # EOS-103: 이 분기가 진단 완료 경계이므로 **같은 트랜잭션**에서 두 행이 적재된다 —
+        # Assessment(진단 결과) + LearnerStateRecord(학습자 상태 자동 생성). 개수만 세지
+        # 않고 타입으로 대조한다: 개수 단언은 한쪽이 다른 쪽으로 바뀌어도 통과한다.
+        assert [type(row).__name__ for row in fake.added] == [
+            "Assessment",
+            "LearnerStateRecord",
+        ], f"적재 구성이 바뀌었다: {[type(r).__name__ for r in fake.added]}"
+        provisioned = fake.added[1]
+        assert provisioned.learner_id == _UID
+        assert provisioned.provisioned_by == "diagnosis_capture"
         assert isinstance(fake.added[0], Assessment)
         # 적재된 *내부* 정본에는 5필드가 그대로 있고 값은 None이다 — 봉인은 노출 축이지
         # 영속 축이 아니다(필드 폐기는 ASM-02에서 (d) 미채택).
@@ -3179,3 +3810,108 @@ class TestAssessmentCaptureEndpoint:
         # 재적재 없음 — 커밋 0·add 0(이중 계상 방지가 실제로 동작함을 확인).
         assert fake.commits == 0
         assert fake.added == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-10 — GET /v1/me/learner-state (LearnerState 단일 조회 표면)
+# ──────────────────────────────────────────────────────────────────────────
+class _LearnerStateSession(_QueueSession):
+    """`_QueueSession` + `get()` — `get_state()`는 `session.get(UserProfile, ...)`도 부른다.
+
+    execute 큐 순서(조립기 계약): ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬 숙달.
+    """
+
+    def __init__(self, results: list[_AQResult], profile: Any = None) -> None:
+        super().__init__(results)
+        self._profile = profile
+
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        return self._profile
+
+
+def _learner_state_client(
+    *,
+    mastery_rows: list[Any] | None = None,
+    irt_rows: list[Any] | None = None,
+    theta_rows: list[Any] | None = None,
+    misconception_rows: list[Any] | None = None,
+    skill_rows: list[Any] | None = None,
+    profile: Any = None,
+) -> TestClient:
+    session = _LearnerStateSession(
+        [
+            _AQResult(mastery_rows or []),
+            _AQResult(irt_rows or []),
+            _AQResult(theta_rows or []),
+            _AQResult(misconception_rows or []),
+            _AQResult(skill_rows or []),
+        ],
+        profile=profile,
+    )
+    return _attempts_client(cast(_QueueSession, session))
+
+
+class TestLearnerStateSurface:
+    """EOS-10: 조각 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)의 **합성 표면**."""
+
+    def test_requires_auth(self) -> None:
+        app = create_app()
+
+        async def _sess() -> AsyncIterator[_LearnerStateSession]:
+            yield _LearnerStateSession([_AQResult([]) for _ in range(5)])
+
+        app.dependency_overrides[get_session] = _sess
+        assert TestClient(app).get("/v1/me/learner-state").status_code == 401
+
+    def test_returns_all_fields_for_new_student(self) -> None:
+        """진단·오개념·프로필이 전부 없는 신규 학생도 200 — 빈 값이지 오류가 아니다."""
+        resp = _learner_state_client().get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["student_id"] == str(_UID)
+        assert body["mastery"] == {}
+        assert body["skill_mastery"] == {}
+        assert body["curriculum_id"] is None
+        assert body["current_objective_id"] is None
+
+    def test_assembles_concept_and_skill_axes_in_one_call(self) -> None:
+        """한 호출로 개념 축(BKT)과 행동 축(스킬)이 함께 온다 — 조각 조회의 이유가 사라진다."""
+        cid = uuid.uuid4()
+        resp = _learner_state_client(
+            mastery_rows=[(cid, "C-1", "개념", 0.85)],
+            skill_rows=[("skill.factorize", 0.72)],
+            theta_rows=[1.2],
+        ).get("/v1/me/learner-state")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mastery"] == {"C-1": 0.85}
+        assert body["skill_mastery"] == {"skill.factorize": 0.72}
+        assert body["recent_successes"] == ["C-1"]  # 0.85 >= 숙달 임계 0.8
+
+    def test_origins_exposes_no_producer_distinctly_from_no_data(self) -> None:
+        """응답이 '이력이 없다'와 '생산자가 없다'를 구별해 말하는가 — 이 표면의 핵심 계약."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        origins = body["origins"]
+        assert origins["skill_mastery"]["status"] == "measured"
+        assert origins["mastery"]["status"] == "no_data"  # 생산자는 있으나 이력 없음
+        assert origins["curriculum_id"]["status"] == "no_producer"
+        assert origins["current_objective_id"]["status"] == "no_producer"
+
+    def test_origins_reports_estimator_for_swap_visibility(self) -> None:
+        """추정기가 응답에 실린다 — BKT→DKT 교체가 소비처에 보이게 하는 축(계획서 §2)."""
+        body = (
+            _learner_state_client(
+                skill_rows=[("skill.factorize", 0.5)],
+                theta_rows=[0.3],
+            )
+            .get("/v1/me/learner-state")
+            .json()
+        )
+        assert body["origins"]["skill_mastery"]["estimator"] == "bkt.v1"
+        assert body["origins"]["general_ability"]["estimator"] == "irt.2pl"

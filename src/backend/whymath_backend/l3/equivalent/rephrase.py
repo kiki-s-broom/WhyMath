@@ -304,11 +304,11 @@ class QuestionRephraser:
     def _resolve_provider(self) -> LLMProvider:
         if self._provider is None:
             # 지연 구성 — 라이브(Phaiakes9)만 도달. hermetic 테스트는 항상 주입.
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            self._provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            self._provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         return self._provider
 
     def _decide_routing(self) -> RoutingDecision:

@@ -24,6 +24,7 @@ select한다(이 조립기는 id 리스트만 필요).
 
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import datetime, timezone
 
@@ -37,8 +38,9 @@ from whymath_backend.db.models.misconception_hypothesis import (
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.l2.ability_tracking import get_current_theta
 from whymath_backend.l2.concept_diagnosis import compute_concept_diagnoses
+from whymath_backend.l2.skill_mastery_tracking import get_all_current_skill_mastery
 
-__all__ = ["LearnerState", "get_state"]
+__all__ = ["FieldOrigin", "FieldStatus", "LearnerState", "get_state"]
 
 # LTHC 숙달도 임계값의 **값만 미러링**(import 아님) — `l4/lthc/adapt.py`의 `_DEVELOPING_THRESHOLD`
 # (0.4)·`_MASTERED_THRESHOLD`(0.8)와 반드시 같은 값을 유지해야 하지만, L2는 L4를 import할 수
@@ -50,6 +52,76 @@ _DEVELOPING_THRESHOLD = 0.4  # l4/lthc/adapt.py::_DEVELOPING_THRESHOLD와 동기
 _MASTERED_THRESHOLD = 0.8  # l4/lthc/adapt.py::_MASTERED_THRESHOLD와 동기화 필수
 
 
+class FieldStatus(str, enum.Enum):
+    """`LearnerState` 한 필드가 **왜** 그 값인지 — 값의 부재를 세 가지로 갈라 적는다.
+
+    "값이 없다"는 한 가지 사실이 아니다. 셋을 같은 `None`으로 접으면 읽는 쪽이
+    *고칠 수 있는 것*(데이터를 더 모으면 된다)과 *고칠 수 없는 것*(생산자를 먼저 만들어야
+    한다)을 구별하지 못한다. CLAUDE.md "모른다 ≠ 아니다"(3상태를 truthiness로 2상태로 접지
+    말 것)와 "작동 신호 없는 알고리즘 부착 금지"(알고리즘이 **실제로 작동한 비율**을 응답이
+    말해야 한다)의 이행이다.
+    """
+
+    MEASURED = "measured"
+    """생산자가 있고, 이 학생의 데이터로 값이 나왔다."""
+
+    NO_DATA = "no_data"
+    """생산자는 있으나 이 학생의 측정 이력이 없다 — 풀이가 쌓이면 채워진다."""
+
+    NO_PRODUCER = "no_producer"
+    """저장소에 생산자 자체가 없다 — 이 학생이 무엇을 해도 채워지지 않는다."""
+
+
+class FieldOrigin(BaseModel):
+    """한 필드의 유래 — **교체 가능성을 주석이 아니라 타입으로** 표현하는 축.
+
+    계획서 300 §2("알고리즘보다 Contract")의 이행이다. v1 내부 구현이 BKT여도 나중에 DKT로
+    갈아끼울 때 `LearnerState`의 *모양*은 바뀌지 않아야 한다 — 바뀌는 것은 `estimator`
+    **문자열 값**뿐이고, 호출부는 그대로다. 추정기 이름을 docstring에만 적어 두면 교체 시
+    그 사실이 응답에 드러나지 않아 소비처가 "무엇이 이 숫자를 냈는지" 알 수 없다.
+    """
+
+    status: FieldStatus = Field(description="값이 있는지·없다면 왜 없는지.")
+    estimator: str | None = Field(
+        default=None,
+        description="이 값을 낸 추정기 식별자(예 `bkt.v1`·`irt.2pl`). 추정이 아니라 프로필·"
+        "저장소 조회로 나온 값이면 None. **BKT→DKT 교체 시 바뀌는 곳이 여기다.**",
+    )
+    seat: str | None = Field(
+        default=None,
+        description="값을 낸 좌석(모듈 경로). 생산자가 없으면 None — 그 자체가 `NO_PRODUCER`의 "
+        "증거다.",
+    )
+
+
+# 추정기 식별자 — `FieldOrigin.estimator`에 실리는 값의 정본. 교체 시 여기만 바꾼다.
+_EST_BKT = "bkt.v1"
+_EST_IRT = "irt.2pl"
+
+# 좌석 경로 — `FieldOrigin.seat`에 실리는 값. 값을 실제로 낸 모듈을 가리킨다.
+_SEAT_DIAGNOSIS = "l2.concept_diagnosis.compute_concept_diagnoses"
+_SEAT_ABILITY = "l2.ability_tracking.get_current_theta"
+_SEAT_SKILL = "l2.skill_mastery_tracking.get_all_current_skill_mastery"
+_SEAT_MISCONCEPTION = "db.models.misconception_hypothesis.MisconceptionHypothesisRecord"
+_SEAT_PROFILE = "db.models.user.UserProfile"
+
+
+def _origin(
+    has_value: bool, *, estimator: str | None = None, seat: str | None = None
+) -> FieldOrigin:
+    """생산자가 **있는** 필드의 유래 — 값이 나왔으면 MEASURED, 안 나왔으면 NO_DATA.
+
+    `NO_PRODUCER`는 이 헬퍼로 만들지 않는다(생산자 부재는 런타임 데이터가 아니라 저장소의
+    구조적 사실이라 호출부에 리터럴로 박힌다 — 그래야 생산자가 생겼을 때 그 줄을 지우는 것이
+    변경의 전부가 된다).
+    """
+    return FieldOrigin(
+        status=FieldStatus.MEASURED if has_value else FieldStatus.NO_DATA,
+        estimator=estimator,
+        seat=seat,
+    )
+
+
 class LearnerState(BaseModel):
     """L2가 조립하는 학습자 요약 상태 v0 — 생산자 실재 필드만.
 
@@ -57,9 +129,14 @@ class LearnerState(BaseModel):
     domain_abilities·active_misconceptions·recent_struggles·recent_successes·grade·goals)만
     담는다.
 
+    **v1(EOS-10) 추가 3필드**: `curriculum_id`·`current_objective_id`·`skill_mastery`.
+    이 중 생산자가 실재하는 것은 `skill_mastery` 하나뿐이고 나머지 둘은 **생산자 0건**이라
+    항상 None이다. v0은 그런 필드를 아예 만들지 않는 원칙("항상 None인 필드는 '읽고 있다'는
+    착시만 준다")을 세웠고 그 원칙은 옳다 — 그래서 v1은 필드를 열되 **`origins`가 그 부재를
+    `NO_PRODUCER`로 말하게** 해 착시를 구조적으로 막는다. 필드가 있으나 유래가 "생산자 없음"인
+    것과, 필드가 없는 것은 다르다: 전자는 계약이 고정돼 생산자가 붙는 날 호출부가 안 바뀐다.
+
     **v0 제외 필드(생산자 부재 — `runtime_selector.py:96-118` 결정의 이행)**:
-    - `curriculum`: `user_profile`에 대응 컬럼이 없다(교육과정 버전 필드 부재 — grep 0건 실측.
-      2026-07-29 편집자 부기가 이 필드를 v0에 포함시켰던 것은 사실 오류였고, 2026-07-30 정정).
     - `affect`: `AffectState` 분류기 자체가 없음(§D6 페이퍼 설계만).
     - `mastery_states: dict[str, MasteryState]`: `MasteryState` 자체가 코드에 미실체화(문서 스케치).
     - `active_textbook_id`: `user_profile`에 학생-교과서 FK 없음(`textbook_mapping`은 콘텐츠
@@ -104,6 +181,42 @@ class LearnerState(BaseModel):
         "target_universities를 문자열화한 목표 사전. 값 없는 필드는 키 생략, 전부 없으면 빈 dict. "
         "**PII 주의**: 이 필드는 이번 슬라이스(PED-05)에서 프롬프트에 착지되지 않는다 — 목표 "
         "점수/등급/대학을 학생 대면 프롬프트에 노출하는 것은 CLAUDE.md PII 가드 위반이다."
+    )
+
+    # ===== v1(EOS-10) 추가 3필드 — 계획서 300 §12 LearnerState 결손분 =====
+    curriculum_id: str | None = Field(
+        default=None,
+        description="학생이 따르는 교육과정 버전 id. **현재 항상 None — 생산자 0건**: "
+        "`user_profile` 컬럼 전수에 교육과정 배정 컬럼이 없고(2026-09-16 실측), "
+        "`curriculum_version`은 콘텐츠 자산이며 `CurriculumDepthResolver`는 학생이 아니라 "
+        "*국가*(KR 고정) 축으로 해석한다. 학생→교육과정 배정 경로 자체가 없다. "
+        "`origins['curriculum_id'].status`가 `no_producer`로 이 사실을 말한다.",
+    )
+    current_objective_id: str | None = Field(
+        default=None,
+        description="지금 학생이 향하는 학습목표(`learning_objective.id`). **현재 항상 None — "
+        "생산자 0건**: `learning_objective`는 콘텐츠로 실재하지만 *이 학생의 현재 목표*를 "
+        "정하는 서버측 결정자가 없다. `api/study.py`는 목표를 **클라이언트가 경로 인자로 "
+        "넘겨준다**(`_load_objective(session, objective_id)`) — 즉 현재 이 결정은 서버 밖에 "
+        "있다. 추천 좌석들(`weak_concept_recommendation`·`learning_path`)은 *개념*을 내지 "
+        "목표를 내지 않는다. `origins['current_objective_id']`가 이 사실을 말한다.",
+    )
+    skill_mastery: dict[str, float] = Field(
+        default_factory=dict,
+        description="`skill_id`(`skill.<slug>`) → 스킬별 최신 BKT 숙달(행동 축). 개념 축 "
+        "`mastery`의 짝이며 **재계산이 아니라 조립**이다 — 값은 소유 모듈 "
+        "`l2/skill_mastery_tracking.py`의 `get_all_current_skill_mastery`가 낸다. 측정 없는 "
+        "스킬은 키 자체가 없다(`mastery`와 같은 규약).",
+    )
+
+    # ===== 유래 축 — 어느 필드가 실제로 작동했는가 =====
+    origins: dict[str, FieldOrigin] = Field(
+        default_factory=dict,
+        description="필드명 → 그 값의 유래(`FieldOrigin`). 데이터 필드 11개 전건에 대해 채워진다 "
+        "— 값이 없는 필드도 *왜* 없는지(`no_data` = 이 학생의 이력 부재 / `no_producer` = "
+        "저장소에 생산자 부재)를 말하므로, 소비처는 `status == 'measured'`의 비율로 **이 조립이 "
+        "실제로 작동한 비율**을 셀 수 있다. 추정기 교체(BKT→DKT)는 이 dict의 `estimator` 값만 "
+        "바꾸고 스키마 모양은 바꾸지 않는다.",
     )
 
 
@@ -156,8 +269,30 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
     `_get_active_misconception_ids`), `grade`·`goals`는 `user_profile` 단건 조회.
 
     진단·오개념·프로필이 전부 없는 신규 학생도 예외 없이 반환한다 — 각 컬렉션은 빈 dict/list,
-    `general_ability`·`grade`는 None, `goals`는 빈 dict(NO_DATA 센티널이 아니라 그냥 빈 값 —
-    이 조립기는 Metric 패턴이 아니라 단순 조립기다).
+    `general_ability`·`grade`는 None, `goals`는 빈 dict. 값의 부재가 무엇을 뜻하는지는
+    `origins`가 필드별로 말한다(빈 값 자체는 센티널이 아니다).
+
+    **좌석 판정 (EOS-10 acceptance ③ — 정본화 ≠ 집행)**
+    ----------------------------------------------------
+    정본이 학습 상태에 배정한 영속 좌석 `user_state_snapshot`(`db/models/user.py`)을 이 조립기는
+    **읽지도 쓰지도 않는다.** 판정과 근거:
+
+    - **실측**: 그 테이블의 writer는 **0건**이다(2026-09-16 · `UserStateSnapshot` 전거 검색 →
+      schema 정의 · `db/models/__init__` 등록 · `privacy/export.py`·`privacy/erasure.py`의
+      읽기·삭제뿐). 비어 있는 테이블을 읽으면 이 조립기는 항상 빈 상태를 돌려준다.
+    - **축이 다르다**: 그 좌석이 담는 것은 `estimated_grade`·`estimated_score`·
+      `estimated_percentile`·`pattern_mastery`·`time_management_score`·
+      `consecutive_active_days` 등 **예측·시간관리·멘탈 신호**이고, `LearnerState`가 담는 것은
+      BKT/IRT 숙달·능력이다. 겹치는 것은 `concept_mastery` 한 축뿐인데 그마저 이쪽은
+      `ConceptMasteryHistory`(append-only 시계열)가 정본이다 — 스냅샷을 읽으면 같은 사실의
+      **두 번째 진실 원천**이 생긴다(붕괴 연쇄 "유지보수 지옥").
+    - **그러므로 조립 즉시 계산이다.** 이 표면은 호출 시점에 기존 좌석들을 조회해 조립하며
+      스냅샷을 경유하지 않는다. 캐시가 필요해지면 그때 `user_state_snapshot`이 아니라 이
+      조립 결과의 캐시 좌석을 따로 판정한다(축이 다른 테이블을 캐시로 전용하지 않는다).
+    - **좌석 자신의 처분은 이 태스크가 하지 않는다.** `privacy/export.py`·`erasure.py`가 그
+      테이블을 읽으므로 폐기는 개인정보 표면을 건드리는 별건이다(범위 규율). "배선 또는 폐기"
+      판정은 후속 태스크가 소유한다 — 본 태스크는 **"이 표면은 그 좌석을 쓰지 않는다"**를
+      확정하는 데까지다.
     """
     diagnoses = await compute_concept_diagnoses(session, user_id)
 
@@ -183,9 +318,37 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
     general_ability = await get_current_theta(session, user_id)
     active_misconceptions = await _get_active_misconception_ids(session, user_id)
 
+    # 스킬 축은 **조립**이다 — "최신 1건" 규칙은 소유 모듈이 갖고 여기서 다시 쓰지 않는다.
+    skill_mastery = await get_all_current_skill_mastery(session, user_id)
+
     profile = await session.get(UserProfile, user_id)
     grade = profile.grade if profile is not None else None
     goals = _build_goals(profile) if profile is not None else {}
+
+    # 데이터 필드 11개 전건의 유래. 생산자가 없는 둘만 리터럴 `NO_PRODUCER`이고(그 줄을 지우는
+    # 것이 생산자가 붙는 날 변경의 전부다), 나머지는 값 유무로 MEASURED/NO_DATA가 갈린다.
+    origins: dict[str, FieldOrigin] = {
+        "mastery": _origin(bool(mastery), estimator=_EST_BKT, seat=_SEAT_DIAGNOSIS),
+        "general_ability": _origin(
+            general_ability is not None, estimator=_EST_IRT, seat=_SEAT_ABILITY
+        ),
+        "domain_abilities": _origin(
+            bool(domain_abilities), estimator=_EST_IRT, seat=_SEAT_DIAGNOSIS
+        ),
+        "skill_mastery": _origin(bool(skill_mastery), estimator=_EST_BKT, seat=_SEAT_SKILL),
+        "active_misconceptions": _origin(bool(active_misconceptions), seat=_SEAT_MISCONCEPTION),
+        "recent_struggles": _origin(
+            bool(recent_struggles), estimator=_EST_BKT, seat=_SEAT_DIAGNOSIS
+        ),
+        "recent_successes": _origin(
+            bool(recent_successes), estimator=_EST_BKT, seat=_SEAT_DIAGNOSIS
+        ),
+        "grade": _origin(grade is not None, seat=_SEAT_PROFILE),
+        "goals": _origin(bool(goals), seat=_SEAT_PROFILE),
+        # ── 생산자 0건(2026-09-16 실측) — 근거는 각 필드 description 참조 ──
+        "curriculum_id": FieldOrigin(status=FieldStatus.NO_PRODUCER),
+        "current_objective_id": FieldOrigin(status=FieldStatus.NO_PRODUCER),
+    }
 
     return LearnerState(
         student_id=str(user_id),
@@ -198,4 +361,8 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
         recent_successes=recent_successes,
         grade=grade,
         goals=goals,
+        curriculum_id=None,
+        current_objective_id=None,
+        skill_mastery=skill_mastery,
+        origins=origins,
     )

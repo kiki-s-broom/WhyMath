@@ -937,6 +937,17 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "by-design:api/me.py list_my_skill_mastery — Phase 2b-2로 명시된 신규 축, 개념 축 "
             "/v1/me/mastery는 이미 클라·테스트가 호출한다(reached) — 스킬 축 화면만 후속"
         ),
+        # LearnerState 단일 조회 표면(EOS-10·2026-09-16 신설) — 구 MOB-22 유예.
+        # 2026-09-18 유예 해제: `tests/backend/api/test_week2_gate_wrong_answer_propagation.py`
+        # (EOS-110 · Week 2 Gate 판정 하네스)가 오답 전후 스냅샷을 이 라우트로 찍으므로
+        # 리터럴 호출로 reached가 됐다. 도달했는데 유예를 남기면 `stale-waiver`로 exit 1이다
+        # — 위 MOB-12·MOB-18·PED-15 해제와 같은 대응이다.
+        #
+        # **정직한 잔여**: 이 축의 `reached`는 "dart 클라 호출 ∪ 백엔드 테스트 호출"이다.
+        # 그러므로 reached는 *판정 하네스가 관통한다*는 뜻이지 *학생 앱이 쓴다*는 뜻이 아니다.
+        # **모바일 소비는 여전히 0건**이고 그 배선은 `MOB-22`가 계속 소유한다 — 다만 그 태스크의
+        # acceptance ②("완료 시 이 선언을 걷는다")는 이 해제로 **이미 충족**됐으니, MOB-22
+        # 완료 시 다시 걷을 항목은 없다.
         # 성장 증거 노출 계약 유일 경로(구 PED-15 유예) — 2026-08-10 유예 해제.
         # 정직 표기: PED-15의 전제("부르는 테스트 0건")는 **실측상 사실이 아니었다** —
         # `test_me_growth_evidence.py`가 처음부터 TestClient로 이 라우트를 때리고 있었고,
@@ -1088,6 +1099,20 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
         "harness.residue_cross_verify_eval": _LIVE_DEPENDENT,
+        # ARCH-49 — DeepSeek/OpenRouter 라이브 프로브. CI에서 원리적으로 못 도는 것이
+        # *실측*됐다(2026-09-17 개발 컨테이너: 키 부재 + egress 프록시가
+        # api.deepseek.com·openrouter.ai에 CONNECT 403). 이 CLI를 실제로 돌려 3축을
+        # 비교하는 것은 `ARCH-55-deepseek-live-battle-measurement`가 소유하며, 그
+        # 실행처는 CI가 아니라 키가 있는 Phaiakes9다.
+        "harness.deepseek_live_probe": _LIVE_DEPENDENT,
+        # ARCH-49 ⑨ — OpenRouter 엔드포인트 조회(공급사 slug·양자화·단가). 위와 같은 이유로
+        # CI에서 못 돈다(키 + `openrouter.ai` egress). 목록을 넓히는 판정은 `ARCH-55`.
+        "harness.openrouter_endpoints_probe": _LIVE_DEPENDENT,
+        # ARCH-55 — 프로바이더 3축 강등전. 클라우드 키 3종이 필요하고 회차마다 실호출을
+        # 하므로 CI에서 돌 수 없다(자격증명 부재 + 과금). 계약 회귀는
+        # `tests/backend/harness/test_provider_accuracy_battle.py`가 CI에서 돈다 —
+        # 즉 *라이브에 갔을 때 옳은 것을 재는가*는 검사되고, *라이브에서 도는가*만 미도달이다.
+        "harness.provider_accuracy_battle": _LIVE_DEPENDENT,
         # EOS-54(2026-08-30): HIT·CU 생산 계측 판독기 — 검수 타이머 *실이벤트*(JSONL) 의존.
         # 계측 표본이 쌓이기 전에는 입력 0 = 측정 실패(exit 1)가 설계값(미측정≠0 승격)이라 CI
         # 상시 배선 비대상 — G2(10/25) 기준선·G5 판정 시점에 운영자가 돌린다(answer_distribution_
@@ -1105,6 +1130,18 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "by-design:12월 검증 결론 판정기(EOS-61) — 입력이 EOS-54/55/60 산출물이라 실측 축적 "
             "전에는 전 지표 미측정(exit 1)이 설계값. G5(12/31) 판정 시점에 운영자가 "
             "`--hit-cu-json`·`--qa-matrix-json`으로 생산자 산출을 직접 먹여 돌린다"
+        ),
+        # EOS-08(2026-09-16): Phase 1 구조 지표 5종 리포터 — **판정기가 아니라 리포터**라
+        # CI 차단 스텝에 넣지 않는다(넣으면 그 모듈이 스스로 못박은 "지표 값으로 합격을
+        # 선언하지 않는다"를 배선이 배신한다 — 두 도구가 서로 다른 합격을 말하면 무엇을
+        # 통과했는지가 결정 불가가 된다). 지표 산출 로직(미측정≠0·분모 동결·근거 유일성)은
+        # backend 잡이 수집하는 tests/backend/ops/test_phase1_structure_report.py가 뮤테이션
+        # 9종으로 상시 검증한다 — "안 도는 코드"가 아니라 "사람이 볼 때 돌리는 대시보드"다.
+        "ops.phase1_structure_report": (
+            "by-design:Phase 1 구조 지표 5종 리포터(EOS-08·계획서 200 §36) — 판정기가 아니라 "
+            "관측 도구라 CI 차단 스텝 비대상이다. 지표가 나빠도 exit 0이므로 게이트로 배선하면 "
+            "의미가 없고, 반대로 exit 1을 내게 바꾸면 validation_scorecard와 합격 판정이 갈린다. "
+            "산출 로직은 tests/backend/ops/test_phase1_structure_report.py가 상시 검증"
         ),
         "ops.hit_cu_metrics": (
             "by-design:검수 타이머 실표본 의존 판독기(EOS-54) — 계측 이벤트 축적 전에는 입력 0이 "

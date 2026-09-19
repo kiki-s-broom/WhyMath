@@ -275,6 +275,15 @@ class ConceptMasteryHistory(BaseModel):
         ge=0,
     )
 
+    attempt_id: uuid.UUID | None = Field(
+        default=None,
+        description="이 측정을 낳은 시도(`problem_attempt.attempt_id`)의 **멱등 키**. 같은 시도가 "
+        "두 번 반영되는 것을 DB 부분 유니크 인덱스가 막는다(EOS-108). `None`은 시도에서 유래하지 "
+        "않은 측정(배치·백필)이며 그 측정은 멱등 보호를 받지 않는다 — 가짜 UUID로 채우면 서로 "
+        "다른 관측이 같은 시도인 척하게 되므로 `None`을 그대로 둔다. FK는 걸지 않는다(느슨참조 "
+        "선례 + 보존기한 파기로 attempt가 사라져도 학습 곡선은 남아야 한다).",
+    )
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # 핵심: SkillMasteryHistory (skill_mastery_history — 스킬 숙달 변화 시계열·Part 2 Phase 2b-2)
@@ -328,6 +337,15 @@ class SkillMasteryHistory(BaseModel):
         default=None,
         description="이 측정의 근거가 된 관측(문제) 수 (개수·ge=0).",
         ge=0,
+    )
+
+    attempt_id: uuid.UUID | None = Field(
+        default=None,
+        description="이 측정을 낳은 시도(`problem_attempt.attempt_id`)의 **멱등 키**. 같은 시도가 "
+        "두 번 반영되는 것을 DB 부분 유니크 인덱스가 막는다(EOS-108). `None`은 시도에서 유래하지 "
+        "않은 측정(배치·백필)이며 그 측정은 멱등 보호를 받지 않는다 — 가짜 UUID로 채우면 서로 "
+        "다른 관측이 같은 시도인 척하게 되므로 `None`을 그대로 둔다. FK는 걸지 않는다(느슨참조 "
+        "선례 + 보존기한 파기로 attempt가 사라져도 학습 곡선은 남아야 한다).",
     )
 
 

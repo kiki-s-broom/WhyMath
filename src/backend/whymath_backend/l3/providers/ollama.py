@@ -21,6 +21,8 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.provider_jurisdiction import Jurisdiction
+from whymath_backend.l3.providers._response_fields import read_response_model_id
 from whymath_backend.l3.router import (
     LOCAL_MODEL_MATRIX,
     QUALITY_MODEL_ID,
@@ -188,6 +190,11 @@ def _extract_usage(generate_response: Any, latency_ms: float) -> Usage:
         input_tokens=_coerce_token_count(_read_field(generate_response, "prompt_eval_count")),
         output_tokens=_coerce_token_count(_read_field(generate_response, "eval_count")),
         latency_ms=latency_ms,
+        # 관측 모델(EOS-112) — ollama 응답의 `model`은 **실제로 로드된 태그**라 요청 태그와
+        # 다를 수 있다(`qwen2-math` → `qwen2-math:7b` 해소). 로컬 경로에도 이 축이 필요한
+        # 이유가 그것이다 — 라우터가 지목한 모델과 데몬이 실제로 쓴 모델이 갈릴 수 있다.
+        served_model=read_response_model_id(generate_response),
+        # `retries`는 None — ollama 클라이언트는 우리 전송기를 타지 않아 계측이 없다.
     )
 
 
@@ -244,6 +251,17 @@ class OllamaProvider:
         if self._settings is None:
             self._settings = get_settings()
         return self._settings
+
+    @property
+    def jurisdiction(self) -> Jurisdiction:
+        """항상 `DOMESTIC` — Phaiakes9 온프레미스라 국외 이전 자체가 없다 (ARCH-49 관할 축).
+
+        디스패처의 관할 게이트는 클라우드 위임에만 선다(로컬은 반출이 아니다). 그래도
+        선언하는 이유는 거버넌스 테스트가 `l3/providers/`의 모든 실제 제공자에 관할
+        선언을 요구하기 때문이다 — "이 제공자는 어디 관할인가"에 답이 없는 좌석을 남기지
+        않는다.
+        """
+        return Jurisdiction.DOMESTIC
 
     def _get_client(self) -> _OllamaClient:
         """클라이언트 지연 해석 — 주입 우선, 없으면 기본 AsyncClient 생성."""

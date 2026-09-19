@@ -130,11 +130,11 @@ class ExplanationGenerator:
     ) -> None:
         """생성기 구성 — provider/trace 미주입 시 표준 구성(지연 연결·네트워크 0)."""
         if provider is None:
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         if trace is None:
             from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
 

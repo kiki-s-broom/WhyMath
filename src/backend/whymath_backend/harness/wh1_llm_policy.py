@@ -9,15 +9,15 @@ Protocol을 *프로덕션*으로 구현한다 — 지금까지 두뇌는 `Script
   ① `TurnState`를 *비민감* 요약으로 압축(학생 원문·정답 원문은 프롬프트에 절대 넣지 않는다 —
      오개념은 id/한국어 라벨만, history는 kind/ok만),
   ② 8개 도구 명세 + WH-1 불변식(verify 의무·정답 억제·Polya 우선)을 시스템 프롬프트로 주고,
-  ③ **L3 provider를 경유**해(직접 Anthropic/Ollama 호출 금지·CLAUDE.md) 구조화 도구 선택을 받고,
+  ③ **L3 파이프라인 좌석(`Wh1LlmSeam`)을 경유**해 구조화 도구 선택을 받고(직접 Anthropic/Ollama
+     호출 금지·CLAUDE.md),
   ④ JSON(`{"kind": ..., ...}`)을 8개 `Action` 중 하나로 매핑한다(Pydantic 판별 유니온 재사용).
 
 **민감 인자 격리(요구사항 ⑥의 핵심).** `match_misconception`의 학생 원문·`verify_step`의 풀이
 단계는 *LLM 출력이 아니라 정책이 생성 시 주입받아 사적으로 보유한 값*으로 채운다. LLM은 "어떤
 도구를 쓸지"(kind)와 개념 id·극성 같은 *비민감 스칼라*만 고른다. 따라서 학생 원문·정답은
-프롬프트에도, LLM 출력 경로에도 실리지 않는다(L3 트레이스는 현재 미결선 — 본 정책은
-`Router` 결정 후 provider를 직접 호출하며, Langfuse `l3_routing`·캐시 결선은 `OPS-26` 소유.
-결선 후에도 프롬프트에 원문이 없으므로 트레이스에 원문이 실릴 수 없다).
+프롬프트에도, LLM 출력 경로에도 실리지 않는다(L3 트레이스·캐시는 `Wh1LlmSeam`으로
+결선돼 있다(OPS-36) — 프롬프트에 원문이 없으므로 트레이스·캐시 키에도 원문이 실릴 수 없다).
 
 **불변식 이중 방어(프롬프트 + 코드).** 하네스가 불변식을 *최종* 강제하지만(정책이 어기면 거부),
 정책도 선제적으로 존중한다:
@@ -46,6 +46,7 @@ from collections.abc import Sequence
 from pydantic import ValidationError
 
 from whymath_backend.config import Settings
+from whymath_backend.harness.wh1_llm_seam import Wh1Generation, Wh1LlmSeam
 from whymath_backend.harness.wh1_loop import (
     _ANSWER_SUPPRESSED_VERDICTS,
     Action,
@@ -61,9 +62,8 @@ from whymath_backend.harness.wh1_loop import (
     VerifyStepAction,
 )
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
-from whymath_backend.l3.interfaces import LLMProvider
+from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l3.models import RoutingRequest
-from whymath_backend.l3.router import Router
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.misconception.probe_selection import ProbeCandidate
@@ -140,6 +140,9 @@ class LLMTutorPolicy:
         self,
         provider: LLMProvider | None = None,
         *,
+        cache: CacheBackend | None = None,
+        trace: TraceSink | None = None,
+        seam: Wh1Generation | None = None,
         settings: Settings | None = None,
         student_text: str = "",
         solution_steps: Sequence[str] = (),
@@ -167,14 +170,11 @@ class LLMTutorPolicy:
                 전부 enum/정수라 학생 원문을 실을 자리가 타입상 없다. None(기본)이면 요약에
                 키 자체가 없어 프롬프트가 기존과 바이트 동일.
         """
-        if provider is None:
-            # 표준 구성 재사용(app.py·pregenerate 동형) — 지연 연결이라 구성만으로 네트워크 미발생.
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
-            from whymath_backend.l3.providers.composite import CompositeProvider
-            from whymath_backend.l3.providers.ollama import OllamaProvider
-
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
-        self._provider = provider
+        # 좌석 조립(OPS-36) — 여기서부터 LLM 호출은 `l3.pipeline` 경유다(라우터·캐시·관측).
+        # `seam`이 주어지면 그것을 쓴다(대체 가능성을 타입으로 — 테스트·미래 파이프라인 교체).
+        self._seam: Wh1Generation = (
+            seam if seam is not None else Wh1LlmSeam(provider=provider, cache=cache, trace=trace)
+        )
         self._settings = settings
         self._student_text = student_text
         self._solution_steps = list(solution_steps)
@@ -191,10 +191,10 @@ class LLMTutorPolicy:
     async def next_action(self, state: TurnState) -> Action:
         """다음 도구를 고른다 — 상태 요약 → L3 provider → 파싱 → 불변식 이중 방어."""
         prompt = self._build_prompt(state)
-        decision = Router().route(self._routing_request())
         try:
-            # provider 반환은 GenerationResult(text, usage) — 도구 선택은 텍스트만 소비.
-            raw = (await self._provider.generate(prompt, _SYSTEM_PROMPT, decision)).text
+            # 좌석 경유(OPS-36): 라우터 결정·캐시 조회/적재·Langfuse 기록이 전부 그 안에서
+            # 일어난다. 도구 선택은 텍스트만 소비한다(usage는 좌석이 트레이스로 흘렸다).
+            raw = await self._seam.generate(self._routing_request(), prompt, _SYSTEM_PROMPT)
         except Exception:  # noqa: BLE001 — provider 장애 시 학생 앞 크래시 금지·안전 강등.
             return self._safe_fallback(state)
         action = self._parse_action(raw, state)

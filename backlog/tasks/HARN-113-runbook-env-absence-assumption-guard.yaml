@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-113-runbook-env-absence-assumption-guard
+title: "런북의 환경변수 부재 가정 측정 검출 — 재실행한 창에서 앞 회차 값을 '기본값'으로 오독한다"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 검출 — 런북 PowerShell 블록에서 **환경변수 부재를 가정한 측정**을 정적 검출한다. 형태: 같은 블록(또는 앞 블록)이 `$env:X = ...`를 설정하는데, 그 전후로 `X`가 없다고 *가정하고* 무언가를 재는 스텝. 대표 반례 = 이번 사고: `$Default = (& $Py -c \"...\")` 다음 줄에서 `$env:WHYMATH_CLOUD_PROVIDER = \"openrouter\"`를 설정하는 구조는 **깨끗한 창에서만** 기본값을 잰다. 재실행·부분 실행한 창에서는 앞 회차가 남긴 값을 기본값으로 오독한다.\n② 처방 고정 — 부재는 *가정*이 아니라 *생성*이어야 한다. 자식 프로세스 안에서 제거하고 재는 형태(`os.environ.pop('X', None)` 선행)를 정본으로 하고, PowerShell `Remove-Item Env:`는 쓰지 않는다(HARN-106 쓰기 가드가 쓰기 명령으로 분류한다 — 실측 확인).\n③ 오염 가시화 — 환경변수에 의존하는 런북 블록은 실행 시점의 값을 **찍는다**: 셸 스코프(`$env:X`)와 User 스코프(`[Environment]::GetEnvironmentVariable('X','User')`)를 함께. 오염이 창 한정인지 머신에 영구 등록된 것인지는 대처가 다르므로 구분 없이 \"오염됨\"만 알면 부족하다.\n④ 실패 주입 — 가드가 이번 사고 형태를 실제로 RED로 잡는지 주입으로 확인한다. 최소 3종: ⓐ 부재 가정 측정(이번 형태) ⓑ `Remove-Item Env:`로 우회한 형태 ⓒ 정상 형태(`os.environ.pop` 선행)가 GREEN인 대조군. 대조군이 없으면 \"전부 RED로 계상\"이라는 과잉 검출이 통과한다.\n⑤ 스캔 0건은 실패 — 런북·블록을 하나도 못 찾으면 공허하게 통과하므로 대상 건수 하한을 단언한다(`check_runbook_blocks.py` 선례 동형).\n⑥ 배선 — 기존 `scripts/ops/check_runbook_blocks.py`에 축을 더할지 별도 스캐너로 둘지는 구현 판단이되, **`infra-contracts` 잡에서 실제로 실행되는 것까지**가 완료 조건이다(그 잡은 `needs: changes` 게이팅이 없어 docs만 바뀐 PR에서도 돈다 — 런북은 정확히 그런 PR에서 바뀐다)."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+  - tests/infra/test_runbook_env_absence_guard.py
+session: null
+notes: "사고 경위 2026-09-18 ARCH-57 런북: [A]가 '환경변수를 설정하기 *전에* 재면 기본값'이라는 전제로 짜였는데, Kiki가 직전 실패 회차에서 같은 창에 $env:WHYMATH_CLOUD_PROVIDER=openrouter를 이미 설정한 상태였다. 결과 SEAT_DEFAULT=OpenRouterProvider — 코드가 아니라 창의 상태를 잰 것이고, 성공/오염 양쪽에서 같은 화면을 내므로 변별력이 0이었다. 컨테이너 재현으로 확정: 오염된 셸에서 종전 형태=OpenRouterProvider / os.environ.pop 선행 형태=AnthropicProvider(깨끗한 셸과 동일). 코드는 정상이며 test_default_cloud_provider_is_anthropic이 깨끗한 프로세스에서 계약을 이미 동결하고 있었다. CLAUDE.md 2026-07-17 '변별력 없는 검증 스텝 금지'가 이미 있는데 런북 저자가 또 재생산했다 — 그 규칙이 *런북의 자가검증 스텝*을 겨냥하면서도 '앞 블록이 남긴 환경을 상속한다'는 축은 말하지 않기 때문이다. 붙여넣기 워크플로가 한 창을 계속 쓰는 한 구조적으로 반복된다. 같은 세션의 런북 결함 2회차(1회차 = 미머지 신규 파일을 main 체크아웃에서 안내 — 2a4b6ca3에서 worktree로 정정)."
+updated: 2026-09-18

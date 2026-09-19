@@ -1,0 +1,4 @@
+{"ts": "2026-09-19T01:58:47+00:00", "actor": "claude/jolly-gauss-uod6lo", "action": "add", "id": "EOS-113", "eos_priority": "P0"}
+{"ts": "2026-09-19T01:58:58+00:00", "actor": "claude/jolly-gauss-uod6lo", "action": "start", "id": "EOS-113", "session": "claude/jolly-gauss-uod6lo", "remote": "ok"}
+{"ts": "2026-09-19T02:47:28+00:00", "actor": "claude/jolly-gauss-uod6lo", "action": "add", "id": "EOS-115", "eos_priority": "P0"}
+{"ts": "2026-09-19T03:23:53+00:00", "actor": "claude/jolly-gauss-uod6lo", "action": "done", "id": "EOS-113", "artifacts": ["https://github.com/kiki-s-broom/WhyMath/pull/1213 — Week 3 Gate 판정 통과(판정 기준 main 13826ece) · 하네스 tests/backend/api/test_week3_gate_remediation_loop.py(2 passed·1 xfailed·exit 0) + 뮤테이션 검증 scripts/ops/verify_week3_gate_discrimination.py(8종 전건 RED·exit 0) · 판정 문서 docs/reviews/week3_gate_judgement_2026-09-19.md · 인접 결함은 EOS-115로 분리"]}

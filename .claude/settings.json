@@ -75,6 +75,20 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/harness/backlog.py\" check-stop"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/fence_guard.py\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[채팅 형식] 코드 펜스는 실행용 전용(언어 태그 필수). 해시·식별자=인라인 백틱 · 명령 결과=요약 문장+인용문 · 구조체=필드명: 값 산문.'"
           }
         ]
       }

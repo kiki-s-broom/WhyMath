@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-106-runbook-write-guard-enforcement
+title: 런북 쓰기 블록의 선행 판정 자가거부 가드 기계 집행
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 런북 마크다운의 PowerShell 블록 중 *쓰기·적재·파괴* 명령을 담은 블록은 자기 선행 판정값을 재검사해 미충족 시 실행을 거부하는 가드를 갖는다 — 가드 형태는 단일 최상위 if와 같은 줄 `} else {`(2026-09-15 실측: 대화형 붙여넣기에서 정상 파싱됨)이며, else 가지는 왜 건너뛰었는지를 출력한다(침묵 금지).\n② 기계 집행: scripts/ops/ 에 런북 스캐너를 신설해 docs/ops/*runbook*.md 의 powershell 펜스를 파싱하고, 쓰기 동사(populate·upgrade·grant·delete·insert·backfill 등)를 포함한 블록에 가드가 없으면 exit 1. CI 차단 스텝으로 배선한다.\n③ 변별력 검증: 가드 없는 블록·가드가 있으나 else 가지가 없는 블록·판정 변수를 참조하지 않는 위장 가드 3종을 주입해 전건 RED를 확인한다. 정상 런북(본 SKB-03 런북 정정본)에서는 GREEN.\n④ 스캔 0건은 실패로 처리한다(대상 런북을 하나도 못 찾으면 공허한 통과가 된다).\n⑤ 기존 런북 소급 적용 범위를 명시한다 — 전건 즉시 정정이 아니면 만료 지점을 동반한 그랜드파더로 적는다(만료 없는 유예 금지)."
+  - "⑥ 입력 여부를 확인할 수 없는 프롬프트를 쓰지 않는다 (근거 2026-09-17 · ARCH-49 키 등록 런북) — 시크릿 입력에 `Read-Host -AsSecureString`을 썼더니 **별표조차 표시되지 않아** 붙여넣기가 실패한 것을 사람이 알 수 없었고, 빈 값이 그대로 `[Environment]::SetEnvironmentVariable`로 등록돼 자가검증이 `KEY_LENGTH=0`을 낼 때까지 무증상이었다. 스캐너는 런북의 대화형 입력 프롬프트가 **입력 사실을 관측 가능하게** 하는지 검사한다: `-AsSecureString`을 쓰는 블록은 입력 직후 길이·접두 검증(값 미출력)을 **같은 블록 안에서** 동반해야 하고, 그 검증이 없으면 exit 1. 기존 「시크릿 입력 안내 규칙」②(등록 직후 자가검증)의 *등록* 축을 **입력** 축으로 확장한 것이다 — 그쪽은 등록된 값을 검사하고 이쪽은 애초에 값이 들어왔는지를 묻는다.\n⑦ 쓰기 블록은 쓴 결과를 되읽어 확인하는 것까지가 한 동작이다 (근거 2026-09-17 · 같은 런북) — Machine 스코프 환경변수 정리 블록이 성공·실패 양쪽에서 똑같이 \"Machine 스코프 정리 완료\"를 출력했다. 무엇이 지워졌는지도, 지워지긴 했는지도 말하지 않는 **위장 검증**이며, CLAUDE.md 「변별력 없는 검증 스텝 금지」(2026-07-17)의 *쓰기* 축이다. 스캐너는 쓰기 블록이 **쓴 대상을 되읽는 문장**(`[Environment]::GetEnvironmentVariable`·`Get-ItemProperty`·조회 CLI 등)을 동반하고 그 결과를 출력하는지 검사하며, 고정 문자열만 출력하고 끝나는 블록은 exit 1. ①의 *사전* 가드(선행 판정 재검사)와 쌍을 이루는 *사후* 축이다 — ①이 \"돌아도 되는가\"를 묻는다면 ⑦은 \"돌고 나서 실제로 바뀌었는가\"를 묻는다."
+artifacts:
+  - "PR #1191 — https://github.com/kiki-s-broom/WhyMath/pull/1191 (머지 커밋 eb048e20)"
+  - "scripts/ops/check_runbook_blocks.py (4축: 가드·되읽기·입력관측·파서) + CI infra-contracts 배선"
+  - "tests/infra/test_runbook_write_guard.py — 결함 주입 10종 + 정당 형태 5종 + 유예 만료/unmatched/스캔0건"
+  - "docs/ops/skb03_atom_node_populate_runbook.md — 사고 당사자 런북 [D] 자가거부 가드 적용, [B]/[C] 판정값 변수화"
+  - "변별력: 뮤테이션 15종 전건 RED·생존 0 (첫 회차 3종 생존은 픽스처 구멍이었고 절을 밟는 픽스처 추가로 해소)"
+  - "소급: 나머지 런북 6건 그랜드파더(만료 2026-12-31) — 만료·unmatched 모두 exit 1"
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - docs/ops/skb03_atom_node_populate_runbook.md
+  - tests/infra/test_runbook_write_guard.py
+session: null
+notes: "사고 경위(2026-09-15 · 동일 유형 2회차): 게이트 G-skb03-atom-node-populate 실행에서 런북의 [B]가 PATHS_MATCH_MAIN=False를, [C]가 HAS_SKIP_FLAG=False를 정확히 출력했는데도 후속 [D](적재)가 그대로 붙여넣어져, SKB-03 배선 이전의 옛 CLI가 돌고 atom_node 적재가 0건으로 끝났다(출력에 atom_nodes 필드 부재·AFTER_TOTAL=0). 원인은 Kiki 클론이 타 세션 브랜치 claude/adoring-mccarthy-sle0uj(HEAD 0367fce4)에 있었던 것이고, 런북은 그것을 검출했으나 멈추지는 못했다. DB 손상은 없었다(전부 멱등 upsert) — 왕복 1회 손실.\n1회차는 2026-09-14 G-skb01(REACH_EXIT=2인데 적재 단계가 그대로 실행)이며, 그때의 대책이 CLAUDE.md 2026-09-14 규칙 ③ '블록 간 선행 조건은 자동 가드로 잇지 말고 사람 판정 지점으로 끊는다'는 산문이었다. 이번 런북은 그 규칙을 충실히 따랐고(판정값 출력 + 눈으로 확인 안내) 그럼에도 실패했다 — 즉 사람 판정 지점만으로는 붙여넣기 흐름을 못 막는다는 것이 2회 실측됐다. CLAUDE.md '동일 유형 텍스트 규칙 2회 실패 후 코드 착지' 선례에 따라 이 태스크는 기계 집행을 담당한다.\n정정 실행에서 확인된 설계: ⓐ 쓰기 블록 자신이 재검사하는 가드(단일 if + 같은 줄 } else {)는 대화형 붙여넣기에서 정상 동작한다 ⓑ 실행 코드의 출처는 MODULE_FROM(import 후 __file__)으로 동결할 수 있다 ⓒ 공유 작업 사본을 건드리지 않는 실행은 git worktree --detach origin/main 으로 성립한다. 셋 다 런북 템플릿 후보다.\n행동 규칙 축(CLAUDE.md)은 같은 PR에서 함께 등재한다 — 이 태스크는 기계 집행 축만 소유한다.\n\n[개명 2026-09-16] HARN-103 → HARN-106-runbook-write-guard-enforcement: 번호 충돌 해소 — 등재 시점(2026-09-15)에 HARN-103-feature-code-freeze-rules가 미머지라 번호 검사에 보이지 않았고, 그쪽이 PR #1171로 먼저 main에 착지하면서 'HARN-103' 참조가 결정 불가가 됐다(머지 큐 harness-integrity가 exit 1로 검출). 미머지인 이쪽을 개명한다. 슬러그도 함께 부여한다 — 원 등재가 bare id였다.\n\n[정정 2026-09-17] ARCH-49 세션에서 같은 유형의 런북 결함 2건 실측 — 관측 불가 입력 프롬프트(KEY_LENGTH=0 무증상)와 성공/실패 동일 출력 위장 검증. 기계 집행 범위에 편입"
+updated: 2026-09-17

@@ -507,6 +507,31 @@ class GenerationLog(BaseModel):
         ),
         max_length=64,
     )
+    # ── 관측 좌석 (EOS-112) — 위 필드들이 '설정이 뭐라고 했나'라면 이 둘은 '누가 실제로
+    # 답했나'다. `model_name`은 설정 유래 **선언값**이라(ARCH-58) provider 측 대체·폴백·
+    # 프록시 라우팅이 일어나도 그대로다 — 그 어긋남을 볼 수 있는 유일한 축이 여기다.
+    served_model: str | None = Field(
+        default=None,
+        description=(
+            "응답이 *실제로 어느 모델에서 왔는지* — provider 응답 최상위의 모델 식별자"
+            "(OpenAI 호환 `model` · Anthropic `message.model` · Ollama `model`). "
+            "None=미관측이며 **설정값으로 접지 않는다** — 접으면 `model_name`의 복사본이 "
+            "되어 대조 축이 영영 0건 어긋남을 보고한다. `model_name`과 다른 것이 곧 "
+            "이상은 아니다: 별칭→버전 해소(`claude-sonnet-4-6` → 날짜 붙은 ID)도 같은 "
+            "차이로 나타나므로, 이 값은 *판정*이 아니라 *볼 자리*를 가리키는 신호다."
+        ),
+        max_length=128,
+    )
+    retries: int | None = Field(
+        default=None,
+        description=(
+            "이 호출 1건에서 일어난 재시도 횟수. None=미계측(Anthropic SDK·Ollama는 우리 "
+            "전송기를 타지 않아 카운터가 없다)이고 0=계측했고 한 번에 성공(실측)이다. "
+            "재시도는 측정을 가린다 — 30% 실패를 재시도로 덮으면 리포트가 100% 성공으로 "
+            "보이고 운영에서 같은 부하를 만났을 때 지연·쿼터 소모가 설명되지 않는다."
+        ),
+        ge=0,
+    )
     cu_slug: str | None = Field(
         default=None,
         description=(

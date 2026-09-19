@@ -22,7 +22,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +38,14 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",  # 다른 슬라이스(DB·결제 등) 환경변수와 공존 — 모르는 키 무시
+        # ARCH-49: 일부 키는 `WHYMATH_` 접두 이름과 **벤더 표준 이름**을 둘 다 읽어야 해서
+        # `validation_alias=AliasChoices(...)`를 쓴다(예 `DEEPSEEK_API_KEY` — Phaiakes9
+        # User 환경변수에 그 이름으로 이미 등록돼 있다). alias가 붙은 필드는 기본적으로
+        # **필드 이름으로 생성할 수 없게** 되는데, 이 클래스는 테스트·DI가
+        # `Settings(deepseek_api_key=...)` 형태로 생성하므로 필드 이름 경로를 함께 연다.
+        # (mypy `pydantic.mypy` 플러그인의 `warn_required_dynamic_aliases`도 이것을 요구한다.)
+        # alias가 없는 기존 필드의 동작은 바뀌지 않는다 — 원래 필드 이름으로만 생성한다.
+        populate_by_name=True,
     )
 
     # ── Ollama (로컬 LLM, Phaiakes9) ──
@@ -315,6 +323,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_attempt_misconception_scan_enabled: bool = Field(
+        default=True,
+        description=(
+            "채점된 **오답 1건**에서 오개념 후보를 훑을지(EOS-104·정식기능). True(기본)면 "
+            "POST /v1/me/attempts가 is_correct=false일 때 과목 어댑터의 오답 서명 검출기"
+            "(`AttemptMisconceptionDetector`)에 문항 지문·제출 답안을 넘겨, 품질 게이트를 "
+            "통과한 후보만 채점 증거(`possible_misconceptions`)에 싣고 활성 가설을 갱신한다. "
+            "정답 시도·답안 미제출은 애초에 훑지 않는다(scan=not_run). False면 이 경로가 통째로 "
+            "not_run이 되어 **'훑지 않았다'로 정직하게 표기된다** — 0건을 '오개념 없음'으로 "
+            "위장하지 않는다. 킬 스위치 용도이며 끄면 감쇠도 함께 멈춘다(관측이 없으면 감쇠할 "
+            "근거도 없다). WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_server_theta_enabled: bool = Field(
         default=True,
         description=(
@@ -482,6 +504,200 @@ class Settings(BaseSettings):
             "기본 False(현 동작 유지) — 적중은 라이브 키로만 검증 가능하고 system 프롬프트가 "
             "L4/L5 미확정이라 효과 잠정. 짧은 프리픽스는 최소 토큰 미만이라 무효(silent no-op)."
         ),
+    )
+
+    # ── 클라우드 슬롯 셀렉터 (ARCH-57 — ARCH-55 채택 판정의 집행 지점) ──
+    # `CompositeProvider`의 cloud 슬롯에 어떤 프로바이더가 앉는가. 종전에는 호출자가
+    # `AnthropicProvider()`를 **하드코딩**해 8곳에 흩어져 있었고, 그래서 ARCH-55가 채택한
+    # OpenRouter 경로를 프로브만 쓰고 실제 저작 작업은 쓸 수 없었다(채택은 났는데 집행이
+    # 없는 상태 — CLAUDE.md 「정본화를 집행으로 착각한 완료 선언 금지」).
+    #
+    # **기본값 `anthropic`은 불변이다.** ARCH-55 채택 판정문이 "선택지를 넓힌 것이지 기본값을
+    # 옮긴 것이 아니다"라고 명시했고, 판정 기준 (d) 지연·가용성이 `ARCH-56`으로 보류 중이라
+    # 미판정 구성이 기본값이 되면 안 된다. 이 기본값을 바꾸는 것은 코드 변경이 아니라 판정이다
+    # (`tests/backend/l3/test_cloud_provider_selector.py`가 계약으로 동결한다).
+    #
+    # 적용 범위는 **저작 경로 한정**이다 — 학생 대면 서빙(`app.py`)은 이 셀렉터를 타지 않는다.
+    # 그쪽을 옮기는 것은 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 트래픽 투입
+    # 결정)를 실현시키는 행위라 Kiki 판정 사안이다.
+    cloud_provider: Literal["anthropic", "openrouter", "deepseek"] = Field(
+        default="anthropic",
+        description=(
+            "저작 경로의 클라우드 슬롯 제공자. `anthropic`(기본·불변 핀 claude-sonnet-4-6) / "
+            "`openrouter`(ARCH-55 채택 — deepseek/deepseek-v4.1-flash·공급사 deepinfra 고정) / "
+            "`deepseek`(공식 API·CN 관할). 좌석 선택만이고 클라이언트 생성은 지연된다. "
+            "학생 대면 서빙은 이 값과 무관하게 항상 anthropic이다(ARCH-56 게이트)."
+        ),
+    )
+
+    # ── DeepSeek 공식 API (CN 관할, ARCH-49 — 03a 클라우드 선택지 확장) ──
+    # 모델 ID는 **실측값만** 쓴다. 2026-09-16 Kiki 머신에서 유효 키로 `GET
+    # https://api.deepseek.com/models`를 조회한 결과 반환된 id는 정확히 두 개다:
+    # `deepseek-flash`·`deepseek-v4-pro`. 웹 자료 3곳이 일치해 적고 있는
+    # `deepseek-v4-flash`는 **API가 받지 않는 이름**이다(제품 표기 ≠ API id).
+    # 새 ID를 핀할 때도 같은 방식으로 실 API 조회를 먼저 한다
+    # (CLAUDE.md 「환경 사실의 추론 등재 금지」).
+    #
+    # 관할: 공식 API는 중국 본토 서버 전용이고 데이터 레지던시 선택지가 없다(2026-09 실측).
+    # 따라서 `Jurisdiction.CN`이며, 기본 허용 등급은 합성 프로브(`WHYMATH_GENERATED`)뿐이다
+    # (`l3.provider_jurisdiction`). 자체 저작 코퍼스를 태우려면 아래 opt-in이 필요하다.
+    deepseek_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("WHYMATH_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"),
+        description=(
+            "DeepSeek 공식 API 키(sk-...). SecretStr — repr/로그에 평문 노출 안 됨. "
+            "기본값 없음(빈 = 미설정). `WHYMATH_DEEPSEEK_API_KEY` 또는 벤더 표준 이름 "
+            "`DEEPSEEK_API_KEY` 둘 다 읽는다 — 후자가 Phaiakes9 User 환경변수에 이미 "
+            "등록돼 있어(2026-09-16 라이브 확인) 재등록을 요구하지 않기 위함이다. "
+            "하드코딩 금지(CLAUDE.md 보안 금기)."
+        ),
+    )
+    deepseek_base_url: str = Field(
+        default="https://api.deepseek.com",
+        description=(
+            "DeepSeek 공식 API 베이스 URL(OpenAI 호환 `/chat/completions`). 시크릿 아님. "
+            "WHYMATH_DEEPSEEK_BASE_URL로 오버라이드."
+        ),
+    )
+    deepseek_model_mid: str = Field(
+        default="deepseek-flash",
+        description=(
+            "CLOUD_MID 티어에 대응하는 DeepSeek 모델 ID. **실측 핀**(2026-09-16 /models 조회) — "
+            "`deepseek-v4-flash`가 아니다. WHYMATH_DEEPSEEK_MODEL_MID로 오버라이드."
+        ),
+    )
+    deepseek_model_high: str = Field(
+        default="deepseek-v4-pro",
+        description=(
+            "CLOUD_HIGH 티어에 대응하는 DeepSeek 모델 ID. **실측 핀**(2026-09-16 /models 조회). "
+            "WHYMATH_DEEPSEEK_MODEL_HIGH로 오버라이드."
+        ),
+    )
+    deepseek_max_tokens: int = Field(
+        default=16000,
+        ge=1,
+        description="DeepSeek chat/completions의 max_tokens. anthropic_max_tokens 미러.",
+    )
+    deepseek_request_timeout_s: float = Field(
+        default=60.0,
+        ge=0.0,
+        description="DeepSeek 단일 호출 타임아웃(초). anthropic_request_timeout_s 미러.",
+    )
+    deepseek_allow_internal_corpus: bool = Field(
+        default=False,
+        description=(
+            "True면 CN 관할 프로바이더에 자체 저작 코퍼스(`INTERNAL_OWNED`) 등급을 실은 요청도 "
+            "허용한다. **기본 False** — 라이선스상 `INTERNAL_OWNED.export=True`라 *법적으로는* "
+            "반출 가능하지만, 개념 그래프·오개념 카탈로그·교수학 프롬프트는 영업자산이고 "
+            "DeepSeek이 유료 API 입력을 학습에 쓰는지가 **미확정**이다(2차 자료가 서로 반대로 "
+            "적고 1차 약관은 조사 세션의 egress 프록시가 차단). 확정되면 그 근거와 함께 "
+            "기본값을 재평가한다. 학생 저작(`USER_GENERATED`)은 이 플래그와 무관하게 "
+            "**어떤 값으로도 열리지 않는다**(export=False라 허용 집합에 들어올 수 없다)."
+        ),
+    )
+
+    # ── OpenRouter 경유 (서방 공급사가 서빙하는 오픈웨이트, ARCH-49 acceptance ⑨⑩) ──
+    # DeepSeek V4는 MIT 오픈웨이트라 서방 공급사도 서빙한다 — 즉 "DeepSeek = CN 관할"은
+    # *경로에 따라* 다르다. OpenRouter의 `deepseek/deepseek-v4-flash` 엔드포인트는 16곳이고
+    # 공급사마다 국적·양자화·데이터 정책이 다르다(2026-09-16 Kiki 머신 실측).
+    #
+    # 채택 계약(코드에 박는다 — `l3/providers/openrouter.py`): 모든 호출이
+    # `provider.only`·`provider.allow_fallbacks=false`·`provider.data_collection="deny"`
+    # 세 파라미터를 **항상** 동반한다. 옵션이 아니라 계약이며, 누락 시 테스트가 RED다.
+    # 셋이 각각 막는 것: only=국적 미상 공급사, allow_fallbacks=조용한 우회,
+    # data_collection=학습 수집. `only` 없이 fallback이 열리면 매 호출마다 다른 정밀도
+    # (fp8/fp4/unknown)가 응답해 품질 비교 자체가 성립하지 않는다.
+    #
+    # Preset 기능은 쓰지 않는다 — 설정이 웹 UI에 있으면 저장소 게이트가 검사할 수 없어
+    # 이중 진실 원천이 된다(요청의 명시 파라미터가 Preset을 덮어쓰므로 코드가 항상 이긴다).
+    openrouter_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("WHYMATH_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
+        description=(
+            "OpenRouter API 키(sk-or-...). SecretStr — repr/로그에 평문 노출 안 됨. "
+            "`WHYMATH_OPENROUTER_API_KEY` 또는 벤더 표준 `OPENROUTER_API_KEY` 둘 다 읽는다 "
+            "(후자가 Phaiakes9에 이미 등록·2026-09-16 라이브 확인). 하드코딩 금지."
+        ),
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API 베이스 URL(OpenAI 호환). 시크릿 아님.",
+    )
+    openrouter_model_mid: str = Field(
+        default="deepseek/deepseek-v4.1-flash",
+        description=(
+            "CLOUD_MID 티어에 대응하는 OpenRouter 모델 slug. **정정 2026-09-17** — "
+            "`deepseek-v4-flash`(점 없음)가 아니라 `deepseek-v4.1-flash`다. Kiki가 "
+            "openrouter.ai 모델 페이지를 열어 확인했다(URL·복사 버튼의 정본 id). "
+            "list price $0.15/$0.60 per 1M · 컨텍스트 1.0M · 출시 2026-09-10. "
+            "공식 API의 `deepseek-flash`와 이름이 다르다 — OpenRouter는 제품명을, "
+            "공식 API는 자기 id를 쓴다. 최종 확정은 `/models` 조회다"
+            "(`harness.openrouter_endpoints_probe --search`)."
+        ),
+    )
+    openrouter_model_high: str = Field(
+        default="deepseek/deepseek-v4-pro",
+        description=(
+            "CLOUD_HIGH 티어에 대응하는 OpenRouter 모델 slug. **미확인 핀** — "
+            "MID가 `v4.1`로 정정된 만큼 이 slug도 같은 오류일 수 있다"
+            "(`v4.1-pro`일 가능성). 쓰기 전에 `--search`로 확정한다."
+        ),
+    )
+    openrouter_allowed_providers: tuple[str, ...] = Field(
+        default=("deepinfra",),
+        description=(
+            "OpenRouter `provider.only`에 실을 공급사 slug 허용목록 — **우리가 국적을 알고 "
+            "데이터 정책이 깨끗한 곳만**. slug는 endpoints 응답 `tag`의 `/` 앞부분이다 "
+            "(`deepinfra/fp8`→`deepinfra`). 이 목록이 `data_collection=deny`와 **독립된 두 "
+            "번째 방어층**이다(CLAUDE.md 이중 회계 — 외부 분류에만 의존 금지). 빈 목록은 "
+            "허용이 아니라 **차단**이다.\n"
+            "기본값이 **`deepinfra` 1곳인 이유**: 검증 가능한 세 축을 *함께* 아는 곳이고 "
+            "가장 싸다(2026-09-17~18 공급사 패널·엔드포인트 응답 실측).\n"
+            "  · 관할 — `Headquarters: US`\n"
+            "  · 데이터 정책 — `Prompt training: No` + `Retention: Zero retention`\n"
+            "  · 양자화 — `Precision: FP8`\n"
+            "`baseten`도 같은 세 축을 만족하며(패널 실측 · `Region: US` 추가) `PROVIDER_*` "
+            "표에 등재돼 있다 — 갈아 끼울 때 근거를 다시 모을 필요가 없다. 그럼에도 기본값이 "
+            "deepinfra인 것은 **회당 비용이 약 절반**이기 때문이다(실측 토큰 기준 $0.00125 vs "
+            "$0.00228 · `claude-sonnet-4-6` $0.004767 대비 3.8배 vs 2.1배).\n"
+            "**가용성은 의도적으로 판정 축에서 뺐다.** 2026-09-17~18에 네 회차를 쟀는데 같은 "
+            "공급사·같은 시험지로 `429 engine_overloaded` 실패율이 **30% → 15% → 0%**로 "
+            "흔들렸다(마지막이 가장 붐빌 것이라던 peak 구간이다 — 시간대로 설명되지 않는다). "
+            "20회 표본으로는 공급사를 가를 수 없고, 실제로 이 분산을 근거로 기본값을 두 번 "
+            "뒤집었다가 되돌렸다. 더 큰 표본을 태우기 전에 짚을 것이 있다 — 실패 원인이 "
+            "`limit_source=upstream_provider_shared_pool` · `is_byok=false`, 즉 **공유 풀**이라 "
+            "BYOK(공급사 자체 키를 OpenRouter integrations에 등록)을 붙이면 이 축 자체가 "
+            "사라진다. 그때까지 이 표의 가용성 숫자는 *우리가 쓰지 않을 구성*을 재는 값이다.\n"
+            "참고: Baseten 엔드포인트는 2곳이지만 **둘 다 tag가 `baseten/fp8`**이라(엔드포인트 "
+            "응답 실측) `only`가 둘을 모두 허용해도 정밀도가 섞이지 않는다 — 두 행은 리전/배포 "
+            "차이다. 그래서 양자화 강제 파라미터를 따로 두지 않는다.\n"
+            "`gmicloud`는 FP8이지만 `Retention: Unknown`이고, `fireworks`·`together`는 보존 "
+            "정책이 깨끗하지만 `Precision: --`(미표기)다. 즉 **어느 한 축씩만 아는 곳을 섞으면 "
+            "다른 축에서 샌다** — 정밀도가 섞인 목록은 `allow_fallbacks=false`라도 매 호출마다 "
+            "다른 모델을 부르는 것과 같고(어느 곳이 응답할지는 OpenRouter가 정한다), 그 "
+            "상태에서 잰 정확도 차이는 모델의 것이 아니라 잡음이다(acceptance ⑨(d)).\n"
+            "`digitalocean`은 뺐다 — 이전 세션이 US로 적었으나 이번 실측으로 재확인되지 "
+            "않았고 그 세션의 OpenRouter 기록 4건이 전부 틀렸다(모델 slug·엔드포인트 수·"
+            "최저가 공급사·단가). 근거를 다시 확보하면 되돌린다.\n"
+            "**가용성 비용을 명시한다**: 1곳 + `allow_fallbacks=false`면 그곳이 죽을 때 호출이 "
+            "실패한다. 지금은 채택 미판정이라 조용한 품질 변동보다 명확한 실패가 낫다는 "
+            "판단이며, 운영 도입 시 **정밀도가 같은** 곳을 추가해 이중화한다(정밀도가 다른 "
+            "곳으로 늘리는 것은 이중화가 아니라 오염이다).\n"
+            "**baseten으로 바꿀 때의 비용 영향**: $0.20/$0.60 → $0.30/$1.20이라 회당 "
+            "약 2배다. `Cache read`도 $0.006 → $0.03으로 5배이므로, 프롬프트 캐시 재사용이 큰 "
+            "워크로드에서는 그 축을 따로 재야 한다. 대신 대기열을 뚫고 난 뒤의 지연은 baseten이 "
+            "낫게 관측됐다(p50 5.3초 vs 36.9초 — 같은 창 A/B 1회)."
+        ),
+    )
+    openrouter_max_tokens: int = Field(
+        default=16000,
+        ge=1,
+        description="OpenRouter chat/completions의 max_tokens. anthropic_max_tokens 미러.",
+    )
+    openrouter_request_timeout_s: float = Field(
+        default=60.0,
+        ge=0.0,
+        description="OpenRouter 단일 호출 타임아웃(초). anthropic_request_timeout_s 미러.",
     )
 
     # ── 인증(JWT 집행 계층, L5) ──
@@ -1417,6 +1633,25 @@ class Settings(BaseSettings):
         SecretStr는 `get_secret_value()`로만 평문을 꺼내며, 여기서는 *비어 있는지*만 본다.
         """
         return bool(self.anthropic_api_key.get_secret_value())
+
+    @property
+    def deepseek_configured(self) -> bool:
+        """DeepSeek 공식 API 키가 채워졌는가(CN 관할 직행 경로 가능 여부, ARCH-49).
+
+        `anthropic_configured`와 같은 형태 — 비어 있으면 DeepSeekProvider가 명확한 오류를
+        던진다(조용한 강등 금지). 값은 로그에 남기지 않는다.
+        """
+        return bool(self.deepseek_api_key.get_secret_value())
+
+    @property
+    def openrouter_configured(self) -> bool:
+        """OpenRouter 키가 채워졌는가(서방 공급사 경유 가능 여부, ARCH-49).
+
+        키만으로는 부족하다 — 호출은 `openrouter_allowed_providers`가 **비어 있지 않을**
+        때만 성립한다(빈 허용목록은 '아무나 허용'이 아니라 '차단'이다). 그 검사는
+        provider 쪽 계약이고, 여기서는 전송 가능 여부(키 존재)만 본다.
+        """
+        return bool(self.openrouter_api_key.get_secret_value())
 
     @property
     def jwt_configured(self) -> bool:

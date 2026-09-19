@@ -59,7 +59,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._auth import ConsentedUser, CurrentUser, RequireContentAdmin
@@ -71,12 +71,14 @@ from whymath_backend.api._growth_evidence_state import (
     get_growth_evidence_counters,
     get_growth_evidence_exposure_counters,
 )
+from whymath_backend.api._next_problem_policy import SuneungRecommendationPolicy
 from whymath_backend.api._query_filters import (
     _validate_time_window,
     _validate_tz_aware,
     time_window_conditions,
 )
 from whymath_backend.api._rate_limit import _client_ip
+from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
 
 # ASM-04: 청사진 조립 후보 조회는 게이팅 라우터(같은 L5 레이어)의 헬퍼를 *재사용*한다 —
 # 후보 조회(절단 경고 포함)와 성취기준 원자 축 조인을 두 번 구현하지 않는다(단일 진실 원천).
@@ -97,9 +99,9 @@ from whymath_backend.db.models.assessment import (
     SkillMasteryHistory,
 )
 from whymath_backend.db.models.audit import DeletionAudit, PrivacyAudit
-from whymath_backend.db.models.concept import Concept, ProblemConcept
+from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.dialogue import Dialogue
-from whymath_backend.db.models.problem import Problem, ProblemRelation
+from whymath_backend.db.models.problem import Problem
 
 # COLLAB-03: 학습시간 통계 좌석의 공급원(l2.learning_metrics_rollup이 적재).
 from whymath_backend.db.models.timeseries import DailyLearningMetrics
@@ -116,38 +118,71 @@ from whymath_backend.harness.wh1_evaluation import (
     compute_wh1_surrogate_metrics,
 )
 from whymath_backend.l2.ability_estimation import (
-    _DIFFICULTY_MIDPOINT,
     ConceptAbilityItem,
     compute_concept_abilities,
-    difficulty_to_logit,
     estimate_global_ability,
     resolve_item_difficulty_b,
 )
+from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
     IrtItem,
     ability_standard_error,
     estimate_ability,
-    item_information,
-    learning_band_weight,
-    select_weighted_item,
+)
+from whymath_backend.l2.learner_state import LearnerState, get_state
+from whymath_backend.l2.learner_state_store import provision_learner_state
+from whymath_backend.l2.learning_event_trace import (
+    DEFAULT_TRACE_LIMIT,
+    MAX_TRACE_LIMIT,
+    LearningEventTrace,
+    build_trace,
 )
 from whymath_backend.l2.learning_path import (
     LearningPath,
     build_learning_path,
 )
+from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
+from whymath_backend.l2.learning_state_machine import (
+    advance_on_attempt,
+    get_current_state,
+    list_transitions,
+    record_transition,
+)
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
+
+# 이 블록의 일부 이름은 이 파일 안에서 쓰이지 않고 **재노출**만 된다(아래 별칭 블록 주석).
+from whymath_backend.l2.next_problem_selection import (  # noqa: F401
+    CANDIDATE_POOL_SIZE,
+    CANDIDATE_ZERO_ALL_GATED_INELIGIBLE,
+    CANDIDATE_ZERO_NO_POOL,
+    TARGET_SE,
+    AttemptHistoryState,
+    _weak_concept_weights,
+    candidate_pool_conditions,
+    candidate_pool_order_by,
+    combine_weights,
+    last_incorrect_problem_id,
+    load_attempt_history_state,
+    load_sibling_ids,
+    load_weak_concept_weights,
+    sibling_weights,
+)
 from whymath_backend.l2.prerequisite_recommendation import (
     MAX_PREREQUISITE_DEPTH,
     PrerequisiteGap,
     recommend_prerequisite_gaps,
 )
+from whymath_backend.l2.recommendation_contract import (
+    LearningContext,
+    RecommendationAction,
+    RecommendationReason,
+)
 from whymath_backend.l2.recommendation_evidence import (
-    POLICY_VERSION_CAT,
-    POLICY_VERSION_SUNEUNG,
     record_recommendation_treatment,
 )
+from whymath_backend.l2.recommendation_policy import CatRecommendationPolicy, NextProblemPolicy
 from whymath_backend.l2.review_queue import ReviewQueue, fetch_review_queue
 from whymath_backend.l2.skill_mastery_tracking import (
     record_problem_attempt_skill_mastery,
@@ -162,20 +197,15 @@ from whymath_backend.l4.calibration_coaching import recommend_calibration_coachi
 from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
-from whymath_backend.l4.misconception.hypothesis_store import get_active_hypotheses
+from whymath_backend.l4.misconception.hypothesis_store import (
+    apply_candidates,
+    get_active_hypotheses,
+)
 from whymath_backend.l4.prerequisite_coaching import recommend_prerequisite_coaching
 from whymath_backend.l6.blueprint import (
     AssembledTestSet,
     ExamBlueprint,
     assemble_test_set,
-)
-from whymath_backend.l6.suneung import (
-    METADATA_ONLY_SOURCES,
-    SUNEUNG_DEFAULT_MIN_FIT,
-    SUNEUNG_EXAM_TYPES,
-    is_suneung_eligible,
-    recommend_suneung_index,
-    suneung_item_weight,
 )
 from whymath_backend.privacy import (
     UserDataExport,
@@ -194,22 +224,33 @@ from whymath_backend.schema.assessment import (
     SkillMasteryHistory as SkillMasteryHistorySchema,
 )
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    MisconceptionCandidate,
+    MisconceptionScan,
+)
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
 from whymath_backend.schema.enums import (
-    ASSESSED_ROLES,
     AssessmentType,
     AuditEventKind,
     AuditResourceType,
     Persona,
     Resolution,
-    ReviewStatus,
+)
+from whymath_backend.schema.learning_state import (
+    LearningState,
+    NextActionKind,
+    TransitionTrigger,
+    UndefinedTransitionError,
+    allowed_targets,
 )
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.timeseries import (
     DailyLearningMetrics as DailyLearningMetricsSchema,
 )
+from whymath_backend.schema.verification_capabilities import AttemptMisconceptionDetector
 
 router = APIRouter(prefix="/v1/me", tags=["me"])
 
@@ -666,6 +707,66 @@ async def list_my_privacy_audit(
 _STARTED_AT_SKEW_TOLERANCE = timedelta(minutes=5)
 
 
+@dataclass(frozen=True)
+class _AttemptMisconceptionScan:
+    """`_scan_attempt_misconceptions`의 결과 — 훑기 3상태 + 게이트 통과 후보.
+
+    능력 구현이 돌려주는 리치 타입을 Core 안에 들이지 않으려는 좌석이다. Core가 읽는 것은
+    `scan`·`candidates` 둘뿐이므로(능력 Protocol이 노출하는 것과 동일) 여기서 그 둘만 고정한다.
+    """
+
+    scan: MisconceptionScan
+    candidates: tuple[MisconceptionCandidate, ...]
+
+
+_NOT_SCANNED = _AttemptMisconceptionScan(scan=MisconceptionScan.NOT_RUN, candidates=())
+"""훑지 않음 — 정답·답안 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**"""
+
+
+async def _scan_attempt_misconceptions(
+    session: AsyncSession,
+    detector: AttemptMisconceptionDetector,
+    *,
+    problem_id: uuid.UUID,
+    correct: bool,
+    answer: str | None,
+) -> _AttemptMisconceptionScan:
+    """채점 1건에서 오개념 후보를 훑는다 — 재료가 없으면 훑지 않았다고 말한다.
+
+    훑지 않는 조건 4종(전부 `NOT_RUN`): 킬 스위치 OFF · 정답 시도 · 답안 미제출 · 문항 지문
+    부재. 이 넷을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면 하류가 *미측정*을 *측정된
+    0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
+
+    정답 시도를 제외하는 것은 성능이 아니라 정직 때문이다 — 오개념은 *틀린 방식*의 이름이라
+    정답에 붙일 대상이 아니고, 붙지 않은 것과 보지 않은 것은 다른 사실이다.
+    """
+    if not get_settings().l4_attempt_misconception_scan_enabled:
+        return _NOT_SCANNED
+    if correct or answer is None:
+        return _NOT_SCANNED
+    question_text = await session.scalar(
+        select(Problem.question_text).where(Problem.problem_id == problem_id)
+    )
+    if not question_text:
+        return _NOT_SCANNED
+    # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를 이름으로
+    # 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
+    try:
+        result = detector.scan_attempt_answer(question_text=question_text, student_answer=answer)
+    except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
+        # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로 여기서 터지면
+        # 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측 실패가 채점 실패를 만드는 셈.
+        # 그래서 삼키되, **예외 타입명을 반드시 남긴다**(CLAUDE.md 침묵 실패 금지 — 무타입 경고가
+        # langfuse v2 쓰기 8일 무증상 전멸의 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
+        _logger.warning(
+            "오개념 훑기 실패 — 채점은 계속한다(scan=not_run). exc_type=%s problem_id=%s",
+            type(exc).__name__,
+            problem_id,
+        )
+        return _NOT_SCANNED
+    return _AttemptMisconceptionScan(scan=result.scan, candidates=tuple(result.candidates))
+
+
 class AttemptSubmitRequest(BaseModel):
     """본인 풀이 채점 결과 제출 — `POST /v1/me/attempts` 요청 본문.
 
@@ -725,8 +826,116 @@ class SkillMasteryUpdate(BaseModel):
     sample_size: int
 
 
+# EOS-105 학습 상태 머신 — 정책이 소유하는 트리거(클라이언트가 이 표면으로 적재 금지).
+#
+# 집합으로 두는 이유: `POST /learning-state/transitions`가 문자열 접두사(`startswith("POLICY_")`)
+# 로 걸러도 되지만, 그러면 **이름 규약이 곧 보안 경계**가 된다. 규약은 리팩터링으로 조용히
+# 깨지고 그때 이 게이트도 함께 열린다. 열거된 집합은 트리거를 추가한 사람이 여기 한 줄을
+# 넣도록 강제하며, 그 강제는 테스트가 동결한다(누락 시 RED).
+_POLICY_OWNED_TRIGGERS: frozenset[TransitionTrigger] = frozenset(
+    {
+        TransitionTrigger.ATTEMPT_SUBMITTED,
+        TransitionTrigger.POLICY_ADVANCE,
+        TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE,
+        TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+        TransitionTrigger.POLICY_PREREQUISITE_GAP,
+        TransitionTrigger.POLICY_REPEATED_FAILURE,
+        TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED,
+    }
+)
+
+
+class LearningStateTransitionView(BaseModel):
+    """전이 이력 1건 — "왜 지금 이 상태인가"의 재구성 자료."""
+
+    from_state: LearningState
+    to_state: LearningState
+    trigger: TransitionTrigger
+    rule_id: str | None = Field(
+        default=None, description="정책이 낸 전이면 규칙 id, 생애주기 전이면 null."
+    )
+    concept_id: str | None = Field(default=None, description="전이가 일어난 맥락 개념 id.")
+    occurred_at: datetime
+
+
+class LearningStateView(BaseModel):
+    """`GET /v1/me/learning-state` 응답 — 현재 상태 + 가능한 다음 상태 + 최근 이력."""
+
+    current_state: LearningState = Field(
+        description="현재 학습 상태. 전이 이력이 없으면 `NEW`(상태 미상이라는 값은 없다)."
+    )
+    allowed_next_states: list[str] = Field(
+        description=(
+            "현재 상태에서 전이표가 허용하는 다음 상태 목록(정렬). 클라이언트가 전이 규칙을 "
+            "복제하지 않도록 서버가 내려 준다 — 규칙의 진실 원천은 서버 전이표 하나다."
+        )
+    )
+    transitions: list[LearningStateTransitionView] = Field(description="최근 전이 이력(최신순).")
+
+
+class LearningStateTransitionRequest(BaseModel):
+    """`POST /v1/me/learning-state/transitions` 요청 — 생애주기 전이 1건.
+
+    `from_state`를 받지 않는다: 클라이언트가 출발 상태를 지어내면 원장이 실제 이력과 어긋난다.
+    출발 상태는 서버가 원장에서 직접 읽는다.
+    """
+
+    to_state: LearningState = Field(description="전이할 목표 상태.")
+    trigger: TransitionTrigger = Field(
+        description=(
+            "전이 사유. 정책 소유 트리거(`ATTEMPT_SUBMITTED`·`POLICY_*`)는 422로 거부된다 "
+            "— 그 전이는 `POST /v1/me/attempts`만 적재할 수 있다."
+        )
+    )
+    concept_id: str | None = Field(default=None, description="맥락 개념 id(선택).")
+
+
+class LearningStateBlock(BaseModel):
+    """응답에 실리는 학습 상태 머신의 결과 — EOS-105.
+
+    **`rejected_transition`이 이 모델의 존재 이유다.** 미정의 전이를 예외로만 흘리면 호출부가
+    `except`로 잡는 순간 사라지고, 사라지면 "조용히 통과"가 된다. 값으로 만들어 학생 응답까지
+    올려 보내 거부가 관측 가능하게 한다(CLAUDE.md 침묵 실패 금지).
+
+    `rule_id`는 "어느 규칙이 실제로 돌았는가"를 매 요청 노출한다 — 알고리즘을 붙였으면 그것이
+    작동한 비율을 응답이 말해야 한다는 원칙(CLAUDE.md "작동한 비율")의 집행 지점이다.
+    """
+
+    from_state: LearningState = Field(description="응답 제출 시점의 학습 상태.")
+    to_state: LearningState = Field(description="이 처리가 끝난 뒤의 학습 상태.")
+    rule_id: str | None = Field(
+        default=None,
+        description="결정을 낸 정책 규칙 id. 전이가 거부돼 정책이 돌지 않았으면 null.",
+    )
+    next_action: NextActionKind | None = Field(
+        default=None, description="정책이 지시한 다음 행동의 종류. 정책 미실행이면 null."
+    )
+    target_concept_id: str | None = Field(
+        default=None, description="다음 행동의 대상 개념 id(선수 개념 복귀 등). 없으면 null."
+    )
+    target_misconception_id: str | None = Field(
+        default=None, description="교정 대상 오개념 id. 없으면 null."
+    )
+    rejected_transition: str | None = Field(
+        default=None,
+        description=(
+            "거부된 전이의 설명(예: 'DIAGNOSING → ASSESSING'). null이면 거부 없음. 값이 "
+            "있으면 상태 머신은 평가 전이를 적재하지 않았다 — 응답 적재·숙달 전파는 그와 "
+            "무관하게 성공한다(이 슬라이스는 기존 학습 경로를 막지 않는다)."
+        ),
+    )
+    entered_learning_from: LearningState | None = Field(
+        default=None,
+        description=(
+            "평가 직전에 **학습 진입 전이가 자동 적재된 경우** 그 직전 상태(EOS-115). "
+            "null이면 이미 평가 가능한 상태였다는 뜻이다. 붙인 단계가 실제로 돌았는지를 "
+            "응답이 말하게 하는 필드다(CLAUDE.md '작동한 비율')."
+        ),
+    )
+
+
 class AttemptSubmitResponse(BaseModel):
-    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록."""
+    """`POST /v1/me/attempts` 응답 — 적재된 attempt + 갱신된 개념·스킬 숙달 목록 + 학습 상태."""
 
     attempt_id: uuid.UUID
     is_correct: bool
@@ -746,6 +955,22 @@ class AttemptSubmitResponse(BaseModel):
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
     )
+    evidence: AssessmentEvidence | None = Field(
+        default=None,
+        description=(
+            "이 채점이 만들어 낸 **증거 묶음**(EOS-12) — 개념·스킬·오개념 후보 3종과 작동 비율. "
+            "`mastery_updates`가 *쓰기 이후*의 결과라면 이 필드는 *쓰기 이전*의 관측이라, 둘을 "
+            "나란히 실어 두 단계가 각각 보이게 한다(부분 쓰기 구조를 한 트랜잭션처럼 가리지 "
+            "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
+            "거기에만 적혀 있다."
+        ),
+    )
+    learning_state: LearningStateBlock = Field(
+        description=(
+            "학습 상태 머신(EOS-105) 처리 결과 — Event→LearnerState→Policy→NextAction. "
+            "전이가 거부된 경우에도 null이 아니라 `rejected_transition`이 채워진 블록이 온다."
+        )
+    )
 
 
 @router.post(
@@ -758,6 +983,9 @@ async def submit_attempt(
     body: AttemptSubmitRequest,
     user: ConsentedUser,
     session: SessionDep,
+    misconception_detector: Annotated[
+        AttemptMisconceptionDetector, Depends(get_attempt_misconception_detector)
+    ],
 ) -> AttemptSubmitResponse:
     """본인 풀이 채점 1건 제출 — `ProblemAttempt` 적재 후 문제의 평가 개념 BKT 숙달 자동 전파.
 
@@ -844,15 +1072,51 @@ async def submit_attempt(
     )
     session.add(attempt)
     await session.commit()
-    # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
-    records = await record_problem_attempt_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
+    # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다 — Answer → Evidence → State 순서가 호출
+    # 지점에서 실제로 성립해야 증거가 "갱신 결과의 사후 요약"으로 전락하지 않는다. 읽기 전용이라
+    # (session.add·commit 0) 이 호출이 아래 적재의 성공/실패를 바꾸지 않고, 반대로 아래가 실패해도
+    # 증거는 남는다 — 두 단계가 각각 관측 가능하다(EOS-81 ⑦ 부분 쓰기 구조를 가리지 않는다).
+    # EOS-104: 오답 1건의 오개념 훑기 — 이 슬라이스의 **집행 지점**이다(정본화≠집행).
+    # 과목 어댑터가 문항 지문·제출 답안을 이어 오류 서명을 읽고, 품질 게이트를 통과한 후보만
+    # 돌려준다. Core는 두 문자열을 *불투명 페이로드*로 넘길 뿐 해석하지 않는다(경계 규칙).
+    #
+    # 귀속(핵심): 후보의 재료가 **이 attempt에서만** 나오므로 attempt 귀속이 정의상 성립한다.
+    # 대화 턴의 게이트 매칭을 옮겨 오지 않는 이유가 이것이다 — 그쪽은 *턴* 단위라 옮기면
+    # "이 답안의 오개념 후보"가 거짓 주장이 된다(EOS-104 acceptance ③).
+    misconception_scan_result = await _scan_attempt_misconceptions(
+        session,
+        misconception_detector,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        answer=body.student_answer,
     )
+    evidence = await collect_assessment_evidence(
+        session,
+        learner_id=user.user_id,
+        problem_id=body.problem_id,
+        correct=body.is_correct,
+        attempt_id=attempt.attempt_id,
+        observed_at=received_at,
+        possible_misconceptions=misconception_scan_result.candidates,
+        misconception_scan=misconception_scan_result.scan,
+    )
+    # 학습자 상태 반영 — 증거 조립(읽기 전용)과 **분리된 단계**다. 증거는 관측이고 상태 변경은
+    # 엔진의 몫이라, 둘을 한 함수에 넣으면 "한 트랜잭션처럼 보이기" 문제가 생긴다(EOS-12 ⑤).
+    #
+    # 훑은 회차에만 부른다. 후보가 0건이어도 부르는 것이 중요하다 — 그 호출이 이번 회차에
+    # 증거를 못 받은 기존 가설을 감쇠시킨다(Persona C: 오개념이 재관측되지 않으면 confidence가
+    # *내려가야* 한다). 반대로 훑지 않은 회차(정답·답안 없음·능력 부재)에 부르면 관측하지도
+    # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
+    if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
+        await apply_candidates(session, user.user_id, misconception_scan_result.candidates)
+        await session.commit()
+    # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
+    # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
+    # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
+    records = await record_problem_attempt_mastery(session, evidence=evidence)
     # 스킬 숙달 전파(Phase 2b-2·행동 축) — 같은 모델 B로 concept→skill 해소 후 스킬별 측정 적재.
     # 개념 전파와 독립 트랜잭션(자체 단일 commit)·concept→skill 매핑/해소 없으면 빈 리스트.
-    skill_records = await record_problem_attempt_skill_mastery(
-        session, user.user_id, body.problem_id, body.is_correct
-    )
+    skill_records = await record_problem_attempt_skill_mastery(session, evidence=evidence)
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속(소급 불가 축 — W2 스키마 ①).
     # 숙달 전파는 "스킬 값이 언제 변했는가"만 남기고 "이 시도가 어떤 스킬을 건드렸는가"는 남기지
     # 않는다 — 매핑이 이후 바뀌면 재구성 불가라 채점 순간에 기록한다. 빈 해소도 `[]`로 적재
@@ -870,6 +1134,47 @@ async def submit_attempt(
     # 순수 L4 결정(DB 무접근·적재 로직 불변)·확신 미제출(None)이면 None(자연).
     calibration_coaching = recommend_calibration_coaching(
         body.confidence_self_reported, body.is_correct
+    )
+    # EOS-105 학습 상태 머신 — Event → LearnerState → Policy → Next Action.
+    #
+    # 여기가 이 슬라이스의 **집행 지점**이다(정본화≠집행). 전이표·정책을 만든 것만으로는
+    # 아무 학생의 상태도 움직이지 않는다 — 서빙 경로가 그것을 실제로 부르는 이 줄이 계약을
+    # 집행으로 바꾼다.
+    #
+    # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
+    # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
+    #
+    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
+    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
+    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
+    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
+    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
+    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
+    policy_evidence = await build_attempt_evidence(
+        session,
+        user_id=user.user_id,
+        is_correct=body.is_correct,
+        confidence=body.confidence_self_reported,
+    )
+    transition = await advance_on_attempt(
+        session,
+        user_id=user.user_id,
+        evidence=policy_evidence,
+        attempt_id=attempt.attempt_id,
+    )
+    decision = transition.decision
+    learning_state_block = LearningStateBlock(
+        from_state=transition.from_state,
+        to_state=transition.final_state,
+        rule_id=decision.rule_id if decision is not None else None,
+        next_action=decision.next_action.kind if decision is not None else None,
+        target_concept_id=(decision.next_action.target_concept_id if decision else None),
+        target_misconception_id=(
+            decision.next_action.target_misconception_id if decision else None
+        ),
+        rejected_transition=transition.rejected_transition,
+        entered_learning_from=transition.entered_learning_from,
     )
     return AttemptSubmitResponse(
         attempt_id=attempt.attempt_id,
@@ -893,7 +1198,94 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        evidence=evidence,
+        learning_state=learning_state_block,
     )
+
+
+@router.get(
+    "/learning-state",
+    response_model=LearningStateView,
+    summary="내 현재 학습 상태 + 전이 이력(학습 상태 머신)",
+)
+async def get_my_learning_state(
+    user: ConsentedUser,
+    session: SessionDep,
+    limit: Limit = 50,
+) -> LearningStateView:
+    """본인 학습 상태 — 현재 상태·거기서 갈 수 있는 상태·최근 전이 이력.
+
+    `allowed_next_states`를 함께 내는 이유: 클라이언트가 전이 규칙을 자기 코드에 복제하지
+    않게 하기 위해서다. 규칙을 클라에 넣으면 전이표의 진실 원천이 둘이 된다(서버 표 + 클라
+    분기) — CLAUDE.md "수학 로직을 클라에 넣지 않는다"의 제어 평면 판이다.
+    """
+    current = await get_current_state(session, user.user_id)
+    transitions = await list_transitions(session, user.user_id, limit=limit)
+    return LearningStateView(
+        current_state=current,
+        allowed_next_states=sorted(s.value for s in allowed_targets(current)),
+        transitions=[
+            LearningStateTransitionView(
+                from_state=t.from_state,
+                to_state=t.to_state,
+                trigger=t.trigger,
+                rule_id=t.rule_id,
+                concept_id=t.concept_id,
+                occurred_at=t.occurred_at,
+            )
+            for t in transitions
+        ],
+    )
+
+
+@router.post(
+    "/learning-state/transitions",
+    response_model=LearningStateView,
+    status_code=status.HTTP_201_CREATED,
+    summary="학습 상태 전이 1건 적재(생애주기 전이 — 진단 시작·학습 시작 등)",
+)
+async def post_my_learning_state_transition(
+    body: LearningStateTransitionRequest,
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearningStateView:
+    """생애주기 전이를 명시적으로 적재한다 — 진단 시작·완료·학습 시작 같은 사건.
+
+    응답 제출로 일어나는 평가 전이(`ATTEMPT_SUBMITTED` 및 정책 전이)는 이 표면이 아니라
+    `POST /v1/me/attempts`가 적재한다. 여기서 그 트리거를 허용하면 클라이언트가 정책을
+    우회해 임의 상태로 점프할 수 있다 — 그래서 **거부한다**(422).
+
+    미정의 전이는 409로 거부한다. 200에 "실패했음" 플래그를 실어 보내지 않는다 — 그 형태는
+    호출부가 플래그를 안 읽는 순간 조용한 통과가 된다.
+    """
+    if body.trigger in _POLICY_OWNED_TRIGGERS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"`{body.trigger.value}`는 정책 엔진이 소유하는 트리거입니다 — 이 표면으로 "
+                f"적재할 수 없습니다. 평가 전이는 `POST /v1/me/attempts`가 적재합니다."
+            ),
+        )
+    try:
+        await record_transition(
+            session,
+            user_id=user.user_id,
+            to_state=body.to_state,
+            trigger=body.trigger,
+            concept_id=body.concept_id,
+        )
+    except UndefinedTransitionError as exc:
+        # 예외 타입명을 detail에 포함한다(CLAUDE.md 침묵 실패 금지 — 무타입 경고 금지).
+        current = await get_current_state(session, user.user_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{type(exc).__name__}: {exc.from_state.value} → {exc.to_state.value}는 "
+                f"정의되지 않은 전이입니다. {current.value}에서 갈 수 있는 상태: "
+                f"{sorted(s.value for s in allowed_targets(current)) or '없음'}."
+            ),
+        ) from exc
+    return await get_my_learning_state(user, session)
 
 
 @router.get(
@@ -1016,6 +1408,55 @@ class ConceptMasterySnapshotItem(BaseModel):
     confidence: float | None = None
     sample_size: int | None = None
     measured_at: datetime
+
+
+TraceLimit = Annotated[
+    int,
+    Query(
+        ge=1,
+        le=MAX_TRACE_LIMIT,
+        description=(
+            "시간선 전역 상한. 초과분은 **오래된 쪽부터** 잘리고 응답의 `truncated`가 true가 된다."
+        ),
+    ),
+]
+
+
+@router.get(
+    "/learning-trace",
+    response_model=LearningEventTrace,
+    summary="내 학습 과정 시간선(Event Trace — 여러 원천을 하나의 시간순으로 재구성)",
+)
+async def get_my_learning_trace(
+    user: ConsentedUser,
+    session: SessionDep,
+    since: SinceParam = None,
+    until: UntilParam = None,
+    limit: TraceLimit = DEFAULT_TRACE_LIMIT,
+) -> LearningEventTrace:
+    """본인 학습 이벤트를 **시간순으로** 재구성한다(EOS-11 · 계획서 300 §17).
+
+    진단·문제 시도·채점·오개념 가설·숙달 변경(전후 값 포함)·θ 측정·코치 행동 이벤트를 한 줄로
+    합친 시간선이다. 집계 리포트와 달리 "이 학생에게 무슨 일이 순서대로 일어났는가"에 답한다.
+
+    **스코프**: `user_id`는 인증 주체로 고정한다 — 경로·쿼리 어디에도 타인 id를 넣을 자리가
+    없다(구조적 차단). 운영자·교사 열람은 이 표면의 범위가 아니다(`ADMIN-05` 계열 별건).
+
+    **응답을 `entries`만 보고 읽지 말 것**: `coverage`가 원천별 가용성을 3상태로 말한다.
+    `dormant`(생산자 0건)·`unjoinable`(학습자 축 결합 불가)인 원천의 0건은 *이 학생이 안 했다*는
+    뜻이 아니라 *우리가 재지 않고 있다*는 뜻이다(미측정을 무활동으로 읽지 않기 — CLAUDE.md
+    "작동한 비율" 원칙).
+
+    원문 답안·풀이·수식은 싣지 않는다(미성년 PII 경계). 답안이 필요하면 `attempt_id`로
+    기존 본인 표면을 경유한다.
+    """
+    return await build_trace(
+        session,
+        learner_id=user.user_id,
+        since=since,
+        until=until,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -1487,6 +1928,44 @@ async def get_my_diagnosis_summary(
     )
 
 
+# ── EOS-10: GET /v1/me/learner-state (LearnerState 단일 조회 표면) ────────────────
+# 계획서 300 §12가 요구한 12종 중 유일하게 대응물이 없던 축. 기존에 학습 상태를 알려면 조각
+# 3개(`/mastery/current`·`/ability`·`/diagnosis/summary`)를 각각 불러 클라이언트가 합쳐야
+# 했고, 그 "합치는 규칙"이 서버 밖에 있어 소비처마다 달라질 수 있었다. 이 표면이 L2 조립기
+# (`l2/learner_state.py::get_state`)를 그대로 노출해 합성 규칙을 서버 안에 둔다.
+#
+# **L5는 표면일 뿐이다** — 조립·계산은 전부 L2가 소유하고 여기서는 user_id 스코핑과 직렬화만
+# 한다(다른 /me GET과 동일 규약·읽기 전용·마이그레이션 0).
+
+
+@router.get(
+    "/learner-state",
+    response_model=LearnerState,
+    summary="내 학습 상태 단일 조회(LearnerState — 숙달·능력·오개념·스킬을 한 번에)",
+)
+async def get_my_learner_state(
+    user: ConsentedUser,
+    session: SessionDep,
+) -> LearnerState:
+    """본인의 `LearnerState`를 **한 호출로** 반환 — 조각 3개를 각각 부르던 것의 합성 표면.
+
+    담는 것: 개념 숙달(BKT)·전과목 및 개념별 능력(IRT θ)·활성 오개념·약/강 개념·스킬 숙달
+    (행동 축)·학년·목표. 전부 **기존 좌석 재사용**이며 이 엔드포인트가 새로 계산하는 값은 없다.
+
+    **`origins`를 함께 읽어라.** 값이 비어 있는 것은 두 가지 뜻일 수 있고 이 응답은 그것을
+    구별해 말한다 — `no_data`는 이 학생의 이력이 없다는 뜻(풀이가 쌓이면 채워진다)이고,
+    `no_producer`는 저장소에 생산자가 없다는 뜻(학생이 무엇을 해도 채워지지 않는다)이다.
+    현재 `curriculum_id`·`current_objective_id` 둘이 후자이며, 각 필드 description에 그
+    실측 근거가 있다. `origins`에서 `status == "measured"`인 비율이 곧 **이 조립이 실제로
+    작동한 비율**이다(CLAUDE.md "작동한 비율" 원칙).
+
+    **PII 주의**: `goals`는 목표 등급·점수·대학을 담는다. 이 표면은 학생 **본인**에게만
+    응답하며(`ConsentedUser` + user_id 스코핑), 여기서 나온 값을 학생 대면 프롬프트에 그대로
+    넣는 것은 별개로 금지다(`LearnerState.goals` description 참조).
+    """
+    return await get_state(session, user.user_id)
+
+
 # ── 원자그래프 소비 슬2: GET /v1/me/weak-concepts (약개념 추천 — 진단 약점 + code 메타 enrich) ──
 # L2 약점 진단(`recommend_weak_concepts`·BKT/IRT 융합·약점 정렬·약점 필터)에 `atom_node`(code)
 # 안전 그래프 메타(name_ko·subject_area·review_status)를 enrich해 "지금 무엇을 복습할지" 후보를
@@ -1788,17 +2267,26 @@ async def get_my_learning_path(
 
 
 # ── slice L2-12: GET /v1/me/next-problem (적응형 출제 — IRT 정보량 최대 미응답 문항) ──
-_CANDIDATE_POOL_SIZE = 50  # θ 근방 후보 풀 크기(SQL로 거리순 선별 후 파이썬 정보량 비교)
-# slice 15: CAT 중단 규칙 목표 표준오차 — 응답한 문항 기준 SE가 이 값 이하로 내려가면
-# "충분히 정밀하게 측정됨"으로 보고 적응 검사 중단을 권고(measurement_sufficient=True).
-# 0.3은 통상적 CAT 종료 임계(θ ± ~0.6 95% 구간). 추후 모드/설정별 보정은 후속.
-_TARGET_SE = 0.3
-# slice 16/17: 약점 개념 가중 출제 — BKT 개념별 숙달이 낮을수록(약점) 후보 문항 정보량에
-# 곱하는 가중치를 키운다. weight = 1 + BOOST·(1 - 최저숙달). BOOST=1.0이면 완전 미숙달(숙달 0)
-# 문항은 가중 2배·완전 숙달(1.0)은 1배. 정책 상수(모드별 차등은 후속).
-_WEAK_CONCEPT_BOOST = 1.0
-# 약점 가중 개념 역할은 `schema.enums.ASSESSED_ROLES`(PRIMARY/TESTED·BKT·IRT와 동일 집합·단일
-# 출처 — slice 84). 문제가 *평가하는* 개념만(SUPPORTING 제외).
+#
+# **EOS-19: 후보 조회·가중·θ 추정 배선은 이 파일에 없다.** 전부
+# `l2.next_problem_selection`으로 *바이트 동일하게* 이동했고(이유: `l2`의 추천 정책이 쓰려면
+# `l2 → api` 역방향 import가 생긴다 — CLAUDE.md 7계층 경계), 아래 별칭은 기존 참조 경로
+# (`whymath_backend.api.me.candidate_pool_conditions` 등)를 **끊지 않기 위한 재노출**이다.
+# `ops/repeat_recommendation_report.py`와 기존 테스트가 그 경로로 참조한다.
+_CANDIDATE_POOL_SIZE = CANDIDATE_POOL_SIZE
+_TARGET_SE = TARGET_SE
+_AttemptHistoryState = AttemptHistoryState
+_load_attempt_history_state = load_attempt_history_state
+_load_weak_concept_weights = load_weak_concept_weights
+_last_incorrect_problem_id = last_incorrect_problem_id
+_load_sibling_ids = load_sibling_ids
+_sibling_weights = sibling_weights
+_combine_weights = combine_weights
+# 공개 이름 둘은 별칭 없이 그대로 재노출된다(`ops/repeat_recommendation_report.py`·
+# `tests/backend/api/test_problem_quarantine_serving.py`가 `api.me.candidate_pool_conditions`로
+# 참조한다). 위 import에 붙인 린트 억제 주석이 그 재노출 의도를 명시한다 — 이 파일 안에서는 쓰이지
+# 않지만 *지워지면 안 되는* 이름이라는 뜻이다.
+
 # slice 17: ?prioritize_weak_concepts — 기본 false(slice 12~15 동작 보존). true면 BKT 약점
 # 개념 우선(개념 숙달 스냅샷·후보 문항 개념 매핑을 추가 조회해 가중).
 PrioritizeWeakConcepts = Annotated[
@@ -1844,136 +2332,9 @@ HarnessMetricsMode = Annotated[
     ),
 ]
 
-# REC-01: 응답 정직 표기 — 이번 요청에 *실제로* 적용된 가중 축 이름(NextProblemResponse
-# `weight_axes_applied`). "적용 안 됨"(빈 리스트)과 "적용했으나 신호가 없었음"
-# (`weak_concept_signal_count=0`)을 별도 필드로 구분하는 것이 이 상수들의 존재 이유다
-# (θ=0 콜드스타트·BKT 숙달 0행 상태를 응답에서 숨기지 않기 위함 — 배경은 모듈 상단 참조).
-# prioritize_weak_concepts=true면 항상 포함(기본/수능 공통).
-WEIGHT_AXIS_WEAK_CONCEPT = "weak_concept"
-# mode=suneung이면 항상 포함(수능 우선순위 가중).
-WEIGHT_AXIS_SUNEUNG_PRIORITY = "suneung_priority"
-
-# REC-01: candidate_zero_reason 값 — problem_id가 null일 때만 채워지는 사유 코드.
-# 기본 CAT 경로는 `best is None`이 곧 `candidate_rows`가 비었다는 뜻뿐이라(select_weighted_item은
-# items가 비면 루프가 안 돌아 None) 항상 NO_POOL이다. 수능 모드만 두 사유가 갈린다: SQL 사전필터
-# 자체가 0건인지(NO_POOL), 아니면 후보는 있었으나 L6 진실 게이트(is_suneung_eligible)가 전부
-# 부적격 처리했는지(ALL_GATED_INELIGIBLE — `recommend_suneung_index`가 None을 반환).
-CANDIDATE_ZERO_NO_POOL = "no_candidate_pool"
-CANDIDATE_ZERO_ALL_GATED_INELIGIBLE = "all_candidates_gated_ineligible"
-
-
-# ── REC-06: 후보 조회의 노출 게이트·정렬을 *한 곳에서만* 정의한다 ──────────────────────────
-# 이 두 함수는 서빙 경로(`recommend_next_problem`)와 반복 추천 리포트
-# (`ops/repeat_recommendation_report.py`)가 **같이** 쓴다. 리포트가 후보 풀을 자기 방식으로
-# 다시 조립하면 "리포트가 보는 풀"과 "학생이 실제로 받는 풀"이 조용히 갈라져, 측정이 서빙을
-# 설명하지 못하게 된다(구축 플레이북 7대 붕괴 연쇄 중 "유지보수 지옥 ← truth source가 하나가
-# 아님"의 방어). 서빙 동작은 무변경이다 — 아래 `candidate_pool_order_by`의 2차 키만 신규다.
-def candidate_pool_conditions() -> list[ColumnElement[bool]]:
-    """기본 CAT 후보의 노출 게이트 3축(WHERE) — 난이도 라벨 · 저작권 축① · 검수 축②.
-
-    ① 난이도 라벨(`difficulty_overall`) 보유: 응답 `difficulty` 노출과 b 폴백에 필요.
-    ② 저작권 노출 게이트(법적·협상 불가): 본문 미보유 출처(평가원/EBS/교과서)는 SQL 레벨 배제.
-    ③ 검수 노출 게이트(운영 축 — 축②와 **절대 합치지 않는다**): `approved`만 후보.
-    """
-    return [
-        Problem.difficulty_overall.isnot(None),
-        # PB-03 축① — 저작권 노출 게이트(법적, 협상 불가). 수능 분기가 쓰는 것과 동일 상수를
-        # 재사용해 판정 기준 이원화를 막는다.
-        Problem.source_type.notin_([s.value for s in METADATA_ONLY_SOURCES]),
-        # PB-03 축② — 검수 노출 게이트. `corpus_audit_eval` 측정 판정만 review_status에
-        # 각인된다(사람 입력 경로 0).
-        Problem.review_status == ReviewStatus.approved,
-    ]
-
-
-def candidate_pool_order_by(theta: float) -> tuple[ColumnElement[Any], ...]:
-    """후보 정렬 키 — ① |b−θ| 오름차순 ② `problem_id`(2차 키·동률 구간 동결).
-
-    ①은 기존 그대로다(보정 b `irt_difficulty_b` 우선·없으면 전문가 난이도→logit 폴백을
-    COALESCE로 표현). **②가 REC-06 acceptance③의 신규분**이다: ①만 있으면 |b−θ|가 같은 동률
-    구간의 행 순서가 **PG 임의**라 같은 DB 상태에서도 후보 풀 구성과 `select_weighted_item`의
-    인덱스가 흔들릴 수 있었다 — 결정론이 선택기에만 있고 그 앞 단계(후보 조회)에는 없던 상태다.
-
-    **무작위화가 아니다.** 2차 키는 동률 구간을 `problem_id` 오름차순으로 *고정*할 뿐이라,
-    ①로 순서가 이미 확정되는 비동률 구간은 전혀 건드리지 않는다. 즉 상위 점수가 유일한 풀에서는
-    선택 결과가 바이트 동일하고(회귀 0), 동률 구간에서만 "PG 임의" → "결정론"으로 바뀐다.
-    노출 통제(randomesque top-k)·다양성 가중은 이 태스크의 범위 밖(동결 — G3 참조).
-    """
-    return (
-        func.abs(
-            func.coalesce(
-                Problem.irt_difficulty_b,
-                Problem.difficulty_overall - _DIFFICULTY_MIDPOINT,
-            )
-            - theta
-        ),
-        # `.asc()`는 방향을 코드에 명시하는 동시에 mypy --strict 정합을 만든다
-        # (`InstrumentedAttribute`는 `ColumnElement`로 좁혀지지 않는다).
-        Problem.problem_id.asc(),
-    )
-
-
-def _weak_concept_weights(
-    candidate_problem_ids: list[uuid.UUID],
-    problem_concepts: dict[uuid.UUID, set[uuid.UUID]],
-    mastery: dict[uuid.UUID, float],
-) -> list[float]:
-    """후보 문항별 약점 가중치 — 문항의 평가 개념 중 *최저 숙달*로 weakness 산출(BKT+IRT 융합).
-
-    각 후보의 평가 개념(`problem_concepts[pid]`) 중 숙달 기록(`mastery`)이 있는 것의 최저 숙달을
-    취해 `weight = 1 + _WEAK_CONCEPT_BOOST·(1 - 최저숙달)`. 약할수록 가중↑. 개념 매핑이 없거나
-    숙달 기록이 없으면 *중립*(1.0 — 정보 없는 개념을 벌하거나 우대하지 않음). 순수·결정론.
-    """
-    weights = []
-    for pid in candidate_problem_ids:
-        relevant = [mastery[c] for c in problem_concepts.get(pid, set()) if c in mastery]
-        if relevant:
-            weights.append(1.0 + _WEAK_CONCEPT_BOOST * (1.0 - min(relevant)))
-        else:
-            weights.append(1.0)
-    return weights
-
-
-async def _load_weak_concept_weights(
-    session: AsyncSession,
-    user_id: uuid.UUID,
-    candidate_ids: list[uuid.UUID],
-) -> list[float]:
-    """슬라이스 17 약점 가중 *조회 배선* — 숙달 스냅샷·개념 매핑 2쿼리 후 가중치 산출.
-
-    S2-06에서 기존 기본 CAT 경로의 인라인 블록을 헬퍼로 추출했다(동작 무변경) — 기본 CAT과
-    수능 모드(mode=suneung) *양 분기*가 같은 약점 가중을 공유하기 위함이다. 조회 2회:
-      ① 개념별 BKT 숙달 스냅샷(개념당 최신 — DISTINCT ON), ② 후보 문항의 평가 개념 매핑
-      (`ASSESSED_ROLES`만). 순수 산출은 `_weak_concept_weights`에 위임한다.
-    """
-    mastery_stmt = (
-        select(ConceptMasteryHistory.concept_id, ConceptMasteryHistory.mastery)
-        .where(ConceptMasteryHistory.user_id == user_id)
-        .distinct(ConceptMasteryHistory.concept_id)
-        .order_by(
-            ConceptMasteryHistory.concept_id,
-            ConceptMasteryHistory.measured_at.desc(),
-        )
-    )
-    mastery = {
-        cid: float(m) for cid, m in (await session.execute(mastery_stmt)).all() if m is not None
-    }
-    pc_stmt = select(ProblemConcept.problem_id, ProblemConcept.concept_id).where(
-        ProblemConcept.problem_id.in_(candidate_ids),
-        ProblemConcept.role.in_(ASSESSED_ROLES),
-    )
-    problem_concepts: dict[uuid.UUID, set[uuid.UUID]] = {}
-    for pid, cid in (await session.execute(pc_stmt)).all():
-        problem_concepts.setdefault(pid, set()).add(cid)
-    return _weak_concept_weights(candidate_ids, problem_concepts, mastery)
-
-
 # S4-14: CAT 형제 후보 필터 — problem_relation(변형·유사) 계보를 소비하는 첫 소비처(승격 없는
 # 영속 금지 원칙 — populate.py가 채운 관계를 여기서 처음 읽는다). 직전 오답 문항의 "형제"
 # (같은 뼈대 변형·인접 유사 문항)를 배제(같은 문제 반복 회피)하거나 가중 우대(약점 재출제)한다.
-_SIBLING_BOOST = 1.0
-"""형제 가중 배율 — `_WEAK_CONCEPT_BOOST`와 동일 스케일 정책(형제는 1+BOOST배·비형제는 중립)."""
-
 SiblingFilter = Annotated[
     Literal["exclude", "include"] | None,
     Query(
@@ -1984,123 +2345,6 @@ SiblingFilter = Annotated[
         )
     ),
 ]
-
-
-async def _last_incorrect_problem_id(session: AsyncSession, user_id: uuid.UUID) -> uuid.UUID | None:
-    """직전 오답 문항 id — `created_at` 최신순 1건.
-
-    `get_my_ability_history`(§6.1)와 동형으로 서버 default 컬럼 `created_at`을 쓴다(`started_at`은
-    nullable·미보장이라 정렬 축 부적합).
-    """
-    stmt = (
-        select(ProblemAttempt.problem_id)
-        .where(
-            ProblemAttempt.user_id == user_id,
-            ProblemAttempt.is_correct.is_(False),
-            ProblemAttempt.problem_id.isnot(None),
-        )
-        .order_by(ProblemAttempt.created_at.desc())
-        .limit(1)
-    )
-    return (await session.execute(stmt)).scalar_one_or_none()
-
-
-async def _load_sibling_ids(session: AsyncSession, problem_id: uuid.UUID) -> set[uuid.UUID]:
-    """`problem_relation` 양방향(parent/related) 조회 — 변형·유사는 시맨틱상 *대칭 소비*라
-    방향 무관하게 상대편 id를 "형제"로 모은다(자기 자신은 스키마가 이미 금지하나 방어적 제외).
-    """
-    stmt = select(ProblemRelation.parent_problem_id, ProblemRelation.related_problem_id).where(
-        or_(
-            ProblemRelation.parent_problem_id == problem_id,
-            ProblemRelation.related_problem_id == problem_id,
-        )
-    )
-    siblings: set[uuid.UUID] = set()
-    for parent_id, related_id in (await session.execute(stmt)).all():
-        other = related_id if parent_id == problem_id else parent_id
-        if other != problem_id:
-            siblings.add(other)
-    return siblings
-
-
-def _sibling_weights(candidate_ids: list[uuid.UUID], sibling_ids: set[uuid.UUID]) -> list[float]:
-    """형제 후보 가중 — `_weak_concept_weights`와 동형(형제 1+BOOST배·비형제 중립 1.0)."""
-    return [1.0 + _SIBLING_BOOST if pid in sibling_ids else 1.0 for pid in candidate_ids]
-
-
-def _combine_weights(*weight_lists: list[float] | None) -> list[float] | None:
-    """None 아닌 가중 리스트들을 원소별 곱으로 합성(약점 가중 × 형제 가중 동시 사용 지원).
-
-    전부 None이면 None(가중 없음 — 기존 `select_weighted_item`/`recommend_suneung_index`의
-    "가중 없음=균등" 계약 보존).
-    """
-    present = [w for w in weight_lists if w is not None]
-    if not present:
-        return None
-    combined = list(present[0])
-    for other in present[1:]:
-        combined = [a * b for a, b in zip(combined, other, strict=True)]
-    return combined
-
-
-@dataclass(slots=True, frozen=True)
-class _AttemptHistoryState:
-    """채점 이력 기반 CAT 상태 — `/next-problem`·ASM-03 평가 캡처 좌석이 *공유*하는 단일
-    진실 원천(single source of truth).
-
-    `attempted_ids`는 `/next-problem`의 후보 필터에만 쓰이는 부가 필드다 — 평가 캡처 좌석
-    (`POST /assessments/capture`)은 `theta`·`standard_error`·`measurement_sufficient`만
-    소비한다.
-    """
-
-    attempted_ids: set[uuid.UUID]
-    theta: float
-    standard_error: float | None
-    measurement_sufficient: bool
-
-
-async def _load_attempt_history_state(
-    session: AsyncSession, user_id: uuid.UUID
-) -> _AttemptHistoryState:
-    """채점 이력 조회 → θ 추정 → SE·`measurement_sufficient`(CAT 중단 규칙, slice 15).
-
-    `/next-problem`(slice 12~17)의 기존 인라인 로직을 *동작 무변경*으로 추출한 것 — 새 계산
-    0(같은 쿼리·같은 순서·같은 공식). ASM-03(`POST /assessments/capture`)이 "measurement_
-    sufficient 경계"를 `/next-problem`과 *같은 지점*에서 판정하기 위해 별도 함수로 뽑았다
-    (진실 원천이 둘로 갈라지면 유지보수 지옥 — CLAUDE.md 구축 플레이북 7대 붕괴 연쇄 방어).
-    """
-    attempt_stmt = (
-        select(
-            ProblemAttempt.problem_id,
-            ProblemAttempt.is_correct,
-            Problem.difficulty_overall,
-            Problem.irt_difficulty_b,
-        )
-        .join(Problem, ProblemAttempt.problem_id == Problem.problem_id)
-        .where(
-            ProblemAttempt.user_id == user_id,
-            ProblemAttempt.is_correct.isnot(None),
-        )
-    )
-    attempt_rows = (await session.execute(attempt_stmt)).all()
-    responses: list[tuple[IrtItem, bool]] = []
-    for _pid, is_correct, difficulty, irt_b in attempt_rows:
-        b = resolve_item_difficulty_b(irt_b, difficulty)
-        if b is not None:
-            responses.append((IrtItem(difficulty=b), bool(is_correct)))
-    theta = estimate_ability(responses)
-    attempted_ids = {pid for pid, _ic, _d, _b in attempt_rows}
-    # slice 15: 응답한 문항(administered) 기준 측정 정밀도 — CAT 중단 규칙 신호.
-    administered_items = [item for item, _ in responses]
-    se = ability_standard_error(theta, administered_items)
-    standard_error = None if math.isinf(se) else se
-    measurement_sufficient = standard_error is not None and standard_error <= _TARGET_SE
-    return _AttemptHistoryState(
-        attempted_ids=attempted_ids,
-        theta=theta,
-        standard_error=standard_error,
-        measurement_sufficient=measurement_sufficient,
-    )
 
 
 class NextProblemResponse(BaseModel):
@@ -2163,6 +2407,32 @@ class NextProblemResponse(BaseModel):
             "대기). purpose=diagnosis(기본)에서는 밴드 자체가 적용되지 않으므로 null."
         ),
     )
+    action: RecommendationAction = Field(
+        description=(
+            "EOS-19: **무엇을 하라는 추천인가** — `reason.type`에서 파생된 학습 행위"
+            "(practice_prerequisite·practice_current·advance_next·diagnose·none). 근거와 "
+            "어긋난 값은 `Recommendation` 생성 단계에서 거부되므로 이 필드는 reason과 "
+            "항상 정합이다."
+        ),
+    )
+    target_concept: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "EOS-19: 학생이 **다음에 다뤄야 할 개념**. 선수개념이 막혔으면"
+            "(action=practice_prerequisite) 개념 그래프에서 찾은 *막힌 선수개념*이고, 그 외에는 "
+            "선택된 문항의 대표 개념이다(=reason.concept_id). 측정된 선수가 없거나 문항에 개념 "
+            "매핑이 없으면 null — 없는 근거를 지어내지 않는다."
+        ),
+    )
+    reason: RecommendationReason = Field(
+        description=(
+            "EOS-14: **왜 이 문항인가** — 선택된 문항의 대표 개념·그 개념의 실측 숙달로 판정한 "
+            "추천 근거. 위 5필드(weight_axes_applied·candidate_pool_size·"
+            "weak_concept_signal_count·candidate_zero_reason·band_calibrated)가 *추천기가 "
+            "어떻게 돌았나*의 관측 메타라면, 이 필드는 *선택된 문항의 근거*다 — 둘은 다른 질문에 "
+            "답하므로 합치지 않는다. `problem_id`가 null이어도 비지 않는다(type=no_candidate)."
+        ),
+    )
 
 
 @router.get(
@@ -2181,326 +2451,81 @@ async def recommend_next_problem(
 ) -> NextProblemResponse:
     """본인 능력 θ에 *정보량 최대*인 *미응답* 문항을 추천 — IRT CAT(적응형 출제) 루프.
 
-    ① 채점 풀이 이력으로 θ 추정(slice 11과 동일 로직)·이미 푼 문항 id 수집. ② 난이도 라벨
-    (difficulty_overall) 있는 *미응답* 문항을 θ 근방(|b-θ| 최소)으로 SQL 선별(`_CANDIDATE_POOL_SIZE`
-    개)·`select_weighted_item`(slice 16)으로 (가중)정보량 최대 1개 선택. 없으면 problem_id=null.
-    난이도→b는 보정 b(`irt_difficulty_b`·slice 79 JMLE) 우선·없으면 `difficulty_to_logit`
-    휴리스틱 폴백(`resolve_item_difficulty_b`·SQL은 COALESCE).
+    **EOS-19: 이 핸들러는 더 이상 문항을 고르지 않는다.** 하는 일은 넷뿐이다 —
+      ① 학습자 상태를 단일 조회 표면(`l2.learner_state.get_state`)에서 읽고,
+      ② 쿼리 파라미터를 `LearningContext`(요청 상황)로 옮기고,
+      ③ `mode`에 맞는 **정책**(`RecommendationPolicy` 구현체)을 골라
+         `policy(learner_state, learning_context)`로 부른 뒤,
+      ④ 돌아온 `Recommendation`을 HTTP 응답으로 옮긴다(+ 처치 기록·commit).
 
-    CAT 중단 규칙(slice 15): *응답한 문항* 기준 표준오차 SE(slice 13)와 `measurement_sufficient`
-    (SE≤`_TARGET_SE`)을 함께 반환 — 호출자는 충분하면 검사를 멈추고 아니면 추천 문항을 출제한다
-    (적응 검사 루프 구동). 추천(problem_id)은 중단 권고와 무관히 후보가 있으면 항상 제공.
+    선택 알고리즘은 정책이 소유한다: 기본 CAT은 `l2.recommendation_policy.
+    CatRecommendationPolicy`, 수능 모드는 `api._next_problem_policy.SuneungRecommendationPolicy`
+    (두 계층 합성이 필요해 위치가 다른 이유는 그 모듈 docstring 참조). 두 정책의 알고리즘은
+    전환 전 이 함수 안에 있던 것과 **같다** — 배치만 바뀌었고 추천 결과는 바뀌지 않는다
+    (EOS-19 acceptance ④).
 
-    BKT+IRT 융합(slice 17·`prioritize_weak_concepts=true`): 후보 풀(θ 근방) 안에서 학생의 BKT
-    개념별 숙달 스냅샷(개념당 최신)을 후보 문항의 평가 개념과 대응해, *약점 개념*(저숙달) 문항의
-    정보량에 가중(`_weak_concept_weights`)을 줘 선택. 즉 "능력에 맞는 난이도" + "약한 개념 우선"을
-    동시 만족(CLAUDE.md 약점 진단). 후보 풀 자체는 여전히 θ 근방이라, 약점이라도 난이도가 θ에서
-    멀면 풀 밖일 수 있다(풀 확장은 후속). 기본 false면 균등 가중(slice 12~15 동작 보존).
+    정책이 무엇을 하는지(θ 추정·후보 조회·약점/밴드/형제 가중·CAT 중단 규칙·수능 L6 게이팅)는
+    각 정책 모듈의 docstring이 정본이다. 여기에 다시 적으면 알고리즘이 바뀔 때 두 설명이
+    갈라진다.
 
-    수능 적응 추천(S2-06·`?mode=suneung`): θ·SE 계산은 공통, *후보 조회·선택만* 분기한다.
-      - SQL 사전필터는 **축소 전용**(저작권 출처 사전배제·수능 신호(기출 유형 ∪ 시그니처 보유)·
-        미응답·θ 근방 50개) — 성능 장치일 뿐, **최종 적격 판정은 `recommend_suneung_index`
-        내부의 `is_suneung_eligible`(L6 진실 게이트)이 재수행**한다(저작권·페르소나 재검증 —
-        사전필터가 느슨해도 부적격이 새지 않는다).
-      - persona_fit-only 적격(기출·시그니처 없이 적합도만 충족) 문항도 이제 사전필터를 통과한다
-        (S3-17). S3-10(2026-08-07 재실행) persona_fit 백필 이후 `exam_type`·`signature_patterns`
-        조건만으로는 시그니처·기출유형이 없는 대다수 문항이 `is_suneung_eligible`상 적격인데도
-        θ 근방 50개 풀에서 원천 배제되는 손실이 있었다(진실 게이트는 "새는 부적격"만 재검증하지
-        "새는 적격 후보"는 못 잡는다) — 세 번째 OR 조건(`persona_fit[persona] >=
-        SUNEUNG_DEFAULT_MIN_FIT`, L6 진실 게이트와 동일 상수 공유)으로 해소했다. 이 JSONB
-        표현식 비교는 persona_fit의 GIN 인덱스를 타지 못해 순차 스캔이나, 코퍼스 규모(2,647건)
-        에서는 감내 가능하다고 판단했다(실 트래픽 QPS·latency 재검증은 범위 밖).
-      - 선택은 L6×L2 결합: 수능 우선순위 가중(`suneung_item_weight`) × 약점 가중
-        (`prioritize_weak_concepts` — 기본 CAT과 공유하는 `_load_weak_concept_weights`)을
-        곱해 가중 정보량 최대 문항(`l2.select_weighted_item`)을 고른다.
-      - `persona`는 수능 모드에서만 쓰인다(기본 A_일반고고3). D·E는 게이트에서 전부 차단 →
-        problem_id=null. mode 미지정 경로는 코드 무변경(회귀 0)·응답 모델 동일.
+    응답 계약은 전환 전과 동일하다(회귀 0): `problem_id`·`theta`·`difficulty`·`standard_error`·
+    `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. **신규 2필드**는
+    `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이며, 둘 다
+    `reason`에서 파생되거나 개념 그래프에서 조회된 값이라 선택 결과를 바꾸지 않는다.
 
-    REC-03: `problem_id`가 확정되면(null이 아니면) `evidence_event`에 처치 1건을 기록한다
-    (`record_recommendation_treatment` — 가짜 처치 금지, null 응답은 기록하지 않음). 결과
-    결합(추천→정답 여부)은 아직 없다(S3-01 파일럿 이후 후속).
-
-    REC-11: 이 처치 기록에는 `candidates`(점수 상위 후보 problem_id·점수)와 `policy_version`
-    (이 분기의 알고리즘 식별자 — 기본 CAT은 `POLICY_VERSION_CAT`, 수능 모드는
-    `POLICY_VERSION_SUNEUNG`)도 함께 실린다 — 정책이 나중에 바뀌어도 과거 로그로 그 시점
-    정책의 소급 평가(off-policy evaluation)가 가능하게 하는 선행 재료다.
-
-    REC-04: `purpose`는 `mode`와 직교하는 축이다(수능 여부와 무관하게 적용). 기본
-    `diagnosis`는 현행 그대로(정보량 최대, 회귀 0). `learning`이면 예상 정답확률이 목표
-    성공률 밴드(70~85%, 문헌값)에 드는 후보를 `l2.learning_band_weight`로 가중해 같은 곱
-    결합 축(약점 가중·수능 가중과 동일 자리)에 얹는다 — 새 선택기는 만들지 않는다. 밴드
-    임계는 실측 미보정이라 응답에 `band_calibrated=false`가 실린다(보정은 `S4-15` 승계).
-
-    CAT 형제 후보 필터(S4-14·`?sibling_filter`): `problem_relation`(변형·유사 계보)의 첫
-    소비처. 직전 오답 문항이 있을 때만 그 문항의 "형제"(양방향 관계로 이어진 문항)를 조회—
-    `exclude`는 후보 SQL에서 배제(같은 뼈대 연속 출제 회피), `include`는 정보량 가중을 곱해
-    우대(형제 = 변형·유사 문항 재출제로 오개념 재확인). 미지정이면 조회 자체를 생략해 기존
-    동작과 쿼리 수가 완전히 같다(회귀 0). 기본 CAT·수능 모드 양쪽에 동일 배선(형제 데이터는
-    mode 무관 — 일관성 우선). `prioritize_weak_concepts`·`purpose=learning`과 동시 지정 시
-    가중은 모두 곱으로 합성.
+    REC-03/REC-11: `problem_id`가 확정되면(null이 아니면) `evidence_event`에 처치 1건을 기록한다
+    (가짜 처치 금지 — null 응답은 기록하지 않음). 그 기록에는 후보 점수(`candidates`)와
+    `policy_version`이 함께 실린다(소급 평가 재료).
     """
-    # 채점 이력 → θ·SE·measurement_sufficient. ASM-03 평가 캡처 좌석과 공유하는 단일 진실
-    # 원천(`_load_attempt_history_state`) — 동작은 기존 인라인 로직과 완전히 동일(회귀 0).
-    attempt_state = await _load_attempt_history_state(session, user.user_id)
-    theta = attempt_state.theta
-    attempted_ids = attempt_state.attempted_ids
-    standard_error = attempt_state.standard_error
-    measurement_sufficient = attempt_state.measurement_sufficient
+    # ① 학습자 상태 — EOS-10이 세운 단일 조회 표면. 핸들러가 θ·숙달·약점을 따로 재계산하지
+    #    않는다(전환 전에는 그랬다). 정책이 이것을 *입력으로* 받는 것이 EOS-19의 요지다.
+    learner_state = await get_state(session, user.user_id)
+    # ② 요청 상황 — 쿼리 파라미터를 계약 타입으로 옮긴다(전송 관심사는 넣지 않는다).
+    learning_context = LearningContext(
+        purpose=purpose,
+        mode=mode,
+        persona=persona.value if mode == "suneung" else None,
+        prioritize_weak_concepts=prioritize_weak_concepts,
+        requested_at=datetime.now(UTC),
+    )
+    # ③ 정책 선택 — `mode`가 정책을 고르는 유일한 축이다. 두 정책은 같은 Protocol을 구현하므로
+    #    아래 호출부는 어느 쪽인지 모른다(교체 가능성이 타입으로 표현된 자리).
+    policy: NextProblemPolicy = (
+        SuneungRecommendationPolicy(session, persona=persona, sibling_filter=sibling_filter)
+        if mode == "suneung"
+        else CatRecommendationPolicy(session, sibling_filter=sibling_filter)
+    )
+    outcome = await policy(learner_state, learning_context)
 
-    # S4-14 — sibling_filter 지정 + 직전 오답 존재 시에만 형제 조회(쿼리 0회 증가 보존 원칙 —
-    # 미지정이면 이 블록 전체가 생략돼 기존 동작과 완전히 동일).
-    sibling_ids: set[uuid.UUID] = set()
-    if sibling_filter is not None:
-        last_incorrect_id = await _last_incorrect_problem_id(session, user.user_id)
-        if last_incorrect_id is not None:
-            sibling_ids = await _load_sibling_ids(session, last_incorrect_id)
-
-    # REC-04: purpose=learning일 때만 False(문헌값·미보정 — S4-15 전까지). diagnosis는 밴드
-    # 자체가 적용되지 않으므로 null(응답 필드 docstring 참조).
-    band_calibrated = False if purpose == "learning" else None
-
-    # ── S2-06: 수능 적응 추천 분기 — θ·SE는 위 공통, 후보 조회·선택만 다르다. ──
-    if mode == "suneung":
-        # SQL 사전필터 = *축소 전용*(성능 장치). 최종 판정은 recommend_suneung_index 내부의
-        # is_suneung_eligible(진실 게이트)이 재수행한다(핸들러 docstring 참조). 게이팅에
-        # source_type·persona_fit·signature_patterns 등 전 필드가 필요해 ORM 전체 행을 뽑는다.
-        suneung_stmt = select(Problem).where(
-            # 응답 difficulty 노출·b 폴백을 위해 기본 CAT과 동일하게 난이도 라벨 보유만 후보.
-            Problem.difficulty_overall.isnot(None),
-            # 저작권 사전축소 — 본문 미보유 출처(평가원/EBS/교과서)는 SQL에서 미리 배제
-            # (게이트가 어차피 재차단하지만, 차단될 행이 θ 근방 50개 풀을 잠식하지 않게).
-            Problem.source_type.notin_([s.value for s in METADATA_ONLY_SOURCES]),
-            # 수능 신호 사전축소 — 기출 유형(수능/모평/학평) 또는 시그니처 패턴 또는 persona_fit
-            # 적합도(S3-17). signature_patterns는 enum ARRAY(cardinality>0, GIN 인덱스 활용
-            # 가능) — persona_fit 조건은 JSONB 표현식 비교라 GIN을 못 타고 순차 스캔이지만
-            # 코퍼스 규모(2,647건)에서는 감내 가능(실 트래픽 QPS·latency 재검증은 범위 밖).
-            # 임계값은 L6 진실 게이트(`is_suneung_eligible`)와 같은 상수를 공유해 이원화를
-            # 막는다(METADATA_ONLY_SOURCES와 동일 원칙).
-            or_(
-                Problem.exam_type.in_([e.value for e in SUNEUNG_EXAM_TYPES]),
-                func.cardinality(Problem.signature_patterns) > 0,
-                Problem.persona_fit[persona.value].as_float() >= SUNEUNG_DEFAULT_MIN_FIT,
-            ),
-        )
-        if attempted_ids:
-            suneung_stmt = suneung_stmt.where(Problem.problem_id.notin_(attempted_ids))
-        if sibling_filter == "exclude" and sibling_ids:
-            suneung_stmt = suneung_stmt.where(Problem.problem_id.notin_(sibling_ids))
-        # θ 근방 정렬·풀 크기는 기본 CAT과 동일(보정 b 우선·휴리스틱 폴백 COALESCE) — 정렬 키는
-        # `candidate_pool_order_by`(2차 키 problem_id 포함)를 공유한다. 이 분기의 동률 구간도
-        # 기본 CAT과 똑같이 PG 임의 순서였으므로 같은 동결을 적용한다(같은 결함·같은 처방).
-        suneung_stmt = suneung_stmt.order_by(*candidate_pool_order_by(theta)).limit(
-            _CANDIDATE_POOL_SIZE
-        )
-        candidates = [
-            row.to_schema() for row in (await session.execute(suneung_stmt)).scalars().all()
-        ]
-        # REC-01: SQL 사전필터 통과 직후(L6 게이팅 전) 실제 후보 풀 크기 — 정직 표기용.
-        candidate_pool_size = len(candidates)
-
-        # 약점 가중(슬라이스 17)은 기본 CAT과 *같은 헬퍼*를 공유 — extra_weights로 곱 결합.
-        extra_weights: list[float] | None = None
-        if prioritize_weak_concepts and candidates:
-            extra_weights = await _load_weak_concept_weights(
-                session, user.user_id, [p.problem_id for p in candidates]
-            )
-        # REC-01: 수능 모드는 suneung_priority가 항상 적용되고, 약점 가중은 플래그에 따른다.
-        # extra_weights는 곱 결합 *전*(순수 약점 가중) 값이라 신호 유무를 여기서 바로 셀 수 있다
-        # (새 쿼리 불요 — 이미 계산된 리스트에서 파생).
-        weight_axes_applied = [WEIGHT_AXIS_SUNEUNG_PRIORITY]
-        if prioritize_weak_concepts:
-            weight_axes_applied.append(WEIGHT_AXIS_WEAK_CONCEPT)
-        weak_concept_signal_count = (
-            sum(1 for w in extra_weights if w != 1.0) if extra_weights is not None else 0
-        )
-        # REC-04: purpose=learning이면 같은 곱 결합 축에 밴드 가중을 얹는다(새 선택기 0).
-        # b 미보유 후보는 어차피 recommend_suneung_index 내부에서 배제되므로 중립 1.0.
-        if purpose == "learning" and candidates:
-            band_weights = [
-                (
-                    learning_band_weight(theta, IrtItem(difficulty=b))
-                    if (b := resolve_item_difficulty_b(p.irt_difficulty_b, p.difficulty_overall))
-                    is not None
-                    else 1.0
-                )
-                for p in candidates
-            ]
-            extra_weights = (
-                band_weights
-                if extra_weights is None
-                else [w * b for w, b in zip(extra_weights, band_weights, strict=True)]
-            )
-        # S4-14 — 형제 가중은 다른 축들과 곱 결합(형제 필터 미지정이면 sibling_ids가 비어
-        # _combine_weights가 무변경 통과 — 회귀 0).
-        if sibling_filter == "include" and sibling_ids and candidates:
-            suneung_sib_weights = _sibling_weights([p.problem_id for p in candidates], sibling_ids)
-            extra_weights = _combine_weights(extra_weights, suneung_sib_weights)
-        chosen_index = recommend_suneung_index(
-            theta, candidates, persona, extra_weights=extra_weights
-        )
-        if chosen_index is None:
-            # 적격 후보 0(전부 차단·신호 없음·b 없음) — 기본 CAT과 동일한 null 계약.
-            # REC-01: 후보 풀 자체가 0건인지, 풀은 있었으나 L6 게이팅이 전부 배제했는지 구분.
-            zero_reason = (
-                CANDIDATE_ZERO_NO_POOL if not candidates else CANDIDATE_ZERO_ALL_GATED_INELIGIBLE
-            )
-            return NextProblemResponse(
-                problem_id=None,
-                theta=theta,
-                difficulty=None,
-                standard_error=standard_error,
-                measurement_sufficient=measurement_sufficient,
-                weight_axes_applied=weight_axes_applied,
-                candidate_pool_size=candidate_pool_size,
-                weak_concept_signal_count=weak_concept_signal_count,
-                candidate_zero_reason=zero_reason,
-                band_calibrated=band_calibrated,
-            )
-        picked = candidates[chosen_index]
-        # REC-11: candidates[] 관측 — recommend_suneung_index 내부 공식(적격 게이트 × 정보량
-        # × 수능우선순위×약점가중)을 재계산해 미러한다(이미 정해진 chosen_index를 그대로 쓰므로
-        # 결정에는 영향 없음·관측 재계산일 뿐). 그 함수의 알고리즘이 바뀌면 이 미러도 함께
-        # 갱신해야 한다 — 단일 진실 원천은 여전히 recommend_suneung_index.
-        candidate_scores: list[tuple[uuid.UUID, float]] = []
-        for i, p in enumerate(candidates):
-            if not is_suneung_eligible(p, persona):
-                continue
-            b = resolve_item_difficulty_b(p.irt_difficulty_b, p.difficulty_overall)
-            if b is None:
-                continue
-            extra = extra_weights[i] if extra_weights is not None else 1.0
-            weight = suneung_item_weight(p) * extra
-            score = item_information(theta, IrtItem(difficulty=b)) * weight
-            candidate_scores.append((p.problem_id, score))
-        # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — null 분기(위)는
-        # 호출하지 않는다.
+    # ④ 처치 기록 — 학생에게 실제로 반환되는 추천만 기록한다(가짜 처치 금지).
+    if outcome.problem_id is not None:
         await record_recommendation_treatment(
             session,
-            problem_id=picked.problem_id,
-            theta=theta,
-            pool_size=len(candidates),
-            applied_weights=extra_weights is not None,
+            problem_id=outcome.problem_id,
+            theta=outcome.theta,
+            pool_size=outcome.candidate_pool_size,
+            applied_weights=outcome.applied_weights,
             mode=mode,
-            candidates=candidate_scores,
-            policy_version=POLICY_VERSION_SUNEUNG,
+            candidates=outcome.candidate_scores,
+            policy_version=outcome.policy_version,
+            reason=outcome.reason,
         )
         await session.commit()
-        return NextProblemResponse(
-            problem_id=picked.problem_id,
-            theta=theta,
-            # SQL이 difficulty_overall NOT NULL을 보장하나, 스키마 타입(Optional) 정합 방어.
-            difficulty=(
-                None if picked.difficulty_overall is None else float(picked.difficulty_overall)
-            ),
-            standard_error=standard_error,
-            measurement_sufficient=measurement_sufficient,
-            weight_axes_applied=weight_axes_applied,
-            candidate_pool_size=candidate_pool_size,
-            weak_concept_signal_count=weak_concept_signal_count,
-            candidate_zero_reason=None,
-            band_calibrated=band_calibrated,
-        )
 
-    # 후보를 θ 근방(|b-θ| 최소)으로 SQL 정렬 — 보정 b(irt_difficulty_b) 우선·없으면 전문가
-    # 난이도→logit(difficulty_overall - 중앙값) 폴백(COALESCE). 응답 difficulty 노출을 위해
-    # difficulty_overall 보유 문항만 후보(보정-only 문항 후보화는 후속). 노출 게이트(WHERE)·
-    # 정렬 키는 `candidate_pool_conditions`·`candidate_pool_order_by`가 단일 출처다(REC-06).
-    candidate_stmt = select(
-        Problem.problem_id, Problem.difficulty_overall, Problem.irt_difficulty_b
-    ).where(*candidate_pool_conditions())
-    if attempted_ids:
-        candidate_stmt = candidate_stmt.where(Problem.problem_id.notin_(attempted_ids))
-    if sibling_filter == "exclude" and sibling_ids:
-        candidate_stmt = candidate_stmt.where(Problem.problem_id.notin_(sibling_ids))
-    candidate_stmt = candidate_stmt.order_by(*candidate_pool_order_by(theta)).limit(
-        _CANDIDATE_POOL_SIZE
-    )
-    candidate_rows = (await session.execute(candidate_stmt)).all()
-    # REC-01: 실제 후보 풀 크기 — 정직 표기용(θ 근방 SQL 선별 후, 미응답·난이도 라벨 보유 개수).
-    candidate_pool_size = len(candidate_rows)
-
-    # 보정 b 우선·없으면 휴리스틱(difficulty_overall NOT NULL 보장 → 항상 값·candidate_rows와 1:1).
-    items = [
-        IrtItem(difficulty=irt_b if irt_b is not None else difficulty_to_logit(float(d)))
-        for _pid, d, irt_b in candidate_rows
-    ]
-
-    # slice 17: 약점 개념 가중(BKT+IRT 융합) — 후보가 있을 때만 추가 2쿼리로 가중치 산출.
-    # S2-06에서 조회 배선을 `_load_weak_concept_weights`로 추출(수능 분기와 공유·동작 무변경).
-    weights: list[float] | None = None
-    if prioritize_weak_concepts and candidate_rows:
-        weights = await _load_weak_concept_weights(
-            session, user.user_id, [pid for pid, _d, _b in candidate_rows]
-        )
-    # REC-04: purpose=learning이면 같은 곱 결합 축에 밴드 가중을 얹는다(새 선택기 0). 미지정
-    # (diagnosis)이면 weights는 위 그대로(None일 수 있음) — 현행과 바이트 동일(회귀 0).
-    if purpose == "learning" and candidate_rows:
-        band_weights = [learning_band_weight(theta, item) for item in items]
-        weights = (
-            band_weights
-            if weights is None
-            else [w * b for w, b in zip(weights, band_weights, strict=True)]
-        )
-    # S4-14 — 형제 가중은 다른 축들과 곱 결합(형제 필터 미지정이면 sibling_ids가 비어
-    # _combine_weights가 무변경 통과 — 회귀 0).
-    if sibling_filter == "include" and sibling_ids and candidate_rows:
-        sib_weights = _sibling_weights([pid for pid, _d, _b in candidate_rows], sibling_ids)
-        weights = _combine_weights(weights, sib_weights)
-
-    # REC-01: 응답 정직 표기 — 기본 CAT은 weak_concept 축만 존재(수능 우선순위 없음).
-    # prioritize_weak_concepts=false면 축 자체가 빈 리스트('적용 안 됨'). true면 축은 항상
-    # 실리되(가중 로직은 "적용"됐다는 뜻), 실제 신호 유무는 weak_concept_signal_count로 구분한다
-    # (weights는 이미 계산된 리스트라 새 쿼리 없이 그대로 파생).
-    weight_axes_applied = [WEIGHT_AXIS_WEAK_CONCEPT] if prioritize_weak_concepts else []
-    weak_concept_signal_count = sum(1 for w in weights if w != 1.0) if weights is not None else 0
-
-    best = select_weighted_item(theta, items, weights=weights)
-    if best is None:
-        # REC-01: 기본 CAT 경로에서 best is None은 candidate_rows가 비었다는 뜻뿐이다
-        # (items는 candidate_rows와 1:1이라 다른 사유가 없음 — select_weighted_item docstring).
-        return NextProblemResponse(
-            problem_id=None,
-            theta=theta,
-            difficulty=None,
-            standard_error=standard_error,
-            measurement_sufficient=measurement_sufficient,
-            weight_axes_applied=weight_axes_applied,
-            candidate_pool_size=candidate_pool_size,
-            weak_concept_signal_count=weak_concept_signal_count,
-            candidate_zero_reason=CANDIDATE_ZERO_NO_POOL,
-            band_calibrated=band_calibrated,
-        )
-    chosen_id, chosen_difficulty, _chosen_b = candidate_rows[best]
-    # REC-11: candidates[] 관측 — select_weighted_item과 *같은* 점수 공식(정보량×가중)을
-    # 그대로 재사용한다(items·weights는 이미 이 함수 안에서 계산돼 있으므로 새 쿼리 0).
-    cat_candidate_scores: list[tuple[uuid.UUID, float]] = [
-        (pid, item_information(theta, item) * (weights[i] if weights is not None else 1.0))
-        for i, ((pid, _d, _b), item) in enumerate(zip(candidate_rows, items, strict=True))
-    ]
-    # REC-03: 학생에게 실제로 반환되는 추천만 처치로 기록(가짜 처치 금지) — 위 null 분기는
-    # 호출하지 않는다.
-    await record_recommendation_treatment(
-        session,
-        problem_id=chosen_id,
-        theta=theta,
-        pool_size=len(candidate_rows),
-        applied_weights=weights is not None,
-        mode=mode,
-        candidates=cat_candidate_scores,
-        policy_version=POLICY_VERSION_CAT,
-    )
-    await session.commit()
     return NextProblemResponse(
-        problem_id=chosen_id,
-        theta=theta,
-        difficulty=float(chosen_difficulty),
-        standard_error=standard_error,
-        measurement_sufficient=measurement_sufficient,
-        weight_axes_applied=weight_axes_applied,
-        candidate_pool_size=candidate_pool_size,
-        weak_concept_signal_count=weak_concept_signal_count,
-        candidate_zero_reason=None,
-        band_calibrated=band_calibrated,
+        problem_id=outcome.problem_id,
+        theta=outcome.theta,
+        difficulty=outcome.difficulty,
+        standard_error=outcome.standard_error,
+        measurement_sufficient=outcome.measurement_sufficient,
+        weight_axes_applied=outcome.weight_axes_applied,
+        candidate_pool_size=outcome.candidate_pool_size,
+        weak_concept_signal_count=outcome.weak_concept_signal_count,
+        candidate_zero_reason=outcome.candidate_zero_reason,
+        band_calibrated=outcome.band_calibrated,
+        reason=outcome.reason,
+        action=outcome.action,
+        target_concept=outcome.target_concept,
     )
 
 
@@ -2936,6 +2961,12 @@ async def capture_measurement_assessment(
     schema = await _assemble_measurement_assessment(session, user.user_id, now=now)
     # 적재는 내부 정본(예측 5필드 포함 · 값은 항상 None)으로, 응답은 학생 대면 정본으로.
     session.add(Assessment.from_schema(schema))
+    # EOS-103: 이 분기가 **진단 완료 경계**다(CAT 중단 규칙 measurement_sufficient가 True이고
+    # 이번 창에 아직 캡처가 없는, 즉 진단 결과가 처음으로 확정되는 지점). 여기서 LearnerState
+    # 영속 행을 자동 생성해, 운영자가 DB에 행을 직접 만들 필요가 없게 한다(멱등 — 이미 있으면
+    # 그 행을 그대로 두고 `provisioned_at`·`provisioned_by`를 덮어쓰지 않는다).
+    # 같은 commit 안에 두어 "진단은 적재됐는데 상태는 없다"는 반쪽 성공이 생기지 않게 한다.
+    await provision_learner_state(session, user.user_id, reason="diagnosis_capture")
     await session.commit()
     return AssessmentCaptureResponse(
         written=True,

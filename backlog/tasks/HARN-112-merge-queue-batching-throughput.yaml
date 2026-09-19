@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-112-merge-queue-batching-throughput
+title: "머지 큐 처리량 — 묶음 크기(batching) 미설정으로 회전이 PR당 1건 직렬(시간당 약 2.5건 상한)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-56-merge-queue-adoption
+requires_gates: []
+acceptance:
+  - "① 현행 처리량 실측 고정 — 큐를 켠 뒤의 실제 회전 시간을 잰다(예측 금지). 실측 표본 1건(2026-09-18 · 이 태스크 등재 세션): PR #1196이 09:35:33Z 큐 진입 → 10:24:35Z 머지 = 49분. 그중 앞 순번 PR #1195 대기가 약 25분이고, 자기 차례의 큐 실행(`gh-readonly-queue/main/pr-1196-4643a314`)이 약 24분이다. 표본 1건은 근거로 약하므로 착수 세션이 `merge_group` 이벤트 실행 N건(최소 10)의 `run_started_at`→`updated_at`으로 중앙값을 낸다. 재현 도구는 `scripts/analysis/measure_merge_gate_latency.py`가 strict 정책 시절 것이라 큐 체제에 그대로 맞지 않는다 — 맞추거나 별도 산출기를 만든다.\n② 분모 실측 — 같은 구간의 PR 착지 요구량을 잰다. 큐 처리량(시간당 머지 건수)과 PR 생산 속도(병렬 세션이 PR을 여는 속도)를 나란히 놓아야 \"느리다\"가 체감이 아니라 수치가 된다. 2026-09-18 브리핑 기준 병렬 세션 8곳이 태스크를 claim 중이었다. 생산 < 처리면 이 태스크는 그 시점에 불필요하므로 **착수하지 않고 닫는다** — 측정이 도입을 부정하는 경우를 미리 열어 둔다.\n③ 일괄 처리(batching) 설정 판정 — GitHub 머지 큐의 묶음 크기 관련 설정이 이 저장소·이 조직 플랜에서 **실제로 제공되는지** 룰셋 화면 또는 라이브 룰셋 조회로 확인한다. 부재가 \"미설정\"인지 \"미제공\"인지 구분하기 전에는 도입을 결정으로 올리지 않는다(CLAUDE.md v0.2.18 「설정 부재를 설정 가능으로 단정 금지」 — 이 규칙의 사고 경위가 정확히 merge queue였다). 미제공이면 그 사실을 `.github/branch-protection-setup.md`에 근거와 함께 남기고 ④로 가지 않는다.\n④ 적용 — 제공되면 묶음 크기를 ①②의 수치가 지지하는 값으로 설정한다. 룰셋 변경은 저장소 관리자 권한이라 세션이 직접 할 수 없다 — Kiki 실행 명령 블록을 CLAUDE.md 「Kiki 직접 수행 과제의 사전 브리핑 템플릿」 6항목에 맞춰 동봉한다(자리표시자 0개 · 실행 블록과 증거 블록 분리).\n⑤ 변별력 양방향 — 적용 후만 재고 통과를 선언하지 않는다. ①의 지표를 적용 전후 같은 방법으로 재고 대조한다. 또한 묶음이 **실제로 묶였는지**를 큐 실행의 PR 수로 확인한다: 묶음 크기를 올렸는데 매 실행이 여전히 PR 1건이면 설정이 안 먹은 것이지 효과가 없는 것이 아니다 — 둘을 구분하지 못하면 판정이 위장이 된다.\n⑥ 실패 경로 — 묶음 안의 PR 하나가 red면 묶음 전체가 어떻게 되는지(전량 축출인지 이등분 재시도인지) 확인해 런북에 적는다. 묶음이 클수록 한 건의 실패가 무고한 PR을 함께 되돌리므로, 그 비용이 ①의 이득을 넘지 않는 크기여야 한다.\n⑦ 경계 별항(중복 소유 회피) — HARN-56은 큐 **도입**(켜기·체크 집합 일치·축출 경로)을 소유하고 in_progress다. HARN-98은 큐를 **감시 축에 편입**(ruleset_drift.py)한 것으로 done이다. HARN-32는 strict 정책 시절의 **경합 원인 규명**으로 done이며 그 완화책으로 merge queue를 명시적으로 채택하지 않았다(⑨). 이 태스크는 그 셋 중 어디에도 없는 **처리량(묶음 크기)** 축만 본다. 착수 시 세 태스크의 현재 상태를 다시 읽어 경계를 재확인한다."
+artifacts: []
+paths:
+  - ".github/workflows/**"
+  - ".github/branch-protection-setup.md"
+  - scripts/harness/ruleset_drift.py
+  - "docs/reviews/**"
+session: null
+notes: "발견 경위(2026-09-18 · EOS-18/PR #1196 머지 과정 실측): Kiki가 \"오케스트레이션 설정이 이렇게 더딘 것인지\" 물어 원인을 나눠 측정한 데서 나왔다. 구간별 실측 — 착수→PR 생성 50분(08:19Z→09:09Z, 조사·구현·전체 스위트 1회 13분·뮤테이션 8종 포함) / PR CI 20분(`backend — lint·type·test` 18분 34초가 지배) / 큐 진입→머지 49분. 즉 **green 확인 이후의 대기가 작업 시간과 맞먹는다**.\n\n병목은 에이전트 쪽이 아니라 큐의 직렬성이다. 큐는 PR을 한 건씩 최신 main 위에 리베이스해 CI를 처음부터 다시 돌리므로 회전당 약 24분이고, 상한이 시간당 약 2.5건이다. 병렬 세션이 그보다 빨리 PR을 만들면 대기열은 구조적으로 길어진다 — 확률이 아니라 구조(HARN-32 notes의 같은 표현).\n\n[등재 전 중복 확인] 역할 기준 검색으로 `merge_group`·`group_size`·`batch size`·`min_entries`·`merge_limit`·`maximum pull requests`·`일괄 처리`·`처리량`을 backlog/·docs/·scripts/·.github/ 전역에 걸었다. 일치 2건은 전부 무관이었다(SEC-04의 `batch_size`는 백필 CLI, integration_flow_gap_review는 브랜치 충돌 일괄 처리). 즉 **묶음 크기 축은 이 저장소에 미등재**다.\n\n[범위 밖] 큐 전용 축약 CI(`merge_group` 이벤트에서 정적 검사 생략)는 이 태스크가 다루지 않는다 — 검증 표면을 줄이는 방향이라 이 저장소의 규율과 충돌하고, 큐 체크 집합은 HARN-56 acceptance ②가 이미 소유한다. 잡 소요 단축은 별건(OPS-58 후속 축)이다."
+updated: 2026-09-18

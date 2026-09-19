@@ -352,12 +352,14 @@ class LLMEquivalentProblemGenerator:
                 재투입된다(`harness/generation_seed_replay_probe`).
         """
         if provider is None:
-            # 표준 구성 재사용(LLMTutorPolicy·app.py 동형) — 지연 연결이라 구성만으로 네트워크 0.
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
+            # 표준 저작 구성 — 지연 연결이라 구성만으로 네트워크 0. 클라우드 좌석은
+            # `settings.cloud_provider`가 정한다(ARCH-57). **app.py와는 의도적으로
+            # 다르다** — 학생 대면 서빙은 셀렉터를 타지 않는다(ARCH-56 게이트 ⓐ).
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         if trace is None:
             # 관측 기본 배선 — providers와 동형의 지연 구성(키 미설정=no-op·네트워크 0).
             from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
@@ -653,6 +655,11 @@ class LLMEquivalentProblemGenerator:
                 cache_creation_input_tokens=(
                     usage.cache_creation_input_tokens if usage is not None else None
                 ),
+                # 관측 좌석(EOS-112) — 위 `model_name`이 *설정이 지목한* 모델이라면 이 둘은
+                # *응답이 온* 모델과 그 호출의 재시도 횟수다. usage가 None(호출 자체가 없었던
+                # 종단)이면 둘 다 None=미관측이다(0으로 접지 않는다).
+                served_model=usage.served_model if usage is not None else None,
+                retries=usage.retries if usage is not None else None,
                 cost_usd=actual_cost_usd_or_none(decision, usage),
                 latency_ms=latency_ms,
                 success=success,

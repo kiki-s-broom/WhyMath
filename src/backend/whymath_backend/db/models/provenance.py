@@ -188,6 +188,14 @@ class GenerationLog(Base):
     # 없는 경로(pregenerate 단발 인제스트)는 NULL=미기록(날조 금지·EOS-55 좌석 동형).
     run_id: Mapped[str | None] = mapped_column(sa.String(64))
 
+    # ── 관측 좌석(EOS-112) — nullable·server_default 없음(구 행 NULL=미기록, 위 좌석 동형).
+    # 폭 128은 `model_name`(64)보다 넓다: 이쪽은 **외부 응답이 정하는 값**이라 공급사가
+    # 접미(`:free`·날짜 버전)를 붙여 돌려줄 수 있다. schema가 같은 폭을 강제한다.
+    served_model: Mapped[str | None] = mapped_column(sa.String(128))
+    # 계측 없는 경로는 NULL이다(0이 아니다) — 0으로 채우면 Anthropic·Ollama 회차가
+    # '재시도 0회 실측'처럼 보여 미계측과 구분되지 않는다.
+    retries: Mapped[int | None] = mapped_column(sa.Integer)
+
     # ── 인덱스 (§10.1 CREATE INDEX) ──
     # idx_generation_run_id: 리콜은 회차 단위 선별이 주 질의라 인덱스를 둔다(EOS-97).
     __table_args__ = (

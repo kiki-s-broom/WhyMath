@@ -178,6 +178,27 @@ class ConceptMasteryHistory(Base):
     confidence: Mapped[float | None] = mapped_column(sa.Numeric(3, 2))
     sample_size: Mapped[int | None] = mapped_column(sa.Integer)
 
+    # ===== 멱등 키 (EOS-108) =====
+    # 이 측정을 낳은 시도. **FK 아님**(느슨참조 선례 + 보존기한 파기로 attempt가 사라져도
+    # 학습 곡선은 남아야 한다). NULL 허용 = 시도에서 유래하지 않은 측정(배치·백필).
+    attempt_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
+
+    __table_args__ = (
+        # 같은 시도가 같은 (학생, 개념)에 두 번 반영되는 것을 **DB가** 막는다. 애플리케이션
+        # 사전 조회만으로는 동시 제출 두 건이 서로의 행을 못 보고 둘 다 통과한다(check-then-act
+        # 경합) — 유니크 제약은 그 경합에서 정확히 한 건만 살린다.
+        # 부분 인덱스인 이유: `attempt_id IS NULL`인 배치·백필 측정은 서로 충돌하면 안 된다
+        # (PostgreSQL에서 NULL은 유니크 비교에서 서로 다르지만, 의도를 조건으로 명시해 둔다).
+        sa.Index(
+            "uq_concept_mastery_history_attempt",
+            "user_id",
+            "concept_id",
+            "attempt_id",
+            unique=True,
+            postgresql_where=sa.text("attempt_id IS NOT NULL"),
+        ),
+    )
+
     @classmethod
     def from_schema(cls, schema: SchemaConceptMasteryHistory) -> ConceptMasteryHistory:
         """검증된 `schema.ConceptMasteryHistory` → 영속 ORM(schema↔db seam)."""
@@ -217,6 +238,20 @@ class SkillMasteryHistory(Base):
     mastery: Mapped[float | None] = mapped_column(sa.Numeric(3, 2))
     confidence: Mapped[float | None] = mapped_column(sa.Numeric(3, 2))
     sample_size: Mapped[int | None] = mapped_column(sa.Integer)
+
+    # ===== 멱등 키 (EOS-108) — 개념 축 동형 =====
+    attempt_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
+
+    __table_args__ = (
+        sa.Index(
+            "uq_skill_mastery_history_attempt",
+            "user_id",
+            "skill_id",
+            "attempt_id",
+            unique=True,
+            postgresql_where=sa.text("attempt_id IS NOT NULL"),
+        ),
+    )
 
     @classmethod
     def from_schema(cls, schema: SchemaSkillMasteryHistory) -> SkillMasteryHistory:

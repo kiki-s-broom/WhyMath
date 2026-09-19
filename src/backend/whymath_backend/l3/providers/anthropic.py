@@ -31,6 +31,8 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.provider_jurisdiction import Jurisdiction
+from whymath_backend.l3.providers._response_fields import read_response_model_id
 from whymath_backend.l3.router import _as_cost_tier
 
 
@@ -206,6 +208,14 @@ def _extract_usage(message: Any, latency_ms: float) -> Usage:
         latency_ms=latency_ms,
         cache_read_input_tokens=_read_usage_token(raw_usage, "cache_read_input_tokens"),
         cache_creation_input_tokens=_read_usage_token(raw_usage, "cache_creation_input_tokens"),
+        # 관측 모델(EOS-112) — usage 블록이 아니라 메시지 **최상위** `model`이다. Anthropic은
+        # 별칭(`claude-sonnet-4-6`)을 보내도 해소된 식별자를 돌려줄 수 있어 선언값과 문자열이
+        # 다를 수 있다 — 그 차이를 여기서 지우지 않는다(대조는 상류의 일이고, 여기서 맞춰
+        # 버리면 진짜 폴백도 함께 보이지 않게 된다).
+        served_model=read_response_model_id(message),
+        # `retries`는 None으로 둔다 — Anthropic은 SDK가 자체 재시도하고 우리 전송기
+        # (`_openai_compat`)를 타지 않아 카운터가 없다. 0으로 접으면 계측 없는 경로가
+        # '재시도 0회'라는 실측처럼 보인다(미측정 ≠ 0).
     )
 
 
@@ -268,6 +278,17 @@ class AnthropicProvider:
         if self._settings is None:
             self._settings = get_settings()
         return self._settings
+
+    @property
+    def jurisdiction(self) -> Jurisdiction:
+        """항상 `US` — Anthropic PBC는 미국 법인이다 (ARCH-49 관할 축).
+
+        관할은 1차 법적 게이트(`l3.data_export_policy`)보다 좁히지 않는다 — 즉 이 경로에
+        대해 관할 축은 아무 판정도 추가하지 않으며, 디스패치 동작은 종전과 같다. 그래도
+        *선언*하는 이유는 기본값(`composite.DEFAULT_CLOUD_JURISDICTION`)에 기대지 않기
+        위해서다: 기본값은 테스트 가짜를 위한 것이고, 프로덕션 좌석은 자기 관할을 말한다.
+        """
+        return Jurisdiction.US
 
     @property
     def configured(self) -> bool:

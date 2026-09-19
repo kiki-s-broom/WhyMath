@@ -225,6 +225,17 @@ async def _cleanup(
             await conn.execute(
                 text("DELETE FROM problem WHERE problem_id = ANY(:ids)"), {"ids": pids}
             )
+            # EOS-115: 응답 제출이 학습 상태 전이를 적재하므로 user_profile보다 먼저 지운다.
+            #
+            # 이 줄이 없으면 `DELETE FROM user_profile`이 FK로 실패하고, 이 블록이
+            # `engine.begin()` **트랜잭션**이라 위에서 지운 문항·숙달행까지 전부 롤백된다 —
+            # 그 잔여 데이터가 *다른* 테스트의 추천 후보로 끼어들어 무관해 보이는 실패를
+            # 만든다(2026-09-19 CI 실측: 이 파일의 FK 실패 5건이 다른 파일의 추천 단언 1건을
+            # 함께 빨강으로 만들었다).
+            await conn.execute(
+                text("DELETE FROM learning_state_transition WHERE user_id = :uid"),
+                {"uid": str(uid)},
+            )
             await conn.execute(
                 text("DELETE FROM user_profile WHERE user_id = :uid"), {"uid": str(uid)}
             )

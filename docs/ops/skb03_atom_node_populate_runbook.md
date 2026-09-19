@@ -124,7 +124,8 @@ git fetch origin main
 git status --porcelain --untracked-files=no
 "----- 실행 입력이 main과 동일한가 -----"
 git diff --quiet origin/main -- "src/backend/whymath_backend/l1/atom_graph" "data/corpus/atom_graph_v1/graph.json"
-"PATHS_MATCH_MAIN=" + ($LASTEXITCODE -eq 0)
+$PathsMatchMain = ($LASTEXITCODE -eq 0)
+"PATHS_MATCH_MAIN=$PathsMatchMain"
 "----- BEFORE (읽기 전용) -----"
 $Before = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT count(*) FROM atom_node;"
 "BEFORE_TOTAL=$Before"
@@ -132,6 +133,10 @@ $Before = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT 
 
 **확인**: `PATHS_MATCH_MAIN=True`. `BEFORE_TOTAL` 값은 0이든 아니든 그대로 기록해 전달한다
 (이 값이 acceptance ①의 답이다).
+
+판정값을 **화면에 찍기만 하지 않고 변수에 담는 이유**: [D]의 자가거부 가드가 그 변수를
+재검사한다. 출력만 하면 가드가 참조할 것이 없어 장식이 된다(HARN-106 — 출력은 흐름을
+멈추지 않는다). 같은 창에서 [B]→[C]→[D] 순서로 붙여넣어야 변수가 살아 있다.
 
 체크아웃을 옮기지 않는 이유: Kiki 클론은 여러 세션이 공유하는 단일 작업 사본이라 미커밋 변경이
 상시 있을 수 있다. 필요한 것은 "HEAD가 main인가"가 아니라 "이 CLI가 읽는 코드·코퍼스가 main과
@@ -150,7 +155,8 @@ $Py = "src\backend\.venv\Scripts\python.exe"
 "PY_OK=" + (Test-Path $Py)
 git log --oneline -1
 $PopulateSrc = "src/backend/whymath_backend/l1/atom_graph/populate.py"
-"HAS_SKIP_FLAG=" + ((Get-Content $PopulateSrc -Raw) -match "skip-atom-node")
+$HasSkipFlag = ((Get-Content $PopulateSrc -Raw) -match "skip-atom-node")
+"HAS_SKIP_FLAG=$HasSkipFlag"
 & $Py -m whymath_backend.ops.db_host_reachability
 "REACH_EXIT=$LASTEXITCODE"
 ```
@@ -162,14 +168,27 @@ CLI가 `atom_node`를 건드리지 않고 조용히 끝난다 — **여기서 �
 
 ### [D] 적재 (여기서만 DB에 쓴다)
 
+이 블록은 **[B]·[C]의 판정값을 스스로 재검사하고, 미충족이면 실행을 거부한다.** 눈으로
+확인하라는 안내에 기대지 않는 이유는 2026-09-15에 그 방식이 실패했기 때문이다 — `[B]`가
+`PATHS_MATCH_MAIN=False`를, `[C]`가 `HAS_SKIP_FLAG=False`를 **정확히 출력했는데도** 이
+블록이 그대로 붙여넣어져 옛 CLI가 돌고 적재가 0건으로 끝났다. **출력은 흐름을 멈추지
+않는다**(HARN-106).
+
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
-& $Py -m whymath_backend.l1.atom_graph.populate
-"POPULATE_EXIT=$LASTEXITCODE"
+$PathsOk = $PathsMatchMain -eq $true
+$FlagOk = $HasSkipFlag -eq $true
+"PATHS_OK=$PathsOk · FLAG_OK=$FlagOk"
+if ($PathsOk -and $FlagOk) { & $Py -m whymath_backend.l1.atom_graph.populate; "POPULATE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — PATHS_OK=$PathsOk FLAG_OK=$FlagOk · 둘 다 True여야 적재합니다. [B]·[C]를 같은 창에서 먼저 돌리고 그 값을 확인하세요." }
 ```
 
 **확인**: `POPULATE_EXIT=0`, 그리고 stdout `[원자 백본 적재] …` 줄 끝의 `atom_nodes=N(경로)`.
 그 줄을 통째로 복사해 전달한다.
+
+`WRITE_REFUSED=True`가 나오면 적재는 **일어나지 않았다** — 무엇이 False였는지 같은 줄에
+찍히므로 그 축을 먼저 해소한다. 닫는 중괄호와 **같은 줄**의 `} else {`인 것이 중요하다:
+새 줄에서 시작하는 `else`는 대화형 프롬프트에서 별개 명령으로 해석돼 그 가지가 통째로
+미실행된다(2026-09-14 실측).
 
 ### [E] AFTER 카운트
 
