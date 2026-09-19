@@ -33,7 +33,14 @@ from whymath_backend.l3.interfaces import (
     LLMProvider,
     TraceSink,
 )
-from whymath_backend.l3.models import CostTier, RoutingDecision, RoutingRequest, Usage
+from whymath_backend.l3.models import (
+    CostTier,
+    LocalModelTier,
+    ModelFamily,
+    RoutingDecision,
+    RoutingRequest,
+    Usage,
+)
 from whymath_backend.l3.pregenerate.validator import SeedValidator, validate_response
 from whymath_backend.l3.router import (
     Router,
@@ -142,6 +149,47 @@ def _image_digest(images: Sequence[str] | None) -> str | None:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def _apply_family_preference(
+    decision: RoutingDecision, prefer_local_family: ModelFamily | None
+) -> RoutingDecision:
+    """LOCAL FAST/MID 결정의 **패밀리 축만** 호출부 선호로 갈아탄다 — 비용·크기·모드는 불변.
+
+    라우터의 축3(MATH/GENERAL)은 task_type·call_site로 결정되는데, 같은 task_type을 쓰면서도
+    *그 호출만* 일반 instruct 모델이 적합한 자리가 있다(프로즈 문맥화·동등문제 저작 — 수학 추론이
+    아니라 instruction-following). 그 자리들이 지금까지 라우터 밖에서 `RoutingDecision`을 손수
+    재조립해 왔고(`wh1_prose._decide_routing`·`l3/equivalent/rephrase._decide_routing` — 같은
+    코드의 3대째 미러), 그 재조립이 곧 파이프라인 우회의 원인이었다(관측·캐시 미결선). 여기로
+    끌어올려 **라우터 경유를 유지한 채** 같은 선호를 표현한다.
+
+    적용 조건은 종전 미러와 동일하다: ① LOCAL 결정일 것 ② 크기가 FAST 또는 MID일 것(QUALITY는
+    비동기 전용이라 손대지 않는다) ③ 이미 선호 패밀리면 그대로. 어느 하나라도 어긋나면 라우터
+    결정을 **그대로** 돌려준다(불변식 4 — 라우터의 비용·크기·모드 결정은 존중).
+
+    데이터 등급 게이트의 판정·발동 신호(`data_export_blocked`·`data_export_reason`)는 **승계**
+    한다 — 패밀리 축만 갈아탈 뿐 법적 판정을 다시 하지 않는다(EOS-59 ②: 안 실으면 발동 사실이
+    관측에서 사라진다).
+    """
+    if prefer_local_family is None:
+        return decision
+    if decision.cost_tier != CostTier.LOCAL.value:
+        return decision
+    if decision.local_model not in (LocalModelTier.FAST.value, LocalModelTier.MID.value):
+        return decision
+    if decision.local_family == prefer_local_family.value:
+        return decision
+    return RoutingDecision(
+        cost_tier=decision.cost_tier,
+        local_family=prefer_local_family,
+        local_model=decision.local_model,
+        mode=decision.mode,
+        reason=f"{decision.reason} \u2192 prefer:{prefer_local_family.value}",
+        est_latency_ms=decision.est_latency_ms,
+        est_cost_krw=decision.est_cost_krw,
+        data_export_blocked=decision.data_export_blocked,
+        data_export_reason=decision.data_export_reason,
+    )
+
+
 async def generate(
     req: RoutingRequest,
     prompt: str,
@@ -157,6 +205,8 @@ async def generate(
     skip_cache_on_signal: bool = False,
     images: Sequence[str] | None = None,
     training_allowed: bool | None = None,
+    prefer_local_family: ModelFamily | None = None,
+    temperature: float | None = None,
 ) -> GenerationResult:
     """라우팅 → (비동기면 큐잉 / 동기면 캐시·생성) → 관측을 조립한다.
 
@@ -172,6 +222,14 @@ async def generate(
         cache_ttl_s: 캐시 TTL(초). None이면 Settings.cache_ttl_s.
         student_id_hash: Langfuse 기록용 학생 ID 해시(직접 ID 금지, 03a §F.2).
         training_allowed: AI 모델 학습/개선에 데이터 사용 동의 여부(EOS §48). 관측용.
+        prefer_local_family: LOCAL FAST/MID 결정일 때만 **패밀리 축**을 이 값으로 갈아탄다
+            (`_apply_family_preference`). None(기본)이면 라우터 결정 그대로 — 기존 호출부는
+            비트동일. 비용·크기·모드는 어느 경우에도 라우터 것을 존중한다(불변식 4).
+        temperature: 샘플링 온도(선택). None(기본)이면 제공자 기본 온도 — 즉 **기존 동작
+            무변경**. ⚠️ 캐시 키는 `(prompt, system, 3축)`이라 **온도를 포함하지 않는다** —
+            같은 프롬프트를 다른 온도로 부르면 앞선 결과가 적중한다. 온도를 다양성 확보
+            수단으로 쓰는 호출부는 프롬프트 자체에 회차 축(턴 번호 등)이 들어가 키가 갈리는지
+            확인하고 쓴다(wh1_prose는 턴 번호·행위 유형·판정이 프롬프트에 있어 갈린다).
         validator: 런타임 shadow 검증기(L3 결정론 도구, 예: `default_seed_validator()`).
             주입 시 *캐시 미스로 새로 생성된 출력*에만 적용해 거짓 수치 관계 등 환각
             신호를 trace의 `validation_signal`로 기록한다. **비차단** — 반환 텍스트·
@@ -191,7 +249,7 @@ async def generate(
     Raises:
         QualityQueueUnavailableError: 큐 미주입(미구성)이거나 enqueue 실패(broker 다운).
     """
-    decision = Router().route(req)
+    decision = _apply_family_preference(Router().route(req), prefer_local_family)
 
     # QUALITY(27b)는 동기 호출 불가(p50≈14초·GPU 단일 점유, 03a §D.3) → 비동기 큐 경로.
     if decision.mode == "async":
@@ -256,8 +314,16 @@ async def generate(
     # 인자가 없어도 그대로 동작(하위호환). 멀티모달 호출만 images-수신 제공자를 쓴다.
     # provider 반환은 models.GenerationResult(text, usage) — text는 종전 str 경로 그대로
     # 소비하고, usage(실측 토큰·지연)는 trace로 흘린다(S1 게이트 ② 배선).
-    if images is not None:
+    # images·temperature는 *있을 때만* 전달한다 — 인자를 받지 않는 기존 제공자·테스트 가짜가
+    # 그대로 동작하도록(하위호환). None을 명시 전달하면 그 가짜들이 TypeError로 죽는다.
+    if images is not None and temperature is not None:
+        generated = await provider.generate(
+            prompt, system, decision, images=images, temperature=temperature
+        )
+    elif images is not None:
         generated = await provider.generate(prompt, system, decision, images=images)
+    elif temperature is not None:
+        generated = await provider.generate(prompt, system, decision, temperature=temperature)
     else:
         generated = await provider.generate(prompt, system, decision)
     output = generated.text
