@@ -514,6 +514,14 @@ def test_submit_attempt_records_and_propagates_mastery_on_live_pg() -> None:
                     ),
                     ("DELETE FROM problem WHERE problem_id=:p", {"p": str(pid)}),
                     ("DELETE FROM concept WHERE concept_id=:c", {"c": str(cid)}),
+                    # EOS-115: 이 테스트는 `POST /v1/me/attempts`를 실제로 호출하므로
+                    # 학습 상태 전이가 적재된다 — user_profile보다 **먼저** 지워야 한다.
+                    # 빠지면 FK로 실패하고, 이 블록이 트랜잭션이라 위 삭제까지 통째로
+                    # 롤백돼 잔여 문항이 다른 테스트의 추천 후보로 끼어든다(2026-09-19 실측).
+                    (
+                        "DELETE FROM learning_state_transition WHERE user_id=:u",
+                        {"u": str(uid)},
+                    ),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
