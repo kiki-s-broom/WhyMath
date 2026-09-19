@@ -188,7 +188,10 @@ class TestEncodingIsNotRelayedThroughTheShell:
         assert ours != mangled, "산출 바이트가 cp949 왕복 결과와 같다 — 손상 경로를 탔다"
         # 그리고 우리 바이트는 UTF-8로 **손실 없이** 디코딩된다(왕복본은 그렇지 않다).
         assert ours.decode("utf-8-sig") == clean
-        assert "�" not in clean and "?" not in clean.replace("?)", "")
+        # U+FFFD를 **이스케이프로** 쓴다 — 리터럴로 두면 이 소스 파일 자신이 손상 파일이
+        # 되어 `scripts/ops/cp949_guard.py`가 "복구 불가 등급"으로 잡는다(2026-09-19 CI 실측).
+        # 런타임 의미는 리터럴과 동일하다.
+        assert "\ufffd" not in clean and "?" not in clean.replace("?)", "")
 
     def test_file_carries_a_bom_so_windows_readers_decode_it_as_utf8(self, tmp_path: Path) -> None:
         """BOM을 붙이는 이유 — 회신자가 `Get-Content`·메모장으로 열어 복사하는 경로까지 닫는다.
