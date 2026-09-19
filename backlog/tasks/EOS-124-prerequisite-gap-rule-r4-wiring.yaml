@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-124-prerequisite-gap-rule-r4-wiring
+title: "상태 머신 R4(선수결손) 미발화 처분 — 선언과 집행의 불일치 해소 (EOS-105 한계 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실 — 학습 상태 머신의 규칙 R4(선수결손 → `GO_TO_PREREQUISITE_CONCEPT` · 트리거 `POLICY_PREREQUISITE_GAP`)는 서빙 경로에서 **한 번도 매치되지 않는다**. `l2/learning_state_evidence.build_attempt_evidence`가 `prerequisite_gap_concept_ids`를 인자로 받도록 열려 있는데 유일한 호출부인 `api/me.py::submit_attempt`가 그것을 넘기지 않기 때문이다. `EOS-105`가 명시한 한계 ②이며(생산자 `recommend_prerequisite_gaps`가 재귀 CTE라 제출마다 돌리기 무겁다는 사유), 그 한계에 **승계 태스크가 없어** 13일째 소유자 공백 상태였다.\n② 그래서 무엇이 아쉬운가 — 계획서 §11 페르소나 B(\"반복 오답 → prerequisite gap → 하위 concept → 보정 → 원래 concept 복귀\")는 P-15 하네스에서 **조회형 3종**(`GET /v1/me/weak-concepts/{id}/prerequisites` · `/coaching` · `/learning-path`)으로 끝까지 관통하는 것이 실증됐다. 즉 경로 자체는 살아 있다. 다만 그 하강이 *학습자가 조회를 해야* 보이는 것이고, 오답 제출의 부수효과로 상태 머신이 스스로 국면을 바꾸지는 않는다. 클라이언트가 그 세 좌석을 부르지 않으면 선수 결손은 학생에게 도달하지 않는다.\n③ 처분 3택 — (가) 제출 경로에 얕은 생산자를 배선한다(직접 선수 1-hop·`max_depth=1`로 한정하고 비용을 실측한 뒤 판정 · 무거우면 비동기·캐시) (나) R4를 상태 머신에서 제거하고 선수 하강을 조회형 좌석의 책임으로 명문화한다(전이 enum·규칙을 함께 정리 — \"선언만 있고 발화하지 않는 규칙\"을 남기지 않는다) (다) 현행 유지하되 미발화 사실을 작동 비율로 계측한다(CLAUDE.md \"작동한 비율\" 원칙 — 붙였으면 작동 비율이 보여야 한다). 어느 쪽이든 *선언과 집행의 불일치를 남기지 않는 것*이 완료 조건이다.\n④ 비용 실측이 (가)의 전제다 — `recommend_prerequisite_gaps(max_depth=1)`의 p50·p95 지연을 실 PG에서 측정해 제출 경로 예산과 비교한 수치를 근거로 적는다. \"무겁다\"는 추정으로 (가)를 배제하지 않는다(EOS-105의 사유도 실측이 아니라 판단이었다).\n⑤ 집행 지점 별항 — (가)를 고르면 `POLICY_PREREQUISITE_GAP` 전이가 실제로 원장(`learning_state_transition`)에 적재되는지를 실 PG 테스트로 확인하는 것까지가 완료다. `tests/backend/api/test_persona_three_path_completion.py`의 B 경로에 그 단언을 얹을 수 있다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_evidence.py
+  - src/backend/whymath_backend/l2/learning_state_policy.py
+  - src/backend/whymath_backend/api/me.py
+session: null
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 확인. 판정 기준 main 433ec9ea. EOS-105(done)가 acceptance 안에 \"명시한 한계 ②\"로 자인했으나 승계 태스크가 없었다 — CLAUDE.md \"회수로 태스크 done 선언 시 acceptance 전수 재대조\" 규칙이 겨냥하는 형태(약속한 것이 다 있는가)의 인접 사례이며, 여기서는 *한계로 선언한 것에 소유자가 없는* 축이다. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP."
+updated: 2026-09-19
