@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-119-phase2-scenario-regression-suite
+title: "Phase 2 시나리오 회귀 스위트 10종 — 단위 테스트가 아니라 상태 변화 시나리오, PR에서 실제 실행되는 좌석에 배선 (P-13)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 시나리오 10종 — 001 신규 학생 정상 학습 / 002 낮은 진단점수 / 003 선수개념 결손 / 004 동일 오개념 반복 / 005 힌트 후 정답 / 006 AI Tutor 질문 / 007 mastery threshold 통과 / 008 다음 concept 이동 / 009 세션 종료 후 재접속 / 010 학습 상태 복구. 각각 하나의 시나리오 테스트로 만든다. 기존 e2e 자산 4건(test_eos_anchor_e2e_a4 · test_e2e_pedagogy_pilot_integration · test_e2e_suneung_loop_integration · test_e2e_vertical_slice_integration)과 먼저 대조해 덮이는 시나리오는 신설하지 않고 확장한다 — 대조 결과를 표로 남긴다.\n② 상태 변화 단언 — 화면 문자열이 아니라 LearnerState 필드와 학습 이벤트를 단언한다. 표현이 아니라 구조로 보는 축(CLAUDE.md L1-L4 규칙)을 시나리오 단언에도 적용한다.\n③ CI 실행 실재 — 시나리오가 PR에서 실제로 실행되는지 확인한다. 현행 e2e-nightly 잡은 github.event_name == schedule 조건이라 PR에서 돌지 않으므로 그 잡에만 넣으면 완료 판정이 서지 않는다. 어느 잡이 소유하는지 명시하고, 그 잡이 skipped가 아니라 실제 실행됐음을 잡 이름·스텝 이름·conclusion으로 확인한다.\n④ nightly와 PR용 분리 — 실행 시간을 실측해 나누되, 나눈 기준(초 단위 실측)과 PR용에 남긴 시나리오를 명시한다. 추측으로 나누지 않는다.\n⑤ 회귀 주입 검증 — 시나리오마다 그 시나리오가 없으면 통과해 버리는 회귀를 하나씩 주입해 RED를 확인한다. 주입 적용 실재(mutated != original)와 cp 백업 바이트 동일 원복을 단언한다. 전건 RED가 나와도 그것은 가드의 세기일 뿐 커버리지의 증거가 아니므로, 안 본 분기를 따로 열거한다.\n⑥ 산출 — 시나리오 10종 + CI 실행 증거(잡 이름·스텝 결과) + 현재 미충족 시나리오가 있으면 사유와 함께 열거 + PR."
+artifacts: []
+paths:
+  - "tests/backend/scenarios/**"
+  - ".github/workflows/ci.yml"
+session: claude/new-session-jchdr8
+notes: "출처: Phase 2 EOS Closed Learning Loop 실행계획 항목 P-13(원 문서 §16) — docs/ops/phase2_eos_closed_loop_execution_prompts.md §3. 완료 판정 = 10종이 CI에서 실행되고(skipped 아님) 각각의 회귀 주입이 RED다. 선행 EOS-117(P-12) 착지 완료(main 82d43d52). 루프 구성요소 EOS-100/103/104/105/108/10/81 전건 done 실측(2026-09-19). 사전 조사에서 확인한 핵심 난점: e2e-nightly 잡이 schedule 전용이라 PR 미실행 — 완료 판정의 skipped 아님 축이 여기서 갈린다."
+updated: 2026-09-19

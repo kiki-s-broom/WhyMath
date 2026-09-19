@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,12 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 기존 자산 전수 대조 — EOS-65(경계표)·EOS-66(SubjectAdapter)·EOS-67(import-linter forbidden)·EOS-84(전이/리터럴 프로브)·EOS-04(어휘 ratchet)가 실제로 덮는 축과 남은 사각을 main 실측으로 표로 적는다. 새로 만들지 말고 확장한다(P-12 지시 3).\n② 스캔 0건 실패 축 — 경계 가드 전건이 대상 집합이 비었을 때 공허하게 통과하지 않는지 확인하고, 통과하는 가드에는 비지 않음 단언을 넣는다(P-12 지시 4 · CLAUDE.md 보호장치 실패주입 규칙 ④).\n③ 위반 주입 → CI RED 실측 — Core 내부 과목 리터럴 분기 1건과 Core→Adapter 역방향 import 1건을 실제로 주입해 어느 가드가 RED를 내는지 실측한다. 주입 자체의 실재(mutated != original)와 cp 백업 원복 바이트 동일을 단언한다. 원복에 git checkout 계열 금지(2026-08-10 규칙).\n④ 스텝 실행 실재 — 그 RED가 이번 CI 실행에서 skipped가 아니라 실제로 실행된 스텝에서 나왔음을 잡 이름·스텝 이름·conclusion으로 확인한다. 로컬 green 보고 금지 축(CLAUDE.md 잡 목록 규칙) 적용 — 어느 잡이 이 가드를 소유하는지 명시한다.\n⑤ 현행 위반 목록 — 주입이 아닌 실제 위반이 남아 있으면 전건 열거하고 정오 판정(진성 위반 vs 설계된 교체점)을 함께 적는다. baseline 동결분은 만료·재확인 지점을 명기한다(만료 없는 유예 금지)."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1215 — 머지 착지 main 82d43d52 · 실 CI 위반 주입 run 35421591228: backend 잡 스텝 #8 Import contracts failure(앞 스텝 Ruff/Black/Mypy 전건 success이므로 skipped 아님) · infra-contracts 잡 스텝 #9 Pytest failure(4 failed 1537 passed) · 원복 후 최종 run 35421783017 9 success 0 비-green"
 paths:
   - "scripts/analysis/**"
   - "tests/infra/**"
   - ".github/workflows/ci.yml"
   - src/backend/pyproject.toml
-session: claude/new-session-jchdr8
+session: null
 notes: "출처: Phase 2 실행계획 항목 P-12(원 문서 §13) — Kiki 2026-09-19 지시. 완료 판정 = 경계 위반 주입이 CI에서 RED이고 그 스텝이 실제 실행됐음이 확인됐다. 선행 자산이 이미 5건(EOS-65/66/67/84/04) 있으므로 신설이 아니라 확장·증명이 범위다. 인접 미완 ARCH-99(harness.wh1_loop 잔여 누수)는 별건으로 남긴다."
 updated: 2026-09-19
