@@ -926,6 +926,12 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-914", "데이터 무결성 게이트(orphan·dangling·duplicate 6종)", "Admin", "QA", "P0",
        "OPS-55 — 느슨참조 드리프트 감사(v_integrity_violations) · 주간 지표 #4 산출원",
        "ops.integrity_violations_gate"),
+    # EOS-15 — 콘텐츠 생산 KPI 12종(`ops.validation_scorecard`)과 **다른 축**이라 별도 행이다.
+    # 분모가 다르다(CU vs 실행된 학습 루프). 같은 행에 묶으면 인벤토리에서도 두 축이 한 덩어리로
+    # 보여 "KPI 17종"이라는 착시가 생긴다 — 정본 경계는 docs/standards/loop_kpi_contract.md.
+    _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
+       "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
+       "ops.loop_kpi_gate"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),

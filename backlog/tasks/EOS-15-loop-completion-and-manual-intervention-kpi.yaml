@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/ops/validation_scorecard.py
-session: null
+session: claude/new-session-hrbqc8
 notes: "출처: 계획서 300 §19(KPI 5축) — 대조표 §6 단위5. 분류(§14): SUPPORT.\n\n실측(판정 기준 main 2e1220b4): 5축 중 ②③⑤는 소유자 실재, **①④만 소유 태스크 0건**이다(검색 범위: backlog 655건 전수 × KPI/지표/loop completion/traceab/역추적/explainab/불일치/integrity/개입). ①은 LearningSession writer 0이라 분모가 구조적으로 미정의이고, ④는 저장소가 G4(12/13)에 배정했으나 측정 방법 소유자가 없다.\n\n이 태스크의 가장 큰 위험은 지표 추가가 아니라 **KPI 정본 이중화**다 — acceptance ④가 그 축을 강제한다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
-updated: 2026-09-16
+updated: 2026-09-19
