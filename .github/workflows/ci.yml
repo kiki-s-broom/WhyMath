@@ -647,6 +647,16 @@ jobs:
       - name: 게이트 — 데이터 무결성 (integrity_violations_gate·orphan·dangling·duplicate 6종)
         run: python -m whymath_backend.ops.integrity_violations_gate
 
+      # EOS-15 — Phase 2 학습 루프 KPI 5종 수집기가 **실 스키마를 상대로 완주**하는지.
+      # 판정 게이트(exit 0/1/2)가 아니라 스키마 스모크인 이유: CI DB는 마이그레이션만 적용한
+      # 빈 DB라 5종이 전부 미측정이고, 그 상태로 판정을 걸면 상시 red가 되어 사람이 게이트를
+      # 끈다(CLAUDE.md "상시 실패하는 fail-open 보호"를 새로 만드는 셈). 반면 "수집 쿼리가
+      # 예외 없이 끝나는가"는 빈 DB에서도 변별력이 있다 — 컬럼 개명·테이블 삭제가 여기서 잡힌다
+      # (2026-09-19 실측: `evidence_event.meta`를 개명하니 exit 1, 되돌리니 exit 0).
+      # KPI 판정 자체는 운영 DB에서 `--since-hours`로 돌린다(docs/standards/loop_kpi_contract.md).
+      - name: 게이트 — 루프 KPI 수집기 스키마 스모크 (loop_kpi_gate --schema-smoke)
+        run: python -m whymath_backend.ops.loop_kpi_gate --schema-smoke
+
       - name: Pytest (통합테스트 — 실 PG·l3 외부서비스 제외)
         env:
           WHYMATH_RUN_INTEGRATION: "1"
