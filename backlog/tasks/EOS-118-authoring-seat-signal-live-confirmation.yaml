@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-118-authoring-seat-signal-live-confirmation
+title: "좌석 작동 신호 라이브 재확인 — EOS-111·EOS-112가 만든 신호가 실제 회차에서 좌석을 말하는가"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-112-generation-log-served-model-and-retries
+requires_gates:
+  - G-eos118-seat-signal-live-run
+acceptance:
+  - "① 라이브 회차 실행 — Phaiakes9에서 `WHYMATH_CLOUD_PROVIDER=openrouter`로 `problem_corpus_accumulate` 회차를 1회 돌리고 요약의 `cloud_seat` 블록 전문을 회신한다. 런북 `docs/ops/arch57_authoring_openrouter_runbook.md`가 이미 있으므로 새로 배선할 것은 없다 — 이 태스크는 도구 태스크가 아니라 **관측 태스크**다.\n② 변별력 — 판정은 두 신호를 **함께** 본다: ⓐ `cloud_seat.state`가 `not_measured`가 아닐 것 ⓑ `cloud_seat.observation.declared_vs_served.comparable`가 0보다 클 것. ⓐ만 보면 선언 축만 살아 있고 관측 축(EOS-112)이 죽어 있어도 통과한다 — 그것이 정확히 EOS-111을 등재하게 만든 형태다(`calls_with_cache_telemetry: 0`이 두 원인에서 같은 값이라 변별력이 0이었다). 한 신호로 두 축을 판정하지 않는다.\n③ 대조군 — 셀렉터를 기본값(`anthropic`)으로 둔 회차도 1회 돌려 `observed_models`가 **다른 값**을 내는지 본다. 양쪽이 같은 화면을 내면 신호가 좌석을 구분하지 못하는 것이며, 그때 ①의 통과는 위장이다. 대조군 없이 ①만 성립하면 '전부 선택 좌석으로 계상'하는 과잉 구현도 통과한다.\n④ 어긋남 쌍의 실제 모양 — `declared_vs_served.differs`가 0보다 크면 `differing_pairs`를 그대로 기록하고, 별칭→버전 해소인지 진짜 폴백인지 **사람이 판정해** 그 판정을 notes에 남긴다(기계가 가르지 않기로 한 축이다 — EOS-112 PR #1211). `differs`가 0이면 \"이 공급사는 선언값과 같은 문자열을 돌려준다\"는 실측이며 그것도 기록한다 — 0은 미관측이 아니라 실측 0이다(②-ⓑ가 comparable>0을 요구하므로 둘이 구분된다).\n⑤ 재시도 축 — `observation.retries.calls_with_retries_measured`가 0보다 커야 한다. OpenAI 호환 경로는 우리 전송기를 타므로 계측이 성립해야 하고, 0이면 계측 배선이 라이브에서 죽은 것이다(None=미계측과는 다른 사실이며 요약이 둘을 구분해 낸다). `retries_total`이 0인 것은 정상(계측했고 재시도가 없었다)이다 — 분모와 분자를 혼동하지 않는다.\n⑥ 판정과 산출물 — ①~⑤가 전부 성립하면 EOS-111·EOS-112 PR 본문의 '정직한 공백'(라이브 미확인)이 닫힌다. 성립하지 않으면 **그 실패가 이 태스크의 산출물**이며, 원인을 실측 규명해 수정 태스크로 분리 등재한다(실패 회차를 폐기하지 않는다 — 측정 도구의 실패 경로 설계 규칙).\n⑦ 승계 근거 — EOS-111(PR #1208)·EOS-112(PR #1211) 양쪽이 \"이 컨테이너에 egress·키가 없어 라이브 확인을 못 했다\"를 '정직한 공백'에 적었고, 두 태스크의 done 조건에는 그 축이 없었다. 산문에만 남기면 만료 없는 유예가 되므로(CLAUDE.md) 대장으로 옮겨 소유자를 만든다. 이것은 '못 했다'의 기록이 아니라 '누가 언제 할 것인가'의 집행이다."
+artifacts: []
+paths:
+  - "docs/ops/**"
+  - "src/backend/whymath_backend/harness/**"
+session: null
+notes: "등재 경위(2026-09-19): DeepSeek 오케스트레이션 잔여 작업 점검 중 발견. 배선 축은 ARCH-49·ARCH-55·ARCH-57·ARCH-58·EOS-111·EOS-112로 전부 done이고 build_cloud_provider의 프로덕션 소비처가 7곳(저작 생성기·재진술·다중풀이·교차검증·해설·비유·사전적재)인데, 그 좌석이 실제로 도는 회차에서 신호가 좌석을 제대로 말하는지는 **아무도 본 적이 없다**. 「작동 신호 없는 알고리즘 부착 금지」가 겨냥하는 형태다 — 신호를 만들었고 단위 계약은 뮤테이션으로 동결했으나(EOS-111 5종·EOS-112 14종) 라이브 작동 비율은 0이다.\n\n실행 자체는 가볍다(런북 실재·키 등록됨·ARCH-57 라이브 1회차 선례 있음). 무거운 것은 판정이다 — ②의 두 신호 동시 확인과 ③의 대조군이 없으면 통과가 위장이 될 수 있다.\n\n주의: 이 태스크가 ARCH-56의 발동 조건 ⓐ(OpenRouter 경로가 상시 배치 트래픽을 받기로 결정)를 건드리지 **않는다**. 1회 관측 회차이지 상시 채택 결정이 아니다. 상시로 돌리기로 하는 판정은 별건이며 그때 ARCH-56 보류가 풀린다(게이트 G-arch56-availability-trigger).\n\n[정정 2026-09-19] 라이브 회차는 Phaiakes9와 키가 필요해 세션이 대체할 수 없다 — 산문에만 두면 selector가 읽지 않아 즉시 착수 후보가 된다(ARCH-56 선례)"
+updated: 2026-09-19
