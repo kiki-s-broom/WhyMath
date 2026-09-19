@@ -38,6 +38,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.concept_version import ConceptVersion as SchemaConceptVersion
 from whymath_backend.schema.version_header import VersionStatus
 
@@ -130,7 +131,9 @@ class ConceptVersion(Base):
         """ORM → schema(Pydantic 검증 복원 — JSONB dict가 서브모델로 재검증된다)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConceptVersion.model_validate(data)
+        return SchemaConceptVersion.model_validate(
+            drop_unset_nulls(data, SchemaConceptVersion, orm_cls=type(self))
+        )
 
 
 __all__ = ["ConceptVersion"]
