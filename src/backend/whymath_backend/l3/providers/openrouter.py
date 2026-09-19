@@ -311,6 +311,7 @@ class OpenRouterProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -320,6 +321,11 @@ class OpenRouterProvider:
         - `images` → 거부. 멀티모달은 로컬 Qwen3-VL 경유이며(미성년자 프라이버시·로컬 우선)
           이 경로는 미배선이다.
         - `temperature` → 그대로 전달(OpenAI 호환 `temperature`).
+        - `top_p` → 그대로 전달(OpenAI 호환 `top_p`). 미지정(기본)이면 **키를 싣지 않아**
+          공급사 기본값이 적용된다 — *기존 동작 무변경*. 이 인자가 존재하는 이유는 좌석 간
+          샘플링 설정을 맞추기 위해서다(EOS-121 선결조건 A): 양 좌석이 각자의 공급사 기본값에
+          의존하면 두 값이 같다는 근거가 없어 생성 다양성 비교가 교란된다. 켜는 것이 기본이
+          아니라 *맞출 수단*이 있는 것이 목표라, 기본값은 None으로 둔다.
         - `seed` → 그대로 전달. OpenAI 호환 API에는 `seed` 파라미터가 **있다**(Anthropic과
           다른 점). 다만 결정론은 공급사·양자화에 따라 보장되지 않으므로, 기록된 seed는
           "전달했다"는 사실이며 재현 성공을 뜻하지 않는다.
@@ -360,6 +366,9 @@ class OpenRouterProvider:
         }
         if temperature is not None:
             payload["temperature"] = temperature
+        # EOS-121 선결조건 A — temperature와 같은 규약(지정 시에만 키를 싣는다·None 전송 금지).
+        if top_p is not None:
+            payload["top_p"] = top_p
         if seed is not None:
             payload["seed"] = seed
 

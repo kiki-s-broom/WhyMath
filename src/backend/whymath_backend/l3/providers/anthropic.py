@@ -14,7 +14,10 @@ SDK 규약 메모 (Anthropic Python SDK): `AsyncAnthropic.messages.create(model=
 system=,messages=[{"role":"user","content":...}])`. 응답은 content 블록 리스트이며
 `type=="text"` 블록의 `.text`만 모은다(thinking/tool 블록 제외). 헬스체크는
 `models.list()`(토큰 비용 0). **Opus 4.7는 temperature/top_p/top_k/budget_tokens를
-거부(400)하므로** 샘플링·thinking 인자를 보내지 않는다(plain create) — 두 모델 모두 안전.
+거부(400)하므로** 샘플링·thinking 인자를 *기본적으로* 보내지 않는다(plain create) — 두 모델
+모두 안전. 샘플링 인자(`temperature`·`top_p`)는 **호출부가 명시할 때만** 실리며, 그 둘은
+같은 계약을 공유한다: 제공자는 조용히 무시하지 않고 그대로 싣고, **CLOUD_HIGH(Opus 4.7)
+경로로 가는 호출부가 지정하지 않는 것**이 계약이다(정책을 축마다 따로 두지 않는다).
 프롬프트 캐싱·thinking/effort 튜닝은 라이브 키 보유 보정 과제로 미룬다(S5 범위 밖).
 
 경계 메모 (CLAUDE.md 절대 금기): 이 제공자가 반환하는 텍스트는 *검증 전 원시 모델
@@ -329,6 +332,7 @@ class AnthropicProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -344,6 +348,16 @@ class AnthropicProvider:
           ⚠️ 주의(모듈 docstring): **Opus 4.7(CLOUD_HIGH)는 temperature를 거부(400)**한다 —
           따라서 CLOUD_HIGH 경로로 가는 호출부는 temperature를 지정하지 말아야 한다. 동등문제
           저작(S2-g)은 라우팅상 LOCAL/CLOUD_MID로 흐르며 CLOUD_HIGH(killer/prove)로는 가지 않는다.
+        - `top_p`(EOS-121 선결조건 A·좌석 간 샘플링 통제)가 주어지면 messages.create의 `top_p=`로
+          전달한다. None(기본)이면 싣지 않아 API 기본값을 쓴다 — *기존 동작 무변경*. 기본값을
+          None으로 두는 것이 이 인자의 요점이다: 무조건 명시 전송하면 공급사 기본값과 다른 값이
+          나가 저작 품질이 조용히 바뀐다(회귀). 측정자가 양 좌석에 **같은 값**을 줄 때만 실린다.
+          ⚠️ 주의(모듈 docstring): **Opus 4.7(CLOUD_HIGH)는 top_p도 temperature와 함께 거부
+          (400)**한다 — 따라서 이 축의 계약은 temperature와 **글자 그대로 동일**하다: 제공자는
+          조용히 무시하지 않고 그대로 싣고(조용한 무시 금지), CLOUD_HIGH 경로로 가는 호출부가
+          지정하지 않는다. 두 축에 서로 다른 정책(한쪽만 런타임 거부 등)을 두지 않는 이유는,
+          같은 API 제약을 두 가지 방식으로 다루면 어느 쪽이 계약인지 호출부가 알 수 없게 되기
+          때문이다. 동등문제 저작 경로는 라우팅상 LOCAL/CLOUD_MID로 흐른다(위 temperature와 동일).
         - `json_schema`(S2-j structured output)가 주어지면 *명확한 오류*를 던진다 — plain
           messages.create에는 문법 제약 디코딩이 없어 스키마를 보장할 수 없다(조용한 무시 금지).
           호출부 계약: 클라우드 결정 경로에서는 json_schema를 지정하지 말고 프롬프트+관대 파서로
@@ -398,6 +412,11 @@ class AnthropicProvider:
         # 거부하므로 CLOUD_HIGH 호출부는 지정하지 않는다(위 docstring ⚠️).
         if temperature is not None:
             extra["temperature"] = temperature
+        # EOS-121 선결조건 A — top_p는 temperature와 **같은 좌석·같은 규약**이다: 지정 시에만
+        # 키를 싣고(미지정이면 키 자체가 없다 — None 전송 금지), Opus 4.7의 400 거부는 호출부
+        # 계약으로 막는다(위 docstring ⚠️ — 축마다 다른 정책을 두지 않는다).
+        if top_p is not None:
+            extra["top_p"] = top_p
 
         # 지연 실측 — 호출을 monotonic으로 감싼다(추정 est_latency_ms와 구분되는 actual).
         start = time.monotonic()

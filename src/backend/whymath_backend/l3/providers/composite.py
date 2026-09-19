@@ -82,6 +82,7 @@ class CompositeProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -94,6 +95,9 @@ class CompositeProvider:
           처리·클라우드 제공자는 images를 받으면 거부).
         - `temperature`(S2-g 생성 다양성)도 위임받는 제공자로 그대로 전달한다(온도 처리는 각
           하위 제공자 책임 — Ollama options·Anthropic API 인자).
+        - `top_p`(EOS-121 선결조건 A)도 그대로 전달한다 — 전달 좌석은 temperature와 같다. 이
+          디스패처는 top_p를 **삼키지 않는다**: 삼키면 "양 좌석에 같은 값을 줬다"고 믿는 측정이
+          실제로는 아무 값도 안 보낸 상태가 되어, 교란 변수를 닫았다고 *거짓말하는* 회차가 된다.
         - `json_schema`(S2-j structured output)도 그대로 전달한다(제약 처리·거부는 각 하위
           제공자 책임 — Ollama format= 제약 디코딩·Anthropic 명확한 거부).
         - `seed`(EOS-73 생성 재현)도 그대로 전달한다(전달·거부는 각 하위 제공자 책임 — Ollama
@@ -104,7 +108,7 @@ class CompositeProvider:
         검증 전 원시 출력(각 제공자 docstring 경계 메모), usage는 하위 제공자가 포착한 실측.
         """
         cost = _as_cost_tier(decision.cost_tier)
-        # 선택 인자(images·temperature·json_schema·seed)는 *있을 때만* 위임 호출에 싣는다 — 해당
+        # 선택 인자(images·temperature·top_p·json_schema·seed)는 *있을 때만* 싣는다 — 해당
         # 인자 미지원 하위 제공자(기존 구현·가짜)는 인자 없이도 동작(하위호환). 전부 None이면
         # 종전과 동일하게 `target.generate(prompt, system, decision)`로 호출된다.
         target = self._local if cost is CostTier.LOCAL else self._cloud
@@ -122,6 +126,8 @@ class CompositeProvider:
             forward["images"] = images
         if temperature is not None:
             forward["temperature"] = temperature
+        if top_p is not None:
+            forward["top_p"] = top_p
         if json_schema is not None:
             forward["json_schema"] = json_schema
         if seed is not None:

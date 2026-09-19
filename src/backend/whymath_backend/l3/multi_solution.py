@@ -1111,6 +1111,8 @@ class DeterministicFakeProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        # EOS-121: top_p 좌석도 seed와 같은 이유로 받되 무시한다(결정론 가짜라 샘플링이 무의미).
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         # EOS-73: seed 좌석은 받되 무시한다 — 이 가짜는 이미 결정론이라 시드가 바꿀 것이 없다
         # (LLMProvider 계약 정합용 인자·값은 캡처하지 않는다).

@@ -277,6 +277,7 @@ class OllamaProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -291,6 +292,11 @@ class OllamaProvider:
         - `temperature`(S2-g 생성 다양성)가 주어지면 ollama generate의 `options=`에
           `{"temperature": ...}`로 실어 샘플링 온도를 올린다(동등문제 저작 mode collapse 방어).
           None(기본)이면 options에 온도를 넣지 않아 Ollama 기본 온도를 쓴다 — *기존 동작 무변경*.
+        - `top_p`(EOS-121 선결조건 A)가 주어지면 같은 `options=`에 `{"top_p": ...}`로 싣는다
+          — 온도·시드와 같은 좌석이다(Ollama는 top_p를 네이티브 옵션으로 받는다). None(기본)
+          이면 options에 넣지 않아 Ollama 기본값을 쓴다 — *기존 동작 무변경*. 로컬 축은 EOS-121
+          측정 대상(클라우드 좌석)이 아니지만, 시그니처만 받고 **조용히 버리면** 호출부가 "설정
+          했다"고 믿는 값이 사라지므로(조용한 무시 금지) 받은 것은 반드시 싣는다.
         - `json_schema`(S2-j structured output)가 주어지면 ollama generate의 `format=`에
           스키마 dict를 그대로 실어 출력을 *문법 수준에서 제약*한다(제약 디코딩 — 자유 텍스트·
           코드펜스·필드 누락을 원천 차단). None(기본)이면 format을 싣지 않아 자유 텍스트 생성
@@ -340,6 +346,9 @@ class OllamaProvider:
         options: dict[str, Any] = {}
         if temperature is not None:
             options["temperature"] = temperature
+        # EOS-121 선결조건 A — 온도와 같은 options 좌석(지정된 것만 담는다).
+        if top_p is not None:
+            options["top_p"] = top_p
         if seed is not None:
             options["seed"] = seed
         if options:
@@ -425,6 +434,7 @@ class FixedModelOllamaProvider(OllamaProvider):
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -450,6 +460,9 @@ class FixedModelOllamaProvider(OllamaProvider):
             options["num_predict"] = self._num_predict
         if temperature is not None:
             options["temperature"] = temperature
+        # EOS-121 선결조건 A — 부모와 같은 options 좌석(지정된 것만 담는다).
+        if top_p is not None:
+            options["top_p"] = top_p
         if seed is not None:
             # EOS-73 — 강등전에서도 시드 고정 재현이 가능해야 한다(부모와 같은 options 좌석).
             options["seed"] = seed

@@ -301,6 +301,100 @@ class TestTuningKnobs:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# top_p (EOS-121 선결조건 A) — 좌석 간 샘플링 통제 수단
+# ──────────────────────────────────────────────────────────────────────────
+class TestTopP:
+    """막는 것은 셋이다.
+
+    ⓐ **기본값이 조용히 바뀌는 것** — 미지정인데 키가 실리면(특히 `None`이 실리면) 현 공급사
+       기본값과 다른 값이 나가 저작 품질이 회귀한다. 그래서 "키가 아예 없는가"를 본다
+       (있는데 null인 것과 **다르다** — `assert kwargs.get("top_p") is None`은 둘을 구분하지
+       못해 변별력이 0이다).
+    ⓑ **지정했는데 안 실리는 것** — 측정자가 "양 좌석을 맞췄다"고 믿는데 실제로는 아무 값도
+       안 간 상태.
+    ⓒ **CLOUD_HIGH에서 정책이 갈리는 것** — Opus 4.7은 temperature/top_p를 함께 거부(400)한다.
+       이 저장소의 기존 대응은 *런타임 거부가 아니라 호출부 계약*이므로(temperature가 그렇다),
+       top_p에만 다른 정책을 발명하지 않는다. 조용히 버리는 것도 금지다(조용한 무시 금지).
+    """
+
+    async def test_top_p_key_is_absent_by_default(self) -> None:
+        """ⓐ 미지정(기본) → messages.create kwargs에 top_p **키 자체가 없다**(null 아님)."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert "top_p" not in kwargs
+
+    async def test_top_p_passed_when_set(self) -> None:
+        """ⓑ 지정 → messages.create의 top_p 인자로 **그 값 그대로** 전달된다."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID), top_p=0.95)
+        assert client.messages.calls[0]["kwargs"]["top_p"] == 0.95
+
+    async def test_top_p_and_temperature_ride_together(self) -> None:
+        """둘을 함께 주면 둘 다 실린다 — 한쪽이 다른 쪽을 덮어쓰지 않는다(같은 `extra` dict)."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate(
+            "p", "s", _cloud_decision(CostTier.CLOUD_MID), temperature=0.9, top_p=0.95
+        )
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert kwargs["temperature"] == 0.9
+        assert kwargs["top_p"] == 0.95
+
+    async def test_cloud_high_carries_top_p_exactly_like_temperature(self) -> None:
+        """ⓒ CLOUD_HIGH(Opus 4.7)에서 top_p 처리가 temperature와 **글자 그대로 같다**.
+
+        Opus 4.7은 둘 다 400으로 거부하지만, 이 저장소의 대응은 *호출부 계약*이다(런타임
+        거부 없음 — `AnthropicProvider.generate`가 temperature에 대해 이미 그렇게 한다).
+        그러므로 top_p에만 예외 처리를 새로 발명하지 않는다. 동시에 **조용히 버리지도 않는다**
+        — 버리면 400 대신 "설정했는데 아무 일도 안 일어난" 상태가 되어 원인 지목이 불가능해진다.
+
+        이 테스트가 봉인하는 것은 *값이 실린다*는 사실과 *두 축이 같은 정책을 쓴다*는 사실 둘 다다:
+        한쪽에만 거부 가드를 넣거나 한쪽만 조용히 버리면 마지막 단언이 RED가 된다.
+        """
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate(
+            "p", "s", _cloud_decision(CostTier.CLOUD_HIGH), temperature=0.9, top_p=0.95
+        )
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert kwargs["top_p"] == 0.95
+        # 정책 대칭 — 두 축의 "실렸는가" 여부가 CLOUD_HIGH에서 일치해야 한다.
+        assert ("top_p" in kwargs) == ("temperature" in kwargs)
+
+    async def test_cloud_high_omits_both_when_unset(self) -> None:
+        """ⓒ 대조군 — CLOUD_HIGH에서 아무것도 지정하지 않으면 두 키 다 없다(plain create).
+
+        이 대조군이 없으면 "CLOUD_HIGH에서는 항상 싣는다"는 과잉 구현도 위 테스트를 통과한다.
+        """
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_HIGH))
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert "top_p" not in kwargs
+        assert "temperature" not in kwargs
+
+    def test_module_docstring_records_the_opus_rejection(self) -> None:
+        """ⓒ 계약의 근거가 *문서에 남아 있는가* — 런타임 가드가 없으므로 경고가 유일한 방어선.
+
+        런타임 거부를 두지 않기로 한 이상, 이 경고문이 지워지면 호출부는 400의 존재를 알 길이
+        없다. 그래서 경고문 자체를 계약으로 동결한다(문자열 열거가 아니라 *두 축의 공동 언급*
+        + 거부 사실을 본다).
+        """
+        import whymath_backend.l3.providers.anthropic as anthropic_module
+
+        doc = anthropic_module.__doc__ or ""
+        assert "top_p" in doc
+        assert "temperature" in doc
+        assert "거부(400)" in doc
+        generate_doc = AnthropicProvider.generate.__doc__ or ""
+        assert "top_p" in generate_doc
+        assert "CLOUD_HIGH" in generate_doc
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # _extract_text — content 블록 정규화 (dict·객체·엣지)
 # ──────────────────────────────────────────────────────────────────────────
 class TestExtractText:
