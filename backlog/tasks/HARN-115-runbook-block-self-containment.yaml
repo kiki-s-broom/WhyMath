@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-115-runbook-block-self-containment
+title: "런북 붙여넣기 블록 자기완결성 기계 집행 — 앞 블록의 변수·환경·CWD 상속 금지(목적지 DB가 조용히 바뀌는 축)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 규칙 정본화: CLAUDE.md 「실행 시스템 진입 경로 완전 명시」(2026-07-16)가 요구하는 세 항목(실행 시스템 라벨 · 진입 명령 · 작업 디렉터리까지의 cd)에 더해, 붙여넣기 단위 자기완결성을 명문 판정 기준으로 정의한다 — 한 블록이 앞 블록이 설정한 셸 변수·환경변수·현재 작업 디렉터리에 의존하지 않는다.\n② 기계 집행: docs/**/*.md 와 .claude/commands/*.md 의 powershell 코드펜스를 대상으로 (a) 시스템 라벨 주석으로 시작하는가 (b) cd 를 포함하는가 (c) 사용하는 세션 변수를 그 블록 안에서 전부 정의하는가 (d) DB·외부 자원에 접근하는 블록이 목적지 환경변수를 스스로 주입하는가 를 판정하는 검사를 신설하고 CI 차단 스텝에 배선한다. 기존 scripts/ops/check_runbook_blocks.py 확장과 신규 스크립트 중 어느 쪽이든 무방하나, 배선 실재성을 tests/infra 배선 동결로 고정한다.\n③ 변별력 증명: 뮤테이션 최소 4종 전건 RED — 사용 중인 세션 변수의 정의 제거 · cd 전부 제거 · 시스템 라벨 제거 · 목적지 환경변수 주입 제거. 각 뮤테이션은 그 절을 실제로 밟는 블록을 겨냥해야 한다(그 변수를 쓰지 않는 블록에서 정의만 지우면 정상적으로 GREEN이며 그것은 검출 실패가 아니다 — 2026-09-18 실측으로 주입 2건이 이 이유로 GREEN이었다).\n④ 기존 런북 처리: 현행 docs/ops/*runbook*.md 는 이 규칙을 대부분 만족하지 않으므로 만료 있는 유예로 처리한다(만료 없는 그랜드파더 금지). 유예 목록과 만료일을 검사기 안에 두고, 만료일을 지난 항목은 차단으로 전환한다.\n⑤ 사고 경위 고정: 2026-09-18 게이트 G-skb01-resolution-remeasure 실행 중 Kiki가 직접 발견. [7-1b] 마이그레이션 블록이 WHYMATH_DATABASE_URL 을 앞 블록에서 상속하도록 작성돼 있었고, config.py:73 의 database_url 기본값은 포트 5432 이며 CLAUDE.md 는 5432 를 타 프로젝트 점유로 사용 금지한다. 새 창에 붙여넣었다면 alembic upgrade head 가 다른 프로젝트 DB 의 스키마를 바꾸려 시도했을 것이다. 두 런북 게이트(check_runbook_blocks.py · check_ps_scripts.py)는 의존형 블록 상태에서도 전건 통과했으므로 이 축의 기계 집행은 부재다."
+  - "⑥ Read-Host 축 (2026-09-18 2회차 실측으로 추가): 붙여넣기 흐름에서 Read-Host 는 사람을 멈추는 수단이 아니라 다음 블록을 손상시키는 수단이다 — 뒤에 다른 블록이 이어 붙으면 Read-Host 가 그 블록의 첫 줄을 입력값으로 삼켜 ①자기 가드가 자동으로 거부되고(승인 실패) ②첫 줄을 잃은 다음 블록이 그대로 실행된다. CLAUDE.md 「붙여넣기 블록의 자리표시자 전면 금지」가 Read-Host 를 정지 수단으로 권하는 것은 블록이 하나일 때만 성립하므로, 그 규칙의 범위를 명시적으로 좁혀야 한다. 검사기는 쓰기 블록의 가드 조건에 Read-Host 결과가 포함되면 경고하고(기계로 계산 가능한 선행 판정으로 대체하라), Read-Host 를 쓰는 블록에는 단독 붙여넣기 경고 문구가 동반되는지 확인한다. 실측 근거: 게이트 G-skb01-resolution-remeasure 실행에서 [7-1b](Read-Host 승인 가드)와 [D]를 연달아 안내한 결과 마이그레이션이 적용되지 않은 채 [D]만 실행돼 같은 UndefinedColumnError 가 2회 반복됐다. 현행 check_runbook_blocks.py 는 이 형태를 검출하지 못한다(뮤테이션 M3: 기계 가드를 Read-Host 로 되돌려도 GREEN)."
+artifacts: []
+paths:
+  - "scripts/ops/**"
+  - tests/infra/test_runbook_block_self_containment.py
+  - "docs/ops/**"
+session: null
+notes: "출처: 2026-09-18 G-skb01-resolution-remeasure 실행 중 Kiki 지적. 상세는 acceptance 5항. 관련 선례 = HARN-106(쓰기 블록 자가거부 기계 집행)·OPS-73(증거 블록 펜스 금지). 이 태스크는 그 둘이 보지 않는 세 번째 축(블록 간 상태 상속)을 다룬다. EOS 등급 P1 근거: 12월 폐쇄루프가 이것 없이도 성립하지만(사람 검토로 우회 가능), 게이트 실행은 12월까지 계속되고 이 축의 실패는 되돌리기 어려운 쪽(타 프로젝트 DB 스키마 변경)이라 품질 기여가 크다.\n\n[정정 2026-09-18] 2026-09-18 2회차 실측 — Read-Host 가 다음 블록 첫 줄을 삼키는 축 추가\n\n[개명 2026-09-19] HARN-110-runbook-block-self-containment → HARN-115-runbook-block-self-containment: 번호 충돌 해소 — main에 HARN-110(pypi 차단 환경 포맷·린트 오라클)이 먼저 착지했다. 미머지인 이쪽을 개명(HARN-100 절차)"
+updated: 2026-09-19
