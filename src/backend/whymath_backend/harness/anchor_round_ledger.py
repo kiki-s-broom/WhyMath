@@ -50,6 +50,7 @@ acceptance 문구는 "수용 0"이지만 이 모듈이 세는 축은 `appended`(
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -58,10 +59,16 @@ from typing import Any, Final, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
-from whymath_backend.l3.equivalent.orchestrator import GenerationOutcome
+from whymath_backend.l3.equivalent.orchestrator import (
+    DuplicateDetector,
+    DuplicateOrigin,
+    GenerationOutcome,
+)
 
 __all__ = [
     "ACCEPTED_STATUSES",
+    "DUPLICATE_DETECTORS",
+    "DUPLICATE_ORIGINS",
     "OUTCOME_STATUSES",
     "PROMPT_CACHE_STATES",
     "SEAT_STATES",
@@ -71,6 +78,7 @@ __all__ = [
     "StagnationVerdict",
     "append_round_ledger",
     "default_round_ledger_path",
+    "duplicate_source_rates",
     "judge_stagnation",
     "load_round_ledger",
     "operating_rates",
@@ -92,6 +100,22 @@ if "accepted_stored" not in OUTCOME_STATUSES or len(OUTCOME_STATUSES) < 2:
         "GenerationOutcome.status Literal에서 outcome 어휘를 파생하지 못했다 — "
         f"파생 결과={OUTCOME_STATUSES!r}. 회차 분포가 위장 통과할 수 있어 import를 중단한다."
     )
+
+# 중복 출처 어휘(EOS-121 B)도 **오케스트레이터의 Literal에서 파생**한다 — outcome 어휘와 같은
+# 이유다(손으로 베끼면 축이 늘 때 리포트가 조용히 그 값을 빠뜨린다).
+DUPLICATE_DETECTORS: tuple[str, ...] = tuple(get_args(DuplicateDetector))
+DUPLICATE_ORIGINS: tuple[str, ...] = tuple(get_args(DuplicateOrigin))
+if len(DUPLICATE_DETECTORS) < 2 or len(DUPLICATE_ORIGINS) < 2:
+    raise RuntimeError(
+        "중복 출처 어휘를 Literal에서 파생하지 못했다 — "
+        f"detectors={DUPLICATE_DETECTORS!r} origins={DUPLICATE_ORIGINS!r}. "
+        "출처 교차표가 위장 통과할 수 있어 import를 중단한다."
+    )
+
+#: 검출기/출처가 **없을 때** 쓰는 명시 키. None을 키에서 빼면 "구분이 안 된 건"이 교차표에서
+#: 사라져 합계가 안 맞는데도 아무도 모른다 — 미판정은 값이지 부재가 아니다(미측정 ≠ 0).
+_UNCLASSIFIED_DETECTOR = "unclassified"
+_UNKNOWN_ORIGIN = "unknown"
 
 # 수용 축 — `needs_review_worklist._STORED_STATUSES`·`run_corpus_accumulate`의 비수용 판정과
 # 같은 집합(두 곳이 이미 이 두 값을 쓴다). 여기서는 *비율 방향*을 가르는 데 쓴다.
@@ -169,6 +193,105 @@ def operating_rates(
         "unmeasured_reason": reason,
         "statuses": statuses,
         "unknown_statuses": unknown,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 중복 출처 '작동한 비율' (EOS-121 선결조건 B) — 구분 장치가 실제로 구분했는가
+#
+# 「작동한 비율」 원칙(CLAUDE.md "작동 신호 없는 알고리즘 부착 금지"): 출처 구분 장치를 붙였으면
+# **그것이 실제로 작동한 비율**을 회차 요약이 말해야 한다. `rejected_duplicate` 4건이 나왔는데
+# 4건 모두 출처 `unknown`이면, 장치는 붙어 있으나 이 회차에서는 **한 번도 일하지 않은 것**이다
+# (좌석 미주입·구판 경로). 그 상태와 "4건 전부 코퍼스 중복"은 조치가 정반대인데 종전에는 둘 다
+# 그냥 `rejected_duplicate: 4`로 보였다.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def duplicate_source_rates(
+    pairs: Sequence[tuple[str | None, str | None]],
+) -> dict[str, Any]:
+    """중복 출처 교차표 + 구분 장치의 작동 비율(순수·파일 I/O 0).
+
+    `pairs`는 이 회차의 **`rejected_duplicate` outcome 전건**의
+    `(duplicate_detector, duplicate_origin)`이다 — 중복이 아닌 outcome은 넣지 않는다(분모가
+    부풀어 "구분 못 한 비율"이 희석된다).
+
+    반환 구조:
+
+        {"duplicates_total": 4, "measured": true, "unmeasured_reason": null,
+         "classified": 4, "classified_rate": 1.0,
+         "origin_resolved": 3, "origin_resolved_rate": 0.75,
+         "counts": {"structural_signature/round": 2, ...},   # 어휘 전건(미판정 키 포함)
+         "by_detector": {...}, "by_origin": {...},
+         "unknown_detectors": {}, "unknown_origins": {}}
+
+    - `counts`는 **어휘 전건**을 싣는다(관측 0인 조합도 0으로 명시) — 키 부재와 0건은 다르다.
+      어휘 밖 값은 버리지 않고 `unknown_detectors`/`unknown_origins`에 남긴다(어휘 드리프트 자백).
+    - `duplicates_total == 0`이면 `measured=false`이고 두 비율이 `None`이다. 중복이 0건인 회차는
+      구분 장치가 **일할 일이 없었던** 것이지 실패한 것이 아니다(미측정 ≠ 0 — 0.0으로 채우면
+      "구분 0% 달성"이라는 거짓 경보가 된다).
+    - `classified_rate`는 "중복 중 **검출기**를 아는 비율", `origin_resolved_rate`는 "중복 중
+      **출처**까지 아는 비율"이다. 둘을 나누는 이유: 검출기는 orchestrator가 항상 채우고 출처만
+      좌석 주입에 달려 있어, 한 숫자로 접으면 *어느 쪽이 빠졌는지* 알 수 없다.
+    """
+    total = len(pairs)
+    measured = total > 0
+    reason: str | None = (
+        None
+        if measured
+        else (
+            "이 회차 rejected_duplicate 0건 — 구분할 대상이 없어 비율을 계산할 수 "
+            "없다(0%가 아니다)"
+        )
+    )
+
+    detector_keys = (*DUPLICATE_DETECTORS, _UNCLASSIFIED_DETECTOR)
+    origin_keys = (*DUPLICATE_ORIGINS, _UNKNOWN_ORIGIN)
+    counts: dict[str, int] = {f"{d}/{o}": 0 for d in detector_keys for o in origin_keys}
+    by_detector: dict[str, int] = {key: 0 for key in detector_keys}
+    by_origin: dict[str, int] = {key: 0 for key in origin_keys}
+    unknown_detectors: dict[str, int] = {}
+    unknown_origins: dict[str, int] = {}
+
+    classified = 0
+    origin_resolved = 0
+    for detector, origin in pairs:
+        if detector is None:
+            detector_key = _UNCLASSIFIED_DETECTOR
+        elif detector in DUPLICATE_DETECTORS:
+            detector_key = detector
+            classified += 1
+        else:
+            # 어휘 밖 — 교차표에는 미분류로 계상하되 원값을 따로 남긴다(조용한 누락 금지).
+            detector_key = _UNCLASSIFIED_DETECTOR
+            unknown_detectors[detector] = unknown_detectors.get(detector, 0) + 1
+
+        if origin is None:
+            origin_key = _UNKNOWN_ORIGIN
+        elif origin in DUPLICATE_ORIGINS:
+            origin_key = origin
+            origin_resolved += 1
+        else:
+            origin_key = _UNKNOWN_ORIGIN
+            unknown_origins[origin] = unknown_origins.get(origin, 0) + 1
+
+        counts[f"{detector_key}/{origin_key}"] += 1
+        by_detector[detector_key] += 1
+        by_origin[origin_key] += 1
+
+    return {
+        "duplicates_total": total,
+        "measured": measured,
+        "unmeasured_reason": reason,
+        "classified": classified,
+        "classified_rate": (classified / total) if measured else None,
+        "origin_resolved": origin_resolved,
+        "origin_resolved_rate": (origin_resolved / total) if measured else None,
+        "counts": counts,
+        "by_detector": by_detector,
+        "by_origin": by_origin,
+        "unknown_detectors": unknown_detectors,
+        "unknown_origins": unknown_origins,
     }
 
 
@@ -445,6 +568,38 @@ class RoundRecord(BaseModel):
             "None이다(키는 남긴다 — '그 경로를 dedup 입력으로 주었으나 읽지 못했다'는 사실 "
             "자체가 관측이며, 첫 회차의 아직 없는 out이 이 경우다). 빈 dict는 '입력 0건으로 "
             "돌았다'는 관측이고, 필드 자체가 None이면 미기록이다."
+        ),
+    )
+    spec_plan: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "이 회차가 **순환시킨 spec 목록**(EOS-121 선결조건 C). 항목 1건 = "
+            "`{spec_id, topic_hint, spec}`이며 `spec`은 `EquivalenceSpec` 직렬화 전문이다 — "
+            "경로·해시가 아니라 *해석된 값*을 싣는 이유는 spec 파일이 나중에 바뀌어도 대장 행이 "
+            "자족하게 하기 위해서다(`dedup_input_digests`가 지문을 쓰는 것과 다른 선택 — 그쪽은 "
+            "파일이 크고 이쪽은 작다). 단일 spec 회차는 항목 1건이고, 필드 자체가 None이면 "
+            "미기록(이 필드 신설 이전 구행)이다."
+        ),
+    )
+    spec_outcome_counts: dict[str, dict[str, int]] | None = Field(
+        default=None,
+        description=(
+            "spec_id → outcome 상태별 건수(EOS-121 C). **좌석 × spec 교차 집계의 절반**이다 — "
+            "좌석은 회차 단위(`cloud_seat`)라 회차 안에서 spec만 갈라 두면 두 축이 완성된다. "
+            "이것이 없으면 spec을 3종 돌려도 '어느 spec이 무엇을 냈는지'가 합산으로 뭉개져 "
+            "acceptance ②가 형식만 충족된다. 빈 dict는 '시도 0건', None은 미기록."
+        ),
+    )
+    duplicate_sources: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "이 회차 중복의 **출처 교차표 + 구분 장치 작동 비율**(EOS-121 선결조건 B · "
+            "`duplicate_source_rates` 산출물 그대로). 회차 대장에 싣는 이유는 이 구분이 "
+            "**사후 복원 불가**이기 때문이다 — `signature_index`는 회차가 끝나면 기존분과 "
+            "회차분이 섞인 한 덩어리라 나중에 어느 것이 어느 쪽이었는지 되살릴 수 없다. "
+            "회차 중 기록하지 않으면 그 회차가 ③에 대해 아무것도 남기지 않는다. "
+            "None=미기록(이 필드 신설 이전 구행), `measured=false`는 '중복 0건이라 잴 것이 "
+            "없었다'로 0%와 구분된다."
         ),
     )
     cli_argv: list[str] | None = Field(
