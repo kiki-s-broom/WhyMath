@@ -31,9 +31,11 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.learning_state_machine import (
+    _LEARNING_ENTRY_TRIGGERS,
     INITIAL_STATE,
     advance_on_attempt,
     assert_transition_allowed,
+    ensure_learning_context,
     get_current_state,
     reconcile_state,
     record_transition,
@@ -434,24 +436,35 @@ async def test_recorded_transition_derives_from_state_from_the_ledger() -> None:
 
 @pytest.mark.asyncio
 async def test_advance_on_attempt_surfaces_the_rejection_instead_of_swallowing_it() -> None:
-    """상태 이력이 없는 학생의 응답 제출 — 거부가 **값으로** 올라온다.
+    """자동 진입 대상이 아닌 상태의 응답 제출 — 거부가 **값으로** 올라온다.
 
     이것이 이 슬라이스의 핵심 계약이다. 예외로만 흘리면 호출부의 `except` 한 줄에서 사라지고,
     사라지면 "조용히 통과"다. 동시에 원장에는 아무 것도 적재되지 않아야 한다.
+
+    픽스처가 `NEW`에서 `DIAGNOSING`으로 바뀐 이유(EOS-115): `NEW`는 이제
+    `ensure_learning_context`가 학습 진입 전이로 메우므로 **거부되지 않는다**. 이 테스트가
+    재는 것은 "NEW가 거부된다"가 아니라 "거부가 값으로 표면화된다"이므로, 여전히 금지된
+    전이로 픽스처를 옮겨 그 계약을 계속 잰다. `DIAGNOSING`을 고른 것은 그것이 자동 진입
+    대상에서 *의도적으로* 빠진 상태이기 때문이다(진단 중 제출은 진단 그 자체일 수 있고
+    LEARNING까지 두 걸음이라 한 건으로 메울 수 없다 — `_LEARNING_ENTRY_TRIGGERS` docstring).
     """
     session = _session()
     fake = cast(_FakeSession, session)
+    await _seed(session, LearningState.DIAGNOSING)
+    before = len(fake.added)
     result = await advance_on_attempt(
         session, user_id=_UID, evidence=AttemptEvidence(is_correct=True, confidence=0.9)
     )
     assert result.assessed is False
     assert result.decision is None
-    assert result.final_state is LearningState.NEW
+    assert result.final_state is LearningState.DIAGNOSING
     assert result.rejected_transition is not None
     # 예외 타입명이 설명에 들어간다(CLAUDE.md 침묵 실패 금지 — 무타입 경고 금지).
     assert "UndefinedTransitionError" in result.rejected_transition
-    assert "NEW → ASSESSING" in result.rejected_transition
-    assert fake.added == []
+    assert "DIAGNOSING → ASSESSING" in result.rejected_transition
+    # 거부된 회차는 원장에 아무 행도 남기지 않는다 — 학습 진입 전이도 적재되지 않는다.
+    assert len(fake.added) == before
+    assert result.entered_learning_from is None
 
 
 @pytest.mark.asyncio
@@ -543,3 +556,187 @@ async def test_reconcile_reports_divergence_without_overwriting() -> None:
     assert report.diverged is True
     assert report.detail is not None and "자동 정정하지 않았습니다" in report.detail
     assert len(fake.added) == before, "대조가 원장을 변경했습니다"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑦ 학습 맥락 확보 — 정책 경로가 실제 학습자에게 닿는가 (EOS-115)
+# ──────────────────────────────────────────────────────────────────────────
+#
+# 이 절이 재는 것은 "전이표에 간선이 있는가"가 아니라 **"학습자가 그 간선을 실제로 지나가는가"**다.
+# EOS-105는 표와 정책을 만들었지만 학습 맥락에 들어가는 전이를 적재하는 경로가 0건이어서,
+# 정책 R1~R6가 준비된 자리에 아무도 도달하지 못했다(정본화 ≠ 집행).
+
+
+@pytest.mark.asyncio
+async def test_default_learner_reaches_the_policy_instead_of_being_rejected() -> None:
+    """전이 이력이 없는 기본 학습자(= 전원)의 오답이 **정책 결정까지 간다** (acceptance ①).
+
+    고치기 전에는 `NEW → ASSESSING` 거부로 `next_action`이 항상 null이었다. 이 마디가
+    없으면 그 회귀가 조용히 되돌아온다 — 거부는 200 응답에 실려 오므로 화면은 정상이다.
+    """
+    session = _session()
+    fake = cast(_FakeSession, session)
+    result = await advance_on_attempt(
+        session,
+        user_id=_UID,
+        evidence=AttemptEvidence(
+            is_correct=False, confidence=0.2, confirmed_misconception_ids=("m-1",)
+        ),
+    )
+    assert result.rejected_transition is None, result.rejected_transition
+    assert result.assessed is True
+    assert result.decision is not None
+    assert result.decision.rule_id == "R3-wrong-misconception"
+    # `from_state`는 온보딩 **이전** 값을 보고한다 — 학습자가 어디서 출발했는지를 잃지 않는다.
+    assert result.from_state is LearningState.NEW
+    assert result.entered_learning_from is LearningState.NEW
+    # 원장은 세 행이다: NEW→LEARNING · LEARNING→ASSESSING · ASSESSING→REMEDIATING.
+    assert [(r.from_state, r.to_state) for r in fake.added] == [
+        (LearningState.NEW, LearningState.LEARNING),
+        (LearningState.LEARNING, LearningState.ASSESSING),
+        (LearningState.ASSESSING, LearningState.REMEDIATING),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_advancing_learner_is_not_stuck_after_a_correct_answer() -> None:
+    """R1으로 `ADVANCING`에 올라간 학습자의 **다음** 응답이 거부되지 않는다.
+
+    같은 결함의 두 번째 얼굴이다(실측 2026-09-19): 정답+높은 확신 → ADVANCING → 다음 응답이
+    `ADVANCING → ASSESSING` 거부로 전건 막혔다. 전이표 주석은 이미 "다음 개념 LEARNING을
+    거쳐야 한다"고 지정했으나 그 경유를 적재하는 코드가 없었다.
+
+    기본 학습자 마디(위)만으로는 이 회귀를 못 잡는다 — 그쪽은 `NEW`만 지나간다.
+    """
+    session = _session()
+    await _seed(
+        session,
+        LearningState.DIAGNOSING,
+        LearningState.READY,
+        LearningState.LEARNING,
+    )
+    first = await advance_on_attempt(
+        session, user_id=_UID, evidence=AttemptEvidence(is_correct=True, confidence=0.95)
+    )
+    assert first.decision is not None and first.decision.rule_id == "R1-correct-high-confidence"
+    assert first.final_state is LearningState.ADVANCING
+    # 이미 평가 가능한 상태였으므로 온보딩은 돌지 않았다 — 무조건 적재가 아님을 못 박는다.
+    assert first.entered_learning_from is None
+
+    second = await advance_on_attempt(
+        session, user_id=_UID, evidence=AttemptEvidence(is_correct=False, confidence=0.2)
+    )
+    assert second.rejected_transition is None, second.rejected_transition
+    assert second.entered_learning_from is LearningState.ADVANCING
+    assert second.decision is not None
+
+
+@pytest.mark.asyncio
+async def test_learning_context_is_not_recorded_when_already_assessable() -> None:
+    """이미 평가 가능한 상태에서는 **아무 것도 적재하지 않는다**.
+
+    무조건 적재하면 원장에 의미 없는 `LEARNING → LEARNING` 행이 쌓여 "왜 이 상태인가"의
+    재구성을 방해한다. 위 두 마디는 적재되는 경로만 재므로 이 반대 방향을 따로 잰다.
+    """
+    session = _session()
+    fake = cast(_FakeSession, session)
+    await _seed(session, LearningState.DIAGNOSING, LearningState.READY, LearningState.LEARNING)
+    before = len(fake.added)
+    entered = await ensure_learning_context(session, user_id=_UID)
+    assert entered is None
+    assert len(fake.added) == before
+
+
+@pytest.mark.asyncio
+async def test_learning_context_does_not_invent_a_diagnosis() -> None:
+    """온보딩은 진단을 **위조하지 않는다** — 원장에 `DIAGNOSING`·`READY`가 생기지 않는다.
+
+    `NEW → DIAGNOSING → READY → LEARNING` 3행을 적재하는 구현도 같은 최종 상태를 만들지만,
+    일어나지 않은 진단을 원장에 적는 셈이다. 그 구현으로 바뀌면 이 마디가 빨강이 된다.
+    """
+    session = _session()
+    fake = cast(_FakeSession, session)
+    entered = await ensure_learning_context(session, user_id=_UID)
+    assert entered is LearningState.NEW
+    assert len(fake.added) == 1
+    row = fake.added[0]
+    assert (row.from_state, row.to_state) == (LearningState.NEW, LearningState.LEARNING)
+    assert row.trigger is TransitionTrigger.LEARNING_STARTED
+    # 생애주기 전이이므로 규칙 id는 비어 있다("규칙이 없었다"와 "못 적었다"의 구분).
+    assert row.rule_id is None
+    assert LearningState.DIAGNOSING not in [r.to_state for r in fake.added]
+    assert LearningState.READY not in [r.to_state for r in fake.added]
+
+
+@pytest.mark.asyncio
+async def test_assessment_still_departs_from_a_learning_context() -> None:
+    """불변식 동결 — 평가(ASSESSING) 진입은 **언제나 학습 맥락에서** 출발한다.
+
+    EOS-115가 연 것은 `NEW → LEARNING`이지 `NEW → ASSESSING`이 아니다. 누군가 나중에
+    "간단하니까" 평가 직행 간선을 열면 이 마디가 빨강이 된다 — 전이표를 직접 읽어 재므로
+    이 테스트를 고치지 않고는 열 수 없다.
+    """
+    assessable = {src for src, dst in ALLOWED_TRANSITIONS if dst is LearningState.ASSESSING}
+    assert LearningState.NEW not in assessable
+    assert LearningState.READY not in assessable
+    assert LearningState.DIAGNOSING not in assessable
+    assert assessable == {
+        LearningState.LEARNING,
+        LearningState.PRACTICING,
+        LearningState.ASSESSING,
+        LearningState.REMEDIATING,
+    }
+
+
+def test_every_auto_entry_state_has_a_real_edge_to_learning() -> None:
+    """자동 진입 표의 모든 출발 상태가 전이표에 **실재하는** 간선을 가진다.
+
+    표에 없는 간선을 적으면 `record_transition`이 거부해 학습자가 다시 막힌다. 두 표가
+    어긋나는 순간을 런타임이 아니라 여기서 잡는다.
+    """
+    for state, trigger in _LEARNING_ENTRY_TRIGGERS.items():
+        assert (state, LearningState.LEARNING) in ALLOWED_TRANSITIONS, state
+        assert isinstance(trigger, TransitionTrigger)
+    # 진단 중은 의도적으로 빠져 있다 — 빠진 것이 실수가 아님을 못 박는다.
+    assert LearningState.DIAGNOSING not in _LEARNING_ENTRY_TRIGGERS
+
+
+@pytest.mark.asyncio
+async def test_learning_context_guard_holds_even_if_entry_table_overlaps_assessable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """평가 가능 상태 가드가 **실제로 막는다** — 표가 겹치도록 오염시켜 확인한다.
+
+    현재 `_LEARNING_ENTRY_TRIGGERS`의 키(NEW·READY·ADVANCING)와 평가 가능 상태
+    (LEARNING·PRACTICING·ASSESSING·REMEDIATING)는 서로소라 이 가드는 평시에 발화하지 않는다.
+    발화하지 않는 가드는 "정상 입력에서 초록"일 뿐 보호의 증거가 아니므로(CLAUDE.md 2026-09-01),
+    겹치는 항목을 주입해 **막으려는 상태를 실제로 만들어** 잰다.
+
+    이 주입이 없으면 가드를 통째로 지워도 모든 테스트가 초록이다 — 아래 disjoint 마디가
+    "겹치면 안 된다"를 재고, 이 마디가 "겹쳐도 막는다"를 잰다. 둘은 다른 축이다.
+    """
+    session = _session()
+    fake = cast(_FakeSession, session)
+    await _seed(session, LearningState.DIAGNOSING, LearningState.READY, LearningState.LEARNING)
+    before = len(fake.added)
+
+    monkeypatch.setitem(
+        _LEARNING_ENTRY_TRIGGERS,
+        LearningState.LEARNING,
+        TransitionTrigger.LEARNING_STARTED,
+    )
+    entered = await ensure_learning_context(session, user_id=_UID)
+
+    assert entered is None, "이미 평가 가능한 상태인데 학습 진입 전이를 적재했습니다"
+    assert len(fake.added) == before, "가드가 막지 못해 LEARNING → LEARNING 행이 쌓였습니다"
+
+
+def test_auto_entry_states_are_never_already_assessable() -> None:
+    """자동 진입 대상과 평가 가능 상태는 **서로소**다.
+
+    겹치면 이미 평가할 수 있는 학습자에게 매 제출마다 의미 없는 학습 진입 행을 쌓게 된다
+    (위 마디가 그 상황에서도 가드가 막음을 따로 잰다). 두 표가 겹치는 순간을 여기서 잡는다.
+    """
+    assessable = {src for src, dst in ALLOWED_TRANSITIONS if dst is LearningState.ASSESSING}
+    overlap = assessable & set(_LEARNING_ENTRY_TRIGGERS)
+    assert overlap == set(), f"자동 진입 대상이 이미 평가 가능합니다: {overlap}"

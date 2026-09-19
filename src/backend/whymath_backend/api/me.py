@@ -919,9 +919,17 @@ class LearningStateBlock(BaseModel):
     rejected_transition: str | None = Field(
         default=None,
         description=(
-            "거부된 전이의 설명(예: 'NEW → ASSESSING'). null이면 거부 없음. 값이 있으면 "
-            "상태 머신은 아무 전이도 적재하지 않았다 — 응답 적재·숙달 전파는 그와 무관하게 "
-            "성공한다(이 슬라이스는 기존 학습 경로를 막지 않는다)."
+            "거부된 전이의 설명(예: 'DIAGNOSING → ASSESSING'). null이면 거부 없음. 값이 "
+            "있으면 상태 머신은 평가 전이를 적재하지 않았다 — 응답 적재·숙달 전파는 그와 "
+            "무관하게 성공한다(이 슬라이스는 기존 학습 경로를 막지 않는다)."
+        ),
+    )
+    entered_learning_from: LearningState | None = Field(
+        default=None,
+        description=(
+            "평가 직전에 **학습 진입 전이가 자동 적재된 경우** 그 직전 상태(EOS-115). "
+            "null이면 이미 평가 가능한 상태였다는 뜻이다. 붙인 단계가 실제로 돌았는지를 "
+            "응답이 말하게 하는 필드다(CLAUDE.md '작동한 비율')."
         ),
     )
 
@@ -1166,6 +1174,7 @@ async def submit_attempt(
             decision.next_action.target_misconception_id if decision else None
         ),
         rejected_transition=transition.rejected_transition,
+        entered_learning_from=transition.entered_learning_from,
     )
     return AttemptSubmitResponse(
         attempt_id=attempt.attempt_id,

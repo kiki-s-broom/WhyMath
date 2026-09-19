@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P0
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 기본 학습자(전이 이력 없음 = NEW)가 `POST /v1/me/attempts`로 오답을 내면 정책 결정이 실제로 내려진다 — 응답 `learning_state.next_action`이 null이 아니고 `rejected_transition`이 null이다. 지금은 NEW → ASSESSING이 전이표에 없어 전원이 거부된다.\n② 어느 축으로 고칠지 판정하고 사유를 남긴다. 셋 중 하나이며 파급이 서로 다르다 — (가) 서빙 경로가 생애주기 전이를 스스로 적재한다(예: 진단 capture/complete·첫 학습 진입이 DIAGNOSIS_STARTED·DIAGNOSIS_COMPLETED·LEARNING_STARTED를 남긴다) (나) 전이표에 NEW·READY에서 ASSESSING으로 가는 간선을 연다(EOS-105가 의도적으로 닫아 둔 축 — 열려면 \"무엇 대비 평가인가\"의 부재를 어떻게 다룰지 함께 적는다) (다) 클라이언트(Flutter)가 생애주기 전이를 적재하도록 배선한다.\n③ 선택한 축이 **서빙 경로에서 실제로 호출되는지**를 별항으로 확인한다(정본화≠집행). 전이를 적재하는 코드가 생겨도 학생 흐름이 그것을 지나가지 않으면 이 결함은 그대로다.\n④ 고쳐지면 Week 3 게이트 하네스의 xfail 표식을 제거한다 — `tests/backend/api/test_week3_gate_remediation_loop.py::test_policy_directed_remediation_fires_for_a_default_learner`는 strict xfail이라 고쳐지는 순간 XPASS로 빨강이 된다. 그 제거까지가 이 태스크의 완료다.\n⑤ 실측 근거를 남긴다 — 고치기 전/후로 같은 호출의 `learning_state` 블록을 찍어 rule_id가 null에서 R3-wrong-misconception으로 바뀌는 것을 보인다(\"작동한 비율\" 원칙 — 규칙이 실제로 돌았다는 신호)."
-artifacts: []
+artifacts:
+  - "PR #1218 (https://github.com/kiki-s-broom/WhyMath/pull/1218) · CI 전건 green(success 9 · skipped 9 · failure 0 · 커밋 6f56e970). 커밋 구성: 67c741fd 구현 · d13085bf 테스트 정리 회귀 수정 · 6f56e970 OPS-85 등재.\n\nacceptance 이행: ① 기본 학습자(전이 이력 없음)의 오답이 rule_id=R3-wrong-misconception · next_action=REMEDIATE_MISCONCEPTION · rejected_transition=null에 도달 — 실 PG 전후 실측 ② 축 (가) 채택: 전이표의 NEW→ASSESSING 금지는 유지하고 ensure_learning_context가 학습 진입 전이 1건을 적재해 NEW→LEARNING→ASSESSING으로 경유. (나)는 EOS-105가 근거와 함께 닫은 축이라 배제, (다)는 학습 생애주기를 클라에 내리는 것이라 배제 ③ 집행 지점 = advance_on_attempt의 ⓪단계이며 서빙 도달은 api/me.py submit_attempt. POST /v1/me/attempts 1회로 원장 3행 생성 실증 + 집행 지점 제거 뮤테이션(M2)이 RED ④ Week3 게이트의 strict xfail이 XPASS로 빨강이 된 것을 확인한 뒤 표식 제거 ⑤ rule_id가 null에서 R3-wrong-misconception으로 바뀌는 전후 블록 기록.\n\n검증: 회귀 주입 9종 전건 RED(주입 실재·바이트 동일 원복 단언) · 전체 백엔드 스위트 14089 passed · 통합(실 PG) 334 passed · mypy --strict 696파일 · lint-imports 4 kept 0 broken · tests/infra 1546 passed.\n\n부수 발견: R1(정답+높은 확신)으로 ADVANCING에 올라간 학습자의 다음 응답이 전건 거부되던 결함도 같은 함수가 해소. 잔여 취약점(통합 테스트 수기 삭제 목록 드리프트)은 OPS-85로 분리 등재."
 paths: []
 session: null
 notes: "Week 3 Gate 판정(EOS-113)이 지목한 인접 결함. 게이트의 여섯 마디에는 없어 판정은 통과했으나, 계획서 300 §9 보정 정책(MISC-30)과 §3 상태 머신(EOS-105)이 실제로 도는 유일한 경로가 이것이다.\n\n실측(2026-09-19 · main 0bf7e1b7 · 로컬 실 PG):\n- 기본 학습자의 오답 응답: from_state=NEW · to_state=NEW · rule_id=null · next_action=null · rejected_transition=\"NEW → ASSESSING (UndefinedTransitionError)\".\n- 생애주기 전이 3건(NEW→DIAGNOSING·DIAGNOSING→READY·READY→LEARNING)을 손으로 POST한 뒤 같은 오답을 내면: from_state=LEARNING · to_state=REMEDIATING · rule_id=R3-wrong-misconception · next_action=REMEDIATE_MISCONCEPTION · target_misconception_id=distribution-over-power · rejected_transition=null. 즉 정책 자체는 살아 있고 도달 경로만 없다.\n- 그 전이 3건을 적재하는 서버 경로 0건·클라이언트 호출부 0건(역할 기반 검색: DIAGNOSIS_STARTED·DIAGNOSIS_COMPLETED·LEARNING_STARTED·PRACTICE_STARTED 4종이 schema/learning_state.py의 enum 선언에만 등장). 즉 사람이 손으로 POST하지 않는 한 R3·R5는 영원히 발동하지 않는다.\n\nEOS-105 모듈 docstring이 이 한계를 이미 자인한다(\"상태 이력이 없는 기존 학생(= 전원)은 ... 응답 제출 시 전이가 거부된다\"). 그러므로 이 태스크는 숨겨진 버그의 발견이 아니라 **선언된 한계의 해소**이며, 어느 축으로 해소할지가 설계 판정이다."

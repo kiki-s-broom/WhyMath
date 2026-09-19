@@ -471,25 +471,23 @@ def test_remediation_content_requires_a_prior_wrong_answer() -> None:
         _teardown(cid, pids, skill_id)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "EOS-115 — 기본 학습자(NEW)는 `POST /v1/me/attempts`에서 정책 전이가 거부돼 "
-        "`next_action`이 항상 null이다. 생애주기 전이(NEW→DIAGNOSING→READY→LEARNING)를 "
-        "적재하는 서버 경로도 클라이언트 호출부도 0건이라, 사람이 손으로 전이 3건을 "
-        "POST하지 않는 한 R3(오개념 교정)·R5(반복 실패)는 영원히 발동하지 않는다."
-    ),
-)
 def test_policy_directed_remediation_fires_for_a_default_learner() -> None:
-    """인접 결함 동결 — 정책이 지시하는 교정 경로가 기본 학습자에게 닿는가.
+    """정책이 지시하는 교정 경로가 **기본 학습자에게 닿는다** — EOS-115로 해소됨.
 
     이 마디는 게이트의 여섯 마디에 **없다**(그래서 본 판정의 합격을 막지 않는다). 그러나
     계획서 §9의 보정 정책이 실제로 도는 유일한 경로가 이것이므로, 닿지 않는다는 사실을
-    조용히 두지 않는다.
+    조용히 두지 않았다.
 
-    `skip`이 아니라 `xfail(strict=True)`인 이유는 저장소 선례와 같다 — skip은 "검사가 없는
-    것"과 구별되지 않아 침묵 실패가 되고, strict xfail은 고쳐지는 순간 XPASS로 빨강이 되어
-    이 표식의 제거를 강제한다.
+    이력(왜 이 주석을 남기는가): 이 테스트는 `xfail(strict=True)`로 등록돼 결함을 동결하고
+    있었다 — `skip`은 "검사가 없는 것"과 구별되지 않아 침묵 실패가 되지만 strict xfail은
+    고쳐지는 순간 XPASS로 빨강이 되어 표식 제거를 강제하기 때문이다. 그 설계대로 EOS-115가
+    경로를 놓자 XPASS로 빨강이 났고(2026-09-19 실측), 그래서 표식을 제거했다. 이제 이 마디는
+    **평범한 회귀 테스트**이며, 경로가 다시 끊어지면 XFAIL이 아니라 FAILED로 떨어진다.
+
+    무엇이 이것을 통과시키는가: `l2/learning_state_machine.ensure_learning_context`가 평가
+    직전에 빠져 있던 학습 진입 전이(`NEW → LEARNING`)를 적재해 학습자가
+    `NEW → LEARNING → ASSESSING → REMEDIATING`으로 경유한다. `NEW → ASSESSING`은 여전히
+    닫혀 있다 — 금지를 푼 것이 아니라 빠진 경로를 놓은 것이다.
     """
     if not asyncio.run(_pg_reachable()):
         pytest.skip("PostgreSQL 미도달 — 판정 불가. 통과가 아니다.")
