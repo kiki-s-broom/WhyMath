@@ -2,7 +2,7 @@
 
 **판정 기준: main `13826ece3869d0beda5eb1dc74c0f3235fbaccb0`**
 **판정자**: claude (구현 세션과 분리 — 이 세션은 판정 하네스만 만들고 P-08~P-10 기능을 구현하지 않았다)
-**태스크**: `EOS-113` · **PR**: __PR_LINK__
+**태스크**: `EOS-113` · **PR**: [#1213](https://github.com/kiki-s-broom/WhyMath/pull/1213)
 **선행**: P-08 = `EOS-14`(recommend 호출 계약·reason 필수) · P-09 = `MISC-30`(보정 정책 테이블·반복 오류 사다리) ·
 P-10 = 기존부분(핵심 제약이 이미 코드 집행 중 — 잔여는 `PED-18`·`PED-19`·`S4-11`가 소유)
 

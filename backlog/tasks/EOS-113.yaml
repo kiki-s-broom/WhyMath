@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P0
 owner: claude
@@ -13,8 +13,9 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 오답 → Misconception → 교정 콘텐츠 → AI Hint → 새 문제 → 재시도 6단계가 사람 개입(DB 직접 수정·수기 값 주입) 없이 자동 연결되는지를 실제 실행해 통과/미통과를 exit code로 내는 판정 하네스가 실재한다 (인상 판정 금지).\n② 각 화살표마다 \"무엇이 그 다음을 촉발했는가\"를 이벤트 trace(P-02 산출물 = EOS-11 표면)로 제시한다. 단계 사이 연결의 근거가 status code가 아니라 산출물·이벤트여야 한다.\n③ 판정 하네스 자신의 변별력을 뮤테이션 주입으로 확인한다 — 각 화살표를 하나씩 끊어 주입했을 때 RED를 내는지, 주입이 실제 적용됐는지(mutated != original)를 단언한다.\n④ 보고 상단에 판정 기준 커밋 해시(main)를 박는다.\n⑤ 미통과면 끊긴 지점을 지목하고 그 지점만 고치는 후속 태스크를 등재한다. 통과면 후속 0건.\n⑥ AI 답변 품질·교정 콘텐츠 품질은 판정 대상이 아니다 — 연결성(촉발 관계·자동 전파)만 본다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1213 — Week 3 Gate 판정 통과(판정 기준 main 13826ece) · 하네스 tests/backend/api/test_week3_gate_remediation_loop.py(2 passed·1 xfailed·exit 0) + 뮤테이션 검증 scripts/ops/verify_week3_gate_discrimination.py(8종 전건 RED·exit 0) · 판정 문서 docs/reviews/week3_gate_judgement_2026-09-19.md · 인접 결함은 EOS-115로 분리"
 paths: []
-session: claude/jolly-gauss-uod6lo
+session: null
 notes: "계획서 300 Phase 2 §10 Week 3 Gate(= Remediation Loop) 판정 세션 (집행 지시문 세트 15/21 GATE-W3). 구현이 아니라 판정이다.\n선행 P-08=EOS-14(done) · P-09=MISC-30(done) · P-10=기존부분(핵심 제약 코드 집행 중 · 잔여 PED-18/PED-19/S4-11 todo).\nWeek 1 Gate 선례 = EOS-106 / docs/reviews/week1_gate_judgement_2026-09-18.md / tests/backend/api/test_week1_gate_closed_loop.py.\n그 선례의 교훈: 판정 기준을 원 문서 문면보다 넓게 잡으면 판정이 제품 대신 판정자를 잰다 — 6단계 밖 표면은 인접 결함으로 분리 보고한다."
 updated: 2026-09-19
