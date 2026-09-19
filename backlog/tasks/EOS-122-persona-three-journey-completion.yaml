@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-122-persona-three-journey-completion
+title: "페르소나 3종 학습자 여정 완주 — A 정상·B 선수결손 복귀·C 오개념 confidence 감소 (PED-36 ⑪ 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 페르소나 3종 학습자 여정 완주 하네스 정본화 — 계획서 300 §11 / 집행 지시문 P-15. A 정상 학습자(진단 → 학습 → 문제 → 대부분 정답 → mastery 상승 → 다음 concept) · B 선수학습 결손(진단 → 문제 → 반복 오답 → prerequisite gap → 하위 concept → 보정 → **원래 concept 복귀**) · C 특정 오개념(진단 → 문제 → 특정 오답 패턴 → misconception detection → corrective explanation → targeted problem → misconception confidence **감소**). 각 단계의 LearnerState 변화를 기록·단언한다.\n\n② 판정 포인트 2종을 수치로 동결 — (가) Persona C는 confidence가 실제로 *내려가야* 통과다(단조 증가만 나오면 보정 미작동) (나) Persona B는 하위 concept 보정에서 멈추지 않고 원래 concept으로 복귀해야 통과다. 두 축 모두 결함 주입(뮤테이션)으로 RED를 확인한 뒤에만 보호로 친다 — 정상 입력에서 초록인 것은 증거가 아니다.\n\n③ 집행 지점 별항(정본화≠집행) — 이 하네스가 실제로 실행되는 CI 잡을 명시하고 배선을 확인한다. 저장소에 존재함 != 돌아감. 현행 관통 테스트 2종은 e2e-nightly(.github/workflows/ci.yml · if github.event_name == schedule) 전용이라 PR·push에서 돌지 않는다는 점을 판정에 반영한다.\n\n④ 승계 표기 — 이 태스크는 PED-36 acceptance ⑪(페르소나 3인 완주)을 승계한다. PED-36은 이 축을 더 이상 소유하지 않는다(폐기 표시는 amend append로 PED-36 쪽에 남긴다 — HARN-76 ④ 삭제 불가). 근거: EOS-120 ③이 제시한 해소 3택 중 (다) 축 분리, 2026-09-19 Kiki 판정.\n\n⑤ 범위 밖 명문 — PED-36 ⑧(SCENARIO-001~010 정형화)·⑩(CI 상시)은 EOS-119가, ⑨(코드갭/테스트갭 분류)·⑫(연속 3루프)는 PED-36이 계속 소유한다. 이 태스크는 그것들을 승계하지 않으며 구현하지도 않는다. 원 문서 §15 10월 동결 목록(신규 EOS 기능번호·Digital Twin·성장 경로 예측 등)은 production code로 구현하지 않는다 — 새 엔진을 추가하지 않고 안정화만 한다.\n\n⑥ 발견 결함의 처분 분리 — 3경로 실행 중 발견한 결함은 고친 것과 태스크로 등재만 한 것을 구분해 보고한다. 범위를 넓히지 않는다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1227"
+paths:
+  - tests/backend/api/test_e2e_persona_journeys.py
+  - docs/reviews/persona_three_journey_stabilization_2026-09-19.md
+session: null
+notes: "출처: 2026-09-19 Kiki 업로드 실행계획 항목 [20] P-15(페르소나 3종 안정화) 집행 세션. 크로스워크 docs/strategy/plan300_phase2_backlog_crosswalk.md:242가 P-15의 처분을 \"amend | PED-36\"으로 지정했으나, 착수 시점(2026-09-19T14:08:20Z) PED-36이 25초 전 타 세션(claude/modest-albattani-cp97rf · claim 14:07:55Z)에 원격 claim돼 backlog.py start가 exit 1로 거부했다. 해당 브랜치는 미push 상태라 작업 범위를 읽을 수 없었다.\n\n착수 순서 규칙(CLAUDE.md 2026-09-06 · claim 전 코드 읽기·쓰기 금지)에 따라 PED-36 위에서 진행하지 않고, EOS-120 ③이 제시한 해소 3택 중 (다) 축 분리를 Kiki 판정으로 집행해 이 태스크를 신규 등재한다. 선행 P-14(EOS-15 · KPI 5종 계측)는 PR #1222로 main 착지 완료(433ec9ea).\n\n주의 — l1/problem_bank/persona_fit_rules.py의 페르소나는 문항 적격 필터용이지 학습자 여정 페르소나가 아니다(이름이 같다고 같은 것이 아니다 · PED-36 ⑪ 원문 경고 승계)."
+updated: 2026-09-19
