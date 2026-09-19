@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-105-human-gate-inflight-visibility
+title: "사람 게이트의 인플라이트 표시 부재 — 두 세션이 같은 게이트를 각자 Kiki에게 안내해 중복 실행(동일 유형 2회차)"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-16 · 판정 기준 main 12f6bffd): 사람 게이트 `G-skb04-concept-content-populate`가 Kiki 머신에서 **두 번 실행**됐다. 1회차 = 세션 claude/quirky-cori-x91nld 안내(2026-09-15 · BEFORE_TOTAL=0 → AFTER_TOTAL=846 · PR #1173으로 clear·main 0e1d2ff9). 2회차 = 이 세션 안내(2026-09-16 · BEFORE_TOTAL=846 → AFTER_TOTAL=846). 이 CLI가 멱등 upsert라 피해는 0이었고 2회차는 오히려 영속성 독립 확인이 됐지만, 그것은 설계 보장이 아니라 **대상 연산의 성질**이었다.\n② 동일 유형 2회차임을 명시: CLAUDE.md의 `G-strict-policy-and-classic-cleanup` evidence 말미가 같은 형태를 이미 기록한다 — \"이 게이트는 두 세션이 병렬로 처리했다\"(2026-09-14 · PR #1157 vs #1154 · 후속 게이트 1건이 신설 시점에 이미 충족된 상태였다). 즉 사람 게이트의 병렬 처리는 1회성 사고가 아니라 구조다. 「실수 관리」 규칙(반복 실수 = 재발방지대책 등재 의무)의 집행이 이 태스크다.\n③ 원인 축(추정 아님 · 실측): 태스크에는 원격 claim 대장(refs/claims)이 있어 병렬 착수가 막히지만, **게이트에는 그 축이 없다**. `backlog.py gates`의 서브명령 전건은 list/add/show/clear/waive이며(main 12f6bffd 실측 · scripts/harness/backlog.py 15~20행 usage) 인플라이트 표시 수단이 없다. 그래서 게이트는 실행 안내가 진행 중이어도 화면상 pending이고, 두 세션이 같은 리마인드를 보고 각자 Kiki에게 안내한다. HARN-94(게이트 화면 처리 상황 가시화 · done)는 경과일·독촉 초과·의존 태스크 건수를 냈지만 **\"지금 누가 이 게이트를 처리 중인가\"는 다루지 않는다**.\n④ 설계 축: 최소 수단으로 \"이 게이트는 세션 X가 2026-09-16T07:20Z에 안내를 시작했다\"가 gates list와 SessionStart 브리핑에 보이면 된다. 후보 3종을 비용과 함께 판정한다 — ⓐ gates.yaml에 in_flight 필드(로컬 대장 · 브랜치에 갇히므로 타 세션이 못 본다 — 태스크 claim이 원격 ref를 쓴 이유와 같은 한계) ⓑ 원격 claim ref 재사용(refs/claims에 게이트 ID로도 마킹 — 다만 HARN-07 실측대로 CCR 프록시에서 push가 상시 403이므로 읽기측 폴백 전제) ⓒ 표시 없이 안내 직전 실측 의무만 규칙화(코드 0 · 사람 규율). **ⓒ를 택하는 것도 결론이며, 그 경우 \"규칙만으로는 2회 실패한 축\"임을 명시해야 한다**(「다음엔 조심한다」는 대책이 아니다).\n⑤ 되돌릴 수 없는 게이트의 구분: 이번 피해가 0이었던 것은 대상이 멱등 upsert였기 때문이다. 게이트 대장에 **재실행 안전성**(멱등/1회성/파괴적)을 사실로 적을 수 있는지 판정한다. 파괴적 게이트(DELETE · 외부 등록 · 서명 · 결제)의 2회 실행은 피해가 0이 아니다 — 실제 사례가 대장에 있다(클래식 브랜치 보호 삭제 · 오프사이트 백업 이동).\n⑥ 실패 주입 검증: 표시 장치를 만들었으면 **인플라이트인 게이트를 주입해 화면이 실제로 그것을 말하는지** RED/GREEN을 가른다. 정상(인플라이트 없음) 상태에서 조용한 것은 보호의 증거가 아니다. 픽스처는 세 상태를 모두 밟는다 — 인플라이트 없음 / 타 세션 인플라이트 / 내 세션 인플라이트. 표시를 지우는 뮤테이션과 항상 표시하는 뮤테이션 양방향으로 변별력을 확인한다(성공 방향 대조군).\n⑦ 정직 고지(범위 밖): 이 태스크는 게이트의 **중복 안내**를 막는 축이며, Kiki가 스스로 같은 게이트를 두 번 돌리는 것이나 게이트 실행 결과의 정합성은 다루지 않는다."
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+session: null
+notes: "출처: 2026-09-16 사람 게이트 G-skb04-concept-content-populate의 중복 실행 실측(1회차 BEFORE=0·2회차 BEFORE=846). 이 세션이 2026-09-15에 실행 안내를 낼 당시 실측으로는 게이트가 미머지·pending이었고(PR #1165 open) 소유 세션이 있다는 것까지 고지했으나, 그 사이 PR #1165 머지 + PR #1173 clear가 진행돼 안내 시점과 실행 시점 사이에 상태가 뒤집혔다. 즉 \"안내 직전 실측\"만으로는 막히지 않는 축이다 — 사람이 실행하기까지의 시차 전체가 창이다."
+updated: 2026-09-16
