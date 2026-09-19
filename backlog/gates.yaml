@@ -230,6 +230,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
+  - id: G-eos118-seat-signal-live-run
+    title: "EOS-118 라이브 관측 회차 2건 실행 (Phaiakes9) — 좌석 신호가 실제로 좌석을 말하는지 확인. 실행 대상 = docs/ops/arch57_authoring_openrouter_runbook.md. ① openrouter 좌석 회차 1건 ② 기본값(anthropic) 대조군 회차 1건. 회신 = 두 회차의 요약 cloud_seat 블록 전문(state · observation.calls_with_served_model · observation.declared_vs_served{comparable,differs,differing_pairs} · observation.retries.calls_with_retries_measured). 판정 기준(한 신호로 두 축을 판정하지 않는다): state가 not_measured가 아닐 것 **그리고** declared_vs_served.comparable > 0일 것 **그리고** 두 회차의 observed_models가 서로 다를 것. 셋 중 하나라도 어긋나면 통과가 아니라 원인 규명 대상이다 — 실패 회차도 그대로 기록한다(폐기 금지). 세션이 실행 전에 6항목 브리핑과 함께 명령 블록을 안내하며, 런북·측정 코드가 Kiki 체크아웃에 실재하는지(main 도달) 먼저 실측 확인한다. 전제: Phaiakes9 · OpenRouter 키 등록됨(ARCH-57 라이브 1회차 선례) · Docker Postgres 가동."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-19
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-eos49-content-version-seat
     title: "EOS-49(ConceptVersion 버전 테이블)·EOS-50(Publish Gate) ↔ ARCH-37 핵심 엔티티 동결 충돌 판정 — ARCH-37(#984·09-05)은 ContentVersion을 '좌석 부재'(canonical_entity_model_v1.md §3-D)로 동결하고 검사 ③/③-b(tests/backend/db/test_canonical_entity_model_freeze.py — 예약 이름 content_version·entity_version 금지 + ContentVersion 좌석 tuple 비어 있음 강제)가 그 좌석 테이블을 RED로 막는다. §4-5는 EOS-49를 '기존 좌석의 컬럼 추가이지 새 엔티티가 아니다'로 적었으나, EOS-49 acceptance ①은 VersionHeader를 공유하는 concept_version 버전 테이블 신설(Pydantic+ORM+alembic)이고 acceptance ②(Published=immutable DB 집행)와 EOS-50(publish 전이 검증 파이프라인)은 그 테이블 위에 선다 — 두 정본 중 하나를 고쳐야 착수 가능. 선택지: ①ARCH-37 §5 절차로 ContentVersion 좌석을 9월에 개통(§1·§2 표 + 테스트 상수 + MEMORY 동반 정정 — '9월 스키마에 넣지 않는다' 지시의 예외 승인) ②EOS-49·50을 동결 해제 지점(10월 이후)으로 연기하고 그때 §5 절차 ③EOS-49 ①을 테이블 없는 계약(VersionHeader Pydantic + concept.current_published_version_id 컬럼 + content_hash — ARCH-37 §4-5의 '컬럼 추가' 해석)으로 축소 재정의하고 EOS-50은 ReviewStatus 축 재사용으로 재정의. 출처: canonical_entity_model_v1.md §3-D·§4-5·§5 · 44_eos_version_management.md §6.3·§7 · EOS-49 acceptance ①②③"
     kind: decision
