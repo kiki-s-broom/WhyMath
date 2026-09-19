@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-34-correct-attempt-decay-trigger
+title: "정답 시도가 오개념 감쇠를 트리거하지 않는다 — 감쇠 트리거 범위 처분"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: cancelled
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실 — 정답 시도는 오개념 가설 신뢰를 움직이지 않는다. `api/me.py`의 오개념 훑기가 정답이면 `MisconceptionScan.NOT_RUN`을 돌려주고, 그 경우 `apply_candidates` 호출 조건에서 빠지기 때문이다. `apply_candidates`는 후보가 0건이어도 호출되면 `turns_elapsed`만큼 감쇠를 적용하므로(저장소 주석이 \"오개념이 관측되지 않은 시도가 신뢰를 내리는 경로가 바로 이것\"이라고 자인), 실제로 감쇠를 트리거하는 것은 *또 다른 오답*과 *코치 턴*뿐이다. P-15 실행에서 측정: 오답 2회 후 0.98 → 코치 세션 1턴 0.85 → **정답 제출 0.85(불변)** → 코치 턴 1회 0.74.\n② 무엇이 문제인가 — 교정 설명을 듣고 targeted 문항을 *맞힌* 것은 그 오개념을 넘어섰을 가능성이 가장 높은 사건인데, 현행 설계에서 그 사건만 신뢰에 아무 영향도 주지 않는다. 학생이 코치를 쓰지 않고 문제만 풀어 해결하면 오개념 가설이 감쇠 없이 남는다(낙인 방지 설계 취지와 역행).\n③ 처분 판단이 이 태스크의 본체다 — 세 안 중 근거와 함께 고른다. (가) 정답 시도에도 감쇠만 적용(후보 0건으로 `apply_candidates` 호출 — 코드 변경 최소·의미는 \"증거 없는 시도가 지났다\") (나) 같은 개념·같은 오개념 사정거리의 정답에 한해 약한 반박 증거를 남긴다(해소 판정은 `MISC-20` ⑨가 고정한 `provenance` 표식 경로를 침범하지 않는 선에서) (다) 현행 유지 — 정답은 오개념 부재의 증거가 아니라는 입장을 명문화하고 문서로만 고정. **(나)를 고를 경우 `MISC-20`의 RESOLVED 정의(정정 형태를 직접 보인 강한 반박만 해소)를 흔들지 않는지 먼저 대조한다.**\n④ 집행 지점 별항 — 처분이 (가)나 (나)면 `tests/backend/api/test_persona_three_path_completion.py`의 C-4 절이 현재 \"정답 시도는 confidence를 움직이지 않는다\"를 계약으로 동결하고 있으므로 그 단언을 함께 뒤집는다. (다)면 그 단언은 그대로 두고 근거를 판정 문서에 적는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - tests/backend/api/test_persona_three_path_completion.py
+session: null
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 발견. 판정 기준 main 433ec9ea. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 인접 소유자 대조: MISC-20(해소율 정직화·done)은 *해소 판정의 정의*를 소유하고 이 태스크는 *감쇠 트리거의 범위*를 다룬다 — 겹치는 축은 처분 (나)뿐이며 acceptance ③에 대조를 명시했다. 분류 LOOP.\n\n[취소 2026-09-19] 중복 — main이 PR #1227에서 EOS-123-correct-attempt-misconception-refutation-asymmetry로 같은 결함(정답 시도가 오개념 감쇠 시계를 돌리지 않는다)을 먼저 등재했다. 실측 근거·paths가 동일하므로 착지한 쪽을 정본으로 남기고 이쪽을 취소한다"
+updated: 2026-09-19

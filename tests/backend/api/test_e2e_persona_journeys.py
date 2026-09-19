@@ -54,8 +54,9 @@ import pytest
 from whymath_backend.api._rate_limit import reset_store
 from whymath_backend.db.models.atom_node import AtomNode
 from whymath_backend.db.models.concept import ConceptEdge
+from whymath_backend.db.models.pedagogy_dsl import LearningObjective, UnitSpec
 from whymath_backend.schema.concept import ConceptEdge as ConceptEdgeSchema
-from whymath_backend.schema.enums import EdgeType
+from whymath_backend.schema.enums import EdgeType, KnowledgeType
 
 pytestmark = pytest.mark.integration
 
@@ -270,6 +271,9 @@ class _Content:
         self.problem_ids: list[uuid.UUID] = []
         self.skill_ids: list[str] = []
         self.atom_codes: list[str] = []
+        #: 학습 단위 공급 좌석이 요구하는 목표·단원(§A-진단확정 여정만 쓴다).
+        self.objective_ids: list[str] = []
+        self.unit_ids: list[str] = []
 
     def teardown(self) -> None:
         """**학습자를 먼저** 지우고 그 다음 저작 콘텐츠를 지운다.
@@ -286,7 +290,10 @@ class _Content:
             try:
                 asyncio.run(_cleanup_content(problem_ids=self.problem_ids, concept_ids=[]))
             finally:
-                asyncio.run(_drop_graph(self.concept_ids, self.skill_ids, self.atom_codes))
+                try:
+                    asyncio.run(_drop_objectives(self.objective_ids, self.unit_ids))
+                finally:
+                    asyncio.run(_drop_graph(self.concept_ids, self.skill_ids, self.atom_codes))
 
 
 async def _drop_graph(
@@ -322,6 +329,72 @@ async def _drop_graph(
             )
     finally:
         await engine.dispose()
+
+
+async def _drop_objectives(objective_ids: list[str], unit_ids: list[str]) -> None:
+    """학습목표·단원 스펙 정리 — 목표가 단원을 복합 FK로 잡으므로 목표를 먼저 지운다."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    if not objective_ids and not unit_ids:
+        return
+    engine = create_async_engine(_settings().database_url)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("DELETE FROM learning_objective WHERE id = ANY(:ids)"),
+                {"ids": objective_ids},
+            )
+            await conn.execute(
+                text("DELETE FROM unit_spec WHERE unit_id = ANY(:ids)"), {"ids": unit_ids}
+            )
+    finally:
+        await engine.dispose()
+
+
+def _seed_objective(content: _Content, code: str) -> str:
+    """학습 단위 공급 좌석이 요구하는 단원 스펙 1 + 학습목표 1을 심고 목표 id를 돌려준다.
+
+    **이 행이 없으면 진단 게이트에 닿지 못한다.** `post_study_unit`은 목표 로드(부재 시 404)를
+    `require_learner_state`(부재 시 409)보다 *먼저* 하므로, 목표를 안 심으면 학습자 상태와
+    무관하게 404가 나고 "진단이 안 끝나서 막혔다"와 "목표가 없어서 막혔다"가 구별되지 않는다
+    (2026-09-19 실측 — 이 마디의 초판이 그 상태로 차단 사유를 *추론*만 하고 있었다).
+    """
+    unit_id = f"U.persona.{content.sfx}"
+    objective_id = f"OBJ.persona.{content.sfx}"
+    asyncio.run(
+        _add_all(
+            UnitSpec(
+                unit_id=unit_id,
+                unit_version=1,
+                api_version="v1",
+                title="페르소나 여정 판정용 단원",
+                curriculum_rev="2022",
+                standard_codes=["[10공수1-01-01]"],
+                concept_nodes=[code],
+                yaml_sha256="0" * 64,
+                compiler_ver="v1",
+            )
+        )
+    )
+    asyncio.run(
+        _add_all(
+            LearningObjective(
+                id=objective_id,
+                unit_id=unit_id,
+                unit_version=1,
+                statement="페르소나 여정 판정용 학습목표",
+                achievement_std="[10공수1-01-01]",
+                k_type=KnowledgeType.CONCEPT,
+                concept_nodes=[code],
+                slot_manifest={},
+                exit_evidence={},
+            )
+        )
+    )
+    content.unit_ids.append(unit_id)
+    content.objective_ids.append(objective_id)
+    return objective_id
 
 
 def _seed_concept(content: _Content, tag: str, name_ko: str) -> tuple[uuid.UUID, str]:
@@ -782,6 +855,85 @@ def test_persona_c_misconception_confidence_declines_after_targeted_problem() ->
                 "`EOS-123`(정답 반증 비대칭)이 해소된 것으로 보인다 — 이 단언을 감소 단언으로 "
                 "승격하고 EOS-123을 닫아라."
             )
+        journal.dump()
+    finally:
+        content.teardown()
+
+
+# ── Persona A 연장 — 진단 확정 → 학습 진입 ───────────────────────────────────────
+#
+# 위 A 여정은 "문제 → 숙달 상승 → 다음 concept"까지 본다. 원 지시문 §11의 A는 그 **앞에**
+# "진단 → 학습"을 둔다. 그 두 마디는 위 여정이 지나가지 않는 표면에 있고(어느 통합 테스트도
+# `POST /v1/me/assessments/capture`를 호출한 적이 없다 — 2026-09-19 전수 실측), 실제로 **끊겨
+# 있다**. 이 테스트는 그 끊김을 계약으로 고정한다.
+#
+# 왜 별도 테스트인가: 위 A 여정은 *통과하는* 경로의 기록이고 이것은 *막힌* 경로의 기록이다.
+# 한 테스트에 합치면 앞 마디에서 멈출 때 뒤 마디가 아예 판정되지 않는다(Week 1 하네스가
+# 읽기 축을 분리해 둔 것과 같은 이유).
+
+
+def test_persona_a_diagnosis_confirmation_and_study_entry_are_blocked() -> None:
+    """A 연장: 진단 확정이 쓰이지 않아 학습 진입이 409로 막힌다(`EOS-126` 동결).
+
+    끊긴 사슬 세 마디 — ①CAT 중단 규칙(SE ≤ 0.3)에 닿지 못해 ②`assessments/capture`가
+    `insufficient_measurement`로 끝나고, 그 분기에서만 도는 `provision_learner_state`가
+    실행되지 않아 ③`POST /v1/me/objectives/{id}/study`가 **409**를 낸다.
+
+    이 단언들이 빨강이 되면 결함이 해소된 것이다 — 그때 `EOS-126`을 닫으면서 여기를
+    `written is True` + `study 201`로 뒤집는다(그 뒤집기가 `EOS-126` acceptance ④다).
+    """
+    content, journal = _begin("A-진단확정")
+    try:
+        cid, code = _seed_concept(content, "diag", "완전제곱식의 전개")
+        pids = _seed_problems(content, cid, "d", [3.0, 3.2, 3.4, 3.6])
+        objective_id = _seed_objective(content, code)
+
+        with _client() as client:
+            _erase_learner(client)
+            auth = _login(client)
+
+            # ① 진단 — 대부분 정답으로 네 문항을 푼다(측정 근거를 쌓는다).
+            for index, pid in enumerate(pids):
+                _attempt(client, auth, pid, correct=index != 2, answer=_UNMATCHED_WRONG_ANSWER)
+            journal.record(
+                "①진단응답", "4문항 제출(3정답 1오답)", 숙달=_mastery_of(client, auth, cid)
+            )
+
+            # ② 진단 확정 — CAT 중단 규칙에 닿지 못해 **쓰이지 않는다**.
+            capture = client.post("/v1/me/assessments/capture", headers=auth)
+            assert capture.status_code == 200, capture.text
+            body = capture.json()
+            journal.record(
+                "②진단확정",
+                "EOS-126 — CAT 중단 규칙(SE ≤ 0.3) 미도달로 적재 안 됨",
+                written=body["written"],
+                reason=body["reason"],
+                SE=round(body["standard_error"], 3) if body["standard_error"] else None,
+            )
+            assert body["written"] is False, (
+                "진단 확정이 쓰였다 — CAT 중단 규칙이 해소된 것이다. `EOS-126`을 닫고 이 "
+                "단언을 `written is True`로, 아래 학습 진입 단언을 201로 뒤집어라."
+            )
+            assert body["reason"] == "insufficient_measurement", body
+
+            # ③ 학습 진입 — `learner_state` 행이 없어 루프 진입 게이트가 막는다.
+            #    단언은 하나다. `== 409`가 404를 이미 배제하므로 "목표가 실재한다"를 별도
+            #    절로 두지 않는다(어떤 입력에서도 판정을 바꾸지 못하는 절은 보호가 아니다).
+            #    404가 나오는 상태는 `_seed_objective`를 지우는 뮤테이션이 RED로 잡는다.
+            study = client.post(f"/v1/me/objectives/{objective_id}/study", headers=auth)
+            journal.record(
+                "③학습진입",
+                "진단 확정이 없으므로 루프 진입 게이트가 막는다",
+                status=study.status_code,
+                응답=study.json().get("detail"),
+            )
+            assert study.status_code == 409, (
+                f"학습 진입이 409가 아니다: {study.status_code} {study.text}\n"
+                "  · 404라면 EOS-126의 증거가 아니라 **픽스처 결함**이다 — 목표 행이 안 심겼고, "
+                "그 검사가 진단 게이트보다 앞서므로 학습자 상태와 무관하게 막힌다.\n"
+                "  · 201이라면 게이트가 열린 것이므로 ②의 동결과 함께 이 절도 뒤집는다."
+            )
+            assert "진단" in study.json()["detail"], study.json()
         journal.dump()
     finally:
         content.teardown()
