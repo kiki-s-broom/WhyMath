@@ -234,9 +234,19 @@ gates:
     title: "EOS-118 라이브 관측 회차 2건 실행 (Phaiakes9) — 좌석 신호가 실제로 좌석을 말하는지 확인. 실행 대상 = docs/ops/arch57_authoring_openrouter_runbook.md. ① openrouter 좌석 회차 1건 ② 기본값(anthropic) 대조군 회차 1건. 회신 = 두 회차의 요약 cloud_seat 블록 전문(state · observation.calls_with_served_model · observation.declared_vs_served{comparable,differs,differing_pairs} · observation.retries.calls_with_retries_measured). 판정 기준(한 신호로 두 축을 판정하지 않는다): state가 not_measured가 아닐 것 **그리고** declared_vs_served.comparable > 0일 것 **그리고** 두 회차의 observed_models가 서로 다를 것. 셋 중 하나라도 어긋나면 통과가 아니라 원인 규명 대상이다 — 실패 회차도 그대로 기록한다(폐기 금지). 세션이 실행 전에 6항목 브리핑과 함께 명령 블록을 안내하며, 런북·측정 코드가 Kiki 체크아웃에 실재하는지(main 도달) 먼저 실측 확인한다. 전제: Phaiakes9 · OpenRouter 키 등록됨(ARCH-57 라이브 1회차 선례) · Docker Postgres 가동."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-19
     remind_after_days: 14
+    evidence: "판정 기준: Phaiakes9 worktree가 origin/main `412ccb71`에서 실행 (`git -C $Tree log -1 --oneline`으로 자가검증 출력 확인 · 런북 PR #1223). 실행 런북 = docs/ops/eos118_seat_signal_live_runbook.md.\n\n[A] SEAT_OK=True (FROM_TREE=True · SEAT_DEFAULT=AnthropicProvider · SEAT_WITH_ENV=OpenRouterProvider · HAS_OBSERVATION=True). PRE_SHELL_VAR=openrouter 오염이 창에 있었으나 자식 프로세스 os.environ.pop 설계가 그것을 제거하고 재어 SEAT_DEFAULT가 정확히 나왔다 — 2026-09-18 오독 경로가 실제로 막혔다. PRE_USER_VAR는 비어 User 환경변수 영구 오염은 없다.\n[B] CHECK_EXIT=0 · CONFIGURED=True · PROVIDERS=('deepinfra',) · JURISDICTION=Jurisdiction.US · ERROR=None.\n[C] OPENROUTER_EXIT=0 · ANTHROPIC_EXIT=0 · 좌석당 5호출.\n\n판정 4축 전건 성립:\nⓐ 선언 축 — 두 회차 모두 state=all_on_selected_seat (not_measured 아님). calls_with_model_name 5/5.\nⓑ 관측 축 — 두 회차 모두 comparable=5 > 0. 관측 축(EOS-112)이 라이브에서 살아 있다.\nⓒ 변별력 — served_models가 서로 다르다: openrouter={'deepseek/deepseek-v4.1-flash': 5} vs anthropic={'claude-sonnet-4-6': 5}. 신호가 좌석을 구분한다.\nⓓ 재시도 — openrouter retries_measured=5 > 0 (retries_total=0 = 계측했고 재시도 없었다). anthropic은 retries_measured=0 · retries_total=null로 정상(SDK 자체 재시도 · 우리 전송기 미경유 · anthropic.py:216).\n\nacceptance ④ 사람 판정: 두 회차 모두 differs=0 · differing_pairs=[]. comparable=5이므로 이것은 미관측이 아니라 실측 0이다 — 두 공급사 모두 선언값과 글자 그대로 같은 문자열을 돌려준다. 별칭→버전 해소가 일어나지 않았다(Anthropic이 날짜 붙은 ID를 돌려줄 것이라는 사전 가정이 실측으로 반증됐다)."
+    cleared_by: kiki
+    notes: ""
+  - id: G-eos121-seat-generation-diversity-run
+    title: "EOS-121 좌석별 생성 다양성 실측 회차 (Phaiakes9) — 좌석당 최소 30회, spec 3종 이상. EOS-118 라이브 부수 실측(main 412ccb71 · 2026-09-19)에서 anthropic 회차가 attempted=5 accepted=1 rejected_duplicate=4였고 openrouter 회차는 rejected_duplicate=0이었다. 표본 n=5 단일 주제라 좌석 특성인지 우연인지 가를 수 없다. 회신 = 좌석별 outcome_counts 전문 + 사용한 spec 목록 + 각 좌석의 샘플링 파라미터(temperature 등). 판정 기준: 교란 변수(좌석별 샘플링 설정 차이)를 먼저 배제한 뒤에만 다양성 차이를 좌석 특성으로 읽는다 — 설정이 다르면 비교 자체가 무효이고 맞춘 뒤 재측정한다. 재현되지 않으면 '표본 5의 우연'으로 기록하고 닫는다(실패 회차도 산출물). 전제: Phaiakes9 · OpenRouter/Anthropic 키 등록됨 · Docker/DB 불요. 비용 주의: 좌석당 30회 x spec 3종 = 180호출이므로 사전에 예산 확인."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-19
+    remind_after_days: 30
     evidence: null
     cleared_by: null
     notes: ""
@@ -524,11 +534,11 @@ gates:
     title: "atom_node.behavior_skills 재전파 (크로스워크 이전 재실행)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-15
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: 측정 시점 main f673448c (실행 블록의 JUDGED_AGAINST_MAIN 출력 · worktree detached origin/main) · 게이트 항목 착지 main e4bec26b 이후(PR #1172 병합 2026-09-16T01:57:40Z)\n\nKiki 실행(Phaiakes9 whymath-pg 5433, 2026-09-16) — 런북 파일 없이 세션이 main 코드를 읽고 작성한 절차(세션 claude/intelligent-planck-ujtlki). 증적 원문은 PR #1172 코멘트 5690324481에 전달돼 있었으나 대장에 반영되지 않은 채 PR이 병합됐고, 이 clear가 그 누락을 상환한다.\n\n실행 조건:\nDOCKER_OK=True (whymath-pg Up · 0.0.0.0:5433->5432/tcp)\nWT_HEAD=f673448c = MAIN_SHA=f673448c (일치)\nMODULE_FROM=C:\\Users\\kiki\\Desktop\\__AI\\_wt_crosswalk\\src\\backend\\whymath_backend\\l1\\concept_atom_crosswalk\\populate.py\nREACH_EXIT=0\nTRANSFER_EXIT=0\n\n실행은 git worktree add --detach origin/main 사본에서 했고 MODULE_FROM으로 모듈 출처를 동결했다. 이는 PR #1172가 기록한 1차 실행 사고(클론이 타 세션 브랜치 0367fce4에 있어 SKB-03 미포함 옛 CLI가 돌았음)를 구조적으로 배제하기 위한 것이다. 클론 체크아웃은 실행 내내 0367fce4 그대로였고(타 세션 작업 무영향) worktree는 실행 후 제거했다(WT_REMOVED=True).\n\nCLI stdout 4줄 전문:\natom_node.behavior_skills 갱신: 1311건 (비어있지 않은 스킬 1198건·대상 원자 1311건).\nconcept.behavior_skills 갱신: 1311건 (비어있지 않은 스킬 1198건·대상 1311건).\nconcept_content.atom_codes(K-12) 갱신: 437건 (대상 437건·대학 행 무변경).\n437-키 자산 원자 축 이전 완료.\n\n경고 줄 0건 — 2026-09-14 실행에서 떴던 \"atom_node 대상 행 부재 1311건\"·\"concept_content K-12 대상 행 부재 437건\" 두 경고가 둘 다 사라졌다. 그것이 이 게이트의 성립 신호다. unmapped skip 줄도 없다(코퍼스 실측 crosswalk.jsonl 437행 중 atom_codes 빈 행 0건과 일치).\n\nDB 대조 (BEFORE -> AFTER):\natom_node 전체 2683\natom_node.behavior_skills 비어있지 않음: 0 -> 1198\nconcept_content.atom_codes 비어있지 않음: 0 -> 437\nconcept.behavior_skills 비어있지 않음: 1198 -> 1198 (무변경)\n\n3자 교차 확인 통과: 코퍼스 실측(crosswalk.jsonl 437행·등장 원자 code 유일 1311) = CLI 보고(1311/1198/437) = DB 카운트(1198/437). 서로 다른 세 경로의 값이 일치하므로 \"이전기 반환값만 맞고 DB는 비어 있는\" 상태가 배제된다.\n\nconcept.behavior_skills가 1198에서 변하지 않은 것은 정상이다 — 2026-09-14 G-skb01-concept-behavior-skills-populate에서 이미 채워진 축이며 이번은 같은 매핑의 멱등 재확인이다. UPDATE 건수 1311과 nonempty 1198의 차이 113건은 스킬이 빈 원자이고, 코드가 두 줄에 같은 nonempty 변수를 쓰므로 atom_node 쪽 1198과 같은 출처다.\n\n정직한 공백:\n1. L2 enrich(off_atom_axis 계상 감소)·L4 콘텐츠 공급(dsl_render_rate)이 실제로 살아났는지는 미증명 — 값이 들어간 것까지만 측정됐다.\n2. 113건이 왜 빈 스킬인지는 확인하지 않았다.\n3. 해소율 축은 이 게이트와 독립임이 사후에 확정됐다 — G-skb01-resolution-remeasure(2026-09-18 cleared) 증적이 해소 사슬은 l2/skill_mastery_tracking.py의 _assessed_skill_ids(Concept.behavior_skills x skill_node 조인)이며 atom_node·concept_content는 그 사슬에 등장하지 않는다고 실측했다. 즉 이 게이트가 pending으로 남아 있던 것은 그 측정의 선행 조건이 아니었다.\n\n지연 사유(정직 고지): 게이트 항목이 당시 미머지 브랜치(PR #1172)에만 있어 이 세션의 브랜치에서는 대장에 쓸 수 없었다. 그래서 증적을 PR 코멘트로 전달했으나 소유 세션이 그것을 반영하지 않고 병합해 3일간 pending으로 방치됐다. 사람 게이트의 인플라이트·증적 인계 공백은 HARN-105(PR #1174)가 소유한다."
+    cleared_by: claude
     notes: ""
   - id: G-skb04-concept-content-populate
     title: "SKB-04 concept_content prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(concept_content.populate 1회 실행). 배경: 이 CLI는 완비돼 있으나 prod에서 한 번도 실행되지 않았다(2026-09-14 실측: 크로스워크 이전이 \"concept_content K-12 대상 행 부재 437건\" 보고). 2026-09-15 착수 검증에서 코드 공백이 아님을 확정했다 — 코퍼스 실재(K-12 437건·대학 409건)·CLI 진입점 실재(main(argv)->int·__main__)·크로스워크가 부재로 지목한 code 3건이 코퍼스에 전건 포함(10기수1-01-01/-02/-03)·concept_content는 FK가 없고 code가 PK라 선행 적재 불요. 즉 실행만 하면 해소된다. 기대 적재: K-12 437 + 대학 409 = 846건. 런북: docs/ops/skb04_concept_content_populate_runbook.md. SKB-03 게이트(G-skb03-atom-node-populate)와 같은 창에서 연달아 실행 가능하며 순서 의존은 없다(두 테이블은 서로 참조하지 않는다)."

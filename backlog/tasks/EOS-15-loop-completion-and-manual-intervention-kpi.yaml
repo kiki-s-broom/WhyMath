@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① KPI ① Loop Completion Rate 소유 — 계획서 §19: \"시작한 학습 세션 중 정상적으로 Recommendation까지 도달한 비율\"(Alpha 목표 >95%). 현행 소유 태스크 0건.\n② 구조적 선결을 먼저 적는다 — 이 지표는 **분모가 정의 불가**다. 세션 단위 분모가 필요한데 `LearningSession` **writer가 0**이고 `l2/recommendation_evidence.py`가 `session_id`를 uuid4 placeholder로 발급한다. 따라서 이 태스크의 첫 산출은 지표가 아니라 **\"세션을 무엇으로 셀 것인가\"의 판정**이다 — 배선하거나, 다른 분모(예: 진단 완료 건)를 쓰거나, 측정 불가를 명시한다.\n③ KPI ④ Manual Intervention 소유 — \"정상 학습 시나리오에서 운영자 DB 개입 = 0\". 현행 소유 태스크 0건이며 저장소는 이 조건을 **G4(12/13)** 에 배정했다(`docs/strategy/eos_transition_declaration_2026-08-30.md:356`). 이 태스크는 그 게이트가 판정할 **측정 방법**을 만든다 — 무엇을 '개입'으로 셀 것인지(직접 SQL·관리자 화면 쓰기·시드 스크립트)를 먼저 정의한다.\n④ 이중 KPI 정본 금지 — 저장소 KPI 정본은 **12종**(기술 6 + 내용 6 · `ops/validation_scorecard.py:129 KPI_SOURCES`)이고 계획서 5축과 **다른 축**이다. 5축을 그대로 얹으면 KPI 정본이 둘이 된다(붕괴 연쇄 \"truth source가 하나가 아님\"). 반드시 ①기존 12종에 편입하거나 ②별도 축임을 명시하고 경계를 적는다 — 둘 중 하나를 고르고 근거를 남긴다.\n⑤ 나머지 3축은 등재하지 않는다 — ②State Integrity는 `ops/integrity_violations_gate.py`(6종 + `v_integrity_violations` + CI 배선)로, ③Explainability는 REC-11(done)로, ⑤Traceability는 EOS-79(done) + `db/models/evidence_link.py` + `attempt_event`로 이미 소유자가 있다. 중복 등재 금지.\n⑥ 측정 실패가 통과로 위장되지 않게 — 분모가 0일 때 \"100% 달성\"이 나오면 안 된다. 미측정과 무위반을 구별해 표기한다(CLAUDE.md 이중 회계 원칙)."
-artifacts: []
+artifacts:
+  - "PR #1222 — https://github.com/kiki-s-broom/WhyMath/pull/1222 (commit a2bae437)"
 paths:
   - src/backend/whymath_backend/ops/validation_scorecard.py
 session: null
 notes: "출처: 계획서 300 §19(KPI 5축) — 대조표 §6 단위5. 분류(§14): SUPPORT.\n\n실측(판정 기준 main 2e1220b4): 5축 중 ②③⑤는 소유자 실재, **①④만 소유 태스크 0건**이다(검색 범위: backlog 655건 전수 × KPI/지표/loop completion/traceab/역추적/explainab/불일치/integrity/개입). ①은 LearningSession writer 0이라 분모가 구조적으로 미정의이고, ④는 저장소가 G4(12/13)에 배정했으나 측정 방법 소유자가 없다.\n\n이 태스크의 가장 큰 위험은 지표 추가가 아니라 **KPI 정본 이중화**다 — acceptance ④가 그 축을 강제한다.\n\n착수 전제: 2026-09-03 Kiki 결정(선언 §1.3) 갱신."
-updated: 2026-09-16
+updated: 2026-09-19
