@@ -742,7 +742,12 @@ def load_spec_plan_file(
     """
     entries: list[tuple[str, EquivalenceSpec, str]] = []
     seen_ids: set[str] = set()
-    with path.open("r", encoding="utf-8") as handle:
+    # 인코딩은 `utf-8-sig`다 — 이 파일은 **사람이 손으로 만드는 유일한 입력**이고, Windows
+    # PowerShell 5.1의 `Set-Content -Encoding utf8`이 UTF-8 **BOM을 붙인다**. `utf-8`로 읽으면
+    # 첫 줄이 `\ufeff{...`가 되어 `JSONDecodeError: Unexpected UTF-8 BOM`으로 죽는다(2026-09-19
+    # Phaiakes9 실측 — 파일럿 회차가 LLM 호출 0건에서 exit 2). `utf-8-sig`는 BOM이 없으면
+    # `utf-8`과 동일하게 동작하므로 기존 파일에 회귀가 없다.
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line_no, line in enumerate(handle, start=1):
             text = line.strip()
             if not text:

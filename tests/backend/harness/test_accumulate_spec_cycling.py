@@ -429,6 +429,45 @@ class TestLoadSpecPlanFile:
             default_topic_hint="기본 힌트",
         )
 
+    def test_reads_powershell_utf8_bom_file(self, tmp_path: Path) -> None:
+        """PowerShell 5.1 `Set-Content -Encoding utf8`이 내놓는 BOM + CRLF 파일을 읽는다.
+
+        이 절이 없으면(로더가 `utf-8`로 읽으면) 첫 줄 앞에 U+FEFF가 남아
+        `JSONDecodeError: Unexpected UTF-8 BOM`으로 죽는다. 2026-09-19 Phaiakes9
+        파일럿 회차가 **LLM 호출 0건에서 exit 2**로 끝난 실제 실패다.
+
+        픽스처가 BOM과 CRLF를 **둘 다** 갖는 이유: Kiki 머신이 실제로 내놓는 바이트가
+        그 조합이고, 한쪽만 재현하면 나머지 축을 한 번도 밟지 않는다.
+        """
+        path = tmp_path / "plan.jsonl"
+        body = (
+            "\r\n".join(
+                json.dumps({"spec_id": sid, "topic_hint": f"힌트 {sid}"}, ensure_ascii=False)
+                for sid in ("a", "b", "c")
+            )
+            + "\r\n"
+        )
+        path.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
+        # 픽스처가 정말 BOM을 갖는지 단언한다 — 갖지 않으면 이 테스트는 BOM 축을
+        # 한 번도 검사하지 않은 채 통과한다(주입이 대상에 닿았는가).
+        assert path.read_bytes()[:3] == b"\xef\xbb\xbf"
+
+        entries = self._load(path)
+        assert [entry[0] for entry in entries] == ["a", "b", "c"]
+
+    def test_reads_plain_utf8_without_bom(self, tmp_path: Path) -> None:
+        """대조군 — BOM이 없는 파일도 그대로 읽힌다.
+
+        위 테스트만 있으면 "BOM을 **요구하는**" 구현(예: 앞 3바이트를 무조건 잘라내는
+        구현)도 통과한다. `utf-8-sig`는 BOM이 없으면 `utf-8`과 동일하게 동작한다.
+        """
+        path = tmp_path / "plan.jsonl"
+        path.write_bytes((json.dumps({"spec_id": "a"}, ensure_ascii=False) + "\n").encode("utf-8"))
+        assert path.read_bytes()[:3] != b"\xef\xbb\xbf"
+
+        entries = self._load(path)
+        assert [entry[0] for entry in entries] == ["a"]
+
     def test_parses_full_entries(self, tmp_path: Path) -> None:
         path = self._write(
             tmp_path,
