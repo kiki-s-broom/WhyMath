@@ -5,6 +5,9 @@
 **태스크**: `EOS-113` · **PR**: [#1213](https://github.com/kiki-s-broom/WhyMath/pull/1213)
 **선행**: P-08 = `EOS-14`(recommend 호출 계약·reason 필수) · P-09 = `MISC-30`(보정 정책 테이블·반복 오류 사다리) ·
 P-10 = 기존부분(핵심 제약이 이미 코드 집행 중 — 잔여는 `PED-18`·`PED-19`·`S4-11`가 소유)
+**라이브 증거**: CI run `35418441444` 잡 `105831534119`(`backend — 마이그레이션·통합 (실 PG)` · pgvector/pgvector:pg16 · `WHYMATH_RUN_INTEGRATION=1`) —
+`329 passed, 13 skipped, 10539 deselected, 2 xfailed in 329.22s` · 스텝 **exit 0** · skipped 스텝 0개
+(그 13 skip은 ocr·embedding·redis 라이브 자원 미도달이고 판정 하네스는 그 안에 없다).
 
 ---
 
