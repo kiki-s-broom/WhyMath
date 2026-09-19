@@ -34,9 +34,14 @@ JOIN 뒤 `atom_meta is None`이면 **원자 축 밖으로 보고 조용히 제�
 
 **판정 밖(의도적으로 보지 않는 것)**
 - 코칭 문구·교정 발화의 교수학적 품질은 보지 않는다(연결성과 *수치 변화*만).
-- `POST /v1/me/objectives/{id}/study`(학습 단위 공급)는 지나가지 않는다 — 그 좌석은
-  `learning_objective` 행과 DSL 적재를 요구하고, 페르소나 A의 "학습" 마디가 막히는 지점은 그
-  앞단(`learner_state` 행 부재)이라 거기까지 가지 못한다. 그 사실 자체는 §A-4가 동결한다.
+- `POST /v1/me/objectives/{id}/study`의 **진단 게이트까지만** 지나간다(§A-6). 그 뒤의 학습 단위
+  *공급*(교수법 선택·DSL 렌더)은 보지 않는다 — 현행 main에서 그 게이트가 열리지 않기 때문이고
+  (§A-5), 열리더라도 DSL 적재라는 별개 전제가 붙는다.
+- **후보 풀이 이 회차의 콘텐츠뿐이라고 가정한다.** §A-4·§B-5·§C-4는 추천된 *문항 id*를 단언하므로,
+  같은 DB에 다른 회차의 저작 콘텐츠가 남아 있으면 거짓 실패가 난다. CI의 `e2e-nightly`는 잡마다
+  새 postgres 서비스를 띄우고 이 하네스는 성패와 무관하게 자기 콘텐츠를 지우므로 그 환경에서는
+  성립한다 — 로컬에서 중단된 실행이 잔여물을 남겼다면 그것부터 지운다(2026-09-19 실측: 중단된
+  탐침이 남긴 문항 6건이 §C-4를 거짓 실패시켰다).
 - 라이브 LLM 0 — 코치는 `decision.prompt`를 AI 턴으로 저장할 뿐 LLM을 부르지 않는다
   (`api/coach.py` 모듈 계약). shadow·judge·의미 매처는 전부 기본 off.
 """
@@ -61,7 +66,8 @@ from whymath_backend.app import create_app
 from whymath_backend.config import get_settings
 from whymath_backend.db.models.atom_node import AtomNode
 from whymath_backend.db.models.concept import ConceptEdge
-from whymath_backend.schema.enums import EdgeType
+from whymath_backend.db.models.pedagogy_dsl import LearningObjective, UnitSpec
+from whymath_backend.schema.enums import EdgeType, KnowledgeType
 
 pytestmark = pytest.mark.integration
 
@@ -239,6 +245,42 @@ def _prereq_edge(from_id: uuid.UUID, to_id: uuid.UUID) -> ConceptEdge:
     )
 
 
+def _unit_spec(unit_id: str, code: str) -> UnitSpec:
+    """학습목표가 매달릴 단원 스펙 — `learning_objective`의 복합 FK 대상(최소 형태)."""
+    return UnitSpec(
+        unit_id=unit_id,
+        unit_version=1,
+        api_version="v1",
+        title="P-15 판정용 단원",
+        curriculum_rev="2022",
+        standard_codes=["[10공수1-01-01]"],
+        concept_nodes=[code],
+        yaml_sha256="0" * 64,
+        compiler_ver="v1",
+    )
+
+
+def _learning_objective(objective_id: str, unit_id: str, code: str) -> LearningObjective:
+    """학습목표 1건 — 이 행이 **있어야** 학습 단위 공급의 진단 게이트까지 도달한다.
+
+    이 픽스처가 왜 필요한지가 판정과 직결된다: `post_study_unit`은 목표 로드(없으면 404)를
+    `require_learner_state`(없으면 409)보다 **먼저** 한다. 그래서 목표를 안 심으면 학습자
+    상태와 무관하게 404가 나고, "진단이 안 끝나서 막혔다"와 "목표가 없어서 막혔다"가 구별되지
+    않는다(2026-09-19 실측 — 이 하네스의 초판이 정확히 그 상태로 §A-6을 *추론*만 하고 있었다).
+    """
+    return LearningObjective(
+        id=objective_id,
+        unit_id=unit_id,
+        unit_version=1,
+        statement="P-15 판정용 학습목표",
+        achievement_std="[10공수1-01-01]",
+        k_type=KnowledgeType.CONCEPT,
+        concept_nodes=[code],
+        slot_manifest={},
+        exit_evidence={},
+    )
+
+
 async def _sql(sql: str, **params: Any) -> list[Any]:
     """관측·정리 전용 원시 SQL — 학습자 *상태*는 쓰지 않는다(읽기 또는 저작 콘텐츠 삭제만)."""
     engine = create_async_engine(_settings().database_url)
@@ -373,10 +415,14 @@ def test_persona_a_normal_learner_completes_path() -> None:
     skill_main, skill_next = f"skill.p15a.{sfx}.m", f"skill.p15a.{sfx}.n"
     pids_main = [uuid.uuid4() for _ in range(5)]
     pids_next = [uuid.uuid4() for _ in range(2)]
+    unit_id, objective_id = f"U.p15a.{sfx}", f"OBJ.p15a.{sfx}"
 
     try:
         _seed_concept(cid_main, code_main, skill_main, pids_main, f"{sfx}m", 3.0)
         _seed_concept(cid_next, code_next, skill_next, pids_next, f"{sfx}n", 3.0)
+        # 6)의 "학습" 마디를 *측정*하려면 목표 행이 있어야 한다(없으면 404로 먼저 막힌다).
+        asyncio.run(_add_all(_unit_spec(unit_id, code_main)))
+        asyncio.run(_add_all(_learning_objective(objective_id, unit_id, code_main)))
 
         with _client() as client:
             _erase(client, "persona-a")  # 선행 정리 — 지난 회차 계정이 남으면 기준선이 깨진다.
@@ -479,7 +525,35 @@ def test_persona_a_normal_learner_completes_path() -> None:
                 f"written=False · reason={cap.json()['reason']} · "
                 f"SE={cap.json()['standard_error']:.3f} (목표 0.3) · learner_state=0건",
             )
+
+            # ── 6) 학습 — 그 끊긴 진단이 **학습 진입을 실제로 막는지**까지 측정한다. ────
+            # 5)가 "확정이 안 쓰인다"만 보였다면 여기는 그 다음 화살표를 본다. 두 사유를
+            # 분리하는 것이 이 마디의 전부다: 목표 행은 위에서 심었으므로 404가 아니고,
+            # 남은 차단 사유는 `require_learner_state`뿐이다. 404가 나오면 그것은 D1의
+            # 증거가 아니라 **픽스처 결함**이므로 따로 지목해 실패시킨다.
+            study = client.post(f"/v1/me/objectives/{objective_id}/study", headers=auth)
+            # 단언은 **하나**다. 처음에는 `status_code != 404`를 앞에 따로 뒀는데, 뮤테이션
+            # M13이 그 절을 지워도 초록이었다 — 당연하다. `== 409`가 404를 이미 배제하므로
+            # 그 절은 *어떤 입력에서도* 판정을 바꾸지 못하는, 검출력 0의 절이었다. 보호처럼
+            # 보이지만 보호가 아닌 절은 남기지 않는다(CLAUDE.md — 변별력 없는 검증 스텝 금지).
+            # 진단 가치는 절이 아니라 **메시지**에 담는다: 404가 나오면 그것은 D1의 증거가
+            # 아니라 픽스처 결함(목표 행 미시딩)이며, 그 경우를 M12가 실제로 RED로 잡는다.
+            assert study.status_code == 409, (
+                f"학습 진입이 409가 아니다: {study.status_code} {study.text}\n"
+                "  · 404라면 D1의 증거가 아니라 **픽스처 결함**이다 — 목표 행이 안 심겼고, "
+                "그 검사가 진단 게이트보다 앞서므로 학습자 상태와 무관하게 막힌다.\n"
+                "  · 201이라면 진단 게이트가 열린 것이므로 5)의 동결과 함께 이 절도 뒤집는다."
+            )
+            assert "진단" in study.json()["detail"], study.json()
+            _step(
+                "A",
+                "6-study-BLOCKED",
+                f"POST /v1/me/objectives/{objective_id}/study → 409 "
+                f"({study.json()['detail']}) · 404 아님(목표 행 실재)",
+            )
     finally:
+        asyncio.run(_sql("DELETE FROM learning_objective WHERE id = :i", i=objective_id))
+        asyncio.run(_sql("DELETE FROM unit_spec WHERE unit_id = :u", u=unit_id))
         _teardown(
             "persona-a",
             concept_ids=[cid_main, cid_next],
