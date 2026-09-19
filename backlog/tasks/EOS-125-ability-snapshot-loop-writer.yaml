@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 실측 사실 — 학습 루프만 도는 학습자에게 `GET /v1/me/learner-state`의 `general_ability`는 **항상 null**이다. 그 필드의 생산자 `l2/ability_tracking.get_current_theta`는 `ability_snapshot` 테이블의 최신 행을 읽는데, 그 행을 만드는 유일한 경로가 `POST /v1/me/ability/snapshots`(수동 캡처)이고 시도 제출 경로는 그것을 부르지 않기 때문이다. P-15 페르소나 3인 전원의 LearnerState 스냅샷 14회가 전부 `theta=None`이었다(2026-09-19 실측 · 판정 기준 main 433ec9ea).\n② 같은 순간 다른 표면은 θ를 낸다 — `GET /v1/me/next-problem`은 같은 학습자에 대해 θ를 계산해 응답에 싣는다(시도 이력에서 즉석 추정). 즉 능력 추정이 없는 것이 아니라 **적재되지 않아** 상태 합성 표면에서만 사라진다. 두 표면이 같은 학습자에 대해 다른 말을 하는 상태다.\n③ 처분 3택 — (가) 시도 제출·진단 확정 같은 자연 경계에서 스냅샷을 자동 적재한다(어느 경계인지·중복 적재 방지·비용을 함께 판정) (나) `LearnerState.general_ability`의 생산자를 적재 테이블이 아니라 즉석 추정으로 바꾼다(그러면 두 표면이 같은 계산을 공유한다 — 대신 상태 조회가 무거워진다) (다) 현행 유지하되 `origins`가 그 필드를 `no_data`로 정직하게 표기하는지 확인하고 소비처(클라·리포트)가 null을 0으로 접지 않는지 전수 확인한다.\n④ 집행 지점 별항 — 어느 안이든 완료 조건은 \"루프만 돈 학습자의 `learner-state`에 θ가 실린다(또는 실리지 않는 이유가 `origins`에 정직하게 남고 소비처가 그것을 구분한다)\"를 실 PG 테스트로 확인하는 것이다. `tests/backend/api/test_persona_three_path_completion.py`의 `_snapshot` 줄이 그 관측 지점으로 이미 있다.\n⑤ 범위 밖 — IRT 추정기 자체·θ 척도·개념별 θ(`/ability/by-concept`)는 건드리지 않는다. 이 태스크는 *적재 경계*만 다룬다."
+  - "[경로 정정 2026-09-19 · PR #1228 축소 후] ④가 관측 지점으로 가리킨 `test_persona_three_path_completion.py`의 `_snapshot` 줄은 **존재하지 않는다** — main이 PR #1227(EOS-122)로 P-15를 먼저 착지시켜 중복 하네스를 폐기했기 때문이다. 이 결함(루프 학습자의 `general_ability`가 항상 null)은 현재 **어떤 하네스도 관측하지 않는다** — 착지본 `test_e2e_persona_journeys.py`는 `mastery/current`·`export`를 쓰고 `GET /v1/me/learner-state`를 지나가지 않는다(2026-09-19 표면 전수 실측). 관측 지점 신설은 이 태스크가 처분과 함께 정한다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l2/ability_tracking.py
   - src/backend/whymath_backend/l2/learner_state.py
   - src/backend/whymath_backend/api/me.py
 session: null
-notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 발견. 부재 판정 절차 적용 — 역할(\"ability snapshot writer\")로 backlog 전수 검색 결과 소유자는 ASM-01(done·관측 리포트 범위)·ASM-05(done·성취기준 관측)뿐이고 둘 다 이 적재 경계를 다루지 않는다. 내가 찾은 방법으로는 미완료 소유자 0건. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 SUPPORT(루프는 이것 없이도 돌지만 상태 표면이 반쪽이 된다)."
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 발견. 부재 판정 절차 적용 — 역할(\"ability snapshot writer\")로 backlog 전수 검색 결과 소유자는 ASM-01(done·관측 리포트 범위)·ASM-05(done·성취기준 관측)뿐이고 둘 다 이 적재 경계를 다루지 않는다. 내가 찾은 방법으로는 미완료 소유자 0건. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 SUPPORT(루프는 이것 없이도 돌지만 상태 표면이 반쪽이 된다).\n\n[정정 2026-09-19] PR #1228 축소 — 폐기된 하네스 경로 참조 정정(관측 지점 부재를 명시)"
 updated: 2026-09-19
