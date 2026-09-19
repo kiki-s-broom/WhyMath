@@ -212,6 +212,9 @@ class TestGeneratePayload:
         await _generate(provider)
         assert "temperature" not in transport.last_payload
         assert "seed" not in transport.last_payload
+        # EOS-121 A — top_p도 같은 규약이다. `is None` 검사가 아니라 **키 부재**를 본다:
+        # `payload["top_p"] = None`이 실리면 공급사 기본값이 아니라 null이 나가므로 둘은 다르다.
+        assert "top_p" not in transport.last_payload
 
     async def test_temperature_and_seed_are_forwarded_when_set(self) -> None:
         """OpenAI 호환 API에는 seed가 **있다** — Anthropic과 달리 거부하지 않는다."""
@@ -220,6 +223,26 @@ class TestGeneratePayload:
         await _generate(provider, temperature=0.9, seed=42)
         assert transport.last_payload["temperature"] == 0.9
         assert transport.last_payload["seed"] == 42
+
+    async def test_top_p_is_forwarded_when_set(self) -> None:
+        """EOS-121 A — 지정한 top_p가 OpenAI 호환 `top_p`로 **그 값 그대로** 실린다."""
+        transport = _RecordingTransport()
+        provider = OpenRouterProvider(transport=transport, settings=_settings())
+        await _generate(provider, top_p=0.95)
+        assert transport.last_payload["top_p"] == 0.95
+
+    async def test_top_p_does_not_disturb_the_provider_block(self) -> None:
+        """top_p를 실어도 세 파라미터 계약(only·allow_fallbacks·data_collection)은 그대로다.
+
+        새 키가 `payload` dict를 조립하는 자리에 들어가므로, 그 자리에서 기존 계약을 덮어쓰는
+        회귀가 가능하다 — 이 단언이 그 자리를 밟는다.
+        """
+        transport = _RecordingTransport()
+        provider = OpenRouterProvider(transport=transport, settings=_settings())
+        await _generate(provider, top_p=0.95)
+        block = transport.last_payload["provider"]
+        assert block["only"] == ["deepinfra", "gmicloud"]
+        assert block["allow_fallbacks"] is False
 
     async def test_authorization_header_carries_the_key(self) -> None:
         transport = _RecordingTransport()

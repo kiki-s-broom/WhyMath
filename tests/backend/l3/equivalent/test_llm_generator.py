@@ -87,22 +87,24 @@ class FakeProvider:
         self.decisions: list[RoutingDecision] = []
         self.json_schemas: list[Mapping[str, object] | None] = []
         self.loops: list[object] = []
+        # EOS-121 A — 받은 키워드 인자를 **그대로** 보관한다. 파라미터 기본값으로만 받으면
+        # "안 왔다"와 "None이 왔다"가 둘 다 None으로 보여 기본값 회귀를 못 잡는다.
+        self.call_kwargs: list[dict[str, object]] = []
 
     async def generate(
         self,
         prompt: str,
         system: str,
         decision: RoutingDecision,
-        *,
-        images: Sequence[str] | None = None,
-        temperature: float | None = None,
-        json_schema: Mapping[str, object] | None = None,
-        seed: int | None = None,  # EOS-73 — LLMProvider 계약 정합(대역은 시드를 쓰지 않는다)
+        **kwargs: object,
     ) -> GenerationResult:
         self.calls.append((prompt, system))
-        self.temperatures.append(temperature)
+        temperature = kwargs.get("temperature")
+        self.temperatures.append(temperature if isinstance(temperature, float) else None)
         self.decisions.append(decision)
-        self.json_schemas.append(json_schema)
+        schema = kwargs.get("json_schema")
+        self.json_schemas.append(schema if isinstance(schema, Mapping) else None)
+        self.call_kwargs.append(dict(kwargs))
         self.loops.append(asyncio.get_running_loop())
         if self._index < len(self._responses):
             out = self._responses[self._index]
@@ -143,6 +145,42 @@ def _gen(provider: object, **overrides: object) -> LLMEquivalentProblemGenerator
     kwargs: dict[str, object] = {"misconception_catalog": _CATALOG}
     kwargs.update(overrides)
     return LLMEquivalentProblemGenerator(provider, **kwargs)  # type: ignore[arg-type]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# top_p (EOS-121 선결조건 A) — 기본은 미전송, 명시할 때만 실린다.
+# ──────────────────────────────────────────────────────────────────────
+class TestTopP:
+    def test_default_does_not_send_top_p(self) -> None:
+        """기본값 None → provider 호출에 top_p **키 자체가 없다**(기존 저작 동작 무변경).
+
+        이것이 이 인자의 핵심 제약이다: 생성기가 기본으로 top_p를 실으면 기존 저작 배치
+        전부의 샘플링이 공급사 기본값에서 *조용히* 바뀐다(회귀). 회귀는 예외도 로그도 남기지
+        않으므로 이 단언이 유일한 방어선이다.
+        """
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        assert "top_p" not in provider.call_kwargs[0]
+        assert provider.temperatures == [0.9]  # 온도 축은 종전 그대로
+
+    def test_explicit_top_p_is_passed_through(self) -> None:
+        """명시 지정 → provider 호출에 **그 값 그대로** 실린다(양 좌석 통제의 손잡이)."""
+        provider = FakeProvider([_HAPPY])
+        _gen(provider, top_p=0.95).generate(_spec())
+        assert provider.call_kwargs[0]["top_p"] == 0.95
+
+    def test_top_p_does_not_disturb_seed_or_schema_slots(self) -> None:
+        """top_p가 실려도 나머지 선택 인자의 규약(값 있을 때만)이 그대로다.
+
+        `_invoke`가 인자들을 한 dict에 모아 넘기므로 그 자리에서 다른 축을 덮는 회귀가
+        가능하다 — LOCAL 결정이면 json_schema는 실리고 seed는 호출부가 안 줬으니 없어야 한다.
+        """
+        provider = FakeProvider([_HAPPY])
+        _gen(provider, top_p=0.95).generate(_spec())
+        kwargs = provider.call_kwargs[0]
+        assert kwargs["top_p"] == 0.95
+        assert kwargs["temperature"] == 0.9
+        assert "json_schema" in kwargs  # LOCAL 경로 — 스키마 좌석 보존
 
 
 # ──────────────────────────────────────────────────────────────────────

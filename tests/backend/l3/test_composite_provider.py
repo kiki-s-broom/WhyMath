@@ -37,19 +37,21 @@ class FakeProvider:
         self.calls: list[tuple[str, str, RoutingDecision]] = []
         self.temperatures: list[float | None] = []
         self.json_schemas: list[Any] = []
+        # EOS-121 A — 위임 호출의 kwargs를 **그대로** 보관한다. 키 부재와 None을 구분하려면
+        # 파라미터 기본값으로 받아서는 안 된다(둘 다 None으로 보인다).
+        self.forwarded_kwargs: list[dict[str, Any]] = []
 
     async def generate(
         self,
         prompt: str,
         system: str,
         decision: RoutingDecision,
-        *,
-        temperature: float | None = None,
-        json_schema: Any = None,
+        **kwargs: Any,
     ) -> GenerationResult:
         self.calls.append((prompt, system, decision))
-        self.temperatures.append(temperature)
-        self.json_schemas.append(json_schema)
+        self.temperatures.append(kwargs.get("temperature"))
+        self.json_schemas.append(kwargs.get("json_schema"))
+        self.forwarded_kwargs.append(dict(kwargs))
         return GenerationResult(self._text)
 
     async def check_status(self) -> Any:
@@ -149,6 +151,32 @@ class TestDispatch:
         composite = CompositeProvider(local=local)
         await composite.generate("p", "s", _local_decision(), temperature=0.9)
         assert local.temperatures == [0.9]
+
+    async def test_top_p_forwarded_to_target(self) -> None:
+        """EOS-121 A: top_p는 위임받는 제공자로 **그 값 그대로** 전달된다(삼키지 않는다)."""
+        local = FakeProvider()
+        composite = CompositeProvider(local=local)
+        await composite.generate("p", "s", _local_decision(), top_p=0.95)
+        assert local.forwarded_kwargs[0]["top_p"] == 0.95
+
+    async def test_top_p_key_absent_when_unset(self) -> None:
+        """EOS-121 A: 미지정이면 위임 호출에 top_p **키 자체가 없다**(None 전송 금지).
+
+        하위 제공자가 "키가 없다"와 "None이 왔다"를 다르게 다룰 수 있으므로(예 payload에
+        `top_p: null`을 싣는 구현) 둘을 구분해 동결한다.
+        """
+        local = FakeProvider()
+        composite = CompositeProvider(local=local)
+        await composite.generate("p", "s", _local_decision())
+        assert "top_p" not in local.forwarded_kwargs[0]
+
+    async def test_top_p_forwarded_to_cloud_seat_too(self) -> None:
+        """EOS-121 A: 클라우드 분기에서도 같은 값이 전달된다 — 좌석 대칭의 디스패처 축."""
+        local, cloud = FakeProvider(), FakeProvider()
+        composite = CompositeProvider(local=local, cloud=cloud)
+        await composite.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID), top_p=0.95)
+        assert cloud.forwarded_kwargs[0]["top_p"] == 0.95
+        assert local.forwarded_kwargs == []
 
     async def test_temperature_omitted_by_default(self) -> None:
         """온도 미지정이면 하위 제공자에 temperature를 싣지 않는다(기본 None·하위호환)."""
