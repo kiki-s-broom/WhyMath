@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: EOS-123-cat-stop-rule-unreachable
+id: EOS-126-cat-stop-rule-unreachable
 title: "CAT 중단 규칙 미도달 — 진단 확정이 영구히 쓰이지 않아 learner_state 자동 생성이 끊긴다"
 track: math-completion
 stage: S3
@@ -20,5 +20,5 @@ paths:
   - src/backend/whymath_backend/api/me.py
   - tests/backend/api/test_persona_three_path_completion.py
 session: null
-notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15(페르소나 3인 완주) 실행 중 실측 발견. 판정 기준 main 433ec9ea. 범위 규율(P-15 ④ \"발견한 결함은 고치되 범위를 넓히지 마라 · 새 기능이 필요하면 태스크로 등재만 하고 보고하라\")에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP.\n\n[정정 2026-09-19] 추론을 실측으로 승격 + 게이트 순서·측정 범위 정정(D1 인과 사슬 재확인)"
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15(페르소나 3인 완주) 실행 중 실측 발견. 판정 기준 main 433ec9ea. 범위 규율(P-15 ④ \"발견한 결함은 고치되 범위를 넓히지 마라 · 새 기능이 필요하면 태스크로 등재만 하고 보고하라\")에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP.\n\n[정정 2026-09-19] 추론을 실측으로 승격 + 게이트 순서·측정 범위 정정(D1 인과 사슬 재확인)\n\n[개명 2026-09-19] EOS-123-cat-stop-rule-unreachable → EOS-126-cat-stop-rule-unreachable: 번호 충돌 — main이 PR #1227에서 EOS-123(오개념 반박 비대칭)을 먼저 착지시켰다. 미머지인 이쪽을 개명(HARN-100)"
 updated: 2026-09-19

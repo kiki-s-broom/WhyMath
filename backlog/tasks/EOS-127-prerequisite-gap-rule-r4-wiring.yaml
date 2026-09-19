@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: EOS-124-prerequisite-gap-rule-r4-wiring
+id: EOS-127-prerequisite-gap-rule-r4-wiring
 title: "상태 머신 R4(선수결손) 미발화 처분 — 선언과 집행의 불일치 해소 (EOS-105 한계 승계)"
 track: math-completion
 stage: S3
@@ -19,5 +19,5 @@ paths:
   - src/backend/whymath_backend/l2/learning_state_policy.py
   - src/backend/whymath_backend/api/me.py
 session: null
-notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 확인. 판정 기준 main 433ec9ea. EOS-105(done)가 acceptance 안에 \"명시한 한계 ②\"로 자인했으나 승계 태스크가 없었다 — CLAUDE.md \"회수로 태스크 done 선언 시 acceptance 전수 재대조\" 규칙이 겨냥하는 형태(약속한 것이 다 있는가)의 인접 사례이며, 여기서는 *한계로 선언한 것에 소유자가 없는* 축이다. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP."
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 확인. 판정 기준 main 433ec9ea. EOS-105(done)가 acceptance 안에 \"명시한 한계 ②\"로 자인했으나 승계 태스크가 없었다 — CLAUDE.md \"회수로 태스크 done 선언 시 acceptance 전수 재대조\" 규칙이 겨냥하는 형태(약속한 것이 다 있는가)의 인접 사례이며, 여기서는 *한계로 선언한 것에 소유자가 없는* 축이다. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP.\n\n[개명 2026-09-19] EOS-124-prerequisite-gap-rule-r4-wiring → EOS-127-prerequisite-gap-rule-r4-wiring: 번호 충돌 — main이 PR #1227에서 EOS-124(next-problem 정책·선택 축 불일치)를 먼저 착지시켰다. 미머지인 이쪽을 개명(HARN-100)"
 updated: 2026-09-19

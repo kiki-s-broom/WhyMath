@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: cancelled
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,5 +19,5 @@ paths:
   - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
   - tests/backend/api/test_persona_three_path_completion.py
 session: null
-notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 발견. 판정 기준 main 433ec9ea. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 인접 소유자 대조: MISC-20(해소율 정직화·done)은 *해소 판정의 정의*를 소유하고 이 태스크는 *감쇠 트리거의 범위*를 다룬다 — 겹치는 축은 처분 (나)뿐이며 acceptance ③에 대조를 명시했다. 분류 LOOP."
+notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 발견. 판정 기준 main 433ec9ea. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 인접 소유자 대조: MISC-20(해소율 정직화·done)은 *해소 판정의 정의*를 소유하고 이 태스크는 *감쇠 트리거의 범위*를 다룬다 — 겹치는 축은 처분 (나)뿐이며 acceptance ③에 대조를 명시했다. 분류 LOOP.\n\n[취소 2026-09-19] 중복 — main이 PR #1227에서 EOS-123-correct-attempt-misconception-refutation-asymmetry로 같은 결함(정답 시도가 오개념 감쇠 시계를 돌리지 않는다)을 먼저 등재했다. 실측 근거·paths가 동일하므로 착지한 쪽을 정본으로 남기고 이쪽을 취소한다"
 updated: 2026-09-19
