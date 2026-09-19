@@ -39,6 +39,7 @@ from pydantic import ValidationError
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, RoutingDecision, Usage
 from whymath_backend.l3.pregenerate.models import PregenItem, PrewarmItemResult
+from whymath_backend.l3.providers.factory import cloud_model_pins
 from whymath_backend.l3.router import _as_cost_tier, actual_cost_usd, resolve_model
 from whymath_backend.schema.provenance import GenerationLog, text_sha256
 
@@ -78,20 +79,11 @@ def model_name_for_decision(
     if cost is CostTier.LOCAL:
         return resolve_model(decision.local_family, decision.local_model)
     resolved = settings if settings is not None else get_settings()
-    seat = resolved.cloud_provider
-    if seat == "openrouter":
-        mid, high = resolved.openrouter_model_mid, resolved.openrouter_model_high
-    elif seat == "deepseek":
-        mid, high = resolved.deepseek_model_mid, resolved.deepseek_model_high
-    elif seat == "anthropic":
-        mid, high = resolved.anthropic_model_mid, resolved.anthropic_model_high
-    else:
-        # Literal에 값이 늘었는데 여기 분기를 안 붙인 경우. anthropic으로 접지 않는다 —
-        # 그러면 출처 로그가 또 조용히 틀린 값을 적는다(이 태스크가 상환한 바로 그 형태).
-        raise ValueError(
-            f"알 수 없는 cloud_provider: {seat!r} — model_name_for_decision에 분기를 "
-            "추가하라(build_cloud_provider와 같은 셀렉터를 읽는다)."
-        )
+    # 좌석→핀 매핑은 `l3/providers/factory.cloud_model_pins()`가 단일 근거다(EOS-111).
+    # 여기서 다시 분기하면 좌석 집계와 이 함수가 갈라질 수 있고, 갈라지는 순간 둘 중
+    # 하나는 거짓이 된다 — ARCH-58이 상환한 사고의 형태가 정확히 그것이다.
+    # 알 수 없는 좌석의 raise도 그 함수가 담당한다(기본 좌석으로 접지 않는다).
+    mid, high = cloud_model_pins(resolved)
     return mid if cost is CostTier.CLOUD_MID else high
 
 
