@@ -283,10 +283,11 @@ def test_week1_gate_one_cycle_without_direct_db_writes() -> None:
             assert len(after_users) == 1, f"user_profile이 1건이 아니다: {after_users}"
             uid = after_users[0]
 
-            # 토큰↔행 연결(`GET /v1/users/me`)은 여기서 단언하지 않는다 — 그 표면이 지금
-            # **깨져 있고**(EOS-109), 그 사실은 아래 전용 테스트가 xfail(strict=True)로
-            # 동결한다. 여기에 두면 1단계에서 멈춰 2~7단계가 아예 판정되지 않는다.
-            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} (읽기 축은 EOS-109)")
+            # 토큰↔행 연결(`GET /v1/users/me`)은 여기서 단언하지 않는다 — 그 축은 아래
+            # 전용 테스트가 GET·PATCH 양쪽으로 따로 판정한다(EOS-109에서 결함을 고치고
+            # xfail 표식을 제거했다). 여기에 합치면 그 축이 깨졌을 때 1단계에서 멈춰
+            # 2~7단계가 아예 판정되지 않으므로, 분리 자체는 결함 해소 뒤에도 유지한다.
+            _step("1-user-created", f"user_profile 0건→1건 · uid={uid} (읽기 축은 전용 테스트)")
 
             # ── 2) 진단 — 요약 조회 + CAT 출제(진단 목적). ─────────────────────────────
             summary = client.get("/v1/me/diagnosis/summary", headers=auth)
