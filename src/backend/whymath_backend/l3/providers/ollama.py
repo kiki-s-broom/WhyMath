@@ -22,6 +22,7 @@ from typing import Any, Protocol, cast, runtime_checkable
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
+from whymath_backend.l3.providers._response_fields import read_response_model_id
 from whymath_backend.l3.router import (
     LOCAL_MODEL_MATRIX,
     QUALITY_MODEL_ID,
@@ -189,6 +190,11 @@ def _extract_usage(generate_response: Any, latency_ms: float) -> Usage:
         input_tokens=_coerce_token_count(_read_field(generate_response, "prompt_eval_count")),
         output_tokens=_coerce_token_count(_read_field(generate_response, "eval_count")),
         latency_ms=latency_ms,
+        # 관측 모델(EOS-112) — ollama 응답의 `model`은 **실제로 로드된 태그**라 요청 태그와
+        # 다를 수 있다(`qwen2-math` → `qwen2-math:7b` 해소). 로컬 경로에도 이 축이 필요한
+        # 이유가 그것이다 — 라우터가 지목한 모델과 데몬이 실제로 쓴 모델이 갈릴 수 있다.
+        served_model=read_response_model_id(generate_response),
+        # `retries`는 None — ollama 클라이언트는 우리 전송기를 타지 않아 계측이 없다.
     )
 
 

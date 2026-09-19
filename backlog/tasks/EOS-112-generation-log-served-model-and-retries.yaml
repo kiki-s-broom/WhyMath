@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/l3/providers/anthropic.py
   - src/backend/whymath_backend/schema/provenance.py
   - src/backend/whymath_backend/db/models/provenance.py
-session: null
+session: claude/exciting-allen-5dkjb0
 notes: "EOS-111 착수 조사(2026-09-18)에서 분리. ARCH-58이 EOS-111로 넘긴 '관측 모델' 축의 실제 소유자다 — EOS-111 acceptance ①이 그 축의 배관 비용을 확인하지 않고 '최소 축'에 넣었고, 착수해 보니 Usage에 모델 필드가 없고 provider 3종이 응답 model 키를 안 읽으며 GenerationLog.from_schema가 mapper 컬럼 필터라 pydantic 전용 필드는 조용히 버려진다는 것이 드러났다. 즉 마이그레이션 없이는 성립하지 않는다."
-updated: 2026-09-18
+updated: 2026-09-19

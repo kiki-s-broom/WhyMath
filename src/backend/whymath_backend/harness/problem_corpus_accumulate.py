@@ -754,6 +754,10 @@ def main(argv: list[str] | None = None) -> int:
             model_name=stamped.model_name,
             success=stamped.success,
             cost_usd=stamped.cost_usd,
+            # 관측 축(EOS-112) — 선언값과 **같은 행**에서 같이 읽는다. 따로 순회하면 두
+            # 집계가 다른 행 집합을 보게 되어 대조 자체가 거짓이 된다.
+            served_model=stamped.served_model,
+            retries=stamped.retries,
         )
 
     # 내구 검수 큐(EOS-58 codex P1-1/P2) — 비수용 outcome 발생 즉시 행 append+flush. 경로는

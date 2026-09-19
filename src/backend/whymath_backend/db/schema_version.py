@@ -156,6 +156,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 재지정해 체인을 직렬로 되돌렸다(단일 head 유지).
     "c1f5a8b2d740",  # EOS-108: concept/skill_mastery_history.attempt_id(멱등 키) + 부분 유니크
     # 인덱스 2종. 같은 시도의 숙달 이중 반영을 DB가 막는다(KPI 2 State Integrity).
+    "d2a9e4b71c35",  # EOS-112: generation_log.served_model·retries(관측 좌석). 선언값
+    # (model_name)과 별개로 "응답이 실제로 어느 모델에서 왔나"를 적는다 — NULL=미관측·미계측.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

@@ -61,6 +61,8 @@ from whymath_backend.l3.providers._openai_compat import (
     HttpxChatTransport,
     extract_text,
     extract_usage,
+    retries_in_current_call,
+    retries_since,
 )
 from whymath_backend.l3.router import _as_cost_tier
 
@@ -367,6 +369,11 @@ class OpenRouterProvider:
             "Authorization": f"Bearer {settings.openrouter_api_key.get_secret_value()}",
             "Content-Type": "application/json",
         }
+        # 재시도 카운터는 ContextVar라 **회차 내내 누적**된다 — 호출 전후 차분을 잡아야
+        # 이 호출 1건의 값이 된다(EOS-112). `reset_retry_count()`를 여기서 부르지 않는
+        # 이유는 그것이 *공유 상태를 지우는* 행위라, 바깥에서 회차 단위로 세고 있는
+        # 소비자(`harness/provider_accuracy_battle`)의 회계를 말없이 뒤엎기 때문이다.
+        retries_before = retries_in_current_call()
         start = time.monotonic()
         response = await transport.post_chat(
             f"{settings.openrouter_base_url.rstrip('/')}/chat/completions",
@@ -377,7 +384,11 @@ class OpenRouterProvider:
         latency_ms = (time.monotonic() - start) * 1000.0
         return GenerationResult(
             text=extract_text(response),
-            usage=extract_usage(response, latency_ms),
+            usage=extract_usage(
+                response,
+                latency_ms,
+                retries=retries_since(retries_before),
+            ),
         )
 
     async def check_status(self) -> OpenRouterStatus:
