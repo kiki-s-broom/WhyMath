@@ -181,16 +181,16 @@ Write-Output "PRECHECK SpecOk=$SpecOk PrevOk=$PrevOk CodeOk=$CodeOk3 Seat=$env:W
 if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\anthropic.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --top-p 0.95 --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\anthropic.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\anthropic.stdout.txt; Write-Output "ANTHROPIC_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk3 · [C]와 [B]를 다시 확인하세요" }
 ```
 
-**좌석별로 `--out`을 가르는 이유**: 회차 대장(`<out>.rounds.jsonl`)이 좌석별로 분리돼 읽기 쉽고, **두 좌석이 같은 dedup 인덱스를 공유하지 않는다.** 같은 파일에 쌓으면 뒤에 도는 좌석이 앞 좌석의 산출물과도 중복 판정을 받아 비교가 오염된다.
+**좌석별로 `--out`을 가르는 이유**: 회차 대장(`--out`의 **확장자를 치환**한 사이드카 — `openrouter.jsonl` → `openrouter.rounds.jsonl`. `with_suffix`이므로 덧붙임이 아니다 · `anchor_round_ledger.py:688`)이 좌석별로 분리돼 읽기 쉽고, **두 좌석이 같은 dedup 인덱스를 공유하지 않는다.** 같은 파일에 쌓으면 뒤에 도는 좌석이 앞 좌석의 산출물과도 중복 판정을 받아 비교가 오염된다.
 
 ## [F] 회신 추출
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos121
-$OrOk = Test-Path .eos121-out\openrouter.jsonl.rounds.jsonl
-$AnOk = Test-Path .eos121-out\anthropic.jsonl.rounds.jsonl
+$OrOk = Test-Path .eos121-out\openrouter.rounds.jsonl
+$AnOk = Test-Path .eos121-out\anthropic.rounds.jsonl
 Write-Output "PRECHECK OrRounds=$OrOk AnRounds=$AnOk"
-if ($OrOk -and $AnOk) { Get-Content .eos121-out\openrouter.jsonl.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_openrouter.json -Encoding utf8; Get-Content .eos121-out\anthropic.jsonl.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_anthropic.json -Encoding utf8; Get-Content .eos121-out\reply_openrouter.json; Write-Output "----- 위가 openrouter · 아래가 anthropic -----"; Get-Content .eos121-out\reply_anthropic.json } else { Write-Output "WRITE_REFUSED=True — 회차 대장이 없습니다(OrRounds=$OrOk AnRounds=$AnOk). 해당 좌석의 .eos121-out\<좌석>.stdout.txt를 확인하세요" }
+if ($OrOk -and $AnOk) { Get-Content .eos121-out\openrouter.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_openrouter.json -Encoding utf8; Get-Content .eos121-out\anthropic.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_anthropic.json -Encoding utf8; Get-Content .eos121-out\reply_openrouter.json; Write-Output "----- 위가 openrouter · 아래가 anthropic -----"; Get-Content .eos121-out\reply_anthropic.json } else { Write-Output "WRITE_REFUSED=True — 회차 대장이 없습니다(OrRounds=$OrOk AnRounds=$AnOk). 해당 좌석의 .eos121-out\<좌석>.stdout.txt를 확인하세요" }
 ```
 
 두 출력을 그대로 회신하면 된다. 파일이 없다는 오류가 나면 해당 좌석 회차가 대장을 쓰지 못한 것이므로 `.eos121-out\<좌석>.stdout.txt`를 함께 보내 주시면 원인을 읽을 수 있다.
