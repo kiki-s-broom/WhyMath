@@ -261,3 +261,49 @@ CI 잡 3종을 로컬에서 그대로 재현해 전건 `exit 0`을 받았다 —
 
 즉 **이 런북의 [C] 가드는 사람이 쓴 것이고 기계가 지키지 않는다.** 이 런북을 고치는 사람은
 그 가드를 CI가 지켜 준다고 가정하지 말 것. 어휘 공백의 상환은 `HARN-116`이 소유한다.
+
+---
+
+## 실행 결과 — 2026-09-19 (판정 기준: `origin/main` `412ccb71`)
+
+Kiki가 Phaiakes9에서 `[A]`→`[B]`→`[C]`를 실행했다. worktree 자가검증 출력이
+`412ccb71 (HEAD, origin/main, origin/HEAD)`으로 찍혀 실행 코드의 출처가 main임이 고정됐다.
+
+- `[A]` `SEAT_OK=True` — `FROM_TREE=True` · `SEAT_DEFAULT=AnthropicProvider` ·
+  `SEAT_WITH_ENV=OpenRouterProvider` · `HAS_OBSERVATION=True`.
+- `[B]` `CHECK_EXIT=0` · `CONFIGURED=True` · `PROVIDERS=('deepinfra',)` ·
+  `JURISDICTION=Jurisdiction.US` · `ERROR=None`.
+- `[C]` `OPENROUTER_EXIT=0` · `ANTHROPIC_EXIT=0` · 좌석당 5호출.
+
+### 판정 4축 — 전건 성립
+
+| 축 | openrouter | anthropic | 판정 |
+|---|---|---|---|
+| ⓐ `state` | `all_on_selected_seat` | `all_on_selected_seat` | 통과 (`not_measured` 아님) |
+| ⓑ `comparable` | 5 | 5 | 통과 (> 0) |
+| ⓒ `served_models` | `deepseek/deepseek-v4.1-flash`: 5 | `claude-sonnet-4-6`: 5 | 통과 (서로 다름) |
+| ⓓ `retries_measured` | 5 (`retries_total` 0) | 0 (`retries_total` `null`) | 통과 (ⓓ는 openrouter 축) |
+
+### 읽을 자리 — `differs=0`이 말하는 것
+
+두 회차 모두 `differs: 0` · `differing_pairs: []`이고 `comparable: 5`다. 4절이 미리 갈라 둔
+대로 이것은 **미관측이 아니라 실측 0**이며, 두 공급사 다 선언값과 **글자 그대로 같은 문자열**을
+돌려준다는 뜻이다. 별칭→버전 해소가 일어나지 않았다.
+
+이것은 사전 가정의 반증이기도 하다 — 이 런북의 추출기를 검증할 때 쓴 픽스처는 Anthropic이
+날짜 붙은 ID(`claude-sonnet-4-6-20260219` 형태)를 돌려줄 것으로 가정했는데 실측은 핀 문자열
+그대로였다. 그러므로 **지금 이 두 좌석에서는 선언 축과 관측 축이 같은 값을 낸다.** EOS-112가
+두 축을 분리해 둔 가치는 *지금 차이가 있어서*가 아니라 **차이가 생겼을 때 보이게 하려고**다 —
+두 값을 한 필드로 합쳤다면 provider가 조용히 다른 모델로 바꾼 날 그 사실이 '일치'로 위장된다.
+
+### 부수 관측 — 창 오염이 실제로 막혔다
+
+`[A]`의 `PRE_SHELL_VAR=openrouter`가 찍혔다. 즉 실행 창에 이전 값이 남아 있었다. 그럼에도
+`SEAT_DEFAULT=AnthropicProvider`가 정확히 나온 것은 이 블록이 부재를 *가정*하지 않고 자식
+프로세스에서 `os.environ.pop`으로 **만들어** 재기 때문이다 — 2026-09-18에 실제로 한 번 겪은
+오독 경로가 설계대로 차단됐다. `PRE_USER_VAR`는 비어 있어 User 환경변수 영구 오염은 없다.
+
+### 닫힌 것
+
+`EOS-111`(PR #1208)·`EOS-112`(PR #1211) 본문의 '정직한 공백'(라이브 미확인)이 이 회차로
+닫힌다. 좌석 신호의 라이브 작동 비율은 더 이상 0이 아니다.
