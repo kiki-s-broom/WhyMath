@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-120-p13-dual-ownership-ped36-eos119
+title: "P-13 중복 소유 — 크로스워크는 PED-36 amend를 지정했는데 EOS-119가 신규 등재돼 SCENARIO-001~010·CI 상시 축을 두 태스크가 동시 소유한다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 중복 소유 실측 확정 — P-13(SCENARIO-001~010 + CI 배선)의 처분이 두 곳에 있다. 크로스워크 `docs/strategy/plan300_phase2_backlog_crosswalk.md:240`은 `| P-13 ... | §16 | amend | PED-36 |`로 *amend*를 지정했고 같은 표의 합계줄도 \"amend 2건\"(P-13·P-15, 둘 다 PED-36)으로 센다. 그러나 2026-09-19T05:45:01Z에 세션 claude/new-session-jchdr8이 *add*로 `EOS-119-phase2-scenario-regression-suite`를 신규 등재·claim했다. 두 태스크의 acceptance가 같은 축을 문자 그대로 중복 소유한다: PED-36 ⑧(SCENARIO-001~010 정형화 10종 열거) ≡ EOS-119 ①(같은 10종 열거) · PED-36 ⑩(\"CI 상시는 현재 미충족\" + e2e-nightly가 schedule 전용) ≡ EOS-119 ③(CI 실행 실재 + 같은 e2e-nightly schedule 전용 지적). 두 세션이 독립적으로 같은 병목(.github/workflows/ci.yml의 e2e-nightly `if github.event_name == schedule`)에 도달했다.\n\n② 판정 기준 명시 — 위 대조는 main 82d43d52와 origin/claude/new-session-jchdr8 f34b7478 기준이다. EOS-119는 이 시점 **미머지**이며 로컬 대장에는 \"미존재\"로 보인다(`backlog.py claims` 출력). 즉 PED-36만 읽는 세션은 이 중복을 볼 수 없다.\n\n③ 이 태스크의 범위는 *판정*이 아니라 *해소 경로 결정 요청*이다. 세 가지 처분이 가능하고 어느 것이 옳은지는 이 태스크가 정하지 않는다: (가) EOS-119를 정본으로 두고 PED-36의 ⑧·⑩을 폐기 표시(tombstone)해 승계를 명시 — amend는 append 전용이라 삭제가 아니라 승계 표기로만 가능하다(HARN-76 ④) (나) EOS-119를 cancel하고 크로스워크대로 PED-36 amend로 수렴 (다) 축을 쪼개 EOS-119=시나리오 10종+CI 배선, PED-36=페르소나 뱅크 스키마+연속 3루프로 경계를 재선언. 어느 쪽이든 크로스워크 240행의 `amend | PED-36` 표기도 함께 정정해야 표와 대장이 어긋나지 않는다.\n\n④ 방치 시 재발 형태 — CLAUDE.md의 VIZ-03/VIZ-07 선례와 같은 \"좌석 계약이 done 태스크를 seat_owner로 지목하는 결정 불가\" 상태다. 한쪽이 done 되면 다른 쪽 acceptance가 코드 대조에 나타나지 않은 채 남는다(회수 규칙 — 존재하지 않는 코드는 대조 실패조차 내지 않는다).\n\n⑤ 이 태스크는 조사·등재 전용이다. EOS-119는 타 세션 원격 claim 상태이므로 이 태스크를 집행하는 세션은 EOS-119의 코드·대장을 건드리기 전에 claim 상태를 재확인한다(착수 순서 규칙)."
+artifacts: []
+paths:
+  - backlog/tasks/PED-36-learning-scenario-bank-schema.yaml
+  - docs/strategy/plan300_phase2_backlog_crosswalk.md
+session: null
+notes: "출처: 2026-09-19 P-13 착수 시도 세션(claude/keen-bell-d95tq7). 업로드된 실행계획 항목 [18] P-13을 집행하려다 대상이 이미 원격 claim 상태임을 확인하고 착수를 중단했다(claim 2026-09-19T05:45:01Z · 확인 06:03Z · 18분 경과). 착수 규율(CLAUDE.md 2026-09-06 등재 — claim 전 코드 읽기·쓰기 금지)에 따라 구현하지 않았고, 대신 claim 확인 과정에서 드러난 중복 소유만 등재한다.\n\n세션이 직접 해소하지 않은 이유: 해소 3택 중 어느 것도 이 세션 소유가 아니다 — EOS-119는 타 세션 claim, PED-36의 amend는 append 전용이라 되돌릴 수 없고, 크로스워크 정정은 어느 쪽을 정본으로 삼느냐에 종속된다. 판정 없이 손대면 되돌릴 수 없는 append가 남는다."
+updated: 2026-09-19
