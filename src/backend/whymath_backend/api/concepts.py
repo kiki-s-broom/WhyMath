@@ -46,7 +46,17 @@ import asyncio
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -273,6 +283,37 @@ async def list_concept_content(
     stmt = stmt.order_by(ConceptContent.code).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return [row.to_schema() for row in result.scalars().all()]
+
+
+@router.get(
+    "/content/{code}",
+    response_model=ConceptContentSchema,
+    summary="개념 콘텐츠 단건",
+)
+async def get_concept_content(
+    code: Annotated[str, Path(description="`concept_content` 기본키 — 개념 콘텐츠 코드.")],
+    session: SessionDep,
+) -> ConceptContentSchema:
+    """`concept_content` 단건 조회 — 계획서 300 §12 `GET /contents/{id}`의 대응 표면.
+
+    **최소 형태다(P-11 ④)**: 목록 좌석 `GET /v1/concepts/content`와 **같은 응답 스키마**를
+    돌려줄 뿐 필드를 늘리지 않는다. 목록에 `code` 필터가 없어 단건 조회 경로가 없던 것을
+    메우는 것이 전부이고, 새 표현·새 집계는 만들지 않는다.
+
+    **노출 계약은 목록과 동일하다** — 학생 직접 노출이 아니라 L2/L4·교사 도구가 소비하는
+    *내부 표면*이며, `formal_definition_internal`은 학생 렌더 경로에서 별도 게이팅으로
+    제외해야 한다. 단건이라고 해서 더 관대하지 않다.
+
+    이 테이블의 기본키는 UUID가 아니라 **코드 문자열**(`concept_content.code`)이다 — 계획서의
+    `{id}`를 UUID로 읽어 경로를 만들면 조회가 영구히 0건이 된다.
+    """
+    row = await session.get(ConceptContent, code)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"개념 콘텐츠를 찾을 수 없다: {code}",
+        )
+    return row.to_schema()
 
 
 @router.post(

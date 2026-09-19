@@ -469,7 +469,7 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-034", "개념 의미검색(pgvector)", "Student", "Knowledge Graph", "P1",
        "원자 검색 좌석 — S0-4a", "concepts", "GET /search"),
     _s("WM-S-035", "개념 콘텐츠(정의·비유·예시) 조회", "Student", "Content", "P0",
-       "Gate2 ⑤ Content→Problem 연결", "concepts", "GET /content"),
+       "Gate2 ⑤ Content→Problem 연결", "concepts", "GET /content", "GET /content/{code}"),
     _s("WM-S-036", "개념 노드 저작 CRUD", "Admin", "Knowledge Graph", "P1",
        "B4 — 운영자 저작 표면", "concepts",
        "POST /", "PATCH /{concept_id}", "DELETE /{concept_id}"),

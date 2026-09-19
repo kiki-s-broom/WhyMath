@@ -1655,6 +1655,22 @@ jobs:
         # `-c`로 설정 파일을 못 박으면 bare 호출과 동일해진다(rootdir=src/backend·configfile 동일).
         run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_e2e_vertical_slice_integration.py
 
+      # ── P-11 — 5단계 내부 연결(Attempt→Event→Assessment→LearnerState→Recommendation) ──
+      # 계획서 300 §12 P-11의 핵심 판정은 "API 12개가 있는가"가 아니라 "이 연결이 이어지는가"다.
+      # 실 PG가 있어야 성립하므로(학습자 상태가 HTTP 부수효과로만 생긴다) 이 잡에 얹는다 —
+      # `backend` 잡에는 postgres service가 없어 이 파일은 그쪽에서 **항상 skip**된다(실측:
+      # WHYMATH_RUN_INTEGRATION 미설정 → `1 skipped`·exit 0). "저장소에 있다"와 "돌아간다"는
+      # 다르다(OPS-03/08/11 선례) — 배선 실재성은 tests/infra/test_p11_chain_nightly_wiring.py가
+      # 기계로 동결한다.
+      # 실행기를 단독 호출하지 않는다(`python -m pytest`) — CLAUDE.md "실행기 단독 호출 금지".
+      - name: P-11 5단계 연결 동결 (Attempt→Event→Assessment→LearnerState→Recommendation)
+        env:
+          WHYMATH_RUN_INTEGRATION: "1"
+          WHYMATH_DB_DISABLE_POOL: "1"
+        # `-c pyproject.toml` 필수 — 위치 인자를 주면 pytest가 rootdir를 저장소 루트로 잡아
+        # src/backend/pyproject.toml의 ini가 통째로 안 읽힌다(OPS-61 실측).
+        run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_p11_five_stage_loop_chain.py
+
       # 초인간 검증 S6(상시성) — 전 코퍼스 verify 재료로 정답을 매일 밤 전수 재검산.
       # 정본 변경·데이터 오염을 야간에 즉시 잡는다(fail 1건이라도 있으면 exit 1). 순수 계산·
       # DB/LLM 0이라 PG 없이도 돌지만 이 잡(야간)에 얹어 상시 재검증을 보장한다.
