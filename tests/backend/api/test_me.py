@@ -1182,14 +1182,25 @@ class TestSubmitAttempt:
         assert upd["mastery"] == 0.69  # 첫 관측·정답
         assert upd["sample_size"] == 1
         assert body["skill_mastery_updates"] == []  # 스킬 해소 0(미매핑)
-        # ProblemAttempt + 개념 숙달행 + EOS-57 `문제시도` 이벤트(스킬행 0).
+        # ProblemAttempt + 개념 숙달행 + EOS-57 `문제시도` 이벤트(스킬행 0)
+        # + EOS-115 학습 진입 전이 1건.
         # 카운트만 세면 신규 축이 숫자에 묻히므로 *종류*로 고정한다.
+        #
+        # 왜 전이가 **1건**인가(이 가짜 세션 한정): `_QueueSession`은 적재분을 되읽지 않아
+        # 현재 상태 질의가 언제나 빈 결과(= `NEW`)를 돌려준다. 그래서 학습 진입 전이는
+        # 적재되지만 뒤따르는 평가 전이는 다시 `NEW → ASSESSING`으로 판정돼 거부된다.
+        # 실 DB에서는 3건이 남는다(`test_week3_gate_remediation_loop.py` 실측). 이 파일이
+        # 재는 것은 채점·숙달·보정 코칭이므로 그 차이를 여기서 메우지 않는다 —
+        # 상태 머신의 실제 동작은 `test_me_learning_state.py`·`test_learning_state_machine.py`가 잰다.
         assert [type(o).__name__ for o in session.added] == [
             "ProblemAttempt",
             "ConceptMasteryHistory",
             "AttemptEvent",
+            "LearningStateTransition",
         ]
-        event = session.added[-1]
+        # 위치가 아니라 **종류**로 집는다 — 뒤에 새 적재 축이 붙어도 이 단언이 엉뚱한
+        # 객체를 보지 않는다(EOS-115가 전이 1건을 뒤에 붙이며 실제로 그 일이 일어났다).
+        event = next(o for o in session.added if type(o).__name__ == "AttemptEvent")
         assert event.event_type is EventType.문제시도
         # 해소 0건은 `[]`로 적재된다 — None(미기록)으로 접히지 않는다(EOS-57 핵심 계약).
         assert event.skill_ids == []
@@ -1219,8 +1230,16 @@ class TestSubmitAttempt:
         assert resp.json()["mastery_updates"] == []
         assert resp.json()["skill_mastery_updates"] == []
         # attempt + EOS-57 `문제시도` 이벤트(숙달행 0 — 개념 매핑 없음).
-        assert [type(o).__name__ for o in session.added] == ["ProblemAttempt", "AttemptEvent"]
-        assert session.added[-1].skill_ids == []  # 해소 0건도 기록된다(미기록 None과 구분)
+        # 끝의 `LearningStateTransition`은 EOS-115 학습 진입 전이 1건이다(위 상세 주석 참조 —
+        # 이 가짜 세션은 적재분을 되읽지 않아 평가 전이는 거부되고 진입 전이만 남는다).
+        assert [type(o).__name__ for o in session.added] == [
+            "ProblemAttempt",
+            "AttemptEvent",
+            "LearningStateTransition",
+        ]
+        # 위치가 아니라 종류로 집는다(위와 같은 이유 — 뒤에 전이 축이 붙었다).
+        _event = next(o for o in session.added if type(o).__name__ == "AttemptEvent")
+        assert _event.skill_ids == []  # 해소 0건도 기록된다(미기록 None과 구분)
 
     def test_submit_overconfident_returns_coaching(self) -> None:
         """과신 제출(틀림 + 확신≥0.7) → calibration_coaching.focus==overconfident(§11.4)."""
@@ -1252,7 +1271,13 @@ class TestSubmitAttempt:
         assert coaching["focus"] == "calibration_overconfident"
         assert coaching["socratic_category"] == "assumption"
         # 적재 로직 불변 — attempt + EOS-57 `문제시도` 이벤트(개념 매핑 없어 숙달행 0).
-        assert [type(o).__name__ for o in session.added] == ["ProblemAttempt", "AttemptEvent"]
+        # 끝의 `LearningStateTransition`은 EOS-115 학습 진입 전이 1건이다(위 상세 주석 참조 —
+        # 이 가짜 세션은 적재분을 되읽지 않아 평가 전이는 거부되고 진입 전이만 남는다).
+        assert [type(o).__name__ for o in session.added] == [
+            "ProblemAttempt",
+            "AttemptEvent",
+            "LearningStateTransition",
+        ]
 
     def test_submit_well_calibrated_no_coaching(self) -> None:
         """잘 보정됨(맞음 + 확신 높음) → calibration_coaching==null."""

@@ -147,14 +147,22 @@ def _client(session: FakeSession) -> TestClient:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_new_learner_reads_as_new_with_diagnosing_as_the_only_next_step() -> None:
-    """이력이 없는 학생은 `NEW`이고, 갈 수 있는 곳은 `DIAGNOSING` 하나다."""
+def test_new_learner_reads_as_new_with_diagnosis_or_learning_as_next_steps() -> None:
+    """이력이 없는 학생은 `NEW`이고, 갈 수 있는 곳은 `DIAGNOSING`·`LEARNING` 둘이다.
+
+    `LEARNING`이 목록에 있는 이유(EOS-115): 진단을 거치지 않은 학습자의 첫 학습 진입이
+    전이표에 열려 있다. 평가로의 직행(`NEW → ASSESSING`)은 **여전히 닫혀 있으며**, 그
+    부재를 아래 `test_allowed_next_states_mirrors_the_server_transition_table`이 표와
+    대조해 동결한다.
+    """
     with _client(FakeSession()) as client:
         resp = client.get("/v1/me/learning-state")
     assert resp.status_code == 200
     body = resp.json()
     assert body["current_state"] == "NEW"
-    assert body["allowed_next_states"] == ["DIAGNOSING"]
+    assert body["allowed_next_states"] == ["DIAGNOSING", "LEARNING"]
+    # 평가로의 직행은 열리지 않았다 — 이 단언이 EOS-115가 금지를 푼 것이 아님을 못 박는다.
+    assert "ASSESSING" not in body["allowed_next_states"]
     assert body["transitions"] == []
 
 

@@ -145,9 +145,12 @@ class TransitionTrigger(str, Enum):
 #
 # **여기 없는 것이 곧 금지다.** 대표적으로 다음은 *의도적으로* 열지 않았다:
 #   - `NEW → ADVANCING`  : 진단·학습 없이 진급. 테스트가 이 쌍으로 거부 경로를 잰다.
-#   - `NEW → ASSESSING`  : 첫 접속 학생의 응답 제출. 상태 이력이 없는 학생을 평가로 밀어
-#                          넣으면 "무엇 대비 평가인가"가 없다. 거부가 정답이며, 호출부는
-#                          그 거부를 삼키지 않고 표면에 드러낸다(`api/me.py` 참조).
+#   - `NEW → ASSESSING`  : 첫 접속 학생의 **평가로의 직행**. 상태 이력이 없는 학생을 평가로
+#                          밀어 넣으면 "무엇 대비 평가인가"가 없다. 여전히 닫혀 있다.
+#                          (주의 — `NEW → LEARNING`은 EOS-115에서 *열었다*. 그것은 평가가
+#                          아니라 학습 맥락을 만드는 간선이라 이 금지와 충돌하지 않는다:
+#                          진단 없는 학습자도 `NEW → LEARNING → ASSESSING`을 거치므로
+#                          "평가는 언제나 학습 맥락에서 출발한다"가 유지된다.)
 #   - `DIAGNOSING → LEARNING` : READY(출발점 확정)를 건너뛴 학습 시작.
 #   - `READY → ASSESSING`     : 학습 없이 평가.
 #   - `ADVANCING → ASSESSING` : 진급 중 평가(다음 개념 LEARNING을 거쳐야 한다).
@@ -159,6 +162,24 @@ ALLOWED_TRANSITIONS: frozenset[tuple[LearningState, LearningState]] = frozenset(
         # ── 온보딩: 가입 → 진단 → 출발점 확정 ──
         (LearningState.NEW, LearningState.DIAGNOSING),
         (LearningState.DIAGNOSING, LearningState.READY),
+        # 진단을 거치지 않은 학습자의 첫 학습 진입 (EOS-115).
+        #
+        # 왜 여는가: 이 시스템은 **진단받지 않은 학습자를 이미 1급 시민으로 모델링하고 있다** —
+        # 정책 R6(`POLICY_PRACTICE_UNDIAGNOSED`)의 존재가 그 증거다. 그런데 전이표에는 그들이
+        # 학습에 들어갈 문이 없어, 정책이 준비한 자리에 도달할 경로가 없었다. 여기를 닫아 둔
+        # 것은 설계 의도가 아니라 표와 정책의 **불일치**였다.
+        #
+        # 왜 `NEW → ASSESSING`(아래 금지 목록)과 다른가: 그쪽은 "무엇 대비 평가인가"가 없는
+        # 평가를 합법으로 만든다. 이 간선은 평가를 만들지 않는다 — 학습 맥락을 만든다. 평가는
+        # 여전히 `LEARNING → ASSESSING`을 거쳐야 하므로 "평가는 언제나 학습 맥락에서 출발한다"는
+        # 불변식이 그대로 유지된다. 즉 이 한 줄은 그 불변식을 깨는 것이 아니라 **충족시키는**
+        # 경로다.
+        #
+        # 진단 사실을 위조하지 않는다: 원장에는 `from_state=NEW`가 남으므로 "진단 없이 학습에
+        # 들어왔다"가 사후에 그대로 읽힌다. `NEW → DIAGNOSING → READY → LEARNING` 3행을 대신
+        # 적재하는 선택지도 있었으나 채택하지 않았다 — 일어나지 않은 진단을 원장에 적는 셈이고,
+        # 그것은 `reconcile_state`가 잡으려는 바로 그 어긋남을 우리 손으로 만드는 것이다.
+        (LearningState.NEW, LearningState.LEARNING),
         # ── 주기: 학습 → 연습 → 평가 ──
         (LearningState.READY, LearningState.LEARNING),
         (LearningState.LEARNING, LearningState.PRACTICING),
