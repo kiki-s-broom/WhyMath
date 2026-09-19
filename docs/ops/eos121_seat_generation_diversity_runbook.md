@@ -96,16 +96,21 @@ $env:PYTHONUTF8 = "1"
 $env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-eos121\src\backend"
 $Src = & $PyExe -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk = $Src -like "*WhyMath-eos121*"
+git fetch origin claude/ecstatic-fermi-uvyp2w 2>&1 | Out-Null
+$HeadSha = (git rev-parse HEAD)
+$RemoteSha = (git rev-parse origin/claude/ecstatic-fermi-uvyp2w)
+$HeadOk = $HeadSha -eq $RemoteSha
 $ArgsOut = & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --help 2>&1 | Out-String
 $HasTopP = $ArgsOut -match "--top-p"
 $HasSpecFile = $ArgsOut -match "--spec-file"
 $KeyOut = & $PyExe -c "from whymath_backend.config import Settings; s = Settings(); print('AN=%s;OR=%s' % (s.anthropic_configured, s.openrouter_configured))"
 $HasAnKey = $KeyOut -match "AN=True;"
 $HasOrKey = $KeyOut -match "OR=True"
-$Ready = $CodeOk -and $HasTopP -and $HasSpecFile -and $HasOrKey -and $HasAnKey
+$Ready = $CodeOk -and $HeadOk -and $HasTopP -and $HasSpecFile -and $HasOrKey -and $HasAnKey
 Write-Output "PYTHON=$PyExe"
 Write-Output "LOADED_FROM=$Src"
 Write-Output "CODE_FROM_WORKTREE=$CodeOk"
+Write-Output "HEAD_MATCHES_REMOTE=$HeadOk  (HEAD=$HeadSha)"
 Write-Output "HAS_TOP_P=$HasTopP  HAS_SPEC_FILE=$HasSpecFile"
 Write-Output "SETTINGS_KEYS=$KeyOut"
 Write-Output "HAS_OPENROUTER_KEY=$HasOrKey  HAS_ANTHROPIC_KEY=$HasAnKey"
@@ -115,6 +120,9 @@ Write-Output "READY=$Ready"
 **각 검사가 무엇을 막는가** (변별력):
 
 - `CODE_FROM_WORKTREE` — 원 클론에 editable 설치된 **옛 코드가 임포트되는** 상황을 막는다. 파일을 눈으로 확인하는 것만으로는 *그 파일이 실제로 임포트됐는지* 모르므로 `__file__`을 찍는다.
+- `HEAD_MATCHES_REMOTE` — **경로가 아니라 버전을 본다.** 위 검사는 *어느 트리인가*만 보므로 **옛 커밋의 worktree에서도 True**가 난다.
+
+  **왜 추가했는가 (2026-09-19 실측)**: 파일럿 재실행에서 정확히 그 구멍을 밟았다. worktree 갱신 블록을 건너뛴 채 파일럿만 돌았는데 `CODE_FROM_WORKTREE=True`라 통과했고, 실행된 것은 BOM 수정 **이전** 리비전이었다(트레이스백의 `line 751`이 구판의 `json.loads` 행과 일치해 확정). 「쓰기 블록은 사람 판정에 기대지 않고 스스로 거부한다」가 겨냥하는 형태다 — 갱신 여부를 산문으로 안내하고 사람이 해시를 눈으로 대조하게 두면, **출력은 흐름을 멈추지 못한다.** 기대 해시를 하드코딩하지 않고 `origin`의 브랜치 끝과 비교하므로 런북이 낡지 않는다.
 - `HAS_TOP_P` / `HAS_SPEC_FILE` — worktree가 옛 커밋이면 두 인자가 없다. **[A]의 해시 대조를 사람이 건너뛰어도 여기서 걸린다.**
 - `HAS_*_KEY` — **환경변수 이름을 보지 않고 `Settings`에 묻는다.** 이것이 [D]·[E]가 실제로 키를 조달하는 바로 그 경로다(`anthropic.py:249`·`openrouter.py:378`). 값은 출력되지 않는다(`SecretStr` + bool 프로퍼티).
 
