@@ -34,6 +34,7 @@ import logging
 import unicodedata
 from collections.abc import Sequence
 
+from whymath_backend.harness.wh1_llm_seam import Wh1Generation, Wh1LlmSeam
 from whymath_backend.harness.wh1_loop import (
     ENCOURAGE_FALLBACK_UTTERANCE,
     NEUTRAL_GUIDE_UTTERANCE,
@@ -46,20 +47,13 @@ from whymath_backend.l3.equivalent.rephrase import (
     REASON_PROVIDER_ERROR,
     RephraseOutcome,
 )
-from whymath_backend.l3.interfaces import LLMProvider
-from whymath_backend.l3.models import (
-    CostTier,
-    LocalModelTier,
-    ModelFamily,
-    RoutingDecision,
-    RoutingRequest,
-)
+from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
+from whymath_backend.l3.models import ModelFamily, RoutingRequest
 from whymath_backend.l3.pregenerate.validator import (
     _RELATION_RE,
     default_seed_validator,
     validate_response,
 )
-from whymath_backend.l3.router import Router
 
 __all__ = [
     "REASON_NOT_REPHRASABLE",
@@ -182,14 +176,17 @@ def gate_policy_prose(text: str, *, student_material: Sequence[str] = ()) -> str
     return None
 
 
-def _decide_routing() -> RoutingDecision:
-    """라우터 결정 + GENERAL 패밀리 선호 — rephrase.py `_decide_routing` 축소 미러(관례 3대째).
+def _routing_request() -> RoutingRequest:
+    """프로즈 문맥화의 라우팅 **입력** — 결정은 파이프라인 안의 라우터가 내린다(OPS-36).
 
-    프로즈 문맥화는 다단계 추론이 아니라 instruction-following이라 easy·비추론·sync로
-    라우팅하고(로컬 FAST 즉답·저비용), 로컬 FAST/MID 결정의 패밀리 축만 GENERAL(qwen2.5)
-    로 갈아탄다 — 라우터의 비용·크기·모드 결정은 존중(불변식 4 유지).
+    문맥화는 다단계 추론이 아니라 instruction-following이라 easy·비추론·sync로 라우팅한다
+    (로컬 FAST 즉답·저비용). 패밀리 축 GENERAL(qwen2.5) 선호는 **여기서 결정을 손으로
+    재조립하지 않고** `pipeline.generate(prefer_local_family=...)`로 넘긴다 — 종전에는 이 함수가
+    `Router().route()` 결과를 받아 `RoutingDecision`을 직접 다시 만들었고(rephrase.py와 같은
+    코드의 3대째 미러), 그 재조립이 곧 파이프라인 우회였다(관측·캐시 미결선). 적용 조건·승계
+    필드는 `_apply_family_preference`가 그대로 승계한다(라우터의 비용·크기·모드 결정은 존중).
     """
-    request = RoutingRequest(
+    return RoutingRequest(
         task_type="generate",
         difficulty="easy",
         requires_reasoning=False,
@@ -201,27 +198,6 @@ def _decide_routing() -> RoutingDecision:
         # *산출물 검증*(gate_policy_prose의 외래 등식 판별)에만 쓰이지 프롬프트에 안 들어간다.
         # 실리는 것은 우리 코치 템플릿·카탈로그 라벨뿐 → 자체 저작(EOS-59).
         data_licenses=SELF_AUTHORED_CORPUS,
-    )
-    decision = Router().route(request)
-    is_local = decision.cost_tier == CostTier.LOCAL.value
-    family_applicable = is_local and decision.local_model in (
-        LocalModelTier.FAST.value,
-        LocalModelTier.MID.value,
-    )
-    if not family_applicable or decision.local_family == ModelFamily.GENERAL.value:
-        return decision
-    return RoutingDecision(
-        cost_tier=decision.cost_tier,
-        local_family=ModelFamily.GENERAL,
-        local_model=decision.local_model,
-        mode=decision.mode,
-        reason=f"{decision.reason} → prose:{ModelFamily.GENERAL.value}",
-        est_latency_ms=decision.est_latency_ms,
-        est_cost_krw=decision.est_cost_krw,
-        # 데이터 등급 게이트의 판정·발동 신호는 *승계*한다 — 패밀리 축만 갈아탈 뿐 법적
-        # 판정을 다시 하지 않는다. 안 실으면 발동 사실이 관측에서 사라진다(EOS-59 ②).
-        data_export_blocked=decision.data_export_blocked,
-        data_export_reason=decision.data_export_reason,
     )
 
 
@@ -266,6 +242,9 @@ async def rephrase_coach_utterance(
     provider: LLMProvider | None,
     timeout_seconds: float,
     temperature: float = _DEFAULT_TEMPERATURE,
+    cache: CacheBackend | None = None,
+    trace: TraceSink | None = None,
+    seam: Wh1Generation | None = None,
 ) -> RephraseOutcome:
     """파생 템플릿 발화를 LLM 문맥 프로즈로 rephrase — fail-closed(어떤 실패든 원 템플릿).
 
@@ -295,10 +274,19 @@ async def rephrase_coach_utterance(
         turn_index=turn_index,
         hypothesis_label=hypothesis_label,
     )
-    decision = _decide_routing()
+    # 좌석 경유(OPS-36) — 라우터 결정·캐시·Langfuse 기록이 전부 파이프라인 안에서 일어난다.
+    generation: Wh1Generation = (
+        seam if seam is not None else Wh1LlmSeam(provider=provider, cache=cache, trace=trace)
+    )
     try:
-        generated = await asyncio.wait_for(
-            provider.generate(prompt, _SYSTEM_PROMPT, decision, temperature=temperature),
+        raw = await asyncio.wait_for(
+            generation.generate(
+                _routing_request(),
+                prompt,
+                _SYSTEM_PROMPT,
+                prefer_local_family=ModelFamily.GENERAL,
+                temperature=temperature,
+            ),
             timeout=timeout_seconds,
         )
     except TimeoutError:
@@ -317,7 +305,6 @@ async def rephrase_coach_utterance(
             reason="LLM 호출 예외",
             reason_code=REASON_PROVIDER_ERROR,
         )
-    raw = generated.text
     code = classify_prose_violation(raw, forbidden_fragments=forbidden_fragments)
     if code is not None:
         # 게이트 거부 — 사유 코드만 로그(발화 원문·raw는 로그 미출력·Outcome으로만 사후 분석).

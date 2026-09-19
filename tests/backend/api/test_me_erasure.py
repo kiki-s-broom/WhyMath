@@ -91,9 +91,11 @@ class TestEraseMyAccount:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["user_id"] == str(_UID)
-        # 23개 테이블(+EOS-32/45/46 신규 3종·SEC-27 job_ownership·EOS-105
-        # learning_state_transition) + user_profile, 각 2행 = 48.
-        assert body["total_rows_deleted"] == 48
+        # `_ERASURE_PLAN` 24개 테이블(+EOS-32/45/46 3종·SEC-27 job_ownership·EOS-105
+        # learning_state_transition·**SEC-35 learner_state**) + user_profile, 각 2행 = 50.
+        # 파생값(`len(_ERASURE_PLAN)`)으로 바꾸지 않는다 — 그러면 계획이 *줄어도* 이 단언이
+        # 따라 줄어 조용히 통과한다. 하드코딩이 곧 "계획이 바뀌면 사람이 본다"는 ratchet이다.
+        assert body["total_rows_deleted"] == 50
         assert fake.commits == 1  # 엔드포인트가 commit(원자적)
         # DeletionAudit 1행 적재(GDPR 증빙·삭제 전).
         from whymath_backend.db.models.audit import DeletionAudit

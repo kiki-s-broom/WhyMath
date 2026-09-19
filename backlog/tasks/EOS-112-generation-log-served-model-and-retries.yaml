@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-112-generation-log-served-model-and-retries
+title: "genlog에 관측 모델·재시도 포착 — '설정이 뭐라고 했나'가 아니라 '누가 실제로 답했나' (EOS-111 승계)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-111-authoring-seat-operating-signal
+requires_gates: []
+acceptance:
+  - "① 관측 모델 포착 — provider 응답이 실제로 어느 모델에서 왔는지를 싣는다. OpenAI 호환(`_openai_compat.extract_usage`)은 payload 최상위 `model` 키, Anthropic(`anthropic._extract_usage`)은 `message.model`, Ollama는 응답 `model`을 읽는다. `Usage`에 필드를 더하고(예: `served_model: str | None`), **없으면 None**이다 — 빈 문자열이나 설정값으로 접지 않는다(모른다 ≠ 아니다).\n② 재시도 포착 — `_openai_compat`의 `retries_in_current_call()`을 저작 경로가 호출별로 읽어 나른다. 현재 그 값을 쓰는 곳은 `provider_accuracy_battle` 하나뿐이고 저작 경로에는 채널이 없다.\n③ 영속 좌석 — `GenerationLog`에 두 축을 담으려면 **pydantic 스키마 + DB 컬럼 + alembic 마이그레이션**이 함께 가야 한다. `db/models/provenance.GenerationLog.from_schema`가 mapper 컬럼으로 필터링하므로 pydantic에만 더하면 DB 저장에서 **조용히 버려진다**(2026-09-18 실측). 스키마만 늘리고 컬럼을 빠뜨리는 형태를 회귀 테스트로 막는다.\n④ 선언 vs 관측의 대조 — 요약이 둘을 **함께** 싣고 어긋나면 그 사실이 보이게 한다. `model_name`(설정 유래 선언값 · `ARCH-58`)과 `served_model`(응답 관측값)이 다른 회차는 provider 측 대체·폴백·프록시 라우팅이 일어났다는 뜻이며, 지금은 그것을 볼 방법이 전혀 없다. 어긋남 건수를 `EOS-111`이 만든 좌석 집계에 축으로 추가한다.\n⑤ 실패 주입 — 최소 4종: ⓐ 응답에 `model` 키 부재(None으로 계상되고 설정값으로 접히지 않는다) ⓑ 선언≠관측 회차(어긋남이 요약에 보인다) ⓒ pydantic에만 필드 추가하고 DB 컬럼 누락(③의 회귀 테스트가 RED) ⓓ 재시도 0건 대조군. 정상 회차 대조군을 함께 둔다.\n⑥ 승계 근거 — `EOS-111` 착수 조사에서 분리됐다. 그 태스크는 기존 `GenerationLog` 필드로 계산 가능한 축만 담았고, 이 태스크는 그러려면 마이그레이션이 필요한 축을 담는다. `ARCH-58`이 \"응답에서 관측한 실제 모델을 싣는 축은 EOS-111이 소유한다\"고 적은 것의 실제 소유자가 이 태스크다."
+artifacts:
+  - "PR #1211 · https://github.com/kiki-s-broom/WhyMath/pull/1211 · main 13826ece (관측 축 2컬럼 + alembic d2a9e4b71c35 · 뮤테이션 14종 전건 RED · 전체 스위트 13528 passed)"
+paths:
+  - src/backend/whymath_backend/l3/models.py
+  - src/backend/whymath_backend/l3/providers/_openai_compat.py
+  - src/backend/whymath_backend/l3/providers/anthropic.py
+  - src/backend/whymath_backend/schema/provenance.py
+  - src/backend/whymath_backend/db/models/provenance.py
+session: null
+notes: "EOS-111 착수 조사(2026-09-18)에서 분리. ARCH-58이 EOS-111로 넘긴 '관측 모델' 축의 실제 소유자다 — EOS-111 acceptance ①이 그 축의 배관 비용을 확인하지 않고 '최소 축'에 넣었고, 착수해 보니 Usage에 모델 필드가 없고 provider 3종이 응답 model 키를 안 읽으며 GenerationLog.from_schema가 mapper 컬럼 필터라 pydantic 전용 필드는 조용히 버려진다는 것이 드러났다. 즉 마이그레이션 없이는 성립하지 않는다."
+updated: 2026-09-19

@@ -25,10 +25,30 @@ from whymath_backend.l2.mastery_tracking import (
     record_attempt_mastery,
     record_problem_attempt_mastery,
 )
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
+)
 
 _M = BktModel()  # 기본 파라미터(p_init=0.3 등)
 _UID = uuid.uuid4()
 _CID = uuid.uuid4()
+_PID = uuid.uuid4()
+_T = datetime(2026, 1, 8, tzinfo=UTC)
+
+
+def _evidence(correct: bool, observed_at: datetime = _T) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 적재 경로가 받는 타입(어댑터 폐기)."""
+    return build_assessment_evidence(
+        learner_id=_UID,
+        problem_id=_PID,
+        correct=correct,
+        observed_at=observed_at,
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
 
 
 class _FakeResult:
@@ -132,7 +152,9 @@ class TestRecordAttemptMastery:
     async def test_first_observation_no_prior(self) -> None:
         """직전 측정 없으면 P(L0)에서 갱신·표본 1·새 행 add·commit."""
         fake = _FakeSession(prior=None)
-        row = await record_attempt_mastery(cast(AsyncSession, fake), _UID, _CID, True, model=_M)
+        row = await record_attempt_mastery(
+            cast(AsyncSession, fake), _CID, evidence=_evidence(True), model=_M
+        )
         assert row.mastery == 0.69
         assert row.sample_size == 1
         assert row.user_id == _UID and row.concept_id == _CID
@@ -142,21 +164,25 @@ class TestRecordAttemptMastery:
     async def test_reads_prior_and_updates(self) -> None:
         """직전 측정(0.69·표본1)을 prior로 → 0.92·표본 2."""
         fake = _FakeSession(prior=_prior_row(0.69, 1))
-        row = await record_attempt_mastery(cast(AsyncSession, fake), _UID, _CID, True, model=_M)
+        row = await record_attempt_mastery(
+            cast(AsyncSession, fake), _CID, evidence=_evidence(True), model=_M
+        )
         assert row.mastery == 0.92
         assert row.sample_size == 2
 
     async def test_prior_with_null_mastery_falls_back_to_p_init(self) -> None:
         """직전 행은 있으나 mastery=NULL이면 P(L0)에서 시작."""
         fake = _FakeSession(prior=_prior_row(None, None))
-        row = await record_attempt_mastery(cast(AsyncSession, fake), _UID, _CID, True, model=_M)
+        row = await record_attempt_mastery(
+            cast(AsyncSession, fake), _CID, evidence=_evidence(True), model=_M
+        )
         assert row.mastery == 0.69
 
     async def test_explicit_measured_at(self) -> None:
         ts = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
         fake = _FakeSession(prior=None)
         row = await record_attempt_mastery(
-            cast(AsyncSession, fake), _UID, _CID, False, measured_at=ts
+            cast(AsyncSession, fake), _CID, evidence=_evidence(False, ts)
         )
         assert row.measured_at == ts
         assert row.mastery == 0.15  # 기본 모델·오답
@@ -164,7 +190,7 @@ class TestRecordAttemptMastery:
     async def test_default_model_when_omitted(self) -> None:
         """model 생략 시 기본 BktModel 사용."""
         fake = _FakeSession(prior=None)
-        row = await record_attempt_mastery(cast(AsyncSession, fake), _UID, _CID, True)
+        row = await record_attempt_mastery(cast(AsyncSession, fake), _CID, evidence=_evidence(True))
         assert row.mastery == 0.69
 
 
@@ -264,7 +290,7 @@ class TestRecordProblemAttemptMastery:
         # execute#1 → 두 개념·이후 각 개념 prior 없음
         fake = _QueueSession([_QResult([cid1, cid2]), _QResult([]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M, measured_at=ts
+            cast(AsyncSession, fake), evidence=_evidence(True, ts), model=_M
         )
         assert [r.concept_id for r in records] == [cid1, cid2]
         assert all(r.mastery == 0.69 for r in records)  # 첫 관측·정답
@@ -277,7 +303,7 @@ class TestRecordProblemAttemptMastery:
         cids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
         fake = _QueueSession([_QResult(cids), _QResult([]), _QResult([]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(True), model=_M
         )
         assert len(records) == 3
         assert len(fake.added) == 3
@@ -287,7 +313,7 @@ class TestRecordProblemAttemptMastery:
         """문제↔개념 매핑이 없으면 숙달 갱신 0(빈 리스트·add 0)."""
         fake = _QueueSession([_QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True
+            cast(AsyncSession, fake), evidence=_evidence(True)
         )
         assert records == []
         assert fake.added == []
@@ -297,7 +323,7 @@ class TestRecordProblemAttemptMastery:
         cid = uuid.uuid4()
         fake = _QueueSession([_QResult([cid]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert len(records) == 1
         assert records[0].mastery == 0.15  # 오답
@@ -309,7 +335,7 @@ class TestRecordProblemAttemptMastery:
         # 큐: PRIMARY 쿼리→[cid_p], cid_p prior→[]. (PRIMARY 비지 않아 TESTED 폴백 미발생)
         fake = _QueueSession([_QResult([cid_p]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.concept_id for r in records] == [cid_p]  # PRIMARY만
         assert len(fake.added) == 1  # TESTED는 add 안 됨
@@ -321,7 +347,7 @@ class TestRecordProblemAttemptMastery:
         # 큐: PRIMARY 쿼리→[](없음), TESTED 폴백 쿼리→[cid_t], cid_t prior→[].
         fake = _QueueSession([_QResult([]), _QResult([cid_t]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.concept_id for r in records] == [cid_t]
         assert fake.commits == 1
@@ -332,7 +358,7 @@ class TestRecordProblemAttemptMastery:
         # 큐: assessed 쿼리→[cid_p, cid_t], 각 prior→[].
         fake = _QueueSession([_QResult([cid_p, cid_t]), _QResult([]), _QResult([])])
         records = await record_problem_attempt_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(True), model=_M
         )
         assert [r.concept_id for r in records] == [cid_p, cid_t]  # 둘 다 지지
         assert all(r.mastery == 0.69 for r in records)  # 정답·첫 관측 상승
@@ -362,20 +388,16 @@ class TestForgettingInRecord:
         fake_late = _FakeSession(prior=_prior_row(0.9, 1))
         row_late = await record_attempt_mastery(
             cast(AsyncSession, fake_late),
-            _UID,
             _CID,
-            True,
+            evidence=_evidence(True, datetime(2026, 1, 31, tzinfo=UTC)),
             model=model,
-            measured_at=datetime(2026, 1, 31, tzinfo=UTC),
         )
         # 같은 날 관측(경과 0·감쇠 없음)
         fake_same = _FakeSession(prior=_prior_row(0.9, 1))
         row_same = await record_attempt_mastery(
             cast(AsyncSession, fake_same),
-            _UID,
             _CID,
-            True,
+            evidence=_evidence(True, datetime(2026, 1, 1, tzinfo=UTC)),
             model=model,
-            measured_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         assert row_late.mastery < row_same.mastery

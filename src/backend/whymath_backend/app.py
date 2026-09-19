@@ -124,6 +124,9 @@ from whymath_backend.api._subject_capability_state import (
     ASSESSMENT_ANSWER_VERIFIER_KEY as _ASSESSMENT_ANSWER_VERIFIER_KEY,
 )
 from whymath_backend.api._subject_capability_state import (
+    ATTEMPT_MISCONCEPTION_DETECTOR_KEY as _ATTEMPT_MISCONCEPTION_DETECTOR_KEY,
+)
+from whymath_backend.api._subject_capability_state import (
     EXPRESSION_EQUIVALENCE_KEY as _EXPRESSION_EQUIVALENCE_KEY,
 )
 from whymath_backend.api._subject_capability_state import (
@@ -169,6 +172,7 @@ from whymath_backend.api.visualization import router as visualization_router
 from whymath_backend.composition import (
     default_answer_form_verifier,
     default_assessment_answer_verifier,
+    default_attempt_misconception_detector,
     default_expression_equivalence,
     default_expression_seal,
     default_final_answer_verifier,
@@ -193,7 +197,8 @@ from whymath_backend.l3.pregenerate.validator import (
     default_seed_validator,
     validate_response,
 )
-from whymath_backend.l3.providers.anthropic import AnthropicProvider, AnthropicStatus
+from whymath_backend.l3.providers.anthropic import AnthropicProvider
+from whymath_backend.l3.providers.cloud_status import CloudStatus
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.ollama import OllamaProvider, OllamaStatus
 from whymath_backend.l3.queue import CeleryJobQueue
@@ -843,6 +848,11 @@ def create_app(
     app.state.__setattr__(_EXPRESSION_SEAL_KEY, default_expression_seal())
     app.state.__setattr__(_ANSWER_FORM_VERIFIER_KEY, default_answer_form_verifier())
     app.state.__setattr__(_STEP_CHAIN_VERIFIER_KEY, default_step_chain_verifier())
+    # EOS-104: 7번째 — 오답 1건에서 오개념 후보를 읽는 능력. 같은 줄들 옆에 두는 이유도 같다
+    #    (빠지면 `api/me.py`의 Depends가 AttributeError로 터지고 infra 테스트가 RED).
+    app.state.__setattr__(
+        _ATTEMPT_MISCONCEPTION_DETECTOR_KEY, default_attempt_misconception_detector()
+    )
     # OAuth provider 레지스트리(로그인 콜백이 provider 이름으로 조회). 기본은 config의 키가
     # 설정된 provider만(카카오·네이버·OAuth-a2) — 키 미설정(CI)이면 빈 dict라 콜백 404. 클라이언트는
     # 지연이라 구성만으로 네트워크 미발생. 테스트는 가짜 provider를 직접 주입한다.
@@ -1110,11 +1120,14 @@ def create_app(
         cloud_error: str | None = None
         cloud_check = getattr(provider, "check_cloud_status", None)
         if cloud_check is not None:
-            cloud_status: AnthropicStatus | None = await cloud_check()
+            cloud_status: CloudStatus | None = await cloud_check()
             if cloud_status is not None:
                 cloud_configured = cloud_status.configured
-                cloud_reachable = cloud_status.reachable
                 cloud_error = cloud_status.error
+                # `reachable`은 공통 표면이 아니다(ARCH-57) — 보고하는 제공자만 자기 Status에
+                # 둔다. 없을 때 False로 접으면 "도달 불가"와 "미측정"이 같은 화면이 되므로
+                # None으로 남긴다(응답 필드가 이미 `bool | None`이라 구분이 보존된다).
+                cloud_reachable = getattr(cloud_status, "reachable", None)
 
         return StatusBody(
             ready=ollama_status.all_present,

@@ -132,6 +132,12 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
         "수학 오답 형태 SymPy 매칭 — doc-100 'math misconception detectors'",
     ),
     "l4.misconception.wrong_form_shadow_harvest": ("ADAPTER", "위 검출기의 shadow 수확"),
+    "l4.misconception.answer_signature": (
+        "ADAPTER",
+        "오답 서명(문항 식 = 제출 답) SymPy 거짓형 정합 — attempt 단위 검출기(EOS-104). "
+        "wrong_form_match와 같은 사유로 ADAPTER: '식을 이어 거짓 항등식을 읽는다'는 독법이 "
+        "수학 고유다. Core는 schema.verification_capabilities의 선택층 Protocol만 안다",
+    ),
     "l4.subject_adapter_math": (
         "ADAPTER",
         "MathSubjectAdapter(EOS-66) — SubjectAdapter 계약의 수학 구현. CORE인 l4에 살지만 "

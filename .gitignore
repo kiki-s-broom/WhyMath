@@ -215,3 +215,7 @@ data/audit/
 # 재생성: python3 scripts/analysis/eos_feature_inventory_v2.py --write
 backlog/inventory/feature_inventory_v2.yaml
 backlog/inventory/feature_inventory_v2.csv
+
+# ARCH-57 저작 배치 산출(런북 docs/ops/arch57_authoring_openrouter_runbook.md)
+# — LLM 생성 문항 JSONL. 로컬 실행 결과이지 저장소 자산이 아니다.
+.arch57-out/

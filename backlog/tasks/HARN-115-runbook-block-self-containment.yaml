@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-110-runbook-block-self-containment
+id: HARN-115-runbook-block-self-containment
 title: "런북 붙여넣기 블록 자기완결성 기계 집행 — 앞 블록의 변수·환경·CWD 상속 금지(목적지 DB가 조용히 바뀌는 축)"
 track: infra-debt
 stage: S3
@@ -20,5 +20,5 @@ paths:
   - tests/infra/test_runbook_block_self_containment.py
   - "docs/ops/**"
 session: null
-notes: "출처: 2026-09-18 G-skb01-resolution-remeasure 실행 중 Kiki 지적. 상세는 acceptance 5항. 관련 선례 = HARN-106(쓰기 블록 자가거부 기계 집행)·OPS-73(증거 블록 펜스 금지). 이 태스크는 그 둘이 보지 않는 세 번째 축(블록 간 상태 상속)을 다룬다. EOS 등급 P1 근거: 12월 폐쇄루프가 이것 없이도 성립하지만(사람 검토로 우회 가능), 게이트 실행은 12월까지 계속되고 이 축의 실패는 되돌리기 어려운 쪽(타 프로젝트 DB 스키마 변경)이라 품질 기여가 크다.\n\n[정정 2026-09-18] 2026-09-18 2회차 실측 — Read-Host 가 다음 블록 첫 줄을 삼키는 축 추가"
-updated: 2026-09-18
+notes: "출처: 2026-09-18 G-skb01-resolution-remeasure 실행 중 Kiki 지적. 상세는 acceptance 5항. 관련 선례 = HARN-106(쓰기 블록 자가거부 기계 집행)·OPS-73(증거 블록 펜스 금지). 이 태스크는 그 둘이 보지 않는 세 번째 축(블록 간 상태 상속)을 다룬다. EOS 등급 P1 근거: 12월 폐쇄루프가 이것 없이도 성립하지만(사람 검토로 우회 가능), 게이트 실행은 12월까지 계속되고 이 축의 실패는 되돌리기 어려운 쪽(타 프로젝트 DB 스키마 변경)이라 품질 기여가 크다.\n\n[정정 2026-09-18] 2026-09-18 2회차 실측 — Read-Host 가 다음 블록 첫 줄을 삼키는 축 추가\n\n[개명 2026-09-19] HARN-110-runbook-block-self-containment → HARN-115-runbook-block-self-containment: 번호 충돌 해소 — main에 HARN-110(pypi 차단 환경 포맷·린트 오라클)이 먼저 착지했다. 미머지인 이쪽을 개명(HARN-100 절차)"
+updated: 2026-09-19

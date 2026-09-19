@@ -323,6 +323,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_attempt_misconception_scan_enabled: bool = Field(
+        default=True,
+        description=(
+            "채점된 **오답 1건**에서 오개념 후보를 훑을지(EOS-104·정식기능). True(기본)면 "
+            "POST /v1/me/attempts가 is_correct=false일 때 과목 어댑터의 오답 서명 검출기"
+            "(`AttemptMisconceptionDetector`)에 문항 지문·제출 답안을 넘겨, 품질 게이트를 "
+            "통과한 후보만 채점 증거(`possible_misconceptions`)에 싣고 활성 가설을 갱신한다. "
+            "정답 시도·답안 미제출은 애초에 훑지 않는다(scan=not_run). False면 이 경로가 통째로 "
+            "not_run이 되어 **'훑지 않았다'로 정직하게 표기된다** — 0건을 '오개념 없음'으로 "
+            "위장하지 않는다. 킬 스위치 용도이며 끄면 감쇠도 함께 멈춘다(관측이 없으면 감쇠할 "
+            "근거도 없다). WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_server_theta_enabled: bool = Field(
         default=True,
         description=(
@@ -489,6 +503,30 @@ class Settings(BaseSettings):
             "True면 messages.create에 top-level cache_control(ephemeral) 적용(prefix 캐시). "
             "기본 False(현 동작 유지) — 적중은 라이브 키로만 검증 가능하고 system 프롬프트가 "
             "L4/L5 미확정이라 효과 잠정. 짧은 프리픽스는 최소 토큰 미만이라 무효(silent no-op)."
+        ),
+    )
+
+    # ── 클라우드 슬롯 셀렉터 (ARCH-57 — ARCH-55 채택 판정의 집행 지점) ──
+    # `CompositeProvider`의 cloud 슬롯에 어떤 프로바이더가 앉는가. 종전에는 호출자가
+    # `AnthropicProvider()`를 **하드코딩**해 8곳에 흩어져 있었고, 그래서 ARCH-55가 채택한
+    # OpenRouter 경로를 프로브만 쓰고 실제 저작 작업은 쓸 수 없었다(채택은 났는데 집행이
+    # 없는 상태 — CLAUDE.md 「정본화를 집행으로 착각한 완료 선언 금지」).
+    #
+    # **기본값 `anthropic`은 불변이다.** ARCH-55 채택 판정문이 "선택지를 넓힌 것이지 기본값을
+    # 옮긴 것이 아니다"라고 명시했고, 판정 기준 (d) 지연·가용성이 `ARCH-56`으로 보류 중이라
+    # 미판정 구성이 기본값이 되면 안 된다. 이 기본값을 바꾸는 것은 코드 변경이 아니라 판정이다
+    # (`tests/backend/l3/test_cloud_provider_selector.py`가 계약으로 동결한다).
+    #
+    # 적용 범위는 **저작 경로 한정**이다 — 학생 대면 서빙(`app.py`)은 이 셀렉터를 타지 않는다.
+    # 그쪽을 옮기는 것은 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 트래픽 투입
+    # 결정)를 실현시키는 행위라 Kiki 판정 사안이다.
+    cloud_provider: Literal["anthropic", "openrouter", "deepseek"] = Field(
+        default="anthropic",
+        description=(
+            "저작 경로의 클라우드 슬롯 제공자. `anthropic`(기본·불변 핀 claude-sonnet-4-6) / "
+            "`openrouter`(ARCH-55 채택 — deepseek/deepseek-v4.1-flash·공급사 deepinfra 고정) / "
+            "`deepseek`(공식 API·CN 관할). 좌석 선택만이고 클라이언트 생성은 지연된다. "
+            "학생 대면 서빙은 이 값과 무관하게 항상 anthropic이다(ARCH-56 게이트)."
         ),
     )
 

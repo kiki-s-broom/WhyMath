@@ -70,7 +70,6 @@ from whymath_backend.l2.learning_path import (
 )
 from whymath_backend.l2.mastery_contract import (
     BKT_ESTIMATOR_ID,
-    AttemptOutcomeEvidence,
     BktMasteryEstimator,
     UnknownMasteryEstimatorError,
     active_estimator_id,
@@ -78,6 +77,10 @@ from whymath_backend.l2.mastery_contract import (
     registered_estimator_ids,
     resolve_estimator,
     use_estimator,
+)
+from whymath_backend.l2.mastery_estimators import (
+    ADDITIVE_ESTIMATOR_ID,
+    AdditiveMasteryEstimator,
 )
 from whymath_backend.l2.mastery_tracking import (
     MasteryRecord,
@@ -89,11 +92,12 @@ from whymath_backend.l2.mastery_tracking import (
 )
 
 __all__ = [
+    "ADDITIVE_ESTIMATOR_ID",
     "BKT_ESTIMATOR_ID",
     "DEFAULT_BKT_PARAMETERS",
     "AbilityReading",
+    "AdditiveMasteryEstimator",
     "Agreement",
-    "AttemptOutcomeEvidence",
     "BktMasteryEstimator",
     "BktModel",
     "BktParameters",

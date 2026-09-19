@@ -1020,6 +1020,14 @@ jobs:
       - name: 게이트 — 런북 쓰기 블록 자가거부 가드 (HARN-106)
         run: python3 scripts/ops/check_runbook_blocks.py
 
+      # EOS-108 — 숙달 단일 쓰기 경로 AST 전수 스캔. 이 잡에 붙이는 이유: 스캐너가 stdlib만
+      # 쓰고 백엔드 소스를 *텍스트로* 읽으므로 백엔드 설치가 불요하며, 이 잡은 `needs: changes`
+      # 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — 우회 경로는 정확히 "숙달과 무관해 보이는"
+      # PR에서 생긴다. 변별력은 `tests/infra/test_mastery_single_write_path.py`의 결함 주입
+      # 9종이 봉인한다(위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 숙달 단일 쓰기 경로 (EOS-108)
+        run: python3 scripts/analysis/mastery_write_path_scan.py
+
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q
 
@@ -1646,6 +1654,22 @@ jobs:
         # 빠진 채 도는데 **화면상 정상으로 보인다** — 이 스텝들은 실제로 그 상태로 돌고 있었다.
         # `-c`로 설정 파일을 못 박으면 bare 호출과 동일해진다(rootdir=src/backend·configfile 동일).
         run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_e2e_vertical_slice_integration.py
+
+      # ── P-11 — 5단계 내부 연결(Attempt→Event→Assessment→LearnerState→Recommendation) ──
+      # 계획서 300 §12 P-11의 핵심 판정은 "API 12개가 있는가"가 아니라 "이 연결이 이어지는가"다.
+      # 실 PG가 있어야 성립하므로(학습자 상태가 HTTP 부수효과로만 생긴다) 이 잡에 얹는다 —
+      # `backend` 잡에는 postgres service가 없어 이 파일은 그쪽에서 **항상 skip**된다(실측:
+      # WHYMATH_RUN_INTEGRATION 미설정 → `1 skipped`·exit 0). "저장소에 있다"와 "돌아간다"는
+      # 다르다(OPS-03/08/11 선례) — 배선 실재성은 tests/infra/test_p11_chain_nightly_wiring.py가
+      # 기계로 동결한다.
+      # 실행기를 단독 호출하지 않는다(`python -m pytest`) — CLAUDE.md "실행기 단독 호출 금지".
+      - name: P-11 5단계 연결 동결 (Attempt→Event→Assessment→LearnerState→Recommendation)
+        env:
+          WHYMATH_RUN_INTEGRATION: "1"
+          WHYMATH_DB_DISABLE_POOL: "1"
+        # `-c pyproject.toml` 필수 — 위치 인자를 주면 pytest가 rootdir를 저장소 루트로 잡아
+        # src/backend/pyproject.toml의 ini가 통째로 안 읽힌다(OPS-61 실측).
+        run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_p11_five_stage_loop_chain.py
 
       # 초인간 검증 S6(상시성) — 전 코퍼스 verify 재료로 정답을 매일 밤 전수 재검산.
       # 정본 변경·데이터 오염을 야간에 즉시 잡는다(fail 1건이라도 있으면 exit 1). 순수 계산·

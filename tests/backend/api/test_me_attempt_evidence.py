@@ -56,12 +56,28 @@ class _Rows:
 class _QueueSession:
     """execute 큐 — `mastery_error`를 주면 *증거 조립 이후* 첫 쓰기에서 터진다."""
 
-    def __init__(self, results: list[list[Any]], *, commit_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        results: list[list[Any]],
+        *,
+        commit_error: Exception | None = None,
+        question_text: str | None = None,
+    ) -> None:
         self._results = results
         self._i = 0
         self.added: list[Any] = []
         self.commits = 0
+        self.flushes = 0
         self._commit_error = commit_error
+        # EOS-104: 오답 오개념 훑기가 문항 지문을 단일 스칼라로 조회한다. 기본 None은
+        # "지문 없음" → scan=not_run이라 이 파일의 다른 시나리오 동작은 그대로다.
+        self.question_text = question_text
+
+    async def scalar(self, _stmt: Any) -> Any:
+        return self.question_text
+
+    async def flush(self) -> None:
+        self.flushes += 1
 
     async def execute(self, _stmt: Any) -> _Rows:
         rows = self._results[self._i] if self._i < len(self._results) else []
@@ -93,16 +109,26 @@ def _client(session: _QueueSession) -> TestClient:
 
 
 def _mapped_session(**kw: Any) -> _QueueSession:
-    """문항-개념 매핑 있음 — 증거 3조회(PRIMARY·TESTED·스킬) + writer 조회들."""
+    """문항-개념 매핑 있음 — 증거 3조회(PRIMARY·TESTED·스킬) + writer 조회들.
+
+    EOS-104: `question_text`를 주면 오개념 훑기가 실제로 돌고, 그 경로가 가설 조회·영속으로
+    **execute 2건을 추가 소비**한다(`get_active_hypotheses` 1 + `_persist_active_set` 1 —
+    기존 가설이 없어 prune 쿼리는 돌지 않는다). 이 큐는 위치 결합이라 그 2건을 증거 조회
+    *뒤*·writer 조회 *앞*에 끼워 넣지 않으면 writer가 엉뚱한 행을 받는다.
+    """
+    misconception_queries: list[list[Any]] = [[], []] if kw.get("question_text") else []
     return _QueueSession(
         [
             [_CONCEPT],  # 증거 #1 PRIMARY
             [],  # 증거 #2 TESTED
             [],  # 증거 #3 스킬 해소(브리지 없음)
+            *misconception_queries,  # 오개념 가설 조회·영속(훑기가 도는 경우에만)
             [_CONCEPT],  # 개념 writer — 평가 개념
+            [],  # 개념 writer — EOS-108 멱등 조회(이 시도는 아직 미반영)
             [],  # 개념 writer — prior 없음
             [_CONCEPT],  # 스킬 writer — 평가 개념
             [],  # 스킬 writer — 스킬 해소 0
+            # 스킬 축은 해소 0건이라 멱등 조회가 아예 돌지 않는다(빈 집합 조기 반환).
         ],
         **kw,
     )
@@ -157,7 +183,9 @@ class TestEvidenceOnResponse:
 
     def test_correct_answer_yields_supporting_joint_evidence(self) -> None:
         session = _QueueSession(
-            [[_CONCEPT], [], [], [_CONCEPT], [], [_CONCEPT], []],
+            # 증거 3조회 → 개념 writer(평가 개념·EOS-108 멱등 조회·prior) → 스킬 writer(평가
+            # 개념·스킬 해소 0 → 멱등 조회 없음).
+            [[_CONCEPT], [], [], [_CONCEPT], [], [], [_CONCEPT], []],
         )
         evidence = _post(_client(session), correct=True).json()["evidence"]
         (concept,) = evidence["concept_evidence"]
@@ -211,5 +239,35 @@ class TestPrivacyBoundary:
 
         evidence_text = json.dumps(resp.json()["evidence"], ensure_ascii=False)
         assert "내 답은 5야" not in evidence_text
+        for forbidden in ("student_answer", "answer_text", "solution"):
+            assert forbidden not in evidence_text
+
+    def test_student_answer_absent_even_when_misconception_scan_ran(self) -> None:
+        """EOS-104 — **오개념 훑기가 실제로 돈 회차**에도 답안이 증거에 새지 않는다.
+
+        위 테스트만으로는 부족하다: 지문이 없으면 `scan=not_run`이라 훑기 경로가 한 번도
+        실행되지 않고, 그러면 "답안이 안 샌다"는 단언이 *공허하게* 통과한다(스캔 0건인 전수
+        가드와 같은 실패 방식). 그래서 후보가 실제로 나오는 입력을 주고, 훑기가 돌았음을
+        **먼저 단언한 뒤** 답안 부재를 확인한다.
+        """
+        session = _mapped_session(question_text="(x+2)²을 전개하시오.")
+        resp = _client(session).post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "student_answer": "x²+4",
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        import json
+
+        evidence = resp.json()["evidence"]
+        # ① 훑기가 실제로 돌았고 후보가 나왔다 — 이 단언이 없으면 아래가 공허하다.
+        assert evidence["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert evidence["possible_misconceptions"], "후보 0건이면 프라이버시 단언이 공허하다"
+        # ② 그런데도 학생 답안 원문은 증거 어디에도 없다.
+        evidence_text = json.dumps(evidence, ensure_ascii=False)
+        assert "x²+4" not in evidence_text
         for forbidden in ("student_answer", "answer_text", "solution"):
             assert forbidden not in evidence_text

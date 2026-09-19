@@ -39,6 +39,7 @@ from pydantic import ValidationError
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, RoutingDecision, Usage
 from whymath_backend.l3.pregenerate.models import PregenItem, PrewarmItemResult
+from whymath_backend.l3.providers.factory import cloud_model_pins
 from whymath_backend.l3.router import _as_cost_tier, actual_cost_usd, resolve_model
 from whymath_backend.schema.provenance import GenerationLog, text_sha256
 
@@ -56,20 +57,34 @@ def model_name_for_decision(
     *,
     settings: Settings | None = None,
 ) -> str:
-    """라우터 결정 → *실제 호출될* 모델 ID 문자열 (GenerationLog.model_name 좌석용).
+    """라우터 결정 → 이 설정에서 *호출 대상이 되는* 모델 ID (GenerationLog.model_name 좌석용).
 
-    LOCAL은 라우터 매트릭스 해석(`resolve_model` — 예 'qwen2.5:7b'), CLOUD_MID/HIGH는
-    Anthropic provider의 모델 해석과 동일한 설정 좌석(`anthropic_model_mid/high` — 예
-    'claude-sonnet-4-6')을 읽는다(`l3/providers/anthropic.py` §해석과 단일 근거). 이
-    함수는 이름만 해석한다 — 호출 자체·검증 계약과 무관한 순수 조회다.
+    LOCAL은 라우터 매트릭스 해석(`resolve_model` — 예 'qwen2.5:7b'). CLOUD_MID/HIGH는
+    **클라우드 좌석 셀렉터(`settings.cloud_provider`)가 지목한 제공자의 모델 핀**을 읽는다 —
+    그 제공자를 실제로 만드는 `l3/providers/factory.build_cloud_provider()`와 같은 설정을
+    보므로 둘이 갈라지지 않는다.
+
+    **선언값이지 관측값이 아니다**(ARCH-58): 이 함수는 설정을 읽어 "이 구성이면 무엇이
+    불릴 것인가"를 답한다. 응답이 실제로 어느 모델에서 왔는지(provider가 돌려준 model id)를
+    싣는 축은 `EOS-111`이 소유한다. 그래서 docstring이 "실제 호출된"이라고 단정하지 않는다 —
+    설정과 실제가 어긋나는 경로(폴백·프록시 라우팅)를 이 함수는 볼 수 없다.
+
+    **회귀 이력**: 종전 판은 CLOUD_*에서 `anthropic_model_mid/high`를 **무조건** 읽었다.
+    클라우드 슬롯이 항상 Anthropic이던 시절에는 참이었으나 `ARCH-57`이 셀렉터를 도입하며
+    그 전제가 깨졌고, 그 사이 OpenRouter 좌석으로 돈 회차의 genlog가 `claude-sonnet-4-6`을
+    적었다(2026-09-18 실측 · Phaiakes9 라이브 1회차). 출처 로그가 조용히 틀린 값을 적는
+    상태였고 — 없는 기록보다 나쁘다, 읽는 사람이 믿기 때문이다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     if cost is CostTier.LOCAL:
         return resolve_model(decision.local_family, decision.local_model)
     resolved = settings if settings is not None else get_settings()
-    if cost is CostTier.CLOUD_MID:
-        return resolved.anthropic_model_mid
-    return resolved.anthropic_model_high
+    # 좌석→핀 매핑은 `l3/providers/factory.cloud_model_pins()`가 단일 근거다(EOS-111).
+    # 여기서 다시 분기하면 좌석 집계와 이 함수가 갈라질 수 있고, 갈라지는 순간 둘 중
+    # 하나는 거짓이 된다 — ARCH-58이 상환한 사고의 형태가 정확히 그것이다.
+    # 알 수 없는 좌석의 raise도 그 함수가 담당한다(기본 좌석으로 접지 않는다).
+    mid, high = cloud_model_pins(resolved)
+    return mid if cost is CostTier.CLOUD_MID else high
 
 
 def actual_cost_usd_or_none(decision: RoutingDecision, usage: Usage | None) -> float | None:
@@ -178,6 +193,10 @@ def generation_log_from_result(
         cache_creation_input_tokens=(
             usage.cache_creation_input_tokens if usage is not None else None
         ),
+        # 관측 좌석(EOS-112) — 같은 usage에서 그대로. 인제스트 모드처럼 호출이 없었던
+        # 항목은 usage 자체가 None이라 둘 다 None=미관측이다.
+        served_model=usage.served_model if usage is not None else None,
+        retries=usage.retries if usage is not None else None,
         cost_usd=cost_usd,
         latency_ms=latency_ms,
         success=result.status in _SUCCESS_STATUSES,

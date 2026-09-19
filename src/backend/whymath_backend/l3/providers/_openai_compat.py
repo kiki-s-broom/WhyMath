@@ -26,6 +26,7 @@ from contextvars import ContextVar
 from typing import Any, Protocol, runtime_checkable
 
 from whymath_backend.l3.models import Usage
+from whymath_backend.l3.providers._response_fields import read_response_model_id
 
 __all__ = [
     "RETRYABLE_STATUS",
@@ -35,6 +36,7 @@ __all__ = [
     "extract_usage",
     "reset_retry_count",
     "retries_in_current_call",
+    "retries_since",
 ]
 
 RETRYABLE_STATUS: frozenset[int] = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
@@ -64,6 +66,22 @@ def retries_in_current_call() -> int:
     `ContextVar`라 asyncio 태스크마다 독립이다(동시 실행 회차끼리 섞이지 않는다).
     """
     return _RETRY_COUNT.get()
+
+
+def retries_since(before: int) -> int | None:
+    """호출 전 스냅샷 대비 *이번 호출의* 재시도 횟수 — 셀 수 없으면 None (EOS-112).
+
+    카운터는 ContextVar라 회차 내내 누적된다. 차분을 잡지 않으면 뒤 호출일수록 남의
+    재시도를 물려받아, "이 호출이 3번 만에 성공했다"가 거짓이 된다.
+
+    **음수는 0으로 접지 않고 None으로 낸다.** 음수는 호출 도중 누군가 카운터를 되돌렸다는
+    뜻이고(중첩 리셋 등), 그때 우리가 아는 것은 "이 호출의 재시도 횟수를 모른다"이지
+    "재시도가 없었다"가 아니다. 0으로 접으면 계측 실패가 실측 0으로 위장되고, 음수를 그대로
+    실으면 `GenerationLog`의 `ge=0`에 걸려 **그 행 전체가 버려진다**(한 필드 때문에 로그가
+    통째로 사라지는 것이 가장 나쁘다).
+    """
+    delta = _RETRY_COUNT.get() - before
+    return delta if delta >= 0 else None
 
 
 @runtime_checkable
@@ -242,7 +260,7 @@ def _read_usage_token(raw_usage: Any, field: str) -> int | None:
     return None
 
 
-def extract_usage(payload: Any, latency_ms: float) -> Usage:
+def extract_usage(payload: Any, latency_ms: float, *, retries: int | None = None) -> Usage:
     """OpenAI 호환 응답의 usage를 `l3.models.Usage`로 정규화.
 
     `prompt_tokens`/`completion_tokens`가 OpenAI 호환 이름이다(Anthropic의
@@ -257,6 +275,12 @@ def extract_usage(payload: Any, latency_ms: float) -> Usage:
     맞추려 들면 어느 한쪽이 거짓이 된다. 적중률 집계는 provider별 의미를 아는 상류
     (`harness/anchor_round_ledger`)가 한다. `cache_creation_input_tokens`는 이 API에
     대응 개념이 **없으므로 항상 None**이다(0이 아니다 — 미측정 ≠ 0).
+
+    관측 축(EOS-112) 둘은 usage 블록이 아니라 **바깥**에서 온다: `served_model`은 payload
+    최상위 `model`(응답이 실제로 어느 모델에서 왔는가), `retries`는 호출자가 전송기 카운터
+    에서 잰 값을 넘긴다. `retries`를 여기서 직접 읽지 않는 이유는 그 값이 ContextVar라
+    *언제* 읽느냐가 곧 의미이기 때문이다 — 순수 함수 안에서 읽으면 호출 경계가 흐려지고,
+    호출자가 안 넘기면 None(미계측)이 정직한 기본값이다(0으로 접지 않는다).
     """
     raw_usage: Any = None
     if isinstance(payload, Mapping):
@@ -269,4 +293,6 @@ def extract_usage(payload: Any, latency_ms: float) -> Usage:
         latency_ms=latency_ms,
         cache_read_input_tokens=_read_usage_token(raw_usage, "prompt_cache_hit_tokens"),
         cache_creation_input_tokens=None,
+        served_model=read_response_model_id(payload),
+        retries=retries,
     )

@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from whymath_backend.schema.verification_capabilities import (
         AnswerFormVerifier,
         AssessmentAnswerVerifier,
+        AttemptMisconceptionDetector,
         ExpressionEquivalence,
         ExpressionSeal,
         FinalAnswerVerifier,
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "default_answer_form_verifier",
+    "default_attempt_misconception_detector",
     "default_assessment_answer_verifier",
     "default_expression_equivalence",
     "default_expression_seal",
@@ -116,3 +118,17 @@ def default_wrong_form_shadow_observer() -> Callable[[str], None]:
     from whymath_backend.l4.misconception.wrong_form_match import observe_wrong_form_shadow
 
     return observe_wrong_form_shadow
+
+
+def default_attempt_misconception_detector() -> AttemptMisconceptionDetector:
+    """`AttemptMisconceptionDetector`(오답 1건 → 오개념 후보)의 기본 구현을 준다.
+
+    Core(채점 핸들러)가 `l4.misconception.answer_signature`를 *이름으로* 알면 경계 위반이다 —
+    함수 안 import여도 경계 스캔은 그 간선을 본다. 그래서 이 팩토리 하나만 알게 한다.
+
+    과목이 이 능력을 제공하지 않으면 호출자는 훑지 않은 것으로 처리한다
+    (`MisconceptionScan.NOT_RUN`) — 능력 부재를 "오개념 없음"으로 접지 않는다.
+    """
+    from whymath_backend.l4.subject_adapter_math import math_attempt_misconception_detector
+
+    return math_attempt_misconception_detector()

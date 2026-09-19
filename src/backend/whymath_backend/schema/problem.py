@@ -59,14 +59,23 @@ from whymath_backend.schema.visualization import Visualization
 # 본문 미보유(구조 메타 전용) source_type — 법적 교정의 대상 집합
 # (MEMORY 2026-05-28: 평가원·EBS·검정교과서 본문 미보유, 저작권 가이드 v2.0 §32 단서)
 # ──────────────────────────────────────────────────────────────────────────
-_METADATA_ONLY_SOURCES: frozenset[SourceType] = frozenset(
+METADATA_ONLY_SOURCES: frozenset[SourceType] = frozenset(
     {SourceType.평가원, SourceType.EBS, SourceType.교과서}
 )
 """이 출처의 레코드는 *구조 메타데이터 참조 전용* — 본문 필드가 비어야 한다.
 
 `source_detail`/`ebs_source`에 단원·코드·문항번호만 둔다. 학생에게 노출·저장되는
 실제 본문은 `SourceType.자체생성`(WHYMATH_GENERATED) 레코드만 가질 수 있다.
+
+**공개 이름인 이유**(EOS-19): 같은 집합이 `l6/_shared.py`에 한 벌 더 있었고, 그 중복의 명시된
+사유가 "여기가 private이라 import할 수 없다"였다. 저작권 차단 집합이 두 곳에 있으면 한쪽만
+고쳐지는 날 *노출 게이트가 갈라진다* — 법적 축에서 가장 위험한 형태의 드리프트다. 이름을 열어
+그 사유를 없앴고, L6·L2는 이제 이 **하나**를 가리킨다. 기존 참조를 위해 아래 private 별칭은
+남긴다(같은 객체 — 드리프트 불가).
 """
+
+#: 구 이름 별칭 — `schema.provenance`·`whs.self_evolution` 등 기존 참조 보존용(동일 객체).
+_METADATA_ONLY_SOURCES: frozenset[SourceType] = METADATA_ONLY_SOURCES
 
 # ──────────────────────────────────────────────────────────────────────────
 # SEC-24(원 SEC-15) — 공개(무인증·학생 대면) 응답에서 **키 자체가 없어야 하는** 정답류 필드

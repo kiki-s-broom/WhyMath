@@ -20,17 +20,24 @@
   - `l2/mastery_tracking.py::_stage_attempt_mastery` (개념 축 적재)
   - `l2/skill_mastery_tracking.py::_stage_skill_attempt_mastery` (스킬 축 적재)
 그 위의 서빙 진입점(`POST /v1/me/attempts` → `record_problem_attempt_mastery` ·
-`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. **API·L3·L4가 이
-계약 타입을 직접 읽는 배선은 아직 없다** — `LearnerState` 단일 조회 표면(`EOS-10`)·
-`AssessmentEvidence` 구체 타입(`EOS-12`)·추천 계약(`EOS-14`)이 각자 소유한다.
+`api/coach.py` 완료 경로)은 두 함수를 통해 *간접적으로* 계약을 경유한다. `LearnerState` 단일
+조회 표면(`EOS-10`)·추천 계약(`EOS-14`)은 각자 소유한다.
+
+**EOS-18(2026-09-18)**: 증거 축의 이음매가 닫혔다. EOS-13이 두었던 임시 어댑터
+`AttemptOutcomeEvidence`(2속성)를 폐기하고, 서빙 경로가 `collect_assessment_evidence`로 조립한
+**실 `AssessmentEvidence`가 적재 경로까지 그대로 내려온다**. 그래서 이제 API가 이 계약의 입력
+타입을 *직접* 만든다 — 정오답·관측시각·학습자·문항의 사본이 0이고, 조립과 적재가 어긋날 여지가
+구조적으로 없다. 이 모듈은 여전히 구체 타입을 import하지 않는다(추정기가 읽는 것은
+`AssessmentEvidenceInput` 2속성뿐 — 귀속은 추정 입력이 아니다).
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import replace
 from datetime import datetime
 from typing import NamedTuple
 
@@ -42,11 +49,13 @@ from whymath_backend.schema.mastery_contract import (
     MasteryContractError,
     MasteryEstimator,
     MasteryUpdate,
+    clamp_unit,
 )
+
+logger = logging.getLogger("whymath.l2.mastery_contract")
 
 __all__ = [
     "BKT_ESTIMATOR_ID",
-    "AttemptOutcomeEvidence",
     "BktMasteryEstimator",
     "MasteryEstimatorFactory",
     "MasteryRecord",
@@ -109,24 +118,6 @@ def compute_mastery_record(
     sample_size = (prior_sample_size or 0) + 1
     confidence = round(sample_size / (sample_size + _CONFIDENCE_HALFLIFE), _MASTERY_DECIMALS)
     return MasteryRecord(mastery=mastery, confidence=confidence, sample_size=sample_size)
-
-
-# ── 증거 어댑터(EOS-12 착지 전 임시 좌석) ─────────────────────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptOutcomeEvidence:
-    """`AssessmentEvidenceInput`을 만족하는 **최소** 어댑터 — 채점 결과 1건.
-
-    ⚠️ **이것은 `AssessmentEvidence`가 아니다.** 구체 evidence 타입의 좌석은 `EOS-12`가
-    소유하며 아직 착지하지 않았다. 계약이 실제로 읽는 두 속성만 담은 임시 운반체이며,
-    **필드를 늘리면 evidence의 두 번째 진실 원천이 된다** — 늘리지 마라. `EOS-12`가 착지하면
-    그 타입이 같은 Protocol을 만족하므로 호출부는 이 클래스 대신 그것을 넘기면 되고, 이
-    어댑터는 그때 폐기 대상이다(호출부 시그니처는 그대로).
-    """
-
-    correct: bool
-    observed_at: datetime
 
 
 # ── ② BKT 추정기 어댑터 ───────────────────────────────────────────────────────
@@ -316,6 +307,11 @@ def update_mastery(
     산출이 입력과 다른 대상을 가리키면 `MasteryContractError`을 던진다 — 잘못된 추정기가
     다른 개념의 숙달을 조용히 덮어쓰는 것이 이 계약에서 가장 위험한 실패다.
 
+    EOS-108: 반환 직전 `_enforce_bounds`가 0~1을 **다시 잰다**. 추정기를 갈아 끼울 수 있게
+    만든 이상 범위를 지키지 않는 구현이 들어올 표면이 생겼고, 그 표면의 방어는 생성자 검사
+    하나로는 부족하다(사후 변조 경로가 남는다). 잘린 산출은 `bounds_clamped=True`를 달고
+    경고 로그를 남긴다 — 값은 구제하되 사실은 잃지 않는다.
+
     ⚠️ 이름 메모: `l2/bkt.py`에도 `update_mastery(prior, correct, params)`가 있다(BKT 수식
     한 스텝). 이쪽은 *호출 계약*이고 그쪽은 *수식*이다 — 패키지 레벨(`whymath_backend.l2`)에는
     bkt의 것만 재노출하므로, 이 함수는 항상 모듈 경로로 import한다
@@ -334,7 +330,43 @@ def update_mastery(
             f"(요청: {learner_state.axis}/{learner_state.target_id}, "
             f"받음: {update.axis}/{update.target_id})."
         )
-    return update
+    return _enforce_bounds(update, engine.estimator_id)
+
+
+def _enforce_bounds(update: MasteryUpdate, estimator_id: str) -> MasteryUpdate:
+    """추정기 산출의 0~1 경계를 **계약이 다시 잰다** — 추정기를 신뢰하지 않는다(EOS-108).
+
+    `MasteryUpdate.__post_init__`이 이미 범위를 검사하지 않느냐는 물음의 답: 그 검사는
+    *정상적으로 생성자를 통과한* 객체만 막는다. frozen dataclass도 `object.__setattr__`로
+    사후 변조가 가능하고, 추정기는 레지스트리를 통해 **임의 구현이 꽂히는 표면**이다. 즉
+    생성자 검사는 저자의 실수를 막고, 이 함수는 *신뢰하지 않는 구현*을 막는다 — 같은 불변식의
+    두 번째 회계이며, 둘 중 하나만 있으면 학생 상태에 범위 밖 값이 들어갈 경로가 남는다.
+
+    자르는 쪽을 택한 이유와 자른 사실을 남기는 이유는 `schema.mastery_contract.clamp_unit`
+    docstring에 있다. 여기서는 그 위에 **경고 로그**를 얹는다 — 어느 추정기가 어떤 값을 냈는지
+    타입·값과 함께 남긴다(침묵 실패 금지 · 대상 id는 개념/스킬 식별자이지 학생 PII가 아니다).
+    """
+    bounded_mastery = clamp_unit(update.mastery)
+    bounded_confidence = clamp_unit(update.confidence)
+    if bounded_mastery == update.mastery and bounded_confidence == update.confidence:
+        return update
+    logger.warning(
+        "MasteryContractBoundsViolation: 추정기 %r가 범위 밖 산출을 냈습니다 "
+        "(axis=%s target=%s mastery=%r->%r confidence=%r->%r) — 계약이 잘랐습니다.",
+        estimator_id,
+        update.axis.value,
+        update.target_id,
+        update.mastery,
+        bounded_mastery,
+        update.confidence,
+        bounded_confidence,
+    )
+    return replace(
+        update,
+        mastery=bounded_mastery,
+        confidence=bounded_confidence,
+        bounds_clamped=True,
+    )
 
 
 def state_from_history(

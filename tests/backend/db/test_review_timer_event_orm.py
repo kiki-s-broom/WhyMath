@@ -108,8 +108,7 @@ class TestNoStudentAxis:
     """학생 소유 축 부재 동결 — RPT-01(`test_defect_report_no_user_id.py`) 선례.
 
     reviewer_id는 검수 *행위자*(content_provenance.approved_by 계열)이지 데이터 주체 소유
-    축이 아니다 — privacy 스윕(`test_erasure_plan_completeness.OWNER_COLUMN_NAMES`)의 분류
-    기준을 그대로 따른다. 이 컬럼 집합이 유지되는 한 erasure/retention/export 3종 배선은
+    축이 아니다 — privacy 스윕(`test_erasure_plan_completeness`)의 분류 기준을 그대로 따른다. 이 컬럼 집합이 유지되는 한 erasure/retention/export 3종 배선은
     불요하며, 학생 축 컬럼을 추가하는 순간 이 테스트와 완전성 스윕이 함께 red가 된다.
     """
 
@@ -121,9 +120,9 @@ class TestNoStudentAxis:
     def test_not_in_erasure_plan_nor_exemptions(self) -> None:
         """삭제권 계획·허용목록 둘 다 밖(의도) + 스윕 소유 축 미보유 실측(추측 금지).
 
-        완전성 스윕(`test_erasure_plan_completeness`)의 소유 축(OWNER_COLUMN_NAMES = user_id/
-        student_id/target_user_id — 정본은 그 파일)을 이 테이블이 보유하지 않으므로, 계획에도
-        허용목록에도 없이 스윕이 green이어야 한다 — 그 스윕 자체는 privacy 스위트가 실행한다
+        완전성 스윕(`test_erasure_plan_completeness`)의 소유 축(SEC-35 이후 *`user_profile.
+        user_id` FK 보유* ∪ *`_ERASURE_PLAN` 파생 컬럼명 보유* — 정본은 그 파일)을 이 테이블이
+        어느 쪽으로도 보유하지 않으므로, 계획에도 허용목록에도 없이 스윕이 green이어야 한다 — 그 스윕 자체는 privacy 스위트가 실행한다
         (본 테스트는 판정 전제 3축을 지역화: 소유 컬럼 0·계획 밖·허용목록 밖). 학생 축 컬럼을
         추가하는 순간 위 컬럼 부재 테스트와 완전성 스윕이 **함께** red가 된다(양방향 변별력).
         """

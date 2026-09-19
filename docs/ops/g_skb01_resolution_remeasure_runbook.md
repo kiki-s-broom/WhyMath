@@ -464,7 +464,11 @@ if ($EvidenceSent -and $ReportExists) { docker exec -i whymath-pg psql -U whymat
 그 밖에 Kiki가 직접 발견한 결함 1건 — 블록들이 앞 블록의 변수·환경·CWD를 상속해 CLAUDE.md
 「실행 시스템 진입 경로 완전 명시」를 위반했다. `config.py`의 `database_url` 기본값이 포트 **5432**
 (타 프로젝트 점유·사용 금지)라 새 창 실행 시 마이그레이션이 다른 DB를 겨냥할 수 있었다. 전 8블록
-자기완결화로 해소했고, 기계 집행 부재는 `HARN-110`으로 등재했다.
+자기완결화로 해소했고, 기계 집행 부재는 **`HARN-115-runbook-block-self-containment`**로 등재했다.
+(등재 시점 ID는 `HARN-110`이었으나 2026-09-19 번호 충돌로 개명했다 — 병렬 세션이 main에 다른
+`HARN-110`을 먼저 착지시켰고 미머지인 이쪽을 `backlog.py rename`으로 옮겼다. **게이트
+`G-skb01-resolution-remeasure`의 증적 본문에 남은 `HARN-110`은 이 태스크를 가리킨다** — 증적은
+append-only 대장이라 손대지 않았고 rename 이벤트가 구↔신을 잇는다.)
 
 **결론(2026-09-18)**: 브리지 데이터 적재는 해소율로 이어진다. 사슬 진단이 표본 생성 전에
 `D_candidates_resolvable=1655`(후보 1,703 중 97.2%)를 예고했고 실측이 그대로 100%로 나왔다.

@@ -28,6 +28,7 @@ from whymath_backend.harness.wh1_loop import (
     VerifyStepAction,
     run_tutoring_turn,
 )
+from whymath_backend.l2.remediation_policy import EscalationRung
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.misconception.probe_selection import ProbeCandidate
 
@@ -40,9 +41,12 @@ def _run(actions: list[Action], **kw: object) -> object:
     return asyncio.run(run_tutoring_turn(policy=ScriptedTutorPolicy(actions), **kw))  # type: ignore[arg-type]
 
 
-def _hyp(mid: str, confidence: float) -> MisconceptionHypothesis:
+def _hyp(mid: str, confidence: float, evidence_count: int = 1) -> MisconceptionHypothesis:
     return MisconceptionHypothesis(
-        misconception_id=mid, confidence=confidence, turns_since_evidence=0, evidence_count=1
+        misconception_id=mid,
+        confidence=confidence,
+        turns_since_evidence=0,
+        evidence_count=evidence_count,
     )
 
 
@@ -447,3 +451,40 @@ class TestEndTurnUtterance:
         """격려 + 발화 미지정 → 격려 폴백 발화."""
         out = _run([EndTurnAction(action_type="격려", utterance=None)])
         assert out.utterance == "좋아, 지금까지 잘 하고 있어. 다음으로 가보자."  # type: ignore[attr-defined]
+
+
+class TestEscalationRungObservability:
+    """MISC-30 ⑥ — 사다리가 *실제로 발동한 비율*을 리포트가 말할 수 있는가.
+
+    분기를 붙였는데 한 번도 타지 않는 상태(reader 0과 구별 불가)를 정상으로 보고하지
+    않으려면, 등급이 턴 결과까지 올라와야 한다(CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").
+    """
+
+    def _turn(self, evidence_count: int, action_type: str = "질문") -> object:
+        return _run(
+            [EndTurnAction(action_type=action_type, utterance=None)],  # type: ignore[arg-type]
+            turn_index=1,
+            initial_hypotheses=[_hyp(_MID, 0.9, evidence_count=evidence_count)],
+        )
+
+    def test_rung_reaches_the_turn_outcome(self) -> None:
+        """개입 발화 턴의 등급이 `TurnOutcome`까지 올라온다 — 비율의 원자료."""
+        expected = {
+            1: EscalationRung.NONE,
+            2: EscalationRung.CORRECTIVE_EXPLANATION,
+            3: EscalationRung.EASIER_PROBLEM,
+            4: EscalationRung.PREREQUISITE_CONCEPT,
+        }
+        for count, rung in expected.items():
+            out = self._turn(count)
+            assert out.escalation_rung is rung, (count, out.escalation_rung)  # type: ignore[attr-defined]
+
+    def test_turns_without_intervention_are_outside_the_denominator(self) -> None:
+        """개입 결정이 없던 턴은 `None`이다 — 미발동(`NONE`)과 섞이면 비율이 희석된다."""
+        out = self._turn(4, action_type="격려")
+        assert out.escalation_rung is None  # type: ignore[attr-defined]
+
+    def test_rung_is_never_spoken_to_the_student(self) -> None:
+        """등급이 올라와도 발화는 반복 횟수에 따라 달라지지 않는다(정서 안전)."""
+        utterances = {self._turn(n).utterance for n in range(1, 6)}  # type: ignore[attr-defined]
+        assert len(utterances) == 1, f"반복 횟수가 학생 발화를 바꿨다: {utterances}"

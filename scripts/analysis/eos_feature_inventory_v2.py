@@ -469,7 +469,7 @@ CATALOG: tuple[Spec, ...] = (
     _s("WM-S-034", "개념 의미검색(pgvector)", "Student", "Knowledge Graph", "P1",
        "원자 검색 좌석 — S0-4a", "concepts", "GET /search"),
     _s("WM-S-035", "개념 콘텐츠(정의·비유·예시) 조회", "Student", "Content", "P0",
-       "Gate2 ⑤ Content→Problem 연결", "concepts", "GET /content"),
+       "Gate2 ⑤ Content→Problem 연결", "concepts", "GET /content", "GET /content/{code}"),
     _s("WM-S-036", "개념 노드 저작 CRUD", "Admin", "Knowledge Graph", "P1",
        "B4 — 운영자 저작 표면", "concepts",
        "POST /", "PATCH /{concept_id}", "DELETE /{concept_id}"),
@@ -551,10 +551,15 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-118", "그래프 분석 유틸(ETL 측)", "Platform", "Knowledge Graph", "P2",
        "data_pipeline 분석 — backend 대응 없음", pipelines=("graph_analytics",)),
     # ════════════════════ E — L2 학습자 모델 ════════════════════
+    # EOS-108: 추정기 구현 축(l2.mastery_estimators)을 **같은 기능번호**에 귀속시킨다 — §15가
+    # 신규 EOS 기능번호 추가를 동결했고, 같은 계약(update_mastery)에 꽂히는 두 번째 구현은
+    # 같은 기능의 다른 추정기이지 별개 기능이 아니다(EOS-103의 영속 축 귀속과 같은 논리).
     _e("WM-E-201", "BKT 숙달 추정·갱신 호출 계약·개념/스킬 숙달 이력 영속", "Student",
        "Learning Model", "P0",
-       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리)", "l2.bkt",
-       "l2.mastery_contract", "l2.mastery_tracking", "l2.skill_mastery_tracking"),
+       "Gate2 ⑧ Mastery 자동 갱신 · EOS-13 계약 분리(추정기 Protocol·레지스트리) · "
+       "EOS-108 §6 가산 규칙 추정기·Attempt 멱등·단일 쓰기 경로", "l2.bkt",
+       "l2.mastery_contract", "l2.mastery_estimators", "l2.mastery_tracking",
+       "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
@@ -594,6 +599,22 @@ CATALOG: tuple[Spec, ...] = (
        "붙인다. 선택 알고리즘은 WM-E-205·WM-E-202 좌석이 유일 권위이고 이 행은 선택 *뒤에* "
        "돌아 결과를 바꾸지 않는다(session.add·commit 0건)",
        "l2.recommendation_contract", "l2.recommendation_reason"),
+    # EOS-19 — WM-E-211(계약)의 **첫 소비처**라 행을 나눈다: 그쪽은 "근거를 붙인다"이고 이쪽은
+    # "정책이 결정한다"이며, 사용자에게 의미 있는 능력 단위가 다르다(계약은 교체돼도 남고 정책은
+    # 교체 대상이다). 세 모듈이 한 행인 이유는 한 흐름의 세 구간이기 때문이다 — 후보 조회 배선
+    # (l2.next_problem_selection) → 기본 CAT 정책(l2.recommendation_policy) → 수능 정책
+    # (api._next_problem_policy). 수능 정책만 `api`에 사는 이유는 그 모듈 docstring 참조
+    # (L6 게이팅 + DB를 동시에 쓰는 유일한 합법 합성 지점).
+    # 번호: main + 원격 39 ref 전수 스캔에서 WM-E-213 미사용 확인(2026-09-18). 클론이 shallow라
+    # 그 39개 밖의 ref는 보지 못했다 — "내가 찾은 방법으로는 0건"이다.
+    _e("WM-E-213", "추천 정책 v1 — recommend(learner_state, learning_context) 실호출", "Student",
+       "Recommendation", "P1",
+       "EOS-19 — 계획서 300 §8. 핸들러가 고르던 문항을 정책 함수가 고른다: LearnerState를 "
+       "입력으로 받고 `Recommendation`(필수 reason + 파생 action + 목표 개념)을 돌려주며, "
+       "핸들러는 그것을 HTTP 응답으로 옮기기만 한다. 알고리즘은 전환 전과 같아 추천 결과가 "
+       "바뀌지 않는다(회귀 0). 개념 그래프 조회는 depth<=2·nodes<=20·visited·timeout 예산 "
+       "안에서만 돌며 그 천장은 생성 시점에 강제된다",
+       "l2.next_problem_selection", "l2.recommendation_policy", "api._next_problem_policy"),
     # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
     # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
     # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
@@ -608,6 +629,18 @@ CATALOG: tuple[Spec, ...] = (
        "*MasteryHistory와 진실 원천이 겹치지 않는다(ADR-006). 정책은 교체 가능한 Protocol이고 "
        "v1 규칙 6종은 if/else다",
        "l2.learning_state_machine", "l2.learning_state_policy", "l2.learning_state_evidence"),
+    # MISC-30 — WM-E-212(상태 전이)와 **다른 행**인 이유: 그쪽은 "학생이 어느 국면에
+    # 있는가"를 정하고 이 행은 "막힌 학생에게 무엇을, 얼마나 세게 줄 것인가"를 정한다.
+    # 반복 축의 입력도 다르다(그쪽 R5 = 원인 무관 연속 오답, 이쪽 = 같은 오개념 누적 증거).
+    # 번호 주의: 213은 원격 브랜치가 선점해 214를 쓴다(전수 스캔 2026-09-18).
+    _e("WM-E-214", "보정 정책 표(경로 선택 + 반복 오류 개입 사다리)", "Student",
+       "Learning Model", "P1",
+       "MISC-30 — 계획서 300 §9. 임계값을 코드에 흩뿌리지 않고 주입 가능한 표 하나"
+       "(`REMEDIATION_POLICY_V1`)로 모은다. 사다리(≥2 교정설명·≥3 쉬운문제·≥4 선수개념)는 "
+       "`l4/misconception/intervene.py`가 focus 가설의 evidence_count로 읽어 배선돼 있고, "
+       "경로 선택(`select_route`)은 아직 소비처 0건이다 — 숙달 축은 WM-E-211의 "
+       "`select_reason_type`에 위임하므로 재구현이 아니다",
+       "l2.remediation_policy"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
        "P0", "A5 AI Model Gateway", "l3.router", "l3.models", "l3.escalation_defaults",
@@ -702,11 +735,15 @@ CATALOG: tuple[Spec, ...] = (
        flag="pedagogy_pack_prompt_enabled"),
     _e("WM-E-410", "적응 교수법 policy(Thompson sampling·안전제약)", "Student", "Pedagogy", "P1",
        "PED-03 — 승격 게이트 대기", "l4.pedagogy.adaptive"),
-    _e("WM-E-411", "오개념 진단·개입·매칭 게이트·distractor 카탈로그", "Student", "Pedagogy", "P0",
-       "B6·Gate2 ⑦ 오개념 기록", "l4.misconception.catalog", "l4.misconception.diagnose",
+    _e("WM-E-411", "오개념 진단·개입·매칭 게이트·distractor 카탈로그·오답 서명 채널", "Student",
+       "Pedagogy", "P0",
+       "B6·Gate2 ⑦ 오개념 기록 (오답 서명 채널 = EOS-104 · 킬스위치 "
+       "l4_attempt_misconception_scan_enabled 기본 ON)",
+       "l4.misconception.catalog", "l4.misconception.diagnose",
        "l4.misconception.combined", "l4.misconception.models", "l4.misconception.intervene",
        "l4.misconception.match_gate", "l4.misconception.distractor",
-       "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit"),
+       "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
+       "l4.misconception.answer_signature"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙", "l4.misconception.hypothesis",
        "l4.misconception.hypothesis_store", "l4.misconception.probe_selection",
@@ -767,7 +804,8 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-704", "WH-1 튜터링 하네스(턴 루프·LLM 정책·프로즈·프로브 공급)", "Student",
        "Pedagogy", "P0", "04a — 학생 대면 발화 primary", "harness.wh1_loop",
        "harness.wh1_llm_policy", "harness.wh1_primary", "harness.wh1_session",
-       "harness.wh1_prose", "harness.wh1_probe_supply", flag="wh1_primary_enabled"),
+       "harness.wh1_prose", "harness.wh1_probe_supply", "harness.wh1_llm_seam",
+       flag="wh1_primary_enabled"),
     _e("WM-E-705", "WH-1 shadow 관측·수확·2단계 종료 게이트", "Platform", "QA", "P1",
        "S1-b·S1-15 shadow 축적", "harness.wh1_shadow", "harness.wh1_shadow_harvest",
        "harness.agreement_gate", "harness.agreement_gate_cli",

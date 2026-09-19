@@ -42,6 +42,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import (
     AnswerFormat,
     BloomLevel,
@@ -325,7 +326,9 @@ class Problem(Base):
         """
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaProblem.model_validate(data)
+        return SchemaProblem.model_validate(
+            drop_unset_nulls(data, SchemaProblem, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -394,7 +397,9 @@ class ProblemStep(Base):
         """영속 ORM → `schema.ProblemStep`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaProblemStep.model_validate(data)
+        return SchemaProblemStep.model_validate(
+            drop_unset_nulls(data, SchemaProblemStep, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -432,7 +437,9 @@ class ProblemRelation(Base):
         """영속 ORM → `schema.ProblemRelation`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaProblemRelation.model_validate(data)
+        return SchemaProblemRelation.model_validate(
+            drop_unset_nulls(data, SchemaProblemRelation, orm_cls=type(self))
+        )
 
 
 __all__ = ["Problem", "ProblemStep", "ProblemRelation"]

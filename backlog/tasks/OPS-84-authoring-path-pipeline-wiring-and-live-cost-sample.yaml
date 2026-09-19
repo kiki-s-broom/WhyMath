@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-84-authoring-path-pipeline-wiring-and-live-cost-sample
+title: "저작 경로(rephrase.py) 파이프라인 결선 + 게이트② 라이브 표본 실측 — OPS-36 잔여 승계"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① l3/equivalent/rephrase.py 파이프라인 결선 — 동기·자체 이벤트루프 저작 경로가 Router().route() 결과를 손으로 재조립해 provider를 직접 부르는 마지막 우회 1건을 해소한다. OPS-36이 학생 대면 축(wh1_llm_policy·wh1_prose)에 쓴 것과 같은 형태로 pipeline.generate(prefer_local_family=) 경유로 전환하되, 이 경로는 동기 래퍼라 좌석 형태를 그대로 쓸 수 없다 — 이벤트루프 소유권을 누가 갖는지 먼저 판정한다. 결선 제거 시 red가 되는 양방향 변별 테스트 동반.\n② 캐시 의미 판정 — 저작 경로는 다양성이 목적이라 온도를 높여 쓴다(학생 대면 프로즈의 0.7과 성격이 다르다). pipeline의 캐시 키는 (prompt, system, 3축)이라 온도를 포함하지 않으므로, 같은 프롬프트를 캐시에 태우면 다양화가 죽는다. 캐시를 켤지·키에 회차 축을 넣을지·끌지를 실측으로 판정하고 그 근거를 docstring에 남긴다(추측 금지).\n③ 게이트② 라이브 표본 실측 — OPS-36 항목2의 미이행분. ops/cost_report 게이트② 표본에 WH-1 primary 경로 호출이 실제로 계상되는지 라이브 트래픽으로 확인한다. PR #1207이 증명한 것은 '주입한 TraceSink에 라우팅 레코드가 들어간다'까지이고, 프로덕션 LangfuseSink로 이벤트가 실제 전송되는지는 미확인이다. 인프로세스 이중 회계(ops/cost_probe 로컬 비율)와 대조해 '측정 실패'가 '0건 통과'로 위장되지 않는지도 함께 본다.\n④ 범위 밖 동결 — 학생 대면 축 재작업 0(PR #1207 df374448에서 착지 완료) · 신규 프로바이더 도입 0 · 캐시 백엔드 교체 0."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/rephrase.py
+  - "tests/backend/l3/**"
+session: null
+notes: "OPS-36 승계 태스크(CLAUDE.md '회수로 done 선언 시 acceptance 전수 재대조 — 미이행분은 승계 태스크로 분리 등재' 규칙 적용). OPS-36은 학생 대면 축을 PR #1207(main df374448)로 착지시키고 done 처리하되, acceptance ①의 괄호 항목(rephrase.py)과 ②(라이브 표본 실측)는 이 태스크가 가져간다. 분리 사유: rephrase.py는 동기·자체 이벤트루프 저작 경로라 학생 대면 축과 이벤트루프 소유권·캐시 의미 판정이 다르고, 라이브 표본은 트래픽이 필요해 코드 슬라이스와 성격이 다르다. 등재 경위: OPS-36을 review로 두면 backlog.py next 후보(132건)에 나오지 않아 잔여 범위가 아무에게도 안 보이는 상태가 된다 — 실측 확인함. 이 저장소가 4회 겪은 '완료작업 고립'과 같은 형태라 done + 승계 분리로 해소한다."
+updated: 2026-09-19

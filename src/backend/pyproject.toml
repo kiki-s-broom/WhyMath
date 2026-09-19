@@ -272,11 +272,18 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "EOS Core → Math Adapter 금지 (baseline 0 — 이미 깨끗한 구역)"
 type = "forbidden"
-# 이 셋은 2026-08-31 실측에서 Adapter 참조가 **0건**이다. 유예 없이 그 상태를 동결한다 —
+# 이 넷은 실측에서 Adapter 참조가 **0건**이다. 유예 없이 그 상태를 동결한다 —
 # 새로 수학을 끌어오면 즉시 적색. `l2`·`l6`는 sympy·수학 어휘도 0건인 구역이다(경계 문서 §3).
+#
+# `lang` 편입(EOS-117 · 2026-09-19): CORE 배정인데 **어느 계약의 source에도 없던** 구역이다.
+# `tests/infra/test_eos_boundary_contract_wiring.py`의 공허 검사(§⑥)가 전수 대조로 찾아냈다 —
+# 종전 §①은 forbidden 쪽만 정확 일치로 동결하고 source 쪽은 "ADAPTER를 넣지 않았는가"만 봐서,
+# CORE 구역을 통째로 빠뜨린 것은 보이지 않았다. 실측: `lang`은 `josa.py` 1개(259줄)이고
+# import가 `re`·`typing` 뿐이라 편입 즉시 KEPT다(빚을 지지 않는 편입).
 source_modules = [
     "whymath_backend.l1",
     "whymath_backend.l2",
+    "whymath_backend.lang",
     "whymath_backend.schema",
 ]
 # 직접 import만 판정한다(간접 체인 제외) — 경계 스캔(`eos_core_adapter_boundary_scan.py`)이
@@ -300,6 +307,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -359,6 +367,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -384,6 +393,11 @@ ignore_imports = [
     # ADAPTER→ADAPTER라 위반이 아니다(위 5줄과 동형).
     "whymath_backend.l4.subject_adapter_math -> whymath_backend.l3.verify_solution",
     "whymath_backend.l4.misconception.wrong_form_match -> whymath_backend.l3.symbolic_equivalence",
+    # EOS-104: 오답 서명 검출기(ADAPTER)가 거짓형 정합기(ADAPTER)에 위임한다 — 탐지 알고리즘을
+    # 다시 쓰지 않는 것이 요점이라 이 간선이 곧 "재구현 0"의 증거다. ADAPTER→ADAPTER라 위반이 아니다.
+    "whymath_backend.l4.misconception.answer_signature -> whymath_backend.l4.misconception.wrong_form_match",
+    # 수학 어댑터가 그 검출기를 선택층 능력(AttemptMisconceptionDetector)으로 노출한다.
+    "whymath_backend.l4.subject_adapter_math -> whymath_backend.l4.misconception.answer_signature",
     #   MIXED 출발 (해소 경로 = 모듈 분할. api.verify/speech/ocr는 표면이 중립·페이로드가 수식):
     "whymath_backend.api.verify -> whymath_backend.l3.verify_answer",
     "whymath_backend.api.verify -> whymath_backend.l3.verify_solution",

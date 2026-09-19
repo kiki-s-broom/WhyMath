@@ -1166,8 +1166,11 @@ async def _complete_problem(
         observed_at=received_at,
     )
     # 숙달 전파(개념·스킬 축) — 서버 판정 is_correct=True. 매핑 없으면 빈 리스트(graceful).
-    await record_problem_attempt_mastery(session, user_id, problem_id, True)
-    skill_records = await record_problem_attempt_skill_mastery(session, user_id, problem_id, True)
+    # EOS-18: 두 축이 위에서 조립한 **같은 증거**를 받는다(정오답·관측시각의 사본 0).
+    await record_problem_attempt_mastery(session, evidence=completion_evidence)
+    skill_records = await record_problem_attempt_skill_mastery(
+        session, evidence=completion_evidence
+    )
     # EOS-57: 해소된 스킬 배열을 `문제시도` 이벤트로 영속 — submit_attempt와 *같은 writer*
     # (중복 구현 0). `source`가 두 채점 경로를 가르므로 기록률 리포트가 경로별 분모로 본다.
     await record_attempt_skill_event(
@@ -2141,6 +2144,8 @@ async def _wh1_primary_decision_or(
     active_hypotheses: list[MisconceptionHypothesis],
     warmstart_mids: list[str],
     provider: LLMProvider | None,
+    cache: CacheBackend | None,
+    trace: TraceSink | None,
     turn_index: int,
     dialogue_id: str | None,
     problem_id: uuid.UUID | None,
@@ -2176,6 +2181,9 @@ async def _wh1_primary_decision_or(
             solution_steps=body.solution_steps or [],
             active_hypotheses=active_hypotheses,
             provider=provider,
+            # OPS-36: 앱 공유 관측·캐시를 하네스까지 흘린다(학생 대면 LLM 표본 복구).
+            cache=cache,
+            trace=trace,
             turn_index=turn_index,
             dialogue_id=dialogue_id,
             problem_id=str(problem_id) if problem_id is not None else None,
@@ -2484,6 +2492,8 @@ async def create_session(
             active_hypotheses=active_hypotheses,
             warmstart_mids=warmstart_mids,
             provider=judge_deps.provider,
+            cache=judge_deps.cache,
+            trace=judge_deps.trace,
             turn_index=1,  # 새 dialogue — 첫 교환(§2.2 ε 카운터·아래 _wh1_turn_state와 정합).
             dialogue_id=None,  # dialogue는 아래에서 생성되므로 아직 id 없음(shadow 동형).
             problem_id=body.problem_id,
@@ -2870,6 +2880,8 @@ async def append_turns(
             active_hypotheses=active_hypotheses,
             warmstart_mids=warmstart_mids_turn,
             provider=judge_deps.provider,
+            cache=judge_deps.cache,
+            trace=judge_deps.trace,
             turn_index=(dialogue.total_turns or 0) // 2 + 1,
             dialogue_id=str(dialogue_id),
             problem_id=dialogue.problem_id,

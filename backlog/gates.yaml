@@ -20,6 +20,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
+  - id: G-arch56-availability-trigger
+    title: "ARCH-56 착수 트리거 확인 — OpenRouter 가용성 축을 지금 재는 것이 맞는가 (ARCH-55 판정 기준 (d) 보류분). 배경: 4회차 429 실패율이 30%→15%→0%로 흔들렸고 실패 원인이 전부 limit_source=upstream_provider_shared_pool·is_byok=false(공유 풀)다 — 공유 풀은 배포 대상 구성이 아니므로 그 대기열 통계는 채택 후를 대표하지 않는다. 2026-09-18 Kiki 판단으로 BYOK을 개발 단계에서 미채택했다(\"우리는 일단 개발과정에 사용할건데 byok까지 할 거 있나?\"). 판정 3택: ①보류 유지(트리거 미발동 — 기본값. 이 게이트를 재생성해 감시 지속) ②착수(발동 조건 중 하나가 실현됨) ③영구 종결(이 경로를 쓰지 않기로 결정). 발동 조건 3종 중 먼저 오는 것: ⓐ OpenRouter 경로가 학생 대면 또는 상시 배치 트래픽을 받기로 결정된 때 ⓑ openrouter_allowed_providers 기본값을 바꾸려는 판정이 생긴 때 ⓒ 개발 단계 측정에서 429 실패율이 한 회차 50% 이상으로 오른 때. 등재 이유: 발동 조건을 태스크 acceptance 산문에만 두면 selector.py가 그것을 읽지 않아(depends_on만 본다) ARCH-55 완료 즉시 착수 후보로 계산된다 — 실측으로 확인했다(backlog.py done 출력이 \"ARCH-56 착수 가능\"을 냈다). G-arch38-verdict-recheck 선례 동형"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-18
+    remind_after_days: 90
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-attempt-retention-purge-backfill-decision
     title: "Kiki 결정: ProblemAttempt PII 보존기한 파기 대상 소급 확인 — started_at 상시 NULL 버그로 지금까지 파기 0건 (원 PED-16이 7n9n72에 고립·main ID 충돌로 유실 → 2026-09-07 감사가 게이트로 재등재). 배경: privacy/retention.py:80이 ProblemAttempt 파기 기준 컬럼으로 started_at을 쓰는데 두 writer(api/coach.py·api/me.py) 어디서도 채우지 않아 상시 NULL — 근본수정은 PED-37(회수 태스크)이 소유하며 착지 후 신규 행부터 정상. 결정 3항(claude가 판단할 사안 아님 — 법령 유래 절차의 기계 대체 금지): (a) 이 컨테이너·개발 환경·Phaiakes9 prod DB(whymath-pg 5433)에 실제 학생 개인정보가 쌓인 적이 있는가(2026-09-03 복구 리허설 실측 problem_attempt 0행·user_profile 1행이면 실무 영향 0 가능성 높음) (b) 있다면 기존 NULL 행의 소급 파기 기준을 무엇으로 볼 것인가(ended_at 대체 등) (c) 소급 파기 스크립트가 필요하면 별도 태스크로 claude에게 위임. clear evidence에 (a)의 실측 행수와 (b)(c)의 결정을 적는다"
     kind: decision
@@ -216,6 +226,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-07
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-eos118-seat-signal-live-run
+    title: "EOS-118 라이브 관측 회차 2건 실행 (Phaiakes9) — 좌석 신호가 실제로 좌석을 말하는지 확인. 실행 대상 = docs/ops/arch57_authoring_openrouter_runbook.md. ① openrouter 좌석 회차 1건 ② 기본값(anthropic) 대조군 회차 1건. 회신 = 두 회차의 요약 cloud_seat 블록 전문(state · observation.calls_with_served_model · observation.declared_vs_served{comparable,differs,differing_pairs} · observation.retries.calls_with_retries_measured). 판정 기준(한 신호로 두 축을 판정하지 않는다): state가 not_measured가 아닐 것 **그리고** declared_vs_served.comparable > 0일 것 **그리고** 두 회차의 observed_models가 서로 다를 것. 셋 중 하나라도 어긋나면 통과가 아니라 원인 규명 대상이다 — 실패 회차도 그대로 기록한다(폐기 금지). 세션이 실행 전에 6항목 브리핑과 함께 명령 블록을 안내하며, 런북·측정 코드가 Kiki 체크아웃에 실재하는지(main 도달) 먼저 실측 확인한다. 전제: Phaiakes9 · OpenRouter 키 등록됨(ARCH-57 라이브 1회차 선례) · Docker Postgres 가동."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-19
     remind_after_days: 14
     evidence: null
     cleared_by: null
