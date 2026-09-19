@@ -475,25 +475,22 @@ def test_mastery_step_assertion_is_discriminating() -> None:
         asyncio.run(_cleanup_content(problem_ids=problem_ids, concept_ids=[]))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "EOS-109 — OAuth 콜백(`resolve_user`)이 만든 학습자는 `GET /v1/users/me`가 500이다. "
-        "ORM 컬럼은 nullable(`list[...] | None`)인데 스키마 필드는 비옵셔널 `list[...]`이고, "
-        "`to_schema()`가 키를 명시적으로 None으로 넘겨 default_factory가 적용되지 않는다. "
-        "해소되면 이 xfail이 XPASS로 *실패*해서 표식을 지우라고 알린다."
-    ),
-)
-def test_oauth_created_learner_can_read_own_profile() -> None:
-    """**Week 1 Gate가 지목한 끊긴 지점** — API로 만든 학습자가 자기 프로필을 읽는가.
+def test_oauth_created_learner_can_read_and_update_own_profile() -> None:
+    """**Week 1 Gate가 지목했던 끊긴 지점** — API로 만든 학습자가 자기 프로필을 읽고 고치는가.
 
-    `skip`이 아니라 `xfail(strict=True)`를 쓴다(`test_notation_evidence_integrity.py` 선례):
-    skip은 "검사가 없는 것"과 구별되지 않아 침묵 실패가 되고, strict xfail은 ①지금 깨져 있음을
-    기계로 남기며 ②고쳐지는 순간 XPASS로 빨강이 되어 표식 제거를 강제한다.
+    EOS-109 이전 이 두 표면은 *둘 다 500*이었다. `resolve_user`는 `from_schema`를 경유하지 않고
+    ORM 생성자를 직접 부르므로 배열 4컬럼(track_type·target_universities·inkang_provider·
+    accessibility_needs)이 NULL로 남는데, `to_schema()`가 그 NULL을 비옵셔널 `list[...]` 필드에
+    명시적으로 넣어 `default_factory`가 적용되지 않고 `ValidationError`가 났다. `PATCH`도 같은
+    스키마를 응답하므로 함께 깨졌다 — 즉 **신규 가입 계정은 온보딩을 시작할 수 없었다**.
 
-    이 결함은 main에 이미 있던 것이고 이 PR이 건드린 코드가 아니다 — 기존 관통 테스트가 학습자를
-    `UserProfile.from_schema(...)`로 시딩해 배열 4컬럼에 `[]`가 채워졌기 때문에 이 경로를 한 번도
-    지나가지 않았다. 사용자 생성을 API로 옮기자 즉시 드러났다.
+    기존 관통 테스트가 이 결함을 1년 가까이 못 본 이유는 학습자를 `UserProfile.from_schema(...)`로
+    시딩해 `[]`가 채워졌기 때문이다. 그래서 이 테스트는 *반드시* 로그인 경로로 만든 행을 쓴다.
+
+    읽기 축의 기존 `xfail(strict=True)` 표식은 EOS-109 착지와 함께 제거했다(남아 있으면 XPASS로
+    CI red). 이미 NULL로 저장된 *기존* 행 축은 원시 SQL이 필요해 이 모듈에 둘 수 없고
+    (`test_week1_gate_no_learner_writes.py`가 학습자 직접 쓰기를 AST로 금지한다)
+    `test_users_me_legacy_null_arrays.py`가 따로 동결한다.
     """
     if not asyncio.run(_pg_reachable()):
         pytest.skip("PostgreSQL 미도달 — 판정 불가. 통과가 아니다.")
@@ -504,9 +501,36 @@ def test_oauth_created_learner_can_read_own_profile() -> None:
         auth = _login(client)
         created = asyncio.run(_demo_user_ids())
         assert len(created) == 1, f"사용자 생성이 1건이 아니다: {created}"
+        uid = created[0]
         try:
+            # 픽스처 전제 — 저장된 행이 정말 NULL이어야 이 테스트가 결함을 밟는다.
+            # (`[]`로 저장돼 있으면 통과해도 아무것도 증명하지 못한다.)
+            stored = asyncio.run(_fetch_all(select(UserProfile).where(UserProfile.user_id == uid)))
+            assert stored[0].track_type is None, (
+                "로그인이 만든 행의 track_type이 NULL이 아니다 — 이 테스트가 원 결함 경로를 "
+                "지나가지 않는다(픽스처 전제 붕괴)."
+            )
+
             me = client.get("/v1/users/me", headers=auth)
             assert me.status_code == 200, me.text
-            assert me.json()["user_id"] == str(created[0]), me.json()
+            body = me.json()
+            assert body["user_id"] == str(uid), body
+            for field in (
+                "track_type",
+                "target_universities",
+                "inkang_provider",
+                "accessibility_needs",
+            ):
+                assert body[field] == [], f"{field}가 빈 배열로 읽히지 않는다: {body[field]!r}"
+
+            # 온보딩 첫 쓰기 — 조건부 갱신(GET ETag)까지 운영 경로 그대로.
+            patched = client.patch(
+                "/v1/users/me",
+                headers={**auth, "If-Match": me.headers["ETag"]},
+                json={"nickname": "게이트", "accessibility_needs": ["큰글씨"]},
+            )
+            assert patched.status_code == 200, patched.text
+            assert patched.json()["nickname"] == "게이트", patched.json()
+            assert patched.json()["accessibility_needs"] == ["큰글씨"], patched.json()
         finally:
             _erase_learner(client)

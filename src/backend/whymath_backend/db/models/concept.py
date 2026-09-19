@@ -35,6 +35,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.concept import Concept as SchemaConcept
 from whymath_backend.schema.concept import ConceptEdge as SchemaConceptEdge
 from whymath_backend.schema.concept import ConceptFusion as SchemaConceptFusion
@@ -186,7 +187,9 @@ class Concept(Base):
         """영속 ORM → `schema.Concept`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConcept.model_validate(data)
+        return SchemaConcept.model_validate(
+            drop_unset_nulls(data, SchemaConcept, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -261,7 +264,9 @@ class ConceptEdge(Base):
         """영속 ORM → `schema.ConceptEdge`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConceptEdge.model_validate(data)
+        return SchemaConceptEdge.model_validate(
+            drop_unset_nulls(data, SchemaConceptEdge, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -302,7 +307,9 @@ class ProblemConcept(Base):
         """영속 ORM → `schema.ProblemConcept`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaProblemConcept.model_validate(data)
+        return SchemaProblemConcept.model_validate(
+            drop_unset_nulls(data, SchemaProblemConcept, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -345,7 +352,9 @@ class ConceptFusion(Base):
         """영속 ORM → `schema.ConceptFusion`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConceptFusion.model_validate(data)
+        return SchemaConceptFusion.model_validate(
+            drop_unset_nulls(data, SchemaConceptFusion, orm_cls=type(self))
+        )
 
 
 __all__ = ["Concept", "ConceptEdge", "ProblemConcept", "ConceptFusion"]
