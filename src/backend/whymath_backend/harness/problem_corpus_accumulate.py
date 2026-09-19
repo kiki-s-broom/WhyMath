@@ -1257,8 +1257,11 @@ def main(argv: list[str] | None = None) -> int:
                 abort_window=args.abort_window,
                 abort_threshold=args.abort_threshold,
                 dedup_input_digests=dedup_digests,
-                # spec 순환 계획·spec별 결과(EOS-121 C) — 좌석(`cloud_seat`)은 회차 단위라
-                # 이 두 값이 있어야 **좌석 × spec 교차 집계**가 대장만으로 성립한다.
+                # spec 순환 계획·spec별 결과(EOS-121 C) — **좌석 × spec 교차 집계의 spec 축**
+                # 이다. 좌석 축은 아래 `cloud_seat`가 따로 싣는다(좌석이 회차 단위라는 것은
+                # 맞지만, 그 값이 대장에 실리지 않으면 대장만으로는 어느 좌석의 회차인지 알 수
+                # 없다 — 2026-09-19 파일럿에서 `cloud_seat: null`로 실측됐다. 두 필드가 함께
+                # 있어야 교차 집계가 성립한다).
                 spec_plan=report.spec_plan,
                 spec_outcome_counts=report.spec_outcome_counts,
                 cli_argv=effective_argv,
@@ -1278,6 +1281,11 @@ def main(argv: list[str] | None = None) -> int:
                 # 회차가 끝나면 signature_index는 기존분과 회차분이 섞인 한 덩어리다.
                 duplicate_sources=report.duplicate_sources,
                 prompt_cache=payload["prompt_cache"],
+                # 좌석 작동 신호(EOS-111/112) — 요약과 **같은 dict**를 싣는다(두 벌 산식 금지).
+                # 대장에도 싣는 이유: stdout 요약은 파이프로 받지 않으면 사라지는데, 좌석 비교
+                # 회차(EOS-121)의 판정은 "어느 좌석의 회차인가"에서 출발한다. 대장이 그것을
+                # 모르면 그 회차는 다시 못 읽는다(파일럿 실측 `cloud_seat: null` — 2026-09-19).
+                cloud_seat=payload["cloud_seat"],
             ),
         )
     except Exception as exc:  # noqa: BLE001 — 대장 적재 장애는 회차를 깨지 않되 타입명을 남긴다

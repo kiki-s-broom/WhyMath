@@ -4,7 +4,7 @@
 > **선행 착지**: 선결조건 A(`top_p` 양 좌석 전송) · B(중복 출처 구분) · C(spec 순환 + `--top-p` CLI)
 > **판정 기준**: 브랜치 `claude/ecstatic-fermi-uvyp2w`
 >
-> ⚠️ **이 런북이 쓰는 코드는 아직 main에 없다.** `--top-p`·`--spec-file` 인자와 `duplicate_sources` 집계는 위 브랜치에만 있다. [A]가 worktree를 그 브랜치로 만들고, [B]가 **그 인자들이 실재하는지 실측해 없으면 멈춘다**.
+> ⚠️ **이 런북이 쓰는 코드는 아직 main에 없다.** `--top-p`·`--spec-file` 인자, `duplicate_sources` 집계, 회차 대장의 `cloud_seat` 필드, [F]의 회신 추출 CLI(`problem_corpus_round_reply`)는 위 브랜치에만 있다. [A]가 worktree를 그 브랜치로 만들고, [B]가 **그 인자들이 실재하는지 실측해 없으면 멈춘다**.
 
 ---
 
@@ -52,13 +52,13 @@ EOS-118 라이브 2회차에서 부수로 관측된 것이 있다. 같은 인자
 | [C] | spec 계획 파일 3종 작성 | 로컬 파일 | 즉시 |
 | [D] | **좌석 1 = openrouter** 90호출 | 산출 파일 | 20~40분 |
 | [E] | **좌석 2 = anthropic** 90호출 | 산출 파일 | 20~40분 |
-| [F] | 회신 추출 | 없음(읽기) | 즉시 |
+| [F] | 회신 추출(Python이 읽고 Python이 쓴다) | 보고서 파일 1건 | 즉시 |
 
 ## 6. 성공 기준
 
 - **[B]에서 `READY=True`가 나와야 한다.** 하나라도 False면 [D]·[E]가 **스스로 거부**한다(출력만 보고 지나칠 수 없게 설계돼 있다).
 - **[D]·[E]에서 `EXIT=0`** 이고 `attempted`가 90에 가까울 것. 중간 중단이 나면 그 사실이 회차 대장에 남는다.
-- **[F]의 회신에 `duplicate_sources`가 `measured: true`로 나올 것.** `measured: false`는 "중복이 0건이라 비율을 낼 수 없다"는 뜻이고, 그 자체가 유효한 결과다(= 재현 실패 방향).
+- **[F]에서 `REPLY_EXIT=0`이고 회신의 `duplicate_sources`가 `measured: true`로 나올 것.** `measured: false`는 "중복이 0건이라 비율을 낼 수 없다"는 뜻이고, 그 자체가 유효한 결과다(= 재현 실패 방향). `REPLY_EXIT=1`은 좌석 하나 이상의 **대장을 읽지 못한** 것이며 사유가 회신 파일에 적힌다.
 - **실패 시 대처**: [B]가 False를 내면 그 항목 이름이 함께 출력된다. 대개는 worktree가 옛 커밋이거나(→ [A] 재실행) 키 미등록이다.
 
 ## 7. 비용
@@ -185,15 +185,31 @@ if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_
 
 ## [F] 회신 추출
 
+**Python이 읽고 Python이 쓴다.** PowerShell에 바이트를 통과시키지 않는 것이 이 블록의 요점이다 — 파일럿에서 `Get-Content <대장> -Tail 1 | Out-File -Encoding utf8`이 한국어를 `?댁감諛⑹젙??`로 깨뜨렸다. 파일은 멀쩡했고 **경유가 깨뜨렸다**: PS 5.1이 바이트를 `[Console]::OutputEncoding`(한국어 Windows 기본 cp949)으로 디코딩한 뒤 재인코딩하기 때문이며, `Out-File -Encoding utf8`은 *이미 깨진 문자열*을 성실히 UTF-8로 쓸 뿐이라 막지 못한다(CLAUDE.md v0.2.24).
+
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos121
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OrOk = Test-Path .eos121-out\openrouter.rounds.jsonl
 $AnOk = Test-Path .eos121-out\anthropic.rounds.jsonl
-Write-Output "PRECHECK OrRounds=$OrOk AnRounds=$AnOk"
-if ($OrOk -and $AnOk) { Get-Content .eos121-out\openrouter.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_openrouter.json -Encoding utf8; Get-Content .eos121-out\anthropic.rounds.jsonl -Tail 1 | Out-File -FilePath .eos121-out\reply_anthropic.json -Encoding utf8; Get-Content .eos121-out\reply_openrouter.json; Write-Output "----- 위가 openrouter · 아래가 anthropic -----"; Get-Content .eos121-out\reply_anthropic.json } else { Write-Output "WRITE_REFUSED=True — 회차 대장이 없습니다(OrRounds=$OrOk AnRounds=$AnOk). 해당 좌석의 .eos121-out\<좌석>.stdout.txt를 확인하세요" }
+$PyOk = [bool]$PyExe
+Write-Output "PRECHECK OrRounds=$OrOk AnRounds=$AnOk PyExe=$PyOk"
+if ($OrOk -and $AnOk -and $PyOk) { & $PyExe -m whymath_backend.harness.problem_corpus_round_reply --round "openrouter=.eos121-out\openrouter.rounds.jsonl" --round "anthropic=.eos121-out\anthropic.rounds.jsonl" --out .eos121-out\reply.md; Write-Output "REPLY_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — OrRounds=$OrOk AnRounds=$AnOk PyExe=$PyOk · 회차 대장이 없거나 [B]를 건너뛴 창입니다. 해당 좌석의 .eos121-out\<좌석>.stdout.txt를 확인하세요" }
 ```
 
-두 출력을 그대로 회신하면 된다. 파일이 없다는 오류가 나면 해당 좌석 회차가 대장을 쓰지 못한 것이므로 `.eos121-out\<좌석>.stdout.txt`를 함께 보내 주시면 원인을 읽을 수 있다.
+**무엇이 나오는가**: 좌석별로 한 절씩, 아래 순서로 정리돼 화면과 파일에 같이 나온다.
+
+- **회차** — `run_id`·기록 시각, `attempted/accepted/appended`, outcome 분포
+- **좌석** — 선택 좌석과 판정 상태(`all_on_selected_seat` / `none_on_selected_seat` / `not_measured`), 선언 모델 ↔ 관측 모델 대조, 재시도 계측
+- **중복 출처** — `structural_signature/round`(회차 내 = 생성 다양성) vs `structural_signature/corpus`(기존 코퍼스 = dedup 정상 동작)
+- **spec** — 계획 3종과 spec별 outcome
+- 끝에 **기계 판독용 JSON 증거** 블록(화면에서 생략한 0건 조합까지 전건)
+
+**회신 방법**: `.eos121-out\reply.md`를 열어 **그 내용을 통째로** 보내 주시면 된다. 화면 표시가 깨져 보여도 **파일이 정본**이다 — 파일은 BOM 붙은 UTF-8이라 메모장·`Get-Content` 어느 쪽으로 열어도 한국어가 온전하다.
+
+`REPLY_EXIT=1`이면 좌석 하나 이상의 재료를 읽지 못한 것이고, **그 사유가 `reply.md`에 적혀 있다**(대장 부재·행 0건·깨진 줄의 예외 타입명). 빈 결과가 아니라 측정 실패이므로 그 파일과 `.eos121-out\<좌석>.stdout.txt`를 함께 보내 주시면 원인을 읽을 수 있다.
 
 ---
 
