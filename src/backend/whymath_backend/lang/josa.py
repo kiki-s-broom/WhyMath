@@ -26,10 +26,6 @@ from __future__ import annotations
 import re
 from typing import NamedTuple
 
-# [EOS-117 임시 주입] CORE(lang) -> ADAPTER(l3.speech) 역방향 import.
-# 실 CI에서 lint-imports 스텝이 RED를 내는지 확인하기 위한 것이며 다음 커밋에서 원복한다.
-from whymath_backend.l3 import speech as _eos117_injected_adapter
-
 __all__ = [
     "TailReading",
     "eul_reul",
@@ -261,14 +257,3 @@ def euro_ro(token: str) -> str:
     if not reading.batchim or reading.rieul:
         return "로"
     return "으로"
-
-
-# [EOS-117 임시 주입] CORE 모듈의 과목 리터럴 분기 — 계획서 100 §3.7 금지 규칙.
-_EOS117_INJECTED_ADAPTER_NAME: str = _eos117_injected_adapter.__name__
-
-
-def _eos117_injected_subject_branch(subject: str) -> bool:
-    """실 CI에서 AST 프로브가 RED를 내는지 확인하기 위한 주입. 다음 커밋에서 원복한다."""
-    if subject == "math":
-        return True
-    return False
