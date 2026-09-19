@@ -240,6 +240,16 @@ gates:
     evidence: "판정 기준: Phaiakes9 worktree가 origin/main `412ccb71`에서 실행 (`git -C $Tree log -1 --oneline`으로 자가검증 출력 확인 · 런북 PR #1223). 실행 런북 = docs/ops/eos118_seat_signal_live_runbook.md.\n\n[A] SEAT_OK=True (FROM_TREE=True · SEAT_DEFAULT=AnthropicProvider · SEAT_WITH_ENV=OpenRouterProvider · HAS_OBSERVATION=True). PRE_SHELL_VAR=openrouter 오염이 창에 있었으나 자식 프로세스 os.environ.pop 설계가 그것을 제거하고 재어 SEAT_DEFAULT가 정확히 나왔다 — 2026-09-18 오독 경로가 실제로 막혔다. PRE_USER_VAR는 비어 User 환경변수 영구 오염은 없다.\n[B] CHECK_EXIT=0 · CONFIGURED=True · PROVIDERS=('deepinfra',) · JURISDICTION=Jurisdiction.US · ERROR=None.\n[C] OPENROUTER_EXIT=0 · ANTHROPIC_EXIT=0 · 좌석당 5호출.\n\n판정 4축 전건 성립:\nⓐ 선언 축 — 두 회차 모두 state=all_on_selected_seat (not_measured 아님). calls_with_model_name 5/5.\nⓑ 관측 축 — 두 회차 모두 comparable=5 > 0. 관측 축(EOS-112)이 라이브에서 살아 있다.\nⓒ 변별력 — served_models가 서로 다르다: openrouter={'deepseek/deepseek-v4.1-flash': 5} vs anthropic={'claude-sonnet-4-6': 5}. 신호가 좌석을 구분한다.\nⓓ 재시도 — openrouter retries_measured=5 > 0 (retries_total=0 = 계측했고 재시도 없었다). anthropic은 retries_measured=0 · retries_total=null로 정상(SDK 자체 재시도 · 우리 전송기 미경유 · anthropic.py:216).\n\nacceptance ④ 사람 판정: 두 회차 모두 differs=0 · differing_pairs=[]. comparable=5이므로 이것은 미관측이 아니라 실측 0이다 — 두 공급사 모두 선언값과 글자 그대로 같은 문자열을 돌려준다. 별칭→버전 해소가 일어나지 않았다(Anthropic이 날짜 붙은 ID를 돌려줄 것이라는 사전 가정이 실측으로 반증됐다)."
     cleared_by: kiki
     notes: ""
+  - id: G-eos121-seat-generation-diversity-run
+    title: "EOS-121 좌석별 생성 다양성 실측 회차 (Phaiakes9) — 좌석당 최소 30회, spec 3종 이상. EOS-118 라이브 부수 실측(main 412ccb71 · 2026-09-19)에서 anthropic 회차가 attempted=5 accepted=1 rejected_duplicate=4였고 openrouter 회차는 rejected_duplicate=0이었다. 표본 n=5 단일 주제라 좌석 특성인지 우연인지 가를 수 없다. 회신 = 좌석별 outcome_counts 전문 + 사용한 spec 목록 + 각 좌석의 샘플링 파라미터(temperature 등). 판정 기준: 교란 변수(좌석별 샘플링 설정 차이)를 먼저 배제한 뒤에만 다양성 차이를 좌석 특성으로 읽는다 — 설정이 다르면 비교 자체가 무효이고 맞춘 뒤 재측정한다. 재현되지 않으면 '표본 5의 우연'으로 기록하고 닫는다(실패 회차도 산출물). 전제: Phaiakes9 · OpenRouter/Anthropic 키 등록됨 · Docker/DB 불요. 비용 주의: 좌석당 30회 x spec 3종 = 180호출이므로 사전에 예산 확인."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-19
+    remind_after_days: 30
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-eos49-content-version-seat
     title: "EOS-49(ConceptVersion 버전 테이블)·EOS-50(Publish Gate) ↔ ARCH-37 핵심 엔티티 동결 충돌 판정 — ARCH-37(#984·09-05)은 ContentVersion을 '좌석 부재'(canonical_entity_model_v1.md §3-D)로 동결하고 검사 ③/③-b(tests/backend/db/test_canonical_entity_model_freeze.py — 예약 이름 content_version·entity_version 금지 + ContentVersion 좌석 tuple 비어 있음 강제)가 그 좌석 테이블을 RED로 막는다. §4-5는 EOS-49를 '기존 좌석의 컬럼 추가이지 새 엔티티가 아니다'로 적었으나, EOS-49 acceptance ①은 VersionHeader를 공유하는 concept_version 버전 테이블 신설(Pydantic+ORM+alembic)이고 acceptance ②(Published=immutable DB 집행)와 EOS-50(publish 전이 검증 파이프라인)은 그 테이블 위에 선다 — 두 정본 중 하나를 고쳐야 착수 가능. 선택지: ①ARCH-37 §5 절차로 ContentVersion 좌석을 9월에 개통(§1·§2 표 + 테스트 상수 + MEMORY 동반 정정 — '9월 스키마에 넣지 않는다' 지시의 예외 승인) ②EOS-49·50을 동결 해제 지점(10월 이후)으로 연기하고 그때 §5 절차 ③EOS-49 ①을 테이블 없는 계약(VersionHeader Pydantic + concept.current_published_version_id 컬럼 + content_hash — ARCH-37 §4-5의 '컬럼 추가' 해석)으로 축소 재정의하고 EOS-50은 ReviewStatus 축 재사용으로 재정의. 출처: canonical_entity_model_v1.md §3-D·§4-5·§5 · 44_eos_version_management.md §6.3·§7 · EOS-49 acceptance ①②③"
     kind: decision
