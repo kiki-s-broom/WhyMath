@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-116-runbook-write-vocab-paid-call-redirect
+title: "런북 쓰기 어휘 공백 — 유료 외부 호출·출력 리다이렉션 블록이 자가거부 가드 검사에서 누락"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 분류 공백의 실측 고정 — `check_runbook_blocks.py`의 `_WRITE_COMMAND_TOKENS`에 유료 외부 호출·파일 리다이렉션 축이 없다. 실측(2026-09-19): `docs/ops/eos118_seat_signal_live_runbook.md`의 [C] 블록은 LLM 호출 10건(유료)을 내고 `cmd /c \"... > 파일\"`로 요약을 덮어쓰며 `--out` JSONL에 append하는데, 스캔은 그것을 쓰기 블록으로 세지 않는다 — 자가거부 가드 `if (...) { }`를 통째로 제거하는 뮤테이션을 넣어도 `위반 0건 / 판정: 통과`였고 집계 수치(`쓰기 블록 18개`)도 변하지 않았다.\n② 가드 자신은 멀쩡하다(대조군 확보) — 같은 세션에서 `docs/ops/skb03_atom_node_populate_runbook.md`의 실제 쓰기 가드(`if ($PathsOk -and $FlagOk) { `)를 제거하자 exit 1 + `[가드] ... 182행 쓰기 명령 populate`로 정확히 잡혔다. 즉 이 태스크가 고칠 것은 탐지 로직이 아니라 **쓰기 어휘의 범위**다.\n③ 최소 수정 후보(구현자 판단) — ⓐ 출력 리다이렉션(`cmd /c \"... > 파일\"`·`>`·`>>`) ⓑ `--out`/`--output` 인자를 받는 모듈 실행 ⓒ 유료 외부 호출을 뜻하는 라우팅 옵트인 동시 등장(`--subscription` + `--budget-krw`). 셋 다 넣을 필요는 없다 — 넣는 축마다 **오탐 대조군**을 픽스처에 함께 둔다(조회 전용 리다이렉션이 위반으로 잡히면 그 가드는 사람이 꺼 버린다).\n④ 실패 주입으로 검증 — 새로 잡게 된 축마다 ⓐ 가드 없는 픽스처에서 RED ⓑ 가드 있는 픽스처에서 GREEN 양방향을 단언한다. 정상 입력의 초록만으로는 보호의 증거가 아니다. 기존 런북 13건이 새 어휘로 무더기 위반이 되면 만료 있는 waiver로만 유예한다(만료 없는 그랜드파더 금지).\n⑤ 소급 적용 범위 명시 — `docs/ops/arch57_authoring_openrouter_runbook.md`의 [C]도 같은 형태(유료 호출 10건)이므로 같은 축에 걸린다. 두 런북 다 실제로는 자가거부 가드를 이미 갖고 있으므로 수정이 아니라 **검증 범위 편입**이다."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - "tests/infra/test_runbook_blocks*.py"
+session: null
+notes: "등재 경위(2026-09-19): EOS-118 게이트 집행(라이브 런북 작성) 중 발견. 새 런북을 쓰고 CI 잡 3종(`infra-contracts`의 `check_runbook_blocks.py` · `infra-shell`의 `check_ps_scripts.py` · `policy-guard`의 `cp949_guard.py`)을 로컬 재현해 전건 exit 0을 받았는데, CLAUDE.md 「스캔 0건은 실패」·「가드가 막는다는 주장도 주입으로 검증」에 따라 내 파일이 실제로 스캔 대상인지 주입으로 확인하다가 드러났다.\n\n핵심은 통과가 **거짓이 아니라 공허**했다는 것이다 — 파일은 스캔 대상에 들어 있고(글로브 `docs/ops/*runbook*.md` 13건에 포함), 문법·인코딩 축은 진짜로 검사됐다. 다만 자가거부 가드 축만 분류 단계에서 빠졌다. 그래서 \"가드 통과\"를 그 축의 증거로 읽으면 안 되는 상태였다.\n\n이 태스크는 EOS-118의 산출물이 아니다 — EOS-118 런북은 가드 유무와 무관하게 자가거부 블록을 갖고 있다. 여기서 상환하는 것은 **미래의 런북 저자가 가드 없이 유료 호출 블록을 써도 CI가 침묵한다**는 구조다."
+updated: 2026-09-19
