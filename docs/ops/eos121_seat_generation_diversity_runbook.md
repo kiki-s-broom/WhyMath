@@ -99,13 +99,15 @@ $CodeOk = $Src -like "*WhyMath-eos121*"
 $ArgsOut = & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --help 2>&1 | Out-String
 $HasTopP = $ArgsOut -match "--top-p"
 $HasSpecFile = $ArgsOut -match "--spec-file"
-$HasOrKey = [bool]$env:OPENROUTER_API_KEY
-$HasAnKey = [bool]$env:ANTHROPIC_API_KEY
+$KeyOut = & $PyExe -c "from whymath_backend.config import Settings; s = Settings(); print('AN=%s;OR=%s' % (s.anthropic_configured, s.openrouter_configured))"
+$HasAnKey = $KeyOut -match "AN=True;"
+$HasOrKey = $KeyOut -match "OR=True"
 $Ready = $CodeOk -and $HasTopP -and $HasSpecFile -and $HasOrKey -and $HasAnKey
 Write-Output "PYTHON=$PyExe"
 Write-Output "LOADED_FROM=$Src"
 Write-Output "CODE_FROM_WORKTREE=$CodeOk"
 Write-Output "HAS_TOP_P=$HasTopP  HAS_SPEC_FILE=$HasSpecFile"
+Write-Output "SETTINGS_KEYS=$KeyOut"
 Write-Output "HAS_OPENROUTER_KEY=$HasOrKey  HAS_ANTHROPIC_KEY=$HasAnKey"
 Write-Output "READY=$Ready"
 ```
@@ -114,7 +116,9 @@ Write-Output "READY=$Ready"
 
 - `CODE_FROM_WORKTREE` — 원 클론에 editable 설치된 **옛 코드가 임포트되는** 상황을 막는다. 파일을 눈으로 확인하는 것만으로는 *그 파일이 실제로 임포트됐는지* 모르므로 `__file__`을 찍는다.
 - `HAS_TOP_P` / `HAS_SPEC_FILE` — worktree가 옛 커밋이면 두 인자가 없다. **[A]의 해시 대조를 사람이 건너뛰어도 여기서 걸린다.**
-- `HAS_*_KEY` — 값을 출력하지 않고 **존재 여부만** 낸다.
+- `HAS_*_KEY` — **환경변수 이름을 보지 않고 `Settings`에 묻는다.** 이것이 [D]·[E]가 실제로 키를 조달하는 바로 그 경로다(`anthropic.py:249`·`openrouter.py:378`). 값은 출력되지 않는다(`SecretStr` + bool 프로퍼티).
+
+  **왜 이렇게 고쳤는가 (2026-09-19 실측)**: 초판은 `$env:ANTHROPIC_API_KEY`·`$env:OPENROUTER_API_KEY`를 직접 봤고, 실행에서 OpenRouter만 True가 나와 `READY=False`로 막혔다. 원인은 키 부재가 아니라 **이름 규칙이 두 좌석에서 다르다**는 것이었다 — `openrouter_api_key`에는 `AliasChoices("WHYMATH_OPENROUTER_API_KEY", "OPENROUTER_API_KEY")`가 붙어 벤더 표준 이름도 읽지만(`config.py:613-621`), `anthropic_api_key`에는 alias가 없어 `WHYMATH_ANTHROPIC_API_KEY`로만 읽힌다(`:442-449`). 「식별자 부재를 기능 부재로 단정 금지」가 정확히 겨냥하는 형태이며, 추측한 이름의 0건을 부재로 읽지 않으려면 **역할(키가 조달되는가)로 물어야 한다.** 이 정정으로 `.env` 경유 주입도 함께 덮인다 — `Settings`가 알아서 찾기 때문이다.
 
 `READY=False`면 위 줄들에서 어느 항목이 False인지 보인다. 고친 뒤 [B]를 다시 돌린다.
 
