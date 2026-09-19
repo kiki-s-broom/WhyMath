@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: review
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,13 +17,14 @@ acceptance:
   - "③ 학생 원문·정답 사적 필드 격리(S1-a) 불변 — 트레이스 이벤트·캐시 키 어디에도 학생 원문 미포함 회귀 가드"
   - "④ wh1_primary.py 경계 docstring의 '범위 밖(후속): Langfuse trace 결선' 선언 회수 + wh1_llm_policy.py 트레이스 서술과 코드 실상의 정합 완결(ai_integration_gap_review.md §정정의 문구 선정정을 코드로 마감)"
   - "[진행 기록 2026-09-18 · PR #1207] ①의 학생 대면 축(wh1_llm_policy·wh1_prose)은 Wh1LlmSeam 경유로 착지했고 양방향 변별 테스트(tests/backend/harness/test_wh1_llm_seam_wiring.py 6건 · 주입 W1~W6 전건 RED)가 동결한다. ③④도 같은 커밋에서 충족(학생 원문 sentinel 부재 검사 · wh1_primary docstring 범위밖-후속 Langfuse trace 결선 선언 회수). **미이행 2건으로 review 유지**: (1) l3/equivalent/rephrase.py는 동기·자체 이벤트루프 저작 경로라 분리 — 온도·캐시 의미를 따로 판정해야 하므로 별도 슬라이스가 옳다(남은 파이프라인 우회 1건) (2) 항목2(ops/cost_report 게이트2 표본에 WH-1 primary 호출이 계상됨을 실측)는 라이브 트래픽이 필요해 미확인 — 이 PR이 증명한 것은 주입한 TraceSink에 라우팅 레코드가 들어간다는 것까지다."
-artifacts: []
+artifacts:
+  - "df374448 · https://github.com/kiki-s-broom/WhyMath/pull/1207 (머지됨) — 학생 대면 축 착지: wh1_llm_policy·wh1_prose가 Wh1LlmSeam 경유로 l3.pipeline에 결선(라우터·캐시·Langfuse). acceptance ③④ 충족. 양방향 변별 테스트 tests/backend/harness/test_wh1_llm_seam_wiring.py 6건 + 주입 W1~W6 전건 RED. **미이행분은 OPS-84로 승계 분리**: ①의 l3/equivalent/rephrase.py(동기 저작 경로) · ②(게이트② 라이브 표본 실측). 승계 사유는 OPS-84 notes 참조."
 paths:
   - src/backend/whymath_backend/harness/wh1_llm_policy.py
   - src/backend/whymath_backend/harness/wh1_prose.py
   - src/backend/whymath_backend/harness/wh1_primary.py
   - src/backend/whymath_backend/l3/equivalent/rephrase.py
   - "tests/backend/harness/**"
-session: claude/pensive-maxwell-42n3i7
+session: null
 notes: "ai_integration_gap_review.md D1(2026-08-10). wh1_primary.py:37이 스스로 '범위 밖(후속)'으로 선언한 항목 — primary 기본 ON(GA) 전환으로 유보 발화 조건 기충족(ai_tutor_module_gap_review §5-④ 동계열). 03a §H-4 클라우드 실측 수치 보정의 선행 조건(표본 공급). 프라이버시 설계(S1-a 사적 필드)는 유지한 채 관측·캐시만 결선한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/비용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-18] PR #1207 착지 범위와 미이행분을 acceptance에 정직 기록 — review 유지 사유 명시(rephrase.py 분리 · 라이브 표본 실측 미확인)"
-updated: 2026-09-18
+updated: 2026-09-19
