@@ -15,10 +15,27 @@ system=,messages=[{"role":"user","content":...}])`. 응답은 content 블록 리
 `type=="text"` 블록의 `.text`만 모은다(thinking/tool 블록 제외). 헬스체크는
 `models.list()`(토큰 비용 0). **Opus 4.7는 temperature/top_p/top_k/budget_tokens를
 거부(400)하므로** 샘플링·thinking 인자를 *기본적으로* 보내지 않는다(plain create) — 두 모델
-모두 안전. 샘플링 인자(`temperature`·`top_p`)는 **호출부가 명시할 때만** 실리며, 그 둘은
-같은 계약을 공유한다: 제공자는 조용히 무시하지 않고 그대로 싣고, **CLOUD_HIGH(Opus 4.7)
-경로로 가는 호출부가 지정하지 않는 것**이 계약이다(정책을 축마다 따로 두지 않는다).
-프롬프트 캐싱·thinking/effort 튜닝은 라이브 키 보유 보정 과제로 미룬다(S5 범위 밖).
+모두 안전. 샘플링 인자(`temperature`·`top_p`)는 **호출부가 명시할 때만** 실린다.
+
+샘플링 제약은 **두 층**이다(2026-09-19 라이브 실측으로 갈렸다 — 종전 이 문단은 둘을 한
+덩어리로 적어 "Opus 한정"으로 읽혔다):
+
+  ⓐ **모델 제약(Opus 4.7 한정)** — Opus는 temperature를 *단독으로* 줘도 거부(400)한다.
+     이 축의 방어는 종전대로 **호출부 계약 + 이 경고문**이다(런타임 가드 없음). CLOUD_HIGH
+     경로로 가는 호출부가 샘플링 인자를 지정하지 않는 것이 계약이다.
+  ⓑ **API 계약(모델 무관·Sonnet 4.6 포함)** — `temperature`와 `top_p`를 **동시에** 주면
+     Anthropic Messages API가 모델과 무관하게 거부한다:
+     `` `temperature` and `top_p` cannot both be specified for this model. ``
+     이 축은 정책 선택이 아니라 **구조적 불가**라서 `images`·`json_schema`·`seed`와 같은
+     부류이며, 따라서 `generate()`가 **호출 전에 RuntimeError로 거부**한다. 한쪽을 조용히
+     버리지 않는다(조용한 무시 금지 — 버리면 설정한 값이 사라진 채 200이 돌아와 원인 지목이
+     불가능해진다).
+
+ⓑ의 실측 경위(EOS-121): `--top-p`를 양 좌석에 동일 전송하도록 배선한 회차에서 anthropic
+좌석 90호출이 **전건 400**으로 죽었다(`outcome_counts: {generation_failed: 90}`·과금 0).
+저작 경로는 `temperature=0.9`를 항상 싣기 때문에(`l3/equivalent/llm_generator.py`) 그 위에
+top_p가 더해지면 100% 400이다. 프롬프트 캐싱·thinking/effort 튜닝은 라이브 키 보유 보정
+과제로 미룬다(S5 범위 밖).
 
 경계 메모 (CLAUDE.md 절대 금기): 이 제공자가 반환하는 텍스트는 *검증 전 원시 모델
 출력*이다. 03 문서 환각 방어 파이프라인(스키마→SymPy/Lean→PRM→자기검증→사람검수)을
@@ -345,19 +362,22 @@ class AnthropicProvider:
           (미성년자 프라이버시·로컬-우선) 클라우드 비전은 미배선이다(조용한 무시 금지).
         - `temperature`(S2-g 생성 다양성)가 주어지면 messages.create의 `temperature=`로
           전달한다. None(기본)이면 온도를 싣지 않아 API 기본 온도를 쓴다 — *기존 동작 무변경*.
-          ⚠️ 주의(모듈 docstring): **Opus 4.7(CLOUD_HIGH)는 temperature를 거부(400)**한다 —
-          따라서 CLOUD_HIGH 경로로 가는 호출부는 temperature를 지정하지 말아야 한다. 동등문제
-          저작(S2-g)은 라우팅상 LOCAL/CLOUD_MID로 흐르며 CLOUD_HIGH(killer/prove)로는 가지 않는다.
+          ⚠️ 주의(모듈 docstring ⓐ): **Opus 4.7(CLOUD_HIGH)는 temperature를 단독으로 줘도
+          거부(400)**한다 — 이 축은 *모델 제약*이라 런타임 가드 없이 호출부 계약으로 막는다.
+          동등문제 저작(S2-g)은 라우팅상 LOCAL/CLOUD_MID로 흐르며 CLOUD_HIGH(killer/prove)로는
+          가지 않는다.
         - `top_p`(EOS-121 선결조건 A·좌석 간 샘플링 통제)가 주어지면 messages.create의 `top_p=`로
           전달한다. None(기본)이면 싣지 않아 API 기본값을 쓴다 — *기존 동작 무변경*. 기본값을
           None으로 두는 것이 이 인자의 요점이다: 무조건 명시 전송하면 공급사 기본값과 다른 값이
-          나가 저작 품질이 조용히 바뀐다(회귀). 측정자가 양 좌석에 **같은 값**을 줄 때만 실린다.
-          ⚠️ 주의(모듈 docstring): **Opus 4.7(CLOUD_HIGH)는 top_p도 temperature와 함께 거부
-          (400)**한다 — 따라서 이 축의 계약은 temperature와 **글자 그대로 동일**하다: 제공자는
-          조용히 무시하지 않고 그대로 싣고(조용한 무시 금지), CLOUD_HIGH 경로로 가는 호출부가
-          지정하지 않는다. 두 축에 서로 다른 정책(한쪽만 런타임 거부 등)을 두지 않는 이유는,
-          같은 API 제약을 두 가지 방식으로 다루면 어느 쪽이 계약인지 호출부가 알 수 없게 되기
-          때문이다. 동등문제 저작 경로는 라우팅상 LOCAL/CLOUD_MID로 흐른다(위 temperature와 동일).
+          나가 저작 품질이 조용히 바뀐다(회귀).
+        - `temperature`와 `top_p`를 **둘 다** 주면 *명확한 오류*를 던진다(모듈 docstring ⓑ) —
+          Anthropic Messages API가 **모델과 무관하게** 둘의 동시 지정을 400으로 거부하기
+          때문이다(Sonnet 4.6도 거부한다·2026-09-19 라이브 90호출 전건 실측). 즉 이 조합은
+          정책 선택이 아니라 **구조적 불가**이며, 그래서 `images`·`json_schema`·`seed`와 같은
+          부류로 런타임 거부한다(그 셋과 달리 종전에 가드가 없던 것은 제약을 Opus 한정으로
+          잘못 읽었기 때문이다). 한쪽을 조용히 버리는 선택은 하지 않는다 — 버리면 측정자가
+          "양 좌석을 맞췄다"고 믿는 상태로 통제되지 않은 회차가 돌고, 200이 돌아오므로 그
+          사실이 어디에도 남지 않는다(조용한 무시 금지).
         - `json_schema`(S2-j structured output)가 주어지면 *명확한 오류*를 던진다 — plain
           messages.create에는 문법 제약 디코딩이 없어 스키마를 보장할 수 없다(조용한 무시 금지).
           호출부 계약: 클라우드 결정 경로에서는 json_schema를 지정하지 말고 프롬프트+관대 파서로
@@ -391,6 +411,19 @@ class AnthropicProvider:
                 "messages.create에는 structured output 강제가 없어 스키마를 보장할 수 없습니다. "
                 "클라우드 경로는 프롬프트+관대 파서로 동작하세요(조용한 무시 금지·S2-j)."
             )
+        if temperature is not None and top_p is not None:
+            # 구조적 불가(모듈 docstring ⓑ) — 모델 제약이 아니라 **API 계약**이라 Sonnet 4.6도
+            # 거부한다. 한쪽을 조용히 버리지 않고 여기서 멈춘다: 버리면 400 대신 200이 돌아오고
+            # "설정했는데 아무 일도 없었다"가 되어 원인 지목이 불가능해진다(조용한 무시 금지).
+            raise RuntimeError(
+                "AnthropicProvider는 temperature와 top_p의 **동시 지정**을 지원하지 않습니다 "
+                f"(받은 temperature={temperature}, top_p={top_p}) — Anthropic Messages API가 "
+                "`temperature` and `top_p` cannot both be specified for this model 로 "
+                "400을 돌려주며, 이는 모델 제약이 아니라 API 계약이라 Sonnet 4.6·Opus 4.7 "
+                "양쪽에 적용됩니다. **둘 중 하나만** 지정하세요 — 저작 경로는 temperature를 "
+                "항상 싣으므로(기본 0.9) 보통은 top_p를 빼는 쪽이 맞고, 반대로 top_p로 "
+                "통제하려면 호출부가 temperature를 명시적으로 None으로 넘겨야 합니다."
+            )
         cost = _as_cost_tier(decision.cost_tier)
         if cost is CostTier.LOCAL:
             raise ValueError(
@@ -412,9 +445,9 @@ class AnthropicProvider:
         # 거부하므로 CLOUD_HIGH 호출부는 지정하지 않는다(위 docstring ⚠️).
         if temperature is not None:
             extra["temperature"] = temperature
-        # EOS-121 선결조건 A — top_p는 temperature와 **같은 좌석·같은 규약**이다: 지정 시에만
-        # 키를 싣고(미지정이면 키 자체가 없다 — None 전송 금지), Opus 4.7의 400 거부는 호출부
-        # 계약으로 막는다(위 docstring ⚠️ — 축마다 다른 정책을 두지 않는다).
+        # EOS-121 선결조건 A — top_p도 지정 시에만 키를 싣는다(미지정이면 키 자체가 없다 —
+        # None 전송 금지). 여기 도달했다는 것은 위 가드를 통과했다는 뜻, 즉 temperature가
+        # None이라는 뜻이다(둘의 동시 지정은 API가 400으로 거부한다 — 모듈 docstring ⓑ).
         if top_p is not None:
             extra["top_p"] = top_p
 

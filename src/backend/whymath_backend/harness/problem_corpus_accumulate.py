@@ -75,19 +75,24 @@ L3 코드에는 L4 import 0(계층 규칙). harness는 import-linter 계약 밖(
   - **spec 순환**(C) — `--spec-file`(JSONL)을 주면 한 회차가 시도마다 spec을 번갈아 쓴다.
     결과는 `spec_outcome_counts`로 갈려 좌석 × spec 교차 집계가 선다. 미지정이면 종전대로
     단일 spec 1종(하위 호환).
-  - **`--top-p`**(A의 CLI 배선) — 미지정이면 미전송(종전 동작 동일). 좌석 비교 회차에서는
-    지정해야 양 좌석에 같은 샘플링 설정이 나간다.
+  - **`--top-p`**(A의 CLI 배선) — 미지정이면 미전송(종전 동작 동일). **anthropic 좌석에서는
+    지정할 수 없다**: Anthropic API가 temperature와 top_p의 동시 지정을 400으로 거부하는데
+    저작 경로는 temperature(0.9)를 항상 싣는다. 그 조합이면 **호출 0건에서** exit 2로 거부한다
+    (2026-09-19 라이브 회차에서 90호출 전건 400으로 죽은 뒤의 정정 — A의 원래 처방 "양 좌석에
+    동일 명시 전송"은 API 제약상 불가능하다). openrouter·로컬 좌석은 둘을 함께 받는다.
 
-exit 코드 3값: 0=신규 수용 ≥1 · 1=이번 회차 무진전 · 2=**둘 중 하나**(stderr가 어느 쪽인지 말한다)
+exit 코드 3값: 0=신규 수용 ≥1 · 1=이번 회차 무진전 · 2=**셋 중 하나**(stderr가 어느 쪽인지 말한다)
   ⑴ 연속 무진전 알람 — 1보다 강한 신호(이번 회차만의 운이 아니라 구조적으로 막혀 있다)
   ⑵ spec 계획 파일 오류 — 회차가 시작조차 못 했다. 1로 내지 않는 이유: 1은 "돌았는데
      무진전"의 어휘라, 설정 오류를 거기 섞으면 "무엇을 고쳐야 하는가"가 사라진다.
+  ⑶ `--top-p` × anthropic 좌석 충돌 — 호출 0건에서 거부한다(위 `--top-p` 항).
+     좌석을 판독조차 못 한 경우도 여기 포함된다(모른다를 통과로 접지 않는다).
 
 사용법(Phaiakes9·라이브):
     python -m whymath_backend.harness.problem_corpus_accumulate \\
         --seed <기존.jsonl> [--seed <추가.jsonl> ...] --out <축적.jsonl> --n 20 \\
         [--topic-hint "..."] [--standard-code "[10공수1-02-02]"] [--difficulty 2.5] \\
-        [--spec-file <계획.jsonl>] [--top-p 0.95] \\
+        [--spec-file <계획.jsonl>] [--top-p 0.95 — anthropic 좌석 제외] \\
         [--generation-log <경로.jsonl>] [--worklist-out <경로.md>] [--stagnation-window 3]
 """
 
@@ -141,6 +146,7 @@ from whymath_backend.harness.needs_review_worklist import (
 )
 from whymath_backend.harness.problem_corpus_batch import JsonlCorpusSink, _record_to_json
 from whymath_backend.l1.problem_bank.populate import load_problem_bank_records
+from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
 from whymath_backend.l3.equivalent.generator import EquivalentProblemGenerator
@@ -152,13 +158,17 @@ from whymath_backend.l3.equivalent.orchestrator import (
 from whymath_backend.l3.equivalent.orchestrator import (
     _to_record as _candidate_to_record,
 )
+from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
+from whymath_backend.l3.models import CostTier, RoutingRequest
 from whymath_backend.l3.pregenerate.provenance_bridge import append_generation_log_jsonl
 from whymath_backend.l3.providers.factory import cloud_model_pins, cloud_provider_name
+from whymath_backend.l3.router import business_cost_tier
 from whymath_backend.schema.provenance import GenerationLog
 
 __all__ = [
     "AccumulateReport",
     "SpecSeat",
+    "authoring_can_reach_cloud",
     "compute_dedup_input_digests",
     "default_generation_log_path",
     "default_round_ledger_path",
@@ -168,6 +178,7 @@ __all__ = [
     "load_spec_plan_file",
     "main",
     "run_corpus_accumulate",
+    "top_p_seat_precheck",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -809,6 +820,103 @@ def load_spec_plan_file(
     return entries
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# `--top-p` × 좌석 사전 거부 (EOS-121 라이브 정정 — 회차 시작 *전에* 막는다)
+# ──────────────────────────────────────────────────────────────────────────
+# 실측(2026-09-19): `--top-p 0.95`로 돈 anthropic 좌석 90호출이 **전건 400**으로 죽었다
+# (`outcome_counts: {generation_failed: 90}`·`accepted: 0`·과금 0). 원인은 Anthropic Messages
+# API가 `temperature`와 `top_p`의 **동시 지정**을 거부하는 것이고, 저작 경로는 temperature를
+# 항상 싣는다(`llm_generator` 기본 0.9). 즉 이 조합은 시도 100%가 실패한다.
+#
+# 프로바이더에도 런타임 가드를 뒀지만(`providers/anthropic.py`) 그것만으로는 **90번 실패한다**
+# — 실패가 싸려면 **호출 0건에서** 걸려야 한다. 그래서 이 CLI가 인자 검증 단계에서 막는다.
+_ANTHROPIC_SEAT = "anthropic"
+# 라우터가 쓰는 난이도 라벨 전집합 — spec의 difficulty(1~5)가 어느 라벨로 떨어지든 덮는다
+# (`llm_generator._difficulty_label`). 한 라벨만 보면 안 된다: 예산이 CLOUD_HIGH 최소비용에
+# 못 미치는 구성에서 "killer"는 LOCAL로 강등되지만 "hard"는 CLOUD_MID로 승급한다.
+_ROUTING_DIFFICULTY_LABELS = ("easy", "medium", "hard", "killer")
+
+
+def authoring_can_reach_cloud(subscription: str | None, budget_krw: float | None) -> bool:
+    """이 회차의 라우팅 신호로 **클라우드 좌석에 닿을 수 있는가** — 라우터에게 직접 묻는다.
+
+    `--subscription`·`--budget-krw` 미지정이면 생성기 기본값(free·0.0)이 쓰이고, 그 조합은
+    라우터 규칙 1·2가 LOCAL로 강제한다 — 즉 anthropic 좌석은 아예 호출되지 않는다
+    (`_build_live_generator` docstring: "클라우드 경로를 태우려면 **둘 다** 필요하다").
+    그런 회차의 `--top-p`는 Ollama로 가므로 막으면 **과잉 차단**이다(로컬·openrouter 좌석은
+    둘의 동시 지정이 가능하다 — 이 제약은 Anthropic 한정).
+
+    판정을 여기서 다시 쓰지 않고 `l3.router.business_cost_tier`를 부르는 이유: 규칙을 사본으로
+    베끼면 라우터가 바뀔 때 조용히 갈라진다(`ops.cost_probe`가 겪은 수동 미러 문제 — 그 함수의
+    docstring이 이 목적으로 공개돼 있다). 법적 등급 게이트는 보지 않는데, 그 게이트는 **강등만**
+    하므로 게이트 전 값을 쓰는 쪽이 보수적(= 더 잘 막는 방향)이다.
+
+    난이도 라벨 4종을 **전부** 훑어 하나라도 클라우드면 True다 — spec 계획의 난이도가 어느
+    라벨로 떨어질지 여기서는 모르고, 놓치는 쪽(= 90호출 태우는 쪽)이 훨씬 비싸다.
+    """
+    defaults = default_student_escalation_signals()
+    resolved_subscription = (
+        subscription if subscription is not None else defaults.student_subscription
+    )
+    resolved_budget = budget_krw if budget_krw is not None else defaults.budget_krw
+    for difficulty in _ROUTING_DIFFICULTY_LABELS:
+        request = RoutingRequest(
+            # 저작 호출의 신호를 그대로 복제한다(`llm_generator._routing_request`).
+            task_type="generate",
+            difficulty=difficulty,
+            requires_reasoning=True,
+            student_subscription=resolved_subscription,
+            budget_krw=resolved_budget,
+            sync=True,
+            # 등급 축도 저작 호출과 같게 둔다. `business_cost_tier`는 이 값을 보지 않지만
+            # (등급 게이트는 그 뒤 단계다), 호출부가 등급을 선언하는 것이 이 저장소의 계약이고
+            # `scripts/ops/check_routing_data_grade.py`가 전수로 강제한다 — 프로브라고
+            # 비워 두면 "이 호출은 등급을 모른다"가 되어 계약이 조용히 갈린다.
+            data_licenses=SELF_AUTHORED_CORPUS,
+        )
+        if business_cost_tier(request) is not CostTier.LOCAL:
+            return True
+    return False
+
+
+def top_p_seat_precheck(
+    *,
+    top_p: float | None,
+    seat: str,
+    subscription: str | None,
+    budget_krw: float | None,
+) -> str | None:
+    """`--top-p` × 좌석 조합이 **구조적으로 실패하는가** — 거부 사유 문자열 또는 None.
+
+    None이면 통과다. 문자열이면 그 텍스트를 그대로 stderr에 내고 exit 2로 끝내면 된다
+    (설정 오류는 0/1의 어휘가 아니다 — 0/1은 "회차가 돌았고 붙었나"를 말한다).
+
+    거부 조건은 **세 개의 논리곱**이며 하나라도 빠지면 과잉 차단이다:
+      ⓐ `--top-p`가 지정됐다 — 미지정이면 전송 자체가 없어 충돌할 것이 없다.
+      ⓑ 좌석이 anthropic이다 — openrouter·로컬(ollama)은 둘의 동시 지정을 받는다.
+      ⓒ 이 회차가 실제로 클라우드에 닿는다 — LOCAL 강제 회차의 top_p는 Ollama로 간다.
+
+    ⓑ만 보고 막으면 **기본 좌석이 anthropic이라 로컬 회차 전부가 막힌다**(`config.py`의
+    `cloud_provider` 기본값). 그래서 ⓒ가 대조군 축으로 반드시 함께 있어야 한다.
+    """
+    if top_p is None or seat != _ANTHROPIC_SEAT:
+        return None
+    if not authoring_can_reach_cloud(subscription, budget_krw):
+        return None
+    return (
+        f"[좌석·인자 충돌] anthropic 좌석에서는 --top-p(받은 값 {top_p})를 쓸 수 없습니다 — "
+        "Anthropic Messages API가 temperature와 top_p의 **동시 지정**을 400으로 거부하고"
+        "(`temperature` and `top_p` cannot both be specified for this model), 동등문제 저작 "
+        "경로는 temperature를 항상 싣습니다(기본 0.9). 즉 이 조합은 시도 100%가 실패합니다 "
+        "— 2026-09-19 라이브 회차에서 90호출 전건 generation_failed로 실측됐습니다.\n"
+        "처방 ①(권장) 이 좌석에서는 **--top-p를 빼고** 실행하세요. 각 공급사 기본값이 쓰이며, "
+        "그것이 EOS-118 회차와 같은 조건입니다(좌석 간 대칭이되 통제되지는 않는 상태 — "
+        "docs/ops/eos121_seat_generation_diversity_precheck.md §1).\n"
+        "처방 ② top_p를 꼭 통제해야 한다면 좌석을 바꾸세요"
+        "(WHYMATH_CLOUD_PROVIDER=openrouter) — openrouter는 두 인자를 함께 받습니다."
+    )
+
+
 def _build_live_generator(
     topic_hint: str,
     *,
@@ -908,9 +1016,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "누적확률 절단(nucleus sampling·EOS-121 선결조건 A). **미지정=미전송**이라 지정하지 "
-            "않으면 호출 형태가 종전과 같고 각 공급사 기본값이 쓰인다. 좌석별 생성 다양성을 잴 "
-            "때는 **반드시 지정**한다 — 지정해야 양 좌석에 같은 값이 나가 이 축이 교란 변수에서 "
-            "빠진다(저장소에는 두 공급사 기본값이 같다는 근거도 다르다는 근거도 없다)."
+            "않으면 호출 형태가 종전과 같고 각 공급사 기본값이 쓰인다. "
+            "⚠️ **anthropic 좌석에서는 쓸 수 없다** — Anthropic API가 temperature와 top_p의 "
+            "동시 지정을 400으로 거부하는데 저작 경로는 temperature(0.9)를 항상 싣기 때문이다. "
+            "그 조합이면 이 CLI가 **호출 0건에서** exit 2로 거부한다(2026-09-19 라이브 90호출 "
+            "전건 실패 실측). openrouter·로컬 좌석에서는 종전대로 쓸 수 있다."
         ),
     )
     parser.add_argument(
@@ -1034,6 +1144,31 @@ def main(argv: list[str] | None = None) -> int:
         # 누적확률이므로 (0,1] 밖은 의미가 없다. 공급사가 400으로 거부하는 값을 180호출
         # **한복판에서** 만나면 회차가 통째로 날아가므로 인자 단계에서 막는다.
         parser.error(f"--top-p는 (0,1] 범위여야 한다(받은 값 {args.top_p}).")
+
+    # ── `--top-p` × 좌석 사전 거부(EOS-121 라이브 정정) ─────────────────────
+    # **호출 0건에서** 막는 것이 요점이다 — 프로바이더 가드만 있으면 90번 시도해 90번 실패한다.
+    # `--top-p` 미지정이면 설정을 읽지도 않는다(종전 경로와 바이트 단위로 같게 둔다).
+    if args.top_p is not None:
+        try:
+            seat_for_precheck = cloud_provider_name(get_settings())
+        except Exception as exc:  # noqa: BLE001 — 판독 실패를 통과로 접지 않는다(타입명 남김)
+            # 좌석을 모르면 거부 판정을 할 수 없다. 여기서 통과시키면 "모른다"가 "문제없다"로
+            # 위장되고, 그 대가는 90호출이다(모른다 ≠ 아니다).
+            sys.stderr.write(
+                f"[좌석 판독 실패] {type(exc).__name__}: {exc} — --top-p를 지정한 회차는 "
+                "좌석을 알아야 사전 거부 판정을 할 수 있습니다. 설정을 고치거나 --top-p를 "
+                "빼고 실행하세요.\n"
+            )
+            return 2
+        seat_refusal = top_p_seat_precheck(
+            top_p=args.top_p,
+            seat=seat_for_precheck,
+            subscription=args.subscription,
+            budget_krw=args.budget_krw,
+        )
+        if seat_refusal is not None:
+            sys.stderr.write(f"{seat_refusal}\n")
+            return 2
 
     # ── spec 순환 계획(EOS-121 선결조건 C) ──────────────────────────────────
     # 미지정이면 좌석 1건(`_DEFAULT_SPEC_ID`)으로 종전과 동일하게 돈다. 파일 오류는

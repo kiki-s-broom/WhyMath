@@ -1,7 +1,7 @@
 # EOS-121 좌석별 생성 다양성 실측 회차 런북 (Phaiakes9)
 
 > **게이트**: `G-eos121-seat-generation-diversity-run` (`kind: human` · `assignee: kiki`)
-> **선행 착지**: 선결조건 A(`top_p` 양 좌석 전송) · B(중복 출처 구분) · C(spec 순환 + `--top-p` CLI)
+> **선행 착지**: ~~선결조건 A(`top_p` 양 좌석 전송)~~ **철회 — API 제약상 불가능**(아래 [D] 인자 근거) · B(중복 출처 구분) · C(spec 순환)
 > **판정 기준**: 브랜치 `claude/ecstatic-fermi-uvyp2w`
 >
 > ⚠️ **이 런북이 쓰는 코드는 아직 main에 없다.** `--top-p`·`--spec-file` 인자, `duplicate_sources` 집계, 회차 대장의 `cloud_seat` 필드, [F]의 회신 추출 CLI(`problem_corpus_round_reply`)는 위 브랜치에만 있다. [A]가 worktree를 그 브랜치로 만들고, [B]가 **그 인자들이 실재하는지 실측해 없으면 멈춘다**.
@@ -123,7 +123,7 @@ Write-Output "READY=$Ready"
 - `HEAD_MATCHES_REMOTE` — **경로가 아니라 버전을 본다.** 위 검사는 *어느 트리인가*만 보므로 **옛 커밋의 worktree에서도 True**가 난다.
 
   **왜 추가했는가 (2026-09-19 실측)**: 파일럿 재실행에서 정확히 그 구멍을 밟았다. worktree 갱신 블록을 건너뛴 채 파일럿만 돌았는데 `CODE_FROM_WORKTREE=True`라 통과했고, 실행된 것은 BOM 수정 **이전** 리비전이었다(트레이스백의 `line 751`이 구판의 `json.loads` 행과 일치해 확정). 「쓰기 블록은 사람 판정에 기대지 않고 스스로 거부한다」가 겨냥하는 형태다 — 갱신 여부를 산문으로 안내하고 사람이 해시를 눈으로 대조하게 두면, **출력은 흐름을 멈추지 못한다.** 기대 해시를 하드코딩하지 않고 `origin`의 브랜치 끝과 비교하므로 런북이 낡지 않는다.
-- `HAS_TOP_P` / `HAS_SPEC_FILE` — worktree가 옛 커밋이면 두 인자가 없다. **[A]의 해시 대조를 사람이 건너뛰어도 여기서 걸린다.**
+- `HAS_TOP_P` / `HAS_SPEC_FILE` — worktree가 옛 커밋이면 두 인자가 없다. **[A]의 해시 대조를 사람이 건너뛰어도 여기서 걸린다.** (인자의 *존재*만 본다 — 이 회차는 `--top-p`를 **쓰지 않는다**. [D] 인자 근거 참조.)
 - `HAS_*_KEY` — **환경변수 이름을 보지 않고 `Settings`에 묻는다.** 이것이 [D]·[E]가 실제로 키를 조달하는 바로 그 경로다(`anthropic.py:249`·`openrouter.py:378`). 값은 출력되지 않는다(`SecretStr` + bool 프로퍼티).
 
   **왜 이렇게 고쳤는가 (2026-09-19 실측)**: 초판은 `$env:ANTHROPIC_API_KEY`·`$env:OPENROUTER_API_KEY`를 직접 봤고, 실행에서 OpenRouter만 True가 나와 `READY=False`로 막혔다. 원인은 키 부재가 아니라 **이름 규칙이 두 좌석에서 다르다**는 것이었다 — `openrouter_api_key`에는 `AliasChoices("WHYMATH_OPENROUTER_API_KEY", "OPENROUTER_API_KEY")`가 붙어 벤더 표준 이름도 읽지만(`config.py:613-621`), `anthropic_api_key`에는 alias가 없어 `WHYMATH_ANTHROPIC_API_KEY`로만 읽힌다(`:442-449`). 「식별자 부재를 기능 부재로 단정 금지」가 정확히 겨냥하는 형태이며, 추측한 이름의 0건을 부재로 읽지 않으려면 **역할(키가 조달되는가)로 물어야 한다.** 이 정정으로 `.env` 경유 주입도 함께 덮인다 — `Settings`가 알아서 찾기 때문이다.
@@ -158,17 +158,23 @@ $SpecOk = Test-Path .eos121-out\spec_plan.jsonl
 $Src2 = & $PyExe -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk2 = $Src2 -like "*WhyMath-eos121*"
 Write-Output "PRECHECK SpecOk=$SpecOk CodeOk=$CodeOk2 Seat=$env:WHYMATH_CLOUD_PROVIDER"
-if ($SpecOk -and $CodeOk2) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\openrouter.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --top-p 0.95 --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\openrouter.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\openrouter.stdout.txt; Write-Output "OPENROUTER_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk2 · [C]와 [B]를 다시 확인하세요" }
+if ($SpecOk -and $CodeOk2) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\openrouter.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\openrouter.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\openrouter.stdout.txt; Write-Output "OPENROUTER_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk2 · [C]와 [B]를 다시 확인하세요" }
 ```
 
 **인자 선택의 근거**:
-- `--top-p 0.95`를 **반드시 지정**한다. 지정해야 양 좌석에 같은 값이 나간다 — 미지정이면 각 공급사 기본값에 맡겨져 교란 변수가 열린 채로 재게 된다. 값 자체(0.95)는 측정자 선택이고, **두 좌석이 같기만 하면 된다.**
+- **`--top-p`를 주지 않는다(2026-09-19 정정 — 종전 판은 `--top-p 0.95`를 "반드시 지정"이라고 적었다).** 그 처방은 **실행 불가**임이 라이브로 드러났다: anthropic 좌석 90호출이 **전건 400**으로 죽었다(`outcome_counts: {generation_failed: 90}` · `accepted: 0` · 400은 과금되지 않아 비용 피해 0).
+
+  > **실측 오류 원문** — ``Error code: 400 - {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}``
+
+  Anthropic Messages API는 `temperature`와 `top_p`의 **동시 지정 자체를** 거부하고(모델 제약이 아니라 API 계약이라 Sonnet 4.6도 마찬가지다), 저작 경로는 `temperature=0.9`를 **항상** 싣는다. 그래서 이 좌석에서 top_p는 **구조적으로 통제할 수 없다**. 두 좌석 모두 미전송(= 각 공급사 기본값)으로 도는 것이 유일한 대칭 조건이며, 그것은 **"닫았다"가 아니라 "대칭이되 통제되지 않음"**이다 — 해석 한계는 §8에 적혀 있다.
+
+  실수로 `--top-p`를 붙여도 **회차가 시작되지 않는다**: CLI가 anthropic 좌석 + `--top-p` 조합을 **호출 0건에서** exit 2로 거부한다(openrouter 좌석·로컬 회차는 종전대로 허용된다 — 제약은 Anthropic 한정).
 - `--subscription premium --budget-krw 5000`은 둘 다 있어야 클라우드 티어로 간다(EOS-118과 같은 인자).
 - `--canary 0 --abort-window 0`으로 중단 장치를 끈다. 켜 두면 중복률이 높은 좌석에서 **우리가 재려는 현상 때문에** 회차가 조기 종료돼 표본이 안 찬다. 이 선택은 회차 대장에 값 그대로 기록된다.
 
 ## [E] 좌석 2 — anthropic 90호출 (쓰기)
 
-[D]와 같은 구조다. 좌석과 출력 파일만 다르다.
+[D]와 같은 구조다. 좌석과 출력 파일만 다르다. **인자는 [D]와 글자 그대로 같아야 한다** — 특히 `--top-p`는 **양 좌석 모두 주지 않는다**([D] 인자 근거). 한쪽에만 주면 비교가 깨지고, anthropic 쪽에 주면 회차가 exit 2로 시작조차 하지 않는다.
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos121
@@ -178,7 +184,7 @@ $PrevOk = Test-Path .eos121-out\openrouter.jsonl
 $Src3 = & $PyExe -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk3 = $Src3 -like "*WhyMath-eos121*"
 Write-Output "PRECHECK SpecOk=$SpecOk PrevOk=$PrevOk CodeOk=$CodeOk3 Seat=$env:WHYMATH_CLOUD_PROVIDER"
-if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\anthropic.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --top-p 0.95 --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\anthropic.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\anthropic.stdout.txt; Write-Output "ANTHROPIC_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk3 · [C]와 [B]를 다시 확인하세요" }
+if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\anthropic.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\anthropic.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\anthropic.stdout.txt; Write-Output "ANTHROPIC_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk3 · [C]와 [B]를 다시 확인하세요" }
 ```
 
 **좌석별로 `--out`을 가르는 이유**: 회차 대장(`--out`의 **확장자를 치환**한 사이드카 — `openrouter.jsonl` → `openrouter.rounds.jsonl`. `with_suffix`이므로 덧붙임이 아니다 · `anchor_round_ledger.py:688`)이 좌석별로 분리돼 읽기 쉽고, **두 좌석이 같은 dedup 인덱스를 공유하지 않는다.** 같은 파일에 쌓으면 뒤에 도는 좌석이 앞 좌석의 산출물과도 중복 판정을 받아 비교가 오염된다.
@@ -230,6 +236,10 @@ if ($OrOk -and $AnOk -and $PyOk) { & $PyExe -m whymath_backend.harness.problem_c
 ### 미리 밝혀 두는 해석 한계
 
 **`embedding_near` 칸은 0으로 나올 것이고, 그 0은 "안 걸렸다"가 아니라 "그 경로가 안 돌았다"이다.** 이 CLI는 `dedup_index`·`embed_provider`를 주입하지 않아 임베딩 과유사 dedup 자체가 실행되지 않는다. 구조는 갖춰 뒀으나 이번 회차에서는 `structural_signature`만 나온다.
+
+**`top_p`는 통제되지 않은 채로 잰다.** 양 좌석 모두 미전송이라 각 공급사 기본값이 쓰이고, **두 기본값이 같다는 근거도 다르다는 근거도 없다**(명시 전송으로 닫는 길이 API 제약으로 막혀 있다 — [D] 인자 근거). 그러므로 좌석 간 차이가 관측되면 그것은 *좌석 특성*과 *공급사 기본 top_p 차이*의 **합**이며, 이 회차는 둘을 가르지 못한다. 통제된 축은 temperature(양 좌석 0.9 명시)·seed(양 좌석 None)·max_tokens(현 설정 동일)뿐이다.
+
+다만 이 미통제 상태는 **EOS-118 회차와 동일한 조건**이므로, 이 회차가 답하려는 원 질문(*n=5의 우연인가*)은 그대로 유효하다 — 같은 조건에서 표본을 18배로 늘려 재현 여부를 보는 것이기 때문이다.
 
 그리고 **중복 판정이 과잉일 여지가 구조적으로 있다.** signature가 발문을 전혀 보지 않고 계수 스케일·부호를 흡수하므로, 서사가 완전히 다른 두 문항도 조건식이 같으면 중복이 된다. 그래서 이 회차의 `rejected_duplicate`는 "같은 문제를 또 만들었다"가 아니라 **"같은 방정식 구조를 또 골랐다"** 로 읽어야 한다. spec 3종이 이 축을 가른다.
 

@@ -1,21 +1,28 @@
-"""`top_p` 좌석 대칭 계약 동결 — EOS-121 선결조건 A (라이브 0·hermetic).
+"""`top_p` 좌석 계약 동결 — EOS-121 선결조건 A + 라이브 정정 (라이브 0·hermetic).
 
 **왜 별도 파일인가**: 각 프로바이더 테스트 파일은 *자기 좌석*만 본다. 그런데 EOS-121이
-닫으려는 교란 변수는 "한 좌석이 top_p를 싣는가"가 아니라 **"두 좌석이 같은 값을 싣는가"**다.
+닫으려던 교란 변수는 "한 좌석이 top_p를 싣는가"가 아니라 **"두 좌석이 같은 값을 싣는가"**였다.
 그 판정은 두 좌석의 전송 직전 페이로드를 *같은 테스트 안에서 나란히 놓아야* 성립한다 —
 한쪽만 보면 반쪽이 조용히 갈라져도 양쪽 파일이 모두 초록이다.
 
-배경(`docs/ops/eos121_seat_generation_diversity_precheck.md` §1): 착지 전 저장소에는 `top_p`를
-페이로드에 싣는 코드가 **0건**이었고, 두 공급사 기본값이 같다는 근거도 다르다는 근거도 없었다.
-즉 "같음"도 "다름"도 아닌 **통제되지 않음**이라는 3번째 상태였다(CLAUDE.md「모른다 ≠ 아니다」).
+**라이브 정정(2026-09-19)**: 그 대칭은 **저작 경로에서 성립하지 않는다.** Anthropic Messages
+API가 `temperature`와 `top_p`의 **동시 지정**을 모델과 무관하게 400으로 거부하는데
+(`temperature` and `top_p` cannot both be specified for this model), 저작 경로는
+temperature=0.9를 항상 싣는다. 실측: anthropic 좌석 90호출 전건 `generation_failed`.
+따라서 선결조건 A의 원 처방("양 좌석에 동일 명시 전송해 축을 닫는다")은 **구조적으로 불가능**
+하며, 측정은 양 좌석 **모두 미전송**(각 공급사 기본값)으로 돈다 — "닫았다"가 아니라
+**"대칭이되 통제되지 않음"**이다(`docs/ops/eos121_seat_generation_diversity_precheck.md` §1·§4).
 
-이 파일이 막는 것 셋(전부 실패 주입으로 RED 확인):
+이 파일이 막는 것 넷(전부 실패 주입으로 RED 확인):
   ⓐ **기본값의 조용한 변경** — 미지정인데 페이로드에 키가 생기는 것. `None`이 실리는 것도
      포함한다(공급사 기본값 ≠ null). 그래서 `is None` 비교가 아니라 **키 부재**를 본다.
-  ⓑ **좌석 비대칭** — 같은 값을 줬는데 한 좌석에만 실리거나 값이 달라지는 것.
-  ⓒ **CLOUD_HIGH 정책 분기** — Opus 4.7은 temperature/top_p를 함께 400으로 거부한다. 이
-     저장소의 기존 대응은 *호출부 계약*(런타임 거부 없음)이므로 top_p에만 다른 정책을
-     발명하지 않는다. 동시에 조용히 버리지도 않는다(조용한 무시 금지).
+  ⓑ **좌석 비대칭(top_p 단독)** — 같은 값을 줬는데 한 좌석에만 실리거나 값이 달라지는 것.
+     이 축은 정정 후에도 그대로 성립한다(temperature가 없으면 anthropic도 top_p를 싣는다).
+  ⓒ **동시 지정이 호출까지 가는 것** — anthropic은 **거부**하고 openrouter는 **싣는다**.
+     이 비대칭 자체가 정정의 핵심 사실이라 여기서 나란히 동결한다.
+  ⓓ **저작 경로에서 그 조합이 조용히 성립한다고 믿는 것** — 생성기는 temperature를 항상
+     실으므로 `top_p=`를 준 생성기 + anthropic 좌석은 **반드시** 터진다. 프로바이더 단독
+     테스트만으로는 "저작 경로가 실제로 무엇을 보내는가"를 모르므로 생성기 축에서 따로 잰다.
 """
 
 from __future__ import annotations
@@ -164,11 +171,16 @@ class TestDefaultIsNoTransmission:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ⓑ 좌석 대칭 — 같은 값을 주면 두 좌석에 같은 값이 실린다
+# ⓑ 좌석 대칭 — top_p **단독**이면 같은 값이 두 좌석에 실린다
 # ──────────────────────────────────────────────────────────────────────────
-class TestSeatSymmetry:
+class TestSeatSymmetryForTopPAlone:
+    """temperature를 함께 주지 않는 한, top_p 축의 좌석 대칭은 그대로 성립한다.
+
+    정정이 무효화한 것은 *저작 경로에서의* 통제이지 *프로바이더의 top_p 전송*이 아니다.
+    둘을 뭉뚱그리면 "anthropic은 top_p를 못 싣는다"는 과잉 일반화가 생긴다.
+    """
+
     async def test_same_value_lands_in_both_seats(self) -> None:
-        """EOS-121이 실제로 필요로 하는 것 — *한 번 지정해 두 좌석을 맞출 수 있는가*."""
         anthropic_payload = await _anthropic_payload(top_p=_TOP_P)
         openrouter_payload = await _openrouter_payload(top_p=_TOP_P)
         assert anthropic_payload["top_p"] == _TOP_P
@@ -186,44 +198,49 @@ class TestSeatSymmetry:
         assert [("top_p" in p) for p in set_pair] == [True, True]
         assert [("top_p" in p) for p in unset_pair] == [False, False]
 
-    async def test_temperature_axis_is_untouched(self) -> None:
-        """top_p를 실어도 temperature 축은 종전 그대로다 — 두 축이 서로를 덮지 않는다.
+    async def test_temperature_axis_is_untouched_when_alone(self) -> None:
+        """temperature **단독** 축은 종전 그대로 두 좌석 대칭이다 — 이번 정정이 그것을 깨지 않는다.
 
-        이 변경의 착지 전 실측에서 temperature는 **이미 통제되고 있었다**(양 좌석 명시 0.9).
-        top_p를 붙이면서 그것을 깨뜨리면 닫혀 있던 축이 도로 열린다.
+        착지 전 실측에서 temperature는 **이미 통제되고 있었다**(양 좌석 명시 0.9). 동시 지정을
+        막으면서 이 축까지 건드리면 닫혀 있던 유일한 축이 도로 열린다.
         """
-        anthropic_payload = await _anthropic_payload(temperature=0.9, top_p=_TOP_P)
-        openrouter_payload = await _openrouter_payload(temperature=0.9, top_p=_TOP_P)
+        anthropic_payload = await _anthropic_payload(temperature=0.9)
+        openrouter_payload = await _openrouter_payload(temperature=0.9)
         assert anthropic_payload["temperature"] == openrouter_payload["temperature"] == 0.9
-        assert anthropic_payload["top_p"] == openrouter_payload["top_p"] == _TOP_P
+        assert "top_p" not in anthropic_payload
+        assert "top_p" not in openrouter_payload
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ⓒ CLOUD_HIGH — Opus 4.7의 400 거부 경로
+# ⓒ 동시 지정 — 좌석이 **갈린다**. 이 비대칭이 정정의 핵심 사실이다
 # ──────────────────────────────────────────────────────────────────────────
-class TestCloudHighRejectionPath:
-    """Opus 4.7은 `temperature`/`top_p`/`top_k`/`budget_tokens`를 **거부(400)** 한다.
+class TestSimultaneousSpecificationSplitsTheSeats:
+    """`temperature` + `top_p`를 함께 주면 anthropic은 거부하고 openrouter는 싣는다.
 
-    이 저장소의 기존 대응(temperature)은 런타임 가드가 아니라 **호출부 계약 + 모듈 경고문**
-    이다. top_p에만 다른 정책(예 CLOUD_HIGH에서 RuntimeError)을 새로 만들지 않는다 — 같은
-    API 제약을 두 방식으로 다루면 호출부가 어느 쪽이 계약인지 알 수 없게 되기 때문이다.
-    그렇다고 **조용히 버리지도 않는다**: 버리면 400 대신 "설정했는데 아무 일도 없다"가 되어
-    원인 지목이 불가능해진다(조용한 무시 금지).
+    두 좌석을 **같은 테스트 안에** 나란히 두는 이유: 한쪽만 보면 "anthropic이 까다롭다"까지만
+    읽히고, *openrouter에서는 되기 때문에* 측정을 대칭으로 맞출 수 없다는 결론이 안 나온다.
+    그 결론이 런북·사전실측 정정의 근거다.
     """
 
-    async def test_cloud_high_treats_top_p_exactly_like_temperature(self) -> None:
-        payload = await _anthropic_payload(
-            decision=_cloud_decision(CostTier.CLOUD_HIGH), temperature=0.9, top_p=_TOP_P
-        )
-        assert payload["top_p"] == _TOP_P
-        # 정책 대칭 — 한쪽에만 거부 가드를 넣거나 한쪽만 버리면 여기서 RED.
-        assert ("top_p" in payload) == ("temperature" in payload)
+    @pytest.mark.parametrize(
+        "cost",
+        [CostTier.CLOUD_MID, CostTier.CLOUD_HIGH],
+        ids=["cloud_mid=Sonnet4.6", "cloud_high=Opus4.7"],
+    )
+    async def test_anthropic_refuses_before_sending(self, cost: CostTier) -> None:
+        """모델과 무관하다 — Sonnet에서도 거부다(오독의 진원지가 바로 이 칸이었다)."""
+        with pytest.raises(RuntimeError, match="동시 지정"):
+            await _anthropic_payload(decision=_cloud_decision(cost), temperature=0.9, top_p=_TOP_P)
 
-    async def test_cloud_high_stays_plain_when_unset(self) -> None:
-        """대조군 — 미지정이면 CLOUD_HIGH도 종전처럼 plain create다(두 키 모두 부재)."""
-        payload = await _anthropic_payload(decision=_cloud_decision(CostTier.CLOUD_HIGH))
-        assert "top_p" not in payload
-        assert "temperature" not in payload
+    async def test_openrouter_accepts_both(self) -> None:
+        """대조군 — 제약이 Anthropic 한정임을 **실측 대칭점으로** 고정한다.
+
+        이 단언이 없으면 "둘의 동시 지정은 원래 안 되는 것"이라는 과잉 일반화가 통과하고,
+        그러면 openrouter 좌석의 `--top-p`까지 막는 구현도 초록이 된다(과잉 차단).
+        """
+        payload = await _openrouter_payload(temperature=0.9, top_p=_TOP_P)
+        assert payload["temperature"] == 0.9
+        assert payload["top_p"] == _TOP_P
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -311,3 +328,48 @@ def test_generator_input_snapshot_records_top_p() -> None:
         top_p=_TOP_P,
     )._input_snapshot(spec, "p")
     assert tuned["top_p"] == _TOP_P
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⓓ 저작 경로 — 생성기 + anthropic 좌석 + top_p 는 **반드시** 터진다
+# ──────────────────────────────────────────────────────────────────────────
+def test_generator_with_top_p_cannot_run_on_the_anthropic_seat() -> None:
+    """이것이 라이브 회차 90건을 죽인 조합 그 자체다 — 시임이 아니라 *실제 프로바이더*로 잰다.
+
+    `_KwargsRecordingProvider`는 무엇이든 받으므로 위 생성기 테스트들은 이 결함을 볼 수 없었다
+    (그래서 라이브에서만 드러났다 — CLAUDE.md「외부 SDK 표면을 시임 테스트만으로 정합 선언
+    금지」의 *파라미터 조합* 축). 여기서는 생성기에 **진짜 AnthropicProvider**를 물려
+    "저작 경로가 실제로 내보내는 조합"을 재현한다.
+
+    생성기가 temperature(기본 0.9)를 *항상* 싣는다는 것이 이 단언의 전제이고, 그 전제는 아래
+    대조군이 지킨다 — temperature를 빼는 회귀가 들어오면 대조군이 RED다.
+    """
+    client = _FakeAnthropicClient()
+    provider = AnthropicProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=Settings(anthropic_api_key=SecretStr("sk-ant-test")),
+    )
+    generator = LLMEquivalentProblemGenerator(provider, top_p=_TOP_P)  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError, match="동시 지정"):
+        generator._invoke("프롬프트", _cloud_decision(), seed=None)
+    # 호출 0건 — 실패는 전송 **전에** 나야 90번 반복되지 않는다.
+    assert client.messages.kwargs == []
+
+
+def test_generator_without_top_p_runs_on_the_anthropic_seat() -> None:
+    """대조군 — top_p를 안 주면 같은 좌석이 종전대로 돈다(temperature만 실린다).
+
+    이 대조군이 없으면 "생성기 + anthropic이면 무조건 거부"하는 과잉 구현이 위 테스트를
+    통과한다. 그리고 그 과잉 구현은 **저작 배치 전체를 멈춘다**(EOS-118 회차와 같은 조건조차
+    못 돌린다) — 정정의 처방이 "top_p를 빼고 돈다"이므로 이 방향이 반드시 살아 있어야 한다.
+    """
+    client = _FakeAnthropicClient()
+    provider = AnthropicProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=Settings(anthropic_api_key=SecretStr("sk-ant-test")),
+    )
+    generator = LLMEquivalentProblemGenerator(provider)  # type: ignore[arg-type]
+    generator._invoke("프롬프트", _cloud_decision(), seed=None)
+    sent = client.messages.kwargs[0]
+    assert sent["temperature"] == 0.9  # 저작 경로가 temperature를 항상 싣는다는 전제
+    assert "top_p" not in sent
