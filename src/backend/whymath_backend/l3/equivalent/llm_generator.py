@@ -101,6 +101,7 @@ import logging
 import re
 from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
+from typing import Any
 
 import sympy
 from pydantic import ValidationError
@@ -280,6 +281,7 @@ class LLMEquivalentProblemGenerator:
         budget_krw: float = _STUDENT_ESCALATION_DEFAULTS.budget_krw,
         difficulty: str | None = None,
         temperature: float = 0.9,
+        top_p: float | None = None,
         authoring_family: ModelFamily | None = ModelFamily.GENERAL,
         slug_prefix: str = "wm-gen",
         subject: Subject = Subject.공통,
@@ -325,6 +327,17 @@ class LLMEquivalentProblemGenerator:
                 문제(예 `x^2-8x+c`·상수만 변주)를 반복하는 mode collapse가 관측됐다. 0.9는
                 다양성과 형식 안정의 균형점이다: 더 높이면(>1.2) JSON 붕괴·수식 오류가 급증하고,
                 낮추면 다시 collapse로 회귀한다. 값을 provider.generate(temperature=)로 전달한다.
+            top_p: **누적확률 절단**(nucleus sampling·EOS-121 선결조건 A). 기본은 **None이고,
+                그것이 이 인자의 요점이다** — temperature(0.9)와 달리 기본값을 두지 않는다.
+                이유: top_p를 무조건 명시 전송하면 현재 각 공급사 기본값과 다른 값이 나가
+                **기존 저작 품질이 조용히 바뀐다**(회귀). 목표는 top_p를 켜는 것이 아니라
+                *양 좌석에 같은 값을 줄 수단*을 갖는 것이다. 좌석별 생성 다양성을 측정할 때
+                top_p가 통제되지 않으면(= 각 공급사 기본값에 의존하면) 어떤 숫자가 나와도
+                "설정 차이 아님"을 말할 수 없다 — 저장소에는 두 공급사 기본값이 같다는 근거도
+                다르다는 근거도 없기 때문이다(사전 실측 문서
+                `docs/ops/eos121_seat_generation_diversity_precheck.md` §1의 3상태 분류:
+                같음/다름/**통제되지 않음**). 값을 주면 provider.generate(top_p=)로 전달되고,
+                `_input_snapshot`에도 기록된다.
             authoring_family: **저작용 로컬 모델 패밀리**(S2-h·기본 GENERAL). 라우터는
                 task_type='generate'를 MATH 패밀리(qwen2-math)로 보내지만, qwen2-math는 *풀이*
                 특화라 저작 시 같은 문제를 반복한다(mode collapse — 온도로도 안 풀림, Phaiakes9
@@ -374,6 +387,7 @@ class LLMEquivalentProblemGenerator:
         self._budget_krw = budget_krw
         self._difficulty = difficulty
         self._temperature = temperature
+        self._top_p = top_p
         self._authoring_family = authoring_family
         # 배치용 지속 이벤트 루프(지연 생성) — asyncio.run의 루프 생성·종료 반복이 provider의
         # 캐시 커넥션 풀을 죽여 배치가 격회 실패하던 실측 회귀 방어(_invoke·_ensure_loop 참조).
@@ -483,6 +497,10 @@ class LLMEquivalentProblemGenerator:
         `temperature=self._temperature`(기본 0.9)를 실어 *생성 다양성*을 확보한다 — 튜터링과
         달리 콘텐츠 저작은 고온도가 필요하다(mode collapse 방어·__init__ temperature 참조).
 
+        `top_p`(EOS-121 선결조건 A)는 **값이 있을 때만** 싣는다 — 기본 None이면 키 자체를
+        넘기지 않아 각 공급사 기본값이 그대로 쓰인다(*기존 동작 무변경*). temperature처럼
+        기본값을 박아 두지 않는 이유는 __init__ top_p 항 참조(무조건 전송 = 조용한 품질 변경).
+
         `json_schema`(S2-j structured output)는 **LOCAL 결정일 때만** 싣는다 — Ollama는
         format= 제약 디코딩으로 출력을 스키마에 맞는 JSON으로 문법 강제하고, 클라우드
         (Anthropic)는 문법 제약이 없어 스키마를 주면 명확히 거부하므로(조용한 무시 금지)
@@ -498,26 +516,20 @@ class LLMEquivalentProblemGenerator:
         # provider 반환은 GenerationResult(text, usage) — 텍스트는 조립이, usage는 관측
         # (_record_trace: 실측 토큰·지연·비용)이 소비한다.
         loop = self._ensure_loop()
-        if seed is None:
-            # 시드 미지원 경로(클라우드) — 실으면 provider가 명확히 거부한다(조용한 무시 금지).
-            return loop.run_until_complete(
-                self._provider.generate(
-                    prompt,
-                    _system_prompt(),
-                    decision,
-                    temperature=self._temperature,
-                    json_schema=schema,
-                )
-            )
+        # 선택 인자는 *값이 있을 때만* 키를 싣는다 — 둘 다 None이면 호출 형태가 종전과 완전히
+        # 같다(`generate(prompt, system, decision, temperature=, json_schema=)`).
+        #   · seed: 시드 미지원 경로(클라우드)에 실으면 provider가 거부한다(조용한 무시 금지).
+        #   · top_p: 미지정이면 공급사 기본값 — 무조건 전송이 곧 조용한 품질 변경이다(EOS-121 A).
+        call_kwargs: dict[str, Any] = {
+            "temperature": self._temperature,
+            "json_schema": schema,
+        }
+        if self._top_p is not None:
+            call_kwargs["top_p"] = self._top_p
+        if seed is not None:
+            call_kwargs["seed"] = seed
         return loop.run_until_complete(
-            self._provider.generate(
-                prompt,
-                _system_prompt(),
-                decision,
-                temperature=self._temperature,
-                json_schema=schema,
-                seed=seed,
-            )
+            self._provider.generate(prompt, _system_prompt(), decision, **call_kwargs)
         )
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
@@ -581,7 +593,9 @@ class LLMEquivalentProblemGenerator:
           - `prompt_sha256`/`system_sha256`: 전문의 sha256 병기 — 무결성 대조 축.
           - `spec`: 이 경로가 실제로 가진 구조 입력 — 성취기준·오개념·난이도·답형태.
             (전문과 중복되는 재료지만 명료성 우선 — 구조 신호로도, 문면으로도 복원 가능.)
-          - `topic_hint`/`temperature`: 프롬프트·샘플링에 실제 반영된 생성 신호.
+          - `topic_hint`/`temperature`/`top_p`: 프롬프트·샘플링에 실제 반영된 생성 신호.
+            `top_p`는 미지정이면 **null로 기록된다** — 키를 빼지 않는 이유는 "안 보냈다"와
+            "구판이라 기록 자체가 없다"를 구분하기 위해서다(부재 ≠ 값 없음·EOS-121 A).
         라우터 결정은 담지 않는다 — spec에서 결정론 유도되는 파생물이고, 실행 모델은
         `model_name` 컬럼이 별도 기록한다(pregenerate측 `input_snapshot_for_prewarm` 동형).
         시드도 담지 않는다 — `GenerationLog.seed` 전용 컬럼이 정본이고, 스냅샷에 사본을 두면
@@ -601,6 +615,7 @@ class LLMEquivalentProblemGenerator:
             },
             "topic_hint": self._topic_hint,
             "temperature": self._temperature,
+            "top_p": self._top_p,
         }
 
     def _emit_generation_log(

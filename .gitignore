@@ -220,6 +220,9 @@ backlog/inventory/feature_inventory_v2.csv
 # — LLM 생성 문항 JSONL. 로컬 실행 결과이지 저장소 자산이 아니다.
 .arch57-out/
 
+# EOS-121 좌석별 생성 다양성 실측 회차 산출물 (라이브 회차 전용·저장소에 넣지 않는다)
+.eos121-out/
+
 # EOS-118 좌석 신호 라이브 회차 산출(런북 docs/ops/eos118_seat_signal_live_runbook.md)
 # — 회차 JSONL·요약 JSON·stderr 로그. 로컬 실행 결과이지 저장소 자산이 아니다.
 .eos118-out/

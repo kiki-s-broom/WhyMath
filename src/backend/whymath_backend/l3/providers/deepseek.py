@@ -171,14 +171,17 @@ class DeepSeekProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
         """라우터 결정에 따라 DeepSeek 공식 API로 생성 (LLMProvider 구현).
 
         선택 인자 처리(조용한 무시 없음): `images`·`json_schema`는 거부하고
-        (비전은 로컬 경유·문법 제약 미실측), `temperature`·`seed`는 OpenAI 호환
+        (비전은 로컬 경유·문법 제약 미실측), `temperature`·`top_p`·`seed`는 OpenAI 호환
         파라미터로 그대로 전달한다. seed는 "전달했다"는 사실이며 결정론을 보장하지 않는다.
+        `top_p`는 미지정(기본)이면 키 자체를 싣지 않아 공급사 기본값이 쓰인다 — 기존 동작
+        무변경이며, 지정 시에만 실린다(EOS-121 선결조건 A·temperature와 같은 규약).
         """
         if images:
             raise RuntimeError(
@@ -210,6 +213,9 @@ class DeepSeekProvider:
         }
         if temperature is not None:
             payload["temperature"] = temperature
+        # EOS-121 선결조건 A — temperature와 같은 규약(지정 시에만 키를 싣는다·None 전송 금지).
+        if top_p is not None:
+            payload["top_p"] = top_p
         if seed is not None:
             payload["seed"] = seed
 

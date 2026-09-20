@@ -1074,6 +1074,18 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "by-design:회차 사이드카 4종이 입력인 카나리 구간 절단 도구(MP-05) — 상주 입력이 "
             "없고, 카나리를 검수하려는 시점에 운영자가 돌려 review_session에 먹일 큐를 만든다"
         ),
+        # EOS-121(2026-09-19): 회차 대장 → 회신 추출. `canary_slice`와 같은 부류다 — 입력이
+        # *특정 회차의 사이드카*(`<out>.rounds.jsonl`)라 레포에 상주하지 않고, 산출은 라이브
+        # 회차를 돌린 사람이 세션에 돌려보낼 보고서다. CI가 매 커밋마다 돌릴 대상이 아니며,
+        # 대장 없이 돌리면 도구가 측정 실패(exit 1)로 거부한다. 렌더 계약(미기록/미측정/0의
+        # 3상태 구분·cp949 왕복 배제·실패 시 증거 보존)은 backend 잡이 수집하는
+        # tests/backend/harness/test_round_reply_extract.py가 뮤테이션 대조로 상시 검증한다.
+        "harness.problem_corpus_round_reply": (
+            "by-design:라이브 회차 대장을 읽어 회신 보고서를 쓰는 추출 도구(EOS-121 [F]) — "
+            "상주 입력이 없고, 좌석 회차를 돌린 운영자가 그 자리에서 한 번 돌린다. "
+            "PowerShell이 바이트를 중계하면 한국어가 cp949 왕복으로 깨지므로 런북 [F]가 "
+            "이 CLI를 경유한다(Python이 읽고 Python이 쓴다)"
+        ),
         # 운영 집계 배치 — COLLAB-03(done)이 신설한 일별 학습지표 롤업 실행기
         "harness.learning_metrics_rollup_cli": _OPERATIONS_BATCH,
         # OPS-56(2026-09-11): 주간 KPI 6종 집계 cron — `ci_executed_modules()`가 `.github/

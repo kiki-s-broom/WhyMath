@@ -192,6 +192,30 @@ class ReviewQueueEntry(BaseModel):
         description="payload canonical(sha256) — 뷰의 재출현 묶기 키(payload 없으면 None).",
     )
     run_id: str = Field(description="이 행을 만든 축적 회차 식별자(리포트 run_id와 조인).")
+    spec_id: str | None = Field(
+        default=None,
+        description=(
+            "이 시도가 쓴 spec 식별자(EOS-121 선결조건 C). 한 회차가 spec 여러 종을 순환하므로 "
+            "행마다 남겨야 '어느 spec이 무엇을 냈는지'가 큐에서도 갈린다. None=미기록(구행·단일 "
+            "spec 호출부)."
+        ),
+    )
+    duplicate_detector: str | None = Field(
+        default=None,
+        description=(
+            "중복을 잡은 검출기(EOS-121 선결조건 B) — `structural_signature`·`embedding_near`. "
+            "`rejected_duplicate` 행에만 값이 있다."
+        ),
+    )
+    duplicate_origin: str | None = Field(
+        default=None,
+        description=(
+            "중복 상대의 출처(EOS-121 B) — `round`(이번 회차가 방금 만든 것)·`corpus`(기존 "
+            "자산)·`mixed`. **`duplicate_detector`가 있는데 이 값이 None이면 미판정**이다 "
+            "(출처 좌석 미주입) — 'corpus'로 접지 않는다. 검수자가 행만 보고 '생성 다양성 문제'와 "
+            "'dedup 정상 동작'을 가를 수 있게 하는 축이며, 회차가 끝나면 복원 불가라 여기 남긴다."
+        ),
+    )
     recorded_at: datetime | None = Field(
         default=None,
         description="기록 시각(UTC) — append가 스탬프(JSONL 매체 = 발생 즉시 기록·genlog 동형).",
@@ -223,6 +247,7 @@ def entry_from_outcome(
     *,
     run_id: str,
     candidate_payload: Mapping[str, Any] | None,
+    spec_id: str | None = None,
 ) -> ReviewQueueEntry:
     """비수용 GenerationOutcome 1건 → 내구 큐 행(순수 — 파일 I/O 없음).
 
@@ -244,6 +269,11 @@ def entry_from_outcome(
         candidate_payload=payload,
         payload_sha256=_canonical_payload_sha256(payload) if payload is not None else None,
         run_id=run_id,
+        spec_id=spec_id,
+        # 중복 출처 2축(EOS-121 B)은 outcome에서 **그대로** 옮긴다 — 여기서 다시 판정하면
+        # 두 벌 산식이 되고, 그 둘이 갈리는 날 어느 쪽이 정본인지 아무도 모른다.
+        duplicate_detector=outcome.duplicate_detector,
+        duplicate_origin=outcome.duplicate_origin,
     )
 
 
