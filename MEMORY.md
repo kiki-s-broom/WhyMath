@@ -338,6 +338,24 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-20 (등재·판정 · EOS-128 / Phase 3 지시문 P3-00a): **Phase 3 실행계획 → 백로그 변환 1회차 — Not Now 12종을 "notes 산문"이 아니라 게이트로 보류시켰고, 원 문서가 없는 축은 창작하지 않았다** (claude 등재·판정) — 판정 기준 main `e91a75d3`
+
+**컨텍스트**: Kiki가 「Phase 3 — Math EOS 과목 완성 실행계획」(2026.10.26~11.22) 집행 지시문 세트 **[01/20] `P3-00a`**를 첨부(마스터 프리앰블 포함 `.md` 1건). 지시 = ①Week 1~4·지표 7종·Release Gate A~E 분해 ②중복 실측 ③`add`만 ④Not Now 12종 보류 등재 ⑤산출 4종 + 대조표 PR. **원 문서 본문과 `P3-01~P3-14`(세트 02~15)는 미첨부** — main·원격 브랜치 32개·열린 PR 10건·이벤트 대장·전체 히스토리(`git fetch --unshallow` 후 `git log --all --grep`) 어디에도 0건(검색어는 대조표 §0-1에 명기).
+
+**무엇을 했나**: ⓐ 변환 태스크 `EOS-128-phase3-plan-backlog-conversion` 등재·claim(`EOS-09` 선례 동형) ⓑ 게이트 **`G-not-now-v1-release-recheck`**(kiki/decision · 재확인 지점 = v1.0 출시 이후 첫 계획 세션 · 리마인드 100일=12/29 · 판정 3택 유지/재개/폐기) 신설 ⓒ Not Now 12종 중 **11건 신규 `NOTNOW-01~12`(06 결번)** — 전건 priority 5·eos_priority P3·stage S5·notes "v1.0 이후, 11월 착수 금지"·자리표시 acceptance(지금 설계하지 않는다) ⓓ #6 다과목 Adapter는 **기존충족 → `E1-01` amend**(트랙 entry_gate `G-s5-subject-expansion`이 이미 하드락 — 계획서 300 변환 §2 #4·#5 판정 그대로, 네 번째 사본을 만들지 않았다) ⓔ 대조표 `docs/strategy/phase3_math_eos_completion_backlog_crosswalk.md`.
+
+**판정 — 완료 조건 부분 충족**: Not Now 12종 보류 등재 = **충족** / 원 문서 각 항목 ↔ 태스크 대조표 = **미충족(입력 결손)**. 원 문서 없이 Week·지표·Gate를 분해하면 대조가 아니라 창작이므로 하지 않았다(§7 ①~④). 시작 조건 "Phase 2 Gate 2 PASS"는 `EOS-22`(2026-09-19·main `77ee1992`) 판정이 **FAIL**이라 현재 미충족 — 본 변환은 등재이지 착수가 아니므로 진행했고, Phase 3 착수·Gate 2 재판정 시점은 Kiki 결정으로 남긴다.
+
+**왜 게이트인가 (결정 근거)**: 지시 4의 "notes에 적고 priority 최하"만으로는 보류가 성립하지 않는다 — `selector.py`는 notes를 읽지 않으므로 priority 5 `todo`는 여전히 착수 후보다(CLAUDE.md "선행 조건을 산문에만 적고 대장에 집행하지 않기 금지"). `block`은 주체 없는 대기라 "만료 없는 유예 금지"에 걸리고, 게이트는 사람 소유 결정 지점 + 리마인드 + `clear --evidence`(HARN-68)라 규칙에 맞는다(`G-arch38-verdict-recheck`·`G-arch56-availability-trigger` 선례 동형). **주입 검증**: 정상 `next --n 800 --json`에 `NOTNOW-*` 0/11 → 게이트 status를 `cleared`로 주입(앵커 1건·길이 산술 단언·`cp` 백업)하자 **11/11 후보 등장(RED)**, `E1-01`은 트랙 게이트로 여전히 0 → `cp` 원복 `cmp` 바이트 동일. 보류를 만드는 것은 게이트 하나이며 열리면 즉시 후보가 되므로 clear 판정은 3택이어야 한다.
+
+**Not Now ∩ 진행중 = 0건** — in_progress 8 + 원격 claim 8 + 열린 PR 10 전수 대조(`MGMT-06`은 #3과 어휘만 겹침 — 기존 예측 5필드의 법률 검토). `EOS-16`(09-16) FUTURE∩진행중 0건과 일치. Kiki께 block 판단을 요청할 항목 없음.
+
+**정직한 공백(Kiki 결정 대기)**: ①지표 7종의 저장소 편입 방식 — KPI 정본 12종 + Phase 2 5종(`EOS-15`) 위에 그냥 얹으면 정본이 셋(`EOS-09` §9-③ 동형) ②Release Gate A~E 표기 — "Gate 0 A~E"(Phase 0)·G0~G5와 이름 충돌 3회차 위험(선언 §1.3 `G2` 선례) → `Phase 3 Release Gate A` 전체 표기 필요 ③11/22가 저장소 `G3`(폭 확장)와 같은 날짜에 다른 판정 대상 ④"대규모 DB Schema 변경·UI 구조 변경 금지"는 기계 게이트 없음(사람 규율) — 대조표 §4 정직 표기.
+
+**검증**: `validate` 748건 green · `audit-deps` 위반 0 · `tests/harness` **831 passed** · `tests/infra` **1,573 passed 1 skipped** · ruff/black(scripts+tests/harness)·`cp949_guard`·`adr_number_check`·`check_runbook_blocks`·`check_ps_scripts` 전건 exit 0. **미실행 1건(명시)**: harness-integrity 잡의 CUR-09 관측 리포트 스텝 — 컨테이너 기본 Python 3.11이라 backend editable 설치가 거부됨(요구 ≥3.12). 그 스텝은 backlog·docs를 읽지 않아 이 변경과 무관하나, CI가 최종 판정한다.
+
+**다음**: 원 문서 본문 + `P3-01~P3-14` 첨부 → `EOS-128`을 **이어서** 2회차(done 처리 금지 — acceptance ① 미이행). `P3-01`(대표 과정 동결) 착수 전 선결 = 2회차 + Gate 2 재판정/면제 결정 + 지표·Gate 편입 방식 결정(대조표 §9).
+
 ### 2026-09-19 (구현·판정 · EOS-15 / 계획서 P-14): **Phase 2 KPI 5종 계측기 신설 — 그리고 5종 중 2종은 "측정 불가"가 정답이었다** (claude 구현) — 판정 기준 main `a58a8473`
 
 **무엇을 만들었나.** 계획서 300 §19의 학습 루프 KPI 5축(Loop Completion·State Integrity·Explainability·Manual Intervention·Traceability)을 exit code로 판정하는 CLI를 신설했다 — `ops/loop_kpi_gate.py`. 계약 정본은 `docs/standards/loop_kpi_contract.md`.

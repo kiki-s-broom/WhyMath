@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-128-phase3-plan-backlog-conversion
+title: "Phase 3 실행계획(Math EOS 과목 완성 · 2026-10-26~11-22) → 빌드 하네스 백로그 변환 + Not Now 12종 보류 등재 + 대조표 (P3-00a)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 원 문서 대조 — Phase 3 실행계획(2026-10-26~11-22)의 Week 1~4 작업·측정 지표 7종·Release Gate A~E를 착수 단위로 분해하고, 원 문서 각 항목이 태스크 ID 하나 이상에 대응되는 대조표를 docs/strategy/ 아래 문서로 남긴다. 입력 조건: 원 문서 본문(실행계획)과 P3-01~P3-14 기준 분해안이 세션에 첨부돼야 한다. 2026-09-20 1회차는 P3-00a 지시문 1건만 첨부돼 이 항은 미이행이며, 대조표가 그 사실을 '등재할 수 없었던 항목'으로 기록한다.\n② 중복 실측 — 분해 단위마다 기존 태스크 전수 조회(Phase 2 P-01~P-16 대응 태스크·EOS-xx 108건·전 prefix) + git log --all --grep(unshallow 후)로 미머지 구현을 확인한다. 겹치면 신규 등재 금지, 기존 태스크에 amend로 acceptance를 덧붙인다.\n③ 신규 등재는 backlog.py add로만 한다(번호 추론 금지). 선행 관계는 notes 산문이 아니라 --depends full-id로 건다.\n④ Not Now List 12종(Digital Twin 고도화·가상 학습 실험·성장 경로 장기 예측·교수법 자동 개선·콘텐츠 자동 리팩토링·다과목 Adapter·연구자 협업·복잡한 Agent 협업·Graph 자동 군집화·자동 교육과정 생성·국제 Curriculum 확장·고급 추론 엔진)을 각각 태스크(겹치면 기존 태스크 amend)로 등재하되 notes에 \"v1.0 이후, 11월 착수 금지\"를 적고 priority 5(최하)·eos_priority P3로 두며, 만료 없는 유예 금지 규칙에 따라 재확인 지점 게이트를 부착한다. Not Now ∩ 진행중(in_progress·원격 claim·열린 PR)은 별표로 보고하고 block 처리 여부는 Kiki가 판단한다.\n⑤ 산출 4종 — ①등재·수정된 태스크 ID 전체(신규/기존 구분) ②원 문서 항목 ↔ 태스크 ID 대조표 ③Not Now ∩ 진행중 목록 ④등재할 수 없었던 항목과 이유. 대조표 상단에 판정 기준 main 커밋 해시를 박고 PR을 연다."
+artifacts: []
+paths:
+  - "docs/strategy/phase3_*crosswalk*.md"
+session: claude/new-session-fy0wry
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성 실행계획」(2026.10.26~11.22) 집행 지시문 세트 [01/20] P3-00a — 2026-09-20 세션에 .md 1건으로 첨부. 원 문서(실행계획 본문)와 P3-01~P3-14 기준 분해안은 미첨부이며, 저장소 main·원격 브랜치 32개·열린 PR 10건·이벤트 대장 어디에도 없다(내가 찾은 방법으로는 0건: 파일명·본문 grep·git log --all --grep).\n\n선례: EOS-09(계획서 300 Phase 2 변환·PR #1178·docs/strategy/plan300_phase2_backlog_crosswalk.md)와 같은 성격의 대장 변환 태스크다. 등재는 대장에 올리는 것이고 착수는 별개다(EOS-09 §0-2 선례) — 이 변환은 Phase 3 실행 승인이 아니다.\n\n지시문의 시작 조건은 \"Phase 2 Gate 2 PASS\"다. main 실측(2026-09-19·77ee1992): EOS-22 최종 판정문 docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md의 결론은 FAIL(10조건 충족·무개입 연속 3루프 미충족). 따라서 시작 조건은 현재 미충족이며, 본 변환은 대장 준비 작업으로만 진행한다. Phase 3 실행 여부와 Gate 2 재판정 시점은 Kiki 결정 사항이다.\n\n분류(계획서 300 §14 어휘): SUPPORT — 계획을 대장에 싣는 지원 작업."
+updated: 2026-09-20

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: NOTNOW-08-complex-agent-collaboration
+title: "[Not Now] 복잡한 Agent 협업 — 다중 에이전트 오케스트레이션 아키텍처"
+track: math-completion
+stage: S5
+subject: cross
+layer: backend
+status: todo
+priority: 5
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates:
+  - G-not-now-v1-release-recheck
+acceptance:
+  - "① 게이트 G-not-now-v1-release-recheck가 clear(재개 판정)되기 전에는 착수하지 않는다 — 이 태스크는 자리표시(placeholder)이며 지금 설계하지 않는다.\n② 재개 시 첫 행위는 이 acceptance를 실제 설계로 교체(amend)하는 것이다 — AI 질문 프로토콜 4축(존재 이유·경계·붕괴 지점·분리)과 7계층 귀속을 적고, 구축 플레이북 불변식(노드·관계 폭발 방어·LLM 전체 그래프 금지·Concept Purity)과의 충돌 여부를 먼저 판정한다.\n③ 재개 판정 근거에 v1.0 운영 실측(학생 표본·KPI·비용)을 인용한다 — 실측 없는 재개 금지. 재개하지 않기로 하면 cancel로 종결한다(만료 없는 유예 금지)."
+artifacts: []
+paths: []
+session: null
+notes: "[Not Now List] Phase 3 실행계획(Math EOS 과목 완성 · 2026-10-26~11-22) 범위 규율이 12월 출시 이후로 보낸 12종 중 하나. v1.0 이후, 11월 착수 금지. 집행: 게이트 G-not-now-v1-release-recheck(kiki/decision · 재확인 지점 = v1.0 출시 이후 첫 계획 세션)이 pending인 동안 selector 후보에서 제외된다 — notes 산문은 selector가 읽지 않으므로 게이트로 집행한다. 이 태스크는 자리표시(placeholder)다: 실제 설계는 재개 판정 시점에 한다(Phase 2 계획서 300 §15가 같은 계열을 production code 동결로 지정했고 그 동결은 유지된다). 등재 경위: EOS-128(P3-00a) · 2026-09-20 · 판정 기준 main e91a75d3.\n\n중복 실측(등재 전): 역할 검색 multi.?agent|agent.?orchestr|에이전트 협업 — 코드 0파일 · 대장 0건 · git log --all --grep 0건.\n인접(다른 축 — 겹침 아님): WH-1 튜터링 하네스·WH-S 솔버 하네스(단일 루프 + 도구 호출·l3 라우터 경유). Phase 2 계획서 300 §15 '새로운 Agent architecture' 동결과 같은 계열. 재개 시 LLM 전체 그래프 금지·subgraph depth ≤ 2 불변식 유지."
+updated: 2026-09-20
