@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-122-policy-promotion-judgment
+title: "조율 정책 승격 판정 — 21,019건 경고·0회 승격의 결정 공백 해소 (adhoc_edit block·path_overlap 소음 진단·승격 게이트 자동 등재)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 정탐률 실측 — `backlog.py policy report --days 74`를 확장해 rule별 경고 건수와 **정탐**(경고 후 같은 파일이 두 세션의 PR·커밋에 실제로 동시 등장한 비율)을 낸다. 훅 축(id='-', file 필드)과 태스크 단위 축(add/start 시 other 필드)을 분리 집계한다 — 현재 path_overlap 18,909건 중 17,021건이 태스크 단위 선언 겹침이며 프리픽스 근사가 `docker-compose*.yml ⊇ backlog/incidents.*` 같은 무관 쌍까지 경고한다(2026-09-20 HARN-118 등재 시 실측 39건)."
+  - "② 승격 판정 집행 — `adhoc_edit`(claim 없이 src/·infra/ 편집)은 claim-first 원칙의 집행 지점이므로 정탐률과 무관하게 block 승격(예외 경로 docs/·backlog/). `scope_drift`는 정탐률 ≥50% 또는 예방 사례 ≥1이면 block, 미달이면 기준 재설계를 결정 로그에 남긴다. `path_overlap` 태스크 단위 축은 add/start 시 1회 요약(상위 3건+총수)으로 축약해 소음을 제거한다. 승격 = policy.yaml 1줄 + MEMORY 결정 로그 + policy_promote 이벤트(build_harness.md §3c 절차 그대로)."
+  - "③ 결정 잊지 않기 — `policy report`가 승격 기준(2주 또는 30세션) 충족 상태를 감지하면 브리핑에 \"승격 판정 필요\" 1줄을 내고 사람 게이트 1건을 자동 등재한다(보고서 §6 E9). 변별력: 기준 미달 픽스처 → 게이트 0건, 충족 픽스처 → 1건(중복 등재 없음)."
+artifacts: []
+paths:
+  - backlog/policy.yaml
+  - scripts/harness/backlog.py
+  - scripts/harness/models.py
+  - "tests/harness/test_policy*.py"
+session: null
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §4 M4·§5 P5. policy_warn 21,019건(이벤트의 89.1%)·전건 warn·승격 0회·측정 74일·330세션 — 승격 조건은 10배 이상 충족됐는데 결정 주체가 없었다. claim 없는 40분 구현 폐기(MP-04)는 adhoc_edit이 block이었다면 첫 편집에서 멈췄다."
+updated: 2026-09-20

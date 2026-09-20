@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-120-mutation-runner-shared
+title: "공용 뮤테이션 러너 — 주입 실재·RED·바이트 원복·픽스처 접촉을 자동 단언 (보호 장치 자기위장 177건의 공통 대책)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `scripts/harness/mutate.py <spec.yaml>` — 뮤테이션 명세(대상 파일·앵커 문자열·치환·기대 RED 테스트 선택자) 목록을 받아 건마다 (a) 앵커 정확히 1건 존재 단언 (b) `mutated != original` 단언 (c) 지정 테스트 실행 → RED 확인 (d) 바이트 동일 원복 단언(sha256)을 수행하고 건별 표(주입됨/RED/원복)를 낸다. 하나라도 단언 실패면 exit 1이며 **\"N passed\"를 검출로 오독할 수 없게** 원복 전 실패도 별도 열로 표기한다."
+  - "② 픽스처 접촉 축 — 옵션 `--touch`가 뮤테이션 대상 줄이 RED 테스트 실행 중 실제로 실행됐는지를 coverage(line hit)로 확인해 \"주입은 됐고 가드도 멀쩡한데 픽스처가 그 절을 안 밟은\" 상태를 별도 상태(UNTOUCHED)로 분류한다. UNTOUCHED가 1건이라도 있으면 exit 1."
+  - "③ 이관·자기검증 — 뮤테이션 하네스가 인라인(bash heredoc·임시 스크립트)으로 존재하는 기존 파일 중 상위 10건(`grep -rlE \"뮤테이션|mutation\" tests scripts` 101파일에서 선정 근거 병기)을 spec.yaml로 이관. CI `harness-integrity` 잡에 러너 자기검증 1스텝(러너 자신의 단언 4종을 각각 깨뜨린 픽스처 → RED) 배선을 `tests/infra/test_test_suite_wiring.py`가 동결."
+artifacts: []
+paths:
+  - scripts/harness/mutate.py
+  - "tests/infra/test_mutate_runner*.py"
+  - "tests/**/mutations/*.yaml"
+session: null
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §3 B(177건·26%·최다). 보호 장치 실패 주입 계열 3회차(5개 날짜)·하네스 자신의 셸 이스케이프 결함(09-06)·픽스처 미접촉 2건(MISC-07·23)·전건 RED≠커버리지(HARN-01). 사고마다 하네스를 손으로 다시 짜는 것이 원인."
+updated: 2026-09-20
