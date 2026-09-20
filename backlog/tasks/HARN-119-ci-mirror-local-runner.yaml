@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-119-ci-mirror-local-runner
+title: "CI 미러 — ci.yml 잡·스텝을 로컬에서 그대로 실행·skipped 계수, drive·done 배선 (검사 판정 무효화 계열 4회차 종결)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-109-ci-job-coverage-enumerator
+requires_gates: []
+acceptance:
+  - "① `scripts/harness/ci_mirror.py --job <name>...`이 `.github/workflows/ci.yml`의 지정 잡 스텝(name·run·working-directory·env)을 순서대로 로컬 실행하고 스텝별 exit code와 **뒤따라 skipped된 스텝 수**를 표로 낸다. 잡 열거 0건·스텝 파싱 0건은 exit 1(HARN-109 계약 계승 — HARN-109가 먼저 착지하면 그 열거기를 호출한다). 결과는 `run_id·기준 커밋 해시·잡별 exit` JSON으로 남긴다(측정 도구 실패 경로 설계: 스텝마다 즉시 flush·타임아웃)."
+  - "② 배선 2곳 — `.claude/commands/drive.md` 4단계 검증 문구를 \"pytest·ruff green\"에서 미러 호출(backend + 변경이 닿는 잡)로 교체하고, `backlog.py done`이 최근 미러 결과 JSON(같은 커밋 해시)이 없으면 경고를 낸다(1단계 warn·측정 후 block 승격은 HARN-122 절차). 정본화≠집행 분리: 문서 문구 교체가 ①이고 done 프리플라이트 호출이 ②다."
+  - "③ 변별력 — 뮤테이션 3종: (a) 스텝 하나를 실패하도록 주입 → 그 스텝 exit≠0과 뒤 스텝 skipped 수가 정확히 계상되는지 (b) 잡 이름 오타 → exit 1 (c) run 블록에 `| tail`·`-q`가 섞인 스텝은 그대로 실행하되 판정은 exit code로만 하는지(출력 억제 축 재현). 주입 실재(`mutated != original`)·원복 바이트 동일 단언 포함."
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+  - "tests/infra/test_ci_mirror*.py"
+  - ".claude/commands/drive.md"
+session: null
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §3 A·§4 M3. 검사 판정 무효화 계열 4회차(08-09→09-10→09-17→09-19 PR #1216)이며 CI backend 잡 26스텝 vs drive.md \"pytest·ruff\" 2종의 표면 불일치가 구조 원인. 규칙 1건+확장 5축이 산문이라 못 막았다 — 도구 부재 축."
+updated: 2026-09-20
