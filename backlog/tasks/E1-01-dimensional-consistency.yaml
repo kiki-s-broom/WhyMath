@@ -10,7 +10,8 @@ priority: 1
 eos_priority: P3
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-not-now-v1-release-recheck
 acceptance:
   - "{consistent/inconsistent/undecidable/parse_error} 4상태 계약 + 테스트"
 artifacts: []
@@ -18,5 +19,5 @@ paths:
   - "src/backend/**"
   - "tests/backend/**"
 session: null
-notes: "subject_expansion_readiness.md §8 보류 대장 항목\n\n[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "subject_expansion_readiness.md §8 보류 대장 항목\n\n[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-20] [Not Now List · Phase 3 실행계획 범위 규율] 다과목 Adapter는 12월 출시 이후로 보낸 항목이다 — v1.0 이후, 11월 착수 금지. 이 축의 대장 소유자는 subject-expansion 트랙(E1~E6·15건·전건 eos_priority P3)이며 트랙 entry_gate G-s5-subject-expansion(kiki/decision)이 이미 하드락이다. 그래서 신규 등재 대신 트랙 첫 태스크인 이 항목에 Not Now 재확인 게이트 G-not-now-v1-release-recheck를 대표로 부착해 두 게이트가 모두 열려야 착수되게 한다(중복 등재 금지·EOS-128 P3-00a 2026-09-20 · 판정 기준 main e91a75d3)."
+updated: 2026-09-20
