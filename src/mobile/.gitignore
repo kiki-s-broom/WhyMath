@@ -26,3 +26,4 @@ build/
 
 # macOS·잡동사니
 .DS_Store
+coverage/

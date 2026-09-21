@@ -438,7 +438,23 @@ void main() {
     );
     expect(find.textContaining('돌아보기 차례'), findsNothing);
     // 완료는 종단 상태 — 턴을 만드는 입력이 잠긴다(끝난 세션에 턴을 더 붙이지 않는다).
-    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    //
+    // 전건 검사인 이유(S3-24 회수·S3-38): 이 픽스처는 choices가 없어 주관식으로 판정되므로
+    // 코치 화면이 '풀이 단계' 모드로 시작한다(S3-38·원 S3-20) — 화면의 입력 표면이 대화
+    // 필드 하나가 아니라 단계 편집기 필드까지 복수다. 단수 단언(`tester.widget<TextField>`)은
+    // 그 상황에서 "Too many elements"로 깨지는데, 그것은 잠금이 풀렸다는 뜻이 아니라 단언이
+    // 화면 구조를 과소 가정했다는 뜻이다. 그래서 단언을 약화하지 않고 *강화*한다 —
+    // "유일한 입력이 잠겼다"가 아니라 "턴을 만드는 입력이 하나도 빠짐없이 잠겼다".
+    // enabled == false로 비교하는 이유: TextField.enabled는 bool?이고 null은 *활성*이므로
+    // truthiness로 접으면 미판정을 잠금으로 오독한다(모른다 ≠ 아니다).
+    final Iterable<TextField> turnInputs =
+        tester.widgetList<TextField>(find.byType(TextField));
+    expect(turnInputs, isNotEmpty, reason: '입력 표면이 0개면 검사가 공허하게 통과한다');
+    expect(
+      turnInputs.every((TextField f) => f.enabled == false),
+      isTrue,
+      reason: '완료 후에도 활성인 입력이 하나라도 있으면 끝난 세션에 턴이 더 붙는다',
+    );
 
     // ── 12) (라) 후속 추천이 갱신을 반영한다 — *결과가 실제로 달라진다* ────────
     await tester.runAsync(() async {
@@ -466,6 +482,16 @@ void main() {
     container.read(activeProblemProvider.notifier).state = diag2.problem;
     await tester.pumpAndSettle();
     expect(find.text('다음 문항으로'), findsNothing);
-    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
+    // 잠금 해제도 같은 이유로 전건 검사다(위 11) 주석 참조) — 주관식이라 풀이단계 모드로
+    // 시작해 입력 표면이 복수다. `enabled != false`로 보는 이유: TextField.enabled의 null은
+    // *활성*이므로 `== true`만 인정하면 기본값 활성 필드를 잠김으로 오판한다.
+    final Iterable<TextField> reopenedInputs =
+        tester.widgetList<TextField>(find.byType(TextField));
+    expect(reopenedInputs, isNotEmpty, reason: '입력 표면이 0개면 검사가 공허하게 통과한다');
+    expect(
+      reopenedInputs.every((TextField f) => f.enabled != false),
+      isTrue,
+      reason: '새 문항에서 입력이 하나라도 잠겨 있으면 다음 바퀴가 시작되지 않는다',
+    );
   });
 }

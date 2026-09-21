@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-08-mp02-runbook-encoding-fix
+title: "MP-02 실행 런북 인코딩 정정 — PowerShell JSON 파싱 제거 + stdout UTF-8 보험 (라이브 회차 실측 2건)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①읽기 인코딩 정정 — MP-02 실행 런북 §5가 `Get-Content`(PowerShell 5.1 기본 = 로케일 cp949)로 UTF-8 JSONL을 읽어 `ConvertFrom-Json`이 실패했다. 2026-09-21 Kiki 실행 실측: 한글이 전부 깨진 채 `잘못된 개체가 전달되었습니다` · run_id 추출 실패 · 리콜 리허설 공전(세션이 Python 경유 블록을 새로 드려 복구). **파일은 온전했다** — 같은 파일을 Python이 encoding=utf-8로 읽자 정상(`HANGUL_OK True`·`CODE_OK True` 실측). 처분: 런북 코드 블록에서 PowerShell JSON 파싱을 전량 제거하고 Python 경유로 바꾼다. `-Encoding UTF8` 추가가 아니라 제거인 이유는 같은 함정이 블록마다 재발하기 때문이다.\n②출력 인코딩 보험 — 런북 실행 블록이 PYTHONIOENCODING=utf-8을 설정한다. 같은 회차 실측 근거: problem_corpus_accumulate가 최종 리포트를 stdout에 json.dump하다 UnicodeEncodeError(cp949·U+2014)로 죽어 **mp02_report.json이 중간에 잘렸고**, 그 결과 ACCUMULATE_EXIT=1이 *카나리 차단*인지 *크래시*인지 구분 불가가 됐다. 이것은 보험이지 해결이 아니다 — 코드 축은 OPS-53(진입점 stdout 재구성)이 소유하며 **OPS-53 착지 시 이 항을 재판정해 불요면 제거한다**(만료 없는 유예 금지).\n③집행 지점(정본화와 별항) — 정정이 실제로 변별력을 내는지 확인한 것까지가 완료다. 런북 코드 블록에 ConvertFrom-Json이 0건이고 PYTHONIOENCODING 설정이 1건 이상임을 기계가 판정하며, 각각을 되돌리는 뮤테이션에서 RED가 나야 한다. 정상 입력에서 초록인 것은 보호의 증거가 아니다.\n④회차 기록 — 2026-09-21 첫 실 LLM 회차 결과를 MEMORY 결정 로그에 남긴다: run_id c0854e382b50415eb11829d991c93820 · attempted 30 · accepted 8 · canary_rate 0.8(8/10 · 중복 20건은 중립이라 분모 제외) · Wilson 하한 0.5408 < 임계 0.90 → canary_blocked=true·본배치 미시작 · model qwen2.5:7b · prompt_version l3.equivalent@sha256:c68238462189 · 리콜 scanned 30/matched 30 exit 0. 9월 10일 회차(accepted 0/20) 대비 유일한 변수는 MP-06이 넣은 conditions/answer_map 경고다. 새 병목은 중복 20/30 전건 structural_signature/round(회차 내 레퍼토리 포화).\n⑤범위 밖(명시) — 카나리 검수 런북은 **MP-07**(다른 세션·PR #1250·docs/reviews/mp02_canary_review_runbook.md)이 소유하므로 이 태스크가 만들지 않는다. MP-02 본체의 status도 건드리지 않는다(다른 세션 claim). OPS-53의 코드 축 수정도 하지 않고 라이브 실측만 그 태스크에 붙인다."
+artifacts:
+  - "PR #1257 (커밋 ab97d9e2 · 브랜치 claude/optimistic-johnson-58q3nw). 2026-09-21 라이브 회차 실측 결함 2건 상환 — ①런북 §5의 PowerShell JSON 파싱(Get-Content+ConvertFrom-Json) 전량 제거→Python 경유 ②§1에 PYTHONIOENCODING=utf-8 + IO_ENCODING 자가검증 추가. 집행 지점(③): tests/infra 가드 2종이 ConvertFrom-Json 0건·PYTHONIOENCODING 실재+자가검증 실재를 판정하며 뮤테이션 3종 전건 RED(사고 형태 복원·설정 제거·자가검증만 제거한 위장), 주입 실재·바이트 동일 원복 단언 포함. ④회차 기록 MEMORY 결정 로그 착지(+19/-0 · run_id c0854e382b50415eb11829d991c93820 · accepted 8/30 · Wilson 하한 0.5408 < 0.90 · 중복 20/30 전건 structural_signature/round). ⑤범위 밖 준수 — 검수 런북은 MP-07(PR #1250) 소유라 미작성, MP-02 status 미변경, OPS-53은 라이브 4회차 실측만 acceptance 부착(식별자 12/12 보존 대조). CI infra-contracts 잡 스텝 전건 재현 exit 0(ruff/black/check_runbook_blocks/mastery_write_path_scan/pytest tests/infra 1590 passed 1 skipped) + validate/audit-deps exit 0. 판정 기준 main 1f140c75."
+paths:
+  - docs/reviews/mp02_first_llm_authoring_run_runbook.md
+  - tests/infra/test_mp02_runbook_sidecar_paths.py
+session: null
+notes: ""
+updated: 2026-09-21

@@ -78,6 +78,8 @@ __all__ = [
     "CrossVerificationResult",
     "CrossVerifier",
     "IndependenceError",
+    "MISSING_CONDITION_PERSPECTIVES",
+    "MULTIPLE_VALID_ANSWERS_PERSPECTIVES",
     "PROBABILITY_PERSPECTIVES",
     "STATISTICAL_PERSPECTIVES",
     "Perspective",
@@ -247,6 +249,35 @@ def _judge_labelled(
     return judge
 
 
+def _judge_defect_class(
+    principle: str, *, expected_defect_class: str
+) -> Callable[[ResidueSubject, Mapping[str, object]], PerspectiveVerdict]:
+    """결함류 전용 관점(v4)의 판정기 — 응답이 결함류를 비워 두면 기대 결함류로 메운다.
+
+    일반 관점(②③)은 "무엇이 결함인지"를 LLM이 자유롭게 분류하지만, v4 관점은 *애초에 한
+    결함류만 겨냥해 구성된* 관점이다. 그래서 응답이 `defect_class`를 비워 보내도 집계
+    라벨이 `unspecified`로 흐려질 이유가 없다 — 구성이 이미 결함류를 고정했다.
+
+    응답이 자기 결함류를 적어 보냈으면 **덮어쓰지 않는다**. LLM이 더 좁은 하위 분류를
+    지목한 것이므로 그 정보를 지우면 오히려 손실이다.
+
+    주의: `_judge_labelled`은 결함류 미기재를 `"unspecified"` 센티넬로 *정규화한 뒤* 넘기므로,
+    "비어 있음" 판정은 정규화된 결과가 아니라 **원본 응답(`data`)**을 다시 본다. 정규화 결과만
+    보면 이 분기는 영원히 닫혀 있는 죽은 코드가 된다(CLAUDE.md "작동 신호 없는 알고리즘 부착 금지").
+    """
+    base = _judge_labelled(principle)
+
+    def judge(subject: ResidueSubject, data: Mapping[str, object]) -> PerspectiveVerdict:
+        verdict = base(subject, data)
+        if verdict.verdict != "defect":
+            return verdict
+        if str(data.get("defect_class", "")).strip():
+            return verdict  # 응답이 스스로 분류했다 — 그대로 둔다(하위 분류 허용).
+        return PerspectiveVerdict(principle, "defect", expected_defect_class, verdict.reason)
+
+    return judge
+
+
 PROBABILITY_PERSPECTIVES: tuple[Perspective, ...] = (
     Perspective(
         principle="independent_reconstruction",
@@ -399,6 +430,182 @@ STATISTICAL_PERSPECTIVES: tuple[Perspective, ...] = (
     ),
 )
 """통계 자료형 K=3 관점 — 원리·프롬프트·가시 필드가 모두 다르다."""
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# v4 — 결함류별 적대적 검증 관점 (missing_condition / multiple_valid_answers)
+# ──────────────────────────────────────────────────────────────────────────
+# ①~⑥이 "어떤 결함이든 있으면 찾아라"라면, v4는 D7 잔여 축 검출에서 병목이 된 **두 결함류를
+# 겨냥한 전용 K=3 묶음**이다. 위 관점들과 별개로 쓰이며(`Verifier`가 도메인별로 고른다), 함께
+# 돌릴 수도 있다.
+#
+# 설계 요지 — **solver가 아니라 adversarial verifier다.** 모든 v4 프롬프트는 문제를 *푸는*
+# 것이 목표가 아니라 "문제 서술의 빈틈·대안 해석을 **증명하는** 것"이 목표다. 정답을 맞히는
+# 능력이 아니라 *반례를 구성하는* 능력을 요구하므로, 모델이 문제를 잘 풀지 못해도 결함 지목은
+# 성립한다(6축 ②적대성). 판정 라벨은 LLM이 내지만 그 라벨은 권위가 아니라 **게이트의 감사
+# 라벨 입력**이다(모듈 docstring 참조).
+#
+# ⚠️ 알려진 간극(회수 시점 기록 · 이식 중 발견) — **선언된 가시 필드 ⊋ 실제 렌더 필드**.
+# `_assert_independent`는 K개 관점의 `visible_fields` *집합이 서로 다를 것*을 요구하는데,
+# v4의 A2·A3·D3은 사용자 템플릿이 발문(+정답)만 싣는데도 `answer`/`answer_explanation`을
+# 함께 선언해 그 검사를 통과한다. 즉 이 세 관점에서 "보는 정보가 다르다" 축은 *명목*이고,
+# 실제로 다른 것은 원리와 시스템 프롬프트 두 축이다(그 둘은 실질적으로 다르다 — 체크리스트
+# / 재구성 역추론 / 학생 대안 읽기). 정본 프롬프트를 고치지 않는 범위에서는 해소할 수 없어
+# (정직하게 좁히면 세 집합이 모두 `{question_text}`로 같아져 구성이 거부된다) 브랜치 원안을
+# 그대로 이식하되 여기에 명시한다 — 침묵으로 넘기면 "독립 3축 충족"이라는 거짓 주장이 된다.
+# 해소 방향: 정본 사용자 템플릿에 해당 필드를 실제로 싣거나(그러면 선언이 참이 된다),
+# 가시 필드 축 대신 *질의 대상*으로 독립성을 재정의한다. 후속 태스크 대상.
+#
+# 결함류 A: 필요조건 결측 — 유일한 해를 위해 필요한 조건이 발문에 명시돼 있는가.
+_SYSTEM_MISSING_CONDITION_CHECKLIST = prompt_text(
+    "l3.cross_verify.missing_condition_checklist_system"
+)
+_SYSTEM_MISSING_CONDITION_MODEL_GROUNDING = prompt_text(
+    "l3.cross_verify.missing_condition_model_grounding_system"
+)
+_SYSTEM_MISSING_CONDITION_STUDENT_READING = prompt_text(
+    "l3.cross_verify.missing_condition_student_reading_system"
+)
+
+
+def _render_missing_condition_checklist(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문뿐 — 필요조건 목록을 발문만 보고 세운다(정답 앵커링 차단)."""
+    return fill(
+        prompt_text("l3.cross_verify.missing_condition_checklist_user"),
+        QUESTION_TEXT=subject.question_text,
+    )
+
+
+def _render_missing_condition_model_grounding(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 기계 모델 서술. 기계 모델이 *전제하는* 조건 중 발문이 말하지
+    않는 것을 역으로 캐게 한다 — 1차 강등전이 전건 놓친(0/3) 축을 직접 조준한다.
+
+    정답을 보여주지 않는 것이 핵심이다. 정답을 보면 모델이 그 값을 정당화하는 방향으로
+    사후 합리화하므로(앵커링), 조건 결측 탐지에는 정답이 독이다.
+    """
+    return fill(
+        prompt_text("l3.cross_verify.missing_condition_model_grounding_user"),
+        QUESTION_TEXT=subject.question_text,
+        MACHINE_MODEL_KO=subject.machine_model_ko,
+    )
+
+
+def _render_missing_condition_student_reading(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 해설. 해설이 *의도한* 읽기와 학생이 할 법한 *다른 읽기*를
+    대조시킨다 — 정답 수치는 주지 않으므로 값 앵커링은 없다."""
+    return fill(
+        prompt_text("l3.cross_verify.missing_condition_student_reading_user"),
+        QUESTION_TEXT=subject.question_text,
+        ANSWER_EXPLANATION=subject.answer_explanation,
+    )
+
+
+MISSING_CONDITION_PERSPECTIVES: tuple[Perspective, ...] = (
+    Perspective(
+        principle="missing_condition_checklist",
+        system_prompt=_SYSTEM_MISSING_CONDITION_CHECKLIST,
+        visible_fields=frozenset({"question_text"}),
+        render=_render_missing_condition_checklist,
+        judge=_judge_defect_class(
+            "missing_condition_checklist", expected_defect_class="missing_condition"
+        ),
+    ),
+    Perspective(
+        principle="missing_condition_model_grounding",
+        system_prompt=_SYSTEM_MISSING_CONDITION_MODEL_GROUNDING,
+        visible_fields=frozenset({"question_text", "machine_model_ko"}),
+        render=_render_missing_condition_model_grounding,
+        judge=_judge_defect_class(
+            "missing_condition_model_grounding", expected_defect_class="missing_condition"
+        ),
+    ),
+    Perspective(
+        principle="missing_condition_student_reading",
+        system_prompt=_SYSTEM_MISSING_CONDITION_STUDENT_READING,
+        visible_fields=frozenset({"question_text", "answer_explanation"}),
+        render=_render_missing_condition_student_reading,
+        judge=_judge_defect_class(
+            "missing_condition_student_reading", expected_defect_class="missing_condition"
+        ),
+    ),
+)
+"""결함류 A(필요조건 결측) 전용 K=3 관점 — 체크리스트 / 재구성 역추론 / 학생 대안 읽기."""
+
+
+# 결함류 D: 복수 정답 — 제시된 정답 외의 합리적 해석에서 다른 답이 나오는가.
+_SYSTEM_MULTIPLE_ANSWERS_COUNTEREXAMPLE = prompt_text(
+    "l3.cross_verify.multiple_valid_answers_counterexample_system"
+)
+_SYSTEM_MULTIPLE_ANSWERS_ALTERNATIVE_MODEL = prompt_text(
+    "l3.cross_verify.multiple_valid_answers_alternative_model_system"
+)
+_SYSTEM_MULTIPLE_ANSWERS_BOUNDARY = prompt_text(
+    "l3.cross_verify.multiple_valid_answers_boundary_system"
+)
+
+
+def _render_multiple_answers_counterexample(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 정답 — 조건 하나를 달리 읽어 *다른 답을 실제로 계산*하게 한다."""
+    return fill(
+        prompt_text("l3.cross_verify.multiple_valid_answers_counterexample_user"),
+        QUESTION_TEXT=subject.question_text,
+        ANSWER=subject.answer,
+    )
+
+
+def _render_multiple_answers_alternative_model(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 해설 — 해설이 쓴 모델 외의 대안 확률 모델을 찾는다(정답 은닉)."""
+    return fill(
+        prompt_text("l3.cross_verify.multiple_valid_answers_alternative_model_user"),
+        QUESTION_TEXT=subject.question_text,
+        ANSWER_EXPLANATION=subject.answer_explanation,
+    )
+
+
+def _render_multiple_answers_boundary(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 정답 + 해설. 결정적 문구를 빼거나 뒤집어 경계를 흔들고, 그
+    변경이 해설이 전제한 해석을 실제로 깨뜨리는지까지 대조시킨다."""
+    return fill(
+        prompt_text("l3.cross_verify.multiple_valid_answers_boundary_user"),
+        QUESTION_TEXT=subject.question_text,
+        ANSWER=subject.answer,
+        ANSWER_EXPLANATION=subject.answer_explanation,
+    )
+
+
+MULTIPLE_VALID_ANSWERS_PERSPECTIVES: tuple[Perspective, ...] = (
+    Perspective(
+        principle="multiple_valid_answers_counterexample",
+        system_prompt=_SYSTEM_MULTIPLE_ANSWERS_COUNTEREXAMPLE,
+        visible_fields=frozenset({"question_text", "answer"}),
+        render=_render_multiple_answers_counterexample,
+        judge=_judge_defect_class(
+            "multiple_valid_answers_counterexample",
+            expected_defect_class="multiple_valid_answers",
+        ),
+    ),
+    Perspective(
+        principle="multiple_valid_answers_alternative_model",
+        system_prompt=_SYSTEM_MULTIPLE_ANSWERS_ALTERNATIVE_MODEL,
+        visible_fields=frozenset({"question_text", "answer_explanation"}),
+        render=_render_multiple_answers_alternative_model,
+        judge=_judge_defect_class(
+            "multiple_valid_answers_alternative_model",
+            expected_defect_class="multiple_valid_answers",
+        ),
+    ),
+    Perspective(
+        principle="multiple_valid_answers_boundary",
+        system_prompt=_SYSTEM_MULTIPLE_ANSWERS_BOUNDARY,
+        visible_fields=frozenset({"question_text", "answer", "answer_explanation"}),
+        render=_render_multiple_answers_boundary,
+        judge=_judge_defect_class(
+            "multiple_valid_answers_boundary",
+            expected_defect_class="multiple_valid_answers",
+        ),
+    ),
+)
+"""결함류 D(복수 정답) 전용 K=3 관점 — 반례 생성 / 대안 모델 탐색 / 경계조건 테스트."""
 
 
 @dataclass(frozen=True, slots=True)

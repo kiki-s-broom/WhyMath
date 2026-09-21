@@ -4,7 +4,7 @@
   "note": "L5 표기 정규화 계층(math_notation.dart canonical 파이프라인)이 *실제 지원하는* 표기 집합의 열거 가능한 정본(단일 진실 원천). 스코프는 현 파이프라인 실측 지원분만 — S3-23 정규화 매크로·유니코드 글리프 클래스·구조 표기·contract canonical 연산(과잉 열거 금지·notation_semantics_layer.md §5 노드 폭발 방어). canonical 표현 = LaTeX 문자열. cases[].input을 Dart toRenderLatex에 통과시키면 cases[].canonical이 나와야 하며, 그 정합은 src/mobile/test/notation_canonical_test.dart가 동결한다. 이 계층은 표기 정규화·렌더만 담당한다 — 수학 의미·동치 판정은 백엔드 L3(SymPy) 단일 권위(표현≠의미).",
   "consumers": [
     "NS-03 표기 커버리지 게이트 (backend CI — 교과서 표기 ⊆ 지원 표기 측정) [provenance: proven]",
-    "src/mobile/test/notation_canonical_test.dart (Dart 파이프라인과의 정합 동결) [provenance: unproven — 파일 부재·NS-02 포기, provenance.claims 참조]"
+    "src/mobile/test/notation_canonical_test.dart (Dart 파이프라인과의 정합 동결) [provenance: proven — NS-02 착지(S3-24 버킷B 회수), provenance.claims 참조]"
   ],
   "provenance": {
     "_note": "MATH-02 ② — 이 정본이 근거로 지목하는 산출물의 실재를 기계 판독 데이터로 보유한다. 이전에는 note·consumers의 산문이 Dart 파이프라인을 지목했는데, 산문은 어떤 검사도 읽지 않아 NS-02가 미병합 브랜치에 고립된 뒤에도 게이트가 계속 green이었다. status='unproven' 항목은 삭제하지 않고 격리한다 — 지우면 공백이 사라져 보인다. 실재 검증은 tests/backend/l3/test_notation_evidence_integrity.py가 동결한다(status는 파일 실재와 일치해야 하며, 둘 중 하나만 고치면 red).",
@@ -14,10 +14,10 @@
       "measured_at": "2026-08-11"
     },
     "claims": [
-      {"claim": "cases[].input을 Dart toRenderLatex에 통과시키면 cases[].canonical이 나온다는 정합 동결", "evidence_path": "src/mobile/test/notation_canonical_test.dart", "status": "unproven"},
-      {"claim": "L5 표기 정규화 계층(canonical 파이프라인) 구현체 — 이 정본이 열거하는 지원 표기의 실제 소비자", "evidence_path": "src/mobile/lib/features/chat/domain/math_notation.dart", "status": "unproven"},
-      {"claim": "KaTeX 렌더 실증(_expectRenders 위젯 조판) — KATEX_PROVEN_MACROS 21건의 출처", "evidence_path": "src/mobile/test/math_notation_audit_test.dart", "status": "unproven"},
-      {"claim": "KaTeX 렌더 실증(prime·lbrack·rbrack 조판) — KATEX_PROVEN_MACROS 3건의 출처", "evidence_path": "src/mobile/test/math_text_test.dart", "status": "unproven"},
+      {"claim": "cases[].input을 Dart toRenderLatex에 통과시키면 cases[].canonical이 나온다는 정합 동결", "evidence_path": "src/mobile/test/notation_canonical_test.dart", "status": "proven"},
+      {"claim": "L5 표기 정규화 계층(canonical 파이프라인) 구현체 — 이 정본이 열거하는 지원 표기의 실제 소비자", "evidence_path": "src/mobile/lib/shared/math/math_notation.dart", "status": "proven"},
+      {"claim": "KaTeX 렌더 실증(_expectRenders 위젯 조판) — KATEX_PROVEN_MACROS 21건의 출처", "evidence_path": "src/mobile/test/math_notation_audit_test.dart", "status": "proven"},
+      {"claim": "KaTeX 렌더 실증(prime·lbrack·rbrack 조판) — KATEX_PROVEN_MACROS 3건의 출처", "evidence_path": "src/mobile/test/math_text_test.dart", "status": "proven"},
       {"claim": "표기 의미 계층 설계 정본 — 이 manifest의 스코프 근거(노드 폭발 방어 §5)", "evidence_path": "docs/architecture/notation_semantics_layer.md", "status": "unproven"},
       {"claim": "NS-03 표기 커버리지 게이트 — 이 정본의 실제 소비자(backend CI에서 매 PR 실행)", "evidence_path": "src/backend/whymath_backend/l3/notation_coverage.py", "status": "proven"}
     ]

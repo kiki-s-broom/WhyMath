@@ -44,6 +44,7 @@ from __future__ import annotations
 import logging
 import math
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal, TypeVar
@@ -197,6 +198,7 @@ from whymath_backend.l4.calibration_coaching import recommend_calibration_coachi
 from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
+from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
@@ -730,41 +732,108 @@ async def _scan_attempt_misconceptions(
     problem_id: uuid.UUID,
     correct: bool,
     answer: str | None,
+    selected_choice_index: int | None,
 ) -> _AttemptMisconceptionScan:
     """채점 1건에서 오개념 후보를 훑는다 — 재료가 없으면 훑지 않았다고 말한다.
 
-    훑지 않는 조건 4종(전부 `NOT_RUN`): 킬 스위치 OFF · 정답 시도 · 답안 미제출 · 문항 지문
-    부재. 이 넷을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면 하류가 *미측정*을 *측정된
-    0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
+    **독립된 두 채널**을 훑고 결과를 합친다. 둘은 재료도 실패 모드도 다르므로 서로의 실행
+    조건이 되지 않는다 — 한쪽이 못 돌아도 다른 쪽은 돈다:
 
-    정답 시도를 제외하는 것은 성능이 아니라 정직 때문이다 — 오개념은 *틀린 방식*의 이름이라
-    정답에 붙일 대상이 아니고, 붙지 않은 것과 보지 않은 것은 다른 사실이다.
+      ① **텍스트 채널**(EOS-104): 과목 어댑터가 문항 지문 + 제출 답안(자유 텍스트)을 이어
+         오류 서명을 읽는다. 지문이나 답안이 없으면 이 채널은 돌지 않는다.
+      ② **선지 채널**(ASM-06): 학생이 고른 보기 인덱스를 그 문항의 `distractor_map`에
+         대조해 역추적한다(`l4.misconception.distractor_link`). 답안 텍스트도 지문도 필요
+         없다 — 인덱스와 매핑만 있으면 된다. 그래서 "보기만 탭하고 아무것도 쓰지 않은"
+         제출에서 **유일하게** 도는 채널이다(종전엔 그런 제출이 통째로 not_run이었다).
+
+    훑지 않는 조건(두 채널 *모두* 미실행일 때만 `NOT_RUN`): 킬 스위치 OFF · 정답 시도 ·
+    (텍스트 채널) 답안 미제출·문항 지문 부재 · (선지 채널) 인덱스 미보고·매핑 부재. 이들을
+    빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면 하류가 *미측정*을 *측정된 0*으로 읽기
+    때문이다(`MisconceptionScan` 3상태의 존재 이유).
+
+    정답 시도를 **두 채널 모두에서** 제외하는 것은 성능이 아니라 정직 때문이다 — 오개념은
+    *틀린 방식*의 이름이라 정답에 붙일 대상이 아니고, 붙지 않은 것과 보지 않은 것은 다른
+    사실이다. 선지 채널도 같은 규칙을 따른다: 정답 회차에 이 함수가 `NOT_RUN`을 벗어나면
+    호출자가 `apply_candidates`를 부르게 되어 **정답이 기존 가설을 감쇠시키는** 동작이
+    새로 생긴다 — 그 비대칭은 별건(EOS-123)의 소관이라 여기서 바꾸지 않는다.
     """
     if not get_settings().l4_attempt_misconception_scan_enabled:
         return _NOT_SCANNED
-    if correct or answer is None:
+    if correct:
         return _NOT_SCANNED
-    question_text = await session.scalar(
-        select(Problem.question_text).where(Problem.problem_id == problem_id)
-    )
-    if not question_text:
-        return _NOT_SCANNED
-    # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를 이름으로
-    # 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
-    try:
-        result = detector.scan_attempt_answer(question_text=question_text, student_answer=answer)
-    except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
-        # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로 여기서 터지면
-        # 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측 실패가 채점 실패를 만드는 셈.
-        # 그래서 삼키되, **예외 타입명을 반드시 남긴다**(CLAUDE.md 침묵 실패 금지 — 무타입 경고가
-        # langfuse v2 쓰기 8일 무증상 전멸의 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
-        _logger.warning(
-            "오개념 훑기 실패 — 채점은 계속한다(scan=not_run). exc_type=%s problem_id=%s",
-            type(exc).__name__,
-            problem_id,
+
+    # ── 채널 ②(선지) — 텍스트보다 먼저. DB 1회(distractor_map 단일 컬럼)이고, 인덱스를
+    # 보고하지 않았으면 그 조회조차 하지 않는다(reactive retrieval — 카탈로그·다른 오개념을
+    # 미리 싣지 않는다·CLAUDE.md 협상 불가).
+    choice_candidates: tuple[MisconceptionCandidate, ...] = ()
+    choice_ran = False
+    if selected_choice_index is not None and get_settings().l4_distractor_link_enabled:
+        distractor_map = await session.scalar(
+            select(Problem.distractor_map).where(Problem.problem_id == problem_id)
         )
+        # 매핑이 아예 없는 문항이면 이 채널은 *돌 재료가 없다* — 돌았는데 0건인 것과 구분해
+        # ran으로 세지 않는다(작동한 비율을 부풀리지 않는다).
+        if distractor_map:
+            choice_ran = True
+            choice_candidates = distractor_link_candidates(distractor_map, selected_choice_index)
+
+    # ── 채널 ①(텍스트) — 기존 EOS-104 경로. 조건·폴백·로그 전부 불변.
+    text_candidates: tuple[MisconceptionCandidate, ...] = ()
+    text_scan = MisconceptionScan.NOT_RUN
+    if answer is not None:
+        question_text = await session.scalar(
+            select(Problem.question_text).where(Problem.problem_id == problem_id)
+        )
+        if question_text:
+            # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를
+            # 이름으로 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
+            try:
+                result = detector.scan_attempt_answer(
+                    question_text=question_text, student_answer=answer
+                )
+            except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
+                # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로
+                # 여기서 터지면 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측
+                # 실패가 채점 실패를 만드는 셈. 그래서 삼키되, **예외 타입명을 반드시 남긴다**
+                # (CLAUDE.md 침묵 실패 금지 — 무타입 경고가 langfuse v2 쓰기 8일 무증상 전멸의
+                # 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
+                _logger.warning(
+                    "오개념 훑기 실패 — 채점은 계속한다(텍스트 채널 not_run). "
+                    "exc_type=%s problem_id=%s",
+                    type(exc).__name__,
+                    problem_id,
+                )
+            else:
+                text_scan = result.scan
+                text_candidates = tuple(result.candidates)
+
+    # ── 합류. 같은 오개념을 두 채널이 함께 지목하면 *더 높은 신뢰도 하나*만 남긴다 — 같은
+    # 사실의 사본 둘이 가설 저장소에서 서로를 덮어쓰는 순서 의존을 만들지 않기 위해서다.
+    merged = _merge_misconception_candidates(choice_candidates, text_candidates)
+    text_ran = text_scan is not MisconceptionScan.NOT_RUN
+    if not choice_ran and not text_ran:
         return _NOT_SCANNED
-    return _AttemptMisconceptionScan(scan=result.scan, candidates=tuple(result.candidates))
+    scan = MisconceptionScan.RAN_WITH_CANDIDATES if merged else MisconceptionScan.RAN_NO_CANDIDATE
+    return _AttemptMisconceptionScan(scan=scan, candidates=merged)
+
+
+def _merge_misconception_candidates(
+    *channels: Sequence[MisconceptionCandidate],
+) -> tuple[MisconceptionCandidate, ...]:
+    """여러 채널의 오개념 후보를 id 기준으로 합친다 — 중복은 신뢰도 높은 쪽만, 순서는 결정론.
+
+    앞 채널의 등장 순서를 보존하고(첫 등장 위치 고정), 같은 id가 뒤에서 더 높은 신뢰도로
+    다시 나오면 *그 자리에서* 값만 교체한다. 정렬을 새로 하지 않는 이유는 각 채널이 이미
+    자기 기준으로 정렬돼 왔고, 여기서 재정렬하면 채널 간 신뢰도 척도가 서로 다른데도 한 줄로
+    비교하는 셈이 되기 때문이다(`semantic_similarity`와 `confidence`를 섞지 않는 것과 동형).
+    """
+    merged: dict[str, MisconceptionCandidate] = {}
+    for channel in channels:
+        for candidate in channel:
+            existing = merged.get(candidate.misconception_id)
+            if existing is None or candidate.confidence > existing.confidence:
+                merged[candidate.misconception_id] = candidate
+    return tuple(merged.values())
 
 
 class AttemptSubmitRequest(BaseModel):
@@ -786,6 +855,21 @@ class AttemptSubmitRequest(BaseModel):
     problem_id: uuid.UUID = Field(description="채점 대상 문제 FK.")
     is_correct: bool = Field(description="정답 여부(v1 클라이언트 보고).")
     student_answer: str | None = Field(default=None, description="학생 제출 답안(선택).")
+    # ASM-06: "몇 번 보기를 골랐는가" — `student_answer`(자유텍스트)엔 이 개념이 없다. 선택
+    # 인덱스는 **클라이언트만 아는 사실**이라 이 슬롯이 없으면 서버는 영원히 알 수 없고,
+    # `model_config`가 `extra="forbid"`라 슬롯 없이는 클라가 임의 필드로 실어 보낼 수도 없다
+    # (그 두 사실이 오답 선지 오개념 신호를 원천적으로 사장시켜 온 원인이다 — ASM-09 실측).
+    selected_choice_index: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "학생이 실제로 고른 객관식 보기의 0-기반 인덱스(`Problem.choices` 위치). "
+            "자유응답형 등 객관식이 아니면 생략 — 생략하면 NULL=미보고로 남는다"
+            "('0번을 골랐다'와 구분). 오답 회차에 한해 문항의 오답 선지→오개념 매핑과 "
+            "대조돼 오개념 **가설**의 근거가 된다(단정 아님 — `evidence."
+            "possible_misconceptions`로만 드러나고 별도 판정 필드를 만들지 않는다)."
+        ),
+    )
     duration_seconds: int | None = Field(default=None, ge=0, description="풀이 소요 시간(초).")
     # PED-37: 클라 *신고* 발생 시작 시각(선택). 서버가 대신 만들어 낼 수 없는 값이라 클라가 주는
     # 통로를 여는 것 말고 정직한 방법이 없다 — `ended_at − duration_seconds` 역산은 ended_at이
@@ -1057,6 +1141,10 @@ async def submit_attempt(
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
         student_answer_nonce=student_answer_nonce,
+        # ASM-06: 클라가 보고한 선지 인덱스를 *그대로* 적재(미보고면 None→NULL). 서버가
+        # student_answer 텍스트로 역산하지 않는다 — 같은 문자열을 직접 타이핑한 학생과
+        # 보기를 탭한 학생이 구분되지 않아 무증상 오귀속을 낳는다("표현 ≠ 의미").
+        selected_choice_index=body.selected_choice_index,
         duration_seconds=body.duration_seconds,
         confidence_self_reported=body.confidence_self_reported,
         # PED-37: 클라 신고 발생 시각을 *그대로* 적재. 미신고면 None이 그대로 들어가 NULL로 남는다
@@ -1089,6 +1177,7 @@ async def submit_attempt(
         problem_id=body.problem_id,
         correct=body.is_correct,
         answer=body.student_answer,
+        selected_choice_index=body.selected_choice_index,
     )
     evidence = await collect_assessment_evidence(
         session,
