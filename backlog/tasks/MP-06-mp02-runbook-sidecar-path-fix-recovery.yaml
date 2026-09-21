@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - docs/reviews/mp02_first_llm_authoring_run_runbook.md
   - docs/prompts/l3_equivalent_gen.md
-session: null
+session: claude/optimistic-johnson-58q3nw
 notes: "출처: 2026-09-18 stray-code 전수 감사(12회차 · docs/reviews/unmerged_branch_audit_2026-09-18.md). 22건 감사 대상 중 유일한 미추적 고립분이다 — 소유 태스크 0건·main 언급 0건으로 실측 확인(`git grep -l relaxed-fermat-8dui3u origin/main -- backlog docs` = 0건).\n\n⚠ **회수 완료 전 원 브랜치 `claude/relaxed-fermat-8dui3u` 삭제 금지.**\n\nMP-02는 대장에서 blocked(사람 게이트 — Kiki 머신 실행 대기)이나 원격 claim 대장에는 `claude/test-driven-development-03elxp` 앞으로 claim이 남아 있다. 그 브랜치는 ahead 151·diff 0파일로 내용이 0건이라 이 정정을 담고 있지 않다(실측). 착수 시 그 claim과의 겹침을 `backlog.py overlap`으로 재확인한다.\n\n[정정 2026-09-18] notes 치환 — 감사 회차 번호 오기 정정 — 2026-09-12가 11회차이므로 이번 감사는 12회차다(docs/reviews/unmerged_branch_audit_2026-09-12.md 헤더 실측)"
-updated: 2026-09-18
+updated: 2026-09-21
