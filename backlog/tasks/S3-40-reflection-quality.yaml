@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-40-reflection-quality
+title: "돌아보기 완료 발화 정직화 — 검증되지 않은 설명 품질 주장 제거(S3-24 버킷B⑥ 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 원 커밋 edd0ab3(원 S3-22)의 l4/completion.py 완료 인정 발화 정직화를 이식한다. 종전 발화는 \"좋아, 근거가 분명하네. 스스로 풀어내고 왜 그런지까지 설명했어 — 다음 문제로 가보자!\"인데, 돌아보기 응답은 검증되지 않으므로(rubber-stamp MVP) 이 발화는 검증되지 않은 것을 단언한다. 2026-07-22 실기기에서 학생이 엉뚱한 근거를 내도 그대로 칭찬된 것이 확인됐다. 정직화 발화는 \"좋아, 여기까지 스스로 풀어냈어 — 다음 문제로 가보자!\" — 완료는 정답에서만 나므로 참이고, 설명의 분명함은 주장하지 않는다.\n② 범위 명시: 이것은 응답 품질 검증 로직의 신설이 아니다. 원본은 검증을 붙이는 대신 발화가 검증되지 않은 것을 주장하지 않게 고쳤다(허위 주장 제거 우선). LLM 근거 검증·재유도는 별도 후속 옵션이며 이 태스크의 acceptance가 아니다. 종전 등재본(섀도 S3-40)의 \"응답의 질 검증 로직을 재설계한다\"는 원 스코프의 오해였다.\n③ 회귀 동결: 발화 상수가 검증되지 않은 품질을 다시 주장하면 실패하는 테스트를 둔다 — 상수 문자열 대조가 아니라 금지 주장 어구(근거가 분명·설명했어 등 응답 품질 단언)의 부재를 검사해, 표기를 바꾼 재유입도 잡히게 한다. 결함주입으로 RED를 확인한다.\n④ 검증: 백엔드 전체 pytest 스위트를 경로 인자 없이 실행해 green을 확인한다(부분 스위트 통과를 전체 통과의 근거로 쓰지 않는다). 돌리지 못하면 그 사실을 명시한다.\n⑤ 정서 안전: 정직화한 발화가 부정 강화가 아닌지 확인한다 — 칭찬을 빼는 것이지 지적을 넣는 것이 아니다(CLAUDE.md 금기: 부정적 피드백의 정서적 강화 금지)."
+artifacts:
+  - "PR #1262 (https://github.com/kiki-s-broom/WhyMath/pull/1262) · 원 커밋 edd0ab3 회수 · 결함주입 5/5 RED·대조군 GREEN(M2 근거가 명확하네·M3 잘 설명했어는 문자열 대조 가드였다면 통과했을 변형) · CI 미러로 잡 12종 전건 exit 0(backend 24스텝·skipped 0건) · ci_job_coverage check 커버리지 충족"
+paths:
+  - src/backend/whymath_backend/l4/completion.py
+  - tests/backend/l4/test_completion.py
+session: null
+notes: "[S3-24 버킷B⑥ 회수] 차단이 해소됐다. 섀도 S3-40은 l4/completion.py가 main에 없다는 이유로 blocked였고 depends_on이 S3-32-learning-loop-closure-recovery였는데, 2026-09-21 실측으로 completion.py가 main에 246줄로 실재하고 S3-32도 done이다. 섀도 자신의 기록도 \"S3-32가 착지하면 이 태스크는 발화 상수 1곳 수정 + 회귀 테스트로 초소형\"이라고 적었다.\n[원본 접근 경로] 원 브랜치 claude/shadow-data-s3-pilot-nh5kbz는 원격에서 삭제됐고 git fetch로는 닿지 않지만, GitHub API의 커밋 조회로 full_patch까지 읽힌다(2026-09-21 재확인). 원 커밋 edd0ab3는 +10/-6이며 실질 변경은 완료 인정 발화 상수 한 곳이다.\n[왜 지금 하는가] 이 거짓 칭찬은 현재 main에서 학생에게 그대로 노출된다. CLAUDE.md 금기 \"확실하지 않을 때 자신 있게 말함 패턴 금지\"의 실동작 위반이므로 방치할 이유가 없다."
+updated: 2026-09-21
