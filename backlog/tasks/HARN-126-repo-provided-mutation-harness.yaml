@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-126-repo-provided-mutation-harness
+title: "뮤테이션 하네스를 저장소 자산으로 — 임시 worktree에서만 주입(작업 트리 불가침)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 뮤테이션 하네스를 저장소가 제공한다 — 현재는 세션마다 스크래치패드에 즉석으로 짜고, 그래서 매번 같은 실수를 다시 할 수 있다. `scripts/harness/mutate.py`(또는 동등)가 ①주입 적용 단언 ②원복 바이트 동일 단언 ③대조군 GREEN 선행 확인을 내장한다.\n② 작업 트리를 건드리지 않는다 — 주입은 `git worktree add --detach`로 뜬 임시 사본에서만 한다. 그러면 '뮤테이션 중 커밋'이라는 사고 계열 자체가 성립하지 않는다(현 사고의 근본 원인). 원 작업 사본의 브랜치·미커밋 변경을 하나도 건드리지 않으며 끝나면 worktree remove.\n③ 변별력 — 주입이 적용되지 않은 상태(치환 대상 0건)를 만들면 하네스가 exit 1로 거부해야 한다. 그리고 원 작업 트리의 대상 파일이 실행 전후 바이트 동일함을 단언한다.\n④ 사고 대장 연결 — 계열 `verification-tree-mutation-during-check`의 2회차부터는 이 코드가 막는다. 등재 시 `incident add --series verification-tree-mutation-during-check`로 회차가 계수된다."
+artifacts: []
+paths:
+  - scripts/harness/mutate.py
+  - tests/harness/test_mutate_harness.py
+session: null
+notes: "근거 = 2026-09-21 사고(사고 대장 계열 verification-tree-mutation-during-check 1회차). 뮤테이션이 J9를 적용한 순간 git add -A가 돌아 mutated jit_rules.py가 커밋돼 PR #1246 CI red. CLAUDE.md '검증이 도는 동안 작업 트리를 바꾸지 않는다'(2026-09-07)의 커밋 방향 변형 — 그쪽은 검사가 거짓 실패하고 이쪽은 산출물이 오염된다."
+updated: 2026-09-21

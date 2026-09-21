@@ -48,6 +48,22 @@ answer_selection(largest/smallest/unique — 항상 넣으세요), unit_codes(�
 answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열).
 선택: distractor_map·concept_tags.
 
+## ⚠️ 가장 흔한 실패 원인 — `conditions`·`answer_map`을 절대 비우지 마세요
+`conditions`와 `answer_map`이 **비어 있거나(null·빈 문자열·빈 배열·빈 객체) 수식이 아닌
+다른 내용**이면, `question_text`·`answer`가 완벽해도 **이 문제는 자동으로 버려집니다**
+(기계가 정답을 검산할 재료가 없기 때문입니다). 실제로 있었던 잘못된 예시 — 절대 이렇게
+쓰지 마세요:
+- ❌ `"conditions": null` (아예 비움)
+- ❌ `"conditions": "에러 없음"` (수식이 아니라 말을 씀)
+- ❌ `"conditions": "두 근 중 더 큰 근"` (문제 설명을 수식 자리에 씀)
+- ❌ `"conditions": "[중3 이차방정식 예제 16]"` (출처·참고 표시를 수식 자리에 씀)
+- ❌ `"conditions": "{"` (JSON이 끊긴 채로 씀)
+- ❌ `"answer_map": null` 또는 `{}` (answer_map을 비움)
+
+`conditions`에는 **오직 방정식/부등식 문자열만**(SymPy 표기, 예: `"x**2 - 6*x + 8 = 0"`)
+넣고, `answer_map`에는 **그 방정식의 변수에 실제 답을 대입한 값**(예: `{"x": "4"}`)을
+반드시 채우세요. 이 두 필드는 `question_text`만큼, 아니 그 이상으로 중요합니다.
+
 ### 예시 — *형식만* 참고하고 숫자·문맥은 반드시 새로 지어 다르게 만드세요(그대로 베끼지 말 것)
 {
   "question_text": "이차방정식 x^2 - 6x + 8 = 0 의 두 근 중 큰 근을 구하시오.",
