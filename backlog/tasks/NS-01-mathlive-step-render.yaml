@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 회수: 섀도 947faefd의 _StepRenderPreview(편집 TextField는 raw 유지·그 아래 읽기전용 조판 프리뷰)를 main의 chat_screen 현재 구조 위에 수동 재적용 — main 독자 변경(MOB-20 완료신호 소비)과 3-way 병합 후 훅 전건 검토, MOB-20 마커 5/5 보존 확인. ② chat_screen_test 증분 회수·통과. ③ 검증: CI mobile 5스텝 exit 0."
-artifacts: []
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
 paths:
   - src/mobile/lib/features/chat/presentation/chat_screen.dart
   - src/mobile/test/chat_screen_test.dart

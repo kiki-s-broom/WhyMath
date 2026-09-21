@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 회수: 섀도 25ff22d8의 canonical 계층(math_notation.dart·math_text.dart 증분)을 이식. ② docs/architecture/notation_contract.md 갱신분은 main 독자 변경과 3-way 병합 후 훅 전건 검토. ③ 테스트 notation_canonical_test.dart 16건 회수·전건 통과. ④ 검증: CI mobile 5스텝 exit 0."
-artifacts: []
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
 paths:
   - src/mobile/lib/shared/math/math_notation.dart
   - src/mobile/lib/shared/widgets/math_text.dart
