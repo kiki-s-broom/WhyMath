@@ -102,14 +102,27 @@ jobs:
           echo "USD→KRW = $RATE (l3/router.py 단일 진실 원천)"
           echo "rate=$RATE" >> "$GITHUB_OUTPUT"
 
+      # 하네스 지표 3종(HARN-118 ③)의 **집행 지점**. 백엔드는 scripts/harness를
+      # 임포트하지 않으므로(하네스 = 의존성 0 단독 실행 · 백엔드 = import-linter 계약)
+      # 집계는 하네스가 하고 결과 JSON만 파일로 건넨다. 이 스텝이 빠지면 다음 스텝은
+      # 3종을 조용히 0으로 내는 게 아니라 `measured=false` + 사유로 낸다 — 그래도
+      # "미수집"이 원장에 남는 것과 "매주 실제로 수집되는 것"은 다르므로 여기서 돈다.
+      - name: 사고 대장 집계 (HARN-118 — 하네스 지표 3종 입력)
+        id: incidents
+        run: |
+          set -e
+          python ../../scripts/harness/backlog.py incident report --json \
+            > "$RUNNER_TEMP/incidents_summary.json"
+          python -c "import json,sys; d=json.load(open(sys.argv[1])); print(f\"사고 {d['total']}건 · 계열 최대 회차 {d['max_series_nth']} · 산문만 대책 {d['rule_only_ratio']:.1%}\")" "$RUNNER_TEMP/incidents_summary.json"
+
       # dry_run=1이면 --dry-run을 얹어 파일을 건드리지 않는다(수동 점검용).
-      - name: 주간 KPI 집계 (EOS-51 §6 6종 · metrics/weekly.json append)
+      - name: 주간 KPI 집계 (EOS-51 §6 6종 + 하네스 3종 · metrics/weekly.json append)
         id: report
         env:
           DRY_RUN: ${{ inputs.dry_run || '0' }}
         run: |
           set -e
-          ARGS=(--metrics-path ../../metrics/weekly.json --krw-per-usd "${{ steps.exchange_rate.outputs.rate }}")
+          ARGS=(--metrics-path ../../metrics/weekly.json --krw-per-usd "${{ steps.exchange_rate.outputs.rate }}" --incidents-summary "$RUNNER_TEMP/incidents_summary.json")
           if [ "$DRY_RUN" = "1" ]; then
             ARGS+=(--dry-run)
           fi
