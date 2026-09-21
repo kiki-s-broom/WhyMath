@@ -357,8 +357,17 @@ class TestSeatExistsInAllThreePlaces:
 
     def test_revision_is_registered_as_head(self) -> None:
         """런타임은 마이그레이션 파일을 읽지 않는다 — 상수 대장이 정본이다."""
-        assert KNOWN_REVISIONS[-1] == "d2a9e4b71c35"
-        assert EXPECTED_ALEMBIC_HEAD == "d2a9e4b71c35"
+        # [2026-09-21 ASM-06] head가 5b3e9c27a1f6(problem_attempt.selected_choice_index)로
+        # 전진해 종전 리터럴 핀이 깨졌다. 이 좌석이 정말 재려는 것은 "**EOS-112 리비전이
+        # 대장에 등재됐는가**"이므로 그것을 직접 단언하고, head 리터럴은 현행으로 갱신해
+        # 기존 계약을 그대로 유지한다(손 유지 사본을 줄일지의 판정은 MISC-31 소관 — 여기서
+        # 앞질러 바꾸지 않는다).
+        #
+        # `KNOWN_REVISIONS[-1] == EXPECTED_ALEMBIC_HEAD` 형태의 단언은 두지 않는다 —
+        # `EXPECTED_ALEMBIC_HEAD`가 `KNOWN_REVISIONS[-1]`로 *정의*돼 있어 정상·고장 양쪽에서
+        # 같은 값을 내는 동어반복이고, 그런 검사는 보호가 아니라 위장이다.
+        assert "d2a9e4b71c35" in KNOWN_REVISIONS, "EOS-112 리비전이 대장에서 사라졌다"
+        assert EXPECTED_ALEMBIC_HEAD == "5b3e9c27a1f6"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

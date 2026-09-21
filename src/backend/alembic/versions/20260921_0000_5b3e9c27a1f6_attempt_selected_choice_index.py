@@ -18,7 +18,7 @@
 - SEC-31 봉투 암호화 대상이 **아니다**: 그 보호는 답안·풀이 *본문*이고, 선지 번호는 같은
   행의 평문 `problem_id` 없이는 의미가 없는 작은 정수다.
 
-down_revision = 2026-09-21 실측 단일 head `d2a9e4b71c35`(EOS-112). 고립 브랜치
+부모 리비전은 2026-09-21 실측 단일 head `d2a9e4b71c35`(EOS-112)다. 고립 브랜치
 `claude/subject-problems-theory-check-7n9n72`의 원 리비전 `0afd40ce1867`은 down_revision이
 `7ef2b5a8e69e`(#738에서 건너뛴 폐기 리비전)이라 그대로 포트하면 multiple heads가 된다 —
 재채번이 이 파일의 존재 이유다(ASM-06 acceptance ④).
