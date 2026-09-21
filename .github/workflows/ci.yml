@@ -1379,6 +1379,20 @@ jobs:
       - name: 의존 선언↔집행 대조 (HARN-52)
         run: python3 scripts/harness/backlog.py audit-deps
 
+      # HARN-121 ④ — 규칙 인덱스 린트. CLAUDE.md의 규칙 전수가 "무엇이 이것을
+      # 집행하는가"를 대장에 갖고 있는지 보고, 산문뿐인 신규 규칙을 거부한다
+      # (2026-09-20 Kiki 지정 산문 규칙 등재 동결의 집행 지점).
+      # render --check는 문서가 대장과 어긋났는지 — 문서는 렌더 결과이므로 손편집은 red다.
+      - name: 규칙 인덱스 린트 (HARN-121 — 산문 동결·전수 귀속)
+        run: |
+          python3 scripts/harness/backlog.py rules lint
+          python3 scripts/harness/backlog.py rules render --check
+
+      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
+      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
+      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+        run: python3 scripts/harness/backlog.py jit check
+
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
       # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날

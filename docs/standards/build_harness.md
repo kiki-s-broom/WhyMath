@@ -121,6 +121,85 @@ CLI로만.
   역전·`continue-on-error`를 결함 주입으로 각각 검출한다
 - 요약을 못 받으면 3종은 **`measured=false` + 사유**다. 0으로 채우지 않는다
 
+## 2d. 규칙 인덱스 — 무엇이 이 규칙을 집행하는가 (HARN-121 ④)
+
+`backlog/rules.ndjson` 한 줄이 규칙 1건이다. 정본은 이 데이터이고
+`docs/standards/rule_index.md`는 **렌더 결과**다(손편집하면 `rules render --check`가 red).
+
+### 왜 필요했나
+
+반복 실패 676건 실측에서 개별 사고의 44%는 코드로 상환됐는데, *일반화된 규칙*으로
+올라간 것들은 **56%가 산문뿐**이었다(`docs/reviews/recurring_failure_taxonomy_2026-09-20.md`
+§2.6). 산문 규칙에는 집행 지점이 없으므로 **막고 있는지를 검증할 수 없다** — 그래서 같은
+유형이 재발할 때마다 글이 한 단락 늘고, 그 글을 다음 세션이 통째로 읽는다.
+
+### 규칙의 네 종류 (origin)
+
+`grep -c '❌'`로 세면 59건인데 인덱스는 85건이다. 차이는 종류에 있다.
+
+| origin | 건수 | 형태 | 집행 요구 |
+|---|---:|---|---|
+| `incident` | 28 | `- ❌ **제목** — 본문` | **요구한다** (코드 또는 태스크) |
+| `extension` | 16 | `  - **확장 — 축 (날짜)**` | 요구한다 (부모 규칙을 갖는다) |
+| `guidance` | 10 | 「Kiki 개인 선호」 절의 `- **제목**` | 요구한다 |
+| `founding` | 31 | `- ❌ 평문` | **요구하지 않는다** (`status: policy`) |
+
+`founding`(창건 원칙 — "단순 사진→답 풀이 앱 금지", "미성년자 PII 외부 공유 금지")을
+인덱스에서 빼지 않는 이유: 빼면 누가 ❌ 항목을 새로 추가했을 때 **인덱스 밖으로 빠져나가고**,
+그러면 전수 검사(L1)가 공허해진다. 대신 `policy`로 "집행 코드를 요구하지 않는다"를 *명시*한다
+— 빈칸으로 두면 "미측정"인지 "해당 없음"인지 구별할 수 없다(모른다 ≠ 아니다).
+
+`guidance`가 별도인 이유: 「Kiki 개인 선호」 절의 규칙은 `❌` 없이 `- **제목**` 형태라
+❌만 보는 파서는 통째로 놓친다. 그런데 그 절이 **E 분류(Kiki 런북 결함) 규칙 13건**이
+사는 곳이고, 사고 34건으로 규칙이 가장 많이 붙은 분류다. 전역으로 `- **...**`를 잡으면
+기술 스택·문서 인덱스 목록까지 규칙이 되어 오탐이 쏟아지므로 **절로 한정**한다.
+
+### 린트 6검사 (`backlog.py rules lint`)
+
+| 검사 | 무엇을 보는가 | 주입 → RED |
+|---|---|---|
+| **L1** | CLAUDE.md의 모든 규칙 ↔ 인덱스가 **양방향** 1:1 | 인덱스에 없는 ❌ 1줄 / 헌법에 없는 인덱스 행 |
+| **L2** | 유예 대상이 아닌 신규 항목의 `status: prose` 거부 | 새 규칙을 산문으로 등재 |
+| **L3** | 대장 참조 없는 새 `사고 경위:` 단락 거부 | 단락 1건 |
+| **L4** | `enforced_by`의 파일이 실재하고 태스크 ID가 대장에 있는가 | 없는 경로·없는 태스크 |
+| **L5** | 산문뿐인 규칙 수가 기준선(`PROSE_BASELINE`)을 넘지 않는가 | 산문 1건 추가 |
+| **L6** | 파싱 0건은 통과가 아니라 실패 | 빈 CLAUDE.md·빈 대장 |
+
+L4가 이 인덱스를 장식이 아니게 만드는 자리다. `enforced_by`에 적어 놓기만 하고 그 파일이
+없으면 인덱스가 거짓말을 하게 되는데, 이 저장소가 반복해 겪은 것이 정확히 그 부류다
+(정본화 ≠ 집행).
+
+### 유예는 두 축이고 서로 독립이다
+
+| 필드 | 축 | 검사 |
+|---|---|---|
+| `grandfathered` | 대책이 **산문뿐**인 빚 | L2·L5 |
+| `narrative_grandfathered` | 동결 이전 **사고 경위 단락** 보유 | L3 |
+
+한 필드로 묶으면 *코드로 상환된 규칙이 자기 사고 경위 단락 때문에 L3에 걸린다* — 첫 구현이
+정확히 그랬고, `enforced_by`를 채우는 순간 멀쩡한 규칙 18건이 위반이 됐다.
+
+### 래칫 (만료 없는 유예 금지의 현실적 형태)
+
+동결 시점에 이미 산문뿐인 규칙이 **29건**이다. 즉시 위반으로 만들면 대장 전체가 red가 되고
+(사람이 린트를 끈다), 영원히 허용하면 "만료 없는 유예"가 된다. 그래서 `grandfathered: true`로
+싣고 **건수가 늘지 않는 것만** 강제한다. `rules.PROSE_BASELINE`은 **줄어드는 방향으로만**
+고친다 — 늘리는 커밋은 빚을 키우는 것이고 그것이 이 래칫이 막으려는 동작이다.
+
+### CLAUDE.md 본문은 건드리지 않는다
+
+인덱스는 **규칙 제목 문자열**로 헌법과 대응한다(2026-09-21 Kiki 승인). 본문에 `{R-014}`
+같은 ID 앵커를 박는 쪽이 견고하지만 그것은 헌법 75줄을 고치는 변경이라 별도 승인이 필요하다.
+제목을 고치면 L1이 red를 내는데, 그것은 *고칠 수 있는* red다(인덱스의 `title`을 같이 고친다)
+— 조용히 어긋나는 것보다 낫다.
+
+### 집행 지점
+
+- CI `harness-integrity` 잡의 "규칙 인덱스 린트" 스텝이 `rules lint` + `rules render --check`를 돈다
+- 그 배선의 실재는 `tests/infra/test_rule_index_lint_wiring.py`가 결함 주입으로 동결한다
+  (스텝 삭제·렌더 대조 누락·`continue-on-error`·잡 이동을 각각 검출)
+- 판정 로직의 변별력은 `tests/harness/test_rule_index.py` 56건이 L1~L6 주입·대조군 쌍으로 고정한다
+
 ## 3. 순차 조율 규칙 (selector)
 
 착수 가능 = `todo` ∧ 의존성 전부 done ∧ 게이트 전부 cleared/waived
@@ -641,6 +720,12 @@ python3 scripts/harness/backlog.py add --id ... --title ... --eos-priority P0|P1
 #     P0가 예산(policy.eos_p0_budget)에 닿았으면 --swap-out <기존 P0 id>로 교환한다(Rule 4)
 #   ↑ add는 등재 후 두 가지를 **고지**한다(차단 아님): 가시성(HARN-43)·의미 중복 후보(HARN-51)
 python3 scripts/harness/backlog.py validate        # 무결성 전수 검증 (태스크·게이트·트랙 + 사고 대장 스키마)
+python3 scripts/harness/backlog.py rules lint               # 규칙 인덱스 린트 L1~L6 — 위반 시 exit 1 (§2d)
+python3 scripts/harness/backlog.py rules report             # 유래·상태 분포 + 갚아야 할 빚(산문뿐) 목록
+python3 scripts/harness/backlog.py rules render [--check]   # 대장 → docs/standards/rule_index.md (--check = 어긋남만 검사)
+                    # 새 규칙을 CLAUDE.md에 쓰면 L1이 먼저 막는다(인덱스 미등재) →
+                    # 산문으로 등재하면 L2·L5가 막는다 → 집행 참조를 붙이면 통과.
+                    # rules.ndjson 손편집 금지 · rule_index.md는 렌더 결과다
 python3 scripts/harness/backlog.py incident report          # 사고 대장 표 5종 (§2c)
 python3 scripts/harness/backlog.py incident report --json   # 주간 지표(metrics/weekly.json harness 블록) 입력
 python3 scripts/harness/backlog.py incident series [<계열>]  # 계열 목록 또는 한 계열의 회차 전개
