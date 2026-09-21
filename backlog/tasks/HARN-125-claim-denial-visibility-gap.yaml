@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-124-claim-denial-visibility-gap
+id: HARN-125-claim-denial-visibility-gap
 title: "claim 거부 후 정보 공백 — 막힌 세션이 진행 중인 작업을 볼 수 없어 축을 쪼개 우회한다"
 track: math-completion
 stage: S3
@@ -19,5 +19,5 @@ paths:
   - scripts/harness/remote_claims.py
   - docs/standards/build_harness.md
 session: null
-notes: "출처: 2026-09-19 P-15 병렬 중복 실측(PR #1228 판정문 §0 · 크로스워크 §11.6). CLAUDE.md 「실수 관리」 의무 — 동일 유형 3회차이므로 재발방지 등재 대상이다. 다만 앞의 두 회차(OPS-07·MP-04)와 원인이 달라 그 대책들이 이번을 막지 못했다는 점을 acceptance ③에 명시했다. Kiki가 2026-09-21 등재 지시. 분류 SUPPORT(루프 기능이 아니라 개발 하네스 축).\n\n정정 이력: 이 사고의 최초 기록(PR #1228 판정문 초판)은 원인을 \"claim 대장이 충돌을 보지 못했다\"로 적었으나 **틀렸다** — 대장은 충돌을 보고 exit 1로 막았다. 같은 PR 후속으로 그 문장을 정정했고 이 태스크가 정확한 축(차단 이후 가시성)을 소유한다.\n\n[정정 2026-09-21] paths ['scripts/harness/backlog.py', 'scripts/harness/claims.py', 'docs/standards/build_harness.md'] → ['scripts/harness/backlog.py', 'scripts/harness/remote_claims.py', 'docs/standards/build_harness.md']: paths 정정 — scripts/harness/claims.py는 실재하지 않는다(실제 파일은 remote_claims.py). 존재하지 않는 경로는 겹침 탐지에서 미탐이 된다\npaths 제거 1건: ['scripts/harness/claims.py']"
+notes: "출처: 2026-09-19 P-15 병렬 중복 실측(PR #1228 판정문 §0 · 크로스워크 §11.6). CLAUDE.md 「실수 관리」 의무 — 동일 유형 3회차이므로 재발방지 등재 대상이다. 다만 앞의 두 회차(OPS-07·MP-04)와 원인이 달라 그 대책들이 이번을 막지 못했다는 점을 acceptance ③에 명시했다. Kiki가 2026-09-21 등재 지시. 분류 SUPPORT(루프 기능이 아니라 개발 하네스 축).\n\n정정 이력: 이 사고의 최초 기록(PR #1228 판정문 초판)은 원인을 \"claim 대장이 충돌을 보지 못했다\"로 적었으나 **틀렸다** — 대장은 충돌을 보고 exit 1로 막았다. 같은 PR 후속으로 그 문장을 정정했고 이 태스크가 정확한 축(차단 이후 가시성)을 소유한다.\n\n[정정 2026-09-21] paths ['scripts/harness/backlog.py', 'scripts/harness/claims.py', 'docs/standards/build_harness.md'] → ['scripts/harness/backlog.py', 'scripts/harness/remote_claims.py', 'docs/standards/build_harness.md']: paths 정정 — scripts/harness/claims.py는 실재하지 않는다(실제 파일은 remote_claims.py). 존재하지 않는 경로는 겹침 탐지에서 미탐이 된다\npaths 제거 1건: ['scripts/harness/claims.py']\n\n[개명 2026-09-21] HARN-124-claim-denial-visibility-gap → HARN-125-claim-denial-visibility-gap: 번호 충돌 해소 — PR #1239가 main에 HARN-124-gate-title-correction-path를 먼저 착지시켰다(머지 83603c81). 이쪽은 미머지였으므로 이동 비용이 낮은 쪽(이쪽)을 옮긴다. 번호는 CLI 제안(HARN-125)을 그대로 받았다 — 손추론 금지. 동일 유형 5회차이며 축 소유자는 HARN-111."
 updated: 2026-09-21
