@@ -885,19 +885,42 @@ class _QueueSession:
     엉뚱하게 소진된 경우까지 통과한다. `overflow`를 노출해 필요하면 단언할 수 있게 남긴다.
     """
 
-    def __init__(self, results: list[_AQResult], *, question_text: str | None = None) -> None:
+    def __init__(
+        self,
+        results: list[_AQResult],
+        *,
+        question_text: str | None = None,
+        distractor_map: list[dict[str, Any]] | None = None,
+    ) -> None:
         self._results = results
         self._i = 0
         self.added: list[Any] = []
         self.commits = 0
         self.overflow = 0
         # EOS-104: 오답 오개념 훑기가 문항 지문을 단일 스칼라로 조회한다(`session.scalar`).
-        # 기본 None은 "지문 없음" → `MisconceptionScan.NOT_RUN`이라 기존 시나리오의 동작이
-        # 그대로 유지된다(훑지 않음 = 이 파일의 다른 단언과 무관).
+        # 기본 None은 "지문 없음" → 텍스트 채널 미실행이라 기존 시나리오의 동작이 그대로
+        # 유지된다(훑지 않음 = 이 파일의 다른 단언과 무관).
         self.question_text = question_text
+        # ASM-06: 선지 채널이 *같은 방식으로* 문항의 오답 선지→오개념 매핑을 조회한다.
+        # 기본 None은 "매핑 없음" → 선지 채널 미실행(기존 시나리오 비트동일).
+        self.distractor_map = distractor_map
         self.flushes = 0
 
-    async def scalar(self, _stmt: Any) -> Any:
+    async def scalar(self, stmt: Any) -> Any:
+        """단일 스칼라 조회 2종을 **선택 컬럼명으로** 가른다(ASM-06 이후).
+
+        종전엔 어떤 stmt가 와도 `question_text`를 돌려줬다 — 조회가 하나뿐이라 성립했던
+        단순화다. 이제 선지 채널이 `distractor_map`을 같은 방식으로 읽으므로, 그대로 두면
+        지문 문자열이 매핑 자리에 실려 *조용히* 엉뚱한 값이 흐른다(순회는 되지만 원소가
+        Mapping이 아니라 전건 무시 — 크래시가 없어 더 위험하다). 호출 *순서*가 아니라
+        컬럼명으로 가르므로 구현이 두 조회의 순서를 바꿔도 픽스처가 따라 깨지지 않는다.
+        """
+        try:
+            column_name = stmt.column_descriptions[0]["name"]
+        except (AttributeError, IndexError, KeyError, TypeError):  # pragma: no cover - 방어
+            column_name = None
+        if column_name == "distractor_map":
+            return self.distractor_map
         return self.question_text
 
     async def get(self, _model: Any, _pk: Any) -> Any:
@@ -1145,6 +1168,217 @@ class TestAttemptMisconceptionScan:
             get_settings.cache_clear()
         assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
         assert off["evidence"]["possible_misconceptions"] == []
+
+
+class TestAttemptDistractorLink:
+    """ASM-06 — 학생이 고른 **오답 선지**가 오개념 후보로 이어지는 서빙 경로의 집행 지점.
+
+    위 `TestAttemptMisconceptionScan`(텍스트 채널)과 짝이며, 여기서 재는 것도 탐지 품질이
+    아니라 *배선*이다. 두 채널은 재료가 다르므로 서로의 실행 조건이 아니라는 것 — 특히
+    **답안 텍스트 없이 보기만 탭한 제출**에서 선지 채널이 홀로 도는 것 — 이 핵심 단언이다.
+
+    순수 변환 자체는 `tests/backend/l4/misconception/test_distractor_link.py`가 본다.
+    나누는 이유는 배선이 끊겨도 그 파일은 초록이기 때문이다.
+    """
+
+    #: 카탈로그 실재 id — 미등록 id는 변환기가 걸러 후보가 되지 않는다(단위테스트가 봉인).
+    _MID = "absolute-value-keeps-sign"
+
+    @classmethod
+    def _post(
+        cls,
+        *,
+        is_correct: bool = False,
+        answer: str | None = None,
+        question: str | None = None,
+        selected_choice_index: int | None = None,
+        distractor_map: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        session = _QueueSession([], question_text=question, distractor_map=distractor_map)
+        client = _attempts_client(session)
+        payload: dict[str, Any] = {"problem_id": str(uuid.uuid4()), "is_correct": is_correct}
+        if answer is not None:
+            payload["student_answer"] = answer
+        if selected_choice_index is not None:
+            payload["selected_choice_index"] = selected_choice_index
+        resp = client.post("/v1/me/attempts", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body
+
+    @classmethod
+    def _dmap(cls, index: int = 1) -> list[dict[str, Any]]:
+        return [{"choice_index": index, "misconception_id": cls._MID}]
+
+    # ── 본류: 텍스트 없이 보기만 탭해도 신호가 산다 ─────────────────────────
+    def test_tapped_distractor_reaches_evidence_without_any_answer_text(self) -> None:
+        """답안 텍스트 0 + 선지 인덱스만 → 후보가 실린다.
+
+        종전엔 이 입력이 통째로 `not_run`이었다(텍스트 채널만 있었고 그 채널은 답안 문자열을
+        요구한다). 객관식에서 학생이 실제로 하는 행동이 바로 이것이라, 이 한 줄이 ASM-06이
+        여는 통로 전체를 대표한다.
+        """
+        body = self._post(selected_choice_index=1, distractor_map=self._dmap())
+        evidence = body["evidence"]
+        assert evidence["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert [c["misconception_id"] for c in evidence["possible_misconceptions"]] == [self._MID]
+        assert evidence["possible_misconceptions"][0]["gate_passed"] is True
+
+    def test_same_input_without_the_slot_is_not_run(self) -> None:
+        """**변별력**: 인덱스를 빼면 같은 문항이 `not_run`으로 돌아간다.
+
+        이 대조가 없으면 위 초록이 "선지 채널이 작동했다"의 증거가 되지 못한다 — 다른
+        경로가 후보를 채웠을 수도 있기 때문이다.
+        """
+        body = self._post(distractor_map=self._dmap())
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert body["evidence"]["possible_misconceptions"] == []
+
+    def test_index_without_distractor_map_is_not_run(self) -> None:
+        """매핑이 없는 문항은 *돌 재료가 없다* — 돌았는데 0건과 구분해 not_run으로 표기한다."""
+        body = self._post(selected_choice_index=1, distractor_map=None)
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    def test_unmapped_index_is_measured_zero_not_unmeasured(self) -> None:
+        """매핑은 있는데 그 인덱스가 없다(정답 선지 등) → 돌았고 0건(`ran_no_candidate`)."""
+        body = self._post(selected_choice_index=3, distractor_map=self._dmap(index=1))
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["evidence"]["possible_misconceptions"] == []
+
+    def test_correct_attempt_is_not_scanned_even_with_index(self) -> None:
+        """정답 회차는 선지 채널도 돌지 않는다 — 감쇠 시계를 새로 돌리지 않기 위해서다.
+
+        여기서 `ran_*`을 내면 호출자가 `apply_candidates`를 부르게 되고, 그러면 *정답이
+        기존 가설을 감쇠시키는* 동작이 이 변경에 딸려 새로 생긴다. 채점/코치 경로의 반증
+        비대칭은 별건(EOS-123)의 소관이라 여기서 건드리지 않는다.
+        """
+        body = self._post(is_correct=True, selected_choice_index=1, distractor_map=self._dmap())
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+    # ── 두 채널의 독립·합류 ───────────────────────────────────────────────
+    def test_both_channels_contribute_distinct_candidates(self) -> None:
+        """텍스트 채널과 선지 채널이 *서로 다른* 오개념을 함께 싣는다(한쪽이 다른 쪽을 덮지 않음)."""
+        body = self._post(
+            answer="x²+4",
+            question="(x+2)²을 전개하시오.",
+            selected_choice_index=1,
+            distractor_map=self._dmap(),
+        )
+        ids = {c["misconception_id"] for c in body["evidence"]["possible_misconceptions"]}
+        assert ids == {"distribution-over-power", self._MID}
+
+    def test_same_misconception_from_both_channels_is_deduped(self) -> None:
+        """같은 오개념을 두 채널이 지목하면 1건으로 합쳐진다 — 같은 사실의 사본을 만들지 않는다."""
+        body = self._post(
+            answer="x²+4",
+            question="(x+2)²을 전개하시오.",
+            selected_choice_index=1,
+            distractor_map=[{"choice_index": 1, "misconception_id": "distribution-over-power"}],
+        )
+        ids = [c["misconception_id"] for c in body["evidence"]["possible_misconceptions"]]
+        assert ids == ["distribution-over-power"]
+
+    def test_text_channel_still_runs_when_choice_channel_is_idle(self) -> None:
+        """선지 채널이 안 돌아도 텍스트 채널은 종전대로 — 회귀 0(기존 시나리오 비트동일)."""
+        body = self._post(answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+
+    # ── 적재 ─────────────────────────────────────────────────────────────
+    def test_index_is_persisted_on_the_attempt_row(self) -> None:
+        """보고된 인덱스가 `ProblemAttempt.selected_choice_index`로 실제 적재된다."""
+        session = _QueueSession([], distractor_map=self._dmap())
+        client = _attempts_client(session)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "selected_choice_index": 1,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        (attempt,) = [obj for obj in session.added if hasattr(obj, "selected_choice_index")]
+        assert attempt.selected_choice_index == 1
+
+    def test_absent_index_persists_as_null_not_zero(self) -> None:
+        """미보고는 NULL로 남는다 — '0번을 골랐다'로 위장하지 않는다."""
+        session = _QueueSession([])
+        client = _attempts_client(session)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={"problem_id": str(uuid.uuid4()), "is_correct": False},
+        )
+        assert resp.status_code == 201, resp.text
+        (attempt,) = [obj for obj in session.added if hasattr(obj, "selected_choice_index")]
+        assert attempt.selected_choice_index is None
+
+    # ── 요청 계약 ────────────────────────────────────────────────────────
+    def test_negative_index_is_rejected(self) -> None:
+        session = _QueueSession([])
+        client = _attempts_client(session)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "selected_choice_index": -1,
+            },
+        )
+        assert resp.status_code == 422, resp.text
+
+    def test_unknown_field_still_forbidden(self) -> None:
+        """`extra="forbid"`는 그대로다 — 슬롯을 *하나* 열었지 계약을 연 것이 아니다."""
+        session = _QueueSession([])
+        client = _attempts_client(session)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "chosen_option_position": 1,
+            },
+        )
+        assert resp.status_code == 422, resp.text
+
+    # ── 킬 스위치 2단 ────────────────────────────────────────────────────
+    def test_channel_kill_switch_stops_choice_channel_only(self) -> None:
+        """좁은 스위치 OFF → 선지 채널만 멈추고 텍스트 채널은 계속 돈다(양방향 주입)."""
+        on = self._post(selected_choice_index=1, distractor_map=self._dmap())
+        assert on["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+
+        var = "WHYMATH_L4_DISTRACTOR_LINK_ENABLED"
+        prev = os.environ.get(var)
+        os.environ[var] = "false"
+        get_settings.cache_clear()
+        try:
+            off = self._post(selected_choice_index=1, distractor_map=self._dmap())
+            text_still_on = self._post(answer="x²+4", question="(x+2)²을 전개하시오.")
+        finally:
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+            get_settings.cache_clear()
+        assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert off["evidence"]["possible_misconceptions"] == []
+        # 좁은 스위치라는 주장의 반대편 — 텍스트 채널까지 끄면 그것은 좁은 스위치가 아니다.
+        assert text_still_on["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+
+    def test_upper_kill_switch_also_stops_choice_channel(self) -> None:
+        """상위 스위치(EOS-104 킬)가 OFF면 선지 채널도 함께 멈춘다 — 스위치가 거짓말하면 안 된다."""
+        var = "WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED"
+        prev = os.environ.get(var)
+        os.environ[var] = "false"
+        get_settings.cache_clear()
+        try:
+            off = self._post(selected_choice_index=1, distractor_map=self._dmap())
+        finally:
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+            get_settings.cache_clear()
+        assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
 
 
 class TestSubmitAttempt:

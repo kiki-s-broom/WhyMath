@@ -20,6 +20,12 @@ from whymath_backend.l4.misconception.diagnose import (
     is_refuted,
     reject_refuted,
 )
+from whymath_backend.l4.misconception.distractor_link import (
+    DISTRACTOR_LINK_CONFIDENCE,
+    distractor_link_candidates,
+    distractor_link_matches,
+    resolve_misconception_from_choice,
+)
 from whymath_backend.l4.misconception.intervene import (
     select_intervention,
     select_intervention_from_hypotheses,
@@ -51,6 +57,7 @@ from whymath_backend.l4.misconception.visualize import visualize_misconception
 __all__ = [
     "CATALOG",
     "CATALOG_BY_ID",
+    "DISTRACTOR_LINK_CONFIDENCE",
     "EmbeddingProvider",
     "FakeEmbeddingProvider",
     "InMemoryVectorIndex",
@@ -70,6 +77,9 @@ __all__ = [
     "is_refuted",
     "reject_refuted",
     "diagnose",
+    "distractor_link_candidates",
+    "distractor_link_matches",
+    "resolve_misconception_from_choice",
     "raise_for_distractor_map",
     "select_intervention",
     "select_intervention_from_hypotheses",

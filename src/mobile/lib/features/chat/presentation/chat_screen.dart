@@ -145,8 +145,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// (단계 리스트 편집기가 합친 원문을 받는다).
   /// 선택지 행 탭 → 그 항목의 *값*을 기존 `send`(`student_input`) 경로로 제출한다(S3-17).
   /// 번호→값 매핑은 화면 표현일 뿐 정답 판정·완료는 서버 권위다(클라는 값 제출만·표현≠의미).
-  Future<void> _onChoiceSelected(String choice) async {
-    await ref.read(chatControllerProvider.notifier).send(choice);
+  /// 선택지 행 탭 — 그 보기의 *값*과 함께 **0-기반 인덱스**를 코치 턴에 동봉한다(ASM-06).
+  ///
+  /// 인덱스를 따로 싣는 이유: 값 문자열만 보내면 서버는 "몇 번을 골랐는가"를 알 수 없고,
+  /// 값으로 역산하면 같은 문자열을 손으로 친 학생과 탭한 학생이 구분되지 않는다. 그
+  /// 인덱스로 서버가 문항의 오답 선지→오개념 매핑을 대조해 오개념 *가설*의 근거를 얻는다
+  /// (판정이 아니다 — 클라는 어떤 진단도 하지 않고 사실 하나만 더 보고할 뿐이다).
+  Future<void> _onChoiceSelected(String choice, int index) async {
+    await ref
+        .read(chatControllerProvider.notifier)
+        .send(choice, selectedChoiceIndex: index);
   }
 
   Future<void> _onSend() async {
@@ -515,8 +523,10 @@ class _ChoiceButtons extends ConsumerWidget {
   /// 맞춰 계산해 내려준다(MOB-02). 보기가 많거나 값이 길어 초과하면 내부 스크롤로 가둔다(Column 안 넘침).
   final double maxHeight;
 
-  /// 선택지 행 탭 콜백 — 그 항목의 *값*을 그대로(`student_input`) 코치 턴으로 제출한다.
-  final Future<void> Function(String choice) onSelected;
+  /// 선택지 행 탭 콜백 — 그 항목의 *값*(`student_input`)과 **0-기반 인덱스**를 함께
+  /// 코치 턴으로 제출한다. 인덱스는 `_renderableChoices`가 `Problem.choices`를 필터·
+  /// 재정렬 없이 그대로 돌려주므로 서버가 보는 선지 위치와 일치한다(ASM-06).
+  final Future<void> Function(String choice, int index) onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -557,7 +567,9 @@ class _ChoiceButtons extends ConsumerWidget {
                         number: i + 1,
                         value: choices[i],
                         enabled: enabled,
-                        onTap: () => onSelected(choices[i]),
+                        // 값과 인덱스를 함께 — `i`는 `Problem.choices`의 위치 그대로다
+                        // (`_renderableChoices`가 필터·재정렬을 하지 않는다·ASM-06).
+                        onTap: () => onSelected(choices[i], i),
                       ),
                     ),
                 ],
