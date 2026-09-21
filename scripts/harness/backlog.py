@@ -1096,6 +1096,12 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             f"(investigation=산출물 없는 조사·계획 / incomplete=미완·게이트 대기 / "
             f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시)"
         )
+    # CI 미러 프리플라이트 (HARN-119 ②) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
+    # 1단계는 warn이다(측정 없는 도입 없음 — block 승격은 HARN-122 절차). 거부하지 않는
+    # 이유는 이 게이트가 막는 것이 *망각*이지 *위조*가 아니기 때문이다. 다만 침묵하지는
+    # 않는다 — 아무 말 없이 통과시키면 "검증했다"와 "검증 안 했다"가 같은 화면이 된다.
+    _warn_if_ci_mirror_missing(root)
+
     error = _transition(task, "done")
     if error:
         return _fail(error)
@@ -1134,6 +1140,34 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             suffix = f" (게이트 대기: {gates})" if gates else " — 착수 가능"
             print(f"  · {t.id} {t.title}{suffix}")
     return 0
+
+
+def _warn_if_ci_mirror_missing(root: Path) -> None:
+    """이번 커밋의 CI 미러 결과가 없거나 실패면 경고한다(HARN-119 ② 집행 지점).
+
+    조회 자체가 실패하는 환경(미러 미설치·git 없음)에서도 done을 막지 않는다 —
+    다만 그 경우에도 **사유를 말한다**. 무타입 침묵은 이 저장소가 금지한 형태다.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import ci_mirror  # noqa: PLC0415  (선택 의존 — 없으면 경고만)
+
+        commit = ci_mirror.current_commit(root)
+        ok, reason = ci_mirror.verdict_for_commit(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
+    except (ImportError, OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"⚠ CI 미러 상태를 확인하지 못했습니다({type(exc).__name__}) — "
+            f"이 완료는 로컬 재현 증거 없이 기록됩니다",
+            file=sys.stderr,
+        )
+        return
+    if not ok:
+        print(
+            f"⚠ {reason}\n"
+            f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
+            f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+            file=sys.stderr,
+        )
 
 
 def cmd_block(root: Path, args: argparse.Namespace) -> int:

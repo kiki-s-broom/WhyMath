@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - scripts/harness/ci_mirror.py
   - "tests/infra/test_ci_mirror*.py"
   - ".claude/commands/drive.md"
-session: null
+session: claude/tender-pasteur-82eu60
 notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §3 A·§4 M3. 검사 판정 무효화 계열 4회차(08-09→09-10→09-17→09-19 PR #1216)이며 CI backend 잡 26스텝 vs drive.md \"pytest·ruff\" 2종의 표면 불일치가 구조 원인. 규칙 1건+확장 5축이 산문이라 못 막았다 — 도구 부재 축."
-updated: 2026-09-20
+updated: 2026-09-21
