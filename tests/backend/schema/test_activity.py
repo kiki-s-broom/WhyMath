@@ -209,6 +209,7 @@ class TestProblemAttempt:
             duration_seconds=240,
             is_correct=False,
             student_answer="42",
+            selected_choice_index=1,
             confidence_self_reported=0.6,
             attempt_mode=AttemptMode.Socratic대화,
             used_socratic=True,
@@ -225,6 +226,7 @@ class TestProblemAttempt:
         assert a.session_id == sid
         assert a.is_correct is False
         assert a.student_answer == "42"
+        assert a.selected_choice_index == 1
         assert a.attempt_mode == AttemptMode.Socratic대화
         assert a.used_socratic is True
         assert a.used_solution_view is False
@@ -253,6 +255,16 @@ class TestProblemAttempt:
         """stuck_at_step은 ge=1(단계 번호) — 0 거부."""
         with pytest.raises(ValidationError):
             ProblemAttempt(stuck_at_step=0)
+
+    def test_selected_choice_index_negative_rejected(self) -> None:
+        """ASM-06: selected_choice_index는 ge=0(0-기반 인덱스) — 음수 거부."""
+        with pytest.raises(ValidationError):
+            ProblemAttempt(selected_choice_index=-1)
+
+    def test_selected_choice_index_zero_accepted(self) -> None:
+        """ASM-06: 0은 유효한 0-기반 인덱스(첫 보기) — 거부되지 않는다."""
+        a = ProblemAttempt(selected_choice_index=0)
+        assert a.selected_choice_index == 0
 
     def test_duration_seconds_negative_rejected(self) -> None:
         """duration_seconds는 ge=0(시간 길이) — 음수 거부."""

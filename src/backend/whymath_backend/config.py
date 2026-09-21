@@ -337,6 +337,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_distractor_link_enabled: bool = Field(
+        default=True,
+        description=(
+            "학생이 고른 **오답 선지**를 문항의 오답 선지→오개념 매핑(`distractor_map`)에 "
+            "대조해 오개념을 역추적할지(ASM-06·정식기능). True(기본)면 학생 표면 두 곳"
+            "(POST /v1/me/attempts의 `selected_choice_index` · POST /v1/coach/sessions"
+            "[/turns]의 같은 이름 슬롯)이 보고한 인덱스를 `l4.misconception.distractor_link`"
+            "가 오개념 **후보**로 바꿔 기존 좌석(채점=possible_misconceptions·가설 갱신 / "
+            "코치=curate_hypothesis)에 합류시킨다 — 별도 판정 경로·응답 필드를 만들지 않는다. "
+            "인덱스 미보고·문항에 매핑 없음·정답 회차는 애초에 돌지 않는다. "
+            "**채점 경로에서는 `l4_attempt_misconception_scan_enabled`가 상위 킬 스위치다** — "
+            "그것이 False면 이 플래그와 무관하게 통째로 not_run이다(같은 좌석에 쓰는 채널이라 "
+            "상위 스위치가 거짓말하면 안 된다). 이 플래그는 *선지 채널만* 끄는 좁은 스위치이며, "
+            "끄면 텍스트 채널은 그대로 돈다. WHYMATH_L4_DISTRACTOR_LINK_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_server_theta_enabled: bool = Field(
         default=True,
         description=(

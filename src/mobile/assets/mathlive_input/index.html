@@ -54,6 +54,16 @@
         }
       }
 
+      // 명령 훅(whymathFocus 등) 준비 완료를 Flutter에 한 번 알린다(S3-50·원 S3-19). Flutter는
+      // 이 신호를 받고 자동 포커스를 요청해 진입 즉시 수식 키보드를 띄운다(키보드 아이콘 재탭
+      // 불요). 이 모듈 스크립트는 top-level await로 비동기 실행되므로 onPageFinished 시점엔 훅이
+      // 아직 미정의일 수 있다 — ready 시점 통지가 자동 포커스 성립의 유일하게 확실한 기준점이다.
+      function emitReady() {
+        if (window.WhymathMathReady) {
+          window.WhymathMathReady.postMessage("ready");
+        }
+      }
+
       // MathLive 로드 실패(자산 누락·구버전 WebView) 시에도 입력이 끊기지 않도록 textarea 폴백.
       function useFallback() {
         const ta = document.createElement("textarea");
@@ -70,6 +80,7 @@
           emit("");
         };
         window.whymathFocus = () => ta.focus();
+        emitReady(); // 폴백(textarea)도 훅이 준비됐음을 알린다(자동 포커스 대상).
       }
 
       // 3단 폴백: ①IIFE 전역(실기기 file:// 안전) → ②동적 import(개발·http 서빙 환경) →
@@ -132,7 +143,17 @@
           mf.setValue("");
           emit("");
         };
-        window.whymathFocus = () => mf.focus();
+        // 포커스 + 수식 키보드 표시(S3-50·원 S3-19). 정책이 manual이라 focus()만으로는 키보드가
+        // 뜨지 않으므로 전역 mathVirtualKeyboard.show()로 명시적으로 띄운다(manual 정책 유지 —
+        // 앱이 표시 시점 제어·토글은 그대로 수동 진입점으로 공존). 전역 훅이 없거나 show가 없으면
+        // (구버전) 최소한 필드 포커스는 성립한다(방어).
+        window.whymathFocus = () => {
+          mf.focus();
+          if (window.mathVirtualKeyboard && window.mathVirtualKeyboard.show) {
+            window.mathVirtualKeyboard.show();
+          }
+        };
+        emitReady(); // 훅 준비 완료 통지 — Flutter가 자동 포커스를 요청한다(진입 즉시 키보드).
       } catch (e) {
         useFallback();
       }

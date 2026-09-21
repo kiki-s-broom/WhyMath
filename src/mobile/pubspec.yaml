@@ -37,9 +37,12 @@ dependencies:
   # 미디어 — cached_network_image·video_player는 *기능 착수 시* 재도입한다(현재 lib/test
   # 사용처 0·선언만 있던 상태, MOB-09). image_picker는 OCR 사진 업로드에 실사용 중이라 유지.
   image_picker: ^1.0.7
-  # 수식 렌더 — flutter_math_fork는 *기능 착수 시* 재도입한다(현재 lib/test 사용처 0·선언만
-  # 있던 상태, MOB-09. 수식 입력은 MathLive WebView 임베드로 이미 커버 — 별도 렌더 라이브러리
-  # 미필요 상태가 유지되고 있다).
+  # 수식 렌더 — S3-39로 재도입(기능 착수). MOB-09가 "사용처 0"으로 제거했던 이유가 바로 이
+  # 렌더 기능(원 S3-21)이 미병합 브랜치에 고립돼 있었기 때문임이 확인돼, 회수와 함께 되살린다.
+  # 현재 실사용처: lib/shared/widgets/math_text.dart(MathText·KaTeX 조판·fail-closed 원문 폴백)와
+  # 그것을 쓰는 chat_screen·coach_emphasis_text·problem_screen. 수식 *입력*은 여전히 MathLive
+  # WebView 임베드가 담당하고, 이 패키지는 *표시*(순수 Dart 렌더러·WebView 불요)만 맡는다.
+  flutter_math_fork: ^0.7.4
   # 웹뷰 (Desmos·GeoGebra)
   webview_flutter: ^4.7.0
   # 음성 — 클라 TTS/STT는 *기능 착수 시* 재도입한다(현재 lib/test 사용처 0·선언만 있던 상태).

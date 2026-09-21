@@ -93,20 +93,40 @@ def _probe_present() -> dsdr.CaptureSlotProbe:
 # 1. acceptance① — 실물 AttemptSubmitRequest 현행 실측 동결(슬롯 부재·extra=forbid)
 # ──────────────────────────────────────────────────────────────────────────
 class TestCurrentRealityFrozen:
-    def test_real_attempt_submit_request_has_no_capture_slot(self) -> None:
-        """실물 요청 계약에 선택 인덱스 슬롯이 없다(r2 §3 D4 재현·2026-08-11 확인).
+    def test_real_attempt_submit_request_has_capture_slot(self) -> None:
+        """실물 요청 계약에 선택 인덱스 슬롯이 **있다**(ASM-06 착지·2026-09-21 재작성).
 
-        ASM-06이 `selected_choice_index`를 신설하면 이 테스트가 깨진다 — 그것이 의도다
-        (ASM-05 선례: 진실이 바뀌면 동결 테스트를 새 진실로 재작성하고, 리포트 상태도
-        `capture_slot_present_backtrace_unmeasured`로 갱신됐는지 함께 확인하라).
+        [진실 갱신] 종전 판(`..._has_no_capture_slot`)은 슬롯 *부재*를 동결했고, 그 docstring이
+        "ASM-06이 `selected_choice_index`를 신설하면 이 테스트가 깨진다 — 그것이 의도다"라고
+        예고해 두었다. 예고대로 깨졌으므로 ASM-05 선례에 따라 **새 진실로 재작성**한다(테스트를
+        지우거나 skip하지 않는다 — 그러면 리포트의 상태 전이가 다시 무보호가 된다).
+
+        변별력은 합성 픽스처가 보존한다 — 슬롯이 *없는* 모델(`_SlotlessSynthetic`)에 대해
+        프로브가 여전히 False를 내는지는 `TestCaptureSlotProbe`가 양방향으로 확인하므로, 이
+        테스트가 True로 뒤집혔다고 해서 "프로브가 항상 True를 낸다"는 위장이 성립하지 않는다.
         """
         from whymath_backend.api.me import AttemptSubmitRequest
 
         probe = dsdr.probe_capture_slot()  # 기본 인자 = 실물 모델 lazy 조사
         assert probe.probed_model == "AttemptSubmitRequest"
-        assert probe.slot_present is False
-        assert probe.matched_field_names == ()
-        assert dsdr._CANONICAL_SLOT_FIELD not in AttemptSubmitRequest.model_fields
+        assert probe.slot_present is True
+        assert dsdr._CANONICAL_SLOT_FIELD in probe.matched_field_names
+        assert dsdr._CANONICAL_SLOT_FIELD in AttemptSubmitRequest.model_fields
+
+    def test_report_backtrace_state_flipped_to_slot_present(self) -> None:
+        """리포트 상태가 `capture_slot_present_backtrace_unmeasured`로 실제 뒤집혔는가.
+
+        종전 판 docstring이 요구한 "리포트 상태도 함께 갱신됐는지 확인하라"의 집행이다 —
+        프로브만 보고 넘어가면 프로브와 리포트 사이 배선이 끊겨도 아무도 모른다.
+
+        **미측정은 여전히 미측정이다**: ASM-06이 슬롯을 열고 역추적을 배선했지만, *이 리포트
+        판*은 attempt↔distractor_map 조인을 세지 않는다(ASM-09 선언 범위 밖). 그래서 상태는
+        `..._backtrace_unmeasured`로 남는 것이 정직하다 — 건수를 0으로도, 측정된 값으로도
+        위장하지 않는다.
+        """
+        report = dsdr.build_report(_counts(), [_record(dmap_entries=2)], _probe_present())
+        assert report.backtrace_state == dsdr._BACKTRACE_SLOT_PRESENT_UNMEASURED
+        assert report.backtrace_state != dsdr._BACKTRACE_UNREACHABLE
 
     def test_real_attempt_submit_request_forbids_extra_fields(self) -> None:
         """`extra='forbid'` — 클라가 임의 필드로 인덱스를 실어 보낼 수도 없다(acceptance①)."""

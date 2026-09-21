@@ -144,6 +144,7 @@ from whymath_backend.l4.misconception import (
     select_intervention_from_hypotheses,
 )
 from whymath_backend.l4.misconception.catalog import CATALOG, CATALOG_BY_ID
+from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
 from whymath_backend.l4.misconception.evidence_store import (
     CORRECT_FORM_DEMONSTRATED,
     log_evidence,
@@ -239,6 +240,26 @@ class CoachRequest(BaseModel):
         min_length=0,
         max_length=4000,
         description="학생 발화(자연어). 빈 문자열 허용(첫 진입). 길이 상한은 남용·비용 방어.",
+    )
+    # ASM-06: 학생이 *탭한* 객관식 보기의 0-기반 인덱스. `student_input`에는 그 보기의
+    # **값 문자열**만 실려 오므로 "몇 번을 골랐는가"가 서버에 전달되지 않았고, 그래서 문항의
+    # 오답 선지→오개념 매핑(`distractor_map`)이 완비돼 있어도 역추적이 원천 불가였다.
+    #
+    # 서버가 `student_input`↔선지 목록 대조로 인덱스를 *파생하지 않는* 이유(택ⓐ 판정 근거):
+    # 같은 문자열을 직접 타이핑한 학생과 보기를 탭한 학생이 구분되지 않고, 중복 선지·공백
+    # 정규화 차이에서 무증상 오귀속이 난다. 선택 인덱스는 클라이언트만 아는 사실이다
+    # ("표현 ≠ 의미" — 화면 문자열에서 구조를 역산하지 않는다).
+    selected_choice_index: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "학생이 탭한 객관식 보기의 0-기반 인덱스(`Problem.choices` 위치). 자유 타이핑·"
+            "주관식이면 생략 — 생략하면 미보고로 남는다('0번을 골랐다'와 구분). 제공되면 "
+            "그 문항의 오답 선지→오개념 매핑과 대조해 오개념 **가설**의 근거가 된다"
+            "(단정 아님 — 기존 가설 좌석으로만 흐르고 별도 판정 필드를 만들지 않는다). "
+            "영속 경로(`/v1/coach/sessions[/turns]`)에서만 소비되며, DB 무접근 계약인 "
+            "stateless `/v1/coach`에서는 조회할 매핑이 없어 무시된다."
+        ),
     )
     student_solution: str | None = Field(
         default=None,
@@ -1821,6 +1842,57 @@ async def _log_response_latency_event(
     session.add(event)  # commit은 핸들러가 — 같은 트랜잭션에 합류(별도 commit 금지).
 
 
+async def _distractor_link_matches_for(
+    session: AsyncSession,
+    *,
+    problem_id: uuid.UUID | None,
+    selected_choice_index: int | None,
+) -> list[MisconceptionMatch]:
+    """학생이 탭한 오답 선지 → 오개념 매칭(ASM-06) — 텍스트 채널과 **독립된 두 번째 채널**.
+
+    `_compute_matches`(텍스트 채널)는 학생 발화·풀이 산문에서 오류 서명을 읽는다. 이 채널은
+    문항 저작 시점에 사람이 적어 둔 오답 선지→오개념 매핑(`Problem.distractor_map`)에 학생의
+    *선택 인덱스*를 대조한다 — 재료도 실패 모드도 서로 다르므로 한쪽이 못 돌아도 다른 쪽은
+    돈다. 특히 "보기만 탭하고 아무 말도 쓰지 않은" 턴에서 **유일하게** 도는 채널이다.
+
+    **reactive retrieval(CLAUDE.md 협상 불가)**: 인덱스를 보고하지 않았거나 플래그가 꺼져
+    있으면 DB 조회 자체를 하지 않는다 — 오개념 카탈로그를 컨텍스트에 미리 싣지 않고, 역추적된
+    id 하나만 확인한다(`distractor_link_matches` 내부).
+
+    `problem_id`가 None이면(문항 맥락 없는 자유 대화 턴) 대조할 매핑이 없으므로 빈 목록이다.
+    """
+    if selected_choice_index is None or problem_id is None:
+        return []
+    if not get_settings().l4_distractor_link_enabled:
+        return []
+    distractor_map = await session.scalar(
+        select(ProblemORM.distractor_map).where(ProblemORM.problem_id == problem_id)
+    )
+    return distractor_link_matches(distractor_map, selected_choice_index)
+
+
+def _merge_distractor_matches(
+    persisted: list[MisconceptionMatch],
+    distractor: list[MisconceptionMatch],
+) -> list[MisconceptionMatch]:
+    """선지 채널 매칭을 영속 대상 목록에 합류 — 이미 있는 오개념은 중복 추가하지 않는다.
+
+    **`verdict_withheld`여서 `persisted`가 비어 있어도 합류시킨다**(호출부 주석 참조). 그
+    보류는 게이트 ②·③이 *텍스트 입력*의 품질을 판정한 결과다(OCR 전사 신뢰도·풀이 산문 속
+    정정 어구의 귀속 불명) — 선지 탭에는 전사도 산문도 없어 그 판정의 대상이 아니다. 텍스트
+    채널의 보류를 선지 채널에 전가하면, 사진을 흐리게 찍은 학생의 *번호 선택*까지 함께
+    사라진다.
+
+    순서: 기존 목록 뒤에 붙인다. 앞으로 끼우면 `curate_hypothesis`의 초점 선택이 보던 순서가
+    바뀌어 이 변경과 무관한 동작이 함께 움직인다(선지 채널은 *추가* 신호이지 재정렬 신호가
+    아니다).
+    """
+    if not distractor:
+        return persisted
+    known = {match.misconception.id for match in persisted}
+    return persisted + [m for m in distractor if m.misconception.id not in known]
+
+
 async def _apply_hypotheses(
     session: AsyncSession,
     user_id: uuid.UUID | None,
@@ -2369,6 +2441,22 @@ async def create_session(
     persisted_matches: list[MisconceptionMatch] = (
         [] if outcome.verdict_withheld else outcome.matches
     )
+    # ASM-06 선지 채널 — 학생이 *탭한* 오답 보기를 문항의 distractor_map에 대조해 나온 매칭을
+    # 같은 영속 좌석에 합류시킨다(create_session — problem_id 출처만 다르다). 별도 판정 경로·응답
+    # 필드를 만들지 않는 것이 핵심이다(이중 진실원천 금지): 여기 합류한 매칭은 아래
+    # `_apply_hypotheses` → `curate_hypothesis`를 그대로 타고, 갱신된 가설 세트가
+    # `_build_response_payload`로 흘러 소크라테스 카테고리·개입 발화까지 구동한다.
+    #
+    # 인덱스 미보고·문항 맥락 없음·플래그 OFF면 DB 조회 0으로 즉시 빈 목록이라 기존 턴은
+    # 비트동일하게 동작한다(회귀 0).
+    persisted_matches = _merge_distractor_matches(
+        persisted_matches,
+        await _distractor_link_matches_for(
+            session,
+            problem_id=body.problem_id,
+            selected_choice_index=body.selected_choice_index,
+        ),
+    )
     active_hypotheses = await _apply_hypotheses(session, user.user_id, persisted_matches)
     # S1-b: WH-1 하네스 *shadow 관측*(비노출·비블로킹·무영속). 플래그 ON일 때만 하네스를 병렬로
     # 돌려 '하네스가 어떤 도구를 골랐는지·verify 판정이 무엇인지'만 서버 로그로 남긴다 — 학생 응답은
@@ -2774,6 +2862,22 @@ async def append_turns(
     # MISC-17/MISC-28: create_session과 동형 — 게이트 ②·③이면 영속 계층에 빈 매칭(주석은 위 참조).
     persisted_matches: list[MisconceptionMatch] = (
         [] if outcome.verdict_withheld else outcome.matches
+    )
+    # ASM-06 선지 채널 — 학생이 *탭한* 오답 보기를 문항의 distractor_map에 대조해 나온 매칭을
+    # 같은 영속 좌석에 합류시킨다(append_turns — problem_id 출처만 다르다). 별도 판정 경로·응답
+    # 필드를 만들지 않는 것이 핵심이다(이중 진실원천 금지): 여기 합류한 매칭은 아래
+    # `_apply_hypotheses` → `curate_hypothesis`를 그대로 타고, 갱신된 가설 세트가
+    # `_build_response_payload`로 흘러 소크라테스 카테고리·개입 발화까지 구동한다.
+    #
+    # 인덱스 미보고·문항 맥락 없음·플래그 OFF면 DB 조회 0으로 즉시 빈 목록이라 기존 턴은
+    # 비트동일하게 동작한다(회귀 0).
+    persisted_matches = _merge_distractor_matches(
+        persisted_matches,
+        await _distractor_link_matches_for(
+            session,
+            problem_id=dialogue.problem_id,
+            selected_choice_index=body.selected_choice_index,
+        ),
     )
     active_hypotheses = await _apply_hypotheses(session, user.user_id, persisted_matches)
     # S1-11(flip-없는 수렴 잔여): 멀티턴에도 WH-1 shadow 관측 배선 — create_session(위 :1191)과

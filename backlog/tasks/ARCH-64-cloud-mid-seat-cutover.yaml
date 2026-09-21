@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-64-cloud-mid-seat-cutover
+title: "CLOUD_MID 좌석 컷오버 — cloud_provider 기본값 openrouter 전환 + 학생 대면 서빙 노출 (ARCH-55 판정 번복)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - ARCH-62-cloud-cost-table-seat-axis
+  - ARCH-63-cloud-seat-failover
+requires_gates:
+  - G-cloud-mid-seat-cutover
+acceptance:
+  - "① cloud_provider 기본값 anthropic → openrouter 전환. ② ARCH-55 판정문의 \"기본 핀 불변\" 조항과 tests/backend/l3/test_cloud_provider_selector.py의 test_default_cloud_provider_is_anthropic 동결 문면을 **함께** 갱신한다 — 코드만 바꾸고 동결 문면을 두면 그 테스트가 이유를 잃은 채 실패하거나, 더 나쁘게는 갱신된 이유를 아무도 모른다. ③ 학생 대면 서빙(app.py)의 좌석 조립을 build_cloud_provider() 팩토리 경유로 전환하고 test_student_facing_app_does_not_use_the_selector를 그 근거로 갱신한다 — 무력화된 채 통과시키지 않는다(가드가 좌석 조립 위치를 계속 보게 한다). ④ 순서 준수 — ③은 ARCH-62·ARCH-63 착지 후 G-cloud-mid-seat-cutover clear 이후에만 한다. 반대 순서는 게이트 우회다(그 테스트 docstring이 명시). ⑤ 라이브 대조 1회 — 전환 후 저작 1회차와 학생 대면 1회차를 각각 돌려 cloud_seat 관측이 openrouter를 말하고, 기록 원가가 좌석 단가(약 0.354원)로 찍히며, seat_primary_success_rate가 산출되는지 확인한다. 실패 회차도 그대로 기록한다(폐기 금지). ⑥ MEMORY 결정 로그 기재 — 전환 근거(2026-09-21 Kiki 지시)·ARCH-55 판정 번복 사실·비용 영향·가용성 해소 수단(ARCH-63 failover). ⑦ CLAUDE.md 기술 스택 표의 클라우드 LLM 행을 실측 정합시킨다(현재 \"claude-sonnet-4-6(CLOUD_MID)·claude-opus-4-7(CLOUD_HIGH)만\" 표기)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/app.py
+  - tests/backend/l3/test_cloud_provider_selector.py
+session: null
+notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 1절·5절. 판정 기준: main d10ba109.\n\n이 태스크에서 새로 짜는 클라우드 코드는 없다 — Kiki가 지정한 네 조건(OpenRouter·특정 공급사·US·fp8)이 config.py에 이미 구현·동결돼 있다(openrouter_model_mid=deepseek/deepseek-v4.1-flash · openrouter_allowed_providers=(deepinfra,) · provider.only + allow_fallbacks=false + data_collection=deny 3종 계약). 바꾸는 것은 기본값 한 줄이고, 그것이 ARCH-55 판정문이 못박은 값이라 코드 변경이 아니라 판정 번복이다.\n\n적용 범위는 저작 경로와 학생 대면 양쪽이다 — 2026-09-21 Kiki 2회 확인."
+updated: 2026-09-21

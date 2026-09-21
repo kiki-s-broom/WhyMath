@@ -1,7 +1,8 @@
 // 진단→문제제시 화면 — CAT 추천 문제를 로드해 발문·맥락·보기를 보이고 코치로 진입시킨다.
 //
 // 경계(CLAUDE.md): 화면은 서버가 내려준 문제 구조를 *그대로 표시*만 한다(표현≠의미). 정답·정오
-// 강조·게임화 없음(절대 금기). LaTeX 발문은 후속 렌더 위젯 전까지 plain Text로 보인다(기존 관행).
+// 강조·게임화 없음(절대 금기). 발문·보기의 캐럿/평문 수식은 MathText가 교과서 조판으로 렌더한다
+// (S3-39 회수) — 조판은 *표기* 변환일 뿐 의미·정오 판정이 아니며, 파싱 불가는 원문 폴백이다.
 //
 // ⚠️ 안전(절대 원칙 #1): [Problem] 모델은 answer를 담지 않으므로 이 화면이 정답을 노출할 방법이
 // 구조적으로 없다(problem_models.dart 안전 주석). 정오 판단은 코치/verify 신호로만 이뤄진다.
@@ -10,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router.dart';
+import '../../../shared/widgets/math_text.dart';
 import '../../../theme/spacing.dart';
 import '../application/active_problem.dart';
 import '../application/diagnosis_controller.dart';
@@ -151,15 +153,30 @@ class _ProblemView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.xl),
-        // 발문(LaTeX는 후속 렌더 위젯 전까지 plain Text).
-        Text(questionBody, style: theme.textTheme.titleMedium),
+        // 발문 — 프로즈+수식 혼합을 교과서 조판으로 렌더한다(캐럿/평문 수식만·표현≠의미·S3-39).
+        MathText(questionBody, style: theme.textTheme.titleMedium),
         if (problem.choices != null && problem.choices!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.xl),
           for (var i = 0; i < problem.choices!.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Text(
-                '${_circledNumber(i + 1)} ${problem.choices![i]}',
+              // 원 번호 접두사는 평문·값만 수식 조판(번호가 값 수식에 섞이지 않게).
+              //
+              // 스타일은 루트 TextSpan이 아니라 Text.rich의 `style` 인자로 준다 — 보기끼리
+              // 색이 갈리지 않음을 `tester.widget<Text>(...).style?.color`로 동결한 S3-35
+              // 게이트가 그래야 변별력을 유지한다(루트 스팬에 넣으면 Text.style이 항상 null이
+              // 돼 정오 차등 강조가 들어와도 통과하는 위장 검사가 된다).
+              child: Text.rich(
+                TextSpan(
+                  children: <InlineSpan>[
+                    TextSpan(text: '${_circledNumber(i + 1)} '),
+                    ...mathInlineSpansFor(
+                      problem.choices![i],
+                      theme.textTheme.bodyLarge ??
+                          DefaultTextStyle.of(context).style,
+                    ),
+                  ],
+                ),
                 style: theme.textTheme.bodyLarge,
               ),
             ),
