@@ -128,8 +128,11 @@ def test_macro_evidence_paths_are_declared_in_manifest_provenance() -> None:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "NS-02 미착륙으로 Dart 실증 파일 전량 부재(2026-08-11 실측 5/5). "
-        "MATH-02 ⑥에서 '포기'로 판정 — 해소되면 이 xfail이 XPASS로 실패해 표식 제거를 알린다."
+        "잔여 근거 1건 부재 — docs/architecture/notation_semantics_layer.md(표기 의미 계층 "
+        "설계 정본)는 한 번도 작성된 적이 없다(원 NS-02 브랜치에도 부재·2026-09-21 실측). "
+        "Dart 실증 4건은 S3-24 버킷B 회수로 착지해 proven이 됐다 — 종전 사유 '전량 부재(5/5)'는 "
+        "그 시점 사실이었고 지금은 1/5만 남았다. 마지막 1건이 작성되면 이 xfail이 XPASS로 "
+        "실패해 표식 제거를 알린다(설계 불변)."
     ),
 )
 def test_all_declared_evidence_files_exist() -> None:
