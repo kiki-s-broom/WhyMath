@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import statistics
 from pathlib import Path
 
 import pytest
@@ -22,18 +23,41 @@ from whymath_backend.harness.residue_cross_verify_eval import (
 )
 from whymath_backend.harness.residue_gate_demotion_battle import (
     RESIDUE_DEFECT_CLASSES,
+    RESIDUE_HOLDOUT_DEFECT_CLASSES,
+    RESIDUE_TUNED_DEFECT_CLASSES,
+    MeasurementConfig,
     ResidueBattleReport,
+    UnionCrossVerifier,
+    _max_value,
+    _mean,
+    _min_value,
     _mutate_ambiguous_wording,
+    _mutate_contradictory_condition,
     _mutate_missing_condition,
     _mutate_multiple_valid_answers,
     _mutate_unstated_equiprobability,
+    _stdev,
     build_residue_seeded_set,
+    build_v4_wiring,
     main,
+    render_repeated_report,
+    render_report,
+    repeated_report_to_json,
     report_to_json,
+    run_repeated_residue_demotion_battle,
     run_residue_demotion_battle,
     write_audit_jsonl,
+    write_repeated_audit_jsonl,
 )
-from whymath_backend.l3.cross_verify import CrossVerificationResult, PerspectiveVerdict
+from whymath_backend.l3.cross_verify import (
+    MISSING_CONDITION_PERSPECTIVES,
+    MULTIPLE_VALID_ANSWERS_PERSPECTIVES,
+    CrossVerificationResult,
+    CrossVerifier,
+    PerspectiveVerdict,
+    ResidueSubject,
+)
+from whymath_backend.l3.models import GenerationResult
 from whymath_backend.l3.verification_tier import VerificationTier
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -416,3 +440,853 @@ def test_pilot_record_reuses_shared_loader_type(records: list[PilotRecord]) -> N
     """PilotRecord/load_pilot_records는 이 모듈이 재구현한 것이 아니라 재사용임을 확인."""
     assert records and isinstance(records[0], PilotRecord)
     assert {r.tier for r in records} == {VerificationTier.MACHINE_EXHAUSTIVE}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S4-16 2차 강등전 준비분 — A) 반복 측정 · B) 대조군 표본 분리 · C) 클라우드 좌석 ·
+# D) 홀드아웃 결함류. 전부 hermetic(결정론 fake verifier·네트워크 0).
+# ══════════════════════════════════════════════════════════════════════════
+
+
+# ── D) 홀드아웃 변조기 `contradictory_condition` ──────────────────────────
+def test_holdout_mutator_inserts_dice_clause_for_groups_a_and_d() -> None:
+    """주사위 그룹(A 확률·D 경우의 수) — 첫 문장 직후에 모순 조건이 한 문장으로 들어간다."""
+    mutated_a, note_a = _mutate_contradictory_condition(_GROUP_A_TEXT)
+    assert mutated_a == (
+        "서로 구별되는 두 개의 주사위를 동시에 던진다. 단, 두 눈의 수는 서로 다르다. "
+        "각 주사위의 여섯 눈이 나올 가능성이 모두 같을 때, 나온 두 눈의 수의 합이 7일 "
+        "확률을 기약분수로 나타내시오."
+    )
+    assert "홀드아웃" in note_a
+
+    mutated_d, _ = _mutate_contradictory_condition(_GROUP_D_TEXT)
+    assert mutated_d == (
+        "서로 구별되는 두 개의 주사위를 동시에 던진다. 단, 두 눈의 수는 서로 다르다. "
+        "나온 두 눈의 수의 합이 6 이상이 되는 경우의 수를 구하시오. "
+        "(두 주사위는 서로 구별하며, 눈의 순서가 다르면 다른 경우로 센다.)"
+    )
+
+
+def test_holdout_mutator_inserts_coin_clause_for_group_b() -> None:
+    mutated_b, note_b = _mutate_contradictory_condition(_GROUP_B_TEXT)
+    assert mutated_b == (
+        "한 개의 동전을 3번 던진다. 단, 첫 번째 시행은 반드시 앞면이다. "
+        "매번 앞면과 뒷면이 나올 가능성이 같을 때, 앞면이 정확히 1번 나올 확률을 "
+        "기약분수로 나타내시오."
+    )
+    assert "홀드아웃" in note_b
+
+
+def test_holdout_mutator_returns_none_when_white_ball_absent() -> None:
+    """공 추출 그룹 — 이 코퍼스에는 흰 공이 없으므로 정직하게 None(억지 변조 금지)."""
+    assert "흰 공" not in _GROUP_C_TEXT
+    assert _mutate_contradictory_condition(_GROUP_C_TEXT) is None
+
+
+def test_holdout_mutator_applies_to_ball_group_only_when_white_ball_exists() -> None:
+    """변별력 — 흰 공이 *있는* 문장에서는 같은 앵커가 적용된다(비적용이 색인 하드코딩이
+    아니라 '흰 공 실재' 판정의 결과임을 증명한다)."""
+    with_white = (
+        "주머니 안에 서로 구별되는 빨간 공 3개와 흰 공 2개가 들어 있다. 이 주머니에서 "
+        "임의로 2개의 공을 동시에 꺼낼 때, 꺼낸 공이 모두 빨간 공일 확률을 기약분수로 "
+        "나타내시오."
+    )
+    result = _mutate_contradictory_condition(with_white)
+    assert result is not None
+    mutated, _ = result
+    assert mutated == (
+        "주머니 안에 서로 구별되는 빨간 공 3개와 흰 공 2개가 들어 있다. "
+        "단, 꺼낸 공 중 적어도 하나는 흰 공이다. 이 주머니에서 임의로 2개의 공을 "
+        "동시에 꺼낼 때, 꺼낸 공이 모두 빨간 공일 확률을 기약분수로 나타내시오."
+    )
+
+
+def test_holdout_coverage_is_measured_not_estimated(records: list[PilotRecord]) -> None:
+    """실측 커버리지 28/34 — 주사위 19(A 11 + D 8) + 동전 9 + 공 추출 0."""
+    battery = build_residue_seeded_set(records)
+    assert len(records) == 34
+    assert battery.coverage["contradictory_condition"] == 28
+    holdout_items = [i for i in battery.seeded if i.defect_class == "contradictory_condition"]
+    assert len(holdout_items) == 28
+    # 변조는 발문에만 — 정답·조건식은 손대지 않는다(튜닝 4종과 같은 계약).
+    for item in holdout_items:
+        assert item.mutated_question_text != item.record.question_text
+        assert item.record.answer == item.record.answer
+
+
+def test_holdout_is_registered_as_holdout_not_tuned() -> None:
+    assert RESIDUE_HOLDOUT_DEFECT_CLASSES == ("contradictory_condition",)
+    assert "contradictory_condition" not in RESIDUE_TUNED_DEFECT_CLASSES
+    assert set(RESIDUE_DEFECT_CLASSES) == set(RESIDUE_TUNED_DEFECT_CLASSES) | set(
+        RESIDUE_HOLDOUT_DEFECT_CLASSES
+    )
+
+
+class _HoldoutOnlyVerifier:
+    """홀드아웃 변조만 잡고 튜닝 4종은 전부 놓치는 검출기 — 분리 집계의 **변별력** 증명용.
+
+    이 프로파일에서 `overall_*`(튜닝)과 `holdout_*`가 **다른 값**을 내야 한다. 같은 값이
+    나오면 분리가 장식이라는 뜻이다.
+    """
+
+    def verify(self, subject: object) -> CrossVerificationResult:
+        question_text: str = subject.question_text  # type: ignore[attr-defined]
+        problem_id: str = subject.problem_id  # type: ignore[attr-defined]
+        is_holdout = "단, 두 눈의 수는 서로 다르다." in question_text or (
+            "단, 첫 번째 시행은 반드시 앞면이다." in question_text
+        )
+        if is_holdout:
+            return CrossVerificationResult(
+                problem_id,
+                (PerspectiveVerdict("p", "defect", "model_mismatch", "모순 조건"),),
+                "defect",
+                "p:model_mismatch",
+                "결함",
+            )
+        return CrossVerificationResult(
+            problem_id, (PerspectiveVerdict("p", "ok", "", "정상"),), "ok", "", "만장일치"
+        )
+
+
+def test_holdout_totals_are_not_summed_into_overall(records: list[PilotRecord]) -> None:
+    """홀드아웃만 잡는 검출기 — 튜닝 집계는 0, 홀드아웃 집계는 100%로 **갈라져야** 한다."""
+    battery = build_residue_seeded_set(records)
+    report = run_residue_demotion_battle(
+        battery, verifier=_HoldoutOnlyVerifier(), sample_n=4, seed="hold1"
+    )
+    assert report.overall_detected == 0
+    assert report.overall_resolved > 0
+    assert report.holdout_detected == report.holdout_resolved > 0
+    # 전체 집계는 튜닝 4종의 합과 정확히 일치한다(홀드아웃이 새지 않는다).
+    assert report.overall_resolved == sum(
+        report.per_class[n].resolved for n in RESIDUE_TUNED_DEFECT_CLASSES
+    )
+    assert report.holdout_resolved == sum(
+        report.per_class[n].resolved for n in RESIDUE_HOLDOUT_DEFECT_CLASSES
+    )
+    holdout_lower = report.holdout_detection_lower_bound(0.95)
+    overall_lower = report.overall_detection_lower_bound(0.95)
+    assert holdout_lower is not None and holdout_lower > 0.4
+    assert overall_lower is not None and overall_lower < 1e-9
+
+
+def test_holdout_reported_on_its_own_line_and_json_key(records: list[PilotRecord]) -> None:
+    """리포트·JSON에서 홀드아웃이 튜닝 집계와 **분리된 자리**에 실린다."""
+    battery = build_residue_seeded_set(records)
+    report = run_residue_demotion_battle(
+        battery, verifier=_HoldoutOnlyVerifier(), sample_n=3, seed="hold2"
+    )
+    text = render_report(report, confidence=0.95, corpus_size=len(records))
+    assert "[홀드아웃 결함류" in text
+    assert "[전체 — 튜닝 4종만 합산(홀드아웃 제외)]" in text
+    # 전체 블록과 홀드아웃 블록은 서로 다른 줄이고, 전체 줄에 홀드아웃 수치가 없다.
+    overall_line = next(line for line in text.splitlines() if "결함 검출률" in line)
+    assert f"{report.overall_detected}/{report.overall_resolved}" in overall_line
+    holdout_line = next(line for line in text.splitlines() if "홀드아웃 검출률" in line)
+    assert f"{report.holdout_detected}/{report.holdout_resolved}" in holdout_line
+    assert overall_line != holdout_line
+
+    payload = report_to_json(report, confidence=0.95)
+    overall = payload["overall"]
+    holdout = payload["holdout"]
+    assert isinstance(overall, dict) and isinstance(holdout, dict)
+    assert overall["detected"] == report.overall_detected
+    assert holdout["detected"] == report.holdout_detected
+    assert payload["holdout_classes"] == ["contradictory_condition"]
+
+
+def test_audit_rows_flag_holdout(records: list[PilotRecord], tmp_path: Path) -> None:
+    """감사 JSONL의 홀드아웃 판정 행은 `holdout: true`로 표시된다(하류 합산 사고 방지)."""
+    battery = build_residue_seeded_set(records)
+    report = run_residue_demotion_battle(
+        battery, verifier=_HoldoutOnlyVerifier(), sample_n=2, seed="hold3"
+    )
+    out = tmp_path / "audit.jsonl"
+    write_audit_jsonl(out, report)
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    verdicts = [r for r in rows if r["record_type"] == "verdict"]
+    holdout_rows = [r for r in verdicts if r["defect_class"] == "contradictory_condition"]
+    assert holdout_rows and all(r["holdout"] is True for r in holdout_rows)
+    tuned_rows = [r for r in verdicts if r["defect_class"] in RESIDUE_TUNED_DEFECT_CLASSES]
+    assert tuned_rows and all(r["holdout"] is False for r in tuned_rows)
+    summary = rows[-1]
+    assert summary["as_found_holdout_detected"] == report.holdout_detected
+    assert summary["as_found_overall_detected"] == report.overall_detected
+
+
+# ── B) `--clean-n` 대조군 표본 분리 ───────────────────────────────────────
+def test_clean_n_scales_control_only(records: list[PilotRecord]) -> None:
+    """대조군만 늘고 결함류 표본 수는 그대로 — 1차가 못 한 오검출 보정의 선결 조건."""
+    battery = build_residue_seeded_set(records)
+    report = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=2,
+        clean_n=20,
+        seed="cn1",
+    )
+    assert report.clean_sampled == 20
+    for name in RESIDUE_DEFECT_CLASSES:
+        assert report.per_class[name].sampled <= 2
+    # 대조군 판정 표본이 20이면 Wilson 상한이 실제로 좁아진다(보정이 가능해진다).
+    fau = report.false_alarm_upper_bound(0.95)
+    assert fau is not None and fau < 0.15
+
+
+def test_clean_n_omitted_preserves_legacy_behaviour(records: list[PilotRecord]) -> None:
+    """생략 시 기존 동작과 **동일** — sample_n이 양쪽을 함께 정한다(회귀 0)."""
+    battery = build_residue_seeded_set(records)
+    omitted = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=3,
+        seed="cn2",
+    )
+    explicit = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=3,
+        clean_n=3,
+        seed="cn2",
+    )
+    assert omitted.clean_sampled == 3
+    assert omitted.clean_sampled == explicit.clean_sampled
+    assert omitted.clean_resolved == explicit.clean_resolved
+    assert omitted.audit_rows == explicit.audit_rows
+
+
+def test_clean_n_keeps_select_sample_determinism(records: list[PilotRecord]) -> None:
+    """표본 추출의 결정론(시드) 성질 유지 — 작은 n의 표본은 큰 n의 **접두사**다."""
+    battery = build_residue_seeded_set(records)
+    small = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=1,
+        clean_n=3,
+        seed="cn3",
+    )
+    large = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=1,
+        clean_n=9,
+        seed="cn3",
+    )
+    small_clean = [r.problem_id for r in small.audit_rows if r.role == "clean"]
+    large_clean = [r.problem_id for r in large.audit_rows if r.role == "clean"]
+    assert len(small_clean) == 3
+    assert len(large_clean) == 9
+    assert large_clean[:3] == small_clean
+
+
+# ── A) `--repeat-runs` 반복 측정 집계 ─────────────────────────────────────
+def test_stat_helpers_exact_values_and_none_handling() -> None:
+    """알려진 입력에서 정확한 값 — None(측정 실패)은 제외하고 0으로 접지 않는다."""
+    assert _mean([1.0, 2.0, None]) == pytest.approx(1.5)
+    assert _mean([None, None]) is None
+    assert _stdev([1.0, 2.0]) == pytest.approx(statistics.stdev([1.0, 2.0]))
+    assert _stdev([0.2, 0.4, 0.9]) == pytest.approx(statistics.stdev([0.2, 0.4, 0.9]))
+    assert _stdev([1.0]) is None  # 1회 실행에 변동성은 없다
+    assert _stdev([1.0, None]) is None
+    assert _min_value([0.3, 0.1, None]) == pytest.approx(0.1)
+    assert _max_value([0.3, 0.1, None]) == pytest.approx(0.3)
+    assert _min_value([None]) is None and _max_value([None]) is None
+
+
+class _PhasedVerifier:
+    """회차 경계에서 동작이 바뀌는 검출기 — 반복 집계가 *회차 간 차이*를 잡는지 증명한다.
+
+    `calls_per_run` 콜마다 위상이 바뀐다: 1회차는 완벽 검출, 2회차는 눈먼 검출기. 반복
+    집계가 옳다면 평균 0.5·표준편차 = stdev([하한1, 하한2])가 나와야 한다.
+    """
+
+    def __init__(self, *, calls_per_run: int) -> None:
+        self._calls_per_run = calls_per_run
+        self._calls = 0
+
+    def verify(self, subject: object) -> CrossVerificationResult:
+        run_index = self._calls // self._calls_per_run
+        self._calls += 1
+        problem_id: str = subject.problem_id  # type: ignore[attr-defined]
+        if run_index % 2 == 0:  # 1회차(및 3, 5…) — 전건 검출
+            return CrossVerificationResult(
+                problem_id,
+                (PerspectiveVerdict("p", "defect", "model_mismatch", "불일치"),),
+                "defect",
+                "p:model_mismatch",
+                "결함",
+            )
+        return CrossVerificationResult(
+            problem_id, (PerspectiveVerdict("p", "ok", "", "정상"),), "ok", "", "만장일치"
+        )
+
+
+def _calls_per_run(records: list[PilotRecord], *, sample_n: int, clean_n: int, seed: str) -> int:
+    """1회차 실행이 실제로 몇 콜을 쓰는지 실측 — 위상 전환 지점을 추측하지 않는다."""
+    battery = build_residue_seeded_set(records)
+    probe = _ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records))
+    run_residue_demotion_battle(
+        battery, verifier=probe, sample_n=sample_n, clean_n=clean_n, seed=seed
+    )
+    return len(probe.seen)
+
+
+def test_repeated_run_aggregates_mean_stdev_min_max(records: list[PilotRecord]) -> None:
+    """알려진 입력(1회차 100% · 2회차 0%)에서 평균/표준편차/최악이 정확한 값을 낸다."""
+    battery = build_residue_seeded_set(records)
+    per_run = _calls_per_run(records, sample_n=2, clean_n=2, seed="rep1")
+    repeated = run_repeated_residue_demotion_battle(
+        battery,
+        verifier=_PhasedVerifier(calls_per_run=per_run),
+        sample_n=2,
+        clean_n=2,
+        seed="rep1",
+        repeat_runs=2,
+        corpus_size=len(records),
+        confidence=0.95,
+    )
+    assert repeated.repeat_runs == 2 and len(repeated.reports) == 2
+    run1, run2 = repeated.reports
+    assert run1.overall_detected == run1.overall_resolved > 0  # 1회차 100%
+    assert run2.overall_detected == 0  # 2회차 0%
+    # 표본 추출은 시드 고정 → 두 회차가 같은 문항을 본다(차이는 검증기의 비결정성뿐).
+    assert [r.problem_id for r in run1.audit_rows] == [r.problem_id for r in run2.audit_rows]
+
+    payload = repeated_report_to_json(repeated)
+    overall = payload["overall"]
+    assert overall["detection_rate_mean"] == pytest.approx(0.5)
+    lowers = [run1.overall_detection_lower_bound(0.95), run2.overall_detection_lower_bound(0.95)]
+    assert lowers[0] is not None and lowers[1] is not None
+    assert overall["detection_lower_bound_mean"] == pytest.approx(statistics.mean(lowers))
+    assert overall["detection_lower_bound_worst"] == pytest.approx(min(lowers))
+    assert overall["detection_lower_bound_stdev"] == pytest.approx(statistics.stdev(lowers))
+
+
+def test_repeated_run_single_run_has_no_stdev(records: list[PilotRecord]) -> None:
+    """1회 실행 — 표준편차는 None(0.0으로 위장하면 '변동 없음'으로 오독된다)."""
+    battery = build_residue_seeded_set(records)
+    repeated = run_repeated_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=2,
+        seed="rep2",
+        repeat_runs=1,
+        corpus_size=len(records),
+    )
+    payload = repeated_report_to_json(repeated)
+    overall = payload["overall"]
+    assert overall["detection_lower_bound_stdev"] is None
+    assert overall["detection_rate_mean"] == pytest.approx(1.0)
+
+
+def test_repeated_run_rejects_zero_runs(records: list[PilotRecord]) -> None:
+    battery = build_residue_seeded_set(records)
+    with pytest.raises(ValueError, match="repeat_runs"):
+        run_repeated_residue_demotion_battle(
+            battery,
+            verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+            repeat_runs=0,
+        )
+
+
+def test_repeated_report_separates_holdout_and_renders_stats(records: list[PilotRecord]) -> None:
+    battery = build_residue_seeded_set(records)
+    repeated = run_repeated_residue_demotion_battle(
+        battery,
+        verifier=_HoldoutOnlyVerifier(),
+        sample_n=2,
+        clean_n=4,
+        seed="rep3",
+        repeat_runs=3,
+        corpus_size=len(records),
+    )
+    text = render_repeated_report(repeated)
+    assert "반복 실행" in text
+    assert "[전체 — 튜닝 4종만 합산(홀드아웃 제외)]" in text
+    assert "[홀드아웃 결함류" in text
+    assert "대조군 표본 4건" in text and "반복 3회" in text
+
+    payload = repeated_report_to_json(repeated)
+    overall = payload["overall"]
+    holdout = payload["holdout"]
+    assert overall["detection_rate_mean"] == pytest.approx(0.0)
+    assert holdout["detection_rate_mean"] == pytest.approx(1.0)
+    per_class = payload["per_class"]
+    assert per_class["contradictory_condition"]["holdout"] is True
+    assert per_class["missing_condition"]["holdout"] is False
+
+
+def test_write_repeated_audit_jsonl_tags_each_run(
+    records: list[PilotRecord], tmp_path: Path
+) -> None:
+    battery = build_residue_seeded_set(records)
+    repeated = run_repeated_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=1,
+        clean_n=1,
+        seed="rep4",
+        repeat_runs=2,
+        corpus_size=len(records),
+        measurement_config=MeasurementConfig(kind="local_fixed", local_model="qwen2.5:7b"),
+    )
+    out = tmp_path / "repeated.jsonl"
+    written = write_repeated_audit_jsonl(out, repeated)
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert written == len(rows)
+    assert rows[0]["record_type"] == "measurement_config"
+    assert rows[0]["local_model"] == "qwen2.5:7b"
+    assert rows[0]["repeat_runs"] == 2
+    verdicts = [r for r in rows if r["record_type"] == "verdict"]
+    assert {r["run"] for r in verdicts} == {1, 2}
+    summaries = [r for r in rows if r["record_type"] == "as_found_summary"]
+    assert [s["run"] for s in summaries] == [1, 2]
+
+
+# ── 결함류별 검증기 주입(--v4 배선을 위한 확장 지점) ──────────────────────
+def test_verifier_mapping_routes_per_defect_class(records: list[PilotRecord]) -> None:
+    """Mapping 주입 — 결함류별로 다른 검증기가 쓰이고, 매핑에 없는 결함류는 기본을 쓴다."""
+    battery = build_residue_seeded_set(records)
+    targeted = _ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records))
+    fallback = _ScriptedVerifier(mode="blind_ok", clean_texts=_clean_texts(records))
+    report = run_residue_demotion_battle(
+        battery,
+        verifier={"missing_condition": targeted},  # type: ignore[dict-item]
+        default_verifier=fallback,
+        sample_n=2,
+        clean_n=2,
+        seed="map1",
+    )
+    # missing_condition만 oracle을 탔으므로 그 결함류만 검출된다.
+    assert report.per_class["missing_condition"].detected > 0
+    for name in RESIDUE_DEFECT_CLASSES:
+        if name != "missing_condition":
+            assert report.per_class[name].detected == 0
+    assert len(targeted.seen) == report.per_class["missing_condition"].sampled
+    # 대조군은 기본 검증기가 맡는다.
+    assert len(fallback.seen) > 0
+
+
+def test_verifier_mapping_without_any_verifier_raises(records: list[PilotRecord]) -> None:
+    """빈 매핑 + 기본 검증기 없음 — 조용히 0건으로 끝내지 않고 raise(침묵 실패 금지)."""
+    battery = build_residue_seeded_set(records)
+    with pytest.raises(ValueError, match="검증기"):
+        run_residue_demotion_battle(battery, verifier={}, sample_n=1)
+
+
+# ── C) 클라우드 좌석 선택(`--cloud`) ──────────────────────────────────────
+def test_cloud_and_local_model_are_mutually_exclusive() -> None:
+    """둘 다 주면 argparse가 거부한다 — 어느 좌석의 수치인지 말할 수 없는 측정은 시작도 못 한다."""
+    if not _PILOT_CORPUS.exists():  # pragma: no cover — 코퍼스 미생성 환경 방어
+        pytest.skip(f"파일럿 코퍼스 미존재({_PILOT_CORPUS})")
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(_PILOT_CORPUS), "--cloud", "--local-model", "qwen2.5:7b"])
+    assert excinfo.value.code == 2  # argparse 사용법 오류
+
+
+def test_measurement_config_describe_and_json() -> None:
+    cloud = MeasurementConfig(
+        kind="cloud_seat",
+        cloud_provider="openrouter",
+        cloud_model_mid="deepseek/deepseek-v4.1-flash",
+        cloud_model_high="deepseek/deepseek-v4.1",
+    )
+    assert "openrouter" in cloud.describe()
+    assert "deepseek/deepseek-v4.1-flash" in cloud.describe()
+    assert cloud.to_json()["cloud_provider"] == "openrouter"
+
+    local = MeasurementConfig(kind="local_fixed", local_model="qwen2.5:7b")
+    assert "qwen2.5:7b" in local.describe()
+    assert local.to_json()["local_model"] == "qwen2.5:7b"
+
+    router = MeasurementConfig(kind="router_default")
+    assert "라우터" in router.describe()
+
+
+def test_report_records_measurement_config(records: list[PilotRecord]) -> None:
+    """측정 구성이 리포트·JSON에 실린다 — 없으면 '기록 없음'이라고 말한다(침묵 금지)."""
+    battery = build_residue_seeded_set(records)
+    config = MeasurementConfig(
+        kind="cloud_seat",
+        cloud_provider="openrouter",
+        cloud_model_mid="mid-pin",
+        cloud_model_high="high-pin",
+    )
+    report = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=1,
+        clean_n=1,
+        seed="mc1",
+        measurement_config=config,
+    )
+    text = render_report(report, confidence=0.95, corpus_size=len(records))
+    assert "[측정 구성] 클라우드 좌석 openrouter" in text
+    assert "mid-pin" in text and "high-pin" in text
+    assert report_to_json(report)["measurement_config"] == config.to_json()
+
+    without = run_residue_demotion_battle(
+        battery,
+        verifier=_ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records)),
+        sample_n=1,
+        clean_n=1,
+        seed="mc1",
+    )
+    assert "[측정 구성] 기록 없음" in render_report(
+        without, confidence=0.95, corpus_size=len(records)
+    )
+    assert report_to_json(without)["measurement_config"] is None
+
+
+def test_cli_cloud_goes_through_provider_factory(
+    records: list[PilotRecord], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--cloud`가 factory를 경유하고 좌석 이름·모델 핀이 산출물에 실린다(네트워크 0)."""
+    if not _PILOT_CORPUS.exists():  # pragma: no cover — 코퍼스 미생성 환경 방어
+        pytest.skip(f"파일럿 코퍼스 미존재({_PILOT_CORPUS})")
+    import whymath_backend.harness.residue_gate_demotion_battle as battle_mod
+
+    sentinel = object()
+    factory_calls: list[str] = []
+
+    def _fake_build_cloud_provider() -> object:
+        factory_calls.append("build_cloud_provider")
+        return sentinel
+
+    def _fake_cloud_provider_name() -> str:
+        factory_calls.append("cloud_provider_name")
+        return "openrouter"
+
+    def _fake_cloud_model_pins() -> tuple[str, str]:
+        factory_calls.append("cloud_model_pins")
+        return ("mid-pin", "high-pin")
+
+    seen_providers: list[object] = []
+    clean_texts = _clean_texts(records)
+
+    class _FakeCrossVerifier:
+        def __init__(self, *, provider: object | None = None) -> None:
+            seen_providers.append(provider)
+            self._inner = _ScriptedVerifier(mode="oracle", clean_texts=clean_texts)
+
+        def verify(self, subject: object) -> CrossVerificationResult:
+            return self._inner.verify(subject)
+
+        def flush_trace(self) -> None:
+            return None
+
+    monkeypatch.setattr(battle_mod, "build_cloud_provider", _fake_build_cloud_provider)
+    monkeypatch.setattr(battle_mod, "cloud_provider_name", _fake_cloud_provider_name)
+    monkeypatch.setattr(battle_mod, "cloud_model_pins", _fake_cloud_model_pins)
+    monkeypatch.setattr(battle_mod, "CrossVerifier", _FakeCrossVerifier)
+
+    audit_out = tmp_path / "cloud_audit.jsonl"
+    exit_code = main(
+        [
+            str(_PILOT_CORPUS),
+            "--cloud",
+            "--sample-n",
+            "1",
+            "--clean-n",
+            "2",
+            "--audit-out",
+            str(audit_out),
+        ]
+    )
+    assert exit_code == 0
+    assert "build_cloud_provider" in factory_calls  # 팩토리 경유 — 자체 클라이언트 조립 아님
+    assert "cloud_provider_name" in factory_calls and "cloud_model_pins" in factory_calls
+    assert seen_providers == [sentinel]  # 팩토리가 만든 provider가 검증기에 주입됐다
+
+    rows = [json.loads(line) for line in audit_out.read_text(encoding="utf-8").splitlines()]
+    header = rows[0]
+    assert header["record_type"] == "measurement_config"
+    assert header["kind"] == "cloud_seat"
+    assert header["cloud_provider"] == "openrouter"
+    assert header["cloud_model_mid"] == "mid-pin"
+    clean_rows = [r for r in rows if r.get("role") == "clean"]
+    assert len(clean_rows) == 2  # --clean-n이 대조군만 2건으로 정했다
+
+
+def test_cli_local_model_records_its_own_measurement_config(
+    records: list[PilotRecord], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--local-model` 경로도 구성을 기록한다 — 클라우드 전용 기능이 아니다."""
+    if not _PILOT_CORPUS.exists():  # pragma: no cover — 코퍼스 미생성 환경 방어
+        pytest.skip(f"파일럿 코퍼스 미존재({_PILOT_CORPUS})")
+    import whymath_backend.harness.residue_gate_demotion_battle as battle_mod
+
+    clean_texts = _clean_texts(records)
+
+    class _FakeCrossVerifier:
+        def __init__(self, *, provider: object | None = None) -> None:
+            self._inner = _ScriptedVerifier(mode="oracle", clean_texts=clean_texts)
+
+        def verify(self, subject: object) -> CrossVerificationResult:
+            return self._inner.verify(subject)
+
+        def flush_trace(self) -> None:
+            return None
+
+    monkeypatch.setattr(battle_mod, "CrossVerifier", _FakeCrossVerifier)
+    monkeypatch.setattr(battle_mod, "FixedModelOllamaProvider", lambda model: object())
+
+    audit_out = tmp_path / "local_audit.jsonl"
+    exit_code = main(
+        [
+            str(_PILOT_CORPUS),
+            "--local-model",
+            "qwen2.5:7b",
+            "--sample-n",
+            "1",
+            "--clean-n",
+            "1",
+            "--audit-out",
+            str(audit_out),
+        ]
+    )
+    assert exit_code == 0
+    header = json.loads(audit_out.read_text(encoding="utf-8").splitlines()[0])
+    assert header["record_type"] == "measurement_config"
+    assert header["kind"] == "local_fixed"
+    assert header["local_model"] == "qwen2.5:7b"
+
+
+def test_cli_repeat_runs_uses_repeated_report(
+    records: list[PilotRecord], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--repeat-runs 2`가 반복 리포트·반복 감사 JSONL 경로를 탄다."""
+    if not _PILOT_CORPUS.exists():  # pragma: no cover — 코퍼스 미생성 환경 방어
+        pytest.skip(f"파일럿 코퍼스 미존재({_PILOT_CORPUS})")
+    import whymath_backend.harness.residue_gate_demotion_battle as battle_mod
+
+    clean_texts = _clean_texts(records)
+
+    class _FakeCrossVerifier:
+        def __init__(self, *, provider: object | None = None) -> None:
+            self._inner = _ScriptedVerifier(mode="oracle", clean_texts=clean_texts)
+
+        def verify(self, subject: object) -> CrossVerificationResult:
+            return self._inner.verify(subject)
+
+        def flush_trace(self) -> None:
+            return None
+
+    monkeypatch.setattr(battle_mod, "CrossVerifier", _FakeCrossVerifier)
+
+    audit_out = tmp_path / "repeat_audit.jsonl"
+    exit_code = main(
+        [
+            str(_PILOT_CORPUS),
+            "--sample-n",
+            "1",
+            "--clean-n",
+            "1",
+            "--repeat-runs",
+            "2",
+            "--audit-out",
+            str(audit_out),
+        ]
+    )
+    assert exit_code == 0
+    rows = [json.loads(line) for line in audit_out.read_text(encoding="utf-8").splitlines()]
+    assert {r["run"] for r in rows if r["record_type"] == "verdict"} == {1, 2}
+
+
+class _AlwaysUnclearVerifier:
+    """전건 판정불가 검출기 — 판정 표본 0(측정 실패) 경로를 실제로 밟게 하는 픽스처.
+
+    이 픽스처가 없으면 `resolved == 0` 가드(홀드아웃 하한·검출률 분모)가 뮤테이션에서
+    **살아남는다** — 정상 입력에서는 그 분기를 한 번도 지나가지 않기 때문이다.
+    """
+
+    def verify(self, subject: object) -> CrossVerificationResult:
+        return CrossVerificationResult(
+            subject.problem_id,  # type: ignore[attr-defined]
+            (PerspectiveVerdict("p", "unclear", "provider_error", "다운"),),
+            "unclear",
+            "p:provider_error",
+            "측정 실패",
+        )
+
+
+def test_holdout_measurement_failure_is_none_not_zero(records: list[PilotRecord]) -> None:
+    """홀드아웃 판정 표본 0 — 검출률·하한은 0.0이 아니라 None(완전 실명으로 위장 금지)."""
+    battery = build_residue_seeded_set(records)
+    report = run_residue_demotion_battle(
+        battery, verifier=_AlwaysUnclearVerifier(), sample_n=2, clean_n=1, seed="hold4"
+    )
+    assert report.holdout_resolved == 0
+    assert report.holdout_unresolved > 0  # 판정불가는 별도로 세어진다
+    assert report.holdout_detected == 0
+    assert report.holdout_detection_lower_bound(0.95) is None
+    # 리포트 본문도 0.0이 아니라 n/a로 말해야 한다.
+    text = render_report(report, confidence=0.95, corpus_size=len(records))
+    holdout_line = next(line for line in text.splitlines() if "홀드아웃 검출률" in line)
+    assert "0/0" in holdout_line and "n/a" in holdout_line
+
+
+def test_repeated_report_rates_are_none_when_nothing_resolved(
+    records: list[PilotRecord],
+) -> None:
+    """반복 집계에서도 0/0은 None — 분모 0을 0.0으로 접으면 '전부 놓쳤다'로 읽힌다."""
+    battery = build_residue_seeded_set(records)
+    repeated = run_repeated_residue_demotion_battle(
+        battery,
+        verifier=_AlwaysUnclearVerifier(),
+        sample_n=2,
+        clean_n=1,
+        seed="hold5",
+        repeat_runs=2,
+        corpus_size=len(records),
+    )
+    payload = repeated_report_to_json(repeated)
+    overall = payload["overall"]
+    holdout = payload["holdout"]
+    clean = payload["clean_control"]
+    assert overall["detection_rate_mean"] is None
+    assert overall["detection_lower_bound_mean"] is None
+    assert holdout["detection_rate_mean"] is None
+    assert holdout["detection_lower_bound_worst"] is None
+    assert clean["false_alarm_rate_mean"] is None
+    # 판정불가율은 *측정된* 값이므로 None이 아니라 1.0(전건 판정불가)이어야 한다.
+    assert overall["abstention_rate_mean"] == pytest.approx(1.0)
+    assert holdout["abstention_rate_mean"] == pytest.approx(1.0)
+    text = render_repeated_report(repeated)
+    assert "보정 제안 불가" in text  # 대조군 판정 0건 → 보정 제안을 지어내지 않는다
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# v4 모드 — 오라클(진단) vs 프로덕션(승격 판정용 합집합)
+#
+# 왜 두 모드를 가르는가: v4는 결함류별 전용 관점이라, 하네스가 주입한 결함류를 알고
+# 세트를 고르면 프로덕션이 갖지 못한 오라클을 쓰는 것이다. 그 수치는 오검출을 과소
+# 추정한다(무결함 문항에 세트가 하나만 걸린다).
+# 정본 = docs/standards/residue_gate_demotion_battle_history.md §4.6.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class _NullTrace:
+    """관측 대역 — 네트워크 0."""
+
+    def record(self, fields: object) -> None:
+        return None
+
+    def flush(self) -> None:
+        return None
+
+
+class _CountingProvider:
+    """호출 수를 세는 provider 대역 — 전 관점이 파싱 가능한 응답을 돌려준다(네트워크 0)."""
+
+    def __init__(self, verdict: str = "ok") -> None:
+        self.calls = 0
+        self._verdict = verdict
+
+    async def generate(
+        self,
+        prompt: str,
+        system: str,
+        decision: object,
+        *,
+        images: object = None,
+        temperature: object = None,
+        json_schema: object = None,
+        seed: object = None,
+    ) -> GenerationResult:
+        self.calls += 1
+        if self._verdict == "ok":
+            # 재구성 계열은 숫자를, 라벨 계열은 verdict를 읽는다 — 양쪽을 함께 만족시킨다.
+            return GenerationResult(
+                '{"total": 36, "favorable": 6, "verdict": "ok", "reason": "이상 없음"}'
+            )
+        return GenerationResult(
+            '{"total": 1, "favorable": 1, "verdict": "defect",'
+            ' "defect_class": "x", "reason": "결함"}'
+        )
+
+
+def _union_verifier(provider: _CountingProvider) -> UnionCrossVerifier:
+    base = CrossVerifier(provider=provider, trace=_NullTrace())  # type: ignore[arg-type]
+    return UnionCrossVerifier(base)
+
+
+def _v4_subject() -> ResidueSubject:
+    return ResidueSubject(
+        problem_id="wm-finite-v4mode",
+        question_text=_GROUP_A_TEXT,
+        answer="1/6",
+        answer_explanation="전체 36가지 중 6가지.",
+        machine_model_ko="주사위 2개를 던져 두 눈의 합이 7인 경우.",
+        machine_total=36,
+        machine_favorable=6,
+        authored_by="deterministic:test",
+    )
+
+
+def test_v4_production_mode_burns_every_perspective_set() -> None:
+    """프로덕션 모드는 세트 3종을 전부 태운다 — 문항당 9콜(세트 3 x K=3)."""
+    provider = _CountingProvider()
+    verifier = _union_verifier(provider)
+    assert len(verifier.perspective_sets) == 3
+    verifier.verify(_v4_subject())
+    assert provider.calls == 9, f"세트 3종 x K=3 = 9콜이어야 하는데 {provider.calls}콜"
+
+
+def test_v4_production_mode_unions_defect_verdicts() -> None:
+    """어느 세트 하나라도 defect면 합집합 판정은 defect — 배포 집계 규칙 그대로."""
+    result = _union_verifier(_CountingProvider(verdict="defect")).verify(_v4_subject())
+    assert result.aggregate == "defect"
+    # 판정 근거가 9관점 전체에서 모인다(세트별로 잘려 나가지 않는다)
+    assert len(result.verdicts) == 9
+
+
+def test_v4_production_mode_ok_requires_all_sets_unanimous() -> None:
+    """전 세트 만장일치 ok여야 ok — 한 세트만 보고 통과시키지 않는다."""
+    result = _union_verifier(_CountingProvider()).verify(_v4_subject())
+    assert result.aggregate == "ok"
+    assert len(result.verdicts) == 9
+
+
+def test_v4_production_mode_respects_explicit_perspectives() -> None:
+    """관점을 명시하면 합집합하지 않는다 — 상위 코드의 지목을 덮어쓰지 않는다."""
+    provider = _CountingProvider()
+    _union_verifier(provider).verify(_v4_subject(), MISSING_CONDITION_PERSPECTIVES)
+    assert provider.calls == 3
+
+
+def test_union_verifier_rejects_empty_perspective_sets() -> None:
+    """세트가 비면 조용히 통과시키지 않고 거부한다 — 검증기 0개의 '검출 0건' 위장 방지."""
+    base = CrossVerifier(provider=_CountingProvider(), trace=_NullTrace())  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="관점 세트가 비었다"):
+        UnionCrossVerifier(base, [])
+
+
+def test_v4_oracle_wiring_routes_per_class_and_falls_back_for_clean() -> None:
+    """오라클 모드: 결함류는 전용 세트로, 대조군·미지정 결함류는 일반 v2 폴백으로.
+
+    대조군까지 오라클을 주면 그 오검출 수치는 아무것도 대표하지 못한다.
+    """
+    base = CrossVerifier(provider=_CountingProvider(), trace=_NullTrace())  # type: ignore[arg-type]
+    mapping, default = build_v4_wiring("oracle", base)
+    assert isinstance(mapping, dict)
+    assert set(mapping) == {"missing_condition", "multiple_valid_answers"}
+    assert mapping["missing_condition"]._perspectives == MISSING_CONDITION_PERSPECTIVES
+    assert mapping["multiple_valid_answers"]._perspectives == MULTIPLE_VALID_ANSWERS_PERSPECTIVES
+    assert default is base, "대조군 폴백이 일반 v2 검증기여야 한다"
+
+
+def test_v4_production_wiring_has_no_oracle_fallback() -> None:
+    """프로덕션 모드는 매핑이 아니라 합집합 검증기 하나 — 결함류를 아는 경로가 없다."""
+    base = CrossVerifier(provider=_CountingProvider(), trace=_NullTrace())  # type: ignore[arg-type]
+    verifier, default = build_v4_wiring("production", base)
+    assert isinstance(verifier, UnionCrossVerifier)
+    assert default is None
+
+
+def test_v4_off_wiring_preserves_legacy_behaviour() -> None:
+    """기본값 off는 종전 동작 — 주입한 검증기를 그대로 쓴다(회귀 0)."""
+    base = CrossVerifier(provider=_CountingProvider(), trace=_NullTrace())  # type: ignore[arg-type]
+    verifier, default = build_v4_wiring("off", base)
+    assert verifier is base
+    assert default is None
