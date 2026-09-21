@@ -27,6 +27,7 @@
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
+$env:PYTHONUTF8="1"
 git fetch origin claude/optimistic-gates-9ef9nm
 git checkout -B claude/optimistic-gates-9ef9nm origin/claude/optimistic-gates-9ef9nm
 git log -1 --oneline
@@ -58,6 +59,7 @@ $env:WHYMATH_OLLAMA_REQUEST_TIMEOUT_S="180"
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
+$env:PYTHONUTF8="1"
 $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
@@ -79,6 +81,7 @@ $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
+$env:PYTHONUTF8="1"
 $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
