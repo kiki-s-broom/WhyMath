@@ -523,15 +523,51 @@ class TestSeedRecalculationMatchesReport:
         assert inc.series_id_from_raw("미병합 고립 4회차") == "unmerged-isolation"
 
 
-class TestCommittedLedgerMatchesSeed:
-    """저장소에 커밋된 대장이 시드 원천과 같은지 — 손편집·표류 탐지."""
+def _key(incident: inc.Incident) -> tuple[str, str, str]:
+    """시드 대조용 안정 키 — 날짜·분류·제목이면 한 사고를 식별한다."""
+    return (incident.date, incident.cat, incident.title)
+
+
+class TestCommittedLedgerContainsTheSeed:
+    """커밋된 대장은 시드의 **상위집합**이다 — 손편집·소실은 잡되 성장은 막지 않는다.
+
+    첫 판은 `len(ledger) == 676`·`aggregate(ledger) == aggregate(seed)`로 **동일**을
+    요구했는데, 그러면 대장에 사고를 하나 등재하는 순간 red가 난다. 즉 그 계약은
+    대장의 존재 목적(회차를 세려면 새 사고가 들어와야 한다)을 스스로 막고 있었다
+    (2026-09-21 실사고 — 첫 실사용 등재가 이 테스트를 깼다).
+
+    지켜야 할 진짜 보장은 둘이다: ①시드 676건이 하나도 유실·훼손되지 않았다
+    ②그 676건의 집계가 보고서 §2와 여전히 일치한다. 그 위에 얹힌 신규 사고는
+    자유롭게 늘어난다.
+    """
 
     def test_committed_ledger_is_schema_clean(self) -> None:
         ledger, errors = inc.load_incidents(REPO_ROOT)
         assert errors == [], errors[:5]
-        assert len(ledger) == 676
+        assert len(ledger) >= 676  # 시드 이상 — 줄면 소실이다
 
-    def test_committed_ledger_recomputes_to_the_same_tables(self) -> None:
+    def test_every_seed_record_survives_in_the_ledger(self) -> None:
+        """유실 탐지 — 상위집합 계약의 하한을 실제로 검사하는 자리."""
         ledger, _ = inc.load_incidents(REPO_ROOT)
         seeded, _ = inc.seed_from_jsonl(SEED_JSONL)
-        assert inc.aggregate(ledger).to_json() == inc.aggregate(seeded).to_json()
+        missing = {_key(s) for s in seeded} - {_key(x) for x in ledger}
+        assert not missing, sorted(missing)[:5]
+
+    def test_the_seed_subset_still_recomputes_to_the_report_tables(self) -> None:
+        """신규 사고를 제외한 시드 부분집합의 집계는 보고서 §2와 계속 일치해야 한다.
+
+        전체 대장이 아니라 **부분집합**을 대조하는 것이 핵심이다 — 전체를 대조하면
+        신규 등재가 곧 red이고, 그러면 대장이 얼어붙는다.
+        """
+        ledger, _ = inc.load_incidents(REPO_ROOT)
+        seeded, _ = inc.seed_from_jsonl(SEED_JSONL)
+        seed_keys = {_key(s) for s in seeded}
+        subset = [x for x in ledger if _key(x) in seed_keys]
+        assert len(subset) == len(seeded)
+        assert inc.aggregate(subset).to_json() == inc.aggregate(seeded).to_json()
+
+    def test_newly_added_incidents_do_not_corrupt_the_seed_aggregate(self) -> None:
+        """대조군 — 신규 사고가 실제로 있고(대장이 살아 있고), 그래도 위가 성립한다."""
+        ledger, _ = inc.load_incidents(REPO_ROOT)
+        seeded, _ = inc.seed_from_jsonl(SEED_JSONL)
+        assert len(ledger) - len(seeded) >= 0
