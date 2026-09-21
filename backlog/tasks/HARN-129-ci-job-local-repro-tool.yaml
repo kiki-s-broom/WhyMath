@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-129-ci-job-local-repro-tool
+title: "CI 잡 로컬 재현 도구 — ci.yml에서 install·run 스텝을 유도해 낸다 (재현 누락 4번째 입구 차단)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① CLI 신설 — `scripts/ops/ci_job_repro.py --job <잡이름>`이 `.github/workflows/ci.yml`을 **파싱해** 그 잡의 install 스텝과 run 스텝을 순서대로 낸다. 사람의 기억이나 문서 사본이 아니라 ci.yml 자신이 단일 진실 원천이어야 한다 — 사본을 두면 드리프트가 곧 이 도구의 거짓말이 된다. ② `--list`로 잡 이름을 전수 열거한다(잡 자체를 빠뜨리는 축 방어). ③ `--exec`로 실제 실행하되 각 스텝의 exit code를 개별 출력하고, **하나라도 비-0이면 전체 exit 1**로 끝낸다(래퍼가 종료 코드를 가리는 축 방어 — 마지막 명령이 echo가 되지 않게 한다). ④ 출력을 파일로 받을 때 `tail`·`head`를 경유하지 않는 형태를 기본값으로 낸다(절단 축 방어). ⑤ 변별력 — ci.yml에서 install 스텝 하나를 지우고 돌리면 그 잡의 재현 명령에서도 사라져야 한다(파싱이 실제로 ci.yml을 읽는지 확인). 하드코딩 사본이면 이 테스트가 통과해 버린다. ⑥ 뮤테이션 4종 전건 RED — (a) install 스텝 누락 (b) 잡 이름 오타 시 조용히 빈 목록 반환 (c) 비-0 스텝을 exit 0으로 접기 (d) `--list`가 일부 잡만 반환. 각 절마다 그 절이 없으면 통과하는 입력을 픽스처로 둔다. ⑦ CI 자기참조 — 이 도구 자신이 `infra-contracts` 잡에서 `--list`로 돌아 ci.yml 파싱이 깨지지 않았음을 상시 확인한다."
+artifacts: []
+paths:
+  - scripts/ops/ci_job_repro.py
+  - tests/infra/test_ci_job_repro.py
+session: null
+notes: "등재 근거 = 2026-09-21 PR #1255 작업 중 발생한 사고 2건(사고 대장 등재). 로컬에서 tests/infra를 돌려 47 failed를 받았는데, 실제로는 CI가 설치하는 7종 중 sqlalchemy·pytest-asyncio 2종을 빼먹은 환경 결손이었다. 두 의존성을 설치하자 같은 파일이 115 passed exit 0. CI의 infra-contracts 잡도 success였다.\n\n피해는 거짓 red 1건과 그것을 가리려 돌린 A/B 2회(기준선 워크트리 포함 약 6분)다. 다행히 거짓 green이 아니라 거짓 red였고 A/B로 자기 변경이 아님을 확정한 뒤 보고했다.\n\n이 도구가 막으려는 것은 CLAUDE.md가 이미 세 번 적은 \"CI가 실제로 쓰는 명령을 그대로 재현한다\"의 네 번째 입구다: 2026-08-09 대상 경로를 좁힘 → 2026-09-10 검사 종류를 빠뜨림 → 2026-09-17 잡을 빠뜨림 → 이번 의존성 집합을 빠뜨림. 세 번의 대책이 전부 산문이었고 네 번째 입구로 뚫렸다. 2026-09-20 산문 규칙 등재 동결에 따라 이번 대책은 코드여야 한다.\n\n핵심 설계 판단: 재현 명령을 문서에 적지 않고 ci.yml에서 유도한다. 적어 두면 그 사본이 드리프트하고, 드리프트한 재현 도구는 안 돌린 것보다 나쁘다(틀린 green을 준다)."
+updated: 2026-09-21

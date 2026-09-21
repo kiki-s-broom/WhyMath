@@ -238,6 +238,18 @@ class ProblemAttempt(BaseModel):
         description="학생이 제출한 답 — *미성년 풀이 데이터*(평문 저장 금지는 저장계층 책임, "
         "모듈 docstring 참조)",
     )
+    # ASM-06 신규: "몇 번 보기를 골랐는가" — student_answer(자유텍스트)엔 이 개념이 없어
+    # distractor_map 역추적(l4.misconception.distractor_link)이 원천적으로 불가능했다.
+    # *미성년 풀이 데이터*(student_answer와 같은 등급, 모듈 docstring 참조) — 다만 값 자체가
+    # 작은 정수라 봉투 암호화 대상에서 제외한다(SEC-31이 보호하는 것은 답안 *본문*이고,
+    # 선지 번호는 문항을 모르면 의미가 없으며 problem_id가 같은 행에 이미 평문으로 있다).
+    selected_choice_index: int | None = Field(
+        default=None,
+        description="학생이 실제로 고른 객관식 보기의 0-기반 인덱스(`Problem.choices` 위치). "
+        "자유응답형 등 객관식이 아니거나 클라가 보고하지 않으면 None — "
+        "distractor_map 대조 오개념 역추적에 쓰인다(ASM-06).",
+        ge=0,
+    )
     confidence_self_reported: float | None = Field(
         default=None,
         description="학생 자기 평가 확신도. DDL 'DECIMAL(3,2)' → 정규화 신호로 보아 "

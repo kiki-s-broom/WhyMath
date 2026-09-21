@@ -136,3 +136,51 @@ def test_detector_flags_the_original_bug(line: str) -> None:
     assert produced, f"이어붙이기 형태를 탐지하지 못했다: {line}"
     assert all(name not in _expected_names() for name in produced)
     assert all(name.startswith("problems.jsonl.") for name in produced)
+
+
+# ── MP-08 — 인코딩 축 ────────────────────────────────────────────────────────
+# 2026-09-21 라이브 회차에서 결함 2건이 났다. 둘 다 *런북*의 결함이고, 둘 다 한국어 Windows
+# 에서만 발현한다 — CI(리눅스·UTF-8)는 구조적으로 재현할 수 없는 구간이라 여기서 **문면을**
+# 동결한다(실행이 아니라 형태를 본다는 뜻이다).
+#
+#   ⓐ `Get-Content`가 UTF-8 JSONL을 로케일 인코딩(cp949)으로 읽어 `ConvertFrom-Json`이 실패
+#      → run_id 추출 실패 → 리콜 리허설 공전. 파일은 온전했고 읽기측만 깨졌다.
+#   ⓑ 회차 리포트가 stdout에서 UnicodeEncodeError(cp949·U+2014)로 잘려 `ACCUMULATE_EXIT=1`이
+#      *카나리 차단*인지 *크래시*인지 구분 불가가 됐다.
+#
+# ⓐ는 **형태의 부재**로, ⓑ는 **설정의 실재**로 동결한다. 방향이 다른 이유: PowerShell JSON
+# 파싱은 이 런북에 있어야 할 이유가 없으므로 0건이 정답이고(`-Encoding UTF8`을 덧붙이는 부분
+# 정정은 블록마다 재발한다), 출력 인코딩은 설정이 *있어야* 보험이 되기 때문이다.
+
+_PS_JSON_PARSE = "ConvertFrom-Json"
+_IO_ENCODING = "PYTHONIOENCODING"
+
+
+def _fenced_text() -> str:
+    return "\n".join(_fenced_blocks(_RUNBOOK.read_text(encoding="utf-8")))
+
+
+def test_runbook_has_no_powershell_json_parsing() -> None:
+    """런북 코드 블록에 PowerShell JSON 파싱이 0건이어야 한다(ⓐ).
+
+    산문(정정 블록)은 *그 함정을 설명하려고* 이름을 인용하므로 펜스 안만 본다.
+    """
+    assert _PS_JSON_PARSE not in _fenced_text(), (
+        f"런북 실행 블록에 {_PS_JSON_PARSE}가 있다 — PowerShell은 파일을 로케일 인코딩"
+        "(한국어 Windows=cp949)으로 읽어 한글 JSON에서 깨진다. Python 경유로 바꿔야 한다."
+    )
+
+
+def test_runbook_forces_utf8_stdout() -> None:
+    """런북이 stdout UTF-8 보험을 설정하고 **그것을 자가검증**해야 한다(ⓑ).
+
+    설정만으로는 부족하다 — 설정이 먹은 창과 안 먹은 창이 같은 화면을 내면 그 단계는 검증이
+    아니라 위장이다(2026-07-17 「변별력 없는 검증 스텝 금지」).
+    """
+    fenced = _fenced_text()
+    assert (
+        _IO_ENCODING in fenced
+    ), f"런북 실행 블록에 {_IO_ENCODING} 설정이 없다 — 회차 리포트가 cp949에서 잘린다"
+    assert (
+        "IO_ENCODING" in fenced
+    ), "설정만 있고 자가검증 출력이 없다 — 설정이 먹었는지 사람이 확인할 수 없다"

@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-50-mathlive-autofocus-ready-keyboard
+title: "수식 자동포커스 실기기 공백 봉합 — ready 신호 + 가상 키보드 표시(S3-24 버킷B③ 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 53e0d462의 WhymathMathReady 채널 기반 포커스(onPageFinished 타이밍 오류 회피)와 index.html의 mathVirtualKeyboard.show() 동반 훅을 이식. ② 충돌 해결 실측: main이 분기 이후 도입한 MOB-19 생명주기 하드닝이 setNavigationDelegate를 로딩·에러 처리 목적으로 쓰는데, 섀도 가드가 그 API의 존재 자체를 금지하는 대리 지표였다 — 전제가 무너진 대리 지표를 버리고 의도 자체(포커스가 onPageFinished 콜백 본문에서 불리지 않을 것)를 구조로 검사하도록 술어를 정정했다. MOB-19 하드닝은 그대로 보존. ③ 정정한 가드의 변별력을 결함주입 4종으로 확인 — 진짜 이동(호출 1개 유지·onPageFinished 본문 절만이 잡는 케이스)·채널명 변조·호출 제거·호출 중복 전건 RED, 무주입 대조군 GREEN. ④ 검증: CI mobile 5스텝 exit 0."
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
+paths:
+  - src/mobile/lib/features/chat/presentation/mathlive_input_webview.dart
+  - src/mobile/assets/mathlive_input/index.html
+  - src/mobile/test/mathlive_autofocus_test.dart
+session: null
+notes: "[S3-24 버킷B 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w(42일 미머지·45커밋·PR로 노출된 적 없음). 이식은 파일 단위 수동 재적용이며 통째 머지를 쓰지 않았다(main이 분기점 이후 463커밋 이동). 같은 브랜치의 MOB-12(activeProblemProvider stale 리셋)는 S3-24 소관이 아니라서 전량 제외했다 — 그 회수는 별도 태스크가 소유한다. 검증은 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트)."
+updated: 2026-09-21

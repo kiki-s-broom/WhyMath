@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -124,8 +125,10 @@ void main() {
 
     expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.byType(OcrCaptureScreen), findsNothing);
-    // 학생 버블(인식 풀이) + 코치 응답 프롬프트.
-    expect(find.text(r'D = b^2 - 4ac'), findsOneWidget);
+    // 학생 버블(인식 풀이) — 캐럿 수식(b^2)은 raw가 아니라 Math로 조판된다(S3-39).
+    expect(find.byType(Math), findsWidgets);
+    expect(find.text(r'D = b^2 - 4ac'), findsNothing);
+    // 코치 응답 프롬프트(순수 프로즈)는 평문으로 그대로 보인다.
     expect(find.text('어느 단계부터 함께 볼까요?'), findsOneWidget);
 
     // 정전 매핑이 코치 요청에 반영됐다(regions 있으니 신뢰도 전달).

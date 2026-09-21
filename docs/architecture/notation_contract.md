@@ -100,6 +100,27 @@ failure_mode_qa가 invariant ⑪("모든 수식 AST는 notation_contract 안·sp
 ⇒ **결론**: ⑪은 "speech를 계약 3자로 확장"이 아니라 **경계 명문화**(본 절)로 충족한다. speech는 이
 계약과 별개의 자족 표기 계층이며, 그 계약은 `test_speech_rules.py` 골든이다.
 
+## 6. NS-02 정합 검토 (2026-07-23) — Dart 렌더 경로 교차검증·NS-03 입력
+
+NS-02(표기 canonical 계층 형식화)가 L5 Dart canonical 파이프라인(`math_notation.dart`의
+`toRenderLatex`)에 이 계약의 **전 식(numeric + equivalence 양변)을 통과시키는 golden 교차검증**을
+신설했다(`src/mobile/test/notation_canonical_test.dart` — 산출 LaTeX golden + 위젯 렌더 실증).
+표기 등가 변환(`*`→`\cdot` · `^3`→`^{3}` · `sqrt(...)`→`\sqrt{...}`)은 KaTeX 렌더 가능·의미 왜곡
+없음이 확인됐다. 지원 표기 집합의 열거 정본은 `data/notation_support_manifest.json`(NS-02 신설 —
+NS-03 커버리지 게이트가 소비).
+
+**어긋난 항목 — 고치지 않고 목록화만(NS-02 스코프 밖·NS-03 커버리지 하네스의 입력)**:
+
+1. **표준함수 이탤릭 조판**: `sin(x)^2+cos(x)^2`의 `sin`·`cos`(§2 표준함수 `tan·log·exp` 동일)가
+   Dart 렌더 경로에서 `\sin` 등 연산자 매크로로 승격되지 않아 KaTeX가 이탤릭 문자 나열(s·i·n)로
+   조판한다. 파싱은 성공(raw 폴백 아님)·의미 무영향(렌더 전용)이나 교과서 로만체 함수 표기가
+   아니다. 함수 중 `sqrt`만 `\sqrt{...}`로 승격된다.
+2. **무신호 식 평문 폴백**: `x+x+x`(수식 신호 `^ _ \ / *` 부재)는 세그먼트가 수식으로 라우팅하지
+   않아 KaTeX 조판을 받지 않고 평문으로 남는다. 과잉 렌더 방지 정책(S3-21)의 의도된 결과이나,
+   계약 canonical 식이 조판에서 빠지는 케이스로 기록한다.
+3. **슬래시 나눗셈**: `x/4+1`은 `\frac` 수평 분수로 승격되지 않고 슬래시 그대로 조판된다 —
+   렌더 가능·의미 왜곡 없음(허용·기록만).
+
 ---
 
 ## 참고
@@ -108,4 +129,6 @@ failure_mode_qa가 invariant ⑪("모든 수식 AST는 notation_contract 안·sp
 - 변경 이력: v0.1 (2026-06-30 — 계약 명문화 + golden test 착수) · v0.2 (2026-07-02 — §5 speech
   프레젠테이션 계층 경계 명문화: invariant ⑪은 계약 3자 확장이 아니라 경계 명시로 충족) · v0.3
   (2026-07-02 — §3 후속 마감: implicit mult·전각/NFKC·비ASCII 연산자·그리스·chained equality를 백엔드
-  입력 정규화(`to_sympy_source`)로 처리·공유 계약 canonical 불변·Part 4 항목4·`math_dsl_part4_ast_review.md`)
+  입력 정규화(`to_sympy_source`)로 처리·공유 계약 canonical 불변·Part 4 항목4·`math_dsl_part4_ast_review.md`) ·
+  v0.4 (2026-07-23 — §6 NS-02 정합 검토: Dart 렌더 canonical 파이프라인 교차검증 golden 신설,
+  어긋난 항목 3건 목록화(수정 없음·NS-03 입력))

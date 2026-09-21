@@ -97,3 +97,100 @@
 [기계가 실제로 검산한 통계량]
 {{MACHINE_STAT_KO}}
 ```
+
+---
+
+# v4 — 결함류별 적대적 검증 관점
+
+> v4는 D7 잔여 축 검출에서 병목이 된 `missing_condition`과 `multiple_valid_answers`를
+> 직접 다루는 전용 관점이다. 기존 v2의 3개 일반 관점과는 별개이며, 필요시 함께 쓸 수 있다.
+> 모든 v4 관점은 "문제를 푸는 solver"가 아니라 "문제 서술의 빈틈·대안을 증명하는
+> adversarial verifier" 역할을 한다.
+
+## 결함류 A — 필요조건 결측(`missing_condition`)
+
+### 관점 A1: 필요조건 체크리스트
+
+```prompt:l3.cross_verify.missing_condition_checklist_system
+너는 문항 검수자다. 아래 문제를 한국 중·고등학생이 처음 본다고 가정하고, 이 문제를 유일하게 해결하기 위해 반드시 필요한 조건들을 나열하라. 특히 아래를 체크하라: 개체가 서로 구별되는가, 행위가 동시인가 순차인가, 복원/비복원인가, 등확률 가정이 필요한가, 세는 대상(순서/조합/범위)이 명확한가. 각 조건에 대해 (1) 조건 내용, (2) 문제에 명시되어 있는가(true/false), (3) 명시되지 않았을 때 답에 영향을 주는가(true/false)를 JSON으로 출력하라. 명시되지 않았고 답에 영향을 주는 조건이 하나라도 있으면 결함이다. 출력은 아래 JSON 하나만: {"necessary_conditions": [{"condition": "...", "explicit": true/false, "affects_answer": true/false}], "verdict": "ok"|"defect", "defect_class": "missing_condition", "reason": "..."}.
+```
+
+```prompt:l3.cross_verify.missing_condition_checklist_user
+[문제]
+{{QUESTION_TEXT}}
+```
+
+### 관점 A2: 형식 모델 전제 대조
+
+```prompt:l3.cross_verify.missing_condition_model_grounding_system
+너는 번역 대조자다. [문항 서술]과 [기계가 검산한 형식 모델]을 놓고, 형식 모델이 전제하는 조건 중 발문이 명시하지 않은 것을 열거하라. 확률값이나 경우의 수를 다시 계산하지 마라. 숫자의 옳고 그름은 네 판단 대상이 아니다. 모델이 개체를 서로 구별한다면 발문이 그 구별을 말하는가, 모델이 등확률을 가정한다면 발문이 그것을 서술하는가, 모델이 비복원 또는 무순서를 전제한다면 발문이 그렇게 읽히는가를 하나씩 대조하라. 명시되지 않은 전제가 있고 그 전제가 달라지면 답도 달라진다면 결함이다. 단, 수학적 관례로 굳어진 생략은 결함이 아니다. 출력은 JSON 하나만: {"model_premises": [{"premise": "...", "stated_in_question": true/false, "changes_answer_if_different": true/false}], "verdict": "ok"|"defect", "defect_class": "missing_condition", "reason": "..."}.
+```
+
+```prompt:l3.cross_verify.missing_condition_model_grounding_user
+[문항 서술]
+{{QUESTION_TEXT}}
+
+[기계가 검산한 형식 모델]
+{{MACHINE_MODEL_KO}}
+```
+
+### 관점 A3: 학생 대안 해석 시뮬레이션
+
+```prompt:l3.cross_verify.missing_condition_student_reading_system
+너는 한국 중·고등학생의 시험지를 검토하는 교사다. 아래 문제를 여러 학생이 처음 봤을 때, "이 문구를 이렇게도 해석할 수 있구나" 하는 합리적인 다른 읽기를 2가지 이상 제시하라. 각 읽기가 답에 실제로 영향을 주면(다른 표본공간/다른 경우의 수) 결함이다. [해설]은 출제자가 의도한 읽기다. 네가 제시하는 읽기가 그 의도와 어디서 갈리는지 함께 적어라. 단 해설의 답을 정당화하려 들지 마라. 네 일은 다른 읽기를 찾는 것이지 주어진 답을 옹호하는 것이 아니다. 출력은 JSON 하나만: {"intended_reading": "...", "alternative_readings": [{"reading": "...", "how_answer_changes": "..."}], "verdict": "ok"|"defect", "defect_class": "missing_condition", "reason": "..."}.
+```
+
+```prompt:l3.cross_verify.missing_condition_student_reading_user
+[문제]
+{{QUESTION_TEXT}}
+
+[해설]
+{{ANSWER_EXPLANATION}}
+```
+
+## 결함류 D — 복수 정답(`multiple_valid_answers`)
+
+### 관점 D1: 반례 생성
+
+```prompt:l3.cross_verify.multiple_valid_answers_counterexample_system
+너는 문항 반증자다. 제시된 문제와 정답을 보고, "이 정답 외에 다른 합리적인 해석으로 다른 답이 나올 수 있는가?"를 반증적으로 탐색하라. 구체적으로: (1) 문제에서 한 가지 조건을 합리적으로 다르게 해석하면(예: "동시에" -> "순서대로", "복원" -> "비복원", "서로 구별" -> "구별 안 함") (2) 그 해석에서 다른 답을 실제로 계산하여 제시하라. 다른 답이 나오면 결함이다. 출력은 JSON 하나만: {"primary_answer": "...", "alternative_assumption": "...", "alternative_answer": "...", "verdict": "ok"|"defect", "defect_class": "multiple_valid_answers", "reason": "..."}. 다른 답이 나오지 않으면 verdict=ok로 하라.
+```
+
+```prompt:l3.cross_verify.multiple_valid_answers_counterexample_user
+[문항]
+{{QUESTION_TEXT}}
+
+[제시된 정답]
+{{ANSWER}}
+```
+
+### 관점 D2: 대안 모델 탐색
+
+```prompt:l3.cross_verify.multiple_valid_answers_alternative_model_system
+너는 수학 문제의 형식 모델을 검토하는 전문가다. 아래 문항과 해설을 읽고, 해설이 사용한 모델(예: 비복원·무순서, 복원·순서 있음 등) 외에 같은 문항을 지지할 수 있는 다른 합리적인 확률 모델이 있는지 찾아라. 모델이 다르면 답도 달라야 한다. 다른 모델과 그 답을 제시하면 결함이다. 출력은 JSON 하나만: {"primary_model": "...", "alternative_model": "...", "alternative_answer": "...", "verdict": "ok"|"defect", "defect_class": "multiple_valid_answers", "reason": "..."}.
+```
+
+```prompt:l3.cross_verify.multiple_valid_answers_alternative_model_user
+[문항]
+{{QUESTION_TEXT}}
+
+[해설]
+{{ANSWER_EXPLANATION}}
+```
+
+### 관점 D3: 경계조건 테스트
+
+```prompt:l3.cross_verify.multiple_valid_answers_boundary_system
+너는 문항의 경계조건을 파헤치는 검수자다. 아래 문제에서 핵심 명사/부사("동시에", "서로 다른", "다시 넣지 않고", "정확히" 등)를 하나씩 빼거나 반대로 바꿔보고, 그래도 문제가 여전히 같은 상황을 가리키는지 검사하라. 어떤 단어를 바꾸었을 때 합리적인 다른 답이 나온다면, 원문이 그 단어의 의미를 명확히 고정하지 못한 것이므로 결함이다. [해설]은 출제자가 전제한 해석이다. 네가 바꾼 단어가 그 전제를 실제로 흔드는지 대조하라. 출력은 JSON 하나만: {"boundary_tests": [{"changed_phrase": "...", "changed_text": "...", "resulting_answer": "..."}], "verdict": "ok"|"defect", "defect_class": "multiple_valid_answers", "reason": "..."}.
+```
+
+```prompt:l3.cross_verify.multiple_valid_answers_boundary_user
+[문항]
+{{QUESTION_TEXT}}
+
+[제시된 정답]
+{{ANSWER}}
+
+[해설]
+{{ANSWER_EXPLANATION}}
+```

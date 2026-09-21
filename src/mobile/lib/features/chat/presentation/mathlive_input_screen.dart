@@ -84,6 +84,10 @@ class _MathliveInputScreenState extends State<MathliveInputScreen> {
                     : MathliveInputWebView(
                         key: _inputKey,
                         onChanged: _onLatexChanged,
+                        // 이 화면은 수식 입력 전용이라 "진입 = 지금 입력하려는 것"이다 —
+                        // 필드를 한 번 더 탭해야 하는 마찰을 없앤다(S3-37). 인라인 임베드는
+                        // 기본값(false)을 그대로 쓴다(webview 쪽 autofocus 주석 참조).
+                        autofocus: true,
                       ),
               ),
               const SizedBox(height: AppSpacing.md),

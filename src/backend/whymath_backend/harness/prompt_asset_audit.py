@@ -263,6 +263,19 @@ L3_PROMPT_RAILS: dict[str, tuple[str, ...]] = {
     "l3.cross_verify.statistical_falsify_user": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.statistical_grounding_system": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.statistical_grounding_user": (RAIL_INDEPENDENCE,),
+    # v4 결함류별 적대적 검증 관점 — 같은 검증자 계열이므로 독립성 레일을 동일 적용한다.
+    "l3.cross_verify.missing_condition_checklist_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.missing_condition_checklist_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.missing_condition_model_grounding_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.missing_condition_model_grounding_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.missing_condition_student_reading_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.missing_condition_student_reading_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_alternative_model_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_alternative_model_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_boundary_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_boundary_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_counterexample_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.multiple_valid_answers_counterexample_user": (RAIL_INDEPENDENCE,),
 }
 
 # 레일 0 자산의 사유 — "왜 이 자산엔 준거를 안 거는가"를 명시한다(침묵 누락 금지).
