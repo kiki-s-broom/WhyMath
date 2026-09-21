@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - "docs/ops/**"
   - "src/backend/whymath_backend/harness/**"
-session: null
+session: claude/gifted-fermi-ua6wd1
 notes: "등재 경위(2026-09-19): EOS-118 게이트 G-eos118-seat-signal-live-run 집행 중 부수로 드러났다. 좌석 신호 판정 3축은 전건 성립했고 그 판정은 PR #1223이 소유한다 — 이 태스크는 **그 회차에서 같이 나왔지만 아무도 소유하지 않은 축**이다.\n\n발견 경로: 회차 stderr의 카나리 권고 줄에서 분모가 openrouter 5/5, anthropic 1/1로 갈린 것이 단서였다. evaluate_canary(batch_safety.py:199)가 중립(중복) status를 분모에서 제외하므로 anthropic 회차의 4건이 중립이라는 뜻이고, 그것을 report.json의 outcome_counts로 확정했다(rejected_duplicate:4). 추론 단계에서 멈추지 않고 파일로 확정한 것이 이 등재의 전제다.\n\n왜 태스크인가: 재현되면 좌석 선택의 비용 축이 바뀐다(실효 단가 5배 차이). 재현되지 않으면 n=5의 우연이다. 어느 쪽이든 채팅·PR 본문에만 남기면 만료 없는 유예가 되므로(CLAUDE.md) 소유자를 만든다. 다만 판정 재료로 쓰기에는 표본이 전혀 부족하므로, 이 태스크의 첫 일은 측정이지 결론이 아니다.\n\n선행: EOS-118 착지 후 착수한다(depends_on으로 집행 — 산문 선행은 selector가 읽지 않는다). 이유는 이 측정이 EOS-118이 신설한 런북 docs/ops/eos118_seat_signal_live_runbook.md를 확장해 쓰는 것이 자연스럽고, 그 파일이 trunk에 없으면 착수 세션이 없는 파일을 대상으로 시작하기 때문이다.\n\n주의: 이 태스크도 ARCH-56의 발동 조건 ⓐ(상시 배치 트래픽 투입)를 건드리지 않는다. 측정 회차이지 채택 결정이 아니다."
-updated: 2026-09-19
+updated: 2026-09-21
