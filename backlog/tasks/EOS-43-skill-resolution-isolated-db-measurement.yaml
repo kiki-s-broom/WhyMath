@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-43-skill-resolution-isolated-db-measurement
+title: "스킬 해소율 측정을 격리 DB에서 수행 — prod는 문항·채점 이력 전수 0건으로 실측됨 (EOS-63 선결 잔여축)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: cancelled
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates:
+  - G-eos63-skill-event-reach-sample
+acceptance:
+  - "① 격리 DB 측정 회차: docker-compose.pilot.yml의 파일럿 DB(5434) 또는 일회용 컨테이너에 alembic upgrade head + 문항 코퍼스를 적재하고, attempt_skill_reach_probe --count 20을 태운 뒤 attempt_skill_event_reach_report --since로 해소율을 산출한다. prod DB(whymath-pg:5433)에는 쓰기 0건임을 회차 전후 problem_attempt 카운트 대조로 증명한다\n② 3분류를 뭉개지 않고 보고: writer 미도달 / 기록·해소 0건 / 해소 1건 이상 각각의 건수와 분모를 남긴다. 해소율이 0%로 나와도 그것이 측정값이므로 실패로 처리하지 않는다 - 다만 그 경우 원인 축이 브리지 데이터임을 명시한다\n③ prod 실측 사실의 등재: 이 태스크 notes에 이미 적힌 prod 전수 0건 측정을 EOS-63 착수 세션이 읽을 수 있게 게이트 또는 EOS-63 notes로 전달한다(EOS-63은 타 세션 claim 중이므로 대장 조작 충돌을 피해 게이트 경유를 우선한다)\n④ 정직 고지: 이 회차의 writer 도달률은 프로브가 스스로 만든 표본이라 배선이 살아 있으면 구성상 100%다. 그것이 증명하는 것은 attempt_submit 경로 배선의 실재까지이며 학생 트래픽 통계가 아니라는 점을 보고에 명시한다. coach_completion 경로는 이 프로브가 태우지 않으므로 미측정으로 표기한다"
+artifacts: []
+paths:
+  - docs/ops/eos63_skill_event_reach_sample_runbook.md
+session: null
+notes: "[측정 실측 2026-09-09 · 판정 기준 main 94d1f28a] 게이트 G-eos63-skill-event-reach-sample 회차에서 Phaiakes9 prod DB(docker whymath-pg:5433)를 실측했다. 리포트는 정상 종료(exit 0)했고 관측 창 제한 없는 전수 조회 결과:\n\n  problem                 0\n  problem_with_difficulty 0\n  problem_attempt         0\n  attempt_event           0\n  concept                 2683\n  user_profile            2\n\n즉 prod DB에는 개념 백본만 있고 문항 코퍼스도 채점 이력도 평생 0건이다. EOS-63 acceptance 2가 요구한 \"writer 도달률이 관측 창에서 충분히 쌓인 뒤\"는 명백히 미충족이며, 그 사실이 이제 추론이 아니라 측정으로 확정됐다.\n\n[왜 prod에서 표본을 만들 수 없나] attempt_skill_reach_probe는 exit 4(CandidateShortageError)로 멈췄다 - 난이도가 매겨진 미시도 문제가 0건이라 태울 문항이 없다. eos63 런북 7-2는 이 경우 scripts/demo/seed_demo.py를 돌리라고 안내하지만, 그 스크립트는 WHYMATH_DATABASE_URL을 그대로 쓰므로 prod에 1704문항을 적재한다. PILOT_RUNBOOK.md 표가 \"B. prod 오버라이드 whymath-pg(5433) - 데모 시드가 prod에 섞임 - 미채택\"으로 2026-07-26 Kiki 확정한 결정과 정면 충돌한다. 그래서 그 경로는 취하지 않았다(런북 7-2 자체가 결함이며 별건으로 정정).\n\n[이 태스크의 범위] 남은 축은 해소율(개념 to 스킬 매핑이 실제로 스킬을 찾아내는 비율)이다. 이 값은 코퍼스와 브리지 데이터의 성질이지 prod 트래픽의 성질이 아니므로, 같은 코퍼스를 적재한 격리 DB에서 재도 같은 답이 나온다. docker-compose.pilot.yml의 파일럿 DB(5434 named volume) 또는 일회용 컨테이너를 쓰면 prod 오염 0으로 측정할 수 있다.\n\n[선행] EOS-63은 병렬 세션이 claim 중이므로 이 태스크는 그 태스크의 코드를 건드리지 않는다 - 측정 회차와 그 결과 기록만 소유한다.\n\n[취소 2026-09-10] 후행 실측이 이 태스크의 전제를 무효화했다. 2026-09-10 다른 세션(PR #1079)이 Kiki와 함께 같은 회차를 prod에서 완주했고, 이 태스크가 격리 DB에서 재려던 해소율이 거기서 이미 나왔다 — WINDOW=2026-09-10T03:33:12Z ATTEMPTS=20 EVENTS=20 WRITER_REACH=1.0 RESOLUTION=0.0 E2E=0.0. 즉 이 태스크의 acceptance ①②는 산출물이 이미 존재하고, ③(EOS-63에 전달)도 그 PR이 EOS-63 notes 갱신으로 이행했으며, 근본원인(skill_node 0행·concept.behavior_skills 전량 빈 배열 2683/2683)은 SKB-01-skill-concept-bridge-prod-populate가 소유한다. 격리 DB에서 다시 재는 것은 같은 답을 더 비싸게 얻는 일이다.\n\n등재 당시 판단이 틀린 지점도 함께 남긴다: 이 태스크는 \"prod에 코퍼스를 시드하는 것은 2026-07-26 확정 결정 위반\"이라는 전제 위에 섰는데, 그 결정(PILOT_RUNBOOK.md DB 선택 표의 B행)은 **파일럿 KPI용 영속 DB를 어디에 둘 것인가**를 정한 것이지 문항 코퍼스 적재 일반을 금지한 것이 아니다. 결정의 적용 범위를 실제보다 넓게 읽었다 — CLAUDE.md 「가드가 막는다는 주장도 주입으로 검증한다」의 문서 축(어떤 결정이 무엇을 막는지 적기 전에 그 결정의 범위를 확인한다)."
+updated: 2026-09-10

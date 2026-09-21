@@ -84,6 +84,13 @@ class EvidenceLink(Base):
     polarity: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
     # verify/PRM 기반 가중치 — 미평가 None.
     weight: Mapped[float | None] = mapped_column(sa.Float)
+    # 증거의 *출처*(어떤 코드 경로가 무엇을 근거로 이 엣지를 썼는가) — MISC-20.
+    # **`weight`로 출처를 추론하지 않는다**: `weight`는 nullable이고(미평가 None) WH-1 하네스의
+    # `LogEvidenceAction.weight`는 **LLM이 지정**할 수 있다. 즉 가중치는 "누가 왜 썼는가"를
+    # 말해 주지 못한다 — 그것으로 "학생이 오개념을 넘어섰다"를 판정하면 LLM이 숫자 하나로
+    # 해소를 선언하게 되고, NULL(미평가=모름)을 강한 신호로 접는 순간 *모른다*가 *확정*이 된다.
+    # 기계가 확인한 사실만 값으로 남기고, 모르면 NULL로 둔다(해소율 분자에서 제외).
+    provenance: Mapped[str | None] = mapped_column(sa.Text)
     # 보존 기한(졸업+1년 등 정책) — 경과 시 야간 배치 파기. 미설정 None.
     retention_until: Mapped[date | None] = mapped_column(sa.Date)
 

@@ -33,10 +33,17 @@ def test_corpus_counts_and_codes() -> None:
 
 def test_corpus_self_authored_and_internal_definition() -> None:
     data = _load()
-    # 자체작성·정식정의 학생비노출 표기(검수필요·NCIC 본문 미수록).
+    # 자체작성·정식정의 학생비노출 표기 + NCIC 출처 표시.
+    # 2026-09-06 정정: 옛 선언 "NCIC 본문 미수록"은 데이터와 모순이었다(explanation 133건이
+    # 성취기준 본문과 사실상 동일). 데이터를 지우는 대신 선언을 데이터에 맞췄으므로
+    # (교육부 고시 = 저작권법 §7 비보호 + 공공누리 제1유형), 여기서 지켜야 할 것은 "미수록"이
+    # 아니라 **출처 표시**다 — 공공누리 제1유형의 유일한 조건.
+    # 선언 ↔ 실측 정합은 test_models_validate.py가, 서빙측 대조는 backend l1 테스트가 본다.
     assert "자체" in data["source_citation"]
     assert "학생 비노출" in data["license_notice"]
-    assert "미수록" in data["license_notice"]
+    assert "미수록" not in data["license_notice"]
+    for marker in ("NCIC", "교육부 고시 제2022-33호", "공공누리"):
+        assert marker in data["license_notice"], f"출처 표시에 '{marker}' 누락"
     # 콘텐츠 4종 전수 채움(검수보고: K-12 437칸 채움).
     for fld in (
         "metaphor",
@@ -49,7 +56,9 @@ def test_corpus_self_authored_and_internal_definition() -> None:
 
 def test_corpus_no_ncic_body_keys() -> None:
     data = _load()
-    # 모든 항목 키에 NCIC 본문 키가 없어야 한다(코드만 보존).
+    # 모든 항목 키에 NCIC 본문 *컬럼*이 없어야 한다. 이것은 스키마 축 동결이지 "본문을 담지
+    # 않는다"의 증명이 아니다 — explanation이 같은 내용을 담고 있었다(2026-09-06 실측).
+    # 그 축은 tests/backend/l1/test_concept_content_license_declaration.py가 본다.
     all_keys: set[str] = set()
     for c in data["content"]:
         all_keys.update(c.keys())

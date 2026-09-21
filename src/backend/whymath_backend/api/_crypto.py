@@ -355,6 +355,83 @@ def require_dialogue_content_cipher(settings: Any) -> MultiKeyCipher | None:
     return None
 
 
+def build_student_work_cipher(settings: Any) -> MultiKeyCipher | None:
+    """`Settings`에서 학생 답안/풀이 본문(SEC-31 — `problem_attempt`·`answer_submission`·
+    `student_solution_step` 3테이블) 저장용 `MultiKeyCipher` 생성.
+
+    `build_dialogue_content_cipher`·`build_evidence_payload_cipher`와 *동일 조립 로직*
+    (`_multikey_from_raw`)이나 **키 소스가 분리**된다(`student_work_encryption_key`·
+    `student_work_decryption_fallback_keys`) — dialogue·evidence·device secret 키와 별개라 한
+    키 유출의 폭발 반경을 자산 간 격리한다. 3테이블은 *이 키 하나를* 공유한다 — 한 답안 제출
+    흐름 안에서 같은 데이터 주체(그 학생)의 같은 논리적 사건으로 함께 적재되는 관계라, 테이블별로
+    쪼개도 폭발 반경이 실질적으로 줄지 않는 반면 "미설정→평문 폴백" 함정만 3배가 된다(dialogue_turn
+    내부 3축 공유 결정과 동일 근거). primary 키 미설정이면 None(평문 폴백·CI·기존 배포 무영향·
+    점진 도입).
+
+    `settings: Any` — `whymath_backend.config.Settings` 순환 import 회피(typing-only 명시).
+    """
+    return _multikey_from_raw(
+        settings.student_work_encryption_key.get_secret_value(),
+        settings.student_work_decryption_fallback_keys.get_secret_value(),
+    )
+
+
+def require_student_work_cipher(settings: Any) -> MultiKeyCipher | None:
+    """SEC-31: cipher를 만들되, **프로덕션 추정 환경에서 키가 없으면 거부**한다(fail-closed).
+
+    `build_student_work_cipher`는 키가 없으면 조용히 `None`(평문 폴백)을 돌려준다. 그 폴백은
+    개발·CI에서는 옳지만 프로덕션에서는 **CLAUDE.md 절대 금기("학생 데이터는 민감 정보로 분류 —
+    암호화 저장")를 조용히 위반**한다 — 그리고 조용하기 때문에 아무도 모른다.
+    `require_dialogue_content_cipher`(SEC-01)와 동일한 게이트 형태.
+
+    **프로덕션 판별**: `config.is_production_like`(단일 좌석)에 위임한다.
+
+    Raises:
+        RuntimeError: prod 추정 환경인데 `WHYMATH_STUDENT_WORK_ENCRYPTION_KEY` 미설정.
+    """
+    from whymath_backend.config import is_production_like
+
+    cipher = build_student_work_cipher(settings)
+    if cipher is not None:
+        return cipher
+    if is_production_like(settings):
+        raise RuntimeError(
+            "프로덕션 추정 환경(실 OAuth provider 구성)인데 학생 답안/풀이 암호화 키가 "
+            "미설정입니다 — `WHYMATH_STUDENT_WORK_ENCRYPTION_KEY`를 설정하세요. 학생 답안·풀이 "
+            "본문을 평문으로 저장하는 것은 절대 금기라 평문 폴백을 허용하지 않습니다."
+        )
+    return None
+
+
+def encrypt_student_solution_step_expression(
+    cipher: SupportsEnvelope | None, expression: str
+) -> tuple[str | None, bytes | None, bytes | None]:
+    """`student_solution_step.expression` 저장용 3-튜플 — **NOT NULL** 전용(schema min_length=1).
+
+    다른 5개 학생 답안/풀이 필드(nullable)는 `encrypt_dialogue_content`(값 없음 분기 포함)를
+    그대로 재사용하지만, `expression`은 값이 *항상* 있어(빈 문자열 없음) 그 분기가 필요 없다 —
+    "값이 항상 있고 cipher 없으면 평문 폴백"인 `encrypt_secret_for_storage`(device secret 계약)
+    를 재사용한다.
+    """
+    return encrypt_secret_for_storage(cipher, expression, allow_plaintext_fallback=True)
+
+
+def resolve_student_solution_step_expression(
+    cipher: SupportsEnvelope | None,
+    expression_plain: str | None,
+    expression_encrypted: bytes | None,
+    expression_nonce: bytes | None,
+) -> str:
+    """저장 표현에서 `expression` 평문 복원 — 항상 `str` 반환(schema 계약 `min_length=1`).
+
+    `resolve_dialogue_content`와 달리 *평문·암호문 둘 다 없는 상태는 정상이 아니다* — expression은
+    NOT NULL 계약이라 `resolve_stored_secret`(device secret과 동일 계약: 암호행인데 cipher
+    미설정이면 RuntimeError, 평문·암호문 둘 다 없으면 데이터 무결성 오류 RuntimeError)을
+    재사용한다 — 조용히 빈 문자열/None을 만들지 않는다.
+    """
+    return resolve_stored_secret(cipher, expression_plain, expression_encrypted, expression_nonce)
+
+
 def encrypt_dialogue_image_uri(
     cipher: SupportsEnvelope | None, image_uri: str | None
 ) -> tuple[str | None, bytes | None, bytes | None]:
@@ -428,16 +505,20 @@ __all__ = [
     "build_dialogue_content_cipher",
     "build_evidence_payload_cipher",
     "build_secret_cipher",
+    "build_student_work_cipher",
     "encrypt_dialogue_content",
     "encrypt_dialogue_image_analysis",
     "encrypt_dialogue_image_uri",
     "encrypt_evidence_payload",
     "encrypt_secret_for_storage",
+    "encrypt_student_solution_step_expression",
     "require_device_secret_cipher",
     "require_dialogue_content_cipher",
+    "require_student_work_cipher",
     "resolve_dialogue_content",
     "resolve_dialogue_image_analysis",
     "resolve_dialogue_image_uri",
     "resolve_evidence_payload",
     "resolve_stored_secret",
+    "resolve_student_solution_step_expression",
 ]

@@ -202,6 +202,9 @@ _TIER_LABEL: dict[ExposureTier, str] = {
     ExposureTier.STUDENT_VISIBLE: "학생 노출 가능",
     ExposureTier.GUARDIAN_SUMMARY: "보호자 요약",
     ExposureTier.INTERNAL_ONLY: "내부 전용",
+    # MISC-20 — 근사라 학생 노출만 보류된 지표. 운영자 리포트에는 값·도달상태가 그대로 실린다
+    # (강등 ≠ 삭제 — 계산·리포트는 유지되고 억제 사유에 재승격 조건이 함께 렌더된다).
+    ExposureTier.PROVISIONAL: "근사(학생 노출 보류)",
 }
 
 

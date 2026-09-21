@@ -16,10 +16,11 @@ acceptance:
   - "코치 대화창에 학생이 자유입력으로 친 최종답도 S3-32의 verify_final_answer 경로로 판정된다(별도의 임시 정규식/휴리스틱 감지 금지 — 단일 권위 원칙)"
   - "MC(객관식) 문항은 보기 탭이 곧 답 제출이다 — 별도 '제출' 버튼 없이 탭 즉시 서버검증 경로 호출"
   - "두 입력면(대화 자유입력·MC 버튼) 모두 같은 CoachResponse completion 신호를 공유한다 — 경로별로 다른 완료 판정 로직 금지"
+  - "[고립 참조 2026-09-07 stray-code 감사] origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 1203530d)가 이 태스크를 '착수 전 조사에서 이미 전량 충족(신규 코드 0 — S3-32·S3-35 계보)'로 done 처리했다. 이식할 코드는 없다 — 착수 시 그 판정 3항(자유입력 감지·MC 탭 즉시 제출·신호 공유)을 main 코드에서 재확인만 하고 done 처리. 재구현 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/coach.py
   - "src/mobile/lib/features/chat/**"
 session: null
-notes: "브랜치 tlthrr의 원 S3-28(대화 입력 최종답 감지)·S3-29(MC 선택지 버튼) 재작성. S3-32의 verify_final_answer/completion 경로를 소비 — 대화창에 직접 친 답도, MC 보기 탭도 같은 서버검증 경로를 타야 한다(경로 이원화 금지).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "브랜치 tlthrr의 원 S3-28(대화 입력 최종답 감지)·S3-29(MC 선택지 버튼) 재작성. S3-32의 verify_final_answer/completion 경로를 소비 — 대화창에 직접 친 답도, MC 보기 탭도 같은 서버검증 경로를 타야 한다(경로 이원화 금지).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착"
+updated: 2026-09-07

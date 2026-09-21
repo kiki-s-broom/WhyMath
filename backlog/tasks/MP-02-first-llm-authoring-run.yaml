@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-02-first-llm-authoring-run
+title: "첫 LLM 저작 회차 완주 — Phaiakes9에서 accumulate n=60(카나리 30+본배치 30) 실 LLM 1회 · 카나리 30건 Kiki 검수 이벤트 기록 · 리콜 리허설 (대체안 A §6 1행)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: blocked
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - MP-04-round-manifest-snapshot
+requires_gates: []
+acceptance:
+  - "① 완주 — Phaiakes9에서 problem_corpus_accumulate를 라우터 경유 실 LLM으로 n=60 1회 돌린다(카나리 30 기본·롤링 창 50 기본). 산출 3종이 전부 실재해야 한다: rounds.jsonl 1행·genlog 60행(run_id 동일)·review.jsonl. 카나리 미달로 차단되면 그것도 결과다 — 차단 사유·Wilson 하한 수치를 기록하고 원인을 규명한 뒤 재회차"
+  - "② 검수 기록 — 카나리 30건을 Kiki가 100% 검수하고 review_session/review_timer 이벤트로 기록한다. 이 기록이 게이트 G-eos-first-run-canary-review의 clear 증적이 된다(이벤트 파일 + 건수 30). 눈으로만 보고 기록을 안 남기면 골든 승격 원천이 생기지 않는다"
+  - "③ 리콜 리허설 — 이 회차 run_id로 generation_recall --corpus dry-run 열거가 정확히 60건(과다·과소 0)인지 실측한다. --apply는 하지 않는다(실 처분은 결함이 있을 때만)"
+  - "④ 기록 — 카나리 통과율·Wilson 95% 하한·임계 0.90 통과 여부가 회차 대장(rounds.jsonl)에 실린다(MP-04 ② 관측 판정 필드 — 그래서 MP-04가 depends_on이다) + MEMORY에 남긴다. 임계의 현실 적합 판정과 변경 결정은 MP-03에서 한다"
+  - "[정정 2026-09-06 · PR #1014 Codex P2] notes의 'EOS 계열 소진' 서술은 backlog.py add 거부 문구를 실측 없이 옮긴 도구 오보고였다 — HARN-73(#1002) 실측: EOS 번호 사용 59·미사용 40(01~05·07~27·29~31·33~43). Kiki 결정 A(하위 미사용 번호 재사용 + 제안기 폴백 · 새 접두 기각)·게이트 G-eos-task-prefix-exhausted clear. EOS 축 후속 태스크는 계속 EOS-nn을 쓰고, MP는 소진 대응이 아니라 회차 축 접두라는 정의만 유효하다. 위 소진 문구는 과거 경위로만 읽는다(이 항은 acceptance가 아니라 정정 기록 — HARN-24 정정 항 관용)"
+artifacts: []
+paths:
+  - "data/corpus/**"
+  - "docs/reviews/**"
+session: null
+notes: "출처: 대체안 A(2026-09-06 Kiki 채택) §6 1행 · §11-5 P1-①. **MP 접두 신설 사유**: EOS 계열 소진(TASK_ID_RE 정확히 2자리·EOS-98/99가 마지막). MP = 마이크로 프로젝트(대체안 A 정의: 1 MP = accumulate 회차 1건). MP-01은 초판 오등재(검수 게이트를 회차 태스크에 걸어 교착 — requires_gates는 착수 조건)로 회수된 번호라 재사용하지 않는다(§11-3). Kiki 머신 실행 필수(실 provider·Phaiakes9) — 세션이 런북(6항목 브리핑·자가검증 동봉)을 제공하고 Kiki가 실행한다. EOS-99(캐시 계측)는 이 태스크의 의존이 아니다(참조만). 골든셋의 시작점이라 P0 논거가 있으나 P0 예산(One In One Out) 때문에 P1 — 승격은 Kiki 판단(amend --priority).\n\n[정정 2026-09-06] PR #1014 Codex P2 — 활성 레코드의 잘못된 소진 근거 정정(HARN-73 실측·Kiki 결정 A). amend에 notes 정정 경로가 없어(HARN-67 ⑥) acceptance 정정 항으로 기록\n\n[차단 2026-09-07] Kiki 머신 실행 대기 — 사람 게이트. 실행 런북은 main 착지 완료(PR #1017 · 머지 커밋 98925b0e · docs/reviews/mp02_first_llm_authoring_run_runbook.md). 회차 자체는 실 LLM·Phaiakes9 몫이라 세션이 대신 수행할 수 없다(샌드박스에 Ollama·실 provider 키 0건). 안내 범위는 런북 1~6절이며, 카나리 검수 절은 구간 식별 도구가 착지한 뒤 별도 런북으로 드린다. 원격 홀드 유지 — Kiki 회신이 이 세션으로 돌아오므로 다른 세션이 이어받을 자리가 아니다."
+updated: 2026-09-07

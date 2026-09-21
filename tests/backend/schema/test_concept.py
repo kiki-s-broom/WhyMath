@@ -499,6 +499,7 @@ class TestConceptNodeFieldGovernance:
             "exam_frequency",
             "weight_in_curriculum",
             "created_at",
+            "current_published_version_id",  # 판 관리 포인터(EOS-49 §6.4)·참조 키(본문 아님)
         }
     )
 

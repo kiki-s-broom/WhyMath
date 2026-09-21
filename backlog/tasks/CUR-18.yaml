@@ -24,5 +24,5 @@ paths:
   - src/backend/whymath_backend/db/models/achievement_standard.py
   - src/backend/whymath_backend/db/models/visualization_card.py
 session: null
-notes: "EOS 6_개념 DB 검토 §39 반영. 기존 API에 누락된 Concept 주변 리소스 조회 엔드포인트를 설계한다.\n\n[차단 2026-08-31] G-eos-verification-relevance-triage 대기 — 12월 검증 관여도 판정 미필(선언 §0-5·§6-5). CUR-11·CUR-12·CUR-17과 동일 계보·동일 사각지대. 판정 시 유의: acceptance는 '엔드포인트 gap 식별·스키마 설계·인터페이스 설계'로 설계 단계이나 paths가 api/concept.py·l1/concept_graph/·db/models 3종이라 착수 시 서빙 표면에 닿는다. 7개 엔드포인트 중 MVP 우선순위 선정(acceptance ②)을 관여도 판정과 함께 하면 중복 판정을 피할 수 있다. 게이트 clear 후 unblock.\n\n[정정 2026-09-01] eos_priority null → P2: Concept Search API 확장 — 12월 내부 검증에 불요. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "EOS 6_개념 DB 검토 §39 반영. 기존 API에 누락된 Concept 주변 리소스 조회 엔드포인트를 설계한다.\n\n[차단 2026-08-31] G-eos-verification-relevance-triage 대기 — 12월 검증 관여도 판정 미필(선언 §0-5·§6-5). CUR-11·CUR-12·CUR-17과 동일 계보·동일 사각지대. 판정 시 유의: acceptance는 '엔드포인트 gap 식별·스키마 설계·인터페이스 설계'로 설계 단계이나 paths가 api/concept.py·l1/concept_graph/·db/models 3종이라 착수 시 서빙 표면에 닿는다. 7개 엔드포인트 중 MVP 우선순위 선정(acceptance ②)을 관여도 판정과 함께 하면 중복 판정을 피할 수 있다. 게이트 clear 후 unblock.\n\n[정정 2026-09-01] eos_priority null → P2: Concept Search API 확장 — 12월 내부 검증에 불요. EOS-80 일괄 백필\n\n[차단 2026-09-06] G-eos-verification-relevance-triage는 2026-09-01 clear됨(Kiki 대기 아님). 판정 = P2·12월 검증 불요·2027 Q1~Q2 이월(docs/ops/eos_relevance_triage_gate_runbook.md §2 표). 재확인 지점 = G4(2026-12-13) 또는 2027-01 착수 계획 시 — 그때까지 파킹. 착수하려면 unblock 1회(남은 사람 결정 없음). priority 2·S3라 지금 unblock하면 next 최상위로 올라가 이월 판정과 어긋나므로 차단으로 파킹한다."
+updated: 2026-09-06

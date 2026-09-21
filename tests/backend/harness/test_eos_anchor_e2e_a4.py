@@ -234,7 +234,7 @@ def _patch_live_generator(monkeypatch: pytest.MonkeyPatch, responses: Sequence[s
     from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID  # 조성 루트 미러
 
     def _build(
-        topic_hint: str, *, generation_log_sink: object = None
+        topic_hint: str, *, generation_log_sink: object = None, **_routing: object
     ) -> LLMEquivalentProblemGenerator:
         return LLMEquivalentProblemGenerator(
             ScriptedProvider(responses),  # type: ignore[arg-type]
@@ -603,7 +603,10 @@ class TestGenerationLogAnchorHonesty:
         발생 시에만 생긴다 — 이 회차는 비수용 0이라 부재가 정직).
 
         허용 사이드카 목록은 **의도적으로 화이트리스트**다 — 새 사이드카가 생기면 이 테스트가
-        빨개져 "무엇을 왜 더 쓰는가"를 한 번 설명하게 만든다. `acc.rounds.jsonl`은 EOS-64 ④의
+        빨개져 "무엇을 왜 더 쓰는가"를 한 번 설명하게 만든다. 아래 금지 문자열 검사도 같은
+        성격으로 **의도적으로 무디다**(중첩된 어디에 있든 잡는다): EOS-99가 회차 대장에
+        프롬프트 캐시 블록을 더할 때 그 판정 키를 `verdict`로 두려다 여기서 빨개졌고, 가드에
+        예외를 파는 대신 키를 `state`로 비켰다 — 무딤이 이 가드의 힘이라 예외가 곧 무력화다. `acc.rounds.jsonl`은 EOS-64 ④의
         회차 대장(기계 산출·검수자 착석 아님)으로 여기 편입했다: 연속 무진전 판정의 재료이며
         `reviewer_id`·`verdict` 같은 사람 판정 필드를 담지 않는다(날조 축과 무관).
         """

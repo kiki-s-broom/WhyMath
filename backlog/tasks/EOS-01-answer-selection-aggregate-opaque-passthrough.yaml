@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-01-answer-selection-aggregate-opaque-passthrough
+title: "answer_selection·answer_aggregate 조용한 None 강등 처분 — answer_kind와 같은 과목 어휘인데 적재기가 열거한다 (EOS-85 잔여·경계 프로브 사각)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 먼저: answer_selection(largest/smallest/unique)·answer_aggregate(sum/product)가 과목 어휘인지 플랫폼 어휘인지 판정한다. answer_kind와 같은 축이면 불투명 통과, 다르면 그 근거를 적는다 — EOS-85가 세운 기준은 '폐쇄집합인가'가 아니라 '누구의 어휘인가'다"
+  - "② 경계 프로브 사각 규명: eos_core_boundary_probe가 answer_kind 튜플은 리터럴 비교로 잡았는데 이 두 튜플은 못 잡았다(EOS-85 실측 — 히트 1건뿐). 프로브의 수학 어휘 매처가 이 값들을 모르는 것인지 다른 이유인지 확인하고, 사각이면 매처를 넓힌다"
+  - "③ 처분 집행 + 회귀 테스트: 통과로 판정하면 미등록 값이 None이 아니라 원문 그대로 실림을 단언하고, 거부로 판정하면 ProblemCorpusError 경로를 단언한다. 어느 쪽이든 결함 주입으로 RED 실증"
+artifacts:
+  - "PR #1015 — answer_selection·answer_aggregate 불투명 통과(과목 어휘 판정·L3 verify_root_selection이 판정 권위) + 사각 규명(두 정적 축 모두 설계상 범위 밖 — MATH_TYPE_RX 미매치·ProblemStatement DTO 비소속) + 회귀 3건·뮤테이션 3/3 검출. backend 11916 / infra 1001 passed EXIT 0."
+paths:
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - tests/backend/l1/problem_bank/test_populate.py
+session: null
+notes: "출처: EOS-85 구현 중 발견. answer_kind와 코드상 인접한 3형제 중 하나만 고쳐 두면 다음 사람이 나머지를 '의도된 차이'로 오독한다 — populate docstring에 이 태스크가 소유자로 적혀 있다. 번호: EOS 상위 소진(HARN-73 폴백)으로 CLI가 제안한 최저 미사용 번호."
+updated: 2026-09-07

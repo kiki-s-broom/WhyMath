@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-42-inventory-v2-package-initializer-population
+title: "기능 인벤토리 v2 모집단에 패키지 초기화 모듈(__init__.py 57건·2,811줄) 편입 — '백엔드 모듈 580/580 전수' 주장의 사각 (PR #980 Codex P2)"
+track: math-completion
+stage: S3
+subject: cross
+layer: docs
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 모집단 정정: scripts/analysis/eos_feature_inventory_v2.py의 _backend_modules()가 __init__.py를 패키지 모듈명(예 db.models)으로 포함한다 — 2026-09-06 실측(head e13765c8) 57건·2,811줄, 상위 3 = db/models/__init__.py 312줄·schema/__init__.py 233줄·whs/__init__.py 191줄. 현재는 전부 제외돼 어느 행도 소유·LOC·import·결합·뮤테이션에 계상하지 못하면서 대시보드는 580/580 전수를 보고한다"
+  - "② 귀속 규칙 명문화: 패키지 형태 카탈로그 항목이 통째 소유하는 40건은 그 행에 자동 귀속(_resolve_modules가 m == entry를 이미 수용). 하위 모듈이 행별로 분할된 17패키지(root·api·db.models·harness·l1·l2·l3·l3.equivalent·l3.pedagogy·l4·l4.misconception·l4.pedagogy·l5·l6·ops·privacy·whs)의 __init__은 재수출 배선이므로 소유 행을 카탈로그에 명시 선언한다 — 다수결 등 암묵 휴리스틱 금지(측정값이 조용히 바뀐다)"
+  - "③ 파급 재산출: 장부 --write 재생성 + 해설 문서(docs/reviews/eos_feature_inventory_v2_2026-09-03.md)의 모듈 수 580과 KEEP/REFACTOR/HEAVY/REPLACE/POSTPONE 분포를 실측으로 갱신하고, 판정(migration_action·release_priority)이 바뀐 행 수를 적는다 — 0건이어도 그 사실을 적는다"
+  - "④ 변별력: __init__.py 하나를 어느 행에도 귀속시키지 않는 뮤테이션에서 '미귀속 모듈' RED를 실측해 기록하고, tests/infra/test_eos_feature_inventory_v2.py의 드리프트·전수성 테스트를 새 모집단으로 갱신한다"
+  - "[정정 2026-09-06 · PR #1014 Codex P2] notes의 'EOS 계열 소진' 서술은 backlog.py add 거부 문구를 실측 없이 옮긴 도구 오보고였다 — HARN-73(#1002) 실측: EOS 번호 사용 59·미사용 40(01~05·07~27·29~31·33~43). Kiki 결정 A(하위 미사용 번호 재사용 + 제안기 폴백 · 새 접두 기각)·게이트 G-eos-task-prefix-exhausted clear. EOS 축 후속 태스크는 계속 EOS-nn을 쓰고, MP는 소진 대응이 아니라 회차 축 접두라는 정의만 유효하다. 위 소진 문구는 과거 경위로만 읽는다(이 항은 acceptance가 아니라 정정 기록 — HARN-24 정정 항 관용)"
+artifacts: []
+paths:
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - "backlog/inventory/feature_inventory_v2.*"
+  - "docs/reviews/eos_feature_inventory_v2_*.md"
+  - tests/infra/test_eos_feature_inventory_v2.py
+session: null
+notes: "출처: PR #980 Codex P2 스레드(scripts/analysis/eos_feature_inventory_v2.py _backend_modules, discussion_r3926295285). EOS-83 장부의 모집단 정의(__init__.py 제외)가 그 acceptance ①의 '모든 백엔드 모듈' 주장과 어긋난다 — 2026-09-06 실측 57건·2,811줄. 40건은 패키지 항목 자동 귀속이 자명하고 17건은 소유 판정이 필요해, 장부 162행과 문서 수치가 함께 바뀌는 파급 때문에 PR #980의 범위 밖으로 분리했다(같은 PR의 다른 Codex 지적 2건 — node_modules 스캔 제외·클라 경로 중복 귀속 검출 — 은 그 PR에서 정정). 스캔 0건은 실패 원칙(CLAUDE.md 2026-09-01 ④)의 모집단 축. 프리픽스: EOS는 00~99를 전부 소진해 CLI가 번호 제안을 거부(HARN-21)했고, 내용이 아키텍처 측정 장부라 기존 ARCH 계열(ARCH-37~39 좌석 판정과 같은 족)로 등재했다 — 번호는 CLI 제안(ARCH-40 로컬 선점·ARCH-41 원격 선점).\n\n[정정 2026-09-06] PR #1014 Codex P2 — 활성 레코드의 잘못된 소진 근거 정정(HARN-73 실측·Kiki 결정 A). amend에 notes 정정 경로가 없어(HARN-67 ⑥) acceptance 정정 항으로 기록"
+updated: 2026-09-06

@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-64-ruleset-pin-plan-tool
+title: "룰셋 소스 pin 변경안 생성 도구 — 브랜치 보호 PUT 본문을 오프라인에서 검증 가능하게"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: cancelled
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates:
+  - G-required-checks-source-pin-cleanup
+acceptance:
+  - "① scripts/harness/ruleset_pin_plan.py 신설 — GET rulesets/{id} 백업 JSON을 입력으로 받아 required_status_checks 항목을 고유 컨텍스트로 중복 제거하고 전건 GitHub Actions(15368) pin으로 정규화한 PUT 본문(ruleset-plan.json)과 사람이 읽는 before/after 표를 출력한다. 네트워크 호출 0건 — 조회·적용은 Kiki의 gh api가 한다"
+  - "② 불변식을 코드가 집행 — 컨텍스트 집합 불변(추가·삭제 0)·status 외 규칙 바이트 동일·읽기 전용 필드(id·node_id·created_at·updated_at·source·source_type·_links·current_user_can_bypass) 제거·status 규칙 파라미터(strict 등) 보존. 위반 시 본문을 쓰지 않고 exit 2"
+  - "③ 거부 조건 — status 규칙 부재(이 도구는 규칙을 만들지 않는다)·다른 앱으로 pin된 항목 존재(의미 변경이라 사람 판단)·입력 형식 이상은 전부 exit 2 + 고유 원인 문구"
+  - "④ 변별력 실측 — 변환 로직 뮤테이션(체크 1건 누락·pin 생략·타 규칙 변조·읽기전용 필드 잔존)에서 테스트 RED 확인. 입력 인코딩 utf-8-sig·utf-16 관용(ruleset_drift.read_json_text 재사용)"
+  - "⑤ 런북 — branch-protection-setup.md 트러블슈팅에 경로 B(백업→변경안→확인→PUT→재검증) PowerShell 블록 추가, 기존 PS 호환 테스트가 포괄"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/infra/**"
+  - ".github/**"
+session: null
+notes: "발견 경위(2026-09-05): HARN-63 첫 라이브 실측이 concept-reach 등급ⓐ 위반 1건·권고 12건을 냈고(예측=실측 정확 일치), 시정 게이트 G-required-checks-source-pin-cleanup은 Kiki의 GitHub UI 작업이었다. UI 경로 안내 3회가 착지하지 않아 API 경로로 전환 — 룰셋 PUT은 본문이 잘못되면 보호를 통째로 약화시키므로, 본문 생성 로직을 저장소 코드로 두고 오프라인 테스트한 뒤 쓰는 것이 '검증 없는 실행 안내 금지'를 지키는 유일한 길이다. 실측 구조: rulesets/16623542 · enforcement=active · rules 5종(deletion·non_fast_forward·pull_request·required_status_checks·required_linear_history) · bypass_actors=[] · conditions.ref_name.include=[~DEFAULT_BRANCH] · 항목 22/고유 16/unpinned 7.\n\n[취소 2026-09-05] 등재 오류 — --gates에 G-required-checks-source-pin-cleanup을 걸어 '요구 게이트'가 됐다. 이 도구는 그 게이트를 여는 수단이라 게이트에 막히면 안 된다. amend는 게이트를 붙이기만 하고 떼는 경로가 없어 cancel 후 재등재(HARN-65)"
+updated: 2026-09-05

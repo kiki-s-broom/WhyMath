@@ -15,6 +15,10 @@ from pathlib import Path
 import pytest
 
 from whymath_backend.api import study as study_api
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.l3.render.dsl import ConceptAssessment
 from whymath_backend.l4.content_supply import (
     REASON_CANNOT_RENDER,
@@ -134,6 +138,8 @@ async def test_supply_records_strategy_into_tally() -> None:
         session=_FakeSession(),  # type: ignore[arg-type]
         cache=_FakeCache(),  # type: ignore[arg-type]
         tally=tally,
+        seal=default_expression_seal(),
+        assessment_verifier=default_assessment_answer_verifier(),
     )
     assert result.strategy in set(PedagogyStrategy)
     assert tally.by_strategy.get(result.strategy.value)

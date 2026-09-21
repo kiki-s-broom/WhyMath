@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-62-amend-paths-correction-path
+title: "amend에 --path 정정 경로 부재 — 등재 후 paths를 고칠 CLI 경로가 없어 손편집으로 몰린다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: cancelled
+priority: 4
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① amend가 paths를 정정할 수 있다(교체 또는 add/remove). 현행 amend는 acceptance·gates·track·depends·priority·eos-priority만 다루고 paths 경로가 없다 — add 시점에 넓게 잡은 glob을 고칠 합법 수단이 0이다"
+  - "② 정정 사유가 notes·이벤트에 남는다(기존 amend --reason 관례 승계)"
+  - "③ 왜 중요한가를 테스트가 아니라 **동기로** 적는다: 넓은 glob은 overlap 경보를 대량 오탐으로 만들고, 상시 오탐은 병렬 세션이 경보를 무시하게 만든다 — 이 저장소가 이미 겪은 'fail-open 보호의 습관화'(refs/claims 403) 유형이다"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "출처: 2026-09-03 세션 실측. MOB-20 등재 시 paths를 src/mobile/lib/**로 넓게 잡아 overlap 경보 17건이 떴고(대부분 오탐) 좁히려 했으나 CLI 경로가 없어 YAML 손편집으로 정정했다 — 그 사실은 PR에 자진 공개했다. HARN-52가 --depends를 열며 남긴 판정('고칠 수 없는 위반을 지적하는 게이트는 사람이 게이트를 끄게 만든다')이 paths 축에도 그대로 성립한다. 12월 검증 비관여(P3).\n\n[취소 2026-09-03] HARN-57(done 증적 정정 경로)과 같은 계열 — amend의 결측 필드 정정 경로 부재라는 한 문제다. 등재 시 CLI가 의미 중복을 고지했고 그 판정을 수용해 HARN-57에 --path 축을 acceptance로 흡수한다(한쪽 cancel · HARN-45 선례). 별도 태스크로 두면 같은 파일(backlog.py amend)을 두 태스크가 소유해 착수 충돌만 만든다."
+updated: 2026-09-03

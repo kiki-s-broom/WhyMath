@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import cast
 
@@ -118,13 +119,25 @@ class TestCurateHypothesisOrchestrationUnit:
         async def fake_net(session: AsyncSession, student_id: uuid.UUID, mid: str) -> float:
             return net.get(mid, 0.0)
 
+        # MISC-20: 해소/반박 구분용 강한 반박 조회가 I/O 경계에 추가됐다 — 이 스텁은 강한 반박
+        # 증거 0(전부 REFUTED)을 뜻하며, 이 클래스가 검증하는 축(후보 집합·반박 판정·캡)은 불변.
+        async def fake_strong(
+            session: AsyncSession, student_id: uuid.UUID, mids: Sequence[str]
+        ) -> set[str]:
+            return set()
+
         async def fake_persist(
-            session: AsyncSession, student_id: uuid.UUID, active: list[MisconceptionHypothesis]
+            session: AsyncSession,
+            student_id: uuid.UUID,
+            active: list[MisconceptionHypothesis],
+            *,
+            reasons: dict[str, object] | None = None,
         ) -> None:
             sink.append(list(active))
 
         monkeypatch.setattr(hypothesis_store, "get_active_hypotheses", fake_active)
         monkeypatch.setattr(hypothesis_store, "net_support", fake_net)
+        monkeypatch.setattr(hypothesis_store, "strong_refutation_mids", fake_strong)
         monkeypatch.setattr(hypothesis_store, "_persist_active_set", fake_persist)
 
     def test_negative_net_support_refutes_even_if_matched(

@@ -66,10 +66,13 @@ r"""공유 계약 fixture(`data/` 최상위) · backend 잡 입력 경로 ↔ CI
 ⑦ **죽은 플래그 금지** — 스텝 `if`가 참조하는 `changes` 플래그는 그 스텝이 속한 잡의 `if`도
    참조해야 한다. 아니면 그 플래그만 참인 PR에서 잡이 통째 skip돼 스텝이 영영 실행되지 않는다
    (죽은 `corpus` 플래그가 정확히 이 형태였다).
-⑧ **동결 테스트 입력** — G0 실패정의·서명 동결 테스트가 읽는 파일(실패정의 문서·`gates.yaml`)이
-   backend 필터 안에 있다. 경로 목록은 하드코딩이 아니라 그 테스트의 `FROZEN_INPUT_PATHS`를
-   **AST로 파싱**해 얻는다(계약 ②와 같은 파생 원칙 — 두 벌이면 한쪽만 고쳐진 채 "위반 0"이
-   나온다). 2026-08-30 PR #910 리뷰(P1)가 지목한 사각이며, ⑥과 같은 구조의 다른 입력 축이다.
+⑧ **동결 테스트 입력** — `FROZEN_INPUT_PATHS`를 선언한 `tests/backend/**`의 동결 테스트
+   **전부**가 읽는 파일(실패정의 문서·`gates.yaml`·정본 엔티티 모델 문서 …)이 backend 필터
+   안에 있다. 경로 목록은 하드코딩이 아니라 각 테스트의 상수를 **AST로 파싱**해 얻고(계약 ②와
+   같은 파생 원칙 — 두 벌이면 한쪽만 고쳐진 채 "위반 0"이 나온다), 대상 테스트도 하드코딩이
+   아니라 **전수 스캔**으로 얻는다(OPS-62 — 종전 단일 파일 하드코딩은 가드 자신이 전수가
+   아니었다). 선언 테스트를 **하나도 못 찾으면 통과가 아니라 예외**다(스캔 0건 = 실패).
+   2026-08-30 PR #910 리뷰(P1)가 지목한 사각이며, ⑥과 같은 구조의 다른 입력 축이다.
 
 의도적으로 검증하지 않는 것 (정직한 공백)
 --------------------------------------
@@ -108,10 +111,12 @@ _CI_YAML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _DATA_DIR = _REPO_ROOT / "data"
 _BACKEND_TESTS_DIR = _REPO_ROOT / "tests" / "backend"
 
-# 계약 ⑧ — G0 동결 테스트(실패정의 F-Ⅰ~Ⅴ·서명 기록)와 그 입력 경로 선언 상수.
-# 경로 목록 자체는 여기 두지 않는다: 단일 진실 원천은 동결 테스트의 상수이고, 이 파일은
-# AST로 그것을 읽는다(하드코딩 두 벌 금지 — 계약 ②와 같은 이유).
-_FREEZE_TEST = _BACKEND_TESTS_DIR / "schema" / "test_failure_definition_freeze.py"
+# 계약 ⑧ — 동결 테스트가 읽는 입력 경로의 선언 상수 이름. **파일을 하드코딩하지 않는다**:
+# `tests/backend/**`의 테스트 전건을 훑어 이 상수를 선언한 모듈을 *전부* 대상으로 삼는다
+# (OPS-62). 종전에는 `test_failure_definition_freeze.py` 한 파일만 가리켜서, 다른 동결 테스트
+# (`test_canonical_entity_model_freeze.py`)의 입력이 필터 밖이어도 "위반 0"이 났다 — 사각을
+# 막으라고 만든 가드 자신의 범위가 좁았던 네 번째 동형 사각(PR #997 실증). 경로 목록 자체는
+# 여전히 여기 두지 않는다: 단일 진실 원천은 각 동결 테스트의 상수이고 이 파일은 AST로 읽는다.
 _FROZEN_PATHS_CONST = "FROZEN_INPUT_PATHS"
 
 # 계약 fixture로 보지 *않을* 최상위 data/ 파일 — 반드시 사유를 적는다(무사유 예외 금지).
@@ -541,23 +546,18 @@ def _sample_repo_path_under(root: str) -> str:
 # ── 계약 ⑧ : 동결 테스트의 입력 경로가 backend 필터 안에 있는가 ────────────────
 
 
-def _frozen_input_paths() -> list[str]:
-    """동결 테스트가 선언한 `FROZEN_INPUT_PATHS` 튜플을 **AST로** 읽는다(import 불가 —
-    이 잡에는 backend 패키지가 설치되지 않는다).
+def _parse_frozen_input_paths(source: str, label: str) -> tuple[str, ...] | None:
+    """모듈 소스에서 최상위 `FROZEN_INPUT_PATHS` 선언을 **AST로** 읽는다(import 불가 — 이 잡에는
+    backend 패키지가 설치되지 않는다).
 
-    경로 목록을 여기에 하드코딩하지 않는 이유는 계약 ②와 같다: 두 벌이 되면 새 동결 입력이
-    늘 때 한쪽만 고쳐지고, 그 순간 가드는 "위반 0"을 조용히 낸다. 단일 진실 원천은 동결
-    테스트 쪽이고 이 파서는 그것을 따라간다.
+    반환: 선언이 없으면 `None`(이 모듈은 대상이 아니다), 있으면 문자열 튜플. 선언은 있는데 파서가
+    읽을 수 없는 형태(빈 튜플·f-string·연산·비문자열 원소)면 **예외** — 그런 선언은 강제 대상에서
+    조용히 빠지므로 "없음"과 구별해 크게 알린다.
     """
-    if not _FREEZE_TEST.is_file():
-        raise AssertionError(
-            f"{_FREEZE_TEST}: 동결 테스트가 없다 — G0 서명 동결이 사라졌거나 파일이 옮겨졌다. "
-            "옮겼다면 이 상수를 함께 고쳐라(조용한 통과 금지)."
-        )
     try:
-        tree = ast.parse(_FREEZE_TEST.read_text(encoding="utf-8"))
+        tree = ast.parse(source)
     except SyntaxError as exc:  # 예외 타입명 동반 — 침묵 실패 금지
-        raise AssertionError(f"{_FREEZE_TEST}: AST 파싱 실패({type(exc).__name__}: {exc})") from exc
+        raise AssertionError(f"{label}: AST 파싱 실패({type(exc).__name__}: {exc})") from exc
 
     for node in tree.body:
         targets = (
@@ -570,7 +570,7 @@ def _frozen_input_paths() -> list[str]:
         value = node.value
         if not isinstance(value, ast.Tuple) or not value.elts:
             raise AssertionError(
-                f"{_FREEZE_TEST}: {_FROZEN_PATHS_CONST}가 비어있지 않은 리터럴 튜플이 아니다 "
+                f"{label}: {_FROZEN_PATHS_CONST}가 비어있지 않은 리터럴 튜플이 아니다 "
                 "— 파서가 읽을 수 없는 형태(f-string·연산 등)로 바뀌면 강제가 무력해진다."
             )
         paths = [
@@ -578,41 +578,96 @@ def _frozen_input_paths() -> list[str]:
         ]
         if len(paths) != len(value.elts):
             raise AssertionError(
-                f"{_FREEZE_TEST}: {_FROZEN_PATHS_CONST}에 문자열 상수가 아닌 원소가 있다 — "
+                f"{label}: {_FROZEN_PATHS_CONST}에 문자열 상수가 아닌 원소가 있다 — "
                 "AST로 확정할 수 없는 경로는 강제 대상에서 조용히 빠진다."
             )
-        return paths
-    raise AssertionError(
-        f"{_FREEZE_TEST}: {_FROZEN_PATHS_CONST} 상수를 찾지 못했다 — 상수를 지우거나 이름을 "
-        "바꾸면 이 가드가 아무것도 강제하지 않게 된다(빈 목록으로 '위반 0'을 만들지 않는다)."
-    )
+        return tuple(paths)
+    return None
+
+
+def _frozen_input_declarations(
+    tests_root: Path = _BACKEND_TESTS_DIR,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """`tests_root/**`의 pytest 수집 모듈(`test_*.py` · `*_test.py`) 전건을 훑어 `FROZEN_INPUT_PATHS`를
+    선언한 (테스트 상대경로, 경로 튜플) 목록을 돌려준다 — **전수 스캔**이 대상을 정한다(단일 파일
+    하드코딩 금지 · OPS-62).
+
+    **스캔 0건은 통과가 아니라 예외다**(CLAUDE.md 2026-09-01 ④): 종전 하드코딩은 최소 1건을 보장했으나
+    전수 스캔은 그 보장이 사라지므로, 상수 이름이 바뀌거나 동결 테스트가 전부 옮겨지면 "위반 0"으로
+    위장되지 않고 여기서 RED가 난다. `tests_root`를 받는 이유는 합성 트리로 이 스캐너 자체의 변별력을
+    실측하기 위해서다(실 레포와 결함 주입이 같은 함수를 쓴다 — 중복 파서 금지).
+    """
+    if not tests_root.is_dir():
+        raise AssertionError(f"{tests_root}: 백엔드 테스트 트리가 없다.")
+    root_for_label = tests_root if tests_root != _BACKEND_TESTS_DIR else _REPO_ROOT
+    declarations: list[tuple[str, tuple[str, ...]]] = []
+    # pytest 기본 수집 패턴 **둘 다**(`python_files` 기본값 = test_*.py · *_test.py — backend
+    # pyproject는 이를 오버라이드하지 않는다). 한쪽만 훑으면 `canonical_freeze_test.py` 같은
+    # 정상 수집 모듈의 선언이 조용히 빠진다(PR #1005 Codex P2).
+    candidates = set(tests_root.rglob("test_*.py")) | set(tests_root.rglob("*_test.py"))
+    for path in sorted(candidates):
+        label = path.relative_to(root_for_label).as_posix()
+        paths = _parse_frozen_input_paths(path.read_text(encoding="utf-8"), label)
+        if paths is not None:
+            declarations.append((label, paths))
+    if not declarations:
+        raise AssertionError(
+            f"{tests_root}: {_FROZEN_PATHS_CONST}를 선언한 동결 테스트가 0건이다 — 상수 이름이 바뀌었거나 "
+            "동결 테스트가 전부 사라졌다. 빈 목록으로 '위반 0'을 만들지 않는다(스캔 0건 = 실패)."
+        )
+    return tuple(declarations)
+
+
+def _frozen_input_paths() -> list[str]:
+    """선언 전건의 경로를 평탄화한 목록(선언 순서 보존·중복 제거)."""
+    seen: dict[str, None] = {}
+    for _label, paths in _frozen_input_declarations():
+        for rel in paths:
+            seen.setdefault(rel, None)
+    return list(seen)
+
+
+def _frozen_input_violations(
+    declarations: Sequence[tuple[str, Sequence[str]]],
+    backend_filter: str,
+    *,
+    repo_root: Path | None = _REPO_ROOT,
+) -> list[str]:
+    """순수 판정 — 선언된 입력 경로 중 backend 필터에 매치되지 않는 것(`테스트: 경로`).
+
+    `repo_root`가 주어지면 각 경로의 **실재**도 요구한다(표본을 가상 경로로 만들지 않는다). 합성
+    주입에서는 `None`을 넘겨 실재 검사를 끈다 — 판정 로직은 양쪽이 같은 함수를 쓴다.
+    """
+    pattern = re.compile(backend_filter)
+    violations: list[str] = []
+    for test_rel, paths in declarations:
+        for rel in paths:
+            if repo_root is not None and not (repo_root / rel).is_file():
+                raise AssertionError(
+                    f"{test_rel}: 동결 테스트가 선언한 입력 {rel!r}이 저장소에 없다 — 표본을 뽑을 수 없다."
+                )
+            if not pattern.search(rel):
+                violations.append(f"  · {test_rel}: {rel}")
+    return violations
 
 
 def test_backend_filter_covers_frozen_freeze_test_inputs() -> None:
-    """계약 ⑧ — G0 동결 테스트가 읽는 입력 파일이 backend 필터 안에 있다.
+    """계약 ⑧ — `FROZEN_INPUT_PATHS`를 선언한 동결 테스트 **전부**의 입력이 backend 필터 안에 있다.
 
-    `test_failure_definition_freeze.py`는 실패정의 문서 §5와 서명 기록(gates.yaml)을 해시로
-    동결한다. 그런데 그 두 파일이 backend 필터 밖이면 **그 파일만 고치는 PR에서 backend 잡이
-    SKIP**되고, skip은 required check에서 *충족*으로 계상된다 — 동결 테스트가 막으라고 만들어진
-    바로 그 벡터(문서·서명의 조용한 수정)에서 테스트가 실행되지 않는 상태다. data/corpus·
-    schemas가 겪은 사각(COLLAB-07 ①②)과 같은 형태이며, 2026-08-30 PR #910 리뷰(P1)가 지목했다.
+    동결 테스트는 정본 문서·서명 기록을 해시로 동결한다. 그런데 그 입력이 backend 필터 밖이면
+    **그 파일만 고치는 PR에서 backend 잡이 SKIP**되고, skip은 required check에서 *충족*으로
+    계상된다 — 동결 테스트가 막으라고 만들어진 바로 그 벡터(문서·서명의 조용한 수정)에서 테스트가
+    실행되지 않는 상태다. data/corpus·schemas(COLLAB-07 ①②)·G0 동결 입력(PR #910 P1)·정본 엔티티
+    모델 문서(PR #997)가 겪은 같은 형태의 사각이며, 마지막 것은 **이 가드가 한 파일만 봐서** 놓쳤다.
 
     실측 표본은 **실재 파일 경로**를 쓴다(가상 경로로 통과/실패를 만들지 않는다).
     """
     jobs = _load_ci_jobs()
-    pattern = re.compile(_backend_filter(jobs))
-
-    violations: list[str] = []
-    for rel in _frozen_input_paths():
-        if not (_REPO_ROOT / rel).is_file():
-            raise AssertionError(
-                f"{rel}: 동결 테스트가 선언한 입력이 저장소에 없다 — 표본을 뽑을 수 없다."
-            )
-        if not pattern.search(rel):
-            violations.append(f"  · {rel}")
+    declarations = _frozen_input_declarations()
+    violations = _frozen_input_violations(declarations, _backend_filter(jobs))
     assert not violations, (
-        "G0 동결 테스트의 입력이 backend 필터 밖이다 — 그 파일만 바꾸는 PR에서 backend 잡이 "
-        "SKIP돼 실패정의·서명 동결이 집행되지 않는다(PR #910 리뷰 P1).\n"
+        "동결 테스트의 입력이 backend 필터 밖이다 — 그 파일만 바꾸는 PR에서 backend 잡이 "
+        "SKIP돼 동결이 집행되지 않는다(PR #910 P1 · PR #997).\n"
         + "\n".join(violations)
         + f"\n현재 backend 필터: {_backend_filter(jobs)!r}"
     )
@@ -623,18 +678,84 @@ def test_frozen_input_parser_is_discriminating() -> None:
 
     "못 찾았으니 위반 없음"이 아니라 **예외**임을 실측한다(빈 목록 위장 금지).
     """
-    # ⓐ 실제 상수는 읽힌다(양성 대조 — 무차별 실패가 아님).
+    # ⓐ 실제 선언이 읽힌다(양성 대조 — 무차별 실패가 아님). 전수 스캔이 단일 파일 시절보다
+    #    좁아지지 않았음을 실 레포로 못 박는다: G0 동결 테스트 + 정본 엔티티 모델 동결 테스트.
+    declarations = _frozen_input_declarations()
+    declared_tests = {label for label, _ in declarations}
+    assert {
+        "tests/backend/schema/test_failure_definition_freeze.py",
+        "tests/backend/db/test_canonical_entity_model_freeze.py",
+    } <= declared_tests, f"전수 스캔이 기대 선언 테스트를 놓쳤다: {sorted(declared_tests)}"
     paths = _frozen_input_paths()
     assert paths and all(isinstance(p, str) for p in paths)
 
     # ⓑ 현행 필터가 그 경로를 실제로 매치한다 + 편입 이전 필터였다면 검출된다(음성 대조).
     jobs = _load_ci_jobs()
-    assert all(re.search(_backend_filter(jobs), p) for p in paths)
-    legacy = re.compile(r"^(src/backend/|tests/backend/|data/[^/]+$|data/corpus/|schemas/)")
-    assert any(not legacy.search(p) for p in paths), (
+    assert not _frozen_input_violations(declarations, _backend_filter(jobs))
+    legacy = r"^(src/backend/|tests/backend/|data/[^/]+$|data/corpus/|schemas/)"
+    assert _frozen_input_violations(declarations, legacy, repo_root=None), (
         "편입 이전 필터로도 전건이 매치된다면 이 가드는 아무것도 막지 못한다 — "
         "동결 입력이 이미 다른 경로로 커버되는지 재확인하라."
     )
+
+
+def test_frozen_input_scan_follows_new_freeze_tests(tmp_path: Path) -> None:
+    """계약 ⑧ 보조 — **합성 트리**로 스캐너·판정의 변별력(OPS-62 ④).
+
+    ⓐ 새 동결 테스트가 늘면 가드가 *따라온다*(하드코딩이면 못 따라온다) ⓑ 그 입력이 필터 밖이면
+    RED ⓒ 선언 0건이면 통과가 아니라 예외 ⓓ 읽을 수 없는 선언(빈 튜플·비문자열)도 예외.
+    실 레포 판정과 **같은 함수**를 쓴다 — 주입용 파서를 따로 두면 그것이 위장이 된다.
+    """
+    tree = tmp_path / "backend"
+    (tree / "db").mkdir(parents=True)
+    (tree / "schema").mkdir()
+    # ⓒ 선언 0건 — 스캔 0건은 실패다.
+    (tree / "db" / "test_nothing.py").write_text("X = 1\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="0건"):
+        _frozen_input_declarations(tree)
+
+    # ⓐ 신규 동결 테스트 2건을 합성 추가 — 스캔이 둘 다 따라온다.
+    (tree / "schema" / "test_a_freeze.py").write_text(
+        'FROZEN_INPUT_PATHS: tuple[str, ...] = ("docs/a.md", "backlog/gates.yaml")\n',
+        encoding="utf-8",
+    )
+    (tree / "db" / "test_b_freeze.py").write_text(
+        'FROZEN_INPUT_PATHS = ("docs/architecture/b.md",)\n', encoding="utf-8"
+    )
+    # pytest의 두 번째 기본 수집 패턴(`*_test.py`)도 대상이다 — 한쪽만 훑으면 정상 수집 모듈의
+    # 선언이 조용히 빠진다(Codex P2). 비수집 이름(helpers.py)은 선언해도 대상이 아니다.
+    (tree / "db" / "c_freeze_test.py").write_text(
+        'FROZEN_INPUT_PATHS = ("docs/c.md",)\n', encoding="utf-8"
+    )
+    (tree / "db" / "helpers.py").write_text(
+        'FROZEN_INPUT_PATHS = ("docs/not_collected.md",)\n', encoding="utf-8"
+    )
+    declarations = _frozen_input_declarations(tree)
+    assert [label for label, _ in declarations] == [
+        "db/c_freeze_test.py",
+        "db/test_b_freeze.py",
+        "schema/test_a_freeze.py",
+    ]
+
+    # ⓑ 판정 — 필터가 둘 중 하나만 덮으면 나머지가 위반으로 잡힌다(과소 검출 금지).
+    only_gates = r"^(backlog/gates\.yaml$)"
+    violations = _frozen_input_violations(declarations, only_gates, repo_root=None)
+    assert violations == [
+        "  · db/c_freeze_test.py: docs/c.md",
+        "  · db/test_b_freeze.py: docs/architecture/b.md",
+        "  · schema/test_a_freeze.py: docs/a.md",
+    ]
+    assert not _frozen_input_violations(declarations, r"^(docs/|backlog/)", repo_root=None)
+
+    # ⓓ 읽을 수 없는 선언은 "없음"으로 접히지 않고 예외다.
+    (tree / "db" / "test_b_freeze.py").write_text("FROZEN_INPUT_PATHS = ()\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="리터럴 튜플"):
+        _frozen_input_declarations(tree)
+    (tree / "db" / "test_b_freeze.py").write_text(
+        'FROZEN_INPUT_PATHS = ("docs/x.md", 3)\n', encoding="utf-8"
+    )
+    with pytest.raises(AssertionError, match="문자열 상수가 아닌"):
+        _frozen_input_declarations(tree)
 
 
 # ── 계약 ⑦ : 죽은 플래그 금지 ─────────────────────────────────────────────────

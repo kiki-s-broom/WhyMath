@@ -30,6 +30,10 @@ from typing import Any
 
 import pytest
 
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.config import get_settings
 from whymath_backend.l3.models import RoutingRequest
 from whymath_backend.l3.render.registry import registered_strategies
@@ -529,6 +533,8 @@ async def _generate_supply(provider: _SystemRecordingProvider, system: str = "ê¸
         provider=provider,  # type: ignore[arg-type]
         trace=_RecordingTrace(),
         system=system,
+        seal=default_expression_seal(),
+        assessment_verifier=default_assessment_answer_verifier(),
     )
 
 
@@ -594,5 +600,7 @@ class TestSupplyCardWiring:
             signals=StudentSignals(),
             session=_FakeSession({"A1": _FakeRow()}),  # type: ignore[arg-type]
             cache=_FakeCache(),
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
         assert result.content_source == "dsl_render"

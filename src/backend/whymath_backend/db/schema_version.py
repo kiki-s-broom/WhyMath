@@ -136,6 +136,28 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     "f4b2d8c1a3e5",  # EOS-55: generation_log 재현 좌석 5컬럼(prompt_version·seed·스냅샷·cu_slug)
     "d4a71c0f9b32",  # EOS-57: attempt_event.skill_ids[] 좌석 + event_type_enum '문제시도'
     "e7c3b9a15f24",  # EOS-71: problem 격리 좌석 2컬럼 + review_status_enum 'quarantined'
+    "b8d3f6a91c24",  # EOS-97: generation_log.run_id — 리콜 조인 축 + idx_generation_run_id
+    "c1a5e07b4d38",  # EOS-99: generation_log 프롬프트 캐시 2종(cache_read/creation_input_tokens)
+    "d2f4a68b91e7",  # MISC-20: misconception_hypothesis.deactivated_reason — 해소율 정직화 축
+    "e3b5c79d02f8",  # MISC-20: evidence_links.provenance — 해소 판정의 출처 축(가중치 추론 폐기)
+    "19149e92d368",  # SEC-33 ⑥: problem_attempt.ingested_at server_default(신규 행 좌석 보장)
+    "f2662166a661",  # SEC-27: job_ownership — 비동기 QUALITY 작업 소유권(job_id→user_id)
+    "4c6dfb1527a9",  # SEC-29: privacy_audit.resource_type/resource_id/action — 콘텐츠CUD 감사
+    "3f5c83f51246",  # SEC-31: 학생 답안/풀이 3테이블 봉투 암호화(problem_attempt·
+    # answer_submission·student_solution_step 8쌍 16컬럼 + expression nullable 완화)
+    "67cf48ad3bce",  # EOS-49: concept_version 테이블(Concept 좌석 4번째) + concept.
+    # current_published_version_id(§6.4) + PUBLISHED 불변성 트리거(§7)
+    "a7d41c9e0b52",  # EOS-103: learner_state 테이블(LearnerState 좌석 2번째) — 학습자
+    # 현재 상태 1행 + 진단 완료 시 자동 생성 계보(provisioned_at/by·updated_at·revision)
+    "5a7c31d9e0b4",  # EOS-105: learning_state_transition(학습 상태 전이 append-only 원장 ·
+    # LearnerState 좌석 3번째 테이블) + learning_state_enum·learning_state_trigger_enum.
+    # 병합 정정(2026-09-17): 두 PR이 같은 부모(67cf48ad3bce) 위에 각자 리비전을 얹어 head가
+    # 둘이 될 뻔했다 — EOS-103이 먼저 머지됐으므로 이 리비전의 down_revision을 a7d41c9e0b52로
+    # 재지정해 체인을 직렬로 되돌렸다(단일 head 유지).
+    "c1f5a8b2d740",  # EOS-108: concept/skill_mastery_history.attempt_id(멱등 키) + 부분 유니크
+    # 인덱스 2종. 같은 시도의 숙달 이중 반영을 DB가 막는다(KPI 2 State Integrity).
+    "d2a9e4b71c35",  # EOS-112: generation_log.served_model·retries(관측 좌석). 선언값
+    # (model_name)과 별개로 "응답이 실제로 어느 모델에서 왔나"를 적는다 — NULL=미관측·미계측.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

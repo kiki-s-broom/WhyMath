@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: LIC-06-kice-report-pdf-git-history
+title: "KICE 평가기준 개발 연구 보고서 원본 PDF 2건이 git 히스토리에 잔존 — 제거 판단·실행 (되돌리기 어려움·Kiki 소유)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: cancelled
+priority: 1
+eos_priority: P1
+owner: kiki
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 대상 확정: blob 35cb705a(고등 CRC 2017-5-6·4.82MB)·7e1d471e(초중 CRC 2016-2-6·5.91MB) — 도입 388f7921 / 삭제 98a34695(2026-08-08). 작업 트리에는 없고 히스토리에만 남아 clone마다 배포된다"
+  - "② 위험 판정 근거 실측 완료(2026-09-06): 두 PDF는 고시가 아니라 KICE 발간 **연구보고서**(ISBN 979-11-5788-529-9 / -347-9·판권장 '※ 본 자료 내용의 무단 복제를 금함'). licensing_safety.md 'NCIC 구분'의 후자(해설서·연구보고서 = 영리 차단·C등급)에 해당 — 상업 서비스인 WhyMath 저장소 잔존은 위험. 같은 커밋군의 data/ncic/raw/curriculum_math_2022.pdf(교육부 고시 제2022-33호 별책 8)는 §7 제1호 비보호라 **제거 대상 아님**"
+  - "③ 제거 실행은 Kiki 소유: git-filter-repo로 두 blob만 제거 → 전 협업자 재clone 공지 → GitHub 캐시 잔존분은 지원 요청(force-push만으로는 원격 GC가 즉시 일어나지 않음). 사전 백업 필수"
+  - "④ 재유입 방지: 저작권 위험 등급 원본 자료의 커밋을 막는 가드(확장자·크기·경로 기반 pre-commit 또는 CI 차단)를 검토·등재. 변별력은 위반 픽스처 주입으로 실증"
+  - "⑤ 범위 밖: 자체 사업계획서 PDF/docx·하네스 zip(저작권 문제 없음·확인 완료)"
+artifacts: []
+paths:
+  - "*"
+session: null
+notes: "2026-09-06 저작권 전수 실사에서 발견. 작업 트리(코드·데이터)에는 저작권 저촉 자료 0건 — 코퍼스 14,034 문항 전량 WHYMATH_GENERATED, 벤더 JS 라이선스 고지 보존, PDF·스캔 0. 유일한 실질 위험이 이 히스토리 2건이다. Kiki 판단 대기(보류/절차서만 작성/즉시 실행).\n\n[취소 2026-09-06] 등재 직후 자기 정정 — paths를 '*'로 잡아 기존·향후 전 태스크와 겹침 경고를 유발한다(실제 작업 범위는 git 히스토리 + 재유입 가드 2곳뿐). 동일 내용을 좁힌 paths로 LIC-07에 재등재. paths 정정 CLI 경로가 없어(amend 미지원) 취소·재등재가 유일한 합법 경로 — 대장 손편집 금지 준수."
+updated: 2026-09-06

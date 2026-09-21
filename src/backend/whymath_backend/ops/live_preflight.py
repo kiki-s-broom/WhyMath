@@ -82,7 +82,7 @@ from whymath_backend.l3.models import (
 from whymath_backend.l3.providers.anthropic import AnthropicProvider, AnthropicStatus
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.ollama import OllamaProvider, OllamaStatus
-from whymath_backend.l3.router import _as_cost_tier, actual_cost_krw
+from whymath_backend.l3.router import Router, _as_cost_tier, actual_cost_krw
 from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
 
 # 스모크 프롬프트 — 가장 짧고 결정적인 산술 1콜(토큰·비용을 실측하려는 것이지 정답 채점이 아님).
@@ -203,38 +203,56 @@ class Report:
 
 
 def _cloud_mid_decision() -> RoutingDecision:
-    """스모크용 CLOUD_MID(Sonnet) 강제 결정 — Opus(HIGH) 아님.
+    """스모크용 CLOUD_MID(Sonnet) 결정 — **라우터 경유**(EOS-77), 손 조립 아님.
 
-    test_anthropic_integration.py의 클라우드 결정 패턴과 동형(불변식 충족:
-    CLOUD_*는 local_family/local_model=None·sync).
+    2026-09-05 이전에는 `RoutingDecision(cost_tier=CLOUD_MID, ...)`를 직접 조립했다. 그 결정은
+    데이터 등급(법적) 게이트(`Router.route` 안의 `guard_data_export`)를 지나지 않아
+    `data_export_reason=None`으로 provider에 도달했다 — 프로덕션 유일의 클라우드 우회였다
+    (EOS-59 자진 공개). 지금은 `--via-pipeline` 경로와 같은 요청(`_cloud_mid_smoke_request`:
+    premium·requires_reasoning·budget 충분·hard/diagnose·등급 SYNTHETIC_PROBE)을 라우터에
+    태워 CLOUD_MID를 *받아낸다*. 판정(`EXPORT_ALLOWED`)이 결정에 실리므로 `ops.cost_report`가
+    이 스모크를 "라우터 게이트 미경유"로 경고하지 않는다.
+
+    긴장(태스크 ②): 라우터를 거치면 비즈니스 규칙(구독·예산 임계)이 바뀔 때 CLOUD_MID가 아닌
+    티어가 나올 수 있고, 그러면 이 도구가 재려던 것(클라우드 1콜 실측 비용)을 못 잰다. 그것을
+    *조용히* 로컬 스모크로 바꾸지 않도록 `_run_smoke`가 티어를 검사해 CLOUD_MID가 아니면
+    스모크를 실행하지 않고 exit 2(측정 실패)로 크게 알린다. 단위 테스트가 현행 규칙에서
+    CLOUD_MID·EXPORT_ALLOWED가 나옴을 동결하므로 규칙 변경은 PR 시점에 드러난다.
     """
-    return RoutingDecision(
-        cost_tier=CostTier.CLOUD_MID,
-        local_family=None,
-        local_model=None,
-        mode="sync",
-        reason="preflight",
-        est_latency_ms=3000,
-        est_cost_krw=0.0,
-    )
+    return Router().route(_cloud_mid_smoke_request())
 
 
 async def _run_smoke(cloud: _CloudProvider) -> SmokeResult:
     """실 클라우드 CLOUD_MID 1콜 → 실측 usage·비용(None-vs-0)."""
     decision = _cloud_mid_decision()
+    # 라우터가 CLOUD_MID를 주지 않았다면 재려던 것을 못 잰다 — 로컬 1콜로 *조용히* 대체하지
+    # 않고 측정 실패로 표면화한다(exit 2). 비즈니스 규칙 변경·등급 게이트 발동 둘 다 여기서
+    # 드러난다(`data_export_blocked`가 True면 게이트가 막은 것 — 사유를 그대로 싣는다).
+    routed = _as_cost_tier(decision.cost_tier)
+    if routed is not CostTier.CLOUD_MID:
+        return SmokeResult(
+            ran=False,
+            error=(
+                f"라우터가 CLOUD_MID를 내지 않았다(cost_tier={decision.cost_tier}, "
+                f"reason={decision.reason!r}, data_export_blocked={decision.data_export_blocked}, "
+                f"data_export_reason={decision.data_export_reason}) — 스모크 미실행·측정 실패"
+            ),
+        )
     try:
         generated = await cloud.generate(_SMOKE_PROMPT, _SMOKE_SYSTEM, decision)
     except Exception as exc:  # noqa: BLE001 — 스모크 실패를 리포트로 흡수(종료 코드로 표면화)
         return SmokeResult(ran=True, error=f"{type(exc).__name__}: {exc}")
 
     usage = generated.usage
-    # None-vs-0 구분(pipeline.py:234-241 동형): usage 없음 → None; 클라우드인데 토큰 미상 →
-    # None; 그 외에만 실측 비용을 산정한다. CLOUD_MID는 항상 클라우드라 토큰 미상 시 None.
-    is_cloud = decision.cost_tier is not CostTier.LOCAL
+    # None-vs-0 구분(pipeline.py:234-241 동형): usage 없음 → None; 토큰 미상 → None; 그 외에만
+    # 실측 비용을 산정한다. 이 경로는 위 가드로 *항상* CLOUD_MID다 — 예전의
+    # `decision.cost_tier is not CostTier.LOCAL` 분기는 `use_enum_values=True`라 필드가
+    # 문자열이어서 항상 참이었고(변별력 0), 가드가 티어를 확정한 지금은 분기 자체가 불필요하다
+    # (EOS-77 정정 — mypy도 CLOUD_MID로 좁힌 값과 LOCAL의 비교를 non-overlapping으로 거부한다).
     cost_krw: float | None
     if usage is None:
         cost_krw = None
-    elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
+    elif usage.input_tokens is None or usage.output_tokens is None:
         cost_krw = None
     else:
         cost_krw = actual_cost_krw(decision, usage)
@@ -553,10 +571,12 @@ def _render_stdout(report: Report) -> str:
         lines.append("[③ 스모크 — pipeline.generate 경유(Langfuse 기록·flush)]")
     else:
         lines.append("[③ 클라우드 스모크 — CLOUD_MID(Sonnet) 1콜]")
-    if not smoke.ran:
-        lines.append(f"  · skip: {smoke.skipped_reason}")
-    elif smoke.error is not None:
+    # 실패를 skip보다 먼저 본다 — 라우터가 CLOUD_MID를 안 준 경우는 ran=False *이면서* error다.
+    # skip으로 렌더하면 exit 2의 원인이 화면에서 사라진다(측정 실패의 위장).
+    if smoke.error is not None:
         lines.append(f"  · 실패: {smoke.error}")
+    elif not smoke.ran:
+        lines.append(f"  · skip: {smoke.skipped_reason}")
     else:
         if smoke.via_pipeline:
             if smoke.pipeline_note:

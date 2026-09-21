@@ -158,10 +158,12 @@ EOS 검토서가 제시한 Privacy & Consent Platform 아키텍처(Consent를 �
 |---|---|---|---|---|
 | RetentionPolicy Registry(데이터별 보존 기간) | `pii_retention_years`(기본 3년), `evidence_retention_years`(기본 3년) | 데이터 카테고리별 보존 정책 레지스트리 부재 | 중간 | `config.py:644,654`, `privacy/retention.py:66-84` |
 | Retention Engine(Scheduler → Engine → Data Catalog → Delete/Anonymize/Archive) | `purge_expired_records` 함수 + docker-compose 24h 루프 | 카탈로그 기반 보존 엔진 부재 | 낮음~중간 | `privacy/retention_purge_cli.py`, `docker-compose.prod.yml:156-166` |
-| 삭제 전파(Deletion Orchestrator): PostgreSQL, Redis, Vector DB, Object Storage, Analytics, LLM logs, Backup | `external_erasure_targets()`로 ClickHouse/S3/Redis 매니페스트만 남김 | 실제 외부 store 삭제 집행 미구현, Vector DB 삭제 누락 | 높음 | `privacy/erasure.py:162-189` |
+| 삭제 전파(Deletion Orchestrator): PostgreSQL, Redis, Vector DB, Object Storage, Analytics, LLM logs, Backup | `external_erasure_targets()`로 Redis/Langfuse 매니페스트만 남김 | 실제 외부 store 삭제 집행 미구현, Vector DB(pgvector) 삭제 누락 | 높음 | `privacy/erasure.py` |
 | 계정 상태 분리(ACTIVE/SUSPENDED/DEACTIVATED/DELETION_PENDING/DELETED/ANONYMIZED) | `is_active`/`is_deleted` boolean + `deleted_at` | 상태 머신 부재, 탈퇴 유예기/복구/익명화 경로 부재 | 중간 | `db/models/user.py:172-173` |
 
 **핵심 갭**: WhyMath의 삭제권은 **PostgreSQL 내에서는 견고**하나, **Vector DB(임베딩)와 외부 store의 실제 삭제 집행**이 매니페스트 수준에 머물러 있음. EOS가 강조한 "삭제 후 Vector DB에 embedding이 남으면 불완전한 삭제"를 아직 해결하지 못함.
+
+> **정정(2026-09-07·SEC-32)**: 이 절의 초판(2026-08-25)은 매니페스트가 선언한 **ClickHouse·S3**를 실재 store로 전제해 "ClickHouse/S3/Redis 삭제 연동"을 후속 과제로 적었다. 실측 결과 두 store는 이 저장소에 **도입된 적이 없고**(설정 키 0·compose 서비스 0·SDK 0), 반대로 학생 유래 데이터가 실제로 나가는 **Langfuse**(L3 라우팅 트레이스·외부 SaaS)가 매니페스트에서 누락돼 있었다. 매니페스트는 Redis·Langfuse 2종으로 정정됐고, 선언↔실재 대조는 `tests/backend/_external_store_evidence.py` 계약이 강제한다. 아래 P1 항목의 대상 store도 그에 맞춰 읽어야 한다.
 
 ---
 
@@ -240,7 +242,7 @@ EOS 검토서가 제시한 Privacy & Consent Platform 아키텍처(Consent를 �
 | **P0** | 3. LLM 입력 PII redaction + Prompt Privacy Classification | 높음 | §45~§47 | 기술 구현, 변호사 검토 병행 |
 | **P0** | 4. AI inference vs training 동의 분리 집행 | 높음 | §5, §48, §50 | `ConsentScope.ai_training`/`ai_inference` 추가, `has_scope_consent`, `privacy/authorize.py` PEP, `/v1/generate` trace 배선. 성인 동의 UI는 미구현으로 `ai_training` 기본 거부 |
 | **P1 (Phase 1.5~2 초반)** | 5. Vector DB 삭제 전파 | 높음 | §59 | `erase_user` 확장 + embedding metadata 추가 |
-| **P1** | 6. 외부 store 삭제/반출 집행 오케스트레이션 | 높음 | §58, §111 | ClickHouse/S3/Redis 삭제 연동 |
+| **P1** | 6. 외부 store 삭제/반출 집행 오케스트레이션 | 높음 | §58, §111 | Redis 무효화 + Langfuse 삭제 API 연동(SEC-32 정정 — ClickHouse·S3는 미도입) |
 | **P1** | 7. `GuardianRelationship` + 보호자 독립 계정 모델 | 높음 | §10~§13, §32~§39 | 스키마 재설계, `MGMT-01` 선행 |
 | **P1** | 8. `PrivacyRequest` 모델/워크플로우 | 중간~높음 | §40~§43 | 상태기계 + API + dashboard |
 | **P1** | 9. 관리자 접근 감사 배선 + `admin_access` 호출부 연결 | 중간~높음 | §63~§66 | 관리자 콘솔/엔드포인트 착지 시 |
@@ -269,7 +271,7 @@ EOS 검토서가 제시한 Privacy & Consent Platform 아키텍처(Consent를 �
 ### P1 (Phase 1.5~2 초반)
 
 5. **Vector DB 삭제 전파** — `erase_user`에 4개 임베딩 테이블 삭제 로직을 추가하거나, 임베딩 테이블에 `source_record_id`/`subject_id`/`source_record_type` 메타데이터를 추가해 삭제 전파가 가능하게 한다.
-6. **외부 Store 삭제/반출 집행** — `external_erasure_targets`/`external_export_pending` 매니페스트를 실제 ClickHouse/S3/Redis 클라이언트 작업으로 완결한다.
+6. **외부 Store 삭제/반출 집행** — `external_erasure_targets`/`external_export_pending` 매니페스트를 실제 클라이언트 작업으로 완결한다. 대상은 **Redis**(응답 캐시·큐 payload)와 **Langfuse**(라우팅 트레이스 SaaS) 2종이다(SEC-32 정정 — ClickHouse·S3는 미도입이라 제외). 다만 두 store 모두 **현재 user 단위 키가 없다** — Redis 캐시 키는 프롬프트 해시이고 Langfuse의 `student_id_hash`는 서빙 경로에서 채워지지 않는다. 따라서 이 과제는 삭제 API 호출 이전에 *user 축을 만들 것인가*(추적 가능성 ↑ vs 삭제 가능성 ↑)를 먼저 판정해야 한다.
 7. **GuardianRelationship 도메인 모델** — `GuardianProfile`, `GuardianRelationship` 테이블을 신설하고, 학생-보호자 N:M 관계, 관계 유형/검증/유효기간/철회를 관리한다.
 8. **PrivacyRequest 워크플로우** — 요청 접수→검증→처리→완료/거부 상태기계를 구현하고, 법정대리인 대리 요청 경로를 만든다.
 9. **관리자 접근 감사 배선** — 관리자 콘솔/엔드포인트가 생기는 시점에 `record_admin_access_audit` 호출부를 연결하고, 관리자 조회 이력을 학생 본인도 확인할 수 있게 한다.

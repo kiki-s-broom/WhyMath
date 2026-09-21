@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-74-gate-clear-blocked-task-reminder
+title: "게이트 clear가 부착 태스크의 차단 상태를 알리지 않는다 — clear 시 그 게이트를 기다리는 blocked 태스크 목록·unblock 명령 출력 (3건 5일 방치 실측)"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① gates clear·waive 직후 CLI가 그 게이트를 requires_gates로 건 blocked 태스크 전건을 나열하고 각각의 unblock 명령을 한 줄씩 출력한다 — 0건이어도 '부착 blocked 태스크 0건'을 명시(침묵 금지)"
+  - "② notes 산문에만 게이트 ID를 적은 blocked 태스크(requires_gates 미부착)도 같은 목록에 '산문 참조'로 별도 표기한다 — CUR-17·CUR-18 형태의 사각을 같은 화면에서 잡는다"
+  - "③ SessionStart 브리핑(brief)에 'cleared 게이트를 기다리는 blocked 태스크' 항목을 추가한다 — clear 시점에 사람이 놓쳐도 다음 세션이 본다(집행 지점 별항)"
+  - "④ 실패 주입 검증: 게이트를 clear해도 목록이 비는 상태를 주입해 RED를 확인한 테스트를 tests/harness에 동결한다(보호 장치 실패 주입 규칙 2026-09-01)"
+  - "⑤ 전체 harness 스위트 green + validate exit 0"
+artifacts:
+  - "PR #1025 — gates clear/waive 직후 부착 blocked·산문 참조 출력(0건 명시) + selector.stale_gate_blocked → status/brief/status --json + tests/harness/test_gate_clear_reminder.py 17건(뮤테이션 3종 RED) + build_harness.md v1.4"
+paths:
+  - scripts/harness/backlog.py
+  - tests/harness
+session: null
+notes: "출처: 2026-09-06 /status 세션 실측. G-prod-dead-column-check(8/31 clear)·G-eos-verification-relevance-triage(9/1 clear)가 닫힌 뒤에도 ADMIN-02·CUR-17·CUR-18이 blocked로 5일 이상 남아 '/status'가 이를 Kiki 대기로 오보고했다. gates clear 핸들러(backlog.py cmd_gates)는 '✔ 게이트 → cleared' 한 줄만 찍고 부착 태스크를 계산하지 않는다 — 보드(HARN-41)는 계산하지만 CLI·브리핑에는 없다. 인접 구분: HARN-52(notes 선행↔depends_on)·HARN-72(acceptance 트리거↔requires_gates)는 '등재 시점' 집행이고, 이 태스크는 '게이트 해소 시점' 후속 집행이다. 부수 실측: ADMIN-02는 unblock 후에도 next 후보에 안 뜬다 — 폐기 판정(병합 금지) 브랜치 claude/whymath-mvp-plan-architecture-trjg5x의 done 사본을 HARN-11 필터가 '이미 완료(미머지)'로 읽기 때문. 이 축은 이 태스크 범위 밖(stray-code·브랜치 처분 축). 번호: HARN-73은 CLI가 원격 브랜치 선점을 잡아 HARN-74를 제안(눈으로 고르지 않음)."
+updated: 2026-09-07

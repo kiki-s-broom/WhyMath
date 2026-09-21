@@ -62,6 +62,7 @@ from whymath_backend.l2.concept_diagnosis import (
     ConceptDiagnosis,
     compute_concept_diagnoses,
 )
+from whymath_backend.l2.recommendation_contract import WEAK_CONCEPT_MASTERY_CEILING
 
 # 검수 게이팅 비교 리터럴 — `atom_node.review_status`가 싣는 reviewed 값(원자 검색 좌석과 동일
 # 규약). 단, 원자 메타 적재는 review_status를 상수 'ai_estimated'로 박으므로(원자 메타는 AI 추정·
@@ -149,14 +150,19 @@ async def recommend_weak_concepts_detailed(
     user_id: uuid.UUID,
     *,
     limit: int = 10,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
+    diagnoses: list[ConceptDiagnosis] | None = None,
 ) -> WeakConceptResult:
     """학습자 약점(BKT/IRT) → 약점 필터 → `atom_node`(code) 안전 메타 enrich → 상위 N 추천.
 
     흐름:
       ① `compute_concept_diagnoses`로 개념별 진단(BKT 최신 + IRT θ 융합·*약점 먼저* 정렬)을 받는다
          — 진단·정렬은 L2 좌석 재사용(신규 0). 정렬은 이미 약점 우선이라 이 함수가 보존한다.
+         호출자가 이미 계산해 둔 진단 스냅샷이 있으면 `diagnoses`로 넘겨 *재사용*한다(기본
+         None이면 이 함수가 직접 조회) — 같은 요청 안에서 약점·강점 추천이 각자 새로 조회하면
+         동시 mastery 갱신 시 서로 다른 스냅샷을 볼 수 있다(코드 리뷰 실측 — `api/me.py`의
+         `_assemble_measurement_assessment`가 단일 스냅샷을 셋에 공유하도록 이 파라미터를 쓴다).
       ② **약점 필터** — 비교 가능한 신호(bkt_mastery·irt_mastery_proxy 중 존재) 최저값이
          `mastery_threshold` *미만*인 개념만(약점). 신호가 하나도 없으면 추천 근거 없음으로 제외.
       ③ **code enrich** — 약점 후보들의 `concept_code`(None 아닌 code)를 모아 `fetch_atom_axis_meta`
@@ -177,8 +183,11 @@ async def recommend_weak_concepts_detailed(
     컬럼이 없어 구조적으로 0(redaction). mastery 파생 로직·`concept_code` 키 축은 건드리지 않는다
     (메타 *조회 엔진*만 sync→호출 세션으로 교체·rekey 0·데이터 변경 0).
     """
-    # ① 진단(약점 먼저 정렬) — L2 좌석 재사용. 융합·정렬·합집합은 이 좌석이 이미 수행.
-    diagnoses = await compute_concept_diagnoses(session, user_id)
+    # ① 진단(약점 먼저 정렬) — 호출자 스냅샷 재사용(제공 시) 또는 L2 좌석 재사용(융합·정렬·
+    # 합집합은 이 좌석이 이미 수행).
+    diagnoses = (
+        diagnoses if diagnoses is not None else await compute_concept_diagnoses(session, user_id)
+    )
 
     # ② 약점 필터 — 최저 신호 < 임계인 개념만(신호 0건은 None → 제외). 정렬은 보존(in-place 순서).
     weak: list[tuple[ConceptDiagnosis, float]] = []
@@ -247,8 +256,9 @@ async def recommend_weak_concepts(
     user_id: uuid.UUID,
     *,
     limit: int = 10,
-    mastery_threshold: float = 0.7,
+    mastery_threshold: float = WEAK_CONCEPT_MASTERY_CEILING,
     reviewed_only: bool = False,
+    diagnoses: list[ConceptDiagnosis] | None = None,
 ) -> list[WeakConceptRecommendation]:
     """`recommend_weak_concepts_detailed`의 추천 목록만 돌려주는 얇은 래퍼(기존 계약 보존).
 
@@ -260,6 +270,7 @@ async def recommend_weak_concepts(
         limit=limit,
         mastery_threshold=mastery_threshold,
         reviewed_only=reviewed_only,
+        diagnoses=diagnoses,
     )
     return result.recommendations
 

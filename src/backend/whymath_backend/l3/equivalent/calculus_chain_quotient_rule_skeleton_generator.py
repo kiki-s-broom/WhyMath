@@ -21,6 +21,11 @@ f'(k) = [(2ak+b)(dk+e) − (ak²+bk+c)d] / (dk+e)²는 일반적으로 분수다
 
 **노출 게이팅**: 산출물은 v0(사람 검수 전). AI 검수(Wilson 게이트)는 실 LLM 필요라 이 환경
 밖(Kiki 머신)에서만 가능 — 그 전까지 `is_published=False`로 유지.
+
+**고교 축과의 공간 분리(QUAL-07·2026-09-12)**: 몫의 미분법 밴드는 고교 미적분Ⅱ 축
+(`highschool_quotient_rule_skeleton_generator`)과 계수 공간이 겹쳐 같은 문항을 만들어 냈다.
+지금은 `_quotient_band_admits`(계수 중 최소 하나가 절댓값 4 이상)로 서로소다 — 연쇄법칙
+밴드는 구조가 달라((ax+b)ⁿ) 애초에 겹치지 않으므로 손대지 않았다.
 """
 
 from __future__ import annotations
@@ -96,6 +101,27 @@ _QUOT_D_RANGE = tuple(v for v in range(-4, 5) if v != 0)
 _QUOT_K_RANGE = range(-3, 4)
 _QUOT_POOL_TARGET = 260
 
+# 고교 미적분Ⅱ 축(`highschool_quotient_rule_skeleton_generator`)과의 **서로소 분리**
+# (QUAL-07·2026-09-12). 두 생성기는 계수 범위가 글자 그대로 같았고 시드까지 같아서
+# (`random.Random(20260807)`) 이 풀 260개가 고교 풀 300개의 **부분집합**이었다 — 두 코퍼스가
+# 수학 실체 138건·발문 동일 71건을 공유한 근본 원인이다(실측). 문항만 은퇴시키면 재생성 때
+# 재발하므로 공간 자체를 갈랐다: 고교 축은 계수 4종 전부 절댓값 3 이하만 쓰고, 대학 축은
+# **최소 하나가 절댓값 4 이상**인 조합만 쓴다. 두 술어는 서로의 부정이라 교집합이 정의상
+# 공집합이며, 이 분할은 난이도 표기(대학 3.9 > 고교 3.7)에 구조적 실체도 준다 — 이전에는
+# 같은 문항에 다른 숫자를 붙인 것뿐이었다.
+# 전수 열거 동결: `tests/backend/l3/equivalent/test_quotient_rule_space_disjointness.py`.
+_QUOT_MIN_LARGE_ABS = 4
+
+
+def _quotient_band_admits(a: int, b: int, c: int, d: int) -> bool:
+    """대학 축 몫의 미분법이 받는 계수 조합인가 — 계수 4종 중 최소 하나가 절댓값 4 이상.
+
+    `e`는 검사하지 않는다: `e = g(k) − d·k`로 *역산되는 종속값*이라 자유 파라미터가 아니고,
+    (a,b,c,d,k,g) 키가 (a,b,c,d,e,k)를 유일하게 결정한다(그래서 키가 서로소면 발문·조건식도
+    서로소다).
+    """
+    return max(abs(a), abs(b), abs(c), abs(d)) >= _QUOT_MIN_LARGE_ABS
+
 
 @dataclass(frozen=True, slots=True)
 class _QuotientSkeleton:
@@ -151,6 +177,8 @@ def _build_quotient_pool() -> tuple[_QuotientSkeleton, ...]:
         d = rng.choice(_QUOT_D_RANGE)
         k = rng.choice(_QUOT_K_RANGE)
         g_sign = rng.choice((1, -1))
+        if not _quotient_band_admits(a, b, c, d):
+            continue  # 고교 축 공간(전 계수 |·|≤3)과의 서로소 유지 — QUAL-07.
         key = (a, b, c, d, k, g_sign)
         if key in seen:
             continue

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-31-alembic-head-pin-seats
+title: "alembic head 손 고정 좌석 3중복 — 줄일 수 있는지 판정 (EOS-112 발견)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현황 실측 — alembic head를 손으로 고정하는 좌석을 전수 열거한다. 2026-09-19 기준 셋: `db/schema_version.py`의 `KNOWN_REVISIONS` 마지막 항 · `scripts/ops/probe_prod_schema_revision.sql`의 마지막 VALUES 행 · `tests/backend/db/test_solution_path_orm.py::TestMigrationFileChain::test_single_head_chain`의 리터럴. 더 있는지 `grep`이 아니라 *역할*로 찾는다(부재 판정 절차).\n② 줄일 수 있는 좌석과 줄이면 안 되는 좌석을 가른다. `KNOWN_REVISIONS`는 wheel에 alembic 파일이 없어서 존재하는 런타임 상수라 없앨 수 없고, `test_schema_version_guard.py`가 실제 `ScriptDirectory.walk_revisions()`와 대조해 표류를 막는다. 프로브는 실 DB에 붙는 SQL이라 별개 자산이다. 남는 것은 ③이다.\n③ `test_single_head_chain`의 리터럴이 **세 번째 사본**인지 판정한다. 그 테스트가 파일 regex로 계산한 heads와 리터럴을 비교하는데, 같은 비교를 `KNOWN_REVISIONS[-1]`로 하면 '파일 체인 ↔ 런타임 상수' 교차 검증이 되고 손 유지 좌석이 하나 준다. 동어반복이 아닌 근거를 적는다 — 상수 쪽은 alembic 워커와 이미 대조되므로 두 값이 함께 틀릴 수 없다. 유지가 맞다고 판정하면 **그 근거를 적고 닫는다**(바꾸는 것이 목적이 아니다).\n④ 실패 주입 — 어떤 판정을 내리든, 마이그레이션을 하나 더 얹은 상태를 주입해 *갱신을 빠뜨린 좌석마다* RED가 나는지 확인한다. 좌석을 줄였다면 줄인 뒤에도 빠짐이 검출되는지가 핵심이다(줄이면서 변별력을 잃으면 안 된다).\n⑤ 사고 경위 — EOS-112(PR 예정)가 마이그레이션 `d2a9e4b71c35`를 더하며 앞 둘은 갱신했으나 ③을 몰라 전체 스위트가 red였다. 표적 실행(`-k`)에는 그 파일이 안 걸렸고 잡 단위 재현(infra-contracts·harness-integrity)도 통과했다 — 전체 스위트만이 잡았다. 즉 이것은 '한 번 실수'가 아니라 *발견 경로가 전체 스위트뿐인 구조*다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/db/schema_version.py
+  - scripts/ops/probe_prod_schema_revision.sql
+  - tests/backend/db/test_solution_path_orm.py
+session: null
+notes: "EOS-112 착수 중 발견(2026-09-19). alembic head가 저장소 세 곳에 손으로 고정돼 있어, 마이그레이션을 더할 때마다 셋을 전부 갱신해야 하고 하나라도 빠지면 전체 스위트에서만 red가 난다(잡 단위 재현으로는 안 보인다). 이 태스크는 '리팩터링하라'가 아니라 '줄일 수 있는지 판정하고 근거를 남겨라'다 — 줄이면서 변별력을 잃는 쪽이 더 나쁘기 때문이다."
+updated: 2026-09-19

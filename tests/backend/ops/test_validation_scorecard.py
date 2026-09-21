@@ -660,15 +660,36 @@ def test_dense_and_sparse_failure_code_maps_are_read_differently() -> None:
     assert adapted["content"]["reviewed_math_errors"] == 3
 
 
-def test_producer_enum_repr_keys_are_understood() -> None:
-    """`qa_confusion_matrix`는 JSON 키에 파이썬 repr을 쓴다 — 어댑터가 둘 다 받는다."""
+def test_producer_enum_repr_keys_are_rejected_as_unmeasured() -> None:
+    """repr 키(`GenerationFailureCode.F1`)는 계약 위반 → **미측정**. 조용히 0건으로 읽지 않는다.
+
+    EOS-61 초판은 양쪽 표기를 받았다(`rsplit`). EOS-75가 생산자의 키를 `.value`로 명시·동결한
+    뒤로 repr 키는 "우리가 아는 그 산출물이 아니다"다 — sparse 경로에서 무시하면 *수학 오류
+    0건*이라는 거짓 통과가 되므로 미측정으로 드러낸다. 정상 표기는 그대로 읽힌다(대조군).
+    """
     from whymath_backend.ops import validation_scorecard as vs
 
-    for key in ("F1", "GenerationFailureCode.F1"):
-        adapted = vs.adapt_qa_confusion_matrix(
-            {"coverage": {"evaluated": 50}, "fn_by_failure_code": {key: 2}}
-        )
-        assert adapted["content"]["reviewed_math_errors"] == 2, f"'{key}' 표기를 못 읽었다"
+    rejected = vs.adapt_qa_confusion_matrix(
+        {"coverage": {"evaluated": 50}, "fn_by_failure_code": {"GenerationFailureCode.F1": 2}}
+    )
+    assert rejected == {}, "repr 키를 읽어 버렸다(계약 위반이 통과로 위장)"
+
+    accepted = vs.adapt_qa_confusion_matrix(
+        {"coverage": {"evaluated": 50}, "fn_by_failure_code": {"F1": 2}}
+    )
+    assert accepted["content"]["reviewed_math_errors"] == 2
+
+    # dense 경로(hit_cu_metrics)도 같은 계약 — 전 코드가 있어도 repr 키가 섞이면 미측정
+    from whymath_backend.schema.enums import GenerationFailureCode
+
+    dense_ok = {c.value: 0 for c in GenerationFailureCode} | {"F1": 3}
+    assert "machine_share" in vs.adapt_hit_cu_metrics(
+        _hit_report_json(rejected_count=10, failure_code_counts=dense_ok)
+    )
+    dense_polluted = dense_ok | {"GenerationFailureCode.F2": 1}
+    assert "machine_share" not in vs.adapt_hit_cu_metrics(
+        _hit_report_json(rejected_count=10, failure_code_counts=dense_polluted)
+    )
 
 
 class TestEditAwareVerdictSeam:

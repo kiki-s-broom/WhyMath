@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,7 +16,9 @@ acceptance:
   - "GET /v1/jobs/{id} 폴링 엔드포인트에서 인증된 사용자가 해당 job의 소유자인지 서버측에서 검사한다"
   - "매핑이 없거나 소유자 불일치 시 404(리소스 존재 자체도 노출하지 않음) 또는 403으로 거부한다"
   - "인가 회귀 테스트를 추가한다: 소유자 ALLOW, 다른 사용자 DENY, 미인증 DENY"
-artifacts: []
+  - "[집행 완료 2026-09-11] acceptance 4항 전건 집행:\n\n① job 소유권 저장 신설 — db/models/job_ownership.py(신규 ORM, PK=job_id(String) = Celery\n태스크 id·외부 발급) + alembic f2662166a661(단일 head, 19149e92d368 다음). api/POST\n/v1/generate가 result.is_queued 확정 직후(같은 트랜잭션) JobOwnership(job_id, user_id)를\n기록한다.\n\n② GET /v1/jobs/{job_id}가 session.get(JobOwnership, job_id)로 소유자를 대조한다(get_current_user와\n같은 세션 인스턴스 — FastAPI Depends 캐시 재사용).\n\n③ 매핑 부재·소유자 불일치 둘 다 404로 통일(존재 자체 비노출 — acceptance③ 명시 요구사항\n그대로 반영). 403 미사용.\n\n④ 인가 회귀 테스트 3건(tests/backend/test_app.py::TestJobsOwnership) — 소유자 ALLOW(POST→GET\n왕복, job_owner=None으로 기본값 마스킹 배제해 실제 쓰기 경로 변별)·타 사용자 DENY·매핑 부재\nDENY. 미인증 DENY는 기존 TestJobsAuthGate::test_unauthenticated_get_returns_401이 이미\n커버(get_current_user가 세션 사용 전에 401 — ownership 검사 도달 전 차단, 무회귀 확인).\n\nRED-before-fix 뮤테이션 2건: ①ownership 검사 블록 제거 → 5/7 관련 테스트 RED(2건은 대조\n테스트라 설계상 불변) ②session.add(쓰기) 제거 → 왕복 테스트 RED. cp 백업/복원(git 계열\n원복 미사용) + diff 바이트 동일 확인.\n\n파급 3건(전부 CI 실제 검증 축, 로컬 RED 확인 후 수정):\n- db/test_canonical_entity_model_freeze.py + canonical_entity_model_v1.md: job_ownership을\n  NON_CORE_TABLES(\"인증(작업 소유권)\")에 편입, 문서 §2 표·합계(78→79) 갱신(과거 서술은 보존,\n  \"※ [갱신 2026-09-11]\" 각주로 델타만 기록).\n- scripts/ops/probe_prod_schema_revision.sql + db/schema_version.py::KNOWN_REVISIONS: 신규\n  head(f2662166a661)에 대한 판별자 행(테이블 존재 검사) 추가·프로브 체인 꼬리 전수 커버 유지.\n- privacy/erasure.py::_ERASURE_PLAN: JobOwnership(user_id) 편입(삭제권 요청에도 영원히\n  안 지워지는 테이블 방지). test_me_erasure.py 하드코딩 총 삭제 행수(44→46) 갱신.\n- 기존 test_app.py `_client()` 공유 가짜 세션을 add/commit/get(JobOwnership,...) 지원으로\n  확장(POST↔GET 요청 경계를 넘는 공유 딕셔너리 + job_owner 기본 소유자 파라미터) — 기존\n  폴링-메커니즘 테스트는 default_owner=_FAKE_USER로 무회귀. TestJobsAuthGate·\n  TestAppVersionGate·test_health_endpoints.py도 각자 가짜 세션에 JobOwnership 분기 추가\n  (get_session이 처음 필수 의존성이 되며 실 DB로 새는 ConnectionRefusedError 차단).\n\n검증: 전체 백엔드 스위트 12810 passed·340 skipped·1 xfailed(0 failed, 1162.89s) — 최종\n재실행(직전 실행은 검증 도중 트리를 고쳐 신뢰 불가 판정 후 폐기, CLAUDE.md \"검증 중 트리\n변경 금지\" 준수). tests/infra 1303 passed·1 skipped(최종 확인). ruff·black·mypy 전건 clean."
+artifacts:
+  - "#1133"
 paths:
   - src/backend/whymath_backend/app.py
   - src/backend/whymath_backend/l3/queue/celery_job_queue.py
@@ -26,5 +28,5 @@ paths:
   - "tests/backend/api/test_jobs*.py"
   - "tests/infra/**"
 session: null
-notes: "48_보안 §P0 객체 수준 인가 갭. 실제 job 생성/폴링 경로는 app.py와 celery_job_queue.py에 있으며, 현재 인증은 있으나 job ↔ user 매핑 및 소유권 검사가 없다. acceptance의 구체적 모듈은 착수 첫 단계에서 현행 코드 실측 후 재조정해도 된다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "48_보안 §P0 객체 수준 인가 갭. 실제 job 생성/폴링 경로는 app.py와 celery_job_queue.py에 있으며, 현재 인증은 있으나 job ↔ user 매핑 및 소유권 검사가 없다. acceptance의 구체적 모듈은 착수 첫 단계에서 현행 코드 실측 후 재조정해도 된다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-11] acceptance 4항 전건 집행 완료"
+updated: 2026-09-11

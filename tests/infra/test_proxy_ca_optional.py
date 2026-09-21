@@ -43,12 +43,26 @@ _SCRIPTS = sorted(
 
 
 def _load(path: Path):
-    spec = importlib.util.spec_from_file_location(f"_ca_{path.stem}", path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """`path`를 독립 모듈로 로드한다 — 형제 모듈(`from models import ...` 등)을
+    import하는 스크립트도 로드되도록 그 디렉터리를 임시로 `sys.path`에 넣는다
+    (`scripts/harness/backlog.py` 자신이 쓰는 것과 같은 패턴). 스캔이 새 스크립트를
+    자동 편입하므로, 로더가 형제-import를 못 버티면 그 스크립트의 계약 검사 전체가
+    `ModuleNotFoundError`로 공허하게 실패한다 — 이 로더 결함 자체가 위장이 된다.
+    """
+    parent = str(path.parent)
+    inserted = parent not in sys.path
+    if inserted:
+        sys.path.insert(0, parent)
+    try:
+        spec = importlib.util.spec_from_file_location(f"_ca_{path.stem}", path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        if inserted:
+            sys.path.remove(parent)
 
 
 def _ca_args_span(tree: ast.AST) -> tuple[int, int] | None:

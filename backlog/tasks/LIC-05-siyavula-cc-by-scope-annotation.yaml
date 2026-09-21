@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,10 +15,14 @@ acceptance:
   - "① licensing_safety.md 매트릭스의 Siyavula 행에 적용 범위 단서 명기 — 약관 원문(2026-08-31 스냅샷 sha256=45723a589bd0a69d) 실측: 'Some material on the site is licensed under a Creative Commons Attribution Only License' / 'Only material that is clearly marked with a Creative Commons license can be re-used without permission'. 즉 사이트 전체가 CC BY가 아니라 명시 표기된 자료에 한정된다"
   - "② 귀속 문구 요건 기록 — 원문이 저자명 + 'From www.everythingmaths.co.za' 또는 'From siyavula.com' 표기를 요구한다. 실제 활용 시 이 문구가 필요하므로 데이터 카드에도 반영"
   - "③ 동일 유형 재점검 — 스냅샷 20곳 중 '전체가 아니라 일부만' 형태의 범위 한정을 두는 소스가 더 있는지 원문 대조(확보된 원문이 있으므로 이제 기계 대조 가능). 발견분은 같은 형식으로 매트릭스에 반영"
-artifacts: []
+  - "③-a 전수 재점검 결과 — 스냅샷 20/20(디렉터리 20·본문 20건) 2패스 대조에서 같은 유형 1건 추가 발견: Illustrative Mathematics 약관 §7이 판(edition)별로 라이선스를 나눈다(초판 K–12 Math 2019–2021=CC BY 4.0 · v.360 2024·TK 2025=CC BY-NC 4.0·상업 명시 금지). 상용 서비스인 우리에겐 초판만 사용 가능하며, 이 구분은 copyright_guide_v2.md에는 있었으나 정본 매트릭스에는 없었다. 매트릭스·01_data_foundation·copyright_gradient·license_snapshot_archive 4곳 반영 완료. 검색 방법은 어구 사전 2패스이며 다른 표현의 범위 한정은 못 본다(범위 명시)"
+artifacts:
+  - "PR #1029 https://github.com/doldori7/WhyMath/pull/1029"
 paths:
   - docs/data/licensing_safety.md
   - "docs/data/**"
+  - docs/architecture/01_data_foundation.md
+  - docs/legal/copyright_gradient.md
 session: null
-notes: "출처: 2026-08-31 LIC-02 20/20 달성 시 내용 검증에서 발견. PR #918 리뷰 P2('키워드 매칭≠라이선스 근거')가 요구한 내용 검증 스텝이 URL 정합성뿐 아니라 라이선스 범위 단서까지 드러낸 사례 — 스냅샷 확보의 실익이 '보관'을 넘어 '대조 가능'에 있음을 보여준다.\n\n[정정 2026-09-01] eos_priority null → P1: 저작권 레일 — CC BY 적용 범위 단서. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: 2026-08-31 LIC-02 20/20 달성 시 내용 검증에서 발견. PR #918 리뷰 P2('키워드 매칭≠라이선스 근거')가 요구한 내용 검증 스텝이 URL 정합성뿐 아니라 라이선스 범위 단서까지 드러낸 사례 — 스냅샷 확보의 실익이 '보관'을 넘어 '대조 가능'에 있음을 보여준다.\n\n[정정 2026-09-01] eos_priority null → P1: 저작권 레일 — CC BY 적용 범위 단서. EOS-80 일괄 백필\n\n[정정 2026-09-07] ③ 재점검이 Siyavula 외 1건(Illustrative Math·판별 NC)을 실제로 찾았다 — 결과를 문면에 남긴다"
+updated: 2026-09-07

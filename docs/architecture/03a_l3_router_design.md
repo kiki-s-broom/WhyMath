@@ -399,6 +399,13 @@ def guard_data_export(desired: CostTier, licenses) -> CostTier:
 CI `backend` 잡)가 프로덕션 호출부의 등급 명시를 강제한다. 호출부가 쓰는 등급 프로파일의
 단일 좌석은 `l3/data_grade_defaults.py`다(코퍼스 구성이 바뀌면 그 한 곳만 고친다).
 
+그 게이트는 **입력**만 본다. 집행 지점은 `Router.route` 하나이므로 `RoutingDecision`을 손으로
+조립해 provider에 넘기면 판정을 지나지 않는다 — 그 우회는 **결정 스캔 게이트**
+(`scripts/ops/check_routing_decision_bypass.py`, 같은 CI 잡 · EOS-77)가 막는다: 클라우드 티어
+리터럴 직접 생성은 위반, 비리터럴 티어는 라우터 결정의 `data_export_reason` *승계*(표현식)가
+있어야 통과, 유예는 `경로::함수=만료일`로만 허용하고 만료·unmatched를 exit 1로 강제한다.
+2026-09-05 기준 프로덕션 유예 0건(유일한 우회였던 `ops/live_preflight`를 라우터 경유로 전환).
+
 **불변식 5**(`RoutingDecision`): `data_export_blocked=True ⟹ cost_tier == LOCAL`.
 막힌 결정이 클라우드로 나가 있으면 모순이므로 스키마가 구성 자체를 거부한다.
 

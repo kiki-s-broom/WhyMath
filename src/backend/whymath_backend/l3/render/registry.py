@@ -14,6 +14,8 @@ house style이다. **조용한 폴백을 두지 않는다** — 등록되지 않
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from whymath_backend.l3.render.adapter import PedagogyAdapter
 from whymath_backend.l3.render.adapters import (
     AnalogyAdapter,
@@ -23,37 +25,54 @@ from whymath_backend.l3.render.adapters import (
     WorkedExampleAdapter,
 )
 from whymath_backend.schema.enums import PedagogyStrategy
+from whymath_backend.schema.verification_capabilities import (
+    AssessmentAnswerVerifier,
+    ExpressionSeal,
+)
 
+# 어댑터 **팩토리** 표 — 인스턴스가 아니라 클래스를 담는다(EOS-89). 어댑터가 과목 능력 2종을
+# 생성 시 주입받게 되면서 모듈 로드 시점에는 그 능력이 없기 때문이다. 능력은 Application이
+# 부팅 시 app.state에 등록한 것이 상류를 타고 `get_adapter`까지 내려온다.
+#
 # 전략 1개 = 어댑터 1개(개념 무관). 개념 수가 늘어도 이 표는 자라지 않는다 — 조합폭발 방지의
 # 구조적 증거다(거버넌스 테스트가 이 불변식을 동결한다).
-_ADAPTERS: dict[PedagogyStrategy, PedagogyAdapter] = {
-    PedagogyStrategy.DIRECT: DirectAdapter(),
-    PedagogyStrategy.SOCRATIC: SocraticAdapter(),
-    PedagogyStrategy.WORKED_EXAMPLE: WorkedExampleAdapter(),
-    PedagogyStrategy.PROBLEM_BASED: ProblemBasedAdapter(),
-    PedagogyStrategy.ANALOGY: AnalogyAdapter(),
+_ADAPTER_FACTORIES: dict[PedagogyStrategy, Callable[..., PedagogyAdapter]] = {
+    PedagogyStrategy.DIRECT: DirectAdapter,
+    PedagogyStrategy.SOCRATIC: SocraticAdapter,
+    PedagogyStrategy.WORKED_EXAMPLE: WorkedExampleAdapter,
+    PedagogyStrategy.PROBLEM_BASED: ProblemBasedAdapter,
+    PedagogyStrategy.ANALOGY: AnalogyAdapter,
 }
 
 
-def get_adapter(strategy: PedagogyStrategy) -> PedagogyAdapter:
-    """전략에 대응하는 어댑터 반환 — 미등록이면 `LookupError`(폴백 대체 금지).
+def get_adapter(
+    strategy: PedagogyStrategy,
+    *,
+    seal: ExpressionSeal,
+    assessment_verifier: AssessmentAnswerVerifier,
+) -> PedagogyAdapter:
+    """전략에 대응하는 어댑터를 **과목 능력을 주입해** 만든다 — 미등록이면 `LookupError`.
 
     호출부(상위 supply)는 이 오류를 잡아 *생성 경로*로 폴백할 수 있다. 여기서 임의 어댑터로
     대체하면 학생이 요청과 다른 방식의 수업을 받게 되므로 하지 않는다.
+
+    EOS-89: `seal`·`assessment_verifier`는 **필수**다. 기본값을 두면 이 모듈이 합성 루트를
+    알아야 하고(pull 지점 부활), 없이 도는 것을 허용하면 미검증 렌더가 학생에게 나간다.
+    어댑터는 상태가 없어 매 호출 생성이 저렴하다(필드 2개 대입).
     """
-    adapter = _ADAPTERS.get(strategy)
-    if adapter is None:
-        available = ", ".join(sorted(s.value for s in _ADAPTERS))
+    factory = _ADAPTER_FACTORIES.get(strategy)
+    if factory is None:
+        available = ", ".join(sorted(s.value for s in _ADAPTER_FACTORIES))
         raise LookupError(
             f"전략 {strategy.value}의 렌더 어댑터가 등록되지 않았습니다(미구현). "
             f"현재 구현: {available}."
         )
-    return adapter
+    return factory(seal=seal, assessment_verifier=assessment_verifier)
 
 
 def registered_strategies() -> frozenset[PedagogyStrategy]:
     """구현된 전략 집합 — 상위가 렌더 가능 여부를 미리 판단할 때 쓴다."""
-    return frozenset(_ADAPTERS)
+    return frozenset(_ADAPTER_FACTORIES)
 
 
 __all__ = ["get_adapter", "registered_strategies"]

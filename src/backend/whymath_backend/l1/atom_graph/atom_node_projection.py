@@ -1,8 +1,9 @@
 """원자 메타 PG 프로젝션 적재 — `atom_node` 테이블 code 키 멱등 upsert (원자 Phase 2a).
 
 `l1/concept_graph/node_projection.py`(개념 메타 UC 키 프로젝션 적재)의 *원자 백본* 짝이다.
-Phase 1 산출 코퍼스 `data/corpus/atom_graph_v1/graph.json`(원자 1,837 + 단원 217 + 소단원 643 =
-2,697 노드)의 원자 *안전 메타*를 `atom_node`(PG) 테이블에 멱등 upsert한다. Phase 1 적재기
+Phase 1 산출 코퍼스 `data/corpus/atom_graph_v1/graph.json`(세부개념 1,823 + 단원 217 +
+소단원 643 = 2,683 노드 — 2026-09-14 실측. 이전 표기 '원자 1,837…2,697'은 낡은 값이었다)의
+원자 *안전 메타*를 `atom_node`(PG) 테이블에 멱등 upsert한다. Phase 1 적재기
 (`atom_backend_concept.py`)가 backend `concept`에 *런타임 최소 식별*만 적재했다면, 이 모듈은
 풍부 원자 메타(인지축·노드유형·학교급·전이·원자성·연결성취기준)를 code 키로 투영한다 — 검색
 enrichment·필터·게이팅을 PG 조인으로 하기 위한 *적재* 좌석이다(조회·조인은 후속).
@@ -125,8 +126,8 @@ def load_atom_nodes_from_graph_json(path: Path) -> list[AtomNodeRecord]:
     `concepts` 배열의 각 항목에서 **안전 키만** 읽어 `AtomNodeRecord`를 만든다 —
     `core_proposition`·`description`·`formal_definition`(본문)·4요소(`misconception`/
     `diagnostic_*`/`socratic`)는 읽지 않는다(레코드 슬롯 부재·구조적 차단). `node_projection`과
-    같이 *빈 표현 제외를 하지 않는다*: 메타 프로젝션은 검색 enrichment·필터용이라 전 노드(2,697)를
-    적재해야 한다(name 빈 노드만 skip).
+    같이 *빈 표현 제외를 하지 않는다*: 메타 프로젝션은 검색 enrichment·필터용이라 전
+    노드(2,683·실측)를 적재해야 한다(name 빈 노드만 skip).
 
     `code`·`name`·`level`은 graph.json이 항상 보유한다(필수 필드). `name`이 빈/None이면
     *건너뛴다*(NOT NULL 위반 방지·정직·조용한 빈 적재 금지). `standard_codes`는 리스트가 아니면 빈
@@ -326,7 +327,7 @@ def populate_atom_nodes(
     """원자 안전 메타를 `atom_node`에 멱등 upsert 적재(영속 프로젝션). 반환=적재 행 수.
 
     `populate_concept_nodes`의 *원자 백본* 짝이다 — 임베딩 호출 없이(provider 불요) 각 레코드를
-    code 키로 upsert한다(2,697 전량·review_status='ai_estimated'). 멱등(재실행 시 갱신). store
+    code 키로 upsert한다(2,683 전량·review_status='ai_estimated'). 멱등(재실행 시 갱신). store
     미주입 시 슬3 sync 엔진 재사용 `AtomNodeStore`를 만든다.
     """
     resolved = settings if settings is not None else get_settings()

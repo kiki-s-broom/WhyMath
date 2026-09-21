@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,10 +16,13 @@ acceptance:
   - "② 변별력 양방향 — 확장 전에는 그 경로 편집이 scope drift로 잡히고, 확장 후에는 잡히지 않는지 실측한다. 한쪽만 보면 '항상 통과'가 그대로 통과한다"
   - "③ 배선 확인 — 신규 테스트가 CI(tests/harness 잡)에서 실제로 실행되는지 tests/infra 계약으로 대조. 저장소에 존재함 ≠ 돌아감"
   - "④ 소급 정정 — OPS-53의 paths에 scripts/harness/**·tests/harness/**를 부착한다(본 결함의 발견 계기). 다른 태스크의 소급 정정은 범위 밖"
-artifacts: []
+  - "①-정정 (2026-09-07 착지 시) — --path는 append가 아니라 **교체**로 구현됐다. 이유: 이 축의 실사용 절반이 '넓게 잡은 glob을 좁히는 것'인데 append로는 좁힐 방법이 자체가 없다(넓은 패턴이 영구 고정된다). 확장은 기존 목록을 함께 지정해 달성한다 — 실제로 OPS-53 소급 정정을 그 형태로 수행했다(3건 → 5건). 대신 이전 값을 notes에 남겨 '무엇을 왜 바꿨는가'가 사라지지 않게 한다. 제거를 열지 않는다는 ①의 원래 취지는 artifacts 축이 승계한다(append만)"
+artifacts:
+  - "PR #1021 — scope drift 양방향 변별력(정정 전 걸림·후 사라짐·좁히면 재발) · tests/harness 배선 특칭 신설 · OPS-53 paths 소급 정정(3→5건) · 경고문의 YAML 손편집 처방 제거 · 뮤테이션 4종 전건 RED · 커밋 d058dc9f"
 paths:
   - scripts/harness/backlog.py
-  - tests/harness/test_amend_paths.py
+  - tests/harness/test_amend_cli.py
+  - tests/infra/test_test_suite_wiring.py
 session: null
-notes: "발견 경위: PR #970 codex P2. OPS-53에 acceptance ④로 'scripts/harness 편입'을 적었으나 paths는 src/backend/.../harness·ops와 tests/backend/**뿐이라, 그 태스크를 claim한 세션이 scripts/harness를 편집하면 scope drift 경고가 나고 겹침 검사도 그 파일을 예약하지 못한다. amend가 acceptance·gate·track·depends·priority·eos-priority는 고칠 수 있는데 paths만 경로가 없다 — HARN-24(acceptance)·HARN-49(track)·HARN-52(depends/priority)가 각각 같은 이유로 열렸던 것의 마지막 구멍이다. 일반형: 정정 경로가 없는 필드는 등재 시점의 오류가 영구화된다."
-updated: 2026-09-01
+notes: "발견 경위: PR #970 codex P2. OPS-53에 acceptance ④로 'scripts/harness 편입'을 적었으나 paths는 src/backend/.../harness·ops와 tests/backend/**뿐이라, 그 태스크를 claim한 세션이 scripts/harness를 편집하면 scope drift 경고가 나고 겹침 검사도 그 파일을 예약하지 못한다. amend가 acceptance·gate·track·depends·priority·eos-priority는 고칠 수 있는데 paths만 경로가 없다 — HARN-24(acceptance)·HARN-49(track)·HARN-52(depends/priority)가 각각 같은 이유로 열렸던 것의 마지막 구멍이다. 일반형: 정정 경로가 없는 필드는 등재 시점의 오류가 영구화된다.\n\n[정정 2026-09-07] paths ['scripts/harness/backlog.py', 'tests/harness/test_amend_paths.py'] → ['scripts/harness/backlog.py', 'tests/harness/test_amend_cli.py', 'tests/infra/test_test_suite_wiring.py']: 구현 의미를 대장에 반영하고 존재하지 않는 테스트 파일 경로를 실제 파일로 교체"
+updated: 2026-09-07

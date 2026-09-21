@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-16
+title: Neo4j runtime 도입 금지 정책 테스트/문서 동결
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - CLAUDE.md/AGENTS.md Neo4j runtime 미도입 조항 인용 테스트 추가
+  - Neo4j runtime import 경로가 없음을 검증
+  - graph_analytics은 optional extra로만 존재
+artifacts: []
+paths:
+  - src/data-pipeline/data_pipeline/graph_analytics
+  - tests/infra
+session: null
+notes: "AGENTS.md 이미 명시. 검토 문서 §52와의 경계 명확화.\n\n[정정 2026-09-12] eos_priority null → P2: PR #893 회수 시점 백필 — Neo4j runtime 미도입 정책 동결은 아키텍처 가드이며 12월 검증 콘텐츠 파이프라인 자체를 막지 않아 P2"
+updated: 2026-09-12

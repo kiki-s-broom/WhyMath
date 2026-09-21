@@ -14,10 +14,11 @@ requires_gates: []
 acceptance:
   - "04b 롤아웃 패턴(shadow→canary→full) 재사용, select_intervention 임계 일관 재사용"
   - "shadow 단계에서 학생 원문 미포함(judge shadow 패턴 답습)"
+  - "[고립 참조 정정 2026-09-07 stray-code 8회차] 원 6dszy0 브랜치는 삭제됨(LIC-07 ⑪ · 보존 증명 7n9n72) — 유일 사본 = origin/claude/subject-problems-theory-check-7n9n72(621b11f9). main 부재 실측 전건: ①config.py misconception_visualization_mode: Literal[off,shadow,on] 플래그(04b 롤아웃 패턴) ②l4/misconception/shadow.py observe_misconception_visualization_shadow + MisconceptionVisualizationShadowObservation(학생 원문 미포함 관측기) ③api/coach.py _maybe_visualize + 응답 visualization 필드(서빙 집행 지점 — S3-32 구설계와 얽혀 cherry-pick 불가·main 핸들러 위 재유도) ④tests/backend/l4/test_misconception_visualization_shadow.py·tests/backend/api/test_coach_visualization.py. 테스트만 회수하면 ①②가 없어 import/monkeypatch 단계에서 실패한다. 파일 단위 회수·통째 머지 금지·회수 완료 전 7n9n72 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/l4/misconception/visualize.py
 session: null
-notes: "docs/architecture/misconception_module_gap_review.md §3 + 04e_misconception_remediation_design.md §1-1. visualize_misconception() 코드 완비·테스트 존재·production 호출자 0건. [2026-08-30 HARN-34 고립 참조] 구현+테스트가 claude/human-bottleneck-tasks-6dszy0(67881979)에 고립(done 표기) — tests/backend/l4/test_misconception_visualization_shadow.py 등 main 부재 실측(감사 2026-08-29). 착수 시 재구현 말고 파일 단위 회수 우선. 7n9n72(621b11f9)에 이중구현 존재(MISC-11 실측) — 최신본 대조 필수\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/misconception_module_gap_review.md §3 + 04e_misconception_remediation_design.md §1-1. visualize_misconception() 코드 완비·테스트 존재·production 호출자 0건. [2026-08-30 HARN-34 고립 참조] 구현+테스트가 claude/human-bottleneck-tasks-6dszy0(67881979)에 고립(done 표기) — tests/backend/l4/test_misconception_visualization_shadow.py 등 main 부재 실측(감사 2026-08-29). 착수 시 재구현 말고 파일 단위 회수 우선. 7n9n72(621b11f9)에 이중구현 존재(MISC-11 실측) — 최신본 대조 필수\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §4.2): 기존 [HARN-34 고립 참조]가 가리키는 claude/human-bottleneck-tasks-6dszy0(67881979)은 LIC-07 ⑪(2026-09-06)으로 원격에서 삭제됐다 — 유일 사본은 7n9n72이며, 7회차(PR #1020)는 이 좌석을 amend하지 않았다. 잔여 파일 전건을 좌석 본문에 고정한다"
+updated: 2026-09-07

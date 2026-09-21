@@ -23,6 +23,8 @@ from whymath_backend.schema.enums import (
     AuditResourceType,
     ConsentScope,
     DefectCategory,
+    PrivacyAuditAction,
+    PrivacyAuditResourceType,
 )
 
 
@@ -58,13 +60,16 @@ class DeletionAudit(BaseModel):
 
 
 class PrivacyAudit(BaseModel):
-    """SEC-09 개인정보 감사 4종(반출·동의변경·관리자접근·역할변경) 1행(읽기) — append-only 표현.
+    """SEC-09 개인정보·콘텐츠 감사 5종(반출·동의변경·관리자접근·역할변경·콘텐츠CUD) 1행(읽기)
+    — append-only 표현.
 
     본문·PII 값·평문 IP는 어떤 필드에도 담지 않는다(`docs/architecture/account_security_gap_
     review.md` D3·CLAUDE.md 미성년 PII 보호). `target_user_id`는 행위자(`user_id`)와 다른
-    사용자의 데이터가 대상일 때만(관리자접근) 채워지고, 본인 계정의 사건(반출·동의변경·역할변경)은
-    NULL이다 — 역할변경은 운영자가 셸에서 돌리는 CLI라 인증된 행위자 신원이 없어 `admin_access`와
-    달리 대상 계정 본인의 사건으로 적재된다(`privacy/audit.py::record_role_change_audit` 참조).
+    사용자의 데이터가 대상일 때만(관리자접근) 채워지고, 본인 계정의 사건(반출·동의변경·역할변경)·
+    콘텐츠CUD(대상이 사용자가 아니라 리소스)는 NULL이다 — 역할변경은 운영자가 셸에서 돌리는
+    CLI라 인증된 행위자 신원이 없어 `admin_access`와 달리 대상 계정 본인의 사건으로 적재된다
+    (`privacy/audit.py::record_role_change_audit` 참조). `resource_type`/`resource_id`/`action`
+    은 콘텐츠CUD 전용(SEC-29) — 대상이 사용자가 아니라 콘텐츠 리소스일 때 그 역할을 대신한다.
     """
 
     model_config = ConfigDict(
@@ -81,16 +86,32 @@ class PrivacyAudit(BaseModel):
     target_user_id: uuid.UUID | None = Field(
         default=None,
         description=(
-            "행위 대상 사용자(행위자와 다를 때만 — 관리자접근) — 본인 행위(반출·동의변경)는 NULL"
+            "행위 대상 사용자(행위자와 다를 때만 — 관리자접근) — 본인 행위(반출·동의변경)·"
+            "콘텐츠CUD는 NULL"
         ),
     )
     event_kind: AuditEventKind | None = Field(
         default=None,
-        description="감사 이벤트 종류(export_data/consent_change/admin_access)",
+        description=(
+            "감사 이벤트 종류(export_data/consent_change/admin_access/"
+            "role_change/content_mutation)"
+        ),
     )
     consent_scope: ConsentScope | None = Field(
         default=None,
         description="event_kind=consent_change일 때만 — 어떤 동의 범위가 바뀌었는지",
+    )
+    resource_type: PrivacyAuditResourceType | None = Field(
+        default=None,
+        description="event_kind=content_mutation일 때만 — 콘텐츠 리소스 도메인(concept/problem)",
+    )
+    resource_id: uuid.UUID | None = Field(
+        default=None,
+        description="event_kind=content_mutation일 때만 — 대상 리소스 id(해당 도메인 PK)",
+    )
+    action: PrivacyAuditAction | None = Field(
+        default=None,
+        description="event_kind=content_mutation일 때만 — CRUD 동작(create/update/delete)",
     )
     ip_hash: str | None = Field(
         default=None,

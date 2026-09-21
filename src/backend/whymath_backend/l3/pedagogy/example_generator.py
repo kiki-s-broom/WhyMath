@@ -241,6 +241,8 @@ def build_example_slot_row(
         "objective_id": target.objective_id,
         "slot_type": target.slot_type,
         "payload": payload,
+        # EOS-89: payload에 `verification` 주장이 없으므로 능력 미주입이어도 None이 정상 반환된다
+        # (주장이 생기면 LookupError — 그때 상류에서 `equivalence=`를 내려야 한다).
         "sympy_verified": verify_slot_payload(payload),
         "tts_safe": _is_tts_safe(payload),
         "provenance_id": None,
@@ -259,6 +261,9 @@ def review_example_rows(rows: Sequence[dict[str, Any]]) -> list[tuple[str, Revie
     verdicts: list[tuple[str, ReviewVerdict]] = []
     for row in rows:
         payload = row["payload"]
+        # EOS-89: 예시 payload는 `verification` 주장을 담지 않으므로(`build_example_slot_row`)
+        # 항등 판정 능력이 필요 없다 — 그래서 이 호출부는 합성 루트를 알 이유가 없다(pull 0 유지).
+        # 주장이 있는 행이 흘러들면 `verify_slot_payload`가 LookupError로 크게 실패한다.
         verdict = review_slot(payload)
         if verdict.approved:
             answer = payload.get("answer")

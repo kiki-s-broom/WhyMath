@@ -22,14 +22,21 @@ from whymath_backend.l2.pedagogy_evidence import (
 from whymath_backend.l2.pedagogy_evidence import (
     EVENT_TYPE_TREATMENT as PEDAGOGY_EVENT_TYPE_TREATMENT,
 )
+from whymath_backend.l2.recommendation_contract import build_reason
 from whymath_backend.l2.recommendation_evidence import (
+    CANDIDATES_META_CAP,
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
     META_KEY_APPLIED_WEIGHTS,
+    META_KEY_CANDIDATES,
     META_KEY_GATE_REASON,
     META_KEY_MODE,
+    META_KEY_POLICY_VERSION,
     META_KEY_POOL_SIZE,
     META_KEY_PROBLEM_ID,
+    META_KEY_REASON,
     META_KEY_THETA,
+    POLICY_VERSION_CAT,
+    POLICY_VERSION_SUNEUNG,
     record_recommendation_treatment,
 )
 
@@ -131,6 +138,145 @@ class TestRecommendationTreatment:
     def test_event_type_constant_is_frozen(self) -> None:
         expected = "recommendation_render"
         assert recommendation_evidence.EVENT_TYPE_RECOMMENDATION_TREATMENT == expected
+
+
+class TestCandidatesAndPolicyVersion:
+    """REC-11 — candidates[]·policy_version 영속(추천 오프라인 평가 소급 불가 축 해소)."""
+
+    async def test_omits_candidates_and_policy_version_when_absent(self) -> None:
+        """둘 다 선택 인자 — 생략하면 기존 동작과 완전히 동일(회귀 0)."""
+        session = _FakeSession()
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert META_KEY_CANDIDATES not in row.meta
+        assert META_KEY_POLICY_VERSION not in row.meta
+
+    async def test_records_candidates_sorted_by_score_descending(self) -> None:
+        session = _FakeSession()
+        pid_low, pid_high, pid_mid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=pid_high,
+            theta=0.0,
+            pool_size=3,
+            applied_weights=False,
+            candidates=[(pid_low, 0.1), (pid_high, 0.9), (pid_mid, 0.5)],
+            policy_version=POLICY_VERSION_CAT,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_CANDIDATES] == [
+            {"problem_id": str(pid_high), "score": 0.9},
+            {"problem_id": str(pid_mid), "score": 0.5},
+            {"problem_id": str(pid_low), "score": 0.1},
+        ]
+        assert row.meta[META_KEY_POLICY_VERSION] == "cat_v1"
+
+    async def test_candidates_truncated_to_cap(self) -> None:
+        """원 풀이 상한보다 크면 점수 상위 `CANDIDATES_META_CAP`건만 남는다."""
+        session = _FakeSession()
+        pool_size = CANDIDATES_META_CAP + 5
+        candidates = [(uuid.uuid4(), float(i)) for i in range(pool_size)]
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=candidates[-1][0],
+            theta=0.0,
+            pool_size=pool_size,
+            applied_weights=False,
+            candidates=candidates,
+            policy_version=POLICY_VERSION_SUNEUNG,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        stored = row.meta[META_KEY_CANDIDATES]
+        assert len(stored) == CANDIDATES_META_CAP
+        # 점수 내림차순 상위 CANDIDATES_META_CAP건 — 가장 높은 점수(pool_size-1)부터.
+        assert stored[0]["score"] == float(pool_size - 1)
+        assert stored[-1]["score"] == float(pool_size - CANDIDATES_META_CAP)
+
+    async def test_policy_version_string_is_recorded_verbatim(self) -> None:
+        session = _FakeSession()
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            policy_version=POLICY_VERSION_SUNEUNG,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_POLICY_VERSION] == "suneung_v1"
+        # candidates는 생략됐으므로 policy_version만 실린다(둘은 독립 선택 인자).
+        assert META_KEY_CANDIDATES not in row.meta
+
+
+class TestReasonPersistence:
+    """EOS-14 acceptance ④ — 추천 근거를 **새 좌석 없이** 이 좌석에 싣는다(재구현 0).
+
+    `candidates`가 *무엇과 비교해 골랐나*를 남긴다면 `reason`은 *어느 개념의 어떤 숙달
+    때문에 골랐나*를 남긴다. 소급 평가에서 두 질문은 다르므로 한쪽으로 접지 않는다.
+    """
+
+    async def test_omits_reason_when_absent(self) -> None:
+        """선택 인자 — 생략하면 기존 동작과 완전히 동일(회귀 0)."""
+        session = _FakeSession()
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert META_KEY_REASON not in row.meta
+
+    async def test_reason_is_stored_as_json_ready_primitives(self) -> None:
+        """JSONB에 들어가려면 enum·UUID가 아니라 문자열이어야 한다 — 직렬화 모드를 동결한다."""
+        session = _FakeSession()
+        concept_id = uuid.uuid4()
+        reason = build_reason(concept_id=concept_id, mastery=0.25, confidence=0.5)
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            reason=reason,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_REASON] == {
+            "type": "prerequisite_gap",
+            "confidence": 0.5,
+            "basis": "measured_mastery",
+            "concept_id": str(concept_id),
+            "mastery": 0.25,
+        }
+
+    async def test_unmeasured_reason_keeps_none_instead_of_zero(self) -> None:
+        """미측정은 영속에서도 None이다 — 0.0으로 접히면 로그가 없는 약점을 만든다(S3-07)."""
+        session = _FakeSession()
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            reason=build_reason(concept_id=uuid.uuid4(), mastery=None, confidence=None),
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_REASON]["mastery"] is None
+        assert row.meta[META_KEY_REASON]["basis"] == "cold_start"
 
 
 class TestB1PlaintextProhibition:

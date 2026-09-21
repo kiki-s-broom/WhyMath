@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-62-freeze-input-trigger-guard-generalization
+title: "동결 입력 트리거 가드 일반화 — 가드가 동결 테스트 한 파일만 하드코딩해 나머지 동결 입력은 필터 밖이어도 통과"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(2026-09-06·main 794c0ea8): tests/infra/test_ci_contract_fixture_trigger_wiring.py의 _FREEZE_TEST가 tests/backend/schema/test_failure_definition_freeze.py **한 파일**을 하드코딩한다. 따라서 다른 동결 테스트가 읽는 입력 파일이 backend 필터 밖이어도 계약 ⑧이 위반 0을 낸다 — 가드 자신이 전수가 아니다"
+  - "② 일반화: tests/backend/** 전건에서 FROZEN_INPUT_PATHS 상수를 선언한 동결 테스트를 **전부** 훑어 그 입력이 backend 필터 안인지 검사한다(단수 → 복수). 기존 AST 파서·변별력 테스트(test_frozen_input_parser_is_discriminating)의 계약은 유지"
+  - "③ **스캔 0건은 실패**로 처리한다(CLAUDE.md 2026-09-01 ④) — 상수를 선언한 테스트를 하나도 못 찾으면 공허하게 통과하지 말고 RED. 현행 하드코딩은 최소 1건을 보장했으나 전수 스캔은 그 보장이 사라진다"
+  - "④ 뮤테이션으로 변별력 확인: 동결 입력 경로를 필터에서 빼면 RED, 되돌리면 GREEN. 신규 동결 테스트를 합성 추가해도 가드가 따라오는지 확인"
+artifacts:
+  - "PR #1005 (https://github.com/doldori7/WhyMath/pull/1005) — 커밋 5a09d27b. 가드 단일 파일 하드코딩 → tests/backend/** 전수 스캔(_frozen_input_declarations·0건=예외) + 순수 판정 _frozen_input_violations(실 레포·합성 주입 공용) + 합성 트리 테스트 + canonical 동결 테스트 FROZEN_INPUT_PATHS 선언. 뮤테이션 5종 전건 검출(M1: 종전 가드는 green이던 필터 제거를 새 가드가 RED). tests/infra 885 passed · backend 전체 12,394 passed · ruff·black exit 0."
+paths:
+  - tests/infra/test_ci_contract_fixture_trigger_wiring.py
+  - ".github/workflows/ci.yml"
+session: null
+notes: "출처: ARCH-38 세션(2026-09-06·PR #997)이 자기 자신으로 실증. docs/architecture/canonical_entity_model_v1.md는 test_canonical_entity_model_freeze.py 검사 ③④의 입력(_CANON_DOC·§2-A 표 파싱)인데 backend 필터 밖이라 그 문서 단독 변경 PR에서 'backend — lint·type·test'가 conclusion=skipped였다(실측). skip은 required check에서 충족으로 계상되므로, §2-A 표를 조용히 고쳐 좌석 배정을 바꿔도 검사 ④가 실행되지 않는 상태였다. COLLAB-07 ①(data/corpus)·②(schemas)·PR #910 P1(G0 동결 입력)에 이은 **네 번째** 동형 사각이며, 앞 셋과 다른 점은 **그 사각을 막으라고 만든 가드 자신의 범위가 좁아서** 생겼다는 것이다. PR #997이 구멍(canonical_entity_model_v1.md 편입)만 막았고 구조(가드 전수화)는 이 태스크가 닫는다 — 구멍만 막으면 다섯 번째가 온다."
+updated: 2026-09-06

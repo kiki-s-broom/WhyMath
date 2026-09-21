@@ -49,7 +49,8 @@ class TestJudgeLive:
         # 실파일을 빌려 `load_probes`에 넘긴다(설치 트리·개발 트리 공통).
         with probes_path() as path:
             probes = load_probes(path)
-        assert len(probes) == 162  # 98 + 극값 MC 4 + 843 트랜치1~5 각 12
+        # 98 + 극값 MC 4 + 843 트랜치1~5 각 12 + #1068 P1 회귀 1건
+        assert len(probes) == 169
 
         # 슬110(#5): bge-m3·Ollama 자원 미도달은 사전체크로 skip(judge=UNCERTAIN 무의미 측정
         # 회피)·측정 경로 코드 버그는 fail로 전파.
@@ -76,9 +77,9 @@ class TestJudgeLive:
         print(format_report(report))
 
         # loose smoke(측정이 목적·품질 hard-fail 아님): 구조 무결성만 단언.
-        assert report.total == 162
-        assert report.total_recall == 95
-        assert report.total_fp == 67
+        assert report.total == 169
+        assert report.total_recall == 98
+        assert report.total_fp == 71
         # judge 후 지표는 None이거나 [0,1](Ollama 미도달이면 전부 UNCERTAIN→의미와 동일).
         for value in (
             report.judge_fp_rate,

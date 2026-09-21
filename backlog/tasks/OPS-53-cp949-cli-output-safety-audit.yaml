@@ -20,11 +20,14 @@ acceptance:
   - "⑥ 변별력(파이프 축) — 콘솔이 아니라 **파이프·리다이렉트**에서 검증한다. 파이프를 걸면 stdout이 로케일 인코딩을 쓰기 때문에 콘솔에서만 테스트하면 이 결함이 보이지 않는다. 로케일 cp949 강제 서브프로세스에서 수정 전 실패·수정 후 성공 양방향 실측"
   - "⑦ 런북 회귀 방지 — 착지 후 docs/ops/eos_relevance_triage_gate_runbook.md §6-1b의 UTF-8 강제 블록이 여전히 필요한지 재판정한다. 불요해지면 제거하거나 '보험'으로 명시(만료 없는 유예 금지)"
   - "⑧ paths 부착 대기 — ④가 넓힌 범위(scripts/harness/**·tests/harness/**)는 이 태스크의 paths에 반영되지 않았다. amend에 paths 정정 경로가 없기 때문이며(HARN-59가 소유), 그때까지 이 태스크를 claim한 세션은 scripts/harness 편집 시 scope drift 경고를 받는다. HARN-59 착지 후 paths를 부착하고 이 항을 해소한다"
+  - "[인접 축 통지 2026-09-14 · 이 태스크의 범위 아님] 같은 cp949 계열의 네 번째 축이 실측됐고 별도로 처리됐다 — 혼동 방지를 위해 적어 둔다. 이 태스크는 '우리가 내는 출력'(stdout/stderr 인쇄)이 cp949에서 죽는 축이다. 새로 난 것은 '셸이 제3 도구의 출력을 디코딩 왕복시켜 파일을 손상시키는' 축이다: PowerShell 5.1이 gh api의 stdout을 Console.OutputEncoding(cp949)으로 디코딩한 뒤 재인코딩해, 필수 체크 이름의 U+2014/U+00B7이 뒤따르는 따옴표를 트레일 바이트로 삼켜 JSON 구조 문자가 유실됐다(2,659→2,618자·41자 소실·판정기 exit 2). 처리 = 런북을 cmd /c 경유로 바꿔 디코딩 자체를 없애고 tests/infra/test_ruleset_drift.py가 그 형태를 동결(뮤테이션 4종 전건 RED). 주의점: 인코딩을 명시해도(Out-File -Encoding utf8) 소용없었다 — 이미 깨진 문자열을 명시한 인코딩으로 쓸 뿐이었다. 그러므로 이 태스크의 acceptance 5(진입점 stdout 재구성)를 채택하더라도 이 축은 덮이지 않는다."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/harness/**"
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/**"
+  - "scripts/harness/**"
+  - "tests/harness/**"
 session: null
-notes: "원 등재 OPS-24(vafylb b1218739에만 잔존·CLAUDE.md 사고 경위 속 별건 OPS-24와 번호 재사용 충돌) — HARN-35 재등재. S4-16 강등전 CLI의 Phaiakes9 라이브 크래시 실측(em dash U+2014·cp949 부재). 2026-07-17 logconfig 사고와 같은 cp949 계열 2회차 — 등재 의무 건\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/계측 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-01] 2026-09-01 실측 사고 편입 + HARN-58 통합. 같은 유형 3회차 — 2026-07-17 logconfig(외부 도구의 읽기 인코딩), HARN-19(우리가 파싱하는 출력), 이번은 **우리가 내는 출력**. 앞 둘은 규칙·코드로 막았으나 출력측 축이 비어 있었다. 우회 수단(PYTHONUTF8 환경변수)은 사람이 매 창에서 기억해야 하므로 항구 대책이 아니다\n\n[정정 2026-09-01] PR #970 codex P2 수용 — acceptance만 넓히고 paths를 못 넓힌 공백을 명시. 정정 경로 부재가 원인이라 HARN-59로 분리 등재했고, 그때까지의 상태를 여기 적어 둔다(침묵 금지)"
-updated: 2026-09-01
+notes: "원 등재 OPS-24(vafylb b1218739에만 잔존·CLAUDE.md 사고 경위 속 별건 OPS-24와 번호 재사용 충돌) — HARN-35 재등재. S4-16 강등전 CLI의 Phaiakes9 라이브 크래시 실측(em dash U+2014·cp949 부재). 2026-07-17 logconfig 사고와 같은 cp949 계열 2회차 — 등재 의무 건\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/계측 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-01] 2026-09-01 실측 사고 편입 + HARN-58 통합. 같은 유형 3회차 — 2026-07-17 logconfig(외부 도구의 읽기 인코딩), HARN-19(우리가 파싱하는 출력), 이번은 **우리가 내는 출력**. 앞 둘은 규칙·코드로 막았으나 출력측 축이 비어 있었다. 우회 수단(PYTHONUTF8 환경변수)은 사람이 매 창에서 기억해야 하므로 항구 대책이 아니다\n\n[정정 2026-09-01] PR #970 codex P2 수용 — acceptance만 넓히고 paths를 못 넓힌 공백을 명시. 정정 경로 부재가 원인이라 HARN-59로 분리 등재했고, 그때까지의 상태를 여기 적어 둔다(침묵 금지)\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/harness/**', 'src/backend/whymath_backend/ops/**', 'tests/backend/**'] → ['src/backend/whymath_backend/harness/**', 'src/backend/whymath_backend/ops/**', 'tests/backend/**', 'scripts/harness/**', 'tests/harness/**']: acceptance 4가 넓힌 범위를 paths에 반영 — 대장 CLI가 대상에 들어왔는데 범위 선언이 따라가지 못했다\n\n[정정 2026-09-14] 같은 cp949 계열 4회차가 별도 축으로 실측·처리됐다. 이 태스크와 범위가 다름을 명시하지 않으면 착수 세션이 중복 처리하거나 반대로 덮였다고 오인한다."
+updated: 2026-09-14

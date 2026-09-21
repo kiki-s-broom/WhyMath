@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-90-subject-contract-v1-candidate-verdicts
+title: "Subject Contract v1 후보 9종 전수 판정·동결 — 계획서 100 §3.9 '과목마다 반드시 존재하는 능력만' 기계 적용 (필수층 3 유지 근거 + 미판정 5건 해소 + Core의 과목 전용 enum/필드 누수 2건 발견)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-88-dependency-direction-contract
+requires_gates: []
+acceptance:
+  - "① Kiki 제시 9후보(getConcept·getPrerequisites·validateProblem·evaluateAnswer·generateExplanation·detectMisconception·getRepresentations·estimateDifficulty·getLearningObjectives)를 4축(능력인가 데이터인가 / 과목 지식을 요구하는가 / Physics·Chemistry·History에 반드시 존재하는가 / Core가 반환값을 해석해야 하는가)으로 전수 판정하고 각 판정을 파일:줄 근거와 함께 문서화. 판정 행선지는 필수층·선택층·계약 아님(데이터/Core 소유/어댑터 내부) 넷뿐"
+  - "② 판정을 **기계가 기억하게** 한다 — tests/backend/schema/test_subject_adapter_two_tier_contract.py에 9후보 판정표를 상수로 동결하고, REQUIRED 판정 후보만 실제 프로토콜에 존재하며 나머지는 부재함을 단언한다(누가 나중에 getConcept을 추가하면 판정 기록과 함께 RED). 기존 REQUIRED_METHODS 동결과 충돌하지 않게 배선"
+  - "③ 조사에서 드러난 **Core의 과목 전용 누수 2건**을 경계 문서에 기록: (a) CORE 배정 l4/visualization_policy.py의 _SEATED_STYLES가 수학 전용 표상 7종을 enum 멤버 리터럴로 열거 (b) CORE 배정 schema/visualization.py의 Graph2dSpec이 tangent_point·integral_region·show_extrema·number_line을 typed 필드로 검증(불투명 페이로드 원칙과 충돌). 상환은 별도 태스크 — 이 태스크는 계측·기록까지"
+  - "④ **EOS-84 프로브의 사각 2종을 계측으로 닫는다** — 현행 프로브는 Compare의 *문자열* 리터럴과 문자열 *상수*만 본다. 실측 확인: 두 누수 모두 프로브 검출 0건. (a) 과목 전용 enum 멤버를 CORE가 열거하는 형태(Attribute 노드) (b) 과목 전용 어휘가 *필드명*으로 박힌 형태를 스캔에 추가하고, 결함 주입으로 변별력을 실증한 뒤 기준선을 실측값으로 동결한다"
+  - "⑤ subject_adapter.py 모듈 docstring의 2층 표에 9후보 판정 요약을 반영(v1이 3메서드인 이유를 explain 1건이 아니라 9후보 전수 기록으로 확장). 계약 자체는 바꾸지 않는다 — 필수층 3 유지가 이 태스크의 결론이며, 그 결론의 *근거*를 남기는 것이 산출물"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/980 (커밋 8319d4ac) — 9후보 전수 판정·CANDIDATE_VERDICTS 동결 7 passed·결함 주입 3건 RED 실증·프로브 스캐너 2종 추가(enum 2·필드 6 동결)·infra 58 passed(seed 0/3)·black/ruff green"
+paths:
+  - tests/backend/schema/test_subject_adapter_two_tier_contract.py
+  - src/backend/whymath_backend/schema/subject_adapter.py
+  - scripts/analysis/eos_core_boundary_probe.py
+  - tests/infra/test_eos_core_boundary_probe.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: Kiki 2026-09-04 계획서 100 §3.9 'Subject Contract v1 설계 — Phase 0에서 가장 중요한 산출물 중 하나' 재제시. 실측: 9후보 중 4건은 EOS-66이 이미 판정(필수 3 + explain 제외·위임 진입점 0건), 5건은 판정 기록 부재였다. Explore 2 병렬 조사 결론 — getConcept·getPrerequisites·getLearningObjectives는 **데이터**(Concept 15컬럼 전부 과목 중립·subject 컬럼은 이미 Overlay로 제거·EdgeType 6종 학습과학 어휘·성취기준은 FK 아닌 crosswalk·NCIC 파서가 물리 코드 이미 수용·어댑터 경유 조회 0건), estimateDifficulty는 **Core 소유**(l2/irt.fit_jmle이 응답 통계만으로 b 추정·소비처 전수가 스칼라로만 읽음·내용 기반 추정은 L3 지역 헬퍼로 Core 소비처 0), getRepresentations만 **선택층 후보**(단 VisualizationStyle 16종이 전량 수학 어휘라 중립 반환 타입 재설계가 전제·Core는 이미 '표현 없음' 경로 완비). 결정적 구분 = 조회(read) vs 계산(compute) — 조회를 계약에 넣으면 schema가 db를 알게 되는 계층 역방향."
+updated: 2026-09-04

@@ -4,30 +4,20 @@ K-12(초·중·고) 개념별 교수학 콘텐츠 4종+α를 담는다 — 은�
 암기카드(앞/뒤/mnemonic). 대학 U4(`concept_content_university`)의 *K-12 짝*이며 같은 개념ID
 (`N1`·`A1`·`HK01`·`10기수1-01-01` 등)로 키잉돼 원자노드DB·성취기준과 조인된다.
 
-라이선스: 와이매스 **자체작성**(원자노드DB 종합·AI 추정). 단 **K-12 성취기준 본문(성취기준 문장·
-요약)은 NCIC 저작물이라 미수록** — `standard_codes`(연결 성취기준 코드)만 다리로 보존한다(NCIC
-본문 다리). **`formal_definition_internal`(정식정의)은 학생 비노출**(내부 교사/검수용)·전 콘텐츠
-검수필요. 콘텐츠 4종 DB 투영(misconception_catalog·problem 등)은 Phase 3 — 이 코퍼스는 *자산
-보존·캡처*다(휘발 xlsx → 커밋 코퍼스).
+라이선스: 와이매스 **자체작성**(원자노드DB 종합·AI 추정). 단 `explanation`의 일부는 NCIC
+성취기준 본문과 사실상 동일하다 — 보유·상업 이용에 제약은 없다(교육부 고시라 저작권법 §7
+제1호상 비보호 + 공공누리 제1유형). **그 건수와 라이선스 선언 문자열은 이 모듈이 아니라
+`ncic_overlap`이 빌드 시점에 실측해 합성한다** — 숫자를 상수로 박으면 다른 xlsx로 재생성할 때
+사실과 다른 표기가 나간다(PR #998 리뷰 지적). `standard_codes`는 성취기준으로 가는 다리로
+함께 보존한다.
+**`formal_definition_internal`(정식정의)은 학생 비노출**(내부 교사/검수용)·전 콘텐츠
+검수필요. 콘텐츠 4종 DB 투영(misconception_catalog·problem 등)은 Phase 3 — 이 코퍼스는
+*자산 보존·캡처*다(휘발 xlsx → 커밋 코퍼스).
 """
 
 from __future__ import annotations
 
-from typing import Final
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-SOURCE_CITATION: Final[str] = (
-    "출처: 와이매스 자체작성 — K-12 개념 교수학 콘텐츠(은유·오개념·정식정의·허용표현·암기카드). "
-    "원자노드DB 종합·AI 추정·검수필요. K-12 성취기준 본문은 NCIC 저작물이라 미수록 — "
-    "연결 성취기준 코드만 다리로 보존."
-)
-LICENSE_NOTICE: Final[str] = (
-    "본 데이터(은유·오개념·정식정의·허용표현·설명·암기카드)는 와이매스 자체 저작물입니다 — "
-    "AI 추정 초안으로 검수필요. **K-12 성취기준 본문(성취기준 문장·요약)은 NCIC 저작물이라 "
-    "미수록**·연결 성취기준 코드만 보존. `formal_definition_internal`(정식정의)은 학생 비노출"
-    "(내부·검수용)."
-)
 
 
 class Flashcard(BaseModel):
@@ -80,8 +70,6 @@ class ConceptContent(BaseModel):
 
 
 __all__ = [
-    "LICENSE_NOTICE",
-    "SOURCE_CITATION",
     "ConceptContent",
     "Flashcard",
 ]

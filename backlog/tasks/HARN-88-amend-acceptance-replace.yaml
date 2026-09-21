@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-88-amend-acceptance-replace
+title: "amend에 acceptance 정정 경로 부재 — 오등재된 항을 지울 CLI 경로가 없다 (append 전용)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: cancelled
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `amend --acceptance-replace <구문자> <신문자>` 추가 — `--notes-replace`(HARN-67 ⑥)와 같은 계약: 구문자는 대상 acceptance 항 전체에 정확히 1회 등장해야 하고(0회·2회+ 거부), 신문자 `''`는 그 항 삭제, 원문은 이벤트 대장에 남는다. 손편집 금지 원칙을 지키면서 오등재를 되돌릴 수 있게 하는 것이 목적이다"
+  - "② 항 단위 삭제 경로 — `--remove-acceptance <인덱스 또는 구문자>`가 필요한지 판정한다. `--acceptance-replace`로 빈 문자열 치환이 가능하면 중복이므로 만들지 않는다(선택지 폭발 방지). 판정 근거를 notes에 남긴다"
+  - "③ 회귀 테스트 — `tests/harness/test_cli.py`에 (a)정상 치환 (b)구문자 0회 거부 (c)구문자 2회+ 거부 (d)빈 신문자로 항 삭제 (e)이벤트에 원문 기록을 동결한다. 뮤테이션으로 각 절이 실제 RED를 내는지 확인한다 — 특히 (b)(c)는 픽스처가 그 절을 밟는지 주의한다(CLAUDE.md 2026-09-07 '픽스처 접촉' 축)"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "발생 경위(2026-09-08): HARN-87에 acceptance ④를 등재하며 bash 인자 안에 마크다운 백틱을 그대로 썼다 — 셸이 그것을 명령 치환으로 실행해 식별자 4개(`*/15`, API 경로, `workflow_dispatch`, `push: branches: [main]`)가 통째로 사라진 채 저장됐다. \"cron은 라 2~3회 발화했어야\" 같은 무의미 문장만 남았고, CLI는 그 사실을 알 수 없어 정상 종료했다. `--acceptance`가 append 전용이라 되돌릴 수 없어 정정본 ⑤를 덧붙이는 것으로만 수습했다 — 대장에 손상된 항이 영구히 남는다.\n\n이것이 이 태스크의 근거다: 지울 수 없는 오등재는 대장의 신뢰를 깎고, 사람이 결국 손편집으로 우회하게 만든다(HARN-53이 \"고칠 수 없는 위반을 지적하는 게이트는 사람이 게이트를 끄게 만든다\"고 적은 것과 같은 구조). `--notes-replace`가 notes 축에 이미 그 경로를 열어 두었으므로 acceptance 축에도 대칭으로 필요하다.\n\n부수: 백틱 자체는 CLAUDE.md 규칙(2026-09-08 등재)이 막는다 — 이 태스크는 그 규칙이 뚫렸을 때의 복구 경로를 만든다. 규칙과 코드는 상보다.\n\n[취소 2026-09-08] 중복 — HARN-76-acceptance-supersede-and-title-amend이 같은 공백을 이미 소유한다(2026-09-06 등재·todo). 그 태스크 ①이 \"amend에 acceptance 항 폐기 표시(tombstone) 경로 신설\"이고, 출처도 동일한 형태의 Codex P2 리뷰(#1012·ARCH-31에서 승계 항이 원 항과 배타적이 된 지적)다.\n\n더 나아가 이 태스크의 제안은 HARN-76과 **충돌**한다: 나는 `--acceptance-replace`로 빈 문자열 치환 시 **항 삭제**를 제안했는데, HARN-76 ④는 \"acceptance 항 삭제·태스크 삭제·ID 변경은 범위 밖 — 대장 손편집 우회 표면이라 계속 닫아 둔다\"고 **의도적으로 닫아 둔** 축이다. HARN-20 사고(덮어쓰기로 blocked 4건의 원 notes 전건 소실) 이후 append 전용은 결함이 아니라 설계다. 내가 그 설계 의도를 모른 채 \"지울 수 있게 하자\"고 제안했다.\n\n따라서 취소하고 HARN-76으로 일원화한다. 이 태스크가 가져온 사고 경위(2026-09-08 셸 백틱 치환으로 HARN-87 ④ 손상·복구 불가)는 HARN-76의 근거를 강화하는 사례로 그쪽 notes에 승계한다.\n\n등재 결함 자기 진단: 등재 전에 **역할로 검색하지 않았다**. `backlog.py add`의 의미 중복 고지가 HARN-75(gates-amend-path)를 0.13으로 지목했으나 HARN-76은 못 잡았고, 나도 따로 찾지 않았다. CLAUDE.md \"식별자 부재를 기능 부재로 단정 금지\"의 절차(①역할로 검색 ②소비자 역추적 ③범위 명시)를 밟았어야 했다 — \"amend acceptance\"로 한 번만 grep했어도 나왔다. 중복 고지는 보조 장치이지 검색의 대체가 아니다."
+updated: 2026-09-08

@@ -1,0 +1,33 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-86-solution-coaching-step-chain-injection
+title: "solution_coaching MIXED 분해 — verify_solution 직접 import를 StepChainVerifier 선택층 주입(composition 팩토리)으로 교체 (EOS-84 잔여 누수 2건 상환 · 방안 A)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-84-core-boundary-math-removal-probe
+requires_gates: []
+acceptance:
+  - "① l4/subject_adapter_math.py에 MathStepChainVerifier(verify_chain → l3.verify_solution 래핑) 추가, composition.py에 default_step_chain_verifier() 지연 import 팩토리 추가(기존 5팩토리와 동형·__all__ 갱신). two-tier 계약 테스트(test_subject_adapter_two_tier_contract.py)가 선택층 구현체 존재를 인지·통과"
+  - "② l4/solution_coaching.py가 l3.verify_solution·l4.misconception.wrong_form_match를 모듈 최상단에서 import하지 않는다 — recommend_coaching_for_solution(…, verifier: StepChainVerifier | None = None) 주입, 기본값은 composition 팩토리. SolutionCoaching.solution_verification 필드 타입을 schema 중립 계약(ChainVerificationCounts/ChainVerification)으로 교체하고 pydantic 직렬화·OpenAPI 스키마 변화를 실측해 기록(Flutter CoachResponse 계약 영향 여부 명시). observe_wrong_form_shadow는 함수 내 지연 import 또는 api.coach 이관 중 하나를 택해 근거를 적는다"
+  - "③ 집행 지점: BOUNDARY_MAP l4.solution_coaching MIXED→CORE 재배정 + pyproject import-linter source에 편입, tests/infra/test_eos_core_boundary_probe.py RESIDUAL_LEAK_BASELINE을 frozenset()으로 ratchet(api.coach·api.ocr_handoff 잔여 0 실측), 문서 §8.1 갱신"
+  - "④ 기존 테스트 무회귀: tests/backend/l4/test_solution_coaching.py(625줄·실제 SymPy 실행)가 기본 주입으로 무수정 통과, API/E2E 경유 9파일 통과. 백엔드 전체 스위트 실행 후 보고(부분 스위트 보고 금지)"
+  - "⑤ 정직한 잔여 명시: validate_response·arithmetic_validator(l3.pregenerate.validator, MIXED·내부 sympy) 경유 수학 의존은 이 태스크가 제거하지 않는다 — 부분 상환임을 문서·MEMORY에 적고, l3.pregenerate.validator 배정 재검토를 승계 태스크로 분리 등재"
+  - "⑥ (§3.8·EOS-88 정정) 새 default_step_chain_verifier() 팩토리를 solution_coaching이 직접 import하면 composition pull 4번째 지점이 되어 test_eos_dependency_direction의 CORE_PULL_BASELINE이 RED다 — 기본값 지연 import 대신 api.coach가 Depends로 주입하거나(EOS-89 등록 경로) pull 기준선 갱신 근거를 적는다. EOS-89와 착수 순서를 조율"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1018"
+paths:
+  - src/backend/whymath_backend/l4/solution_coaching.py
+  - src/backend/whymath_backend/composition.py
+  - src/backend/whymath_backend/l4/subject_adapter_math.py
+  - scripts/analysis/eos_core_adapter_boundary_scan.py
+  - tests/infra/test_eos_core_boundary_probe.py
+  - src/backend/pyproject.toml
+session: null
+notes: "출처: docs/reviews/eos_core_boundary_remediation_candidates_2026-09-04.md §2. 실측: 실행 코드 ~40줄, 수학 결과 접근 has_incorrect·first_incorrect_index 2필드, 시그니처 이미 과목 중립. schema/verification_capabilities.StepChainVerifier.verify_chain 선재 + l3/verify_solution.py:224 _counts_conformance가 구조 적합성을 mypy로 증명(변환 객체 불요). api.ocr_handoff 누수는 api.coach 경유 파생 — 누수 지점 1개. 방안 B(검증을 api.coach로 올림)는 누수를 CORE로 승격시켜 import-linter 직접 위반 — 비채택.\n\n[정정 2026-09-04] EOS-88 실측: 현행 Core는 composition을 pull하는 형태(3지점)이며 §3.8은 등록 형태를 더 정확한 방향으로 지정 — EOS-86의 방안 A 초안이 pull을 하나 더 만들 위험"
+updated: 2026-09-06

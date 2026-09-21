@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -38,6 +39,7 @@ from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_boun
 from whymath_backend.ops.qa_confusion_matrix import (
     CONTENT_KPI_CONSUMERS,
     Prediction,
+    _report_payload,
     build_report,
     evaluate,
     main,
@@ -646,3 +648,62 @@ class TestJsonOutput:
         assert payload["metrics"]["fn_rate_upper"] is not None
         assert payload["golden"]["rotation"] == 0
         assert payload["fn_by_failure_code"] == {"F2": 1}
+
+
+class TestFailureCodeKeyContract:
+    """실패코드 JSON 키 계약(EOS-75) — 키는 코드 **값**(`F1`)이지 파이썬 repr이 아니다.
+
+    검증을 거친 `GoldenItem`은 `use_enum_values=True`라 *우연히* `F1`을 냈다(그래서 기존
+    테스트는 `str(enum)` 구현에서도 초록이었다 — 변별력 0). 그 우연을 계약으로 바꾼다:
+    검증을 우회해 enum 인스턴스를 든 항목에서도 같은 키가 나와야 하고, 뮤테이션(`str()`로
+    되돌리기)에서 이 클래스가 RED여야 한다.
+    """
+
+    @staticmethod
+    def _constructed(slug: str, code: GenerationFailureCode) -> GoldenItem:
+        # model_construct = 검증 우회 → use_enum_values가 적용되지 않아 enum 인스턴스가 남는다
+        return GoldenItem.model_construct(
+            cu_slug=slug,
+            subject_id="math",
+            anchor_id="A4",
+            label=GoldenLabel.DEFECTIVE,
+            failure_code=code,
+            as_found_basis=AsFoundBasis.REJECTED_FAILURE_CODE,
+        )
+
+    def test_keys_are_code_values_even_when_items_bypass_validation(self) -> None:
+        item = self._constructed("a", GenerationFailureCode.F1)
+        assert isinstance(item.failure_code, GenerationFailureCode)  # 전제: enum 인스턴스다
+
+        report = build_report(_golden([item]), [Prediction("a", passed=True)])
+
+        assert report.fn_by_failure_code == {"F1": 1}
+        assert report.golden_by_failure_code == {"F1": 1}
+
+    def test_json_payload_keys_match_the_contract(self) -> None:
+        """JSON 키 전수 = `F1`~`F8` 또는 `(코드 없음)` — 검증 경유·우회 항목을 섞어도."""
+        items = [
+            _item("a", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2),
+            self._constructed("b", GenerationFailureCode.F3),
+            _item("c", GoldenLabel.DEFECTIVE),  # defective인데 코드 미기재 → "(코드 없음)"
+            _item("d", GoldenLabel.CLEAN),
+        ]
+        predictions = [Prediction(slug, passed=True) for slug in ("a", "b", "c", "d")]
+
+        payload = _report_payload(build_report(_golden(items), predictions))
+
+        for section in ("fn_by_failure_code", "golden_by_failure_code"):
+            keys = set(payload[section])
+            assert keys == {"F2", "F3", "(코드 없음)"}, section
+            for key in keys:
+                assert key == "(코드 없음)" or re.fullmatch(
+                    r"F[1-8]", key
+                ), f"{section} 키가 계약 밖(파이썬 repr 누출?): {key!r}"
+
+    def test_content_kpi_table_counts_enum_backed_golden(self) -> None:
+        """결선표(⑤)는 `.value`로 조회한다 — 생산·조회 표기가 갈라지면 정답지가 있어도 0건."""
+        item = self._constructed("a", GenerationFailureCode.F1)
+        rendered = render_report(build_report(_golden([item]), [Prediction("a", passed=False)]))
+
+        row = next(line for line in rendered.splitlines() if "수학적 오류율" in line)
+        assert "| 1건 |" in row, row

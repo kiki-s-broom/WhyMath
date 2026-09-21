@@ -92,7 +92,14 @@ STATUS_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "todo": ("in_progress", "blocked", "cancelled"),
     "in_progress": ("review", "done", "blocked", "todo"),
     "blocked": ("todo", "cancelled"),
-    "review": ("done", "in_progress"),
+    # "blocked"는 HARN-95가 추가 — review의 유일한 비-done 출구가 in_progress였는데
+    # 그 홉은 cmd_review가 session을 보존해 CLI로 항상 거부된다(review는 여전히
+    # in-flight). 그래서 done 말고는 나갈 길이 없는 막다른 길이었다 — PR이 closed로
+    # 처리되거나 재작업이 필요해 이 태스크를 blocked/cancelled로 내려야 하는 경우
+    # 손편집 말고는 방법이 없었다. cmd_block은 이미 어떤 상태에서든 session을 비우고
+    # blocked로 내리는 범용 동사이므로, review를 그 출발점에 추가하는 것만으로
+    # review → blocked → todo → cancelled/in_progress 전 구간이 다시 열린다.
+    "review": ("done", "in_progress", "blocked"),
     "done": (),  # 종결 상태
     "cancelled": (),  # 종결 상태
 }
@@ -106,7 +113,17 @@ GATE_STATUSES: tuple[str, ...] = ("pending", "cleared", "waived")
 POLICY_MODES: tuple[str, ...] = ("off", "warn", "block")
 
 # 태스크 ID 규칙: <스테이지 또는 접두>-<번호>-<슬러그> (파일명 stem과 동일해야 함)
-TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{0,7}-\d{2}(-[a-z0-9]+(-[a-z0-9]+)*)?$")
+#
+# 번호는 2자리(01~99) 또는 3자리(100~999, 선행 0 없음) — HARN-97: 접두당 99개 상한에
+# ARCH·EOS 두 접두가 실제로 도달해(2026-09-09 실측) 등재가 거부됐다. 3자리를 열어
+# 001~099 같은 선행 0 표기는 금지한다 — 허용하면 "099"와 "99"가 같은 번호를 가리키는
+# 두 표기가 되어 store._ID_NUMBER_RE 기반 충돌 검사·문서 짧은 참조(dep_declaration.py
+# `_REF_RE`는 이미 `\d{1,3}`)가 같은 번호를 다른 문자열로 다루게 된다.
+# 기존 2자리 ID는 전부 그대로 유효(하위호환) — 상한만 999로 올라간다. 파싱은 이미
+# 문제없다: `store._ID_NUMBER_RE`(`\d+`)·`backlog.py`의 번호 추출은 전부 `int()`로 변환해
+# 자리수와 무관하게 비교하므로, 이 정규식만 좁혀 왔던 것이 유일한 병목이었다(실측 —
+# MEMORY.md 2026-09-11 HARN-97 결정 로그 참조).
+TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{0,7}-(?:\d{2}|[1-9]\d{2})(-[a-z0-9]+(-[a-z0-9]+)*)?$")
 GATE_ID_RE = re.compile(r"^G-[a-z0-9]+(-[a-z0-9]+)*$")
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -213,6 +230,23 @@ class Gate:
     requested: str = ""  # YYYY-MM-DD
     remind_after_days: int | None = None  # 경과 시 SessionStart 브리핑에 리마인드
     evidence: str | None = None  # cleared 시 근거(커밋/문서) 필수
+    # clear를 수행한 **주체** (HARN-60) — "kiki"/"partner"(사람 자기기입) 또는 "claude"(에이전트).
+    #
+    # 왜 필요한가: 이벤트의 `actor`는 **브랜치명**이라(예: 'claude/git-unshallow-repo-crr6x5',
+    # 'main') 사람이 clear했는지 에이전트가 했는지를 담지 못한다. 준수 감사 A3은 "에이전트의
+    # 사람 게이트 clear"를 심각도 높음으로 보는데, 그 준수를 사후 증명할 채널이 git 저자뿐이었고
+    # 저장소 정책상 스쿼시 머지만 허용돼(merge·rebase 405) 저자는 머지 수행자로 덮이고 브랜치
+    # ref는 자동 삭제된다 — 즉 증거가 복원 불가능해진다. 그래서 증거를 git 메타데이터가 아니라
+    # **대장 데이터**에 둔다.
+    #
+    # 왜 `as_owner`(start/done의 이벤트 필드)를 그대로 쓰지 않는가: 그쪽 규약은 *부재 = 에이전트*다.
+    # 이 태스크가 없애려는 결함이 정확히 그 **부재의 모호함**이라(부재가 '에이전트'인지 'HARN-60
+    # 이전이라 미기록'인지 구별 불가), 여기서는 **항상 명시**되는 별도 필드를 둔다. 플래그(`--as`)와
+    # 소유자 어휘(OWNERS)는 HARN-06 선례를 그대로 재사용한다 — 새 프레임워크가 아니다.
+    #
+    # `None`은 **미상**이며 HARN-60 이전에 clear된 행에만 남는다. 소급 추정 금지(날조 금지):
+    # 스쿼시로 git 저자가 소실됐으므로 사후에 알 수 없다.
+    cleared_by: str | None = None
     notes: str = ""
 
     def validate(self) -> list[str]:
@@ -227,6 +261,10 @@ class Gate:
             errors.append(f"{self.id}: status '{self.status}' 미등록")
         if self.status == "cleared" and not self.evidence:
             errors.append(f"{self.id}: cleared인데 evidence 없음 (근거 필수)")
+        # HARN-60: 주체가 *적혀 있으면* 등록된 소유자여야 한다(오타·자유문자열 유입 차단).
+        # 비어 있는 것은 오류가 아니다 — HARN-60 이전 행의 정직한 '미상'이다(소급 날조 금지).
+        if self.cleared_by is not None and self.cleared_by not in OWNERS:
+            errors.append(f"{self.id}: cleared_by '{self.cleared_by}' 미등록 소유자")
         if self.requested and not DATE_RE.match(self.requested):
             errors.append(f"{self.id}: requested 는 YYYY-MM-DD 형식이어야 함")
         return errors

@@ -8,8 +8,9 @@ harness 모듈의 함수를 monkeypatch해 결정론·경량으로 게이트 판
 끝까지 돌려 exit code·JSON 유효성을 확인한다(느려도 필수 — acceptance).
 
 `TestAxisDefectReportIntake`(RPT-01 8번째 축)는 실 PG 없이 세션 팩토리를 가짜로 주입해
-"미배선"(no_snapshot)·"0건 접수"(ok+count=0)·"그 외 DB 오류"(error로 전파) 세 상태를
-결정론적으로 재현한다 — 실 PG로의 왕복(진짜 gen_random_uuid()/now())은
+"미배선"(no_snapshot·table_exists=False)·"DB 도달 불가"(no_snapshot·table_exists=None,
+ARCH-23)·"0건 접수"(ok+count=0)·"그 외 DB 오류"(error로 전파) 네 상태를 결정론적으로
+재현한다 — 실 PG로의 왕복(진짜 gen_random_uuid()/now())은
 `tests/backend/api/test_reports_integration.py`가 담당한다.
 """
 
@@ -130,6 +131,57 @@ class TestAxisEquivalenceCanonicalize:
         result = qp._axis_equivalence_canonicalize(tmp_path)
         assert result.status == "ok"
         assert result.detail == {"total_conditions_checked": 0, "violations": 0}
+
+    @pytest.mark.parametrize("answer_kind", sorted(qp._NON_EQUATION_DSL_ANSWER_KINDS))
+    def test_non_equation_dsl_answer_kinds_are_excluded_from_check(
+        self, tmp_path: Path, answer_kind: str
+    ) -> None:
+        """S3-28: 확률/통계 전용 DSL(answer_kind별 별도 파서)은 등식 DSL 검사 대상이 아니다.
+
+        실측(2026-08-03, 2026-09-10 재확인): 코퍼스 전수에서 위반이 전부 이 6종 —
+        각자 이미 닫힌 파서(`l3/finite_probability.py`·`l3/verify_answer.py`의
+        comma-list 파서)로 검증되므로 등식 sympify 폐쇄성 검사를 적용하면 필연적으로
+        위반 오탐이 난다(코퍼스 결함 아님).
+        """
+        bank = tmp_path / "problem_bank_a"
+        bank.mkdir()
+        # 실제로 sympify 위반을 내는 형태(확률 미니 DSL·쉼표 숫자열) — exempt 안 됐다면
+        # gate_fail이 났을 조건들. answer_kind가 상위/verify 어느 쪽에 있어도 동작해야 한다.
+        rows = [
+            {
+                "slug": "p1",
+                "answer_kind": answer_kind,
+                "conditions": "space=dice(n=2,faces=6); event=sum==7",
+            },
+            {"slug": "p2", "verify": {"answer_kind": answer_kind, "conditions": "3,5,7,9"}},
+        ]
+        (bank / "problems.jsonl").write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8"
+        )
+        result = qp._axis_equivalence_canonicalize(tmp_path)
+        assert result.status == "ok"
+        assert result.detail == {"total_conditions_checked": 0, "violations": 0}
+
+    def test_equation_answer_kind_violation_still_caught(self, tmp_path: Path) -> None:
+        """비exempt answer_kind(또는 무지정)는 등식 DSL 검사가 그대로 적용된다(회귀 방지 —
+        exempt 범위를 넓혀 진짜 결함까지 숨기지 않았는지 확인)."""
+        bank = tmp_path / "problem_bank_a"
+        bank.mkdir()
+        rows = [
+            {
+                "slug": "p1",
+                "verify": {
+                    "answer_kind": "real_root_count",
+                    "conditions": "largest_root(2, 8) == 8",
+                },
+            }
+        ]
+        (bank / "problems.jsonl").write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8"
+        )
+        result = qp._axis_equivalence_canonicalize(tmp_path)
+        assert result.status == "gate_fail"
+        assert result.detail == {"total_conditions_checked": 1, "violations": 1}
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -465,7 +517,8 @@ def _undefined_table_error() -> ProgrammingError:
 
 
 class TestAxisDefectReportIntake:
-    """ "미배선"(no_snapshot)·"0건 접수"(ok)·"그 외 오류"(error 전파) 세 상태 변별력 재현."""
+    """ "미배선"(no_snapshot·table_exists=False)·"DB 도달 불가"(no_snapshot·table_exists=None)·
+    "0건 접수"(ok)·"그 외 오류"(error 전파) — 3중 회계 + error 격리 변별력 재현."""
 
     def test_undefined_table_reports_no_snapshot_not_ok(self) -> None:
         """테이블 자체가 없음(마이그레이션 미적용) — 이중 회계의 "미배선" 값."""
@@ -509,17 +562,52 @@ class TestAxisDefectReportIntake:
         with pytest.raises(ProgrammingError):
             qp._axis_defect_report_intake(maker)
 
-    def test_connection_failure_propagates_for_run_axis_safely_to_classify_as_error(self) -> None:
-        """DB 도달 불가(연결 실패) — no_snapshot도 ok도 아닌 "error"(세 번째 상태)."""
+    def test_connection_failure_reports_no_snapshot_not_error(self) -> None:
+        """DB 도달 불가(연결 실패) — CI data-pipeline 잡처럼 Postgres 자체가 없는 정당한
+        환경 제약이지 결함이 아니다(ARCH-23 r3 보강 (a)안) — no_snapshot(집계 제외)으로
+        강등하되, "테이블 없음"(table_exists=False)과는 table_exists=None(모른다)으로
+        계속 구분한다(3상태를 truthiness로 접지 않는다)."""
         conn_error = OperationalError("SELECT 1", {}, _FakeOrigError("08006"))
         session = _FakeAsyncSession(execute_error=conn_error)
         maker = _FakeSessionmaker(session)
-        result = qp._run_axis_safely(
-            lambda: qp._axis_defect_report_intake(maker), axis_name="defect_report_intake"
+        result = qp._axis_defect_report_intake(maker)
+        assert result.status == "no_snapshot"
+        assert result.measured is True
+        assert result.detail["table_exists"] is None
+        assert result.detail["db_reachable"] is False
+
+    def test_real_connection_refused_error_reports_no_snapshot_not_error(self) -> None:
+        """실측 회귀 — 실제 asyncpg 커넥션 풀 체크아웃 실패는 `sqlalchemy.exc.
+        OperationalError`가 아니라 **래핑되지 않은** `ConnectionRefusedError`(`OSError`
+        하위)로 그대로 올라온다(SQLAlchemy 2.0.52 + asyncpg 실측 확인 — Postgres 없는
+        이 환경에서 `python -m whymath_backend.harness.qa_pipeline`을 실제로 돌려 발견).
+        `OperationalError`만 잡는 최초 구현은 이 경로를 못 잡아 `_run_axis_safely`의 일반
+        핸들러로 새어나가 "error"가 됐고, 그 상태로 continue-on-error를 제거했다면 CI가
+        상시 red가 됐을 것이다(CLAUDE.md "외부 SDK 표면을 시임 테스트만으로 정합 선언
+        금지" — 가짜 `OperationalError` 픽스처만으로는 이 결함을 잡지 못했다)."""
+        conn_error = ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 5432)")
+        session = _FakeAsyncSession(execute_error=conn_error)
+        maker = _FakeSessionmaker(session)
+        result = qp._axis_defect_report_intake(maker)
+        assert result.status == "no_snapshot"
+        assert result.measured is True
+        assert result.detail["table_exists"] is None
+        assert result.detail["db_reachable"] is False
+
+    def test_table_missing_and_db_unreachable_no_snapshot_are_distinguishable(self) -> None:
+        """3중 회계 핵심 단언 — "테이블 없음"과 "DB 도달 불가"가 둘 다 no_snapshot이어도
+        *다른 값*을 낸다(같으면 어느 사태인지 구분 불가 — 변별력 위장)."""
+        table_missing = qp._axis_defect_report_intake(
+            _FakeSessionmaker(_FakeAsyncSession(execute_error=_undefined_table_error()))
         )
-        assert result.status == "error"
-        assert result.measured is False
-        assert result.detail["error_type"] == "OperationalError"
+        conn_error = OperationalError("SELECT 1", {}, _FakeOrigError("08006"))
+        db_unreachable = qp._axis_defect_report_intake(
+            _FakeSessionmaker(_FakeAsyncSession(execute_error=conn_error))
+        )
+        assert table_missing.status == db_unreachable.status == "no_snapshot"
+        assert table_missing.to_json() != db_unreachable.to_json()
+        assert table_missing.detail["table_exists"] is False
+        assert db_unreachable.detail["table_exists"] is None
 
 
 # ──────────────────────────────────────────────────────────────────────────

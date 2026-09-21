@@ -113,17 +113,38 @@ class TestStudentSolutionStepTable:
         assert composite[0].ondelete == "CASCADE"
 
     def test_required_columns_not_null(self) -> None:
-        """attempt_id·user_id·sequence_no·expression·concept_ids·submitted_at NOT NULL."""
+        """attempt_id·user_id·sequence_no·concept_ids·submitted_at NOT NULL."""
         columns = StudentSolutionStep.__table__.columns
         for name in (
             "attempt_id",
             "user_id",
             "sequence_no",
-            "expression",
             "concept_ids",
             "submitted_at",
         ):
             assert columns[name].nullable is False, f"{name}은 NOT NULL이어야 한다"
+
+    def test_expression_relaxed_to_nullable_for_envelope_encryption(self) -> None:
+        """SEC-31: `expression`은 원래 NOT NULL이었으나, 암호화 행에서는 평문 컬럼이 NULL이
+        되므로 DB 제약을 nullable로 완화했다(마이그레이션 3f5c83f51246). schema 계약(필수
+        `str`·min_length=1)은 불변 — handler/헬퍼 층의
+        `resolve_student_solution_step_expression`이 둘 다 없으면 RuntimeError로 "항상 문자열"
+        약속을 지킨다(조용한 None 통과 없음)."""
+        assert StudentSolutionStep.__table__.columns["expression"].nullable is True
+
+    def test_expression_envelope_columns_present_and_nullable(self) -> None:
+        """SEC-31: expression_encrypted/expression_nonce — LargeBinary·nullable·schema 밖."""
+        columns = StudentSolutionStep.__table__.columns
+        for name in ("expression_encrypted", "expression_nonce"):
+            assert columns[name].nullable is True, f"{name}은 nullable이어야 한다"
+        assert name in StudentSolutionStep._NON_SCHEMA_COLUMNS  # type: ignore[attr-defined]
+
+    def test_canonical_ast_envelope_columns_present_and_nullable(self) -> None:
+        """SEC-31: canonical_ast_encrypted/canonical_ast_nonce — LargeBinary·nullable·schema 밖."""
+        columns = StudentSolutionStep.__table__.columns
+        for name in ("canonical_ast_encrypted", "canonical_ast_nonce"):
+            assert columns[name].nullable is True, f"{name}은 nullable이어야 한다"
+            assert name in StudentSolutionStep._NON_SCHEMA_COLUMNS  # type: ignore[attr-defined]
 
     def test_jsonb_columns_declare_none_as_null(self) -> None:
         """JSONB 3컬럼 전부 `none_as_null=True`(SEC-06)."""

@@ -123,7 +123,7 @@ Host phaiakes9
 ```bash
 # Phaiakes9 콘솔에서
 cd ~
-git clone https://github.com/doldori7/WhyMath.git whymath
+git clone https://github.com/kiki-s-broom/WhyMath.git whymath
 cd whymath/infra/phaiakes9
 bash bootstrap.sh          # ← Phase D + E를 한 번에 수행
 ```

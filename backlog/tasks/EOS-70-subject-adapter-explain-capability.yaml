@@ -11,6 +11,7 @@ eos_priority: P2
 owner: claude
 depends_on:
   - EOS-66-subject-adapter-contract
+  - EOS-98-age-band-explanation-generation
 requires_gates: []
 acceptance:
   - "① 선결 확인: 위임 가능한 공개 설명 생성 진입점이 실재하는지 재실측(EOS-66 시점 0건 — l1~l6 공개 explain* 함수 전무, EOS-53 crosswalk C9 '신규' 판정). 여전히 0이면 이 태스크는 blocked로 되돌리고 C9 착지를 기다린다"
@@ -22,5 +23,5 @@ paths:
   - src/backend/whymath_backend/schema/subject_adapter.py
   - src/backend/whymath_backend/l4/subject_adapter_math.py
 session: null
-notes: "출처: EOS-66이 계약 v1을 3메서드로 확정하며 분리한 축. 계획서 100 §3.9는 explain을 후보로 들었으나 저장소에 위임 대상이 없어 v1에서 제외했다(없는 것을 계약에 넣으면 NotImplementedError 좌석이 생겨 '선언≠배선'이 하나 는다). 우선도 3 — 12월 검증 관여도는 간접(설명 품질 KPI F7과 연결되나 계약 형태와는 독립).\n\n[정정 2026-09-01] eos_priority null → P2: 계약 확장 판정 — 12월 검증 불요. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: EOS-66이 계약 v1을 3메서드로 확정하며 분리한 축. 계획서 100 §3.9는 explain을 후보로 들었으나 저장소에 위임 대상이 없어 v1에서 제외했다(없는 것을 계약에 넣으면 NotImplementedError 좌석이 생겨 '선언≠배선'이 하나 는다). 우선도 3 — 12월 검증 관여도는 간접(설명 품질 KPI F7과 연결되나 계약 형태와는 독립).\n\n[정정 2026-09-01] eos_priority null → P2: 계약 확장 판정 — 12월 검증 불요. EOS-80 일괄 백필\n\n[차단 2026-09-06] acceptance ① 재실측(2026-09-06 main b87486d0): 위임 가능한 공개 설명 생성 진입점 0건 — 이름 검색(def explain*/generate_explanation* 공개 함수 0) + 역할 검색(schema/subject_adapter.py:60 자인 '비공개 _explanation()뿐' · l3/equivalent 스켈레톤 생성기의 explanation은 문항 해설 조립이지 개념 설명 생성이 아님) 모두 0. acceptance ①의 지시대로 blocked — C9(연령별 설명 생성, EOS-53 crosswalk 갭 후보 #16) 착지를 기다린다. 단 C9는 backlog 좌석(태스크)이 아직 없다 — 등재는 /plan 또는 Kiki 판단(만료 없는 유예 금지 원칙상 좌석 등재가 선결)\n\n[정정 2026-09-06] C9 좌석 EOS-98-age-band-explanation-generation 등재에 따라 depends_on으로 집행 — blocked 표시 대신 selector가 의존으로 차단하고 C9가 done이 되면 자동 해금된다(PR #994 Codex P2 수용). acceptance ①의 재실측 결과(진입점 0건)는 그대로 유효"
+updated: 2026-09-06

@@ -18,8 +18,9 @@ KPI)의 측정 방법 "검수 타이머 이벤트(시작·종료·중단) 전수
     스키마가 측정 실패를 제조한다. `GenerationLog.problem_id`(같은 생산 계측 로그 계열)와
     동형: nullable·ondelete 지정 없음(NO ACTION).
   - `reviewer_id` TEXT NOT NULL — 검수 *행위자* 핸들. **학생 소유 축 아님**: privacy 스윕
-    (`test_erasure_plan_completeness.OWNER_COLUMN_NAMES` = user_id/student_id/target_user_id)에
-    걸리지 않음을 실측 확인(green)했고, 그 파일 주석이 created_by·approved_by류를 "콘텐츠
+    (`test_erasure_plan_completeness` — SEC-35 이후 FK 산출물 ∪ 계획 파생 이름)에 걸리지 않음을
+    실측 확인(green)했다. 이 테이블은 `user_profile.user_id` FK가 없고 `_ERASURE_PLAN`이 쓰는
+    컬럼명도 갖지 않는다. 그 파일 주석이 created_by·approved_by류를 "콘텐츠
     저작/검수 행위자"로 명시 분류한다. 따라서 erasure/retention/export 3종 배선 **불요** —
     학생 축 컬럼 부재는 `test_review_timer_event_orm.py`가 RPT-01(`test_defect_report_no_
     user_id.py`) 선례로 동결한다.

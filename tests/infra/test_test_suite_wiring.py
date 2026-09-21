@@ -494,6 +494,34 @@ def test_tests_infra_itself_is_wired() -> None:
     )
 
 
+def test_tests_harness_itself_is_wired() -> None:
+    """계약 ①의 특칭 2 — 대장 CLI 계약(`tests/harness`)이 실제로 배선돼 있는지 별도 동결.
+
+    왜 특칭이 하나 더 필요한가 (HARN-59 ③)
+    ------------------------------------
+    `backlog.py`는 사람이 **매일** 쓰는 유일한 대장 조작 경로이고, 그 CLI의 안전장치는 전부
+    `tests/harness`에만 산다 — 대장 손편집 금지를 집행하는 거부들, `done`의 PR 증적 게이트,
+    `amend`의 정정 축, `check-edit` 훅의 조율 정책 3분기. 이 디렉터리가 CI에서 새면 그 거부들이
+    **전부 조용히 무력해진다**: 코드는 남아 있고 테스트 파일도 남아 있으므로 아무 신호가 없다.
+
+    일반 계약(`test_every_test_directory_is_wired_to_a_ci_job`)이 이미 이 디렉터리를 덮지만,
+    일반 계약은 리팩터·허용 목록 추가로 느슨해질 수 있다. `tests/infra`와 같은 이유로 경로를
+    한 줄 박아 둔다 — 느슨해지는 순간 이 줄이 먼저 붉어진다.
+
+    (HARN-59 ③이 요구한 "신규 테스트가 CI에서 실제로 실행되는지 대조"의 집행 지점이다. 배선의
+    단위는 **디렉터리**이므로 파일마다 계약을 두지 않는다 — 배선된 디렉터리에 놓인 새 파일은
+    pytest가 자동 수집한다. 파일 단위로 열거하면 새 파일마다 목록 갱신을 사람이 기억해야 하고,
+    그 기억이 이 저장소가 이미 네 번 실패한 지점이다.)
+    """
+    wirings = _all_wirings()
+    covering = [w for w in wirings if w.covers(_TESTS_ROOT / "harness")]
+    assert covering, (
+        "tests/harness가 어떤 CI pytest 실행에도 포함되지 않는다 — 대장 CLI의 거부·게이트·훅 "
+        "계약이 전부 CI에서 검증되지 않는다는 뜻이다.\n현재 배선:\n"
+        + _wiring_report(_REPO_ROOT, wirings)
+    )
+
+
 def test_unwired_allowlist_entries_carry_a_reason() -> None:
     """계약 ② — 미배선 허용은 **사유와 함께**여야 한다(빈 사유로 조용히 빠져나가지 못하게)."""
     empty = [name for name, reason in _INTENTIONALLY_UNWIRED.items() if not reason.strip()]

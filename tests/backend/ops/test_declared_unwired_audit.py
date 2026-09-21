@@ -770,8 +770,22 @@ class TestRealRepositoryConstantIndirectionDiscrimination:
         assert ("POST", "/v1/ocr/pages") in callers
 
     def test_route_without_any_caller_stays_unreached(self) -> None:
-        """음성 대조 — 아무도 안 부르는 라우트는 여전히 미도달이다(`GET /v1/gating/gifted`)."""
+        """음성 대조 — 아무도 안 부르는 라우트는 여전히 미도달이다(`GET /v1/me/skill-mastery`).
+
+        대조군 교체(MOB-18 회수 2026-09-07): 이전 대조군은 `GET /v1/gating/gifted`였는데,
+        PB-04 도달 관측 테스트(`test_l6_mode_reach_observability.py`)가 그 경로를 실제로
+        호출하면서 **대조군 자격을 잃었다**(도달했으므로 이 단언이 정당하게 깨졌다).
+        단언을 지우면 "전부 도달로 뭉개는 반대 방향 오탐"을 못 잡게 되므로 지우지 않고
+        *진짜* 미호출 라우트로 갈아끼웠다 — 감사기 실측(`--json` 리포트)에서 by-design
+        미도달 11건 중 하나다.
+
+        `skill-mastery`를 고른 이유는 위 `test_producer_only_events_remain_unconsumed`와
+        같은 성질 때문이다: 감사기 대장에 **짝이 되는 유예**가 있어(`api/me.py` Phase 2b-2
+        선언), 언젠가 스킬 축 화면이 배선되면 이 단언과 그 유예가 *함께* 깨진다 — 둘은 같은
+        사실을 말하므로 함께 갱신하는 것이 맞다. 유예 없는 라우트를 골랐다면 테스트만 조용히
+        낡는다.
+        """
         callers = dua.test_call_entries(
             dua.repo_root() / "tests" / "backend"
         ) | dua.dart_call_entries(dua.repo_root() / "src" / "mobile" / "lib")
-        assert dua._route_reached("GET", "/v1/gating/gifted", callers) is False
+        assert dua._route_reached("GET", "/v1/me/skill-mastery", callers) is False

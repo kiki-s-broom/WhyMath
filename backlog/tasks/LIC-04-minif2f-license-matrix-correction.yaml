@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,9 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 매트릭스 miniF2F 행을 폴더별 3라이선스로 정정(근거: LIC-02 실측 ·data/licenses/snapshots/minif2f 스냅샷) ② 정정이 기존 소비 판정(Tier1 포함 여부)에 영향 없는지 1줄 판정 병기"
-artifacts: []
+  - "①-a 실측 정정 — acceptance ①은 폴더 '3라이선스'라 적었으나 스냅샷 실측은 4폴더다(lean=Apache · isabelle=Apache · metamath=MIT · hollight=FreeBSD). isabelle이 누락돼 있었다. 정정 대상도 매트릭스 1곳이 아니라 문서 4곳이었다(licensing_safety 표 · license_snapshot_archive 14행 · 01_data_foundation L1 표 · copyright_gradient 등급1 표) — 전부 정정했고, 코드측 레지스트리는 LIC-08이 소유한다"
+artifacts:
+  - "PR #1028 https://github.com/doldori7/WhyMath/pull/1028"
 paths:
   - "docs/data/**"
+  - docs/architecture/01_data_foundation.md
+  - docs/legal/copyright_gradient.md
 session: null
-notes: "출처: LIC-02 라이브 수집 중 실측(2026-08-30). 스냅샷 증적 = data/licenses/snapshots/minif2f/. 정본 매트릭스 수정이라 별도 태스크로 분리(LIC-02 범위 밖 판단).\n\n[정정 2026-09-01] eos_priority null → P1: 저작권 레일 — 라이선스 표기 정정. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: LIC-02 라이브 수집 중 실측(2026-08-30). 스냅샷 증적 = data/licenses/snapshots/minif2f/. 정본 매트릭스 수정이라 별도 태스크로 분리(LIC-02 범위 밖 판단).\n\n[정정 2026-09-01] eos_priority null → P1: 저작권 레일 — 라이선스 표기 정정. EOS-80 일괄 백필\n\n[정정 2026-09-07] 실측이 등재 문면보다 넓었다 — 폴더 3종→4종, 정정 지점 1곳→4곳. 문면을 실측에 맞춘다"
+updated: 2026-09-07

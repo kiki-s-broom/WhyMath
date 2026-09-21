@@ -143,6 +143,7 @@ class _ScriptedProvider:
         *,
         images: object = None,
         temperature: float | None = None,
+        top_p: float | None = None,  # EOS-121 계약 정합 — 스크립트 대역이라 샘플링은 쓰지 않는다
         json_schema: object = None,
         seed: int | None = None,  # EOS-73 계약 정합 — 스크립트 대역이라 시드는 쓰지 않는다
     ) -> GenerationResult:

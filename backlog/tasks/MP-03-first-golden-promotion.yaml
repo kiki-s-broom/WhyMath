@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-03-first-golden-promotion
+title: "골든 첫 승격 시도 + 카나리 임계 현실 판정 — MP-02 검수 이벤트로 golden_promotion_gate 1차 시도·거부 사유 기록 (실측 0/200의 첫 항목·대체안 A §6)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - MP-02-first-llm-authoring-run
+requires_gates:
+  - G-eos-first-run-canary-review
+acceptance:
+  - "① 승격 시도 — MP-02의 검수 이벤트로 golden_promotion_gate를 1회 돌린다. as-found·재채점 금지 계약(golden_benchmark_contract.md §3·§4) 준수 — 라벨을 고쳐 넣지 않는다. **30건으로는 게이트를 구조적으로 통과할 수 없다**(PR #1000 Codex P1 실측: 기본 --max-defect-rate 0.02·신뢰 0.95에서 0/30 Wilson 단측 상한 0.0827 > 0.02 · 0결함 최소 133건 · 결함 1건이라도 있으면 더 필요). 따라서 (a) 1차 시도·거부 기록(②)만으로 done 가능 (b) 실제 승격은 검수 이벤트 누적 ≥133건(30건/회차면 ≥5회차) 이후 재시도 또는 Kiki가 --max-defect-rate 변경을 명시 결정한 뒤(백필 CLI와 같은 값·결정 로그 필수)에만. 임계 변경은 여기서 하지 않는다"
+  - "② 작동한 비율 — 승격 시도 수 대비 승격 수와 탈락 사유 분포(Wilson 상한 수치 포함)를 낸다. 0건 승격이면 그 사유(표본 부족·계약 위반·이벤트 형식)를 규명한다 — 0건은 통과가 아니다"
+  - "③ 임계 현실 판정 — MP-02가 대장에 기록한 카나리 통과율·Wilson 하한으로 0.90(사실상 만점 요구)이 현실에 맞는지 판정을 MEMORY 결정 로그에 남긴다. 임계 변경은 Kiki 결정 사항으로 올리고 여기서 바꾸지 않는다"
+  - "④ 골든 벤치 시계열 첫 점 — golden_benchmark를 1회 돌려 시계열 첫 레코드를 남긴다(설계서 §7 모델 표류 감지의 시작점). 골든 0건이면 '측정 불가'로 기록(0점 위장 금지)"
+artifacts: []
+paths:
+  - "data/corpus/**"
+  - "docs/reviews/**"
+session: null
+notes: "출처: 대체안 A §6 1~2행 · §11-5 P1-②. requires_gates=G-eos-first-run-canary-review — Kiki의 카나리 30건 검수(MP-02 ②)가 끝나야 착수 가능하도록 게이트를 **이 태스크에** 건다(회차 태스크에 걸면 교착 — §11-3). 카나리 30 vs 승격 133의 격차는 Kiki 결정 사항(ⓐ 5회차 누적 ⓑ 첫 승격 임계 완화 0.05→59건+백필 동일값 ⓒ 카나리 확대 — 게이트 docstring은 ⓐ 처방)."
+updated: 2026-09-06

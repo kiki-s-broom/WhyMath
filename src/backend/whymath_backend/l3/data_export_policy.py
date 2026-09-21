@@ -50,7 +50,10 @@ fail-closed 기본값
 그 보수 기본값이 *일상 동작*이 되면 클라우드가 사실상 꺼진다. 그래서 이 게이트는
 **소스 스캔 게이트**(`scripts/ops/check_routing_data_grade.py`, CI `backend` 잡)와 한 쌍이다 —
 프로덕션 호출부는 등급을 *명시*해야 하고, 기본값은 그 명시를 잊었을 때만 작동하는
-**사고 방지용 backstop**으로 남는다.
+**사고 방지용 backstop**으로 남는다. 그 스캐너는 *입력*만 보므로, `RoutingDecision`을 손으로
+조립해 `Router.route`(유일한 집행 지점)를 건너뛰는 우회는 **결정 스캔 게이트**
+(`scripts/ops/check_routing_decision_bypass.py`, EOS-77)가 따로 막는다 — 클라우드 티어 리터럴
+직접 생성 금지·비리터럴 티어는 `data_export_reason` 승계 필수·유예는 만료·unmatched 강제.
 
 7계층: L3 → L1(권리 모델)·`schema`만 의존한다(하위 방향). 순수 함수·I/O 없음.
 """

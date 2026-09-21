@@ -26,14 +26,20 @@
 ORM/쿼리빌더만(`delete(Model).where(...)` — 원시 SQL 0·CLAUDE.md). `dialogue_turn`은 user 컬럼이
 없어 `dialogue` CASCADE로 제거(보고에는 cascade로 표기).
 
-외부 store(ClickHouse 행동 로그·S3 객체·Redis 세션)는 RDB 밖이라 이 단일 트랜잭션에 못 넣는다 —
+외부 store(Redis 캐시·큐 · Langfuse 트레이스 SaaS)는 RDB 밖이라 이 단일 트랜잭션에 못 넣는다 —
 삭제를 *조용히 누락하지 않고* `external_erasure_targets`로 *구조화*해
 `ErasureReport.pending_external`에 담는다(GDPR 범위 정직·날조 0·ops 후속 체크리스트). 실제 외부
 삭제 *집행*은 후속.
 
+매니페스트 진실성(SEC-32, 2026-09-07): 이 목록에는 **실재하는 store만** 적는다. 종전 판은 도입된
+적 없는 ClickHouse·S3를 선언하면서(설정 키 0·compose 서비스 0) 정작 학생 유래 데이터가 실제로
+나가는 Langfuse를 빠뜨렸다 — 양방향 오류이고, 없는 곳을 적는 쪽보다 *있는 곳을 빠뜨린* 쪽이
+중대하다(외부 반출 사실 자체가 은폐된다). 선언↔실재 대조는
+`tests/backend/_external_store_evidence.py` 계약이 강제한다(설정 키·compose 서비스를 실제로 조회).
+
 범위 밖(후속): 삭제권 *요청* API 엔드포인트(인증·본인 확인·법정대리인 동의 흐름)·보존 기한 배치
 (`evidence_store.purge_expired`는 retention 전용·여기는 user 단위)·외부 store 삭제 *집행*
-(ClickHouse·S3·Redis 클라이언트 — 현재는 `pending_external` 매니페스트로 명시만).
+(Redis 무효화·Langfuse 삭제 API — 현재는 `pending_external` 매니페스트로 명시만).
 
 완전성 검사의 방향(COLLAB-02, 2026-08): 기존 `tests/backend/privacy/test_erasure.py`는 "계획된
 테이블은 전부 실제 삭제 순서에 등장하는가"(계획→실행)만 단언했다 — 그 역방향("소유 컬럼을 가진
@@ -68,6 +74,11 @@ from whymath_backend.db.models.device import DeviceCredential
 from whymath_backend.db.models.dialogue import Dialogue
 from whymath_backend.db.models.evidence_link import EvidenceLink
 from whymath_backend.db.models.hint_usage import HintUsage
+from whymath_backend.db.models.job_ownership import JobOwnership
+from whymath_backend.db.models.learner_state import LearnerStateRecord
+from whymath_backend.db.models.learning_state_transition import (
+    LearningStateTransition,
+)
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
 from whymath_backend.db.models.parental_consent import ParentalConsent
 from whymath_backend.db.models.refresh_token_session import RefreshTokenSession
@@ -114,18 +125,38 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
     (EvidenceLink, "student_id"),  # 증거 그래프(user CASCADE이나 명시 삭제로 보고 일관)
     (DeviceCredential, "user_id"),
     (RefreshTokenSession, "user_id"),
+    (JobOwnership, "user_id"),  # SEC-27: 비동기 QUALITY 작업 소유권·느슨참조(job_id FK 아님)
     (ParentalConsent, "user_id"),
     (UserTrackHistory, "user_id"),
     (UserPersonaHistory, "user_id"),
     (UserStateSnapshot, "user_id"),
+    # EOS-105: 학습 상태 전이 원장 — 학생의 학습 국면 이력(느슨참조·user_id 실 FK).
+    # 삭제권 대상인 이유: "이 학생이 언제 교정 국면에 있었는가"는 미성년 학습자의 학습
+    # 기록 그 자체이며, 익명 통계가 아니라 user_id로 직접 지목되는 행이다.
+    (LearningStateTransition, "user_id"),
+    # SEC-35: 학습자 현재 상태 1행 — 소유 컬럼이 `user_id`가 아니라 **`learner_id`**다.
+    # 이 별칭이 정확히 이 테이블을 완전성 가드의 사각으로 만들었다(아래 허용목록 주석 참조).
+    # 파기 누락이 아니라 **삭제 불능**이었다: `learner_id`는 `user_profile.user_id`를
+    # `ondelete` 없이(=NO ACTION) 물고 있어, 행이 하나라도 있으면 마지막의
+    # `delete(UserProfile)`이 ForeignKeyViolationError로 터지고 단일 트랜잭션 전체가
+    # 롤백된다 — 진단을 완료한 학생(= 이 행을 가진 학생)은 삭제권 행사가 *항상* 실패했다
+    # (실 PG 실측 2026-09-18 · `tests/backend/privacy/test_erasure_learner_state_integration.py`
+    # 가 그 전제와 수정 후 성립을 양방향으로 동결한다).
+    (LearnerStateRecord, "learner_id"),
 )
 
-# COLLAB-02 방향 역전 — 소유 컬럼(user_id·student_id·target_user_id)을 가졌지만 *정당하게*
-# `_ERASURE_PLAN` 밖에 있어야 하는 테이블의 사유 명시 허용목록. 무사유 예외는 금지(CLAUDE.md).
+# COLLAB-02 방향 역전 — 소유 축을 가졌지만 *정당하게* `_ERASURE_PLAN` 밖에 있어야 하는
+# 테이블의 사유 명시 허용목록. 무사유 예외는 금지(CLAUDE.md).
 # `tests/backend/privacy/test_erasure_plan_completeness.py`가 `Base.metadata.tables` 전수에서
-# 소유 컬럼 보유 테이블을 스윕해 이 두 집합(_ERASURE_PLAN ∪ 아래 허용목록) 밖의 테이블을 red로
+# 소유 테이블을 스윕해 이 두 집합(_ERASURE_PLAN ∪ 아래 허용목록) 밖의 테이블을 red로
 # 잡는다 — 기존 test_erasure.py:94 `test_covers_all_planned_tables`(계획→실행, planned <= order)의
 # *역방향*(실행→계획, 소유 테이블 중 계획 누락 검출)이다.
+#
+# 소유 판정(SEC-35, 2026-09-18): **`user_profile.user_id` FK 보유(컬럼명 무관) ∪ `_ERASURE_PLAN`이
+# 쓰는 컬럼명 보유**의 합집합이다. 종전에는 컬럼명 3종(user_id·student_id·target_user_id) 고정
+# 열거 하나였고, 그래서 `learner_state`(소유 컬럼 `learner_id`)가 스윕에 한 번도 들어오지
+# 않았다 — 가드는 초록인데 테이블은 계획 밖이었다. 판정 로직·남는 사각은 그 테스트 파일의
+# `_owner_tables` 위 주석이 정본이다.
 #
 # 분류 근거: `docs/architecture/collaboration_landing_design.md` §2.2(소유 축 5분류) — 여기 등재된
 # 모든 테이블은 **E형(감사)** 또는 `user_profile`(별도 명시 삭제) 둘 중 하나다. 미래 협업 스키마가
@@ -154,16 +185,18 @@ _ERASURE_PLAN_EXEMPTIONS: dict[str, str] = {
 class ExternalErasureTarget(BaseModel):
     """`erase_user`가 *직접 삭제하지 않는* 외부 store의 사용자 데이터 — 별도 ops 삭제 대상. 불변.
 
-    `erase_user`는 PostgreSQL(`_ERASURE_PLAN`)만 단일 트랜잭션으로 지운다. 외부 store(ClickHouse
-    행동 로그·S3/MinIO 객체·Redis 세션)는 RDB 밖·별도 클라이언트/비동기 인프라라 그 트랜잭션에
+    `erase_user`는 PostgreSQL(`_ERASURE_PLAN`)만 단일 트랜잭션으로 지운다. 외부 store(Redis
+    캐시·큐, Langfuse 트레이스 SaaS)는 RDB 밖·별도 클라이언트/전송 인프라라 그 트랜잭션에
     *포함되지 않는다*. 이 모델은 그 누락을 *조용히 넘기지 않고*(날조 0·GDPR 삭제 범위 정직) ops가
     집행할 체크리스트로 *구조화*한다. `locator`는 *정확한 키 문법을 단정하지 않는다* — 키/프리픽스
-    규약은 인프라 정의라 user_id 연관 대상을 서술만 한다(없는 사실 날조 금지).
+    규약은 인프라 정의라 user_id 연관 대상을 서술만 한다(없는 사실 날조 금지). 나아가 **user 단위
+    특정이 애초에 불가능한 store는 그 사실 자체를 locator에 적는다**(SEC-32) — "지울 수 있다"는
+    인상만 남기고 실제로는 못 지우는 체크리스트가 가장 위험하다.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    store: str = Field(description="외부 store 식별자(clickhouse·s3·redis).")
+    store: str = Field(description="외부 store 식별자(redis·langfuse).")
     data: str = Field(description="그 store가 보유한 사용자 데이터 설명(한국어).")
     locator: str = Field(description="삭제 대상(user_id 연관·키 규약은 인프라 정의·단정 아님).")
     reason: str = Field(description="`erase_user` 단일 TX에 *포함되지 않는* 이유.")
@@ -177,24 +210,46 @@ def external_erasure_targets(user_id: uuid.UUID) -> tuple[ExternalErasureTarget,
     *키 문법을 단정하지 않고* user_id 연관 대상만 서술한다(인프라 키 규약 날조 금지).
     """
     uid = str(user_id)
+    # 여기서 뺀 것 — ClickHouse(행동 로그)·S3/MinIO(객체 저장소)는 **아직 도입되지 않았다**
+    # (설정 키 0·compose 서비스 0·SDK 0 · 2026-09-07 실측). CLAUDE.md 스택 표는 Neo4j·Wolfram
+    # 처럼 *계획된 미도입*을 "미도입" 병기로 남기지만, 그 표는 아키텍처 서술이고 이쪽은 **집행
+    # 체크리스트**다 — 없는 store를 적으면 ops는 지울 수 없는 항목을 받고, 법적 독자는 "학생
+    # 행동 로그가 ClickHouse에 있다"는 거짓 사실을 읽는다. 그래서 목록에서는 빼고 사유만 여기
+    # 남긴다. 도입하는 날 이 주석과 매니페스트·계약 상수를 함께 갱신하라
+    # (`tests/backend/_external_store_evidence.py` KNOWN_UNDEPLOYED_STORES).
     return (
         ExternalErasureTarget(
-            store="clickhouse",
-            data="학습 행동 로그(이벤트 스트림·분석)",
-            locator=f"student_id_hash(user_id={uid}) 연관 이벤트 행 — 해시 매핑은 적재 규약 따름",
-            reason="별도 분석 store·비동기 배치 삭제(RDB 트랜잭션 밖) — 단일 TX 불포함.",
-        ),
-        ExternalErasureTarget(
-            store="s3",
-            data="업로드 이미지·렌더 객체(손글씨 풀이·시각화)",
-            locator=f"user_id={uid} 연관 업로드/렌더 객체(프리픽스 규약은 인프라 정의)",
-            reason="객체 저장소(S3/MinIO)는 RDB 밖·SDK 삭제 — 단일 TX 불포함.",
-        ),
-        ExternalErasureTarget(
             store="redis",
-            data="세션·핫 캐시(작업메모리·레이트리밋)",
-            locator=f"user_id={uid} 연관 세션·캐시 키(TTL 만료가 기본·즉시 무효화는 별도)",
-            reason="캐시는 RDB 밖·별도 클라이언트 무효화 — 단일 TX 불포함.",
+            data=(
+                "LLM 응답 캐시(학생 프롬프트로 생성된 응답 본문)·QUALITY 비동기 큐 payload"
+                "(prompt·system 원문). 레이트리밋·디바이스 캐시는 배포 기본값에서 비활성"
+                "(coach_rate_limit_backend=memory·device_store_mode=none)이라 제외."
+            ),
+            locator=(
+                f"user_id={uid}의 요청에서 파생되나 *user_id로 조회할 키가 없다* — 캐시 키는 "
+                "(프롬프트·시스템·티어) 해시이고(l3/router.cache_key_for) 큐 payload에도 user "
+                "축이 없다(l3/pipeline._build_async_payload). 선택 삭제 불가·TTL 만료가 실질 경로."
+            ),
+            reason="캐시·브로커는 RDB 밖·별도 클라이언트 무효화 — 단일 TX 불포함.",
+        ),
+        ExternalErasureTarget(
+            store="langfuse",
+            data=(
+                "L3 라우팅 결정 트레이스(`l3_routing` 이벤트) — 티어·모델·토큰·비용·지연·결정 "
+                "사유 등 *결정 메타데이터*. 프롬프트·응답 *본문*은 보내지 않는다"
+                "(l3/router.langfuse_fields 필드 표가 전송 범위의 정본)."
+            ),
+            locator=(
+                f"user_id={uid}의 학습 요청에서 생성되나 학생 연결 축은 `student_id_hash` 하나뿐"
+                "이고 그마저 *이미 해시된 값*이라 원시 user_id로 조회되지 않는다. 더구나 현행 "
+                "서빙 경로는 그 필드를 채우지 않아(전달 호출부 0건·2026-09-07 실측) 지금 적재된 "
+                "트레이스는 user 단위 특정 자체가 성립하지 않는다 — 삭제 요청은 기간·프로젝트 "
+                "단위로만 가능하다."
+            ),
+            reason=(
+                "외부 SaaS로 전송되는 별도 저장소(기본 호스트 cloud.langfuse.com·`langfuse_host`"
+                "로 자체 호스팅 가능) — 삭제는 Langfuse API/보존 정책으로 별도 집행."
+            ),
         ),
     )
 
@@ -219,7 +274,7 @@ class ErasureReport(BaseModel):
     pending_external: tuple[ExternalErasureTarget, ...] = Field(
         default=(),
         description=(
-            "이 트랜잭션이 *삭제하지 않은* 외부 store 대상(ClickHouse·S3·Redis). RDB 밖이라 "
+            "이 트랜잭션이 *삭제하지 않은* 외부 store 대상(Redis·Langfuse). RDB 밖이라 "
             "단일 TX에 못 넣어 *별도 ops 삭제*가 필요하다 — 누락을 조용히 넘기지 않고(날조 0·GDPR "
             "범위 정직) 후속 집행 체크리스트로 남긴다. 정보 누출 방지로 응답엔 미노출(ops만)."
         ),

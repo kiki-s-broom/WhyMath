@@ -166,9 +166,29 @@ class TestMigrationFileChain:
                 downs.add(down.group(1))
         heads = revisions - downs
         assert len(heads) == 1, f"단일 head여야 한다 — 실제 heads: {sorted(heads)}"
-        # EOS-71 problem 격리 좌석이 현 head(EOS-57 attempt_event.skill_ids 위에 선형 적재).
-        # 두 리비전은 건드리는 테이블이 겹치지 않아(attempt_event ↔ problem) 순서 의존이 0이다.
-        assert heads == {"e7c3b9a15f24"}
+        # SEC-33 ⑥이 problem_attempt.ingested_at에 server_default를 부여 — MISC-20 2건
+        # (d2f4a68b91e7·e3b5c79d02f8) 위로 재부모화해 선형 적재(병렬 착지로 head가 갈라져
+        # 재부모화·마이그레이션 docstring 참조). 건드리는 객체가 겹치지 않아 순서 의존 0.
+        # 이 상수는 `db/schema_version.py::KNOWN_REVISIONS`의 마지막 항과 **함께** 움직인다 —
+        # 마이그레이션을 더하면 두 곳을 같이 갱신해야 한다(둘 다 head를 고정한다).
+        # SEC-29가 f2662166a661(SEC-27) 위에 4c6dfb1527a9(privacy_audit.resource_type/
+        # resource_id/action)를 얹어 head를 이동.
+        # SEC-31이 4c6dfb1527a9 위에 3f5c83f51246(학생 답안/풀이 3테이블 봉투 암호화)를 얹어
+        # head를 다시 이동.
+        # EOS-49가 3f5c83f51246 위에 67cf48ad3bce(concept_version 테이블 + PUBLISHED
+        # 불변성 트리거)를 얹어 head를 다시 이동.
+        # EOS-103이 67cf48ad3bce 위에 a7d41c9e0b52(learner_state 테이블 — 학습자 현재 상태
+        # 1행 + 진단 완료 시 자동 생성 계보)를 얹어 head를 이동.
+        # EOS-105가 그 위에 5a7c31d9e0b4(learning_state_transition 원장 + 상태·트리거 enum
+        # 2종)를 얹어 head를 다시 이동. 두 PR이 같은 부모 위에서 병행 개발돼 head가 둘이 될
+        # 뻔했고, 병합 시 EOS-105의 down_revision을 재지정해 직렬로 되돌렸다.
+        # EOS-108이 그 위에 c1f5a8b2d740(concept/skill_mastery_history.attempt_id 멱등 키 +
+        # 부분 유니크 인덱스 2종)을 얹어 head를 다시 이동.
+        # EOS-112가 그 위에 d2a9e4b71c35(generation_log.served_model·retries 관측 좌석)를
+        # 얹어 head를 다시 이동. 이 리터럴은 head를 고정하는 **세 번째** 좌석이다
+        # (schema_version.KNOWN_REVISIONS·probe_prod_schema_revision.sql이 나머지 둘) —
+        # 손으로 유지하는 사본이 셋이라 마이그레이션마다 전부 갱신해야 한다(= MISC-31).
+        assert heads == {"d2a9e4b71c35"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

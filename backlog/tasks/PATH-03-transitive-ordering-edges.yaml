@@ -20,10 +20,11 @@ acceptance:
   - "④ 변별력: A→X→B fixture에서 순서가 실제로 역전되는지 확인한다(before: ordering_edge_count=0·tiebreak_only·B 먼저 / after: count=1·topological·A 먼저). 순서가 뒤집히지 않는 fixture만으로 검증하면 위장이다"
   - "⑤ 날조 방지·계약 회귀: 전이 엣지에 합성 edge_strength(곱·최소·평균)를 부여하지 않음을 테스트로 동결한다. has_cycle·is_cycle_residual 계약 회귀 0(bounded 도달은 참 ancestor의 부분집합이고 ancestor는 DAG 위에서 비순환). bounded reachability가 전이적이지 않다는 한계를 docstring에 명시한다"
   - "⑥ 범위 밖 명시: max_depth 기본값 변경(페이퍼 P1)·전역 학습 경로(§5 유보)·Assessment.recommended_path 소생(페이퍼 P3)·prerequisites/coaching 엔드포인트 정렬 변경은 이 태스크에 포함하지 않는다"
+  - "[고립 참조 2026-09-07 stray-code 8회차] **재구현 금지** — origin/claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17 · 커밋 7fb49e4d)에 이 태스크의 done 구현이 보존: src/backend/whymath_backend/l2/learning_path.py fetch_ordering_subgraph(bounded 재귀 CTE·MAX_PREREQUISITE_DEPTH 재사용)·derive_ordering_edges(순수)·build_learning_path 배선 교체·합성 강도 0 (136줄) + tests/backend/l2/test_learning_path.py(107줄·필터·dedup·집합 밖 배제·정렬 재현) + tests/backend/l2/test_learning_path_ordering_subgraph_integration.py(149줄·acceptance ① 'A→X→B(X 비-막힌)' fixture 실PG). main 실측: learning_path.py:307 '(예: A→X→B…) 후속 범위.' 그대로·두 함수 grep 0. PB-13 ②가 이 3파일을 '소관 분리'로 명시 제외했으나 소관을 받은 태스크가 없었다(curriculum_module_gap_review_r2.md:361은 관측만). 파일 단위 이식(브랜치 286커밋 낡음·통째 머지 금지)·main 현행 learning_path 구조 위 재적용. 이 태스크는 HARN-11 필터('이미 완료(미머지): trjg5x')로 next에서 가려지므로 착수는 명시 start. 회수 완료 전 trjg5x 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l2/learning_path.py
   - "tests/backend/l2/**"
 session: null
-notes: "docs/architecture/learning_path_module_gap_review.md §3 D3. learning_path.py:258이 스스로 '후속 범위'라 적어두고 백로그에 등재된 적 없는 항목이며, 실측상 위상정렬 무력화의 지배적 원인이다(1홉 96건 → 5홉 249건). depends는 측정 선행(PATH-01)과 런타임 계측기 확보(PATH-02)를 위한 것. 저장소 전수에서 '후속 범위' 표기는 이 1건뿐이라 docstring TODO 일제 점검 태스크는 만들지 않는다(패턴이 아니라 단발).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/learning_path_module_gap_review.md §3 D3. learning_path.py:258이 스스로 '후속 범위'라 적어두고 백로그에 등재된 적 없는 항목이며, 실측상 위상정렬 무력화의 지배적 원인이다(1홉 96건 → 5홉 249건). depends는 측정 선행(PATH-01)과 런타임 계측기 확보(PATH-02)를 위한 것. 저장소 전수에서 '후속 범위' 표기는 이 1건뿐이라 docstring TODO 일제 점검 태스크는 만들지 않는다(패턴이 아니라 단발).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) trjg5x 커버리지 정독: 이 태스크의 acceptance ②와 함수명까지 동일한 구현이 trjg5x에 done(7fb49e4d)으로 보존돼 있는데 본문이 회수 원천을 지목하지 않아 재구현 전제 — 게다가 HARN-11 미머지 done 필터가 이 태스크를 next에서 가린다(MEMORY 2026-09-06 부수 실측). 7회차(PR #1020) 무접촉"
+updated: 2026-09-07

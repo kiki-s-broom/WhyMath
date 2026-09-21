@@ -1,0 +1,60 @@
+# PR 자동 재동기화 (HARN-85) — GitHub merge queue의 대체 경로
+#
+# 왜 merge queue가 아니었나: 큐는 **조직(Organization) 소유 저장소 전용**인데, 이 워크플로를
+# 만들 당시 저장소는 개인 계정 소유라 룰셋에 `Require merge queue` 항목 자체가 없었다
+# (2026-09-07 실측). 근거·실패 경위 = .github/branch-protection-setup.md.
+#
+# [전제 변경 2026-09-10 실측] 저장소가 조직으로 이관돼(repo id 동일 · owner.type=Organization)
+# 그 제약이 사라졌고, 실제로 merge queue가 켜져 있다 — `PUT /pulls/{n}/merge`가
+# `Changes must be made through the merge queue` 룰 위반으로 405를 낸다. 즉 위 문단은
+# **이 워크플로가 만들어진 이유의 기록**이지 현재 상태의 서술이 아니다. 큐 도입 후 이 워크플로를
+# 안전망으로 남길지 제거할지의 재판정은 HARN-56-merge-queue-adoption의 몫이며, 이 주석은
+# 사실만 병기한다(정책 판단을 여기서 하지 않는다).
+#
+# 무엇을 하는가: auto-merge가 켜져 있고 base보다 뒤처진(BEHIND) PR만 update-branch로
+# 최신화한다. `Require branches to be up to date`는 **유지**한다 — 보호를 낮추는 것이
+# 아니라 그 충족을 사람 대신 기계가 하게 만드는 것이다.
+#
+# 한계(큐가 아님): 직렬화하지 않는다 · 충돌(409)은 사람 몫 · auto-merge를 켜지 않은 PR은
+# 건드리지 않는다(리뷰 중인 diff를 임의로 전진시키지 않기 위함).
+name: pr-auto-resync
+
+on:
+  # 15분 주기. GitHub 예약은 지연될 수 있으므로 정확한 주기를 전제하지 않는다 —
+  # 늦게 돌아도 다음 주기가 같은 일을 한다(멱등).
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1이면 update-branch를 호출하지 않고 후보만 출력"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-auto-resync
+  cancel-in-progress: false
+
+jobs:
+  resync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 토큰 종류를 스크립트에 **명시적으로** 넘긴다. GITHUB_TOKEN이 만든 push는 workflow를
+      # 재발화시키지 않으므로(GitHub 문서화 제약), 그 토큰으로 update-branch를 하면 새 head에
+      # required check가 하나도 보고되지 않아 strict 하에서 PR이 영구히 막힌다 —
+      # behind보다 나쁜 상태다(사람이 Update branch를 눌러 푸는 탈출구마저 사라진다).
+      # 그래서 폴백으로 조용히 진행하지 않고 스크립트가 fail-closed로 멈춘다(Codex P1).
+      - name: 재동기화 실행
+        env:
+          GH_TOKEN: ${{ secrets.PR_AUTO_RESYNC_TOKEN || github.token }}
+          RESYNC_TOKEN_KIND: ${{ secrets.PR_AUTO_RESYNC_TOKEN != '' && 'pat' || 'github_token' }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run || '0' }}
+        run: bash .github/scripts/pr_auto_resync.sh

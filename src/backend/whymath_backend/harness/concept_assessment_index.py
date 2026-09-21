@@ -70,6 +70,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# EOS-89: 이 모듈은 **INFRA 측정 CLI**(엔트리포인트)라 합성 루트를 직접 소비한다 — Core에서
+# 걷어낸 pull 지점과 구분되는 자리다(계획서 100 §3.8 · 경계 문서 §9.2 "엔트리포인트 소비").
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.harness.corpus_reverify import _reverify_one
 from whymath_backend.l3.render.adapter import RenderContext
 from whymath_backend.l3.render.dsl import ConceptAssessment, ConceptDSL, from_concept_content
@@ -80,6 +86,10 @@ from whymath_backend.l4.content_supply import SupplyTally
 # 검수 판정의 단일 권위(CONT-01) — `l6/_shared.is_review_cleared`가 같은 함수를 쓴다.
 # 문자열 "approved"를 이 파일에 다시 적지 않기 위한 import다(기준 이원화 금지).
 from whymath_backend.schema.enums import is_review_status_cleared
+from whymath_backend.schema.verification_capabilities import (
+    AssessmentAnswerVerifier,
+    ExpressionSeal,
+)
 
 _EXIT_OK = 0
 _EXIT_GATE_FAIL = 1
@@ -464,7 +474,11 @@ def _dsl_or_none(concept: ConceptRow) -> ConceptDSL | None:
 
 
 def render_rates(
-    concepts: list[ConceptRow], entries: list[IndexEntry]
+    concepts: list[ConceptRow],
+    entries: list[IndexEntry],
+    *,
+    seal: ExpressionSeal | None = None,
+    assessment_verifier: AssessmentAnswerVerifier | None = None,
 ) -> tuple[dict[str, SupplyTally], dict[str, SupplyTally], int]:
     """어댑터별 렌더 성공률을 **주입 전 / 주입 후** 두 번 측정 → (before, after, dsl_invalid).
 
@@ -472,7 +486,18 @@ def render_rates(
     생겨 "generate로 집계되나 학생은 못 본" 이중 회계 왜곡이 관측 가능해진다(전략별 분해 포함).
     성공 판정은 `can_render`만이 아니라 **렌더 후 검증 통과**(`RenderedUnit.ok`)다 — 렌더가 되고도
     미검증이면 학생에게 나가지 않으므로 성공이 아니다.
+
+    EOS-89: 어댑터는 이제 과목 능력 2종을 생성 시 주입받는다. 이 모듈은 **INFRA 측정 CLI**
+    (프로세스가 여기서 시작한다 = 합성 루트를 소비해도 되는 자리)이므로 주입이 없으면 합성
+    루트에서 기본 구현을 받아 온다. Core(`l3.render.*`·`l4.content_supply`)에는 그 폴백이
+    없다 — 있으면 §3.8이 없애려던 pull 지점이 그대로 남는다.
     """
+    inspector = seal if seal is not None else default_expression_seal()
+    checker = (
+        assessment_verifier
+        if assessment_verifier is not None
+        else default_assessment_answer_verifier()
+    )
     by_code = {entry.concept_code: entry for entry in entries}
     strategies = sorted(registered_strategies(), key=lambda s: s.value)
     before: dict[str, SupplyTally] = {s.value: SupplyTally() for s in strategies}
@@ -492,7 +517,7 @@ def render_rates(
             else base
         )
         for strategy in strategies:
-            adapter = get_adapter(strategy)
+            adapter = get_adapter(strategy, seal=inspector, assessment_verifier=checker)
             for tally, dsl in ((before[strategy.value], base), (after[strategy.value], injected)):
                 if not adapter.can_render(dsl):
                     tally.record(

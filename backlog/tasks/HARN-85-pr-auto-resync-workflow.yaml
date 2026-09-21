@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-85-pr-auto-resync-workflow
+title: "머지 경합 해소 — 자동 재동기화 워크플로우 (merge queue 대체·개인 계정 소유라 큐 미제공)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 워크플로우 배선 — 예약(schedule) + workflow_dispatch로 열린 PR을 조회해 mergeable_state=behind 이면서 auto-merge가 켜진 것만 PUT /repos/{owner}/{repo}/pulls/{n}/update-branch 로 최신화한다. strict(up-to-date 강제)는 유지 — 보호를 낮추지 않고 충족을 자동화한다"
+  - "② 토큰 제약 실측 — GITHUB_TOKEN이 만든 push는 workflow를 재발화시키지 않는다는 것이 GitHub의 알려진 제약이다. 이 제약이 이 저장소에서 실제로 성립하는지 실측하고(update-branch 후 PR의 check run이 새로 생기는지), 성립하면 PAT/앱 토큰 시크릿을 게이트로 올린다. 추론으로 단정하지 않는다 — 부재를 미제공으로 읽어 실패한 것이 이 태스크의 발생 경위다"
+  - "③ 실패 경로 설계 — update-branch가 409(충돌)·403(권한)·422로 실패할 때 무엇이 남는가. 조용히 넘기지 말고 실패 PR 번호와 HTTP 응답 본문을 잡 로그에 남긴다(CLAUDE.md '측정·수집 도구를 성공 경로만 보고 설계 금지'). 충돌은 자동 해소 대상이 아니므로 건너뛰되 그 사실이 보여야 한다"
+  - "④ 변별력 실측 — 도입 전후를 같은 지표로 비교한다. 전: PR #935 재동기화 4회 · PR #952가 CI green 3회 확보하고도 behind로 3라운드. 후: 테스트 PR 1건에 auto-merge를 켜고 대기 중 main에 다른 PR을 의도적으로 착지시킨 뒤, 수동 개입 없이 재동기화가 일어나 최종 머지되는지 확인. 이 주입 없이는 '경합이 없었을 뿐'과 '경합에 강해졌음'을 구분할 수 없다"
+  - "⑤ 정본 문서 갱신 — .github/branch-protection-setup.md에 (a) merge queue가 이 저장소에서 미제공인 사실과 그 조건(조직 소유 전용)을 못 박아 다음 세션의 재제안을 막고 (b) 자동 재동기화의 동작·한계(직렬화하지 않음·충돌은 사람 몫)를 적는다"
+artifacts:
+  - "PR #1040 (머지 34001b42) — 워크플로 .github/workflows/pr-auto-resync.yml + 스크립트 .github/scripts/pr_auto_resync.sh + 계약 테스트 tests/infra/test_pr_auto_resync.py 23건. 뮤테이션 16종 전건 RED. Codex P1(쓰기 자격 fail-closed)·P2 2건 수용·resolve. acceptance ①③⑤ 완료, ②④는 잔여 — 게이트 G-pr-auto-resync-token(PAT 발급) 착지 후에만 측정 가능하므로 HARN-87로 분리 승계"
+paths:
+  - ".github/workflows/**"
+  - "tests/infra/**"
+  - ".github/branch-protection-setup.md"
+session: null
+notes: "발생 경위(2026-09-07): 게이트 G-merge-queue-or-strict-relax를 'merge queue 도입'으로 판정하고 집행 PR(#1040)까지 냈으나, Kiki가 룰셋 편집 화면에서 'Require merge queue'를 찾지 못해 전제가 무너졌다. 실측 결과 doldori7/WhyMath는 owner.type=User(개인 계정·공개)이고 merge queue는 조직 소유 저장소 전용이다. 세션 결함: 라이브 룰셋에서 merge_queue 규칙 부재를 확인하고 그것을 '미설정'으로 읽었다 — '미제공' 가능성을 배제하지 않았다(부재 판정 절차의 역방향 오류). Kiki 재판정 = D) 자동 재동기화. HARN-56(merge queue 도입)은 타 세션 claim 상태이며 그 전제도 같은 이유로 무효다 — 이 태스크가 대체하되 HARN-56 자체는 소유 세션이 처분한다(무접촉)."
+updated: 2026-09-08

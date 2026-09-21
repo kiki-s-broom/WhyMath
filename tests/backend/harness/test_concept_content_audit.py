@@ -132,7 +132,7 @@ def test_multiple_defects_on_one_concept_count_once_in_rate() -> None:
 # ── explanation 크롤링 잔류(QUAL-06) ─────────────────────────────
 #
 # content.json의 explanation 47건에 NCIC 크롤링 쓰레기(개정 연도·페이지/절 표기)가 박혀 있던
-# 사고의 회귀 방어다 — 사이드카 license_notice가 "성취기준 본문 미수록"을 선언하는 한 이 표기는
+# 사고의 회귀 방어다 — 사이드카 선언과 무관하게(2026-09-06 선언 정정 이후에도) 이 표기는
 # 정상 등장 경로가 없다. red(파손 샘플 탐지)와 green(실 코퍼스 잔류 0)을 함께 동결한다.
 
 

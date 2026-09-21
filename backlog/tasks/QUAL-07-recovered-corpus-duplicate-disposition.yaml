@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,10 +16,14 @@ acceptance:
   - "② 쌍별 개별 판정 — QUAL-02(2026-08-11)가 9쌍을 쌍별 판정해 9레코드를 은퇴시킨 선례를 따른다. 일괄 삭제 금지: 몫미분은 고교·대학 양쪽 교육과정에 실재하므로 '같은 문항이 두 학교급에 있는 것'이 항상 결함은 아니다. 각 쌍마다 ⑴양쪽 성취기준 코드가 실제로 다른가 ⑵난이도·문맥이 학교급에 맞게 분화돼야 하는가 ⑶한쪽 은퇴가 그 코퍼스의 성취기준 커버를 깨뜨리는가를 판정하고 근거를 문서에 남긴다"
   - "③ 생성기 축 판정(재발 방지) — 71쌍은 두 결정론 생성기가 같은 파라미터 공간을 공유해 생긴 것으로 보인다. 문항 은퇴만 하면 생성기를 다시 돌릴 때 재발한다. highschool_quotient_rule_skeleton_generator와 calculus_chain_quotient_rule_skeleton_generator의 공간 겹침을 실측하고, 필요하면 생성기 수정까지 범위에 넣는다(수정 시 코퍼스 재생성 동반)"
   - "④ 집행 지점(정본화와 별항) — 처분 후 test_problem_duplication_audit의 동결값 71을 실측 신값으로 갱신하고 그 테스트가 CI에서 실제로 도는지 확인한다. 데모 풀 동시노출 0 단언과 '두 코퍼스 한정' 단언은 유지한다 — 그 두 축이 깨지면 시급도가 올라간다는 신호다"
-artifacts: []
+artifacts:
+  - "PR #1151 (https://github.com/kiki-s-broom/WhyMath/pull/1151) · CI run 34707224116 success"
+  - "생성기 2종 공간 서로소 분리(고교 |계수|<=3 / 대학 _quotient_band_admits >=4) + 두 코퍼스 재생성 · 은퇴 0건 · docs/data/problem_duplicate_disposition_2026-09.md(쌍별 판정·4안 비교·71쌍 대응표) · tests/backend/l3/equivalent/test_quotient_rule_space_disjointness.py 신설"
+  - "실측: 발문 중복 71->0 · 조건식 중복 138->0 · 문항수 200/400 불변 · 성취기준 커버 3종 전부 불변 · 대학 연쇄 200건 불변"
+  - "검증: 독립 뮤테이션 5종 전건 RED(과잉수정 대조군·코퍼스 재생성 누락 포함) · 전체 백엔드 12430 passed · corpus-authoring 509 passed · tests/infra 1324 passed · ruff/black/mypy --strict/lint-imports exit 0 · CI 잡 단위 확인(backend Pytest 스텝·corpus-authoring 스텝·QA 파이프라인 게이트 실제 실행)"
 paths:
   - "data/corpus/problem_bank_highschool_quotient_rule_v0/**"
   - "data/corpus/problem_bank_university_calc1_chain_quotient_v0/**"
 session: null
 notes: "출처: PB-13 회수 검증(2026-09-01). 회수 자체는 유효 — 기존 콘텐츠 오염 0·학생 노출 0이라 긴급도는 낮으나, 0쌍 계약이 71쌍으로 바뀐 사실을 숨기지 않고 계약으로 동결해 뒀다(test_problem_duplication_audit T2). QUAL-01→QUAL-02 처분 선례: docs/data/problem_duplicate_disposition_2026-08.md\n\n[정정 2026-09-02] eos_priority null → P2: P2(판정 이후) 배정 — PB-13 회수가 만든 실중복 71쌍 처분. 12월 검증(G0~G5) 성립에 필수가 아닌 근거: ⑴71쌍 전부 신규↔신규로 기존 main 코퍼스 교차 중복 0(검증 대상 기존 자산 무오염) ⑵데모 풀 동시노출 0/71 — 두 코퍼스 모두 데모 풀 밖이라 학생 노출 경로에 닿지 않는다 ⑶중복은 커버리지 산정(78→130)에 영향을 주지 않는다. 실측 수치는 test_problem_duplication_audit T2가 계약으로 동결해 뒀으므로 방치돼도 조용히 묻히지 않는다."
-updated: 2026-09-02
+updated: 2026-09-12

@@ -11,8 +11,17 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from whymath_backend.l3 import pipeline
+from whymath_backend.l3.data_export_policy import EXPORT_ALLOWED, EXPORT_PROHIBITED
 from whymath_backend.l3.interfaces import InMemoryCache
-from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.models import (
+    CostTier,
+    GenerationResult,
+    LocalModelTier,
+    ModelFamily,
+    RoutingDecision,
+    RoutingRequest,
+    Usage,
+)
 from whymath_backend.l3.providers.anthropic import AnthropicStatus
 from whymath_backend.l3.providers.ollama import ModelAvailability, OllamaStatus
 from whymath_backend.l3.router import actual_cost_krw
@@ -138,6 +147,73 @@ async def test_smoke_computes_actual_cost_krw() -> None:
     assert smoke.latency_ms == 1234.5
     assert smoke.text_chars == 1
     assert report.exit_code == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-77: 스모크 결정은 라우터가 낸다 — 손 조립 클라우드 결정(법적 게이트 우회) 금지
+# ──────────────────────────────────────────────────────────────────────────
+def test_cloud_mid_decision_is_routed_and_carries_export_judgment() -> None:
+    """현행 라우터 규칙에서 스모크 요청은 CLOUD_MID·sync로 라우팅되고 등급 판정이 실린다.
+
+    2026-09-05 이전의 손 조립 결정은 `data_export_reason=None`(판정 안 함)이었다. 이 테스트가
+    실패하면 ①비즈니스 규칙(구독·예산 임계)이 바뀌어 스모크가 클라우드에 못 가거나 ②등급
+    게이트가 SYNTHETIC_PROBE를 막게 됐다는 뜻이다 — 프리플라이트가 재려던 것을 못 재는 상태를
+    Kiki 실행 시점이 아니라 PR 시점에 드러낸다.
+    """
+    decision = lp._cloud_mid_decision()
+    assert decision.cost_tier == CostTier.CLOUD_MID.value
+    assert decision.mode == "sync"
+    assert decision.data_export_reason == EXPORT_ALLOWED
+    assert decision.data_export_blocked is False
+    # CLOUD_* 불변식(03a §G) — 축3·축2 없음.
+    assert decision.local_family is None and decision.local_model is None
+
+
+class _LocalOnlyRouter:
+    """라우터 스텁 — 비즈니스 규칙이 바뀌어(또는 등급 게이트가 막아) LOCAL을 내는 상황."""
+
+    def route(self, req: RoutingRequest) -> RoutingDecision:
+        return RoutingDecision(
+            cost_tier=CostTier.LOCAL,
+            local_family=ModelFamily.MATH,
+            local_model=LocalModelTier.FAST,
+            mode="sync",
+            reason="local/math/fast (data-export gate: EXPORT_PROHIBITED)",
+            est_latency_ms=1010,
+            est_cost_krw=0.0,
+            data_export_blocked=True,
+            data_export_reason=EXPORT_PROHIBITED,
+        )
+
+
+async def test_smoke_refuses_to_run_when_router_does_not_yield_cloud_mid(
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    """라우터가 CLOUD_MID를 주지 않으면 스모크를 *실행하지 않고* exit 2 — 로컬 1콜로 조용히
+    대체하지 않는다(재려던 것을 못 잰 사실을 크게 알린다). 사유에 라우터 판정을 싣는다."""
+    monkeypatch.setattr(lp, "Router", _LocalOnlyRouter)
+    usage = Usage(input_tokens=100, output_tokens=50, latency_ms=10.0)
+    cloud = _FakeCloud(
+        configured=True, reachable=True, result=GenerationResult(text="2", usage=usage)
+    )
+    report = await lp.run_preflight(
+        _settings(anthropic=True, langfuse=True),
+        smoke=True,
+        cloud_provider_factory=_cloud_factory(cloud),
+        local_provider_factory=_local_factory(_FakeOllama(reachable=True)),
+    )
+    assert cloud.generate_calls == [], "라우터가 LOCAL을 냈는데 클라우드 1콜이 나갔다"
+    smoke = report.smoke
+    assert smoke.ran is False
+    assert smoke.error is not None
+    assert "CLOUD_MID" in smoke.error
+    assert "cost_tier=local" in smoke.error
+    assert EXPORT_PROHIBITED in smoke.error  # 게이트가 막은 사유가 그대로 보인다
+    assert report.exit_code == 2
+    # 렌더: skip이 아니라 실패로 보인다(측정 실패의 위장 방지).
+    text = lp._render_stdout(report)
+    assert "실패:" in text and "라우터가 CLOUD_MID" in text
+    assert "skip:" not in text
 
 
 # ──────────────────────────────────────────────────────────────────────────

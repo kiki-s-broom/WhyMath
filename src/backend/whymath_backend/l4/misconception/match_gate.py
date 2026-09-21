@@ -12,6 +12,11 @@
      *재확인 질문*을 유도해 오염된 매칭으로 단정하지 않게 한다. `ocr_confidence`가 None이면(OCR
      입력이 아님) 플래그하지 않는다 — 본 슬라이스에서 요청에 OCR confidence 필드가 없으면 이 분기는
      *dormant*(인터페이스만 마련·실제 미적용)다.
+  ③ **top-1의 정정 귀속이 불명하면 `attribution_unclear` 플래그** (MISC-28) — ②와 *같은 좌석*
+     이다: 매칭은 유지하되 확신 진단을 보류하고 하류가 재확인을 유도하게 한다. 차이는 신호의
+     출처뿐이다(② = 입력 OCR 품질 · ③ = L4 매처의 귀속 판정). 판정 기준을 **top-1**로 두는 것은
+     게이트 ①과 같은 근거다 — 학생에게 실제로 발화되는 것이 top-1이므로, 그것이 깨끗하면
+     확신은 깨끗하다.
 
 **신뢰도 축 = `confidence`(진단 신뢰)**: 게이트 ①은 `MisconceptionMatch.confidence`(substring 신호
 비율 1.0/0.5·정규식 가산)를 기준으로 판단한다. `semantic_similarity`(표면 코사인 근접도)는 *다른
@@ -72,6 +77,15 @@ class MatchGateResult(BaseModel):
             "`ocr_confidence`가 None(OCR 입력 아님)이면 항상 False."
         ),
     )
+    attribution_unclear: bool = Field(
+        default=False,
+        description=(
+            "MISC-28 게이트 ③ — 게이트 ①을 통과한 **top-1**이 `attribution_unclear`면 True. "
+            "학생 풀이에 정정 어구가 있으나 그것이 그 오개념을 가리키는지 판정할 수 없다는 뜻이며, "
+            "매칭은 *유지*하되 확신 진단을 보류한다(`low_quality`와 같은 좌석·다른 출처). 게이트 "
+            "①이 후보를 비웠으면(top-1 없음) 항상 False — 보류할 판정 자체가 없다."
+        ),
+    )
 
 
 def apply_match_quality_gate(
@@ -102,6 +116,11 @@ def apply_match_quality_gate(
     게이트 ② (OCR low_quality): `ocr_confidence is not None and ocr_confidence < ocr_threshold`면
     → `low_quality=True`. 매칭은 *유지*(게이트 ①의 결과를 그대로)하되 플래그만 세운다 — 하류가
     재확인을 유도하게 한다. `ocr_confidence`가 None이면 `low_quality=False`(OCR 입력 아님).
+
+    게이트 ③ (MISC-28 정정 귀속): 게이트 ①을 통과한 top-1이 `attribution_unclear`면
+    → `attribution_unclear=True`. ②와 같은 처분(매칭 유지 + 보류 플래그)이며, 게이트 ①이 후보를
+    비웠으면 항상 False다. 이 게이트는 인자를 받지 않는다 — 판정은 L4 매처(`diagnose`)가 이미
+    내렸고 여기서는 top-1 축으로 *승격*만 한다.
     """
     # 게이트 ① — top-1 신뢰도 floor. 비었거나 top-1<floor면 후보 전체를 비운다(억지 매칭 금지).
     if not matches or matches[0].confidence < confidence_floor:
@@ -114,10 +133,15 @@ def apply_match_quality_gate(
     # 게이트 ② — OCR 산출물이고 인식 신뢰도가 임계 미만이면 low_quality 플래그(매칭은 유지).
     low_quality = ocr_confidence is not None and ocr_confidence < ocr_threshold
 
+    # 게이트 ③(MISC-28) — top-1의 정정 귀속이 불명이면 플래그(매칭은 유지). 게이트 ①이 후보를
+    # 비운 경우 `gated`가 비어 있으므로 자연히 False다(보류할 판정 자체가 없음).
+    attribution_unclear = bool(gated) and gated[0].attribution_unclear
+
     return MatchGateResult(
         matches=gated,
         no_confident_match=no_confident_match,
         low_quality=low_quality,
+        attribution_unclear=attribution_unclear,
     )
 
 

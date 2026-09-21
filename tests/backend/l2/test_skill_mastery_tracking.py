@@ -12,17 +12,42 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.assessment import SkillMasteryHistory
 from whymath_backend.l2 import BktModel
 from whymath_backend.l2.skill_mastery_tracking import (
+    _latest_skill_mastery,
+    get_all_current_skill_mastery,
     get_current_skill_mastery,
     record_problem_attempt_skill_mastery,
+)
+from whymath_backend.schema.assessment_evidence import (
+    AssessmentEvidence,
+    build_assessment_evidence,
 )
 
 _M = BktModel()
 _UID = uuid.uuid4()
+_PID = uuid.uuid4()
+_T = datetime(2026, 1, 8, tzinfo=UTC)
+
+
+def _evidence(correct: bool, observed_at: datetime = _T) -> AssessmentEvidence:
+    """실 `AssessmentEvidence` — EOS-18 이후 스킬 적재 경로가 받는 타입(어댑터 폐기)."""
+    return build_assessment_evidence(
+        learner_id=_UID,
+        problem_id=_PID,
+        correct=correct,
+        observed_at=observed_at,
+        concept_evidence=(),
+        skill_evidence=(),
+        concept_mapping_present=False,
+        skill_bridge_present=False,
+    )
+
+
 _SID = "skill.compute-fraction"
 
 
@@ -128,7 +153,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[c1,c2] → #2 스킬[s1,s2] → #3 s1 prior[] → #4 s2 prior[]
         fake = _QueueSession([_QResult([c1, c2]), _QResult([s1, s2]), _QResult([]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M, measured_at=ts
+            cast(AsyncSession, fake), evidence=_evidence(True, ts), model=_M
         )
         assert [r.skill_id for r in records] == [s1, s2]
         assert all(float(r.mastery) == 0.69 for r in records)  # 정답·첫 관측
@@ -143,7 +168,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 PRIMARY[c_p] → #2 스킬[s1] → #3 s1 prior[]
         fake = _QueueSession([_QResult([c_p]), _QResult([s1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.skill_id for r in records] == [s1]
         assert records[0].mastery == 0.15  # 오답·첫 관측
@@ -156,7 +181,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 PRIMARY[] → #2 TESTED[c_t] → #3 스킬[s1] → #4 s1 prior[]
         fake = _QueueSession([_QResult([]), _QResult([c_t]), _QResult([s1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), False, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(False), model=_M
         )
         assert [r.skill_id for r in records] == [s1]
         assert fake.commits == 1
@@ -166,7 +191,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[] — 이후 _assessed_skill_ids는 빈 입력이라 쿼리 없음.
         fake = _QueueSession([_QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True
+            cast(AsyncSession, fake), evidence=_evidence(True)
         )
         assert records == []
         assert fake.added == []
@@ -178,7 +203,7 @@ class TestRecordProblemAttemptSkillMastery:
         # execute: #1 개념[c1] → #2 스킬[] (해소 0)
         fake = _QueueSession([_QResult([c1]), _QResult([])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True
+            cast(AsyncSession, fake), evidence=_evidence(True)
         )
         assert records == []
         assert fake.added == []
@@ -190,7 +215,96 @@ class TestRecordProblemAttemptSkillMastery:
         s1 = "skill.a"
         fake = _QueueSession([_QResult([c1]), _QResult([s1]), _QResult([_prior_row(0.69, 1)])])
         records = await record_problem_attempt_skill_mastery(
-            cast(AsyncSession, fake), _UID, uuid.uuid4(), True, model=_M
+            cast(AsyncSession, fake), evidence=_evidence(True), model=_M
         )
         assert records[0].mastery == 0.92
         assert records[0].sample_size == 2
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-10 — 벌크 좌석 `get_all_current_skill_mastery` (조립기가 쓰는 "스킬별 최신 전건")
+# ──────────────────────────────────────────────────────────────────────────
+class _CaptureSession:
+    """`execute()`에 들어온 statement를 붙잡아 두는 세션 — SQL 형태 대조용."""
+
+    def __init__(self, rows: list[Any] | None = None) -> None:
+        self.stmt: Any = None
+        self._rows = rows or []
+
+    async def execute(self, stmt: Any) -> _QResult:
+        self.stmt = stmt
+        return _QResult(self._rows)
+
+
+def _order_by_sql(stmt: Any) -> str:
+    """statement의 ORDER BY 절만 문자열로 — 두 좌석의 '최신' 정의를 대조하는 축."""
+    return " ".join(str(clause) for clause in stmt._order_by_clauses)
+
+
+def _compiled_sql(stmt: Any) -> str:
+    """Postgres 방언으로 컴파일한 SQL 전문 — `DISTINCT ON` 같은 *방언 절*을 보는 축.
+
+    `_order_by_sql`은 ORDER BY만 보므로 DISTINCT 절을 지워도 값이 그대로다(초판 뮤테이션
+    M11이 정확히 그 틈으로 생존했다 — 가드가 관대한 게 아니라 그 절을 밟는 픽스처가 없었다).
+    """
+    return str(stmt.compile(dialect=postgresql.dialect()))
+
+
+class TestGetAllCurrentSkillMastery:
+    """벌크 좌석 — `{skill_id: mastery}`. 단건 좌석과 **같은 '최신' 규칙**이어야 한다."""
+
+    async def test_maps_skill_id_to_latest_mastery(self) -> None:
+        fake = _CaptureSession([("skill.a", 0.5), ("skill.b", 0.9)])
+        got = await get_all_current_skill_mastery(cast(AsyncSession, fake), _UID)
+        assert got == {"skill.a": 0.5, "skill.b": 0.9}
+
+    async def test_null_mastery_rows_produce_no_key(self) -> None:
+        """NULL은 '숙달 0'이 아니라 '측정 없음' — 키 자체가 없어야 한다(단건 좌석의 None과 동형)."""
+        fake = _CaptureSession([("skill.a", None), ("skill.b", 0.4)])
+        got = await get_all_current_skill_mastery(cast(AsyncSession, fake), _UID)
+        assert got == {"skill.b": 0.4}
+        assert "skill.a" not in got
+
+    async def test_empty_history_yields_empty_dict(self) -> None:
+        fake = _CaptureSession([])
+        assert await get_all_current_skill_mastery(cast(AsyncSession, fake), _UID) == {}
+
+    async def test_latest_rule_matches_single_seat(self) -> None:
+        """두 좌석이 같은 (user, skill)에 대해 **다른 행**을 고르면 그 자체가 결함이다.
+
+        벌크는 `DISTINCT ON (skill_id)`, 단건은 `LIMIT 1`이라 형태가 다르지만 "무엇이 최신인가"의
+        정의(`measured_at` 내림차순)는 반드시 같아야 한다. 한쪽만 asc로 바뀌면 조립기가 내는
+        스킬 숙달과 `/skill-mastery` 단건 조회가 조용히 어긋난다 — 이 테스트가 그것을 잡는다.
+        """
+        bulk_session = _CaptureSession([])
+        await get_all_current_skill_mastery(cast(AsyncSession, bulk_session), _UID)
+        single_session = _CaptureSession([])
+        await _latest_skill_mastery(cast(AsyncSession, single_session), _UID, _SID)
+
+        bulk_order = _order_by_sql(bulk_session.stmt)
+        single_order = _order_by_sql(single_session.stmt)
+        assert "measured_at DESC" in bulk_order, f"벌크 좌석의 최신 정의가 아니다: {bulk_order}"
+        assert "measured_at DESC" in single_order, f"단건 좌석의 최신 정의가 아니다: {single_order}"
+        # DISTINCT ON은 ORDER BY가 그 키로 시작해야 최신 행 선택이 성립한다(Postgres 제약).
+        assert bulk_order.split()[0].endswith(
+            "skill_id"
+        ), f"DISTINCT ON (skill_id)인데 ORDER BY가 skill_id로 시작하지 않는다: {bulk_order}"
+
+    async def test_bulk_seat_selects_one_row_per_skill(self) -> None:
+        """`DISTINCT ON (skill_id)` 절 자체를 밟는 반례 — 이 절이 없으면 시계열 전건이 나온다.
+
+        ORDER BY만 검사하는 위 테스트는 이 절을 지워도 통과한다(실측: 뮤테이션 M11 생존).
+        "스킬별 **최신 1건**"이라는 계약은 ORDER BY가 아니라 이 절이 만들므로, 절을 직접 본다 —
+        빠지면 조립기의 `skill_mastery`가 한 스킬의 옛 측정값에 덮어써질 수 있다(dict 마지막
+        승자가 최신이라는 보장이 사라진다).
+        """
+        fake = _CaptureSession([])
+        await get_all_current_skill_mastery(cast(AsyncSession, fake), _UID)
+        sql = _compiled_sql(fake.stmt)
+        assert "DISTINCT ON" in sql.upper(), (
+            "벌크 좌석에 DISTINCT ON이 없다 — 스킬별 최신 1건이 아니라 측정 시계열 전건이 나온다:\n"
+            f"{sql}"
+        )
+        assert (
+            "skill_id" in sql.split("DISTINCT ON", 1)[1].split(")", 1)[0]
+        ), f"DISTINCT ON의 키가 skill_id가 아니다:\n{sql}"

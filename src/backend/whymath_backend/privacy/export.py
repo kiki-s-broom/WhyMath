@@ -25,9 +25,11 @@ data access·portability)이다. 삭제권이 이미 *어떤 테이블이 사용
 `AttemptEvent`(세부 시도 이벤트)를 동기 export로 포함(Phase1·완전성 우선) — 매우 큰 이력은 후속
 스트리밍으로 최적화 가능.
 
-외부 store(ClickHouse 행동 로그·S3 객체·Redis 캐시)는 RDB 밖이라 이 export(PostgreSQL)에 *포함되지
+외부 store(Redis 캐시·큐 · Langfuse 트레이스 SaaS)는 RDB 밖이라 이 export(PostgreSQL)에 *포함되지
 않는다* — `external_export_pending`으로 *구조화*해 ops가 가시화한다(#252 `external_erasure_targets`
 미러·정보 누출 방지로 student-facing 응답엔 인프라 store명/locator 미노출·ops 로그만).
+그 매니페스트에 적히는 store는 **실재하는 것만**이다(SEC-32 — 미도입 ClickHouse·S3 제거·
+실 반출처 Langfuse 등재. 근거 대조는 `tests/backend/_external_store_evidence.py` 계약).
 
 저장소 패턴: `AsyncSession` 주입·**읽기 전용**(commit 0·flush 0·`select`만·원시 SQL 0). per-user
 본인 데이터라 HTTP 노출이 맞다("전역 집계는 ops CLI" 제약은 *전역*에만 — 이건 본인 1명).
@@ -47,6 +49,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,6 +75,11 @@ from whymath_backend.db.models.user import (
     UserProfile,
     UserStateSnapshot,
     UserTrackHistory,
+)
+from whymath_backend.schema.activity import ProblemAttempt as SchemaProblemAttempt
+from whymath_backend.schema.answer_submission import AnswerSubmission as SchemaAnswerSubmission
+from whymath_backend.schema.student_solution_step import (
+    StudentSolutionStep as SchemaStudentSolutionStep,
 )
 
 __all__ = [
@@ -132,7 +140,7 @@ _EXPORT_PLAN: tuple[tuple[type[Base], str, str], ...] = (
 # 부분 export임을 정직히 알린다(GDPR 완전성·날조 0). 외부 store 상세는 ops 로그(아래 함수)로만.
 _NOT_INCLUDED: tuple[str, ...] = (
     "손글씨 이미지 *원본 파일*은 외부 저장소(별도 시스템) 보관 — 본 export엔 참조 URI만 담긴다.",
-    "행동 로그·세션 캐시 등 외부 시스템 보관 데이터는 미포함(별도 시스템).",
+    "LLM 응답 캐시·요청 처리 트레이스 등 외부 시스템 보관 데이터는 미포함(별도 시스템).",
     "보안 항목(로그인 토큰·기기 자격)은 보안상 내보내지 않는다.",
     # ASM-12 — 제외를 침묵하면 부분 export를 완전 export로 위장하게 된다(정직 고지).
     "성적 예측 추정치(추정 등급·점수·백분위·합격 예측)는 학습 보호 정책에 따라 미포함 — "
@@ -169,16 +177,18 @@ _STUDENT_FACING_SERIALIZERS: dict[type[Base], Any] = {
 class ExternalDataLocation(BaseModel):
     """RDB *밖* store에 남은 본인 데이터 — 이 export(PG)에 *포함되지 않음*. ops용 구조화. 불변.
 
-    `export_user_data`는 PostgreSQL만 읽는다. 외부 store(ClickHouse 행동 로그·S3/MinIO 객체·Redis
-    캐시)는 RDB 밖·별도 클라이언트라 이 export에 *포함되지 않는다*. 이 모델은 그 미포함을 *조용히
-    넘기지 않고*(날조 0·GDPR 범위 정직) ops가 인지·후속 export할 체크리스트로 *구조화*한다.
-    `locator`는 *정확한 키 문법을 단정하지 않는다* — 키/프리픽스 규약은 인프라 정의라 user_id 연관
-    대상만 서술한다(없는 사실 날조 금지). 정보 누출 방지로 student-facing 응답엔 싣지 않는다.
+    `export_user_data`는 PostgreSQL만 읽는다. 외부 store(Redis 캐시·큐, Langfuse 트레이스
+    SaaS)는 RDB 밖·별도 클라이언트/전송 인프라라 이 export에 *포함되지 않는다*. 이 모델은 그
+    미포함을 *조용히 넘기지 않고*(날조 0·GDPR 범위 정직) ops가 인지·후속 export할 체크리스트로
+    *구조화*한다. `locator`는 *정확한 키 문법을 단정하지 않는다* — 키/프리픽스 규약은 인프라
+    정의라 user_id 연관 대상만 서술하고, **user 단위 조회가 불가능한 store는 그 사실 자체를
+    적는다**(SEC-32 — 후속 export가 가능하다는 인상만 남기면 미포함 고지가 거짓이 된다).
+    정보 누출 방지로 student-facing 응답엔 싣지 않는다.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    store: str = Field(description="외부 store 식별자(clickhouse·s3·redis).")
+    store: str = Field(description="외부 store 식별자(redis·langfuse).")
     data: str = Field(description="그 store가 보유한 사용자 데이터 설명(한국어).")
     locator: str = Field(description="대상(user_id 연관·키 규약은 인프라 정의·단정 아님).")
 
@@ -191,21 +201,32 @@ def external_export_pending(user_id: uuid.UUID) -> tuple[ExternalDataLocation, .
     locator는 *키 문법을 단정하지 않고* user_id 연관 대상만 서술한다(인프라 키 규약 날조 금지).
     """
     uid = str(user_id)
+    # 삭제권 매니페스트(`erasure.external_erasure_targets`)와 *같은 store 집합*을 본다 — 한쪽만
+    # 고치면 "지울 곳"과 "못 담은 곳"이 어긋나 두 권리의 범위 고지가 서로 모순된다. ClickHouse·
+    # S3를 뺀 사유와 Langfuse를 넣은 사유는 그쪽 주석이 정본이다(중복 서술 대신 단일 진실).
     return (
         ExternalDataLocation(
-            store="clickhouse",
-            data="학습 행동 로그(이벤트 스트림·분석)",
-            locator=f"student_id_hash(user_id={uid}) 연관 이벤트 행 — 해시 매핑은 적재 규약 따름",
-        ),
-        ExternalDataLocation(
-            store="s3",
-            data="업로드 이미지·렌더 객체(손글씨 풀이·시각화)",
-            locator=f"user_id={uid} 연관 업로드/렌더 객체(프리픽스 규약은 인프라 정의)",
-        ),
-        ExternalDataLocation(
             store="redis",
-            data="세션·핫 캐시(작업메모리·레이트리밋)",
-            locator=f"user_id={uid} 연관 세션·캐시 키(TTL 만료가 기본)",
+            data=(
+                "LLM 응답 캐시(학생 프롬프트로 생성된 응답 본문)·QUALITY 비동기 큐 payload"
+                "(prompt·system 원문)."
+            ),
+            locator=(
+                f"user_id={uid}의 요청에서 파생되나 *user_id로 조회할 키가 없다* — 캐시 키는 "
+                "(프롬프트·시스템·티어) 해시라 본인 데이터만 골라 담을 수 없다."
+            ),
+        ),
+        ExternalDataLocation(
+            store="langfuse",
+            data=(
+                "L3 라우팅 결정 트레이스(`l3_routing` 이벤트) — 티어·모델·토큰·비용·지연 등 "
+                "*결정 메타데이터*. 프롬프트·응답 본문은 전송하지 않는다."
+            ),
+            locator=(
+                f"user_id={uid}의 요청에서 생성되나 학생 연결 축은 해시(`student_id_hash`) 하나"
+                "뿐이고 현행 서빙 경로는 그마저 채우지 않는다(2026-09-07 실측) — user 단위 조회 "
+                "불가."
+            ),
         ),
     )
 
@@ -233,6 +254,89 @@ class UserDataExport(BaseModel):
     )
 
 
+# SEC-31: 학생 답안/풀이 3테이블(problem_attempt·answer_submission·student_solution_step)의
+# 봉투 암호화 필드 복호 명세 — (schema/attr 이름, 평문 컬럼, 암호화 컬럼, nonce 컬럼, 종류).
+# 종류: "text"(nullable str — resolve_dialogue_content 재사용)·"json"(nullable dict —
+# resolve_dialogue_image_analysis 재사용)·"text_required"(student_solution_step.expression
+# 전용 — schema는 필수 str이라 resolve_student_solution_step_expression으로 복호. 둘 다 없으면
+# RuntimeError·조용한 빈 문자열 없음).
+_StudentWorkFieldSpec = tuple[str, str, str, str, str]
+
+_PROBLEM_ATTEMPT_ENCRYPTED_FIELDS: tuple[_StudentWorkFieldSpec, ...] = (
+    (
+        "student_answer",
+        "student_answer",
+        "student_answer_encrypted",
+        "student_answer_nonce",
+        "text",
+    ),
+    (
+        "handwriting_uri",
+        "handwriting_uri",
+        "handwriting_uri_encrypted",
+        "handwriting_uri_nonce",
+        "text",
+    ),
+    ("ocr_result", "ocr_result", "ocr_result_encrypted", "ocr_result_nonce", "json"),
+)
+_ANSWER_SUBMISSION_ENCRYPTED_FIELDS: tuple[_StudentWorkFieldSpec, ...] = (
+    ("raw_response", "raw_response", "raw_response_encrypted", "raw_response_nonce", "text"),
+    ("latex", "latex", "latex_encrypted", "latex_nonce", "text"),
+    ("canonical_ast", "canonical_ast", "canonical_ast_encrypted", "canonical_ast_nonce", "json"),
+)
+_STUDENT_SOLUTION_STEP_ENCRYPTED_FIELDS: tuple[_StudentWorkFieldSpec, ...] = (
+    ("expression", "expression", "expression_encrypted", "expression_nonce", "text_required"),
+    ("canonical_ast", "canonical_ast", "canonical_ast_encrypted", "canonical_ast_nonce", "json"),
+)
+
+# 모델 → (필드 명세, 대응 schema 클래스). `_row_to_json`(→`to_schema()`)을 그대로 못 쓰는 이유:
+# `student_solution_step.expression`은 schema에서 필수 `str`인데, 암호화 행에서는 ORM 컬럼이
+# NULL이라 `to_schema()`를 먼저 부르면 복호 적용 전에 ValidationError가 난다(SEC-31 마이그레이션
+# 참조). 그래서 이 3모델은 "복호 → schema 검증" 순서를 지키는 전용 함수(`_student_work_row_json`)
+# 로 내보낸다.
+_StudentWorkModelSpec = tuple[tuple[_StudentWorkFieldSpec, ...], type[BaseModel]]
+_STUDENT_WORK_MODELS: dict[type[Base], _StudentWorkModelSpec] = {
+    ProblemAttempt: (_PROBLEM_ATTEMPT_ENCRYPTED_FIELDS, SchemaProblemAttempt),
+    AnswerSubmission: (_ANSWER_SUBMISSION_ENCRYPTED_FIELDS, SchemaAnswerSubmission),
+    StudentSolutionStep: (_STUDENT_SOLUTION_STEP_ENCRYPTED_FIELDS, SchemaStudentSolutionStep),
+}
+
+
+def _student_work_row_json(row: Any, cipher: Any) -> dict[str, Any]:
+    """SEC-31: 학생 답안/풀이 3테이블 전용 — 복호를 *먼저* 적용한 뒤 schema로 재검증한 JSON.
+
+    `_row_to_json`(→ `row.to_schema()`)을 그대로 쓰지 않는 이유는 모듈 상단 `_STUDENT_WORK_MODELS`
+    주석 참조(student_solution_step.expression 필수 str 계약과의 순서 충돌). ciphertext 컬럼은
+    필드 명세의 `encrypted_attr`/`nonce_attr` 집합으로 직접 제외한다(`_NON_SCHEMA_COLUMNS`
+    속성에 의존하지 않아 이 함수가 자기 완결적이다). 복호 실패(cipher 미설정인데 암호화 행)는
+    각 resolve 헬퍼가 RuntimeError로 노출한다(조용한 침묵 실패 금지 — CLAUDE.md).
+    """
+    from whymath_backend.api._crypto import (
+        resolve_dialogue_content,
+        resolve_dialogue_image_analysis,
+        resolve_student_solution_step_expression,
+    )
+
+    model = type(row)
+    specs, schema_cls = _STUDENT_WORK_MODELS[model]
+    exclude = {name for spec in specs for name in (spec[2], spec[3])}
+    mapped_keys = {
+        col.key for col in sa.inspect(model).mapper.column_attrs if col.key not in exclude
+    }
+    data: dict[str, Any] = {key: getattr(row, key) for key in mapped_keys}
+    for attr, plain_attr, encrypted_attr, nonce_attr, kind in specs:
+        plain = getattr(row, plain_attr)
+        encrypted = getattr(row, encrypted_attr)
+        nonce = getattr(row, nonce_attr)
+        if kind == "text":
+            data[attr] = resolve_dialogue_content(cipher, plain, encrypted, nonce)
+        elif kind == "json":
+            data[attr] = resolve_dialogue_image_analysis(cipher, plain, encrypted, nonce)
+        else:  # "text_required"
+            data[attr] = resolve_student_solution_step_expression(cipher, plain, encrypted, nonce)
+    return schema_cls.model_validate(data).model_dump(mode="json")
+
+
 def _row_to_json(row: Any) -> dict[str, Any]:
     """ORM 행 → JSON-safe dict(`to_schema().model_dump(mode="json")`). `_EXPORT_PLAN` 모델 전제.
 
@@ -255,6 +359,16 @@ async def export_user_data(session: AsyncSession, *, user_id: uuid.UUID) -> User
     `user_profile`은 단건. **commit/flush 0**(읽기 전용·저장소 패턴). 외부 store는 포함하지 않고
     `external_export_pending`(ops)로 별도 고지. 멱등·부작용 0(같은 user는 같은 데이터·시각만 갱신).
     """
+    # SEC-31: 학생 답안/풀이 3테이블 봉투 암호화 cipher — export 순회 전 1회 조립(감사상환 #2
+    # content_cipher와 동일 위치·동일 이유: 함수-지역 import로 privacy → api 순환 회피). 이
+    # cipher는 `_student_work_row_json`에 전달돼 3모델 각각의 복호에 재사용된다(요청당 1회
+    # cipher 조립 — 행마다 조립하지 않음). 키 유실 시 조용한 평문 유출/빈 응답 대신 시끄러운
+    # 실패(각 resolve 헬퍼가 RuntimeError).
+    from whymath_backend.api._crypto import require_student_work_cipher
+    from whymath_backend.config import get_settings
+
+    student_work_cipher = require_student_work_cipher(get_settings())
+
     data: dict[str, list[dict[str, Any]]] = {}
     for model, column, category in _EXPORT_PLAN:
         result = await session.execute(
@@ -262,7 +376,11 @@ async def export_user_data(session: AsyncSession, *, user_id: uuid.UUID) -> User
             .where(getattr(model, column) == user_id)
             .order_by(*model.__mapper__.primary_key)
         )
-        data[category] = [_row_to_json(row) for row in result.scalars().all()]
+        rows = result.scalars().all()
+        if model in _STUDENT_WORK_MODELS:
+            data[category] = [_student_work_row_json(row, student_work_cipher) for row in rows]
+        else:
+            data[category] = [_row_to_json(row) for row in rows]
 
     # 대화 턴(채팅 본문·손글씨) — `dialogue_turn`엔 user_id가 없어 부모 `dialogue`로 조인해 본인
     # 턴만 조회. (dialogue_id, turn_order) 정렬로 대화별·시간순 결정적. 전체 본문 포함(증분 6).
@@ -282,7 +400,6 @@ async def export_user_data(session: AsyncSession, *, user_id: uuid.UUID) -> User
         resolve_dialogue_image_analysis,
         resolve_dialogue_image_uri,
     )
-    from whymath_backend.config import get_settings
 
     content_cipher = require_dialogue_content_cipher(get_settings())
     turn_dicts: list[dict[str, Any]] = []

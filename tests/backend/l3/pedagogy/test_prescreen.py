@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from types import TracebackType
 
+from whymath_backend.composition import default_expression_equivalence
 from whymath_backend.l3.pedagogy.prescreen import (
     PRESCREEN_PASS_THRESHOLD,
     PrescreenStore,
@@ -101,7 +102,11 @@ class TestPrescreenRubric:
             assert 0 <= s <= 3
 
     def test_prescreen_rows_from_generated(self) -> None:
-        rows = build_slot_rows("U:OBJ-01", [{"type": "diag_item", "count": 2}])
+        rows = build_slot_rows(
+            "U:OBJ-01",
+            [{"type": "diag_item", "count": 2}],
+            equivalence=default_expression_equivalence(),
+        )
         scored = prescreen_rows(rows)
         assert len(scored) == 2
         assert all(score >= PRESCREEN_PASS_THRESHOLD for _id, score in scored)

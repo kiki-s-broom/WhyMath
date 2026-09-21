@@ -30,13 +30,20 @@ from sqlalchemy.exc import IntegrityError
 from whymath_backend.api._auth import require_content_admin
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.concept import Concept, ConceptEdge
 from whymath_backend.db.models.concept_content import ConceptContent
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.schema.concept import Concept as ConceptSchema
 from whymath_backend.schema.concept import ConceptEdge as ConceptEdgeSchema
-from whymath_backend.schema.enums import EdgeType, Role
+from whymath_backend.schema.enums import (
+    AuditEventKind,
+    EdgeType,
+    PrivacyAuditAction,
+    PrivacyAuditResourceType,
+    Role,
+)
 from whymath_backend.security import create_access_token
 
 _VALID_BODY = {"code": "CAL-INT-FTC", "name_ko": "미적분학의 기본정리", "level": "단원"}
@@ -71,10 +78,14 @@ class FakeSession:
         self,
         *,
         get_map: dict[uuid.UUID, Concept] | None = None,
+        content_map: dict[str, ConceptContent] | None = None,
         list_rows: list[Concept] | None = None,
         commit_error: Exception | None = None,
     ) -> None:
         self._get_map = dict(get_map or {})
+        # `concept_content`의 기본키는 UUID가 아니라 **코드 문자열**이라 get_map과 키 공간이
+        # 다르다. 한 dict에 섞으면 타입이 무너지므로 모델별로 나눠 둔다.
+        self._content_map = dict(content_map or {})
         self._list_rows = list(list_rows or [])
         self._commit_error = commit_error
         self.added: list[Any] = []
@@ -102,7 +113,9 @@ class FakeSession:
     async def merge(self, obj: Any) -> Any:
         return obj
 
-    async def get(self, model: Any, pk: uuid.UUID) -> Concept | None:
+    async def get(self, model: Any, pk: Any) -> Any:
+        if model is ConceptContent:
+            return self._content_map.get(pk)
         return self._get_map.get(pk)
 
     async def execute(self, stmt: Any) -> _FakeResult:
@@ -174,7 +187,8 @@ class TestCreate:
         assert resp.status_code == 201, resp.text
         assert resp.json()["code"] == "CAL-INT-FTC"
         assert fake.committed is True
-        assert len(fake.added) == 1
+        # SEC-29: Concept 본체 + 콘텐츠CUD 감사 행(PrivacyAudit) = 2건, 같은 트랜잭션.
+        assert len(fake.added) == 2
 
     def test_create_duplicate_code_returns_409(self) -> None:
         """code UNIQUE 충돌(IntegrityError) → 롤백 후 409(스택트레이스 없이)."""
@@ -328,6 +342,70 @@ class TestDelete:
         assert fake.rolled_back is True
 
 
+class TestContentMutationAudit:
+    """SEC-29(48_보안 §P0) — 콘텐츠 CUD(생성/수정/삭제)가 `PrivacyAudit` 행을 남긴다.
+
+    비관리자/미인증 거부는 `TestAuthGate`(이 파일)가 이미 검증한다 — 여기서는 acceptance④의
+    나머지 절반("관리자 동작 시 감사 이벤트 생성")과 그 행의 필드 정합을 검증한다.
+    """
+
+    def _audit_rows(self, fake: FakeSession) -> list[PrivacyAudit]:
+        return [obj for obj in fake.added if isinstance(obj, PrivacyAudit)]
+
+    def test_create_writes_content_mutation_audit_row(self) -> None:
+        fake = FakeSession()
+        resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
+        assert resp.status_code == 201, resp.text
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.user_id == _ADMIN_USER.user_id
+        assert row.target_user_id is None
+        assert row.event_kind == AuditEventKind.content_mutation.value
+        assert row.resource_type == PrivacyAuditResourceType.concept.value
+        assert row.action == PrivacyAuditAction.create.value
+        assert str(row.resource_id) == resp.json()["concept_id"]
+
+    def test_patch_writes_content_mutation_audit_row(self) -> None:
+        concept = _sample_concept()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).patch(
+            f"/v1/concepts/{concept.concept_id}", json={"name_en": "Updated FTC"}
+        )
+        assert resp.status_code == 200, resp.text
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        assert rows[0].action == PrivacyAuditAction.update.value
+        assert rows[0].resource_id == concept.concept_id
+
+    def test_delete_writes_content_mutation_audit_row(self) -> None:
+        concept = _sample_concept()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
+        assert resp.status_code == 204
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        assert rows[0].action == PrivacyAuditAction.delete.value
+        assert rows[0].resource_id == concept.concept_id
+
+    def test_failed_create_does_not_leave_committed_audit_row(self) -> None:
+        """IntegrityError로 롤백되면(409) 감사 행도 함께 롤백 대상(같은 트랜잭션).
+
+        `FakeSession`은 실제 롤백을 모사하지 않으므로(add된 객체를 지우지 않음) 여기서는
+        `rolled_back is True`(전체 트랜잭션이 롤백 호출을 받았다)만 확인한다 — 실 PG에서
+        ROLLBACK이 add()된 행까지 되돌린다는 것은 DB 트랜잭션의 기본 보장이라 별도 가정이
+        필요 없다(session.add는 flush 전까지 방문 상태일 뿐).
+        """
+        err = IntegrityError("INSERT", {}, Exception("duplicate key value violates unique"))
+        fake = FakeSession(commit_error=err)
+        resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
+        assert resp.status_code == 409
+        assert fake.rolled_back is True
+        # 감사 행은 add()는 됐으나(같은 트랜잭션 참여) commit은 되지 않았다.
+        assert len(self._audit_rows(fake)) == 1
+        assert fake.committed is False
+
+
 class TestConcurrency:
     """낙관적 동시성 — ETag 노출 + If-Match 조건부 변경."""
 
@@ -465,6 +543,49 @@ class TestListContent:
         assert client.get("/v1/concepts/content?limit=0").status_code == 422
         assert client.get("/v1/concepts/content?limit=999").status_code == 422
         assert client.get("/v1/concepts/content?offset=-1").status_code == 422
+
+
+class TestGetContent:
+    """GET /v1/concepts/content/{code} — 단건 조회(P-11 ④로 채운 최소 표면).
+
+    계획서 300 §12의 `GET /contents/{id}`에 대응한다. 목록 좌석과 **같은 응답 스키마**를
+    돌려줄 뿐 필드를 늘리지 않는 것이 이 표면의 계약이다.
+    """
+
+    def test_get_content_returns_the_row(self) -> None:
+        row = _sample_concept_content("N1", review_status="reviewed")
+        resp = _client(FakeSession(content_map={"N1": row})).get("/v1/concepts/content/N1")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == "N1"
+        assert body["review_status"] == "reviewed"
+
+    def test_get_content_missing_code_returns_404(self) -> None:
+        """부재는 빈 200이 아니라 404다 — 없는 것을 '있는데 비었다'로 돌려주지 않는다."""
+        resp = _client(FakeSession(content_map={})).get("/v1/concepts/content/NOPE")
+        assert resp.status_code == 404
+
+    def test_get_content_does_not_enrich_the_list_schema(self) -> None:
+        """P-11 ④ — 단건이라고 필드를 더 주지 않는다(목록과 키 집합이 같다)."""
+        row = _sample_concept_content("N1")
+        fake = FakeSession(content_map={"N1": row}, list_rows=[row])
+        client = _client(fake)
+        single = client.get("/v1/concepts/content/N1").json()
+        listed = client.get("/v1/concepts/content").json()
+        assert listed, "목록이 비어 대조가 성립하지 않는다"
+        assert set(single) == set(listed[0]), (
+            f"단건 응답이 목록과 다른 필드 집합을 낸다 — 스키마를 풍부하게 만들지 않는다는 "
+            f"계약 위반: 단건만={set(single) - set(listed[0])} 목록만={set(listed[0]) - set(single)}"
+        )
+
+    def test_get_content_code_is_not_parsed_as_uuid(self) -> None:
+        """코드 문자열이 UUID로 파싱되지 않는다 — 그러면 조회가 영구히 422가 된다."""
+        row = _sample_concept_content("MATH.LIMIT.01")
+        resp = _client(FakeSession(content_map={"MATH.LIMIT.01": row})).get(
+            "/v1/concepts/content/MATH.LIMIT.01"
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["code"] == "MATH.LIMIT.01"
 
 
 class TestAuthGate:

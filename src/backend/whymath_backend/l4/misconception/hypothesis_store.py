@@ -48,14 +48,19 @@ from whymath_backend.config import get_settings
 from whymath_backend.db.models.misconception_hypothesis import (
     MisconceptionHypothesisRecord,
 )
+from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.crosslink_shadow import observe_crosslink_shadow_async
-from whymath_backend.l4.misconception.evidence_store import net_support
+from whymath_backend.l4.misconception.evidence_store import (
+    net_support,
+    strong_refutation_mids,
+)
 from whymath_backend.l4.misconception.hypothesis import (
+    DeactivationReason,
     MisconceptionHypothesis,
-    curate,
-    update_hypotheses,
+    curate_with_reasons,
 )
 from whymath_backend.l4.misconception.models import MisconceptionMatch
+from whymath_backend.schema.assessment_evidence import MisconceptionCandidate
 
 __all__ = [
     "apply_matches",
@@ -131,13 +136,56 @@ async def apply_matches(
     current = await get_active_hypotheses(session, user_id)
 
     # 2. #191 순수 로직 재사용 — 이번 턴 활성 세트 계산(재구현 0).
-    updated = update_hypotheses(current, matches, turns_elapsed=turns_elapsed)
+    # MISC-20: 사유까지 받는 `curate_with_reasons`를 쓴다 — 반박·캡 입력이 없으므로 생존 세트는
+    # `update_hypotheses`와 동일하고(캡을 무력화하는 큰 max_active), 사유는 이 경로의 유일한 탈락
+    # 원인인 감쇠·임계 가지치기(DECAYED)만 나온다.
+    updated, reasons = curate_with_reasons(
+        current, matches, turns_elapsed=turns_elapsed, max_active=len(current) + len(matches) + 1
+    )
 
     # 3. 영속(upsert + 빠진 활성 행 비활성화) — curate_hypothesis와 공유하는 헬퍼(중복 0).
-    await _persist_active_set(session, user_id, updated)
+    await _persist_active_set(session, user_id, updated, reasons=reasons)
 
     # 4. 이번 턴 활성 세트(순수) 반환.
     return updated
+
+
+async def apply_candidates(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    candidates: Sequence[MisconceptionCandidate],
+    *,
+    turns_elapsed: int = 1,
+) -> list[MisconceptionHypothesis]:
+    """채점 증거의 오개념 **후보**를 가설 세트에 반영·영속한다 — `apply_matches` 얇은 래퍼.
+
+    왜 별도 진입점인가: 채점 경로(Core)가 들고 있는 것은 계약 DTO(`MisconceptionCandidate` —
+    id·신뢰도·게이트 플래그)이고, 가설 갱신 로직이 요구하는 것은 L4 리치 타입
+    (`MisconceptionMatch` — 카탈로그 객체 포함)이다. 그 간극을 Core에서 메우려면 Core가
+    카탈로그를 뒤져야 하고, 그러면 같은 변환이 호출처마다 복제된다. 여기서 **한 번만** 한다.
+
+    감쇠·강화·가지치기는 전부 `apply_matches`가 한다(재구현 0). 특히 **후보가 비어 있어도
+    호출은 유효하다** — 그 경우 이번 회차에 증거를 못 받은 기존 가설이 `turns_elapsed`만큼
+    감쇠하고, 임계 미만이면 비활성화된다. "오개념이 관측되지 않은 시도"가 신뢰를 *내리는*
+    경로가 바로 이것이다.
+
+    `gate_passed=False` 후보는 **무시한다**(가설로 승격하지 않는다). 계약상 그런 후보는
+    증거에 실릴 수 없고, 저장소가 그 경계를 느슨하게 하면 게이트가 우회 가능해진다.
+    카탈로그에 없는 id도 무시한다 — 알 수 없는 오개념으로 학생 상태를 바꾸지 않는다.
+
+    `curate_hypothesis`(증거 그래프 반박·최대 N 캡)를 부르지 *않는다*: 반박 판정과 확정은
+    코치 경로가 소유하고, 채점 증거는 관측이라 그 권위를 갖지 않는다(EOS-104 acceptance ④).
+    """
+    matches = [
+        MisconceptionMatch(
+            misconception=CATALOG_BY_ID[c.misconception_id],
+            confidence=c.confidence,
+            attribution_unclear=c.attribution_unclear,
+        )
+        for c in candidates
+        if c.gate_passed and c.misconception_id in CATALOG_BY_ID
+    ]
+    return await apply_matches(session, user_id, matches, turns_elapsed=turns_elapsed)
 
 
 async def persist_hypotheses(
@@ -158,6 +206,8 @@ async def _persist_active_set(
     session: AsyncSession,
     user_id: uuid.UUID,
     active: Sequence[MisconceptionHypothesis],
+    *,
+    reasons: dict[str, DeactivationReason] | None = None,
 ) -> None:
     """이번 턴 *활성 가설 세트*를 영속한다 — upsert + 빠진 활성 행 비활성화(공통 영속 절차).
 
@@ -167,6 +217,11 @@ async def _persist_active_set(
         없으면 새 행 insert.
       · `active`에서 *빠진* 기존 *활성* 행(= 가지치기·반박·최대 N 캡 탈락)은 `is_active=false`로
         비활성화한다(행 삭제 X — 증거 이력 보존·낙인 방지·§5.1 archived 보존).
+
+    MISC-20: `reasons`(오개념 id → `DeactivationReason`)를 주면 비활성화 행에 그 사유를 함께
+    쓴다. **사유를 모르는 호출자는 주지 않는다** — 그 경우 `deactivated_reason`은 NULL(사유 미상)로
+    남으며 해소율 분자에서 제외된다(날조 0 · 04e §9-D4). 재활성화되는 행은 사유를 비운다(옛 사유가
+    되살아난 가설에 라벨로 따라다니지 않게 — `is_active` 컨벤션의 낙인 방지 원칙 승계).
     server_default(id·타임스탬프)·갱신을 같은 트랜잭션에서 가시화하도록 `flush`(commit은 호출자).
     """
     existing_stmt = select(MisconceptionHypothesisRecord).where(
@@ -187,6 +242,8 @@ async def _persist_active_set(
             record.turns_since_evidence = hyp.turns_since_evidence
             record.evidence_count = hyp.evidence_count
             record.is_active = True
+            # 재활성화 — 옛 탈락 사유를 비운다(현재 활성 행의 사유는 항상 NULL이라는 불변식).
+            record.deactivated_reason = None
         else:
             # upsert(insert) — 신규 가설.
             session.add(
@@ -197,6 +254,7 @@ async def _persist_active_set(
                     turns_since_evidence=hyp.turns_since_evidence,
                     evidence_count=hyp.evidence_count,
                     is_active=True,
+                    deactivated_reason=None,
                 )
             )
 
@@ -205,15 +263,24 @@ async def _persist_active_set(
         mid for mid, record in by_mid.items() if record.is_active and mid not in active_mids
     ]
     if pruned_mids:
-        prune_stmt = (
-            update(MisconceptionHypothesisRecord)
-            .where(
-                MisconceptionHypothesisRecord.user_id == user_id,
-                MisconceptionHypothesisRecord.misconception_id.in_(pruned_mids),
+        # MISC-20 — 사유별로 묶어 UPDATE한다. 사유를 모르는 id(reasons 미제공·키 부재)는 마지막
+        # 묶음에서 `deactivated_reason=None`으로 남는다(사유 미상 정직 표기 — 임의 값 대입 금지).
+        by_reason: dict[DeactivationReason | None, list[str]] = {}
+        for mid in pruned_mids:
+            by_reason.setdefault((reasons or {}).get(mid), []).append(mid)
+        for reason, mids in by_reason.items():
+            prune_stmt = (
+                update(MisconceptionHypothesisRecord)
+                .where(
+                    MisconceptionHypothesisRecord.user_id == user_id,
+                    MisconceptionHypothesisRecord.misconception_id.in_(mids),
+                )
+                .values(
+                    is_active=False,
+                    deactivated_reason=reason.value if reason is not None else None,
+                )
             )
-            .values(is_active=False)
-        )
-        await session.execute(prune_stmt)
+            await session.execute(prune_stmt)
 
     # server_default(id·타임스탬프)·갱신을 같은 트랜잭션에서 가시화(commit은 호출자).
     await session.flush()
@@ -265,14 +332,21 @@ async def curate_hypothesis(
             refuted.add(mid)
 
     # 3. #191 순수 큐레이션 재사용(감쇠·강화·가지치기·반박 제거·최대 N 캡) — 재구현 0.
-    active = curate(
+    # 2-b. MISC-20 — 반박 중에서도 *정정 형태를 직접 보였다고 기계가 기록한*(provenance 표식)
+    # 오개념만 "해소"(학생이 실제로 넘어섬)로 구분한다. 표식이 없는 반박(막연한 clean 풀이·하네스
+    # 경로·구 데이터)은 REFUTED에 머문다 — 해소율 분자를 부풀리지 않는다. 반박 집합이 비면 쿼리 0.
+    resolved = await strong_refutation_mids(session, student_id, sorted(refuted))
+
+    # MISC-20: 사유 맵을 함께 받는다(생존 세트는 `curate`와 동일 — 동치 테스트로 동결).
+    active, reasons = curate_with_reasons(
         current,
         matches,
         turns_elapsed=turns_elapsed,
         refuted=frozenset(refuted),
+        resolved=frozenset(resolved),
         max_active=max_active,
     )
 
     # 4. 영속(upsert + 탈락 비활성화) 후 활성 세트 반환.
-    await _persist_active_set(session, student_id, active)
+    await _persist_active_set(session, student_id, active, reasons=reasons)
     return active

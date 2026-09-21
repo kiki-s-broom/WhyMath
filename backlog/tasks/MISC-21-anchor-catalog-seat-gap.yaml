@@ -1,0 +1,38 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-21-anchor-catalog-seat-gap
+title: "앵커 A1·A2·A3·A5의 오개념 카탈로그 좌석 0 해소 — 크로스워크가 이 4앵커 코드에 kebab 항목을 하나도 연결하지 않는다(기계 채널 이전에 좌석이 없다)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재현: 앵커 코드 → misconceptions_v1 M-id → crosslinks kebab 경로로 앵커별 좌석 수를 세는 판정을 남긴다. MISC-07 착수 시점 실측(main 기준)은 A1=0·A2=0·A3=0·A4=3·A5=0·A6=2 (M-id는 A1=4·A2=2·A3=4·A4=8·A6=8로 존재하는데 kebab 좌석만 없다 — 즉 크로스워크 미연결이지 오개념 부재가 아니다)"
+  - "② 4앵커(초3 분수·초6 비와 비율·중2 경우의수확률·고1 이차함수 최대최소) 각각에 대해, 이미 있는 M-id를 kebab 카탈로그로 승격할지 / 크로스워크만 연결할지 / 해당 없음인지 판정한다. doc-first 불변 — 카탈로그 신규 항목은 misconception_diagnosis.md 상세화가 선행한다"
+  - "③ 크로스워크 신규 연결은 승인 게이트 계약(crosswalk_gate_contract.md)을 경유한다 — 손으로 crosslinks.json에 행을 추가하지 않는다"
+  - "④ 좌석이 생긴 뒤에야 기계 채널 부여를 판단한다(MISC-07이 만든 anchor_detection_channel_eval에 채널이 추가되면 그 게이트가 자동으로 변별력을 요구한다)"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1068"
+paths:
+  - "src/backend/whymath_backend/l4/misconception/**"
+  - "data/corpus/misconception_crosslinks_v1/**"
+  - docs/prompts/misconception_diagnosis.md
+  - docs/data/misconception_crosslink_review_queue.json
+  - tests/backend/l4/test_anchor_seat_gap.py
+  - tests/backend/l4/test_misconception_catalog.py
+  - tests/backend/l4/test_crosslink_review.py
+  - tests/backend/l4/test_crosslink_triage.py
+  - tests/backend/l4/test_misconception_semantic_eval.py
+  - tests/backend/l4/test_misconception_probes.py
+  - tests/backend/l4/test_misconception_judge_integration.py
+  - tests/backend/l4/test_misconception_semantic_eval_integration.py
+  - tests/backend/harness/test_crosslink_demotion_eval.py
+  - tests/backend/harness/test_wh1_evaluation.py
+session: null
+notes: "MISC-07 착수 중 실측으로 드러난 별건. MISC-07은 '앵커 커버 오개념에 기계 채널 부여'인데, 측정해 보니 앵커 커버 kebab 좌석 자체가 A4(3)·A6(2) 5종뿐이고 나머지 4앵커는 0이었다. 채널 커버 0의 절반은 채널이 없어서가 아니라 좌석이 없어서다 — 두 문제는 해법이 다르므로 분리한다. MISC-07 범위는 좌석이 있는 5종까지.\n\n[정정 2026-09-08] paths ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md'] → ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'tests/backend/l4/test_anchor_seat_gap.py', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/harness/test_crosslink_demotion_eval.py']: 앵커 좌석 3종(A1/A2/A3) 카탈로그 승격이 도메인·프로브·검수큐·트리아지·강등전 회귀 테스트에 연쇄됨(카탈로그 전수 카운트·프로브 전수 커버리지·no_signal 재집계) — acceptance ④(회귀 없음 확인)의 필연적 결과. crosslinks.json은 손대지 않음(승인 게이트 미경유 유지).\n\n[정정 2026-09-08] paths ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'tests/backend/l4/test_anchor_seat_gap.py', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/harness/test_crosslink_demotion_eval.py'] → ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'tests/backend/l4/test_anchor_seat_gap.py', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/l4/test_misconception_probes.py', 'tests/backend/harness/test_crosslink_demotion_eval.py']: test_misconception_probes.py도 같은 카탈로그 성장 연쇄(전수 프로브 카운트)로 회귀 발견·수정.\n\n[정정 2026-09-08] paths ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'tests/backend/l4/test_anchor_seat_gap.py', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/l4/test_misconception_probes.py', 'tests/backend/harness/test_crosslink_demotion_eval.py'] → ['src/backend/whymath_backend/l4/misconception/**', 'data/corpus/misconception_crosslinks_v1/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'tests/backend/l4/test_anchor_seat_gap.py', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/l4/test_misconception_probes.py', 'tests/backend/l4/test_misconception_judge_integration.py', 'tests/backend/l4/test_misconception_semantic_eval_integration.py', 'tests/backend/harness/test_crosslink_demotion_eval.py', 'tests/backend/harness/test_wh1_evaluation.py']: 프로브셋 전수 카운트에 의존하는 나머지 회귀(judge/semantic_eval integration·wh1 평가 표본메타) 동기화."
+updated: 2026-09-08

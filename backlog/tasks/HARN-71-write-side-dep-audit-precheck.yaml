@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-71-write-side-dep-audit-precheck
+title: "대장 쓰기측 의존 감사 선검사 — amend --reason·add --notes·block --reason이 notes를 쓰기 전에 audit-deps를 그 태스크에 적용해 위반이면 거부한다 (읽기측 CI 감사만 있어 세션이 red를 두 번 push)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 집행 지점: backlog.py의 notes 기록 경로 3종(amend --reason·add --notes·block --reason, cancel --reason 포함 여부 실측)에서 파일을 쓰기 전에 dep_declaration.find_undeclared_dependencies를 결과 태스크 1건에 적용한다. 위반이면 exit 1로 거부하고 감사 메시지(어구·창·정정 명령)를 그대로 낸다 — 대장은 무변경이어야 한다(부분 쓰기 금지)"
+  - "② 우회 경로 차단 아님: --depends와 함께 주면 선언된 참조는 통과한다(amend --depends X --reason '…X…'는 정상). 강제 통과 플래그는 두지 않는다 — 단순 참조라면 문장을 고치는 것이 정정 경로다"
+  - "③ 변별력 양방향: tests/harness/test_cli.py에 (가) 위반 문장을 --reason으로 주면 exit 1 + 파일 바이트 동일 (나) 같은 문장에 --depends를 함께 주면 exit 0 (다) 어구 없는 문장은 exit 0 을 고정하고, 선검사 호출을 제거하는 뮤테이션에서 (가)가 RED임을 실측해 기록한다"
+  - "④ 배선 실재성: CI harness-integrity의 audit-deps 스텝은 그대로 둔다(읽기측 이중 회계). 쓰기측 선검사가 CI 스텝을 대체한다고 선언하지 않는다"
+artifacts:
+  - "PR #1026 https://github.com/doldori7/WhyMath/pull/1026"
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/dep_declaration.py
+  - tests/harness/test_cli.py
+session: null
+notes: "사고 경위(2026-09-06 PR #994·같은 세션 2회): ⓐ EOS-50 amend --reason 문장에 어구와 태스크 ID가 같이 들어가 CI harness-integrity red → 정정 push ⓑ 그 사각을 등재하는 HARN-70의 --notes가 원문을 인용해 같은 감사에 다시 걸림 — 게다가 로컬 체인이 ;라 감사 exit 1인데도 커밋·push가 진행됐다(두 번째 정정 push). 공통 원인: 감사는 CI(읽기측)에만 있고 대장을 쓰는 CLI(쓰기측)에는 없다 — 사람이 쓴 문장이 규칙을 어겼는지 쓰기 시점에 아무도 보지 않는다. HARN-52 등재 당시 '이 모듈은 의존을 자동으로 채우지 않는다'는 원칙은 유지하되, 위반 문장을 대장에 넣는 것은 막는다. CLAUDE.md 실수 관리(동일 유형 2회 이상은 대책 등재 의무)의 코드 형태 대책. 세션측 규율은 별도: 대장 조작 체인은 audit-deps && validate && commit && push로 게이트한다"
+updated: 2026-09-07

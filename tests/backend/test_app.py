@@ -26,6 +26,7 @@ from pydantic import SecretStr
 from whymath_backend.api._auth import get_current_user
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.models.job_ownership import JobOwnership
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.l3.interfaces import InMemoryCache, RecordingTraceSink
@@ -128,18 +129,59 @@ class NoPollQueue:
 
 
 class _FakeSession:
-    """/v1/generate의 session 의존성용 가짜 세션 — 동의 원장 조회만 모사."""
+    """/v1/generate·/v1/jobs의 session 의존성용 가짜 세션 — 동의 조회 + job_ownership 모사.
+
+    `ownership`는 여러 HTTP 요청(POST 큐잉 → GET 폴링)에 걸쳐 *공유*되는 인메모리 딕셔너리다
+    (`_client()`가 하나 만들어 클로저로 매 요청의 새 `_FakeSession` 인스턴스에 주입) — 실
+    세션은 매 요청 새로 만들어지지만(FastAPI `Depends`), job_id→user_id 매핑은 요청 경계를
+    넘어 살아있어야 실제 `job_ownership` 테이블의 영속성을 흉내낼 수 있다.
+
+    `default_owner`는 `ownership`에 명시 기록이 없는 job_id의 소유자를 무엇으로 볼지
+    결정한다 — 기본값(`_FAKE_USER.user_id`)은 SEC-27 이전부터 있던 큐 폴링 메커니즘
+    테스트들(TestJobsEndpoint 등)이 소유권 도입으로 회귀하지 않게 하기 위함이다(그
+    테스트들은 소유권이 아니라 큐 상태 매핑을 검증한다). 소유권 자체를 검증하는 테스트는
+    `default_owner=None`(매핑 부재) 또는 다른 UUID(타 사용자 소유)를 명시한다.
+    """
+
+    def __init__(
+        self,
+        *,
+        default_owner: uuid.UUID | None = None,
+        ownership: dict[str, uuid.UUID] | None = None,
+    ) -> None:
+        self._default_owner = default_owner
+        self._ownership = ownership if ownership is not None else {}
 
     async def scalar(self, stmt: Any) -> Any:
         return None
 
+    def add(self, obj: Any) -> None:
+        if isinstance(obj, JobOwnership):
+            self._ownership[obj.job_id] = obj.user_id
 
-async def _fake_session() -> AsyncIterator[_FakeSession]:
-    yield _FakeSession()
+    async def commit(self) -> None:
+        return None
+
+    async def get(self, model: Any, pk: Any) -> Any:
+        if model is JobOwnership:
+            owner = self._ownership.get(pk, self._default_owner)
+            return JobOwnership(job_id=pk, user_id=owner) if owner is not None else None
+        return None
 
 
-def _client(provider: StubProvider, queue: Any | None = None) -> TestClient:
-    """provider/cache/trace/queue를 가짜로, get_current_user/get_session을 오버라이드."""
+def _client(
+    provider: StubProvider,
+    queue: Any | None = None,
+    *,
+    job_owner: uuid.UUID | None = _FAKE_USER.user_id,
+) -> TestClient:
+    """provider/cache/trace/queue를 가짜로, get_current_user/get_session을 오버라이드.
+
+    `job_owner`(SEC-27) — 명시 기록 없는 job_id의 기본 소유자. 기본값은 `_FAKE_USER`라
+    기존(소유권 도입 이전) 테스트가 무회귀. 실제 POST(큐잉)→GET(폴링) 왕복은 같은 클라이언트
+    안에서 `ownership` 딕셔너리를 공유하므로, POST가 기록한 실 소유자가 `job_owner` 기본값보다
+    우선한다(`_FakeSession.get`의 `ownership.get(pk, default_owner)`).
+    """
     app = create_app(
         provider=provider,
         cache=InMemoryCache(),
@@ -148,7 +190,13 @@ def _client(provider: StubProvider, queue: Any | None = None) -> TestClient:
         queue=queue if queue is not None else StubQueue(),
     )
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
-    # /v1/generate가 ConsentScope.ai_training 동의 판정에 session을 쓰므로 가짜 세션 주입.
+    ownership: dict[str, uuid.UUID] = {}
+
+    async def _fake_session() -> AsyncIterator[_FakeSession]:
+        yield _FakeSession(default_owner=job_owner, ownership=ownership)
+
+    # /v1/generate가 ConsentScope.ai_training 동의 판정 + job_ownership 기록에 session을
+    # 쓰므로, /v1/jobs가 소유권 조회에 쓰는 것과 같은 가짜 세션을 주입한다.
     app.dependency_overrides[get_session] = _fake_session
     return TestClient(app)
 
@@ -640,6 +688,61 @@ class TestJobsEndpoint:
         assert body["error"] is not None
 
 
+class TestJobsOwnership:
+    """SEC-27(48_보안 §P0) — `GET /v1/jobs/{id}` 소유권(job↔user) 인가 회귀.
+
+    acceptance④: 소유자 ALLOW, 다른 사용자 DENY, 미인증 DENY(+ 매핑 부재도 DENY —
+    acceptance③이 명시한 세 번째 상태). 전부 404로 통일(존재 자체 비노출 — `get_job`
+    docstring의 근거)한다.
+    """
+
+    def test_owner_can_poll_own_job(self) -> None:
+        """POST가 큐잉한 job을 같은(소유자) 사용자가 폴링 → 200(왕복 — 실 소유권 기록 경로).
+
+        `job_owner=None`(매핑 없으면 거부)으로 명시해 "POST가 실제로 JobOwnership 행을
+        기록했다"는 것 자체를 변별한다 — 기본값(`_FAKE_USER`)을 그대로 뒀다면 POST의
+        기록 여부와 무관하게 항상 200이 나와 이 테스트가 아무것도 검증하지 못했을 것이다.
+        """
+        queue = StubQueue(
+            job_id="job-owned-1",
+            statuses={"job-owned-1": JobStatus(job_id="job-owned-1", state="pending")},
+        )
+        client = _client(StubProvider(), queue=queue, job_owner=None)
+        payload = {
+            "request": {
+                "task_type": "self_verify",
+                "difficulty": "hard",
+                "requires_reasoning": True,
+                "student_subscription": "free",
+                "sync": False,
+                "call_site": "self_verify",
+            },
+            "prompt": "검증해줘",
+            "system": "",
+        }
+        post_resp = client.post("/v1/generate", json=payload)
+        assert post_resp.status_code == 202
+        job_id = post_resp.json()["job_id"]
+        assert job_id == "job-owned-1"
+        get_resp = client.get(f"/v1/jobs/{job_id}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["state"] == "pending"
+
+    def test_other_user_job_returns_404(self) -> None:
+        """소유자가 다른 사용자(job_owner≠현재 인증 사용자) → 404(리소스 존재 비노출)."""
+        queue = StubQueue(statuses={"j-other": JobStatus(job_id="j-other", state="pending")})
+        client = _client(StubProvider(), queue=queue, job_owner=uuid.uuid4())
+        resp = client.get("/v1/jobs/j-other")
+        assert resp.status_code == 404
+
+    def test_unmapped_job_returns_404(self) -> None:
+        """job_ownership 행 자체가 없음(job_owner=None) → 404(매핑 부재도 동일 거부)."""
+        queue = StubQueue(statuses={"j-unmapped": JobStatus(job_id="j-unmapped", state="pending")})
+        client = _client(StubProvider(), queue=queue, job_owner=None)
+        resp = client.get("/v1/jobs/j-unmapped")
+        assert resp.status_code == 404
+
+
 class TestJobsAuthGate:
     """SEC-24(원 SEC-15) M6 — `GET /v1/jobs/{id}` 인가 회귀(오버라이드 없는 *실제* `get_current_user`).
 
@@ -674,15 +777,24 @@ class TestJobsAuthGate:
         assert resp.status_code == 401
 
     def test_valid_token_keeps_polling_behavior(self) -> None:
-        """유효 토큰(실 mint/decode 왕복) → 기존 폴링 동작(200 + 상태) 유지."""
+        """유효 토큰(실 mint/decode 왕복) + 소유자 본인 → 기존 폴링 동작(200 + 상태) 유지.
+
+        SEC-27: `get_job`이 이제 `JobOwnership` PK lookup도 하므로(`get_current_user`와 같은
+        세션 인스턴스 — FastAPI Depends 캐시) `_UserSession.get`이 모델별로 분기해 job "j1"의
+        소유자를 `user`로 응답한다.
+        """
         user = UserProfile(user_id=uuid.uuid4())
         app = self._app(statuses={"j1": JobStatus(job_id="j1", state="pending")})
 
         class _UserSession:
-            """get_current_user가 부르는 `get(UserProfile, pk)`만 모사(test_problems 패턴)."""
+            """get_current_user·get_job이 부르는 get(model, pk) 모사(test_problems 패턴)."""
 
-            async def get(self, model: Any, pk: uuid.UUID) -> UserProfile | None:
-                return user if pk == user.user_id else None
+            async def get(self, model: Any, pk: Any) -> Any:
+                if model is UserProfile:
+                    return user if pk == user.user_id else None
+                if model is JobOwnership:
+                    return JobOwnership(job_id="j1", user_id=user.user_id) if pk == "j1" else None
+                return None
 
         async def _fake_session() -> Any:
             yield _UserSession()
@@ -750,6 +862,94 @@ class TestDocsProdSurfaceGate:
             get_settings.cache_clear()  # 다음 테스트로 kakao 구성 누수 방지.
 
 
+class TestSecurityHeadersMiddleware:
+    """SEC-26(48_보안 §P0 "CORS/보안 헤더 미들웨어" 갭) — 모든 응답에 보안 헤더가 얹힌다.
+
+    HSTS·CSP는 `_prod_like`에서만(도크스 게이팅과 같은 축 재사용 — `TestDocsProdSurfaceGate`와
+    동일한 kakao env 트리거 패턴). 나머지 3종은 항상.
+    """
+
+    def _client(self) -> TestClient:
+        app = create_app(
+            provider=StubProvider(),
+            cache=InMemoryCache(),
+            trace=RecordingTraceSink(),
+            queue=StubQueue(),
+        )
+        return TestClient(app)
+
+    def test_always_on_headers_present_in_dev(self) -> None:
+        """dev(kakao 미설정) → nosniff·DENY·referrer-policy는 있고 HSTS·CSP는 없다."""
+        get_settings.cache_clear()
+        try:
+            resp = self._client().get("/health")
+            assert resp.headers["x-content-type-options"] == "nosniff"
+            assert resp.headers["x-frame-options"] == "DENY"
+            assert resp.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+            assert "strict-transport-security" not in {k.lower() for k in resp.headers}
+            assert "content-security-policy" not in {k.lower() for k in resp.headers}
+        finally:
+            get_settings.cache_clear()
+
+    def test_hsts_and_csp_present_when_production_like(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """kakao 구성(프로덕션 추정) → HSTS·CSP가 추가로 실린다."""
+        monkeypatch.setenv("WHYMATH_KAKAO_CLIENT_ID", "prod-kakao-id")
+        get_settings.cache_clear()
+        try:
+            resp = self._client().get("/health")
+            assert resp.headers["strict-transport-security"] == (
+                "max-age=63072000; includeSubDomains; preload"
+            )
+            assert resp.headers["content-security-policy"] == (
+                "default-src 'none'; frame-ancestors 'none'"
+            )
+            # 상시 헤더도 여전히 실린다(축소가 아니라 추가).
+            assert resp.headers["x-content-type-options"] == "nosniff"
+        finally:
+            get_settings.cache_clear()
+
+
+class TestTrustedHostMiddleware:
+    """SEC-26 — TrustedHostMiddleware. 미설정(기본) → `*`(무회귀). 설정 시 Host 헤더 검증."""
+
+    def test_default_allows_any_host(self) -> None:
+        """미설정 → 어떤 Host 헤더든 통과(현재 동작 무회귀)."""
+        get_settings.cache_clear()
+        try:
+            app = create_app(
+                provider=StubProvider(),
+                cache=InMemoryCache(),
+                trace=RecordingTraceSink(),
+                queue=StubQueue(),
+            )
+            resp = TestClient(app, base_url="http://anything.example.com").get("/health")
+            assert resp.status_code == 200
+        finally:
+            get_settings.cache_clear()
+
+    def test_configured_allowlist_rejects_mismatched_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """WHYMATH_TRUSTED_HOSTS_ALLOWLIST 설정 시, 목록 밖 Host는 400으로 거부된다."""
+        monkeypatch.setenv("WHYMATH_TRUSTED_HOSTS_ALLOWLIST", "api.whymath.kr")
+        get_settings.cache_clear()
+        try:
+            app = create_app(
+                provider=StubProvider(),
+                cache=InMemoryCache(),
+                trace=RecordingTraceSink(),
+                queue=StubQueue(),
+            )
+            ok = TestClient(app, base_url="http://api.whymath.kr").get("/health")
+            assert ok.status_code == 200
+            rejected = TestClient(app, base_url="http://evil.example.com").get("/health")
+            assert rejected.status_code == 400
+        finally:
+            get_settings.cache_clear()
+
+
 class TestParseAppVersion:
     """`_parse_app_version` 순수 함수 단위테스트(OPS-17) — 외부 semver 라이브러리 없이 정수
     3튜플 비교로 버전을 가른다."""
@@ -798,6 +998,14 @@ class TestAppVersionGate:
             queue=queue,
         )
         app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+
+        # SEC-27: get_job이 session.get(JobOwnership, ...)을 부르므로, 이 클래스의 관심사
+        # (미들웨어)와 무관한 실 DB 진입을 막기 위해 _FAKE_USER를 기본 소유자로 하는 가짜
+        # 세션을 주입한다(_client()의 _FakeSession과 동형 — 여기선 클래스 헬퍼가 별도라 인라인).
+        async def _fake_session() -> AsyncIterator[_FakeSession]:
+            yield _FakeSession(default_owner=_FAKE_USER.user_id)
+
+        app.dependency_overrides[get_session] = _fake_session
         return app
 
     def test_missing_header_passes_through_and_counts_unknown(self) -> None:

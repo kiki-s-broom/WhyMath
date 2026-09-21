@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-95-batch-canary-abort-gate
+title: "배치 안전장치 — 카나리 게이트 + 롤링 불량률 중단 (진행 중 멈추는 장치 0건 해소·설계서 갭 G-1)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 카나리 2단계 — 본배치 전 소량(기본 30건) 생성 후 전 게이트 통과율을 판정하고 미달 시 본배치를 시작하지 않는다(exit 1). **판정은 점추정이 아니라 Wilson 단측 하한**(CLAUDE.md 검증 권위: 점추정·인상 판정 금지)"
+  - "② 임계 = **0.90** (2026-09-05 Kiki 결정). 근거: n=30에서 임계 0.95는 **만점 30/30(Wilson 95% 하한 91.7%)에도 통과 불가능한 명세**다. 0.90이면 30/30(91.7%)만 통과하고 29/30(86.4%)은 탈락한다 — 사실상 만점 요구. n을 60으로 늘리는 대안(60/60→95.7%)은 생성·검수 비용 2배라 미채택. **n 또는 임계를 바꾸려면 이 계산을 다시 하고 근거를 남긴다**"
+  - "③ 롤링 불량률 중단 — 본배치 진행 중 최근 N건 창의 불량률이 임계 초과 시 즉시 중단한다. 그 시점까지의 통과분은 커밋하고 탈락분은 보존한다(삭제 금지). 중단 사유·창 크기·관측 불량률을 리포트에 남긴다"
+  - "④ 집행 별항(정본화≠집행) — 현행 배치 루프 3종(l3/equivalent/orchestrator.py::run_batch · harness/problem_corpus_accumulate.py::run_corpus_accumulate · harness/problem_corpus_batch.py::run_batch) 중 **어느 것이 이 게이트를 실제로 경유하는지 명기**한다. 경유하지 않는 루프가 남으면 그 사실을 그대로 적는다 — 있는 척 금지"
+  - "⑤ 변별력 양방향 실측 — 카나리 통과율을 임계 아래로 주입하면 본배치 미시작(exit 1), 위로 주입하면 진행. 롤링도 동일하게 양방향. **정상 입력에서 초록인 것은 보호의 증거가 아니다**(CLAUDE.md 2026-09-01)"
+  - "⑥ 실패 경로 설계 — 측정 자체가 실패하면(생성 0건·게이트 예외 등) '불량 0% 통과'가 아니라 **측정 실패로 exit 1**. 단계마다 즉시 flush해 중단 시에도 증거가 남는다(CLAUDE.md 2026-08-22)"
+artifacts:
+  - "PR #989 (https://github.com/doldori7/WhyMath/pull/989) — squash fd55515f · harness/batch_safety.py 신설(evaluate_canary Wilson 단측 하한·RollingFailureWindow·NEUTRAL_STATUSES) + run_corpus_accumulate·CLI 배선(카나리 관문·롤링 중단·exit 1) · 신규 테스트 51건(관련 81건 통과) · 커버리지 batch_safety 99%/accumulate 92% · 뮤테이션 20종 전건 검출 · 전체 스위트 11,811 passed(실패 0) · ruff·black·mypy --strict(638파일) EXIT=0 · CI 성공 9/skip 9/실패 0 · Codex P1(기본 설정 무판정) 수용·수정·resolved"
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - src/backend/whymath_backend/harness/problem_corpus_batch.py
+  - src/backend/whymath_backend/l3/equivalent/orchestrator.py
+  - "tests/backend/harness/**"
+session: null
+notes: "출처: docs/reviews/eos_micro_project_orchestration_v1_gap_review_2026-09-05.md §6 갭 G-1(최대 가치) + §4-C 통계 판정. 실측: 저장소에 건별 게이트(수용 게이트 4종)와 사후 게이트(qa_pipeline·corpus_reverify)는 있으나 **배치 진행 중에 멈추는 장치가 0건**이다 — 배치 루프 3종이 전부 for _ in range(n)이고 누적 통계로 break하지 않는다. 10~11월 콘텐츠 대량 생산 국면에서 결함이 대량 복제된 뒤에야 사후 게이트가 발견한다."
+updated: 2026-09-06

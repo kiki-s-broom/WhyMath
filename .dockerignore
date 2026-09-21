@@ -29,6 +29,8 @@ src/data-pipeline
 
 # 문서·하네스 대장·테스트 (이미지에 넣지 않는다)
 docs
+# 예외: L3 프롬프트 정본은 런타임(부팅) 필수 — Dockerfile `COPY docs/prompts`의 짝 (EOS-89 · 2026-09-07)
+!docs/prompts
 tests
 backlog
 scripts

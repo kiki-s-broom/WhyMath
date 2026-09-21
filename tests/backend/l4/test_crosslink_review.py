@@ -365,11 +365,20 @@ _TRANCHE5_DIRECT: dict[str, set[tuple[str, float]]] = {
     "same-item-permutation-no-divide": {("M0190", 0.95)},
 }
 
+# MISC-21 — EOS G0 앵커 A1·A2·A3 좌석 보강 3종(같은 화이트리스트 계약·전행 pending·미서명).
+# A5는 의도적 미승격(카탈로그 docstring·misconception_diagnosis.md #65-67 판정 근거 참조)이라
+# 여기 없다.
+_MISC21_DIRECT: dict[str, set[tuple[str, float]]] = {
+    "bigger-denominator-bigger-fraction": {("M0462", 0.9)},
+    "ratio-order-swapped": {("M0515", 0.85)},
+    "addition-multiplication-rule-confused": {("M0599", 0.9)},
+}
+
 
 def test_real_queue_direct_top_confidences_match_draft(
     real_rows: list[dict[str, Any]],
 ) -> None:
-    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 — 그 외 차단.
+    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 — 그 외 차단.
     expected: dict[str, set[tuple[str, float]]] = {
         k: set(_DRAFT_DIRECT_TOPS.get(k, set()))
         | set(_REVIEWED_DIRECT_ALTS.get(k, set()))
@@ -380,6 +389,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE3_DIRECT.get(k, set()))
         | set(_TRANCHE4_DIRECT.get(k, set()))
         | set(_TRANCHE5_DIRECT.get(k, set()))
+        | set(_MISC21_DIRECT.get(k, set()))
         for k in set(_DRAFT_DIRECT_TOPS)
         | set(_REVIEWED_DIRECT_ALTS)
         | set(_S2P_DIRECT)
@@ -389,6 +399,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE3_DIRECT)
         | set(_TRANCHE4_DIRECT)
         | set(_TRANCHE5_DIRECT)
+        | set(_MISC21_DIRECT)
     }
     actual: dict[str, set[tuple[str, float]]] = {}
     for row in real_rows:

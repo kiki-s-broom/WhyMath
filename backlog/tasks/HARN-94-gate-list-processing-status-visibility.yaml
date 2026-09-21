@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-94-gate-list-processing-status-visibility
+title: "게이트 화면이 처리 상황을 말하지 않는다 — 경과일만 내고 remind_after_days·차단 태스크·정렬이 없다"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정: 세 화면(gates list · status 텍스트 · status --json)이 pending 게이트에 대해 경과일만 낸다 — remind_after_days를 어디에도 출력하지 않는다. 결과: 2026-09-08 실측에서 G-eos63(7일 경과/리마인드 7일 = 초과)과 G-eos-ip-separation-evidence(9일 경과/리마인드 14일 = 미도래)가 화면상 구분되지 않고, 오히려 후자가 더 급해 보인다. 정렬도 id순이라 급한 것이 아래로 밀린다. ② 왜 고쳐야 하는가: 게이트 화면은 \"지금 사람이 무엇을 해야 하는가\"의 정본인데, 재확인 예약 게이트(재확인 지점 2026-10-26 · 2026-09-27 · 2026-12-13 3건)와 즉시 행동 게이트가 같은 무게로 뜬다. 예약분이 \"N일 방치\"로 읽히면 목록 전체가 소음이 되고, 소음이 된 목록은 사람이 읽지 않는다 — 상시 실패 fail-open 경고가 습관화되는 것과 같은 형태다. ③ 표시 축(사실만 · 추론 금지): 경과일 · remind_after_days · 초과/미도래 및 그 일수 · 이 게이트를 requires_gates로 건 미종결 태스크 건수. 산문 title에서 \"재확인 지점\"을 파싱해 추정하지 않는다(모른다 != 아니다) — remind_after_days가 이 저장소가 이미 채택한 그 축의 대리값이다. ④ 계산은 한 곳: selector.gate_dependent_tasks(단일 진실 원천)를 재사용하고, 게이트 상태 계산 헬퍼를 report.py에 두어 세 소비자가 같은 값을 쓴다. 각자 comprehension으로 만들면 한쪽만 고쳐질 때 두 화면이 서로 다른 사실을 말한다. ⑤ 정렬: 독촉 초과분 먼저(초과 일수 큰 순) - 미도래(남은 일수 적은 순) - 기한 없음. id순 정렬은 급한 것을 아래로 민다. ⑥ 변별력(실패 주입): 뮤테이션으로 각 축을 무력화해 RED를 실측한다 - 초과 판정을 뒤집기 - remind 표시 제거 - 차단 건수를 0 고정 - 정렬을 id순으로 회귀. 정상 입력에서 초록인 것은 보호의 증거가 아니다. 픽스처는 각 절을 실제로 밟아야 한다 - 초과/미도래/기한없음 세 상태를 모두 넣는다. ⑦ JSON 축도 같은 사실을 낸다 - status --json의 pending_gates에 remind_after_days · overdue · blocked_tasks를 추가한다. 텍스트만 고치면 기계 소비자가 여전히 구분하지 못한다."
+  - "[정정 2026-09-08] ⑦의 필드명 `blocked_tasks`는 틀렸다 — 구현은 `dependents`를 내며 그것이 맞다. 근거: 게이트는 status가 blocked인 태스크만 붙잡지 않는다. `todo` 태스크도 `requires_gates`로 착수 후보에서 제외되므로, blocked만 세면 그 게이트가 실제로 붙잡는 양을 **과소 보고**한다. 값의 출처인 `selector.gate_dependent_tasks`는 미종결(done·cancelled 제외) 전건을 돌려주며 그 docstring이 \"이 목록은 *의존 관계*이지 '현재 차단'이 아니다\"라고 명시한다. 구현을 틀린 문면에 맞추면 JSON이 자기 내용에 대해 거짓말을 하므로 이름을 값의 의미에 맞추고 계약을 정정한다. 발견 = Codex P2 리뷰(PR #1070) — 지적이 옳았고(문면≠구현) 해소 방향만 리뷰가 제시한 두 갈래 중 \"계약 정정\" 쪽을 택했다. 동결 = `tests/harness/test_gate_processing_status.py::test_status_json_exposes_the_same_facts`가 키 이름과 그 근거를 못박는다."
+artifacts:
+  - "#1070"
+paths:
+  - scripts/harness/report.py
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "2026-09-08 /gates 실행 중 발견 — 대기 10건을 훑다가 경과일만으로는 급한 것과 예약된 것을 가를 수 없음을 확인. Kiki 지시로 착수.\n\n[정정 2026-09-08] Codex P2(PR #1070) 수용 — acceptance ⑦의 필드명이 값의 의미와 어긋나 계약을 정정"
+updated: 2026-09-08

@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-12
+title: Concept schema misconception_codes 제거 및 MisconceptionRelation canonical 전환
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: cancelled
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - concept.schema.yaml의 misconception_codes 필드 삭제
+  - "MisconceptionRelation이 Concept↔Misconception 관계의 유일 진실원천임을 문서화"
+  - cross-reference 일관성 테스트 추가
+artifacts: []
+paths:
+  - schemas/v1.1/concept.schema.yaml
+  - src/backend/whymath_backend/db/models/misconception_relation.py
+session: null
+notes: "CLAUDE.md Concept Purity 준수. 검토 문서 §10·§25·§68-7 반영.\n\n[정정 2026-09-12] eos_priority null → P2: PR #893 회수 시점 백필 — Concept Purity 구조 정합성 수정(schema 필드 제거), 12월 검증 G0~G5 콘텐츠 파이프라인 자체를 막지 않아 P2\n\n[취소 2026-09-12] PR #893 회수 중 발견: main의 tests/data_pipeline/concept_graph/test_concept_node_purity.py::test_misconception_link_is_reference_only가 misconception_codes를 Concept-Misconception의 허용된 참조 키(전체 오개념 데이터 내장이 아니라 카탈로그 코드 참조)로 이미 명시 승인, 동결하고 있음을 확인. 2026-08-26 시점 설계(검토문서 근거 완전 제거)는 그 이후 main에 착지한 이 테스트와 충돌하여 schemas concept.schema.yaml의 필드 제거를 되돌림. 재설계가 필요하면 신규 태스크로 재등재할 것."
+updated: 2026-09-12

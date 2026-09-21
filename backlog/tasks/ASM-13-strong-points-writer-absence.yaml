@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ASM-13-strong-points-writer-absence
+title: "assessment.strong_points writer 0건 처분 — 학생 응답에는 실려 나가는데 채우는 코드가 없는 컬럼 (공급 축)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 처분 판정 먼저: strong_points를 (a) 채운다(writer 배선) (b) 응답에서 뺀다 (c) '예약 좌석'으로 자인 주석+동결 — 셋 중 하나를 실측 근거로 고른다. 판정이 결론이지 배선이 결론이 아니다"
+  - "② 실측 전제(2026-09-06·main 794c0ea8): 5필드 중 strong_points만 writer 0건이다. capture(api/me.py:2730-2732)는 concept_diagnosis·weak_points·recommended_path 3필드를, assemble(:3021)은 pattern_diagnosis를 채우지만 strong_points는 어느 경로도 채우지 않는다 — 그런데 StudentAssessment 응답 스키마(schema/assessment.py:139)에는 실려 나가 학생에게 항상 [] 로 보인다"
+  - "③ (a)를 고르면 '작동 신호 없는 알고리즘 부착 금지' 준수 — 채운 비율이 assessment_seat_reach_report(harness/)에 보이게 한다. (b)를 고르면 ASM-07 예측필드 봉인과 같은 허용목록 구조를 따르고 test_prediction_field_sealing.py 계열 동결을 갱신한다"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1018"
+paths:
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/schema/assessment.py
+session: null
+notes: "출처: ARCH-38 판정 세션(2026-09-06)의 부수 실측. 정본 §7-C '좌석이 있다고 writer가 있다는 뜻이 아니다'의 **컬럼 축** 사례 — 그 조항은 테이블 축(learning_session writer 0)만 예시로 들고 있었다. ARCH-38 notes가 '소유자 없는 알려진 결함은 Gate D(owner 존재) NO'라 적었으므로 이 결함에도 소유자가 필요하다. ARCH-38 본체(좌석 분리 판정)와 축이 다르다 — 이쪽은 분리가 아니라 공급이다. 인접: ASM-11(적재된 행을 보는 학생 화면 부재·소비 축)."
+updated: 2026-09-06

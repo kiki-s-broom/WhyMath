@@ -339,6 +339,12 @@ def test_dockerfile_preserves_repo_layout() -> None:
     assert re.search(
         r"^COPY data /app/data$", text, re.MULTILINE
     ), "data/ 동봉이 사라졌다 — 런타임이 읽는 data/corpus가 이미지에 없다"
+    # EOS-89 이후 `create_app()`이 부팅 시 수학 어댑터를 즉시 조립 → `l3.cross_verify`의 모듈 수준
+    # `prompt_text()`가 부팅 경로에 들어와 `docs/prompts/l3_*.md`가 없으면 컨테이너가 기동 중 죽는다
+    # (2026-09-07 docker-build 스모크 실측). 이 줄이 빠지면 /health/live 스모크가 RED다.
+    assert re.search(
+        r"^COPY docs/prompts /app/docs/prompts$", text, re.MULTILINE
+    ), "docs/prompts 동봉이 사라졌다 — 부팅 시 PromptAssetError로 컨테이너가 죽는다(EOS-89)"
 
 
 def test_dockerignore_keeps_required_paths() -> None:
@@ -351,6 +357,12 @@ def test_dockerignore_keeps_required_paths() -> None:
             "교수법 팩 로드에서 깨진다"
         )
     assert ".venv" in lines, ".venv 제외가 사라졌다 — 818MB 컨텍스트 전송(2026-07-26 실측)"
+    # `docs`를 통째로 제외하면서 프롬프트 정본만 되살리는 부정 패턴 — Dockerfile `COPY docs/prompts`의
+    # 짝이다. 이 줄이 빠지면 COPY가 빌드 단계에서 "no such file"로 실패한다(EOS-89 · 2026-09-07).
+    assert "!docs/prompts" in lines, (
+        ".dockerignore에 `!docs/prompts` 예외가 없다 — `docs` 제외가 프롬프트 정본까지 지워 "
+        "`COPY docs/prompts`가 빌드 단계에서 실패한다"
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────

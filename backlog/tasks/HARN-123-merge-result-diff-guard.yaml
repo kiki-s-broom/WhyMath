@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-123-merge-result-diff-guard
+title: "머지 큐 squash가 마지막 커밋을 빠뜨림 — 머지 결과 diff ↔ PR head diff 대조 가드 + 푸시 직후 auto-merge 경합 차단 (산출물 소실 변종 2회차)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재현 — PR #1234의 머지 결과 `03cb6502`와 PR head `3b7da83f`를 `git diff`로 대조해 유실분(5파일·+33/−40)을 고정 픽스처로 남기고, GitHub API(pull_request merge_commit_sha·merge queue 로그·check suite head_sha)로 큐가 어느 head를 스냅샷했는지 확정한다. 추정(\"푸시와 enqueue가 같은 초에 겹침\")을 실측으로 바꾼다."
+  - "② 머지 결과 대조 가드 — `scripts/harness/merge_result_check.py <pr>`가 (a) PR head 대비 merge-base diff와 (b) squash 커밋 대비 그 부모 diff를 파일·해시 단위로 대조해 불일치면 exit 1과 유실 파일 목록을 낸다. `pr-auto-resync` 또는 신규 post-merge 워크플로(pull_request closed·merged)에서 자동 실행하고, 불일치 시 이슈 생성 + 원 브랜치 보존(자동 삭제 보류). 배선을 `tests/infra/test_test_suite_wiring.py`가 동결한다."
+  - "③ 예방 축 — enable_pr_auto_merge를 푸시 직후 호출할 때의 경합을 막는다: 활성화 전 PR head sha가 방금 푸시한 로컬 HEAD와 같은지 대조하고 다르면 대기·재시도(하네스 CLI 또는 런북 절차). 변별력: (a) 유실 픽스처 주입 → 가드 exit 1·파일 목록 정확 (b) 동일 diff → exit 0 (c) head 불일치 주입 → 활성화 거부."
+artifacts: []
+paths:
+  - scripts/harness/merge_result_check.py
+  - "tests/infra/test_merge_result_check*.py"
+  - ".github/workflows/pr-auto-resync.yml"
+  - ".github/workflows/post-merge-check.yml"
+session: null
+notes: "사고 경위 = MEMORY 2026-09-20 Kiki 결정 로그 항목(PR #1234 squash 03cb6502에 정정 커밋 3b7da83f 누락, git diff로 5파일 차이 실측). 1회차 = MEMORY 2026-09-18 '머지됐는데 force-push 되감기+빈 스쿼시로 산출물 소실'. 새 산문 규칙 등재 동결(CLAUDE.md v0.2.30) 이후 첫 사고라 규칙이 아니라 이 태스크로만 등재한다. HARN-118 대장 착지 시 계열 ID를 부여할 것."
+updated: 2026-09-20

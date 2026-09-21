@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MOB-21-onboarding-grade-schooltype-input
+title: "온보딩에 학년·학교유형 입력 추가 — EOS-82가 연 API의 클라이언트 측 소비"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P1
+owner: kiki
+depends_on:
+  - EOS-82-profile-grade-schooltype-writer
+requires_gates: []
+acceptance:
+  - "① 온보딩 목표 입력 페이지에 학년(10~14 드롭다운)·학교유형(SchoolType 12종 드롭다운) 2필드를 추가하고 기존 PATCH /v1/users/me 전송 본문에 합류시킨다. 자유 입력 금지(드롭다운만 — 3분 무마찰 원칙). 두 필드 모두 선택이며 비워도 진행된다(기존 온보딩 계약 유지)"
+  - "② 변별력 — 값을 고르지 않으면 본문에 키가 실리지 않고(서버 None 유지), 고르면 실린다는 것을 controller 단위 테스트로 동결한다. 항상 실리거나 항상 안 실리면 검사가 아니다"
+  - "③ 검증 — flutter analyze·flutter test 통과. 이 저장소 CI의 mobile 잡이 실제로 실행하는 명령 그대로 돌린다"
+artifacts: []
+paths:
+  - "src/mobile/lib/features/onboarding/**"
+  - "src/mobile/test/**"
+session: null
+notes: "선행 EOS-82가 백엔드 화이트리스트를 열었다(PATCH /v1/users/me에 grade·school_type 수용 + 테스트 8건 동결). 그러나 앱 온보딩은 목표 등급·점수·시험일·출생연도 4종만 모으므로 **학생이 값을 넣을 화면이 여전히 없다** — API만 열려 있고 소비자 4곳은 계속 None을 받는다. 이 태스크가 착지해야 G1이 실제로 닫힌다. 등재 사유(범위 분리): 세션 환경에 Flutter SDK가 없어 analyze·test로 검증할 수 없었다 — 검증 못 하는 변경을 같은 PR에 실으면 CI red 위험(CLAUDE.md 완료·병합 예외 ③). 참조: docs/reviews/eos_one_subject_completion_review_2026-09-03.md §2.4."
+updated: 2026-09-03

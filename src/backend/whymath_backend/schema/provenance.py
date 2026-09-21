@@ -425,6 +425,25 @@ class GenerationLog(BaseModel):
         description="출력 토큰 수",
         ge=0,
     )
+    cache_read_input_tokens: int | None = Field(
+        default=None,
+        description=(
+            "프롬프트 캐시에서 *읽힌* 프리픽스 토큰 수(EOS-99 적중 축). `input_tokens`와 "
+            "**합산 관계가 아니라 배타 관계**다 — Anthropic은 캐시 적중분을 input_tokens에서 "
+            "빼고 여기에 따로 센다. None=미기록(캐시 개념이 없는 로컬 Ollama 경로·응답 미노출·"
+            "이 컬럼 신설 이전 구행)이고 0=읽었는데 적중 0(실측)이다. 캐싱 플래그가 켜진 "
+            "회차에서 0이 이어지면 '켰지만 작동 안 함'이다(작동 신호 없는 알고리즘 부착 금지)."
+        ),
+        ge=0,
+    )
+    cache_creation_input_tokens: int | None = Field(
+        default=None,
+        description=(
+            "프롬프트 캐시에 *쓰인* 프리픽스 토큰 수(EOS-99 — 첫 회차 호출에서 발생·약 1.25배 "
+            "과금). 의미 규약은 `cache_read_input_tokens`와 동일(None=미기록·0=실측 0)."
+        ),
+        ge=0,
+    )
     cost_usd: float | None = Field(
         default=None,
         description="호출 비용(USD) — DECIMAL(8,4)",
@@ -476,6 +495,42 @@ class GenerationLog(BaseModel):
             "없으므로 전문을 담는다(#912 P1-1 — 자체 문면이라 저작권 무관·행당 수 KB 허용). "
             "복원은 `restore_input_snapshot`(해시 대조 통과분만 반환)."
         ),
+    )
+    run_id: str | None = Field(
+        default=None,
+        description=(
+            "이 호출이 속한 **생성 회차(Run) 식별자** — 리콜의 조인 축(EOS-97). 종전에는 "
+            "run_id가 `AccumulateReport`·`ReviewQueueEntry`에만 있고 GenerationLog에는 없어 "
+            "'이 배치로 만든 산출물'을 기계가 특정할 수 없었다(설계서 §3 리콜 시나리오가 "
+            "짚은 실제 공백). 값은 회차 시작 시 호출자가 정하고 JSONL append 시 스탬프된다 "
+            "— 회차 개념이 없는 경로(pregenerate 단발 인제스트)는 None=미기록(날조 금지)."
+        ),
+        max_length=64,
+    )
+    # ── 관측 좌석 (EOS-112) — 위 필드들이 '설정이 뭐라고 했나'라면 이 둘은 '누가 실제로
+    # 답했나'다. `model_name`은 설정 유래 **선언값**이라(ARCH-58) provider 측 대체·폴백·
+    # 프록시 라우팅이 일어나도 그대로다 — 그 어긋남을 볼 수 있는 유일한 축이 여기다.
+    served_model: str | None = Field(
+        default=None,
+        description=(
+            "응답이 *실제로 어느 모델에서 왔는지* — provider 응답 최상위의 모델 식별자"
+            "(OpenAI 호환 `model` · Anthropic `message.model` · Ollama `model`). "
+            "None=미관측이며 **설정값으로 접지 않는다** — 접으면 `model_name`의 복사본이 "
+            "되어 대조 축이 영영 0건 어긋남을 보고한다. `model_name`과 다른 것이 곧 "
+            "이상은 아니다: 별칭→버전 해소(`claude-sonnet-4-6` → 날짜 붙은 ID)도 같은 "
+            "차이로 나타나므로, 이 값은 *판정*이 아니라 *볼 자리*를 가리키는 신호다."
+        ),
+        max_length=128,
+    )
+    retries: int | None = Field(
+        default=None,
+        description=(
+            "이 호출 1건에서 일어난 재시도 횟수. None=미계측(Anthropic SDK·Ollama는 우리 "
+            "전송기를 타지 않아 카운터가 없다)이고 0=계측했고 한 번에 성공(실측)이다. "
+            "재시도는 측정을 가린다 — 30% 실패를 재시도로 덮으면 리포트가 100% 성공으로 "
+            "보이고 운영에서 같은 부하를 만났을 때 지연·쿼터 소모가 설명되지 않는다."
+        ),
+        ge=0,
     )
     cu_slug: str | None = Field(
         default=None,

@@ -85,6 +85,7 @@ from whymath_backend.harness.golden_benchmark import (
     GoldenLabel,
     GoldenSet,
     append_evaluation_ledger,
+    canonical_value,
     find_rescore_violation,
     load_evaluation_ledger,
     load_golden_set,
@@ -354,9 +355,14 @@ class MatrixReport:
     extraneous_predictions: tuple[str, ...]
     by_anchor: tuple[AnchorBreakdown, ...]
     fn_by_failure_code: Mapping[str, int]
-    """놓친 결함(FN)의 실패코드 분포 — 어떤 결함류를 못 보는지가 다음 교정 대상이다."""
+    """놓친 결함(FN)의 실패코드 분포 — 어떤 결함류를 못 보는지가 다음 교정 대상이다.
+
+    키 계약(EOS-75): 코드 **값** 문자열(`F1`~`F8`) 또는 `(코드 없음)` — 파이썬 enum
+    repr(`GenerationFailureCode.F1`)은 금지. JSON 소비자(`validation_scorecard`)가 이 표기만
+    읽는다.
+    """
     golden_by_failure_code: Mapping[str, int]
-    """골든 정답지의 실패코드 분포 — 내용 KPI별 정답지 확보 현황(acceptance ⑤)."""
+    """골든 정답지의 실패코드 분포 — 내용 KPI별 정답지 확보 현황(acceptance ⑤). 키 계약 동일."""
     ledger_enforced: bool
     parse_errors: tuple[str, ...] = field(default=())
     confidence: float = _CONFIDENCE
@@ -392,7 +398,13 @@ def build_report(
     golden_by_code: dict[str, int] = {}
     for item in golden.items:
         if item.label == GoldenLabel.DEFECTIVE:
-            code = str(item.failure_code) if item.failure_code is not None else "(코드 없음)"
+            # 키는 코드 값(`F1`)이다 — `str(enum)`은 repr(`GenerationFailureCode.F1`)을 내고,
+            # 검증 경유 항목이 우연히 str인 것에 기대지 않는다(EOS-75 · `canonical_value`).
+            code = (
+                canonical_value(item.failure_code)
+                if item.failure_code is not None
+                else "(코드 없음)"
+            )
             golden_by_code[code] = golden_by_code.get(code, 0) + 1
             prediction = by_slug.get(item.cu_slug)
             if prediction is not None and prediction.passed:
@@ -510,8 +522,10 @@ def render_report(report: MatrixReport) -> str:
     lines.append("| 내용 KPI (EOS-51 §6) | 골든 라벨 축 | 정답지 건수 | 채점기 | 좌석 |")
     lines.append("|---|---|---|---|---|")
     for consumer in CONTENT_KPI_CONSUMERS:
+        # 조회 키도 같은 표기(`canonical_value`)로 — 생산·조회가 갈라지면 정답지가 있어도 0건.
         count = sum(
-            report.golden_by_failure_code.get(str(code.value), 0) for code in consumer.failure_codes
+            report.golden_by_failure_code.get(canonical_value(code), 0)
+            for code in consumer.failure_codes
         )
         landed = _module_available(consumer.consumer_module)
         engine = f"`{consumer.consumer_module}`" if landed else "**미착지**"

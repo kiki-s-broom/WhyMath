@@ -209,8 +209,17 @@ class AtomConcept(BaseModel):
         default_factory=list,
         description="이 레코드에서 redact된 필드 마커(예 ['핵심명제/성취기준내용']). 누수 감사용.",
     )
+    behavior_skills: list[str] = Field(
+        default_factory=list,
+        description=(
+            "인지 행동 스킬 코드(예 'skill.reasonableness-check', dedup·사전순). 원자에만 채움 — "
+            "구 437 코퍼스(concept_graph_v1/concepts.jsonl)가 저작 정본, "
+            "concept_atom_crosswalk 경유 union+dedup 전파(S0-2 동일 의미론·SKB-02 corpus 병합)."
+            " 단원/소단원·비크로스워크 원자는 빈 리스트."
+        ),
+    )
 
-    @field_validator("standard_codes", "redacted_fields")
+    @field_validator("standard_codes", "redacted_fields", "behavior_skills")
     @classmethod
     def _validate_str_list(cls, v: list[str]) -> list[str]:
         """리스트 항목에 빈 문자열 금지(코드·마커 누락 차단)."""

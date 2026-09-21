@@ -16,6 +16,7 @@ acceptance:
   - "② gdmwhk의 카탈로그·소비 배선(schema/pedagogy_strategy.py·strategy_registry.py·runtime_selector.narrow_candidates·prompt_assembler.attach_strategy_card·YAML 10종·04f 문서)을 파일 단위 이식. 브랜치의 백로그 태스크 PED-18~21·REND-05는 main PED-18/19와 ID 충돌이므로 그대로 이식 금지 — 필요분만 CLI 재배정"
   - "③ PED-22·23 처분 판정 — gdmwhk 이식으로 충족되면 done(증적=이 태스크 PR) 또는 cancel 처리하고 사유를 notes에 기록. PED-24(생성기)·PED-25는 잔존 확인"
   - "④ 집행 지점 — 플래그 OFF 캔어리 상태에서 기존 경로 비트동일·ON에서 카탈로그 조회 실측(작동한 비율 원칙). 전체 backend 스위트 + exit code 판정"
+  - "⑤ [고립 참조 정정 2026-09-07 stray-code 8회차] (a) **처분 기록 의무** — gdmwhk 태스크 5건(REND-05 Kiki 08-11 결정: RETRIEVAL·SPACING·INTERLEAVING·SELF_EXPLANATION·VISUALIZATION이 select()에서 영원히 선택 불가·main 대응 0건 / PED-21 coach 실행용 축 수렴·signal_assembly / 기타)과 uqyg79 태스크 2건(PED-08 ① 신호 조립 공용 좌석 signal_assembly.py 60줄+테스트 119줄 — 로직은 main _build_signals get_state 리팩터가 우세·유실은 좌석 경계뿐 / **PED-13** coach objective_id 해석 다리 — concept 그래프 code ↔ 원자 code ID 공간 불일치·runtime crosswalk 필요 실측 분석이 main 어디에도 없음) 각각에 대해 재배정 ID 또는 제외 사유를 notes에 기록한다. main PED-08/13 번호는 다른 done 태스크가 점유 — CLI 재배정. (b) 04f 문서는 파일 단위 이식이 아니라 **병합** — main 04e는 PED-22~24 회수 부기·mode_guard 배선 행이 후행 갱신됐고 브랜치 ②mode_guard 판정 뒤집기는 PED-23(08-15)이 재역전해 폐기 대상. 반영할 것은 §10 'REND-05 진짜 갭' 재판정 행·§12 해제 조건 행·부록 재현 스크립트·**04e 문서번호 이중 점유 해소**(main에 04e_misconception_remediation_design.md와 04e_pedagogy_strategy_catalog.md가 공존·04f는 pedagogy_module_boundaries가 점유)뿐. (c) 소액 문서 잔여: .claude/agents/{llm-architect,ml-engineer,pedagogy-designer}.md PED-11 부기 4줄(main은 유령 필드 preferred_solution_style을 실재처럼 서술) · docs/architecture/00_overview.md 04e 인덱스 줄(정본 문서가 개요 인덱스에서 안 보임). (d) acceptance ③의 'PED-24 잔존 확인'은 stale — PED-24는 main done(#835). (e) 브랜치판 코드 채택 시 회귀 3종(mode_guard 판정·k_type 맹글링·secret 폴백) — 코드는 이식하지 않는다. 회수 완료 전 gdmwhk·uqyg79 삭제 금지"
 artifacts: []
 paths:
   - "data/corpus/pedagogy_strategies_v1/**"
@@ -24,5 +25,5 @@ paths:
   - docs/architecture/04f_pedagogy_strategy_catalog.md
   - "tests/backend/l4/**"
 session: null
-notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §3-②. 카탈로그 계보: uqyg79(1차)→enfkqt(부분집합·삭제)→gdmwhk(3차 완성본·PR 미오픈)→main PED-22~25(4차 구현 대기). gdmwhk는 브랜치 태스크가 todo라 고립-done 탐지기 사각(HARN-31 등재 근거). 회수 완료 전 gdmwhk·uqyg79 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §3-②. 카탈로그 계보: uqyg79(1차)→enfkqt(부분집합·삭제)→gdmwhk(3차 완성본·PR 미오픈)→main PED-22~25(4차 구현 대기). gdmwhk는 브랜치 태스크가 todo라 고립-done 탐지기 사각(HARN-31 등재 근거). 회수 완료 전 gdmwhk·uqyg79 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 — gdmwhk·uqyg79 두 브랜치: 코드 잔여 0이나 acceptance ②가 '필요분만 CLI 재배정'이라 처분 기록 의무가 없어 REND-05·PED-21·PED-13 판정이 done 시 조용히 소실될 구조이고, '04f 파일 단위 이식'은 main 04e 후행 갱신을 덮어쓴다. 7회차(PR #1020) 무접촉"
+updated: 2026-09-07

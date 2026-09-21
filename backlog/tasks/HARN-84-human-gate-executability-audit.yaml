@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-84-human-gate-executability-audit
+title: "사람 게이트의 실행 가능성 감사 — 태스크를 막는 게이트가 '무엇을 어떻게 하면 닫히는지'를 어디에도 말하지 않는 상태 탐지"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 탐지: requires_gates로 태스크를 막는 kind=human 게이트 중, 실행 절차(런북 문서 경로·명령 블록·'무엇을 제출하면 닫히는가')를 title/notes/문서 어디에서도 찾을 수 없는 것을 열거한다 — 부재 판정이므로 검색 방법 자체를 출력에 명시한다(게이트 ID grep은 약한 도구다: docs/ops/eos02_prompt_cache_live_runbook.md는 실재하는데 게이트 ID를 인용하지 않아 grep에 안 걸린다)"
+  - "② 판정 아님: 경고로 낸다(exit 0). 결정형 게이트(법률 검토·판단 대기)는 실행 절차가 없는 것이 정상이라, 차단 게이트로 만들면 정상 상태에서 멈춘다 — 변별력 없는 정지 장치 금지"
+  - "③ 등재 시점 유도: backlog.py gates add가 '이 게이트를 닫으려면 담당자가 무엇을 해야 하는가'를 비워 두면 경고한다(거부 아님)"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+session: null
+notes: "발견 경위: G-eos63-skill-event-reach-sample이 2026-09-01 등재된 뒤 6일간 실행 절차가 어디에도 없어 아무도 닫을 수 없는 상태였다(OPS-68 세션이 런북을 새로 작성해 해소). 약한 도구(게이트 ID grep)로 훑은 결과 pending 11건 중 문서 참조가 잡히지 않는 것이 3건이었으나, 그 3건 중 최소 1건(G-eos02-prompt-cache-live-run)은 런북이 실재하고 게이트 ID만 인용하지 않은 경우다 — 즉 이 수치는 상한이 아니라 *측정 도구의 한계*를 보여주며, 그래서 이 태스크의 acceptance ①은 검색 방법 명시를 요구한다. '정본화를 집행으로 착각한 완료 선언 금지'의 게이트 대장 축.\\n\\n[개명 2026-09-07] 원래 HARN-82로 등재했으나(OPS-68 브랜치·미push 상태) 타 세션의 HARN-82-required-checks-premise-drift가 PR #1045로 main에 먼저 착지해 충돌했고, 재배정한 83도 원격 브랜치의 HARN-83-gate-clear-attribution-guard-tail-regex가 선점하고 있어 CLI 제안대로 84로 확정했다. add 시점의 가시성 고지가 예고한 그대로다 — '이 번호는 push 전까지 다른 세션에 보이지 않는다'. main이 trunk이므로 착지한 쪽이 82를 갖는다(validate가 충돌을 exit 1로 잡아 발견)."
+updated: 2026-09-07

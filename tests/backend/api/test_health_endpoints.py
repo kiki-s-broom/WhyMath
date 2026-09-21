@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -22,6 +24,8 @@ from fastapi.testclient import TestClient
 
 from whymath_backend.api._auth import UserProfile, get_current_user
 from whymath_backend.app import create_app
+from whymath_backend.db.models.job_ownership import JobOwnership
+from whymath_backend.db.session import get_session
 from whymath_backend.l3.interfaces import InMemoryCache, RecordingTraceSink
 from whymath_backend.l3.models import GenerationResult, RoutingDecision
 from whymath_backend.l3.providers.ollama import OllamaStatus
@@ -42,6 +46,21 @@ from whymath_backend.ops.service_health import (
 # 계측 표본용 고정 인증 사용자 — `/v1/jobs` 경로가 SEC-24(원 SEC-15) CurrentUser 게이트를 얻은 뒤에도
 # 이 파일의 미들웨어 테스트가 그 경로를 2xx 표본으로 계속 쓸 수 있게 한다(_build_app 참조).
 _FAKE_METRICS_USER = UserProfile(user_id=uuid.uuid4())
+
+
+class _FakeOwnershipSession:
+    """SEC-27: `/v1/jobs/{id}`가 이제 `session.get(JobOwnership, ...)`을 부른다 — 이 파일의
+    관심사(계측 미들웨어)와 무관한 실 DB 진입을 막고, 표본용 job_id 전부를
+    `_FAKE_METRICS_USER` 소유로 취급한다(test_app.py `_FakeSession` 동형·간이판)."""
+
+    async def get(self, model: Any, pk: Any) -> Any:
+        if model is JobOwnership:
+            return JobOwnership(job_id=pk, user_id=_FAKE_METRICS_USER.user_id)
+        return None
+
+
+async def _fake_session() -> AsyncIterator[_FakeOwnershipSession]:
+    yield _FakeOwnershipSession()
 
 
 class _BoomError(Exception):
@@ -117,6 +136,7 @@ def _build_app(
     # 얻어, 계측 표본용으로 그 경로를 쓰는 아래 테스트들이 401을 받지 않게 한다(인증 자체의
     # 양방향 검증은 test_app.py `TestJobsAuthGate`가 오버라이드 없이 담당).
     app.dependency_overrides[get_current_user] = lambda: _FAKE_METRICS_USER
+    app.dependency_overrides[get_session] = _fake_session
     return app, resolved_metrics
 
 

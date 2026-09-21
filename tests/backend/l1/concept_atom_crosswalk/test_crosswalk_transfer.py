@@ -34,6 +34,7 @@ from whymath_backend.l1.concept_atom_crosswalk.transfer import (
     load_concept_src_bridge,
     load_crosswalk_records,
     transfer_atom_behavior_skills,
+    transfer_concept_behavior_skills,
     transfer_k12_content_atom_codes,
 )
 
@@ -343,6 +344,49 @@ class TestAtomSkillUpdate:
         assert len(engine.executed) == 1
 
 
+class TestConceptSkillUpdate:
+    """런타임 concept.behavior_skills 갱신(SKB-01) — atom_node 짝(같은 mapping·다른 테이블)."""
+
+    def test_executes_update_not_insert(self) -> None:
+        store, engine = _fake_store()
+        report = store.update_concept_behavior_skills({"a1": ("skill.s1",)})
+        assert report == CrosswalkTransferReport(updated=1, missing=())
+        assert len(engine.executed) == 1
+        compiled = _compile(engine.executed[0])
+        assert "UPDATE concept" in compiled
+        assert "INSERT" not in compiled
+        assert "behavior_skills" in compiled
+        assert "concept.code =" in compiled
+
+    def test_does_not_touch_updated_at(self) -> None:
+        """`Concept`에는 `updated_at` 컬럼이 없다(atom_node와 달리) — SET에 등장하면 안 된다."""
+        store, engine = _fake_store()
+        store.update_concept_behavior_skills({"a1": ("skill.s1",)})
+        compiled = _compile(engine.executed[0])
+        assert "updated_at" not in compiled
+
+    def test_missing_row_reported(self) -> None:
+        store, _engine = _fake_store(missing_codes=frozenset({"a9"}))
+        report = store.update_concept_behavior_skills({"a1": ("skill.s1",), "a9": ()})
+        assert report.updated == 1
+        assert report.missing == ("a9",)
+
+    def test_codes_processed_in_sorted_order(self) -> None:
+        store, engine = _fake_store()
+        store.update_concept_behavior_skills({"b2": (), "a1": ()})
+        codes = [
+            stmt.compile().params["code_1"]  # type: ignore[attr-defined]
+            for stmt in engine.executed
+        ]
+        assert codes == ["a1", "b2"]  # 사전순(결정론)
+
+    def test_wrapper_uses_injected_store(self) -> None:
+        store, engine = _fake_store()
+        report = transfer_concept_behavior_skills({"a1": ("skill.s1",)}, store=store)
+        assert report.updated == 1
+        assert len(engine.executed) == 1
+
+
 class TestContentAtomCodesUpdate:
     def test_update_filters_k12_scope(self) -> None:
         """scope='K-12' 필터 — 대학 행은 WHERE가 구조적으로 차단(무변경 보장)."""
@@ -428,22 +472,29 @@ class TestCli:
             seen["atoms"] = dict(mapping)
             return CrosswalkTransferReport(updated=len(mapping), missing=())
 
+        def _fake_concepts(mapping: dict[str, tuple[str, ...]]) -> CrosswalkTransferReport:
+            seen["concepts"] = dict(mapping)
+            return CrosswalkTransferReport(updated=len(mapping), missing=())
+
         def _fake_content(mapping: dict[str, tuple[str, ...]]) -> CrosswalkTransferReport:
             seen["content"] = dict(mapping)
             return CrosswalkTransferReport(updated=len(mapping), missing=())
 
         # DB 우회 — transfer를 가짜로 교체(load·derive는 실 tmp 파일로 동작).
         monkeypatch.setattr(populate_cli, "transfer_atom_behavior_skills", _fake_atoms)
+        monkeypatch.setattr(populate_cli, "transfer_concept_behavior_skills", _fake_concepts)
         monkeypatch.setattr(populate_cli, "transfer_k12_content_atom_codes", _fake_content)
         rc = populate_cli.main(
             ["--crosswalk", str(cw), "--concept-graph", str(graph), "--concepts", str(concepts)]
         )
         assert rc == 0
-        # 전파 결과 — atom_codes 전체에 전파·K-12 연결은 src_id 키.
+        # 전파 결과 — atom_codes 전체에 전파·concept은 atom과 같은 mapping·K-12 연결은 src_id 키.
         assert seen["atoms"] == {"a1": ("skill.s1",), "a2": ("skill.s1",)}
+        assert seen["concepts"] == seen["atoms"]  # SKB-01: 같은 매핑 재사용(다리 불요)
         assert seen["content"] == {"N1": ("a1", "a2")}
         out = capsys.readouterr().out
         assert "unmapped 크로스워크 행 skip: 1건" in out  # math.a.y — 조용히 넘기지 않음
+        assert "concept.behavior_skills 갱신" in out
         assert "이전 완료" in out
 
     def test_missing_rows_are_reported(
@@ -455,6 +506,7 @@ class TestCli:
             return CrosswalkTransferReport(updated=0, missing=tuple(sorted(mapping)))
 
         monkeypatch.setattr(populate_cli, "transfer_atom_behavior_skills", _fake_report)
+        monkeypatch.setattr(populate_cli, "transfer_concept_behavior_skills", _fake_report)
         monkeypatch.setattr(populate_cli, "transfer_k12_content_atom_codes", _fake_report)
         rc = populate_cli.main(
             ["--crosswalk", str(cw), "--concept-graph", str(graph), "--concepts", str(concepts)]
@@ -462,4 +514,5 @@ class TestCli:
         assert rc == 0
         out = capsys.readouterr().out
         assert "atom_node 대상 행 부재 2건" in out
+        assert "concept 대상 행 부재 2건" in out
         assert "concept_content K-12 대상 행 부재 1건" in out

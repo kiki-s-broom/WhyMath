@@ -293,7 +293,7 @@ Write-Host "EXIT=$LASTEXITCODE"
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-python scripts/harness/backlog.py gates clear G-eos-verification-relevance-triage --evidence "2026-09-__ Kiki 판정. ①관여도 분류: 비종결 190건 전건 eos_priority 부여 완료(판정표 171 + 신규 19). 게이트 제목의 '151건(S3 68·S4 83)'은 8/31 수치이며 현행은 190건. ②이월 표시: N 판정분을 P2/P3로 부여(폐기 아님 — 선언 §6-5). ③CUR-11·CUR-12 착수 판정: 두 태스크 모두 그 사이 done(CUR-11 PR #920) — 판정 대상 소멸. 근거 문서 docs/reviews/eos_verification_relevance_triage_2026-08-31.md(제안본) + 매핑 규칙은 docs/ops/eos_relevance_triage_gate_runbook.md §2 결정②."
+python scripts/harness/backlog.py gates clear G-eos-verification-relevance-triage --as kiki --evidence "2026-09-__ Kiki 판정. ①관여도 분류: 비종결 190건 전건 eos_priority 부여 완료(판정표 171 + 신규 19). 게이트 제목의 '151건(S3 68·S4 83)'은 8/31 수치이며 현행은 190건. ②이월 표시: N 판정분을 P2/P3로 부여(폐기 아님 — 선언 §6-5). ③CUR-11·CUR-12 착수 판정: 두 태스크 모두 그 사이 done(CUR-11 PR #920) — 판정 대상 소멸. 근거 문서 docs/reviews/eos_verification_relevance_triage_2026-08-31.md(제안본) + 매핑 규칙은 docs/ops/eos_relevance_triage_gate_runbook.md §2 결정②."
 ```
 
 **6-4. 사후 자가검증 — 이것이 진짜 판정이다**

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from types import TracebackType
 
+from whymath_backend.composition import default_expression_equivalence
 from whymath_backend.l3.pedagogy.review import (
     REVIEWER_TAG,
     ReviewStore,
@@ -16,6 +17,9 @@ from whymath_backend.l3.pedagogy.review import (
     verb_confirms_k_type,
 )
 from whymath_backend.l3.pedagogy.slot_generator import build_slot_rows
+
+# EOS-89: 항등 판정 능력은 상류가 준다 — 이 파일에서는 테스트가 상류(엔트리포인트)다.
+_EQ = default_expression_equivalence()
 
 _VALID_NUMERIC = {
     "body": "이차함수 $f(x)=x^{2}-4x+3$ 의 최솟값을 구하시오.",
@@ -69,14 +73,14 @@ def _compile_sql(statement: object) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 class TestReviewGate:
     def test_valid_numeric_approved(self) -> None:
-        assert review_slot(_VALID_NUMERIC) == ReviewVerdict(True, None)
+        assert review_slot(_VALID_NUMERIC, equivalence=_EQ) == ReviewVerdict(True, None)
 
     def test_wrong_math_rejected(self) -> None:
         broken = {
             **_VALID_NUMERIC,
             "verification": {"claim_lhs": "1", "claim_rhs": "2"},
         }
-        v = review_slot(broken)
+        v = review_slot(broken, equivalence=_EQ)
         assert v.approved is False
         assert v.reason == "sympy_reverify_failed"
 
@@ -89,13 +93,13 @@ class TestReviewGate:
             "structure_tags": ["quadratic"],
             "verification": {"claim_lhs": "(2)**2 - 4*(2) + 3", "claim_rhs": "-1"},
         }
-        v = review_slot(leaked)
+        v = review_slot(leaked, equivalence=_EQ)
         assert v.approved is False
         assert v.reason == "answer_leak"
 
     def test_missing_tags_rejected(self) -> None:
         no_tags = {"body": "이차함수 $y=x^{2}$ 발문", "reasoning_type": "example_pair"}
-        v = review_slot(no_tags)
+        v = review_slot(no_tags, equivalence=_EQ)
         assert v.approved is False
         assert v.reason == "missing_structure_tags"
 
@@ -104,8 +108,9 @@ class TestReviewGate:
         rows = build_slot_rows(
             "U:OBJ-01",
             [{"type": "example_pair", "count": 2}, {"type": "diag_item", "count": 2}],
+            equivalence=default_expression_equivalence(),
         )
-        verdicts = review_rows(rows)
+        verdicts = review_rows(rows, equivalence=_EQ)
         assert all(v.approved for _id, v in verdicts)
 
 

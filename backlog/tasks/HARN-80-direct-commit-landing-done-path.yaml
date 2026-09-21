@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-80-direct-commit-landing-done-path
+title: "직접 커밋으로 main에 착지한 태스크의 done 경로 부재 — --no-pr 4종 어디에도 없고 잘못된 사유로 통과시키면 거부 우회 (CUR-07 실사례: 구현은 main 7b4fb546에 있는데 대장은 todo·HARN-34 노트는 '고립')"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 고정(2026-09-07 main b75f495d): CUR-07-achievement-standard-schema-extension 산출물 12파일이 main 7b4fb546(2026-08-25 · doldori7 · first-parent 직접 커밋 · 'Closes CUR-07' · PR 참조 없음)에 착지 — 브랜치 34zvse 판과 4파일 바이트 동일·6파일 main 후행 우세·acceptance ③ 충족(criteria_loader CriteriaMatchResult.unmatched). 그런데 main YAML은 status todo·artifacts []·session 34zvse(죽은 claim)이고 HARN-34 notes(08-30)는 '34zvse에 고립·미이식'으로 사실과 어긋난다. `backlog.py done CUR-07 --artifact 7b4fb546`은 PR 증적 게이트가 exit 1로 거부(실측) — --no-pr {investigation|incomplete|ci-red|kiki-hold} 어느 것도 '직접 커밋 착지'가 아니다"
+  - "② 경로 신설: --no-pr direct-commit <sha> — 기계 변별력 필수: 그 sha가 `git merge-base --is-ancestor <sha> origin/main`으로 trunk 조상임을 CLI가 실측한 뒤에만 통과(조상이 아니면 exit 1 · git 실패·shallow는 측정 실패로 exit 3 — 0건 통과로 위장 금지). 사유·sha는 notes와 이벤트 양쪽에 남는다 — 남지 않는 탈출구는 게이트를 끄는 것과 같다(HARN-68 --no-base 선례 동형)"
+  - "③ 변별력 양방향: main 조상 sha로는 done 성공, 비조상 sha(브랜치 전용 커밋)로는 거부, 기존 --no-pr 4종의 동작 불변 — 뮤테이션(조상 검사 제거)이 RED를 내는지 실측 후 통과 선언"
+  - "④ 집행: CUR-07을 이 경로로 done 전이하고(증적 7b4fb546·session 해제) HARN-34 notes의 '34zvse 고립' 기술을 amend로 정정한다. 그 뒤 34zvse는 코드 잔여 0(§5 실측)이므로 삭제 배치 후보 — 전이 전 삭제 금지"
+  - "⑤ 범위 밖: 직접 커밋 자체의 허용 여부(브랜치 보호 룰셋·OPS-08 소관) · HARN-57(done 후 artifacts 정정·PR #1021)과 중복 착수 금지 — 그쪽은 done *이후* 보정, 이쪽은 done *진입* 경로"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - tests/harness/test_cli.py
+  - backlog/tasks/CUR-07-achievement-standard-schema-extension.yaml
+  - backlog/tasks/HARN-34-lost-bookkeeping-gate-recovery.yaml
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5·§7 (stray-code 8회차 — 34zvse 커버리지 정독). CLAUDE.md '거부의 우회 금지' 처리 순서 ③(CLI 경로 자체가 없는 설계 공백이면 태스크로 등재 — HARN-06 선례). 8회차 세션은 done을 시도해 거부를 실측했고 우회하지 않았다. 코드·데이터 유실 0 — 대장(상태·증적·이벤트) 축만 공백."
+updated: 2026-09-07

@@ -18,11 +18,12 @@ acceptance:
   - "④ 검증 재수행 — 원 커밋 증적을 승계하지 않는다. CI 동일 명령·판정은 exit code"
   - "⑤ CI 배선 실재 확인 — 이 태스크가 만드는 계약이 실제로 CI 잡에서 실행되는지 확인한다(장치 존재 ≠ 배선·OPS-10)"
   - "⑥ 완료 조건 — 원 브랜치를 .github/branch-cleanup-request.txt 대상으로 기록"
+  - "⑦ [고립 참조 정정 2026-09-07 stray-code 8회차] 같은 브랜치 커밋 ee9df6dc의 태스크 등재 4건 중 HARN-15는 main done(#758)·OPS-21은 main OPS-32가 독립 흡수, **SEC-13(매니페스트 진실성)·OPS-20(이벤트 seam 강제)은 8회차가 SEC-32·OPS-67로 재등재**했다(번호 매핑: SEC-13→SEC-32 · OPS-20→OPS-67). ③의 r2 문서 처분에서 '폐기'를 택하더라도 §3 R2·R3·부록 B1·C1은 SEC-32·OPS-67의 유일한 실측 근거이므로 그 절은 착지시키거나 두 태스크 notes로 이관한 뒤에만 폐기한다. 부수: 원 OPS-19 acceptance ⑥의 ops.cost_report CI 미배선(main ci.yml 호출 0건)은 소유 태스크 없음 — 회수 판정 시 함께 처분"
 artifacts: []
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/infra/**"
   - "docs/architecture/*"
 session: null
-notes: "docs/reviews/unmerged_branch_verdict_2026-08-11.md. 원 브랜치 claude/whymath-ai-recommendation-review-q8tvcx head=e1835c0c·구현 커밋=592c961f·문서 커밋=ee9df6dc. 원 태스크 ID=OPS-19-ci-gate-reachability-contract(main 부재). 최초 OPS-34로 등재했으나 리베이스 시 main의 OPS-34-offline-report-recipient-contract(타 세션)와 충돌해 재배정했다(HARN-10 가드가 검출·OPS-35도 원격 브랜치 점유).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/reviews/unmerged_branch_verdict_2026-08-11.md. 원 브랜치 claude/whymath-ai-recommendation-review-q8tvcx head=e1835c0c·구현 커밋=592c961f·문서 커밋=ee9df6dc. 원 태스크 ID=OPS-19-ci-gate-reachability-contract(main 부재). 최초 OPS-34로 등재했으나 리베이스 시 main의 OPS-34-offline-report-recipient-contract(타 세션)와 충돌해 재배정했다(HARN-10 가드가 검출·OPS-35도 원격 브랜치 점유).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독: q8tvcx가 같은 커밋(ee9df6dc)으로 등재한 SEC-13·OPS-20이 acceptance 어디에도 없어 done 시 소실될 상태 — 8회차가 SEC-32·OPS-67로 재등재했으므로 ③의 문서 처분이 그 근거를 지우지 않게 명시"
+updated: 2026-09-07

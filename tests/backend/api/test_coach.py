@@ -15,12 +15,13 @@ from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api import coach
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._rate_limit import reset_store
+from whymath_backend.api._subject_capability_state import STEP_CHAIN_VERIFIER_KEY
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
@@ -858,6 +859,126 @@ class TestOcrConfidenceGatingWiring:
         sc = resp.json()["solution_coaching"]
         assert sc is not None
         assert sc["verification_ocr_gated"] is True
+
+
+class _FakeChainResult(BaseModel):
+    """가짜 연쇄 검증 결과 — `ChainVerificationCounts` 구조 계약의 최소 충족분.
+
+    `marker`가 있는 이유: 응답에 실려 나온 것이 *이 가짜의 판정인지* 진짜 수학 구현의 판정인지를
+    한 글자로 가르기 위해서다(둘 다 "verdict가 있다"까지는 같은 모양이라 변별력이 없다).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    steps: list[Any] = []
+    first_incorrect_index: int | None = 0
+    n_transitions: int = 1
+    n_correct: int = 0
+    n_incorrect: int = 1
+    n_unverifiable: int = 0
+    unverified_ratio: float = 0.0
+    unverifiable_by_reason: dict[Any, int] = {}
+    marker: str = "COMP-01-FAKE"
+
+
+class _RecordingStepChainVerifier:
+    """호출을 기록하는 가짜 `StepChainVerifier` — app.state에 올려 주입 경로를 관측한다."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def verify_chain(
+        self, steps: Any, step_types: Any = None
+    ) -> _FakeChainResult:  # noqa: ANN401 - 계약 시그니처 그대로
+        self.calls.append(list(steps))
+        return _FakeChainResult()
+
+
+class TestStepChainVerifierInjection:
+    """COMP-01 — 세 프로덕션 경로가 **app.state 등록분**을 L4에 명시 주입한다.
+
+    이 클래스가 없으면 `api/coach.py`의 `step_chain_verifier=` 인자를 지워도 아무 테스트가
+    깨지지 않는다(L4가 합성 루트로 조용히 폴백해 *같은 답*을 내기 때문이다 — 실패 주입 실측).
+    그래서 등록분을 **가짜로 갈아 끼우고**, 그 가짜가 호출됐는지와 그 판정이 응답에 실려 나오는지를
+    본다. 진짜 수학 구현이라면 아래 단계 시퀀스는 correct(동치)라 `solution_coaching`이 노출
+    게이트에서 탈락해 None이 된다 — 즉 두 경로가 서로 다른 값을 낸다(변별력 확보).
+    """
+
+    # 진짜 수학 구현이면 correct 전이(2*x+4 ≡ 2*(x+2)) → 노출 None. 가짜면 incorrect → verify.
+    _STEPS = ["2*x + 4", "2*(x + 2)"]
+
+    def _install(self, client: TestClient) -> _RecordingStepChainVerifier:
+        """`create_app`이 올린 진짜 능력을 가짜로 교체(다른 능력·경로는 그대로)."""
+        fake = _RecordingStepChainVerifier()
+        client.app.state.__setattr__(STEP_CHAIN_VERIFIER_KEY, fake)
+        return fake
+
+    def _assert_used(self, fake: _RecordingStepChainVerifier, payload: dict[str, Any]) -> None:
+        assert fake.calls == [self._STEPS], "등록분이 호출되지 않았다 — 합성 루트로 폴백한 것"
+        sc = payload["solution_coaching"]
+        assert sc is not None, "가짜 판정(incorrect)이 코칭 결정에 반영되지 않았다"
+        assert sc["solution_verification"]["marker"] == "COMP-01-FAKE"
+        assert sc["trigger"]["focus"] == "verify"
+
+    def test_stateless_coach_injects_registered_verifier(self) -> None:
+        client = _client()
+        fake = self._install(client)
+        resp = client.post(
+            "/v1/coach",
+            json={"student_input": "확인", "bkt_mastery": 0.95, "solution_steps": self._STEPS},
+        )
+        assert resp.status_code == 200, resp.text
+        self._assert_used(fake, resp.json())
+
+    def test_session_create_injects_registered_verifier(self) -> None:
+        client, _ = _session_client()
+        fake = self._install(client)
+        resp = client.post(
+            "/v1/coach/sessions",
+            json={
+                "student_input": "확인",
+                "student_solution": "2*x + 4",
+                "bkt_mastery": 0.95,
+                "solution_steps": self._STEPS,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        self._assert_used(fake, resp.json())
+
+    def test_append_turn_injects_registered_verifier(self) -> None:
+        from whymath_backend.db.models.dialogue import Dialogue as DialogueORM
+        from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
+
+        did = uuid.uuid4()
+        dialogue = DialogueORM.from_schema(
+            DialogueSchema(
+                dialogue_id=did, user_id=_UID, total_turns=2, student_turns=1, assistant_turns=1
+            )
+        )
+        client, _ = _session_client(preload={(DialogueORM, did): dialogue})
+        fake = self._install(client)
+        resp = client.post(
+            f"/v1/coach/sessions/{did}/turns",
+            json={
+                "student_input": "확인",
+                "student_solution": "2*x + 4",
+                "bkt_mastery": 0.95,
+                "solution_steps": self._STEPS,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        self._assert_used(fake, resp.json())
+
+    def test_missing_registration_is_not_silent(self) -> None:
+        """등록이 빠지면 **조용히 폴백하지 않고 터진다** — 침묵 실패 금지의 런타임 판.
+
+        `_subject_capability_state`의 getter가 폴백 없는 `getattr`인 것이 그 장치이며, 이
+        테스트는 그 장치가 *실제로* 요청 경로에서 작동하는지를 본다(정본화 ≠ 집행).
+        """
+        client = _client()
+        delattr(client.app.state, STEP_CHAIN_VERIFIER_KEY)
+        with pytest.raises(AttributeError):
+            client.post("/v1/coach", json={"student_input": "확인"})
 
 
 class TestHintLevelWiring:
@@ -5148,7 +5269,11 @@ class TestLogRefutationEvidence:
     def test_endpoint_match_turn_logs_support_not_refutation(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # 매치 입력 + clean 풀이 → +1 지지만(no-match 게이트로 −1 미적재·상호배타).
+        # 매치 턴 → +1 지지만(no-match 게이트로 −1 미적재·상호배타).
+        # MISC-17: 진단은 WH-1 primary와 같이 `student_solution or student_input`을 본다 —
+        # 풀이가 있으면 *풀이*가 매치 턴의 정의다(형제 케이스 5116·5139도 풀이 기준 반박을 기대).
+        # 종전 픽스처("발화에 신호 + clean 풀이 x = 2")는 풀이 우선에서 no-match→−1이 되므로,
+        # 이 테스트의 의도(+1/−1 상호배타)를 보존하려 신호를 풀이에 둔다.
         from whymath_backend.db.models.evidence_link import EvidenceLink
 
         async def _fake(session: Any, user_id: Any, matches: Any) -> list[MisconceptionHypothesis]:
@@ -5159,8 +5284,8 @@ class TestLogRefutationEvidence:
         resp = client.post(
             "/v1/coach/sessions",
             json={
-                "student_input": "내 풀이는 (a+b)² = a² + b² 이렇게 했어",
-                "student_solution": "x = 2",
+                "student_input": "이렇게 풀었어",
+                "student_solution": "내 풀이는 (a+b)² = a² + b² 이렇게 했어",
             },
         )
         assert resp.status_code == 201, resp.text

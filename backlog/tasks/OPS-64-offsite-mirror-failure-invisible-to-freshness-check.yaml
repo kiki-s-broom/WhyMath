@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-64-offsite-mirror-failure-invisible-to-freshness-check
+title: "오프사이트 미러 실패가 감시에 안 보인다 — backup_status.json이 Step 9보다 먼저 기록돼, 미러가 실패한 회차도 대장에는 성공으로 남는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 근거: backup_whymath_pg.ps1은 266줄에서 Write-BackupStatus로 backup_status.json에 성공을 기록하고, 오프사이트 미러(Step 9·302줄~)는 그 뒤에 온다. Step 9의 모든 실패 경로는 Fail(exit 1)이지만 대장에는 이미 성공이 적힌 뒤다. 매일 09:00 WhyMath-DB-Backup-Check는 그 대장을 읽으므로(never_recorded/stale/plaintext_artifact 3사유) 미러가 매 회차 실패해도 '정상'을 보고한다 — 유일한 신호인 LastTaskResult를 자동으로 읽는 것이 없다"
+  - "② 대책 선택지 중 하나를 골라 구현한다: (a) Write-BackupStatus를 Step 9 뒤로 옮긴다 — 단 오프사이트 실패 시 백업 자체는 유효한데 대장이 비어 stale로 오경보하는 부작용을 검토할 것 (b) 상태 레코드에 offsite 필드(요청 여부·성공 여부·목적지·바이트)를 추가하고 check_backup_freshness가 offsite_failed를 별도 사유로 exit 1 (c) Step 9 실패 시 backup_alert.txt를 직접 쓴다. (b)가 기존 3사유 체계와 정합적이다"
+  - "③ 변별력(결함 주입): 오프사이트 목적지를 읽기 전용/부재로 만들어 Step 9를 실패시킨 회차에서 감시가 실제로 exit 1을 내는지 확인한다. 현행 상태에서는 같은 주입에서 감시가 통과한다는 것(=보호 부재)을 먼저 실측해 기록한다 — 정상 상태의 초록은 보호의 증거가 아니다"
+  - "④ tests/infra/test_backup_encryption.py에 계약을 동결한다. PS1은 실행 검증이 불가하므로 backup_status.py의 판정 함수(evaluate_backup_health)는 실동작으로, PS1 쪽 순서·필드는 텍스트로 고정한다(A축 한계 명시)"
+  - "②-정정: 선택지 (b)로 구현했다 — BackupStatus에 offsite_requested/offsite_ok/offsite_destination/offsite_size_bytes 4필드를 추가하고, evaluate_backup_health가 offsite_requested and not offsite_ok를 별도 사유 offsite_failed(exit 1)로 판정한다(require_encrypted와 무관하게 항상 본다 — 오프사이트 도착 여부는 로컬 암호화 정책과 별개 사실). PS1 쪽은 Write-BackupStatus를 두 번 부른다: Step 7에서 -OffsiteRequested/-OffsiteDestination만 넘긴 비관적 기록(OffsiteOk는 함수 기본값 $false), Step 9의 모든 Fail 갈래를 지난 뒤(사이즈 대조까지 통과한 뒤)에만 -OffsiteOk $true로 재기록한다. (a) 안(Step 9 뒤로 옮기기)은 채택하지 않았다 — 백업 자체는 성공했는데 미러 단계 예외로 레코드가 전혀 안 쓰이면 stale로 오경보한다.\n\n③ 변별력(결함 주입 3건, 각각 RED 확인 후 원본과 바이트 동일 복원): (1) Step 7 호출에서 -OffsiteRequested/-OffsiteDestination을 제거 → test_step7_records_offsite_request_pessimistically RED. (2) Step 9 성공 경로의 재기록 호출을 삭제 → test_step9_success_overwrites_with_optimistic_offsite_status RED(\"정확히 1건\" 단언 0==1). (3) 같은 재기록 호출을 사이즈 대조 Fail보다 앞(오프사이트 사이즈 산출 직후)으로 옮김 → 순서 불변식 단언 RED(call_idx 36 <= last_fail_idx 56) — Step 9가 아직 실패할 수 있는 시점에 낙관적 레코드가 쓰이는 회귀를 별도로 잡는다. 파이썬 판정 축의 사고 재현·수정 대조는 test_offsite_failure_is_invisible_without_the_new_fields ①이 \"신규 필드 없는 레코드는 오프사이트 요청·실패 여부와 무관하게 항상 ok=True\"(구버전 동작 그대로)를 실측하고, 같은 함수·다른 입력(②)이 offsite_failed를 낸다.\n\n④-정정: 정직한 공백 — mypy가 backup_status.py:329(record 서브커맨드의 status 재대입)에서 기존에 이미 내던 Incompatible-types 경고 1건이 이번 편집으로 줄 번호만 이동했다(267→329). 이 태스크의 범위(오프사이트 상태 필드 추가) 밖의 선행 결함이라 손대지 않았다 — 별도 추적 필요."
+artifacts:
+  - "c7ada85a (#1115)"
+paths:
+  - scripts/backup/backup_whymath_pg.ps1
+  - scripts/backup/backup_status.py
+  - scripts/backup/check_backup_freshness.ps1
+  - tests/infra/test_backup_encryption.py
+session: null
+notes: "발견 경위: 2026-09-06 게이트 G-backup-offsite-move 실행 중 미러 작동 여부를 코드로 검증하다 발견. 그 게이트 자체는 LastTaskResult=0으로 미러 성공이 증명돼 막히지 않는다. CLAUDE.md '측정·게이트 도구가 판정치를 외부에만 의존 금지'·'침묵 실패 금지'의 감시 축. 관련 = OPS-31(암호화·스케줄), 런북 db_backup_dr_runbook.md §2-2·§4-1c\n\n[정정 2026-09-11] 구현 완료 — 선택지(b) 채택 근거·결함주입 3건 RED 실측·mypy 선행결함 공백 기록"
+updated: 2026-09-11

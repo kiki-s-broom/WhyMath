@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-100-task-id-rename-path-and-inflight-collision
+title: "태스크 ID 개명 경로 부재 + 브랜치 간 동시 add — validate가 고칠 수 없는 위반을 지적한다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-12 · 판정 기준 main `7408c4fd`) — `validate`의 번호 충돌 remedy는 \"하나를 다음 빈 번호로 개명하거나, 이미 머지돼 개명이 불가능하면 store._GRANDFATHERED_ID_NUMBERS에 사유와 함께 등재하라\"인데, **`backlog.py`에 개명 명령이 없다**. `--help` 전건 확인: `status,next,start,done,block,unblock,review,cancel,gates,add,amend,audit-deps,validate,brief,check-stop,check-edit,claims,branches,overlap,policy,seed` — rename/mv 부재. 실제 발생 시 `add`(새 번호) + 구 파일 `git rm` + `start` 재claim으로 수행했고, 그 과정에서 구 태스크의 이벤트 이력과 원격 claim이 새 ID로 이어지지 않는다. **고칠 수 없는 위반을 지적하는 게이트는 사람이 게이트를 끄게 만든다**(`EOS-62`의 `amend --depends` 부재 선례와 같은 형태).\n② 발생 축 — 번호 충돌은 사람의 부주의가 아니라 **구조**다. `HARN-10` 검사는 로컬 백로그 + 원격 claim 대장을 보지만, **다른 브랜치에서 방금 `add`됐고 아직 push되지 않은 번호는 어느 쪽에도 없다**. 실측 2건: (ⓐ) 2026-09-10 `OPS-73`을 등재했는데 이틀 뒤 main 병합에서 타 세션의 `OPS-73-runbook-evidence-fence-guard`와 충돌 — 상대가 머지됨이라 이쪽이 이동 (ⓑ) 개명 시도에서 `OPS-74`·`OPS-75`도 원격 브랜치 인플라이트로 거부돼 CLI가 76을 제안. 이는 `HARN-97` acceptance ④가 예고한 축이며, `HARN-97` 본체(자릿수 확장 · #1106)는 이 축을 다루지 않고 done 처리됐다.\n③ 개명 경로 설계 — `backlog.py rename <old-full-id> <new-full-id> --reason ...`을 만들 때 최소 세 가지를 함께 옮긴다: (ⅰ) 태스크 YAML 파일명과 `id` 필드 (ⅱ) 이벤트 대장(`backlog/events/*.ndjson`)의 해당 ID 참조 (ⅲ) 원격 claim(`refs/claims/*`)의 in_progress 표시. 옮기지 않은 것이 있으면 **무엇을 안 옮겼는지 stdout에 명시**한다(조용한 부분 이행 금지). `depends_on`이 구 ID를 가리키는 다른 태스크도 전수 갱신하고, 갱신 건수를 출력한다.\n④ 되돌릴 수 없는 경우의 처리 — 양쪽이 모두 머지된 상태면 개명이 불가하므로 `_GRANDFATHERED_ID_NUMBERS` 경로만 남는다. 그 등재도 **CLI 경로로** 열어야 한다(YAML·소스 손편집 금지 원칙과 정합). 현재는 소스 상수를 직접 고치는 것이 유일한 길인지 실측 확인하고, 그렇다면 그 사실 자체를 문서에 적는다.\n⑤ 실패 주입 검증 — 개명 CLI를 만들었으면 ⓐ존재하지 않는 old-id ⓑ이미 쓰이는 new-id ⓒ이벤트 대장에만 있고 파일이 없는 ID ⓓ`depends_on`이 구 ID를 가리키는 타 태스크가 있는 경우를 각각 주입해 의도한 대로 거부/갱신하는지 확인한다. **성공 방향 대조군**(정상 개명 1건이 전 항목을 옮기는지)을 함께 둔다 — 없으면 \"전부 거부\"라는 과잉 수정이 통과한다.\n⑥ 예방 축(별항 — ③은 사후 수습, 이것은 사전 회피) — 인플라이트 번호를 보이게 할 수단이 있는지 판정한다. 후보: `add` 시 번호를 즉시 원격에 예약(claim과 같은 ref 경로)하거나, 번호 대신 슬러그만으로 식별하거나, 세션별 번호 구간을 나눈다. 각 후보의 비용과 버린 이유를 MEMORY에 남긴다. **채택하지 않기로 결정하는 것도 결론이며, 그 경우 ③의 사후 경로가 유일한 대책임을 명시한다.**"
+artifacts:
+  - "9200d244 (#1148)"
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/store.py
+  - "tests/harness/**"
+session: null
+notes: "출처: OPS-76 착수 중 실측(2026-09-12). HARN-97 acceptance ④가 예고한 축의 실제 발생 2건이며, HARN-97 본체는 자릿수 확장(#1106)으로 done 처리돼 이 축을 다루지 않는다. 완료된 태스크의 acceptance를 되살리지 않고 승계 태스크로 분리했다(CLAUDE.md 회수 규칙)."
+updated: 2026-09-12

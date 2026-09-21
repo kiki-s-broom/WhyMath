@@ -25,10 +25,11 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 # EOS-69: Core는 **좁은 능력 계약**(schema.verification_capabilities)만 안다.
-# 수학 구현은 합성 루트(`composition`, INFRA)가 주입한다 — Core가 어댑터를 이름으로 알면
-# 계약을 도입한 의미가 사라진다. `SubjectAdapter` 필수 3종에 넣지 않은 이유는 계약 모듈
-# docstring 참조(항등 판정은 역사·국어엔 없다 — 필수로 만들면 빈 구현을 강요한다).
-from whymath_backend.composition import default_expression_equivalence
+# EOS-89: 나아가 구현을 합성 루트에서 **끌어오지도 않는다**(계획서 100 §3.8 "등록 형태").
+# 능력은 상류가 주입하며, 판정이 필요한데 주입이 없으면 조용히 넘어가지 않고 터진다
+# (`_require_equivalence`) — 미검증을 "검증 통과"로 위장하는 폴백을 두지 않기 위해서다.
+# `SubjectAdapter` 필수 3종에 넣지 않은 이유는 계약 모듈 docstring 참조(항등 판정은 역사·국어엔
+# 없다 — 필수로 만들면 빈 구현을 강요한다).
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.pedagogy_dsl import PedagogyContentSlot
 from whymath_backend.l1.embedding_primitives import build_sync_engine
@@ -62,6 +63,26 @@ NUMERIC_SLOT_TYPES: frozenset[str] = frozenset(
 # ──────────────────────────────────────────────────────────────────────────
 # payload 검증 — 숫자형 슬롯의 답을 SymPy로 실제 대조
 # ──────────────────────────────────────────────────────────────────────────
+def _require_equivalence(equivalence: ExpressionEquivalence | None) -> ExpressionEquivalence:
+    """항등 판정 능력이 실제로 필요한 순간에만 존재를 강제한다 — 없으면 즉시 `LookupError`.
+
+    왜 "선택 인자 + 필요 시 예외"인가(EOS-89): 이 모듈의 두 하류 호출부
+    (`example_generator`·`diag_item_projector`)가 만드는 payload에는 `verification` 주장이
+    **구조적으로 없다** — 그들에게 능력을 필수 인자로 요구하면, 쓰지도 않을 능력을 얻기 위해
+    합성 루트를 import하게 되고 그 순간 pull 지점이 새로 생긴다(이 태스크가 없앤 것).
+
+    반대로 기본값 폴백(`default_expression_equivalence()`)을 두면 미주입이 조용히 통과하고,
+    그 폴백 한 줄이 Core → 합성 루트 간선을 되살린다. 그래서 **필요할 때만, 크게 실패한다**.
+    """
+    if equivalence is None:
+        raise LookupError(
+            "항등 판정(ExpressionEquivalence) 능력이 주입되지 않았습니다 — "
+            "`verification` 주장이 있는 payload는 과목 능력 없이 판정할 수 없습니다. "
+            "상류에서 `equivalence=`로 주입하십시오(app.state 등록분 또는 합성 루트)."
+        )
+    return equivalence
+
+
 def verify_slot_payload(
     payload: dict[str, Any], *, equivalence: ExpressionEquivalence | None = None
 ) -> bool | None:
@@ -74,8 +95,9 @@ def verify_slot_payload(
 
     검증 없는 True 표기 금지 — 실제 판정을 거쳐야만 sympy_verified가 True가 된다.
 
-    `equivalence`는 과목의 항등 판정 능력(EOS-69). 생략하면 수학 구현이 주입되므로 기존
-    호출부는 그대로 동작한다 — **이 리팩터는 호출 경로 변경이지 동작 변경이 아니다**.
+    `equivalence`는 과목의 항등 판정 능력(EOS-69·EOS-89). `verification` 주장이 **있는데**
+    주입이 없으면 `LookupError`다(`_require_equivalence` docstring — 조용한 폴백 금지).
+    주장이 없으면 능력을 아예 건드리지 않으므로 미주입이어도 None이 정상 반환된다.
     4상태 중 `identity`만 True이고 나머지 3종은 전부 False다(기존과 동일 — `undecidable`을
     True로 올리지 않는다).
     """
@@ -84,7 +106,7 @@ def verify_slot_payload(
         return None
     lhs = str(verification.get("claim_lhs", ""))
     rhs = str(verification.get("claim_rhs", ""))
-    verifier = equivalence if equivalence is not None else default_expression_equivalence()
+    verifier = _require_equivalence(equivalence)
     return verifier.identity_status(lhs, rhs) is EquivalenceOutcome.identity
 
 
@@ -144,6 +166,8 @@ def _build_conceptual_payload(slot_type: str, objective_id: str, index: int) -> 
 def build_slot_rows(
     objective_id: str,
     slot_manifest: Sequence[dict[str, Any]],
+    *,
+    equivalence: ExpressionEquivalence | None = None,
 ) -> list[dict[str, Any]]:
     """목표 1개의 slot_manifest(list[{type,count}]) → `pedagogy_content_slot` 행 dict 리스트.
 
@@ -151,6 +175,9 @@ def build_slot_rows(
     (id = `{objective_id}:{slot_type}:{i}`).
     숫자형 유형은 SymPy로 답을 검증해 `sympy_verified`를 채우고, 개념형은 None으로 둔다. 모든 행은
     fail-closed로 `status='DRAFT'`·`provenance_id=None`(자체 저작)으로 낸다.
+
+    `slot_manifest`에 숫자형 유형이 하나라도 있으면 `equivalence`(과목 항등 판정)가 **필요하다** —
+    없으면 `verify_slot_payload`가 `LookupError`를 던진다(EOS-89 · 조용한 미검증 금지).
     """
     rows: list[dict[str, Any]] = []
     for slot in slot_manifest:
@@ -170,7 +197,7 @@ def build_slot_rows(
                     "slot_type": slot_type,
                     "payload": payload,
                     # 실제 SymPy 판정을 거친 값만 True가 된다(개념형은 None).
-                    "sympy_verified": verify_slot_payload(payload),
+                    "sympy_verified": verify_slot_payload(payload, equivalence=equivalence),
                     "tts_safe": _is_tts_safe(payload),
                     "provenance_id": None,
                     "status": "DRAFT",

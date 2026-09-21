@@ -47,6 +47,11 @@
 | Learning History | 교육적 의미가 부여된 시계열·이력 | `learning_session`·`problem_attempt`(`db/models/activity.py`), `concept_mastery_history`·`skill_mastery_history`(append-only 측정 시계열 — `db/models/assessment.py`), `daily_learning_metrics` 등 롤업 3종(`db/models/timeseries.py`) |
 | Learner State | 추론된 현재 학습자 상태 | `UserStateSnapshot`(`db/models/user.py:282`), `l2/learner_state.py` 조립기, `MisconceptionHypothesisRecord` |
 
+> **다른 축 1건 (EOS-79)**: 위 3계층은 "얼마나 가공됐는가"를 묻는다. "무엇에 대한 증거인가"
+> (Attempt·Evaluation·Assessment·Mastery)는 별도 축이며 `evidence_layer_boundary.md`가 정본이다.
+> 한 축의 배정으로 다른 축을 추론할 수 없다 — 예: `concept_mastery_history`는 여기서 Learning
+> History이고 그쪽에서 Mastery다. **충돌 시 이 문서(선행 정본)가 우선한다.**
+
 주의: Learning History는 단일 정규화 테이블이 아니라 **목적별 다중 테이블**(이벤트 로그·측정 시계열·롤업·증거)이다. hypertable 시계열 + 삭제권 오케스트레이션이라는 이 workload에는 이 구조가 맞으며, 단일 거대 history 테이블을 새로 만들지 않는다.
 
 ---
@@ -131,6 +136,7 @@ EOS-48이 §7의 두 갭을 착지시킨다(신규 테이블 없음 — 기존 3
 4. **privacy 3종 무변경 검토(검증 가능)** — 신규 테이블 0이라 플랜 변경 0. 3테이블의 기존 플랜 커버 유지·파기 축 불변·신규 컬럼의 export payload 노출은 `tests/backend/privacy/test_event_time_active_time_privacy.py`가 기계로 동결.
 5. **ADR-001 무충돌** — attempt_event 컬럼 추가는 파티션 키·복합 PK 불변이라 hypertable 전환 절차와 무충돌(ADR-001 추기 2026-08-31).
 6. **writer 배선은 범위 밖** — event_time 신고·ingested_at 기록·heartbeat 기반 active/idle 계측의 클라·서버 배선은 후속 몫(빈 좌석·ratio 지표가 그 작동률을 상시 드러낸다).
+   - **부분 착지 (PED-37 · 2026-09-07)**: `problem_attempt` 축의 서버 writer 2종이 배선됐다 — `api/me.py::submit_attempt`가 요청의 선택 필드 `started_at`(클라 신고 발생 시각)을 *그대로* 적재하고 수신 시각을 `ingested_at`에 분리 기록하며, `api/coach.py::_complete_problem`은 `dialogue.started_at`을 이관받는다. 미신고는 NULL 유지(서버 now 폴백 금지 — §EOS-48-2 '수신 시각 복제 = 날조'). 배경은 `started_at`이 상시 NULL이라 `harness/wh1_evaluation`의 since/until 집계와 `privacy/retention` 파기가 조용히 0행이었던 것이고, 집행은 `tests/backend/api/test_attempt_started_at_integration.py`(실 PG·개수 단언)가 동결한다. **남은 몫**: `attempt_event.event_time` 신고, heartbeat 기반 active/idle 계측, 그리고 클라이언트(Flutter)가 실제로 `started_at`을 보내는 배선.
 
 ---
 

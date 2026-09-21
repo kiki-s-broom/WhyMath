@@ -14,11 +14,12 @@ requires_gates: []
 acceptance:
   - "① 본문 대조(선행) — origin/claude/whymath-service-operations-review-5t5lmv(head 7052c34a)의 r2 문서·검증 실행 함정 2건 등재분이 main 현행과 여전히 정합인지 읽고 판정한다(추측 채택 금지). 코드 2파일(api/speech.py·schema/speech.py) 변경의 채택 여부 포함"
   - "② 채택분 파일 단위 이식 + 문서는 docs/reviews 착지. 기각분은 기각 사유를 이 태스크 notes에 기록"
+  - "⑤ [고립 참조 정정 2026-09-07 stray-code 8회차 — head dd3e9475 기준 acceptance 밖 잔여 승격] (a) OPS-35 클라 버전 게이트 관측(브랜치 done 7df9ff8d·PR 없음·main OPS-35는 별건 → CLI 재등재): backend app.py 426 차단의 요청 회계 편입·_observe_version_state 3상태 카운터·/health/ready client_version(92줄) + config.py min_app_version '상향 트리거' 블록(~5줄만 — 나머지 AES/texteller 줄은 SEC-28·PED-23 후행 reflow라 이식 금지) + tests/backend/test_app.py TestAppVersionObservability 3건 + mobile core/update_required.dart(426 단일 좌석)·test/update_required_test.dart + 컨트롤러 7건의 426 소비 줄만(account_security·auth·chat 4줄·ocr·onboarding·diagnosis·me_tab 5줄 — me_tab ~17줄·chat 6줄은 MOB-17/#863·MOB-20/#979 후행판이 main 우세·이식 금지) + incident_response_slo.md §1-4 client_version 행. main grep client_version/blocked_total/update_required 0건. (b) A11Y-02 접근성 커버리지 드리프트 가드(브랜치 done a7a9e9ec·PR 없음·main 번호 미사용 → CLI 재등재): src/mobile/test/accessibility_coverage_governance_test.dart(160)·accessibility_test.dart 3축(ChatScreen·ProblemScreen·DefectReport, 155)·06_design_system.md §7 — main 0건. (c) OPS-34 제거된 의존↔정본 동기 게이트 설계 YAML(todo·main OPS-34는 별건 → CLI 재등재·동등 테스트 main 0건). (d) r2 §4 정정 유실 6문서 — 05_interaction.md:48·system_deep_dive.md:101/103·visualization_module_gap_review.md:143(제목줄·R4·§8은 main 우세·이식 금지)·ui/01:105·ui/02:39,46·service_ops_mgmt_gap_review_2026-07.md:43 — main이 여전히 'flutter_tts 합성'·'44dp'로 stale. (e) CLAUDE.md 규칙 1줄 '문서 §정정의 소유자 위임을 집행으로 착각 금지(2026-08-11·반복 실수 11회차)' main 0건(버전줄·스택표 6줄은 main 우세) + MEMORY 결정 로그 3건(08-11 서비스 운영 r2·OPS-35·A11Y-02, 30줄). (f) events.ndjson 44줄은 이식 금지(번호 충돌 — CLI가 새 이벤트 생성). 회수 완료 전 5t5lmv 삭제 금지"
 artifacts: []
 paths:
   - "docs/reviews/**"
   - src/backend/whymath_backend/api/speech.py
   - src/backend/whymath_backend/schema/speech.py
 session: null
-notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A5. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A5. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 risk=high: acceptance ①②가 head 7052c34a 기준이라 그 뒤 4커밋(7df9ff8d OPS-35 구현·91c0f527·a7a9e9ec A11Y-02 구현·dd3e9475)의 산출물 29항목이 무소유 — HARN-35 notes는 'OPS-40 소유'로 미뤄 상호 미소유. 별항으로 승격"
+updated: 2026-09-07

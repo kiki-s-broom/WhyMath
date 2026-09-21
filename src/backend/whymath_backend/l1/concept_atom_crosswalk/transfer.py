@@ -11,6 +11,12 @@
      atom_codes를 투영(Phase 3 Slice 1이 "원자 연결은 Phase 4"로 예고한 좌석). **대학 행(409·
      소단원코드 키)은 무변경** — 대학 code는 이미 원자 그래프와 같은 키 공간이라 원자 정합(다리
      불요)이며, 갱신 SQL이 `scope='K-12'` 필터로 구조적으로 차단한다.
+  ③ **런타임 concept.behavior_skills 전파(SKB-01)**: ①과 *같은* 원자→skills 매핑을 런타임
+     `concept` 테이블(atom_backend_concept 적재·`concept.code`=원자/소단원/단원 code)에도 전파한다.
+     `l1/atom_graph/atom_backend_concept.py`가 `concept` 행을 채우지만 `behavior_skills`는 건드리지
+     않아(신규 행은 `server_default '{}'`) 이 컬럼이 항상 비어 있었다(EOS-63 실측: 2,683/2,683
+     전량 빈 배열). `concept.code`는 원자 code와 같은 키 공간이므로(atom_backend_concept docstring)
+     ①의 매핑을 다리 없이 그대로 재사용한다 — 별도 유도 불요.
 
 ────────────────────────────────────────────────────────────────────────────
 전파 규칙 (S0-2 확정 — 메인 세션 결정·데이터카드 §소비처 동기)
@@ -286,6 +292,36 @@ class CrosswalkTransferStore:
                     updated += 1
         return CrosswalkTransferReport(updated=updated, missing=tuple(missing))
 
+    def update_concept_behavior_skills(
+        self, mapping: Mapping[str, tuple[str, ...]]
+    ) -> CrosswalkTransferReport:
+        """원자→skills 매핑을 런타임 `concept.behavior_skills`에 멱등 UPDATE(SKB-01).
+
+        `update_atom_behavior_skills`(atom_node 짝)와 *같은 mapping*(atom code 키)을 받아
+        `concept.code`(atom_backend_concept 적재·원자와 같은 키 공간)로 조인한다. `Concept`에는
+        `updated_at` 컬럼이 없어(atom_node와 달리) 그 필드는 SET하지 않는다. 대상 행 부재
+        (rowcount 0)는 missing 수집(선행 `atom_backend_concept` populate 미실행 신호).
+        """
+        from sqlalchemy import update
+
+        from whymath_backend.db.models.concept import Concept
+
+        missing: list[str] = []
+        updated = 0
+        with self._get_engine().begin() as conn:
+            for code in sorted(mapping):
+                stmt = (
+                    update(Concept)
+                    .where(Concept.code == code)
+                    .values(behavior_skills=list(mapping[code]))
+                )
+                result = conn.execute(stmt)
+                if result.rowcount == 0:
+                    missing.append(code)
+                else:
+                    updated += 1
+        return CrosswalkTransferReport(updated=updated, missing=tuple(missing))
+
     def update_k12_content_atom_codes(
         self, mapping: Mapping[str, tuple[str, ...]]
     ) -> CrosswalkTransferReport:
@@ -328,6 +364,18 @@ def transfer_atom_behavior_skills(
     return transfer_store.update_atom_behavior_skills(mapping)
 
 
+def transfer_concept_behavior_skills(
+    mapping: Mapping[str, tuple[str, ...]],
+    *,
+    settings: Settings | None = None,
+    store: CrosswalkTransferStore | None = None,
+) -> CrosswalkTransferReport:
+    """같은 원자→skills 매핑을 런타임 `concept.behavior_skills`에 멱등 갱신(SKB-01·③)."""
+    resolved = settings if settings is not None else get_settings()
+    transfer_store = store if store is not None else CrosswalkTransferStore(settings=resolved)
+    return transfer_store.update_concept_behavior_skills(mapping)
+
+
 def transfer_k12_content_atom_codes(
     mapping: Mapping[str, tuple[str, ...]],
     *,
@@ -350,5 +398,6 @@ __all__ = [
     "load_concept_src_bridge",
     "load_crosswalk_records",
     "transfer_atom_behavior_skills",
+    "transfer_concept_behavior_skills",
     "transfer_k12_content_atom_codes",
 ]

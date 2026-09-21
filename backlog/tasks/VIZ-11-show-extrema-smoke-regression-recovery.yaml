@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: VIZ-11-show-extrema-smoke-regression-recovery
+title: "VIZ-06 미이행 acceptance ④ 승계 — GraphingCalculator.smoke.test.jsx show_extrema 명세 주입 크래시 회귀 테스트 8줄(e98dw4 고립본) 복원"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정(2026-09-07 main b75f495d): origin/claude/openrouter-setup-guide-e98dw4(f8c0e3b6)의 src/web/graphing-calculator/test/GraphingCalculator.smoke.test.jsx 고유 8줄 = it('show_extrema 명세 주입 후 크래시 없이 그리기까지 완료한다(VIZ-04 회귀)') 1건. VIZ-06(done·PR #740=ddfb130c) acceptance ④가 'GraphingCalculator.smoke.test.jsx 일부'를 함께 복원한다고 약속했으나 #740 stat에 smoke test 없음·main smoke test에 show_extrema/findExtrema 0건. 재현: git diff origin/main...origin/claude/openrouter-setup-guide-e98dw4 -- src/web/graphing-calculator/test/GraphingCalculator.smoke.test.jsx"
+  - "② 파일 단위 이식(통째 머지 금지) — main의 현행 smoke 테스트 구조 위에 재적용. jsdom stub에서 findExtrema가 draw 이펙트 안에서 도는지를 단언하는 테스트여야 하며, 변별력: main graph2d의 극값 마커 경로를 뮤테이션(findExtrema 호출 제거)하면 RED"
+  - "③ 집행: 웹 잡(vitest)에서 실제로 수집·실행됨을 CI 로그 또는 배선 테스트로 확인('저장소에 존재함 ≠ 돌아감'). 회수 완료 전 e98dw4 삭제 금지(브랜치는 S3-28 좌석도 지킨다)"
+artifacts: []
+paths:
+  - src/web/graphing-calculator/test/GraphingCalculator.smoke.test.jsx
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5 (stray-code 8회차 — e98dw4 커버리지 정독). CLAUDE.md '회수로 done 선언 시 acceptance 전수 재대조 생략 금지'의 실사례 — VIZ-06 done 시 acceptance ④의 smoke 축이 대조에서 빠졌다(코드에 없는 미이행분은 diff 대조에 나타나지 않는다). 위험 low(테스트 동결 축·8줄)."
+updated: 2026-09-07

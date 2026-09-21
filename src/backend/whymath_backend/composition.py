@@ -36,23 +36,28 @@ Physics·국어를 붙일 때 **이 파일은 고쳐야 한다** — 그것이 �
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from whymath_backend.schema.verification_capabilities import (
         AnswerFormVerifier,
         AssessmentAnswerVerifier,
+        AttemptMisconceptionDetector,
         ExpressionEquivalence,
         ExpressionSeal,
         FinalAnswerVerifier,
+        StepChainVerifier,
     )
 
 __all__ = [
     "default_answer_form_verifier",
+    "default_attempt_misconception_detector",
     "default_assessment_answer_verifier",
     "default_expression_equivalence",
     "default_expression_seal",
     "default_final_answer_verifier",
+    "default_step_chain_verifier",
+    "default_wrong_form_shadow_observer",
 ]
 
 
@@ -93,3 +98,37 @@ def default_answer_form_verifier() -> AnswerFormVerifier:
     from whymath_backend.l4.subject_adapter_math import math_answer_form_verifier
 
     return math_answer_form_verifier()
+
+
+def default_step_chain_verifier() -> StepChainVerifier:
+    """`StepChainVerifier`(풀이 단계 연쇄 검증)의 기본 구현을 준다."""
+    from whymath_backend.l4.subject_adapter_math import math_step_chain_verifier
+
+    return math_step_chain_verifier()
+
+
+def default_wrong_form_shadow_observer() -> Callable[[str], None]:
+    """오개념 거짓 항등식 SymPy shadow 관측(fire-and-forget)의 기본 구현을 준다.
+
+    `verification_capabilities.py`의 Protocol 계약이 아니라 콜러블 하나다 — 관측기는 값을
+    돌려주지 않고 로그로만 sink하므로(비노출·비차단) 능력 계약으로 분리할 상태가 없다. 그래도
+    구현(`l4.misconception.wrong_form_match`)은 ADAPTER이므로 이 파일을 통해서만 조회한다
+    (그래야 solution_coaching이 이 모듈 하나만 알면 된다 — 규칙 1·3 그대로 적용).
+    """
+    from whymath_backend.l4.misconception.wrong_form_match import observe_wrong_form_shadow
+
+    return observe_wrong_form_shadow
+
+
+def default_attempt_misconception_detector() -> AttemptMisconceptionDetector:
+    """`AttemptMisconceptionDetector`(오답 1건 → 오개념 후보)의 기본 구현을 준다.
+
+    Core(채점 핸들러)가 `l4.misconception.answer_signature`를 *이름으로* 알면 경계 위반이다 —
+    함수 안 import여도 경계 스캔은 그 간선을 본다. 그래서 이 팩토리 하나만 알게 한다.
+
+    과목이 이 능력을 제공하지 않으면 호출자는 훑지 않은 것으로 처리한다
+    (`MisconceptionScan.NOT_RUN`) — 능력 부재를 "오개념 없음"으로 접지 않는다.
+    """
+    from whymath_backend.l4.subject_adapter_math import math_attempt_misconception_detector
+
+    return math_attempt_misconception_detector()

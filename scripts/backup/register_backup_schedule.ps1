@@ -34,6 +34,7 @@
 # Usage (Windows PowerShell, ELEVATED - task registration needs admin):
 #   .\scripts\backup\register_backup_schedule.ps1
 #   .\scripts\backup\register_backup_schedule.ps1 -At 03:30 -RequireEncryption
+#   .\scripts\backup\register_backup_schedule.ps1 -RequireEncryption -OffsiteDir "C:\Users\kiki\Google Drive\WhyMath-backups"
 #   .\scripts\backup\register_backup_schedule.ps1 -Unregister
 #
 # Exit codes: 0 = success, 1 = failure (reason printed).
@@ -58,6 +59,13 @@ param(
     # Interpreter used by the check task. Kiki's machine has conda base and a
     # .venv active at once, so an explicit path may be required.
     [string]$PythonExe = "python",
+    # Offsite mirror directory passed through to backup_whymath_pg.ps1. Empty
+    # by default. When set, each successful encrypted run is mirrored there and
+    # the same retention is applied to it - without this the offsite copy is a
+    # one-time snapshot whose RPO grows without bound and whose expired files
+    # outlive the retention window that runbook 4-3 declares as the PIPA
+    # deletion bound.
+    [string]$OffsiteDir = "",
     # Remove the task instead of creating it.
     [switch]$Unregister
 )
@@ -67,6 +75,20 @@ $ErrorActionPreference = "Stop"
 function Fail([string]$Reason) {
     Write-Host "[FAIL] $Reason"
     exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Step 0a: elevation. Registering a task needs an elevated session; without it
+# Register-ScheduledTask fails with "Access is denied" (HRESULT 0x80070005).
+# We check FIRST so the operator is told what to do, instead of reading a
+# stack trace halfway through a run that has already printed [OK] lines.
+# (2026-09-06: this script printed two [OK] lines after exactly that failure.)
+# ---------------------------------------------------------------------------
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal(
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+)
+if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Fail "this window is not elevated - scheduled task registration needs Administrator. Open a NEW PowerShell window with 'Run as administrator' and re-run the same command."
 }
 
 # ---------------------------------------------------------------------------
@@ -82,7 +104,11 @@ if ($Unregister) {
             Write-Host "[OK] task '$name' does not exist - nothing to remove"
             continue
         }
-        Unregister-ScheduledTask -TaskName $name -Confirm:$false
+        try {
+            Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction Stop
+        } catch {
+            Fail "Unregister-ScheduledTask failed for '$name': $($_.Exception.GetType().Name): $($_.Exception.Message)"
+        }
         $still = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
         if ($still) {
             Fail "Unregister-ScheduledTask returned but '$name' is still registered."
@@ -112,6 +138,9 @@ if (-not (Test-Path $checkScriptPath)) {
 # Step 2: build the action
 # ---------------------------------------------------------------------------
 $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -BackupDir `"$BackupDir`" -RetentionDays $RetentionDays"
+if ($OffsiteDir) {
+    $argList = "$argList -OffsiteDir `"$OffsiteDir`""
+}
 if ($RequireEncryption) {
     $argList = "$argList -RequireEncryption"
 }
@@ -130,7 +159,11 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnB
 # ---------------------------------------------------------------------------
 # Step 4: register (replacing any earlier version of the same task)
 # ---------------------------------------------------------------------------
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+try {
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force -ErrorAction Stop | Out-Null
+} catch {
+    Fail "Register-ScheduledTask failed for '$TaskName': $($_.Exception.GetType().Name): $($_.Exception.Message)"
+}
 
 # ---------------------------------------------------------------------------
 # Step 5: self-verification - read the task BACK and check the two properties
@@ -150,8 +183,13 @@ if (-not $check.Settings.StartWhenAvailable) {
     Fail "task '$TaskName' registered without StartWhenAvailable - a run missed while the machine was off would be dropped silently."
 }
 
+$registeredArgs = "$($check.Actions.Arguments)"
+if ($registeredArgs -ne $argList) {
+    Fail "task '$TaskName' exists but its action is NOT what this run built - an older registration is still in place (did registration silently fail?).`n  registered: $registeredArgs`n  expected:   $argList"
+}
+
 Write-Host "[OK] task '$TaskName' registered: daily $At, LogonType S4U, StartWhenAvailable"
-Write-Host "[OK] action: powershell.exe $argList"
+Write-Host "[OK] action (read back from the task): powershell.exe $registeredArgs"
 
 # ---------------------------------------------------------------------------
 # Step 6: register the CHECK task. This is the half that makes a missed backup
@@ -167,7 +205,11 @@ $checkAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $chec
 $checkTrigger = New-ScheduledTaskTrigger -Daily -At $CheckAt
 $checkSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
 
-Register-ScheduledTask -TaskName $checkTaskName -Action $checkAction -Trigger $checkTrigger -Principal $principal -Settings $checkSettings -Force | Out-Null
+try {
+    Register-ScheduledTask -TaskName $checkTaskName -Action $checkAction -Trigger $checkTrigger -Principal $principal -Settings $checkSettings -Force -ErrorAction Stop | Out-Null
+} catch {
+    Fail "Register-ScheduledTask failed for '$checkTaskName': $($_.Exception.GetType().Name): $($_.Exception.Message)"
+}
 
 # ---------------------------------------------------------------------------
 # Step 7: self-verification for the check task, same standard as step 5.
@@ -184,6 +226,11 @@ if ("$checkLogon" -ne "S4U") {
 }
 if (-not $checkBack.Settings.StartWhenAvailable) {
     Fail "task '$checkTaskName' registered without StartWhenAvailable."
+}
+
+$registeredCheckArgs = "$($checkBack.Actions.Arguments)"
+if ($registeredCheckArgs -ne $checkArgList) {
+    Fail "task '$checkTaskName' exists but its action is NOT what this run built - an older registration is still in place.`n  registered: $registeredCheckArgs`n  expected:   $checkArgList"
 }
 
 Write-Host "[OK] task '$checkTaskName' registered: daily $CheckAt, threshold $CheckMaxAgeHours h, LogonType S4U"

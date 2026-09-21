@@ -38,6 +38,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import (
     Accessibility,
     Device,
@@ -194,7 +195,9 @@ class UserProfile(Base):
         """영속 ORM → `schema.UserProfile`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaUserProfile.model_validate(data)
+        return SchemaUserProfile.model_validate(
+            drop_unset_nulls(data, SchemaUserProfile, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -236,7 +239,9 @@ class UserTrackHistory(Base):
         """영속 ORM → `schema.UserTrackHistory`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaUserTrackHistory.model_validate(data)
+        return SchemaUserTrackHistory.model_validate(
+            drop_unset_nulls(data, SchemaUserTrackHistory, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -273,7 +278,9 @@ class UserPersonaHistory(Base):
         """영속 ORM → `schema.UserPersonaHistory`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaUserPersonaHistory.model_validate(data)
+        return SchemaUserPersonaHistory.model_validate(
+            drop_unset_nulls(data, SchemaUserPersonaHistory, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -342,7 +349,9 @@ class UserStateSnapshot(Base):
         """영속 ORM → `schema.UserStateSnapshot`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaUserStateSnapshot.model_validate(data)
+        return SchemaUserStateSnapshot.model_validate(
+            drop_unset_nulls(data, SchemaUserStateSnapshot, orm_cls=type(self))
+        )
 
 
 __all__ = [

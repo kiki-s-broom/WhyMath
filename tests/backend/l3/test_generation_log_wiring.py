@@ -507,7 +507,7 @@ class TestAccumulateMainWiring:
         monkeypatch.setattr(
             problem_corpus_accumulate,
             "_build_live_generator",
-            lambda topic_hint, generation_log_sink=None: _SinkUsingGenerator(generation_log_sink),
+            lambda topic_hint, **kwargs: _SinkUsingGenerator(kwargs.get("generation_log_sink")),
         )
         out = tmp_path / "accumulated.jsonl"
         code = problem_corpus_accumulate.main(["--out", str(out), "--n", "2"])
@@ -538,7 +538,7 @@ class TestAccumulateMainWiring:
         monkeypatch.setattr(
             problem_corpus_accumulate,
             "_build_live_generator",
-            lambda topic_hint, generation_log_sink=None: _EmittingGenerator(generation_log_sink),
+            lambda topic_hint, **kwargs: _EmittingGenerator(kwargs.get("generation_log_sink")),
         )
         out = tmp_path / "accumulated.jsonl"
         custom = tmp_path / "로그" / "run.jsonl"

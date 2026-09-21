@@ -77,11 +77,30 @@ class _CapturingQueueSession:
         self._i += 1
         return result
 
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        """EOS-19: 핸들러가 정책 호출 전에 조립하는 `LearnerState`가 프로필을 단건 조회한다.
+
+        None은 "프로필 없음"이라는 정합한 상태다 — 이 파일이 재는 것은 후보 SQL의 게이트 조건뿐.
+        """
+        return None
+
     def add(self, obj: Any) -> None:  # pragma: no cover — 이 라우트는 add를 쓰지 않음
         pass
 
     async def commit(self) -> None:  # pragma: no cover — 이 라우트는 commit을 쓰지 않음
         pass
+
+
+#: EOS-19 — 핸들러가 정책을 부르기 **전에** 조립하는 `LearnerState`가 소비하는 결과 수.
+#: 내역은 `tests/backend/api/test_me.py::_learner_state_results` docstring이 정본이다(개념 진단
+#: 2 · 전과목 θ 1 · 활성 오개념 1 · 스킬 숙달 1). 이 파일은 후보 stmt를 *인덱스로* 집으므로
+#: 그 앞단 수를 상수로 둔다 — 생 인덱스를 박아 두면 앞단이 하나 늘 때 엉뚱한 stmt를 검사한다.
+_NP_STMT_BASE = 5
+
+
+def _learner_state_results() -> list[_AQResult]:
+    """LearnerState 조립분 자리 채움 — 전부 빈 결과(이력 없는 학생)."""
+    return [_AQResult([]) for _ in range(_NP_STMT_BASE)]
 
 
 def _client_with_session(session: _CapturingQueueSession) -> TestClient:
@@ -104,14 +123,14 @@ class TestBaseCatCandidateStmtCopyrightAndReviewGates:
     def test_candidate_stmt_excludes_metadata_only_sources(self) -> None:
         """축① — candidate_stmt SQL에 source_type NOT IN (평가원·EBS·교과서) 조건이 실린다."""
         # execute 순서: ①채점 이력(빈 이력 → θ=0) ②기본 CAT candidate_stmt.
-        session = _CapturingQueueSession([_AQResult([]), _AQResult([])])
+        session = _CapturingQueueSession(_learner_state_results() + [_AQResult([]), _AQResult([])])
         client = _client_with_session(session)
 
         resp = client.get("/v1/me/next-problem")
 
         assert resp.status_code == 200
-        assert len(session.captured_stmts) == 2
-        candidate_sql = _compiled_sql(session.captured_stmts[1])
+        assert len(session.captured_stmts) == _NP_STMT_BASE + 2
+        candidate_sql = _compiled_sql(session.captured_stmts[_NP_STMT_BASE + 1])
         assert "NOT IN" in candidate_sql
         for blocked in ("평가원", "EBS", "교과서"):
             assert blocked in candidate_sql, candidate_sql
@@ -122,13 +141,13 @@ class TestBaseCatCandidateStmtCopyrightAndReviewGates:
         축①(저작권)과 축②(검수)이 실제로 *별개* 조건절로 SQL에 나타나는지 확인 — 하나로
         합쳐지지 않았음을 SQL 문자열 레벨에서 재확인(설계 핵심 회귀 방지).
         """
-        session = _CapturingQueueSession([_AQResult([]), _AQResult([])])
+        session = _CapturingQueueSession(_learner_state_results() + [_AQResult([]), _AQResult([])])
         client = _client_with_session(session)
 
         resp = client.get("/v1/me/next-problem")
 
         assert resp.status_code == 200
-        candidate_sql = _compiled_sql(session.captured_stmts[1])
+        candidate_sql = _compiled_sql(session.captured_stmts[_NP_STMT_BASE + 1])
         assert "review_status" in candidate_sql
         assert "'approved'" in candidate_sql
         # 축①·축②가 서로 다른 조건절(각자의 컬럼)로 남아 있는지 — 하나로 뭉개지지 않았다는

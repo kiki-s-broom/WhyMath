@@ -17,10 +17,16 @@ audit_wiring.py`(ARCH-20) 동형 선례). 이 테스트가 없으면 `ci.yml`에
 ④ 그 스텝은 `working-directory: .`로 레포 루트를 명시한다 — 잡 기본값이
    `src/data-pipeline`이라(오버라이드 없으면 `ModuleNotFoundError`·상대경로 꼬임)
 ⑤ 파서가 위장하지 않는다 — 워크플로/잡을 못 찾으면 "위반 0 통과"가 아니라 **실패**
+⑥ [ARCH-23] 그 스텝에 `continue-on-error`가 없다 — "돌아감≠막음" 방지(제거 *전* 이
+   테스트를 구 ci.yml에 대입해 실제 RED가 남을 실측 확인했다)
+⑦ [ARCH-23] `changes` 잡의 corpus 필터가 검사기 소스 경로(harness/·
+   provenance_audit.py·l3/equivalent/)도 감시한다 — 검사기만 바뀌고 코퍼스는 무변경인
+   PR에서 게이트가 안 도는 구멍 방지
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -121,3 +127,54 @@ def test_changes_job_exposes_corpus_output() -> None:
         raise AssertionError("ci.yml에 `changes` 잡이 없다.")
     outputs = (jobs["changes"] or {}).get("outputs") or {}
     assert "corpus" in outputs, "`changes` 잡에 `corpus` output이 없다 — 코퍼스 변경 감지 미배선."
+
+
+def test_qa_pipeline_step_is_a_blocking_gate_not_fail_open() -> None:
+    """ARCH-23 — continue-on-error로 무력화된 채였던 게이트를 강제 게이트로 전환한다.
+
+    "돌아감≠막음"(ARCH-23 notes) — 위 5개 계약은 스텝이 *실행되는지*만 확인하고 실행
+    결과가 PR을 실제로 막는지는 확인하지 않았다. `continue-on-error: true`가 있으면
+    exit 1이 나도 잡은 success로 보고된다(상시 fail-open — CLAUDE.md "상시 실패하는
+    fail-open 보호를 보호 있음으로 신뢰 금지"). 제거 *전*에 이 테스트를 구 ci.yml에
+    대입해 실제 RED가 나는지 실측 확인했다(변별력 실측 의무 — 성공/실패 양쪽 같은
+    값이면 위장이므로).
+    """
+    steps = _qa_pipeline_steps()
+    assert steps, "qa_pipeline 스텝을 찾을 수 없다(선행 테스트가 먼저 실패했을 것)."
+    for step in steps:
+        value = step.get("continue-on-error")
+        assert value in (None, False), (
+            "qa_pipeline 게이트가 여전히 continue-on-error로 무력화돼 있다 — "
+            f"이 게이트는 PR을 실제로 막아야 한다(ARCH-23): {step}"
+        )
+
+
+_CORPUS_FILTER_BLOCK_RE = re.compile(r"grep\s+-qE\s+'(?P<regex>[^']*)'\s*;\s*then\s*\n\s*cp=true")
+
+
+def _corpus_filter_regex() -> str:
+    spec_text = _CI_PATH.read_text(encoding="utf-8")
+    match = _CORPUS_FILTER_BLOCK_RE.search(spec_text)
+    if not match:
+        raise AssertionError("ci.yml에서 corpus(cp) 플래그의 grep -qE 필터 블록을 찾지 못했다.")
+    return match.group("regex")
+
+
+def test_corpus_flag_filter_includes_qa_pipeline_checker_sources() -> None:
+    """ARCH-23 — 검사기 소스가 바뀌어도 corpus 플래그가 깨어나야 한다.
+
+    `data/corpus/`만 감시하면, 같은 코퍼스에 *다른 판정 로직*을 적용하는 검사기 자체의
+    변경(harness/qa_pipeline.py·ops/provenance_audit.py·l3/equivalent/canonicalize.py 등)이
+    이 플래그를 깨우지 못한다 — "검사기가 바뀌어도 안 돌던 구멍"(acceptance).
+    """
+    pattern = re.compile(_corpus_filter_regex())
+    samples = [
+        "src/backend/whymath_backend/harness/qa_pipeline.py",
+        "src/backend/whymath_backend/ops/provenance_audit.py",
+        "src/backend/whymath_backend/l3/equivalent/canonicalize.py",
+    ]
+    missing = [s for s in samples if not pattern.search(s)]
+    assert not missing, (
+        f"corpus 플래그 필터가 검사기 소스 경로를 놓친다 — {missing}. 그 경로만 고치는 PR에서 "
+        f"qa_pipeline 게이트가 실행되지 않는다. 현재 필터: {pattern.pattern!r}"
+    )

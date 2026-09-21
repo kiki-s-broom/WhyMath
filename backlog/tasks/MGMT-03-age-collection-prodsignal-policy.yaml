@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MGMT-03-age-collection-prodsignal-policy
+title: "연령 강제 수집 정책 + is_production_like 다신호화 — PIPA 미성년 게이트 실집행·안전장치 결박 해소 (법률·정책 결정 · k20m0w 등재 유실 재등재)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: kiki
+depends_on:
+  - MGMT-02-terms-privacy-policy-counsel
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정(2026-09-07 main b75f495d): 원 MGMT-03은 origin/claude/whymath-issues-review-k20m0w(2330a095)에만 존재(정본 docs/reviews/functional_security_audit_2026-08-08.md H4·M7). main 백로그 MGMT-03 0건·git grep MGMT-03 0건·동등 태스크 0건(유사 언급은 docs/legal/guardian_verification_counsel_brief.md의 birth_year 필수화 여부 1줄뿐). 좌석 MOB-18·SEC-24·SEC-30·PB-14·HARN-25·S3-24 어느 acceptance에도 없었다"
+  - "② 결정A(연령 수집): 실 OAuth(카카오/네이버)가 birth_year 미전달(원 실측 oauth_providers.py:85,147)이라 신규 가입자 전원 is_minor=None → 동의 게이트(_auth.py:88)가 '알려진 미성년'만 차단. 가입 시 birth_year 필수화 여부·카카오/네이버 birthday 스코프 파싱 도입 여부를 변호사 자문으로 결정(현재 '모르면 모른다'는 의도된 정책 경계·MGMT-02 의존). 착수 시 줄 번호는 현행 main에서 재실측"
+  - "③ 결정/수정B(prod 신호): config.py is_production_like가 OAuth 구성 단일 신호로 대화암호화 fail-closed·PII IP salt·데모 provider 차단 3중을 동시 판정. OAuth 외 로그인(device/email) 추가 시 미성년이 is_minor=None으로 진입하며 안전장치가 함께 꺼지는 침묵 실패 위험 — prod 판별을 명시 env 축으로 다신호화(안전장치별 독립 fail-closed) 검토. B는 법률 판단이 아닌 공학 변경이라 변호사 회신 없이도 분리 착수 가능(분리 시 별도 등재)"
+  - "④ 집행 게이트: 실 OAuth 로그인 배선 시점에 birth_year 수집·is_minor 파생이 라이브 미성년 보호를 실제 집행하는지 결함주입으로 확인(선언≠집행). 법령 유래 절차(변호사 판단)의 기계 대체 금지"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/auth.py
+  - src/backend/whymath_backend/api/oauth_providers.py
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/consent.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5 (stray-code 8회차 — k20m0w 커버리지 정독 risk=high). 원 등재 2026-08-08(k20m0w) 정본 = functional_security_audit_2026-08-08.md H4(HIGH·PARTIAL)·M7(MEDIUM·PARTIAL). 법률·정책 결정(변호사)이라 owner=kiki·MGMT-02 의존 — MGMT-01/02와 같은 '공개 β 준비 착수' 계열이나, 실 OAuth 배선 시 즉시 라이브 노출되므로 그 시점이 재확인 지점. 완화: 현 실 로그인 클라 스텁·데모는 birth_year 전달. 보안·법령 관련 고립분 → priority 1(stray-code 규칙). 원 브랜치 k20m0w는 MOB-18 회수 완료 전 삭제 금지."
+updated: 2026-09-07

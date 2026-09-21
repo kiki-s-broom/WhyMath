@@ -21,7 +21,7 @@
 {"statement": "두 수의 합에 로그를 취한 값은 각각에 로그를 취해서 더한 것과 같다고 생각했어", "expected_id": "log-distribution", "near_id": null, "kind": "paraphrase", "note": "log(a+b)=log a+log b 오개념 — signals log(a+b)·log a + log b 회피(말로 풀어 씀)"}
 {"statement": "덧셈한 결과에 로그를 씌우면 로그를 각 항에 따로 씌워 합한 것으로 분리된다고 적었어", "expected_id": "log-distribution", "near_id": null, "kind": "paraphrase", "note": "동일 오개념 다른 어휘"}
 {"statement": "두 수의 곱에 로그를 취하면 각각에 로그를 취해서 더한 값과 같아진다", "expected_id": null, "near_id": "log-distribution", "kind": "correct-near", "note": "log(ab)=log a+log b는 올바른 로그 법칙(합이 아니라 곱일 때)"}
-{"statement": "log(2+3) = log2 + log3 이라고 계산했어", "expected_id": "log-distribution", "near_id": null, "kind": "paraphrase", "note": "v1.2 후속 regex 탐지 — 로그를 합에 분배한 거짓 수치 항등식(canonical log(a+b)=log a+log b)을 수치 대입으로 재진술. substring 기호 signals는 부재(수치만)·regex_signals가 잡음(kind=paraphrase·기존 스키마)"}
+{"statement": "로그는 더한 값에 씌우나 각각 씌워서 더하나 결과가 같다고 생각했어", "expected_id": "log-distribution", "near_id": null, "kind": "paraphrase", "note": "MISC-22 정정 — 원래는 수치 대입 재진술(log(2+3)=log2+log3)이었으나, MISC-22(v1.5)가 regex 매치를 신호 전체와 동등한 완결 증거로 가산하도록 confidence 공식을 정정해 그 문장이 이제 regex 단독으로 conf 1.0(완전매치)까지 도달한다 — recall 프로브는 substring·regex 양쪽을 회피해 의미 매처만 측정해야 하므로(TestProbeSetStructure.test_recall_probes_evade_substring_full_match) 순수 구어체 패러프레이즈로 교체한다. signals(log(a+b)·log a + log b)·수치 정규식 둘 다 미포함"}
 {"statement": "log(2·3) = log2 + log3 으로 계산했어", "expected_id": null, "near_id": "log-distribution", "kind": "correct-near", "note": "FP 가드 — 곱(2·3)에 로그를 취하면 합으로 분리되는 올바른 곱 법칙 log(ab)=log a+log b. regex는 괄호 안 합(\\d+\\+\\d+)만 매치하므로 곱(·)엔 미발화(disjoint·FP 0)"}
 {"statement": "이차방정식에서 판별식이 음수로 나오면 그 방정식은 아예 풀리지 않아 근이 하나도 없다고 결론지었어", "expected_id": "discriminant-negative-no-real-root", "near_id": null, "kind": "paraphrase", "note": "D<0이면 해 없음 단정 오개념 — signals 판별식·해가 없 중 '해가 없'을 '근이 하나도 없'으로 우회"}
 {"statement": "판별식 값이 0보다 작으면 이 식을 만족시키는 답은 존재하지 않는다고 봤어", "expected_id": "discriminant-negative-no-real-root", "near_id": null, "kind": "paraphrase", "note": "동일 오개념 다른 어휘"}
@@ -160,3 +160,10 @@
 {"statement": "반지름이 r인 원의 넓이는 원주율에 반지름의 제곱을 곱한 값이다", "expected_id": null, "near_id": "circle-area-circumference", "kind": "correct-near", "note": "올바른 원 넓이 πr² — 2πr 미포함"}
 {"statement": "조합은 뽑는 순서를 고려하지 않고 개수만 세는 경우의 수이다", "expected_id": null, "near_id": "combination-no-denominator", "kind": "correct-near", "note": "올바른 조합 정의 — nPr 미포함"}
 {"statement": "같은 것이 있는 순열은 전체 계승을 같은 것의 개수의 계승으로 나눈다", "expected_id": null, "near_id": "same-item-permutation-no-divide", "kind": "correct-near", "note": "올바른 같은 것 순열 — 서로 다른 미포함"}
+{"statement": "네 조각으로 나눈 것 하나가 두 조각으로 나눈 것 하나보다 양이 많다고 생각했어", "expected_id": "bigger-denominator-bigger-fraction", "near_id": null, "kind": "paraphrase", "note": "MISC-21 A1 좌석 — signals 미공출현(분모가 클수록·크다 회피)"}
+{"statement": "분모가 클수록 한 조각의 크기는 작아진다", "expected_id": null, "near_id": "bigger-denominator-bigger-fraction", "kind": "correct-near", "note": "MISC-21 A1 좌석 — 올바른 단위분수 크기 비교(크다 미포함)"}
+{"statement": "3:2랑 2:3은 결국 같은 관계를 나타낸다고 봤어", "expected_id": "ratio-order-swapped", "near_id": null, "kind": "paraphrase", "note": "MISC-21 A2 좌석 — signals 미공출현(비의 순서 회피)"}
+{"statement": "3:2와 2:3은 비교하는 대상의 앞뒤가 달라 서로 다른 비다", "expected_id": null, "near_id": "ratio-order-swapped", "kind": "correct-near", "note": "MISC-21 A2 좌석 — 올바른 비의 순서 구분(비의 순서·같다 미포함)"}
+{"statement": "동전과 주사위를 같이 던지는 경우의 수를 셀 때 그냥 두 경우의 수를 더해버렸어", "expected_id": "addition-multiplication-rule-confused", "near_id": null, "kind": "paraphrase", "note": "MISC-21 A3 좌석 — signals 미공출현(합의 법칙·곱의 법칙 회피)"}
+{"statement": "동시에 일어나는 두 사건의 경우의 수는 각각의 경우의 수를 곱해서 구한다", "expected_id": null, "near_id": "addition-multiplication-rule-confused", "kind": "correct-near", "note": "MISC-21 A3 좌석 — 올바른 곱사건 판단(법칙 명칭 미포함)"}
+{"statement": "합의 법칙과 곱의 법칙을 구분해서 써야 한다", "expected_id": null, "near_id": "addition-multiplication-rule-confused", "kind": "correct-near", "note": "PR #1068 Codex P1 회귀 — 법칙 명칭 공출현 + 반박 조건(구분) 대조"}

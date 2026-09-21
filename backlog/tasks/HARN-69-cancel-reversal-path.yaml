@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-69-cancel-reversal-path
+title: "cancelled 태스크 복원 경로 부재 — 취소가 되돌릴 수 없어 대장 손편집이나 파일 삭제 우회를 부른다"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 복원 경로 신설: cancelled → todo 전이를 CLI로 제공(예: backlog.py uncancel <id> --reason). 사유는 notes·이벤트 대장에 기록"
+  - "② 실패 주입 검증: 복원 후 backlog.py next 후보에 실제로 다시 나타나는지, 복원 전에는 나타나지 않는지 양쪽을 확인한다. 정상 상태 초록만으로는 보호의 증거가 아니다"
+  - "③ 남용 방지: done→todo 등 다른 역전이는 허용하지 않는다. cancelled 전용임을 테스트로 동결"
+  - "④ 인접 태스크 합치기 판단: HARN-67(origin/main·todo)은 '선행이 cancelled일 때 후속이 영구 차단되는' 축이고 본 태스크는 'cancelled 태스크 자신을 되살리는' 축이다. 둘 다 정정 경로 부재 계열(HARN-57 done 증적·HARN-59 paths)이므로 착수 전 HARN-67 상태를 확인하고 한 PR로 묶을지 판정한다"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+session: null
+notes: "사고 경위(2026-09-06): PR #987에서 EOS-93을 중복으로 cancel했는데 Codex P1이 '그 커밋 단독 머지 시 트리에 프로브 소유자가 0명'을 지적(EOS-92는 미머지 브랜치에만 존재). 되살리려 했으나 cancelled→todo CLI가 없어 yaml 파일을 rm 후 add로 재등재하는 우회를 썼다 — 대장 손편집 금지 원칙의 경계선이며, 번호 충돌 검사·이벤트 연속성을 우회할 수 있는 경로다. 취소는 인간이 흔히 되돌리는 판단인데 되돌릴 수단이 없으면 우회가 표준이 된다. HARN-57(done 증적 정정)·HARN-59(paths 정정)와 같은 계열 — '정정 경로 부재' 3번째.\n\n[정정 2026-09-06] PR #987 Codex 대응 중 하네스 의미중복 고지가 HARN-67을 지목 — 별개 결함이나 같은 계열이라 관계를 대장에 명시"
+updated: 2026-09-06

@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-23-root-loss-substring-false-positive
+title: "root-loss-by-dividing substring 신호가 올바른 설명을 confidence 1.0으로 오진단 — '양변'+'x로 나누' 공출현은 함정을 정확히 설명하는 정답에도 발화한다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재현: diagnose('x²=2x에서 양변을 x로 나누면 x=2만 나와서 안 되고 해는 0과 2다')가 root-loss-by-dividing을 confidence 1.0으로 낸다 — 품질 게이트(0.65)를 넘어 확신 오진단이 학생에게 나간다. 이 문장은 함정을 *정확히 설명한* 정답이다"
+  - "② 이것은 substring 경로의 결함이며 MISC-07이 만든 정규식 경로와 무관하다(main 기준으로도 재현된다 — 정규식은 제로근 표기 배제로 이미 발화하지 않는다). 그러므로 정정 대상은 signals=('양변','x로 나누') 자체다"
+  - "③ 정정안: 공출현 신호에 *부정 조건*이 없다는 것이 근본 원인이다(v1.3 경계 매칭이 '10 속의 0'을 고친 것과 같은 축의 다음 문제). 제로근 표기가 보이면 반박하는 correct_form류 신호를 두거나, 신호 자체를 오류 진술 단편으로 좁힌다. 어느 쪽이든 양성/음성 픽스처로 변별력 실측"
+artifacts:
+  - "PR #1039 (main 04be75d7) — refuting_regex 신설 + 의미 경로 공통 출구 집행 + 제로근 부정형 배제"
+  - 뮤테이션 13종 전건 RED · backend 12053 passed · tests/infra 1005 passed
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - docs/prompts/misconception_diagnosis.md
+session: null
+notes: "출처: PR #1032 Codex P1이 정규식 결함으로 지적했고, 고친 뒤 실측하니 confidence가 여전히 1.0이었다 — 진짜 원인은 substring 경로였고 main에도 있다(git show origin/main 대조 확인). 결정 우선순위 #1(학생 정서) 위반 축이라 P1. 오답이라고 말하는 방향의 오류는 놓치는 것보다 해롭다."
+updated: 2026-09-07

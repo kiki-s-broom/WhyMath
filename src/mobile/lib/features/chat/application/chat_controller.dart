@@ -4,6 +4,7 @@
 // (1) 학생 입력을 요청으로 옮기고 (2) 받은 [CoachResponse]를 화면 메시지로 *렌더*하며
 // (3) 서버가 내린 단계 전이 결정을 그대로 적용할 뿐이다(표현≠의미·수학 로직 클라 미구현).
 // 부수효과는 [CoachApi] 호출 하나뿐 — 나머지는 순수 상태 전이다.
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../ocr/data/ocr_models.dart';
@@ -14,6 +15,7 @@ import '../data/scene_api.dart';
 import '../domain/chat_message.dart';
 import '../domain/latex_to_plain.dart';
 import 'chat_state.dart';
+import 'completion_signal.dart';
 
 part 'chat_controller.g.dart';
 
@@ -175,6 +177,10 @@ class ChatController extends _$ChatController {
       isSending: true,
       error: null,
     );
+    // 이전 턴의 완료 신호는 이 턴에 대해 더 이상 참이 아니다 — 새 응답이 오기 전까지 비운다
+    // (실패해 응답이 없으면 신호도 없는 상태로 남는다: 낡은 완료 패널을 계속 보이지 않는다).
+    ref.read(coachCompletionSignalProvider.notifier).state =
+        CoachCompletionSignal.none;
 
     try {
       // ② 서버 호출 — 영속 세션 경로(WH-1 턴·가설 누적·백엔드 E2E 앵커 정합).
@@ -182,17 +188,18 @@ class ChatController extends _$ChatController {
       //    같은 세션에 턴으로 잇는다. 스테이트리스 `coach()`는 자유 대화 fallback으로 남는다.
       final api = ref.read(coachApiProvider);
       String? dialogueId = state.dialogueId;
-      final CoachResponse response;
+      // 이 턴이 *어느 문제*에 대한 것인지 — 완료 신호를 그 문제에 스코프하는 데 쓴다.
+      // (세션 생성 경로에서만 읽으면 turns 경로의 신호가 문제 없이 남아 낡은 완료로 오독된다.)
+      final String? activeProblemId = ref.read(activeProblemProvider)?.problemId;
+      final CoachTurnResult result;
       if (dialogueId == null) {
         // 진단→문제제시에서 넘어온 활성 문제(있으면)에 세션을 묶는다(problem_id 영속).
-        final problemId = ref.read(activeProblemProvider)?.problemId;
-        final result = await api.createSession(request, problemId: problemId);
+        result = await api.createSession(request, problemId: activeProblemId);
         dialogueId = result.dialogueId;
-        response = result.response;
       } else {
-        final result = await api.addTurn(dialogueId, request);
-        response = result.response;
+        result = await api.addTurn(dialogueId, request);
       }
+      final CoachResponse response = result.response;
 
       // ③ 코치 발화를 만든다 — `decision.prompt`(메타인지 유도 발화)를 그대로 표시한다.
       final decision = response.decision;
@@ -228,8 +235,21 @@ class ChatController extends _$ChatController {
         dialogueId: dialogueId,
         isSending: false,
       );
+
+      // 서버가 내린 완료 신호를 *그대로* 옮긴다(MOB-20 · S3-32 클라 절반). 클라는 완료 여부를
+      // 판정하지 않고, attempt 재적재도 하지 않는다(서버가 이미 적재 — 중복 적재 금지 계약).
+      ref.read(coachCompletionSignalProvider.notifier).state =
+          CoachCompletionSignal(
+        problemComplete: result.problemComplete,
+        awaitingReflection: result.awaitingReflection,
+        completedAttemptId: result.completedAttemptId,
+        problemId: activeProblemId,
+      );
     } catch (e) {
       // ④ 실패는 graceful — 에러만 기록하고 입력 상태를 복구한다(앱 안 죽음).
+      // 침묵 실패 금지(CLAUDE.md): 학생 화면 문구는 부드럽게 두되 예외 *타입명*은 남긴다
+      // (본문·PII는 남기지 않는다 — 학생 발화가 요청에 실려 있다).
+      debugPrint('코치 턴 실패(${e.runtimeType}) — 대화는 유지하고 재시도를 연다.');
       state = state.copyWith(
         isSending: false,
         error: '코치와 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',

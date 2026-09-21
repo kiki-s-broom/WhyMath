@@ -79,6 +79,20 @@ class BackupStatus:
 
     개인키·패스프레이즈는 **절대** 여기 담지 않는다(§4-5 키 분리).
     """
+    offsite_requested: bool = False
+    """이 회차가 `-OffsiteDir`로 오프사이트 미러를 요청했는가(OPS-64).
+
+    기본값 `False`는 두 경우를 **의도적으로 뭉친다** — ①오프사이트를 아예 안 쓰는
+    운용 ②이 필드가 생기기 전에 기록된 옛 상태 파일(`load_status`가 없는 키를
+    `False`로 기본 처리). 둘 다 "오프사이트 실패로 판정할 근거가 없다"는 같은
+    결론이라 구분할 필요가 없다 — `never_recorded`처럼 별도 사유를 둘 이유가 없다.
+    """
+    offsite_ok: bool = False
+    """오프사이트 미러가 *이 회차에서* 성공했는가. `offsite_requested=False`면 무의미."""
+    offsite_destination: str | None = None
+    """오프사이트 목적지 경로 — 진단용(어디로 보내려 했는지)."""
+    offsite_size_bytes: int | None = None
+    """오프사이트 사본의 바이트 수 — 로컬 크기와 대조해 진단할 때 쓴다."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,12 +120,20 @@ def record_success(
     size_bytes: int,
     encrypted: bool,
     recipients_fingerprint: str | None = None,
+    offsite_requested: bool = False,
+    offsite_ok: bool = False,
+    offsite_destination: str | None = None,
+    offsite_size_bytes: int | None = None,
     moment: datetime | None = None,
 ) -> BackupStatus:
     """성공 회차를 각인한다 — 백업 스크립트의 마지막 단계가 호출한다.
 
     **성공 경로에서만** 호출한다. 실패한 회차가 시각을 갱신하면 신선도 판정이
     "돌긴 돌았다"로 위장되어 이 모듈의 존재 이유가 사라진다.
+
+    `offsite_requested=True, offsite_ok=False`(기본값)로 먼저 쓰고 오프사이트가 실제로
+    성공한 뒤에야 `offsite_ok=True`로 다시 쓰는 것이 호출부(PS1)의 계약이다(OPS-64) —
+    그래야 오프사이트 단계에서 죽어도 이미 적힌 레코드가 실패를 정직하게 담고 있다.
     """
     stamped = (moment or datetime.now(UTC)).astimezone(UTC)
     status = BackupStatus(
@@ -120,6 +142,10 @@ def record_success(
         size_bytes=int(size_bytes),
         encrypted=bool(encrypted),
         recipients_fingerprint=recipients_fingerprint,
+        offsite_requested=bool(offsite_requested),
+        offsite_ok=bool(offsite_ok),
+        offsite_destination=offsite_destination,
+        offsite_size_bytes=offsite_size_bytes,
     )
     _atomic_write(
         status_path,
@@ -129,6 +155,10 @@ def record_success(
             "size_bytes": status.size_bytes,
             "encrypted": status.encrypted,
             "recipients_fingerprint": status.recipients_fingerprint,
+            "offsite_requested": status.offsite_requested,
+            "offsite_ok": status.offsite_ok,
+            "offsite_destination": status.offsite_destination,
+            "offsite_size_bytes": status.offsite_size_bytes,
         },
     )
     return status
@@ -165,6 +195,12 @@ def load_status(status_path: Path) -> BackupStatus | None:
         size_bytes=int(raw.get("size_bytes", 0)),
         encrypted=bool(raw.get("encrypted", False)),
         recipients_fingerprint=raw.get("recipients_fingerprint"),
+        # 없는 키는 False/None 기본값 — OPS-64 이전에 기록된 상태 파일도 그대로 읽힌다
+        # (오프사이트를 안 쓰는 회차와 구분할 수 없지만, 둘 다 "판정 근거 없음"으로 같다).
+        offsite_requested=bool(raw.get("offsite_requested", False)),
+        offsite_ok=bool(raw.get("offsite_ok", False)),
+        offsite_destination=raw.get("offsite_destination"),
+        offsite_size_bytes=raw.get("offsite_size_bytes"),
     )
 
 
@@ -204,11 +240,19 @@ def evaluate_backup_health(
     두 소비자가 같은 것을 보게 한다.
     (2026-09-01 PR #968 Codex P2 지적 수용)
 
-    신선도가 먼저다 — 기록이 없거나 오래됐으면 암호화 여부는 물을 대상이 없다.
+    신선도가 먼저다 — 기록이 없거나 오래됐으면 암호화 여부·오프사이트 여부는 물을 대상이
+    없다. 오프사이트 실패(OPS-64)는 `--require-encrypted` 플래그와 무관하게 항상 본다 —
+    로컬 백업의 암호화 요구 정책과 오프사이트 미러가 실제로 도착했는가는 별개 사실이다.
     """
     verdict = evaluate_staleness(status, max_age_hours=max_age_hours, now=now)
     if not verdict.ok:
         return verdict
+    if status is not None and status.offsite_requested and not status.offsite_ok:
+        # backup_whymath_pg.ps1 Step 9(오프사이트 미러)가 실패한 회차 — Step 7이 이미 쓴
+        # "성공" 레코드만 보면 이 회차가 정상으로 위장된다(OPS-64 발단 사고). PS1은
+        # offsite_ok=False를 먼저 쓰고 미러가 실제로 끝난 뒤에만 True로 다시 쓰므로,
+        # 여기 도달했다는 것 자체가 Step 9가 성공적으로 끝나지 못했다는 뜻이다.
+        return StalenessVerdict(False, "offsite_failed", verdict.age_hours)
     if require_encrypted and status is not None and not status.encrypted:
         return StalenessVerdict(False, "plaintext_artifact", verdict.age_hours)
     return verdict
@@ -238,6 +282,20 @@ def main(argv: list[str] | None = None) -> int:
         help="산출물이 암호화됐는가 — 오프사이트 반출 가부의 입력",
     )
     rec.add_argument("--recipients-fingerprint", default=None)
+    rec.add_argument(
+        "--offsite-requested",
+        choices=("true", "false"),
+        default="false",
+        help="이 회차가 오프사이트 미러를 요청했는가(OPS-64)",
+    )
+    rec.add_argument(
+        "--offsite-ok",
+        choices=("true", "false"),
+        default="false",
+        help="오프사이트 미러가 이 회차에서 성공했는가",
+    )
+    rec.add_argument("--offsite-destination", default=None)
+    rec.add_argument("--offsite-size-bytes", type=int, default=None)
 
     chk = sub.add_parser("check", help="신선도 판정(누락 탐지) — exit 0 통과 / 1 미달")
     chk.add_argument("--backup-dir", required=True)
@@ -259,6 +317,10 @@ def main(argv: list[str] | None = None) -> int:
             size_bytes=args.size_bytes,
             encrypted=args.encrypted == "true",
             recipients_fingerprint=args.recipients_fingerprint,
+            offsite_requested=args.offsite_requested == "true",
+            offsite_ok=args.offsite_ok == "true",
+            offsite_destination=args.offsite_destination,
+            offsite_size_bytes=args.offsite_size_bytes,
         )
         print(f"[OK] backup status recorded: {status_path} ({status.last_success_utc.isoformat()})")
         return _EXIT_OK
@@ -282,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
         "age_hours": verdict.age_hours,
         "last_success_utc": status.last_success_utc.isoformat() if status else None,
         "encrypted": status.encrypted if status else None,
+        "offsite_requested": status.offsite_requested if status else None,
+        "offsite_ok": status.offsite_ok if status else None,
     }
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -290,6 +354,14 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"[FAIL] 백업 성공 기록이 없다 ({status_path}) — 한 번도 안 돌았거나 "
                 "상태 경로가 다르다. '0회'와 '오래됨'은 다른 사태다.",
+                file=sys.stderr,
+            )
+        elif verdict.reason == "offsite_failed":
+            dest = status.offsite_destination or "목적지 미기록"
+            print(
+                f"[FAIL] 오프사이트 미러가 이 회차에서 실패했다({dest}) "
+                "— 로컬 백업 자체는 유효하지만 반출 사본이 없다(런북 4-3 PIPA 파기창 전제가 "
+                f"흔들린다). 기록: {status.last_success_utc.isoformat() if status else '-'}",
                 file=sys.stderr,
             )
         elif verdict.reason == "plaintext_artifact":

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: docs
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,9 +16,10 @@ acceptance:
   - "② 현행 코드 귀속표: 실재 모델(attempt_event·AnswerSubmission·evidence_event·ConceptMasteryHistory·SkillMasteryHistory·verified_solution·student_solution_step 등)을 4층 중 하나로 배정한다. 판정 불가는 '혼재'로 **그대로** 적는다 — 날조 금지(EOS-65 경계표 선례)"
   - "③ 집행 별항(정본화≠집행): 이 문서만으로는 아무것도 강제되지 않음을 머리에 명기한다. 기계 대조 지점이 있으면 그것을 적고, **없으면 '기계 집행 없음'을 명시**한다 — 있는 척 금지"
   - "④ 반례 처리: 4층에 안 들어가는 실재 모델이 나오면 **층을 늘리지 말고** 그 모델이 왜 예외인지 적는다(층 폭발 방지 — 관계 타입 폭발 금지의 동형). 층을 늘려야 한다고 판단하면 그 근거를 별항으로"
-artifacts: []
+artifacts:
+  - "PR #985 (https://github.com/doldori7/WhyMath/pull/985) — commit bffc1826 · docs/architecture/evidence_layer_boundary.md 신설(판별질문 4·불변식 3·귀속표 22모델·혼재 5·반례 8) · 32_learning_history.md 양방향 상호참조 · tests/infra/test_evidence_layer_boundary_doc.py 10건 · 뮤테이션 10종 전건 검출 · infra+harness 1349 passed"
 paths:
   - "docs/architecture/**"
 session: null
 notes: "출처: 계획서 200 §24 + 검토 §8.1 D3(docs/reviews/eos_phase1_plan_200_gap_review_2026-09-01.md). 200에서 살아남는 지향성 7건 중 실제로 할 일이 남은 3건 가운데 하나다. 실측: 4층이 코드로는 전부 실재하나(모델 7종) 네 개념의 경계를 규정한 정본 문서가 없다 — docs/architecture/0*.md 21건·docs/standards 역할 검색에서 0건(검색 범위 명시). 그래서 새 코드가 어느 층에 속하는지 판정할 근거가 사람 머릿속에만 있다. (가) 결정 하에서 12/31 판정 대상은 아니지만, 10~11월 콘텐츠 생산 국면에서 증거 층을 잘못 고르면 스코어카드 입력이 오염된다.\n\n[정정 2026-09-01] eos_priority null → P1: KPI 산출 경로 보호 — 태스크 자신이 '12/31 판정 대상은 아니지만 10~11월 콘텐츠 생산 국면에서 증거 층을 잘못 고르면 스코어카드 입력이 오염된다'고 적었다. 오염된 입력은 12월 판정을 무효화하므로 우회 가능하되 품질 기여가 크다. HARN-55 머지 전에 분기한 세션의 구버전 CLI가 만들어 eos_priority 필드 자체가 없던 건 — 브랜치 시차 편입"
-updated: 2026-09-01
+updated: 2026-09-05

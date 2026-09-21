@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from whymath_backend.composition import default_expression_equivalence
 from whymath_backend.l3.pedagogy.diag_item_projector import (
     DiagItemFillReport,
     DiagItemTarget,
@@ -212,12 +213,18 @@ class TestOtherSlotTypesUnchanged:
         from whymath_backend.l3.pedagogy.slot_generator import NUMERIC_SLOT_TYPES, build_slot_rows
 
         assert "diag_item" in NUMERIC_SLOT_TYPES  # 분류 불변 — 이 모듈이 재분류하지 않는다.
-        rows = build_slot_rows(_OBJ, [{"type": "diag_item", "count": 2}])
+        rows = build_slot_rows(
+            _OBJ, [{"type": "diag_item", "count": 2}], equivalence=default_expression_equivalence()
+        )
         assert len(rows) == 2
         assert all(r["slot_type"] == "diag_item" for r in rows)
 
     def test_example_pair_slot_type_unaffected(self) -> None:
         from whymath_backend.l3.pedagogy.slot_generator import build_slot_rows
 
-        rows = build_slot_rows(_OBJ, [{"type": "example_pair", "count": 3}])
+        rows = build_slot_rows(
+            _OBJ,
+            [{"type": "example_pair", "count": 3}],
+            equivalence=default_expression_equivalence(),
+        )
         assert len(rows) == 3

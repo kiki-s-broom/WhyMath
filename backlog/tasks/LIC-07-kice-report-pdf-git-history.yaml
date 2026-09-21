@@ -1,0 +1,38 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: LIC-07-kice-report-pdf-git-history
+title: "KICE 평가기준 개발 연구 보고서 원본 PDF 2건이 git 히스토리에 잔존 — 제거 판단·실행 (되돌리기 어려움·Kiki 소유)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: kiki
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 대상 확정: blob 35cb705a(고등 CRC 2017-5-6·4.82MB)·7e1d471e(초중 CRC 2016-2-6·5.91MB). 도입 388f7921 / 삭제 98a34695(둘 다 2026-08-08). 작업 트리에는 없고 히스토리에만 남아 clone마다 배포된다"
+  - "② 위험 판정 근거는 실측 완료(2026-09-06·PDF 판권장 직접 추출): 두 PDF는 고시가 아니라 KICE 발간 연구보고서다(ISBN 979-11-5788-529-9 / 979-11-5788-347-9 · 판권장에 '※ 본 자료 내용의 무단 복제를 금함'). licensing_safety.md 'NCIC 구분'의 후자(해설서·연구보고서 = 영리 차단·C등급)에 해당해 상업 서비스 저장소 잔존은 위험. 같은 커밋군의 data/ncic/raw/curriculum_math_2022.pdf는 교육부 고시 제2022-33호 별책 8이라 저작권법 §7 제1호 비보호 — 제거 대상 아님"
+  - "③ 제거 실행은 Kiki 소유(되돌리기 어려움): 사전 백업 → git-filter-repo로 두 blob만 제거 → 전 협업자 재clone 공지 → 원격 캐시 잔존분은 GitHub 지원 요청(force-push만으로 원격 GC가 즉시 일어나지 않는다). 열린 PR 전건 재기반 필요"
+  - "④ 재유입 방지 가드 등재·배선: 저작권 위험 원본(대용량 PDF·hwp 등)의 커밋 차단을 CI 또는 pre-commit에 붙이고, 위반 픽스처 주입으로 red를 실증한다(보호 장치 실패 주입 검증 의무)"
+  - "⑤ 범위 밖: 자체 사업계획서 PDF/docx·하네스 zip(자체 저작물·확인 완료) / 작업 트리 코퍼스(전수 실사 결과 저촉 0건)"
+  - "⑥ [정정·2026-09-06 unshallow 실측] main은 두 blob을 담지 않는다 — 'git merge-base --is-ancestor 388f7921 origin/main' → false, 'git rev-list --objects refs/heads/main | grep <blob>' → 0건. 도달 가능한 ref는 브랜치 2개(claude/human-bottleneck-tasks-6dszy0 · merge/human-bottleneck-6dszy0)와 닫힌 PR #739의 refs/pull/739/head뿐이다. 따라서 ③이 전제했던 main 히스토리 재작성·전 협업자 재clone·열린 PR 전건 재기반은 **불요**하다. 등재 시점 판정이 shallow 클론(SessionStart 훅이 판정 보류를 경고)에 근거한 것이 원인"
+  - "⑦ [방법 확정] 브랜치를 삭제하지 않고 **재작성**한다 — claude/human-bottleneck-tasks-6dszy0은 main에 없는 21커밋을 담고 그중 MISC-01·MISC-03·PB-02 구현이 main에 미착지다(내용 실측: coach.py의 visualize_misconception 매치 main 0 / 브랜치 6, ci.yml 커버리지 재생성 main 0 / 브랜치 3). 삭제하면 미병합 고립 5회차가 된다. blob ID 지정(--strip-blobs-with-ids)으로 PDF만 들어내고 커밋은 보존한다. 비용: 21커밋 SHA 변경으로 백로그 notes의 옛 SHA 참조(REC-02의 d554ddad 등)가 해석 불능이 된다 — 작업 소실은 없다"
+  - "⑧ [실행 경로] 런북 docs/ops/kice_pdf_history_purge_runbook.md (6항목 브리핑·단계별 자가검증·변별력 3축[blob 0 + 커밋수 pre 또는 pre-1 + 내용 마커]). 세션이 실행하지 않은 이유 2가지: 되돌리기 어려움 + 이 세션의 git filter-repo 실행이 권한 분류기에 거부됨(우회 금지 규칙에 따라 소유자 실행으로 이관)"
+  - "⑨ [남는 한계·명시] refs/pull/739/head는 저장소 소유자도 git으로 지울 수 없다 — force-push로도 사라지지 않는다. 다만 일반 git clone은 refs/pull/*을 가져오지 않으므로, 브랜치 재작성만으로 노출은 '모든 clone'에서 'PR ref를 명시 fetch하는 사람'으로 줄어든다. 완전 제거는 GitHub Support 요청(저장소·PR #739·blob SHA 2건 명시)이며 웹 폼 작업이라 런북 범위 밖"
+  - "⑩ [방법 정정·실행으로 판명] ⑦의 브랜치 재작성은 **이 저장소에서 구조적으로 불가능**하다. 커밋이 전부 서명(gpgsig·SSH)돼 있고 filter-repo의 엔진 fast-export가 서명을 버리므로, PDF와 무관한 조상 705건까지 SHA가 바뀌어 브랜치가 main에서 분리된다(실측: main 공유 736 → 31 · main..A 21 → 726). main을 --refs에 넣는 것은 main 재작성이라 불가. 자가검증 2축(커밋 수)이 이를 잡았고 1·3축만 봤다면 그대로 push됐다"
+  - "⑪ [실행 완료·2026-09-06] 두 브랜치를 삭제해 제거했다(재작성 0·main 무변경·협업자 재clone 불요). 삭제 전 소실 0을 전수 증명: MISC-01·MISC-03·PB-02 구현이 claude/subject-problems-theory-check-7n9n72에 보존(기능 마커 5/5·핵심 파일 6개 blob SHA 바이트 동일)돼 있고 그 브랜치는 KICE blob 0건 · 6dszy0 전용 파일 4개는 MISC-04 분으로 전부 main 실재. 최종 확인: 완전히 새 clone에서 KICE blob 0건(Kiki 실행)"
+  - "⑫ [런북 갱신] docs/ops/kice_pdf_history_purge_runbook.md를 지시서에서 **실행 기록·교훈**으로 재작성. 일반화 교훈(서명 저장소에서 일부 ref만 재작성하면 이력이 분리된다 — 지울 수 있으면 재작성하지 마라) + 검증 스텝 결함 2건(정상 상태에서 실패하는 커밋 수 기대값 · 한글 grep 인코딩) + 실행 환경 함정 2건(pip 설치 후 PATH 부재 · --version이 버전을 안 냄) 기록"
+  - "⑬ [④ 착지·2026-09-06] 재유입 방지 3중 방어선: ⓪ .gitignore '저작권 위험 원본 문서' 블록(사고 당시 아카이브만 있었고 PDF·hwp·오피스는 규칙 부재 — git check-ignore 실측) ① scripts/ops/check_source_document_binaries.py 확장자 축(add -f 우회 차단) ② 매직 바이트 축(%PDF·PK — 확장자 위장 차단). 가드가 ⓪의 실재도 검사하고, 죽은 허용 목록 항목은 red, 전수 스캔 미성립은 exit 2(통과 위장 금지). CI는 기존 policy-guard 잡에 스텝 추가(신규 잡 신설 0)"
+  - "⑭ [변별력 실증] tests/infra/test_source_document_binary_guard.py 14건이 위반을 실제 주입해 red 요구 — 사고 당시 파일명 PDF·hwp·docx·zip·확장자 위장 PDF·위장 xlsx·죽은 예외·.gitignore 규칙 삭제·얇은 인벤토리·비-git 디렉터리 + 대칭 축(진짜 텍스트는 통과). 배선 실재성은 test_source_document_binary_guard_wiring.py 3건(ci.yml 스텝 삭제 시 red 실증 · needs:changes 종속 금지 — skip이 required check 충족으로 계상되는 함정)"
+  - "⑮ [남은 공백·명시] 확장자를 바꾼 구형 .hwp(OLE 복합문서)는 매직 축 미탐지 · 텍스트로 옮겨 적은 본문은 이 가드의 대상이 아님(policy-guard 패턴 축·사람 검수 몫)"
+  - "⑯ [리뷰 라운드·2026-09-07 PR #1016] 가드 결함 3건을 실측 재현 후 수정: ⓐ허용 목록의 *경로* 면제가 모든 검사를 우회(등재 xlsx를 %PDF로 덮어써도 EXIT=0) → _ALLOWED를 {경로:(sha256,사유)}로 바꿔 내용에 묶음 ⓑ.tar.gz/.tar.bz2 미커버(git add -f로 EXIT=0) → BLOCKED_SUFFIXES +.gz/.bz2/.xz/.tar · BLOCKED_MAGIC +gzip/bzip2/xz/7z/rar · .gitignore 동일 4종 ⓒ읽지 못한 추적 파일을 '매직 없음'으로 접던 fail-open → UnreadableTrackedFileError로 exit 2(예외 타입명 로그). 또한 기존 확장자 축 테스트가 %PDF 내용을 써서 매직 축이 대신 잡던 변별력 결함을 정정(확장자 목록을 비워도 초록이었음). 가드 뮤테이션 6종 전건 RED(주입 적용·바이트 동일 원복을 하네스가 각각 단언) · tests/infra 1001 passed"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1016 (e410c181 머지) + https://github.com/doldori7/WhyMath/pull/1008 (히스토리 제거 런북)"
+paths:
+  - docs/data/licensing_safety.md
+  - ".github/workflows/ci.yml"
+session: null
+notes: "2026-09-06 저작권 전수 실사에서 발견(세션: claude/remove-copyright-materials-nptqyr). 작업 트리에는 저작권 저촉 자료 0건 — 문제은행 14,034 문항 전량 WHYMATH_GENERATED·자체생성, 벤더 JS(MathLive/three.js/React) 라이선스 고지 보존, 교과서·기출 스캔/PDF 0, 금지 등급 외부 소스(Khan·CK-12·AoPS 등) 실물 0. 유일한 실질 위험이 이 히스토리 2건이다. Kiki 판단 대기(보류 / 절차서만 작성 / 즉시 실행). LIC-06은 paths 과대 지정으로 취소 후 이 번호로 재등재.\n\n[정정 2026-09-06] 2026-09-06 unshallow 후 도달성 재판정 — 등재 시점 판정을 정정한다. 등재는 shallow 클론에서 이뤄져 'main 히스토리 잔존'을 전제했으나, 전체 히스토리를 받아 실측하니 main은 깨끗했다. 작업 규모·위험도가 크게 줄어 acceptance를 갱신한다.\n\n[정정 2026-09-06] 2026-09-06 실행 완료 — 방법이 ⑦(브랜치 재작성)에서 브랜치 삭제로 바뀌었고, 그 근거와 실행 결과를 기록한다.\n\n[정정 2026-09-06] acceptance ④(재유입 방지 가드) 착지 — 3중 방어선 + 위반 주입 14건 red 실증 + CI 배선 동결.\n\n[정정 2026-09-07] PR #1016 리뷰 지적 3건 반영분을 acceptance에 기록(정본화를 집행으로 착각한 완료 선언 금지 — 실제 착지 내용과 대장을 일치시킨다)"
+updated: 2026-09-08

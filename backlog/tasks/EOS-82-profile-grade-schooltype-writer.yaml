@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-82-profile-grade-schooltype-writer
+title: "학년·학교유형 자가입력 경로 부재 — 소비자 4곳이 영구 None으로 무효화 (G1)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P0
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 입력 경로 개통 — PATCH /v1/users/me의 _SELF_EDITABLE에 grade·school_type을 추가한다. 두 필드는 학생 자가신고 학적 정보이며 동의·신원·결제·시스템 판정 필드가 아니다. school_id·school_region·gender는 범위 밖(미소비 컬럼 처분 게이트 G-prod-dead-column-check 대상이라 반대 방향)"
+  - "② 집행 지점(정본화와 별항) — 화이트리스트 추가만으로는 '값이 들어간다'가 증명되지 않는다. 소비자 4곳(api/study.py grade_band · api/coach.py _grade_for · l2/target_progress.py 스코프 · l2/learner_state.py)이 PATCH로 넣은 값을 실제로 읽는지 최소 1곳을 관통 테스트로 동결한다"
+  - "③ 변별력 양방향 — 유효값(grade 10~14 · school_type 12종)은 200으로 통과하고, 범위 밖(grade 9·15)·미정의 enum은 422로 거부됨을 동결한다. 모든 입력에서 통과하는 화이트리스트는 게이트가 아니다"
+  - "④ 게이트 우회 회귀 방지 — grade·school_type 추가가 is_minor 서버 파생·동의 게이트·PII 제외를 건드리지 않음을 기존 13건 + 신규 테스트로 확인한다. 특히 미성년 동의 게이트 우회 경로가 열리지 않아야 한다"
+artifacts:
+  - "PR #977 (https://github.com/doldori7/WhyMath/pull/977) · 커밋 970676c3(구현+테스트)·6a08ed66(리뷰 정정) · CI 전건 green(success 9·skip 9·fail 0, run 33705793097) · 전체 스위트 11,643 passed·0 failed · 계층 커버리지 전 계층 PASS(집계 86.69%) · 뮤테이션 2종으로 신규 8건 변별력 확인(A 7 red · B 1 red) · mypy --strict 637파일 clean"
+paths:
+  - src/backend/whymath_backend/api/users.py
+  - tests/backend/api/test_users.py
+session: null
+notes: "출처: docs/reviews/eos_one_subject_completion_review_2026-09-03.md §2.3 G1 (PR #977). 실측 — 소비자 4곳(api/study.py:167 · api/coach.py:1220 · l2/target_progress.py:148 · l4/pedagogy/runtime_selector.py:136,231)이 존재하고 ORM 컬럼(db/models/user.py:90,94)과 DB 인덱스(idx_user_school)까지 있는데 HTTP writer가 0곳이라 전 학생이 영구 None. 결과적으로 교수법 학년 밴드 필터·코치 학년 개인화·성취기준 커버리지가 조용히 스킵/null 된다. security_privacy.md는 UserProfile의 학년 수집을 이미 승인한다(닉네임·학년·school_id·birth_year)."
+updated: 2026-09-03

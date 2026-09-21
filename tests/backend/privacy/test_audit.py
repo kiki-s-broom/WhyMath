@@ -1,10 +1,13 @@
-"""개인정보 감사(SEC-09, `privacy/audit.py`) — 단위(hermetic·순수함수 + FakeSession).
+"""개인정보·콘텐츠 감사(SEC-09/SEC-29, `privacy/audit.py`) — 단위(hermetic·순수함수 + FakeSession).
 
-`hash_client_ip`(salt 해싱·fail-closed/경고 분기)와 세 writer(`record_export_audit`·
-`record_consent_change_audit`·`record_admin_access_audit`)의 *조립 로직*만 검증한다(session.add
-로 무엇이 쌓이는지·commit은 호출자 책임이라 여기선 add까지만). end-to-end(엔드포인트 결선·동일
-TX 커밋)는 `tests/backend/api/test_me_export.py`·`test_parental_consent.py`·실 PG 통합
-(`tests/backend/api/test_privacy_audit_integration.py`)이 검증한다(중복 0).
+`hash_client_ip`(salt 해싱·fail-closed/경고 분기)와 네 writer(`record_export_audit`·
+`record_consent_change_audit`·`record_admin_access_audit`·`record_content_mutation_audit`)의
+*조립 로직*만 검증한다(session.add로 무엇이 쌓이는지·commit은 호출자 책임이라 여기선 add까지만).
+end-to-end(엔드포인트 결선·동일 TX 커밋)는 `tests/backend/api/test_me_export.py`·
+`test_parental_consent.py`·`test_concepts.py`/`test_problems.py`(`TestContentMutationAudit`)·
+실 PG 통합(`tests/backend/api/test_privacy_audit_integration.py`)이 검증한다(중복 0).
+`record_role_change_audit`은 `tests/backend/ops/test_role_grant_cli.py`가 담당(그쪽이 유일
+호출부라 조립 로직도 거기서 함께 본다).
 """
 
 from __future__ import annotations
@@ -22,9 +25,10 @@ from whymath_backend.privacy.audit import (
     hash_client_ip,
     record_admin_access_audit,
     record_consent_change_audit,
+    record_content_mutation_audit,
     record_export_audit,
 )
-from whymath_backend.schema.enums import ConsentScope
+from whymath_backend.schema.enums import ConsentScope, PrivacyAuditAction, PrivacyAuditResourceType
 
 _UID = uuid.uuid4()
 _TARGET_UID = uuid.uuid4()
@@ -149,3 +153,45 @@ class TestRecordAdminAccessAudit:
         assert row.target_user_id == _TARGET_UID  # 행위 대상(본인 아닌 학생)
         assert row.event_kind == "admin_access"
         assert row.consent_scope is None
+
+
+class TestRecordContentMutationAudit:
+    """SEC-29 — `api/concepts.py`·`api/problems.py`의 CUD 6라우터가 실 첫 호출부."""
+
+    def test_adds_content_mutation_row_with_resource_fields(self) -> None:
+        resource_id = uuid.uuid4()
+        session = _FakeSession()
+        row = record_content_mutation_audit(
+            session,
+            actor_user_id=_UID,
+            resource_type=PrivacyAuditResourceType.concept,
+            resource_id=resource_id,
+            action=PrivacyAuditAction.create,
+            ip="203.0.113.7",
+            settings=_settings(salt="s"),
+        )
+        assert session.added == [row]
+        assert row.user_id == _UID  # 행위자(관리자)
+        assert row.target_user_id is None  # 대상은 사용자가 아니라 리소스
+        assert row.event_kind == "content_mutation"
+        assert row.resource_type == "concept"
+        assert row.resource_id == resource_id
+        assert row.action == "create"
+        assert row.consent_scope is None
+
+    def test_action_and_resource_type_vary_independently(self) -> None:
+        """세 값(resource_type·resource_id·action)이 서로 다른 조합에서도 올바르게 채워진다."""
+        session = _FakeSession()
+        resource_id = uuid.uuid4()
+        row = record_content_mutation_audit(
+            session,
+            actor_user_id=_UID,
+            resource_type=PrivacyAuditResourceType.problem,
+            resource_id=resource_id,
+            action=PrivacyAuditAction.delete,
+            ip=None,
+            settings=_settings(salt="s"),
+        )
+        assert row.resource_type == "problem"
+        assert row.action == "delete"
+        assert row.ip_hash is None  # ip=None → 해싱할 것이 없음(hash_client_ip 계약)

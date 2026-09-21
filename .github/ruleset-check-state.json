@@ -1,0 +1,9 @@
+{
+  "last_checked": "2026-09-14",
+  "verdict": "ok",
+  "violations": 0,
+  "advisories": 0,
+  "waived": 3,
+  "source": "ruleset.json",
+  "_note": "scripts/harness/ruleset_drift.py --record 가 쓴다. 손편집 금지 — 확인하지 않고 날짜만 미루면 리마인드가 위장이 된다."
+}

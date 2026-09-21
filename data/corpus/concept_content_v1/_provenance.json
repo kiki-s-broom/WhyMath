@@ -12,13 +12,25 @@
       "reviewed": 0
     }
   },
-  "source_citation": "출처: 와이매스 자체작성 — K-12 개념 교수학 콘텐츠(은유·오개념·정식정의·허용표현·암기카드). 원자노드DB 종합·AI 추정·검수필요. K-12 성취기준 본문은 NCIC 저작물이라 미수록 — 연결 성취기준 코드만 다리로 보존.",
-  "license_notice": "본 데이터(은유·오개념·정식정의·허용표현·설명·암기카드)는 와이매스 자체 저작물입니다 — AI 추정 초안으로 검수필요. **K-12 성취기준 본문(성취기준 문장·요약)은 NCIC 저작물이라 미수록**·연결 성취기준 코드만 보존. `formal_definition_internal`(정식정의)은 학생 비노출(내부·검수용).",
+  "source_citation": "출처: 와이매스 자체작성 — K-12 개념 교수학 콘텐츠(은유·오개념·정식정의·허용표현·암기카드). 원자노드DB 종합·AI 추정·검수필요. 단, `explanation` 133건은 NCIC 성취기준 본문과 사실상 동일하며 그 출처는 교육부 고시 제2022-33호 [수학과 교육과정], 국가교육과정정보센터(NCIC, https://www.ncic.go.kr)다.",
+  "license_notice": "본 데이터(은유·오개념·정식정의·허용표현·설명·암기카드)는 와이매스 자체 저작물입니다 — AI 추정 초안으로 검수필요. **단, `explanation` 133건은 NCIC 성취기준 본문과 사실상 동일하다(유사도 ≥0.90·그중 124건은 표기 정규화 후 완전 일치·437건 중 전수 실측).** 해당 본문의 출처는 교육부 고시 제2022-33호 [수학과 교육과정], 국가교육과정정보센터(NCIC, https://www.ncic.go.kr)이며, 고시는 저작권법 제7조 제1호(고시·공고·훈령)상 보호받지 못하는 저작물이고 NCIC 공개분은 공공누리 제1유형(출처 표시·상업 이용·변경 허용)이라 보유·상업 이용에 제약이 없다 — `licensing_safety.md`의 'NCIC 구분'(고시 본문 = §7 비보호 ↔ 해설서·연구보고서 = 영리 차단)에서 전자에 해당한다. 나머지 explanation과 다른 5개 필드는 자체 저작물이다. `formal_definition_internal`(정식정의)은 학생 비노출(내부·검수용).",
   "post_extraction": [
     "개념(학교급!='대학교') 437 + 암기카드 조인 추출. 대학 비추출(U4 별도).",
     "성취기준 본문 미수록(NCIC)·연결 성취기준 코드만 보존. 정식정의=학생 비노출. DB 투영 Phase 3.",
     "review_status 축 도입(S3-26): 안내 시트상 전량 'AI 추정·검수필요'라 437행 모두 'ai_estimated'. 검수 승격 시 행 단위로 'reviewed'로 갱신하며, 결함율·미검수 비율 관측은 `python -m whymath_backend.harness.concept_content_audit`.",
     "QUAL-06: explanation 47건의 NCIC 크롤링 잔류(개정 연도·페이지/절 표기)를 자체 서술로 정정 — license_notice의 \"성취기준 본문 미수록\"과의 모순 해소. 다른 필드 무수정·직렬화 포맷 동결. 재오염 감시는 concept_content_audit의 explanation_revision_mark·explanation_section_trailer 신호(전수 스캔).",
-    "QUAL-06 추가: 문장 중간 bare 페이지 숫자 삽입('…방법을 70 설명할 수 있다', H:12대수03-05) 1건 추가 정정 — 정정 대상 총 48건. 감사 신호 explanation_page_insert 추가 (조사+bare 숫자 패턴 — F6 '분모 10 진분수' 류 정상 서술 오탐 없음 전수 실측)."
-  ]
+    "QUAL-06 추가: 문장 중간 bare 페이지 숫자 삽입('…방법을 70 설명할 수 있다', H:12대수03-05) 1건 추가 정정 — 정정 대상 총 48건. 감사 신호 explanation_page_insert 추가 (조사+bare 숫자 패턴 — F6 '분모 10 진분수' 류 정상 서술 오탐 없음 전수 실측).",
+    "2026-09-06 저작권 실사: license_notice의 \"성취기준 본문 미수록\" 선언이 데이터와 정면 모순임을 전수 실측으로 확인(133건 ≥0.90·124건 완전 일치 — QUAL-06 ⑥이 KG-02 소관으로 남긴 잔류분). 데이터는 삭제하지 않고 선언을 데이터에 맞춰 정정했다 — 근거는 NCIC 성취기준이 교육부 고시라 저작권법 §7 비보호 + 공공누리 제1유형이어서 보유·상업 이용에 제약이 없다는 점이며, 동일 본문을 이미 `standards_v1`이 같은 근거로 895건 보유한다. 선언↔데이터 드리프트 재발은 `ncic_statement_overlap` 실측치와 대조하는 거버넌스 테스트가 전수 스캔으로 잡는다."
+  ],
+  "ncic_statement_overlap": {
+    "field": "explanation",
+    "reference": "data/corpus/standards_v1/standards.json (교육부 고시 제2022-33호)",
+    "similarity_threshold": 0.9,
+    "count": 133,
+    "exact_after_normalization": 124,
+    "compared": 437,
+    "measured_at": "2026-09-06",
+    "legal_basis": "저작권법 제7조 제1호(고시) 비보호 + 공공누리 제1유형(출처 표시) — 보유·상업 이용 제약 없음",
+    "enforced_by": "tests/backend/l1/test_concept_content_license_declaration.py"
+  }
 }

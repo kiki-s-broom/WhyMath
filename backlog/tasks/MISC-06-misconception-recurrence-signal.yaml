@@ -15,10 +15,11 @@ requires_gates: []
 acceptance:
   - "misconception_hypothesis 시계열을 읽기전용 노출 — BKT/DKT θ와 융합하지 않음(원칙6 준수), 학생 노출 라벨·코칭강도 결정엔 미사용"
   - "select_probe 우선순위 신호로만 소비, 낙인방지(is_active 가지치기 원칙과 정합)"
+  - "[고립 참조 2026-09-07 stray-code 감사] 구현+테스트가 origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 caf4520a)에 done 표기로 보존 — l4/misconception/hypothesis_store.py·warmstart.py·api/coach.py 변경 + tests/backend/l4/misconception/test_recurrence_signal.py main 부재 실측(심볼 recurrence_signal grep 0). 착수 시 재구현 말고 파일 단위 회수 우선(브랜치가 main보다 228커밋 낡아 통째 머지 금지). 회수 완료 전 원 브랜치 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
   - src/backend/whymath_backend/harness/wh1_primary.py
 session: null
-notes: "04e_misconception_remediation_design.md §4. REC-02 인프라 재사용(중복 구현 방지).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "04e_misconception_remediation_design.md §4. REC-02 인프라 재사용(중복 구현 방지).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착"
+updated: 2026-09-07

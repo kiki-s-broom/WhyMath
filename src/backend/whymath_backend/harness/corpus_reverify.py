@@ -25,46 +25,34 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from whymath_backend.l3.equivalent.acceptance import (
+    _CONCEPTUAL_VERIFIERS as _ACCEPTANCE_CONCEPTUAL_VERIFIERS,
+)
 from whymath_backend.l3.equivalent.counterexample_fuzz import fuzz_answer
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
     verify_answer,
-    verify_conditional_equal,
-    verify_congruent_by_ratio,
-    verify_dot_product_scalar,
-    verify_events_independent,
-    verify_extremum_count,
-    verify_geometric_convergence,
-    verify_inequality_direction,
-    verify_is_differentiable,
-    verify_is_one_to_one,
-    verify_limit_equals_value,
-    verify_mean_equals_median,
-    verify_real_root_count,
     verify_root_aggregate,
     verify_root_selection,
-    verify_series_converges,
 )
 from whymath_backend.l3.verify_solution import verify_solution
 
-# 개념형 검증기 디스패치 — answer_kind → SymPy 독립 재검증 프리미티브(acceptance와 동일 표·S6).
-_CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerdict]] = {
-    "real_root_count": verify_real_root_count,
-    "extremum_count": verify_extremum_count,
-    "is_one_to_one": verify_is_one_to_one,
-    "geometric_convergence": verify_geometric_convergence,
-    "limit_equals_value": verify_limit_equals_value,
-    "is_differentiable": verify_is_differentiable,
-    "series_converges": verify_series_converges,
-    "excluded_point_count": verify_real_root_count,
-    "mean_equals_median": verify_mean_equals_median,
-    "events_independent": verify_events_independent,
-    "conditional_equal": verify_conditional_equal,
-    "congruent_by_ratio": verify_congruent_by_ratio,
-    "dot_product_scalar": verify_dot_product_scalar,
-    "inequality_direction": verify_inequality_direction,
-    "root_loss_count": verify_real_root_count,
-}
+# 개념형 검증기 디스패치 — **acceptance의 표를 그대로 쓴다**(EOS-85 ④·사본 금지).
+#
+# 종전엔 같은 표를 여기 손으로 한 벌 더 적어 두고 주석에 "acceptance와 동일 표"라고 썼는데,
+# **실제로는 달랐다**: acceptance 17종 · 여기 15종으로 `finite_probability`·`finite_count`가
+# 빠져 있었다(2026-09-06 실측). 그 두 종은 `problem_bank_probability_finite_v0`에 34행
+# (26+8) 실재하므로, 이 파일로 그 코퍼스를 재검증하면 두 종이 디스패치에 없어 **조용히
+# 건너뛴다** — S6 상시성이 지키는 척만 하는 구간이 생긴다. 지금 야간 잡이 도는 코퍼스 3종
+# (generated·rephrased·killer)에는 answer_kind가 0건이라 아직 드러나지 않았을 뿐이다.
+#
+# 사본을 고치는 대신 **없앤다**(CLAUDE.md "유지보수 지옥 ← truth source가 하나가 아님").
+# 판정 어휘의 단일 원천은 `l3.equivalent.acceptance`이며, 이 모듈은 이미 같은 계층의
+# `l3.verify_answer`·`l3.verify_solution`·`l3.equivalent.counterexample_fuzz`를 쓰고 있어
+# 새 의존이 생기지 않는다.
+_CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerdict]] = (
+    _ACCEPTANCE_CONCEPTUAL_VERIFIERS
+)
 
 _EXIT_OK = 0
 _EXIT_FAIL = 1

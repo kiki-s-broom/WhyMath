@@ -13,6 +13,23 @@ PRD `Hint` 정렬(스펙 L41-61): WhyMath 1~3단계 ↔ PRD 1~3, WhyMath 4단계
 
 후속 슬라이스(범위 밖): `prev_hint_level` 영속(L2 세션 모델)·LLM-judged 좌절 감지·학습자
 정서 신호(`affect=frustrated`) 통합·답 미루기 KPI 집계.
+
+**PED-35 정직한 공백**(acceptance②) — `STUCK_TURN_THRESHOLD=5`는 이번 태스크에서
+*튜닝하지 않았다*(스펙 L37 값을 그대로 유지). 이 세션은 라이브 `wh1_evaluation`
+세션 지표(도움 감소 곡선·이탈률)에 접근할 수 없어, 임계값 변경의 실측 근거를
+만들 수 없다 — LearnLM 2407.12687 §5.5(과잉 유도 완화 근거)는 방향성 참고일 뿐
+이 임계값에 대한 직접 측정이 아니다. 규칙 6은 *기존* 임계값의 보장을 복원할
+뿐, 임계값 자체의 재보정은 라이브 세션 데이터가 있는 후속(SSM 파일럿 또는
+전용 실측 태스크)으로 미룬다.
+
+**PED-31과의 관계**(acceptance④) — `docs/architecture/04f_pedagogy_module_boundaries.md`
+§102가 이미 명문화했듯, `decide_hint_level`의 단계 결정은 hint_deferral *고유
+책임*이며 PED-31이 설계하는 전략 라이브러리(`PedagogyPack.fading_schedule` 등
+strategy 단위 성공/실패 스트릭 기반 페이딩·해당 문서 갭 ⑩)와는 다른 층위다.
+PED-31 문서가 그 갭의 후속으로 제안한 번호(문서 표의 "PED-36")는 실제
+`backlog.py add`로 등재된 적이 없다(2026-09-11 실측 — `backlog/tasks/`에 해당
+ID 파일 없음) — 이 태스크(PED-35)가 그 자리를 선점하거나 중복 설계하는 것이
+아니라, 이미 존재하던 hint_deferral 내부 버그를 고친 것뿐이다.
 """
 
 from __future__ import annotations
@@ -97,6 +114,13 @@ def decide_hint_level(
     4. 그 외 → 1(방향, 가장 빠른 단계).
     5. `mastery_level`로 양방향 조정(slice 69 숙달·slice 77 초보·L2→L4·ZPD): '숙달'→max(1,
        base-1)(생산적 고투), '초보'→min(4, base+1)(능력 낮음→세분화). 발전중/None은 불변.
+    6. **상한 도달 보장**(PED-35) — 규칙 1(5회+ 막힘)이 정한 최소 레벨 3을 규칙 5의 '숙달'
+       완화가 다시 깎지 못하게 한다. 즉답(레벨4) 허용이 아니라 스펙 L37 "3. 부분 풀이(5회+
+       막힘)" 종착 보장이다 — 규칙 5가 매 턴 재적용되고 그 결과가 다음 턴 `prev`로 그대로
+       피드백되면서, '숙달' 학생은 5턴 이상 막혀도 레벨이 최대 2에서 고착됐다(실측 갭 —
+       `docs/reviews/learnlm_pedagogy_prompting_review_2026-08.md` §4-2 인용). 규칙 6은
+       규칙 1의 조건(turn_count ≥ 5)을 그대로 재사용해 그 보장만 복원한다 — 짧은 horizon의
+       점진 상승(규칙 2·3)은 '생산적 고투' 취지대로 여전히 완화된다.
 
     `prev_hint_level=None`(새 세션·첫 결정) → 1 시작. 후퇴는 자동 없음(prev 이하로 안 내림은
     1·2 규칙에서 보장; 4의 기본 1 복귀는 의도된 디폴트 — 막힘 신호 사라지면 다시 은근하게).
@@ -121,6 +145,13 @@ def decide_hint_level(
     elif mastery_level == "초보":
         base = min(4, base + 1)
 
+    # 6. 상한 도달 보장(PED-35) — 규칙 1과 *같은 조건*을 재사용해, 규칙 5의 '숙달' 완화가
+    # 그 최소 레벨(3)까지 깎지 못하게 한다. prev가 매 턴 이 함수의 반환값으로 피드백되므로
+    # 완화 없이는 이 보장이 없다 — 실측 갭: turn_count≥5가 유지돼도 '숙달' 학생은 최대
+    # 레벨 2에서 고착됐다(레벨 3 "부분 풀이"에 구조적으로 도달 불가).
+    if turn_count >= STUCK_TURN_THRESHOLD:
+        base = max(base, 3)
+
     return cast(HintLevel, base)
 
 
@@ -140,3 +171,17 @@ def is_stuck_turn_count(turn_count: int) -> bool:
     `decide_hint_level`의 1번 규칙(5회+ 막힘→hint_level 최소 3)과 *같은 임계*를 재사용한다.
     """
     return turn_count >= STUCK_TURN_THRESHOLD
+
+
+def is_ceiling_reached(hint_level: int, turn_count: int) -> bool:
+    """PED-35 acceptance③("작동한 비율") — 5회+ 막힘 상황에서 규칙 6의 상한(레벨 3)이
+    실제로 *달성*됐는가.
+
+    `decide_hint_level`이 반환한 `hint_level`을 그대로 넘겨 판정한다(재계산 아님) — 상한
+    보장이 무작동 상태로 정상 응답에 섞여 위장되지 않도록(CLAUDE.md "작동한 비율" 원칙),
+    호출측(리포트·텔레메트리 계층)이 세션 로그에서 `상한 도달률 = Σis_ceiling_reached /
+    Σis_stuck_turn_count`를 집계할 수 있는 순수 훅만 제공한다. **정직한 공백**: 이 훅을
+    실제 리포트에 배선하는 것은 이 태스크의 `paths`(hint_deferral.py + 테스트) 밖이라
+    범위 밖으로 남긴다 — 정본화(이 함수)와 집행 지점(리포트 배선)을 혼동하지 않는다.
+    """
+    return is_stuck_turn_count(turn_count) and hint_level >= 3

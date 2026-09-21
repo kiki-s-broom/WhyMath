@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -729,16 +730,23 @@ def evaluate_kpis(payload: dict[str, Any]) -> tuple[KpiResult, ...]:
 # 그것이 정직한 상태이고, 채워 넣으면 좌석 미착지가 통과로 위장된다.
 
 
-def _normalize_code_key(key: str) -> str:
-    """실패코드 키를 `F1` 형태로 — 생산자 둘의 표기가 다르기 때문이다.
+#: 생산자가 JSON 키에 파이썬 enum repr을 새게 했을 때의 접두 — 계약 위반 탐지용(EOS-75).
+_ENUM_REPR_KEY_PREFIX = "GenerationFailureCode."
 
-    `hit_cu_metrics`는 `code.value`(→ `"F1"`)를 키로 쓰고, `qa_confusion_matrix`는
-    `str(enum)`(→ `"GenerationFailureCode.F1"`)을 쓴다. 후자는 JSON 키에 파이썬 repr이
-    새어 나온 것이라 생산자 쪽에서 바로잡는 편이 낫지만, 그것은 EOS-60 소유의 산출
-    계약이라 이 PR에서 건드리지 않는다 — 어댑터가 **양쪽 표기를 모두** 받아 두면 나중에
-    생산자가 고쳐도 이 경로는 그대로 동작한다.
+
+def _has_enum_repr_key(keys: Iterable[str]) -> bool:
+    """실패코드 키에 파이썬 repr(`GenerationFailureCode.F1`)이 섞였는가 — 계약 위반이다.
+
+    EOS-61 초판은 `key.rsplit(".", 1)[-1]`로 `F1`·`GenerationFailureCode.F1` 양쪽 표기를
+    **조용히** 받았다 — 생산자 `qa_confusion_matrix`가 `str(enum)`을 키로 쓴다고 봤기
+    때문이다. EOS-75 실측: 검증을 거친 골든은 `use_enum_values=True`라 실제로는 항상 `F1`을
+    냈고, repr 키가 든 저장 산출물은 저장소에 0건이다 — **구버전 호환 대상이 없다**. 생산자는
+    이제 `canonical_value`로 `.value`를 명시하고 테스트가 동결한다(생산자·소비자 양쪽).
+    그래서 수용 분기를 제거하고 반대로 **거부**한다: repr 키를 그냥 두면 sparse 경로에서
+    "키 없음 = 0건"으로 읽혀 *수학 오류 0건*이라는 거짓 통과가 되므로, 미측정(None)으로
+    드러내는 편이 정직하다(측정 실패가 통과로 위장되면 안 된다 — CLAUDE.md 이중 회계 원칙).
     """
-    return key.rsplit(".", 1)[-1]
+    return any(key.startswith(_ENUM_REPR_KEY_PREFIX) for key in keys)
 
 
 def _fc_sum(counts: Any, codes: tuple[str, ...], *, dense: bool) -> int | None:
@@ -754,7 +762,10 @@ def _fc_sum(counts: Any, codes: tuple[str, ...], *, dense: bool) -> int | None:
     """
     if not isinstance(counts, dict):
         return None
-    normalized: dict[str, Any] = {_normalize_code_key(str(k)): v for k, v in counts.items()}
+    normalized: dict[str, Any] = {str(k): v for k, v in counts.items()}
+    if _has_enum_repr_key(normalized):
+        # 표기 계약 위반 산출물 — 조용히 0으로 읽지 않고 미측정으로 드러낸다(EOS-75).
+        return None
     total = 0
     for code in codes:
         if code not in normalized:

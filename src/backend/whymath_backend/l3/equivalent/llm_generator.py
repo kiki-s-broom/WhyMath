@@ -101,6 +101,7 @@ import logging
 import re
 from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
+from typing import Any
 
 import sympy
 from pydantic import ValidationError
@@ -277,8 +278,10 @@ class LLMEquivalentProblemGenerator:
         misconception_catalog: Mapping[str, str] | None = None,
         topic_hint: str | None = None,
         subscription: str = _STUDENT_ESCALATION_DEFAULTS.student_subscription,
+        budget_krw: float = _STUDENT_ESCALATION_DEFAULTS.budget_krw,
         difficulty: str | None = None,
         temperature: float = 0.9,
+        top_p: float | None = None,
         authoring_family: ModelFamily | None = ModelFamily.GENERAL,
         slug_prefix: str = "wm-gen",
         subject: Subject = Subject.공통,
@@ -308,6 +311,15 @@ class LLMEquivalentProblemGenerator:
             subscription: 라우팅 신호(구독 — 클라우드 승급 가드). 기본값은
                 `escalation_defaults.default_student_escalation_signals()` 단일 좌석(OPS-18,
                 오늘은 free).
+            budget_krw: 라우팅 신호(클라우드 잔여 예산·원). 기본값은 같은 단일 좌석(오늘은 0.0)
+                이라 **동작 변경 0**이다. 이 좌석이 따로 필요한 이유(EOS-99 PR #1023 codex P1):
+                클라우드로 나가려면 `subscription != free`와 `budget_krw > 0`이 **둘 다** 필요한데
+                (`router.business_cost_tier` 규칙1이 예산을, 규칙2가 구독을 각각 LOCAL로 강제하고
+                `guard_cloud`가 한 번 더 본다), 종전에는 구독만 열려 있고 예산은 단일 좌석 상수로
+                박혀 있어 **구독만 바꿔도 여전히 LOCAL**이었다. 즉 클라우드 경로를 실제로 태울
+                방법이 이 생성기에 없었고, 그래서 프롬프트 캐시 적중 계측(EOS-99)이 이 경로에서는
+                영영 `not_applicable`만 낸다. 실측(2026-09-07): free/0=local · premium/0=local ·
+                premium/5000=cloud_mid.
             difficulty: 라우팅 난이도 라벨(None이면 spec.difficulty_overall에서 파생).
             temperature: **생성 샘플링 온도**(S2-g 생성 다양성·기본 0.9). 튜터링(도구선택·다음
                 행동)은 *결정론*이 좋아 온도를 지정하지 않지만(제공자 기본), *동등문제 저작*은
@@ -315,6 +327,17 @@ class LLMEquivalentProblemGenerator:
                 문제(예 `x^2-8x+c`·상수만 변주)를 반복하는 mode collapse가 관측됐다. 0.9는
                 다양성과 형식 안정의 균형점이다: 더 높이면(>1.2) JSON 붕괴·수식 오류가 급증하고,
                 낮추면 다시 collapse로 회귀한다. 값을 provider.generate(temperature=)로 전달한다.
+            top_p: **누적확률 절단**(nucleus sampling·EOS-121 선결조건 A). 기본은 **None이고,
+                그것이 이 인자의 요점이다** — temperature(0.9)와 달리 기본값을 두지 않는다.
+                이유: top_p를 무조건 명시 전송하면 현재 각 공급사 기본값과 다른 값이 나가
+                **기존 저작 품질이 조용히 바뀐다**(회귀). 목표는 top_p를 켜는 것이 아니라
+                *양 좌석에 같은 값을 줄 수단*을 갖는 것이다. 좌석별 생성 다양성을 측정할 때
+                top_p가 통제되지 않으면(= 각 공급사 기본값에 의존하면) 어떤 숫자가 나와도
+                "설정 차이 아님"을 말할 수 없다 — 저장소에는 두 공급사 기본값이 같다는 근거도
+                다르다는 근거도 없기 때문이다(사전 실측 문서
+                `docs/ops/eos121_seat_generation_diversity_precheck.md` §1의 3상태 분류:
+                같음/다름/**통제되지 않음**). 값을 주면 provider.generate(top_p=)로 전달되고,
+                `_input_snapshot`에도 기록된다.
             authoring_family: **저작용 로컬 모델 패밀리**(S2-h·기본 GENERAL). 라우터는
                 task_type='generate'를 MATH 패밀리(qwen2-math)로 보내지만, qwen2-math는 *풀이*
                 특화라 저작 시 같은 문제를 반복한다(mode collapse — 온도로도 안 풀림, Phaiakes9
@@ -342,12 +365,14 @@ class LLMEquivalentProblemGenerator:
                 재투입된다(`harness/generation_seed_replay_probe`).
         """
         if provider is None:
-            # 표준 구성 재사용(LLMTutorPolicy·app.py 동형) — 지연 연결이라 구성만으로 네트워크 0.
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
+            # 표준 저작 구성 — 지연 연결이라 구성만으로 네트워크 0. 클라우드 좌석은
+            # `settings.cloud_provider`가 정한다(ARCH-57). **app.py와는 의도적으로
+            # 다르다** — 학생 대면 서빙은 셀렉터를 타지 않는다(ARCH-56 게이트 ⓐ).
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         if trace is None:
             # 관측 기본 배선 — providers와 동형의 지연 구성(키 미설정=no-op·네트워크 0).
             from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
@@ -359,8 +384,10 @@ class LLMEquivalentProblemGenerator:
         self._catalog = dict(misconception_catalog) if misconception_catalog is not None else None
         self._topic_hint = topic_hint
         self._subscription = subscription
+        self._budget_krw = budget_krw
         self._difficulty = difficulty
         self._temperature = temperature
+        self._top_p = top_p
         self._authoring_family = authoring_family
         # 배치용 지속 이벤트 루프(지연 생성) — asyncio.run의 루프 생성·종료 반복이 provider의
         # 캐시 커넥션 풀을 죽여 배치가 격회 실패하던 실측 회귀 방어(_invoke·_ensure_loop 참조).
@@ -470,6 +497,10 @@ class LLMEquivalentProblemGenerator:
         `temperature=self._temperature`(기본 0.9)를 실어 *생성 다양성*을 확보한다 — 튜터링과
         달리 콘텐츠 저작은 고온도가 필요하다(mode collapse 방어·__init__ temperature 참조).
 
+        `top_p`(EOS-121 선결조건 A)는 **값이 있을 때만** 싣는다 — 기본 None이면 키 자체를
+        넘기지 않아 각 공급사 기본값이 그대로 쓰인다(*기존 동작 무변경*). temperature처럼
+        기본값을 박아 두지 않는 이유는 __init__ top_p 항 참조(무조건 전송 = 조용한 품질 변경).
+
         `json_schema`(S2-j structured output)는 **LOCAL 결정일 때만** 싣는다 — Ollama는
         format= 제약 디코딩으로 출력을 스키마에 맞는 JSON으로 문법 강제하고, 클라우드
         (Anthropic)는 문법 제약이 없어 스키마를 주면 명확히 거부하므로(조용한 무시 금지)
@@ -485,26 +516,20 @@ class LLMEquivalentProblemGenerator:
         # provider 반환은 GenerationResult(text, usage) — 텍스트는 조립이, usage는 관측
         # (_record_trace: 실측 토큰·지연·비용)이 소비한다.
         loop = self._ensure_loop()
-        if seed is None:
-            # 시드 미지원 경로(클라우드) — 실으면 provider가 명확히 거부한다(조용한 무시 금지).
-            return loop.run_until_complete(
-                self._provider.generate(
-                    prompt,
-                    _system_prompt(),
-                    decision,
-                    temperature=self._temperature,
-                    json_schema=schema,
-                )
-            )
+        # 선택 인자는 *값이 있을 때만* 키를 싣는다 — 둘 다 None이면 호출 형태가 종전과 완전히
+        # 같다(`generate(prompt, system, decision, temperature=, json_schema=)`).
+        #   · seed: 시드 미지원 경로(클라우드)에 실으면 provider가 거부한다(조용한 무시 금지).
+        #   · top_p: 미지정이면 공급사 기본값 — 무조건 전송이 곧 조용한 품질 변경이다(EOS-121 A).
+        call_kwargs: dict[str, Any] = {
+            "temperature": self._temperature,
+            "json_schema": schema,
+        }
+        if self._top_p is not None:
+            call_kwargs["top_p"] = self._top_p
+        if seed is not None:
+            call_kwargs["seed"] = seed
         return loop.run_until_complete(
-            self._provider.generate(
-                prompt,
-                _system_prompt(),
-                decision,
-                temperature=self._temperature,
-                json_schema=schema,
-                seed=seed,
-            )
+            self._provider.generate(prompt, _system_prompt(), decision, **call_kwargs)
         )
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
@@ -568,7 +593,9 @@ class LLMEquivalentProblemGenerator:
           - `prompt_sha256`/`system_sha256`: 전문의 sha256 병기 — 무결성 대조 축.
           - `spec`: 이 경로가 실제로 가진 구조 입력 — 성취기준·오개념·난이도·답형태.
             (전문과 중복되는 재료지만 명료성 우선 — 구조 신호로도, 문면으로도 복원 가능.)
-          - `topic_hint`/`temperature`: 프롬프트·샘플링에 실제 반영된 생성 신호.
+          - `topic_hint`/`temperature`/`top_p`: 프롬프트·샘플링에 실제 반영된 생성 신호.
+            `top_p`는 미지정이면 **null로 기록된다** — 키를 빼지 않는 이유는 "안 보냈다"와
+            "구판이라 기록 자체가 없다"를 구분하기 위해서다(부재 ≠ 값 없음·EOS-121 A).
         라우터 결정은 담지 않는다 — spec에서 결정론 유도되는 파생물이고, 실행 모델은
         `model_name` 컬럼이 별도 기록한다(pregenerate측 `input_snapshot_for_prewarm` 동형).
         시드도 담지 않는다 — `GenerationLog.seed` 전용 컬럼이 정본이고, 스냅샷에 사본을 두면
@@ -588,6 +615,7 @@ class LLMEquivalentProblemGenerator:
             },
             "topic_hint": self._topic_hint,
             "temperature": self._temperature,
+            "top_p": self._top_p,
         }
 
     def _emit_generation_log(
@@ -634,6 +662,19 @@ class LLMEquivalentProblemGenerator:
                 seed=seed,  # 실려 나간 값만(클라우드=None 미기록·날조 금지)
                 input_tokens=usage.input_tokens if usage is not None else None,
                 output_tokens=usage.output_tokens if usage is not None else None,
+                # 프롬프트 캐시 2종(EOS-99) — 캐시 개념이 없는 로컬 경로는 provider가 채우지
+                # 않아 None(해당 없음)이고, 클라우드는 응답 usage 실측이 그대로 실린다.
+                cache_read_input_tokens=(
+                    usage.cache_read_input_tokens if usage is not None else None
+                ),
+                cache_creation_input_tokens=(
+                    usage.cache_creation_input_tokens if usage is not None else None
+                ),
+                # 관측 좌석(EOS-112) — 위 `model_name`이 *설정이 지목한* 모델이라면 이 둘은
+                # *응답이 온* 모델과 그 호출의 재시도 횟수다. usage가 None(호출 자체가 없었던
+                # 종단)이면 둘 다 None=미관측이다(0으로 접지 않는다).
+                served_model=usage.served_model if usage is not None else None,
+                retries=usage.retries if usage is not None else None,
                 cost_usd=actual_cost_usd_or_none(decision, usage),
                 latency_ms=latency_ms,
                 success=success,
@@ -704,7 +745,7 @@ class LLMEquivalentProblemGenerator:
             difficulty=difficulty,
             requires_reasoning=True,
             student_subscription=self._subscription,
-            budget_krw=_STUDENT_ESCALATION_DEFAULTS.budget_krw,  # 단일 좌석 값(OPS-18·회귀 0)
+            budget_krw=self._budget_krw,  # 기본값=단일 좌석(OPS-18·회귀 0)·호출자 명시 시 override
             sync=True,
             # 등급: 프롬프트에는 비민감 스펙 요약(성취기준 코드·오개념 id·난이도·답 형태)만
             # 싣고 원본 본문·풀이는 애초에 스펙에 없다(`_build_user_prompt` 참조) — 실리는

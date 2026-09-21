@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-93-physics-probe-subject-contract
+title: "Physics Probe (P1-PROBE) — Subject Contract v1 교차과목 대조 후 Freeze 판정 (ADR-004 집행)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: cancelled
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-66-subject-adapter-contract
+requires_gates: []
+acceptance:
+  - "① 판정표 산출: 필수층 3메서드(evaluate_answer·detect_misconception·validate_problem) + 반환모델 4종(ProblemStatement·AnswerEvaluation·ProblemValidation·MisconceptionSignal)의 각 필드에 대해 '물리에서 반드시 성립하는가' ○/✗ 판정. 판정표는 중단 여부와 무관하게 파일로 남긴다"
+  - "② 강등 방향 강제: ✗ 항목은 Math Adapter/선택층으로 내린다. Core에 물리용 분기·옵셔널 필드·유니온 추가 금지(계획서 100 §3.7 재발 방지). 조정 후 test_subject_adapter_two_tier_contract.py REQUIRED_METHODS 갱신"
+  - "③ 중단 규칙: ✗ > 3이면 즉시 중단하고 상태를 'Frozen (math-only, acknowledged)'로 표기해 2026-09-27 예정대로 Freeze — 일정 연기 금지"
+  - "④ 상태 전환: ADR-004의 Status를 Provisional → 채택으로 갱신하고 결정일·근거 기재. ADR-004가 갱신되지 않으면 done 금지"
+  - "⑤ 중복 해소(착수 전 필수): EOS-92-cross-subject-contract-probe(origin/claude/entity-model-freeze-lji37v)가 같은 프로브다. 착수 시점에 EOS-92가 main에 있으면 이 태스크를 cancel하고 EOS-92로 진행하며, 없으면 이 태스크로 진행하고 EOS-92 머지 시 그쪽을 cancel한다 — 프로브 소유자가 항상 정확히 1명이게 한다"
+artifacts: []
+paths:
+  - docs/architecture/adr/ADR-004-subject-contract-v1-provisional.md
+  - src/backend/whymath_backend/schema/subject_adapter.py
+  - tests/backend/schema/test_subject_adapter_two_tier_contract.py
+session: null
+notes: "출처: ADR-004(2026-09-05 Kiki 결정). 일정 = 프로브 09-21~09-23 · 계약 조정 09-24~09-26 · Freeze 09-27(G1 판정일). 주차 라벨 금지(저장소에 주차 체계가 둘). 프로브는 Physics 구현이 아니라 대조다. G1 차단조건(Core→Math 정적의존 0)과는 독립.\\n\\n[취소→복원 2026-09-05/06] 최초 EOS-92 중복으로 cancel했으나 PR #987 Codex P1 지적 수용: EOS-92는 미머지 브랜치에만 있어 이 커밋 단독 머지 시 트리에 프로브 소유자가 0명이 된다(backlog.py next/start의 스케줄링 권위는 backlog/). 착수 가능 상태로 되살리고 중복 해소를 acceptance ⑤로 집행. cancelled→todo CLI 경로가 없어 파일 제거 후 재등재로 처리했다(공백은 HARN-68로 등재).\n\n[취소 2026-09-06] EOS-93 acceptance ⑤ 집행 — 착수 시점에 EOS-92가 main에 있으므로(2026-09-06 실측: origin/main status=todo) 이 태스크를 cancel하고 EOS-92로 진행한다. 프로브 소유자는 정확히 1명(EOS-92). EOS-93이 담고 있던 유일한 초과분(✗>3 중단 상한)은 같은 날 EOS-92 acceptance ⑤로 이관 완료"
+updated: 2026-09-06

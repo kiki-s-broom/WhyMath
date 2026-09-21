@@ -153,7 +153,7 @@ jobs:
         # red로 만들지 않는다). 판정은 exit code + 출력 내용 양쪽으로 한다.
         run: |
           set +e
-          out=$(python3 scripts/ops/pr_delivery_audit.py doldori7/WhyMath 2>&1)
+          out=$(python3 scripts/ops/pr_delivery_audit.py "$GITHUB_REPOSITORY" 2>&1)
           rc=$?
           echo "$out"
           echo "EXIT=$rc"

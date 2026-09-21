@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,12 +21,14 @@ acceptance:
   - "⑦ 완료 판정 문구 — 착지 후 growth_evidence_exposure.py:131의 '이 함수가 유일한 노출 판정 경로가 되게 한다'가 처음으로 참이 됨을 근거와 함께 기술"
   - "⑧ 전체 스위트 실행 후 회귀 없음 보고(부분 스위트 통과를 전체 통과 근거로 쓰지 않는다). 못 돌렸으면 '전체는 확인 못함'을 명시"
   - "⑨ 범위 밖 동결 — 응답 모델 변경 · /growth-evidence 변경 · 클라 배선(D10 소관) · focus_score/engagement_score 좌석(S3-16 소유)"
-artifacts: []
+  - "[정정 2026-09-11] 실측 재확인 — 이 태스크의 요구사항은 전부 SEC-24(PR #816,\n`014b790d`, 2026-08-12 19:24 병합)가 이미 구현·병합해 놓았다. 이 태스크(r3 재점검,\n`69c3986d`, 2026-08-13 01:21 병합)는 SEC-24가 main에 착지한 지 6시간 뒤에 병합됐지만\nreview 작성 당시의 브랜치 기준으로 \"여전히 ConsentedUser\"라고 서술했고, 병합 시점에\n재확인하지 않아 이미 해소된 위협을 새 태스크로 재등재했다(\"trunk 부재를 미구현으로\n단정 금지\" 규칙의 거울상 — 여기서는 \"trunk 존재를 놓치고 미구현으로 오판\"). 각 acceptance\n항목을 현재 main 기준으로 대조한다:\n\n①(재구현 금지) — 준수됨. 이 정정도 새 계약을 만들지 않는다.\n\n②(집행 지점) — `GET /v1/me/harness-metrics`(`api/me.py:3256` `get_my_harness_metrics`)가\n`user: RequireContentAdmin`을 받는다(SEC-24가 `ConsentedUser`에서 교체). 학생 토큰 호출은\n`tests/backend/api/test_me_harness_metrics_auth_gate.py::test_student_role_forbidden`이\n403을 실측(재확인: 로컬 재실행 24 passed).\n\n③(의존성 교체 판단) — SEC-24가 이미 `RequireContentAdmin` 재사용을 선택하고 그 근거를\n라우트 주석에 남겼다(`api/me.py:3246-3248`: \"신규 ops 역할 신설은 과공학, ADMIN-01\n후속 과제\" — 문제·개념 CUD 라우터와 동일 v0 역할 게이트 재사용). 이 판단은 이 태스크가\n요구한 것과 동일한 형태(의미가 다른 의존성의 임의 재사용이 아니라 실측 근거를 남긴\n재사용)이므로 재작업 불필요.\n\n④(무변경 동결) — `response_model=SurrogateMetrics` 불변, `_growth_evidence_state`\n카운터(`get_growth_evidence_counters(...).record_request()`) 호출 그대로 존재,\n`/health/ready` 배선(`GrowthEvidenceReachCounters`) 불변. 라우트 docstring 자신이\n\"응답 필드 자체는 이번 태스크로 변경하지 않는다 — SEC-24는 *누가* 호출할 수 있는지만\n좁힌다\"고 명시.\n\n⑤(변별력 3방향) — `test_me_harness_metrics_auth_gate.py`에 이미 3방향 전부 실측 고정됨:\n`test_no_token_returns_401`(401) · `test_student_role_forbidden`(403, 원시 지표\nINTERNAL_ONLY 필드가 응답 본문에도 없음을 직렬화 우회 대비까지 확인) ·\n`test_content_admin_role_allowed`(200) · `test_require_content_admin_is_the_actual_gate`\n(오버라이드 시 우회됨을 교차검증하는 메타 변별력 테스트). 재실행 확인:\n`pytest tests/backend/api/test_me_harness_metrics_auth_gate.py\ntests/backend/api/test_me_growth_evidence.py -q` → 24 passed.\n\n⑥(기존 통합테스트 갱신) — `tests/backend/harness/test_wh1_evaluation_integration.py`의\n`_user()` 헬퍼가 `role=Role.CONTENT_ADMIN`으로 시드하며, SEC-24를 인용하는 주석이\n그 이유(\"이 파일은 원시 지표 계산 정확성을 검증하므로 role=CONTENT_ADMIN으로 시드해\n인가를 통과시킨다\")를 명시한다 — \"테스트 약화가 아니라 계약 변경\"의 실질을 그대로\n충족(문구는 이 태스크가 요구한 형태로 재커밋하지 않음 — SEC-24 자신의 커밋 메시지가\n이미 그 구분을 전제로 작성됐고, 재커밋은 이력 재작성이라 하지 않는다).\n\n⑦(완료 판정 문구) — `growth_evidence_exposure.py:153`(원 인용의 :131은 과거 줄번호,\n현재 파일에서 재확인한 실제 위치)의 \"이 함수가 유일한 노출 판정 경로가 되게 한다\"가\n**참이다**: `GET /v1/me/growth-evidence`(`api/me.py:3503`)가\n`classify_metric_exposure`를 실제로 호출하는 유일한 학생 대면 경로이고,\n`GET /v1/me/harness-metrics`는 이제 학생 토큰이 도달할 수 없다(403) — 원시 표면을\n우회해 계약을 건너뛰던 경로가 닫혔다.\n\n⑧(전체 스위트) — `pytest tests/backend -q`(python3.12 venv, `/tmp/backend_ped27.log`)\n→ 아래 검증 절 참조.\n\n⑨(범위 밖 동결) — 이 정정에서 응답 모델·`/growth-evidence`·클라 배선·\nfocus_score/engagement_score를 손대지 않았다(코드 변경 자체가 없다).\n\n**결론**: 코드 변경 불필요 — SEC-24(`014b790d` / PR #816)가 이미 유일한 구현이자\n증적이다. 이 태스크는 \"구현\"이 아니라 \"이미 해소됨을 확인하고 대장을 정정\"하는\n작업으로 완료 처리한다."
+artifacts:
+  - "014b790d (#816)"
 paths:
   - src/backend/whymath_backend/api/me.py
   - src/backend/whymath_backend/api/_auth.py
   - tests/backend/harness/test_wh1_evaluation_integration.py
   - "tests/backend/api/test_me_harness_metrics*.py"
 session: null
-notes: "docs/architecture/gamification_module_gap_review_r3.md §2 G1 · §4 D8. PED-08이 학생 안전 라우트(/growth-evidence)를 신설했으나 원시 라우트가 '문자 그대로 동일한 게이트'(둘 다 ConsentedUser · api/me.py:3069 vs :3261)로 원시 16지표+gaming_suspect 낙인 라벨+내부 전용 2종(diagnosis_agreement_rate·tokens_per_turn)을 학생 토큰에 반환한다. r2 D5가 이 표면을 동결한 근거('ops·리포트가 원시값으로 소비하는 표면')는 오탐 — 실측하면 ops 2종은 HTTP를 안 타고 compute_wh1_surrogate_metrics를 직접 호출한다(surrogate_baseline_report.py:314 · pilot_kpi_baseline.py:809). 라우트 주석 자신도 'ops/스크립트가 직접 호출'을 명시(api/me.py:3060-3061). Flutter 호출 0. 즉 HTTP 소비자 0건이고 유일한 호출자는 계약이 보호하려던 그 학생. 세 슬라이스(PED-08 acceptance ⑩ · S4-19 wh1_evaluation.py:1839 · PED-15)가 각각 인지하고 각각 회피만 했다 — 반복 실수 11회차 '인지하고 우회'. 형태=운영자 게이트 강등(Kiki 확정 2026-08-11 — 삭제는 되돌리기 비용·응답 축소는 우회로 존치).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/학생안전 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/gamification_module_gap_review_r3.md §2 G1 · §4 D8. PED-08이 학생 안전 라우트(/growth-evidence)를 신설했으나 원시 라우트가 '문자 그대로 동일한 게이트'(둘 다 ConsentedUser · api/me.py:3069 vs :3261)로 원시 16지표+gaming_suspect 낙인 라벨+내부 전용 2종(diagnosis_agreement_rate·tokens_per_turn)을 학생 토큰에 반환한다. r2 D5가 이 표면을 동결한 근거('ops·리포트가 원시값으로 소비하는 표면')는 오탐 — 실측하면 ops 2종은 HTTP를 안 타고 compute_wh1_surrogate_metrics를 직접 호출한다(surrogate_baseline_report.py:314 · pilot_kpi_baseline.py:809). 라우트 주석 자신도 'ops/스크립트가 직접 호출'을 명시(api/me.py:3060-3061). Flutter 호출 0. 즉 HTTP 소비자 0건이고 유일한 호출자는 계약이 보호하려던 그 학생. 세 슬라이스(PED-08 acceptance ⑩ · S4-19 wh1_evaluation.py:1839 · PED-15)가 각각 인지하고 각각 회피만 했다 — 반복 실수 11회차 '인지하고 우회'. 형태=운영자 게이트 강등(Kiki 확정 2026-08-11 — 삭제는 되돌리기 비용·응답 축소는 우회로 존치).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/학생안전 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-11] SEC-24가 이미 전체 해소 — 재구현 불필요, 정정만 기록"
+updated: 2026-09-11

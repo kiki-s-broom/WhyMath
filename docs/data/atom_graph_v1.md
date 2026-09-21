@@ -64,6 +64,16 @@ to_학교급 · 학교급연계
 (개념=단원 / 소개념=소단원 / 원자=세부개념), 기존 `Concept.level` enum + `parent_concept_id` 재사용.
 원자.parent=소단원·소단원.parent=단원. 소단원코드 예: `초수연-U1-S1`·`공수1-U1-S1`·대학 `CALC1-U1-S1`.
 
+### 2.4 파생 필드 — `behavior_skills`(SKB-02 corpus 병합)
+원자_통합마스터 xlsx에 없던 필드. 구 437 코퍼스(`concept_graph_v1/concepts.jsonl`, #419 저작)의
+concept→skill 매핑을 크로스워크(`concept_atom_crosswalk_v1/crosswalk.jsonl`) 경유로 전파해
+**후처리 병합**한다(원본 xlsx 휘발 → transform-v1 재실행 불가, U2와 동형 제약). 전파 규칙 =
+`whymath_backend.l1.concept_atom_crosswalk.transfer`(S0-2)와 동일 의미론(crosswalk 행의
+atom_codes 전체에 union+dedup+사전순 — primary 아님). **원자에만 채움**(단원/소단원·비크로스워크
+원자는 `[]`). 병합기 = `data_pipeline/atom_graph/behavior_skills_merge.py` ·
+CLI `python -m data_pipeline.atom_graph merge-behavior-skills`. 재실행 결과는 `_provenance.json`의
+`behavior_skills_merge` 블록 참조.
+
 ---
 
 ## 3. 라이선스·안전 (CLAUDE.md 우선순위 #2)

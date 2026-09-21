@@ -9,7 +9,7 @@
 > 금지**다(12월에 고치면 검증이 아니라 확증편향이 된다 — 전환 설계서 §2.4). §6 KPI *목표값*은
 > G2(10/25) 기준선 실측에서 재조정할 수 있으나(§7 한계), *지표 정의·측정 방법*은 동결이다.
 > **서명 절차**: Kiki가 본 문서를 검토·승인하면
-> `python3 scripts/harness/backlog.py gates clear G-eos-g0-verification-design-freeze --evidence "..."`
+> `python3 scripts/harness/backlog.py gates clear G-eos-g0-verification-design-freeze --as kiki --evidence "..."`
 > 로 기록한다 — 그 clear가 곧 서명이다(G0 차단 조건 ③).
 
 ---

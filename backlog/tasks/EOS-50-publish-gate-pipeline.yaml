@@ -9,8 +9,10 @@ status: todo
 priority: 3
 eos_priority: P0
 owner: claude
-depends_on: []
-requires_gates: []
+depends_on:
+  - EOS-49-concept-version-contract
+requires_gates:
+  - G-eos49-content-version-seat
 acceptance:
   - "① 44_eos_version_management.md §9의 Publish Gate를 코드로: publish 전이 시 검증 파이프라인(스키마 유효성·content_hash 산출·governance 필드 완결) 경유를 강제 — 검증 미통과 publish는 exit/예외로 거부(기계 게이트·점추정 인상 판정 금지)"
   - "② 기존 검수 축과 이원화 금지: review_status(ReviewStatus)·PB-03 노출 계약과의 관계를 먼저 판정해 문서화 — 같은 축이면 재사용, 다른 축이면 경계 명문화(판정 이원화 회피)"
@@ -22,5 +24,5 @@ paths:
   - "src/backend/whymath_backend/api/**"
   - "tests/backend/**"
 session: null
-notes: "출처: 44_eos_version_management.md §16-6 — EOS-44 종결 시 MVP 범위(§12 'Publish with validation') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D1★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: 44_eos_version_management.md §16-6 — EOS-44 종결 시 MVP 범위(§12 'Publish with validation') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D1★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신(DRAFT→…→PUBLISHED) 위에 선다 — EOS-49가 ARCH-37 동결 충돌로 게이트 대기이므로 같은 게이트를 부착(원 notes의 ARCH-31/EOS-49는 OR 관계라 depends_on으로 표현 불가·HARN-53 분류 대상 — 뒤 항목에서 EOS-49를 depends_on에 집행). 2026-09-06 /drive 실측\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신 위에 서므로 depends_on에 EOS-49를 집행한다(ARCH-31은 OR 대안이라 LEGACY_EXEMPT·HARN-53 분류에 맡긴다). 2026-09-06 PR #994 CI audit-deps red 정정 — 직전 정정 문장의 어구가 감사 창에 걸렸다"
+updated: 2026-09-06

@@ -162,6 +162,42 @@ class TestWeaknessFilter:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# ⓐ diagnoses 스냅샷 재사용 (PR #1018 Codex 리뷰 — 동시 mastery 갱신 시 스냅샷 불일치 방지)
+# ──────────────────────────────────────────────────────────────────────────
+class TestDiagnosesSnapshotReuse:
+    async def test_passed_diagnoses_skips_internal_fetch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`diagnoses=`를 넘기면 `compute_concept_diagnoses`를 아예 호출하지 않는다.
+
+        단순히 인자를 받아 두고 무시하는 것이 아니라 *실제로 재사용*함을 못 박는다 — 그래야
+        호출자가 이미 구한 스냅샷과 다른 시점의 데이터를 다시 조회해 불일치가 생기는 것을
+        막는다는 주장이 성립한다.
+        """
+        calls = {"n": 0}
+
+        async def _boom(_session: AsyncSession, _user_id: uuid.UUID) -> list[ConceptDiagnosis]:
+            calls["n"] += 1
+            raise AssertionError("diagnoses가 주어졌는데 내부에서 재조회했다")
+
+        monkeypatch.setattr(wcr_mod, "compute_concept_diagnoses", _boom)
+        _patch_meta(monkeypatch)
+        given = [_diagnosis(code=_UC_A, bkt=0.2, proxy=0.3)]
+        out = await recommend_weak_concepts(_fake_session(), _UID, diagnoses=given)
+        assert calls["n"] == 0
+        assert [r.concept_code for r in out] == [_UC_A]
+
+    async def test_none_diagnoses_still_fetches_internally(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 기본값(None)은 기존 계약 그대로 — 하위호환.
+        _patch_meta(monkeypatch)
+        _patch_diagnoses(monkeypatch, [_diagnosis(code=_UC_A, bkt=0.2, proxy=0.3)])
+        out = await recommend_weak_concepts(_fake_session(), _UID)
+        assert [r.concept_code for r in out] == [_UC_A]
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # ② 정렬 보존 — 진단의 약점 우선 순서를 그대로 유지
 # ──────────────────────────────────────────────────────────────────────────
 class TestSortPreserved:

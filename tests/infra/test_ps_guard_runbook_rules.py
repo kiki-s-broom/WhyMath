@@ -225,12 +225,230 @@ class TestUtf8MustBeEnabling:
         assert any("UTF-8" in i for i in issues)
 
 
+class TestAutoVariableAssignment:
+    """⑦(OPS-60) 자동/예약 변수 대입 — 대입은 거부되는데 $home은 이미 참이라 위장 성공."""
+
+    @pytest.mark.parametrize(
+        "name", ["home", "host", "input", "error", "args", "pwd", "matches", "profile"]
+    )
+    def test_assignment_to_each_reserved_name_is_rejected(
+        self, tmp_path: pathlib.Path, name: str
+    ) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence(f'${name} = "x"')))
+        assert any("자동/예약 변수 대입" in i for i in issues), name
+
+    def test_case_insensitive_match(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('$HOME = "x"')))
+        assert any("자동/예약 변수 대입" in i for i in issues)
+
+    def test_similarly_named_variable_passes(self, tmp_path: pathlib.Path) -> None:
+        """`$homeDir`는 다른 변수다 — 접두 일치만으로 오탐하면 안 된다."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('$homeDir = "C:\\temp"')))
+        assert issues == []
+
+    def test_comparison_is_not_assignment(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("if ($home -eq $null) {}")))
+        assert issues == []
+
+    def test_property_assignment_on_the_variable_passes(self, tmp_path: pathlib.Path) -> None:
+        """`$Host.UI...`는 $Host 재대입이 아니라 멤버 대입 — 흔한 정상 패턴이라 통과해야 한다."""
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence('$Host.UI.RawUI.WindowTitle = "WhyMath"'))
+        )
+        assert issues == []
+
+    def test_reading_the_variable_passes(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("Write-Host $args[0]")))
+        assert issues == []
+
+
+class TestInvokeWebRequestNeedsBasicParsing:
+    """⑧(OPS-60) -UseBasicParsing 누락 — PS 5.1 IE 파싱이 무인 실행을 대화형으로 멈춘다."""
+
+    def test_missing_flag_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence('Invoke-WebRequest "http://x/health"'))
+        )
+        assert any("-UseBasicParsing" in i for i in issues)
+
+    def test_alias_iwr_is_also_checked(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('iwr "http://x/health"')))
+        assert any("-UseBasicParsing" in i for i in issues)
+
+    def test_flag_present_passes(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence('Invoke-WebRequest -UseBasicParsing "http://x/health"'))
+        )
+        assert issues == []
+
+    def test_unrelated_command_passes(self, tmp_path: pathlib.Path) -> None:
+        assert guard.check_runbook_markdown(_md(tmp_path, _fence("Write-Host hi"))) == []
+
+
+class TestCatchResponseNeedsExistenceCheck:
+    """⑨(OPS-60) catch 안 $_.Exception.Response 무가드 접근 — 전송 계층 오류에서 null."""
+
+    def test_unguarded_property_access_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        body = _fence(
+            "try {\n  Invoke-WebRequest -UseBasicParsing $u\n} catch {\n"
+            "  $_.Exception.Response.StatusCode\n}"
+        )
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("Exception.Response" in i for i in issues)
+
+    def test_guarded_by_earlier_if_in_same_block_passes(self, tmp_path: pathlib.Path) -> None:
+        body = _fence(
+            "try {\n  Invoke-WebRequest -UseBasicParsing $u\n} catch {\n"
+            "  if ($_.Exception.Response) {\n"
+            "    $_.Exception.Response.StatusCode\n"
+            "  }\n}"
+        )
+        assert guard.check_runbook_markdown(_md(tmp_path, body)) == []
+
+    def test_bare_mention_without_dot_access_passes(self, tmp_path: pathlib.Path) -> None:
+        """대입만 하고 프로퍼티 체인으로 파고들지 않으면 이 좁은 규칙의 대상이 아니다."""
+        body = _fence("catch {\n  $resp = $_.Exception.Response\n}")
+        assert guard.check_runbook_markdown(_md(tmp_path, body)) == []
+
+    def test_guard_in_later_block_does_not_retroactively_protect(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        body = (
+            _fence("catch {\n  $_.Exception.Response.StatusCode\n}")
+            + "\n"
+            + _fence("if ($_.Exception.Response) {}")
+        )
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("Exception.Response" in i for i in issues)
+
+
+class TestFenceStartingWithBareElse:
+    """④(OPS-60, 좁힌 채택) 펜스가 else/elseif로 시작 — 대응하는 if가 있을 수 없다."""
+
+    def test_fence_starting_with_else_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        body = _fence("if ($x) {\n  Write-Host a\n}") + "\n" + _fence("else {\n  Write-Host b\n}")
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("else" in i and "펜스가" in i for i in issues)
+
+    def test_fence_starting_with_elseif_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        body = _fence("elseif ($y) {\n  Write-Host b\n}")
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("펜스가" in i for i in issues)
+
+    def test_if_else_in_the_same_fence_passes(self, tmp_path: pathlib.Path) -> None:
+        body = _fence("if ($x) {\n  Write-Host a\n} else {\n  Write-Host b\n}")
+        assert guard.check_runbook_markdown(_md(tmp_path, body)) == []
+
+    def test_closing_brace_before_else_is_still_caught(self, tmp_path: pathlib.Path) -> None:
+        """`} else {`처럼 닫는 중괄호가 붙어 시작해도 잡는다(`\\}?` 허용)."""
+        body = _fence("if ($x) {\n  Write-Host a") + "\n" + _fence("} else {\n  Write-Host b\n}")
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("펜스가" in i for i in issues)
+
+    def test_first_fence_is_also_checked(self, tmp_path: pathlib.Path) -> None:
+        """맨 처음 펜스가 else로 시작해도(앞선 펜스 자체가 없어도) 구조적으로 깨져 있다."""
+        body = _fence("else {\n  Write-Host b\n}")
+        issues = guard.check_runbook_markdown(_md(tmp_path, body))
+        assert any("펜스가" in i for i in issues)
+
+
+class TestShellPromptPrefixInCode:
+    """⑩(OPS-73) 셀 프롬프트 접두(`$ `·`PS>`·`PS C:\\...>`)가 실행용 코드로 남음."""
+
+    def test_dollar_space_prefix_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("$ git status")))
+        assert any("셀 프롬프트 접두" in i for i in issues)
+
+    def test_ps_gt_prefix_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("PS> git status")))
+        assert any("셀 프롬프트 접두" in i for i in issues)
+
+    def test_ps_drive_prompt_prefix_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence(r"PS C:\Users\kiki\Desktop\__AI\WhyMath> git status"))
+        )
+        assert any("셀 프롬프트 접두" in i for i in issues)
+
+    def test_variable_assignment_passes(self, tmp_path: pathlib.Path) -> None:
+        """`$name = ...`는 정상 코드다 — `$` 뒤에 이름이 바로 오면 프롬프트가 아니다."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('$sha = "abc1234"')))
+        assert issues == []
+
+    def test_pipeline_variable_passes(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("Write-Host $_.Name")))
+        assert issues == []
+
+
+class TestArrowJudgementWordInCode:
+    """⑪(OPS-73) 화살표(→/←) 뒤 판정어 — 실행 결과·증거를 실행용 펜스에 그대로 인용."""
+
+    def test_incident_line_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        """★ 실측 사고 재현 — 화살표 뒤 텍스트가 git의 두 번째 인자로 파싱된다."""
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence("git cat-file -e origin/main:backlog/gates.yaml  → 존재"))
+        )
+        assert any("화살표" in i for i in issues)
+
+    def test_left_arrow_is_also_checked(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("결과 ← 성공")))
+        assert any("화살표" in i for i in issues)
+
+    def test_arrow_inside_comment_passes(self, tmp_path: pathlib.Path) -> None:
+        """주석 안의 화살표는 면제(acceptance③) — strip_noncode가 이미 지운다."""
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence("# 흐름: 입력 → 완료 순서로 진행된다\nWrite-Host hi"))
+        )
+        assert issues == []
+
+    def test_arrow_inside_string_literal_passes(self, tmp_path: pathlib.Path) -> None:
+        """문자열 리터럴 안의 화살표도 면제(acceptance③)."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('Write-Host "상태: → 완료"')))
+        assert issues == []
+
+    def test_arrow_without_judgement_word_passes(self, tmp_path: pathlib.Path) -> None:
+        """판정어가 없으면 통과 — 오탐을 좁히는 쪽(acceptance③)."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("# A → B 흐름도")))
+        assert issues == []
+
+
+class TestCommitHashLineInCode:
+    """⑫(OPS-73) 커밋 해시+메시지 형태의 줄 — 실행 결과를 그대로 인용."""
+
+    def test_incident_line_is_rejected(self, tmp_path: pathlib.Path) -> None:
+        """★ 실측 사고 재현 — 메시지의 (#1234)가 PowerShell에서 식으로 파싱된다."""
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence("b64f470d  OPS-72: 실행용 코드펜스 증거 혼입 가드 (#1065)"))
+        )
+        assert any("커밋 해시" in i for i in issues)
+
+    def test_full_length_hash_is_also_rejected(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(
+            _md(tmp_path, _fence("c7ada85a4db52de87d1ef245f7ba3d4997a10d26 fix(backup): OPS-64"))
+        )
+        assert any("커밋 해시" in i for i in issues)
+
+    def test_variable_assignment_with_hash_string_passes(self, tmp_path: pathlib.Path) -> None:
+        """줄이 `$`로 시작하는 변수 대입은 해시가 값이어도 통과한다."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence('$sha = "b64f470d"')))
+        assert issues == []
+
+    def test_short_token_below_minimum_length_passes(self, tmp_path: pathlib.Path) -> None:
+        """7자 미만은 커밋 해시로 보기엔 짧다 — 오탐을 좁히는 쪽."""
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("ab12cd Write-Host hi")))
+        assert issues == []
+
+    def test_ordinary_command_passes(self, tmp_path: pathlib.Path) -> None:
+        issues = guard.check_runbook_markdown(_md(tmp_path, _fence("Write-Host hi")))
+        assert issues == []
+
+
 class TestRepositoryAssetsStayGreen:
     """기존 자산 전건이 새 규칙에서 green이어야 CI 차단으로 승격할 수 있다 (acceptance ③)."""
 
     def test_all_repo_targets_pass(self) -> None:
         root = _GUARD.resolve().parents[2]
         targets = sorted((root / "scripts").rglob("*.ps1")) + sorted((root / "docs").rglob("*.md"))
+        targets += sorted((root / ".claude" / "commands").glob("*.md"))
         offenders: dict[str, list[str]] = {}
         for t in targets:
             issues = (
@@ -241,6 +459,36 @@ class TestRepositoryAssetsStayGreen:
             if issues:
                 offenders[str(t.relative_to(root))] = issues
         assert not offenders, f"기존 자산 위반: {offenders}"
+
+
+class TestCommandsDirIsScannedByDefault:
+    """acceptance① 배선 — `main()`이 인자 없이 돌 때 `.claude/commands/*.md`도 대상이다."""
+
+    def test_main_includes_commands_dir_without_explicit_args(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        root = tmp_path
+        (root / "scripts").mkdir()
+        (root / "docs").mkdir()
+        commands_dir = root / ".claude" / "commands"
+        commands_dir.mkdir(parents=True)
+        offender = commands_dir / "example.md"
+        offender.write_text(_fence("git cat-file -e origin/main:x  → 존재"), encoding="utf-8")
+
+        monkeypatch.chdir(root)
+        code = guard.main(["check_ps_scripts.py"])
+        out = capsys.readouterr().out
+        assert code == 1, "새 규칙 위반이 있는데 exit 0이면 배선이 안 된 것"
+        assert "example.md" in out
+
+    def test_absent_commands_dir_does_not_crash(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`.claude/commands`가 없는 체크아웃(예: 부분 clone)에서도 죽지 않는다."""
+        (tmp_path / "scripts").mkdir()
+        (tmp_path / "docs").mkdir()
+        monkeypatch.chdir(tmp_path)
+        assert guard.main(["check_ps_scripts.py"]) == 0
 
 
 class TestHistoricalIncidentIsCaught:

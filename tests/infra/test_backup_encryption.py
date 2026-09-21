@@ -18,6 +18,7 @@ A축의 한계를 명시한다: 텍스트 동결은 "그 문장이 있다"까지
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -105,6 +106,26 @@ def _check_text() -> str:
 
 def _check_code() -> str:
     return _strip_ps_comments(_check_text())
+
+
+_RUNBOOK = _ROOT / "docs" / "architecture" / "db_backup_dr_runbook.md"
+
+
+def _runbook_section(heading: str) -> str:
+    """런북에서 `heading`으로 시작하는 절 본문(다음 `### `/`## ` 제목 전까지)을 돌려준다."""
+    text = _RUNBOOK.read_text(encoding="utf-8")
+    start = text.index(heading)
+    tail = text[start + len(heading) :]
+    end = re.search(r"^#{2,3} ", tail, flags=re.MULTILINE)
+    return tail if end is None else tail[: end.start()]
+
+
+def _runbook_fences(heading: str) -> list[str]:
+    """절 안의 ```powershell 코드펜스 본문들(주석 줄 제거)."""
+    section = _runbook_section(heading)
+    fences = re.findall(r"```powershell\n(.*?)```", section, flags=re.DOTALL)
+    assert fences, f"런북 절 {heading!r}에 powershell 펜스가 없다"
+    return [_strip_ps_comments(f) for f in fences]
 
 
 # ===========================================================================
@@ -312,6 +333,45 @@ class TestScheduleContract:
         ), "되읽기는 하는데 LogonType을 판정하지 않음 — 변별력 없는 검증 스텝"
         assert "$check.Settings.StartWhenAvailable" in after
 
+    def test_registration_refuses_to_run_unelevated(self) -> None:
+        """★ 권한 없는 창에서는 아무것도 건드리기 전에 멈춰야 한다 (2026-09-06 Phaiakes9 실측).
+
+        S4U + RunLevel Highest 등록은 관리자 창이 필요하다. 구판은 사전 검사가 없어
+        Register-ScheduledTask가 'Access is denied'를 CIM 오류로 내고도 계속 진행했고,
+        되읽기 단계에서 "reported success but cannot be read back"이라는 **틀린 원인**을
+        보고했다 — 침묵 실패의 사촌인 *오진*이다. 검사는 등록·해제 어느 쪽보다도 앞에 있어야
+        한다(-Unregister 경로도 같은 권한이 필요하다).
+        """
+        code = _schedule_code()
+        elev = code.index("IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
+        first_register = code.index("Register-ScheduledTask -TaskName")
+        first_unregister = code.index("Unregister-ScheduledTask -TaskName")
+        assert (
+            elev < first_register and elev < first_unregister
+        ), "권한 검사가 등록/해제보다 뒤에 있다 — 검사 전에 이미 손을 댄다"
+        # 검사 실패는 Fail(exit 1)이어야 한다 — 경고 후 진행이면 사전 검사가 아니다.
+        assert 'Fail "' in code[elev : elev + 400], "권한 검사가 실패해도 멈추지 않는다"
+
+    def test_registration_failure_names_the_real_cause(self) -> None:
+        """★ Register-ScheduledTask 실패는 예외 타입·메시지로 보고해야 한다 (침묵 실패 금지).
+
+        CIM 오류는 $ErrorActionPreference = "Stop"을 존중하지 않으므로 -ErrorAction Stop +
+        try/catch가 없으면 실패가 다음 단계로 흘러가 엉뚱한 단계가 원인으로 지목된다.
+        """
+        lines = _schedule_code().splitlines()
+        registers = [i for i, ln in enumerate(lines) if "Register-ScheduledTask -TaskName" in ln]
+        assert len(registers) == 2, f"등록 호출이 2건이어야 한다: {len(registers)}"
+        for i in registers:
+            assert (
+                "-ErrorAction Stop" in lines[i]
+            ), f"{i + 1}행: -ErrorAction Stop 부재 — CIM 오류가 흘러간다"
+            prev = next(ln for ln in reversed(lines[:i]) if ln.strip())
+            assert prev.strip() == "try {", f"{i + 1}행: try 블록 밖에서 등록한다"
+            tail = "\n".join(lines[i + 1 : i + 6])
+            assert (
+                "catch" in tail and "$($_.Exception.GetType().Name)" in tail
+            ), f"{i + 1}행: catch가 예외 타입명을 보고하지 않는다"
+
     def test_absolute_script_path(self) -> None:
         """태스크는 임의 작업 디렉터리에서 뜬다 — 상대 경로면 트리거 시각에 실패한다."""
         text = _schedule_code()
@@ -371,6 +431,132 @@ class TestBackupStatus:
         assert got.encrypted is True
         assert got.recipients_fingerprint == "qmm59p6"
         assert got.last_success_utc == moment
+
+    def test_offsite_fields_round_trip(self, tmp_path: Path) -> None:
+        """OPS-64 신규 필드 4종이 기록·판독 왕복에서 손실 없이 보존된다."""
+        path = tmp_path / bs.STATUS_FILENAME
+        moment = datetime(2026, 9, 11, 3, 0, 0, tzinfo=UTC)
+        bs.record_success(
+            path,
+            artifact="whymath_20260911_030000.dump.age",
+            size_bytes=4096,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=True,
+            offsite_destination="D:\\offsite",
+            offsite_size_bytes=4096,
+            moment=moment,
+        )
+        got = bs.load_status(path)
+        assert got is not None
+        assert got.offsite_requested is True
+        assert got.offsite_ok is True
+        assert got.offsite_destination == "D:\\offsite"
+        assert got.offsite_size_bytes == 4096
+
+    def test_offsite_fields_default_false_for_pre_ops64_records(self, tmp_path: Path) -> None:
+        """OPS-64 이전에 기록된 상태 파일(신규 키 부재)도 그대로 읽힌다 — 하위호환."""
+        path = tmp_path / bs.STATUS_FILENAME
+        path.write_text(
+            json.dumps(
+                {
+                    "last_success_utc": "2026-09-01T03:00:00+00:00",
+                    "artifact": "old.dump.age",
+                    "size_bytes": 10,
+                    "encrypted": True,
+                    "recipients_fingerprint": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        got = bs.load_status(path)
+        assert got is not None
+        assert got.offsite_requested is False
+        assert got.offsite_ok is False
+        assert got.offsite_destination is None
+        assert got.offsite_size_bytes is None
+
+    def test_offsite_failure_is_invisible_without_the_new_fields(self, tmp_path: Path) -> None:
+        """★ acceptance③ — 사고 재현(수정 전) vs 판정(수정 후)을 같은 판정 함수로 대조한다.
+
+        OPS-64 사고: Step 9(오프사이트 미러)가 죽어도 Step 7이 이미 쓴 "성공" 레코드는
+        `offsite_requested`/`offsite_ok`를 몰랐다(그 필드가 존재하기 전) — 그래서
+        `evaluate_backup_health`는 이 회차를 무조건 `fresh`로 승인했다. 아래 ①이 그
+        무증상을 재현하고, ②가 새 필드로 같은 상황을 `offsite_failed`로 잡아낸다 —
+        판정 함수는 하나(`evaluate_backup_health`)이고 입력만 다르다.
+        """
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+
+        # ① 수정 전 재현 — 레코드가 오프사이트를 요청했다는 사실 자체를 모른다
+        #   (구버전 backup_status.py가 기록했을 상태와 동일 — 신규 키 부재).
+        never_tracked_path = tmp_path / "never_tracked" / bs.STATUS_FILENAME
+        bs.record_success(
+            never_tracked_path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            moment=now - timedelta(hours=1),
+        )
+        blind_status = bs.load_status(never_tracked_path)
+        blind_verdict = bs.evaluate_backup_health(blind_status, now=now)
+        assert blind_verdict.ok is True, (
+            "이것이 정확히 사고다 — 오프사이트를 몰랐던 레코드는 미러 실패 여부와 무관하게 "
+            "항상 통과로 보인다(신규 필드가 없던 시절의 실제 동작)"
+        )
+
+        # ② 수정 후 — Step 7이 -OffsiteRequested $true로 쓰고 Step 9가 죽어 -OffsiteOk
+        #   $true 재기록에 도달하지 못한 상태를 그대로 재현한다.
+        failed_mirror_path = tmp_path / "failed_mirror" / bs.STATUS_FILENAME
+        bs.record_success(
+            failed_mirror_path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=False,
+            offsite_destination="D:\\offsite",
+            moment=now - timedelta(hours=1),
+        )
+        failed_status = bs.load_status(failed_mirror_path)
+        failed_verdict = bs.evaluate_backup_health(failed_status, now=now)
+        assert failed_verdict.ok is False
+        assert failed_verdict.reason == "offsite_failed"
+
+    def test_offsite_success_still_passes(self, tmp_path: Path) -> None:
+        """미러가 실제로 성공한 회차(Step 9가 -OffsiteOk $true로 재기록)는 여전히 통과한다."""
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+        path = tmp_path / bs.STATUS_FILENAME
+        bs.record_success(
+            path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=True,
+            offsite_destination="D:\\offsite",
+            offsite_size_bytes=10,
+            moment=now - timedelta(hours=1),
+        )
+        status = bs.load_status(path)
+        verdict = bs.evaluate_backup_health(status, now=now)
+        assert verdict.ok is True
+        assert verdict.reason == "fresh"
+
+    def test_offsite_not_requested_is_unaffected(self, tmp_path: Path) -> None:
+        """오프사이트를 안 쓰는 운용(로컬 전용)은 이 축과 무관하게 통과해야 한다."""
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+        path = tmp_path / bs.STATUS_FILENAME
+        bs.record_success(
+            path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            moment=now - timedelta(hours=1),
+        )
+        status = bs.load_status(path)
+        verdict = bs.evaluate_backup_health(status, now=now)
+        assert verdict.ok is True
+        assert verdict.reason == "fresh"
 
     def test_corrupt_status_raises_instead_of_defaulting(self, tmp_path: Path) -> None:
         """손상된 상태 파일을 '기록 없음'이나 '신선함'으로 넘기면 무증상 실패가 된다."""
@@ -435,6 +621,84 @@ class TestBackupStatus:
         payload = json.loads(capsys.readouterr().out)
         assert payload["ok"] is False
         assert payload["reason"] == "never_recorded"
+
+    def test_cli_record_wires_offsite_flags(self, tmp_path: Path) -> None:
+        """CLI `record`가 새 오프사이트 플래그 4종을 실제로 `record_success`에 넘긴다."""
+        assert (
+            self._cli(
+                tmp_path,
+                "record",
+                "--backup-dir",
+                str(tmp_path),
+                "--artifact",
+                "a.dump.age",
+                "--size-bytes",
+                "10",
+                "--encrypted",
+                "true",
+                "--offsite-requested",
+                "true",
+                "--offsite-ok",
+                "false",
+                "--offsite-destination",
+                "D:\\offsite",
+                "--offsite-size-bytes",
+                "10",
+            )
+            == 0
+        )
+        loaded = bs.load_status(bs._default_status_path(str(tmp_path)))
+        assert loaded is not None
+        assert loaded.offsite_requested is True
+        assert loaded.offsite_ok is False
+        assert loaded.offsite_destination == "D:\\offsite"
+        assert loaded.offsite_size_bytes == 10
+
+    def test_cli_check_reports_offsite_failed_reason(self, tmp_path: Path, capsys) -> None:
+        """CLI `check`가 offsite_failed를 별도 사유(stderr 문면·exit 1)로 낸다."""
+        self._cli(
+            tmp_path,
+            "record",
+            "--backup-dir",
+            str(tmp_path),
+            "--artifact",
+            "a.dump.age",
+            "--size-bytes",
+            "10",
+            "--encrypted",
+            "true",
+            "--offsite-requested",
+            "true",
+            "--offsite-ok",
+            "false",
+        )
+        code = self._cli(tmp_path, "check", "--backup-dir", str(tmp_path))
+        captured = capsys.readouterr()
+        assert code == 1
+        assert "오프사이트 미러가 이 회차에서 실패했다" in captured.err
+
+    def test_cli_check_json_surfaces_offsite_fields(self, tmp_path: Path, capsys) -> None:
+        self._cli(
+            tmp_path,
+            "record",
+            "--backup-dir",
+            str(tmp_path),
+            "--artifact",
+            "a.dump.age",
+            "--size-bytes",
+            "10",
+            "--encrypted",
+            "true",
+            "--offsite-requested",
+            "true",
+            "--offsite-ok",
+            "true",
+        )
+        capsys.readouterr()  # record 호출의 "[OK] backup status recorded: ..." 줄을 비운다
+        self._cli(tmp_path, "check", "--backup-dir", str(tmp_path), "--json")
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["offsite_requested"] is True
+        assert payload["offsite_ok"] is True
 
 
 # ===========================================================================
@@ -570,6 +834,322 @@ class TestEncryptedVerification:
         vb.verify_encrypted_backup(enc, identity_file=identity)
         after = {p.name for p in tmp_path.iterdir()}
         assert after == before, f"검증이 파일을 남겼다: {after - before}"
+
+
+# ===========================================================================
+# C-3. 오프사이트 미러 생명주기 (PR #974 Codex P1-2)
+#
+# 1회 복사는 두 방향으로 썩는다: 이후 백업이 오프사이트에 안 가서 RPO가 무한히
+# 자라고, 만료 사본이 클라우드에 남아 §4-3이 PIPA 파기 창의 상한이라고 선언한
+# 보존 기간이 거짓이 된다. 그래서 미러는 스케줄 스크립트에 편입돼야 한다.
+# ===========================================================================
+class TestOffsiteMirror:
+    def test_backup_script_accepts_offsite_dir(self) -> None:
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        assert "$OffsiteDir" in body, "백업 스크립트에 오프사이트 미러 경로 인자가 없다"
+
+    def test_offsite_is_opt_in(self) -> None:
+        """기본값이 비어 있어야 기존 스케줄이 재등록 전까지 동작을 바꾸지 않는다."""
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        assert '[string]$OffsiteDir = ""' in body, "오프사이트가 opt-in이 아니다"
+
+    def test_plaintext_is_never_mirrored(self) -> None:
+        """★ 평문 회차에 -OffsiteDir가 주어지면 거부해야 한다.
+
+        평문 덤프에는 학적·프로필·활동 메타가 그대로 들어 있다(§4 표). 미러가
+        암호화 여부를 보지 않으면 미성년 PII가 클라우드로 나간다.
+        """
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        offsite = body.split("Step 9", 1)[1]
+        assert "if (-not $encrypted)" in offsite, "미러가 암호화 여부를 확인하지 않는다"
+
+    def test_offsite_retention_applies_the_same_window(self) -> None:
+        """★ 만료 사본이 클라우드에 남으면 §4-3의 PIPA 파기 창 선언이 거짓이 된다."""
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        offsite = body.split("Step 9", 1)[1]
+        assert "$offsiteExpired" in offsite, "오프사이트에 보존 정책이 적용되지 않는다"
+        assert "$cutoff" in offsite, "로컬과 다른 만료 기준을 쓰고 있다"
+        assert (
+            "Select-Object -Skip 1" in offsite
+        ), "최신 1개 보존 불변식이 오프사이트에 없다 — 전멸 가능"
+
+    def test_offsite_copy_is_verified_by_size(self) -> None:
+        """존재 검사만으로는 잘린 사본을 못 잡는다 — 있으면서 열리지 않는다."""
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        offsite = body.split("Step 9", 1)[1]
+        assert "$offsiteSize -ne $sizeBytes" in offsite, "사본 크기를 대조하지 않는다"
+
+    def test_offsite_failure_is_fatal_not_a_warning(self) -> None:
+        """★ 무인 실행에서 경고는 아무도 안 읽는다 — 종료코드만 사람에게 닿는다."""
+        body = (_BACKUP_DIR / "backup_whymath_pg.ps1").read_text(encoding="utf-8")
+        offsite = body.split("Step 9", 1)[1]
+        assert 'Fail "offsite copy failed' in offsite, "복사 실패가 치명이 아니다"
+        assert (
+            "[WARN] offsite" not in offsite
+        ), "오프사이트 실패를 경고로 흘리고 있다 — 스케줄러 stdout은 아무도 읽지 않는다"
+
+    def test_step7_records_offsite_request_pessimistically(self) -> None:
+        """★ OPS-64 — Step 7의 상태 기록이 오프사이트 요청 사실을 놓치면 사고가 재현된다.
+
+        Step 7은 Step 9(미러)보다 먼저 돈다. 이 시점에 `-OffsiteRequested`/
+        `-OffsiteDestination`을 넘기지 않으면, Step 9가 죽어도 대장에는 "오프사이트를
+        요청한 적조차 없다"는 상태만 남아 `evaluate_backup_health`가 실패를 볼 방법이
+        없다(`test_offsite_failure_is_invisible_without_the_new_fields` ①이 그 판정을
+        고정한다). `-OffsiteOk`를 명시적으로 넘기지 않는 것 자체가 계약이다 — 함수
+        기본값(`$false`)이 비관적 초기값을 만든다.
+        """
+        body = _dump_text()
+        step7 = body.split("# Step 7:", 1)[1].split("# Step 8:", 1)[0]
+        assert "Write-BackupStatus" in step7, "Step 7에 상태 기록 호출이 없다"
+        call_line = next(line for line in step7.splitlines() if "Write-BackupStatus" in line)
+        assert "-OffsiteRequested" in call_line, "Step 7이 오프사이트 요청 여부를 기록하지 않는다"
+        assert "-OffsiteDestination" in call_line, "Step 7이 오프사이트 목적지를 기록하지 않는다"
+        assert "-OffsiteOk" not in call_line, (
+            "Step 7이 -OffsiteOk를 넘기면 안 된다 — 함수 기본값 $false(비관적)를 그대로 "
+            "써야 Step 9가 죽었을 때 낙관적 값이 남지 않는다"
+        )
+
+    def test_step9_success_overwrites_with_optimistic_offsite_status(self) -> None:
+        """★ Step 9가 검증까지 전부 통과한 뒤에만 -OffsiteOk $true로 재기록한다.
+
+        이 호출이 offsite 실패 경로(Fail 호출들) *뒤에* 있어야 사고가 고쳐진다 — 앞에
+        있으면 Step 9가 죽기 전에 이미 낙관적 레코드가 쓰여 원래 사고가 재발한다.
+        """
+        body = _dump_text()
+        offsite = body.split("Step 9", 1)[1]
+        calls = [line for line in offsite.splitlines() if "Write-BackupStatus" in line]
+        assert len(calls) == 1, "Step 9 안에 상태 재기록 호출이 정확히 1건 있어야 한다"
+        call_line = calls[0]
+        assert "-OffsiteOk $true" in call_line, "Step 9 성공 경로가 낙관적으로 재기록하지 않는다"
+        assert (
+            "-OffsiteSizeBytes $offsiteSize" in call_line
+        ), "오프사이트 사본 크기를 기록하지 않는다"
+
+        # 순서 불변식: 재기록 호출이 마지막 Fail(사이즈 대조) 이후에 와야 한다.
+        last_fail_idx = max(i for i, line in enumerate(offsite.splitlines()) if "Fail " in line)
+        call_idx = next(
+            i for i, line in enumerate(offsite.splitlines()) if "Write-BackupStatus" in line
+        )
+        assert call_idx > last_fail_idx, (
+            "상태 재기록이 마지막 Fail 갈래보다 앞에 있다 — Step 9가 아직 실패할 수 있는 "
+            "시점에 낙관적 레코드를 쓰면 원래 사고가 재발한다"
+        )
+
+    def test_schedule_passes_offsite_through(self) -> None:
+        """★ 스크립트가 받아도 스케줄이 안 넘기면 상시 미러가 아니다(배선 실재성).
+
+        **주석이 아니라 조립되는 인자 문자열을 본다.** 초판은 파일 전체에 대한
+        substring 검사여서, argList 조립을 통째로 지워도 상단 usage 주석의
+        `-OffsiteDir` 한 글자에 매치돼 통과했다(2026-09-03 뮤테이션 O4에서 실측 —
+        검출 실패). CLAUDE.md "정의만 하고 안 써도 통과하는 substring 검사" 그대로다.
+        """
+        body = (_BACKUP_DIR / "register_backup_schedule.ps1").read_text(encoding="utf-8")
+        assert "$OffsiteDir" in body, "스케줄 등록이 오프사이트 인자를 모른다"
+
+        # 주석(#로 시작)을 제외한 실행 라인에서 argList 조립을 찾는다.
+        code_lines = [ln for ln in body.splitlines() if not ln.lstrip().startswith("#")]
+        assembly = [ln for ln in code_lines if "$argList" in ln and "-OffsiteDir" in ln]
+        assert assembly, (
+            "argList에 -OffsiteDir를 실어 보내는 실행 라인이 없다 — 인자를 받기만 하고 "
+            "작업에 전달하지 않으면 스케줄된 회차는 오프사이트로 가지 않는다"
+        )
+
+    def test_runbook_does_not_reference_a_nonexistent_flag(self) -> None:
+        """런북이 안내하는 플래그가 스크립트에 실재하는가 (가정 기반 런북 금지).
+
+        2026-09-03에 실제로 존재하지 않는 -BackupArgs를 안내할 뻔했다.
+        """
+        runbook = (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "architecture"
+            / "db_backup_dr_runbook.md"
+        ).read_text(encoding="utf-8")
+        register = (_BACKUP_DIR / "register_backup_schedule.ps1").read_text(encoding="utf-8")
+        for flag in re.findall(r"register_backup_schedule\.ps1([^\n]*)", runbook):
+            for opt in re.findall(r"-([A-Z][A-Za-z]+)", flag):
+                assert (
+                    f"${opt}" in register or f"-{opt}" in register
+                ), f"런북이 register_backup_schedule.ps1에 없는 플래그 -{opt} 를 안내한다"
+
+    def test_runbook_seed_block_does_not_create_the_sync_root(self) -> None:
+        """★ §4-1b 시딩 블록은 동기화 루트를 만들지 않아야 한다 (변별력 없는 자가검증 금지).
+
+        초판은 `New-Item -Force`로 목적지를 무조건 만들었다. 동기화 루트 경로를 잘못
+        적어도(오타·미설치·가상 드라이브 문자 차이) 로컬에 일반 폴더가 생기고 복사가
+        성공하며, 자가검증 1(크기 일치)·2(키·평문 미유출)가 전부 통과한다 — 파일은
+        있는데 클라우드에는 아무것도 올라가지 않은 채로. 게이트 G-backup-offsite-move가
+        "업로드 완료 미확인"으로 남은 경로다(2026-09-06). 루트는 클라이언트가 만든 것이어야
+        하므로 부모 폴더의 실재를 New-Item **보다 먼저** 확인해야 한다.
+        """
+        code = "\n".join(_runbook_fences("### 4-1b.")).splitlines()
+
+        def _first(pred) -> int | None:
+            return next((i for i, ln in enumerate(code) if pred(ln)), None)
+
+        root_idx = _first(lambda ln: "$SyncRoot" in ln and "Split-Path -Parent $Offsite" in ln)
+        assert root_idx is not None, "시딩 블록이 동기화 루트(부모 폴더)를 계산하지 않는다"
+        test_idx = _first(lambda ln: "Test-Path" in ln and "$SyncRoot" in ln)
+        assert test_idx is not None, "동기화 루트의 실재를 검사하지 않는다"
+        mk_idx = _first(lambda ln: "New-Item" in ln and "$Offsite" in ln)
+        assert mk_idx is not None, "목적지 하위 폴더 생성이 없다"
+        assert root_idx < test_idx < mk_idx, (
+            "New-Item이 루트 검사보다 먼저 실행된다 — 없는 루트를 만들어 버리고 "
+            "자가검증이 로컬 사본에서 전부 통과한다"
+        )
+        assert not any(
+            "New-Item" in ln and "$SyncRoot" in ln for ln in code
+        ), "동기화 루트 자체를 만들고 있다 — 루트는 클라이언트가 만든 것이어야 한다"
+        # 사람이 웹 화면과 대조할 증적 줄이 있어야 게이트가 '이 PC 안 관측'만으로 닫히지 않는다.
+        assert any("[EVIDENCE]" in ln for ln in code), "게이트 증적 줄([EVIDENCE])이 없다"
+        # 부정 검출: 동기화 클라이언트가 안 돌면 어떤 폴더도 업로드되지 않는다.
+        assert any(
+            "Get-Process" in ln and "Count -gt 0" in ln for ln in code
+        ), "동기화 클라이언트 프로세스 검사(자가검증 2b)가 없다"
+
+    def test_runbook_registration_self_elevates(self) -> None:
+        """★ 등록 블록은 사람이 관리자 창을 여는 데 의존하지 않는다.
+
+        2026-09-06 한 세션에서 "관리자 창을 새로 열어 붙여넣는다"가 2회 연속 실패했다
+        (일반 창에 붙여넣음 — 1회차는 Access is denied, 2회차는 사전 가드가 거부).
+        실패 확률이 사람에게 걸린 단계는 런북이 없애야 한다: 일반 창에서 UAC로 자가 승격
+        (`Start-Process -Verb RunAs`)하고, 등록 여부는 일반 창에서 독립적으로 되읽는다.
+        """
+        for heading in ("## §2.", "### 4-1c."):
+            code = "\n".join(_runbook_fences(heading))
+            assert "register_backup_schedule.ps1" in code, f"{heading}: 등록 스크립트 호출이 없다"
+            assert (
+                "Start-Process" in code and "-Verb RunAs" in code
+            ), f"{heading}: 자가 승격 런처가 없다 — 관리자 창 열기가 사람 몫으로 남는다"
+            assert "Get-ScheduledTask" in code, f"{heading}: 일반 창의 독립 되읽기가 없다"
+
+    def test_runbook_offsite_has_deletion_propagation_probe(self) -> None:
+        """★ 오프사이트 보존 정책은 클라우드 측 삭제 전파를 실측해야 성립한다.
+
+        §4-3은 RetentionDays를 PIPA 파기 창의 상한으로 선언한다. 로컬 오프사이트 폴더의
+        만료 삭제가 클라우드로 전파되지 않는 모드(백업형 동기화)면 만료 사본이 영원히 남아
+        그 선언이 거짓이 된다 — 모드별 동작을 문서로 추론하지 않고 프로브 파일로 잰다.
+        """
+        code = "\n".join(_runbook_fences("### 4-1c."))
+        assert (
+            "retention_probe" in code
+        ), "삭제 전파 프로브가 없다 — 보존 정책의 클라우드 측이 미측정"
+        assert (
+            "Remove-Item" in code and "Test-Path" in code
+        ), "프로브를 지우고 부재를 확인하는 단계가 없다"
+
+    def test_runbook_first_scheduled_offsite_run_is_recency_bound(self) -> None:
+        """§4-1c 첫 회차 확인은 '이번 회차' 산출물만 인정해야 한다.
+
+        시각 조건이 없으면 §4-1b에서 손으로 복사한 시딩 사본이 "스케줄 회차가
+        오프사이트에 도착했다"로 읽힌다 — 지금 보는 것이 이번 실행 것인가(CLAUDE.md
+        2026-08-22). S4U 문맥에서 목적지가 안 보이는 실패가 정확히 이 형태로 가려진다.
+        """
+        code = "\n".join(_runbook_fences("### 4-1c."))
+        assert "Start-ScheduledTask" in code, "첫 회차를 실제로 돌리지 않는다"
+        assert "LastTaskResult" in code, "회차 종료코드를 보지 않는다 — Step 9 실패가 안 보인다"
+        assert (
+            "AddMinutes(" in code and "LastWriteTime -gt" in code
+        ), "최신 산출물의 생성 시각 조건이 없다 — 시딩 사본을 이번 회차로 오독한다"
+
+
+# ===========================================================================
+# C-2. 컨테이너 경유 pg_restore (2026-09-03 Phaiakes9 실사용 결함)
+#
+# 초판은 호스트 PATH의 pg_restore만 받았는데, 런북의 전제는 "호스트에 PostgreSQL
+# 클라이언트 불요 — 전 과정이 컨테이너 안에서 실행된다"이다. 그 전제를 정확히
+# 지키는 환경에서 이 검증은 영구 exit 2가 됐고, 게이트 G-backup-offsite-move의
+# 반출 검증이 거기서 멈췄다. 아래는 그 회귀를 막는다.
+# ===========================================================================
+class TestContainerPgRestore:
+    def test_host_mode_argv_is_unchanged(self, tmp_path: Path) -> None:
+        """기본(호스트) 경로는 종전과 같아야 한다 — 회귀 방지."""
+        target = tmp_path / "a.dump"
+        assert vb.pg_restore_list_argv(target) == ["pg_restore", "--list", str(target)]
+
+    def test_docker_mode_mounts_parent_readonly_and_targets_by_name(self, tmp_path: Path) -> None:
+        """★ 컨테이너 안에서는 **마운트 경로**로 파일을 가리켜야 한다.
+
+        호스트 절대경로를 그대로 넘기면 컨테이너 안에 그 경로가 없어 pg_restore가
+        '파일 없음'으로 비0을 낸다. 그러면 ①(잠김) 축이 암호화 여부와 무관하게 항상
+        통과해, 평문을 .age로 개명만 한 산출물도 잠김 판정을 받는다 — 검사가 위장이 된다.
+        """
+        target = tmp_path / "whymath_x.dump.age"
+        argv = vb.pg_restore_list_argv(target, docker_image="pgvector/pgvector:pg16")
+
+        assert argv[:3] == ["docker", "run", "--rm"], "일회용 실행이어야 한다"
+        assert f"{tmp_path}:{vb._CONTAINER_MOUNT}:ro" in argv, "부모 디렉터리를 읽기 전용으로"
+        assert (
+            argv[-1] == f"{vb._CONTAINER_MOUNT}/{target.name}"
+        ), "컨테이너 내부 경로로 가리켜야 한다"
+        assert str(target) not in argv, "호스트 절대경로가 컨테이너 인자로 새면 안 된다"
+        assert "pgvector/pgvector:pg16" in argv
+
+    def test_docker_mode_mount_is_read_only(self, tmp_path: Path) -> None:
+        """검사가 백업 산출물을 건드릴 이유가 없다 — 쓰기 가능 마운트는 거부한다."""
+        argv = vb.pg_restore_list_argv(tmp_path / "a.age", docker_image="img")
+        mount = argv[argv.index("-v") + 1]
+        assert mount.endswith(":ro"), f"읽기 전용이 아니다: {mount}"
+
+    def test_docker_mode_does_not_require_host_pg_restore(self, tmp_path: Path) -> None:
+        """★ 컨테이너 모드에서 호스트 pg_restore 부재가 판정 불가를 만들면 안 된다.
+
+        이것이 이 결함의 본체다 — 요구하는 도구가 모드에 따라 달라야 한다.
+        docker 자체가 없는 환경에서는 여전히 2가 맞으므로 그 경우는 분기해 확인한다.
+        """
+        enc = tmp_path / "x.dump.age"
+        enc.write_bytes(b"age-encrypted-not-really")
+        identity = tmp_path / "id.key"
+        identity.write_text("dummy\n", encoding="utf-8")
+
+        code = vb.main(
+            [
+                str(enc),
+                "--identity",
+                str(identity),
+                "--age-bin",
+                _AGE or "age",
+                "--pg-restore-bin",
+                "/nonexistent/pg_restore",
+                "--pg-restore-docker-image",
+                "pgvector/pgvector:pg16",
+            ]
+        )
+        if shutil.which("docker") is None or _AGE is None:
+            assert code == 2, "docker·age가 없으면 판정 불가가 맞다"
+        else:
+            assert code != 2, (
+                "컨테이너 모드인데 호스트 pg_restore 부재로 판정 불가가 났다 — "
+                "요구 도구 분기가 동작하지 않는다"
+            )
+
+    def test_missing_host_pg_restore_names_the_container_workaround(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        """실패에 **대처**가 남아야 한다 — 무엇이 없는지만 알리면 사람이 거기서 막힌다.
+
+        2026-09-03 실사용에서 Kiki가 정확히 여기서 멈췄다: exit 2 메시지가 pg_restore
+        부재만 말하고 다음 수를 말하지 않았다.
+        """
+        enc = tmp_path / "x.dump.age"
+        enc.write_bytes(b"whatever")
+        identity = tmp_path / "id.key"
+        identity.write_text("dummy\n", encoding="utf-8")
+
+        code = vb.main(
+            [
+                str(enc),
+                "--identity",
+                str(identity),
+                "--age-bin",
+                _AGE or "age",
+                "--pg-restore-bin",
+                "/nonexistent/pg_restore",
+            ]
+        )
+        assert code == 2
+        err = capsys.readouterr().err
+        assert "--pg-restore-docker-image" in err, "대처 경로를 알려주지 않는다"
 
 
 # ===========================================================================
@@ -769,3 +1349,181 @@ class TestReviewRegressions:
             bs.load_status(path), max_age_hours=48, require_encrypted=True, now=now
         )
         assert verdict.reason == "stale"
+
+
+# ===========================================================================
+# D. 런북 상호참조 (2026-09-06 · 게이트 G-backup-offsite-move 실행 준비 중 실측)
+#
+# 반출 조건 ⓑ가 "개인키가 다른 매체에 있다(§4-5)"라고 가리키는데, 그 §4-5를
+# 문서에서 찾을 수 없는 상태였다. 취급 규칙 목록(1~5번) 사이에 §4-1a~4-1d가
+# 삽입되면서 2~5번 항목이 §4-1d 본문 안으로 밀려났고, 절 번호는 본문 어디에도
+# 적혀 있지 않아 §4-2·§4-3·§4-5 참조가 전부 착지점을 잃었다. §4-3은 이 파일의
+# 주석도 인용하는 번호라 하중을 받고 있었다.
+#
+# 문서 결함은 조용하다 — 렌더링도 되고 링크도 아니라서 깨진 티가 나지 않는다.
+# 그래서 기계가 본다.
+# ===========================================================================
+
+# §4-1a·§3-3b·§1b처럼 숫자 뒤 알파벳 접미가 붙는 절이 있다.
+_SECTION = r"(\d+[a-z]?(?:-\d+[a-z]?)?)"
+
+
+def _runbook_definitions(text: str) -> set[str]:
+    """절 번호의 **정의부**만 모은다 — 본문 중 괄호 참조는 정의가 아니다.
+
+    변별력 주의: `(§1b)` 같은 괄호 *참조*를 정의로 세면 모든 참조가 스스로를
+    정의하게 돼 검사가 항상 통과한다(정의만 하고 안 써도 통과하는 substring
+    검사와 같은 위장). 그래서 정의는 두 형태로만 인정한다.
+    """
+    headings = set(re.findall(rf"^#{{2,4}}\s+§?{_SECTION}\.", text, re.M))
+    # 번호 목록 항목의 **접두** 라벨: `5. **(§4-5) 키 분리 유지**: ...`
+    items = set(re.findall(rf"^\d+\.\s+\*\*\(§{_SECTION}\)", text, re.M))
+    return headings | items
+
+
+class TestRunbookCrossReferences:
+    def test_every_section_reference_resolves(self) -> None:
+        """런북이 §N으로 가리키는 절이 전부 문서 안에 실재하는가."""
+        text = _RUNBOOK.read_text(encoding="utf-8")
+        dangling = sorted(set(re.findall(rf"§{_SECTION}", text)) - _runbook_definitions(text))
+        assert not dangling, (
+            f"런북이 존재하지 않는 절을 참조한다: {['§' + d for d in dangling]} — "
+            "읽는 사람이 조건의 정의를 찾지 못한다"
+        )
+
+    def test_export_condition_b_points_at_a_defined_section(self) -> None:
+        """★ 반출 조건 ⓑ의 착지점 — 이 게이트가 실제로 밟는 참조다.
+
+        ⓑ는 '개인키가 다른 매체에 있다'를 요구하면서 그 정의를 다른 절에 위임한다.
+        위임 대상이 없으면 조건은 문장만 남고 판정 기준이 사라진다.
+        """
+        text = _RUNBOOK.read_text(encoding="utf-8")
+        condition = next(
+            (ln for ln in text.splitlines() if ln.lstrip().startswith("- ⓑ")),
+            None,
+        )
+        assert condition is not None, "반출 조건 ⓑ 자체가 런북에서 사라졌다"
+
+        targets = re.findall(rf"§{_SECTION}", condition)
+        assert targets, "ⓑ가 키 분리 규칙의 정의부를 가리키지 않는다"
+        definitions = _runbook_definitions(text)
+        for target in targets:
+            assert target in definitions, f"ⓑ가 가리키는 §{target} 가 런북에 없다"
+
+    def test_key_separation_section_covers_the_age_private_key(self) -> None:
+        """§4-5는 age 개인키를 다뤄야 한다 — ⓑ가 요구하는 키가 그것이다.
+
+        종전 문면은 봉투 암호화 마스터 키(env)만 다뤘다. 그 키는 덤프 *내용물*을
+        덮는 키이고, 반출 조건 ⓑ가 말하는 키는 `.dump.age`를 여는 age 개인키다.
+        정의부가 다른 키를 설명하면 참조가 해소돼도 조건은 여전히 미정의다.
+        """
+        text = _RUNBOOK.read_text(encoding="utf-8")
+        body = next(
+            (ln for ln in text.splitlines() if ln.startswith("5. **(§4-5)")),
+            None,
+        )
+        assert body is not None, "§4-5 정의부(취급 규칙 5번)가 없다"
+        assert (
+            "whymath-backup-identity.key" in body
+        ), "§4-5가 age 개인키를 명시하지 않는다 — 반출 조건 ⓑ의 대상이 미정의로 남는다"
+
+
+# ===========================================================================
+# E. 등록 실패의 fail-closed (2026-09-06 · 게이트 실행 중 실측)
+#
+# Kiki가 비권한 창에서 register_backup_schedule.ps1을 돌렸다. 두 번의
+# Register-ScheduledTask가 "Access is denied"(0x80070005)로 실패했는데
+# 스크립트는 **[OK] 2줄을 출력하고 exit 0**으로 끝났다. 세 가지가 겹쳤다:
+#
+#   ⓐ 파일 상단에 $ErrorActionPreference = "Stop"이 **있었는데도** 실행이
+#     계속됐다 — 이 cmdlet 계열(ScheduledTasks·CDXML/CIM)에는 그 선호변수가
+#     걸리지 않는다. 보호가 있다고 믿은 자리에 보호가 없었다.
+#   ⓑ Step 5의 되읽기가 **동명의 옛 태스크**를 읽어 통과했다. 2026-07-17
+#     좀비 uvicorn과 같은 형태 — 다른 등록이 대신 만족시키는 간접 신호다.
+#   ⓒ "[OK] action:" 줄이 방금 조립한 $argList를 출력했다. 등록된 값이
+#     아니라 **등록하려던 값**이라, 실패해도 성공과 글자가 같았다.
+#
+# 아래는 세 축을 각각 동결한다. 검사는 주석이 아니라 **실행 라인**을 본다.
+# ===========================================================================
+
+
+def _ps_code_lines(path: Path) -> list[str]:
+    """주석 줄을 걷어낸 실행 라인만 돌려준다.
+
+    substring 검사를 파일 전체에 걸면 위 사고를 설명하는 *주석* 한 줄이
+    검사를 만족시킨다(2026-09-03 뮤테이션 O4에서 실측된 실패 형태).
+    """
+    return [
+        ln
+        for ln in path.read_text(encoding="utf-8").splitlines()
+        if not ln.lstrip().startswith("#")
+    ]
+
+
+class TestScheduledTaskRegistrationFailsClosed:
+    def test_every_registration_call_sets_error_action_stop(self) -> None:
+        """★ 상태 변경 cmdlet은 호출 자리에서 명시적으로 종료 오류로 승격한다.
+
+        $ErrorActionPreference만 믿으면 안 된다 — 실측에서 그 선호변수가 설정된
+        채로 Access denied가 통과했다.
+        """
+        calls = [
+            ln
+            for ln in _ps_code_lines(_SCHEDULE_SCRIPT)
+            if "Register-ScheduledTask" in ln and "-TaskName" in ln
+        ]
+        assert calls, "등록/해제 호출을 하나도 찾지 못했다 — 스캔 0건은 공허한 통과다"
+        for call in calls:
+            assert (
+                "-ErrorAction Stop" in call
+            ), f"등록 호출이 실패를 삼킨다(명시적 -ErrorAction Stop 없음): {call.strip()}"
+
+    def test_registration_failure_reports_the_exception_type(self) -> None:
+        """침묵 실패 금지 — 예외 타입명이 사유에 실려야 한다."""
+        code = "\n".join(_ps_code_lines(_SCHEDULE_SCRIPT))
+        assert "catch {" in code, "등록 실패를 잡는 catch 블록이 없다"
+        assert (
+            "$_.Exception.GetType().Name" in code
+        ), "실패 사유에 예외 타입명이 없다 — 서로 다른 실패가 같은 글자로 보인다"
+
+    def test_elevation_is_checked_before_the_first_registration(self) -> None:
+        """권한 부재는 실행 전에 말한다 — [OK]를 출력한 뒤가 아니라."""
+        lines = _ps_code_lines(_SCHEDULE_SCRIPT)
+        elevation = next(
+            (i for i, ln in enumerate(lines) if "IsInRole" in ln and "Administrator" in ln),
+            None,
+        )
+        assert elevation is not None, "관리자 권한 사전 확인이 없다"
+
+        first_write = next(
+            (
+                i
+                for i, ln in enumerate(lines)
+                if "Register-ScheduledTask" in ln or "Unregister-ScheduledTask" in ln
+            ),
+            None,
+        )
+        assert first_write is not None
+        assert (
+            elevation < first_write
+        ), "권한 확인이 첫 등록/해제 호출보다 뒤에 있다 — 실패한 뒤에 알려 주는 검사다"
+
+    def test_success_line_reports_the_task_not_the_intent(self) -> None:
+        """★ 성공 보고는 **되읽은 값**이어야 한다.
+
+        조립한 $argList를 출력하면 등록이 실패해도 같은 화면이 나온다. 그리고
+        되읽기는 '읽히는가'가 아니라 '이번 실행이 만든 것과 같은가'를 물어야
+        동명의 옛 태스크가 대신 만족시키지 못한다.
+        """
+        code = "\n".join(_ps_code_lines(_SCHEDULE_SCRIPT))
+        assert "$registeredArgs = " in code, "등록된 인자를 되읽는 줄이 없다"
+        assert "$registeredArgs -ne $argList" in code, (
+            "되읽은 인자를 이번 실행이 조립한 인자와 대조하지 않는다 — "
+            "동명의 옛 태스크가 검사를 대신 통과시킨다"
+        )
+        assert (
+            "$registeredCheckArgs -ne $checkArgList" in code
+        ), "검사 태스크 쪽 대조가 없다 — 백업만 갱신되고 감시는 옛 등록으로 남는다"
+        assert (
+            'Write-Host "[OK] action: powershell.exe $argList"' not in code
+        ), "성공 줄이 여전히 조립값을 출력한다"

@@ -90,9 +90,22 @@ class StudentSolutionStep(Base):
 
     # ===== step 본문 (*미성년 풀이 데이터* — 표현≠의미) =====
     # 렌더러-중립 LaTeX 본문(구조는 canonical_ast — CLAUDE.md 현행 정밀).
-    expression: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    # SEC-31: schema는 여전히 `str`(required·min_length=1) — 암호화 행에서는 이 컬럼이
+    # NULL이 되므로 DB 제약을 nullable로 완화한다(마이그레이션 3f5c83f51246). 복호는
+    # `resolve_student_solution_step_expression`이 둘 다 없으면 RuntimeError로 보장한다(schema
+    # 계약의 "항상 문자열"은 handler/헬퍼 층이 지킨다 — dialogue_turn과 달리 이 필드는 NOT NULL
+    # 계약이라 nullable content와 다른 특수 취급).
+    expression: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    # 봉투 암호화(AES-256-GCM) — 둘 다 NULL이면 평문(expression) 행. schema round-trip 제외
+    # (`_NON_SCHEMA_COLUMNS`).
+    expression_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    expression_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     # SEC-06: none_as_null=True — "값 없음"은 SQL NULL(JSONB 스칼라 null 오계수 방지).
     canonical_ast: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    # SEC-31: JSONB는 **결정론 직렬화 후**(sort_keys=True·ensure_ascii=False) 암호화
+    # (dialogue_turn.image_analysis_encrypted 선례).
+    canonical_ast_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    canonical_ast_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
 
     # ===== 검증·개념 태그 =====
     # 구조 계약 = schema StepValidation(SymPy 단일 권위 — 미검증=NULL·침묵 valid 위장 금지).
@@ -124,6 +137,17 @@ class StudentSolutionStep(Base):
         sa.Index("idx_student_solution_step_user", "user_id", sa.desc("submitted_at")),
     )
 
+    # SEC-31: schema round-trip에서 제외하는 봉투 암호화 컬럼(schema는 extra="forbid"라 이 키가
+    # model_validate에 들어가면 실패). 복호는 handler/헬퍼 층이 담당(dialogue_turn 동형).
+    _NON_SCHEMA_COLUMNS = frozenset(
+        {
+            "expression_encrypted",
+            "expression_nonce",
+            "canonical_ast_encrypted",
+            "canonical_ast_nonce",
+        }
+    )
+
     # ── 변환 헬퍼 (schema↔db seam, answer_submission.py 패턴) ────────────
     @classmethod
     def from_schema(cls, schema: SchemaStudentSolutionStep) -> StudentSolutionStep:
@@ -131,7 +155,9 @@ class StudentSolutionStep(Base):
 
         `validation` 서브모델은 `model_dump()`가 dict로 풀어 JSONB에 담긴다.
         `submitted_at=None`(schema 기본 — DB가 채움)은 kwargs에서 *제외*한다 — 명시적 None
-        할당은 NULL INSERT가 되어 NOT NULL 위반(EOS-32/45 동형).
+        할당은 NULL INSERT가 되어 NOT NULL 위반(EOS-32/45 동형). 암호화 컬럼(expression_encrypted
+        등)은 schema에 없어 여기서 설정되지 않는다 — handler/헬퍼 층이 expression을 암호화해
+        채운다(schema의 `expression: str` 필수 계약은 여기선 항상 값이 있으므로 영향 없음).
         """
         data = schema.model_dump()
         mapped_keys = {col.key for col in sa.inspect(cls).mapper.column_attrs}
@@ -144,9 +170,18 @@ class StudentSolutionStep(Base):
         """영속 ORM → `schema.StudentSolutionStep`(Pydantic 검증 복원 — validation 재검증).
 
         JSONB dict는 `StepValidation`으로 재검증된다(구조 오염 시 ValidationError — 침묵
-        통과 없음).
+        통과 없음). 봉투 암호화 컬럼은 `_NON_SCHEMA_COLUMNS`로 제외(ciphertext 비노출).
+
+        **주의**: 암호화 행은 `expression`(ORM상 nullable)이 NULL이지만 schema의 `expression`은
+        필수 `str`이라 *이 메서드를 암호화 행에 직접 호출하면 ValidationError가 난다* — 호출자
+        (`privacy/export.py`)가 `resolve_student_solution_step_expression`으로 복호한 평문을
+        먼저 확보해 schema를 구성해야 한다(이 메서드를 그대로 쓰지 않음. 모듈 최상단 참조).
         """
-        mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
+        mapped_keys = {
+            col.key
+            for col in sa.inspect(type(self)).mapper.column_attrs
+            if col.key not in self._NON_SCHEMA_COLUMNS
+        }
         data = {key: getattr(self, key) for key in mapped_keys}
         return SchemaStudentSolutionStep.model_validate(data)
 

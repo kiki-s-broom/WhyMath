@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-91-subject-contract-provisional-status
+title: "Subject Contract v1 상태 강등: Frozen → Provisional (pending cross-subject probe 9/27) + 단조 축소 래칫 집행"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 상태 정본: 계약 모듈 docstring 최상단에 'Provisional — pending cross-subject probe (9/27)'를 명시. v1이 Math 단일 과목에서 도출된 가설임을 판정 가능한 문장으로"
+  - "② 규칙 2조 명문화: (가) 프로브에서 깨진 필드는 무조건 Core→Adapter 강등 — 유지·조건부 유지·특례 없음 (나) Core 확장 금지 — 계약은 프로브를 거치며 줄어들 수만 있다(단조 축소)"
+  - "③ 집행 별항: 현행 동결은 *메서드*만 본다(REQUIRED_METHODS) — DTO **필드**는 동결 0건이 실측. 필드 축을 동결하되 확장은 무조건 RED, 축소는 강등 대장 경유로만 통과하게 한다"
+  - "④ 상태 라벨 자체를 동결 — 프로브 없이 Provisional을 되돌리면 RED"
+artifacts:
+  - "PR #986 https://github.com/doldori7/WhyMath/pull/986 · 커밋 df09f6b3 · schema/subject_adapter.py 상태 정본(Provisional + 규칙 2조) + test_subject_adapter_two_tier_contract.py 필드 래칫 4건 신설(4→8 passed EXIT=0) · 뮤테이션 6종(5 RED + 대조군 1 PASS) · schema+l4 2404 passed 0 failed · ruff/black EXIT=0 · 후속 EOS-92 등재"
+paths:
+  - src/backend/whymath_backend/schema/subject_adapter.py
+  - tests/backend/schema/test_subject_adapter_two_tier_contract.py
+session: null
+notes: "Kiki 지시(2026-09-05): 'Subject Contract v1의 상태를 Frozen이 아니라 Provisional — pending cross-subject probe (9/27). 프로브에서 깨진 필드는 무조건 Core→Adapter 강등. Core 확장은 금지.' 실측: 저장소에 리터럴 'Frozen' 라벨은 없고 계약 모듈 docstring의 '기계 동결'·갭리뷰의 '확정/초과 달성' 표기가 사실상 Frozen으로 읽히던 상태. 9/27 = G1 게이트일(Core→Math 정적 의존 0)."
+updated: 2026-09-05

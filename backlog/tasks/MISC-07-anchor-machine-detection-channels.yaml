@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P0
 owner: claude
@@ -15,11 +15,16 @@ acceptance:
   - "① G0 확정 앵커의 오개념 커버분(현행 A4=8·A6=8 등)에 정규식 또는 SymPy 술어(canonical_wrong_form 선례) 탐지 채널 부여 — L4 카탈로그 3계 채널 위 증설·kebab 명명 체계 유지(신규 명명 금지 — EOS-52 §5)"
   - "② 탐지 변별력 — 양성/음성 픽스처로 검출·비검출 양쪽 실측(Wilson 경계 CLI exit 0/1)"
   - "③ 집행 별항: 생성 파이프라인 F6(오개념 오연결) 자동 부여 결선은 D2 후속(ARCH-23·EOS-51 실패코드)과 공유 — 이 태스크는 탐지 채널 제작까지"
-artifacts: []
+artifacts:
+  - "PR #1032 https://github.com/doldori7/WhyMath/pull/1032"
 paths:
   - "src/backend/whymath_backend/l4/misconception/**"
   - "data/corpus/misconception*/**"
   - "tests/backend/l4/**"
+  - src/backend/whymath_backend/harness/anchor_detection_channel_eval.py
+  - tests/backend/harness/test_anchor_detection_channel_eval.py
+  - docs/prompts/misconception_diagnosis.md
+  - ".github/workflows/ci.yml"
 session: null
 notes: "출처: EOS-53 crosswalk 갭 #9(B6 잔여). EOS-52 실측: detection_rule 필드 저장소 0건·기계채널(정규식 4·SymPy 2)의 앵커 커버 0. 내용 KPI(OP 라벨 정확도 ≥85%) 측정 전제.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/B6★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-07

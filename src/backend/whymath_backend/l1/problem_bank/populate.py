@@ -343,7 +343,33 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
 
 
 def _verify_meta_from_raw(verify_raw: Any, *, slug: str) -> ProblemVerifyMeta:
-    """verify authoring dict → `ProblemVerifyMeta`. 부재 시 빈 조건(품질 테스트가 unverifiable)."""
+    """verify authoring dict → `ProblemVerifyMeta`. 부재 시 빈 조건(품질 테스트가 unverifiable).
+
+    미지 값 정책은 필드마다 다르며, **그 차이는 의도적이다**(EOS-85):
+
+    - `answer_kind` — **통과**(불투명 문자열). 이 필드의 어휘는 *과목이 정하는 것*이라 CORE인
+      적재기가 열거할 수 없다. 검증 가능 여부는 L3 검산이 판정한다.
+    - `verification_tier` — **거부**(`ProblemCorpusError`). 이쪽은 *기계 검증 강도*를 뜻하는
+      **플랫폼 어휘**라 과목과 무관하게 폐쇄집합이며, 오타가 조용히 통과하면 검증 강도를
+      잘못 보고하게 된다.
+    - `answer_selection`·`answer_aggregate` — **통과**(EOS-01). `answer_kind`와 같은 과목
+      어휘이며 판정 권위도 같은 자리(L3 `verify_root_selection`·`verify_root_aggregate`)에 있다.
+
+    ⚠ **기계 가드의 범위(있는 척 금지 · EOS-01 ② 실측)**: 이 세 필드의 어휘 열거는 두 정적
+    축 중 **어느 쪽도 잡지 못한다**. ⑴ 경계 프로브(`eos_core_boundary_probe`)는 리터럴을
+    `MATH_TYPE_RX` 접두 목록으로 판정하는데 `largest`·`smallest`·`unique`·`sum`·`product`는
+    전부 미매치다(실측). 이 낱말들을 정규식에 넣으면 일반어라 거짓 양성이 신호를 덮는다 —
+    그 판단은 프로브 자신의 주석이 이미 밝힌 설계다. ⑵ 불투명 페이로드 게이트는
+    `ProblemStatement` DTO 필드를 축으로 삼는데 이 두 필드는 **DTO에 없다**(계약은 `answer`·
+    `answer_kind`·`conditions` 3종만 불투명으로 선언). 즉 사각은 잘못 설정된 것이 아니라
+    **설계상 범위 밖**이다. 그래서 이 축의 실질 보호는 아래 회귀 테스트(행동 축)가 맡는다 —
+    `tests/backend/l1/problem_bank/test_populate.py`의 미등록 값 통과 단언 3종.
+    (두 필드를 Subject Contract 필수층 DTO에 편입할지는 별건이다 — 필수층 추가는 "모든 과목이
+    반드시 제공한다"는 선언이라 되돌리기 어렵고, `subject_adapter.py`가 그 게이트를 따로 둔다.)
+
+    즉 판정 기준은 "폐쇄집합인가"가 아니라 **"누구의 어휘인가"**다 — 과목 어휘는 통과시키고
+    플랫폼 어휘는 거부한다.
+    """
     if not isinstance(verify_raw, dict):
         return ProblemVerifyMeta(conditions="", answer_map={})
     conditions = verify_raw.get("conditions", "")
@@ -353,35 +379,32 @@ def _verify_meta_from_raw(verify_raw: Any, *, slug: str) -> ProblemVerifyMeta:
         raise ProblemCorpusError(f"verify.conditions 형식오류: slug={slug} value={conditions!r}")
     answer_map = {str(k): str(v) for k, v in dict(answer_map_raw).items()}
     steps = [str(s) for s in steps_raw] if isinstance(steps_raw, list) else None
+    # EOS-01 — `answer_selection`·`answer_aggregate`도 **불투명 문자열로 통과**시킨다.
+    # EOS-85가 `answer_kind`에 세운 기준("폐쇄집합인가"가 아니라 "누구의 어휘인가")을 같은
+    # 함수의 남은 두 형제에 적용한다. 실측(2026-09-07)으로 둘 다 **과목 어휘**임을 확인했다:
+    #   · 판정 권위가 L3에 있다 — `l3/verify_answer.verify_root_selection`이
+    #     `selection not in ("largest","smallest","unique")`이면 보수적으로 `None`을 낸다
+    #     (`_CONCEPTUAL_VERIFIERS` 디스패치와 같은 구조). 적재기가 거를 일이 아니다.
+    #   · 의미가 수학에 묶여 있다 — "근 중 가장 큰 값"·"근들의 합/곱"이며, 다른 과목은 같은
+    #     자리에 다른 어휘를 담는다.
+    # 종전엔 목록 밖 값이 예외도 경고도 없이 `None`이 됐다(answer_kind와 같은 조용한 손실).
     sel_raw = verify_raw.get("answer_selection")
-    selection = sel_raw if sel_raw in ("largest", "smallest", "unique") else None
+    selection = sel_raw if isinstance(sel_raw, str) and sel_raw else None
     agg_raw = verify_raw.get("answer_aggregate")
-    aggregate = agg_raw if agg_raw in ("sum", "product") else None
+    aggregate = agg_raw if isinstance(agg_raw, str) and agg_raw else None
+    # EOS-85 — `answer_kind`는 **불투명 문자열로 그대로 통과**시킨다(어휘 열거 없음).
+    # 종전엔 17종을 튜플로 열거하고 그 밖은 `None`으로 떨어뜨렸다. 두 가지가 문제였다:
+    #   ⑴ **경계 위반** — 적재기는 CORE인데 수학 answer_kind 어휘를 알고 있었다. 경계 프로브
+    #      (`eos_core_boundary_probe`)가 세던 리터럴 비교 **1건이 정확히 이 자리**였다.
+    #   ⑵ **조용한 손실** — 목록에 없는 값이 예외도 경고도 없이 `None`이 됐다. 새 검증 종류를
+    #      L3에 추가하고 여기를 안 고치면 그 문항의 검증 종류가 적재 시 사라지고, 화면에는
+    #      "answer_kind 없는 문항"으로 보인다(S4-17 `finite_probability` 손실이 그 전례다).
+    # 여기서는 **형식만** 본다(문자열인가·빈 값이 아닌가). *어떤 값이 검증 가능한가*의 판정은
+    # L3 검산이 한다 — `l3.equivalent.acceptance._CONCEPTUAL_VERIFIERS`에 디스패치가 없으면
+    # 그 문항은 개념형 검증을 건너뛴다. 즉 미지 값은 여기서 지워지는 대신 L3까지 도달해
+    # **어디서 왜 못 쟀는지가 보이는** 형태가 된다.
     kind_raw = verify_raw.get("answer_kind")
-    kind = (
-        kind_raw
-        if kind_raw
-        in (
-            "real_root_count",
-            "extremum_count",
-            "is_one_to_one",
-            "geometric_convergence",
-            "limit_equals_value",
-            "is_differentiable",
-            "series_converges",
-            "excluded_point_count",
-            "mean_equals_median",
-            "events_independent",
-            "conditional_equal",
-            "congruent_by_ratio",
-            "dot_product_scalar",
-            "inequality_direction",
-            "root_loss_count",
-            "finite_probability",
-            "finite_count",
-        )
-        else None
-    )
+    kind = kind_raw if isinstance(kind_raw, str) and kind_raw else None
     tier_raw = verify_raw.get("verification_tier")
     if tier_raw is not None and tier_raw not in _VERIFICATION_TIER_VALUES:
         raise ProblemCorpusError(

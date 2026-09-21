@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-84-core-boundary-math-removal-probe
+title: "EOS Core 경계 계측 2종 — '수학을 제거했을 때 무엇이 남는가'(CORE→ADAPTER 전이 도달·합성 루트 제외 잔여 누수) + 금지 규칙(CORE 내 과목·수학 유형 리터럴 비교) 기계 스캔 (계획서 100 §3.7)"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 전이 도달 프로브: CORE 모듈이 (CORE/INFRA/MIXED 경유) ADAPTER에 닿는 경로를 BFS로 전수 산출하고, 합성 루트(composition)를 설계된 유일 교체점으로 제외한 잔여 누수를 별도로 센다 — EOS-67(직접 import만)의 사각을 계측"
+  - "② 금지 규칙 스캔: CORE 모듈 AST에서 subject/수학 유형 문자열 리터럴 비교(Compare·match)를 검출(계획서 100 §3.7 'if subject == \"math\"' 규칙 그대로) + 수학 어휘 문자열 상수(데이터·프롬프트 누수)를 모듈별로 센다"
+  - "③ tests/infra 동결: 리터럴 비교 히트 0 유지(ratchet) · 잔여 누수 집합 동결 · 결함 주입(가짜 CORE 소스에 subject 비교 삽입 → 검출)으로 변별력 확인"
+  - "④ 경계 정본 문서(eos_core_adapter_boundary.md)에 §8 실측 절 추가 — 정본화≠집행 별항: 이 프로브는 계측기이며 집행은 EOS-67 계약과 새 infra 테스트"
+  - "③-정정 실측: CORE 리터럴 비교는 0이 아니라 1건(l1.problem_bank.populate._verify_meta_from_raw의 answer_kind 16종 튜플 열거 — EOS-66 불투명 문자열 계약 충돌·진성 경계 냄새). 게이트는 (모듈,종류) 기준선 1건 동결(늘면 RED·줄면 ratchet) + 과목명 비교는 기준선 없이 0 강제로 집행. 잔여 누수 동결 열쇠는 끝점이 아니라 누수 지점(path[-2])"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/980 (커밋 ec04d10c) — probe 실측 CORE 266/도달 14/잔여 2/생존 252/리터럴 1/어휘 77 · tests/infra 20 passed(PYTHONHASHSEED 0/1/12345 동일) · black·ruff green"
+paths:
+  - scripts/analysis/eos_core_boundary_probe.py
+  - tests/infra/test_eos_core_boundary_probe.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: Kiki 2026-09-04 계획서 100 §3.7 'EOS Core Boundary 결정' 제시. 선행 EOS-65(배정)·67(직접 import 계약)·69(위반 상환)이 있으나 '수학 제거 시 남는 것'(전이)과 '리터럴 금지 규칙'은 미계측이었다. 1차 실측: CORE 266 중 전이 도달 14(전부 composition 경유 = 설계된 교체점) · 리터럴 비교 히트 0.\n\n[정정 2026-09-04] 첫 실측 메모 '히트 0'은 오판 — ratchet 테스트가 1건을 잡았고, BFS set 순회 비결정성(해시 시드별 동률 끝점)도 함께 발견·수정"
+updated: 2026-09-04

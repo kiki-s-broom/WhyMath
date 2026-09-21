@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-39-hint-storage-seat
+title: "Hint 저장 좌석 판정 — schemas/v1.1/hint.schema.yaml이 선언한 hints 테이블 부재 (설계 정본 ↔ 저장 실측 불일치 유일 엔티티)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 먼저: 답 미루기 4단계(Phase 1 성공 기준)에 graded 힌트 *본문 저장*이 실제로 필요한가 — l3/solution_path.py의 힌트 원천 텍스트로 충분한지, L4 구조화(hint.schema.yaml '구조화는 L4 몫')가 어디서 막혀 있는지 실측 근거로 적는다"
+  - "② 좌석 신설이면: hint_usage.hint_id 느슨참조를 FK로 조일지 함께 판정 + canonical_entity_model_v1.md §3-B·§2-A + test_canonical_entity_model_freeze.py 상수(ABSENT → 좌석) 갱신. RESERVED_ABSENT_TABLE_NAMES의 hints 예약을 풀어야 CI 통과"
+  - "③ 좌석 불요면: hint.schema.yaml의 storage 선언을 실측에 맞게 고치고(드리프트 §7-B 해소) canonical §3-B를 '영구 부재'로 갱신"
+artifacts:
+  - "PR #1015 (80ccee31) — Hint 영구 부재 판정(판정 기준 main 3f2b39c1·근거 3) + 재확인 트리거 ① 컬럼 축 집행(결함 주입 실증: 신규 가드 FAILED / 기존 테이블 축 2 passed) + hint.schema.yaml storage 정정(드리프트 §7-B 해소) + 부록 재현 명령 OPS-61 함정 정정. 전체 스위트 11886 passed EXIT 0."
+paths:
+  - schemas/v1.1/hint.schema.yaml
+  - src/backend/whymath_backend/db/models/hint_usage.py
+  - docs/architecture/canonical_entity_model_v1.md
+session: null
+notes: "출처: ARCH-37 정본 §3-B·§7-B. 좌석 부재 4종 중 설계 정본이 없는 테이블(hints)을 선언하는 유일한 엔티티. Kiki 리뷰(2026-09-05): 소유자 없는 알려진 결함 → Gate D NO. 기한 없음(AssessmentResult와 달리 W8 경로에 직접 걸리지 않음)."
+updated: 2026-09-06

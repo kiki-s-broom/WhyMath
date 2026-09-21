@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-38-assessment-result-separation
+title: "AssessmentResult 좌석 분리 — assessment 행에 혼입된 결과 JSONB 5필드를 별도 엔티티로 (기한 2026-10-05 · W8 채점→오개념→Mastery 선행)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P0
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 분리 판정 먼저: assessment(세션·언제 진단했나)와 결과(concept_diagnosis·pattern_diagnosis·weak_points·strong_points·recommended_path)를 분리했을 때 W8 채점→오개념→Mastery 경로가 실제로 무엇을 얻는지 실측 근거로 적는다 — 이득이 없으면 '혼입 유지'로 판정하고 canonical_entity_model_v1.md §3-C를 그 판정으로 갱신한다(분리가 결론이 아니라 판정이 결론)"
+  - "② 분리하면: 별도 좌석 신설 + canonical_entity_model_v1.md §1-16·§2-A·§3-C 갱신 + test_canonical_entity_model_freeze.py 상수 갱신(둘 중 하나만 고치면 RED) + 소급 불가 변경이므로 마이그레이션 왕복(upgrade→downgrade→upgrade) 통과"
+  - "③ 기한 2026-10-05: W8(10/12~) 전에 판정이 착지해야 한다. 미착지 시 W8 착수 전 Kiki 판정 게이트"
+artifacts:
+  - "PR #997 (b2fde42a) — 혼입 유지 판정: canonical_entity_model_v1.md §1-16·§3-C 갱신 + 재확인 지점 ARCH-40·부수 실측 소유자 ASM-13 등재. 뮤테이션 검증(assessment_result 주입 시 2건 RED exit 1 → 원복 8건 GREEN exit 0)"
+paths:
+  - src/backend/whymath_backend/db/models/assessment.py
+  - docs/architecture/canonical_entity_model_v1.md
+session: null
+notes: "출처: ARCH-37 정본 §3-C가 '혼입 상태를 인정하고 적음'으로 남긴 좌석 부재 4종 중 1건. Kiki 리뷰(2026-09-05): 'AssessmentResult는 나중 일이 아니다 — 진단 세션과 결과가 한 테이블에 섞여 있으면 Phase 2 W8(10/12~10/18, 채점→오개념→Mastery)에서 바로 걸린다. 10월 초 데드라인을 붙여서 등재.' 소유자 없는 알려진 결함은 Gate D(owner 존재) NO."
+updated: 2026-09-06

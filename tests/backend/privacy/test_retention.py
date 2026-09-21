@@ -13,8 +13,10 @@ from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.privacy.retention import (
     _RETENTION_PLAN,
+    _effective_timestamp,
     purge_expired_records,
     retention_cutoff,
 )
@@ -39,14 +41,16 @@ class _FakeResult:
 
 
 class _FakeSession:
-    """delete 실행 순서·테이블명을 캡처(rowcount 고정 반환)."""
+    """delete 실행 순서·테이블명·WHERE절 텍스트를 캡처(rowcount 고정 반환)."""
 
     def __init__(self, rowcount: int = 2) -> None:
         self.deletes: list[str] = []
+        self.wheres: list[str] = []
         self.rowcount = rowcount
 
     async def execute(self, stmt: Any) -> _FakeResult:
         self.deletes.append(stmt.table.name)
+        self.wheres.append(str(stmt.whereclause))
         return _FakeResult(self.rowcount)
 
 
@@ -87,3 +91,51 @@ class TestPurgeExpiredRecords:
         )
         assert sum(counts.values()) == 0
         assert len(counts) == len(_RETENTION_PLAN)
+
+    def test_problem_attempt_where_clause_coalesces_ingested_at(self) -> None:
+        """SEC-33 ② — 실행 시 problem_attempt DELETE의 WHERE절이 실제로 COALESCE를 쓴다.
+
+        `_effective_timestamp` 단위 테스트(아래)는 그 함수 자체를 보지만, 이 테스트는
+        `purge_expired_records`가 그 함수를 *실제로 호출해 반영하는지*를 본다(배선 증명 —
+        함수만 옳고 호출부가 옛 `getattr` 그대로면 이 테스트만 잡는다).
+        """
+        session = _FakeSession(rowcount=2)
+        asyncio.run(
+            purge_expired_records(cast(AsyncSession, session), as_of=date(2026, 6, 18), years=3)
+        )
+        idx = session.deletes.index("problem_attempt")
+        where = session.wheres[idx].lower()
+        assert "coalesce" in where
+        assert "started_at" in where
+        assert "ingested_at" in where
+
+    def test_other_tables_where_clauses_do_not_use_coalesce(self) -> None:
+        """회귀 가드 — COALESCE 폴백은 SEC-33이 지정한 problem_attempt 하나뿐이다."""
+        session = _FakeSession(rowcount=2)
+        asyncio.run(
+            purge_expired_records(cast(AsyncSession, session), as_of=date(2026, 6, 18), years=3)
+        )
+        for table, where in zip(session.deletes, session.wheres, strict=True):
+            if table == "problem_attempt":
+                continue
+            assert "coalesce" not in where.lower(), f"{table}이 예기치 않게 COALESCE를 쓴다"
+
+
+class TestEffectiveTimestamp:
+    """`_effective_timestamp` — SEC-33 ② COALESCE 폴백의 단위 계약."""
+
+    def test_problem_attempt_started_at_becomes_coalesce_with_ingested_at(self) -> None:
+        expr = _effective_timestamp(ProblemAttempt, "started_at")
+        compiled = str(expr).lower()
+        assert "coalesce" in compiled
+        assert "started_at" in compiled
+        assert "ingested_at" in compiled
+
+    def test_all_non_problem_attempt_plan_entries_are_unwrapped(self) -> None:
+        """회귀 가드 — `ProblemAttempt` 외 모든 플랜 항목은 원 컬럼 그대로(COALESCE 미개입)."""
+        for model, column in _RETENTION_PLAN:
+            if model is ProblemAttempt:
+                continue
+            expr = _effective_timestamp(model, column)
+            assert "coalesce" not in str(expr).lower()
+            assert expr is getattr(model, column)

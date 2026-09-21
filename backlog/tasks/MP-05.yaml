@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-05
+title: "카나리 구간 식별 — 회차 앞머리 canary_size건을 검수 큐 JSONL로 잘라내는 CLI (MP-02 ② 선결)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - MP-04-round-manifest-snapshot
+requires_gates: []
+acceptance:
+  - "① 식별 근거 — genlog JSONL에서 같은 run_id 행을 **적재 순서대로** 읽어 앞머리 canary_size건을 카나리 구간으로 잘라낸다. canary_size는 대장(rounds.jsonl) 행의 canary_size 필드에서 읽는다(추론 금지 — 회차마다 다를 수 있고 0=관문 끔·None=미기록은 서로 다른 처분이다)"
+  - "② 산출 — review_session --queue가 그대로 먹는 JSONL(slug 키를 갖는 행)을 낸다. 카나리 시도 중 **수용된 것**은 코퍼스 <out>.jsonl에서, **비수용**은 <out>.review.jsonl에서 해결하며, 어느 쪽에서도 못 찾은 행은 조용히 버리지 않고 사유와 함께 남긴다(침묵 실패 금지)"
+  - "③ 변별력 — 카나리 30 회차와 카나리 0(관문 끔) 회차에서 산출 건수가 달라야 한다. 대장에 canary_size가 None(미기록·구행)이면 '모른다'로 exit 1 — 30을 기본값으로 가정해 채우지 않는다(모른다 ≠ 아니다)"
+  - "④ 실측 공백 근거 — 2026-09-06 실측: 카나리 통과분은 표식 없이 그대로 코퍼스에 append되고(problem_corpus_accumulate.py:305-306 '카나리는 버리는 표본이 아니라 이 회차의 앞부분이므로, 통과분은 그대로 코퍼스에 append된다'), 코퍼스 행·검수 큐 행 어디에도 phase 표식이 0건이라 '이 30건이 카나리였다'를 기계가 특정할 수 없다"
+artifacts:
+  - "PR #1021 (https://github.com/doldori7/WhyMath/pull/1021) — commit 2134d600 · harness/canary_slice.py 신규(genlog 적재 순서로 앞머리 canary_size건 절단) · canary_size는 대장에서만 판독(None→exit 1·0→0건) · 미해결 3종 사유 구분 전건 보고·불변식 산출+미해결=canary_size 동결 · review_session.load_review_items 직접 호출로 형식 호환 기계 증명 · 신규 테스트 14건 · 검증자 독립 뮤테이션 3종 전건 RED · 전체 백엔드 12432 passed·infra+harness 1585 passed·ruff/black/mypy EXIT=0"
+paths:
+  - "src/backend/whymath_backend/harness/**"
+  - "tests/backend/harness/**"
+session: null
+notes: "출처: MP-02 착수 중 실측 발견(2026-09-06). MP-02 acceptance ②는 '카나리 30건을 100% 검수'를 요구하는데 그 30건을 지목할 수단이 저장소에 없다 — genlog 적재 순서가 유일한 근거다. 이 CLI가 없으면 검수자는 60건 전부를 보거나 임의로 30건을 고르게 되고, 어느 쪽이든 게이트 G-eos-first-run-canary-review의 증적이 '카나리 30건 검수'라는 주장을 뒷받침하지 못한다. MP-04가 depends인 이유: canary_size를 대장 행에서 읽는데 그 필드가 MP-04 산출물이다."
+updated: 2026-09-07

@@ -75,6 +75,27 @@ _PII_EXCLUDE = {"email_hash", "parent_email_hash"}
 # 특히 parent_consent_at·is_minor(동의 게이트)·email_hash(신원)·subscription_*(결제)·
 # persona_*·diagnostic_*(시스템 판정)·created_at 등 감사/신원/결제 필드는 자가수정 불가.
 #
+# `grade`·`school_type`(학적 자가신고)이 여기 있는 이유 — EOS-82. 둘은 **소비자가 이미 4곳**
+# 인데(`api/study.py::_build_signals`의 grade_band 교수법 필터 · `api/coach.py::_grade_for`의
+# 학년 프롬프트 개인화 · `l2/target_progress.py`의 성취기준 커버리지 스코프 ·
+# `l2/learner_state.py`의 학습자 상태 조립) **값을 넣는 HTTP 경로가 0곳**이라 전 학생이 영구
+# `None`이었다. ORM 컬럼(`db/models/user.py`)과 DB 인덱스(`idx_user_school`)까지 있는데 입력만
+# 없어서, 만들어 둔 기능들이 *에러 없이 조용히* 스킵/null 되고 있었다(무증상 무효화 —
+# CLAUDE.md "작동 신호 없는 알고리즘 부착 금지"와 같은 형태). 실측·경위는
+# `docs/reviews/eos_one_subject_completion_review_2026-09-03.md` §2.3 G1.
+#
+# 이 둘이 화이트리스트에 들어가도 안전한 근거: ⑴ **자가신고 학적 정보**이지 동의·신원·결제·
+# 시스템 판정 필드가 아니다 ⑵ 미성년 게이트의 입력이 아니다 — 게이트는 `birth_year` → 서버
+# 파생 `is_minor` 단일 경로이고 `grade`는 그 계산에 들어가지 않는다(아래 패치 로직 참조)
+# ⑶ 값 범위는 스키마가 강제한다(`grade` ge=10 le=14 · `school_type` enum 12종) — 병합 결과
+# 재검증에서 범위 밖은 422 ⑷ `security_privacy.md` §PII가 `UserProfile`의 학년 수집을 이미
+# 승인한다(닉네임·학년·`school_id`·`birth_year` + 암호화 비대상 — 커리큘럼 정렬·진단의 쿼리
+# 입력이라 암호화하면 조회가 불가능해진다).
+#
+# **여기 넣지 않는 것**: `school_id`·`school_region`·`gender`는 미소비 컬럼 처분 게이트
+# (`G-prod-dead-column-check`)의 *제거* 후보라 방향이 반대다. 소비자가 생기기 전에 수집을
+# 열면 목적 없는 PII 수집이 된다(최소 수집 원칙).
+#
 # `birth_year`는 *수정 가능*하다(온보딩에서 사용자가 입력) — 단 그 결과로 정해지는
 # `is_minor`(미성년 동의 게이트의 입력)는 클라가 *직접 못 정한다*: is_minor는 화이트리스트에
 # 없어 직접 PATCH가 422고, patch_me가 매 쓰기마다 birth_year에서 *서버 파생*해 덮어쓴다
@@ -85,6 +106,8 @@ _SELF_EDITABLE = frozenset(
     {
         "nickname",
         "birth_year",
+        "grade",  # 학년 10~14(고1~고3·N수1·N수2) — EOS-82. 소비자: study·coach·target_progress
+        "school_type",  # 학교 유형 12종 enum — EOS-82. 소비자: target_progress 커버리지 스코프
         "primary_device",
         "has_apple_pencil",
         "note_app",

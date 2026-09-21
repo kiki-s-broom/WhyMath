@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-29-weak-signal-proximity-requirement
+title: "약한 신호(숫자·단일문자)에 근접 요구 — 정답 해설 오진단 94건(18.9%)의 원인, division-by-zero 70건 최대"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - MISC-27-false-positive-on-own-correct-explanations
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — 정답 해설 오진단 497건 중 **94건(18.9%)**이 `weak-signal-mixed`/`weak-signals-only`다(`harness/misconception_false_positive_eval.py` 분류). 최대 항목은 `division-by-zero` 70건 — `signals=('분모','0')`인데 \"몫의 미분법에 따라 분자와 **분모**를 각각 미분해 조합하면 f'(-1)의 값은 **0**이다\" 같은 완전히 올바른 해설이 confidence 1.0으로 잡힌다. `angle-sum-non-triangle`(`('내각','180')`) 24건도 \"n각형의 **내각**의 합은 (n-2)·**180**°\" 해설이 걸린다. 나눗셈 오개념·다각형 오개념과 아무 관계가 없다.\n② 원인 — v1.3이 약한 signal(숫자-only·단일 ASCII)에 **경계 검사**를 붙여 토큰 내부 오매칭(`'0'∈'10'`)은 막았지만, **거리**는 보지 않는다. `'분모'`와 `'0'`이 한 문장 안 아무 데나 있으면 공출현 AND가 성립한다. 초기 거리 실측(표본 6건): 정탐 3·3·5·5 / 오탐 11·31 — 간격이 있어 보이나 **표본이 작아 임계 확정 불가**다. 착수 시 정답 해설 494건과 recall 프로브로 분포를 전수 측정해 정한다.\n③ 설계 — `MISC-25`가 만든 근접 창(`_CORRECTION_LOOKBEHIND`/`_CORRECTION_LOOKAHEAD`·`_is_weak_signal`)과 **같은 도구를 신호 공출현에 적용**한다: 약한 signal은 내용성 signal에서 N자 이내일 때만 매치로 센다. 재구현 0 — 이미 `_is_weak_signal`이 있고 절 분리(`_clauses`)도 있다. **파급 주의**: 이것은 `_match_one`의 confidence 산식이 아니라 `matched` 집합을 바꾸므로 `matched_signals` 텔레메트리와 부분매칭(0.5) 경계가 함께 움직인다 — `MISC-22`(정규식 가산)·`MISC-24`(모호 정규식)가 각각 별도 태스크였던 것과 같은 무게다.\n④ 집행 지점(정본화와 별항) — 착지 후 `misconception_false_positive_eval`을 재실행해 CI ratchet(`ci.yml`의 `--max-fp-ratio 0.07`)을 **내려 잠근다**. 내리지 않으면 개선이 회귀 방지로 전환되지 않는다. 동시에 `anchor_detection_channel_eval`·recall 프로브로 **정탐이 죽지 않았는지** 확인한다 — 오진단만 보면 \"전부 미매치\"라는 과잉 수정이 6.5%→0%로 보인다."
+  - "[정정 2026-09-10 — ③의 설계가 실측으로 기각됐다] 착수 후 acceptance ②가 요구한 전수 측정을 하니 근접 임계로는 가를 수 없다는 것이 확정됐다. 등재 당시 표본 6건(정탐 3·3·5·5 / 오탐 11·31)은 **오탐 모집단을 잘못 잡은** 결과였다.\n[정정 근거 ⓐ — 94건의 실제 구성] `weak-signal` 계열 94건 중 **72건은 오탐이 아니다**. 정답 해설이 오개념을 *가르치려고* 인용한 문장이다(\"…분모에 변수가 와도 항상 정의된다고 여기면 0으로 **잘못** 답한다\" · \"…모든 다각형의 내각의 합을 180°로 여기면 **틀린다**\"). 해설에 그 오개념 문장이 실제로 들어 있으므로 매치가 옳다 — 대리 지표(학생 입력이 아님)의 한계이지 신호 정밀도 결함이 아니다. **순수 오탐은 정정 언급 없는 22건뿐**이고 전부 `division-by-zero`의 한 생성기 템플릿(\"몫의 미분법에 따라 분자와 분모를 각각 미분해…\")이다.\n[정정 근거 ⓑ — 분포가 겹친다] 순수 오탐 22건의 거리는 **12·27·29**다. 반면 진짜 오개념 발화의 거리는 **0·1·3·10·13**이다. 결정적 반례: `\"분모에 변수가 와도 항상 정의되니까 0을 넣어도 된다\"`는 거리 **13**으로 오탐 최소(12)보다 **멀다**. 이 문장은 `division-by-zero`의 `canonical_statement`를 학생이 그대로 발화한 형태라 반드시 잡아야 한다. 즉 임계를 12로 두면 이 정탐이 죽고, 14로 두면 오탐 20건이 그대로 남는다 — 어느 쪽으로도 가를 수 없다.\n[집행 — 기각을 재현 가능하게 남긴다] 판정을 산문으로만 적으면 다음 세션이 같은 가설을 처음부터 다시 세운다. 그래서 `harness/misconception_false_positive_eval.py`에 `weak_signal_gap()`을 남기고 리포트가 **거리 분포를 항상 출력**하게 했다(`1:24 3:24 9:24 12:20 27:1 29:1`). 코퍼스가 바뀌어 겹침이 해소되면 그 출력만 보고 재검토할 수 있다. 회귀 테스트가 결정적 반례 2건(거리 13 정탐 · 거리 12 오탐)의 **대소 관계 자체**를 동결한다 — 관계가 뒤집히면 red가 나서 재검토 시점을 알린다.\n[④ 미이행 — ratchet은 내리지 않는다] 오진단이 줄지 않았으므로 `ci.yml`의 `--max-fp-ratio 0.07`은 그대로 둔다. 개선 없이 임계만 내리면 상시 red가 되고, 그것이 게이트를 끄게 만든다.\n[잔여 이관] 순수 오탐 22건(단일 템플릿)과 correction-mention 72건은 서로 다른 축이다. 후자는 `MISC-28`(귀속 판정) 소관이다 — 정정 언급이 있는데 근접 창 밖이라 못 잡은 경우이고, 어휘·거리가 아니라 판정 축이 필요하다는 그 태스크의 근거와 정확히 같은 형태다. 전자는 실 학생 글에서의 빈도가 미측정이라 지금 매칭 계약을 바꿀 근거가 부족하다."
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1075"
+  - fe873548
+paths:
+  - src/backend/whymath_backend/l4/misconception/diagnose.py
+session: null
+notes: "발단: MISC-27의 원인 분류에서 최대 단일 원인으로 확인됐다. MISC-25가 만든 근접 창 도구를 재사용하므로 신규 프레임워크 0. EOS P1 — 맞게 쓴 글에 확신 오진단이 나가는 축이라 의사결정 우선순위 #1(학생 안전·정서)에 직접 닿는다.\n\n[정정 2026-09-10] 전수 측정이 근접 임계 설계를 기각 — 정탐 거리 13 > 순수 오탐 최소 12로 분포가 겹친다"
+updated: 2026-09-10

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-27-false-positive-on-own-correct-explanations
+title: "자체생성 정답 해설 7,644건 중 885건(11.6%)이 오개념 게이트를 통과 — signal 정밀도 축(정정 어휘와 무관한 잔여 25건 포함)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — 이 저장소가 **스스로 생성한 정답 해설**(`data/corpus/**/problems.jsonl`의 `answer_explanation`, 중복 제거 7,644건) 중 **885건(11.6%)**이 오개념 진단의 서빙 품질 게이트(top-1 floor 0.65)를 통과한다. 즉 올바른 수학 산문에 확신 오진단이 나간다. 이 수치는 `MISC-25`(명시적 정정 언급) 작업 중 교수학 검토가 곁가지로 실측한 것이며, 그 태스크의 범위(학생이 오개념을 *부정*한 경우)와 **겹치지 않는 별개 축**이다.\n② 범위 분리 — 885건 중 **25건(2.8%)은 정정 어휘가 아예 없다**. 즉 `MISC-25`의 근접 반박 축으로도, `EXPLICIT_CORRECTION_MENTION`을 아무리 넓혀도(`MISC-26`) 걸리지 않는다. 순수한 **signal 정밀도** 문제다. 나머지 860건이 MISC-25 착지로 실제로 얼마나 줄었는지 먼저 재측정해 분모를 확정한다 — 재측정 없이 885를 그대로 인용하면 이미 고쳐진 몫을 중복 계상한다.\n③ 원인 분류 — 남은 오진단을 유형별로 나눈다. 알려진 축: 짧은 영숫자 signal의 오매칭(v1.3이 경계 검사로 줄였으나 `\"0\"`·`\"a⁰\"`처럼 정의역 조건 어구 안에서 매치되는 잔여가 있다 — 교수학 검토 실측: \"a는 0이 아니다. 그러므로 a⁰ = 0 이다.\"는 어떤 스코프로도 못 고치고 신호 품질로만 풀린다), `signals` 2개짜리 항목의 부분매칭(0.5)이 다른 항목과 결합해 top-1을 차지하는 경우 등.\n④ 집행 지점(정본화와 별항) — 측정 도구를 만들고 CI에 배선한다. `harness/explicit_correction_gap_eval.py`가 세운 형식(대조군 동반·분모 없는 0 금지·측정 실패는 exit 2)을 승계하되 모집단이 다르다(카탈로그 항목이 아니라 정답 해설 코퍼스). 임계는 실측 후 정하고, **0건이 되기 전에는 게이트를 걸지 않는다** — 상시 red인 게이트는 사람이 게이트를 끄게 만든다."
+artifacts:
+  - "PR #1075 · commit cf5e3693 — 재측정 885→497건(11.6%→6.5%) · 원인 5유형 분류 · misconception_false_positive_eval 신설 + CI ratchet 0.07 배선 · 전체 백엔드 12,240 passed · 잔여는 MISC-29"
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - src/backend/whymath_backend/harness/explicit_correction_gap_eval.py
+session: null
+notes: "발단: MISC-25 교수학 검토의 곁가지 실측. MISC-25(정정 언급)·MISC-26(어휘 확장)과 축이 다르다 — 그 둘로 안 걸리는 25건이 남는다는 것이 이 태스크의 근거다. EOS P1로 둔 이유: 정답을 쓴 학생에게 확신 오진단이 나가는 것은 의사결정 우선순위 #1(학생 안전·정서)에 직접 닿는다."
+updated: 2026-09-10

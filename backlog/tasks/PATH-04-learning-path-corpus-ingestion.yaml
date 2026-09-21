@@ -5,12 +5,14 @@ track: math-completion
 stage: S4
 subject: math
 layer: data-pipeline
-status: blocked
+status: todo
 priority: 4
 eos_priority: P2
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-path04-learning-path-xlsx
+  - G-path04-source-xlsx-local-handoff
 acceptance:
   - "① 원본 자산 확보 **선행**(Kiki 소유 행동) — Path xlsx는 저장소에 없다(저장소 내 .xlsx는 ai_llm_inventory_2026-07.xlsx 1건뿐). 제공받은 파일의 sha256 앞 16자리가 f4ee650b734ac854와 일치하는지 검증하고, 불일치면 코드가 아니라 데이터 카드(docs/data/concept_content_corpus_v1.md B.1)부터 정정한다. 자산 없이 store만 만들면 dead table"
   - "② 코퍼스 추출 → data/corpus/learning_paths_v1/. 불변식 검증(데이터 카드 §C): 전체요약 677행 · 트랙 합계 일치(초119+중60+고기본34+고일반93+고진로127+재수130+영재114=677) · concept_id 전건 해소(고아 0)"
@@ -24,5 +26,5 @@ paths:
   - "src/backend/whymath_backend/l1/**"
   - docs/data/concept_content_corpus_v1.md
 session: null
-notes: "acceptance ① 선행 자산(7주체 S1~S7 경로 xlsx, sha256 앞16 f4ee650b734ac854) 부재 실측(2026-08-10: 저장소 xlsx는 ai_llm_inventory 1건뿐·data/corpus/learning_paths_v1 무) — Kiki 소유 행동 대기. '자산 없이 store만 만들면 dead table'이라 코드 선행 불가. unblock 트리거: Kiki가 파일 제공·sha256 일치 확인 시\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "acceptance ① 선행 자산(7주체 S1~S7 경로 xlsx, sha256 앞16 f4ee650b734ac854) 부재 실측(2026-08-10: 저장소 xlsx는 ai_llm_inventory 1건뿐·data/corpus/learning_paths_v1 무) — Kiki 소유 행동 대기. '자산 없이 store만 만들면 dead table'이라 코드 선행 불가. unblock 트리거: Kiki가 파일 제공·sha256 일치 확인 시\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-06] notes 산문의 Kiki 대기(xlsx 제공)를 게이트로 집행 — 산문 선행은 /gates 화면·리마인드에 안 보인다(정본화≠집행)\n\n[정정 2026-09-06] 게이트 교체 — 초판 G-path04-learning-path-xlsx의 원본 커밋 요구 결함(PR #1004 Codex P2) 정정판 부착. 구 게이트는 waive(교체 사유 기록)"
+updated: 2026-09-06

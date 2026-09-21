@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-93-pr-disposal-label-expiry
+title: "처분 라벨이 붙은 열린 PR 10건의 만료 없는 유예 — 닫기 전 좌석 선행이 무소유"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 (2026-09-08 main 4abacdce): 열린 PR 19건 중 10건이 HARN-42(done)의 처분 라벨을 단 채 2026-08-31T06:24Z 이후 8일간 갱신 0이다 — eos-rework 5(#846·#847·#880·#882·#893) · eos-postpone 4(#844·#856·#860·#865) · eos-close 1(#858). 이 라벨은 처분 *결정*이고 HARN-42 acceptance ④가 집행을 Kiki에게 넘겼으나, 결정에 만료·재확인 지점이 없다(CLAUDE.md 만료 없는 유예·제외 금지). 닫히는 순간 브랜치 내용이 고아가 되며 main 부재 파일이 실재한다(src|tests|scripts|data 기준 · b75f495d와 4abacdce 양쪽에서 동일): #882 12 · #880 6 · #847 2 · #844 1 · #865 1 · #893 1 · 나머지 4건 0. 재현: 이 문서 docs/reviews/unmerged_branch_audit_2026-09-08.md 제3절 명령 블록"
+  - "② 탐지기 공백 (관측·이 태스크의 실질): backlog.py branches는 PR의 열림/닫힘만 가르고 **처분 라벨을 보지 않는다**. 2026-09-08 실측 출력에서 10건 전부가 활성 PR과 동일한 [PR] — PR #975(5일 전·실작업 중)와 #858(eos-close·16일 전·닫기로 결정됨)이 같은 줄 모양이다. HARN-78(done)이 닫힌 PR을 pr_closed로 분리했으나 그것은 *이미 닫힌* 뒤의 축이고, 이 축은 *닫히기 전*이다. 조치는 둘 중 하나로 좁힌다: (a) branches 렌더에 라벨·정체 일수를 병기해 사람이 보게 한다 (b) 라벨별 재확인 게이트를 대장에 등재한다. (a)를 택하면 GitHub 토큰 없는 경로에서 라벨 조회가 불가하므로 HARN-78 ②의 오프라인 원칙(답할 수 있는 것만 답한다·상태 미확인 경로 유지)을 그대로 승계한다"
+  - "③ 집행 지점 (정본화와 별항): 라벨이 붙은 PR을 닫기 전에 **파일 단위 대조 + 회수 좌석 선행 등재**가 실제로 일어나게 하는 지점이 무엇인지 명시하고 그것을 배선한다. 지금은 어떤 태스크·게이트·코드도 그 선행을 소유하지 않는다(역할 기준 검색 3종 실측: 라벨명 grep은 HARN-42와 문서 2건만, 닫기 전 어구 grep은 무관 태스크 3건, HARN-42는 done이고 acceptance ④가 집행을 사람에게 넘김). #858은 diff 28파일로 최대이고 유일한 eos-close이므로 첫 대상이다. 좌석 없이 닫으면 미머지 고립 5회차가 된다 — 앞 4회는 전부 PR을 열지 않아서 생겼지만 이번 형태는 **PR을 열어 두고 닫아서** 생긴다. 코드 이식은 이 태스크 범위 밖(stray-code 소관 분리 — HARN-78 ⑤ 동형)"
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1086"
+paths:
+  - "scripts/harness/**"
+  - "backlog/**"
+  - "docs/reviews/**"
+session: null
+notes: "출처: stray-code 9회차 감사(docs/reviews/unmerged_branch_audit_2026-09-08.md). 8회차 r2 정직한 공백이 '다음 회차 최우선 관찰 대상'으로 지목한 축을 등재한다. 회수 태스크가 아니라 **처분 안전 태스크**다 — 코드를 옮기지 않고, 옮겨야 할 것이 있는지 닫기 전에 알게 한다."
+updated: 2026-09-10

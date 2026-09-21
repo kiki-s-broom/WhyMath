@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-92-cross-subject-contract-probe
+title: "교차 과목 프로브 — Subject Contract v1 필드가 과목 중립인지 Physics로 실측 (9/27 · Provisional 해제 조건)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-91-subject-contract-provisional-status
+requires_gates: []
+acceptance:
+  - "① 프로브 대상: SubjectAdapter 3메서드 + DTO 4종의 **모든 필드**를 Physics 문항으로 실제 채워 본다. 채우지 못하거나 의미가 뒤틀리는 필드를 '깨진 필드'로 판정한다 — 인상 판정 금지, 필드별 채움 성공/실패를 표로"
+  - "② 깨진 필드는 **무조건 Core→Adapter 강등**(EOS-91 규칙 2조 가). 강등 대장(DEMOTED_FIELDS)에 강등 대상과 이관처를 기재하고 계약에서 제거한다. 유지·조건부 유지·특례 금지"
+  - "③ **Core 확장 0건**(규칙 2조 나) — 프로브 결과로 필수층에 필드·메서드를 추가하지 않는다. Physics가 필요로 하는 새 능력은 전부 선택층 또는 어댑터 내부로"
+  - "④ 프로브 후에만 상태 라벨을 Provisional에서 바꾼다 — 깨진 필드 0이면 Frozen 승격 가능, 1건 이상이면 강등 반영 후 재판정"
+  - "⑤ 중단 상한(ADR-004 §결정 ④ 집행) — ④의 '강등 반영 후 재판정'에는 상한이 없어 재판정이 늘면 2026-09-27을 넘긴다. 깨진 필드가 **3건을 초과하면 즉시 프로브를 중단**하고, 상태를 'Frozen (math-only, acknowledged)'로 표기해 09-27(G1 판정일)에 **예정대로 Freeze**한다 — 일정 연기 금지. 중단해도 그 시점까지의 판정표는 산출물로 남긴다. 근거: 4건 초과는 부분 수정 대상이 아니라 재설계 대상인데 재설계는 9월 안에 끝나지 않는다. 인지된 한계는 관리할 수 있지만 잘못 선언된 중립성은 관리할 수 없다"
+artifacts:
+  - "PR #999 (784e1824) — 교차 과목 프로브 완주: Physics 15/15 ○(✗ 0)·강등 0·Core 확장 0. 판정표 = docs/architecture/subject_contract_cross_probe.md. 라운드 2가 History 대조군으로 검사 반증력 부족을 실증해 Frozen 승격 보류(ADR-004 ① 9/27 이전 금지 + 근거 강도). 승계 EOS-99·ARCH-41"
+paths:
+  - docs/architecture/subject_contract_cross_probe.md
+session: null
+notes: "EOS-91이 건 Provisional 상태의 해제 조건. 9/27 = G1 게이트일. 실측(2026-09-05 역할 기반 검색: 'cross-subject probe'·'교차 과목 프로브'·'타 과목 프로브'·physics 프로브 → docs/·backlog/ 에서 0건) — 이 프로브는 지시 이전까지 소유자가 없었다.\n\n[정정 2026-09-05] track subject-expansion → math-completion: validate 경고: stage=S3인데 subject-expansion 트랙(진입 게이트 G-s5) 전원보다 앞섬. 프로브는 과목 확장이 아니라 EOS Core 계약(EOS-66·math-completion)의 검증이며 G1(9/27) 조건 — 계약과 같은 트랙으로\n\n[정정 2026-09-06] ADR-004(#987 머지·40c29e58) §결정 ④의 중단 규칙을 대장에 집행. 산문에만 있던 상한을 acceptance로 내린다 — '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'의 같은 축. 최초 지적은 PR #987 자체 리뷰"
+updated: 2026-09-06

@@ -51,6 +51,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.curriculum_entry import CurriculumEntry as SchemaCurriculumEntry
 from whymath_backend.schema.enums import CurriculumLicense, RequiredDepth
 
@@ -155,7 +156,9 @@ class CurriculumEntry(Base):
         """영속 ORM → `schema.CurriculumEntry`(Pydantic 검증 복원 — 불변식 안전망)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaCurriculumEntry.model_validate(data)
+        return SchemaCurriculumEntry.model_validate(
+            drop_unset_nulls(data, SchemaCurriculumEntry, orm_cls=type(self))
+        )
 
 
 __all__ = ["CurriculumEntry"]

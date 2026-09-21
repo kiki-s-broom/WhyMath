@@ -7,7 +7,8 @@
 개념-무관 어댑터 N개)의 합이다 — 조합은 렌더 시점에 계산한다(조합폭발 방지).
 
     dsl = from_concept_content(row)          # 교수법-중립 투영
-    adapter = get_adapter(PedagogyStrategy.SOCRATIC)   # 전략 선택은 L4(PED-02) 소관
+    # 전략 선택은 L4(PED-02) 소관 · 과목 능력 2종은 상류(app.state 등록분)에서 내려온다(EOS-89)
+    adapter = get_adapter(PedagogyStrategy.SOCRATIC, seal=seal, assessment_verifier=verifier)
     unit = adapter.render(dsl, RenderContext())
     if unit.ok: ...                          # 검증 통과분만 학생 노출
 

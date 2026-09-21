@@ -13,6 +13,11 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
+from _external_store_evidence import (
+    KNOWN_UNDEPLOYED_STORES,
+    assert_manifest_stores_are_deployed,
+    evidence_for,
+)
 from pydantic import SecretStr, ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -148,14 +153,43 @@ class TestEraseOrchestration:
 
 
 class TestExternalErasureManifest:
-    """외부 store(RDB 밖) 삭제 누락을 구조화·정직히 명시(GDPR 범위·날조 0)."""
+    """외부 store(RDB 밖) 삭제 누락을 구조화·정직히 명시(GDPR 범위·날조 0).
 
-    def test_targets_cover_three_external_stores(self) -> None:
-        """ClickHouse·S3·Redis 3종 — `erase_user`가 못 지우는 외부 store를 모두 명시."""
+    SEC-32 이전 이 클래스는 `{"clickhouse", "s3", "redis"}`라는 **하드코딩 집합**과의 일치만
+    봤다 — 그 집합이 사실인지는 묻지 않아, 도입된 적 없는 store 2종을 3년치 회귀 테스트가
+    *동결*하고 있었다. 이제는 **계약**으로 본다: 선언된 store는 배포 근거(설정 키 또는 compose
+    서비스)로 실재가 확인돼야 한다. 근거 조회는 `_external_store_evidence`가 산출물
+    (`Settings.model_fields`·파싱된 compose)에서 직접 수행한다(소스 grep 아님 — 표기 변형·
+    주석·슬라이스 라벨에 속지 않는다).
+    """
+
+    def test_declared_stores_are_actually_deployed(self) -> None:
+        """선언된 store 전부에 배포 근거가 있다 — 허위 선언 차단(계약 본체)."""
         targets = external_erasure_targets(uuid.uuid4())
-        assert {t.store for t in targets} == {"clickhouse", "s3", "redis"}
+        assert_manifest_stores_are_deployed(
+            (t.store for t in targets), source="external_erasure_targets"
+        )
         assert all(isinstance(t, ExternalErasureTarget) for t in targets)
         assert all(t.data and t.reason for t in targets)  # 설명·이유 비지 않음
+
+    def test_undeployed_stores_are_not_declared(self) -> None:
+        """미도입 store(ClickHouse·S3)는 매니페스트에 없다 — 없는 곳을 적으면 집행 불가 항목이 된다."""
+        declared = {t.store for t in external_erasure_targets(uuid.uuid4())}
+        for store in KNOWN_UNDEPLOYED_STORES:
+            assert store not in declared, (
+                f"'{store}'는 이 저장소에 도입된 적이 없다(설정 키 0·compose 서비스 0). "
+                "실제로 도입했다면 이 테스트가 아니라 매니페스트·근거 상수를 갱신하라."
+            )
+
+    def test_langfuse_is_declared(self) -> None:
+        """실 반출처 Langfuse가 등재돼 있다 — *누락*이 허위 선언보다 중대하다(SEC-32).
+
+        Langfuse는 학생 요청마다 라우팅 트레이스를 외부 SaaS로 보낸다. 매니페스트에 없으면
+        "우리 DB 밖으로 나가는 학생 유래 데이터가 없다"고 주장하는 것과 같다.
+        """
+        declared = {t.store for t in external_erasure_targets(uuid.uuid4())}
+        assert "langfuse" in declared
+        assert evidence_for("langfuse"), "Langfuse 배선 근거(설정 키·compose env)가 사라졌다"
 
     def test_locators_reference_user_id(self) -> None:
         """locator는 *그 user* 대상을 가리킨다(per-user actionable·체크리스트)."""
@@ -175,7 +209,8 @@ class TestExternalErasureManifest:
         uid = uuid.uuid4()
         report = asyncio.run(erase_user(cast(AsyncSession, session), user_id=uid))
         assert report.pending_external == external_erasure_targets(uid)
-        assert len(report.pending_external) == 3
+        # 개수를 상수로 박지 않는다 — store가 늘고 주는 것은 정상이고, *실재하는가*만이 계약이다.
+        assert report.pending_external
         assert any(k == "add" for k, _ in session.events)  # 삭제 *시도* 증빙
 
 

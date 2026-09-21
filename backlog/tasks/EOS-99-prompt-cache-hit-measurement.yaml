@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-99-prompt-cache-hit-measurement
+title: "프롬프트 캐시 적중 계측 — cache_read_input_tokens 판독·적중률을 작동한 비율로 산출 (단위비용 KPI ≤250원/CU·대체안 A §5-②)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판독 — Usage에 cache_read_input_tokens·cache_creation_input_tokens(Optional)를 더하고 providers/anthropic._extract_usage가 판독한다. 실측(2026-09-06): 현행은 input_tokens·output_tokens만 판독, cache 관련 0건 — anthropic_prompt_caching을 켜도 적중 여부를 알 수단이 없다"
+  - "② 작동한 비율 — genlog 행에 캐시 토큰을 전파하고, 회차 리포트/대장이 적중률(cache_read/input)을 낸다. 캐싱 플래그 ON인데 적중 0%가 연속되면 '켰지만 작동 안 함'이 보여야 한다(CLAUDE.md 작동한 비율 원칙). 로컬 Ollama 경로는 캐시 토큰 개념이 없으므로 None=해당 없음으로 구별한다"
+  - "③ 측정 지점(PR #1000 Codex P2 반영) — 현행 accumulate는 EquivalenceSpec 1개(--topic-hint·--standard-code·--difficulty)를 n회 반복 생성한다(실측 accumulate.py:595·for _ in range(n) :335). 즉 회차 안 prefix는 이미 동일하고 정렬할 대상이 없다 — (학년군·유형) 정렬 요구는 두지 않는다. 측정은 그 반복 prefix에서: 한 회차(n≥10)에서 1회차 호출은 cache_creation, 2회차부터 cache_read가 잡히는지, 적중률이 (n-1)/n에 근접해야 정상이고 0이면 켰지만 작동 안 함. 다중 대상(회차 안 서로 다른 스펙) 인터페이스는 별도 태스크 후보 — 그것이 생길 때 정렬 요구가 되살아난다"
+  - "④ 순서 — anthropic_prompt_caching 기본값 전환 판단은 ①②③ 계측 결과 이후에만. 계측 없이 켜지 않는다(측정 없는 알고리즘 부착 금지)"
+artifacts:
+  - "PR #1023 (https://github.com/doldori7/WhyMath/pull/1023) · 커밋 9accfc27 · 전체 스위트 11931 passed·infra 1001·harness 610 · ruff/black/mypy --strict/import-linter/계층커버리지 전건 exit 0 · 뮤테이션 9종 전건 RED(cp 백업 원복·바이트 동일) · 실물 SDK 표면 대조(anthropic.types.Usage 2필드 실재). acceptance ④ 미착수 유지(계측 없이 켜지 않음) · ③ 라이브 절반은 EOS-02-prompt-cache-live-measurement로 분리 등재"
+paths:
+  - src/backend/whymath_backend/l3/models.py
+  - src/backend/whymath_backend/l3/providers/anthropic.py
+  - src/backend/whymath_backend/schema/provenance.py
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - "tests/backend/l3/**"
+session: null
+notes: "출처: 대체안 A(2026-09-06 Kiki 채택) §5-② · 갭 리뷰 §2 행26(prefix 캐싱 부분) · §11-5 P2. cache_control 배선 자체는 providers/anthropic.py:356에 실재(flag OFF). ③의 실측은 Kiki 머신 실 provider 필요 — hermetic으로는 적중률이 정의되지 않는다. PR #1000 재구성 재등재분(초판 d29cb5ae — EOS-98 번호 충돌로 브랜치 재구성·§11-6)."
+updated: 2026-09-07

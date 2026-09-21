@@ -166,6 +166,8 @@ def build_diag_item_slot_row(target: DiagItemTarget) -> dict[str, Any]:
         "objective_id": target.objective_id,
         "slot_type": _SLOT_TYPE,
         "payload": payload,
+        # EOS-89: atom_probe payload에는 `verification` 주장이 없다 — 능력 미주입이어도 None.
+        # 이 호출부가 합성 루트를 import하지 않는 이유이기도 하다(pull 지점 0 유지).
         "sympy_verified": verify_slot_payload(payload),
         "tts_safe": _is_tts_safe(payload),
         "provenance_id": None,

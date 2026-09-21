@@ -82,8 +82,12 @@ def test_slot_generator_honors_injected_equivalence() -> None:
     from whymath_backend.l3.pedagogy.slot_generator import verify_slot_payload
 
     payload = {"verification": {"claim_lhs": "(x+1)**2", "claim_rhs": "x**2 + 2*x + 1"}}
-    # 기본(수학) 구현이면 identity → True. 더블이 이기면 False.
-    assert verify_slot_payload(payload) is True  # 변별력 확인: 기본 경로는 True다.
+    # 변별력 확인: 합성 루트의 수학 구현을 주입하면 identity → True.
+    # (EOS-89 이후 이 인자는 **필수 경로**다 — 생략하면 폴백이 아니라 LookupError다.)
+    assert (
+        verify_slot_payload(payload, equivalence=composition.default_expression_equivalence())
+        is True
+    )
 
     double = _AlwaysNotIdentity()
     assert verify_slot_payload(payload, equivalence=double) is False
@@ -157,6 +161,72 @@ def test_solution_verification_result_satisfies_the_chain_contracts() -> None:
     for step in result.steps:
         assert isinstance(step, StepOutcome)
         assert isinstance(step.state, VerificationOutcome)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ④-b EOS-89 — 능력이 **app.state에 실제로 올라간다**(등록 형태의 런타임 판)
+# ──────────────────────────────────────────────────────────────────────────
+def test_create_app_registers_working_subject_capabilities() -> None:
+    """`create_app()`이 능력 6종을 app.state에 올리고, 올라간 것이 **판정을 한다**.
+
+    AST 검사(`tests/infra/test_eos_dependency_direction.py`)는 "그렇게 적혀 있다"까지만 본다.
+    여기서는 앱을 실제로 만들어 꺼내 쓴다 — 지연 import가 깨졌거나 팩토리가 껍데기를 주면
+    정적 검사는 통과하고 요청이 죽는 부류를 여기서 잡는다(정본화 ≠ 집행).
+    """
+    from whymath_backend.api._subject_capability_state import (
+        EXPRESSION_EQUIVALENCE_KEY,
+        SUBJECT_CAPABILITY_KEYS,
+    )
+    from whymath_backend.app import create_app
+
+    app = create_app()
+    assert SUBJECT_CAPABILITY_KEYS, "등록 대상 키가 0개다 — 스캔 0건은 통과가 아니다"
+    for key in sorted(SUBJECT_CAPABILITY_KEYS):
+        assert getattr(app.state, key, None) is not None, f"app.state에 {key}가 없다"
+
+    # 껍데기가 아니라 판정기다 — 참/거짓 양쪽에서 다른 값을 낸다(변별력).
+    equivalence = getattr(app.state, EXPRESSION_EQUIVALENCE_KEY)
+    assert equivalence.identity_status("(x+1)**2", "x**2 + 2*x + 1") is EquivalenceOutcome.identity
+    assert equivalence.identity_status("x + 1", "x + 2") is EquivalenceOutcome.not_identity
+
+
+def test_registered_capability_keys_match_the_composition_factories() -> None:
+    """등록 키 수 = 합성 루트 팩토리 수 — 한쪽만 늘면 조용한 누락이 생긴다.
+
+    EOS-86의 `StepChainVerifier` 팩토리가 합성 루트에 들어온 날 이 테스트가 실제로 **먼저
+    실패했다**(2026-09-07, PR #1018 — EOS-89와 병행 개발되며 origin/main 병합 중 실측). 그때는
+    "정직한 유예"로 판정해 `default_step_chain_verifier`를 예외 목록에 담아 두었고, **COMP-01이
+    그 예외를 해소했다** — `STEP_CHAIN_VERIFIER_KEY`가 `SUBJECT_CAPABILITY_KEYS`에 편입되고
+    `app.py`가 부팅 시 등록하며 `api/coach.py`의 세 핸들러가 명시 주입한다. 그래서 이제 이
+    카운트 비교에서 빼야 하는 것은 관측기 1건뿐이다.
+
+    남은 정직한 공백: `l4.solution_coaching`의 지연 import 폴백은 *제거하지 않았다*(이 함수를
+    직접 호출하는 300+ 단위테스트가 verifier 명시 주입 없이 동작을 기대한다). 그래서
+    `test_eos_dependency_direction.py`의 `CORE_PULL_BASELINE`은 축소되지 않는다 — 그 폴백이
+    사라져도 같은 모듈이 `default_wrong_form_shadow_observer`를 지연 조회하므로 어차피 축소되지
+    않는다는 점도 함께 기록해 둔다(축소 조건은 두 폴백을 *모두* 걷어내는 것).
+
+    두 번째 이유는 범주 문제다 — `default_wrong_form_shadow_observer`는 애초에 "능력"이
+    아니다. `Callable[[str], None]` 관측기(fire-and-forget sink)로, 값을 돌려주지 않아
+    `SUBJECT_CAPABILITY_KEYS`가 다루는 "판정 능력" 범주에 들지 않는다(팩토리 자신의 docstring:
+    "능력 계약으로 분리할 상태가 없다"). 그래서 이 카운트 비교에서 항상 제외한다 — 이름
+    접두사(`default_*`)만 보는 이 스캔의 한계이며, `PULL_ONLY_COMPOSITION_FACTORIES`
+    (test_eos_dependency_direction.py)와 이중 회계되는 관측기 축이다.
+    """
+    from whymath_backend.api._subject_capability_state import SUBJECT_CAPABILITY_KEYS
+
+    # 관측기(비-능력) 팩토리 — 위 docstring 참조. 능력 카운트에서 항상 제외한다.
+    non_capability_factories = frozenset({"default_wrong_form_shadow_observer"})
+
+    factories = [
+        n
+        for n in dir(composition)
+        if n.startswith("default_") and n not in non_capability_factories
+    ]
+    assert len(SUBJECT_CAPABILITY_KEYS) == len(factories), (
+        "합성 루트 팩토리와 app.state 등록 키의 개수가 어긋난다 — "
+        f"팩토리 {sorted(factories)} / 키 {sorted(SUBJECT_CAPABILITY_KEYS)}"
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────

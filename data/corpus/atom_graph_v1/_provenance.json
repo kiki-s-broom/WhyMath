@@ -36,6 +36,19 @@
     {
       "id": "dedup_merge_2026-07-28",
       "summary": "중복 원자 병합 14건(검수:Kiki 2026-07-28 승인 16 중 D13·D18은 사이클 충돌로 실행 보류) — 원자 1837→1823·전체 2697→2683·엣지 2213→2210(재배선 32·중복 제거 3)·crosswalk 13건 재배선. 정본 맵: dedup_merges_v1.json. 이후 graph.json은 원본 xlsx transform 산출과 이 이관분만큼 다르다."
+    },
+    {
+      "id": "behavior_skills_merge_v1",
+      "summary": "[SKB-02 2026-09-11] behavior_skills 병합 — 크로스워크 437행(skip 0) 경유 원자 1311건에 전파(비어있지 않음 1198건). 구 437 코퍼스 concepts.jsonl이 저작 정본."
     }
-  ]
+  ],
+  "behavior_skills_merge": {
+    "executed_at": "2026-09-11T06:49:39.730759+00:00",
+    "crosswalk_path": "data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl",
+    "crosswalk_rows": 437,
+    "unmapped_crosswalk_rows": 0,
+    "atoms_mapped": 1311,
+    "atoms_nonempty": 1198,
+    "source": "SKB-02 — crosswalk_v1 경유 concept_graph_v1(구 437) behavior_skills 병합"
+  }
 }

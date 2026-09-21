@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-63-integration-rate-limiter-process-global-isolation
+title: "통합 테스트 레이트리미터 격리 — 프로세스 전역 InMemoryBackend(_rate_limit._BACKEND)의 순서 의존 오염을 conftest autouse로 봉인 (OPS-06 db 엔진 전역 오염과 같은 유형의 2회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① tests/backend/conftest.py에 autouse 픽스처를 추가해 모든 백엔드 테스트 시작 시 whymath_backend.api._rate_limit.reset_store()로 프로세스 전역 인메모리 백엔드(_BACKEND)의 카운트를 비운다. 원인 실측(2026-09-06): configure_backend_from_settings 호출처 0건이라 앱마다 백엔드가 재설치되지 않고, 같은 pytest 프로세스의 통합 테스트 21파일이 IP 쓰기 버킷(ip:testclient·60/분)을 공유한다 — 같은 코드로 CI run 34024961969의 실 PG 잡이 07:29 green → 09:39 red(pytest-randomly 순서 차이). InMemory 백엔드일 때만 리셋하고 Redis 백엔드 설정은 건드리지 않는다"
+  - "② test_coach.py·test_viz01_reach_discrimination_integration.py·test_e2e_vertical_slice_integration.py의 개별 reset_store 호출은 그대로 두거나 픽스처로 흡수하되, 한도 계약을 재는 test_rate_limit_integration.py의 단언이 깨지지 않음을 확인한다 — 픽스처는 시작 시점만 비우고 테스트 내부에서 쌓는 카운트는 손대지 않는다"
+  - "③ 변별력(실 PG 필요 — CI 'backend — 마이그레이션·통합 (실 PG)' 잡 또는 Phaiakes9 whymath-pg 5433): 픽스처를 끈 뮤테이션에서 -p no:randomly 고정 순서 test_coach_integration → test_e2e_vertical_slice_integration(E2E 자체 reset 제거 상태)로 429가 재현되고, 픽스처를 켜면 green임을 실측해 기록한다. 로컬 컨테이너(pgvector 없음)에서는 재현 불가하므로 어디서 쟀는지 적는다"
+  - "④ OPS-07 가드와의 관계를 픽스처 docstring에 명시: OPS-07은 종료 시 전역 누수를 탐지·귀책(hermetic 한정), 이 픽스처는 시작 시 카운트를 비우는 격리(통합 포함). 귀책 축은 추가하지 않는다 — 레이트리미터 카운트는 정상 동작의 잔여물이지 누수가 아니다"
+  - "③-정정(PR #1001 Codex P2 수용): 원래 ③의 두 파일 순서로는 429가 나지 않는다 — test_coach_integration.py의 코치 쓰기 POST는 정적 32건(루프 포함 ≤35)이고 E2E는 두 번째 세션 생성 전 3건(create 1 + turns 2)이라 합계 ≈38건 < 60(coach_rate_limit_ip_write_per_minute 기본값). RateLimitedTripleWrite 사용처는 api/coach.py 4곳뿐이라 IP 쓰기 버킷을 채우는 것은 코치 쓰기뿐이다(/v1/verify-solution은 미계상). CI 실패는 test_dialogue_content_encryption_integration(7)·test_e2e_suneung_loop_integration(2) 등 여러 파일의 누적이었다. 따라서 변별력은 시딩으로 만든다: 픽스처를 끈 뮤테이션에서 같은 프로세스의 _rate_limit._BACKEND에 hit_by_ip('testclient', write 카테고리) 60건을 직접 넣거나(-p no:randomly 고정 순서의 시더 테스트로) 그 직후 E2E의 첫 POST /v1/coach/sessions가 429임을 실측한다. 픽스처를 켜면 같은 시딩 뒤에도 201(green). 실 PG가 필요한 E2E 경로는 CI 실 PG 잡 또는 Phaiakes9 whymath-pg 5433에서 재고, PG 없이 도는 hermetic 검증(시딩 → 픽스처 → 잔여 카운트 0 단언 / 픽스처 off → 잔여 60)을 함께 둔다"
+  - "[이행 2026-09-11] acceptance③-정정 hermetic 검증 완료 — test_rate_limit_fixture_isolation.py(4건: 시딩 후 429 재현·헬퍼 호출 후 재요청 통과·오토유즈 픽스처 자체 수혜 확인·Redis 백엔드 미터치 확인). 실 PG 필요 축(21파일 실제 순서 재현)은 이 샌드박스에 pgvector 없어 CI 실PG 잡의 green으로 간접 확인"
+artifacts:
+  - "a1e534c4 (#1113)"
+paths:
+  - tests/backend/conftest.py
+  - "tests/backend/api/**"
+session: null
+notes: "출처: PR #980 머지 드라이브 2026-09-06 — 실 PG 통합 잡이 같은 코드에서 순서에 따라 red(E2E의 두 번째 POST /v1/coach/sessions가 429). 즉시 조치는 E2E 시작 시 reset_store 한 줄(커밋 e13765c8·PR #980)이고, 이 태스크는 통합 21파일 전체에 대한 구조 격리다. 같은 유형 선례: OPS-06(db.session._engine 전역 오염 → OPS-07 가드·OPS-09 무작위화). 두 번째 발생이라 CLAUDE.md 실수 관리 규칙(시스템·반복 실수 재발방지 등재 의무)에 따라 등재. 번호는 CLI 제안(OPS-62는 로컬 선점). 로컬 검증 한계: 이 컨테이너에는 pgvector 확장·docker가 없어 실 PG 재현은 CI가 판정했다.\n\n[정정 2026-09-06] PR #1001 Codex P2 — ③의 뮤테이션 순서(두 파일)가 IP 쓰기 한도 60에 못 미쳐(≈38) 변별력 0. 시딩 기반 절차로 정정(2026-09-06 실측)\n\n[정정 2026-09-11] acceptance③-정정(PR #1001 Codex P2 수용분) 이행 — 실 PG 없이도 도는 hermetic 시딩 검증을\ntests/backend/api/test_rate_limit_fixture_isolation.py로 구현했다: ①IP 쓰기 버킷에 60건\n직접 시딩 → 헬퍼(reset_inmemory_rate_limit_store) 호출 없이 _enforce_by_ip가 429를 내는지\n확인(픽스처 끈 상태 재현) ②같은 시딩 후 헬퍼 호출 → 재요청이 통과하는지 확인(격리가 실제로\n비움) ③Redis 백엔드로 교체한 상태에서 헬퍼가 .reset()을 호출하지 않는지 확인(acceptance①\n\"Redis 설정은 건드리지 않는다\" 경계). pytest-randomly 순서와 무관하게 직접 함수 호출로\n검증해 순서 의존을 배제했다. 21개 통합 테스트 파일의 실제 순서 재현(실 PG 필요 축)은 이\n샌드박스에 pgvector·docker가 없어 재현 불가 — CI의 \"backend — 마이그레이션·통합 (실 PG)\"\n잡이 이 픽스처가 적용된 상태로 green인지로 간접 확인한다(태스크 notes가 이미 이 한계를\n명시)."
+updated: 2026-09-11

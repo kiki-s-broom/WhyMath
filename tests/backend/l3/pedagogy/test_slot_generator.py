@@ -9,6 +9,9 @@ from __future__ import annotations
 from types import TracebackType
 from typing import Any
 
+import pytest
+
+from whymath_backend.composition import default_expression_equivalence
 from whymath_backend.l3.pedagogy.slot_generator import (
     NUMERIC_SLOT_TYPES,
     ContentSlotStore,
@@ -67,36 +70,57 @@ def _compile_sql(statement: object) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 class TestBuildSlotRows:
     def test_count_matches_manifest_total(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, _CONCEPT_MANIFEST)
+        rows = build_slot_rows(
+            _OBJ_ID, _CONCEPT_MANIFEST, equivalence=default_expression_equivalence()
+        )
         assert len(rows) == 4 + 2 + 3 + 2  # slot_manifest count 합
 
     def test_ids_deterministic_and_shaped(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, _CONCEPT_MANIFEST)
+        rows = build_slot_rows(
+            _OBJ_ID, _CONCEPT_MANIFEST, equivalence=default_expression_equivalence()
+        )
         ids = [r["id"] for r in rows]
         assert f"{_OBJ_ID}:example_pair:0" in ids
         assert f"{_OBJ_ID}:diag_item:1" in ids
         # 결정론 — 같은 입력이면 같은 행(재실행 안정).
-        assert build_slot_rows(_OBJ_ID, _CONCEPT_MANIFEST) == rows
+        assert (
+            build_slot_rows(
+                _OBJ_ID, _CONCEPT_MANIFEST, equivalence=default_expression_equivalence()
+            )
+            == rows
+        )
 
     def test_all_draft_and_no_provenance(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, _CONCEPT_MANIFEST)
+        rows = build_slot_rows(
+            _OBJ_ID, _CONCEPT_MANIFEST, equivalence=default_expression_equivalence()
+        )
         assert all(r["status"] == "DRAFT" for r in rows)
         assert all(r["provenance_id"] is None for r in rows)
 
     def test_numeric_slot_verified_true(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, [{"type": "diag_item", "count": 2}])
+        rows = build_slot_rows(
+            _OBJ_ID,
+            [{"type": "diag_item", "count": 2}],
+            equivalence=default_expression_equivalence(),
+        )
         assert all(r["slot_type"] in NUMERIC_SLOT_TYPES for r in rows)
         # 숫자형은 SymPy 검증 통과 → True(개념형 None 아님).
         assert all(r["sympy_verified"] is True for r in rows)
 
     def test_conceptual_slot_verified_none(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, [{"type": "example_pair", "count": 3}])
+        rows = build_slot_rows(
+            _OBJ_ID,
+            [{"type": "example_pair", "count": 3}],
+            equivalence=default_expression_equivalence(),
+        )
         assert all(r["slot_type"] not in NUMERIC_SLOT_TYPES for r in rows)
         # 개념형은 수치 검증 대상 아님 → None(정직 표기).
         assert all(r["sympy_verified"] is None for r in rows)
 
     def test_all_rows_tts_safe(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, _CONCEPT_MANIFEST)
+        rows = build_slot_rows(
+            _OBJ_ID, _CONCEPT_MANIFEST, equivalence=default_expression_equivalence()
+        )
         assert all(r["tts_safe"] is True for r in rows)
 
 
@@ -106,15 +130,27 @@ class TestBuildSlotRows:
 class TestVerifyDiscrimination:
     def test_correct_answer_verified(self) -> None:
         payload = {"verification": {"claim_lhs": "(2)**2 - 4*(2) + 3", "claim_rhs": "-1"}}
-        assert verify_slot_payload(payload) is True
+        assert verify_slot_payload(payload, equivalence=default_expression_equivalence()) is True
 
     def test_wrong_answer_rejected(self) -> None:
         # 답을 일부러 틀리게(-1이 맞는데 0 주장) → not_identity → False.
         payload = {"verification": {"claim_lhs": "(2)**2 - 4*(2) + 3", "claim_rhs": "0"}}
-        assert verify_slot_payload(payload) is False
+        assert verify_slot_payload(payload, equivalence=default_expression_equivalence()) is False
 
     def test_no_verification_returns_none(self) -> None:
+        # 주장이 없으면 능력을 건드리지 않는다 — 미주입이어도 None(EOS-89 fail-loud의 경계).
         assert verify_slot_payload({"body": "개념 발문"}) is None
+
+    def test_claim_without_injected_capability_fails_loudly(self) -> None:
+        """주장이 있는데 능력이 없으면 **터진다** — 조용히 통과하거나 False로 위장하지 않는다.
+
+        EOS-89가 기본값 폴백(`default_expression_equivalence()`)을 걷어낸 자리의 변별력 검사다.
+        폴백이 남아 있었다면 이 호출은 True를 냈을 것이다(그래서 이 테스트는 뮤테이션 검출력이
+        있다 — 폴백을 되살리면 RED).
+        """
+        payload = {"verification": {"claim_lhs": "(2)**2 - 4*(2) + 3", "claim_rhs": "-1"}}
+        with pytest.raises(LookupError, match="ExpressionEquivalence"):
+            verify_slot_payload(payload)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -138,7 +174,11 @@ class TestTtsSafeDiscrimination:
 # ──────────────────────────────────────────────────────────────────────────
 class TestContentSlotStore:
     def test_seed_upsert_excludes_pk(self) -> None:
-        rows = build_slot_rows(_OBJ_ID, [{"type": "diag_item", "count": 1}])
+        rows = build_slot_rows(
+            _OBJ_ID,
+            [{"type": "diag_item", "count": 1}],
+            equivalence=default_expression_equivalence(),
+        )
         engine = _FakeEngine()
         n = ContentSlotStore(engine=engine).seed(rows)  # type: ignore[arg-type]
         assert n == 1

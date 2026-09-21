@@ -28,9 +28,10 @@ G1(9/27) 차단 조건, `eos_plan52_crosswalk_2026-09.md` §2 후보 #1).
     FK를 강제하면 적재 전 후보의 검수가 기록 불가 = 측정 실패를 스키마가 제조한다. 적재된
     CU만 채우고, 미적재 후보는 None(정직 — 가짜 id 생성 금지·`hint_id` 느슨 방침과 동계열).
   - `reviewer_id` — 검수 *행위자* 핸들(TEXT). **학생 소유 축이 아니다** — privacy 스윕
-    (`test_erasure_plan_completeness.OWNER_COLUMN_NAMES`)은 user_id/student_id/target_user_id만
-    소유 축으로 보고, created_by·approved_by·reviewed_by류는 "콘텐츠 저작/검수 행위자"로
-    분류한다(그 파일 주석 실측). 기존 검수 라벨 형식(#841 `reviewed_by: "kiki"`)과 동형.
+    (`test_erasure_plan_completeness`)의 소유 판정은 SEC-35 이후 *FK 산출물 검사 ∪ 계획 파생
+    컬럼명*인데, 이 컬럼은 `user_profile.user_id` FK가 없고 `_ERASURE_PLAN`이 쓰는 이름도
+    아니다. created_by·approved_by·reviewed_by류는 "콘텐츠 저작/검수 행위자"로 분류한다
+    (그 파일 주석 실측). 기존 검수 라벨 형식(#841 `reviewed_by: "kiki"`)과 동형.
   - `elapsed_ms` — **nullable**(0 날조 금지·acceptance ④). 경과는 검수 도구(클라) 계측인데
     도구 강제 종료·크래시 복구 등 계측 실패 케이스가 구조적으로 존재한다. None=미측정 —
     finished인데 elapsed가 None이면 "판정은 있으나 HIT 미계측"으로 집계가 **분리 카운트**한다

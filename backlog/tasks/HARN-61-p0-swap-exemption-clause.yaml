@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-61-p0-swap-exemption-clause
+title: "One In → One Out 예외 3종 집행 — 보안·데이터 손실·출시 차단 결함은 교환 없이 P0 등재 (Kiki 2026-09-03 조건부 채택)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 예외 3종을 **CLI가 아는 형태**로 집행한다 — 보안 / 데이터 손실 / 출시 차단 결함은 --swap-out 없이 P0 등재를 허용한다. 산문 예외는 CLI가 읽지 않는다(HARN-55가 Rule 4 본체에 대해 이미 내린 판정과 동형: '경고는 집행이 아니다'). 형태는 done --no-pr {investigation|incomplete|ci-red|kiki-hold} 선례를 따라 열거 플래그를 권한다"
+  - "② 예외 사유는 notes·이벤트 대장에 기록되어 사후 감사 가능해야 한다 — 예외가 기록 없이 통과하면 예산 자체가 무의미해진다(--no-pr 선례와 같은 이유)"
+  - "③ 변별력: 예외 아닌 사유로 예외 플래그를 쓰면 거부되는지, 예산 미달 상태에서 예외 플래그가 불필요 경고를 내는지 **양쪽 상태를 주입해** 확인한다(CLAUDE.md 2026-09-01 보호 장치 실패 주입)"
+  - "④ 착수 트리거 실측 기준선 (2026-09-03) — eos_priority P0 **총 15건 중 비종결 13건** · 예산 50건(policy.eos_p0_budget · models.py:280) · **여유 37건**. notes 초판의 '비종결 P0 15건'은 오기이며 이 항이 정본이다(총계와 비종결을 혼동). 착수 판단 시 이 수치를 재실측한다 — 기준선은 굳으면 안 된다"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "출처: Kiki 결정 2026-09-03 — 'One In → One Out 조건부 채택: 신규 P0 추가 시 기존 P0 하나를 제거·연기하되 보안·데이터 손실·출시 차단 결함은 예외'. 실측: Rule 4 본체는 HARN-55가 이미 집행한다(backlog.py:1312-1382 --swap-out · policy.eos_p0_budget=50 · models.py:280). **예외 조항만 미집행**이다. 지금 물리지 않는 이유 = 비종결 P0 15건 < 예산 50건이라 교환 요구 자체가 발동하지 않는다 — 그래서 P2다. 착수 트리거: 비종결 P0가 예산에 근접하거나(45+) 예외 사유에 해당하는 P0 등재가 실제로 거부될 때. 그 전에 등재해 두는 이유는 예산에 닿는 순간이 곧 '급한 보안 결함을 못 넣는 순간'이기 때문이다.\n\n[정정 2026-09-03] notes 수치 오기 정정 — '비종결 P0 15건'은 총계(15)와 비종결(13)의 혼동이다. amend에 notes 정정 경로가 없어(HARN-57 결측 필드 계열) 실측 기준선을 acceptance ④로 고정한다. 판정·트리거(45+)에는 영향 없으나 결정 로그의 실측 수치가 틀린 채 굳는 것을 막는다"
+updated: 2026-09-03

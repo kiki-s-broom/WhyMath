@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-85-populate-answer-kind-opaque-passthrough
+title: "적재기 answer_kind 화이트리스트 제거 — Core가 수학 answer_kind 어휘를 열거하지 않는다 (EOS-84 리터럴 위반 1건 상환 · EOS-66 불투명 문자열 계약 집행)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-84-core-boundary-math-removal-probe
+requires_gates: []
+acceptance:
+  - "① l1/problem_bank/populate.py _verify_meta_from_raw의 answer_kind 튜플 열거(17종)를 제거하고 값을 불투명 str로 그대로 통과시킨다 — 미지 값의 '조용한 None 강등'(S4-17 finite_probability 손실 전례)도 함께 사라진다. import-linter 계약(l1→l3.equivalent/l3.verifier/l4.subject_adapter_math 금지·baseline 0)을 유지한다(acceptance 테이블 재사용 금지)"
+  - "② 미지 answer_kind 정책을 코드에 명시: 통과(Kiki 권고 채택)이며 판정은 L3 검산 단계(acceptance._CONCEPTUAL_VERIFIERS/_SUPPORTED_KINDS)가 한다는 것을 populate docstring과 verification_tier(거부 정책)와의 비대칭 설명으로 적는다. 테스트: 코퍼스 17종 전부 그대로 실림 + 미등록 값('unit_consistency')이 None이 아니라 원문 그대로 실림을 단언"
+  - "③ 집행 지점: tests/infra/test_eos_core_boundary_probe.py LITERAL_COMPARE_BASELINE을 {}로 ratchet(비우지 않으면 '줄었다' RED). eos_core_boundary_probe.py 재실행으로 리터럴 비교 0 실측·문서 §8.2 갱신"
+  - "④ 어휘 사본 4곳 중 하네스 corpus_reverify._CONCEPTUAL_VERIFIERS(15종·finite_* 누락 드리프트)의 처리 방침을 결정·기록(acceptance 테이블 import로 단일화 또는 드리프트 동결 테스트) — 미이행 시 승계 태스크 분리 등재"
+artifacts:
+  - "PR #1015 (3a6a78c5) — 적재기 answer_kind 화이트리스트 제거·불투명 통과 + 정책 비대칭 문서화 + 기준선 2종({} ratchet: LITERAL_COMPARE_BASELINE·KNOWN_VIOLATIONS) + corpus_reverify 어휘 사본 제거(15→17종 드리프트 해소) + 회귀 3건. 승계 EOS-01 등재. backend 11913 passed / tests-infra 965 passed EXIT 0."
+paths:
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - tests/backend/l1/problem_bank/test_populate.py
+  - tests/infra/test_eos_core_boundary_probe.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: docs/reviews/eos_core_boundary_remediation_candidates_2026-09-04.md §1 — Kiki 2026-09-04 '권고안대로 등재'. 실측: 튜플 17종 = 코퍼스 distinct 17종(차집합 0·현재 거르는 값 0건). 어휘 사본 4곳(acceptance 17·corpus_reverify 15·verifier 파생·populate 17). SubjectAdapter.answer_kinds() 추가는 two-tier 필수층 동결(REQUIRED_METHODS)과 충돌해 비채택."
+updated: 2026-09-07

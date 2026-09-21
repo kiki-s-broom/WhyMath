@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-90-resync-summary-cause-attribution
+title: "재동기화 요약의 '대상 0건'이 처방 다른 세 상태를 한 화면으로 만든다 — 분모 3층 + 원인 진단"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 분모 3층을 요약에 낸다 — 스캔 → 판정(mergeStateStatus를 아는 것) → 각 축(auto-merge 켜짐·BEHIND) → 교집합(실제 대상). 기존 요약은 교집합만 내서 0의 의미를 복원할 수 없었다: 분류 루프가 `[ \"$automerge\" != \"on\" ] && continue` · `[ \"$state\" != \"BEHIND\" ] && continue` 두 줄에서 카운터 없이 버렸다."
+  - "② 대상이 0건이면 **왜** 0인지 이름을 붙인다 — 네 분기: ⓐauto-merge를 켠 PR이 아예 없다(자동화가 구조적으로 발화 불가) ⓑBEHIND가 없다(정상 대기) ⓒ둘 다 있으나 교집합이 없다 ⓓ판정된 PR이 0건이다(대상 집합을 모른다). ⓐ만 `::notice::`로 annotation에 올린다 — ⓐ는 주기 조정으로 해결되지 않고 운용 관행·설계 변경을 요구하므로 로그 안쪽에 묻히면 안 된다. 나머지는 평문이다."
+  - "③ 대조군 — 대상이 있으면 진단 줄은 **나오지 않는다**. 모든 실행에서 나오는 줄은 상태를 가르는 신호가 아니라 배경이고, 배경은 습관화돼 읽히지 않는다. 계약 테스트가 이 부재를 단언한다."
+artifacts:
+  - "PR #1062 — .github/scripts/pr_auto_resync.sh(카운터 2종 신설·분모 3층 요약·원인 진단 4분기) + tests/infra/test_pr_auto_resync.py(계약 6건 신설, 23→29건). 뮤테이션 9종 전건 RED(순수 파이썬 하네스 — 주입 실재 단언 `mutated != original` + 치환 count 일치, 원복은 cp 백업 바이트 동일 단언·git 계열 미사용). M4(진단 조건을 항상 참으로)가 대조군 테스트를 RED로 만드는 것이 계약의 핵심이다. 4개 분기마다 그 분기를 실제로 밟는 픽스처를 따로 뒀다. 검증: tests/infra 1125 passed 0 failed(main 병합 후 재실행) · ruff·black CI 명령 그대로 exit 0."
+paths:
+  - ".github/scripts/pr_auto_resync.sh"
+session: null
+notes: "[경위] 2026-09-08 게이트 G-pr-auto-resync-token 집행으로 pr-auto-resync가 처음 성공 실행됐고(run #3 · id 34188745979), 그 요약 줄 `BEHIND+auto-merge 0건`을 읽다가 0의 의미가 복원 불가함을 발견했다. CLAUDE.md 2026-08-03 \"작동한 비율\" 원칙(알고리즘을 붙였으면 그것이 작동한 비율을 리포트가 말해야 한다)의 이 워크플로 축이며, 스크립트가 스스로 \"분모를 항상 낸다\"고 선언해 둔 설계 원칙을 auto-merge·BEHIND 두 축에서만 지키지 않고 있었다.\n\n[의존 방향 — 주의] 이 태스크는 어떤 태스크에도 의존하지 않는다(depends_on 없음). 반대로 이 축이 없으면 \"1주 뒤 재동기화 발생 건수를 세어 주기를 조정하거나 유지한다\"는 라이브 측정 축이 판정 불능이 된다 — 최신화 0건이 나와도 ⓐ대상 집합이 비었음과 ⓑ경합이 없었음이 갈리지 않으므로 조정할 근거도 유지할 근거도 없다. 즉 방향은 이 태스크 → 그 측정 축이다.\n\n[분리 사유] 원래 HARN-87 acceptance ⑧로 등재하려 했으나 구현 도중 다른 세션(PR #1059 · main 05:11Z 머지)이 그 태스크에 새 의존을 붙여 착수 자격이 소멸했고 ⑧ 번호도 그쪽이 먼저 썼다. 거부를 우회하지 않고 별도 태스크로 분리한다(CLAUDE.md \"거부의 우회 금지\"). 관측 결과는 그쪽 acceptance ⑨로 따로 남겼다.\n\n[정직한 고지] 코드가 먼저 쓰이고 태스크가 나중에 등재됐다 — 착수 순서 규칙의 이상형이 아니다. 작성 시점에는 claim이 유효했고(로컬 트리 기준 의존 없음) 그 자격이 병합 시점에 소급 소멸했다. 그 소급 소멸을 하네스가 경고하지 못하는 축은 별도 태스크로 등재했다."
+updated: 2026-09-08

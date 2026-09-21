@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,10 +17,17 @@ acceptance:
   - "③ 변별력 확인 후 동결 — OCR 제출 형상(student_input='' + student_solution 채움) 턴에서 (a) 후보 산출 (b) misconception_hypothesis 행 적재 (c) evidence_links 적재 3건을 API 테스트로 고정. 테스트를 먼저 수정 전 코드에 돌려 red임을 확인한 뒤 구현한다"
   - "④ 신규 안전장치 0 — OCR 품질 강등은 이미 ocr_confidence → apply_match_quality_gate 게이트②가 담당. 새 임계·새 게이트를 만들지 않는다"
   - "⑤ 범위 밖 동결 — 두 필드 이어붙이기 · intervene 임계 변경 · warmstart/preload 규약 변경 · 모바일 클라 변경(서버측만으로 해소)"
-artifacts: []
+  - "②-b [구현 중 실측 2026-09-07] 기존 테스트 1건(test_coach.py TestLogRefutationEvidence::test_endpoint_match_turn_logs_support_not_refutation)이 ①과 충돌 — 픽스처가 '발화에 오개념 신호 + student_solution=\"x = 2\"(clean)'로 매치 턴을 *발화*로 정의해, 풀이 우선에서는 no-match→반박 −1이 적재된다. ②의 비트동일 보장(student_solution=None)의 범위 밖 혼합 형상. 원인 규명 결과 회귀가 아니라 ①의 의미론(풀이가 있으면 풀이가 진단 대상 — 형제 케이스 5116·5139도 같은 전제)과 이 1건의 전제 충돌. 처분: 테스트 *의도*(+1/−1 상호배타)를 보존하고 픽스처만 신호를 풀이에 두도록 정정(발화 우선 대안은 ①이 금지한 관용구 발명이자 반대 방향 split-brain이라 기각). 혼합 형상 18곳 전수 중 이 1건만 해당. Kiki가 뒤집으면 PR revert 1건"
+  - "①-b [PR #1034 Codex P1 수용 2026-09-07] OCR 산출물은 계약상 LaTeX(OcrResult.plain_latex)인데 L4 diagnose._normalize가 NFKC+공백제거만 해 인식기 정상 출력 (a+b)^2=a^2+b^2가 신호 1/2(0.5)로 게이트 ①(0.65) 탈락·\\left(…\\right)형은 0건 — 합류가 픽스처(유니코드 위첨자)에서만 성립하는 위장이었다. 처분: _normalize에 LaTeX 접기(\\left·\\right·^·{·} 제거) 추가(카탈로그 signals·correct_form에 해당 문자 0건 실측). 대표 OCR LaTeX 3형이 세션 경로에서 (a)(b)(c) 성립함을 테스트로 고정. \\frac·\\cdot 등 다른 명령은 필요 미실측이라 접지 않음(정직한 공백)"
+  - "④-b [PR #1034 Codex P1 수용 2026-09-07] ④의 '새 임계·새 게이트 0'은 유지하되, 기존 게이트 ② low_quality 플래그의 *집행 지점*을 영속 계층에 추가 — 풀이 합류로 노이즈 전사의 우연 매칭이 가설 편입·+1 지지·−1 반박으로 즉시 영속되는 경로가 열렸기 때문(응답 플래그는 DB 쓰기를 되돌리지 못함). low_quality면 세션/턴 핸들러가 빈 매칭으로 큐레이션(중립 텍스트 턴과 동일)하고 반박 호출을 보류. 응답의 후보·match_low_quality·개입 결정은 불변(⑤ intervene 불변 준수). 정본화≠집행 규칙의 게이트 ② 적용"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1034"
+  - ba6ea08e
 paths:
   - src/backend/whymath_backend/api/coach.py
   - "tests/backend/api/test_coach*.py"
+  - src/backend/whymath_backend/l4/misconception/diagnose.py
+  - tests/backend/l4/test_misconception_diagnose.py
 session: null
-notes: "원 등재 MISC-07(r1skwr 세션 2026-08-11·backup a95bb456에만 잔존) — HARN-35가 재등재(원 번호 재사용 금지). 정본: docs/architecture/misconception_module_gap_review_r2.md §2 G1 + 04e §9-D1. R2 최대 갭·미해소 2026-08-30 재실측. 발화를 만드는 WH-1 primary만 LaTeX를 봐서 '발화는 풀이를 알고 학생 상태는 모르는' split-brain\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "원 등재 MISC-07(r1skwr 세션 2026-08-11·backup a95bb456에만 잔존) — HARN-35가 재등재(원 번호 재사용 금지). 정본: docs/architecture/misconception_module_gap_review_r2.md §2 G1 + 04e §9-D1. R2 최대 갭·미해소 2026-08-30 재실측. 발화를 만드는 WH-1 primary만 LaTeX를 봐서 '발화는 풀이를 알고 학생 상태는 모르는' split-brain\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] acceptance ② '수정 필요 시 중단·원인 규명' 이행 기록 — 규명 결과와 처분을 대장에 남긴다\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/api/coach.py', 'tests/backend/api/test_coach*.py'] → ['src/backend/whymath_backend/api/coach.py', 'tests/backend/api/test_coach*.py', 'src/backend/whymath_backend/l4/misconception/diagnose.py', 'tests/backend/l4/test_misconception_diagnose.py']: PR #1034 Codex P1 2건 실측 수용 — L4 정규화·게이트 ② 집행 지점이 범위에 들어와 acceptance·paths 정정"
+updated: 2026-09-07

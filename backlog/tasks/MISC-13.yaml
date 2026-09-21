@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-13
+title: Misconception signature SymPy parseability QA 및 canonical LaTeX 계약
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "misconception_signature 스키마/ORM에 sympy_expr, canonical_latex 추가"
+  - signature가 SymPy parseable한지 CI 검증 룰 추가
+  - data/corpus/misconceptions_v1 signature 마이그레이션 샘플
+artifacts: []
+paths:
+  - src/backend/whymath_backend/db/models/misconception_signature.py
+  - src/backend/whymath_backend/schema/misconception_signature.py
+session: null
+notes: "검토 문서 §7-9 반영. SymPy 단일 권위.\n\n[정정 2026-09-12] eos_priority null → P2: PR #893 회수 시점 백필 — misconception_signature SymPy parseability는 향후 검증 신뢰도에 기여하나 아직 서빙 경로 미배선, 판정 이후 과제로 P2"
+updated: 2026-09-12

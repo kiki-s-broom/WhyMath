@@ -14,6 +14,13 @@
     코치(`hint_deferral.decide_hint_level` + LLM)가 *동적 생성*하며 영속 정체성이 없다.
     없는 테이블에 FK를 만들지 않는다(FK 날조 금지). 식별자가 실재하는 경로(예: GenerationLog
     id·콘텐츠 주소 해시)에서만 채우고, 없으면 None(정직 — 가짜 id 생성 금지).
+    **현황 명시(ARCH-39 · 2026-09-06 · 판정 기준 main 3f2b39c1)**: `hints` 좌석은 지금도
+    없으며(ORM·마이그레이션 0건), 신설은 `S4-11-hint-content-generation`(P0·todo)이 소유한다
+    (`canonical_entity_model_v1.md` §3-B). 그러므로 이 컬럼은 **언젠가 FK가 될 수 있는 자리**이며,
+    그 전환 판단(FK로 조일지)도 S4-11의 몫이다. 그때까지는 위에 적은 *실재하는 식별자 경로*만
+    담는다. **현재 writer는 0건**이다(서빙 코드 전수 — 정의·주석 외 대입 0). 즉 이 필드는 지금
+    *구조만 있고 흐르지 않는다* — "작동 신호 없는 알고리즘 부착 금지"(CLAUDE.md)에 따라 그 사실을
+    여기 명시해 둔다.
   - `hint_level` 1~4 — 폐쇄 범위의 정본은 `l4.hint_deferral.HintLevel`(Literal[1,2,3,4])이다.
     schema는 l4를 import할 수 없으므로(7계층 단방향) 수치를 복제해 ge=1·le=4로 구속한다
     (정본 변경 시 여기도 갱신 — 주석 명시 복제).

@@ -301,6 +301,123 @@ class TestTuningKnobs:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# top_p (EOS-121 선결조건 A) — 좌석 간 샘플링 통제 수단
+# ──────────────────────────────────────────────────────────────────────────
+class TestTopP:
+    """막는 것은 넷이다.
+
+    ⓐ **기본값이 조용히 바뀌는 것** — 미지정인데 키가 실리면(특히 `None`이 실리면) 현 공급사
+       기본값과 다른 값이 나가 저작 품질이 회귀한다. 그래서 "키가 아예 없는가"를 본다
+       (있는데 null인 것과 **다르다** — `assert kwargs.get("top_p") is None`은 둘을 구분하지
+       못해 변별력이 0이다).
+    ⓑ **지정했는데 안 실리는 것** — 측정자가 "양 좌석을 맞췄다"고 믿는데 실제로는 아무 값도
+       안 간 상태.
+    ⓒ **temperature와 동시 지정이 호출까지 가는 것** — Anthropic API는 **모델과 무관하게**
+       둘의 동시 지정을 400으로 거부한다(2026-09-19 라이브 90호출 전건 실측). 구조적 불가이므로
+       `images`·`json_schema`·`seed`와 같은 부류로 **호출 전에 RuntimeError**를 던진다.
+    ⓓ **한쪽을 조용히 버리는 것** — 버리면 400 대신 200이 오고 "설정했는데 아무 일도 없었다"가
+       되어 원인 지목이 불가능해진다(조용한 무시 금지). 그래서 ⓒ가 *예외*지 *누락*이 아니다.
+    """
+
+    async def test_top_p_key_is_absent_by_default(self) -> None:
+        """ⓐ 미지정(기본) → messages.create kwargs에 top_p **키 자체가 없다**(null 아님)."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert "top_p" not in kwargs
+
+    async def test_top_p_passed_when_set_alone(self) -> None:
+        """ⓑ temperature 없이 top_p만 지정 → `top_p=`로 **그 값 그대로** 전달된다."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID), top_p=0.95)
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert kwargs["top_p"] == 0.95
+        # 대조군 — 혼자 실릴 때 temperature 키가 따라붙지 않는다(우리가 기본값을 발명하지 않는다).
+        assert "temperature" not in kwargs
+
+    @pytest.mark.parametrize(
+        "cost",
+        [CostTier.CLOUD_MID, CostTier.CLOUD_HIGH],
+        ids=["cloud_mid=Sonnet4.6", "cloud_high=Opus4.7"],
+    )
+    async def test_both_together_is_refused_before_the_call(self, cost: CostTier) -> None:
+        """ⓒ 동시 지정 → RuntimeError. **Sonnet에서도** 그렇다는 것이 이 테스트의 요점이다.
+
+        종전 계약은 이 제약을 Opus 한정으로 읽고 CLOUD_MID에서는 둘을 함께 실었다. 라이브
+        회차가 그 오독의 대가를 치렀다(90호출 전건 400). 그래서 두 티어를 **같은 파라미터로**
+        돌린다 — 한쪽만 막는 구현이면 반드시 한 케이스가 RED다.
+        """
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        with pytest.raises(RuntimeError, match="동시 지정"):
+            await provider.generate("p", "s", _cloud_decision(cost), temperature=0.9, top_p=0.95)
+        # 호출 0건 — "던지긴 하는데 이미 보낸 뒤"면 400이 그대로 난다(실패가 싸지 않다).
+        assert client.messages.calls == []
+
+    async def test_refusal_message_says_how_to_fix(self) -> None:
+        """ⓒ 메시지가 *무엇을 어떻게 고칠지*를 담는다 — 측정자가 읽고 바로 고칠 수 있어야 한다.
+
+        예외 타입만 맞고 본문이 비면 런북이 "왜 죽었는지"를 다시 소스에서 찾아야 한다.
+        """
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        with pytest.raises(RuntimeError) as excinfo:
+            await provider.generate(
+                "p", "s", _cloud_decision(CostTier.CLOUD_MID), temperature=0.9, top_p=0.95
+            )
+        message = str(excinfo.value)
+        assert "둘 중 하나만" in message  # 처방
+        assert "cannot both be specified" in message  # 공급사 원문(검색 가능한 지문)
+        assert "0.9" in message and "0.95" in message  # 받은 값 — 어느 호출인지 특정된다
+
+    async def test_temperature_alone_still_rides_on_cloud_high(self) -> None:
+        """ⓓ 대조군 — Opus의 *단독* temperature 거부는 종전대로 **런타임 가드가 없다**.
+
+        이 대조군이 없으면 "CLOUD_HIGH에서는 샘플링 인자를 전부 거부"하는 과잉 구현이 위
+        테스트들을 통과한다. 단독 temperature는 모델 제약(ⓐ축)이라 호출부 계약으로 막는다 —
+        이번 변경이 건드리는 것은 **API 계약**(동시 지정)뿐이다.
+        """
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_HIGH), temperature=0.9)
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert kwargs["temperature"] == 0.9
+        assert "top_p" not in kwargs
+
+    async def test_cloud_high_omits_both_when_unset(self) -> None:
+        """ⓓ 대조군 — 아무것도 지정하지 않으면 두 키 다 없다(plain create·종전 동작)."""
+        client = FakeAnthropicClient()
+        provider = AnthropicProvider(client=client, settings=_model_settings())
+        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_HIGH))
+        kwargs = client.messages.calls[0]["kwargs"]
+        assert "top_p" not in kwargs
+        assert "temperature" not in kwargs
+
+    def test_module_docstring_separates_the_two_constraint_layers(self) -> None:
+        """제약이 **두 층**이라는 사실이 문서에 남아 있는가 — 오독의 재발 방지선.
+
+        ⓐ(Opus 한정 모델 제약)는 런타임 가드가 없으므로 경고문이 유일한 방어선이고,
+        ⓑ(모델 무관 API 계약)는 가드가 있지만 *왜 가드가 있는지*가 없으면 다음 세션이
+        "축마다 다른 정책"으로 읽고 되돌린다. 두 층이 함께 적혀 있어야 계약이 성립한다.
+        """
+        import whymath_backend.l3.providers.anthropic as anthropic_module
+
+        doc = anthropic_module.__doc__ or ""
+        assert "top_p" in doc
+        assert "temperature" in doc
+        assert "거부(400)" in doc
+        # 모델 제약(Opus 단독)과 API 계약(모델 무관 동시 지정)이 **갈려** 적혀 있을 것.
+        assert "동시에" in doc
+        assert "Sonnet 4.6" in doc
+        generate_doc = AnthropicProvider.generate.__doc__ or ""
+        assert "top_p" in generate_doc
+        assert "CLOUD_HIGH" in generate_doc
+        assert "구조적 불가" in generate_doc
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # _extract_text — content 블록 정규화 (dict·객체·엣지)
 # ──────────────────────────────────────────────────────────────────────────
 class TestExtractText:
@@ -543,3 +660,105 @@ class TestUsageCapture:
         assert out.usage is not None
         assert out.usage.input_tokens is None
         assert out.usage.output_tokens is None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 프롬프트 캐시 토큰 판독 (EOS-99 ① — 켰다는 사실 ≠ 적중했다는 사실)
+#
+# `anthropic_prompt_caching`을 켜면 요청에 `cache_control`이 실리지만, **적중 여부는
+# 응답 usage에만 있다.** 이 두 필드를 안 읽으면 플래그를 켠 상태와 캐시가 실제로 작동하는
+# 상태가 코드에서 구분되지 않는다(짧은 프리픽스는 최소 토큰 미만이라 조용히 무효).
+# ──────────────────────────────────────────────────────────────────────────
+class TestPromptCacheUsageCapture:
+    async def test_dict_cache_tokens_captured(self) -> None:
+        """dict usage의 캐시 2종을 실측 그대로 포착한다(적중 회차)."""
+        msg = _dict_message("42") | {
+            "usage": {
+                "input_tokens": 20,
+                "output_tokens": 5,
+                "cache_read_input_tokens": 2048,
+                "cache_creation_input_tokens": 0,
+            }
+        }
+        provider = AnthropicProvider(
+            client=FakeAnthropicClient(message_response=msg), settings=_model_settings()
+        )
+
+        out = await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+
+        assert out.usage is not None
+        assert out.usage.cache_read_input_tokens == 2048
+        assert out.usage.cache_creation_input_tokens == 0
+
+    async def test_object_cache_tokens_captured(self) -> None:
+        """pydantic 객체 스타일 usage(실 SDK anthropic.types.Usage 형태)도 포착한다."""
+
+        class _Usage:
+            input_tokens = 11
+            output_tokens = 3
+            cache_read_input_tokens = 0
+            cache_creation_input_tokens = 4096
+
+        msg = _ObjMessage([_Block("text", "본문")])
+        msg.usage = _Usage()  # type: ignore[attr-defined]
+        provider = AnthropicProvider(
+            client=FakeAnthropicClient(message_response=msg), settings=_model_settings()
+        )
+
+        out = await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+
+        assert out.usage is not None
+        assert out.usage.cache_read_input_tokens == 0
+        assert out.usage.cache_creation_input_tokens == 4096
+
+    async def test_absent_cache_fields_are_none_not_zero(self) -> None:
+        """캐시 필드가 **없는** 응답 → None(미측정)이지 0(실측 0)이 아니다.
+
+        이 방향이 이 태스크의 급소다. 부재를 0으로 접으면 캐시 개념이 없는 provider·구버전
+        SDK 응답이 '적중 0%'로 보고되고, 그러면 '켰지만 작동 안 함' 신호가 상시 켜져 습관화된다.
+        """
+        msg = _dict_message("42") | {"usage": {"input_tokens": 12, "output_tokens": 34}}
+        provider = AnthropicProvider(
+            client=FakeAnthropicClient(message_response=msg), settings=_model_settings()
+        )
+
+        out = await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+
+        assert out.usage is not None
+        assert out.usage.input_tokens == 12  # 다른 축은 정상 판독(스캔 0건 방지)
+        assert out.usage.cache_read_input_tokens is None
+        assert out.usage.cache_creation_input_tokens is None
+
+    async def test_malformed_cache_values_coerced_to_none(self) -> None:
+        """캐시 값이 비정상 타입(str·bool·음수)이면 None — 토큰 축과 같은 방어 규약."""
+        msg = _dict_message("42") | {
+            "usage": {
+                "input_tokens": 1,
+                "output_tokens": 1,
+                "cache_read_input_tokens": True,
+                "cache_creation_input_tokens": -7,
+            }
+        }
+        provider = AnthropicProvider(
+            client=FakeAnthropicClient(message_response=msg), settings=_model_settings()
+        )
+
+        out = await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
+
+        assert out.usage is not None
+        assert out.usage.cache_read_input_tokens is None
+        assert out.usage.cache_creation_input_tokens is None
+
+    def test_sdk_surface_exposes_cache_fields(self) -> None:
+        """실물 SDK의 `Usage`에 우리가 읽는 두 필드가 **실재**하는지 확인한다.
+
+        CLAUDE.md "외부 SDK 표면을 시임(가짜) 테스트만으로 정합 선언 금지" — 위 테스트는
+        전부 우리가 만든 가짜 응답이라, 필드 이름을 틀려도 자기들끼리 초록이다. SDK가 없는
+        환경(hermetic 단위 CI)에서는 건너뛴다.
+        """
+        anthropic_types = pytest.importorskip("anthropic.types")
+
+        fields = set(anthropic_types.Usage.model_fields)
+
+        assert "cache_read_input_tokens" in fields
+        assert "cache_creation_input_tokens" in fields

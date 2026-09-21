@@ -93,18 +93,24 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# 서빙 경로와 후보 조회를 공유한다(모듈 docstring "합성 프로브" 참조) — 재구현 금지.
-from whymath_backend.api.me import (
-    _CANDIDATE_POOL_SIZE,
-    candidate_pool_conditions,
-    candidate_pool_order_by,
-)
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.concept import Concept, ProblemConcept
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
 from whymath_backend.l2.ability_estimation import resolve_item_difficulty_b
 from whymath_backend.l2.irt import IrtItem, estimate_ability, item_information, select_weighted_item
+
+# 서빙 경로와 후보 조회를 공유한다(모듈 docstring "합성 프로브" 참조) — 재구현 금지.
+# EOS-19: 후보 풀 정의가 `api/me.py`(L5)에서 `l2/next_problem_selection.py`로 내려갔다.
+# 리포트가 *서빙과 같은 풀*을 보는 것이 이 import의 존재 이유이므로(REC-06), 재노출 경유가
+# 아니라 소유 모듈을 직접 가리킨다.
+from whymath_backend.l2.next_problem_selection import (
+    CANDIDATE_POOL_SIZE as _CANDIDATE_POOL_SIZE,
+)
+from whymath_backend.l2.next_problem_selection import (
+    candidate_pool_conditions,
+    candidate_pool_order_by,
+)
 from whymath_backend.schema.enums import ASSESSED_ROLES
 
 __all__ = [

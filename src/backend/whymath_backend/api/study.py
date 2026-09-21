@@ -49,12 +49,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.api._auth import ConsentedUser
 from whymath_backend.api._l3_state import get_cache
 from whymath_backend.api._rate_limit import RateLimitedVisualization
+from whymath_backend.api._subject_capability_state import (
+    get_assessment_answer_verifier,
+    get_expression_seal,
+)
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.pedagogy_dsl import LearningObjective
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.l2.irt import theta_to_mastery_proxy
 from whymath_backend.l2.learner_state import get_state
+from whymath_backend.l2.learner_state_store import (
+    LearnerStateMissingError,
+    require_learner_state,
+)
 from whymath_backend.l2.pedagogy_evidence import (
     DuplicateOutcomeError,
     SessionOwnershipError,
@@ -216,13 +224,35 @@ async def post_study_unit(
     # 공급은 후속 — 지금 임의 병합을 하면 처치 귀속이 흐려진다.
     concept_code = concept_codes[0]
 
+    # EOS-103 루프 진입 게이트 — LearnerState 영속 행이 없으면 **여기서 멈춘다**.
+    #
+    # 왜 조용히 진행하면 안 되는가: `_build_signals`는 진단이 없는 학생에게 숙달 축을 비운
+    # `StudentSignals`를 만들어 내려보낸다(그 자체는 "가짜 통과 금지" 규약이 옳게 작동하는
+    # 것이다 — 없는 값을 기본치로 채우지 않는다). 문제는 그 다음이다: 선택기는 근거 0으로
+    # 교수법을 고르고, 학생은 *맞춤 학습 단위*라는 이름의 무근거 콘텐츠를 받고, 처치 행이
+    # 기록되어 나중 집계에서 "개인화된 처치"로 계상된다. 즉 침묵 실패가 데이터까지 오염시킨다.
+    #
+    # 409를 쓰는 이유: 서버 결함(5xx)도 인가 문제(403)도 아니고, *선행 상태가 아직 아니다*
+    # 라는 리소스 상태 충돌이다. 학생이 할 일(진단 완료)이 응답에 적혀 있어야 한다.
+    try:
+        await require_learner_state(session, user.user_id)
+    except LearnerStateMissingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="학습을 시작하려면 먼저 진단을 완료해야 합니다.",
+        ) from exc
+
     signals = await _build_signals(session, user.user_id, concept_code)
     tally = get_process_tally()
+    # EOS-89: 과목 능력 2종은 app.state 등록분(`create_app`)에서 꺼내 공급 사슬에 내려보낸다 —
+    # 렌더 어댑터가 합성 루트를 스스로 부르지 않게 하는 push 경로의 시작점이 여기다.
     result = await supply(
         code=concept_code,
         signals=signals,
         session=session,
         cache=get_cache(request),
+        seal=get_expression_seal(request),
+        assessment_verifier=get_assessment_answer_verifier(request),
         k_type=KnowledgeType(objective.k_type).value,
         tally=tally,
     )

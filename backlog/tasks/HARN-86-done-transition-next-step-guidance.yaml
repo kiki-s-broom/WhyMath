@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-86-done-transition-next-step-guidance
+title: "backlog.py의 전이 거부가 다음 단계를 안내하지 않는다 — todo→done 거부 시 start 선행 명령 동봉"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① _transition() 거부 메시지가 '허용 목록'만 내고 **어떻게 하면 되는지**를 내지 않는다. 사람에게 넘기는 런북에 이 명령이 들어가면 왕복이 1회 낭비된다(2026-09-07 실측: LIC-07 done 안내가 todo→done 거부로 공전 — 세션이 전이 규칙을 확인하지 않고 안내했다)"
+  - "② done/review 등 종결 방향 전이가 거부될 때, 현재 status에서 목표 status로 가는 **최단 경로 명령**을 그대로 붙여 넣을 수 있게 출력한다(사람 소유면 --as <owner> 포함 — owner 거부 메시지가 이미 쓰는 형식과 동일하게)"
+  - "③ 변별력 실증: 거부 상태를 주입해 안내 문자열이 실제로 나오는지 테스트로 동결한다(정상 전이에서도 같은 화면을 내면 무효)"
+artifacts:
+  - "PR #1067 — 큐 경유 머지(gh-readonly-queue/main/pr-1067-94d1f28a · merge_group run 34318528035) · main a374d2e0. 뮤테이션 20종 전건 RED · tests/harness 771 passed · tests/infra 1123 passed"
+paths:
+  - scripts/harness/backlog.py
+  - tests/harness/test_cli.py
+session: null
+notes: "재발방지대책(CLAUDE.md 실수 관리 의무). 사고 경위: 2026-09-07 LIC-07 완료 기입을 Kiki에게 안내하면서 done 명령만 주었는데 todo→done이 전이표에 없어 exit 1. '검증 없는 실행 안내 금지'(가정 기반 런북) 유형의 재발이며, 세션 쪽 규칙은 이미 있으므로 이번 대책은 **도구 쪽**에 둔다 — 거부가 해소 경로를 함께 내면 안내자가 규칙을 몰라도 사람이 막히지 않는다. '고칠 수 없는 위반을 지적하는 게이트는 사람이 게이트를 끄게 만든다'(HARN-52 등재 사유)의 같은 축."
+updated: 2026-09-09

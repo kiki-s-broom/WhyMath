@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ASM-14-access-matrix-produced-by-staleness
+title: "access_matrix.json #8 produced_by가 봉인된 필드를 산출자로 지목 — produced_by 진위 검사 부재(문자열 비어있음만 검사)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: cancelled
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① data/access_matrix.json 'peer_comparison'(#8)의 produced_by 정정 — 현재 'GET /v1/me/assessments — AssessmentSchema.estimated_percentile(api/me.py::list_my_assessments)'를 지목하나 그 엔드포인트의 response_model은 ASM-07(2026-08-09) 이후 StudentAssessment이고 estimated_percentile은 그 모델에 자리가 없다(schema/assessment.py:64-75·api/me.py:425). 즉 계약이 '더는 산출하지 않는 경로'를 산출자로 적고 있다"
+  - "② #8의 resolution.student='summary' 재검토 — 현행 코드상 학생이 또래 비교로 받는 것은 요약이 아니라 0이다(export도 ASM-12로 봉인). 문서 표(pipa_data_matrix.md:46)와 코드 실태의 어느 쪽을 정본으로 삼을지 판정하고 §2.4 절차로 반영"
+  - "③ 집행 지점(정본화와 별항): produced_by의 *진위*를 검사하는 축 신설 — 현행 tests/backend/schema/test_access_matrix.py::_produced_by_violations는 '문자열이 비어있지 않은가'만 보므로(테스트 파일 169-180행) 이번 같은 stale 지목은 공허하게 통과한다. 최소한 '지목된 스키마 클래스에 그 필드가 실재하는가'를 검사하고, 실패 주입으로 RED를 확인한다"
+artifacts: []
+paths:
+  - data/access_matrix.json
+  - tests/backend/schema/test_access_matrix.py
+  - docs/legal/pipa_data_matrix.md
+session: null
+notes: "발견 경위: 2026-09-07 MGMT-07(G-export-prediction-disclosure 자문 브리핑 · 등재 당시 번호는 MGMT-04) 작성 중 5필드 소비처 역추적에서 실측. 계약 자신의 note가 produced_by의 목적을 '문서에만 있고 코드와 무관한 상태를 닫는다'로 선언하는데, 검사가 문자열 존재만 보므로 정확히 그 목적이 집행되지 않는다 — CLAUDE.md '보호 장치를 실패 주입 없이 보호 있음으로 선언 금지'의 ④축(스캔이 공허하게 통과) 사례. MGMT-07 범위 밖이라 분리 등재(브리핑 §5-A 분기가 실행되면 이 행을 어차피 고쳐야 하므로 그때 함께 처리해도 된다).\n\n[취소 2026-09-07] 중복 — COLLAB-05-access-matrix-reference-integrity가 동일 결함을 더 넓게 이미 소유한다(①현행 실측 고정 ②#8 summary→none 정정 ③참조 무결성 축 신설 ④변별력 주입). 2026-09-07 MGMT-07 작성 중 독립 재발견했으나 backlog.py add의 의미 중복 고지(유사도 0.18)로 확인. 재발견 사실 자체는 COLLAB-05 notes에 교차기록하지 않는다 — 그쪽 근거(collaboration_module_gap_review_r3.md §3 D7)가 이미 충분하다.\n\n[정정 2026-09-07] notes 치환 — MGMT-04→MGMT-07 개명 반영 — main의 MGMT-04-ip-separation-evidence-pack과 오독 방지\n\n[정정 2026-09-07] notes 치환 — MGMT-04→MGMT-07 개명 반영(2/3)\n\n[정정 2026-09-07] notes 치환 — MGMT-04→MGMT-07 개명 반영(3/3)"
+updated: 2026-09-07

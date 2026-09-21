@@ -102,7 +102,7 @@ shadow 측정 → canary/full 노출 플립(사람) → canonical M-id 리포트
 
 - **동기 이동 규약**: 적재 가능 crosswalk corpus(`data/corpus/misconception_crosslinks_v1/`)에
   행을 추가·승격하는 커밋은 **같은 PR에서** backlog 게이트 대장을 동기 이동해야 한다 —
-  ⑴ 전량 승인 완료면 `backlog.py gates clear G-crosswalk-approval --evidence ...`(kiki 행동),
+  ⑴ 전량 승인 완료면 `backlog.py gates clear G-crosswalk-approval --as kiki --evidence ...`(kiki 행동),
   ⑵ 부분 진행이면 게이트 `notes`에 현재 라이브 건수·서명 근거 위치를 갱신.
   대장이 실태를 뒤따라가지 못하는 커밋은 감사 대상이다.
 - **clear evidence 요건**: `G-crosswalk-approval` clear 시 evidence는 다음을 포함해야 한다 —

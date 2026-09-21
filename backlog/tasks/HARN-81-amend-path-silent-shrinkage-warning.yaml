@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-81-amend-path-silent-shrinkage-warning
+title: "amend --path의 교체 의미가 무증상이다 — 기존 경로가 조용히 사라져 겹침 탐지가 약해진다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재현 — amend --path는 append가 아니라 교체다(HARN-57 의도적 설계: 넓은 glob을 좁히는 것이 실사용 절반이라 append로는 좁힐 방법이 없다). 그런데 교체가 무증상이라 신규 경로만 넘기면 기존 경로가 조용히 사라진다. 2026-09-07 SEC-32 구현 중 실제 발생: 신규 6건만 넘겨 원 7건이 소실됐고 구현자가 알아채 13건 전체를 다시 명시해 복원했다"
+  - "② 왜 위험한가 — paths는 병렬 세션 겹침 탐지의 유일한 입력이다. 넓어지면 오탐(HARN-59가 다룬 축)이지만 좁아지면 **미탐**이고, 미탐은 경보가 안 뜨므로 사람이 알아챌 기회 자체가 없다. 두 세션이 같은 파일을 모르고 병렬 구현하는 형태(2026-07-27 OPS-07 735줄 폐기·2026-09-06 MP-04 전량 폐기)의 재발 경로다"
+  - "③ 대책 — 제거되는 경로가 있으면 그 목록을 stderr에 명시하고, 확인 플래그 없이는 거부하거나(fail-closed) 최소한 제거분을 전건 열거한다. 교체 의미 자체는 유지한다(좁히기가 목적이므로). 어느 쪽(경고 vs 거부)인지는 구현자가 근거와 함께 판단하고 테스트로 동결"
+  - "④ 변별력 — 경로를 좁히는 amend를 실제로 주입해 경고·거부가 나는지 확인한다. 정상(경로 유지·확장) 케이스에서 조용한지도 대조군으로 확인한다 — 양쪽에서 같은 화면이면 위장이다"
+artifacts:
+  - "PR #1053 (https://github.com/doldori7/WhyMath/pull/1053) — amend --path 축소 무증상 해소. ①제거분 전건 열거(changed·notes·이벤트) ②사고 형태(범위를 잃으면서 동시에 얻는 경우)만 fail-closed·탈출구 --drop-scope ③판정은 pathscope.overlap 승계(start·overlap과 같은 함수 — 파일 차집합은 파일 0건 저장소에서 정상·사고 양쪽 0건을 내 공허하게 통과했다·실측 후 교체) ④뮤테이션 4종 전건 RED(거부절·열거·과잉거부·파일차집합 회귀). tests/harness 742 passed/0 failed · ruff·black EXIT=0. tests/infra 47건 실패는 깨끗한 origin/main 739aae46에서도 동일 47건(sqlalchemy 미설치 환경) — 이 PR의 것이 아님을 별도 worktree로 실측"
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "발견 경위: 2026-09-07 SEC-32 구현 서브에이전트가 자진 보고. 즉시 복원됐고 이전 값이 notes·이벤트 대장에 남아 피해 0이었으나, 알아채지 못하면 무증상으로 남는다. HARN-57(정정 경로 신설)·HARN-59(scope drift 축 도달)의 후속 — 그 둘이 '고칠 수 있게' 만들었다면 이건 '고치다가 잃지 않게' 만드는 축이다. CLI가 제안한 번호 81을 채택(79는 로컬 충돌)"
+updated: 2026-09-07

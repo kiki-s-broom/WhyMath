@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-61-explicit-path-pytest-asyncio-mode-trap
+title: "명시 경로 pytest invocation의 asyncio_mode 미적용 함정 — 718건 유령 실패를 1건의 즉시 실패로 바꾼다 (ARCH-22 관측의 2회차·원인 정정)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 원인 정정을 정본에: ARCH-22가 '무상한 pin' 탓으로 적은 관측(pyproject.toml:97-98)의 실제 원인은 **rootdir 해석**이다 — src/backend에서 명시 경로(../../tests/backend …)를 주면 pytest가 인자 공통조상을 상향 탐색해 **루트 pyproject.toml(pytest 섹션 없음)을 rootdir 앵커**로 잡고 src/backend/pyproject.toml의 asyncio_mode=auto를 읽지 않는다 → strict 폴백 → 모든 async def 테스트 실패. pin 버전과 무관(1.4.0에서 재현·-c 강제 시 즉시 통과)"
+  - "② 함정을 1건의 즉시 실패로: tests/backend/conftest.py에 config.getini('asyncio_mode')=='auto' 가드 — 아니면 pytest_configure에서 명확한 메시지('src/backend에서 bare pytest 또는 -c src/backend/pyproject.toml --rootdir=src/backend')로 UsageError. 718건의 혼란스러운 실패 대신 1건의 원인 지목 실패(실패가 정보가 되게)"
+  - "③ 변별력: 가드를 넣은 뒤 명시 경로 invocation이 UsageError 1건으로 끝나는지 / bare pytest·-c 강제는 무영향인지 양방향 확인. CI(bare pytest)는 동작 불변"
+  - "④ 잔여 12건 분류: sync 10 + 판정불가 2는 컨테이너 의존성(ollama·langfuse 클라이언트·log formatter·ImportError) — CI 미해당. 로컬 재현 런북에 '최소 의존성 목록' 1줄로 남기고 별도 태스크 불요 판정"
+artifacts:
+  - "PR #1003 (a123ac6f) — 원인 정정(rootdir·주석) + conftest 가드 + 변별력 3축 실측 + testing.md 런북. 전체 백엔드 스위트 12394 passed EXIT=0."
+paths:
+  - src/backend/pyproject.toml
+  - tests/backend/conftest.py
+session: null
+notes: "실측 2026-09-05(EOS-91 세션·Python 3.11 컨테이너): 전체 스위트 730 실패 중 async def 718(98.4%)·sync 10·판정불가 2. rootdir — 명시 경로: /home/user/WhyMath(루트 pyproject, pytest 섹션 없음) vs bare: src/backend. 대조 실험: 실패 파일 3개를 -c pyproject.toml --rootdir=. 로 재실행 → 200 passed EXIT=0. CI main(bare pytest)은 11,727 passed 0 failed로 미해당. Kiki 리뷰: '동일하다는 건 이번 변경이 원인이 아니다만 증명 — 왜 실패하는지는 아무도 모른다. 723건이 항상 빨간 상태면 새 실패와 소음을 구분할 수 없다. 분류가 안 되어 있는 게 문제.' 반복 실수 규칙(동일 유형 2회+ → 대책 등재 의무): ARCH-22(2026-07-30)에 이어 2회차."
+updated: 2026-09-06

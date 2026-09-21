@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,11 +16,13 @@ acceptance:
   - "② 집행 지점 별항(정본화≠집행): l4/polya/prompts.py 정적 템플릿에 지시문 착지 + 실소비 경로(/v1/coach·PedagogyDecision) 경유를 테스트로 동결"
   - "③ 측정 계약(측정 없는 도입 없음): 도입 전후를 SSM #12 pedagogical_rubric 자체평가 또는 prompt_engineering.md LLM-as-judge 문항 확장으로 비교 — 판정치는 CLI exit/기계 게이트 형식"
   - "④ 범위 밖: 루브릭(채점기) 확장은 SSM #12 파일럿 소관 — 이 태스크는 저작(프롬프트) 축만"
-artifacts: []
+  - "①-정정: `docs/standards/prompt_engineering.md`에 \"### 6. 인지부하 관리\" 신설 —\n위반 판정 가능한 5문장(턴당 질문 1개·응답 길이 상한(3문장 이내)·관리 가능한 청크\n분할·무관 정보/반복 금지·정보 제시 순서(선 유도→후 보강))으로 명문화했다. 출처\n귀속은 이미 문서 하단 \"참고 소스\" 절에 병기돼 있던 것을 그대로 참조(별도 추가\n불필요 — `docs/reviews/learnlm_pedagogy_prompting_review_2026-08.md` §4).\n\n②-정정: `l4/polya/prompts.py`의 `_BASE_SYSTEM`(4단계 전체 공유)에 원칙 6을 6번\n항목으로 추가하고, 기존 \"질문 1-2개까지만\"을 \"질문은 정확히 1개\"로 교체했다(원칙과\n충돌하는 기존 문구를 남겨두면 모델이 혼란한 신호를 받는다). 집행 지점 검증 —\n`tests/backend/l4/test_polya_prompts.py`(신규) 9건이 ①`STAGE_PROMPTS` 정본 문면\n②`PolyaCoach.decide()` → `PedagogyDecision.system`(= `/v1/coach`가 실제로 LLM에\n넘기는 그 문자열) 양쪽에서 5축 전부를 확인한다 — 정본화(문서·②의 앞절)와 집행\n지점(②의 뒷절)을 별항으로 검증(CLAUDE.md \"정본화를 집행으로 착각한 완료 선언 금지\").\n\n③-정정: 측정 계약 — 루브릭 채점기(자동 실행기) 확장은 acceptance④가 명시적으로\nSSM #12 파일럿 소관으로 배제하므로, 이 태스크는 `prompt_engineering.md`의 기존\nLLM-as-judge `EVAL_PROMPT`(5문항)에 신규 5문항(6-10, 원칙 6의 5축과 1:1 대응하는\n0/1 판정 문항)을 추가해 SSM #12가 실행할 판정 기준만 명문화했다. 채점 로직\n재구현은 하지 않았다(acceptance①·④ 준수).\n\n④(범위 밖) — 준수됨. `pedagogical_rubric.py`(SSM #12 소유 결정론 루브릭 모듈)는\n읽기만 했고 손대지 않았다.\n\n⑤ 변별력(결함 주입 — `_BASE_SYSTEM`을 원문(구버전 \"질문 1-2개\")으로 되돌림 → RED\n9건 확인 → `cp` 백업으로 바이트 동일 복원 — git 계열 원복 금지 준수): 신설 원칙 6의\n5축 단언 5건 + 4단계(UNDERSTAND/PLAN/EXECUTE/REVIEW) 실소비 경로 단언 4건, 총 9건\n전부 RED. 복원 후 재확인 GREEN(`tests/backend/l4/test_polya_prompts.py` 9 +\n`test_polya_engine.py`(기존 23건, \"1-2개\" 텍스트 의존 0건 확인) = 32 passed).\n\n⑥ 원문 재확인 시도(§6 지시 준수) — 이 세션에서도 `arxiv.org`가 에이전트 프록시로\n차단됨을 직접 확인(`EGRESS_BLOCKED`, 원 검토가 §6에서 이미 적어 둔 것과 동일\n제약). 문면 차용의 원출처(2412.16429 25항목 루브릭 중 인지부하 9항목)는 이\n세션에서도 재확인하지 못했다 — 원 검토의 confidence 표기(likely/unverified)를\n그대로 승계하며 새로 확인된 사실은 추가하지 않는다(정직한 공백).\n\n⑦ 부작용: `tests/backend/l4/test_polya_engine.py`는 \"1-2개\" 텍스트에 의존하는\n단언이 없어 무편집으로 green 유지."
+artifacts:
+  - "2c24e69b (#1122)"
 paths:
   - docs/standards/prompt_engineering.md
   - src/backend/whymath_backend/l4/polya/prompts.py
   - tests/backend/l4/test_polya_prompts.py
 session: null
-notes: "출처: LearnLM 검토(docs/reviews/learnlm_pedagogy_prompting_review_2026-08.md) 차용 후보 1 — 적대 검증 2렌즈 생존. 현 원칙 5개에 학생 대면 응답 부하 축이 0건(실측·grep 0건)인 순수 공백. 2407.12687이 '표층 규칙은 프롬프팅으로 잘 된다'고 명시한 이식 가능 영역.\n\n[정정 2026-09-01] eos_priority null → P1: C9 연령별 설명·F7 언어 수준 내용 KPI 접점. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: LearnLM 검토(docs/reviews/learnlm_pedagogy_prompting_review_2026-08.md) 차용 후보 1 — 적대 검증 2렌즈 생존. 현 원칙 5개에 학생 대면 응답 부하 축이 0건(실측·grep 0건)인 순수 공백. 2407.12687이 '표층 규칙은 프롬프팅으로 잘 된다'고 명시한 이식 가능 영역.\n\n[정정 2026-09-01] eos_priority null → P1: C9 연령별 설명·F7 언어 수준 내용 KPI 접점. EOS-80 일괄 백필\n\n[정정 2026-09-11] 구현·변별력·측정계약·원문재확인시도 결과 기록"
+updated: 2026-09-11

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,10 +16,12 @@ acceptance:
   - "② 임계 파라미터(STUCK_TURN_THRESHOLD=5·점진폭·연속 N)의 튜닝 근거를 세션 지표로 실측 — wh1_evaluation ⑤ 도움 감소 곡선·이탈률. 외부 선례 = LearnLM 2407.12687 §5.5(과잉 유도가 좌절·학습 지연 유발 → 의도적 완화)"
   - "③ '작동한 비율' 원칙: 상한 도달률·좌절 해소율 리포트 필드 동반 — 무작동이 정상 응답으로 위장되지 않게"
   - "④ PED-31 notes의 Fading policy 항과 관계 명문화(중복 설계 금지) — 이 태스크가 Fading의 상한 축, PED-31이 전략 라이브러리 축"
-artifacts: []
+  - "①(핵심 구현) 완료: decide_hint_level에 규칙 6(상한 도달 보장) 신설 — 규칙 1의\n조건(turn_count >= STUCK_TURN_THRESHOLD)을 재사용해 규칙 5('숙달' base-1 완화)가\n규칙 1의 최소 레벨(3)을 다시 깎지 못하게 한다. prev가 매 턴 반환값으로 피드백되며\n발생하는 고정점 붕괴(구 버전: '숙달' 학생이 5턴+ 막혀도 레벨 2에서 고착)를\n수학적으로 확인 후 최소 변경으로 복원 — 새 파라미터·PolyaState 필드·turn_meta\n연동 없이 기존 STUCK_TURN_THRESHOLD 조건만 재사용(paths 범위 준수).\n\n검증: 기존 29건 중 구 버그값을 pin하던 1건(test_master_stuck_lowered_to_2 →\ntest_master_stuck_ceiling_guaranteed_at_3, 2→3)을 정정하고, discriminability\n테스트 8건 신설(연속 턴 피드백 고착 재현·턴 경계 4 vs 5·비숙달 학생 무영향·\n상한이 3이지 4가 아님·is_ceiling_reached 술어 4건). RED-before-fix 2회\n실시(cp 백업/복원, git 계열 원복 금지 준수): (a) 규칙 6 제거 → 정확히 3건 RED\n(나머지 34건 무관) (b) is_ceiling_reached를 `return True`로 뮤테이션 → 정확히\n2건 RED. 전체 backend 스위트 12784 passed(0 regression, PED-34 시점 12776 +8 =\nRule6 테스트 4 + predicate 테스트 4와 정확히 일치). tests/infra 1303 passed +\n36 passed(EOS 인벤토리 — 신규 함수 반영 재생성 완료). ruff/black/mypy --strict\nclean.\n\n②(임계 튜닝) 정직한 공백으로 남김: STUCK_TURN_THRESHOLD=5는 튜닝하지 않았다 —\n이 세션은 라이브 wh1_evaluation 세션 지표(도움 감소 곡선·이탈률)에 접근할 수\n없어 튜닝의 실측 근거를 만들 수 없다. 규칙 6은 *기존* 임계값의 보장만 복원.\nhint_deferral.py 모듈 docstring에 이 공백과 재보정 경로(SSM 파일럿 또는 전용\n실측 태스크)를 명시.\n\n③(\"작동한 비율\") 정본화만 완료, 집행은 범위 밖: is_ceiling_reached(hint_level,\nturn_count) 순수 훅 신설 — is_stuck_turn_count/is_answer_demand와 같은 패턴으로\ndecide_hint_level의 실제 출력을 재사용(재계산 아님). 상한 도달률 =\nΣis_ceiling_reached / Σis_stuck_turn_count 집계가 가능한 훅만 제공하며, 이를\n실제 세션 리포트/텔레메트리에 배선하는 것은 이 태스크의 paths(hint_deferral.py +\n테스트) 밖 — \"정본화를 집행으로 착각한 완료 선언 금지\" 준수.\n\n④(PED-31 관계) 완료: docstring에 명시 — decide_hint_level의 단계 결정은\nhint_deferral 고유 책임(04f_pedagogy_module_boundaries.md §102)이며 PED-31의\n전략 라이브러리 축(strategy 단위 fading_schedule, 문서 갭 ⑩)과는 다른 층위.\nPED-31 문서가 그 갭의 후속으로 제안한 번호(\"PED-36\")는 실제 backlog.py add로\n등재된 적이 없음을 실측 확인(backlog/tasks/ 전수 grep) — 중복 설계 아님."
+artifacts:
+  - "eb87b9cd (#1124)"
 paths:
   - src/backend/whymath_backend/l4/hint_deferral.py
   - tests/backend/l4/test_hint_deferral.py
 session: null
-notes: "출처: LearnLM 검토 차용 후보 2 — 적대 검증 생존, 갭은 검증 렌즈가 코드로 확증(세션 재확인 완료). 기존 answer_deferral_max_level(learning_scene)과의 방향 차이도 설계에서 화해할 것.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C7/F8 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: LearnLM 검토 차용 후보 2 — 적대 검증 생존, 갭은 검증 렌즈가 코드로 확증(세션 재확인 완료). 기존 answer_deferral_max_level(learning_scene)과의 방향 차이도 설계에서 화해할 것.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C7/F8 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-11] 구현 완료 기록 — RED-before-fix 검증 결과 및 acceptance②③④ 처분(정직한 공백/정본화 범위) 등재"
+updated: 2026-09-11

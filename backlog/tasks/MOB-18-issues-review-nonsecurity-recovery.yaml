@@ -5,22 +5,29 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
 depends_on:
   - SEC-24-issues-review-security-hardening-recovery
+  - HARN-57-done-artifact-correction-path
 requires_gates: []
 acceptance:
   - "① 고립 실측 고정 — origin/claude/whymath-issues-review-k20m0w(head 2330a095)의 비보안 고립 done: MOB-14(활성문제 stale 리셋)·MOB-15(401·sendTimeout·release 서명 게이트)·NS-01(MathLive step 렌더)·NS-02(표기 정준화 계층)·S3-37/38/39/41/49/50(수식 렌더·자동포커스·선지 동결)·ARCH-29·OPS-25·PB-04·MOB-11·S4-22. main 대비 신규 파일: math_notation.dart·math_text.dart·dialogue_store.dart·onboarding 2종 + 테스트 10종"
   - "② 파일 단위 이식(통째 머지 금지 — 39커밋 뒤) + 원 번호 재사용 금지: 브랜치 MOB-14·OPS-25는 main의 동번호와 내용이 다른 ID 충돌(감사 §4-3). NS-01/02는 main NS 계열이 03부터 시작해 번호 충돌 없음 — CLI로 재배정"
   - "③ 집행 지점 — 이식한 위젯·표기 계층이 실제 화면 경로에서 소비되는지(problem_screen·chat_screen 배선), 테스트가 CI에서 도는지 확인"
   - "④ SEC-24와 같은 브랜치를 공유하므로 이식 순서·공유 파일(me.py·app.py 등) 충돌을 SEC-24 완료 후 재실측"
+  - "⑤ [고립 참조 정정 2026-09-07 stray-code 8회차] (a) docs/reviews/functional_security_audit_2026-08-08.md(133줄·결함 11건 H1~H4·M1~M7·L1~L4의 감사 정본·main 부재)를 docs/reviews에 착지 — SEC-24·HARN-25·이 태스크가 모두 참조만 하고 이식을 약속하지 않았다. (b) paths 사각: 실제 잔여는 src/mobile·tests/backend 밖에도 있다 — src/backend 소스 20파일(OPS-25 등)·src/web 4파일 + tests/infra 2파일(ARCH-29)·docs 2·backlog/gates 서명 게이트 1건. paths로 범위를 잡으면 놓친다 — HARN-57(--path amend·PR #1021) 착지 후 paths 확장. (c) ARCH-29(출하 자산 판정 거버넌스) 회수는 main ARCH-12(done·Kiki 2026-07-13 '(a) 데모 예외 공식화'·WHITELIST 2건 동결)와 정면 상충 — main 번들 index-DJ9D7N0L.js에 quiz_history·그래프 맞히기·정답 보기·채점하기·당신의 답 5종 문자열 실재라 test_shipped_asset_judgement_governance.py를 그대로 이식하면 즉시 RED. 결정 재판정(학생 도달 실측 반증)이 선행돼야 한다. (d) S3-42~48(버킷 C 7건)은 S3-24가 아니라 main S3-25 소관 — 7회차 주석 'S3-24 소관'은 버킷 B에만 맞다. (e) 같은 브랜치의 MGMT-03(연령 수집·prod 신호 정책·owner kiki)은 8회차가 재등재. 회수 완료 전 k20m0w 삭제 금지"
 artifacts: []
 paths:
   - "src/mobile/**"
   - "tests/backend/**"
-session: null
-notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A1. SEC-24와 동일 브랜치(2330a095) — 보안분 선행 회수 후 착수. 회수 완료 전 원 브랜치 삭제 금지. 최초 제안 번호 MOB-17은 원격 브랜치(8ap436)의 MOB-17-growth-evidence-render 선점으로 CLI가 거부 — 제안 번호 MOB-18 채택\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+  - "src/backend/whymath_backend/api/**"
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - src/backend/whymath_backend/app.py
+  - "tests/infra/**"
+  - "docs/reviews/**"
+session: claude/whymath-system-review-n75r24
+notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A1. SEC-24와 동일 브랜치(2330a095) — 보안분 선행 회수 후 착수. 회수 완료 전 원 브랜치 삭제 금지. 최초 제안 번호 MOB-17은 원격 브랜치(8ap436)의 MOB-17-growth-evidence-render 선점으로 CLI가 거부 — 제안 번호 MOB-18 채택\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 risk=high: 감사 정본 문서가 HARN-25 ⑥(회수 범위 밖)·MOB-18 paths(docs 없음)로 고아, 잔여의 src/backend 20·src/web 4·tests/infra 2파일이 paths 밖, ARCH-29 회수가 main ARCH-12 결정과 정면 상충. 7회차(PR #1020) 무접촉\n\n[정정 2026-09-07] Codex P1(PR #1027): ⑤(b) 'HARN-57 착지 후 paths 확장'을 산문에만 적고 depends_on에 넣지 않아 selector가 MOB-18을 후보로 냈다 — 선언≠집행(CLAUDE.md 2026-09-01 규칙·HARN-52)의 자기 위반. 집행으로 전환\n\n[정정 2026-09-07] paths ['src/mobile/**', 'tests/backend/**'] → ['src/mobile/**', 'tests/backend/**', 'src/backend/whymath_backend/api/**', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'src/backend/whymath_backend/app.py', 'tests/infra/**', 'docs/reviews/**']: ⑤(b) paths 사각 해소 — HARN-57(--path amend) 착지 확인 후 확장. 실측(2026-09-07 main 기준 k20m0w 잔여 48파일): 잔여가 src/mobile·tests/backend 밖에도 있다 — src/backend api·ops·app.py(PB-04 도달 관측 배선)·tests/infra 2·docs/reviews 1. 기존 2건은 HARN-81(--path 교체 의미가 무증상) 때문에 전부 재명시했다."
+updated: 2026-09-07

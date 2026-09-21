@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,10 +17,14 @@ acceptance:
   - "③ 변별력 양방향: 적용 전후 소요를 같은 방식으로 재고 분포(최대 표본)로 비교한다. 적용 후만 재고 통과 선언 금지. 목표는 '평균이 줄었다'가 아니라 '최대 표본의 여유가 상한의 30% 이상'이다"
   - "④ 커버리지 게이트 불변: --cov-fail-under=70·계층별 floor·Wilson 게이트 9종은 그대로 돌아야 한다. 병렬화로 게이트가 조용히 빠지면 '검증 장치를 만들고 배선 확인 없이 완료 선언 금지'에 걸린다 — 적용 후 게이트 스텝이 실제로 실행되는지 확인"
   - "⑤ 경계 별항(중복 회피): HARN-32 ③이 '완화책 후보 = CI 분할·단축(백엔드 잡이 병목)'을 적어 두었으나 그 태스크의 대상은 *머지 경합*(base 전진·mergeable_state)이다. 이 태스크는 *잡 자체의 시간 여유*를 본다 — 착수 시 HARN-32와 소유 축이 갈리는지 재확인하고, 겹치면 한쪽으로 합친다"
-artifacts: []
+  - "⑥ [재측정 완료 2026-09-10] pytest-xdist 병렬화는 OPS-58(PR #944, 2026-08-31~09-01 착지)이 '-n auto --dist loadfile'로 이미 적용했다(다른 태스크·다른 동기=머지 경합 완화였으나 소요 축을 줄이는 동일 메커니즘). OPS-47은 그 효과가 타임아웃 여유에 실제로 반영됐는지 독립 재측정으로 확인했다. 재현 스크립트: scripts/analysis/measure_backend_job_timeout_headroom.py(신규, ci.yml에서 timeout-minutes를 직접 읽어 하드코딩 회피). 실행: python3 scripts/analysis/measure_backend_job_timeout_headroom.py kiki-s-broom/WhyMath main --n 11. 결과(2026-09-08~09-10 main push 11표본, GET /repos/{owner}/{repo}/actions/workflows/ci.yml/runs?branch=main&event=push): backend 잡 소요 최소/중앙/최대 = 12.7/18.3/19.5분(적용 전 20.9/28.2/29.4분 대비 대폭 축소). 최대 표본 기준 여유 = 35 - 19.53 = 15.47분(44.2%) — 목표 '상한의 30% 이상'을 충족한다.\n⑦ [④ 재확인] 재측정 표본 11건 전부 backend 잡 conclusion=success이고, 잡 스텝 목록에 계층별 커버리지 게이트·결함주입 강등전·선택형단답 채점 강등전·코치 프로즈 유출·앵커 탐지 채널·교수법 팩·비유예시 결함 검출기·표기 커버리지·콘텐츠 출처감사·데이터 등급 라우팅·라우터 우회 결정·L3 프롬프트 레일 게이트가 전 표본에서 정상 실행·통과했다(--cov-fail-under=70 포함 Pytest 스텝이 게이트들보다 먼저 완주). 병렬화로 게이트가 빠지지 않았음을 확인.\n⑧ [⑤ 재확인] HARN-32는 필수 상태 체크(브랜치 보호 up-to-date 요구) 기준 머지 경합 축을 다루고(⑦ 실측 — strict policy 확정, PR #916), backend 잡은 애초에 필수 체크 목록에 없다(HARN-32 ⑧). 이 태스크는 backend 잡 자체의 타임아웃 상한 대비 여유를 다룬다 — 축이 겹치지 않음을 재확인. ci.yml 주석(backend 잡 timeout-minutes 위)을 재측정 수치로 갱신했다."
+artifacts:
+  - scripts/analysis/measure_backend_job_timeout_headroom.py
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1089"
 paths:
   - ".github/workflows/ci.yml"
   - src/backend/pyproject.toml
+  - scripts/analysis/measure_backend_job_timeout_headroom.py
 session: null
-notes: "발견 경위: 2026-08-21 PR #848 스쿼시 머지 후 main CI 확인 중 backend 잡이 40분에 cancelled. lint·black·mypy·import-linter는 통과했고 Pytest 단계에서 잘렸다. 이 머지의 diff는 src/backend를 한 파일도 건드리지 않았고(변경 9파일 = MEMORY.md·backlog/·infra/·tests/infra), backend 잡은 working-directory: src/backend라 diff와 무관 — 즉 이 타임아웃은 #848의 결함이 아니라 선재하는 여유 부족이 드러난 것이다. 직전 main 커밋 38278c85는 같은 스위트를 28.3분에 통과했다. 재실행으로 확인하려 했으나 rerun-failed-jobs가 403(권한 없음)이라 못 했다 — 이 판정은 소요 분포 11표본 실측에 근거한다. ci.yml:279가 '후속 최적화 과제: pytest-xdist 병렬 실행·무거운 생성기/게이트 테스트 slow 마크 분리'를 적어 두었으나 태스크로 등재돼 있지 않았다(CLAUDE.md: 주석 속 계획은 백로그를 대신하지 못한다).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "발견 경위: 2026-08-21 PR #848 스쿼시 머지 후 main CI 확인 중 backend 잡이 40분에 cancelled. lint·black·mypy·import-linter는 통과했고 Pytest 단계에서 잘렸다. 이 머지의 diff는 src/backend를 한 파일도 건드리지 않았고(변경 9파일 = MEMORY.md·backlog/·infra/·tests/infra), backend 잡은 working-directory: src/backend라 diff와 무관 — 즉 이 타임아웃은 #848의 결함이 아니라 선재하는 여유 부족이 드러난 것이다. 직전 main 커밋 38278c85는 같은 스위트를 28.3분에 통과했다. 재실행으로 확인하려 했으나 rerun-failed-jobs가 403(권한 없음)이라 못 했다 — 이 판정은 소요 분포 11표본 실측에 근거한다. ci.yml:279가 '후속 최적화 과제: pytest-xdist 병렬 실행·무거운 생성기/게이트 테스트 slow 마크 분리'를 적어 두었으나 태스크로 등재돼 있지 않았다(CLAUDE.md: 주석 속 계획은 백로그를 대신하지 못한다).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-10] 재측정 완료 — pytest-xdist(OPS-58)가 이미 적용돼 있었고 독립 재측정으로 타임아웃 여유 회복을 확인\n\n[정정 2026-09-10] paths ['.github/workflows/ci.yml', 'src/backend/pyproject.toml'] → ['.github/workflows/ci.yml', 'src/backend/pyproject.toml', 'scripts/analysis/measure_backend_job_timeout_headroom.py']: 범위 확장 — 재현 스크립트 산출물 경로 반영"
+updated: 2026-09-10

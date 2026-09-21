@@ -21,6 +21,7 @@ acceptance:
   - "⑥ 학생 대면 표현 제약 — 원 스칼라(분/개념) 노출 금지. '정답을 빠르게'로 오독될 수 있는 속도 수치는 서술 변환하거나 INTERNAL_ONLY로 둔다(reclaimed_time_positioning_v1.md §1 안전선). 비교·서열·순위 파생 0"
   - "⑦ 변별력 양방향 + CI 배선 실재 확인(OPS-03·OPS-10)"
   - "⑧ 범위 밖 동결 — learning_session writer 신설·step_times/time_vs_expected dead column 소생·ClickHouse 도입·보호자 대시보드"
+  - "[고립 참조 2026-09-07 stray-code 감사] 구현+테스트가 origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 c7f481a4→08db05ec)에 done 표기로 보존 — harness/wh1_evaluation.py·growth_evidence_exposure.py·api/coach.py 변경 + tests/backend/harness/test_wh1_evaluation_time_normalized_mastery.py main 부재 실측(심볼 time_normalized_mastery grep 0). 착수 시 재구현 말고 파일 단위 회수 우선(통째 머지 금지). 부수 발견 PED-15(started_at NULL)는 별도 회수 태스크로 재등재됨 — 같은 감사 참조. 회수 완료 전 원 브랜치 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/wh1_evaluation.py
@@ -28,5 +29,5 @@ paths:
   - "src/mobile/lib/features/problems/**"
   - "tests/backend/harness/test_wh1_evaluation*.py"
 session: null
-notes: "docs/strategy/reclaimed_time_positioning_v1.md §3·§7. 포지셔닝의 대표 지표이나 현재 계산 불가 — 학습 시간 분모가 없다(duration_seconds 클라 송신 0건·learning_session 생성 경로 0). S3-32가 서버측 ProblemAttempt 적재를 착지시키면 분자(숙달 델타)와 분모(누적 duration)가 처음으로 동시에 생긴다. 이 지표가 서지 않는 한 '더 빨리 도달한다'는 대외 주장은 측정 없는 주장이다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/strategy/reclaimed_time_positioning_v1.md §3·§7. 포지셔닝의 대표 지표이나 현재 계산 불가 — 학습 시간 분모가 없다(duration_seconds 클라 송신 0건·learning_session 생성 경로 0). S3-32가 서버측 ProblemAttempt 적재를 착지시키면 분자(숙달 델타)와 분모(누적 duration)가 처음으로 동시에 생긴다. 이 지표가 서지 않는 한 '더 빨리 도달한다'는 대외 주장은 측정 없는 주장이다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착"
+updated: 2026-09-07

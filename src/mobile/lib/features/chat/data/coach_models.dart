@@ -381,6 +381,9 @@ class CoachTurnResult {
     required this.dialogueId,
     required this.response,
     required this.wh1TurnIndex,
+    this.problemComplete = false,
+    this.awaitingReflection = false,
+    this.completedAttemptId,
   });
 
   /// 이 대화 세션 PK(UUID 문자열) — 이후 턴 추가·세션 조회에 재사용.
@@ -392,8 +395,26 @@ class CoachTurnResult {
   /// 이 교환의 WH-1 턴 번호(1-기반·세션 누적). 생성=1·턴마다 증가.
   final int wh1TurnIndex;
 
+  /// 이 턴에 문제가 *완료*됐는지(서버 `problem_complete`·기본 false).
+  ///
+  /// 서버가 내리는 **권위값**이다 — 클라는 정오·완료를 판정하지 않고 이 값만 본다.
+  /// true면 서버가 ProblemAttempt를 이미 적재하고 숙달을 전파했으므로 클라는 별도로
+  /// `POST /v1/me/attempts`를 부르지 않는다(중복 적재 금지·api/coach.py 계약 명문).
+  final bool problemComplete;
+
+  /// 정답 도달 후 *돌아보기(메타인지) 1턴*을 대기 중인지(서버 `awaiting_reflection`·기본 false).
+  ///
+  /// true면 이번 턴은 완료가 아니며([problemComplete]=false) 학생의 근거 응답 다음 턴에 완료된다.
+  final bool awaitingReflection;
+
+  /// 완료 시 서버가 적재한 ProblemAttempt PK(UUID 문자열)·완료가 아니면 null.
+  final String? completedAttemptId;
+
   /// 세션 생성/턴 추가 응답 JSON에서 파싱한다. [dialogueId]는 생성 응답이면 본문에서,
   /// 턴 추가 응답이면 URL에서 주입된다(TurnAppendResponse엔 dialogue_id가 없음).
+  ///
+  /// 완료 신호 3필드는 서버 기본값과 정합하게 폴백한다 — bool 둘은 부재 시 false,
+  /// `completed_attempt_id`는 부재 시 null(구판 서버 호환·조용한 추정 없음).
   factory CoachTurnResult.fromJson(
     Map<String, dynamic> json, {
     required String dialogueId,
@@ -402,6 +423,9 @@ class CoachTurnResult {
       dialogueId: dialogueId,
       response: CoachResponse.fromJson(json),
       wh1TurnIndex: (json['wh1_turn_index'] as num?)?.toInt() ?? 1,
+      problemComplete: json['problem_complete'] as bool? ?? false,
+      awaitingReflection: json['awaiting_reflection'] as bool? ?? false,
+      completedAttemptId: json['completed_attempt_id'] as String?,
     );
   }
 }

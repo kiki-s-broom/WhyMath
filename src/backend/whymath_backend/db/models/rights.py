@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import (
     DerivationType,
     LicenseType,
@@ -109,7 +110,9 @@ class SourceEntity(Base):
         """영속 ORM → schema.SourceEntity."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaSourceEntity.model_validate(data)
+        return SchemaSourceEntity.model_validate(
+            drop_unset_nulls(data, SchemaSourceEntity, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -144,7 +147,9 @@ class RightsHolderEntity(Base):
     def to_schema(self) -> SchemaRightsHolderEntity:
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaRightsHolderEntity.model_validate(data)
+        return SchemaRightsHolderEntity.model_validate(
+            drop_unset_nulls(data, SchemaRightsHolderEntity, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -203,7 +208,9 @@ class RightsEntity(Base):
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
         data["permissions"] = SchemaPermissionSet.model_validate(data.get("permissions") or {})
-        return SchemaRightsEntity.model_validate(data)
+        return SchemaRightsEntity.model_validate(
+            drop_unset_nulls(data, SchemaRightsEntity, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -241,7 +248,9 @@ class ContentSourceLink(Base):
     def to_schema(self) -> SchemaContentSourceLink:
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaContentSourceLink.model_validate(data)
+        return SchemaContentSourceLink.model_validate(
+            drop_unset_nulls(data, SchemaContentSourceLink, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -279,7 +288,9 @@ class ContentRightsLink(Base):
     def to_schema(self) -> SchemaContentRightsLink:
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaContentRightsLink.model_validate(data)
+        return SchemaContentRightsLink.model_validate(
+            drop_unset_nulls(data, SchemaContentRightsLink, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -321,4 +332,6 @@ class DerivationEdge(Base):
     def to_schema(self) -> SchemaDerivationEdge:
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaDerivationEdge.model_validate(data)
+        return SchemaDerivationEdge.model_validate(
+            drop_unset_nulls(data, SchemaDerivationEdge, orm_cls=type(self))
+        )

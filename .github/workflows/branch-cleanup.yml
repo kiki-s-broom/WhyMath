@@ -15,6 +15,11 @@
 #   · 삭제 직전 각 브랜치의 head SHA를 런 로그에 남긴다 — 삭제 후에도 그 SHA로
 #     `commits/<sha>`·`contents?ref=<sha>` API 접근이 가능하다(섀도 브랜치 회수로 실증).
 #   · 한 브랜치의 실패가 나머지를 막지 않되, 실패가 하나라도 있으면 잡은 red로 끝난다.
+#
+# 집행 본체는 `.github/scripts/branch_cleanup.sh`다(HARN-01에서 분리). 인라인 `run:`으로
+# 두면 쉘 스크립트를 로컬에서 실행 검증할 방법이 없어, 실패 주입 검증(정상에서 초록인 것만으론
+# 보호의 증거가 아니다 — CLAUDE.md 2026-09-01)이 GitHub 러너 전용이 된다. 분리하면
+# `tests/infra/test_branch_cleanup.py`가 `gh`를 스텁으로 갈아끼우고 실제로 돌릴 수 있다.
 name: branch-cleanup
 
 # 트리거 2경로:
@@ -46,39 +51,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCHES: ${{ inputs.branches }}
           REPO: ${{ github.repository }}
-        run: |
-          set -u
-          fail=0
-          # push 트리거면 요청 파일에서, dispatch면 입력에서 목록을 읽는다.
-          if [ -z "${BRANCHES:-}" ] && [ -f .github/branch-cleanup-request.txt ]; then
-            # 파일 형식: 브랜치 1줄 1개 · '#' 시작 줄은 주석.
-            BRANCHES=$(grep -v '^#' .github/branch-cleanup-request.txt | tr '\n' ',')
-          fi
-          if [ -z "${BRANCHES:-}" ]; then
-            echo "삭제 목록이 비어 있음 — 종료(no-op)"; exit 0
-          fi
-          IFS=',' read -ra list <<< "$BRANCHES"
-          for raw in "${list[@]}"; do
-            b="$(echo "$raw" | xargs)"   # 공백 트림
-            [ -z "$b" ] && continue
-            case "$b" in
-              main)
-                echo "::error::거부 — 'main'은 삭제 대상이 될 수 없다"; fail=1; continue ;;
-              claude/*|tmp-*|worktree-agent-*)
-                : ;;
-              *)
-                echo "::error::거부 — 허용 패턴(claude/*, tmp-*, worktree-agent-*) 밖: $b"
-                fail=1; continue ;;
-            esac
-            sha=$(gh api "repos/$REPO/git/refs/heads/$b" --jq .object.sha 2>/dev/null || true)
-            if [ -z "$sha" ]; then
-              echo "::warning::부재(이미 삭제됨?): $b"; continue
-            fi
-            echo "삭제 전 스냅샷: $sha  $b"
-            if gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null 2>&1; then
-              echo "삭제 완료: $b"
-            else
-              echo "::error::삭제 실패: $b"; fail=1
-            fi
-          done
-          exit $fail
+        run: bash .github/scripts/branch_cleanup.sh

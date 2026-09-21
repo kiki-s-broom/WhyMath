@@ -39,7 +39,7 @@
 |---|---|---|
 | CK-12 | CC BY-NC | 비상업 활용·해설 영감 |
 | OpenStax | CC BY | 상업 활용 가능 |
-| Siyavula | CC BY | 남아공 수학·과학 |
+| Siyavula | CC BY (**명시 표기 자료 한정** — 사이트 기본값은 closed) | 남아공 수학·과학 |
 | LibreTexts | CC BY-SA | 광범위한 수학 자원 |
 | NRICH | 비상업 무료 | *영감만* (상업 X) |
 | Mathigon | 비상업 | 시각화 영감 |
@@ -51,7 +51,7 @@
 | NuminaMath-CoT | Apache 2.0 | 860k 문항 |
 | MathNet (MIT 2026) | 확인 필요 | 30,000+ 47개국 17언어 |
 | OmniMath | 공개 | 4,428 문항 |
-| miniF2F | MIT | 488 Lean 형식화 |
+| miniF2F | 폴더별 상이 — 우리가 쓰는 `lean`은 **Apache 2.0** (metamath=MIT·hollight=FreeBSD·isabelle=Apache 2.0) | 488 Lean 형식화 |
 | AoPS Wiki | CC BY-SA | 미국·국제경시 |
 
 ### 7. 오개념 카탈로그

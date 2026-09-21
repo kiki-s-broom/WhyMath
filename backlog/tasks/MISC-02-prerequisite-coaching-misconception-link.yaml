@@ -11,13 +11,17 @@ eos_priority: P2
 owner: claude
 depends_on:
   - PED-05-learner-state-assembly
+  - HARN-57-done-artifact-correction-path
 requires_gates: []
 acceptance:
   - "recommend_prerequisite_coaching(gaps) 시그니처 불변(회귀 0), concept_src_id 느슨참조 재사용해 PrerequisiteGap 변환 어댑터만 신설"
+  - "[고립 참조 2026-09-07 stray-code 감사] origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 43e5d6d8)에 이 태스크의 done 구현이 보존 — l4/misconception/prerequisite_link.py(gaps_from_active_misconceptions 어댑터)+tests/backend/l4/misconception/test_prerequisite_link.py(main 부재 실측·심볼 grep 0). 위 [차단 2026-08-11]의 옵션 A/B/C 결정이 선행이며, 이 구현은 '오개념이 관한 개념→선수' 흐름이라 차단 사유 ③(오라벨) 우려의 실물이다 — 결정 후 착수 시 대조 자료로만 쓰고 무비판 이식 금지. 회수 판정 전 원 브랜치 삭제 금지"
+  - "[고립 참조 보완 2026-09-07 stray-code 8회차 · 판정 기준 main d50781b7] 위 참조의 2파일 외 **동반 변경**: api/coach.py·api/me.py 보충 경로(그래프 선수 0건일 때만 misconception_crosslink_mode != off 게이트로 보충) + 테스트 6건(tests/backend/api/test_coach.py TestPrerequisiteCoachingMisconceptionSupplement 3건 · test_me.py 3건). 실측: main src에 gaps_from_active_misconceptions 0파일. **플래그는 신설 불요** — misconception_crosslink_mode는 main config.py에 이미 실재한다. 단 이 태스크는 blocked(옵션 A/B/C 결정 선행)이고 브랜치 구현은 crosslink resolver 경유(옵션 C 계열)라, 결정 전에는 대조 자료로만 쓴다 — 무비판 이식 금지는 위 항 그대로. paths 유의: 현 paths(l4/prerequisite_coaching.py·l2/learner_state.py)가 api/**를 덮지 않는다(정정 CLI는 HARN-57 소관·미착지)"
+  - "[Codex P2 수용 2026-09-07] 앞 항의 'paths 유의' 문면은 *다른 세션에게* 충돌을 알리지 못한다 — start·overlap은 acceptance 산문이 아니라 paths만 읽는다. 이 태스크를 HARN-57(amend --path 신설)에 depends_on으로 걸었고, 착수 전에 paths를 api/**로 실제 확장한다(옵션 A/B/C 결정 선행은 별개로 유지)"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l4/prerequisite_coaching.py
   - src/backend/whymath_backend/l2/learner_state.py
 session: null
-notes: "04e_misconception_remediation_design.md §1-2. PED-05의 active_misconceptions 슬롯 선착지가 자연스러운 신호원.\n\n[차단 2026-08-11] 고립 브랜치 claude/misc-02-prerequisite-coaching-misconception-link(6d61321d) block 사유 이관: ①acceptance 필드 오류 — 'PrerequisiteGap.concept_src_id'는 실재하지 않음(concept_src_id는 MisconceptionCatalog 필드·PrerequisiteGap은 concept_code, id공간 상이) ②입력 소스 미정 — MisconceptionHypothesis(kebab)에 개념 링크 부재, kebab→M-id→source_id→Concept 다중 홉 crosslink 필요(현재 빈 테이블)와 '얇은 어댑터' 상충 ③교수학 미승인 — '오개념이 관한 개념'≠'선수'이므로 recommend_prerequisite_coaching에 흘리면 선수로 오라벨. 리뷰어 확정점: 재사용 필드·입력 소스·오라벨 승인 여부 — 옵션 A(순수 삼중쌍 어댑터)/B(별도 recommend_misconception_review_coaching)/C(crosslink 전배선·비권장) 택1 시 착수 가능. 상세 원문 = 해당 브랜치 태스크 yaml notes\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "04e_misconception_remediation_design.md §1-2. PED-05의 active_misconceptions 슬롯 선착지가 자연스러운 신호원.\n\n[차단 2026-08-11] 고립 브랜치 claude/misc-02-prerequisite-coaching-misconception-link(6d61321d) block 사유 이관: ①acceptance 필드 오류 — 'PrerequisiteGap.concept_src_id'는 실재하지 않음(concept_src_id는 MisconceptionCatalog 필드·PrerequisiteGap은 concept_code, id공간 상이) ②입력 소스 미정 — MisconceptionHypothesis(kebab)에 개념 링크 부재, kebab→M-id→source_id→Concept 다중 홉 crosslink 필요(현재 빈 테이블)와 '얇은 어댑터' 상충 ③교수학 미승인 — '오개념이 관한 개념'≠'선수'이므로 recommend_prerequisite_coaching에 흘리면 선수로 오라벨. 리뷰어 확정점: 재사용 필드·입력 소스·오라벨 승인 여부 — 옵션 A(순수 삼중쌍 어댑터)/B(별도 recommend_misconception_review_coaching)/C(crosslink 전배선·비권장) 택1 시 착수 가능. 상세 원문 = 해당 브랜치 태스크 yaml notes\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착\n\n[정정 2026-09-07] stray-code 8회차 후속(#1027 §4.2 표): 7회차 참조가 prerequisite_link.py+테스트만 열거해 서빙 집행 지점과 테스트 6건이 빠졌다. 판정 기준 main d50781b7\n\n[정정 2026-09-07] Codex P2(PR #1033) 수용: 회수 범위의 api/coach.py·api/me.py가 paths(l4/prerequisite_coaching.py·l2/learner_state.py) 밖이라 claim 시점 충돌 검출이 불가 — acceptance 산문은 그 역할을 못 하므로 paths 정정 CLI(HARN-57)를 depends_on으로 집행"
+updated: 2026-09-07

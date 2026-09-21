@@ -10,7 +10,9 @@ Phase 3가 캡처한 콘텐츠 코퍼스(`concept_content_v1/content.json`·K-12
   - **키가 code**이되 의미가 다르다: K-12=구 437 개념코드(예 'N1'·'A1') / 대학=소단원코드
     (예 'CALC1-U1-S1'). 겹침 0이라 단일 PK·`scope`('K-12'|'대학')로 구분(loader 인자로 주입).
   - **콘텐츠 4종 + 암기카드 수용**: metaphor·misconception·formal_definition_internal·
-    accepted_expressions·explanation·flashcards(JSONB list). 4종은 전량 자체작성(보유 허용).
+    accepted_expressions·explanation·flashcards(JSONB list). 4종은 자체작성이고, `explanation`
+    일부(K-12 133건)는 NCIC 성취기준 본문과 동일하다 — 교육부 고시라 저작권법 §7 비보호·공공누리
+    제1유형이라 보유·노출 제약 없음(코퍼스 사이드카 `ncic_statement_overlap`).
   - **review_status는 코퍼스 record 값**: 콘텐츠는 AI 추정·검수필요라 코퍼스에서
     `review_status`를 읽고, 부재 시만 'ai_estimated'로 폴백한다(정직 표기·검수 게이팅용·
     승격 후 재적재 시 `reviewed` 보존).

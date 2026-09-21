@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-37-canonical-entity-model-freeze
+title: "핵심 엔티티 19종 동결 — 9월 스키마 노드 폭발 방지 정본 + 기계 집행"
+track: math-completion
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 핵심 엔티티 19종을 위반 판정 가능한 문장으로 정의(무엇이 이 엔티티이고 무엇이 아닌지)"
+  - "② 현행 78테이블 전수 귀속표 — 19종 중 하나에 배정하거나 '핵심 외'로 배정. 판정 불가는 '혼재'로 그대로 적는다(날조 금지)"
+  - "③ 집행 별항(정본화≠집행): 기계 대조 지점을 명기하거나 없으면 '기계 집행 없음'을 명시"
+  - "④ 부재 엔티티(코드에 실체 없는 것)를 '부재'로 동결 — 몰래 생기지 못하게"
+artifacts:
+  - "PR #984 https://github.com/doldori7/WhyMath/pull/984 · 커밋 7cc45073 · 정본 docs/architecture/canonical_entity_model_v1.md(19종 동결·78테이블 전수 귀속 41좌석+37핵심외) + 집행 tests/backend/db/test_canonical_entity_model_freeze.py 7 passed EXIT=0 · 뮤테이션 6종 전건 RED · ruff/black EXIT=0"
+paths:
+  - docs/architecture/canonical_entity_model_v1.md
+  - tests/backend/db/test_canonical_entity_model_freeze.py
+session: null
+notes: "Kiki 지시(2026-09-05): 이날은 코드 개발을 멈추고 핵심 엔티티를 고정한다. 기존 검토해 온 훨씬 많은 Node를 9월 schema에 전부 넣지 않는다."
+updated: 2026-09-05

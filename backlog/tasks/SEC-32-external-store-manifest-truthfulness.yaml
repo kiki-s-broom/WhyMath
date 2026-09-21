@@ -1,0 +1,38 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-32-external-store-manifest-truthfulness
+title: "개인정보 삭제·반출 매니페스트 진실성 회수 — 실재 반출처 Langfuse 누락 + 미도입 store 2종(ClickHouse·S3) 허위 선언 (원 SEC-13 q8tvcx판 등재 유실·번호 이중 배정으로 재등재)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정(2026-09-07 main b75f495d): 원 SEC-13-external-store-manifest-truthfulness는 origin/claude/whymath-ai-recommendation-review-q8tvcx(e1835c0c · 등재 커밋 ee9df6dc)에만 존재. main에 SEC-13-* 파일 자체가 없고(SEC-12→SEC-19) k20m0w의 SEC-13-harness-metrics-exposure-contract와 번호 이중 배정. 실체 미해소 실측: privacy/erasure.py:182/188·export.py:196/201이 clickhouse·s3를 선언하고 langfuse 0건, tests/backend/privacy/test_erasure.py:156이 {clickhouse,s3,redis} 하드코딩 유지. 후행 docs/reviews/eos_privacy_gap_analysis.md:161/243/272는 'ClickHouse/S3/Redis 삭제 연동'을 P1로 적어 허위 전제를 승계 — 그 문서도 정정 대상"
+  - "② Langfuse를 외부 store 매니페스트에 등재(본체) — l3/trace/langfuse_sink.py가 student_id_hash를 외부 SaaS로 실제 전송하고 app.py 기본 주입·docker-compose.prod.yml env 실배포. 미성년자 데이터의 실재 반출처가 삭제·반출 매니페스트에 없다(의사결정 우선순위 2위 법적·윤리). 착수 시 위 줄 번호는 현행 main에서 재실측"
+  - "③ ClickHouse·S3 항목 처분 — 제거하거나 '미도입' 사유 병기(선례: CLAUDE.md Wolfram Alpha·GPT-5/Gemini·Neo4j 미도입 표기). Redis locator는 배포 기본값(coach_rate_limit_backend=memory·device_store_mode=none)에서 비활성인 두 경로 대신 실재 학생 유래 데이터(LLM 응답 캐시·Celery payload)를 서술하거나 조건부 표기"
+  - "④ 회귀 테스트를 하드코딩 집합에서 계약으로 전환 — '선언된 store는 config 키 또는 compose 서비스로 실재가 확인돼야 한다'(test_erasure·test_export·test_me_erasure·test_me_export). 변별력: 미도입 store를 매니페스트에 1건 추가하면 RED"
+  - "⑤ 범위 밖: 실제 외부 삭제 실행(Langfuse API 연동)은 별건 — 매니페스트 진실성까지. 원 번호 SEC-13 재사용 금지"
+artifacts:
+  - "PR #1036 — clickhouse·s3 허위 선언 제거(미도입 사유는 코드 주석 병기) · 실배포 langfuse 등재 · redis locator 거짓 정정 · 하드코딩 집합을 Settings.model_fields+파싱된 compose 대조 계약으로 전환 · 뮤테이션 구현자 4종+검증자 5종(미도입 재선언·langfuse 제거 전건 RED) · 전체 백엔드 12529 passed · 후속 HARN-81 등재 · 커밋 20b96204"
+paths:
+  - src/backend/whymath_backend/privacy/erasure.py
+  - src/backend/whymath_backend/privacy/export.py
+  - src/backend/whymath_backend/api/me.py
+  - tests/backend/_external_store_evidence.py
+  - tests/backend/privacy/test_erasure.py
+  - tests/backend/privacy/test_export.py
+  - tests/backend/privacy/test_external_store_evidence.py
+  - tests/backend/api/test_me_erasure.py
+  - tests/backend/api/test_me_export.py
+  - docs/reviews/eos_privacy_gap_analysis.md
+  - docs/architecture/04a_wh1_tutoring_harness.md
+  - backlog/inventory/feature_inventory_v2.yaml
+  - backlog/inventory/feature_inventory_v2.csv
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5 (stray-code 8회차 — q8tvcx 커버리지 정독 risk=high). 원 등재 근거 = q8tvcx의 data_platform_module_gap_review_r2.md C1(2026-08-04): 매니페스트가 없는 store 2개를 선언하고 있는 store 1개를 누락 — 양방향 오류이며 누락 쪽이 중대. pending_external은 API 응답에 실리지 않고 ops 로그로만 나간다(수신자 = 운영자). 소유 태스크 OPS-38(OPS-19 회수)의 acceptance 어디에도 없어 OPS-38 done 시 소실될 상태였다. 보안·법령 관련 고립분 → priority 1(stray-code 규칙). 원 브랜치 q8tvcx는 OPS-38 회수 완료 전 삭제 금지.\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/privacy/erasure.py', 'src/backend/whymath_backend/privacy/export.py', 'tests/backend/privacy/test_erasure.py', 'tests/backend/privacy/test_export.py', 'tests/backend/api/test_me_erasure.py', 'tests/backend/api/test_me_export.py', 'docs/reviews/eos_privacy_gap_analysis.md'] → ['tests/backend/_external_store_evidence.py', 'tests/backend/privacy/test_external_store_evidence.py', 'src/backend/whymath_backend/api/me.py', 'docs/architecture/04a_wh1_tutoring_harness.md', 'backlog/inventory/feature_inventory_v2.yaml', 'backlog/inventory/feature_inventory_v2.csv']: SEC-32 구현 범위 실측 반영: ④ 계약을 tests/backend/_external_store_evidence.py(배포 근거 조회)와 그 변별력 테스트로 분리 신설, api/me.py의 store 열거 docstring·ops 로그 주석 정합, 설계 정본 04a의 3-store 열거에 정정 노트 추가(허위 전제 승계 차단), 테스트 함수 증가로 EOS 인벤토리 재생성(--write)\n\n[정정 2026-09-07] paths ['tests/backend/_external_store_evidence.py', 'tests/backend/privacy/test_external_store_evidence.py', 'src/backend/whymath_backend/api/me.py', 'docs/architecture/04a_wh1_tutoring_harness.md', 'backlog/inventory/feature_inventory_v2.yaml', 'backlog/inventory/feature_inventory_v2.csv'] → ['src/backend/whymath_backend/privacy/erasure.py', 'src/backend/whymath_backend/privacy/export.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/_external_store_evidence.py', 'tests/backend/privacy/test_erasure.py', 'tests/backend/privacy/test_export.py', 'tests/backend/privacy/test_external_store_evidence.py', 'tests/backend/api/test_me_erasure.py', 'tests/backend/api/test_me_export.py', 'docs/reviews/eos_privacy_gap_analysis.md', 'docs/architecture/04a_wh1_tutoring_harness.md', 'backlog/inventory/feature_inventory_v2.yaml', 'backlog/inventory/feature_inventory_v2.csv']: 직전 amend의 --path가 append가 아니라 replace라 원 7건이 소실됐다 — 원 7건 + 신규 6건 전체를 다시 명시해 복원한다(대장 손편집 금지 규칙 준수)"
+updated: 2026-09-07

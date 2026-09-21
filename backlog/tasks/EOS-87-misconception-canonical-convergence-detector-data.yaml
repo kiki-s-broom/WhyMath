@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-87-misconception-canonical-convergence-detector-data
+title: "오개념 3중 표현 부채 canonical 수렴 — L4 탐지 카탈로그 64종·distractor 10건 데이터 파일화 + MisconceptionDomain Literal 개방 (물리 오개념 시드 선결 · 기존 문서 부채의 대장 편입)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "⓪ 선결 결정(착수 첫 항): 정본을 docs/prompts/misconception_diagnosis.md(doc-first 불변식 유지)로 둘지 데이터 파일로 바꿀지 Kiki 판정을 받아 기록 — 미결이면 데이터 파일을 더해 3중 부채를 4중으로 만들지 않는다(착수 금지)"
+  - "① l4/misconception/catalog.py의 CATALOG 64종을 패키지 내 데이터 파일(probes_v1.jsonl·importlib.resources 선례 동형)로 이전, 로더 lru_cache + PEP 562 __getattr__로 CATALOG·CATALOG_BY_ID 심볼 보존 → 소비자 28모듈·테스트 40파일 무수정 통과. 정규식·SymPy 문자열의 JSON escape 왕복 동일성 테스트 + 스키마 동결 테스트(타입 검증이 CI→부팅으로 이동하는 것을 보상)"
+  - "② l4/misconception/distractor.py DISTRACTOR_CATALOG 10건 동일 방식 이전 — import-time field_validator(CATALOG_BY_ID 조회)의 순환·부팅 순서를 실측해 lazy 검증으로 전환하되 fail-fast 상실을 테스트로 보상"
+  - "③ l4/misconception/models.py MisconceptionDomain Literal(수학 8영역)을 개방 str + 과목 팩 어휘 검증으로 교체 — 데이터 컬럼 misconception_catalog.domain String(64)과 정합. 'phys-' 접두 시드가 타입 수정 없이 통과함을 테스트로 증명(물리 시드 자체는 이 태스크 범위 밖)"
+  - "④ import-time 굳힘 지점 정리: api/coach.py _FANOUT = len(CATALOG) 등 모듈 상수를 lazy화·전수 grep 목록을 문서에 기록. 하드코딩 단언 테스트(test_misconception_catalog.py 64 집합·test_crosslink_demotion_eval.py kebabs_total 64) 조정"
+  - "⑤ 문서 정합: subject_expansion_readiness.md·math_dsl_evolution.md·current_phase_checklist.md의 'canonical 수렴 선행' 부채 항목이 이 태스크 ID를 가리키게 갱신 + eos_core_adapter_boundary.md §8.3 어휘 상수 재실측. stale 건수 표기(catalog.py docstring 34종·주석 30종 등) 일괄 정정"
+  - "⓪-판정 [Kiki 2026-09-06 결정] 정본 = docs/prompts/misconception_diagnosis.md **유지**(doc-first 불변식 불변). 따라서 ①②가 만드는 데이터 파일은 **정본이 아니라 그 문서의 파생물**이며, 이 결정은 착수 조건을 푸는 동시에 새 의무를 만든다: (a) 데이터 파일 헤더에 '정본은 docs/prompts/misconception_diagnosis.md · 이 파일은 파생물'을 명시 (b) **문서↔데이터 동기화 검사를 테스트로 동결** — 문서에 있는 오개념이 데이터에 없거나 그 반대면 RED. 이 검사가 없으면 3중 부채가 4중이 된다(등재 시 지적한 그 위험이 결정으로 사라지는 것이 아니라 검사로 옮겨간다) (c) 문서를 고치고 데이터를 안 고친 상태가 통과하지 않는지 결함 주입으로 실증"
+  - "⓪-판정-보강 [Codex P2 대응 · PR #1010 리뷰] (b) 동기화 검사의 범위를 명시적으로 확정한다 — 검사 대상은 misconception 64종뿐 아니라 DISTRACTOR_CATALOG 10건(②)도 포함한다. docs/prompts/misconception_diagnosis.md에 distractor 레코드(10개 op-code ID)가 실려 있지 않다면, ②를 위한 canonical 표현을 같은 문서에 추가하거나(선호 — doc-first 불변식과 일치), 그것이 부적합하면 distractor 전용 정본 소스와 그 자체의 동기화 테스트를 별도로 명시한다. 어느 쪽이든 (c) 결함 주입 실증은 misconception 축과 distractor 축을 각각 독립으로 수행 — 한쪽만 깨뜨려 다른 쪽 검사가 여전히 통과하는지까지 확인해야 \"검사가 두 축을 다 본다\"는 주장이 성립한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - src/backend/whymath_backend/l4/misconception/distractor.py
+  - src/backend/whymath_backend/l4/misconception/models.py
+  - tests/backend/l4/test_misconception_catalog.py
+session: null
+notes: "출처: docs/reviews/eos_core_boundary_remediation_candidates_2026-09-04.md §3. 대장 전수 grep 결과 'canonical 수렴' 태스크가 부재해(문서 3곳에만 산문 등재) 이 태스크가 그 부채의 대장 정본이 된다 — 신설이 아니라 편입. 실측: 64종 100% 순수 데이터(함수·람다 0), 843 M-id 코퍼스+DB 테이블+crosslinks 64건(kebab↔M-id 1:1·Kiki 검수 2026-07-12) 실재. DB 테이블 방안(B)은 audit.py 'DB 0·순수·결정론' 계약 위반 — 비채택. eos_priority P2 근거: 물리 부착은 12월 판정 이후(2027 Q1~Q2).\n\n[정정 2026-09-06] Kiki 판정: 정본은 프롬프트 문서 유지. 착수 선결 조건 해소 — 다만 데이터 파일이 파생물이 되므로 동기화 검사 의무가 새로 생긴다(4중 부채 방지의 집행 지점)\n\n[정정 2026-09-10] Codex P2 리뷰(PR #1010) 대응 — 동기화 검사 범위에 distractor 10건 명시 편입"
+updated: 2026-09-10

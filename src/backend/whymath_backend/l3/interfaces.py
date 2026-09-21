@@ -30,6 +30,7 @@ class LLMProvider(Protocol):
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -49,6 +50,19 @@ class LLMProvider(Protocol):
         바람직한 호출부는 지정하지 않아 종전 그대로다). 값을 주면(예 동등문제 저작=0.9) 제공자가
         그 온도로 호출한다. 온도를 지원하지 않는 백엔드(예 Opus 4.7·temperature 거부)는 이를
         조용히 무시하지 않고 호출부가 지정하지 않도록 하는 것이 계약이다(아래 각 제공자 주석).
+
+        `top_p`(누적확률 절단·nucleus sampling)는 temperature와 **같은 축의 짝**인 *선택적*
+        입력이다(EOS-121 선결조건 A). None(기본)이면 제공자가 top_p를 **싣지 않아** 각 공급사
+        기본값이 적용된다 — 즉 **기존 동작 무변경**이다. 기본값을 None으로 두는 이유가 이
+        파라미터의 요점이다: 무조건 명시 전송하면 현재 공급사 기본값과 다른 값이 나가 *저작
+        품질이 조용히 바뀐다*(회귀). 목표는 "top_p를 켜는 것"이 아니라 **좌석 간 샘플링 설정을
+        맞출 수단을 갖는 것**이다 — 좌석별 생성 다양성을 측정할 때 통제되지 않은 공급사 기본값이
+        교란 변수가 되기 때문이다(`docs/ops/eos121_seat_generation_diversity_precheck.md` §1:
+        저장소에는 두 공급사 기본값이 같다는 근거도 다르다는 근거도 없다 — "모른다 ≠ 아니다").
+        값을 주면 제공자가 그 값을 실제 페이로드에 싣는다. top_p를 지원하지 않는 백엔드(예
+        Opus 4.7은 temperature/top_p/top_k를 함께 거부·400)는 temperature와 **같은 계약**을
+        따른다 — 제공자가 조용히 무시하지 않고, 호출부가 그 경로에 지정하지 않는 것이 계약이다
+        (temperature와 다른 정책을 이 축에만 따로 두지 않는다 — 각 제공자 주석 참조).
 
         `json_schema`(출력 JSON 스키마)는 *structured output 문법 강제*용 *선택적* 입력이다
         (S2-j). None(기본)이면 자유 텍스트 생성 — **기존 동작 무변경**. 스키마를 주면 제공자가

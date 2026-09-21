@@ -9,15 +9,17 @@ status: todo
 priority: 3
 eos_priority: P3
 owner: claude
-depends_on: []
+depends_on:
+  - HARN-57-done-artifact-correction-path
 requires_gates: []
 acceptance:
   - "① 본문 대조(선행) — origin/claude/whymath-coding-architecture-iws58k(head a8e01be2)의 E7 설계·2차 과목 비교 검토가 subject_expansion_e_axis_v1.md 현행과 정합인지 읽고 채택 여부 판정"
   - "② 채택 시 문서 착지 + scripts/harness/models.py 변경분 판정(하네스 코드이므로 tests/harness 회귀 확인). 기각 시 사유 기록"
+  - "③ [고립 참조 정정 2026-09-07 stray-code 8회차 — acceptance 밖 잔여 승격] (a) backlog/tasks/E7-{01,02,03,04,05,90}-*.yaml 6건(코드 실행 채점 primitive·에디터 임베드 결정(kiki)·정보과 영역 등록·코딩 오개념 시드·정보 라이선스 매트릭스·코딩 배치 결정(kiki) — 전부 subject: coding·main 0건): models.py SUBJECTS 'coding' 등록과 **동일 판정**으로 backlog.py add 경유 재등재하거나 기각 사유를 notes에 기록(번호 추론 금지·브랜치 문서가 E7-01/02/90을 인용하므로 문서 착지 시 ID 정합 필수). (b) docs/data/licensing_safety.md 고유 3행(백준/프로그래머스 본문 ❌·KOI 기출 ❌ 메타만·NCIC 정보과 공공누리 1유형 가등록) — 법령·라이선스 축·브랜치 유일 정보. 나머지 2행(최종 갱신·K-12)은 LIC-02 후행판이 main 우세·이식 금지. (c) docs/architecture/subject_expansion_readiness.md §1·§8 신규 축 2건·CODE AREA·코딩 오개념 시드 행·범례 '신규 축' 정의(10줄) + docs/architecture/06_application_modes.md 디버깅 도장 E축 관계 1줄 — 채택/기각을 ②와 같은 판정으로. (d) MEMORY 2026-08-10 E7 제안 로그 6줄은 ②의 판정 기록이 대체·events 7줄은 CLI가 재생성(이식 금지). paths 확장은 HARN-57(--path amend·PR #1021) 착지 후 docs/data/licensing_safety.md·docs/architecture/{06_application_modes,subject_expansion_readiness}.md 추가. 회수 완료 전 iws58k 삭제 금지"
 artifacts: []
 paths:
   - "docs/strategy/**"
   - scripts/harness/models.py
 session: null
-notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A6. subject-expansion 트랙 유일 미회수 설계 산출물. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A6. subject-expansion 트랙 유일 미회수 설계 산출물. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독: acceptance ①②·paths(docs/strategy/**·models.py)가 E7 태스크 6건·라이선스 매트릭스 3행·아키텍처 문서 2건을 다루지 않음 — models.py 'coding' 등록과 E7 YAML은 결합 의존(유일 소비자)이라 문서만 착지하면 매달린 ID 참조가 남는다. 7회차(PR #1020) 무접촉\n\n[정정 2026-09-07] Codex P1(PR #1027) 동형: ③ 'paths 확장은 HARN-57 착지 후'가 산문 선행 — depends_on으로 집행"
+updated: 2026-09-07

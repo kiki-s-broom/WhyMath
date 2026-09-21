@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-78
+title: "미머지 브랜치 탐지기 pr_filed 축이 닫힌 미머지 PR을 소유자로 센다 — '처분은 해당 PR에서'가 막다른 길 (결정 불요 위장 계열 3번째)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 고정: 2026-09-07 full clone에서 `backlog.py branches`가 gates/deploy-environment-approval(PR #967 · closed 2026-09-01 · merged=false)·whymath-curriculum-design-6eejrv(PR #802 · closed 08-14 · merged=false · 고립 done 1)·whymath-pedagogy-review-uqyg79(PR #675 · closed 08-14 · merged=false · 고립 done 9)를 '[PR] — 처분은 해당 PR에서'로 냈다. 원인 = remote_claims.py:1601이 자인한 한계(refs/pull/<N>/head는 닫힌 PR에도 남음) — 수정 전 재현을 먼저 고정한다"
+  - "② 판정 강화: pr_filed를 열림/닫힘으로 가른다. 오프라인 git 원칙(토큰 없이도 판정 소멸 금지)은 유지하되 답할 수 있는 것만 답한다 — (a) GitHub 토큰이 있는 경로(CI harness-integrity 잡·GITHUB_TOKEN)에서는 PR state를 조회해 closed·merged=false를 새 분류 `pr_closed`(행동요구 = isolated와 동일·evidence에 'PR #N 닫힘(미머지)')로 승격 (b) 조회 불가·토큰 없음이면 `pr_filed`에 '상태 미확인' 표기를 붙이고 브리핑 문구를 '처분은 해당 PR에서'가 아니라 'PR #N 열림/닫힘을 확인하라'로 바꾼다 — 성공(상태 확인됨)과 실패(미확인)가 다른 글자를 내야 한다"
+  - "③ 변별력 양방향: 닫힌 PR 3건이 pr_closed로 빠지고 열린 PR(#975 등)은 pr_filed로 남는 것 + 상태 조회를 무력화(토큰 제거·API 실패 주입)하면 '상태 미확인' 경로가 실제로 나오는 것을 각각 테스트로 동결. 뮤테이션(state 판독 제거)이 red를 내는지 실측 후 통과 선언"
+  - "④ 배선 실재성(정본화와 별항): 새 분류가 SessionStart 브리핑(report.py)과 CI `backlog.py branches` 양쪽에서 실제로 렌더됨을 tests/harness/test_report.py·test_remote_claims.py 확장으로 동결. '저장소에 존재함 ≠ 돌아감'"
+  - "⑤ 범위 밖 동결: refs/pull/<N>/merge 휴리스틱 재도입 금지(2026-08-31 실측 폐기 — 열린 14건 중 merge ref 8건·변별력 없음) · 브랜치 삭제·회수(stray-code 소관) · HARN-30(PR 배송 상태·체크런 축)과의 중복 착수 금지 — 그쪽은 PR을, 이쪽은 브랜치의 소유 판정을 본다"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1043"
+paths:
+  - scripts/harness/remote_claims.py
+  - scripts/harness/report.py
+  - scripts/harness/backlog.py
+  - tests/harness/test_remote_claims.py
+  - tests/harness/test_report.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §3.2 (stray-code 8회차). 사고 경위: HARN-47(#936)이 isolated/pr_filed를 갈라 경고 소음 61%를 걷어냈으나 pr_filed는 '이 tip으로 PR이 열린 이력이 있다'만 답한다 — 닫힌 미머지 PR 3건(#967·#802·#675)이 '처분은 해당 PR에서'로 렌더돼, 읽는 세션이 그 브랜치를 소유됨으로 넘긴다. 08-11 ④(느슨한 needle→거짓 ported)·HARN-37(문서 커밋→거짓 ported)에 이은 '결정 불요로 위장' 계열 3번째 변형. 오늘 실피해 0은 stray-code 감사가 GitHub API로 PR 상태를 따로 실측하기 때문이지 탐지기 덕이 아니다. 시스템 실수(도구 결함)·반복 계열 → CLAUDE.md 실수 관리 규칙에 따른 의무 등재."
+updated: 2026-09-07

@@ -158,6 +158,11 @@ class GenerationLog(Base):
     prompt_template_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid)
     input_tokens: Mapped[int | None] = mapped_column(sa.Integer)
     output_tokens: Mapped[int | None] = mapped_column(sa.Integer)
+    # 프롬프트 캐시 2종(EOS-99) — nullable·server_default 없음(구 행 NULL=미기록·소급 날조
+    # 금지, run_id/EOS-55 재현 좌석과 같은 방침). 여기 컬럼이 없으면 `from_schema`의
+    # mapped_keys 필터가 값을 **조용히 버려** DB 경로만 캐시 축을 잃는다(침묵 실패 금지).
+    cache_read_input_tokens: Mapped[int | None] = mapped_column(sa.Integer)
+    cache_creation_input_tokens: Mapped[int | None] = mapped_column(sa.Integer)
     cost_usd: Mapped[float | None] = mapped_column(sa.Numeric(8, 4))
     latency_ms: Mapped[int | None] = mapped_column(sa.Integer)
     success: Mapped[bool | None] = mapped_column(sa.Boolean)
@@ -179,9 +184,24 @@ class GenerationLog(Base):
     # 생산 CU 조인 정체성(#912 P1-2) — 코퍼스 키·review_timer cu_slug와 동일 산식(폭 128
     # schema 강제 동형). 정체성 없는 종단(파싱 실패·pregenerate 시드)은 NULL=미기록.
     cu_slug: Mapped[str | None] = mapped_column(sa.String(128))
+    # 리콜 조인 축(EOS-97) — "이 회차로 만든 산출물"을 기계가 특정하는 키. 회차 개념이
+    # 없는 경로(pregenerate 단발 인제스트)는 NULL=미기록(날조 금지·EOS-55 좌석 동형).
+    run_id: Mapped[str | None] = mapped_column(sa.String(64))
+
+    # ── 관측 좌석(EOS-112) — nullable·server_default 없음(구 행 NULL=미기록, 위 좌석 동형).
+    # 폭 128은 `model_name`(64)보다 넓다: 이쪽은 **외부 응답이 정하는 값**이라 공급사가
+    # 접미(`:free`·날짜 버전)를 붙여 돌려줄 수 있다. schema가 같은 폭을 강제한다.
+    served_model: Mapped[str | None] = mapped_column(sa.String(128))
+    # 계측 없는 경로는 NULL이다(0이 아니다) — 0으로 채우면 Anthropic·Ollama 회차가
+    # '재시도 0회 실측'처럼 보여 미계측과 구분되지 않는다.
+    retries: Mapped[int | None] = mapped_column(sa.Integer)
 
     # ── 인덱스 (§10.1 CREATE INDEX) ──
-    __table_args__ = (sa.Index("idx_generation_problem", "problem_id"),)
+    # idx_generation_run_id: 리콜은 회차 단위 선별이 주 질의라 인덱스를 둔다(EOS-97).
+    __table_args__ = (
+        sa.Index("idx_generation_problem", "problem_id"),
+        sa.Index("idx_generation_run_id", "run_id"),
+    )
 
     @classmethod
     def from_schema(cls, schema: SchemaGenerationLog) -> GenerationLog:

@@ -34,9 +34,11 @@ CLAUDE.md 의사결정 우선순위 2번(법적·윤리적 준수)에 따라, **
 |---|---|---|
 | NCIC 성취기준 | 공공누리 1유형 | WhyMath의 truth source(MEMORY.md 2026-05-13 결정 로그) |
 | 학교알리미 | 공공 | PII 처리 주의 |
-| OpenStax · Siyavula · Illustrative Math | CC BY 4.0 | 상업·가공 자유 |
+| OpenStax | CC BY 4.0 | 상업·가공 자유 |
+| Siyavula | CC BY (**명시 표기 자료 한정**) | 사이트 기본값은 closed copyright — CC 표기가 붙은 자료만 · 귀속 문구 지정(`From siyavula.com` 등) |
+| Illustrative Math | 초판 2019–2021=CC BY 4.0 · **v.360(2024·2025)=CC BY-NC** | **v.360은 상업 금지** — 상용 서비스인 우리는 초판만 · 귀속 3조건(저자·라이선스 링크·변경 표시) |
 | NuminaMath-CoT · OmniMath · OlymMATH | Apache 2.0 / 공개 | LLM 학습 데이터 |
-| miniF2F · Mathlib4 | MIT / Apache 2.0 | Lean 형식화 |
+| miniF2F · Mathlib4 | 둘 다 **Apache 2.0**(miniF2F는 폴더별 상이 — 우리가 쓰는 `lean`이 Apache 2.0) | Lean 형식화 |
 
 **처리 원칙**: 자유롭게 활용하되 **출처 표시 의무는 반드시 이행**(`licensing_safety.md` 출처 표시 표준 — 인앱 표시 + 내부 로그).
 

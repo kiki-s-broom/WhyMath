@@ -29,6 +29,7 @@ from whymath_backend.api._crypto import (
     encrypt_evidence_payload,
     resolve_evidence_payload,
 )
+from whymath_backend.composition import default_expression_equivalence
 from whymath_backend.config import Settings
 from whymath_backend.l1.pedagogy.pack_loader import PedagogyPackStore, load_packs
 from whymath_backend.l1.pedagogy.unit_compiler import (
@@ -125,7 +126,11 @@ def test_pilot_pipeline_e2e() -> None:
         # ── ③ 생성(work_order 전 슬롯 DRAFT·숫자형 sympy_verified) ──────
         all_rows: list[dict] = []
         for obj in compiled.objective_rows:
-            all_rows.extend(build_slot_rows(obj["id"], obj["slot_manifest"]))
+            all_rows.extend(
+                build_slot_rows(
+                    obj["id"], obj["slot_manifest"], equivalence=default_expression_equivalence()
+                )
+            )
         assert all_rows and all(r["status"] == "DRAFT" for r in all_rows)
         ContentSlotStore(engine=engine).seed(all_rows)
 
@@ -135,7 +140,9 @@ def test_pilot_pipeline_e2e() -> None:
         PrescreenStore(engine=engine).apply(scored)
 
         # ── ⑤ 검수(APPROVED·reviewed_by 기계·k_type_verified 정직) ─────
-        verdicts = review_rows(all_rows)
+        # EOS-89: 생성 단계와 같은 항등 판정 능력을 검수 단계에도 넘긴다 — 주입된 행은
+        # `verification` 주장을 가지므로 능력 없이 검수하면 LookupError다(Codex P1 #1024).
+        verdicts = review_rows(all_rows, equivalence=default_expression_equivalence())
         assert all(v.approved for _id, v in verdicts)  # 정상 픽스처 전건 승인
         ReviewStore(engine=engine).apply(verdicts)
         verified = [

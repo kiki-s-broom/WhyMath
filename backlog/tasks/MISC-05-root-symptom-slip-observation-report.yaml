@@ -9,15 +9,19 @@ status: todo
 priority: 4
 eos_priority: P2
 owner: claude
-depends_on: []
+depends_on:
+  - HARN-57-done-artifact-correction-path
 requires_gates: []
 acceptance:
   - "신규 스키마·필드 0 — 가설 감쇠(반감기5턴)·강화횟수·judge 방향판별만으로 slip-like vs 지속오개념-like를 읽기전용 리포트로 산출"
   - "04c §6-4가 예고한 '라이브 오진단 실측 시 결정'의 트리거 발화 조건을 리포트가 관측 가능하게 만듦"
+  - "[고립 참조 2026-09-07 stray-code 감사] 구현+테스트가 origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 5d544abc)에 done 표기로 보존 — harness/misconception_slip_report.py·tests/backend/harness/test_misconception_slip_report.py main 부재 실측(심볼 grep 0). 착수 시 재구현 말고 파일 단위 회수 우선(브랜치가 main보다 228커밋 낡아 통째 머지 금지). 회수 완료 전 원 브랜치 삭제 금지"
+  - "[고립 참조 보완 2026-09-07 stray-code 8회차 · 판정 기준 main d50781b7] 위 참조의 2파일과 **함께** ops/declared_unwired_audit.py에 'harness.misconception_slip_report'를 _OFFLINE_REPORT로 등록한다. 실측: main에 _OFFLINE_REPORT 분류 자체는 실재하나 misconception_slip_report 등록은 0건 — 리포트만 착지시키면 OPS-22 선언≠배선 감사가 그 모듈을 미분류로 보고 CI가 red일 수 있다(소스 판독 기반 예측·주입 미실측이므로 착수 세션이 먼저 재현할 것). paths 유의: 현 paths(harness/·l4/misconception/hypothesis.py)가 ops/를 덮지 않아 scope-drift 경고가 나면 이 항이 명시 승인한 범위다(정정 CLI는 HARN-57 소관·미착지)"
+  - "[Codex P2 수용 2026-09-07] 앞 항의 'paths 유의' 문면은 *다른 세션에게* 충돌을 알리지 못한다 — start·overlap은 acceptance 산문이 아니라 paths만 읽는다. 이 태스크를 HARN-57(amend --path 신설)에 depends_on으로 걸었고, 착수 전에 paths에 ops/declared_unwired_audit.py를 실제 추가한다"
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/
   - src/backend/whymath_backend/l4/misconception/hypothesis.py
 session: null
-notes: "04c_misconception_seven_stage_separation.md §6-4(최대 미구현 갭). 04e_misconception_remediation_design.md §3. 새 분류축 도입은 04c 자신의 유예 판단을 존중해 하지 않음.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "04c_misconception_seven_stage_separation.md §6-4(최대 미구현 갭). 04e_misconception_remediation_design.md §3. 새 분류축 도입은 04c 자신의 유예 판단을 존중해 하지 않음.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착\n\n[정정 2026-09-07] stray-code 8회차 후속(#1027 §4.2 표): 리포트+테스트만 회수하면 OPS-22 감사기 대장에 등록이 없어 미분류로 CI RED가 날 수 있다. 판정 기준 main d50781b7\n\n[정정 2026-09-07] Codex P2(PR #1033) 수용: 회수 범위의 ops/declared_unwired_audit.py가 paths(harness/·l4/misconception/hypothesis.py) 밖이라 claim 시점 충돌 검출이 불가 — paths 정정 CLI(HARN-57)를 depends_on으로 집행"
+updated: 2026-09-07

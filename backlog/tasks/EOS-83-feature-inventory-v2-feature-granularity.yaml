@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-83-feature-inventory-v2-feature-granularity
+title: "기능 인벤토리 v2 — 기능 단위 전수 장부(161행·4평면) + EOS Ownership·Migration Action 기계 판정 (EOS-68 후속·계획서 100 §3.3 '기존 120개' 모집단 대응)"
+track: math-completion
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 모집단 정의를 먼저 적고(기능 = 사용자에게 의미 있는 능력 1단위 · S서빙표면/E엔진/C클라/O운영도구 4평면) 그 정의의 전수성을 기계가 검사한다 — 모든 백엔드 모듈·모든 엔드포인트·모든 Flutter feature가 정확히 1행에 귀속(미귀속·중복 = exit 1)"
+  - "② 행마다 계획서 100 §3.3 필드 전부(Feature ID·기능명·현재 위치·사용자·Domain·EOS Ownership·EOS 대상·상태·결합도·테스트·Migration Action·출시 우선도·Migration Risk)를 채우고, EOS Ownership은 BOUNDARY_MAP(EOS-65)으로·Migration Action은 v1 6축 임계 import로 기계 판정한다(임계 이중 정의 금지)"
+  - "③ 상태 필드는 선언값이 아니라 config.py 플래그 기본값 실측으로 덮는다(Flag-off) · 출시 우선도는 제안으로 표기(확정 Kiki) · P2는 POSTPONE으로 덮되 매트릭스 원판정을 보존"
+  - "④ 산출물 = 기계 장부 yaml+csv(utf-8-sig) + 해설 문서 + tests/infra 동결(장부↔생성기 드리프트·전수성·결함 주입 RED 확인). v1(라우터 23행)은 Gate 0-D 재료로 존치하고 관계를 두 문서에 명기"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/980"
+  - "scripts/analysis/eos_feature_inventory_v2.py (생성기 정본)"
+  - "backlog/inventory/feature_inventory_v2.yaml + .csv (기계 장부 162행)"
+  - "docs/reviews/eos_feature_inventory_v2_2026-09-03.md (해설·전수 표·판정)"
+  - "tests/infra/test_eos_feature_inventory_v2.py (동결 18건)"
+paths:
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - "backlog/inventory/feature_inventory_v2.*"
+  - "docs/reviews/eos_feature_inventory_v2_*.md"
+  - tests/infra/test_eos_feature_inventory_v2.py
+session: null
+notes: "출처: Kiki 요청 2026-09-03 '기존 WhyMath 기능 전수 Inventory — 약 120개 기능을 한 장부로, 기능명 단순 나열 금지, 최중요 필드 = EOS Ownership·Migration Action'. v1(EOS-68) 23행은 라우터 단위라 계획서 100의 기능 단위보다 굵다(v1 §1 자인 '행 수는 하한'). 외부 xlsx의 120은 판정 불가(EOS-68 notes 동일)."
+updated: 2026-09-03

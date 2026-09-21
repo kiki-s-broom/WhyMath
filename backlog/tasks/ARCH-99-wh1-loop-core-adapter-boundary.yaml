@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-99-wh1-loop-core-adapter-boundary
+title: "harness.wh1_loop CORE→ADAPTER 직접 의존 정리 — EOS-86이 드러낸 잔여 누수"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① harness.wh1_loop이 l3.verify_solution·l4.misconception.*(ADAPTER)을 직접 import하는 자리를 전수 실측(현재 최소 l3.verify_solution 1건 확인) — 각 자리의 처분(합성 루트 경유 주입 vs harness는 INFRA라 원래 허용되는 자리임을 문서화하고 DESIGNED_SEAMS에 harness 편입 vs 그대로 둠) 판정"
+  - "② 판정에 따라 RESIDUAL_LEAK_BASELINE(tests/infra/test_eos_core_boundary_probe.py)을 갱신 — 해소되면 (api.coach, harness.wh1_loop)·(api.ocr_handoff, harness.wh1_loop) 항목 제거, 원천 허용으로 판정되면 문서·baseline에 근거 명시"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_loop.py
+  - tests/infra/test_eos_core_boundary_probe.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: EOS-86(solution_coaching MIXED 분해) 세션에서 RESIDUAL_LEAK_BASELINE 실측 중 발견. l4.solution_coaching이 verify_solution 직접 import를 걷어내자(StepChainVerifier 선택층 주입으로 교체), BFS 최단경로가 사라지며 그보다 긴 기존 경로가 드러났다: api.coach/api.ocr_handoff -> ... -> harness.wh1_loop(INFRA) -> l3.verify_solution/l4.misconception.*(ADAPTER). harness.wh1_loop은 EOS-86 이전부터 그 직접 import를 갖고 있었고, solution_coaching 경유의 더 짧은 경로에 가려 tests/infra/test_eos_core_boundary_probe.py의 RESIDUAL_LEAK_BASELINE에 드러나지 않았을 뿐이다. EOS-86 범위 밖이라 그대로 baseline 동결(api.coach/harness.wh1_loop 2건)하고 이 태스크로 분리 등재한다."
+updated: 2026-09-06

@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-97-generation-recall-selection
+title: "생성 산출물 리콜 — run_id 축 + 해시 기준 선별 처분 (결함 발견 시 무엇을 버릴지 특정·설계서 갭 G-2)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 조인 축 확정 — GenerationLog에 run_id를 신설하거나 기존 cu_slug 조인 설계를 확정한다. 어느 쪽이든 '이 배치·이 프롬프트 버전·이 모델로 만든 산출물'을 **기계가 특정할 수 있어야** 한다. 실측: run_id는 AccumulateReport·ReviewQueueEntry에만 있고 GenerationLog와 조인 축이 아니다"
+  - "② 선별 조회 CLI — run_id·prompt_version·model_name·seed 중 하나로 산출물을 열거한다(--json). **절단 금지** — 전건 모드를 제공하고 상위 N건만 내는 기본값이 있으면 분모를 함께 낸다(CLAUDE.md 절단 출력 부재 판정 축)"
+  - "③ 처분 — 열거분을 격리로 넘기거나 재생성 대상 목록을 산출한다. **격리 경로는 신설하지 않는다** — 이미 실재한다(PATCH /v1/problems/{id} · RequireContentAdmin · review_status+quarantine_reason+quarantined_at 3필드 동시 기입 · problem_quarantine_contract.md §5). 그 계약 §138이 전용 격리 엔드포인트를 의도적으로 미채택했으므로 표면을 늘리지 말고 기존 PATCH를 호출한다. **dry-run 기본**이며 실제 처분은 명시 플래그로만"
+  - "④ 집행 별항(정본화≠집행) — 조회 원천이 genlog JSONL 사이드카인지 DB GenerationLog인지 명기한다. 현행은 **DB 직접 조회 모드가 미구현**이고 hit_cu_metrics docstring이 이를 '정직한 공백'으로 자인한다. 둘 다 지원하지 않으면 어느 쪽을 지원하는지 적는다"
+  - "⑤ 변별력 양방향 실측 — 특정 해시로 만든 산출물 N건을 주입한 뒤 **그 N건만 정확히** 열거되는지 과다·과소 양방향으로 확인한다. 무관한 산출물이 섞이거나 대상이 빠지면 리콜은 오히려 위험하다"
+artifacts:
+  - "PR #992 (https://github.com/doldori7/WhyMath/pull/992) — 커밋 3c25fa2b·740b6b2b·6ae6d1b8·73413d57. run_id 조인 축(schema+ORM+idx+alembic b8d3f6a91c24) + ops/generation_recall.py 선별·처분 CLI(셀렉터 5종·--corpus로 cu_slug→problem_id 해결·3분류·dry-run 기본). 뮤테이션 18종 전건 검출, CI 18잡 green."
+paths:
+  - src/backend/whymath_backend/schema/provenance.py
+  - src/backend/whymath_backend/l3/pregenerate/provenance_bridge.py
+  - "tests/backend/schema/**"
+session: null
+notes: "출처: docs/reviews/eos_micro_project_orchestration_v1_gap_review_2026-09-05.md §6 갭 G-2 (설계서 §3 리콜 시나리오). EOS-96 재등재분 — 원 등재의 depends_on: EOS-94가 오등재 취소로 무의미해졌고 amend에 의존 제거 경로가 없어 새 ID로 옮겼다. 실측: EOS-55·EOS-73으로 provenance는 설계서보다 강하게 착지했으나(프롬프트 전문 스냅샷+해시 무결성 강제) **선별 처분 축만 비었다** — genlog JSONL 소비 도구 2종은 집계만 하고 개별 산출물을 선별·처분하지 않는다. 설계서가 이 저장소의 실제 공백을 정확히 짚은 항목이다."
+updated: 2026-09-06

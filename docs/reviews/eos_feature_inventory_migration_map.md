@@ -9,6 +9,13 @@
 > `python3 scripts/analysis/eos_feature_inventory.py --write`
 >
 > 대조 시점: 2026-08-31 · 브랜치 `claude/review-status-differences-jw5m4a`(EOS-65~67 착지 후).
+>
+> **v2 관계 (2026-09-03 · EOS-83)**: 이 문서의 모집단은 *라우터 단위* 23행이며 §1이 자인한 대로
+> 행 수는 **하한**이다. 계획서 100 §3.3의 "기능" 단위(약 120개)로 내린 전수 장부는
+> `docs/reviews/eos_feature_inventory_v2_2026-09-03.md`(생성기 `eos_feature_inventory_v2.py` ·
+> 장부 `backlog/inventory/feature_inventory_v2.{yaml,csv}`)다. 두 장부는 **대체가 아니라 두 해상도**다 —
+> Gate 0-D 4문항은 이 문서(라우터 해상도)로 판정하고, EOS Ownership·Migration Action의 행별
+> 판정은 v2(기능 해상도)를 읽는다. 6축 임계는 v2가 이 생성기에서 import하므로 정본은 하나다.
 
 ---
 

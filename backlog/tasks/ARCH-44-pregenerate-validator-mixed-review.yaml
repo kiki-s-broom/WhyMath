@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-44-pregenerate-validator-mixed-review
+title: "l3.pregenerate.validator MIXED 배정 재검토 — solution_coaching이 여전히 직접 import하는 SymPy 내장 시드 검증기"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① l3.pregenerate.validator의 SymPy 의존 지점을 실측하고 처분(그대로 MIXED 유지 vs 검증 로직만 별도 ADAPTER 모듈로 분리) 판정"
+  - "② 판정에 따라 solution_coaching의 validate_response/arithmetic_validator 사용도 같은 주입 패턴(StepChainVerifier 선례)으로 재배선할지 결정·기록 — 재배선하지 않기로 하면 그 사유를 문서화"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/pregenerate/validator.py
+  - src/backend/whymath_backend/l4/solution_coaching.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: EOS-86(solution_coaching MIXED→CORE 분해) acceptance ⑤ 정직한 잔여 명시. solution_coaching은 verify_solution·wrong_form_match(ADAPTER) 직접 import는 걷어냈으나, validate_response·arithmetic_validator(l3.pregenerate.validator)는 그대로 최상단에서 import한다. 이 모듈은 BOUNDARY_MAP에서 MIXED이고 추가 ADAPTER 모듈을 더 당기지 않아(실측: reach_residual 증가 0) 지금 당장 게이트 위반은 아니지만, solution_coaching이 CORE로 재배정된 지금 이 MIXED 의존은 같은 종류의 미해소 축이다. EOS-86 범위 밖으로 분리."
+updated: 2026-09-06

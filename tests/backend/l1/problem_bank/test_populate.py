@@ -528,6 +528,160 @@ def test_load_accepts_finite_probability_and_finite_count_answer_kind(tmp_path: 
     assert {r.verify.answer_kind for r in records} == {"finite_probability", "finite_count"}
 
 
+def test_load_passes_unknown_answer_kind_through_verbatim(tmp_path: Path) -> None:
+    """EOS-85 — 적재기가 모르는 `answer_kind`는 **원문 그대로** 실린다(조용한 None 금지).
+
+    종전엔 17종을 튜플로 열거하고 그 밖은 `None`으로 떨어뜨렸다. 그래서 L3에 새 검증 종류를
+    추가하고 이 파일을 안 고치면 그 문항의 검증 종류가 **적재 시점에 사라졌다** — 화면에는
+    "answer_kind 없는 문항"으로 보여 원인을 지목할 수 없었다(S4-17 `finite_probability`
+    손실이 그 전례이고, 바로 위 테스트가 그 상환분이다).
+
+    여기 쓰는 `"unit_consistency"`는 **어느 표에도 없는 값**이다 — 있는 값을 쓰면 화이트리스트를
+    되살려도 이 테스트가 통과해 변별력이 0이 된다(그 경우 위 finite 테스트와 구분되지 않는다).
+    """
+    record = _base_record(
+        slug="wm-test-unknown-kind",
+        verify={"conditions": "u=...", "answer_map": {}, "answer_kind": "unit_consistency"},
+    )
+    path = _write(tmp_path, [record])
+    records = load_problem_bank_records(path)
+    assert records[0].verify.answer_kind == "unit_consistency"
+
+
+def test_load_passes_unknown_selection_and_aggregate_through_verbatim(tmp_path: Path) -> None:
+    """EOS-01 — `answer_selection`·`answer_aggregate`도 미등록 값이 **원문 그대로** 실린다.
+
+    `answer_kind`와 같은 함수·같은 결함류다. 판정 권위는 L3에 있고
+    (`verify_root_selection`이 `selection not in ("largest","smallest","unique")`이면 보수적으로
+    `None`을 낸다), 적재기는 거를 일이 아니다.
+
+    쓰는 값은 **어느 목록에도 없는 것**이다 — 있는 값을 쓰면 화이트리스트를 되살려도 통과해
+    변별력이 0이 된다. 이 축은 정적 가드 두 개(`MATH_TYPE_RX` 접두 매처 · 불투명 페이로드 게이트)
+    가 **구조적으로 못 보는** 자리라(populate docstring §기계 가드의 범위), 이 테스트가 실질
+    보호의 전부다.
+    """
+    record = _base_record(
+        slug="wm-test-unknown-selection",
+        verify={
+            "conditions": "x**2 - 1 = 0",
+            "answer_map": {},
+            "answer_selection": "closest_to_origin",
+            "answer_aggregate": "median",
+        },
+    )
+    path = _write(tmp_path, [record])
+    records = load_problem_bank_records(path)
+    assert records[0].verify.answer_selection == "closest_to_origin"
+    assert records[0].verify.answer_aggregate == "median"
+
+
+def test_load_keeps_selection_and_aggregate_type_hygiene(tmp_path: Path) -> None:
+    """음성 대조 — 불투명 통과는 타입 위생까지 버리는 것이 아니다(문자열 아님·빈 값 → None)."""
+    for bad in ({"nested": 1}, "", 7, None, ["largest"]):
+        record = _base_record(
+            slug="wm-test-bad-selection",
+            verify={
+                "conditions": "x**2 - 1 = 0",
+                "answer_map": {},
+                "answer_selection": bad,
+                "answer_aggregate": bad,
+            },
+        )
+        path = _write(tmp_path, [record])
+        records = load_problem_bank_records(path)
+        assert records[0].verify.answer_selection is None, bad
+        assert records[0].verify.answer_aggregate is None, bad
+
+
+def test_corpus_selection_and_aggregate_values_all_survive_loading(tmp_path: Path) -> None:
+    """실코퍼스가 쓰는 두 필드의 어휘 전건이 그대로 실린다(전수 축 · 스캔 0건은 실패)."""
+    import json
+
+    repo_root = Path(__file__).resolve().parents[4]
+    pairs: set[tuple[str | None, str | None]] = set()
+    for corpus in sorted((repo_root / "data" / "corpus").glob("*/problems.jsonl")):
+        for line in corpus.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            verify = json.loads(line).get("verify") or {}
+            sel, agg = verify.get("answer_selection"), verify.get("answer_aggregate")
+            if isinstance(sel, str) and sel or isinstance(agg, str) and agg:
+                pairs.add(
+                    (
+                        sel if isinstance(sel, str) and sel else None,
+                        agg if isinstance(agg, str) and agg else None,
+                    )
+                )
+    assert (
+        pairs
+    ), "코퍼스에서 answer_selection·answer_aggregate를 하나도 찾지 못했다 — 스캔이 공허하다"
+
+    records = [
+        _base_record(
+            slug=f"wm-test-sa-{i}",
+            verify={
+                "conditions": "x**2 - 1 = 0",
+                "answer_map": {},
+                **({"answer_selection": sel} if sel else {}),
+                **({"answer_aggregate": agg} if agg else {}),
+            },
+        )
+        for i, (sel, agg) in enumerate(sorted(pairs, key=lambda t: (t[0] or "", t[1] or "")))
+    ]
+    path = _write(tmp_path, records)
+    loaded = load_problem_bank_records(path)
+    assert {(r.verify.answer_selection, r.verify.answer_aggregate) for r in loaded} == pairs
+
+
+def test_load_keeps_answer_kind_type_hygiene(tmp_path: Path) -> None:
+    """불투명 통과는 **형식 검사까지 버리는 것이 아니다** — 문자열이 아니거나 비면 None.
+
+    음성 대조: 위 테스트가 "무엇이든 통과"를 뜻한다면 여기서 dict·빈 문자열도 실려야 한다.
+    실리지 않는다 — 통과시키는 것은 *어휘 판정*이지 *타입 위생*이 아니다.
+    """
+    for bad in ({"nested": 1}, "", 7, None):
+        record = _base_record(
+            slug="wm-test-bad-kind",
+            verify={"conditions": "u=...", "answer_map": {}, "answer_kind": bad},
+        )
+        path = _write(tmp_path, [record])
+        records = load_problem_bank_records(path)
+        assert records[0].verify.answer_kind is None, bad
+
+
+def test_corpus_answer_kinds_all_survive_loading(tmp_path: Path) -> None:
+    """실코퍼스의 answer_kind 17종이 **전건 그대로** 실린다(acceptance ② 전수 축).
+
+    합성 레코드만 보면 "내가 아는 값만 넣은" 검사가 된다. 실제 코퍼스가 쓰는 어휘 전건을
+    돌려 하나도 떨어지지 않음을 본다. 스캔 0건은 실패로 처리한다.
+    """
+    import json
+
+    # 저장소 루트 기준 절대 경로 — cwd 의존 금지. CI는 `src/backend`에서 도므로 상대 경로는
+    # 조용히 0건이 된다(이 테스트를 처음 쓸 때 실제로 그랬고, 위 "스캔 0건은 실패" 단언이
+    # 잡았다 — 공허한 통과였다면 아무도 몰랐을 자리).
+    repo_root = Path(__file__).resolve().parents[4]
+    kinds: set[str] = set()
+    for corpus in sorted((repo_root / "data" / "corpus").glob("*/problems.jsonl")):
+        for line in corpus.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            kind = (json.loads(line).get("verify") or {}).get("answer_kind")
+            if isinstance(kind, str) and kind:
+                kinds.add(kind)
+    assert kinds, "코퍼스에서 answer_kind를 하나도 찾지 못했다 — 스캔이 공허하다"
+
+    records = [
+        _base_record(
+            slug=f"wm-test-kind-{i}", verify={"conditions": "c", "answer_map": {}, "answer_kind": k}
+        )
+        for i, k in enumerate(sorted(kinds))
+    ]
+    path = _write(tmp_path, records)
+    loaded = load_problem_bank_records(path)
+    assert {r.verify.answer_kind for r in loaded} == kinds
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 계보(relations) 파싱 — S4-18
 # ──────────────────────────────────────────────────────────────────────────

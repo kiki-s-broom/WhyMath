@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import MutableSet
+from dataclasses import dataclass, field
 from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -57,8 +58,11 @@ from whymath_backend.l3.equivalent.generator import (
 from whymath_backend.schema.enums import GenerationType, LicenseType, SourceType
 
 __all__ = [
+    "DuplicateDetector",
+    "DuplicateOrigin",
     "GenerationOutcome",
     "ProblemBankSink",
+    "RoundDedupScope",
     "run_batch",
     "run_equivalent_generation",
 ]
@@ -66,6 +70,102 @@ __all__ = [
 # 과유사 dedup 기본 임계값 — S2-c 좌석 상수(코사인 0.97·"거의 동일" 밴드)를 그대로 물려받는다.
 # (`l1/problem_bank/embedding._NEAR_DUPLICATE_THRESHOLD`와 같은 값·같은 근거 — 판박이만 거른다.)
 _DEFAULT_DEDUP_THRESHOLD = 0.97
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 중복의 *출처* 구분(EOS-121 선결조건 B)
+#
+# 종전에는 `rejected_duplicate` 1종이 서로 **원인도 처방도 다른 두 사건**을 같은 글자로 찍었다:
+#   ⓐ **회차 내 중복** — 이번 배치가 방금 만든 것과 겹쳤다 = *생성 다양성*이 낮다(모델·프롬프트
+#      쪽 문제. 처방은 spec을 가르거나 샘플링을 바꾸는 것).
+#   ⓑ **코퍼스 중복** — 기존 자산과 겹쳤다 = dedup이 *정상 동작*한 것(처방 없음. 오히려 이 값이
+#      0이면 회차 간 dedup이 안 걸린다는 신호다).
+# 둘이 한 칸에 섞이면 "중복 4/5"라는 숫자로부터 아무 판정도 못 낸다. 그래서 상태 이름(`status`)은
+# 그대로 두고(**기존 소비자 호환** — 리포트·카나리 `evaluate_canary`·검수 큐·테스트가 이 Literal을
+# 읽는다) *출처 필드 2축*을 결과 객체에 **추가**한다.
+#
+# 축이 둘인 이유: "무엇이 잡았나"(검출기)와 "무엇과 겹쳤나"(출처)는 독립이다. 구조 signature와
+# 임베딩 과유사는 각각 회차 내·코퍼스 양쪽에서 날 수 있으므로, 한 축으로 접으면 다시 섞인다.
+DuplicateDetector = Literal["structural_signature", "embedding_near"]
+"""중복을 잡은 **검출기** — 구조 signature(S2-l·SymPy 정규형) vs 임베딩 과유사(S2-c·코사인)."""
+
+DuplicateOrigin = Literal["round", "corpus", "mixed"]
+"""중복 상대의 **출처** — 이번 회차가 추가한 것/그 전부터 있던 것/둘이 섞임(임베딩 다건 판정).
+
+`mixed`는 임베딩 경로에서만 날 수 있다(과유사는 여러 건과 동시에 걸린다). 구조 signature는
+단일 값 대조라 `round`·`corpus` 둘 중 하나다.
+"""
+
+
+@dataclass(slots=True)
+class RoundDedupScope:
+    """**이 회차가 시작된 뒤 오케스트레이터 자신이 인덱스에 추가한 것**의 장부(출처 판정 기준).
+
+    이 경계가 이 클래스의 존재 이유다. `signature_index`는 **호출자가 소유한 가변 집합**이고,
+    호출자는 회차 시작 전에 기존 코퍼스 signature를 미리 채워 넣는다
+    (`problem_corpus_accumulate`: `seed_signatures | out_signatures`). 오케스트레이터는 그
+    집합을 넘겨받을 뿐이므로 **"이 값이 원래 있던 것인지 방금 내가 넣은 것인지"를 사후에 알
+    방법이 없다** — 초기 집합을 통째로 복사해 두는 방법도 있으나 회차마다 코퍼스 전체를 한 벌
+    더 들고 있게 되고, 무엇보다 *의도*가 어긋난다(우리가 알고 싶은 것은 "기존 코퍼스가 무엇인가"가
+    아니라 "이번 회차가 무엇을 만들었는가"다).
+
+    그래서 구분 기준을 **회차 시작 뒤 orchestrator 자신이 추가한 것**으로 잡고, 그 추가분만
+    여기에 모은다. 판정은 대조 한 번이다:
+      - 중복 상대가 이 장부에 있다 → `round`(이번 회차가 방금 만든 것과 겹침 = 생성 다양성)
+      - 없다 → `corpus`(회차 시작 시점에 이미 있던 것 = dedup 정상 동작)
+      - 이 좌석을 **주입하지 않으면** → 출처 `None`(**미판정** — `corpus`로 접지 않는다.
+        「모른다 ≠ 아니다」. 모르는 것을 corpus로 적으면 생성 다양성 문제가 영영 0으로 보인다)
+
+    **한계(명시)**: 호출자가 이 장부를 회차 사이에 재사용하면(새로 만들지 않으면) 이전 회차의
+    추가분이 `round`로 계상된다 — 장부의 수명이 곧 "회차"의 정의다. 회차마다 새 인스턴스를
+    만드는 것이 호출자 계약이며, `run_batch`는 그것을 스스로 지킨다.
+    """
+
+    signatures: set[str] = field(default_factory=set)
+    """이 회차에 orchestrator가 `signature_index`에 추가한 구조 signature."""
+
+    problem_ids: set[uuid.UUID] = field(default_factory=set)
+    """이 회차에 orchestrator가 `dedup_index`에 upsert한 problem_id(임베딩 출처 판정 재료)."""
+
+
+#: 출처 → 사람이 읽는 라벨(사유 문자열용). **미판정(None)도 어휘에 있다** — 라벨을 안 붙이면
+#: 검수자가 "출처 표기가 없는 행"을 구판으로 읽을지 미판정으로 읽을지 알 수 없다(침묵 금지).
+_ORIGIN_LABELS: dict[DuplicateOrigin | None, str] = {
+    "round": "회차내(이번 배치가 방금 만든 것과 겹침 — 생성 다양성)",
+    "corpus": "코퍼스(회차 시작 시점에 이미 있던 것 — dedup 정상 동작)",
+    "mixed": "혼재(회차분·기존 코퍼스 양쪽과 겹침)",
+    None: "미판정(출처 판정 좌석 미주입)",
+}
+
+
+def _classify_signature_origin(
+    signature: str, round_scope: RoundDedupScope | None
+) -> DuplicateOrigin | None:
+    """구조 signature 중복의 출처 — 장부에 있으면 `round`, 없으면 `corpus`, 좌석 없으면 None."""
+    if round_scope is None:
+        return None
+    return "round" if signature in round_scope.signatures else "corpus"
+
+
+def _classify_embedding_origin(
+    near: list[tuple[uuid.UUID, float]], round_scope: RoundDedupScope | None
+) -> DuplicateOrigin | None:
+    """임베딩 과유사 중복의 출처 — 전부 회차분이면 `round`, 전무면 `corpus`, 섞이면 `mixed`.
+
+    과유사는 **여러 건과 동시에** 걸리므로 이진 판정이 성립하지 않는다. 한 건이라도 기존
+    코퍼스와 겹쳤으면 "이번 회차가 만든 것 때문에 막혔다"고 말할 수 없고, 반대로 전부 회차분이면
+    코퍼스 dedup은 아무 일도 하지 않은 것이다 — 그 둘을 한 값으로 접으면 처방이 갈리지 않는다.
+    `near`가 비면(호출 계약상 일어나지 않는다) 판정 대상이 없으므로 None=미판정.
+    """
+    if round_scope is None or not near:
+        return None
+    hit_ids = {problem_id for problem_id, _ in near}
+    from_round = hit_ids & round_scope.problem_ids
+    if not from_round:
+        return "corpus"
+    if from_round == hit_ids:
+        return "round"
+    return "mixed"
 
 
 @runtime_checkable
@@ -96,6 +196,11 @@ class GenerationOutcome(BaseModel):
 
     `reasons`는 모든 거부/검수/중복 사유의 누적(조용한 실패 금지). `near_duplicates`는 과유사로
     잡힌 (problem_id, 코사인 유사도) 목록이다.
+
+    **중복의 출처(EOS-121 선결조건 B)**: `rejected_duplicate` 한 이름 안에 원인도 처방도 다른
+    사건들이 섞여 있었다. `status` 이름은 하위 호환으로 그대로 두고(소비자가 이 Literal을 읽는다)
+    `duplicate_detector`·`duplicate_origin` 2축을 **추가**해 구분한다 — 모듈 상단
+    `DuplicateDetector`·`DuplicateOrigin`·`RoundDedupScope` 주석이 그 경계의 정본이다.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -127,6 +232,21 @@ class GenerationOutcome(BaseModel):
     reasons: list[str] = Field(
         default_factory=list,
         description="거부/검수/중복 사유 누적(사람 가독·학생 비노출·조용한 실패 금지).",
+    )
+    duplicate_detector: DuplicateDetector | None = Field(
+        default=None,
+        description=(
+            "중복을 잡은 검출기(EOS-121 B). `rejected_duplicate`일 때만 값이 있고 그 외 상태에선 "
+            "항상 None이다 — 즉 `detector is None`은 '중복이 아니다'를 뜻한다."
+        ),
+    )
+    duplicate_origin: DuplicateOrigin | None = Field(
+        default=None,
+        description=(
+            "중복 상대의 출처(EOS-121 B). **`detector`가 있는데 이 값이 None이면 '미판정'이다** "
+            "— 출처 판정 좌석(`round_scope`)을 주입하지 않은 회차. `corpus`로 접지 않는 이유는 "
+            "모르는 것을 확정으로 적으면 생성 다양성 문제가 영영 0으로 보이기 때문이다."
+        ),
     )
 
 
@@ -188,6 +308,7 @@ def run_equivalent_generation(
     dedup_index: ProblemEmbeddingIndex | None = None,
     embed_provider: EmbeddingProvider | None = None,
     signature_index: MutableSet[str] | None = None,
+    round_scope: RoundDedupScope | None = None,
     store: ProblemBankSink | None = None,
     dedup_threshold: float = _DEFAULT_DEDUP_THRESHOLD,
     verification_tier: str | None = None,
@@ -207,6 +328,11 @@ def run_equivalent_generation(
     좌석 주입 규약:
       - `signature_index`(S2-l 구조 dedup·`MutableSet[str]`) 주면 임베딩 전에 SymPy 정규형
         signature로 판박이를 결정론 차단(임베딩 불요·비용 0). 미주입이면 이 단계 스킵.
+      - `round_scope`(EOS-121 B·`RoundDedupScope`) 주면 중복의 **출처**(회차 내 vs 코퍼스)를
+        판정해 `duplicate_origin`에 싣는다. 미주입이면 출처는 `None`=미판정이다(중복 판정 자체는
+        그대로 난다 — 이 좌석은 *계측*이지 *차단*이 아니다). 경계 정의는 `RoundDedupScope` 참조:
+        기준은 "회차가 시작된 뒤 **이 오케스트레이터가** 추가한 것"이며, 호출자가 회차 전에
+        `signature_index`에 무엇을 넣었는지는 알 수 없다(그래서 그것을 기준으로 삼지 않는다).
       - `dedup_index`·`embed_provider` 둘 다 줘야 임베딩 dedup이 돈다(하나만 주면 스킵·순수 결정).
       - `store` 없으면 dry-run(검증만·저장 0). 저장 후 임베딩 영속은 `dedup_index`+`embed_provider`
         가 함께 주입됐을 때만 일어난다(임베딩 저장소 seam이 곧 dedup_index — 같은 벡터 재사용).
@@ -263,15 +389,21 @@ def run_equivalent_generation(
         )
         signature = canonical_signature(candidate.conditions, _sig_payload)
         if signature is not None and signature in signature_index:
+            # 출처 판정(EOS-121 B) — 사유 문자열에도 실어 검수 큐 행만 봐도 갈린다.
+            # 접두 "구조 중복"은 기존 소비자·테스트가 읽으므로 보존한다(뒤에만 덧붙인다).
+            origin = _classify_signature_origin(signature, round_scope)
             reasons.append(
                 "구조 중복 — 정규형이 같은 방정식·근 선택이 이미 코퍼스에 있음"
                 "(표현만 다른 판박이·저장 차단·S2-l)."
+                f" 출처={_ORIGIN_LABELS[origin]}"
             )
             return GenerationOutcome(
                 status="rejected_duplicate",
                 candidate=candidate,
                 acceptance=verdict,
                 reasons=reasons,
+                duplicate_detector="structural_signature",
+                duplicate_origin=origin,
             )
 
     # ── 3b. 과유사 dedup(S2-c) — 좌석 둘 다 주입 시에만 ──
@@ -281,9 +413,11 @@ def run_equivalent_generation(
         candidate_vec = embed_provider.embed([text])[0]
         near = find_near_duplicates(dedup_index, candidate_vec, threshold=dedup_threshold)
         if near:
+            origin = _classify_embedding_origin(near, round_scope)
             reasons.append(
                 f"과유사 중복 — 기존 코퍼스 {len(near)}건과 코사인 ≥ {dedup_threshold}"
                 "(거의 동일한 판박이·저장 차단)."
+                f" 출처={_ORIGIN_LABELS[origin]}"
             )
             return GenerationOutcome(
                 status="rejected_duplicate",
@@ -291,12 +425,18 @@ def run_equivalent_generation(
                 acceptance=verdict,
                 near_duplicates=near,
                 reasons=reasons,
+                duplicate_detector="embedding_near",
+                duplicate_origin=origin,
             )
 
     # 두 dedup을 통과한 신규 문제 — 이후 후보가 이 구조를 중복으로 보게 signature를 등록한다
     # (배치 누적 구조 dedup·저장 여부 무관·dry-run에서도 배치 내 판박이를 잡는다).
     if signature is not None and signature_index is not None:
         signature_index.add(signature)
+        # 같은 자리에서 회차 장부에도 적는다(EOS-121 B) — 따로 순회하면 두 집합이 갈려
+        # "인덱스엔 있는데 장부엔 없는" signature가 생기고, 그 순간 출처 판정이 거짓이 된다.
+        if round_scope is not None:
+            round_scope.signatures.add(signature)
 
     # ── 4. 저장(S2-b) — 좌석 주입 시에만 ──
     if store is not None:
@@ -312,6 +452,10 @@ def run_equivalent_generation(
                 candidate_vec,
                 source_text=problem_embedding_text(candidate.problem),
             )
+            # 회차 장부(EOS-121 B) — 이 upsert가 있어야 뒤 후보가 *이번 회차분*과 과유사로
+            # 걸릴 수 있으므로, 출처 판정 재료도 정확히 이 자리에서 쌓인다.
+            if round_scope is not None:
+                round_scope.problem_ids.add(candidate.problem.problem_id)
         return GenerationOutcome(
             status="accepted_stored",
             candidate=candidate,
@@ -337,6 +481,7 @@ def run_batch(
     dedup_index: ProblemEmbeddingIndex | None = None,
     embed_provider: EmbeddingProvider | None = None,
     signature_index: MutableSet[str] | None = None,
+    round_scope: RoundDedupScope | None = None,
     store: ProblemBankSink | None = None,
     dedup_threshold: float = _DEFAULT_DEDUP_THRESHOLD,
     verification_tier: str | None = None,
@@ -353,6 +498,11 @@ def run_batch(
     차단한다(Phaiakes9 실측: 같은 이차식이 문구만 바꿔 반복). 임베딩 dedup(의미 근사)과 상보.
     """
     shared_signatures: MutableSet[str] = signature_index if signature_index is not None else set()
+    # 출처 판정 장부도 배치에서 **기본 ON**이다(EOS-121 B) — signature_index와 같은 이유로,
+    # 좌석을 잊으면 중복 통계가 통째로 "미판정"이 되어 이 배치가 무엇 때문에 막혔는지 영영
+    # 모르게 된다. 호출자가 주면 그것을 쓰고(회차 경계를 호출자가 소유하는 경우), 안 주면
+    # **이 배치 1회를 한 회차로** 보고 새로 만든다(`RoundDedupScope` docstring의 수명 계약).
+    shared_scope: RoundDedupScope = round_scope if round_scope is not None else RoundDedupScope()
     return [
         run_equivalent_generation(
             spec,
@@ -360,6 +510,7 @@ def run_batch(
             dedup_index=dedup_index,
             embed_provider=embed_provider,
             signature_index=shared_signatures,
+            round_scope=shared_scope,
             store=store,
             dedup_threshold=dedup_threshold,
             verification_tier=verification_tier,

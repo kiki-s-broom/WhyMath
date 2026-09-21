@@ -14,6 +14,10 @@ from pathlib import Path
 
 import pytest
 
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.l3.render import assessment_bank
 from whymath_backend.l3.render.adapter import RenderContext
 from whymath_backend.l3.render.adapters import ProblemBasedAdapter, WorkedExampleAdapter
@@ -33,6 +37,14 @@ def _isolate_bank_cache():
     reset_assessment_bank_cache()
     yield
     reset_assessment_bank_cache()
+
+
+def _caps() -> dict[str, object]:
+    """어댑터 생성 시 주입할 과목 능력 2종(EOS-89) — 테스트가 이 사슬의 상류다."""
+    return {
+        "seal": default_expression_seal(),
+        "assessment_verifier": default_assessment_answer_verifier(),
+    }
 
 
 def _dsl(**overrides: object) -> ConceptDSL:
@@ -106,7 +118,7 @@ def test_problem_based_cannot_render_before_injection_but_can_after(
             ["TEST-2"],
         ),
     )
-    adapter = ProblemBasedAdapter()
+    adapter = ProblemBasedAdapter(**_caps())
     before = _dsl()
     assert adapter.can_render(before) is False
 
@@ -224,7 +236,7 @@ def test_injection_does_not_break_worked_example_seal() -> None:
             conditions=("t**2 - 4 = 0",), answer_map={"t": "2"}, prompt="t를 구하시오."
         ),
     )
-    for adapter in (WorkedExampleAdapter(), ProblemBasedAdapter()):
+    for adapter in (WorkedExampleAdapter(**_caps()), ProblemBasedAdapter(**_caps())):
         unit = adapter.render(dsl, RenderContext())
         assert unit.ok, f"{adapter.strategy.value}: {unit.validation_signal}"
 
@@ -238,9 +250,9 @@ def test_body_segments_are_still_sealed() -> None:
     from whymath_backend.l3.render.adapters import DirectAdapter
 
     dsl = _dsl(definition="핵심 식은 {slot} 이다.")
-    ok = DirectAdapter().render(dsl, RenderContext(bindings={"slot": "x + 1 = 2"}))
+    ok = DirectAdapter(**_caps()).render(dsl, RenderContext(bindings={"slot": "x + 1 = 2"}))
     assert ok.ok
-    broken = DirectAdapter().render(
+    broken = DirectAdapter(**_caps()).render(
         _dsl(definition="핵심 식은 x + 1 = 2 이고 {slot} 도 성립한다."),
         RenderContext(bindings={"slot": "y = 3"}),
     )

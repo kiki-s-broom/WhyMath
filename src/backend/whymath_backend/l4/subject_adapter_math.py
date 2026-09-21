@@ -40,7 +40,7 @@ EOS-69 착수 시점 15건에서 이 배선 이후 실측치로 내려갔다(정
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, cast
 
 from whymath_backend.l3.equivalent.rephrase import classify_invariance_failure, extract_equation
 from whymath_backend.l3.symbolic_equivalence import identity_status
@@ -48,8 +48,14 @@ from whymath_backend.l3.verifier import ProblemVerifyInput, Verifier
 from whymath_backend.l3.verify_answer import AnswerVerdict, verify_answer
 from whymath_backend.l3.verify_answer_form import form_verdict_for
 from whymath_backend.l3.verify_final_answer import FinalAnswerResult, verify_final_answer
+from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l4.misconception.answer_signature import (
+    AttemptMisconceptionScanResult,
+    scan_attempt_answer,
+)
 from whymath_backend.l4.misconception.diagnose import diagnose
 from whymath_backend.schema.answer_form import FormVerdict
+from whymath_backend.schema.enums import StepType
 from whymath_backend.schema.subject_adapter import (
     AnswerEvaluation,
     MisconceptionSignal,
@@ -60,10 +66,13 @@ from whymath_backend.schema.subject_adapter import (
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
     AssessmentAnswerVerifier,
+    AttemptMisconceptionDetector,
+    ChainVerificationCounts,
     EquivalenceOutcome,
     ExpressionEquivalence,
     ExpressionSeal,
     FinalAnswerVerifier,
+    StepChainVerifier,
 )
 
 _MACHINE_AXIS_NUMERIC = "numeric_substitution"
@@ -253,6 +262,52 @@ def math_answer_form_verifier() -> MathAnswerFormVerifier:
     return MathAnswerFormVerifier()
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 선택적 능력 — 풀이 단계 연쇄 검증 (EOS-86)
+# ──────────────────────────────────────────────────────────────────────────
+class MathStepChainVerifier:
+    """`StepChainVerifier` 수학 구현 — `l3.verify_solution.verify_solution`으로 위임.
+
+    `SolutionVerificationResult`는 이미 `ChainVerificationCounts`(→`ChainVerification`)
+    구조적 적합성을 갖는다(`l3/verify_solution.py`의 `_counts_conformance` 증명 — 설계
+    규칙 1: 중간 변환 객체 금지). 여기서도 상태를 재해석하지 않고 그대로 반환한다.
+    """
+
+    def verify_chain(
+        self, steps: Sequence[str], step_types: Sequence[Any] | None = None
+    ) -> ChainVerificationCounts:
+        """전이별 연쇄 검증 그대로 — 4상태(correct/incorrect/unverifiable) 재해석 없음."""
+        typed = cast("Sequence[StepType | None] | None", step_types)
+        return verify_solution(steps, typed)
+
+
+def math_step_chain_verifier() -> MathStepChainVerifier:
+    """기본 주입용 팩토리."""
+    return MathStepChainVerifier()
+
+
+class MathAttemptMisconceptionDetector:
+    """`AttemptMisconceptionDetector` 수학 구현 — `l4.misconception.answer_signature`로 위임.
+
+    "문항 식과 제출 답을 이어 거짓 항등식을 읽는다"는 것이 **수학 고유의 독법**임을 아는 곳이
+    여기 하나다. Core는 `question_text`·`student_answer`를 불투명 문자열로 넘길 뿐이다.
+
+    변환 없음(설계 규칙 1): `AttemptMisconceptionScanResult`가 `scan`·`candidates`를 그대로
+    갖고 있어 Protocol을 **구조적으로** 만족한다 — 중간 변환 객체를 두지 않는다.
+    """
+
+    def scan_attempt_answer(
+        self, *, question_text: str, student_answer: str | None
+    ) -> AttemptMisconceptionScanResult:
+        """오답 1건의 오개념 훑기 — 판정·게이트는 전부 위임(재구현 0)."""
+        return scan_attempt_answer(question_text=question_text, student_answer=student_answer)
+
+
+def math_attempt_misconception_detector() -> MathAttemptMisconceptionDetector:
+    """기본 주입용 팩토리."""
+    return MathAttemptMisconceptionDetector()
+
+
 if TYPE_CHECKING:
     # 구조적 적합성 증명 — SubjectAdapter와 동일 패턴(mypy --strict가 검사).
     _EQUIVALENCE_CONFORMANCE: ExpressionEquivalence = MathExpressionEquivalence()
@@ -260,3 +315,7 @@ if TYPE_CHECKING:
     _ASSESSMENT_CONFORMANCE: AssessmentAnswerVerifier = MathAssessmentAnswerVerifier()
     _SEAL_CONFORMANCE: ExpressionSeal = MathExpressionSeal()
     _ANSWER_FORM_CONFORMANCE: AnswerFormVerifier = MathAnswerFormVerifier()
+    _STEP_CHAIN_CONFORMANCE: StepChainVerifier = MathStepChainVerifier()
+    _ATTEMPT_MISCONCEPTION_CONFORMANCE: AttemptMisconceptionDetector = (
+        MathAttemptMisconceptionDetector()
+    )

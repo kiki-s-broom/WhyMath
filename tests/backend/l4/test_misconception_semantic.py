@@ -403,7 +403,8 @@ class TestDiagnoseUnchanged:
             for x in diagnose("(3+4)² = 3² + 4² = 25", top_k=5)
             if x.misconception.id == "distribution-over-power"
         )
-        assert m.confidence == 0.5
+        # MISC-22(v1.5): 정규식 매치 1건 = substring 신호 전체와 동등한 완결 증거 → conf 1.0.
+        assert m.confidence == 1.0
         assert m.matched_signals == ()
         assert len(m.matched_regex_signals) == 1
         assert m.semantic_similarity is None

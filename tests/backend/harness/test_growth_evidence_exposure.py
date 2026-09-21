@@ -153,3 +153,45 @@ def test_no_ranking_or_percentile_derivation_function_exists() -> None:
         assert not any(
             token in lowered for token in forbidden_tokens
         ), f"금지된 파생 함수로 의심됨: {name}"
+
+
+# ── MISC-20: ⑩ 오개념 해소율 강등 — PROVISIONAL(근사·노출 보류) 계층 ──────────────────
+def test_resolution_rate_demoted_to_provisional_and_not_exposable() -> None:
+    """(a) 강등 — 값이 is_active=false 비율(해소 *근사*)인데 근사임을 알릴 채널이 없다.
+
+    학생은 "내가 오개념을 극복한 비율"로 읽는다(의사결정 우선순위 #1·"확실하지 않을 때 자신
+    있게 말함 금지"). STUDENT_VISIBLE에서 내리되 INTERNAL_ONLY(시스템 품질·비용)와는 성격이
+    달라 별도 계층 PROVISIONAL로 둔다 — 계산·리포트는 유지되고 학생 노출만 멈춘다(삭제 아님).
+    """
+    result = classify_metric_exposure(_metrics(R15Verdict.GENUINE_IMPROVEMENT))
+    exp = result["misconception_resolution_rate"]
+    assert exp.tier is ExposureTier.PROVISIONAL
+    assert exp.exposable_now is False
+    assert exp.suppressed_reason  # 사유 비어있지 않음(재승격 조건을 담는다)
+    assert "재승격" in exp.suppressed_reason
+
+
+def test_provisional_demotion_does_not_touch_other_student_visible_metrics() -> None:
+    """⑥ 범위 밖 동결 — 다른 지표 티어는 그대로(mastery_gain_rate는 PED-14 소관)."""
+    result = classify_metric_exposure(_metrics(R15Verdict.GENUINE_IMPROVEMENT))
+    for field in (
+        "verify_pass_rate",
+        "session_completion_rate",
+        "help_reduction_slope",
+        "help_demand_supply_ratio",
+        "transfer_score",
+        "hint_depth_reached",
+        "mastery_gain_rate",
+        "gap_recovery_leadtime_days",
+        "self_solve_rate",
+        "calibration_brier",
+    ):
+        assert result[field].tier is ExposureTier.STUDENT_VISIBLE, field
+        assert result[field].exposable_now is True, field
+
+
+def test_provisional_is_the_only_field_in_that_tier() -> None:
+    """강등 대상은 ⑩ 하나뿐 — PROVISIONAL이 다른 지표로 번지지 않는다(범위 동결)."""
+    result = classify_metric_exposure(_metrics(R15Verdict.GENUINE_IMPROVEMENT))
+    provisional = {f for f, e in result.items() if e.tier is ExposureTier.PROVISIONAL}
+    assert provisional == {"misconception_resolution_rate"}

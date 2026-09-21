@@ -81,17 +81,19 @@ YAML에서 파싱한 스텝 개수와 원문에서 찾은 `- name:` 경계 개�
 -------------------------------------------------------------------
 `ops/provenance_audit.py`의 `_load_backlog_task_statuses`(ARCH-25가 실제로 돌리는 코드)는
 `backlog/tasks/*.yaml`을 전수 스캔해 **그 파일의 `id:` 필드 내용**으로 `{task_id: status}`
-맵을 만든다(파일명이 아니라 내용 기준). `ARCH-23-qa-gate-enforcement.yaml`의 `id:` 필드는
-`ARCH-23-qa-gate-enforcement`(전체 슬러그)이지 `ARCH-23`(짧은 코드)이 아니다 — 실측 확인.
-`declared_unwired_audit.py`의 실제 `_MANIFEST`도 `pending-task:S4-22-attempt-event-signal-
-consumer-wiring`·`pending-task:S4-16-residue-gate-demotion-battle`처럼 항상 전체 슬러그를
-쓴다(짧은 코드만 쓰는 선례는 이 저장소에 없다). 이 모듈도 같은 이식 규약을 그대로
-따른다 — `pending-task:<id>`의 `<id>`는 `backlog/tasks/*.yaml`의 `id:` 필드 값과 정확히
-일치해야 한다. 그래서 `ci.yml`에는 `pending-task:ARCH-23`이 아니라
-`pending-task:ARCH-23-qa-gate-enforcement`를 써넣는다 — "ARCH-23"은 산문에서 흔히 쓰는
-줄임 표기일 뿐, 실제 `id:` 필드가 아니다(짧은 코드로 쓰면 이 모듈 자신의 그랜드파더 조회가
-"태스크 없음"으로 판정해 위반이 된다 — 아래 `TestRealCiWorkflowIntegration`이 전체
-슬러그로 0위반임을 실측 고정한다).
+맵을 만든다(파일명이 아니라 내용 기준). `declared_unwired_audit.py`의 실제 `_MANIFEST`도
+`pending-task:S4-22-attempt-event-signal-consumer-wiring`·`pending-task:S4-16-residue-
+gate-demotion-battle`처럼 항상 전체 슬러그를 쓴다(짧은 코드만 쓰는 선례는 이 저장소에
+없다). 이 모듈도 같은 이식 규약을 그대로 따른다 — `pending-task:<id>`의 `<id>`는
+`backlog/tasks/*.yaml`의 `id:` 필드 값과 정확히 일치해야 한다("ARCH-23" 같은 산문 줄임
+표기를 쓰면 그랜드파더 조회가 "태스크 없음"으로 판정해 위반이 된다).
+
+[ARCH-23 정정 — 착수 후 완료] 이 절이 원래 들던 구체 예시(`ci.yml`의 qa_pipeline 스텝이
+`pending-task:ARCH-23-qa-gate-enforcement`로 유예됐던 상태)는 ARCH-23 자신이 그 스텝의
+`continue-on-error`와 선언을 함께 제거하면서 사라졌다 — 만료 계약이 설계대로 작동한
+사례다(태스크가 done이 되기 *전에* 소유 태스크가 직접 걷어냈다는 점에서 "방치 뒤 위반
+발견"보다 이른 단계의 정상 경로). 규약 자체(전체 슬러그 요구)는 `declared_unwired_audit.py`
+쪽 실사용 예시로 여전히 유효하다.
 """
 
 from __future__ import annotations
@@ -688,20 +690,20 @@ class TestRealCiWorkflowIntegration:
 
     def test_detector_is_not_blind_finds_known_non_blocking_steps(self) -> None:
         """수집기 파손 방어(맹목 탐지 방지) — 0건 발견은 "전부 선언됨"과 구분 불가하므로,
-        알려진 비차단 스텝 최소 2건(qa_pipeline·shellcheck)을 실제로 찾는지 먼저 확인한다.
-        이게 없으면 아래 "위반 0건" 테스트가 탐지기가 죽어서 통과하는 것인지, 정말 전부
-        선언됐기 때문인지 구분할 수 없다."""
+        알려진 비차단 스텝 최소 1건(shellcheck)을 실제로 찾는지 먼저 확인한다. 이게 없으면
+        아래 "위반 0건" 테스트가 탐지기가 죽어서 통과하는 것인지, 정말 전부 선언됐기
+        때문인지 구분할 수 없다.
+
+        [ARCH-23] data-pipeline의 qa_pipeline continue-on-error는 이제 제거됐다(그 스텝이
+        더 이상 이 탐지기에 걸리지 않는 것 자체가 ARCH-23의 성공 증거 — 아래
+        `test_qa_pipeline_step_no_longer_requires_declaration`이 명시적으로 고정한다)."""
         classified = self._real_classified()
         found = {(c.ref.job_key, c.reason) for c in classified}
-        assert ("data-pipeline", _REASON_CONTINUE_ON_ERROR) in found, (
-            "data-pipeline 잡의 qa_pipeline continue-on-error 스텝을 찾지 못했다 — "
-            "탐지기가 깨졌을 가능성(수집기 파손)."
-        )
         assert ("infra-shell", _REASON_CONTINUE_ON_ERROR) in found, (
             "infra-shell 잡의 shellcheck continue-on-error 스텝을 찾지 못했다 — "
             "탐지기가 깨졌을 가능성(수집기 파손)."
         )
-        assert len(classified) >= 2
+        assert len(classified) >= 1
 
     def test_real_ci_workflow_has_zero_declaration_violations(self) -> None:
         classified = self._real_classified()
@@ -709,22 +711,24 @@ class TestRealCiWorkflowIntegration:
         violations = validate_declarations(classified, task_statuses)
         assert violations == [], f"CI 강제 상태 선언 계약 위반: {violations}"
 
-    def test_qa_pipeline_step_declares_pending_task_arch_23(self) -> None:
-        """②의 구체 증거 — qa_pipeline 스텝이 정확히 `pending-task:ARCH-23-qa-gate-
-        enforcement`로 등재됐고, 그 태스크가 오늘 시점 `status: todo`라 유효함을 명시적으로
-        고정한다(모듈 docstring "짧은 코드가 아니라 전체 슬러그" 결정의 실측 근거)."""
+    def test_qa_pipeline_step_no_longer_requires_declaration(self) -> None:
+        """②의 구체 증거(만료 계약 실현) — ARCH-23이 `continue-on-error`와 그 `pending-task:
+        ARCH-23-qa-gate-enforcement` 선언을 함께 제거했으므로, data-pipeline 잡에는 더
+        이상 이 탐지기가 걸릴 비차단 스텝이 없다. 이 테스트가 없으면 "선언이 사라진 것"과
+        "스텝 자체가 사라진 것"을 구분할 수 없으므로, qa_pipeline 스텝 자체는 여전히
+        존재함을 `tests/infra/test_qa_pipeline_wiring.py`를 통해 별도 고정한다(이 파일은
+        그 파일과 계층이 달라 직접 import하지 않는다 — 여기서는 이 탐지기 관점의 결과만
+        본다)."""
         classified = self._real_classified()
         matches = [
             c
             for c in classified
             if c.ref.job_key == "data-pipeline" and c.reason == _REASON_CONTINUE_ON_ERROR
         ]
-        assert len(matches) == 1
-        decl = matches[0].declaration
-        assert decl == Declaration(kind="pending-task", value="ARCH-23-qa-gate-enforcement")
-
-        task_statuses = load_backlog_task_statuses(_BACKLOG_TASKS_DIR)
-        assert task_statuses.get("ARCH-23-qa-gate-enforcement") == "todo"
+        assert matches == [], (
+            "data-pipeline 잡에 여전히 continue-on-error 비차단 스텝이 남아 있다 — "
+            f"ARCH-23이 제거했어야 한다: {matches}"
+        )
 
     def test_shellcheck_step_declares_by_design(self) -> None:
         """②의 구체 증거 — shellcheck 스텝이 by-design으로 등재됐다."""

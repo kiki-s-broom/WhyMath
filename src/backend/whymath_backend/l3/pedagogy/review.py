@@ -32,6 +32,7 @@ from whymath_backend.db.models.pedagogy_dsl import (
 )
 from whymath_backend.l1.embedding_primitives import build_sync_engine
 from whymath_backend.l3.pedagogy.slot_generator import verify_slot_payload
+from whymath_backend.schema.verification_capabilities import ExpressionEquivalence
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -59,14 +60,19 @@ class ReviewVerdict:
 # ──────────────────────────────────────────────────────────────────────────
 # 기계 게이트
 # ──────────────────────────────────────────────────────────────────────────
-def review_slot(payload: dict[str, Any]) -> ReviewVerdict:
+def review_slot(
+    payload: dict[str, Any], *, equivalence: ExpressionEquivalence | None = None
+) -> ReviewVerdict:
     """슬롯 1개 검수 — 구조+기호 결정 가능 검사만. 통과=APPROVE, 실패=REJECT(사유).
 
     ① 숫자형 SymPy 재검증(`verify_slot_payload`가 False면 답 틀림 → 반려) ② 본문·유형·태그 완전성
     ③ 정답 유출(answer 값이 body에 노출) — fail-closed로 하나라도 걸리면 반려한다.
+
+    `equivalence`(과목 항등 판정·EOS-89)는 payload에 `verification` 주장이 있을 때만 필요하다 —
+    주입 없이 주장 있는 payload를 넣으면 `LookupError`다(미검증을 통과로 위장하지 않는다).
     """
     # ① 숫자형 재검증(개념형은 None → 통과).
-    if verify_slot_payload(payload) is False:
+    if verify_slot_payload(payload, equivalence=equivalence) is False:
         return ReviewVerdict(False, "sympy_reverify_failed")
 
     # ② 구조 완전성.
@@ -86,9 +92,11 @@ def review_slot(payload: dict[str, Any]) -> ReviewVerdict:
     return ReviewVerdict(True, None)
 
 
-def review_rows(rows: Sequence[dict[str, Any]]) -> list[tuple[str, ReviewVerdict]]:
+def review_rows(
+    rows: Sequence[dict[str, Any]], *, equivalence: ExpressionEquivalence | None = None
+) -> list[tuple[str, ReviewVerdict]]:
     """슬롯 행들 → `(id, ReviewVerdict)` 리스트(각 payload에 `review_slot` 적용)."""
-    return [(str(row["id"]), review_slot(row["payload"])) for row in rows]
+    return [(str(row["id"]), review_slot(row["payload"], equivalence=equivalence)) for row in rows]
 
 
 def verb_confirms_k_type(source_verb: str | None, k_type: str) -> bool:

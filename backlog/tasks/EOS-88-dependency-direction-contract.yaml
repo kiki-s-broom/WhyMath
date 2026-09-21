@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-88-dependency-direction-contract
+title: "EOS Core 허용 의존 방향 실측·동결 — Application→Core→Subject Interface←Math Adapter (계획서 100 §3.8) · Core가 어댑터 구현체를 아는 지점 0 + composition pull 지점 동결"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-84-core-boundary-math-removal-probe
+requires_gates: []
+acceptance:
+  - "① 네 화살표를 AST로 실측: (a) Subject Interface(schema.subject_adapter·verification_capabilities)가 schema 밖을 import하지 않는다 (b) Math Adapter가 Interface를 import하고 적합성 증명(: SubjectAdapter = MathSubjectAdapter())을 갖는다 (c) CORE 코드(docstring 제외)에 어댑터 구현체 이름·모듈명 0 (d) Core(l*·schema·lang·composition)가 Application(api·app·main)을 import하지 않는다"
+  - "② 등록(push) vs 풀(pull) 실측: composition을 import하는 Core 모듈 집합을 동결(현재 3: api.coach·l3.pedagogy.slot_generator·l3.render.adapters — 늘면 RED·줄면 ratchet) + l* 풀 지점은 전부 pyproject layers ignore_imports에 열거돼 있어야 함(세탁 통로 방지) + app.py의 app.state 등록 중 과목 능력 0건임을 문서에 기록"
+  - "③ 변별력: 가짜 소스로 Interface→Adapter import(함수 내 지연 import 포함)·Core 코드 내 구현체 이름·문자열 모듈명 각각 검출, docstring 언급은 비검출"
+  - "④ 경계 정본 eos_core_adapter_boundary.md §9 신설(§3.8 두 그림 대조·실측표·정본화≠집행: 집행은 EOS-67 계약 + 이 테스트) · 등록 형태 전환은 별도 태스크로 등재"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/980 (커밋 b7e3cc29) — test_eos_dependency_direction.py 19 passed(PYTHONHASHSEED 0/7) · Interface→Adapter 0 · Core 구현체 이름 0 · Core→api 0 · pull 3 동결 · 문서 §9 · black/ruff green"
+paths:
+  - tests/infra/test_eos_dependency_direction.py
+  - docs/architecture/eos_core_adapter_boundary.md
+session: null
+notes: "출처: Kiki 2026-09-04 계획서 100 §3.8 'Core의 허용 방향' 제시 — 권장 Application→Core→Subject Contract→Math Adapter, 실행 시 등록 형태면 Core→Subject Interface←Math Adapter(DI 역전)이 더 정확·Core는 구현체를 몰라야 한다. 1차 실측: Interface→Adapter 코드 import 0(EOS-67 계약 1이 schema를 source로 이미 강제), 어댑터→Interface ✓(적합성 증명 L151), Core 코드의 구현체 이름 0(docstring 2건만), Core→api 0, composition pull 3모듈(5팩토리 호출), app.state 등록 13키 중 과목 능력 0 — 즉 현행은 §3.8의 '덜 정확한' 풀 형태이고 등록 형태는 부재."
+updated: 2026-09-04

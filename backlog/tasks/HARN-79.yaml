@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-79
+title: "위임 에이전트 검증 명령 포그라운드 규약 회수 — 7n9n72에만 있는 backend-engineer 페르소나 17줄(반복 실수 3회차 재발방지)을 전 페르소나로 일반화"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정(2026-09-07 main b75f495d): origin/claude/subject-problems-theory-check-7n9n72(621b11f9)의 .claude/agents/backend-engineer.md '검증 명령 실행 규약(2026-08-10 등재 — 반복 실수 3회차 재발방지)' 17줄이 main 부재 — 역할 기반 검색(백그라운드·포그라운드·run_in_background·nohup·완료까지 대기)으로 .claude/·docs/standards/·CLAUDE.md 0건(무관 매치 Celery·비동기 제외). 재현: git diff origin/main...origin/claude/subject-problems-theory-check-7n9n72 -- .claude/agents/backend-engineer.md"
+  - "② 이식 = 파일 단위(통째 머지 금지). 규약 본문(오래 걸리는 검증 명령은 포그라운드로 완료까지 대기·run_in_background/&/nohup 금지·타임아웃을 크게 잡고 1회 대기·사고 경위 MISC-02·MISC-06·PED-14 3회 반복)을 backend-engineer.md에 회수하고, 같은 실패가 페르소나와 무관하므로 .claude/agents/*.md 7종 전부에 같은 절을 두거나 공통 참조 1곳(CLAUDE.md 또는 docs/standards)으로 올린다 — 선택 근거를 notes에 남긴다"
+  - "③ 집행 지점(정본화와 별항): 규약이 실제로 위임 프롬프트와 무관하게 적용되는지 — 페르소나 파일이 서브에이전트 시스템 프롬프트로 로드되는 경로(.claude/agents 규약)를 확인하고, 7종 파일 전부에 규약 절이 존재하는지 tests/infra 거버넌스 테스트로 동결(1개라도 빠지면 RED — 빈 스캔 0건은 실패)"
+  - "④ 범위 밖: 코드 변경 0 · 7n9n72의 다른 잔여(MISC-01/03/05/06·PED-14·ASM-06·MISC-02·PB-02·S3-33/34·PED-15 계열)는 각 좌석 소관"
+artifacts: []
+paths:
+  - ".claude/agents/*.md"
+  - tests/infra/test_agent_persona_rules.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §4.2 (stray-code 8회차 — 7n9n72 잔여 재도출에서 '좌석 없는 잔여'로 검출). 원 등재 경위(브랜치 문면): 위임 에이전트가 전체 스위트를 detached 백그라운드로 던지고 보고 없이 턴을 종료한 사례가 한 세션에서 3회 반복(MISC-02·MISC-06·PED-14) — 위임 프롬프트에 개별로 적는 방식은 위임자가 깜빡하면 재발하므로 페르소나 정의에 상시 등재한 재발방지 규칙이었다. 그 규칙 자체가 미머지 브랜치에 고립돼 main에는 0건 — CLAUDE.md 실수 관리 규칙(대책은 규칙·코드·태스크 중 하나의 형태)상 규칙이 유실된 상태라 회수 태스크로 보존한다. 회수 완료 전 7n9n72 삭제 금지."
+updated: 2026-09-07

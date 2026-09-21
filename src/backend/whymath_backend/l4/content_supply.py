@@ -59,6 +59,10 @@ from whymath_backend.l4.pedagogy.runtime_selector import StudentSignals, decide
 from whymath_backend.l4.pedagogy.strategy_registry import get_strategy
 from whymath_backend.schema.enums import PedagogyStrategy
 from whymath_backend.schema.pedagogy_strategy import PedagogyStrategyCard
+from whymath_backend.schema.verification_capabilities import (
+    AssessmentAnswerVerifier,
+    ExpressionSeal,
+)
 
 logger = logging.getLogger("whymath.l4.content_supply")
 
@@ -258,15 +262,23 @@ async def get_concept_dsl(
 
 
 def _render_or_reason(
-    dsl: ConceptDSL, strategy: PedagogyStrategy, ctx: RenderContext
+    dsl: ConceptDSL,
+    strategy: PedagogyStrategy,
+    ctx: RenderContext,
+    *,
+    seal: ExpressionSeal,
+    assessment_verifier: AssessmentAnswerVerifier,
 ) -> tuple[RenderedUnit | None, str | None]:
     """렌더 시도 — 성공하면 (unit, None), 불가·미검증이면 (None, 사유).
 
     어댑터 미등록(`LookupError`)은 REND-01 레지스트리의 명시적 계약이다(조용한 대체 금지). 여기서
     잡아 폴백 사유로 바꾼다 — 상위는 생성 경로로 가면 되지 예외로 죽을 이유가 없다.
+
+    EOS-89: 과목 능력 2종은 이 함수가 만들지 않고 **받아서 내려보낸다** — 합성 루트를 부르면
+    L4가 새 pull 지점이 된다(계획서 100 §3.8).
     """
     try:
-        adapter = get_adapter(strategy)
+        adapter = get_adapter(strategy, seal=seal, assessment_verifier=assessment_verifier)
     except LookupError:
         return None, REASON_NO_ADAPTER
 
@@ -285,6 +297,8 @@ async def supply(
     signals: StudentSignals,
     session: AsyncSession,
     cache: CacheBackend,
+    seal: ExpressionSeal,
+    assessment_verifier: AssessmentAnswerVerifier,
     k_type: str | None = None,
     ctx: RenderContext | None = None,
     generate_request: RoutingRequest | None = None,
@@ -304,6 +318,10 @@ async def supply(
 
     생성 폴백에 필요한 인자(`generate_request`·`provider`·`trace`)가 없으면 폴백을 시도하지 않고
     렌더 실패 사유를 담은 결과를 돌려준다 — 호출자가 폴백 없이 쓰는 경우(사전 점검·배치)를 위해서다.
+
+    `seal`·`assessment_verifier`(과목 능력)는 **필수 인자**다(EOS-89). 기본값을 주면 L4가
+    합성 루트를 알아야 하고, `None` 허용은 미검증 렌더가 학생에게 나가는 길이 된다. 상류는
+    `api/study.py`이며 `app.state` 등록분을 `Depends`로 받아 그대로 내려준다.
     """
     gate_result = decide(signals, k_type=k_type)
     strategy = gate_result.strategy
@@ -314,7 +332,13 @@ async def supply(
         reason: str | None = REASON_NO_DSL
         unit: RenderedUnit | None = None
     else:
-        unit, reason = _render_or_reason(dsl, strategy, render_ctx)
+        unit, reason = _render_or_reason(
+            dsl,
+            strategy,
+            render_ctx,
+            seal=seal,
+            assessment_verifier=assessment_verifier,
+        )
 
     if unit is not None:
         result = SupplyResult(

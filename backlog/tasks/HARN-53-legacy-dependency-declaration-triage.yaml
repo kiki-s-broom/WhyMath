@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "① HARN-52 LEGACY_EXEMPT 9건 각각을 판정: ⓐ진짜 선행 → amend --depends로 부착 / ⓑ소프트 권고(SEC-26 '스테이지 순서상 하드 의존 불가' 자인 등) → 소프트 표기 규약 신설 후 면제 해제"
   - "② 타 세션 claim 중인 태스크(등재 시점 EOS-28 등)는 소유 세션에 이관 — 병렬 세션의 태스크를 대신 고치지 않는다"
   - "③ 처리 완료분은 LEGACY_EXEMPT에서 제거 — 이 태스크가 done인데 면제가 남으면 HARN-52 ⑤ 만료 계약이 red를 낸다(자동 검출)"
-artifacts: []
+artifacts:
+  - "PR #1006 (https://github.com/doldori7/WhyMath/pull/1006) — commit 1b75fd2a · 레거시 6건 전수 분류(하드 0·소프트 6, 사유 코드 5종) · LEGACY_EXEMPT {} · 진짜 선행 2건 부착(ADMIN-02→ADMIN-09·SEC-30→PB-04) · amend 되먹임 가드 · build_harness.md §3d · 테스트 12건 신규 · infra+harness 1361 passed"
 paths:
   - scripts/harness/dep_declaration.py
   - "backlog/tasks/**"
 session: null
 notes: "출처: HARN-52 실측 9태스크 10건. 즉시 전건 수정하지 않는 이유 2가지 — ①일부는 타 세션 claim 중이라 병렬 착수 금지 ②SEC-26처럼 하드 의존이 설계상 불가능하다고 자인한 건이 있어 일괄 부착이 오히려 틀린다. 게이트는 신규 위반을 오늘부터 막고, 레거시는 이 태스크가 만료 지점을 갖는다.\n\n[정정 2026-09-01] HARN-52의 LEGACY_EXEMPT를 분류하는 태스크이므로 게이트 착지가 하드 선행 (notes 선언을 depends_on으로 집행 — 이 태스크가 고치려는 결함을 스스로 범하지 않는다)\n\n[정정 2026-09-01] priority 3 → 2: HARN-52 그랜드파더 6건의 만료 지점이라 priority 3이면 만료가 명목상으로만 성립한다 — 아무도 착수하지 않으면 면제가 사실상 영구화되므로 '만료 없는 유예 금지'를 실질 충족시키려면 착수 가시권에 둬야 한다 (자기평가에서 발견·Kiki 승인)\n\n[정정 2026-09-01] eos_priority null → P1: 하네스 전제 — HARN-52 그랜드파더 만료. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-06

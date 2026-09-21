@@ -348,6 +348,27 @@ class TestRotationAndFreeze:
 
         assert base.digest != edited.digest
 
+    def test_digest_is_representation_independent(self) -> None:
+        """같은 정답지는 enum 인스턴스를 들든 값 문자열을 들든 같은 digest다(EOS-75).
+
+        검증 경유 항목은 `use_enum_values`로 `str`("F2")을, `model_construct`(검증 우회)
+        항목은 enum 인스턴스를 든다. `str(enum)`이 repr을 내는 구현에서는 둘의 digest가
+        갈라져 재채점 금지 원장이 같은 셋의 재실행을 "다른 골든"으로 통과시켰다.
+        """
+        validated = _item("cu-a")
+        constructed = GoldenItem.model_construct(
+            cu_slug="cu-a",
+            subject_id=validated.subject_id,
+            anchor_id="A4",
+            label=GoldenLabel.DEFECTIVE,
+            failure_code=GenerationFailureCode.F2,
+            as_found_basis=AsFoundBasis.REJECTED_FAILURE_CODE,
+        )
+        assert isinstance(validated.failure_code, str)
+        assert isinstance(constructed.failure_code, GenerationFailureCode)
+
+        assert compute_digest([validated]) == compute_digest([constructed])
+
     def test_tampered_file_fails_to_load(self, tmp_path: Path) -> None:
         """손편집 변조는 무증상으로 통과하지 않는다(로드 시 validator가 터진다)."""
         path = tmp_path / "golden.json"

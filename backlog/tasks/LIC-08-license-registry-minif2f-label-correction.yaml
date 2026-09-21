@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: LIC-08-license-registry-minif2f-label-correction
+title: "license_snapshot_archiver 레지스트리 miniF2F 라벨 정정 — license_label='MIT' 단일 표기와 폴더 3종 주석을 실측 4종(lean·isabelle=Apache 2.0 · metamath=MIT · hollight=FreeBSD)에 맞춘다"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 레지스트리 Tier1Source(minif2f)의 license_label 표기를 폴더별 상이 사실이 드러나게 고치고, 인접 주석의 폴더 열거 3종을 실측 4종으로 정정한다(누락분 = isabelle=Apache License). 근거 = data/licenses/snapshots/minif2f/9b6de2b0a301c318.txt README §License 절 5행"
+  - "② license_label은 meta.json에 그대로 기록되므로(archiver 482~495행) 표기 변경이 기존 스냅샷 메타와 어긋나는지 실측 판정한다 — 재생성이 필요하면 도구로 재생성하고 손편집하지 않는다"
+  - "③ tests/infra/test_license_snapshot_archiver.py가 라벨 문자열을 동결하고 있는지 확인하고, 동결 중이면 함께 갱신한다. 갱신 후 tests/infra 전체 EXIT 0"
+artifacts: []
+paths:
+  - scripts/ops/license_snapshot_archiver.py
+  - tests/infra/test_license_snapshot_archiver.py
+session: null
+notes: "docs/data/licensing_safety.md 매트릭스 정정(LIC-04)에서 파생. 같은 사실 오류가 문서와 레지스트리 두 곳에 있었고 LIC-04의 선언 범위는 docs/data/** 라 코드측을 분리 등재한다. 두 파일은 서로 독립이라 순서 제약은 없다 — LIC-04 문서 각주가 이 태스크를 소유자로 지목한다."
+updated: 2026-09-07

@@ -51,7 +51,7 @@
 > ⚠️ **2026-08-03 정정**: 자매 데이터셋 §A(7계층 본문)는 `data/corpus/concept_content_v1/content.json`과
 > 적재기(`l1/concept_content/populate.py`)까지 **실재 착지**했는데, 이 §B는 코퍼스 파일·store·로더가
 > **전부 미존재**다. 같은 표 형식으로 나란히 적혀 있어 실재로 오독되던 것을 ⏳ 표기로 분리한다.
-> 원본 Path xlsx도 저장소에 없다(Kiki 소유). 추적은 `PATH-02-learning-path-corpus-ingestion`이
+> 원본 Path xlsx도 저장소에 없다(Kiki 소유). 추적은 `PATH-04-learning-path-corpus-ingestion`이
 > 소유한다 — 근거: `docs/architecture/learning_path_module_gap_review.md` §3 D2·§6 8회차.
 
 ### B.2 스키마 (행 = 한 소단원의 페르소나별 경로)

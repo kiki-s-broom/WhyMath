@@ -9,7 +9,8 @@ status: todo
 priority: 3
 eos_priority: P2
 owner: claude
-depends_on: []
+depends_on:
+  - PB-04-l6-mode-reach-observability
 requires_gates: []
 acceptance:
   - "① 실측 고정: gifted·metacognition·suneung·thinking 4건 면제가 여전히 주석 사유만으로 유지(2026-08-30 재실측: declared_unwired_audit.py에 잔존·PB-04 _l6_mode_reach 테스트 main 미착지). 근본 원인 후보 = 감사기 정규식 _TEST_CLIENT_CALL이 _client([...]).get(...) 형태 미인식"
@@ -21,5 +22,5 @@ paths:
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
   - "tests/backend/ops/**"
 session: null
-notes: "원 등재 SEC-25(6ybkis backup 5d2c2b71에만 잔존) — HARN-35 재등재. SEC-24 회수 세션의 정직한 공백 ①에서 분리된 좌석. 선행 조건 PB-04는 여전히 k20m0w 고립(MOB-18 소유)\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "원 등재 SEC-25(6ybkis backup 5d2c2b71에만 잔존) — HARN-35 재등재. SEC-24 회수 세션의 정직한 공백 ①에서 분리된 좌석. 선행 조건 PB-04는 여전히 k20m0w 고립(MOB-18 소유)\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-06] HARN-53 분류: SEC-30 notes의 '선행 조건 PB-04'가 진짜 선행이다. 스캐너 창(60자)이 같은 문장의 MOB-18(브랜치 소유 태스크)을 함께 잡았으므로 그 쌍은 SOFT_DECLARED[MISREAD_REF]로 분류"
+updated: 2026-09-06

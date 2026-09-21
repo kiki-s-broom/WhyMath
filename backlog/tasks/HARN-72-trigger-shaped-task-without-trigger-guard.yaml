@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-72-trigger-shaped-task-without-trigger-guard
+title: "트리거형 태스크가 트리거 없이 등재되는 것을 막는 가드 — '~하면 재측정' acceptance인데 depends_on·requires_gates 공백 (동일 세션 2회 반복)"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 문제 정의: acceptance에 **미래 조건부 문장**('~가 생기면 재측정', '~ 착지 시점에', '트리거 3종', '재확인한다', '전환되면')을 담은 태스크가 depends_on·requires_gates 둘 다 비어 있으면, selector가 **즉시 착수 후보로 계산**한다. 그 태스크를 지금 실행하면 조건이 전부 False임을 확인하고 종결되며, 지키려던 미래 전이는 미추적으로 남는다. 산문이 아니라 대장이 집행해야 한다는 HARN-52의 축을 **acceptance 문장**으로 확장한 것"
+  - "② 실측 근거(2회 반복·같은 세션 2026-09-06): ⓐARCH-40(ARCH-38 판정 재확인) — Codex P2가 'next --n 533 --json에 포함'을 실측 지적, 게이트 부착으로 후보 124→123 ⓑARCH-41(필수층 미사용 추적) — 같은 지적을 **같은 세션에서 다시** 받음(Codex P1·PR #999), 후보 123→122. 1회성 실수가 아니라 등재 절차에 집행 장치가 없다는 신호다"
+  - "③ 가드 형태: backlog.py add/validate가 acceptance 텍스트에서 트리거형 어구를 검출하고 depends_on·requires_gates가 모두 비면 **경고 또는 거부**한다. 금지 문자열 열거가 아니라 **판정 근거를 남기는 형태**로 — 어떤 어구가 걸렸는지 출력해 등재자가 '이건 트리거가 아니다'를 판단할 수 있게 한다(오탐 시 탈출구 필요: --no-trigger <사유>)"
+  - "④ **실패 주입으로 검증**(CLAUDE.md 2026-09-01) — ARCH-40·ARCH-41의 게이트 부착 *이전* YAML을 합성해 가드가 RED를 내는지, 그리고 트리거형 문장이 없는 평범한 태스크에서는 통과하는지 양방향 확인. 정상 입력에서만 초록인 것은 보호의 증거가 아니다"
+  - "⑤ **스캔 0건은 실패** — 저장소 전수에서 트리거형 태스크를 하나도 못 찾으면 그것은 '위반 없음'이 아니라 검출기가 깨진 것이다. 기존 위반 전수 스캔 결과를 먼저 내고(그랜드파더 필요 시 만료 지점 동반 — 만료 없는 유예 금지) 그 위에 가드를 건다"
+artifacts:
+  - "PR #999 (c958c21d) — trigger_declaration.py 신설 + store.validate_backlog 배선(add·validate 동시 집행) + amend/add --no-trigger 탈출구. 규칙 1(문장내 미래조건+재측정) + 규칙 2(자기 재생성)로 알려진 사고 2건 전건 검출·저장소 오탐 0(그랜드파더 불요). CLI 실패 주입 검증: add 거부 exit 1·파일 미생성 / validate 주입 exit 1→원복 exit 0. 테스트 18건 신규(harness 559→577)"
+paths:
+  - scripts/harness/backlog.py
+  - tests/harness
+session: null
+notes: "출처: PR #999 Codex P1. CLAUDE.md '실수 관리 — 반복 실수(동일 유형 2회 이상)는 재발방지대책 등재가 의무'의 집행. 대책은 '다음엔 조심한다'가 아니라 규칙·코드·태스크 중 하나여야 하므로 코드 축으로 등재한다.\\n\\n인접 구분: HARN-52(audit-deps)는 **notes에 적힌 선행**이 depends_on에 집행됐는지를 본다. 이 태스크는 **acceptance에 적힌 미래 트리거**가 requires_gates·depends_on에 집행됐는지를 본다 — 같은 '산문↔집행' 축이지만 필드가 다르다. 확장으로 될 일이면 audit-deps를 확장하고, 안 되면 사유를 적는다(새 장치 남발 금지).\n\n[정정 2026-09-06] [트리거 면제] 이 태스크가 검출기 자신이라 acceptance ①·②가 탐지 대상 어구('~가 생기면 재측정' 등)를 **예시로 인용**한다. 대기 태스크가 아니라 트리거 장치를 *만드는* 태스크이므로 게이트를 붙일 대상이 없다 — 검출기의 첫 실사용 오탐 사례이자 탈출구가 필요한 근거 그 자체"
+updated: 2026-09-06

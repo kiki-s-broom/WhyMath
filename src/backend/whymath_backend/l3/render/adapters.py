@@ -14,17 +14,16 @@
 ② **결정론·LLM=0**: 같은 (dsl, ctx) → 같은 RenderedUnit. 네트워크·난수·시계 0.
 ③ **검증 후 노출**: 평가 재료를 렌더하면 `verify_answer`로 정답을 확인하고, 수치·수식은
    `rephrase.classify_invariance_failure`의 봉인으로 원본 보존을 확인한다. 실패는 예외가 아니라
-   `validation_signal`로 표면화한다(조용한 실패 금지).
+   `validation_signal`로 표면화한다(조용한 실패 금지). 두 검사에 쓰는 **과목 능력**
+   (`ExpressionSeal`·`AssessmentAnswerVerifier`)은 이 모듈이 합성 루트에서 끌어오지 **않는다** —
+   생성 시 주입받는다(EOS-89 · 계획서 100 §3.8 "등록 형태"). 그래서 이 파일에는 `composition`
+   import가 없다.
 ④ **한국어 조사 일치**: 이름·값 뒤 조사는 `lang/josa.py`가 판정한다(재발명 금지 ·
    EOS-69로 수학 패키지 밖 이동 — 조사 판별은 과목과 무관하므로 Core가 알아도 된다).
 """
 
 from __future__ import annotations
 
-from whymath_backend.composition import (
-    default_assessment_answer_verifier,
-    default_expression_seal,
-)
 from whymath_backend.l3.pregenerate.models import ValidationSignal
 from whymath_backend.l3.render.adapter import RenderContext, RenderedUnit, RenderSegment
 from whymath_backend.l3.render.dsl import ConceptDSL
@@ -57,7 +56,7 @@ def _seal_signal(
     dsl: ConceptDSL,
     segments: tuple[RenderSegment, ...],
     *,
-    seal: ExpressionSeal | None = None,
+    seal: ExpressionSeal,
 ) -> ValidationSignal | None:
     """수식 봉인 검사 — DSL 본문의 수식이 렌더 후에도 바이트 동일하게 남았는지.
 
@@ -74,7 +73,9 @@ def _seal_signal(
     그대로 검사한다).
     """
     # EOS-69: 봉인 대상이 "방정식"이라는 사실은 과목 구현만 안다 — Core는 뽑기/판정 두 동작만.
-    inspector = seal if seal is not None else default_expression_seal()
+    # EOS-89: 기본값 폴백을 없앴다 — 능력이 없으면 *검사를 건너뛰는* 것이 아니라 애초에 어댑터를
+    # 만들 수 없다(생성자 필수 인자). 폴백이 있으면 미주입 상태가 조용히 "검증 통과"로 보인다.
+    inspector = seal
     sources = [text for text in (dsl.definition, dsl.intuition) if text] + list(dsl.examples)
     for source in sources:
         equation = inspector.extract_sealed(source)
@@ -96,7 +97,7 @@ def _seal_signal(
 
 
 def _assessment_signal(
-    dsl: ConceptDSL, *, verifier: AssessmentAnswerVerifier | None = None
+    dsl: ConceptDSL, *, verifier: AssessmentAnswerVerifier
 ) -> ValidationSignal | None:
     """평가 재료 정답 검증 — 렌더에 실린 답이 조건을 만족하는지(Tier1 SymPy).
 
@@ -105,8 +106,7 @@ def _assessment_signal(
     """
     if dsl.assessment is None:
         return None
-    checker = verifier if verifier is not None else default_assessment_answer_verifier()
-    verdict = checker.verify_answer(list(dsl.assessment.conditions), dsl.assessment.answer_map)
+    verdict = verifier.verify_answer(list(dsl.assessment.conditions), dsl.assessment.answer_map)
     if verdict.state == "fail":
         return ValidationSignal(
             kind="solution",
@@ -115,27 +115,52 @@ def _assessment_signal(
     return None
 
 
-def _validate(dsl: ConceptDSL, segments: tuple[RenderSegment, ...]) -> ValidationSignal | None:
-    """렌더 산출 검증 파이프 — 봉인 → 평가 정답. 먼저 걸린 신호를 돌려준다(통과=None)."""
-    return _seal_signal(dsl, segments) or _assessment_signal(dsl)
+class _CapabilityBackedAdapter:
+    """어댑터 공통 종결부 — 과목 능력 2종을 **생성 시 주입**받아 보관한다(EOS-89).
+
+    왜 생성자인가: `PedagogyAdapter` Protocol의 `render(dsl, ctx)` 서명은 계약이라 인자를 늘릴 수
+    없고, `RenderContext`(치환 바인딩·로케일)에 능력을 섞으면 "렌더 1회의 부수 입력"이라는 그
+    값객체의 뜻이 흐려진다. 생성자 주입이면 **능력 없이는 어댑터가 존재할 수 없다** — 미주입
+    상태가 런타임 어딘가가 아니라 조립 시점에 드러난다(mypy·TypeError).
+
+    상류는 `l3/render/registry.get_adapter(strategy, seal=…, assessment_verifier=…)`이고, 그
+    상류는 `l4/content_supply.supply(...)`, 다시 그 상류가 `api/study.py`(app.state Depends)다.
+    """
+
+    def __init__(
+        self,
+        *,
+        seal: ExpressionSeal,
+        assessment_verifier: AssessmentAnswerVerifier,
+    ) -> None:
+        self._seal = seal
+        self._assessment_verifier = assessment_verifier
+
+    def _validate(
+        self, dsl: ConceptDSL, segments: tuple[RenderSegment, ...]
+    ) -> ValidationSignal | None:
+        """렌더 산출 검증 파이프 — 봉인 → 평가 정답. 먼저 걸린 신호를 돌려준다(통과=None)."""
+        return _seal_signal(dsl, segments, seal=self._seal) or _assessment_signal(
+            dsl, verifier=self._assessment_verifier
+        )
+
+    def _finish(
+        self,
+        strategy: PedagogyStrategy,
+        dsl: ConceptDSL,
+        segments: list[RenderSegment],
+    ) -> RenderedUnit:
+        """세그먼트 열을 검증해 RenderedUnit으로 봉한다(모든 어댑터 공통 종결부)."""
+        frozen = tuple(segments)
+        return RenderedUnit(
+            strategy=strategy,
+            dsl_code=dsl.code,
+            segments=frozen,
+            validation_signal=self._validate(dsl, frozen),
+        )
 
 
-def _finish(
-    strategy: PedagogyStrategy,
-    dsl: ConceptDSL,
-    segments: list[RenderSegment],
-) -> RenderedUnit:
-    """세그먼트 열을 검증해 RenderedUnit으로 봉한다(모든 어댑터 공통 종결부)."""
-    frozen = tuple(segments)
-    return RenderedUnit(
-        strategy=strategy,
-        dsl_code=dsl.code,
-        segments=frozen,
-        validation_signal=_validate(dsl, frozen),
-    )
-
-
-class DirectAdapter:
+class DirectAdapter(_CapabilityBackedAdapter):
     """직접교수 — 정의를 앞세워 설명하고 예시로 굳힌다."""
 
     @property
@@ -160,10 +185,10 @@ class DirectAdapter:
             segments.append(
                 RenderSegment(kind="example", content=_substitute(example, ctx.bindings))
             )
-        return _finish(self.strategy, dsl, segments)
+        return self._finish(self.strategy, dsl, segments)
 
 
-class SocraticAdapter:
+class SocraticAdapter(_CapabilityBackedAdapter):
     """소크라테스식 — 정의를 *주지 않고* 발문으로 스스로 도달하게 한다.
 
     핵심 차이: 정의는 화면에 실리지 않는다(학생이 답할 자리를 비운다). 개념명은 발문의 재료로만
@@ -202,10 +227,10 @@ class SocraticAdapter:
                 content=f"어떤 점{i_ga('점')} 가장 헷갈리나요? 헷갈리는 지점을 말해 주세요.",
             )
         )
-        return _finish(self.strategy, dsl, segments)
+        return self._finish(self.strategy, dsl, segments)
 
 
-class WorkedExampleAdapter:
+class WorkedExampleAdapter(_CapabilityBackedAdapter):
     """완전예제 — 풀이 과정을 끝까지 보여준다.
 
     ⚠️ 이 전략은 학생이 시도하기 *전*에 제공하면 "막혔을 때 바로 정답 제공 금지"를 어긴다. 그
@@ -243,10 +268,10 @@ class WorkedExampleAdapter:
             segments.append(
                 RenderSegment(kind="example", content=_substitute(example, ctx.bindings))
             )
-        return _finish(self.strategy, dsl, segments)
+        return self._finish(self.strategy, dsl, segments)
 
 
-class ProblemBasedAdapter:
+class ProblemBasedAdapter(_CapabilityBackedAdapter):
     """문제기반 — 문제를 먼저 제시하고 개념은 뒤따라 끌어온다(정답은 제시하지 않는다)."""
 
     @property
@@ -272,10 +297,10 @@ class ProblemBasedAdapter:
                 content=f"이 문제를 풀려면 어떤 개념{i_ga('개념')} 필요할까요?",
             )
         )
-        return _finish(self.strategy, dsl, segments)
+        return self._finish(self.strategy, dsl, segments)
 
 
-class AnalogyAdapter:
+class AnalogyAdapter(_CapabilityBackedAdapter):
     """비유 — 친숙한 상황에 빗대어 직관을 먼저 세운다(개념 이해 부족에 유효)."""
 
     @property
@@ -308,7 +333,7 @@ class AnalogyAdapter:
                 content="비유는 이해를 돕는 도구일 뿐, 정확한 정의를 대신하지 않습니다.",
             )
         )
-        return _finish(self.strategy, dsl, segments)
+        return self._finish(self.strategy, dsl, segments)
 
 
 __all__ = [

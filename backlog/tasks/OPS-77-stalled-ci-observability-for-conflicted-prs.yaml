@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-77-stalled-ci-observability-for-conflicted-prs
+title: "충돌로 CI가 멈춘 PR을 도구가 관측한다 — 낡은 결과가 실패로 위장하는 상태 검출"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-12 · 판정 기준 main `7408c4fd`) — 충돌한 PR은 GitHub이 `refs/pull/N/merge`를 계산하지 못해 `pull_request` 워크플로를 **아예 발화시키지 않는다**. PR #1075 실측: 21:55·22:17 두 푸시가 런을 0건 만들었고(`actions_list` branch 필터로 확인 — 마지막 런은 6시간 전 16:48), 충돌 해소 후 22:22 푸시는 1분 내 런 생성. 그동안 PR 화면에는 낡은 실패가 남아 **\"CI가 안 돈다\"가 \"CI가 실패했다\"로 보인다** — 침묵이 아니라 위장이다. `OPS-76`이 이 상태의 최대 발생원(생성 장부)을 제거했지만 **관측 축은 그것과 독립적으로 남는다**: 다른 원인(코드 충돌·lockfile·생성 파일 신설)으로 같은 상태가 언제든 재발한다.\n② 검사 정의 — \"열린 PR의 **최신 head sha**에 대한 CI 런이 존재하는가\"를 판정한다. 없으면 `mergeable_state`와 함께 보고한다(`dirty`면 충돌이 원인, 그 밖이면 다른 원인). 주의: `mergeable_state`는 GitHub이 비동기로 계산하므로 **`unknown`을 `clean`으로 접지 않는다**(3상태를 truthiness로 2상태로 접으면 모르는 것으로 확정 신호를 낸다 — CLAUDE.md 2026-09-01 ③). `HARN-99`가 같은 축의 auto-resync 쪽을 이미 다뤘으므로 그 판정 로직을 재사용할 수 있는지 먼저 확인한다(중복 프레임워크 금지).\n③ 배선 지점(정본화와 별항) — `scripts/ops/pr_delivery_audit.py` 또는 `scripts/ops/flow_health.py` 중 **실제로 CI가 부르는 쪽**에 넣는다. 어느 잡의 몇 번째 스텝인지 실측으로 확인하고 적는다. 저장소에 존재하는 것과 돌아가는 것은 다르다.\n④ 실패 주입(대조군 동반) — ⓐ 충돌 상태 PR(런 부재)을 주입해 RED/경고가 나는지 ⓑ **정상 PR 대조군**(최신 head에 런 존재)에서 조용한지 ⓒ `mergeable_state: unknown`을 주입해 \"모른다\"로 보고하는지(clean으로 접지 않는지) ⓓ API 조회 실패(403·rate limit)를 주입해 **\"측정 실패\"로 보고하는지**(0건 통과로 위장하지 않는지 — CLAUDE.md 이중 회계 원칙). 대조군 ⓑ가 없으면 \"전부 경고\"라는 과잉 수정이 통과한다.\n⑤ 병렬 PR 실측(`OPS-76` acceptance ⑥ 승계) — **두 PR을 실제로 동시에 열어** 백로그를 각각 건드리고 인벤토리 충돌이 나지 않는지 확인한다. `tests/infra`의 추적 금지 가드가 통과하는 것과 병렬 PR에서 충돌이 사라지는 것은 다르다. 남아 있는 다른 생성 커밋 파일(lockfile·`feature_inventory.yaml` v1 등)이 같은 형태로 충돌하는지도 함께 본다."
+artifacts:
+  - "PR #1149 (https://github.com/kiki-s-broom/WhyMath/pull/1149) · 머지 큐 경유 squash 71b84c06"
+  - "scripts/ops/pr_delivery_audit.py(STALLED_CONFLICT·NO_CHECKS_CAUSE_UNKNOWN·MERGE_STATE_UNKNOWN + 미판정 시 단건 재조회) · tests/infra/test_pr_delivery_audit.py(28건) — main 실측(STALLED_CONFLICT 6건·MERGE_STATE_UNKNOWN 4건 출현)"
+  - "검증: 뮤테이션 14종 전건 RED(주입 실재·바이트 동일 원복 단언 내장) · tests/infra 1324 passed · ruff·black CI 명령 exit 0 · CI run 34691293463 success(infra-contracts의 Pytest 스텝 완주 실측 · skipped 12잡은 전부 경로 필터)"
+paths:
+  - scripts/ops/pr_delivery_audit.py
+  - scripts/ops/flow_health.py
+  - "tests/infra/**"
+session: null
+notes: "출처: OPS-76 acceptance ⑤·⑥ 승계(2026-09-12). OPS-76은 충돌원(생성 장부)을 제거했으나 관측 축과 병렬 PR 실측은 미이행으로 남았다 — 조용히 남기지 않고 분리 등재(VIZ-07 선례). HARN-99가 auto-resync의 merge-state unknown 축을 이미 소유하므로 재사용 가능성을 먼저 확인할 것."
+updated: 2026-09-12

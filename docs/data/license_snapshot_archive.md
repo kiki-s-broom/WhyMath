@@ -32,7 +32,7 @@
 | 11 | `phet` | PhET 시뮬레이션 | CC BY | https://phet.colorado.edu/en/licensing | 공식 라이선싱 페이지 |
 | 12 | `metamath-set-mm` | Metamath set.mm | CC0 | https://raw.githubusercontent.com/metamath/set.mm/HEAD/LICENSE | 공식 저장소 LICENSE(raw·HEAD) |
 | 13 | `omnimath` | OmniMath | 공개 | https://huggingface.co/datasets/KbsdJames/Omni-MATH | 공식 데이터셋 카드 |
-| 14 | `minif2f` | miniF2F | MIT | https://raw.githubusercontent.com/openai/miniF2F/HEAD/README.md | 공식 저장소 README §License(raw·HEAD) — LICENSE 파일 부재 실측(404), README가 선언 원문(lean=Apache·metamath=MIT·hollight=FreeBSD) |
+| 14 | `minif2f` | miniF2F | 폴더별 상이(lean·isabelle=Apache 2.0 · metamath=MIT · hollight=FreeBSD) | https://raw.githubusercontent.com/openai/miniF2F/HEAD/README.md | 공식 저장소 README §License(raw·HEAD) — LICENSE 파일 부재 실측(404), README가 선언 원문. **폴더 4종**(종전 3종 표기는 `isabelle` 누락 · LIC-04 정정) · 우리가 쓰는 488 Lean은 Apache 2.0 |
 | 15 | `olymmath` | OlymMATH | 공개 | https://huggingface.co/datasets/RUC-AIBOX/OlymMATH | 공식 데이터셋 카드 |
 | 16 | `mathlib4` | Mathlib4 | Apache 2.0 | https://raw.githubusercontent.com/leanprover-community/mathlib4/HEAD/LICENSE | 공식 저장소 LICENSE(raw·HEAD) |
 | 17 | `gsm8k` | GSM8K (문서 행 "GSM8K · MATH"의 앞) | MIT | https://raw.githubusercontent.com/openai/grade-school-math/HEAD/LICENSE | 공식 저장소 LICENSE(raw·HEAD) |
@@ -163,7 +163,10 @@ python scripts/ops/license_snapshot_archiver.py [--out data/licenses] [--sources
 "**Only material that is clearly marked** with a Creative Commons license can be re-used without
 permission". 즉 **사이트 전체가 CC BY가 아니라 명시 표기된 자료에 한정**된다. 귀속 문구도
 저자명 + `From www.everythingmaths.co.za` 또는 `From siyavula.com` 표기를 요구한다.
-매트릭스(`licensing_safety.md`) 반영은 `LIC-05`.
+매트릭스(`licensing_safety.md`) 반영 = **`LIC-05` 완료(2026-09-07)** — 같은 태스크의 전수 재점검에서
+**Illustrative Math**도 같은 유형으로 드러났다: 약관 §7이 판(edition)별로 라이선스를 나눠, 초판
+K–12 Math(2019–2021)는 CC BY 4.0이지만 **v.360(2024·TK 2025)은 CC BY-NC 4.0**으로 상업 이용을
+명시 금지한다. 상용 서비스인 우리에겐 초판만 사용 가능하다.
 
 > 이 단서는 URL 정합성만 봤다면 드러나지 않았다 — 리뷰가 요구한 **내용 검증** 스텝이
 > 잡아낸 것이며, 스냅샷 확보의 실익이 "보관"을 넘어 **"대조 가능"**에 있음을 보여준다.

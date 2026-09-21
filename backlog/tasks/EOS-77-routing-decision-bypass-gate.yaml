@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,7 +16,8 @@ acceptance:
   - "② 판정: 우회 경로 각각을 ⓐ`Router.route` 경유로 전환 ⓑ정당한 예외로 두되 명시 유예 + 만료 기계 ⓒ차단 중 하나로 결정하고 근거를 적는다. `ops/live_preflight._cloud_mid_decision`은 클라우드 1콜 비용 계측이 목적이라 route 경유로 바꾸면 재려던 것을 못 재게 될 수 있다 — 그 긴장을 판정에 반영할 것"
   - "③ 집행(정본화와 별항) — `scripts/ops/check_routing_data_grade.py`를 확장하거나 별도 스캐너로 '클라우드 티어 RoutingDecision 직접 생성'을 검출해 CI에서 차단한다. 정당한 예외는 유예 목록으로 두되 `unmatched` 만료 기계를 켜 조용히 눌러앉지 못하게 한다(EOS-67 baseline 선례)"
   - "④ 변별력 양방향 — 새 우회를 주입하면 red, 정당한 예외는 green을 hermetic으로 동결. 무조건 red면 개발이 막히고 무조건 green이면 게이트가 아니다"
-artifacts: []
+artifacts:
+  - "PR #983 (https://github.com/doldori7/WhyMath/pull/983) — commit ad90e741 · check_routing_decision_bypass.py 신설·CI backend 잡 차단 배선 · live_preflight 라우터 경유 전환(유예 0건) · tests/infra 27건 + preflight 2건 · 뮤테이션 11종 전건 검출 · backend 11645+84 passed / infra+harness 1335 passed"
 paths:
   - scripts/ops/check_routing_data_grade.py
   - src/backend/whymath_backend/ops/live_preflight.py
@@ -24,4 +25,4 @@ paths:
   - ".github/workflows/ci.yml"
 session: null
 notes: "출처: EOS-59 구현 중 자진 공개(정직한 공백 B). EOS-59가 만든 데이터 등급 법적 게이트(AIHub 4조건 ② 국외반출 금지의 기계 집행)의 집행 지점은 `Router.route` 하나인데, `RoutingDecision`을 손으로 조립해 provider에 바로 넘기면 그 판정을 지나지 않는다. 실측: 프로덕션 직접 생성 10건 중 클라우드 도달 확인 1건 = `ops/live_preflight._cloud_mid_decision`(프롬프트가 리터럴 `_SMOKE_PROMPT`라 오늘 법적 노출 0·학생/콘텐츠 경로 아님). 오늘 위반은 없으나 **구조적 사각은 실재**하며, 등급 게이트가 법적 축이라 사각을 산문으로만 남기면 '정본화를 집행으로 착각한 완료 선언'이 된다. 관측 보조는 이미 있다 — 그런 결정은 `data_export_reason=None`이라 `ops/cost_report`가 '라우터 게이트 미경유 생성'으로 경고하지만 차단하지는 않는다. [개명 2026-09-01: 원 ID = EOS-75. main에 착지한 EOS-75-failure-code-json-key-contract와 번호 충돌 — 머지된 쪽이 번호를 지키는 규칙에 따라 미머지인 이쪽을 개명. 충돌 원인은 등재 시점의 로컬 대장이 main보다 뒤처져 상대 태스크를 볼 수 없었던 것으로, HARN-54가 등재한 실패 유형(낡은 로컬 대장)이 같은 세션에서 재발한 사례다 — HARN-54 우선순위의 실측 근거.]\n\n[정정 2026-09-01] eos_priority null → P1: 12월 검증 폐쇄루프는 이 태스크에 의존하지 않는다 — EOS-59가 배선한 법적 게이트의 실제 서빙 경로는 Router.route이고, 실측된 유일한 클라우드 도달 우회는 ops/live_preflight._cloud_mid_decision(리터럴 _SMOKE_PROMPT·학생/콘텐츠 경로 아님·오늘 노출 0)이다. 따라서 P0 아님(애매하면 P0가 아니다 규칙 준수). P2(판정 이후)로도 두지 않는 이유는 법적 축이고 발동 조건이 이미 알려져 있기 때문이다 — AIHub가 저작 입력으로 편입되면(EOS-59의 SELF_AUTHORED_CORPUS 만료 기계가 예상하는 사건) 이 사각이 즉시 실 노출이 된다. 등급 누락 경위: 이 태스크는 HARN-55(신규 등재 등급 필수) 착지 몇 시간 전에 등재돼 null로 들어갔고, 등재자인 내가 문맥을 가진 지금 백필한다"
-updated: 2026-09-01
+updated: 2026-09-05

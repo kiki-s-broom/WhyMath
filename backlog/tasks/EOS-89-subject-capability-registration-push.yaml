@@ -1,0 +1,33 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-89-subject-capability-registration-push
+title: "과목 능력 등록(push) 전환 — Core가 composition에서 기본 구현을 끌어오는 pull 3지점을 app.py 부팅 시 app.state 등록 + Depends/파라미터 주입으로 교체 (계획서 100 §3.8 'Core→Subject Interface←Math Adapter' 역전 형태 실현)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-88-dependency-direction-contract
+requires_gates: []
+acceptance:
+  - "① app.py(Application)가 부팅 시 composition.default_*() 5종(+EOS-86의 StepChainVerifier)을 한 번 호출해 app.state에 인터페이스 타입(ExpressionEquivalence·FinalAnswerVerifier·AssessmentAnswerVerifier·ExpressionSeal·AnswerFormVerifier)으로 등록 — 등록 키는 기존 _PROVIDER_KEY 관례·인벤토리 v2 DI 다리(__setattr__ 파싱)가 인식하는 형태"
+  - "② api/coach.py가 default_final_answer_verifier·default_answer_form_verifier를 직접 부르지 않고 Depends(_get_judge_seam_deps 선례)로 app.state에서 읽음 → composition import 제거"
+  - "③ l3/pedagogy/slot_generator.py·l3/render/adapters.py가 composition을 import하지 않음 — 기존 equivalence=·seal=·verifier= 파라미터로 상류(호출부 4곳: review·example_generator·diag_item_projector·l4.content_supply 경로)에서 받는다. 호출부가 상류를 갖지 못하는 곳은 그 이유와 임시 처방을 적는다(호출부 자체가 새 pull 지점이 되면 안 됨)"
+  - "④ 집행 지점: tests/infra/test_eos_dependency_direction.py CORE_PULL_BASELINE을 frozenset()으로 ratchet + test_app_factory_registers_no_subject_capability_yet를 '등록 5종 존재' 단언으로 교체(두 형태의 소리 없는 공존 금지) + pyproject layers ignore_imports 2줄 삭제(unmatched_ignore_imports_alerting가 요구) + lint-imports green"
+  - "⑤ 백엔드 전체 스위트 실행 후 보고(부분 스위트 금지) · 기존 test_solution_coaching 등 실제 SymPy 경로 무회귀 · 경계 문서 §9.2 재실측(pull 0·등록 N) · eos_core_boundary_probe 전이 도달 재실측(composition 경유 14건이 어떻게 변하는지 기록 — 등록 형태에서는 Core→composition 정적 간선이 사라져 도달 자체가 0에 가까워져야 한다)"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1024"
+  - c1ef3c0b
+paths:
+  - src/backend/whymath_backend/app.py
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/l3/pedagogy/slot_generator.py
+  - src/backend/whymath_backend/l3/render/adapters.py
+  - tests/infra/test_eos_dependency_direction.py
+  - src/backend/pyproject.toml
+session: null
+notes: "출처: Kiki 2026-09-04 계획서 100 §3.8 + EOS-88 실측(경계 문서 §9.2): 현행은 service-locator형 pull 3지점(api.coach 2팩토리·slot_generator 1·render.adapters 2), app.state 13키 중 과목 능력 0, MathSubjectAdapter 프로덕션 인스턴스화 0. EOS-69가 '호출부 4곳이 능력을 상류에서 받아 내리면 이 줄도 사라진다'고 적어 둔 잔여의 실행편. EOS-86(StepChainVerifier 팩토리)은 이 등록 경로를 타야 pull 4번째 지점을 만들지 않는다 — EOS-86 acceptance에 amend로 명시."
+updated: 2026-09-07

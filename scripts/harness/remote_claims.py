@@ -82,14 +82,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import subprocess
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from models import Backlog
+from models import Backlog, Task
 
 # claim 저장소 = origin의 단일 브랜치. 태스크당 파일 1개.
 CLAIMS_BRANCH = "harness-claims"
@@ -759,6 +761,40 @@ def _top_level_field(text: str, key: str) -> str:
     return ""
 
 
+def _top_level_list_field(text: str, key: str) -> list[str]:
+    """태스크 YAML 본문에서 최상위 리스트 필드를 뽑는다 (`_top_level_field`의 리스트 버전).
+
+    `store.dump_task`가 내는 두 형태만 지원한다: `key: []`(빈 리스트) 또는 `key:` 다음
+    `  - value` 들여쓰기 줄들. 손편집으로 형식이 어긋난 파일(플로우 스타일 `[a, b]` 등)은
+    못 읽고 빈 리스트를 반환한다 — 탐지 실패는 미탐이며, `_top_level_field`와 같은 한계를
+    그대로 승계한다(우리가 원격에서 읽는 파일은 전부 `store.dump_task`가 쓴 것이므로
+    정상 경로에서는 이 한계에 걸리지 않는다).
+    """
+    prefix = f"{key}:"
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith(prefix):
+            continue
+        rest = line[len(prefix) :].strip()
+        if rest == "[]":
+            return []
+        if rest:
+            return []  # 인라인 스칼라 — 리스트 형태가 아님(미탐)
+        values: list[str] = []
+        for item_line in lines[i + 1 :]:
+            if not item_line.startswith("  - "):
+                break
+            item = item_line[4:].strip()
+            if len(item) >= 2 and item.startswith('"') and item.endswith('"'):
+                try:
+                    item = json.loads(item)
+                except json.JSONDecodeError:
+                    item = item[1:-1]
+            values.append(item)
+        return values
+    return []
+
+
 def _resolve_trunk_ref(root: Path) -> tuple[str, str]:
     """기본(트렁크) 브랜치의 원격 ref를 해소한다 — (ref, 해소 경로).
 
@@ -810,6 +846,111 @@ def _trunk_task_status(root: Path, trunk_ref: str, task_id: str) -> str:
     if show.returncode != 0:
         return ""  # 브랜치에서 신설된 태스크 — 트렁크에 아직 없다
     return _top_level_field(show.stdout, "status")
+
+
+def _trunk_gate_status(root: Path, trunk_ref: str, gate_id: str) -> str:
+    """트렁크 사본 gates.yaml에서 특정 게이트의 status. 없거나 못 읽으면 "" (신호 없음).
+
+    `store.dump_gates`의 고정 출력 형태(`  - id: <id>` 다음 `    <key>: <value>` 들여쓰기
+    블록)만 파싱한다 — `_trunk_task_status`와 같은 한계 선언(손편집 어긋남은 미탐).
+    """
+    try:
+        show = _git(root, "show", f"{trunk_ref}:backlog/gates.yaml", timeout=10)
+    except Exception:  # pragma: no cover - 환경 의존
+        return ""
+    if show.returncode != 0:
+        return ""
+    id_prefix = "  - id:"
+    in_block = False
+    for line in show.stdout.splitlines():
+        if line.startswith(id_prefix):
+            in_block = line[len(id_prefix) :].strip() == gate_id
+            continue
+        if not in_block:
+            continue
+        if not line.startswith("    "):
+            in_block = False
+            continue
+        if line.strip().startswith("status:"):
+            return line.split("status:", 1)[1].strip()
+    return ""
+
+
+@dataclass(frozen=True)
+class TrunkDrift:
+    """트렁크 사본이 로컬보다 착수 조건을 강화한 항목 1건 (HARN-91).
+
+    `kind`: "dep"(트렁크에만 있는 미충족 의존) | "gate"(트렁크에만 있는 미통과 게이트).
+    `trunk_state`: 그 항목의 트렁크 관점 상태(의존 태스크의 status·게이트의 status) —
+        관측 자체가 안 됐으면 "?"(파일 없음·파싱 실패 — 모른다 ≠ 아니다이므로 미충족으로
+        간주해 여전히 drift로 센다: 신규 항목의 부재는 안전 방향이 아니다).
+    """
+
+    kind: str
+    ref_id: str
+    trunk_state: str
+
+
+@dataclass(frozen=True)
+class TrunkDriftResult:
+    """트렁크 의존·게이트 시차 탐지 결과. status가 `ok`가 아니면 판정 불가(HARN-91 ④-ⓓ)."""
+
+    status: str  # ok | offline | error:<Type>
+    drift: list[TrunkDrift] = field(default_factory=list)
+    trunk_ref: str = ""
+
+
+def scan_trunk_task_drift(root: Path, task: Task) -> TrunkDriftResult:
+    """트렁크 사본의 태스크 파일에 로컬 사본엔 없는 미충족 의존·게이트가 있는지 본다.
+
+    (HARN-91) `start`의 착수 자격 판정(`selector.classify_todo`)은 **로컬 작업 트리의
+    백로그 사본**만 읽는다 — 내 클론이 마지막으로 fetch한 뒤 origin/<트렁크>에 새로
+    착지한 의존·게이트(조건이 *강화*되는 방향)는 그 판정에 반영되지 않는다. 이 함수는
+    트렁크 사본의 같은 태스크 파일을 직접 읽어 그 시차를 좁힌다.
+
+    네트워크 비용: 이 함수 자체는 fetch하지 않는다 — 호출측(`cmd_start`)이 HARN-11의
+    `scan_remote_done(fetch=True)`로 이미 remote-tracking ref를 최신화한 뒤 같은 fetch에
+    편승한다(추가 왕복은 `_resolve_trunk_ref`의 `ls-remote` 1회뿐). 오프라인 환경에서
+    쓰려면 호출측이 먼저 fetch 여부/상태를 판정해 이 함수 호출 여부를 결정한다.
+
+    비교 대상은 **로컬에 없는 항목만**이다 — 로컬에 이미 있는 의존·게이트는
+    `selector.classify_todo`가 이미 검사했다(중복 판정 금지). 로컬·트렁크가 같으면
+    drift 0건이다(대조군 — 모든 착수를 막는 검사는 검사가 아니다).
+    """
+    if not has_remote(root):
+        return TrunkDriftResult("offline")
+    try:
+        trunk_ref, _source = _resolve_trunk_ref(root)
+        show = _git(root, "show", f"{trunk_ref}:backlog/tasks/{task.id}.yaml", timeout=10)
+        if show.returncode != 0:
+            # 트렁크에 이 태스크 파일이 없다 — 로컬에서 신설된 태스크(아직 트렁크 미착지).
+            # 이 축의 관심사는 "트렁크가 조건을 강화했는가"이므로 신설 자체는 drift가 아니다.
+            return TrunkDriftResult("ok", trunk_ref=trunk_ref)
+
+        trunk_deps = _top_level_list_field(show.stdout, "depends_on")
+        trunk_gates = _top_level_list_field(show.stdout, "requires_gates")
+
+        drift: list[TrunkDrift] = []
+        for dep_id in trunk_deps:
+            if dep_id in task.depends_on:
+                continue
+            dep_status = _trunk_task_status(root, trunk_ref, dep_id)
+            if dep_status != "done":
+                drift.append(TrunkDrift("dep", dep_id, dep_status or "?"))
+
+        for gate_id in trunk_gates:
+            if gate_id in task.requires_gates:
+                continue
+            gate_status = _trunk_gate_status(root, trunk_ref, gate_id)
+            if gate_status not in ("cleared", "waived"):
+                drift.append(TrunkDrift("gate", gate_id, gate_status or "?"))
+
+        return TrunkDriftResult("ok", drift, trunk_ref)
+    except subprocess.TimeoutExpired:
+        return TrunkDriftResult("offline")
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
+        return TrunkDriftResult(f"error:{type(exc).__name__}")
 
 
 def scan_remote_in_progress(
@@ -1519,14 +1660,22 @@ STALE_BRANCH_DEFAULT_DAYS = 3
 class StaleBranch:
     """N일 이상 트렁크에 흡수되지 않은 원격 브랜치 1건.
 
-    status(HARN-13 잔여 — 2026-08-05 3분류 확장 · HARN-47 2026-08-31 4분류):
+    status(HARN-13 잔여 — 2026-08-05 3분류 확장 · HARN-47 2026-08-31 4분류 ·
+    HARN-78 2026-09-07 5분류):
       · "isolated"   — **PR로 노출된 적이 한 번도 없다**. 이 브랜치의 작업은 GitHub
                         어디에서도 보이지 않으므로 이 브리핑 줄이 유일한 존재 증거다.
                         진짜 고립이며 즉시 조치 대상. 기본값.
-      · "pr_filed"   — 이 tip으로 PR이 열린 이력이 있다(`refs/pull/<N>/head` 일치).
-                        작업은 GitHub에 보이고 처분은 그 PR에서 이뤄진다 — 브리핑이
-                        Kiki에게 "결정하라"고 다시 물을 일이 아니라 PR 번호를 건네줄
-                        일이다. evidence에 "PR #<N>".
+      · "pr_filed"   — 이 tip으로 PR이 열린 이력이 있다(`refs/pull/<N>/head` 일치)
+                        **그리고** (a) GitHub API로 그 PR이 지금 열려 있음을 확인했거나
+                        (b) 열림/닫힘을 확인할 수단(GITHUB_TOKEN/GH_TOKEN)이 없다.
+                        (a)면 처분은 그 PR에서 이뤄진다 — evidence "PR #<N>". (b)면
+                        상태를 모른다는 사실 자체가 evidence에 " (상태 미확인)"로
+                        붙는다(모른다 ≠ 열려 있다 — CLAUDE.md "모른다 ≠ 아니다"의
+                        3상태 원칙과 동형).
+      · "pr_closed"  — (HARN-78) `pr_filed`였던 PR을 GitHub API로 대조했더니
+                        **닫혔고 머지되지 않았다**. `isolated`와 행동 요구가 같다
+                        (재작업 또는 폐기 판단) — PR이 있었다는 사실이 "처분 완료"를
+                        뜻하지 않는다. evidence "PR #<N> 닫힘(미머지)".
       · "ported"     — 이 브랜치의 유용한 부분이 이미 별도 소형 PR로 trunk에
                         흡수된 흔적(커밋 메시지에 브랜치 세션 접미사 언급)이 있다.
                         원본은 정리 대상일 뿐 결정 대기가 아니다.
@@ -1540,7 +1689,16 @@ class StaleBranch:
     fail-open 보호"의 경고 습관화 형태다. 진짜 고립은 7건뿐이었고 그 7건이 11건의
     소음 속에 숨어 24일간 방치됐다.
 
-    evidence: ported면 근거 커밋(짧은 sha + 제목), pr_filed면 "PR #<N>", 그 외 "".
+    pr_closed 신설 근거(HARN-78 실측 2026-09-07): 위 분리가 "PR이 있으면 처분됐다"고
+    가정했는데, `gates/deploy-environment-approval`(PR #967)·`whymath-curriculum-
+    design-6eejrv`(PR #802)·`whymath-pedagogy-review-uqyg79`(PR #675) 3건은 PR이
+    **닫혔지만 머지되지 않았다** — 즉 처분되지 않고 그대로 버려졌는데도 `pr_filed`로
+    분류돼 "결정 불요"처럼 보였다. `refs/pull/<N>/head`는 닫힌 PR에도 남으므로
+    오프라인 git만으로는 이 구분이 원천적으로 불가능하다(아래 열림/닫힘 판정 참조).
+
+    evidence: ported면 근거 커밋(짧은 sha + 제목) · pr_filed면 "PR #<N>"(상태 확인
+    시) 또는 "PR #<N> (상태 미확인)"(미확인 시) · pr_closed면 "PR #<N> 닫힘(미머지)"
+    · 그 외 "".
     """
 
     branch: str
@@ -1562,6 +1720,15 @@ class StaleBranch:
     "N/M 파일" 형태. 이 값이 있으면 status는 **ported가 아니다**(잔여 고유 코드가 있으므로
     '결정 불요'로 부를 수 없다) — 대신 브리핑이 이 단서를 함께 보여 사람이 나머지를 볼 수
     있게 한다. 흡수 흔적을 버리지도, 흡수됐다고 단정하지도 않는 중간 상태다.
+    """
+    disposal_labels: tuple[str, ...] = ()
+    """(HARN-93 ②) `pr_filed`인 이 PR에 붙은 처분 라벨(`DISPOSAL_LABELS`) 중 실재분.
+
+    `status == "pr_filed"`이고 GITHUB_TOKEN/GH_TOKEN이 있을 때만 채워진다 — 라벨은
+    "언젠가 닫는다/미룬다"는 결정이고 `age_days`는 그 결정 이후로도 계속 흐른 방치
+    기간의 근사치다(정확한 라벨 부착 시각이 아니라 최종 커밋 기준 — HARN-93 acceptance
+    ①이 "8일간 갱신 0"을 이 근사로 실측했다). 빈 튜플은 "라벨 없음"과 "조회 안 함/실패"
+    양쪽을 뜻할 수 있으므로, 후자는 `StaleBranchScanResult.pr_label_lookup_ok`로 가른다.
     """
 
 
@@ -1598,13 +1765,17 @@ def _fetch_pr_head_shas(root: Path) -> tuple[dict[str, int] | None, str]:
     "PR 이력 없음"(= 고립)으로 읽으면 **안 된다**. 인프라가 죽었을 때 11건이 통째로
     "고립"으로 승격되면 그건 측정 실패가 경보로 위장된 것이다.
 
-    ⚠ 정직한 한계 — **열림/닫힘은 구분하지 못한다.** `refs/pull/<N>/head`는 닫힌
-    PR에도 남는다. `refs/pull/<N>/merge`가 열린 PR에만 생긴다는 통설로 이를 가르려다
-    실측에서 폐기했다(2026-08-31: 열린 PR 14건 중 merge ref 보유는 8건뿐이고, 이미
-    머지된 #922도 head만 남아 있었다 — 성공/실패 양쪽에서 같은 값을 내는 검사는
+    ⚠ 정직한 한계 — **이 함수 자체는 열림/닫힘을 구분하지 못한다.** `refs/pull/<N>/head`는
+    닫힌 PR에도 남는다. `refs/pull/<N>/merge`가 열린 PR에만 생긴다는 통설로 이를
+    가르려다 실측에서 폐기했다(2026-08-31: 열린 PR 14건 중 merge ref 보유는 8건뿐이고,
+    이미 머지된 #922도 head만 남아 있었다 — 성공/실패 양쪽에서 같은 값을 내는 검사는
     검증이 아니라 위장이다. CLAUDE.md "변별력 없는 검증 스텝 금지"). 그래서 이 함수는
-    "PR로 노출된 적이 있는가"라는 **답할 수 있는 질문만** 답하고, 열림/닫힘은 브리핑이
-    건네는 PR 번호로 사람이 1클릭에 확인한다.
+    오프라인 git만으로 "PR로 노출된 적이 있는가"라는 **답할 수 있는 질문만** 답한다.
+
+    (HARN-78 갱신) 열림/닫힘 자체는 이제 `_fetch_pr_states`가 **GitHub API로**
+    가른다 — 다만 그건 `GITHUB_TOKEN`/`GH_TOKEN`이 있을 때만 가능한 별도 축이다.
+    이 함수는 여전히 토큰 없이 도는 1차 스캔이고, `_fetch_pr_states`는 그 결과 중
+    `pr_filed` 후보만 골라 선택적으로 정밀화하는 2차 스캔이다.
     """
     try:
         result = _git(root, "ls-remote", "origin", "refs/pull/*/head", timeout=_PR_REF_TIMEOUT)
@@ -1630,6 +1801,280 @@ def _fetch_pr_head_shas(root: Path) -> tuple[dict[str, int] | None, str]:
         if prev is None or int(number) > prev:
             mapping[sha] = int(number)
     return mapping, ""
+
+
+# GitHub API PR 상태 조회 타임아웃 — 번호당 1회.
+_PR_STATE_TIMEOUT = 20
+
+# 스캔 전체 예산(초) — 후보 수와 무관하게 SessionStart 훅·CI 잡을 무한정 묶어 두지
+# 않는다. `pr_filed` 후보가 많으면 번호당 순차 curl 호출이 누적돼 총 소요가
+# 무제한으로 늘어날 수 있다(Codex 리뷰 지적, PR #1043). 예산을 넘으면 남은 조회를
+# 건너뛰고 실패로 낸다 — 이미 이 함수는 단일 PR 조회 실패에도 전체를 실패로 내는
+# 전부-또는-전무 계약이므로, 예산 초과도 같은 모양의 실패일 뿐 새 분기를 만들지 않는다.
+_PR_STATE_SCAN_BUDGET_SECONDS = 60.0
+
+
+def _attribute_api_failure(data: object) -> str | None:
+    """API 응답이 *정책 거부*면 그 사유를 귀속해 돌려준다 — 아니면 `None`(HARN-04).
+
+    왜 필요한가: 프록시가 막은 응답도 `{"message": ...}` 모양이라 `"state" not in data`
+    분기에 함께 떨어지고, 거기 붙은 문구는 **"응답 형식 이상"**이었다. 형식이 이상한 게
+    아니라 정책이 막은 것이며, 둘은 처방이 완전히 다르다 — 전자는 코드 결함이고 후자는
+    **이 세션에서는 고칠 수 없는 환경 조건**이다. 그 구분이 없어서 같은 조사가 세 세션
+    반복됐다(2026-09-11·09-12 ×2 비재현 기록이 이 태스크 acceptance에 쌓여 있다).
+
+    실측(2026-09-12 · 이 컨테이너)이 확정한 것은 **이름을 고쳐도 안 뚫린다**는 사실이다.
+    두 이름을 각각 `curl -w '%{http_code} %{url_effective}'`로 재 본 결과(원문 수치는
+    `HARN-04` acceptance에 있다 — 여기에 옛 owner 리터럴을 적으면 정본 참조 가드가
+    실행 표면 위반으로 잡는다):
+
+      이관 *전* 이름 → 301 → 숫자 ID 경로   → 403 (프록시가 숫자 경로를 막는다)
+      **정본** 이름  → 리다이렉트 없음      → 403 (이 세션 스코프에 저장소가 없다)
+
+    그러므로 이 함수는 해법을 권하지 않고 **무엇이 막았는지만** 정확히 말한다. 여기서
+    "origin을 정본으로 바꾸라"고 안내하면 실패 문구만 바뀌고 결과는 그대로다 — 이 태스크
+    acceptance ④가 이름 붙인 함정("오류 문구가 바뀌었다는 해결의 증거가 아니다")이다.
+    """
+    if not isinstance(data, dict):
+        return None
+    message = data.get("message")
+    if not isinstance(message, str):
+        return None
+    if "Numeric-ID repository paths" in message:
+        return (
+            "ProxyNumericPathBlocked: 저장소 이관으로 요청이 숫자 ID 경로로 301 리다이렉트되고 "
+            "에이전트 프록시가 그 경로를 막는다. **정본 이름으로 바꿔도 뚫리지 않는다**"
+            "(실측 2026-09-12: 정본 이름은 리다이렉트 없이 '세션 미활성' 403) — "
+            "정본 이름을 스코프에 포함하는 세션에서만 조회된다"
+        )
+    if "not enabled for this session" in message:
+        return (
+            "SessionScopeBlocked: 이 세션 스코프에 이 저장소가 없다 — "
+            "세션 시작 시 소스로 부착된 저장소만 API로 조회된다"
+        )
+    return None
+
+
+# 에이전트 프록시 CA (있을 때만 사용) — 모듈 상수여야 거버넌스 테스트가
+# `monkeypatch.setattr(mod, "_CA_PATH", ...)`로 갈아끼울 수 있다.
+_CA_PATH = "/root/.ccr/ca-bundle.crt"
+
+
+def _auth_args() -> list[str]:
+    """토큰이 있으면 `["-H", "Authorization: Bearer <token>"]`, 없으면 `[]`.
+
+    `scripts/ops/pr_merge_readiness.py`·`flow_health.py`·`pr_delivery_audit.py`와
+    동일한 패턴을 그대로 따른다(이 저장소에서 이미 3곳이 각자 들고 있는 관용구 —
+    공유 모듈로 뽑는 것은 이 4번째 사용만으로는 과공학이라 보류).
+
+    **왜 필수인가** (2026-09-01 main red 실측): GitHub API의 **미인증** 한도는
+    IP당 60req/h인데, 공유 러너/프록시 환경에서는 실질적으로 상시 소진 상태다.
+    그래서 `_fetch_pr_states`는 토큰이 없으면 이 함수를 호출하는 지점까지도
+    가지 않는다(호출부의 `if not token: return None, ...` 조기 반환) — 이 함수
+    자체는 그 계약과 무관하게, 거버넌스 테스트가 요구하는 독립된 헬퍼로 존재한다.
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    return ["-H", f"Authorization: Bearer {token}"] if token else []
+
+
+def _ca_args() -> list[str]:
+    """프록시 CA를 쓸 수 있으면 `["--cacert", <경로>]`, 아니면 `[]`.
+
+    `scripts/ops/flow_health.py`·`pr_merge_readiness.py`·`pr_delivery_audit.py`와
+    동일한 패턴을 그대로 따른다(이 저장소에서 이미 3곳이 각자 들고 있는 관용구 —
+    공유 모듈로 뽑는 것은 이 4번째 사용만으로는 과공학이라 보류).
+
+    **왜 존재 검사를 예외로 감싸는가** (2026-09-01 main red 실측): `Path.exists()`는
+    실패를 False로 돌려주지 **않는다** — `pathlib._IGNORED_ERRNOS`는
+    `(ENOENT, ENOTDIR, EBADF, ELOOP)`뿐이라 **EACCES는 전파된다**. 러너의 `runner`
+    유저는 `/root`(mode 700)를 통과할 수 없어 검사 자체가 `PermissionError`로 죽는다.
+    """
+    try:
+        with open(_CA_PATH, "rb"):
+            return ["--cacert", _CA_PATH]
+    except OSError:
+        return []
+
+
+def _fetch_pr_states(
+    root: Path, pr_numbers: Sequence[int]
+) -> tuple[dict[int, tuple[str, bool]] | None, str]:
+    """주어진 PR 번호들의 `(state, merged)` — **GitHub API**, `GITHUB_TOKEN`/`GH_TOKEN` 필요.
+
+    반환: `(번호 → (state, merged) 매핑, 실패사유)`. 성공이면 `(dict, "")`.
+    실패(토큰 없음 포함)면 `(None, "<사유>")` — **빈 dict가 아니다**. `pr_numbers`가
+    비었으면 조회할 것이 없으므로 `({}, "")`을 즉시 돌려준다(호출부가 "빈 입력은
+    성공"으로 처리할 수 있게 — 조회 시도 자체가 없었던 것과 API가 실패한 것은 다르다).
+
+    `_fetch_pr_head_shas`(오프라인 git)가 "PR로 노출된 적이 있는가"만 답하는 것과
+    달리, 이 함수는 "그 PR이 지금 열려 있는가·머지됐는가"를 답한다 — 그 답은
+    오프라인 git으로는 원천적으로 못 낸다(위 `_fetch_pr_head_shas` 정직한 한계
+    참조). 그래서 이 함수만 GitHub API를 쓰고, 토큰이 없으면 **호출 자체를 하지
+    않는다**(미인증 요청은 IP당 60req/h로 상시 소진 상태 — CLAUDE.md 2026-09-01
+    main red 실측과 같은 함정).
+
+    토큰이 있어도 이 조회는 **선택적 정밀화**다 — 실패해도 `pr_filed` 1차 분류
+    자체는 이미 서 있으므로(오프라인 git), 브리핑은 "상태 미확인"으로 낮춰 계속
+    보여준다(측정 실패를 침묵으로 덮지 않는다).
+    """
+    if not pr_numbers:
+        return {}, ""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None, "NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정 — 열림/닫힘 조회 생략"
+    try:
+        remote = _git(root, "remote", "get-url", "origin", timeout=15)
+    except subprocess.TimeoutExpired:
+        return None, "TimeoutExpired: origin 조회 타임아웃"
+    except Exception as exc:  # noqa: BLE001 - 환경 의존
+        return None, f"{type(exc).__name__}: {exc}"
+    if remote.returncode != 0:
+        return None, f"git remote get-url 비0 종료({remote.returncode}): {remote.stderr.strip()}"
+    match = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", remote.stdout.strip())
+    if not match:
+        return None, f"RemoteParseError: origin이 GitHub이 아니다({remote.stdout.strip()[:60]})"
+    owner, repo = match.group(1), match.group(2)
+
+    states: dict[int, tuple[str, bool]] = {}
+    scan_started = time.monotonic()
+    for number in sorted(set(pr_numbers)):
+        if time.monotonic() - scan_started > _PR_STATE_SCAN_BUDGET_SECONDS:
+            return None, (
+                f"ScanBudgetExceededError: {_PR_STATE_SCAN_BUDGET_SECONDS:.0f}초 예산 초과 — "
+                f"{len(states)}/{len(pr_numbers)}건만 조회 후 중단"
+            )
+        cmd = [
+            "curl",
+            "-sS",
+            "-L",  # 이관 리다이렉트 추종 — 301 본문을 데이터로 오독하지 않기 위해
+            "--max-time",
+            str(_PR_STATE_TIMEOUT),
+            *_ca_args(),
+            *_auth_args(),
+            "-H",
+            "Accept: application/vnd.github+json",
+            f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}",
+        ]
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",  # HARN-19 — 로케일(cp949) 디코드 금지
+                errors="replace",
+                timeout=_PR_STATE_TIMEOUT + 10,
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return None, f"{type(exc).__name__}: {exc} (PR #{number} 조회 중)"
+        if proc.returncode != 0:
+            return None, (
+                f"CurlExitError({proc.returncode}): {proc.stderr.strip()[:160]} (PR #{number})"
+            )
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            return None, f"JSONDecodeError: {exc} — 본문 {proc.stdout[:120]!r} (PR #{number})"
+        if not isinstance(data, dict) or "state" not in data:
+            blocked = _attribute_api_failure(data)
+            if blocked:
+                return None, f"{blocked} (PR #{number})"
+            return None, f"APIError: PR #{number} 응답 형식 이상 — {str(data)[:120]}"
+        states[number] = (str(data["state"]), bool(data.get("merged", False)))
+    return states, ""
+
+
+# HARN-42가 부착하는 처분 라벨 4종. 이 라벨은 "언젠가 닫는다/미룬다"는 *결정*인데
+# 만료·재확인 지점이 없다(CLAUDE.md 2026-08-03 "만료 없는 유예·제외 금지"). HARN-93 ②는
+# 이 결정을 `branches` 브리핑에서 사람 눈에 보이게 하는 축이다 — 결정 자체를 바꾸지 않는다.
+DISPOSAL_LABELS = frozenset({"eos-merge", "eos-rework", "eos-postpone", "eos-close"})
+
+
+def _fetch_pr_labels(
+    root: Path, pr_numbers: Sequence[int]
+) -> tuple[dict[int, tuple[str, ...]] | None, str]:
+    """주어진 PR 번호들의 라벨 이름 목록 — GitHub API, `GITHUB_TOKEN`/`GH_TOKEN` 필요(HARN-93).
+
+    `_fetch_pr_states`와 같은 엔드포인트(`GET /pulls/{n}`)를 별도로 다시 부른다 — 한
+    응답에 `state`·`labels`가 같이 들어 있지만, 기존 `_fetch_pr_states`의 반환 튜플
+    모양(`(state, merged)`)을 바꾸면 그 계약을 봉인한 기존 테스트·호출부가 전부
+    갈아엎여야 한다. 이 저장소는 같은 판단을 `_auth_args`/`_ca_args`에도 이미
+    적용했다(4번째 사용만으로는 공유 추출이 과공학 — 각 파일이 자기 사본을 든다).
+    대상이 10건 안팎(HARN-93 실측)이라 API 왕복이 갑절이 되어도 인증 한도(5000/h)에
+    영향이 없다.
+
+    반환·실패 계약은 `_fetch_pr_states`와 동형이다: 실패(토큰 없음 포함)는
+    `(None, "<사유>")` — **빈 dict가 아니다**. 라벨이 하나도 없는 PR은 `{번호: ()}`로
+    채워진다(조회 성공·라벨 없음과 조회 실패는 다른 사실 — CLAUDE.md "모른다 ≠ 아니다").
+    """
+    if not pr_numbers:
+        return {}, ""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None, "NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정 — 라벨 조회 생략"
+    try:
+        remote = _git(root, "remote", "get-url", "origin", timeout=15)
+    except subprocess.TimeoutExpired:
+        return None, "TimeoutExpired: origin 조회 타임아웃"
+    except Exception as exc:  # noqa: BLE001 - 환경 의존
+        return None, f"{type(exc).__name__}: {exc}"
+    if remote.returncode != 0:
+        return None, f"git remote get-url 비0 종료({remote.returncode}): {remote.stderr.strip()}"
+    match = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", remote.stdout.strip())
+    if not match:
+        return None, f"RemoteParseError: origin이 GitHub이 아니다({remote.stdout.strip()[:60]})"
+    owner, repo = match.group(1), match.group(2)
+
+    labels: dict[int, tuple[str, ...]] = {}
+    scan_started = time.monotonic()
+    for number in sorted(set(pr_numbers)):
+        if time.monotonic() - scan_started > _PR_STATE_SCAN_BUDGET_SECONDS:
+            return None, (
+                f"ScanBudgetExceededError: {_PR_STATE_SCAN_BUDGET_SECONDS:.0f}초 예산 초과 — "
+                f"{len(labels)}/{len(pr_numbers)}건만 조회 후 중단"
+            )
+        cmd = [
+            "curl",
+            "-sS",
+            "-L",  # 이관 리다이렉트 추종 — 301 본문을 데이터로 오독하지 않기 위해
+            "--max-time",
+            str(_PR_STATE_TIMEOUT),
+            *_ca_args(),
+            *_auth_args(),
+            "-H",
+            "Accept: application/vnd.github+json",
+            f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}",
+        ]
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",  # HARN-19 — 로케일(cp949) 디코드 금지
+                errors="replace",
+                timeout=_PR_STATE_TIMEOUT + 10,
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return None, f"{type(exc).__name__}: {exc} (PR #{number} 조회 중)"
+        if proc.returncode != 0:
+            return None, (
+                f"CurlExitError({proc.returncode}): {proc.stderr.strip()[:160]} (PR #{number})"
+            )
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            return None, f"JSONDecodeError: {exc} — 본문 {proc.stdout[:120]!r} (PR #{number})"
+        if not isinstance(data, dict) or "labels" not in data:
+            blocked = _attribute_api_failure(data)
+            if blocked:
+                return None, f"{blocked} (PR #{number})"
+            return None, f"APIError: PR #{number} 응답 형식 이상 — {str(data)[:120]}"
+        names = tuple(
+            item["name"]
+            for item in data.get("labels", [])
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        )
+        labels[number] = names
+    return labels, ""
 
 
 @dataclass(frozen=True)
@@ -1808,6 +2253,21 @@ class StaleBranchScanResult:
     pr_lookup_ok: bool = False
     # PR 조회 실패 사유 — **예외 타입명을 포함**한다. 빈 문자열이면 실패가 없었다는 뜻.
     pr_lookup_error: str = ""
+    # (HARN-78) pr_filed 후보의 열림/닫힘 조회가 성공했는가 — GitHub API, 선택적
+    # 정밀화. True는 "시도했고 성공"뿐 아니라 "조회할 pr_filed 후보가 애초에 0건"도
+    # 포함한다(조회 대상이 없으면 실패할 것도 없다). False면 pr_filed 항목들의
+    # 열림/닫힘이 미확인 상태로 남았다는 뜻 — evidence에 "(상태 미확인)"이 붙는다.
+    pr_state_lookup_ok: bool = True
+    # 상태 조회 실패 사유 — **예외 타입명을 포함**한다(NoTokenError 포함).
+    # 빈 문자열이면 실패가 없었다는 뜻(조회 불요 또는 조회 성공).
+    pr_state_lookup_error: str = ""
+    # (HARN-93) pr_filed 후보의 처분 라벨 조회가 성공했는가 — GitHub API, 선택적
+    # 정밀화. True는 pr_state_lookup_ok와 같은 의미로 "시도 성공" 또는 "대상 0건"을
+    # 뜻한다. False면 disposal_labels가 전부 빈 튜플이더라도 그것이 "라벨 없음"이
+    # 아니라 "모른다"는 뜻 — 소비처는 이 값이 False일 때 라벨 부재를 단정하면 안 된다.
+    pr_label_lookup_ok: bool = True
+    # 라벨 조회 실패 사유 — **예외 타입명을 포함**한다(NoTokenError 포함).
+    pr_label_lookup_error: str = ""
     trunk_ref: str = ""
     trunk_branch: str = ""
     trunk_source: str = ""
@@ -1907,6 +2367,10 @@ def scan_stale_branches(
         )
 
         stale: list[StaleBranch] = []
+        # (HARN-78) pr_filed로 잠정 분류된 항목의 stale 인덱스 → PR 번호. 루프가 끝난
+        # 뒤 한 번에 GitHub API로 열림/닫힘을 조회해 정밀화한다(브랜치마다 API를 부르면
+        # 왕복이 N배가 된다 — 위 pr_heads의 "스캔당 1회" 원칙과 같은 이유).
+        pr_filed_index_to_number: dict[int, int] = {}
         for ref, date_str, tip_sha in entries:
             if ref == trunk_ref:
                 continue
@@ -1957,6 +2421,7 @@ def scan_stale_branches(
                     pr_number = pr_heads.get(tip_sha) if tip_sha else None
                     if pr_number is not None:
                         status, evidence = "pr_filed", f"PR #{pr_number}"
+                        pr_filed_index_to_number[len(stale)] = pr_number
                     else:
                         status = "isolated"
             stale.append(
@@ -1973,6 +2438,68 @@ def scan_stale_branches(
                 )
             )
 
+        # (HARN-78) 2차 정밀화 — pr_filed 후보의 열림/닫힘을 GitHub API로 가른다.
+        # 조회 대상이 0건이면 시도할 것도 실패할 것도 없으므로 lookup_ok=True(기본값)
+        # 그대로 둔다 — "조회 안 함"과 "조회 실패"는 다른 사실이다.
+        pr_state_lookup_ok = True
+        pr_state_lookup_error = ""
+        if pr_filed_index_to_number:
+            pr_states, state_err = _fetch_pr_states(root, list(pr_filed_index_to_number.values()))
+            if pr_states is None:
+                # 상태를 모른다 — evidence에 그 사실 자체를 남긴다(모른다 ≠ 열려
+                # 있다). 기존 1차 분류(pr_filed)는 그대로 유지 — 오프라인 git 근거는
+                # 여전히 유효하다.
+                pr_state_lookup_ok = False
+                pr_state_lookup_error = state_err
+                for idx in pr_filed_index_to_number:
+                    stale[idx] = replace(
+                        stale[idx], evidence=f"{stale[idx].evidence} (상태 미확인)"
+                    )
+            else:
+                for idx, number in pr_filed_index_to_number.items():
+                    state_info = pr_states.get(number)
+                    if state_info is None:
+                        # API가 이 번호를 못 찾음(드묾 — 삭제된 PR 등) — 미확인으로 낮춘다.
+                        stale[idx] = replace(
+                            stale[idx], evidence=f"{stale[idx].evidence} (상태 미확인)"
+                        )
+                        continue
+                    pr_state, pr_merged = state_info
+                    if pr_state == "closed" and not pr_merged:
+                        stale[idx] = replace(
+                            stale[idx],
+                            status="pr_closed",
+                            evidence=f"PR #{number} 닫힘(미머지)",
+                        )
+                    # open, 또는 closed+merged=True — pr_filed 그대로 둔다. 후자(닫힘+
+                    # 머지됨)는 이 태스크의 명시 acceptance 범위 밖이다(정직한 공백 —
+                    # HARN-78은 "닫힘·미머지"만 새 분류로 승격하라고 요구했다).
+
+        # (HARN-93 ②) 3차 정밀화 — 여전히 열려 있는 pr_filed 후보의 처분 라벨을
+        # GitHub API로 붙인다. "닫아도 되는데 아무도 모르는" 축은 열린 PR에만 성립한다
+        # — 위 2차 정밀화가 pr_closed로 승격시킨 항목은 처분이 이미 집행됐으므로
+        # 라벨 조회 대상에서 뺀다(대상 자체가 없으면 lookup_ok는 True로 남는다).
+        pr_label_lookup_ok = True
+        pr_label_lookup_error = ""
+        still_open = {
+            idx: number
+            for idx, number in pr_filed_index_to_number.items()
+            if stale[idx].status == "pr_filed"
+        }
+        if still_open:
+            pr_labels, label_err = _fetch_pr_labels(root, list(still_open.values()))
+            if pr_labels is None:
+                # 라벨을 모른다 — disposal_labels는 빈 튜플로 남기고 lookup_ok로
+                # "모른다"를 별도로 알린다(모른다 ≠ 라벨 없음).
+                pr_label_lookup_ok = False
+                pr_label_lookup_error = label_err
+            else:
+                for idx, number in still_open.items():
+                    names = pr_labels.get(number, ())
+                    disposal = tuple(n for n in names if n in DISPOSAL_LABELS)
+                    if disposal:
+                        stale[idx] = replace(stale[idx], disposal_labels=disposal)
+
         return StaleBranchScanResult(
             "ok",
             stale=stale,
@@ -1980,6 +2507,10 @@ def scan_stale_branches(
             truncated=truncated,
             pr_lookup_ok=pr_heads is not None,
             pr_lookup_error=pr_lookup_error,
+            pr_state_lookup_ok=pr_state_lookup_ok,
+            pr_state_lookup_error=pr_state_lookup_error,
+            pr_label_lookup_ok=pr_label_lookup_ok,
+            pr_label_lookup_error=pr_label_lookup_error,
             trunk_ref=trunk_ref,
             trunk_branch=trunk_branch,
             trunk_source=trunk_source,

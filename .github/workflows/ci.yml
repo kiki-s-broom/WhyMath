@@ -11,6 +11,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # merge queue 진입분 재검증 (HARN-56). 큐는 PR을 **main 최신 위에 얹은** 임시 브랜치
+  # (refs/heads/gh-readonly-queue/...)에서 검증하므로, 이 트리거가 없으면 required check가
+  # 큐 안에서 **한 번도 보고되지 않아** 모든 PR이 큐에서 무한 대기한다.
+  # ⚠ 순서 제약: 이 트리거가 main에 착지한 *뒤에* 저장소 설정에서 큐를 켠다. 반대로 하면
+  #    켠 시점부터 머지가 전면 정지한다.
+  # 잡 게이팅과의 상호작용(실측): 무거운 잡의 if는 전부 `github.event_name != 'pull_request'`
+  # 형태라 merge_group에서는 **전건 실행**된다 — 큐에서는 경로 기반 절약이 적용되지 않고
+  # 전체 검증이 돈다. 이것이 의도한 동작이다(큐의 목적이 최신 base 위 전체 재검증이므로).
+  # 야간 전용 잡(`if: github.event_name == 'schedule'`)은 큐에서 계속 스킵된다.
+  merge_group:
   # 야간(KST 03시 = UTC 18시) E2E 안전망 — push/PR 없이도 관통 슬라이스가 도는지 확인.
   # GitHub schedule은 default branch(main)에서만 발화한다. 이 이벤트에선 e2e-nightly만
   # 돌고, 무거운 push/PR 잡들은 `&& github.event_name != 'schedule'` 가드로 스킵된다.
@@ -119,7 +129,27 @@ jobs:
           # **AST로 파싱해** 강제한다(경로 목록의 하드코딩 두 벌 금지 — 새 동결 입력이 늘면
           # 가드가 자동으로 따라온다). 과트리거는 파일 2건 한정이라 비용이 사실상 0이다
           # (backlog/ 전체가 아니라 gates.yaml 하나 — 태스크 상태 변경 PR은 깨우지 않는다).
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|\.github/workflows/ci\.yml$)'; then
+          #
+          # **엔티티 동결 입력 1건 편입**(ARCH-38 · 2026-09-06) — 같은 형태의 사각이 하나 더
+          # 있었고, 이 PR이 **자기 자신으로** 실증했다. `canonical_entity_model_v1.md`는
+          # tests/backend/db/test_canonical_entity_model_freeze.py의 검사 ③④가 읽는 입력이다
+          # (`_CANON_DOC` — §2-A·§2-B 표를 파싱해 상수와 1:1 대조). 그런데 필터 밖이라 그 문서만
+          # 고치는 PR에서 backend 잡이 SKIP됐다 — 즉 **§2-A 표를 조용히 고쳐 좌석 배정을 바꿔도
+          # 검사 ④가 실행되지 않는다**. G0 동결 입력(위)·data/corpus·schemas(COLLAB-07 ①②)와
+          # 정확히 같은 형태의 네 번째다. 실증: PR #997(이 문서 단독 변경)에서 `backend —
+          # lint·type·test`가 conclusion=skipped였고, skip은 required check에서 충족으로 계상된다.
+          # ※ 이 입력도 이제 **AST 가드의 강제 범위 안**이다(OPS-62 · 2026-09-06) — 종전에는
+          # test_ci_contract_fixture_trigger_wiring.py의 `_FREEZE_TEST`가 동결 테스트 **한 파일**을
+          # 하드코딩해 다른 동결 테스트의 입력은 따라오지 않았다(그래서 이 사각이 생겼다). 지금은
+          # 가드가 tests/backend/** 전건을 훑어 FROZEN_INPUT_PATHS를 선언한 동결 테스트 **전부**를
+          # 대상으로 삼고(선언 0건이면 통과가 아니라 RED), test_canonical_entity_model_freeze.py도
+          # 그 상수를 선언한다. 새 동결 테스트는 상수만 선언하면 이 필터 편입이 자동으로 강제된다.
+          # **루프 계약 동결 입력 1건 편입**(EOS-100 · 2026-09-16) — 같은 형태의 다섯 번째다.
+          # `learning_loop_contract_v1.md`는 tests/backend/schema/test_learning_loop_contract.py
+          # 의 검사 ⑤⑧이 읽는 입력이다(§2 관계표·§3 귀속표를 파싱해 상수와 1:1 대조). 필터 밖이면
+          # 그 문서만 고치는 PR에서 backend 잡이 SKIP돼 **관계표를 조용히 고쳐도 검사 ⑧이 실행되지
+          # 않는다**. 위 AST 가드가 그 테스트의 FROZEN_INPUT_PATHS를 읽어 이 편입을 강제한다.
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
             be=true
           fi
           if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|\.github/workflows/ci\.yml$)'; then
@@ -173,7 +203,13 @@ jobs:
           # 22분+)에 붙어 있어 무거운 3축을 얹으면 타임아웃 리스크가 실재한다.
           # 코퍼스 자체의 *상시* 게이트(표기 커버리지)는 별개로 위 be 필터가 담당한다 —
           # 두 축은 대체재가 아니라 서로 다른 게이트다.
-          if printf '%s\n' "$files" | grep -qE '^(data/corpus/|\.github/workflows/ci\.yml$)'; then
+          #
+          # ARCH-23: 검사기 소스(harness/·provenance_audit.py·l3/equivalent/)만 바뀌고
+          # data/corpus/는 무변경인 PR에서는 이 플래그가 안 켜져 qa_pipeline 게이트가 한
+          # 번도 안 돈다 — "검사기가 바뀌어도 안 돌던 구멍"(같은 코퍼스에 다른 판정 로직을
+          # 적용하는 변경이 게이트를 건너뛴다). 세 경로를 추가해 검사기 변경도 이 플래그를
+          # 깨우게 한다.
+          if printf '%s\n' "$files" | grep -qE '^(data/corpus/|src/backend/whymath_backend/harness/|src/backend/whymath_backend/ops/provenance_audit\.py$|src/backend/whymath_backend/l3/equivalent/|\.github/workflows/ci\.yml$)'; then
             cp=true
           fi
           # PB-13: 결정론 저작 도구(스켈레톤 생성기·적재 배치)와 그 테스트를 건드리면
@@ -267,24 +303,17 @@ jobs:
       # corpus 플래그 경유). harness/의 기존 검사 자산 9종(corpus_audit·수식동치·개념그래프·
       # 오개념crosswalk·코치프로즈누설·저작권·결함주입강등전·금칙어PII(ARCH-24)·
       # 학생결함신고수집(RPT-01) + wilson 경계)을 조립해 단일 JSON 리포트 + exit 0/1 게이트를
-      # 낸다. 축 9(defect_report_intake)는 DB를 읽는데 이 잡엔 Postgres 서비스가 없어 상시
-      # error로 보고되지만, 이 스텝은 continue-on-error: true라 CI를 막지 않는다.
+      # 낸다. 축 9(defect_report_intake)는 DB를 읽는데 이 잡엔 Postgres 서비스가 없어 이
+      # 축만 상시 no_snapshot(검사 미수행 — 집계 제외, ARCH-23)으로 보고된다.
       # 이 스텝만 레포 루트로 working-directory를
       # 오버라이드한다 — 잡 기본값(defaults.run.working-directory: src/data-pipeline)에서는
       # `-m whymath_backend.harness.qa_pipeline`이 backend 패키지를 못 찾는다.
+      # ARCH-23: S3-28 판정 반영(equivalence_canonicalize 축의 사전 존재 결함/오탐 해소) +
+      # 축 9의 환경 판정 분리(DB 도달 불가 → no_snapshot, 위 참조) 완료로 continue-on-error를
+      # 제거한다 — 이제 이 게이트는 실제로 PR을 막는 강제 게이트다.
       - name: 게이트 — QA 파이프라인 오케스트레이터 (코퍼스 변경 시만·qa_pipeline)
         if: needs.changes.outputs.corpus == 'true'
         working-directory: .
-        # continue-on-error(임시): 첫 실행에서 equivalence_canonicalize 축이 코퍼스 전수(2647건
-        # 중 130건)에서 사전 존재 결함/오탐을 실측 발견했다(condition_dsl_violation이 확률·통계
-        # 미니 DSL을 검증 대상으로 상정하지 않았을 가능성 — S3-28로 등재·Kiki 판정 대기). 이
-        # 축이 해소되기 전까지 이 신규 게이트를 무음 실패시키지 않으면서도(리포트는 그대로
-        # 남는다) 다른 PR의 CI를 막지 않는다. S3-28 완료 시 이 줄을 제거해 강제 게이트로 전환.
-        # OPS-29 강제 상태 선언(tests/infra/test_ci_enforcement_declaration_contract.py 계약)
-        # — 이 줄의 continue-on-error 실제 제거는 ARCH-23이 소유한다(S3-28은 ARCH-23의 선행
-        # 의존일 뿐 직접 소유자가 아니다):
-        # pending-task:ARCH-23-qa-gate-enforcement
-        continue-on-error: true
         run: python -m whymath_backend.harness.qa_pipeline --json qa_report.json
 
   # ─────────────────────────────────────────────────────────────────
@@ -297,7 +326,12 @@ jobs:
     # 스위트 성장(초인간 검증 하니스·843 트랜치·원자 축 누적·CACHE-01 content_supply)으로
     # 유닛+커버리지가 25분 경계 초과 → 2026-07-25 boundary 타임아웃 실측(pytest 단독 22분+ 미완).
     # timeout은 상한일 뿐이라 정상 완료 시 낭비 없음(hang 방지 상한만 유지)이므로 여유 상향.
-    # 후속 최적화 과제: pytest-xdist 병렬 실행·무거운 생성기/게이트 테스트 slow 마크 분리.
+    # 2026-08-21 main 01ff6041에서 이 여유(당시 최대 표본 기준 16%)가 실제로 소진돼
+    # Pytest 단계 cancelled 발생(OPS-47). pytest-xdist 병렬화(OPS-58, 아래 Pytest 스텝
+    # `-n auto --dist loadfile`)로 소요 자체를 줄이는 축을 채택 — slow 마크 분리는
+    # 미채택(여러 축 동시 투입 시 어느 것이 들었는지 판정 불가 — CLAUDE.md 규칙).
+    # 재측정(2026-09-10, main push 11표본, scripts/analysis/measure_backend_job_timeout_headroom.py):
+    # 소요 최소/중앙/최대 12.7/18.3/19.5분 → 최대 표본 기준 여유 15.5분(44.2%, 목표 30%+ 충족).
     timeout-minutes: 35
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
@@ -400,10 +434,58 @@ jobs:
             --n-defective 150 --n-clean 150 --seed 20260810 \
             --min-detection-lower 0.95 --max-false-alarm-upper 0.02
 
+      # MISC-25: 학생이 오개념을 **명시적으로 부정**했는데도 확신 진단이 학생에게 도달하는
+      # 비율. 착지 직전 실측은 측정 가능 66종 중 **66종(100%)**이었다 — 항목별 결함이 아니라
+      # substring 공출현(AND)에 부정 조건이 없던 구조적 공백이었고, 절 경계 근접 반박 축으로
+      # 0%가 됐다. 상한을 0.0으로 두는 이유: 이 사각은 "줄이는" 성질이 아니라 카탈로그에
+      # 항목이 새로 들어올 때 **다시 생기는** 성질이라 신규 항목이 회귀를 끌고 들어온다.
+      # 단위 테스트(`TestExplicitCorrectionNearSignals`)는 대표 항목만 밟으므로 전수는 여기다.
+      # hermetic·1.4초(DB 0·LLM 0·네트워크 0). 측정 불가(대조군 전멸)는 exit 2로 따로 낸다 —
+      # 기준 미달과 측정 실패를 같은 코드로 내면 무엇을 고쳐야 하는지가 사라진다.
+      - name: 게이트 — 명시적 정정 언급 사각 (explicit_correction_gap·사각 상한 0%)
+        run: |
+          python -m whymath_backend.harness.explicit_correction_gap_eval \
+            --max-gap-ratio 0.0
+
+      # MISC-27: **올바른 산문**(자체생성 정답 해설 7,644건)에 오개념 진단이 확신 수준으로
+      # 나가는 비율. 맞게 쓴 글에 틀렸다고 말하는 것이라 의사결정 우선순위 #1에 직접 닿는다.
+      #
+      # 상한 7%는 **ratchet**이다 — 실측 6.5%(497건) 바로 위. 0을 요구하지 않는 이유는
+      # 상시 red인 게이트가 사람이 게이트를 끄게 만들기 때문이고(MISC-27 acceptance④),
+      # 그렇다고 임계를 안 걸면 회귀가 조용히 들어온다. 그래서 "지금보다 나빠지면 red"로
+      # 잡는다. 수치가 내려가면 이 값도 함께 내려 잠근다(계층별 커버리지 floor와 같은 관례).
+      #
+      # 이력: MISC-25 착지 전 885건(11.6%) → 착지 후 497건(6.5%). 명시적 정정 언급 축이
+      # 388건을 걷어 낸 몫이다. hermetic 9초(DB 0·LLM 0·네트워크 0).
+      - name: 게이트 — 정답 해설 오진단 ratchet (misconception_false_positive·상한 7%)
+        run: |
+          python -m whymath_backend.harness.misconception_false_positive_eval \
+            --max-fp-ratio 0.07
+
+      # QUAL-08: 형제 스켈레톤 생성기의 **파라미터 공간** 겹침. `problem_duplication_audit`이
+      # 코퍼스(공간의 *표본*)를 보는 반면 이 게이트는 생성기 풀을 전수 소진해 공간 자체를 본다 —
+      # 코퍼스가 깨끗해도 공간이 겹치면 재생성·증량에서 그대로 재발하기 때문이다(QUAL-07이 그
+      # 형태였다: 대학 풀 260이 고교 풀 300의 진부분집합 → 코퍼스 71쌍).
+      # 판정 축은 **발문 공간 교집합** 하나다. 조건식 축은 오탐 지배(10쌍 전건 오탐)라 리포트
+      # 진단으로만 내고, 조건식+단원코드 AND 축은 QUAL-07 양성 대조군에서 **0건 검출**이라
+      # 기각했다(모든 입력에서 초록인 가드 — 근거는 모듈 docstring 축 비교표).
+      # 실측: 생성기 구성 64개·58,368문항 전수 열거 2,016쌍 비교, 겹침 0. hermetic 약 10초.
+      - name: 게이트 — 생성기 공간 겹침 (generator_space_overlap·발문 공간 교집합 0)
+        run: python -m whymath_backend.harness.generator_space_overlap_audit
+
       - name: 게이트 — 코치 프로즈 유출 (coach_prose_leak·노출 상한 0.05·오차단 상한 0.2)
         run: |
           python -m whymath_backend.harness.coach_prose_leak_eval \
             --n-per-cell 12 --max-leak-upper 0.05 --max-false-block-upper 0.2
+
+      # MISC-07: 앵커 커버 오개념의 정규식 탐지 채널 변별력. 임계는 모듈 상수(검출 하한 0.80·
+      # 오검출 상한 0.10)이고 픽스처는 결정론 생성이라 인자가 없다 — 라이브 0·시드 0·DB 0.
+      # 이 스텝이 없으면 채널은 "저장소에 존재함"일 뿐 매 PR 회귀로 강제되지 않는다(OPS-22
+      # declared-unwired 감사가 정확히 그 상태를 미도달로 잡아냈다).
+      # 표본 수가 게이트의 *통과 가능성*을 좌우하므로(Wilson 상한 0/20=0.1192로 완벽한 채널도
+      # FAIL) CLI가 도달 가능성 자체를 매 실행 재검사하고 불가면 별도 stderr로 구분해 낸다.
+      - name: 게이트 — 앵커 탐지 채널 변별력 (anchor_detection_channel·검출 하한 0.80·오검출 상한 0.10)
+        run: python -m whymath_backend.harness.anchor_detection_channel_eval
 
       # PED-01 ③: 교수법 팩 금지모드 가드 결함주입 강등전. 고정 그리드 실측 여유값 —
       # violating/clean 각 72셀 미검출·오검출 0 → Wilson 상한 0.0362 → 게이트 통과.
@@ -420,6 +502,14 @@ jobs:
         run: |
           python -m whymath_backend.harness.analogy_fidelity_eval \
             --n-per-cell 12 --max-miss-upper 0.05 --max-false-alarm-upper 0.2
+
+      # EOS-98 ④: 연령별(학교급 4개) 설명 언어 수준(F7) 결함주입 강등전 — analogy_fidelity와
+      # 동형 관례(고정 그리드·Wilson 상한·--control 대조군은 하네스 단위테스트가 봉인). 초등 8축·
+      # 중등 6축 violating 셀 미검출 0 · clean 셀(중등 root/trig 경계 포함) 오검출 0을 상시 회귀로
+      # 강제한다 — 이 스텝이 없으면 F7 검출기는 "저장소에 존재함"일 뿐 매 PR 회귀로 강제되지
+      # 않는다(OPS-22 declared-unwired 감사가 그 미도달을 실측했다).
+      - name: 게이트 — 연령별 설명 언어 수준 검출기 (explanation_f7·미검출 상한 0.05·오검출 상한 0.2)
+        run: python -m whymath_backend.harness.explanation_f7_eval
 
       # NS-03 — 코퍼스 표기 ⊆ 지원 표기(data/notation_support_manifest.json) 커버리지 게이트.
       # hermetic(LLM 0·DB 0)·결정론. 신규 누락 심볼 발견 시 exit 1(베이스라인 래칫) — 변별력은
@@ -441,6 +531,25 @@ jobs:
       # 변별력은 tests/infra/test_routing_data_grade_scan_wiring.py의 결함 주입이 봉인.
       - name: 게이트 — 데이터 등급 라우팅 신호 (check_routing_data_grade·미명시 0건)
         run: python ../../scripts/ops/check_routing_data_grade.py
+
+      # EOS-77: 라우터 우회 결정 소스 스캔 — 프로덕션 `RoutingDecision(` 직접 생성 중
+      # *클라우드 티어 리터럴*(CLOUD_MID/HIGH)을 검출한다. 그런 결정은 `Router.route`의 데이터
+      # 등급(법적) 게이트를 지나지 않고 국외 프로바이더에 도달한다(위 EOS-59 게이트는 *입력*의
+      # 등급 명시만 보므로 이 우회를 못 본다). 비리터럴 티어는 판정 승계(`data_export_reason=`
+      # 표현식)를 요구하고, 유예는 만료·unmatched를 exit 1로 강제한다. hermetic·cwd 무관.
+      # 변별력은 tests/infra/test_routing_decision_bypass_scan_wiring.py의 결함 주입이 봉인.
+      - name: 게이트 — 라우터 우회 결정 (check_routing_decision_bypass·클라우드 직접 생성 0건)
+        run: python ../../scripts/ops/check_routing_decision_bypass.py
+
+      # ARCH-46: 프로바이더 좌석 계약 스캔 — 위 두 게이트가 *라우팅 자료구조*(RoutingRequest·
+      # RoutingDecision)를 볼 때, 이 게이트는 **프로바이더를 쥐고 부르는 자리**를 본다. 새
+      # 프로바이더를 붙이며 라우터를 통하지 않고 `SomeProvider().generate(...)`를 부르면 그
+      # 경로엔 RoutingDecision이 아예 없어 위 둘은 조용히 통과한다(D1의 사각). 임포트 좌석마다
+      # 라우터 경유의 증거(Router().route 또는 l3.pipeline)를 요구하고, generate 호출의 인자
+      # 목록에 결정이 실렸는지 본다. 유예는 만료·unmatched를 exit 1로 강제한다. hermetic.
+      # 변별력은 tests/infra/test_provider_seat_contract.py의 결함 주입이 봉인.
+      - name: 게이트 — 프로바이더 좌석 계약 (check_provider_seat_contract·라우터 미경유 0건)
+        run: python ../../scripts/ops/check_provider_seat_contract.py
 
       # OPS-16: L3 생성 프롬프트 정본(docs/prompts/l3_*.md)의 3레일 감사 —
       # ⓐ 저작권(평가원·EBS·교과서 본문 복제 금지 지시문) ⓑ 봉인(rephrase 수치·정답 불변)
@@ -528,6 +637,25 @@ jobs:
         run: |
           alembic downgrade base
           alembic upgrade head
+
+      # OPS-55: 데이터 무결성 게이트 — orphan concept/skill/problem·dangling curriculum_ref·
+      # duplicate canonical_id·event schema_invalid 6종을 실 PG에서 스캔(0건=exit 0). 마이그레이션
+      # 직후 DB는 비어 있어 이 스텝 자체는 상시 통과(스모크)이지만, "저장소에 존재함≠돌아감"
+      # (OPS-10 선례) — 이 스텝이 CI 배선의 집행 지점이다. 6종 각각의 검출 변별력(주입 성공/실패
+      # 양쪽 신호)은 바로 아래 Pytest 통합테스트 스텝이 수집하는
+      # test_integrity_violations_gate_integration.py가 검증한다.
+      - name: 게이트 — 데이터 무결성 (integrity_violations_gate·orphan·dangling·duplicate 6종)
+        run: python -m whymath_backend.ops.integrity_violations_gate
+
+      # EOS-15 — Phase 2 학습 루프 KPI 5종 수집기가 **실 스키마를 상대로 완주**하는지.
+      # 판정 게이트(exit 0/1/2)가 아니라 스키마 스모크인 이유: CI DB는 마이그레이션만 적용한
+      # 빈 DB라 5종이 전부 미측정이고, 그 상태로 판정을 걸면 상시 red가 되어 사람이 게이트를
+      # 끈다(CLAUDE.md "상시 실패하는 fail-open 보호"를 새로 만드는 셈). 반면 "수집 쿼리가
+      # 예외 없이 끝나는가"는 빈 DB에서도 변별력이 있다 — 컬럼 개명·테이블 삭제가 여기서 잡힌다
+      # (2026-09-19 실측: `evidence_event.meta`를 개명하니 exit 1, 되돌리니 exit 0).
+      # KPI 판정 자체는 운영 DB에서 `--since-hours`로 돌린다(docs/standards/loop_kpi_contract.md).
+      - name: 게이트 — 루프 KPI 수집기 스키마 스모크 (loop_kpi_gate --schema-smoke)
+        run: python -m whymath_backend.ops.loop_kpi_gate --schema-smoke
 
       - name: Pytest (통합테스트 — 실 PG·l3 외부서비스 제외)
         env:
@@ -791,7 +919,13 @@ jobs:
       # 모바일이 새 `/v1/` 표면을 호출하기 시작하면 이 파일이 깨져 "가시화 리포트가 낡았다"를
       # 신호한다(회귀 감시). 명시 파일 경로 실행 — 이 파일엔 async 테스트가 없다.
       - name: Pytest (concept_reach 회귀 가드 — 단일 파일 경량)
-        run: python3 -m pytest ../../tests/backend/harness/test_concept_reach_report.py -q
+        # `-c pyproject.toml` 필수 — 위치 인자(테스트 경로)를 주면 pytest가 인자의 공통조상을
+        # 상향 탐색해 **저장소 루트**를 rootdir로 잡고, 루트 pyproject.toml에는 pytest 설정이
+        # 없어 `src/backend/pyproject.toml`의 ini가 통째로 안 읽힌다(OPS-61 실측). 그러면
+        # asyncio_mode=auto·--strict-markers·--strict-config·--import-mode=importlib가 전부
+        # 빠진 채 도는데 **화면상 정상으로 보인다** — 이 스텝들은 실제로 그 상태로 돌고 있었다.
+        # `-c`로 설정 파일을 못 박으면 bare 호출과 동일해진다(rootdir=src/backend·configfile 동일).
+        run: python3 -m pytest -c pyproject.toml ../../tests/backend/harness/test_concept_reach_report.py -q
 
   # ─────────────────────────────────────────────────────────────────
   # L5 웹 (그래프 계산기 — 격리 Vite + React SPA·국소 비상구)
@@ -886,6 +1020,23 @@ jobs:
 
       - name: Black --check (tests/infra + infra + conftest.py)
         run: python3 -m black --check --line-length 100 tests/infra infra conftest.py
+
+      # HARN-106 — 런북 쓰기 블록 자가거부 가드. 이 잡에 붙이는 이유: 검사 대상이
+      # `docs/ops/*runbook*.md`(마크다운)이라 백엔드 설치가 불요하고, 이 잡은
+      # `needs: changes` 게이팅이 없어 **docs만 바뀐 PR에서도 반드시 돈다** — 런북은
+      # 정확히 그런 PR에서 바뀌므로 backend 잡에 붙이면 그 경우를 통째로 놓친다.
+      # 변별력은 `tests/infra/test_runbook_write_guard.py`의 결함 주입 7종이 봉인한다
+      # (위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 런북 쓰기 블록 자가거부 가드 (HARN-106)
+        run: python3 scripts/ops/check_runbook_blocks.py
+
+      # EOS-108 — 숙달 단일 쓰기 경로 AST 전수 스캔. 이 잡에 붙이는 이유: 스캐너가 stdlib만
+      # 쓰고 백엔드 소스를 *텍스트로* 읽으므로 백엔드 설치가 불요하며, 이 잡은 `needs: changes`
+      # 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — 우회 경로는 정확히 "숙달과 무관해 보이는"
+      # PR에서 생긴다. 변별력은 `tests/infra/test_mastery_single_write_path.py`의 결함 주입
+      # 9종이 봉인한다(위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 숙달 단일 쓰기 경로 (EOS-108)
+        run: python3 scripts/analysis/mastery_write_path_scan.py
 
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q
@@ -1091,21 +1242,63 @@ jobs:
         uses: actions/checkout@v4
 
       # 검정교과서 출판사명 + "본문" 또는 "예제" 동시 등장 패턴은 사전 차단
-      # (코드·문서에 의도적으로 사용된 경우는 # codeowner-ack 주석으로 우회)
-      # ci.yml 자신은 위 패턴 문자열을 정의로 포함하므로 제외 (자기참조 오탐 방지)
+      # (코드·문서에 의도적으로 사용된 경우는 # codeowner-ack 주석으로 우회 — OPS-54가
+      # 실제로 배선했다. 이전에는 이 주석만 있고 grep이 그 마커를 걸러내지 않아
+      # "우회 규약"이 존재하지 않는 기능이었다 — 실측: 매칭 라인에 마커를 넣어도 여전히
+      # 적색이었다)
+      # ci.yml 자신과 tests/infra/test_policy_guard_source_patterns.py(이 두 스텝의 픽스처·
+      # 문서 문자열이 위반 패턴을 그대로 담고 있다)는 정의/픽스처로 패턴 문자열을 포함하므로
+      # 제외한다 (자기참조 오탐 방지 — 실측: 제외 없이 돌리면 저 테스트 파일 자체가 걸린다)
       - name: Forbid 검정교과서 본문 patterns
         run: |
           set -e
           patterns='천재교육.*본문|비상교육.*본문|미래엔.*본문|동아출판.*예제|신사고.*예제'
-          if grep -rEn --include='*.py' --include='*.md' --include='*.json' \
+          hits=$(grep -rEn --include='*.py' --include='*.md' --include='*.json' \
               --include='*.txt' --include='*.yaml' --include='*.yml' \
               --exclude-dir='.git' --exclude-dir='node_modules' \
-              --exclude='ci.yml' \
-              "$patterns" . ; then
+              --exclude='ci.yml' --exclude='test_policy_guard_source_patterns.py' \
+              -E "$patterns" . | grep -v '#\s*codeowner-ack' || true)
+          if [ -n "$hits" ]; then
+              echo "$hits"
               echo "::error::검정교과서 본문/예제 직접 인용 의심 패턴 발견 (CLAUDE.md 절대 금기)"
               exit 1
           fi
           echo "OK — 검정교과서 본문 패턴 없음"
+
+      # EBS·평가원(수능·모평) 본문 직접 인용 의심 패턴 — OPS-54(EOS-53 crosswalk 갭 #7).
+      # 기존 검정교과서 패턴과 달리 "EBS"·"평가원"·"수능" 같은 낱말은 *이 저장소 자신의
+      # 저작권 준수 docstring*(예: schema/problem.py "평가원·EBS·검정교과서는 본문·문항
+      # 미보유")에 극도로 흔해서, 낱말 단순 동시등장으로는 실측 292건 오탐이 났다.
+      # 그래서 정책 산문이 아니라 **실제 인용의 공식 표기 형식**만 잡는다:
+      #   ① 평가원 공식 출처 표기(연도+학년도+대학수학능력시험/모의평가/모의고사) —
+      #      실제 기출 인용에는 항상 붙지만 "평가원 기출 금지" 같은 정책 문장에는 없다
+      #   ② EBS 대표 교재명(수능특강/수능완성/만점마무리) + 쪽수 표기 — 구조 메타데이터
+      #      (JSON {"book":..,"page":47} 등)는 "쪽"·"페이지"·"p."를 산문으로 쓰지 않는다
+      # 실측(2026-09-10 main 기준): 두 패턴 모두 저장소 전수 0건 — 배경 산문과 변별됨.
+      - name: Forbid EBS·평가원 본문 patterns
+        run: |
+          set -e
+          patterns='[0-9]{4}학년도.*(대학수학능력시험|모의평가|모의고사)|EBS.*(수능특강|수능완성|만점마무리).*[0-9]+(쪽|페이지|p\.)'
+          hits=$(grep -rEn --include='*.py' --include='*.md' --include='*.json' \
+              --include='*.txt' --include='*.yaml' --include='*.yml' \
+              --exclude-dir='.git' --exclude-dir='node_modules' \
+              --exclude='ci.yml' --exclude='test_policy_guard_source_patterns.py' \
+              -E "$patterns" . | grep -v '#\s*codeowner-ack' || true)
+          if [ -n "$hits" ]; then
+              echo "$hits"
+              echo "::error::EBS·평가원 본문 직접 인용 의심 패턴 발견 (CLAUDE.md 절대 금기)"
+              exit 1
+          fi
+          echo "OK — EBS·평가원 본문 패턴 없음"
+
+      # 저작권 위험 원본 문서(PDF·hwp·오피스·아카이브)의 커밋 차단 — LIC-07 ④.
+      # 위 패턴 검사는 "본문을 옮겨 적었는가"를 보지만, 2026-08-08 KICE 보고서 PDF 2건은
+      # 원본 파일 자체가 들어온 사고였다(텍스트 검사가 구조적으로 못 보는 축).
+      # 확장자 + 매직 바이트 + .gitignore 1차 방어선 실재까지 본다.
+      - name: Forbid source-document binaries (저작권 원본 유입 차단)
+        run: |
+          set -e
+          python3 scripts/ops/check_source_document_binaries.py
 
       # 시크릿 패턴 사전 차단 (의도된 .env.example 등은 .gitignore로 제외됨)
       - name: Forbid hardcoded secret patterns
@@ -1125,6 +1318,15 @@ jobs:
               exit 1
           fi
           echo "OK — 하드코딩된 시크릿 패턴 없음"
+
+      # 인코딩·바이트 무결성 — cp949/UTF-8 혼용이 만드는 손상을 전수 차단 (OPS-78).
+      #   축 A U+FFFD(복구 불가·면제 없음) / B 선언 없는 비-UTF-8 / C mojibake /
+      #   D 선언↔실측 불일치 / E 라이선스 스냅샷 sha256 무결성.
+      #   이 잡에 붙인 이유: 신규 잡을 만들면 필수 체크 목록과 문서 REQUIRED_CHECKS
+      #   블록까지 함께 고쳐야 하고, 성격도 'CLAUDE.md 금기 가드'와 같은 계열이다.
+      #   정본 문서 = docs/standards/encoding_safety.md
+      - name: 인코딩 무결성 가드 (U+FFFD·비-UTF-8·mojibake·스냅샷 해시)
+        run: python3 scripts/ops/cp949_guard.py
 
   # ─────────────────────────────────────────────────────────────────
   # 빌드 하네스 무결성 + 원격 claim 교차 검증 (항상 실행 — 초 단위)
@@ -1177,6 +1379,22 @@ jobs:
       - name: 의존 선언↔집행 대조 (HARN-52)
         run: python3 scripts/harness/backlog.py audit-deps
 
+      # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
+      # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
+      # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날
+      # 15:45에 선점된 ADR-003과 충돌했다(ADR-004로 개명 상환) — 태스크 번호는
+      # `backlog.py add`가 원격 claim까지 검사해 같은 사고를 거부했는데 ADR 번호에는 그
+      # 장치가 없었다. 이 스텝이 그 비대칭을 없앤다.
+      #
+      # 이 잡의 checkout은 fetch-depth: 0이지만 그것만으로는 **원격 브랜치 ref가 로컬에
+      # 오지 않는다**(actions/checkout은 기본적으로 단일 ref만 가져온다). 명시적으로
+      # 전 브랜치를 fetch해야 스캔이 성립하며, 성립하지 않으면 검사기가 exit 1로 그
+      # 사실을 드러낸다("0건 통과" 위장 금지).
+      - name: ADR 번호 충돌 검사 (HARN-66 · 원격 전 브랜치)
+        run: |
+          git fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*'
+          python3 scripts/harness/adr_number_check.py
+
       # HARN-09 — 이 스텝은 **공전하고 있었다**. claim이 `refs/claims/*`에 있었고 그
       # 네임스페이스 push가 프록시에서 403이라 원격 claim이 단 1건도 존재한 적이 없어,
       # reap이 늘 "stale claim 없음"을 보고했다. 즉 "통과"가 "검사했다"를 뜻하지 않았다.
@@ -1211,7 +1429,13 @@ jobs:
       # 게이트가 아니라 **관측**이다 — 남의 방치 브랜치 때문에 무관한 PR을 red로 만들지
       # 않는다. 다만 침묵하지도 않는다: 고립 N건은 warning으로, *측정 실패*는 그와
       # 구분되는 별도 warning으로 낸다(0건 통과로 위장 금지).
+      # HARN-78 — `pr_filed`의 열림/닫힘을 GitHub API로 정밀화하려면 `_fetch_pr_states`가
+      # 토큰을 읽어야 한다(Codex 리뷰 지적, PR #1043). 토큰이 없으면 이 스텝에서
+      # `pr_closed`가 영구히 "상태 미확인"으로만 남아, 이 잡이 그 분류를 한 번도
+      # 실측하지 못한다 — `harness-audit.yml`의 API 소비 스텝과 동일 패턴으로 맞춘다.
       - name: 고립 브랜치 관측 — PR로 노출된 적 없는 미머지 브랜치 (HARN-47)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           out=$(python3 scripts/harness/backlog.py branches) && rc=0 || rc=$?
@@ -1224,6 +1448,13 @@ jobs:
           n=$(echo "$out" | grep -c '^  \[고립\]' || true)
           if [ "$n" -gt 0 ]; then
             echo "::warning::PR로 노출된 적 없는 미머지 브랜치 ${n}건 — 회수(PR 생성) 또는 삭제가 필요하다. 이 목록이 유일한 존재 증거다"
+          fi
+          # HARN-78 — 닫힌 미머지 PR은 isolated와 같은 "재작업 또는 폐기 판단 필요"
+          # 위계인데, 이 카운트가 없으면 `[PR-닫힘]` 줄이 스텝 로그에 묻혀 아무도 안 본다
+          # (Codex 리뷰 지적, PR #1043).
+          m=$(echo "$out" | grep -c '^  \[PR-닫힘\]' || true)
+          if [ "$m" -gt 0 ]; then
+            echo "::warning::PR이 닫혔지만 머지되지 않은 미머지 브랜치 ${m}건 — 재작업 또는 폐기 판단이 필요하다"
           fi
 
       # CUR-09 후속: EOS 단원 구조 관측 리포트 — 현행 모델/스키마/코퍼스에 EOS 설계 메타데이터가
@@ -1426,7 +1657,29 @@ jobs:
         env:
           WHYMATH_RUN_INTEGRATION: "1"
           WHYMATH_DB_DISABLE_POOL: "1"
-        run: python -m pytest -m integration ../../tests/backend/api/test_e2e_vertical_slice_integration.py
+        # `-c pyproject.toml` 필수 — 위치 인자(테스트 경로)를 주면 pytest가 인자의 공통조상을
+        # 상향 탐색해 **저장소 루트**를 rootdir로 잡고, 루트 pyproject.toml에는 pytest 설정이
+        # 없어 `src/backend/pyproject.toml`의 ini가 통째로 안 읽힌다(OPS-61 실측). 그러면
+        # asyncio_mode=auto·--strict-markers·--strict-config·--import-mode=importlib가 전부
+        # 빠진 채 도는데 **화면상 정상으로 보인다** — 이 스텝들은 실제로 그 상태로 돌고 있었다.
+        # `-c`로 설정 파일을 못 박으면 bare 호출과 동일해진다(rootdir=src/backend·configfile 동일).
+        run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_e2e_vertical_slice_integration.py
+
+      # ── P-11 — 5단계 내부 연결(Attempt→Event→Assessment→LearnerState→Recommendation) ──
+      # 계획서 300 §12 P-11의 핵심 판정은 "API 12개가 있는가"가 아니라 "이 연결이 이어지는가"다.
+      # 실 PG가 있어야 성립하므로(학습자 상태가 HTTP 부수효과로만 생긴다) 이 잡에 얹는다 —
+      # `backend` 잡에는 postgres service가 없어 이 파일은 그쪽에서 **항상 skip**된다(실측:
+      # WHYMATH_RUN_INTEGRATION 미설정 → `1 skipped`·exit 0). "저장소에 있다"와 "돌아간다"는
+      # 다르다(OPS-03/08/11 선례) — 배선 실재성은 tests/infra/test_p11_chain_nightly_wiring.py가
+      # 기계로 동결한다.
+      # 실행기를 단독 호출하지 않는다(`python -m pytest`) — CLAUDE.md "실행기 단독 호출 금지".
+      - name: P-11 5단계 연결 동결 (Attempt→Event→Assessment→LearnerState→Recommendation)
+        env:
+          WHYMATH_RUN_INTEGRATION: "1"
+          WHYMATH_DB_DISABLE_POOL: "1"
+        # `-c pyproject.toml` 필수 — 위치 인자를 주면 pytest가 rootdir를 저장소 루트로 잡아
+        # src/backend/pyproject.toml의 ini가 통째로 안 읽힌다(OPS-61 실측).
+        run: python -m pytest -c pyproject.toml -m integration ../../tests/backend/api/test_p11_five_stage_loop_chain.py
 
       # 초인간 검증 S6(상시성) — 전 코퍼스 verify 재료로 정답을 매일 밤 전수 재검산.
       # 정본 변경·데이터 오염을 야간에 즉시 잡는다(fail 1건이라도 있으면 exit 1). 순수 계산·
@@ -1457,7 +1710,13 @@ jobs:
       # 환경에서 `pytest` 런처가 `python`과 다른 인터프리터에 결합될 수 있다. 이 잡의 설치·
       # 마이그레이션·테스트 스텝을 전부 `python -m` 형태로 통일해 한 인터프리터로 못 박는다.
       - name: 앵커 A4 생성 E2E 관통 (EOS-64 상시화 — hermetic)
-        run: python -m pytest ../../tests/backend/harness/test_eos_anchor_e2e_a4.py
+        # `-c pyproject.toml` 필수 — 위치 인자(테스트 경로)를 주면 pytest가 인자의 공통조상을
+        # 상향 탐색해 **저장소 루트**를 rootdir로 잡고, 루트 pyproject.toml에는 pytest 설정이
+        # 없어 `src/backend/pyproject.toml`의 ini가 통째로 안 읽힌다(OPS-61 실측). 그러면
+        # asyncio_mode=auto·--strict-markers·--strict-config·--import-mode=importlib가 전부
+        # 빠진 채 도는데 **화면상 정상으로 보인다** — 이 스텝들은 실제로 그 상태로 돌고 있었다.
+        # `-c`로 설정 파일을 못 박으면 bare 호출과 동일해진다(rootdir=src/backend·configfile 동일).
+        run: python -m pytest -c pyproject.toml ../../tests/backend/harness/test_eos_anchor_e2e_a4.py
 
   # ── OPS-58 후속 — 병렬화가 약화시킨 탐지력의 복구 (PR #944 Codex P2 지적 수용) ──────
   # `backend — lint·type·test`는 `-n auto --dist loadfile`로 돈다. `loadfile`은 *같은 파일*의

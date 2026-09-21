@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-76-generated-inventory-conflict-blocks-ci
+title: "생성 인벤토리 장부가 PR 충돌을 상시화하고, 충돌한 PR은 CI가 조용히 멈춘다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-10 · 판정 기준 main `091dd3c5`) — 충돌한 PR은 **CI가 조용히 멈춘다**. PR #1075에서 실측: 21:55·22:17 두 번의 푸시가 `pull_request` 워크플로 런을 **한 건도 만들지 않았고**(`actions_list` branch 필터로 확인 — 마지막 런은 16:48), 충돌을 해소해 22:22에 푸시하자 **1분 내에** 런이 생성됐다. 원인은 GitHub이 `refs/pull/<N>/merge`를 계산하지 못하면 `pull_request` 이벤트를 발화시키지 않기 때문이다. 그동안 PR 화면에는 **16:48의 낡은 실패 결과**가 남아 있어 \"CI가 안 돈다\"가 \"CI가 실패했다\"로 보인다 — 즉 침묵이 아니라 **위장**이다.\n② 충돌원 — `backlog/inventory/feature_inventory_v2.{csv,yaml}`은 `scripts/analysis/eos_feature_inventory_v2.py`가 생성하고 저장소에 커밋되며, `tests/infra/test_eos_feature_inventory_v2.py`가 \"장부 == 생성기 출력\"을 동결한다. 이 생성기의 입력에 백로그 대장·소스 LOC가 들어가므로 **백로그를 건드리는 거의 모든 PR이 이 두 파일을 재생성**한다. 그리고 그 재생성분은 전 행에 걸친 수치 변경이라 자동 병합이 실패한다. main이 merge queue로 20분 간격 전진하는 현 상태에서, **준비에 20분 이상 걸리는 PR은 구조적으로 충돌한다**(이 세션은 한 태스크 처리 중 3회 충돌했다).\n③ 두 결함의 결합이 진짜 문제다 — ②가 충돌을 상시화하고 ①이 그 충돌을 **관측 불가**하게 만든다. 결과: PR이 조용히 낡은 red를 달고 방치되며, 세션은 로컬 green만 보고 \"CI가 최종 판정한다\"고 적는다. PR #1075가 정확히 그 상태로 5회를 보냈다.\n④ 방향 후보(하나를 고르고 나머지를 버린 이유를 MEMORY에 남긴다) — ⓐ 인벤토리 산출물을 저장소에서 빼고 CI가 매 실행 생성해 검사만 한다(충돌원 제거·`.gitignore`) ⓑ 커밋은 유지하되 `.gitattributes`에 `merge=ours`+재생성 훅으로 충돌을 기계 해소한다 ⓒ 생성 주기를 낮춰(예: main push 시에만 갱신) PR 브랜치가 건드리지 않게 한다. ⓐ가 가장 근본적이나 \"장부를 사람이 읽는다\"는 현 용도를 잃는지 확인이 필요하다.\n⑤ 관측 축(①은 ②와 별개로 남는다) — 충돌로 CI가 멈춘 상태를 **사람이 아니라 도구가** 알려야 한다. `scripts/ops/pr_delivery_audit.py`나 `flow_health.py`에 \"열린 PR의 최신 head sha에 대한 CI 런이 존재하는가\"를 검사로 넣고, 없으면 `mergeable_state`와 함께 보고한다. 실패 주입으로 검증한다(충돌 PR을 만들어 그 검사가 RED를 내는지 — 정상 PR 대조군 동반).\n⑥ 집행 지점(정본화와 별항) — ④의 선택을 코드에 착지시킨 뒤, **실제로 두 PR을 동시에 열어** 인벤토리 충돌이 나지 않는지 실측한다. 테스트가 통과하는 것과 병렬 PR에서 충돌이 사라지는 것은 다르다."
+  - "⑦ [승계 2026-09-12] acceptance ⑤(관측 축)·⑥(병렬 PR 실측)은 이 태스크에서 **미이행**이며 `OPS-77-stalled-ci-observability-for-conflicted-prs`로 분리 등재했다. 이 태스크가 착지시킨 것은 ④의 방향 ⓐ(충돌원 제거)와 그 실패 주입 검증까지다 — 충돌한 PR이 CI를 멈춘 상태를 *도구가* 알려주는 축은 남아 있다."
+artifacts:
+  - "dc72c90c (#1075)"
+paths:
+  - "backlog/inventory/**"
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - scripts/ops/pr_delivery_audit.py
+session: null
+notes: "발단: PR #1075 처리 중 실측. 한 태스크(MISC-29) 마무리 과정에서 인벤토리 충돌 3회, 그중 2회는 CI가 아예 안 돌아 5회 연속 red를 낡은 결과로 오인했다. CLAUDE.md v0.2.21이 관측 쪽 사람 규칙을 등재했고 이 태스크는 그 기계 집행과 충돌원 제거를 소유한다. [개명 2026-09-12] 원래 OPS-73으로 등재했으나, 이 브랜치가 미머지로 머무는 동안 다른 세션이 같은 번호로 OPS-73-runbook-evidence-fence-guard를 add해 main에 착지시켰다(done). validate가 번호 충돌 exit 1을 내 OPS-76으로 옮긴다(OPS-74·75도 원격 브랜치가 인플라이트로 점유 중이라 CLI가 76을 제안했다) — main 쪽은 머지돼 개명 불가이므로 미머지인 이쪽이 이동한다. 이 현상 자체는 HARN-97 acceptance ④가 예고한 '브랜치 간 동시 add' 축이며, backlog.py에 개명 명령이 없어 add+파일 제거로 수행했다(승계 태스크에 등재).\n\n[정정 2026-09-12] acceptance ⑤·⑥ 미이행분의 승계 태스크를 명시 — 어디로 갔는지 대장에서 추적 가능하게"
+updated: 2026-09-12

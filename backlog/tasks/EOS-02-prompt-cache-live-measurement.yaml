@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-02-prompt-cache-live-measurement
+title: "프롬프트 캐시 라이브 계측 회차 + 기본값 전환 판단 (EOS-99 ④ 승계 — 실 provider 필요)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: blocked
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-99-prompt-cache-hit-measurement
+requires_gates:
+  - G-eos02-prompt-cache-live-run
+acceptance:
+  - "① 라이브 회차 — Kiki 머신(Phaiakes9) 실 Anthropic 키로 accumulate 회차를 n>=10으로 1회 돌리고, 회차 리포트 prompt_cache 블록을 그대로 회신받는다. 판정 재료는 state·hit_rate·calls_with_cache_telemetry 3개다(EOS-99가 이미 산출한다 — 이 태스크는 도구를 만들지 않는다)"
+  - "② 정상 판정 — state='enabled_working'이고 hit_rate가 (n-1)/n에 근접하면 캐시가 작동한다. state='enabled_not_working'(적중 0%)이면 '켰지만 작동 안 함'이며 원인을 규명한다(프리픽스가 최소 캐시 토큰 미만인지·회차마다 프리픽스가 갈리는지). state='not_applicable'은 클라우드 호출이 0건이었다는 뜻이라 회차 자체를 다시 돌린다(0%로 읽지 않는다)"
+  - "③ 기본값 전환 판단 — ①②의 실측 결과가 나온 뒤에만 anthropic_prompt_caching 기본값(현행 False) 전환 여부를 판단한다. 켜는 쪽으로 결정하면 MEMORY 결정 로그에 실측 적중률·절감 추정을 근거로 기재한다. 계측 없이 켜지 않는다(EOS-99 ④ 승계)"
+  - "①-a 선행 조건(PR #1023 codex P1 정정) — 회차 명령에 --subscription premium --budget-krw <양수>를 **둘 다** 준다. 키만 넣고 돌리면 라우터가 LOCAL로 강제해 클라우드 호출이 0건이 되고 state='not_applicable'만 나온다(측정 회차 공전). 근거 실측 2026-09-07: free/0=local · free/5000=local · premium/0=local · premium/5000=cloud_mid — 구독·예산이 각각 독립적으로 LOCAL을 강제한다(business_cost_tier 규칙1·2 + guard_cloud). 두 플래그는 EOS-99가 함께 배선했고 미지정 시 기본값(free/0.0)은 종전과 동일하다. 회차 직후 자가검증: 리포트 prompt_cache.calls_with_cache_telemetry > 0 이어야 ①이 성립한다 — 0이면 클라우드로 안 나간 것이므로 적중률을 읽지 말고 플래그부터 확인한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+  - docs/ops/eos02_prompt_cache_live_runbook.md
+session: null
+notes: "EOS-99(계측 배선)의 라이브 절반. 분리 이유: acceptance ③의 실측은 실 provider가 필요해 hermetic으로는 적중률이 정의되지 않는다 — EOS-99에 검수 게이트를 걸면 '산출물을 만드는 태스크에 그 산출물 검수 게이트를 거는' 교착이 된다(build_harness.md 2026-09-06 등재). 소비 태스크로 분리한다. ID: 상위 소진(최대 EOS-99)으로 하위 미사용 번호 재사용 — HARN-73.\n\n[정정 2026-09-07] PR #1023 codex P1: acceptance ①이 도달 불가능했다 — accumulate가 구독·예산을 단일 좌석(free/0.0)으로 고정해 Anthropic 키만으로는 클라우드로 나가지 못한다. 검증 없는 실행 안내 금지(CLAUDE.md) 위반이었고, 실행됐으면 라이브 측정 회차 1회가 공전했다.\n\n[차단 2026-09-07] Kiki 라이브 회차 대기 — 실 Anthropic 키가 필요해 세션이 완결할 수 없다. 실행 런북 착지: docs/ops/eos02_prompt_cache_live_runbook.md (검증 기준 main 1abf743b). 회신 재료 = prompt_cache 블록 3값(state·hit_rate·calls_with_cache_telemetry) + EXIT 줄. 그 값이 오면 acceptance ②③(정상 판정·기본값 전환 여부)을 이어서 판정한다\n\n[정정 2026-09-07] acceptance ①(라이브 회차)은 Kiki 머신에서만 가능한 사람 행동이라 에이전트 착수 조건으로 사람 게이트를 부착한다 — 회차 리포트 prompt_cache 블록 회신이 게이트 clear 근거. 런북 = docs/ops/eos02_prompt_cache_live_runbook.md"
+updated: 2026-09-07

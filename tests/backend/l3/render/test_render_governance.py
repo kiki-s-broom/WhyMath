@@ -13,6 +13,10 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.l3.render import registry
 from whymath_backend.l3.render.dsl import ConceptDSL
 from whymath_backend.schema.enums import PedagogyStrategy
@@ -148,7 +152,15 @@ class TestAdaptersAreConceptAgnostic:
         assert len(registry.registered_strategies()) <= len(PedagogyStrategy)
 
     def test_one_adapter_per_strategy_no_duplicates(self) -> None:
-        strategies = [registry.get_adapter(s).strategy for s in registry.registered_strategies()]
+        # EOS-89: 어댑터는 과목 능력을 생성 시 주입받는다 — 테스트가 그 상류 역할을 한다.
+        strategies = [
+            registry.get_adapter(
+                s,
+                seal=default_expression_seal(),
+                assessment_verifier=default_assessment_answer_verifier(),
+            ).strategy
+            for s in registry.registered_strategies()
+        ]
         assert len(strategies) == len(set(strategies))
 
 

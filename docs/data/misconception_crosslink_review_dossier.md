@@ -39,7 +39,7 @@ crosswalk 매핑(런타임 탐지 kebab-id → 리포트 노출 canonical M-id)�
    적재 규칙: `method=manual` ∧ note에 서명 stamp. (AI 자기승인·미서명 JSON 구조적 차단.)
 4. **게이트 clear** — 적재·검수 증적과 함께:
    ```bash
-   python3 scripts/harness/backlog.py gates clear G-crosswalk-approval --evidence "<커밋/문서/기록>"
+   python3 scripts/harness/backlog.py gates clear G-crosswalk-approval --as kiki --evidence "<커밋/문서/기록>"
    ```
    → `S2-01`(저작권 안전 동등문제 코퍼스) 해금. 이후 shadow→canary 노출 플립은 별 슬라이스(사람).
 

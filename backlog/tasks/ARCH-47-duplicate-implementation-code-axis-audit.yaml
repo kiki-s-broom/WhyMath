@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-47-duplicate-implementation-code-axis-audit
+title: "중복 구현 감사의 코드 축 부재 — 태스크 축(similar.py)·코퍼스 축(problem_duplication_audit)은 있는데 이미 머지된 서비스 코드의 중복을 재는 경로가 0건"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 축 구분을 먼저 적는다 (중복 등재 금지): 이 저장소의 중복 탐지는 세 축이다 — (가) 태스크 축 = scripts/harness/similar.py(HARN-51·착수 시점 IDF 고지) (나) 코퍼스 축 = harness/problem_duplication_audit.py(QUAL-01·슬러그/발문/조건 3계층) (다) 생성기 공간 축 = harness/generator_space_overlap_audit.py(QUAL-08). 이 태스크는 넷째 축인 **이미 머지된 서비스 코드 자신의 중복**이며 앞 셋의 대체재가 아니다. 착수 시 세 축이 그 사이 이 영역을 흡수했는지 재확인한다"
+  - "② 실측 전제 (2026-09-15 · main 4b33d243 · AST 기준): whymath_backend 최상위 공개 정의 2,379개 중 이름 충돌 117건, schema↔db(Pydantic↔ORM 의도적 쌍)를 한 구역으로 접으면 64건. 다수 사본 = render_report 40 · report_to_json 23 · build_report 23 · dump_json 18. **그러나 AST 완전 동일 클론은 2쌍뿐이다**(dump_json × 2조) — 이름 충돌은 중복 구현이 아니라 관례일 수 있다. 중간 지대 실측: 평가 하네스 4종(analogy_fidelity·coach_prose_leak·pedagogy_pack_fidelity·explanation_f7)의 골격은 유사도 34~95%로 흩어져 있다(run_machine: analogy vs explanation_f7 = 95.24%)"
+  - "③ 그러므로 첫 산출은 처분이 아니라 **판정 가능한 측정**이다: 이름 일치·AST 완전 일치·정규화 후 유사도(구조 해시 또는 토큰 시퀀스)의 3단 신호를 내고, 각 신호가 실제 중복을 몇 건 맞히는지 표본으로 정확도를 적는다. 신호를 못 믿으면 게이트로 못 쓴다 — \"N건 검출\"은 그 자체로 판정이 아니다"
+  - "④ 의도적 중복은 면제가 아니라 **선언**으로 처리한다: schema↔db 쌍, CLI main() 관례(162건), 계층별 report 관례처럼 의도한 반복은 목록으로 선언하고 그 목록이 실제 코드와 어긋나면 실패하게 한다(면제를 통째 와일드카드로 열면 세탁 통로가 된다 — import-linter의 composition 면제 선례)"
+  - "⑤ 보호 장치는 실패 주입으로 검증한다: 기존 모듈을 복제한 파일을 실제로 주입해 RED를 확인하고, 동시에 **성공 방향 대조군**(의도적 쌍은 통과)을 둔다. 스캔 대상 0건이 되는 경로(경로 오타·필터 과잉)는 공허한 통과이므로 대상 수 하한을 단언한다"
+  - "⑥ 집행 지점을 정본화와 별항으로: 감사가 CI 어느 잡에서 도는지(또는 의도적으로 수동인지)를 적고, CI 배선이면 그 잡에서 실제 실행됐는지 확인한 뒤에만 완료로 친다(앞 스텝 실패로 skipped 되는 자리인지 포함)"
+artifacts: []
+paths:
+  - scripts/analysis/duplicate_implementation_audit.py
+  - tests/infra/test_duplicate_implementation_audit.py
+session: null
+notes: "출처: Kiki 지시(2026-09-15) \"소유자 없는 갭 등재\" 8건 중 '중복 서비스 감사' 축.\n\n왜 갭인가: 이 저장소의 중복 방어는 전부 **착수 시점**(태스크 축)이나 **콘텐츠**(코퍼스·생성기 축)에 있고, 이미 트렁크에 들어간 코드끼리의 중복을 보는 경로는 없다. 사고 이력도 착수 시점 축뿐이다 — OPS-07 병렬 중복 735줄 폐기(2026-07-27·claim push 상시 실패가 원인), MP-04 전량 폐기(2026-09-06·claim 자체를 안 함). 두 사고 모두 \"머지 전\"에 잡거나 못 잡은 것이고, 머지된 뒤 남은 중복은 아무도 세지 않는다.\n\n부재 판정 범위(명시): 역할 기반 검색 결과다 — scripts/ 전수에 duplicate / 중복 / overlap / similar / clone / copy-paste / jscpd, backlog/tasks 전수에 코드 중복 / 중복 구현 / 클론으로 검색했고 걸린 것은 태스크 축·코퍼스 축·생성기 축뿐이었다. \"내가 찾은 방법으로는 0건\"이라는 뜻이다.\n\n주의(등재자 자신의 한계): 예비 스캔의 큰 숫자(render_report 40건 등)는 **이름 충돌**이고 완전 동일 클론은 2쌍뿐이었다. 이 태스크를 \"중복이 많다\"의 근거로 인용하지 말 것 — 얼마나 중복인지는 아직 측정되지 않았고 그 측정이 acceptance ③이다."
+updated: 2026-09-15

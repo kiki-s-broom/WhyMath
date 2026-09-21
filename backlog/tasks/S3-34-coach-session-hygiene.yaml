@@ -15,10 +15,11 @@ requires_gates: []
 acceptance:
   - "새 문제로 진입 시 dialogue가 이전 문제의 turn을 이어받지 않고 새로 시작한다 — 원 브랜치가 발견한 버그(완료 오기록으로 인한 반복/고갈)가 현재 main에서도 재현되는지 먼저 실측 확인 후 수정"
   - "오답 최종답 판정 시 정답 공개 없이 재고를 유도하는 코칭 발화로 전환(일반 소크라테스 반복이 아니라 '이미 답을 시도했다'는 맥락을 반영) — 부정적 정서 강화 표현 금지(CLAUDE.md 교수학 금기)"
+  - "[고립 참조 2026-09-07 stray-code 감사] 구현+테스트가 origin/claude/subject-problems-theory-check-7n9n72(621b11f9 · 커밋 778ea85b)에 done 표기로 보존 — src/mobile/lib/features/chat/application/chat_controller.dart(activeProblemProvider.problemId select-watch로 문제 전환 시 대화 리셋)·src/mobile/test/chat_controller_test.dart, main 부재 실측(select 패턴 main 0 vs 브랜치 1). 착수 시 재구현 말고 파일 단위 회수 우선(통째 머지 금지). 회수 완료 전 원 브랜치 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/coach.py
   - "src/mobile/lib/features/chat/**"
 session: null
-notes: "브랜치 tlthrr의 원 S3-30(문제별 dialogue 리셋 — 완료 오기록으로 인한 대화 반복/고갈 버그 수정)·S3-31(오답 최종답 피드백) 재작성. S3-32 완료 신호에 의존.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "브랜치 tlthrr의 원 S3-30(문제별 dialogue 리셋 — 완료 오기록으로 인한 대화 반복/고갈 버그 수정)·S3-31(오답 최종답 피드백) 재작성. S3-32 완료 신호에 의존.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] 7n9n72 브랜치 단위 소유자였던 HARN-37이 done(#962)이 되어 잔여 좌석의 명시 참조가 끊김 — 2026-09-07 미머지 브랜치 감사(docs/reviews/unmerged_branch_audit_2026-09-07.md)가 좌석 태스크 본문에 고립 참조를 부착"
+updated: 2026-09-07

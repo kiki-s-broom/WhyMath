@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-15
+title: Misconception remediation strategy 카탈로그 분리
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - misconception_remediation 스키마/ORM/마이그레이션 추가
+  - intervene.py 하드코딩 전략 1개 이상 카탈로그 레코드로 전환
+  - L4 개입이 카탈로그를 조회하도록 어댑터 추가
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/intervene.py
+  - src/backend/whymath_backend/db/models/misconception_remediation.py
+session: null
+notes: "검토 문서 §20-21·§46 반영. 직접 교정 금지 원칙 유지.\n\n[정정 2026-09-12] eos_priority null → P3: PR #893 회수 시점 백필 — remediation strategy 카탈로그 분리는 콘텐츠 확장 성격의 장기 과제, P3"
+updated: 2026-09-12

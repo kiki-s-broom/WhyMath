@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-70-dep-declaration-hangul-particle-blindspot
+title: "의존 선언 감사(HARN-52)의 한글 조사 사각 — 태스크 ID 뒤에 조사가 직결되면(EOS-54가·EOS-49의) _REF_RE의 후행 \\b가 경계를 못 잡아 선언이 보이지 않는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정: scripts/harness/dep_declaration.py의 _REF_RE(\\b([A-Z][A-Z0-9]{1,7}-\\d{1,3})\\b)가 'EOS-54 착지 후'는 잡고 'EOS-54가 착지한 후'·'EOS-54를 선행으로'·'EOS-49의 버전 테이블'은 0건 매치임을 테스트로 고정한다(파이썬 \\w가 한글을 단어문자로 보므로 숫자↔한글 사이는 경계가 아니다). notes는 한국어라 조사 직결 표기가 기본형이므로 감사 결과가 표기 우연(따옴표·공백 유무)에 좌우된다"
+  - "② 정정: 후행 경계를 ASCII 부정 전방탐색((?![A-Za-z0-9-]))로 바꿔 조사 직결 표기도 참조로 잡는다. 선행 경계도 같은 원리로 검토하고 판정을 적는다(한글 직전 표기는 드물지만 존재 여부 실측)"
+  - "③ 변별력 양방향: tests/harness/test_dep_declaration.py에 조사 직결 6형(가·를·의·는·이·로) 검출 + 비참조 표기(PR #946·v1.2-3·ISO-8601 등) 비검출을 고정하고, 경계를 \\b로 되돌리는 뮤테이션에서 RED를 실측해 기록한다"
+  - "④ 베이스라인 재산출: 정정 후 apply_exemptions=False 전건 조회로 새로 드러나는 위반 수를 적는다. 신규 위반은 LEGACY_EXEMPT에 넣지 않고(만료 없는 유예 금지) 각 태스크에 amend --depends 또는 notes 표현 정정으로 해소하며, 하드/소프트 판정이 필요한 건은 HARN-53 분류로 넘긴다"
+artifacts: []
+paths:
+  - scripts/harness/dep_declaration.py
+  - tests/harness/test_dep_declaration.py
+session: null
+notes: "사고 경위(2026-09-06 PR #994): /drive 세션이 EOS-50에 amend --reason으로 붙인 문장 안에서 따옴표 경계가 있는 'EOS-49'는'과 공백 경계가 있는 'HARN-53 분류'는 감사에 잡혔고, 같은 문장의 'EOS-49의'·'EOS-49가'는 잡히지 않았다 — 즉 CI red 자체는 옳았지만 판정이 표기 우연에 좌우됨이 함께 드러났다. EOS-50 원 notes의 'ARCH-31 또는 EOS-49의 버전 테이블 실체화' 문구에서 EOS-49가 한 번도 위반으로 잡히지 않은 이유도 이것이다(ARCH-31만 LEGACY_EXEMPT에 있는 상태로 main이 green이었다). 보호 장치 실패 주입 검증 규칙(CLAUDE.md 2026-09-01)의 '금지 패턴 열거 대신 산출물 검사' 축 — 탐지기가 정상 입력 일부에서만 초록인 상태. 우선순위 3: 감사 자체는 작동 중이고 사각은 누락 방향(오탐 아님)이라 즉시 위험은 낮다. 번호는 CLI 제안(HARN-68은 원격 브랜치 claude/entity-model-freeze-lji37v가 선점)"
+updated: 2026-09-06

@@ -120,7 +120,7 @@ def dump_task(task: Task) -> str:
 
 def dump_gates(gates: list[Gate]) -> str:
     lines = [
-        "# 사람 게이트 대장 — clear는 evidence 필수 (backlog.py gates clear <id> --evidence ...)",
+        "# 사람 게이트 대장 — clear는 evidence 필수 · 사람이 직접 닫으면 --as <담당자>(HARN-60)",
         "gates:",
     ]
     for gate in gates:
@@ -437,6 +437,21 @@ def detect_cycle(backlog: Backlog) -> list[str]:
     return sorted(tid for tid, deg in indegree.items() if deg > 0)
 
 
+def _trigger_declaration_errors(backlog: Backlog) -> list[str]:
+    """acceptance의 미래 트리거가 depends_on·requires_gates로 집행되는지 (HARN-72).
+
+    `dep_declaration`(notes의 선행 축)과 짝을 이루는 acceptance 축이다. 지연 import인 이유는
+    `store`가 최상단에서 형제 모듈을 끌어오지 않는 기존 구성을 유지하기 위함이며,
+    `dep_declaration`이 별도 subcommand로 사는 것과 달리 이쪽은 `validate_backlog`에 들어와
+    **`add`와 `validate` 양쪽이 한 번에 집행**된다(별도 CI 스텝을 늘리지 않는다).
+    """
+    from trigger_declaration import find_untriggered_tracking_tasks
+
+    if not backlog.tasks:
+        return []  # 빈 백로그는 상위 스키마 검사가 이미 잡는다 — 여기서 중복 실패시키지 않는다
+    return [f.render() for f in find_untriggered_tracking_tasks(backlog.tasks)]
+
+
 def validate_backlog(backlog: Backlog, schema_errors: list[str] | None = None) -> list[str]:
     """전체 무결성 검증 — 위반 목록 반환 (빈 리스트 = green)."""
     errors: list[str] = list(schema_errors or [])
@@ -478,6 +493,10 @@ def validate_backlog(backlog: Backlog, schema_errors: list[str] | None = None) -
     cycle = detect_cycle(backlog)
     if cycle:
         errors.append(f"depends_on 순환 참조 검출: {cycle}")
+
+    # HARN-72 — 산문에만 적힌 미래 트리거를 대장이 집행하게 한다
+    # (selector는 acceptance를 읽지 않는다 — depends_on·requires_gates만 본다)
+    errors.extend(_trigger_declaration_errors(backlog))
 
     errors.extend(_id_number_collisions(backlog.tasks.keys()))
     errors.extend(_eos_priority_grandfather_errors(backlog))
@@ -529,6 +548,12 @@ def _eos_priority_grandfather_errors(backlog: Backlog) -> list[str]:
 # 모두 **병렬 세션이 서로의 브랜치를 못 봐서** 났다 — 로컬 백로그만 보는 검사로는 애초에
 # 예방할 수 없다. 그래서 예방의 본체는 `add` 시점의 *원격 claim 대장* 조회이고(backlog.py),
 # 이 함수는 머지 후 잔존을 막는 2선 방어다.
+# ⚠ **이 표에는 CLI 쓰기 경로가 없다 (HARN-100 실측 2026-09-12)** — `scripts/` 전체에서
+# 이 상수를 참조하는 곳은 이 파일뿐이고, 등재하려면 이 소스를 직접 고치는 수밖에 없다.
+# "대장 손편집 금지" 원칙과 어긋나 보이지만 의도적이다: 그랜드파더는 *번호 충돌을 영구히
+# 면제*하는 결정이라 코드 리뷰를 반드시 거쳐야 하고, CLI로 열면 리뷰 없이 게이트를 끄는
+# 길이 생긴다. 대신 **개명이 가능한 경우에는 이 표를 쓰지 않는다** — `backlog.py rename`
+# 이 그 경로다(HARN-100). 이 표는 양쪽이 이미 머지돼 개명이 불가능할 때만 쓴다.
 _GRANDFATHERED_ID_NUMBERS: dict[str, str] = {
     # 이미 main에 머지된 과거 충돌 — 개명하면 MEMORY·커밋·PR의 기존 참조가 끊긴다.
     "ARCH-13": (
@@ -574,7 +599,9 @@ def _id_number_collisions(task_ids: object) -> list[str]:
             continue
         errors.append(
             f"태스크 ID 번호 충돌 '{number}': {sorted(ids)} — 사람·문서·커밋의 "
-            f"'{number}' 참조가 결정 불가가 된다. 하나를 다음 빈 번호로 개명하거나, "
-            "이미 머지돼 개명이 불가능하면 store._GRANDFATHERED_ID_NUMBERS에 사유와 함께 등재하라."
+            f"'{number}' 참조가 결정 불가가 된다. 미머지인 쪽을 개명하라: "
+            f"`backlog.py rename <구 full-id> <새 full-id> --reason ...`(HARN-100). "
+            "양쪽이 이미 머지돼 개명이 불가능할 때만 "
+            "store._GRANDFATHERED_ID_NUMBERS에 사유와 함께 등재한다."
         )
     return errors

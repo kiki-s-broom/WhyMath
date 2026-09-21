@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-125-claim-denial-visibility-gap
+title: "claim 거부 후 정보 공백 — 막힌 세션이 진행 중인 작업을 볼 수 없어 축을 쪼개 우회한다"
+track: math-completion
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 사고 실측 — 2026-09-19 지시문 `P-15`(페르소나 3종 안정화)를 두 세션이 병렬 집행해 하네스 1종(787줄)이 통째로 폐기됐다. 경위는 크로스워크 §11.6과 판정문 `docs/reviews/p15_diagnosis_confirmation_and_study_entry_gap_2026-09-19.md` §0에 있다. 핵심은 **claim 대장이 제 일을 했다는 것**이다 — 세션 A가 `2026-09-19T14:07:55Z`에 `PED-36`을 원격 claim했고, 25초 뒤 세션 B의 `backlog.py start`가 exit 1로 **정상 거부**됐다.\n\n② 그래서 결함은 *충돌 탐지*가 아니라 **차단 이후의 가시성**이다 — 거부당한 세션 B는 \"저쪽이 이 태스크로 무엇을 하는 중인지\"를 알 방법이 없었다. 세션 A의 브랜치가 아직 push되지 않아 작업 범위를 읽을 수 없었고, claim 대장이 주는 정보는 브랜치 이름과 시각뿐이다. 착수 순서 규칙(claim 전 코드 열람 금지)상 그 태스크 위에서 진행할 수도 없다. B에게 남은 선택지는 ⓐ무기한 대기 ⓑ다른 일 ⓒ**축을 쪼개 우회**뿐이었고, ⓒ가 선택됐다(`EOS-120` ③의 (다)안 · Kiki 판정). 판정 자체는 그 시점 정보로는 합리적이었다 — 정보가 없었던 것이 문제다.\n\n③ 3회차이되 원인이 다르다 — `OPS-07`(2026-07-27 · 735줄 폐기)은 claim push가 상시 403으로 실패한 **장치 고장**, `MP-04`(2026-09-06)는 claim 자체를 안 한 **순서 위반**이었다. 이번은 **양쪽 다 규약을 지켰는데도** 발생했다. 그러므로 사람 규율(규칙 문장)로는 막히지 않는다 — 텍스트 규칙 2회 실패 후 코드 착지 선례가 적용되는 자리다.\n\n④ 처분 후보 3택(이 태스크가 근거와 함께 고른다) — (가) **claim에 작업 범위 메타를 싣는다**: `start` 시점에 태스크의 `paths`와 한 줄 의도를 claim ref에 함께 기록해, 거부당한 세션이 `backlog.py claims --verbose`만으로 \"무엇이 진행 중인지\"를 읽게 한다(브랜치 push 불요) (나) **거부 시 안내를 행동 가능하게 만든다**: 현재 exit 1 메시지는 브랜치명·시각뿐이다. 여기에 \"이 태스크의 축을 쪼개려면 `EOS-120` 선례처럼 먼저 소유자에게 확인하라 / 대기하려면 이 명령\" 같은 다음 행동을 붙인다 (다) **지시문 항목(P-xx) 단위 네임스페이스**: 태스크 id가 아니라 *작업 단위*로도 claim을 걸어, 축을 쪼개 신규 등재해도 같은 지시문이면 충돌이 잡히게 한다. (다)가 가장 근본적이나 지시문 항목이 있는 작업(계획서 집행)에만 적용된다 — 일반 태스크에는 (가)+(나)가 필요하다.\n\n⑤ 선행 실측 — 처분 전에 두 가지를 확인한다: ⓐ `refs/claims/*`에 메타데이터를 실을 수 있는가(현재 형식·크기 제약·`HARN-09`가 `refs/heads/claims/*`로 우회한 경위) ⓑ 거부 경로(`backlog.py start`의 exit 1 분기)가 실제로 어떤 정보를 갖고 있는가. (가)는 ⓐ가 막히면 성립하지 않는다.\n\n⑥ 집행 지점 별항(정본화≠집행) — 무엇을 고르든 **거부당한 세션이 실제로 그 정보를 받는지**를 확인하는 것까지가 완료다. 합성 충돌(태스크 하나를 두 세션 이름으로 claim)을 주입해 거부 출력에 새 정보가 실제로 실리는지 본다. \"코드에 넣었다\"와 \"거부 화면에 보인다\"는 다르다.\n\n⑦ 범위 밖 — 번호 충돌(`HARN-10`·done)·미머지 done 가시성(`HARN-11`)·고립 브랜치 탐지(`HARN-13`)·설계 문서 중복 탐지(`HARN-14`·done)는 각각 다른 축이다. 이 태스크는 **claim이 거부된 직후의 정보 공백** 하나만 다룬다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+  - docs/standards/build_harness.md
+session: null
+notes: "출처: 2026-09-19 P-15 병렬 중복 실측(PR #1228 판정문 §0 · 크로스워크 §11.6). CLAUDE.md 「실수 관리」 의무 — 동일 유형 3회차이므로 재발방지 등재 대상이다. 다만 앞의 두 회차(OPS-07·MP-04)와 원인이 달라 그 대책들이 이번을 막지 못했다는 점을 acceptance ③에 명시했다. Kiki가 2026-09-21 등재 지시. 분류 SUPPORT(루프 기능이 아니라 개발 하네스 축).\n\n정정 이력: 이 사고의 최초 기록(PR #1228 판정문 초판)은 원인을 \"claim 대장이 충돌을 보지 못했다\"로 적었으나 **틀렸다** — 대장은 충돌을 보고 exit 1로 막았다. 같은 PR 후속으로 그 문장을 정정했고 이 태스크가 정확한 축(차단 이후 가시성)을 소유한다.\n\n[정정 2026-09-21] paths ['scripts/harness/backlog.py', 'scripts/harness/claims.py', 'docs/standards/build_harness.md'] → ['scripts/harness/backlog.py', 'scripts/harness/remote_claims.py', 'docs/standards/build_harness.md']: paths 정정 — scripts/harness/claims.py는 실재하지 않는다(실제 파일은 remote_claims.py). 존재하지 않는 경로는 겹침 탐지에서 미탐이 된다\npaths 제거 1건: ['scripts/harness/claims.py']\n\n[개명 2026-09-21] HARN-124-claim-denial-visibility-gap → HARN-125-claim-denial-visibility-gap: 번호 충돌 해소 — PR #1239가 main에 HARN-124-gate-title-correction-path를 먼저 착지시켰다(머지 83603c81). 이쪽은 미머지였으므로 이동 비용이 낮은 쪽(이쪽)을 옮긴다. 번호는 CLI 제안(HARN-125)을 그대로 받았다 — 손추론 금지. 동일 유형 5회차이며 축 소유자는 HARN-111."
+updated: 2026-09-21

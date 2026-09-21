@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-63-required-checks-live-drift-detection
+title: "브랜치 보호 required check의 **라이브 설정** 드리프트 탐지 — 문서·ci.yml 대조만으로는 3회차 사고를 못 막는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 드리프트 탐지기 신설 — 'gh api repos/doldori7/WhyMath/rules/branches/main' 출력(JSON)을 입력으로 받아 문서 REQUIRED_CHECKS 블록과 대조하고 exit 0/1로 판정하는 CLI를 만든다. **입력은 파일 경로로 받는다** — 샌드박스·CI에는 관리자 토큰이 없어 스스로 조회할 수 없다(2026-07-26 문서가 'Resource not accessible by integration' 실측 기록). 조회는 Kiki가, 판정은 기계가 한다는 분업이 이 태스크의 설계 전제다"
+  - "② strict 정책·승인 수도 함께 대조 — required_status_checks 목록뿐 아니라 strict_required_status_checks_policy·required_approving_review_count·dismiss_stale_reviews_on_push·require_code_owner_review를 문서 선언과 대조한다. 2026-09-03 실측에서 승인 수도 어긋나 있었다(문서 '최소 1명' vs 라이브 0). 체크 목록만 보면 이 축을 놓친다"
+  - "③ 변별력 실측 — 정상 JSON에서 exit 0, **결함 주입 JSON**(체크 1건 제거·strict를 false로·승인 수 0으로) 각각에서 exit 1임을 테스트로 동결한다. 정상 입력에서만 초록인 탐지기는 탐지기가 아니다(CLAUDE.md 2026-09-01). 특히 빈 목록·빈 JSON·필드 부재에서 '위반 0 통과'가 되지 않는지 확인한다"
+  - "④ 실행 리듬 배선 — 이 탐지기가 *언제* 돌지 정한다. CI가 스스로 조회할 수 없으므로 자동 상시 실행이 불가능하다는 것이 정직한 제약이다. 후보: SessionStart 브리핑에 '마지막 룰셋 확인일 N일 경과' 리마인드 / 사람 게이트로 분기 1회 / done 게이트에 부착. 어느 것이든 '만들었지만 아무도 안 돌린다'가 되지 않게 집행 지점을 acceptance와 별항으로 명시한다"
+  - "⑤ 문서 정정 — branch-protection-setup.md에 2026-09-03 재발 사실을 기록한다. **라이브에 맞춰 문서를 낮추지 않는다** — 문서는 의도이고 라이브가 결함이다. 또한 '이 토큰으로 API 접근 불가' 기술을 정정한다: Kiki 토큰의 gh api로는 읽기가 실제로 된다(2026-09-03 실측)"
+  - "⑥ 중복·소스 pin 축 처리 — 2026-09-03 시정에서 6건이 중복 등록됐다(라이브 항목 22·고유 16). 비교기는 **개수가 아니라 집합**으로 대조해야 한다(개수 대조는 정상 상태를 위반으로 오판한다). 더불어 각 항목의 integration_id를 본다: 한쪽만 GitHub Actions(15368)로 pin되고 다른 한쪽이 unpinned면 그 항목은 *어느 앱이든* 같은 컨텍스트 이름으로 보고하면 충족된다 — 이름만 같으면 통과하는 좌석이 생기는 것이라 위장 경로다. 중복 자체는 막는 힘을 약화시키지 않으므로 정리는 권고 수준으로 판정하되, unpinned 항목은 위반으로 판정한다"
+  - "⑦ 판정 등급 분리 — unpinned 항목을 일괄 '삭제 대상'으로 다루면 안 된다. 2026-09-03 실측에서 concept-reach는 **unpinned 항목만 존재**했다(pin된 쌍 없음). 순진하게 unpinned를 제거하면 그 체크가 미강제로 되돌아간다 — 방금 고친 사고의 재생산이다. 탐지기는 세 등급으로 나눠 보고한다: ⓐ pin 항목 0건(=이름만 같으면 충족·**위반**) ⓑ pin+unpin 혼재(unpin 쪽만 제거 권고) ⓒ pin만(정상). 그리고 시정 순서를 출력에 명시한다 — ⓐ는 **pin 항목 추가가 먼저**고 제거는 그다음이다"
+artifacts:
+  - "PR #981 — https://github.com/doldori7/WhyMath/pull/981 (commit dbd5d47d)"
+paths:
+  - "scripts/harness/**"
+  - "tests/infra/**"
+  - ".github/**"
+session: null
+notes: "발견 경위(2026-09-03): HARN-56 acceptance ①(룰셋 실측)을 Kiki가 실행하자 부수적으로 드러났다. 라이브 required_status_checks가 **6건**인데 문서 REQUIRED_CHECKS 블록은 **16건**을 선언한다 — 미강제 10건: changes / **backend — lint·type·test** / mobile / concept-reach / web / **infra-contracts** / docker-build / **harness-integrity** / declared-unwired-audit / corpus-authoring. 승인 축도 어긋난다(문서 '최소 1명·stale dismiss·CODEOWNERS' vs 라이브 required_approving_review_count=0·dismiss_stale=false·code_owner=false). strict_required_status_checks_policy=true·required_review_thread_resolution=true·required_linear_history=true는 문서와 정합.\n\n**같은 계급 3회차다.** (1)2026-07-26: 문서가 3종만 나열하고 backend lint 누락 → PR #606이 1 failed로 머지·main red. (2)같은 실측에서 그 3종조차 enforcement_level=off·checks=[]로 통째 미강제(OPS-08). (3)이번. 매번 같은 잡(backend — lint·type·test)이 빠진다.\n\n**왜 기존 방어가 못 잡았나 — 이것이 이 태스크의 핵심**: test_required_checks_doc.py는 '문서 ↔ ci.yml'을 동결한다. 두 축 다 **저장소 안**이다. 라이브 GitHub 설정은 저장소 밖이라 어떤 테스트도 보지 않는다. 즉 문서가 완벽하고 ci.yml이 완벽해도 **설정이 비어 있으면 전부 통과**한다 — CLAUDE.md '검증 장치를 만들고 배선 확인 없이 완료 선언 금지'의 저장소 경계 밖 변형이다.\n\n**새 사실**: 문서는 'Branch Protection API는 이 토큰으로 접근 불가(Resource not accessible by integration)'로 기록하나, **Kiki 토큰의 gh api repos/.../rules/branches/main 은 EXIT=0으로 읽힌다**(2026-09-03 실측). 즉 자동 탐지의 읽기 경로가 존재한다 — 다만 그 토큰이 CI에 없으므로 '조회는 사람·판정은 기계' 분업이 현실적 설계다.\n\n시정 자체(체크 10건 등록·승인 수)는 게이트 G-required-checks-live-drift-fix[kiki]. 이 태스크는 **재발 탐지**를 소유한다 — 시정만 하면 4회차가 온다.\n\nHARN-56과의 관계: merge queue가 검증할 체크 집합은 라이브 required 집합이다. 지금 켜면 큐가 **6건만** 검증한다. HARN-56 (2)는 시정 후의 16건을 기준으로 해야 한다.\n\n[정정 2026-09-03] 2026-09-03 시정 실행에서 드러난 두 축 편입 — 중복 등록(집합 대조 필요)과 integration_id pin 여부(이름만 같으면 충족되는 좌석). 둘 다 시정 *직후* 상태에 실재하므로 탐지기가 처음부터 다뤄야 한다.\n\n[정정 2026-09-03] 2026-09-03 integration_id 실측: unpinned 7건 중 6건은 pin된 쌍이 있으나 concept-reach는 없다. '중복 제거'로 뭉뚱그리면 미강제 재발을 만든다 — 등급 분리와 시정 순서가 탐지기 출력에 있어야 한다."
+updated: 2026-09-05

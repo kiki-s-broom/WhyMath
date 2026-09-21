@@ -70,6 +70,7 @@ def _get(path: str) -> object:
     cmd = [
         "curl",
         "-sS",
+        "-L",  # 이관 리다이렉트 추종 — 301 본문을 데이터로 오독하지 않기 위해
         "--max-time",
         str(TIMEOUT),
         *_ca_args(),

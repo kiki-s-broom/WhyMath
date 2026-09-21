@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
-from data_pipeline.concept_content.models import (
-    LICENSE_NOTICE,
-    SOURCE_CITATION,
-    ConceptContent,
-    Flashcard,
+from data_pipeline.concept_content.models import ConceptContent, Flashcard
+from data_pipeline.concept_content.ncic_overlap import (
+    build_license_notice,
+    build_source_citation,
+    load_standard_statements,
+    measure_overlap,
 )
 from data_pipeline.concept_content.validate import validate_content
 from pydantic import ValidationError
@@ -87,8 +91,58 @@ class TestValidate:
         assert report.flashcard_count == 1
 
 
-def test_self_authored_license() -> None:
-    assert "자체" in SOURCE_CITATION
-    assert "학생 비노출" in LICENSE_NOTICE and "검수필요" in LICENSE_NOTICE
-    # NCIC 본문 미수록·코드만 보존 표기.
-    assert "미수록" in LICENSE_NOTICE
+# 선언은 상수가 아니라 **빌드 시점 실측으로 합성**된다(`ncic_overlap`). 커밋된 코퍼스만 고치고
+# 생성원을 놔두면 다음 재생성에서 옛 선언이 소리 없이 돌아온다 — 2026-09-06 정정에서 실제로
+# 드러난 드리프트 경로다. 그래서 여기서 동결하는 것은 "선언이 옳다"가 아니라
+# "**생성원이 산출물을 재현한다**"이다(집행 지점 분리).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_CORPUS = _REPO_ROOT / "data" / "corpus" / "concept_content_v1" / "content.json"
+_SIDECAR = _REPO_ROOT / "data" / "corpus" / "concept_content_v1" / "_provenance.json"
+_STANDARDS = _REPO_ROOT / "data" / "corpus" / "standards_v1" / "standards.json"
+
+
+def _measured_from_committed():
+    committed = json.loads(_CORPUS.read_text(encoding="utf-8"))
+    return committed, measure_overlap(
+        [(c.get("explanation") or "", c.get("standard_codes") or []) for c in committed["content"]],
+        load_standard_statements(_STANDARDS),
+    )
+
+
+def test_builders_reproduce_committed_corpus() -> None:
+    """생성원 ↔ 산출물 — 커밋된 코퍼스를 빌더가 그대로 재현해야 한다."""
+    committed, overlap = _measured_from_committed()
+    assert committed["source_citation"] == build_source_citation(overlap), (
+        "커밋된 코퍼스의 source_citation을 빌더가 재현하지 못한다 — 재생성하면 코퍼스 선언이 "
+        "조용히 바뀐다. 코퍼스를 다시 생성하거나 빌더를 맞춰라."
+    )
+    assert committed["license_notice"] == build_license_notice(
+        overlap
+    ), "커밋된 코퍼스의 license_notice를 빌더가 재현하지 못한다 — 위와 같은 이유로 red."
+
+
+def test_sidecar_records_measured_overlap() -> None:
+    """사이드카의 기계 판독 실측치가 지금 측정한 값과 같아야 한다."""
+    _, overlap = _measured_from_committed()
+    declared = json.loads(_SIDECAR.read_text(encoding="utf-8"))["ncic_statement_overlap"]
+    assert (declared["count"], declared["exact_after_normalization"]) == (
+        overlap.count,
+        overlap.exact,
+    ), "사이드카 실측치가 재측정과 다르다 — 코퍼스를 재생성했다면 사이드카도 함께 갱신하라."
+
+
+def test_declaration_states_attribution_when_overlap_exists() -> None:
+    """겹침이 있으면 출처 표시를 담고, 거짓이 된 '미수록' 주장은 담지 않는다.
+
+    공공누리 제1유형의 유일한 조건이 출처 표시다. 겹침이 0으로 내려가면 이 축은 해제된다 —
+    그때는 출처 표시가 오히려 사실이 아니게 되므로 빌더가 다른 문장을 만든다(아래 대칭 테스트).
+    """
+    _, overlap = _measured_from_committed()
+    if overlap.count == 0:
+        pytest.skip("겹침 0건 — 출처 표시 의무가 발생하지 않는다")
+    notice = build_license_notice(overlap)
+    assert "미수록" not in notice
+    for marker in ("NCIC", "교육부 고시 제2022-33호", "공공누리"):
+        assert marker in notice, f"출처 표시에 '{marker}' 누락"
+    assert "자체" in build_source_citation(overlap)
+    assert "학생 비노출" in notice and "검수필요" in notice

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,10 +15,11 @@ acceptance:
   - "① qa_confusion_matrix의 fn_by_failure_code·golden_by_failure_code 키를 code.value(F1)로 정정 — JSON 산출 계약에 파이썬 repr이 새면 소비자가 전부 파싱 우회를 갖는다"
   - "② 소비자 정합: validation_scorecard._normalize_code_key의 repr 수용 분기를 제거할 수 있는지 확인하고, 남긴다면 왜 남기는지(구버전 산출물 호환) 근거를 코드에 적는다"
   - "③ 집행: 키 형식을 테스트로 동결한다(생산자 쪽 test_qa_confusion_matrix + 소비자 쪽 어댑터 테스트 양쪽)"
-artifacts: []
+artifacts:
+  - "PR #994 (https://github.com/doldori7/WhyMath/pull/994) · 커밋 095a86a5(구현+테스트+MEMORY) · ruff/black exit 0 · mypy --strict 639파일 clean · 대상 3파일 137 passed · 전체 스위트 11868 passed·323 skipped·1 xfailed·0 failed(CI 동일 -m/-n/--dist, data-pipeline 설치 포함) · 뮤테이션 3종 전건 검출(생산자 str 회귀→신규 3건만 RED·기존 33 green = 기존 변별력 0 실증 / 소비자 거부 무력화→1 RED / digest str 회귀→1 RED, cp 원복 md5 동일) · 등재 전제 정정: 활성 아닌 잠복 결함(use_enum_values가 가림) + 같은 뿌리의 digest 취약 동반 정정"
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/ops/**"
 session: null
 notes: "출처: PR #953(EOS-61) 구현 중 실측. str(GenerationFailureCode.F1) == 'GenerationFailureCode.F1'이라 JSON 키가 파이썬 repr이 된다. EOS-61 어댑터는 양쪽 표기를 받는 우회로 대응했고(생산자는 EOS-60 소유라 그 PR에서 안 건드림), 이 태스크가 그 우회의 추적 축이다. 같은 축을 hit_cu_metrics는 code.value로 써서 두 생산자의 표기가 갈라져 있다.\n\n[정정 2026-09-01] eos_priority null → P1: QA 혼동행렬 키 오염 — 내용 KPI 산출 정합. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-06

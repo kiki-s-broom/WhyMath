@@ -94,11 +94,26 @@ dev = [
     # 백엔드 CI 4스텝(ruff·black·mypy·pytest)을 동일 floor·동일 도구로 핀해
     # data-pipeline과 재현성을 일치시킨다. 다음 메이저는 재검증 후 상한을 올린다.
     "pytest>=8.3.3,<10",
-    # 상한 재검증 2026-07-30(ARCH-22): 무상한 pin이 명시 테스트 경로 인자 invocation에서
-    # asyncio_mode 미적용(strict 폴백)을 유발할 수 있음을 로컬에서 관측했으나, 실 CI(bare
-    # `pytest` invocation·PR #648 run 30528307807)에서는 1.4.0도 정상 green — 활성 장애는
-    # 아니었다. 현재 검증된 1.x 계열(1.4.0)에 상한만 걸어 미검증 차기 메이저(2.x) 드리프트를
-    # 예방한다(langfuse>=2.50,<5 선례 동형).
+    # 상한은 미검증 차기 메이저(2.x) 드리프트 예방 목적으로 유지한다(langfuse>=2.50,<5 동형).
+    #
+    # ⚠ 원인 정정 2026-09-06(OPS-61 — ARCH-22 관측의 2회차): ARCH-22(2026-07-30)는 명시 테스트
+    # 경로 invocation에서 asyncio_mode가 미적용(strict 폴백)되는 현상을 **"무상한 pin"** 탓으로
+    # 적었다. **그 진단은 틀렸다 — 실제 원인은 pin이 아니라 `rootdir` 해석이다.**
+    #
+    # `src/backend`에서 `pytest ../../tests/backend/...`처럼 **명시 경로**를 주면 pytest가 인자의
+    # 공통조상을 상향 탐색해 **저장소 루트의 `pyproject.toml`을 rootdir 앵커로 잡는다**. 루트
+    # `pyproject.toml`에는 `[tool.pytest.ini_options]`가 없으므로 이 파일의 `asyncio_mode = "auto"`
+    # 가 **읽히지 않고** strict로 폴백하며, 그 결과 `async def` 테스트가 전부 실패한다.
+    #
+    # 실측(2026-09-06·pytest-asyncio 1.x):
+    #     bare     → rootdir=src/backend        · inifile=src/backend/pyproject.toml · mode='auto'
+    #     명시 경로 → rootdir=<저장소 루트>       · inifile=<루트>/pyproject.toml       · mode='strict'
+    # 즉 **pin 버전과 무관**하며 상한을 올려도 내려도 재현된다. 2026-09-05 전체 스위트 730 실패 중
+    # 718건(98.4%)이 이 형태였고, CI(bare `pytest`)는 같은 커밋에서 11,727 passed·0 failed였다.
+    #
+    # 함정 자체는 `tests/backend/conftest.py`의 `pytest_configure` 가드가 **1건의 즉시 실패**로
+    # 바꾼다 — 718건의 혼란 대신 원인을 지목하는 UsageError 하나. 이 주석은 *왜 그 가드가 있는지*의
+    # 근거이며, 가드를 지우려면 이 문단도 함께 지워야 한다(둘 중 하나만 남으면 다음 사람이 또 밟는다).
     "pytest-asyncio>=0.24.0,<2",
     "pytest-cov>=5.0.0",
     # pytest-randomly — 매 실행 테스트 순서를 섞어 *순서 의존*을 조기·반복 노출한다(OPS-09).
@@ -199,6 +214,9 @@ warn_required_dynamic_aliases = true
 # privacy는 횡단 인프라다. `lint-imports`(CI lint 잡)가 위반을 차단한다.
 [tool.importlinter]
 root_package = "whymath_backend"
+# ARCH-48: 외부 패키지(`sqlalchemy`)를 forbidden 대상으로 쓰려면 필수다. 기존 3계약의 판정은
+# 바뀌지 않는다(전부 whymath_backend 내부 간선만 본다 — 도입 전후 KEPT 동일, 실측 2026-09-16).
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "7계층 단방향 (L_n → L_{n-1}, 역방향 금지)"
@@ -213,25 +231,28 @@ layers = [
     "whymath_backend.l1",
     "whymath_backend.schema",
 ]
-# 합성 루트(`whymath_backend.composition`) 경유 체인 — **간선 1건만** 좁게 예외한다.
+# 합성 루트(`whymath_backend.composition`) 경유 면제 — EOS-89가 기존 2건을 0으로 줄였으나
+# **EOS-86이 병행 개발로 신규 1건을 추가해 현재 1건이다** (merge 시 실측 정정 — 두 태스크가
+# 서로를 모르는 채로 같은 구간을 건드렸다).
 #
-# 왜 예외가 필요한가: 합성 루트는 계층 스택 *밖*의 횡단 배선 지점이라(능력 계약과 과목
-# 구현을 잇는 유일한 곳) 정의상 상위 계층을 안다. layers 계약은 간접 체인을 따라가므로
-# `l3.pedagogy.slot_generator -> composition -> l4.subject_adapter_math`를 역방향으로 본다.
+# 히스토리(지우지 않는 이유): EOS-69는 `l3.pedagogy.slot_generator`·`l3.render.adapters`가
+# 합성 루트를 경유해 어댑터에 닿는 간선 2건을 여기 **간선 단위로** 적어 두고 "호출부가 능력을
+# 상류에서 받아 내리면 이 줄도 사라진다"고 남겼다. EOS-89가 그 상류를 만들었다 —
+# 능력은 `create_app`이 `app.state`에 등록하고, 렌더는 어댑터 **생성자 주입**으로, 슬롯 검증은
+# 호출부 파라미터로 내려온다. 그래서 두 간선이 실제로 사라졌고
+# `unmatched_ignore_imports_alerting`(기본 ERROR)이 "이 줄을 지워라"라고 말했다 —
+# 만료가 날짜가 아니라 기계였다는 것의 실증이다.
 #
-# 왜 `-> whymath_backend.composition` 전체를 열지 않는가: 그러면 합성 루트가 **세탁 통로**가
-# 된다 — 어느 Core 모듈이든 이 경유로 어댑터에 닿아도 계약이 침묵한다. 간선 단위로 적어 두면
-# 새 Core→composition 간선이 생기는 즉시 lint-imports가 적색이 되어 *그때마다 판단*을
-# 강요한다. 반대로 이 간선이 사라지면 `unmatched_ignore_imports_alerting`(기본 ERROR)이
-# "이 줄을 지워라"라고 말한다 — 만료가 날짜가 아니라 기계다.
-#
-# 정직한 잔여(EOS-69): `verify_slot_payload`는 이제 능력(`ExpressionEquivalence`)을 **주입받는다**
-# — 타 과목·테스트는 L3를 건드리지 않고 자기 구현을 넣을 수 있다. 남은 것은 *기본 구현 선택*
-# 편의뿐이며, 호출부 4곳(review·example_generator·diag_item_projector·slot_generator 자신)이
-# 능력을 상류에서 받아 내리면 이 줄도 사라진다. 위반이 없어진 게 아니라 **작아졌다**.
+# 다시 열지 말 것: `-> whymath_backend.composition`을 통째로 면제하면 합성 루트가 **세탁 통로**가
+# 된다(어느 Core 모듈이든 이 경유로 어댑터에 닿아도 계약이 침묵). 새 간선이 필요하면 간선
+# 단위로 한 줄씩 적고, `tests/infra/test_eos_dependency_direction.py`의 CORE_PULL_BASELINE도
+# 함께 갱신해야 한다(그 테스트가 면제 줄과 실제 간선의 **정확한 일치**를 양방향으로 잰다).
 ignore_imports = [
-    "whymath_backend.l3.pedagogy.slot_generator -> whymath_backend.composition",
-    "whymath_backend.l3.render.adapters -> whymath_backend.composition",
+    # EOS-86: solution_coaching이 verify_solution 직접 import를 걷어내고 StepChainVerifier
+    # 기본 구현을 합성 루트에서 지연 조회한다(§CORE_PULL_BASELINE — l4.solution_coaching 편입).
+    # EOS-89(slot_generator·render.adapters push 전환)와 별개로 남는 간선이다 — EOS-89는
+    # 이 간선을 몰랐고(병행 개발), 이후 push 전환 여부는 별도 판단 대상이다.
+    "whymath_backend.l4.solution_coaching -> whymath_backend.composition",
 ]
 
 # ──────────────────────────────────────────────────────────────────────
@@ -251,11 +272,18 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "EOS Core → Math Adapter 금지 (baseline 0 — 이미 깨끗한 구역)"
 type = "forbidden"
-# 이 셋은 2026-08-31 실측에서 Adapter 참조가 **0건**이다. 유예 없이 그 상태를 동결한다 —
+# 이 넷은 실측에서 Adapter 참조가 **0건**이다. 유예 없이 그 상태를 동결한다 —
 # 새로 수학을 끌어오면 즉시 적색. `l2`·`l6`는 sympy·수학 어휘도 0건인 구역이다(경계 문서 §3).
+#
+# `lang` 편입(EOS-117 · 2026-09-19): CORE 배정인데 **어느 계약의 source에도 없던** 구역이다.
+# `tests/infra/test_eos_boundary_contract_wiring.py`의 공허 검사(§⑥)가 전수 대조로 찾아냈다 —
+# 종전 §①은 forbidden 쪽만 정확 일치로 동결하고 source 쪽은 "ADAPTER를 넣지 않았는가"만 봐서,
+# CORE 구역을 통째로 빠뜨린 것은 보이지 않았다. 실측: `lang`은 `josa.py` 1개(259줄)이고
+# import가 `re`·`typing` 뿐이라 편입 즉시 KEPT다(빚을 지지 않는 편입).
 source_modules = [
     "whymath_backend.l1",
     "whymath_backend.l2",
+    "whymath_backend.lang",
     "whymath_backend.schema",
 ]
 # 직접 import만 판정한다(간접 체인 제외) — 경계 스캔(`eos_core_adapter_boundary_scan.py`)이
@@ -279,6 +307,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -338,6 +367,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_final_answer",
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
+    "whymath_backend.l4.misconception.answer_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -359,7 +389,15 @@ ignore_imports = [
     "whymath_backend.l4.subject_adapter_math -> whymath_backend.l3.equivalent.rephrase",
     # EOS-28: 형태 판정 능력(AnswerFormVerifier)의 수학 구현이 form_verdict_for에 위임한다.
     "whymath_backend.l4.subject_adapter_math -> whymath_backend.l3.verify_answer_form",
+    # EOS-86: 선택적 능력 6번째(StepChainVerifier)의 수학 구현이 verify_solution에 위임한다.
+    # ADAPTER→ADAPTER라 위반이 아니다(위 5줄과 동형).
+    "whymath_backend.l4.subject_adapter_math -> whymath_backend.l3.verify_solution",
     "whymath_backend.l4.misconception.wrong_form_match -> whymath_backend.l3.symbolic_equivalence",
+    # EOS-104: 오답 서명 검출기(ADAPTER)가 거짓형 정합기(ADAPTER)에 위임한다 — 탐지 알고리즘을
+    # 다시 쓰지 않는 것이 요점이라 이 간선이 곧 "재구현 0"의 증거다. ADAPTER→ADAPTER라 위반이 아니다.
+    "whymath_backend.l4.misconception.answer_signature -> whymath_backend.l4.misconception.wrong_form_match",
+    # 수학 어댑터가 그 검출기를 선택층 능력(AttemptMisconceptionDetector)으로 노출한다.
+    "whymath_backend.l4.subject_adapter_math -> whymath_backend.l4.misconception.answer_signature",
     #   MIXED 출발 (해소 경로 = 모듈 분할. api.verify/speech/ocr는 표면이 중립·페이로드가 수식):
     "whymath_backend.api.verify -> whymath_backend.l3.verify_answer",
     "whymath_backend.api.verify -> whymath_backend.l3.verify_solution",
@@ -367,7 +405,9 @@ ignore_imports = [
     "whymath_backend.api.speech -> whymath_backend.l3.speech",
     "whymath_backend.api.ocr -> whymath_backend.l5.ocr.factory",
     "whymath_backend.api.ocr -> whymath_backend.l5.ocr.pipeline",
-    "whymath_backend.l4.solution_coaching -> whymath_backend.l3.verify_solution",
+    # [EOS-86 상환] l4.solution_coaching -> l3.verify_solution 직접 import는 제거됐다(CORE
+    # 재배정 — 위 BOUNDARY_MAP·경계 문서 참조). 이 줄을 지운다(만료는 날짜가 아니라 기계다 —
+    # 간선이 사라지면 unmatched ignore로 CI가 알려준다).
     "whymath_backend.l4.speech -> whymath_backend.l3.speech",
     #   INFRA 출발 (EOS-69 2차 상환에서 재배정 — 아래 그룹② 주석 참조):
     "whymath_backend.api._ocr_state -> whymath_backend.l5.ocr.factory",
@@ -412,6 +452,43 @@ ignore_imports = [
     # ⚠️ **0은 "아무도 막지 않는 0"이 아니다** — 위 세 계약이 지금 이 목록을 강제한다.
     #    다만 스캔(`eos_core_adapter_boundary_scan.py`)의 0과 이 계약의 0은 *다른 측정*이다:
     #    스캔은 AST 직접 import를, 계약은 체인을 본다. 둘이 어긋나면 스캔이 정본이다.
+]
+
+# ──────────────────────────────────────────────────────────────────────
+# 데이터 접근 계층 (ARCH-48) — 7계층 축·EOS 경계 축과 **또 다른 축**이다.
+#
+# 처분 정본: `docs/architecture/data_access_layer_disposition.md`
+# 계측·baseline: `scripts/analysis/data_access_layer_audit.py` (`CLEAN_LAYERS`가 아래 목록의 정본)
+# 정합 동결:    `tests/infra/test_data_access_layer_contract.py`
+#
+# 왜 앞의 두 축으로 부족한가: 7계층 계약은 `l6 -> l1` 같은 *계층 간 방향*을 보고, EOS 계약은
+# Core가 수학 어댑터를 아는지를 본다. 둘 다 "이 모듈이 DB를 직접 잡는가"를 표현하지 못한다.
+#
+# **한계(명시)**: import-linter는 import 그래프 도구라 `session.execute(...)` 같은 **메서드 호출**
+# 을 볼 수 없다. 그래서 이 계약이 막는 것은 *아직 sqlalchemy를 한 줄도 안 쓴* 4계층이 그것을
+# 끌어오기 시작하는 순간뿐이다. 이미 잡고 있는 118파일(호출 축)은
+# `tests/infra/test_data_access_layer_contract.py`가 집합으로 동결한다 — 두 장치는 상보다.
+# ──────────────────────────────────────────────────────────────────────
+
+[[tool.importlinter.contracts]]
+name = "데이터 접근 금지 (baseline 0 — 아직 DB를 모르는 구역)"
+type = "forbidden"
+# 2026-09-16 실측(main 0f12e76a): 이 넷은 sqlalchemy import 0건 · `whymath_backend.db` import
+# 0건 · 세션 호출 0건이다(74파일). 유예 없이 그 상태를 동결한다 — 새로 DB를 끌어오면 즉시 적색.
+# `schema`는 Pydantic 계약, `lang`은 한국어 처리, `l5`는 상호작용, `l6`은 응용 모드다.
+source_modules = [
+    "whymath_backend.schema",
+    "whymath_backend.lang",
+    "whymath_backend.l5",
+    "whymath_backend.l6",
+]
+# 직접 import만 판정한다 — EOS 계약과 같은 이유다(스캔이 AST 직접 import를 세므로 계약과
+# 문서가 서로 다른 숫자를 말하지 않게 한다). 경유 의존(`l6 -> l4 -> session`)은 잡지 않으며,
+# 그 축은 호출 축 가드가 파일 단위로 본다.
+allow_indirect_imports = true
+forbidden_modules = [
+    "sqlalchemy",
+    "whymath_backend.db",
 ]
 
 # ──────────────────────────────────────────────────────────────────────

@@ -31,6 +31,10 @@ from typing import Annotated
 
 import typer
 
+from data_pipeline.atom_graph.behavior_skills_merge import (
+    append_provenance,
+    run_behavior_skills_merge,
+)
 from data_pipeline.atom_graph.extract import ExtractError, extract_workbook
 from data_pipeline.atom_graph.models import SOURCE_CITATION, AtomConcept, AtomEdge
 from data_pipeline.atom_graph.transform import TransformResult, transform_dataset
@@ -271,6 +275,108 @@ def load(
         "[멱등] MERGE 기반 — 재실행해도 노드·엣지 수 불변. "
         f"노드 {report.nodes_merged}개·엣지 {report.edges_merged}개."
     )
+
+
+def _resolve_merge_targets(graph: Path, output_dir: Path | None) -> tuple[Path, Path]:
+    """`merge-behavior-skills` 저장 대상 결정 — 생략 시 `--graph` 경로에 in-place.
+
+    `--output-dir` 지정 시 원본을 건드리지 않고 그 디렉터리에 graph.json·_provenance.json을
+    쓴다(테스트·미리보기용). provenance는 원본 `_provenance.json`이 있으면 시드로 복사한 뒤
+    `append_provenance`가 병합 블록을 덧붙인다(원본 부재 시 provenance 생략 — 코퍼스 미생성
+    환경 대응, `university_standard_fill._append_provenance`와 동일 관용).
+    """
+    if output_dir is None:
+        return graph, graph.parent / "_provenance.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target_graph = output_dir / "graph.json"
+    target_prov = output_dir / "_provenance.json"
+    source_prov = graph.parent / "_provenance.json"
+    if not target_prov.exists() and source_prov.exists():
+        target_prov.write_text(source_prov.read_text(encoding="utf-8"), encoding="utf-8")
+    return target_graph, target_prov
+
+
+@app.command(name="merge-behavior-skills")
+def merge_behavior_skills(
+    graph: Annotated[
+        Path,
+        typer.Option("--graph", help="원자 백본 graph.json 경로(병합 대상이자 기본 출력 위치)."),
+    ] = Path("data/corpus/atom_graph_v1/graph.json"),
+    crosswalk: Annotated[
+        Path,
+        typer.Option("--crosswalk", help="437↔원자 크로스워크 crosswalk.jsonl 경로."),
+    ] = Path("data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl"),
+    legacy_graph: Annotated[
+        Path,
+        typer.Option("--legacy-graph", help="구 437 코퍼스 graph.json(concept_id↔source_id 다리)."),
+    ] = Path("data/corpus/concept_graph_v1/graph.json"),
+    legacy_concepts: Annotated[
+        Path,
+        typer.Option(
+            "--legacy-concepts", help="구 437 코퍼스 concepts.jsonl(behavior_skills 저작 정본)."
+        ),
+    ] = Path("data/corpus/concept_graph_v1/concepts.jsonl"),
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-dir",
+            help="graph.json·_provenance.json 저장 디렉터리(생략 시 --graph 경로에 in-place).",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="병합 결과만 보고하고 파일을 쓰지 않는다."),
+    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="DEBUG 로그.")] = False,
+) -> None:
+    """crosswalk_v1 경유 구 437 코퍼스(concept_graph_v1) behavior_skills를 원자 백본에 병합(SKB-02).
+
+    원자 백본 원본 xlsx는 휘발돼 transform-v1 재실행이 불가하므로(`university_standard_fill.py`
+    U2와 동형 제약), 커밋된 graph.json을 **후처리**한다(behavior_skills_merge.py 참조). 전파
+    규칙 = S0-2(`whymath_backend.l1.concept_atom_crosswalk.transfer`)와 동일 의미론(union+dedup·
+    사전순, atom_codes 전체 — primary 아님).
+    """
+    _setup_logging(verbose)
+
+    for path, label in (
+        (graph, "graph"),
+        (crosswalk, "crosswalk"),
+        (legacy_graph, "legacy-graph"),
+        (legacy_concepts, "legacy-concepts"),
+    ):
+        if not path.exists():
+            typer.echo(f"[!] {label} 없음: {path}", err=True)
+            raise typer.Exit(code=2)
+
+    payload = json.loads(graph.read_text(encoding="utf-8"))
+    try:
+        result = run_behavior_skills_merge(
+            payload,
+            crosswalk_path=crosswalk,
+            legacy_graph_path=legacy_graph,
+            legacy_concepts_path=legacy_concepts,
+        )
+    except ValueError as exc:
+        typer.echo(f"[!] 코퍼스 조인 실패: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    unmapped = result.unmapped_crosswalk_rows
+    gr = result.graph_report
+    print(
+        f"[병합] 크로스워크 {result.crosswalk_rows}행(unmapped skip {unmapped}) → "
+        f"원자 {gr.atoms_mapped}건 매핑, behavior_skills 비어있지 않음 {gr.atoms_nonempty}건 "
+        f"(전체 concepts {gr.total_concepts})."
+    )
+
+    if dry_run:
+        print("[dry-run] 파일 쓰기 생략.")
+        return
+
+    target_graph, target_prov = _resolve_merge_targets(graph, output_dir)
+    merged_text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    target_graph.write_text(merged_text, encoding="utf-8")
+    append_provenance(target_prov, result, crosswalk_path=crosswalk)
+    print(f"[저장] {target_graph} · {target_prov}")
 
 
 if __name__ == "__main__":  # pragma: no cover

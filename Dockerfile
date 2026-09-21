@@ -69,6 +69,12 @@ COPY src/backend/alembic /app/src/backend/alembic
 
 # 런타임이 레포 상대 경로로 읽는 자산(헤더 주석 참조) — 13MB(2026-07-26 실측 `du -sh data/corpus`).
 COPY data /app/data
+# L3 프롬프트 정본(OPS-16) — `prompt_assets.py`가 `__file__` 기준 `/app/docs/prompts`를 읽는다.
+# EOS-89 이후 `create_app()`이 부팅 시 수학 어댑터를 즉시 조립하므로 `l3.cross_verify`의
+# 모듈 수준 `prompt_text()`가 부팅 경로에 들어왔다 — 이 파일들이 없으면 컨테이너가 기동 중
+# 죽는다(2026-09-07 docker-build 스모크 실측: PromptAssetError). `.dockerignore`의 `docs` 제외에
+# `!docs/prompts` 예외가 짝으로 있어야 한다(test_deploy_artifacts.py가 둘을 함께 고정).
+COPY docs/prompts /app/docs/prompts
 
 # alembic.ini가 여기 있어야 런북 §3 명령이 그대로 동작한다.
 WORKDIR /app/src/backend

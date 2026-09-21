@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-76-acceptance-supersede-and-title-amend
+title: "acceptance 항 폐기 표시(tombstone)·title 정정의 CLI 경로 부재 — 승계 대조표가 매번 길어진다"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① amend에 acceptance 항 **폐기 표시** 경로 신설 — 삭제가 아니라 '이 항은 N항으로 승계됨' 마커를 붙이는 형태(HARN-20 '원항 소실 금지' 규약 보존). 표시된 항은 CLI 출력·selector에서 승계 대상과 함께 보이게 한다"
+  - "② amend에 title 정정 경로 신설 — 현행 amend 설계 원칙 2는 'title 불변'인데, 그 근거는 상태 전이 우회 방지(status·session·artifacts)이지 title이 아니다. 원 title은 notes에 보존(HARN-49 track 축 선례)"
+  - "③ 변별력 확인: 폐기 표시된 항을 그대로 구현한 상태를 주입해 검사가 RED를 내는지 실측(정상 상태 GREEN 대조 포함). 표시만 남고 아무도 안 보는 필드면 위장이다"
+  - "④ 범위 밖: acceptance 항 **삭제**·태스크 삭제·ID 변경 — 대장 손편집 우회 표면이라 계속 닫아 둔다"
+  - "[범위 축소 2026-09-06 · 등재 직후] ②항(title 정정 경로)은 **HARN-57 ⑤가 이미 소유**한다(2026-09-03 등재 — 'SessionStart 브리핑과 next가 노출하는 것은 title 한 줄이라 paths보다 위험도가 높다'). 중복 구현 금지 — ②는 **범위 밖**으로 내리고 이 태스크는 ①(acceptance 항 폐기 표시) 축만 소유한다. HARN-57은 artifacts·--no-pr·paths·title 4축을 다루고 acceptance 항 축은 다루지 않으므로 ①은 중복이 아니다. 발견 경위: backlog.py add의 의미 중복 고지가 HARN-57을 유사도 0.14로 지목 — 고지가 실제 중복을 잡은 사례"
+  - "[근거 보강 2026-09-08 · HARN-88 취소분 승계] 같은 공백이 다른 형태로 한 번 더 실증됐다. `HARN-87` acceptance ④를 등재할 때 bash 인자의 마크다운 백틱이 명령 치환으로 실행돼 식별자 4개(`*/15`·API 경로·`workflow_dispatch`·`push: branches: [main]`)가 빈 문자열로 저장됐다 — \"cron은 라 2~3회 발화했어야\" 같은 무의미 문장만 남았고 CLI는 정상 종료했다. `--acceptance`가 append 전용이라 **되돌릴 경로가 없어** 정정본 ⑤를 덧붙이는 것으로만 수습했고, 손상된 ④가 활성 항으로 남았다.\n\n그 뒤 ⑥(과신한 결론)을 ⑦로 철회했을 때 PR #1057 Codex P2가 정확히 이 구조를 지적했다: **\"⑦을 append해도 ⑥은 그대로 활성 acceptance로 남으므로, 정본에 서로 배타적인 두 요구가 동시에 존재한다 — 실행자가 이전 항을 먼저 읽으면 이번 변경이 막으려는 조기 도입을 그대로 수행한다.\"** ARCH-31(#1012)에서 이 태스크를 낳은 것과 **같은 형태의 2회차**다.\n\n즉 이 태스크의 ①(폐기 표시)은 \"대조표가 길어진다\"는 가독성 문제가 아니라 **정본이 모순을 담는 문제**다. 우선순위 재고 근거로 남긴다(현재 priority 3).\n\n한편 취소된 HARN-88은 `--acceptance-replace`의 빈 문자열 치환으로 **항 삭제**를 제안했는데, 그것은 이 태스크 ④가 의도적으로 닫아 둔 축이다(HARN-20 사고 이후 append 전용은 결함이 아니라 설계). 폐기 표시(tombstone)와 삭제는 다르다 — 이 태스크의 경계를 그대로 유지한다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "출처: Codex P2 리뷰 #1012 — ARCH-31에서 게이트 판정 파급 항(5항)이 원 acceptance 1·2항과 배타적이 돼 '구현자가 FK 대상을 결정할 수 없다'는 지적. 리뷰의 처방은 '원항을 대체하라'였으나 amend는 append 전용이 의도된 설계이고(HARN-20 사고: 덮어쓰기가 blocked 4건 전건의 원 notes 소실) title 정정 경로도 없다 — CLAUDE.md '거부의 우회 금지'·AGENTS.md 'CLI 경로가 없는 설계 공백이면 태스크로 등재'에 따라 등재. 당장의 모호성은 ARCH-31에 항별 승계 대조표를 append해 해소했으나, 판정 파급이 반복되면 대조표가 계속 길어지는 구조적 문제가 남는다. 등재 시 HARN-74를 먼저 시도했다가 병렬 세션 선점으로 CLI가 거부·HARN-76 재배정(HARN-10 번호 충돌 검사가 실동작한 사례)\n\n[정정 2026-09-06] CLI 의미 중복 고지 수용 — title 축 중복 제거, acceptance 축으로 범위 확정\n\n[정정 2026-09-08] HARN-88 취소분 승계 — 같은 공백의 2회차 실증(HARN-87 ④ 손상·⑥⑦ 모순 활성) 근거 보강"
+updated: 2026-09-08

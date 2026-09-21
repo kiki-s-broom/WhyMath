@@ -18,5 +18,5 @@ paths:
   - "src/backend/whymath_backend/harness/**"
   - "docs/standards/**"
 session: null
-notes: "S4-13(#PR)의 정직한 미충족 축. 현 환경에 LLM provider가 없어 전 테스트가 결정론 시임 — 게이트 *배선*은 완료·게이트 *승격*은 미완이다. 실 LLM 호출이 필요하므로 Kiki 머신(Phaiakes9) 실행 동반. 파일럿 코퍼스 problem_bank_probability_finite_v0(34문)는 그때까지 노출 부적격 유지(is_published=False).\n\n[차단 2026-08-14] 로컬 Ollama 모델로는 강등전 통과 불가 — qwen3.5:27b timeout(115~300s/call)·qwen2.5:7b 100% 오검출·qwen2-math:7b 검출 58%/오검출 67%. 클라우드 provider 또는 로컬 LLM 스택 최적화(llama.cpp Vulkan 등) 필요. 측정 증적: data/audit/s4-16-qwen2math-battle-audit.jsonl + MEMORY.md 2026-08-14 기록.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/검증권위 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "S4-13(#PR)의 정직한 미충족 축. 현 환경에 LLM provider가 없어 전 테스트가 결정론 시임 — 게이트 *배선*은 완료·게이트 *승격*은 미완이다. 실 LLM 호출이 필요하므로 Kiki 머신(Phaiakes9) 실행 동반. 파일럿 코퍼스 problem_bank_probability_finite_v0(34문)는 그때까지 노출 부적격 유지(is_published=False).\n\n[차단 2026-08-14] 로컬 Ollama 모델로는 강등전 통과 불가 — qwen3.5:27b timeout(115~300s/call)·qwen2.5:7b 100% 오검출·qwen2-math:7b 검출 58%/오검출 67%. 클라우드 provider 또는 로컬 LLM 스택 최적화(llama.cpp Vulkan 등) 필요. 측정 증적: data/audit/s4-16-qwen2math-battle-audit.jsonl + MEMORY.md 2026-08-14 기록.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/검증권위 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[회수 2026-09-11 S4-59] 1차 강등전 실측 기록(2026-08-10)을 docs/standards/residue_gate_demotion_battle_2026-08-10.md로 회수·이식 완료 — 재개 시 먼저 참조(결함류별 실명 관찰·비용 실측, 08-14 기록에는 없는 내용).\n\n[정정 2026-09-11] notes 치환 — S4-59 회수 완료 — 1차 강등전 실측 기록 문서 이식 사실을 notes에 링크(집행 지점 — 정본화와 별항)"
+updated: 2026-09-11

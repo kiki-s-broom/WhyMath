@@ -37,6 +37,7 @@ def _counts(
     type_counts: dict[str, int] | None = None,
     concept_diagnosis_nonempty: int = 0,
     recommended_path_nonempty: int = 0,
+    strong_points_nonempty: int = 0,
 ) -> asrr.SeatCounts:
     return asrr.SeatCounts(
         table_row_counts={
@@ -48,6 +49,7 @@ def _counts(
         assessment_type_counts=type_counts or {},
         concept_diagnosis_nonempty_count=concept_diagnosis_nonempty,
         recommended_path_nonempty_count=recommended_path_nonempty,
+        strong_points_nonempty_count=strong_points_nonempty,
     )
 
 
@@ -194,6 +196,15 @@ def test_concept_diagnosis_and_recommended_path_nonempty_counts_pass_through() -
     assert "2" in rendered
     assert "concept_diagnosis" in rendered
     assert "recommended_path" in rendered
+
+
+def test_strong_points_nonempty_count_passes_through() -> None:
+    """ASM-13 — `strong_points`(강점 개념) writer 착지의 채운 비율 가시화 동결."""
+    report = asrr.build_report(_counts(strong_points_nonempty=4))
+    assert report.strong_points_nonempty_count == 4
+    rendered = asrr.render_report(report)
+    assert "strong_points" in rendered
+    assert "4" in rendered
 
 
 # ──────────────────────────────────────────────────────────────────────────

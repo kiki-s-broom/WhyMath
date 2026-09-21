@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-98-merge-queue-premise-refresh
+title: "merge queue 미제공 전제가 거짓이 됐다 — 감시 축 편입 · 문서·테스트 정정"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 (2026-09-09 · main a374d2e0): 저장소가 kiki-s-broom(owner.type=Organization)으로 이전되고 main 룰셋에 merge queue가 켜졌다. **큐가 실제로 작동함을 실증**했다 — PR #1067이 큐 경유로 머지됐고(큐 브랜치 gh-readonly-queue/main/pr-1067-94d1f28a · merge_group 워크플로 실행 run 34318528035 · 그 head a374d2e0이 그대로 main이 됨), 큐에서는 ci.yml 주석대로 경로 기반 스킵이 걸리지 않아 backend/mobile/web/data-pipeline이 전건 실행됐다. 그런데 저장소 세 곳이 아직 \"merge queue는 이 저장소에서 쓸 수 없다\"는 **거짓이 된 전제**를 담고 있다: (a) scripts/harness/ruleset_drift.py 규칙 타입 튜플이 merge_queue를 의도적으로 제외하고 그 사유를 주석으로 고정 (b) .github/branch-protection-setup.md의 \"머지 경합 — merge queue는 이 저장소에서 쓸 수 없다\" 절 전체 (c) tests/infra/test_pr_auto_resync.py::test_doc_records_that_merge_queue_is_unavailable_here가 그 문서 문면을 동결"
+  - "② 무엇을 바꾸는가: (a) ruleset_drift.py 튜플에 merge_queue를 편입한다 — 코드 주석이 \"저장소가 조직으로 이관되면 그때 이 튜플에 추가한다\"고 이 조건을 미리 적어 뒀고 그 조건이 충족됐다. **지금 상태의 실질 위험**: 큐가 머지 경로를 지탱하는데 감시 축에 없어 누가 큐를 꺼도 판정기가 모른다 — 보호가 있다고 믿는 무보호 상태다. (b) setup 문서의 \"쓸 수 없다\" 절을 정정하되 **사고 기록은 지우지 않는다** — 그 절은 CLAUDE.md v0.2.18(\"설정 부재를 설정 가능으로 단정 금지\")의 발생 근거이므로, 당시 판정이 그 시점 계정 유형에서는 옳았고 이전으로 전제가 바뀌었다는 이력으로 재서술한다. (c) 테스트를 \"미제공 사실이 적혀 있다\"에서 \"현행 사실이 적혀 있다\"로 재정의한다 — 지금 그 테스트는 거짓을 동결하고 있다"
+  - "③ 집행 지점 (정본화와 별항): 문서·주석 수정만으로는 ⓐ가 실효를 갖지 못한다. ruleset_drift.py가 merge_queue를 **실제로 감시하는지**를 결함 주입으로 확인한다 — 큐 규칙이 빠진 룰셋 픽스처를 넣었을 때 판정기가 위반으로 잡아야 하고(RED), 켜진 픽스처에서는 통과해야 한다(GREEN). 양쪽이 같은 답이면 그 편입은 위장이다(CLAUDE.md 변별력 없는 검증 스텝 금지). 한계 명시: 이 세션은 라이브 룰셋을 직접 읽지 못한다 — 구 소유자 경로는 숫자 ID로 301되고 프록시가 그 형태를 막으며, 신 소유자 경로는 add_repo 교차 추가가 거부된다. 따라서 \"큐가 켜져 있다\"의 근거는 라이브 룰셋 덤프가 아니라 **큐 경유 머지가 실제로 일어났다는 사실**이다. 라이브 덤프가 필요한 축(HARN-56 acceptance ①)은 이 태스크 범위 밖이며 새 세션이 필요하다"
+artifacts:
+  - "PR #1078 — 큐 경유 머지(gh-readonly-queue/main/pr-1078-28a90846 · merge_group run 34432706624 · 잡 18건 중 성공 16·스킵 2·실패 0) · main b2afb674 · 착지 확인: ruleset_drift.py:304 감시 튜플에 merge_queue 편입 + branch-protection-setup.md RULESET_POLICY 선언 + tests/infra 회귀 2종(off=위반·on=조용) · 뮤테이션 Q1~Q5 전건 RED"
+paths:
+  - scripts/harness/ruleset_drift.py
+  - ".github/branch-protection-setup.md"
+  - tests/infra/test_pr_auto_resync.py
+session: null
+notes: "출처: 2026-09-09 저장소 조직 이전 + 큐 활성화(Kiki). **HARN-96(정본 저장소 전환)과 경로가 겹치지 않는다** — HARN-96 paths는 .github/workflows/** · docs/** · backlog/**이고 이 태스크는 scripts/harness/ruleset_drift.py · .github/branch-protection-setup.md · tests/infra/test_pr_auto_resync.py다. 다만 **같은 파일의 다른 절을 건드릴 여지**가 하나 있다: HARN-96 acceptance ③이 branch-protection-setup.md에 라이브 required check 개수를 병기하려 하고, 이 태스크는 같은 문서의 merge queue 절을 정정한다. 절이 달라 의미 충돌은 없으나 텍스트 충돌은 날 수 있으므로 나중 착수 쪽이 병합한다. HARN-56(merge queue 도입·claim 중)의 pr-auto-resync.yml:4 낡은 주석은 그쪽 소관이라 손대지 않는다. **분리 이유**: HARN-96은 게이트(G-canonical-repo-cutover-kiki-s-broom) 대기이고 acceptance ⑧이 kiki-s-broom을 초기 소스로 하는 새 세션을 요구해 언제 착수될지 모르는데, 이 태스크가 고치는 것은 지금 살아 있는 보호 공백(감시 축에 큐가 없어 큐가 꺼져도 판정기가 모름)과 거짓을 동결 중인 테스트라 대기시킬 성질이 아니다."
+updated: 2026-09-10

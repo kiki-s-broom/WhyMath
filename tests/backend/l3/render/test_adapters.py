@@ -4,11 +4,29 @@ from __future__ import annotations
 
 import pytest
 
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.l3.render.adapter import NullAdapter, PedagogyAdapter, RenderContext
 from whymath_backend.l3.render.dsl import ConceptAssessment, ConceptDSL
 from whymath_backend.l3.render.registry import get_adapter, registered_strategies
 from whymath_backend.l3.verify_answer import verify_answer
 from whymath_backend.schema.enums import PedagogyStrategy
+
+
+def _adapter(strategy: PedagogyStrategy) -> PedagogyAdapter:
+    """레지스트리 조회 + **과목 능력 주입**(EOS-89).
+
+    어댑터는 더 이상 합성 루트를 스스로 부르지 않는다 — 능력은 상류가 준다. 프로덕션에서 그
+    상류는 `api/study.py`(app.state 등록분)이고, 이 파일에서는 **테스트 자신이 상류**다
+    (프로세스가 여기서 시작하므로 합성 루트를 소비해도 되는 자리).
+    """
+    return get_adapter(
+        strategy,
+        seal=default_expression_seal(),
+        assessment_verifier=default_assessment_answer_verifier(),
+    )
 
 
 def _dsl(**overrides: object) -> ConceptDSL:
@@ -47,15 +65,15 @@ class TestRegistry:
     def test_unimplemented_strategy_raises_not_silent_fallback(self) -> None:
         # 조용한 대체 금지 — 요청과 다른 방식의 수업을 주지 않는다.
         with pytest.raises(LookupError, match="등록되지 않았습니다"):
-            get_adapter(PedagogyStrategy.RETRIEVAL)
+            _adapter(PedagogyStrategy.RETRIEVAL)
 
     def test_adapters_satisfy_protocol(self) -> None:
         for strategy in registered_strategies():
-            assert isinstance(get_adapter(strategy), PedagogyAdapter)
+            assert isinstance(_adapter(strategy), PedagogyAdapter)
 
     def test_adapter_strategy_matches_registry_key(self) -> None:
         for strategy in registered_strategies():
-            assert get_adapter(strategy).strategy is strategy
+            assert _adapter(strategy).strategy is strategy
 
 
 class TestNullAdapterStub:
@@ -75,13 +93,13 @@ class TestSameContentDifferentMethod:
     """같은 DSL이 전략별로 *다른* 화면을 낸다 — 콘텐츠 하나, 방식 N개."""
 
     def test_direct_presents_definition(self) -> None:
-        unit = get_adapter(PedagogyStrategy.DIRECT).render(_dsl(), RenderContext())
+        unit = _adapter(PedagogyStrategy.DIRECT).render(_dsl(), RenderContext())
         kinds = [seg.kind for seg in unit.segments]
         assert "definition" in kinds
         assert "question" not in kinds  # 설명 중심 — 발문으로 끌지 않는다.
 
     def test_socratic_withholds_definition_and_asks(self) -> None:
-        unit = get_adapter(PedagogyStrategy.SOCRATIC).render(_dsl(), RenderContext())
+        unit = _adapter(PedagogyStrategy.SOCRATIC).render(_dsl(), RenderContext())
         kinds = [seg.kind for seg in unit.segments]
         assert "question" in kinds
         # 소크라테스식의 요점 — 정의를 주지 않는다(학생이 답할 자리를 비운다).
@@ -89,7 +107,7 @@ class TestSameContentDifferentMethod:
 
     def test_problem_based_leads_with_problem_and_hides_answer(self) -> None:
         dsl = _assessed_dsl()
-        unit = get_adapter(PedagogyStrategy.PROBLEM_BASED).render(dsl, RenderContext())
+        unit = _adapter(PedagogyStrategy.PROBLEM_BASED).render(dsl, RenderContext())
         assert unit.segments[1].kind == "prompt"  # heading 다음이 곧 문제.
         body = " ".join(seg.content for seg in unit.segments)
         assert "x - 1 = 0" in body
@@ -97,11 +115,11 @@ class TestSameContentDifferentMethod:
         assert "1로 구해집니다" not in body
 
     def test_worked_example_shows_solution_steps(self) -> None:
-        unit = get_adapter(PedagogyStrategy.WORKED_EXAMPLE).render(_assessed_dsl(), RenderContext())
+        unit = _adapter(PedagogyStrategy.WORKED_EXAMPLE).render(_assessed_dsl(), RenderContext())
         assert any(seg.kind == "solution_step" for seg in unit.segments)
 
     def test_analogy_leads_with_intuition_and_flags_limits(self) -> None:
-        unit = get_adapter(PedagogyStrategy.ANALOGY).render(_dsl(), RenderContext())
+        unit = _adapter(PedagogyStrategy.ANALOGY).render(_dsl(), RenderContext())
         assert unit.segments[1].kind == "intuition"
         # 비유를 정의로 오인하면 그 자체가 오개념이므로 한계를 반드시 짚는다.
         assert any(seg.kind == "reflection" for seg in unit.segments)
@@ -111,19 +129,19 @@ class TestCanRender:
     """재료가 없으면 False — 상위가 생성 경로로 폴백한다(빈 화면 금지)."""
 
     def test_problem_based_requires_assessment(self) -> None:
-        assert get_adapter(PedagogyStrategy.PROBLEM_BASED).can_render(_dsl()) is False
-        assert get_adapter(PedagogyStrategy.PROBLEM_BASED).can_render(_assessed_dsl()) is True
+        assert _adapter(PedagogyStrategy.PROBLEM_BASED).can_render(_dsl()) is False
+        assert _adapter(PedagogyStrategy.PROBLEM_BASED).can_render(_assessed_dsl()) is True
 
     def test_analogy_requires_intuition(self) -> None:
-        adapter = get_adapter(PedagogyStrategy.ANALOGY)
+        adapter = _adapter(PedagogyStrategy.ANALOGY)
         assert adapter.can_render(_dsl(intuition=None)) is False
 
     def test_direct_requires_definition_or_intuition(self) -> None:
-        adapter = get_adapter(PedagogyStrategy.DIRECT)
+        adapter = _adapter(PedagogyStrategy.DIRECT)
         assert adapter.can_render(_dsl(definition=None, intuition=None)) is False
 
     def test_socratic_always_renderable(self) -> None:
-        adapter = get_adapter(PedagogyStrategy.SOCRATIC)
+        adapter = _adapter(PedagogyStrategy.SOCRATIC)
         assert adapter.can_render(_dsl(definition=None, intuition=None, examples=())) is True
 
 
@@ -136,14 +154,14 @@ class TestRenderVerify:
         verdict = verify_answer(list(dsl.assessment.conditions), dsl.assessment.answer_map)  # type: ignore[union-attr]
         assert verdict.state == "pass"
 
-        unit = get_adapter(PedagogyStrategy.WORKED_EXAMPLE).render(dsl, RenderContext())
+        unit = _adapter(PedagogyStrategy.WORKED_EXAMPLE).render(dsl, RenderContext())
         assert unit.ok is True
         assert unit.validation_signal is None
 
     def test_wrong_answer_is_flagged_not_exposed(self) -> None:
         # x - 1 = 0 인데 x = 2 라고 실으면 렌더는 실패 신호를 달고 나온다(조용한 통과 금지).
         dsl = _dsl(assessment=ConceptAssessment(conditions=("x - 1 = 0",), answer_map={"x": "2"}))
-        unit = get_adapter(PedagogyStrategy.WORKED_EXAMPLE).render(dsl, RenderContext())
+        unit = _adapter(PedagogyStrategy.WORKED_EXAMPLE).render(dsl, RenderContext())
         assert unit.ok is False
         assert unit.validation_signal is not None
         assert unit.validation_signal.kind == "solution"
@@ -151,7 +169,7 @@ class TestRenderVerify:
     def test_failure_is_signalled_not_raised(self) -> None:
         dsl = _dsl(assessment=ConceptAssessment(conditions=("x - 1 = 0",), answer_map={"x": "2"}))
         # 예외를 던지지 않는다 — 상위가 폴백을 결정할 수 있어야 한다.
-        unit = get_adapter(PedagogyStrategy.PROBLEM_BASED).render(dsl, RenderContext())
+        unit = _adapter(PedagogyStrategy.PROBLEM_BASED).render(dsl, RenderContext())
         assert unit.validation_signal is not None
 
 
@@ -160,7 +178,7 @@ class TestDeterminismAndBindings:
 
     def test_render_is_deterministic(self) -> None:
         for strategy in registered_strategies():
-            adapter = get_adapter(strategy)
+            adapter = _adapter(strategy)
             dsl = _assessed_dsl()
             first = adapter.render(dsl, RenderContext())
             second = adapter.render(dsl, RenderContext())
@@ -168,19 +186,17 @@ class TestDeterminismAndBindings:
 
     def test_bindings_substitute_without_breaking_latex(self) -> None:
         dsl = _dsl(definition="계수가 {coef}인 식. 형태는 \\frac{a}{b} 이다.")
-        unit = get_adapter(PedagogyStrategy.DIRECT).render(
-            dsl, RenderContext(bindings={"coef": "3"})
-        )
+        unit = _adapter(PedagogyStrategy.DIRECT).render(dsl, RenderContext(bindings={"coef": "3"}))
         body = " ".join(seg.content for seg in unit.segments)
         assert "계수가 3인 식" in body
         assert "\\frac{a}{b}" in body  # LaTeX 중괄호는 건드리지 않는다.
 
     def test_josa_agrees_with_concept_name(self) -> None:
         # 받침 有('일차식') → '은', 받침 無('함수') → '는'. 개념명이 무엇이든 문법이 맞아야 한다.
-        with_batchim = get_adapter(PedagogyStrategy.SOCRATIC).render(
+        with_batchim = _adapter(PedagogyStrategy.SOCRATIC).render(
             _dsl(name="일차식"), RenderContext()
         )
-        without_batchim = get_adapter(PedagogyStrategy.SOCRATIC).render(
+        without_batchim = _adapter(PedagogyStrategy.SOCRATIC).render(
             _dsl(name="함수"), RenderContext()
         )
         assert "일차식은" in " ".join(s.content for s in with_batchim.segments)

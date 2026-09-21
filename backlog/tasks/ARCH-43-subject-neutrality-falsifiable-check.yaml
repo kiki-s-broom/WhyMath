@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-43-subject-neutrality-falsifiable-check
+title: "과목 중립성의 반증 가능한 검사 설계 — 필드 채움 검사는 배제 선언한 과목도 통과한다(반증력 0)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(2026-09-06·main 76f415db·EOS-92 프로브 §3): Subject Contract v1의 15필드 중 13개가 str·str|None·tuple[str,...]이라 불투명 문자열은 어떤 과목이든 받는다. Physics 15/15 ○인데 **계약이 명시적으로 배제 선언한 History(verification_capabilities.py:277 '역사엔 없다')도 15/15 채워진다** — 성공/실패 양쪽에서 같은 값을 내므로 검증이 아니라 위장이다(CLAUDE.md 변별력 없는 검증 스텝 금지)"
+  - "② 반증 가능한 검사를 설계한다: 무엇이 관측되면 '중립성 위반'인가를 먼저 정의하고, 그 상태를 **실제로 주입해 RED가 나는지** 확인한 뒤에만 검사로 친다. 후보 축 — (a) Core 모듈이 answer_kind·conditions 값을 읽어 분기하는지 정적 검출(AST·문자열 비교/딕셔너리 조회 패턴) (b) Physics 어댑터 **스텁**을 실제로 구현해 3메서드를 채워 보고 NotImplementedError·의미 왜곡이 나는 지점 관측 (c) 계약 시그니처의 수학 은유 용어 검출"
+  - "③ 새 장치를 만들기 전에 기존 것으로 되는지 먼저 확인 — eos_core_adapter_boundary_scan.py는 정적 import만 보고 페이로드 해석은 못 본다고 계약이 자인한다(subject_adapter.py:52-55). 확장으로 될 일이면 확장하고, 안 되면 그 사유를 적는다"
+  - "④ **스캔 0건은 실패**로 처리(CLAUDE.md 2026-09-01 ④) — 검사 대상 모듈을 하나도 못 찾으면 공허하게 통과시키지 않는다"
+  - "⑥ [정정 · Codex P1 · PR #999] acceptance ①의 근거 문장을 정정한다. **History는 대조군이 아니다** — verification_capabilities.py:274-277의 '역사엔 없다'는 *선택적* ExpressionEquivalence에 관한 문장이고 '그래서 필수 3종에 넣지 않았다'로 잇는다. 반대로 subject_adapter.py:221-227의 필수층 게이트는 'Physics·Chemistry·**History**에도 반드시 존재하는가?'라 **History는 필수층의 대상**이다. 따라서 History가 DTO를 채우는 것은 설계된 성공이지 반증 실패 사례가 아니다. **정정 후 이 태스크의 근거**: 채움 축(갈래 A)은 15필드 중 13개가 임의 문자열을 받아 **실패 사례를 구성할 수 없고**(extra='forbid'는 필드 추가만 막는다), 뒤틀림 축(갈래 B)은 사람 판정에 기계 뒷받침이 0이다(subject_adapter.py:52-55가 자인). 근거가 바뀌어도 태스크의 필요성은 유지된다 — 오히려 '무엇을 만들어야 하는가'가 더 분명해졌다"
+  - "[정정 2026-09-06 · PR #1014 Codex P2] notes의 'EOS 계열 소진' 서술은 backlog.py add 거부 문구를 실측 없이 옮긴 도구 오보고였다 — HARN-73(#1002) 실측: EOS 번호 사용 59·미사용 40(01~05·07~27·29~31·33~43). Kiki 결정 A(하위 미사용 번호 재사용 + 제안기 폴백 · 새 접두 기각)·게이트 G-eos-task-prefix-exhausted clear. EOS 축 후속 태스크는 계속 EOS-nn을 쓰고, MP는 소진 대응이 아니라 회차 축 접두라는 정의만 유효하다. 위 소진 문구는 과거 경위로만 읽는다(이 항은 acceptance가 아니라 정정 기록 — HARN-24 정정 항 관용)"
+artifacts:
+  - "PR #1014 (https://github.com/doldori7/WhyMath/pull/1014) 절 B — 커밋 1609e35b. scripts/analysis/eos_opaque_payload_gate.py(불투명 페이로드 해석 게이트·AST·6자리·별칭 추적·KNOWN_VIOLATIONS 소유자+재확인) + tests/infra 58건(주입 21형태 RED·0건 exit 2) + Physics 스텁 5건. 실 레포 CORE 309/639 · 위반 1건(populate:363 membership · EOS-85 소유 · G1 9/27 재확인). 뮤테이션 6+1종 RED. tests/infra 948 · backend 전체 12,4xx passed · ruff·black·mypy 0."
+paths:
+  - tests/backend/schema/test_subject_adapter_two_tier_contract.py
+  - scripts/analysis/eos_core_adapter_boundary_scan.py
+session: null
+notes: "출처: EOS-92 교차 과목 프로브(2026-09-06) §3 라운드 2. 프로브는 acceptance ① 문자 그대로 15/15 ○를 냈으나, 같은 검사가 History도 통과시킨다는 것을 대조군으로 실증했다 — 즉 '✗ 0'의 정보량이 낮다. 이것은 계약의 결함이 아니라 '**Core는 페이로드를 해석하지 않는다**'는 설계가 성공한 결과이며, 동시에 필드 채움 검사의 반증력을 0에 가깝게 만든다. 계약 파일 자신이 이 함정을 예고했다(subject_adapter.py:40-55 '래칫의 한계 — 의미적 확장은 잡지 못한다. 그런데 과목 중립성이 실제로 깨지는 주된 경로가 바로 이쪽이다'). EOS-92는 그 축을 §4에서 사람 판정으로 메웠으나(해석 지점 0건 실측) 기계 집행은 여전히 없다 — 이 태스크가 그 공백을 소유한다. 9/27 G1 승격 판정 자체를 막지는 않는다(프로브는 완주했고 ✗ 0).\n\n[정정 2026-09-06] Codex P1 지적 수용(PR #999) — 초판 근거가 선택층 문장을 필수층에 적용한 오독이었다. 결론(반증력 있는 검사 필요)은 유지, 근거를 정정\n\n[개명 2026-09-06] 초판 id는 EOS-99-subject-neutrality-falsifiable-check이었으나 타 세션 #1000이 같은 번호로 EOS-99-prompt-cache-hit-measurement를 **먼저 머지**해 충돌했다(validate가 '사람·문서·커밋의 EOS-99 참조가 결정 불가가 된다'로 거부 — HARN-10 유형). 머지된 쪽은 개명 불가이므로 미머지인 이쪽을 옮겼다. EOS 계열은 소진(#1000: 'EOS-98·EOS-99가 마지막')이고 **MP는 EOS 후속이 아니라 회차 축 접두**이며, EOS 축 일반의 후속 접두는 게이트 G-eos-task-prefix-exhausted[kiki]가 정한다 — 미결이다. 3자리 손제작은 build_harness.md §8 금기. 그래서 내용상 아키텍처 계약 검증이라 기존 ARCH 계열로 옮겼다(자매 태스크 ARCH-41과 같은 판단). CLI 개명 경로 부재는 HARN-67이 소유한다.\n\n[정정 2026-09-06] PR #1014 Codex P2 — 활성 레코드의 잘못된 소진 근거 정정(HARN-73 실측·Kiki 결정 A). amend에 notes 정정 경로가 없어(HARN-67 ⑥) acceptance 정정 항으로 기록"
+updated: 2026-09-06

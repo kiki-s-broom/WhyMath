@@ -22,14 +22,29 @@
 #     Hint.level 3 (거의 정답)  ↔  답 미루기 3.부분 풀이 — 일부 단계 실제 시연
 #     (Hint 엔티티 없음)        ↔  답 미루기 4.전체 풀이 — 마지막 수단, 학습 곡선 분석과 함께만
 #
-# 상태: 명세 단계. graded 힌트는 Phase 1 성공 기준(답 미루기 4단계 + 도달 깊이 2.5+).
+# 상태: **명세 단계 — 좌석 미실체화**(ARCH-39 실측). graded 힌트는 Phase 1 성공 기준
+#       (답 미루기 4단계 + 도달 깊이 2.5+)이며, 그 KPI는 **현재 본문 저장 없이도 측정된다**
+#       (`wh1_evaluation ⑧` = `attempt_event.hint_level` 평균·최대). 즉 아래 `reveal_score`는
+#       KPI 성립의 전제가 아니라 **정밀화**이며, 지금은 **미구현**이다.
+#       런타임 정본: `l4/hint_deferral.py`(HintLevel 1~4 · REVEALS 라벨) · 정서 안전은
+#       `l4/tone_filter.filter_tone`. 본문 생산 경로는 `l3/dsl`의 `HintSpec.text` →
+#       `CompiledContent.hint_texts`에 있으나 **dsl 밖 소비자가 0건**이다(S4-11의 "coach 서빙
+#       reader"가 그 끊긴 지점).
 # =============================================================================
 
 entity: Hint
 layer: L4
-storage: "PostgreSQL 16 (hints) — SolutionStep 에 종속"
-primary_key: hint_id
-phase_scope: "Phase 1 — 답 미루기 4단계 엔진, 평균 도달 깊이 2.5+"
+# storage 정정 (ARCH-39 · 2026-09-06 · 판정 기준 main 3f2b39c1):
+#   종전 선언 "PostgreSQL 16 (hints)"는 *이미 있는* 저장소를 가리키는 것처럼 읽혔으나
+#   `hints` 테이블은 **존재한 적이 없다**(ORM 0건·alembic 0건). 이 줄은 그래서 **계획**임을
+#   명시하도록 고쳤다 — 좌석 신설 자체는 `S4-11-hint-content-generation`(P0·todo)이 소유한다
+#   (canonical_entity_model_v1.md §3-B).
+#   [정정 2026-09-07] 이 자리에 한때 "영구 부재 판정"이라고 적혔다. **틀렸다** — S4-11이
+#   acceptance로 "hints 테이블 실체화"를 약속하고 있다. 실측(힌트가 턴마다 동적 생성된다·
+#   KPI는 hint_level로 이미 측정된다)은 유효하지만, 그것으로 P0 태스크를 무효화할 수는 없다.
+storage: "계획 — `hints` 미실체화(2026-09-06 실측: ORM·마이그레이션 0건). 좌석 신설은 `S4-11-hint-content-generation`(P0)이 소유하며 선행 `S4-09`·`S3-01` 대기 중. 현재 힌트는 L4 코치가 턴마다 동적 생성하고, 사용 *기록*만 `hint_usage` 테이블에 남는다(본문 아님·hint_id는 FK 없는 느슨참조)."
+primary_key: "hint_id (좌석 실체화 시 PK — 현재는 서빙 응답 내 식별자로만 유효)"
+phase_scope: "Phase 1 — 답 미루기 4단계 엔진, 평균 도달 깊이 2.5+ (KPI 측정은 hint_level 기반·본문 불요)"
 
 fields:
 

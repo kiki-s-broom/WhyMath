@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-67-event-payload-contract-enforcement
+title: "이벤트 페이로드 계약 seam 강제 — build_event_data 경유가 규율일 뿐 불변식이 아님(우회 금지 테스트 0건) (원 OPS-20 q8tvcx판 등재 유실 재등재)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정(2026-09-07 main b75f495d): 원 OPS-20-event-payload-contract-enforcement는 origin/claude/whymath-ai-recommendation-review-q8tvcx(e1835c0c · ee9df6dc)에만 존재. main: tests/infra/test_event_contract_seam.py 부재, AttemptEvent 생성 전량이 build_event_data를 경유함을 강제하는 AST 스캔 테스트 0건, db/models/activity.py from_schema 우회문 잔존, tests/backend/schema/test_event_data_contract.py _PRODUCED가 손베낌 리터럴. 주변 OPS-22·OPS-35·S4-22는 축이 다름(seam 강제 아님)"
+  - "② 소스 스캔 정적 테스트 신설 — src/ 내 AttemptEvent(...) 생성 전량이 build_event_data를 경유함을 강제. import 별칭 해석 필수(api/coach.py가 'AttemptEvent as AttemptEventORM'으로 import) — ast로 ImportFrom asname을 따라간다. 문자열 grep만으로 만들면 '통과하지만 안 보는 장치'"
+  - "③ _PRODUCED 손베낌 리터럴을 스캔 산출로 대체 + from_schema 우회문 처분(제거 또는 계약 경유 강제)"
+  - "④ 변별력 양방향: AttemptEvent(event_data={...})를 seam 우회로 1줄 넣으면 RED·빼면 GREEN. 착수 시 줄 번호 현행 재실측. 원 번호 OPS-20 재사용 금지"
+artifacts: []
+paths:
+  - tests/backend/schema/test_event_data_contract.py
+  - src/backend/whymath_backend/db/models/activity.py
+  - tests/infra/test_event_contract_seam.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5 (stray-code 8회차 — q8tvcx 커버리지 정독). 원 근거 = data_platform_module_gap_review_r2.md B1: 현재 3/3 준수는 사실이되 강제는 0 — 계약을 지키는 것이 테스트가 아니라 사람이다. 소유 태스크 OPS-38 acceptance에 없어 done 시 소실될 상태였다. OPS-65/66은 미머지 PR #1007(lji37v)이 선점해 67 채택."
+updated: 2026-09-07

@@ -15,10 +15,11 @@ requires_gates: []
 acceptance:
   - "REC-02가 만드는 L1 역인덱스 조회 좌석 재사용, 신규 인덱스·신규 조회 로직 0"
   - 오개념 confidence 게이트 통과 시에만 같은 mis_id 태깅·미응답 문항 1건 반환
+  - "[고립 참조 정정 2026-09-07 stray-code 8회차] 원 6dszy0 브랜치는 삭제됨 — 유일 사본 = origin/claude/subject-problems-theory-check-7n9n72(621b11f9). main 부재 실측 전건: ①api/coach.py _similar_problem_for + 응답 similar_problem_id 필드(서빙 집행 지점 — S3-32 구설계와 얽혀 cherry-pick 불가·main 핸들러 위 재유도) ②tests/backend/api/test_coach_similar_problem.py. REC-02 조회 좌석 공유 원칙 유지. 파일 단위 회수·통째 머지 금지·회수 완료 전 7n9n72 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l1/misconception/
   - src/backend/whymath_backend/api/coach.py
 session: null
-notes: "04e_misconception_remediation_design.md §1-3. REC-02와 조회 좌석 공유(진단용 vs 교정용 소비 목적만 다름). [2026-08-30 HARN-34 고립 참조] 구현+테스트가 claude/human-bottleneck-tasks-6dszy0(67881979)에 고립(done 표기) — tests/backend/api/test_coach_similar_problem.py main 부재 실측. 착수 시 파일 단위 회수 우선. 7n9n72(621b11f9) 이중구현 대조 필수\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "04e_misconception_remediation_design.md §1-3. REC-02와 조회 좌석 공유(진단용 vs 교정용 소비 목적만 다름). [2026-08-30 HARN-34 고립 참조] 구현+테스트가 claude/human-bottleneck-tasks-6dszy0(67881979)에 고립(done 표기) — tests/backend/api/test_coach_similar_problem.py main 부재 실측. 착수 시 파일 단위 회수 우선. 7n9n72(621b11f9) 이중구현 대조 필수\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §4.2): 기존 [HARN-34 고립 참조]의 6dszy0 브랜치는 LIC-07 ⑪로 삭제됨 — 유일 사본 7n9n72. 7회차(PR #1020)는 이 좌석을 amend하지 않았고, 테스트 1파일만 알려져 있어 서빙 집행 지점이 누락돼 있었다"
+updated: 2026-09-07

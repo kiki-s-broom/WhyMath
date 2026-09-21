@@ -232,21 +232,39 @@ class GoldenSet(BaseModel):
         return self
 
 
+def canonical_value(value: object) -> str:
+    """enum·문자열 혼재 값을 **값 문자열**로 — `str(enum)`은 파이썬 repr을 낸다.
+
+    `GenerationFailureCode`·`GoldenLabel`·`AsFoundBasis`는 `(str, Enum)`이라
+    `str(GenerationFailureCode.F1) == "GenerationFailureCode.F1"`이다(Python 3.11+ 실측).
+    검증을 거친 `GoldenItem`은 `use_enum_values=True`로 이미 `str`("F1")을 들고 있지만,
+    그 사실은 멀리 떨어진 model_config에 기대는 것이라 `model_construct` 같은 검증 우회
+    경로에서 enum 인스턴스가 들어오면 digest·JSON 키가 **조용히** repr로 갈라진다(EOS-75
+    실측: 같은 정답지가 다른 digest를 내 재채점 금지 원장이 "다른 골든"으로 오판). 표기를
+    한 곳에서 `.value`로 고정한다 — 생산자 `qa_confusion_matrix`의 JSON 키도 이 함수를 쓴다.
+    """
+    if isinstance(value, Enum):
+        return str(value.value)
+    return str(value)
+
+
 def compute_digest(items: Sequence[GoldenItem]) -> str:
     """골든 내용 digest — 판정에 쓰이는 필드만으로 계산(정렬 무관·부기 필드 무관).
 
     포함 축 = (cu_slug, subject_id, anchor_id, label, failure_code, as_found_basis).
     reviewer_id·시각·원본 이벤트 id는 *부기*라 digest에 넣지 않는다 — 같은 정답지를 다른
     추적 메타로 다시 쓴 것을 "다른 골든"으로 오판하지 않기 위해서다.
+    enum 축은 `canonical_value`로 값 문자열을 쓴다 — 검증 경유(str)·검증 우회(enum) 항목이
+    같은 정답지면 같은 digest여야 한다(EOS-75). 검증 경유 항목에서는 기존 digest와 동일하다.
     """
     payload = sorted(
         (
             item.cu_slug,
             item.subject_id,
             item.anchor_id,
-            str(item.label),
-            str(item.failure_code) if item.failure_code is not None else "",
-            str(item.as_found_basis),
+            canonical_value(item.label),
+            canonical_value(item.failure_code) if item.failure_code is not None else "",
+            canonical_value(item.as_found_basis),
         )
         for item in items
     )

@@ -73,7 +73,10 @@ DEFECT_DSL_PROJECTION_REJECTED = "dsl_projection_rejected"
 
 DEFECT_EXPLANATION_REVISION_MARK = "explanation_revision_mark"
 """explanation에 'NNNN 개정' 꼴 개정 연도 표기 — NCIC 크롤링 잔류. 코퍼스 사이드카의
-license_notice("K-12 성취기준 본문은 NCIC 저작물이라 미수록")와 정면으로 모순되는 오염이다."""
+NCIC 페이지에서 긁어 온 흔적이며, 개념 gloss에 개정 연도가 등장할 정상 경로는 없다.
+(2026-09-06까지 이 신호의 근거는 사이드카의 "성취기준 본문 미수록" 선언이었으나, 그 선언 자체가
+데이터와 모순임이 실측돼 정정됐다 — 성취기준 본문의 *보유*는 이제 허용된다. 이 신호가 잡는 것은
+보유가 아니라 **파손**이다: 문장 중간에 낀 서지 표기.)"""
 
 DEFECT_EXPLANATION_SECTION_TRAILER = "explanation_section_trailer"
 """explanation에 '(N) 절제목' 꼴 페이지·절 표기 — 같은 NCIC 크롤링 잔류의 두 번째 형태."""

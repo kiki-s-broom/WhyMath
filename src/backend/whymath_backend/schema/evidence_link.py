@@ -34,6 +34,13 @@ class EvidenceLink(BaseModel):
     )
     polarity: int = Field(description="증거 극성 — +1 지지·−1 반박.")
     weight: float | None = Field(default=None, description="verify/PRM 기반 가중치·미평가 None.")
+    provenance: str | None = Field(
+        default=None,
+        description=(
+            "증거 출처 표식(MISC-20). 기계가 확인한 사실만 값으로 남긴다 — 예: "
+            "correct_form_demonstrated(정정 형태 실측). 모르면 None(해소 판정에서 제외)."
+        ),
+    )
     retention_until: date | None = Field(
         default=None, description="보존 기한(경과 시 야간 배치 파기)·미설정 None."
     )

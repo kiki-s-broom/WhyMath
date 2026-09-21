@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-80-eos-axis-research-feature-isolation-flag
+title: "E축·연구성 기능 격리 플래그 부재 — 12월 판정 시 미완 기능을 끌 스위치가 Settings에 0건"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 (판정 기준 main 4b33d243 · 2026-09-15): `config.py`의 `*_enabled` 플래그는 실재하고 서빙 경로에서 소비된다 — **체계는 있다**. 없는 것은 E축(과목 확장)·연구성 기능을 12월 판정 시점에 격리할 플래그다. `grep -niE \"eos|research|experimental\" src/backend/whymath_backend/config.py` → 관련 플래그 0건(주석 1건만)."
+  - "② **기존 Settings 체계 확장으로만 한다 — 신규 Feature Flag 프레임워크 금지.** 2026-08-31 갭리뷰 초판이 `grep \"feature_flags\"` 0건만으로 \"체계 부재\"를 결론냈고(리뷰 봇이 정정), 그 오판정대로 만들었으면 16+건이 이미 사는 패턴 위에 중복 프레임워크가 생겼다. CLAUDE.md '부재 판정 절차'의 가장 비싼 실증 사례다."
+  - "③ 정본화≠집행 별항 — 플래그를 *선언*하는 것과 그 플래그가 서빙 경로에서 실제로 *분기*되는 것은 다르다. 대상 기능마다 소비 지점(파일:라인)을 명시하고, default OFF 상태에서 그 경로가 실제로 닫히는지 테스트로 대조한다."
+  - "④ 변별력 — 플래그 ON/OFF 양방향에서 서로 다른 결과가 나는지 실측한다. 양쪽에서 같은 값을 내는 플래그는 격리가 아니라 위장이다(2026-07-17 '변별력 없는 검증 스텝 금지')."
+  - "⑤ 범위 경계 — **무엇이 E축·연구성 기능인가**를 먼저 확정한다. 확정 전에 플래그를 선제 추가하지 않는다 — 소비자 0인 설정은 dead 축이 되고, 이 저장소는 그 부류(ADMIN-02·ADMIN-12)를 이미 상환 중이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+  - "tests/backend/**"
+session: null
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B2 · §5 B급 미등재 후보 2. 2026-09-15 재대조(판정 기준 main 4b33d243)에서 이 후보가 **소유자 0건**으로 남아 있음을 확인해 등재한다 — CLAUDE.md Gate D(소유자 없는 알려진 결함을 만들지 않는다)·'만료 없는 유예·제외 금지' 집행. 갭리뷰 §5는 B급 8건을 \"Kiki 판정 대기\"로 산문에만 남겼고, eos_phase0_gate_a_e_judgment_2026-09-06.md §6이 \"그 8건을 재대조하지 않았다\"고 공백을 명시했다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(기능 플래그·default OFF·미완 기능 격리·experimental) → 무관 1건(HARN-55)만."
+updated: 2026-09-15

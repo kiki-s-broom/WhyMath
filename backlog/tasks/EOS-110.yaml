@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-110
+title: "계획서 300 Phase 2 Week 2 Gate 판정 — 오답 1건이 Attempt→Assessment→Misconception→Mastery→LearnerState 전 구간에 전파되고 이벤트와 일치하는지 exit code로 판정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P0
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 오답 1건이 Attempt → Assessment → Misconception → Mastery → LearnerState 전 구간을 실제로 전파하는지 실행으로 판정하는 하네스가 실재하고, 통과/미통과를 exit code로 낸다 (인상 판정 금지).\n② 오답 1건 투입 전후의 LearnerState 스냅샷 2개를 비교해 값 변화를 증거로 제시한다 — 변화 없음은 미통과다.\n③ 그 변화가 P-02 이벤트(Event Trace)에도 남아 있는지 대조한다. 상태와 이벤트가 어긋나면 KPI 2(State Integrity) 위반으로 미통과다.\n④ 판정 하네스 자신의 변별력을 뮤테이션 주입으로 확인한다 — 각 구간(Assessment·Misconception·Mastery·이벤트)을 하나씩 끊어 주입했을 때 RED가 나는지, 주입이 실제 적용됐는지(mutated != original)를 단언한다.\n⑤ 보고 상단에 판정 기준 커밋 해시(main)를 박는다.\n⑥ 미통과면 끊긴 지점 하나를 지목하고 그 지점만 고치는 후속 태스크를 등재한다.\n⑦ AI 품질·오개념 탐지 정확도·UI는 판정 대상이 아니다 — 연결성(전파·일치)만 본다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1201 — Week 2 Gate 판정 통과(PASS) · 판정 기준 main 54f9af58 · 하네스 tests/backend/api/test_week2_gate_wrong_answer_propagation.py(본 판정 + 음성 대조군 2건) · 뮤테이션 검증 scripts/ops/verify_week2_gate_discrimination.py(7종 전건 RED·기준선 exit 0) · 판정 문서 docs/reviews/week2_gate_judgement_2026-09-18.md. 실측: 통합 스위트 324 passed/13 skipped/1 xfailed exit 0 · backend 전체 13810 passed exit 0 · tests/infra 1461 passed exit 0 · tests/harness 831 passed exit 0 · mypy --strict exit 0 · lint-imports 4 kept 0 broken · declared_unwired_audit exit 0. 끊긴 지점 0건 → 후속 태스크 0건."
+paths: []
+session: null
+notes: "계획서 300 Phase 2 §7 Week 2 Gate 판정 세션 (집행 지시문 세트 11/21 GATE-W2). 구현이 아니라 판정이다.\n선행 P-05~P-07 = EOS-12(Evidence 3종 계약) · EOS-13(update_mastery 호출 계약) · EOS-18(임시 어댑터 폐기·실 AssessmentEvidence 연결) · EOS-104(오개념 후보 생산자 배선) 전건 done.\nWeek 1 Gate(EOS-106) 선례를 따른다 — 공개 HTTP 표면만으로 관통하고 단계마다 status code가 아니라 산출물을 단언한다."
+updated: 2026-09-18

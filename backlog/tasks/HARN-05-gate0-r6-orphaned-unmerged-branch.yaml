@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-05-gate0-r6-orphaned-unmerged-branch
+title: "문서(Phase 0) 지시문 이행 점검 중 발견: Gate 0 A~E 판정 r6 확정본이 main에 없다 — 미머지 브랜치 고립"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 (2026-09-10) — docs/reviews/eos_phase0_gate_a_e_judgment_2026-09-06.md 는 main 히스토리상 커밋 749ccb16(PR #995) 한 건만 이 파일을 건드렸고, 그 내용은 r5 상태(B축=조건부충족)다. 2026-09-06 14:10 UTC에 Kiki가 B축을 조건부충족에서 충족으로 확정한 r6 개정(커밋 1e6720d6, 커밋 메시지: Gate 0 판정 r6 — Kiki 해석 확정 2건 반영)은 origin/claude/entity-model-freeze-lji37v 브랜치에만 존재하고 main에 merge된 적이 없다(git merge-base --is-ancestor 1e6720d6 main 이 NO). 이는 스쿼시 머지로 인한 손실이 아니라 그 브랜치 자체가 main보다 10개 커밋을 앞서 갖고도 한 번도 PR 머지되지 않은 상태다."
+  - "② 조치 — r6 커밋의 diff(git diff 749ccb16 1e6720d6 -- docs/reviews/eos_phase0_gate_a_e_judgment_2026-09-06.md)를 main 기준 현재 파일에 적용해 Kiki의 2026-09-06 확정 판정(B축 충족·D축 owner 문항 부분 유지·종합 충족2/부분3/미충족0)을 정본 문서에 반영한다. 원문 그대로 포팅하고 임의 재작성하지 않는다."
+  - "③ 후속 갈래 고지(이 태스크 범위 밖) — origin/claude/entity-model-freeze-lji37v 브랜치는 r6 외에도 HARN-77·OPS-65·OPS-66·CUR-17·CUR-18 관련 backlog 커밋 9건을 추가로 보유하며 이 태스크 ID들은 현재 backlog/tasks/에 전혀 존재하지 않는다(완전 고립). 이 브랜치는 2026-09-07·09-08 stray-code 감사 문서(unmerged_branch_audit_2026-09-07*.md, *_2026-09-08.md) 어디에도 등장하지 않아 기존 고립 브랜치 전수 감사에서 누락됐다. 이 9건의 회수 여부는 stray-code 다음 회차 감사로 이관하고 이 태스크는 손대지 않는다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1081"
+paths:
+  - docs/reviews/eos_phase0_gate_a_e_judgment_2026-09-06.md
+session: null
+notes: "[발견 경위] 2026-09-10 Kiki 요청으로 별도 계획 문서(Phase 0 — Architecture Reset & Scope Freeze, 외부 docx)의 지시문 40개 이행 여부를 저장소와 대조하는 조사 중, F항목(Gate 0 최종 판정) 근거 문서를 열람하다 r5/r6 불일치를 발견했다."
+updated: 2026-09-10

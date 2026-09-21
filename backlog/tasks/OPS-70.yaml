@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-70
+title: "테스트가 저장소 정본 파일(anchors.yaml)을 실행 중 훼손 — xdist 병렬 리더와의 경쟁으로 무관 잡이 red (OPS-63 전역 오염의 파일시스템 축)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현·기전 확정(완료·이 태스크 등재 근거) — tests/backend/l1/test_eos_anchor_registry.py:199가 정본 data/corpus/eos_anchor_set_v1/anchors.yaml을 'anchors: []'로 덮어쓰고 최대 120초 subprocess를 돌린 뒤 되돌린다. -n auto 병렬에서 다른 워커가 그 창에 읽으면 AnchorRegistryError('anchors가 비어 있거나 리스트가 아니다')로 죽는다 — PR #1044 head 2523b06f에서 test_golden_benchmark.py::test_anchor_ids_match_frozen_registry가 그렇게 red. 로컬 실측 증거: 전체 스위트 실행 전후 anchors.yaml sha256 동일(4d06a7b8)인데 mtime만 바뀐다(=쓰기가 실재하나 내용은 복원됨)"
+  - "② 정본 파일 무훼손으로 전환 — 실패 주입 대상을 저장소 정본이 아니라 tmp_path 사본으로 옮긴다. 선행 확인 필요: scripts/analysis/eos_anchor_asset_audit.py의 main()은 현재 --out만 받고 레지스트리 경로는 모듈 상수 ANCHOR_REGISTRY_PATH 고정이라 경로 주입구가 없다(2026-09-07 실측). 따라서 ②는 그 스크립트에 --registry(기본=정본) 추가를 포함한다. cwd 트릭·심볼릭 링크로 우회하지 않는다(다른 리더도 같이 속는다)"
+  - "③ 변별력 — 정본을 훼손하는 형태로 되돌리는 뮤테이션에서 RED가 나는 가드를 둔다. 후보: 스위트 전후 data/corpus 정본 파일 mtime·해시 대조(세션 실측에 쓴 방법 그대로) 또는 tests/infra 전수 가드로 '테스트가 data/corpus 아래에 쓰지 않는다'를 동결. 정상 상태에서만 초록인 검사는 보호가 아니다"
+  - "④ 같은 형태 전수 점검 — 이 1건만 고치고 닫지 않는다. 저장소 정본 파일을 실행 중 write하는 테스트가 더 있는지 전수 스캔한다(이번 발견은 mtime 관측으로 우연히 걸렸고, grep 'data/corpus' + write_text로는 0건이 나왔다 — 검색 방법이 이 형태를 놓쳤다는 사실 자체가 ④의 근거)"
+  - "⑤ 범위 밖 — 429 레이트리미터 전역 오염은 OPS-63 소관(별건·중복 구현 금지). 이 태스크는 파일시스템 축만 다룬다"
+  - "②-정정: `scripts/analysis/eos_anchor_asset_audit.py`에 `--registry`(기본값=정본\n`data/corpus/eos_anchor_set_v1/anchors.yaml`) CLI 플래그를 추가하고 `load_anchor_defs()`/\n`step_anchor_registry()`가 그 값을 인자로 받도록 스레딩했다(선행 확인 사항이던 \"경로 주입구\n부재\"를 해소). `tests/backend/l1/test_eos_anchor_registry.py::test_broken_registry_still_writes_evidence`는\n더 이상 정본을 `write_text`로 훼손하지 않는다 — `tmp_path` 사본을 만들어 `--registry`로\n가리킨다. cwd 트릭·심볼릭 링크는 채택하지 않았다(다른 리더도 같이 속는 우회이므로 acceptance②의\n명시 배제를 따름).\n\n③ 변별력(결함 주입 2건, 각각 RED 확인 후 `cp` 백업으로 바이트 동일 복원 — git 계열 원복 금지):\n1. 테스트를 원래 형태(정본 직접 write_text + finally 복원)로 되돌림 →\n   `test_broken_registry_injection_never_touches_the_canonical_file`가 RED(스파이가\n   `Path.write_text`/`write_bytes` 호출 자체를 가로채므로, `finally` 복원 여부와 무관하게\n   검출한다 — 스위트 전후 해시 대조였다면 복원 후라 무증상이었을 것).\n2. 스크립트의 `step_anchor_registry`에서 `ctx.get(\"registry_path\")` 전달을 제거(→\n   `load_anchor_defs()`로 되돌림, `--registry` 플래그를 파싱만 하고 무시하는 회귀) →\n   `test_broken_registry_still_writes_evidence`가 RED(`--registry`로 깨진 사본을 가리켜도\n   스크립트가 정본을 계속 읽어 exit 0 — \"적재 실패가 exit 0으로 위장\" 그 자체가 재현됨).\n\n④ 전수 점검: naive `grep 'data/corpus' + write_text`가 이 결함을 놓친 이유(리터럴과 write\n호출이 다른 표현식)를 재현하지 않는 AST 기반 스캐너(함수 단위로 \"data/corpus\" 리터럴이 관여한\n변수명에 태그를 붙이고 그 변수에 대한 write_text/write_bytes/open(w) 호출을 탐지)로\n`tests/`·`scripts/` 전체를 스캔했다. 결과: 이 1건(수정 대상 그 자체) 외 추가 인스턴스 0건 —\n\"검색 방법이 이 형태를 놓쳤다\"는 지적을 그대로 해소하는 방법으로 재확인했고, 정직한 음성\n결과다(스캐너 자체는 세션 스크래치패드에만 존재 — 상시 CI 가드로 승격하지는 않았다. 이\n1건의 패턴이 반복 발생하는 근거가 아직 없어 과공학 방지 원칙상 보류).\n\n⑤ 부작용: `tests/infra/test_eos_feature_inventory_v2.py`(피처 인벤토리 대장)가 이 테스트\n파일의 신규 테스트 함수 2건을 집계에 반영하지 못해 드리프트 — `eos_feature_inventory_v2.py --write`로\n재생성."
+artifacts:
+  - "a0cd2374 (#1117)"
+paths:
+  - tests/backend/l1/test_eos_anchor_registry.py
+  - scripts/analysis/eos_anchor_asset_audit.py
+session: null
+notes: "발견 경위: PR #1044(MISC-20) CI 자체 점검. 이 PR의 diff는 앵커·하네스에 0줄이고 로컬 전체 스위트는 12079 passed로 통과 — 병렬 타이밍에만 나타나는 공유 상태 결함이다. OPS-63(프로세스 전역 InMemoryBackend)과 같은 유형의 파일시스템 판이며, 무관한 PR의 CI를 무작위로 red로 만들어 '내 변경이 깼나' 조사를 반복 유발한다.\n\n[정정 2026-09-11] 구현·변별력·전수점검 결과 기록"
+updated: 2026-09-11

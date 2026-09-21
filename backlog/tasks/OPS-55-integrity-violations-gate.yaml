@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P0
 owner: claude
@@ -15,11 +15,12 @@ acceptance:
   - "① orphan concept/skill/problem·dangling curriculum_ref·duplicate canonical_id·event schema_invalid 6종을 한 뷰(또는 동등 CLI)로 — 0건=exit 0·위반=exit 1"
   - "② 위반 주입 변별력 실측(성공/실패 양쪽 신호 확인)"
   - "③ 집행 별항: CI 잡 배선 실재 확인 — tests/infra 배선 계약 선례('저장소에 존재함≠돌아감'·OPS-10)"
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1091 — ops/integrity_violations_gate.py 6종(orphan concept/skill/problem·dangling curriculum_ref·duplicate canonical_id·event schema_invalid) 단일 CLI. hermetic 배선테스트 8건 + 실PG 통합테스트 9건(6종 전부 삽입→검출→cleanup 3단 왕복 변별력 실측). CI: backend-migrations 잡 배선 + tests/infra/test_integrity_violations_gate_wiring.py 3건이 배선 실재성 동결(OPS-10 선례). eos_feature_inventory_v2 WM-O-914 귀속."
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/**"
   - ".github/workflows/ci.yml"
 session: null
 notes: "출처: EOS-53 crosswalk 갭 #12(H2). G3 차단 조건('메타 누락 0')·CU 메타 완결성 판정 도구. 주간 지표 #4의 산출원.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/H2★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-10

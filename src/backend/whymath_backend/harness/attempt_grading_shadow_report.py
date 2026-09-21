@@ -21,9 +21,18 @@ parsed[*].formal`(자유서술 수식 문자열, 전 레포 소비자 0건 확�
 `verify_answer`의 수치 샘플링 경로가 *엉뚱한 변수*에 값을 넣어 거짓 pass/fail을 만들 수
 있다(조용한 오류 유입 — `verify_answer` 자체는 정직해도 호출자의 입력 조립이 틀리면 그
 정직성이 무의미해진다). `derive_verify_inputs`가 이 위험의 유일한 방어선이다: 모든 조건의
-`formal`이 파싱 가능하고 그 자유기호 합집합이 **정확히 `{"x"}`**(단일 미지수)일 때만
-파생하고, 아니면 `None`(비파생)으로 물러나 `verify_answer`를 아예 호출하지 않는다 — 다중
-미지수 문항은 이 슬라이스의 의도적 스코프 밖이다.
+`formal`이 파싱 가능하고 그 자유기호 합집합이 **정확히 하나**(단일 미지수)일 때만 파생하고,
+아니면 `None`(비파생)으로 물러나 `verify_answer`를 아예 호출하지 않는다 — 다중 미지수 문항은
+이 슬라이스의 의도적 스코프 밖이다.
+
+  *NLP-09 정정(2026-09-10)*: 원 구현은 위 게이트를 자유기호가 정확히 `{"x"}`일 때로 적었다.
+  이름을 못 박은 것은 위 위험의 보수적 *대리 지표*였는데, 실측이 그 대리가 과했음을 보였다 —
+  코퍼스 파생 실패 7,048건 중 진짜 다중 미지수는 **0건**이고 전량 단일 미지수 `y`였다
+  (`4*1/5 = y` 등). 게다가 미적분 은행은 `Integral(4*x**2+x-2,(x,0,2)) + 8 = y`처럼 `x`가
+  이미 적분 변수라, 코퍼스를 `x`로 "교정"하는 쪽이 오히려 충돌을 만든다. 그래서 판정 기준을
+  이름에서 **개수**로 옮겼다: 미지수가 하나뿐이면 오인할 대상 자체가 없고, 그 이름은 조건식
+  에서 읽어 오면 된다. 코퍼스 경로는 여기에 더해 **답산맵 키 == 조건식의 그 자유기호**까지
+  요구하므로 계약이 오히려 강해졌다(이전에는 코퍼스 경로가 자유기호를 아예 보지 않았다).
 
 **채점 대상은 항상 학생 제출값이다**: `derive_verify_inputs`가 반환하는 `answer_map`은
 `Problem.answer`(문항 정답 본문)로 채워지지만, 이는 파생 가능성(자유기호 게이트)을 확정하는
@@ -127,8 +136,14 @@ __all__ = [
 # 한다(verify_answer.py의 동일 관례 — `logger.debug("... 보수 회피: %s", type(exc).__name__)`).
 logger = logging.getLogger("whymath.harness.attempt_grading_shadow_report")
 
-# 이 슬라이스가 지원하는 유일한 미지수 이름 — 다중 미지수 문항은 스코프 밖(모듈 docstring).
-_SUPPORTED_UNKNOWN = "x"
+# 이 슬라이스가 지원하는 미지수 **개수** — 이름이 아니다(NLP-09).
+#
+# 원래는 `_SUPPORTED_UNKNOWN = "x"`였다. 이름을 못 박은 것은 "엉뚱한 변수에 학생 답을 대입"
+# 하는 사고를 막으려는 보수적 대리 지표였는데, 실측이 그 대리가 과했음을 보여 줬다 —
+# 파생 실패 7,048건이 전량 단일 미지수이고 이름만 `y`였다(진짜 다중 미지수 0건).
+# 지켜야 할 불변식은 이름이 아니라 **미지수가 하나뿐일 것**이다. 하나뿐이면 오인할 대상 자체가
+# 없고, 그 이름은 조건식에서 읽어 오면 된다.
+_SUPPORTED_UNKNOWN_COUNT = 1
 
 # NLP-05 — 파생 실패 원인(acceptance⑤). `derive_verify_inputs`가 None을 반환할 때의 사유.
 _NotDerivableReason = Literal[
@@ -198,16 +213,35 @@ def _load_corpus_verify_blocks() -> dict[str, tuple[list[str], dict[str, str]]]:
     return blocks
 
 
-def _can_parse_for_derivation(condition: str) -> bool:
-    """코퍼스 conditions 문자열이 verify_answer 수준에서 파싱 가능한지 사전 점검.
+def _free_symbol_names(parsed: object) -> set[str] | None:
+    """파싱된 식의 자유기호 이름 집합. 자유기호를 물을 수 없는 값이면 `None`.
+
+    `sympy.sympify("1 == 1")`처럼 파싱 결과가 파이썬 `bool`이면 `free_symbols` 자체가 없다.
+    그 경우 "자유기호 0개"가 아니라 **모른다**로 돌려준다 — 모른다를 아니다로 접으면
+    판정 불가 상태가 확정 신호로 둔갑한다(CLAUDE.md "모른다 ≠ 아니다").
+    실측상 현재 코퍼스 13,520블록에는 이 경로에 걸리는 건이 0이지만, 미지수 계약은
+    이 모듈의 유일한 방어선이므로 모르는 입력에서는 통과가 아니라 후퇴한다.
+    """
+    symbols = getattr(parsed, "free_symbols", None)
+    if symbols is None:
+        return None
+    return {str(s) for s in symbols}
+
+
+def _parse_for_derivation(condition: str) -> sympy.Basic | None:
+    """코퍼스 conditions 문자열을 verify_answer 수준의 관용도로 파싱한다(실패 시 `None`).
 
     `verify_answer._parse_condition`은 `=`/`==`/`Eq` 등을 모두 등식 잔차로 정규화하지만,
     `sympy.sympify` 단독으로는 `=`를 파이썬 대입문으로 보아 예외를 던진다. derivation 게이트는
-    실제 검산기와 동일한 관용도를 허용해야 하므로, 등호 정규화 후 sympify 시도로 판단한다.
+    실제 검산기와 동일한 관용도를 허용해야 하므로, 등호 정규화 후 sympify를 시도한다.
+
+    NLP-09: 반환형이 `bool`에서 **파싱된 식**으로 바뀌었다. 미지수 계약(단일 자유기호)을
+    판정하려면 파싱 성공 여부가 아니라 그 식의 `free_symbols`가 필요하기 때문이다 —
+    "파싱은 됐다"만 알고 자유기호를 안 보면 답산맵 키와 조건의 미지수가 어긋나도 통과한다.
     """
     normalized = condition.strip()
     if not normalized:
-        return False
+        return None
     # `=` 단독을 `==`로 정규화 -- `<=`, `>=`, `!=`, `==`는 건드리지 않는다.
     if (
         "=" in normalized
@@ -218,19 +252,33 @@ def _can_parse_for_derivation(condition: str) -> bool:
     ):
         normalized = normalized.replace("=", "==", 1)
     try:
-        sympy.sympify(normalized, evaluate=False)
+        return sympy.sympify(normalized, evaluate=False)
     except Exception:  # noqa: BLE001
-        return False
-    return True
+        return None
 
 
 def _derive_from_corpus(
     problem: Problem,
 ) -> tuple[list[str], dict[str, str]] | _UnclassifiedReason:
-    """`Problem.slug`로 코퍼스 verify 블록을 역조회해 단일 미지수(`x`) 파생 재료를 만든다.
+    """`Problem.slug`로 코퍼스 verify 블록을 역조회해 **단일 미지수** 파생 재료를 만든다.
 
-    answer_map 키가 정확히 `{"x"}`가 아니면 비파생 -- 다중 미지수는 이 슬라이스 스코프 밖.
     실패 시 `UnclassifiedReason` 문자열을 반환해 ceiling/shadow 리포트의 사유 계수를 채운다.
+
+    NLP-09 — 미지수 이름 `x` 하드코딩을 걷어냈다. 이전 게이트는 `answer_map` 키가 정확히
+    `{"x"}`가 아니면 전부 `multi_symbol`로 물렸는데, 실측 결과 그 7,048건은 **하나도**
+    다중 미지수가 아니었다: 전량 단일 미지수이며 이름이 `y`일 뿐이었다(예: `4*1/5 = y`).
+    코퍼스 저작이 틀린 것도 아니다 — 미적분 은행은 `Integral(4*x**2+x-2,(x,0,2)) + 8 = y`
+    처럼 `x`가 이미 적분 변수로 쓰이므로, `y`를 `x`로 바꾸는 "교정"은 오히려 충돌을 만든다.
+    즉 결함은 데이터가 아니라 파생기 쪽이었다.
+
+    다만 이름만 넓히면 위험하다. 모듈 docstring이 경고하는 진짜 사고는 "엉뚱한 변수에 값을
+    넣는 것"이고, 이름 자체는 그 위험의 대리 지표였을 뿐이다. 그래서 실제 불변식으로 바꾼다 —
+    **조건식의 자유기호가 정확히 하나이고 그것이 answer_map의 유일한 키와 같을 것.**
+    이는 기존보다 *강한* 계약이다: 예전에는 코퍼스 경로가 자유기호를 아예 보지 않아
+    `answer_map {"x": ...}` + `conditions "y + 1 = 0"` 같은 어긋난 짝도 통과했다.
+
+    판정 순서도 바꿨다(파싱 → 미지수 계약). 자유기호를 보려면 먼저 파싱돼야 하므로,
+    "파싱도 안 되는 식의 미지수"를 먼저 판정하던 이전 순서는 성립하지 않는다.
     """
     if not problem.slug:
         return "no_verify_block"
@@ -239,13 +287,19 @@ def _derive_from_corpus(
     if item is None:
         return "no_verify_block"
     conditions, answer_map = item
-    if set(answer_map.keys()) != {_SUPPORTED_UNKNOWN}:
-        return "multi_symbol"
     if not conditions or not conditions[0].strip():
         return "no_verify_block"
-    if not _can_parse_for_derivation(conditions[0]):
+    parsed = _parse_for_derivation(conditions[0])
+    if parsed is None:
         logger.debug("derive_verify_inputs corpus 비파생(conditions 파싱 실패)")
         return "parse_error"
+    free_symbols = _free_symbol_names(parsed)
+    if (
+        free_symbols is None
+        or len(free_symbols) != _SUPPORTED_UNKNOWN_COUNT
+        or free_symbols != set(answer_map)
+    ):
+        return "multi_symbol"
     return conditions, answer_map
 
 
@@ -276,12 +330,20 @@ def _derive_from_conditions_parsed(
         except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 비파생(pass 위장 금지)
             logger.debug("derive_verify_inputs 비파생(formal 파싱 실패): %s", type(exc).__name__)
             return "parse_error"
-        free_symbols |= {str(s) for s in parsed.free_symbols}
+        names = _free_symbol_names(parsed)
+        if names is None:
+            return "parse_error"
+        free_symbols |= names
         formals.append(formal)
 
-    if free_symbols != {_SUPPORTED_UNKNOWN}:
+    # NLP-09 — 미지수 **이름**이 아니라 **개수**로 판정한다. DB 경로에는 answer_map이 없고
+    # 이름 없는 `problem.answer` 하나뿐이라, 답산맵 키는 조건식에서 읽어 와야 한다. 예전처럼
+    # `{"x": answer}`를 무조건 만들면 조건이 `y`를 쓸 때 학생 답이 `y`가 아닌 `x`에 들어가
+    # `y`가 미결 자유기호로 남는다 — 모듈 docstring이 경고하는 "엉뚱한 변수" 그 자체다.
+    # 자유기호가 정확히 하나면 오인할 대상이 없으므로, 그 이름을 그대로 키로 쓴다.
+    if len(free_symbols) != _SUPPORTED_UNKNOWN_COUNT:
         return "multi_symbol"
-    return formals, {_SUPPORTED_UNKNOWN: problem.answer}
+    return formals, {next(iter(free_symbols)): problem.answer}
 
 
 def _derive_verify_inputs_with_reason(
@@ -309,14 +371,17 @@ def _derive_verify_inputs_with_reason(
 def derive_verify_inputs(problem: Problem) -> tuple[list[str], dict[str, str]] | None:
     """`Problem.conditions_parsed[*].formal` + `Problem.answer` → verify_answer 입력 파생.
 
-    단일 미지수(`x`) 문항만 지원한다(모듈 docstring 위험 설명). 다음 중 하나라도 해당하면
-    `None`(비파생) — **`verify_answer`를 호출하지 않는다**(false mismatch 근원 차단):
+    **단일 미지수** 문항만 지원한다 — 이름은 묻지 않는다(NLP-09 · 모듈 docstring 위험 설명).
+    다음 중 하나라도 해당하면 `None`(비파생) — **`verify_answer`를 호출하지 않는다**
+    (false mismatch 근원 차단):
       - 조건이 하나도 없음(`conditions_parsed`가 빈 목록)
       - `Problem.answer`가 없거나 공백만
       - 어느 조건의 `formal`이 없거나 공백만
       - 어느 조건의 `formal`이 SymPy로 파싱 불가(구문 오류 등 — 보수적 회피)
-      - 조건들의 자유기호 합집합이 정확히 `{"x"}`가 아님(미지수가 없거나·다른 이름이거나·
-        다중 변수인 경우 — 이 게이트가 "y를 x로 오인"류 오류를 막는 유일한 방어선)
+      - 조건들의 자유기호 합집합의 크기가 1이 아님(미지수가 없거나 둘 이상인 경우 —
+        이 게이트가 "학생 답을 엉뚱한 변수에 대입"하는 오류를 막는 유일한 방어선이다.
+        미지수가 하나면 대입할 자리가 하나뿐이라 오인 자체가 성립하지 않으므로, 이름이
+        `x`든 `y`든 `t`든 안전하다)
 
     NLP-05 추가: `conditions_parsed`로 파생 불가하면 `Problem.slug`로 코퍼스
     `verify.{conditions,answer_map}`을 역조회해 재시도한다. 코퍼스 verify 블록은
@@ -324,9 +389,11 @@ def derive_verify_inputs(problem: Problem) -> tuple[list[str], dict[str, str]] |
     전부 단일 미지수 `x`다(실측). 이 경로로 `derive_verify_inputs`가 0에서 벗어나
     `verify_answer`가 실제 호출된다.
 
-    반환은 `(conditions, answer_map)`이며 `answer_map`은 `{"x": problem.answer}` — 이 값은
-    "파생 가능성이 확정됐다"는 *틀*일 뿐, 실제 shadow 채점은 `grade_attempt`가 이 틀의 키에
-    학생 제출값을 대입해서 이뤄진다(모듈 docstring "채점 대상은 항상 학생 제출값이다").
+    반환은 `(conditions, answer_map)`이며 `answer_map`은 `{조건식의 유일한 미지수:
+    problem.answer}` — 키 이름이 `"x"`로 고정되지 않는다(NLP-09). 이 값은 "파생 가능성이
+    확정됐다"는 *틀*일 뿐, 실제 shadow 채점은 `grade_attempt`가 이 틀의 키에 학생 제출값을
+    대입해서 이뤄진다(모듈 docstring "채점 대상은 항상 학생 제출값이다"). 코퍼스 경로에서는
+    코퍼스가 적어 둔 `answer_map`을 그대로 쓰되, 그 키가 조건식의 자유기호와 같을 때만이다.
     """
     result, _reason = _derive_verify_inputs_with_reason(problem)
     return result

@@ -13,6 +13,10 @@ from typing import Any
 
 import pytest
 
+from whymath_backend.composition import (
+    default_assessment_answer_verifier,
+    default_expression_seal,
+)
 from whymath_backend.l3.models import RoutingRequest
 from whymath_backend.l3.render.adapter import RenderContext
 from whymath_backend.l3.render.dsl import ConceptDSL
@@ -175,6 +179,8 @@ class TestSupplyBranching:
             generate_request=_routing_request(),
             provider=provider,
             trace=trace,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
 
         assert result.content_source == "dsl_render"
@@ -193,6 +199,8 @@ class TestSupplyBranching:
             generate_request=_routing_request(),
             provider=provider,
             trace=trace,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
 
         assert result.content_source == "generate"
@@ -212,6 +220,8 @@ class TestSupplyBranching:
             generate_request=_routing_request(),
             provider=provider,
             trace=trace,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
 
         assert result.strategy is PedagogyStrategy.PROBLEM_BASED
@@ -227,6 +237,8 @@ class TestSupplyBranching:
             signals=StudentSignals(),
             session=_FakeSession(),
             cache=_FakeCache(),
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
         assert result.content_source == "generate"
         assert result.fallback_reason == REASON_NO_DSL
@@ -249,6 +261,8 @@ class TestSupplyDiscriminativePower:
                 generate_request=_routing_request(),
                 provider=_FakeProvider(),
                 trace=_RecordingTrace(),
+                seal=default_expression_seal(),
+                assessment_verifier=default_assessment_answer_verifier(),
             )
             return result.content_source
 
@@ -268,6 +282,8 @@ class TestGateCannotBeBypassed:
             session=_session_with_content(),
             cache=_FakeCache(),
             k_type="CONCEPT",
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
 
         assert result.strategy is not PedagogyStrategy.WORKED_EXAMPLE
@@ -326,6 +342,8 @@ class TestSupplyTally:
             session=_session_with_content(),
             cache=_FakeCache(),
             tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
         assert tally.counts.get("dsl_render") == 1
 
@@ -349,6 +367,8 @@ class TestSupplyTracing:
             session=_session_with_content(),
             cache=_FakeCache(),
             trace=trace,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
         assert any(r.get("content_source") == "dsl_render" for r in trace.records)
         assert any(r.get("cost_krw") == 0.0 for r in trace.records)
@@ -364,6 +384,8 @@ class TestRenderContextPassthrough:
             session=session,
             cache=_FakeCache(),
             ctx=RenderContext(bindings={"coef": "3"}),
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
         )
         assert result.content_source == "dsl_render"
         assert result.rendered is not None
