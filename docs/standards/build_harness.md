@@ -71,6 +71,56 @@ backlog/policy.yaml           조율 정책 — 겹침·ad-hoc 감지 강제 수
     종결(done·cancelled) 태스크는 면제 — 끝난 일에 등급을 소급하는 것은 분류가 아니라
     장부 청소다. 계약 동결 = `tests/harness/test_eos_priority_enforcement.py`(16건).
 
+## 2c. 사고 대장 — 회차를 산문이 아니라 데이터로 센다 (HARN-118)
+
+`backlog/incidents.ndjson` 한 줄이 사고 1건이다. 태스크·게이트와 같은 `backlog/` 대장이며
+같은 규칙을 받는다 — **손편집 금지**(`validate`·`check-edit` 훅이 스키마를 검사한다), 등재는
+CLI로만.
+
+### 왜 필요했나
+
+이 저장소는 같은 유형의 실패를 반복하면서 회차를 *산문으로* 셌다("동일 유형 3회차",
+"미병합 고립 4회차"). 그 결과 **문서마다 회차가 다르다** — 병렬 중복 구현은 CLAUDE.md가
+2회차, MEMORY 2026-09-01이 6회차, 실제 발생은 7회다
+(`docs/reviews/recurring_failure_taxonomy_2026-09-20.md` §2.7 실측). 회차를 셀 수 없으면
+"2회차부터 코드로 막는다"는 규칙도 집행할 수 없다.
+
+### 계약 3가지
+
+| 축 | 규칙 | 집행 지점 |
+|---|---|---|
+| 회차 계수 | `nth`는 **저장하지 않는다** — `compute_nth`가 같은 `series_id` 안에서 (date, 파일 위치) 순으로 계산한다. 저장하면 진실 원천이 둘이 되고, 과거 사고를 뒤늦게 등재할 때 조용히 어긋난다 | `incidents.compute_nth` |
+| 2회차 코드 착지 | 같은 계열 2회차 이상은 `fix_form`이 `code`·`task`·`rule+code`·`rule+task` 중 하나여야 하고 `fix_ref`(테스트 경로·태스크 ID)가 있어야 한다. 산문(`rule`)뿐이거나 `none`/`unknown`이면 **exit 1** | `incidents.repeat_settlement_error` · `incident add` |
+| 모른다 ≠ 1회차 | `series_id`가 비면 `nth`는 `None`이다. 0도 1도 아니다 — 미배정을 "첫 발생"으로 접으면 2회차 강제가 통째로 무력해진다 | 위와 같음 |
+
+### 시드와 계열 배정의 정직한 한계
+
+시드 676건은 `docs/data/recurring_failure_ledger_2026-09-20/incidents.jsonl`에서 왔고
+**전건 `reviewed: false`**(사람 검수 전)다. `series_id`는 시드의 회차 문자열을 키워드 표
+(`incidents.SERIES_KEYWORDS`)로 정규화한 *파생값*이며 원문은 `series_raw`에 그대로 남는다
+(`series_source: seed_keyword`). "반복 실수 9회차" 같은 **통산 카운터 표기는 일부러 미배정**
+으로 둔다 — 서로 다른 사고에 같은 번호가 붙으므로 계열 키가 될 수 없고, 억지로 묶으면
+회차가 거짓이 된다.
+
+그래서 `incident report`의 계열 표 회차는 **대장 레코드를 센 것**이고, 보고서 §2.7의 회차는
+*문서가 스스로 센 것*이라 같은 계열에서도 숫자가 다를 수 있다. 그 불일치가 이 대장을 만든
+이유이므로 한쪽을 다른 쪽에 맞추지 않는다.
+
+### 주간 지표 배선 (정본화 ≠ 집행)
+
+`incident report --json`의 세 수치(`total`·`max_series_nth`·`rule_only_ratio`)가
+`metrics/weekly.json`의 **`harness` 블록**으로 들어간다. EOS-51 §6이 동결한 기술 KPI 6종과는
+별개 블록이다 — 6종은 콘텐츠 제작 KPI이고 이 3종은 공정 자신의 건강 지표라, 섞으면 어느
+분모로 읽어야 하는지 알 수 없게 된다.
+
+- **정본화**: `ops/weekly_metrics_report.py`의 `--incidents-summary`
+- **집행 지점**: `.github/workflows/weekly-metrics.yml`의 선행 스텝이 매주 하네스 집계를 돌려
+  JSON을 건넨다 (백엔드는 `scripts/harness`를 임포트하지 않는다 — 하네스는 의존성 0 단독
+  실행이고 백엔드는 import-linter 계약 아래 있다)
+- **배선 동결**: `tests/infra/test_incident_metrics_wiring.py` — 스텝 부재·경로 불일치·순서
+  역전·`continue-on-error`를 결함 주입으로 각각 검출한다
+- 요약을 못 받으면 3종은 **`measured=false` + 사유**다. 0으로 채우지 않는다
+
 ## 3. 순차 조율 규칙 (selector)
 
 착수 가능 = `todo` ∧ 의존성 전부 done ∧ 게이트 전부 cleared/waived
@@ -590,7 +640,16 @@ python3 scripts/harness/backlog.py add --id ... --title ... --eos-priority P0|P1
 #   ↑ --eos-priority는 **필수**다 — 미지정은 exit 1 (계획서 100 Rule 1·3 집행 지점 · HARN-55).
 #     P0가 예산(policy.eos_p0_budget)에 닿았으면 --swap-out <기존 P0 id>로 교환한다(Rule 4)
 #   ↑ add는 등재 후 두 가지를 **고지**한다(차단 아님): 가시성(HARN-43)·의미 중복 후보(HARN-51)
-python3 scripts/harness/backlog.py validate        # 무결성 전수 검증
+python3 scripts/harness/backlog.py validate        # 무결성 전수 검증 (태스크·게이트·트랙 + 사고 대장 스키마)
+python3 scripts/harness/backlog.py incident report          # 사고 대장 표 5종 (§2c)
+python3 scripts/harness/backlog.py incident report --json   # 주간 지표(metrics/weekly.json harness 블록) 입력
+python3 scripts/harness/backlog.py incident series [<계열>]  # 계열 목록 또는 한 계열의 회차 전개
+python3 scripts/harness/backlog.py incident add --title "..." --cat B --series <계열> \
+        --fix-form code --fix-ref "tests/...::test_..." --who-caught bot --damage-class false_pass
+                    # 같은 계열 2회차 이상인데 fix_form이 rule/none/unknown이면 **exit 1** —
+                    # 산문 규칙은 집행 지점이 없어 막고 있는지 검증할 수 없다(HARN-118 ②).
+                    # 거부 사유는 계열·회차와 함께 stderr에 남는다. 1회차는 산문도 허용된다
+                    # (계열인 줄 모르는 시점이므로). incidents.ndjson 손편집 금지
 python3 scripts/harness/backlog.py claims list --verbose   # 원격 claim 현황 (누가 무엇을)
 python3 scripts/harness/backlog.py claims release <id> [--force]  # claim 해제 (남의 것은 --force)
 python3 scripts/harness/backlog.py claims reap [--apply]   # stale claim 청소 (기본 dry-run)
