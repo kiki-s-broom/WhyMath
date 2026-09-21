@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-61-verdict-guard-field-set-mismatch
+title: "ARCH-38 재확인 가드의 근거 필드 집합 불일치 — 허용목록 주석이 트리거 3을 '예측 5필드'로 지목(정본은 JSONB 진단 5필드)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 정정: `tests/backend/db/test_assessment_result_verdict_premise.py`의 `_ALLOWED_IMPORTERS` 중 `l2/learning_event_trace.py` 항목 주석이 재판정 트리거 3의 미발동 근거로 **예측 5필드**(`estimated_grade`·`estimated_score`·`estimated_percentile`·`target_university_id`·`admission_probability`)를 지목한다. 그러나 정본 `docs/architecture/canonical_entity_model_v1.md` §3-C가 트리거 2·3에서 말하는 \"5필드\"는 **JSONB 진단 5필드**(`concept_diagnosis`·`pattern_diagnosis`·`weak_points`·`strong_points`·`recommended_path`)다. 주석의 근거 문장을 정본 집합으로 바꾼다"
+  - "② 결론 불변 확인 후 명기: 그 모듈이 JSONB 5필드도 읽지 않는다는 것을 실측하고 주석에 적는다(2026-09-21 실측 — 읽는 컬럼은 `started_at`·`completed_at`·`assessment_type` 3종뿐이고 `select(Assessment)`는 시간선 투영용 조회 1곳). 즉 판정 결론은 바뀌지 않으며 이 태스크는 **근거 문장의 정정**이지 판정 변경이 아니다"
+  - "③ 전수 대조: 같은 파일 허용목록의 나머지 항목(`db/models/__init__.py`·`api/me.py`·`privacy/erasure.py`·`privacy/export.py`·`privacy/retention.py`·`harness/assessment_seat_reach_report.py`) 사유 문장도 \"5필드\"를 어느 집합으로 쓰는지 대조한다. 한 건만 고치고 나머지가 같은 혼동을 담고 있으면 정정이 아니다. 대조 결과를 0건이라도 적는다(CLAUDE.md 부재 판정 절차 — 검색 범위 명시)"
+  - "④ 회귀 방지 장치: 두 집합의 혼동이 재발하지 않도록 JSONB 5필드 집합을 이 파일의 명시 상수로 올리거나(예: `_JSONB_RESULT_FIELDS`) 정본 §3-C 문면과 대조하는 검사를 둔다. **단 장치를 만들면 실패 주입으로 RED를 먼저 확인한 뒤에만 보호로 계상한다** — 정상 입력에서 초록인 것은 보호의 증거가 아니다(CLAUDE.md 보호 장치 실패 주입). 주입은 \"정본의 5필드 목록을 예측 필드로 바꿔치기\" 1종 이상을 포함한다"
+  - "⑤ 범위 밖(명시): `ARCH-38` '혼입 유지' 판정 자체는 건드리지 않는다. 재판정 트리거 3종은 2026-09-21 조기 실측에서 **전건 미발동**이었고(트리거1 가드 5건 통과 · 트리거2 5필드 속성대입 0건·`update(Assessment)` 0건 · 트리거3 서빙 소비 reader 0건·`ASM-11` status=todo), 재판정 착수는 게이트 `G-arch38-verdict-recheck`와 `ARCH-40`이 소유한다. 이 태스크가 그 게이트를 닫거나 앞당기지 않는다"
+artifacts: []
+paths:
+  - tests/backend/db/test_assessment_result_verdict_premise.py
+  - docs/architecture/canonical_entity_model_v1.md
+session: null
+notes: "출처: 2026-09-21 게이트 `G-arch38-verdict-recheck`의 조기 실측 중 발견(판정 기준 main `3d534dcc`). 게이트의 재확인 지점은 2026-10-26이라 아직 35일 남았고, 그 사전 정보를 모으다 가드 주석의 근거 지목 오류가 드러났다.\n\n왜 사소하지 않은가: CLAUDE.md \"가드가 *막는다*는 주장도 주입으로 검증한다\"(2026-09-06)가 겨냥하는 형태다 — 차단·미발동의 **근거를 틀리게 지목**하면 그 문장을 믿고 판단하는 다음 세션이 어긋난 결론을 낸다. 여기서는 두 집합이 우연히 같은 결론(\"그 모듈은 안 읽는다\")을 내므로 지금 당장의 오판은 없지만, 근거와 결론이 서로 다른 것을 가리키는 상태 자체가 재확인 가드의 신뢰를 깎는다. 특히 이 파일은 `ARCH-38` 판정의 **자동 축 전부**를 지는 유일한 가드다.\n\n함께 기록(고치지 않고 적는다 — 별건): 판정 당시(2026-09-06) §3-C가 \"`pattern_diagnosis`가 비어 있고 소비처가 없어 이 용도로 쓴다\"고 적은 것과 달리, 지금은 `POST /v1/me/assessments/assemble`(L6 블루프린트 좌석)이 이 필드에 문항 id 배열을 **실데이터로 쓴다**(`api/me.py`의 `_blueprint_pattern_diagnosis`). 행을 새로 만들며 쓰는 **생성 writer**라 재판정 트리거 2(갱신 writer)는 미발동이지만, 그 배열을 되읽어 무엇을 낼지 결정하는 코드가 생기면 **트리거 3이 발동**한다. 2026-10-26 재확인 때 볼 감시 대상이 하나 늘었다는 사실을 `ARCH-40`·게이트 판정자가 알아야 한다.\n\n측정 범위(명시): 이 컨테이너에는 sqlalchemy가 없어 백엔드 전체 스위트를 돌리지 못했다. 해당 가드는 순수 AST라 `--noconftest`로 실행해 5건 통과(exit 0)를 확인했고, 트리거 2·3은 세션이 별도 AST 스캔·grep으로 잰 값이지 CI 게이트의 판정이 아니다."
+updated: 2026-09-21

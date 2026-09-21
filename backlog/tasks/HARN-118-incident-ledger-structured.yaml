@@ -16,7 +16,8 @@ acceptance:
   - "② 2회차 코드 착지 강제 — 같은 series_id의 2회차 이상을 `incident add`로 등재할 때 fix_form이 rule(산문)뿐이면 exit 1로 거부하고, code 또는 task 참조(테스트 파일 경로·HARN/OPS 태스크 ID)를 요구한다. 뮤테이션: 2회차 rule-only 등재 주입 → RED, code 참조 부착 → GREEN. 거부 사유가 stderr에 series·nth와 함께 남는다."
   - "③ 시드·리포트 — `docs/data/recurring_failure_ledger_2026-09-20/incidents.jsonl` 676건을 시드로 적재(사람 검수 열 `reviewed: false` 기본). `incident report`가 대분류·월·피해·대책 형태·계열 최대 회차 표를 낸다(보고서 §2 표와 같은 형식·재계산 일치 검증). `weekly_metrics_report`에 사고 건수·계열 최대 회차·산문만 대책 비율 3종 append 배선(정본화≠집행 분리 — 집행 지점 = weekly-metrics 워크플로 스텝에서 실제 호출됨을 `tests/infra`가 동결)."
 artifacts:
-  - "https://github.com/kiki-s-broom/WhyMath/pull/1241 (squash 머지 0469f289 — 사고 대장 676건·incident CLI 4종·2회차 코드 착지 게이트·주간 지표 harness 블록)"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1241"
+  - 0469f2891061486495b47ac8e84c9bdcd393de82
 paths:
   - "backlog/incidents.*"
   - scripts/harness/incidents.py
