@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - scripts/harness/ci_job_coverage.py
   - tests/infra/test_ci_job_coverage.py
-session: null
+session: claude/tender-pasteur-82eu60
 notes: "출처: 2026-09-17 PR #1189(EOS-105) CI red. CLAUDE.md '검사 판정 무효화' 계열의 3회차이며, 그 규칙 본문이 이 태스크를 기계 집행으로 지목한다.\n\n3회차 경위(같은 규칙이 세 번 다른 입구로 뚫렸다):\n· 2026-08-09 — 검사 대상 *경로*를 좁혔다(black --check -q | tail).\n· 2026-09-10 — 한 잡 안에서 검사 *종류*를 빠뜨렸다(pytest만 돌리고 mypy·lint-imports·게이트 CLI 미실행). 대책은 산문 규칙(\"로컬 검증은 CI 잡의 스텝 목록을 열어 놓고 맞춘다\").\n· 2026-09-17 — 그 산문 규칙을 충실히 따랐는데도 뚫렸다. backend 잡 16스텝을 전건 exit 0으로 재현했으나 infra-contracts 잡이 통째로 미실행이었다. 그 규칙 문장이 \"잡\"을 단수로 전제하기 때문이다.\n\n왜 코드여야 하는가: 잡 누락은 로컬 화면에 실패 스텝도 skipped 스텝도 남기지 않는다 — 그냥 없다. 사람이 \"내가 무엇을 안 봤는가\"를 눈으로 알아내려면 워크플로 전체를 매번 다시 읽어야 하고, 그 읽기를 건너뛴 것이 정확히 이번 사고다. 텍스트 규칙 2회 실패 후 코드 착지 선례(PB-02 그랜드파더 만료 계약)를 따른다.\n\n실측 참고(판정 기준 main 27df076e): ci.yml의 잡 중 이번 PR이 실제로 닿았던 것은 backend와 infra-contracts 두 개였고, infra-contracts에서만 도는 검사가 EOS 기능 인벤토리 전수 귀속(test_eos_feature_inventory_v2.py)과 prod 스키마 프로브(test_prod_schema_probe.py)다. 둘 다 \"신규 자산을 대장에 귀속시켰는가\"를 묻는 부류라 새 모듈·새 마이그레이션을 추가하는 PR이면 반드시 닿는다.\n\n[정정 2026-09-19] 4회차 실례 기록 — PR #1216에서 잡을 전수 열거했는데도 스코프 판정을 틀렸다(changes 잡 path filter를 읽지 않고 근거를 지어냄). acceptance 2가 이미 겨냥한 축이라 설계 변경 불요이고 우선순위 근거만 강화된다"
-updated: 2026-09-19
+updated: 2026-09-21
