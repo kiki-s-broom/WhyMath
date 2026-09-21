@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-39-math-notation-rendering
+title: "수식렌더링 flutter_math_fork 전환(모바일) — S3-24 버킷B⑤ 회수"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 브랜치 S3-39(원 커밋 75c3dda / 섀도 58d55d1d)의 표기 계층 기반을 main 위에 이식 — lib/shared/math/math_notation.dart(표기 정규화·세그먼트·수학 판정 0)와 lib/shared/widgets/math_text.dart(KaTeX 조판·조각별 원문 폴백)는 섀도 팁 blob과 바이트 동일(main에 부재 파일이라 충돌 불가). ② flutter_math_fork ^0.7.4 재도입 — MOB-09의 \"사용처 0\" 제거 근거가 순환이었음(그 사용처를 만든 커밋이 고립돼 있었다)을 pubspec 주석에 정정 기록. ③ 배선 3화면(chat_screen 발문·학생 버블·선택지 / coach_emphasis_text 코치 버블 / problem_screen 발문·보기)을 main 현재 구조 위에 수동 재적용 — 자동 병합에 의존하지 않고 훅 전건 검토. ④ 검증: CI mobile 잡 5스텝 전건 재현 exit 0 (pub get --enforce-lockfile / build_runner / analyze 0 issues / test 488 passed / 커버리지 83.7% >= 60%)."
+artifacts: []
+paths:
+  - "src/mobile/lib/shared/**"
+  - src/mobile/lib/features/chat/presentation/chat_screen.dart
+  - src/mobile/lib/features/chat/presentation/coach_emphasis_text.dart
+  - src/mobile/lib/features/problems/presentation/problem_screen.dart
+  - src/mobile/pubspec.yaml
+session: null
+notes: "[S3-24 버킷B⑤ 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w (42일 미머지·45커밋). 설계 판정은 섀도 시점에 Kiki가 선택 (A)로 확정한 것을 그대로 따른다. main이 그 사이 채택한 latex_to_plain.dart(MOB-06/MATH-01·LaTeX→평문·백엔드 계약 동결)와는 역할이 다르다 — latex_to_plain은 verify 계약으로 보낼 평문 생성이고, MathText는 화면 표시용 조판이다. MathLive WebView는 입력 전용이라 발문·코치 발화·선택지 표시는 원래부터 커버되지 않았다."
+updated: 2026-09-21

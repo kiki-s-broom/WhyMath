@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MOB-23-active-problem-stale-reset-recovery
+title: "활성 문제 stale 리셋 회수 — 문제 전환·로그아웃 후 직전 문제 잔존(k20m0w 고립분)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수 대상 고정: 고립 브랜치 claude/whymath-issues-review-k20m0w의 커밋 04b6f9be(브랜치 내 ID는 MOB-12, 이후 브랜치 자체 재개명으로 MOB-14) — activeProblemProvider가 문제 전환·로그아웃 후에도 직전 문제를 들고 있어, 결함 신고 등 그 provider를 읽는 화면이 이전 문제 id로 접수하는 stale 결함. 산출물 8파일: auth_controller.dart(로그아웃 시 리셋)·problem_screen.dart(onStart에서 null 경유 후 재세팅)·auth_controller_test(73줄)·chat_screen_test(69줄)·problem_screen_test(76줄).\n② 번호 충돌 주의: main의 MOB-12/MOB-13/MOB-14는 전부 *다른* 태스크(인증 세션 수명주기·콘텐츠 공급 루프·scene 계약 동결)가 이미 점유했다. 원 번호를 재사용하지 말고 CLI가 배정한 이 ID로 착지한다.\n③ 이식 방식: 통째 머지 금지(main이 분기점 이후 463커밋 이동). 파일 단위 수동 재적용 후 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트) exit 0.\n④ 회귀 기준선: main 402 passed(2026-09-21 실측). S3-24 버킷B 회수 착지 후에는 그 시점 main을 기준선으로 다시 잡는다."
+artifacts: []
+paths:
+  - src/mobile/lib/features/auth/application/auth_controller.dart
+  - src/mobile/lib/features/problems/presentation/problem_screen.dart
+  - src/mobile/test/auth_controller_test.dart
+  - src/mobile/test/chat_screen_test.dart
+  - src/mobile/test/problem_screen_test.dart
+session: null
+notes: "[분리 경위] S3-24 버킷B 회수(이 세션) 도중 발견. 섀도 브랜치에서 problem_screen.dart·problem_screen_test.dart·chat_screen_test.dart를 MOB-12가 *먼저* 건드리고 그 위에 S3-24 항목들이 쌓여 있어, 브랜치 팁을 그대로 취하면 S3-24와 무관한 MOB-12가 조용히 섞여 들어온다. 실제로 한 번 섞였고(게다가 auth_controller 쪽 절반은 안 따라와 불완전 이식 상태였다), main 버전에서 다시 시작해 S3-24 커밋만 재적용하는 방식으로 전량 제외했다. 제외 확인은 특정 마커 3종(problem_screen의 state = null / chat_screen_test의 _FakeDefectReportApi / problem_screen_test의 stale 이전 문제)이 0건임으로 실측했다.\n[중복 소유 주의] 같은 브랜치의 비보안 회수는 MOB-18-issues-review-nonsecurity-recovery도 소유한다. 다만 MOB-18은 claim이 release됐고(3d570b8c) 소유 브랜치 claude/whymath-system-review-n75r24는 원격에 없으며 부분 회수(PB-04·#1031)만 머지된 stale in_progress다 — 착수 전 MOB-18과의 경계를 먼저 확정할 것."
+updated: 2026-09-21

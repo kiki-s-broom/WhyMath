@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-37-mathlive-autofocus
+title: "수식 입력 화면 자동 포커스 — 웹 훅을 Dart에 배선(S3-24 버킷B③ 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 24e3c6f1의 mathlive_input_screen autofocus opt-in + webview 포커스 스크립트 배선을 이식. ② S3-50과 한 쌍으로 착지(단독으로는 실기기 공백이 남는다). ③ 검증: CI mobile 5스텝 exit 0."
+artifacts: []
+paths:
+  - src/mobile/lib/features/chat/presentation/mathlive_input_screen.dart
+  - src/mobile/lib/features/chat/presentation/mathlive_input_webview.dart
+  - src/mobile/test/mathlive_autofocus_test.dart
+session: null
+notes: "[S3-24 버킷B 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w(42일 미머지·45커밋·PR로 노출된 적 없음). 이식은 파일 단위 수동 재적용이며 통째 머지를 쓰지 않았다(main이 분기점 이후 463커밋 이동). 같은 브랜치의 MOB-12(activeProblemProvider stale 리셋)는 S3-24 소관이 아니라서 전량 제외했다 — 그 회수는 별도 태스크가 소유한다. 검증은 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트)."
+updated: 2026-09-21
