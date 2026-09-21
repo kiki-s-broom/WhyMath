@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -22,6 +22,10 @@ paths:
   - scripts/harness/backlog.py
   - "tests/harness/test_incidents*.py"
   - "docs/data/recurring_failure_ledger_2026-09-20/**"
-session: null
-notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §5 P1·§4 M1/M5. 사고 676건·규칙 52건 중 산문만 56%·계열 최대 11회차인데 회차 계수가 문서마다 다르다. 이 태스크가 착지하면 CLAUDE.md 새 산문 규칙 등재 동결(§5.3)이 성립한다. HARN-121(헌법 다이어트)의 사고 경위 이동 대상이 이 대장이다."
-updated: 2026-09-20
+  - src/backend/whymath_backend/ops/weekly_metrics_report.py
+  - tests/backend/ops/test_weekly_metrics_harness_block.py
+  - tests/infra/test_incident_metrics_wiring.py
+  - ".github/workflows/weekly-metrics.yml"
+session: claude/peaceful-franklin-fo4p3q
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §5 P1·§4 M1/M5. 사고 676건·규칙 52건 중 산문만 56%·계열 최대 11회차인데 회차 계수가 문서마다 다르다. 이 태스크가 착지하면 CLAUDE.md 새 산문 규칙 등재 동결(§5.3)이 성립한다. HARN-121(헌법 다이어트)의 사고 경위 이동 대상이 이 대장이다.\n\n[정정 2026-09-21] paths ['backlog/incidents.*', 'scripts/harness/incidents.py', 'scripts/harness/backlog.py', 'tests/harness/test_incidents*.py', 'docs/data/recurring_failure_ledger_2026-09-20/**'] → ['backlog/incidents.*', 'scripts/harness/incidents.py', 'scripts/harness/backlog.py', 'tests/harness/test_incidents*.py', 'docs/data/recurring_failure_ledger_2026-09-20/**', 'src/backend/whymath_backend/ops/weekly_metrics_report.py', 'tests/backend/ops/test_weekly_metrics_harness_block.py', 'tests/infra/test_incident_metrics_wiring.py', '.github/workflows/weekly-metrics.yml']: acceptance 3의 weekly_metrics_report append 배선·집행 지점(워크플로 스텝)·그 배선을 동결하는 tests/infra가 선언 범위 밖이었다 — 범위 확장"
+updated: 2026-09-21

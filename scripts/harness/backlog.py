@@ -47,6 +47,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
+import incidents as incidents_mod
 import pathscope
 import remote_claims
 import report
@@ -3071,9 +3072,177 @@ def cmd_audit_deps(root: Path, args: argparse.Namespace) -> int:
     return 1
 
 
+def _incident_ledger_errors(root: Path) -> list[str]:
+    """사고 대장 스키마 검사 — validate·check-edit 공용 (HARN-118 ① '손편집 금지').
+
+    두 호출처가 같은 함수를 쓰는 것이 핵심이다. 훅만 검사하면 CI가 못 보고, CLI만
+    검사하면 편집 직후를 못 본다 — 이 저장소는 "만들었는데 어느 잡도 실행하지
+    않던" 상태를 이미 3회 겪었다(OPS-03·08·11).
+    """
+    _, errors = incidents_mod.load_incidents(root)
+    return errors
+
+
+def cmd_incident(root: Path, args: argparse.Namespace) -> int:
+    action = args.incident_command
+    if action == "add":
+        return _cmd_incident_add(root, args)
+    if action == "report":
+        return _cmd_incident_report(root, args)
+    if action == "series":
+        return _cmd_incident_series(root, args)
+    if action == "seed":
+        return _cmd_incident_seed(root, args)
+    return _fail(f"incident: 알 수 없는 하위 명령 '{action}'")
+
+
+def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건 — 등재 전에 고쳐라:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+
+    candidate = incidents_mod.Incident(
+        date=args.date or _today(),
+        cat=args.cat,
+        title=args.title,
+        sub=args.sub,
+        cause=args.cause,
+        damage=args.damage,
+        damage_class=args.damage_class,
+        fix_form=args.fix_form,
+        fix_ref=args.fix_ref,
+        series_id=args.series or "",
+        who_caught=args.who_caught,
+        quote=args.quote,
+        src=args.src,
+        line=args.line,
+        series_raw=args.series_raw,
+        series_source="manual" if args.series else "",
+        reviewed=True,  # CLI 등재 = 사람/세션이 지금 쓴 것. 시드만 reviewed=False다.
+    )
+    schema_errors = candidate.validate()
+    if schema_errors:
+        print("❌ 사고 스키마 위반:", file=sys.stderr)
+        for error in schema_errors:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+
+    # ② 2회차 코드 착지 강제 — 거부 사유는 series·nth와 함께 stderr에 남는다.
+    blocked = incidents_mod.repeat_settlement_error(ledger, candidate)
+    if blocked:
+        print(f"❌ 사고 등재 거부 — {blocked}", file=sys.stderr)
+        return 1
+
+    ledger.append(candidate)
+    ledger.sort(key=lambda i: i.date)
+    incidents_mod.save_incidents(root, ledger)
+    nth = incidents_mod.next_nth([i for i in ledger if i is not candidate], candidate)
+    store.append_event(
+        root,
+        "incident_add",
+        candidate.series_id or "-",
+        cat=candidate.cat,
+        nth=nth,
+        fix_form=candidate.fix_form,
+        fix_ref=candidate.fix_ref,
+        title=candidate.title,
+    )
+    where = "계열 미배정" if nth is None else f"계열 {candidate.series_id} {nth}회차"
+    print(f"▶ 사고 등재 ({where}) — {candidate.date} [{candidate.cat}] {candidate.title}")
+    print(f"  대장: {incidents_mod.ledger_path(root).relative_to(root)} (총 {len(ledger)}건)")
+    return 0
+
+
+def _cmd_incident_report(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    aggregated = incidents_mod.aggregate(ledger)
+    if args.json:
+        json.dump(aggregated.to_json(), sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+    else:
+        print(incidents_mod.render_report(aggregated))
+    return 0
+
+
+def _cmd_incident_series(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    nths = incidents_mod.compute_nth(ledger)
+    if args.series:
+        members = [(i, n) for i, n in zip(ledger, nths, strict=True) if i.series_id == args.series]
+        if not members:
+            return _fail(f"계열 '{args.series}' 에 등재된 사고가 없다")
+        print(f"# 계열 {args.series} — {len(members)}건")
+        for incident, nth in sorted(members, key=lambda m: m[1] or 0):
+            settled = "✔" if incident.fix_form in incidents_mod.SETTLING_FIX_FORMS else "·"
+            ref = f" → {incident.fix_ref}" if incident.fix_ref else ""
+            print(f"  {nth}회차 {settled} {incident.date} [{incident.cat}] {incident.title}{ref}")
+        return 0
+    aggregated = incidents_mod.aggregate(ledger)
+    print(f"# 계열 {len(aggregated.series)}종 — 사고 {aggregated.total}건")
+    for row in aggregated.series:
+        settled = "code/task" if row.settled else "산문뿐"
+        print(
+            f"  {row.max_nth:>2}회차  {row.series_id:<40} "
+            f"{row.first_date}~{row.last_date}  {settled}"
+        )
+    print(f"  (계열 미배정 {aggregated.unassigned_series}건 — 회차 미계수)")
+    return 0
+
+
+def _cmd_incident_seed(root: Path, args: argparse.Namespace) -> int:
+    existing, _ = incidents_mod.load_incidents(root)
+    if existing and not args.force:
+        return _fail(
+            f"사고 대장에 이미 {len(existing)}건이 있다 — 덮어쓰려면 --force "
+            f"(시드는 최초 1회다. append는 `incident add`를 쓴다)"
+        )
+    source = Path(args.source)
+    if not source.is_absolute():
+        source = root / source
+    if not source.exists():
+        return _fail(f"시드 원천이 없다: {source}")
+    seeded, errors = incidents_mod.seed_from_jsonl(source)
+    if errors:
+        print(f"❌ 시드 원천 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    incidents_mod.save_incidents(root, seeded)
+    aggregated = incidents_mod.aggregate(seeded)
+    # 레포 밖 원천(테스트 픽스처·외부 추출본)도 허용하므로 relative_to를 강제하지 않는다 —
+    # 여기서 ValueError가 나면 적재는 끝났는데 이벤트만 못 남기는 반쪽 상태가 된다.
+    try:
+        source_ref = str(source.relative_to(root))
+    except ValueError:
+        source_ref = str(source)
+    store.append_event(root, "incident_seed", "-", count=len(seeded), source=source_ref)
+    print(f"▶ 사고 대장 시드 {len(seeded)}건 적재 — {incidents_mod.ledger_path(root)}")
+    print(
+        f"  계열 {len(aggregated.series)}종 배정 · 미배정 {aggregated.unassigned_series}건 · "
+        f"최대 회차 {aggregated.max_series_nth} · 전건 reviewed=false(사람 검수 전)"
+    )
+    return 0
+
+
 def cmd_validate(root: Path, args: argparse.Namespace) -> int:
     backlog, schema_errors = _load(root)
     errors = store.validate_backlog(backlog, schema_errors)
+    # HARN-118 ① — 사고 대장도 backlog/ 의 대장이다. 손편집이 조용히 통과하면
+    # 회차 계수가 틀어지고, 틀어진 회차는 2회차 강제를 통째로 무력화한다.
+    errors.extend(_incident_ledger_errors(root))
     warnings = _stage_outliers_on_gated_tracks(backlog)
     # 취소된 선행 차단 (HARN-67 ②) — 무결성 위반이 아니다(대장은 정합하다·차단은 결정 대기).
     # red로 만들면 정당한 cancel이 CI를 깨고, 그러면 사람이 cancel 대신 손편집으로 도망간다.
@@ -3354,6 +3523,7 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     if "backlog/" in file_path.replace("\\", "/"):
         backlog, schema_errors = _load(root)
         errors = store.validate_backlog(backlog, schema_errors)
+        errors.extend(_incident_ledger_errors(root))
         if errors:
             print(
                 f"[빌드하네스] backlog 직접 편집 후 무결성 위반 {len(errors)}건:",
@@ -4081,6 +4251,47 @@ def build_parser() -> argparse.ArgumentParser:
         help="그랜드파더 무시하고 전건 표시 (감사 모드 — 항상 exit 0)",
     )
     p.set_defaults(func=cmd_audit_deps)
+
+    p = sub.add_parser("incident", help="사고 대장 — 회차 계수·2회차 코드 착지 강제 (HARN-118)")
+    isub = p.add_subparsers(dest="incident_command", required=True)
+
+    ip = isub.add_parser("add", help="사고 1건 등재 (같은 계열 2회차부터 code/task 상환 필수)")
+    ip.add_argument("--title", required=True, help="한 줄 요약 (≤80자)")
+    ip.add_argument("--cat", required=True, choices=list(incidents_mod.CATS), help="대분류 A~K")
+    ip.add_argument("--date", default=None, help="사고 발생일 YYYY-MM-DD (기본 오늘)")
+    ip.add_argument("--sub", default="", help="소분류 자유 라벨")
+    ip.add_argument("--cause", default="", help="근본 원인 1줄")
+    ip.add_argument("--damage", default="0", help="피해 정량 (없으면 0)")
+    ip.add_argument("--damage-class", default="none", choices=list(incidents_mod.DAMAGE_CLASSES))
+    ip.add_argument(
+        "--fix-form",
+        default="unknown",
+        choices=list(incidents_mod.FIX_FORMS),
+        help="대책 형태 — 2회차 이상은 code|task|rule+code|rule+task 만 허용",
+    )
+    ip.add_argument("--fix-ref", default="", help="대책 식별자 (테스트 파일 경로·태스크 ID·PR)")
+    ip.add_argument("--series", default="", help="계열 슬러그 (소문자 kebab) — 회차 계산 키")
+    ip.add_argument("--series-raw", default="", help="문서가 적은 회차 문자열 원문(있으면)")
+    ip.add_argument("--who-caught", default="unknown", choices=list(incidents_mod.WHO_CAUGHT))
+    ip.add_argument("--quote", default="", help="근거 인용 ≤120자")
+    ip.add_argument("--src", default="", help="출처 파일")
+    ip.add_argument("--line", type=int, default=None, help="출처 줄 번호")
+
+    ip = isub.add_parser("report", help="대분류·월·피해·대책 형태·계열 최대 회차 표")
+    ip.add_argument("--json", action="store_true", help="집계를 JSON으로 (주간 지표 입력용)")
+
+    ip = isub.add_parser("series", help="계열 목록 또는 한 계열의 회차 전개")
+    ip.add_argument("series", nargs="?", default="", help="계열 슬러그 (생략 시 전체 목록)")
+
+    ip = isub.add_parser("seed", help="추출 산출물 JSONL → 대장 최초 적재")
+    ip.add_argument(
+        "--source",
+        default="docs/data/recurring_failure_ledger_2026-09-20/incidents.jsonl",
+        help="시드 원천 JSONL (레포 상대 경로 허용)",
+    )
+    ip.add_argument("--force", action="store_true", help="이미 적재된 대장을 덮어쓴다")
+
+    p.set_defaults(func=cmd_incident)
 
     p = sub.add_parser("validate", help="백로그 무결성 전수 검증")
     p.add_argument("--quiet", action="store_true")

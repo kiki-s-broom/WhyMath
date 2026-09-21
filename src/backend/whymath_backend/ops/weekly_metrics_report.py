@@ -54,7 +54,7 @@ import asyncio
 import json
 import logging
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -70,8 +70,11 @@ from whymath_backend.db.models.review_timer_event import (
 from whymath_backend.ops.hit_cu_metrics import HitCuReport, aggregate
 
 __all__ = [
+    "HARNESS_METRIC_NAMES",
     "KPI_NAMES",
     "STRUCTURALLY_UNMEASURED",
+    "build_harness_metrics",
+    "load_incidents_summary",
     "KpiValue",
     "WeeklyRecord",
     "build_record_from_report",
@@ -126,6 +129,20 @@ class KpiValue:
         }
 
 
+# 하네스 지표 3종 (HARN-118 ③) — EOS-51 §6의 "기술 KPI 6종"과 **별개 블록**이다.
+#
+# 왜 `KPI_NAMES`에 합치지 않는가: 이 모듈의 docstring이 "문서가 실제로 동결한 6종만
+# 집계하고 7번째를 지어내지 않는다"를 명시적 계약으로 걸고 있고(2026-09-11 "7지표"
+# 표기 정정), 그 계약을 지키면서 사고 지표를 같은 원장에 실으려면 블록을 나누는 것이
+# 유일한 길이다. 6종은 EOS 검증 설계가 정의한 *콘텐츠 제작* KPI이고, 이 3종은 *공정
+# 자신*의 건강 지표다 — 섞으면 어느 쪽 분모로 읽어야 하는지 알 수 없게 된다.
+HARNESS_METRIC_NAMES: tuple[str, ...] = (
+    "incident_count",  # 대장에 등재된 사고 총건수
+    "max_series_nth",  # 계열 최대 회차 — 같은 유형이 몇 번 뚫렸는가
+    "rule_only_fix_ratio",  # 대책이 산문(rule)뿐인 사고의 비율
+)
+
+
 @dataclass(frozen=True, slots=True)
 class WeeklyRecord:
     """주간 리포트 1행 — `metrics/weekly.json`(JSON 배열)의 원소 1개."""
@@ -134,6 +151,9 @@ class WeeklyRecord:
     week_end: str  # ISO8601 — 집계 창 끝(미포함)
     generated_at: str  # ISO8601 — 이 행을 만든 시각
     kpis: dict[str, KpiValue]
+    # 하네스 지표 3종 — 기본 빈 dict가 아니라 *항상 3키*다(아래 build_harness_metrics가
+    # 미측정도 키를 채운다). 빈 dict로 두면 "안 쟀다"와 "못 쟀다"가 같은 모양이 된다.
+    harness: dict[str, KpiValue] = field(default_factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -141,7 +161,76 @@ class WeeklyRecord:
             "week_end": self.week_end,
             "generated_at": self.generated_at,
             "kpis": {name: kpi.to_json() for name, kpi in self.kpis.items()},
+            "harness": {name: kpi.to_json() for name, kpi in self.harness.items()},
         }
+
+
+def load_incidents_summary(path: Path | None) -> tuple[dict[str, Any] | None, str | None]:
+    """`backlog.py incident report --json` 산출물 읽기 → (요약, 실패 사유).
+
+    백엔드는 `scripts/harness`를 **임포트하지 않는다** — 하네스는 의존성 0 단독 실행
+    설계이고 백엔드는 import-linter 계약 아래 있다. 그래서 집계 로직을 재구현하지 않고
+    (이중 진실 원천 금지) 하네스가 낸 JSON을 파일로 건네받는다. 그 전달을 실제로 수행하는
+    자리는 `weekly-metrics.yml`의 선행 스텝이며, 그 배선은 `tests/infra`가 동결한다
+    (정본화 ≠ 집행).
+
+    실패는 **사유를 돌려준다** — 예외 타입명을 포함한다(침묵 실패 금지). 사유가 있으면
+    호출측이 `measured=False`로 낸다. 0으로 위장하지 않는다.
+    """
+    if path is None:
+        return None, "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+    if not path.exists():
+        return None, f"사고 요약 파일 없음: {path}"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"사고 요약 읽기 실패 — {type(exc).__name__}: {exc}"
+    if not isinstance(data, dict):
+        return None, f"사고 요약이 객체가 아님 (받은 타입 {type(data).__name__})"
+    return data, None
+
+
+def build_harness_metrics(
+    summary: dict[str, Any] | None, *, failure_reason: str | None = None
+) -> dict[str, KpiValue]:
+    """사고 요약 → 하네스 지표 3종. 순수 함수 — I/O 0.
+
+    요약이 없거나 필요한 키가 비면 **그 지표만** 미측정이다. 하나가 빠졌다고 셋 다
+    버리지 않고, 하나가 있다고 나머지를 0으로 채우지도 않는다.
+    """
+    units = {
+        "incident_count": "count",
+        "max_series_nth": "count",
+        "rule_only_fix_ratio": "ratio",
+    }
+    if summary is None:
+        reason = failure_reason or "사고 요약 미수집"
+        return {
+            name: KpiValue(measured=False, value=None, unit=units[name], reason=reason)
+            for name in HARNESS_METRIC_NAMES
+        }
+
+    source_keys = {
+        "incident_count": "total",
+        "max_series_nth": "max_series_nth",
+        "rule_only_fix_ratio": "rule_only_ratio",
+    }
+    metrics: dict[str, KpiValue] = {}
+    for name in HARNESS_METRIC_NAMES:
+        raw = summary.get(source_keys[name])
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
+            metrics[name] = KpiValue(
+                measured=False,
+                value=None,
+                unit=units[name],
+                reason=(
+                    f"사고 요약에 '{source_keys[name]}' 키가 없거나 수치가 아님 "
+                    f"(받은 값 {raw!r})"
+                ),
+            )
+        else:
+            metrics[name] = KpiValue(measured=True, value=float(raw), unit=units[name])
+    return metrics
 
 
 def build_record_from_report(
@@ -152,6 +241,7 @@ def build_record_from_report(
     generated_at: datetime,
     krw_per_usd: float | None,
     db_failure_reason: str | None = None,
+    harness: dict[str, KpiValue] | None = None,
 ) -> WeeklyRecord:
     """`HitCuReport`(또는 DB 실패 시 `None`) → `WeeklyRecord`. 순수 함수 — I/O 0.
 
@@ -249,6 +339,10 @@ def build_record_from_report(
         week_end=week_end.isoformat(),
         generated_at=generated_at.isoformat(),
         kpis=kpis,
+        # `harness`가 None이어도 빈 dict가 아니라 **미측정 3키**를 채운다 —
+        # 키가 없으면 "안 쟀다"와 "못 쟀다"가 같은 모양이 되고, 그러면 원장을 읽는 쪽이
+        # 미수집을 0으로 읽는다(CLAUDE.md: 측정 실패가 "0건 통과"로 위장되면 안 된다).
+        harness=harness if harness is not None else build_harness_metrics(None),
     )
 
 
@@ -302,6 +396,7 @@ async def collect(
     generated_at: datetime,
     krw_per_usd: float | None,
     database_url: str | None = None,
+    harness: dict[str, KpiValue] | None = None,
 ) -> WeeklyRecord:
     """DB에 연결해 한 주간 리포트를 만든다. 연결·쿼리 실패는 예외를 삼키지 않고 타입명과
     함께 전체 4종을 미측정 처리한다(침묵 실패 금지 — CLAUDE.md)."""
@@ -316,6 +411,7 @@ async def collect(
             week_end=week_end,
             generated_at=generated_at,
             krw_per_usd=krw_per_usd,
+            harness=harness,
         )
     except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지(CLAUDE.md): 타입명을 반드시 로그.
         _logger.error(
@@ -331,6 +427,7 @@ async def collect(
             generated_at=generated_at,
             krw_per_usd=krw_per_usd,
             db_failure_reason=f"DB 연결/조회 실패 — {type(exc).__name__}",
+            harness=harness,
         )
     finally:
         await engine.dispose()
@@ -386,6 +483,15 @@ def main(argv: list[str] | None = None) -> int:
         help="USD→KRW 환율(단위비용 KPI 산출에 필요) — 미지정 시 그 KPI만 미측정",
     )
     parser.add_argument(
+        "--incidents-summary",
+        type=Path,
+        default=None,
+        help=(
+            "`backlog.py incident report --json` 산출물 경로 — 하네스 지표 3종의 입력 "
+            "(미지정 시 그 3종만 미측정. 0으로 채우지 않는다)"
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="집계만 하고 파일에 쓰지 않음(stdout에 출력)"
     )
     args = parser.parse_args(argv)
@@ -393,12 +499,18 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(UTC)
     week_start, week_end = _resolve_window(now=now)
 
+    summary, summary_failure = load_incidents_summary(args.incidents_summary)
+    if summary_failure is not None:
+        _logger.warning("weekly_metrics_report: 하네스 지표 미수집 — %s", summary_failure)
+    harness = build_harness_metrics(summary, failure_reason=summary_failure)
+
     record = asyncio.run(
         collect(
             week_start=week_start,
             week_end=week_end,
             generated_at=now,
             krw_per_usd=args.krw_per_usd,
+            harness=harness,
         )
     )
 
