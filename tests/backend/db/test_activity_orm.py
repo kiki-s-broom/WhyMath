@@ -200,6 +200,7 @@ def test_problem_attempt_roundtrip_jsonb_and_loose_ref() -> None:
         ocr_result={"text": "f(x)=x^2", "conf": 0.9},
         step_times=[{"step": 1, "seconds": 30}, {"step": 2, "seconds": 120}],
         stuck_at_concept_id=stuck,
+        selected_choice_index=2,
     )
     orm = OrmProblemAttempt.from_schema(s)
     assert orm.attempt_id == aid
@@ -208,6 +209,7 @@ def test_problem_attempt_roundtrip_jsonb_and_loose_ref() -> None:
     assert orm.ocr_result == {"text": "f(x)=x^2", "conf": 0.9}
     assert orm.step_times == [{"step": 1, "seconds": 30}, {"step": 2, "seconds": 120}]
     assert orm.stuck_at_concept_id == stuck
+    assert orm.selected_choice_index == 2
 
     back = orm.to_schema()
     assert back.attempt_id == aid
@@ -215,6 +217,16 @@ def test_problem_attempt_roundtrip_jsonb_and_loose_ref() -> None:
     assert back.step_times == s.step_times
     assert back.stuck_at_concept_id == stuck
     assert back.used_solution_view is False
+    assert back.selected_choice_index == 2
+
+
+def test_problem_attempt_selected_choice_index_defaults_to_none() -> None:
+    """ASM-06: selected_choice_index 미지정(자유응답형 등) → None으로 보존(기존 행 호환)."""
+    s = SchemaProblemAttempt()
+    orm = OrmProblemAttempt.from_schema(s)
+    assert orm.selected_choice_index is None
+    back = orm.to_schema()
+    assert back.selected_choice_index is None
 
 
 def test_problem_attempt_default_step_times() -> None:

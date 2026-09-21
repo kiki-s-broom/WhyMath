@@ -1,0 +1,3372 @@
+{
+ "version": 1,
+ "max_notes": 5,
+ "notes": [
+  {
+   "kind": "rule",
+   "ref": "R-033a",
+   "paths": [
+    "tests/harness/test_cli.py"
+   ],
+   "text": "확장 — 도구가 *기본값으로* 자르는 축 (2026-09-01)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-033d",
+   "paths": [
+    "scripts/harness/ci_job_coverage.py",
+    "tests/infra/test_ci_job_coverage.py"
+   ],
+   "text": "확장 — 스텝 목록을 맞추기 전에 *잡 목록*을 맞춘다 (2026-09-17 · 같은 계열 3회차)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-036",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/pyproject.toml",
+    "src/data-pipeline/pyproject.toml",
+    "tests/backend/**",
+    "tests/backend/conftest.py"
+   ],
+   "text": "부분 스위트 통과를 전체 통과의 근거로 보고 금지",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-037",
+   "paths": [
+    ".dockerignore",
+    ".env.prod.example",
+    ".github/**",
+    ".github/branch-protection-setup.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    "Dockerfile",
+    "docker-compose.prod.yml",
+    "docs/architecture/**",
+    "infra/**",
+    "tests/infra/**",
+    "tests/infra/test_test_suite_wiring.py"
+   ],
+   "text": "검증 장치를 만들고 배선 확인 없이 완료 선언 금지",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-039",
+   "paths": [
+    "scripts/ops/check_ps_scripts.py"
+   ],
+   "text": "측정·수집 도구를 성공 경로만 보고 설계 금지 (2026-08-22 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-040d",
+   "paths": [
+    ".github/branch-cleanup-request.txt",
+    ".github/workflows/branch-cleanup.yml"
+   ],
+   "text": "확장 — 뮤테이션 전건 RED는 *커버리지*의 증거가 아니다 (2026-09-08 · 동일 유형 3회차)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-043",
+   "paths": [
+    ".github/branch-protection-setup.md",
+    ".github/workflows/**",
+    "tests/infra/**"
+   ],
+   "text": "설정 부재를 설정 가능으로 단정 금지 (가용성 확인 절차 — 2026-09-07 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-046",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "셸 인자에 마크다운 백틱을 담아 CLI에 넘기기 금지 (2026-09-08 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-047",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "태스크 ID 번호를 추론으로 배정 금지",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-048",
+   "paths": [
+    "src/backend/whymath_backend/api/_growth_evidence_state.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/growth_evidence_exposure.py",
+    "tests/backend/api/test_me_growth_evidence*.py"
+   ],
+   "text": "정본화를 집행으로 착각한 완료 선언 금지 (2026-08-04 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-049",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/dep_declaration.py",
+    "tests/harness/test_dep_declaration.py",
+    "tests/infra/test_dep_declaration_wiring.py"
+   ],
+   "text": "선행 조건을 산문에만 적고 대장에 집행하지 않기 금지 (2026-09-01 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-053",
+   "paths": [
+    ".claude/commands/**",
+    "CLAUDE.md",
+    "MEMORY.md",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/**"
+   ],
+   "text": "완료 산출물을 PR 없이 브랜치에 남긴 채 세션 종료 금지 (2026-08-11 등재)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-059a",
+   "paths": [
+    ".editorconfig",
+    ".gitattributes",
+    "docs/standards/encoding_safety.md",
+    "scripts/harness/**",
+    "scripts/ops/cp949_guard.py",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/ops/**",
+    "tests/backend/**",
+    "tests/harness/**",
+    "tests/infra/test_ruleset_drift.py"
+   ],
+   "text": "확장 — 셸이 중계하는 제3 도구 출력은 셸을 통과시키지 않는다 (2026-09-14 · 같은 계열 4회차)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-066a",
+   "paths": [
+    ".claude/hooks/fence_guard.py",
+    ".claude/settings.json",
+    "scripts/ops/check_ps_scripts.py",
+    "tests/infra/**",
+    "tests/infra/test_fence_guard.py"
+   ],
+   "text": "확장 — 증거는 펜스에 넣지 않는다 (2026-09-10 · 동일 유형 2회차)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-066b",
+   "paths": [
+    ".claude/hooks/fence_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_fence_guard.py"
+   ],
+   "text": "확장 — 금지형에서 대체형으로, 그리고 기계 집행 (2026-09-18 · 동일 유형 3회차)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-069b",
+   "paths": [
+    "docs/ops/g_skb01_concept_behavior_skills_populate_runbook.md"
+   ],
+   "text": "확장 — 대화형 붙여넣기의 제어 흐름 3축 (2026-09-14 등재 · 위 `throw` 가드 처방의 정정)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
+   "ref": "R-069c",
+   "paths": [
+    "docs/ops/skb03_atom_node_populate_runbook.md",
+    "scripts/ops/check_runbook_blocks.py",
+    "tests/infra/test_runbook_write_guard.py"
+   ],
+   "text": "확장 — 쓰기 블록은 사람 판정에 기대지 않고 스스로 거부한다 (2026-09-15 등재 · 위 축 ③의 정정 · 동일 유형 2회차)",
+   "weight": 100
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-03",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_clear_attribution.py"
+   ],
+   "text": "gate_clear 이벤트 actor가 브랜치명 — 사람/에이전트 판정 불가, 스쿼시로 저자 소실",
+   "weight": 6
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "amend --acceptance에 백틱 4곳이 명령 치환으로 실행돼 식별자 무증상 소실, append 전용이라 복구 불가",
+   "weight": 6
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-14",
+   "paths": [
+    ".editorconfig",
+    ".gitattributes",
+    "data/licenses/snapshots/**",
+    "docs/standards/encoding_safety.md",
+    "scripts/ops/cp949_guard.py"
+   ],
+   "text": "라이선스 스냅샷 5건 sha256 훼손 — .gitattributes 부재로 CRLF→LF 정규화, 3건 복원 불가",
+   "weight": 6
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-19",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "shadow 턴 라벨이 마지막 판정만 추출해 unverifiable로 구조적 왜곡",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-26",
+   "paths": [
+    "tests/backend/**",
+    "tests/backend/conftest.py"
+   ],
+   "text": "test_devices.py 3건이 이미 오염 중인데 뒤 테스트가 우연히 치워줘 green(기준선 green은 운)",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-26",
+   "paths": [
+    ".github/**",
+    "tests/infra/**"
+   ],
+   "text": "tests/infra 192건이 어떤 CI 잡에서도 실행되지 않던 위장 게이트(testpaths 한정)",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "src/backend/whymath_backend/api/_auth.py",
+    "src/backend/whymath_backend/api/concepts.py",
+    "src/backend/whymath_backend/api/problems.py",
+    "src/backend/whymath_backend/db/models/user.py",
+    "src/backend/whymath_backend/schema/enums.py"
+   ],
+   "text": "위임 세션 '실 PG 통합 12/12 passed' 보고 부정확 — 독립 재검증에서 2건 different loop 실패",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-08",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/pathscope.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/infra/test_harness_subprocess_encoding.py"
+   ],
+   "text": "pathscope·store의 except Exception이 로그 없이 []·unknown 반환 — 경로 겹침 보호 침묵 사망",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-08",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/pathscope.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/infra/test_harness_subprocess_encoding.py"
+   ],
+   "text": "하네스 git 서브프로세스 cp949 디코드 붕괴 — HARN-11 탐지가 Kiki 머신에서 상시 fail-open, 12건 노출",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-09",
+   "paths": [
+    "src/backend/whymath_backend/l3/**",
+    "src/backend/whymath_backend/l4/**",
+    "src/mobile/lib/**"
+   ],
+   "text": "모바일 검증 환경 함정 — build_runner 미실행 시 가짜 오류 594건·flutter clean 없으면 13건 위장 실패",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/access_matrix.json",
+    "tests/backend/schema/**"
+   ],
+   "text": "access_matrix produced_by가 ASM-07이 삭제한 필드를 지목하는데 거버넌스 게이트 green(심볼 실재 미해석)",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/**"
+   ],
+   "text": "access_matrix.json이 backend CI 필터에 없어 계약만 고친 PR은 게이트 미실행 — 바로 위 주석 답습 실패",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/harness/attempt_grading_shadow_report.py",
+    "src/backend/whymath_backend/harness/selective_grading_demotion_eval.py",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/backend/harness/test_attempt_grading_shadow_report.py",
+    "tests/backend/harness/test_selective_grading_demotion_eval.py"
+   ],
+   "text": "backlog validate가 done+artifacts sha의 트렁크 도달을 검사하지 않아 고립 done을 green 통과",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "data/notation_contract.json",
+    "data/scene_contract.json",
+    "data/segmentation_contract.json",
+    "src/backend/whymath_backend/l3/symbolic_equivalence.py",
+    "src/backend/whymath_backend/l5/ocr/verify.py",
+    "src/mobile/lib/features/chat/domain/latex_to_plain.dart",
+    "src/mobile/test/latex_to_plain_test.dart",
+    "src/web/graphing-calculator/src/lib/mathExpr.js",
+    "src/web/graphing-calculator/test/notation_contract.test.js",
+    "tests/backend/l3/test_notation_contract.py"
+   ],
+   "text": "mobile CI 필터 구멍 4건 — 착륙한 Dart 골든 4계약이 미집행, skip이 required check 충족으로 계상",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-22",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "backlog.py overlap이 todo끼리 paths 동일(NLP-06·COLLAB-04)에도 '겹침 없음' 출력",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "backlog/tasks/**"
+   ],
+   "text": "overlap을 인자 없이 실행해 EXIT=2인데 grep 0을 '겹침 0건'으로 읽음 — 실제 11건",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "기존 테스트 4건이 '다른 파일을 옮겨도 포팅'을 계약으로 동결",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness"
+   ],
+   "text": "ARCH-41이 미래 조건 재측정을 acceptance에만 적고 트리거 비움 — ARCH-40 직후 같은 형태 재발",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/test_ci_contract_fixture_trigger_wiring.py"
+   ],
+   "text": "PR #997 backend 잡 conclusion=skipped — 동결 문서가 CI 필터 밖(동결 입력 사각 4회차)",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/dep_declaration.py",
+    "tests/harness/test_dep_declaration.py"
+   ],
+   "text": "_REF_RE 후행 \\b가 한글 조사 직결 표기(EOS-49의)를 못 잡아 위반 누락",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/backup/backup_status.py",
+    "scripts/backup/backup_whymath_pg.ps1",
+    "scripts/backup/check_backup_freshness.ps1",
+    "tests/infra/test_backup_encryption.py"
+   ],
+   "text": "backup_status.json이 Step 7에서 성공 기록 후 Step 9 미러 실패 → 감시가 매 회차 실패를 '정상'으로",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness"
+   ],
+   "text": "폐기 판정 브랜치의 done 사본을 HARN-11 필터가 '이미 완료'로 읽어 ADMIN-02가 next에서 가려짐",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    ".github/scripts/pr_auto_resync.sh"
+   ],
+   "text": "자동 재동기화가 behind PR #1059를 UNKNOWN으로 건너뜀 — 형식적 정상·실효 0",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-26",
+   "paths": [
+    "docs/standards/incident_response_slo.md",
+    "src/backend/whymath_backend/api/_degradation.py",
+    "src/backend/whymath_backend/api/_device_store.py",
+    "src/backend/whymath_backend/api/_rate_limit.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/l3/cache/**",
+    "tests/backend/api/**",
+    "tests/backend/l3/**"
+   ],
+   "text": "/health/ready 200인데 Redis 다운 시 학생 5xx — 레디니스 정책≠동작 보증 잠복 결함",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-27",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/harness/**",
+    "tests/harness/**",
+    "tests/infra/test_infra_lint_wiring.py"
+   ],
+   "text": "tests/harness·scripts/harness를 lint하는 잡 0 + black 드리프트 17파일 선재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-27",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/**"
+   ],
+   "text": "tests/infra를 lint/format하는 CI 잡이 없던 상태(OPS-11 등재)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/data_pipeline/**",
+    "tests/infra/**"
+   ],
+   "text": "lint 무배선 4건 추가 발견 — scripts 7파일·benchmark 2·루트 conftest·tests/data_pipeline 75파일",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/data_pipeline/**",
+    "tests/infra/**"
+   ],
+   "text": "ruff per-file-ignores tests/** 설정이 아무것도 매치한 적 없는 죽은 설정",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l1/problem_bank/**",
+    "src/backend/whymath_backend/l3/equivalent/orchestrator.py",
+    "tests/backend/harness/**",
+    "tests/backend/l1/problem_bank/**",
+    "tests/backend/l3/equivalent/test_orchestrator.py"
+   ],
+   "text": "answer_kind 화이트리스트가 finite_probability/finite_count 미포함 → 조용히 None 강등",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "data/corpus/**",
+    "docs/data/**"
+   ],
+   "text": "v1.1 problem.schema.yaml이 구본 저작권 스탠스('평가원 인용 OK')로 정본 행세",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "태스크 ID 번호 충돌 2회차 — ARCH-13 2건 머지 완료·OPS-15 2건 인플라이트, validate exit 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "src/backend/whymath_backend/api/_auth.py",
+    "src/backend/whymath_backend/api/concepts.py",
+    "src/backend/whymath_backend/api/problems.py",
+    "src/backend/whymath_backend/db/models/user.py",
+    "src/backend/whymath_backend/schema/enums.py"
+   ],
+   "text": "/v1/concepts·/v1/problems CUD 6라우터+/v1/generate 완전 무인증(DELETE 포함)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "shadow-data-s3-pilot 브랜치 9일 고립(70커밋·128파일) — 등재된 텍스트 규칙이 재발을 못 막음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "docker-compose.prod.yml",
+    "infra/**",
+    "src/backend/whymath_backend/privacy/retention_purge_cli.py"
+   ],
+   "text": "보존 파기 CLI 완비인데 부르는 스케줄 grep 0 — 집행되지 않는 상태(존재함≠돌아감)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "src/backend/whymath_backend/api/study.py",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l3/render/**",
+    "src/backend/whymath_backend/l4/content_supply.py"
+   ],
+   "text": "숙달 판정 학생은 437개 전 개념에서 404 — assessment=None 무조건→can_render 항상 False·지표 소비처 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "data/corpus/concept_visual_style_v1/**",
+    "src/backend/whymath_backend/l1/atom_graph/populate.py",
+    "src/backend/whymath_backend/l1/concept_visual_style/**",
+    "src/backend/whymath_backend/l1/concept_visualization/**"
+   ],
+   "text": "전 시각화 스택(2,141행 계산기 포함) 학생 도달 0회 — 두 오버레이 프로덕션 적재 호출 4함수 전건 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-31",
+   "paths": [
+    "src/backend/whymath_backend/api/_ocr_state.py",
+    "src/backend/whymath_backend/api/ocr.py",
+    "src/mobile/lib/features/ocr/**",
+    "tests/backend/api/test_ocr*.py"
+   ],
+   "text": "OCR 코드 완결인데 배포 경로 양쪽 비활성 — 파일럿 /v1/ocr 503·클라가 503/401/422 무변별(3회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-31",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/learning_metrics_rollup_cli.py",
+    "src/backend/whymath_backend/l2/**",
+    "src/backend/whymath_backend/privacy/retention.py",
+    "tests/backend/api/test_learning_metrics_rollup_integration.py",
+    "tests/backend/l2/test_learning_metrics_rollup.py",
+    "tests/backend/privacy/test_learning_metrics_privacy_plan.py"
+   ],
+   "text": "daily_learning_metrics 등 3테이블 — 파기·반출·보존 배관 등재인데 writer 0(동일 실패 유형 재발)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-31",
+   "paths": [
+    "src/backend/whymath_backend/privacy/**",
+    "tests/backend/privacy/**"
+   ],
+   "text": "파기 완전성 검사 방향이 반대 — planned<=order만 단언해 신설 user_id 테이블 누락 시 red 없음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-01",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/ops/*",
+    "tests/backend/api/test_me_next_problem*.py"
+   ],
+   "text": "추천 엔진 입력 루프 단절 — Flutter 13개 엔드포인트에 attempts POST 없어 problem_attempt 0행(4~6회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/harness/qa_pipeline.py",
+    "tests/backend/harness/test_qa_pipeline.py",
+    "tests/infra/test_ci_enforcement_declaration_contract.py",
+    "tests/infra/test_qa_pipeline_wiring.py"
+   ],
+   "text": "ARCH-21 QA 게이트가 CI 배선됐으나 continue-on-error로 상시 fail-open — 3겹 무력(돌아감≠막음)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/ops/provenance_audit.py",
+    "tests/infra/**"
+   ],
+   "text": "S6 상시성 재검증이 ci.yml 3파일 하드코딩으로 3/7 코퍼스만 배선 — 1,478문(55.8%) 미배선",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/db/models/assessment.py",
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/db/test_assessment_seat_reach_report_integration.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "assessment 4테이블 — 조회·완료·삭제·프라이버시 5표면 완비인데 생성 코드 0건(8회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/alembic/versions/*",
+    "src/backend/whymath_backend/db/models/user.py",
+    "src/backend/whymath_backend/schema/user.py",
+    "tests/backend/api/test_no_lockout_columns.py"
+   ],
+   "text": "dead 컬럼 4개(school_id·subscription_*) — 만들고 읽지 않음의 스키마 판(8회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/ops/*",
+    "src/backend/whymath_backend/privacy/audit.py",
+    "src/backend/whymath_backend/schema/enums.py",
+    "tests/backend/ops/**"
+   ],
+   "text": "require_content_admin 게이트는 섰으나 CONTENT_ADMIN 부여 경로 0건 — 아무도 통과 불가(7회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "data/corpus/concept_visualization_v1/**",
+    "src/backend/whymath_backend/l1/concept_visualization/**",
+    "tests/backend/l1/test_concept_visualization_orphan_gate.py"
+   ],
+   "text": "visualizability 코퍼스 7/7 orphan — is_visualizable fail-open 보호가 2회+ 반복 무력",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/*",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "tests/backend/api/test_me_harness_metrics*.py",
+    "tests/backend/harness/test_wh1_evaluation*.py"
+   ],
+   "text": "교수법 콘텐츠 슬롯 파이프라인이 프로덕션 호출자 0·학생 reader 0로 완전 격리(역방향 8회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/gating.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/l6/**",
+    "src/mobile/lib/features/problems/**",
+    "tests/backend/api/**"
+   ],
+   "text": "기본 CAT이 저작권 게이트 우회·L6 모드 6종 학생 도달 0·fetch 상한 1000<2647로 1,647문 후보 불가",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "data/corpus/problem_bank_*/**",
+    "docs/data/**",
+    "scripts/harness/**",
+    "src/backend/whymath_backend/l1/problem_bank/**",
+    "src/backend/whymath_backend/l3/equivalent/**",
+    "src/backend/whymath_backend/ops/provenance_audit.py",
+    "tests/harness/**",
+    "tests/infra/**"
+   ],
+   "text": "미병합 고립 3회차 — 완료 태스크 4건(S3-11·S3-10·ARCH-19·S4-14) 4일 고립·실피해 4건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/*",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "tests/backend/api/test_me_harness_metrics*.py",
+    "tests/backend/harness/test_wh1_evaluation*.py"
+   ],
+   "text": "성장 증거 11지표 서버 계산 완비인데 Flutter 호출 결정 자체 부재 — 학생 도달 0(7회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/l4/misconception/visualize.py"
+   ],
+   "text": "오개념 교정 시각화 visualize_misconception() 코드·테스트 완비인데 production 호출자 0건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/api/scene.py",
+    "src/backend/whymath_backend/api/visualization.py",
+    "src/backend/whymath_backend/l3/cross_verify.py",
+    "src/backend/whymath_backend/l3/equivalent/**",
+    "src/backend/whymath_backend/l3/router.py",
+    "src/backend/whymath_backend/l4/misconception/judge_seam.py",
+    "src/backend/whymath_backend/ops/cost_probe.py"
+   ],
+   "text": "클라우드 승급 가드 3축이 학생 경로 6곳 하드코딩(budget 0·free)으로 4겹 차단 — 도달 0·변별력 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "학습경로 위상정렬이 기본 max_depth=1에서 96.4% 무력 — 200·테스트 18건 green인데 '돌아서' 안 보임(8회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "학습목표(Objective) 파이프라인·API 완비인데 실데이터 895 중 1개(0.1%) — 파일럿 후 확장 정지(7회차)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "src/mobile/lib/core/router.dart",
+    "src/mobile/lib/features/chat/**",
+    "src/mobile/lib/features/onboarding/**",
+    "src/mobile/test/**"
+   ],
+   "text": "5원칙 원칙 4(복귀 지원)가 정본인데 현행 역행 — 온보딩 매 실행 노출·대화 복원 0·열린 태스크 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "src/backend/whymath_backend/api/_growth_evidence_state.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/growth_evidence_exposure.py",
+    "tests/backend/api/test_me_growth_evidence*.py"
+   ],
+   "text": "PED-06 노출 계약 서빙 미집행 — importer는 CLI+자기 테스트뿐, /harness-metrics가 원시 11지표 반환",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    ".github/workflows/**",
+    "docker-compose*.yml",
+    "infra/**",
+    "tests/infra/**"
+   ],
+   "text": "리포트 CLI 11개 중 러너 보유 1개(cost_report) — 실데이터 수치 한 번도 산출 0회, 미측정이 문제 없음으로 읽힘",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "미머지 9개 브랜치가 done 13건 고립 — 브리핑이 이미 done된 S3-26을 착수 후보 3위로 추천",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/mobile/lib/features/problems/**",
+    "src/mobile/lib/features/profile/presentation/me_screen.dart",
+    "src/mobile/test/**"
+   ],
+   "text": "성장의 증거가 클라 메모리까지 도달했는데 렌더 0 — DiagnosisState 전량인데 화면은 4필드만 읽음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "src/mobile/test/governance/anti_gamification_governance_test.dart",
+    "tests/backend/l1/test_anti_gamification_governance.py"
+   ],
+   "text": "5원칙 #2(남과 비교하지 않는다)가 문서 20곳+ 인용되나 기계 강제 0 — 게이트 _ROOTS 8종이 비교 파생 어근 미포함",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "docs/architecture/data_platform_module_gap_review.md",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/visualization_reach_report.py",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "src/mobile/lib/core/router.dart",
+    "src/mobile/lib/features/chat/**",
+    "src/mobile/lib/features/onboarding/**",
+    "src/mobile/lib/features/problems/**",
+    "src/mobile/lib/features/profile/presentation/me_screen.dart",
+    "src/mobile/test/**",
+    "tests/backend/ops/test_declared_unwired_audit.py",
+    "tests/backend/ops/test_slo_contract.py",
+    "tests/infra/test_declared_unwired_audit_wiring.py"
+   ],
+   "text": "선언≠배선 신규 3건(S4-22 EventType 소비자 0·MOB-10 모바일 화면 0·MOB-11 호출측 0) — 계열 6회 반복",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "src/backend/alembic/**",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/db/models/dialogue.py",
+    "src/backend/whymath_backend/harness/growth_evidence_exposure.py",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "src/backend/whymath_backend/l3/verify_final_answer.py",
+    "src/backend/whymath_backend/l4/completion.py",
+    "src/mobile/lib/features/problems/**",
+    "tests/backend/harness/test_wh1_evaluation*.py"
+   ],
+   "text": "증명 지표 5종 중 계산 가능 1종 — attempts 0행·duration 송신 0·session 0·ClickHouse 실체 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-08",
+   "paths": [
+    "src/backend/whymath_backend/harness/wh1_primary.py",
+    "src/backend/whymath_backend/l1/*",
+    "tests/backend/harness/test_wh1_*probe*.py"
+   ],
+   "text": "WH-1 도구6 select_probe 라이브 구조적 항상 실패 — 공급자 0, 판별 문항 없음이 정상 폴백으로 위장",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "data/visual_style_contract.json",
+    "src/backend/whymath_backend/harness/visualization_reach_report.py",
+    "src/backend/whymath_backend/l3/visualization.py",
+    "src/backend/whymath_backend/l3/viz_eval.py",
+    "src/backend/whymath_backend/l4/visualization_policy.py",
+    "src/backend/whymath_backend/schema/visualization.py",
+    "src/mobile/assets/graphing_calculator/**",
+    "src/web/graphing-calculator/src/GraphingCalculator.jsx",
+    "src/web/graphing-calculator/src/lib/graph2dSpec.js",
+    "src/web/graphing-calculator/test/graph2dSpec.test.js",
+    "tests/backend/l3/*",
+    "tests/backend/schema/test_visualization_spec.py"
+   ],
+   "text": "#703 병합에서 VIZ-04 관계식·부등식 프롬프트 예시 유실 — seated인데 LLM 안내 사라진 실질 회귀",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "HARN-15가 미머지 브랜치 q8tvcx에만 존재 — main 백로그·next 비가시, '포팅됨' 분류라 소실 직전",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "docker-compose.prod.yml",
+    "docs/architecture/deployment_cd_runbook.md",
+    "tests/infra/**"
+   ],
+   "text": "QUALITY 워커가 prod compose에 없어 202 작업 영구 pending(producer-only 배포)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "src/backend/whymath_backend/api/study.py",
+    "src/backend/whymath_backend/l4/content_supply.py",
+    "tests/backend/api/**",
+    "tests/backend/l4/**"
+   ],
+   "text": "SupplyTally가 학생 404와 실수신을 동일 튜플로 합산 — 무변별 계상",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "data/visual_style_contract.json",
+    "src/backend/whymath_backend/harness/visualization_reach_report.py",
+    "src/backend/whymath_backend/l3/visualization.py",
+    "src/backend/whymath_backend/l3/viz_eval.py",
+    "src/backend/whymath_backend/l4/visualization_policy.py",
+    "src/backend/whymath_backend/schema/visualization.py",
+    "src/mobile/assets/graphing_calculator/**",
+    "src/web/graphing-calculator/src/GraphingCalculator.jsx",
+    "src/web/graphing-calculator/src/lib/graph2dSpec.js",
+    "src/web/graphing-calculator/test/graph2dSpec.test.js",
+    "tests/backend/l3/*",
+    "tests/backend/schema/test_visualization_spec.py"
+   ],
+   "text": "VIZ-03 done인데 §7 확장 acceptance ①-b·⑥ 미이행 — NLP-04 회수가 확장 이전 아티팩트만 이식하고 done",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/mobile/tool/sync_graphing_calculator.sh",
+    "tests/infra/*"
+   ],
+   "text": "WH-1 primary(GA)가 l3.pipeline 우회 → Langfuse·캐시 0 — 학생 LLM 트래픽 100%가 비용 게이트 표본 밖",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/mobile/tool/sync_graphing_calculator.sh",
+    "tests/infra/*"
+   ],
+   "text": "vendored 계산기 번들이 생성 커밋부터 stale — 실기기 WebView spec 렌더가 착륙 후 성립한 적 없을 가능성",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".claude/commands/**",
+    "CLAUDE.md",
+    "MEMORY.md",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/**"
+   ],
+   "text": "'요청 없으면 PR 안 함' 기본값이 완료작업 고립을 양산 — /drive 루프에 PR 단계 자체가 없었음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "backlog/**",
+    "data/corpus/problem_bank_rephrased_v0/**",
+    "scripts/harness/**",
+    "src/backend/whymath_backend/harness/problem_bank_coverage.py",
+    "src/backend/whymath_backend/harness/problem_type_mapping.py"
+   ],
+   "text": "1차 §4 트리거 6종의 조건 충족 검사 주체 0 — 3건이 이미 발화 상태로 방치, 유예가 유예를 오염",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/tasks/CUR-07-achievement-standard-schema-extension.yaml",
+    "data/corpus/achievement_criteria_v1/**",
+    "docs/data/**",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/l2/target_progress.py",
+    "tests/backend/**",
+    "tests/infra/**"
+   ],
+   "text": "34zvse 브랜치 done 3건(OPS-29·CUR-04·CUR-05) main 미착지 — 미병합 고립 5회차",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/harness/attempt_grading_shadow_report.py",
+    "src/backend/whymath_backend/harness/selective_grading_demotion_eval.py",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/backend/harness/test_attempt_grading_shadow_report.py",
+    "tests/backend/harness/test_selective_grading_demotion_eval.py"
+   ],
+   "text": "AI 추천 r2 문서와 REC-05~08이 7일간 main 미도달(tv1f08) — 세션이 'r2 없음' 전제로 착수",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/data/**",
+    "src/data-pipeline/data_pipeline/graph_analytics/**",
+    "tests/data_pipeline/graph_analytics/**"
+   ],
+   "text": "ARCH-17 그래프 분석 CLI가 산출 아티팩트 0·ci.yml 0건 — 참조처는 자기 테스트뿐",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "ASM-04 모의고사 세트 폐루프 범위 밖 자인했으나 후속 소유자 0 — problem_attempt에 assessment_id 없음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/l2/**",
+    "tests/backend/api/**"
+   ],
+   "text": "COLLAB-03 롤업 CLI 호출 주체 전건 0 + 신선도 축 없어 '활동 없음'과 '집계 안 돎'이 같은 값",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/**",
+    "docs/data/**"
+   ],
+   "text": "CUR-03 done인데 산출물(성취수준 코퍼스) main 미착륙·후속 태스크 약속 0 — 같은 날 미머지 done 17건 계통",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/pilot_kpi_baseline.py",
+    "tests/backend/harness/test_pilot_kpi_baseline*.py"
+   ],
+   "text": "D7 retention ≥30% 측정 경로 KPI2가 생성자 0건인 LearningSession을 읽음 — 구조적 불가가 NO_DATA로 위장",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/problem_bank_rephrased_v0/**",
+    "src/backend/whymath_backend/harness/problem_type_backfill.py",
+    "src/backend/whymath_backend/harness/problem_type_mapping.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "EXCLUDED_CORPORA 제외 사유(S4-14 미착지) 소멸 후 6일간 코드 잔존 — 유형 태깅 83.8%에서 정지",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/**"
+   ],
+   "text": "NLP-03 교차 골든 segmentation_contract.json이 CI 어느 필터에도 없어 계약만 고친 PR은 잡 0개",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/l5/ocr/assemble.py",
+    "src/backend/whymath_backend/schema/ocr.py",
+    "src/mobile/lib/features/ocr/data/ocr_models.dart"
+   ],
+   "text": "OCR 재확인 축 상시 False — ocr_min_confidence 기본 0.0, 임계 3곳(0.0/0.8/0.8) 분산·정본 없음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/learning_path_orderability_report.py",
+    "src/mobile/lib/features/profile/**",
+    "src/mobile/test/**",
+    "tests/backend/api/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "PATH-02 정직 표기 ordering_basis(96.4%)가 영속·렌더 두 경계에서 소실, has_cycle(0%)만 생존",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/problems.py",
+    "tests/backend/api/test_problems.py"
+   ],
+   "text": "PB-03 노출 계약이 GET /v1/problems 누락 — pending 158건 열람·answer 노출이 클라 단독 방어",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/_auth.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/growth_evidence_exposure.py",
+    "tests/backend/api/test_me_growth_evidence*.py",
+    "tests/backend/api/test_me_harness_metrics*.py",
+    "tests/backend/harness/test_wh1_evaluation_integration.py"
+   ],
+   "text": "PED-08 안전 라우트 옆에 원시 /harness-metrics가 동일 게이트로 학생 토큰에 열림 — r2 동결 근거(ops 소비) 오탐",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/harness/qa_pipeline.py",
+    "tests/backend/harness/test_qa_pipeline.py",
+    "tests/infra/test_ci_enforcement_declaration_contract.py",
+    "tests/infra/test_qa_pipeline_wiring.py"
+   ],
+   "text": "QA 게이트 continue-on-error 9일째 + 축 9 잡에 PG 0으로 상시 error — ARCH-23이 실행 불가 상태로 등재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/mobile/lib/features/problems/**",
+    "src/mobile/test/**"
+   ],
+   "text": "REC-01·REC-04 정직 표기 5필드를 Flutter가 하나도 파싱 안 함 — 서버가 구분해 보낸 두 원인을 클라가 뭉개 문서화",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/ops/**",
+    "tests/backend/ops/**"
+   ],
+   "text": "RPT-01 학생 결함 신고 채널 열었으나 읽는 경로 0 — 유일 관측이 축 9 행 수 카운트",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/concept_content_audit.py",
+    "src/backend/whymath_backend/harness/qa_pipeline.py"
+   ],
+   "text": "S3-26이 'ARCH-21이 흡수 예정'이라 적은 감사 축이 9축에도 미측정 선언에도 없음 — 약속의 소멸",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/alembic/**",
+    "src/backend/whymath_backend/api/problems.py",
+    "src/backend/whymath_backend/db/**",
+    "src/backend/whymath_backend/l3/**",
+    "src/backend/whymath_backend/l4/scene_generation.py",
+    "src/backend/whymath_backend/whs/**"
+   ],
+   "text": "S4-09 SolutionPath 2,153줄이 13일 고립(최장) — 공통 조상 소실·657커밋 드리프트로 merge 불성립",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/mobile/lib/features/home/**",
+    "src/mobile/lib/features/reports/**",
+    "src/mobile/test/**"
+   ],
+   "text": "S4-18 서버 review-queue·target_* 첫 reader를 Flutter가 0건 호출 — acceptance 3항 전부 서버 항목",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "SEC-13이 두 브랜치에 서로 다른 태스크로 배정 — ID 이중 배정 3회차, 가드는 소급 해소 불가",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/growth_evidence_exposure.py",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "src/backend/whymath_backend/harness/wh1_primary.py",
+    "src/backend/whymath_backend/harness/wh1_shadow.py",
+    "src/backend/whymath_backend/harness/wh1_shadow_harvest.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "WH-1 primary GA 3주 넘게 작동 비율 좌석 0 — provider 실패는 레코드도 안 남겨 Ollama 죽어도 16종 지표 정상",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/*"
+   ],
+   "text": "_DOC_SERIES_SUFFIX 접미어 1종 의존 — audit·_r2.md 문서가 브리핑 탐지에서 존재하지 않는 문서",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/infra/**"
+   ],
+   "text": "_OFFLINE_REPORT 면제 16항이 '사람이 돌린다'인데 그 사람에게 지시하는 런북·주기 0건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/collection_inventory.json",
+    "docs/legal/pipa_data_matrix.md",
+    "src/backend/whymath_backend/db/models/user.py",
+    "tests/backend/schema/*"
+   ],
+   "text": "gender·school_region·school_id가 ORM 실재·수집 0·소비 0·PIPA 대장 미등재 — 수집 항목 진실 원천 부재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/concept_assessment_v1/**",
+    "src/backend/whymath_backend/harness/concept_assessment_index.py",
+    "src/backend/whymath_backend/l3/render/assessment_bank.py"
+   ],
+   "text": "is_review_cleared 8지점 배선인데 /study 주입만 비껴감 — review_status 죽은 필드, 61 중 5건 pending",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/pyproject.toml",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/infra/**"
+   ],
+   "text": "opentelemetry·structlog 선언만 import 0건 — 의존성 축 감사 부재(Flutter는 있는데 backend 무감사)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/*"
+   ],
+   "text": "policy-guard 시크릿 grep 사각 — tests 제외·.dart/.js 미포함(dart-define 토큰 축이 빠짐)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "data/notation_contract.json",
+    "data/scene_contract.json",
+    "data/segmentation_contract.json",
+    "src/backend/whymath_backend/l3/symbolic_equivalence.py",
+    "src/backend/whymath_backend/l5/ocr/verify.py",
+    "src/mobile/lib/features/chat/domain/latex_to_plain.dart",
+    "src/mobile/test/latex_to_plain_test.dart",
+    "src/web/graphing-calculator/src/lib/mathExpr.js",
+    "src/web/graphing-calculator/test/notation_contract.test.js",
+    "tests/backend/l3/test_notation_contract.py"
+   ],
+   "text": "py LaTeX 정규화 실결함 2건 — \\rightarrow→arrow 오염·\\leq 미처리로 부등식 OCR 신뢰도 항상 강등",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/scene.py",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l4/learning_scene.py",
+    "src/backend/whymath_backend/l4/scene_generation.py",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "src/mobile/lib/features/chat/**",
+    "tests/infra/**"
+   ],
+   "text": "step_panel이 스키마·클라 모델·렌더러 stub·테스트 6곳·계약 동결까지 완비인데 서버 생산자 0·데이터 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/**"
+   ],
+   "text": "tests/infra/*_wiring.py 11개 중 continue-on-error를 assert하는 것 0건 — '돌아감≠막음'만 기계 없음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "backlog/tasks/**",
+    "docs/data/**",
+    "src/backend/whymath_backend/harness/problem_bank_coverage.py"
+   ],
+   "text": "trjg5x 111커밋 PR 없음 — 코퍼스 30종 11,446문·태스크 22건 미등재 고립, R2 상위 판단을 뒤집음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/pedagogy_strategies_v1/**",
+    "docs/architecture/04f_pedagogy_strategy_catalog.md",
+    "scripts/harness/remote_claims.py",
+    "src/backend/whymath_backend/l4/pedagogy/**",
+    "src/backend/whymath_backend/schema/pedagogy_strategy.py",
+    "tests/backend/l4/**",
+    "tests/harness/**"
+   ],
+   "text": "고립 탐지가 'done 표기' 대조뿐이라 구현만 있는 브랜치는 항구 사각 — gdmwhk 3차 구현 실증",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "공식(모듈 9) write-only — api 내 formula grep 0·canonical_signature 0/25, 적재기가 자인",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/concept_content_university_v1/**",
+    "data/corpus/concept_content_v1/**",
+    "docs/architecture/**",
+    "docs/data/**",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l1/concept_content/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "과목 축 점검이 전날 7n9n72에 이미 수행·고립 — main이 4곳에서 그 산출물을 참조 중(매달린 참조)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/tasks/CUR-07-achievement-standard-schema-extension.yaml",
+    "data/corpus/achievement_criteria_v1/**",
+    "data/corpus/pedagogy_strategies_v1/**",
+    "docs/architecture/**",
+    "docs/architecture/04f_pedagogy_strategy_catalog.md",
+    "docs/data/**",
+    "docs/reviews/**",
+    "docs/strategy/**",
+    "scripts/harness/models.py",
+    "scripts/harness/remote_claims.py",
+    "src/backend/whymath_backend/api/**",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/api/speech.py",
+    "src/backend/whymath_backend/app.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/l2/target_progress.py",
+    "src/backend/whymath_backend/l4/pedagogy/**",
+    "src/backend/whymath_backend/l5/ocr/**",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "src/backend/whymath_backend/schema/pedagogy_strategy.py",
+    "src/backend/whymath_backend/schema/speech.py",
+    "src/mobile/**",
+    "tests/backend/**",
+    "tests/backend/l4/**",
+    "tests/harness/**",
+    "tests/infra/**"
+   ],
+   "text": "미머지 46건 전수 감사 — 선행 판정(#785)이 못 본 미추적 고립 7건, 보안 하드닝 45커밋 main grep 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/security_privacy.md",
+    "src/backend/whymath_backend/api/_auth.py",
+    "src/backend/whymath_backend/api/users.py",
+    "tests/backend/api/*"
+   ],
+   "text": "미성년 동의 만료·철회 집행 0 — expires_at·revoked_at reader 0, 한 번 받은 동의가 영구 유효",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/**",
+    "docs/data/**",
+    "src/backend/whymath_backend/harness/**",
+    "src/data-pipeline/**",
+    "tests/backend/harness/**",
+    "tests/data_pipeline/**"
+   ],
+   "text": "선수 그래프 학교급 경계 엣지 20/2,210·고→대 0 — S4-01 acceptance가 노드 존재만으로 통과시키는 구조",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/**",
+    "src/backend/whymath_backend/l2/**",
+    "tests/backend/**"
+   ],
+   "text": "성취기준 조인 축 이원화 — target-progress가 조인 실패를 '도달 0%'로 위장(이었다가 끊긴 걸 아무도 안 봄)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "data/notation_contract.json",
+    "data/scene_contract.json",
+    "data/segmentation_contract.json",
+    "src/backend/whymath_backend/l3/symbolic_equivalence.py",
+    "src/backend/whymath_backend/l5/ocr/verify.py",
+    "src/mobile/lib/features/chat/domain/latex_to_plain.dart",
+    "src/mobile/lib/features/chat/presentation/mathlive_input_screen.dart",
+    "src/mobile/lib/features/ocr/presentation/ocr_capture_screen.dart",
+    "src/mobile/test/latex_to_plain_test.dart",
+    "src/mobile/test/mathlive_input_screen_test.dart",
+    "src/web/graphing-calculator/src/lib/mathExpr.js",
+    "src/web/graphing-calculator/test/notation_contract.test.js",
+    "tests/backend/l3/test_notation_contract.py"
+   ],
+   "text": "수식 엔진 갭 점검이 PR #678에 8일 고립 — 설계 문서 고립은 코드와 달리 아무 신호가 안 남",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "오답 분석을 막는 것은 NLP-02가 아니라 요청 슬롯 하나 — distractor_map 1,616건(61.1%) 미소비",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/architecture/db_backup_dr_runbook.md",
+    "docs/standards/incident_response_slo.md",
+    "scripts/backup/**",
+    "src/backend/whymath_backend/ops/**",
+    "tests/backend/ops/**",
+    "tests/infra/test_backup_script.py"
+   ],
+   "text": "운영 46·49·50을 태스크 상태만 보고 ✅ 승계 — 런북 3종 §정직한 공백 25종의 백로그 추적 0건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/mobile/lib/features/chat/presentation/mathlive_input_screen.dart",
+    "src/mobile/lib/features/ocr/presentation/ocr_capture_screen.dart",
+    "src/mobile/test/mathlive_input_screen_test.dart"
+   ],
+   "text": "원문 LaTeX가 학생에게 2표면(미리보기·OCR 결과) 노출 — MOB-06이 채팅 버블 한 곳만 배선",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/**",
+    "src/backend/whymath_backend/harness/problem_corpus_batch.py",
+    "src/backend/whymath_backend/l3/equivalent/**",
+    "tests/backend/l3/**"
+   ],
+   "text": "유보 ④(변형 3종) 발화 조건 성립·게이트 철회됐는데 6일째 방치 — 검사 주체 부재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/ops/*",
+    "src/backend/whymath_backend/ops/**",
+    "src/backend/whymath_backend/privacy/audit.py",
+    "src/backend/whymath_backend/schema/enums.py",
+    "tests/backend/ops/**"
+   ],
+   "text": "인가 데드락 9일 — CONTENT_ADMIN 부여 코드 0으로 CUD 6라우터 전건 403, 해소 구현 815줄 브랜치 고립",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "data/corpus/problem_bank_rephrased_v0/**",
+    "scripts/backfill_rephrase_lineage_s4_18.py",
+    "src/backend/whymath_backend/harness/rephrased_corpus_hygiene.py",
+    "tests/infra/test_backfill_rephrase_lineage_s4_18.py"
+   ],
+   "text": "재서술 백필 스크립트가 무변화 282건(65.7%)에도 slug·identity_id·relations 부여 → 적재 시 가짜 중복 DB 행",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/learning_path_orderability_report.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "전역 경로 유보 해제 조건이 산문뿐 — PATH-01 done인데 필요한 축이 없어 해제도 영구화도 불가",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/attempt_grading_shadow_report.py",
+    "src/backend/whymath_backend/l1/problem_bank/**",
+    "src/backend/whymath_backend/ops/*",
+    "tests/backend/harness/test_attempt_grading_shadow_report.py"
+   ],
+   "text": "채점 shadow 커버리지가 '좁다'가 아니라 구조적 0 — Condition.formal 2,647건 중 0건·writer 0",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "backlog/tasks/**",
+    "docs/data/**",
+    "scripts/harness/**",
+    "src/backend/whymath_backend/harness/problem_bank_coverage.py",
+    "tests/harness/**"
+   ],
+   "text": "태스크 ID 충돌 누적 9건 실측(브랜치 vs main 동번호 이내용)",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-14",
+   "paths": [
+    "src/backend/whymath_backend/api/problems.py",
+    "src/backend/whymath_backend/db/models/problem.py",
+    "src/backend/whymath_backend/schema/problem.py"
+   ],
+   "text": "문제(problem) 축 시각화 죽은 사슬 — 좌석 완비인데 생산자·소비자·데이터 전부 0, 두 달간 성립 안 함",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-15",
+   "paths": [
+    "data/corpus/pedagogy_strategies_v1/**",
+    "docs/architecture/*",
+    "src/backend/whymath_backend/harness/analogy_fidelity_eval.py",
+    "src/backend/whymath_backend/harness/wh1_*.py",
+    "src/backend/whymath_backend/l2/**",
+    "src/backend/whymath_backend/l3/pedagogy/**",
+    "src/backend/whymath_backend/l4/pedagogy/**",
+    "src/backend/whymath_backend/l4/pedagogy/strategy_registry.py",
+    "src/backend/whymath_backend/schema/pedagogy_strategy.py",
+    "tests/backend/harness/**",
+    "tests/backend/l3/**",
+    "tests/backend/l4/**"
+   ],
+   "text": "uqyg79 브랜치 PED-04~12 done인데 main 전건 부재 — 미병합 고립 6회차",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-29",
+   "paths": [
+    "backlog/tasks/**",
+    "scripts/harness/**",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l4/misconception/diagnose.py",
+    "src/backend/whymath_backend/ops/**",
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/backend/**",
+    "tests/backend/api/test_coach*.py",
+    "tests/backend/l4/test_misconception_diagnose.py",
+    "tests/backend/ops/**",
+    "tests/harness/**"
+   ],
+   "text": "backup/*-pre-rebase가 유일 사본인 사례 2건 + 태스크 등재 유실 7건 — '백업' 이름이 원본 실재 착시",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-29",
+   "paths": [
+    "backlog/gates.yaml",
+    "backlog/tasks/**"
+   ],
+   "text": "재생성-머지 패턴이 코드만 착지시키고 부기 유실 — 변호사 검토 게이트 G-export-prediction-disclosure·done 기록 3건 미착지",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-30",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "브리핑 '이미 포팅됨' 오분류 2회차 — 7n9n72 문서 커밋 #770을 포팅 근거로 오인, main 부재 15파일",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "backlog/tasks/S4-16-residue-gate-demotion-battle.yaml",
+    "backlog/tasks/S4-59-demotion-battle-first-round-record-recovery.yaml",
+    "docs/standards/residue_gate_demotion_battle_2026-08-10.md",
+    "docs/standards/superhuman_verification_standard.md"
+   ],
+   "text": "HARN-35 done으로 vafylb 좌석 소멸 — 잔여 S4-16 강등전 1차 실측 104줄 고아",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_track_amend.py"
+   ],
+   "text": "S1-16이 track 오분류(subject-expansion)로 12일 착수 불가 — track 정정 verb 부재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "docs/architecture/db_backup_dr_runbook.md",
+    "src/backend/whymath_backend/ops/**"
+   ],
+   "text": "prod DB whymath-pg가 8/25 빈 클러스터로 재생성(경위 미상) — 6일간 무감지",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "backlog/tasks/**",
+    "data/corpus/**",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l3/equivalent/**",
+    "tests/backend/harness/**",
+    "tests/backend/l3/equivalent/**"
+   ],
+   "text": "trjg5x(11,446문·생성기 30·태스크 32) 소유 PB-06 done 후 20일간 추적자 0 — 만료 없는 유예",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/dep_declaration.py",
+    "tests/harness/test_dep_declaration.py",
+    "tests/infra/test_dep_declaration_wiring.py"
+   ],
+   "text": "EOS-62 notes '선행: EOS-54'만 적고 depends_on 비움 — 전수 스캔 결과 미완료 6건 동일, amend --depends 부재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "문서화 커밋(#770)이 포팅 근거로 인정돼 main 부재 15파일이 '결정 불요' 뒤에 은폐",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-04",
+   "paths": [
+    ".github/**",
+    "scripts/harness/**",
+    "tests/infra/**"
+   ],
+   "text": "브랜치 보호 라이브 설정 드리프트가 3회 재발 — 저장소 내 테스트는 저장소 밖을 못 봄",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "docs/data/licensing_safety.md"
+   ],
+   "text": ".gitignore에 PDF·hwp·오피스 규칙 전무 — 저작권 원본이 들어온 경로가 그대로 열려 있었다",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness"
+   ],
+   "text": "게이트 clear 후 blocked 태스크 3건 unblock 미추종 — 5일 이상 방치·'Kiki 대기'로 오보고",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/backup/backup_status.py",
+    "scripts/backup/backup_whymath_pg.ps1",
+    "scripts/backup/check_backup_freshness.ps1",
+    "tests/infra/test_backup_encryption.py"
+   ],
+   "text": "정기 백업 작업 WhyMath-DB-Backup 미등록 4일 공백 — 누락 감시 장치도 부재",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-07",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "G-eos63 게이트가 6일간 닫는 절차 없이 EOS-63을 막음 — 실행하면 분모 0으로 공전할 형태",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-07",
+   "paths": [
+    "backlog/inventory/feature_inventory_v2.csv",
+    "backlog/inventory/feature_inventory_v2.yaml",
+    "docs/architecture/32_learning_history.md",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/wh1_evaluation.py",
+    "tests/backend/api/test_attempt_started_at_integration.py",
+    "tests/backend/api/test_coach_completion.py",
+    "tests/backend/api/test_me.py",
+    "tests/backend/harness/test_wh1_evaluation*.py"
+   ],
+   "text": "ID 충돌 그랜드파더로 PED-15(started_at NULL 근본수정) 회수 유실 — retention 파기 기준 컬럼이라 PII 파기 0건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-07",
+   "paths": [
+    "backlog/inventory/feature_inventory_v2.csv",
+    "backlog/inventory/feature_inventory_v2.yaml",
+    "docs/architecture/04a_wh1_tutoring_harness.md",
+    "docs/reviews/eos_privacy_gap_analysis.md",
+    "src/backend/whymath_backend/api/auth.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/api/oauth_providers.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/consent.py",
+    "src/backend/whymath_backend/db/models/activity.py",
+    "src/backend/whymath_backend/privacy/erasure.py",
+    "src/backend/whymath_backend/privacy/export.py",
+    "tests/backend/_external_store_evidence.py",
+    "tests/backend/api/test_me_erasure.py",
+    "tests/backend/api/test_me_export.py",
+    "tests/backend/privacy/test_erasure.py",
+    "tests/backend/privacy/test_export.py",
+    "tests/backend/privacy/test_external_store_evidence.py",
+    "tests/backend/schema/test_event_data_contract.py",
+    "tests/infra/test_event_contract_seam.py"
+   ],
+   "text": "추적 중 14건 중 9건 acceptance가 잔여 미커버 — SEC-13(반출 매니페스트)·MGMT-03·OPS-20 main 0건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "docs/prompts/misconception_diagnosis.md",
+    "src/backend/whymath_backend/l4/misconception/catalog.py",
+    "src/backend/whymath_backend/l4/misconception/diagnose.py"
+   ],
+   "text": "오개념 정규식 채널 7종 중 4종이 conf 0.5에 갇혀 런칭 이래 한 번도 학생에게 도달 못함",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "backlog/**",
+    "docs/reviews/**",
+    "scripts/harness/**"
+   ],
+   "text": "처분 라벨 단 열린 PR 10건이 8일간 갱신 0 — 닫히면 main 부재 파일 고아",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "MEMORY.md",
+    "docs/prompts/misconception_diagnosis.md",
+    "src/backend/whymath_backend/harness/anchor_detection_channel_eval.py",
+    "src/backend/whymath_backend/l4/misconception/catalog.py",
+    "src/backend/whymath_backend/l4/misconception/diagnose.py",
+    "src/backend/whymath_backend/l4/misconception/models.py",
+    "tests/backend/harness/test_anchor_detection_channel_eval.py",
+    "tests/backend/l4/test_misconception_diagnose.py"
+   ],
+   "text": "카탈로그 주석의 안전 근거('정규식 단독 conf 0.5로 안전')가 실측과 어긋난 채 방치",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/infra/**"
+   ],
+   "text": "policy-guard '#codeowner-ack 우회' 문구가 2026-05-28부터 주석에만 있고 실배선된 적 없음",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    "backlog/**",
+    "docs/reviews/**",
+    "scripts/harness/**"
+   ],
+   "text": "처분 라벨(eos-close 등) 붙은 열린 PR 10건이 만료 지점 없이 8일+ 방치",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-11",
+   "paths": [
+    "backlog/tasks/S4-16-residue-gate-demotion-battle.yaml",
+    "backlog/tasks/S4-59-demotion-battle-first-round-record-recovery.yaml",
+    "docs/standards/residue_gate_demotion_battle_2026-08-10.md",
+    "docs/standards/superhuman_verification_standard.md"
+   ],
+   "text": "HARN-35 회수가 같은 고립 브랜치의 104줄 실측 문서·CLAUDE.md 규칙 1줄·MEMORY 1줄을 남김",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-11",
+   "paths": [
+    "src/backend/whymath_backend/api/**",
+    "src/backend/whymath_backend/app.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/l5/ocr/**",
+    "tests/backend/**",
+    "tests/infra/**"
+   ],
+   "text": "PED-27이 SEC-24가 6시간 먼저 닫은 위협을 재등재 — trunk 기실재 해법을 놓치고 새 태스크",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-11",
+   "paths": [
+    "src/backend/whymath_backend/l4/hint_deferral.py",
+    "tests/backend/l4/test_hint_deferral.py"
+   ],
+   "text": "hint_deferral 규칙 5가 규칙 1 결과를 매 턴 깎아 숙달 학생이 레벨 3에 구조적으로 도달 불가",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-14",
+   "paths": [
+    "src/backend/whymath_backend/l1/atom_graph/**",
+    "src/backend/whymath_backend/l1/concept_content/**"
+   ],
+   "text": "atom_node 1311·concept_content 437 대상 행 부재 — S0-2가 UPDATE만 만들고 적재 안 함, 서빙은 조용히 빈 결과",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-14",
+   "paths": [
+    ".github/branch-protection-setup.md",
+    "scripts/harness/ruleset_drift.py"
+   ],
+   "text": "게이트 등재 세션이 필수 체크·merge queue만 대조 — enforce_admins(bypass_actors) 축 미확인",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-15",
+   "paths": [
+    ".github/pull_request_template.md",
+    ".github/workflows/**",
+    "docs/standards/release_freeze*.md",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/harness/golden_*.py",
+    "tests/backend/**",
+    "tests/backend/harness/test_golden_*.py",
+    "tests/golden/**"
+   ],
+   "text": "'Kiki 판정 대기' 산문 8건 중 6건 소유자 0 — 2주 방치, 2건은 소유자·유예 근거 소멸",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "backlog/tasks/CUR-07-achievement-standard-schema-extension.yaml",
+    "backlog/tasks/HARN-34-lost-bookkeeping-gate-recovery.yaml",
+    "scripts/harness/backlog.py",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "claim 대장이 존재하지 않는 브랜치 2건 지목·in_progress 좌석 2건 완료 표기 누락·notes 사실 오류 1건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-16",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "CCR 프록시가 refs/claims/* push를 403 거부 — 원격 claim이 상시 offline 폴백(fail-open)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-25",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "병렬 세션 원격 claim 403으로 조율 불가 → REND-01/#587 중복 구현 발생",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-27",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "OPS-07 병렬 중복 구현 735줄 폐기 — 원격 claim이 한 번도 작동한 적 없음(403 상시·fail-open)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-28",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "병렬 중복 작업 2회차(OPS-12) — 내 구현 ddb5cff 폐기, #618 머지·3분 창을 읽기측 폴백이 못 막음",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "S3-11 근접 중복 착수 — 사이드카 5파일 작성 후 start 시도에서 타 브랜치 done 감지·제거",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-06",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "HARN-14 동일 브랜치명에 독립 세션이 같은 태스크 선-구현·선-푸시 — refs/claims 403 사각의 세 번째 반복",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "src/backend/alembic/**",
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/db/models/dialogue.py",
+    "src/backend/whymath_backend/l3/verify_final_answer.py",
+    "src/backend/whymath_backend/l4/completion.py",
+    "src/mobile/lib/features/chat/**"
+   ],
+   "text": "tlthrr 브랜치 학습 루프 코드가 merge-base 이후 coach.py 632줄·me.py 430줄 drift로 포트 불가 → 재구현",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/security_privacy.md",
+    "src/backend/whymath_backend/privacy/retention.py",
+    "tests/backend/privacy/*"
+   ],
+   "text": "ADMIN-03이 같은 날 두 곳에서 구현(#716 148줄 vs 53c1d7b2 36줄) — OPS-07과 동일 기전",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "src/backend/alembic/versions/*",
+    "src/backend/whymath_backend/db/models/user.py",
+    "src/backend/whymath_backend/schema/user.py",
+    "tests/backend/api/test_no_lockout_columns.py",
+    "tests/harness/*"
+   ],
+   "text": "trjg5x b3a58b02가 병합된 정정(c3376c42)을 거슬러 subscription_* 4컬럼 전량 드롭 구현 — 정정 도달 실패",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/harness/attempt_grading_shadow_report.py",
+    "tests/backend/harness/test_attempt_grading_shadow_report.py"
+   ],
+   "text": "평가 r2 최대 갭 D3(shadow 채점 0.00%)이 PR 직전 중복 판명 — REC-05/07/08이 일주일 먼저 소유",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-21",
+   "paths": [
+    "infra/phaiakes9/benchmark/**",
+    "tests/infra/**"
+   ],
+   "text": "Phaiakes9 성능 수치 2건 폐기",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "같은 충돌 해소를 두 세션이 동시에 수행 — non-fast-forward 거부(5분 차)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*",
+    "tests/harness/test_review_cancel_and_block_notes.py"
+   ],
+   "text": "병렬 세션이 같은 원본 3건을 다른 번호(EOS-69/70 vs 71/72)로 이중 등재",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/**"
+   ],
+   "text": "HARN-45와 HARN-48이 같은 문제를 반대 극성으로 각자 구현 — ID 달라 가드 미검출·PR #942 폐기",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "낡은 로컬 대장이 이미 done(#916)인 EOS-69를 후보 1위로 → 중복 구현 후 전량 폐기",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/dep_declaration.py",
+    "src/backend/whymath_backend/harness/anchor_round_ledger.py",
+    "src/backend/whymath_backend/harness/problem_corpus_accumulate.py",
+    "tests/backend/harness/**",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "add EOS-98이 타 세션 #994 선등재를 못 봐 merge conflict → CI 미발화·초판 3커밋 폐기",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-26",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/pyproject.toml",
+    "src/data-pipeline/pyproject.toml",
+    "tests/backend/**",
+    "tests/backend/conftest.py"
+   ],
+   "text": "OPS-06(#606) 머지 후 main CI red — api 1077건 부분 통과를 회귀 없음으로 보고",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-26",
+   "paths": [
+    ".github/branch-protection-setup.md",
+    "tests/infra/**"
+   ],
+   "text": "main 보호 required check enforcement=off — PR 5건 연속 미검증 auto-merge·#606 red 유입",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-27",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/pyproject.toml",
+    "src/data-pipeline/pyproject.toml",
+    "tests/backend/**",
+    "tests/backend/conftest.py"
+   ],
+   "text": "OPS-06 머지 후 main CI red(1 failed) — 순서 의존 오염을 api 1077건 통과로 '회귀 없음' 보고",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-08",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "tests/backend/harness/test_concept_reach_report.py"
+   ],
+   "text": "PR #730 CI red — mobile-only PR(PATH-05)이 backend 잡 스킵으로 concept_reach 가드 우회",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "tests/backend/api/**",
+    "tests/backend/conftest.py"
+   ],
+   "text": "실 PG 통합 잡이 레이트리미터 전역 상태(InMemory) 순서 의존으로 429 — 07:29 green→09:39 red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    ".github/branch-cleanup-request.txt",
+    ".github/workflows/branch-cleanup.yml"
+   ],
+   "text": "branch-cleanup 잡 3회 연속 red — 부재 가드가 존재하지만 발화 못함(gh api 오류 본문 stdout)",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    ".github/workflows/harness-audit.yml",
+    ".github/workflows/pr-auto-resync.yml",
+    "scripts/harness/ruleset_drift.py",
+    "scripts/harness/ruleset_pin_plan.py",
+    "scripts/ops/pr_delivery_audit.py",
+    "scripts/ops/pr_merge_readiness.py",
+    "tests/infra/test_canonical_repo_reference.py"
+   ],
+   "text": "조직 이관 후 harness-audit 상시 red — 옛 owner 리터럴 + curl -L 부재로 301 본문을 규칙 배열로 오독",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-11",
+   "paths": [
+    "scripts/analysis/eos_anchor_asset_audit.py",
+    "tests/backend/l1/test_eos_anchor_registry.py"
+   ],
+   "text": "테스트가 정본 anchors.yaml을 직접 비우고 복원 → -n auto 병렬 워커가 빈 창을 읽어 무관 잡 red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-12",
+   "paths": [
+    "backlog/inventory/**",
+    "scripts/analysis/eos_feature_inventory_v2.py",
+    "scripts/ops/pr_delivery_audit.py"
+   ],
+   "text": "생성 인벤토리 장부 커밋이 병합마다 충돌 — CI 이틀 정지",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "docs/standards/*.md",
+    "tests/infra/*.py"
+   ],
+   "text": "Black 동작을 추측해 고쳐 CI red 2회 — 회차마다 뒤 20스텝 skipped, 원인은 오라클 부재",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/harness/test_mutate_harness.py"
+   ],
+   "text": "뮤테이션 실행 중 커밋 — 주입된 소스가 커밋돼 CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "src/backend/pyproject.toml"
+   ],
+   "text": "로컬 전체 스위트 575건 실패를 'CI 실질 마비'(pri 1)로 오판 — 실 CI green·원인은 pytest 경로 인자",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-30",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "태스크 번호 S3-09~16 7건이 main과 shadow에서 전혀 다른 작업에 재사용 + alembic 리비전 ID 동시 채번 충돌 1건",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "ARCH-23 번호가 병렬 PR의 ARCH-23-qa-gate-enforcement와 충돌 → ARCH-26으로 CLI 재등재",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "docs/standards/**",
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "태스크 ID 이중 배정 13건 — 이 세션의 HARN-14·HARN-15 등재도 충돌했는데 CLI가 2회 정상 통과",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "S3-26/27/28 3중 번호 충돌 + Alembic 리비전 재충돌(같은 결정론 규칙을 두 세션이 독립 적용)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-09",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/whymath_backend/harness/problem_corpus_persona_fit_backfill.py",
+    "src/backend/whymath_backend/harness/problem_corpus_review_status_backfill.py"
+   ],
+   "text": "OPS-23을 add CLI로 정상 등재했는데 병렬 세션의 OPS-23이 먼저 main 머지 → 리베이스 후 충돌, OPS-24 개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-09",
+   "paths": [
+    "src/mobile/lib/features/chat/presentation/chat_screen.dart",
+    "src/mobile/test/chat_screen_test.dart"
+   ],
+   "text": "S3-17 회수 패치가 main에 없는 S3-12 위의 diff — main의 S3-12는 번호만 같은 다른 태스크·원본 브랜치 원격 삭제됨",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "src/backend/whymath_backend/ops/declared_unwired_audit.py",
+    "tests/backend/ops/test_declared_unwired_audit.py"
+   ],
+   "text": "감사기 상수 간접참조 맹점 — 오탐 2건이 유령 태스크 PED-15 등재·S4-22 허위 유예(막힘)를 만듦",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "ADMIN-08 이중 등재 — 병렬 세션 동일 ID·슬러그, add 가드가 제안 번호를 예약하지 않는 TOCTOU 재발",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "NLP-06이 COLLAB-04와 paths 완전 동일한 중복 등재 — backlog.py overlap은 todo를 제외해 '겹침 없음' 출력",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/**"
+   ],
+   "text": "PR #779 auto-merge 57분 미머지 — 체크런 0건(CI 미발화), 병합 커밋 푸시로 발화",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "번호 가드 뚫림 — 두 세션이 OPS-29를 동시 제안받고 상대가 먼저 머지(#775), 병합 시 validate 충돌로 OPS-33 개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/architecture/db_backup_dr_runbook.md",
+    "src/backend/whymath_backend/ops/**"
+   ],
+   "text": "좌석 발급 게이트 실행 실패 ① whymath-pg 마이그레이션 뒤처짐을 런북이 가정(선행조건 미명시)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-30",
+   "paths": [
+    "backlog/tasks/**",
+    "docs/reviews/**",
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/harness/**",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "EOS-49/50/51 번호를 kiki 머신 미push 브랜치와 main이 각자 배정(번호 충돌 3회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-30",
+   "paths": [
+    "scripts/harness/**",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/ops/**",
+    "tests/backend/**",
+    "tests/harness/**"
+   ],
+   "text": "kiki 머신 PowerShell에서 backlog.py gates가 UnicodeEncodeError('⏳')로 사망",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    ".gitattributes",
+    "docs/reviews/**",
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "PR #931 머지 blocked의 실제 원인이 CI·충돌이 아닌 미해결 codex 스레드(405 본문에서만 드러남)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    ".gitattributes",
+    "docs/reviews/**",
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "PR #931이 CI 16잡 green 4회 확보하고도 머지 5라운드 지연(웹훅 유실·대장 경합·룰)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*",
+    "tests/harness/test_review_cancel_and_block_notes.py"
+   ],
+   "text": "block이 claim을 반납해 게이트 대기 창에 다른 세션이 HARN-38을 claim(CAS 충돌)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    ".gitattributes",
+    "docs/reviews/**",
+    "docs/standards/build_harness.md",
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "공용 events.ndjson add/add 충돌이 PR마다 반복(#910·#913·#915/917/918 흡수 3회)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "병렬 세션이 CLAUDE.md 버전 v0.2.4를 각자 배정(git content 충돌로 차단)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/store.py",
+    "tests/harness/**"
+   ],
+   "text": "이벤트 대장 ts가 오프셋 없는 로컬 시각 — 같은 파일 두 줄이 9시간 어긋난 척도",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "재배정 직후 #924가 v0.2.5를 올려 한 시간 안에 두 번째 버전 충돌",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-03",
+   "paths": [
+    "src/mobile/lib/features/chat/application/**",
+    "src/mobile/lib/features/problems/**",
+    "src/mobile/test/e2e_loop_flow_test.dart",
+    "src/mobile/test/problems_api_test.dart",
+    "tests/backend/api/test_e2e_vertical_slice_integration.py"
+   ],
+   "text": "'Flutter가 POST /v1/me/attempts 미호출'로 오진단 — 처방대로면 attempt·숙달 이중 적재, REC-01 08-03 관측을 낡은 채 인용",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-05",
+   "paths": [
+    "docs/architecture/adr/README.md",
+    "scripts/harness/**"
+   ],
+   "text": "ADR 번호 규약을 만든 세션이 작업 트리 ls로 003을 골라 원격 브랜치와 ADR-003 충돌",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-05",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_judgment_base_commit.py"
+   ],
+   "text": "Gate 0 검토가 미머지 PR #986을 근거로·'소유자 부여 완료' 3건 전부 미머지(판정 시점 오류)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-05",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/selector.py",
+    "tests/harness/**"
+   ],
+   "text": "add --gates 오지정 후 amend로 게이트를 뗄 수 없어 cancel 후 재등재(취소 스텁 잔존)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-05",
+   "paths": [
+    ".github/**",
+    "scripts/harness/**",
+    "tests/infra/**"
+   ],
+   "text": "브랜치 보호 UI 시정 안내가 3회 미착지 → API 경로(HARN-65)로 전환",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_next_free_number_format_guard.py"
+   ],
+   "text": "'EOS 00~99 모두 소진' 오보고를 두 세션이 사실로 등재(실제 미사용 40개) → 결정 게이트·MP 접두 신설",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/selector.py",
+    "tests/harness/**"
+   ],
+   "text": "MP-01에 검수 게이트를 걸어 교착 + notes 소프트 선행 red — 정정 CLI 없어 cancel(번호 소모 3회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "src/backend/whymath_backend/harness/anchor_round_ledger.py",
+    "src/backend/whymath_backend/harness/problem_corpus_accumulate.py",
+    "tests/backend/harness/**"
+   ],
+   "text": "PR #1000 등재 3건이 전부 저장소를 열지 않고 쓴 수치·경로(필드 부재·no-op·30건 승격 불가)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "내 EOS-99가 타 세션 #1000의 EOS-99와 같은 번호로 충돌 → 미머지 쪽 ARCH-43으로 이동",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/dep_declaration.py",
+    "tests/harness/test_cli.py",
+    "tests/harness/test_dep_declaration.py"
+   ],
+   "text": "대장 쓰기측에 의존 감사 없어 같은 세션이 audit-deps red를 두 번 push(`;` 체인이 exit 1 무시)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "HARN-88 중복 등재 후 취소 — 역할 검색 없이 등재, HARN-76이 이미 소유·삭제는 의도적 폐쇄 축",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "LIC-07 done 안내가 todo→done 전이 불가로 exit 1 공전 — 왕복 1회",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    ".github/scripts/pr_auto_resync.sh",
+    "tests/infra/test_pr_auto_resync.py"
+   ],
+   "text": "RESYNC_TOKEN 붙여넣기에 개행·공백 혼입 — 첫 예약 실행 invalid header 실패",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "게이트 title만 인용해 이미 cleared(D안 결정·구현)된 merge queue 선택을 Kiki에게 재요청",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-08",
+   "paths": [
+    ".github/branch-protection-setup.md",
+    ".github/scripts/pr_auto_resync.sh",
+    ".github/workflows/pr-auto-resync.yml",
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "타 워크플로 표본 5건으로 '*/15 구조적 달성 불가' 확정 — 절반 철회 후 남은 결론도 무근거(2·3회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    ".github/workflows/**",
+    "backlog/**",
+    "docs/**",
+    "scripts/harness/models.py"
+   ],
+   "text": "두 브랜치가 HARN-97을 독립으로 배정 — HARN 접두 99 중 97 사용, 빈 번호 2개뿐",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/models.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "전이표 합법 전이 2종이 CLI에서 실행 불가(unblock이 session 미해제·review 막다른 길)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    "scripts/ops/check_ps_scripts.py",
+    "tests/infra/**"
+   ],
+   "text": "증거(커밋 해시 줄·명령+결과 주석)를 실행용 펜스에 담아 Kiki 붙여넣기 오류 3건 — 2회차",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-12",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/**"
+   ],
+   "text": "미머지 브랜치의 태스크 번호 OPS-73을 다른 세션이 선점 — 개명 명령 부재로 add+git rm 우회",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-15",
+   "paths": [
+    "scripts/harness/**",
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/**"
+   ],
+   "text": "HARN-103 번호가 타 세션 미머지 HARN-103과 충돌 — 머지 큐 harness-integrity가 검출·개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-15",
+   "paths": [
+    "docs/ops/skb03_atom_node_populate_runbook.md",
+    "scripts/ops/check_runbook_blocks.py",
+    "tests/infra/test_runbook_write_guard.py"
+   ],
+   "text": "런북이 PATHS_MATCH_MAIN=False·HAS_SKIP_FLAG=False를 출력했는데 적재 블록이 붙여넣어져 옛 CLI 적재 0건",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "docs/ops/**",
+    "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/l3/providers/**"
+   ],
+   "text": "ARCH-55 세션 오판 5건 — judge 역할로 측정·Uptime 오독·기본값 2회 뒤집기·무변별 검증 기준·편익 없는 BYOK 작업",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "docs/prompts/l3_equivalent_gen.md",
+    "docs/reviews/mp02_first_llm_authoring_run_runbook.md"
+   ],
+   "text": "MP-02 런북 사이드카 경로가 이어붙이기(실코드는 with_suffix) → stale 검사 무효·같은 회차 2번 기록",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "태스크 번호 EOS-108이 24초 경합으로 중복 배정 — 3회차",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/ops/ci_job_repro.py",
+    "tests/infra/test_ci_job_repro.py"
+   ],
+   "text": "pytest 출력을 tail로 잘라 캡처 — 실패 목록 유실로 재실행 (출력 절단 축 재관통)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/ops/ci_job_repro.py",
+    "tests/infra/test_ci_job_repro.py"
+   ],
+   "text": "로컬 tests/infra 47건 거짓 red — CI의 의존성 집합을 재현하지 않음 (재현 누락 4번째 입구)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-19",
+   "paths": [
+    "src/backend/whymath_backend/l3/**"
+   ],
+   "text": "S3-02 현행 verify의 실전 거짓 incorrect 2건(항등식→파생 단계·x2 심볼 solve 오판) 발견",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-20",
+   "paths": [
+    "src/mobile/lib/features/chat/**"
+   ],
+   "text": "MathLive 제출 시 학생 버블에 LaTeX 원문 노출 + verify에 원문 전송(변환 계약 공백)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-20",
+   "paths": [
+    "src/backend/whymath_backend/l3/**",
+    "tests/backend/l3/**"
+   ],
+   "text": "S3-08 거짓 incorrect 실측 — 답 고르기 단계를 틀렸다고 판정하고 학생 UI에 '다시 살펴볼 지점' 노출",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-27",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/backend/pyproject.toml",
+    "src/data-pipeline/pyproject.toml"
+   ],
+   "text": "pytest-randomly 재현 seed 헤더 첫 구현이 확정 전 값 \"default\"를 찍는 위장",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "HARN-11이 next/start만 걸러 브리핑은 done된 S3-10·S3-11을 계속 1순위 추천(일부만 배선)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-07-29",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "next가 타 세션 done된 S3-09를 1순위 추천·claim까지 진행 — 후속 태스크 notes로 발견",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-03",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "src/mobile/pubspec.lock",
+    "src/mobile/pubspec.yaml",
+    "src/mobile/test/pubspec_dependency_usage_governance_test.dart",
+    "tests/infra/**"
+   ],
+   "text": "firebase_messaging 등 푸시 인프라가 pubspec 선언만·Dart/Kotlin/iOS 구현 0(만들지 않고 선언만)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/harness/attempt_grading_shadow_report.py",
+    "src/backend/whymath_backend/l3/verify_answer.py",
+    "tests/backend/api/test_me_attempts*.py",
+    "tests/backend/harness/test_attempt_grading_shadow_report.py"
+   ],
+   "text": "NLP-02가 scope_drift 10건 쌓인 채 done 처리됨 — paths 사후 정정",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-04",
+   "paths": [
+    ".claude/settings.json",
+    "scripts/harness/**",
+    "tests/harness/**",
+    "tests/infra/**"
+   ],
+   "text": "운영 플랫폼 갭 점검 중복 착수 — 미머지 PR #663에 동일 산출물 507줄 발견해 작성 전 중단",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-05",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "stale-branch 경고 19건 중 진짜 방치 6건 — 포팅 완료 10건이 원본 미폐쇄로 영구 재경고(습관화)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "HARN-14 ID 충돌(#687 vs #714 서로 다른 태스크) — HARN-15도 소진돼 HARN-18로 재배정",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-07",
+   "paths": [
+    "src/mobile/test/governance/anti_gamification_governance_test.dart",
+    "tests/backend/l1/test_anti_gamification_governance.py"
+   ],
+   "text": "포지셔닝 초안 지표 '또래 평균 대비 선행 개월'이 5원칙 #2(비교 금지) 정본 4곳 위반 — 폐기",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-08",
+   "paths": [
+    "src/backend/whymath_backend/api/me.py",
+    "src/backend/whymath_backend/schema/assessment.py",
+    "tests/backend/api/test_prediction_field_sealing.py"
+   ],
+   "text": "갭 리뷰 D2 전제 '노출 코드 0건' 부정확 — writer만 0이고 노출 배관 완성, estimated_grade가 키째로 학생 응답에 나감",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-09",
+   "paths": [
+    "src/mobile/test/governance/anti_gamification_governance_test.dart",
+    "tests/backend/l1/test_anti_gamification_governance.py"
+   ],
+   "text": "Dart \\b가 밑줄을 단어문자로 봐 studentClassRank 같은 큰 식별자 안 등장을 놓침(파이썬 게이트 기결함 동형)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-09",
+   "paths": [
+    "scripts/harness/**",
+    "src/backend/whymath_backend/schema/visualization.py",
+    "src/web/graphing-calculator/src/GraphingCalculator.jsx",
+    "src/web/graphing-calculator/src/lib/graph2dSpec.js",
+    "tests/harness/**"
+   ],
+   "text": "고립본이 쓴 VIZ-04 번호가 main의 VIZ-04(done)와 충돌 — 극값 좌석 VIZ-06으로 재배정",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "CLAUDE.md",
+    "docs/architecture/00_overview.md",
+    "docs/architecture/05_interaction.md",
+    "src/mobile/lib/features/chat/data/scene_models.dart",
+    "src/mobile/lib/features/chat/presentation/scene_renderer.dart",
+    "src/mobile/pubspec.yaml"
+   ],
+   "text": "'05 §5.2' 앵커가 수십 곳 인용되나 실존 안 함·scene_renderer.dart 헤더가 사실과 정반대",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "data/corpus/formula_graph_v1/**",
+    "src/backend/whymath_backend/l1/formula_graph/**",
+    "tests/backend/l1/test_formula_governance.py"
+   ],
+   "text": "formula.quadratic.roots latex ± vs dsl + 근 하나 — 정합 게이트 0(write-only라 피해 0)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-10",
+   "paths": [
+    "src/backend/whymath_backend/api/_concept_orchestration.py",
+    "src/backend/whymath_backend/api/scene.py",
+    "src/backend/whymath_backend/api/visualization.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/harness/wh1_*.py",
+    "src/backend/whymath_backend/l1/pedagogy/**",
+    "src/backend/whymath_backend/l4/pedagogy/**",
+    "tests/backend/l1/test_pedagogy_pack_yaml_db_parity.py",
+    "tests/backend/l1/test_unit_spec_yaml_db_parity.py",
+    "tests/backend/l4/**"
+   ],
+   "text": "mode_guard.check_forbidden_modes 프로덕션 호출 0인데 config·docstring이 배선 주장(과대 진술 2곳)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/**"
+   ],
+   "text": "'MCP PR은 CI 영영 미발화'가 만성 미머지 원인이라는 자기 가설 반증 — created_at==updated_at 프록시 무효",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/l4/socratic/**",
+    "src/backend/whymath_backend/l4/turn_meta.py",
+    "tests/backend/api/test_coach*.py"
+   ],
+   "text": "AI 튜터 v1 ✅ 오판정 — 기능 37 개념 질의에서 표면 존재를 능력으로 읽음(4축 전부 부재)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/alembic/**",
+    "src/backend/whymath_backend/api/problems.py",
+    "src/backend/whymath_backend/db/**",
+    "src/backend/whymath_backend/l3/**",
+    "src/backend/whymath_backend/l4/scene_generation.py",
+    "src/backend/whymath_backend/whs/**"
+   ],
+   "text": "S4-09·S4-10·S4-12 priority가 정렬 방향 역으로 매겨짐(5=가장 중요로 읽은 흔적)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/*"
+   ],
+   "text": "XFF 무검증을 최대 갭으로 등재 직전 — k20m0w가 SEC-14로 이미 봉합(미머지), 수동 조사가 막음(운)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/security_privacy.md",
+    "src/backend/whymath_backend/privacy/retention.py",
+    "tests/backend/privacy/*"
+   ],
+   "text": "next 경고 사유 오류 — ADMIN-03은 병합됐는데 '미머지'로 표시(코드는 트렁크에·done만 브랜치에)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/l6/blueprint/__init__.py",
+    "src/backend/whymath_backend/l6/blueprint/assembly.py"
+   ],
+   "text": "partial_credit 계산기 착지했는데 프로덕션 호출자 0 — v1 미채택 근거 stale",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/**"
+   ],
+   "text": "pull_request_read get_status가 모든 PR에 total_count 0 — 무변별 신호를 #779 진단 첫 근거로 사용",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-11",
+   "paths": [
+    "src/backend/whymath_backend/ops/**",
+    "tests/backend/ops/**"
+   ],
+   "text": "스펙 선언 4건을 '유령 선언'으로 판정했으나 40xspg에 이미 구현 — trunk 부재를 미구현으로 오판(자기 정정)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-15",
+   "paths": [
+    "docs/architecture/*",
+    "src/backend/whymath_backend/l2/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "caplog 오염 결정론적 잔존 — finally가 핸들러만 복원해 propagate=False 남음, 러너 9.1.1이 마스킹",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-15",
+   "paths": [
+    "docs/architecture/*",
+    "src/backend/whymath_backend/l2/**",
+    "tests/backend/harness/**"
+   ],
+   "text": "유령 필드 preferred_solution_style 무부기 서술 6곳 — MasteryState 코드 0건인데 존재처럼 읽힘",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-29",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/**"
+   ],
+   "text": "claim 경로 CRLF 오염",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-08-31",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_backlog_add_id_collision.py"
+   ],
+   "text": "번호 충돌 3회차 규명 후 가드 개선을 '후보'로만 남겨 추적자 미부착(재발방지 등재 누락)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/**"
+   ],
+   "text": "6회차 사고 기록 초안이 '대책 제안 없음'으로 종료 — 실수 관리 규칙 위반을 리뷰 봇이 지적",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-01",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/pathscope.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/store.py",
+    "tests/infra/test_harness_subprocess_encoding.py"
+   ],
+   "text": "신규 코드에 로케일 인코딩 디코드 3건 — 기존 거버넌스(HARN-19)가 잡음(반례)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-03",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "MOB-20 paths 손편집 — overlap 경보 17건을 좁힐 CLI 경로 부재",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "docs/architecture/canonical_entity_model_v1.md",
+    "tests/backend/db/test_canonical_entity_model_freeze.py"
+   ],
+   "text": "ARCH-38 P0 근거 'W8에서 바로 걸린다'가 실측하니 W8 경로가 그 테이블을 안 지나감",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-06",
+   "paths": [
+    "docs/architecture/subject_contract_cross_probe.md",
+    "scripts/analysis/eos_core_adapter_boundary_scan.py",
+    "src/backend/whymath_backend/schema/subject_adapter.py",
+    "tests/backend/schema/test_subject_adapter_two_tier_contract.py"
+   ],
+   "text": "Subject Contract 필드 채움 검사가 History도 15/15 통과 — 반증력 0(성공/실패 같은 값)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-07",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/**"
+   ],
+   "text": "ASM-06 보완이 api/me.py만 열거 — 실제 학생 흐름은 coach라 회수해도 슬롯 영원히 NULL",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-07",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_remote_claims.py",
+    "tests/harness/test_report.py"
+   ],
+   "text": "backlog.py branches가 닫힌 미머지 PR 3건을 'PR 제출됨'으로 위장 — 탐지기 사각 3번째 변형",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-10",
+   "paths": [
+    "scripts/ops/check_ps_scripts.py",
+    "tests/infra/**"
+   ],
+   "text": "커밋 해시+메시지 줄·git cat-file 화살표 주석을 실행용 펜스에 담아 Kiki가 실행 → ParserError·fatal 2건",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-11",
+   "paths": [
+    "scripts/ops/check_ps_scripts.py",
+    "tests/infra/test_ps_guard_runbook_rules.py"
+   ],
+   "text": "CD 런북 catch 블록이 Response 존재 확인 없이 StatusCode 접근 — 전송 오류 시 원인 유실",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-18",
+   "paths": [
+    "src/backend/alembic/versions/*audit*.py",
+    "src/backend/whymath_backend/db/models/audit.py",
+    "src/backend/whymath_backend/l3/interfaces.py",
+    "src/backend/whymath_backend/l3/router.py",
+    "src/backend/whymath_backend/ops/role_grant_cli.py",
+    "src/backend/whymath_backend/privacy/audit.py",
+    "src/backend/whymath_backend/schema/audit.py",
+    "tests/backend/db/test_audit_event_*.py",
+    "tests/backend/ops/test_role_grant_cli*.py"
+   ],
+   "text": "닫힌 PR #880 브랜치에만 있는 246줄 감사 설계 문서가 대장 어디에도 없어 삭제될 뻔",
+   "weight": 0
+  }
+ ]
+}

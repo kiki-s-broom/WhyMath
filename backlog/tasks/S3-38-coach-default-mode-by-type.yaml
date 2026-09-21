@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-38-coach-default-mode-by-type
+title: "문제유형별 코치 기본모드 — 객관식은 대화·주관식은 풀이단계(S3-24 버킷B④ 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 df5d4790의 initState 초기 모드 결정(_isMultipleChoice 재사용·수동 전환 불변)을 이식. 서버·coach.py·L4 무접촉인 클라 입력 표면 한정 변경. ② 파급 실측: 이 변경으로 주관식 픽스처 화면의 입력 표면이 복수가 되어 main의 e2e_loop_flow_test 단수 TextField 단언 2곳이 깨졌다 — 단언을 약화하지 않고 전건 검사로 강화해 해소(enabled 3상태 주의: null은 활성). ③ 검증: CI mobile 5스텝 exit 0."
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
+paths:
+  - src/mobile/lib/features/chat/presentation/chat_screen.dart
+  - src/mobile/test/chat_screen_test.dart
+  - src/mobile/test/e2e_loop_flow_test.dart
+session: null
+notes: "[S3-24 버킷B 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w(42일 미머지·45커밋·PR로 노출된 적 없음). 이식은 파일 단위 수동 재적용이며 통째 머지를 쓰지 않았다(main이 분기점 이후 463커밋 이동). 같은 브랜치의 MOB-12(activeProblemProvider stale 리셋)는 S3-24 소관이 아니라서 전량 제외했다 — 그 회수는 별도 태스크가 소유한다. 검증은 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트)."
+updated: 2026-09-21

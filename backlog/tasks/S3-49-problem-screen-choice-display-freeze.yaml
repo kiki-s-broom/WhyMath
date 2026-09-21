@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S3-49-problem-screen-choice-display-freeze
+title: "객관식 세로 번호목록 UI 회귀 동결 — 이미 구현됐으나 미보호였던 표시 계약(S3-24 버킷B① 보강 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 37529224의 problem_screen_test 동결 4건(번호 부착·세로 배치 y좌표 증가·주관식엔 번호 없음·보기 간 색 동일성) 이식 — 가로 전환·번호 제거·정오 차등 강조가 조용히 통과하던 사각을 닫는다. ② 항목①(S3-35)의 구현은 이미 main에 착지(#743)돼 있었고 동결만 미머지였다. ③ 검증: CI mobile 5스텝 exit 0."
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
+paths:
+  - src/mobile/test/problem_screen_test.dart
+session: null
+notes: "[S3-24 버킷B 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w(42일 미머지·45커밋·PR로 노출된 적 없음). 이식은 파일 단위 수동 재적용이며 통째 머지를 쓰지 않았다(main이 분기점 이후 463커밋 이동). 같은 브랜치의 MOB-12(activeProblemProvider stale 리셋)는 S3-24 소관이 아니라서 전량 제외했다 — 그 회수는 별도 태스크가 소유한다. 검증은 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트)."
+updated: 2026-09-21

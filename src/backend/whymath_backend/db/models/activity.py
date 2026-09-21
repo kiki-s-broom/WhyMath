@@ -207,6 +207,17 @@ class ProblemAttempt(Base):
     student_answer_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     confidence_self_reported: Mapped[float | None] = mapped_column(sa.Numeric(3, 2))
 
+    # ASM-06 신규: 학생이 실제로 고른 객관식 보기 인덱스(0-기반) — `Problem.distractor_map`
+    # 대조로 오개념을 역추적한다(`l4.misconception.distractor_link`). `student_answer`(자유
+    # 텍스트)엔 "몇 번 보기를 골랐는가"가 없어 그 61%의 신호가 원천적으로 사장돼 있었다
+    # (실측 = `harness/distractor_signal_dormancy_report.py`·ASM-09).
+    #
+    # *미성년 풀이 데이터*지만 SEC-31 봉투 암호화 대상은 **아니다**: 그 보호는 답안·풀이
+    # *본문*(자유 서술·손글씨 URI·OCR 결과)을 대상으로 하고, 선지 번호는 같은 행의 평문
+    # problem_id 없이는 의미가 없는 작은 정수다. ge=0 구조 검증은 schema.activity 책임
+    # (가짜 DB CHECK 미생성 — 모듈 docstring 방침과 정합).
+    selected_choice_index: Mapped[int | None] = mapped_column(sa.Integer)
+
     # ===== 풀이 방식 (특성 #96) =====
     attempt_mode: Mapped[AttemptMode | None] = mapped_column(
         _pg_enum(AttemptMode, "attempt_mode_enum")

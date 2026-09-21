@@ -8,9 +8,13 @@
 // 전체 마크다운 엔진은 도입하지 않는다(pubspec 무접촉) — 코치 템플릿이 쓰는 표기는
 // `*...*` 한 가지뿐이라 초소형 파서로 충분하고, 그 이상은 과설계다.
 //
-// 이 렌더는 *코치 버블 전용*이다. 학생 버블에는 절대 적용하지 않는다 — 학생 입력의
-// 별표는 곱셈 기호(`3*4`)일 수 있어 어떤 해석도 하지 않고 원문 그대로 보여야 한다.
+// 이 *강조* 렌더는 코치 버블 전용이다. 학생 버블에는 절대 적용하지 않는다 — 학생 입력의
+// 별표는 곱셈 기호(`3*4`)일 수 있어 강조로 해석하면 안 된다. 학생 버블은 대신 MathText로
+// 곧장 간다(S3-39): 별표가 강조가 아니라 곱셈 `\cdot`으로 조판될 뿐이라 강조 오해가 없고,
+// 글자를 잃지도 않는다(조판 실패 시 원문 폴백). "강조 해석 0" 불변식은 그대로다.
 import 'package:flutter/material.dart';
+
+import '../../../shared/widgets/math_text.dart';
 
 /// 강조 파싱 결과 한 조각 — 부분 문자열과 강조 여부.
 ///
@@ -95,15 +99,17 @@ List<EmphasisSegment> parseCoachEmphasis(String text) {
   return segments;
 }
 
-/// 코치 버블 본문 텍스트 — `*...*` 강조만 굵게 렌더하는 Text 대체 위젯.
+/// 코치 버블 본문 텍스트 — `*...*` 강조는 굵게, 수식은 교과서 조판으로 렌더하는 Text 대체 위젯.
 ///
-/// 강조가 하나도 인정되지 않으면 원문 그대로의 평문 [Text]를 반환한다(파싱 실패
-/// 안전 폴백 — 기존 렌더와 바이트 단위 동일). 강조는 굵기(w700)로만 표현한다 —
-/// 색을 쓰지 않아 색맹 친화 원칙(색만으로 정보 전달 금지)을 지키고 테마와도 무관하다.
+/// 강조(w700)는 색 없이 굵기로만 표현한다 — 색맹 친화 원칙(색만으로 정보 전달 금지)·테마 무관.
+/// 강조가 하나도 없으면 [MathText]에 위임한다(순수 프로즈면 그 안에서 평문 [Text]로 폴백 —
+/// 기존 렌더와 바이트 단위 동일·무회귀). 강조가 있으면 비강조 조각만 프로즈+수식으로 조판하고
+/// (코치 발화의 `3x^2` 등), 강조 조각은 굵은 평문으로 둔다 — 코치 강조는 한국어 구절 대상이라
+/// 강조 안 수식 렌더는 하지 않는다(단순·안전·원문 무손실). 수학 판정은 없다(표현≠의미).
 class CoachEmphasisText extends StatelessWidget {
   const CoachEmphasisText(this.text, {super.key});
 
-  /// 코치 발화 원문(템플릿 `*...*` 표기 포함 가능).
+  /// 코치 발화 원문(템플릿 `*...*` 표기·수식 포함 가능).
   final String text;
 
   @override
@@ -111,21 +117,23 @@ class CoachEmphasisText extends StatelessWidget {
     final List<EmphasisSegment> segments = parseCoachEmphasis(text);
     final bool hasEmphasis = segments.any((s) => s.emphasized);
     if (!hasEmphasis) {
-      // 강조가 없으면 기존과 동일한 평문 렌더 — 원문 무손실 보증.
-      return Text(text);
+      // 강조가 없으면 수식 렌더만 — MathText가 순수 프로즈면 평문 Text로 폴백한다(무회귀).
+      return MathText(text);
     }
-    return Text.rich(
-      TextSpan(
-        children: <InlineSpan>[
-          for (final EmphasisSegment segment in segments)
-            TextSpan(
-              text: segment.text,
-              style: segment.emphasized
-                  ? const TextStyle(fontWeight: FontWeight.w700)
-                  : null,
-            ),
-        ],
-      ),
-    );
+    final TextStyle baseStyle = DefaultTextStyle.of(context).style;
+    final List<InlineSpan> children = <InlineSpan>[];
+    for (final EmphasisSegment segment in segments) {
+      if (segment.emphasized) {
+        children.add(
+          TextSpan(
+            text: segment.text,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        );
+      } else {
+        children.addAll(mathInlineSpansFor(segment.text, baseStyle));
+      }
+    }
+    return Text.rich(TextSpan(style: baseStyle, children: children));
   }
 }
