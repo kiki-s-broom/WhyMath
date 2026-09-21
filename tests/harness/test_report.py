@@ -232,7 +232,60 @@ class TestBrief:
             ],
         )
         assert "고립 브랜치 — PR로 노출된 적 없음 (회수 또는 삭제 필요) — 1건" in text
-        assert "PR 제출됨 — 처분은 해당 PR에서 — 2건" in text
+        assert "PR 제출됨(열림 확인) — 처분은 해당 PR에서 — 2건" in text
+
+    def test_pr_closed_gets_action_required_framing_like_isolated(self):
+        """test_PR닫힘_미머지는_고립과_같은_강조_위계로_뜬다 (HARN-78)
+
+        PR이 있었다는 사실이 처분 완료를 뜻하지 않는다 — `pr_closed`는 `pr_filed`의
+        "참고, 결정 불요" 섹션이 아니라 `isolated`처럼 행동을 요구하는 섹션에 나와야
+        한다. 재현 대상: PR #967(closed·merged=false)이 `pr_filed`로 뭉개져 "결정
+        불요"처럼 보였던 사고.
+        """
+        text = report.render_brief(
+            _backlog(),
+            [],
+            "branch-x",
+            date(2026, 7, 20),
+            stale_branches=[
+                (
+                    "gates/deploy-environment-approval",
+                    26.0,
+                    3,
+                    "pr_closed",
+                    "PR #967 닫힘(미머지)",
+                ),
+            ],
+        )
+        assert "PR 닫힘(미머지)" in text and "재작업 또는 폐기 판단 필요" in text
+        assert "gates/deploy-environment-approval" in text
+        assert "PR #967 닫힘(미머지)" in text
+        # '처분은 해당 PR에서'(결정 불요 프레이밍)에 섞이면 안 된다.
+        assert "처분은 해당 PR에서" not in text
+
+    def test_pr_filed_header_says_unconfirmed_when_state_lookup_failed(self):
+        """test_상태_조회_실패시_문구가_확인됨이_아니라_미확인으로_바뀐다 (HARN-78)
+
+        성공(상태 확인됨)과 실패(미확인)가 다른 글자를 내야 한다 — 실패했는데도
+        "처분은 해당 PR에서"(마치 열림이 확인된 것처럼)라고 말하면 열려 있다고
+        가정하는 것과 같은 오판정이다(모른다 ≠ 아니다).
+        """
+        text = report.render_brief(
+            _backlog(),
+            [],
+            "branch-x",
+            date(2026, 7, 20),
+            stale_branches=[
+                ("claude/pr-1", 12.0, 7, "pr_filed", "PR #846"),
+            ],
+            pr_state_lookup_ok=False,
+            pr_state_lookup_error="NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정",
+        )
+        assert "상태 미확인" in text
+        assert "NoTokenError" in text
+        assert "PR 번호로 열림/닫힘을 확인하라" in text
+        assert "처분은 해당 PR에서" not in text
+        assert "claude/pr-1" in text and "PR #846" in text
 
     def test_legacy_3tuple_input_falls_back_to_undetermined(self):
         """test_3튜플_구버전_입력은_고립_여부_미판정으로_취급

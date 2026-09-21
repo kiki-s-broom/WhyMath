@@ -39,7 +39,12 @@ shadow와 달리 **발화(`outcome.utterance`)를 호출자(coach)에게 돌려�
 범위 밖(후속): fast path(§5.3·비풀이 턴 경량 즉답 — 레이턴시 최적화)·실 LLM 프롬프트 품질
 튜닝·상태 오케스트레이션 수렴(`run_persisted_turn` HTTP 배선 — 라이브 coach가 이미 턴당
 가설 큐레이션·증거 생산을 영속하므로 이중 영속 회피를 위해 발화 승격과 분리·해당 모듈 docstring
-참조)·Langfuse trace 결선(정책 호출은 shadow와 동일하게 provider 직접 소비).
+참조).
+
+Langfuse trace·캐시는 **결선 완료**(OPS-36) — 정책·프로즈 모두 `Wh1LlmSeam`을 거쳐
+`l3.pipeline`으로 간다(라우터 경유·캐시·`l3_routing` 기록). 호출자(coach)가 `cache`·`trace`에
+앱 공유 인스턴스를 넘기면 학생 대면 트래픽이 비용 게이트② 표본에 계상된다. 미주입이면 좌석이
+인메모리 기본값으로 폴백한다 — 그때는 기록이 앱 밖으로 나가지 않을 뿐 경유 자체는 유지된다.
 """
 
 from __future__ import annotations
@@ -56,7 +61,7 @@ from whymath_backend.harness.wh1_loop import TurnOutcome, run_tutoring_turn
 from whymath_backend.harness.wh1_probe_supply import assemble_probe_candidate_pool
 from whymath_backend.harness.wh1_prose import gate_policy_prose, rephrase_coach_utterance
 from whymath_backend.harness.wh1_shadow import _extract_verify_verdict, emit_wh1_observation
-from whymath_backend.l3.interfaces import LLMProvider
+from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.mode_guard import check_forbidden_modes, fallback_reply_for
 from whymath_backend.l4.session_recall import SessionRecall
@@ -107,6 +112,8 @@ async def run_wh1_primary_turn(
     solution_steps: Sequence[str],
     active_hypotheses: Sequence[MisconceptionHypothesis],
     provider: LLMProvider | None = None,
+    cache: CacheBackend | None = None,
+    trace: TraceSink | None = None,
     turn_index: int = 1,
     max_tool_calls: int = 16,
     timeout_seconds: float | None = None,
@@ -156,6 +163,11 @@ async def run_wh1_primary_turn(
         )
         policy = LLMTutorPolicy(
             provider,
+            # L3 관측·캐시 결선(OPS-36) — 앱 공유 LangfuseSink·RedisCache가 여기로 흘러
+            # 학생 대면 LLM 호출이 비용 게이트② 표본에 계상된다. 미주입(단위테스트·app.state
+            # 없는 경로)이면 좌석이 인메모리 기본값으로 폴백한다(하위호환).
+            cache=cache,
+            trace=trace,
             # 학생 원문·풀이 단계는 프롬프트가 아니라 정책 보유값으로만 사적 사용(S1-a 계약).
             student_text=student_solution,
             solution_steps=list(solution_steps),
@@ -241,6 +253,8 @@ async def run_wh1_primary_turn(
                 forbidden_fragments=student_material,
                 provider=provider,
                 timeout_seconds=settings.wh1_prose_timeout_seconds,
+                cache=cache,
+                trace=trace,
             )
             utterance = prose_outcome.text  # fail-closed — 실패면 원 템플릿 그대로.
             prose_rephrased = prose_outcome.rephrased

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,14 +16,26 @@ acceptance:
   - "결정이 (b)이면: ops/role_grant_cli.py 등 target_user_id가 명확한 관리자 조작 지점에서 record_admin_access_audit을 호출한다"
   - "결정이 (c)이면: PrivacyAudit 모델/마이그레이션과 record_admin_access_audit 시그니처를 resource_type/resource_id/action/policy_version/reason을 포함하도록 확장한다"
   - "인가 회귀 테스트를 추가한다: 관리자 동작 시 감사 이벤트 생성, 비관리자/미인증 시 거부"
-artifacts: []
+  - "[실행 증적 2026-09-11] 결정 = (c) 스키마 확장, 단 `reason` 자유텍스트는 기존 불변식(\"자유텍스트 필드 금지\")과 충돌해 의도적 제외(엔티티/사유는 resource_type+resource_id+action으로 표현). record_admin_access_audit 자체는 대상 호출부가 없어(ADMIN-06 선행) 그대로 두고, 실제로 감사 0인 CONTENT_ADMIN 갭(api/concepts.py·api/problems.py CUD 6라우터)에 신규 5번째 event_kind `content_mutation`(AuditEventKind)을 배선했다.\n\n구현: PrivacyAuditResourceType(concept/problem)·PrivacyAuditAction(create/update/delete) 신설(schema/enums.py) · PrivacyAudit에 nullable 컬럼 3종(resource_type/resource_id/action, db/models/audit.py) + Pydantic 스키마 동기화(schema/audit.py, extra=forbid) · 마이그레이션 4c6dfb1527a9(down=f2662166a661, alembic --sql 오프라인 양방향 검증) · schema_version.py KNOWN_REVISIONS·probe_prod_schema_revision.sql(97→98) 갱신 · 신규 writer record_content_mutation_audit(privacy/audit.py) · concepts.py/problems.py 6라우터(POST/PATCH/DELETE ×2) 배선 · EventKindFilter 설명에 content_mutation 추가(test_privacy_audit_kind_doc_sync.py 가드 충족).\n\n인가 회귀: \"비관리자/미인증 시 거부\"는 기존 TestAuthGate(SEC-07 D1, test_concepts.py/test_problems.py)가 이미 401/403 검증 중(무회귀). \"관리자 동작 시 감사 이벤트 생성\"은 신규 TestContentMutationAudit(concepts 4건·problems 3건)+TestRecordContentMutationAudit(test_audit.py 2건)이 검증.\n\nRED-before-fix(cp 백업/복원, git 원복 미사용, diff 바이트 동일 확인 3건): ①concepts.py 3개 호출부 제거 → 5건 RED(40건 무회귀) ②problems.py 동일 → 4건 RED(43건 무회귀) ③writer(resource_type=/action= 대입 제거) → test_audit.py 신규 2건 RED(10건 무회귀).\n\n문서: docs/architecture/48_eos_security_access_control.md L827(관리자 접근 감사) 갱신 — content_mutation 축 충족·admin_access(개인정보 열람) 축은 ADMIN-06 대기로 명시 분리. 같은 표 L832(Job 소유권 검사)도 SEC-27 착지분 반영(누락 발견·보정).\n\n검증: ruff·black·mypy 대상 파일 전건 clean. 전체 백엔드 스위트 12819 passed·340 skipped·1 xfailed(0 failed, 18분49초·2차 실행 — 1차는 head 상수 갱신 전이라 폐기). tests/infra 1301 passed·1 skipped(feature_inventory 재생성 후)."
+artifacts:
+  - "#1135"
 paths:
   - src/backend/whymath_backend/privacy/audit.py
+  - src/backend/whymath_backend/privacy/__init__.py
   - src/backend/whymath_backend/db/models/audit.py
-  - src/backend/whymath_backend/api/_auth.py
-  - src/backend/whymath_backend/ops/role_grant_cli.py
+  - src/backend/whymath_backend/schema/audit.py
+  - src/backend/whymath_backend/schema/enums.py
+  - src/backend/whymath_backend/api/concepts.py
+  - src/backend/whymath_backend/api/problems.py
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/db/schema_version.py
+  - scripts/ops/probe_prod_schema_revision.sql
   - "src/backend/alembic/versions/**"
   - tests/backend/privacy/test_audit.py
+  - tests/backend/api/test_concepts.py
+  - tests/backend/api/test_problems.py
+  - tests/backend/db/test_solution_path_orm.py
+  - docs/architecture/48_eos_security_access_control.md
 session: null
-notes: "48_보안 §P0 Security Audit 갭. record_admin_access_audit은 관리자 콘솔 Phase B(ADMIN-06)를 전제로 한 dead code 상태다. 현재 contract는 actor_user_id/target_user_id/ip/settings뿐이므로 CONTENT_ADMIN 엔드포인트(concepts/problems)에는 직접 적용할 수 없다. 본 태스크는 먼저 삭제/배선/확장 3개 방향 중 하나를 결정하고 그에 맞춰 실행한다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "48_보안 §P0 Security Audit 갭. record_admin_access_audit은 관리자 콘솔 Phase B(ADMIN-06)를 전제로 한 dead code 상태다. 현재 contract는 actor_user_id/target_user_id/ip/settings뿐이므로 CONTENT_ADMIN 엔드포인트(concepts/problems)에는 직접 적용할 수 없다. 본 태스크는 먼저 삭제/배선/확장 3개 방향 중 하나를 결정하고 그에 맞춰 실행한다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-12] paths ['src/backend/whymath_backend/privacy/audit.py', 'src/backend/whymath_backend/db/models/audit.py', 'src/backend/whymath_backend/api/_auth.py', 'src/backend/whymath_backend/ops/role_grant_cli.py', 'src/backend/alembic/versions/**', 'tests/backend/privacy/test_audit.py'] → ['src/backend/whymath_backend/privacy/audit.py', 'src/backend/whymath_backend/privacy/__init__.py', 'src/backend/whymath_backend/db/models/audit.py', 'src/backend/whymath_backend/schema/audit.py', 'src/backend/whymath_backend/schema/enums.py', 'src/backend/whymath_backend/api/concepts.py', 'src/backend/whymath_backend/api/problems.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/db/schema_version.py', 'scripts/ops/probe_prod_schema_revision.sql', 'src/backend/alembic/versions/**', 'tests/backend/privacy/test_audit.py', 'tests/backend/api/test_concepts.py', 'tests/backend/api/test_problems.py', 'tests/backend/db/test_solution_path_orm.py', 'docs/architecture/48_eos_security_access_control.md']: 투자 결과 결정 (c) 스키마 확장을 채택 — (b) 배선 후보였던 api/_auth.py·ops/role_grant_cli.py는 최종 미편집이라 범위에서 뺀다. 실제 편집 범위로 좁힌다: schema/enums.py·schema/audit.py(신규 enum·Pydantic 필드), api/concepts.py·api/problems.py·api/me.py(6라우터 배선·EventKindFilter 설명), db/schema_version.py·probe_prod_schema_revision.sql(신규 head 반영), test_concepts.py·test_problems.py·test_solution_path_orm.py(RED-before-fix·head 상수 갱신) 추가. HARN-59 scope_drift 경고 정정.\npaths 제거 2건: ['src/backend/whymath_backend/api/_auth.py', 'src/backend/whymath_backend/ops/role_grant_cli.py']\n\n[정정 2026-09-12] SEC-29 실행 완료 — 결정 (c) 확정·구현·RED-before-fix·전체 검증 증적 등재"
+updated: 2026-09-12

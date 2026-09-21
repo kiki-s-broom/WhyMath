@@ -34,7 +34,10 @@ WH-1 1단계 OCR 신뢰 게이팅: `ocr_confidence`(L5 OCR 인식 신뢰도)가 
 EOS-86 MIXED 분해 — 단계 연쇄 검증은 `l3.verify_solution` 직접 import 대신 `StepChainVerifier`
 (schema/verification_capabilities.py) 선택층 계약을 통해 주입받는다. `recommend_coaching_
 for_solution(..., verifier=...)`을 주입하지 않으면 합성 루트(`composition.
-default_step_chain_verifier`)의 기본 구현(수학)으로 지연 폴백한다. `observe_wrong_form_shadow`
+default_step_chain_verifier`)의 기본 구현(수학)으로 지연 폴백한다. **[COMP-01] 프로덕션
+경로(`api/coach.py` 3핸들러)는 app.state 등록분을 명시 주입하므로 그 폴백을 타지 않는다** —
+남은 폴백은 이 함수를 직접 부르는 단위테스트용이며, 그래서 이 모듈은 여전히 `composition`을
+import한다(`CORE_PULL_BASELINE` 미축소의 사유 — 함수 본문 주석 참조). `observe_wrong_form_shadow`
 호출도 같은 이유로 합성 루트(`composition.default_wrong_form_shadow_observer`)를 경유한다 —
 이 파일이 더 이상 `l3.verify_solution`·`l4.misconception.wrong_form_match`(둘 다 ADAPTER)를
 직접 알지 못하게 하면서, CORE에서 그 두 모듈로 직접 닿던 경로였던 잔여 누수 2건(`api.coach`·
@@ -194,10 +197,11 @@ def recommend_coaching_for_solution(
     **단계 결선(WH-1 1단계 · EOS-86 재배선)**: `solution_steps`가 제공되고 전이가 1개 이상(즉
     len≥2)이면 `verifier.verify_chain(solution_steps, solution_step_types)`로 *L5가 분해한 단계
     시퀀스*를 연쇄 검증한다(텍스트→단계 *분해*는 L5 OCR·공간정보 책임으로 본 함수 범위 밖 —
-    백엔드는 제공된 단계만 검증). `verifier`를 주입하지 않으면 합성 루트(`composition.
-    default_step_chain_verifier`)의 기본 구현(수학 — `l3.verify_solution` 위임)으로 지연
-    폴백한다(이 파일은 `l3.verify_solution`을 더 이상 알지 못한다 — CORE→ADAPTER 직접 의존
-    제거·EOS-84/86). 신호 결합은 **추가적(OR)**으로, 기존 텍스트 레벨 신호를 *약화하지
+    백엔드는 제공된 단계만 검증). `verifier`가 주어지면 **그것을 쓰고**, 주어지지 않을 때만 합성
+    루트(`composition.default_step_chain_verifier`)의 기본 구현(수학 — `l3.verify_solution`
+    위임)으로 지연 폴백한다(COMP-01: 서빙 3경로는 전부 명시 주입이라 폴백을 타지 않는다 — 본문
+    주석에 확인 방법 2가지). 이 파일은 `l3.verify_solution`을 더 이상 알지 못한다(CORE→ADAPTER
+    직접 의존 제거·EOS-84/86). 신호 결합은 **추가적(OR)**으로, 기존 텍스트 레벨 신호를 *약화하지
     않는다*: `arithmetic_error = (텍스트 신호 있음) or verification.has_incorrect`·`verify_steps
     = (텍스트 신호가 kind="solution") or verification.has_incorrect`(단계 레벨 incorrect는
     *단계 자가검산* 프레이밍과 자연 정합). 이 bool들을 *그대로* 기존 `recommend_coaching`에
@@ -241,9 +245,25 @@ def recommend_coaching_for_solution(
         student_solution,
     )
     # 단계 결선 — L5가 분해한 단계 시퀀스가 있고 전이가 1개 이상(len≥2)일 때만 검증 호출(분해는
-    # L5 책임·범위 밖). 미제공·전이 0개면 None(기존 텍스트 레벨 동작 완전 불변). verifier 미주입
-    # 시 합성 루트 기본 구현(수학)으로 지연 폴백 — 이 모듈 자체는 l3.verify_solution을 모른다
-    # (EOS-86: CORE→ADAPTER 직접 의존 제거. composition은 설계된 유일 교체점).
+    # L5 책임·범위 밖). 미제공·전이 0개면 None(기존 텍스트 레벨 동작 완전 불변).
+    #
+    # [COMP-01] **주어지면 그것을 쓰고, 주어지지 않을 때만 폴백한다.** 프로덕션 경로는 push
+    # 주입이다 — `create_app`이 app.state에 올린 능력을 `api/coach.py`의 세 핸들러가
+    # `_build_response_payload(step_chain_verifier=...)`로 명시 주입하므로, 서빙 중에는 아래
+    # `if verifier is None` 분기가 **돌지 않는다**. 남은 폴백은 이 함수를 직접 호출하는 300+
+    # 단위테스트 편의용이며, 지우면 그 전량이 verifier를 만들어 넘겨야 해 이 태스크 범위를 넘는다
+    # (회귀 위험 > 이득 — COMP-01 acceptance ③ "유지 시 사유 문서화").
+    #
+    # 서빙 경로가 정말 주입을 쓰는지 확인하는 법(추론 금지·주입으로 확인):
+    #   ① `tests/backend/api/test_coach.py::TestStepChainVerifierInjection` — 가짜 verifier를
+    #      app.state에 올리고 `/v1/coach` 응답이 그 가짜의 판정을 담는지 본다. 명시 주입을
+    #      빼면 이 테스트가 RED다(폴백이 진짜 수학 구현을 부르므로 가짜가 호출되지 않는다).
+    #   ② 이 분기에 breakpoint/로그를 걸고 `/v1/coach`에 단계 2개 이상을 제출 — 걸리면 어딘가
+    #      주입이 빠진 것이다.
+    # 폴백이 남아 있으므로 이 모듈은 여전히 `composition`을 import하며(아래 관측기도 같다),
+    # `CORE_PULL_BASELINE`에서 `l4.solution_coaching`은 **축소되지 않는다**.
+    # verifier가 오든 폴백이든 이 모듈 자체는 l3.verify_solution을 모른다(EOS-86: CORE→ADAPTER
+    # 직접 의존 제거. composition은 설계된 유일 교체점).
     verification: ChainVerificationCounts | None = None
     if solution_steps is not None and len(solution_steps) >= 2:
         if verifier is None:

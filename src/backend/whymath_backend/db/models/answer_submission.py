@@ -103,9 +103,19 @@ class AnswerSubmission(Base):
     # 폐쇄 4종 강제는 schema Literal(latex/text/choice/handwriting) — DB는 String 좌석만.
     response_type: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     raw_response: Mapped[str | None] = mapped_column(sa.Text)
+    # SEC-31: at-rest 봉투 암호화(AES-256-GCM) — dialogue_turn.content_encrypted 선례 미러.
+    # 둘 다 NULL이면 평문(raw_response) 행. schema round-trip 제외(`_NON_SCHEMA_COLUMNS`).
+    raw_response_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    raw_response_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     latex: Mapped[str | None] = mapped_column(sa.Text)
+    latex_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    latex_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     # SEC-06: none_as_null=True — "값 없음"은 SQL NULL(JSONB 스칼라 null 오계수 방지).
     canonical_ast: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    # SEC-31: JSONB는 **결정론 직렬화 후**(sort_keys=True·ensure_ascii=False) 암호화
+    # (dialogue_turn.image_analysis_encrypted 선례).
+    canonical_ast_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    canonical_ast_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
 
     # ===== 채점·오류 분석 (구조 계약 = schema GradingResult/ErrorAnalysis) =====
     grading_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
@@ -132,6 +142,19 @@ class AnswerSubmission(Base):
         sa.Index("idx_answer_submission_user", "user_id", sa.desc("submitted_at")),
     )
 
+    # SEC-31: schema round-trip에서 제외하는 봉투 암호화 컬럼(schema는 extra="forbid"라 이 키가
+    # model_validate에 들어가면 실패). 복호는 handler/헬퍼 층이 담당(dialogue_turn 동형).
+    _NON_SCHEMA_COLUMNS = frozenset(
+        {
+            "raw_response_encrypted",
+            "raw_response_nonce",
+            "latex_encrypted",
+            "latex_nonce",
+            "canonical_ast_encrypted",
+            "canonical_ast_nonce",
+        }
+    )
+
     # ── 변환 헬퍼 (schema↔db seam, dialogue.py 패턴) ──────────────────────
     @classmethod
     def from_schema(cls, schema: SchemaAnswerSubmission) -> AnswerSubmission:
@@ -140,7 +163,8 @@ class AnswerSubmission(Base):
         `grading_result`/`error_analysis` 서브모델은 `model_dump()`가 dict로 풀어 JSONB에
         그대로 담긴다. `submitted_at=None`(schema 기본 — DB가 채움)은 kwargs에서 *제외*한다 —
         명시적 None 할당은 SQLAlchemy가 NULL을 INSERT해 NOT NULL 위반이 되고, 속성 미설정이어야
-        `server_default now()`가 적용된다.
+        `server_default now()`가 적용된다. 암호화 컬럼(raw_response_encrypted 등)은 schema에
+        없어 여기서 설정되지 않는다 — handler/헬퍼 층이 raw_response 등을 암호화해 채운다.
         """
         data = schema.model_dump()
         mapped_keys = {col.key for col in sa.inspect(cls).mapper.column_attrs}
@@ -153,9 +177,15 @@ class AnswerSubmission(Base):
         """영속 ORM → `schema.AnswerSubmission`(Pydantic 검증 복원 — response_type 재검증).
 
         JSONB dict는 GradingResult/ErrorAnalysis 서브모델로 재검증된다(구조 오염 시
-        ValidationError — 침묵 통과 없음).
+        ValidationError — 침묵 통과 없음). 봉투 암호화 컬럼은 `_NON_SCHEMA_COLUMNS`로 제외
+        (ciphertext 비노출) — 암호화 행은 raw_response 등이 NULL이므로 handler/헬퍼 층
+        (`privacy/export.py`)이 복호값을 덮어쓴다.
         """
-        mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
+        mapped_keys = {
+            col.key
+            for col in sa.inspect(type(self)).mapper.column_attrs
+            if col.key not in self._NON_SCHEMA_COLUMNS
+        }
         data = {key: getattr(self, key) for key in mapped_keys}
         return SchemaAnswerSubmission.model_validate(data)
 

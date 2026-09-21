@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-72-prod-db-host-reachability-blindspot
+title: "호스트→prod DB 도달성 감시 사각 해소 — 백업·프로브가 전부 docker exec라 포트 게시 실패를 아무도 못 본다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 도달성 점검 축 신설: prod DB의 호스트 TCP 도달성을 docker exec 우회 없이 직접 확인하는 점검을 만든다. 판정은 컨테이너 생존(docker ps)이 아니라 실제 TCP 연결 성립이어야 한다 - 간접 신호를 성공 판정으로 쓰지 않는다는 CLAUDE.md 규칙의 집행 지점\n② 설정과 실현의 구분을 판정에 반영: HostConfig.PortBindings(설정)와 NetworkSettings.Ports(실현)를 모두 읽고 둘이 어긋나면 그 자체를 고장으로 보고한다. 어느 필드를 보는지 출력 문면에 명시한다\n③ 실패 주입으로 검증: 게시가 없는 상태를 실제로 만들어(포트 미게시 컨테이너 또는 모킹) 점검이 RED를 내는지 확인한 뒤에만 보호로 친다. 정상 상태에서 초록인 것은 증거가 아니다\n④ 재발 절차 카탈로그화: Windows 동적 포트 제외 범위 진단(netsh interface ipv4 show excludedportrange protocol=tcp)과 영구 조치(관리자 권한 winnat 재기동 + 5433 관리 포트 제외 등록)를 트러블슈팅 카탈로그에 등재해, 다음 세션이 추측 없이 같은 경로를 밟게 한다\n⑤ 인시던트 런북 정합: incident_response_slo.md의 DB 다운 절에 이 형태(컨테이너는 Up이고 pg_isready도 통과하는데 호스트에서만 못 붙음)를 실패 유형으로 추가한다 - 현행 문면은 이 상태를 성공으로 읽는다"
+artifacts:
+  - "PR #1065 (머지 b64f470d) — ops/db_host_reachability 신설: 컨테이너 생존이 아닌 실제 TCP 연결로 판정, HostConfig.PortBindings(설정)와 NetworkSettings.Ports(실현) 구분, FOREIGN_LISTENER 별도 상태, 3상태 미접합(UNKNOWN=exit 2). 뮤테이션 9종 전건 RED·생존 0·sha256 바이트 동일 복원. 배선 = declared_unwired_audit 의도 선언 + incident_response_slo.md 4-1 성공 기준 교정 + demo-doctor W1 신설 + G-eos63 런북 CLI 호출 교체. 함께: 런북 결함 5건 정정, EOS-43 취소"
+paths:
+  - docs/standards/incident_response_slo.md
+session: null
+notes: "[사고 경위 2026-09-08~09 · 판정 기준 main 94d1f28a] G-eos63 측정 회차에서 Phaiakes9 prod DB(docker whymath-pg)가 호스트 TCP 5433으로 접속 불가 상태임이 드러났다. 증상은 ConnectionRefusedError(WinError 1225)였고, 최종 원인은 Windows Hyper-V/WinNAT의 동적 포트 제외 범위가 5368~5467을 잡아 Docker가 5433을 게시하지 못한 것이었다(docker run으로 5434를 게시해 봐도 동일 오류 - 컨테이너 문제가 아님을 결정적 실험으로 가름).\n\n[왜 무증상이었나 - 이것이 본 태스크의 존재 이유] 이 고장을 볼 수 있는 도구가 하나도 없다. 백업(backup_whymath_pg.ps1)은 docker exec pg_dump로, 스키마 프로브(probe_prod_schema_revision.sql)는 docker exec psql로 컨테이너 안으로 들어간다. 저장소 전수 검색 결과 호스트 127.0.0.1:5433에 의존하는 스크립트는 0건이다. 즉 감시 사각이 우연이 아니라 구조적이다 - 백업은 계속 성공하고 아무 경보도 울리지 않는 동안 호스트에서 붙는 모든 경로(측정 도구·호스트 uvicorn·호스트 alembic)가 죽어 있었다.\n\n[또 하나의 판별 함정] docker ps의 Ports 칸은 실현된 게시(NetworkSettings.Ports)를 보여주고, docker inspect의 HostConfig.PortBindings는 생성 시 요청한 설정을 보여준다. 이번 사고에서 PortBindings에는 5433이 멀쩡히 있었고 NetworkSettings.Ports는 빈 배열이었다 - 설정만 보고 정상으로 읽으면 고장을 못 본다. 이 세션도 그 함정에 한 번 빠져 오진했다.\n\n[해소 계기] 별도 조치 없이 Docker Desktop 재기동 과정에서 동적 예약이 반납돼 5433이 풀렸다. 즉 근본 해결이 아니며 재부팅·WSL 재시작마다 재발할 수 있다. 영구 조치는 관리자 권한으로 winnat을 내렸다 올리며 5433을 관리 포트 제외로 못 박는 것이다."
+updated: 2026-09-10

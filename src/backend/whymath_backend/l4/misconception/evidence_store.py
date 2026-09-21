@@ -29,6 +29,7 @@ FK CASCADE + 본 모듈 `purge_expired`(보존 경과)로 보장. API 노출은 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import date
 from typing import Any, cast
 
@@ -49,7 +50,9 @@ __all__ = [
     "log_evidence",
     "net_support",
     "net_support_by_misconception",
+    "CORRECT_FORM_DEMONSTRATED",
     "purge_expired",
+    "strong_refutation_mids",
 ]
 
 _VALID_POLARITY = (-1, 1)
@@ -82,6 +85,7 @@ async def log_evidence(
     event_id: int | None = None,
     node_id: str | None = None,
     weight: float | None = None,
+    provenance: str | None = None,
     retention_until: date | None = None,
     logged_on: date | None = None,
     crosslink_resolver: MisconceptionCrosslinkResolver | None = None,
@@ -132,6 +136,7 @@ async def log_evidence(
         event_id=event_id,
         node_id=node_id,
         weight=weight,
+        provenance=provenance,
         retention_until=retention_until,
     )
     session.add(link)
@@ -211,6 +216,49 @@ async def net_support_by_misconception(
     )
     result = await session.execute(stmt)
     return {mid: float(support) for mid, support in result.all()}
+
+
+# MISC-20 — "해소"로 셀 수 있는 증거의 **출처 표식**. 값이 있는 행만 해소 후보이며, 이 상수는
+# `correct_form_present`(정정 형태 실측)가 True일 때 coach가 기록한다.
+#
+# **왜 `weight`로 판정하지 않는가**(Codex P1 수용 · PR #1044): 초판은
+# `polarity=-1 AND coalesce(weight, 1.0) >= 0.75`로 가중치에서 출처를 추론했는데 두 곳에서 깨졌다.
+#   ① `weight`는 nullable(미평가 None)이라 `coalesce(..., 1.0)`이 **NULL을 최강 신호로** 접었다
+#      — *모른다*가 *확정*이 되는 방향이며 CLAUDE.md "모른다 ≠ 아니다"의 정확한 반대다.
+#   ② WH-1 하네스의 `LogEvidenceAction.weight`는 **LLM이 지정**한다 — 숫자 하나로 "학생이
+#      오개념을 넘어섰다"가 영구 기록될 수 있었다.
+# 가중치는 *강도*를 말할 뿐 **누가 무엇을 근거로 썼는지**를 말하지 못한다. 그래서 출처를 1급
+# 컬럼으로 분리하고, 이 판정은 그 컬럼만 본다(가중치 무관·NULL은 해소 아님).
+CORRECT_FORM_DEMONSTRATED = "correct_form_demonstrated"
+
+
+async def strong_refutation_mids(
+    session: AsyncSession, student_id: uuid.UUID, misconception_ids: Sequence[str]
+) -> set[str]:
+    """주어진 오개념들 중 **정정 형태를 직접 보였다고 기계가 기록한** 증거가 있는 id 집합(MISC-20).
+
+    "해소"(학생이 실제로 넘어섬)와 "반박"(그냥 안 틀렸음)을 가르는 유일한 신호이며, 판정 축은
+    **출처 표식 `provenance == CORRECT_FORM_DEMONSTRATED`**다(가중치가 아니다 — 위 상수 주석의
+    ①② 참조). 막연한 clean 풀이의 약한 반박은 출처가 없어 `REFUTED`에 머문다(과대해석 금지 ·
+    해소율 분자를 부풀리지 않는다). `provenance`가 NULL인 행(구 데이터·하네스 경로)도 **해소가
+    아니다** — 모르는 것을 확정으로 세지 않는다.
+
+    `misconception_ids`가 비면 쿼리 없이 빈 집합(N+1·불필요 왕복 회피). 순수 쿼리빌더만.
+    """
+    if not misconception_ids:
+        return set()
+    stmt = (
+        select(EvidenceLink.misconception_id)
+        .where(
+            EvidenceLink.student_id == student_id,
+            EvidenceLink.misconception_id.in_(list(misconception_ids)),
+            EvidenceLink.polarity == -1,
+            EvidenceLink.provenance == CORRECT_FORM_DEMONSTRATED,
+        )
+        .distinct()
+    )
+    result = await session.execute(stmt)
+    return {mid for (mid,) in result.all()}
 
 
 async def purge_expired(session: AsyncSession, *, as_of: date) -> int:

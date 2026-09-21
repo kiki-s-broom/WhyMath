@@ -83,13 +83,17 @@ class AnchorRegistryLoadError(RuntimeError):
     """
 
 
-def load_anchor_defs() -> tuple[dict[str, Any], ...]:
+def load_anchor_defs(registry_path: Path | None = None) -> tuple[dict[str, Any], ...]:
     """1급 등록에서 앵커 정의를 읽는다 — 실패는 `AnchorRegistryLoadError`.
 
     감사 도구가 앵커 0건으로 "성공"하면 그 결과는 "자산 없음"으로 읽힌다. 레지스트리를 못
     읽는 것은 측정 실패이지 측정 결과가 아니므로 조용한 빈 튜플을 돌려주지 않는다.
+
+    `registry_path`(OPS-70): 기본은 정본(`REPO_ROOT / ANCHOR_REGISTRY_PATH`)이지만, 실패
+    경로를 실측하는 테스트가 정본을 직접 훼손하지 않도록 임시 사본을 가리키는 주입구다 —
+    `-n auto` 병렬 실행에서 다른 워커가 정본을 읽는 창과 경합하는 사고(OPS-70)를 없앤다.
     """
-    path = REPO_ROOT / ANCHOR_REGISTRY_PATH
+    path = registry_path if registry_path is not None else REPO_ROOT / ANCHOR_REGISTRY_PATH
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
@@ -201,7 +205,7 @@ def step_anchor_registry(ctx: dict[str, Any], result: dict[str, Any]) -> None:
     이 단계가 실패하면 뒤 단계는 조인 축 자체가 없으므로 main()이 측정을 중단한다
     (같은 원인으로 8개 단계가 각자 죽는 소음 대신 중단 사유 1건).
     """
-    defs = load_anchor_defs()
+    defs = load_anchor_defs(ctx.get("registry_path"))
     ctx["anchor_defs"] = defs
     result["anchor_defs"] = [
         {
@@ -594,8 +598,18 @@ def main() -> int:
         default=str(REPO_ROOT / "data/audit/eos_anchor_asset_audit_2026-09.json"),
         help="결과 JSON 경로(기본: data/audit/eos_anchor_asset_audit_2026-09.json)",
     )
+    parser.add_argument(
+        "--registry",
+        default=str(REPO_ROOT / ANCHOR_REGISTRY_PATH),
+        help=(
+            "앵커 1급 등록 경로(기본: 정본 "
+            f"{ANCHOR_REGISTRY_PATH}) — 실패 경로를 실측하는 테스트가 정본을 훼손하지 "
+            "않도록 사본을 가리키는 주입구(OPS-70)"
+        ),
+    )
     args = parser.parse_args()
     out_path = Path(args.out)
+    registry_path = Path(args.registry)
 
     result: dict[str, Any] = {
         "task": "EOS-52-anchor-asset-audit",
@@ -618,7 +632,7 @@ def main() -> int:
     }
     persist_ok = _flush(result, out_path)  # 시작 상태부터 저장 — 첫 단계 전 실패도 증거가 남는다
 
-    ctx: dict[str, Any] = {}
+    ctx: dict[str, Any] = {"registry_path": registry_path}
     for name, fn in STEPS:
         try:
             fn(ctx, result)

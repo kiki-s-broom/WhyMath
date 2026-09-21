@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,9 +16,10 @@ acceptance:
   - "② 원인 규명 — multi_symbol 판정이 나는 조건 형태를 유형별로 분류하고, 파생기(derive_verify_inputs)의 한계인지 코퍼스 저작 관행의 문제인지 판정한다. 전자면 파생기 확장, 후자면 생성기 출력 형태 교정 — 어느 쪽인지 정하지 않고 고치면 반대쪽에 부채가 쌓인다"
   - "③ 영향 범위 명시 — 이 62%가 실제로 무엇을 못 하게 하는지 확정한다. 섀도 채점 경로만 막히는지, 아니면 학생 노출 적격 판정·품질 게이트까지 영향받는지. 커버리지 기여(78→130)는 이미 실측 확인됐으므로 그 축은 무관하다"
   - "④ 집행 지점(정본화와 별항) — 개선 후 test_multi_symbol_population_is_frozen의 7098을 실측 신값으로 갱신하고 CI 실행을 확인한다. 그 테스트가 개선을 수치로 증명하는 계량기다"
-artifacts: []
+artifacts:
+  - "PR #1075 · commit 27320837 — 파생 게이트 이름→개수 일반화. 코퍼스 verify 블록 파생 성공 6,472→13,520(100%) · ceiling C버킷 5,220→12,268 · 전체 백엔드 12,130 passed · 뮤테이션 11/11 RED"
 paths:
   - src/backend/whymath_backend/harness/attempt_grading_shadow_report.py
 session: null
 notes: "출처: PB-13 회수 검증(2026-09-01). 회수한 11,446문의 커버리지 기여는 유효하나 62%가 섀도 채점 경로에서 소비되지 않는다 — '11,446문 회수 완료'가 실제보다 크게 읽히지 않도록 계약으로 동결해 뒀다.\n\n[정정 2026-09-02] eos_priority null → P2: P2(판정 이후) 배정 — 회수분 11,446블록 중 7,098건(62%)이 multi_symbol로 섀도 채점 파생 불가. 12월 검증 성립에 필수가 아닌 근거: ⑴기존 main 코퍼스 2,124블록은 파생 성공률 100%로 무영향 — 회수분에 한정된 한계다 ⑵커버리지 기여(성취기준 78→130·초등 9→22)는 파생 여부와 무관하게 이미 실측 확인됐다 ⑶섀도 채점은 관측 경로이지 학생 노출 게이트가 아니다. 다만 '11,446문 회수 완료'가 실제보다 크게 읽히는 것을 막으려고 test_multi_symbol_population_is_frozen이 7,098을 계량기로 동결했다."
-updated: 2026-09-02
+updated: 2026-09-10

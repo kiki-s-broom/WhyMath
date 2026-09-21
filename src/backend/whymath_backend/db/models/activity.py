@@ -181,9 +181,15 @@ class ProblemAttempt(Base):
     ended_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     duration_seconds: Mapped[int | None] = mapped_column(sa.Integer)
     # EOS-48: 서버 *수신* 시각 — 오프라인 sync에서 발생(started_at)과 수신이 벌어지는 것을
-    # 구분한다. NULL=미기록(기존 행·기존 writer 무영향 — server_default를 달지 않는 이유:
-    # ALTER 시 기존 행에 마이그레이션 시각이 백필되는 날조를 막는다. 신규 writer가 채운다).
-    ingested_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    # 구분한다. NULL=미기록(EOS-48 도입 이전 기존 행 — server_default가 없었을 때라 정직하게
+    # 비어 있다). SEC-33 ⑥: 이후 이 컬럼이 `privacy/retention`의 COALESCE 폴백 좌석이 되므로
+    # server_default를 부여했다(19149e92d368 — 신규 INSERT가 값을 생략해도 서버 시각으로
+    # 채워진다·기존 NULL 행은 SET DEFAULT가 건드리지 않아 날조 없음). 두 writer(api/me.py·
+    # api/coach.py)가 여전히 명시적으로 `received_at`을 채우므로 이 기본값은 *셋째 writer가
+    # 생략했을 때만* 발동하는 안전망이다.
+    ingested_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True, server_default=sa.func.now()
+    )
     # EOS-48: 실측 활동/공백 시간(초) — 클라 heartbeat 등 *실측 신호가 있을 때만* 적재
     # (32_learning_history §7 "측정된 것만 적재"). NULL=미측정(0 날조 금지 — ended_at-started_at
     # 을 active로 승격하는 백필 금지·EOS-45 view_duration_ms 판정과 동형).
@@ -194,6 +200,11 @@ class ProblemAttempt(Base):
     is_correct: Mapped[bool | None] = mapped_column(sa.Boolean)
     # *미성년 풀이 데이터* — 평문 저장 금지는 저장계층 책임(모듈 docstring).
     student_answer: Mapped[str | None] = mapped_column(sa.Text)
+    # SEC-31: 학생 답안 at-rest 봉투 암호화(AES-256-GCM) — 마스터 키(DB 밖·env)로 암호화된 본문 +
+    # 96-bit nonce. 둘 다 NULL이면 평문(student_answer) 행. dialogue_turn.content_encrypted/
+    # content_nonce 선례 미러(schema round-trip 제외 — `_NON_SCHEMA_COLUMNS`).
+    student_answer_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    student_answer_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     confidence_self_reported: Mapped[float | None] = mapped_column(sa.Numeric(3, 2))
 
     # ===== 풀이 방식 (특성 #96) =====
@@ -206,7 +217,15 @@ class ProblemAttempt(Base):
 
     # ===== 풀이 이미지/PDF (특성 #95) — *미성년 풀이 데이터* =====
     handwriting_uri: Mapped[str | None] = mapped_column(sa.Text)
+    # SEC-31: 손글씨 URI at-rest 봉투 암호화 — student_answer와 같은 등급·같은 키(student_work).
+    handwriting_uri_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    handwriting_uri_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
     ocr_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    # SEC-31: OCR 결과(JSONB)는 **결정론 JSON 직렬화 후** 암호화(dialogue_turn.image_analysis
+    # 선례 — sort_keys=True·ensure_ascii=False). SEC-04: none_as_null=True는 원본 컬럼에 이미
+    # 적용됨(위) — 암호화 컬럼 자체는 스칼라 bytes라 해당 없음.
+    ocr_result_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+    ocr_result_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
 
     # ===== 막힌 지점 분석 =====
     stuck_at_step: Mapped[int | None] = mapped_column(sa.Integer)
@@ -242,17 +261,46 @@ class ProblemAttempt(Base):
         sa.UniqueConstraint("attempt_id", "user_id", name="uq_problem_attempt_attempt_user"),
     )
 
+    # SEC-31: schema round-trip에서 제외하는 봉투 암호화 컬럼(schema는 extra="forbid"라 이 키가
+    # model_validate에 들어가면 실패). 복호는 handler/헬퍼 층이 담당하고(순수 seam에 cipher
+    # 미주입), schema 필드엔 복호된 평문을 별도 설정한다. ciphertext는 API·export에 노출하지
+    # 않는다(dialogue_turn._NON_SCHEMA_COLUMNS 동형).
+    _NON_SCHEMA_COLUMNS = frozenset(
+        {
+            "student_answer_encrypted",
+            "student_answer_nonce",
+            "handwriting_uri_encrypted",
+            "handwriting_uri_nonce",
+            "ocr_result_encrypted",
+            "ocr_result_nonce",
+        }
+    )
+
     @classmethod
     def from_schema(cls, schema: SchemaProblemAttempt) -> ProblemAttempt:
-        """검증된 `schema.ProblemAttempt` → 영속 ORM(schema↔db seam)."""
+        """검증된 `schema.ProblemAttempt` → 영속 ORM(schema↔db seam).
+
+        암호화 컬럼(student_answer_encrypted 등)은 schema에 없어 여기서 설정되지 않는다 —
+        handler/헬퍼 층이 student_answer 등을 암호화해 채운다(dialogue_turn._build_dialogue_turn
+        패턴 동형).
+        """
         data = schema.model_dump()
         mapped_keys = {col.key for col in sa.inspect(cls).mapper.column_attrs}
         kwargs = {k: v for k, v in data.items() if k in mapped_keys}
         return cls(**kwargs)
 
     def to_schema(self) -> SchemaProblemAttempt:
-        """영속 ORM → `schema.ProblemAttempt`(Pydantic 검증 복원)."""
-        mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
+        """영속 ORM → `schema.ProblemAttempt`(Pydantic 검증 복원).
+
+        봉투 암호화 컬럼은 `_NON_SCHEMA_COLUMNS`로 제외(schema extra="forbid"·ciphertext 비노출).
+        암호화 행은 student_answer 등이 NULL이므로 handler/헬퍼 층이 복호값을 schema 필드에
+        덮어쓴다(예: `privacy/export.py`).
+        """
+        mapped_keys = {
+            col.key
+            for col in sa.inspect(type(self)).mapper.column_attrs
+            if col.key not in self._NON_SCHEMA_COLUMNS
+        }
         data = {key: getattr(self, key) for key in mapped_keys}
         return SchemaProblemAttempt.model_validate(data)
 

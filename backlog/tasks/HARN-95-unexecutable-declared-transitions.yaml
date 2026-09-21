@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-95-unexecutable-declared-transitions
+title: "전이표가 허용하는 전이 2종이 CLI로 실행 불가 — unblock의 session 잔류 · review 막다른 길"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 (2026-09-08 · 시딩 저장소 종단 실행 · main 4abacdce): 전이표(models.py STATUS_TRANSITIONS)가 허용하는 전이 2종이 CLI로 실행 불가다. 원인은 공통 — cmd_start가 전이 검사를 통과한 뒤 selector.classify_todo를 부르고 그것이 session 보유 태스크를 claimed로 거부한다(selector.py:206). (a) in_progress → todo: cmd_unblock이 원격 claim만 걷고 task.session은 그대로 둔다 → todo/session=b라는 상태가 만들어지고 그 태스크는 next 후보에서도 빠지고 start도 거부된다(실측 EXIT=1 · 착수 거부 — claimed). 우회로는 block 선행(cmd_block은 task.session = None)뿐이라 in_progress 재진입이 2단계가 아니라 3단계다. (b) review → in_progress: cmd_review가 session을 의도적으로 보존하므로(여전히 in-flight · HARN-20) start가 항상 거부된다. 게다가 review의 전이표 출구는 done·in_progress 둘뿐이라 session을 비우는 block이 없어 우회로 자체가 없다 → review 태스크는 done 말고 나갈 길이 없는 막다른 길이다"
+  - "② 판정할 것 (설계 선택 · 이 태스크가 정한다): (a)는 cmd_unblock이 task.session을 비워야 하는가 — 원격 claim을 이미 해제하면서 로컬 session만 남기는 것이 일관적인지, 아니면 in_progress → todo 엣지 자체를 전이표에서 닫아야 하는지. (b)는 review 재개 경로를 열 것인가 — 선택지는 ⓐ cmd_start의 claim 검사에 자기 세션 재개 예외를 둔다(task.status == review이고 task.session == 현재 브랜치일 때만 — 이중 claim 방어를 넓히지 않는 최소 narrowing) ⓑ review 전용 재개 명령을 신설 ⓒ review → blocked 엣지를 전이표에 추가 ⓓ 막다른 길을 의도로 확정하고 문서화. HARN-08·HARN-45·HARN-48이 claim 의미론을 지고 있으므로 어느 쪽이든 그 계약을 먼저 읽는다 — 이중 claim 방어는 이 저장소가 병렬 중복 구현으로 두 번(735줄·40분) 대가를 치른 뒤 세운 것이다"
+  - "③ 집행 지점 (정본화와 별항): 고친 뒤 그 전이가 **실제로 도는지**를 종단 실행으로 동결한다 — 상태 필드 단언이 아니라 CLI를 실행해 exit 0을 확인하는 형태다(문자열·파싱 검사는 이 결함을 통과시켰다: PR #1067의 파서 전수 가드가 green인 채로 실행하면 exit 1인 명령을 안내했고 Codex P2가 잡았다). 선례 = tests/harness/test_cli.py::TestTransitionRejectionGuidance의 _run_guided 헬퍼(안내 → 파싱 → 전건 실행 → 전부 exit 0). 부수 정합: 이 결함이 고쳐지면 backlog.py의 경로 탐색 모델(_hop_is_executable · _session_after)이 낡은 사실을 담게 되므로 함께 갱신하고, 그 모델의 뮤테이션 7종(P1~P7)이 여전히 RED인지 재실행한다"
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1086"
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/selector.py
+  - scripts/harness/models.py
+  - tests/harness/test_cli.py
+session: null
+notes: "출처: PR #1067 Codex P2 리뷰(HARN-86 후속). 지적은 '안내가 실행 불가한 명령을 낸다'였고 그 안내 결함은 #1067에서 고쳤다(경로 탐색이 실행 가능성을 모델링) — 이 태스크는 그 아래에 있는 **CLI 자체의 결함**을 소유한다. #1067은 결함을 우회할 뿐 없애지 않는다: (a)는 block 경유로 돌아가고 (b)는 정직한 진단만 낸다."
+updated: 2026-09-10

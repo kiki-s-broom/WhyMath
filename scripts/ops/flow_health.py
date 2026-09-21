@@ -375,6 +375,7 @@ def _open_pr_numbers(root: Path) -> tuple[set[int] | None, str]:
         cmd = [
             "curl",
             "-sS",
+            "-L",  # 이관 리다이렉트 추종 — 301 본문을 데이터로 오독하지 않기 위해
             "--max-time",
             "30",
             *_ca_args(),

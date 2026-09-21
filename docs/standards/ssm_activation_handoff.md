@@ -51,7 +51,7 @@ C                    └─(B후)─▶ 파일럿 측정 ─▶ SSM §5 재판�
 ### S0. 준비 (최초 1회)
 - [ ] repo·venv:
   ```powershell
-  git clone https://github.com/doldori7/WhyMath.git
+  git clone https://github.com/kiki-s-broom/WhyMath.git
   cd WhyMath\src\backend
   python -m venv .venv
   .venv\Scripts\Activate.ps1

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-107-vertical-slice-task-decomposition-convention
+title: "Vertical Slice 태스크 분해 지침 부분 채택 — 09-03 대조가 권고했으나 등재되지 않아 13일째 소유자 없던 축 (PR:태스크 1:1 정본은 불변)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: docs
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 부분 채택만 한다 — 계획서 §20은 PR 단위를 기능 기준에서 Vertical Slice 기준으로 바꾸라고 한다(나쁜 예 \"PR — Mastery DB 추가\" / 좋은 예 \"PR — Wrong Answer → LearnerState Update Slice\"). 저장소의 PR 단위 정본은 **태스크 1:1**이며 그것은 바꾸지 않는다. 채택하는 것은 **태스크 분해 지침**이다 — \"표면 1개만 만드는 태스크\"보다 \"학생이 실제로 도달하는 슬라이스\"를 선호한다.\n② 규약을 어디에 적을지 정한다 — `docs/standards/build_harness.md`(태스크 분해 규약이 사는 곳)가 1순위다. CLAUDE.md 본문에 넣으려면 버전·수정일 표기도 함께 갱신한다.\n③ 기계 집행 여부를 명시한다(정본화≠집행) — 이 규약은 **사람 규율**로 둘 것인지, `backlog.py add`가 제목 형태를 검사할 것인지 판정해 적는다. 집행하지 않기로 하면 \"기계 집행 없음\"을 명시한다. 슬라이스 여부는 기계가 판정하기 어려우므로 사람 규율이 정직한 기본값이다.\n④ 기존 게이트와 충돌하지 않는다 — `backlog.py done`의 PR 증적 검사(HARN-23 done)와 태스크:PR 1:1은 그대로 유지된다. 이 규약은 그 위에 얹는 **분해 취향**이지 대장 구조 변경이 아니다.\n⑤ 인접 미머지 확인 — `HARN-104-pr-template-eos-blocks`(todo·미머지 all=2/main=0)가 PR 템플릿을 건드린다. 템플릿 파일을 수정하려면 그 브랜치와 충돌하는지 먼저 확인한다."
+artifacts: []
+paths:
+  - docs/standards/build_harness.md
+session: null
+notes: "출처: 계획서 300 §20(4주간 PR 운영도 바꾸는 것이 좋습니다) — 대조표 §6 단위7. 분류(§14): SUPPORT.\n\n실측(판정 기준 main 2e1220b4): 소유 태스크 **0건**(검색 범위: backlog 655건 전수 × vertical/slice/수직/PR 단위/PR template · `backlog/tasks/` 전수 × 수직 슬라이스/Vertical Slice). `.github/pull_request_template.md:9`에 태스크 id 기입란만 있고 슬라이스 관련 칸은 0이다.\n\n등재 이유(이 태스크의 실제 가치): 2026-09-03 대조 `docs/reviews/eos_phase2_plan_300_gap_review_2026-09-03.md` §8-③이 이 축을 \"부분 채택 권고·P2\"로 적었으나 **태스크로 등재된 적이 없다** — 소유자 없는 권고로 13일째 부유했다. 계획서 실행 여부와 무관하게 이것은 **떨어뜨린 공**이므로 소유자를 준다.\n\n착수 전제: 이 항목은 09-03 결정이 이미 \"부분 채택\"으로 판정한 축이라 결정 갱신을 기다리지 않는다."
+updated: 2026-09-16

@@ -1,10 +1,10 @@
 """핵심 엔티티 19종 동결 — 정본 `docs/architecture/canonical_entity_model_v1.md`의 기계 집행.
 
 이 파일이 **강제하는 것**(정본화≠집행 — CLAUDE.md):
-  ① 78테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
+  ① 81테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
   ② 좌석 실재 — 19종의 좌석 테이블이 사라지거나 개명되면 RED.
   ③ 좌석 부재 4종 — Subject·Hint·AssessmentResult·ContentVersion용 테이블이 생기면 RED.
-  ④ 문서 정합 — 정본 문서가 78테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
+  ④ 문서 정합 — 정본 문서가 81테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
 
 이 파일이 **강제하지 않는 것**(있는 척 금지):
   · 컬럼 수준 스키마(어떤 필드를 갖는지)는 각 모델의 기존 ORM 테스트 소관이다.
@@ -46,7 +46,11 @@ def _load_all_models() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 동결 상수 — 정본 §1·§2 표와 1:1 (실측 2026-09-05·78테이블)
+# 동결 상수 — 정본 §1·§2 표와 1:1 (실측 2026-09-05·78테이블, SEC-27 job_ownership 추가로 79테이블,
+# EOS-49가 concept_version을 Concept 좌석 4번째 테이블로 추가해 2026-09-14 80테이블로,
+# EOS-103이 learner_state를 LearnerState 좌석 2번째로, EOS-105가 learning_state_transition을
+# 3번째로 추가해 2026-09-17 82테이블 — 둘은 서로 다른 브랜치에서 각각 +1로 착지했으므로 병합
+# 결과는 81이 아니라 82다)
 # ──────────────────────────────────────────────────────────────────────────
 
 # 핵심 19종 → 좌석 테이블. 빈 tuple = **좌석 부재 동결**(정본 §3).
@@ -61,7 +65,7 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
         "textbook_mapping",
     ),
     "LearningObjective": ("learning_objective", "unit_spec"),
-    "Concept": ("concept", "concept_node", "atom_node"),
+    "Concept": ("concept", "concept_node", "atom_node", "concept_version"),
     "Skill": ("skill_node",),
     "Misconception": ("misconception_catalog",),
     "Problem": ("problem", "problem_step"),
@@ -69,7 +73,12 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
     "Hint": (),
     "Content": ("concept_content", "pedagogy_content_slot"),
     "Learner": ("user_profile",),
-    "LearnerState": ("user_state_snapshot",),
+    # LearnerState 좌석은 3테이블이며 **셋이 담는 사실이 다르다**(같은 사실의 복제가 아니다):
+    #   · `learner_state`            학생당 1행 — 지금의 교육과정·학습목표 배치(EOS-103)
+    #   · `user_state_snapshot`      학생당 N행 — 시점 사진(숙련 맵·평균 풀이시간)
+    #   · `learning_state_transition` 학생당 N행 — 8상태 학습 국면의 **전이 원장**(EOS-105)
+    # 전이 원장에는 가변 상태 컬럼이 없다 — 현재 국면은 최신 행에서 파생된다.
+    "LearnerState": ("user_state_snapshot", "learner_state", "learning_state_transition"),
     "MasteryState": ("concept_mastery_history", "skill_mastery_history", "ability_snapshot"),
     "Assessment": ("assessment",),
     "AssessmentResult": (),
@@ -140,6 +149,9 @@ NON_CORE_TABLES: dict[str, str] = {
     "user_persona_history": "사용자 이력(페르소나 변경) — LearnerState 아님",
     # 판정 보류 — 날조 금지(정본 §2-C). Misconception(카탈로그)도 LearningEvent(원시)도 아니다.
     "misconception_hypothesis": "판정 보류 — L2 오개념 추론 산출물. 카탈로그도 원시 이벤트도 아니다",
+    # SEC-27: 비동기 작업 소유권 — 학습 도메인 엔티티가 아니라 서버 내부 인가 메타(refresh_
+    # token_session·device_credential과 동형 — 인증·법령 그룹에 편입).
+    "job_ownership": "인증(작업 소유권) — 학습 도메인 엔티티 아님",
 }
 
 # 좌석 부재 4종(정본 §3) — **좌석 tuple이 비어 있다는 사실 자체**를 동결한다.

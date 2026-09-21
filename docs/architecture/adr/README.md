@@ -6,8 +6,9 @@
 
 1. **ADR 번호 계열은 이 디렉터리 하나뿐이다.** 다른 계열(`EOSADR-00n` 등)을 만들지 않는다.
 2. **새 ADR은 다음 빈 번호를 받는다** — 고르는 법은 아래 §"번호를 고르는 법"(작업 트리 `ls` 금지).
-3. **계획서 100 §3.16의 "ADR-001~010"은 번호가 아니라 결정해야 할 *주제 목록*이다.** 그 번호를
-   저장소 파일명으로 쓰지 않는다 — 아래 매핑표로만 연결한다.
+3. **계획서의 "ADR-001~010"은 번호가 아니라 결정해야 할 *주제 목록*이다.** 그 번호를
+   저장소 파일명으로 쓰지 않는다 — 아래 매핑표로만 연결한다. **계획서가 둘(100 §3.16 · 200 §31)이고
+   주제 목록이 서로 다르므로 매핑표도 둘이다** — 계획서끼리도 번호로 대조하면 안 된다.
 
 ## 왜 이 규칙인가
 
@@ -54,7 +55,7 @@ python3 scripts/harness/adr_number_check.py
 
 ---
 
-## 현재 계열 (2026-09-05)
+## 현재 계열 (2026-09-16)
 
 | 번호 | 주제 | 상태 | 소재 |
 |---|---|---|---|
@@ -62,8 +63,10 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-002](./ADR-002-student-solution-step-entity.md) | 학생 풀이 step = 별도 정규 엔티티 | 채택 | main |
 | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 노드 ID의 과목 접두사는 규약이지 Subject 엔티티 참조가 아니다 | 채택 | main |
 | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Provisional** (target 2026-09-27) | main |
+| [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
+| [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) | 학습 상태 머신 8상태 채택 · 상태를 저장하지 않고 전이 원장에서 파생 | 채택 (2026-09-03 보류의 번복 · 게이트 판정 ②) | main |
 
-**다음 빈 번호: ADR-005** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
+**다음 빈 번호: ADR-007** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
 
 ---
 
@@ -77,21 +80,55 @@ python3 scripts/harness/adr_number_check.py
 | ADR-002 Subject Adapter | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | 오늘 작성 — Provisional |
 | ADR-003 Entity ID | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 주제 일치 확인 — 노드 ID 접두사 규약 축 |
 | ADR-004 Event Model | | 미확인 |
-| ADR-005 LearnerState | | 미확인 |
+| ADR-005 LearnerState | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) (학습 국면 축) + `l2/learner_state.py`(요약 상태 조립기 축) | **부분** — 학습 *국면*의 상태·전이 계약은 ADR-006이 덮는다. 요약 LearnerState의 단일 조회 표면·영속 좌석은 `EOS-10`·`EOS-103`이 소유하며 아직 ADR 형식의 기록이 없다 |
 | ADR-006 Content Version | | 미확인 |
-| ADR-007 AI Gateway | | 미확인 |
+| ADR-007 AI Gateway | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | 충족 — 기존 결정의 정본화(ARCH-45). 주제의 실질(`l3/router.py`·`03a_l3_router_design.md`)은 이미 있었고 ADR 형식의 단일 기록만 없었다 |
 | ADR-008 Knowledge Graph | | 미확인 |
 | ADR-009 Assessment Architecture | | 미확인 |
 | ADR-010 Math AST | | 미확인 |
 
 **왼쪽 번호는 계획서의 것이고 오른쪽 파일명의 번호는 저장소의 것이다 — 둘은 무관하다.**
+
 계획서 ADR-002(Subject Adapter)가 저장소 ADR-004에 있고, 계획서 ADR-003(Entity ID)이 저장소
 ADR-003에 있는 것은 **우연**이다(후자는 두 계열이 같은 번호에서 우연히 만난 경우다).
 
-**검색 범위 명시(부재 판정 절차)**: "미확인" 7칸은 *조사하지 않았다*는 뜻이지 *대응 문서가
-없다*는 뜻이 아니다. 위 3칸은 각각 실측(`eos_source_docs_gap_review_2026-08-31.md` §7.3-④·§319
+**검색 범위 명시(부재 판정 절차)**: "미확인" 6칸은 *조사하지 않았다*는 뜻이지 *대응 문서가
+없다*는 뜻이 아니다. 채워진 4칸은 각각 실측(`eos_source_docs_gap_review_2026-08-31.md` §7.3-④·§319
 인용, 원격 브랜치 파일 실측)에 근거한다. 계획서 100 원본은 Kiki 보유이며 저장소에 반입돼 있지
 않다(`grep -rln "계획서 100"` = 인용 문서 6건, 원본 0건).
+---
+
+## 계획서 200 §31 주제 ↔ 저장소 문서 매핑
+
+**위 표(계획서 100 §3.16)와 주제 목록이 다르다 — 덧쓰지 않고 별도로 둔다.** 200은 Entity
+Versioning·Curriculum Mapping·Concept/Skill separation·Problem/Answer·Misconception Model을
+갖고, 100은 AI Gateway·Math AST·Knowledge Graph·Content Version·Assessment Architecture를
+갖는다. 두 계획서의 `ADR-00n`은 **서로 다른 주제**를 가리키므로 번호로 대조하면 안 된다.
+
+**작성 근거**: 2026-09-16 Kiki가 계획서 200 원본(docx)을 세션에 반입해 항목별 대조를 지시했고,
+그 재대조(`docs/reviews/eos_phase1_plan_200_reverify_2026-09-16.md` §5 · 판정 기준 main
+`2520a27c`)가 10주제 전건의 저장소 정본을 실측했다. 위 100 §3.16 표의 7칸이 비어 있는 사유
+("계획서 100 원본 미반입")는 **여전히 유효하다** — 반입된 것은 200이지 100이 아니다.
+
+| 계획서 200 §31 주제 | 저장소 정본 | 상태 |
+|---|---|---|
+| ADR-001 EOS Core Boundary | `docs/architecture/eos_core_adapter_boundary.md` + `scripts/analysis/eos_core_adapter_boundary_scan.py`(`BOUNDARY_MAP` 64항목) | 충족 — ADR 형식은 아니나 전수 배정으로 정본화(`EOS-65`) |
+| ADR-002 Entity ID Strategy | `docs/standards/eos_identity_layer_011_1_decision.md` + [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 충족 — 2026-08-17 판정(부분 수용·부분 거부) + 접두사 규약 |
+| ADR-003 Entity Versioning | `docs/architecture/44_eos_version_management.md` + `schema/version_header.py`(`VersionStatus` 6종) | 충족 — `EOS-44`(설계)·`EOS-49`(`concept_version` 착지) |
+| ADR-004 Subject Contract | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | **Provisional** — 9/27 Freeze 판정 대기 |
+| ADR-005 Curriculum Mapping | `docs/architecture/eos_curriculum_semantic_backbone_adr.md` | 충족 — Overlay 방식(개념 백본 위에 Framework/Version/Alignment 레이어) |
+| ADR-006 Concept/Skill separation | `docs/architecture/canonical_entity_model_v1.md` §1-5·§1-6 | 충족 — 이다/아니다 쌍으로 판정 가능하게 정의 |
+| ADR-007 Problem/Answer Contract | `docs/architecture/adr_answer_form_contract.md` + `schema/answer_form.py` | 충족 — `EOS-28` |
+| ADR-008 Misconception Model | `docs/standards/crosswalk_gate_contract.md` + `04b`/`04c`/`04e` | 충족 — kebab↔M-id 승인·적재 게이트가 코드 동결 |
+| ADR-009 Event Architecture | [ADR-001](./ADR-001-event-storage-postgresql-first.md) + `schema/event_data_contract.py` | 충족 — 저장소 선택 + payload 계약 단일 진실원 |
+| ADR-010 Learner State | `docs/architecture/evidence_layer_boundary.md`(`EOS-79`) + `docs/architecture/02_learner_model.md` | 충족(정본) · **집행 없음**(문서 §3이 스스로 명시) |
+
+**10주제 전부 저장소 정본이 실재하므로 새로 쓸 ADR은 없다.** 계획서가 "작성할 가치가 크다"고
+한 10건은 ADR 파일이 아닌 형태(경계 문서·표준 문서·계약 모듈·동결 테스트)로 이미 결정돼 있다.
+이 표는 **그 대응을 기록하는 것이지 새 ADR을 예약하는 것이 아니다** — 위 §"번호를 고르는 법"의
+다음 빈 번호는 이 표와 무관하다.
+
+
 
 ---
 

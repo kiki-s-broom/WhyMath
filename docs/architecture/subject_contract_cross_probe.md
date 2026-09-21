@@ -354,22 +354,36 @@ else { $hits | ForEach-Object { $_.Path + ":" + $_.LineNumber }; Write-Host "RES
 `-q`를 쓰지 않는다. 조용한 도구는 실패해도 성공과 같은 화면을 내며, 이 저장소는 그 형태로
 한 번 뚫렸다(2026-08-09 PR #732 — `black --check -q`가 6파일 실패를 감춰 main red).
 
+> **정정 (2026-09-20 · `G-required-tier-caller-recheck` 사전 실행에서 발견)** — 초판의 아래
+> 명령은 **저장소 루트에서 명시 경로**를 주는 형태였고, 지금 그대로 실행하면 `EXIT=4`로
+> 거부된다. 프로브와 **같은 날**(2026-09-06) 착지한 `tests/backend/conftest.py`의
+> `pytest_configure` 가드 때문이다 — 루트에서 명시 경로를 주면 pytest가 rootdir을 저장소
+> 루트로 잡아 `src/backend/pyproject.toml`의 `asyncio_mode = "auto"`를 **읽지 못하고**
+> strict로 폴백해 `async def` 테스트가 전부 깨진다(2026-09-05 실측 718건). 가드는 그 718건의
+> 혼란을 UsageError 1건으로 바꾼다. 이 절은 가드와 같은 날 쓰여 그것을 반영하지 못했고,
+> 그대로 두면 9/27 재확인이 **측정이 아닌 이유로 공전**한다. 아래는 2026-09-20에 `EXIT=0`을
+> 실측한 형태다(CLAUDE.md "검증 없는 실행 안내 금지·가정 기반 런북 금지").
+
 ```bash
 # WSL / Linux — 저장소 루트에서
-python -m pytest tests/backend/schema/test_subject_adapter_two_tier_contract.py \
+python -m pytest -c src/backend/pyproject.toml --rootdir=src/backend \
+                 tests/backend/schema/test_subject_adapter_two_tier_contract.py \
                  tests/backend/schema/test_subject_adapter.py; echo "EXIT=$?"
 ```
 
 ```powershell
 # Windows PowerShell (Phaiakes9) — 저장소 루트
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-python -m pytest tests\backend\schema\test_subject_adapter_two_tier_contract.py `
+python -m pytest -c src\backend\pyproject.toml --rootdir=src\backend `
+                 tests\backend\schema\test_subject_adapter_two_tier_contract.py `
                  tests\backend\schema\test_subject_adapter.py; echo "EXIT=$LASTEXITCODE"
 ```
 
-기대: **19 passed · EXIT=0**. 판정은 **exit code**로 한다(출력 문자열 아님 — CLAUDE.md
-"검사 명령의 출력을 억제하거나 잘라서 판정 금지"). 실행기는 `python -m pytest`로 못 박는다
-(단독 `pytest` 금지 — 다중 환경에서 다른 인터프리터에 결합될 수 있다).
+기대: **`EXIT=0`**. 건수는 기대값으로 박지 않는다 — 2026-09-06에 19였고 2026-09-20 실측은
+**22**다(계약이 아니라 테스트가 늘었다). 건수를 박아 두면 정상 상태가 실패로 보인다.
+판정을 exit code로 하는 근거는 CLAUDE.md "검사 명령의 출력을 억제하거나 잘라서 판정 금지"다.
+실행기는 `python -m pytest`로 못 박는다(단독 `pytest` 금지 — 다중 환경에서 다른 인터프리터에
+결합될 수 있다).
 
 ### 이 재현 명령에 변별력이 있는가 — 실패 주입으로 확인함 (2026-09-06)
 
@@ -389,3 +403,36 @@ python -m pytest tests\backend\schema\test_subject_adapter_two_tier_contract.py 
 `getattr(adapter, "evaluate_answer")()` 같은 동적 호출은 잡지 못한다 — 저장소 실측 0건이라
 현재는 공백이 아니지만, 잡지 못한다는 사실 자체를 적는다. 이 축의 기계 집행 설계는
 `ARCH-43`가 소유한다.
+
+---
+
+## 부록 B. 재확인 사전 실행 기록 — 2026-09-20 (판정 아님)
+
+**판정 기준: main `e91a75d3`** (작업 트리 소스가 그 커밋과 동일함을 `git diff --quiet HEAD
+origin/main -- src/backend/whymath_backend/`로 확인). 게이트
+`G-required-tier-caller-recheck`의 재확인 지점은 **2026-09-27**이고 이 기록은 그보다 **7일
+이르다** — 따라서 이것은 **판정이 아니라 판정의 입력**이며, 9/27까지 호출자가 생기면 결과가
+바뀐다. 판정은 kind=decision·assignee=kiki인 그 게이트가 소유한다.
+
+| # | 확인 항목 | 명령 | 결과 |
+|---|---|---|---|
+| 1 | 필수층 3메서드 Core 호출자 (부록 ①) | 부록 ① bash 블록 | **`ZERO_CALLERS`** (첫 grep rc=1) |
+| 2 | 1의 변별력 | `api/coach.py`에 호출 1줄 주입 | 주입 시 **rc=0·CALLERS_FOUND**로 검출 · `cp` 원복 후 sha256 **바이트 동일** · 잔류 0건 |
+| 3 | `MathSubjectAdapter` 인스턴스화 | `grep -rn MathSubjectAdapter`(구현 파일 제외) | **0건** — 유일 언급이 `subject_adapter.py:184` 산문 |
+| 4 | `composition.py` 필수층 팩토리 | `__all__` 전수 | **0건** — 8종 전부 `default_*` **선택층**(2026-09-06 5종에서 3종 증가) |
+| 5 | 동적 호출(부록 ① 명시 한계) | `grep getattr(...evaluate_answer\|...)` | **0건** |
+| 6 | `DEMOTED_FIELDS` | 정의 실측 | **`{}` 유지** — 강등 0 |
+| 7 | 계약 동결 테스트 (부록 ②) | 부록 ② 정정판 | **EXIT=0 · 22 passed** |
+
+**결과 = 게이트 3택 중 ①(여전히 0)** 에 해당한다. 단 위 7일 조기 단서 때문에 **9/27에 항목
+1·7을 재실행한 뒤** 판정한다 — 이 표는 그 재실행을 대체하지 않는다.
+
+### 이 사전 실행이 새로 발견한 것 2건
+
+1. **부록 ②의 명령이 깨져 있었다** — 위 정정 참조. 프로브와 같은 날 착지한 rootdir 가드와
+   충돌해 `EXIT=4`였다. 고치지 않았으면 9/27 재확인이 **측정이 아닌 이유로 공전**했다
+   (2026-08-22 "측정 4회 공전"과 같은 형태).
+2. **§4-2 표의 근거가 부분적으로 낡았다** — `composition.py` 팩토리가 5종에서 8종으로 늘었다.
+   셋 다 `default_*` 선택층이라 **층 구분 결론은 불변**이지만, 선택층은 계속 자라는데
+   필수층은 0에 머물러 있다는 사실 자체가 ④ 라벨 권고(`Frozen (unexercised)`)를 **약화가
+   아니라 강화**한다. 필수층 미사용이 과도기가 아니라 정착 상태로 보인다는 뜻이다.

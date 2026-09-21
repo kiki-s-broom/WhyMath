@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,10 +18,12 @@ acceptance:
   - "④ if/else 다중행 구조 경고 검토 — 대화형 붙여넣기에서 if{...}와 else{...}가 여러 입력으로 나뉘면 PS가 if를 완결 문으로 파싱해 else가 고아가 되고(CommandNotFoundException) 검증 스텝이 통째로 미실행된다(OPS-57 notes의 4번째 관측). 오탐 위험이 커 채택 여부를 먼저 판정한다"
   - "⑤ 변별력 양방향 — 규칙마다 위반 샘플 exit 1 · 정상 샘플 exit 0을 tests/infra로 동결. 기존 자산 전건이 green인지 먼저 확인한 뒤 차단으로 승격(OPS-57 acceptance ③과 동일 규약)"
   - "⑥ 오탐 우선 — 오탐이 있는 가드는 사람이 끄게 만든다. 좁히는 쪽을 택하고 놓치는 형태를 명시한다(OPS-57에서 자리표시자 꺾쇠 오탐 1건을 그렇게 처리했다)"
-artifacts: []
+  - "[판정 2026-09-11] ④ 채택 여부 판정 완료 — 전면 채택(펜스 경계 무관 모든 if/else 짝 정적 추적)은 중첩·backtick 줄바꿈·문자열 속 else 등 변수가 많아 오탐 위험 커 보류. 대신 '펜스가 else/elseif로 시작'만 채택 — 그 펜스 안에 대응하는 if가 있을 수 없는 구조적으로 오탐 0인 좁은 부분집합. TestFenceStartingWithBareElse(5건)로 양방향 동결"
+artifacts:
+  - "b5d55def (#1111)"
 paths:
   - scripts/ops/check_ps_scripts.py
   - tests/infra/test_ps_guard_runbook_rules.py
 session: null
-notes: "OPS-57 acceptance ②의 미이행분 승계. 출처는 2026-08-31 LIC-02 siyavula URL 프로브이며 2026-09-01 관여도 트리아지 런북 사고와는 **별개 축**이다 — OPS-57은 후자만 구현하고 done 처리했고, 그 사실을 PR #973 본문에 적었으나 리뷰 봇(codex P1)이 '되돌릴 수 없는 done이 잔여 작업을 대장에서 지운다'고 지적해 승계로 분리했다. done은 종결 상태라 in_progress로 되돌릴 CLI 경로가 없으므로 승계 등재가 유일한 정정 경로다. 회수 시 acceptance 전수 재대조 규칙(2026-08-10)의 취지 그대로다."
-updated: 2026-09-02
+notes: "OPS-57 acceptance ②의 미이행분 승계. 출처는 2026-08-31 LIC-02 siyavula URL 프로브이며 2026-09-01 관여도 트리아지 런북 사고와는 **별개 축**이다 — OPS-57은 후자만 구현하고 done 처리했고, 그 사실을 PR #973 본문에 적었으나 리뷰 봇(codex P1)이 '되돌릴 수 없는 done이 잔여 작업을 대장에서 지운다'고 지적해 승계로 분리했다. done은 종결 상태라 in_progress로 되돌릴 CLI 경로가 없으므로 승계 등재가 유일한 정정 경로다. 회수 시 acceptance 전수 재대조 규칙(2026-08-10)의 취지 그대로다.\n\n[정정 2026-09-11] acceptance④ 판정(오탐 위험이 커 채택 여부를 먼저 판정하라는 지시 이행) — 전면 채택(펜스\n경계 무관 모든 if/else 짝을 정적 추적)은 중첩·backtick 줄바꿈·문자열 속 else 등 변수가\n많아 보류. 대신 \"펜스가 else/elseif로 시작\"만 채택 — 이 부분집합은 그 펜스 안에 대응하는\nif가 존재할 수 없어(있었다면 else로 시작하지 않는다) 오탐이 구조적으로 0이다.\n`TestFenceStartingWithBareElse`(5건)로 양방향 동결. acceptance⑤·⑥은 기존 자산 전건\n재검사(324파일 0위반)로 충족 — 그 과정에서 deployment_cd_runbook.md의 실사고 패턴\n(`$_.Exception.Response.StatusCode`를 존재확인 없이 참조)을 실제로 1건 발견해 고쳤다\n(규칙을 좁혀 피해가지 않고 코드를 고침)."
+updated: 2026-09-11

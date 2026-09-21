@@ -1,13 +1,15 @@
 """437-키 자산 원자 축 이전 CLI — `whymath_backend.l1.concept_atom_crosswalk.populate` (S0-2).
 
 커밋된 크로스워크 코퍼스(`crosswalk.jsonl`)와 구 437 코퍼스(`graph.json`·`concepts.jsonl` 다리)
-를 읽어 `atom_node.behavior_skills`(#419 저작분 전파)와 `concept_content.atom_codes`(K-12 원자
-연결)를 멱등 UPDATE한다. `l1/concept_content/populate`(콘텐츠 적재 CLI)와 같은 골격을 따른다
-(argparse·`main(argv)->int`·파일 부재 `return 2`·stdout 보고).
+를 읽어 `atom_node.behavior_skills`(#419 저작분 전파)·런타임 `concept.behavior_skills`(SKB-01·
+atom_node와 같은 매핑 재사용)·`concept_content.atom_codes`(K-12 원자 연결)를 멱등 UPDATE한다.
+`l1/concept_content/populate`(콘텐츠 적재 CLI)와 같은 골격을 따른다(argparse·`main(argv)->int`·
+파일 부재 `return 2`·stdout 보고).
 
 전제: 마이그레이션 head(`b2c3d4e5f0a1`) 적용 실 PG + 대상 행 선적재(`atom_node`는
-`atom_node_projection`·`concept_content`는 `concept_content/populate`). 대상 행 부재는 조용히
-넘기지 않고 missing으로 보고한다. 이전 로직 0(얇은 래퍼): 파싱·유도·갱신은 `transfer.py` 소관.
+`atom_node_projection`·런타임 `concept`은 `atom_graph.atom_backend_concept`·`concept_content`는
+`concept_content/populate`). 대상 행 부재는 조용히 넘기지 않고 missing으로 보고한다. 이전 로직
+0(얇은 래퍼): 파싱·유도·갱신은 `transfer.py` 소관.
 
 사용:
     python -m whymath_backend.l1.concept_atom_crosswalk.populate \\
@@ -28,6 +30,7 @@ from whymath_backend.l1.concept_atom_crosswalk.transfer import (
     load_concept_src_bridge,
     load_crosswalk_records,
     transfer_atom_behavior_skills,
+    transfer_concept_behavior_skills,
     transfer_k12_content_atom_codes,
 )
 
@@ -46,8 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="whymath-crosswalk-transfer",
         description=(
-            "437↔원자 크로스워크 경유 이전 — atom_node.behavior_skills 전파 + "
-            "concept_content K-12 atom_codes 연결(멱등 UPDATE·S0-2)."
+            "437↔원자 크로스워크 경유 이전 — atom_node.behavior_skills·concept.behavior_skills "
+            "전파(SKB-01) + concept_content K-12 atom_codes 연결(멱등 UPDATE·S0-2)."
         ),
     )
     parser.add_argument(
@@ -98,6 +101,18 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"⚠ atom_node 대상 행 부재 {len(atom_report.missing)}건 "
             f"(예: {list(atom_report.missing[:3])}) — atom_node_projection 선적재를 확인하세요."
+        )
+
+    # 런타임 concept.behavior_skills(SKB-01) — atom_node와 같은 atom_skills 매핑 재사용(다리 불요).
+    concept_report = transfer_concept_behavior_skills(atom_skills)
+    print(
+        f"concept.behavior_skills 갱신: {concept_report.updated}건 "
+        f"(비어있지 않은 스킬 {nonempty}건·대상 {len(atom_skills)}건)."
+    )
+    if concept_report.missing:
+        print(
+            f"⚠ concept 대상 행 부재 {len(concept_report.missing)}건 "
+            f"(예: {list(concept_report.missing[:3])}) — atom_backend_concept 선적재를 확인하세요."
         )
 
     content_report = transfer_k12_content_atom_codes(content_atoms)

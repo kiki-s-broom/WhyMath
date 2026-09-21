@@ -21,6 +21,8 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
+from whymath_backend.l3.provider_jurisdiction import Jurisdiction
+from whymath_backend.l3.providers._response_fields import read_response_model_id
 from whymath_backend.l3.router import (
     LOCAL_MODEL_MATRIX,
     QUALITY_MODEL_ID,
@@ -188,6 +190,11 @@ def _extract_usage(generate_response: Any, latency_ms: float) -> Usage:
         input_tokens=_coerce_token_count(_read_field(generate_response, "prompt_eval_count")),
         output_tokens=_coerce_token_count(_read_field(generate_response, "eval_count")),
         latency_ms=latency_ms,
+        # 관측 모델(EOS-112) — ollama 응답의 `model`은 **실제로 로드된 태그**라 요청 태그와
+        # 다를 수 있다(`qwen2-math` → `qwen2-math:7b` 해소). 로컬 경로에도 이 축이 필요한
+        # 이유가 그것이다 — 라우터가 지목한 모델과 데몬이 실제로 쓴 모델이 갈릴 수 있다.
+        served_model=read_response_model_id(generate_response),
+        # `retries`는 None — ollama 클라이언트는 우리 전송기를 타지 않아 계측이 없다.
     )
 
 
@@ -245,6 +252,17 @@ class OllamaProvider:
             self._settings = get_settings()
         return self._settings
 
+    @property
+    def jurisdiction(self) -> Jurisdiction:
+        """항상 `DOMESTIC` — Phaiakes9 온프레미스라 국외 이전 자체가 없다 (ARCH-49 관할 축).
+
+        디스패처의 관할 게이트는 클라우드 위임에만 선다(로컬은 반출이 아니다). 그래도
+        선언하는 이유는 거버넌스 테스트가 `l3/providers/`의 모든 실제 제공자에 관할
+        선언을 요구하기 때문이다 — "이 제공자는 어디 관할인가"에 답이 없는 좌석을 남기지
+        않는다.
+        """
+        return Jurisdiction.DOMESTIC
+
     def _get_client(self) -> _OllamaClient:
         """클라이언트 지연 해석 — 주입 우선, 없으면 기본 AsyncClient 생성."""
         if self._client is None:
@@ -259,6 +277,7 @@ class OllamaProvider:
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -273,6 +292,11 @@ class OllamaProvider:
         - `temperature`(S2-g 생성 다양성)가 주어지면 ollama generate의 `options=`에
           `{"temperature": ...}`로 실어 샘플링 온도를 올린다(동등문제 저작 mode collapse 방어).
           None(기본)이면 options에 온도를 넣지 않아 Ollama 기본 온도를 쓴다 — *기존 동작 무변경*.
+        - `top_p`(EOS-121 선결조건 A)가 주어지면 같은 `options=`에 `{"top_p": ...}`로 싣는다
+          — 온도·시드와 같은 좌석이다(Ollama는 top_p를 네이티브 옵션으로 받는다). None(기본)
+          이면 options에 넣지 않아 Ollama 기본값을 쓴다 — *기존 동작 무변경*. 로컬 축은 EOS-121
+          측정 대상(클라우드 좌석)이 아니지만, 시그니처만 받고 **조용히 버리면** 호출부가 "설정
+          했다"고 믿는 값이 사라지므로(조용한 무시 금지) 받은 것은 반드시 싣는다.
         - `json_schema`(S2-j structured output)가 주어지면 ollama generate의 `format=`에
           스키마 dict를 그대로 실어 출력을 *문법 수준에서 제약*한다(제약 디코딩 — 자유 텍스트·
           코드펜스·필드 누락을 원천 차단). None(기본)이면 format을 싣지 않아 자유 텍스트 생성
@@ -322,6 +346,9 @@ class OllamaProvider:
         options: dict[str, Any] = {}
         if temperature is not None:
             options["temperature"] = temperature
+        # EOS-121 선결조건 A — 온도와 같은 options 좌석(지정된 것만 담는다).
+        if top_p is not None:
+            options["top_p"] = top_p
         if seed is not None:
             options["seed"] = seed
         if options:
@@ -407,6 +434,7 @@ class FixedModelOllamaProvider(OllamaProvider):
         *,
         images: Sequence[str] | None = None,
         temperature: float | None = None,
+        top_p: float | None = None,
         json_schema: Mapping[str, object] | None = None,
         seed: int | None = None,
     ) -> GenerationResult:
@@ -432,6 +460,9 @@ class FixedModelOllamaProvider(OllamaProvider):
             options["num_predict"] = self._num_predict
         if temperature is not None:
             options["temperature"] = temperature
+        # EOS-121 선결조건 A — 부모와 같은 options 좌석(지정된 것만 담는다).
+        if top_p is not None:
+            options["top_p"] = top_p
         if seed is not None:
             # EOS-73 — 강등전에서도 시드 고정 재현이 가능해야 한다(부모와 같은 options 좌석).
             options["seed"] = seed

@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MGMT-06-export-prediction-disclosure-counsel
+title: "열람권 export 예측치 제외의 변호사 자문 수행 — G-export-prediction-disclosure 해소 (준비물 완비)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: blocked
+priority: 1
+eos_priority: P2
+owner: kiki
+depends_on: []
+requires_gates:
+  - G-export-prediction-disclosure
+acceptance:
+  - "① 변호사(개인정보·IT) 자문 수행 — 법령 유래 사람 의사표시라 기계 대체 불가(CLAUDE.md '법령 유래 절차의 기계 대체 금지'). 질문·첨부는 docs/legal/export_prediction_disclosure_counsel_brief.md §4·§7을 그대로 사용한다(다시 작성하지 않는다). 우선순위 질문 3개 = Q1(추론 산출물이 열람 대상인가) · Q2(데이터 주체 *본인*의 정서적 이익이 열람 제한 사유로 성립하는가) · Q4(제외 고지 문구의 형식 요건)"
+  - "② 회신을 서면으로 확보하고 docs/legal/에 자문 결과 요약 문서로 기록 — 질문별 답을 브리핑 §4 각 항 ⓒ(답변별 코드 귀결)에 대조"
+  - "③ 브리핑 §5 매핑대로 분기 실행: A 복원(export만 5필드 복원 + pipa_data_matrix §2.2 #8 각주를 §2.4 절차로 개정 + access_matrix #8 consumers 등재 + 봉인 테스트 2종 재작성) / B 확정(verdict '잠정'을 확정으로 승격·근거 조항 기재·코드 변경 없음) / C 절충(제시된 대안 수단을 acceptance로 하는 구현 태스크 신설). 어느 분기든 Q4 회신은 반드시 _NOT_INCLUDED(privacy/export.py:135-142)에 반영"
+  - "④ 게이트 clear는 Kiki 본인이 CLI로 수행 — python3 scripts/harness/backlog.py gates clear G-export-prediction-disclosure --evidence '<회신 요약·문서 경로·날짜>' (claude 대행 금지·HARN-06)"
+  - "⑤ COLLAB-05와의 선후 확인 — COLLAB-05 acceptance ⑥이 'pipa_data_matrix §2.2 표 기호 변경은 §2.4 변호사 검토 소관'이라며 이 자문에 양보한다. 분기 A를 고르면 COLLAB-05 ②(#8 summary→none 축소)와 방향이 충돌하므로 회신 수령 시점에 두 태스크 선후를 재확인"
+  - "⑥ [④ 정정 — 2026-09-07] ④에 적은 clear 명령은 그대로 실행하면 실패한다. 정본 명령·자가검증은 docs/legal/export_prediction_disclosure_counsel_brief.md §8이며 두 플래그가 필수다: (a) --as kiki — 이 게이트는 kind=human·assignee=kiki라 생략하면 대장에 cleared_by: claude라는 거짓 주체가 남는다(HARN-60) (b) --no-base '변호사 서면 회신 — 판정 근거가 커밋·PR이 아니라 외부 전문가의 법률 의사표시' — gates clear는 evidence에 판정 기준(커밋 해시·PR 참조)이 없으면 exit 1로 거부하고(HARN-68·backlog.py:1088-1095), 변호사 회신은 커밋과 무관한 근거라 이 경로로 통과시킨다. 자가검증은 gates list 출력에서 '(cleared)' AND 'clear 주체: kiki' 두 문자열을 모두 확인한다(게이트 ID 존재만 보는 검사는 clear 전후 양쪽에서 같은 값을 내므로 변별력이 없다)"
+artifacts: []
+paths:
+  - "docs/legal/**"
+session: null
+notes: "[착수 시점 — 2026-09-07 Kiki 판정] '배치 보류' 선택. MGMT-01(법정대리인 본인확인)·MGMT-02(약관·처리방침)와 같은 부류의 외부 변호사 검토이므로 2026-07-27 지시('변호사 회신 등 외부 작업이 미완성 제품의 병목이 되는 것 반대')와 같은 배치로 묶는다. unblock 트리거 = 공개 β 준비 착수 (MGMT-01·MGMT-02와 동일 문구·동일 시점). 같은 변호사에게 3건을 한 번에 의뢰하면 서비스 배경 설명 중복이 제거된다.\\n\\n[유예의 만료 지점 — CLAUDE.md '만료 없는 유예·제외 금지'] 이 보류는 무기한이 아니다. 두 트리거 중 먼저 오는 쪽에서 재확인한다: ⓐ 공개 β 준비 착수(기본) ⓑ 예측 5필드에 값을 채우는 코드가 처음 추가되는 시점 — 그 순간 판정 근거 3번('실피해 0의 창')이 무효가 되고 잠정 봉인이 진짜 열람 제약으로 바뀌므로 자문 우선순위가 즉시 올라간다.\\n\\n[준비물 완비] docs/legal/export_prediction_disclosure_counsel_brief.md (MGMT-07·PR #1038) — 질문 Q1~Q7·답변별 코드 귀결·회신→구현 매핑 3분기·첨부 색인. 착수 시 이 문서를 그대로 들고 가면 되고 다시 작성하지 않는다.\\n\\n[게이트 상태] G-export-prediction-disclosure는 pending 유지가 맞다 — waive가 아니다. 자문은 공개 β 전에 반드시 수행돼야 하고 waive하면 그 요구 자체가 사라진다. 다만 gates 하위 명령에 notes 수정 경로가 없어(list/add/clear/waive뿐) 이 보류 사실을 게이트 자체에는 적지 못했다 — 이 태스크가 그 기록을 대신한다(MGMT-01/02 선례 동형).\n\n[차단 2026-09-07] 공개 β 준비 착수까지 배치 보류 — 2026-09-07 Kiki 판정(선택지 3택 중 ①). MGMT-01·MGMT-02와 동일 배치·동일 트리거. 만료 지점 2종(먼저 오는 쪽): ⓐ공개 β 준비 착수 ⓑ예측 5필드 writer 최초 추가 시점(그 순간 '실피해 0' 논거 무효). 준비물은 완비 — docs/legal/export_prediction_disclosure_counsel_brief.md (MGMT-07·PR #1038).\n\n[정정 2026-09-07] PR #1038 Codex P1 수용 — acceptance ④에 적은 clear 명령이 CLI에 거부당하는 형태였다(--no-base 누락 시 exit 1 · --as 누락 시 cleared_by가 거짓 주체 claude로 기록). acceptance는 append 전용이라 ④를 고쳐 쓸 수 없으므로 ⑥으로 정정분을 덧붙인다.\n\n[정정 2026-09-07] notes 치환 — MGMT-04→MGMT-07 개명 반영(1/2) — main의 MGMT-04-ip-separation-evidence-pack(cancelled)과 번호 충돌해 validate exit 1, 개명 가능한 이쪽을 옮겼다\n\n[정정 2026-09-07] notes 치환 — MGMT-04→MGMT-07 개명 반영(2/2) — 차단 사유 절의 참조"
+updated: 2026-09-07

@@ -12,14 +12,14 @@ HARN-63 첫 라이브 실측(2026-09-05)이 `concept-reach` 등급ⓐ 위반 1�
 이 도구는 **네트워크 호출을 하지 않는다.** 조회(`GET rulesets/{id}`)와 적용(`PUT`)은 관리자
 토큰을 가진 Kiki의 `gh api`가 한다. 도구는 백업 JSON → 변경안 JSON + 사람이 읽는 표만 낸다.
 
-    gh api repos/doldori7/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
+    gh api repos/{owner}/{repo}/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
     python scripts\\harness\\ruleset_pin_plan.py ruleset-backup.json --out ruleset-plan.json
         → ruleset-plan.json(변경안) + ruleset-rollback.json(되돌리기) 두 파일.
           둘 다 검증 통과 후에만 쓴다.
     (표를 확인한 뒤)
-    gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-plan.json
+    gh api -X PUT repos/{owner}/{repo}/rulesets/16623542 --input ruleset-plan.json
     (문제가 있으면)
-    gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-rollback.json
+    gh api -X PUT repos/{owner}/{repo}/rulesets/16623542 --input ruleset-rollback.json
 
 무엇을 바꾸고 무엇을 바꾸지 않는가 (불변식 — 코드가 집행·위반 시 본문을 쓰지 않는다)
 --------------------------------------------------------------------------------------

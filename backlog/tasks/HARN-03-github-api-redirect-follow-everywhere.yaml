@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-03-github-api-redirect-follow-everywhere
+title: "이관 리다이렉트를 따라가지 않아 PR 상태 판정이 전건 불능 — GitHub API curl 4곳에 -L 부재"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 1
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실패 관측 고정 — SessionStart 브리핑이 미머지 브랜치 13건을 \"PR 제출됨 — 상태 미확인\"으로 내고 있고, 그 사유가 `APIError: PR #675 응답 형식 이상 — {'message': 'Moved Permanently', 'url': 'https://api.github.com/repositories/1237870848/pulls/675', ...}`다(2026-09-10 실측). 즉 이관 리다이렉트를 따라가지 못해 PR 열림/닫힘 판정이 **전건 불능**이다. 첫 PR에서 None을 돌려주고 중단하므로 13건 전부가 미판정으로 떨어진다."
+  - "② 전수 배선 — 저장소의 GitHub API curl 호출 4곳(scripts/harness/remote_claims.py · scripts/ops/pr_merge_readiness.py · scripts/ops/flow_health.py · scripts/analysis/measure_merge_gate_latency.py)에 리다이렉트 추종을 넣는다. HARN-02가 pr_delivery_audit.py 한 곳만 고쳤는데, 실측해 보니 **나머지 전부가 같은 상태**였다 — 한 곳만 고치면 나머지가 조용히 남는다."
+  - "③ 산출물 검사 가드 — 소스에 문자열이 있는지가 아니라 **AST로 구성된 인자 목록**을 본다: 리스트 리터럴의 첫 원소가 \"curl\"이고 그 안에 GitHub API URL(api.github.com 또는 API 상수 보간)이 있으면 \"-L\"이 반드시 포함돼야 한다. 스캔 대상이 0건이면 실패한다(대상을 못 찾은 전수 가드는 공허하게 통과한다). 금지 패턴 열거가 아니라 구성 결과 검사라 표기 변형에 뚫리지 않는다."
+  - "④ 변별력 — 4개 파일 각각에서 \"-L\"을 제거해 가드가 RED를 내는지 확인한다(파일별로 따로 — 한 곳만 검출하는 가드도 하나만 깨뜨리면 RED다). 추가로 ⓐAST 스캔의 대상 수집을 0건으로 만들고 ⓑ리스트 리터럴이 아닌 형태로 curl 인자를 구성했을 때 스캔이 놓치는지 확인해 한계를 기록한다. 각 주입은 치환 count와 mutated != original을 단언하고 원복은 cp 백업 + 바이트 동일로 확인한다."
+  - "⑤ **가드 범위 정정 — 계정 이름이 아니라 \"경로 형태\"만 금지한다 (병합 중 실측 · 2026-09-10).**\n\n[무엇이 있었나] origin/main을 병합하자 HARN-98(타 세션 · PR #1078)이 착지해 있었고, 그 커밋이 scripts/harness/ruleset_drift.py에 이력 주석을 넣었다: \"owner.type=User(개인 계정 doldori7)였고 GitHub merge queue는 조직 소유 전용이라 켤 수 …\". HARN-02가 만든 전수 스캔이 이것을 **위반으로 잡아 tests/infra가 RED**가 됐다(1 failed / 1161 passed).\n\n[판정] 가드가 틀렸다. 그 주석은 **과거를 서술하는 정당한 기록**이고, 이력을 현재로 덮어쓰게 강요하는 가드는 사람이 가드를 끄게 만든다. 실제 결함은 언제나 **경로 형태**로 나타난다 — `repos/doldori7/WhyMath`, 인자 `doldori7/WhyMath`. 그래서 금지 대상을 계정 이름 `doldori7`에서 경로 접두 `doldori7/`로 좁혔다.\n\n[변별력 재확인] 뮤테이션 M6을 \"주석을 거짓 상태로 회귀\"에서 \"워크플로 run 인자에 옛 경로 재삽입\"으로 교체해 좁힌 축을 그대로 밟게 했다. 재실행 결과 M1~M6 전건 RED · 생존 0. HARN-03의 N1~N7도 전건 RED 유지.\n\n[남는 사각(명시)] 이 가드는 이제 산문의 사실성은 보지 않는다. 문서가 거짓이 되는 축은 HARN-98이 착지시킨 tests/infra/test_ruleset_drift.py·test_pr_auto_resync.py가 담당한다. 다만 .github/workflows/pr-auto-resync.yml의 헤더 주석(HARN-02가 사실 병기한 곳)은 어느 쪽 가드도 문면을 동결하지 않는다 — 알고 남기는 공백이다."
+  - "⑥ **가드가 신규 도입을 실제로 잡았다 — 첫 실전 검출 (2026-09-10)**\n\norigin/main(114e63e1 · PR #1086 · HARN-93/95·OPS-54)을 병합하자 `tests/infra`가 RED가 됐다. 검출된 3곳:\n· `scripts/analysis/measure_backend_job_timeout_headroom.py:66` — 신규 파일\n· `scripts/ops/pr_disposal_precheck.py:88` — 신규 파일\n· `scripts/harness/remote_claims.py:1851` — **기존 파일의 두 번째 curl 호출**(PR 라벨 조회). HARN-03이 고친 1768행 호출은 그대로 살아 있다 — 회귀가 아니라 같은 파일에 새로 생긴 호출이다.\n\n[의미] 이 가드는 만들 때 정상 입력에서 초록이었을 뿐 실전 검출 이력이 없었다. 이번이 **첫 실측 검출**이며, 셋 다 \"이관 후 새로 작성된 GitHub API 호출이 리다이렉트를 따르지 않는\" 정확히 그 형태였다. AST로 구성된 인자 목록을 보는 방식이 표기 변형이 아니라 **신규 도입**에도 작동함이 확인됐다.\n\n[조치] 3곳 모두 `-L` 추가. `tests/infra` 1228 passed·ruff/black EXIT=0으로 확인. 남의 태스크(HARN-93·OPS-56 계열) 파일이지만 한 줄 추가이고 이미 트렁크에 있는 공유 코드라 병합 정합 차원에서 처리했다.\n\n[남는 관찰] 가드가 없었다면 이 3곳은 조용히 빈 결과를 내며 살았을 것이다 — 특히 `pr_disposal_precheck.py`는 **PR을 닫아도 되는지 판정하는 도구**라, 301을 데이터로 오독하면 \"확인 결과 안전\"을 잘못 낼 수 있었다."
+artifacts:
+  - "커밋 b5074dbe · 커밋(아래 참조) · PR #1063 (같은 브랜치 누적).\n\n[실패 관측] SessionStart 브리핑이 미머지 브랜치 13건을 \"PR 제출됨 — 상태 미확인\"으로 내고 사유가 `APIError: PR #675 응답 형식 이상 — {'message': 'Moved Permanently', 'url': '.../repositories/1237870848/pulls/675'}`였다. 첫 PR에서 None 반환·중단이라 열림/닫힘 판정이 전건 불능이었다.\n\n[전수] GitHub API curl 5곳 중 HARN-02가 고친 1곳을 뺀 4곳 전부에 -L이 없었다 — 한 곳만 고쳤으면 나머지가 조용히 남았을 것이다.\n\n[가드] AST로 `[\"curl\", ...]` 리스트 리터럴을 모아 GitHub API 대상이면 -L 포함을 요구한다. 판별 신호를 URL로 잡으면 5곳 중 4곳을 놓친다는 것을 실측했고(f-string의 호스트가 모듈 상수라 AST 상수 조각에 안 남는다) Accept 헤더로 교체했다. 리스트 리터럴이 아닌 조립 형태는 이 가드의 사각이며, 그 사실을 자명 단언이 아니라 \"리터럴 GitHub curl >= 5건\" 단언으로 못박아 조용히 비어 가지 않게 했다.\n\n[뮤테이션 7종 전건 RED · 생존 0] 파일별 -L 제거 4종 + AST 스캔 대상 0건화 + 판별 신호를 URL만으로 약화 + pr_delivery_audit의 -L 제거(HARN-02 회귀). 각 주입은 치환 count와 mutated != original을 단언하고, 원복은 cp 백업 + sha256 바이트 동일로 확인했다.\n\n[스위트] tests/infra 1159 passed 1 skipped EXIT=0 · tests/harness 787 passed EXIT=0 · validate green(태스크 608·게이트 41) EXIT=0 · audit-deps 위반 0건 EXIT=0 · ruff/black CI 명령 그대로 EXIT=0(ruff 1회차 N802로 함수명 상환).\n\n[정직한 공백] 실효(브리핑이 13건의 열림/닫힘을 실제로 판정하는지)는 이 컨테이너에 GITHUB_TOKEN이 없어 미관측이다 — 토큰 없으면 조회 자체를 생략한다. main 착지 후 Kiki 머신 또는 토큰 있는 세션의 SessionStart에서 확인된다."
+paths:
+  - scripts/harness/remote_claims.py
+  - scripts/ops/pr_merge_readiness.py
+  - scripts/ops/flow_health.py
+  - scripts/analysis/measure_merge_gate_latency.py
+  - tests/infra/test_canonical_repo_reference.py
+session: null
+notes: "발견 경위(2026-09-10): HARN-02 착지 직후 SessionStart 브리핑이 이 오류를 그대로 출력했다. HARN-02는 pr_delivery_audit.py 한 곳의 리다이렉트 미추종을 고쳤고 실행 표면의 옛 owner 리터럴을 없앴지만, **이 파일은 owner를 리터럴로 갖고 있지 않다** — `git remote get-url origin`에서 파싱한다. 그래서 HARN-02가 만든 옛-owner 스캔 가드에 걸리지 않았고, 클론의 origin URL이 옛 주소인 한 계속 301을 받는다.\n\n교훈이 하나 있다: 이관 결함의 축은 **두 개**다 — ⓐ이름을 리터럴로 박아 둔 것(HARN-02가 처리) ⓑ리다이렉트를 따라가지 않는 것(이 태스크). ⓐ만 고치면 ⓑ는 옛 URL을 가진 모든 클론에서 그대로 남는다. HARN-02의 가드는 ⓐ만 본다.\n\n[겹침 고지] scripts/ops/pr_merge_readiness.py는 HARN-82(claude/g-export-prediction-disclosure-m8adzc · blocked)의 소유 파일이다. 이 태스크가 건드리는 것은 curl 인자 한 줄이고 HARN-82의 축(필수 체크 6종 vs 16종 docstring)과 겹치지 않는다. HARN-02에서도 같은 파일의 사용 예 1줄을 같은 사유로 고쳤다.\n\n[정정 2026-09-10] 병합 중 타 세션(HARN-98) 이력 주석과 충돌 — 가드를 경로 형태로 좁히고 뮤테이션 재확인\n\n[정정 2026-09-10] 가드 첫 실전 검출 — 병합된 신규 3곳에서 -L 부재 검출·수정"
+updated: 2026-09-10

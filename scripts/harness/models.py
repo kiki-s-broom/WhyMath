@@ -92,7 +92,14 @@ STATUS_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "todo": ("in_progress", "blocked", "cancelled"),
     "in_progress": ("review", "done", "blocked", "todo"),
     "blocked": ("todo", "cancelled"),
-    "review": ("done", "in_progress"),
+    # "blocked"는 HARN-95가 추가 — review의 유일한 비-done 출구가 in_progress였는데
+    # 그 홉은 cmd_review가 session을 보존해 CLI로 항상 거부된다(review는 여전히
+    # in-flight). 그래서 done 말고는 나갈 길이 없는 막다른 길이었다 — PR이 closed로
+    # 처리되거나 재작업이 필요해 이 태스크를 blocked/cancelled로 내려야 하는 경우
+    # 손편집 말고는 방법이 없었다. cmd_block은 이미 어떤 상태에서든 session을 비우고
+    # blocked로 내리는 범용 동사이므로, review를 그 출발점에 추가하는 것만으로
+    # review → blocked → todo → cancelled/in_progress 전 구간이 다시 열린다.
+    "review": ("done", "in_progress", "blocked"),
     "done": (),  # 종결 상태
     "cancelled": (),  # 종결 상태
 }
@@ -106,7 +113,17 @@ GATE_STATUSES: tuple[str, ...] = ("pending", "cleared", "waived")
 POLICY_MODES: tuple[str, ...] = ("off", "warn", "block")
 
 # 태스크 ID 규칙: <스테이지 또는 접두>-<번호>-<슬러그> (파일명 stem과 동일해야 함)
-TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{0,7}-\d{2}(-[a-z0-9]+(-[a-z0-9]+)*)?$")
+#
+# 번호는 2자리(01~99) 또는 3자리(100~999, 선행 0 없음) — HARN-97: 접두당 99개 상한에
+# ARCH·EOS 두 접두가 실제로 도달해(2026-09-09 실측) 등재가 거부됐다. 3자리를 열어
+# 001~099 같은 선행 0 표기는 금지한다 — 허용하면 "099"와 "99"가 같은 번호를 가리키는
+# 두 표기가 되어 store._ID_NUMBER_RE 기반 충돌 검사·문서 짧은 참조(dep_declaration.py
+# `_REF_RE`는 이미 `\d{1,3}`)가 같은 번호를 다른 문자열로 다루게 된다.
+# 기존 2자리 ID는 전부 그대로 유효(하위호환) — 상한만 999로 올라간다. 파싱은 이미
+# 문제없다: `store._ID_NUMBER_RE`(`\d+`)·`backlog.py`의 번호 추출은 전부 `int()`로 변환해
+# 자리수와 무관하게 비교하므로, 이 정규식만 좁혀 왔던 것이 유일한 병목이었다(실측 —
+# MEMORY.md 2026-09-11 HARN-97 결정 로그 참조).
+TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{0,7}-(?:\d{2}|[1-9]\d{2})(-[a-z0-9]+(-[a-z0-9]+)*)?$")
 GATE_ID_RE = re.compile(r"^G-[a-z0-9]+(-[a-z0-9]+)*$")
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

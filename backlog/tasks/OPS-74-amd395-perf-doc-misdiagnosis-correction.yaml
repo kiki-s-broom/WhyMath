@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-74-amd395-perf-doc-misdiagnosis-correction
+title: "AMD395 성능 문서 오진 기록 정정 — SEC-34 원인규명 반영(2026-08-22 '미규명 235GB'·'재시작이 답' 오진 정정 + 재측정 전건 잠정치 경고)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "docs/ops/amd395_local_llm_performance.md 상단에 측정구간 전체(2026-08-21~2026-09-10) 오염가능 경고 + ★확정결론 7항을 잠정치로 재분류하는 정정 박스 삽입"
+  - "동 문서의 2026-08-22 '미규명 235GB' 구절과 '① 커밋 미스터리 해소 — 재시작이 답이었다' 절에 SEC-34 원인규명(무단 채굴) 정정 박스 삽입 — 재시작을 운영 규칙으로 남기지 않고 예약작업 점검으로 대체"
+  - ".claude/commands/llm-perf-doctor.md '미확정' 절의 '커밋 235GB의 정체 — 무엇이 점유하는지 모른다' 항을 취소선 처리하고 SEC-34 정정 반영(같은 파일 §0 위생3종과의 내부 불일치 해소)"
+  - "재측정 필요성을 산문으로만 남기지 않고 OPS-75(전면 재측정 후속 태스크)를 depends_on SEC-34로 등재해 대장에 집행 — HARN-52 audit-deps 준수"
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1137"
+paths:
+  - docs/ops/amd395_local_llm_performance.md
+  - ".claude/commands/llm-perf-doctor.md"
+session: null
+notes: "발견 경위: Kiki가 공유한 Phaiakes9 침해 조사 기록(6695c176-memory-investigation.md)을 근거로 AMD395 LLM 성능 문서 전면 점검을 요청받아 감사했다. SEC-34 acceptance ④가 이 정정을 이미 요구하고 있었으나 SEC-34는 owner:kiki(자격증명 로테이션·백신 검사 등 물리 조치 포함)라 세션이 --as kiki로 우회 착수하지 않고(거부 우회 금지), 세션이 실행 가능한 순수 문서정정 스코프만 분리해 별도 태스크로 등재했다. SEC-34 acceptance ④ 자체는 SEC-34 쪽에서 유지된다(중복 완료 선언 아님 — 두 태스크가 같은 문서를 다른 각도로 다룬다: SEC-34=침해대응 관점 acceptance 충족 여부, 이 태스크=문서 텍스트 정정 그 자체)."
+updated: 2026-09-12

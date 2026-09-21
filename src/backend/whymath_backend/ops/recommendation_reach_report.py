@@ -26,7 +26,7 @@
 `REQUEST_COUNTER_STATUS`로 정직하게 보고한다 — 없는 카운터를 지어내거나 새 미들웨어·이벤트
 타입을 신설하지 않는다(그건 이 슬라이스의 범위 밖이자 더 큰 설계 결정이다).
 
-실제로 DB에서 직접 측정하는 4축 (전부 SQLAlchemy Core — 원시 SQL 0)
+실제로 DB에서 직접 측정하는 5축 (전부 SQLAlchemy Core — 원시 SQL 0)
 ----------------------------------------------------------------------
 1. **problem_attempt 적재** — 전체 행 수. 0이면 "0건 통과"가 아니라 **'미도달'**로 표시한다
    (이 리포트에서 가장 중요한 숫자 — 아래 3축이 전부 이 축에 종속된 부분집합이다).
@@ -40,8 +40,11 @@
    모집단). `/next-problem`의 `_CANDIDATE_POOL_SIZE=50`은 이 모집단에서 θ 근방으로 잘라내는
    *상한값*일 뿐이다 — 이 리포트는 그 상한 자체를 명시하지, 실제 요청별 후보 풀 크기는
    `NextProblemResponse.candidate_pool_size`(REC-01 갈래 B)에서 확인한다.
+5. **REC-11 candidates·policy_version 기록률** — `evidence_event`의 `recommendation_render`
+   처치 전체 중 `meta`에 `candidates`·`policy_version`이 둘 다 실린 건수의 비율("작동한
+   비율" — CLAUDE.md 원칙). 분모(처치 전체)가 0이면 비율은 **None**(0/0을 지어내지 않는다).
 
-집계 코어(`build_report`)는 순수 함수(원시 카운트 4개 → 리포트)라 hermetic 테스트로 전량
+집계 코어(`build_report`)는 순수 함수(원시 카운트 6개 → 리포트)라 hermetic 테스트로 전량
 검증 가능하다. DB 접속(`fetch_reach_counts`)만 async I/O 경계다.
 
 실행
@@ -69,8 +72,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
+from whymath_backend.l2.recommendation_evidence import (
+    EVENT_TYPE_RECOMMENDATION_TREATMENT,
+    META_KEY_CANDIDATES,
+    META_KEY_POLICY_VERSION,
+)
 
 __all__ = [
     "NOT_REACHED",
@@ -106,24 +115,27 @@ REQUEST_COUNTER_STATUS = (
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# DB 접속 경계 — 실제 쿼리 4회(전부 SQLAlchemy Core, 원시 SQL 0).
+# DB 접속 경계 — 실제 쿼리 6회(전부 SQLAlchemy Core, 원시 SQL 0).
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(slots=True, frozen=True)
 class ReachCounts:
-    """DB에서 실측한 원시 카운트 4종 — `build_report`(순수)의 유일한 입력."""
+    """DB에서 실측한 원시 카운트 6종 — `build_report`(순수)의 유일한 입력."""
 
     problem_attempt_total: int
     theta_eligible_response_total: int
     weak_concept_signal_pair_total: int
     candidate_pool_structural_cap: int
+    recommendation_treatment_total: int
+    recommendation_treatment_with_policy_metadata_total: int
 
 
 async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
-    """4개 실측 카운트를 쿼리 4회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
+    """6개 실측 카운트를 쿼리 6회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
 
-    각 쿼리의 의미는 모듈 docstring "실제로 DB에서 직접 측정하는 4축" 참조. 쿼리 순서는
-    테스트(큐 기반 가짜 세션)와 계약이므로 바꾸지 않는다: ① problem_attempt 전체 행 수
-    ② θ 추정 유효 응답 ③ 개인화(BKT) 유니크 (user, concept) 쌍 ④ 후보 풀 구조적 상한.
+    각 쿼리의 의미는 모듈 docstring "실제로 DB에서 직접 측정하는 5축" 참조.
+    쿼리 순서는 테스트(큐 기반 가짜 세션)와 계약이므로 바꾸지 않는다: ① problem_attempt
+    전체 행 수 ② θ 추정 유효 응답 ③ 개인화(BKT) 유니크 (user, concept) 쌍 ④ 후보 풀 구조적
+    상한 ⑤ REC-11 candidates·policy_version 기록률(분자·분모).
     """
     attempt_total = int(
         (await session.execute(select(func.count()).select_from(ProblemAttempt))).scalar_one()
@@ -163,11 +175,30 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         ).scalar_one()
     )
 
+    # REC-11 — 처치 기록 전체 중 candidates·policy_version 둘 다 실린 건수("작동한 비율"의
+    # 분자·분모). 정본 함수(`record_recommendation_treatment`)는 두 키를 항상 같이 넣거나
+    # 같이 생략하므로(호출자가 둘 다 넘기거나 둘 다 생략) 둘 다 있어야만 "기록됨"으로 센다.
+    treatment_total_stmt = (
+        select(func.count())
+        .select_from(EvidenceEvent)
+        .where(EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT)
+    )
+    treatment_total = int((await session.execute(treatment_total_stmt)).scalar_one())
+    with_policy_metadata_stmt = treatment_total_stmt.where(
+        EvidenceEvent.meta.has_key(META_KEY_CANDIDATES),
+        EvidenceEvent.meta.has_key(META_KEY_POLICY_VERSION),
+    )
+    with_policy_metadata_total = int(
+        (await session.execute(with_policy_metadata_stmt)).scalar_one()
+    )
+
     return ReachCounts(
         problem_attempt_total=attempt_total,
         theta_eligible_response_total=eligible_total,
         weak_concept_signal_pair_total=pair_total,
         candidate_pool_structural_cap=pool_cap,
+        recommendation_treatment_total=treatment_total,
+        recommendation_treatment_with_policy_metadata_total=with_policy_metadata_total,
     )
 
 
@@ -186,10 +217,24 @@ class ReachReport:
     weak_concept_signal_pair_total: int
     weak_concept_signal_reached: bool
     candidate_pool_structural_cap: int
+    recommendation_treatment_total: int
+    recommendation_treatment_with_policy_metadata_total: int
+    recommendation_treatment_policy_metadata_rate: float | None
 
 
 def build_report(counts: ReachCounts) -> ReachReport:
-    """원시 카운트 4개 → `ReachReport`(순수·부작용 0). `reached`는 count>0(분모 없는 0 방지)."""
+    """원시 카운트 5개 → `ReachReport`(순수·부작용 0). `reached`는 count>0(분모 없는 0 방지).
+
+    `recommendation_treatment_policy_metadata_rate`(REC-11 "작동한 비율")는 분모
+    (`recommendation_treatment_total`)가 0이면 **None**이다 — 0/0을 0.0으로 지어내지
+    않는다(이 모듈의 None-vs-0 회계 원칙 그대로 승계).
+    """
+    rate = (
+        None
+        if counts.recommendation_treatment_total == 0
+        else counts.recommendation_treatment_with_policy_metadata_total
+        / counts.recommendation_treatment_total
+    )
     return ReachReport(
         request_counter_status=REQUEST_COUNTER_STATUS,
         problem_attempt_total=counts.problem_attempt_total,
@@ -199,6 +244,11 @@ def build_report(counts: ReachCounts) -> ReachReport:
         weak_concept_signal_pair_total=counts.weak_concept_signal_pair_total,
         weak_concept_signal_reached=counts.weak_concept_signal_pair_total > 0,
         candidate_pool_structural_cap=counts.candidate_pool_structural_cap,
+        recommendation_treatment_total=counts.recommendation_treatment_total,
+        recommendation_treatment_with_policy_metadata_total=(
+            counts.recommendation_treatment_with_policy_metadata_total
+        ),
+        recommendation_treatment_policy_metadata_rate=rate,
     )
 
 
@@ -253,7 +303,22 @@ def render_report(report: ReachReport) -> str:
         "SQL로 잘라 후보 풀을 구성한다 — 이 값은 그 상한일 뿐, 실제 요청별 후보 풀 크기는 "
         "`NextProblemResponse.candidate_pool_size`(REC-01 갈래 B)에서 확인한다.",
         "",
+        "## 5. candidates·policy_version 기록률 (REC-11 — '작동한 비율')",
+        "",
+        f"- 처치 기록 전체: **{report.recommendation_treatment_total}**",
+        f"- candidates·policy_version 둘 다 실린 건수: "
+        f"**{report.recommendation_treatment_with_policy_metadata_total}**",
     ]
+    if report.recommendation_treatment_policy_metadata_rate is None:
+        lines.append(f"- 기록률: {NOT_REACHED}(처치 기록 0건 — 분모 없음)")
+    else:
+        lines.append(f"- 기록률: **{report.recommendation_treatment_policy_metadata_rate:.1%}**")
+        if report.recommendation_treatment_policy_metadata_rate < 1.0:
+            lines.append(
+                "  - 1.0 미만이면 REC-11 이전(구버전 배선)에 기록된 처치가 섞여 있다는 뜻이다 "
+                "— 결함이 아니라 배선 시점 이전 데이터의 정직한 흔적."
+            )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -275,6 +340,11 @@ def report_to_json(report: ReachReport) -> dict[str, Any]:
         },
         "candidate_pool_structural_cap": report.candidate_pool_structural_cap,
         "next_problem_candidate_pool_size": _NEXT_PROBLEM_CANDIDATE_POOL_SIZE,
+        "recommendation_treatment_policy_metadata": {
+            "total": report.recommendation_treatment_total,
+            "with_policy_metadata": report.recommendation_treatment_with_policy_metadata_total,
+            "rate": report.recommendation_treatment_policy_metadata_rate,
+        },
     }
 
 
@@ -286,7 +356,7 @@ def dump_json(report: ReachReport) -> str:
 # CLI (얇은 껍데기 — DB 세션 열고 닫기·입출력만, 집계는 위 순수 코어)
 # ──────────────────────────────────────────────────────────────────────────
 async def _run() -> ReachReport:
-    """세션을 열어 4축을 실측하고 리포트를 조립한다(조회 전용·쓰기 0). 종료 시 엔진 정리."""
+    """세션을 열어 5축을 실측하고 리포트를 조립한다(조회 전용·쓰기 0). 종료 시 엔진 정리."""
     sessionmaker = get_sessionmaker()
     try:
         async with sessionmaker() as session:
@@ -307,7 +377,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m whymath_backend.ops.recommendation_reach_report",
         description=(
             "추천 도달 관측 리포트(REC-01) — problem_attempt 적재·θ 추정 유효 응답·개인화 "
-            "가중 적용 가능 건수·후보 풀 구조적 상한을 실 DB에서 집계한다. 결정론적 exit 0/2"
+            "가중 적용 가능 건수·후보 풀 구조적 상한·candidates/policy_version 기록률"
+            "(REC-11)을 실 DB에서 집계한다. 결정론적 exit 0/2"
             "(게이트 아님). 추천 요청 수는 카운터가 없어 그 사실 자체를 보고한다."
         ),
     )

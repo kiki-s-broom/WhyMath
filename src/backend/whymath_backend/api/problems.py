@@ -45,7 +45,7 @@ import logging
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.exc import IntegrityError
@@ -57,9 +57,18 @@ from whymath_backend.api._concurrency import (
     etag_for,
     matches_if_none_match,
 )
+from whymath_backend.api._rate_limit import _client_ip
+from whymath_backend.config import get_settings
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.session import get_session
-from whymath_backend.schema.enums import ReviewStatus, Subject, is_review_status_quarantined
+from whymath_backend.privacy.audit import record_content_mutation_audit
+from whymath_backend.schema.enums import (
+    PrivacyAuditAction,
+    PrivacyAuditResourceType,
+    ReviewStatus,
+    Subject,
+    is_review_status_quarantined,
+)
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import PublicProblem, PublicProblemStep
@@ -148,7 +157,11 @@ def _reject_if_quarantined(orm: Problem, problem_id: uuid.UUID) -> None:
     summary="문제 생성",
 )
 async def create_problem(
-    body: ProblemSchema, session: SessionDep, response: Response, admin: RequireContentAdmin
+    body: ProblemSchema,
+    session: SessionDep,
+    response: Response,
+    admin: RequireContentAdmin,
+    request: Request,
 ) -> ProblemSchema:
     """검증된 schema.Problem을 영속화하고 복원해 반환한다(201). `Role.CONTENT_ADMIN` 전용.
 
@@ -156,9 +169,22 @@ async def create_problem(
     본문 보유 금지 등 출처별 불변식은 schema.Problem이 이미 검증했다(경계 메모 참조).
     응답에 ETag(공개 투영 기준 — 모듈 docstring SEC-24 오라클 항목)를 실어 이후 조건부
     수정(If-Match)을 가능케 한다. 응답 본문은 관리자 표면이라 전체 스키마 유지.
+
+    SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
+    (IntegrityError로 롤백되면 감사 행도 함께 롤백 — 실패한 시도는 감사하지 않는다).
     """
     orm = Problem.from_schema(body)
     session.add(orm)
+    settings = get_settings()
+    record_content_mutation_audit(
+        session,
+        actor_user_id=admin.user_id,
+        resource_type=PrivacyAuditResourceType.problem,
+        resource_id=orm.problem_id,
+        action=PrivacyAuditAction.create,
+        ip=_client_ip(request, settings=settings),
+        settings=settings,
+    )
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -308,6 +334,7 @@ async def patch_problem(
     session: SessionDep,
     response: Response,
     admin: RequireContentAdmin,
+    request: Request,
     if_match: Annotated[str | None, Header()] = None,
 ) -> ProblemSchema:
     """제공된 필드만 부분 수정 — 병합 결과를 schema로 *재검증*해 불변식(본문 보유 금지 등)을
@@ -316,6 +343,8 @@ async def patch_problem(
     ETag)를 보내면 그사이 변경됐을 때 412로 거부한다(미전송 시 무조건 진행 — 비파괴). 응답에
     새 ETag를 싣는다. ETag는 공개 투영 기준(모듈 docstring SEC-24 — GET이 공개 투영
     ETag를 주므로 여기서도 같은 기준으로 비교해야 If-Match 흐름이 정합한다).
+
+    SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다.
     """
     existing = await session.get(Problem, problem_id)
     if existing is None:
@@ -338,6 +367,16 @@ async def patch_problem(
             },
         ) from exc
     updated = await session.merge(Problem.from_schema(validated))
+    settings = get_settings()
+    record_content_mutation_audit(
+        session,
+        actor_user_id=admin.user_id,
+        resource_type=PrivacyAuditResourceType.problem,
+        resource_id=problem_id,
+        action=PrivacyAuditAction.update,
+        ip=_client_ip(request, settings=settings),
+        settings=settings,
+    )
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -356,6 +395,7 @@ async def delete_problem(
     problem_id: uuid.UUID,
     session: SessionDep,
     admin: RequireContentAdmin,
+    request: Request,
     if_match: Annotated[str | None, Header()] = None,
 ) -> Response:
     """문제 삭제 — 없으면 404. 풀이단계·관계·시도 등 참조가 있으면 FK 위반 → 409.
@@ -364,6 +404,9 @@ async def delete_problem(
     cascade를 ORM에 두지 않았으므로 참조가 있으면 삭제를 거부한다(가짜 cascade 금지).
     `If-Match`를 보내면 그사이 변경된 리소스의 삭제를 412로 막는다(조건부 삭제 —
     비교 기준은 공개 투영 ETag·모듈 docstring SEC-24).
+
+    SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
+    (FK 위반으로 롤백되면 감사 행도 함께 롤백).
     """
     existing = await session.get(Problem, problem_id)
     if existing is None:
@@ -373,6 +416,16 @@ async def delete_problem(
         )
     ensure_if_match(if_match, etag_for(PublicProblem.from_problem(existing.to_schema())))
     await session.delete(existing)
+    settings = get_settings()
+    record_content_mutation_audit(
+        session,
+        actor_user_id=admin.user_id,
+        resource_type=PrivacyAuditResourceType.problem,
+        resource_id=problem_id,
+        action=PrivacyAuditAction.delete,
+        ip=_client_ip(request, settings=settings),
+        settings=settings,
+    )
     try:
         await session.commit()
     except IntegrityError as exc:

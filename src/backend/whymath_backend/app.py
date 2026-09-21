@@ -27,9 +27,12 @@ Langfuse·Celery broker가 필요하지 않다(첫 사용 시 연결). LangfuseS
 소비처가 아직 특정 역할로 좁혀지지 않음) `require_content_admin`이 아니라 인증 존재만 요구한다.
 `/v1/jobs/{id}`(폴링)도 같은 `CurrentUser` 게이트다(SEC-24(원 SEC-15) —
 `functional_security_audit_2026-08-08.md` M6): SEC-07 당시 "범위 밖"으로 남겨졌던 폴링이
-무인증인 채 검증 전 원시 LLM 출력을 반환하고 있었다(짝인 POST는 봉인·폴링만 열림). 소유권
-(job↔user) 검사는 현재 job 저장 구조(`JobStatus` — job_id·state·text·error뿐)에 user 매핑이
-없어 불가 — job→user 저장이 생길 때 후속(그전까지 최소 인증 게이트·job_id는 UUID4라 열거 곤란).
+무인증인 채 검증 전 원시 LLM 출력을 반환하고 있었다(짝인 POST는 봉인·폴링만 열림).
+
+소유권(job↔user) 검사(SEC-27, 48_보안 §P0): `job_ownership` 테이블(`db/models/
+job_ownership.py`)이 `POST /v1/generate`의 큐잉 시점에 (job_id, user_id)를 기록하고,
+`GET /v1/jobs/{id}`가 그 행으로 소유자를 대조해 타 사용자 job 폴링을 404로 거부한다
+(매핑 부재도 동일하게 404 — 존재 자체를 노출하지 않음).
 """
 
 from __future__ import annotations
@@ -41,11 +44,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from whymath_backend.api._auth import CurrentUser, has_scope_consent
 from whymath_backend.api._device_store import (
@@ -84,6 +89,12 @@ from whymath_backend.api._l3_state import (
 from whymath_backend.api._l3_state import (
     get_trace as _get_trace,
 )
+from whymath_backend.api._l6_mode_reach_state import (
+    L6ModeReachCounters,
+    L6ModeReachSnapshot,
+    get_l6_mode_reach_counters,
+    set_l6_mode_reach_counters,
+)
 from whymath_backend.api._misconception_state import get_semantic_matcher
 from whymath_backend.api._ocr_state import (
     OCR_COUNTERS_KEY as _OCR_COUNTERS_KEY,
@@ -113,6 +124,9 @@ from whymath_backend.api._subject_capability_state import (
     ASSESSMENT_ANSWER_VERIFIER_KEY as _ASSESSMENT_ANSWER_VERIFIER_KEY,
 )
 from whymath_backend.api._subject_capability_state import (
+    ATTEMPT_MISCONCEPTION_DETECTOR_KEY as _ATTEMPT_MISCONCEPTION_DETECTOR_KEY,
+)
+from whymath_backend.api._subject_capability_state import (
     EXPRESSION_EQUIVALENCE_KEY as _EXPRESSION_EQUIVALENCE_KEY,
 )
 from whymath_backend.api._subject_capability_state import (
@@ -120,6 +134,9 @@ from whymath_backend.api._subject_capability_state import (
 )
 from whymath_backend.api._subject_capability_state import (
     FINAL_ANSWER_VERIFIER_KEY as _FINAL_ANSWER_VERIFIER_KEY,
+)
+from whymath_backend.api._subject_capability_state import (
+    STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -155,11 +172,14 @@ from whymath_backend.api.visualization import router as visualization_router
 from whymath_backend.composition import (
     default_answer_form_verifier,
     default_assessment_answer_verifier,
+    default_attempt_misconception_detector,
     default_expression_equivalence,
     default_expression_seal,
     default_final_answer_verifier,
+    default_step_chain_verifier,
 )
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.models.job_ownership import JobOwnership
 from whymath_backend.db.schema_version import verify_schema_version
 from whymath_backend.db.session import dispose_engine, get_session
 from whymath_backend.l3 import pipeline
@@ -177,7 +197,8 @@ from whymath_backend.l3.pregenerate.validator import (
     default_seed_validator,
     validate_response,
 )
-from whymath_backend.l3.providers.anthropic import AnthropicProvider, AnthropicStatus
+from whymath_backend.l3.providers.anthropic import AnthropicProvider
+from whymath_backend.l3.providers.cloud_status import CloudStatus
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.ollama import OllamaProvider, OllamaStatus
 from whymath_backend.l3.queue import CeleryJobQueue
@@ -413,6 +434,35 @@ class GrowthEvidenceExposureReachBody(BaseModel):
     )
 
 
+class L6ModeReachBody(BaseModel):
+    """/health/ready L6 응용 모드 6종 도달 관측 섹션(PB-04) — `GET /v1/gating/*` 6개 카운터.
+
+    `problem_bank_gap_review_r2.md` §0-②-나 — 6개 값이 전부 0이면 "L6 응용 모드 6종이
+    구현은 됐지만 학생 앱(mobile/web) 어디도 이 경로를 호출한 적이 없다"는 실측 주장이
+    라이브로도 유지된다는 뜻이다. 어느 값이든 0이 아니게 되는 순간이 그 모드의 도달 주장이
+    깨지는 순간이다(정적 grep 감사와의 이중 회계).
+    """
+
+    retake: int = Field(
+        ..., description="GET /v1/gating/retake 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+    suneung: int = Field(
+        ..., description="GET /v1/gating/suneung 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+    school_progress: int = Field(
+        ..., description="GET /v1/gating/school-progress 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+    thinking: int = Field(
+        ..., description="GET /v1/gating/thinking 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+    metacognition: int = Field(
+        ..., description="GET /v1/gating/metacognition 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+    gifted: int = Field(
+        ..., description="GET /v1/gating/gifted 누적 요청 수(프로세스 재시작 시 리셋)"
+    )
+
+
 class OcrReachBody(BaseModel):
     """/health/ready OCR 도달 관측 요약 (NLP-01) — 요청·성공·사유별 503 인프로세스 카운트.
 
@@ -475,6 +525,10 @@ class ReadyBody(BaseModel):
         ...,
         description="성장 증거 노출 계약 경유 도달 관측(PED-08) — /growth-evidence(구분 카운터).",
     )
+    l6_mode_reach: L6ModeReachBody = Field(
+        ...,
+        description="L6 응용 모드 6종 도달 관측(PB-04) — /v1/gating/* 6개 엔드포인트별 카운터.",
+    )
 
 
 def _component_body(check: ComponentCheck) -> ComponentCheckBody:
@@ -522,6 +576,18 @@ def _growth_evidence_exposure_body(
     달라(다른 라우트를 명명하는 별도 docstring) 별도 변환 함수를 둔다.
     """
     return GrowthEvidenceExposureReachBody(requests_total=snapshot.requests_total)
+
+
+def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
+    """L6ModeReachSnapshot(도메인) → L6ModeReachBody(HTTP 스키마) 변환(PB-04)."""
+    return L6ModeReachBody(
+        retake=snapshot.retake,
+        suneung=snapshot.suneung,
+        school_progress=snapshot.school_progress,
+        thinking=snapshot.thinking,
+        metacognition=snapshot.metacognition,
+        gifted=snapshot.gifted,
+    )
 
 
 def _metrics_body(snapshot: MetricsSnapshot) -> MetricsSummaryBody:
@@ -709,6 +775,49 @@ def create_app(
         redoc_url=None if _prod_like else "/redoc",
         openapi_url=None if _prod_like else "/openapi.json",
     )
+    # SEC-26(48_보안 §P0 "CORS/보안 헤더 미들웨어" 갭): TrustedHost → CORS → 보안 헤더 순으로
+    # 가장 먼저 건다(등록 순서 = 바깥 래핑 순서 — 나쁜 Host를 가장 먼저 걷어내고, preflight를
+    # CORS가 처리하고, 마지막으로 모든 응답에 보안 헤더를 얹는다). 셋 다 *항상* 등록한다 —
+    # allowlist가 비어 있으면 각자 안전한 기본 자세로 수렴한다(TrustedHost는 `*`=현재 동작
+    # 무회귀, CORS는 deny-by-default=네이티브 앱 미영향). 와일드카드+credentials 조합은
+    # `Settings._forbid_cors_wildcard_with_credentials`가 부팅 시점에 이미 막았다.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings_for_app.trusted_hosts_list)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings_for_app.cors_allowed_origins_list,
+        allow_credentials=settings_for_app.cors_allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.middleware("http")
+    async def _security_headers_middleware(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """모든 응답에 보안 헤더를 얹는다(SEC-26 — 48_보안 §P0 "CORS/보안 헤더" 갭 해소).
+
+        `X-Content-Type-Options`·`X-Frame-Options`·`Referrer-Policy`는 항상 적용한다(다운사이드
+        없음 — `/docs` 등 스키마 표면도 프레이밍·스니핑 보호를 받아야 마땅하다). `Strict-
+        Transport-Security`·`Content-Security-Policy`는 `_prod_like`에서만 적용한다 — CSP
+        `default-src 'none'`은 이 API가 JSON 전용이라 안전하지만 Swagger UI(`/docs`)는 CDN
+        스크립트·스타일을 로드해야 렌더링되므로, 개발 환경(docs 활성)에서 CSP를 걸면 그
+        페이지가 깨진다. `_prod_like`에서는 `docs_url`이 이미 None(라우트 자체가 없음)이라
+        이 충돌이 발생하지 않는다 — 즉 CSP 게이팅은 기존 docs_url 게이팅과 정확히 같은 축을
+        재사용한다(별도 판정 좌석을 만들지 않음).
+        """
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if _prod_like:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains; preload"
+            )
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'none'"
+            )
+        return response
+
     # 기본 provider는 CompositeProvider — cost_tier로 로컬(Ollama)↔클라우드(Anthropic)
     # 디스패치(S5). 둘 다 지연이라 구성 시 라이브 Ollama·Anthropic 키가 필요 없다.
     # (OPS-01) 변수로 잡아 두는 이유: 기본 readiness probes가 같은 provider의
@@ -730,14 +839,20 @@ def create_app(
     # 라우터는 `api/_subject_capability_state.py`의 Depends로 꺼내 쓴다 — 그래서 Core 모듈은
     # `composition`을 이름으로 알지 않는다(`EOS Core → Subject Interface ← Math Adapter`).
     # 부팅 1회 호출이라 요청 경로에서 재조립하지 않는다(팩토리는 상태 없는 판정기를 준다).
-    # ⚠️ EOS-86의 `StepChainVerifier` 팩토리도 **반드시 이 줄들 옆에** 등록해야 한다. Core가
-    #    직접 `composition.default_step_chain_verifier()`를 부르면 EOS-89가 없앤 pull 지점이
-    #    4번째로 되살아난다(SUBJECT_CAPABILITY_KEYS에 키를 더하는 것이 그 강제 장치다).
+    # COMP-01: EOS-86의 `StepChainVerifier` 팩토리도 **같은 줄들 옆에** 등록한다(6번째). 이 줄이
+    #    빠지면 `api/coach.py`의 Depends가 `AttributeError`로 터지고(폴백 없음·침묵 실패 금지),
+    #    tests/infra `test_app_factory_registers_every_subject_capability`가 RED가 된다.
     app.state.__setattr__(_EXPRESSION_EQUIVALENCE_KEY, default_expression_equivalence())
     app.state.__setattr__(_FINAL_ANSWER_VERIFIER_KEY, default_final_answer_verifier())
     app.state.__setattr__(_ASSESSMENT_ANSWER_VERIFIER_KEY, default_assessment_answer_verifier())
     app.state.__setattr__(_EXPRESSION_SEAL_KEY, default_expression_seal())
     app.state.__setattr__(_ANSWER_FORM_VERIFIER_KEY, default_answer_form_verifier())
+    app.state.__setattr__(_STEP_CHAIN_VERIFIER_KEY, default_step_chain_verifier())
+    # EOS-104: 7번째 — 오답 1건에서 오개념 후보를 읽는 능력. 같은 줄들 옆에 두는 이유도 같다
+    #    (빠지면 `api/me.py`의 Depends가 AttributeError로 터지고 infra 테스트가 RED).
+    app.state.__setattr__(
+        _ATTEMPT_MISCONCEPTION_DETECTOR_KEY, default_attempt_misconception_detector()
+    )
     # OAuth provider 레지스트리(로그인 콜백이 provider 이름으로 조회). 기본은 config의 키가
     # 설정된 provider만(카카오·네이버·OAuth-a2) — 키 미설정(CI)이면 빈 dict라 콜백 404. 클라이언트는
     # 지연이라 구성만으로 네트워크 미발생. 테스트는 가짜 provider를 직접 주입한다.
@@ -803,6 +918,9 @@ def create_app(
     set_growth_evidence_counters(
         app, GrowthEvidenceReachCounters(), key=GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY
     )
+    # PB-04 — L6 응용 모드 6종(`GET /v1/gating/*`) 도달 관측 카운터. 앱 수명 동안 1개
+    # (재시작 시 리셋 — 인프로세스 계측이라 영속 저장 0·growth_evidence와 동형 전제).
+    set_l6_mode_reach_counters(app, L6ModeReachCounters())
 
     def _observe_request(elapsed_ms: float, status_code: int) -> None:
         """요청 1건 계측 + 알림 평가 — 계측 실패가 요청을 절대 깨지 않는다.
@@ -937,6 +1055,7 @@ def create_app(
         growth_evidence_exposure_counters = get_growth_evidence_counters(
             request.app, key=GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY
         )
+        l6_mode_reach_counters = get_l6_mode_reach_counters(request.app)
         # 세 딥체크는 서로 독립이라 동시 실행한다. 각 체크는 예외를 던지지 않는 계약
         # (ops/service_health — 비크래시 보고)이라 gather에 예외 누수가 없다.
         db_check, redis_check, llm_check = await asyncio.gather(
@@ -968,6 +1087,7 @@ def create_app(
             growth_evidence_exposure=_growth_evidence_exposure_body(
                 growth_evidence_exposure_counters.snapshot()
             ),
+            l6_mode_reach=_l6_mode_reach_body(l6_mode_reach_counters.snapshot()),
         )
         return JSONResponse(
             status_code=(status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE),
@@ -1000,11 +1120,14 @@ def create_app(
         cloud_error: str | None = None
         cloud_check = getattr(provider, "check_cloud_status", None)
         if cloud_check is not None:
-            cloud_status: AnthropicStatus | None = await cloud_check()
+            cloud_status: CloudStatus | None = await cloud_check()
             if cloud_status is not None:
                 cloud_configured = cloud_status.configured
-                cloud_reachable = cloud_status.reachable
                 cloud_error = cloud_status.error
+                # `reachable`은 공통 표면이 아니다(ARCH-57) — 보고하는 제공자만 자기 Status에
+                # 둔다. 없을 때 False로 접으면 "도달 불가"와 "미측정"이 같은 화면이 되므로
+                # None으로 남긴다(응답 필드가 이미 `bool | None`이라 구분이 보존된다).
+                cloud_reachable = getattr(cloud_status, "reachable", None)
 
         return StatusBody(
             ready=ollama_status.all_present,
@@ -1079,6 +1202,12 @@ def create_app(
             )
 
         if result.is_queued:
+            # SEC-27: 소유권(job↔user) 기록 — /v1/jobs/{job_id} 폴링이 이 행으로 소유자를
+            # 대조한다(app.py 모듈 docstring 경계 메모의 "job→user 저장이 생길 때 후속"이 이것).
+            # is_queued=True는 pipeline.generate가 실제 enqueue 성공 후에만 세우므로(l3/pipeline.py
+            # GenerationResult.is_queued) job_id는 항상 채워진 문자열이다.
+            session.add(JobOwnership(job_id=result.job_id or "", user_id=user.user_id))
+            await session.commit()
             # 비동기 QUALITY 큐잉 → 202 Accepted + job_id(폴링 안내).
             queued = GenerateQueuedBody(
                 job_id=result.job_id or "",
@@ -1103,13 +1232,24 @@ def create_app(
         )
 
     @app.get("/v1/jobs/{job_id}", tags=["l3"], response_model=JobStatusBody)
-    async def get_job(job_id: str, request: Request, user: CurrentUser) -> JobStatusBody:
+    async def get_job(
+        job_id: str,
+        request: Request,
+        user: CurrentUser,
+        session: Annotated[AsyncSession, Depends(get_session)],
+    ) -> JobStatusBody:
         """QUALITY 비동기 작업 폴링 — 상태 + (완료 시) 생성 텍스트 (03a §D.3).
 
         인증 필수(`CurrentUser` — SEC-24(원 SEC-15) M6, POST /v1/generate와 동일 게이트):
-        무인증 폴링은 검증 전 원시 LLM 출력의 무인증 노출 표면이었다. **소유권(job↔user)
-        검사는 후속** — 현재 job 저장 구조(`JobStatus`)에 user 매핑이 없어 인증 게이트만
-        건다. job→user 저장이 생기면 타 사용자 job 폴링을 403/404로 거부하도록 확장한다.
+        무인증 폴링은 검증 전 원시 LLM 출력의 무인증 노출 표면이었다.
+
+        **소유권(job↔user) 검사(SEC-27)**: `job_ownership` 테이블(POST /v1/generate가
+        큐잉 시점에 기록)에서 `job_id`를 PK lookup한다. 행이 없거나(매핑 부재 — 이 배포
+        이전에 큐잉된 job·잘못된 job_id) `user_id`가 요청자와 다르면(타 사용자 job) 둘 다
+        **404**로 거부한다(403이 아닌 이유 — acceptance③: 소유자가 아니면 그 리소스의
+        *존재 자체*도 노출하지 않는다. job_id는 UUID4라 존재 여부 자체는 열거 곤란하지만,
+        403/404 응답 차이로 "존재하지만 내 것이 아님"을 알려주지 않는 것이 더 안전한
+        기본값이다).
 
         완료(success) 시 `text`는 *검증 전 원시 출력*이다(앱 docstring 경계 메모) —
         학생 직접 노출 금지. 진행 중(pending)·실패(failure)·판정 불가(unknown)는 모두
@@ -1117,8 +1257,12 @@ def create_app(
         우선). result backend 도달 실패도 unknown으로 흡수된다(CeleryJobQueue.result).
 
         큐가 폴링(result)을 지원하지 않으면(가짜·미지원 구현) unknown으로 보고한다 —
-        ollama check_status 기능 탐지와 동일한 방어 패턴.
+        ollama check_status 기능 탐지와 동일한 방어 패턴. 소유권 검사는 그보다 *먼저*
+        하므로, 큐 미지원이라도 소유자가 아니면 여전히 404다.
         """
+        ownership = await session.get(JobOwnership, job_id)
+        if ownership is None or ownership.user_id != user.user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
         queue = _get_queue(request)
         result_fn = getattr(queue, "result", None)
         if result_fn is None:

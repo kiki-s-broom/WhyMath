@@ -32,5 +32,12 @@ class MisconceptionHypothesisRecord(BaseModel):
     turns_since_evidence: int = Field(description="마지막 증거 이후 경과 턴(감쇠 입력).")
     evidence_count: int = Field(description="이 가설을 지지한 누적 증거 수.")
     is_active: bool = Field(description="활성 여부(가지치기=비활성·행 삭제 X).")
+    deactivated_reason: str | None = Field(
+        default=None,
+        description=(
+            "비활성화 사유(resolved/refuted/decayed/capped). 활성 행·사유 미상 행은 None "
+            "— 과거 행 백필 없음(MISC-20 정직 회계)."
+        ),
+    )
     created_at: datetime = Field(description="레코드 생성 시각(UTC).")
     updated_at: datetime = Field(description="레코드 갱신 시각(UTC).")

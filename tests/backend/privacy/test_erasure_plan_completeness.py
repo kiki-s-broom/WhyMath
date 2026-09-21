@@ -2,20 +2,28 @@
 
 `test_erasure.py:94 test_covers_all_planned_tables`는 "`_ERASURE_PLAN`에 있는 테이블은 전부 실제
 삭제 순서(`_delete_order`)에 등장하는가"(계획→실행, `planned <= order`)만 단언한다. 그 역방향 —
-"소유 컬럼(`user_id`·`student_id`·`target_user_id`)을 가진 테이블인데 `_ERASURE_PLAN`에 아예 없는
-것이 있는가"(실행→계획) — 는 검사되지 않았다. 새 테이블을 만들며 사용자 데이터를 담는데 실수로
+"소유 컬럼을 가진 테이블인데 `_ERASURE_PLAN`에 아예 없는 것이 있는가"(실행→계획) — 는
+검사되지 않았다. 새 테이블을 만들며 사용자 데이터를 담는데 실수로
 `_ERASURE_PLAN` 등재를 깜빡하면, 그 테이블은 삭제권 요청에도 영원히 안 지워지는데 아무 테스트도
 잡지 못했다. 본 모듈이 그 역방향을 강제한다.
 
 hermetic: `Base.metadata.tables`(SQLAlchemy 선언적 메타데이터)만 읽는다 — DB 연결 0
 (`tests/backend/l1/test_edge_relation_governance.py` 순수 메타데이터 스윕 선례).
 
-실측(2026-08 COLLAB-02, 현행 62테이블 전수):
-  owner 컬럼(`user_id`·`student_id`·`target_user_id`) 보유 테이블 = 21개
-    = `_ERASURE_PLAN` 18개 + `user_profile`(계획 밖에서 `erase_user()`가 마지막에 명시 삭제)
-    + `deletion_audit`·`privacy_audit`(E형 감사 — `_ERASURE_PLAN_EXEMPTIONS`에 사유와 함께 등재).
-  → **현행 누락 0건**(반증 결과 — 문제를 억지로 만들지 않는다). 상세 스캔 명령·출력은 이 태스크의
-  세션 보고에 기록.
+소유 판정 방식(SEC-35, 2026-09-18 전환): 종전 **고정 3종 컬럼명 열거**에서
+**FK 산출물 검사 ∪ 계획 파생 이름**의 합집합으로 바꿨다 — 근거·실측·남는 사각은 아래
+`_owner_tables` 위의 주석 블록이 정본이다.
+
+실측(2026-09-18 SEC-35, 현행 82테이블 전수 · 판정 기준 main `a34d31d4`):
+  (A) FK→`user_profile.user_id` 보유 = 18건 · (B) 계획 파생 이름 보유 = 26건 · 합집합 = 27건
+  (A)에만 있고 (B)에 없던 것 = **`learner_state` 1건**(소유 컬럼 `learner_id` — 이 별칭이 종전
+    3종 열거의 사각이었다). (B)에만 있고 (A)에 없는 것 = 9건(느슨참조·FK 0).
+  → 합집합 27건 = `_ERASURE_PLAN` 24개 + `user_profile` + `deletion_audit`·`privacy_audit`
+    (E형 감사 — `_ERASURE_PLAN_EXEMPTIONS`에 사유와 함께 등재) → **누락 0건**.
+
+  전환 이전 상태(반증): 같은 스캔을 고정 3종 열거로 돌리면 누락 0건이 나왔다 — `learner_state`가
+  스윕 대상에 **들어오지 않았기 때문**이지 계획에 있었기 때문이 아니다. 가드가 초록인데 테이블은
+  파기 계획 밖이었고, 그 상태에서 삭제권 요청은 FK 위반으로 전면 실패했다(축 ② 통합 테스트).
 
 허용목록(`_ERASURE_PLAN_EXEMPTIONS`)은 `privacy/erasure.py`에 사유와 함께 정의돼 있다 — 무사유
 예외 금지(CLAUDE.md). 협업(다자 소유) 스키마가 만들 B·C·D형 테이블의 파기 규칙은
@@ -32,23 +40,71 @@ from sqlalchemy import Column, MetaData, Table, Uuid
 
 from whymath_backend.privacy.erasure import _ERASURE_PLAN, _ERASURE_PLAN_EXEMPTIONS
 
-# `_ERASURE_PLAN`이 실제로 쓰는 소유 컬럼명(user_id·student_id) + `privacy_audit`의 target_user_id
-# (다른 사용자의 데이터가 대상일 때의 소유 표지). 실제 스키마(db/models/*.py) 전수 확인 결과 이
-# 3개 외에 "비슷한 의미"(owner_id·author_id 등)의 컬럼은 *소유 축*이 아니라 *콘텐츠 저작/검수
-# 행위자*(problem.created_by·content_provenance.approved_by·curriculum_entry.verified_by·
-# pedagogy_content_slot.reviewed_by)다 — 그 테이블 자체가 공유 콘텐츠(문항·성취기준·교수법 팩)라
-# "이 행의 데이터 주체가 이 사용자다"라는 삭제권 의미가 성립하지 않는다(스캔 근거는 세션 보고 참조).
-OWNER_COLUMN_NAMES: frozenset[str] = frozenset({"user_id", "student_id", "target_user_id"})
+# ===========================================================================
+# 소유 테이블 판정 — **산출물 검사 ∪ 계획 파생 이름** (SEC-35, 2026-09-18)
+#
+# 종전 판은 `OWNER_COLUMN_NAMES = {"user_id","student_id","target_user_id"}` **고정 3종 열거**
+# 하나였다. 그 형태는 CLAUDE.md 「금지 패턴 열거 대신 산출물 검사」가 겨냥하는 바로 그 구조이고,
+# 실제로 뚫렸다 — `learner_state`는 소유 컬럼 이름이 `learner_id`라 전수 스윕에 **한 번도
+# 걸리지 않았고**(실측: 82테이블 중 이름 스윕 26건에 미포함), 그 사이 그 테이블은 파기 계획
+# 밖에 있었다. 더구나 그것은 조용한 누락이 아니라 **삭제 불능**이었다(FK NO ACTION → 삭제권
+# 요청 자체가 ForeignKeyViolationError로 전체 롤백 · `test_erasure_learner_state_integration.py`).
+#
+# 그래서 판정을 두 축의 **합집합**으로 바꾼다. 어느 한쪽도 단독으로는 완전하지 않다(실측):
+#   (A) **FK 기반 산출물 검사** — `user_profile.user_id`를 참조하는 FK를 가진 테이블 전건.
+#       컬럼 *이름과 무관*하므로 `learner_id` 같은 별칭을 구조적으로 본다. 단독으로는 18건.
+#   (B) **계획 파생 이름** — `_ERASURE_PLAN`이 *실제로 쓰는* 컬럼명 + 아래 EXTRA.
+#       느슨참조(FK 0·hypertable) 테이블을 잡는다 — 그쪽은 FK가 없어 (A)가 구조적으로 못 본다.
+#       실측 9건(ability_snapshot·attempt_event·concept_mastery_history·daily_learning_metrics·
+#       skill_mastery_history·user_behavior_metrics·deletion_audit·privacy_audit·user_profile).
+#   → (A)로 (B)를 *대체*하면 그 9건을 통째로 잃는다. 합집합이 fail-safe 방향이다.
+#
+# (B)를 **계획에서 파생**시키는 것이 종전과의 차이다: 새 테이블을 `_ERASURE_PLAN`에 다른 별칭
+# (`learner_id` 등)으로 등재하는 순간 그 이름이 스윕 대상에 자동 편입되므로, 사람이 이 파일의
+# 리터럴을 기억해야 하는 유지보수 지점이 사라진다(종전 구조는 그 기억에 의존해 실패했다).
+#
+# **남는 사각(정직 표기)**: FK가 없고(느슨참조) 이름도 계획에 없는 새 별칭(예: FK 0인
+# `owner_uid` 컬럼)은 여전히 두 축 모두에 안 걸린다. 그런 테이블을 만들 때는 `_ERASURE_PLAN`
+# 등재가 유일한 방어이며, 이 파일이 자동으로 잡아 주지 못한다 — "전수 방어"라고 쓰지 않는다.
+
+# `_ERASURE_PLAN`이 쓰지 않지만 소유 표지인 컬럼명. `target_user_id`는 `privacy_audit`
+# (다른 사용자의 데이터가 대상일 때의 소유 표지)에만 있고 그 테이블은 계획이 아니라 허용목록
+# 소속이라 (B)의 계획 파생으로는 나오지 않는다. 실측상 이 컬럼을 *단독으로*(user_id 없이)
+# 가진 테이블은 현재 0건이지만, 생기는 날을 대비해 남긴다.
+#
+# 여기에 이름을 더하는 것은 최후 수단이다 — 새 소유 축은 `_ERASURE_PLAN` 등재((B)가 자동
+# 반영)나 FK((A)가 자동 반영)로 표현하는 쪽이 옳다.
+OWNER_COLUMN_NAMES_EXTRA: frozenset[str] = frozenset({"target_user_id"})
+
+# 소유 축의 정본 참조 — 이 FK를 가진 테이블은 컬럼명과 무관하게 "이 사용자의 데이터"다.
+USER_OWNER_FK_TARGET = "user_profile.user_id"
 
 
-def _owner_tables(metadata: MetaData) -> dict[str, frozenset[str]]:
-    """메타데이터 전수에서 소유 컬럼을 가진 테이블명 → 매칭된 컬럼명 집합."""
-    result: dict[str, frozenset[str]] = {}
-    for name, table in metadata.tables.items():
-        matched = frozenset(c.name for c in table.columns) & OWNER_COLUMN_NAMES
-        if matched:
-            result[name] = matched
-    return result
+def owner_column_names() -> frozenset[str]:
+    """(B) 스윕이 볼 컬럼명 — `_ERASURE_PLAN`이 실제로 쓰는 이름 + EXTRA(파생·하드코딩 아님)."""
+    return frozenset(column for _, column in _ERASURE_PLAN) | OWNER_COLUMN_NAMES_EXTRA
+
+
+def _tables_with_owner_fk(metadata: MetaData) -> frozenset[str]:
+    """(A) 산출물 검사 — `user_profile.user_id`를 참조하는 FK 보유 테이블(컬럼명 무관)."""
+    return frozenset(
+        name
+        for name, table in metadata.tables.items()
+        if any(fk.target_fullname == USER_OWNER_FK_TARGET for fk in table.foreign_keys)
+    )
+
+
+def _tables_with_owner_column_name(metadata: MetaData) -> frozenset[str]:
+    """(B) 이름 기반 — 계획 파생 컬럼명을 가진 테이블(느슨참조·FK 0 축)."""
+    names = owner_column_names()
+    return frozenset(
+        name for name, table in metadata.tables.items() if {c.name for c in table.columns} & names
+    )
+
+
+def _owner_tables(metadata: MetaData) -> frozenset[str]:
+    """소유 테이블 전건 = (A) FK 산출물 ∪ (B) 계획 파생 이름. 어느 한쪽도 단독 완전 아님."""
+    return _tables_with_owner_fk(metadata) | _tables_with_owner_column_name(metadata)
 
 
 def _missing_from_plan(
@@ -58,7 +114,7 @@ def _missing_from_plan(
     exemptions: dict[str, str],
 ) -> frozenset[str]:
     """소유 테이블 중 계획(`planned`)·허용목록(`exemptions`) 둘 다에 없는 것(실행→계획)."""
-    return frozenset(_owner_tables(metadata)) - planned - frozenset(exemptions)
+    return _owner_tables(metadata) - planned - frozenset(exemptions)
 
 
 # ===========================================================================
@@ -81,7 +137,7 @@ def test_no_owner_column_table_missing_from_erasure_plan() -> None:
     )
 
     assert missing == frozenset(), (
-        f"소유 컬럼(user_id/student_id/target_user_id)을 가졌으나 _ERASURE_PLAN에도 "
+        f"소유 축(user_profile.user_id FK 또는 계획 파생 컬럼명)을 가졌으나 _ERASURE_PLAN에도 "
         f"_ERASURE_PLAN_EXEMPTIONS에도 없는 테이블: {sorted(missing)} — "
         "삭제권 요청에도 영원히 지워지지 않는 테이블이다. _ERASURE_PLAN에 추가하거나, "
         "정당한 사유와 함께 _ERASURE_PLAN_EXEMPTIONS에 등재하라(무사유 예외 금지)."
@@ -177,3 +233,110 @@ def test_sweep_respects_exemptions() -> None:
         meta, planned=frozenset(), exemptions={"audit_tbl": "감사 로그 — 계정 삭제 후에도 잔존."}
     )
     assert missing_with_exemption == frozenset()  # 사유 명시 예외 등재 시 green
+
+
+# ===========================================================================
+# SEC-35 축 ④ — 합집합 스윕의 **실패 주입** 변별력.
+#
+# CLAUDE.md 「보호 장치를 실패 주입 없이 "보호 있음"으로 선언 금지」 + 「픽스처가 그 절을 실제로
+# 밟는가」. 아래 각 테스트는 *합집합의 한 축을 지우면 통과해 버리는* 입력을 픽스처로 쓴다 —
+# 그 절의 반례를 고른 것이지 추상적 경계 케이스가 아니다:
+#   · (A) FK 축의 반례 = 계획에 없는 **별칭 컬럼 + FK**  → (B)만 남기면 GREEN이 된다
+#   · (B) 이름 축의 반례 = 계획 컬럼명 + **FK 0**(느슨참조) → (A)만 남기면 GREEN이 된다
+# 한 축만 검증하는 픽스처를 쓰면 다른 축이 뮤테이션에서 살아남는다(2026-09-07 MISC-07 선례).
+# ===========================================================================
+
+
+def _synthetic_user_profile(metadata: MetaData) -> Table:
+    """FK 대상이 되는 합성 `user_profile` — 실 Base.metadata를 오염시키지 않는다."""
+    return Table(
+        "user_profile",
+        metadata,
+        Column("user_id", Uuid, primary_key=True, default=uuid.uuid4),
+    )
+
+
+def test_fk_axis_catches_alias_owner_column_that_name_axis_misses() -> None:
+    """(A) 반례 — 계획 밖 별칭 컬럼 + FK. 이름 축만으론 못 보는 것을 FK 축이 잡는다.
+
+    별칭으로 `learner_id`를 쓰면 안 된다 — SEC-35가 그것을 `_ERASURE_PLAN`에 등재한 순간
+    계획 파생 이름에 편입돼(B) 이 픽스처가 FK 축을 **한 번도 밟지 않게** 된다. 아래 대조군
+    단언이 그 상태를 실제로 잡았다(초안이 `learner_id`였고 red로 발각됐다).
+    """
+    meta = MetaData()
+    _synthetic_user_profile(meta)
+    Table(
+        "aliased_owner_tbl",
+        meta,
+        # 계획 파생 이름 어디에도 없는 별칭 — (B)는 이 테이블을 구조적으로 못 본다.
+        Column("pupil_uid", Uuid, sa.ForeignKey("user_profile.user_id"), primary_key=True),
+    )
+    assert "pupil_uid" not in owner_column_names(), "픽스처 별칭이 계획에 편입됐다 — 다른 이름으로."
+
+    # 대조군 — 이름 축 단독이면 이 테이블이 안 보인다(= 종전 가드의 실패 재현).
+    assert "aliased_owner_tbl" not in _tables_with_owner_column_name(meta), (
+        "픽스처가 이름 축에 걸려 버렸다 — 이 컬럼명이 계획 파생 이름에 들어갔다는 뜻이고, "
+        "그러면 이 테스트는 FK 축을 한 번도 밟지 않는다(변별력 0)."
+    )
+    # 본 검사 — FK 축이 잡는다.
+    assert "aliased_owner_tbl" in _tables_with_owner_fk(meta)
+    missing = _missing_from_plan(meta, planned=frozenset({"user_profile"}), exemptions={})
+    assert missing == frozenset({"aliased_owner_tbl"}), "FK 축 주입에서 red가 나지 않았다."
+
+
+def test_name_axis_catches_loose_reference_that_fk_axis_misses() -> None:
+    """(B) 반례 — 계획 컬럼명 + FK 0(느슨참조·hypertable 형태). FK 축만으론 못 본다."""
+    meta = MetaData()
+    _synthetic_user_profile(meta)
+    Table(
+        "loose_metrics_tbl",
+        meta,
+        Column("id", Uuid, primary_key=True, default=uuid.uuid4),
+        Column("user_id", Uuid),  # FK 없음 — (A)는 이 테이블을 구조적으로 못 본다.
+    )
+
+    # 대조군 — FK 축 단독이면 안 보인다.
+    assert "loose_metrics_tbl" not in _tables_with_owner_fk(
+        meta
+    ), "픽스처에 FK가 생겼다 — 그러면 이 테스트는 이름 축을 한 번도 밟지 않는다(변별력 0)."
+    assert "loose_metrics_tbl" in _tables_with_owner_column_name(meta)
+    missing = _missing_from_plan(meta, planned=frozenset({"user_profile"}), exemptions={})
+    assert missing == frozenset({"loose_metrics_tbl"}), "이름 축 주입에서 red가 나지 않았다."
+
+
+def test_owner_column_names_are_derived_from_plan_not_hardcoded() -> None:
+    """(B)의 이름 집합은 `_ERASURE_PLAN`에서 *파생*된다 — 계획에 별칭을 등재하면 자동 편입.
+
+    종전 구조는 이 파일의 리터럴을 사람이 기억해 갱신해야 했고, 그 기억이 실패한 결과가 SEC-35다.
+    """
+    names = owner_column_names()
+    plan_columns = {column for _, column in _ERASURE_PLAN}
+    assert plan_columns <= names, "계획이 쓰는 컬럼명이 스윕 대상에서 빠졌다."
+    # SEC-35가 편입한 별칭이 파생으로 따라왔는지 — 하드코딩이면 이 단언이 의미를 잃는다.
+    assert "learner_id" in names, (
+        "learner_id가 스윕 이름 집합에 없다 — _ERASURE_PLAN 파생이 끊겼거나 "
+        "learner_state 등재가 사라졌다."
+    )
+    assert OWNER_COLUMN_NAMES_EXTRA <= names
+
+
+def test_learner_state_is_covered_and_was_invisible_to_legacy_name_enumeration() -> None:
+    """실 메타데이터 회귀 핀 — `learner_state`가 계획에 있고, 종전 3종 열거로는 안 보였다.
+
+    두 단언이 함께 있어야 의미가 있다: 앞은 *지금 지워지는가*, 뒤는 *왜 종전 가드가 초록이었는가*.
+    뒤 단언이 깨지면(= learner_id 외 3종 중 하나가 생기면) 이 사각의 서술이 낡은 것이므로
+    위 주석 블록과 함께 갱신하라.
+    """
+    import whymath_backend.db.models  # noqa: F401
+    from whymath_backend.db.base import Base
+
+    planned = {model.__tablename__ for model, _ in _ERASURE_PLAN}
+    assert "learner_state" in planned, "learner_state가 _ERASURE_PLAN에서 빠졌다(파기 누락 재발)."
+
+    table = Base.metadata.tables["learner_state"]
+    legacy_names = frozenset({"user_id", "student_id", "target_user_id"})
+    assert not (
+        {c.name for c in table.columns} & legacy_names
+    ), "learner_state가 종전 3종 열거에 걸리는 컬럼을 갖게 됐다 — 사각 서술이 낡았다."
+    # FK 축이 이 테이블을 보는 것이 이번 전환의 집행 지점이다.
+    assert "learner_state" in _tables_with_owner_fk(Base.metadata)

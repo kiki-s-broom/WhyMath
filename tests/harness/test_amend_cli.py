@@ -995,6 +995,9 @@ class TestFrozenAxesStayFrozen:
                     "새 제목",
                     "--path",
                     "docs/b/**",
+                    # HARN-81 — 이 픽스처는 범위를 통째로 스왑한다(잃기+얻기 동시 = 사고 형태).
+                    # 여기서는 의도된 스왑이므로 확인 플래그를 붙인다.
+                    "--drop-scope",
                     "--artifact",
                     "PR #3",
                     "--reason",
@@ -1027,6 +1030,7 @@ class TestFrozenAxesStayFrozen:
                     "새 제목",
                     "--path",
                     "docs/b/**",
+                    "--drop-scope",  # HARN-81 — 범위 스왑이므로 확인 플래그 (위 주석 참조)
                     "--reason",
                     "3축 정정",
                 ]
@@ -1278,3 +1282,153 @@ class TestPathsCorrectionEndsScopeDrift:
         capsys.readouterr()
         assert self._invoke_hook(monkeypatch, target) == 0
         assert "scope_drift" in capsys.readouterr().err  # 좁힌 뒤엔 범위 밖
+
+
+class TestPathScopeShrinkageIsNotSilent:
+    """HARN-81 — `--path` 교체가 **기존 경로를 조용히 버리는** 것을 막는다.
+
+    사고 경위
+    --------
+    2026-09-07 SEC-32 구현 중 실제로 났다. `--path`는 append가 아니라 교체인데(HARN-57 ④ —
+    좁히기가 목적이라 append로는 좁힐 방법이 없다) 그 교체가 **무증상**이라, 신규 6건만
+    넘겼더니 원 7건이 소실됐다. 구현자가 우연히 알아채 13건을 다시 명시해 복원했다 —
+    설계가 아니라 운이었다.
+
+    왜 미탐이 오탐보다 나쁜가
+    ----------------------
+    `paths`는 병렬 세션 겹침 탐지의 **유일한** 입력이다. 넓어지면 오탐(HARN-59 축)인데
+    오탐은 시끄러워서 자가교정된다. 좁아지면 **미탐**이고, 미탐은 경보가 아예 안 뜨므로
+    사람이 알아챌 기회 자체가 없다 — 두 세션이 같은 파일을 모르고 병렬 구현하는 형태
+    (2026-07-27 OPS-07 735줄 폐기 · 2026-09-06 MP-04 전량 폐기)의 재발 경로다.
+
+    왜 '모든 축소 거부'가 아닌가 (설계 근거)
+    ------------------------------------
+    좁히기는 이 축의 목적이고 실사용의 절반이다. 절반에서 매번 요구되는 확인 플래그는
+    사람이 **항상** 붙이게 되고, 항상 붙이는 플래그는 가드가 아니다 — 이 저장소가 fail-open
+    경고에서 겪은 습관화가 fail-closed 쪽으로 뒤집힌 형태일 뿐이다. 그래서 **사고의 형태**만
+    거부한다: 잃은 파일과 얻은 파일이 *동시에* 있는 경우(= 덧붙이려다 교체됨). 순수 축소는
+    통과시키되 제거분을 열거한다.
+
+    변별력
+    -----
+    이 클래스의 네 축이 서로 **다른 화면**을 내는지가 핵심이다. 전부 같은 화면이면 검증이
+    아니라 위장이다(CLAUDE.md "변별력 없는 검증 스텝 금지").
+      · 사고 형태(잃기+얻기) → 거부(exit 1)
+      · 플래그를 붙이면      → 통과 + 제거분 열거
+      · 순수 축소            → 통과 + 제거분 열거 (조용하지 않다)
+      · 순수 확장            → 통과 + 제거분 **없음** (대조군 — 여기선 조용하다)
+    """
+
+    def _seed(self, task_id: str, *paths: str) -> None:
+        args: list[str] = []
+        for p in paths:
+            args += ["--path", p]
+        assert _add(task_id, *args) == 0
+
+    def test_drop_and_add_together_is_refused(self, seeded_repo: Path, capsys):
+        """SEC-32 형태 — 옛 범위를 잃으면서 새 범위를 얻으면 거부한다."""
+        self._seed("T1-80-shrink-accident", "src/backend/api/**")
+        capsys.readouterr()
+        rc = cli.main(
+            [
+                "amend",
+                "T1-80-shrink-accident",
+                "--path",
+                "scripts/harness/**",
+                "--reason",
+                "하네스도 건드린다 — 덧붙이려던 것",
+            ]
+        )
+        assert rc == 1, "덧붙이려다 교체된 형태가 통과하면 원 범위가 조용히 사라진다"
+        err = capsys.readouterr().err
+        assert "제거되는 패턴" in err, err
+        assert "src/backend/api/**" in err, "무엇이 사라지는지 열거하지 않으면 고지가 아니다"
+        assert "--drop-scope" in err, "탈출구를 알려주지 않으면 사람이 대장을 손편집한다"
+        # 거부는 **대장을 바꾸지 않는다** — 반만 적용되면 그게 제일 나쁘다
+        assert _task(seeded_repo, "T1-80-shrink-accident").paths == ["src/backend/api/**"]
+
+    def test_drop_scope_flag_allows_it_and_still_enumerates(self, seeded_repo: Path, capsys):
+        """확인 플래그를 붙이면 통과하되 제거분이 **기록에 남는다**(탈출구는 흔적을 남긴다)."""
+        self._seed("T1-81-shrink-confirmed", "src/backend/api/**")
+        capsys.readouterr()
+        rc = cli.main(
+            [
+                "amend",
+                "T1-81-shrink-confirmed",
+                "--path",
+                "scripts/harness/**",
+                "--drop-scope",
+                "--reason",
+                "범위를 하네스로 완전히 옮긴다",
+            ]
+        )
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "paths 제거 1건" in out and "src/backend/api/**" in out, out
+        task = _task(seeded_repo, "T1-81-shrink-confirmed")
+        assert task.paths == ["scripts/harness/**"]
+        assert "paths 제거" in task.notes, "탈출구가 흔적을 안 남기면 게이트를 끈 것과 같다"
+
+    def test_pure_narrowing_passes_but_is_not_silent(self, seeded_repo: Path, capsys):
+        """순수 축소는 정당하므로 통과 — 다만 무엇이 빠졌는지는 말한다."""
+        self._seed("T1-82-shrink-pure", "src/backend/api/**", "scripts/harness/**")
+        capsys.readouterr()
+        rc = cli.main(
+            [
+                "amend",
+                "T1-82-shrink-pure",
+                "--path",
+                "src/backend/api/**",
+                "--reason",
+                "실제 범위는 API뿐",
+            ]
+        )
+        assert rc == 0, "좁히기가 이 축의 목적이다 — 거부하면 사람이 손편집으로 도망간다"
+        out = capsys.readouterr().out
+        assert "paths 제거 1건" in out and "scripts/harness/**" in out, out
+
+    def test_pure_widening_stays_quiet_about_removal(self, seeded_repo: Path, capsys):
+        """대조군 — 확장에는 제거 고지가 **없어야** 한다.
+
+        이 단언이 이 클래스의 변별력이다. 제거 줄이 모든 경우에 나오면 그 줄은 신호가 아니라
+        배경 소음이고, 배경 소음은 사람이 읽지 않는다.
+        """
+        self._seed("T1-83-widen", "src/backend/api/**")
+        capsys.readouterr()
+        rc = cli.main(
+            [
+                "amend",
+                "T1-83-widen",
+                "--path",
+                "src/backend/api/**",
+                "--path",
+                "scripts/harness/**",
+                "--reason",
+                "하네스까지 범위 확장",
+            ]
+        )
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "paths 제거" not in out, out
+        assert "paths 제거" not in _task(seeded_repo, "T1-83-widen").notes
+
+    def test_removal_is_recorded_in_the_event_ledger(self, seeded_repo: Path):
+        """이벤트에도 남는다 — notes만 보면 대장 도구가 축소를 영영 못 본다."""
+        self._seed("T1-84-shrink-event", "src/backend/api/**", "scripts/harness/**")
+        assert (
+            cli.main(
+                [
+                    "amend",
+                    "T1-84-shrink-event",
+                    "--path",
+                    "src/backend/api/**",
+                    "--reason",
+                    "범위 축소",
+                ]
+            )
+            == 0
+        )
+        events = _amend_events(seeded_repo, "T1-84-shrink-event")
+        assert events, "amend 이벤트가 없다"
+        blob = json.dumps(events, ensure_ascii=False)
+        assert "scripts/harness/**" in blob, "제거된 경로가 이벤트에 없다"

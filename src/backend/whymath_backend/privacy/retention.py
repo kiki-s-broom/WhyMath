@@ -17,6 +17,18 @@
 정직 스코프: NULL 타임스탬프(미시작 세션 등)는 `ts < cutoff`가 NULL이라 *파기 대상 아님*
 (보수적). 테이블별 차등 보존기한·졸업일 기반 정밀 보존은 후속(현 균일 `pii_retention_years`).
 
+SEC-33 — `ProblemAttempt`만 예외: 클라가 `started_at`을 신고하지 않으면(NULL) 위 정직 스코프가
+그 행을 *영원히* 파기 대상에서 빼는 회피 통로가 된다(started_at은 클라 재량 — 신고 자체를
+생략하면 미래값 검증(`api/me.py::submit_attempt`의 422 가드)조차 우회한다). 그래서 이 테이블만
+`COALESCE(started_at, ingested_at)`을 파기 기준으로 쓴다 — `ingested_at`은 서버가 수신 시각
+그대로 채우는 값이라 클라가 조작할 수 없다(⑥: `server_default`로 세 번째 writer의 누락까지
+방어 — `db/models/activity.py` 참조). 미신고 행은 *발생*이 아니라 *수신* 기준으로 파기되므로
+보수성이 살짝 낮아지지만(오프라인 sync로 발생이 훨씬 과거인 행이 조금 늦게 파기될 뿐 — 방향은
+항상 "덜 지운다"), 무기한 잔존보다 안전하다. `started_at`·`ingested_at`이 둘 다 NULL인 행
+(EOS-48 도입 이전 레거시)은 여전히 파기 대상이 아니다 — 그 소급 처리는 게이트
+`G-attempt-retention-purge-backfill-decision`(법령 유래 판단·Kiki 소유)의 몫이며 이 모듈은
+그 행에 손대지 않는다(신규 회피 통로만 닫는다).
+
 감사 2테이블 의도적 제외 — 무기한 보존의 *명문화된* 침묵 (ADMIN-03):
   `deletion_audit`(`DeletionAudit`)·`privacy_audit`(`PrivacyAudit`, `db/models/audit.py`)는
   이 `_RETENTION_PLAN`에도, 삭제권 `_ERASURE_PLAN`에도 **의도적으로 넣지 않는다**. 두 테이블은
@@ -39,7 +51,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, delete
+from sqlalchemy import ColumnElement, CursorResult, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.config import get_settings
@@ -96,6 +108,19 @@ _RETENTION_PLAN: tuple[tuple[type[Base], str], ...] = (
 )
 
 
+def _effective_timestamp(model: type[Base], column: str) -> ColumnElement[Any]:
+    """파기 기준 표현식 — 기본은 `getattr(model, column)` 그대로, `ProblemAttempt`만 예외(SEC-33 ②).
+
+    `started_at`은 클라 신고값이라 미신고(NULL)가 파기를 영원히 회피하는 통로다(모듈 docstring
+    「SEC-33」 참조). `ingested_at`(서버 수신 시각 — server_default로 보장·⑥)으로 폴백해
+    그 통로를 닫는다. 다른 모든 테이블은 NOT NULL이거나 서버 통제 컬럼이라 이 폴백이 불필요하다.
+    """
+    ts_column = getattr(model, column)
+    if model is ProblemAttempt:
+        return cast("ColumnElement[Any]", func.coalesce(ts_column, ProblemAttempt.ingested_at))
+    return cast("ColumnElement[Any]", ts_column)
+
+
 def retention_cutoff(as_of: date, *, years: int) -> date:
     """보존 만료 기준일 = `as_of − years`년(순수·윤년 안전·2/29→2/28 클램프).
 
@@ -117,13 +142,16 @@ async def purge_expired_records(
     """학습 활동 PII 시계열에서 보존기한 경과분을 파기 — 테이블별 삭제 행수 반환(commit은 호출자).
 
     `years` 미지정 시 `Settings.pii_retention_years`(기본 3). `cutoff = as_of − years`년 이전
-    타임스탬프(`_RETENTION_PLAN`의 각 컬럼) 행을 child→parent 순서로 삭제한다(FK 안전·CASCADE
-    동반). NULL 타임스탬프는 비교가 NULL이라 미파기(보수적). 순수 ORM·원시 SQL 0.
+    타임스탬프(`_RETENTION_PLAN`의 각 컬럼 — `ProblemAttempt`는 `_effective_timestamp`가
+    COALESCE로 대체·SEC-33 ②) 행을 child→parent 순서로 삭제한다(FK 안전·CASCADE 동반). NULL
+    타임스탬프는 비교가 NULL이라 미파기(보수적) — `ProblemAttempt`도 `started_at`·`ingested_at`
+    이 둘 다 NULL인 레거시 행에는 여전히 적용된다. 순수 ORM·원시 SQL 0.
     """
     resolved_years = years if years is not None else get_settings().pii_retention_years
     cutoff = retention_cutoff(as_of, years=resolved_years)
     counts: dict[str, int] = {}
     for model, column in _RETENTION_PLAN:
-        result = await session.execute(delete(model).where(getattr(model, column) < cutoff))
+        ts_expr = _effective_timestamp(model, column)
+        result = await session.execute(delete(model).where(ts_expr < cutoff))
         counts[model.__tablename__] = cast("CursorResult[Any]", result).rowcount or 0
     return counts

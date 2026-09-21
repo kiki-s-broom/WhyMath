@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-46-router-only-contract-enforcement
+title: "D1 라우터 단일 경유의 기계 집행 부재 — 프로바이더 직접 임포트 13건 이상의 정오 판정과 가드 배선"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - ARCH-45-ai-gateway-adr
+requires_gates: []
+acceptance:
+  - "①전수 실측·정오 판정 — l3/providers/* 를 직접 임포트하는 모듈을 providers/ 밖에서 전건 열거하고(개수와 검색 방법을 함께 기록 — 절단 출력로 부재 판정 금지), 각 모듈을 3분류한다: (a)라우터 결정을 받아 실행하는 정상 경유 (b)라우터를 거치지 않는 위반 (c)진단·측정·배틀 전용 의도적 예외(ops/·harness/). 분류 근거를 모듈당 1줄로 남기고, 소스를 읽어 추론한 것은 '읽어서 그렇게 보인다'로 범위를 밝혀 적는다. ARCH-45 시점 실측은 13건 이상이었고 정오 판정은 하지 않았다.\n②위반 처분 — ①의 (b)가 0건이 아니면 이 태스크에서 수정하거나 해소 태스크로 분리 등재한다. 0건이면 그 사실을 근거와 함께 기록한다.\n③집행 배선 — D1(모든 LLM 호출은 라우터 경유·직접 호출 금지)을 기계가 판정하게 한다. import-linter forbidden 계약 또는 동등한 AST 기반 전수 가드 중 하나를 배선하며, 금지 문자열 열거가 아니라 구성된 결과(실제 임포트 그래프·인자 목록)를 검사한다. baseline 면제가 필요하면 'EOS Core 에 Math Adapter 금지(baseline 있음)' 선례 형태로 만료 또는 재확인 지점을 동반한다 — 만료 없는 그랜드파더 금지.\n④실패 주입 검증 — 가드가 막으려는 상태를 실제로 주입해 RED를 확인한 뒤에만 보호로 친다. 정상 입력에서 초록인 것은 보호의 증거가 아니다. 주입 하네스는 (i)주입이 실제 적용됐는지(mutated != original·치환 count) (ii)원복이 바이트 동일한지를 테스트 실행 전후에 각각 단언한다. 절을 여러 개 둔 경우 절마다 그 절이 없으면 통과해 버리는 반례를 픽스처에 넣는다.\n⑤CI 배선 실재 확인 — ③의 검사가 CI 잡에서 실제로 실행되는지 확인한다. 저장소에 존재함과 돌아감은 다르다. 해당 실행에서 skipped 가 아니라 도달했음을 잡 로그로 확인하고 그 근거를 남긴다.\n⑥ADR 갱신 — docs/architecture/adr/ADR-005-ai-gateway-single-router-seam.md 의 집행 지점 표에서 D1 행을 판정 결과로 갱신하고 열린 질문 1번을 해소 또는 갱신한다."
+artifacts:
+  - "PR #1177 (https://github.com/kiki-s-broom/WhyMath/pull/1177) · 커밋 fb98e1a5 · CI run 35063856319 전 잡 success(야간 2건만 skipped) · acceptance⑤ 근거: backend 잡 스텝25 '게이트 — 프로바이더 좌석 계약' conclusion=success(06:48:37~39), 같은 잡 skipped 스텝 0건 · 산출물: scripts/ops/check_provider_seat_contract.py, tests/infra/test_provider_seat_contract.py(18 passed), 뮤테이션 11종 전건 RED, ADR-005 D1행 갱신 · 판정: 좌석 18건 = 정상 14 + 위반 0 + 의도적 예외 4"
+paths:
+  - src/backend/pyproject.toml
+  - "tests/infra/**"
+  - "docs/architecture/adr/**"
+session: null
+notes: "출처: ARCH-45(PR #1166) ADR-005 집행 지점 표·열린 질문 1번. 실측 근거 = import-linter 계약 3건(7계층 단방향 1 + EOS Core 에 Math Adapter 금지 2) 중 프로바이더 소비자를 제한하는 계약 0건. CLAUDE.md 절대 원칙 중 기계 집행이 없는 항목이라는 점이 등재 사유다. 주의: 정오 판정 없이 계약부터 걸면 상시 실패하는 fail-open 보호를 하나 더 만드는 것이므로 acceptance 1번이 3번의 선행이다."
+updated: 2026-09-16

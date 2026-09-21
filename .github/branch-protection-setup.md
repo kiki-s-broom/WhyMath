@@ -34,13 +34,22 @@
 
 ## 진입 경로
 
-1. https://github.com/doldori7/WhyMath 접속
+1. https://github.com/kiki-s-broom/WhyMath 접속
 2. 우상단 **Settings** 탭 → 좌측 사이드바 **Branches**
 3. *Branch protection rules* 섹션 → **Add branch protection rule** 또는 **Add rule** 클릭
 
 ---
 
 ## 적용할 설정 (체크 박스 그대로 따라가기)
+
+> **[2026-09-14 — 이 섹션은 클래식(legacy) 브랜치 보호 규칙의 역사적 설정 기록이다]** 이
+> 섹션이 기술하는 클래식 규칙은 `G-strict-policy-and-classic-cleanup` 결정으로 **삭제
+> 대상**이 됐다(§"strict 해제 확정 + 클래식 브랜치 보호 삭제" 참조) — 룰셋(Rulesets)이
+> 이미 이 내용 전체(필수체크 16건·승인 정책·linear history 등)를 포함해 더 넓게 담당한다.
+> 지우지 않고 남겨 두는 이유는 클래식이 왜 존재했고 무엇을 담당했는지의 기록이 필요하기
+> 때문이다 — 아래 "Require branches to be up to date before merging" 체크는 특히 룰셋의
+> `strict_required_status_checks_policy = false` 선언과 **의도적으로 어긋나 있던** 축이며,
+> 클래식 삭제로 그 어긋남이 해소된다.
 
 ### Branch name pattern
 ```
@@ -54,7 +63,10 @@ main
   - [x] Require review from Code Owners *(CODEOWNERS 파일 활용)*
 
 - [x] **Require status checks to pass before merging**
-  - [x] Require branches to be up to date before merging
+  - [ ] ~~Require branches to be up to date before merging~~ — **끈다**
+    (2026-09-14 Kiki 결정 · 게이트 `G-strict-policy-and-classic-cleanup`).
+    merge queue가 큐 브랜치를 최신 `main` 위에 얹어 재검증하므로 이 요구는 구조적으로
+    중복이고, 실제 마찰이 관측됐다 — 아래 「## 머지 경합」 절 참조.
   - **Status checks that are required** — 아래 블록의 이름을 *그대로* 검색해 전부 추가:
 
 <!-- REQUIRED_CHECKS_BEGIN — 이 블록은 tests/infra/test_required_checks_doc.py가 ci.yml과 대조해 동결한다. 잡 추가·개명 시 여기도 갱신해야 CI가 통과한다. -->
@@ -100,7 +112,7 @@ main
 
 <!-- RULESET_POLICY_BEGIN — scripts/harness/ruleset_drift.py가 라이브 JSON과 대조한다. tests/infra/test_ruleset_drift.py가 이 블록의 실재를 동결한다. -->
 - `required_check_integration_id` = `15368`
-- `strict_required_status_checks_policy` = `true`
+- `strict_required_status_checks_policy` = `false`
 - `required_approving_review_count` = `1`
 - `dismiss_stale_reviews_on_push` = `true`
 - `require_code_owner_review` = `true`
@@ -108,10 +120,56 @@ main
 - `required_linear_history` = `true`
 - `deletion` = `true`
 - `non_fast_forward` = `true`
+- `merge_queue` = `true`
+- `ruleset_id` = `16623542`
+- `ruleset_enforcement` = `active`
+- `ruleset_bypass_actor_count` = `0`
 <!-- RULESET_POLICY_END -->
+
+**`strict_required_status_checks_policy`가 `false`인 이유** (2026-09-14 Kiki 결정 · A안):
+merge queue가 켜져 있으면 큐가 PR을 최신 `main` 위에 얹어 **전건 재검증**한 뒤에만
+머지하므로, 개별 PR에 up-to-date를 따로 요구하는 것은 같은 보장을 두 번 사는 것이다.
+그리고 그 중복은 공짜가 아니다 — 2026-09-10에 PR #1063·#1092·#1094가 전부 `behind`로
+막혀 `main` 수동 병합을 3회 반복했고 그때마다 CI가 처음부터 다시 돌았다(실측).
+**보호를 낮춘 것이 아니라 집행 지점을 큐로 옮긴 것이다**: 낡은 base에서 통과한 CI로
+머지되는 일은 큐가 막는다. 이 선언이 `true`로 되돌아가면 그 마찰도 함께 돌아온다.
 
 `required_check_integration_id`는 GitHub Actions 앱의 id다 — required check 항목을 이 앱으로
 pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고해도 충족되지 않는다.
+
+#### 뒤 3줄은 **다른 엔드포인트**에서 온다 (HARN-102 · 2026-09-15 편입)
+
+`ruleset_id`·`ruleset_enforcement`·`ruleset_bypass_actor_count`는 위 축들과 달리
+`/rules/branches/main` 응답에 **없다**. 그래서 판정기는 입력을 둘 받는다.
+
+| 선언 | 정본 엔드포인트 | 무엇을 묻는가 |
+|---|---|---|
+| 체크 목록 · 정책 파라미터 · 규칙 타입 | `GET /repos/{owner}/{repo}/rules/branches/main` | main에 **지금 적용되는** 규칙은 무엇인가 |
+| `ruleset_enforcement` · `ruleset_bypass_actor_count` | `GET /repos/{owner}/{repo}/rulesets/16623542` | 그 룰셋 **자체**는 어떻게 정의돼 있는가 |
+
+**왜 둘을 합치지 않는가**: 앞 엔드포인트는 여러 룰셋이 겹친 *적용 결과*라 체크 목록의 정본으로
+정확하고, 뒤 엔드포인트는 한 룰셋의 *정의*라 "누가 이 규칙을 건너뛸 수 있는가"를 담는다. 질문이
+다르므로 한쪽으로 다른 쪽을 대신할 수 없다.
+
+**`ruleset_bypass_actor_count` = `0`의 뜻**: 우회 주체가 0명 = 관리자에게도 규칙이 그대로
+적용된다 = 삭제된 클래식 브랜치 보호의 `enforce_admins: true`와 등가다. 여기에 한 건이라도
+들어오면 그 주체는 required check 16건·리뷰·linear history를 **전부 건너뛰고** `main`에 쓸 수
+있다. 2026-09-14 실측이 `[]`임을 확인했지만 그것은 *한 시점의 스냅샷*이었다 — 판정기가 읽지
+않는 축은 나중에 채워져도 조용하다. **지금 안전한 것과 그 상태가 감시되는 것은 다르다**는 것이
+이 선언을 만든 이유다.
+
+**`ruleset_id`는 대조 축이 아니라 신원 확인용**이다(`required_check_integration_id`와 같은
+취급). 라이브 값이 다르면 "정책이 어긋났다"가 아니라 "엉뚱한 룰셋의 덤프를 줬다"이므로 판정기가
+위반(exit 1)이 아니라 **측정 실패(exit 2)**로 올린다.
+
+> **id 하드코딩의 취약성과 그 처리**: 룰셋을 지웠다 다시 만들면 id가 바뀐다. 그때 수집 명령은
+> `404`를 받고, gh는 오류 본문을 그대로 파일에 쓰므로 판정기가 `id`가 없는 객체를 보고 exit 2를
+> 낸다 — **틀린 답이 아니라 침묵 없는 실패**다. `/rulesets` 목록에서 이름으로 찾는 방식도
+> 검토했으나, 그러려면 `cmd /c` 안에서 `--jq`를 중첩 따옴표로 감싸야 해 런북 자체가 깨지기 쉽고,
+> 얻는 것은 "id가 바뀌어도 조용히 동작"뿐이다. 이 저장소에서 더 위험한 것은 *조용한 오답*이므로
+> 하드코딩 + 시끄러운 실패를 택했다. id가 바뀌면 고칠 곳은 **세 곳**이다:
+> 위 `ruleset_id` 선언 · 아래 런북 블록 · `scripts/harness/ruleset_drift.py`의 `RULESET_ID`
+> (셋의 일치는 `tests/infra/test_ruleset_drift.py`가 기계로 동결한다).
 
 ### 알면서 유예한 축 (만료 필수)
 
@@ -147,25 +205,48 @@ Test-Path scripts\harness\ruleset_drift.py
 ```powershell
 # Windows PowerShell — 위 자가검증이 True일 때만
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-gh api repos/doldori7/WhyMath/rules/branches/main | Out-File -Encoding utf8 ruleset.json
-python scripts\harness\ruleset_drift.py ruleset.json --record
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rules/branches/main > ruleset.json"
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json"
+python scripts\harness\ruleset_drift.py ruleset.json --ruleset-full ruleset-full.json --record
 echo "EXIT=$LASTEXITCODE"
 ```
 
-> **`>` 대신 `Out-File -Encoding utf8`을 쓰는 이유**: Windows PowerShell 5.1의 `>`는 네이티브
-> 명령 출력을 **UTF-16LE**로 씁니다. 그러면 판정기가 읽다가 `UnicodeDecodeError`로 죽어
-> exit 0/1/2 어느 것도 나오지 않습니다(2026-09-05 실측). 읽기측도 UTF-16·BOM을 관용하도록
-> 고쳤지만(`read_json_text`), 산출측에서 먼저 맞추는 것이 정본입니다 —
-> CLAUDE.md "외부 도구가 읽는 파일은 그 도구의 읽기 인코딩에 맞춘다".
+> **수집이 두 줄인 이유**: 두 번째 줄이 `bypass_actors`(= 클래식 `enforce_admins`의 대응 축)와
+> `enforcement`를 가져옵니다. 첫 줄의 응답에는 그 필드가 없습니다. 두 번째 줄을 빼면 판정기가
+> **exit 2(측정 실패)**를 냅니다 — 빠진 입력을 "위반 0"으로 접지 않습니다. 자세한 근거는 위
+> 「뒤 3줄은 다른 엔드포인트에서 온다」 절.
+
+> **`cmd /c`로 감싸는 이유 — gh 출력을 PowerShell에 통과시키지 않는다**: PS 5.1은 네이티브
+> 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본 **cp949**)으로 디코딩한 뒤
+> 다시 인코딩합니다. 필수 체크 이름의 `—`·`·`는 UTF-8 3바이트인데 cp949는 2바이트 조합이라
+> 경계가 어긋나고, 선행바이트가 뒤따르는 `"`(0x22)를 트레일로 삼켜 **JSON 구조 문자가
+> 소실됩니다.** `cmd /c`는 바이트를 그대로 파일로 보내 이 경유 자체를 없앱니다.
+>
+> **실측(2026-09-14)**: `| Out-File -Encoding utf8`로 받은 파일이 `...가드","app_id"` →
+> `...媛??,"app_id"`가 되어 2,659→2,618자로 41자 유실됐고, 판정기가
+> `Expecting ',' delimiter: line 1 column 1828`로 **exit 2**를 냈습니다. 같은 회차에
+> `cmd /c`로 다시 받자 즉시 `EXIT=0`.
+>
+> **이전 처방이 왜 부족했나**: `Out-File -Encoding utf8`은 2026-09-05에 `>`의 UTF-16LE를
+> 피하려고 도입됐고 그 축에서는 옳았습니다. 다만 **디코딩 경유는 그대로 남겨** 이번 축을
+> 못 막았습니다 — *인코딩을 명시해도 이미 깨진 문자열을 명시한 인코딩으로 쓸 뿐입니다.*
+> 읽기측 관용(`read_json_text`)도 인코딩만 가리므로 이 축에는 무력합니다.
+> (CLAUDE.md HARN-19 — Windows 로케일 디코딩 붕괴의 *산출측* 대응.)
 
 | EXIT | 판정 | 다음 행동 |
 |---|---|---|
 | `0` | 정합 (권고만 있어도 0) | 없음 — 기록 갱신됨 |
 | `1` | **드리프트 위반** | 출력의 "시정 순서"를 위에서부터 따른다 |
-| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재) | 통과가 아니다 — `gh auth status`부터 확인 |
+| `2` | **측정 실패** (빈 응답·권한 부족·필드 부재·**수집 손상**·**룰셋 전문 미수집/불일치**) | 통과가 아니다. `JSON 파싱 불가`면 위 `cmd /c` 형태로 재수집(cp949 유실) · `--ruleset-full 입력이 없다`면 수집 두 번째 줄을 빠뜨린 것 · `다른 룰셋의 덤프다`면 룰셋 id가 바뀐 것(위 「id 하드코딩」 참조) · 그 외는 `gh auth status`부터 확인 |
 
 기록 파일(`.github/ruleset-check-state.json`)은 `--record`가 쓴다. **손편집 금지** — 확인하지
 않고 날짜만 미루면 리마인드가 위장이 된다.
+
+> **첫 2입력 회차는 게이트로 추적한다** (`G-ruleset-bypass-actors-live-watch`). 기록 파일의
+> 마지막 `verdict: ok`는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, **지금은 실제로 측정하지
+> 않은 축까지 통과로 읽힌다.** 손편집으로 고칠 수 없는(그리고 고쳐선 안 되는) 범위 불일치이므로
+> 실행 1회로 닫는다 — 그 회차가 기록을 올바른 범위로 덮어쓴다. 30일 리마인드는 그다음부터
+> 제 역할을 한다.
 
 ---
 
@@ -194,6 +275,10 @@ echo "EXIT=$LASTEXITCODE"
 > **문서와 정합한 항목**(참고): `strict_required_status_checks_policy: true`(= up to date 요구) ·
 > `required_review_thread_resolution: true` · `required_linear_history: true` · deletion·
 > non_fast_forward 보호.
+>
+> *[후속 2026-09-14] `strict_required_status_checks_policy`는 이후 `false`로 정정됐다
+> (Kiki 결정 A안 · merge queue 도입으로 중복). 위 줄은 2026-09-03 시점 실측 기록이므로
+> 그대로 둔다 — 현행 선언은 「정책 파라미터 선언」 블록이 정본이다.*
 >
 > #### ✅ 시정 완료 (같은 날 2026-09-03 · 게이트 `G-required-checks-live-drift-fix`)
 >
@@ -285,6 +370,211 @@ echo "EXIT=$LASTEXITCODE"
 
 ---
 
+## 머지 경합 — merge queue **사용 중** (2026-09-09 전환)
+
+> **현행 사실**: `main` 룰셋에 merge queue가 켜져 있고, `Require branches to be up to date`는
+> **꺼져 있다**(2026-09-14 Kiki 결정 A안 · 게이트 `G-strict-policy-and-classic-cleanup`).
+> 큐가 PR을 최신 `main` 위에 얹어 재검증하므로 up-to-date 요구는 구조적 중복이었고,
+> 실제로 마찰만 남겼다(2026-09-10 PR 3건이 `behind`로 막혀 수동 병합 3회).
+>
+> ⚠️ 이 절은 2026-09-09~09-13 동안 "`strict`를 **유지한 채** 재동기화를 자동화한다"고
+> 적고 있었다. 그 서술은 큐 도입 *직후*의 과도기 사실이었고, 09-10 마찰 실측으로 뒤집혔다.
+> 아래 「대신 하는 것」 절도 같은 전제 위에 쓰였으므로 함께 읽는다.
+>
+> 이 절은 2026-09-07~09-08에 정반대 내용("이 저장소에서는 쓸 수 없다")을 담고 있었다.
+> **그때는 그 판정이 옳았다** — 아래 「전제가 바뀐 이력」이 왜 바뀌었는지를 기록한다.
+
+### 무엇이 달라졌는가 (실측)
+
+| 축 | 2026-09-07 | 2026-09-09 |
+|---|---|---|
+| 소유자 | `doldori7` (`owner.type` = **`User`**, 개인 계정) | `kiki-s-broom` (`owner.type` = **`Organization`**) |
+| `visibility` | `public` | `public` |
+| merge queue | 조직 소유 전용이라 룰셋 항목 **자체가 없음** | 룰셋에 활성 |
+
+merge queue는 **조직(Organization) 소유 저장소 전용**이다 — 공개 저장소는 조직 소유면 무료
+플랜에서도 되고, 비공개는 조직 + Enterprise Cloud가 필요하다. 개인 계정 소유는 공개·비공개
+모두 제공되지 않는다. 이 조건은 변하지 않았고, **저장소가 조건을 넘어갔다.**
+
+### 큐가 실제로 일한다는 근거
+
+라이브 룰셋 덤프가 아니라 **큐가 한 일**로 확인했다(설정 조회보다 강한 증거다):
+
+- PR #1067이 큐 브랜치 `gh-readonly-queue/main/pr-1067-94d1f28a`에서 검증됨
+- `merge_group` 이벤트로 CI 실행 생성 (`ci.yml` run `34318528035`) — 그 전까지 이 이벤트의
+  실행은 **역대 0건**이었다
+- 그 큐 브랜치의 head `a374d2e0`이 그대로 `main`이 됨
+
+**큐에서는 경로 기반 잡 스킵이 걸리지 않는다.** 무거운 잡의 `if`가 전부
+`github.event_name != 'pull_request'` 형태라 `merge_group`에서는 전건 실행된다 — PR
+컨텍스트에서 skip되던 backend·mobile·web·data-pipeline이 큐에서 처음 돌았다. 의도된 동작이다
+(큐의 목적이 최신 base 위 전체 재검증이므로). 야간 전용 잡은 큐에서도 계속 스킵된다.
+
+### 전제가 바뀐 이력 (사고 기록 — 지우지 않는다)
+
+> 2026-09-07 세션이 라이브 룰셋에서 `merge_queue` 규칙이 **없음**을 확인하고 그것을 "아직 안
+> 켰다"로 읽었다. 부재는 *미설정*일 수도 *미제공*일 수도 있는데 앞의 것만 가정했고, 그 상태로
+> Kiki에게 결정을 올려 왕복 1회를 태웠다. **설정 부재는 설정 가능을 함의하지 않는다** — 기능
+> 도입을 제안하기 전에 그 기능이 이 저장소의 *계정 유형·가시성·플랜*에서 제공되는지부터
+> 확인한다. 이 사고가 CLAUDE.md v0.2.18 "설정 부재를 설정 가능으로 단정 금지"의 발생 근거다.
+>
+> **그 규칙은 지금도 유효하다.** 전제가 바뀐 것이지 규칙이 틀린 것이 아니다 — 오히려 이 절이
+> 그 규칙의 실례다: 2026-09-07의 "쓸 수 없다"는 *그 시점 계정 유형에서는* 실측으로 옳았고,
+> 소유자가 바뀌자 사실도 바뀌었다. **판정은 시점에 종속된다.**
+>
+> `ruleset_drift.py`의 규칙 타입 축에서 `merge_queue`를 당시 **의도적으로 뺐던** 이유도
+> 같다 — 충족 불가한 것을 선언하면 위반이 상시 보고돼 판정기 전체가 소음이 된다(CLAUDE.md
+> "상시 실패하는 fail-open 보호"). 그 주석은 "저장소가 조직으로 이관되면 그때 이 튜플에
+> 추가한다"고 조건을 박아 뒀고, **2026-09-09에 그 조건이 충족돼 편입했다**(HARN-98).
+> 지금은 반대 방향이 위험하다: 큐가 머지 경로를 지탱하는데 감시 축에 없으면 누가 큐를 꺼도
+> 판정기가 모른다.
+
+### 대신 하는 것 — 자동 재동기화 (`pr-auto-resync.yml` · HARN-85)
+
+> **⚠️ 이 절의 전제는 2026-09-14에 소멸했다.** 아래 본문은 `strict`가 *켜져 있던* 동안
+> 그 충족을 자동화하려고 쓰인 것이다. `strict`가 꺼진 지금은 `behind`가 더 이상 머지를
+> 막지 않으므로 이 워크플로는 **머지 경로의 필수 요소가 아니다**(돌아도 해롭지 않지만
+> CI를 소모한다). 존치·폐기 판정은 `HARN-101`이 소유한다 — 그 전까지 아래 서술은
+> *동작 설명*으로만 유효하고 *근거*로는 유효하지 않다.
+>
+> 본문이 근거로 든 #931/#935 사례(낡은 base에서 통과한 CI가 머지 후 `main`을 깨는 일)는
+> 사라진 위험이 아니다 — **집행 주체가 바뀌었을 뿐이다**. 이제 merge queue가 큐 브랜치에서
+> 최신 base 위로 전건 재검증하며 같은 일을 막는다.
+
+보호를 낮추는 대신(=`strict` 해제) **충족을 자동화**한다. `Require branches to be up to date`는
+그대로 유지된다 — 그 게이트는 실제로 일하고 있다(#931이 `ReviewStatus`에 `quarantined`를
+추가하자 #935의 단언이 red가 됐다. 동기화하지 않았으면 머지 후 `main`에서 터졌다).
+
+예약 워크플로우가 주기적으로 열린 PR을 훑어, **auto-merge가 켜져 있고 `behind`인 것만**
+`PUT /repos/{owner}/{repo}/pulls/{n}/update-branch`로 최신화한다. 사람이 누르던 "Update branch"를
+기계가 누르는 것이다.
+
+**한계(명시)** — 큐가 아니다:
+- **직렬화하지 않는다.** 동시에 여러 PR이 auto-merge 대기 중이면 모두 같은 `main` 위로
+  최신화되고, 그중 하나가 먼저 머지되면 나머지는 다시 `behind`가 된다(다음 주기에 또 최신화).
+  PR 동시 대기 수가 많을수록 CI 소모가 늘어난다 — 큐의 `Maximum entries to build`에 해당하는
+  절약 장치가 없다.
+- **충돌은 사람 몫이다.** `update-branch`가 409를 내면(내용 충돌) 워크플로우는 건너뛰고
+  로그에 PR 번호와 응답 본문을 남긴다. 조용히 넘기지 않는다.
+- **auto-merge를 켜지 않은 PR은 건드리지 않는다.** 의도적이다 — 아직 리뷰 중인 PR의 브랜치를
+  임의로 전진시키면 리뷰어가 보던 diff가 바뀐다.
+
+**토큰 — 이것이 없으면 워크플로는 멈춘다(fail-closed)**: `GITHUB_TOKEN`이 만든 push는
+workflow를 재발화시키지 않는다(GitHub 문서화 제약). 그 토큰으로 `update-branch`를 하면
+브랜치는 최신화되지만 **새 head에 required check가 하나도 보고되지 않아** strict 하에서 그
+PR은 "체크 대기"로 **영구히** 막힌다 — `behind`는 사람이 Update branch를 눌러 풀 수 있지만
+(사람 행위는 CI를 재발화시킨다) 체크 없는 head는 그 탈출구마저 없앤다. **즉 폴백은 아무것도
+안 하느니 나쁘다**: 성공을 보고하면서 PR을 좌초시킨다.
+
+그래서 폴백으로 진행하지 않고 **쓰기 전에 멈춘다**. 저장소 시크릿
+`PR_AUTO_RESYNC_TOKEN`(fine-grained PAT · `Contents: Read and write` +
+`Pull requests: Read and write`)이 없으면 스크립트가 `쓰기 자격 없음`을 내고 exit 1 —
+게이트 `G-pr-auto-resync-token`이 그 발급을 추적한다.
+
+> 이 결정은 제약의 성립 여부와 **무관하게** 옳다. 제약이 실재하지 않는다면 비용은 "PAT를
+> 불필요하게 요구했다" 1회이고, 실재한다면 폴백의 비용은 "좌초된 PR"이다 — 비대칭이 크므로
+> 측정을 기다리지 않고 안전한 쪽을 택한다. (`HARN-85` ②의 실측은 PAT 착지 후에도 유효하다:
+> 폴백 경로가 실제로 어떻게 실패하는지는 여전히 모르는 채로 남는다.)
+
+**수동 확인**: Actions 탭 → `pr-auto-resync` → Run workflow → `dry_run` = `1`. 읽기 전용이라
+**PAT 없이도 돈다** — 쓰기 자격 검사를 통과해 후보와 분모(스캔 N건 · BEHIND+auto-merge M건)만
+출력한다. 배선 확인 경로를 일부러 열어 둔 것이다.
+
+### strict 해제 확정 + 클래식 브랜치 보호 삭제 (2026-09-14 · 게이트 `G-strict-policy-and-classic-cleanup`)
+
+**결정 (Kiki · 대화 중 즉석 결정)**: ① `strict_required_status_checks_policy`를 **해제**(문서
+선언을 `true`→`false`로 정정, 위 RULESET_POLICY 블록에 반영됨) ② 클래식 브랜치 보호 규칙을
+**삭제**.
+
+**strict 해제 근거** — 위 `## 머지 경합` 섹션이 이미 현재 사실을 담고 있다: merge queue가
+PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **구조적으로 중복**이다. 게다가
+2026-09-10 이 세션의 PR #1063·#1092·#1094가 전부 `behind`로 막혀 main 수동 병합을 3회
+반복했고, 그때마다 CI가 처음부터 다시 돌았다 — 실제 마찰이 관측됐다. 기존 게이트
+`G-merge-queue-or-strict-relax`(2026-09-01)가 애초에 "merge queue 도입 **또는** strict
+해제"를 택일로 물었고, merge queue 쪽이 이미 채택돼 있으니 strict 해제가 남은 반쪽을
+마무리하는 것이다. **판정 기준(라이브 실측)**: `gh api repos/kiki-s-broom/WhyMath/rules/branches/main`
+조회 결과 룰셋 자체는 이미 `strict_required_status_checks_policy: false`였다(2026-09-14
+세션 내 재확인) — 문서만 뒤처져 있었다. 이 정정으로 `ruleset_drift.py`의 strict 축
+드리프트가 해소된다.
+
+**클래식 삭제 근거** — 클래식 필수체크 13건은 룰셋 16건의 **부분집합**(부족분: `concept-reach`·
+`declared-unwired-audit`·`corpus-authoring`)이고 `required_merge_queue`가 없어, 삭제해도
+큐는 죽지 않고 필수 체크도 줄지 않는다(`G-required-checks-source-of-truth` 선행 확인 실측).
+클래식이 살려 두던 것은 **실질 strict=true**뿐이었고, 그 축을 해제하기로 결정했으므로 클래식은
+더 지킬 것이 없는 낡은 사본이다.
+
+**부수 근거 — 관측 도구가 정본을 보게 된다**: `ruleset_drift.py`·`pr_delivery_audit.py`·`ruleset_pin_plan.py`
+   **3종이 전부 룰셋만 읽는다.** 게다가 `GITHUB_TOKEN`은 클래식 브랜치 보호에 **403**이라 CI
+   안에서는 갈라진 쪽을 볼 수단 자체가 없다 — 집행이 두 벌인 동안 이 도구들의 "정합" 판정은
+   *실제 집행*이 아니라 *한쪽 소스*에 대한 판정이었다. 한 벌로 줄이면 판정이 다시 집행을
+   가리킨다. (CLAUDE.md 「변별력 없는 검증 스텝 금지」의 *소스 축* — 검사는 멀쩡한데 보는
+   곳이 정본이 아니게 된 상태였다.)
+
+#### 집행 결과 — ✅ 완료 (2026-09-14)
+
+> **실측**: `DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection` 실행 후 재조회가
+> `HTTP 404 Branch not protected`. 삭제 **전** 같은 명령은 JSON 2,512자를 돌려줬으므로
+> **변별력 있는 확인**이다(성공/실패 양쪽에서 같은 값을 내는 검사가 아니다). 직후
+> `ruleset_drift.py --record`가 `EXIT=0`(위반 0 · 유예 3건, 전부 만료 전 승인 축) —
+> 클래식이 사라진 뒤에도 **룰셋 단독으로 문서 선언을 충족**함을 기계가 판정했다.
+>
+> **병렬 처리 기록**: 이 게이트는 두 세션이 동시에 처리했다. PR #1157은 세션 토큰이
+> `/branches/main/protection`에 403이라 대행 불가로 판단하고 Kiki 실행 브리핑 + 후속 게이트
+> `G-classic-branch-protection-delete`를 실었다. 그 판단은 *그 세션의 토큰 기준으로는* 옳았고,
+> 실제로는 같은 시각 이 세션에서 **Kiki가 자신의 `gh` 토큰으로 직접 실행**했다. 브리핑은
+> 역할을 다했으므로 위 실행 결과로 대체하고, 후속 게이트는 신설 시점에 이미 충족된
+> 상태였으므로 같은 근거로 clear한다.
+
+#### 삭제 직전 실측 (2026-09-14 · 백업 JSON은 Git 밖이라 여기 남긴다)
+
+| 클래식 축 | 값 | 룰셋의 대응 |
+|---|---|---|
+| `required_status_checks.strict` | `true` | 없음 — **이것이 실질 strict였다**(의도적 제거) |
+| `required_status_checks.contexts` | 13건 | 룰셋 16건이 상위집합 |
+| `required_linear_history` | `true` | `required_linear_history` ✔ |
+| `allow_force_pushes` | `false` | `non_fast_forward` ✔ |
+| `allow_deletions` | `false` | `deletion` ✔ |
+| `required_conversation_resolution` | `true` | `required_review_thread_resolution` ✔ |
+| `required_approving_review_count` | `0` | `0` (동일·유예 중) |
+| `require_code_owner_reviews` | `false` | `false` (동일·유예 중) |
+| `required_signatures` | `false` | 원래 꺼져 있었다 — 소실 없음 |
+| `block_creations` · `lock_branch` · `allow_fork_syncing` | `false` | 전부 꺼져 있었다 |
+| `restrictions` | **키 자체 부재** | 없었으므로 소실 없음 |
+| `enforce_admins` | `true` | `bypass_actors: []` ✔ **(2026-09-14 확인)** — 우회 주체 0명이므로
+  관리자에게도 규칙이 그대로 적용된다. 소실 없음 |
+
+`dismiss_stale_reviews`만 클래식 `true` vs 룰셋 `false`인데, 승인 요구가 0인 상태에서는
+단독으로 의미가 없다(문서의 유예 3건 중 하나가 같은 축을 이미 다룬다).
+
+**12축 대조 결과: 소실 0.** 마지막 미확인 칸(`enforce_admins`)은 게이트
+`G-ruleset-bypass-actors-read`로 분리해 Kiki 머신에서 1회 조회로 닫았다.
+
+> 「실측」 2026-09-14 · `cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json"`
+> → `bypass_actors 건수: 0` · 배열 `[]`.
+> 빈 배열은 룰셋을 우회할 수 있는 주체가 없다는 뜻이고, 이는 클래식의 `enforce_admins: true`와 등가다.
+> 파이프(`| Out-File`)를 쓰지 않은 이유는 아래 "수집 명령" 절 참조 — cp949 왕복으로 JSON이 손상된다.
+
+**다만 지금 안전한 것과 그 상태가 감시되는 것은 다르다.** 위 실측 시점의 `ruleset_drift.py`는
+`/rules/branches/main`만 읽었고 그 응답에는 `bypass_actors`가 없다 — 즉 **선언 축에도 판정기에도
+없어서, 나중에 누군가 `bypass_actors`를 채워도 기계는 조용했다.**
+
+> **판정 — 편입한다 (HARN-102 ③ · 2026-09-15)**. 이 저장소가 겪은 사고 3회(2026-07-26 ×2 ·
+> 2026-09-03)는 전부 *보호가 없는데 화면이 초록인* 형태였다. 감시하지 않는 축을 남기면 같은
+> 형태를 하나 더 만드는 것이고, 하필 그 축은 **다른 모든 축을 한 번에 무력화**한다(우회 주체는
+> required check·리뷰·linear history를 전부 건너뛴다). 그래서 스냅샷을 상시 판정으로 승격시킨다:
+> `ruleset_bypass_actor_count` = `0`·`ruleset_enforcement` = `active`를 선언 축으로 넣고,
+> 판정기가 `/rulesets/16623542`를 **두 번째 입력**으로 받는다(위 「뒤 3줄은 다른 엔드포인트에서
+> 온다」·「재발 탐지 실행법」).
+>
+> 덤으로 `enforcement` 축의 추론도 닫혔다. 위 12축 대조 당시 "`/rules/branches/main`이 규칙
+> 16건을 돌려줬으니 룰셋은 active다"는 **API 의미를 읽은 추론**이었지 필드를 읽은 것이 아니었다.
+> 이제 같은 입력에 그 필드가 실제로 들어 있으므로 직접 대조한다.
+
+**되돌리는 법**: 클래식 규칙은 삭제해도 룰셋이 남으므로 보호 공백이 생기지 않는다. 그래도
+되돌리려면 Settings → Branches에서 `main` 규칙을 다시 만들면 된다(필수 체크는 룰셋 16건을
+정본으로 복사한다 — 낡은 13건을 복원하지 않는다).
+
+
 ## 저장 후 확인
 
 1. 페이지 하단 **Create** 또는 **Save changes** 클릭
@@ -299,7 +589,7 @@ echo "EXIT=$LASTEXITCODE"
 ```bash
 # 어디서든(claude 세션 포함) 실행 가능 — 토큰만 있으면 된다
 curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
-  "https://api.github.com/repos/doldori7/WhyMath/branches/main" |
+  "https://api.github.com/repos/kiki-s-broom/WhyMath/branches/main" |
   python3 -c "import sys,json;p=json.load(sys.stdin)['protection']['required_status_checks'];print(p['enforcement_level'], len(p['checks']), sorted(c['context'] for c in p['checks']))"
 ```
 
@@ -391,7 +681,7 @@ Actions pin" 외에는 아무것도 바꾸지 않음을 코드가 집행하고 �
 # Windows PowerShell (= Phaiakes9)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 Test-Path scripts\harness\ruleset_pin_plan.py
-gh api repos/doldori7/WhyMath/rulesets/16623542 | Out-File -Encoding utf8 ruleset-backup.json
+cmd /c "gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-backup.json"
 Test-Path ruleset-backup.json
 ```
 첫 `Test-Path`가 `False`면 변경안 도구가 이 체크아웃에 없다 — 위 §"판정기 파일이 없다"와 같은
@@ -421,7 +711,7 @@ Test-Path ruleset-rollback.json
 하나라도 없으면 **PUT을 보내지 않는다**)
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-plan.json | Out-Null; "PUT_EXIT=$LASTEXITCODE" } else { "중단 — 변경안 또는 롤백 본문이 없다. ②를 먼저 성공시킨다." }
+if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh api -X PUT repos/kiki-s-broom/WhyMath/rulesets/16623542 --input ruleset-plan.json | Out-Null; "PUT_EXIT=$LASTEXITCODE" } else { "중단 — 변경안 또는 롤백 본문이 없다. ②를 먼저 성공시킨다." }
 ```
 
 **④ 재검증** — 위 §재발 탐지 실행법의 조회+판정 블록을 다시 돌린다. `EXIT=0`이면 완료
@@ -432,7 +722,7 @@ if ((Test-Path ruleset-plan.json) -and (Test-Path ruleset-rollback.json)) { gh a
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $v = if (Test-Path .github\ruleset-check-state.json) { (Get-Content .github\ruleset-check-state.json -Raw | ConvertFrom-Json).verdict } else { 'unknown' }
-if ($v -ne 'ok') { gh api -X PUT repos/doldori7/WhyMath/rulesets/16623542 --input ruleset-rollback.json | Out-Null; "ROLLBACK_EXIT=$LASTEXITCODE" } else { "중단 — 마지막 판정이 정합(ok)이라 되돌릴 이유가 없다. ④가 실패했을 때만 실행한다." }
+if ($v -ne 'ok') { gh api -X PUT repos/kiki-s-broom/WhyMath/rulesets/16623542 --input ruleset-rollback.json | Out-Null; "ROLLBACK_EXIT=$LASTEXITCODE" } else { "중단 — 마지막 판정이 정합(ok)이라 되돌릴 이유가 없다. ④가 실패했을 때만 실행한다." }
 ```
 > **왜 가드가 필요한가 (2026-09-05 실측)**: ③ `PUT_EXIT=0` → ④ **위반 0·권고 0·정합** → 그런데
 > 같은 메시지에 있던 ⑤가 그대로 붙여넣기되어 `ROLLBACK_EXIT=0` — 방금 닫힌 게이트가 다시

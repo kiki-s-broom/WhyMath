@@ -72,16 +72,34 @@ function Write-BackupStatus {
         [string]$Artifact,
         [long]$SizeBytes,
         [bool]$Encrypted,
-        [string]$RecipientsFingerprint
+        [string]$RecipientsFingerprint,
+        # OPS-64: called TWICE per run when -OffsiteDir is set. First (before
+        # the mirror stage runs) with OffsiteOk=$false - a pessimistic default.
+        # Second (after the mirror stage finishes, only reached on success)
+        # with OffsiteOk=$true. If the mirror stage fails, `Fail` exits before
+        # the second call ever happens, so the pessimistic record from the
+        # first call is what a reader sees - a failed mirror can no longer
+        # look identical to "backup succeeded, mirror not requested". See
+        # scripts/backup/backup_status.py evaluate_backup_health.
+        [bool]$OffsiteRequested = $false,
+        [bool]$OffsiteOk = $false,
+        [string]$OffsiteDestination = $null,
+        [Nullable[long]]$OffsiteSizeBytes = $null
     )
     $fp = $null
     if ($RecipientsFingerprint) { $fp = $RecipientsFingerprint }
+    $dest = $null
+    if ($OffsiteDestination) { $dest = $OffsiteDestination }
     $record = [ordered]@{
         last_success_utc        = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss+00:00")
         artifact                = $Artifact
         size_bytes              = $SizeBytes
         encrypted               = $Encrypted
         recipients_fingerprint  = $fp
+        offsite_requested       = $OffsiteRequested
+        offsite_ok              = $OffsiteOk
+        offsite_destination     = $dest
+        offsite_size_bytes      = $OffsiteSizeBytes
     }
     # BOM-free UTF-8. PowerShell 5.1's `Set-Content -Encoding UTF8` emits a BOM,
     # which makes json.loads(..., encoding="utf-8") fail on the reader side with
@@ -263,7 +281,8 @@ if (-not $resolvedRecipients) {
 # turns that silence into exit 1.
 # ---------------------------------------------------------------------------
 $statusPath = Join-Path $BackupDir "backup_status.json"
-Write-BackupStatus -StatusPath $statusPath -Artifact $finalPath -SizeBytes $sizeBytes -Encrypted $encrypted -RecipientsFingerprint $fingerprint
+$offsiteRequested = [bool]$OffsiteDir
+Write-BackupStatus -StatusPath $statusPath -Artifact $finalPath -SizeBytes $sizeBytes -Encrypted $encrypted -RecipientsFingerprint $fingerprint -OffsiteRequested $offsiteRequested -OffsiteDestination $OffsiteDir
 
 # ---------------------------------------------------------------------------
 # Step 8: retention - delete expired backups, ALWAYS keeping the newest.
@@ -343,6 +362,12 @@ if ($OffsiteDir) {
     if ($offsitePlaintext.Count -gt 0) {
         Fail "offsite directory contains $($offsitePlaintext.Count) PLAINTEXT .dump file(s) - readable student PII outside the machine (runbook 4-1). Remove them (and empty the cloud trash) before the next run."
     }
+    # OPS-64: overwrite the Step 7 record now that offsite actually succeeded.
+    # Everything above this line is fatal on failure (Fail exits before reaching
+    # here), so arriving here means the mirror is verified-by-size and the
+    # ledger's pessimistic default from Step 7 is now stale and must be corrected.
+    Write-BackupStatus -StatusPath $statusPath -Artifact $finalPath -SizeBytes $sizeBytes -Encrypted $encrypted -RecipientsFingerprint $fingerprint -OffsiteRequested $true -OffsiteOk $true -OffsiteDestination $OffsiteDir -OffsiteSizeBytes $offsiteSize
+
     Write-Host "[OK] offsite: $offsiteCopy ($offsiteSize bytes), retention deleted $($offsiteExpired.Count) expired copy(ies)"
 }
 

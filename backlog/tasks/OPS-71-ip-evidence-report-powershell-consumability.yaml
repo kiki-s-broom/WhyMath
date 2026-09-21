@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-71-ip-evidence-report-powershell-consumability
+title: "IP 증빙 리포트가 Windows PowerShell에서 파싱 불가 — 대소문자만 다른 신원 키로 ConvertFrom-Json 실패 + 실패 시 FOREIGN=0종 위장"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 런북의 리포트 소비 경로에서 ConvertFrom-Json을 제거한다 — Windows PowerShell 5.1은 JSON 객체 키를 대소문자 무시로 다뤄 'Claude <...>'와 'claude <...>'를 중복 키로 거부한다. 키는 사람 이름·이메일이라 우리가 통제할 수 없으므로 소비자를 바꾼다(python -m json.tool 계열 인프로세스 추출)."
+  - "② 실패가 성공으로 위장되지 않는다 — 파싱 실패 시 FOREIGN=0종처럼 '이상 없음'으로 읽히는 값을 출력하지 않고 즉시 중단 사유를 낸다. 결함 주입(중복 대소문자 키·파일 부재·status=error)으로 RED를 실측한다."
+  - "③ 도구 축: 리포트 JSON이 대소문자 충돌 키를 포함할 수 있음을 도구가 스스로 알리거나(리포트 필드) 소비 안전한 형태를 함께 낸다 — 소비자가 조용히 깨지지 않게."
+  - "④ clear 블록도 같은 경로로 교체 — 게이트 clear가 리포트 파싱에 의존하므로 ①을 적용하지 않으면 G-eos-ip-separation-evidence는 계속 막힌다."
+artifacts:
+  - "PR #1058 (https://github.com/doldori7/WhyMath/pull/1058) · squash 머지 ee2e1918"
+  - "scripts/ops/ip_separation_evidence.py(--summary-from·consumption) · tests/infra/test_ip_separation_evidence.py(73건) · docs/ops/ip_separation_evidence_gate_runbook.md — main 실측 확인(git cat-file -e origin/main:<path> 3건 전건 존재)"
+  - "검증: 뮤테이션 22종 전건 RED(주입 실재·바이트 동일 원복 단언 내장) · tests/infra 1119 passed · ruff·black CI 명령 exit 0 · Actions run 34187081805 success · Codex P1 1건 수용·수정·resolve"
+paths:
+  - scripts/ops/ip_separation_evidence.py
+  - tests/infra/test_ip_separation_evidence.py
+  - docs/ops/ip_separation_evidence_gate_runbook.md
+session: null
+notes: "2026-09-08 라이브 실측에서 발견 — Kiki가 MGMT-05 런북 실행 블록 ①을 돌려 EXIT=0·전수 2621건까지 성공했으나 자가검증 3)의 ConvertFrom-Json이 DuplicateKeysInJsonString으로 거부(coauthor에 'Claude <noreply@anthropic.com>' 702건과 'claude <noreply@anthropic.com>' 1건이 공존). 더 나쁜 것은 그 상태에서 FOREIGN=0종이 출력된 것 — $J가 null인데 .PSObject.Properties.Count가 0을 내 '혼입 없음'처럼 읽혔다(CLAUDE.md '변별력 없는 검증 스텝 금지' 위반). clear 블록은 fail-safe로 멈췄으나 게이트가 통째로 막힌다."
+updated: 2026-09-08

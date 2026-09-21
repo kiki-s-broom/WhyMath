@@ -40,6 +40,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import LegalReviewStatus
 from whymath_backend.schema.textbook_mapping import TextbookMapping as SchemaTextbookMapping
 from whymath_backend.schema.textbook_mapping import TextbookToneProfile as SchemaTextbookToneProfile
@@ -135,7 +136,9 @@ class TextbookMapping(Base):
         data: dict[str, object] = {key: getattr(self, key) for key in scalar_keys}
         data["tone_profile"] = SchemaTextbookToneProfile.model_validate(self.tone_profile)
         data["unit_tree"] = [unit.to_schema() for unit in self.units]
-        return SchemaTextbookMapping.model_validate(data)
+        return SchemaTextbookMapping.model_validate(
+            drop_unset_nulls(data, SchemaTextbookMapping, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -201,7 +204,9 @@ class TextbookUnit(Base):
         schema_fields = set(SchemaTextbookUnit.model_fields)
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys & schema_fields}
-        return SchemaTextbookUnit.model_validate(data)
+        return SchemaTextbookUnit.model_validate(
+            drop_unset_nulls(data, SchemaTextbookUnit, orm_cls=type(self))
+        )
 
 
 __all__ = ["TextbookMapping", "TextbookUnit"]

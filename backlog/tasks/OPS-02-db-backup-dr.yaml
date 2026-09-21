@@ -7,6 +7,7 @@ subject: cross
 layer: infra
 status: done
 priority: 2
+eos_priority: null
 owner: claude
 depends_on: []
 requires_gates: []
@@ -16,10 +17,11 @@ acceptance:
   - "백업 산출물의 미성년 PII·암호화 취급 규칙 준수 (민감정보 분류)"
 artifacts:
   - e05e93f
+  - "OPS-31 (PR #968) + 게이트 G-backup-offsite-move(cleared 2026-09-06/07) — 대체 메커니즘으로 목표 달성"
 paths:
   - "infra/**"
   - "scripts/**"
   - "docs/architecture/**"
 session: null
-notes: "CLAUDE.md 로컬 DB 지도(prod=whymath-pg:5433) 근거·단일 머신 SPOF. 운영 축 상환 #2 (service_ops_mgmt_gap_review_2026-07)."
-updated: 2026-07-26
+notes: "CLAUDE.md 로컬 DB 지도(prod=whymath-pg:5433) 근거·단일 머신 SPOF. 운영 축 상환 #2 (service_ops_mgmt_gap_review_2026-07).\n\n[정정 2026-09-12] PR #847 회수 검토 중 발견: 기존 artifact 'e05e93f'는 저장소에 존재하지 않는 git 객체였다(git cat-file -e 실패) — 실제로는 어떤 코드도 착지하지 않은 채 done 선언된 상태(HARN-23 PR 증적 게이트 착지 2026-08-11 이전 done이라 검사를 통과하지 못했다). PR #847이 원래 구현하려던 NAS 이동 스크립트(move_backup_to_nas.ps1)는 그 이후 별도로 착지한 OPS-31(PR #968 — age 암호화·백업 스케줄 자동화)과 게이트 G-backup-offsite-move의 실제 클리어(Google Drive 컴퓨터 백업 오프사이트 미러, 2026-09-06/07 Kiki 실행·실측)로 완전히 대체됐다 — OPS-02가 의도한 '오프사이트 사본 SPOF 상환'이라는 목표 자체는 이미 달성됐다. PR #847은 close하고 재작업하지 않는다."
+updated: 2026-09-12

@@ -496,7 +496,7 @@ class TestDiagnosisAgreementOffline:
         assert diag.status is MetricStatus.MEASURED
         assert diag.value is not None and 0.0 <= diag.value <= 1.0
         # 표본 메타 = recall 프로브 수(DB 표본 아님·프로브셋 크기·현재 89건)
-        assert m.sample_diagnostic_probes == 95
+        assert m.sample_diagnostic_probes == 98
         assert "오프라인 진단정확도" in diag.note
 
     async def test_offline_metric_invariant_to_user_and_window(self) -> None:
@@ -983,7 +983,7 @@ class TestMetaAndFieldSet:
         assert m.sample_difficulty_attempts == 3  # 유효 b(Problem join) 행 수
         assert m.sample_calibration_pairs == 5  # 유효 보정 쌍 수
         assert m.sample_transfer_probes == 3  # ⑦ 전이 프로브 수(초견·사전 노출·패턴별)
-        assert m.sample_diagnostic_probes == 95  # ② recall 프로브 수(시스템 지표·프로브셋 크기)
+        assert m.sample_diagnostic_probes == 98  # ② recall 프로브 수(시스템 지표·프로브셋 크기)
         assert m.sample_mastery_groups == 2  # ⑨ 자격 (user,concept) 그룹 수(≥2점)
         assert m.sample_misconception_hypotheses == 5  # ⑩ 오개념 가설 총수(비활성 2 포함)
         assert m.sample_resolved_dialogues == 4  # ⑪ resolution 채워진 세션 수(자력해결 3 포함)

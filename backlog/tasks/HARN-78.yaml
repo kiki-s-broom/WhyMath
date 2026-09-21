@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,7 +17,8 @@ acceptance:
   - "③ 변별력 양방향: 닫힌 PR 3건이 pr_closed로 빠지고 열린 PR(#975 등)은 pr_filed로 남는 것 + 상태 조회를 무력화(토큰 제거·API 실패 주입)하면 '상태 미확인' 경로가 실제로 나오는 것을 각각 테스트로 동결. 뮤테이션(state 판독 제거)이 red를 내는지 실측 후 통과 선언"
   - "④ 배선 실재성(정본화와 별항): 새 분류가 SessionStart 브리핑(report.py)과 CI `backlog.py branches` 양쪽에서 실제로 렌더됨을 tests/harness/test_report.py·test_remote_claims.py 확장으로 동결. '저장소에 존재함 ≠ 돌아감'"
   - "⑤ 범위 밖 동결: refs/pull/<N>/merge 휴리스틱 재도입 금지(2026-08-31 실측 폐기 — 열린 14건 중 merge ref 8건·변별력 없음) · 브랜치 삭제·회수(stray-code 소관) · HARN-30(PR 배송 상태·체크런 축)과의 중복 착수 금지 — 그쪽은 PR을, 이쪽은 브랜치의 소유 판정을 본다"
-artifacts: []
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1043"
 paths:
   - scripts/harness/remote_claims.py
   - scripts/harness/report.py

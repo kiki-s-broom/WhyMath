@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-101-pr-auto-resync-disposal-after-strict-off
+title: strict 해제로 전제가 소멸한 pr-auto-resync의 존치·폐기 판정
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates:
+  - G-strict-policy-and-classic-cleanup
+acceptance:
+  - "① 전제 재확인 — strict 해제(2026-09-14 Kiki 결정 A안) 착지 후, pr-auto-resync가 실제로 무엇을 하고 있는지 실측한다. dry_run=1로 1회 실행해 분모(스캔 N건)와 후보(BEHIND+auto-merge M건)를 기록한다. strict가 꺼진 뒤에도 후보가 계속 잡힌다면 그 PR들은 behind이되 머지는 막히지 않는 상태다 — 즉 최신화가 '필요해서'가 아니라 '조건에 걸려서' 일어난다.\n② 존치/폐기 판정 — 세 축으로 가른다. ⓐ 머지 경로 필수성: strict off + merge queue 하에서 behind는 머지를 막지 않으므로 필수 아님(이것은 이미 확정) ⓑ 부수 효용: 큐 진입 전에 미리 최신화해 두면 큐 안 재검증 실패를 앞당겨 발견하는 효과가 있는가 — 있으면 정량으로 적고 없으면 없다고 적는다 ⓒ 비용: 주기 실행이 소모하는 CI 분과 update-branch가 유발하는 워크플로 재발화 수. ⓒ가 ⓑ를 넘으면 폐기.\n③ 폐기로 판정하면 — .github/workflows/pr-auto-resync.yml 제거, PR_AUTO_RESYNC_TOKEN 시크릿 폐기 안내(게이트 G-pr-auto-resync-token은 cleared이므로 되돌리지 않고 후속 노트만 단다), .github/branch-protection-setup.md의 '대신 하는 것' 절을 사고 기록으로 강등한다(지우지 않는다 — 왜 만들었고 왜 없앴는지가 다음 세션의 판단 재료다).\n④ 존치로 판정하면 — 위 문서 절 머리의 '전제 소멸' 경고를 존치 근거로 교체하고, 그 근거가 ②ⓑ의 실측 수치를 인용하게 한다. '일단 두자'는 근거가 아니다.\n⑤ 어느 쪽이든 HARN-85(워크플로 신설)·HARN-87(라이브 실측)의 notes에 이 판정 결과를 승계 참조로 남긴다 — 그 둘의 acceptance는 strict 유지를 전제로 쓰였으므로, 전제가 바뀐 사실이 그쪽 기록에서도 보여야 한다."
+artifacts: []
+paths:
+  - ".github/workflows/pr-auto-resync.yml"
+  - ".github/branch-protection-setup.md"
+session: null
+notes: "발견 경위(2026-09-14): 게이트 G-strict-policy-and-classic-cleanup을 A안(strict 해제 + 클래식 삭제)으로 처분하면서, pr-auto-resync 워크플로의 존재 근거가 통째로 사라진 것을 확인했다.\n\n그 워크플로는 \"보호를 낮추는 대신(=strict 해제) 충족을 자동화한다\"는 취지로 만들어졌다(HARN-85 · .github/branch-protection-setup.md '대신 하는 것' 절). 즉 strict를 *유지하기 위한* 장치다. strict가 꺼지면 behind가 머지를 막지 않으므로 자동 최신화는 머지 경로의 필수 요소가 아니게 된다.\n\n왜 즉시 지우지 않는가: ⓐ 부수 효용이 남아 있을 수 있다(큐 진입 전 최신화가 큐 안 재검증 실패를 앞당겨 노출) ⓑ PR_AUTO_RESYNC_TOKEN 발급이 사람 왕복 1회를 이미 소모했으므로 되돌리기 전에 측정 근거가 있어야 한다 ⓒ 무엇보다 이 세션은 게이트 처분 범위이지 워크플로 처분 범위가 아니다 — 범위를 넓히지 않는다.\n\n그래서 문서에는 '전제 소멸' 경고만 박고 판정은 이 태스크로 분리했다. 경고 없이 두면 다음 세션이 그 절을 *현행 근거*로 읽는다(CLAUDE.md '만료 없는 유예·제외 금지' — 판정 지점 없는 존치는 유예다).\n\n인접: HARN-85(워크플로 신설)·HARN-87(라이브 실측)이 같은 전제 위에 있다. HARN-82(pr_merge_readiness docstring의 strict=true 전제)도 같은 축이나 그쪽은 별도 태스크로 이미 등재돼 있다(blocked).\n\n[정정 2026-09-14] 존치·폐기 판정의 전제가 'strict가 실제로 꺼져 있음'이다. 게이트가 clear되기 전(=클래식 삭제 전)에는 실질 strict가 살아 있어 ②ⓐ 판정이 성립하지 않는다 — 산문이 아니라 대장에 집행한다(HARN-52 축)."
+updated: 2026-09-14

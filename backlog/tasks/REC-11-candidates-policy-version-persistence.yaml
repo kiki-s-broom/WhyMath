@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P0
 owner: claude
@@ -15,11 +15,15 @@ acceptance:
   - "① 추천 처치 기록(REC-03 evidence_event 좌석)에 candidates[](후보 problem_id·점수)·policy_version 추가 — 비민감 meta 계약 유지"
   - "② followed 결과 결합은 파일럿 이후임을 명문(범위 밖 별항 — REC-03 docstring 동결과 정합)"
   - "③ 기록률 리포트('작동한 비율') 동반"
-artifacts: []
+  - "①(candidates[]·policy_version 영속) 완료: record_recommendation_treatment(l2/recommendation_evidence.py)에\ncandidates: list[tuple[uuid.UUID, float]] | None·policy_version: str | None 선택 인자 신설 —\n둘 다 None이면 기존 동작과 완전히 동일(회귀 0). candidates는 점수 내림차순 상위\nCANDIDATES_META_CAP(10)건만 meta.candidates에 {\"problem_id\",\"score\"} 딕셔너리 목록으로\n저장(원 풀 최대 50건 전량 저장은 과공학 — pool_size가 원 풀 크기를 이미 별도 기록하므로\n축소가 은폐되지 않음). policy_version은 POLICY_VERSION_CAT=\"cat_v1\"/\nPOLICY_VERSION_SUNEUNG=\"suneung_v1\" 상수로 신설.\n\n집행 지점(정본화≠집행 — CLAUDE.md 준수): 이 함수를 실제로 호출하는 api/me.py의 두 분기\n모두 배선했다. ⓐ 기본 CAT 분기: 이미 계산된 items·weights를 재사용해 새 쿼리 0으로\nitem_information(theta,item)*weight를 candidates[]로 구성. ⓑ 수능 분기: 점수 계산을\nrecommend_suneung_index(l6/suneung/recommendation.py) 내부 공식(적격 게이트 is_suneung_eligible\n× 정보량 × suneung_item_weight × 약점가중)을 그대로 미러해 재계산한다 — 이미 정해진\nchosen_index는 그대로 쓰므로 결정에는 영향 없음(관측 재계산일 뿐), 단일 진실 원천은\n여전히 recommend_suneung_index. 원 paths(l2/recommendation_evidence.py·db/models/**·\ntests/backend/**)가 api/me.py를 빠뜨려 \"정본화만 하고 집행 안 됨\" 사고를 만들 뻔했음을\n발견 → backlog.py amend --path로 api/me.py·ops/recommendation_reach_report.py 추가\n(정정 사유는 대장 notes에 기록됨).\n\n정직한 공백(수능 분기 점수 산정): candidates[]의 수능 분기 점수는 recommend_suneung_index의\n알고리즘을 별도 코드로 재계산(미러)한 것이다 — 그 함수 내부를 직접 호출해 점수를 받는\nAPI는 없다(내부 구현이라 노출 안 됨). 그 함수의 알고리즘이 나중에 바뀌면 이 미러도 함께\n갱신해야 하며, 갱신을 잊으면 candidates[]의 점수가 실제 선택 로직과 조금씩 어긋날 수\n있다(선택된 problem_id 자체는 항상 정확 — chosen_index는 재계산 없이 그대로 사용). 이\n드리프트 위험을 코드 주석 2곳에 명시했다.\n\n②(followed 결과 결합 범위 밖 명문) 완료: l2/recommendation_evidence.py 모듈 docstring에\n\"REC-11: candidates[]·policy_version\" 절 신설 — followed 결과 결합(추천→정답 여부 조인)은\nREC-03 docstring이 이미 동결한 것과 동일 이유(실 session_id 미배선)로 이 태스크 범위\n밖임을 명시. candidates·policy_version은 그 결합이 나중에 배선된 뒤 \"무엇과 비교해\n선택했는가\"를 재구성할 수 있게 하는 선행 재료일 뿐, 이 좌석 자체가 결과를 결합하지\n않는다.\n\n③(\"작동한 비율\" 기록률 리포트) 완료: ops/recommendation_reach_report.py(REC-01 기존 4축\n리포트)에 5번째 축 신설 — evidence_event의 recommendation_render 처치 전체 중\nmeta.candidates·meta.policy_version이 \"둘 다\" 실린 건수의 비율(JSONB has_key ? 연산자\n2회 AND). 분모(처치 전체)가 0이면 비율은 None(0/0을 지어내지 않음 — 이 리포트의 기존\nNone-vs-0 회계 원칙 그대로 승계). render_report·report_to_json·CLI 설명문 전부 갱신.\n\n검증: test_recommendation_evidence.py 12 passed(기존 8 + 신규 4). test_me.py 192\npassed(기존 190 + 신규 2 — CAT·수능 분기 각 1건, 수능 분기 테스트는 부적격 후보가\ncandidates[]에서 실제로 빠지는지도 함께 확인). test_recommendation_reach_report.py 16\npassed(기존 11 + 신규 5 — None/비율 양방향 토글·JSON 구조·부분 커버리지 안내 문구).\n전체 백엔드 스위트 12795 passed(PED-35 시점 12784 + 11 = 신규 테스트 수와 정확히\n일치, 회귀 0). tests/infra 1303 passed(EOS 인벤토리 신규 함수 3개 반영 재생성).\nruff/black/mypy --strict 3개 파일 전부 clean.\n\n변별력(RED-before-fix, cp 백업/복원 3회 — git 계열 원복 금지 준수, 매회 바이트 동일\n확인): (a) record_recommendation_treatment의 candidates/policy_version meta 기록 로직\n제거 → 신규 4건 중 \"값 검증\" 3건 정확히 RED(absence-only 1건은 애초에 무관, 변별력\n없음이 아니라 그 테스트의 대상이 아니므로 GREEN 유지가 맞음) (b) build_report의 rate\n계산을 상수 0.0으로 뮤테이션 → 7건 정확히 RED(rate를 단언하는 테스트 전부, 무관한\n9건은 GREEN 유지) (c) api/me.py 두 호출부에서 candidates=·policy_version= 인자를\n제거 → API 레벨 신규 테스트 2건(CAT·수능 분기 각 1건) 정확히 RED."
+artifacts:
+  - "f68f1128 (#1126)"
 paths:
   - src/backend/whymath_backend/l2/recommendation_evidence.py
   - "src/backend/whymath_backend/db/models/**"
   - "tests/backend/**"
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/ops/recommendation_reach_report.py
 session: null
-notes: "출처: EOS-53 crosswalk 갭 #5(E6 잔여). policy_version 전수 grep 0 실측 — 선언 정본 §5 '미확정' 항의 실측 확정.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/W2★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "출처: EOS-53 crosswalk 갭 #5(E6 잔여). policy_version 전수 grep 0 실측 — 선언 정본 §5 '미확정' 항의 실측 확정.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/W2★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-11] paths ['src/backend/whymath_backend/l2/recommendation_evidence.py', 'src/backend/whymath_backend/db/models/**', 'tests/backend/**'] → ['src/backend/whymath_backend/l2/recommendation_evidence.py', 'src/backend/whymath_backend/db/models/**', 'tests/backend/**', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py']: acceptance①이 record_recommendation_treatment 신설 필드의 실 서빙 배선(api/me.py 두 분기)과 acceptance③ 기록률 리포트(ops/recommendation_reach_report.py) 확장을 요구한다 — 원 paths가 두 파일을 빠뜨려 정본화≠집행 위반을 만들 뻔했다(CLAUDE.md 준수를 위한 범위 보정)\n\n[정정 2026-09-11] 구현 완료 기록 — RED-before-fix 검증 결과(3회 뮤테이션) 및 acceptance①②③ 전항목 이행 등재"
+updated: 2026-09-11

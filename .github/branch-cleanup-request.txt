@@ -123,3 +123,136 @@ claude/backup/ai-integration-5qqcp4-pre-rebase
 #   status-f9lp65(HARN-56 block) · test-driven-development-03elxp(MP-02 block·MP-05)
 claude/drive-eos-81-sequential-wbhw8v
 claude/review-dydkkx-runbook
+
+# ── 2026-09-08 8차 배치 (1건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-09-08.md §4 ──
+# 직전 배치 집행 확인(2026-09-08 실측): 누적 21건 전건 잔존 0/21 · 허용 패턴 밖 수동 3건
+#   (gates/deploy-environment-approval·pr/collab-07·backend/cur-16-*) 전건 삭제 완료.
+#   ⚠ 이 파일은 삭제된 과거 배치를 계속 열거한다 — 워크플로가 그 404를 실패로 계상해 매 실행 red다(HARN-01 소유).
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   backup/ai-content-a3ysut-pre-rebase = b271671b
+#     근거: diff 16파일 **전부 main 실재**(부재 0). 고유 줄 20(6파일)은 전건 옛 판이며 main이 더 넓다 —
+#     예: schema/enums.py ReviewStatus가 브랜치 3종 docstring인 데 반해 main은 3종+quarantined+EOS-71 근거.
+#     CONT-02/03/04는 updated 날짜와 옛 notes뿐. 8회차가 유일 uncovered로 남긴 MEMORY.md 글자 깨짐은
+#     #1027이 정정해 지금 고유 줄 0. 좌석 OPS-41 ④(a)가 "이 축은 충족 상태 · 착수 세션이 재확인 후
+#     삭제 배치 후보로 내릴 수 있다"고 명시 승인했고, 9회차가 그 재확인을 독립 재도출로 수행했다.
+#     OPS-41의 나머지 두 축(t608mk·azdnov)은 브랜치가 그대로 남아 영향 없다.
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 7차 배치 승계에서 a3ysut만 해제:
+#   7n9n72(**삭제 절대 금지** — 좌석 10건이 main 기준으로 전부 참조 확인 2026-09-08) ·
+#   trjg5x(PB-13·PB-14·ADMIN-02·PATH-03) · k20m0w(MOB-18) · gdmwhk/uqyg79(PED-26) · 34zvse(CUR-07) ·
+#   5t5lmv(OPS-40) · iws58k(ARCH-30) · t608mk/azdnov(OPS-41) · 6eejrv(PB-08) · e98dw4(S3-28) ·
+#   q8tvcx(OPS-38·SEC-32는 done이나 OPS-38·OPS-67 잔존) · vafylb(S4-59·OPS-53)
+# ⚠ 원격 claim 활성 4건은 다른 세션 소유라 판정 보류 — status-f6qz0c(ahead 0·diff 0) ·
+#   test-driven-development-03elxp(ahead 0·diff 0 — 9회차 신규 측정) · status-f9lp65(2↑·diff 5) ·
+#   status-iraoq3(MISC-21·9회차 신규 등장). 앞 둘은 claim 해제 시 잃을 내용 0으로 즉시 삭제 후보다.
+claude/backup/ai-content-a3ysut-pre-rebase
+
+# ── 2026-09-10 9차 배치 (1건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-09-10.md §3.1·§4 ──
+# 직전 배치 집행 확인(2026-09-10 실측): 누적 22건(8차 a3ysut 포함) 전건 잔존 0/22.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   misc-24-extremum-ambiguous-coincidence = c3415fd4
+#     근거: 소유 태스크 MISC-24(done)의 notes가 "PR #1072는 중복 diff로 close, 실제 변경은
+#     PR #1071(claude/status-vlul18, 2026-09-09 07:54 UTC 머지)로 통합"이라고 기록한 경위를
+#     GitHub API로 직접 재확인(PR #1071 merged:true · PR #1072 closed·merged:false, 기록과 일치).
+#     diff 13파일(main 부재 0) — models.py 바이트 동일, catalog.py는 main이 MISC-25 후속까지
+#     포함한 상위집합(고유 줄은 들여쓰기 차이뿐).
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 8차 배치 승계 전건 유지:
+#   7n9n72(**삭제 절대 금지**) · trjg5x(PB-13·PB-14·ADMIN-02·PATH-03) · k20m0w(MOB-18) ·
+#   gdmwhk/uqyg79(PED-26) · 34zvse(CUR-07·HARN-80) · 5t5lmv(OPS-40) · iws58k(ARCH-30) ·
+#   t608mk/azdnov(OPS-41) · 6eejrv(PB-08) · e98dw4(S3-28·VIZ-11) · q8tvcx(OPS-67) · vafylb(S4-59·OPS-53)
+# ⚠ 원격 claim 활성 3건은 다른 세션 소유라 판정 보류 — status-f6qz0c(ahead 0·diff 0) ·
+#   test-driven-development-03elxp(ahead 0·diff 0) · status-f9lp65(diff 5). 9회차의 status-iraoq3은
+#   이번 population에서 부재(브랜치 삭제 확인).
+# ⚠ 참고(판정 아님) — claude/entity-model-freeze-lji37v는 PR #1007(오픈)로 이미 노출된 브랜치라
+#   이 배치의 판정 대상이 아니다. 그 PR의 Gate 0 r6 판정 부분은 이 세션의 별도 PR #1081이 이미
+#   main에 직접 포팅했다 — PR #1007 자체의 처분(HARN-77·OPS-65·OPS-66 부분 재제출 여부)은
+#   그 PR 소유자가 판단할 사안이다(감사 §6 정직한 공백 참조).
+claude/misc-24-extremum-ambiguous-coincidence
+
+# ── 2026-09-12 10차 배치 (1건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-09-12.md ──
+# 직전 배치 집행 확인: 누적 23건(9차 misc-24 포함) 삭제 대상 등재 이력 — 이번 세션은 ls-remote
+# 재확인을 수행하지 않았다(범위 밖 — OPS-74/75 세션이 stray-code 감사 요청을 이어받아 실행).
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   ops-50-51-52-moe-rocm-followup = 167b5dd0
+#     근거: PR #860(오늘 superseded 판정으로 종료) 원 브랜치. diff 39파일이지만 내용 대조 결과
+#     부재 0 — LIC-01 rights 모듈 9파일 바이트 동일 · quality_tier_moe_accuracy_battle.py는
+#     main이 더 신판(PR #854 JSON schema 강화 반영, 브랜치는 구판) · LIC-01 alembic 마이그레이션은
+#     revision-id 헤더만 다르고 본문 동일 · 나머지 파일들의 브랜치 고유 추가줄 259개 중 256개가
+#     main에 그대로 존재(3개는 black 재포맷 줄바꿈 차이뿐). OPS-52.yaml(done) notes가 "PR #860
+#     diff에서 결과 서술·doc 갱신을 PR #1090으로 추가 포팅했다"고 명시. OPS-51(done·PR #876
+#     후속 재측정)·LIC-01(in_progress이나 코드는 이미 착지) 교차 확인 완료.
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 9차 배치 승계 전건 유지:
+#   7n9n72(**삭제 절대 금지**) · trjg5x(PB-13 in_progress·PB-14·ADMIN-02·PATH-03) ·
+#   k20m0w(MOB-18 in_progress) · gdmwhk/uqyg79(PED-26) · 34zvse(CUR-07·HARN-80) · 5t5lmv(OPS-40) ·
+#   iws58k(ARCH-30) · t608mk/azdnov(OPS-41) · 6eejrv(PB-08) · e98dw4(VIZ-11) · q8tvcx(OPS-38·OPS-67) ·
+#   vafylb(S4-59·OPS-53)
+claude/ops-50-51-52-moe-rocm-followup
+
+# ── 2026-09-18 11차 배치 (4건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-09-18.md ──
+# 직전 배치 집행 확인(2026-09-18 ls-remote 실측): 7~10차 + 허용 패턴 밖 수동분 표본 10건
+#   (ops-50-51-52-moe-rocm-followup · misc-24-* · backup/ai-content-a3ysut-pre-rebase ·
+#    drive-eos-81-sequential-wbhw8v · review-dydkkx-runbook · pr/collab-07 ·
+#    backend/cur-16-* · curriculum/eos-curriculum-* · curriculum/cur-15-* ·
+#    gates/deploy-environment-approval) 전건 **잔존 0/10**.
+#
+# 이번 배치의 계기: 9회차가 "최우선 관찰 대상"으로 지목한 8월 PR 10건 중 6건이 2026-09-12에
+#   미머지로 닫혔고(10차 배치가 그중 1건만 처리), 나머지 5건이 이번 회차에 처음 감사 대상이 됐다.
+#   각 PR의 **close 코멘트가 곧 처분**이므로 그것을 1차 자료로 읽고 파일 단위로 교차 확인했다.
+#
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   backend-misc-12-16-misconception-review-impl = bce7a6be
+#     근거: PR #893 → 대체 PR **#1144 머지**(merged:true·2026-09-12T05:16Z API 실측)로 회수 완료.
+#     main 부재 0. 고유 줄 전건이 옛 판 — MISC-12.yaml은 브랜치 todo vs main **cancelled**
+#     (#1144가 설계 충돌로 취소) · concept.schema.yaml 고유 줄은 #1144가 **의도적으로 되돌린**
+#     misconception_codes 완전 제거분(main의 test_misconception_link_is_reference_only가
+#     그 필드를 허용된 참조 키로 이미 동결) · test_neo4j_runtime_ban.py 고유 줄은 ruff 지적으로
+#     #1144가 제거한 `import sys` 1줄.
+#   ops-02-offsite-backup-move = fab70f96
+#     근거: PR #847 close — 방식 자체가 OPS-31(PR #968 · age 암호화 + 클라우드 동기화)로 대체됐고
+#     게이트 G-backup-offsite-move는 2026-09-06/07 Kiki 실행으로 실측 클리어. close 코멘트가
+#     "스크립트 자체는 유효하지만 채택된 방식이 아니라 병합 대상이 아니다"로 처분을 명시한다.
+#     main 부재 2건(move_backup_to_nas.ps1·그 테스트)은 그 미채택 방식의 산출물이다. main의
+#     db_backup_dr_runbook.md는 OPS-31 개정판으로 §1b(키쌍)·§2(로그온 비의존)·§2-2(누락 감시)를
+#     갖춰 브랜치 §7(NAS)·§7-2(7-Zip AES)를 상위 대체한다. problem.py 고유 26줄은 스택 조상
+#     #846에서 온 것으로 s1-17과 동일 사유(S1-16/#941 흡수).
+#   clever-bell-8lh19k = 98c25456
+#     근거: main 부재 0. 고유 줄은 ARCH-49 yaml 4줄뿐이며 전부 옛 상태다 — status: in_progress
+#     (main=done) · session(main=null) · artifacts: [](main=증적 있음) · 짧은 옛 notes.
+#     이 브랜치가 만든 acceptance ⑥~⑩(OpenRouter 실측·관할 축 설계)은 main에 그대로 실재한다
+#     (`git grep 'OpenRouter 경유 실측 확정' origin/main` 적중). 원격 claim도 2026-09-17T07:37Z release.
+#   laughing-faraday-opgsjg = 46bf374c
+#     근거: main 부재 0. SKB-02는 main **done**(브랜치 in_progress) · SKB-01 notes는 main이
+#     3,835자로 브랜치 1,235자를 포함·초과하며, 브랜치가 남긴 2026-09-11 발견(graph.json에
+#     behavior_skills 부재 → SKB-02 분리)이 main에 [정정 2026-09-11 후속]으로 PR #1127·
+#     크로스워크 437행 실측까지 붙어 더 자세히 남아 있다.
+#
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 10차 배치 승계 + 신규 2건:
+#   7n9n72(**삭제 절대 금지**) · trjg5x(PB-13 in_progress·PB-14·ADMIN-02·PATH-03) ·
+#   k20m0w(MOB-18 in_progress·MOB-11·SEC-19·SEC-30) · gdmwhk/uqyg79(PED-26) · 34zvse(CUR-07·HARN-80) ·
+#   5t5lmv(OPS-40) · iws58k(ARCH-30) · t608mk/azdnov(OPS-41) · 6eejrv(PB-08) · e98dw4(VIZ-11) ·
+#   q8tvcx(OPS-38·OPS-67) · vafylb(S4-59 done·OPS-53·KG-02·NLP-05)
+#   ★신규 backend-audit-event-foundation-29ac1b — ADMIN-10 acceptance ①이 요구하는
+#     docs/architecture/90_audit_log.md(246줄·설계 확정)가 **main 부재·이 브랜치에만** 실재한다.
+#     main에 대체 감사 설계 문서 0건. 이번 회차가 ADMIN-10 ⑦로 고립 참조를 부착했다.
+#   ★신규 relaxed-fermat-8dui3u — 회수 태스크 MP-06 등재(MP-02 런북 사이드카 경로 버그 정정).
+#
+# ⚠ 원격 claim 활성 3건은 다른 세션 소유라 판정 보류 — status-f6qz0c(ahead 0·diff 0) ·
+#   test-driven-development-03elxp(ahead 0·diff 0) · status-f9lp65(ahead 2·diff 5).
+#   앞 둘은 claim 해제 시 잃을 내용 0으로 즉시 삭제 후보다(3회차 연속 동일 측정).
+#
+# ⚠ 허용 패턴(claude/*) 밖이라 이 배치에 못 싣는 삭제 확정 2건 — Kiki 수동 삭제 필요:
+#   backend-eos-204-education-event-phase1 = 2ab82c24
+#     PR #882 close — ADR-001(2026-08-02 채택)의 "범용 Event Bus 미도입"과 정면 충돌해 **설계 거부**.
+#     E204-01/E204-02 태스크 ID는 main에 등록된 적이 없다. main 부재 13건은 전부 그 거부된 설계의
+#     산출물이며, 처분은 "재검토 조건을 실측으로 채운 뒤 새 ADR과 함께 재제안"이다.
+#     git push origin --delete backend-eos-204-education-event-phase1
+#   s1-17-phase-b-math-extension = f9749daf
+#     PR #846 close — 실작업(schema_version + extensions.math 분리)이 S1-16으로 **PR #941 done** 착지.
+#     main 부재 0 · 고유 줄은 problem.py 26줄(옛 판)뿐.
+#     ※ 부수: HARN-49 notes가 아직 "S1-16의 구현 자체는 미머지 PR #846(브랜치
+#       s1-17-phase-b-math-extension)에 실재한다 — 회수는 저비용"이라고 적고 있으나 #941 착지로
+#       사실이 아니게 됐다. 이 감사는 소유가 아니라 정정하지 않았다 — HARN-49 착수 세션이 판단한다.
+#     git push origin --delete s1-17-phase-b-math-extension
+claude/backend-misc-12-16-misconception-review-impl
+claude/ops-02-offsite-backup-move
+claude/clever-bell-8lh19k
+claude/laughing-faraday-opgsjg

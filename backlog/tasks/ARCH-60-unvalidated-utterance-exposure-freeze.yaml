@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-60-unvalidated-utterance-exposure-freeze
+title: "학생 대면 LLM 발화의 검증 통과 동결 — P-10 주입 3축 중 '미검증 응답 노출' 축(ARCH-59 권위축·ARCH-46 라우터축에 이은 잔여)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 실측·정오 판정 — LLM이 만든 문자열이 학생 응답으로 나가는 경로를 전건 열거하고(개수와 검색 방법을 함께 기록 — 절단 출력로 부재 판정 금지), 각 경로를 3분류한다: (a)게이트를 통과한 뒤에만 승격 (b)게이트 없이 승격(위반) (c)학생 대면이 아님(진단·배틀·리포트 전용). 소스를 읽어 추론한 것은 '읽어서 그렇게 보인다'로 범위를 밝혀 적는다.\n② 위반 처분 — ①의 (b)가 0건이 아니면 이 태스크에서 막거나 해소 태스크로 분리 등재한다. 0건이면 그 사실을 근거와 함께 기록한다.\n③ 집행 배선 — 'LLM 생성 문자열은 검증 게이트를 통과한 것만 학생에게 노출된다'를 AST 전수 가드로 동결한다. 금지 문자열 열거가 아니라 구성된 결과(승격 지점의 제어 흐름에 게이트 호출이 실재하는가·게이트 반환값이 실제로 분기 조건으로 쓰이는가)를 검사한다. 게이트를 호출만 하고 결과를 버리는 형태도 위반으로 잡는다.\n④ 스캔 0건 실패 — 대상을 하나도 못 찾으면 exit 1/RED. 전수 가드가 공허하게 통과하는 상태를 금지한다(test_proxy_ca_optional.py 선례).\n⑤ 결함 주입 실증 — 게이트 제거·반환값 무시·조건 반전 등 우회 형태를 각각 주입해 RED를 확인하고, 주입이 실제 적용됐는지(mutated != original)·원복이 바이트 동일한지를 하네스가 단언한다. 절마다 그 절이 없으면 통과해 버리는 반례를 픽스처에 넣는다(2026-09-07 픽스처 접촉 규칙).\n⑥ CI 배선 실재 확인 — tests/infra는 infra-contracts 잡이 항상 실행한다. 이 파일이 그 잡에서 실제로 수집·실행되는지 확인한 것까지가 완료다(OPS-03·OPS-10).\n⑦ 범위 밖 동결 — 신규 PRM 엔진 0 · 신규 Agent 계층 0(Phase 2 원문 §15) · 발화 내용·톤 변경 0 · Assessment/Mastery 로직 변경 0 · 새 검증기 신설 0(기존 게이트를 동결하는 태스크이지 게이트를 만드는 태스크가 아니다) · 산문 docstring 추가만으로 완료 선언 금지."
+  - "[진행 기록 2026-09-19 · 판정 기준: main df374448] ①②의 실측 결과 — LLM이 만든 문자열이 학생 응답으로 나가는 좌석은 **2건**이고 위반(b)은 **0건**이다. 검색 방법: (i) 역할 기반 — 백엔드 프로덕션 .py 전수(rglob)를 ast로 파싱해 filter_tone을 *호출*하는 모듈 집계(재수출·docstring 언급 제외) (ii) 소비자 역추적 — api/ 에서 LLM 텍스트를 응답에 싣는 호출처 grep (iii) Wh1LlmSeam·l3.pipeline 소비자 전건 열거. 결과: (a)게이트 통과 후 승격 2건 = harness/wh1_primary.py::run_wh1_primary_turn(verify 의무 §3.1 → 정답 억제 §3.4 → 프로즈 정책 게이트 → 금지모드 가드 → filter_tone) · l4/polya/engine.py::PolyaCoach.coach(LLM 원문 → filter_tone). (c)학생 대면 아님 = l4/misconception/judge_seam(오개념 후보 분류) · l5/ocr/recognize(인식) · l4/content_supply(저작·검수 게이트가 별도 축) · l3/equivalent/rephrase(저작). 소스를 읽어 판정한 것이므로 '읽어서 그렇게 보인다' 범위다 — 라이브 트래픽 표본은 보지 않았다.\n[진행 기록 2026-09-19] ③~⑥ 착지 — tests/infra/test_unvalidated_utterance_exposure.py(17건) 7절 AST 전수 가드. 절 A 최종 게이트 도달 · B 프로즈 게이트 반환값 소비 · C verify 의무의 선행(순서) · D 정답 억제 백스톱 + verdict 집합 동결 · E Polya 엔진 최종 게이트 · F 톤 게이트 좌석 baseline · G 승격 값의 출처. ⑤ 주입 M1~M15 15종 전건 RED·생존 0(하네스가 치환 count·mutated != original·원복 바이트 동일을 매 건 단언). ⑥ infra-contracts 잡은 needs 게이팅이 없어 항상 pytest tests/infra를 수집·실행한다.\n[미이행 · 정직 기록] ARCH-46(라우터 축)·ARCH-59(권위 축)와 달리 이 가드는 *새 학생 대면 좌석의 신설*을 절 F(좌석 baseline)로만 본다 — 누군가 filter_tone을 거치지 않는 완전히 새로운 학생 대면 LLM 경로를 만들면 절 F는 그것을 보지 못한다(baseline이 늘지 않으므로). WH-1 축은 절 A+G 조합으로 닫혀 있고(승격되는 값은 run_wh1_primary_turn 반환뿐) Polya 축은 절 E가 닫는다. 이 잔여를 메우려면 '학생 대면 응답 필드의 생산자 등록부'가 필요하며 그것은 P-11(API 표면 정리)의 소유다."
+artifacts:
+  - "5bbbd2f4 · https://github.com/kiki-s-broom/WhyMath/pull/1210 — AST 전수 가드 7절 착지(tests/infra/test_unvalidated_utterance_exposure.py 17건). 주입 M1~M15 15종 전건 RED·생존 0(치환 count·mutated != original·원복 바이트 동일 단언). 실측: 학생 대면 LLM 발화 좌석 2건·위반 0건. CI 잡 재현 infra-contracts 5스텝 전건 exit 0(pytest tests/infra 1537 passed, 1 skipped)·harness-integrity·policy-guard 전건 exit 0. 판정 기준: main df374448"
+paths:
+  - "tests/infra/**"
+session: null
+notes: "Phase 2 실행계획 P-10(AI Tutor v1) 검증 항목 7의 3축 중 남은 1축. 자매 축은 이미 착지: ①LLM→mastery 경로 = ARCH-59(done · PR #1207 · 주입 8종 전건 RED) ②라우터 우회 직접 호출 = ARCH-46(done · PR #1177 · 뮤테이션 11종 전건 RED · 좌석 18건 = 정상 14 + 위반 0 + 의도적 예외 4). ③미검증 응답 노출 축만 소유자가 0이다.\n\n부재 판정 범위(2026-09-19 · main df374448): backlog/tasks 전건 title 스캔에서 '발화·노출·검증' 어휘로 걸린 태스크 중 이 축을 소유한 것 0건. 역할 기반 재검색으로 wh1_prose.py에 classify_prose_violation·gate_policy_prose가 실재함을 확인했으므로 게이트 자체는 있다 — 없는 것은 그 게이트를 우회하는 승격 경로를 막는 기계 검사다. 내가 찾은 방법으로는 0건.\n\n경계: ARCH-59는 LLM이 바꾸는 키의 집합(권위)을 보고 이 태스크는 그 값이 나가기 전에 무엇을 통과했는가(검증)를 본다 — 겹치지 않는다. OPS-36은 같은 경로의 관측·캐시 결선이고 PED-18은 작동 비율 좌석이다.\n\n[정정 2026-09-19] ①②실측 결과·③~⑥ 착지 범위·미이행 잔여를 정직 기록"
+updated: 2026-09-19

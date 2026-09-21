@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,7 +18,8 @@ acceptance:
   - "③ Concept 테이블에 current_published_version_id nullable 추가(§6.4) — 기존 데이터 비파괴, ARCH-31(ProblemVersion 축)과 마이그레이션 체인 충돌 회피(나중 착수 쪽이 rebase)"
   - "④ 범위 밖: Release Snapshot·VersionContext(Phase 2 — §13)·Edge 버전화(원칙 5의 확장분)"
   - "①-b [게이트 판정 2026-09-06·D안] concept_version 테이블은 새 엔티티가 아니라 **Concept 좌석의 4번째 테이블**로 등재한다(curriculum_version⊂Curriculum 선례). ContentVersion 좌석은 비운 채 유지 — 엔티티 19종 불변. canonical_entity_model_v1.md §2-A 표 + test_canonical_entity_model_freeze.py 좌석 상수 + ORM/alembic을 **같은 PR에 원자적으로** 담는다(선등재 시 검사 ①②④ 3중 RED — §5-1 실측)"
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1156"
 paths:
   - "src/backend/whymath_backend/db/models/concept*.py"
   - "src/backend/whymath_backend/schema/concept*.py"
@@ -26,4 +27,4 @@ paths:
   - "tests/backend/db/**"
 session: null
 notes: "출처: 44_eos_version_management.md §16-3 — EOS-44 종결 시 MVP 범위(§12 'Problem/Concept/Solution 버전 테이블') 좌석 부재를 발견해 등재(docstring 계획은 백로그를 대신하지 못한다). ARCH-31(Problem 축)·EOS-47(attempt 고정 축)과 3분할\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/버전규율 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-06] ARCH-37(#984) 핵심 엔티티 동결이 ContentVersion 좌석을 §3-D '부재'로 동결하고 freeze 테스트 ③/③-b가 좌석 테이블을 RED로 막는다 — acceptance ①(버전 테이블 신설)과 정면 충돌. Kiki 결정(게이트) 전 착수 금지. 2026-09-06 /drive 실측\n\n[정정 2026-09-06] 게이트 G-eos49-content-version-seat Kiki 판정(D안) 집행 — ARCH-37 동결과의 충돌 해소 방식을 acceptance에 명문화"
-updated: 2026-09-06
+updated: 2026-09-14

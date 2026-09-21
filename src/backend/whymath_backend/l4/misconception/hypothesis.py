@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Sequence
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -161,6 +162,86 @@ def update_hypotheses(
     return pruned
 
 
+class DeactivationReason(str, Enum):
+    """가설이 활성 세트에서 빠진 *사유* — MISC-20 (b) 해소율 정직화의 분자 판정 축.
+
+    종전에는 감쇠·반박·해소·캡절단이 전부 같은 `is_active=false`로 수렴해, ⑩ 오개념 해소율이
+    "학생이 실제로 넘어선 것"과 "증거 부족으로 조용히 시든 것"을 구분하지 못했다(R2 §2 G4 ·
+    `wh1_evaluation._misconception_resolution_from_counts`가 스스로 자백한 한계). 사유를 분리해
+    **RESOLVED만 분자로 세는 것**이 재승격의 전제다.
+
+    `RESOLVED`(해소)의 정의는 좁게 고정한다 — *반박으로 탈락했고* 그 반박 증거 중에 **정정
+    형태를 직접 보인 강한 반박**(`coach._log_refutation_evidence`의 `_REFUTE_STRONG_WEIGHT`
+    경로 = `correct_form_present` True)이 실재하는 경우만이다. 막연한 clean 풀이의 약한 반박
+    (0.5)은 `REFUTED`에 머문다 — "안 틀렸다"는 "넘어섰다"가 아니다(과대해석 금지).
+    """
+
+    RESOLVED = "resolved"
+    """해소 — 정정 형태를 직접 보인 강한 반박 증거로 탈락(학생이 실제로 넘어섬). 유일한 분자."""
+
+    REFUTED = "refuted"
+    """반박 — 증거 순지지도가 음수로 돌아 탈락(강한 반박 증거는 없음)."""
+
+    DECAYED = "decayed"
+    """감쇠 — 증거 미갱신으로 confidence가 임계 미만이 되어 가지치기(stale 정리)."""
+
+    CAPPED = "capped"
+    """캡 절단 — 상위 N개 제한에 밀려 탈락(가설 자체가 부정된 것이 아니다)."""
+
+
+def curate_with_reasons(
+    current: Sequence[MisconceptionHypothesis],
+    matches: Sequence[MisconceptionMatch],
+    *,
+    turns_elapsed: int = 1,
+    refuted: frozenset[str] = frozenset(),
+    resolved: frozenset[str] = frozenset(),
+    max_active: int = _MAX_ACTIVE,
+) -> tuple[list[MisconceptionHypothesis], dict[str, DeactivationReason]]:
+    """`curate`와 동일한 생존 세트 + **탈락 사유 맵**을 함께 반환(순수·결정론·MISC-20).
+
+    `curate`는 생존 세트만 돌려줘 "왜 빠졌는지"가 호출자에 도달하지 못했다 — 저장소가 모든
+    탈락을 같은 `is_active=false`로 눌러 쓴 근본 원인이다. 이 함수는 같은 파이프라인을 단계별로
+    관측해 사유를 붙인다(로직 재구현 0 — `update_hypotheses`·슬라이스 규칙 그대로).
+
+    사유 우선순위(단계 순서 그대로): **감쇠 → 반박/해소 → 캡절단**. 감쇠로 이미 사라진 가설은
+    반박 집합에 있어도 `DECAYED`다(반박 판정이 닿기 전에 임계에서 탈락했다 — 시간 순서가 곧
+    우선순위이며 별도 규칙을 발명하지 않는다).
+
+    `resolved`는 `refuted`의 *부분집합으로 취급*된다 — 반박으로 탈락하지 않은 가설은 강한 증거가
+    있어도 활성이므로 사유 자체가 없다. 두 집합의 판정은 증거 그래프(DB) 몫이라 이 순수 함수는
+    id 집합으로 주입받는다(`curate`의 `refuted` 규약 승계).
+
+    사유 맵의 키는 **`current`에 있던 가설만**이다 — 이번 턴 신규 매치는 영속 행이 없어 "탈락"
+    개념이 성립하지 않는다. 생존 세트는 `curate`와 항상 동일하다(동치 테스트로 동결).
+    """
+    survivors_after_prune = update_hypotheses(current, matches, turns_elapsed=turns_elapsed)
+    surviving_ids = {h.misconception_id for h in survivors_after_prune}
+    existing_ids = {h.misconception_id for h in current}
+
+    reasons: dict[str, DeactivationReason] = {}
+    # 1단계 — 감쇠·임계 가지치기로 사라진 기존 가설.
+    for mid in existing_ids - surviving_ids:
+        reasons[mid] = DeactivationReason.DECAYED
+
+    # 2단계 — 반박 제거(강한 반박 증거가 있으면 해소).
+    after_refute = [h for h in survivors_after_prune if h.misconception_id not in refuted]
+    for h in survivors_after_prune:
+        mid = h.misconception_id
+        if mid not in refuted or mid not in existing_ids:
+            continue
+        reasons[mid] = (
+            DeactivationReason.RESOLVED if mid in resolved else DeactivationReason.REFUTED
+        )
+
+    # 3단계 — 최대 N 캡 절단.
+    kept = after_refute[:max_active]
+    for h in after_refute[max_active:]:
+        if h.misconception_id in existing_ids:
+            reasons[h.misconception_id] = DeactivationReason.CAPPED
+    return kept, reasons
+
+
 def curate(
     current: Sequence[MisconceptionHypothesis],
     matches: Sequence[MisconceptionMatch],
@@ -182,10 +263,16 @@ def curate(
 
     `refuted=∅`·`max_active≥세트크기`이면 `update_hypotheses`와 동치다(순수 상위 호환). 입력은
     변형하지 않고 항상 새 리스트를 반환한다(`update_hypotheses` 불변 승계).
+
+    **MISC-20 이후 구현**: 본 함수는 `curate_with_reasons`의 생존 세트를 그대로 돌려주는 얇은
+    래퍼다 — 파이프라인 구현은 **하나**뿐이다. 사본을 두면 한쪽만 고쳐질 때 두 경로가 같은
+    입력에 다른 판정을 내며, 그것이 `test_coach_wh1_convergence_governance.py`가 동결하는 바로
+    그 위험이다. 사유가 필요 없는 호출자(하네스 in-memory 루프)는 계속 이 이름을 쓴다.
     """
-    updated = update_hypotheses(current, matches, turns_elapsed=turns_elapsed)
-    survivors = [h for h in updated if h.misconception_id not in refuted]
-    return survivors[:max_active]
+    survivors, _reasons = curate_with_reasons(
+        current, matches, turns_elapsed=turns_elapsed, refuted=refuted, max_active=max_active
+    )
+    return survivors
 
 
 def select_focus(
@@ -217,8 +304,10 @@ def select_focus(
 
 
 __all__ = [
+    "DeactivationReason",
     "MisconceptionHypothesis",
     "curate",
+    "curate_with_reasons",
     "decay",
     "reinforce",
     "select_focus",

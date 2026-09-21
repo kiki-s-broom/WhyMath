@@ -95,6 +95,20 @@ class MisconceptionHypothesisRecord(Base):
     # 가지치기된(임계 미만·결과 세트에서 빠진) 가설은 false로 비활성화(stale 정리·낙인 방지).
     is_active: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=sa.true())
 
+    # MISC-20 (b) — 비활성화 *사유*(`l4.misconception.hypothesis.DeactivationReason` 값).
+    # `is_active=false` 단일 신호로는 "학생이 실제로 넘어섬(해소)"과 "감쇠·반박·캡절단으로 조용히
+    # 빠짐"을 구분할 수 없어 ⑩ 오개념 해소율이 근사에 머물렀다(R2 §2 G4). 이 컬럼이 서면 RESOLVED만
+    # 분자로 세는 정직한 해소율이 가능해진다.
+    #   · **NULL = 사유 미상**이며 두 경우에 남는다: ⓐ 활성 행(빠진 적 없음) ⓑ 사유를 모르는 경로가
+    #     비활성화한 행(하네스 결과 세트 영속 `persist_hypotheses`).
+    #     **과거 행 백필은 하지 않는다** —
+    #     이미 비활성화된 행의 사유는 복원 불가능한 정보이며, 날조 대신 NULL로 두고
+    #     분자에서 제외한다
+    #     (정직 회계 · 04e §9-D4 명시).
+    #   · CHECK 제약을 두지 않는다 — 값 집합은 애플리케이션(Enum)이 소유하고 ORM에 불변식을
+    #     위장하지 않는다(이 모듈 상단 방침·`activity.py` 선례와 동형).
+    deactivated_reason: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+
     # ===== 운영 메타 =====
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()

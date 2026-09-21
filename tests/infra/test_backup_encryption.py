@@ -432,6 +432,132 @@ class TestBackupStatus:
         assert got.recipients_fingerprint == "qmm59p6"
         assert got.last_success_utc == moment
 
+    def test_offsite_fields_round_trip(self, tmp_path: Path) -> None:
+        """OPS-64 신규 필드 4종이 기록·판독 왕복에서 손실 없이 보존된다."""
+        path = tmp_path / bs.STATUS_FILENAME
+        moment = datetime(2026, 9, 11, 3, 0, 0, tzinfo=UTC)
+        bs.record_success(
+            path,
+            artifact="whymath_20260911_030000.dump.age",
+            size_bytes=4096,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=True,
+            offsite_destination="D:\\offsite",
+            offsite_size_bytes=4096,
+            moment=moment,
+        )
+        got = bs.load_status(path)
+        assert got is not None
+        assert got.offsite_requested is True
+        assert got.offsite_ok is True
+        assert got.offsite_destination == "D:\\offsite"
+        assert got.offsite_size_bytes == 4096
+
+    def test_offsite_fields_default_false_for_pre_ops64_records(self, tmp_path: Path) -> None:
+        """OPS-64 이전에 기록된 상태 파일(신규 키 부재)도 그대로 읽힌다 — 하위호환."""
+        path = tmp_path / bs.STATUS_FILENAME
+        path.write_text(
+            json.dumps(
+                {
+                    "last_success_utc": "2026-09-01T03:00:00+00:00",
+                    "artifact": "old.dump.age",
+                    "size_bytes": 10,
+                    "encrypted": True,
+                    "recipients_fingerprint": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        got = bs.load_status(path)
+        assert got is not None
+        assert got.offsite_requested is False
+        assert got.offsite_ok is False
+        assert got.offsite_destination is None
+        assert got.offsite_size_bytes is None
+
+    def test_offsite_failure_is_invisible_without_the_new_fields(self, tmp_path: Path) -> None:
+        """★ acceptance③ — 사고 재현(수정 전) vs 판정(수정 후)을 같은 판정 함수로 대조한다.
+
+        OPS-64 사고: Step 9(오프사이트 미러)가 죽어도 Step 7이 이미 쓴 "성공" 레코드는
+        `offsite_requested`/`offsite_ok`를 몰랐다(그 필드가 존재하기 전) — 그래서
+        `evaluate_backup_health`는 이 회차를 무조건 `fresh`로 승인했다. 아래 ①이 그
+        무증상을 재현하고, ②가 새 필드로 같은 상황을 `offsite_failed`로 잡아낸다 —
+        판정 함수는 하나(`evaluate_backup_health`)이고 입력만 다르다.
+        """
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+
+        # ① 수정 전 재현 — 레코드가 오프사이트를 요청했다는 사실 자체를 모른다
+        #   (구버전 backup_status.py가 기록했을 상태와 동일 — 신규 키 부재).
+        never_tracked_path = tmp_path / "never_tracked" / bs.STATUS_FILENAME
+        bs.record_success(
+            never_tracked_path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            moment=now - timedelta(hours=1),
+        )
+        blind_status = bs.load_status(never_tracked_path)
+        blind_verdict = bs.evaluate_backup_health(blind_status, now=now)
+        assert blind_verdict.ok is True, (
+            "이것이 정확히 사고다 — 오프사이트를 몰랐던 레코드는 미러 실패 여부와 무관하게 "
+            "항상 통과로 보인다(신규 필드가 없던 시절의 실제 동작)"
+        )
+
+        # ② 수정 후 — Step 7이 -OffsiteRequested $true로 쓰고 Step 9가 죽어 -OffsiteOk
+        #   $true 재기록에 도달하지 못한 상태를 그대로 재현한다.
+        failed_mirror_path = tmp_path / "failed_mirror" / bs.STATUS_FILENAME
+        bs.record_success(
+            failed_mirror_path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=False,
+            offsite_destination="D:\\offsite",
+            moment=now - timedelta(hours=1),
+        )
+        failed_status = bs.load_status(failed_mirror_path)
+        failed_verdict = bs.evaluate_backup_health(failed_status, now=now)
+        assert failed_verdict.ok is False
+        assert failed_verdict.reason == "offsite_failed"
+
+    def test_offsite_success_still_passes(self, tmp_path: Path) -> None:
+        """미러가 실제로 성공한 회차(Step 9가 -OffsiteOk $true로 재기록)는 여전히 통과한다."""
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+        path = tmp_path / bs.STATUS_FILENAME
+        bs.record_success(
+            path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            offsite_requested=True,
+            offsite_ok=True,
+            offsite_destination="D:\\offsite",
+            offsite_size_bytes=10,
+            moment=now - timedelta(hours=1),
+        )
+        status = bs.load_status(path)
+        verdict = bs.evaluate_backup_health(status, now=now)
+        assert verdict.ok is True
+        assert verdict.reason == "fresh"
+
+    def test_offsite_not_requested_is_unaffected(self, tmp_path: Path) -> None:
+        """오프사이트를 안 쓰는 운용(로컬 전용)은 이 축과 무관하게 통과해야 한다."""
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+        path = tmp_path / bs.STATUS_FILENAME
+        bs.record_success(
+            path,
+            artifact="x.dump.age",
+            size_bytes=10,
+            encrypted=True,
+            moment=now - timedelta(hours=1),
+        )
+        status = bs.load_status(path)
+        verdict = bs.evaluate_backup_health(status, now=now)
+        assert verdict.ok is True
+        assert verdict.reason == "fresh"
+
     def test_corrupt_status_raises_instead_of_defaulting(self, tmp_path: Path) -> None:
         """손상된 상태 파일을 '기록 없음'이나 '신선함'으로 넘기면 무증상 실패가 된다."""
         path = tmp_path / bs.STATUS_FILENAME
@@ -495,6 +621,84 @@ class TestBackupStatus:
         payload = json.loads(capsys.readouterr().out)
         assert payload["ok"] is False
         assert payload["reason"] == "never_recorded"
+
+    def test_cli_record_wires_offsite_flags(self, tmp_path: Path) -> None:
+        """CLI `record`가 새 오프사이트 플래그 4종을 실제로 `record_success`에 넘긴다."""
+        assert (
+            self._cli(
+                tmp_path,
+                "record",
+                "--backup-dir",
+                str(tmp_path),
+                "--artifact",
+                "a.dump.age",
+                "--size-bytes",
+                "10",
+                "--encrypted",
+                "true",
+                "--offsite-requested",
+                "true",
+                "--offsite-ok",
+                "false",
+                "--offsite-destination",
+                "D:\\offsite",
+                "--offsite-size-bytes",
+                "10",
+            )
+            == 0
+        )
+        loaded = bs.load_status(bs._default_status_path(str(tmp_path)))
+        assert loaded is not None
+        assert loaded.offsite_requested is True
+        assert loaded.offsite_ok is False
+        assert loaded.offsite_destination == "D:\\offsite"
+        assert loaded.offsite_size_bytes == 10
+
+    def test_cli_check_reports_offsite_failed_reason(self, tmp_path: Path, capsys) -> None:
+        """CLI `check`가 offsite_failed를 별도 사유(stderr 문면·exit 1)로 낸다."""
+        self._cli(
+            tmp_path,
+            "record",
+            "--backup-dir",
+            str(tmp_path),
+            "--artifact",
+            "a.dump.age",
+            "--size-bytes",
+            "10",
+            "--encrypted",
+            "true",
+            "--offsite-requested",
+            "true",
+            "--offsite-ok",
+            "false",
+        )
+        code = self._cli(tmp_path, "check", "--backup-dir", str(tmp_path))
+        captured = capsys.readouterr()
+        assert code == 1
+        assert "오프사이트 미러가 이 회차에서 실패했다" in captured.err
+
+    def test_cli_check_json_surfaces_offsite_fields(self, tmp_path: Path, capsys) -> None:
+        self._cli(
+            tmp_path,
+            "record",
+            "--backup-dir",
+            str(tmp_path),
+            "--artifact",
+            "a.dump.age",
+            "--size-bytes",
+            "10",
+            "--encrypted",
+            "true",
+            "--offsite-requested",
+            "true",
+            "--offsite-ok",
+            "true",
+        )
+        capsys.readouterr()  # record 호출의 "[OK] backup status recorded: ..." 줄을 비운다
+        self._cli(tmp_path, "check", "--backup-dir", str(tmp_path), "--json")
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["offsite_requested"] is True
+        assert payload["offsite_ok"] is True
 
 
 # ===========================================================================
@@ -683,6 +887,53 @@ class TestOffsiteMirror:
         assert (
             "[WARN] offsite" not in offsite
         ), "오프사이트 실패를 경고로 흘리고 있다 — 스케줄러 stdout은 아무도 읽지 않는다"
+
+    def test_step7_records_offsite_request_pessimistically(self) -> None:
+        """★ OPS-64 — Step 7의 상태 기록이 오프사이트 요청 사실을 놓치면 사고가 재현된다.
+
+        Step 7은 Step 9(미러)보다 먼저 돈다. 이 시점에 `-OffsiteRequested`/
+        `-OffsiteDestination`을 넘기지 않으면, Step 9가 죽어도 대장에는 "오프사이트를
+        요청한 적조차 없다"는 상태만 남아 `evaluate_backup_health`가 실패를 볼 방법이
+        없다(`test_offsite_failure_is_invisible_without_the_new_fields` ①이 그 판정을
+        고정한다). `-OffsiteOk`를 명시적으로 넘기지 않는 것 자체가 계약이다 — 함수
+        기본값(`$false`)이 비관적 초기값을 만든다.
+        """
+        body = _dump_text()
+        step7 = body.split("# Step 7:", 1)[1].split("# Step 8:", 1)[0]
+        assert "Write-BackupStatus" in step7, "Step 7에 상태 기록 호출이 없다"
+        call_line = next(line for line in step7.splitlines() if "Write-BackupStatus" in line)
+        assert "-OffsiteRequested" in call_line, "Step 7이 오프사이트 요청 여부를 기록하지 않는다"
+        assert "-OffsiteDestination" in call_line, "Step 7이 오프사이트 목적지를 기록하지 않는다"
+        assert "-OffsiteOk" not in call_line, (
+            "Step 7이 -OffsiteOk를 넘기면 안 된다 — 함수 기본값 $false(비관적)를 그대로 "
+            "써야 Step 9가 죽었을 때 낙관적 값이 남지 않는다"
+        )
+
+    def test_step9_success_overwrites_with_optimistic_offsite_status(self) -> None:
+        """★ Step 9가 검증까지 전부 통과한 뒤에만 -OffsiteOk $true로 재기록한다.
+
+        이 호출이 offsite 실패 경로(Fail 호출들) *뒤에* 있어야 사고가 고쳐진다 — 앞에
+        있으면 Step 9가 죽기 전에 이미 낙관적 레코드가 쓰여 원래 사고가 재발한다.
+        """
+        body = _dump_text()
+        offsite = body.split("Step 9", 1)[1]
+        calls = [line for line in offsite.splitlines() if "Write-BackupStatus" in line]
+        assert len(calls) == 1, "Step 9 안에 상태 재기록 호출이 정확히 1건 있어야 한다"
+        call_line = calls[0]
+        assert "-OffsiteOk $true" in call_line, "Step 9 성공 경로가 낙관적으로 재기록하지 않는다"
+        assert (
+            "-OffsiteSizeBytes $offsiteSize" in call_line
+        ), "오프사이트 사본 크기를 기록하지 않는다"
+
+        # 순서 불변식: 재기록 호출이 마지막 Fail(사이즈 대조) 이후에 와야 한다.
+        last_fail_idx = max(i for i, line in enumerate(offsite.splitlines()) if "Fail " in line)
+        call_idx = next(
+            i for i, line in enumerate(offsite.splitlines()) if "Write-BackupStatus" in line
+        )
+        assert call_idx > last_fail_idx, (
+            "상태 재기록이 마지막 Fail 갈래보다 앞에 있다 — Step 9가 아직 실패할 수 있는 "
+            "시점에 낙관적 레코드를 쓰면 원래 사고가 재발한다"
+        )
 
     def test_schedule_passes_offsite_through(self) -> None:
         """★ 스크립트가 받아도 스케줄이 안 넘기면 상시 미러가 아니다(배선 실재성).

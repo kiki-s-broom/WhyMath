@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
 
@@ -281,6 +282,70 @@ class TestAppendTurnsCompletesAfterReflection:
         assert attempt.problem_id == pid
         assert attempt.used_socratic is True
         assert str(attempt.attempt_id) == body["completed_attempt_id"]
+        # EOS-12: 완료 채점이 만든 증거가 **응답 조립까지** 이어지는지 — 만들어 놓고 안 싣는
+        # 배선 누락을 여기서 잡는다(계약이 있어도 도달하지 않으면 없는 것과 같다).
+        evidence = body["completion_evidence"]
+        assert evidence is not None
+        assert evidence["attempt_id"] == body["completed_attempt_id"]
+        assert evidence["correct"] is True  # 이 경로의 완료는 서버 판정 정답이다
+        # 이 경로는 오개념을 보지 않는다 — 0건이 "없었다"로 읽히면 안 된다.
+        assert evidence["coverage"]["misconception_scan"] == "not_run"
+        assert "misconception" in evidence["coverage"]["unmeasured_kinds"]
+
+    def test_completed_attempt_inherits_dialogue_started_at(self) -> None:
+        """PED-37: 완료 attempt의 `started_at`은 대화 시작 시각을 *이관*받는다(추정 아님).
+
+        학생이 이 문항 풀이에 착수한 시점 = 이 대화가 시작된 시점이라 `dialogue.started_at`이
+        유일하게 정직한 출처다. 이 값이 비면 `harness/wh1_evaluation`의 시간창 집계와
+        `privacy/retention`의 파기 창이 조용히 0행이 된다(상시 NULL 버그의 코치 축).
+
+        `_complete_problem`은 dialogue를 모르므로 호출부(append_turn)가 넘긴다 — 여기서 보는
+        것은 그 *배선*이다(헬퍼를 직접 부르면 배선이 끊겨도 초록이라 라우트로 검증한다).
+        """
+        did = uuid.uuid4()
+        pid = uuid.uuid4()
+        dialogue = self._dialogue_awaiting_reflection(did, pid)
+        dialogue.started_at = datetime(2026, 5, 4, 8, 15, tzinfo=timezone.utc)
+        preload = {
+            (DialogueORM, did): dialogue,
+            (ProblemORM, pid): _problem(answer="3"),
+        }
+        client, captured = _session_client(preload=preload)
+        resp = client.post(
+            f"/v1/coach/sessions/{did}/turns",
+            json={"student_input": "2x=6이니까 양변을 2로 나눠서 x=3이 나왔어요"},
+        )
+        assert resp.status_code == 201, resp.text
+        attempts = [o for o in captured.added if isinstance(o, ProblemAttemptORM)]
+        assert len(attempts) == 1
+        assert attempts[0].started_at == dialogue.started_at
+        # 발생/수신 분리(EOS-48) — 수신 시각은 별도 좌석에, 발생 자리를 덮지 않는다.
+        assert attempts[0].ingested_at is not None
+        assert attempts[0].ingested_at != attempts[0].started_at
+
+    def test_completed_attempt_started_at_stays_null_when_dialogue_has_none(self) -> None:
+        """대화 시작 시각이 없으면 NULL로 둔다 — 서버 now로 메우지 않는다(날조 금지).
+
+        NULL은 미측정이라는 뜻이고, 그 attempt는 시간창 집계·보존 파기에서 조용히 빠진다.
+        빠지는 것이 계약이다 — 없는 발생 시각을 지어내 창 안으로 끌어들이지 않는다.
+        """
+        did = uuid.uuid4()
+        pid = uuid.uuid4()
+        dialogue = self._dialogue_awaiting_reflection(did, pid)
+        assert dialogue.started_at is None  # 스키마 기본값(미설정) — 전제 고정
+        preload = {
+            (DialogueORM, did): dialogue,
+            (ProblemORM, pid): _problem(answer="3"),
+        }
+        client, captured = _session_client(preload=preload)
+        resp = client.post(
+            f"/v1/coach/sessions/{did}/turns",
+            json={"student_input": "2x=6이니까 양변을 2로 나눠서 x=3이 나왔어요"},
+        )
+        assert resp.status_code == 201, resp.text
+        attempts = [o for o in captured.added if isinstance(o, ProblemAttemptORM)]
+        assert len(attempts) == 1
+        assert attempts[0].started_at is None
 
     def test_reflection_turn_does_not_reverify_solution(self) -> None:
         # 돌아보기 응답 턴은 *이 턴 풀이 내용과 무관*하게 완료된다(자연어 근거일 뿐 — 재검증 없음).

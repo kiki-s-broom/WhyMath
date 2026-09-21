@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-111-authoring-seat-operating-signal
+title: "저작 배치 요약이 '어느 좌석이 실제로 처리했는가'를 말하게 — 셀렉터는 openrouter인데 LOCAL이 돈 상태가 지금은 안 보인다"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - ARCH-57-cloud-provider-selector-authoring-wiring
+requires_gates: []
+acceptance:
+  - "① 좌석 작동 신호 정본화 — 저작 배치 요약(`problem_corpus_accumulate`의 `payload`)에 **어느 좌석이 몇 건을 실제로 처리했는가**를 싣는다. 형태는 기존 `payload[\"prompt_cache\"]`(EOS-99 `PromptCacheTally` → `prompt_cache_rates`)와 **동형**으로 한다: 호출별 `GenerationLog`를 이미 받고 있는 `_genlog_sink`에서 집계하고(두 벌 산식 금지), 리포트와 회차 대장에 같은 dict를 싣는다. 최소 축: `model_name` 분포(건수) · 선택된 셀렉터 값(`cloud_provider_name()`) · 성공/실패 건수 · 재시도 총합(`retries_in_current_call`).\n② 미측정과 0의 구분 — `model_name`이 None인 호출이 섞이면 그것을 0건이나 빈 문자열로 접지 않고 **미측정으로 계상**한다. `prompt_cache`가 이미 이 규약을 지킨다(`measured`·`unmeasured_reason`·`state`). 같은 이유로 \"셀렉터는 openrouter인데 실제 호출은 0건\"인 상태가 **눈에 보여야** 한다 — 그것이 이 태스크의 존재 이유다.\n③ 선언≠배선 해소 — `l3/providers/factory.cloud_provider_name()`은 ARCH-57이 신설했으나 **프로덕션 호출처가 0건**이다(실측 2026-09-18: `__all__`과 테스트뿐). 이 태스크가 그것을 실제로 부르거나, 부르지 않기로 판정하면 제거한다. 선언만 남겨 두지 않는다.\n④ 변별력 — 이 신호가 **실제로 구분하는지** 주입으로 확인한다. 최소 3종: ⓐ 셀렉터 openrouter인데 LOCAL 경로만 돈 회차(요약이 그 사실을 말해야 한다) ⓑ 혼재 회차(클라우드 일부·로컬 일부) ⓒ `model_name` None 혼재(미측정으로 계상되고 0으로 접히지 않는다). 정상 회차 대조군을 함께 둔다 — 대조군이 없으면 \"전부 미측정으로 계상\"이라는 과잉 수정이 통과한다.\n⑤ 이 태스크가 상환하는 실제 사고 — 2026-09-18 ARCH-57 라이브 1회차에서 `OPENROUTER_EXIT=0`·5/5 저장이 나왔는데 **OpenRouter가 서빙했는지 요약만으로는 판정 불가**였다. `calls_with_cache_telemetry: 0`이 \"OpenRouter가 캐시 필드를 안 낸다\"와 \"LOCAL로 떨어졌다\" 양쪽에서 같은 값이라 변별력이 0이었고(`unmeasured_reason` 문구 자체가 두 원인을 나란히 적는다), genlog 사이드카를 따로 열어야 알 수 있었다. 요약이 스스로 말했다면 왕복이 없었다.\n⑥ 범위 밖(명시) — 비용 집계의 정확도 향상(청구서 대조)은 이 태스크가 아니다. `GenerationLog.cost_usd`를 그대로 합산해 싣되 \"단가 곱셈이며 청구서 미대조\"임을 표기만 한다. 좌석별 품질 비교도 범위 밖이다(표본 설계가 필요하며 ARCH-55가 그 축의 선례다)."
+  - "[범위 분할 2026-09-18 · 착수 시 실측] 등재 당시 acceptance ①의 \"최소 축\" 4개 중 **둘이 새 배관을 요구한다**는 것이 착수 조사에서 드러났다(등재 세션의 계획 오류 — 비용을 확인하지 않고 적었다). 실측: ⓐ `GenerationLog`에 retry 필드가 0건이고 `retries_in_current_call`은 `provider_accuracy_battle`에서만 쓰여 저작 경로에는 그 값을 싱크까지 나르는 채널이 없다 ⓑ `Usage`에 모델 필드가 없고 provider 3종 어디도 응답의 `model` 키를 읽지 않는다 ⓒ `db/models/provenance.GenerationLog.from_schema`가 mapper 컬럼으로 필터링하므로 pydantic에만 필드를 더하면 DB 저장에서 조용히 버려진다 — 제대로 하려면 pydantic + DB 컬럼 + alembic 마이그레이션까지다.\n그래서 이 태스크의 범위를 **기존 `GenerationLog` 필드로 계산 가능한 축**으로 좁힌다: `model_name` 분포 · 선택된 셀렉터 값(`cloud_provider_name()`) · 성공/실패 건수 · 비용 합(미상 건수 분리). 사고의 핵심(\"셀렉터는 openrouter인데 LOCAL이 돌았다\")은 이 축만으로 구분된다 — LOCAL은 qwen 핀, 클라우드는 좌석 핀이기 때문이다(`ARCH-58`이 후자를 고쳤다).\n**재시도 총합과 관측 모델(ARCH-58이 이 태스크로 넘긴 축)은 후속 태스크로 분리한다** — 조용한 유예가 아니라 승계이며, 승계 태스크 id를 이 항에 적어 추적 가능하게 한다. 그 축은 \"설정이 뭐라고 했나\"가 아니라 \"누가 실제로 답했나\"를 묻는 다른 질문이고 provider 측 대체·폴백을 잡는다. 승계 = `EOS-112-generation-log-served-model-and-retries`."
+artifacts:
+  - "PR #1208 (https://github.com/kiki-s-broom/WhyMath/pull/1208) · commit 6758522a — 라이브 재확인(요약이 실제로 좌석을 말하는지)은 미수행, PR 본문 '정직한 공백'에 명시"
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - src/backend/whymath_backend/l3/providers/factory.py
+  - tests/backend/harness/test_authoring_seat_signal.py
+session: null
+notes: "사고 경위 2026-09-18 ARCH-57 라이브 1회차(Kiki 실행 Phaiakes9): OPENROUTER_EXIT=0 · 5/5 accepted_stored로 배치는 성공했으나 OpenRouter가 실제로 서빙했는지 요약으로 판정 불가. 대조군 Anthropic 회차는 calls_with_cache_telemetry=5 · prompt_tokens_total=12110 · measured=true였는데 OpenRouter 회차는 0건이었고, 그 0이 '이 provider가 캐시 필드를 노출하지 않는다'와 'LOCAL 경로만 돌았다' 양쪽에서 나온다(unmeasured_reason 문구가 두 원인을 나란히 적는다 — 즉 도구 자신이 변별력 없음을 알고 있다). 판정하려면 genlog 사이드카의 model_name을 따로 열어야 했다. CLAUDE.md 「작동 신호 없는 알고리즘 부착 금지」의 정확한 사례이며, ARCH-57 PR #1202 본문이 이 공백을 '정직한 공백'으로 미리 적어 둔 항목이다(그때 판단은 '산출물 스키마 변경이라 라이브 1회차에서 무엇이 필요한지 본 뒤가 낫다'였고, 1회차가 필요한 것을 정확히 알려 줬다). 훅 지점은 이미 있다 — _genlog_sink가 호출별 GenerationLog(model_name·input_tokens·output_tokens·cost_usd·success·latency_ms)를 받고 PromptCacheTally가 같은 자리에서 집계한다. 대칭 구조로 좌석 집계를 붙이는 일이다.\n\n[정정 2026-09-18] 착수 조사에서 acceptance ①의 최소 축 2개가 새 배관(마이그레이션 포함)을 요구함이 드러나 범위를 분할 — 승계 EOS-112 등재. 산문에만 남기면 만료 없는 유예가 되므로 acceptance에 append로 고정"
+updated: 2026-09-18

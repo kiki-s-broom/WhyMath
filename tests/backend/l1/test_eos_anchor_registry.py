@@ -188,24 +188,34 @@ class TestAuditScriptReadsTheRegistry:
 
         구조 단언만으로는 부족하다 — 실제로 스크립트를 돌려 ①exit 1 ②증거 파일 실재
         ③실패 사유에 예외 타입명 포함을 확인한다.
+
+        OPS-70: 실패 주입은 **정본이 아니라 `tmp_path` 사본**에 한다. 원래 이 테스트는
+        정본 `_REGISTRY_PATH`를 직접 `write_text`로 비우고 `finally`에서 복원했는데,
+        `-n auto` 병렬 실행에서 다른 워커가 비워진 창에 정본을 읽으면
+        `AnchorRegistryError`로 무관한 잡이 red가 됐다(PR #1044 head 2523b06f 실측 —
+        스위트 전후 sha256은 동일해도 그 사이 창에는 실제로 빈 상태가 있었다). 스크립트의
+        `--registry` 플래그(이 태스크에서 추가)로 사본을 가리키면 정본은 한 번도 손대지
+        않는다.
         """
         import subprocess
         import sys as _sys
 
-        registry = _REPO_ROOT / "data/corpus/eos_anchor_set_v1/anchors.yaml"
-        original = registry.read_bytes()
+        broken_registry = tmp_path / "anchors.yaml"
+        broken_registry.write_text("anchors: []\n", encoding="utf-8")
         out_path = tmp_path / "audit.json"
-        try:
-            registry.write_text("anchors: []\n", encoding="utf-8")
-            proc = subprocess.run(
-                [_sys.executable, str(self._SCRIPT), "--out", str(out_path)],
-                capture_output=True,
-                timeout=120,
-                cwd=str(_REPO_ROOT),
-            )
-        finally:
-            # git 계열 원복 금지(미커밋 작업분 소실) — 바이트를 그대로 되돌린다.
-            registry.write_bytes(original)
+        proc = subprocess.run(
+            [
+                _sys.executable,
+                str(self._SCRIPT),
+                "--out",
+                str(out_path),
+                "--registry",
+                str(broken_registry),
+            ],
+            capture_output=True,
+            timeout=120,
+            cwd=str(_REPO_ROOT),
+        )
 
         assert proc.returncode == 1, "적재 실패가 exit 0으로 위장되면 안 된다"
         assert out_path.exists(), "★ 증거 없는 실패 — 이 지적의 핵심"
@@ -213,6 +223,40 @@ class TestAuditScriptReadsTheRegistry:
         assert payload["steps_completed"] == []
         types = {e["error_type"] for e in payload["errors"]}
         assert "AnchorRegistryLoadError" in types  # 무타입 경고 금지
+
+    def test_broken_registry_injection_never_touches_the_canonical_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★ OPS-70 변별력 — 실패 주입이 정본을 향하면 여기서 RED가 난다.
+
+        `test_broken_registry_still_writes_evidence`가 다시 정본(`_REGISTRY_PATH`)에
+        쓰도록 되돌아가면(원래 사고의 정확한 재현) 이 스파이가 그 호출 자체를 잡는다 —
+        `finally`로 나중에 복원해도 상관없다: 스파이는 *쓰기 호출 시점*을 가로채므로,
+        스위트 전후 해시 대조(복원되면 무증상)와 달리 이 사고를 실제로 검출한다.
+        """
+        touched: list[Path] = []
+        real_write_text = Path.write_text
+        real_write_bytes = Path.write_bytes
+
+        def _spy_write_text(self: Path, *args: object, **kwargs: object) -> int:
+            if self.resolve() == _REGISTRY_PATH.resolve():
+                touched.append(self)
+            return real_write_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        def _spy_write_bytes(self: Path, *args: object, **kwargs: object) -> int:
+            if self.resolve() == _REGISTRY_PATH.resolve():
+                touched.append(self)
+            return real_write_bytes(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(Path, "write_text", _spy_write_text)
+        monkeypatch.setattr(Path, "write_bytes", _spy_write_bytes)
+
+        self.test_broken_registry_still_writes_evidence(tmp_path)
+
+        assert touched == [], (
+            f"실패 주입이 정본 파일을 직접 건드렸다({touched}) — OPS-70 사고의 정확한 "
+            "재현이다. tmp_path 사본 + --registry 플래그로만 주입해야 한다."
+        )
 
     def test_script_anchor_defs_match_the_registry(self, registry) -> None:
         """스크립트가 읽은 결과와 레지스트리가 같은 코드셋인가(이관 무손실)."""

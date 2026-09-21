@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MGMT-07-export-prediction-counsel-brief
+title: "열람권 export 예측 5필드 봉인 — 변호사 자문 브리핑 준비 (G-export-prediction-disclosure 준비물)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 변호사 자문 브리핑 docs/legal/export_prediction_disclosure_counsel_brief.md 신설 — MGMT-01 guardian_verification_counsel_brief.md 형식(0.Kiki 6항목 · 1.서비스 요약 · 2.현행 실태 실측표 파일:줄 · 3.질문 ⓐ배경ⓑ질문ⓒ답변별 코드귀결 · 4.회신→구현 매핑 · 5.첨부 색인)"
+  - "② 판정 전제 재실측 병기: 예측 5필드 non-None writer 0건이 2026-09-07 현재도 유지되는지 실측하고 verdict 문서에 측정일·방법·결과를 각주로 고정 (전제가 깨지면 '실피해 0의 창' 논거가 무효)"
+  - "③ docs/legal/pipa_data_matrix.md §5 변호사 자문 체크리스트에 이 질문 1줄 추가 — 게이트는 대장에 있는데 변호사에게 건네는 체크리스트에는 없던 누락 해소"
+  - "④ 집행 지점(정본화와 별항): 브리핑이 verdict 문서·게이트에서 역참조되어 자문 착수 시 실제로 도달 가능한가 — verdict 문서에 링크 1줄"
+artifacts:
+  - "PR #1038 (https://github.com/doldori7/WhyMath/pull/1038) — ①docs/legal/export_prediction_disclosure_counsel_brief.md 신설(질문 Q1~Q7·ⓒ답변별 코드 귀결·회신→구현 매핑 3분기 A/B/C·첨부 색인) ②verdict 문서에 전제 재실측 각주 고정(4축 전부 writer 0건 유지·측정기 변별력 주입 검증 통과·운영DB 미확인 범위 명시·재확인 지점 = writer 최초 추가 시점) ③pipa_data_matrix.md §5 체크리스트 1줄 추가+버전 0.1.0→0.1.1 ④집행 지점: verdict 문서 상단에 브리핑 역참조 1줄(자문 착수 시 도달 가능). 게이트 G-export-prediction-disclosure는 미해소 유지 — 변호사 판단이라 기계 대체 금지, clear는 Kiki 소유. 브리핑 §6에 착수 시점 3택(①배치 보류 권고 ②즉시 착수 ③현행 유지 비권장) 제시."
+paths:
+  - "docs/legal/**"
+session: null
+notes: "G-export-prediction-disclosure(2026-08-11 원 요청·08-30 재등재) 준비물. 게이트 자체는 변호사 판단이라 기계 대체 금지 — 이 태스크는 '준비물 완비'까지만 소유하고 자문 수행·게이트 clear는 Kiki 소유로 남는다(MGMT-01 선례 동형).\n\n[번호 개명 2026-09-07 · 2회차] 최초 MGMT-04로 등재했으나 같은 날 main에 MGMT-04-ip-separation-evidence-pack(status: cancelled)이 착지해 번호가 충돌했다(validate exit 1로 검출). main 쪽은 그 세션이 MGMT-05로 재번호하며 남긴 묘비이지만 이미 머지됐으므로 개명 가능한 쪽인 이쪽을 MGMT-07로 옮긴다. 커밋 메시지·PR #1038 본문·리뷰 답글의 'MGMT-04' 참조는 이 태스크를 가리킨다 — 문서(브리핑·verdict·pipa_data_matrix·MGMT-06 notes)는 전부 MGMT-07로 정정했다. 같은 PR에서 HARN-82→HARN-83 개명에 이은 두 번째 충돌이다."
+updated: 2026-09-07

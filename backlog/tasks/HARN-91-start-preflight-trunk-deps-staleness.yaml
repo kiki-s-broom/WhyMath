@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-91-start-preflight-trunk-deps-staleness
+title: start의 착수 자격 판정이 로컬 사본 기준이라 트렁크에 새로 착지한 의존·게이트를 못 본다
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 고정 — `start`의 착수 자격 판정은 `selector.classify_todo(backlog, task)`로 **로컬 작업 트리의 백로그 사본**을 읽는다(scripts/harness/backlog.py). 원격을 보는 프리플라이트는 두 개뿐이다: 타 세션 claim(`_remote_claim_map`)과 미머지 done(`scan_remote_done` · HARN-11). 즉 **내 클론이 마지막으로 fetch한 뒤 origin/main에 착지한 새 의존·게이트는 판정에 반영되지 않는다.**"
+  - "② 실증(2026-09-08) — 한 세션이 05:1x에 `start HARN-87-pr-auto-resync-live-measurement`를 통과했다(로컬 사본 기준 의존 0건). 그러나 origin/main은 이미 05:11:30Z 시점에 그 태스크에 `depends_on: [HARN-76-acceptance-supersede-and-title-amend]`를 담고 있었다(PR #1059 · 머지 9a229e18). 세션은 40분 뒤 main을 병합하고서야 착수 자격이 없음을 알았고, 그 사이 작성한 코드는 귀속 태스크를 잃어 HARN-90으로 분리해야 했다."
+  - "③ 같은 형태의 기존 프리플라이트가 이미 있다 — HARN-11이 \"미머지 done\"을 위해 `fetch=True`로 원격을 본다. 그 주석이 근거를 이렇게 적었다: \"claim 대장은 done 시 release돼 비어 있고 트렁크 사본은 아직 todo라, 다른 어떤 검사도 이걸 못 본다. 되돌리기 비싼 지점이므로 fetch=True로 최신 상태를 본다.\" **의존·게이트 축도 정확히 같은 노출을 갖는데 그 검사가 없다.** 트렁크에서 조건이 *강화*되는 방향(의존 추가·게이트 부착)이 로컬에 안 보이는 것이 이 축이다."
+  - "④ 변별력 — 정상 상태에서 초록인 것은 보호의 증거가 아니다. 구현했으면 **로컬 사본과 트렁크 사본이 어긋난 상태를 실제로 주입**해 검출을 확인한다: ⓐ로컬은 의존 0건·트렁크는 의존 1건(미충족) → 거부되어야 한다 ⓑ로컬은 게이트 미부착·트렁크는 pending 게이트 부착 → 거부되어야 한다 ⓒ**대조군**: 로컬과 트렁크가 같으면 추가 거부가 일어나지 않아야 한다(모든 착수를 막는 검사는 검사가 아니다) ⓓ원격 조회가 실패하면 \"이상 없음\"이 아니라 조회 실패 사실이 보여야 한다(fail-open 무증상 금지)."
+artifacts:
+  - "a2e9162e (#1085)"
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/selector.py
+  - "tests/harness/test_start_preflight*.py"
+session: null
+notes: "[발생 경위] 2026-09-08. 위 ②의 사례가 그대로다. 피해는 크지 않았다 — 코드 자체는 유효해서 HARN-90으로 재귀속했고 폐기는 0줄이다. 다만 병합 시점이 아니라 착수 시점에 알았다면 애초에 다른 순서로 진행했을 것이다.\n\n[왜 1회성이 아닌가] 이 저장소는 장기 미머지 브랜치가 상시 수십 건이고 대장이 git 안에 산다. 즉 로컬 사본과 트렁크의 시차는 예외가 아니라 상시 조건이며, 조건이 강화되는 방향(의존 추가·게이트 부착)의 변경이 잦을수록 이 형태는 반복된다. CLAUDE.md \"trunk 부재를 미구현으로 단정 금지\"·\"미머지 존재를 충족으로 단정 금지\"가 사람의 판정에 대해 말하는 것을, 이 태스크는 **하네스 자신의 판정**에 대해 묻는다.\n\n[구현 시 고려] fetch 비용이 매 start마다 추가된다. HARN-11이 이미 `fetch=True`를 한 번 하므로 같은 fetch에 편승할 수 있는지 먼저 본다. 오프라인·프록시 차단 환경에서 조회 실패를 fail-closed로 할지 fail-open+명시 경고로 할지는 구현자 판정이되, 어느 쪽이든 **무증상은 금지**다."
+updated: 2026-09-10

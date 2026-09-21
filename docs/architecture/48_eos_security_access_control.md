@@ -813,7 +813,7 @@ EOS-SEC-TEST-001   새 기능은 인가 회귀 테스트를 통과해야 한다.
 
 ---
 
-# 제2부. 현행 WhyMath 매핑 (2026-08-25 실측)
+# 제2부. 현행 WhyMath 매핑 (2026-08-25 최초 실측 · 2026-09-11 SEC-26/27/29 반영 갱신)
 
 | EOS 영역 | WhyMath 현행 | 파일/자산 | 판정 |
 |---|---|---|---|
@@ -824,12 +824,12 @@ EOS-SEC-TEST-001   새 기능은 인가 회귀 테스트를 통과해야 한다.
 | 필드 수준 암호화 | AES-256-GCM, 3개 자산별 키, MultiKeyCipher 회전, dialogue content만 prod fail-closed; device secret 평문 폴백 갭 있음 | `api/_crypto.py` | 🟡 부분 |
 | Log PII 스크러버 | 시크릿/이메일/전화번호/학생 발화 마스킹, 예외 타입명 보존 | `ops/log_scrubber.py` | ✅ 충족 |
 | 감사 테이블 | DeletionAudit, PrivacyAudit, DefectReport | `db/models/audit.py` | ✅ 구조 충족 |
-| 관리자 접근 감사 | `record_admin_access_audit` 호출부 0곳 | — | ⬜ 미착지 |
+| 관리자 접근 감사 | `record_admin_access_audit`(관리자→학생 개인정보 열람) 호출부 여전히 0곳(ADMIN-06 콘솔 선행 대기) — 콘텐츠 CUD(개념·문항)는 신설 5번째 event_kind `content_mutation`으로 별도 배선(SEC-29, `api/concepts.py`·`api/problems.py` 6라우터) | `privacy/audit.py`, `api/concepts.py`, `api/problems.py` | 🟡 부분(콘텐츠축 충족·개인정보열람축 미착지) |
 | Rate Limiting | 슬라이딩 윈도우, 메모리/Redis, 카테고리별 | `api/_rate_limit.py` | ✅ 충족 |
-| CORS/보안 헤더 미들웨어 | 없음 | — | ⬜ 미착지 |
+| CORS/보안 헤더 미들웨어 | TrustedHost→CORS→보안헤더 순 상시 등록, allowlist 비면 deny-by-default(네이티브 앱 무영향), prod에서 HSTS/CSP 추가(SEC-26) | `app.py::create_app`, `config.py` | ✅ 충족 |
 | 테넌시/RLS | 없음 | — | ⬜ 미착지(EOS 단계) |
 | Service-to-Service 인증 | 내부망 신뢰 가정 | — | ⬜ 미착지(EOS 단계) |
-| Job 소유권 검사 | `/v1/jobs/{id}` 폴링에 인증은 있으나 job↔user 매핑 없음 | — | ⬜ 미착지 |
+| Job 소유권 검사 | `/v1/jobs/{id}` job↔user 매핑 적재·대조(`JobOwnership`, SEC-27) — 매핑 부재·타인 소유 둘 다 404로 통일 | `db/models/job_ownership.py`, `app.py` | ✅ 충족 |
 | access_matrix 런타임 소비 | `data/access_matrix.json`은 계약 테스트만 읽음 | `tests/backend/schema/test_access_matrix.py` | 🟡 부분 |
 | 비밀번호 인증 | 미채택(OAuth 전용), passlib 제거 | `pyproject.toml:38` | N/A |
 | Secret 관리 | env 주입, 이미지 시크릿 0 | `Dockerfile`, CI | 🟡 부분 |
@@ -881,7 +881,7 @@ EOS-SEC-TEST-001   새 기능은 인가 회귀 테스트를 통과해야 한다.
 
 권장 착지 단계:
 
-1. **48-P0 현행 강화**(독립 가능): CORS/보안 헤더, admin access 감사 배선, job 소유권 검사, `access_matrix.json` 런타임 소비, expires_at writer.
+1. **48-P0 잔여**(독립 가능): `access_matrix.json` 런타임 소비, expires_at writer, `record_admin_access_audit`(관리자→학생 개인정보 열람 — ADMIN-06 콘솔 선행 대기). CORS/보안 헤더(SEC-26)·job 소유권 검사(SEC-27)·콘텐츠 CUD 감사(SEC-29)는 착지 완료.
 2. **46 먼저**: 인증·역할·MFA/Passkey 결정.
 3. **47 먼저**: 동의·보호자 관계·데이터 처리 근거·보존기간.
 4. **48-P1 EOS 확장**: ReBAC/ABAC, tenant_id, RLS, 관리자 콘솔.

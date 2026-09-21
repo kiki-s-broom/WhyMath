@@ -505,11 +505,11 @@ class CrossVerifier:
     ) -> None:
         _assert_independent(perspectives, min_perspectives)
         if provider is None:
-            from whymath_backend.l3.providers.anthropic import AnthropicProvider
             from whymath_backend.l3.providers.composite import CompositeProvider
+            from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
-            provider = CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+            provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         if trace is None:
             from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
 

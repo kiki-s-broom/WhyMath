@@ -54,6 +54,10 @@ _UNPINNED_WITH_TWIN = (
 )
 _GRADE_A = "concept-reach — mobile 호출 표면 회귀 가드"
 
+# `None`(입력 없음)과 '기본값을 써라'를 구별하기 위한 표식 — 둘을 같은 값으로 접으면
+# '룰셋 전문을 안 줬다' 픽스처를 만들 수 없다.
+_SENTINEL = object()
+
 
 def _documented() -> list[str]:
     """실제 문서가 선언한 체크 목록 — 픽스처를 문서와 같은 진실 원천에 묶는다."""
@@ -71,12 +75,16 @@ def _load_backlog() -> Any:
 def _rules(
     checks: list[tuple[str, int | None]],
     *,
-    strict: bool = True,
+    # 기본값은 **문서 선언을 따라간다**. 둘이 어긋나면 *정상* 입력이 위반으로 판정돼
+    # 이 파일 전체가 red가 된다 — 2026-09-14에 실제로 그렇게 발각됐다(선언을 false로
+    # 고치자 기본값 True인 픽스처가 10건 RED).
+    strict: bool = False,
     approvals: int = 0,
     dismiss: bool = False,
     codeowner: bool = False,
     thread: bool = True,
     linear: bool = True,
+    merge_queue: bool = True,
 ) -> list[dict[str, Any]]:
     """`gh api .../rules/branches/main` 응답 형태(규칙 배열)를 만든다.
 
@@ -108,6 +116,8 @@ def _rules(
     ]
     if linear:
         rules.append({"type": "required_linear_history"})
+    if merge_queue:
+        rules.append({"type": "merge_queue"})
     return rules
 
 
@@ -116,16 +126,58 @@ def _healthy_checks() -> list[tuple[str, int | None]]:
     return [(name, ruleset_drift.GITHUB_ACTIONS_INTEGRATION_ID) for name in _documented()]
 
 
-def _run(payload: Any, tmp_path: Path, today: date = _TODAY) -> int:
-    """CLI를 실제로 통과시켜 **exit code로** 판정한다(출력 문자열 눈대중 금지)."""
+def _full(
+    *,
+    bypass: list[dict[str, Any]] | None = None,
+    enforcement: str = "active",
+    ruleset_id: int | None = None,
+) -> dict[str, Any]:
+    """`gh api .../rulesets/<id>` 응답 형태(룰셋 전문)를 만든다.
+
+    기본값은 2026-09-14 실측 그대로다 — `bypass_actors: []`(우회 주체 0명)·`enforcement:
+    active`. 이것이 정상 상태여야 아래 주입들이 의미를 갖는다.
+    """
+    return {
+        "id": ruleset_drift.RULESET_ID if ruleset_id is None else ruleset_id,
+        "name": "main",
+        "target": "branch",
+        "enforcement": enforcement,
+        "bypass_actors": [] if bypass is None else bypass,
+    }
+
+
+def _run(
+    payload: Any,
+    tmp_path: Path,
+    today: date = _TODAY,
+    *,
+    full: Any = _SENTINEL,
+) -> int:
+    """CLI를 실제로 통과시켜 **exit code로** 판정한다(출력 문자열 눈대중 금지).
+
+    `full=None`이면 룰셋 전문 입력을 **주지 않는다** — 선언은 있는데 입력이 없는 상태를
+    재현하는 경로이며, 그 조합은 exit 2여야 한다(미측정 ≠ 위반 0).
+    """
     target = tmp_path / "ruleset.json"
     target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    return ruleset_drift.main([str(target), "--today", today.isoformat()])
+    argv = [str(target), "--today", today.isoformat()]
+    if full is _SENTINEL:
+        full = _full()
+    if full is not None:
+        full_path = tmp_path / "ruleset-full.json"
+        full_path.write_text(json.dumps(full, ensure_ascii=False), encoding="utf-8")
+        argv += ["--ruleset-full", str(full_path)]
+    return ruleset_drift.main(argv)
 
 
-def _report(payload: Any, today: date = _TODAY) -> ruleset_drift.Report:
+def _report(
+    payload: Any, today: date = _TODAY, *, full: dict[str, Any] | None = None
+) -> ruleset_drift.Report:
     doc = ruleset_drift.parse_doc(_DOC)
     live = ruleset_drift.parse_live(payload)
+    live = ruleset_drift.merge_ruleset_full(
+        live, ruleset_drift.parse_ruleset_full(full or _full(), doc.ruleset_id)
+    )
     return ruleset_drift.compare(doc, live, today)
 
 
@@ -158,14 +210,46 @@ def test_all_documented_checks_are_individually_detectable(tmp_path: Path) -> No
         assert _run(_rules(checks), tmp_path) == 1, f"{name} 제거가 탐지되지 않았다"
 
 
-def test_strict_policy_false_is_violation(tmp_path: Path) -> None:
-    """결함 주입: strict(=브랜치 최신화 요구)를 끈다. 체크 목록만 보면 놓치는 축."""
-    assert _run(_rules(_healthy_checks(), strict=False), tmp_path) == 1
+def test_strict_policy_true_is_violation(tmp_path: Path) -> None:
+    """결함 주입: strict(=브랜치 최신화 요구)를 켠다. 체크 목록만 보면 놓치는 축.
+
+    2026-09-14 `G-strict-policy-and-classic-cleanup` 결정으로 문서 선언이 `true`→`false`로
+    바뀌었다(merge queue가 이미 최신 base 재검증을 하므로 'up to date 요구'가 구조적으로
+    중복 — `.github/branch-protection-setup.md` '### strict 해제 확정' 참조). 그래서 드리프트
+    방향도 반대가 됐다 — 이제는 누가 strict를 **다시 켜는 것**이 문서 선언과의 불일치다.
+
+    **이 테스트가 사라지지 않는 것이 핵심이다** — 축을 감시하지 않게 된 것이 아니라
+    감시 방향이 바뀐 것뿐이다. 누가 strict를 되켜면 여기서 걸린다.
+    """
+    assert _run(_rules(_healthy_checks(), strict=True), tmp_path) == 1
 
 
 def test_thread_resolution_false_is_violation(tmp_path: Path) -> None:
     """결함 주입: 유예 대상이 *아닌* 정책 파라미터 축."""
     assert _run(_rules(_healthy_checks(), thread=False), tmp_path) == 1
+
+
+def test_merge_queue_off_is_violation(tmp_path: Path) -> None:
+    """결함 주입: 누가 merge queue를 끈다 (HARN-98).
+
+    2026-09-09부터 큐가 머지 경로를 지탱한다 — PR은 큐 브랜치에서 최신 main 위에 얹혀
+    재검증되고, 거기서만 경로 기반 잡 스킵이 풀려 전체 스위트가 돈다. 큐가 꺼지면 그 재검증이
+    통째로 사라지는데, 감시 축에 없으면 **아무 신호도 나지 않는다**. 그 상태가 정확히
+    "보호가 있다고 믿는 무보호"다(CLAUDE.md 상시 실패하는 fail-open 보호).
+    """
+    assert _run(_rules(_healthy_checks(), merge_queue=False), tmp_path) == 1
+    report = _report(_rules(_healthy_checks(), merge_queue=False))
+    assert any("merge_queue" in v for v in report.violations), report.violations
+
+
+def test_merge_queue_on_is_not_a_violation() -> None:
+    """변별력 — 켜진 상태에서는 조용해야 한다.
+
+    양쪽에서 같은 답을 내면 이 축은 아무것도 구별하지 않는 것이다. 위 RED와 짝이어야
+    "감시한다"가 성립한다.
+    """
+    report = _report(_rules(_healthy_checks(), merge_queue=True))
+    assert not any("merge_queue" in v for v in report.violations), report.violations
 
 
 def test_undocumented_live_check_is_violation(tmp_path: Path) -> None:
@@ -332,7 +416,9 @@ def test_as_found_2026_09_03_state_is_reported_exactly(tmp_path: Path) -> None:
     """
     checks = _healthy_checks() + [(name, None) for name in _UNPINNED_WITH_TWIN]
     checks = [c for c in checks if c != (_GRADE_A, 15368)] + [(_GRADE_A, None)]
-    payload = _rules(checks)
+    # strict=True를 그 시점 실측대로 고정한다 — `_rules`의 기본값은 2026-09-14 이후
+    # 문서 선언(false)을 따라가므로, 이 역사적 스냅숏은 기본값 변화와 무관하게 유지해야 한다.
+    payload = _rules(checks, strict=True)
 
     assert _run(payload, tmp_path) == 1
     report = _report(payload)
@@ -597,7 +683,22 @@ def test_input_encodings_are_tolerated(label: str, encoding: str, tmp_path: Path
         target.write_bytes((bom + text).encode(encoding))
     else:
         target.write_bytes(text.encode(encoding))
-    assert ruleset_drift.main([str(target), "--today", _TODAY.isoformat()]) == 0, label
+    # 인코딩 축만 보는 테스트이므로 룰셋 전문은 정상 상태로 동봉한다 — 없으면 exit 2(미측정)가
+    # 나와 *인코딩 관용이 깨진 것*과 구별되지 않는다(HARN-102 이후).
+    full_path = tmp_path / "ruleset-full.json"
+    full_path.write_text(json.dumps(_full(), ensure_ascii=False), encoding="utf-8")
+    assert (
+        ruleset_drift.main(
+            [
+                str(target),
+                "--ruleset-full",
+                str(full_path),
+                "--today",
+                _TODAY.isoformat(),
+            ]
+        )
+        == 0
+    ), label
 
 
 def test_undecodable_input_exits_two_without_traceback(tmp_path: Path) -> None:
@@ -630,12 +731,23 @@ def test_measurement_failure_is_recorded_and_surfaced(tmp_path: Path) -> None:
 
 
 def _powershell_incompatibilities(command: str) -> list[str]:
-    """PS 5.1에서 그대로 붙여넣었을 때 깨지는 표기를 찾는다."""
+    """PS 5.1에서 그대로 붙여넣었을 때 깨지거나 **손상된 파일을 만드는** 표기를 찾는다."""
     problems = []
     if "&&" in command:
         problems.append("`&&` — Windows PowerShell 5.1이 받지 않는다")
     if "python3 " in command:
         problems.append("`python3` — 이 저장소의 Windows 안내는 `python`이다")
+    for line in command.splitlines():
+        if "gh api" not in line or "cmd /c" in line:
+            continue
+        # 손상 축은 **출력을 파일로 받아 되읽을 때**만 성립한다. `| Out-Null`처럼 버리는
+        # 호출(쓰기 API의 응답 등)은 파싱 대상이 아니므로 경유해도 무해하다 — 여기서
+        # 좁히지 않으면 정상 블록이 위반으로 잡혀 사람이 이 가드를 끄게 된다.
+        if any(sink in line for sink in ("Out-File", "Set-Content", "Tee-Object", ">")):
+            problems.append(
+                f'gh 출력을 PowerShell로 받아 파일에 쓴다 — `cmd /c "gh api ... > file"`로 '
+                f"감싼다: {line.strip()}"
+            )
     return problems
 
 
@@ -647,13 +759,57 @@ def test_reminder_command_runs_on_windows_powershell() -> None:
     """
     runbook = ruleset_drift.POWERSHELL_FETCH_RUNBOOK
     assert not _powershell_incompatibilities(runbook), _powershell_incompatibilities(runbook)
-    assert (
-        "Out-File -Encoding utf8" in runbook
-    ), "PS 5.1의 `>`는 UTF-16LE로 쓴다 — 산출 인코딩을 명시해야 한다"
+    assert "cmd /c" in runbook, (
+        "gh 출력이 PowerShell 파이프라인을 거치면 cp949 디코딩 왕복에서 JSON 구조 문자가 "
+        "유실된다(2026-09-14 실측 41자) — `cmd /c` 안에서 파일로 바로 받아야 한다"
+    )
     assert "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath" in runbook, "고정 작업 디렉터리 누락"
 
     # 리마인드 3종 전부가 그 명령을 그대로 실어야 한다(한 곳만 고치고 나머지가 새는 것 방지).
     assert runbook in (ruleset_drift.state_reminder(Path("/존재하지-않는-루트"), _TODAY) or "")
+
+
+@pytest.mark.parametrize(
+    "label,command,should_flag",
+    [
+        # 2026-09-14 실측 축 — 인코딩은 명시됐으나 디코딩 경유가 남아 41자가 유실됐다.
+        (
+            "파이프 경유(Out-File)",
+            "gh api repos/o/r/rules/branches/main | Out-File -Encoding utf8 x.json",
+            True,
+        ),
+        # 2026-09-05 실측 축 — PS 5.1의 `>`는 UTF-16LE로 쓴다.
+        ("bare 리다이렉트", "gh api repos/o/r/rules/branches/main > x.json", True),
+        # 현행 정본 — 바이트가 PowerShell을 통과하지 않는다.
+        ("cmd /c 경유", 'cmd /c "gh api repos/o/r/rules/branches/main > x.json"', False),
+        # 성공 방향 대조군: gh를 쓰지 않는 줄은 이 절이 건드리지 않는다.
+        ("gh 무관 명령", "python scripts\\harness\\ruleset_drift.py x.json --record", False),
+        # 대조군 — 출력을 *버리는* 쓰기 호출. 파싱 대상이 아니므로 경유해도 무해하다.
+        # (실제 오탐이었다: 첫 구현이 문서의 룰셋 PUT 블록을 위반으로 잡았다.)
+        (
+            "출력 폐기(Out-Null)",
+            "gh api -X PUT repos/o/r/rulesets/1 --input p.json | Out-Null",
+            False,
+        ),
+    ],
+)
+def test_gh_output_must_not_pass_through_powershell(
+    label: str, command: str, should_flag: bool
+) -> None:
+    """수집 명령의 *형태*를 동결한다 — 산출물이 깨지는 축은 인코딩 관용으로 못 막는다.
+
+    왜 읽기측이 아니라 여기인가: `read_json_text`의 폴백은 **인코딩**만 가린다. cp949 왕복은
+    바이트를 실제로 *유실*시키므로 결과 파일은 UTF-8로 멀쩡히 디코딩되고 JSON 단계에서야
+    깨진다(`Expecting ',' delimiter`). 즉 산출측 형태가 유일한 방어선이다.
+
+    픽스처 4종은 각각 다른 절을 밟는다 — 파이프 축·리다이렉트 축·정본 축·무관 축. 앞의 둘은
+    이 저장소에서 **실제로 exit 2를 낸** 형태이고, 뒤의 둘은 과잉 탐지(모든 명령을 위반으로
+    계상하는 수정)를 잡는 대조군이다(CLAUDE.md 2026-09-08 — 성공 방향 대조군 없이는 과잉
+    수정이 전건 RED로 통과한다).
+    """
+    problems = _powershell_incompatibilities(command)
+    gh_problems = [p for p in problems if "PowerShell로 받아 파일에 쓴다" in p]
+    assert bool(gh_problems) is should_flag, f"[{label}] 탐지 결과가 기대와 다르다: {problems}"
 
 
 def test_doc_runbook_selfcheck_precedes_the_run_command() -> None:
@@ -677,7 +833,7 @@ def test_doc_runbook_selfcheck_precedes_the_run_command() -> None:
     assert blocks, "문서에 powershell 블록이 없다 — 실행 경로가 사라졌다"
 
     run_at = next(
-        (n for n, b in enumerate(blocks) if "ruleset_drift.py ruleset.json --record" in b),
+        (n for n, b in enumerate(blocks) if "ruleset_drift.py ruleset.json" in b),
         None,
     )
     assert run_at is not None, "판정기를 실행하는 런북 블록이 없다"
@@ -718,6 +874,234 @@ def test_doc_runbook_block_runs_on_windows_powershell() -> None:
     assert blocks, "문서에 powershell 블록이 없다 — 실행 경로가 사라졌다"
     for block in blocks:
         assert not _powershell_incompatibilities(block), _powershell_incompatibilities(block)
+    # 위 루프가 *나쁜 형태*를 막는다. 여기서는 **정본 형태가 실재하는지**를 따로 본다 —
+    # 조회 블록을 통째로 지워도 위 루프는 조용히 통과하기 때문이다(스캔 0건은 공허한 통과).
+    # 규칙 자체는 `_powershell_incompatibilities` 한 곳에만 둔다: 여기에 사본을 두었더니
+    # 출력을 버리는 PUT 블록까지 위반으로 잡혔다(2026-09-14 오탐).
     assert any(
-        "Out-File -Encoding utf8" in b for b in blocks
-    ), "조회 블록이 `>`로 리다이렉트하면 UTF-16LE가 나와 판정기가 읽지 못한다"
+        "cmd /c" in b and "gh api" in b and ">" in b for b in blocks
+    ), "gh 결과를 파일로 받는 정본 조회 블록이 문서에서 사라졌다 — 실행 경로가 없다"
+
+
+# ---------------------------------------------------------------------------
+# 계약 ⑦ — 룰셋 전문 축(bypass_actors·enforcement) · HARN-102
+#
+# 왜 별도 계약인가: 이 축은 `/rules/branches/main`에 **없어서** 2026-09-14까지 아무도 보지
+# 않았다. 그날 클래식 브랜치 보호를 지우며 `bypass_actors: []`를 1회 실측했지만, 판정기가 읽지
+# 않으니 그것은 스냅샷일 뿐이었다 — 나중에 채워 넣어도 화면은 초록이다. 아래 주입들은 그
+# "초록인 무보호"가 실제로 RED가 되는지를 확인한다(CLAUDE.md 2026-09-01: 정상 입력에서 초록인
+# 것은 보호의 증거가 아니다).
+#
+# 픽스처 접촉(2026-09-07 규칙): 아래 각 케이스는 판정기의 *서로 다른 절*을 밟는다 —
+# 비어 있지 않은 배열 · 키 자체의 부재 · id 불일치 · 오류 본문 · enforcement 값 · 입력 누락.
+# 한 절을 지우면 정확히 한 케이스가 살아남도록 배치했다.
+# ---------------------------------------------------------------------------
+
+
+def test_empty_bypass_actors_is_the_baseline(tmp_path: Path) -> None:
+    """기준선 — 2026-09-14 실측 상태(`[]`·active)는 통과해야 아래 RED들이 의미를 갖는다."""
+    assert _run(_rules(_healthy_checks()), tmp_path) == 0
+
+
+@pytest.mark.parametrize(
+    ("label", "actors"),
+    [
+        (
+            "조직 관리자 역할",
+            [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+        ),
+        # PR 한정 우회도 우회다 — 이 저장소의 머지 경로가 전부 PR이므로 실질은 always와 같다.
+        (
+            "PR 한정 우회",
+            [{"actor_id": 1, "actor_type": "OrganizationAdmin", "bypass_mode": "pull_request"}],
+        ),
+        (
+            "여러 주체",
+            [
+                {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"},
+                {"actor_id": 99, "actor_type": "Integration", "bypass_mode": "always"},
+            ],
+        ),
+    ],
+)
+def test_nonempty_bypass_actors_is_a_violation(
+    label: str, actors: list[dict[str, Any]], tmp_path: Path
+) -> None:
+    """우회 주체가 생기면 exit 1 — 클래식 `enforce_admins: false`와 같은 상태다."""
+    assert _run(_rules(_healthy_checks()), tmp_path, full=_full(bypass=actors)) == 1, label
+
+
+def test_violation_names_the_actors_not_just_the_count(tmp_path: Path) -> None:
+    """개수만 보고하면 "누가 우회하는가"를 다시 조회해야 한다 — 판정과 같은 화면에 있어야 한다.
+
+    변별력: 상세 문구 절을 지우면 exit code는 그대로 1이라 위 테스트는 **살아남는다**. 그래서
+    코드가 아니라 문구를 따로 묶는다(2026-09-04 M6·M7과 같은 형태의 방어).
+    """
+    report = _report(
+        _rules(_healthy_checks()),
+        full=_full(
+            bypass=[{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}]
+        ),
+    )
+    joined = "\n".join(report.violations)
+    assert "RepositoryRole#5(always)" in joined, joined
+    assert any("bypass_actors" in r for r in report.remediation), report.remediation
+
+
+def test_missing_full_input_is_measurement_failure_not_pass(tmp_path: Path) -> None:
+    """**이 태스크의 핵심 주입** — 선언은 있는데 입력이 없으면 exit 2다.
+
+    빠진 입력을 "위반 0"으로 접으면 이 도구가 막으려는 형태(미측정이 통과로 보이는 상태)를
+    스스로 만든다. 0도 1도 아니어야 한다는 것이 계약이다.
+    """
+    assert _run(_rules(_healthy_checks()), tmp_path, full=None) == 2
+
+
+def test_doc_declares_the_full_ruleset_axes() -> None:
+    """선언 자체가 사라지면 RED — 선언을 지우면 CLI가 입력을 요구하지 않아 조용해진다.
+
+    즉 위 `test_missing_full_input...`은 **선언이 있을 때만** 변별력이 있다. 그 전제를 여기서
+    따로 동결한다(CLAUDE.md "스캔 0건은 실패"와 같은 축 — 대상이 사라진 가드는 공허히 통과한다).
+    """
+    doc = ruleset_drift.parse_doc(_DOC)
+    assert ruleset_drift.FULL_RULESET_KEYS <= set(doc.params), (
+        "문서 RULESET_POLICY 블록에서 룰셋 전문 축 선언이 사라졌다 — " f"선언: {sorted(doc.params)}"
+    )
+    assert doc.params["ruleset_bypass_actor_count"] == 0
+    assert doc.params["ruleset_enforcement"] == "active"
+
+
+def test_doc_without_ruleset_id_fails_loudly(tmp_path: Path) -> None:
+    """룰셋 전문 입력의 신원 확인 기준이 없으면 판정할 수 없다.
+
+    조용히 "id 검사 생략"이 되면 **다른 룰셋의 덤프로도 초록**이 난다 — 판정 대상이 바뀌었는데
+    화면은 같은 형태다(`required_check_integration_id` 축과 같은 이유로 필수).
+    """
+    broken = tmp_path / "no_rid.md"
+    broken.write_text(
+        "<!-- REQUIRED_CHECKS_BEGIN -->\n- `x`\n<!-- REQUIRED_CHECKS_END -->\n"
+        "<!-- RULESET_POLICY_BEGIN -->\n- `required_check_integration_id` = `15368`\n"
+        "<!-- RULESET_POLICY_END -->\n"
+        "<!-- RULESET_DEVIATIONS_BEGIN -->\n<!-- RULESET_DEVIATIONS_END -->\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ruleset_drift.RulesetInputError, match="ruleset_id"):
+        ruleset_drift.parse_doc(broken)
+
+
+def test_declared_ruleset_id_matches_the_runbook_constant() -> None:
+    """문서 선언 · 판정기 상수 · 런북 명령이 **같은 룰셋**을 가리켜야 한다.
+
+    셋이 갈라지면 수집은 A를 받아 오고 판정은 B를 기대해 상시 exit 2가 된다 — 고칠 수 없는
+    위반을 매번 보고하는 판정기는 사람이 끄게 된다(CLAUDE.md "상시 실패하는 fail-open").
+    """
+    doc = ruleset_drift.parse_doc(_DOC)
+    assert doc.ruleset_id == ruleset_drift.RULESET_ID
+    assert f"rulesets/{doc.ruleset_id}" in ruleset_drift.POWERSHELL_FETCH_RUNBOOK
+    assert f"rulesets/{doc.ruleset_id}" in _DOC.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("label", "payload", "reason"),
+    [
+        # 키 부재를 0으로 접으면 응답 형식이 바뀌는 날 보호가 조용히 사라진다.
+        (
+            "bypass_actors 키 부재",
+            {"id": ruleset_drift.RULESET_ID, "enforcement": "active"},
+            "bypass_actors",
+        ),
+        (
+            "enforcement 키 부재",
+            {"id": ruleset_drift.RULESET_ID, "bypass_actors": []},
+            "enforcement",
+        ),
+        # gh는 404/403 본문도 stdout으로 내보내므로 그대로 파일에 남는다.
+        ("API 오류 본문", {"message": "Not Found", "status": "404"}, "`id`가 없다"),
+        # 룰셋을 다시 만들면 id가 바뀐다 — 그때는 "정책 위반"이 아니라 "엉뚱한 파일"이다.
+        (
+            "다른 룰셋의 덤프",
+            {"id": 999, "enforcement": "active", "bypass_actors": []},
+            "다른 룰셋의 덤프",
+        ),
+        # 규칙 배열(첫 번째 입력)을 두 번째 자리에 넣은 경우.
+        ("입력 두 개를 뒤바꿈", [{"type": "deletion"}], "객체여야"),
+        (
+            "bypass_actors 항목 형식 이상",
+            {
+                "id": ruleset_drift.RULESET_ID,
+                "enforcement": "active",
+                "bypass_actors": [{"bypass_mode": "always"}],
+            },
+            "형식이 예상과 다르다",
+        ),
+    ],
+)
+def test_full_ruleset_measurement_failures(label: str, payload: Any, reason: str) -> None:
+    """룰셋 전문 축의 측정 실패는 **각각 고유한 원인 문구**를 남긴다.
+
+    exit code만 묶으면 상류 가드를 지워도 하류가 같은 2를 내며 초록이 유지된다.
+    """
+    with pytest.raises(ruleset_drift.RulesetInputError, match=reason):
+        ruleset_drift.parse_ruleset_full(payload, ruleset_drift.RULESET_ID, source=label)
+
+
+@pytest.mark.parametrize(
+    ("label", "payload"),
+    [
+        ("bypass_actors 키 부재", {"id": ruleset_drift.RULESET_ID, "enforcement": "active"}),
+        ("API 오류 본문", {"message": "Not Found"}),
+        ("다른 룰셋의 덤프", {"id": 999, "enforcement": "active", "bypass_actors": []}),
+    ],
+)
+def test_full_ruleset_failures_reach_exit_two_through_the_cli(
+    label: str, payload: Any, tmp_path: Path
+) -> None:
+    """파서가 올린 실패가 CLI 층에서 **exit 2**로 나온다(예외 누출·exit 0/1 아님)."""
+    assert _run(_rules(_healthy_checks()), tmp_path, full=payload) == 2, label
+
+
+def test_undecodable_full_input_exits_two(tmp_path: Path) -> None:
+    """두 번째 입력도 첫 번째와 같은 인코딩·파싱 방어를 받는다(관용 없는 침묵 금지)."""
+    target = tmp_path / "ruleset.json"
+    target.write_text(json.dumps(_rules(_healthy_checks()), ensure_ascii=False), encoding="utf-8")
+    broken = tmp_path / "ruleset-full.json"
+    broken.write_text("{이건 JSON이 아니다", encoding="utf-8")
+    assert (
+        ruleset_drift.main(
+            [str(target), "--ruleset-full", str(broken), "--today", _TODAY.isoformat()]
+        )
+        == 2
+    )
+    assert ruleset_drift.main([str(target), "--ruleset-full", str(tmp_path / "없다.json")]) == 2
+
+
+@pytest.mark.parametrize("enforcement", ["evaluate", "disabled"])
+def test_inactive_enforcement_is_a_violation(enforcement: str, tmp_path: Path) -> None:
+    """`enforcement`가 active가 아니면 규칙이 있어도 막지 않는다 — 추론이 아니라 대조한다.
+
+    2026-09-14 12축 대조는 "규칙 16건이 돌아왔으니 active다"라는 **API 의미 추론**이었다.
+    이제 필드를 직접 읽으므로 그 추론 구간이 사라진다.
+    """
+    assert _run(_rules(_healthy_checks()), tmp_path, full=_full(enforcement=enforcement)) == 1
+
+
+def test_doc_runbook_collects_the_full_ruleset() -> None:
+    """런북·판정기 상수가 **두 엔드포인트를 모두** 수집해야 한다.
+
+    변별력: 두 번째 수집 줄만 지우면 Kiki의 실행이 상시 exit 2가 되는데, 그 상태는 첫 줄만
+    보는 기존 테스트에서 전부 초록이다 — 그래서 정본 형태의 *실재*를 따로 본다
+    (CLAUDE.md "스캔 0건은 실패").
+    """
+    text = _DOC.read_text(encoding="utf-8")
+    blocks = re.findall(r"```powershell\n(.*?)```", text, flags=re.DOTALL)
+    run_block = next((b for b in blocks if "ruleset_drift.py ruleset.json" in b), None)
+    assert run_block is not None, "판정기 실행 블록이 없다"
+    assert (
+        "--ruleset-full" in run_block
+    ), "런북이 룰셋 전문을 판정기에 넘기지 않는다 — bypass_actors 축이 상시 미측정(exit 2)이 된다"
+    assert f"rulesets/{ruleset_drift.RULESET_ID}" in run_block, "런북에 룰셋 전문 수집 줄이 없다"
+    # 두 수집 모두 cp949 왕복을 피해야 한다(2026-09-14 41자 유실).
+    assert run_block.count("cmd /c") >= 2, run_block
+    assert (
+        "--ruleset-full" in ruleset_drift.POWERSHELL_FETCH_RUNBOOK
+    ), "브리핑 리마인드 명령이 룰셋 전문을 빠뜨린다 — 안내대로 실행하면 exit 2가 난다"

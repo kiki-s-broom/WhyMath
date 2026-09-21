@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-86-eos118-seat-signal-gate-runbook
+title: "EOS-118 게이트 실행 도구 — 회차 요약 cloud_seat 추출기 + 라이브 관측 런북"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: cancelled
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 추출기 착지 — `scripts/ops/extract_cloud_seat.py` 신설. `problem_corpus_accumulate`의 stdout JSON에서 `cloud_seat` 블록만 뽑아 **ASCII 전용**으로 출력한다(`ensure_ascii=True`). 이유는 인코딩 안전이다 — Kiki가 콘솔 출력을 복사해 회신하는데 한국어(`note`·`unmeasured_reason`·`cost_note`)가 섞이면 PowerShell cp949 디코딩 왕복에서 손상된다(CLAUDE.md 2026-09-14 셸 중계 축). 로그 줄이 앞에 섞여도 `raw_decode`로 첫 JSON 객체를 집는다.\n② 0과 None을 구분해 낸다 — `retries_total`·`calls_with_any_retry`가 None이면 `None`으로, 0이면 `0`으로 낸다. 둘을 같은 글자로 접으면 '계측했고 재시도 0건'과 '아무도 계측 안 함'이 한 화면이 된다(EOS-112가 분모를 따로 낸 이유). `cost_usd_total`도 같은 축이다.\n③ 판정 보조 출력 — EOS-118 acceptance ②의 두 신호를 **각각 별도 키**로 낸다(`SIGNAL_STATE_MEASURED`·`SIGNAL_COMPARABLE_POSITIVE`). 한 줄로 합치지 않는다 — 한 신호로 두 축을 판정하면 선언 축만 살아 있고 관측 축이 죽은 회차가 통과한다(EOS-111 등재를 부른 형태).\n④ 런북 착지 — `docs/ops/eos118_seat_signal_live_runbook.md` 신설. 6항목 브리핑 + 블록 3개([A] 좌석 왕복 조회 · [B] 사전 점검 조회 · [C] 2회차 실행 + 추출). [C]는 쓰기 블록이므로 단일 최상위 `if (…) { … } else { … }` 자가거부 가드를 갖고 else 가지가 **어느 조건이 False였는지** 출력한다(HARN-106). `scripts/ops/check_runbook_blocks.py` exit 0으로 실측 확인한다.\n⑤ 인코딩 경유 제거 — accumulate stdout은 PowerShell 파이프가 아니라 `cmd /c` 리디렉션으로 파일에 받는다(cp949 디코딩 왕복 회피 — 출력 인코딩 명시로는 막히지 않는 축). 캡처 파일은 UTF-8로 남고 콘솔에는 추출기의 ASCII 출력만 나온다.\n⑥ 전제 정정 — 게이트 `G-eos118-seat-signal-live-run` 설명은 'Docker Postgres 가동'을 전제로 적었으나 `problem_corpus_accumulate`는 DB를 임포트하지 않는다(실측: 해당 모듈 import 문에 db·session·sqlalchemy·engine 0건 · ARCH-57 런북도 'Docker·DB·서버 불요'로 적는다). 런북 §5에 'DB 불요'와 그 실측 근거를 명기해 Kiki가 없는 선행 조건을 갖추느라 왕복하지 않게 한다.\n⑦ 회귀 동결 — `tests/infra/test_extract_cloud_seat.py`로 ①~③을 고정하고 뮤테이션으로 변별력을 확인한다(ensure_ascii 제거 · None을 0으로 접기 · 두 신호를 한 키로 합치기 · raw_decode 폴백 제거 — 각각 RED여야 한다).\n⑧ 경계 — 이 태스크는 게이트 실행 자체가 아니다. EOS-118의 라이브 회차는 Phaiakes9·키가 필요해 여전히 Kiki 소유이며 `G-eos118-seat-signal-live-run`이 그것을 막는다. 이 태스크는 그 게이트를 **실행 가능하게 만드는** 도구·런북 축만 소유하고, 관측 결과의 판정은 EOS-118이 소유한다."
+artifacts: []
+paths:
+  - scripts/ops/extract_cloud_seat.py
+  - docs/ops/eos118_seat_signal_live_runbook.md
+  - tests/infra/test_extract_cloud_seat.py
+session: null
+notes: "등재 경위(2026-09-19): \"EOS-118을 먼저\"라는 Kiki 지시로 착수. 그런데 그 태스크는 `requires_gates: [G-eos118-seat-signal-live-run]`이라 `backlog.py start`가 착수를 거부한다(실측 exit 1) — 즉 본체는 세션이 잡을 수 없고, 세션이 할 수 있는 일은 그 게이트를 **실행 가능하게 만드는 것**뿐이다. 게이트 설명 자신이 \"세션이 실행 전에 6항목 브리핑과 함께 명령 블록을 안내하며, 런북·측정 코드가 Kiki 체크아웃에 실재하는지(main 도달) 먼저 실측 확인한다\"를 세션에 배정해 두었다.\n\n실측으로 확인한 공백(기존 ARCH-57 런북을 그대로 쓸 수 없는 이유): `docs/ops/arch57_authoring_openrouter_runbook.md`의 [C] 블록은 exit code와 산출 JSONL 행 수만 회신받는다. 요구되는 것은 회차 요약의 `cloud_seat` 블록 전문인데 그 요약은 stdout으로만 나가고(`json.dump(payload, sys.stdout)`) 런북이 그것을 캡처하지 않는다 — 지금 상태로 안내하면 Kiki가 회차를 다 돌고도 판정 재료가 화면 스크롤로 사라진다. 또 ARCH-57 런북은 `$Ref`를 미머지 브랜치로 고정해 두었는데 그 PR은 이미 main에 착지했다(`l3/providers/factory.py` main 실재 실측).\n\n이 태스크는 관측 태스크를 done으로 만들지 않는다 — 회차 실행과 그 판정(어긋남 쌍의 사람 판정 포함)은 EOS-118이 소유한다.\n\n[취소 2026-09-19] 중복 등재 — 같은 산출물이 이미 존재한다. PR #1223(브랜치 claude/hopeful-einstein-9rdysp · 2026-09-19T12:41Z 생성)이 docs/ops/eos118_seat_signal_live_runbook.md를 신설하고 라이브 2회차를 실행·판정하고 게이트 G-eos118-seat-signal-live-run을 cleared로 닫았다. 추출기도 그 런북 본문에 인라인으로 들어 있어 scripts/ops/extract_cloud_seat.py를 따로 만들 이유가 없고, 이 태스크가 부수로 적었던 가드 어휘 공백은 같은 PR이 HARN-116으로 등재해 이미 소유자가 있다. 등재 시점에 하네스의 의미 중복 고지(유사도 0.14 · 공유 희소어 eos118_seat_signal_live_runbook)가 이것을 잡았고, 그 고지가 없었으면 코드를 쓰기 시작했을 것이다."
+updated: 2026-09-19

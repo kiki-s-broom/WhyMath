@@ -61,9 +61,15 @@ ADAPTER_IMPL_MODULE_TOKEN = "subject_adapter_math"
 # 어댑터 생성자 주입으로, `l3.pedagogy.slot_generator`는 호출부 파라미터로 각각 바뀌었다.
 # [EOS-86, EOS-89와 병행 개발] `l4.solution_coaching`이 신규 1건으로 남는다 — verify_solution
 # 직접 import를 걷어내는 대가로 이 모듈이 합성 루트에서 StepChainVerifier 기본 구현을 지연
-# 조회한다(기존 테스트 무수정 통과를 위해 기본 인자 해석을 이 모듈이 스스로 맡음 — api.coach가
-# 대신 주입하는 방향은 solution_coaching의 300+ 단위테스트 전량이 verifier를 명시 주입해야 해서
-# 비용이 더 컸다). EOS-89는 이 간선을 몰랐다(병행 개발) — 등록 형태 전환은 별도 판단 대상.
+# 조회한다.
+# [COMP-01] 그 능력의 *서빙* 경로는 push로 바뀌었다(app.py 등록 + api.coach 3핸들러 명시 주입).
+# 그럼에도 이 baseline이 줄지 않는 이유는 두 가지이며, 둘 다 소스에서 확인된다:
+#   ① 단위테스트 편의 폴백(`if verifier is None: from ...composition import ...`)이 남아 있다 —
+#      지우면 `recommend_coaching_for_solution`을 직접 부르는 300+ 테스트가 전부 verifier를
+#      만들어 넘겨야 한다.
+#   ② 설령 ①을 지워도 같은 모듈이 `default_wrong_form_shadow_observer`를 지연 조회하므로 간선은
+#      남는다. 즉 이 baseline의 축소 조건은 "두 폴백을 모두 걷어내는 것"이다.
+# 이 항목을 지우려는 사람은 위 두 import를 먼저 없애야 한다(그러지 않으면 이 테스트가 RED).
 CORE_PULL_BASELINE: frozenset[str] = frozenset({"l4.solution_coaching"})
 
 # 합성 루트를 소비해도 되는 **비-CORE** 모듈 — 프로세스가 시작되는 자리(=합성 루트의 정의).
@@ -80,14 +86,19 @@ NON_CORE_COMPOSITION_CONSUMERS: frozenset[str] = frozenset(
 # 정본이고, 이 목록은 그 정본과 대조된다(이름을 두 곳에 손으로 적어 두지 않는다).
 SUBJECT_CAPABILITY_STATE_MODULE = "api._subject_capability_state"
 
-# 합성 루트 팩토리 중 app.py가 부르지 **않아도 되는** 것들 — CORE_PULL_BASELINE과 이중 회계다.
-# [EOS-86, EOS-89와 병행 개발] `default_step_chain_verifier`·`default_wrong_form_shadow_observer`는
-# app.state 등록 대상이 아니라 `l4.solution_coaching`(CORE_PULL_BASELINE에 이미 편입)이 지연
-# 호출하는 값이다. 여기서 빼면서 저기에 안 넣거나, 저기서 빼면서 여기에 남기면 이중 회계가
-# 깨진다 — 두 집합을 함께 갱신한다.
-PULL_ONLY_COMPOSITION_FACTORIES: frozenset[str] = frozenset(
-    {"default_step_chain_verifier", "default_wrong_form_shadow_observer"}
-)
+# 합성 루트 팩토리 중 app.py가 부르지 **않아도 되는** 것들. 이 집합이 하는 일은 하나다 —
+# `test_app_factory_calls_every_composition_factory`가 "app.py가 반드시 호출해야 하는 팩토리"를
+# 계산할 때 전체 팩토리에서 이만큼을 뺀다. 즉 **여기 남은 것은 app.py가 부르지 않는 것이 정상**이고,
+# 여기서 빠지는 순간 app.py 호출이 강제된다.
+# [COMP-01] `default_step_chain_verifier`는 app.state 등록(push) 대상이 되어 이 집합에서 빠졌다 —
+# app.py가 이제 실제로 호출한다. 남은 `default_wrong_form_shadow_observer`는 애초에 "능력"이 아닌
+# 관측기(`Callable[[str], None]`·fire-and-forget)라 등록 대상이 아니며, `l4.solution_coaching`이
+# 지연 조회한다.
+# CORE_PULL_BASELINE과의 관계(더 이상 1:1 이중 회계가 아니다): step chain은 **양쪽 형태가 공존**
+# 한다 — 서빙 3경로는 push 주입이고(그래서 여기서 빠짐), 단위테스트용 폴백 지연 import는 소스에
+# 남는다(그래서 `l4.solution_coaching`은 CORE_PULL_BASELINE에 잔존). 그 잔존은 관측기 폴백만으로도
+# 성립하므로, 이 집합에서 능력이 빠졌다고 저 집합이 줄어야 하는 것이 아니다.
+PULL_ONLY_COMPOSITION_FACTORIES: frozenset[str] = frozenset({"default_wrong_form_shadow_observer"})
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -412,8 +423,10 @@ def test_app_factory_calls_every_composition_factory() -> None:
 
     키만 올리고 값이 딴 데서 오면 "등록 형태"라는 주장이 절반만 참이다. app.py가 import한
     `default_*` 이름과 합성 루트의 `__all__`을 대조해 누락을 잡는다. `PULL_ONLY_COMPOSITION_
-    FACTORIES`(CORE_PULL_BASELINE과 이중 회계)에 실린 것은 app.py가 부르지 않는 것이 정상이므로
-    제외한다.
+    FACTORIES`에 실린 것은 app.py가 부르지 않는 것이 정상이므로 제외하되, **그 면제가 참인지도
+    함께 잰다**(COMP-01) — 목록에 적힌 팩토리를 app.py가 실제로 부르고 있으면 그것은 면제가
+    아니라 미갱신이므로 RED다. 한쪽 방향만 재면 면제 목록에 이름을 더하는 것만으로 이 게이트를
+    조용히 끌 수 있다.
     """
     app_src = (_PKG / "app.py").read_text(encoding="utf-8")
     assert f"whymath_backend.{COMPOSITION_MODULE}" in absolute_imports(app_src)
@@ -432,6 +445,17 @@ def test_app_factory_calls_every_composition_factory() -> None:
     assert (
         push_factories <= called
     ), f"app.py가 부르지 않는 합성 루트 팩토리: {sorted(push_factories - called)}"
+    # [COMP-01] **역방향도 잰다** — 면제 목록이 한쪽으로만 잠겨 있으면 그 목록은 서명란이 된다.
+    # 위 단언만 있을 때 `PULL_ONLY_COMPOSITION_FACTORIES`에 이름을 *더하면* push_factories가
+    # 줄어들 뿐이라 항상 통과한다(실패 주입 실측 2026-09-07: step chain을 목록에 되돌려 넣어도
+    # 22 passed — 면제 추가가 무증상이었다). 그래서 "여기 남은 것은 app.py가 부르지 않는 것이
+    # 정상"이라는 이 목록의 정의 자체를 단언한다: 등록해 놓고 면제 목록에도 적어 두는 모순
+    # 상태(둘 중 어느 쪽이 진실인지 읽는 사람이 알 수 없다)를 RED로 만든다.
+    contradictory = PULL_ONLY_COMPOSITION_FACTORIES & called
+    assert not contradictory, (
+        "app.py가 부르는데 PULL_ONLY_COMPOSITION_FACTORIES에도 실려 있다 — 등록(push)됐다면 "
+        f"목록에서 빼라: {sorted(contradictory)}"
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MGMT-05-ip-separation-evidence-pack
+title: "겸직 IP 귀속 분리 증빙팩 — 커밋 신원·시각 증빙 생성기 + 확인서/양도예정 기록 템플릿 (게이트 G-eos-ip-separation-evidence 입력)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 기계 축: scripts/ops/ip_separation_evidence.py가 전체 git 이력에서 커밋 신원(author/committer 이메일·이름)·타임스탬프 분포를 산출하고, shallow·git 실패를 exit 2(측정 불가)로 분리해 '수집 실패'가 '이상 없음'으로 위장되지 않는다. 리포트는 단계마다 즉시 flush."
+  - "② 집행 지점(정본화와 별항): tests/infra/test_ip_separation_evidence.py가 CI에서 실제로 실행되며(배선 확인), 판정 로직을 정상 상태 GREEN·결함 주입 RED 양방향으로 동결한다 — 뮤테이션 주입으로 RED를 실측한 기록을 PR에 남긴다."
+  - "③ 증빙 한계 명시: 리포트·문서가 git 메타데이터로 증명하는 것(계정 귀속·시각 분포)과 증명하지 못하는 것(장비 소유·author date 위조 가능성)을 분리해 적는다 — '모르면 모른다'."
+  - "④ 사람 축 템플릿 정본화: 재직사 자산·데이터 무사용 확인서·신설 법인 IP 양도 예정 기록 템플릿을 docs/legal/templates/에 두고, 기입된 실물은 저장소 커밋 금지(.gitignore + 가드)로 배선한다."
+  - "⑤ Kiki 런북: docs/ops/ip_separation_evidence_gate_runbook.md — 6항목 사전 브리핑 + PowerShell 명령 블록(자리표시자 0개·python -m·cd 고정·자가검증 스텝 변별력 확인)."
+  - "⑥ 게이트 clear는 Kiki 소유 — 세션은 clear하지 않는다(kind=human·assignee=kiki). 서명·법률 판단의 기계 대체 금지."
+artifacts:
+  - "PR #1041 (https://github.com/doldori7/WhyMath/pull/1041) · squash 머지 79b0cc4d"
+  - "scripts/ops/ip_separation_evidence.py · tests/infra/test_ip_separation_evidence.py(45건) · docs/legal/templates/ 2종 · docs/ops/ip_separation_evidence_gate_runbook.md — main 실측 확인(git cat-file -e origin/main:<path> 6건 전건 존재)"
+  - "검증: 뮤테이션 31종 전건 RED · tests/infra 1059 passed · Codex 리뷰 2라운드 11건 전건 수용·resolve"
+paths:
+  - scripts/ops/ip_separation_evidence.py
+  - tests/infra/test_ip_separation_evidence.py
+  - "docs/legal/templates/**"
+  - docs/ops/ip_separation_evidence_gate_runbook.md
+session: null
+notes: "게이트 G-eos-ip-separation-evidence(2026-08-30 등재·remind 14d·2026-09-07 현재 미해소·경과 8일)의 입력을 만든다. 이 태스크는 게이트를 대체하지 않는다 — 확인서 작성·서명·법인 설립 계획 기록은 Kiki 소유이고, 세션은 그 2h를 기입·서명만 남기도록 줄인다. eos_priority: 선언문(§4)은 이 항목을 'P0'이라 부르나 대장 rubric의 P0은 '없으면 12월 검증 G0~G5가 성립하지 않는다'로 더 좁아 P1로 등재한다 — 검증 성립이 아니라 투자 실사·귀속 리스크 축이다. [등재 경위] MGMT-04로 먼저 등재했다가 owner 오기입(kiki)으로 start가 거부돼 cancel 후 재등재 — owner 변경 verb 부재."
+updated: 2026-09-07

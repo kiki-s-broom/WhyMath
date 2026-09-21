@@ -657,3 +657,107 @@ class TestComputeMatchesReturnShape:
         assert outcome.matches == []  # 게이트 ①이 비움
         assert outcome.no_confident_match is True
         assert outcome.low_quality is False  # OCR 미제공
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 반박 조건은 의미 경로도 막는다 (MISC-23 · PR #1039 Codex P2)
+# ──────────────────────────────────────────────────────────────────────────
+class _RootLossMatcher:
+    """의미 경로가 `root-loss-by-dividing`을 고신뢰로 되돌려주는 결정론 스텁.
+
+    substring 경로가 반박으로 제거한 오개념을 의미 경로가 **되살리는지**를 재는 도구다.
+    `combine_diagnoses`는 substring이 뺀 id를 "semantic-only"로 보고 아래에 붙이므로,
+    반박이 substring에만 걸려 있으면 이 스텁의 결과가 그대로 노출된다.
+    """
+
+    def match(
+        self, student_solution: str, *, top_k: int, threshold: float
+    ) -> list[MisconceptionMatch]:
+        return [
+            MisconceptionMatch(
+                misconception=CATALOG_BY_ID["root-loss-by-dividing"],
+                confidence=0.95,
+                semantic_similarity=0.95,
+            )
+        ]
+
+
+class TestRefutationCoversSemanticPath:
+    # 입력 선정에 두 개의 마스킹을 **동시에** 피해야 한다 — 둘 중 하나라도 걸리면 root-loss가
+    # 애초에 응답에 없어서, 내 필터를 제거해도 테스트가 통과한다(= 위장). 실제로 처음 고른
+    # 입력이 그랬고 뮤테이션 P1 생존으로 발각됐다.
+    #
+    #   ① 품질 게이트 — `matches[0]`(substring 1위)이 floor(0.65) 미만이면 후보를 **통째로**
+    #      비운다. 그래서 substring 1위가 **1.0**인 입력이어야 한다.
+    #   ② `combine_diagnoses`의 top_k 컷 — substring이 3칸을 다 채우면 semantic-only가
+    #      **잘려 나간다**. 그래서 substring 후보가 **2건 이하**인 입력이어야 한다.
+    #
+    # 아래 두 문장은 실측으로 골랐다(substring 2건 · 1위 1.0 · 결합 결과에 root-loss 포함).
+    _LEAD = "분모가 0이면 나눌 수 있다고 봤고"
+
+    #: 제로근을 **주장한** 서술 동반 — 반박이 성립해야 한다.
+    _REFUTED_CORRECT = _LEAD + " 해는 0과 2다"
+
+    #: 제로근을 **부정한** 서술 동반 — 반박이 성립하면 안 된다(대조군).
+    _NEGATED_WRONG = _LEAD + " x=0은 근이 아니다"
+
+    def test_semantic_hit_cannot_resurrect_a_refuted_misconception(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """의미_경로가_반박된_오개념을_되살리지_못한다
+
+        substring에만 반박을 걸었을 때 정확히 여기가 뚫렸다 — 의미 후보가 semantic-only로
+        붙어 정답에 확신 오진단이 다시 나갔다.
+        """
+        set_semantic_matcher(_RootLossMatcher())  # type: ignore[arg-type]
+        _enable_gate(monkeypatch)
+        try:
+            body = _client().post("/v1/coach", json={"student_input": self._REFUTED_CORRECT}).json()
+        finally:
+            get_settings.cache_clear()
+        ids = [m["misconception"]["id"] for m in body["misconceptions"]]
+        assert "root-loss-by-dividing" not in ids, ids
+
+    def test_semantic_hit_survives_when_not_refuted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """반박되지_않은_입력에서는_의미_후보가_그대로_산다 — 대조군
+
+        이 단언이 없으면 위 테스트는 "의미 경로를 통째로 죽였다"로도 통과한다. 제로근을
+        *부정한* 오답에서는 반박이 성립하지 않으므로 후보가 남아야 한다.
+        """
+        set_semantic_matcher(_RootLossMatcher())  # type: ignore[arg-type]
+        _enable_gate(monkeypatch)
+        try:
+            body = _client().post("/v1/coach", json={"student_input": self._NEGATED_WRONG}).json()
+        finally:
+            get_settings.cache_clear()
+        ids = [m["misconception"]["id"] for m in body["misconceptions"]]
+        assert "root-loss-by-dividing" in ids, ids
+
+    def test_input_is_not_masked_by_gate_or_topk(self) -> None:
+        """입력이_게이트·topk에_가려지지_않는다 — 위 두 테스트가 공허하지 않기 위한 전제
+
+        substring 1위가 floor 미만이거나 substring이 3칸을 채우면 root-loss는 반박과 **무관하게**
+        응답에서 사라진다. 그 상태면 위 단언들이 통과해도 아무것도 증명하지 못한다.
+        """
+        from whymath_backend.l4.misconception.diagnose import diagnose as _diagnose
+
+        for text in (self._REFUTED_CORRECT, self._NEGATED_WRONG):
+            subs = _diagnose(text, top_k=64)
+            assert subs, text
+            assert subs[0].confidence >= 0.65, f"게이트가 비운다: {text}"
+            assert len(subs) <= 2, f"top_k 컷에 semantic이 잘린다({len(subs)}건): {text}"
+
+    def test_matcher_is_actually_called(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """의미_매처가_실제로_호출된다 — 위 두 테스트가 공허하지 않음을 보인다
+
+        모드가 off로 새면 매처가 아예 안 불리고, 그러면 "되살리지 못한다"는 단언이 *의미 경로를
+        시험하지 않은 채* 통과한다.
+        """
+        stub = _StubMatcher()
+        set_semantic_matcher(stub)  # type: ignore[arg-type]
+        _enable_gate(monkeypatch)
+        try:
+            _client().post("/v1/coach", json={"student_input": self._REFUTED_CORRECT})
+        finally:
+            get_settings.cache_clear()
+        assert stub.calls == 1, "의미 매처 미호출 — 모드가 on이 아니다"

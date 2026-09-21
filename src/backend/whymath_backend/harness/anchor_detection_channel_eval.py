@@ -13,8 +13,12 @@ G0 확정 앵커(A1~A6)에 귀속되는 오개념 중 L4 카탈로그에 좌석�
   - `positive` — 오개념 흔적이 **확정적으로** 들어 있는 풀이. 검출돼야 한다(검출률 Wilson **하한**).
   - `negative` — 올바른 풀이·기호 일반형·인접 정답 형태. 검출되면 **안 된다**
     (오검출률 Wilson **상한**).
-  - `ambiguous` — 원리상 구별 불가한 우연의 일치(예: f(x₀)=x₀). **게이트에 넣지 않고 보고만** 한다.
-    숨기면 오검출률이 실제보다 좋아 보이고, 음성에 넣으면 원리상 통과 불가한 게이트가 된다.
+  - `ambiguous` — 원리상 구별 불가한 우연의 일치(예: f(x₀)=x₀). *정규식 발화 자체*(`ambiguous_
+    fired`)는 게이트에 넣지 않고 보고만 한다 — 숨기면 오검출률이 실제보다 좋아 보이고, 음성에
+    넣으면 원리상 통과 불가한 게이트가 된다. 다만 `ambiguous_serving_reach`(서빙 품질 게이트까지
+    살아남은 수)는 **0으로 강제**한다(MISC-24) — 원리상 구별 불가한 텍스트가 학생에게 확신
+    오진단으로 나가면 그 자체가 해악이므로, "발화했다"는 보고만 하되 "확신 진단으로 도달했다"는
+    회귀를 잡는다.
 
 픽스처는 템플릿 × 수치로 **결정론 생성**한다(난수 0·외부 I/O 0·LLM 0). 손으로 3건씩 적으면
 표본이 작아 Wilson 하한이 구조적으로 게이트를 통과할 수 없다(3/3의 95% 하한은 0.44다).
@@ -222,9 +226,12 @@ def _survives_serving_gate(kebab_id: str, text: str) -> bool:
     """이 텍스트의 그 오개념이 **서빙 품질 게이트(top-1 floor 0.65)를 넘어** 살아남는가.
 
     정규식이 *발화했다*와 학생 경로에 *도달했다*는 다른 사실이다(PR #1032 Codex P2). 이 채널들의
-    의도된 수치 입력에서는 기호 substring 신호가 0이라 정규식 단독 가산분만 남고
-    confidence=1/2=0.5 → floor 0.65 미만으로 `apply_match_quality_gate`가 **후보 전체를 비운다**.
-    그 사실을 재지 않으면 "검출률 100%"가 곧 "쓰인다"로 오독된다(작동 신호 없는 알고리즘 부착 금지).
+    의도된 수치 입력에서는 기호 substring 신호가 0이라 정규식 단독 매치만 남는다. MISC-22(v1.5)
+    이전에는 그 가산분이 substring 신호 1개와만 동등해 confidence=1/2=0.5 → floor 0.65 미만으로
+    `apply_match_quality_gate`가 **후보 전체를 비웠다**(factor-sign-flip이 이렇게 한 번도 학생에게
+    도달하지 못했다). MISC-22가 정규식 매치 1건을 신호 전체와 동등하게 가산하도록 confidence
+    공식을 정정해 이 함수는 그 사실(도달 여부)을 계속 잰다 — "검출률 100%"가 곧 "쓰인다"로
+    오독되지 않도록(작동 신호 없는 알고리즘 부착 금지) 채널 추가·정정 때마다 재측정한다.
     """
     gated = apply_match_quality_gate(diagnose(text, top_k=len(CATALOG_BY_ID)))
     return any(m.misconception.id == kebab_id for m in gated.matches)
@@ -242,6 +249,13 @@ class ChannelResult:
     negatives: int = 0
     ambiguous_fired: int = 0
     ambiguous_total: int = 0
+    #: MISC-24 — 모호 픽스처 중 **서빙 품질 게이트(top-1 floor 0.65)까지 살아남은** 수. 위
+    #: `ambiguous_fired`(정규식 발화 여부)와는 다른 축이다: "정규식이 매치했다"와 "학생에게 확신
+    #: 오진단으로 나갔다"는 다른 사실이라(PR #1032 Codex P2가 `positive` 계급에 세운 것과 같은
+    #: 구별). `passed`가 이 값을 **0으로 강제**한다 — 원리상 구별 불가한 우연의 일치가 서빙까지
+    #: 도달하면 그 자체로 확신 오진단이므로, `positives`의 serving_reach(보고만)와 달리 여기는
+    #: 보고에 그치지 않고 게이트로 쓴다.
+    ambiguous_serving_reach: int = 0
     #: 양성 중 **서빙 게이트까지 살아남은** 수. 검출 수와 다를 수 있고, 0이어도 게이트는 통과한다
     #: — 서빙 결선은 acceptance ③이 D2 후속으로 명시 이관한 범위이기 때문이다. 다만 **보고한다**.
     serving_reach: int = 0
@@ -261,6 +275,10 @@ class ChannelResult:
         return (
             self.detection_lower >= DETECTION_FLOOR
             and self.false_positive_upper <= FALSE_POSITIVE_CEILING
+            # MISC-24: 원리상 구별 불가한 우연의 일치가 서빙 게이트까지 살아남으면 그 자체로
+            # 확신 오진단(학생 정서 최우선 위반)이므로, ambiguous_total이 0(픽스처 없는 채널)이든
+            # 아니든 항상 강제한다 — ambiguous_total=0인 채널은 이 항이 트리비얼하게 참이다.
+            and self.ambiguous_serving_reach == 0
         )
 
     def to_json(self) -> dict[str, object]:
@@ -275,6 +293,7 @@ class ChannelResult:
             "false_positive_upper_bound": round(self.false_positive_upper, 4),
             "ambiguous_fired": self.ambiguous_fired,
             "ambiguous_total": self.ambiguous_total,
+            "ambiguous_serving_reach": self.ambiguous_serving_reach,
             "serving_reach": self.serving_reach,
             "passed": self.passed,
             "misses": self.misses[:5],
@@ -304,6 +323,8 @@ def evaluate() -> list[ChannelResult]:
         for text in fx.ambiguous:
             if _channel_fired(fx.kebab_id, text):
                 r.ambiguous_fired += 1
+            if _survives_serving_gate(fx.kebab_id, text):
+                r.ambiguous_serving_reach += 1
         results.append(r)
     return results
 
@@ -406,7 +427,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"검출 {ch.detected}/{ch.positives}(하한 {ch.detection_lower:.4f}) · "
                 f"오검출 {ch.false_positives}/{ch.negatives}"
                 f"(상한 {ch.false_positive_upper:.4f}) · "
-                f"모호 {ch.ambiguous_fired}/{ch.ambiguous_total} · "
+                f"모호 {ch.ambiguous_fired}/{ch.ambiguous_total}"
+                f"(서빙도달 {ch.ambiguous_serving_reach} — 게이트 강제 0) · "
                 f"서빙도달 {ch.serving_reach}/{ch.positives}"
             )
         print(

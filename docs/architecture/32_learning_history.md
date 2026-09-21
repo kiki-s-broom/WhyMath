@@ -136,6 +136,7 @@ EOS-48이 §7의 두 갭을 착지시킨다(신규 테이블 없음 — 기존 3
 4. **privacy 3종 무변경 검토(검증 가능)** — 신규 테이블 0이라 플랜 변경 0. 3테이블의 기존 플랜 커버 유지·파기 축 불변·신규 컬럼의 export payload 노출은 `tests/backend/privacy/test_event_time_active_time_privacy.py`가 기계로 동결.
 5. **ADR-001 무충돌** — attempt_event 컬럼 추가는 파티션 키·복합 PK 불변이라 hypertable 전환 절차와 무충돌(ADR-001 추기 2026-08-31).
 6. **writer 배선은 범위 밖** — event_time 신고·ingested_at 기록·heartbeat 기반 active/idle 계측의 클라·서버 배선은 후속 몫(빈 좌석·ratio 지표가 그 작동률을 상시 드러낸다).
+   - **부분 착지 (PED-37 · 2026-09-07)**: `problem_attempt` 축의 서버 writer 2종이 배선됐다 — `api/me.py::submit_attempt`가 요청의 선택 필드 `started_at`(클라 신고 발생 시각)을 *그대로* 적재하고 수신 시각을 `ingested_at`에 분리 기록하며, `api/coach.py::_complete_problem`은 `dialogue.started_at`을 이관받는다. 미신고는 NULL 유지(서버 now 폴백 금지 — §EOS-48-2 '수신 시각 복제 = 날조'). 배경은 `started_at`이 상시 NULL이라 `harness/wh1_evaluation`의 since/until 집계와 `privacy/retention` 파기가 조용히 0행이었던 것이고, 집행은 `tests/backend/api/test_attempt_started_at_integration.py`(실 PG·개수 단언)가 동결한다. **남은 몫**: `attempt_event.event_time` 신고, heartbeat 기반 active/idle 계측, 그리고 클라이언트(Flutter)가 실제로 `started_at`을 보내는 배선.
 
 ---
 

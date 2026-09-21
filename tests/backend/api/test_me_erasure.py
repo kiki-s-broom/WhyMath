@@ -13,12 +13,14 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from _external_store_evidence import assert_manifest_stores_are_deployed
 from fastapi.testclient import TestClient
 
 from whymath_backend.api._auth import get_current_user
 from whymath_backend.app import create_app
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
+from whymath_backend.privacy.erasure import external_erasure_targets
 from whymath_backend.schema.enums import Persona
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
@@ -89,8 +91,11 @@ class TestEraseMyAccount:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["user_id"] == str(_UID)
-        # 21개 테이블(+EOS-32/45/46 신규 3종) + user_profile, 각 2행 = 44.
-        assert body["total_rows_deleted"] == 44
+        # `_ERASURE_PLAN` 24개 테이블(+EOS-32/45/46 3종·SEC-27 job_ownership·EOS-105
+        # learning_state_transition·**SEC-35 learner_state**) + user_profile, 각 2행 = 50.
+        # 파생값(`len(_ERASURE_PLAN)`)으로 바꾸지 않는다 — 그러면 계획이 *줄어도* 이 단언이
+        # 따라 줄어 조용히 통과한다. 하드코딩이 곧 "계획이 바뀌면 사람이 본다"는 ratchet이다.
+        assert body["total_rows_deleted"] == 50
         assert fake.commits == 1  # 엔드포인트가 commit(원자적)
         # DeletionAudit 1행 적재(GDPR 증빙·삭제 전).
         from whymath_backend.db.models.audit import DeletionAudit
@@ -129,14 +134,22 @@ class TestEraseMyAccount:
     def test_pending_external_logged_not_in_response(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """외부 store 별도 삭제 필요를 *ops 로그*로만 가시화 — 응답엔 미노출(정보 누출 0)."""
+        """외부 store 별도 삭제 필요를 *ops 로그*로만 가시화 — 응답엔 미노출(정보 누출 0).
+
+        SEC-32: 기대 store를 이 파일에 하드코딩하지 않는다. 매니페스트를 진실 원천으로 삼아
+        ①그 store들이 실재하고(계약) ②전부 로그에 찍히는지(누락 0)를 본다 — store 목록이
+        바뀔 때 로그 배선만 조용히 뒤처지는 일을 막는다.
+        """
         client, _ = _client(rowcount=2)
         with caplog.at_level(logging.INFO, logger="whymath.api.me"):
             resp = client.request("DELETE", "/v1/me", json={"confirmation": _CONFIRM})
         assert resp.status_code == 200
         # ops 로그에 store명·user_id가 남아 누락이 가시화된다(조용한 누락 0).
         logged = "\n".join(r.getMessage() for r in caplog.records if r.name == "whymath.api.me")
-        assert "clickhouse" in logged and "s3" in logged and "redis" in logged
+        stores = [t.store for t in external_erasure_targets(_UID)]
+        assert_manifest_stores_are_deployed(stores, source="DELETE /v1/me ops 로그")
+        missing = [store for store in stores if store not in logged]
+        assert not missing, f"ops 로그에 안 찍힌 외부 store: {missing}"
         assert str(_UID) in logged
         # student-facing 응답엔 인프라/매니페스트 미노출(요약 영수증 2필드만).
         assert set(resp.json()) == {"user_id", "total_rows_deleted"}

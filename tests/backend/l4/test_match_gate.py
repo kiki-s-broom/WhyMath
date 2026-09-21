@@ -152,6 +152,7 @@ class TestResultModel:
             "matches",
             "no_confident_match",
             "low_quality",
+            "attribution_unclear",  # MISC-28 게이트 ③
         }
 
     def test_extra_field_forbidden(self) -> None:

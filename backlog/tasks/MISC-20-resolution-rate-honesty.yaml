@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -18,11 +18,28 @@ acceptance:
   - "④ 과거 행 백필 금지 — 기존 비활성화 사유는 복원 불가. NULL(사유 미상)로 두고 분자에서 제외(정직 회계·날조 0)"
   - "⑤ 집행 지점 별항 — 강등이 GET /v1/me/growth-evidence 응답에 실제 반영되는지(value null화·suppressed_reason 학생 대면 문장) API 테스트로 확인. 티어 상수만 바꾸고 서빙 확인 생략하면 미완"
   - "⑥ 범위 밖 동결 — 다른 지표 티어(mastery_gain_rate는 PED-14 소관) · SurrogateMetrics 계산식 · hint_depth_reached 조합 제약"
-artifacts: []
+  - "③-b [구현 중 판정 2026-09-07] RESOLVED 정의를 좁게 고정 — '반박 탈락 ∧ 정정 형태를 직접 보인 강한 반박 증거(weight>=0.75=coach._REFUTE_STRONG_WEIGHT 경로) 실재'만 해소로 센다. 막연한 clean 풀이의 약한 반박(0.5)은 REFUTED에 머문다('안 틀렸다'≠'넘어섰다'). 경계가 내려가면 사유 컬럼을 갖춘 채 과대해석이 되살아나므로(근사라는 사실조차 숨어 더 나쁘다) 경계값 자체를 테스트가 동결(evidence_store._STRONG_REFUTATION_MIN_WEIGHT)"
+  - "③-c [구현 중 판정 2026-09-07] ⑩ 계산식(is_active=false 비율)은 이번 범위에서 바꾸지 않는다 — 사유별 분자(RESOLVED만)로 전환하면 표본 축적 전이라 분자 0인 지표가 된다. deactivated_reason은 그 전환의 재료를 이제부터 모으며, 전환은 재승격 판정과 함께(③의 명시적 판정에 포함). 정직한 공백으로 PR·04e에 명시"
+  - "⑦ [구현 중 실측 2026-09-07] 기존 거버넌스 테스트 1건 정정(test_coach_wh1_convergence_governance::test_curate_single_source) — 전체 스위트에서 red로 발견. 원인: 저장소가 curate_with_reasons를, 하네스가 curate를 부르게 되며 identity 동결(hypothesis_store.curate is wh1_loop.curate)이 성립 불가. 처분: 사본 분기를 만들지 않는 방향으로 해소 — curate를 curate_with_reasons의 얇은 래퍼로 만들어 구현을 하나로 유지하고, 동결 지점을 그 단일 구현으로 옮겼다(불변식 보존·약화 0). 래퍼 계약 단언은 비퇴화 입력으로 작성(빈 입력은 어떤 구현이든 []라 변별력 0 — 뮤테이션 2종으로 확인)"
+  - "⑧ [머지 후 실측 2026-09-07] main이 착지시킨 CLAUDE.md v0.2.16(픽스처 접촉 축 — 절마다 그 절의 반례를 픽스처에 명시)을 자체 적용해 결함 1건 자가 발견·해소. strong_refutation_mids의 polarity 절 단언이 토큰 존재(\"polarity\" in compiled)만 봐서, 부호가 -1→+1로 뒤집히는 뮤테이션(M8)이 살아남았다 — 그 상태는 *지지* 증거를 반박으로 읽어 강하게 지지된 가설을 해소로 계상한다(해소율이 반대 방향으로 부풀려지는 최악의 오작동). 값까지 보도록 강화(polarity = -1 · >= 0.75 리터럴 단언) 후 M7(절 삭제)·M8(부호 반전)·M5(임계 완화) 3종 전건 RED 확인"
+  - "⑨ [Codex P1 수용 2026-09-07] 해소 판정 축을 가중치 추론 → **출처 표식**으로 교체. 지적: strong_refutation_mids가 polarity=-1 AND coalesce(weight,1.0)>=0.75로 판정해 두 곳에서 뚫린다 — ①weight는 nullable(미평가 None)인데 coalesce(...,1.0)이 NULL을 최강 신호로 접는다(모른다→확정, CLAUDE.md '모른다≠아니다'의 정반대) ②WH-1 하네스 LogEvidenceAction.weight는 LLM이 지정하므로 숫자 하나로 '학생이 오개념을 넘어섰다'가 영구 기록될 수 있다. 실측 확인 후 수용. 처분: evidence_links.provenance TEXT NULL 신설(리비전 e3b5c79d02f8·백필 0·NULL=출처 미상은 해소 아님) + coach가 correct_form_present 실측일 때만 CORRECT_FORM_DEMONSTRATED를 남기고 + 판정 쿼리는 그 컬럼만 본다(가중치는 판정에서 완전 제거 — 테스트가 compiled SQL에 'weight' 부재를 단언). 뮤테이션 4종 전건 RED: 가중치 추론 회귀·polarity 절 삭제·표식 무조건 부착·표식 미부착"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1044"
+  - a3bbefff
 paths:
+  - src/backend/whymath_backend/db/models/evidence_link.py
+  - src/backend/whymath_backend/schema/evidence_link.py
   - src/backend/whymath_backend/harness/growth_evidence_exposure.py
   - src/backend/whymath_backend/db/models/misconception_hypothesis.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - src/backend/whymath_backend/l4/misconception/evidence_store.py
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/api/coach.py
+  - "src/backend/alembic/versions/*deactivated_reason.py"
+  - "src/backend/alembic/versions/*provenance.py"
   - "tests/backend/api/test_me_growth_evidence*.py"
+  - "tests/backend/l4/test_misconception_hypothesis*.py"
 session: null
-notes: "원 등재 MISC-10(r1skwr backup a95bb456에만 잔존) — HARN-35 재등재. 정본: misconception_module_gap_review_r2.md §2 G4 + 04e §9-D4. 학생 안전 #1·'확실하지 않을 때 자신 있게 말함 금지' 축. PED-14와 paths 공유 — 나중 착수 쪽이 rebase\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "원 등재 MISC-10(r1skwr backup a95bb456에만 잔존) — HARN-35 재등재. 정본: misconception_module_gap_review_r2.md §2 G4 + 04e §9-D4. 학생 안전 #1·'확실하지 않을 때 자신 있게 말함 금지' 축. PED-14와 paths 공유 — 나중 착수 쪽이 rebase\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/harness/growth_evidence_exposure.py', 'src/backend/whymath_backend/db/models/misconception_hypothesis.py', 'tests/backend/api/test_me_growth_evidence*.py'] → ['src/backend/whymath_backend/harness/growth_evidence_exposure.py', 'src/backend/whymath_backend/db/models/misconception_hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis_store.py', 'src/backend/whymath_backend/l4/misconception/evidence_store.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/alembic/versions/*deactivated_reason.py', 'tests/backend/api/test_me_growth_evidence*.py', 'tests/backend/l4/test_misconception_hypothesis*.py']: MISC-20 구현 중 판정 3건(RESOLVED 좁은 정의·계산식 전환 유보·거버넌스 테스트 정정) 기록 + paths를 실제 변경 파일로 정정\n\n[정정 2026-09-07] 머지 후 자체 점검 — 신규 규칙 v0.2.16 자체 적용으로 polarity 절 뮤테이션 생존 1건 발견·해소\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/harness/growth_evidence_exposure.py', 'src/backend/whymath_backend/db/models/misconception_hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis_store.py', 'src/backend/whymath_backend/l4/misconception/evidence_store.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/alembic/versions/*deactivated_reason.py', 'tests/backend/api/test_me_growth_evidence*.py', 'tests/backend/l4/test_misconception_hypothesis*.py'] → ['src/backend/whymath_backend/db/models/evidence_link.py', 'src/backend/whymath_backend/schema/evidence_link.py', 'src/backend/whymath_backend/harness/growth_evidence_exposure.py', 'src/backend/whymath_backend/db/models/misconception_hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis.py', 'src/backend/whymath_backend/l4/misconception/hypothesis_store.py', 'src/backend/whymath_backend/l4/misconception/evidence_store.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/api/coach.py', 'src/backend/alembic/versions/*deactivated_reason.py', 'src/backend/alembic/versions/*provenance.py', 'tests/backend/api/test_me_growth_evidence*.py', 'tests/backend/l4/test_misconception_hypothesis*.py']: Codex P1 수용 — 해소 판정을 가중치 추론에서 출처 표식으로 교체(리비전 1건 추가) + paths에 신규 대상 편입"
+updated: 2026-09-07

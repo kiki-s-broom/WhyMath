@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-100-learning-loop-relation-contract
+title: "EOS Learning Loop Contract v1 — 14객체·9관계 계약 코드 고정 + ARCH-37 좌석 매핑표"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 계획서 300 §1 EOS Kernel의 14객체(Learner·LearnerState·Curriculum·Objective·Concept·Skill·Content·Problem·Attempt·Assessment·Misconception·Mastery·Recommendation·LearningSession)를 코드 상수로 고정 — 목록 외 객체 추가 시 기계가 RED\n② 객체 간 관계 9묶음을 (source, edge, target) 삼중항 레지스트리로 고정 — 정의되지 않은 관계 추가 시 기계가 RED\n③ ARCH-37 19종 좌석 정본과의 1:1 매핑표를 문서로 산출 — 좌석 없는 객체(Recommendation 등)·좌석에 흡수된 객체(Attempt/LearningSession)를 '부재'/'흡수'로 정직 표기. 신규 DB 테이블·신규 좌석을 만들지 않는다(ARCH-37 엣지 테이블 핵심외 배제 판정 불변)\n④ prerequisite 관계의 DAG 무결성(순환 부재)을 검사하는 reachability 테스트 동봉 — 순환 주입 시 RED\n⑤ 집행 별항(정본화≠집행): 이 계약을 기계가 대조하는 지점을 명기한다. 서빙 코드 배선은 이 태스크 범위 밖이며 그 사실을 명시한다\n⑥ 뮤테이션 검증 — 계약 위반 상태(미정의 객체 추가·미정의 관계 추가·순환 prerequisite 삽입)를 실제 주입해 전건 RED 확인. 주입 적용 자체(mutated != original)도 단언"
+artifacts:
+  - "PR #1180 https://github.com/kiki-s-broom/WhyMath/pull/1180 · 커밋 a5b4b386 · 정본 docs/architecture/learning_loop_contract_v1.md(14객체·18관계·ARCH-37 19종 전수 귀속·집행 고지 별항) + 코드 src/backend/whymath_backend/schema/learning_loop_contract.py + 집행 tests/backend/schema/test_learning_loop_contract.py 37 passed EXIT=0 · 뮤테이션 25종 전건 RED 생존 0(순수 Python 하네스·주입 적용/바이트 동일 원복 단언) · 전체 백엔드 12601 passed EXIT=0 커버리지 90.40% · 계층 커버리지 게이트 PASS · ruff/black/mypy --strict(664파일)/lint-imports(3계약 kept) 전건 EXIT=0 · tests/infra 1411 + tests/harness 831 passed · 결함주입 강등전 120/120 오검출 0/120 EXIT=0 · CI 경로 필터 편입(다섯 번째 동결 입력) · 미판정 1건(Assessment 이름 충돌)은 EOS-12 acceptance ⑤로 대장 집행"
+paths:
+  - src/backend/whymath_backend/schema/learning_loop_contract.py
+  - tests/backend/schema/test_learning_loop_contract.py
+  - docs/architecture/learning_loop_contract_v1.md
+session: null
+notes: "Kiki 지시(2026-09-16 · 계획서 300 집행 지시문 P-01)로 착수. plan300 크로스워크(EOS-09) §9-②는 이 축을 '등재 제외'로 판정했었다 — 사유: ARCH-37(done)이 엣지 테이블을 '핵심 외'로 명시 배제했으므로 관계 계약 등재는 그 판정을 조용히 뒤집는다, 필요한 것은 결정이지 착수 단위가 아니다. 이번 등재는 그 '결정'이 Kiki 지시로 내려진 것으로 간주한다. 충돌 회피 설계: 본 태스크는 DB 테이블/좌석을 하나도 만들지 않고 호출 계약(타입 + 관계 레지스트리) 층만 고정하므로 ARCH-37의 좌석 배제 판정과 양립한다. 지시문 세트 원문은 PR #1176(미머지) docs/ops/phase2_eos_closed_loop_execution_prompts.md."
+updated: 2026-09-16

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-82-required-checks-premise-drift
+title: "머지 판정 도구의 필수 체크 전제가 실측과 어긋난다 — docstring '6종·6.5분·느린 잡 제외' vs 현재 규칙 16종(느린 잡 포함)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: blocked
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재확인 — GET /repos/doldori7/WhyMath/rules/branches/main 으로 required_status_checks 전건을 다시 조회해 목록·건수를 조회 시각과 함께 기록한다. 2026-09-07 실측값은 16종이며 'backend — lint·type·test'가 포함돼 있다"
+  - "② docstring 정정 — pr_merge_readiness.py 모듈 docstring의 '필수 체크 6종(중앙값 6.5분)뿐' 과 '최장 잡 backend — lint·type·test(~30분)는 필수 목록에 없다' 두 문장을 실측값으로 교체한다. 도구 *코드*는 규칙을 라이브 조회하므로 동작 자체는 정상이다 — 고칠 대상은 전략을 오도하는 산문이지 로직이 아니다"
+  - "③ 완화 전략 재판정 — 느린 잡이 필수에 포함되면 '필수만 기다리면 6.5분'이라는 완화가 성립하지 않는다. 필수 16종의 실측 소요(중앙값)를 다시 재어 대기 시간과 base 전진 확률을 재산출하고, 완화가 여전히 유효한지 판정한다. 무효라면 그 사실을 docstring에 명시해 다음 세션이 없는 최적화를 믿지 않게 한다"
+  - "④ 변별력 — 도구가 필수 목록을 하드코딩이 아니라 라이브 조회한다는 것을 결함 주입으로 확인한다(규칙 응답을 6종으로 축소 주입 → 판정 문구·exit code가 실제로 달라지는가). 주입 전후 바이트 동일 원복을 단언한다"
+  - "⑤ 정직한 공백 — 6종에서 16종으로 늘어난 시점과 사유는 ruleset 이력 조회 권한이 없어 규명하지 못했다. 규명 수단을 찾지 못하면 '조회 방법 없음'이라고 범위를 밝혀 적는다(추론으로 채우지 않는다)"
+artifacts: []
+paths:
+  - scripts/ops/pr_merge_readiness.py
+session: null
+notes: "발견 경위(2026-09-07): 세션이 PR #1025를 머지하려다 REST 405 'Repository rule violations found / 16 of 16 required status checks are expected'를 2회 맞았다. 원인 규명 과정에서 pr_merge_readiness.py를 읽었는데, 그 docstring은 '필수 체크 6종(중앙값 6.5분)뿐이고 최장 잡 backend — lint·type·test(~30분)는 필수 목록에 없다'고 적고 있었다. 그런데 같은 도구를 실행해 규칙을 라이브 조회하니 16종이었고 그 느린 잡이 필수에 들어 있었다. 405 에러 문구의 '16'과도 일치한다.\\n\\n왜 중요한가: 그 docstring은 단순 설명이 아니라 이 저장소의 머지 전략 근거다 — '필수만 기다리면 6.5분이라 base 전진 확률 16%, 전체를 기다리면 28.6분이라 70%'라는 계산이 완화 방안 전체를 떠받친다. 느린 잡이 필수가 된 순간 그 계산의 분자가 바뀌므로, 전략을 읽고 따르는 세션은 있지도 않은 최적화를 믿게 된다. 도구 코드는 라이브 조회라 정상 동작하므로 이것은 무증상이다 — 판정은 맞고 산문만 틀렸다.\\n\\n인접: HARN-32가 그 전제를 세운 태스크이고, 머지 큐 도입(HARN-56)이 착지하면 이 축의 실효성 자체가 달라진다. 다만 이 태스크는 그 둘과 독립적으로 성립한다 — 산문이 실측과 어긋난 것을 고치는 일이라 다른 태스크의 결과를 기다리지 않는다.\n\n[차단 2026-09-07] acceptance ① 실측이 이 세션에서 결론 불가 — 소스 둘이 서로 반대를 가리킨다(2026-09-07T23:56Z 조회). [실측] ⓐ룰셋 /rules/branches/main·/rulesets/16623542(전문·admin 뷰) 양쪽 모두 required_status_checks 규칙 **자체가 없다**(규칙 = deletion·non_fast_forward·pull_request·required_linear_history). 그 룰셋의 updated_at은 2026-09-07T21:25:48Z로 오늘 갱신됐다 ⓑ레거시 /branches/main/protection은 **HTTP 403 'Resource not accessible by integration'** — 읽을 수 없다(없는 것이 아니라 못 보는 것) ⓒ그런데 PR #1053의 mergeable_state는 여전히 **behind**이고, behind는 strict 요구가 살아 있을 때 나오는 상태다 ⓓpr_merge_readiness.py를 실 PR에 돌리면 '필수 체크 0건 — 규칙 미조회/권한 부족(측정 실패)' exit 1. [왜 멈추는가] 태스크 전제는 '16종'인데 룰셋은 0종, 동작 신호는 반대, 이를 가를 레거시 소스는 403이다. 이 상태에서 docstring을 '0종'으로 고치면 근거가 한쪽 소스뿐이고 동작 신호가 반대인 **틀린 정정**을 박는 것이 된다 — 이 태스크가 고치려는 결함(전제와 실측의 어긋남)을 그대로 재생산한다. [해소 조건] 둘 중 하나. ①레거시 브랜치 보호를 읽을 수 있는 권한(admin)으로 1회 조회해 required check 유무·strict 여부를 확정 ②또는 Kiki가 21:25:48Z 룰셋 변경의 내용을 확인해 준다. [함께 보고할 것] G-merge-queue-or-strict-relax(kiki/decision·6일 경과)가 정확히 이 결정을 소유하는데 여전히 pending이고, 룰셋 변경을 기록한 커밋·게이트 증적이 저장소에 없다 — 결정이 대장 밖에서 일어났을 가능성. [부수 확인 사항] pr_merge_readiness.py는 '0건'을 항상 '측정 실패'로 접는다. 진짜 0(규칙 없음)과 조회 실패를 구분하지 못하므로, ①이 확정되면 그 구분도 함께 고쳐야 한다"
+updated: 2026-09-07

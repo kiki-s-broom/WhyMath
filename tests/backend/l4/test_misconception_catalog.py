@@ -21,10 +21,11 @@ from whymath_backend.l4.misconception.match_gate import _DEFAULT_CONFIDENCE_FLOO
 
 class TestCatalogShape:
     def test_thirty_two_entries_doc_explicit_only(self) -> None:
-        # doc 명시·상세화: 대수 35 + 기하 8 + 확률통계 6 + 함수 3
-        #                 + 미적분 7 + 수열 2 + 삼각함수 2 + 벡터 1 = 64
-        #                 (Phase 1 30 + S2-p 2 + 극값 MC 2 + 843 트랜치1~4 각 6 + 트랜치5 6)
-        assert len(CATALOG) == 64
+        # doc 명시·상세화: 대수 37 + 기하 8 + 확률통계 7 + 함수 3
+        #                 + 미적분 7 + 수열 2 + 삼각함수 2 + 벡터 1 = 67
+        #                 (Phase 1 30 + S2-p 2 + 극값 MC 2 + 843 트랜치1~4 각 6 + 트랜치5 6
+        #                  + MISC-21 3(앵커 A1·A2·A3 좌석 보강 — doc #65-67))
+        assert len(CATALOG) == 67
 
     def test_all_ids_unique(self) -> None:
         ids = [m.id for m in CATALOG]
@@ -135,6 +136,24 @@ class TestCanonicalIdsFromDoc:
         ):
             assert mid in CATALOG_BY_ID
             assert CATALOG_BY_ID[mid].domain == "함수"
+
+
+class TestMisc21AnchorSeatIds:
+    """MISC-21(2026-09-08) — G0 앵커 A1·A2·A3 좌석 보강 3종(doc #65-67)."""
+
+    def test_algebra_two(self) -> None:
+        for mid in ("bigger-denominator-bigger-fraction", "ratio-order-swapped"):
+            assert mid in CATALOG_BY_ID
+            assert CATALOG_BY_ID[mid].domain == "대수"
+
+    def test_probstat_one(self) -> None:
+        assert "addition-multiplication-rule-confused" in CATALOG_BY_ID
+        assert CATALOG_BY_ID["addition-multiplication-rule-confused"].domain == "확률통계"
+
+    def test_a5_not_promoted(self) -> None:
+        """A5(고1 이차함수 최대·최소) 후보 M-id는 omission형이라 의도적 미승격 — 회귀 가드."""
+        for mid in ("domain-restricted-vertex-only", "quadratic-max-min-endpoint-ignored"):
+            assert mid not in CATALOG_BY_ID
 
 
 class TestSuneungCanonicalIds:

@@ -203,8 +203,37 @@ docker ps -a --filter "name=whymath-pg" --format "{{.Names}}`t{{.Status}}`t{{.Po
 docker exec whymath-pg pg_isready -U whymath -d whymath
 ```
 
-- **성공**: `Up ...` 상태 + `... accepting connections`.
+> ⚠ **위 두 줄만으로는 부족하다(2026-09-08 실측).** 둘 다 통과하는데 호스트에서는 못 붙는
+> 상태가 실재했다 — 컨테이너는 `Up`, `pg_isready`는 `accepting connections`, 그런데 5433은
+> 닫혀 있었다. 두 명령이 **전부 컨테이너 안쪽**을 보기 때문이다(`docker exec`는 호스트
+> 네트워크를 경유하지 않는다). 아래 도달성 판정을 **함께** 돌린다:
+>
+> ```powershell
+> # [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
+> cd C:\Users\kiki\Desktop\__AI\WhyMath
+> $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+> $env:PYTHONPATH = (Resolve-Path "src\backend").Path
+> & src\backend\.venv\Scripts\python.exe -m whymath_backend.ops.db_host_reachability
+> "EXIT=$LASTEXITCODE"
+> ```
+>
+> exit **0=도달 가능 / 1=도달 불가 / 2=측정 불가**. 이 도구는 `HostConfig.PortBindings`(만들 때
+> 요청한 **설정**)와 `NetworkSettings.Ports`(실제로 성립한 **게시**)를 구분해 읽는다 — 사고
+> 당시 전자는 멀쩡했고 후자가 비어 있었다. 설정만 보면 고장을 정상으로 읽는다.
+
+- **성공**: `Up ...` 상태 **그리고** `... accepting connections` **그리고** 도달성 CLI가
+  `REACHABLE`(exit 0). 셋 다 필요하다 — 앞의 둘은 컨테이너 안쪽만 증명한다.
 - **실패 유형별 조치**
+  - **컨테이너는 Up · `pg_isready` 통과 · 그런데 호스트에서 못 붙음**(도달성 CLI가
+    `NOT_PUBLISHED`/`NO_BINDING`/`PUBLISHED_BUT_CLOSED`/`FOREIGN_LISTENER`) → DB가 죽은 것이
+    아니라 **문이 안 열린** 것이다. `[조치]` CLI 출력의 「대책」절을 따른다. Windows에서
+    실측된 원인은 Hyper-V/WinNAT 동적 포트 제외 범위가 5433을 삼킨 것이며, 진단·영구 조치
+    절차는 `/demo-doctor` 카탈로그 **§W1**에 있다. 이 유형이 **무증상으로 오래 갈 수 있는**
+    이유도 기억한다 — 백업(`docker exec pg_dump`)도 스키마 프로브(`docker exec psql`)도
+    컨테이너 안으로 들어가므로 이 고장을 **구조적으로 볼 수 없다**(OPS-72).
+  - `FOREIGN_LISTENER`가 나오면 특히 급하다 — **다른 프로세스가 그 포트를 물고 있다**는
+    뜻이라, 붙는 도구들이 성공하면서 엉뚱한 대상에 말을 걸고 있을 수 있다. 점유 프로세스부터
+    식별한다(`Get-NetTCPConnection -LocalPort 5433 -State Listen`).
   - 컨테이너가 `Exited` → `[조치]` `docker start whymath-pg`
   - 컨테이너 자체가 없음(`docker ps -a`에 행 없음) → **데이터 소실 가능성** → §4-8(OPS-02 복구 런북)로 이동. 새 컨테이너를 **추측으로 재생성하지 않는다**(포트·볼륨 구성은 OPS-02 §3-4의 `whymath-pg.inspect.json` 스냅샷으로 재현).
   - Docker Desktop 자체가 미가동 → Docker Desktop 실행 후 위 명령 재시도.

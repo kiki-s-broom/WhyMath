@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P0
 owner: claude
@@ -15,10 +15,14 @@ requires_gates: []
 acceptance:
   - "S3-28 판정 반영 후 .github/workflows/ci.yml:192 continue-on-error 제거 → qa_pipeline 게이트가 실제로 PR을 막는 강제 게이트가 된다. tests/infra/test_qa_pipeline_wiring.py에 6번째 계약 추가 — 이 스텝에 continue-on-error 키가 없을 것을 assert(변별력 실측 의무: 제거 *전* 상태에서 그 테스트가 실제 red를 내는지 확인한 뒤 제거한다 — 성공/실패 양쪽 같은 값이면 위장). changes 잡의 corpus 경로 필터(ci.yml:96)에 검사기 소스 경로 추가 — src/backend/whymath_backend/harness/·ops/provenance_audit.py·l3/equivalent/ (검사기가 바뀌어도 안 돌던 구멍). 상시 실행·스케줄 전환은 미채택(비용 대비 이익 불명확·스케줄은 PR을 막지 못함)."
   - "[r3 보강·2026-08-11] 블로커가 S3-28 하나가 아니다 — 축 9(defect_report_intake)는 DB를 읽는데 data-pipeline 잡에 Postgres 서비스가 없어(ci.yml 해당 잡에 services: 블록 0건 실측) 상시 'error'로 보고되고, qa_pipeline._aggregate가 gate_fail과 error를 똑같이 실패로 집계하므로 exit 1이다. 즉 위 acceptance를 문자 그대로 수행하면(continue-on-error 제거) S3-28이 해소돼도 CI가 상시 red가 된다. 따라서 제거 *전에* 축 9의 환경 판정을 분리한다 — 3안 중 착수 세션이 실측으로 택일: (a) DB 도달 불가를 no_snapshot(정당 상태·집계 제외)으로 강등하되 '테이블 없음'(수집 경로 미배선)과는 계속 구분해 현 이중 회계를 3중으로 넓힌다 [권장 — 비용 0이고 두 사태가 실제로 다르다] (b) data-pipeline 잡에 Postgres 서비스 추가 (c) 축 9를 Postgres가 이미 있는 backend-migrations 잡으로 이설. 어느 안이든 '검사 안 함'과 '검사했고 통과'가 같은 값이 되면 안 된다(CLAUDE.md 변별력 규칙)."
-artifacts: []
+artifacts:
+  - "19c7389a (#1101)"
 paths:
   - ".github/workflows/ci.yml"
   - tests/infra/test_qa_pipeline_wiring.py
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - tests/backend/harness/test_qa_pipeline.py
+  - tests/infra/test_ci_enforcement_declaration_contract.py
 session: null
-notes: "docs/architecture/operations_module_gap_review_r2.md §3 D3 — 외부 EOS 틀 모듈 45(QA 엔진) 재점검. ARCH-21이 만든 게이트가 CI에 배선은 됐으나 continue-on-error로 상시 fail-open이고 해제 조건이 ci.yml 주석·MEMORY 한 줄(=사람 기억)에만 존재. CLAUDE.md '상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지'·'대책은 규칙·코드·태스크 형태여야 한다' 정면 해당. ARCH-20/21이 학습한 '존재함≠돌아감'의 다음 단계 = '돌아감≠막음'. S3-28의 130/2647 판정 자체는 교수학 판정이라 이 태스크 범위 밖(임의 수정 금지). [2026-08-11 r3 §3 D7] 9일째 미착수 — 같은 fail-open이 2회 연속 관측됐다(r2 1회차·r3 2회차). r3가 두 번째 블로커(축 9 상시 error)를 실측 발견해 acceptance 2항을 추가했다. 라인번호도 :186→:192로 정정(그 사이 ci.yml 주석 증가). 일반 계약('돌아감≠막음'의 기계화)은 OPS-29가 별도로 담당하며, 이 태스크는 qa_pipeline 스텝의 실제 해제를 맡는다.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D2★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/operations_module_gap_review_r2.md §3 D3 — 외부 EOS 틀 모듈 45(QA 엔진) 재점검. ARCH-21이 만든 게이트가 CI에 배선은 됐으나 continue-on-error로 상시 fail-open이고 해제 조건이 ci.yml 주석·MEMORY 한 줄(=사람 기억)에만 존재. CLAUDE.md '상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지'·'대책은 규칙·코드·태스크 형태여야 한다' 정면 해당. ARCH-20/21이 학습한 '존재함≠돌아감'의 다음 단계 = '돌아감≠막음'. S3-28의 130/2647 판정 자체는 교수학 판정이라 이 태스크 범위 밖(임의 수정 금지). [2026-08-11 r3 §3 D7] 9일째 미착수 — 같은 fail-open이 2회 연속 관측됐다(r2 1회차·r3 2회차). r3가 두 번째 블로커(축 9 상시 error)를 실측 발견해 acceptance 2항을 추가했다. 라인번호도 :186→:192로 정정(그 사이 ci.yml 주석 증가). 일반 계약('돌아감≠막음'의 기계화)은 OPS-29가 별도로 담당하며, 이 태스크는 qa_pipeline 스텝의 실제 해제를 맡는다.\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D2★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-11] paths ['.github/workflows/ci.yml', 'tests/infra/test_qa_pipeline_wiring.py'] → ['.github/workflows/ci.yml', 'tests/infra/test_qa_pipeline_wiring.py', 'src/backend/whymath_backend/harness/qa_pipeline.py', 'tests/backend/harness/test_qa_pipeline.py', 'tests/infra/test_ci_enforcement_declaration_contract.py']: r3 보강(acceptance②)이 요구한 축 9 환경판정 분리 자체가 qa_pipeline.py+그 단위테스트 수정 없이는 불가능했고, continue-on-error 제거가 OPS-29 계약의 실제 예시(qa_pipeline pending-task 선언)를 소거해 그 계약 테스트도 함께 갱신해야 했다(HARN-59 scope_drift 경고 실측 반영)"
+updated: 2026-09-11

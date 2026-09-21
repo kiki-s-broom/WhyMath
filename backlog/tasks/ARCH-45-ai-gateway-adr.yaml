@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-45-ai-gateway-adr
+title: "AI Gateway ADR — 계획서 100 §3.16 주제 ADR-007 대응 문서 부재(매핑표 미확인 칸)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①정본화 — docs/architecture/adr/ADR-005-*.md 작성(계획서 100 §3.16 주제 'ADR-007 AI Gateway' 대응). 이미 내려진 결정을 실측 근거와 함께 한 문서로 모은다: (a) 모든 LLM 호출의 단일 경유 지점 = l3/router.py, 프로바이더 직접 호출 금지 (b) 3축 라우팅(비용·위치 축 × 로컬 크기 축 × 모델 패밀리 축) (c) 로컬 우선 목표 분포 80/18/2 (d) 프로바이더 포트폴리오 개방 원칙과 채택 조건 3건(2026-08-16 결정 로그) (e) 프로바이더가 바뀌어도 불변인 계약(검증 권위·관측·미성년자 데이터·저작권 레일). 각 항은 출처(파일·행·결정 로그 날짜)를 병기한다.\n②집행 지점 별항 — 위 각 결정을 실제로 강제하는 코드·테스트·CI 검사를 실측으로 지목한다. 강제 장치가 확인되지 않는 축은 추측으로 채우지 않고 '미집행(강제 장치 없음 — 사람 규율)'으로 표기한다. 정본화만으로 완료 선언하지 않는다.\n③매핑표 반영 — docs/architecture/adr/README.md의 '계획서 100 §3.16 주제 매핑' 표에서 'ADR-007 AI Gateway' 칸을 ADR-005로 채우고, '현재 계열' 표에 1행을 추가하고, '다음 빈 번호'를 ADR-006으로 갱신한다.\n④검사 통과 — scripts/harness/adr_number_check.py exit 0, tests/harness/test_adr_number_check.py 회귀 없음. 판정 기준 커밋 해시를 PR 본문에 명기한다."
+artifacts:
+  - "1e5f52c3 · https://github.com/kiki-s-broom/WhyMath/pull/1166"
+paths:
+  - "docs/architecture/adr/**"
+session: null
+notes: "출처: docs/architecture/adr/README.md 매핑표 'ADR-007 AI Gateway = 미확인'. 부재 판정 절차 준수 — 실측 결과 주제의 실질(03a_l3_router_design.md·l3/router.py·CLAUDE.md 라우터 경유 원칙)은 저장소에 존재하나 ADR 형식의 단일 결정 기록이 없다. 따라서 '신규 결정'이 아니라 기존 결정의 정본화 태스크다."
+updated: 2026-09-15

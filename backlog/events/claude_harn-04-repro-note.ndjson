@@ -1,0 +1,1 @@
+{"ts": "2026-09-11T02:56:19+00:00", "actor": "claude/harn-04-repro-note", "action": "amend", "id": "HARN-04-transfer-redirect-target-unreachable-via-proxy", "reason": "실측 재확인 — 원 사고 PR #675 포함 4건이 현재 세션에서 리다이렉트/프록시 거부 없이 정상 응답. 재현 실패로 고칠 대상 없음, 다음 재현 세션을 위해 기록만 남김.", "changed": ["acceptance +1 ([2026-09-11 재측정 — 재현 실패] 이 CCR 세션(브랜치 cl…)"]}

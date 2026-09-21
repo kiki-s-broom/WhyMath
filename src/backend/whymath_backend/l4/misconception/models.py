@@ -14,6 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from whymath_backend.l2.remediation_policy import EscalationRung
+
 MisconceptionDomain = Literal[
     "대수", "기하", "확률통계", "함수", "미적분", "수열", "삼각함수", "벡터"
 ]
@@ -53,9 +55,50 @@ class Misconception(BaseModel):
         description=(
             "v1.2 보조 탐지 경로 — *정규화된 텍스트*에 `re.search`로 검사하는 정규식(OR). "
             "주로 *거짓 항등식의 수치 대입*(예: `(3+4)²=3²+4²`)을 잡는다. 미설정(기본 빈 튜플) 시 "
-            "기존 substring 동작 불변. confidence 분모는 substring `signals` 기준 유지하고 정규식 "
-            "매치는 분자에 *가산*(상한 1.0)하므로, 수치 정규식은 기호 substring 케이스와 "
-            "*겹치지 않게*(disjoint) 작성해 기존 confidence·matched_signals를 보존한다."
+            "기존 substring 동작 불변. v1.5(MISC-22): 정규식 매치 1건은 substring 신호 **전체**와 "
+            "동등한 완결 증거로 가산(단독으로도 confidence 1.0) — 명명그룹 역참조로 정답·기호식과 "
+            "*disjoint*하게 작성된 정규식은 substring AND 전체에 준하는 확정적 단서이기 때문이다. "
+            "그래서 정규식은 *반드시* 기호 substring 케이스·정답과 겹치지 않게(disjoint) 작성해야 "
+            "하고(그렇지 않으면 확신 오진단), substring만으로의 기존 confidence·matched_signals는 "
+            "불변이다."
+        ),
+    )
+    refuting_regex: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "**반박 조건**(OR·정규식) — 하나라도 정규형 텍스트에 매치되면 이 오개념은 매칭 자체가 "
+            "성립하지 않는다(`_match_one`이 None 반환). `signals`가 다 맞아도 무효다.\n\n"
+            "`signals`·`regex_signals`가 *양성* 단편을 찾는 것과 반대 방향이며, 공출현 AND에 "
+            "**부정 조건이 없다는 구조적 공백**을 메운다(MISC-23). 그 공백의 실례: "
+            "`root-loss-by-dividing`의 `('양변','x로 나누')`는 근 손실을 *저지른* 풀이와 그 함정을 "
+            '*정확히 설명한 정답*을 구별하지 못해, "…x=2만 나와서 안 되고 해는 0과 2다"라는 '
+            "정답에 confidence 1.0을 줬다(게이트 0.65를 넘어 확신 오진단이 나갔다).\n\n"
+            "**왜 감점이 아니라 거부인가**: 오개념 귀속이 *반박된* 것이지 *덜 확실한* 것이 아니다. "
+            "낮은 confidence로 남기면 하류(가설·역추적·shadow)가 그것을 약한 증거로 "
+            "취급한다 — 반박된 후보는 증거가 아니라 소음이다. 또 놓치는 오류보다 **정답에 틀렸다고 "
+            "말하는 오류가 해롭다**(결정 우선순위 #1 학생 정서).\n\n"
+            "미설정(기본 빈 튜플)이면 동작 완전 불변 — 기존 항목은 이 필드를 갖지 않는다."
+        ),
+    )
+    ambiguous_regex_signals: bool = Field(
+        default=False,
+        description=(
+            "**MISC-24** — true면 이 항목의 `regex_signals` 매치는 `matched_regex_signals`"
+            "(디버그·텔레메트리)에는 여전히 기록되지만 confidence 가산에는 **기여하지 않는다**"
+            "(`_match_one`이 numerator에서 완전히 배제 — matched substring만으로 confidence를 "
+            "결정). `refuting_regex`(반박·OR)와는 반대 축이다: 반박은 *반박할 문자열*이 따로 "
+            "있어야 성립하는데, 이 필드가 다루는 케이스는 반박할 대상 자체가 없다 — 극점 x좌표와 "
+            "극값이 *우연히 같은 수*(f(x₀)=x₀)인 정답과, 그 값을 x좌표로 혼동한 오답은 텍스트가 "
+            "**글자 그대로 동일**하다(disjoint 증명이 성립하지 않음 — MISC-22가 다른 5개 정규식 "
+            "채널에 요구한 disjoint 보증과 근본적으로 다른 케이스). 옛 v1.2식(정규식 매치=신호 "
+            "1개 상당)으로도 이 문제는 안 풀린다: `extremum-value-vs-point-confused`는 signals가 "
+            "2개뿐이고 정규식 패턴 자체가 리터럴 '극댓값'을 포함해 매치 시 substring이 이미 1개"
+            "(=신호 1개 상당) 함께 발화하므로, 옛 식으로도 1(substring)+1(regex 1개 credit)="
+            "2=len(signals) → confidence 1.0으로 동일하게 게이트를 넘는다(실측: MISC-24). 그래서 "
+            "이 필드는 *가산분을 아예 0으로* 만든다 — 이 항목의 confidence는 substring 신호"
+            "(`극댓값`·`x좌표`)만으로 결정되고, 'x좌표'라는 말을 학생이 실제로 쓴 명시적 케이스만 "
+            "confidence 1.0(원래도 정규식과 무관하게 도달하던 경로)에 도달한다. 미설정(기본 "
+            "False)이면 기존 항목(MISC-22 5개 채널) 동작 완전 불변."
         ),
     )
     canonical_wrong_form: tuple[str, str] | None = Field(
@@ -104,6 +147,18 @@ class MisconceptionMatch(BaseModel):
             "분리해 보관하므로 기존 소비자의 matched_signals 단언은 불변."
         ),
     )
+    attribution_unclear: bool = Field(
+        default=False,
+        description=(
+            "MISC-28 — 학생 풀이에 정정 어구가 있으나 그것이 **이 오개념을 가리키는지** 판정할 "
+            "수 없을 때 True(신호 *앞*의 정정). 두 가지가 위치로 구별되지 않기 때문이다: "
+            "정당한 반박(`틀린 풀이: <오개념>` — 라벨 후 인용)과 무관한 정정"
+            "(`부호를 잘못 옮겨 적었지만 <오개념>`). **매칭은 유지하되**(억제하면 후자를 통째로 "
+            "미검출) 확신 진단은 보류한다 — `MatchGateResult.low_quality`와 같은 좌석이다. "
+            "정정 어구가 신호 *뒤*면 귀속이 어순으로 확정돼 `_match_one`이 아예 None을 내므로 "
+            "이 플래그가 붙은 결과로 오지 않는다. 기본 False(정정 어구 없음·기존 동작 불변)."
+        ),
+    )
     semantic_similarity: float | None = Field(
         default=None,
         description=(
@@ -141,3 +196,22 @@ class InterventionDecision(BaseModel):
     pattern: InterventionPattern
     prompt: str = Field(description="학생에게 노출할 어셈블된 발화(자각 유도형).")
     misconception_id: str = Field(description="진단된 misconception.id — 텔레메트리.")
+    escalation_rung: EscalationRung | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "반복 오류 개입 강도 등급(`l2/remediation_policy.py` 정본). **3상태다** — "
+            "`None`은 반복 신호를 입력받지 못한 경로(단일 턴 raw 매치), `NONE`은 "
+            "신호를 읽었고 사다리 첫 칸에 못 미친 상태, 나머지는 발동한 등급이다. "
+            "둘을 접으면 '사다리가 한 번도 안 탔다'와 '사다리를 볼 수 없었다'가 "
+            "같은 글자가 된다(작동 비율의 분모가 사라진다). "
+            "**학생 비노출** — 강도는 콘텐츠 난이도·스캐폴드 밀도로만 표현하고 "
+            "반복 횟수를 발화에 싣지 않는다(정서적 낙인 금지). 그래서 `exclude=True`다: "
+            "이 모델은 `api/coach.py`의 `CoachResponse.intervention`으로 **그대로 직렬화**되므로, "
+            "필드를 그냥 추가하면 내부 라우팅 신호가 HTTP 응답에 실린다. 그것은 MISC-30의 범위가 "
+            "아니고(노출 필드 신설은 별건), 학생-대면 응답을 *누적 증거의 함수*로 만들어 "
+            "동일 입력의 응답 비트동일성을 깬다 — 실제로 `test_coach_wh1_shadow.py`의 "
+            "shadow ON/OFF 노출 비트동일 단언 2건이 그렇게 RED가 났다(2026-09-18 PR #1203). "
+            "등급의 관측 좌석은 HTTP가 아니라 `harness/wh1_loop.TurnOutcome.escalation_rung`이다."
+        ),
+    )

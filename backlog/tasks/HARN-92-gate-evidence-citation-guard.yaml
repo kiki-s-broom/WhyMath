@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-92-gate-evidence-citation-guard
+title: "게이트 서술 시 title만 인용해 낡은 결정을 재안내 — status·evidence를 함께 내는 단일 게이트 조회 경로 부재"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 진술 — `gates.yaml`의 `title`은 게이트 최초 등재 시점의 질문 문구를 담는다. 이후 `status`가 `pending → cleared/waived`로 바뀌고 `evidence`에 재판정 내용이 기록돼도 `title` 자체는 갱신되지 않는다(append 전용 설계·HARN-76). `gates list`는 `status`(예: `(cleared)`)와 `title`은 함께 보이지만 `evidence`는 보이지 않는다 — 사람에게 게이트를 설명할 때 `title`만 옮겨 적으면 이미 뒤집힌 질문을 다시 묻게 된다."
+  - "② 재현 — 2026-09-07~08 세션이 \"머지됐습니다\" 보고에서 `G-merge-queue-or-strict-relax`의 `title`(\"merge queue 도입 또는 'up to date' 요구 해제\")을 그대로 인용해 사용자에게 선택을 요청했다. 실측하니 그 게이트는 이미 `cleared`(`cleared_by: kiki`)였고 `evidence`에 \"1)merge queue는 조직 전용이라 실행 불가(전제 반증) → 재판정 = D)자동 재동기화 워크플로우\"가 기록돼 있었다. 사용자가 그 낡은 title에 따라 \"up to date 요구 해제\"를 선택한 뒤에야 `evidence`를 조회해 이미 결정·구현된 사안임을 뒤늦게 발견했다 — 왕복 1회 낭비."
+  - "③ 조치 — `backlog.py gates`에 단일 게이트 브리핑 경로(예: `gates show <id>` 또는 기존 `list`의 단건 모드 확장)를 추가해 `id`·`status`·`cleared_by`·`evidence`(전문 또는 앞 N자)를 **`title`과 함께, `title`보다 먼저** 출력한다. `evidence`가 비어 있으면(`pending`) \"evidence: 없음(아직 결정 전)\"을 명시해 \"없음\"과 \"확인 안 함\"을 구분한다(CLAUDE.md \"모른다 ≠ 아니다\"). 사람에게 게이트를 서술하는 모든 안내는 이 출력 경로를 거치도록 문서(`docs/standards/build_harness.md`)에 못박는다."
+  - "④ 변별력 — evidence가 채워진 `cleared` 게이트 픽스처와 evidence가 빈 `pending` 게이트 픽스처를 각각 만들어, 신설 출력이 두 상태에서 서로 다른 화면을 내는지(및 `title`만으로는 상태를 알 수 없는 대조군) 테스트로 고정한다. `title`이 오래된 질문을 담은 게이트(예: 현재 `G-merge-queue-or-strict-relax`)를 실 데이터로 검증해, 신설 출력이 `title`과 `evidence`가 서로 다른 결론을 가리키는 경우에도 `evidence`를 화면 앞머리에 낸다는 것을 확인한다."
+  - "[Codex P2×2 수용 · PR #1066 리뷰] ③④를 두 지점에서 정정한다. **(1) `notes` 누락** — `waive`는 사유를 `evidence`가 아니라 `notes`에 적는다(`gates.py`의 `clear`↔`waive` 저장 위치가 다름). 실측: `G-merge-queue-enable-ruleset`은 `status: waived`·`evidence: None`이고, 실제 대체 결정(\"대체 = HARN-85\")은 `notes`에만 있다. ③이 `evidence`만 내면 이 게이트에서 \"evidence: 없음\"이 나가 HARN-92가 막으려는 바로 그 사각(정보 없어 보임)을 waived 게이트에서 재현한다 — ③은 `status`별로 다르게 낸다: `cleared`는 `evidence`, `waived`는 `notes`, `pending`은 \"없음(아직 결정 전)\"을 낸다. **(2) 앞 N자 절단이 핵심을 놓칠 수 있음** — `G-merge-queue-or-strict-relax`의 `evidence`는 993자이고 현재 판정을 담은 문구(\"재판정 = D\")는 403번째 글자에서 시작한다. 100~400자 미리보기로는 그 문구가 통째로 잘려나가 \"낡은 선택지가 실패한 이유\"만 보이고 \"무엇으로 대체됐는지\"는 안 보인다 — 요약이 아니라 **절단**이 되는 순간 이 태스크의 목적이 무효화된다. ④의 요구를 \"전문 출력(절단 없음)\" 또는 \"구조화 요약(마지막 정정 문단 전체)\"으로 좁히고, 신규 테스트는 이 예시 게이트로 \"재판정 = D\"라는 구체 문자열이 출력에 실재하는지 단언한다(추상적 '앞부분에 evidence가 보인다'가 아니라)."
+artifacts:
+  - "dfce3b28 (#1104)"
+paths:
+  - scripts/harness/backlog.py
+  - tests/harness/test_cli.py
+  - docs/standards/build_harness.md
+session: null
+notes: "재발방지대책(CLAUDE.md 실수 관리 의무). 사고 경위: 2026-09-08 \"머지 경합 해소\" 안내에서 `G-merge-queue-or-strict-relax`의 title을 그대로 인용해 이미 cleared·재판정된 결정을 사용자에게 다시 물었다(evidence를 먼저 읽었다면 나지 않았을 왕복). 같은 세션에서 `G-pr-auto-resync-token`도 main 기준 pending만 보고 \"미발급\"으로 판정할 뻔했으나, 이번엔 \"trunk 부재를 미구현으로 단정 금지\" 규칙을 스스로 적용해(미머지 브랜치 실측) 사전에 잡았다 — 그 규칙이 이미 커버하는 축이라 별항 등재는 하지 않는다. 이 태스크는 오직 \"title만 읽고 evidence를 안 읽는\" 축을 겨냥한다. 도구가 title 옆에 evidence를 강제로 보여주면, 안내자가 그 규율을 몰라도 낡은 title에 낚이지 않는다 — HARN-86(전이 거부가 해소 경로를 안 알려주던 결함)과 같은 형태의 \"도구 쪽 대책\"이다.\n\n[정정 2026-09-10] Codex P2×2(PR #1066) 수용 — ③이 notes 저장 게이트(waive)를 못 보고 ④가 앞부분 절단으로 핵심 문구를 잘라낼 수 있음을 지적. 둘 다 실측 재현 후 acceptance에 정정 반영"
+updated: 2026-09-11

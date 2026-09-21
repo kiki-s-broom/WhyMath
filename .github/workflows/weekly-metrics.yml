@@ -1,0 +1,218 @@
+# 주간 KPI 집계 cron (OPS-56) — EOS-51 §6 "기술 KPI 6종"을 metrics/weekly.json에 append.
+#
+# 집행 경계(acceptance③ — OPS-19·OPS-30과 중복 등재 금지):
+#   이 워크플로가 담당하는 것은 딱 셋 — ① 매주 발화 ② `ops.weekly_metrics_report` 실행·
+#   원장 append ③ 구조적 DB 실패를 "0"으로 위장하지 않고 잡 자체를 red로 만드는 최소 경보.
+#   "러너가 실제 프로덕션(Phaiakes9) 데이터에 닿게 만드는 것"은 OPS-19의 몫이고, "그 실패를
+#   Slack/이메일 등 실제 채널로 전달하는 것"은 OPS-30의 몫이다 — 여기서는 GitHub이 예약
+#   실행 실패 시 기본 제공하는 저장소 알림(watcher 이메일)을 최소 경보로 그대로 쓴다(신규
+#   채널을 만들지 않는다).
+#
+# 환경의 정직한 공백: 이 워크플로가 붙는 Postgres는 backend-migrations 잡과 동형인
+# **매 실행 새로 뜨는 빈 컨테이너**다 — Phaiakes9의 실제 콘텐츠 제작 DB가 아니다(원격에서
+# 그 DB로 가는 네트워크 경로 자체가 없음 · `weekly_metrics_report.py` 모듈 docstring 동일
+# 판정). 그래서 이 워크플로가 지금 내는 4종 동적 KPI는 당분간 "이번 주 행 0건"이라는
+# 정직한 0이다 — 결함이 아니라 실제 환경 상태이며, 실 데이터 도달은 OPS-19 몫이다.
+#
+# main은 머지 큐 전용 룰셋이라(HARN-56) 워크플로가 직접 push할 수 없다 — 브랜치를 만들어
+# 커밋·푸시하고 PR을 연 뒤 auto-merge를 켜는 방식으로 우회한다(harness-audit.yml의
+# `refs/heads/harness-claims` 직접 push와 달리, 이 파일은 *main에 반영되는* 변경이라
+# PR 경로가 필수 — 위 CLAUDE.md "PR 기본값" 원칙과 동일 근거).
+name: weekly-metrics
+
+on:
+  # 월 07:00 KST = 일 22:00 UTC(KST=UTC+9, 전날로 자정 넘어감). 분 필드를 0으로 고정하면
+  # 이 저장소 하네스가 "정시 시작"으로 앵커링한다(create_trigger 관례와 동일 근거는 아니고
+  # 단순 크론 문자열이지만, 정각 표기를 유지해 위 acceptance①의 "UTC 변환 명시"를 코드
+  # 자신이 보여주게 한다).
+  schedule:
+    - cron: "0 22 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1이면 파일에 쓰지 않고 집계 결과만 출력(PR도 안 만듦)"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # 매주 1회·수동 발화도 드묾 — 취소보다 직렬 대기가 항상 안전(harness-audit과 같은 판단).
+  group: weekly-metrics
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: weekly-metrics — 6종 KPI 집계·append (실 PG)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: src/backend
+
+    services:
+      postgres:
+        # backend-migrations 잡과 동형(pgvector 프리설치·trust 인증) — 마이그레이션이
+        # `CREATE EXTENSION vector`를 성공시켜야 "0건"이 진짜 빈 스키마 판정이 된다.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: whymath
+          POSTGRES_DB: whymath
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whymath"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      WHYMATH_DATABASE_URL: postgresql+asyncpg://whymath@127.0.0.1:5432/whymath
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Alembic upgrade head (fresh DB — 전 마이그레이션 적용)
+        run: python -m alembic upgrade head
+
+      # 새 매직넘버를 만들지 않는다 — 이 저장소의 USD→KRW 단일 진실 원천은
+      # `l3/router.py`의 `USD_TO_KRW`(비용 라우팅 실측 비용 산정에도 쓰이는 그 상수)다.
+      # 여기서 리터럴로 다시 적으면 두 곳이 따로 표류한다(단위비용 KPI가 그 표류를 그대로
+      # 반영하면 곤란 — 같은 환율이어야 라우팅 비용 계측과 비교 가능).
+      - name: 환율 상수 조회 (l3.router.USD_TO_KRW — 단일 진실 원천)
+        id: exchange_rate
+        run: |
+          RATE=$(python -c "from whymath_backend.l3.router import USD_TO_KRW; print(USD_TO_KRW)")
+          echo "USD→KRW = $RATE (l3/router.py 단일 진실 원천)"
+          echo "rate=$RATE" >> "$GITHUB_OUTPUT"
+
+      # 하네스 지표 3종(HARN-118 ③)의 **집행 지점**. 백엔드는 scripts/harness를
+      # 임포트하지 않으므로(하네스 = 의존성 0 단독 실행 · 백엔드 = import-linter 계약)
+      # 집계는 하네스가 하고 결과 JSON만 파일로 건넨다. 이 스텝이 빠지면 다음 스텝은
+      # 3종을 조용히 0으로 내는 게 아니라 `measured=false` + 사유로 낸다 — 그래도
+      # "미수집"이 원장에 남는 것과 "매주 실제로 수집되는 것"은 다르므로 여기서 돈다.
+      - name: 사고 대장 집계 (HARN-118 — 하네스 지표 3종 입력)
+        id: incidents
+        run: |
+          set -e
+          python ../../scripts/harness/backlog.py incident report --json \
+            > "$RUNNER_TEMP/incidents_summary.json"
+          python -c "import json,sys; d=json.load(open(sys.argv[1])); print(f\"사고 {d['total']}건 · 계열 최대 회차 {d['max_series_nth']} · 산문만 대책 {d['rule_only_ratio']:.1%}\")" "$RUNNER_TEMP/incidents_summary.json"
+
+      # dry_run=1이면 --dry-run을 얹어 파일을 건드리지 않는다(수동 점검용).
+      - name: 주간 KPI 집계 (EOS-51 §6 6종 + 하네스 3종 · metrics/weekly.json append)
+        id: report
+        env:
+          DRY_RUN: ${{ inputs.dry_run || '0' }}
+        run: |
+          set -e
+          ARGS=(--metrics-path ../../metrics/weekly.json --krw-per-usd "${{ steps.exchange_rate.outputs.rate }}" --incidents-summary "$RUNNER_TEMP/incidents_summary.json")
+          if [ "$DRY_RUN" = "1" ]; then
+            ARGS+=(--dry-run)
+          fi
+          python -m whymath_backend.ops.weekly_metrics_report "${ARGS[@]}" | tee "$RUNNER_TEMP/weekly_metrics_report.json"
+
+      - name: PR 생성·auto-merge (main이 머지 큐 전용이라 직접 push 불가)
+        if: ${{ (inputs.dry_run || '0') != '1' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          if git diff --quiet -- ../../metrics/weekly.json 2>/dev/null; then
+            echo "metrics/weekly.json 변경 없음 — PR 생략(이번 실행이 이전과 완전히 동일한 행을 냈다는 뜻은 아니다. generated_at이 매번 갱신되므로 통상 항상 변경이 있다 — 변경 없음은 조사할 일이다)."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="ops/weekly-metrics-$(date -u +%Y%m%dT%H%M%SZ)"
+          git checkout -b "$BRANCH"
+          git add ../../metrics/weekly.json
+          git commit -m "$(cat <<'EOF'
+          ops: 주간 KPI 6종 집계 append (OPS-56 자동 cron)
+
+          EOS-51 §6 "기술 KPI 6종"(HIT·자동검증 1차 통과율·재작업률·처리량·단위비용·
+          실패유형분포) 중 4종을 이번 창(직전 7일)으로 집계해 metrics/weekly.json에
+          append. 나머지 2종(자동검증 1차 통과율·재작업률)은 이 저장소에 집계 대상 로그가
+          아직 없어 구조적으로 항상 미측정(measured=false)이다 — 0으로 위장하지 않는다.
+
+          weekly-metrics 워크플로 자동 생성.
+          EOF
+          )"
+          git push -u origin "$BRANCH"
+          PR_URL=$(gh pr create \
+            --title "ops: 주간 KPI 6종 집계 append ($(date -u +%Y-%m-%d))" \
+            --body "$(cat <<'EOF'
+          ## 무엇을 · 왜
+
+          OPS-56 주간 cron 자동 실행분. EOS-51 §6이 동결한 "기술 KPI 6종" 중 지난 7일 창에서
+          계산 가능한 4종(HIT·처리량·단위비용·실패유형분포)을 집계해 `metrics/weekly.json`에
+          1행 append. 나머지 2종(자동검증 1차 통과율·재작업률)은 이 저장소에 집계 대상 로그
+          자체가 없어 구조적으로 항상 미측정 — "0%"이 아니라 "측정 불가"로 표기된다.
+
+          ## 검증 — 무엇을 돌렸고 결과가 무엇인가
+
+          - `alembic upgrade head`(신규 실 PG 컨테이너에 전 마이그레이션 적용) → 성공
+          - `python -m whymath_backend.ops.weekly_metrics_report`(순수 로직은
+            `test_weekly_metrics_report.py` 14건이 hermetic으로 상시 검증, 실 PG 왕복은
+            `test_weekly_metrics_report_integration.py`가 CI의 "backend — 마이그레이션·통합
+            (실 PG)" 잡에서 상시 검증 — 이 PR 자체의 검증이 아니라 그 코드를 만든 OPS-56
+            구현 PR이 이미 확보한 검증)
+          - 산출된 JSON을 파일로 append하고 그대로 PR 본문 하단에 첨부(수치 그대로)
+
+          ## 변별력 — 무엇을 *깨뜨려* 확인했는가
+
+          해당 없음 — 이 PR은 코드 변경이 아니라 이미 검증된 집계기의 정기 실행 산출물이다.
+          집계기 자체의 변별력 검증(빈 표본→미측정, DB 실패→미측정+예외타입명, 창 밖 행
+          배제)은 OPS-56 구현 PR에서 완료됐다.
+
+          ## 정직한 공백
+
+          이 워크플로가 붙는 Postgres는 매 실행 새로 뜨는 빈 컨테이너다(Phaiakes9의 실제
+          콘텐츠 제작 DB가 아님 — 네트워크 경로 자체가 없다). 그래서 이번 실행의 4종 동적
+          KPI는 대부분 "이번 주 행 0건"이라는 정직한 0이다(진짜 미측정이 아니라 활동 부재).
+          실 데이터에 닿게 만드는 것은 OPS-19 몫(이 태스크의 acceptance③ 경계).
+
+          ## 영향 범위 · 롤백
+
+          `metrics/weekly.json` 1행 append만 — 코드·마이그레이션·시크릿 변경 없음. 롤백은
+          이 커밋을 되돌리거나 원장에서 마지막 행을 제거하면 된다(다른 행에 영향 없음).
+
+          ---
+          🤖 자동 생성 — `weekly-metrics` 워크플로(OPS-56)
+          EOF
+          )" \
+            --base main --head "$BRANCH")
+          echo "PR: $PR_URL"
+          gh pr merge --auto --squash "$PR_URL"
+
+      # 최소 경보(acceptance③) — 이번 창의 DB 조회가 구조적으로 실패했다면(연결 끊김 등)
+      # 그건 "이번 주 활동 없음"이 아니라 "측정 자체가 안 됐다"이므로 잡을 red로 만든다.
+      # 신규 알림 채널을 만들지 않는다 — GitHub의 예약 실행 실패 기본 알림(저장소 watcher
+      # 이메일)이 그 최소 경보 역할을 한다(실제 채널 다양화·수신자 관리는 OPS-30 몫).
+      # 이 스텝을 커밋·PR 스텝 *뒤*에 두는 이유: 위 "측정·수집 도구를 성공 경로만 보고
+      # 설계 금지"(CLAUDE.md) — 구조적 실패라도 그 사실을 담은 행 자체는 먼저 원장에
+      # 남겨야 증거가 유실되지 않는다. 잡이 이 스텝에서 red가 되어도 이미 커밋·푸시·PR
+      # 생성은 끝난 뒤다.
+      - name: 최소 경보 — DB 연결/조회 실패를 '측정 0'으로 위장하지 않는다
+        run: |
+          if grep -q "DB 연결/조회 실패" "$RUNNER_TEMP/weekly_metrics_report.json"; then
+            echo "::error::주간 KPI 집계 — DB 연결/조회 실패로 4종 KPI가 미측정 강등됐다(진짜 0이 아니다). 원장에는 이미 그 사유(예외 타입명 포함)가 append됐다 — 이 잡의 실패 자체가 최소 경보다."
+            exit 1
+          fi
+          echo "DB 연결 정상 — 구조적 실패로 인한 미측정 강등 없음(자동검증 1차 통과율·재작업률 2종의 항상-미측정은 정상 설계이며 별개)."

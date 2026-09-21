@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from _external_store_evidence import assert_manifest_stores_are_deployed
 from fastapi.testclient import TestClient
 
 from whymath_backend.api._auth import get_consented_user
@@ -194,9 +195,18 @@ class TestExportMyData:
         assert "exported_at" in body
 
     def test_external_store_not_in_response(self) -> None:
-        """외부 store 상세(인프라 store명·locator)는 응답에 미노출(정보 누출 0)."""
+        """외부 store 상세(인프라 store명·locator)는 응답에 미노출(정보 누출 0).
+
+        SEC-32: 검사 대상을 매니페스트에서 가져온다 — 종전엔 `"clickhouse"` 한 단어만 봤고,
+        그 store는 애초에 존재하지도 않아 *어떤 구현에서도 통과하는* 검사였다.
+        """
+        from whymath_backend.privacy.export import external_export_pending
+
+        stores = [t.store for t in external_export_pending(_UID)]
+        assert_manifest_stores_are_deployed(stores, source="GET /v1/me/export 응답")
         body_text = _client().get("/v1/me/export").text
-        assert "clickhouse" not in body_text
+        leaked = [store for store in stores if store in body_text.lower()]
+        assert not leaked, f"응답에 인프라 store명이 샜다: {leaked}"
         assert "locator" not in body_text
 
     def test_no_token_401(self) -> None:
@@ -252,9 +262,19 @@ class TestExportMyData:
         assert not hasattr(audits[0], "export_payload")
 
     def test_pending_external_logged(self, caplog: pytest.LogCaptureFixture) -> None:
-        """외부 store 별도 export 필요를 *ops 로그*로 가시화(store명·user_id)."""
+        """외부 store 별도 export 필요를 *ops 로그*로 가시화(store명·user_id).
+
+        SEC-32: 매니페스트가 선언한 store가 *전부* 로그에 있어야 한다(한 곳이라도 빠지면
+        ops는 그 store를 영영 모른다). 기대 목록은 매니페스트에서 가져온다.
+        """
+        from whymath_backend.privacy.export import external_export_pending
+
         with caplog.at_level(logging.INFO, logger="whymath.api.me"):
             _client().get("/v1/me/export")
         msgs = [r.getMessage() for r in caplog.records]
         assert any("열람·이동권 export" in m and str(_UID) in m for m in msgs)
-        assert any("clickhouse" in m for m in msgs)  # ops 로그엔 store명 포함
+        logged = "\n".join(msgs)
+        stores = [t.store for t in external_export_pending(_UID)]
+        assert_manifest_stores_are_deployed(stores, source="GET /v1/me/export ops 로그")
+        missing = [store for store in stores if store not in logged]
+        assert not missing, f"ops 로그에 안 찍힌 외부 store: {missing}"

@@ -35,6 +35,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
 from whymath_backend.db.models._orm_enum import _pg_enum
+from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.concept import Concept as SchemaConcept
 from whymath_backend.schema.concept import ConceptEdge as SchemaConceptEdge
 from whymath_backend.schema.concept import ConceptFusion as SchemaConceptFusion
@@ -149,6 +150,16 @@ class Concept(Base):
     # 코퍼스 부재였다(위 Phase 1b 4컬럼 청산 선례 동형). 실 벡터는 code 키 별 테이블
     # (`concept_embedding` 등)이 소유하므로 이 참조 컬럼은 불필요 — 마이그레이션 동반 제거.
 
+    # ===== 판 관리(EOS-49 §6.4) — 현재 발행 버전 포인터 =====
+    # `concept_version`(Concept 좌석 4번째 테이블 — canonical_entity_model_v1.md §3-D
+    # 판정 D안)의 PUBLISHED 행을 가리키는 느슨 포인터. nullable·기본값 없음 — 기존 행
+    # 무영향(비파괴, 44_eos_version_management.md §6.4 "Entity 상태와 Version 상태는
+    # 분리"). 이 컬럼 자체는 어떤 전이 규칙도 강제하지 않는다 — PUBLISHED 불변·
+    # PUBLISHED→DRAFT 금지는 `concept_version` BEFORE UPDATE 트리거가 강제한다.
+    current_published_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid, sa.ForeignKey("concept_version.version_id")
+    )
+
     # ===== 운영 메타 =====
     created_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
@@ -176,7 +187,9 @@ class Concept(Base):
         """영속 ORM → `schema.Concept`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConcept.model_validate(data)
+        return SchemaConcept.model_validate(
+            drop_unset_nulls(data, SchemaConcept, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -251,7 +264,9 @@ class ConceptEdge(Base):
         """영속 ORM → `schema.ConceptEdge`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConceptEdge.model_validate(data)
+        return SchemaConceptEdge.model_validate(
+            drop_unset_nulls(data, SchemaConceptEdge, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -292,7 +307,9 @@ class ProblemConcept(Base):
         """영속 ORM → `schema.ProblemConcept`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaProblemConcept.model_validate(data)
+        return SchemaProblemConcept.model_validate(
+            drop_unset_nulls(data, SchemaProblemConcept, orm_cls=type(self))
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -335,7 +352,9 @@ class ConceptFusion(Base):
         """영속 ORM → `schema.ConceptFusion`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
         data = {key: getattr(self, key) for key in mapped_keys}
-        return SchemaConceptFusion.model_validate(data)
+        return SchemaConceptFusion.model_validate(
+            drop_unset_nulls(data, SchemaConceptFusion, orm_cls=type(self))
+        )
 
 
 __all__ = ["Concept", "ConceptEdge", "ProblemConcept", "ConceptFusion"]

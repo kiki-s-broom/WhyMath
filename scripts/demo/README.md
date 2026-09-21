@@ -123,7 +123,9 @@ fvm flutter run --dart-define=API_URL=http://<이 PC LAN IP>:8000 --dart-define=
 ```powershell
 .\scripts\demo\stop_demo.ps1
 # 녹화가 끝난 *뒤에만* 실행. <>는 치지 말고 실제 링크를 따옴표로 감싼다(PowerShell은 < 를 예약어로 거부).
-python scripts\harness\backlog.py gates clear G-kiki-device-demo --as kiki --evidence "https://실제-녹화-링크"
+# --no-base 는 필수다: 이 게이트의 근거는 영상 링크라 HARN-68 의 커밋·PR 기준 검사를 구조적으로
+# 통과할 수 없다(빼면 clear 가 exit 1 로 거부된다).
+python scripts\harness\backlog.py gates clear G-kiki-device-demo --as kiki --evidence "https://실제-녹화-링크" --no-base "시연 녹화 링크 — 판정 근거가 커밋·PR이 아니라 실기기 시연 영상이다"
 ```
 
 ## A-*. Windows 함정
@@ -259,7 +261,8 @@ flutter run --dart-define=API_URL=http://<Phaiakes9 LAN IP>:8000 --dart-define=D
 bash scripts/demo/stop_demo.sh     # uvicorn 종료 + throwaway PG(볼륨째) 제거
 # 녹화 증적(링크)을 걸어 게이트 clear:
 # 녹화가 끝난 뒤에만 실행 — 실제 링크를 따옴표로 감싼다.
-python3 scripts/harness/backlog.py gates clear G-kiki-device-demo --as kiki --evidence "https://실제-녹화-링크"
+# --no-base 는 필수다: 영상 링크는 HARN-68 의 커밋·PR 기준 검사를 통과할 수 없다.
+python3 scripts/harness/backlog.py gates clear G-kiki-device-demo --as kiki --evidence "https://실제-녹화-링크" --no-base "시연 녹화 링크 — 판정 근거가 커밋·PR이 아니라 실기기 시연 영상이다"
 ```
 게이트가 clear되면 `S1-14-exit-gate-judgement`(owner=kiki)로 3종 게이트 판정을 기록해 S1을 공식 탈출한다.
 

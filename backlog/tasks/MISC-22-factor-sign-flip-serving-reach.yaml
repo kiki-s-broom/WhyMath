@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,11 +15,12 @@ acceptance:
   - "① 실측 재현: anchor_detection_channel_eval 리포트의 serving_reach가 factor-sign-flip에서 0/27임을 확인한다(다른 두 채널은 27/27 — 대조군이 있으므로 측정 결함이 아니다). 원인은 그 항목의 signals가 기호형('(x-a)'·'x=-a')이라 수치 입력에 substring이 0건 매치되고, v1.2 confidence 분모가 substring signals 개수로 고정돼 정규식 단독 매치가 1/2=0.5에 갇히는 것"
   - "② 두 선택지 중 하나를 근거와 함께 고른다 — (가) 그 항목에 수치 형태 signal을 추가(substring 동작이 넓어지므로 기존 오검출 회귀를 측정해야 한다) (나) v1.2 confidence 의미를 확장해 정규식 매치가 분모에도 반영되게 한다(4개 기존 항등식 채널의 confidence가 함께 변하므로 전건 회귀 측정 필요). 어느 쪽도 doc-first"
   - "③ 해소 후 tests/backend/harness/test_anchor_detection_channel_eval.py::TestServingReachIsMeasured::test_factor_sign_flip_does_not_reach_serving 이 실패로 바뀌므로 그 테스트를 함께 갱신한다 — 그 실패가 곧 '해소됨'의 신호다(동결이 스스로 만료를 알린다)"
-artifacts: []
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1071"
 paths:
   - src/backend/whymath_backend/l4/misconception/catalog.py
   - src/backend/whymath_backend/l4/misconception/diagnose.py
   - docs/prompts/misconception_diagnosis.md
 session: null
 notes: "출처: PR #1032 Codex P2 지적. 지적은 '세 채널 모두 서빙에 못 닿는다'였으나 실측하니 factor-sign-flip 하나뿐이었다(나머지 둘은 substring이 함께 발화해 conf 1.0). MISC-07 acceptance ③이 서빙 결선을 D2 후속으로 명시 이관했으므로 MISC-07의 게이트로 삼지 않고 분리 등재한다. 측정 자체는 MISC-07이 착지시켰다(serving_reach 필드)."
-updated: 2026-09-07
+updated: 2026-09-08

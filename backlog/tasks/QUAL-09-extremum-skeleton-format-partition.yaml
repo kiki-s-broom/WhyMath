@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-09-extremum-skeleton-format-partition
+title: 극값 단답형·객관식 뼈대 공간 파티션과 코퍼스 처분
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - QUAL-08-sibling-generator-space-overlap-audit
+requires_gates: []
+acceptance:
+  - "① 뼈대 분할 설계 — `calculus_skeleton_generator`의 `_build_value_pool()`(150)과 `_build_mc_pool()`(146)이 같은 `(m, n, kind)` 뼈대를 **140쌍 공유**한다(QUAL-08 실측). 같은 삼차함수가 단답형·객관식으로 각각 출제될 수 있다는 뜻이다. 선례는 이미 저장소에 있다 — 기본 `skeleton_generator.py`의 `_MC_PARTITION_MOD = 3` 해시 파티션이 *\"같은 뼈대는 정확히 한 형식에만 배정\"*하고 그 이유를 *\"단답형·객관식 중복 시 dedup 충돌 — 원천 차단\"*이라 적어 두었다. `_build_mc_pool` docstring도 4지선다 부적격 뼈대가 \"단답형 풀에 남는다\"고 **분할 의도를 선언**했으나 값 풀이 MC 적격 뼈대를 배제하지 않아 집행된 적이 없다. 그 선언을 코드로 만든다. 주의: MC 적격(4값 상이)을 값 풀에서 단순 배제하면 값 풀이 150→10으로 붕괴한다(실측) — 해시 파티션이어야 한다."
+  - "② 다양성·난이도·성취기준 영향 측정 — 파티션 비율을 정하기 전에 두 밴드가 성취기준 `[12미적Ⅰ-02-07]` 요구를 여전히 만족하는지 측정한다(QUAL-07 선례: 좁히는 쪽의 분포를 측정으로 확인). 현재 코퍼스는 단답형 40·객관식 30이므로 파티션 후 두 풀이 각각 그 수를 낼 수 있어야 한다."
+  - "③ 코퍼스 처분 — 파티션이 들어가면 `problem_bank_generated_v0`의 해당 밴드 **70건**(단답형 40·객관식 30)이 생성기로 재현 불가가 되고, 그 문항을 부모로 삼는 `problem_bank_rephrased_v0` **246건**의 계보가 영향을 받는다. QUAL-07·QUAL-02 선례대로 **쌍별 판정 문서**를 남기고(일괄 삭제 금지) 은퇴를 최소화한다. 코퍼스에 실재하는 형식 트윈 4건(예: `wm-calc-extv-bd21cd8484d2` ↔ `wm-calc-extmc-bd21cd8484d2`)은 그 판정의 1순위 대상이다."
+  - "④ 집행 지점(정본화와 별항) — 파티션이 착지하면 `tests/backend/l3/equivalent/test_calculus_extremum_format_disjointness.py::test_skeleton_space_is_still_shared_and_that_is_recorded`의 기대값 140을 0으로 갱신하고 그 docstring도 함께 고친다(그 테스트는 이 축이 열려 있음을 기록하려고 일부러 140을 단언한다 — 갱신을 강제하는 장치다). 뼈대 공유 0을 결함 주입으로 실측한다(정상 입력 초록은 보호의 증거가 아니다). QUAL-08 게이트(`generator_space_overlap_audit`)는 발문 축이라 이 축을 보지 못하므로, 뼈대 축을 게이트로 올릴지 여부도 판정해 근거와 함께 남긴다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/calculus_skeleton_generator.py
+  - tests/backend/l3/equivalent/test_calculus_extremum_format_disjointness.py
+  - "data/corpus/problem_bank_generated_v0/**"
+  - "docs/data/**"
+session: null
+notes: "QUAL-08 승계. 입력 수치·선례·닫지 않은 이유 전문 = docs/data/generator_space_overlap_audit_2026-09.md 3.2~3.3절·5절. QUAL-08은 발문 축(템플릿 서로소화)만 닫았고 뼈대 축은 코퍼스 처분 규모(70건+rephrased 246건) 때문에 분리했다.\n\n[정정 2026-09-13] QUAL-09 acceptance ④가 갱신 대상으로 지목하는 tests/backend/l3/equivalent/test_calculus_extremum_format_disjointness.py 자체가 QUAL-08 산출물이다(PR #1153·미머지). 착지 전 착수하면 존재하지 않는 파일을 대상으로 작업하게 된다. notes 산문('QUAL-08 승계')만으로는 selector가 읽지 않으므로 대장에 집행한다."
+updated: 2026-09-13

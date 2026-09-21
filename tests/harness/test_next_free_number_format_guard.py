@@ -1,11 +1,18 @@
 """backlog._next_free_number — 100 이상에서 형식 위반 ID를 제안하던 결함 (HARN-21 결함②).
 
 `{index:02d}`는 **최소** 2자리이지 **정확히** 2자리가 아니다 — `index=100`이면 `"100"`
-(3자리)을 낸다. 그런데 `models.TASK_ID_RE`는 `\\d{2}` — 정확히 2자리만 허용한다. 즉
-어떤 프리픽스가 99개를 다 쓰면 다음 제안이 형식 위반 ID(`E1-100`)가 됐다.
+(3자리)을 낸다. HARN-21 시점에는 `models.TASK_ID_RE`가 `\\d{2}`(정확히 2자리)만
+허용해 그 출력이 형식 위반 ID였다. 그래서 당시 수정은 index가 99를 넘으면
+`_next_free_number`가 `None`을 반환하고 `cmd_add`가 "프리픽스 소진 — 사람의 결정
+필요" 명시적 오류로 승격하는 것이었다(날조된 3자리 제안 금지).
 
-수정: index가 99를 넘어서면 `_next_free_number`가 `None`을 반환하고, `cmd_add`가 이를
-"프리픽스 소진 — 사람의 결정 필요" 명시적 오류로 승격한다(날조된 3자리 제안 금지).
+[HARN-97 갱신 · 2026-09-11] 그 "99 = 소진" 판정 자체가 실제로 ARCH·EOS 두 접두를
+막았다 — `--id EOS-100`이 형식 검증에서 거부됐다. `models.TASK_ID_RE`를 2~3자리
+(100~999, 선행 0 없이)로 넓히면서, `_next_free_number`는 `cap` 인자(기본 99 —
+HARN-21·HARN-73 동작·아래 테스트 불변)를 받고, `_suggest_number`는 하위(01~99)
+재사용마저 없을 때만 `cap=999`로 다시 불러 3자리를 제안한다(`history="extended"`).
+"정말 소진"의 경계는 99에서 **999**로 옮겨갔다 — 아래 `test_exactly_99_used_*` 류는
+"99에서 3자리를 확장 제안한다"로, `test_truly_exhausted_*`는 999 기준으로 갱신했다.
 """
 
 from __future__ import annotations
@@ -26,7 +33,7 @@ def seeded_repo(git_repo: Path, monkeypatch) -> Path:
 
 
 def _taken_full(prefix: str, numbers: range) -> dict[str, tuple[str, str]]:
-    """`{prefix}-01`..`{prefix}-NN`이 전부 점유된 taken 딕셔너리를 만든다."""
+    """`{prefix}-01`..`{prefix}-NN`(100 이상은 3자리 그대로)이 전부 점유된 taken 딕셔너리."""
     return {f"{prefix}-{i:02d}": (f"{prefix}-{i:02d}-task", "로컬 백로그") for i in numbers}
 
 
@@ -83,25 +90,45 @@ class TestCmdAddSurfacesExhaustionAsExplicitError:
             ]
         )
 
-    def test_exhausted_prefix_collision_fails_with_explicit_message_not_three_digit_suggestion(
+    def test_99_used_collision_extends_to_three_digit_suggestion(
         self, seeded_repo, monkeypatch, capsys
     ):
-        """소진된_프리픽스_충돌은_3자리_제안_대신_명시적_오류를_낸다"""
+        """[HARN-97] 01~99가_전부_점유돼도_소진이_아니라_3자리로_확장_제안한다"""
         fake_taken = _taken_full("ZQ", range(1, 100))  # ZQ-01..ZQ-99 전부 로컬 점유로 가장
 
         def _fake_taken_id_numbers(root, backlog, policy):
             return dict(fake_taken)
 
         monkeypatch.setattr(cli, "_taken_id_numbers", _fake_taken_id_numbers)
+        monkeypatch.setattr(cli, "_historically_used_numbers", lambda root, prefix: (set(), "ok"))
 
         capsys.readouterr()
         assert self._add("ZQ-01-my-new-slug") == 1, "번호 충돌은 여전히 거부돼야 한다"
         captured = capsys.readouterr()
-        assert "ZQ-100" not in captured.err, "3자리 형식 위반 ID를 제안하면 안 된다"
+        assert "ZQ-100" in captured.err, "01~99 소진 시 3자리(ZQ-100)를 제안해야 한다"
+        assert "상위 2자리 번호 소진" in captured.err, captured.err
+        assert "001~999" not in captured.err, "001~999 전부 소진 문구는 아직 나오면 안 된다"
+        assert "사람의 결정" not in captured.err, "3자리 제안이 됐으면 사람의 결정은 필요 없다"
+
+    def test_999_used_collision_fails_with_explicit_message_not_four_digit_suggestion(
+        self, seeded_repo, monkeypatch, capsys
+    ):
+        """[HARN-97] 001~999까지_전부_점유되면_비로소_소진_오류를_낸다 — 4자리 날조 금지"""
+        fake_taken = _taken_full("ZQ", range(1, 1000))  # ZQ-001..ZQ-999 전부 로컬 점유로 가장
+
+        def _fake_taken_id_numbers(root, backlog, policy):
+            return dict(fake_taken)
+
+        monkeypatch.setattr(cli, "_taken_id_numbers", _fake_taken_id_numbers)
+        monkeypatch.setattr(cli, "_historically_used_numbers", lambda root, prefix: (set(), "ok"))
+
+        capsys.readouterr()
+        assert self._add("ZQ-01-my-new-slug") == 1, "번호 충돌은 여전히 거부돼야 한다"
+        captured = capsys.readouterr()
+        assert "ZQ-1000" not in captured.err, "4자리 형식 위반 ID를 제안하면 안 된다"
         assert "소진" in captured.err, "프리픽스 소진 사실이 명시돼야 한다"
         assert "사람의 결정" in captured.err, "사람의 결정이 필요함을 알려야 한다"
-        # 번호 공간은 01~99 — 00을 세지 않으면서 "00~99 소진"이라 말하던 불일치 정정
-        assert "01~99" in captured.err and "00~99" not in captured.err, captured.err
+        assert "001~999" in captured.err, captured.err
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -154,22 +181,43 @@ class TestSuggestNumberLowestUnusedFallback:
         verdict = cli._suggest_number("E1", taken, _boom)
         assert verdict.suggestion == "E1-05" and verdict.history == "not_needed"
 
-    def test_truly_exhausted_returns_none(self):
-        """정말_전부_점유면_None — 3자리 날조 금지는 그대로"""
+    def test_01_to_99_full_extends_to_three_digit_not_none(self):
+        """[HARN-97] 01~99가_전부_점유면_None_대신_3자리(E1-100)를_제안한다"""
         taken = _taken_full("E1", range(1, 100))
         verdict = cli._suggest_number("E1", taken, lambda _p: (set(), "ok"))
-        assert verdict.suggestion is None and verdict.free_lower == ()
+        assert verdict.suggestion == "E1-100" and verdict.free_lower == ()
+        assert verdict.history == "extended"
 
-    def test_all_free_numbers_retired_returns_none_with_retired_list(self):
-        """빈_번호가_전부_이력상_사용이면_None이고_retired에_그_목록이_남는다"""
+    def test_all_free_numbers_retired_extends_to_three_digit_with_retired_list(self):
+        """[HARN-97] 빈_번호가_전부_이력상_사용이면_3자리로_확장하고_retired에_그_목록이_남는다"""
         taken = _taken_full("E1", range(44, 100))
         verdict = cli._suggest_number("E1", taken, lambda _p: (set(range(1, 44)), "ok"))
-        assert verdict.suggestion is None and verdict.history == "ok"
+        assert verdict.suggestion == "E1-100" and verdict.history == "extended"
         assert len(verdict.retired) == 43
+
+    def test_999_used_returns_none(self):
+        """[HARN-97] 001~999가_전부_점유돼야_비로소_None — 4자리 날조 금지는 그대로"""
+        taken = _taken_full("E1", range(1, 1000))
+        verdict = cli._suggest_number("E1", taken, lambda _p: (set(), "ok"))
+        assert verdict.suggestion is None and verdict.free_lower == ()
+        assert verdict.history == "ok"
 
 
 class TestHistoricallyUsedNumbers:
     """실 git 이력 — 추가됐다 삭제된 번호가 잡히고, 조회 불가·shallow는 None(fail-closed)."""
+
+    def test_deleted_three_digit_task_file_number_is_reported(self, git_repo: Path):
+        """[HARN-97] 3자리(100 이상) 번호의 삭제된 태스크 파일도 이력에서 잡힌다 —
+        `_HISTORY_TASK_FILE_RE`를 `\\d{2}`에서 `\\d{2,3}`로 넓힌 변경의 직접 검증."""
+        tasks = git_repo / "backlog" / "tasks"
+        tasks.mkdir(parents=True)
+        (tasks / "ZQ-100-old.yaml").write_text("id: ZQ-100-old\n", encoding="utf-8")
+        _git("add", ".", cwd=git_repo)
+        _git("commit", "-m", "add ZQ-100", cwd=git_repo)
+        (tasks / "ZQ-100-old.yaml").unlink()
+        _git("add", "-A", cwd=git_repo)
+        _git("commit", "-m", "rm ZQ-100", cwd=git_repo)
+        assert cli._historically_used_numbers(git_repo, "ZQ") == ({100}, "ok")
 
     def test_deleted_task_file_number_is_reported(self, git_repo: Path):
         """삭제된_태스크_파일의_번호도_이력에서_잡힌다"""

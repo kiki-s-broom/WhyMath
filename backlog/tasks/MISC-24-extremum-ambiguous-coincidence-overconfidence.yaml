@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-24-extremum-ambiguous-coincidence-overconfidence
+title: "extremum-value-vs-point-confused 정규식 채널이 f(x0)=x0 우연의 일치 정답에도 confidence 1.0으로 서빙 도달 — 원리상 구별 불가 케이스의 확신 오진단 위험"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재현: diagnose('극대는 x=2 에서 나오고 극댓값은 2 이다 (f(2)=2 인 함수)')가 extremum-value-vs-point-confused를 confidence 1.0으로 반환하고 apply_match_quality_gate(top-1 floor 0.65)를 통과함을 확인한다 — 카탈로그 주석(catalog.py 극댓값 항목)은 이 케이스가 '정규식 단독 매치 0.5로 게이트 미만'이라 안전하다고 적지만, 그 정규식 패턴 자체가 리터럴 '극댓값'을 포함해 매치 시 substring 신호도 항상 함께 발화하므로 실제로는 conf 1.0이다(MISC-22 조사 중 발견 — 요구되는 조건이 아니라 결과다)"
+  - "② f(x0)=x0인 정답(극대점 좌표와 극댓값이 우연히 같은 수)이 실제로 학생에게 '오개념'으로 확신 진단될 위험을 해소한다 — 원리상 구별 불가이므로(카탈로그 주석 명시) 이 채널이 게이트를 통과해서는 안 된다는 것이 원 설계 의도였다. 해소 방향은 이 항목만 예외적으로 regex-only 가산을 옛 방식(1개 신호 상당)으로 유지하거나, ambiguous 판정을 코드 경로에 반영하거나(예: 별도 refuting 신호로 f(x)=x 좌표-값 동일 케이스를 배제) 등 pedagogy-designer 검토 대상"
+  - "③ anchor_detection_channel_eval의 ambiguous 계급 측정(현재 '보고만' 함)이 실제 서빙 게이트 통과 여부까지 재는지 확인하고, 필요하면 ambiguous fixture에도 _survives_serving_gate 단언을 추가해 이 위험을 회귀 동결한다"
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1072"
+  - "https://github.com/doldori7/WhyMath/pull/1071"
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - src/backend/whymath_backend/l4/misconception/diagnose.py
+  - src/backend/whymath_backend/l4/misconception/models.py
+  - docs/prompts/misconception_diagnosis.md
+  - src/backend/whymath_backend/harness/anchor_detection_channel_eval.py
+  - tests/backend/l4/test_misconception_diagnose.py
+  - tests/backend/harness/test_anchor_detection_channel_eval.py
+  - MEMORY.md
+session: null
+notes: "출처: MISC-22(정규식 매치를 substring 신호 전체와 동등하게 가산하도록 confidence 공식을 정정하는 작업) 조사 중 발견. MISC-22 변경과 무관하게 *이미* main에 존재하던 위험이다(구 v1.2 공식으로도 이 케이스는 conf 1.0이었음을 실측 확인 — regex 패턴이 '극댓값' 리터럴을 포함해 substring이 항상 동반 매치). 학생 정서 최우선(CLAUDE.md 의사결정 우선순위 #1) 원칙상 방치 부적절하나 MISC-22 acceptance 범위 밖이라 분리 등재한다.\n\n[정정 2026-09-08] paths ['src/backend/whymath_backend/l4/misconception/catalog.py', 'src/backend/whymath_backend/l4/misconception/diagnose.py', 'docs/prompts/misconception_diagnosis.md'] → ['src/backend/whymath_backend/l4/misconception/catalog.py', 'src/backend/whymath_backend/l4/misconception/diagnose.py', 'src/backend/whymath_backend/l4/misconception/models.py', 'docs/prompts/misconception_diagnosis.md', 'src/backend/whymath_backend/harness/anchor_detection_channel_eval.py', 'tests/backend/l4/test_misconception_diagnose.py', 'tests/backend/harness/test_anchor_detection_channel_eval.py', 'MEMORY.md']: 구현 범위: models.py에 ambiguous_regex_signals 필드 신설, anchor_detection_channel_eval.py에 ambiguous_serving_reach 게이트 추가, 관련 테스트·MEMORY 결정 로그 갱신\n\n[정정 2026-09-08] 완료 증적을 PR #1072→PR #1071로 정정한다. 착수 지시 시 '별도 PR을 열라'고 안내했으나, 같은 브랜치(claude/status-vlul18)에서 이미 PR #1071(MISC-22)이 열려 있어 GitHub 제약(같은 head→base 쌍에 PR 1개)상 애초에 실현 불가능한 지시였다 — 지시한 세션의 실수. 실행 세션은 이를 정직하게 인지하고 새 브랜치(claude/misc-24-extremum-ambiguous-coincidence)를 만들어 PR #1072를 열었으나, 그 브랜치가 status-vlul18의 커밋(c3415fd4)에서 분기해 MISC-22 변경을 diff에 함께 포함하는 중복 상태였다. 정리: PR #1071(claude/status-vlul18)에 MISC-22→MISC-24→Codex P1 후속(EXPLICIT_CORRECTION_MENTION)이 순차 커밋으로 전부 누적돼 있고 PR 본문도 세 가지를 통합 서술하도록 갱신했으므로, 이 하나로 병합해 진행한다. PR #1072는 close(머지 안 함) — 중복 diff로 인한 리뷰 혼란·머지 순서 위험(#1072가 먼저 머지되면 main이 Codex P1 미대응 상태로 노출) 방지.\n\n[정정 2026-09-08] notes 치환 — PR #1072가 PR #1071(같은 브랜치·같은 head→base)과 diff가 겹쳐 중복 — #1071 하나로 통합, #1072는 close"
+updated: 2026-09-08

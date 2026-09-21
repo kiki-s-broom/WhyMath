@@ -1,0 +1,12 @@
+{
+  "// 인코딩": "한국어 Windows에서 VS Code가 파일을 cp949로 추측해 열고 그대로 저장하면 mojibake가 커밋된다. 추측을 끄고 UTF-8로 고정한다 — docs/standards/encoding_safety.md 사례 A.",
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+  "// autoGuessEncoding": "편해 보이지만 대규모 저장소에서는 오판이 섞인다. 자동 탐지는 ASCII 위주·짧은 파일·한글이 몇 자 없는 파일에서 특히 틀린다. 외부 cp949 입력은 추측이 아니라 ingestion 단계에서 명시적으로 변환한다.",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "// 스냅샷": "라이선스 약관 스냅샷은 바이트 그대로가 증거다. 실수로 열어 저장하는 경로를 줄이려고 탐색기·검색에서 감춘다(읽기가 필요하면 명시적으로 연다).",
+  "files.readonlyInclude": {
+    "data/licenses/snapshots/**": true
+  }
+}

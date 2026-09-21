@@ -42,10 +42,29 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._l6_mode_reach_state import (
+    GIFTED as _MODE_GIFTED,
+)
+from whymath_backend.api._l6_mode_reach_state import (
+    METACOGNITION as _MODE_METACOGNITION,
+)
+from whymath_backend.api._l6_mode_reach_state import (
+    RETAKE as _MODE_RETAKE,
+)
+from whymath_backend.api._l6_mode_reach_state import (
+    SCHOOL_PROGRESS as _MODE_SCHOOL_PROGRESS,
+)
+from whymath_backend.api._l6_mode_reach_state import (
+    SUNEUNG as _MODE_SUNEUNG,
+)
+from whymath_backend.api._l6_mode_reach_state import (
+    THINKING as _MODE_THINKING,
+)
+from whymath_backend.api._l6_mode_reach_state import get_l6_mode_reach_counters
 from whymath_backend.db.models.atom_node import AtomNode
 from whymath_backend.db.models.concept import Concept, ProblemConcept
 from whymath_backend.db.models.problem import Problem
@@ -322,6 +341,7 @@ def _to_public(items: list[ProblemSchema]) -> list[PublicProblem]:
     summary="RT(재수전용) 트랙 게이팅",
 )
 async def gating_retake(
+    request: Request,
     candidates: CandidatesDep,
     persona: Annotated[Persona, Query(description="노출 대상 페르소나(필수). RT는 B·C 대상")],
     min_fit: Annotated[float, Query(description="persona_fit 임계값(0~1)")] = 0.5,
@@ -334,6 +354,8 @@ async def gating_retake(
     *전부 L6 게이팅이* 수행한 결과를 그대로 돌려준다. 비대상 페르소나(A·D·E)는 게이팅이 전부
     걸러 빈 리스트가 된다. 평가원/EBS/교과서(본문 미보유) 출처는 저작권 게이트가 차단한다.
     """
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_RETAKE)
     return _to_public(select_retake_items(candidates, persona, min_fit=min_fit, limit=limit))
 
 
@@ -343,6 +365,7 @@ async def gating_retake(
     summary="수능(정시) 모드 게이팅",
 )
 async def gating_suneung(
+    request: Request,
     candidates: CandidatesDep,
     persona: Annotated[
         Persona, Query(description="노출 대상 페르소나. 수능은 A·B·C 대상")
@@ -358,6 +381,8 @@ async def gating_suneung(
     기출 *본문*은 절대 노출 불가 → 저작권 게이트가 원천 차단하고, 학생에겐 자체생성 동등문제만
     노출된다(CLAUDE.md 우선순위 #2 법적). D(수시·학종)·E(영재)는 게이팅이 비대상으로 거른다.
     """
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_SUNEUNG)
     return _to_public(select_suneung_items(candidates, persona, min_fit=min_fit, limit=limit))
 
 
@@ -367,6 +392,7 @@ async def gating_suneung(
     summary="학교진도 모드 게이팅",
 )
 async def gating_school_progress(
+    request: Request,
     candidates: SchoolProgressCandidatesDep,
     persona: Annotated[
         Persona, Query(description="노출 대상 페르소나. 학교진도는 A·D 대상")
@@ -415,6 +441,8 @@ async def gating_school_progress(
     # 빈 리스트(쿼리 미지정·`?unit_codes=` 빈값)는 None과 동일하게 폴백/비신호를 타도록
     # `set(...) or None`으로 정규화한다(빈 set은 falsy → None). 게이팅은 둘 다 None이면 진도 정보
     # 부재로 보고 persona_fit으로 판정한다(school_progress.gating 계약).
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_SCHOOL_PROGRESS)
     unit_code_set = set(target_unit_codes) if target_unit_codes else None
     achievement_code_set = set(target_achievement_codes) if target_achievement_codes else None
     return _to_public(
@@ -436,6 +464,7 @@ async def gating_school_progress(
     summary="사고력 모드 게이팅",
 )
 async def gating_thinking(
+    request: Request,
     candidates: CandidatesDep,
     persona: Annotated[
         Persona, Query(description="노출 대상 페르소나. 사고력 주 대상 D·E(닫힌 집합 게이트 없음)")
@@ -456,6 +485,8 @@ async def gating_thinking(
     노출된다(MVP 페르소나 배제 금지·persona_fit 메커니즘만 사용). 평가원/EBS/교과서(본문 미보유)
     출처는 저작권 게이트가 차단하고, 학생에겐 자체생성 동등문제만 노출된다(CLAUDE.md 우선순위 #2).
     """
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_THINKING)
     return _to_public(select_thinking_items(candidates, persona, min_fit=min_fit, limit=limit))
 
 
@@ -465,6 +496,7 @@ async def gating_thinking(
     summary="메타인지 모드 게이팅",
 )
 async def gating_metacognition(
+    request: Request,
     candidates: CandidatesDep,
     persona: Annotated[
         Persona,
@@ -486,6 +518,8 @@ async def gating_metacognition(
     코어(CLAUDE.md §3)라 A(첫 노출 MVP)부터 E까지 `persona_fit`이 임계 이상이면 노출된다.
     평가원/EBS/교과서(본문 미보유) 출처는 저작권 게이트가 차단한다(CLAUDE.md 우선순위 #2).
     """
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_METACOGNITION)
     return _to_public(select_metacognition_items(candidates, persona, min_fit=min_fit, limit=limit))
 
 
@@ -495,6 +529,7 @@ async def gating_metacognition(
     summary="영재 트랙 게이팅",
 )
 async def gating_gifted(
+    request: Request,
     candidates: CandidatesDep,
     persona: Annotated[
         Persona, Query(description="노출 대상 페르소나. 영재는 E(홈스쿨링 영재) 전용 닫힌 집합")
@@ -520,6 +555,8 @@ async def gating_gifted(
     영재 콘텐츠(KMO·올림피아드)는 코퍼스 미존재라 데이터가 차오르면 자동 활성한다(데이터0 안전·
     학교진도 성취기준 선례). 평가원/EBS/교과서(본문 미보유) 출처는 저작권 게이트가 차단한다.
     """
+    # 도달 관측(PB-04) — 성공/실패 무관하게 '이 핸들러에 요청이 닿았다'를 센다.
+    get_l6_mode_reach_counters(request.app).record(_MODE_GIFTED)
     return _to_public(
         select_gifted_items(
             candidates, persona, min_fit=min_fit, min_difficulty=min_difficulty, limit=limit

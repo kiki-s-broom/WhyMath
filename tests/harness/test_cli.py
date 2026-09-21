@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import json
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -180,6 +181,85 @@ class TestGatesCli:
         assert cli.main(["next", "--n", "10", "--json"]) == 0
         ids = [item["id"] for item in json.loads(capsys.readouterr().out)]
         assert "S1-12-phaiakes9-live-verify" in ids
+
+
+class TestGatesShow:
+    """HARN-92 — `gates show <id>`가 status별 근거를 title보다 먼저 낸다.
+
+    title만 인용하면 이미 뒤집힌 결정을 재안내하게 되는 사고(2026-09-07~08 실측:
+    `G-merge-queue-or-strict-relax`)의 재발방지대책. cleared→evidence, waived→notes,
+    pending→"없음(아직 결정 전)"으로 근거 필드가 갈린다(Codex P2 리뷰 지적 — waive는
+    evidence가 아니라 notes에 저장된다).
+    """
+
+    def test_show_missing_id_rejected(self, seeded_repo: Path):
+        assert cli.main(["gates", "show"]) == 1
+
+    def test_show_unknown_gate_rejected(self, seeded_repo: Path):
+        assert cli.main(["gates", "show", "G-does-not-exist"]) == 1
+
+    def test_show_pending_gate_states_no_decision_yet(self, seeded_repo: Path, capsys):
+        """pending — "없음(아직 결정 전)"을 명시한다(모른다 ≠ 아니다)."""
+        assert cli.main(["gates", "show", "G-phaiakes9-key"]) == 0
+        out = capsys.readouterr().out
+        assert "상태: pending" in out
+        assert "없음(아직 결정 전)" in out
+
+    def test_show_cleared_gate_prints_full_evidence_before_title(self, seeded_repo: Path, capsys):
+        """cleared — evidence 전문(절단 없음)이 title보다 먼저 나온다.
+
+        `G-merge-queue-or-strict-relax` 사고 재현: evidence가 길고 핵심 재판정 문구가
+        뒷부분에 있어도(993자 중 403번째 글자) 그 문구가 통째로 출력에 실재해야 한다
+        — 앞 N자 미리보기였다면 잘려나갔을 자리에 마커를 심는다.
+        """
+        padding = "배경 설명 " * 80  # 403자 안팎을 앞에 채워 "뒷부분" 시나리오를 재현
+        marker = "재판정 = D 자동 재동기화 워크플로우"
+        evidence = f"{padding}{marker} — 커밋 abc1234에서 확정"
+        assert cli.main(["gates", "add", "G-show-cleared", "--title", "낡은 질문 문구"]) == 0
+        capsys.readouterr()
+        assert (
+            cli.main(["gates", "clear", "G-show-cleared", "--as", "kiki", "--evidence", evidence])
+            == 0
+        )
+        capsys.readouterr()
+        assert cli.main(["gates", "show", "G-show-cleared"]) == 0
+        out = capsys.readouterr().out
+        assert "상태: cleared (clear 주체: kiki)" in out
+        assert marker in out  # 절단됐다면 이 마커는 사라진다
+        assert out.index(marker) < out.index("낡은 질문 문구")  # evidence가 title보다 먼저
+
+    def test_show_waived_gate_prints_notes_not_evidence_label(self, seeded_repo: Path, capsys):
+        """waived — 사유는 notes에 있다(evidence 아님). ③ 정정 지점의 직접 검증."""
+        assert cli.main(["gates", "add", "G-show-waived", "--title", "낡은 질문 문구2"]) == 0
+        capsys.readouterr()
+        assert cli.main(["gates", "waive", "G-show-waived", "--reason", "대체 결정 = HARN-85"]) == 0
+        capsys.readouterr()
+        assert cli.main(["gates", "show", "G-show-waived"]) == 0
+        out = capsys.readouterr().out
+        assert "상태: waived" in out
+        assert "대체 결정 = HARN-85" in out
+        assert "evidence (전문)" not in out  # waived는 evidence 라벨을 쓰지 않는다
+        assert out.index("대체 결정 = HARN-85") < out.index("낡은 질문 문구2")
+
+    def test_list_title_alone_does_not_reveal_evidence(self, seeded_repo: Path, capsys):
+        """대조군 — `gates list`의 title 인용만으로는 재판정 내용을 알 수 없다.
+
+        `show`가 새로 여는 정보(근거)를 `list`가 이미 주고 있었다면 이 태스크는
+        불필요하다 — 그렇지 않음을 실측으로 고정한다.
+        """
+        marker = "재판정 = D 자동 재동기화 워크플로우"
+        evidence = "배경 " * 50 + marker
+        assert cli.main(["gates", "add", "G-show-contrast", "--title", "대조군 질문"]) == 0
+        capsys.readouterr()
+        assert (
+            cli.main(["gates", "clear", "G-show-contrast", "--evidence", evidence + " abc1234"])
+            == 0
+        )
+        capsys.readouterr()
+        assert cli.main(["gates", "list"]) == 0
+        out = capsys.readouterr().out
+        assert "대조군 질문" in out
+        assert marker not in out  # list는 title만 보여줄 뿐 evidence 본문은 안 보여준다
 
 
 class TestGatesAdd:
@@ -1946,6 +2026,195 @@ class TestStaleBranchClassificationWiring:
         assert "--unshallow" in out
         assert "미해결 장기 미머지 브랜치" not in out
 
+    def test_brief_forwards_pr_state_lookup_flags_to_render(self, bare_remote, monkeypatch, capsys):
+        """brief가_pr_state_lookup_ok_실패_사유를_render까지_전달한다 (HARN-78 배선 실재성)
+
+        `cmd_brief`가 `scan.pr_state_lookup_ok`/`pr_state_lookup_error`를 읽고도
+        `render_brief`에 안 넘기면, 화면은 상태 조회가 실패했는지 모른 채 예전 문구
+        ("처분은 해당 PR에서")를 계속 낸다 — "장치 존재 ≠ 배선"(OPS-10)의 이 태스크 축.
+        """
+        import remote_claims
+        import report
+
+        _, clone = bare_remote
+        mine = clone("brief-pr-state")
+        monkeypatch.chdir(mine)
+        assert cli.main(["seed"]) == 0
+
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_stale_branches",
+            lambda root, **kwargs: remote_claims.StaleBranchScanResult(
+                "ok",
+                stale=[
+                    remote_claims.StaleBranch(
+                        branch="claude/pr-1",
+                        ref="refs/remotes/origin/claude/pr-1",
+                        last_commit_at=datetime.now(timezone.utc),
+                        age_days=12.0,
+                        ahead=7,
+                        status="pr_filed",
+                        evidence="PR #846 (상태 미확인)",
+                    ),
+                ],
+                pr_lookup_ok=True,
+                pr_state_lookup_ok=False,
+                pr_state_lookup_error="NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정",
+            ),
+        )
+        captured_kwargs: dict = {}
+        original_render = report.render_brief
+
+        def spy(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            return original_render(*args, **kwargs)
+
+        monkeypatch.setattr(report, "render_brief", spy)
+        capsys.readouterr()
+        assert cli.main(["brief"]) == 0
+
+        assert captured_kwargs.get("pr_state_lookup_ok") is False
+        assert "NoTokenError" in captured_kwargs.get("pr_state_lookup_error", "")
+        out = capsys.readouterr().out
+        assert "상태 미확인" in out
+        assert "처분은 해당 PR에서" not in out
+
+    def test_branches_cmd_reports_pr_closed_and_state_lookup_gap(
+        self, bare_remote, monkeypatch, capsys
+    ):
+        """branches_CLI가_PR닫힘과_상태_미확인을_화면에_낸다 (HARN-78 배선 실재성)
+
+        CI 진입점(`cmd_branches`)이 `pr_closed`를 별도 태그로 안 내거나 상태 미확인
+        사실을 삼키면, 이 축의 정본화(remote_claims)는 있는데 CI가 보는 화면에는
+        여전히 예전 3~4분류만 나온다.
+        """
+        import remote_claims
+
+        _, clone = bare_remote
+        mine = clone("branches-pr-closed")
+        monkeypatch.chdir(mine)
+        assert cli.main(["seed"]) == 0
+
+        now = datetime.now(timezone.utc)
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_stale_branches",
+            lambda root, **kwargs: remote_claims.StaleBranchScanResult(
+                "ok",
+                stale=[
+                    remote_claims.StaleBranch(
+                        branch="gates/deploy-environment-approval",
+                        ref="refs/remotes/origin/gates/deploy-environment-approval",
+                        last_commit_at=now,
+                        age_days=26.0,
+                        ahead=3,
+                        status="pr_closed",
+                        evidence="PR #967 닫힘(미머지)",
+                    ),
+                    remote_claims.StaleBranch(
+                        branch="claude/pr-2",
+                        ref="refs/remotes/origin/claude/pr-2",
+                        last_commit_at=now,
+                        age_days=13.0,
+                        ahead=9,
+                        status="pr_filed",
+                        evidence="PR #847 (상태 미확인)",
+                    ),
+                ],
+                pr_lookup_ok=True,
+                pr_state_lookup_ok=False,
+                pr_state_lookup_error="NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정",
+            ),
+        )
+        capsys.readouterr()
+        assert cli.main(["branches"]) == 0
+        out = capsys.readouterr().out
+        assert "PR 닫힘(미머지): 1건" in out
+        assert "[PR-닫힘] gates/deploy-environment-approval — PR #967 닫힘(미머지)" in out
+        assert "PR 열림/닫힘 조회 미수행" in out and "NoTokenError" in out
+
+    def test_branches_cmd_renders_disposal_label_and_precheck_hint(
+        self, bare_remote, monkeypatch, capsys
+    ):
+        """branches_CLI가_처분_라벨과_회수_선행_확인_안내를_화면에_낸다 (HARN-93 ② 배선 실재성)
+
+        `remote_claims.scan_stale_branches`가 `disposal_labels`를 채워도 `cmd_branches`가
+        그것을 읽어 출력하지 않으면 "정본화는 있는데 화면에는 안 보인다"는 HARN-93 acceptance
+        ②가 지적한 바로 그 공백이 재생산된다 — 이 테스트가 실제 CLI 출력 문자열을 본다.
+        """
+        import remote_claims
+
+        _, clone = bare_remote
+        mine = clone("branches-disposal-label")
+        monkeypatch.chdir(mine)
+        assert cli.main(["seed"]) == 0
+
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_stale_branches",
+            lambda root, **kwargs: remote_claims.StaleBranchScanResult(
+                "ok",
+                stale=[
+                    remote_claims.StaleBranch(
+                        branch="claude/lic-01-rights-provenance-mvp-2",
+                        ref="refs/remotes/origin/claude/lic-01-rights-provenance-mvp-2",
+                        last_commit_at=datetime.now(timezone.utc),
+                        age_days=16.0,
+                        ahead=28,
+                        status="pr_filed",
+                        evidence="PR #858",
+                        disposal_labels=("eos-close",),
+                    ),
+                ],
+                pr_lookup_ok=True,
+                pr_state_lookup_ok=True,
+                pr_label_lookup_ok=True,
+            ),
+        )
+        capsys.readouterr()
+        assert cli.main(["branches"]) == 0
+        out = capsys.readouterr().out
+        assert "라벨: eos-close(정체 16일)" in out
+        assert "pr_disposal_precheck.py --pr <N>" in out
+
+    def test_branches_cmd_reports_label_lookup_failure_reason(
+        self, bare_remote, monkeypatch, capsys
+    ):
+        """토큰이 없어 라벨 조회 자체를 못 했으면 그 사실을 명시한다(모른다 ≠ 라벨 없음)."""
+        import remote_claims
+
+        _, clone = bare_remote
+        mine = clone("branches-label-lookup-fail")
+        monkeypatch.chdir(mine)
+        assert cli.main(["seed"]) == 0
+
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_stale_branches",
+            lambda root, **kwargs: remote_claims.StaleBranchScanResult(
+                "ok",
+                stale=[
+                    remote_claims.StaleBranch(
+                        branch="claude/pr-3",
+                        ref="refs/remotes/origin/claude/pr-3",
+                        last_commit_at=datetime.now(timezone.utc),
+                        age_days=8.0,
+                        ahead=4,
+                        status="pr_filed",
+                        evidence="PR #844",
+                    ),
+                ],
+                pr_lookup_ok=True,
+                pr_state_lookup_ok=True,
+                pr_label_lookup_ok=False,
+                pr_label_lookup_error="NoTokenError: GITHUB_TOKEN/GH_TOKEN 미설정 — 라벨 조회 생략",
+            ),
+        )
+        capsys.readouterr()
+        assert cli.main(["branches"]) == 0
+        out = capsys.readouterr().out
+        assert "처분 라벨 조회 미수행" in out and "NoTokenError" in out
+
 
 class TestBatchBlobParsing:
     """HARN-11 — `git cat-file --batch` 출력 파싱의 바이트 정렬.
@@ -2097,3 +2366,325 @@ class TestAddWriteSideDepAudit:
         import dep_declaration
 
         assert "cancelled" in dep_declaration._SCAN_SKIP_STATUSES
+
+
+class TestTransitionRejectionGuidance:
+    """전이 거부가 **해소 경로**를 함께 내는가 (HARN-86).
+
+    사고 경위: 2026-09-07 LIC-07(owner=kiki) 완료 기입을 Kiki에게 안내하며 `done
+    ... --as kiki` 한 줄만 주었는데, 그 태스크가 todo라 전이표에 없어 exit 1로
+    공전했다 — 왕복 1회 낭비. 세션 쪽 규칙("검증 없는 실행 안내 금지")은 이미
+    있으므로 대책을 **도구 쪽**에 둔다: 거부가 해소 경로를 내면 안내자가 전이표를
+    몰라도 실행자가 막히지 않는다.
+    """
+
+    def _task(self, status: str, owner: str = "claude", session: str | None = None) -> cli.Task:
+        # session 축이 기본값이 아니다 — in_progress·review 태스크는 **항상** session을 들고
+        # 있고(cmd_start가 채우고 cmd_review가 보존한다), 그 사실이 어느 경로가 실행 가능한지를
+        # 바꾼다. session=None으로만 시험하면 실제로 쓰이는 상태를 한 번도 밟지 않는다.
+        return cli.Task(
+            id="TEST-01-probe",
+            title="probe",
+            track="infra-debt",
+            stage="S3",
+            status=status,
+            owner=owner,
+            session=session,
+        )
+
+    # ── ① 사고 재현 경로: todo → done ────────────────────────────────────
+    def test_todo_to_done_rejection_carries_start_command(self):
+        """todo→done_거부는_start_선행_명령을_동봉한다"""
+        message = cli._transition(self._task("todo"), "done")
+        assert message is not None
+        assert "todo → in_progress → done" in message
+        # 실행자가 그대로 붙여 넣을 수 있어야 한다 — "start를 먼저 하세요" 같은
+        # 산문은 안내가 아니라 또 하나의 규칙 설명이다.
+        assert "backlog.py start TEST-01-probe" in message
+        assert "backlog.py done TEST-01-probe --artifact <증적>" in message
+
+    def test_human_owned_rejection_carries_as_flag_on_every_hop(self):
+        """사람소유_거부는_모든_홉에_as_플래그를_단다"""
+        # LIC-07이 실제로 그랬다 — owner=kiki. `--as`가 빠진 안내는 owner 거부로
+        # 또 한 번 튕겨 왕복이 2회가 된다.
+        message = cli._transition(self._task("todo", owner="kiki"), "done")
+        assert message is not None
+        assert "start TEST-01-probe --as kiki" in message
+        assert "done TEST-01-probe --as kiki --artifact <증적>" in message
+
+    # ── ② 변별력: 정상 전이는 같은 화면을 내지 않는다 ──────────────────────
+    def test_allowed_transition_emits_no_guidance(self):
+        """허용된_전이는_안내를_내지_않는다"""
+        # 성공/실패 양쪽에서 같은 값을 내는 검사는 검증이 아니라 위장이다
+        # (CLAUDE.md 2026-07-17 "변별력 없는 검증 스텝 금지").
+        assert cli._transition(self._task("todo"), "in_progress") is None
+        assert cli._transition(self._task("in_progress"), "done") is None
+
+    def _startable_id(self, capsys) -> str:
+        """게이트 없이 즉시 착수 가능한 태스크 1건 (TestLifecycle과 같은 방식)."""
+        assert cli.main(["next", "--n", "1", "--json"]) == 0
+        return json.loads(capsys.readouterr().out)[0]["id"]
+
+    def test_guidance_is_absent_from_successful_cli_run(self, seeded_repo: Path, capsys):
+        """정상_start_출력에는_해소_경로가_없다"""
+        task_id = self._startable_id(capsys)
+        assert cli.main(["start", task_id, "--session", "b"]) == 0
+        captured = capsys.readouterr()
+        assert "해소 경로" not in (captured.out + captured.err)
+
+    def test_rejection_surfaces_through_cli_stderr(self, seeded_repo: Path, capsys):
+        """거부_안내는_CLI_stderr로_실제로_나온다"""
+        # 함수 단위 통과와 "사용자가 실제로 본다"는 다르다 — 배선까지 동결한다.
+        # 같은 태스크의 같은 상태(todo)에서 갈리는 두 검사다: start는 통과하고
+        # review는 거부된다 — 화면이 갈리지 않으면 이 안내는 변별력이 0이다.
+        task_id = self._startable_id(capsys)
+        assert cli.main(["review", task_id]) == 1
+        assert "해소 경로" in capsys.readouterr().err
+
+    # ── ③ 종결 상태: 없는 경로를 지어내지 않는다 ──────────────────────────
+    def test_terminal_status_says_no_route_instead_of_inventing_one(self):
+        """종결_상태는_경로를_지어내지_않는다"""
+        for terminal in cli.TERMINAL_STATUSES:
+            message = cli._transition(self._task(terminal), "in_progress")
+            assert message is not None
+            assert "해소 경로 없음" in message
+            # 우회를 권하면 안 된다 — 거부는 판정이다(CLAUDE.md 거부 우회 금지).
+            assert "손편집" in message
+            assert "backlog.py add" in message
+
+    # ── ④ 산출물 검사: 안내한 명령이 실제로 파싱되는가 ─────────────────────
+    def test_every_suggested_command_actually_parses(self):
+        """안내한_모든_명령이_실제_파서를_통과한다"""
+        # 문자열이 아니라 **구성된 결과**를 검사한다(CLAUDE.md 2026-09-01 ①).
+        # 이 검사가 없으면 `review --as kiki`처럼 존재하지 않는 플래그를 안내해도
+        # 초록이다 — 그 안내를 받은 사람은 argparse 오류를 보게 된다.
+        parser = cli.build_parser()
+        statuses = tuple(cli.STATUS_TRANSITIONS)
+        pairs = [
+            (src, dst)
+            for src in statuses
+            for dst in statuses
+            if dst not in cli.STATUS_TRANSITIONS.get(src, ()) and src != dst
+        ]
+        assert pairs, "거부 쌍이 0건이면 이 전수 가드는 공허하게 통과한다"
+        checked = 0
+        for src, dst in pairs:
+            for owner in ("claude", "kiki"):
+                route = cli._transition_route(src, dst, session_held=False)
+                if route is None:
+                    continue
+                for status in route:
+                    command = cli._status_command(self._task(src, owner=owner), status)
+                    argv = command.replace(cli._CLI + " ", "").split()
+                    # 자리표시자는 그 자리의 값일 뿐이므로 파싱에는 영향이 없다
+                    parser.parse_args(argv)
+                    checked += 1
+        assert checked > 0, "스캔 0건은 실패다 — 검사 대상을 하나도 못 찾았다"
+
+    # ── ⑤ 같은 상태로의 전이: 0단계 경로를 내지 않는다 ──────────────────
+    def test_same_status_rejection_is_not_an_empty_route(self):
+        """같은_상태_거부는_빈_경로를_내지_않는다"""
+        # 2026-09-08 stray-code 9회차가 자기 PR에서 잡은 결함: 세션이 끊긴 in_progress
+        # 태스크에 start를 걸면 "해소 경로 (0단계): in_progress"만 나왔다 — 답처럼
+        # 보이는데 실행할 명령이 하나도 없다. 위 ④의 전수 가드는 `src != dst`만
+        # 생성하므로 이 절을 **한 번도 밟지 않았다**(절마다 그 절의 반례가 필요하다).
+        message = cli._transition(self._task("in_progress", session="b"), "in_progress")
+        assert message is not None
+        assert "0단계" not in message
+        assert "이미 'in_progress' 상태다" in message
+        # 재진입 고리는 **실행 가능한** 명령을 동반해야 한다 — HARN-95 이후 unblock 자체가
+        # session을 비우므로 2단계(unblock → start)로 충분하다(이전에는 block 경유
+        # 3단계였다 — 위 test_reentry_cycle_is_executable_not_merely_shortest 참조).
+        assert "backlog.py unblock TEST-01-probe" in message
+        assert "backlog.py start TEST-01-probe" in message
+
+    def test_reentry_cycle_is_executable_not_merely_shortest(self):
+        """재진입_고리는_최단이_아니라_실행_가능한_것이다"""
+        # HARN-95 이전: session을 든 in_progress에서 2단계 후보(unblock → start)는
+        # **실측에서 거부됐다** — cmd_unblock이 session을 비우지 않아 뒤따르는 start가
+        # claimed로 막혔다. 실제로 도는 것은 3단계(block이 session을 비운다)뿐이었다.
+        # HARN-95가 cmd_unblock 자체를 고쳐(session도 함께 비움) 2단계가 이제 실제로
+        # 실행된다 — 최단이 곧 실행 가능한 것이 됐다(아래 종단 테스트가 exit 0을 확인).
+        assert cli._transition_cycle("in_progress", session_held=True) == ["todo", "in_progress"]
+        assert cli._transition_cycle("in_progress", session_held=False) == ["todo", "in_progress"]
+        # in_progress 재진입은 이제 session 유무와 무관하게 같은 2단계지만, session이
+        # 여전히 판단을 가르는 자리가 남아 있다 — `review`는 in_progress 직행(start)이
+        # session 보유 시 항상 거부되므로(review는 여전히 in-flight, HARN-20), session을
+        # 쥔 채로는 반드시 `blocked`를 거쳐야 한다(review→blocked, HARN-95가 새로 연 엣지).
+        # 양쪽이 같은 답이면 이 모델은 session에 대해 아무것도 구별하지 않는 것이다.
+        assert cli._transition_cycle("review", session_held=True) == [
+            "blocked",
+            "todo",
+            "in_progress",
+            "review",
+        ]
+        assert cli._transition_cycle("review", session_held=False) == ["in_progress", "review"]
+
+    def test_same_status_route_is_none_not_empty(self):
+        """같은_상태_경로는_빈_리스트가_아니라_None이다"""
+        # 빈 리스트를 돌려주면 호출부가 그것을 "0단계 경로"로 렌더한다 — 결함의 뿌리였다.
+        assert cli._transition_route("in_progress", "in_progress", session_held=True) is None
+        assert cli._transition_route("todo", "todo", session_held=False) is None
+
+    # ── ⑥ 종단: 안내한 명령을 실제로 실행하면 전건 성공하는가 ────────────
+    #
+    # Codex P2(PR #1067)가 잡은 것이 정확히 이 축이다 — 파싱은 통과하지만 **실행하면
+    # exit 1**인 명령을 안내했다(`review`에서 시작하는 경로의 첫 홉 `start`가 claim
+    # 검사에 걸린다). ④의 파서 검사는 "문법이 맞는가"만 묻고 "돌아가는가"는 묻지 않는다.
+    # "붙여 넣을 수 있는 명령"을 약속하는 기능의 유일한 정직한 검증은 붙여 넣어 보는 것이다.
+
+    _COMMAND_RE = __import__("re").compile(r"\d\) python3 scripts/harness/backlog\.py (.+)$")
+
+    def _guidance_commands(self, stderr: str) -> list[list[str]]:
+        """안내 블록에서 명령 인자만 뽑아 자리표시자를 실제 값으로 채운다."""
+        out: list[list[str]] = []
+        for line in stderr.splitlines():
+            m = self._COMMAND_RE.search(line.strip())
+            if not m:
+                continue
+            argv = [a.strip("'") for a in m.group(1).split()]
+            out.append([a.replace("<사유>", "검증").replace("<증적>", "PR #1") for a in argv])
+        return out
+
+    def _run_guided(self, cli_argv: list[str], task_id: str, capsys) -> None:
+        """거부 → 안내 추출 → 안내대로 전건 실행 → 전부 exit 0이어야 한다."""
+        assert cli.main(cli_argv) == 1
+        commands = self._guidance_commands(capsys.readouterr().err)
+        assert commands, "안내가 명령을 하나도 내지 않았다"
+        for argv in commands:
+            extra = ["--no-remote"] if argv[0] == "start" else []
+            assert cli.main([*argv, *extra]) == 0, f"안내한 명령이 실패했다: {argv}"
+            capsys.readouterr()
+
+    def test_guided_route_todo_to_done_actually_runs(self, seeded_repo: Path, capsys):
+        """안내대로_실행하면_todo에서_done까지_간다"""
+        task_id = self._startable_id(capsys)
+        self._run_guided(["done", task_id, "--artifact", "PR #1"], task_id, capsys)
+        backlog, _ = store.load_backlog(seeded_repo)
+        assert backlog.tasks[task_id].status == "done"
+
+    def test_guided_route_in_progress_to_cancelled_actually_runs(self, seeded_repo: Path, capsys):
+        """안내대로_실행하면_in_progress에서_cancelled까지_간다"""
+        task_id = self._startable_id(capsys)
+        assert cli.main(["start", task_id, "--session", "b", "--no-remote"]) == 0
+        capsys.readouterr()
+        self._run_guided(["cancel", task_id, "--reason", "x"], task_id, capsys)
+        backlog, _ = store.load_backlog(seeded_repo)
+        assert backlog.tasks[task_id].status == "cancelled"
+
+    def test_guided_reentry_cycle_actually_runs(self, seeded_repo: Path, capsys):
+        """안내대로_실행하면_재진입_고리가_실제로_돈다"""
+        # HARN-95 이전에는 이 테스트가 원래 결함(unblock → start)을 잡았다: unblock이
+        # session을 비우지 않아 start가 claimed로 거부됐다 — 문자열 검사로는 안 보이고
+        # 실행해야만 보였다. HARN-95가 cmd_unblock 자체를 고쳐 그 결함은 이제 없다 —
+        # 이 테스트는 그 회귀가 재발하지 않는지(안내한 명령이 실제로 exit 0인지)를
+        # 계속 지킨다.
+        task_id = self._startable_id(capsys)
+        assert cli.main(["start", task_id, "--session", "b", "--no-remote"]) == 0
+        capsys.readouterr()
+        self._run_guided(["start", task_id, "--no-remote"], task_id, capsys)
+        backlog, _ = store.load_backlog(seeded_repo)
+        assert backlog.tasks[task_id].status == "in_progress"
+
+    # ── ⑦ HARN-95: review는 더 이상 막다른 길이 아니다 ──────────────────
+    #
+    # 2026-09-08 시점에는 review→cancelled(session 보유)가 진짜 막다른 길이었고, 위
+    # `test_review_dead_end_reports_why_instead_of_a_broken_command`(현재는 삭제·아래로
+    # 대체)가 "깨진 명령 대신 이유를 말한다"는 정직성만 지켰다. HARN-95가 `review →
+    # blocked` 엣지를 열어(cmd_block은 이미 어느 상태에서든 session을 비우는 범용
+    # 동사라 새 코드가 필요 없었다) 그 막다른 길 자체를 없앴다 — 이제 review에서
+    # done이 아닌 다른 곳(blocked·todo·cancelled·in_progress)으로도 나갈 수 있다.
+    def test_review_reaches_blocked_and_beyond_end_to_end(self, seeded_repo: Path, capsys):
+        """review에서_시작한_안내대로_실행하면_cancelled까지_간다 (HARN-95 종단)"""
+        task_id = self._startable_id(capsys)
+        assert cli.main(["start", task_id, "--session", "b", "--no-remote"]) == 0
+        capsys.readouterr()
+        assert cli.main(["review", task_id]) == 0
+        capsys.readouterr()
+        # review는 session을 보존한 채라 in_progress 직행은 여전히 거부되지만, blocked
+        # 경유로 cancelled까지 실제로 도달한다 — 더 이상 done만 남은 막다른 길이 아니다.
+        self._run_guided(["cancel", task_id, "--reason", "검증"], task_id, capsys)
+        backlog, _ = store.load_backlog(seeded_repo)
+        assert backlog.tasks[task_id].status == "cancelled"
+
+    def test_review_to_in_progress_direct_hop_still_needs_session_free(self):
+        """review→in_progress_직행은_여전히_session_보유_시_거부된다"""
+        # HARN-95는 review의 *다른* 출구(blocked)를 열었을 뿐, review→in_progress 직행
+        # 자체는 그대로다 — cmd_review가 여전히 session을 보존하기 때문(HARN-20). 변별력:
+        # session 유무가 경로의 **모양**(길이)을 계속 가른다 — 도달 자체는 막히지 않지만
+        # (아래 ⑧ 전수 스캔이 그 사실을 고정한다) 직행이 되는 것과 blocked를 거쳐야 하는
+        # 것은 다른 사실이다. 양쪽이 같은 길이면 이 모델은 session에 대해 아무것도
+        # 구별하지 않는 것이다.
+        held = cli._transition_route("review", "in_progress", session_held=True)
+        free = cli._transition_route("review", "in_progress", session_held=False)
+        assert free == ["in_progress"]
+        assert held == ["blocked", "todo", "in_progress"]
+        assert len(held) > len(free)
+
+    # ── ⑧ 전수 스캔: session이 원인인 전 구간 봉쇄가 이제 0건이다 ──────────
+    def test_no_session_caused_dead_ends_remain(self):
+        """session_보유가_전_구간을_막는_쌍이_이_그래프에는_없다 (HARN-95 acceptance ②③)
+
+        "review 하나만 고쳤다"가 아니라 **그래프 전체**에서 session 보유가 목적지
+        도달을 완전히 막는 (출발, 도착) 쌍이 하나도 남지 않았음을 스캔으로 고정한다.
+        위 개별 테스트들이 review·in_progress를 짚었지만, 이 테스트가 없으면 다른
+        (출발, 도착) 조합에 같은 결함이 남아 있어도 아무도 모른다(CLAUDE.md "스캔
+        0건은 실패" — 전수를 보지 않은 통과 선언은 공허하다).
+        """
+        statuses = list(cli.STATUS_TRANSITIONS)
+        non_terminal = [s for s in statuses if s not in cli.TERMINAL_STATUSES]
+        assert non_terminal, "스캔 대상이 0건이면 이 전수 가드는 공허하게 통과한다"
+        blocked_by_session: list[tuple[str, str]] = []
+        checked = 0
+        for src in non_terminal:
+            for dst in statuses:
+                if dst == src:
+                    continue
+                checked += 1
+                held_route = cli._transition_route(src, dst, session_held=True)
+                free_route = cli._transition_route(src, dst, session_held=False)
+                if held_route is None and free_route is not None:
+                    blocked_by_session.append((src, dst))
+        assert checked > 0, "스캔 0건은 실패다 — 검사 대상을 하나도 못 찾았다"
+        assert blocked_by_session == [], (
+            f"session 보유가 전 구간을 막는 쌍이 남아 있다: {blocked_by_session} — "
+            "이 쌍들에 대해 사람은 손편집 말고 나갈 방법이 없다"
+        )
+
+    def test_blocked_by_session_note_mechanism_still_works_on_a_synthetic_gap(self, monkeypatch):
+        """세션이_막는_경로_설명_장치_자체는_여전히_동작한다 (합성 시나리오)
+
+        위 ⑧이 *실 전이표*에는 그런 쌍이 없음을 고정하지만, 그 설명 장치
+        (`_blocked_by_session_note`)가 죽은 코드로 방치되면 안 된다 — 미래에 새 상태·
+        엣지가 session 인지 없이 추가되면 이 장치가 다시 필요해진다. 전이표를 일시적으로
+        좁혀(A→B 직행만 있고 session을 비우는 우회가 없는 합성 그래프) 장치가 여전히
+        "왜 막혔는지"를 정확히 설명하는지 확인한다.
+        """
+        # A -> X -> in_progress -> () : 목표(in_progress)가 A의 직접 허용 목록에 없어
+        # `_transition`이 안내 계산으로 들어가고, session을 쥔 채로는 X를 지나 in_progress로
+        # 가는 홉이 막힌다(X가 session을 비우지 않으므로) — 반면 session이 없으면 같은
+        # 경로가 통한다. `_transition`(공개 경로)을 통해 불러서 "route(held=True)가 이미
+        # None"이라는 이 헬퍼의 전제를 실제 호출부와 똑같이 만족시킨다(헬퍼를 전제 없이
+        # 직접 부르면 무의미한 입력에 무의미한 답을 낼 뿐이다).
+        synthetic = {"A": ("X",), "X": ("in_progress",), "in_progress": ()}
+        monkeypatch.setattr(cli, "STATUS_TRANSITIONS", synthetic)
+        message = cli._transition(self._task("A", session="b"), "in_progress")
+        assert message is not None
+        assert "backlog.py start" not in message
+        assert "실행 가능한 해소 경로 없음" in message
+        assert "classify_todo" in message
+
+    def test_route_is_shortest_not_merely_valid(self):
+        """경로는_유효한_아무_경로가_아니라_최단이다"""
+        # in_progress→cancelled는 blocked 경유·todo 경유 둘 다 유효하지만 어느 쪽도
+        # 2단계다. 3단계짜리 경로를 내놓으면 사람이 한 번 더 왕복한다.
+        assert len(cli._transition_route("in_progress", "cancelled", session_held=False)) == 2
+        assert cli._transition_route("blocked", "done", session_held=False) == [
+            "todo",
+            "in_progress",
+            "done",
+        ]
+        assert cli._transition_route("todo", "review", session_held=False) == [
+            "in_progress",
+            "review",
+        ]

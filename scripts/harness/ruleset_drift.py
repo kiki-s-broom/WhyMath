@@ -19,8 +19,25 @@
 따라서 이 도구는 **JSON을 파일 경로로 받는다** — 스스로 조회하지 않는다. 자동 상시 실행이
 불가능하다는 것이 정직한 제약이며, 그 제약 위에서 "조회는 사람·판정은 기계"로 분업한다.
 
-    gh api repos/doldori7/WhyMath/rules/branches/main > ruleset.json
-    python3 scripts/harness/ruleset_drift.py ruleset.json --record
+    gh api repos/{owner}/{repo}/rules/branches/main > ruleset.json
+    gh api repos/{owner}/{repo}/rulesets/16623542        > ruleset-full.json
+    python3 scripts/harness/ruleset_drift.py ruleset.json \
+        --ruleset-full ruleset-full.json --record
+
+입력이 둘인 이유 — bypass_actors는 다른 엔드포인트에 산다 (HARN-102)
+--------------------------------------------------------------------
+클래식 브랜치 보호의 `enforce_admins: true`("관리자도 우회 불가")에 대응하는 룰셋 축은
+`bypass_actors`인데, **`/rules/branches/main` 응답에는 그 필드가 없다**. 그 엔드포인트는
+"main에 지금 적용되는 규칙"만 돌려주고, "누가 그 규칙을 건너뛸 수 있는가"는 룰셋 자신의
+속성이라 `/rulesets/{id}`에서만 나온다.
+
+2026-09-14에 클래식 보호를 삭제하면서 12축을 대조했고 `bypass_actors: []`(우회 주체 0명)을
+실측해 소실 0을 확인했다. **그러나 그것은 한 시점의 스냅샷이었다** — 판정기가 그 필드를 읽지
+않으니 나중에 누가 채워 넣어도 기계는 조용했다. 지금 안전한 것과 그 상태가 감시되는 것은
+다르다. 그래서 두 번째 입력을 정본으로 편입한다.
+
+**선언했는데 입력이 없으면 exit 2**다. 빠진 입력을 "위반 0"으로 접으면 이 도구가 막으려는
+바로 그 형태(미측정이 통과로 보이는 상태)를 스스로 만든다.
 
 exit code (셋 다 서로 구별된다 — "측정 실패"가 "위반 0 통과"로 위장되면 안 된다)
     0 = 정합 (권고 사항만 있어도 0)
@@ -49,7 +66,7 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -66,14 +83,33 @@ STALE_AFTER_DAYS = 30
 # Kiki 머신(Windows PowerShell) 그대로 복사-실행 가능한 조회 명령. 세 가지가 강제된다:
 #   · `;` 구분 — Windows PowerShell 5.1은 `&&`를 받지 않는다
 #   · `python` — 이 저장소의 Windows 안내는 `python3`가 아니다
-#   · `Out-File -Encoding utf8` — PS 5.1의 `>`는 **UTF-16LE**로 쓴다. 그러면 판정기가
-#     읽다가 UnicodeDecodeError로 죽는다(2026-09-05 실측). 읽기측도 관용하지만
-#     (`_read_json_text`) 산출측에서 먼저 맞춘다 — CLAUDE.md 인코딩 정합 규칙.
+#   · `cmd /c "gh api ... > file"` — gh의 출력 바이트를 **PowerShell에 통과시키지 않는다**.
+#     PS 5.1은 네이티브 명령의 stdout을 `[Console]::OutputEncoding`(한국어 Windows 기본
+#     **cp949**)으로 디코딩한 뒤 다시 인코딩한다. 필수 체크 이름의 `—`·`·`는 UTF-8
+#     3바이트인데 cp949는 2바이트 조합이라 경계가 어긋나고, 선행바이트가 뒤따르는
+#     `"`(0x22)를 트레일로 삼켜 **JSON 구조 문자가 소실된다**. 2026-09-14 실측:
+#     `...가드","app_id"`가 `...媛??,"app_id"`가 되어 2,659→2,618자로 41자 유실,
+#     판정기는 `Expecting ',' delimiter: line 1 column 1828`로 exit 2.
+#
+#     이전 세대(`| Out-File -Encoding utf8`)는 `>`의 UTF-16LE만 피했을 뿐 디코딩
+#     경유는 그대로였다 — **인코딩을 명시해도 이미 깨진 문자열을 명시한 인코딩으로
+#     쓸 뿐이다.** `cmd /c`는 그 경유 자체를 없앤다.
+#
+# 수집이 **두 엔드포인트**인 이유 (HARN-102 ④):
+#   · `/rules/branches/main` — main에 *실제로 적용되는* 규칙의 합집합. 체크 목록·정책
+#     파라미터의 정본이다. 여러 룰셋이 겹쳐도 여기서 합쳐진 결과가 나온다.
+#   · `/rulesets/{id}`       — 그 룰셋 *자체*의 정의. **`bypass_actors`는 여기에만 있다.**
+#     "누가 이 규칙을 건너뛸 수 있는가"는 적용 결과가 아니라 룰셋의 속성이라 앞 응답에
+#     담기지 않는다. 클래식 브랜치 보호의 `enforce_admins`에 대응하는 유일한 축이다.
+# 한쪽만 받으면 다른 쪽 축은 판정 불가이며, 그때는 exit 2(측정 실패)다 — 조용한 통과가 아니다.
+RULESET_ID = 16623542
+
 POWERSHELL_FETCH_RUNBOOK = (
     "cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath; "
-    "gh api repos/doldori7/WhyMath/rules/branches/main | "
-    "Out-File -Encoding utf8 ruleset.json; "
-    "python scripts\\harness\\ruleset_drift.py ruleset.json --record"
+    'cmd /c "gh api repos/{owner}/{repo}/rules/branches/main > ruleset.json"; '
+    f'cmd /c "gh api repos/{{owner}}/{{repo}}/rulesets/{RULESET_ID} > ruleset-full.json"; '
+    "python scripts\\harness\\ruleset_drift.py ruleset.json "
+    "--ruleset-full ruleset-full.json --record"
 )
 
 _DOC_RELPATH = Path(".github") / "branch-protection-setup.md"
@@ -131,6 +167,9 @@ class DocDeclaration:
     params: dict[str, Any]
     deviations: dict[str, Deviation]
     integration_id: int
+    # 룰셋 전문(`/rulesets/{id}`)을 받을 때 **그 파일이 이 룰셋의 것인지** 확인하는 기준.
+    # 다른 룰셋의 덤프를 넘기면 bypass_actors 판정이 엉뚱한 대상에 대해 초록을 낸다.
+    ruleset_id: int
 
 
 def parse_doc(path: Path) -> DocDeclaration:
@@ -164,6 +203,16 @@ def parse_doc(path: Path) -> DocDeclaration:
             f"(얻은 값: {integration_id!r}). pin 판정의 기준이라 없으면 판정할 수 없다."
         )
 
+    # `ruleset_id`는 *대조 축*이 아니라 **입력 신원 확인용 파라미터**다(integration_id와 같은
+    # 취급). 라이브와 다르면 "정책이 어긋났다"가 아니라 "엉뚱한 파일을 줬다"이므로 위반이
+    # 아니라 측정 실패로 올린다 — 아래 parse_ruleset_full 참조.
+    ruleset_id = params.pop("ruleset_id", None)
+    if not isinstance(ruleset_id, int):
+        raise RulesetInputError(
+            f"{source}: RULESET_POLICY 블록에 정수 `ruleset_id` 선언이 없다 "
+            f"(얻은 값: {ruleset_id!r}). 룰셋 전문 입력이 어느 룰셋의 것인지 확인할 수 없다."
+        )
+
     deviations: dict[str, Deviation] = {}
     dev_block = _block(text, _DEVIATION_BEGIN, _DEVIATION_END, "RULESET_DEVIATIONS", source)
     for key, until, reason in re.findall(
@@ -180,6 +229,7 @@ def parse_doc(path: Path) -> DocDeclaration:
         params=params,
         deviations=deviations,
         integration_id=integration_id,
+        ruleset_id=ruleset_id,
     )
 
 
@@ -199,6 +249,19 @@ def _coerce(raw: str) -> Any:
 
 
 @dataclass(frozen=True)
+class BypassActor:
+    """룰셋을 우회할 수 있는 주체 1건. 클래식의 `enforce_admins: false`에 해당하는 구멍이다."""
+
+    actor_type: str
+    actor_id: int | None
+    bypass_mode: str
+
+    def render(self) -> str:
+        ident = "" if self.actor_id is None else f"#{self.actor_id}"
+        return f"{self.actor_type}{ident}({self.bypass_mode})"
+
+
+@dataclass(frozen=True)
 class LiveCheck:
     context: str
     integration_id: int | None
@@ -214,6 +277,10 @@ class LiveRuleset:
     # 이것을 exit 2로 올리면 write_state가 돌지 않아 직전의 `ok` 기록이 그대로 남고,
     # main이 완전 무방비인 채로 브리핑이 최대 30일간 침묵한다(2026-09-05 Codex P1 지적).
     status_checks_enforced: bool = True
+    # `/rulesets/{id}`에서만 오는 축. 기본값 ()는 "없다"가 아니라 "**아직 안 받았다**"이며,
+    # 그 구별은 CLI가 짊어진다(선언돼 있는데 입력이 없으면 exit 2). 여기서 ()를 "우회 주체
+    # 0명"으로 읽으면 미측정이 합격으로 위장된다 — CLAUDE.md "모른다 ≠ 아니다".
+    bypass_actors: tuple[BypassActor, ...] = ()
 
 
 def parse_live(payload: Any, source: str = "<입력>") -> LiveRuleset:
@@ -288,7 +355,20 @@ def parse_live(payload: Any, source: str = "<입력>") -> LiveRuleset:
                 params[key] = rparams.get(key)
 
     # 규칙 타입 자체의 존재 여부도 선언 축이다(required_linear_history 등은 파라미터가 없다).
-    for rtype in ("required_linear_history", "deletion", "non_fast_forward"):
+    #
+    # `merge_queue`는 2026-09-07~09-08 동안 **의도적으로 여기 없었다** — 그때 이 저장소는
+    # owner.type=User(개인 계정 doldori7)였고 GitHub merge queue는 조직 소유 전용이라 켤 수
+    # 없었다. 충족 불가한 것을 선언하면 위반이 상시 보고돼 판정기 전체가 소음이 되므로
+    # (CLAUDE.md '상시 실패하는 fail-open 보호') 빼 두고, "저장소가 조직으로 이관되면 그때
+    # 이 튜플에 추가한다"는 조건을 주석에 박아 뒀다.
+    #
+    # **그 조건이 충족됐다(2026-09-09)**: 저장소가 kiki-s-broom(Organization)으로 전환되고
+    # main 룰셋에 merge queue가 켜졌다. 근거는 라이브 룰셋 덤프가 아니라 **큐가 실제로 일한
+    # 사실**이다 — PR #1067이 큐 브랜치 `gh-readonly-queue/main/pr-1067-94d1f28a`에서
+    # merge_group CI(run 34318528035)를 거쳐 머지됐고 그 head가 그대로 main(a374d2e0)이 됐다.
+    # 이제 큐가 머지 경로를 지탱하므로 **감시 축에서 빠져 있는 것이 위험**이다: 누가 큐를 꺼도
+    # 판정기가 모르는, 보호가 있다고 믿는 무보호 상태가 된다.
+    for rtype in ("required_linear_history", "deletion", "non_fast_forward", "merge_queue"):
         params[rtype] = rtype in rule_types
 
     # 규칙은 읽혔는데 status check 강제가 없거나 목록이 비었다 — 확정된 회귀다(측정 실패 아님).
@@ -298,6 +378,87 @@ def parse_live(payload: Any, source: str = "<입력>") -> LiveRuleset:
         rule_types=rule_types,
         status_checks_enforced=bool(saw_status_rule and checks),
     )
+
+
+def parse_ruleset_full(payload: Any, expected_id: int, source: str = "<입력>") -> LiveRuleset:
+    """`gh api repos/<owner>/<repo>/rulesets/<id>` 출력(룰셋 전문 객체)을 파싱.
+
+    돌려주는 것은 **전문 축만 채운 부분 LiveRuleset**이다 — 체크 목록·규칙 파라미터는
+    `/rules/branches/main` 쪽이 정본이고 여기서는 건드리지 않는다(`merge_ruleset_full`이 합친다).
+
+    필드 부재를 기본값으로 접지 않는다. 특히 `bypass_actors` 키가 없는 것을 "0명"으로 읽으면
+    **응답 형식이 바뀌는 날 보호가 조용히 사라진다** — 그래서 부재는 측정 실패다.
+    """
+    if not isinstance(payload, dict):
+        raise RulesetInputError(
+            f"{source}: 룰셋 전문은 객체여야 하는데 {type(payload).__name__}이 왔다. "
+            "`/rulesets/<id>`(전문)와 `/rules/branches/main`(규칙 배열)을 바꿔 넣지 않았는지 보라."
+        )
+    if "id" not in payload:
+        # gh는 404/403 본문도 stdout으로 내보내므로 `{"message": ...}`가 그대로 파일에 남는다.
+        raise RulesetInputError(
+            f"{source}: 룰셋 전문에 `id`가 없다 — API 오류 응답일 수 있다. "
+            f"앞부분: {json.dumps(payload, ensure_ascii=False)[:200]}"
+        )
+
+    actual_id = payload.get("id")
+    if actual_id != expected_id:
+        raise RulesetInputError(
+            f"{source}: 다른 룰셋의 덤프다(id={actual_id!r}, "
+            f"문서 선언 `ruleset_id`={expected_id}). "
+            "룰셋을 다시 만들어 id가 바뀌었다면 문서의 `ruleset_id` 선언·런북 명령·테스트를 "
+            "함께 고쳐라 — 한 곳만 고치면 나머지가 엉뚱한 룰셋을 본다."
+        )
+
+    enforcement = payload.get("enforcement")
+    if not isinstance(enforcement, str) or not enforcement:
+        raise RulesetInputError(
+            f"{source}: 룰셋 전문에 `enforcement` 문자열이 없다(얻은 값: {enforcement!r})."
+        )
+
+    raw_actors = payload.get("bypass_actors")
+    if not isinstance(raw_actors, list):
+        raise RulesetInputError(
+            f"{source}: 룰셋 전문에 `bypass_actors` 배열이 없다(얻은 값: {raw_actors!r}). "
+            "부재를 '우회 주체 0명'으로 읽지 않는다 — 모르는 것과 없는 것은 다르다."
+        )
+
+    actors: list[BypassActor] = []
+    for entry in raw_actors:
+        if not isinstance(entry, dict) or not entry.get("actor_type"):
+            raise RulesetInputError(f"{source}: bypass_actors 항목 형식이 예상과 다르다: {entry!r}")
+        aid = entry.get("actor_id")
+        actors.append(
+            BypassActor(
+                actor_type=str(entry["actor_type"]),
+                actor_id=int(aid) if isinstance(aid, int) else None,
+                bypass_mode=str(entry.get("bypass_mode") or "?"),
+            )
+        )
+
+    return LiveRuleset(
+        checks=(),
+        params={
+            "ruleset_enforcement": enforcement,
+            "ruleset_bypass_actor_count": len(actors),
+        },
+        rule_types=frozenset(),
+        bypass_actors=tuple(actors),
+    )
+
+
+def merge_ruleset_full(live: LiveRuleset, full: LiveRuleset) -> LiveRuleset:
+    """`/rules/branches/main` 판정 결과에 룰셋 전문 축을 얹는다(전문 쪽 파라미터가 덮어쓴다)."""
+    return replace(
+        live,
+        params={**live.params, **full.params},
+        bypass_actors=full.bypass_actors,
+    )
+
+
+# 룰셋 전문(`/rulesets/<id>`)에서만 나오는 선언 키. 문서가 이 중 하나라도 선언했는데
+# `--ruleset-full` 입력이 없으면 **판정 불가**이므로 exit 2다(조용한 통과 금지).
+FULL_RULESET_KEYS: frozenset[str] = frozenset({"ruleset_enforcement", "ruleset_bypass_actor_count"})
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +562,10 @@ def compare(doc: DocDeclaration, live: LiveRuleset, today: date) -> Report:
         if actual == expected:
             continue
         message = f"정책 불일치 — `{key}`: 문서 선언 {expected!r} vs 라이브 {actual!r}"
+        if key == "ruleset_bypass_actor_count" and live.bypass_actors:
+            # 개수만 보여 주면 "누가 우회할 수 있는가"를 다시 조회해야 한다. 우회 주체는
+            # 보호가 뚫린 지점 그 자체이므로 판정과 같은 화면에 있어야 한다.
+            message += " — 우회 주체: " + ", ".join(a.render() for a in live.bypass_actors)
         deviation = doc.deviations.get(key)
         if deviation is None:
             report.violations.append(message)
@@ -413,6 +578,18 @@ def compare(doc: DocDeclaration, live: LiveRuleset, today: date) -> Report:
             report.waived.append(
                 f"{message} — {deviation.until.isoformat()}까지 유예. 사유: {deviation.reason}"
             )
+
+    # 우회 주체가 실제로 있고 그것이 선언과 어긋났을 때만 시정 순서에 올린다. 유예된 경우에도
+    # 올린다 — 유예는 "알면서 둔다"이지 "고칠 필요가 없다"가 아니다.
+    if live.bypass_actors and doc.params.get("ruleset_bypass_actor_count") != len(
+        live.bypass_actors
+    ):
+        report.remediation.append(
+            f"룰셋 `bypass_actors` {len(live.bypass_actors)}건을 검토한다 — 이 주체들은 "
+            "required check·리뷰·linear history를 **전부 건너뛰고** main에 쓸 수 있다"
+            "(클래식 `enforce_admins: false`와 같은 상태). 의도한 것이면 문서에 유예를 "
+            "만료일과 함께 등재하고, 아니면 룰셋 편집에서 비운다."
+        )
 
     # 쓸모를 다한 유예는 제거 권고 — 유예가 필요 없어졌는데 선언만 남으면, 나중에 같은 축이
     # 다시 어긋났을 때 **조용히 면제**된다(유예가 그 자리에 이미 있으므로). 만료일이 있어도
@@ -444,6 +621,11 @@ def read_json_text(path: Path) -> str:
     *우리가 읽는 쪽* 대응이다(HARN-19 서브프로세스 디코딩과 같은 축). 산출측도 런북에서
     UTF-8로 맞추지만(`POWERSHELL_FETCH_RUNBOOK`), 읽기측이 관용해야 실수 한 번이 판정
     자체를 죽이지 않는다.
+
+    **관용의 한계(2026-09-14 실측)**: 이 폴백은 *인코딩*만 가린다. gh 출력을 PowerShell
+    파이프라인에 태우면 cp949 디코딩 왕복에서 바이트가 실제로 **유실**되는데, 그 결과물은
+    UTF-8로 멀쩡히 디코딩되고 JSON 단계에서야 깨진다. 즉 산출측을 `cmd /c`로 고치는 것이
+    유일한 방어이고 읽기측 관용은 그 축을 막지 못한다.
     """
     raw = path.read_bytes()  # OSError는 호출부가 잡는다
     for encoding in ("utf-8-sig", "utf-16"):  # utf-16은 BOM으로 LE/BE를 스스로 가린다
@@ -453,7 +635,8 @@ def read_json_text(path: Path) -> str:
             continue
     raise RulesetInputError(
         f"{path}: 텍스트로 디코딩하지 못했다(시도: utf-8/utf-8-sig/utf-16). "
-        "PowerShell에서는 `> file` 대신 `| Out-File -Encoding utf8 file`을 쓴다."
+        "PowerShell에서는 gh 출력을 파이프에 태우지 말고 "
+        '`cmd /c "gh api ... > file"`로 받는다.'
     )
 
 
@@ -563,7 +746,20 @@ def main(argv: list[str] | None = None) -> int:
             "gh api repos/<owner>/<repo>/rules/branches/main 출력(JSON 파일)을 입력으로 받는다."
         )
     )
-    parser.add_argument("ruleset_json", type=Path, help="gh api 출력 JSON 파일 경로")
+    parser.add_argument(
+        "ruleset_json",
+        type=Path,
+        help="gh api repos/<o>/<r>/rules/branches/main 출력 JSON 파일 경로",
+    )
+    parser.add_argument(
+        "--ruleset-full",
+        type=Path,
+        default=None,
+        help=(
+            "gh api repos/<o>/<r>/rulesets/<id> 출력(룰셋 전문) JSON 파일 경로 — "
+            "bypass_actors·enforcement 축은 여기서만 나온다"
+        ),
+    )
     parser.add_argument(
         "--doc",
         type=Path,
@@ -603,13 +799,47 @@ def main(argv: list[str] | None = None) -> int:
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
-        return _measurement_failed(f"JSON 파싱 불가: {exc}\n앞 200자: {raw[:200]}")
+        return _measurement_failed(
+            f"JSON 파싱 불가: {exc}\n앞 200자: {raw[:200]}\n"
+            "흔한 원인 — PowerShell 경유 수집(cp949 디코딩)으로 구조 문자가 유실됐다. "
+            f"재수집: {POWERSHELL_FETCH_RUNBOOK}"
+        )
 
     try:
         doc = parse_doc(doc_path)
         live = parse_live(payload, source=str(args.ruleset_json))
     except RulesetInputError as exc:
         return _measurement_failed(str(exc))
+
+    # 룰셋 전문 축 — 선언과 입력이 맞물려야 판정이 성립한다.
+    declared_full = sorted(FULL_RULESET_KEYS & set(doc.params))
+    if args.ruleset_full is None:
+        if declared_full:
+            return _measurement_failed(
+                f"문서가 룰셋 전문 축을 선언했는데({', '.join(f'`{k}`' for k in declared_full)}) "
+                "`--ruleset-full` 입력이 없다. 이 축은 `/rules/branches/main` 응답에 담기지 "
+                "않으므로 판정할 수 없다 — 위반 0이 아니라 **미측정**이다.\n"
+                f"수집: {POWERSHELL_FETCH_RUNBOOK}"
+            )
+    else:
+        try:
+            full_raw = read_json_text(args.ruleset_full)
+        except OSError as exc:
+            return _measurement_failed(f"룰셋 전문 파일을 읽지 못했다({type(exc).__name__}): {exc}")
+        except RulesetInputError as exc:
+            return _measurement_failed(str(exc))
+        try:
+            full_payload = json.loads(full_raw)
+        except json.JSONDecodeError as exc:
+            return _measurement_failed(
+                f"룰셋 전문 JSON 파싱 불가: {exc}\n앞 200자: {full_raw[:200]}\n"
+                f"재수집: {POWERSHELL_FETCH_RUNBOOK}"
+            )
+        try:
+            full = parse_ruleset_full(full_payload, doc.ruleset_id, source=str(args.ruleset_full))
+        except RulesetInputError as exc:
+            return _measurement_failed(str(exc))
+        live = merge_ruleset_full(live, full)
 
     report = compare(doc, live, today)
     print(render(report, str(args.ruleset_json)))

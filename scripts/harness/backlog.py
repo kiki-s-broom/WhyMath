@@ -38,6 +38,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
@@ -46,9 +47,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
+import incidents as incidents_mod
+import jit_rules
 import pathscope
 import remote_claims
 import report
+import rules as rules_mod
 import ruleset_drift
 import selector
 import similar
@@ -58,6 +62,7 @@ from models import (
     GATE_KINDS,
     OWNERS,
     STATUS_TRANSITIONS,
+    TASK_ID_RE,
     TERMINAL_STATUSES,
     Backlog,
     Gate,
@@ -80,13 +85,216 @@ def _fail(message: str, code: int = 1) -> int:
     return code
 
 
+# ── 전이 거부의 해소 경로 안내 (HARN-86) ────────────────────────────────────
+# 거부는 장애물이 아니라 판정이다(CLAUDE.md 프로세스·안내). 다만 "허용 목록"만 내는
+# 거부는 *전이표를 이미 아는 사람*에게만 유용하다 — 안내자가 규칙을 모른 채 런북에
+# 명령을 적으면 그 런북은 실행 시점에 exit 1로 공전한다(2026-09-07 실측: LIC-07의
+# done 안내가 todo→done 거부로 왕복 1회 낭비). 그래서 거부가 **해소 경로 자체**를
+# 함께 낸다 — 안내자가 규칙을 몰라도 실행자가 막히지 않게. "고칠 수 없는 위반을
+# 지적하는 게이트는 사람이 게이트를 끄게 만든다"(HARN-52 등재 사유)의 같은 축이다.
+_CLI = "python3 scripts/harness/backlog.py"
+
+
+# 전이표가 허용하는 전이가 곧 **실행 가능한** 전이는 아니다 (Codex P2 · PR #1067).
+# `cmd_start`는 전이 검사를 통과한 뒤 `selector.classify_todo`를 부르고, 그것이 session을
+# 보유한 태스크를 `claimed`로 거부한다(selector.py:206). 그래서 session을 든 채 in_progress로
+# 가는 홉은 전이표상 합법이어도 반드시 exit 1이다. 그래서 경로 탐색을 (상태, session 보유)
+# 쌍 위에서 한다: 최단이 아니라 **실행 가능한 것 중 최단**을 고른다.
+#
+# (HARN-95 — 2026-09-10) 이 모델이 실측으로 잡은 진짜 결함 2건은 **모델을 정확히 하는 것을
+# 넘어 근본 원인을 고쳤다**(경로를 우회하는 것으로 끝내지 않았다):
+#   ⓐ `cmd_unblock`이 원격 claim만 걷고 `task.session`은 비우지 않아, in_progress→todo
+#      직행(unblock) 뒤의 `start`가 여전히 claimed로 거부됐다 — "더 짧은 경로가 깨진
+#      경로"였다. `cmd_unblock`도 `cmd_block`처럼 session을 비우도록 고쳐 이제 직행이
+#      실제로 통한다(아래 `_HOP_FREES_SESSION`에 `todo`도 포함).
+#   ⓑ `review`의 비-done 출구가 `in_progress` 하나뿐인데 그 홉은 session 보유 시 항상
+#      거부되고 review에서 나가는 다른 전이가 없어, review 태스크는 done 말고 나갈 길이
+#      없는 막다른 길이었다(재작업·PR 폐기 시 대장 손편집 말고는 방법이 없었다).
+#      `models.py`에 `review → blocked` 엣지를 추가했다 — `cmd_block`은 이미 어느
+#      상태에서든 session을 비우고 blocked로 내리는 범용 동사라 새 코드가 필요 없었다.
+# 두 수정을 합치면 이 그래프에서 session이 원인이 되어 전 구간이 막히는 (출발, 도착) 쌍이
+# 0건이 된다(전수 스캔 — `TestNoSessionCausedDeadEnds`). 그래도 이 (상태, session) 모델
+# 자체는 남긴다 — review→in_progress 직행은 여전히 session 보유 시 거부되므로(review는
+# 여전히 in-flight) 세션 인지 경로 탐색이 계속 필요하다.
+_HOP_NEEDS_FREE_SESSION = "in_progress"  # start — classify_todo의 claimed 검사
+# block과 unblock 둘 다 session을 비운다 — (HARN-95) `unblock`은 이전에는 원격 claim만
+# 걷고 로컬 `task.session`은 그대로 둬서 in_progress→todo 직행이 session을 든 todo를
+# 만들었다(그 뒤 start가 claimed로 거부). `cmd_unblock`을 `cmd_block`과 같은 계약으로
+# 맞췄으므로(todo = 아무도 안 쥔 상태) 여기도 함께 넓힌다.
+_HOP_FREES_SESSION = frozenset({"blocked", "todo"})
+
+
+def _hop_is_executable(target: str, session_held: bool) -> bool:
+    """이 홉의 CLI 명령이 지금 상태에서 실제로 성공하는가."""
+    return not (target == _HOP_NEEDS_FREE_SESSION and session_held)
+
+
+def _session_after(target: str, session_held: bool) -> bool:
+    """홉을 밟은 뒤의 session 보유 상태.
+
+    `block`·`unblock`(HARN-95 이후)은 비우고(`task.session = None`), `start`는 채운다.
+    `review`(HARN-20)는 보존한다 — 여전히 in-flight라는 뜻이므로 `session_held` 그대로.
+    """
+    if target in _HOP_FREES_SESSION:
+        return False
+    if target == _HOP_NEEDS_FREE_SESSION:
+        return True
+    return session_held
+
+
+def _transition_route(source: str, target: str, *, session_held: bool) -> list[str] | None:
+    """source → target **실행 가능한** 최단 경로(source 제외 경유 상태). 없으면 None.
+
+    (상태, session 보유) 쌍 위의 BFS다 — 상태만으로 탐색하면 실행 불가한 홉을 최단이라는
+    이유로 고른다. `session_held`는 호출부가 실제 태스크에서 읽어 넘긴다(가정 금지).
+    `seen`을 enqueue 시점에 채우므로 같은 쌍을 두 번 거치는 경로는 나오지 않는다.
+    """
+    if source == target:
+        # 같은 상태로의 "이동"은 경로가 아니라 무의미다 — 빈 리스트를 돌려주면 호출부가
+        # 그것을 0단계 경로로 렌더해 **명령이 하나도 없는 안내**를 낸다(2026-09-08 실측:
+        # 세션이 죽은 in_progress 태스크에 start를 걸면 "해소 경로 (0단계): in_progress").
+        # 순환(같은 상태로 되돌아오는 최단 고리)이 필요하면 _transition_cycle이 따로 낸다.
+        return None
+    seen = {(source, session_held)}
+    queue: deque[tuple[str, bool, list[str]]] = deque([(source, session_held, [])])
+    while queue:
+        node, held, path = queue.popleft()
+        for nxt in STATUS_TRANSITIONS.get(node, ()):
+            if not _hop_is_executable(nxt, held):
+                continue
+            nxt_held = _session_after(nxt, held)
+            if (nxt, nxt_held) in seen:
+                continue
+            step = [*path, nxt]
+            if nxt == target:
+                return step
+            seen.add((nxt, nxt_held))
+            queue.append((nxt, nxt_held, step))
+    return None
+
+
+def _transition_cycle(status: str, *, session_held: bool) -> list[str] | None:
+    """status를 떠났다가 **다시 status로** 돌아오는 최단 고리. 없으면 None.
+
+    쓰임: 이미 그 상태인 태스크에 같은 전이를 걸었을 때(예: 세션이 죽은 `in_progress`
+    태스크의 재착수). 전이표는 자기 자신으로의 전이를 열지 않으므로 한 바퀴 돌아야 한다.
+
+    선정 기준은 두 단계다. **1차는 실행 가능성** — 실행 불가한 홉은 후보에서 제외한다
+    (`_hop_is_executable`). `in_progress` 재진입은 (HARN-95 이후) 2단계 `unblock`→`start`가
+    직접 실행된다 — `unblock`이 이제 session을 비우므로 뒤따르는 `start`가 claimed로
+    거부되지 않는다(HARN-95 이전에는 이 홉이 거부돼 3단계 `block`→`unblock`→`start`를
+    골라야 했다). **2차는 동률일 때 `todo` 경유** — session이 없어 두 후보가 다 도는 경우
+    `review` 경유는 원격 claim을 유지하고 `todo` 경유(`unblock`)는 해제한다. 같은 상태로의
+    재진입은 앞 홀더가 사라졌다는 뜻이므로 자리를 비우는 쪽이 옳다.
+    """
+    best: list[str] | None = None
+    for first in sorted(STATUS_TRANSITIONS.get(status, ()), key=lambda st: st != "todo"):
+        if not _hop_is_executable(first, session_held):
+            continue
+        rest = _transition_route(first, status, session_held=_session_after(first, session_held))
+        if rest is None:
+            continue
+        candidate = [first, *rest]
+        if best is None or len(candidate) < len(best):
+            best = candidate
+    return best
+
+
+def _status_command(task: Task, status: str) -> str:
+    """목표 status로 가는 CLI 한 줄.
+
+    `--as <owner>` 표기는 owner 거부 메시지(HARN-06, cmd_start·cmd_done)가 이미 쓰는
+    형식을 그대로 재사용한다 — 새 어휘를 만들지 않는다. `--as`를 받는 것은 start·done
+    두 명령뿐이므로 나머지 홉에는 붙이지 않는다(붙이면 argparse가 거부한다).
+    `<증적>`·`<사유>`는 그 명령의 required 인자 자리이며, 안내를 보는 사람이 원래
+    알고 있는 값이다(앞 명령이 만들어 내는 값이 아니다 — CLAUDE.md 자리표시자 규칙).
+    """
+    as_flag = f" --as {task.owner}" if task.owner != "claude" else ""
+    commands = {
+        "in_progress": f"{_CLI} start {task.id}{as_flag}",
+        "review": f"{_CLI} review {task.id}",
+        "done": f"{_CLI} done {task.id}{as_flag} --artifact <증적>",
+        "blocked": f"{_CLI} block {task.id} --reason '<사유>'",
+        "cancelled": f"{_CLI} cancel {task.id} --reason '<사유>'",
+        "todo": f"{_CLI} unblock {task.id}",
+    }
+    return commands[status]
+
+
+def _blocked_by_session_note(task: Task, new_status: str, session_held: bool) -> str:
+    """실행 가능한 경로가 없을 때, 그 원인이 session 보유인지 구조인지 가려 말한다.
+
+    없는 경로를 지어내지 않는 것만으로는 부족하다 — 왜 없는지를 말하지 않으면 읽는 사람이
+    전이표를 뒤지다 "표에는 있는데?"에서 멈춘다. 실제로 그 경로는 표에는 있고 CLI로만 막힌다.
+    """
+    if not session_held:
+        return ""
+    if _transition_route(task.status, new_status, session_held=False) is None:
+        return ""  # session을 비워도 못 간다 — 구조적 부재이므로 호출부의 설명이 맞다
+    return (
+        f"\n  실행 가능한 해소 경로 없음 — 전이표에는 '{task.status}' → … → '{new_status}' 경로가 "
+        f"있으나 그 경로가 `start`를 지나고, 이 태스크는 session('{task.session}')을 들고 있어 "
+        f"`start`가 claim 검사에서 거부한다(selector.classify_todo). "
+        f"'{task.status}'에서는 session을 비우는 전이(`block`)가 전이표에 없어 우회로도 없다. "
+        f"→ 갈 수 있는 곳: {list(STATUS_TRANSITIONS.get(task.status, ())) or '없음'} "
+        f"(세션 소유자 본인이면 그 세션에서 이어서 작업하는 것이 정상 경로다)"
+    )
+
+
+def _transition_guidance(task: Task, new_status: str) -> str:
+    """거부에 덧붙일 해소 경로 블록 — 그대로 붙여 넣을 수 있는 명령 목록."""
+    held = bool(task.session)
+    if new_status == task.status:
+        # 이미 그 상태다. "0단계 경로"를 내는 것은 안내가 아니라 위장이다 — 답처럼 보이는데
+        # 실행할 것이 없다. 무엇이 사실인지 말하고, 재진입이 필요한 경우의 고리만 준다.
+        head = f"\n  이미 '{task.status}' 상태다 — 이 명령이 바꿀 것이 없다."
+        cycle = _transition_cycle(task.status, session_held=held)
+        if cycle is None:
+            return head + _blocked_by_session_note(task, task.status, held)
+        lines = [
+            head,
+            f"\n  같은 상태로 **다시** 들어가려면 (예: 세션이 끊긴 태스크의 재착수) "
+            f"({len(cycle)}단계): {' → '.join([task.status, *cycle])}",
+        ]
+        lines += [f"\n    {i}) {_status_command(task, st)}" for i, st in enumerate(cycle, 1)]
+        return "".join(lines)
+    route = _transition_route(task.status, new_status, session_held=held)
+    if route is None:
+        # 현행 전이표에서 도달 불가는 곧 "출발이 종결 상태"다. 그래도 종결 여부를
+        # 따로 묻는다 — 전이표가 바뀌어 다른 도달 불가 쌍이 생겨도 없는 사실을
+        # 단정하지 않기 위해서다(모르면 모른다고 — CLAUDE.md AI·신뢰).
+        if task.status in TERMINAL_STATUSES:
+            return (
+                f"\n  해소 경로 없음 — '{task.status}'은(는) 종결 상태이며 나가는 전이가 없다. "
+                f"후속 작업은 새 태스크로 등재한다: {_CLI} add ... "
+                f"(대장 YAML 손편집으로 되돌리지 않는다 — CLAUDE.md 거부 우회 금지)"
+            )
+        note = _blocked_by_session_note(task, new_status, held)
+        if note:
+            return note
+        return (
+            f"\n  해소 경로 없음 — 전이표에 '{task.status}'에서 '{new_status}'로 가는 "
+            f"경로가 없다(models.py STATUS_TRANSITIONS 확인)"
+        )
+    chain = " → ".join([task.status, *route])
+    lines = [f"\n  해소 경로 ({len(route)}단계): {chain}"]
+    lines += [f"\n    {i}) {_status_command(task, status)}" for i, status in enumerate(route, 1)]
+    return "".join(lines)
+
+
 def _transition(task: Task, new_status: str) -> str | None:
-    """상태 전이 검사 — 허용되지 않으면 오류 메시지 반환."""
+    """상태 전이 검사 — 허용되지 않으면 오류 메시지 반환.
+
+    거부 메시지에는 항상 해소 경로가 붙는다. 정상 전이는 None을 돌려주므로 안내
+    문자열이 나올 자리가 구조적으로 없다 — 성공/실패가 같은 화면을 내면 그 안내는
+    변별력이 0이고, 변별력 없는 안내는 위장이다(CLAUDE.md 2026-07-17).
+    """
     allowed = STATUS_TRANSITIONS.get(task.status, ())
     if new_status not in allowed:
         return (
             f"{task.id}: {task.status} → {new_status} 전이 불가 "
             f"(허용: {list(allowed) or '없음(종결 상태)'})"
+            f"{_transition_guidance(task, new_status)}"
         )
     return None
 
@@ -479,6 +687,50 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
 
+        # [프리플라이트 0.5] 트렁크 의존·게이트 시차 (HARN-91) — classify_todo는 로컬
+        # 백로그 사본만 보므로, 내 마지막 fetch 뒤 트렁크에 새로 착지한 의존·게이트(조건이
+        # *강화*되는 방향)는 그쪽 판정에 안 보인다. 위 done 스캔이 이미 fetch=True로 최신
+        # remote-tracking ref를 받아 뒀으므로 같은 fetch에 편승한다(추가 네트워크 없음).
+        # done_status != "ok"면 그 fetch 자체가 실패한 것이라 이 검사도 신뢰할 근거가
+        # 없다 — 같은 원인이므로 별도 경고를 내지 않고 위 경고 하나로 묶는다.
+        if done_status == "ok":
+            drift_result = remote_claims.scan_trunk_task_drift(root, task)
+            if drift_result.status == "ok" and drift_result.drift:
+                lines = [
+                    f"  - {'의존 미충족' if d.kind == 'dep' else '게이트 미통과'}: "
+                    f"{d.ref_id} (트렁크 상태: {d.trunk_state})"
+                    for d in drift_result.drift
+                ]
+                message = (
+                    f"{task.id} 착수 거부 — 트렁크 사본에 로컬엔 없는 조건이 새로 "
+                    f"착지했다(HARN-91):\n"
+                    + "\n".join(lines)
+                    + f"\n  확인: git show {drift_result.trunk_ref}:backlog/tasks/{task.id}.yaml\n"
+                    f"  로컬을 최신화(git fetch && git merge {drift_result.trunk_ref})한 뒤 "
+                    f"재시도하거나, 그래도 착수해야 하면: --ignore-remote-claim"
+                )
+                if getattr(args, "ignore_remote_claim", False):
+                    print(
+                        f"⚠ 트렁크 의존·게이트 시차 무시하고 진행 — 착수 조건 미충족 위험을 "
+                        f"감수합니다: {', '.join(d.ref_id for d in drift_result.drift)}",
+                        file=sys.stderr,
+                    )
+                    store.append_event(
+                        root,
+                        "start_ignored_trunk_drift",
+                        task.id,
+                        drift=[f"{d.kind}:{d.ref_id}" for d in drift_result.drift],
+                    )
+                else:
+                    return _fail(message)
+            elif drift_result.status != "ok":
+                # 판정 불가를 '시차 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 트렁크 의존·게이트 시차 탐지 불가({drift_result.status}) — "
+                    f"트렁크에 새로 착지한 조건을 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+
     # [프리플라이트 1] 파일 범위 겹침 — 타 in-flight(로컬 ∪ 원격 claim) paths와 교차
     overlap_error = _check_path_overlap(
         root, backlog, task, policy, remote_claimed=remote_claimed, session=session
@@ -847,6 +1099,12 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             f"(investigation=산출물 없는 조사·계획 / incomplete=미완·게이트 대기 / "
             f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시)"
         )
+    # CI 미러 프리플라이트 (HARN-119 ②) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
+    # 1단계는 warn이다(측정 없는 도입 없음 — block 승격은 HARN-122 절차). 거부하지 않는
+    # 이유는 이 게이트가 막는 것이 *망각*이지 *위조*가 아니기 때문이다. 다만 침묵하지는
+    # 않는다 — 아무 말 없이 통과시키면 "검증했다"와 "검증 안 했다"가 같은 화면이 된다.
+    _warn_if_ci_mirror_missing(root)
+
     error = _transition(task, "done")
     if error:
         return _fail(error)
@@ -885,6 +1143,34 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             suffix = f" (게이트 대기: {gates})" if gates else " — 착수 가능"
             print(f"  · {t.id} {t.title}{suffix}")
     return 0
+
+
+def _warn_if_ci_mirror_missing(root: Path) -> None:
+    """이번 커밋의 CI 미러 결과가 없거나 실패면 경고한다(HARN-119 ② 집행 지점).
+
+    조회 자체가 실패하는 환경(미러 미설치·git 없음)에서도 done을 막지 않는다 —
+    다만 그 경우에도 **사유를 말한다**. 무타입 침묵은 이 저장소가 금지한 형태다.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import ci_mirror  # noqa: PLC0415  (선택 의존 — 없으면 경고만)
+
+        commit = ci_mirror.current_commit(root)
+        ok, reason = ci_mirror.verdict_for_commit(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
+    except (ImportError, OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"⚠ CI 미러 상태를 확인하지 못했습니다({type(exc).__name__}) — "
+            f"이 완료는 로컬 재현 증거 없이 기록됩니다",
+            file=sys.stderr,
+        )
+        return
+    if not ok:
+        print(
+            f"⚠ {reason}\n"
+            f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
+            f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+            file=sys.stderr,
+        )
 
 
 def cmd_block(root: Path, args: argparse.Namespace) -> int:
@@ -1029,6 +1315,14 @@ def _release_remote_claim(root: Path, task_id: str, prev_session: str | None) ->
 
 
 def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
+    """전이표의 모든 `→ todo` 홉이 이 명령을 거친다(blocked→todo가 주 용도지만
+    `_status_command`가 in_progress→todo에도 이 명령을 안내한다 — HARN-95).
+
+    `task.session`을 **비운다**(HARN-95 이전에는 원격 claim만 걷고 로컬 session은
+    남겼다) — `cmd_block`과 같은 계약: `todo` = 아무도 쥐지 않은 상태. 이전 계약대로
+    두면 in_progress→todo 직행(unblock) 뒤의 `start`가 여전히 claimed로 거부돼, 전이표가
+    합법으로 표시하는 홉이 실제로는 항상 실패했다(실측 2026-09-08).
+    """
     backlog, _ = _load(root)
     task = backlog.tasks.get(args.id)
     if task is None:
@@ -1038,6 +1332,7 @@ def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
         return _fail(error)
     prev_session = task.session
     task.status = "todo"
+    task.session = None
     task.updated = _today()
     store.save_task(root, task)
     store.append_event(root, "unblock", task.id)
@@ -1050,13 +1345,22 @@ def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
 def cmd_gates(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     if args.gate_action == "list" or args.gate_action is None:
-        pending = [g for g in backlog.gates.values() if g.status == "pending"]
+        # HARN-94: 경과일만 찍던 화면을 **처리 상황**으로 바꾼다. 계산·정렬은 report에 한 곳
+        # (pending_gate_views) — 여기서 따로 세면 status 화면과 두 숫자가 갈라진다.
+        views = report.pending_gate_views(backlog, date.today())
         others = [g for g in backlog.gates.values() if g.status != "pending"]
-        print("⏳ 대기 중 게이트:")
-        for gate in sorted(pending, key=lambda g: g.id):
-            days = report._days_pending(gate.requested, date.today())
-            age = f" — {days}일 경과" if days is not None else ""
-            print(f"  {gate.id} [{gate.assignee}/{gate.kind}] {gate.title}{age}")
+        overdue_n = sum(1 for v in views if v.overdue)
+        print(f"⏳ 대기 중 게이트 {len(views)}건 (독촉 초과 {overdue_n}건) — 급한 순:")
+        for view in views:
+            gate = view.gate
+            # 대기 태스크는 0건도 찍는다 — 줄이 없으면 "0건"과 "안 셌다"를 구분할 수 없다.
+            dep = f"대기 태스크 {len(view.dependents)}건"
+            if view.dependents:
+                dep += f" ({', '.join(view.dependents)})"
+            mark = "⚠" if view.overdue else "·"
+            print(f"  {mark} {gate.id} [{gate.assignee}/{gate.kind}]")
+            print(f"      {view.status_text()} · {dep}")
+            print(f"      {gate.title}")
         if others:
             print("✔ 통과/면제:")
             for gate in sorted(others, key=lambda g: g.id):
@@ -1070,6 +1374,9 @@ def cmd_gates(root: Path, args: argparse.Namespace) -> int:
 
     if args.gate_action == "add":
         return _cmd_gates_add(root, args, backlog)
+
+    if args.gate_action == "show":
+        return _cmd_gates_show(args, backlog)
 
     gate = backlog.gates.get(args.gate_id)
     if gate is None:
@@ -1188,6 +1495,52 @@ def _print_gate_release_reminder(
         print("  · 산문 참조(requires_gates 미부착) 0건")
 
 
+def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
+    """게이트 단건 브리핑 — `status`·근거를 `title`보다 먼저 낸다 (HARN-92).
+
+    왜 필요한가: `gates.yaml`의 `title`은 게이트 최초 등재 시점의 질문 문구이고
+    append 전용 설계(HARN-76)라 `status`가 `pending → cleared/waived`로 바뀌어도
+    갱신되지 않는다. `gates list`는 `title`과 `status`를 함께 보여도 근거(evidence/
+    notes)는 안 보이므로, 사람에게 게이트를 서술할 때 `title`만 옮겨 적으면 이미
+    뒤집힌 질문을 다시 묻게 된다(2026-09-07~08 실측: `G-merge-queue-or-strict-relax`
+    가 이미 cleared·재판정됐는데 title을 그대로 인용해 사용자에게 다시 물었다).
+
+    `status`별로 근거 필드가 다르다(Codex P2 리뷰 지적 — `gates.py`의 clear/waive
+    저장 위치가 다르다): `cleared`는 `evidence`, `waived`는 `notes`(waive 사유는
+    evidence가 아니라 notes에 적힌다), `pending`은 아직 근거가 없다는 사실 자체를
+    "없음(아직 결정 전)"으로 명시한다(CLAUDE.md "모른다 ≠ 아니다" — 조회 실패와
+    아직-없음을 구분). 근거는 **전문 출력**(절단 없음)이다 — 앞 N자 미리보기는
+    핵심 정정 문구가 뒷부분에 있으면 통째로 잘라낼 수 있다(같은 리뷰 지적 —
+    `G-merge-queue-or-strict-relax`의 993자 evidence 중 재판정 문구는 403번째
+    글자부터 시작한다).
+    """
+    gate_id = args.gate_id
+    if not gate_id:
+        return _fail("gates show: 게이트 id 필요 (예: gates show G-xxx)")
+    gate = backlog.gates.get(gate_id)
+    if gate is None:
+        return _fail(f"게이트 '{gate_id}' 없음")
+
+    header = f"게이트: {gate.id}  [{gate.assignee}/{gate.kind}]"
+    if gate.status == "cleared":
+        header += f"  상태: cleared (clear 주체: {gate.cleared_by or '미상(HARN-60 이전)'})"
+    else:
+        header += f"  상태: {gate.status}"
+    print(header)
+
+    if gate.status == "cleared":
+        print("evidence (전문):")
+        print(gate.evidence or "(이상 상태 — cleared인데 evidence 없음. validate로 확인)")
+    elif gate.status == "waived":
+        print("notes — waive 사유 (전문):")
+        print(gate.notes or "(이상 상태 — waived인데 notes 없음)")
+    else:
+        print("evidence: 없음(아직 결정 전)")
+    print()
+    print(f"title(등재 시점 질문 — 최신 판정을 반영하지 않을 수 있다): {gate.title}")
+    return 0
+
+
 def _cmd_gates_add(root: Path, args: argparse.Namespace, backlog) -> int:
     """게이트 대장(gates.yaml)에 새 게이트를 CLI로 등재한다 (HARN-18).
 
@@ -1304,17 +1657,25 @@ def _taken_id_numbers(root: Path, backlog: object, policy: object) -> dict[str, 
     return taken
 
 
-def _next_free_number(prefix: str, taken: Mapping[str, tuple[str, str]]) -> str | None:
-    """`<PREFIX>-<n>` 다음 빈 번호(2자리 zero-padded) — **최대 사용 번호 +1**부터 찾는다.
+def _next_free_number(
+    prefix: str, taken: Mapping[str, tuple[str, str]], *, cap: int = 99
+) -> str | None:
+    """`<PREFIX>-<n>` 다음 빈 번호(2자리 zero-padded, 100 이상은 3자리) — **최대 사용
+    번호 +1**부터 `cap`까지 찾는다.
 
     가장 작은 빈 번호를 주면 과거에 비워진 낮은 번호(예 HARN-01)를 제안하게 되는데,
     그건 "이 트랙의 다음 작업"이라는 사람의 기대와 어긋나 제안이 오히려 혼선을 준다.
 
     `{index:02d}`는 **최소** 2자리이지 **정확히** 2자리가 아니다 — index가 100을 넘으면
-    "100"(3자리)을 내는데, `models.TASK_ID_RE`는 `\\d{2}` 정확히 2자리만 허용한다. 즉
-    프리픽스가 00~99번을 다 쓰면 다음 제안이 형식 위반 ID가 된다(HARN-21 결함②). 그래서
-    index가 99를 넘어서면 날조된 3자리를 내지 않고 **`None`을 반환** — 호출부(`cmd_add`)가
-    사람에게 "이 프리픽스가 소진됐다"는 명시적 오류를 낸다.
+    "100"(3자리)을 그대로 낸다(Python format spec은 최소 폭이지 절단이 아니다). HARN-21
+    시점에는 `models.TASK_ID_RE`가 정확히 2자리만 허용해 그 3자리 출력이 형식 위반
+    ID였다 — 그래서 기본 `cap=99`는 그대로 두어 이 함수 자신과 HARN-73의 tier 1(상향)
+    동작·기존 테스트를 전혀 바꾸지 않는다. HARN-97이 `models.TASK_ID_RE`를 2~3자리
+    (100~999는 선행 0 없이)로 넓히면서, `_suggest_number`의 tier 3(하위 미사용 번호도
+    없을 때의 최종 폴백)만 `cap=999`로 이 함수를 다시 불러 3자리 번호를 제안한다 —
+    호출부를 분리해 두어 "언제 3자리를 제안해도 되는가"라는 정책 판단은
+    `_suggest_number`가 갖고, 이 함수는 순수하게 "주어진 상한 안에서 다음 빈 번호"만
+    계산한다.
     """
     used = [
         int(number.rsplit("-", 1)[1])
@@ -1322,14 +1683,16 @@ def _next_free_number(prefix: str, taken: Mapping[str, tuple[str, str]]) -> str 
         if number.rsplit("-", 1)[0] == prefix and number.rsplit("-", 1)[1].isdigit()
     ]
     index = max(used) + 1 if used else 1
-    while index <= 99 and (f"{prefix}-{index}" in taken or f"{prefix}-{index:02d}" in taken):
+    while index <= cap and (f"{prefix}-{index}" in taken or f"{prefix}-{index:02d}" in taken):
         index += 1
-    if index > 99:
+    if index > cap:
         return None
     return f"{prefix}-{index:02d}"
 
 
-_HISTORY_TASK_FILE_RE = re.compile(r"^backlog/tasks/([A-Z][A-Z0-9]{0,7})-(\d{2})(?:-|\.yaml$)")
+# HARN-97: 2자리뿐 아니라 3자리(100~999) 파일명도 이력에 잡아야 향후 3자리 번호의
+# "한 번이라도 쓰인 적 있음"을 정확히 판정한다 — models.TASK_ID_RE와 폭을 맞춘다.
+_HISTORY_TASK_FILE_RE = re.compile(r"^backlog/tasks/([A-Z][A-Z0-9]{0,7})-(\d{2,3})(?:-|\.yaml$)")
 
 
 def _historically_used_numbers(root: Path, prefix: str) -> tuple[set[int] | None, str]:
@@ -1394,7 +1757,7 @@ class NumberSuggestion:
     max_used: int  # 점유된 최대 번호(없으면 0)
     free_lower: tuple[int, ...]  # taken에 없는 01~99 번호 — 상위 소진 시에만 계산
     retired: tuple[int, ...]  # free_lower 중 이력상 쓰였다 사라진 번호(재사용 금지)
-    history: str  # "not_needed" | "ok" | "unavailable"
+    history: str  # "not_needed" | "ok" | "extended" | "unavailable"
     history_reason: str = "ok"  # unavailable일 때 원인("shallow"·"exception:…"·"git_error:…")
 
 
@@ -1403,20 +1766,37 @@ def _suggest_number(
     taken: Mapping[str, tuple[str, str]],
     history_lookup: Callable[[str], tuple[set[int] | None, str]],
 ) -> NumberSuggestion:
-    """번호 제안 2단계 — ① 최대+1 상향(HARN-21 그대로) ② 상위 소진 시 하위 미사용 폴백(HARN-73).
+    """번호 제안 3단계 — ① 최대+1 상향(HARN-21, 01~99) ② 상위 소진 시 하위 미사용
+    폴백(HARN-73, 01~99 범위 한정) ③ ②도 없으면 3자리(100~999)로 확장 제안(HARN-97).
+
+    ①②는 **그대로 유지한다** — HARN-73에서 이미 Kiki가 결정한 동작(A안: 하위 미사용
+    번호 재사용)과 그 테스트를 이 태스크가 바꿀 이유가 없다. `_next_free_number`의
+    기본 `cap=99`가 그 경계를 그대로 지킨다.
 
     ②의 후보는 taken에 없고 **이력에도 없는** 번호 중 가장 낮은 것. "낮은 번호 제안은
     '다음 작업' 기대와 어긋난다"는 ①의 설계 의도는 유지된다 — 폴백은 ①이 불가능할 때만
-    작동하고, 이력 조회(`history_lookup`)도 그때만 부른다(비용·부작용 최소화).
-
-    번호 공간은 **01~99**다 — `00`은 `TASK_ID_RE`(`\\d{2}`)상 형식적으로 유효하지만
-    `_next_free_number`가 1부터 세듯 제안 대상이 아니며, "모두 소진" 판정과 문구도 이
-    공간(01~99)을 기준으로 말한다(PR #1002 Codex P2 — 00을 세지 않으면서 "00~99 소진"이라
+    작동하고, 이력 조회(`history_lookup`)도 그때만 부른다(비용·부작용 최소화). 후보
+    공간은 **01~99**로 한정한다 — 100 이상은 아직 아무도 안 써 본 새 번호이지 "재사용할
+    옛 빈자리"가 아니다. `00`은 `TASK_ID_RE`상 형식적으로 유효하지만 `_next_free_number`가
+    1부터 세듯 제안 대상이 아니다(PR #1002 Codex P2 — 00을 세지 않으면서 "00~99 소진"이라
     말하던 불일치 정정).
 
-    사고 경위(2026-09-06): EOS-99가 원격 브랜치에 선점되자 ①이 None을 내고 cmd_add가
-    "00~99번을 모두 소진"이라고 보고했다 — 실측은 59/100 사용·40개는 한 번도 안 쓰임.
-    오보고가 사람 결정 게이트를 열었다(G-eos-task-prefix-exhausted).
+    ③이 HARN-97의 실제 신설분이다 — 2026-09-09 실측: `--id EOS-100`을 직접 지정해도
+    `models.TASK_ID_RE`가 정확히 2자리만 허용해 **형식 검증 단계에서** 거부됐다(①②의
+    "탐색 소진" 판정과는 다른 길 — ①②는 여기 도달하기 전에 이미 안전한 2자리 번호를
+    찾아낼 수도 있었지만, 사람이 "다음은 100번대"라는 순차 기대로 3자리를 직접 썼을
+    때도 형식 자체가 막았다). `models.TASK_ID_RE`를 2~3자리(100~999, 선행 0 없이)로
+    넓혔으므로, ②까지 전부 실패했을 때(01~99가 지금 점유돼 있거나 이력상 전부
+    쓰인 적 있음) `_next_free_number(prefix, taken, cap=999)`로 100 이상을 다시 시도한다
+    — `history="extended"`로 표시해 호출부(`cmd_add`)가 "하위 재사용"과 "3자리 확장"을
+    다른 문구로 알린다(같은 값이면 사람이 왜 100번대를 받았는지 알 수 없다).
+
+    사고 경위(2026-09-06 · HARN-73): EOS-99가 원격 브랜치에 선점되자 ①이 None을 내고
+    cmd_add가 "00~99번을 모두 소진"이라고 보고했다 — 실측은 59/100 사용·40개는 한 번도
+    안 쓰임. 오보고가 사람 결정 게이트를 열었다(G-eos-task-prefix-exhausted, Kiki 결정
+    A = 하위 재사용). 사고 경위(2026-09-09 · HARN-97): 그 A안으로 우회하며 실제 상한에
+    처음 부딪혔다 — ARCH·EOS 두 접두 모두 01~99 소진에 근접·`--id EOS-100`이 형식
+    위반으로 거부. ③은 그 다음 층을 연다.
     """
     used = [
         int(number.rsplit("-", 1)[1])
@@ -1433,14 +1813,18 @@ def _suggest_number(
         if f"{prefix}-{n:02d}" not in taken and f"{prefix}-{n}" not in taken
     )
     if not free_lower:
-        return NumberSuggestion(None, max_used, (), (), "not_needed")
+        extended = _next_free_number(prefix, taken, cap=999)
+        return NumberSuggestion(extended, max_used, (), (), "extended" if extended else "ok")
     history, reason = history_lookup(prefix)
     if history is None:
         return NumberSuggestion(None, max_used, free_lower, (), "unavailable", reason)
     retired = tuple(n for n in free_lower if n in history)
     candidates = [n for n in free_lower if n not in history]
     if not candidates:
-        return NumberSuggestion(None, max_used, free_lower, retired, "ok")
+        extended = _next_free_number(prefix, taken, cap=999)
+        return NumberSuggestion(
+            extended, max_used, free_lower, retired, "extended" if extended else "ok"
+        )
     return NumberSuggestion(f"{prefix}-{candidates[0]:02d}", max_used, free_lower, retired, "ok")
 
 
@@ -1617,6 +2001,111 @@ def _active_p0(backlog: Backlog) -> list[str]:
     )
 
 
+def _id_number_conflict(
+    root: Path, backlog: object, new_id: str, *, verb: str = "add"
+) -> tuple[str | None, bool]:
+    """`new_id`의 `<PREFIX>-<번호>`가 이미 점유돼 있으면 **거부 문구**를 돌려준다 (HARN-10).
+
+    반환: `(거부 문구 또는 None, 원격_조회_성공)`. 문구가 `None`이면 통과다.
+
+    왜 함수로 빼는가 — 이 판정은 이제 `add`(신규 등재)와 `rename`(개명) **두 곳**이 쓴다.
+    같은 판정을 두 벌로 두면 한쪽만 고쳐지고, 그때 갈라지는 것은 *번호 충돌을 막는 규칙*
+    자체다(HARN-100). `verb`는 거부 문구 안의 재실행 안내에만 쓴다 — 판정 자체는 동일하다.
+    """
+    # 규약 밖 ID(번호 없음)는 검사 대상이 아니다 — 그 경우에도 반환 계약은 지켜야 하므로
+    # 루프 밖에서 초기화한다(안 하면 `return None, remote_ok`가 NameError로 터진다).
+    remote_ok = True
+
+    def _no(message: str) -> tuple[str, bool]:
+        """거부 문구를 반환 계약 `(문구, 원격_조회_성공)`에 맞춰 싣는다.
+
+        `remote_ok`를 클로저로 읽는다 — 거부 시점에는 이미 확정돼 있다. 이 래퍼가
+        없으면 각 거부 지점이 문자열만 돌려주고, 호출부의 튜플 언패킹이 문자열을
+        글자 단위로 풀어 `ValueError`가 난다(추출 중 실제로 이 형태로 6건 RED).
+        """
+        return message, remote_ok
+
+    remote_ok = True
+    number = store.id_number_of(new_id)
+    if number:
+        policy, _ = store.load_policy(root)
+        try:
+            taken = _taken_id_numbers(root, backlog, policy)
+            remote_ok = True
+        except Exception as exc:  # 원격 조회 실패는 등재를 막지 않는다 — 단 침묵 금지
+            taken = _taken_id_numbers(root, backlog, None)
+            remote_ok = False
+            print(
+                f"  ⚠ 원격 claim 대장 조회 실패({type(exc).__name__}) — 번호 충돌 검사가 "
+                "로컬 백로그로 축소됨(병렬 세션의 인플라이트 번호는 못 본다)",
+                file=sys.stderr,
+            )
+        owner, source = taken.get(number, ("", ""))
+        # 같은 full ID의 재등재(다른 클론에서의 시딩 등)는 충돌이 아니다 — 슬러그가
+        # 다를 때만 번호 참조가 모호해진다.
+        if owner and owner != new_id:
+            prefix = number.rsplit("-", 1)[0]
+            verdict = _suggest_number(prefix, taken, lambda p: _historically_used_numbers(root, p))
+            base = f"태스크 ID 번호 충돌: '{number}' 는 이미 {owner}({source}) 가 쓰고 있다. "
+            tail = "(같은 번호를 나눠 쓰면 문서·커밋의 번호 참조가 결정 불가가 된다 — HARN-10)"
+            if verdict.suggestion is not None and verdict.history == "not_needed":
+                return _no(base + f"다음 빈 번호 제안: {verdict.suggestion}. " + tail)
+            top = f"{prefix}-{verdict.max_used:02d}"
+            if verdict.suggestion is not None and verdict.history == "extended":
+                # 하위(01~99) 재사용도 없다 — 3자리(100~999)로 확장 제안(HARN-97).
+                usable = len(verdict.free_lower) - len(verdict.retired)
+                return _no(
+                    base + f"상위 2자리 번호 소진(최대 {top}) · 미사용 하위 번호 {usable}개도 "
+                    f"없음 — 3자리로 확장해 {verdict.suggestion} 제안(HARN-97). " + tail
+                )
+            if verdict.suggestion is not None:
+                # 상위(최대+1)는 막혔지만 한 번도 쓰인 적 없는 하위 번호가 있다(HARN-73).
+                usable = len(verdict.free_lower) - len(verdict.retired)
+                return _no(
+                    base + f"상위 번호 소진(최대 {top}) — 미사용 하위 번호 {usable}개 중 가장 낮은 "
+                    f"{verdict.suggestion} 제안(이력상 쓰였다 사라진 {len(verdict.retired)}개는 "
+                    "제외 — HARN-73). " + tail
+                )
+            if verdict.history == "unavailable":
+                # 후보는 있으나 "한 번도 쓰인 적 없음"을 확인할 수 없다 — 모른다를 없다로
+                # 접지 않고, **원인을 해소한 뒤 같은 명령을 다시 돌리게** 한다(fail-closed).
+                # shallow 클론에 `git log`를 손으로 돌리라고 안내하면 방금 거부한 것과 같은
+                # 불완전 이력을 재탐색할 뿐이므로(PR #1002 Codex P2) 수동 --id 추론은
+                # 안내하지 않는다 — 배정은 도구가 확인할 수 있을 때까지 막힌 채로 둔다.
+                preview = ", ".join(f"{prefix}-{n:02d}" for n in verdict.free_lower[:10])
+                if len(verdict.free_lower) > 10:
+                    preview += " …"
+                if verdict.history_reason == "shallow":
+                    remedy = (
+                        "이 클론은 shallow(이력 일부 없음)라 로컬 이력 조회로도 확인할 수 없다 — "
+                        "`git fetch --unshallow origin`으로 전체 이력을 받은 뒤 같은 "
+                        f"{verb} 명령을 다시 실행하라"
+                    )
+                else:
+                    remedy = (
+                        f"사유 {verdict.history_reason} — 원인을 해소한 뒤 같은 {verb} 명령을 "
+                        "다시 실행하라"
+                    )
+                return _no(
+                    base
+                    + f"상위 번호 소진(최대 {top}) · 미사용 하위 후보 {len(verdict.free_lower)}개"
+                    f"({preview}) — git 이력 조회 불가로 '한 번도 쓰인 적 없음'을 확인할 수 "
+                    f"없어 제안하지 않는다. {remedy}. 번호를 손으로 추론해 --id로 넣지 말 것"
+                    "(HARN-73). " + tail
+                )
+            # 정말 다 찼다 — 001~999(HARN-97 확장 상한) 전부가 지금 점유돼 있거나
+            # 이력상 쓰였다 사라진 번호다. TASK_ID_RE(2~3자리, 999 상한)를 지키는 다음
+            # 번호를 더 이상 제안할 수 없다 — 이 규모(접두당 999개)에 실제로 도달하는
+            # 것은 이 저장소 관측 이력상 전무하므로 사람의 결정이 필요하다(HARN-97).
+            return _no(
+                base + f"게다가 프리픽스 '{prefix}'는 001~999번을 모두 소진했다(번호 공간은 01부터 "
+                f"센다 · 미사용 0개 · 이력상 쓰였다 사라진 {len(verdict.retired)}개는 재사용 "
+                "금지) — TASK_ID_RE(2~3자리 숫자, 999 상한)를 지키는 다음 번호를 더 이상 제안할 "
+                "수 없다. 새 프리픽스로 분리하는 등 사람의 결정이 필요하다(HARN-97). " + tail
+            )
+    return None, remote_ok
+
+
 def cmd_add(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     if args.id in backlog.tasks:
@@ -1638,76 +2127,9 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
             f"(허용: {list(EOS_PRIORITIES)})"
         )
 
-    # ID 번호 충돌 차단 (HARN-10 — ARCH-13·OPS-15 2회 실측 후 등재)
-    number = store.id_number_of(args.id)
-    if number:
-        policy, _ = store.load_policy(root)
-        try:
-            taken = _taken_id_numbers(root, backlog, policy)
-            remote_ok = True
-        except Exception as exc:  # 원격 조회 실패는 등재를 막지 않는다 — 단 침묵 금지
-            taken = _taken_id_numbers(root, backlog, None)
-            remote_ok = False
-            print(
-                f"  ⚠ 원격 claim 대장 조회 실패({type(exc).__name__}) — 번호 충돌 검사가 "
-                "로컬 백로그로 축소됨(병렬 세션의 인플라이트 번호는 못 본다)",
-                file=sys.stderr,
-            )
-        owner, source = taken.get(number, ("", ""))
-        # 같은 full ID의 재등재(다른 클론에서의 시딩 등)는 충돌이 아니다 — 슬러그가
-        # 다를 때만 번호 참조가 모호해진다.
-        if owner and owner != args.id:
-            prefix = number.rsplit("-", 1)[0]
-            verdict = _suggest_number(prefix, taken, lambda p: _historically_used_numbers(root, p))
-            base = f"태스크 ID 번호 충돌: '{number}' 는 이미 {owner}({source}) 가 쓰고 있다. "
-            tail = "(같은 번호를 나눠 쓰면 문서·커밋의 번호 참조가 결정 불가가 된다 — HARN-10)"
-            if verdict.suggestion is not None and verdict.history == "not_needed":
-                return _fail(base + f"다음 빈 번호 제안: {verdict.suggestion}. " + tail)
-            top = f"{prefix}-{verdict.max_used:02d}"
-            if verdict.suggestion is not None:
-                # 상위(최대+1)는 막혔지만 한 번도 쓰인 적 없는 하위 번호가 있다(HARN-73).
-                usable = len(verdict.free_lower) - len(verdict.retired)
-                return _fail(
-                    base + f"상위 번호 소진(최대 {top}) — 미사용 하위 번호 {usable}개 중 가장 낮은 "
-                    f"{verdict.suggestion} 제안(이력상 쓰였다 사라진 {len(verdict.retired)}개는 "
-                    "제외 — HARN-73). " + tail
-                )
-            if verdict.history == "unavailable":
-                # 후보는 있으나 "한 번도 쓰인 적 없음"을 확인할 수 없다 — 모른다를 없다로
-                # 접지 않고, **원인을 해소한 뒤 같은 명령을 다시 돌리게** 한다(fail-closed).
-                # shallow 클론에 `git log`를 손으로 돌리라고 안내하면 방금 거부한 것과 같은
-                # 불완전 이력을 재탐색할 뿐이므로(PR #1002 Codex P2) 수동 --id 추론은
-                # 안내하지 않는다 — 배정은 도구가 확인할 수 있을 때까지 막힌 채로 둔다.
-                preview = ", ".join(f"{prefix}-{n:02d}" for n in verdict.free_lower[:10])
-                if len(verdict.free_lower) > 10:
-                    preview += " …"
-                if verdict.history_reason == "shallow":
-                    remedy = (
-                        "이 클론은 shallow(이력 일부 없음)라 로컬 이력 조회로도 확인할 수 없다 — "
-                        "`git fetch --unshallow origin`으로 전체 이력을 받은 뒤 같은 add 명령을 "
-                        "다시 실행하라"
-                    )
-                else:
-                    remedy = (
-                        f"사유 {verdict.history_reason} — 원인을 해소한 뒤 같은 add 명령을 "
-                        "다시 실행하라"
-                    )
-                return _fail(
-                    base
-                    + f"상위 번호 소진(최대 {top}) · 미사용 하위 후보 {len(verdict.free_lower)}개"
-                    f"({preview}) — git 이력 조회 불가로 '한 번도 쓰인 적 없음'을 확인할 수 "
-                    f"없어 제안하지 않는다. {remedy}. 번호를 손으로 추론해 --id로 넣지 말 것"
-                    "(HARN-73). " + tail
-                )
-            # 정말 다 찼다(미사용 0, 또는 남은 번호가 전부 이력상 사용) — 3자리 제안은
-            # TASK_ID_RE 위반이라 날조하지 않는다(HARN-21 결함②). 사람의 결정이 필요.
-            return _fail(
-                base + f"게다가 프리픽스 '{prefix}'는 01~99번을 모두 소진했다(번호 공간은 01부터 "
-                f"센다 · 미사용 0개 · 이력상 쓰였다 사라진 {len(verdict.retired)}개는 재사용 "
-                "금지) — TASK_ID_RE(정확히 "
-                "2자리 숫자)를 지키는 다음 번호를 더 이상 제안할 수 없다. 새 프리픽스로 "
-                "분리하는 등 사람의 결정이 필요하다(HARN-21). " + tail
-            )
+    err, remote_ok = _id_number_conflict(root, backlog, args.id)
+    if err:
+        return _fail(err)
         if not remote_ok:
             print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")
     task = Task(
@@ -2181,10 +2603,52 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
                 f"{task.id}: paths가 이미 {new_paths} — 바꿀 것이 없다 "
                 "(지정한 목록이 새 paths 전체가 된다)"
             )
+
+        # HARN-81 — 축소가 무증상이면 미탐이 된다. 두 가지를 한다: ⓐ제거분을 **항상 열거**하고
+        # ⓑ "덧붙이려다 교체된" 형태만 **거부**한다.
+        #
+        # 왜 모든 축소를 거부하지 않는가: 좁히기가 이 축의 목적이고 실사용의 절반이다
+        # (HARN-57). 절반에서 매번 요구되는 확인 플래그는 사람이 항상 붙이게 되고, 항상
+        # 붙이는 플래그는 가드가 아니다 — 이 저장소가 fail-open 경고에서 겪은 습관화가
+        # fail-closed 쪽으로 뒤집힌 형태일 뿐이다.
+        #
+        # 그래서 **사고의 형태**만 거부한다: 잃은 파일과 얻은 파일이 **동시에** 있는 경우.
+        # 순수 축소(잃기만)는 의도적 좁히기이고, 순수 확장(얻기만)은 위험 방향이 아니다.
+        # 둘이 같이 나면 "새 경로를 덧붙이려 했는데 교체라 옛것이 사라진" SEC-32 형태다.
+        dropped, lost_scope, gained_scope, delta_error = _path_scope_delta(
+            root, task.id, task.paths, new_paths
+        )
+        if delta_error:
+            # 침묵 실패 금지 — 타입명을 남긴다. 파일 전개 없이는 ⓑ 판정이 불가능하므로
+            # 거부는 못 하지만 ⓐ 열거는 아래에서 그대로 수행된다(가드가 반만 산다).
+            print(
+                f"  ⚠ 범위 델타 계산 실패({delta_error}) — 축소 거부 판정은 생략, "
+                "제거 목록만 열거한다",
+                file=sys.stderr,
+            )
+        if lost_scope and gained_scope and not getattr(args, "drop_scope", False):
+            return _fail(
+                f"{task.id}: paths 교체로 **기존 범위가 사라지면서 새 범위가 늘었다** — "
+                "덧붙이려다 교체된 형태다(--path는 append가 아니라 교체·HARN-57).\n"
+                f"  제거되는 패턴 {len(dropped)}건: {dropped}\n"
+                f"  범위를 잃는 패턴 {len(lost_scope)}건: {lost_scope}\n"
+                f"  새로 잡는 영역 {len(gained_scope)}건: {gained_scope}\n"
+                "  paths는 병렬 세션 겹침 탐지의 유일한 입력이라 좁아지면 *미탐*이 된다 — "
+                "경보가 안 뜨므로 사람이 알아챌 기회 자체가 없다(HARN-81).\n"
+                "  의도한 것이라면: 남길 경로를 **전부** --path로 다시 명시하거나, "
+                "정말 버리는 것이면 --drop-scope 를 붙여라(사유는 --reason에 남는다)."
+            )
+
         paths_before = list(task.paths)
         task.paths = new_paths
         changed.append(f"paths {paths_before} → {new_paths}")
         note_lines.append(f"paths {paths_before} → {new_paths}: {args.reason}")
+        # ⓐ 제거분 전건 열거 — 순수 축소(정당한 좁히기)에서도 조용하지 않게 한다.
+        # 정상(유지·확장) 케이스에서는 이 줄이 아예 안 나온다(대조군 — 양쪽이 같은 화면이면
+        # 검증이 아니라 위장이다).
+        if dropped:
+            changed.append(f"paths 제거 {len(dropped)}건: {dropped}")
+            note_lines.append(f"paths 제거 {len(dropped)}건: {dropped}")
 
     # ⑨ title 정정 — 교체 (HARN-57 ⑤).
     #
@@ -2350,6 +2814,55 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _path_scope_delta(
+    root: Path, task_id: str, before: list[str], after: list[str]
+) -> tuple[list[str], list[str], list[str], str | None]:
+    """paths 교체의 축소분 — (제거된 패턴, 범위를 잃은 패턴, 새 영역 패턴, 계산실패 사유).
+
+    **왜 필요한가 (HARN-81)**: `--path`는 append가 아니라 교체다(HARN-57 ④ — 좁히는 것이
+    이 축의 목적이라 append로는 좁힐 방법이 없다). 그런데 교체가 **무증상**이라, 신규 경로만
+    넘기면 기존 경로가 조용히 사라진다. 2026-09-07 SEC-32에서 실제로 났다 — 신규 6건만 넘겨
+    원 7건이 소실됐고 구현자가 우연히 알아채 13건을 다시 명시해 복원했다(설계가 아니라 운).
+
+    **왜 위험한가**: `paths`는 병렬 세션 겹침 탐지의 유일한 입력이다. 넓어지면 오탐이지만
+    (HARN-59가 다룬 축 — 시끄러워서 자가교정된다) **좁아지면 미탐**이고, 미탐은 경보가 아예
+    안 뜨므로 사람이 알아챌 기회 자체가 없다. 두 세션이 같은 파일을 모르고 병렬 구현하는
+    형태(2026-07-27 OPS-07 735줄 폐기 · 2026-09-06 MP-04 전량 폐기)의 재발 경로다.
+
+    **판정은 `pathscope.overlap`으로 한다** — `start`·`overlap`이 쓰는 것과 **같은** 함수다.
+    여기서 따로 세면 두 숫자가 갈라진다(`_print_overlap_delta`가 세운 규약을 승계).
+    파일 차집합으로 재지 *않는* 이유: 패턴이 아직 아무 파일도 안 덮을 수 있고(신규 디렉터리),
+    그러면 파일 기준 판정은 **정상·사고 양쪽에서 0건**을 내 공허하게 통과한다(실측 —
+    시드 저장소에서 이 가드가 그렇게 뚫렸다. CLAUDE.md "스캔 0건은 실패").
+    `overlap`은 정적 프리픽스 축을 함께 보므로 파일이 0건이어도 판정이 산다.
+
+    · *잃은 패턴* = 제거됐고, 새 목록의 **어느 패턴과도 더는 겹치지 않는** 것.
+      (`lib/**` → `lib/core/**`처럼 새 패턴이 옛 범위 안이면 겹치므로 잃은 것으로 세지 않는다 —
+       그건 세분화이지 포기가 아니다.)
+    · *새 영역 패턴* = 옛 목록의 어느 패턴과도 겹치지 않는 신규 패턴.
+
+    실패해도 판정을 멈추지 않는다(fail-open) — 대신 사유를 돌려주고 호출부가 타입명과 함께
+    경고한다(침묵 실패 금지). 전개가 불가능해도 *제거된 패턴 목록*은 정확하므로 열거는 산다.
+    """
+    removed = [p for p in before if p not in after]
+    added = [p for p in after if p not in before]
+    try:
+        files = pathscope.repo_files(root)
+    except Exception as exc:  # noqa: BLE001 — 전개 실패가 정정을 막으면 사람이 가드를 끈다
+        return removed, [], [], type(exc).__name__
+    lost = [
+        p
+        for p in removed
+        if after and pathscope.overlap(task_id, [p], task_id, after, files) is None
+    ]
+    gained = [
+        p
+        for p in added
+        if before and pathscope.overlap(task_id, [p], task_id, before, files) is None
+    ]
+    return removed, lost, gained, None
+
+
 def _print_overlap_delta(root: Path, backlog, task, paths_before: list[str]) -> None:
     """paths 정정 전/후의 겹침 건수를 그 자리에서 보여준다 (HARN-57 ④).
 
@@ -2423,6 +2936,116 @@ def _stage_outliers_on_gated_tracks(backlog: Backlog) -> list[str]:
     return out
 
 
+def cmd_rename(root: Path, args: argparse.Namespace) -> int:
+    """태스크 ID 개명 — 번호 충돌의 **유일한 정정 경로** (HARN-100).
+
+    왜 필요한가: `validate`의 번호 충돌 remedy는 "하나를 다음 빈 번호로 개명하라"인데
+    그 개명을 수행할 명령이 없었다. 실제로 충돌이 났을 때(2026-09-12 `OPS-73`)
+    `add`(새 번호) + 구 파일 `git rm` + `start` 재claim으로 우회했고, 그 과정에서 구
+    태스크의 이벤트 이력과 원격 claim이 새 ID로 이어지지 않았다. **고칠 수 없는 위반을
+    지적하는 게이트는 사람이 게이트를 끄게 만든다**(`EOS-62`의 `amend --depends` 부재와
+    같은 형태).
+
+    무엇을 함께 옮기는가 — 옮기는 것과 **옮기지 않는 것**을 둘 다 stdout에 낸다
+    (조용한 부분 이행 금지):
+
+      옮긴다   ① 태스크 YAML 파일명과 `id` 필드
+               ② 다른 태스크의 `depends_on` 안의 구 ID (전수 · 건수 출력)
+               ③ 원격 claim — 구 ID 해제, `in_progress`면 새 ID로 재claim
+      안 옮긴다 ④ **과거 이벤트 기록**. 이벤트 대장은 append-only이고(HARN-20 사고 이후의
+                 설계), 과거 기록의 ID를 고쳐 쓰면 "그때 무엇이 일어났는가"가 사라진다.
+                 대신 `rename` 이벤트 한 건을 append해 구↔신을 잇는다 — 추적은 그 링크로
+                 하고, 이 사실을 실행 때마다 화면에 적는다.
+
+    프리픽스 변경은 막지 않는다(`OPS-73-x` → `HARN-100-y` 허용). 번호 충돌 검사는
+    `add`와 **같은 함수**(`_id_number_conflict`)를 거치므로 판정이 갈라지지 않는다.
+    """
+    backlog, _ = _load(root)
+    old = backlog.tasks.get(args.old_id)
+    if old is None:
+        return _fail(f"태스크 '{args.old_id}' 없음 — 개명할 대상이 없다")
+    if args.new_id == args.old_id:
+        return _fail("구 ID와 새 ID가 같다 — 개명할 것이 없다")
+    if args.new_id in backlog.tasks:
+        return _fail(
+            f"새 ID '{args.new_id}' 가 이미 존재한다 — 개명은 빈 ID로만 간다"
+            "(기존 태스크와 합치려면 한쪽을 cancel하라)"
+        )
+    if not TASK_ID_RE.match(args.new_id):
+        return _fail(
+            f"새 ID '{args.new_id}' 가 ID 규약을 벗어난다 — " f"형식: {TASK_ID_RE.pattern}"
+        )
+    err, remote_ok = _id_number_conflict(root, backlog, args.new_id, verb="rename")
+    if err:
+        return _fail(err)
+
+    old_path = store.backlog_dir(root) / "tasks" / f"{old.id}.yaml"
+    prev_session, prev_status = old.session, old.status
+
+    # ② 구 ID를 선행으로 가리키는 다른 태스크 — 전수 갱신. 여기서 빠뜨리면 `audit-deps`가
+    #    존재하지 않는 선행을 지목하고, 그 태스크는 영원히 착수 후보에서 빠진다.
+    updated_dependents: list[str] = []
+    for other in backlog.tasks.values():
+        if other.id == old.id or old.id not in other.depends_on:
+            continue
+        other.depends_on = [args.new_id if d == old.id else d for d in other.depends_on]
+        other.updated = _today()
+        store.save_task(root, other)
+        updated_dependents.append(other.id)
+
+    # ① 태스크 자신 — 새 파일을 먼저 쓰고 구 파일을 지운다. 순서가 반대면 중간에 죽었을 때
+    #    태스크가 통째로 사라진다(새 파일도 구 파일도 없는 상태). 이 순서면 최악이 중복이고,
+    #    중복은 validate가 번호 충돌로 즉시 잡는다 — 소실보다 낫다.
+    old.id = args.new_id
+    old.notes = _append_note(old.notes, f"{args.old_id} → {args.new_id}: {args.reason}", "개명")
+    old.updated = _today()
+    new_path = store.save_task(root, old)
+    old_path.unlink(missing_ok=True)
+
+    store.append_event(
+        root,
+        "rename",
+        args.new_id,
+        previous_id=args.old_id,
+        reason=args.reason,
+        updated_dependents=updated_dependents,
+    )
+
+    # ③ 원격 claim — 구 ID의 claim은 이제 존재하지 않는 태스크를 가리킨다.
+    _release_remote_claim(root, args.old_id, prev_session)
+    reclaimed = ""
+    if prev_status == "in_progress":
+        result = remote_claims.claim(root, args.new_id, prev_session or store.current_branch(root))
+        reclaimed = result.status
+        if result.status not in ("ok", "offline"):
+            print(
+                f"⚠ 새 ID 원격 claim 실패({result.status}): {result.message} — "
+                f"`backlog.py start {args.new_id}`로 다시 잡으라",
+                file=sys.stderr,
+            )
+
+    print(f"✎ {args.old_id} → {args.new_id} 개명 — {args.reason}")
+    print(f"  · 태스크 파일: {old_path.name} → {new_path.name}")
+    if updated_dependents:
+        print(f"  · depends_on 갱신 {len(updated_dependents)}건: {', '.join(updated_dependents)}")
+    else:
+        print("  · depends_on 갱신 0건 (이 태스크를 선행으로 가리킨 태스크 없음)")
+    if prev_status == "in_progress":
+        print(f"  · 원격 claim: 구 ID 해제 + 새 ID 재claim({reclaimed or '미시도'})")
+    # 안 옮긴 것을 반드시 말한다 — 조용한 부분 이행이 이 CLI의 최대 실패 모드다.
+    print(
+        f"  ⚠ 과거 이벤트 기록의 '{args.old_id}' 참조는 **옮기지 않았다**(append-only 대장 — "
+        f"고쳐 쓰면 그때의 사실이 사라진다). `rename` 이벤트가 구↔신을 잇는다."
+    )
+    print(
+        f"  ⚠ 문서·커밋 메시지·PR 본문의 '{args.old_id}' 참조도 옮기지 않았다 — "
+        f"이 CLI 범위 밖이다. 필요하면 손으로 확인하라: git grep -n {args.old_id}"
+    )
+    if not remote_ok:
+        print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")
+    return 0
+
+
 def cmd_audit_deps(root: Path, args: argparse.Namespace) -> int:
     """의존 선언↔집행 대조 (HARN-52) — exit 0/1.
 
@@ -2485,9 +3108,338 @@ def cmd_audit_deps(root: Path, args: argparse.Namespace) -> int:
     return 1
 
 
+def _incident_ledger_errors(root: Path) -> list[str]:
+    """사고 대장 스키마 검사 — validate·check-edit 공용 (HARN-118 ① '손편집 금지').
+
+    두 호출처가 같은 함수를 쓰는 것이 핵심이다. 훅만 검사하면 CI가 못 보고, CLI만
+    검사하면 편집 직후를 못 본다 — 이 저장소는 "만들었는데 어느 잡도 실행하지
+    않던" 상태를 이미 3회 겪었다(OPS-03·08·11).
+    """
+    _, errors = incidents_mod.load_incidents(root)
+    return errors
+
+
+def cmd_incident(root: Path, args: argparse.Namespace) -> int:
+    action = args.incident_command
+    if action == "add":
+        return _cmd_incident_add(root, args)
+    if action == "report":
+        return _cmd_incident_report(root, args)
+    if action == "series":
+        return _cmd_incident_series(root, args)
+    if action == "seed":
+        return _cmd_incident_seed(root, args)
+    return _fail(f"incident: 알 수 없는 하위 명령 '{action}'")
+
+
+def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건 — 등재 전에 고쳐라:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+
+    candidate = incidents_mod.Incident(
+        date=args.date or _today(),
+        cat=args.cat,
+        title=args.title,
+        sub=args.sub,
+        cause=args.cause,
+        damage=args.damage,
+        damage_class=args.damage_class,
+        fix_form=args.fix_form,
+        fix_ref=args.fix_ref,
+        series_id=args.series or "",
+        who_caught=args.who_caught,
+        quote=args.quote,
+        src=args.src,
+        line=args.line,
+        series_raw=args.series_raw,
+        series_source="manual" if args.series else "",
+        reviewed=True,  # CLI 등재 = 사람/세션이 지금 쓴 것. 시드만 reviewed=False다.
+    )
+    schema_errors = candidate.validate()
+    if schema_errors:
+        print("❌ 사고 스키마 위반:", file=sys.stderr)
+        for error in schema_errors:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+
+    # ② 2회차 코드 착지 강제 — 거부 사유는 series·nth와 함께 stderr에 남는다.
+    blocked = incidents_mod.repeat_settlement_error(ledger, candidate)
+    if blocked:
+        print(f"❌ 사고 등재 거부 — {blocked}", file=sys.stderr)
+        return 1
+
+    ledger.append(candidate)
+    ledger.sort(key=lambda i: i.date)
+    incidents_mod.save_incidents(root, ledger)
+    nth = incidents_mod.next_nth([i for i in ledger if i is not candidate], candidate)
+    store.append_event(
+        root,
+        "incident_add",
+        candidate.series_id or "-",
+        cat=candidate.cat,
+        nth=nth,
+        fix_form=candidate.fix_form,
+        fix_ref=candidate.fix_ref,
+        title=candidate.title,
+    )
+    where = "계열 미배정" if nth is None else f"계열 {candidate.series_id} {nth}회차"
+    print(f"▶ 사고 등재 ({where}) — {candidate.date} [{candidate.cat}] {candidate.title}")
+    print(f"  대장: {incidents_mod.ledger_path(root).relative_to(root)} (총 {len(ledger)}건)")
+    return 0
+
+
+def _cmd_incident_report(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    aggregated = incidents_mod.aggregate(ledger)
+    if args.json:
+        json.dump(aggregated.to_json(), sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+    else:
+        print(incidents_mod.render_report(aggregated))
+    return 0
+
+
+def _cmd_incident_series(root: Path, args: argparse.Namespace) -> int:
+    ledger, errors = incidents_mod.load_incidents(root)
+    if errors:
+        print(f"❌ 사고 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    nths = incidents_mod.compute_nth(ledger)
+    if args.series:
+        members = [(i, n) for i, n in zip(ledger, nths, strict=True) if i.series_id == args.series]
+        if not members:
+            return _fail(f"계열 '{args.series}' 에 등재된 사고가 없다")
+        print(f"# 계열 {args.series} — {len(members)}건")
+        for incident, nth in sorted(members, key=lambda m: m[1] or 0):
+            settled = "✔" if incident.fix_form in incidents_mod.SETTLING_FIX_FORMS else "·"
+            ref = f" → {incident.fix_ref}" if incident.fix_ref else ""
+            print(f"  {nth}회차 {settled} {incident.date} [{incident.cat}] {incident.title}{ref}")
+        return 0
+    aggregated = incidents_mod.aggregate(ledger)
+    print(f"# 계열 {len(aggregated.series)}종 — 사고 {aggregated.total}건")
+    for row in aggregated.series:
+        settled = "code/task" if row.settled else "산문뿐"
+        print(
+            f"  {row.max_nth:>2}회차  {row.series_id:<40} "
+            f"{row.first_date}~{row.last_date}  {settled}"
+        )
+    print(f"  (계열 미배정 {aggregated.unassigned_series}건 — 회차 미계수)")
+    return 0
+
+
+def _cmd_incident_seed(root: Path, args: argparse.Namespace) -> int:
+    existing, _ = incidents_mod.load_incidents(root)
+    if existing and not args.force:
+        return _fail(
+            f"사고 대장에 이미 {len(existing)}건이 있다 — 덮어쓰려면 --force "
+            f"(시드는 최초 1회다. append는 `incident add`를 쓴다)"
+        )
+    source = Path(args.source)
+    if not source.is_absolute():
+        source = root / source
+    if not source.exists():
+        return _fail(f"시드 원천이 없다: {source}")
+    seeded, errors = incidents_mod.seed_from_jsonl(source)
+    if errors:
+        print(f"❌ 시드 원천 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    incidents_mod.save_incidents(root, seeded)
+    aggregated = incidents_mod.aggregate(seeded)
+    # 레포 밖 원천(테스트 픽스처·외부 추출본)도 허용하므로 relative_to를 강제하지 않는다 —
+    # 여기서 ValueError가 나면 적재는 끝났는데 이벤트만 못 남기는 반쪽 상태가 된다.
+    try:
+        source_ref = str(source.relative_to(root))
+    except ValueError:
+        source_ref = str(source)
+    store.append_event(root, "incident_seed", "-", count=len(seeded), source=source_ref)
+    print(f"▶ 사고 대장 시드 {len(seeded)}건 적재 — {incidents_mod.ledger_path(root)}")
+    print(
+        f"  계열 {len(aggregated.series)}종 배정 · 미배정 {aggregated.unassigned_series}건 · "
+        f"최대 회차 {aggregated.max_series_nth} · 전건 reviewed=false(사람 검수 전)"
+    )
+    return 0
+
+
+def cmd_rules(root: Path, args: argparse.Namespace) -> int:
+    action = args.rules_command
+    if action == "lint":
+        return _cmd_rules_lint(root, args)
+    if action == "report":
+        return _cmd_rules_report(root, args)
+    if action == "render":
+        return _cmd_rules_render(root, args)
+    return _fail(f"rules: 알 수 없는 하위 명령 '{action}'")
+
+
+def _cmd_rules_lint(root: Path, args: argparse.Namespace) -> int:
+    """규칙 인덱스 린트 (HARN-121 ④) — 위반 1건이라도 있으면 exit 1.
+
+    판정은 exit code로 한다. 출력이 길어도 자르지 않는다 — 이 저장소는 `-q`·`tail`로
+    잘린 출력의 "보이는 문자열"로 통과를 선언했다가 CI red를 낸 적이 있다(2026-08-09).
+    """
+    findings = rules_mod.lint_repo(root)
+    if not findings:
+        rules, _ = rules_mod.load_rules(root)
+        stats = rules_mod.summary(rules)
+        print(
+            f"✔ 규칙 인덱스 green — 규칙 {stats['total']}건 "
+            f"(집행 {stats['enforced_count']} · 산문 {stats['prose_count']}"
+            f"/기준선 {stats['prose_baseline']} · 창건 {stats['by_status'].get('policy', 0)})"
+        )
+        return 0
+    by_check: dict[str, int] = {}
+    for finding in findings:
+        by_check[finding.check] = by_check.get(finding.check, 0) + 1
+    print(f"❌ 규칙 인덱스 위반 {len(findings)}건 {by_check}:", file=sys.stderr)
+    for finding in findings:
+        print(f"  · {finding}", file=sys.stderr)
+    print(
+        "\n검사 뜻: L1 전수 귀속 · L2 산문 동결 · L3 사고 경위 동결 · "
+        "L4 집행 참조 실재 · L5 유예 래칫 · L6 스캔 0건",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def _cmd_rules_report(root: Path, args: argparse.Namespace) -> int:
+    rules, errors = rules_mod.load_rules(root)
+    if errors:
+        print(f"❌ 규칙 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    stats = rules_mod.summary(rules)
+    if args.json:
+        json.dump(stats, sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+        return 0
+    print(f"# 규칙 인덱스 — 전체 {stats['total']}건")
+    print(f"  유래: {stats['by_origin']}")
+    print(f"  상태: {stats['by_status']}")
+    print(
+        f"  산문뿐 {stats['prose_count']}건 ({stats['prose_ratio']:.1%}) / "
+        f"래칫 기준선 {stats['prose_baseline']}건"
+    )
+    prose = sorted((r for r in rules if r.status == "prose"), key=lambda r: r.id)
+    if prose:
+        print("\n갚아야 할 빚(산문뿐):")
+        for rule in prose:
+            print(f"  {rule.id}  {rule.title[:72]}")
+    return 0
+
+
+def _cmd_rules_render(root: Path, args: argparse.Namespace) -> int:
+    """대장 → `docs/standards/rule_index.md` 재생성. `--check`는 쓰지 않고 대조만."""
+    rules, errors = rules_mod.load_rules(root)
+    if errors:
+        print(f"❌ 규칙 대장 스키마 위반 {len(errors)}건:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    body = rules_mod.render_index(rules, prose_baseline=rules_mod.PROSE_BASELINE)
+    target = root / rules_mod.INDEX_DOC
+    if args.check:
+        current = target.read_text(encoding="utf-8") if target.exists() else ""
+        if current != body:
+            print(
+                f"❌ {rules_mod.INDEX_DOC} 가 대장과 어긋났다 — "
+                f"`backlog.py rules render`로 재생성하라 (문서는 렌더 결과다)",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"✔ {rules_mod.INDEX_DOC} 가 대장과 일치")
+        return 0
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    print(f"▶ {rules_mod.INDEX_DOC} 재생성 — 규칙 {len(rules)}건")
+    return 0
+
+
+def cmd_jit(root: Path, args: argparse.Namespace) -> int:
+    action = args.jit_command
+    if action in ("build", "check"):
+        return _cmd_jit_build(root, args, check=(action == "check"))
+    if action == "show":
+        return _cmd_jit_show(root, args)
+    return _fail(f"jit: 알 수 없는 하위 명령 '{action}'")
+
+
+def _build_jit_notes(root: Path) -> tuple[list[jit_rules.Note], list[str]]:
+    backlog, _ = _load(root)
+    rule_list, rule_errors = rules_mod.load_rules(root)
+    incident_list, incident_errors = incidents_mod.load_incidents(root)
+    errors = rule_errors + incident_errors
+    return jit_rules.build_notes(backlog, rule_list, incident_list), errors
+
+
+def _cmd_jit_build(root: Path, args: argparse.Namespace, *, check: bool) -> int:
+    notes, errors = _build_jit_notes(root)
+    if errors:
+        print(
+            f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr
+        )
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    body = jit_rules.dump_index(notes)
+    target = jit_rules.index_path(root)
+    if check:
+        current = target.read_text(encoding="utf-8") if target.exists() else ""
+        if current != body:
+            print(
+                f"❌ {jit_rules.INDEX_NAME} 이 대장과 어긋났다 — "
+                f"`backlog.py jit build`로 재생성하라 (인덱스는 대장의 렌더 결과다)",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"✔ {jit_rules.INDEX_NAME} 가 대장과 일치 (주입 후보 {len(notes)}건)")
+        return 0
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    rules_n = sum(1 for n in notes if n.kind == "rule")
+    print(
+        f"▶ {jit_rules.INDEX_NAME} 재생성 — 주입 후보 {len(notes)}건 "
+        f"(규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+    )
+    return 0
+
+
+def _cmd_jit_show(root: Path, args: argparse.Namespace) -> int:
+    """이 경로를 편집하면 무엇이 뜨는지 — 훅을 돌리지 않고 확인하는 경로."""
+    notes = jit_rules.load_index(root)
+    if not notes:
+        return _fail(
+            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 "
+            f"(0건은 침묵이 아니라 미구축이다)"
+        )
+    matched = jit_rules.notes_for_path(notes, args.path)
+    rendered = jit_rules.render_injection(matched, args.path)
+    if not rendered:
+        print(f"(주입 0건 — '{args.path}' 경로에서 난 사고·규칙이 대장에 없다)")
+        return 0
+    print(rendered)
+    return 0
+
+
 def cmd_validate(root: Path, args: argparse.Namespace) -> int:
     backlog, schema_errors = _load(root)
     errors = store.validate_backlog(backlog, schema_errors)
+    # HARN-118 ① — 사고 대장도 backlog/ 의 대장이다. 손편집이 조용히 통과하면
+    # 회차 계수가 틀어지고, 틀어진 회차는 2회차 강제를 통째로 무력화한다.
+    errors.extend(_incident_ledger_errors(root))
     warnings = _stage_outliers_on_gated_tracks(backlog)
     # 취소된 선행 차단 (HARN-67 ②) — 무결성 위반이 아니다(대장은 정합하다·차단은 결정 대기).
     # red로 만들면 정당한 cancel이 CI를 깨고, 그러면 사람이 cancel 대신 손편집으로 도망간다.
@@ -2535,6 +3487,8 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     stale_branches: list[tuple[str, float, int, str, str]] = []
     stale_branch_status = "ok"
     stale_branch_message = ""
+    pr_state_lookup_ok = True
+    pr_state_lookup_error = ""
     if policy.remote_claims:
         try:
             scan = remote_claims.scan_stale_branches(
@@ -2542,6 +3496,8 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             )
             stale_branch_status = scan.status
             stale_branch_message = scan.message
+            pr_state_lookup_ok = scan.pr_state_lookup_ok
+            pr_state_lookup_error = scan.pr_state_lookup_error
             if scan.status == "ok":
                 stale_branches = [
                     (
@@ -2634,6 +3590,8 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             stale_branches=stale_branches,
             stale_branch_status=stale_branch_status,
             stale_branch_message=stale_branch_message,
+            pr_state_lookup_ok=pr_state_lookup_ok,
+            pr_state_lookup_error=pr_state_lookup_error,
             done_excluded=done_excluded,
             doc_series_candidates=doc_series_candidates,
             doc_series_status=doc_series_status,
@@ -2762,6 +3720,7 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     if "backlog/" in file_path.replace("\\", "/"):
         backlog, schema_errors = _load(root)
         errors = store.validate_backlog(backlog, schema_errors)
+        errors.extend(_incident_ledger_errors(root))
         if errors:
             print(
                 f"[빌드하네스] backlog 직접 편집 후 무결성 위반 {len(errors)}건:",
@@ -2771,10 +3730,37 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
                 print(f"  · {error}", file=sys.stderr)
             return 2
         return 0
+    # HARN-121 ③ 적시 주입 — 이 경로에서 실제로 났던 사고·규칙만 최대 5줄.
+    # 정책 검사보다 **먼저** 낸다: 정책 위반이 block이면 아래에서 exit 2로 끝나는데,
+    # 그때 정작 도움이 되는 맥락을 못 보여주면 안 된다.
+    _inject_jit_notes(root, file_path)
     try:
         return _check_edit_policy(root, file_path)
     except Exception:  # 정책 검사 실패는 무조건 통과 (fail-open)
         return 0
+
+
+def _inject_jit_notes(root: Path, file_path: str) -> None:
+    """편집 경로에 걸리는 사고·규칙을 stderr에 주입 — 0건이면 침묵 (HARN-121 ③).
+
+    훅을 절대 볼모로 잡지 않는다: 어떤 실패도 exit code를 바꾸지 않는다. 다만 예외를
+    **삼키지는 않는다** — 타입명을 남긴다(CLAUDE.md 침묵 실패 금지). 무타입 경고가
+    langfuse 쓰기 8일 무증상 전멸의 원인이었다.
+    """
+    try:
+        if not file_path:
+            return
+        try:
+            rel = str(Path(file_path).resolve().relative_to(root.resolve()))
+        except ValueError:
+            return  # 레포 밖 — 관할 아님
+        rel = rel.replace("\\", "/")
+        notes = jit_rules.load_index(root)
+        rendered = jit_rules.render_injection(jit_rules.notes_for_path(notes, rel), rel)
+        if rendered:
+            print(rendered, file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — 관측성 코드는 개발을 막지 않는다
+        print(f"[적시 규칙] 주입 실패 — {type(exc).__name__} (편집은 계속된다)", file=sys.stderr)
 
 
 def _check_edit_policy(root: Path, file_path: str) -> int:
@@ -2989,6 +3975,7 @@ def cmd_branches(root: Path, args: argparse.Namespace) -> int:
 
     isolated = buckets.get("isolated", [])
     pr_filed = buckets.get("pr_filed", [])
+    pr_closed = buckets.get("pr_closed", [])
     undetermined = buckets.get("unresolved", [])
 
     # PR 대조를 못 했으면 "고립 N건"이라는 문장 자체를 만들지 않는다 — 조회 실패
@@ -3004,13 +3991,40 @@ def cmd_branches(root: Path, args: argparse.Namespace) -> int:
     active = buckets.get("active", [])
     ported = buckets.get("ported", [])
     print(
-        f"고립(PR 이력 0건): {len(isolated)}건 · PR 제출됨: {len(pr_filed)}건 · "
-        f"타 세션 진행중: {len(active)}건 · 포팅됨: {len(ported)}건"
+        f"고립(PR 이력 0건): {len(isolated)}건 · PR 닫힘(미머지): {len(pr_closed)}건 · "
+        f"PR 제출됨: {len(pr_filed)}건 · 타 세션 진행중: {len(active)}건 · "
+        f"포팅됨: {len(ported)}건"
     )
+    # (HARN-78) pr_filed의 열림/닫힘 조회 결과 — 토큰 없으면 시도조차 안 되므로 그
+    # 사실을 명시한다("확인함"과 "확인 못함"은 다른 사실이다).
+    if pr_filed and not scan.pr_state_lookup_ok:
+        reason = scan.pr_state_lookup_error or "사유 미상"
+        print(
+            f"⚠ PR 열림/닫힘 조회 미수행({reason}) — PR 제출됨 {len(pr_filed)}건은 수동 확인 필요"
+        )
+    # (HARN-93 ②) 처분 라벨(eos-merge/rework/postpone/close) 조회 결과 — 이 라벨은
+    # "닫는다/미룬다"는 결정인데 만료 지점이 없어 방치되기 쉽다(CLAUDE.md "만료 없는
+    # 유예·제외 금지"). 토큰이 없으면 조회 자체를 안 하므로 그 사실을 먼저 밝힌다.
+    disposal_labeled = [item for item in pr_filed if item.disposal_labels]
+    if pr_filed and not scan.pr_label_lookup_ok:
+        reason = scan.pr_label_lookup_error or "사유 미상"
+        print(
+            f"⚠ 처분 라벨 조회 미수행({reason}) — PR 제출됨 {len(pr_filed)}건은 라벨 수동 확인 필요"
+        )
     for item in isolated:
         print(f"  [고립] {item.branch} — {item.age_days:.0f}일 전 · trunk 대비 {item.ahead}커밋")
+    for item in pr_closed:
+        print(f"  [PR-닫힘] {item.branch} — {item.evidence} · {item.age_days:.0f}일 전")
     for item in pr_filed:
-        print(f"  [PR]   {item.branch} — {item.evidence} · {item.age_days:.0f}일 전")
+        label_note = ""
+        if item.disposal_labels:
+            label_note = f" · 라벨: {','.join(item.disposal_labels)}(정체 {item.age_days:.0f}일)"
+        print(f"  [PR]   {item.branch} — {item.evidence} · {item.age_days:.0f}일 전{label_note}")
+    if disposal_labeled:
+        print(
+            f"⚠ 처분 라벨 붙은 열린 PR {len(disposal_labeled)}건 — 닫기 전 "
+            "`python3 scripts/ops/pr_disposal_precheck.py --pr <N>`로 회수 선행 확인 (HARN-93 ③)"
+        )
     return 0
 
 
@@ -3194,8 +4208,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--ignore-remote-claim",
         action="store_true",
         dest="ignore_remote_claim",
-        help="이 태스크의 읽기측 교차 세션 판정만 무시 (stale 홀더 확인 후 — "
-        "HARN-08). CAS conflict는 무시되지 않는다",
+        help="이 태스크의 읽기측 판정만 무시 — 교차 세션(stale 홀더 확인 후, HARN-08)·"
+        "미머지 done(HARN-11)·트렁크 의존·게이트 시차(HARN-91). CAS conflict는 무시되지 않는다",
     )
     p.add_argument(
         "--as",
@@ -3236,7 +4250,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=cmd_block)
 
-    p = sub.add_parser("unblock", help="차단 해제")
+    p = sub.add_parser(
+        "unblock", help="→ todo 전이(session 해제) — 차단 해제뿐 아니라 in_progress 재진입에도 사용"
+    )
     p.add_argument("id")
     p.set_defaults(func=cmd_unblock)
 
@@ -3249,8 +4265,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reason", required=True)
     p.set_defaults(func=cmd_cancel)
 
+    p = sub.add_parser("rename", help="태스크 ID 개명 — 번호 충돌 정정 경로 (HARN-100)")
+    p.add_argument("old_id")
+    p.add_argument("new_id")
+    p.add_argument("--reason", required=True)
+    p.set_defaults(func=cmd_rename)
+
     p = sub.add_parser("gates", help="사람 게이트 대장")
-    p.add_argument("gate_action", nargs="?", choices=["list", "add", "clear", "waive"])
+    p.add_argument("gate_action", nargs="?", choices=["list", "add", "clear", "waive", "show"])
     p.add_argument("gate_id", nargs="?")
     p.add_argument("--evidence")
     p.add_argument("--reason")
@@ -3429,6 +4451,14 @@ def build_parser() -> argparse.ArgumentParser:
         "정정 직후 겹침 건수 변화를 함께 보고한다",
     )
     p.add_argument(
+        "--drop-scope",
+        action="store_true",
+        dest="drop_scope",
+        help="paths 교체로 기존 범위를 *버리는* 것이 의도임을 확인 (HARN-81). "
+        "잃는 파일과 얻는 파일이 동시에 있으면 '덧붙이려다 교체된' 사고 형태라 기본 거부한다 — "
+        "정말 버리는 경우에만 붙여라. 제거된 패턴은 어느 경우든 notes·이벤트에 열거된다",
+    )
+    p.add_argument(
         "--title",
         help="title 교체 (HARN-57). 브리핑·next가 노출하는 유일한 문자열이라 "
         "옛 제목이 남으면 다음 세션이 정정 전 처방을 읽고 착수한다. 이전 값은 notes에 남는다",
@@ -3445,6 +4475,68 @@ def build_parser() -> argparse.ArgumentParser:
         help="그랜드파더 무시하고 전건 표시 (감사 모드 — 항상 exit 0)",
     )
     p.set_defaults(func=cmd_audit_deps)
+
+    p = sub.add_parser("incident", help="사고 대장 — 회차 계수·2회차 코드 착지 강제 (HARN-118)")
+    isub = p.add_subparsers(dest="incident_command", required=True)
+
+    ip = isub.add_parser("add", help="사고 1건 등재 (같은 계열 2회차부터 code/task 상환 필수)")
+    ip.add_argument("--title", required=True, help="한 줄 요약 (≤80자)")
+    ip.add_argument("--cat", required=True, choices=list(incidents_mod.CATS), help="대분류 A~K")
+    ip.add_argument("--date", default=None, help="사고 발생일 YYYY-MM-DD (기본 오늘)")
+    ip.add_argument("--sub", default="", help="소분류 자유 라벨")
+    ip.add_argument("--cause", default="", help="근본 원인 1줄")
+    ip.add_argument("--damage", default="0", help="피해 정량 (없으면 0)")
+    ip.add_argument("--damage-class", default="none", choices=list(incidents_mod.DAMAGE_CLASSES))
+    ip.add_argument(
+        "--fix-form",
+        default="unknown",
+        choices=list(incidents_mod.FIX_FORMS),
+        help="대책 형태 — 2회차 이상은 code|task|rule+code|rule+task 만 허용",
+    )
+    ip.add_argument("--fix-ref", default="", help="대책 식별자 (테스트 파일 경로·태스크 ID·PR)")
+    ip.add_argument("--series", default="", help="계열 슬러그 (소문자 kebab) — 회차 계산 키")
+    ip.add_argument("--series-raw", default="", help="문서가 적은 회차 문자열 원문(있으면)")
+    ip.add_argument("--who-caught", default="unknown", choices=list(incidents_mod.WHO_CAUGHT))
+    ip.add_argument("--quote", default="", help="근거 인용 ≤120자")
+    ip.add_argument("--src", default="", help="출처 파일")
+    ip.add_argument("--line", type=int, default=None, help="출처 줄 번호")
+
+    ip = isub.add_parser("report", help="대분류·월·피해·대책 형태·계열 최대 회차 표")
+    ip.add_argument("--json", action="store_true", help="집계를 JSON으로 (주간 지표 입력용)")
+
+    ip = isub.add_parser("series", help="계열 목록 또는 한 계열의 회차 전개")
+    ip.add_argument("series", nargs="?", default="", help="계열 슬러그 (생략 시 전체 목록)")
+
+    ip = isub.add_parser("seed", help="추출 산출물 JSONL → 대장 최초 적재")
+    ip.add_argument(
+        "--source",
+        default="docs/data/recurring_failure_ledger_2026-09-20/incidents.jsonl",
+        help="시드 원천 JSONL (레포 상대 경로 허용)",
+    )
+    ip.add_argument("--force", action="store_true", help="이미 적재된 대장을 덮어쓴다")
+
+    p.set_defaults(func=cmd_incident)
+
+    p = sub.add_parser("rules", help="규칙 인덱스 — 집행 지점 대장·산문 동결 린트 (HARN-121)")
+    rsub = p.add_subparsers(dest="rules_command", required=True)
+
+    rp = rsub.add_parser("lint", help="L1~L6 검사 — 위반이 있으면 exit 1")
+
+    rp = rsub.add_parser("report", help="유래·상태 분포와 갚아야 할 빚 목록")
+    rp.add_argument("--json", action="store_true", help="집계를 JSON으로")
+
+    rp = rsub.add_parser("render", help="대장 → docs/standards/rule_index.md 재생성")
+    rp.add_argument("--check", action="store_true", help="쓰지 않고 어긋남만 검사(exit 1)")
+
+    p.set_defaults(func=cmd_rules)
+
+    p = sub.add_parser("jit", help="적시 규칙 주입 인덱스 — 편집 경로별 사고·규칙 (HARN-121 ③)")
+    jsub = p.add_subparsers(dest="jit_command", required=True)
+    jsub.add_parser("build", help="대장 3종 → backlog/jit_index.json 재생성")
+    jsub.add_parser("check", help="인덱스가 대장과 어긋났는지 검사 (exit 1)")
+    jp = jsub.add_parser("show", help="이 경로를 편집하면 무엇이 뜨는지 미리보기")
+    jp.add_argument("path", help="레포 상대 경로")
+    p.set_defaults(func=cmd_jit)
 
     p = sub.add_parser("validate", help="백로그 무결성 전수 검증")
     p.add_argument("--quiet", action="store_true")

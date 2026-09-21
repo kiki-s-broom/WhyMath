@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,7 +17,8 @@ acceptance:
   - "l4.solution_coaching의 지연 pull import(composition.default_step_chain_verifier) 제거 여부 판단 — 제거 시 CORE_PULL_BASELINE에서 l4.solution_coaching 축소, 유지 시 사유 문서화"
   - tests/backend/schema/test_verification_capabilities_wiring.py의 _PENDING_PUSH_CAPABILITY_FACTORIES 예외 제거
   - "tests/infra/test_eos_dependency_direction.py의 PULL_ONLY_COMPOSITION_FACTORIES에서 default_step_chain_verifier 제거(관측기 default_wrong_form_shadow_observer만 잔존)"
-artifacts: []
+artifacts:
+  - "PR #1045 — app.state 6번째 능력 등록 + coach.py 3경로 명시 주입 + 면제 목록 역방향 가드 신설(실패 주입으로 한쪽 잠김 발견) + wiring/PULL_ONLY 예외 해제"
 paths:
   - src/backend/whymath_backend/api/_subject_capability_state.py
   - src/backend/whymath_backend/app.py

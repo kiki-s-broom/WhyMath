@@ -52,7 +52,7 @@ git push origin --delete merge/human-bottleneck-6dszy0
 cd C:\Users\kiki\Desktop\__AI
 $Blobs = "^(35cb705abfef4f7fbee7b2e6b77d68a6c25f272d|7e1d471e69b2d4135310cd53c4eca98d1b32b5a1) "
 Remove-Item -Recurse -Force .\wm-verify -ErrorAction SilentlyContinue
-git clone https://github.com/doldori7/WhyMath.git wm-verify
+git clone https://github.com/kiki-s-broom/WhyMath.git wm-verify
 $objs = git -C wm-verify rev-list --objects --all
 $rc = $LASTEXITCODE
 $n = ($objs | Select-String -Pattern $Blobs).Count

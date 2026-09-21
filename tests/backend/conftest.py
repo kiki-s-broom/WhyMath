@@ -89,6 +89,50 @@ def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.
 # (최상단 import — 변별력을 test_db_leak_guard.py에서 별도로 실측하려고 분리).
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# rate limit 전역 격리 (OPS-63 — OPS-06/OPS-07과 같은 유형의 2회차)
+# ──────────────────────────────────────────────────────────────────────────
+# 2026-09-06 사고 실측: `configure_backend_from_settings` 호출처가 0건이라 FastAPI 앱마다
+# 백엔드가 재설치되지 않고, 같은 pytest 프로세스에서 도는 통합 테스트 21파일이 프로세스
+# 전역 `whymath_backend.api._rate_limit._BACKEND`(기본 InMemoryBackend)의 IP 쓰기 버킷
+# (`ip:testclient`·`coach_rate_limit_ip_write_per_minute`=60/분)을 공유한다 — 같은 커밋의
+# 실 PG 통합 잡이 07:29 green → 09:39 red로 갈렸다(pytest-randomly 순서 차이, CI run
+# 34024961969). 개별 파일의 `reset_store()` 자체 픽스처(test_coach.py 등 다수)가 이미
+# 있었지만, 새 통합 테스트가 그 관용을 안 따르면 재발한다 — OPS-06(db.session._engine
+# 전역 오염 → OPS-07 가드)과 같은 유형의 전역 오염이다.
+#
+# **OPS-07과의 관계(범위 분리)**: OPS-07(`_guard_db_session_global_leak`, 아래)은 테스트
+# **종료** 시 전역 누수를 탐지·귀책하고 hermetic에만 적용된다. 이 픽스처는 테스트 **시작**
+# 시 카운트를 비우는 *격리*이고 hermetic·integration 양쪽 모두에 적용된다 — 귀책 축은
+# 추가하지 않는다(레이트리미터 카운트는 정상 동작의 잔여물이지 누수가 아니다).
+#
+# **Redis 백엔드는 건드리지 않는다** — `InMemoryBackend`일 때만 리셋한다. 로직을 별도
+# 함수로 뺀 이유: `@pytest.fixture`로 감싼 함수는 pytest 내부 메커니즘을 거쳐야만 실행할
+# 수 있어 직접 호출하는 단위 테스트로 변별력을 재기 어렵다. 이 헬퍼는 순수 함수라
+# `tests/backend/api/test_rate_limit_fixture_isolation.py`가 pytest 스케줄링·실행 순서와
+# 무관하게 직접 호출해 전/후 상태를 단언한다(`import conftest` — 위 sys.path 삽입 덕에
+# `_db_leak_guard`와 동형으로 sibling import 가능).
+def reset_inmemory_rate_limit_store() -> None:
+    """InMemoryBackend일 때만 rate limit 카운트를 비운다 — Redis 설정은 손대지 않는다."""
+    from whymath_backend.api._rate_limit import InMemoryBackend, get_backend, reset_store
+
+    if isinstance(get_backend(), InMemoryBackend):
+        import asyncio
+
+        asyncio.run(reset_store())
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_store_before_test() -> None:
+    """모든 백엔드 테스트 **시작 시** 인메모리 rate limit 카운트를 비운다(OPS-63).
+
+    개별 파일의 기존 `reset_store()` 자체 픽스처(test_coach.py 등)와 중복 실행돼도
+    무해하다 — 두 번 비워도 결과는 빈 상태 그대로다. 테스트 *내부*에서 쌓는 카운트는
+    건드리지 않는다(시작 시점 1회만).
+    """
+    reset_inmemory_rate_limit_store()
+
+
 @pytest.fixture(autouse=True)
 def _guard_db_session_global_leak(request: pytest.FixtureRequest) -> Iterator[None]:
     """모든 백엔드 테스트 종료 후 db.session 전역 누수를 탐지·격리·귀책한다(OPS-07).

@@ -43,7 +43,8 @@ class TestSemanticEvalLive:
 
     def test_full_probeset_recall_and_fp_measurement(self) -> None:
         probes = _load_real_probes()
-        assert len(probes) == 162  # 98 + 극값 MC 4 + 843 트랜치1~5 각 12
+        # 98 + 극값 MC 4 + 843 트랜치1~5 각 12 + #1068 P1 회귀 1건
+        assert len(probes) == 169
 
         # 슬110(#5): bge-m3 자원 미도달은 사전체크로 skip·측정 코드 버그는 fail로 전파.
         require_local_embedding()
@@ -59,9 +60,9 @@ class TestSemanticEvalLive:
         print(format_report(report))
 
         # loose smoke(측정이 목적·품질 hard-fail 아님): 구조 무결성만 단언.
-        assert report.total == 162
-        assert report.total_recall == 95
-        assert report.total_fp == 67
+        assert report.total == 169
+        assert report.total_recall == 98
+        assert report.total_fp == 71
         rlb = report.recall_lower_bound()
         fub = report.fp_rate_upper_bound()
         assert rlb is not None and 0.0 <= rlb <= 1.0

@@ -22,10 +22,20 @@ from sqlalchemy.exc import IntegrityError
 from whymath_backend.api._auth import require_content_admin
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
-from whymath_backend.schema.enums import Curriculum, RelationType, Role, SourceType, Subject
+from whymath_backend.schema.enums import (
+    AuditEventKind,
+    Curriculum,
+    PrivacyAuditAction,
+    PrivacyAuditResourceType,
+    RelationType,
+    Role,
+    SourceType,
+    Subject,
+)
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import ProblemStep as ProblemStepSchema
@@ -149,7 +159,8 @@ class TestCreate:
         assert resp.status_code == 201, resp.text
         assert resp.json()["subject"] == "미적분"
         assert fake.committed is True
-        assert len(fake.added) == 1
+        # SEC-29: Problem 본체 + 콘텐츠CUD 감사 행(PrivacyAudit) = 2건, 같은 트랜잭션.
+        assert len(fake.added) == 2
 
     def test_create_duplicate_returns_409(self) -> None:
         """external_id/slug UNIQUE 충돌(IntegrityError) → 롤백 후 409."""
@@ -390,6 +401,52 @@ class TestDelete:
         resp = _client(fake).delete(f"/v1/problems/{problem.problem_id}")
         assert resp.status_code == 409
         assert fake.rolled_back is True
+
+
+class TestContentMutationAudit:
+    """SEC-29(48_보안 §P0) — 콘텐츠 CUD(생성/수정/삭제)가 `PrivacyAudit` 행을 남긴다.
+
+    비관리자/미인증 거부는 `TestAuthGate`(이 파일)가 이미 검증한다 — 여기서는 acceptance④의
+    나머지 절반("관리자 동작 시 감사 이벤트 생성")과 필드 정합을 검증한다(concepts.py
+    `TestContentMutationAudit`와 동형).
+    """
+
+    def _audit_rows(self, fake: FakeSession) -> list[PrivacyAudit]:
+        return [obj for obj in fake.added if isinstance(obj, PrivacyAudit)]
+
+    def test_create_writes_content_mutation_audit_row(self) -> None:
+        fake = FakeSession()
+        resp = _client(fake).post("/v1/problems", json=_valid_body())
+        assert resp.status_code == 201, resp.text
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.user_id == _ADMIN_USER.user_id
+        assert row.target_user_id is None
+        assert row.event_kind == AuditEventKind.content_mutation.value
+        assert row.resource_type == PrivacyAuditResourceType.problem.value
+        assert row.action == PrivacyAuditAction.create.value
+        assert str(row.resource_id) == resp.json()["problem_id"]
+
+    def test_patch_writes_content_mutation_audit_row(self) -> None:
+        problem = _sample_problem()
+        fake = FakeSession(get_map={problem.problem_id: problem})
+        resp = _client(fake).patch(f"/v1/problems/{problem.problem_id}", json={"answer": "42"})
+        assert resp.status_code == 200, resp.text
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        assert rows[0].action == PrivacyAuditAction.update.value
+        assert rows[0].resource_id == problem.problem_id
+
+    def test_delete_writes_content_mutation_audit_row(self) -> None:
+        problem = _sample_problem()
+        fake = FakeSession(get_map={problem.problem_id: problem})
+        resp = _client(fake).delete(f"/v1/problems/{problem.problem_id}")
+        assert resp.status_code == 204
+        rows = self._audit_rows(fake)
+        assert len(rows) == 1
+        assert rows[0].action == PrivacyAuditAction.delete.value
+        assert rows[0].resource_id == problem.problem_id
 
 
 class TestConcurrency:

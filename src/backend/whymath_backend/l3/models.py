@@ -286,6 +286,20 @@ class RoutingDecision(BaseModel):
             "결정)이며 '허용'이 아니다 — 미상과 통과를 구분한다."
         ),
     )
+    # ── 관할 축(ARCH-49)이 읽는 등급 *승계* 필드 ──
+    data_licenses: tuple[LicenseType, ...] = Field(
+        default=(),
+        description=(
+            "이 결정이 판정 대상으로 삼은 자료 등급 목록 — `RoutingRequest.data_licenses`를 "
+            "그대로 승계한다. 반출 *가부*(`data_export_reason`)만으로는 답할 수 없는 질문이 "
+            "있어서 싣는다: `l3.provider_jurisdiction`은 '반출해도 되는가'가 아니라 '**어느 "
+            "관할로** 반출해도 되는가'를 묻고, 그 답은 등급별로 다르다(CN은 합성 프로브만). "
+            "빈 튜플은 '자료 없음'이 아니라 **'미선언'**이며, 추가 좁힘이 있는 관할(CN·미확인 "
+            "공급사)은 미선언을 fail-closed로 차단한다 — 라우터를 거치지 않고 손으로 조립된 "
+            "결정이 중국 서버로 새어 나가지 않게 하는 기본값이다. 좁힘이 없는 관할(US·현행 "
+            "Anthropic 경로)은 이 필드를 요구하지 않아 **기존 호출부 동작은 무변경**이다."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_axis_invariants(self) -> RoutingDecision:
@@ -404,6 +418,31 @@ class Usage:
 
     cache_creation_input_tokens: int | None = None
     """캐시에 *쓰인* 프리픽스 토큰 수(첫 회차 — 약 1.25배 과금). 미상·해당없음이면 None."""
+
+    # ── 관측 축 (EOS-112) ────────────────────────────────────────────────
+    # 위 필드들이 "얼마나 썼나"라면 이 둘은 **"누가 실제로 답했나"**다. 나머지 모든 모델
+    # 표기(`RoutingDecision`·`GenerationLog.model_name`)는 *설정이 지목한* 선언값이라
+    # provider 측 대체·폴백·프록시 라우팅을 볼 수 없다(ARCH-58이 고친 것은 그 선언값이
+    # 셀렉터를 따르게 한 것까지다). 응답에서 읽은 값만 여기 싣는다.
+    served_model: str | None = None
+    """응답이 *실제로 어느 모델에서 왔는지* — provider 응답의 모델 식별자.
+
+    출처: OpenAI 호환 payload 최상위 `model`, Anthropic `message.model`, Ollama 응답
+    `model`. 응답에 없거나 문자열이 아니면 None이다 — **설정값으로 접지 않는다**(그 순간
+    이 필드가 선언값의 복사본이 되어 존재 이유가 사라진다). 선언값과의 대조는 상류
+    (`harness/anchor_round_ledger.seat_operating_rates`)가 한다.
+    """
+
+    retries: int | None = None
+    """이 호출 1건에서 실제로 일어난 재시도 횟수. 미계측이면 None(0이 아니다).
+
+    `None`과 `0`은 다른 사실이다 — None은 "이 provider 경로에 재시도 계측이 없다"
+    (Anthropic SDK·Ollama는 우리 전송기를 타지 않아 카운터가 없다)이고, 0은 "계측했고
+    한 번에 성공했다"는 실측이다. 0으로 접으면 계측 없는 경로가 '재시도 0%'로 위장된다.
+
+    재시도는 측정을 가린다 — 30% 실패를 재시도로 덮으면 리포트가 100% 성공으로 보인다
+    (`_openai_compat.retries_in_current_call` docstring). 그 사실을 저작 경로까지 나른다.
+    """
 
 
 @dataclass(slots=True, frozen=True)

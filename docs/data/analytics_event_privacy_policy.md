@@ -42,7 +42,20 @@
 | `검산결과` | `passed`, `error_kind`, `mode`, `persona` | 낮음 — 오류 분류만 | 허용 |
 | `힌트제공` | `hint_level`, `mode`, `persona` | 낮음 — 노출 레벨만 | 허용 |
 | `시각화조작` | 기존 봉투 계약 | **P0 보류** | payload 내부 자유형이므로 분석 envelope producer에 연결하지 않음 |
+| `막힘` | `turn_count`, `mode`, `persona` | 낮음 — 누적 턴 수만(임계 도달 시점 실측값) | 허용 |
+| `힌트요청` | `mode`, `persona` | 낮음 — 값 필드 없음(발생 자체가 신호) | 허용 |
+| `답입력` | `server_latency_ms`, `mode`, `persona` | 낮음 — 서버 기준 지연 ms만(입력 *내용*은 싣지 않는다) | 허용 |
+| `문제시도` | `is_correct`, `source` | 낮음 — 정오 불리언·채점 경로 라벨(답안 원문 미포함) | 허용 |
 | 그 외 휴면 EventType | 없음 | 미정 | producer 금지 |
+
+위 4종(`막힘`·`힌트요청`·`답입력`·`문제시도`)은 v1 작성(2026-08-14) 이후 편입된 생산 좌석이다(S3-16: 막힘·힌트요청·답입력 · EOS-57: 문제시도). 넷 다 payload가 **비식별 스칼라와 폐쇄 라벨뿐**이라
+등급이 기존 2종과 같다 — 학생 원문·좌표·기기 식별자를 담는 필드가 없다. `mode`·`persona`는 개인이 아니라
+**코호트 태그**(예: `suneung`·`A_일반고고3`)이므로 그 자체로는 재식별 축이 아니지만, §payload 규칙 5의
+직접 식별자와 결합 저장하지 않는다는 전제에서만 '낮음'이 유지된다.
+
+**이 표는 `EVENT_DATA_CONTRACT`와 동기화 상태를 기계가 강제한다** — 생산 계약에 EventType이 추가됐는데
+이 표에 행이 없으면 `test_pii_policy_covers_all_produced_event_types`가 실패한다. v1이 3종만 담은 채
+생산 좌석이 7종으로 늘어난 한 달간(2026-08-14~09-15) 아무 검사도 그것을 지적하지 못한 것이 이 가드의 등재 이유다.
 
 `시각화조작`의 기존 `payload`는 조작별 자유형이라 P0의 타입별 allowlist 원칙과 맞지 않는다. 해당 이벤트를 분석 envelope에 연결하기 전에 별도 세부 allowlist와 PII 검토를 추가한다.
 
@@ -63,3 +76,4 @@
 - 타입별 payload allowlist 강제
 - mobile source의 session ID 요구
 - 수신 시각이 발생 시각보다 빠른 입력 거부
+- **위 PII 등급표가 `EVENT_DATA_CONTRACT` 생산 EventType 전건을 덮는가**(문서↔계약 드리프트 차단)

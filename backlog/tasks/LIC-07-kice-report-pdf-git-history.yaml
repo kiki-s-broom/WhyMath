@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: done
 priority: 1
 eos_priority: P1
 owner: kiki
@@ -28,10 +28,11 @@ acceptance:
   - "⑭ [변별력 실증] tests/infra/test_source_document_binary_guard.py 14건이 위반을 실제 주입해 red 요구 — 사고 당시 파일명 PDF·hwp·docx·zip·확장자 위장 PDF·위장 xlsx·죽은 예외·.gitignore 규칙 삭제·얇은 인벤토리·비-git 디렉터리 + 대칭 축(진짜 텍스트는 통과). 배선 실재성은 test_source_document_binary_guard_wiring.py 3건(ci.yml 스텝 삭제 시 red 실증 · needs:changes 종속 금지 — skip이 required check 충족으로 계상되는 함정)"
   - "⑮ [남은 공백·명시] 확장자를 바꾼 구형 .hwp(OLE 복합문서)는 매직 축 미탐지 · 텍스트로 옮겨 적은 본문은 이 가드의 대상이 아님(policy-guard 패턴 축·사람 검수 몫)"
   - "⑯ [리뷰 라운드·2026-09-07 PR #1016] 가드 결함 3건을 실측 재현 후 수정: ⓐ허용 목록의 *경로* 면제가 모든 검사를 우회(등재 xlsx를 %PDF로 덮어써도 EXIT=0) → _ALLOWED를 {경로:(sha256,사유)}로 바꿔 내용에 묶음 ⓑ.tar.gz/.tar.bz2 미커버(git add -f로 EXIT=0) → BLOCKED_SUFFIXES +.gz/.bz2/.xz/.tar · BLOCKED_MAGIC +gzip/bzip2/xz/7z/rar · .gitignore 동일 4종 ⓒ읽지 못한 추적 파일을 '매직 없음'으로 접던 fail-open → UnreadableTrackedFileError로 exit 2(예외 타입명 로그). 또한 기존 확장자 축 테스트가 %PDF 내용을 써서 매직 축이 대신 잡던 변별력 결함을 정정(확장자 목록을 비워도 초록이었음). 가드 뮤테이션 6종 전건 RED(주입 적용·바이트 동일 원복을 하네스가 각각 단언) · tests/infra 1001 passed"
-artifacts: []
+artifacts:
+  - "https://github.com/doldori7/WhyMath/pull/1016 (e410c181 머지) + https://github.com/doldori7/WhyMath/pull/1008 (히스토리 제거 런북)"
 paths:
   - docs/data/licensing_safety.md
   - ".github/workflows/ci.yml"
 session: null
 notes: "2026-09-06 저작권 전수 실사에서 발견(세션: claude/remove-copyright-materials-nptqyr). 작업 트리에는 저작권 저촉 자료 0건 — 문제은행 14,034 문항 전량 WHYMATH_GENERATED·자체생성, 벤더 JS(MathLive/three.js/React) 라이선스 고지 보존, 교과서·기출 스캔/PDF 0, 금지 등급 외부 소스(Khan·CK-12·AoPS 등) 실물 0. 유일한 실질 위험이 이 히스토리 2건이다. Kiki 판단 대기(보류 / 절차서만 작성 / 즉시 실행). LIC-06은 paths 과대 지정으로 취소 후 이 번호로 재등재.\n\n[정정 2026-09-06] 2026-09-06 unshallow 후 도달성 재판정 — 등재 시점 판정을 정정한다. 등재는 shallow 클론에서 이뤄져 'main 히스토리 잔존'을 전제했으나, 전체 히스토리를 받아 실측하니 main은 깨끗했다. 작업 규모·위험도가 크게 줄어 acceptance를 갱신한다.\n\n[정정 2026-09-06] 2026-09-06 실행 완료 — 방법이 ⑦(브랜치 재작성)에서 브랜치 삭제로 바뀌었고, 그 근거와 실행 결과를 기록한다.\n\n[정정 2026-09-06] acceptance ④(재유입 방지 가드) 착지 — 3중 방어선 + 위반 주입 14건 red 실증 + CI 배선 동결.\n\n[정정 2026-09-07] PR #1016 리뷰 지적 3건 반영분을 acceptance에 기록(정본화를 집행으로 착각한 완료 선언 금지 — 실제 착지 내용과 대장을 일치시킨다)"
-updated: 2026-09-07
+updated: 2026-09-08

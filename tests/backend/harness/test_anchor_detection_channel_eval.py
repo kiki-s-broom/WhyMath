@@ -163,23 +163,113 @@ class TestServingReachIsMeasured:
         for ch in build_report().channels:
             assert 0 <= ch.serving_reach <= ch.positives
 
-    def test_factor_sign_flip_does_not_reach_serving(self) -> None:
-        """factor_sign_flip은_서빙_게이트를_넘지_못한다 — 측정된 사실을 동결한다
+    def test_factor_sign_flip_now_reaches_serving(self) -> None:
+        """factor_sign_flip은_서빙_게이트를_넘는다 — MISC-22 해소를 동결한다(스스로 만료 알림).
 
-        기호 substring 신호(`(x-a)`·`x=-a`)는 수치 입력에 매치되지 않으므로 정규식 단독 가산분만
-        남아 confidence=1/2=0.5 → floor 0.65 미만이다. **이 0을 숨기면 "검출률 100%"가 "쓰인다"로
-        오독된다.** 서빙 결선은 acceptance ③이 D2 후속으로 이관한 범위이므로 게이트로 삼지 않고
-        MISC-22로 등재했다 — 그 태스크가 해소되면 이 테스트가 XPASS처럼 실패해 알린다.
+        기호 substring 신호(`(x-a)`·`x=-a`)는 수치 입력에 매치되지 않지만, MISC-22(v1.5)가
+        confidence 공식을 정정해 정규식 매치 1건을 신호 전체와 동등한 완결 증거로 가산한다 —
+        conf=1.0 → floor 0.65 통과. 이전(v1.2 원식)에는 0.5에 갇혀 **한 번도 학생에게 도달하지
+        못했다**(작동 신호 없는 알고리즘 부착). 이 테스트는 그 해소를 동결한다 — 회귀(다시 0.5로
+        떨어짐)가 생기면 이 테스트가 실패해 알린다.
         """
-        assert not _survives_serving_gate("factor-sign-flip", "(x-2)=0 이므로 x=-2")
+        assert _survives_serving_gate("factor-sign-flip", "(x-2)=0 이므로 x=-2")
         reach = {c.kebab_id: c.serving_reach for c in build_report().channels}
-        assert reach["factor-sign-flip"] == 0
+        assert reach["factor-sign-flip"] == 27
 
-    def test_other_channels_do_reach_serving(self) -> None:
-        """나머지_두_채널은_서빙에_도달한다 — 위 0이 측정 결함이 아님을 대조로 보인다"""
+    def test_root_loss_by_dividing_reaches_serving(self) -> None:
+        """root_loss_by_dividing은_서빙에_도달한다 — 위 0이 측정 결함이 아님을 대조로 보인다"""
         reach = {c.kebab_id: c.serving_reach for c in build_report().channels}
         assert reach["root-loss-by-dividing"] > 0
-        assert reach["extremum-value-vs-point-confused"] > 0
+
+    def test_extremum_no_longer_reaches_serving_via_regex_alone(self) -> None:
+        """extremum은_MISC-24_이후_regex단독으로는_서빙에_도달하지_않는다 — 회귀가 아니라 의도.
+
+        `_extremum_value_vs_point()`의 `positives` 픽스처는 전부 "좌표 숫자 == 값 숫자"
+        형태(예: `극대는 x=-1 … 극댓값은 -1`)라 `ambiguous` 픽스처와 **텍스트 구조가 동일**하다
+        — f(x₀)=x₀ 우연의 일치와 원리상 구별 불가능한 자리다. MISC-24 이전에는 이 구조 때문에
+        `positives`도 `ambiguous`도 똑같이 conf 1.0으로 서빙에 도달했다(확신 오진단 위험).
+        `ambiguous_regex_signals`(MISC-24)가 이 정규식 채널의 confidence 가산을 0으로 만들어
+        이제 `positives`·`ambiguous` 둘 다 conf 0.5(게이트 미만)에 멈춘다 — serving_reach=0은
+        측정 결함이 아니라 "이 텍스트 형태로는 확신할 수 없다"는 설계 의도의 정확한 반영이다.
+        학생이 명시적으로 "x좌표"라는 말을 써 값을 좌표로 답한 경우는 정규식과 무관한 substring
+        AND 경로로 여전히 conf 1.0에 도달한다(아래 `TestExtremumSubstringPathUnaffected`).
+        """
+        reach = {c.kebab_id: c.serving_reach for c in build_report().channels}
+        assert reach["extremum-value-vs-point-confused"] == 0
+        # 정규식은 여전히 *발화*한다(검출은 유지) — 다만 confidence 가산이 0이라 게이트를 못 넘을 뿐.
+        assert _channel_fired(
+            "extremum-value-vs-point-confused", "극대는 x=-1 에서 나오고 극댓값은 -1"
+        )
+        assert not _survives_serving_gate(
+            "extremum-value-vs-point-confused", "극대는 x=-1 에서 나오고 극댓값은 -1"
+        )
+
+
+class TestExtremumSubstringPathUnaffected:
+    """MISC-24 정정이 substring AND 경로("극댓값"+"x좌표" 명시)는 건드리지 않는다."""
+
+    def test_explicit_x_coordinate_confusion_still_reaches_serving(self) -> None:
+        """학생이_x좌표라는_말을_명시하면_여전히_서빙에_도달한다 — 정규식과 무관한 경로"""
+        text = "극댓값을 극점의 x좌표라고 답함"
+        assert _survives_serving_gate("extremum-value-vs-point-confused", text)
+
+
+class TestAmbiguousServingReachIsGated:
+    """MISC-24 acceptance ③ — ambiguous 계급이 이제 서빙 게이트 통과 여부까지 재고, 0을 강제한다.
+
+    f(x₀)=x₀ 우연의 일치 정답이 확신 오진단으로 학생에게 나가는 것이 이 태스크의 실제 해악
+    지점이다. `ambiguous_fired`(정규식 발화)는 여전히 보고만 하지만, `ambiguous_serving_reach`
+    (서빙 품질 게이트까지 살아남은 수)는 `ChannelResult.passed`가 0으로 강제한다.
+    """
+
+    def test_ambiguous_fixtures_do_not_survive_serving_gate(self) -> None:
+        """모호_픽스처는_서빙_게이트를_통과하지_못한다 — MISC-24 실제 해악 지점의 직접 단언"""
+        for fx in build_fixtures():
+            for text in fx.ambiguous:
+                assert not _survives_serving_gate(fx.kebab_id, text), text
+
+    def test_report_ambiguous_serving_reach_is_zero(self) -> None:
+        """리포트의_ambiguous_serving_reach가_0이다 — 회귀 시 이 단언이 먼저 깨진다"""
+        for ch in build_report().channels:
+            assert ch.ambiguous_serving_reach == 0, ch.kebab_id
+
+    def test_ambiguous_serving_reach_gates_passed(self) -> None:
+        """ambiguous_serving_reach가_0이_아니면_passed가_False가_된다 — 게이트 자신의 변별력 확인
+
+        뮤테이션 대신 `ChannelResult`를 직접 조립해 0이 아닌 값을 주입한다 — 이 검사가
+        실제로 `passed`를 끄는지 확인해야 "게이트가 있다"가 위장이 되지 않는다.
+        """
+        from whymath_backend.harness.anchor_detection_channel_eval import ChannelResult
+
+        healthy = ChannelResult(
+            kebab_id="probe",
+            anchor_id="A0",
+            detected=27,
+            positives=27,
+            false_positives=0,
+            negatives=30,
+            ambiguous_fired=2,
+            ambiguous_total=2,
+            ambiguous_serving_reach=0,
+        )
+        assert healthy.passed is True
+        contaminated = ChannelResult(
+            kebab_id="probe",
+            anchor_id="A0",
+            detected=27,
+            positives=27,
+            false_positives=0,
+            negatives=30,
+            ambiguous_fired=2,
+            ambiguous_total=2,
+            ambiguous_serving_reach=1,
+        )
+        assert contaminated.passed is False
+
+    def test_ambiguous_serving_reach_reported_in_json(self) -> None:
+        """JSON_출력에도_ambiguous_serving_reach가_실린다"""
+        for ch in build_report().to_json()["channels"]:
+            assert "ambiguous_serving_reach" in ch
 
 
 class TestReachabilityChecksBothBounds:

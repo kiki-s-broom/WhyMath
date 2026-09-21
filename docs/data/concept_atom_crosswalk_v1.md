@@ -95,6 +95,15 @@ backend `whymath_backend/l1/concept_atom_crosswalk/`(`transfer.py` 유도·갱�
   정합(다리 불요). 갱신 SQL의 `scope='K-12'` 필터가 구조적으로 차단(키 공간 무교차와 이중 방어).
 - 실측(2026-07-03): K-12 **437/437** 전량 연결·dangling 0.
 
+### ③ 런타임 concept.behavior_skills 전파 (SKB-01·2026-09-12)
+- ①과 **같은 mapping**(atom code → behavior_skills)을 런타임 `concept` 테이블(`atom_backend_concept`
+  적재·`code`=원자/소단원/단원 code)에도 전파한다 — `concept.code`는 원자 code와 같은 키 공간이라
+  별도 다리·유도가 불요하다.
+- 원인: `atom_backend_concept.py`는 `concept` 행을 채우지만 `behavior_skills`는 건드리지 않아
+  (신규 행 `server_default '{}'`) 이 컬럼이 EOS-63 실측(2026-09-10) 기준 2,683/2,683 전량 빈
+  배열이었다. `Concept`에는 `updated_at` 컬럼이 없어(atom_node와 달리) 그 필드는 SET하지 않는다.
+- prod 반영은 게이트 실행이 선행돼야 한다(human gate — `docs/ops/g_skb01_concept_behavior_skills_populate_runbook.md`).
+
 ### 게이트
 - 거버넌스(hermetic): `tests/backend/l1/concept_atom_crosswalk/test_crosswalk_transfer_governance.py`
   — 전파 스킬 ⊆ 27 정본·전파 원자 ⊆ 세부개념·K-12 437 전량·대학 키 무교차·커버리지 하한.

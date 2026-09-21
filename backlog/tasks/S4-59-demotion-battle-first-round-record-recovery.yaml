@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,12 +17,14 @@ acceptance:
   - "③ 고유 가치 판정 후 이식 — 1차 라운드가 후행 08-14 라운드에 없는 것: 결함류별 검출 내역(missing_condition 0/3·unstated_equiprobability 0/3 = '조건 결측 계열 실명' 관찰)과 qwen3.5:27b num_ctx 8192 기준 콜당 약 15.5분·45콜 11h36m 비용 실측. 이식 전 이 두 축이 여전히 main 부재인지 재확인하고, 해소분은 이식 대신 판정 기록으로 남긴다"
   - "④ 집행 지점(정본화와 별항) — 이식된 기록이 S4-16 재개 시 실제로 참조되도록 S4-16 태스크 notes 또는 docs/standards/superhuman_verification_standard.md에서 이 문서를 지목하는 링크를 건다. 문서만 옮기고 아무도 부르지 않으면 회수가 아니다. backlog.py validate exit 0 확인"
   - "⑤ [고립 참조 정정 2026-09-07 stray-code 8회차] 미커버 문서·프로세스 잔여 2건의 회수 여부를 ④(S4-16 notes 링크) 착지 시 함께 판정하고 결과를 notes에 기록한다 — (a) MEMORY.md 2026-08-09 결정 로그 1줄(병렬 충돌 사고 2건: openrouter 세션 e98dw4 f8c0e3b6의 S4-16 중복 구현 '머지 금지' 판정 · Kiki 머신 클론이 타 세션 브랜치 s4-16-battle로 전환돼 argparse 오류·자가검증이 검출 · add CLI를 썼는데도 발생한 OPS-23 번호 충돌 3회차) — main 전수 grep 0건. 특히 'e98dw4의 S4-16 하네스는 정본 아님(#683이 대체)' 판정이 main에 없어 미래 회수 세션의 오판 소지. (b) CLAUDE.md 규칙 1줄 'Kiki 머신의 클론은 여러 세션이 공유하는 단일 작업 사본 — 브랜치 의존 실행 명령 블록에는 실행 직전 git log -1 --oneline 자가검증(기대 해시 명기) 필수' — main 동등 규칙 부재(08-31 'git fetch + checkout -B' 규칙은 타 세션이 그 사이 브랜치를 전환해 둘 수 있다는 축을 다루지 않음). 둘 다 코드·법령 아님·위험 low. 부기: 인플라이트 s4-16-blocked-evidence(PR #844)가 같은 src 파일에 UTF-8 reconfigure 방식 가드를 독자 보유(OPS-53 ⑤ 방향)하나 em dash 77건 잔존·1차 기록 문서 없음 — ②의 인플라이트 대조 시 참조"
-artifacts: []
+  - "① 실측 고정 재확인 완료: docs/standards/residue_gate_demotion_battle_2026-08-10.md(104줄)를\norigin/claude/whymath-ai-content-design-vafylb(b1218739 → 이 세션 fetch 시점 HEAD)에서\ngit show로 재확인·전문 대조. main·s4-16-blocked-evidence(PR #844) 양쪽에서 \"0.0568\"·\n\"승격 기각\"·\"11h 36m\" 전건 0건 재확인(git grep). MEMORY.md의 실제 08-14 라운드 항목\n(2026-08-14 측정·S4-16 — qwen3.5:27b timeout·qwen2.5:7b/qwen2-math:7b 구분력 부재)을\n직접 읽고 대조 — missing_condition/unstated_equiprobability 세부·45콜 11h36m 비용은\n그 항목에 없음을 확인(라인 번호는 이후 편집으로 stale해졌으나 grep 키워드로 재탐색해\n정확한 항목을 찾았다 — \"trunk 부재를 미구현으로 단정 금지\" 절차의 라인번호 축 적용).\n\n② 이식 방식: 파일 단위(git show 전문 diff → 신규 파일 작성, byte-diff 0 확인). 브랜치\n통째 머지·cp949 코드 수정분(OPS-53 소유) 접촉 0.\n\n③ 고유 가치 판정 완료: 1차 라운드 고유 관찰(missing_condition 0/3·unstated_equiprobability\n0/3 \"조건 결측 계열 실명\"·qwen3.5:27b num_ctx=8192·콜당 15.5분·45콜 11h36m38s)이 main에\n부재함을 재확인 후 그대로 이식(해소분 없음 — 08-14 라운드는 완전히 다른 측정: 모델\n3종 비교·Wilson 하한/상한만 기록).\n\n④ 집행 지점 완료: S4-16 태스크 notes에 회수 문서 참조 링크 추가(backlog.py amend\n--notes-replace). backlog.py validate exit 0 확인(태스크 618건·게이트 44건·트랙 3건\ngreen).\n\n⑤ 고립 참조 2건 판정 완료 — 둘 다 회수:\n(a) MEMORY.md 2026-08-09 결정 로그 1줄(S4-16 병렬 중복 구현 \"머지 금지\" 판정 + OPS-23\n번호 충돌 3회차 + Kiki 머신 브랜치 전환 사고) — main 전수 grep 0건 재확인 후 원문 그대로\n백필(2026-08-09 블록의 마지막 항목 뒤에 위치·시간 역순 유지). \"e98dw4의 S4-16 하네스는\n정본 아님\" 판정이 이제 main에 명시.\n(b) CLAUDE.md 규칙 1줄(\"Kiki 머신 클론은 여러 세션 공유 단일 작업 사본 — 브랜치 의존\n실행 명령 블록에 실행 직전 git log -1 --oneline 자가검증 필수\") — main 전수 grep 0건\n재확인 후 기존 \"Kiki 머신(Phaiakes9) 행동 요청 시 실행 명령 동봉 필수\" 규칙 안에\n삽입(2026-08-31 \"git fetch + checkout -B\" 규칙과는 다른 축 — 그쪽은 재시작된 브랜치,\n이쪽은 실행 도중 타 세션이 전환해 두는 경우). CLAUDE.md 버전 푸터 0.2.20→0.2.21 갱신\n(본문 규칙 변경 시 버전 갱신 의무 준수).\n부기 인플라이트 대조: s4-16-blocked-evidence(PR #844)의 독자 UTF-8 reconfigure 가드도\n1차 기록 문서 없음을 재확인(em dash 잔존은 그 PR 자신의 관할).\n\n검증: docs-only 변경(코드 경로 무접촉)이라 tests/backend 회귀 대상 없음. tests/infra\n1303 passed, 1 skipped(EOS 인벤토리 드리프트 없음 — Python 소스 무변경). policy-guard\n3패턴(검정교과서·EBS/평가원·시크릿) 로컬 재현 전건 clean. backlog.py validate exit 0."
+artifacts:
+  - "b1e540b0 (#1129)"
 paths:
   - docs/standards/residue_gate_demotion_battle_2026-08-10.md
   - docs/standards/superhuman_verification_standard.md
   - backlog/tasks/S4-16-residue-gate-demotion-battle.yaml
   - backlog/tasks/S4-59-demotion-battle-first-round-record-recovery.yaml
 session: null
-notes: "출처: docs/reviews/unmerged_branch_audit_2026-08-31.md. 회수 완료 전 원 브랜치 claude/whymath-ai-content-design-vafylb 삭제 금지. 소유 공백 경위: HARN-35(done·PR #900)가 이 브랜치의 OPS-24만 회수하고 종료해 나머지 잔여의 소유자가 사라졌다 — '소유 태스크가 done이어도 잔여 diff가 남는다'(stray-code 4절)의 실사례. CLAUDE.md 검증 권위 서열 직결(측정이 증명하지 못한 게이트는 승격되지 않는다)이라 기록 유실은 미래 세션의 게이트 승격 오판 위험.\n\n[정정 2026-09-01] eos_priority null → P1: 회수 축 — 강등전 1차 실측 기록. EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독: 08-31 감사가 'CLAUDE.md·MEMORY.md = main 우세 흡수'로 뭉뚱그린 판정을 줄 단위로 재검한 결과 2건은 옛 판이 아니라 main 부재 신규 내용 — 어느 acceptance에도 없음. 7회차(PR #1020) 무접촉"
-updated: 2026-09-07
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-08-31.md. 회수 완료 전 원 브랜치 claude/whymath-ai-content-design-vafylb 삭제 금지. 소유 공백 경위: HARN-35(done·PR #900)가 이 브랜치의 OPS-24만 회수하고 종료해 나머지 잔여의 소유자가 사라졌다 — '소유 태스크가 done이어도 잔여 diff가 남는다'(stray-code 4절)의 실사례. CLAUDE.md 검증 권위 서열 직결(측정이 증명하지 못한 게이트는 승격되지 않는다)이라 기록 유실은 미래 세션의 게이트 승격 오판 위험.\n\n[정정 2026-09-01] eos_priority null → P1: 회수 축 — 강등전 1차 실측 기록. EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독: 08-31 감사가 'CLAUDE.md·MEMORY.md = main 우세 흡수'로 뭉뚱그린 판정을 줄 단위로 재검한 결과 2건은 옛 판이 아니라 main 부재 신규 내용 — 어느 acceptance에도 없음. 7회차(PR #1020) 무접촉\n\n[정정 2026-09-11] 구현 완료 기록 — acceptance①②③④⑤ 전항목 이행 및 재확인 결과 등재"
+updated: 2026-09-11

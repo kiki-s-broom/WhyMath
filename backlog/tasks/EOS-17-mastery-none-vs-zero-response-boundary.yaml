@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-17-mastery-none-vs-zero-response-boundary
+title: "응답 경계에서 미측정(None)이 0.0으로 접힘 — 클라이언트가 미측정과 숙달 0을 구분 못 함"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 범위 확정 — 응답 경계에서 미측정(None)을 0.0으로 접는 지점을 전수로 찾는다. 2026-09-16 확인분: api/me.py의 개념 숙달·스킬 숙달 응답이 mastery가 None일 때 0.0을 반환한다(스킬 축도 동형). 역할 기반으로 재검색해 다른 경계도 본다\n② 의미 판정 — 클라이언트가 '아직 측정 안 됨'과 '숙달도 0'을 구분해야 하는지 정한다. 구분이 필요하면 응답 스키마에서 None을 살리고(Optional), 불필요하면 왜 불필요한지 근거를 적는다. L2 계약(EOS-13)은 미측정을 None으로 지키므로, 접는 결정을 유지하더라도 그것이 의도된 표현 계층 결정임을 문서화한다\n③ 클라이언트 영향 — 모바일이 그 필드를 어떻게 읽는지 확인한다. Optional로 바꾸면 Dart 쪽 파싱이 깨질 수 있으므로 계약 변경 범위를 먼저 잰다\n④ 변별력 — 미측정 학습자로 응답을 만들어 '구분 가능'이 실제로 성립하는지 확인한다. 접기를 유지하기로 했다면 그 결정을 회귀 테스트로 동결해 다음 세션이 무심코 뒤집지 못하게 한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/me.py
+session: null
+notes: "EOS-13 구현 중 발견(범위 밖이라 손대지 않음 — 행동 동결 준수). L2 숙달 계약은 미측정을 None으로 보존하는데 API 응답 경계에서 0.0으로 접히므로 그 구분이 클라이언트에 도달하지 않는다. CLAUDE.md 'None != 0' 축(S3-07 선례)의 표현 계층 판. 기존 동작이므로 정책 변경이며 리팩터가 아니다."
+updated: 2026-09-16

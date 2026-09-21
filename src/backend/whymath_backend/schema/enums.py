@@ -1542,21 +1542,26 @@ class AuditResourceType(str, Enum):
 
 
 class AuditEventKind(str, Enum):
-    """`privacy_audit.event_kind` — SEC-09 개인정보 감사 폐쇄 택소노미(현 4종).
+    """`privacy_audit.event_kind` — SEC-09 개인정보 감사 폐쇄 택소노미(현 5종).
 
     `docs/architecture/account_security_gap_review.md` D3의 경계 확정: `security_privacy.md:
     88-100`의 "모든 PII 접근 로그"는 **채택하지 않는다**(본인 조회 29개 엔드포인트 전수 감사는
     미성년 프로파일링 자산화·볼륨 소음 — 정정 경위는 `docs/standards/security_privacy.md` §감사
     로그 편집자 부기 참조). 감사 대상은 "시스템 밖으로 나가는 사건"·"본인 아닌 주체의 접근"·
-    **"계정 권한 자체의 변경"**이며, 값은 그 편집자 부기의 pseudo-schema(`action` 필드)와
-    정확히 일치시킨다(부기에 값을 추가할 때 이 enum도 함께 늘린다 — 단일 진실원천).
+    "계정 권한 자체의 변경"·**"전역 콘텐츠 리소스의 CUD"**(SEC-29가 추가한 4번째 축 — 학생
+    개인정보가 아니라 개념·문항 같은 공유 콘텐츠 대상이라 D3의 "모든 PII 접근 로그" 거부와
+    무관하다)이며, 값은 그 편집자 부기의 pseudo-schema(`action` 필드)와 정확히 일치시킨다
+    (부기에 값을 추가할 때 이 enum도 함께 늘린다 — 단일 진실원천).
 
-    **4번째 값 `role_change`는 ADMIN-01(2026-08-11 회수)이 추가**했다. SEC-09 시점의 "3종"은
-    그 시점 실측이었을 뿐 상한이 아니다 — 폐쇄 택소노미의 뜻은 "임의 문자열 금지"이지
-    "영원히 3개"가 아니다.
+    **4번째 값 `role_change`는 ADMIN-01(2026-08-11 회수)이, 5번째 값 `content_mutation`은
+    SEC-29(2026-09-11)가 추가**했다. SEC-09 시점의 "3종"은 그 시점 실측이었을 뿐 상한이 아니다
+    — 폐쇄 택소노미의 뜻은 "임의 문자열 금지"이지 "영원히 3개"가 아니다.
 
-    `deletion_audit`(별도 테이블·`DeletionAudit`)이 삭제 감사의 **단일 권위**를 유지하므로
-    `resource_type`류의 삭제 이벤트는 여기 포함하지 않는다(이중 진실원천 금지 — D3 판단 근거).
+    `deletion_audit`(별도 테이블·`DeletionAudit`)이 **학생 소유 데이터 삭제** 감사의 단일
+    권위를 유지하므로 그 도메인의 `resource_type`류 삭제 이벤트는 여기 포함하지 않는다(이중
+    진실원천 금지 — D3 판단 근거). `content_mutation`의 `resource_type`(개념·문항)은 학생
+    소유 데이터가 아닌 *전역 콘텐츠*를 가리키므로 이 경계와 겹치지 않는다(`PrivacyAuditResourceType`
+    docstring 참조 — `AuditResourceType`과 값 공간을 분리한 이유).
     """
 
     export_data = "export_data"
@@ -1584,6 +1589,57 @@ class AuditEventKind(str, Enum):
     (`ops/role_grant_cli.py` 모듈 docstring 참조). HTTP 미노출 — 순수 ops CLI, 운영자 직접 실행
     (`retention_purge_cli` 컨벤션 미러).
     """
+
+    content_mutation = "content_mutation"
+    """`Role.CONTENT_ADMIN`이 콘텐츠 리소스(개념·문항)를 생성·수정·삭제(SEC-29).
+
+    **5번째 값 — `record_admin_access_audit`이 겨냥한 "관리자가 학생 개인정보를 봄"과는
+    다른 축이다.** `admin_access`는 여전히 호출부 0곳(관리자 콘솔 Phase B 전제, ADMIN-06
+    미착지)이지만, "콘텐츠 CUD에 감사 로그가 없다"(누가 어떤 문항을 승인·격리·삭제했는지
+    흔적 없음 — `docs/reviews/eos_one_subject_completion_review_2026-09-03.md` §S3)는
+    ADMIN-06과 무관하게 *오늘* 실재하는 별도 갭이고, `RequireContentAdmin`이 이미 게이팅하는
+    `POST/PATCH/DELETE /v1/concepts`·`/v1/problems` 6라우터가 그 실제 호출부다.
+
+    `target_user_id`는 채우지 않는다(개인정보 대상이 아니라 콘텐츠 리소스 대상 — `resource_type`/
+    `resource_id`가 그 역할). `user_id`는 행위자(관리자). `PrivacyAuditAction`(action 컬럼)이
+    create/update/delete를 구분한다. `reason`류 자유텍스트는 넣지 않는다(`PrivacyAudit`
+    모델 docstring의 "자유텍스트 필드는 두지 않는다" 불변식 — 무엇을 했는지는 action+resource로
+    충분히 특정된다).
+    """
+
+
+class PrivacyAuditResourceType(str, Enum):
+    """`privacy_audit.resource_type` — `event_kind=content_mutation` 전용 콘텐츠 리소스
+    도메인(SEC-29).
+
+    `AuditResourceType`(`deletion_audit` 전용 — 학생 연결 데이터 삭제 도메인)과는 별개의 폐쇄
+    택소노미다. 값은 해당 ORM `__tablename__`과 일치(concept·problem — `AuditResourceType`과
+    동일 명명 관례). 두 enum을 분리한 이유: `deletion_audit`은 "학생이 소유한 데이터의 영구
+    삭제"만 다루는 단일 권위(`AuditEventKind` docstring D3 — 이중 진실원천 금지)인 반면,
+    `content_mutation`은 *학생이 소유하지 않는 전역 콘텐츠*(개념·문항)의 생성·수정·삭제라
+    범주 자체가 다르다 — 같은 이름의 컬럼을 재사용해도 값 공간을 섞지 않는다.
+    """
+
+    concept = "concept"
+    """`Concept`(`db/models/concept.py`) — `/v1/concepts` CUD."""
+
+    problem = "problem"
+    """`Problem`(`db/models/problem.py`) — `/v1/problems` CUD."""
+
+
+class PrivacyAuditAction(str, Enum):
+    """`privacy_audit.action` — `event_kind=content_mutation` 전용 CRUD 동작 폐쇄 택소노미(SEC-29).
+
+    `resource_type`+`resource_id`가 *무엇을*, 이 값이 *무엇을 했는지*를 특정한다. 자유텍스트
+    `reason`을 두지 않는 대신(`PrivacyAudit` 모델 docstring 참조) 이 3값만으로 "생성/수정/삭제"
+    사실을 충분히 감사한다 — 상세 diff·사유는 이 테이블의 책임이 아니다(1차 기록은 애플리케이션
+    로그·PG 자체의 데이터, 이 행은 "그 시각 그 사건이 있었다"는 2차 감사 신호 — `record_role_
+    change_audit` docstring과 동일 철학).
+    """
+
+    create = "create"
+    update = "update"
+    delete = "delete"
 
 
 class DefectCategory(str, Enum):

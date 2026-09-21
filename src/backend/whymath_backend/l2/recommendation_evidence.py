@@ -32,8 +32,29 @@ PED-03(`l2/pedagogy_evidence.py`)이 이미 세운 `evidence_event` 좌석(sessi
 지금은 "이 추천이 실제로 나갔다"는 처치 존재 자체만 관측한다(acceptance④ 범위 밖 동결).
 
 B1(미성년 원문 발화 평문 저장 금지): `meta`에는 problem_id·theta·pool_size·applied_weights·
-mode·gate_reason 등 비민감 메타만 넣는다. 이 모듈의 함수 시그니처에는 학생 원문·풀이·user_id
-슬롯이 아예 없다(구조적 차단 — 나중에 실수로 채울 여지 자체가 없다).
+mode·gate_reason·candidates·policy_version·reason 등 비민감 메타만 넣는다. 이 모듈의 함수
+시그니처에는 학생 원문·풀이·user_id 슬롯이 아예 없다(구조적 차단 — 나중에 실수로 채울 여지
+자체가 없다).
+
+────────────────────────────────────────────────────────────────────────────
+REC-11: candidates[]·policy_version — 추천 오프라인 평가의 소급 불가 축(W2 스키마 ②)
+────────────────────────────────────────────────────────────────────────────
+지금까지는 *어떤 문항이 나갔는지*만 기록했고 *그때 무엇과 비교해 선택됐는지*는 기록하지
+않았다 — 정책(선택 알고리즘)이 나중에 바뀌면, 과거 로그로 "그 시점 정책이 얼마나 좋았는가"를
+소급 평가(counterfactual/off-policy evaluation)할 수 없다. `candidates`(후보 problem_id·점수
+쌍)와 `policy_version`(선택 알고리즘 식별자)을 추가해 이 소급 평가의 최소 재료를 남긴다.
+
+`candidates`는 원 후보 풀 전체가 아니라 점수 내림차순 상위 `CANDIDATES_META_CAP`건만 저장한다
+— `pool_size`가 원 풀 크기를 이미 별도로 기록하므로 이 축소가 은폐되지 않는다(전량 저장은
+매 호출마다 최대 50건의 UUID+float를 누적하는 과공학). `policy_version`은 호출자가 지금
+쓰는 후보생성·선택 알고리즘의 식별자를 넘긴다(`POLICY_VERSION_CAT`/`POLICY_VERSION_SUNEUNG`)
+— 알고리즘이 바뀌면 새 버전 문자열을 쓴다(과거 로그는 그대로, 무엇이 바뀌었는지는 이 축이
+구분).
+
+**followed 결과 결합(추천→정답 여부 조인)은 이 태스크의 범위 밖**이다(REC-03 docstring이
+이미 동결한 것과 동일 이유 — 실 session_id 미배선). `candidates`·`policy_version`은 그
+결합이 배선된 뒤에 "무엇과 비교해 선택했는가"를 재구성할 수 있게 하는 선행 재료일 뿐,
+이 좌석 자체가 결과를 결합하지 않는다.
 """
 
 from __future__ import annotations
@@ -45,6 +66,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.evidence_event import EvidenceEvent
+from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.schema.enums import KnowledgeType
 
 EVENT_TYPE_RECOMMENDATION_TREATMENT: str = "recommendation_render"
@@ -57,6 +79,21 @@ META_KEY_POOL_SIZE: str = "pool_size"
 META_KEY_APPLIED_WEIGHTS: str = "applied_weights"
 META_KEY_MODE: str = "mode"
 META_KEY_GATE_REASON: str = "gate_reason"
+META_KEY_CANDIDATES: str = "candidates"
+META_KEY_POLICY_VERSION: str = "policy_version"
+META_KEY_REASON: str = "reason"
+
+# 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
+# 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
+# 로그를 섞어 판정하지 않게 한다).
+POLICY_VERSION_CAT: str = "cat_v1"
+"""기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
+POLICY_VERSION_SUNEUNG: str = "suneung_v1"
+"""수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
+
+CANDIDATES_META_CAP: int = 10
+"""`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
+내림차순 상위 N만 남긴다(모듈 docstring REC-11 절 참조)."""
 
 # objective_id·k_type NOT NULL 제약을 채우는 네임스페이스 격리 placeholder(모듈 docstring
 # "좌석 재사용" 참조) — event_type 축으로 PED-03 집계와 완전히 분리되므로 실제 학습목표·
@@ -79,6 +116,9 @@ async def record_recommendation_treatment(
     applied_weights: bool,
     mode: str | None = None,
     gate_reason: str | None = None,
+    candidates: list[tuple[uuid.UUID, float]] | None = None,
+    policy_version: str | None = None,
+    reason: RecommendationReason | None = None,
     occurred_at: datetime | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
@@ -91,6 +131,19 @@ async def record_recommendation_treatment(
     `prioritize_weak_concepts` 가중이 실제로 적용됐는지(약점 개념 가중 쿼리가 돌았는지).
     `mode`: "suneung" 또는 None(기본 CAT). `gate_reason`: 이 추천이 어떤 게이트 사유로
     조정됐는지(있으면) — 현재 호출부는 채우지 않지만 향후 L6 게이팅 사유 노출용으로 열어둔다.
+
+    `candidates`(REC-11): `(problem_id, score)` 쌍의 목록 — 점수 내림차순 상위
+    `CANDIDATES_META_CAP`건만 저장한다(원 풀 전체가 아님, 모듈 docstring REC-11 절 참조).
+    `policy_version`: 이 추천을 만든 후보생성·선택 알고리즘의 식별자(`POLICY_VERSION_CAT`/
+    `POLICY_VERSION_SUNEUNG`). 둘 다 선택 인자다 — 호출자가 아직 준비되지 않았으면
+    생략해도 기존 동작과 완전히 동일(회귀 0).
+
+    `reason`(EOS-14): `l2.recommendation_contract.RecommendationReason` — *왜 이 문항인가*.
+    영속 좌석을 **새로 만들지 않고** 이 좌석에 싣는다(EOS-14 acceptance ④ "재구현하지
+    않는다"). `candidates`가 *무엇과 비교해 골랐나*를 남긴다면 이 키는 *어느 개념의 어떤
+    숙달 때문에 골랐나*를 남긴다 — 소급 평가에서 두 질문은 다르다. 직렬화는 계약 모델의
+    `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
+    (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
     """
     meta: dict[str, Any] = {
         META_KEY_PROBLEM_ID: str(problem_id),
@@ -103,6 +156,15 @@ async def record_recommendation_treatment(
         meta[META_KEY_MODE] = mode
     if gate_reason is not None:
         meta[META_KEY_GATE_REASON] = gate_reason
+    if candidates is not None:
+        ranked = sorted(candidates, key=lambda pair: pair[1], reverse=True)
+        meta[META_KEY_CANDIDATES] = [
+            {"problem_id": str(pid), "score": score} for pid, score in ranked[:CANDIDATES_META_CAP]
+        ]
+    if policy_version is not None:
+        meta[META_KEY_POLICY_VERSION] = policy_version
+    if reason is not None:
+        meta[META_KEY_REASON] = reason.model_dump(mode="json")
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
@@ -117,12 +179,18 @@ async def record_recommendation_treatment(
 
 
 __all__ = [
+    "CANDIDATES_META_CAP",
     "EVENT_TYPE_RECOMMENDATION_TREATMENT",
     "META_KEY_APPLIED_WEIGHTS",
+    "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
     "META_KEY_MODE",
+    "META_KEY_POLICY_VERSION",
     "META_KEY_POOL_SIZE",
     "META_KEY_PROBLEM_ID",
+    "META_KEY_REASON",
     "META_KEY_THETA",
+    "POLICY_VERSION_CAT",
+    "POLICY_VERSION_SUNEUNG",
     "record_recommendation_treatment",
 ]

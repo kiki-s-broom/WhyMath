@@ -5,7 +5,7 @@
   "corpus_name": "problem_bank_highschool_quotient_rule_v0",
   "record_count": 200,
   "generated": "2026-08-09",
-  "generation_method": "결정론 스켈레톤 생성기(LLM 0) — l3/equivalent/highschool_quotient_rule_skeleton_generator.py",
+  "generation_method": "결정론 스켈레톤 생성기(LLM 0) — l3/equivalent/highschool_quotient_rule_skeleton_generator.py. 2026-09-12 QUAL-07로 전건 재생성: 대학 CALC1 몫의 미분법 축과 계수 공간이 겹쳐 발문 동일 71건·수학 실체 동일 138건을 공유하던 것을 계수 절댓값 3 이하 공간으로 분리했다(record_count 200 불변·성취기준 커버 [12미적Ⅱ-02-04] 200건 불변).",
   "generation_cli": "python -m whymath_backend.harness.highschool_quotient_rule_batch",
   "recovery": {
     "task": "PB-13-authoring-expansion-corpus-recovery",
@@ -17,5 +17,13 @@
     "note": "미검수 — 노출 4단(게이트 통과→코퍼스 편입→노출 적격→실노출) 중 *코퍼스 편입*까지만 도달했다. 표본 검수 미실시이므로 노출 적격이 아니다.",
     "sample_review": "없음(0건)",
     "evidence": "없음 — 검수 전까지 is_published=False 유지"
+  },
+  "disposition": {
+    "task": "QUAL-07-recovered-corpus-duplicate-disposition",
+    "date": "2026-09-12",
+    "action": "생성기 파라미터 공간 서로소 분리 후 전건 재생성(레코드 은퇴 0건)",
+    "record": "docs/data/problem_duplicate_disposition_2026-09.md",
+    "retired_slugs": [],
+    "note": "은퇴가 아니라 재생성이므로 200건 전건의 slug가 바뀐다(slug=본문 해시). 외부 배선 참조 0건을 제거 전 전수 확인했다."
   }
 }

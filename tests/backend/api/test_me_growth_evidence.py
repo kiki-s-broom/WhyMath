@@ -376,3 +376,45 @@ class TestSchemaStructuralProof:
     def test_declared_top_level_fields_present(self) -> None:
         schema = GrowthEvidenceResponse.model_json_schema()
         assert set(schema["properties"]) == _DECLARED_FIELDS
+
+
+class TestResolutionRateProvisionalSuppression:
+    """MISC-20 ⑤ 집행 지점 — 강등이 `GET /v1/me/growth-evidence` 응답에 실제로 반영된다.
+
+    티어 상수만 바꾸고 서빙 확인을 생략하면 미완(CLAUDE.md "정본화≠집행"). 계약이 ⑩을
+    PROVISIONAL(근사·노출 보류)로 판정하면 서빙 층은 value를 null로 강제하고, 계약 모듈의
+    내부 문구 대신 *서빙 층이 소유한 학생 대면 문장*을 `suppressed_reason`으로 낸다
+    (hint_depth_reached 랜드마인 방어와 동형 — 검수 안 된 내부 문구를 학생에게 흘리지 않는다).
+    """
+
+    def test_value_null_and_student_facing_reason(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def _fake_compute(*_args: Any, **_kwargs: Any) -> SurrogateMetrics:
+            return _surrogate_metrics()  # ⑩ value=0.5 MEASURED — 계약이 보류하면 흘러가면 안 된다
+
+        monkeypatch.setattr("whymath_backend.api.me.compute_wh1_surrogate_metrics", _fake_compute)
+        body = _client_with_auth().get(_ENDPOINT).json()
+        view = body["misconception_resolution_rate"]
+        assert view["value"] is None, "강등된 근사값이 학생 응답에 흘러갔다"
+        assert view["exposable_now"] is False
+        assert view["status"] == "measured"  # 계측 상태는 정직하게 그대로(삭제 아님)
+        reason = view["suppressed_reason"]
+        assert isinstance(reason, str) and reason
+        # 계약 모듈 내부 문구(재승격·is_active 등 내부 용어)가 아니라 서빙 층 소유 문장이다.
+        assert "재승격" not in reason
+        assert "is_active" not in reason
+        assert "deactivated_reason" not in reason
+
+    def test_field_still_present_in_schema_not_structurally_removed(self) -> None:
+        """② 강등은 삭제가 아니다 — 필드는 남고 값만 보류(INTERNAL_ONLY의 구조적 배제와 다르다)."""
+        assert "misconception_resolution_rate" in GrowthEvidenceResponse.model_fields
+
+    def test_other_metrics_unaffected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def _fake_compute(*_args: Any, **_kwargs: Any) -> SurrogateMetrics:
+            return _surrogate_metrics()
+
+        monkeypatch.setattr("whymath_backend.api.me.compute_wh1_surrogate_metrics", _fake_compute)
+        body = _client_with_auth().get(_ENDPOINT).json()
+        for field in ("verify_pass_rate", "mastery_gain_rate", "self_solve_rate"):
+            assert body[field]["value"] == 0.5, field
+            assert body[field]["exposable_now"] is True, field
+            assert body[field]["suppressed_reason"] is None, field

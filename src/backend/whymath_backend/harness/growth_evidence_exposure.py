@@ -51,6 +51,14 @@ class ExposureTier(str, Enum):
     GUARDIAN_SUMMARY = "guardian_summary"
     """보호자 요약 노출 가능. 현재 범위에서는 `STUDENT_VISIBLE`과 동일 소속(§ 상단 참조)."""
 
+    PROVISIONAL = "provisional"
+    """근사 지표 — 계산·내부 리포트는 유지하되 학생·보호자 노출은 보류(MISC-20).
+
+    `INTERNAL_ONLY`(시스템 품질·비용 — 애초에 학생 개인 지표가 아님)와 성격이 다르다. 이 계층은
+    "학생 지표가 맞지만 값이 아직 정직하게 말할 수 있는 상태가 아니다"를 뜻하며, 재승격 조건이
+    충족되면 `STUDENT_VISIBLE`로 되돌아간다(만료 없는 유예 금지 — 조건은 suppressed_reason에 명시).
+    """
+
     INTERNAL_ONLY = "internal_only"
     """운영·내부 전용 — 학생·보호자 어느 쪽에도 노출 금지(시스템 품질·비용 지표 등)."""
 
@@ -76,12 +84,26 @@ _STATIC_TIER: dict[str, ExposureTier] = {
     # ⑯ 결손 복구 리드타임(PED-13) — 자기 대비 축이라 학생 노출 가능. 또래·평균 대비 파생은
     # 두지 않는다(부재가 계약 · 5원칙 #2 · ARCH-27 게이트가 기계로 막는다).
     "gap_recovery_leadtime_days": ExposureTier.STUDENT_VISIBLE,
-    "misconception_resolution_rate": ExposureTier.STUDENT_VISIBLE,
+    # MISC-20 (a) 강등 — 값이 `is_active=false` 비율이라 "학생이 실제로 극복"과 "감쇠·반박·캡
+    # 절단으로 조용히 비활성화"를 구분하지 못하는데(코드가 자백: wh1_evaluation:1208), 근사임을
+    # 알리는 `Metric.note`는 `GrowthEvidenceMetricView`에서 구조적으로 탈락한다 — 학생은 근사값을
+    # "내가 오개념을 극복한 비율"로 읽는다(우선순위 #1 학생 안전 · "확실하지 않을 때 자신 있게
+    # 말함 금지"). note를 학생에게 흘리는 우회는 택하지 않는다(검수 안 된 내부 문구).
+    "misconception_resolution_rate": ExposureTier.PROVISIONAL,
     "self_solve_rate": ExposureTier.STUDENT_VISIBLE,
 }
 
 # SurrogateMetrics 필드 순서(정본 순서 — surrogate_baseline_report._METRIC_ROWS와 동일 순서).
 METRIC_FIELD_ORDER: tuple[str, ...] = tuple(_STATIC_TIER)
+
+# MISC-20 — PROVISIONAL 억제 사유(내부 문구). **재승격 조건을 문면에 담는다** — 만료 없는
+# 유예를 만들지 않기 위해서다(CLAUDE.md 금기 · PB-02 그랜드파더 만료 계약 동형). 이 문장은
+# *운영자 리포트용*이며 학생 응답에는 서빙 층이 소유한 별도 문장이 나간다(api/me.py).
+_PROVISIONAL_SUPPRESSED_REASON = (
+    "근사 지표라 학생 노출을 보류합니다 — 값이 is_active=false 비율이라 실제 해소와 감쇠·반박·"
+    "캡절단을 구분하지 못합니다. 재승격 조건: misconception_hypothesis.deactivated_reason이 "
+    "착지하고(MISC-20 b) 실데이터에서 '해소' 표본이 최소 규모에 도달한 시점의 명시적 판정."
+)
 
 _BRIER_GOOD_THRESHOLD = 0.15  # 낮을수록 좋음 — 경험적 구간(과신·과소신 진단 아님, 3구간 요약).
 _BRIER_FAIR_THRESHOLD = 0.30
@@ -134,6 +156,14 @@ def classify_metric_exposure(metrics: SurrogateMetrics) -> dict[str, MetricExpos
     verdict = metrics.help_reduction_validated.verdict
     result: dict[str, MetricExposure] = {}
     for field, tier in _STATIC_TIER.items():
+        if tier is ExposureTier.PROVISIONAL:
+            result[field] = MetricExposure(
+                field=field,
+                tier=tier,
+                exposable_now=False,
+                suppressed_reason=_PROVISIONAL_SUPPRESSED_REASON,
+            )
+            continue
         if tier is ExposureTier.INTERNAL_ONLY:
             result[field] = MetricExposure(
                 field=field,

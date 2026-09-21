@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MGMT-04-ip-separation-evidence-pack
+title: "겸직 IP 귀속 분리 증빙팩 — 커밋 신원·시각 증빙 생성기 + 확인서/양도예정 기록 템플릿 (게이트 G-eos-ip-separation-evidence 입력)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: docs
+status: cancelled
+priority: 1
+eos_priority: P1
+owner: kiki
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 기계 축: scripts/ops/ip_separation_evidence.py가 전체 git 이력에서 커밋 신원(author/committer 이메일·이름)·타임스탬프 분포를 산출하고, shallow·git 실패를 exit 2(측정 불가)로 분리해 '수집 실패'가 '이상 없음'으로 위장되지 않는다. 리포트는 단계마다 즉시 flush."
+  - "② 집행 지점(정본화와 별항): tests/infra/test_ip_separation_evidence.py가 CI에서 실제로 실행되며(배선 동결), 판정 로직을 정상 상태 GREEN·결함 주입 RED 양방향으로 동결한다 — 뮤테이션 주입으로 RED를 실측한 기록을 PR에 남긴다."
+  - "③ 증빙 한계 명시: 리포트·문서가 git 메타데이터로 증명되는 것(계정 귀속·시각 분포)과 증명되지 않는 것(장비 소유·author date 위조 가능성)을 분리해 적는다 — '모르면 모른다'."
+  - "④ 사람 축 템플릿 정본화: 재직사 자산·데이터 무사용 확인서(②)·신설 법인 IP 양도 예정 기록(③) 템플릿을 docs/legal/templates/에 두고, 기입된 실물은 저장소 커밋 금지(.gitignore + 가드)로 배선한다."
+  - "⑤ Kiki 런북: docs/ops/ip_separation_evidence_gate_runbook.md — 6항목 사전 브리핑 + PowerShell 명령 블록(자리표시자 0개·python -m·cd 고정·자가검증 스텝 변별력 확인)."
+  - "⑥ 게이트 clear는 Kiki 소유 — 세션은 clear하지 않는다(kind=human·assignee=kiki). 서명·법률 판단의 기계 대체 금지."
+artifacts: []
+paths:
+  - scripts/ops/ip_separation_evidence.py
+  - tests/infra/test_ip_separation_evidence.py
+  - "docs/legal/**"
+  - docs/ops/ip_separation_evidence_gate_runbook.md
+session: null
+notes: "게이트 G-eos-ip-separation-evidence(2026-08-30 등재·remind 14d·2026-09-07 현재 미해소)의 입력을 만든다. 이 태스크는 게이트를 대체하지 않는다 — 서명·확인서 작성·법인 설립 계획 기록은 Kiki 소유이고, 세션은 그 2h를 기입·서명만 남기도록 줄인다. eos_priority: 선언문 자신은 이 항목을 'P0'이라 부르나(12/31 산출물 전체의 귀속), 대장 rubric의 P0은 '없으면 12월 검증 G0~G5가 성립하지 않는다'로 더 좁아 P1로 등재한다 — 검증 성립이 아니라 투자 실사·귀속 리스크 축이다.\n\n[취소 2026-09-07] 등재 오류 정정 — owner를 kiki로 오기입해 start가 거부됨(HARN-06 사람소유 기입 경로). 실제 소유는 claude(스크립트·테스트·템플릿·런북 생성)이고 kiki 소유분은 게이트 clear·서명뿐이다. owner 변경 verb가 CLI에 없어 cancel 후 MGMT-05로 재등재한다(대장 손편집 금지 준수)."
+updated: 2026-09-07

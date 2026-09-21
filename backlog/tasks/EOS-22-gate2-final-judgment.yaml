@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-22-gate2-final-judgment
+title: "Gate 2 최종 판정 — 10조건 + 무개입 연속 3루프 (계획서 300 §18 · P-16)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① Gate 2 10조건 전건 판정 — 계획서 300 §18 / 집행 지시문 P-16. (1)신규 학생 생성 (2)진단 완료 (3)LearnerState 자동 생성 (4)Concept 자동 선택 (5)Content→Problem 연결 (6)Attempt→Assessment 동작 (7)Misconception 기록 (8)Mastery 자동 갱신 (9)다음 학습 자동 추천 (10)전체 과정 반복. 각 조건을 실행 증거(테스트 실행 출력·이벤트 trace·exit code)와 함께 충족/미충족으로 판정한다. \"Alpha 완성\" 류 모호 판정 금지.\n\n② 무개입 연속 3루프 판정 — 운영자가 DB를 직접 수정하지 않고 Loop1(진단→문제→오답→보정) · Loop2(보정→문제→정답→mastery 상승) · Loop3(다음 concept→문제→평가→추천)가 연속 성립하는지 실행으로 확인한다. 중간에 한 번이라도 사람이 DB·관리자 화면으로 값을 넣었으면 그 조건은 미충족이다.\n\n③ KPI 5종(P-14 · EOS-15) 실측값 병기 — ops/loop_kpi_gate CLI의 exit code와 5종 verdict를 그대로 싣는다. 미측정은 0으로 적지 않고 unmeasured로 명시한다.\n\n④ 판정 시점 규율 — 보고 상단에 판정 기준 main 커밋 해시를 박는다. 미머지 브랜치를 근거로 조건을 닫지 않는다. P-13(EOS-119)이 타 세션 claim·미머지 상태이므로 그 축은 main 기준으로만 판정한다.\n\n⑤ 미충족 조건마다 (가)끊긴 지점 (나)남은 작업량 추정 (다)11월 일정에 미치는 영향을 적는다. 최종 한 줄은 PASS 또는 FAIL이며 조건부 PASS는 없다.\n\n⑥ 이 태스크는 판정 전용이다 — 조건을 충족시키려고 production code를 고치지 않는다. 발견한 결함은 태스크로 등재만 한다. 원 문서 §15 10월 동결 13종은 구현하지 않는다.\n\n⑦ 일정 사실 명시 — 원 계획의 Gate 2 시점은 2026-10-25이고 이 판정은 2026-09-19에 수행된다. 크로스워크 docs/strategy/plan300_phase2_backlog_crosswalk.md가 P-16을 \"등재 제외 — 빌드 항목이 아니라 게이트 판정\"으로 처분했고 일정 충돌(§9-①)이 미해소라는 사실을 판정문에 함께 적는다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1229 (#1229) · 커밋 c5a43cc1 · 판정 기준 main 77ee1992 · 판정문 docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md · 최종 판정 FAIL"
+paths: []
+session: null
+notes: "출처: 2026-09-19 Kiki 업로드 실행계획 항목 [21] P-16(Gate 2 최종 판정) 집행 세션. 판정 전용 — 구현 세션과 분리(지시문 세트 주의 3번)."
+updated: 2026-09-19
