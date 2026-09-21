@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: blocked
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/config.py
   - docs/ops/eos02_prompt_cache_live_runbook.md
-session: null
+session: claude/nifty-mayer-3nz1z7
 notes: "EOS-99(계측 배선)의 라이브 절반. 분리 이유: acceptance ③의 실측은 실 provider가 필요해 hermetic으로는 적중률이 정의되지 않는다 — EOS-99에 검수 게이트를 걸면 '산출물을 만드는 태스크에 그 산출물 검수 게이트를 거는' 교착이 된다(build_harness.md 2026-09-06 등재). 소비 태스크로 분리한다. ID: 상위 소진(최대 EOS-99)으로 하위 미사용 번호 재사용 — HARN-73.\n\n[정정 2026-09-07] PR #1023 codex P1: acceptance ①이 도달 불가능했다 — accumulate가 구독·예산을 단일 좌석(free/0.0)으로 고정해 Anthropic 키만으로는 클라우드로 나가지 못한다. 검증 없는 실행 안내 금지(CLAUDE.md) 위반이었고, 실행됐으면 라이브 측정 회차 1회가 공전했다.\n\n[차단 2026-09-07] Kiki 라이브 회차 대기 — 실 Anthropic 키가 필요해 세션이 완결할 수 없다. 실행 런북 착지: docs/ops/eos02_prompt_cache_live_runbook.md (검증 기준 main 1abf743b). 회신 재료 = prompt_cache 블록 3값(state·hit_rate·calls_with_cache_telemetry) + EXIT 줄. 그 값이 오면 acceptance ②③(정상 판정·기본값 전환 여부)을 이어서 판정한다\n\n[정정 2026-09-07] acceptance ①(라이브 회차)은 Kiki 머신에서만 가능한 사람 행동이라 에이전트 착수 조건으로 사람 게이트를 부착한다 — 회차 리포트 prompt_cache 블록 회신이 게이트 clear 근거. 런북 = docs/ops/eos02_prompt_cache_live_runbook.md"
-updated: 2026-09-07
+updated: 2026-09-21
