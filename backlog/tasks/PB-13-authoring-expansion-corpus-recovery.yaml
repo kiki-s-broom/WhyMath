@@ -19,6 +19,7 @@ acceptance:
   - "⑤ 집행 지점(정본화와 별항) — 이식된 코퍼스가 실제로 게이트 경로를 경유하는지 확인: 상시 CI의 provenance_audit이 신규 30종을 실제로 스캔하는가. PB-06 정직한 공백이 'data/corpus가 backend 경로 필터에 없어 코퍼스만 바꾸는 PR은 provenance_audit이 한 번도 안 돈다'는 결함을 발견해 PB-02 notes에 남겼다 — 이식 PR에서 그 경로 필터가 실제로 발화하는지 실측하고, 안 돌면 그 사실을 명시 보고한다. 전체 스위트 EXIT=0"
 artifacts:
   - "PR #969 (squash 5bb2947b) — 코퍼스 30종 11,446문 + 생성기/배치 60 + 테스트 60 + 사이드카 30 이식, Codex P1/P2 수학 결함 수정, corpus-authoring CI 잡 분리"
+  - "[수치 정정 2026-09-21] 위 항의 \"11,446건\"은 오기다. 실측은 11,396건 — 커밋 5bb2947b가 신설한 problems.jsonl 30개 파일의 행 합계다. 차이 50건은 problem_bank_calculus2_trig_integral_v0에서 역순 구간 결함으로 제거된 문제 수이며, 그 파일은 제거 후 80행이다(main 실측 일치). 원 수치는 제거 이전 값을 그대로 옮긴 것으로 보인다. 지적 출처 = PR #975의 Codex P2 리뷰(discussion_r3914578106), 검증 = 세션 실측(git show 5bb2947b:<각 파일> 행수 합산). 후속 PB-14 및 NLP-09 계열이 이 수치를 인용할 경우 11,396을 쓴다."
 paths:
   - "data/corpus/**"
   - "src/backend/whymath_backend/l3/equivalent/**"
@@ -26,5 +27,5 @@ paths:
   - "tests/backend/l3/equivalent/**"
   - "tests/backend/harness/**"
 session: null
-notes: "출처: G-authoring-expansion-merge-decision(2026-08-31 Kiki '회수' 결정으로 cleared) + docs/reviews/unmerged_branch_audit_2026-08-31.md §5. 선행 조건은 PB-06(done·#795)이 전부 확정해 뒀다 — 차단 3건 중 사이드카는 PB-11(done)이 CLI 상환, shallow는 08-31 감사가 unshallow로 해소, ID 충돌만 후속 태스크가 담당. 회수 완료 전 원 브랜치 삭제 금지. 저작 태스크 32건 재등재와 S4-19/S4-22 ID 충돌 해소는 후속 태스크 소관이라 이 태스크 범위 밖(중복 등재 금지). 별건 관찰: l2/learning_metrics_writer.py도 main 부재 고립이나 코퍼스와 무관해 이 범위 밖 — 별도 판단 필요.\n\n[정정 2026-09-01] eos_priority null → P1: 회수 축 — 코퍼스 11,446문·생성기 60파일. EOS-80 일괄 백필"
-updated: 2026-09-02
+notes: "출처: G-authoring-expansion-merge-decision(2026-08-31 Kiki '회수' 결정으로 cleared) + docs/reviews/unmerged_branch_audit_2026-08-31.md §5. 선행 조건은 PB-06(done·#795)이 전부 확정해 뒀다 — 차단 3건 중 사이드카는 PB-11(done)이 CLI 상환, shallow는 08-31 감사가 unshallow로 해소, ID 충돌만 후속 태스크가 담당. 회수 완료 전 원 브랜치 삭제 금지. 저작 태스크 32건 재등재와 S4-19/S4-22 ID 충돌 해소는 후속 태스크 소관이라 이 태스크 범위 밖(중복 등재 금지). 별건 관찰: l2/learning_metrics_writer.py도 main 부재 고립이나 코퍼스와 무관해 이 범위 밖 — 별도 판단 필요.\n\n[정정 2026-09-01] eos_priority null → P1: 회수 축 — 코퍼스 11,446문·생성기 60파일. EOS-80 일괄 백필\n\n[정정 2026-09-21] Codex P2 지적 실측 검증 — 코퍼스 수치 11,446은 오기이고 실측 11,396"
+updated: 2026-09-21
