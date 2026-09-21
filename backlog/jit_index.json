@@ -2896,6 +2896,26 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/ops/ci_job_repro.py",
+    "tests/infra/test_ci_job_repro.py"
+   ],
+   "text": "pytest 출력을 tail로 잘라 캡처 — 실패 목록 유실로 재실행 (출력 절단 축 재관통)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/ops/ci_job_repro.py",
+    "tests/infra/test_ci_job_repro.py"
+   ],
+   "text": "로컬 tests/infra 47건 거짓 red — CI의 의존성 집합을 재현하지 않음 (재현 누락 4번째 입구)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
