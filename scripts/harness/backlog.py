@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
 import incidents as incidents_mod
+import jit_rules
 import pathscope
 import remote_claims
 import report
@@ -3333,6 +3334,69 @@ def _cmd_rules_render(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_jit(root: Path, args: argparse.Namespace) -> int:
+    action = args.jit_command
+    if action in ("build", "check"):
+        return _cmd_jit_build(root, args, check=(action == "check"))
+    if action == "show":
+        return _cmd_jit_show(root, args)
+    return _fail(f"jit: 알 수 없는 하위 명령 '{action}'")
+
+
+def _build_jit_notes(root: Path) -> tuple[list[jit_rules.Note], list[str]]:
+    backlog, _ = _load(root)
+    rule_list, rule_errors = rules_mod.load_rules(root)
+    incident_list, incident_errors = incidents_mod.load_incidents(root)
+    errors = rule_errors + incident_errors
+    return jit_rules.build_notes(backlog, rule_list, incident_list), errors
+
+
+def _cmd_jit_build(root: Path, args: argparse.Namespace, *, check: bool) -> int:
+    notes, errors = _build_jit_notes(root)
+    if errors:
+        print(f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr)
+        for error in errors[:10]:
+            print(f"  · {error}", file=sys.stderr)
+        return 1
+    body = jit_rules.dump_index(notes)
+    target = jit_rules.index_path(root)
+    if check:
+        current = target.read_text(encoding="utf-8") if target.exists() else ""
+        if current != body:
+            print(
+                f"❌ {jit_rules.INDEX_NAME} 이 대장과 어긋났다 — "
+                f"`backlog.py jit build`로 재생성하라 (인덱스는 대장의 렌더 결과다)",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"✔ {jit_rules.INDEX_NAME} 가 대장과 일치 (주입 후보 {len(notes)}건)")
+        return 0
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    rules_n = sum(1 for n in notes if n.kind == "rule")
+    print(
+        f"▶ {jit_rules.INDEX_NAME} 재생성 — 주입 후보 {len(notes)}건 "
+        f"(규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+    )
+    return 0
+
+
+def _cmd_jit_show(root: Path, args: argparse.Namespace) -> int:
+    """이 경로를 편집하면 무엇이 뜨는지 — 훅을 돌리지 않고 확인하는 경로."""
+    notes = jit_rules.load_index(root)
+    if not notes:
+        return _fail(
+            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 (0건은 침묵이 아니라 미구축이다)"
+        )
+    matched = jit_rules.notes_for_path(notes, args.path)
+    rendered = jit_rules.render_injection(matched, args.path)
+    if not rendered:
+        print(f"(주입 0건 — '{args.path}' 경로에서 난 사고·규칙이 대장에 없다)")
+        return 0
+    print(rendered)
+    return 0
+
+
 def cmd_validate(root: Path, args: argparse.Namespace) -> int:
     backlog, schema_errors = _load(root)
     errors = store.validate_backlog(backlog, schema_errors)
@@ -3629,10 +3693,37 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
                 print(f"  · {error}", file=sys.stderr)
             return 2
         return 0
+    # HARN-121 ③ 적시 주입 — 이 경로에서 실제로 났던 사고·규칙만 최대 5줄.
+    # 정책 검사보다 **먼저** 낸다: 정책 위반이 block이면 아래에서 exit 2로 끝나는데,
+    # 그때 정작 도움이 되는 맥락을 못 보여주면 안 된다.
+    _inject_jit_notes(root, file_path)
     try:
         return _check_edit_policy(root, file_path)
     except Exception:  # 정책 검사 실패는 무조건 통과 (fail-open)
         return 0
+
+
+def _inject_jit_notes(root: Path, file_path: str) -> None:
+    """편집 경로에 걸리는 사고·규칙을 stderr에 주입 — 0건이면 침묵 (HARN-121 ③).
+
+    훅을 절대 볼모로 잡지 않는다: 어떤 실패도 exit code를 바꾸지 않는다. 다만 예외를
+    **삼키지는 않는다** — 타입명을 남긴다(CLAUDE.md 침묵 실패 금지). 무타입 경고가
+    langfuse 쓰기 8일 무증상 전멸의 원인이었다.
+    """
+    try:
+        if not file_path:
+            return
+        try:
+            rel = str(Path(file_path).resolve().relative_to(root.resolve()))
+        except ValueError:
+            return  # 레포 밖 — 관할 아님
+        rel = rel.replace("\\", "/")
+        notes = jit_rules.load_index(root)
+        rendered = jit_rules.render_injection(jit_rules.notes_for_path(notes, rel), rel)
+        if rendered:
+            print(rendered, file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — 관측성 코드는 개발을 막지 않는다
+        print(f"[적시 규칙] 주입 실패 — {type(exc).__name__} (편집은 계속된다)", file=sys.stderr)
 
 
 def _check_edit_policy(root: Path, file_path: str) -> int:
@@ -4401,6 +4492,14 @@ def build_parser() -> argparse.ArgumentParser:
     rp.add_argument("--check", action="store_true", help="쓰지 않고 어긋남만 검사(exit 1)")
 
     p.set_defaults(func=cmd_rules)
+
+    p = sub.add_parser("jit", help="적시 규칙 주입 인덱스 — 편집 경로별 사고·규칙 (HARN-121 ③)")
+    jsub = p.add_subparsers(dest="jit_command", required=True)
+    jsub.add_parser("build", help="대장 3종 → backlog/jit_index.json 재생성")
+    jsub.add_parser("check", help="인덱스가 대장과 어긋났는지 검사 (exit 1)")
+    jp = jsub.add_parser("show", help="이 경로를 편집하면 무엇이 뜨는지 미리보기")
+    jp.add_argument("path", help="레포 상대 경로")
+    p.set_defaults(func=cmd_jit)
 
     p = sub.add_parser("validate", help="백로그 무결성 전수 검증")
     p.add_argument("--quiet", action="store_true")

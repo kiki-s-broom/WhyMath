@@ -1388,6 +1388,11 @@ jobs:
           python3 scripts/harness/backlog.py rules lint
           python3 scripts/harness/backlog.py rules render --check
 
+      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
+      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
+      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+        run: python3 scripts/harness/backlog.py jit check
+
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
       # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날
