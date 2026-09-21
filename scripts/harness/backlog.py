@@ -3354,7 +3354,9 @@ def _build_jit_notes(root: Path) -> tuple[list[jit_rules.Note], list[str]]:
 def _cmd_jit_build(root: Path, args: argparse.Namespace, *, check: bool) -> int:
     notes, errors = _build_jit_notes(root)
     if errors:
-        print(f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr)
+        print(
+            f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr
+        )
         for error in errors[:10]:
             print(f"  · {error}", file=sys.stderr)
         return 1
@@ -3386,7 +3388,8 @@ def _cmd_jit_show(root: Path, args: argparse.Namespace) -> int:
     notes = jit_rules.load_index(root)
     if not notes:
         return _fail(
-            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 (0건은 침묵이 아니라 미구축이다)"
+            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 "
+            f"(0건은 침묵이 아니라 미구축이다)"
         )
     matched = jit_rules.notes_for_path(notes, args.path)
     rendered = jit_rules.render_injection(matched, args.path)

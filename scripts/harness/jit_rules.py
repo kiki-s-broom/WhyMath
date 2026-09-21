@@ -145,7 +145,7 @@ def index_path(root: Path) -> Path:
 
 def dump_index(notes: list[Note]) -> str:
     """결정적 직렬화 — 같은 대장이면 같은 바이트(diff 안정·`check`가 성립하려면 필수)."""
-    ordered = list(notes)
+    ordered = sorted(notes, key=lambda n: (-n.weight, n.kind, n.ref, n.text))
     payload = {"version": 1, "max_notes": MAX_NOTES, "notes": [asdict(n) for n in ordered]}
     return json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=False) + "\n"
 

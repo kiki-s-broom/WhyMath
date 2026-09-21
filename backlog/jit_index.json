@@ -2373,6 +2373,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-21",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/harness/test_mutate_harness.py"
+   ],
+   "text": "뮤테이션 실행 중 커밋 — 주입된 소스가 커밋돼 CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-30",
    "paths": [
     "src/backend/pyproject.toml"

@@ -184,7 +184,9 @@ class TestRankingAndCap:
             backlog,
             [],
             [
-                FakeIncident(date="2026-09-01", title="무해", fix_ref="HARN-99", damage_class="none"),
+                FakeIncident(
+                    date="2026-09-01", title="무해", fix_ref="HARN-99", damage_class="none"
+                ),
                 FakeIncident(
                     date="2026-09-02", title="소실", fix_ref="HARN-99", damage_class="data_loss"
                 ),
@@ -247,9 +249,7 @@ class TestLiveRepo:
         rule_list, rule_errors = rules_mod.load_rules(REPO_ROOT)
         incident_list, incident_errors = incidents_mod.load_incidents(REPO_ROOT)
         assert rule_errors == [] and incident_errors == []
-        expected = jit_rules.dump_index(
-            jit_rules.build_notes(backlog, rule_list, incident_list)
-        )
+        expected = jit_rules.dump_index(jit_rules.build_notes(backlog, rule_list, incident_list))
         assert jit_rules.index_path(REPO_ROOT).read_text(encoding="utf-8") == expected
 
     def test_index_is_not_empty(self) -> None:
@@ -306,7 +306,9 @@ class TestCheckEditHook:
             raise RuntimeError("터짐")
 
         monkeypatch.setattr(jit_rules, "load_index", boom)
-        payload = json.dumps({"tool_input": {"file_path": str(REPO_ROOT / "scripts/harness/backlog.py")}})
+        payload = json.dumps(
+            {"tool_input": {"file_path": str(REPO_ROOT / "scripts/harness/backlog.py")}}
+        )
         monkeypatch.setattr("sys.stdin", io.StringIO(payload))
         assert cli.main(["check-edit"]) == 0
         assert "RuntimeError" in capsys.readouterr().err
