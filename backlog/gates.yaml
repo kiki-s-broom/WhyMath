@@ -280,6 +280,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: "원 요청일 2026-08-11(ph1ad7 905ed311·ASM-12/PR #815) — #822 재생성-머지에서 게이트만 유실돼 2026-08-30 HARN-34가 이관 재등재. 판정 정본 docs/legal/export_prediction_disclosure_verdict.md·뒤집힘 시 export 복원+매트릭스 §2.4 개정+access_matrix #8 동시 반영"
+  - id: G-harn121-constitution-token-measure
+    title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-kiki-device-demo
     title: "S1 탈출 게이트 ① — 실기기 학습 루프 시연"
     kind: human
