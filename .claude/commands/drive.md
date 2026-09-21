@@ -53,8 +53,17 @@ python3 scripts/harness/backlog.py start <id>
 llm-architect / pedagogy-designer). 위임 프롬프트에 반드시 포함:
 acceptance 전 항목 · 7계층 경계 · CLAUDE.md 금기 · 한국어 주석 규칙.
 
-**4. 검증**
-- `pytest` (+해당 시 `flutter test`) · `ruff` green
+**4. 검증** — 무엇을 돌릴지 사람이 고르지 않는다 (HARN-109·HARN-119)
+```bash
+python3 scripts/harness/ci_mirror.py run          # 변경이 닿는 잡을 자동 계산해 그대로 실행
+```
+이 한 줄이 종전의 "pytest·ruff green"을 대체한다. 사람이 검증 범위를 고르는 한
+같은 계열이 다시 뚫린다 — 잡을 빠뜨리고(2026-09-17), 검사 종류를 빠뜨리고(09-10),
+스코프를 틀리게 판정한다(09-19). 도구는 `changes` 잡의 path filter를 *정본으로 읽어*
+대상을 계산하고, 스텝별 exit code와 **앞 스텝 실패로 건너뛴 스텝 수**를 함께 낸다.
+- 재현 불가 잡(docker·서비스 컨테이너 의존)은 "재현 불가"로 표기되며 CI가 최종 판정한다
+- 범위를 직접 지정해야 하면 `--job <이름>`(반복 지정). 무엇이 있는지는
+  `python3 scripts/harness/ci_job_coverage.py scope`가 답한다
 - acceptance 전 항목 자기평가 (하나라도 미충족 = 미완)
 - 실패 → **1회 재시도**. 재실패 →
   `backlog.py block <id> --reason "..."` 후 다음 후보로 (같은 태스크 무한 재시도 금지)
