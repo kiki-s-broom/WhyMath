@@ -107,11 +107,14 @@ class TestApplyLabels:
         univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=["G1"])
         fake_store = _FakeStore()
 
-        labels = [LabelRow("N1", "reviewed", "kiki", None)]
+        labels = [LabelRow("N1", "reviewed", "kiki", "2026-08-16T00:00:00Z")]
         report = apply_labels(
             labels, k12_path=k12, university_path=univ, store=fake_store, dry_run=True
         )
 
+        # 게이트는 통과해야 한다 — 통과하지 않으면 이 테스트는 dry-run이 아니라 게이트를 본다.
+        assert report.gate_violations == []
+        assert report.approved_codes == ["N1"]
         assert report.k12_updated == 0
         assert report.university_updated == 0
         assert report.db_updated == 0
@@ -123,15 +126,20 @@ class TestApplyLabels:
     def test_missing_code_in_corpus_is_reported(self, tmp_path: Path) -> None:
         k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
         univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
-        labels = [LabelRow("MISSING", "reviewed", "kiki", None)]
+        labels = [LabelRow("MISSING", "reviewed", "kiki", "2026-08-16T00:00:00Z")]
         report = apply_labels(labels, k12_path=k12, university_path=univ, dry_run=True)
+        assert report.gate_violations == []
         assert report.missing_in_corpus == ["MISSING"]
 
 
 class TestApplyCLI:
     def test_main_dry_run(self, tmp_path: Path) -> None:
         labels = tmp_path / "labels.jsonl"
-        labels.write_text('{"code":"N1","review_status":"reviewed"}\n', encoding="utf-8")
+        labels.write_text(
+            '{"code":"N1","review_status":"reviewed",'
+            '"reviewed_by":"kiki","reviewed_at":"2026-08-16T00:00:00Z"}\n',
+            encoding="utf-8",
+        )
         k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
         univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
         out = tmp_path / "report.json"
@@ -160,7 +168,11 @@ class TestApplyCLI:
 
     def test_main_missing_corpus_code_returns_1(self, tmp_path: Path) -> None:
         labels = tmp_path / "labels.jsonl"
-        labels.write_text('{"code":"MISSING","review_status":"reviewed"}\n', encoding="utf-8")
+        labels.write_text(
+            '{"code":"MISSING","review_status":"reviewed",'
+            '"reviewed_by":"kiki","reviewed_at":"2026-08-16T00:00:00Z"}\n',
+            encoding="utf-8",
+        )
         k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
         univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
 
@@ -175,3 +187,110 @@ class TestApplyCLI:
             ]
         )
         assert rc == 1
+
+
+class TestReviewGateBlocksSelfApproval:
+    """검수 게이트 통합 — AI 자기승인·미서명 라벨이 코퍼스·DB에 닿지 않는다.
+
+    2026-09-21 실측: 이 게이트 도입 전에는 아래 3종이 **전건 승격**됐다(코퍼스 3건 + DB 1콜).
+    그 상태를 그대로 주입해 차단을 확인한다(CLAUDE.md 실패 주입 규칙).
+    """
+
+    def test_unsigned_and_ai_signed_labels_are_all_refused(self, tmp_path: Path) -> None:
+        k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1", "N2", "N3"])
+        univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
+        fake_store = _FakeStore()
+
+        labels = [
+            LabelRow("N1", "reviewed", None, None),  # 무서명
+            LabelRow("N2", "reviewed", "claude", "2026-09-21T00:00:00Z"),  # AI 자기승인
+            LabelRow("N3", "reviewed", "", "2026-09-21T00:00:00Z"),  # 빈 서명
+        ]
+        report = apply_labels(
+            labels, k12_path=k12, university_path=univ, store=fake_store, dry_run=False
+        )
+
+        assert report.gate_violations != []
+        assert report.k12_updated == 0
+        assert report.db_updated == 0
+        assert fake_store.calls == []
+
+        # 코퍼스 파일 자체가 안 바뀌었는지 — 리포트 수치만 보면 쓰기를 놓칠 수 있다.
+        statuses = {
+            r["code"]: r["review_status"]
+            for r in json.loads(k12.read_text(encoding="utf-8"))["content"]
+        }
+        assert set(statuses.values()) == {CONTENT_REVIEW_STATUS_AI_ESTIMATED}
+
+    def test_one_bad_row_refuses_the_whole_batch(self, tmp_path: Path) -> None:
+        """fail-closed — 부분 적용을 허용하면 '일부는 서명 없이 들어간다'가 된다."""
+        k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1", "N2", "N3"])
+        univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
+        fake_store = _FakeStore()
+
+        labels = [
+            LabelRow("N1", "reviewed", "kiki", "2026-09-21T00:00:00Z"),
+            LabelRow("N2", "reviewed", "kiki", "2026-09-21T00:00:00Z"),
+            LabelRow("N3", "reviewed", None, None),  # 1건만 미서명
+        ]
+        report = apply_labels(
+            labels, k12_path=k12, university_path=univ, store=fake_store, dry_run=False
+        )
+
+        assert report.k12_updated == 0
+        assert fake_store.calls == []
+
+    def test_signed_labels_still_promote(self, tmp_path: Path) -> None:
+        """성공 방향 대조군 — 없으면 '전부 거부'라는 과잉 수정이 통과한다."""
+        k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
+        univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=["G1"])
+        fake_store = _FakeStore()
+
+        labels = [
+            LabelRow("N1", "reviewed", "kiki", "2026-09-21T00:00:00Z"),
+            LabelRow("G1", "reviewed", "kiki", "2026-09-21T00:00:00Z"),
+        ]
+        report = apply_labels(
+            labels, k12_path=k12, university_path=univ, store=fake_store, dry_run=False
+        )
+
+        assert report.gate_violations == []
+        assert report.k12_updated == 1
+        assert report.university_updated == 1  # 대학 축도 같은 게이트를 지난다(acceptance ⑤)
+        assert fake_store.calls == [(("N1", "G1"), "reviewed")]
+
+    def test_rejected_rows_need_no_signature(self, tmp_path: Path) -> None:
+        """거부 라벨은 코퍼스를 안 건드리므로 서명을 강요하지 않는다(게이트 과잉 방지)."""
+        k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
+        univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
+        report = apply_labels(
+            [LabelRow("N1", "rejected", None, None)],
+            k12_path=k12,
+            university_path=univ,
+            dry_run=True,
+        )
+        assert report.gate_violations == []
+        assert report.rejected_or_other == ["N1"]
+
+    def test_cli_refuses_unsigned_labels_with_exit_1(self, tmp_path: Path) -> None:
+        labels = tmp_path / "labels.jsonl"
+        labels.write_text('{"code":"N1","review_status":"reviewed"}\n', encoding="utf-8")
+        k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=["N1"])
+        univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
+        out = tmp_path / "report.json"
+
+        rc = main(
+            [
+                "--labels",
+                str(labels),
+                "--k12",
+                str(k12),
+                "--university",
+                str(univ),
+                "--json",
+                str(out),
+            ]
+        )
+        assert rc == 1
+        # 침묵 실패 금지 — 리포트에 위반 사유가 남아야 한다.
+        assert json.loads(out.read_text(encoding="utf-8"))["gate_violations"] != []
