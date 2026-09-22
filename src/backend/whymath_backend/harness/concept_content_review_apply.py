@@ -1,8 +1,13 @@
 """사람 검수 승인 라벨 → 코퍼스 JSON + DB `review_status` 갱신 CLI.
 
-입력 JSONL은 사람(또는 사람이 최종 확인한 자동 라벨)이 검수한 `code`·`review_status` 목록이다.
+입력 JSONL은 사람(또는 강등전을 통과한 기계 판정자)이 검수한 `code`·`review_status` 목록이다.
 `review_status='reviewed'`인 code만 코퍼스 JSON과 `concept_content` 테이블에 반영한다.
 다른 상태(rejected, ai_estimated 등)는 코퍼스/DB를 건드리지 않는다(fail-closed).
+
+**승인 행은 검수 게이트를 통과해야 한다** — `l1.concept_content.review_gate`가 승격 권위를
+검사한다(`reviewed_by`가 등재 검수자 + `reviewed_at` ISO 8601). `review_status='reviewed'`는
+학생 노출 게이팅 기준이라(`l1/*/retrieval.py`) 서명 없는 승격은 미검증 AI 콘텐츠의 학생 노출이
+된다. 위반이 1건이라도 있으면 **전체를 거부**한다(부분 적용 금지).
 
 사용:
     python -m whymath_backend.harness.concept_content_review_apply \
@@ -25,7 +30,7 @@
 
 exit code:
     0 — 갱신 완료(또는 dry-run 시 갱신할 수 있음).
-    1 — DB 코퍼스 불일치(승인 code가 코퍼스에 1건도 없음) 등 검수 라벨 문제.
+    1 — 검수 게이트 위반(서명 누락·미등재 검수자) 또는 DB 코퍼스 불일치 등 검수 라벨 문제.
     2 — 입력 파일 부재·JSONL 파싱 오류.
 """
 
@@ -39,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from whymath_backend.l1.concept_content.projection import ConceptContentStore
+from whymath_backend.l1.concept_content.review_gate import promotion_violations
 
 _EXIT_OK = 0
 _EXIT_LABEL_ERROR = 1
@@ -70,6 +76,7 @@ class ApplyReport:
     university_updated: int
     db_updated: int
     missing_in_corpus: list[str]
+    gate_violations: list[str]
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -81,6 +88,7 @@ class ApplyReport:
             "university_updated": self.university_updated,
             "db_updated": self.db_updated,
             "missing_in_corpus": sorted(self.missing_in_corpus),
+            "gate_violations": list(self.gate_violations),
         }
 
     def render(self) -> str:
@@ -95,6 +103,15 @@ class ApplyReport:
             f"대학 JSON 갱신: {self.university_updated}건",
             f"DB 갱신: {self.db_updated}건",
         ]
+        if self.gate_violations:
+            lines.append("")
+            lines.append(
+                f"검수 게이트 위반: {len(self.gate_violations)}건 — 승격 거부(fail-closed)"
+            )
+            for violation in self.gate_violations[:10]:
+                lines.append(f"  - {violation}")
+            if len(self.gate_violations) > 10:
+                lines.append(f"  ... 외 {len(self.gate_violations) - 10}건")
         if self.missing_in_corpus:
             lines.append(f"코퍼스에 없는 승인 code: {len(self.missing_in_corpus)}건")
             for code in self.missing_in_corpus[:10]:
@@ -176,7 +193,23 @@ def apply_labels(
         university_updated=0,
         db_updated=0,
         missing_in_corpus=[],
+        gate_violations=[],
     )
+
+    # 검수 게이트 — 승격 권위 확인이 가장 먼저다(fail-closed: 1행이라도 위반이면 전체 거부).
+    # 부분 적용을 허용하면 "일부는 서명 없이도 들어간다"가 되어 게이트가 무의미해진다.
+    for index, row in enumerate(approved):
+        report.gate_violations.extend(
+            promotion_violations(
+                code=row.code,
+                review_status=row.review_status,
+                reviewed_by=row.reviewed_by,
+                reviewed_at=row.reviewed_at,
+                row_label=f"[행 {index}] ",
+            )
+        )
+    if report.gate_violations:
+        return report
 
     if not approved_codes:
         return report
@@ -249,6 +282,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"리포트 JSON: {args.json}")
 
+    if report.gate_violations:
+        print(
+            f"검수 게이트 거부: {len(report.gate_violations)}건 — 승격하지 않았습니다"
+            " (AI 자기승인 금지·서명 필수).",
+            file=sys.stderr,
+        )
+        return _EXIT_LABEL_ERROR
     if report.missing_in_corpus:
         print(
             f"라벨 오류: {len(report.missing_in_corpus)}건의 승인 code가 코퍼스에 없습니다.",

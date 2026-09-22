@@ -56,7 +56,7 @@ red**다. `EVENT_DATA_CONTRACT ∪ _CONTRACT_EXEMPT == 전체`를 거버넌스 �
 0.140부터 `include_router()`가 하위 라우트를 `app.routes`로 평탄화하지 않고 `_IncludedRouter`
 래퍼 1개만 얹으므로(래퍼는 `path` 속성이 없고 `original_router`를 들고 있다), 순진하게
 `app.routes`의 `path`만 모으면 `/v1/**` 전체가 통째로 누락된다 — 그 파일의 도크스트링이 실측
-함정으로 기록해 두었다. 이 모듈의 `_walk_routes`가 그 재귀 언랩의 **유일한 구현**이고,
+함정으로 기록해 두었다. 이 모듈의 `walk_routes`가 그 재귀 언랩의 **유일한 구현**이고,
 `route_paths()`(경로만)·`app_route_entries()`(메서드+경로, 이 모듈의 HTTP 축 전용)가 둘 다
 그 위에서 파생된다. `test_slo_contract.py`는 이제 `route_paths()`를 import해 쓴다(재구현 0).
 
@@ -149,12 +149,12 @@ class CollectorError(RuntimeError):
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def _walk_routes(routes: Iterable[object]) -> Iterator[object]:
+def walk_routes(routes: Iterable[object]) -> Iterator[object]:
     """FastAPI 0.140 lazy-include 래퍼(`_IncludedRouter`)를 재귀로 풀어 실제 라우트만 낸다."""
     for route in routes:
         inner = getattr(route, "original_router", None)
         if inner is not None:  # FastAPI 0.140 lazy include 래퍼
-            yield from _walk_routes(inner.routes)
+            yield from walk_routes(inner.routes)
             continue
         yield route
 
@@ -168,7 +168,7 @@ def route_paths() -> frozenset[str]:
     승격했다(OPS-22 — 함정을 두 곳에서 각자 풀지 않도록).
     """
     found: set[str] = set()
-    for route in _walk_routes(create_app().routes):
+    for route in walk_routes(create_app().routes):
         path = getattr(route, "path", None)
         if isinstance(path, str) and path:
             found.add(path)
@@ -179,7 +179,7 @@ def route_paths() -> frozenset[str]:
 def app_route_entries() -> tuple[tuple[str, str], ...]:
     """`(method, path)` 표(정규화 전 원본 경로) — HTTP 축 전용(메서드까지 필요)."""
     found: set[tuple[str, str]] = set()
-    for route in _walk_routes(create_app().routes):
+    for route in walk_routes(create_app().routes):
         path = getattr(route, "path", None)
         if not isinstance(path, str) or not path:
             continue

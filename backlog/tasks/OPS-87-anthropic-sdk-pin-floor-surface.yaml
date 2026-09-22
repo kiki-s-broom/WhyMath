@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-87-anthropic-sdk-pin-floor-surface
+title: "anthropic SDK pin 하한이 우리가 호출하는 표면을 보장하지 않는다 — 최상위 cache_control은 0.83.0 도입, 하한은 0.40.0"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① pin 하한 실측 정정 — src/backend/pyproject.toml 의 anthropic 하한을 우리가 실제로 호출하는 표면이 존재하는 최초 버전으로 올린다. 2026-09-21 실측(PyPI 실물 설치 후 inspect.signature): 최상위 cache_control 은 0.83.0 에서 도입됐다(0.81.0·0.82.0 부재 / 0.83.0·0.84.0·0.85.0·0.90.0·0.95.0·0.100.0·0.117.0 존재). output_config(effort)는 0.80.0 에서 이미 존재하고 0.60.0 에는 부재. 현행 하한 0.40.0 은 둘 다 없는 구간을 허용한다.\n② 실패 양태가 무증상이 아님을 확인 — anthropic SDK 의 messages.create 에는 VAR_KEYWORD(**kwargs)가 없다(0.40.0·0.117.0 양쪽 실측). 따라서 구버전에서는 TypeError 로 즉사하며 조용한 무시가 아니다. 그러나 저작 배치는 호출 실패를 generation_failed 로 집계하므로, 회차 전체가 실패해도 리포트는 정상 종료한다 — 즉 사람에게는 무증상에 가깝다. 이 사실을 pin 주석에 남긴다.\n③ 회귀 동결 — 시임 테스트만으로 표면을 선언하지 않는다는 규약의 집행 지점을 만든다. 우리가 최상위 인자로 싣는 키 3종(cache_control·output_config·thinking)이 설치된 실물 anthropic 의 messages.create 시그니처에 존재하는지 inspect 로 검사하는 테스트를 tests/backend/l3/ 에 추가하고, 부재 시 어느 키가 없는지 이름을 내며 RED 가 되게 한다. 뮤테이션 검증: 존재하지 않는 키 이름을 검사 목록에 주입했을 때 RED 가 나오는지 확인한다.\n④ 범위 밖 — 상한(<1)은 건드리지 않는다. 이 태스크는 하한만 다룬다."
+artifacts: []
+paths: []
+session: null
+notes: "발견 경위: 2026-09-21 게이트 G-eos02-prompt-cache-live-run 실행 준비 중, 런북이 안내할 명령이 기대 산출물을 실제로 내는 코드 경로인지 확인하다가 드러났다(검증 없는 실행 안내 금지). anthropic_prompt_caching=True 가 l3/providers/anthropic.py 에서 messages.create(cache_control=...) 로 나가는데, 그 인자의 실재를 동결하는 것은 tests/backend/l3/test_anthropic_provider.py 의 시임(가짜 클라이언트) 단언뿐이었다 — 가짜 클라이언트는 어떤 키든 받는다. 실물 SDK 를 설치해 재 보니 pin 허용 구간의 상당 부분(0.40~0.82)에 그 인자가 없다.\n\n이것은 CLAUDE.md 가 명시적으로 금지하는 형태다: 외부 SDK 표면을 시임 테스트만으로 정합 선언 금지 — 우리가 호출하는 메서드가 pin 허용 범위의 실물 SDK 에 존재하는지 실측 검증한다. 선례 langfuse>=2.50,<5 는 상한 축이었고 이번은 하한 축이다.\n\nEOS-02 라이브 회차 자체는 이 태스크를 기다리지 않는다 — 런북 v2 의 사전검증 블록이 설치된 SDK 를 실측해 SDK_HAS_CACHE_CONTROL 이 False 면 회차를 거부하므로, 게이트 실행은 pin 수정 전에도 안전하다. pin 수정은 그 방어를 Kiki 머신 1대가 아니라 저장소 전체로 옮기는 일이다."
+updated: 2026-09-21
