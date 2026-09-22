@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/harness/concept_content_review_batch.py
   - tests/backend/harness/test_concept_content_review_batch.py
-session: null
+session: claude/amazing-euler-zyvq0a
 notes: "근거: 2026-09-23 G-kg02 게이트 실행 1회차. Phaiakes9 Ollama quality 티어로 돌린 결과가 BATCH_EXIT=1(결함율 상한 73.5% > 임계 5.0%)이었는데, 주입 결함 2건은 **전부 검출**됐다. 즉 rubric의 false negative는 0인데 false positive는 측정 자체가 없다.\n\n도구 구조상의 원인: harness/concept_content_review_batch.py의 `_injected_defects()`가 결함 레코드만 반환하고, 집계(`missed_injected`)도 결함을 놓친 경우만 센다. 표본 레코드의 참값은 알 수 없으므로 표본 결함율은 rubric 판정일 뿐 콘텐츠 품질이 아니다.\n\nKG-02 acceptance ④는 결함 주입이 FAIL로 나오는지(= false negative 축)만 요구하므로 이 갭을 덮지 않는다. 그래서 별도 등재한다.\n\n주의: 1회차 측정은 Kiki 클론이 로컬 전용 브랜치에 있던 상태에서 돌아 코드·코퍼스 출처가 미확정이다(게이트 증적 아님·리허설로 기록). 재측정은 main 기준 worktree에서 한다."
 updated: 2026-09-22
