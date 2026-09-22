@@ -126,6 +126,19 @@ _READBACK_TOKENS: tuple[str, ...] = (
     "docker ps",
 )
 _SECURE_STRING = re.compile(r"-AsSecureString\b", re.IGNORECASE)
+# ── 대화형 판정 ──────────────────────────────────────────────────────────
+# **반복해서** stdin을 읽는 명령(대화형 TUI). 이것이 다른 명령과 한 블록에 있으면, 사람이
+# 블록을 통째로 붙여넣는 순간 **버퍼에 남은 줄들이 연달아 그 프롬프트의 입력이 된다**.
+#   review_session — 카나리 검수 TUI(항목마다 판정 키를 묻는 루프)
+#
+# `Read-Host`는 **의도적으로 제외한다.** 한 줄만 읽고 반환하므로 버퍼를 비우는 것이 아니라
+# *한 줄을 소비하고 멈추는* 장치이고, CLAUDE.md가 붙여넣기 정지 수단으로 **권장**한다
+# ("블록이 멈춰서 묻는다 — Read-Host로 입력을 받으면 통째로 붙여넣어도 그 줄에서 정지한다").
+# 초판이 이것을 함께 넣었다가 `ip_separation_evidence_gate`·`g_skb01_resolution_remeasure`
+# 두 런북의 **정상 정지 장치**를 위반으로 잡았다(2026-09-22 실측) — 헌법이 처방한 형태를
+# 가드가 거부하면 사람은 가드를 끈다. 여기에 어휘를 더할 때는 "한 줄인가, 루프인가"를 먼저
+# 판정할 것.
+_INTERACTIVE = re.compile(r"\breview_session\b", re.IGNORECASE)
 _LENGTH_CHECK = re.compile(r"\.Length\b|\bLength\b", re.IGNORECASE)
 
 _VARIABLE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*|\$\(")
@@ -508,6 +521,38 @@ def secure_string_unverified(block: Block) -> bool:
     return not any(_LENGTH_CHECK.search(line) for line in block.lines)
 
 
+def interactive_not_alone(block: Block) -> int | None:
+    """대화형 명령이 **다른 명령과 같은 블록**에 있으면 그 행 번호를 돌려준다.
+
+    막는 것 — 붙여넣기 잔여분이 프롬프트에 먹히는 경로
+    -------------------------------------------------
+    대화형 명령이 실행되는 순간 터미널의 붙여넣기 버퍼에 아직 줄이 남아 있으면, 그 줄들은
+    셸이 아니라 **실행 중인 프로세스의 stdin**으로 들어간다. 2026-09-22 실측(게이트
+    `G-eos-first-run-canary-review`): 환경 설정 7줄 + 가드 1줄 뒤에 `review_session`을 둔
+    블록을 붙여넣자 잔여 빈 줄들이 판정 프롬프트에 먹혀 「a/e/r/s/q 중 하나여야 합니다」가
+    10회 연속 출력됐다. 무효 입력이라 판정은 기록되지 않았으나 **첫 항목의 HIT 타이머에 그
+    시간이 포함된다** — 이 검수가 만들어야 할 지표(F-Ⅰ)를 오염시킨다.
+
+    그래서 기준은 "마지막 줄인가"가 아니라 **"혼자인가"**다. 마지막 줄이어도 앞 줄들과 함께
+    붙여넣어지면 버퍼는 그대로 남는다(위 실측이 정확히 그 형태였다). 환경 설정·선행 가드는
+    앞 블록에서 끝내고, 대화형 명령은 그 한 줄만 준다.
+
+    주석 줄은 세지 않는다(`strip_strings_and_comments`가 비운다) — 대화형 블록에도 실행
+    시스템 라벨 주석은 있어야 하기 때문이다.
+    """
+    commands = [
+        (line_no, stripped)
+        for line_no, line in enumerate(block.lines, start=1)
+        if (stripped := strip_strings_and_comments(line).strip())
+    ]
+    if len(commands) <= 1:
+        return None
+    for line_no, stripped in commands:
+        if _INTERACTIVE.search(stripped):
+            return line_no
+    return None
+
+
 def parse_runbook(path: pathlib.Path) -> list[Block]:
     """마크다운에서 ```powershell 펜스를 블록으로 뽑는다."""
     blocks: list[Block] = []
@@ -555,6 +600,19 @@ def audit_block(block: Block) -> list[Violation]:
                 "입력 관측",
                 "`-AsSecureString`은 입력이 별표조차 보이지 않아 붙여넣기 실패가 빈 값으로 "
                 "조용히 통과한다. 같은 블록에서 `.Length`로 검증하라(값은 출력하지 않는다).",
+            )
+        )
+
+    interactive_line = interactive_not_alone(block)
+    if interactive_line is not None:
+        violations.append(
+            Violation(
+                block.location,
+                "대화형",
+                f"{interactive_line}행의 대화형 명령이 다른 명령과 한 블록에 있다 — 블록을 "
+                "통째로 붙여넣으면 **버퍼에 남은 줄이 그 프롬프트의 입력으로 먹힌다**"
+                "(2026-09-22 실측: 무효 입력 10회 + 첫 항목 HIT 타이머 오염). 환경 설정·"
+                "선행 가드는 앞 블록에서 끝내고, 대화형 명령은 **그 한 줄만** 주어라.",
             )
         )
 

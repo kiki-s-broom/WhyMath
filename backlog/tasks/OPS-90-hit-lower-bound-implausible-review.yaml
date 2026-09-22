@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-90-hit-lower-bound-implausible-review
+title: "HIT 하한 무방비 — 6초 중앙값이 '목표 4분 대비 40배 달성'으로 읽힌다(재입력·스킵 세션을 도구가 구분 못 함)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 비현실적으로 짧은 판정의 가시화 — hit_cu_metrics가 measured CU 중 경과가 하한 미만인 건수를 별도로 세고 리포트에 출력한다. 하한은 인자(--min-plausible-seconds)로 주되 기본값을 둔다. 그 건수가 표본의 과반이면 HIT 중앙값 줄 옆에 경고를 붙인다 — 지금은 중앙값 6초가 목표 4분을 40배 초과 달성한 성공으로만 읽힌다.\n② 게이트의 방향 대칭 — --max-median-minutes가 상한만 보므로 0초에 가까울수록 무조건 통과한다. 하한 위반이 다수일 때 게이트를 통과시킬지 말지를 결정해 집행한다(fail-closed 권장·미채택이면 사유를 docstring에 남긴다).\n③ 실패 주입으로 변별력 확인 — 하한 미만 표본을 주입해 RED를 확인하고, 정상 표본 대조군이 GREEN인 것까지 확인한다. 정상 입력에서 초록인 것은 보호의 증거가 아니다.\n④ 하한값의 근거를 적는다 — 임의의 숫자를 박지 않는다. 실측 근거(2026-09-22 회차: 중앙값 6초·P90 41초·총합 4분 6초 / 15건 전건 승인 13 반려 2)를 docstring이나 문서에 남기고, 근거 없이 고른 값이면 그렇게 밝힌다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/hit_cu_metrics.py
+  - "tests/backend/ops/test_hit_cu_metrics*.py"
+session: null
+notes: "출처: 2026-09-22 G-eos-first-run-canary-review 실행. 검수 15건의 HIT 중앙값이 6초로 나왔는데 리포트는 그것을 목표(4분 이하) 대비 성공으로만 출력했다. 실제로는 Kiki가 앞선 창에서 이미 읽고 이번엔 결정만 재입력한 세션이었다(Kiki 확인) — 즉 측정 대상이 다른 숫자였다. 게이트 증적에는 자인으로 적어 막았으나 그것은 사람 규율이고 도구에는 집행 지점이 없다.\n\n현행 실측: anomaly 판정은 구조적 이상(한 세션 복수 slug·복수 종결)만 보고 경과 시간의 하한은 보지 않는다. 검색 범위 = ops/hit_cu_metrics.py 전문 + eos_verification_design_v1.md(하한/최소/floor 어휘 0건) + EOS-54·EOS-78 acceptance. 내가 찾은 방법으로는 이 축의 소유자가 0건이다.\n\n이것은 이 모듈이 이미 채택한 원칙의 미적용 지점이다 — 같은 파일이 \"미측정 != 0\"과 \"성공 지표가 실패를 가리는 구조를 끊는다\"(EOS-62 승인 해상도)를 명시하는데, HIT 축만 상한 게이트뿐이라 0초 방향이 무방비다."
+updated: 2026-09-22

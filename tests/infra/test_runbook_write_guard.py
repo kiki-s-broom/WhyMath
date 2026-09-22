@@ -151,6 +151,33 @@ $Plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServ
 """
 
 
+# 대화형 TUI가 환경 설정과 한 블록에 있다 — 붙여넣기 버퍼의 잔여 줄이 판정 프롬프트의
+# 입력으로 먹힌다(2026-09-22 라이브 실측 · MP-11). 이 축이 없으면 통과하는 형태다.
+_INTERACTIVE_WITH_SETUP = """
+$env:PYTHONPATH = "C:\\repo\\src\\backend"
+$PyExe = "C:\\repo\\.venv\\Scripts\\python.exe"
+$Data = "C:\\out"
+& $PyExe -m whymath_backend.harness.review_session --queue "$Data\\q.jsonl" --reviewer-id kiki
+"""
+
+# 같은 명령이 **혼자** 있으면 정당하다 — 붙여넣기 단위가 한 줄이라 버퍼가 남지 않는다.
+# 이 대조군이 없으면 「대화형 명령 자체를 금지」하는 과잉 수정이 통과한다.
+_INTERACTIVE_ALONE = """
+& $PyExe -m whymath_backend.harness.review_session --queue "$Data\\q.jsonl" --reviewer-id kiki
+"""
+
+# `Read-Host`는 **의도적으로 대화형 축 밖**이다 — 한 줄만 읽고 반환하므로 버퍼를 비우는 것이
+# 아니라 *한 줄을 소비하고 멈추는* 장치이고, CLAUDE.md가 붙여넣기 정지 수단으로 권장한다.
+# 초판이 이것을 축에 넣었다가 실제 런북 2건의 정상 정지 장치를 red로 만들었다(2026-09-22).
+_READ_HOST_WITH_SETUP = """
+$Repo = "C:\\repo"
+cd $Repo
+"CWD=" + (Get-Location).Path
+$Confirm = Read-Host "계속하려면 GO 를 입력하십시오"
+"CONFIRM=$Confirm"
+"""
+
+
 def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = None) -> int:
     """픽스처 런북 1개를 만들어 스캐너를 돌린다 — 판정은 exit code로만 한다."""
     path = tmp_path / f"{name}_runbook.md"
@@ -178,6 +205,7 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("write_outside_guard", _WRITE_OUTSIDE_AN_EXISTING_GUARD),
         ("write_in_else", _WRITE_IN_THE_ELSE_BRANCH),
         ("dangling_else_only", _DANGLING_ELSE_WITHOUT_OTHER_DEFECTS),
+        ("interactive_with_setup", _INTERACTIVE_WITH_SETUP),
     ],
 )
 def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
@@ -193,6 +221,8 @@ def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
         ("path_variable", _PATH_VARIABLE_NOT_A_WRITE),
         ("directory_scaffold", _DIRECTORY_SCAFFOLD),
         ("secure_verified", _SECURE_STRING_VERIFIED),
+        ("interactive_alone", _INTERACTIVE_ALONE),
+        ("read_host_with_setup", _READ_HOST_WITH_SETUP),
     ],
 )
 def test_legitimate_forms_pass(tmp_path: Path, name: str, body: str) -> None:
