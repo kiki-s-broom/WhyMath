@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: LIC-09
+title: "관리자 REST 문항 생성의 provenance 동반 강제 — LIC-03 잔여(REST 축)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① POST /v1/problems 요청 계약에 provenance 3축(generation_type/license/original_source) 좌석 신설 — source_type=자체생성이면 동반 필수, 부재 시 422로 거부(A4 DoD \"provenance 없는 AI 생성물 INSERT 거부\"의 REST 축)"
+  - "② 핸들러가 l1/problem_bank/provenance_gate.require_provenance를 경유하고 같은 트랜잭션에서 content_provenance 행을 남김 — 코퍼스 경로(LIC-03)와 동일 관문"
+  - "③ AST 단일관문 가드 tests/backend/db/test_problem_write_provenance_single_gate.py의 면제 목록에서 api/problems.py를 제거 — 면제 만료 테스트가 이 태스크 done 시 RED로 바뀌어 제거를 강제한다(만료 없는 유예 금지)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/problems.py
+  - "src/backend/whymath_backend/l1/problem_bank/**"
+  - "tests/backend/**"
+session: null
+notes: "LIC-03 판정(docs/standards/provenance_enforcement_layer_decision.md)이 코퍼스 적재 경로만 집행하고 남긴 잔여. 범위 분리 근거: DoD가 겨냥하는 \"AI 생성물\" 생산자는 L3 생성 파이프라인→코퍼스 적재기이고, 관리자 REST POST는 사람 저작 표면이라 요청 계약 변경(새 요청 모델)이 필요하다 — 집행 지점 결정·배선의 범위를 넘으므로 분리한다. 현재 상태 실측: api/problems.py:176-177이 source_type=자체생성 문항을 provenance 없이 session.add 한다(테스트 11건이 이 경로를 쓴다)."
+updated: 2026-09-22

@@ -26,6 +26,7 @@ from whymath_backend.l1.problem_bank.populate import (
     load_problem_bank_records,
     populate_problem_bank,
 )
+from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceMissingError
 
 # 원자 code → concept_id(UUID) 맵의 재료(가짜 concept 테이블 — S2-03 재연결 후 태깅은 원자 행).
 # 크로스워크 primary: HK06→10공수1-02-02-1 · HK09→10공수1-02-04-1 · HK10→10공수1-02-05-1 ·
@@ -742,3 +743,224 @@ def test_real_corpus_parses() -> None:
     mc = next(r for r in records if r.slug == "wm-quad-eq-root-count-mc")
     assert mc.problem.distractor_map is not None
     assert mc.problem.distractor_map[0].misconception_id == "root-loss-by-dividing"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# provenance 관문 배선 (LIC-03) — 판정 정본:
+#   docs/standards/provenance_enforcement_layer_decision.md
+# ──────────────────────────────────────────────────────────────────────────
+def test_populate_writes_content_provenance_row(tmp_path: Path) -> None:
+    """생성물 적재는 같은 트랜잭션에서 `content_provenance` 행을 남긴다.
+
+    이 단언이 없으면 A4 원장은 영원히 빈 채로 "적재 성공"이 보고된다 — 실제로 LIC-03
+    착수 시점의 상태가 그랬다(원장 테이블은 있고 쓰는 코드가 0건).
+    """
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    report = populate_problem_bank(None, problems_path=path, store=_store(engine))
+    compiled = _compiled(engine)
+    assert any("INSERT INTO content_provenance" in c for c in compiled), (
+        "원장 INSERT가 없다 — 문항만 들어가고 provenance가 빠졌다.\n"
+        f"실행된 문장: {[c.splitlines()[0] for c in compiled]}"
+    )
+    assert report.provenance_rows_loaded == 1, (
+        "'작동한 비율'이 0이다 — 적재 200이 원장이 일했다는 증거는 아니다 " f"(report={report})"
+    )
+
+
+def test_populate_provenance_row_carries_generation_axes(tmp_path: Path) -> None:
+    """원장 행에 generation_type·license가 실린다 — 빈 행은 추적 불가라 무의미하다."""
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    populate_problem_bank(None, problems_path=path, store=_store(engine))
+    provenance_stmts = [
+        s
+        for s in engine.executed
+        if "INSERT INTO content_provenance" in str(s.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+    ]
+    assert provenance_stmts, "원장 INSERT 문장을 찾지 못했다"
+    params = provenance_stmts[0].compile(dialect=_pg_dialect()).params  # type: ignore[attr-defined]
+    values = {v for v in params.values() if isinstance(v, str)}
+    assert "FULLY_GENERATED" in values, f"generation_type이 원장에 안 실렸다: {params}"
+    assert "WHYMATH_GENERATED" in values, f"license가 원장에 안 실렸다: {params}"
+
+
+def test_populate_rejects_generated_record_without_generation_type(tmp_path: Path) -> None:
+    """생성물인데 generation_type이 없으면 **적재 전에** 거부 — DoD 'INSERT 거부'.
+
+    거부는 파싱 단계에서 일어나므로 DB 왕복이 0이어야 한다(부분 적재 방지).
+    구 파서는 이 입력을 빈 문자열로 접어 조용히 통과시켰다.
+    """
+    record = _base_record()
+    del record["generation_type"]
+    path = _write(tmp_path, [record])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    with pytest.raises(ProvenanceMissingError) as excinfo:
+        populate_problem_bank(None, problems_path=path, store=_store(engine))
+    assert "wm-test-eq" in str(excinfo.value), "거부 메시지가 문항을 지목하지 않는다"
+    assert not [
+        s for s in engine.executed if "INSERT INTO problem " in str(s.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+    ], "거부됐는데 문항 INSERT가 나갔다 — 파싱이 아니라 적재 도중에 막혔다는 뜻"
+
+
+def test_populate_provenance_is_idempotent_when_row_exists(tmp_path: Path) -> None:
+    """원장 행이 이미 있으면 새로 만들지 않는다 — 재적재가 감사 추적을 부풀리지 않는다.
+
+    대조군(`test_populate_writes_content_provenance_row`)이 짝이다: 둘 다 있어야
+    "항상 쓴다"와 "항상 안 쓴다" 양쪽 과잉 수정이 통과하지 못한다.
+    """
+
+    class _ExistingProvenanceEngine(_FakeEngine):
+        def begin(self) -> _FakeConnection:
+            return _ExistingProvenanceConnection(self)
+
+    class _ExistingProvenanceConnection(_FakeConnection):
+        def execute(self, statement: object, parameters: object = None) -> _FakeResult:
+            compiled = str(statement.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+            if "content_provenance.provenance_id" in compiled and "INSERT" not in compiled:
+                self._engine.executed.append(statement)
+                return _FakeResult(rows=[object()])  # 기존 행 있음
+            return super().execute(statement, parameters)
+
+    path = _write(tmp_path, [_base_record()])
+    engine = _ExistingProvenanceEngine(_ALL_CONCEPTS)
+    report = populate_problem_bank(None, problems_path=path, store=_store(engine))
+    compiled = _compiled(engine)
+    assert not any(
+        "INSERT INTO content_provenance" in c for c in compiled
+    ), "기존 행이 있는데 원장 INSERT가 또 나갔다 — 재적재마다 감사 행이 쌓인다"
+    assert report.provenance_rows_loaded == 0
+
+
+def test_cli_reports_provenance_rows(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """CLI 화면이 원장 건수를 말한다 — "작동한 비율"(CLAUDE.md).
+
+    적재 성공 건수는 provenance가 일했다는 증거가 아니다. 복원 회차를 운영자가 화면만
+    보고 검증할 수 있어야 하므로 CLI stdout이 정본 보고 표면이다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    monkeypatch.setattr(
+        mod,
+        "populate_problem_bank",
+        lambda _s, *, problems_path, store=None: mod.ProblemBankStore.populate(
+            _store(engine), mod.load_problem_bank_records(problems_path)
+        ),
+    )
+    assert mod.main(["--problems", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "content_provenance" in out, f"CLI가 원장을 언급조차 하지 않는다:\n{out}"
+    assert "신규 기록: 1건" in out, f"원장 건수가 화면에 없다:\n{out}"
+
+
+def test_cli_distinguishes_zero_provenance_from_silence(
+    tmp_path: Path, capsys, monkeypatch  # type: ignore[no-untyped-def]
+) -> None:
+    """원장 0건도 *말한다* — 침묵하면 '이미 있어서 0'과 '관문 무작동 0'이 같은 화면이 된다.
+
+    위 테스트의 대조군이다. 둘 다 있어야 "항상 출력"·"항상 침묵" 양쪽 과잉 수정이 막힌다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    path = _write(tmp_path, [_base_record()])
+    monkeypatch.setattr(
+        mod,
+        "populate_problem_bank",
+        lambda _s, *, problems_path, store=None: ProblemBankPopulateReport(
+            problems_loaded=1,
+            problem_concepts_loaded=0,
+            concepts_skipped=0,
+            provenance_rows_loaded=0,
+        ),
+    )
+    assert mod.main(["--problems", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "신규 기록: 0건" in out, f"0건이 화면에서 침묵했다:\n{out}"
+    assert "관문 무작동" in out, f"0건의 두 의미를 구분해 주지 않는다:\n{out}"
+
+
+# ── `--all` 전 코퍼스 적재 (LIC-03 §9 복원 경로) ─────────────────────────
+def test_discover_finds_every_problem_bank_corpus() -> None:
+    """실 저장소에서 문제은행 코퍼스를 전부 찾는다 — 스캔 0건은 이 축의 실패다."""
+    from whymath_backend.l1.problem_bank.populate import discover_problem_corpora
+
+    found = discover_problem_corpora(_ROOT)
+    assert len(found) >= 30, f"코퍼스 스캔이 {len(found)}건뿐 — 글롭이 실제 배치와 어긋났다"
+    assert all(p.name == "problems.jsonl" for p in found), found[:3]
+    # 문제은행만 고른다 — 개념·크로스워크 코퍼스가 섞이면 적재기가 남의 스키마를 읽는다.
+    assert all(p.parent.name.startswith("problem_bank_") for p in found), found[:3]
+
+
+def test_discover_excludes_non_problem_bank_corpora(tmp_path: Path) -> None:
+    """`problem_bank_` 접두 절의 **반례**로 검증한다 — 합성 트리가 필요한 이유.
+
+    실 저장소에는 `data/corpus/<problem_bank_ 아님>/problems.jsonl`이 **0건**이라(2026-09-22
+    실측), 위 테스트만으로는 글롭을 `data/corpus/*/problems.jsonl`로 넓혀도 통과한다
+    (뮤테이션 `glob_wide` 생존으로 발각). 즉 그 절을 한 번도 밟지 않았다. 여기서 반례를
+    만들어 절을 실제로 실행시킨다(CLAUDE.md "픽스처가 그 절을 실제로 밟는가").
+    """
+    from whymath_backend.l1.problem_bank.populate import discover_problem_corpora
+
+    corpus = tmp_path / "data" / "corpus"
+    (corpus / "problem_bank_synthetic_v0").mkdir(parents=True)
+    (corpus / "problem_bank_synthetic_v0" / "problems.jsonl").write_text("", encoding="utf-8")
+    # 반례 — 문제은행이 아닌 코퍼스가 같은 파일명을 쓰는 경우.
+    (corpus / "concept_graph_v9").mkdir(parents=True)
+    (corpus / "concept_graph_v9" / "problems.jsonl").write_text("", encoding="utf-8")
+
+    found = discover_problem_corpora(tmp_path)
+    assert [p.parent.name for p in found] == [
+        "problem_bank_synthetic_v0"
+    ], f"문제은행 아닌 코퍼스가 섞였다: {[str(p) for p in found]}"
+
+
+def test_cli_all_loads_every_corpus_and_totals(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """`--all`은 발견한 코퍼스를 전부 적재하고 합계를 보고한다."""
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    corpora = [tmp_path / f"problem_bank_c{i}" / "problems.jsonl" for i in range(3)]
+    seen: list[Path] = []
+    monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: corpora)
+
+    def _fake(
+        _s: object, *, problems_path: Path, store: object = None
+    ) -> ProblemBankPopulateReport:
+        seen.append(problems_path)
+        return ProblemBankPopulateReport(
+            problems_loaded=5,
+            problem_concepts_loaded=0,
+            concepts_skipped=0,
+            provenance_rows_loaded=5,
+        )
+
+    monkeypatch.setattr(mod, "populate_problem_bank", _fake)
+    assert mod.main(["--all"]) == 0
+    assert seen == corpora, f"적재한 경로가 발견 목록과 다르다: {seen}"
+    out = capsys.readouterr().out
+    assert "전 코퍼스 3개 합계: 문항 15건 · 출처 원장 신규 15건" in out, out
+    # 합계가 코퍼스별 줄을 대신하지 않는다 — 어느 코퍼스가 0이었는지는 개별 줄에만 있다.
+    assert out.count("출처 원장(content_provenance) 신규 기록: 5건") == 3, out
+
+
+def test_cli_all_fails_loudly_on_empty_scan(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """스캔 0건은 exit 2 — "성공적으로 아무것도 안 함"을 통과로 보고하지 않는다.
+
+    위 테스트의 대조군이다. 이것이 없으면 잘못된 디렉터리에서 돌린 복원 회차가
+    조용히 exit 0으로 끝나고, 운영자는 복원됐다고 믿는다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: [])
+    assert mod.main(["--all"]) == 2
+    assert "스캔 0건" in capsys.readouterr().out
+
+
+def test_cli_all_and_problems_are_mutually_exclusive() -> None:
+    """`--all`과 `--problems` 동시 지정은 argparse가 거부한다(의도 모호 금지)."""
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    with pytest.raises(SystemExit) as excinfo:
+        mod.main(["--all", "--problems", "x.jsonl"])
+    assert excinfo.value.code == 2
