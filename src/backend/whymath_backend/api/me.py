@@ -199,6 +199,9 @@ from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
 from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
+from whymath_backend.l4.misconception_review_coaching import (
+    recommend_misconception_review_coaching,
+)
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
@@ -1039,6 +1042,17 @@ class AttemptSubmitResponse(BaseModel):
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
     )
+    misconception_review_coaching: CoachingTrigger | None = Field(
+        default=None,
+        description=(
+            "오개념 복습 코칭(MISC-35) — 누적 활성 오개념 *가설*의 초점이 보류 바닥(0.5)을 넘고 "
+            "정본 카탈로그로 해소될 때만 채워진다. `calibration_coaching`과 나란한 별개 신호이며 "
+            "축이 다르다: 보정은 *확신↔정오답* 어긋남, 이쪽은 *규칙 오적용* 의심이다. **이번 "
+            "회차에 오개념을 실제로 훑은 경우에만** 계산한다 — 훑지 않은 회차의 null은 '의심이 "
+            "없다'가 아니라 '보지 않았다'이며 그 구분은 `evidence.coverage`가 말한다. 가설은 "
+            "확정 라벨이 아니므로 발화는 가정형이고 오개념 본문·신뢰도 수치는 실리지 않는다."
+        ),
+    )
     evidence: AssessmentEvidence | None = Field(
         default=None,
         description=(
@@ -1196,9 +1210,25 @@ async def submit_attempt(
     # 증거를 못 받은 기존 가설을 감쇠시킨다(Persona C: 오개념이 재관측되지 않으면 confidence가
     # *내려가야* 한다). 반대로 훑지 않은 회차(정답·답안 없음·능력 부재)에 부르면 관측하지도
     # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
+    misconception_review_coaching: CoachingTrigger | None = None
     if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
         await apply_candidates(session, user.user_id, misconception_scan_result.candidates)
         await session.commit()
+        # MISC-35 **집행 지점**(정본화≠집행) — 위 `apply_candidates`가 갱신한 *그* 가설 세트를
+        # 다시 읽어 "오개념 복습" 코칭을 결정한다. 모듈을 만든 것만으로는 어떤 학생에게도 닿지
+        # 않는다; 이 줄이 계약을 집행으로 바꾼다.
+        #
+        # 훑은 회차 안에 둔 이유: 밖에 두면 *이번에 관측하지도 않은* 과거 가설로 코칭이 나간다
+        # (정답 회차에 지난 오개념을 꺼내는 형태). 훑은 회차로 좁히면 코칭이 항상 *이번 관측*에
+        # 뿌리를 두며, 이는 오개념 reactive retrieval 원칙과 같은 방향이다. 그래서 이 필드의
+        # null은 두 뜻을 가진다 — 훑었는데 의심이 약함 / 아예 훑지 않음. 그 구분은 응답의
+        # `evidence.coverage`에 이미 적혀 있으므로 여기서 또 만들지 않는다.
+        #
+        # 읽기는 commit *이후*다. `apply_candidates`가 flush한 감쇠·강화 결과를 반영한 세트를
+        # 봐야 "이번 턴 이후의 의심"이 되기 때문이다(commit 전 세트는 갱신 전 값이다).
+        misconception_review_coaching = recommend_misconception_review_coaching(
+            await get_active_hypotheses(session, user.user_id)
+        )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
     # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
@@ -1287,6 +1317,7 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        misconception_review_coaching=misconception_review_coaching,
         evidence=evidence,
         learning_state=learning_state_block,
     )

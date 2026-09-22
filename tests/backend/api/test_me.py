@@ -25,6 +25,8 @@ from whymath_backend.api import me as me_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._crypto import SecretCipher
 from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
+from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
+from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.api.me import (
     ConceptAbilityItem,
     NextProblemResponse,
@@ -1168,6 +1170,120 @@ class TestAttemptMisconceptionScan:
             get_settings.cache_clear()
         assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
         assert off["evidence"]["possible_misconceptions"] == []
+
+
+class TestAttemptMisconceptionReviewCoaching:
+    """MISC-35 — 활성 오개념 가설이 "오개념 복습" 코칭으로 이어지는 **서빙 경로**의 집행 지점.
+
+    여기서 재는 것은 코칭 문면의 품질이 아니라 *배선*이다: 핸들러가 실제로 활성 가설을 읽어
+    L4 결정 함수를 부르고 그 결과를 응답에 싣는가. 결정 로직 자체는
+    `tests/backend/l4/test_misconception_review_coaching.py`가 본다 — 둘을 나누는 이유는
+    **배선이 끊겨도 결정 테스트는 초록이기 때문**이다(위 `TestAttemptMisconceptionScan`
+    docstring과 동일한 분업).
+
+    가설 세트 조회는 `_QueueSession`의 위치 기반 큐로는 안정적으로 채울 수 없어(뒤쪽 질의는
+    빈 결과로 소진된다) `get_active_hypotheses`를 monkeypatch로 고정하고 *분기*만 본다 —
+    `test_coach.py`의 `recommend_prerequisite_coaching` 고정과 같은 방식이다.
+    """
+
+    _STRONG = "distribution-over-power"
+
+    @staticmethod
+    def _patch_hypotheses(monkeypatch: pytest.MonkeyPatch, hypotheses: list[Any]) -> list[int]:
+        """`get_active_hypotheses`를 고정하고 **호출 횟수 카운터**를 돌려준다.
+
+        카운터가 있어야 "응답이 null이다"가 *부르고 나서 보류*인지 *아예 안 불렀다*인지를
+        가를 수 있다. 둘을 구분하지 못하면 분기 위치를 검증할 수 없다.
+        """
+        calls = [0]
+
+        async def _fake(_session: Any, _user_id: Any) -> list[Any]:
+            calls[0] += 1
+            return hypotheses
+
+        monkeypatch.setattr("whymath_backend.api.me.get_active_hypotheses", _fake)
+        return calls
+
+    @staticmethod
+    def _hyp(misconception_id: str, confidence: float) -> MisconceptionHypothesis:
+        return MisconceptionHypothesis(
+            misconception_id=misconception_id,
+            confidence=confidence,
+            turns_since_evidence=0,
+            evidence_count=1,
+        )
+
+    @staticmethod
+    def _post(*, is_correct: bool, answer: str | None, question: str | None) -> dict[str, Any]:
+        session = _QueueSession([], question_text=question)
+        client = _attempts_client(session)
+        payload: dict[str, Any] = {"problem_id": str(uuid.uuid4()), "is_correct": is_correct}
+        if answer is not None:
+            payload["student_answer"] = answer
+        resp = client.post("/v1/me/attempts", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body
+
+    def test_strong_hypothesis_reaches_response(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """훑은 오답 + 강한 가설 → 응답 `misconception_review_coaching`이 채워진다."""
+        calls = self._patch_hypotheses(monkeypatch, [self._hyp(self._STRONG, 0.9)])
+        body = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+        coaching = body["misconception_review_coaching"]
+        assert coaching is not None
+        assert coaching["focus"] == "misconception_review"
+        assert CATALOG_BY_ID[self._STRONG].name_kr in coaching["prompt"]
+        assert calls[0] == 1
+
+    def test_weak_hypothesis_is_held(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """대조군 — 같은 경로를 밟되 가설이 약하면 null. 차이가 신뢰도 하나임을 고정한다."""
+        calls = self._patch_hypotheses(monkeypatch, [self._hyp(self._STRONG, 0.4)])
+        body = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert body["misconception_review_coaching"] is None
+        assert calls[0] == 1  # 불렀으나 보류 — "안 불렀다"와 구분된다.
+
+    def test_correct_answer_does_not_even_read_hypotheses(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """정답 회차(훑지 않음)는 **조회 자체를 하지 않는다** — 가설이 아무리 강해도 null.
+
+        이 단언이 분기 *위치*를 고정한다. 결정을 `if scan is not NOT_RUN` 밖으로 옮기면
+        카운터가 1이 되어 깨진다 — 그 상태는 *이번에 관측하지도 않은* 과거 가설로 코칭이
+        나가는 형태다.
+        """
+        calls = self._patch_hypotheses(monkeypatch, [self._hyp(self._STRONG, 0.99)])
+        body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert body["misconception_review_coaching"] is None
+        assert calls[0] == 0
+
+    def test_empty_hypothesis_set_is_null(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """훑었는데 활성 가설이 없으면 null(정상) — 훑지 않은 null과 coverage로 구분된다."""
+        calls = self._patch_hypotheses(monkeypatch, [])
+        body = self._post(is_correct=False, answer="x²+4", question="(x+2)²을 전개하시오.")
+        assert body["misconception_review_coaching"] is None
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert calls[0] == 1
+
+    def test_is_separate_from_calibration_coaching(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """두 코칭은 나란한 *별개* 신호다 — 한쪽이 채워져도 다른 쪽을 덮어쓰지 않는다."""
+        self._patch_hypotheses(monkeypatch, [self._hyp(self._STRONG, 0.9)])
+        session = _QueueSession([], question_text="(x+2)²을 전개하시오.")
+        client = _attempts_client(session)
+        resp = client.post(
+            "/v1/me/attempts",
+            json={
+                "problem_id": str(uuid.uuid4()),
+                "is_correct": False,
+                "student_answer": "x²+4",
+                "confidence_self_reported": 0.9,  # 틀렸는데 확신↑ → 과신 코칭도 함께.
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["calibration_coaching"]["focus"] == "calibration_overconfident"
+        assert body["misconception_review_coaching"]["focus"] == "misconception_review"
 
 
 class TestAttemptDistractorLink:
