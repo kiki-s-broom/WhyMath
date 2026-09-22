@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - ".claude/hooks/**"
   - "tests/harness/**"
-session: null
+session: claude/compassionate-hypatia-chznsu
 notes: "사고 경위 2회차(2026-09-22 · 이 세션): P3 ID 체계 시험용 태스크를 지우면서 `git checkout -- backlog/events/` 를 실행했다. 그 결과 이 세션의 미커밋 이벤트 약 10건(게이트 5건 add · HARN-134 start/unblock · 시험 태스크 add/cancel)이 소실됐다 — 파일이 HEAD 기준 90줄로 되돌아갔다. 실체(gates.yaml 5건·신규 문서)는 untracked/staged 밖이라 살아남아 피해는 감사 추적 단절에 그쳤다.\n\n1회차는 2026-08-10 OPS-24 로, `_check_exit_code` 뮤테이션을 `git checkout -- <파일>` 로 원복하다 미커밋 구현분 +59/-6 을 통째로 잃었다. CLAUDE.md 는 그때 산문 규칙(\"미커밋 작업분이 있는 트리에서 git checkout --·git restore·git stash 로 뮤테이션 원복 금지\")을 등재했고, 이번 세션은 **그 규칙을 알고 있었음에도 뮤테이션이 아닌 맥락(임시 파일 정리)에서 같은 명령을 썼다.** 즉 규칙의 문면이 '뮤테이션 원복'으로 좁아 일반 정리 작업에는 적용되지 않는 것처럼 읽혔다 — 산문의 한계이며, 그래서 2회차 대책은 코드여야 한다(CLAUDE.md 실수 관리 · 2026-09-20 이후 새 산문 규칙 등재는 동결).\n\n무증상성이 핵심이다: 명령은 exit 0 이고 `git status` 에서 파일이 조용히 사라질 뿐이라, 되돌린 규모를 따로 확인하지 않으면 발견되지 않는다. 이번에는 직후 `git status`·`wc -l` 대조를 했기 때문에 발견했다."
 updated: 2026-09-22
