@@ -1180,27 +1180,28 @@ class TestAttemptMisconceptionReviewCoaching:
     **배선이 끊겨도 결정 테스트는 초록이기 때문**이다(위 `TestAttemptMisconceptionScan`
     docstring과 동일한 분업).
 
-    가설 세트 조회는 `_QueueSession`의 위치 기반 큐로는 안정적으로 채울 수 없어(뒤쪽 질의는
-    빈 결과로 소진된다) `get_active_hypotheses`를 monkeypatch로 고정하고 *분기*만 본다 —
-    `test_coach.py`의 `recommend_prerequisite_coaching` 고정과 같은 방식이다.
+    가설 세트는 `_QueueSession`의 위치 기반 큐로는 안정적으로 채울 수 없어(뒤쪽 질의는 빈
+    결과로 소진된다) 가설 세트를 **반환하는** `apply_candidates`를 monkeypatch로 고정하고
+    *분기*만 본다 — `test_coach.py`의 `recommend_prerequisite_coaching` 고정과 같은 방식이다.
+    영속 자체는 `tests/backend/l4/misconception/`이 본다.
     """
 
     _STRONG = "distribution-over-power"
 
     @staticmethod
     def _patch_hypotheses(monkeypatch: pytest.MonkeyPatch, hypotheses: list[Any]) -> list[int]:
-        """`get_active_hypotheses`를 고정하고 **호출 횟수 카운터**를 돌려준다.
+        """가설 세트를 내는 `apply_candidates`를 고정하고 **호출 횟수 카운터**를 돌려준다.
 
         카운터가 있어야 "응답이 null이다"가 *부르고 나서 보류*인지 *아예 안 불렀다*인지를
         가를 수 있다. 둘을 구분하지 못하면 분기 위치를 검증할 수 없다.
         """
         calls = [0]
 
-        async def _fake(_session: Any, _user_id: Any) -> list[Any]:
+        async def _fake(_session: Any, _user_id: Any, _candidates: Any, **_kw: Any) -> list[Any]:
             calls[0] += 1
             return hypotheses
 
-        monkeypatch.setattr("whymath_backend.api.me.get_active_hypotheses", _fake)
+        monkeypatch.setattr("whymath_backend.api.me.apply_candidates", _fake)
         return calls
 
     @staticmethod

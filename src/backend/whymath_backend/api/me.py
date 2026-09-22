@@ -1212,23 +1212,26 @@ async def submit_attempt(
     # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
     misconception_review_coaching: CoachingTrigger | None = None
     if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
-        await apply_candidates(session, user.user_id, misconception_scan_result.candidates)
+        active_hypotheses = await apply_candidates(
+            session, user.user_id, misconception_scan_result.candidates
+        )
         await session.commit()
-        # MISC-35 **집행 지점**(정본화≠집행) — 위 `apply_candidates`가 갱신한 *그* 가설 세트를
-        # 다시 읽어 "오개념 복습" 코칭을 결정한다. 모듈을 만든 것만으로는 어떤 학생에게도 닿지
+        # MISC-35 **집행 지점**(정본화≠집행) — 바로 위 `apply_candidates`가 **반환한** 갱신
+        # 세트(감쇠·강화·가지치기가 끝나고 confidence 내림차순으로 정렬된 이번 턴의 활성
+        # 가설)로 "오개념 복습" 코칭을 결정한다. 모듈을 만든 것만으로는 어떤 학생에게도 닿지
         # 않는다; 이 줄이 계약을 집행으로 바꾼다.
+        #
+        # 반환값을 쓰고 `get_active_hypotheses`로 다시 읽지 않는 이유: 같은 내용을 얻으려고
+        # DB를 한 번 더 왕복할 이유가 없고(그 조회가 바로 `apply_matches` 1단계다), 조회를
+        # 하나 더 끼우면 위치 기반으로 결과를 큐잉하는 테스트 대역들의 순서를 밀어 *이 변경과
+        # 무관한* 실패를 만든다(실측: 그 형태로 프라이버시 경계 테스트 1건이 깨졌다).
         #
         # 훑은 회차 안에 둔 이유: 밖에 두면 *이번에 관측하지도 않은* 과거 가설로 코칭이 나간다
         # (정답 회차에 지난 오개념을 꺼내는 형태). 훑은 회차로 좁히면 코칭이 항상 *이번 관측*에
         # 뿌리를 두며, 이는 오개념 reactive retrieval 원칙과 같은 방향이다. 그래서 이 필드의
         # null은 두 뜻을 가진다 — 훑었는데 의심이 약함 / 아예 훑지 않음. 그 구분은 응답의
         # `evidence.coverage`에 이미 적혀 있으므로 여기서 또 만들지 않는다.
-        #
-        # 읽기는 commit *이후*다. `apply_candidates`가 flush한 감쇠·강화 결과를 반영한 세트를
-        # 봐야 "이번 턴 이후의 의심"이 되기 때문이다(commit 전 세트는 갱신 전 값이다).
-        misconception_review_coaching = recommend_misconception_review_coaching(
-            await get_active_hypotheses(session, user.user_id)
-        )
+        misconception_review_coaching = recommend_misconception_review_coaching(active_hypotheses)
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
     # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
