@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-07-solution-qa-machine-verification
+title: "P3-07 — Solution QA: 정답·풀이 기계 검증, Solution QA Pass 99%+ CLI"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 정답·풀이의 수학적 정확성을 **SymPy 단일 권위 경로**로 기계 검증한다. LLM 생성 콘텐츠는 검증 전까지 Draft 다.\n② Solution QA Pass 를 CLI 로 산출한다(≥99% — 실측 기준선 확인 후 Kiki 확정).\n③ 변별력 — 문제-정답-풀이 불일치를 주입해 RED 를 확인한다.\n④ 기존 KPI 와의 관계를 먼저 판정해 적는다 — 저장소 '수학적 오류율 ≤0.5%'(= 99.5% 통과)가 이 축보다 **더 엄격**하므로, 새 지표를 얹기 전에 흡수할지 병존할지 결정한다(EOS-128 2회차 §12-2 ④ 는 '기존 흡수'를 권고했고 Kiki 가 수용했다).\n⑤ 완료 판정 — Solution QA Pass 가 CLI 로 산출되고 불일치 주입이 RED."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [07]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] ARCH-44(todo·pregenerate validator)가 인접하고 EOS-60(done·골든 벤치마크 혼동행렬)이 FN율 측정 근거를 준다. 수학적 오류율 KPI 는 ops/validation_scorecard.py 에 실재한다. 이 회차는 그것들을 대체하는 것이 아니라 **대표 과정 단위의 Solution QA Pass 산출**을 더하는 것이며, ④ 가 이원화 여부를 먼저 판정하게 한다."
+updated: 2026-09-22

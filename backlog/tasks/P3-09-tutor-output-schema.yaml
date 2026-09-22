@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-09-tutor-output-schema
+title: "P3-09 — Tutor 구조화 출력 스키마: 스키마 검증 통과해야만 학생에게 나가고 mastery_update_allowed 는 항상 false"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-08-tutor-context-builder
+requires_gates: []
+acceptance:
+  - "① Tutor 응답을 구조화 스키마로 고정하고, **스키마 검증을 통과해야만 학생에게 나가게** 한다.\n② `mastery_update_allowed` 가 **항상 false 로 강제**되는지 기계로 동결한다 — LLM 은 학습 상태를 직접 결정하지 않는다(Phase 2 동결 계약).\n③ 변별력 — 스키마 위반 응답과 mastery_update_allowed=true 응답을 주입해 각각 차단되는지 확인한다.\n④ 완료 판정 — 검증 미통과 응답이 학생에게 나가지 못하고, mastery_update_allowed 강제가 주입으로 확인됨."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [09]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] 역할 정규식 검색 0건. 코드에는 CoachResponse(api/coach.py:350)가 원 문서 제안 8필드를 전부 덮고 6종을 더 낸다(match_low_quality·no_confident_match·lthc·prerequisite_coaching·answer_form·completion_evidence). hint_level 은 값 범위(Literal[1,2,3,4])까지 일치한다. 따라서 이 회차의 실질은 **스키마 신설이 아니라 게이팅**이다 — '검증 통과해야만 나간다'와 'mastery_update_allowed 항상 false'의 기계 집행. ARCH-59(done·LLM↔상태 권위 경계 AST 가드)가 ② 의 인접 축을 이미 가진다."
+updated: 2026-09-22

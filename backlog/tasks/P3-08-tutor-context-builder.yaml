@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-08-tutor-context-builder
+title: "P3-08 — Tutor Context Builder 확장(9종 context): 누락 시 조용히 진행하지 않는다"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-07-solution-qa-machine-verification
+requires_gates:
+  - G-p3-g2-week2
+acceptance:
+  - "① Tutor 호출마다 9종 context 가 채워지게 한다 — 학생 상태 · 현재 Concept · 현재 Skill · 문제 · 학생 답안 · 풀이 기록 · 추정 Misconception · Mastery · Pedagogy Policy.\n② **누락 시 조용히 진행하지 않는다** — 침묵 실패 금지. 무엇이 비었는지 로그·응답에 드러난다.\n③ 그래프 조회는 depth ≤ 2, max_nodes ≤ 12~20 를 지킨다. 오개념은 preload 하지 않는다(reactive).\n④ 변별력 — context 를 하나씩 비우는 주입에서 '조용한 진행'이 발생하지 않는지 각각 확인한다.\n⑤ 완료 판정 — 9종이 채워지고 누락이 무증상으로 지나가지 않음."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [08]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] 역할 정규식 검색에서 이 축의 태스크는 **0건**이다. 다만 코드에는 CoachRequest(api/coach.py:234)가 9종을 전부 포함하고 polya_state·bkt_mastery·coaching_focus·solution_steps·ocr_confidence·persona 까지 더 받는다 — 즉 이 회차의 실질은 '만들기'가 아니라 **누락 시 침묵 금지의 집행**이다. ARCH-11(blocked·subgraph depth guard)이 ③ 의 폭주 방어를 소유한다."
+updated: 2026-09-22

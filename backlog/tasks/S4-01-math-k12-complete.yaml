@@ -9,8 +9,7 @@ status: todo
 priority: 1
 eos_priority: P2
 owner: claude
-depends_on:
-  - S3-01-pilot-cohort
+depends_on: []
 requires_gates: []
 acceptance:
   - "초·중·고+대학 4축 활성 + traversal 성능 예산 실부하 통과"
@@ -21,5 +20,5 @@ paths:
   - "docs/data/**"
   - "tests/data_pipeline/**"
 session: null
-notes: "대학과정 포함 — 개념 그래프는 학년 무관(Curriculum-as-Overlay). 문제은행 축 연계(2026-07-29, problem_bank_gap_review.md §3): ARCH-18 커버리지 리포트가 저작 우선순위 입력(D4), S4-13 SymPy 불가 영역 경로가 확률·기하 확장 선결(D7) [2026-08-11 과목/학교급 완비 점검 승계] acceptance의 '초·중·고+대학 4축 활성'은 노드 존재만으로 충족 판정될 수 있다 — 대학 축 실측 하한: 원자 1,069(32과목) 존재하나 대학 코드 참조 문항 0/2,638 · 고등→대학 엣지 0 · 대학 내부 481엣지가 같은 과목 479/과목 간 2로 사실상 32개 고립 사슬. K-12 축은 0문 4과목(2수·12경수·12실통·12수과)·초3~4 2.1%. 근거: docs/architecture/subject_content_coverage_gap_review.md §8 · docs/data/problem_bank_coverage_2026-08.md.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "대학과정 포함 — 개념 그래프는 학년 무관(Curriculum-as-Overlay). 문제은행 축 연계(2026-07-29, problem_bank_gap_review.md §3): ARCH-18 커버리지 리포트가 저작 우선순위 입력(D4), S4-13 SymPy 불가 영역 경로가 확률·기하 확장 선결(D7) [2026-08-11 과목/학교급 완비 점검 승계] acceptance의 '초·중·고+대학 4축 활성'은 노드 존재만으로 충족 판정될 수 있다 — 대학 축 실측 하한: 원자 1,069(32과목) 존재하나 대학 코드 참조 문항 0/2,638 · 고등→대학 엣지 0 · 대학 내부 481엣지가 같은 과목 479/과목 간 2로 사실상 32개 고립 사슬. K-12 축은 0문 4과목(2수·12경수·12실통·12수과)·초3~4 2.1%. 근거: docs/architecture/subject_content_coverage_gap_review.md §8 · docs/data/problem_bank_coverage_2026-08.md.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-22] depends_on 제거 1건: 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다."
+updated: 2026-09-22

@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-03-coverage-fill
+title: "P3-03 — Coverage 채우기: 최소 구조(Curriculum→Concept→Skill→Problem) + 핵심 개념 5종 추가 연결, 핵심 Concept Coverage 95%+"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-02-coverage-instruments
+requires_gates:
+  - G-p3-entry-gate2-pass
+acceptance:
+  - "① 대표 과정의 모든 Curriculum 항목이 최소 `Curriculum → Concept → Skill → Problem` 구조를 갖게 채운다.\n② 핵심 개념은 추가로 Prerequisite / Misconception / Solution / Hint / Pedagogy 5종까지 연결한다.\n③ 완료 판정 — **P3-02 CLI 기준** 핵심 Concept Content Coverage ≥ 95%(수치는 P3-02 실측 기준선을 본 뒤 Kiki 확정 — 지시문 주의 5).\n④ 콘텐츠는 코드가 아니라 데이터다 — 개념·문제·풀이·오개념을 소스에 하드코딩하지 않는다.\n⑤ 대표 과정 범위 밖 학년·단원을 '김에 같이' 채우지 않는다(상시 지시문 S-02)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [03]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] CUR-06(todo)은 학교급 경계 연결을 **관측**한다(20/2210 = 0.9%·고→대 0) — 채우기는 아니다. ARCH-17(done·DAG)·EOS-100(done)이 구조를 가지나 대표 과정 단위 충족은 0건. 신규. Hint 저장 좌석은 ARCH-39 가 '선언 정본 ↔ 저장 실측 불일치 유일 엔티티'로 지목했으므로 ②의 Hint 연결은 그 좌석 해소가 선행일 수 있다."
+updated: 2026-09-22

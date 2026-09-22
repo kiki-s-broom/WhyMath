@@ -36,6 +36,13 @@ HARN45_ACCEPTANCE = [
     "진짜 차단에서는 인계가 가능한지 양방향 동결. 한 방향만 검증하면 반대 결함을 못 잡는다",
 ]
 
+#: `HARN-48`과 **같은 뿌리**(`cmd_block`/`cmd_unblock`의 `_release_remote_claim`)를
+#: 다루는 태스크들의 id 접두. 실코퍼스 보정 테스트가 1위로 허용하는 집합이며, 여기
+#: 넣기 전에 정말 같은 뿌리인지 확인한다 — 목록이 길어지는 것 자체가 재보정 신호다.
+#:   · HARN-48  : 원격 홀드 게시 (차단이 머지 지연 창에서 무력화되던 축)
+#:   · HARN-134 : 그 ④의 교차 세션 해제 축 승계 (차단한 세션이 끝나면 아무도 못 걷는다)
+_LINEAGE = ("HARN-48-", "HARN-134-")
+
 HARN48_TITLE = "차단(block)의 원격 게시 — 머지 지연 창에서 차단이 무력화되는 결함 해소"
 HARN48_NOTES = (
     "세션 A가 block → 13분 뒤 세션 B가 원격 claim → B가 구현·머지 완료. "
@@ -129,6 +136,19 @@ class TestSignalCatchesTheRealIncident:
 
         브리틀함은 의도적이다: 코퍼스가 이 검출을 못 하게 될 만큼 바뀌었다면
         그것 자체가 재보정이 필요하다는 신호이고, 조용히 지나가면 안 된다.
+
+        [재보정 2026-09-22] 1위 단언이 `HARN-48` **단수**였다가 `_LINEAGE` 집합으로
+        바뀌었다. 계기는 `HARN-134`(HARN-48 ④의 교차 세션 축 승계)가 등재되자 이
+        테스트가 RED가 된 것이다 — 그리고 그 RED는 **오탐이 아니었다**. 같은 뿌리
+        (`cmd_block`/`cmd_unblock`의 `_release_remote_claim`)를 다루는 태스크가
+        코퍼스에 둘이 되면 둘 다 정답이므로, 그중 하나를 1위로 못 박는 것은
+        과다 명세다. 등재 시점의 `add` 고지는 침묵했다 — pool이 미완 상태만 보므로
+        `done`인 `HARN-48`을 구조적으로 못 본다(그 사각의 처분 = `HARN-134` 축 ⑥).
+
+        약화를 막기 위해 **근거 단언을 함께 추가**했다: 1위는 계보에 속하는 것만으로
+        부족하고 결정적 희소 식별자를 근거로 갖고 있어야 한다. 이름만 비슷한 태스크가
+        1위로 올라오면 여전히 RED다. 계보에 새 id를 넣을 때는 그것이 정말 같은 뿌리인지
+        확인하고 넣는다 — 이 목록이 길어지는 것 자체가 다음 재보정 신호다.
         """
         import pathlib
 
@@ -141,18 +161,25 @@ class TestSignalCatchesTheRealIncident:
             corpus[data["id"]] = similar.task_text(
                 data.get("title") or "", data.get("notes") or "", data.get("acceptance") or []
             )
-        target = next((k for k in corpus if k.startswith("HARN-48-")), None)
-        if target is None:
+        lineage = {k for k in corpus if k.startswith(_LINEAGE)}
+        if not lineage:
             import pytest
 
-            pytest.skip("HARN-48이 백로그에 없다 — 이 회귀의 기준점이 사라졌다")
+            pytest.skip(f"{_LINEAGE} 어느 것도 백로그에 없다 — 이 회귀의 기준점이 사라졌다")
 
         index = similar.SimilarityIndex(corpus)
         pool = {k: v for k, v in corpus.items() if not k.startswith("HARN-45-")}
         found = index.candidates(_text(HARN45_TITLE, HARN45_NOTES, HARN45_ACCEPTANCE), pool)
 
         assert found, f"보정값 floor={similar.SIMILARITY_FLOOR}가 실사고를 놓친다 — 재보정 필요"
-        assert found[0].task_id == target
+        assert found[0].task_id in lineage, (
+            f"1위 {found[0].task_id}가 HARN-48 계보 밖이다 — 신호가 엉뚱한 곳을 가리킨다. "
+            f"계보={sorted(lineage)}"
+        )
+        # 계보 소속만으로는 통과시키지 않는다 — 1위가 *왜* 1위인지까지 건다.
+        assert {"cmd_block", "cmd_unblock", "_release_remote_claim"} & set(
+            found[0].shared_terms
+        ), f"1위의 근거에 결정적 희소어가 없다: {found[0].shared_terms}"
 
 
 class TestSignalStaysQuietOtherwise:

@@ -19,6 +19,7 @@ import hashlib
 from collections.abc import Iterable
 from typing import Final
 
+from whymath_backend.config import CloudSeat
 from whymath_backend.l3.data_export_policy import (
     OFFSHORE_TIERS,
     export_judgment,
@@ -119,12 +120,51 @@ DAILY_LIMIT_KRW: Final[dict[str, int]] = {
 # 토큰 출처만 다르다: est=가정 토큰, actual=실측 토큰). 아래 CLOUD_MIN_COST_KRW도
 # 이 표에서 유도한다(더는 하드코딩 매직넘버 아님).
 # ──────────────────────────────────────────────────────────────────────────
-CLOUD_TOKEN_PRICE_USD_PER_1M: Final[dict[CostTier, tuple[float, float]]] = {
-    # (입력, 출력) USD per 1M tokens — 공개 가격(2026-06-23 확인).
-    CostTier.CLOUD_MID: (3.0, 15.0),  # claude-sonnet-4-6 $3/$15
-    CostTier.CLOUD_HIGH: (5.0, 25.0),  # claude-opus-4-7 $5/$25
+# 키가 **(티어, 좌석)** 인 이유(ARCH-62): 종전 표는 `CostTier`만으로 키가 잡혀 있어
+# "CLOUD_MID = Anthropic Sonnet"이라는 *암묵 가정* 위에 서 있었다. 좌석을 옮기면 그 가정만
+# 깨지고 표는 그대로라, MID를 DeepSeek으로 옮긴 순간 원가가 **24.4배 과대 계상**된다
+# (8.612원 vs 0.354원 — 03c §2.2). 그 값은 `guard_cloud`의 예산 판정 입력이므로 결과는
+# **불필요한 LOCAL 강등**이고, 강등된 응답도 200이라 **무증상**이다(CLAUDE.md 「작동 신호
+# 없는 알고리즘 부착 금지」가 겨냥하는 형태 그대로).
+#
+# 좌석 어휘는 `config.CloudSeat` 하나만 쓴다 — 여기서 새 enum을 세우면 좌석 어휘가 둘이
+# 되고, 그것이 `ARCH-58`이 상환한 사고다.
+CLOUD_TOKEN_PRICE_USD_PER_1M: Final[dict[tuple[CostTier, CloudSeat], tuple[float, float]]] = {
+    # (입력, 출력) USD per 1M tokens.
+    # ── anthropic 좌석 — 공개 가격(2026-06-23 확인) ──
+    (CostTier.CLOUD_MID, "anthropic"): (3.0, 15.0),  # claude-sonnet-4-6 $3/$15
+    (CostTier.CLOUD_HIGH, "anthropic"): (5.0, 25.0),  # claude-opus-4-7 $5/$25
+    # ── openrouter 좌석 — deepseek/deepseek-v4.1-flash @ deepinfra ──
+    # 공급사가 `openrouter_allowed_providers=("deepinfra",)`로 **고정**돼 있으므로 모델의
+    # list price($0.15/$0.60)가 아니라 **그 공급사의 실단가**를 쓴다(공급사마다 다르다 —
+    # baseten이면 $0.30/$1.20으로 약 2배다. config 주석 실측 2026-09-17~18 · 03c §2.2).
+    (CostTier.CLOUD_MID, "openrouter"): (0.20, 0.60),
+    # ── deepseek 공식 API 좌석 — 피크 단가(보수적 상한) ──
+    # 이 좌석만 시간대 이중 단가다(off-peak $0.15/$0.60 · peak $0.30/$1.20 — 플랫폼 Usage
+    # 공지 배너 2026-09-17, 청구서 101req/236,012tok/$0.11로 교차검증). 단일 값을 골라야
+    # 한다면 **상한**이다: 이 표는 `guard_cloud`의 예산 판정에도 쓰이고, 그쪽에서 과소
+    # 계상은 한도 초과를 낳는다(과대 계상이 낳는 불필요한 강등보다 되돌리기 어렵다).
+    (CostTier.CLOUD_MID, "deepseek"): (0.30, 1.20),
+    # ── 의도적 미등재 ──
+    # (CLOUD_HIGH, "openrouter") — 핀 `deepseek/deepseek-v4-pro` 자체가 **미확인**이다
+    #   (config 주석: MID가 v4.1로 정정된 만큼 이 slug도 같은 오류일 수 있다).
+    # (CLOUD_HIGH, "deepseek")   — 같은 이유로 단가 근거 없음.
+    # 근거 없는 조합에 값을 지어 넣지 않는다 — 조회는 `None`(미측정)으로 떨어지고,
+    # 그것이 "0원이었다"와 구별되는 정직한 답이다(CLAUDE.md 「모른다 ≠ 아니다」).
 }
-"""클라우드 티어 토큰 가격(USD/1M, 입력·출력). est·actual 공통 단가 근거."""
+"""클라우드 (티어, 좌석) 토큰 가격(USD/1M, 입력·출력). est·actual 공통 단가 근거."""
+
+SERVING_CLOUD_SEAT: Final[CloudSeat] = "anthropic"
+"""**학생 대면 서빙**의 클라우드 좌석 — 항상 anthropic.
+
+`settings.cloud_provider` 셀렉터를 읽지 *않는* 것이 의도다: 그 셀렉터는 **저작 경로 전용**
+이고(config `cloud_provider` 주석), 학생 대면을 옮기는 것은 코드 변경이 아니라
+`G-arch56-availability-trigger`의 Kiki 판정 사안이다. 여기서 셀렉터를 읽으면 저작 경로의
+좌석 변경이 학생 트래픽의 예산 판정까지 조용히 바꾼다.
+
+저작 경로는 이 상수를 쓰지 않고 `providers.factory.cloud_provider_name()`이 돌려준 좌석을
+`seat=`로 **명시해서** 넘긴다.
+"""
 
 USD_TO_KRW: Final[float] = 1540.0
 """환율(원/USD) — 2026-06-23 기준. 라이브 보정 대상."""
@@ -159,40 +199,82 @@ _EST_ASSUMED_OUTPUT_TOKENS: Final[int] = 358
 # guard_cloud의 "잔여 예산 부족" 판정·est_cost_krw에 쓰인다. 가정 토큰을 튜닝하면
 # 이 dict가 자동 재계산된다(위 튜닝 절차 참조·§H 후속 4).
 # ──────────────────────────────────────────────────────────────────────────
-CLOUD_MIN_COST_KRW: Final[dict[CostTier, float]] = {
-    cost: (_EST_ASSUMED_INPUT_TOKENS * price_in + _EST_ASSUMED_OUTPUT_TOKENS * price_out)
+CLOUD_MIN_COST_KRW: Final[dict[tuple[CostTier, CloudSeat], float]] = {
+    key: (_EST_ASSUMED_INPUT_TOKENS * price_in + _EST_ASSUMED_OUTPUT_TOKENS * price_out)
     / 1_000_000
     * USD_TO_KRW
-    for cost, (price_in, price_out) in CLOUD_TOKEN_PRICE_USD_PER_1M.items()
+    for key, (price_in, price_out) in CLOUD_TOKEN_PRICE_USD_PER_1M.items()
 }
-"""클라우드 티어 1회 호출 추정 비용(원). 가정 토큰 상수 × 실측 단가표 유도(하드코딩 아님)."""
+"""클라우드 (티어, 좌석) 1회 호출 추정 비용(원). 가정 토큰 상수 × 실측 단가표 유도.
+
+좌석 축을 타므로 `(CLOUD_MID, "anthropic")`은 8.612원이지만 `(CLOUD_MID, "openrouter")`는
+**0.354원**이다 — 종전 표가 이 둘을 같은 값으로 접고 있었다(ARCH-62).
+"""
 
 
-def actual_cost_usd(decision: RoutingDecision, usage: Usage) -> float:
+def cloud_token_price(cost: CostTier, seat: CloudSeat | None) -> tuple[float, float] | None:
+    """(티어, 좌석) → (입력단가, 출력단가) USD/1M. **모르면 None**.
+
+    None을 돌려주는 두 경우를 호출부가 같게 다뤄도 되는 이유는 둘 다 "산정 불가"이기
+    때문이다: ⓐ `seat`가 None(어느 좌석이 응답했는지 모름) ⓑ 그 (티어, 좌석) 조합이 표에
+    없음(단가 근거를 확보하지 못함 — 미등재 목록은 표 주석 참조).
+
+    어느 쪽도 **0원으로 접지 않는다**. 접는 순간 "공짜로 돌았다"와 "얼마인지 모른다"가
+    리포트에서 같은 글자가 되고, 비용 합계는 조용히 과소 계상된다.
+    """
+    if seat is None:
+        return None
+    return CLOUD_TOKEN_PRICE_USD_PER_1M.get((cost, seat))
+
+
+def actual_cost_usd(
+    decision: RoutingDecision,
+    usage: Usage,
+    *,
+    seat: CloudSeat | None = SERVING_CLOUD_SEAT,
+) -> float | None:
     """실측 토큰 → 호출 비용(USD) 순수 함수 (S1 게이트 ② 비용 실측).
 
-    - LOCAL(Phaiakes9) → 0.0 (토큰 무관·0원 확정).
-    - CLOUD_* → (입력토큰×입력단가 + 출력토큰×출력단가)/1M.
+    - LOCAL(Phaiakes9) → 0.0 (토큰 무관·0원 확정. 좌석과 무관하다).
+    - CLOUD_* → (입력토큰×입력단가 + 출력토큰×출력단가)/1M — **좌석별 단가**를 쓴다.
     - CLOUD_*인데 토큰이 미상(None)이면 0.0을 돌려주지만, 이는 '0원 확정'이 아니라
       '산정 불가'다 — 호출부(파이프라인)는 usage 토큰이 None이면 cost를 **None으로
       기록**해 미상과 0원을 구분한다(값을 지어내지 않음, CLAUDE.md).
+    - **좌석 또는 단가가 미상이면 `None`** — 0.0과 구별된다(ARCH-62 acceptance ③).
+
+    `seat`의 세 상태가 각각 다른 사실을 말한다:
+      · 생략      — 학생 대면 서빙 좌석(`SERVING_CLOUD_SEAT` = anthropic). 기존 호출부의 뜻.
+      · 명시       — 저작 경로 등 **실제 응답한 좌석**(`cloud_provider_name()` 값).
+      · `None` 명시 — 좌석 미상. 읽을 단가가 없으므로 `None`을 돌려준다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     if cost is CostTier.LOCAL:
         return 0.0
     if usage.input_tokens is None or usage.output_tokens is None:
         return 0.0  # 토큰 미상 — 호출부가 None 기록으로 구분(지어내지 않음)
-    price_in, price_out = CLOUD_TOKEN_PRICE_USD_PER_1M[cost]
+    price = cloud_token_price(cost, seat)
+    if price is None:
+        return None  # 좌석 미상 또는 단가 미등재 — 0원으로 접지 않는다
+    price_in, price_out = price
     return (usage.input_tokens * price_in + usage.output_tokens * price_out) / 1_000_000
 
 
-def actual_cost_krw(decision: RoutingDecision, usage: Usage) -> float:
+def actual_cost_krw(
+    decision: RoutingDecision,
+    usage: Usage,
+    *,
+    seat: CloudSeat | None = SERVING_CLOUD_SEAT,
+) -> float | None:
     """실측 토큰 → 호출 비용(원) 순수 함수 — actual_cost_usd × 환율 (S1 게이트 ②).
 
     추정 `est_cost_krw`(라우터 결정 시점·대표 토큰 가정)와 *명시적으로 분리*된 실측이다.
     LOCAL=0.0. 토큰 미상 시 0.0 — '미상' 표시는 호출부가 usage 토큰 None으로 판단한다.
+    좌석·단가 미상이면 `None`(미측정) — 환율을 곱할 값 자체가 없다.
     """
-    return actual_cost_usd(decision, usage) * USD_TO_KRW
+    usd = actual_cost_usd(decision, usage, seat=seat)
+    if usd is None:
+        return None
+    return usd * USD_TO_KRW
 
 
 CLOUD_LATENCY_MS: Final[dict[CostTier, int]] = {
@@ -283,28 +365,43 @@ def cloud_latency(cost: CostTier) -> int:
     return CLOUD_LATENCY_MS[cost]
 
 
-def cloud_min_cost(desired: CostTier) -> float:
+def cloud_min_cost(desired: CostTier, seat: CloudSeat = SERVING_CLOUD_SEAT) -> float:
     """클라우드 1회 최소 추정 비용(원) — guard_cloud 예산 판정용(§D.4).
 
-    값은 실측 단가표에서 유도된 CLOUD_MIN_COST_KRW를 참조한다(하드코딩 아님).
+    값은 실측 단가표에서 유도된 CLOUD_MIN_COST_KRW를 **좌석별로** 참조한다(ARCH-62).
+    기본 좌석은 학생 대면 서빙 좌석이다 — `guard_cloud`가 재는 것이 학생의 예산이므로.
+
+    단가 근거가 없는 (티어, 좌석) 조합은 **기본 좌석으로 접지 않고 raise**한다.
+    `providers.factory.cloud_model_pins`와 같은 규율이다: 접으면 "새 좌석을 골랐는데 옛
+    좌석 단가로 예산을 판정하는" 침묵 실패가 되고, 그것이 이 태스크가 상환하는 사고다.
+    예산 판정은 값 없이 진행할 수 없으므로 `None`을 돌려줄 자리가 아니다.
     """
-    return CLOUD_MIN_COST_KRW[desired]
+    try:
+        return CLOUD_MIN_COST_KRW[(desired, seat)]
+    except KeyError:
+        raise ValueError(
+            f"단가 미등재 조합: 티어={desired} 좌석={seat!r} — "
+            "CLOUD_TOKEN_PRICE_USD_PER_1M에 근거 있는 단가를 등재하라 "
+            "(근거 없이 값을 지어 넣지 말 것)."
+        ) from None
 
 
-def cloud_cost(req: RoutingRequest, cost: CostTier) -> float:
+def cloud_cost(req: RoutingRequest, cost: CostTier, seat: CloudSeat = SERVING_CLOUD_SEAT) -> float:
     """클라우드 호출 예상 비용(원) — 가정 토큰 × 실측 단가표 유도(03a §E·§H 후속 4).
 
     route() 시점엔 실제 토큰이 미상이라 *가정 토큰*(_EST_ASSUMED_*) 기반 사전 추정을
     쓴다(보수적). 실측 단가표(CLOUD_TOKEN_PRICE_USD_PER_1M)를 근거로 삼아 actual_cost_*와
     같은 단가에서 유도되며, 호출별 실측 비용은 actual_cost_krw로 별도 계산한다(#465).
     """
-    return CLOUD_MIN_COST_KRW[cost]
+    return cloud_min_cost(cost, seat)
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # 구독·예산 가드 (03a §D.4 guard_cloud)
 # ──────────────────────────────────────────────────────────────────────────
-def guard_cloud(req: RoutingRequest, desired: CostTier) -> CostTier:
+def guard_cloud(
+    req: RoutingRequest, desired: CostTier, seat: CloudSeat = SERVING_CLOUD_SEAT
+) -> CostTier:
     """클라우드 승급 전 구독·예산 가드. 미통과 시 LOCAL/하위 티어로 강등 (03a §D.4).
 
     규칙(03a §D.4 의사코드 그대로):
@@ -312,10 +409,14 @@ def guard_cloud(req: RoutingRequest, desired: CostTier) -> CostTier:
       2. 잔여 예산(budget_krw)이 1회 최소 비용 미만 → LOCAL 강등(+신뢰도 경고).
       3. CLOUD_HIGH 희망인데 basic 구독 → CLOUD_MID로 제한(HIGH 불가).
       그 외 → 희망 티어 그대로.
+
+    규칙 2의 임계값이 **좌석별**이다(ARCH-62). 종전에는 좌석과 무관하게 anthropic 단가를
+    써서, 더 싼 좌석에서도 같은 임계로 강등했다 — basic 일 500원 기준 표가 말하는 58회 대
+    실제 1,414회(03c §2.2). 그 강등은 응답 200으로 나가므로 학생도 로그도 눈치채지 못한다.
     """
     if req.student_subscription == "free":
         return CostTier.LOCAL  # 무료는 클라우드 금지
-    if req.budget_krw < cloud_min_cost(desired):
+    if req.budget_krw < cloud_min_cost(desired, seat):
         return CostTier.LOCAL  # 잔여 예산 부족 → 강등(+신뢰도 경고)
     if desired == CostTier.CLOUD_HIGH and req.student_subscription == "basic":
         return CostTier.CLOUD_MID  # basic은 HIGH 불가 → MID로 제한

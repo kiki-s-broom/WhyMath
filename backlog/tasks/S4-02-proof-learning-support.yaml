@@ -9,8 +9,7 @@ status: todo
 priority: 4
 eos_priority: P2
 owner: claude
-depends_on:
-  - S3-01-pilot-cohort
+depends_on: []
 requires_gates: []
 acceptance:
   - "학생 대면 증명 학습(증명 구조 시각화·단계 피드백·다중 증명 방식 비교)을 verify_step unverifiable 경계 안에서 설계·구현 — '네 증명이 맞다'류 허위 확언 금지. 형식증명(Lean/Tier3)은 WH-S 솔버·S5 유지"
@@ -19,5 +18,5 @@ paths:
   - "src/backend/whymath_backend/l4/**"
   - "src/backend/whymath_backend/l3/**"
 session: null
-notes: "core_feature_review_2026-07.md §3.1 — 진짜 공백(학생측 0건). 파일럿(S3-01) 검증 후 착수. 04a R5 unverifiable 경계·CLAUDE.md AI 금기 준수. 선행 설계 확정(2026-07-27): docs/architecture/knowledge_module_gap_review.md §3 D2 — TheoremNode≠ProofNode 분리·theorem.<slug> 사람 관리 ID·Formula 경계 규칙(등식=Formula/명제=Theorem·겹침은 상호 참조 키)·신규 엣지 타입 0(참조 키만)·검증 tier(SymPy 항등식/unverifiable 학생 피드백/Lean S5)·canonical-only 시드. 채점 심화 선행 설계(2026-07-29): docs/architecture/solution_module_gap_review.md §3 D5 — 누락 단계는 모범 SolutionPath 정렬 기반 '후보'만(동치 다양성 때문에 확언 금지)·학생 대면은 소크라테스 질문형·justification 1차 invariant는 S4-09 흡수.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "core_feature_review_2026-07.md §3.1 — 진짜 공백(학생측 0건). 파일럿(S3-01)은 본 태스크의 입력이 아니다 — 실학생 응답을 소비하지 않으므로 12/31 내용 완성 우선 결정에 따라 순서 의존을 해제했다(2026-09-22). 04a R5 unverifiable 경계·CLAUDE.md AI 금기 준수. 선행 설계 확정(2026-07-27): docs/architecture/knowledge_module_gap_review.md §3 D2 — TheoremNode≠ProofNode 분리·theorem.<slug> 사람 관리 ID·Formula 경계 규칙(등식=Formula/명제=Theorem·겹침은 상호 참조 키)·신규 엣지 타입 0(참조 키만)·검증 tier(SymPy 항등식/unverifiable 학생 피드백/Lean S5)·canonical-only 시드. 채점 심화 선행 설계(2026-07-29): docs/architecture/solution_module_gap_review.md §3 D5 — 누락 단계는 모범 SolutionPath 정렬 기반 '후보'만(동치 다양성 때문에 확언 금지)·학생 대면은 소크라테스 질문형·justification 1차 invariant는 S4-09 흡수.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-22] depends_on 제거 1건: 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다.\nnotes 치환 — 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다."
+updated: 2026-09-22

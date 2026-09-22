@@ -302,3 +302,106 @@ class TestMeasurabilityDiscrimination:
             ]
         )
         assert code == 0
+
+
+class TestItemBodyIsRendered:
+    """검수 화면에 **문항 본문**이 오른다 (MP-12).
+
+    착수 시점 `_render_item`은 slug·큐 상태·근거 세 줄만 냈다. 큐 행에는 본문이
+    `candidate_payload`로 이미 들어 있었으므로(`canary_slice`가 코퍼스 레코드를 그 자리에
+    싣는다) 데이터 공백이 아니라 렌더러 공백이었고, 그 상태로 진행된 판정은 F1~F8 중
+    **기계가 못 보는 축**(F2 정답 불일치·F3 논리 비약·F8 힌트 정답 누설)을 사람이 본 적이
+    없는 채로 기록한다. 이 스위트는 렌더 문자열이 아니라 **출력 스트림에 실제로 나타난
+    내용**을 단언한다.
+    """
+
+    def _payload(self) -> dict[str, object]:
+        return {
+            "slug": "cu-a",
+            "question_text": "두 복소수 z1 = 3 + i, z2 = 1 - 2i에 대하여 z1 + z2를 구하시오.",
+            "answer": "4 - i",
+            "answer_explanation": "실수부끼리·허수부끼리 더하면 4 - i 이다.",
+            "achievement_standard_codes": ["[10공수1-02-01]"],
+            "difficulty_overall": 2.2,
+        }
+
+    def test_queue_row_body_reaches_the_screen(self, tmp_path: Path) -> None:
+        path = _write_jsonl(
+            tmp_path / "queue.jsonl",
+            [{"slug": "cu-a", "status": "needs_review", "candidate_payload": self._payload()}],
+        )
+        items, errors = load_review_items(path)
+        assert errors == []
+        _, rendered = _run(tmp_path, items, "a\n")
+        assert "두 복소수 z1 = 3 + i" in rendered
+        assert "4 - i" in rendered
+        assert "실수부끼리" in rendered
+
+    def test_answer_and_explanation_share_one_item_block(self, tmp_path: Path) -> None:
+        """F8(힌트 정답 누설)·F2(정답 불일치)는 두 축의 **대조**로만 성립한다.
+
+        정답과 부가 설명이 서로 다른 화면에 있으면 사람은 대조 자체를 할 수 없다. 항목
+        머리글(`[i/n]`)로 블록을 잘라 같은 블록 안에 둘 다 있는지 본다.
+        """
+        path = _write_jsonl(
+            tmp_path / "queue.jsonl",
+            [
+                {"slug": "cu-a", "candidate_payload": self._payload()},
+                {"slug": "cu-b", "candidate_payload": {"question_text": "다른 문항"}},
+            ],
+        )
+        items, _ = load_review_items(path)
+        _, rendered = _run(tmp_path, items, "a\na\n")
+        first_block = rendered.split("[2/2]")[0]
+        assert "4 - i" in first_block
+        assert "실수부끼리" in first_block
+
+    def test_absent_body_is_announced_not_silent(self, tmp_path: Path) -> None:
+        """본문 없는 행은 **없다고 적는다** - 빈 화면은 '볼 것이 없다'와 구분되지 않는다."""
+        path = _write_jsonl(
+            tmp_path / "queue.jsonl",
+            [{"slug": "cu-x", "status": "generation_failed", "candidate_payload": None}],
+        )
+        items, _ = load_review_items(path)
+        assert items[0].payload is None
+        _, rendered = _run(tmp_path, items, "s\n")
+        assert "문항 본문 없음" in rendered
+        assert "NoneType" in rendered  # 부재 사유가 타입까지 말한다(침묵 실패 금지)
+        assert "보류(s)" in rendered
+
+    def test_corpus_row_is_its_own_body(self, tmp_path: Path) -> None:
+        """코퍼스 모드 - `candidate_payload` 키가 아예 없으면 행 자신이 본문이다."""
+        path = _write_jsonl(tmp_path / "corpus.jsonl", [self._payload()])
+        items, _ = load_review_items(path)
+        _, rendered = _run(tmp_path, items, "a\n")
+        assert "두 복소수 z1 = 3 + i" in rendered
+
+    def test_unrendered_nonempty_keys_are_disclosed(self, tmp_path: Path) -> None:
+        """화이트리스트의 사각을 화이트리스트가 고지한다.
+
+        이 회차 코퍼스에는 힌트 필드가 없지만(실측 2026-09-22) 설계서 §3의 CU 정의는 3단계
+        힌트를 포함한다. 나중에 실리기 시작하면 **미표시 고지 줄에 키 이름이 나타나야** 한다 -
+        그래야 검수자가 '내가 못 본 것이 있다'를 안다. 빈 값은 볼 것이 없으므로 고지하지
+        않는다(대조군).
+        """
+        payload = {**self._payload(), "hints": ["L1 힌트", "L2 힌트"], "tags": []}
+        path = _write_jsonl(
+            tmp_path / "queue.jsonl", [{"slug": "cu-a", "candidate_payload": payload}]
+        )
+        items, _ = load_review_items(path)
+        _, rendered = _run(tmp_path, items, "a\n")
+        disclosure = [line for line in rendered.splitlines() if "미표시" in line]
+        assert len(disclosure) == 1
+        assert "hints" in disclosure[0]
+        assert "tags" not in disclosure[0]
+
+    def test_long_body_is_not_truncated(self, tmp_path: Path) -> None:
+        """자르지 않는다 - 잘린 뒤쪽에 있는 누설·비약이 화면에서 사라진다."""
+        tail = "마지막문장정답은42다"
+        payload = {**self._payload(), "answer_explanation": "가" * 4000 + tail}
+        path = _write_jsonl(
+            tmp_path / "queue.jsonl", [{"slug": "cu-a", "candidate_payload": payload}]
+        )
+        items, _ = load_review_items(path)
+        _, rendered = _run(tmp_path, items, "a\n")
+        assert tail in rendered
