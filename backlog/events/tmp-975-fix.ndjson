@@ -1,0 +1,1 @@
+{"ts": "2026-09-21T13:32:55+00:00", "actor": "tmp-975-fix", "action": "rename", "id": "HARN-128-conflict-marker-commit-guard", "previous_id": "HARN-61-conflict-marker-commit-guard", "reason": "ID 번호 충돌 해소 — main의 HARN-61-p0-swap-exemption-clause와 번호가 겹쳐 validate exit 1. 미머지인 이쪽을 개명(CLAUDE.md ID 중복 배정 금지·HARN-100 절차)", "updated_dependents": []}

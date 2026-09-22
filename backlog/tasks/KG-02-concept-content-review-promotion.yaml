@@ -5,19 +5,20 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: blocked
+status: todo
 priority: 4
 eos_priority: P1
 owner: claude
-depends_on:
-  - ARCH-62-cloud-cost-table-seat-axis
-requires_gates: []
+depends_on: []
+requires_gates:
+  - G-kg02-review-promotion-llm-session
 acceptance:
   - "① 표본 검수 배치: concept_content_v1 437건 + concept_content_university_v1 409건 = 846건을 S2-05 ①~⑥ 판정 축·Wilson min-n 샘플링(superhuman_verification_standard.md 게이트 CLI 관례)으로 검수한다"
   - "② AI 자기승인 금지(knowledge_module_gap_review.md §2-③ 협상 불가) — 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만. 문항 선례(2026-07-10 AI 검수 전환 결정·S4-16 강등전)와 동형, 실 LLM 필요 시 Kiki 머신 동반"
   - "③ PASS 스코프만 review_status를 결정론 각인(사람 인상 입력 경로 0 — PB-03 축② 선례)하고, 승격 후 /concepts/search reviewed_only=true 재측정 N>0으로 KG-01 ③ 관측 축이 실제로 소비됨을 확인한다"
   - "④ 미통과분은 ai_estimated 유지 + 결함 목록 산출(침묵 승격 금지). 변별력: 결함 주입 표본(오류 정의 삽입)이 검수 배치에서 실제 FAIL로 나오는지 실측한다"
   - "⑤ 대학 409의 층위 불일치 해소 — 코퍼스에는 review_status 필드 자체가 없는데 l1/concept_content/projection.py가 K-12·대학 구분 없이 ai_estimated 상수를 각인한다. 승격 판정이 대학 행에도 실제로 적용되는지(또는 명시적으로 제외되는지) 코드 경로에서 확인한다"
+  - "⑥ [2026-09-21 추가] 승격 권위 게이트 집행 — acceptance ②(AI 자기승인 금지)를 산문이 아니라 코드가 검사한다. l1/concept_content/review_gate.py가 승인 행의 서명(reviewed_by가 등재 검수자 allowlist + reviewed_at ISO 8601)을 검사하고, 위반이 1건이라도 있으면 배치 전체를 거부한다(fail-closed·부분 적용 금지). CERTIFIED_MACHINE_REVIEWERS는 강등전(S4-16) 미통과 상태를 반영해 빈 튜플로 동결하며 거버넌스 테스트가 그 공백을 지킨다. 변별력 = 뮤테이션 9종(allowlist 무력화·서명 검사 제거·시각 검사 제거·게이트 전체 무력화·승인 어휘 오타·미인증 기계 판정자 등재·공백 정규화 제거·fail-closed 제거·CLI 거부 제거) 전건 RED. 한계 명시: 이 게이트가 막는 것은 망각과 자기승인이지 위조가 아니다(세션이 reviewed_by에 사람 이름을 적는 것은 로컬 CLI 계층에서 막을 수 없다 — backlog.py done의 PR 증적 검사와 동형 한계)."
 artifacts:
   - "https://github.com/doldori7/WhyMath/pull/841"
 paths:
@@ -27,5 +28,5 @@ paths:
   - "data/corpus/concept_content_university_v1/**"
   - "tests/backend/harness/**"
 session: null
-notes: "정본: docs/architecture/subject_content_coverage_gap_review.md §3 D2(스코프 확대 근거는 §8-③). 검수 축이 세 태스크(S3-26 ③ 축 도입·S2-05 문항 30문·KG-01 관측)에 걸쳐 각자 done인데 사이의 승격 실행이 무주공산. [2026-08-11 회수·스코프 확대] 초판 notes는 'K-12 437 우선 — 대학 409는 review_status 필드 부재라 별도 판단'이었으나, 실측상 projection.py:196이 두 축을 구분 없이 ai_estimated로 각인하므로 reviewed_only=true 소비 경로에서 구분되지 않는다 → 대상을 846으로 확대(신규 태스크 신설이 아니라 기존 acceptance 정밀화).\n\n[차단 2026-08-11] 회수 시 브랜치 최종 상태(c17b7f1d) 승계 — 핵심 전제 2건이 구조적으로 미성립: ①acceptance①의 실 검수는 LLM provider 호출이 필수인데 원격 세션에 backend용 provider 미배선(ANTHROPIC_API_KEY/OPENAI_API_KEY/OLLAMA_* 전부 부재) ②acceptance②가 재사용을 명시한 결함주입 강등전 인프라(agreement_gate*.py)를 S4-16(claude/whymath-ai-content-design-vafylb)이 동일 사유로 점유 중 — 2026-08-11 재확인 결과 S4-16은 여전히 in_progress. 재개 조건: S4-16 완료(범용 강등전 게이트 패턴 확정) 또는 Kiki 머신 실 LLM 세션. 회수 시 스코프를 437→846(대학 409 포함)으로 확대했으므로 재개 시 projection.py 층위 불일치(acceptance⑤)도 함께 판정한다.\n\n[2026-08-23 상태 정정] 2026-08-16 done 표기는 조기 종결. 실제 acceptance 충족 증거 부족(검수 배치 미실행, LLM provider 미배선, S4-16 강등전 인프라 점유 지속). status를 blocked로 되돌림. progress 0%.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/내용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-21] KG-02의 846건 검수 배치는 MID 좌석(2026-09-21 Kiki 좌석 확정으로 DeepSeek V4.1 flash @ OpenRouter)에서 실 LLM을 호출한다. 그런데 `CLOUD_TOKEN_PRICE_USD_PER_1M`이 `CostTier`로만 키가 잡혀 있어, 그 좌석에서 도는 회차의 비용 기록이 24.4배 과대 계상된다(1회 8.612원으로 기록되지만 실제는 0.354원). 그 값은 `guard_cloud`의 예산 판정 입력이기도 하다. 846건은 예산 판정에 유의미한 규모이므로, ARCH-62가 단가표에 좌석 축을 넣어 착지한 뒤에 이 검수 배치를 돌려야 회차 비용 기록이 사실이 된다. 같은 단가표 근거로 MID 컷오버 쪽도 이미 같은 의존을 대장에 집행해 두었다(정본 = docs/architecture/03c_cloud_tier_transition_v2.md). 이 관계를 notes 산문이 아니라 depends_on으로 집행하는 이유는 selector.py가 notes를 읽지 않기 때문이다. 판정 기준: main bcbbcd73 (PR #1255 머지 직후 · ARCH-62 실재를 git cat-file -e로 실측)."
+notes: "정본: docs/architecture/subject_content_coverage_gap_review.md §3 D2(스코프 확대 근거는 §8-③). 검수 축이 세 태스크(S3-26 ③ 축 도입·S2-05 문항 30문·KG-01 관측)에 걸쳐 각자 done인데 사이의 승격 실행이 무주공산. [2026-08-11 회수·스코프 확대] 초판 notes는 'K-12 437 우선 — 대학 409는 review_status 필드 부재라 별도 판단'이었으나, 실측상 projection.py:196이 두 축을 구분 없이 ai_estimated로 각인하므로 reviewed_only=true 소비 경로에서 구분되지 않는다 → 대상을 846으로 확대(신규 태스크 신설이 아니라 기존 acceptance 정밀화).\n\n[차단 2026-08-11] 회수 시 브랜치 최종 상태(c17b7f1d) 승계 — 핵심 전제 2건이 구조적으로 미성립: ①acceptance①의 실 검수는 LLM provider 호출이 필수인데 원격 세션에 backend용 provider 미배선(ANTHROPIC_API_KEY/OPENAI_API_KEY/OLLAMA_* 전부 부재) ②acceptance②가 재사용을 명시한 결함주입 강등전 인프라(agreement_gate*.py)를 S4-16(claude/whymath-ai-content-design-vafylb)이 동일 사유로 점유 중 — 2026-08-11 재확인 결과 S4-16은 여전히 in_progress. 재개 조건: S4-16 완료(범용 강등전 게이트 패턴 확정) 또는 Kiki 머신 실 LLM 세션. 회수 시 스코프를 437→846(대학 409 포함)으로 확대했으므로 재개 시 projection.py 층위 불일치(acceptance⑤)도 함께 판정한다.\n\n[2026-08-23 상태 정정] 2026-08-16 done 표기는 조기 종결. 실제 acceptance 충족 증거 부족(검수 배치 미실행, LLM provider 미배선, S4-16 강등전 인프라 점유 지속). status를 blocked로 되돌림. progress 0%.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/내용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-21] 차단 사유를 대장이 집행하게 — 재개 조건(S4-16 완료 또는 Kiki 머신 실 LLM 세션)이 2026-08-11부터 notes 산문에만 있어 /gates 화면에 보이지 않았고 만료·재확인 지점도 없었다. 2026-09-21 실측으로 전제 2건이 여전히 성립함을 확인(provider 부재·S4-16 자신도 blocked)하고 human 게이트로 등재해 부착한다.\n\n[정정 2026-09-21] [정정 2026-09-21 · 실측 재판정] 41일 전 notes의 전제 2건이 코드 변화로 낡았다. 실측: ①acceptance ⑤가 말한 \"대학 코퍼스에는 review_status 필드 자체가 없다\"는 더 이상 사실이 아니다 — concept_content_v1 437건·concept_content_university_v1 409건 **전건이 review_status 필드를 보유**(값은 모두 ai_estimated)하고, projection.py는 레코드 값을 읽어 upsert하며 부재 시에만 ai_estimated로 폴백한다(각인 상수 고정이 아니다). 즉 층위 불일치는 이미 해소됐고 승격 판정은 대학 행에도 동일하게 적용된다 ②\"승격 실행이 무주공산\"도 낡았다 — harness/concept_content_review_apply.py(승격 CLI)와 projection.mark_review_status(전용 좌석)가 이미 존재하며 K-12·대학 양축을 함께 갱신한다. 실제로 비어 있던 것은 acceptance ②였다: AI 자기승인 금지가 모듈 docstring에만 있고 코드가 검사하지 않아, reviewed_by 누락·\"claude\"·빈 문자열 라벨 3건이 코퍼스와 DB에 전건 승격되는 것을 실측으로 확인했다(코퍼스 3건 갱신·mark_review_status 1콜). review_status==\"reviewed\"는 l1/concept_graph/retrieval.py·l1/atom_graph/retrieval.py가 학생 노출을 거르는 기준이므로 이는 메타데이터 부정확이 아니라 미검증 AI 콘텐츠의 학생 노출 경로다(의사결정 우선순위 #1)."
 updated: 2026-09-21
