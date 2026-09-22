@@ -432,6 +432,12 @@ CATALOG: tuple[Spec, ...] = (
        "제거한다. 권한 없는 사용자는 403이 아니라 빈 메뉴를 받는다(메뉴는 모듈이 아니라 "
        "모듈 목록)",
        "admin_menu", "GET /menu"),
+    _s("WM-S-055", "관리 콘솔 운영 조회(모델·비용·검수 큐·사용자)", "Admin", "Operations", "P1",
+       "ADMIN-05 · 04 §2 원칙2 Admin BFF — Phase A read-only. 가드는 레지스트리 파생"
+       "(require_module_roles)이라 메뉴와 어긋날 수 없고, 데모 계정은 역할과 무관하게 403. "
+       "집계·마스킹은 BFF에서 끝내 원자료를 프런트로 내보내지 않는다",
+       "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
+       "GET /users/{user_id}"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -840,7 +846,7 @@ CATALOG: tuple[Spec, ...] = (
        "device_store_mode 기본 none", "api._device_store", "api._device_metrics"),
     _e("WM-E-807", "앱 조립·합성 루트·설정·app.state 배관", "Platform", "Operations", "P0",
        "composition = 경계의 유일한 배선 지점(EOS-69)", "composition", "config",
-       "api._l3_state", "api._ocr_state", "api._misconception_state",
+       "api._model_status", "api._l3_state", "api._ocr_state", "api._misconception_state",
        "api._growth_evidence_state", "api._segmentation_state",
        # EOS-89: 과목 능력 5종의 app.state 등록 주소·조회(등록 형태의 배관). `_l3_state`와
        # 같은 성격이라 같은 좌석에 귀속한다 — 판정 로직 0, 키·getter만.

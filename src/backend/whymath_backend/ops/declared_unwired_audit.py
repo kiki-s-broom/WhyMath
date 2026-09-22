@@ -1105,7 +1105,6 @@ _MANIFEST: dict[str, dict[str, str]] = {
         ),
         # 라이브 의존 — CI에 키·GPU·실 PG가 없어 원리적으로 못 돈다
         "ops.cost_probe": _LIVE_DEPENDENT,
-        "ops.cost_report": _LIVE_DEPENDENT,
         "ops.live_preflight": _LIVE_DEPENDENT,
         "ops.dialogue_encryption_preflight": _LIVE_DEPENDENT,
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,

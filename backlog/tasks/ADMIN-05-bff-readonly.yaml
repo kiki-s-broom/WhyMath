@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "정본화: /v1/admin/* read 라우터 — require_role(CONTENT_ADMIN) 전 엔드포인트 부착(무인증 401·무권한 403 동결)·demo 토큰 불통(04 §4)·집계/마스킹은 BFF에서(원자료 미노출)·조회 감사 로그"
   - "집행: app.py include_router 배선 + 테스트가 CI에서 실행됨"
   - "쓰기 0 — Phase A는 read-only(쓰기 라우트 부재를 테스트로 동결·쓰기는 ADMIN-07 Phase B)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1272"
 paths:
   - "src/backend/whymath_backend/**"
   - "tests/backend/**"
 session: null
 notes: "04 §2 원칙2·§7 Phase A·§8 ADMIN-BFF 제안의 등재. 미성년 PII 최소화는 BFF 집계·마스킹이 좌석\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-22

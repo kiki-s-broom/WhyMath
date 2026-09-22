@@ -124,6 +124,12 @@ BASELINE: dict[str, frozenset[str]] = {
             # `l6`(DB 접근 불가 — 이 파일 상단 "import 축")에도 둘 수 없어 합성 지점에 산다.
             "api/_next_problem_policy.py",
             "api/_device_store.py",
+            # ADMIN-05 — Admin BFF. 04 §2 원칙2가 "집계·마스킹은 BFF에서(원자료 미노출)"를
+            # 요구하므로 집계 쿼리가 여기 있는 것이 설계다: 사용자 수를 라우터 밖에서 세면
+            # per-user 행이 경계를 넘고, 그것이 정확히 그 원칙이 막는 것이다. 기존 조회
+            # 함수로 대체 불가한 새 접근점(역할·티어·검수상태 group-by)이라 (b) 대신 (a)를
+            # 택했다 — 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
+            "api/admin_bff.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",
