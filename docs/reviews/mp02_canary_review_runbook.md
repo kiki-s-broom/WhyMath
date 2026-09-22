@@ -65,29 +65,67 @@ Phaiakes9 = 평소 쓰시는 **Windows PowerShell**. 작업 디렉터리 `C:\Use
 > 경로만 main과 같은지** 확인합니다 — 무관한 파일이 더러워도 통과하고 실행 입력이 다르면 막는
 > 검사입니다.
 
+이 런북은 **처음부터 워크트리에서 돕니다.** 2026-09-22 실측에서 클론이 다른 세션 브랜치에
+있어 `MP09_FIX_PRESENT False`가 났습니다 — 「브랜치가 맞는지 보고 아니면 워크트리로」가 아니라
+**언제나 워크트리**가 왕복을 없앱니다.
+
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ①
+# Windows PowerShell (= Phaiakes9) · 창 ① — 워크트리 생성 + 코드 출처 검증
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 git fetch origin main
-git diff --quiet origin/main -- src/backend/whymath_backend/harness/ src/backend/whymath_backend/ops/
-"CODE_MATCHES_MAIN=$($LASTEXITCODE -eq 0)"
-$Py = ".\.venv\Scripts\python.exe"
-& $Py -c "import whymath_backend.harness.canary_slice as m; print('CANARY_SLICE_FILE', m.__file__)"
-"IMPORT_EXIT=$LASTEXITCODE"
+if (Test-Path C:\Users\kiki\Desktop\__AI\WhyMath-mp07) { git worktree remove --force C:\Users\kiki\Desktop\__AI\WhyMath-mp07 } else { "기존 워크트리 없음 — 새로 만듭니다" }
+git worktree add --detach C:\Users\kiki\Desktop\__AI\WhyMath-mp07 origin/main
+cd C:\Users\kiki\Desktop\__AI\WhyMath-mp07
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-mp07\src\backend"
+$PyExe = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+$Src = & $PyExe -c "import whymath_backend.harness.canary_slice as m; print(m.__file__)"
+$Mp09 = & $PyExe -c "import whymath_backend.harness.canary_slice as m, inspect; print('queue_duplicate_slug_rows' in inspect.getsource(m))"
+"LOADED_FROM=$Src"
+"CODE_FROM_WORKTREE=$($Src -like '*WhyMath-mp07*')"
+"MP09_FIX_PRESENT=$Mp09"
+"HEAD_MATCHES_REMOTE=$((git rev-parse HEAD) -eq (git rev-parse origin/main))"
 ```
 
-**판정**: `CODE_MATCHES_MAIN=True` · `IMPORT_EXIT=0` · `CANARY_SLICE_FILE` 출력, 셋 다 나와야
-통과입니다. `CANARY_SLICE_FILE` 경로가 `...\WhyMath\src\backend\...`로 시작하는지 눈으로
-확인해 주십시오 — **파일을 검사하는 것만으로는 그 파일이 실제로 임포트됐는지 모르기 때문에**
-임포트 후 `__file__`을 직접 출력합니다.
+**판정**: 네 줄이 전부 `True`여야 §1-b로 갑니다.
 
-**실패 시**:
-- `CODE_MATCHES_MAIN=False` → 다른 세션의 변경이 실행 입력에 섞여 있습니다. 작업 사본을 건드리지
-  않는 별도 워크트리에서 돌리십시오:
-  `git worktree add --detach C:\Users\kiki\Desktop\__AI\wm-mp07 origin/main`
-  (끝나면 `git worktree remove C:\Users\kiki\Desktop\__AI\wm-mp07`)
-- `ModuleNotFoundError` → 의존성 미설치입니다. `& $Py -m pip install -e .\src\backend`를 돌린 뒤
-  이 블록을 다시 실행하십시오(실행기 단독 `pip` 금지 — `python -m pip`로 같은 인터프리터를 강제).
+- `CODE_FROM_WORKTREE` — 원 클론에 편집 설치된 **옛 코드가 임포트되는** 상황을 막습니다. 파일을
+  보는 것만으로는 *그 파일이 실제로 임포트됐는지* 모르므로 `__file__`을 찍습니다. `PYTHONPATH`가
+  편집 설치를 이깁니다(2026-09-22 실측 · `eos02` 회차 선례와 동형).
+- `MP09_FIX_PRESENT` — 중복 slug를 fail-close하지 않는 정정본인지. False면 §2가 반드시 막힙니다.
+- `HEAD_MATCHES_REMOTE` — 경로가 아니라 **버전**을 봅니다. 옛 커밋 워크트리에서도 앞 검사는 True가 납니다.
+
+`ModuleNotFoundError`가 나면 `& $PyExe -m pip install -e C:\Users\kiki\Desktop\__AI\WhyMath\src\backend`
+를 돌린 뒤 이 블록을 다시 실행하십시오(실행기 단독 `pip` 금지 — 같은 인터프리터를 강제).
+
+---
+
+## 1-b. 회차 산출물 찾기 — 창 ①
+
+**경로를 문서에 박지 않습니다.** 회차 출력 위치는 실행자가 그때그때 정하는 값입니다 —
+2026-09-22 실측에서 이 런북이 가리키던 코퍼스 폴더에는 `accepted 0` 회차 3건뿐이었고
+`problems.jsonl`조차 없었으며, 검수 대상 회차는 클론 **밖**(`Desktop\__AI\mp02-out`)에
+있었습니다. 그래서 **대장을 훑어 찾습니다.**
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — 회차 대장 전수 스캔(읽기 전용 · 1~2분)
+cd C:\Users\kiki\Desktop\__AI\WhyMath-mp07
+$Scan = "import json,pathlib; root=pathlib.Path(r'C:\Users\kiki\Desktop\__AI'); dirs=[d for d in root.iterdir() if d.is_dir() and (d.name.startswith('WhyMath') or d.name.startswith('mp02') or d.name.startswith('wm-'))]; rows=[(p.stat().st_mtime,p.parent,json.loads(l)) for d in dirs for p in d.rglob('*.rounds.jsonl') for l in p.read_text(encoding='utf-8').splitlines() if l.strip().startswith('{')]; rows.sort(key=lambda r: r[0]); [print('%s | run_id %s | att %s | acc %s | blocked %s | corpus %s' % (d, r.get('run_id'), r.get('attempted'), r.get('accepted'), r.get('canary_blocked'), (d/'problems.jsonl').exists())) for _, d, r in rows]"
+$Pick = "import json,pathlib; root=pathlib.Path(r'C:\Users\kiki\Desktop\__AI'); dirs=[d for d in root.iterdir() if d.is_dir() and (d.name.startswith('WhyMath') or d.name.startswith('mp02') or d.name.startswith('wm-'))]; c=[(p.stat().st_mtime,p.parent) for d in dirs for p in d.rglob('*.rounds.jsonl') if (p.parent/'problems.jsonl').exists()]; print(max(c)[1] if c else '')"
+& $PyExe -c $Scan
+$Data = (& $PyExe -c $Pick)
+"DATA=$Data"
+"DATA_OK=$(Test-Path ""$Data\problems.jsonl"")"
+```
+
+**판정**: `DATA_OK=True`이고, `DATA`가 위 목록에서 **검수하려는 회차**(`acc`가 0보다 크고
+`corpus True`)의 폴더와 같아야 합니다. 두 번째 명령은 *코퍼스 파일을 가진 회차 중 가장 최근
+것*을 고릅니다 — 방금 돌린 회차를 뜻하지만 **목록과 눈으로 대조해 주십시오.** 다르면 `$Data`에
+그 폴더 경로를 직접 넣고 진행하십시오.
+
+`DATA`가 비어 있으면 코퍼스 파일을 가진 회차가 **한 건도 없다**는 뜻입니다 — 검수할 수용분이
+없으므로 회차를 다시 돌리는 것이 먼저입니다(§3의 판정을 여기서 미리 만난 것입니다).
 
 ---
 
@@ -103,13 +141,18 @@ $Py = ".\.venv\Scripts\python.exe"
 > 자체를 없앱니다 — 바이트가 셸을 통과하지 않습니다.
 
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ①
-cd C:\Users\kiki\Desktop\__AI\WhyMath
+# Windows PowerShell (= Phaiakes9) · 창 ① — §1-b의 $Data·$PyExe를 그대로 씁니다
+cd C:\Users\kiki\Desktop\__AI\WhyMath-mp07
 $env:PYTHONIOENCODING = "utf-8"
-cmd /c ".venv\Scripts\python.exe -m whymath_backend.harness.canary_slice --out data\corpus\problem_bank_mp02_first_run_v0\problems.jsonl --queue-out data\corpus\problem_bank_mp02_first_run_v0\canary_review_queue.jsonl > mp02_canary_slice.json 2> mp02_canary_slice.err"
-"SLICE_EXIT=$LASTEXITCODE"
-Get-Content mp02_canary_slice.json -Encoding UTF8
-Get-Content mp02_canary_slice.err -Encoding UTF8
+$C1 = Test-Path "$Data\problems.jsonl"
+$C2 = Test-Path "$Data\problems.rounds.jsonl"
+$C3 = Test-Path "$Data\problems.genlog.jsonl"
+$C4 = Test-Path "$Data\problems.review.jsonl"
+"CORPUS=$C1  ROUNDS=$C2  GENLOG=$C3  REVIEWQ=$C4"
+$Src = & $PyExe -c "import whymath_backend.harness.canary_slice as m; print(m.__file__)"
+$Mp09 = & $PyExe -c "import whymath_backend.harness.canary_slice as m, inspect; print('queue_duplicate_slug_rows' in inspect.getsource(m))"
+"LOADED_FROM=$Src"
+if ($C1 -and $C2 -and $C3 -and $C4 -and ($Src -like "*WhyMath-mp07*") -and ($Mp09 -match "True")) { cmd /c "$PyExe -m whymath_backend.harness.canary_slice --out $Data\problems.jsonl --queue-out $Data\canary_review_queue.jsonl > mp02_canary_slice.json 2> mp02_canary_slice.err"; "SLICE_EXIT=$LASTEXITCODE"; Get-Content mp02_canary_slice.json -Encoding UTF8; "--- stderr ---"; Get-Content mp02_canary_slice.err -Encoding UTF8 } else { "WRITE_REFUSED=True — CORPUS=$C1 ROUNDS=$C2 GENLOG=$C3 REVIEWQ=$C4 LOADED_FROM=$Src MP09=$Mp09. False인 항목을 회신해 주십시오. 아무것도 쓰지 않았습니다." }
 ```
 
 **판정**: `SLICE_EXIT=0`이고 요약 JSON에 `"written": true`가 있으면 통과입니다.
@@ -225,17 +268,25 @@ if ($S -eq $null) { "판정 불가: §2 요약을 읽지 못했습니다 — §2
 > 뒤의 **완주 판정**은 그것과 다른 숫자(`emitted_distinct_slugs`)로 합니다. 두 숫자가 다른 것이
 > 이 회차의 정상 상태입니다.
 
+**먼저 이 검사 블록**을 돌립니다. PowerShell의 `ConvertFrom-Json`은 쓰지 않습니다(UTF-8을
+로케일 인코딩으로 읽어 깨지는 축 — `MP-08` 실측). Python이 직접 읽습니다.
+
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ① — 대화형입니다. 끝날 때까지 다른 명령을 넣지 마십시오.
-cd C:\Users\kiki\Desktop\__AI\WhyMath
-$Py = ".\.venv\Scripts\python.exe"
-$QueueOut = "data\corpus\problem_bank_mp02_first_run_v0\canary_review_queue.jsonl"
-$Events = "data\corpus\problem_bank_mp02_first_run_v0\canary_review_events.jsonl"
-$Verdicts = "data\corpus\problem_bank_mp02_first_run_v0\canary_review_verdicts.jsonl"
-$S = Get-Content "mp02_canary_slice.json" -Raw -Encoding UTF8 | ConvertFrom-Json
-$QueueLines = if (Test-Path $QueueOut) { (Get-Content $QueueOut | Where-Object { $_.Trim() }).Count } else { -1 }
-"SLICE_WRITTEN=$($S.written)"; "EMITTED=$($S.emitted)"; "DISTINCT=$($S.emitted_distinct_slugs)"; "QUEUE_LINES=$QueueLines"
-if ($S.written -eq $true -and $QueueLines -eq $S.emitted) { & $Py -m whymath_backend.harness.review_session --queue $QueueOut --events $Events --verdicts $Verdicts --reviewer-id kiki; "REVIEW_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — SLICE_WRITTEN=$($S.written) · QUEUE_LINES=$QueueLines vs EMITTED=$($S.emitted). §2를 다시 돌리십시오." }
+# Windows PowerShell (= Phaiakes9) · 창 ① — 검사만 합니다(읽기 전용)
+cd C:\Users\kiki\Desktop\__AI\WhyMath-mp07
+$Chk = & $PyExe -c "import json,pathlib,sys; s=json.loads(pathlib.Path('mp02_canary_slice.json').read_text(encoding='utf-8')); q=pathlib.Path(sys.argv[1])/'canary_review_queue.jsonl'; n=(sum(1 for x in q.open(encoding='utf-8') if x.strip()) if q.exists() else -1); print(('OK' if (s.get('written') is True and n==s.get('emitted')) else 'NO'), 'emitted=%s queue_lines=%s distinct=%s' % (s.get('emitted'), n, s.get('emitted_distinct_slugs')))" $Data
+"CHECK=$Chk"
+```
+
+`CHECK`가 `OK`로 시작하고 `distinct=<숫자>`가 보이면 진행합니다. **그 `distinct` 값이 완주
+분모입니다** — 아래 블록을 붙여넣기 전에 눈으로 적어 두십시오. `NO`면 §2부터 다시 하십시오.
+
+**아래는 대화형 명령 하나뿐인 블록입니다.** 다른 줄과 함께 붙여넣지 마십시오 — 붙여넣기 버퍼에
+남은 줄이 **판정 프롬프트의 입력으로 먹힙니다**(2026-09-22 실측: 무효 입력 10회 + 첫 항목 HIT
+타이머 오염 · `MP-11`).
+
+```powershell
+& $PyExe -m whymath_backend.harness.review_session --queue "$Data\canary_review_queue.jsonl" --events "$Data\canary_review_events.jsonl" --verdicts "$Data\canary_review_verdicts.jsonl" --reviewer-id kiki
 ```
 
 **`WRITE_REFUSED=True`가 나오면** 검수를 시작하지 않은 것입니다(이벤트·판정 파일에 아무것도
@@ -261,14 +312,13 @@ if ($S.written -eq $true -and $QueueLines -eq $S.emitted) { & $Py -m whymath_bac
 ## 5. 증적 확인 — 창 ①
 
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ①
-cd C:\Users\kiki\Desktop\__AI\WhyMath
-$Py = ".\.venv\Scripts\python.exe"
-$Events = "data\corpus\problem_bank_mp02_first_run_v0\canary_review_events.jsonl"
-$Verdicts = "data\corpus\problem_bank_mp02_first_run_v0\canary_review_verdicts.jsonl"
+# Windows PowerShell (= Phaiakes9) · 창 ① — §1-b의 $Data·$PyExe를 그대로 씁니다
+cd C:\Users\kiki\Desktop\__AI\WhyMath-mp07
+$Events = "$Data\canary_review_events.jsonl"
+$Verdicts = "$Data\canary_review_verdicts.jsonl"
 $HaveFiles = (Test-Path $Events) -and (Test-Path $Verdicts)
 "FILES_PRESENT=$HaveFiles"
-if ($HaveFiles) { "EVENT_LINES=$((Get-Content $Events | Where-Object { $_.Trim() }).Count)"; "VERDICT_LINES=$((Get-Content $Verdicts | Where-Object { $_.Trim() }).Count)"; & $Py -m whymath_backend.ops.hit_cu_metrics --events $Events --verdicts $Verdicts; "HIT_EXIT=$LASTEXITCODE" } else { "READ_REFUSED=True — 검수 산출 파일이 없습니다(§4가 거부됐거나 아직 실행되지 않았습니다). §4부터 다시 하십시오." }
+if ($HaveFiles) { "EVENT_LINES=$((Get-Content $Events | Where-Object { $_.Trim() }).Count)"; "VERDICT_LINES=$((Get-Content $Verdicts | Where-Object { $_.Trim() }).Count)"; & $PyExe -m whymath_backend.ops.hit_cu_metrics --events $Events --verdicts $Verdicts; "HIT_EXIT=$LASTEXITCODE" } else { "READ_REFUSED=True — 검수 산출 파일이 없습니다(§4가 거부됐거나 아직 실행되지 않았습니다). §4부터 다시 하십시오." }
 ```
 
 **판정**: `VERDICT_LINES`가 §2의 `emitted_distinct_slugs`와 같으면 100% 검수입니다(30이
