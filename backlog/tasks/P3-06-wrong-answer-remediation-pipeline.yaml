@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-06-wrong-answer-remediation-pipeline
+title: "P3-06 — 오답 → Error Signature → 오개념 후보·confidence → Remediation Strategy 전 구간 산출"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-05-triangle-density
+requires_gates: []
+acceptance:
+  - "① 학생 답안에서 Error Signature 를 추출하고, 그것으로 Misconception Candidate 와 confidence 를 낸 뒤, Remediation Strategy 까지 도달하는 전 구간을 연결한다.\n② 오답을 단순 incorrect 로 처리하지 않는다 — 그러면 EOS 의 가치가 크게 떨어진다(원 문서 Week 2).\n③ 대표 과정 핵심 오개념 **각각에 대해** 위 산출이 실제로 나오는지 확인한다.\n④ 변별력 — 잘못된 오답을 주입했을 때 엉뚱한 오개념이 confidence 높게 나오지 않는지, 신호가 없을 때 조용히 단정하지 않는지(no_confident_match) 주입으로 확인한다.\n⑤ 오개념은 LLM 초기 context 에 preload 하지 않는다(reactive retrieval 만). ID 는 기존 kebab↔M-id 크로스워크를 경유한다.\n⑥ 완료 판정 — 핵심 오개념 각각에 대해 오답 → 후보·confidence → 교정 전략이 산출되고 변별력 주입이 RED."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [06]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] ASM-06(done·오답지↔오개념 역링크)·ASM-09(done·distractor 신호)·MISC-30(done)이 입력측을 가지고, MisconceptionMatch.confidence 는 코드에 실재한다(l4/misconception/models.py:132). 그러나 **교정 전략까지 도달하는 전 구간**은 0건이다. EOS-123(todo)은 정답 회차의 오개념 감쇠 비대칭이라 다른 축이다 — 겹치지 않는다."
+updated: 2026-09-22

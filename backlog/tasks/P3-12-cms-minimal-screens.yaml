@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-12-cms-minimal-screens
+title: "P3-12 — CMS 12종 최소 운영 화면: 개발자 없이 콘텐츠팀이 12종 작업을 하고, 권한 없는 사용자는 수정 못 한다"
+track: math-completion
+stage: S4
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - ADMIN-04-module-registry
+  - ADMIN-06-admin-web-shell
+  - ADMIN-07-review-ui
+  - EOS-50-publish-gate-pipeline
+requires_gates: []
+acceptance:
+  - "① 12종 CMS 작업이 **관리자 화면에서** 가능하게 한다 — Curriculum(조회·수정·버전) · Concept(CRUD·관계) · Skill(Concept 연결) · Problem(문제·정답·난이도) · Solution(풀이) · Misconception(Signature·교정) · Pedagogy(교수전략) · Content(설명/힌트) · QA(검수상태) · Version(변경이력) · Publish(배포) · Rollback(이전 버전 복구).\n② **권한 없는 사용자가 수정하지 못한다** — 주입으로 확인한다.\n③ 예쁘게 만들 필요는 없다 — 운영 가능성 > UI 완성도(원 문서 Week 4).\n④ 완료 판정 — 12종 작업이 관리자 화면에서 가능하고 권한 차단이 주입으로 확인됨."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [12]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측·신규 사유] 세 태스크가 그릇을 나눠 가진다 — 모듈 레지스트리·백오피스 웹 셸·검수 큐 UI(전부 todo·미claim). 이 회차는 그중 하나의 확장이 아니라 **12종 화면의 통합 완성**이라 어느 한쪽에 amend 하면 나머지 둘과의 관계가 대장에서 사라진다. 그래서 신규로 등재하고 셋을 전부 선행으로 건다.\n\n[코드 실측] API 표면은 일부 실재한다 — api/concepts.py·api/problems.py 에 POST·PATCH·DELETE 각 3건이 RequireContentAdmin 게이트와 함께 있고, api/curricula.py 는 읽기 5·쓰기 0, api/solution_paths.py 는 읽기만이다. Skill·Misconception·Pedagogy·Content 전용 라우터는 0건. 결정적으로 /v1/admin/* 라우터가 0건이라 **API 는 있고 CMS 화면은 없다** — 이 회차가 요구하는 것은 API 가 아니라 개발자 없이 쓸 수 있는 화면이다(EOS-128 2회차 대조표 §11-4b)."
+updated: 2026-09-22

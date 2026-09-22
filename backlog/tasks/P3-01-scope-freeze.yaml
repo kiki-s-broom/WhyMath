@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-01-scope-freeze
+title: "P3-01 — 대표 과정 동결(Scope Freeze): 9항 범위 명세를 데이터 파일로 + 로더 스키마 검증"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-128-phase3-plan-backlog-conversion
+  - P3-00-phase2-acceptance-check
+requires_gates:
+  - G-p3-entry-gate2-pass
+acceptance:
+  - "① 현재 DB·시드·교육과정 노드 자산에서 학년/과목/단원별 Concept·Skill·Problem·Misconception 보유량과 연결 상태를 표로 실측한다. **이 표 없이 과정을 추천하지 않는다.**\n② 그 표를 근거로 대표 과정 후보 2~3개를 제안한다. 후보마다 ⓐ현재 연결 밀도 ⓑ4주 안에 95% 도달에 필요한 추가 작업량 ⓒ출시 시장성 근거. **최종 선택은 Kiki가 한다 — 세션이 임의 확정하지 않는다**(AI가 확정하면 이후 모든 Coverage 분모가 흔들린다).\n③ 선택된 과정에 대해 9항을 **데이터 파일(YAML/JSON)**로 명세한다: 과정 1개 / 대상 학년·과목·단원 범위 / Curriculum Node 목록 / Concept 목록(핵심 여부 표시) / Skill 목록 / 핵심 오개념 목록 / 필수 Problem Type 목록 / 문제 수량 목표 / 콘텐츠 completeness 기준.\n④ 이 명세는 P3-02 Coverage 계측의 **분모**다. 이후 변경은 PR + 변경 사유 기록으로만 한다.\n⑤ 스키마 위반(빈 목록·존재하지 않는 Concept ID 참조)에 로더가 실패하게 한다 — **존재하지 않는 ID를 주입해 RED 를 확인**한다.\n⑥ 완료 판정 — 9항 범위 명세가 데이터 파일로 main 에 있음."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [01]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-52(done·앵커 후보 8단원 자산 실사)·EOS-56(done·앵커 세트 1급 등록)이 인접 자산을 이미 가진다. 그러나 ⓐ앵커 세트는 8단원이고 대표 과정은 1개 과정이라 분모가 다르며 ⓑ 9항 명세 데이터 파일과 로더 스키마 검증은 내가 찾은 방법으로는 0건이다. 신규로 등재하되 EOS-52 의 실측 표와 EOS-56 의 성취기준 코드셋을 입력으로 승계한다(새 ID 체계를 만들지 않는다)."
+updated: 2026-09-22

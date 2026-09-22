@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-00-phase2-acceptance-check
+title: "P3-00b — Phase 2 인수 점검: Gate 2 10조건·KPI 5종 main 기준 재실측 + 미충족분을 Phase 3 선행으로 등재"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-128-phase3-plan-backlog-conversion
+  - EOS-21-week-gate-harnesses-never-run-in-ci
+requires_gates:
+  - G-p3-entry-gate2-pass
+acceptance:
+  - "① Phase 2 Gate 2 의 10조건과 KPI 5종을 **main 기준으로 재실측**한다(판정 기준 커밋 해시를 보고 상단에 박는다). 문서 언급이 아니라 실파일·명령 출력·태스크 ID 중 하나가 근거여야 한다.\n② 미충족 항목 각각을 Phase 3 선행 태스크로 등재하고, 선행 관계는 notes 산문이 아니라 --depends full-id 로 건다.\n③ EOS-22 판정문(docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md)이 유일 미충족으로 지목한 '무개입 연속 3루프'의 현재 상태를 재확인하고, 그 축의 소유 태스크를 지목한다.\n④ 완료 판정 — Gate 2 10조건·KPI 5종이 main 기준으로 재실측되고 미충족 항목이 Phase 3 선행 태스크로 등재됨."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [00]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-22(done·Gate 2 최종 판정 FAIL)는 *판정*이고 EOS-21(todo·주간 게이트 하네스 CI 미배선)은 *배선*이다. 이 회차가 요구하는 '10조건·KPI 5종 main 재실측 + 미충족분 선행 등재'는 둘 중 어느 것도 아니다 — 신규. 다만 EOS-21 이 미배선으로 지목한 하네스 3종이 재실측의 입력이므로 실무상 선행이다."
+updated: 2026-09-22
