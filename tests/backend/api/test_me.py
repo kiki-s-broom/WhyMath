@@ -25,8 +25,6 @@ from whymath_backend.api import me as me_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._crypto import SecretCipher
 from whymath_backend.api._subject_capability_state import get_attempt_misconception_detector
-from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
-from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.api.me import (
     ConceptAbilityItem,
     NextProblemResponse,
@@ -66,6 +64,7 @@ from whymath_backend.l2.recommendation_evidence import (
 )
 from whymath_backend.l2.strong_concept_recommendation import StrongConceptRecommendation
 from whymath_backend.l2.weak_concept_recommendation import WeakConceptRecommendation
+from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.schema.activity import LearningSession as LearningSessionSchema
 from whymath_backend.schema.assessment import (

@@ -199,12 +199,12 @@ from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
 from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
-from whymath_backend.l4.misconception_review_coaching import (
-    recommend_misconception_review_coaching,
-)
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
+)
+from whymath_backend.l4.misconception_review_coaching import (
+    recommend_misconception_review_coaching,
 )
 from whymath_backend.l4.prerequisite_coaching import recommend_prerequisite_coaching
 from whymath_backend.l6.blueprint import (

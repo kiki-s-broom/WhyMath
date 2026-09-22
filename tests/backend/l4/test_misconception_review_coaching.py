@@ -70,7 +70,9 @@ class TestConfidenceFloor:
 
     def test_exactly_at_floor_returns_trigger(self) -> None:
         """경계 — `<` 이므로 바닥 *정확히*는 통과한다. `<=`로 바꾸면 이 테스트가 잡는다."""
-        assert recommend_misconception_review_coaching([_hyp(confidence=_MIN_CONFIDENCE)]) is not None
+        assert (
+            recommend_misconception_review_coaching([_hyp(confidence=_MIN_CONFIDENCE)]) is not None
+        )
 
     def test_just_above_floor_returns_trigger(self) -> None:
         assert recommend_misconception_review_coaching([_hyp(confidence=0.51)]) is not None
@@ -98,7 +100,9 @@ class TestCatalogResolution:
 
     def test_known_id_returns_trigger(self) -> None:
         """대조군 — 신뢰도는 그대로 높고 id만 실재로 바꾸면 통과한다(차이가 id 하나임을 고정)."""
-        assert recommend_misconception_review_coaching([_hyp(_REAL_ID, confidence=0.95)]) is not None
+        assert (
+            recommend_misconception_review_coaching([_hyp(_REAL_ID, confidence=0.95)]) is not None
+        )
 
 
 class TestFocusSelection:
@@ -137,9 +141,7 @@ class TestTriggerShape:
         assert label in trig.prompt
 
     def test_other_suspicions_count_appended(self) -> None:
-        trig = recommend_misconception_review_coaching(
-            [_hyp(_REAL_ID, 0.9), _hyp(_REAL_ID_2, 0.8)]
-        )
+        trig = recommend_misconception_review_coaching([_hyp(_REAL_ID, 0.9), _hyp(_REAL_ID_2, 0.8)])
         assert trig is not None
         assert "다른 의심 1개 더 있음" in trig.rationale
 
