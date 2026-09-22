@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: review
 priority: 1
 eos_priority: P1
 owner: claude
