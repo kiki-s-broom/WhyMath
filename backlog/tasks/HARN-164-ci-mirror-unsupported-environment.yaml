@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-164-ci-mirror-unsupported-environment
+title: "CI 미러의 환경 부적합 — 러너 파이썬 < requires-python이면 install 스텝에서 전 잡이 죽고, 미측정이 '실패'로 위장된다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 진단 — 미러가 `pip install -e`에 의존하는 잡에서 러너 파이썬과 `requires-python`이 어긋나면 **첫 스텝에서 죽어 잡 전체가 미실행**이 된다는 것을 재현한다. 실측(2026-09-22 CCR 클라우드 세션): `korean-math-backend requires a different Python: 3.11.15 not in '>=3.12'`로 backend·harness-integrity·declared-unwired-audit·corpus-authoring·data-pipeline 5잡이 전부 install 스텝 exit 1 → 뒤 스텝 전건 \"앞 스텝 실패로 미실행\". 그 세션은 같은 검사들을 **수동으로는 전건 exit 0으로 돌렸다**(시스템에 이미 설치돼 있었다) — 즉 미러의 실패는 검사의 실패가 아니다.\n② 구분 — 결과 JSON과 화면이 **\"검사 실패\"와 \"미러를 돌릴 수 없는 환경\"을 다른 값으로** 말해야 한다. 지금은 둘 다 `exit 1`·`✗ 실패 잡`으로 나와, 환경 때문에 못 돈 것이 회귀처럼 보인다(「인프라가 죽으면 '측정 실패'가 보여야지 '0건 통과/미달'로 위장되면 안 된다」의 반대 방향 — 여기서는 *미측정*이 *실패*로 위장된다). 환경 부적합은 별도 상태(예: `unsupported_environment`)로 내고 사유(요구 파이썬·현재 파이썬)를 남긴다.\n③ 집행 — `backlog.py done`의 미러 프리플라이트가 ②의 환경 부적합 결과를 **경고로 계상하지 않는다**. 현행은 결과 파일이 없거나 실패면 똑같이 warn을 내므로, 클라우드 세션에서는 이 경고가 항상 뜨고 결코 충족될 수 없다 — CLAUDE.md 「상시 실패하는 fail-open 보호를 '보호 있음'으로 신뢰 금지」가 지목하는 상태다(같은 경고가 2회+ 반복 관측되면 그 보호는 상시 무력). 경고 문면도 바꾼다: 실행 가능한 환경에서만 \"미러를 돌려라\"를 권하고, 아니면 무엇이 대체 증거인지(실제 CI run 참조) 말한다.\n④ 변별력 — 뮤테이션 3종 전건 RED: ⒜ 환경 부적합 판정을 지우면(전부 `failed`로 접음) 테스트가 RED ⒝ `done` 프리플라이트가 환경 부적합을 다시 경고로 계상하면 RED ⒞ **대조군** — 진짜 검사 실패(스텝 하나를 깨뜨림)는 두 경우 모두에서 여전히 `failed`로 계상돼야 한다. ⒞가 필수다 — 실패를 전부 \"환경 탓\"으로 접는 과잉 수정도 ⒜⒝만으로는 통과한다."
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "2026-09-22 KG-08 착지(PR #1258) 중 실측. `backlog.py done`이 미러 결과 부재를 warn했고, 지시대로 `ci_mirror.py run`을 돌리자 5잡 전건이 install 스텝에서 죽었다. 원인은 CCR 클라우드 컨테이너의 파이썬이 3.11인데 `korean-math-backend`가 `requires-python = \">=3.12\"`인 것.\n\nHARN-162(셸 불일치)와 다른 축이다 — 그쪽은 스텝이 *돌긴 하는데* 판정이 틀리는 것이고, 이쪽은 **첫 스텝에서 죽어 아무 스텝도 돌지 않는다**. 증상도 반대다: HARN-162는 거짓 실패(없는 회귀를 쫓게 함), 이쪽은 미측정이 실패로 표시되는 것(측정 자체가 불가능한데 회귀처럼 보임).\n\n왜 중요한가: 이 세션은 같은 검사를 전부 수동으로 돌려 exit 0을 확인했고 실제 CI도 19잡 전건 green이었다(run 35797290434). 그런데 미러 결과 JSON에는 5잡 실패가 남는다. 다음 세션이 그 캐시를 보면 이 커밋이 red였다고 읽는다. 그리고 클라우드 세션에서는 이 상태가 **상시**이므로, 경고가 습관화되어 미러 출력 전체가 소음이 된다 — HARN-119가 만들려던 보호가 그 환경에서 무력해진다.\n\n범위: `ci_mirror.py`와 `backlog.py done` 프리플라이트. 컨테이너에 3.12를 까는 것은 해법이 아니다(환경은 세션마다 다르고 우리 통제 밖이다) — 도구가 자기 실행 가능성을 판정해야 한다."
+updated: 2026-09-22
