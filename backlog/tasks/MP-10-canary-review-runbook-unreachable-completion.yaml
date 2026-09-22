@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-10-canary-review-runbook-unreachable-completion
+title: "검수 런북의 완주 판정이 도달 불가능 — 중복 slug가 있으면 emitted 분모가 영원히 안 채워져 완주한 검수가 미완주로 보인다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①결함 고정(실측 2026-09-22) — 검수 런북 `docs/reviews/mp02_canary_review_runbook.md`의 완주 판정이 **도달 불가능**하다. §4는 「승인+수정승인+반려의 합이 §2의 `emitted`와 같으면 완주」, §5는 「`VERDICT_LINES`가 §2의 `emitted`와 같으면 100% 검수」라고 적는데, 중복 slug가 있으면 이 등식은 성립할 수 없다. 코드 2곳 대조: ⓐ `canary_slice.py:618`이 `for row in result.rows`로 카나리 슬롯 **전건**(중복 slug 포함)을 큐 파일에 쓴다 — 큐 행 수 = `emitted` ⓑ `review_session.py:216`이 `slug in seen`이면 `DuplicateSlug(skipped)`로 **건너뛴다**(주석: 「같은 CU가 큐에 두 번 오면 한 번만 검수한다 — 중복 계측은 HIT를 부풀린다」) — 판정 건수 = 고유 slug 수. 2026-09-21 라이브 회차에 중복은 **실재**한다(MEMORY 379행 리콜 열거에서 같은 slug 8회·4회 · PR #1260 실측 큐 중복 11건).\n②영향 — 완주한 검수가 미완주로 보인다. 런북이 그 경우 「`--resume`으로 이어가십시오」를 지시하지만 고유 건은 전부 종결됐으므로 `--resume`은 **아무것도 하지 않는다** — Kiki가 효과 없는 재실행을 반복하고 게이트 `G-eos-first-run-canary-review`는 증적이 다 있는데도 열리지 않는다. 도달 불가능한 정지 조건이라 `EOS-126`(CAT stop rule unreachable)과 같은 부류다. 회차 내 구조 중복은 LLM 저작의 지배적 실패 모드이므로(PR #1260 ③) 이것도 예외가 아니라 상시 상태다.\n③처분 — 분모를 고유 건수로 교체한다: §2 표에 `emitted_distinct_slugs` 행 추가 · §4·§5의 완주 판정을 `emitted` → `emitted_distinct_slugs`로 교체 · §6 회신 문면이 「카나리 N건 중 고유 M건 전건 검수」를 적게 한다. 게이트 문면(「카나리 30건 100% 검수」)과의 차이는 **회신에 숫자로 정직하게** 남긴다 — 분모를 30으로 위장하지 않고, 검수 불가능한 건을 검수한 것으로도 세지 않는다.\n④MP-09 신규 필드 편입 — PR #1260이 요약에 `queue_duplicate_slug_rows`·`queue_duplicate_slugs`를 추가한다. 이 회차에서 비-0이 확실하므로(11건 실측) §2 표가 그것을 설명해야 한다. 설명 없는 비-0 필드는 Kiki께 원인 불명 경고로 읽혀 실행이 멈춘다.\n⑤집행 지점(정본화와 별항) — `tests/infra/test_mp02_runbook_sidecar_paths.py`에 이 축의 가드를 추가한다(MP-06 ③ 선례). 그 파일을 고른 근거는 그 docstring이 명시한다: CI 잡 `infra-contracts`는 `needs: changes` 게이팅이 없어 **docs만 바뀐 PR에서도 반드시 돌고**, 백엔드를 설치하지 않으므로 대조는 AST로 한다. 가드는 금지 문자열 열거가 아니라 **양방향 대조**다 — 런북이 인용하는 완주 판정 필드 ↔ `review_session`이 실제로 dedupe하는 사실.\n⑥변별력(실패 주입) — 세 방향을 각각 확인한다: ⓐ런북 판정 기준을 `emitted`로 되돌리는 뮤테이션 → RED ⓑ`review_session`의 dedupe 절을 제거하는 뮤테이션 → RED(대조군 — dedupe가 없으면 `emitted`가 옳은 분모이므로, 가드가 어느 쪽이 정본인지 알고 있어야 한다. 이 항이 없으면 「런북만 본」 단방향 가드가 통과한다) ⓒ런북에서 해당 절이 사라지면 RED(스캔 0건은 실패).\n⑦한계 명시 — 실제 고유 건수는 Kiki 머신 산출물로만 확정된다. 그러므로 런북에 숫자를 하드코딩하지 않고 §2 요약의 `emitted_distinct_slugs`를 읽게 한다(모른다 ≠ 아니다)."
+artifacts: []
+paths:
+  - docs/reviews/mp02_canary_review_runbook.md
+  - tests/infra/test_mp02_runbook_sidecar_paths.py
+session: claude/wizardly-tesla-2lsb3z
+notes: "검수 런북 축 결함 3회차다(사이드카 경로·인코딩에 이어). 앞 둘은 Kiki 머신 라이브 실행 중에 드러났으나 이번엔 실행 전에 코드 대조로 발견했다 — 그래서 왕복 손실 0이다. 방향은 이 태스크가 앞이고 회차 검수 실행이 뒤다: 이 정정 없이 검수를 안내하면 완주한 검수가 미완주로 보이고 게이트가 증적을 다 갖춘 상태로 닫힌 채 남는다. 회차 태스크 쪽 depends_on 부착은 그 태스크의 claim이 풀린 뒤에 한다(현재 다른 세션 claim)."
+updated: 2026-09-22
