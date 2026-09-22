@@ -26,6 +26,7 @@ from whymath_backend.l1.problem_bank.populate import (
     load_problem_bank_records,
     populate_problem_bank,
 )
+from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceMissingError
 
 # 원자 code → concept_id(UUID) 맵의 재료(가짜 concept 테이블 — S2-03 재연결 후 태깅은 원자 행).
 # 크로스워크 primary: HK06→10공수1-02-02-1 · HK09→10공수1-02-04-1 · HK10→10공수1-02-05-1 ·
@@ -742,3 +743,90 @@ def test_real_corpus_parses() -> None:
     mc = next(r for r in records if r.slug == "wm-quad-eq-root-count-mc")
     assert mc.problem.distractor_map is not None
     assert mc.problem.distractor_map[0].misconception_id == "root-loss-by-dividing"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# provenance 관문 배선 (LIC-03) — 판정 정본:
+#   docs/standards/provenance_enforcement_layer_decision.md
+# ──────────────────────────────────────────────────────────────────────────
+def test_populate_writes_content_provenance_row(tmp_path: Path) -> None:
+    """생성물 적재는 같은 트랜잭션에서 `content_provenance` 행을 남긴다.
+
+    이 단언이 없으면 A4 원장은 영원히 빈 채로 "적재 성공"이 보고된다 — 실제로 LIC-03
+    착수 시점의 상태가 그랬다(원장 테이블은 있고 쓰는 코드가 0건).
+    """
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    report = populate_problem_bank(None, problems_path=path, store=_store(engine))
+    compiled = _compiled(engine)
+    assert any("INSERT INTO content_provenance" in c for c in compiled), (
+        "원장 INSERT가 없다 — 문항만 들어가고 provenance가 빠졌다.\n"
+        f"실행된 문장: {[c.splitlines()[0] for c in compiled]}"
+    )
+    assert report.provenance_rows_loaded == 1, (
+        "'작동한 비율'이 0이다 — 적재 200이 원장이 일했다는 증거는 아니다 " f"(report={report})"
+    )
+
+
+def test_populate_provenance_row_carries_generation_axes(tmp_path: Path) -> None:
+    """원장 행에 generation_type·license가 실린다 — 빈 행은 추적 불가라 무의미하다."""
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    populate_problem_bank(None, problems_path=path, store=_store(engine))
+    provenance_stmts = [
+        s
+        for s in engine.executed
+        if "INSERT INTO content_provenance" in str(s.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+    ]
+    assert provenance_stmts, "원장 INSERT 문장을 찾지 못했다"
+    params = provenance_stmts[0].compile(dialect=_pg_dialect()).params  # type: ignore[attr-defined]
+    values = {v for v in params.values() if isinstance(v, str)}
+    assert "FULLY_GENERATED" in values, f"generation_type이 원장에 안 실렸다: {params}"
+    assert "WHYMATH_GENERATED" in values, f"license가 원장에 안 실렸다: {params}"
+
+
+def test_populate_rejects_generated_record_without_generation_type(tmp_path: Path) -> None:
+    """생성물인데 generation_type이 없으면 **적재 전에** 거부 — DoD 'INSERT 거부'.
+
+    거부는 파싱 단계에서 일어나므로 DB 왕복이 0이어야 한다(부분 적재 방지).
+    구 파서는 이 입력을 빈 문자열로 접어 조용히 통과시켰다.
+    """
+    record = _base_record()
+    del record["generation_type"]
+    path = _write(tmp_path, [record])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    with pytest.raises(ProvenanceMissingError) as excinfo:
+        populate_problem_bank(None, problems_path=path, store=_store(engine))
+    assert "wm-test-eq" in str(excinfo.value), "거부 메시지가 문항을 지목하지 않는다"
+    assert not [
+        s for s in engine.executed if "INSERT INTO problem " in str(s.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+    ], "거부됐는데 문항 INSERT가 나갔다 — 파싱이 아니라 적재 도중에 막혔다는 뜻"
+
+
+def test_populate_provenance_is_idempotent_when_row_exists(tmp_path: Path) -> None:
+    """원장 행이 이미 있으면 새로 만들지 않는다 — 재적재가 감사 추적을 부풀리지 않는다.
+
+    대조군(`test_populate_writes_content_provenance_row`)이 짝이다: 둘 다 있어야
+    "항상 쓴다"와 "항상 안 쓴다" 양쪽 과잉 수정이 통과하지 못한다.
+    """
+
+    class _ExistingProvenanceEngine(_FakeEngine):
+        def begin(self) -> _FakeConnection:
+            return _ExistingProvenanceConnection(self)
+
+    class _ExistingProvenanceConnection(_FakeConnection):
+        def execute(self, statement: object, parameters: object = None) -> _FakeResult:
+            compiled = str(statement.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+            if "content_provenance.provenance_id" in compiled and "INSERT" not in compiled:
+                self._engine.executed.append(statement)
+                return _FakeResult(rows=[object()])  # 기존 행 있음
+            return super().execute(statement, parameters)
+
+    path = _write(tmp_path, [_base_record()])
+    engine = _ExistingProvenanceEngine(_ALL_CONCEPTS)
+    report = populate_problem_bank(None, problems_path=path, store=_store(engine))
+    compiled = _compiled(engine)
+    assert not any(
+        "INSERT INTO content_provenance" in c for c in compiled
+    ), "기존 행이 있는데 원장 INSERT가 또 나갔다 — 재적재마다 감사 행이 쌓인다"
+    assert report.provenance_rows_loaded == 0

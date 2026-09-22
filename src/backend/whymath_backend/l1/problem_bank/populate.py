@@ -107,6 +107,10 @@ from whymath_backend.l1.concept_atom_crosswalk.transfer import (
 
 # 슬3 sync 엔진 빌더 재사용(신규 seam 0) — standards/atom_graph와 동일 좌석. (intra-L1 import)
 from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
+from whymath_backend.l1.problem_bank.provenance_gate import (
+    ProvenanceInput,
+    require_provenance,
+)
 from whymath_backend.schema.enums import ConceptRole, LicenseType, RelationType, SourceType
 from whymath_backend.schema.problem import Problem
 
@@ -207,6 +211,19 @@ class ProblemProvenanceMeta:
     original_source: str | None = None
 
 
+def _gate_input(meta: ProblemProvenanceMeta) -> ProvenanceInput:
+    """코퍼스 저작 메타 → provenance 관문 입력(계층 경계 어댑터 — LIC-03).
+
+    두 타입을 합치지 않는 이유는 관문 모듈 docstring 참조(관문이 코퍼스 포맷에 묶이면
+    다른 쓰기 경로가 그 관문을 쓸 수 없다).
+    """
+    return ProvenanceInput(
+        generation_type=meta.generation_type,
+        license=meta.license,
+        original_source=meta.original_source,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ProblemBankRecord:
     """코퍼스 1레코드 = 검증된 Problem + 저작 메타(개념 태깅·verify·provenance·계보).
@@ -242,6 +259,13 @@ class ProblemBankPopulateReport:
     problem_concepts_reconciled: int = 0
     problem_relations_loaded: int = 0
     problem_relations_skipped: int = 0
+    provenance_rows_loaded: int = 0
+    """LIC-03 — 이번 회차에 새로 남긴 `content_provenance` 행 수.
+
+    **왜 리포트에 싣는가**("작동한 비율" 원칙 — CLAUDE.md): 적재 성공(문항 N행)은 원장이
+    일했다는 증거가 아니다. 멱등이라 재적재에서는 0이 정상이며, *첫* 적재에서 0이면
+    관문이 무작동이라는 뜻이다. 말미 기본값 필드라 기존 위치 인자 호출부는 무영향.
+    """
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -331,6 +355,16 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
         generation_type=str(generation_type) if generation_type is not None else "",
         license=str(license_value),
         original_source=str(original_source) if original_source is not None else None,
+    )
+    # ── ④-b provenance 관문(LIC-03) — 생성물인데 원장 재료가 없으면 여기서 거부한다.
+    #    적재 루프가 아니라 *파싱*에서 막는 이유: 거부를 DB 왕복 앞으로 당겨야 부분 적재
+    #    (일부 행만 들어간 트랜잭션)가 생기지 않는다. 반환값은 버린다 — 이 시점엔 아직
+    #    problem_id가 없어 원장 행을 조립할 수 없고, 여기서 필요한 것은 *판정*뿐이다.
+    #    행 조립은 upsert가 RETURNING으로 식별자를 준 뒤 같은 관문을 다시 부른다.
+    require_provenance(
+        slug=slug,
+        source_type_value=source_value,
+        provenance=_gate_input(provenance_meta),
     )
     return ProblemBankRecord(
         slug=slug,
@@ -580,6 +614,9 @@ class ProblemBankStore:
         from whymath_backend.db.models.problem import (
             ProblemRelation as ProblemRelationORM,
         )
+        from whymath_backend.db.models.provenance import (
+            ContentProvenance as ContentProvenanceORM,
+        )
 
         # ① slug 기준 dedup(마지막 우선) — 단일 배치 ON CONFLICT 중복행 오류 방지.
         by_slug: dict[str, ProblemBankRecord] = {r.slug: r for r in records}
@@ -592,7 +629,10 @@ class ProblemBankStore:
         problem_cols = {col.key for col in sa.inspect(ProblemORM).mapper.column_attrs}
         problem_update_keys = problem_cols - {"problem_id", "slug", "created_at"}
 
+        provenance_cols = {col.key for col in sa.inspect(ContentProvenanceORM).mapper.column_attrs}
+
         problems_loaded = 0
+        provenance_rows_loaded = 0
         problem_concepts_loaded = 0
         reconciled = 0
         relations_loaded = 0
@@ -613,6 +653,37 @@ class ProblemBankStore:
                 problem_id = conn.execute(problem_stmt).scalar_one()
                 problems_loaded += 1
                 slug_to_problem_id[record.slug] = problem_id
+
+                # ③-b provenance 원장 동반(LIC-03) — 생성물이면 같은 트랜잭션에서
+                #     `content_provenance` 행을 남긴다. 문항 행만 들어가고 원장이 빠지는
+                #     상태가 곧 A4 DoD 위반이므로 두 쓰기는 원자적이어야 한다.
+                #     **멱등**: 재적재는 행을 늘리지 않는다 — 원장은 감사 추적이라
+                #     같은 문항에 같은 출처 행이 회차마다 쌓이면 "몇 번 만들었나"가 아니라
+                #     "몇 번 적재했나"를 세게 된다. 기존 행이 있으면 건너뛴다(비파괴 —
+                #     사람이 채운 검수·승인 필드를 적재기가 덮지 않는다).
+                gate_result = require_provenance(
+                    slug=record.slug,
+                    source_type_value=record.problem.source_type,
+                    provenance=_gate_input(record.provenance),
+                    problem_id=problem_id,
+                )
+                if gate_result is not None:
+                    existing = conn.execute(
+                        sa.select(ContentProvenanceORM.provenance_id)
+                        .where(ContentProvenanceORM.problem_id == problem_id)
+                        .limit(1)
+                    ).first()
+                    if existing is None:
+                        conn.execute(
+                            sa.insert(ContentProvenanceORM).values(
+                                **{
+                                    key: value
+                                    for key, value in gate_result.model_dump().items()
+                                    if key in provenance_cols and value is not None
+                                }
+                            )
+                        )
+                        provenance_rows_loaded += 1
 
                 # ④ 개념 태깅 해석(orphan skip)·같은 (concept_id, role) 접힘 시 relevance max
                 #    (None은 최저 취급 — 마지막-우선의 조용한 정보 손실 방지).
@@ -722,6 +793,7 @@ class ProblemBankStore:
             problem_concepts_reconciled=reconciled,
             problem_relations_loaded=relations_loaded,
             problem_relations_skipped=len(relations_skipped),
+            provenance_rows_loaded=provenance_rows_loaded,
         )
 
 

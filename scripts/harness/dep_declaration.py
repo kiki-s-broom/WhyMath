@@ -180,10 +180,18 @@ SOFT_DECLARED: dict[tuple[str, str], SoftDeclaration] = {
         quotes=("on') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화",),
     ),
     ("LIC-03-provenance-enforcement-layer-decision", "LIC-01"): SoftDeclaration(
-        "STAGE_BLOCKED",
-        "LIC-03(S3)이 LIC-01(E2)에 의존하면 store.validate_backlog가 '후행 스테이지 태스크에 "
-        "의존 — 로드맵 순서 위반'으로 거부한다(2026-09-06 시뮬레이션으로 재현 확인 — notes의 "
-        "2026-08-30 실측이 오늘도 유효). 스케줄러 제외는 status=blocked가 담당한다.",
+        # 2026-09-21 재분류: STAGE_BLOCKED → HISTORICAL. 바로 위 EOS-50↔ARCH-31 선례와 동형 —
+        # 의존이 done이 되면 '제외되지 않는다' 위반이 나므로 재분류로 해소한다.
+        "HISTORICAL",
+        "LIC-01이 done이다(산출물은 PR #861 `af712f09`로 main 착지 — 2026-09-21 LIC-03 착수 "
+        "세션이 파일 해시 대조로 실측: l1/rights/ 5모듈·schema/rights.py가 브랜치와 바이트 "
+        "동일, alembic a1b2c3d4e5f6 실재). 따라서 notes의 '[차단 2026-08-30] LIC-01 완결' "
+        "문장은 앞으로의 순서 제약이 아니라 이미 해소된 과거 사실이며, status=blocked도 그 "
+        "실측을 근거로 해제됐다. 종전 STAGE_BLOCKED 분류의 근거(LIC-03=S3 ↔ LIC-01=E2라 "
+        "하드 부착 시 store.validate_backlog가 로드맵 순서 위반으로 거부한다)는 스테이지가 "
+        "그대로라 여전히 사실이다 — 바뀐 것은 '막아야 하는가'이지 '하드로 표현 가능한가'가 "
+        "아니다. 그래서 STAGE_BLOCKED 유지 + blocked 해제 조합은 성립하지 않는다"
+        "(그 코드는 스케줄러 제외를 다른 수단이 담당할 것을 요구한다).",
         quotes=(
             "[차단 2026-08-30] LIC-01 완결 선행(기계 강제 — #908 co",
             "용). depends_on 형식 표현은 LIC-01 stage=E2 로드맵 가드가 거부(2",

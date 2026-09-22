@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: blocked
+status: in_progress
 priority: 2
 eos_priority: P0
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/backend/whymath_backend/db/models/provenance.py
   - "src/backend/whymath_backend/l1/rights/**"
   - "tests/backend/**"
-session: null
+session: claude/serene-dijkstra-kykrxn
 notes: "출처: EOS-53 crosswalk 갭 #10(G1+A4 잔여). 충돌 실측: provenance.py:48-50이 DB CHECK 미생성 자기선언(schema 계층 강제 방침)인데 계획서 DoD는 INSERT 거부 요구. 부수 발견: LIC-01 stage=E2는 실질(12월 저작권 레일)과 어긋나 보임 — 스테이지 재조정은 Kiki/후속 판단.\n\n[차단 2026-08-30] LIC-01 완결 선행(기계 강제 — #908 codex 리뷰 수용). depends_on 형식 표현은 LIC-01 stage=E2 로드맵 가드가 거부(2026-08-30 실측)해 불가 — blocked가 스케줄러 제외를 보장하는 유일한 기존 수단. unblock 트리거 = LIC-01 done(머지 확인) 후 착수 세션이 unblock. 부기: LIC-01 stage=E2의 실질 정합(12월 저작권 레일인데 E축) 재조정은 별도 판단 사안(crosswalk §2.3 병기)\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/G1★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-21

@@ -415,10 +415,28 @@ def test_codes_that_can_be_expressed_do_not_require_blocked(monkeypatch) -> None
 
 
 def test_repository_exclusion_backed_codes_are_actually_excluded() -> None:
-    """실 대장 — 제외가 필요한 코드의 태스크가 실제로 착수 후보에서 빠지는가(EOS-50·LIC-03)."""
+    """실 대장 — 제외가 필요한 코드의 태스크가 실제로 착수 후보에서 빠지는가.
+
+    **모집단이 비는 것은 정상 상태다**(2026-09-21 LIC-03 재분류로 실제로 0건이 됐다):
+    제외 필요 코드(DISJUNCTIVE·STAGE_BLOCKED)는 *하드로 표현 불가한 미해소 선행*에만 붙고,
+    그 선행이 해소되면 HISTORICAL로 재분류되어 모집단에서 빠진다(EOS-50↔ARCH-31·
+    LIC-03↔LIC-01 둘 다 그 경로를 밟았다). 종전 판은 `assert needing`으로 0건을 실패로
+    봤는데, 그러면 **정상 상태가 상시 red**가 되고 고칠 방법이 없다 — 고칠 수 없는 위반을
+    지적하는 게이트는 사람이 게이트를 끄게 만든다(CLAUDE.md).
+
+    그렇다고 0건을 조용히 통과시키면 원래 막으려던 것(탐지 규칙 사망)을 놓친다. 그래서
+    **입력이 살아 있는지를 대신 단언**한다 — 분류표와 코드 집합이 둘 다 비지 않았다면
+    교집합 0건은 '규칙이 죽었다'가 아니라 '지금 해당 태스크가 없다'는 읽을 수 있는 상태다.
+    규칙 자체의 변별력은 합성 픽스처(`test_codes_that_cannot_be_hard_require_scheduler_exclusion`)가
+    주입으로 계속 검증한다.
+    """
     from pathlib import Path
 
+    import pytest
     import store
+
+    assert dd.SOFT_DECLARED, "소프트 분류표가 비었다 — 분류 체계가 통째로 사라졌다"
+    assert dd._CODES_REQUIRING_EXCLUSION, "제외 필요 코드 집합이 비었다 — 탐지 규칙 사망"
 
     backlog, _ = store.load_backlog(Path(__file__).resolve().parents[2])
     needing = [
@@ -426,6 +444,11 @@ def test_repository_exclusion_backed_codes_are_actually_excluded() -> None:
         for (tid, _ref), v in dd.SOFT_DECLARED.items()
         if v.code in dd._CODES_REQUIRING_EXCLUSION
     ]
-    assert needing, "제외 필요 분류가 0건 — 이 테스트가 공허하게 통과한다"
+    if not needing:
+        pytest.skip(
+            "제외 필요 분류가 현재 0건 — 정상 상태다(선행이 해소되면 HISTORICAL로 재분류된다). "
+            f"분류표 {len(dd.SOFT_DECLARED)}건 · 제외 필요 코드 "
+            f"{sorted(dd._CODES_REQUIRING_EXCLUSION)} 는 살아 있음을 위에서 단언했다."
+        )
     for tid in needing:
         assert dd._is_scheduler_excluded(backlog.tasks[tid], backlog.tasks), tid
