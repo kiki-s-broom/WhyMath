@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-135-battle-audit-incremental-flush
+title: "강등전 CLI 의 증거 지속성 공백 — 531콜 회차가 중간에 죽으면 판정 원자료가 0건으로 사라진다"
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - S4-16-residue-gate-demotion-battle
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — 강등전 CLI(`harness/residue_gate_demotion_battle.py`)는 **끝까지 돌지 않으면 아무 증거도 남기지 않는다.** main 266c3d55 실측: 표준출력 `print`는 `main()` 말미 2곳(1473·1494행)뿐이고 감사 JSONL `write_audit_jsonl` 도 배터리 전건 완주 **이후**에 호출된다(1467·1489행). 진행 중 부분 기록·부분 flush 경로가 0건이다. 정본 회차 규모는 실 LLM **531콜**(항목 59건 x 9콜 · 예상 45분~2시간 20분)이므로, 중간에 죽으면 그 시간과 콜이 통째로 증거 0으로 사라진다. `Tee-Object` 로그도 마지막 한 번의 print 를 받으므로 같이 빈다.\n② 왜 이것이 결함인가 — CLAUDE.md 「측정·수집 도구를 성공 경로만 보고 설계 금지」 ①(실패해도 증거가 남는가 — 단계마다 즉시 flush)의 정면 위반이다. 2026-08-22 Phaiakes9 진단에서 측정 4회가 도구 결함으로 공전한 그 부류이며, 이 도구는 회차당 비용이 특히 크다. 부수로 ②(실패 *원인*이 남는가)도 부분적으로만 성립한다 — 관점 호출 실패는 `provider_error` 로 `unclear` 에 남지만, 그 기록 자체가 완주 후에만 파일에 닿는다.\n③ 최소 수정 후보(구현자 판단) — ⓐ 항목 판정 1건마다 감사 JSONL 에 append + flush(`--audit-out` 이 주어진 경우) ⓑ 항목별 1행 진행 표시를 stderr 로 즉시 내보내 `Tee-Object` 로그가 살아 있게 한다 ⓒ 중단 지점부터 재개(`--resume`)는 **범위 밖 후보**로 남긴다(표본 시드 결정론과 얽혀 설계 비용이 크다). ⓐ만으로도 \"측정 실패가 0건 통과로 위장되지 않는다\"는 목적은 달성된다.\n④ 실패 주입으로 검증 — ⓐ 배터리 중간에서 예외를 던지는 주입을 넣고 그 시점까지의 판정 행이 감사 파일에 **실재**하는지 단언한다(주입 전 = 0행, 주입 후 = N행). ⓑ 정상 완주 시 파일 내용이 종전과 동일한지(회귀 없음) 단언한다 — 성공 방향 대조군. ⓒ `--audit-out` 미지정 시 파일을 만들지 않는 기존 동작이 유지되는지 확인한다. 주입은 `mutated != original` 을 단언하고 원복은 `cp` 백업에서 한다.\n⑤ 범위 밖(명시) — 강등전의 *판정 로직*·임계·관점 세트는 `S4-16` 이 소유한다. 이 태스크는 **증거 지속성**만 다룬다. 쓰기 블록 가드가 이 CLI 를 쓰기로 분류하지 않는 축은 `HARN-116` 이 소유한다(acceptance ⑦)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/residue_gate_demotion_battle.py
+  - tests/backend/harness/test_residue_gate_demotion_battle.py
+session: null
+notes: "발견 경위(2026-09-22 · 게이트 G-s416-round2-live-battle 실행 준비): 2시간짜리 라이브 회차를 Kiki 머신에 안내하기 직전에 \"중간에 죽으면 무엇이 남는가\"를 확인했고, 답이 **아무것도 남지 않는다**였다.\n\nS4-16 은 현재 다른 세션이 claim 중(in_progress · claude/optimistic-gates-9ef9nm)이며 그 태스크의 acceptance 에는 이 축이 없다(실측: flush·증거·중단·재시작·부분 키워드 0건). 즉 중복 등재가 아니라 미소유 축이다. 다만 대상 파일이 S4-16 과 겹치므로 착수 전 overlap 확인이 필요하고, S4-16 착지 후에 손대는 편이 충돌이 적다.\n\n이번 회차에 대한 즉시 완화는 코드가 아니라 운영으로 했다 — 런북 §1-⑥ 이 \"[D] 가 도는 동안 그 창을 건드리지 말 것\"을 명시하고 있고, ⑥ 브리핑에 예상 소요를 적어 두었다. 그것은 예방이 아니라 주의 환기이므로 이 태스크가 필요하다.\n\n주의: 이 결함은 게이트 미달(BATTLE_EXIT)과 무관하다. 게이트 미달은 유효한 측정 결과이고, 이 결함이 만드는 것은 **측정 자체의 소실**이다."
+updated: 2026-09-22
