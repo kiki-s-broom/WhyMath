@@ -1,5 +1,15 @@
 # 사람 게이트 대장 — clear는 evidence 필수 · 사람이 직접 닫으면 --as <담당자>(HARN-60)
 gates:
+  - id: G-admin06-browser-menu-call
+    title: "백오피스 셸 실 브라우저 menu 호출 확인 — 허용 origin에서 200+내비 렌더 / 비허용 origin에서 차단 (ADMIN-06 acceptance ②의 사람 축)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-amd395-perf-baseline
     title: "Phaiakes9(AMD 395/8060S) GPU 추론 베이스라인 측정 — docs/ops/amd395_local_llm_performance.md Phase 0~1 실행(evidence_*.txt·bench_*.csv). 라우터 LOCAL_LATENCY_MS 보정·QUALITY 티어 판단의 선결"
     kind: human
@@ -300,16 +310,6 @@ gates:
     evidence: null
     cleared_by: null
     notes: "원 요청일 2026-08-11(ph1ad7 905ed311·ASM-12/PR #815) — #822 재생성-머지에서 게이트만 유실돼 2026-08-30 HARN-34가 이관 재등재. 판정 정본 docs/legal/export_prediction_disclosure_verdict.md·뒤집힘 시 export 복원+매트릭스 §2.4 개정+access_matrix #8 동시 반영"
-  - id: G-kg02-review-promotion-llm-session
-    title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
-    kind: human
-    assignee: kiki
-    status: pending
-    requested: 2026-09-21
-    remind_after_days: 14
-    evidence: null
-    cleared_by: null
-    notes: ""
   - id: G-harn121-constitution-token-measure
     title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
     kind: human
@@ -317,6 +317,16 @@ gates:
     status: pending
     requested: 2026-09-21
     remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-kg02-review-promotion-llm-session
+    title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 14
     evidence: null
     cleared_by: null
     notes: ""

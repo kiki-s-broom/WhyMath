@@ -5,10 +5,13 @@
 섹션 순서·섹션 라벨까지 서버가 주는 이유는 `module_registry.SECTION_ORDER` 주석 참조
 (프런트가 순서 배열을 들고 있으면 그것이 곧 하드코딩 nav의 재발이다).
 
-인가(04 §2 원칙7·§4): 이 경로는 `get_current_user`만 요구한다. 역할이 모자라면 403이 아니라
-**빈 메뉴**를 받는다 — 메뉴는 모듈이 아니라 *모듈 목록*이고, 권한 판정은 각 모듈 라우트가
-자체 가드로 한다(이중 방어). 그 예외는 `module_registry.GUARD_EXEMPT_PATHS`에 사유와 함께
-등재돼 있고 `test_admin_route_guards.py`가 낡은 면제를 잡는다.
+인가(04 §2 원칙7·§4)는 **두 축이 다르게** 걸린다.
+  · *역할* 축 — `get_current_user`만 요구한다. 역할이 모자라면 403이 아니라 **빈 메뉴**를 받는다
+    (메뉴는 모듈이 아니라 *모듈 목록*이고, 권한 판정은 각 모듈 라우트가 자체 가드로 한다 —
+    이중 방어). 그 면제는 `module_registry.GUARD_EXEMPT_PATHS`에 사유와 함께 등재돼 있다.
+  · *신원* 축 — **데모 계정은 403**이다(ADMIN-06). 위 면제는 역할 축의 면제일 뿐이고, 04 §4의
+    "콘솔은 실 신원 필수"는 면제 대상이 아니다. 백오피스 셸이 앱 로드 시 **가장 먼저** 부르는
+    곳이 여기라, 여기가 열려 있으면 데모 토큰으로 콘솔 골격과 모듈 목록까지는 그려진다.
 
 표현 ≠ 의미(04 §2 원칙1): 여기서 나가는 것은 *구조*(섹션·모듈·상태·경로)뿐이며 렌더 방식
 (아이콘·색·비활성 표기)은 클라가 정한다. `status`는 화면 문자열이 아니라 3값 enum이다.
@@ -16,16 +19,18 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.api._auth import CurrentUser
 from whymath_backend.api.admin_module_registry import (
+    DEMO_ACCOUNT_DENIED_DETAIL,
     SECTION_LABELS_KO,
     SECTION_ORDER,
     AdminModule,
     AdminModuleStatus,
     AdminSection,
+    is_demo_account,
     visible_modules,
 )
 
@@ -92,6 +97,15 @@ async def get_admin_menu(user: CurrentUser) -> AdminMenuResponse:
     `visible_modules`가 `PLANNED`를 거르지 않는다는 점이 중요하다 — 존재를 숨기면 운영자가
     "그 기능은 없는 줄 알았다"가 되고, 그것이 곧 04 §2 원칙7이 막으려는 "발견 안 됨"이다.
     """
+    if is_demo_account(user):
+        # 데모 계정은 **역할과 무관하게** 콘솔 입구에서 막는다(04 §4 "콘솔은 실 신원 필수").
+        # 이 경로가 `GUARD_EXEMPT_PATHS`인 것은 *역할* 축의 면제이지 *신원* 축의 면제가 아니다 —
+        # 셸(ADMIN-06)이 앱 로드 시 가장 먼저 부르는 곳이 여기라, 여기서 막지 않으면 데모 토큰으로
+        # 콘솔 골격과 모듈 목록이 그려진 뒤 개별 모듈에서만 403이 난다(각 모듈 가드는 이미 막는다).
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=DEMO_ACCOUNT_DENIED_DETAIL,
+        )
     allowed = visible_modules(user.role)
     by_section: dict[AdminSection, list[AdminMenuItem]] = {}
     for module in allowed:
