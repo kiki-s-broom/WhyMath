@@ -127,9 +127,11 @@ class TestVerifyStep200:
 
 
 class TestVerifyStepExposureContract:
-    """노출 계약 — 응답은 판정만(state·reason·reason_code·evidence_weight·step_type).
+    """노출 계약 — 응답은 판정만(state·reason·reason_code·evidence_weight·step_type·form).
 
-    정답/본문 누출 0. reason_code(MATH-03)는 폐쇄 7종 코드라 누출 표면이 아니다.
+    정답/본문 누출 0. reason_code(MATH-03)는 폐쇄 7종 코드라, form(S3-51)은 폐쇄 3종 경로
+    라벨(equation|mixed|expression)이라 누출 표면이 아니다 — 어느 경로로 판정했는지일 뿐
+    학생 식·정답을 담지 않는다(reason_code 편입 선례 동형).
     """
 
     def test_response_field_set(self) -> None:
@@ -140,7 +142,21 @@ class TestVerifyStepExposureContract:
             "reason",
             "reason_code",
             "evidence_weight",
+            "form",
         }
+
+    def test_form_serialized_as_closed_label(self) -> None:
+        # 직렬화 경유 실측 — 폐쇄 3종 라벨이 HTTP 응답까지 평문 문자열로 온다(reason_code 선례).
+        # 등식 전이는 equation, 표현식 전이는 expression — 두 correct가 응답에서 구별된다.
+        eq = _client().post(
+            "/v1/verify-step", json={"expr_before": "2*x+3=7", "expr_after": "2*x=4"}
+        )
+        expr = _client().post(
+            "/v1/verify-step", json={"expr_before": "2*(x+1)", "expr_after": "2*x+2"}
+        )
+        assert eq.json()["state"] == expr.json()["state"] == "correct"
+        assert eq.json()["form"] == "equation"
+        assert expr.json()["form"] == "expression"
 
     def test_reason_code_serialized_as_string(self) -> None:
         # MATH-03 직렬화 경유 실측 — HTTP 응답까지 코드가 평문 문자열로 온다(rephrase 선례 동형).
@@ -249,7 +265,11 @@ class TestVerifySolution200:
 
 
 class TestVerifySolutionExposureContract:
-    """노출 계약 — 응답은 검증 집계뿐(상태·카운트·비율·폐쇄 사유 코드). 정답/본문 누출 0."""
+    """노출 계약 — 응답은 검증 집계뿐(상태·카운트·비율·폐쇄 사유 코드). 정답/본문 누출 0.
+
+    최상위 키는 아래 동결이 지키고, `steps` 원소는 verify_step 응답 계약(위 클래스)이 지킨다
+    — 그쪽에 편입된 폐쇄 라벨(reason_code·form)이 여기 중첩으로도 함께 온다(값은 라벨뿐).
+    """
 
     def test_response_field_set(self) -> None:
         resp = _client().post("/v1/verify-solution", json={"steps": ["2+3", "5"]})

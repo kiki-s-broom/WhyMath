@@ -83,6 +83,9 @@ sync 엔진은 슬3 `_build_sync_engine`을 재사용한다(신규 seam 0·stand
     python -m whymath_backend.l1.problem_bank.populate \\
         --problems data/corpus/problem_bank_v1/problems.jsonl
 
+    # 전 코퍼스(provenance 원장 복원 — LIC-03 §9). 저장소 루트에서 실행한다.
+    python -m whymath_backend.l1.problem_bank.populate --all
+
 7계층: L1 데이터 기반의 *런타임 엔티티 적재*. 소비(게이팅·진단·출제)는 이 행을 *조회*하되 여기서
 구현하지 않는다(역방향 의존 금지).
 """
@@ -107,6 +110,10 @@ from whymath_backend.l1.concept_atom_crosswalk.transfer import (
 
 # 슬3 sync 엔진 빌더 재사용(신규 seam 0) — standards/atom_graph와 동일 좌석. (intra-L1 import)
 from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
+from whymath_backend.l1.problem_bank.provenance_gate import (
+    ProvenanceInput,
+    require_provenance,
+)
 from whymath_backend.schema.enums import ConceptRole, LicenseType, RelationType, SourceType
 from whymath_backend.schema.problem import Problem
 
@@ -115,6 +122,9 @@ if TYPE_CHECKING:
 
 # 코퍼스 기본 경로(신설 problem_bank_v1·손저작 시드).
 _DEFAULT_PROBLEMS = Path("data/corpus/problem_bank_v1/problems.jsonl")
+# 전 코퍼스 글롭(`--all`) — `_DEFAULT_PROBLEMS`와 같은 repo-root 상대 규약. 문제은행 코퍼스만
+# 고른다(개념·크로스워크 등 다른 코퍼스는 각자 적재기가 있다).
+_ALL_PROBLEMS_GLOB = "data/corpus/problem_bank_*/problems.jsonl"
 # 크로스워크 코퍼스 기본 경로(S2-03 원자 재연결 — _DEFAULT_PROBLEMS와 동일 repo-root 상대 규약).
 _DEFAULT_CROSSWALK = Path("data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl")
 # 구 437 개념그래프(다리 concept_id→src_id) 기본 경로 — legacy_snapshot의 *빌드타임* 소비
@@ -207,6 +217,19 @@ class ProblemProvenanceMeta:
     original_source: str | None = None
 
 
+def _gate_input(meta: ProblemProvenanceMeta) -> ProvenanceInput:
+    """코퍼스 저작 메타 → provenance 관문 입력(계층 경계 어댑터 — LIC-03).
+
+    두 타입을 합치지 않는 이유는 관문 모듈 docstring 참조(관문이 코퍼스 포맷에 묶이면
+    다른 쓰기 경로가 그 관문을 쓸 수 없다).
+    """
+    return ProvenanceInput(
+        generation_type=meta.generation_type,
+        license=meta.license,
+        original_source=meta.original_source,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ProblemBankRecord:
     """코퍼스 1레코드 = 검증된 Problem + 저작 메타(개념 태깅·verify·provenance·계보).
@@ -242,6 +265,13 @@ class ProblemBankPopulateReport:
     problem_concepts_reconciled: int = 0
     problem_relations_loaded: int = 0
     problem_relations_skipped: int = 0
+    provenance_rows_loaded: int = 0
+    """LIC-03 — 이번 회차에 새로 남긴 `content_provenance` 행 수.
+
+    **왜 리포트에 싣는가**("작동한 비율" 원칙 — CLAUDE.md): 적재 성공(문항 N행)은 원장이
+    일했다는 증거가 아니다. 멱등이라 재적재에서는 0이 정상이며, *첫* 적재에서 0이면
+    관문이 무작동이라는 뜻이다. 말미 기본값 필드라 기존 위치 인자 호출부는 무영향.
+    """
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -331,6 +361,16 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
         generation_type=str(generation_type) if generation_type is not None else "",
         license=str(license_value),
         original_source=str(original_source) if original_source is not None else None,
+    )
+    # ── ④-b provenance 관문(LIC-03) — 생성물인데 원장 재료가 없으면 여기서 거부한다.
+    #    적재 루프가 아니라 *파싱*에서 막는 이유: 거부를 DB 왕복 앞으로 당겨야 부분 적재
+    #    (일부 행만 들어간 트랜잭션)가 생기지 않는다. 반환값은 버린다 — 이 시점엔 아직
+    #    problem_id가 없어 원장 행을 조립할 수 없고, 여기서 필요한 것은 *판정*뿐이다.
+    #    행 조립은 upsert가 RETURNING으로 식별자를 준 뒤 같은 관문을 다시 부른다.
+    require_provenance(
+        slug=slug,
+        source_type_value=source_value,
+        provenance=_gate_input(provenance_meta),
     )
     return ProblemBankRecord(
         slug=slug,
@@ -580,6 +620,9 @@ class ProblemBankStore:
         from whymath_backend.db.models.problem import (
             ProblemRelation as ProblemRelationORM,
         )
+        from whymath_backend.db.models.provenance import (
+            ContentProvenance as ContentProvenanceORM,
+        )
 
         # ① slug 기준 dedup(마지막 우선) — 단일 배치 ON CONFLICT 중복행 오류 방지.
         by_slug: dict[str, ProblemBankRecord] = {r.slug: r for r in records}
@@ -592,7 +635,10 @@ class ProblemBankStore:
         problem_cols = {col.key for col in sa.inspect(ProblemORM).mapper.column_attrs}
         problem_update_keys = problem_cols - {"problem_id", "slug", "created_at"}
 
+        provenance_cols = {col.key for col in sa.inspect(ContentProvenanceORM).mapper.column_attrs}
+
         problems_loaded = 0
+        provenance_rows_loaded = 0
         problem_concepts_loaded = 0
         reconciled = 0
         relations_loaded = 0
@@ -613,6 +659,37 @@ class ProblemBankStore:
                 problem_id = conn.execute(problem_stmt).scalar_one()
                 problems_loaded += 1
                 slug_to_problem_id[record.slug] = problem_id
+
+                # ③-b provenance 원장 동반(LIC-03) — 생성물이면 같은 트랜잭션에서
+                #     `content_provenance` 행을 남긴다. 문항 행만 들어가고 원장이 빠지는
+                #     상태가 곧 A4 DoD 위반이므로 두 쓰기는 원자적이어야 한다.
+                #     **멱등**: 재적재는 행을 늘리지 않는다 — 원장은 감사 추적이라
+                #     같은 문항에 같은 출처 행이 회차마다 쌓이면 "몇 번 만들었나"가 아니라
+                #     "몇 번 적재했나"를 세게 된다. 기존 행이 있으면 건너뛴다(비파괴 —
+                #     사람이 채운 검수·승인 필드를 적재기가 덮지 않는다).
+                gate_result = require_provenance(
+                    slug=record.slug,
+                    source_type_value=record.problem.source_type,
+                    provenance=_gate_input(record.provenance),
+                    problem_id=problem_id,
+                )
+                if gate_result is not None:
+                    existing = conn.execute(
+                        sa.select(ContentProvenanceORM.provenance_id)
+                        .where(ContentProvenanceORM.problem_id == problem_id)
+                        .limit(1)
+                    ).first()
+                    if existing is None:
+                        conn.execute(
+                            sa.insert(ContentProvenanceORM).values(
+                                **{
+                                    key: value
+                                    for key, value in gate_result.model_dump().items()
+                                    if key in provenance_cols and value is not None
+                                }
+                            )
+                        )
+                        provenance_rows_loaded += 1
 
                 # ④ 개념 태깅 해석(orphan skip)·같은 (concept_id, role) 접힘 시 relevance max
                 #    (None은 최저 취급 — 마지막-우선의 조용한 정보 손실 방지).
@@ -722,6 +799,7 @@ class ProblemBankStore:
             problem_concepts_reconciled=reconciled,
             problem_relations_loaded=relations_loaded,
             problem_relations_skipped=len(relations_skipped),
+            provenance_rows_loaded=provenance_rows_loaded,
         )
 
 
@@ -757,6 +835,17 @@ def populate_problem_bank(
     return bank_store.populate(records)
 
 
+def discover_problem_corpora(root: Path | None = None) -> list[Path]:
+    """전 문제은행 코퍼스 경로를 정렬해 반환(`--all` 재료).
+
+    **0건은 호출자가 실패로 다뤄야 한다** — 대상을 하나도 못 찾은 전수 작업은 "성공적으로
+    아무것도 안 함"으로 위장된다(CLAUDE.md "스캔 0건은 실패"). 이 함수는 판정하지 않고
+    사실만 돌려주며, 판정은 `main`이 exit 2로 한다.
+    """
+    base = root if root is not None else Path()
+    return sorted(base.glob(_ALL_PROBLEMS_GLOB))
+
+
 def main(argv: list[str] | None = None) -> int:
     """문제 코퍼스(JSONL)를 `problem`/`problem_concept`에 멱등 적재하고 리포트를 보고(CLI 본체).
 
@@ -770,27 +859,71 @@ def main(argv: list[str] | None = None) -> int:
             "(slug 충돌 upsert·concept 해석·orphan skip·자체생성 위생)."
         ),
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--problems",
         type=Path,
-        default=_DEFAULT_PROBLEMS,
-        help=f"문제 코퍼스 JSONL 경로(기본 {_DEFAULT_PROBLEMS}).",
+        default=None,
+        help=f"문제 코퍼스 JSONL 경로(미지정·--all 없음이면 {_DEFAULT_PROBLEMS}).",
+    )
+    # `--all`(LIC-03 §9) — 전 코퍼스 순차 적재. provenance 원장 복원이 주 용도다:
+    # 재료가 코퍼스에 남아 있고 적재가 멱등이라 재실행이 곧 복원인데, 코퍼스가 수십 개라
+    # 손으로 반복하면 빠뜨린 것과 없는 것이 구분되지 않는다.
+    group.add_argument(
+        "--all",
+        action="store_true",
+        help=f"전 문제은행 코퍼스({_ALL_PROBLEMS_GLOB})를 순차 적재.",
     )
     args = parser.parse_args(argv)
 
-    path: Path = args.problems
-    if not path.exists():
-        print(f"문제 코퍼스 없음: {path} — 코퍼스 생성기(손저작 시드)로 먼저 생성하세요.")
-        return 2
+    if args.all:
+        paths = discover_problem_corpora()
+        if not paths:
+            # 스캔 0건은 실패 — "성공적으로 아무것도 안 함"을 통과로 보고하지 않는다.
+            print(
+                f"전 코퍼스 스캔 0건: {_ALL_PROBLEMS_GLOB} 에 일치하는 파일이 없습니다 — "
+                "저장소 루트에서 실행했는지 확인하세요(경로는 repo-root 상대)."
+            )
+            return 2
+    else:
+        single = args.problems if args.problems is not None else _DEFAULT_PROBLEMS
+        if not single.exists():
+            print(f"문제 코퍼스 없음: {single} — 코퍼스 생성기(손저작 시드)로 먼저 생성하세요.")
+            return 2
+        paths = [single]
 
-    report = populate_problem_bank(None, problems_path=path)
-    print(
-        f"문제 적재 완료: {report.problems_loaded}건·개념 태깅: "
-        f"{report.problem_concepts_loaded}건·reconcile 삭제: "
-        f"{report.problem_concepts_reconciled}건 (src={path}). "
-        f"개념 orphan skip: {report.concepts_skipped}건"
-        + (" (원자 미적재 — l1.atom_graph 선행)." if report.concepts_skipped else ".")
-    )
+    total_problems = 0
+    total_provenance = 0
+    for path in paths:
+        report = populate_problem_bank(None, problems_path=path)
+        total_problems += report.problems_loaded
+        total_provenance += report.provenance_rows_loaded
+        print(
+            f"문제 적재 완료: {report.problems_loaded}건·개념 태깅: "
+            f"{report.problem_concepts_loaded}건·reconcile 삭제: "
+            f"{report.problem_concepts_reconciled}건 (src={path}). "
+            f"개념 orphan skip: {report.concepts_skipped}건"
+            + (" (원자 미적재 — l1.atom_graph 선행)." if report.concepts_skipped else ".")
+        )
+        # LIC-03 — 원장("작동한 비율"). 적재 성공 건수는 provenance가 일했다는 증거가 아니다.
+        # 0건에는 두 의미가 있어 구분해 보고한다: *이미 있어서* 0(멱등 재적재·정상)과
+        # *관문이 무작동이라* 0(신규 적재인데 원장이 안 생김·이상). 운영자가 화면만 보고
+        # 판정할 수 있어야 복원 회차를 검증할 수 있다.
+        if report.provenance_rows_loaded:
+            print(f"출처 원장(content_provenance) 신규 기록: {report.provenance_rows_loaded}건.")
+        elif report.problems_loaded:
+            print(
+                "출처 원장(content_provenance) 신규 기록: 0건 — 이 문항들의 원장이 이미 있거나"
+                "(멱등 재적재) 생성물이 아닌 출처입니다. 첫 적재인데 0건이면 관문 무작동을 "
+                "의심하세요(docs/standards/provenance_enforcement_layer_decision.md)."
+            )
+
+    if args.all:
+        # 합계는 코퍼스별 줄을 *대신하지 않는다* — 어느 코퍼스가 0이었는지는 위 줄에만 있다.
+        print(
+            f"전 코퍼스 {len(paths)}개 합계: 문항 {total_problems}건 · "
+            f"출처 원장 신규 {total_provenance}건."
+        )
     return 0
 
 

@@ -158,6 +158,7 @@ from whymath_backend.l2.next_problem_selection import (  # noqa: F401
     CANDIDATE_POOL_SIZE,
     CANDIDATE_ZERO_ALL_GATED_INELIGIBLE,
     CANDIDATE_ZERO_NO_POOL,
+    MAX_ADMINISTERED_ITEMS,
     TARGET_SE,
     AttemptHistoryState,
     _weak_concept_weights,
@@ -202,6 +203,9 @@ from whymath_backend.l4.misconception.distractor_link import distractor_link_can
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
+)
+from whymath_backend.l4.misconception_review_coaching import (
+    recommend_misconception_review_coaching,
 )
 from whymath_backend.l4.prerequisite_coaching import recommend_prerequisite_coaching
 from whymath_backend.l6.blueprint import (
@@ -1039,6 +1043,17 @@ class AttemptSubmitResponse(BaseModel):
             "확신 미제출(None)이면 null. 적재 로직과 무관한 순수 L4 결정(측정→코칭)."
         ),
     )
+    misconception_review_coaching: CoachingTrigger | None = Field(
+        default=None,
+        description=(
+            "오개념 복습 코칭(MISC-35) — 누적 활성 오개념 *가설*의 초점이 보류 바닥(0.5)을 넘고 "
+            "정본 카탈로그로 해소될 때만 채워진다. `calibration_coaching`과 나란한 별개 신호이며 "
+            "축이 다르다: 보정은 *확신↔정오답* 어긋남, 이쪽은 *규칙 오적용* 의심이다. **이번 "
+            "회차에 오개념을 실제로 훑은 경우에만** 계산한다 — 훑지 않은 회차의 null은 '의심이 "
+            "없다'가 아니라 '보지 않았다'이며 그 구분은 `evidence.coverage`가 말한다. 가설은 "
+            "확정 라벨이 아니므로 발화는 가정형이고 오개념 본문·신뢰도 수치는 실리지 않는다."
+        ),
+    )
     evidence: AssessmentEvidence | None = Field(
         default=None,
         description=(
@@ -1196,9 +1211,28 @@ async def submit_attempt(
     # 증거를 못 받은 기존 가설을 감쇠시킨다(Persona C: 오개념이 재관측되지 않으면 confidence가
     # *내려가야* 한다). 반대로 훑지 않은 회차(정답·답안 없음·능력 부재)에 부르면 관측하지도
     # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
+    misconception_review_coaching: CoachingTrigger | None = None
     if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
-        await apply_candidates(session, user.user_id, misconception_scan_result.candidates)
+        active_hypotheses = await apply_candidates(
+            session, user.user_id, misconception_scan_result.candidates
+        )
         await session.commit()
+        # MISC-35 **집행 지점**(정본화≠집행) — 바로 위 `apply_candidates`가 **반환한** 갱신
+        # 세트(감쇠·강화·가지치기가 끝나고 confidence 내림차순으로 정렬된 이번 턴의 활성
+        # 가설)로 "오개념 복습" 코칭을 결정한다. 모듈을 만든 것만으로는 어떤 학생에게도 닿지
+        # 않는다; 이 줄이 계약을 집행으로 바꾼다.
+        #
+        # 반환값을 쓰고 `get_active_hypotheses`로 다시 읽지 않는 이유: 같은 내용을 얻으려고
+        # DB를 한 번 더 왕복할 이유가 없고(그 조회가 바로 `apply_matches` 1단계다), 조회를
+        # 하나 더 끼우면 위치 기반으로 결과를 큐잉하는 테스트 대역들의 순서를 밀어 *이 변경과
+        # 무관한* 실패를 만든다(실측: 그 형태로 프라이버시 경계 테스트 1건이 깨졌다).
+        #
+        # 훑은 회차 안에 둔 이유: 밖에 두면 *이번에 관측하지도 않은* 과거 가설로 코칭이 나간다
+        # (정답 회차에 지난 오개념을 꺼내는 형태). 훑은 회차로 좁히면 코칭이 항상 *이번 관측*에
+        # 뿌리를 두며, 이는 오개념 reactive retrieval 원칙과 같은 방향이다. 그래서 이 필드의
+        # null은 두 뜻을 가진다 — 훑었는데 의심이 약함 / 아예 훑지 않음. 그 구분은 응답의
+        # `evidence.coverage`에 이미 적혀 있으므로 여기서 또 만들지 않는다.
+        misconception_review_coaching = recommend_misconception_review_coaching(active_hypotheses)
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
     # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
@@ -1287,6 +1321,7 @@ async def submit_attempt(
             for r in skill_records
         ],
         calibration_coaching=calibration_coaching,
+        misconception_review_coaching=misconception_review_coaching,
         evidence=evidence,
         learning_state=learning_state_block,
     )
@@ -2364,6 +2399,7 @@ async def get_my_learning_path(
 # `ops/repeat_recommendation_report.py`와 기존 테스트가 그 경로로 참조한다.
 _CANDIDATE_POOL_SIZE = CANDIDATE_POOL_SIZE
 _TARGET_SE = TARGET_SE
+_MAX_ADMINISTERED_ITEMS = MAX_ADMINISTERED_ITEMS
 _AttemptHistoryState = AttemptHistoryState
 _load_attempt_history_state = load_attempt_history_state
 _load_weak_concept_weights = load_weak_concept_weights
@@ -2879,6 +2915,32 @@ _CAPTURE_NOTE = (
 )
 
 
+def _capture_note(state: AttemptHistoryState) -> str:
+    """적재되는 Assessment의 `notes` — **어느 중단 규칙이 발화했는지**를 행에 각인한다(EOS-126).
+
+    응답(`AssessmentCaptureResponse.reason`)만 정직하면 그 정직성은 호출 순간에만 존재한다.
+    `assessment` 행은 나중에 `GET /v1/me/assessments`로 다시 읽히고 골든셋·리포트가 소비하므로,
+    "이 진단이 정밀도로 확정됐는지 문항 수 상한으로 확정됐는지"가 **행 자체에** 남아야 한다.
+    남지 않으면 상한 확정 진단과 정밀 진단이 downstream에서 구별 불가능해진다(침묵 실패).
+    """
+    if state.measurement_sufficient:
+        basis = (
+            f"중단 규칙=정밀도 달성(SE {state.standard_error:.4f} ≤ 목표 {_TARGET_SE})"
+            if state.standard_error is not None
+            else f"중단 규칙=정밀도 달성(목표 {_TARGET_SE})"
+        )
+    else:
+        se_text = (
+            f"SE {state.standard_error:.4f}" if state.standard_error is not None else "SE 산출 불가"
+        )
+        basis = (
+            f"중단 규칙=문항 수 상한(EOS-126 · 채점 응답 {state.administered_count}건 ≥ 상한 "
+            f"{_MAX_ADMINISTERED_ITEMS}) — **정밀도 미달**({se_text} > 목표 {_TARGET_SE}). "
+            "이 진단의 θ는 목표 정밀도로 측정된 값이 아니다."
+        )
+    return f"{_CAPTURE_NOTE} {basis}"
+
+
 def _capture_window_start(now: datetime) -> datetime:
     """캡처 idempotency 창의 시작 시각 — UTC 자정(하루 단위). 순수 함수(테스트 용이)."""
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -2907,7 +2969,11 @@ async def _find_existing_capture(
 
 
 async def _assemble_measurement_assessment(
-    session: AsyncSession, user_id: uuid.UUID, *, now: datetime
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    now: datetime,
+    stop_rule_state: AttemptHistoryState,
 ) -> AssessmentSchema:
     """기존 L2 산출물 4종을 *조립만* 해서 `AssessmentSchema`를 만든다 — 신규 계산 0.
 
@@ -2971,7 +3037,7 @@ async def _assemble_measurement_assessment(
         weak_points=weak_point_items,
         strong_points=strong_point_items,
         recommended_path=recommended_path_items,
-        notes=_CAPTURE_NOTE,
+        notes=_capture_note(stop_rule_state),
     )
 
 
@@ -2979,11 +3045,19 @@ class AssessmentCaptureResponse(BaseModel):
     """`POST /v1/me/assessments/capture` 응답 — 실제로 썼는지·왜 안 썼는지를 정직하게 표기."""
 
     written: bool = Field(description="이번 호출로 Assessment 행이 실제로 새로 생성됐는지.")
-    reason: Literal["captured", "insufficient_measurement", "already_captured_window"] = Field(
+    reason: Literal[
+        "captured",
+        "captured_at_item_cap",
+        "insufficient_measurement",
+        "already_captured_window",
+    ] = Field(
         description=(
-            "'captured'=신규 적재. 'insufficient_measurement'=SE가 목표 이상이라 측정 미충분"
-            "(적재 안 함). 'already_captured_window'=같은 창(오늘)에 이미 캡처됨(idempotent — "
-            "적재 안 함·기존 행 반환)."
+            "'captured'=신규 적재(정밀도 축 — SE가 목표 이하). 'captured_at_item_cap'=신규 "
+            "적재이되 **정밀도가 아니라 문항 수 상한**으로 확정됨(EOS-126 2차 중단 규칙 — SE는 "
+            "목표 미달이며 `standard_error`·`measurement_sufficient`가 그 사실을 그대로 표기). "
+            "'insufficient_measurement'=두 중단 규칙 어느 쪽도 발화하지 않아 미확정(적재 안 함). "
+            "'already_captured_window'=같은 창(오늘)에 이미 캡처됨(idempotent — 적재 안 함·"
+            "기존 행 반환)."
         )
     )
     assessment: StudentAssessmentSchema | None = Field(
@@ -2997,7 +3071,17 @@ class AssessmentCaptureResponse(BaseModel):
         description="판정에 쓰인 현재 SE(참고용 — `/next-problem`과 동일 계산). 응답 없으면 null.",
     )
     measurement_sufficient: bool = Field(
-        description="판정에 쓰인 measurement_sufficient(참고용 — `/next-problem`과 동일 경계)."
+        description=(
+            "판정에 쓰인 measurement_sufficient(참고용 — `/next-problem`과 동일 경계). "
+            "**정밀도 축만 뜻한다**(SE ≤ 목표). EOS-126 문항 수 상한으로 확정된 회차에서는 "
+            "`written=True`인데도 이 값이 False다 — 상한이 정밀도 달성을 참칭하지 않는다."
+        )
+    )
+    administered_count: int = Field(
+        description=(
+            "EOS-126: SE 산출에 실제로 들어간 채점 응답 수. 문항 수 상한"
+            f"({_MAX_ADMINISTERED_ITEMS})과 견주는 값이며, 상한 확정 회차의 근거다."
+        )
     )
 
 
@@ -3015,7 +3099,16 @@ async def capture_measurement_assessment(
     하나로 조립해 적재한다(ASM-01이 관측만 하고 남겨둔 writer 부재를 해소).
 
     ① **경계 판정** — `_load_attempt_history_state`(=`/next-problem`과 *같은* 계산)로 현재
-       SE·measurement_sufficient를 구한다. False면 적재하지 않고 `insufficient_measurement`.
+       SE·measurement_sufficient·채점 응답 수를 구한다. **중단 규칙은 둘이다**(EOS-126):
+       정밀도 축(SE ≤ 목표)과 문항 수 상한 축(채점 응답 ≥ `_MAX_ADMINISTERED_ITEMS`). 둘 중
+       하나라도 발화하면(`diagnosis_confirmable`) 확정하고, 둘 다 아니면 적재하지 않고
+       `insufficient_measurement`.
+
+       상한으로 확정된 회차는 **정밀도를 달성한 척하지 않는다** — `reason`이
+       `captured_at_item_cap`이 되고 `measurement_sufficient`는 False 그대로이며, 적재되는
+       행의 `notes`에도 어느 규칙이 발화했는지가 각인된다(`_capture_note`). 상한이 필요한
+       이유(a=1.0 고정 → SE 0.3의 이론적 하한이 45문항)는 `l2.next_problem_selection`의
+       `MAX_ADMINISTERED_ITEMS` 주석 참조.
     ② **idempotency** — 같은 학생·같은 창(오늘, UTC)에 이미 캡처된 행이 있으면 다시 쓰지
        않고 `already_captured_window`(기존 행을 그대로 반환 — 이중 계상 방지).
     ③ **조립·적재** — `_assemble_measurement_assessment`(신규 계산 0, 위 함수 참조)로
@@ -3027,13 +3120,14 @@ async def capture_measurement_assessment(
     채우지 않는다(모듈 상단 주석·`_assemble_measurement_assessment` docstring 참조).
     """
     state = await _load_attempt_history_state(session, user.user_id)
-    if not state.measurement_sufficient:
+    if not state.diagnosis_confirmable:
         return AssessmentCaptureResponse(
             written=False,
             reason="insufficient_measurement",
             assessment=None,
             standard_error=state.standard_error,
             measurement_sufficient=False,
+            administered_count=state.administered_count,
         )
 
     now = datetime.now(UTC)
@@ -3044,10 +3138,14 @@ async def capture_measurement_assessment(
             reason="already_captured_window",
             assessment=StudentAssessmentSchema.from_assessment(existing.to_schema()),
             standard_error=state.standard_error,
-            measurement_sufficient=True,
+            # EOS-126: 하드코딩 True였다 — 상한 확정 회차가 생기면서 그 상수가 거짓말이 된다.
+            measurement_sufficient=state.measurement_sufficient,
+            administered_count=state.administered_count,
         )
 
-    schema = await _assemble_measurement_assessment(session, user.user_id, now=now)
+    schema = await _assemble_measurement_assessment(
+        session, user.user_id, now=now, stop_rule_state=state
+    )
     # 적재는 내부 정본(예측 5필드 포함 · 값은 항상 None)으로, 응답은 학생 대면 정본으로.
     session.add(Assessment.from_schema(schema))
     # EOS-103: 이 분기가 **진단 완료 경계**다(CAT 중단 규칙 measurement_sufficient가 True이고
@@ -3059,10 +3157,13 @@ async def capture_measurement_assessment(
     await session.commit()
     return AssessmentCaptureResponse(
         written=True,
-        reason="captured",
+        # EOS-126: 어느 중단 규칙이 발화해 확정됐는지를 응답이 말한다("작동한 비율" 원칙 —
+        # 적재 성공 200은 *정밀도가 달성됐다*는 증거가 아니다).
+        reason="captured" if state.measurement_sufficient else "captured_at_item_cap",
         assessment=StudentAssessmentSchema.from_assessment(schema),
         standard_error=state.standard_error,
-        measurement_sufficient=True,
+        measurement_sufficient=state.measurement_sufficient,
+        administered_count=state.administered_count,
     )
 
 

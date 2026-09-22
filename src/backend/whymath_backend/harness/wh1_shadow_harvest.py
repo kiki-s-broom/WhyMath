@@ -47,7 +47,7 @@ import json
 import logging
 import sys
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
@@ -56,11 +56,13 @@ from whymath_backend.harness.wh1_shadow import Wh1HarnessShadowObservation, reco
 
 __all__ = [
     "RECORD_LOGGER_NAME",
+    "VERIFY_TARGET_LABELS",
     "ParseAccounting",
     "Wh1ShadowDistributionSummary",
     "Wh1ShadowHarvestReport",
     "dedup_key",
     "dedupe",
+    "filter_window",
     "harvest_files",
     "load_ledger",
     "main",
@@ -76,6 +78,12 @@ RECORD_LOGGER_NAME: str = record_logger.name
 
 # verdict 4-라벨(3-state + verify 미호출 None) — 분포 리포트의 고정 축(0건이어도 표기).
 _VERDICT_LABELS: tuple[str, ...] = ("correct", "incorrect", "unverifiable", "none")
+
+# **판정 모집단** — verify가 실제로 호출된 턴(3-state)만. `none`(verify 미호출 대화 턴)은
+# 사전등록 판정문(s3_pilot_briefing.md 트리거 ③ 모집단 정의)에서 분모 밖이라 분리한다.
+# 리포트 상단의 4-라벨 비율은 *전체* 분모라 그대로 읽으면 사전등록 비율과 다른 수가 된다 —
+# 그 오독을 막기 위해 같은 리포트에 모집단 분모를 병기한다(판정선은 여전히 내지 않는다).
+VERIFY_TARGET_LABELS: tuple[str, ...] = ("correct", "incorrect", "unverifiable")
 
 # 종료 코드 — 판정선이 아니라 도구 성공/입력 오류 구분(cost_probe CLI 관례의 절반만 차용).
 _EXIT_OK = 0
@@ -200,6 +208,47 @@ def dedupe(
     return unique, duplicates
 
 
+def _as_utc(moment: datetime) -> datetime:
+    """시간대 미표기(naive) 시각을 UTC로 간주 — 비교 시 TypeError를 내지 않기 위한 정규화.
+
+    관측 emit은 항상 tz-aware UTC(`wh1_shadow.py` default_factory)라 정상 경로에서는 no-op이다.
+    수기 편집·외부 도구가 naive 값을 넣은 원장에서도 구간 비교가 *조용히 터지지 않게* 한다
+    (해석 규칙은 CLI 출력에 명시 — 숨은 가정 금지).
+    """
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
+
+
+def filter_window(
+    observations: Sequence[Wh1HarnessShadowObservation],
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> tuple[list[Wh1HarnessShadowObservation], int]:
+    """관측 시각 구간으로 **집계 대상**을 자른다 — (구간 내 관측, 구간 밖으로 제외된 수).
+
+    경계는 `since <= observed_at <= until`(양끝 포함). 둘 다 None이면 no-op(원본·0).
+
+    왜 필요한가: 원장은 *축적*이 목적이라 수확 리포트가 항상 원장 전체 분포를 낸다. 그래서
+    측정 회차 하나를 판정하려 하면 **이전 회차(합성 probe 포함)가 같은 분모에 남는다** —
+    2026-07-19 합성 60제출(eq 24/24 correct)이 그대로 섞이면 이번 회차와 무관하게 통과가
+    나온다(거짓 green). 필터는 원장을 건드리지 않고 *보는 창*만 자른다(축적 불변·재현 가능).
+    """
+    if since is None and until is None:
+        return list(observations), 0
+    kept: list[Wh1HarnessShadowObservation] = []
+    excluded = 0
+    for obs in observations:
+        moment = _as_utc(obs.observed_at)
+        if since is not None and moment < _as_utc(since):
+            excluded += 1
+            continue
+        if until is not None and moment > _as_utc(until):
+            excluded += 1
+            continue
+        kept.append(obs)
+    return kept, excluded
+
+
 def load_ledger(path: Path) -> tuple[list[Wh1HarnessShadowObservation], int]:
     """누적 원장(ndjson·한 줄당 관측 JSON) 로드 — (관측 리스트, 깨진 라인 수).
 
@@ -263,6 +312,27 @@ class Wh1ShadowDistributionSummary(BaseModel):
     transition_records: int
     """전이 카운트를 보유한 레코드 수(신판·S3-07+) — transition_counts 합산의 표본 회계."""
 
+    verify_target_total: int
+    """**판정 모집단** 크기 = verdict가 3-state인 턴 수(none=verify 미호출 제외·사전등록 정의).
+
+    사전등록 판정문(트리거 ③)의 분모다. 리포트 상단 4-라벨 비율은 `total`(none 포함) 분모라
+    이 수와 다르다 — 두 분모를 같은 화면에 병기해 오독을 구조적으로 막는다."""
+
+    verify_target_ratios: dict[str, float]
+    """판정 모집단 분모 기준 3-state 비율. 모집단 0이면 빈 dict(0%로 위장 금지)."""
+
+    form_transition_counts: dict[str, int]
+    """전이 *형태*별 합산(Σ등호 방정식·Σ혼합 형태·S3-51) — 형태 축 보유 레코드만 합산."""
+
+    equation_turns: int
+    """등호 방정식 전이가 **1건 이상**인 턴 수 — 사전등록 유효성 전제 V3가 읽는 수다."""
+
+    form_records: int
+    """형태 축(n_equation_transitions)을 보유한 레코드 수(신판·S3-51+) — 합산의 표본 회계."""
+
+    form_legacy_records: int
+    """형태 축 미보유 레코드 수(S3-51 이전) — 합산 제외·분리 표기(0으로 위장 금지)."""
+
     legacy_records: int
     """전이 카운트 미보유 레코드 수(구판·S3-07 이전) — 합산에서 제외하고 분리 표기한다
     (구판을 '전이 0'으로 위장 금지 — 정직 회계)."""
@@ -288,6 +358,10 @@ def summarize(
     transition_counts: dict[str, int] = {"correct": 0, "incorrect": 0, "unverifiable": 0}
     transition_records = 0
     legacy_records = 0
+    form_counts: dict[str, int] = {"equation": 0, "mixed": 0}
+    equation_turns = 0
+    form_records = 0
+    form_legacy_records = 0
     dialogues: set[str] = set()
     observed_min: datetime | None = None
     observed_max: datetime | None = None
@@ -310,6 +384,15 @@ def summarize(
             transition_counts["unverifiable"] += obs.n_unverifiable
         else:
             legacy_records += 1
+        # 형태 축(S3-51) — 구판(필드 None)은 합산에서 빼고 따로 센다(전이 카운트 선례 동형).
+        if obs.n_equation_transitions is None:
+            form_legacy_records += 1
+        else:
+            form_records += 1
+            form_counts["equation"] += obs.n_equation_transitions
+            form_counts["mixed"] += obs.n_mixed_form_transitions or 0
+            if obs.n_equation_transitions > 0:
+                equation_turns += 1
         if obs.dialogue_id is not None:
             dialogues.add(obs.dialogue_id)
         if observed_min is None or obs.observed_at < observed_min:
@@ -320,6 +403,16 @@ def summarize(
     verdict_ratios = (
         {label: count / total for label, count in verdict_counts.items()} if total > 0 else {}
     )
+    # 판정 모집단(none 제외) — 사전등록 판정문의 분모. 같은 규칙으로 0이면 빈 dict.
+    verify_target_total = sum(verdict_counts.get(label, 0) for label in VERIFY_TARGET_LABELS)
+    verify_target_ratios = (
+        {
+            label: verdict_counts.get(label, 0) / verify_target_total
+            for label in VERIFY_TARGET_LABELS
+        }
+        if verify_target_total > 0
+        else {}
+    )
     return Wh1ShadowDistributionSummary(
         total=total,
         verdict_counts=verdict_counts,
@@ -328,6 +421,12 @@ def summarize(
         turn_verdicts={k: turn_verdicts[k] for k in sorted(turn_verdicts)},
         transition_counts=transition_counts,
         transition_records=transition_records,
+        verify_target_total=verify_target_total,
+        verify_target_ratios=verify_target_ratios,
+        form_transition_counts=form_counts,
+        equation_turns=equation_turns,
+        form_records=form_records,
+        form_legacy_records=form_legacy_records,
         legacy_records=legacy_records,
         distinct_dialogues=len(dialogues),
         observed_at_min=observed_min,
@@ -361,11 +460,29 @@ class Wh1ShadowHarvestReport(BaseModel):
     appended: int
     """이번 수확으로 원장에 새로 append된 관측 수."""
 
+    filter_since: str | None
+    """집계 구간 시작(--since·ISO·포함). None이면 하한 없음."""
+
+    filter_until: str | None
+    """집계 구간 끝(--until·ISO·포함). None이면 상한 없음."""
+
+    filtered_out: int
+    """구간 밖이라 **집계에서 제외**된 관측 수(원장에는 그대로 남아 있다).
+
+    0이 아니면 이 리포트의 분포는 원장 전체가 아니라 *구간 표본*이다 — 그 사실이 리포트
+    본문에도 한 줄로 찍힌다(무엇을 보고 있는지 숨기지 않는다)."""
+
     summary: Wh1ShadowDistributionSummary
     """분포 요약 — 원장 사용 시 *원장 전체* 기준, 미사용 시 이번 입력(중복 제거) 기준."""
 
 
-def harvest_files(paths: Sequence[Path], *, store: Path | None = None) -> Wh1ShadowHarvestReport:
+def harvest_files(
+    paths: Sequence[Path],
+    *,
+    store: Path | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> Wh1ShadowHarvestReport:
     """로그 파일(들) 수확 → (옵션) 원장 축적 → 분포 리포트 — CLI 본체(파일 I/O 최소).
 
     원장(`store`) 사용 시: 원장 로드(자체 dedup) → 입력에서 원장에 없는 신규만 append →
@@ -388,6 +505,7 @@ def harvest_files(paths: Sequence[Path], *, store: Path | None = None) -> Wh1Sha
 
     if store is None:
         unique, duplicates = dedupe(observations)
+        in_window, filtered_out = filter_window(unique, since=since, until=until)
         return Wh1ShadowHarvestReport(
             sources=[str(p) for p in paths],
             accounting=accounting,
@@ -396,7 +514,10 @@ def harvest_files(paths: Sequence[Path], *, store: Path | None = None) -> Wh1Sha
             ledger_existing=0,
             ledger_broken=0,
             appended=0,
-            summary=summarize(unique),
+            filter_since=since.isoformat() if since is not None else None,
+            filter_until=until.isoformat() if until is not None else None,
+            filtered_out=filtered_out,
+            summary=summarize(in_window),
         )
 
     ledger_obs, ledger_broken = load_ledger(store)
@@ -405,6 +526,8 @@ def harvest_files(paths: Sequence[Path], *, store: Path | None = None) -> Wh1Sha
     ledger_unique, _ledger_dups = dedupe(ledger_obs, seen=seen)
     new_obs, duplicates = dedupe(observations, seen=seen)
     _append_ledger(store, new_obs)
+    # 축적은 *무필터*(원장은 전부 보존) — 필터는 **집계 창**에만 적용한다(축적 ≠ 판정 분모).
+    in_window, filtered_out = filter_window(ledger_unique + new_obs, since=since, until=until)
     return Wh1ShadowHarvestReport(
         sources=[str(p) for p in paths],
         accounting=accounting,
@@ -413,7 +536,10 @@ def harvest_files(paths: Sequence[Path], *, store: Path | None = None) -> Wh1Sha
         ledger_existing=len(ledger_unique),
         ledger_broken=ledger_broken,
         appended=len(new_obs),
-        summary=summarize(ledger_unique + new_obs),  # 원장 전체 기준(축적 목적)
+        filter_since=since.isoformat() if since is not None else None,
+        filter_until=until.isoformat() if until is not None else None,
+        filtered_out=filtered_out,
+        summary=summarize(in_window),  # 구간 미지정이면 원장 전체 기준(기존 동작 불변)
     )
 
 
@@ -442,6 +568,14 @@ def render_report(report: Wh1ShadowHarvestReport) -> str:
         )
     else:
         lines.append(f"[무축적] --store 미지정 — 이번 입력만 집계(중복 {report.input_duplicates})")
+    if report.filter_since is not None or report.filter_until is not None:
+        lines.append(
+            f"[집계 구간] since={report.filter_since or '하한 없음'} · "
+            f"until={report.filter_until or '상한 없음'} — 구간 밖 제외 {report.filtered_out}건"
+            " (원장에는 남아 있음·이 분포는 *구간 표본*이다)"
+        )
+    else:
+        lines.append("[집계 구간] 미지정 — 원장/입력 전체 기준 분포(회차 분리 없음)")
     lines.append(f"[관측 총 n] {s.total} · 고유 dialogue {s.distinct_dialogues}")
     if s.observed_at_min is not None and s.observed_at_max is not None:
         lines.append(
@@ -452,6 +586,30 @@ def render_report(report: Wh1ShadowHarvestReport) -> str:
         count = s.verdict_counts.get(label, 0)
         ratio = f" ({_fmt_ratio(s.verdict_ratios[label])})" if label in s.verdict_ratios else ""
         lines.append(f"  {label:<12}: {count}건{ratio}")
+    # 판정 모집단(none 제외) — 사전등록 판정문의 분모. 위 4-라벨 비율과 분모가 다르다는 사실을
+    # 같은 화면에 병기해 "화면 숫자를 그대로 읽는" 오독을 구조적으로 막는다(판정선은 없음).
+    lines.append("[판정 모집단 — verify 호출 턴만(none 제외·사전등록 분모)]")
+    lines.append(f"  모집단 n     : {s.verify_target_total}건 (위 총 n {s.total} 중)")
+    if s.verify_target_ratios:
+        for label in VERIFY_TARGET_LABELS:
+            count = s.verdict_counts.get(label, 0)
+            lines.append(f"  {label:<12}: {count}건 ({_fmt_ratio(s.verify_target_ratios[label])})")
+    else:
+        lines.append("  (모집단 0건 — 비율 산출 불가·0%로 위장하지 않음)")
+    # 전이 형태 축(S3-51) — S3-02 해집합 경로가 실제로 작동한 횟수·혼합 형태 잔여.
+    lines.append("[전이 형태 — 등호 방정식(해집합 경로·S3-02) / 혼합 형태]")
+    lines.append(
+        f"  형태 축 보유 {s.form_records}건 · 구판(축 미보유) {s.form_legacy_records}건 "
+        "— 구판은 합산 제외(정직 회계)"
+    )
+    if s.form_records > 0:
+        lines.append(
+            f"  {'Σ등호 방정식 전이':<16}: {s.form_transition_counts.get('equation', 0)}건"
+        )
+        lines.append(f"  {'Σ혼합 형태 전이':<16}: {s.form_transition_counts.get('mixed', 0)}건")
+        lines.append(f"  {'등호 전이 >=1 턴':<16}: {s.equation_turns}건")
+    else:
+        lines.append("  (합산 불가 — 형태 축 보유 레코드 0건)")
     lines.append("[status 분포]")
     if s.status_counts:
         for status, count in s.status_counts.items():
@@ -505,6 +663,21 @@ def main(argv: list[str] | None = None) -> int:
         help="누적 원장 ndjson 경로 — 있으면 dedup 후 신규만 append·원장 전체 기준 집계.",
     )
     parser.add_argument(
+        "--since",
+        type=str,
+        default=None,
+        help=(
+            "집계 구간 시작(ISO 8601·포함) — 예 2026-09-22T09:00:00+09:00. 원장은 축적이라 "
+            "이전 회차가 같은 분모에 남는다. 회차 하나를 판정하려면 이 구간을 준다."
+        ),
+    )
+    parser.add_argument(
+        "--until",
+        type=str,
+        default=None,
+        help="집계 구간 끝(ISO 8601·포함). 미지정이면 상한 없음.",
+    )
+    parser.add_argument(
         "--json",
         type=Path,
         default=None,
@@ -516,8 +689,41 @@ def main(argv: list[str] | None = None) -> int:
     store: Path | None = args.store
     json_out: Path | None = args.json_out
 
+    # 구간 인자 파싱 — 형식 오류는 조용히 무시하지 않고 입력 오류(exit 2)로 거부한다.
+    # 잘못 적힌 --since를 무시하면 "필터가 걸린 줄 알았는데 원장 전체를 판정"이 된다.
+    bounds: dict[str, datetime | None] = {"since": None, "until": None}
+    for name in ("since", "until"):
+        raw: str | None = getattr(args, name)
+        if raw is None:
+            continue
+        try:
+            moment = datetime.fromisoformat(raw)
+        except ValueError as exc:
+            print(
+                f"--{name} 파싱 실패({type(exc).__name__}): {raw!r} — ISO 8601이어야 한다"
+                " (예 2026-09-22T09:00:00+09:00)",
+                file=sys.stderr,
+            )
+            return _EXIT_ERROR
+        if moment.tzinfo is None:
+            # 해석 규칙을 숨기지 않는다 — naive 입력은 UTC로 간주하고 그 사실을 알린다.
+            print(
+                f"⚠ --{name}에 시간대가 없어 UTC로 해석한다: {moment.isoformat()}Z"
+                " (KST로 주려면 +09:00을 붙인다)",
+                file=sys.stderr,
+            )
+            moment = moment.replace(tzinfo=timezone.utc)
+        bounds[name] = moment
+
+    since, until = bounds["since"], bounds["until"]
+    if since is not None and until is not None and since > until:
+        print(
+            f"--since({since.isoformat()})가 --until({until.isoformat()})보다 늦다", file=sys.stderr
+        )
+        return _EXIT_ERROR
+
     try:
-        report = harvest_files([Path(p) for p in log_paths], store=store)
+        report = harvest_files([Path(p) for p in log_paths], store=store, since=since, until=until)
     except OSError as exc:
         # 부분 수확을 리포트로 위장하지 않는다 — 어떤 파일이 왜 안 읽혔는지 타입명과 함께 보고.
         print(f"로그 파일 읽기 실패({type(exc).__name__}): {exc}", file=sys.stderr)

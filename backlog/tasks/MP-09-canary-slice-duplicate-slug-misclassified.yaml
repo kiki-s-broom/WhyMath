@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MP-09-canary-slice-duplicate-slug-misclassified
+title: "canary_slice가 중복 slug를 파싱 손상으로 오분류해 fail-close — 회차 내 중복이 지배적인 실상에서 절단 자체가 불가"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①결함 고정(실측 2026-09-21) — `canary_slice`가 검수 큐의 **중복 slug 행**을 파싱 손상과 같은 바구니에 담아 fail-close한다. 라이브 실측: run_id c0854e382b50415eb11829d991c93820(카나리 30·중복 20)에서 `SLICE_EXIT=1` · stderr 「해결원에 손상된 행이 있다」 + `review_queue`에 `DuplicateSlug(first kept)` 11건. 코퍼스·genlog·대장은 멀쩡했다.\n②왜 결함인가(코드 3곳 대조) — ⓐ `_queue_index` docstring이 「같은 slug가 회차를 넘어 재출현하는 것은 큐의 정상 동작이므로(재시도) 실패가 아니라 사유 수집 대상이다」라고 *명시*하는데 호출부(`canary_slice.py:532`)가 그 errors를 `source_errors[\"review_queue\"]`에 합쳐 `_fail`로 보낸다 ⓑ fail-close 정당화 주석은 「손상 행의 slug를 읽을 수 없으므로 어느 후보였는지 판정할 방법이 없다」인데 DuplicateSlug 행은 slug를 **읽었기 때문에** 중복으로 분류된다 — 논거가 이 부류에 적용되지 않는다 ⓒ 요약에 `duplicate_slug_rows`(`:573`)가 이미 있고 MP-07 런북 §2 표도 이를 연성 조건으로 적는다(「0이 아니면 같은 문항이 두 번 실려 실검수 건수가 산출 건수보다 적어집니다」). 문서 둘과 코드가 어긋난다.\n③영향 — 회차 내 구조 중복은 LLM 저작의 지배적 실패 모드다(2026-08 S2-o 실측 「60회 중 82% 판박이」·이번 회차 20/30). 그 경우 카나리 절단이 **구조적으로 불가능**해져 게이트 `G-eos-first-run-canary-review`의 증적 경로가 막힌다. 즉 이 결함은 예외 상황이 아니라 상시 상태를 막는다.\n④처분 — 중복 slug는 fail-close에서 빼고 **계수·보고**로 내린다(요약에 큐 중복 행 수와 건별 사유를 싣는다). 진짜 파싱 손상(`queue_load_errors`)·코퍼스 손상·genlog 손상·대장 손상의 fail-close는 **그대로 둔다** — 이 태스크는 안전 계약을 넓히는 것이 아니라 잘못 분류된 한 부류를 옮기는 것이다.\n⑤집행 지점(정본화와 별항) — 고친 뒤 **라이브 회차 산출물로 실제 절단이 성립하는지**까지 확인한 것이 완료다(Kiki 머신 mp02-out · 기대: emitted 30 · unresolved_count 0 · resolved_from.corpus 8). 단위 테스트 통과만으로는 이 결함이 처음 드러난 조건을 재현하지 못한다.\n⑥변별력(실패 주입) — 세 방향을 각각 확인한다: ⓐ 중복 slug만 있는 큐 → exit 0 + 중복 수가 요약에 실림 ⓑ 진짜 파싱 손상 행이 있는 큐 → 여전히 exit 1(안전 계약 유지) ⓒ 수정을 되돌리는 뮤테이션 → RED. ⓑ가 없으면 「fail-close를 통째로 없앤」 과잉 수정이 통과한다.\n⑦기존 테스트 공백 명시 — 중복 slug 큐 픽스처가 `tests/backend/harness/test_canary_slice.py`에 0건이다(`test_corrupt_review_queue_row_is_failure`는 파싱 손상 축). 그래서 이 동작은 한 번도 검증된 적이 없고 문서와 어긋난 채로 착지했다 — 픽스처를 추가하는 것이 수정의 일부다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/canary_slice.py
+  - tests/backend/harness/test_canary_slice.py
+session: claude/optimistic-johnson-58q3nw
+notes: ""
+updated: 2026-09-22

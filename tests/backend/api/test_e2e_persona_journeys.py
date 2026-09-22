@@ -108,6 +108,13 @@ def _load_week2_harness() -> ModuleType:
 
 
 _W2 = _load_week2_harness()
+# EOS-126 중단 규칙 2종의 상수 — 테스트가 값을 복제하지 않고 소스에서 읽는다(상한을 바꾸면
+# 단언과 픽스처가 함께 따라간다).
+from whymath_backend.l2.next_problem_selection import (  # noqa: E402
+    MAX_ADMINISTERED_ITEMS as _MAX_ADMINISTERED_ITEMS,
+)
+from whymath_backend.l2.next_problem_selection import TARGET_SE as _TARGET_SE  # noqa: E402
+
 _EXPECTED_MISCONCEPTION = _W2._EXPECTED_MISCONCEPTION
 _UNMATCHED_WRONG_ANSWER = _W2._UNMATCHED_WRONG_ANSWER
 _WRONG_ANSWER = _W2._WRONG_ANSWER
@@ -433,6 +440,36 @@ def _seed_problems(
         content.problem_ids.append(pid)
         pids.append(pid)
     return pids
+
+
+def _provisioned_by(client: Any, auth: dict[str, str]) -> str | None:
+    """이 학생의 `learner_state` 행이 **무엇 때문에** 생겼는지 — 없으면 None.
+
+    읽기 전용 SELECT다(Week 1 하네스 `_fetch_all`과 같은 규약 — 읽기는 "DB 직접 수정"이
+    아니므로 판정에 허용된다). 공개 표면으로는 볼 수 없는 값이라 행을 직접 읽는다.
+    """
+    # `GET /v1/me`는 없다(`DELETE`만 — 2026-09-21 라우터 실측). 본인 user_id를 내는 공개
+    # 표면은 반출권 export다(`UserDataExport.user_id`).
+    user_id = uuid.UUID(_get(client, auth, "/v1/me/export")["user_id"])
+
+    async def _read() -> str | None:
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        engine = create_async_engine(_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                row = (
+                    await conn.execute(
+                        text("SELECT provisioned_by FROM learner_state WHERE learner_id = :lid"),
+                        {"lid": str(user_id)},
+                    )
+                ).first()
+            return None if row is None else str(row[0])
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(_read())
 
 
 def _begin(persona: str) -> tuple[_Content, _Journal]:
@@ -873,14 +910,20 @@ def test_persona_c_misconception_confidence_declines_after_targeted_problem() ->
 
 
 def test_persona_a_diagnosis_confirmation_and_study_entry_are_blocked() -> None:
-    """A 연장: 진단 확정이 쓰이지 않아 학습 진입이 409로 막힌다(`EOS-126` 동결).
+    """A 연장: **짧은** 진단 세션은 확정되지 않아 학습 진입이 409로 막힌다.
 
-    끊긴 사슬 세 마디 — ①CAT 중단 규칙(SE ≤ 0.3)에 닿지 못해 ②`assessments/capture`가
-    `insufficient_measurement`로 끝나고, 그 분기에서만 도는 `provision_learner_state`가
-    실행되지 않아 ③`POST /v1/me/objectives/{id}/study`가 **409**를 낸다.
+    사슬 세 마디 — ①중단 규칙 **둘 다** 미발화(SE > 0.3이고 채점 응답 4건 < 상한 20)라
+    ②`assessments/capture`가 `insufficient_measurement`로 끝나고, 그 분기에서만 도는
+    `provision_learner_state`가 실행되지 않아 ③`POST /v1/me/objectives/{id}/study`가 **409**.
 
-    이 단언들이 빨강이 되면 결함이 해소된 것이다 — 그때 `EOS-126`을 닫으면서 여기를
-    `written is True` + `study 201`로 뒤집는다(그 뒤집기가 `EOS-126` acceptance ④다).
+    **`EOS-126` 해소 후 이 테스트의 지위가 바뀌었다.** 해소 전에는 "진단이 *영원히* 확정되지
+    않는다"는 결함의 동결이었다. 지금은 **정상 동작의 동결**이다 — 4문항짜리 세션이 진단으로
+    확정되면 그것이 결함이다(측정 근거 없이 학습 경로를 정하게 된다). 해소의 증거는 여기가
+    아니라 바로 아래 `..._confirms_at_item_cap`이며, 그쪽이 `written=True`·`study 201`을
+    단언한다(`EOS-126` acceptance ④의 뒤집기 — ⑬이 열어 둔 "문항 수를 늘려 뒤집을지"의 답).
+
+    두 테스트가 함께 있어야 변별력이 산다: 이것만 있으면 "아무것도 확정 안 됨"이, 저것만
+    있으면 "아무거나 확정됨"이 통과한다.
     """
     content, journal = _begin("A-진단확정")
     try:
@@ -905,14 +948,15 @@ def test_persona_a_diagnosis_confirmation_and_study_entry_are_blocked() -> None:
             body = capture.json()
             journal.record(
                 "②진단확정",
-                "EOS-126 — CAT 중단 규칙(SE ≤ 0.3) 미도달로 적재 안 됨",
+                "중단 규칙 둘 다 미발화(SE > 0.3 · 채점 4건 < 상한) → 적재 안 됨",
                 written=body["written"],
                 reason=body["reason"],
                 SE=round(body["standard_error"], 3) if body["standard_error"] else None,
             )
             assert body["written"] is False, (
-                "진단 확정이 쓰였다 — CAT 중단 규칙이 해소된 것이다. `EOS-126`을 닫고 이 "
-                "단언을 `written is True`로, 아래 학습 진입 단언을 201로 뒤집어라."
+                "4문항 세션이 진단으로 확정됐다 — 중단 규칙 둘 중 하나가 너무 느슨하다. "
+                f"상한({_MAX_ADMINISTERED_ITEMS})이 4 이하로 내려갔거나 `TARGET_SE`가 "
+                "측정 근거를 잃을 만큼 완화된 것이다(`EOS-126` acceptance ③의 금지선)."
             )
             assert body["reason"] == "insufficient_measurement", body
 
@@ -931,9 +975,153 @@ def test_persona_a_diagnosis_confirmation_and_study_entry_are_blocked() -> None:
                 f"학습 진입이 409가 아니다: {study.status_code} {study.text}\n"
                 "  · 404라면 EOS-126의 증거가 아니라 **픽스처 결함**이다 — 목표 행이 안 심겼고, "
                 "그 검사가 진단 게이트보다 앞서므로 학습자 상태와 무관하게 막힌다.\n"
-                "  · 201이라면 게이트가 열린 것이므로 ②의 동결과 함께 이 절도 뒤집는다."
+                "  · 201이라면 4문항만으로 학습자 상태가 생긴 것이다 — 진단 게이트가 "
+                "측정 근거 없이 열렸다."
             )
             assert "진단" in study.json()["detail"], study.json()
+        journal.dump()
+    finally:
+        content.teardown()
+
+
+def test_persona_a_diagnosis_confirms_at_item_cap_and_study_entry_opens() -> None:
+    """A 연장: 문항 수 상한에 닿으면 진단이 확정되고 학습 진입이 열린다(`EOS-126` 해소 동결).
+
+    이것이 `EOS-126` acceptance ④/⑨가 요구한 **뒤집기**다. 위 4문항 테스트가 "짧은 세션은
+    확정되지 않는다"를 지키고, 이 테스트가 "감당 가능한 길이에서는 확정된다"를 지킨다.
+
+    네 마디를 단언한다:
+      ① 상한만큼 채점되면 `capture`가 `written=True`로 적재한다.
+      ② 그 확정은 정밀도를 **참칭하지 않는다** — `reason="captured_at_item_cap"`이고
+         `measurement_sufficient`는 False다(SE는 여전히 목표 미달). 이 절이 이 테스트의
+         핵심이다: 상한을 "임계를 낮춰 통과시키는 장치"로 쓰지 않았음을 기계가 지킨다.
+      ③ 그 분기에서 `provision_learner_state`가 돌아 `learner_state` 행이 생긴다.
+      ④ 그래서 `POST /v1/me/objectives/{id}/study`가 **409를 내지 않는다** — 끊겼던
+         "진단 → 학습" 화살표가 이어진다(계획서 §11 페르소나 A · §18 조건 3).
+
+    **왜 201이 아니라 "409 아님"인가**: 이 화살표에는 마디가 둘이고 `EOS-126`은 앞 마디만
+    소유한다. 게이트를 통과한 뒤 `supply()`가 이 개념의 DSL을 못 찾아 404를 내는데, 그것은
+    `PED-17` acceptance ①이 이미 소유한 **다른 결함**이다(저장소에서 `/study` 201에 닿는
+    테스트는 전부 `supply()`를 대역으로 바꾼다 — 실제 콘텐츠를 심는 경로가 없다). 여기서
+    201을 요구하면 `EOS-126`의 판정이 남의 태스크에 인질로 잡힌다. 대신 ④-b가 그 404를
+    사유까지 동결해 두어, 콘텐츠가 열리면 빨강으로 알려 준다.
+
+    **왜 이 길이인가**: `TARGET_SE=0.3`은 이 경로가 모든 응답을 Rasch(a=1.0)로 다루는 한
+    45문항이 이론적 하한이라(`MAX_ADMINISTERED_ITEMS` 주석의 실측) 한 자리에서 도달할 수
+    없다. 상한은 그 도달 불가를 *정직하게 우회*하는 2차 중단 규칙이다.
+    """
+    content, journal = _begin("A-상한확정")
+    try:
+        cid, code = _seed_concept(content, "cap", "완전제곱식의 전개")
+        # 상한 도달에 필요한 만큼 + 1(경계 바로 앞과 바로 뒤를 같은 회차에서 본다).
+        difficulties = [2.0 + 0.1 * i for i in range(_MAX_ADMINISTERED_ITEMS)]
+        pids = _seed_problems(content, cid, "c", difficulties)
+        objective_id = _seed_objective(content, code)
+
+        with _client() as client:
+            _erase_learner(client)
+            auth = _login(client)
+
+            # ① 상한 **직전**까지 — 아직 확정되면 안 된다(경계의 변별력).
+            for index, pid in enumerate(pids[:-1]):
+                _attempt(client, auth, pid, correct=index % 3 != 0, answer=_UNMATCHED_WRONG_ANSWER)
+            before = client.post("/v1/me/assessments/capture", headers=auth)
+            assert before.status_code == 200, before.text
+            before_body = before.json()
+            journal.record(
+                "①상한직전",
+                f"채점 {_MAX_ADMINISTERED_ITEMS - 1}건 — 상한 미달이라 확정 안 됨",
+                written=before_body["written"],
+                reason=before_body["reason"],
+                채점수=before_body["administered_count"],
+            )
+            assert before_body["written"] is False, (
+                f"상한({_MAX_ADMINISTERED_ITEMS}) 직전인 "
+                f"{_MAX_ADMINISTERED_ITEMS - 1}건에서 확정됐다 — 경계가 하나 어긋났다(off-by-one)."
+            )
+            assert before_body["reason"] == "insufficient_measurement", before_body
+            assert before_body["administered_count"] == _MAX_ADMINISTERED_ITEMS - 1, before_body
+
+            # ② 상한 도달 — 여기서 확정된다.
+            _attempt(client, auth, pids[-1], correct=True, answer=_UNMATCHED_WRONG_ANSWER)
+            capture = client.post("/v1/me/assessments/capture", headers=auth)
+            assert capture.status_code == 200, capture.text
+            body = capture.json()
+            journal.record(
+                "②상한확정",
+                "EOS-126 2차 중단 규칙 발화 — 정밀도가 아니라 문항 수로 확정",
+                written=body["written"],
+                reason=body["reason"],
+                정밀도달성=body["measurement_sufficient"],
+                SE=round(body["standard_error"], 3) if body["standard_error"] else None,
+                채점수=body["administered_count"],
+            )
+            assert body["written"] is True, (
+                f"상한({_MAX_ADMINISTERED_ITEMS})에 닿았는데 확정되지 않았다: {body}. "
+                "2차 중단 규칙이 끊긴 것이다 — `EOS-126`이 재발했다."
+            )
+            assert body["administered_count"] >= _MAX_ADMINISTERED_ITEMS, body
+            # ②-b **정직 표기** — 상한 확정이 정밀도 달성을 참칭하면 안 된다.
+            assert body["reason"] == "captured_at_item_cap", (
+                f"상한 확정의 사유가 `captured_at_item_cap`이 아니다: {body['reason']}. "
+                "정밀도로 확정된 회차와 구별되지 않으면 downstream이 이 진단의 신뢰도를 "
+                "알 수 없다(침묵 실패)."
+            )
+            assert body["measurement_sufficient"] is False, (
+                "상한으로 확정했는데 `measurement_sufficient`가 True다 — 상한이 정밀도 달성을 "
+                "참칭하고 있다. `TARGET_SE`를 낮춰 통과시킨 것과 같다"
+                "(`EOS-126` acceptance ③의 금지선)."
+            )
+            assert body["standard_error"] is not None and body["standard_error"] > _TARGET_SE, body
+
+            # ③ 학습자 상태 행 — 확정 분기에서만 도는 `provision_learner_state`의 산출물.
+            #    학습 진입 201과 **별개로** 단언한다: 201만 보면 "게이트가 열렸다"는 알아도
+            #    "행이 생겨서 열렸다"는 모른다(게이트 자체가 사라져도 201이 나온다).
+            #    `GET /v1/me/learner-state`로는 볼 수 없다 — 그 표면은 숙달·능력을 합성해
+            #    돌려줄 뿐 행의 생성 사유(`provisioned_by`)를 담지 않는다(2026-09-21 실측).
+            provisioned_by = _provisioned_by(client, auth)
+            journal.record(
+                "③학습자상태",
+                "진단 확정 분기에서 자동 생성(계획서 §18 조건 3)",
+                provisioned_by=provisioned_by,
+            )
+            assert provisioned_by == "diagnosis_capture", (
+                f"학습자 상태 행이 진단 확정으로 만들어지지 않았다: {provisioned_by!r}. "
+                "None이면 행 자체가 없다 — 확정 분기에서 "
+                "`provision_learner_state(reason=diagnosis_capture)`가 돌지 않은 것이다."
+            )
+
+            # ④ 학습 진입 — 끊겼던 화살표가 이어진다.
+            study = client.post(f"/v1/me/objectives/{objective_id}/study", headers=auth)
+            journal.record(
+                "④학습진입",
+                "진단이 확정됐으므로 루프 진입 게이트가 열린다",
+                status=study.status_code,
+                응답=study.json().get("detail"),
+            )
+            # ④-a **EOS-126의 뒤집기는 이 단언이다** — 진단 게이트가 더 이상 막지 않는다.
+            assert study.status_code != 409, (
+                f"학습 진입이 여전히 409다: {study.text}\n"
+                "진단이 확정(`written=True`)되고 학습자 상태 행까지 생겼는데 루프 진입이 "
+                "막혔다 — `EOS-126`의 끊긴 화살표가 재발했다."
+            )
+            # ④-b 남은 마디는 **다른 결함**이다(`PED-17` acceptance ① 소유). 진단 게이트를
+            #     통과한 뒤 `supply()`가 이 개념의 DSL을 못 찾아 404를 낸다. `EOS-126`의
+            #     범위가 아니므로 여기서 고치지 않고, 대신 *지금 사실*을 동결한다 — 콘텐츠
+            #     공급이 열리면 이 단언이 빨강이 되고, 그때 201로 승격하면 된다.
+            #     사유를 문자열로 함께 잠근다: 그러지 않으면 목표 부재 404(픽스처 결함)와
+            #     구별되지 않아 단언이 변별력을 잃는다(`EOS-126` acceptance ⑦).
+            assert study.status_code == 404, (
+                f"학습 진입이 404가 아니다: {study.status_code} {study.text}\n"
+                "201이라면 콘텐츠 공급이 열린 것이다 — `PED-17`을 닫으면서 이 단언을 201로 "
+                "승격하라."
+            )
+            assert study.json()["detail"] == "이 개념의 학습 콘텐츠가 아직 준비되지 않았습니다.", (
+                f"404의 사유가 콘텐츠 미적재가 아니다: {study.json()}. "
+                "'학습목표를 찾을 수 없습니다' 계열이면 픽스처 결함이다(목표 행 미시딩) — "
+                "그 상태는 진단 게이트보다 *앞서* 막으므로 이 회차는 EOS-126을 판정하지 "
+                "못한 것이다."
+            )
         journal.dump()
     finally:
         content.teardown()

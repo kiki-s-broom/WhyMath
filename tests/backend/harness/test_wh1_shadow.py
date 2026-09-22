@@ -180,6 +180,8 @@ class TestNoRawLeak:
         # n_correct/n_incorrect/n_unverifiable(S3-07)은 비식별 *정수* 카운트라 허용 목록에 든다.
         # primary/tone_rewritten/tone_violations(S1-11 flip)도 비식별 bool·정수뿐(발화 원문 없음).
         # prose_rephrased/prose_reason_code(S4-04)도 비식별 bool·코드 라벨뿐(발화 원문 없음).
+        # n_equation_transitions/n_mixed_form_transitions(S3-51)도 비식별 *정수* 개수뿐 —
+        # 어느 경로로 판정했는지의 횟수이지 식·원문이 아니다(형태 라벨은 폐쇄 3종 enum).
         parsed = json.loads(raw)
         assert set(parsed.keys()) <= {
             "status",
@@ -188,6 +190,8 @@ class TestNoRawLeak:
             "n_correct",
             "n_incorrect",
             "n_unverifiable",
+            "n_equation_transitions",
+            "n_mixed_form_transitions",
             "tool_calls",
             "hypothesis_count",
             "dialogue_id",
@@ -457,3 +461,110 @@ class TestTransitionCounts:
         obs = Wh1HarnessShadowObservation.model_validate_json(_records(caplog)[0])
         assert obs.verify_verdict is None
         assert (obs.n_correct, obs.n_incorrect, obs.n_unverifiable) == (0, 0, 0)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑦ 전이 형태 축(S3-51) — S3-02 해집합 경로의 '작동한 횟수' 관측
+# ──────────────────────────────────────────────────────────────────────────
+class TestFormCounts:
+    """턴당 전이 *형태* 카운트(등호 방정식·혼합) 동결 — 자유사용 대표측정 V3가 읽는 축.
+
+    3-state만으로는 "등호 방정식을 해집합 경로로 판정한 correct"와 "표현식 동치 correct"가
+    구분되지 않는다. 그래서 S3-02가 실사용에서 몇 번 작동했는지를 원장이 말하지 못했다
+    (CLAUDE.md '작동 신호 없는 알고리즘 부착 금지'). 이 축은 그 횟수를 정수로만 남긴다.
+    """
+
+    def test_counts_sum_form_labels_from_trace(self) -> None:
+        trace = [
+            ToolResult(
+                kind="verify_step",
+                ok=True,
+                detail="검증 correct(내부).",
+                verify_form_counts={"equation": 2, "expression": 1},
+            ),
+            ToolResult(
+                kind="verify_step",
+                ok=True,
+                detail="검증 unverifiable(내부).",
+                verify_form_counts={"mixed": 1},
+            ),
+            ToolResult(kind="end_turn", ok=True, detail="학생 발화 산출(질문)."),
+        ]
+        assert wh1_shadow._count_verify_forms(trace) == (2, 1)
+
+    def test_rejected_and_legacy_results_contribute_nothing(self) -> None:
+        # ok=False(거부)는 판정이 아니고, 형태 카운트가 없는 결과(None)는 0으로 합산된다 —
+        # 판정 축(_count_verify_verdicts)의 규칙과 동형이라 두 축이 어긋나지 않는다.
+        trace = [
+            ToolResult(
+                kind="verify_step",
+                ok=False,
+                detail="verify 거부 — 게이트 위반.",
+                verify_form_counts={"equation": 9},
+            ),
+            ToolResult(kind="verify_step", ok=True, detail="검증 correct(내부)."),
+        ]
+        assert wh1_shadow._count_verify_forms(trace) == (0, 0)
+
+    def test_equation_chain_end_to_end_counts_two_transitions(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # 배선 동결(L3 분기 → 하네스 트레이스 → 레코드): 등호 방정식 3단계 = 전이 2개가
+        # 해집합 경로로 판정되고, 그 2가 레코드의 n_equation_transitions로 그대로 나온다.
+        # 이 테스트가 없으면 "형태 축을 만들었다"와 "그 축이 실제로 채워진다"가 구분되지 않는다.
+        provider = _FakeProvider(
+            [
+                '{"kind": "end_turn", "action_type": "격려"}',  # verify 의무로 재지정됨
+                '{"kind": "end_turn", "action_type": "격려"}',
+            ]
+        )
+        with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+            asyncio.run(
+                observe_wh1_harness_shadow(
+                    student_solution="2x+3=7 을 풀었어",
+                    solution_steps=["2*x+3=7", "2*x=4", "x=2"],
+                    active_hypotheses=[],
+                    provider=provider,
+                )
+            )
+        obs = Wh1HarnessShadowObservation.model_validate_json(_records(caplog)[0])
+        assert obs.verify_verdict == "correct"
+        assert obs.n_equation_transitions == 2
+        assert obs.n_mixed_form_transitions == 0
+
+    def test_mixed_form_input_is_counted_separately(self, caplog: pytest.LogCaptureFixture) -> None:
+        # 등식↔표현식 혼합 입력은 등호 전이로 계상되지 않고 혼합 축에 쌓인다 — V3 미달의
+        # 원인이 '백엔드 판정'이 아니라 '입력 형태'임을 리포트가 구분하게 하는 축이다.
+        provider = _FakeProvider(['{"kind": "end_turn", "action_type": "격려"}'])
+        with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+            asyncio.run(
+                observe_wh1_harness_shadow(
+                    student_solution="정리했어",
+                    solution_steps=["2*x+3=7", "2*x"],
+                    active_hypotheses=[],
+                    provider=provider,
+                )
+            )
+        obs = Wh1HarnessShadowObservation.model_validate_json(_records(caplog)[0])
+        assert obs.n_equation_transitions == 0
+        assert obs.n_mixed_form_transitions == 1
+
+    def test_turn_without_verify_records_zero_not_none(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # 신판 emit은 verify 미호출 턴도 0을 기록한다 — None(구판·미기록)과 구분되어야
+        # 수확기가 '축 없음'과 '0회'를 섞지 않는다(전이 카운트 S3-07 규칙 동형).
+        provider = _FakeProvider(['{"kind": "end_turn", "action_type": "격려"}'])
+        with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+            asyncio.run(
+                observe_wh1_harness_shadow(
+                    student_solution="질문이 있어",
+                    solution_steps=[],
+                    active_hypotheses=[],
+                    provider=provider,
+                )
+            )
+        obs = Wh1HarnessShadowObservation.model_validate_json(_records(caplog)[0])
+        assert obs.verify_verdict is None
+        assert obs.n_equation_transitions == 0
+        assert obs.n_mixed_form_transitions == 0

@@ -527,9 +527,16 @@ def main(argv: list[str] | None = None) -> int:
     # 이 네 파일은 같은 파이프라인이 append로 쓰는 기계 산출물이라 손상 자체가 이상 사건이다.
     # 산출물이 게이트 증적(`G-eos-first-run-canary-review`)이 되는 이상, "일부는 읽었다"로
     # 넘어가는 예외 경로를 두지 않는다 — 예외 경로가 곧 다음 구멍이 된다.
+    # 중복 slug는 이 바구니에 **넣지 않는다**(MP-09). 위 논거는 "손상 행의 slug를 읽을 수
+    # 없다"에 기대는데, `DuplicateSlug` 행은 slug를 **읽었기 때문에** 중복으로 분류된 것이라
+    # 그 논거가 적용되지 않는다. `_queue_index`의 계약도 그것을 "실패가 아니라 사유 수집
+    # 대상"이라고 명시한다. 실측(2026-09-21 라이브 회차): 회차 안에서 같은 구조가 반복되면
+    # — LLM 저작의 지배적 실패 모드다(카나리 30 중 중복 20) — 큐에 같은 slug가 여러 줄
+    # 실리는 것이 정상이므로, 이것을 손상으로 닫으면 **상시 상태에서 절단이 불가능**해지고
+    # 게이트 증적 경로가 통째로 막힌다. 대신 아래 요약이 건수와 건별 사유로 보고한다.
     source_errors = {
         "corpus": corpus_errors,
-        "review_queue": [*queue_load_errors, *queue_dup_errors],
+        "review_queue": queue_load_errors,
     }
     broken_sources = {name: errs for name, errs in source_errors.items() if errs}
     if broken_sources:
@@ -597,8 +604,16 @@ def main(argv: list[str] | None = None) -> int:
             "ledger": ledger_errors,
             "genlog": genlog_errors,
             "corpus": corpus_errors,
-            "review_queue": [*queue_load_errors, *queue_dup_errors],
+            # 파싱 손상만 여기 담는다(fail-close 대상과 같은 집합). 중복 slug는 손상이 아니라
+            # 큐의 정상 동작이므로 아래 `queue_duplicate_slugs`로 분리해 보고한다 — 두 부류를
+            # 한 칸에 담으면 읽는 사람이 "닫히는 것"과 "세어지는 것"을 구별할 수 없다.
+            "review_queue": queue_load_errors,
         },
+        # 큐 파일 안에서 같은 slug가 두 번 이상 나온 행(첫 행을 채택하고 나머지는 색인에서
+        # 제외했다). 재시도·회차 내 dedup 거부에서 정상적으로 발생한다 — 건수가 0이 아니어도
+        # 절단은 성립하며, 검수자가 같은 문항을 중복으로 보지 않게 하는 것이 이 처리의 목적이다.
+        "queue_duplicate_slug_rows": len(queue_dup_errors),
+        "queue_duplicate_slugs": queue_dup_errors,
     }
 
     if canary_size > 0 and not result.rows:

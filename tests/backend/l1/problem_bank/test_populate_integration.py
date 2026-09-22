@@ -137,6 +137,17 @@ def _cleanup(created_codes: list[str] | None = None) -> None:
                 ),
                 {"slugs": _SLUGS},
             )
+            # LIC-03 — 원장 선삭제. `content_provenance.problem_id → problem`은
+            # ON DELETE 절이 없어(NO ACTION) 원장 행이 남아 있으면 문항 DELETE가
+            # IntegrityError로 막힌다(2026-09-21 실 PG 프로브 실측). 감사 추적을 조용히
+            # 지우지 않으려는 의도적 설계이므로, 정리하는 쪽이 순서를 맞춘다.
+            conn.execute(
+                text(
+                    "DELETE FROM content_provenance WHERE problem_id IN "
+                    "(SELECT problem_id FROM problem WHERE slug = ANY(:slugs))"
+                ),
+                {"slugs": _SLUGS},
+            )
             conn.execute(text("DELETE FROM problem WHERE slug = ANY(:slugs)"), {"slugs": _SLUGS})
             if created_codes:
                 # 이 테스트가 *만든* 개념 행만 제거 — 실 원자 백본 행은 보호.

@@ -5,7 +5,7 @@ track: infra-debt
 stage: E2
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "1) LicenseType enum에 KOGL_0~4, CC0, CC_BY, CC_BY_SA, CC_BY_NC, CC_BY_ND, CC_BY_NC_SA, CC_BY_NC_ND, INTERNAL_OWNED, CONTRACT_LICENSED, DIRECT_PERMISSION, UNKNOWN, RESTRICTED 추가. 2) SourceEntity, RightsEntity, RightsHolderEntity ORM + alembic migration 생성. 3) content_source, content_rights N:M 연결 테이블 및 Permission primitive(display/copy/modify/translate/commercial_use/download/rag_index/ai_context/ai_training/ai_fine_tuning/ai_evaluation) 스키마 추가. 4) POST /rights/check API 구현(decision: ALLOW/ALLOW_WITH_ATTRIBUTION/REVIEW_REQUIRED/DENY + reason_code). 5) AI 파이프라인 및 RAG retrieval 앞단에 Rights Gateway 연결. 6) Attribution 자동 생성기(공공누리/CC/자체/계약별 템플릿) 구현. 7) ruff/black/mypy/pytest 통과. 8) PR 생성."
-artifacts: []
+artifacts:
+  - "af712f09 (#861)"
 paths:
   - "src/backend/whymath_backend/**"
   - "tests/backend/**"
   - "schemas/v1.1/**"
-session: claude/lic-01-rights-provenance-mvp
+session: null
 notes: "EOS 42번 모듈에 해당. 제공된 83개 항목 저작권·출처 관리 검토 문서의 MVP 10가지(§76)를 우선 구현. WhyMath 확정 원칙과 정합: L1~L4 독립 수학 코어, 표현≠의미, LLM 안전, 공공누리 AI유형, EBS/평가원/검정교과서 금지.\n\n[정정 2026-09-01] eos_priority null → P1: 저작권 레일 불변 계약 — Rights & Provenance MVP. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-21
