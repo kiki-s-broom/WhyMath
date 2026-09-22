@@ -561,3 +561,83 @@ class TestThisRoundVerdictWins:
         rows = _read_jsonl(queue_out)
         assert rows[0]["status"] == STATUS_CORPUS_RESOLVED
         assert rows[0]["resolved_from"] == "corpus"
+
+
+class TestDuplicateSlugIsCountedNotFatal:
+    """MP-09 — 큐의 **중복 slug**는 손상이 아니라 정상 동작이다.
+
+    실측 경위 (2026-09-21 라이브 회차 · `run_id c0854e382b50415eb11829d991c93820`)
+    ------------------------------------------------------------------------
+    카나리 30건 중 **20건이 중복**이었고(전건 `structural_signature/round` — 회차 *안에서*
+    모델이 같은 구조를 반복했다), dedup 거부는 같은 `cu_slug`로 검수 큐에 여러 줄 실린다.
+    초판은 그 `DuplicateSlug(first kept)` 11건을 파싱 손상과 같은 바구니에 담아 fail-close
+    했고, 그 결과 게이트 `G-eos-first-run-canary-review`의 증적 경로가 통째로 막혔다.
+
+    왜 손상이 아닌가 — 세 근거가 코드 안에 이미 있었다
+    ------------------------------------------------
+    ⓐ `_queue_index` docstring: "같은 slug가 회차를 넘어 재출현하는 것은 큐의 정상 동작이므로
+       (재시도) **실패가 아니라 사유 수집 대상**이다"
+    ⓑ fail-close 정당화는 "손상 행의 slug를 **읽을 수 없다**"에 기대는데, DuplicateSlug 행은
+       slug를 *읽었기 때문에* 중복으로 분류된다 — 논거가 이 부류에 적용되지 않는다
+    ⓒ 요약에 `duplicate_slug_rows`가 이미 있었다(산출 행 기준). 즉 설계는 중복을 **세는**
+       것이었고 닫는 것이 아니었다
+
+    이 클래스가 붙드는 것은 세 방향이다. 정상 방향만 보면 "fail-close를 통째로 없앤" 과잉
+    수정도 통과하므로, **파싱 손상은 여전히 닫힌다**를 같은 클래스에서 함께 고정한다.
+    """
+
+    def _fixture(self, tmp_path: Path) -> tuple[Path, Path]:
+        """카나리 3건이 전부 같은 slug를 내는 회차 — 실측 회차의 축소판."""
+        out = tmp_path / "corpus.jsonl"
+        _write_ledger(out, canary_size=3)
+        _write_genlog(out, [(_RUN, "cu-same"), (_RUN, "cu-same"), (_RUN, "cu-same")])
+        return out, tmp_path / "queue.jsonl"
+
+    def test_duplicate_slug_rows_do_not_block_the_slice(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """ⓐ 중복만 있는 큐 → 절단이 성립하고 중복 수가 요약에 실린다."""
+        out, queue_out = self._fixture(tmp_path)
+        # 같은 slug 3줄 — dedup 거부가 회차 안에서 반복된 실제 형태.
+        _write_review_queue(out, ["cu-same", "cu-same", "cu-same"])
+
+        assert _run_cli(out, queue_out) == 0, "중복 slug가 절단을 막았다 — 손상이 아니다"
+
+        summary = _summary(capsys)
+        assert summary["written"] is True
+        assert summary["emitted"] == 3
+        assert summary["unresolved_count"] == 0
+        # 닫히지 않되 **보이지 않게** 넘어가지도 않는다 — 건수와 건별 사유가 남는다.
+        assert summary["queue_duplicate_slug_rows"] == 2, "중복이 요약에서 사라졌다"
+        assert len(summary["queue_duplicate_slugs"]) == 2
+        # 손상 칸은 비어 있어야 한다 — 중복을 손상으로 세면 읽는 사람이 두 부류를 못 가른다.
+        load_errors = summary["load_errors"]
+        assert isinstance(load_errors, dict)
+        assert load_errors["review_queue"] == []
+
+    def test_parse_corruption_in_the_same_queue_still_fails(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """ⓑ 대조군 — 같은 큐에 **진짜 파싱 손상**이 있으면 여전히 닫힌다.
+
+        이 픽스처가 없으면 ⓐ는 "fail-close를 전부 없앴다"와 구별되지 않는다.
+        """
+        out, queue_out = self._fixture(tmp_path)
+        _write_review_queue(out, ["cu-same", "cu-same"])
+        _corrupt_line(default_review_queue_path(out), 1)
+
+        assert _run_cli(out, queue_out) == 1, "파싱 손상까지 통과시켰다 — 안전 계약이 넓어졌다"
+        assert not queue_out.exists()
+        assert "해결원에 손상된 행" in capsys.readouterr().err
+
+    def test_duplicate_row_reasons_name_the_line(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """ⓒ 사유가 **몇 번째 줄**인지 말해야 사람이 큐를 열어 확인할 수 있다."""
+        out, queue_out = self._fixture(tmp_path)
+        _write_review_queue(out, ["cu-same", "cu-same"])
+
+        assert _run_cli(out, queue_out) == 0
+        reasons = _summary(capsys)["queue_duplicate_slugs"]
+        assert isinstance(reasons, list)
+        assert all("review queue line" in str(r) for r in reasons), reasons
