@@ -427,6 +427,11 @@ CATALOG: tuple[Spec, ...] = (
        "계획서 300 §3 학습 상태 머신 — EOS-105. 미정의 전이는 409로 거부하고 정책 소유 "
        "트리거는 422로 거부한다(클라가 정책을 우회해 임의 상태로 점프하지 못한다)",
        "me", "GET /learning-state", "POST /learning-state/transitions"),
+    _s("WM-S-054", "관리 콘솔 좌측 내비(모듈 레지스트리 파생)", "Admin", "Operations", "P1",
+       "ADMIN-04 · 04 §2 원칙7 — 메뉴를 레지스트리에서 파생시켜 내비·가드 중복 유지보수를 "
+       "제거한다. 권한 없는 사용자는 403이 아니라 빈 메뉴를 받는다(메뉴는 모듈이 아니라 "
+       "모듈 목록)",
+       "admin_menu", "GET /menu"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -892,6 +897,10 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·shadow 합성 트래픽", "Admin", "Operations",
        "P1", "ADMIN-01/11", "ops.account_bootstrap_cli", "ops.role_grant_cli",
        "ops.wh1_shadow_probe"),
+    _o("WM-O-916", "관리 모듈 레지스트리·라우트 가드 감사", "Admin", "Operations", "P1",
+       "ADMIN-04 — 내비·가드의 단일 진실 원천(선언)과 그 선언을 CI에서 대조하는 감사기. "
+       "가드는 레지스트리에서 파생되므로 값 불일치가 아니라 *파생 경로 미사용*을 찾는다",
+       "api.admin_module_registry", "ops.admin_guard_audit"),
     _o("WM-O-909", "동등문제 코퍼스 축적·후처리 배치(36 단원 배치 포함)", "Admin", "Content", "P0",
        "C1·C3 — 앵커 CU 물량", "harness.problem_corpus_*", "harness.*_batch",
        "-harness.concept_content_review_batch",

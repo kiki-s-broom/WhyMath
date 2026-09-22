@@ -138,6 +138,7 @@ from whymath_backend.api._subject_capability_state import (
 from whymath_backend.api._subject_capability_state import (
     STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
+from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
     OAUTH_PROVIDERS_KEY as _OAUTH_PROVIDERS_KEY,
@@ -1318,5 +1319,7 @@ def create_app(
     # CUR-11: subject-neutral 교육과정 조회 표면(curricula·learning-outcomes·alignments).
     app.include_router(curricula_router)
     app.include_router(alignments_router)
+    # ADMIN-04: Admin BFF 모듈 레지스트리 — GET /v1/admin/menu(좌측 내비 파생 원천).
+    app.include_router(admin_menu_router)
 
     return app
