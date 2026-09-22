@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-89-cache-breakpoint-placement-shared-prefix
+title: "캐시 브레이크포인트가 가변 꼬리 뒤에 있다 — 최상위 자동 캐싱을 system 끝 명시 지점으로 옮겨 세 경로 전부 적중시킨다"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 형태 고정 — l3/providers/anthropic.py 는 messages.create(cache_control=...) 형태의 최상위 자동 캐싱을 쓴다. 자동 캐싱은 브레이크포인트를 마지막 캐시 가능 블록에 놓으므로, 렌더 순서 tools → system → messages 에서 그 자리는 매 호출 달라지는 user 프롬프트 뒤다.\n② 문제 실증 — 안정 프리픽스 + 가변 꼬리 형태의 호출 경로에서 그 배치는 다시 읽히지 않을 바이트에 쓰기 할증(1.25배) 을 내고 적중은 0 이다. 2026-09-21 trunk aa7df278 실측으로 해당 형태의 경로 2건을 확인했다: l3/cross_verify.py 의 _run_perspective(user = perspective.render(subject) 로 문항마다 고유 · system = perspective.system_prompt 상수) 와 l3/multi_solution.py(user = _build_user_prompt(seed) 로 seed 마다 고유 · system = _SYSTEM_PROMPT 모듈 상수). 다만 이 2건은 코드를 읽어 판정한 것이고 캐시 ON 으로 돌려 cache_read 0 을 관측한 것은 아니다 — 이 태스크가 주입으로 확인한다.\n③ 수정 — 최상위 자동 캐싱 대신 system 블록 마지막에 명시 브레이크포인트를 둔다. 그러면 세 경로 전부 공유 system 프리픽스를 적중시키고 가변 꼬리는 브레이크포인트 뒤라 할증을 내지 않는다. system 이 문자열인 현행 시그니처를 블록 리스트로 바꾸는 범위를 포함한다.\n④ 최소 토큰 확인 — Sonnet 4.6 의 최소 캐시 프리픽스는 1024 토큰이다. 각 경로의 system 프롬프트가 그 위인지 확인하고, 미만인 경로는 캐시가 조용히 무효가 되므로 그 사실을 기록한다(무효 자체는 결함이 아니라 사실이다).\n⑤ 검증 — 경로별로 같은 system 을 쓰는 연속 2회 호출에서 2회차의 cache_read_input_tokens 가 0 보다 큰지 단언하는 회귀 테스트. 시임이 아니라 실물 SDK 표면에 대고 확인하는 축이 필요하면 OPS-87 과 조율한다.\n⑥ 선행 관계 — 이 태스크가 착지해야 EOS-02 acceptance ③ 의 기본값 전환 재판정이 성립한다. 재판정 지점은 게이트 G-eos02-default-flip-recheck 가 소유한다."
+artifacts: []
+paths: []
+session: null
+notes: "발견 경위: 2026-09-21 게이트 G-eos02-prompt-cache-live-run 라이브 회차 판정 중. 판정문 docs/ops/eos02_prompt_cache_live_verdict.md 4 절이 근거다. 라이브 회차 자체는 적중률 89.9%로 성공했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. EOS-02 acceptance 3 이 전역 기본값 전환을 보류한 직접 사유다."
+updated: 2026-09-21

@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-88-actual-cost-ignores-cache-token-pricing
+title: "회차 비용 산식이 캐시 토큰을 모른다 — actual_cost_usd 가 미캐시 잔량만 계산해 28% 과소(예산 가드 동일 산식)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 고정 — router.actual_cost_usd 가 usage.input_tokens 에만 입력 단가를 곱한다. Anthropic 의 input_tokens 는 미캐시 잔량만이며 총 프롬프트 = input_tokens + cache_creation_input_tokens + cache_read_input_tokens 다. 2026-09-21 EOS-02 라이브 회차 실측: 보고 cost_usd_total 0.03987 vs 실제 추정 0.05549 = 28.1% 과소(read 21789 tok · creation 2421 tok 이 산식에 항이 없다).\n② 산식 확장 — 캐시 읽기 0.1배 · 캐시 쓰기 1.25배(5분 TTL) 를 반영한다. 단가 배수는 상수로 두되 근거(공개 가격)를 주석에 남기고, TTL 1시간(2배) 을 쓰게 되면 그 축도 표현 가능한 형태로 만든다. Usage 에 두 필드가 이미 있으므로 새 계측은 불요다.\n③ 예산 가드 축 — 같은 산식이 actual_cost_krw 를 거쳐 예산 소진 판정에 쓰인다. 캐시를 켠 상태에서 프리픽스가 재사용되지 않는 경로는 쓰기 할증 1.25배가 통째로 누락돼 실제보다 적게 센다. 가드가 보는 값이 바뀌므로 회귀 테스트로 방향을 고정한다.\n④ 미측정과 0 의 구분 유지 — 캐시 2종이 None(구버전 SDK·미노출) 인 회차에서 0 으로 접지 않는다. 현행 계약(토큰 미상이면 호출부가 None 기록) 을 깨뜨리지 않는다.\n⑤ 실패 주입 — 캐시 읽기만 있는 회차 · 쓰기만 있는 회차 · 둘 다 None 인 회차 3종 픽스처로 각각 기대 금액을 단언하고, 배수 상수를 1.0 으로 뮤테이션했을 때 RED 가 나오는지 확인한다."
+artifacts: []
+paths: []
+session: null
+notes: "발견 경위: 2026-09-21 게이트 G-eos02-prompt-cache-live-run 라이브 회차 판정 중. 판정문 docs/ops/eos02_prompt_cache_live_verdict.md 3-1 절이 근거다. 캐시가 실제로 작동하기 시작하면서 비로소 드러난 결함이라, 캐시 기본값이 꺼져 있던 동안에는 증상이 없었다(input_tokens 가 곧 총 프롬프트였으므로 산식이 맞았다)."
+updated: 2026-09-21
