@@ -799,21 +799,6 @@ class Settings(BaseSettings):
     # 켜면 create_app이 FakeOAuthProvider를 레지스트리에 등록해 기존 콜백 경로 그대로 고정
     # 데모 계정의 실 JWT를 발급한다(security.py/_auth.py 무변경). 신원 검증이 전혀 없으므로
     # prod에서 켜면 누구나 데모 계정 토큰을 얻는다 — 로컬 시연 호스트 밖에서 절대 금지.
-    # ── 관리 콘솔(Admin BFF) 검수 큐 원천 (ADMIN-05) ──
-    # `harness/needs_review_worklist.py`의 큐는 축적 산출물 곁 사이드카 JSONL이고
-    # (`problem_corpus_accumulate.default_review_queue_path` = out.with_suffix(".review.jsonl")),
-    # 그 경로를 아는 설정 좌석이 지금까지 없었다. 비워 두면 `GET /v1/admin/review-queue`의
-    # JSONL 축이 **"0건"이 아니라 "미설정"**으로 보고된다 — 측정 실패를 통과로 위장하지 않는
-    # 이중 회계 원칙(04 §2 원칙6)이 이 기본값의 이유다. DB 축(problem.review_status)은
-    # 이 값과 무관하게 항상 집계되므로, 미설정이어도 엔드포인트는 쓸모가 있다.
-    admin_review_queue_path: str = Field(
-        default="",
-        description=(
-            "검수 큐 JSONL 경로(빈 문자열=미설정). 관리 콘솔의 검수 큐 조회가 읽는 파일이며, "
-            "미설정이면 JSONL 축을 'unconfigured'로 보고한다(0건으로 접지 않는다)."
-        ),
-    )
-
     demo_auth_enabled: bool = Field(
         default=False,
         description=(

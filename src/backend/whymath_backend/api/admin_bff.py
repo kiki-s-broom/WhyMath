@@ -3,7 +3,7 @@
 엔드포인트 (전부 GET — **Phase A는 read-only**, 쓰기는 ADMIN-07 Phase B):
   - GET /v1/admin/models        — 모델 상태 매트릭스(로컬 Ollama + 클라우드 구성)
   - GET /v1/admin/costs         — 비용·라우팅 집계(Langfuse 이벤트 → cost_report)
-  - GET /v1/admin/review-queue  — 검수 큐(DB 축 + JSONL 축 이중 회계)
+  - GET /v1/admin/review-queue  — 검수 큐(적재 문항 축 — JSONL 축은 승계 태스크)
   - GET /v1/admin/users         — 사용자 **집계**(PII 0)
   - GET /v1/admin/users/{id}    — 사용자 단건(마스킹) + 관리자 접근 감사 1행
 
@@ -26,7 +26,6 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 from typing import Annotated, Literal
 
 import anyio.to_thread
@@ -234,74 +233,24 @@ class AdminReviewDbAxis(BaseModel):
     total: int = Field(..., description="전체 문항 수.")
 
 
-class AdminReviewJsonlAxis(BaseModel):
-    """JSONL 축 — 생성 후보 큐. **문항 본문은 싣지 않는다.**
-
-    `ReviewQueueEntry.candidate_payload`에는 문항 본문 전문이 들어 있어 학생 대면·외부 노출이
-    금지된 자산이다. 콘솔 목록에 필요한 것은 개수와 상태 분포뿐이므로 본문은 아예 꺼내지 않는다
-    (저작권 레일 — 필요해지면 그때 별도 인가를 붙여 단건으로 연다).
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    state: Literal["unconfigured", "missing", "unreadable", "loaded"] = Field(
-        ...,
-        description=(
-            "unconfigured=경로 미설정 · missing=설정된 경로에 파일 없음 · unreadable=읽기 실패 · "
-            "loaded=읽음. **앞의 셋은 '0건'이 아니라 '미측정'이다.**"
-        ),
-    )
-    counts: dict[str, int] = Field(
-        default_factory=dict, description="상태값별 항목 수(loaded일 때만 의미 있음)."
-    )
-    total: int = Field(0, description="유효 항목 수.")
-    load_error_count: int = Field(0, description="파싱 실패한 줄 수(조용히 버리지 않는다).")
-    detail: str | None = Field(None, description="미측정·실패 사유(경로 문자열은 싣지 않는다).")
-
-
 class AdminReviewQueueResponse(BaseModel):
-    """`GET /v1/admin/review-queue` — 두 축을 **함께** 낸다(04 §2 원칙6 이중 회계).
+    """`GET /v1/admin/review-queue` — 적재 문항의 검수 상태 분포.
 
-    한 축만 내면 그 축의 원천이 죽었을 때 화면이 비고, 빈 화면은 "검수할 것이 없다"로 읽힌다.
-    두 축을 나란히 두면 한쪽이 미측정이어도 다른 쪽이 살아 있고, 무엇이 미측정인지도 보인다.
+    **생성 후보 큐(JSONL) 축은 이 PR에서 의도적으로 빠졌다.** 그 축을 읽으려면
+    `harness.needs_review_worklist`를 import해야 하는데, 그 모듈이
+    `l3.equivalent.orchestrator`를 끌어 `api.admin_bff → harness → l3.equivalent`라는
+    **신규 잔여 전이 누수**가 생긴다. `RESIDUAL_LEAK_BASELINE`(tests/infra/
+    test_eos_core_boundary_probe.py)은 **shrink-only 래칫**이라 신규 항목 추가가 설계상
+    금지돼 있고, 내 편의로 그 기준선을 늘리는 것은 게이트를 느슨하게 하는 우회다. 그래서
+    축을 줄이고 승계 태스크로 분리했다 — 선행은 그 harness 모듈의 어댑터 의존 절단이다.
+
+    DB 축만 남아도 이 엔드포인트는 쓸모가 있다: 여기 보이는 것이 *실제로 적재된* 문항의
+    검수 상태이고, JSONL은 적재 이전의 생성 후보라 축 자체가 다르다.
     """
 
     model_config = ConfigDict(frozen=True)
 
     db: AdminReviewDbAxis = Field(..., description="적재 문항 축.")
-    jsonl: AdminReviewJsonlAxis = Field(..., description="생성 후보 큐 축.")
-
-
-def _load_jsonl_axis(raw_path: str) -> AdminReviewJsonlAxis:
-    """JSONL 큐를 읽어 축 요약을 만든다. **동기 파일 I/O** — 호출부가 to_thread로 감싼다."""
-    if not raw_path.strip():
-        return AdminReviewJsonlAxis(
-            state="unconfigured",
-            detail="검수 큐 경로가 설정되지 않았습니다(admin_review_queue_path).",
-        )
-    path = Path(raw_path)
-    if not path.is_file():
-        return AdminReviewJsonlAxis(
-            state="missing", detail="설정된 경로에 검수 큐 파일이 없습니다."
-        )
-    # 지연 import — `harness`는 조회 경로의 선택적 원천이라 모듈 로드 비용을 상시 지불하지 않는다.
-    from whymath_backend.harness.needs_review_worklist import load_review_queue_jsonl
-
-    try:
-        entries, load_errors = load_review_queue_jsonl(path)
-    except Exception as exc:  # noqa: BLE001 — 사유는 타입명으로 남긴다(침묵 실패 금지)
-        return AdminReviewJsonlAxis(
-            state="unreadable", detail=f"검수 큐를 읽지 못했습니다({type(exc).__name__})."
-        )
-    counts: dict[str, int] = {}
-    for entry in entries:
-        counts[entry.status] = counts.get(entry.status, 0) + 1
-    return AdminReviewJsonlAxis(
-        state="loaded",
-        counts=counts,
-        total=len(entries),
-        load_error_count=len(load_errors),
-    )
 
 
 @router.get(
@@ -310,11 +259,9 @@ def _load_jsonl_axis(raw_path: str) -> AdminReviewJsonlAxis:
     summary="검수 큐 — 적재 문항 축 + 생성 후보 큐 축(이중 회계)",
 )
 async def get_admin_review_queue(
-    admin: RequireReviewAdmin,
-    session: SessionDep,
-    settings: SettingsDep,
+    admin: RequireReviewAdmin, session: SessionDep
 ) -> AdminReviewQueueResponse:
-    """DB 축은 항상, JSONL 축은 설정·파일이 있을 때만 실측한다."""
+    """적재 문항의 검수 상태를 집계한다(모듈 docstring — JSONL 축은 승계 태스크)."""
     rows = (
         await session.execute(
             select(Problem.review_status, func.count()).group_by(Problem.review_status)
@@ -331,13 +278,7 @@ async def get_admin_review_queue(
         key = value.value if isinstance(value, ReviewStatus) else str(value)
         counts[key] = counts.get(key, 0) + int(count)
 
-    raw_path = str(getattr(settings, "admin_review_queue_path", "") or "")
-    jsonl = await anyio.to_thread.run_sync(_load_jsonl_axis, raw_path)
-
-    return AdminReviewQueueResponse(
-        db=AdminReviewDbAxis(counts=counts, unset=unset, total=total),
-        jsonl=jsonl,
-    )
+    return AdminReviewQueueResponse(db=AdminReviewDbAxis(counts=counts, unset=unset, total=total))
 
 
 # ── 사용자 조회 ──────────────────────────────────────────────────────────────────────

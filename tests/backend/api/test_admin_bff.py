@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -291,41 +290,6 @@ def test_costs_rejects_out_of_range_days() -> None:
         assert client.get("/v1/admin/costs", params={"days": 999}).status_code == 422
 
 
-def test_review_queue_jsonl_axis_states(tmp_path: Path) -> None:
-    """미설정 · 파일 부재 · 정상 로드가 서로 다른 `state`를 낸다."""
-    from whymath_backend.api.admin_bff import _load_jsonl_axis
-
-    assert _load_jsonl_axis("").state == "unconfigured"
-    assert _load_jsonl_axis(str(tmp_path / "없는파일.jsonl")).state == "missing"
-
-    queue = tmp_path / "q.review.jsonl"
-    queue.write_text(
-        '{"status": "needs_review", "reasons": [], "run_id": "r1"}\n'
-        '{"status": "needs_review", "reasons": [], "run_id": "r1"}\n'
-        '{"status": "rejected_gate", "reasons": [], "run_id": "r1"}\n',
-        encoding="utf-8",
-    )
-    axis = _load_jsonl_axis(str(queue))
-    assert axis.state == "loaded"
-    assert axis.total == 3
-    assert axis.counts == {"needs_review": 2, "rejected_gate": 1}
-
-
-def test_review_queue_does_not_expose_problem_text(tmp_path: Path) -> None:
-    """`candidate_payload`(문항 본문)는 절대 응답에 실리지 않는다 — 저작권·노출 레일."""
-    from whymath_backend.api.admin_bff import _load_jsonl_axis
-
-    queue = tmp_path / "q.review.jsonl"
-    queue.write_text(
-        '{"status": "needs_review", "reasons": [], "run_id": "r1",'
-        ' "candidate_payload": {"stem": "비밀문항본문"}}\n',
-        encoding="utf-8",
-    )
-    axis = _load_jsonl_axis(str(queue))
-    assert axis.state == "loaded"
-    assert "비밀문항본문" not in axis.model_dump_json()
-
-
 def test_review_queue_db_axis_counts_unset_separately() -> None:
     """`review_status`가 NULL인 문항을 어느 상태값에도 섞지 않는다(미판정은 판정이 아니다)."""
     from whymath_backend.schema.enums import ReviewStatus
@@ -336,4 +300,3 @@ def test_review_queue_db_axis_counts_unset_separately() -> None:
     with _client(_ADMIN, fake) as client:
         payload = client.get("/v1/admin/review-queue").json()
     assert payload["db"] == {"counts": {"pending": 4, "approved": 7}, "unset": 2, "total": 13}
-    assert payload["jsonl"]["state"] == "unconfigured"
