@@ -1299,12 +1299,30 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def _release_remote_claim(root: Path, task_id: str, prev_session: str | None) -> None:
-    """done/block 후 원격 claim 해제 — best-effort (실패해도 진행, reap이 나중에 청소)."""
+def _release_remote_claim(
+    root: Path,
+    task_id: str,
+    prev_session: str | None,
+    allow_foreign_kinds: tuple[str, ...] = (),
+) -> remote_claims.ClaimResult:
+    """done/block 후 원격 claim 해제 — best-effort (실패해도 진행, reap이 나중에 청소).
+
+    결과를 **돌려준다**(HARN-134 ④) — 종전에는 None을 반환해 호출자가 실패를 알 수
+    없었고, 그래서 `unblock`이 해제 실패 뒤에도 로컬을 todo로 바꿔 "대장은 차단인데
+    로컬은 todo"인 분기 상태를 무증상으로 남겼다. 경고 1줄은 화면에서 휘발한다.
+
+    `allow_foreign_kinds`는 그대로 전달한다 — 판정은 `remote_claims.release`가
+    실제 홀더 레코드를 읽어서 한다(여기서 kind를 추측하지 않는다).
+    """
     policy, _ = store.load_policy(root)
     if not policy.remote_claims:
-        return
-    result = remote_claims.release(root, task_id, prev_session or store.current_branch(root))
+        return remote_claims.ClaimResult("ok", message="원격 claim 비활성")
+    result = remote_claims.release(
+        root,
+        task_id,
+        prev_session or store.current_branch(root),
+        allow_foreign_kinds=allow_foreign_kinds,
+    )
     if result.status not in ("ok", "offline"):
         print(
             f"⚠ 원격 claim 해제 실패({result.status}): {result.message} — "
@@ -1312,6 +1330,7 @@ def _release_remote_claim(root: Path, task_id: str, prev_session: str | None) ->
             file=sys.stderr,
         )
         store.append_event(root, "claim_release_failed", task_id, status=result.status)
+    return result
 
 
 def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
@@ -1331,13 +1350,35 @@ def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
     if error:
         return _fail(error)
     prev_session = task.session
+    # 차단 홀드를 **로컬 전이보다 먼저** 걷는다 (HARN-134 ②④).
+    #
+    # 순서가 계약이다: 종전은 로컬을 todo로 바꾼 뒤 best-effort로 해제해서, 해제가
+    # 실패하면 "원격 대장은 차단 · 로컬 파일은 todo"인 분기 상태가 남았다. 되돌리기
+    # (rollback)로 고칠 수도 있었지만 그건 실패 경로에만 도는 코드라 정작 필요할 때
+    # 돌지 않을 위험이 있다 — 아예 **쓰기 전에 판정**하면 되돌릴 상태가 생기지 않는다.
+    #
+    # `allow_foreign_kinds=("block",)` — 차단 홀드는 착수 점유가 아니므로 홀더가 아닌
+    # 세션도 정상 경로로 걷는다. 차단 사유는 대부분 외부 입력 대기라 **해소를 판정하는
+    # 쪽이 거의 항상 다음 세션**이고, 그 경우가 예외가 아니라 기본이다. `claim`은 이
+    # 목록에 없으므로 착수 점유 탈취는 여전히 --force 없이는 막힌다.
+    release = _release_remote_claim(root, task.id, prev_session, allow_foreign_kinds=("block",))
+    if release.status not in ("ok", "offline"):
+        # `offline`은 통과시킨다 — 원격이 없으면 교차 세션 신호 자체가 없어 분기할
+        # 상태가 없다. 반대로 error/conflict는 **홀드가 살아 있다**는 뜻이므로,
+        # 여기서 통과시키면 다른 세션의 start가 계속 거부된다.
+        holder = release.claim.branch if release.claim else "(홀더 미상)"
+        return _fail(
+            f"{task.id}: 원격 차단 홀드를 걷지 못해 차단 해제를 중단한다 "
+            f"({release.status}) — 로컬은 blocked 그대로다.\n"
+            f"  홀더: {holder} · 사유: {release.message}\n"
+            f"  → 원격 조회가 되는 환경에서 다시 시도하거나, 홀드가 claim(착수 점유)이면\n"
+            f"     `claims release {task.id} --force`로 청소한 뒤 다시 unblock 하라."
+        )
     task.status = "todo"
     task.session = None
     task.updated = _today()
     store.save_task(root, task)
-    store.append_event(root, "unblock", task.id)
-    # 차단 홀드도 함께 걷는다 — 안 걷으면 해제된 태스크가 영구 차단으로 보인다(HARN-42)
-    _release_remote_claim(root, task.id, prev_session)
+    store.append_event(root, "unblock", task.id, release_status=release.status)
     print(f"· {task.id} 차단 해제 → todo")
     return 0
 
@@ -1971,13 +2012,34 @@ def _print_similar_notice(root: Path, backlog, task: Task, policy: object) -> No
         tid: similar.task_text(other.title, other.notes, other.acceptance)
         for tid, other in backlog.tasks.items()
     }
+    # 대조군 상태 (HARN-134 ⑥ 판정) — in-flight **+ done**.
+    #
+    # 종전 pool은 in-flight 4종뿐이라 `done`을 **구조적으로 보지 않았다.** 병렬 이중
+    # 구현 방지라는 원 목적에는 맞는 필터지만, 실측으로 다른 축이 그 사각에 그대로
+    # 들어간다는 것이 드러났다: **미이행 acceptance를 남긴 done 태스크의 승계**다.
+    # 2026-09-22 `HARN-134` 등재 때 `HARN-48`(done, acceptance ④가 같은 축)을 이 고지가
+    # 침묵했고, 잡아낸 것은 등재 시점이 아니라 CI의 실코퍼스 보정 테스트였다.
+    #
+    # 세 안 중 ⓐ를 골랐다: ⓑ(미이행 acceptance 승계 탐지를 별도 축으로)는 어느 항이
+    # 미이행인지를 기계가 알아야 하는데 그 판정 자체가 사람 몫이라 새 프레임워크가 되고,
+    # ⓒ(현행 유지)는 실사고가 이미 반증했다. ⓐ는 pool 한 줄과 라벨로 끝난다.
+    #
+    # `cancelled`는 넣지 않는다 — 취소 사유의 상당수가 *중복이라서*이므로, 살아남은
+    # 쌍둥이와 높은 유사도를 내며 상시 오탐이 된다(고칠 수 없는 경고는 소음이 된다).
+    pool_statuses = ("todo", "in_progress", "blocked", "review", "done")
     pool = {
         tid: text
         for tid, text in corpus.items()
-        if tid != task.id
-        and backlog.tasks[tid].status in ("todo", "in_progress", "blocked", "review")
+        if tid != task.id and backlog.tasks[tid].status in pool_statuses
     }
-    origins: dict[str, str] = {}
+    # done은 라벨로 구분한다 — "지금 누가 하고 있다"(조율 대상)와 "이미 끝났다"
+    # (승계 여부 확인 대상)는 읽는 사람이 할 행동이 다르다. 한 색으로 내면
+    # 완료된 태스크를 병렬 충돌로 오독하고 엉뚱하게 cancel할 수 있다.
+    origins: dict[str, str] = {
+        tid: "로컬·완료됨"
+        for tid in pool
+        if backlog.tasks.get(tid) is not None and backlog.tasks[tid].status == "done"
+    }
     remote_status = "disabled"
     if getattr(policy, "remote_claims", False):
         # 고지는 관측 기능이다 — 원격 조회가 어떤 식으로 죽든 `add` 자체를 막지 않는다.

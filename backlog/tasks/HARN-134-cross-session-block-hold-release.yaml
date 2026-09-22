@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - scripts/harness/backlog.py
   - scripts/harness/remote_claims.py
   - "tests/harness/**"
-session: null
+session: claude/compassionate-hypatia-chznsu
 notes: "사고 경위(2026-09-22 · EOS-128 2회차 착수 시 실측): EOS-128 은 세션 A(브랜치 claude/new-session-fy0wry)가 \"2회차 입력 대기\"로 차단했고, 그 세션의 작업은 PR #1237 로 main 에 병합돼 종료됐다(브랜치 tip 3d534dcc 가 origin/main 조상). 이후 Kiki 가 원 문서를 첨부해 차단 사유가 해소됐으나, 세션 B(claude/compassionate-hypatia-chznsu)가 `unblock` 을 실행하자 로컬만 todo 로 바뀌고 원격 홀드는 남았다. `start` 는 그 원격 홀드를 CAS conflict 로 읽어 착수를 거부했고, 코드 주석이 밝히듯 --ignore-remote-claim 은 읽기측 판정만 끄므로 이 경로에는 애초에 닿지 않는다(실측: 하네스 분류기도 같은 판정으로 거부).\n\n즉 차단을 건 세션이 끝난 뒤 다른 세션이 사유를 해소하는 것은 이 하네스의 정상 흐름인데(차단 사유가 대부분 외부 입력 대기이므로), 그 흐름에 정본 경로가 없다. 남은 수단은 claims release --force 뿐인데 CLI 자신이 그것을 \"차단 우회\"로 금지하고 있어, 규칙을 지키는 세션은 전진할 수 없고 규칙을 어기는 세션만 전진한다.\n\n원인 지점: cmd_unblock → _release_remote_claim(root, task.id, prev_session) 에서 prev_session 은 task.session 이고, 차단 시 cmd_block 이 그것을 비우므로 항상 None 이 되어 current_branch 로 폴백한다. 홀더 브랜치를 읽지 않는 것이 결함의 핵심이다.\n\n관련: HARN-42 가 \"차단 홀드는 착수 점유가 아니다\" 분기를 넣어 --force 탈취 유도를 막았는데, 그 분기가 안내하는 해소 경로(`unblock`)가 교차 세션에서 동작하지 않는다는 것이 이번에 드러났다. HARN-45(게이트 대기와 차단 전이 분리)는 cancelled 이며 반대 축(block 이 claim 을 반납해 병렬 세션이 집어가는 창)을 다뤘다 — 중복 아님.\n\nCLAUDE.md 상시 실패 fail-open 규칙 해당: _release_remote_claim 은 best-effort 이고 실패해도 진행하므로, 이 결함은 무증상으로 \"대장은 blocked · 로컬은 todo\" 분기를 만든다.\n\n[정정 2026-09-22] HARN-48(done) ④의 미이행 축 승계임을 선언 — CI 의미 중복 가드가 검출 · 고지 pool의 done 사각을 축 ⑥으로 추가\n\n[정정 2026-09-22] 수동 해제 절차를 build_harness.md §3b-4에 정본화 — 완화이지 해소가 아님을 명시"
 updated: 2026-09-22
