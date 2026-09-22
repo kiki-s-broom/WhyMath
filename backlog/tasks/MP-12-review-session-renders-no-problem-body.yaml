@@ -5,7 +5,7 @@ track: infra-debt
 stage: S1
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P0
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "F8(힌트 정답 누설) 판정에 필요한 축이 한 화면에 함께 보인다 — 최종 정답과 L1·L2 힌트를 같은 항목 안에 렌더한다. 이 두 축이 분리돼 있으면 무관용 KPI(누설률 0%)를 사람이 구조적으로 판정할 수 없다"
   - "회귀 동결 — `tests/backend/harness/test_review_session.py`에 본문 렌더 계약 테스트를 추가하고, 뮤테이션으로 변별력을 실측한다: ①`candidate_payload` 렌더 절을 제거하면 RED ②본문 부재 고지 절을 제거하면 RED ③정상 입력 대조군은 GREEN. 렌더 문자열이 아니라 *출력 스트림에 실제로 나타난 내용*을 단언한다"
   - "정정(②의 전제 오류) — ②는 \"L1·L2 힌트를 정답과 함께 렌더한다\"고 적었으나, 이 저장소의 문제 코퍼스에는 힌트 필드가 없다(실측 2026-09-22: `data/corpus/problem_bank_*/problems.jsonl` 전 파일에 `hint` 키 0건 · `schema/problem.py`의 `Problem`에도 힌트 필드 부재 — `common_mistakes`의 `hint` 키는 오개념 축이고 문항 본문 축이 아니다). 있지도 않은 필드를 요건으로 두면 영원히 충족 불가한 acceptance가 되므로 축을 정정한다: F8은 이 회차에서 **정답과 해설(`answer_explanation`)의 대조**로 판정하며, 힌트가 나중에 실리면 `기타 필드(값 있음·미표시)` 고지 줄에 키 이름이 나타나 검수자가 그 사실을 알 수 있게 한다(회귀 동결 = `test_unrendered_nonempty_keys_are_disclosed`). 설계서 §3의 CU 정의(3단계 힌트 포함)와 현행 코퍼스의 간극 자체는 이 태스크가 닫지 않는다 — 저작 스펙 축이다."
-artifacts: []
+artifacts:
+  - "PR #1283 — review_session 문항 본문 렌더(_resolve_payload·_render_body·미표시 고지) + 회귀 7건 · 뮤테이션 5종 전건 RED · main 927de2c9 착지"
 paths:
   - src/backend/whymath_backend/harness/review_session.py
   - tests/backend/harness/test_review_session.py
-session: claude/optimistic-johnson-58q3nw
+session: null
 notes: "G-eos-first-run-canary-review 실행 직전 발견. Kiki께 [R2] 대화형 검수를 안내했는데, 코드를 다시 읽어 보니 `_render_item`(review_session.py:300)이 출력하는 것은 `[i/n] slug`·`큐 상태:`·`근거:` 셋뿐이고 문항 본문이 없다. 큐 파일(canary_review_queue.jsonl)에는 본문이 `candidate_payload`로 이미 들어 있으며(canary_slice.py:321이 코퍼스 레코드를 그 자리에 싣는다) `load_review_items`가 그 키를 읽지 않을 뿐이다 — 데이터 공백이 아니라 렌더러 공백이다. 그대로 실행됐다면 눈 감은 판정 15건이 골든셋 승격 원천(MP-03)으로 기록될 뻔했다. ADMIN-14와는 반대 축이다: 그쪽은 `candidate_payload`의 HTTP 응답 노출을 금지 동결하고(관리 웹 표면), 이쪽은 로컬 CLI가 검수자 본인에게 보여주는 축이라 노출이 요건이다 — 두 태스크가 같은 필드를 반대 방향으로 다루므로 구현 시 서로의 테스트를 깨지 않는지 확인한다.\n 병렬 세션의 MP-11(브랜치 claude/wizardly-tesla-2lsb3z · PR #1279)이 2026-09-22 라이브 검수에서 런북 결함 2건을 잡았고 그 태스크는 \"검수 자체는 15건 분모로 정상 진행됐다\"고 적었다 — 즉 본문 없이 진행된 검수가 이미 있을 수 있다. main의 검수 런북(docs/reviews/mp02_canary_review_runbook.md)도 §4 판정 키·F1~F8 표만 주고 문항을 보는 경로를 주지 않는다(grep: 본문/candidate_payload 0건). 따라서 이 결함은 런북 축이 아니라 렌더러 축이며, 이미 기록된 판정이 있다면 그 유효성 재판정이 뒤따른다.\n\n[정정 2026-09-22] ②가 존재하지 않는 힌트 필드를 요건으로 선언한 것을 실측으로 정정(가용성 확인 절차)"
 updated: 2026-09-22
