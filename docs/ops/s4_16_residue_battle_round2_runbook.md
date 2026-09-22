@@ -11,32 +11,42 @@
 |---|---|
 | **① 과제 명칭** | 잔여 축 교차검증 게이트 2차 강등전 — v4 프로덕션 모드 라이브 측정 |
 | **② 목적** | 결함을 우리가 일부러 주입한 시험지를 검출기에 태워 **검출률·오검출률을 측정**한다. 이 수치가 `S4-16`의 승격/기각 판정 근거이고, 통과하면 파일럿 코퍼스 34문의 노출 게이팅(`is_published=False`)이 풀린다. 1차(2026-08-10)는 검출 2/12로 기각됐고, 그 뒤 클라우드 회차 2번은 **오검출**에서 막혔다(측정 이력 = `docs/standards/residue_gate_demotion_battle_history.md`). |
-| **③ 구체적 절차** | 4단계. [A] 브랜치 체크아웃 + 자가검증 → [B] Ollama·모델 실재 확인 → [C] 실행 전 판정값 출력 → [D] 측정 실행(판정값을 재검사해 스스로 거부). [D]의 예상 소요는 **호출 531회**(항목 59건 x 9콜)이며, 콜당 5~15초 가정 시 **45분~2시간 20분**이다. 진행 중 출력은 없다 — 끝날 때 리포트가 한 번에 나온다. |
-| **④ 성공 기준** | [D]가 리포트를 출력하고 `BATTLE_EXIT=0` 또는 `=1`을 낸다. **둘 다 정상**이다 — 0은 게이트 통과, 1은 게이트 미달이며 **미달도 유효한 측정 결과**다(우리가 알고 싶은 것이 그 수치다). 실패는 `=2`(인자·환경 오류)이거나 `WRITE_REFUSED=True`(선행 조건 미충족)이다. 실패 시 대처는 각 단계에 적었다. |
+| **③ 구체적 절차** | 4단계. [A] main 트리 고정 + 자가검증 → [B] Ollama·모델 실재 확인 → [C] 실행 전 판정값 출력 → [D] 측정 실행(판정값을 재검사해 스스로 거부). [D]의 예상 소요는 **호출 531회**(항목 59건 x 9콜)이며, 콜당 5~15초 가정 시 **45분~2시간 20분**이다. 진행 중 출력은 없다 — 끝날 때 리포트가 한 번에 나온다. |
+| **④ 성공 기준** | **`BATTLE_EXIT` 으로 판정하지 않는다.** 이 회차는 임계를 일부러 주지 않으므로(§5) exit 1 은 구조적으로 나올 수 없고, `=0` 은 "게이트 통과"가 아니라 "임계 검사를 하지 않았다"는 뜻이다 — 검출 0%·오검출 100%·전건 측정실패 세 경우가 전부 `=0` 을 낸다(2026-09-22 실측, 세 시나리오 주입). 성공은 **리포트의 세 수치**로 판정한다: `결함 검출률`·`무결함 오검출`·그 두 줄의 **`판정불가 N건`**. 판정불가가 절반을 넘으면 그 회차는 측정 실패이므로 수치를 판정 근거로 쓰지 않고 [B]의 모델·타임아웃을 점검해 재실행한다(전 관점이 `unclear` 로 떨어지는 가장 흔한 원인이 provider 타임아웃이며, 그 상태도 `BATTLE_EXIT=0` 으로 보인다). 환경·인자 오류는 `=2`, 선행 조건 미충족은 `WRITE_REFUSED=True` 로 각각 구분된다. |
 | **⑤ 실행 환경** | Kiki 작업 PC = Phaiakes9. **Windows PowerShell**(진입 명령 불요). 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`. 선행 조건: Ollama 가동 + `qwen3:30b-a3b` 모델 보유. Docker·DB는 **불필요**하다(이 측정은 코퍼스 파일만 읽는다). |
 | **⑥ 창 구분** | 창 하나면 된다. 서버를 띄우지 않으므로 점유 창이 없다. [D]는 길게 도니 그 동안 그 창을 건드리지 말 것. |
 
 ---
 
-## 2. [A] 브랜치 체크아웃 + 자가검증
+## 2. [A] main 트리 고정 + 자가검증
 
-이 런북이 쓰는 CLI 옵션(`--v4`·`--clean-n`·`--repeat-runs`)은 **아직 main에 없다.** 반드시
-이 브랜치로 옮긴 뒤 실행한다. 클론은 여러 세션이 공유하는 단일 작업 사본이라, 다른 세션이
-그 사이 브랜치를 바꿔 뒀을 수 있다 — 그래서 아래 블록은 옮긴 뒤 **무엇으로 옮겨졌는지 직접
-출력한다**.
+이 런북이 쓰는 CLI 옵션(`--v4`·`--clean-n`·`--repeat-runs`)은 **main에 있다**(2026-09-22
+실측 — `residue_gate_demotion_battle.py` 는 main과 옛 작업 브랜치가 바이트 동일이다). 그러므로
+**타 세션 브랜치로 옮기지 않는다.** 종전 문면은 `claude/optimistic-gates-9ef9nm` 체크아웃을
+지시했는데, 그 브랜치는 지금 다른 세션이 `S4-16` 을 claim한 채 쓰는 **진행 중 트리**이고
+main보다 11커밋 앞서 있다 — 이 측정과 무관한 미착지 코드를 함께 끌고 오는 셈이다.
+
+클론은 여러 세션이 공유하는 단일 작업 사본이라 다른 세션이 브랜치를 바꿔 뒀을 수 있다. 아래
+블록은 ①main 트리로 **비파괴적으로** 옮기고(덮어쓸 로컬 변경이 있으면 git이 큰 소리로 거부한다)
+②무엇으로 옮겨졌는지 직접 출력하고 ③**실제로 임포트되는 파일 경로**를 출력한다. 파일을 읽어
+보는 것만으로는 그 파일이 돌았는지 알 수 없다.
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $env:PYTHONUTF8="1"
-git fetch origin claude/optimistic-gates-9ef9nm
-git checkout -B claude/optimistic-gates-9ef9nm origin/claude/optimistic-gates-9ef9nm
+git fetch origin main
+git switch --detach origin/main
 git log -1 --oneline
+python -c "import whymath_backend.harness.residue_gate_demotion_battle as m; print(m.__file__)"
 python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4","--clean-n"
 ```
 
-**확인할 것**: 마지막 명령이 `--v4`와 `--clean-n` 두 줄을 출력해야 한다.
-아무것도 안 나오면 옛 코드가 돌고 있는 것이다(체크아웃이 안 됐거나 다른 트리다) — 진행하지 말고
-`git log -1 --oneline` 출력을 세션에 회신한다.
+**확인할 것** 3가지. ①`git switch` 가 오류 없이 끝난다 — `local changes would be overwritten`
+으로 거부하면 타 세션의 미커밋 변경이 있는 것이니 **진행하지 말고** 그 메시지를 세션에 회신한다
+(임의로 버리면 남의 작업분이 사라진다). ②`__file__` 이
+`C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\whymath_backend\...` 아래를 가리킨다 —
+다른 경로면 설치된 옛 사본이 돌고 있다. ③마지막 명령이 `--v4`와 `--clean-n` 두 줄을 출력한다.
+하나라도 어긋나면 진행하지 말고 `git log -1 --oneline` 출력과 함께 회신한다.
 
 ---
 
@@ -64,13 +74,21 @@ $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
 $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
+git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl
+$PathsMatchMain = ($LASTEXITCODE -eq 0)
 "CORPUS_OK=$CorpusOk"
 "HAS_V4=$HasV4"
 "OLLAMA_OK=$OllamaOk"
+"PATHS_MATCH_MAIN=$PathsMatchMain"
 ```
 
-세 줄이 전부 `True`여야 다음 단계가 실행된다. 하나라도 `False`면 [D]는 **스스로 거부하고 멈춘다**
-— 그래도 위 세 줄을 눈으로 확인하고 넘어가는 편이 낫다.
+네 줄이 전부 `True`여야 다음 단계가 실행된다. 하나라도 `False`면 [D]는 **스스로 거부하고 멈춘다**
+— 그래도 위 네 줄을 눈으로 확인하고 넘어가는 편이 낫다.
+
+`PATHS_MATCH_MAIN` 은 **이 측정이 읽는 경로만** main과 비교한다(검증기 2개 + 코퍼스). 무관한
+파일이 더러워도 통과하고, 측정 입력이 다르면 막는다 — 변별력이 필요한 자리에 정확히 놓은
+검사다. `False` 면 어느 경로가 다른지
+`git diff --stat origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl` 로 확인해 회신한다.
 
 ---
 
@@ -86,7 +104,9 @@ $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
 $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
-if ($CorpusOk -and $HasV4 -and $OllamaOk) { python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl 2>&1 | Tee-Object -FilePath battle_v4_production.log ; "BATTLE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk (하나라도 False면 측정하지 않는다)" }
+git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl
+$PathsMatchMain = ($LASTEXITCODE -eq 0)
+if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain) { python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl 2>&1 | Tee-Object -FilePath battle_v4_production.log ; "BATTLE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
 ```
 
 - `--v4 production`: 전 관점 세트를 태우고 판정을 합집합한다. **승격 판정은 이 모드로만 한다**
@@ -98,14 +118,34 @@ if ($CorpusOk -and $HasV4 -and $OllamaOk) { python -m whymath_backend.harness.re
 
 ---
 
-## 6. 회신할 것
+## 6. 회신할 것 + 오검출 천장 판정
 
-`battle_v4_production.log`의 리포트 전문과 `BATTLE_EXIT` 값. 특히 이 두 줄:
+### 6.1 회신할 것
 
-- `결함 검출률 : m/n (95% 하한 …)`
-- `무결함 오검출 : m/34 (95% 상한 …)`
+`battle_v4_production.log`의 리포트 전문. 특히 이 두 줄(각 줄 끝의 **`판정불가 N건`** 까지 함께
+— 그것이 이 회차가 실제로 측정에 성공했는지를 말한다):
+
+- `결함 검출률 : m/n (95% 하한 …)  판정불가 N건`
+- `무결함 오검출 : m/34 (95% 상한 …)  판정불가 N건`
 
 그리고 `data\audit\s4-16-v4-production-2026-09.jsonl`(항목별 판정 원자료).
+`BATTLE_EXIT` 값도 같이 적되 **판정 근거로는 쓰지 않는다**(§1-④ — 이 회차에서 그 값은 항상 0).
+
+### 6.2 함께 판정할 것 — 오검출 천장을 얼마로 둘 것인가
+
+`S4-16` acceptance 가 요구하는 오검출 상한 **0.05 는 이 코퍼스로 인증이 불가능하다.** 대조군
+34문 **전건 무오검출**이어도 95% 단측 Wilson 상한은 `0.0737` 에서 멈춘다(위 §5 [D] 를 돌리면
+리포트가 그 수치를 직접 낸다). 0.05 아래로 내리려면 대조군 `n>=51` 이 필요한데 코퍼스가 34문이다
+— 즉 지금 임계를 적용하면 **모델이 완벽해도 상시 FAIL** 이다(잘못 캘리브레이션된 임계).
+
+그래서 이 회차는 천장을 *적용*하지 않고 *판정*한다. Kiki 판정 3택:
+
+1. **천장을 `.08` 수준으로 재설정** — n=34 전건 무오검출을 요구한다(이 코퍼스에서 달성 가능한
+   가장 엄격한 기준). 측정치가 그 아래면 통과.
+2. **코퍼스를 확장해 0.05 를 겨냥** — 대조군 51문 이상을 만든 뒤 재측정한다(별도 태스크).
+3. **이 경로를 인간 검수 대체 후보에서 내린다** — 다섯 회차에서 검출률은 16.7%→90% 로 올랐지만
+   오검출은 한 번도 60% 아래로 내려오지 않았다. 구속 축이 모델 성능이 아니라 프로토콜이라는
+   판단이면 이 선택지가 맞다(이력 = `docs/standards/residue_gate_demotion_battle_history.md`).
 
 ---
 
