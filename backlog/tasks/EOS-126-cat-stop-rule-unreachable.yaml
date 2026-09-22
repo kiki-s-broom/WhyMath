@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P0
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/l2/next_problem_selection.py
   - src/backend/whymath_backend/api/me.py
   - tests/backend/api/test_e2e_persona_journeys.py
-session: null
+session: claude/gallant-johnson-dxfe58
 notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15(페르소나 3인 완주) 실행 중 실측 발견. 판정 기준 main 433ec9ea. 범위 규율(P-15 ④ \"발견한 결함은 고치되 범위를 넓히지 마라 · 새 기능이 필요하면 태스크로 등재만 하고 보고하라\")에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP.\n\n[정정 2026-09-19] 추론을 실측으로 승격 + 게이트 순서·측정 범위 정정(D1 인과 사슬 재확인)\n\n[개명 2026-09-19] EOS-123-cat-stop-rule-unreachable → EOS-126-cat-stop-rule-unreachable: 번호 충돌 — main이 PR #1227에서 EOS-123(오개념 반박 비대칭)을 먼저 착지시켰다. 미머지인 이쪽을 개명(HARN-100)\n\n[정정 2026-09-19] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/api/test_persona_three_path_completion.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/api/test_e2e_persona_journeys.py']: PR #1228 축소 — 중복 하네스(test_persona_three_path_completion.py)를 폐기했으므로 그 경로를 버리고 착지본 test_e2e_persona_journeys.py로 교체한다. 나머지 2경로는 유지\npaths 제거 1건: ['tests/backend/api/test_persona_three_path_completion.py']\n\n[정정 2026-09-19] title 'CAT 중단 규칙 미도달 — 진단 확정이 영구히 쓰이지 않아 learner_state 자동 생성이 끊긴다' → 'CAT 중단 규칙 도달 비용 — 진단 확정에 67문항이 필요해 학습 진입이 실질적으로 막힌다': EOS-22 Gate 2 실측 수용 — '영구히 미도달'이 아니라 '67문항에서 도달'로 전제 정정"
-updated: 2026-09-19
+updated: 2026-09-21

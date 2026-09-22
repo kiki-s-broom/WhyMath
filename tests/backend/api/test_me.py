@@ -50,6 +50,9 @@ from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.l2.concept_diagnosis import ConceptDiagnosis
 from whymath_backend.l2.learning_path import LearningPath, LearningStep
+from whymath_backend.l2.next_problem_selection import (
+    MAX_ADMINISTERED_ITEMS as _MAX_ADMINISTERED_ITEMS,
+)
 from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
     META_KEY_APPLIED_WEIGHTS,
@@ -3500,6 +3503,18 @@ class TestSessionEndConceptSnapshots:
 
 
 # ── ASM-03: POST /v1/me/assessments/capture ────────────────────────────────
+#: EOS-126: 조립 함수가 요구하는 중단 규칙 상태 — 아래 조립 테스트들의 축은 *조립 결과*이지
+#: 중단 규칙이 아니므로, 기존 동작과 같은 "정밀도로 확정된" 상태를 고정 공급한다.
+#: 상한 확정 쪽 표기는 `TestCaptureItemCapHonesty`가 따로 검증한다.
+_PRECISE_STOP_STATE = _AttemptHistoryState(
+    attempted_ids=set(),
+    theta=0.0,
+    standard_error=0.25,
+    measurement_sufficient=True,
+    administered_count=46,
+)
+
+
 class TestAssessmentCaptureWindow:
     """`_capture_window_start` — idempotency 창 시작 시각(UTC 자정) 순수 함수."""
 
@@ -3618,7 +3633,10 @@ class TestAssembleMeasurementAssessment:
         now = datetime(2026, 1, 1, tzinfo=UTC)
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=now
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=now,
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert schema.estimated_grade is None
@@ -3653,7 +3671,10 @@ class TestAssembleMeasurementAssessment:
         )
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert len(schema.concept_diagnosis) == 2
@@ -3689,7 +3710,10 @@ class TestAssembleMeasurementAssessment:
         )
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert len(schema.weak_points) == 2
@@ -3716,7 +3740,10 @@ class TestAssembleMeasurementAssessment:
         )
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert len(schema.strong_points) == 1
@@ -3747,7 +3774,10 @@ class TestAssembleMeasurementAssessment:
         )
         asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert len(weak_calls) == 1 and weak_calls[0] is shared
@@ -3759,7 +3789,10 @@ class TestAssembleMeasurementAssessment:
         self._patch_l2_outputs(monkeypatch, diagnoses=[], hypotheses=[], weak=[], strong=[])
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert schema.strong_points == []
@@ -3807,7 +3840,10 @@ class TestCapturedPathOrderingHonesty:
         )
         return asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
 
@@ -3889,7 +3925,10 @@ class TestCapturedPathOrderingHonesty:
         helper._patch_l2_outputs(monkeypatch, diagnoses=[], hypotheses=[], weak=[])
         schema = asyncio.run(
             me_module._assemble_measurement_assessment(
-                cast(AsyncSession, FakeSession()), _UID, now=datetime(2026, 1, 1, tzinfo=UTC)
+                cast(AsyncSession, FakeSession()),
+                _UID,
+                now=datetime(2026, 1, 1, tzinfo=UTC),
+                stop_rule_state=_PRECISE_STOP_STATE,
             )
         )
         assert schema.recommended_path == []
@@ -3928,7 +3967,13 @@ class TestAssessmentCaptureEndpoint:
     def test_insufficient_measurement_not_written(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_state(session: Any, user_id: Any) -> _AttemptHistoryState:
             return _AttemptHistoryState(
-                attempted_ids=set(), theta=0.0, standard_error=0.9, measurement_sufficient=False
+                attempted_ids=set(),
+                theta=0.0,
+                standard_error=0.9,
+                measurement_sufficient=False,
+                # EOS-126: 상한 축도 미발화여야 `insufficient_measurement`다. 이 값이 상한
+                # 이상이면 2차 중단 규칙이 발화해 적재되므로, 미발화를 명시적으로 고정한다.
+                administered_count=4,
             )
 
         async def _boom_assemble(*args: Any, **kwargs: Any) -> Any:
@@ -3954,13 +3999,19 @@ class TestAssessmentCaptureEndpoint:
     def test_written_when_measurement_sufficient(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_state(session: Any, user_id: Any) -> _AttemptHistoryState:
             return _AttemptHistoryState(
-                attempted_ids=set(), theta=0.5, standard_error=0.2, measurement_sufficient=True
+                attempted_ids=set(),
+                theta=0.5,
+                standard_error=0.2,
+                measurement_sufficient=True,
+                administered_count=46,
             )
 
         async def _no_existing(session: Any, user_id: Any, now: Any) -> Assessment | None:
             return None
 
-        async def _fake_assemble(session: Any, user_id: Any, *, now: datetime) -> AssessmentSchema:
+        async def _fake_assemble(
+            session: Any, user_id: Any, *, now: datetime, stop_rule_state: Any
+        ) -> AssessmentSchema:
             return AssessmentSchema(
                 user_id=user_id,
                 assessment_type=AssessmentType.단원진단,
@@ -4015,7 +4066,11 @@ class TestAssessmentCaptureEndpoint:
 
         async def _fake_state(session: Any, user_id: Any) -> _AttemptHistoryState:
             return _AttemptHistoryState(
-                attempted_ids=set(), theta=0.5, standard_error=0.2, measurement_sufficient=True
+                attempted_ids=set(),
+                theta=0.5,
+                standard_error=0.2,
+                measurement_sufficient=True,
+                administered_count=46,
             )
 
         existing_row = Assessment.from_schema(
@@ -4044,6 +4099,118 @@ class TestAssessmentCaptureEndpoint:
         # 재적재 없음 — 커밋 0·add 0(이중 계상 방지가 실제로 동작함을 확인).
         assert fake.commits == 0
         assert fake.added == []
+
+
+class TestCaptureItemCapHonesty:
+    """EOS-126 2차 중단 규칙 — 상한 확정이 **정밀도를 참칭하지 않는가**.
+
+    통합 하네스(`test_e2e_persona_journeys.py`)는 실제 DB로 상한 도달까지 가지만, 아래 두 축은
+    그 경로가 닿지 않는다: ①`already_captured_window` 재호출 ②적재되는 행의 `notes`. 둘 다
+    "상한으로 확정된 진단"과 "정밀도로 확정된 진단"이 구별되는지를 묻는 같은 질문이다.
+    """
+
+    @staticmethod
+    def _capped_state() -> _AttemptHistoryState:
+        """상한에 닿았으나 정밀도는 미달인 상태 — 이 태스크가 새로 만든 경계."""
+        return _AttemptHistoryState(
+            attempted_ids=set(),
+            theta=0.4,
+            standard_error=0.48,
+            measurement_sufficient=False,
+            administered_count=_MAX_ADMINISTERED_ITEMS,
+        )
+
+    def test_capped_capture_writes_but_does_not_claim_precision(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """상한 확정은 적재하되 `reason`·`measurement_sufficient`로 근거를 정직하게 밝힌다."""
+        captured: dict[str, Any] = {}
+
+        async def _fake_state(session: Any, user_id: Any) -> _AttemptHistoryState:
+            return self._capped_state()
+
+        async def _no_existing(session: Any, user_id: Any, now: Any) -> Assessment | None:
+            return None
+
+        async def _fake_assemble(
+            session: Any, user_id: Any, *, now: datetime, stop_rule_state: Any
+        ) -> AssessmentSchema:
+            captured["notes"] = me_module._capture_note(stop_rule_state)
+            return AssessmentSchema(
+                user_id=user_id,
+                assessment_type=AssessmentType.단원진단,
+                started_at=now,
+                completed_at=now,
+            )
+
+        monkeypatch.setattr("whymath_backend.api.me._load_attempt_history_state", _fake_state)
+        monkeypatch.setattr("whymath_backend.api.me._find_existing_capture", _no_existing)
+        monkeypatch.setattr(
+            "whymath_backend.api.me._assemble_measurement_assessment", _fake_assemble
+        )
+        client, _fake = _client([])
+        resp = client.post("/v1/me/assessments/capture")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+
+        assert body["written"] is True, "상한에 닿았는데 적재되지 않았다"
+        assert body["reason"] == "captured_at_item_cap", body
+        assert (
+            body["measurement_sufficient"] is False
+        ), "상한 확정이 정밀도 달성을 참칭했다 — `TARGET_SE`를 낮춰 통과시킨 것과 같다."
+        assert body["administered_count"] == _MAX_ADMINISTERED_ITEMS, body
+        # 적재되는 **행**에도 남는가 — 응답만 정직하면 그 정직성은 호출 순간에만 존재한다.
+        assert "문항 수 상한" in captured["notes"], captured["notes"]
+        assert "정밀도 미달" in captured["notes"], captured["notes"]
+
+    def test_already_captured_window_does_not_claim_precision_when_capped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """재호출(idempotent) 응답도 정밀도를 참칭하지 않는다.
+
+        이 분기는 `measurement_sufficient=True`를 **상수로** 들고 있었다. 상한 확정이 생기기
+        전에는 참이었지만(이 분기에 정밀 확정만 도달했다), 지금은 상한으로 확정된 학생이
+        같은 창에서 다시 부르면 그 상수가 거짓말이 된다.
+        """
+
+        async def _fake_state(session: Any, user_id: Any) -> _AttemptHistoryState:
+            return self._capped_state()
+
+        existing_row = Assessment.from_schema(
+            AssessmentSchema(user_id=_UID, assessment_type=AssessmentType.단원진단)
+        )
+
+        async def _existing(session: Any, user_id: Any, now: Any) -> Assessment:
+            return existing_row
+
+        monkeypatch.setattr("whymath_backend.api.me._load_attempt_history_state", _fake_state)
+        monkeypatch.setattr("whymath_backend.api.me._find_existing_capture", _existing)
+        client, _fake = _client([])
+        resp = client.post("/v1/me/assessments/capture")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+
+        assert body["reason"] == "already_captured_window", body
+        assert (
+            body["measurement_sufficient"] is False
+        ), "재호출 응답이 정밀도 달성을 주장했다 — 이 분기의 하드코딩 True가 남아 있다."
+        assert body["administered_count"] == _MAX_ADMINISTERED_ITEMS, body
+
+    def test_precise_capture_note_names_precision_not_cap(self) -> None:
+        """대조군 — 정밀도로 확정된 회차의 `notes`는 상한을 근거로 적지 않는다.
+
+        이 대조군이 없으면 "무조건 상한이라고 적는다"는 과잉 수정이 위 테스트를 통과한다.
+        """
+        precise = _AttemptHistoryState(
+            attempted_ids=set(),
+            theta=0.4,
+            standard_error=0.28,
+            measurement_sufficient=True,
+            administered_count=46,
+        )
+        note = me_module._capture_note(precise)
+        assert "정밀도 달성" in note, note
+        assert "문항 수 상한" not in note, note
 
 
 # ──────────────────────────────────────────────────────────────────────────

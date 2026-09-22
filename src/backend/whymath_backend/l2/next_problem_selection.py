@@ -50,6 +50,7 @@ __all__ = [
     "build_candidate_pool_stmt",
     "CANDIDATE_ZERO_ALL_GATED_INELIGIBLE",
     "CANDIDATE_ZERO_NO_POOL",
+    "MAX_ADMINISTERED_ITEMS",
     "TARGET_SE",
     "WEIGHT_AXIS_SUNEUNG_PRIORITY",
     "WEIGHT_AXIS_WEAK_CONCEPT",
@@ -70,6 +71,34 @@ CANDIDATE_POOL_SIZE = 50  # θ 근방 후보 풀 크기(SQL로 거리순 선별 
 # "충분히 정밀하게 측정됨"으로 보고 적응 검사 중단을 권고(measurement_sufficient=True).
 # 0.3은 통상적 CAT 종료 임계(θ ± ~0.6 95% 구간). 추후 모드/설정별 보정은 후속.
 TARGET_SE = 0.3
+# EOS-126: CAT **2차 중단 규칙** — 출제 문항 수 상한. `TARGET_SE`(정밀도 축)에 닿지 못해도
+# 이 수만큼 채점되면 진단을 *확정 가능*으로 본다(`AttemptHistoryState.diagnosis_confirmable`).
+#
+# **왜 필요한가 — 실측**: 이 경로의 θ 추정은 모든 응답을 Rasch(a=1.0)로 다룬다
+# (`load_attempt_history_state`가 `IrtItem(difficulty=b)`만 만들고 변별도를 넘기지 않는다).
+# a=1.0이면 문항 하나가 주는 최대 정보량이 a²·0.25 = 0.25이고, SE ≤ 0.3은 총정보량
+# I ≥ 1/0.3² = 11.11을 요구한다 → **최소 45문항**(11.11/0.25 = 44.4). 이 45는 튜닝 여지가
+# 아니라 *모든 문항의 난이도가 학생 능력과 완전히 일치(P=0.5)할 때의 이론적 하한*이다.
+# 실측이 그 하한을 확인했다: 난이도 1.0~5.0 균등 코퍼스에서 `select_next_item`으로 이상적
+# 적응 출제를 돌리면 46문항(SE 0.2973), EOS-22 판정 프로브(정답률 2/3 고정)는 67문항이었다
+# (`docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md` §2-1). 즉 **완벽한 적응 알고리즘도
+# a=1.0인 한 45문항을 깰 수 없다** — 실학생이 한 자리에서 완주할 수 없는 길이다.
+#
+# **왜 20인가**: 같은 실측 곡선에서 20문항 SE≈0.45·25문항 0.41·30문항 0.37이다. 어디서 끊어도
+# 0.3에는 못 닿으므로 이 상한의 근거는 정밀도가 아니라 *학생이 한 자리에서 감당하는 분량*이고,
+# 고정 길이 적응 진단의 통상 범위(20~30문항) 하단을 택했다.
+#
+# **임계를 낮추는 것이 아니다**(EOS-126 acceptance ③의 금지선): `TARGET_SE`는 0.3 그대로이고
+# `measurement_sufficient`의 의미도 "SE ≤ 0.3"에서 바뀌지 않는다. 이 상한은 *정밀도 달성*을
+# 참칭하지 않고 **별도의 중단 사유**를 하나 더 둘 뿐이다 — 상한으로 끝난 진단은 응답·적재 양쪽에
+# `measurement_sufficient=False`와 달성 SE를 그대로 달고 나간다(침묵 실패 금지).
+#
+# **근본 원인은 따로 있다**: 수렴 속도 자체를 올리려면 문항 변별도 a를 실측·소비해야 하는데,
+# `Problem.irt_a` 컬럼은 존재하지만 **쓰기 경로가 저장소 어디에도 없고**(항상 NULL) 보정기
+# `l2/item_calibration.py`는 `fit_jmle`(1PL·a 고정)로 b만 적합한다. a=1.5면 하한이 20문항,
+# a=2.0이면 12문항으로 내려간다. 그 2PL 보정은 문항당 응답 축적이 선행돼야 하므로 별건이다
+# = `EOS-129`.
+MAX_ADMINISTERED_ITEMS = 20
 # slice 16/17: 약점 개념 가중 출제 — BKT 개념별 숙달이 낮을수록(약점) 후보 문항 정보량에
 # 곱하는 가중치를 키운다. weight = 1 + BOOST·(1 - 최저숙달). BOOST=1.0이면 완전 미숙달(숙달 0)
 # 문항은 가중 2배·완전 숙달(1.0)은 1배. 정책 상수(모드별 차등은 후속).
@@ -258,6 +287,25 @@ class AttemptHistoryState:
     theta: float
     standard_error: float | None
     measurement_sufficient: bool
+    #: EOS-126: SE 산출에 실제로 들어간 채점 응답 수(= 난이도 b가 해소된 응답).
+    #: `attempted_ids`와 다르다 — 난이도 라벨도 보정 b도 없는 문항은 θ·SE에 기여하지 못하므로
+    #: 여기서도 세지 않는다(상한과 SE가 *같은 문항 집합*을 가리키게 한다).
+    administered_count: int
+
+    @property
+    def item_cap_reached(self) -> bool:
+        """EOS-126 2차 중단 규칙 — 채점된 출제 문항이 상한에 닿았는가(정밀도와 무관)."""
+        return self.administered_count >= MAX_ADMINISTERED_ITEMS
+
+    @property
+    def diagnosis_confirmable(self) -> bool:
+        """진단을 확정(capture)해도 되는가 — 중단 규칙 **둘 중 하나**라도 발화하면 참.
+
+        `measurement_sufficient`(정밀도 축)와 **별개 개념**이다. 정밀도를 달성해서 참인지
+        상한에 닿아서 참인지는 이 값으로 구분되지 않으므로, 소비처는 두 원천을 각각 읽어
+        정직하게 표기한다(`api/me.py`의 capture `reason`).
+        """
+        return self.measurement_sufficient or self.item_cap_reached
 
 
 async def load_attempt_history_state(
@@ -307,6 +355,7 @@ async def load_attempt_history_state(
         theta=theta,
         standard_error=standard_error,
         measurement_sufficient=measurement_sufficient,
+        administered_count=len(administered_items),
     )
 
 
