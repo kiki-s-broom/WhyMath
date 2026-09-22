@@ -863,6 +863,18 @@ def main(argv: list[str] | None = None) -> int:
         f"개념 orphan skip: {report.concepts_skipped}건"
         + (" (원자 미적재 — l1.atom_graph 선행)." if report.concepts_skipped else ".")
     )
+    # LIC-03 — 원장("작동한 비율"). 적재 성공 건수는 provenance가 일했다는 증거가 아니다.
+    # 0건에는 두 의미가 있어 구분해 보고한다: *이미 있어서* 0(멱등 재적재·정상)과
+    # *관문이 무작동이라* 0(신규 적재인데 원장이 안 생김·이상). 운영자가 화면만 보고
+    # 판정할 수 있어야 복원 회차를 검증할 수 있다.
+    if report.provenance_rows_loaded:
+        print(f"출처 원장(content_provenance) 신규 기록: {report.provenance_rows_loaded}건.")
+    elif report.problems_loaded:
+        print(
+            "출처 원장(content_provenance) 신규 기록: 0건 — 이 문항들의 원장이 이미 있거나"
+            "(멱등 재적재) 생성물이 아닌 출처입니다. 첫 적재인데 0건이면 관문 무작동을 "
+            "의심하세요(docs/standards/provenance_enforcement_layer_decision.md)."
+        )
     return 0
 
 

@@ -830,3 +830,52 @@ def test_populate_provenance_is_idempotent_when_row_exists(tmp_path: Path) -> No
         "INSERT INTO content_provenance" in c for c in compiled
     ), "기존 행이 있는데 원장 INSERT가 또 나갔다 — 재적재마다 감사 행이 쌓인다"
     assert report.provenance_rows_loaded == 0
+
+
+def test_cli_reports_provenance_rows(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """CLI 화면이 원장 건수를 말한다 — "작동한 비율"(CLAUDE.md).
+
+    적재 성공 건수는 provenance가 일했다는 증거가 아니다. 복원 회차를 운영자가 화면만
+    보고 검증할 수 있어야 하므로 CLI stdout이 정본 보고 표면이다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    path = _write(tmp_path, [_base_record()])
+    engine = _FakeEngine(_ALL_CONCEPTS)
+    monkeypatch.setattr(
+        mod,
+        "populate_problem_bank",
+        lambda _s, *, problems_path, store=None: mod.ProblemBankStore.populate(
+            _store(engine), mod.load_problem_bank_records(problems_path)
+        ),
+    )
+    assert mod.main(["--problems", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "content_provenance" in out, f"CLI가 원장을 언급조차 하지 않는다:\n{out}"
+    assert "신규 기록: 1건" in out, f"원장 건수가 화면에 없다:\n{out}"
+
+
+def test_cli_distinguishes_zero_provenance_from_silence(
+    tmp_path: Path, capsys, monkeypatch  # type: ignore[no-untyped-def]
+) -> None:
+    """원장 0건도 *말한다* — 침묵하면 '이미 있어서 0'과 '관문 무작동 0'이 같은 화면이 된다.
+
+    위 테스트의 대조군이다. 둘 다 있어야 "항상 출력"·"항상 침묵" 양쪽 과잉 수정이 막힌다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    path = _write(tmp_path, [_base_record()])
+    monkeypatch.setattr(
+        mod,
+        "populate_problem_bank",
+        lambda _s, *, problems_path, store=None: ProblemBankPopulateReport(
+            problems_loaded=1,
+            problem_concepts_loaded=0,
+            concepts_skipped=0,
+            provenance_rows_loaded=0,
+        ),
+    )
+    assert mod.main(["--problems", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "신규 기록: 0건" in out, f"0건이 화면에서 침묵했다:\n{out}"
+    assert "관문 무작동" in out, f"0건의 두 의미를 구분해 주지 않는다:\n{out}"
