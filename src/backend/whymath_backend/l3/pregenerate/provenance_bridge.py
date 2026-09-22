@@ -36,11 +36,16 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from whymath_backend.config import Settings, get_settings
+from whymath_backend.config import CloudSeat, Settings, get_settings
 from whymath_backend.l3.models import CostTier, RoutingDecision, Usage
 from whymath_backend.l3.pregenerate.models import PregenItem, PrewarmItemResult
 from whymath_backend.l3.providers.factory import cloud_model_pins
-from whymath_backend.l3.router import _as_cost_tier, actual_cost_usd, resolve_model
+from whymath_backend.l3.router import (
+    SERVING_CLOUD_SEAT,
+    _as_cost_tier,
+    actual_cost_usd,
+    resolve_model,
+)
 from whymath_backend.schema.provenance import GenerationLog, text_sha256
 
 logger = logging.getLogger("whymath.l3.pregenerate.provenance_bridge")
@@ -87,21 +92,31 @@ def model_name_for_decision(
     return mid if cost is CostTier.CLOUD_MID else high
 
 
-def actual_cost_usd_or_none(decision: RoutingDecision, usage: Usage | None) -> float | None:
+def actual_cost_usd_or_none(
+    decision: RoutingDecision,
+    usage: Usage | None,
+    *,
+    seat: CloudSeat | None = SERVING_CLOUD_SEAT,
+) -> float | None:
     """실측 비용(USD) 또는 미상(None) — '0원 확정'과 '산정 불가'를 구분한다(날조 금지).
 
     - LOCAL → 0.0 (Phaiakes9 0원 확정 — usage 유무 무관).
     - CLOUD_*인데 usage가 없거나 토큰이 미상 → None (미상 — pipeline `_record_trace` 동형).
       호출 자체가 없었던 경로(스킵·사전 오류)도 클라우드 결정이면 보수적으로 None이다 —
       "호출 안 됨=0원"과 "호출 실패=토큰 미상"을 결과만으로 가릴 수 없어 지어내지 않는다.
-    - CLOUD_* + 토큰 실측 → 단가표 산정(`actual_cost_usd`).
+    - CLOUD_* + 토큰 실측 → **좌석별** 단가표 산정(`actual_cost_usd`).
+
+    `seat`은 `actual_cost_usd`와 같은 세 상태다(생략=서빙 좌석 / 명시=실제 응답 좌석 /
+    `None`=좌석 미상→None). 저작 경로는 `cloud_provider_name()`을 명시해 넘긴다 —
+    이 어댑터가 좌석을 *추측*하지 않는 이유는, 여기서 `get_settings()`를 읽으면 순수
+    함수가 프로세스 설정에 묶여 호출부가 어느 좌석으로 기록되는지 못 보게 되기 때문이다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     if cost is CostTier.LOCAL:
         return 0.0
     if usage is None or usage.input_tokens is None or usage.output_tokens is None:
         return None
-    return actual_cost_usd(decision, usage)
+    return actual_cost_usd(decision, usage, seat=seat)
 
 
 def input_snapshot_for_prewarm(item: PregenItem) -> dict[str, Any]:

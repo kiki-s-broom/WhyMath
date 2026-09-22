@@ -575,7 +575,7 @@ class TestActualUsageInstrumentation:
         from whymath_backend.l3.router import CLOUD_MIN_COST_KRW
 
         assert rec["est_cost_krw"] == pytest.approx(
-            CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH]
+            CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")]
         )  # 라우터 추정(CLOUD_MIN_COST_KRW·실측 보정 유도 — 상수 참조라 재보정에 강건)
         assert rec["cost_tier"] == "cloud_high"
 
