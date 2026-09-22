@@ -879,3 +879,88 @@ def test_cli_distinguishes_zero_provenance_from_silence(
     out = capsys.readouterr().out
     assert "신규 기록: 0건" in out, f"0건이 화면에서 침묵했다:\n{out}"
     assert "관문 무작동" in out, f"0건의 두 의미를 구분해 주지 않는다:\n{out}"
+
+
+# ── `--all` 전 코퍼스 적재 (LIC-03 §9 복원 경로) ─────────────────────────
+def test_discover_finds_every_problem_bank_corpus() -> None:
+    """실 저장소에서 문제은행 코퍼스를 전부 찾는다 — 스캔 0건은 이 축의 실패다."""
+    from whymath_backend.l1.problem_bank.populate import discover_problem_corpora
+
+    found = discover_problem_corpora(_ROOT)
+    assert len(found) >= 30, f"코퍼스 스캔이 {len(found)}건뿐 — 글롭이 실제 배치와 어긋났다"
+    assert all(p.name == "problems.jsonl" for p in found), found[:3]
+    # 문제은행만 고른다 — 개념·크로스워크 코퍼스가 섞이면 적재기가 남의 스키마를 읽는다.
+    assert all(p.parent.name.startswith("problem_bank_") for p in found), found[:3]
+
+
+def test_discover_excludes_non_problem_bank_corpora(tmp_path: Path) -> None:
+    """`problem_bank_` 접두 절의 **반례**로 검증한다 — 합성 트리가 필요한 이유.
+
+    실 저장소에는 `data/corpus/<problem_bank_ 아님>/problems.jsonl`이 **0건**이라(2026-09-22
+    실측), 위 테스트만으로는 글롭을 `data/corpus/*/problems.jsonl`로 넓혀도 통과한다
+    (뮤테이션 `glob_wide` 생존으로 발각). 즉 그 절을 한 번도 밟지 않았다. 여기서 반례를
+    만들어 절을 실제로 실행시킨다(CLAUDE.md "픽스처가 그 절을 실제로 밟는가").
+    """
+    from whymath_backend.l1.problem_bank.populate import discover_problem_corpora
+
+    corpus = tmp_path / "data" / "corpus"
+    (corpus / "problem_bank_synthetic_v0").mkdir(parents=True)
+    (corpus / "problem_bank_synthetic_v0" / "problems.jsonl").write_text("", encoding="utf-8")
+    # 반례 — 문제은행이 아닌 코퍼스가 같은 파일명을 쓰는 경우.
+    (corpus / "concept_graph_v9").mkdir(parents=True)
+    (corpus / "concept_graph_v9" / "problems.jsonl").write_text("", encoding="utf-8")
+
+    found = discover_problem_corpora(tmp_path)
+    assert [p.parent.name for p in found] == [
+        "problem_bank_synthetic_v0"
+    ], f"문제은행 아닌 코퍼스가 섞였다: {[str(p) for p in found]}"
+
+
+def test_cli_all_loads_every_corpus_and_totals(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """`--all`은 발견한 코퍼스를 전부 적재하고 합계를 보고한다."""
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    corpora = [tmp_path / f"problem_bank_c{i}" / "problems.jsonl" for i in range(3)]
+    seen: list[Path] = []
+    monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: corpora)
+
+    def _fake(
+        _s: object, *, problems_path: Path, store: object = None
+    ) -> ProblemBankPopulateReport:
+        seen.append(problems_path)
+        return ProblemBankPopulateReport(
+            problems_loaded=5,
+            problem_concepts_loaded=0,
+            concepts_skipped=0,
+            provenance_rows_loaded=5,
+        )
+
+    monkeypatch.setattr(mod, "populate_problem_bank", _fake)
+    assert mod.main(["--all"]) == 0
+    assert seen == corpora, f"적재한 경로가 발견 목록과 다르다: {seen}"
+    out = capsys.readouterr().out
+    assert "전 코퍼스 3개 합계: 문항 15건 · 출처 원장 신규 15건" in out, out
+    # 합계가 코퍼스별 줄을 대신하지 않는다 — 어느 코퍼스가 0이었는지는 개별 줄에만 있다.
+    assert out.count("출처 원장(content_provenance) 신규 기록: 5건") == 3, out
+
+
+def test_cli_all_fails_loudly_on_empty_scan(tmp_path: Path, capsys, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """스캔 0건은 exit 2 — "성공적으로 아무것도 안 함"을 통과로 보고하지 않는다.
+
+    위 테스트의 대조군이다. 이것이 없으면 잘못된 디렉터리에서 돌린 복원 회차가
+    조용히 exit 0으로 끝나고, 운영자는 복원됐다고 믿는다.
+    """
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: [])
+    assert mod.main(["--all"]) == 2
+    assert "스캔 0건" in capsys.readouterr().out
+
+
+def test_cli_all_and_problems_are_mutually_exclusive() -> None:
+    """`--all`과 `--problems` 동시 지정은 argparse가 거부한다(의도 모호 금지)."""
+    from whymath_backend.l1.problem_bank import populate as mod
+
+    with pytest.raises(SystemExit) as excinfo:
+        mod.main(["--all", "--problems", "x.jsonl"])
+    assert excinfo.value.code == 2
