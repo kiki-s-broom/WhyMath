@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/router.py
   - tests/backend/l3/test_router.py
-session: null
+session: claude/laughing-hawking-uantt8
 notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md §2. 판정 기준: main d10ba109.\n\n현행 `CLOUD_TOKEN_PRICE_USD_PER_1M`은 {CLOUD_MID:(3.0,15.0), CLOUD_HIGH:(5.0,25.0)}로 티어만 키가 잡혀 있고 `actual_cost_usd`가 `[cost]` 한 줄로 단가를 꺼낸다 — \"CLOUD_MID = Anthropic Sonnet\"이라는 암묵 가정 위에 선 구조다. MID 좌석을 DeepSeek으로 옮기면 24.4배 과대 계상이 되고, 그 값이 `guard_cloud`의 예산 판정 입력이라 불필요한 LOCAL 강등을 낳는다(basic 일 500원: 표 58회 vs 실제 1414회). 강등은 응답 200으로 나가므로 무증상이다 — CLAUDE.md 「작동 신호 없는 알고리즘 부착 금지」 형태.\n\n그래서 ARCH-64가 이 태스크를 depends_on으로 걸고 있다. 순서를 바꾸면 비용 회계가 거짓이 된 채로 돈다.\n\n[정정 2026-09-21] notes 치환 — audit-deps 오탐 정정 — 원 문장이 의존 방향을 반대로 읽히게 썼다. 실제 방향은 이 태스크가 앞이고 컷오버 태스크가 뒤이며, 그 관계는 뒤쪽 태스크의 depends_on에 이미 집행돼 있다. 이 정정은 문구만 바꾸며 의존 관계 자체는 건드리지 않는다"
-updated: 2026-09-21
+updated: 2026-09-22
