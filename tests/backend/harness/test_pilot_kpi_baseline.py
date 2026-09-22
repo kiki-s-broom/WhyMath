@@ -203,6 +203,14 @@ def _summary(
         # 구판(카운트 미보유)으로 둔다(필수 필드라 명시적으로 채움·정직 회계 계약 유지).
         transition_counts={"correct": 0, "incorrect": 0, "unverifiable": 0},
         transition_records=0,
+        # 판정 모집단(none 제외·사전등록 분모)·전이 형태 축(S3-51)도 KPI5와 무관하지만
+        # 필수 필드라 명시적으로 채운다 — 기본값으로 숨기면 산출 누락이 0으로 위장된다.
+        verify_target_total=correct + incorrect + unverifiable,
+        verify_target_ratios={},
+        form_transition_counts={"equation": 0, "mixed": 0},
+        equation_turns=0,
+        form_records=0,
+        form_legacy_records=total,
         legacy_records=total,
         distinct_dialogues=0,
         observed_at_min=None,

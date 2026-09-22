@@ -88,6 +88,21 @@ class Wh1HarnessShadowObservation(BaseModel):
     n_unverifiable: int | None = None
     """이 턴 verify_step 전이별 unverifiable 판정 수(S3-07). None=구판 레코드(카운트 미기록)."""
 
+    n_equation_transitions: int | None = None
+    """이 턴에서 **해집합 보존 경로**(등호 방정식 변형·S3-02)로 판정된 전이 수(S3-51).
+
+    **None=구판 레코드**(형태 축 이전 emit)로 "등호 전이 0회"(=0)와 구분한다 — 신판 emit은
+    항상 기록한다(verify 미호출 턴도 0). 자유사용 대표측정(S3-02 트리거 ③)의 사전등록 유효성
+    전제 V3(등호 방정식 변형 턴 >=5건)이 읽는 축이며, S3-02 알고리즘이 실사용에서 *실제로
+    작동한 횟수*이기도 하다(CLAUDE.md '작동한 비율' 원칙). 정수 개수만 — 식·원문은 없다."""
+
+    n_mixed_form_transitions: int | None = None
+    """이 턴에서 **혼합 형태**(한쪽만 등식)라 비교 전제 불성립으로 회피한 전이 수(S3-51).
+
+    None=구판. V3 미달·unverifiable 잔여의 원인이 백엔드 판정이 아니라 *입력 형태*(단계가
+    등식으로 정렬되지 않음)임을 구분하는 진단 축 — 2026-07-19 실측에서 잔여 원인이 입력 UX로
+    이동했다는 결론(S3-05)의 후속 관측이다."""
+
     tool_calls: int
     """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일)."""
 
@@ -168,6 +183,30 @@ def _count_verify_verdicts(trace: Sequence[ToolResult]) -> tuple[int, int, int]:
     return counts["correct"], counts["incorrect"], counts["unverifiable"]
 
 
+def _count_verify_forms(trace: Sequence[ToolResult]) -> tuple[int, int]:
+    """트레이스의 verify_step 전이 *형태* 집계 — (등호 방정식 전이 수, 혼합 형태 전이 수).
+
+    `_count_verify_verdicts`(판정 축)의 자매 함수다(S3-51). 하네스가 이미 계산해 트레이스에
+    실어 둔 `verify_form_counts`를 **합산만** 한다 — 형태 판정을 재구현하지 않는다(단일 진실
+    원천은 `l3/verify_step.py`의 분기). 구판 ToolResult(필드 없음·None)는 0으로 합산되는데,
+    그건 *같은 프로세스 안* 이야기라 발생하지 않는다(레코드 축의 신/구판 구분은 관측 필드의
+    None이 담당한다).
+
+    산출은 비식별 정수 2개뿐 — 학생 원문·단계·정답을 담지 않는다(프라이버시 계약 유지).
+    """
+    equation = 0
+    mixed = 0
+    for result in trace:
+        if result.kind != "verify_step" or not result.ok:
+            continue
+        counts = result.verify_form_counts
+        if counts is None:
+            continue
+        equation += counts.get("equation", 0)
+        mixed += counts.get("mixed", 0)
+    return equation, mixed
+
+
 def emit_wh1_observation(
     outcome: TurnOutcome,
     *,
@@ -192,6 +231,8 @@ def emit_wh1_observation(
     verify_verdict = _extract_verify_verdict(outcome.trace)
     # 전이별 카운트(S3-07) — 마지막 판정(턴 라벨)이 가리는 앞 전이 correct를 분포에 노출.
     n_correct, n_incorrect, n_unverifiable = _count_verify_verdicts(outcome.trace)
+    # 전이 *형태* 집계(S3-51) — S3-02 해집합 경로가 이 턴에 몇 번 작동했는지(V3 축).
+    n_equation, n_mixed = _count_verify_forms(outcome.trace)
     logger.info(
         "WH-1 하네스 %s — status=%s action_type=%s verify=%s "
         "transitions(c/i/u)=%d/%d/%d (tool_calls=%d hypotheses=%d tone_rewritten=%s)",
@@ -214,6 +255,8 @@ def emit_wh1_observation(
             n_correct=n_correct,
             n_incorrect=n_incorrect,
             n_unverifiable=n_unverifiable,
+            n_equation_transitions=n_equation,
+            n_mixed_form_transitions=n_mixed,
             tool_calls=outcome.tool_calls,
             hypothesis_count=len(outcome.hypotheses),
             dialogue_id=dialogue_id,
