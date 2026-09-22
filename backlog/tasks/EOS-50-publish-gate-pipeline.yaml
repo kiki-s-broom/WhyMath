@@ -11,18 +11,21 @@ eos_priority: P0
 owner: claude
 depends_on:
   - EOS-49-concept-version-contract
+  - P3-10-ai-quality-eval-suite
 requires_gates:
   - G-eos49-content-version-seat
+  - G-p3-g3-week3
 acceptance:
   - "① 44_eos_version_management.md §9의 Publish Gate를 코드로: publish 전이 시 검증 파이프라인(스키마 유효성·content_hash 산출·governance 필드 완결) 경유를 강제 — 검증 미통과 publish는 exit/예외로 거부(기계 게이트·점추정 인상 판정 금지)"
   - "② 기존 검수 축과 이원화 금지: review_status(ReviewStatus)·PB-03 노출 계약과의 관계를 먼저 판정해 문서화 — 같은 축이면 재사용, 다른 축이면 경계 명문화(판정 이원화 회피)"
   - "③ 집행 지점 별항: publish API/CLI가 실제로 이 게이트를 경유함을 소스 스캔 또는 통합 테스트로 동결(정본화≠집행)"
   - "④ 범위 밖: Impact Analysis·Dependency lock(Phase 2 — §13)"
+  - "[P3-11 흡수 2026-09-22 · EOS-128 3회차] 이 태스크가 Phase 3 회차 P3-11(콘텐츠 상태 워크플로우 Draft→Published→Rollback)의 소유자다. 지시문 세트 16/20 이 요구하는 축을 기존 acceptance 에 덧붙인다 — 신규 등재하면 같은 Publish 축의 두 번째 사본이 된다.\n⑨ 상태 전이를 **데이터로 선언**한다 — Draft → Review → QA → Approved → Published → Deprecated/Rollback. 전이표가 코드 분기에 흩어지지 않게 한다.\n⑩ 미정의 전이와 미승인 Publish 가 **RED** 다 — 주입으로 확인한다(정상 전이만 통과하는 것은 증거가 아니다).\n⑪ **Rollback 이 이전 버전을 실제로 복원**한다 — 복원 후 내용이 이전 버전과 일치하는지 단언한다. EOS-128 2회차 대조표 §11-4b 가 Rollback 을 저장소 '대응 없음'으로 판정했다.\n⑫ 완료 판정(P3-11) — 상태 전이가 데이터로 선언되고, 미정의 전이·미승인 Publish 가 RED 이며, Rollback 이 이전 버전을 복원함."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/**"
   - "src/backend/whymath_backend/api/**"
   - "tests/backend/**"
 session: null
-notes: "출처: 44_eos_version_management.md §16-6 — EOS-44 종결 시 MVP 범위(§12 'Publish with validation') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D1★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신(DRAFT→…→PUBLISHED) 위에 선다 — EOS-49가 ARCH-37 동결 충돌로 게이트 대기이므로 같은 게이트를 부착(원 notes의 ARCH-31/EOS-49는 OR 관계라 depends_on으로 표현 불가·HARN-53 분류 대상 — 뒤 항목에서 EOS-49를 depends_on에 집행). 2026-09-06 /drive 실측\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신 위에 서므로 depends_on에 EOS-49를 집행한다(ARCH-31은 OR 대안이라 LEGACY_EXEMPT·HARN-53 분류에 맡긴다). 2026-09-06 PR #994 CI audit-deps red 정정 — 직전 정정 문장의 어구가 감사 창에 걸렸다"
-updated: 2026-09-06
+notes: "출처: 44_eos_version_management.md §16-6 — EOS-44 종결 시 MVP 범위(§12 'Publish with validation') 좌석 부재 발견·등재. 선행: ARCH-31 또는 EOS-49의 버전 테이블 실체화\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/D1★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신(DRAFT→…→PUBLISHED) 위에 선다 — EOS-49가 ARCH-37 동결 충돌로 게이트 대기이므로 같은 게이트를 부착(원 notes의 ARCH-31/EOS-49는 OR 관계라 depends_on으로 표현 불가·HARN-53 분류 대상 — 뒤 항목에서 EOS-49를 depends_on에 집행). 2026-09-06 /drive 실측\n\n[정정 2026-09-06] publish 전이 파이프라인은 EOS-49의 버전 상태 머신 위에 서므로 depends_on에 EOS-49를 집행한다(ARCH-31은 OR 대안이라 LEGACY_EXEMPT·HARN-53 분류에 맡긴다). 2026-09-06 PR #994 CI audit-deps red 정정 — 직전 정정 문장의 어구가 감사 창에 걸렸다\n\n[정정 2026-09-22] P3-11 회차 소유자로 지정 — Rollback·전이 데이터 선언·미정의 전이 RED 3축 흡수 (신규 등재 대신 amend: 같은 Publish 축)"
+updated: 2026-09-22

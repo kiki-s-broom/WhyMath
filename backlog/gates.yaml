@@ -410,6 +410,56 @@ gates:
     evidence: "2026-07-16 Kiki가 Phaiakes9 whymath-pg(docker·pgvector/pg16·호스트 5433)에서 diagnose_atom_orphans.py 실행. concept/atom_node/atom_embedding/concept_content 미적 계열 0행(R1 raw 잔존 없음). misconception_catalog 140건은 H: 네임스페이스 정상 어휘 오탐(현행 misconceptions_v1 코퍼스에 동일 H: 코드 142건) — 진짜 orphan 0건. 스크립트 오탐 필터(mis_id LIKE 'ATOM:%') 수정 커밋 동반."
     cleared_by: null
     notes: ""
+  - id: G-p3-entry-gate2-pass
+    title: "Phase 3 진입 조건 — Phase 2 Gate 2 PASS 판정. 지시문 세트 00_README가 명시한 전제이며, 2026-09-19 EOS-22 판정문(docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md)은 FAIL이다(10조건 충족·무개입 연속 3루프 미충족). 이 게이트가 pending인 동안 P3-01~P3-14 태스크는 selector 착수 후보에서 제외된다 — 등재는 착수가 아니다(EOS-09 §0-2). 재판정은 구현 세션과 분리된 판정 세션에서 한다(지시문 주의 4)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 40
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-p3-g1-week1
+    title: "P3-G1 — Week 1 Gate 판정 (11/1). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 60
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-p3-g2-week2
+    title: "P3-G2 — Week 2 Gate 판정 (11/8). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 60
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-p3-g3-week3
+    title: "P3-G3 — Week 3 Gate 판정 (11/15). AI 품질 8종이 합의된 기준 충족 + LLM이 학습 상태를 못 바꾸는 것이 재확인됨. 선행 P3-08~P3-10. 판정 회차 분리 집행"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 60
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-p3-g4-release
+    title: "P3-G4 — Phase 3 Release Gate 최종 판정 (11/22). Phase 3 Release Gate A~E 전부 충족 + 성공 기준 3문항 전부 YES → 최종 한 줄 PASS. 선행 P3-11~P3-14. 판정 회차 분리 집행"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 60
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human

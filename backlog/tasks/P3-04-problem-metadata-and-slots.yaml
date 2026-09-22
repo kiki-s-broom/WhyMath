@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-04-problem-metadata-and-slots
+title: "P3-04 — Problem 메타데이터 7필드 강제 + 문제 유형 6슬롯: 7필드 없는 Problem 은 Published 불가"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-03-coverage-fill
+requires_gates:
+  - G-p3-g1-week1
+acceptance:
+  - "① Problem 필수 7필드를 강제한다 — difficulty · skill · concept · solution · answer · misconception signature · hint strategy.\n② 문제 유형 6슬롯을 정의한다 — 대표 / 기본 / 응용 / 오개념 유발 / 진단 / 숙련도 확인.\n③ 집행 지점 — **7필드가 없는 Problem 은 Published 상태가 될 수 없다**(선언이 아니라 전이 차단).\n④ 변별력 — 필드를 하나씩 비우는 누락 주입이 각각 RED 인지 확인한다. 정상 입력 통과는 증거가 아니다.\n⑤ 완료 판정 — 7필드 누락 Problem 의 Published 전이가 거부되고 누락 주입이 RED."
+artifacts: []
+paths: []
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [04]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] S1-16(done·IRT difficulty)·EOS-07(done·모든 Problem 최소 1 Skill 연결 계약)이 개별 필드를 가지며 SignaturePattern enum 도 실재한다. 그러나 7필드 일괄 강제와 6슬롯 분류는 내가 찾은 방법으로는 0건이다 — EOS-128 2회차 대조표 §11-2 가 W2-1(문제 6종)을 주 항목 '대응 없음' 2건 중 하나로, W2-2(필드 7종)를 '부분 대응'으로 판정했다. hint strategy 필드의 저장 좌석 부재는 ARCH-39 가 지목한 상태다."
+updated: 2026-09-22
