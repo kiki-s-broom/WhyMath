@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -14,10 +14,11 @@ requires_gates: []
 acceptance:
   - "정본화: admin/module_registry.py — AdminModule 스키마 + _MODULE_REGISTRY(초기 시드 = 03 §5 22모듈·required_roles 빈 집합 금지·status 3값) + GET /v1/admin/menu(role 필터·planned 비활성 노출)"
   - "집행: 메뉴 필터와 라우트 가드 required_roles 일치 동결 테스트가 CI에서 실제 실행됨 — 파일 존재가 아니라 잡 수집 확인"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1269"
 paths:
   - "src/backend/whymath_backend/**"
   - "tests/backend/**"
-session: claude/keen-keller-q7o54o
+session: null
 notes: "docs/design/ui/04_admin_console_architecture.md §2 원칙7·§8 ADMIN-MODULE-REGISTRY 제안의 등재. SEC-07(RBAC v0 2값) 완료로 선결 없음. ADMIN-05 선결\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-21
+updated: 2026-09-22
