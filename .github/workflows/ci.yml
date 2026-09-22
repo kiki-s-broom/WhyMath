@@ -1056,9 +1056,17 @@ jobs:
             echo "::error::공개 산출물에 /admin 라우트가 있다 — 빌드 타깃 분리가 깨졌다(web_strategy §2)"
             exit 1
           fi
-          leak=$(grep -rl 'wm-admin-shell-bundle' out/ | wc -l)
-          if [ "$leak" -ne 0 ]; then
-            echo "::error::공개 번들에 admin 코드가 실렸다(표식 $leak건) — 공개 소스가 app/admin/을 import했는지 확인하라"
+          # **파이프를 쓰지 않는다.** `grep … | wc -l` 형태는 no-match일 때 grep이 exit 1을
+          # 내는데, 그 값이 `pipefail`이 켜진 셸에서 파이프라인의 상태가 되고 `set -e`가
+          # 스크립트를 **판정 전에** 죽인다 — 즉 누출이 *없을 때* 빨개지는 뒤집힌 검사가 된다.
+          # 지금 초록인 것은 GitHub의 *기본* 셸이 `bash -e`(pipefail 없음)라 wc의 0이 grep의
+          # 1을 가려 주기 때문일 뿐이고, 이 스텝에 `shell: bash`를 붙이는 순간(그것이
+          # `--noprofile --norc -eo pipefail`이다) 판정이 뒤집힌다. 2026-09-22 실측:
+          # 깨끗한 out/에 대해 `bash -eo pipefail`로 돌리면 아무 출력 없이 exit 1.
+          # `if grep -rq …`는 파이프가 없고 조건문 안이라 두 셸에서 같은 판정을 낸다.
+          if grep -rq 'wm-admin-shell-bundle' out/; then
+            echo "::error::공개 번들에 admin 코드가 실렸다 — 공개 소스가 app/admin/을 import했는지 확인하라"
+            grep -rl 'wm-admin-shell-bundle' out/ || true
             exit 1
           fi
           echo "OK — 공개 산출물 3건 실재 · admin 누출 0"
