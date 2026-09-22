@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from whymath_backend.config import Settings, get_settings
+from whymath_backend.config import CloudSeat, Settings, get_settings
 
 if TYPE_CHECKING:  # pragma: no cover - 타입 전용(런타임 import 비용·순환 회피)
     from whymath_backend.l3.interfaces import LLMProvider
@@ -101,7 +101,7 @@ def cloud_model_pins(settings: Settings | None = None) -> tuple[str, str]:
     )
 
 
-def cloud_provider_name(settings: Settings | None = None) -> str:
+def cloud_provider_name(settings: Settings | None = None) -> CloudSeat:
     """지금 선택된 클라우드 좌석의 이름 — 리포트·로그의 *작동 신호*용.
 
     CLAUDE.md 「작동 신호 없는 알고리즘 부착 금지」: 저작 산출물이 "어느 제공자가 처리했는가"를

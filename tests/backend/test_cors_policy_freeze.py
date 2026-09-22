@@ -13,6 +13,14 @@ control.md` L829). 이제 CORSMiddleware를 *항상* 등록하되(`whymath_backe
 
 이 테스트가 실패하면(=CORSMiddleware가 제거되거나 기본 allowlist가 비명시적으로 넓어짐) 이
 결정이 조용히 우회된 것이므로 회귀다.
+
+**ADMIN-06 추가 축 — `/v1/admin/menu`의 실 프리플라이트**: 위 두 검사는 `/health`로 미들웨어
+*자체*를 본다. 그런데 브라우저 백오피스 셸이 처음 보내는 요청은 `Authorization` 헤더를 단
+cross-origin GET이고, 그 프리플라이트는 `Access-Control-Request-Headers: authorization`을
+함께 보낸다 — 즉 allow-origin뿐 아니라 **allow-headers까지 맞아야** 실제로 열린다. 미들웨어가
+살아 있어도 이 조합이 막히면 셸은 원인 없는 실패를 본다(브라우저가 차단된 응답을 JS에 넘기지
+않으므로 서버 로그에는 200만 찍힌다). 그래서 web_strategy §4-4가 CORS의 집행 시점으로 지목한
+바로 그 경로·바로 그 헤더 조합을 여기서 동결한다.
 """
 
 from __future__ import annotations
@@ -94,5 +102,53 @@ class TestCorsPolicyFreeze:
                 },
             )
             assert resp.headers.get("access-control-allow-origin") == "https://admin.whymath.kr"
+        finally:
+            get_settings.cache_clear()
+
+
+class TestAdminMenuPreflightForWebShell:
+    """ADMIN-06 — 백오피스 셸이 실제로 보내는 프리플라이트가 origin에 따라 갈린다.
+
+    두 테스트가 서로의 대조군이다(같은 요청·같은 술어, 설정만 다르다). 한쪽만 두면
+    "전부 막힌다"·"전부 열린다" 양쪽 오구현이 통과한다.
+    """
+
+    _ORIGIN = "https://admin.internal.whymath.kr"
+    _PATH = "/v1/admin/menu"
+
+    def _preflight(self, client: TestClient) -> object:
+        return client.options(
+            self._PATH,
+            headers={
+                "Origin": self._ORIGIN,
+                "Access-Control-Request-Method": "GET",
+                # 셸은 Bearer 토큰을 헤더로 보낸다 → 프리플라이트에 이 줄이 반드시 붙는다.
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+
+    def test_unlisted_origin_is_denied(self) -> None:
+        """기본(deny-by-default) — allowlist에 없으면 CORS 허용 헤더가 나오지 않는다."""
+        get_settings.cache_clear()
+        try:
+            resp = self._preflight(_client())
+            assert "access-control-allow-origin" not in {k.lower() for k in resp.headers}
+        finally:
+            get_settings.cache_clear()
+
+    def test_listed_origin_is_allowed_including_authorization_header(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """allowlist에 넣으면 같은 프리플라이트가 origin + Authorization 허용을 받는다."""
+        monkeypatch.setenv("WHYMATH_CORS_ALLOWED_ORIGINS", self._ORIGIN)
+        get_settings.cache_clear()
+        try:
+            resp = self._preflight(_client())
+            assert resp.headers.get("access-control-allow-origin") == self._ORIGIN
+            allowed_headers = resp.headers.get("access-control-allow-headers", "").lower()
+            assert "authorization" in allowed_headers or "*" in allowed_headers, (
+                "Authorization 프리플라이트가 거부됐다 — 셸의 첫 요청이 브라우저에서 막힌다: "
+                + allowed_headers
+            )
         finally:
             get_settings.cache_clear()

@@ -224,6 +224,15 @@ class ToolResult(BaseModel):
     kind: str = Field(description="실행된 도구 종류(action.kind).")
     ok: bool = Field(description="실행/적용 성공 여부(거부·게이트 위반은 False).")
     detail: str = Field(description="사람 가독 사유(거부·등급·발화 등·내부용·학생 비노출).")
+    verify_form_counts: dict[str, int] | None = Field(
+        default=None,
+        description=(
+            "verify_step 전이의 *판정 경로 형태*별 개수(equation|mixed|expression·S3-51). "
+            "verify_step 실행 결과에만 채워지고 다른 도구는 None이다. 값은 개수뿐 — 학생 "
+            "원문·식은 담지 않는다(shadow 관측 레코드의 비식별 계약 유지). 관측 전용이며 "
+            "하네스 판정(3-state·불변식)에는 쓰이지 않는다."
+        ),
+    )
 
 
 class EvidenceEdge(BaseModel):
@@ -354,6 +363,26 @@ def _turn_verdict(
     return "correct"
 
 
+def _count_verify_forms(result: SolutionVerificationResult) -> dict[str, int]:
+    """전이별 *판정 경로 형태*(equation|mixed|expression) 개수 — 관측 전용(S3-51·희소 dict).
+
+    왜 세는가: S3-02가 붙인 해집합 보존 판정이 실사용에서 **몇 번 작동했는지**를 3-state만으로는
+    알 수 없다("등호 방정식을 해집합으로 판정한 correct"와 "표현식 동치 correct"가 같은 글자).
+    자유사용 대표측정(S3-02 트리거 ③)의 사전등록 유효성 전제 V3가 이 축이라, 관측이 없으면
+    사람이 자유사용 중에 손으로 세야 하고 그러면 "대본 금지"(자연 사용) 전제가 깨진다.
+
+    판정 재구현 0 — `verify_step`이 이미 분기에서 정한 `form` 라벨을 세기만 한다. 형태 판별
+    *전에* 회피한 전이(비대수 step_type·빈 입력)는 form이 None이라 어느 키에도 안 들어간다
+    (값 합 <= n_transitions — 0으로 위장하지 않는 희소 회계·`unverifiable_by_reason` 선례).
+    """
+    counts: dict[str, int] = {}
+    for step in result.steps:
+        if step.form is None:
+            continue
+        counts[step.form.value] = counts.get(step.form.value, 0) + 1
+    return counts
+
+
 def _net_support(evidence: list[EvidenceEdge], misconception_id: str) -> float:
     """in-memory 증거 순지지도 = Σ polarity×(weight or 1.0) — `evidence_store.net_support` 동형."""
     return sum(
@@ -456,10 +485,16 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
         )
 
     if isinstance(action, VerifyStepAction):
-        verdict = _turn_verdict(verify_solution(action.steps))
+        verification = verify_solution(action.steps)
+        verdict = _turn_verdict(verification)
         state.verify_called = True
         state.last_verdict = verdict
-        return ToolResult(kind=action.kind, ok=True, detail=f"검증 {verdict}(내부).")
+        return ToolResult(
+            kind=action.kind,
+            ok=True,
+            detail=f"검증 {verdict}(내부).",
+            verify_form_counts=_count_verify_forms(verification),
+        )
 
     if isinstance(action, QueryCurriculumAction):
         return ToolResult(

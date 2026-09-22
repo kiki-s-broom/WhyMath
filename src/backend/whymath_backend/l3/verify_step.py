@@ -72,6 +72,7 @@ from whymath_backend.schema.enums import StepType
 from whymath_backend.schema.verification_capabilities import VerificationOutcome
 
 __all__ = [
+    "VerifyStepForm",
     "VerifyStepReasonCode",
     "VerifyStepResult",
     "VerifyStepState",
@@ -90,6 +91,33 @@ VerifyStepState = VerificationOutcome
 # 상태라 절반으로 할인(설계 §3.1) — 후속 PRM·다중풀이 집계가 이 가중치를 곱해 쓴다.
 _WEIGHT_DECISIVE = 1.0  # correct·incorrect — 결정론 판정 완료.
 _WEIGHT_UNVERIFIABLE = 0.5  # unverifiable — 판정 불가, 증거력 할인.
+
+
+class VerifyStepForm(str, Enum):
+    """이 전이를 *어느 경로로* 판정했는가 — 등식(해집합)·혼합·표현식(S3-51 관측 축).
+
+    `state`(3상태)·`reason_code`(왜 판정 못 했는가)와 직교하는 **형태 라벨**이다. 판정 로직을
+    바꾸지 않고, 이미 분기에서 결정돼 있던 사실을 하류가 *셀 수 있게* 노출만 한다.
+
+    왜 필요한가(작동한 비율 원칙 — CLAUDE.md "작동 신호 없는 알고리즘 부착 금지"): S3-02가
+    붙인 해집합 보존 판정이 실사용에서 **몇 번 실제로 작동했는지**를 현행 관측이 말하지
+    못했다. 3상태만으로는 "등호 방정식 변형을 해집합으로 판정한 correct"와 "표현식 동치
+    correct"가 같은 글자다. 자유사용 대표측정(S3-02 트리거 ③)의 사전등록 유효성 전제
+    V3(등호 방정식 변형 턴 >=5건)이 바로 이 축이라, 축이 없으면 사람이 자유사용 중에 손으로
+    세야 하고 그러면 "자연 자유사용"(대본 금지) 전제가 깨진다.
+
+    프라이버시: 값은 경로 라벨 3종뿐이고 학생 원문·식·정답을 담지 않는다 — 하류(shadow 관측
+    레코드)가 *개수*로만 집계한다.
+    """
+
+    equation = "equation"
+    """양변 모두 등식 형태 — 해집합 보존 동치로 판정(S3-02 경로). 연쇄 등식 내부 위반 승격 포함."""
+
+    mixed = "mixed"
+    """한쪽만 등식(방정식↔표현식 혼합) — 비교 전제 불성립이라 보수적 unverifiable."""
+
+    expression = "expression"
+    """양변 모두 등식 아님 — SymPy 심볼릭 동치 경로(기존 기본 경로)."""
 
 
 class VerifyStepReasonCode(str, Enum):
@@ -197,15 +225,30 @@ class VerifyStepResult(BaseModel):
     evidence_weight: float = Field(
         description="증거 가중치 — correct/incorrect=1.0·unverifiable=0.5(설계 §3.1 할인).",
     )
+    form: VerifyStepForm | None = Field(
+        default=None,
+        description=(
+            "판정 경로 형태(equation|mixed|expression·S3-51 관측 축). None은 형태를 "
+            "*판별하기 전에* 회피한 경우(비대수 step_type·빈 입력) — 'expression'으로 "
+            "위장하지 않는다(정직 회계)."
+        ),
+    )
 
 
 def _unverifiable(
-    reason: str, step_type: StepType | None, reason_code: VerifyStepReasonCode
+    reason: str,
+    step_type: StepType | None,
+    reason_code: VerifyStepReasonCode,
+    form: VerifyStepForm | None = None,
 ) -> VerifyStepResult:
     """unverifiable 결과 조립 — 사유·step_type 전파·가중치 0.5(정직 회피의 단일 출구).
 
     `reason_code`는 필수 인자다(MATH-03) — 모든 unverifiable 분기가 구조 라벨을 갖게 시그니처
     수준에서 강제한다(코드 없는 unverifiable을 만들 수 없음 → 집계 총합 불변식의 구조 보장).
+
+    `form`(S3-51)은 선택이다 — 형태를 *판별하기 전에* 회피한 분기(비대수 step_type·빈 입력)는
+    None이 정직하다("expression으로 접기" 금지). 형태를 판별한 뒤의 회피(해집합 판정 불가·
+    혼합 형태·SymPy 미결정)는 호출부가 해당 형태를 넘긴다.
     """
     return VerifyStepResult(
         state=VerifyStepState.unverifiable,
@@ -213,6 +256,7 @@ def _unverifiable(
         reason=reason,
         reason_code=reason_code,
         evidence_weight=_WEIGHT_UNVERIFIABLE,
+        form=form,
     )
 
 
@@ -251,6 +295,7 @@ def _equation_step_result(
             step_type=step_type,
             reason=None,
             evidence_weight=_WEIGHT_DECISIVE,
+            form=VerifyStepForm.equation,
         )
     if verdict is IdentityVerdict.not_identity:
         return VerifyStepResult(
@@ -258,6 +303,7 @@ def _equation_step_result(
             step_type=step_type,
             reason=f"해집합 비보존 — SymPy: {expr_before} ↛ {expr_after}",
             evidence_weight=_WEIGHT_DECISIVE,
+            form=VerifyStepForm.equation,
         )
     # undecidable/parse_error → 위장 없이 unverifiable(다변수·비다항·복소·미정·파싱 불가).
     # 가드 라벨은 발생 지점(solution_set)이 낸 것을 어휘 번역만 한다(가드 재검사 금지). 계약상
@@ -267,7 +313,9 @@ def _equation_step_result(
         if undecidable_kind is not None
         else VerifyStepReasonCode.undecidable
     )
-    return _unverifiable("해집합 판정 불가 — 검증 안전 회피", step_type, reason_code)
+    return _unverifiable(
+        "해집합 판정 불가 — 검증 안전 회피", step_type, reason_code, VerifyStepForm.equation
+    )
 
 
 def verify_step(
@@ -337,6 +385,7 @@ def verify_step(
                 step_type=step_type,
                 reason=f"연쇄 등식 내부 동치 위반 — SymPy: {violated_lhs} ≠ {violated_rhs}",
                 evidence_weight=_WEIGHT_DECISIVE,
+                form=VerifyStepForm.equation,
             )
 
     # ①.5 등식 형태 단계 — before·after가 *둘 다* 등식 형태면 해집합 보존 동치로 판정한다
@@ -353,6 +402,7 @@ def verify_step(
             "등호 방정식↔표현식 혼합 단계 — 검증 대상 불일치·안전 회피",
             step_type,
             VerifyStepReasonCode.heterogeneous_form,
+            VerifyStepForm.mixed,
         )
 
     # ② 대수 단계(계산·검산·None·등호 없는 식) — 동치 권위 primitive(`identity_status`·SymPy) 위임.
@@ -368,6 +418,7 @@ def verify_step(
             step_type=step_type,
             reason=None,
             evidence_weight=_WEIGHT_DECISIVE,
+            form=VerifyStepForm.expression,
         )
     if verdict is IdentityVerdict.not_identity:
         return VerifyStepResult(
@@ -375,6 +426,7 @@ def verify_step(
             step_type=step_type,
             reason=f"동치 아님 — SymPy: {expr_before} ≠ {expr_after}",
             evidence_weight=_WEIGHT_DECISIVE,
+            form=VerifyStepForm.expression,
         )
     # parse_error(빈 입력은 위에서 거름·sympify 예외) → "파싱 불가" 표기로 보수. 이 코드의 비중이
     # 곧 MATH-01(표기 권위)·자연표기 확장(gap review §5-③)의 발화 조건 데이터다.
@@ -383,6 +435,7 @@ def verify_step(
             "SymPy 판정 불가/파싱 불가 — 검증 안전 회피",
             step_type,
             VerifyStepReasonCode.parse_error,
+            VerifyStepForm.expression,
         )
     # undecidable — 항등성을 *증명도 반증도* 못 함(예: √(x²) vs x는 정의역 의존)·correct 위장 금지.
     # 변수 집합 불일치(치환 맥락·detail이 이미 계산한 불리언)면 별도 라벨 — 운영이 "치환 맥락"과
@@ -395,4 +448,5 @@ def verify_step(
             if detail.variable_mismatch
             else VerifyStepReasonCode.undecidable
         ),
+        VerifyStepForm.expression,
     )

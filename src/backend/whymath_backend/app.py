@@ -96,6 +96,7 @@ from whymath_backend.api._l6_mode_reach_state import (
     set_l6_mode_reach_counters,
 )
 from whymath_backend.api._misconception_state import get_semantic_matcher
+from whymath_backend.api._model_status import collect_model_status
 from whymath_backend.api._ocr_state import (
     OCR_COUNTERS_KEY as _OCR_COUNTERS_KEY,
 )
@@ -138,6 +139,8 @@ from whymath_backend.api._subject_capability_state import (
 from whymath_backend.api._subject_capability_state import (
     STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
+from whymath_backend.api.admin_bff import router as admin_bff_router
+from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
     OAUTH_PROVIDERS_KEY as _OAUTH_PROVIDERS_KEY,
@@ -198,9 +201,8 @@ from whymath_backend.l3.pregenerate.validator import (
     validate_response,
 )
 from whymath_backend.l3.providers.anthropic import AnthropicProvider
-from whymath_backend.l3.providers.cloud_status import CloudStatus
 from whymath_backend.l3.providers.composite import CompositeProvider
-from whymath_backend.l3.providers.ollama import OllamaProvider, OllamaStatus
+from whymath_backend.l3.providers.ollama import OllamaProvider
 from whymath_backend.l3.queue import CeleryJobQueue
 from whymath_backend.l3.trace import LangfuseSink
 from whymath_backend.l5.ocr.factory import build_ocr_components
@@ -1103,31 +1105,11 @@ def create_app(
         (CompositeProvider만 노출)로 점검한다. provider가 해당 메서드를 노출하지 않으면
         (가짜·로컬전용) 로컬은 도달 불가로, 클라우드는 미노출(None)로 간주한다.
         """
-        provider = _get_provider(request)
-        ollama_status: OllamaStatus
-        check = getattr(provider, "check_status", None)
-        if check is None:
-            ollama_status = OllamaStatus(
-                reachable=False, models=(), error="provider has no status check"
-            )
-        else:
-            ollama_status = await check()
-
-        # 클라우드 상태(선택) — CompositeProvider만 check_cloud_status를 노출한다.
-        # 없으면(가짜·로컬전용 provider) cloud_* 필드는 None으로 남는다(기존 응답 호환).
-        cloud_configured: bool | None = None
-        cloud_reachable: bool | None = None
-        cloud_error: str | None = None
-        cloud_check = getattr(provider, "check_cloud_status", None)
-        if cloud_check is not None:
-            cloud_status: CloudStatus | None = await cloud_check()
-            if cloud_status is not None:
-                cloud_configured = cloud_status.configured
-                cloud_error = cloud_status.error
-                # `reachable`은 공통 표면이 아니다(ARCH-57) — 보고하는 제공자만 자기 Status에
-                # 둔다. 없을 때 False로 접으면 "도달 불가"와 "미측정"이 같은 화면이 되므로
-                # None으로 남긴다(응답 필드가 이미 `bool | None`이라 구분이 보존된다).
-                cloud_reachable = getattr(cloud_status, "reachable", None)
+        # 수집은 `api/_model_status.collect_model_status`가 단독으로 한다(ADMIN-05) —
+        # `GET /v1/admin/models`가 같은 것을 보고하므로, 로직을 양쪽에 두면 provider 미노출
+        # 처리와 ARCH-57(클라우드 reachable 미측정=None) 중 하나가 한쪽에서만 유지되다 갈라진다.
+        snapshot = await collect_model_status(request)
+        ollama_status = snapshot.local
 
         return StatusBody(
             ready=ollama_status.all_present,
@@ -1138,9 +1120,9 @@ def create_app(
             ],
             missing=list(ollama_status.missing),
             error=ollama_status.error,
-            cloud_configured=cloud_configured,
-            cloud_reachable=cloud_reachable,
-            cloud_error=cloud_error,
+            cloud_configured=snapshot.cloud_configured,
+            cloud_reachable=snapshot.cloud_reachable,
+            cloud_error=snapshot.cloud_error,
         )
 
     @app.post("/v1/generate", tags=["l3"])
@@ -1318,5 +1300,9 @@ def create_app(
     # CUR-11: subject-neutral 교육과정 조회 표면(curricula·learning-outcomes·alignments).
     app.include_router(curricula_router)
     app.include_router(alignments_router)
+    # ADMIN-04: Admin BFF 모듈 레지스트리 — GET /v1/admin/menu(좌측 내비 파생 원천).
+    app.include_router(admin_menu_router)
+    # ADMIN-05: Admin BFF read-only — 모델 상태·비용·검수 큐·사용자 조회(Phase A).
+    app.include_router(admin_bff_router)
 
     return app

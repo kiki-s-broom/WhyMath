@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-136-git-revert-guard-hook
+title: "미커밋 변경을 삼키는 git 원복 명령 차단 훅 — checkout --·restore·stash 의 무증상 소실 (동일 유형 2회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 고정 — 미커밋 변경이 있는 상태에서 `git checkout -- <경로>` / `git restore <경로>` / `git stash` 가 그 변경을 무증상으로 삼키는 것을 테스트로 고정한다. 특히 대장 경로(backlog/events/·backlog/tasks/·backlog/gates.yaml)와 스크래치가 아닌 산출물 경로를 대상으로.\n② PreToolUse 훅 신설 — `.claude/hooks/` 에 Bash 명령을 검사하는 훅을 두어, 명령이 git 원복 계열(`checkout --`·`restore`·`stash`)이고 대상 경로에 **미커밋 변경이 실재하면** 차단한다. 차단 메시지는 대안을 함께 낸다(뮤테이션 원복은 `cp` 백업 경유 · 의도적 폐기면 명시적 사유와 함께 사람이 실행). 선례 = `.claude/hooks/fence_guard.py`(HARN-114) 의 Stop 훅 구조.\n③ 변별력 — 정상 케이스(미커밋 변경이 없는 경로의 checkout·다른 git 명령·경로 없는 `git checkout <branch>`)에서 통과하는지, 위반 케이스(대장 경로에 변경이 있는 상태의 원복)에서 실제로 차단하는지 **양쪽을 주입해 확인**한다. 전건 차단하면 정상 브랜치 전환이 막혀 워크플로가 깨진다 — 탐지 기준은 \"git 원복 명령\"이 아니라 \"**그 경로에 잃을 것이 있는가**\"다.\n④ 사각 명시 — 훅은 Bash 도구를 경유하는 명령만 본다. 스크립트 안에서 호출되는 git, 다른 도구가 부르는 git 은 닿지 않는다. 그 한계를 훅 docstring 과 build_harness.md 에 적는다(막지 못하는 것을 막는다고 말하지 않는다).\n⑤ 배선 확인 — 훅이 settings.json 에 실제로 등록돼 발화하는지 확인한 뒤 완료로 친다. \"파일이 존재함\"과 \"돌아감\"은 다르다."
+artifacts: []
+paths:
+  - ".claude/hooks/**"
+  - "tests/harness/**"
+session: null
+notes: "사고 경위 2회차(2026-09-22 · 이 세션): P3 ID 체계 시험용 태스크를 지우면서 `git checkout -- backlog/events/` 를 실행했다. 그 결과 이 세션의 미커밋 이벤트 약 10건(게이트 5건 add · HARN-134 start/unblock · 시험 태스크 add/cancel)이 소실됐다 — 파일이 HEAD 기준 90줄로 되돌아갔다. 실체(gates.yaml 5건·신규 문서)는 untracked/staged 밖이라 살아남아 피해는 감사 추적 단절에 그쳤다.\n\n1회차는 2026-08-10 OPS-24 로, `_check_exit_code` 뮤테이션을 `git checkout -- <파일>` 로 원복하다 미커밋 구현분 +59/-6 을 통째로 잃었다. CLAUDE.md 는 그때 산문 규칙(\"미커밋 작업분이 있는 트리에서 git checkout --·git restore·git stash 로 뮤테이션 원복 금지\")을 등재했고, 이번 세션은 **그 규칙을 알고 있었음에도 뮤테이션이 아닌 맥락(임시 파일 정리)에서 같은 명령을 썼다.** 즉 규칙의 문면이 '뮤테이션 원복'으로 좁아 일반 정리 작업에는 적용되지 않는 것처럼 읽혔다 — 산문의 한계이며, 그래서 2회차 대책은 코드여야 한다(CLAUDE.md 실수 관리 · 2026-09-20 이후 새 산문 규칙 등재는 동결).\n\n무증상성이 핵심이다: 명령은 exit 0 이고 `git status` 에서 파일이 조용히 사라질 뿐이라, 되돌린 규모를 따로 확인하지 않으면 발견되지 않는다. 이번에는 직후 `git status`·`wc -l` 대조를 했기 때문에 발견했다."
+updated: 2026-09-22

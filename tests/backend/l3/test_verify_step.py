@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from whymath_backend.l3.verify_step import (
+    VerifyStepForm,
     VerifyStepReasonCode,
     VerifyStepResult,
     VerifyStepState,
@@ -272,13 +273,14 @@ class TestDeterminismAndFields:
     def test_result_field_set(self) -> None:
         result = verify_step("2+3", "5")
         assert isinstance(result, VerifyStepResult)
-        # frozen·extra=forbid 모델 — 5필드 정확히(MATH-03에서 reason_code 직교 추가).
+        # frozen·extra=forbid 모델 — 6필드 정확히(MATH-03 reason_code·S3-51 form 직교 추가).
         assert set(result.model_dump().keys()) == {
             "state",
             "step_type",
             "reason",
             "reason_code",
             "evidence_weight",
+            "form",
         }
 
     def test_calc_step_type_uses_algebraic_path(self) -> None:
@@ -454,3 +456,60 @@ class TestReasonCodeInvariants:
             assert result.state == VerifyStepState.unverifiable
             assert result.reason == expected_reason
             assert result.evidence_weight == 0.5
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 판정 경로 형태 라벨 (S3-51) — 분기가 이미 정한 사실의 노출·판정 변경 0
+# ──────────────────────────────────────────────────────────────────────────
+class TestFormLabel:
+    """`form`은 *어느 경로로* 판정했는지만 말한다 — state·reason_code와 직교(S3-51).
+
+    이 축이 없으면 "등호 방정식을 해집합으로 판정한 correct"와 "표현식 동치 correct"가 같은
+    글자라, S3-02가 실사용에서 몇 번 작동했는지(자유사용 대표측정 V3)를 셀 수 없다.
+    """
+
+    def test_equation_transition_is_equation_form(self) -> None:
+        result = verify_step("2*x+3=7", "2*x=4")
+        assert result.state == VerifyStepState.correct
+        assert result.form == VerifyStepForm.equation
+
+    def test_solution_set_break_is_equation_form(self) -> None:
+        # 해집합 비보존(거짓 증명)도 등식 경로다 — incorrect라고 형태가 바뀌지 않는다.
+        result = verify_step("2*x+3=7", "2*x=5")
+        assert result.state == VerifyStepState.incorrect
+        assert result.form == VerifyStepForm.equation
+
+    def test_chain_equation_violation_is_equation_form(self) -> None:
+        # 연쇄 등식 내부 위반 승격(S3-06 ①)도 등식 형태로 계상된다.
+        result = verify_step("x=(1+3)/2=3", "x=2")
+        assert result.state == VerifyStepState.incorrect
+        assert result.form == VerifyStepForm.equation
+
+    def test_mixed_form_is_mixed(self) -> None:
+        # 한쪽만 등식 — 비교 전제 불성립(보수적 unverifiable)이며 형태는 mixed다.
+        result = verify_step("2*x+3=7", "2*x")
+        assert result.state == VerifyStepState.unverifiable
+        assert result.reason_code == VerifyStepReasonCode.heterogeneous_form
+        assert result.form == VerifyStepForm.mixed
+
+    def test_expression_path_is_expression_form(self) -> None:
+        result = verify_step("2*(x+1)", "2*x+2")
+        assert result.state == VerifyStepState.correct
+        assert result.form == VerifyStepForm.expression
+
+    def test_expression_undecidable_keeps_expression_form(self) -> None:
+        # 표현식 경로의 회피(미결정)도 형태는 판별된 뒤다 — expression으로 남는다.
+        result = verify_step("sqrt(x**2)", "x")
+        assert result.state == VerifyStepState.unverifiable
+        assert result.form == VerifyStepForm.expression
+
+    def test_non_algebraic_step_has_no_form(self) -> None:
+        # 형태를 *판별하기 전에* 회피한 분기는 None — expression으로 접으면 위장이다.
+        result = verify_step("경우 1과 2로 나눈다", "경우 1", StepType.케이스분류)
+        assert result.state == VerifyStepState.unverifiable
+        assert result.form is None
+
+    def test_empty_input_has_no_form(self) -> None:
+        result = verify_step("", "x=2")
+        assert result.state == VerifyStepState.unverifiable
+        assert result.form is None

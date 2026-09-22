@@ -406,3 +406,190 @@ def test_render_transition_section_no_new_records(tmp_path: Path) -> None:
     assert "구판(카운트 미보유) 1건" in out
     assert "합산 불가" in out
     assert "Σn_correct" not in out  # 표본 없는 Σ 행은 아예 내지 않는다
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 회차 구간 분리·판정 모집단·전이 형태 축 (S3-51)
+# ──────────────────────────────────────────────────────────────────────────
+def _obs_at(observed: str, verdict: str | None, *, turn: int, forms: tuple[int, int] | None = None):
+    """구간·형태 축 픽스처 — `forms`=(등호 전이 수, 혼합 전이 수). None이면 구판(축 미보유)."""
+    return Wh1HarnessShadowObservation(
+        status="ended",
+        action_type="질문",
+        verify_verdict=verdict,
+        n_correct=1 if verdict == "correct" else 0,
+        n_incorrect=1 if verdict == "incorrect" else 0,
+        n_unverifiable=1 if verdict == "unverifiable" else 0,
+        n_equation_transitions=forms[0] if forms is not None else None,
+        n_mixed_form_transitions=forms[1] if forms is not None else None,
+        tool_calls=3,
+        hypothesis_count=0,
+        dialogue_id="d-win",
+        turn_index=turn,
+        problem_id=None,
+        observed_at=datetime.fromisoformat(observed),
+    )
+
+
+def test_filter_window_boundaries_are_inclusive() -> None:
+    # 경계는 양끝 포함 — 시작·끝 시각에 찍힌 관측이 빠지면 회차가 잘린다.
+    observations = [
+        _obs_at("2026-09-22T08:59:59+00:00", "correct", turn=1),
+        _obs_at("2026-09-22T09:00:00+00:00", "correct", turn=2),
+        _obs_at("2026-09-22T09:30:00+00:00", "correct", turn=3),
+        _obs_at("2026-09-22T10:00:00+00:00", "correct", turn=4),
+        _obs_at("2026-09-22T10:00:01+00:00", "correct", turn=5),
+    ]
+    kept, excluded = hv.filter_window(
+        observations,
+        since=datetime.fromisoformat("2026-09-22T09:00:00+00:00"),
+        until=datetime.fromisoformat("2026-09-22T10:00:00+00:00"),
+    )
+    assert [o.turn_index for o in kept] == [2, 3, 4]
+    assert excluded == 2
+
+
+def test_filter_window_without_bounds_is_noop() -> None:
+    observations = [_obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1)]
+    kept, excluded = hv.filter_window(observations)
+    assert kept == observations
+    assert excluded == 0
+
+
+def test_filter_window_handles_naive_observed_at() -> None:
+    # 수기 편집·외부 도구가 시간대 없는 값을 넣어도 비교가 터지지 않는다(UTC 간주).
+    naive = Wh1HarnessShadowObservation(
+        status="ended",
+        action_type=None,
+        verify_verdict="correct",
+        n_correct=1,
+        n_incorrect=0,
+        n_unverifiable=0,
+        tool_calls=1,
+        hypothesis_count=0,
+        dialogue_id=None,
+        turn_index=1,
+        problem_id=None,
+        observed_at=datetime.fromisoformat("2026-09-22T09:30:00"),
+    )
+    kept, excluded = hv.filter_window(
+        [naive], since=datetime.fromisoformat("2026-09-22T09:00:00+00:00")
+    )
+    assert len(kept) == 1
+    assert excluded == 0
+
+
+def test_ledger_keeps_everything_while_window_narrows_the_view(tmp_path: Path) -> None:
+    """원장은 전부 축적하고 *집계 창*만 좁힌다 — 축적과 판정 분모를 분리한다.
+
+    원장은 누적이 목적이라 이전 회차(2026-07 합성분 포함)가 늘 함께 있다. 구간을 안 주면
+    그 전부가 분모가 되므로, 회차 하나를 판정하려는 사람이 *이전 회차 덕분에* 통과하는 수를
+    읽게 된다(거짓 green). 필터는 원장 파일을 건드리지 않는다.
+    """
+    old = [
+        _obs_at("2026-07-19T03:00:00+00:00", "correct", turn=i, forms=(1, 0)) for i in range(1, 9)
+    ]
+    new = [
+        _obs_at("2026-09-22T09:10:00+00:00", "unverifiable", turn=10, forms=(0, 1)),
+        _obs_at("2026-09-22T09:20:00+00:00", "correct", turn=11, forms=(2, 0)),
+    ]
+    log = tmp_path / "records.log"
+    _write_log(log, old + new)
+    ledger = tmp_path / "ledger.ndjson"
+
+    report = hv.harvest_files(
+        [log], store=ledger, since=datetime.fromisoformat("2026-09-22T00:00:00+00:00")
+    )
+    assert report.appended == 10  # 축적은 무필터 — 원장은 전부 보존
+    assert report.filtered_out == 8
+    assert report.summary.total == 2  # 집계 창은 이번 회차만
+    assert report.summary.verdict_counts["correct"] == 1
+    assert len(ledger.read_text(encoding="utf-8").strip().splitlines()) == 10
+
+
+def test_verify_target_population_excludes_none(tmp_path: Path) -> None:
+    # 사전등록 판정문의 모집단은 verify 호출 턴(3-state)뿐이다 — none(대화 턴)은 분모 밖.
+    observations = [
+        _obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(1, 0)),
+        _obs_at("2026-09-22T09:01:00+00:00", "unverifiable", turn=2, forms=(0, 1)),
+        _obs_at("2026-09-22T09:02:00+00:00", None, turn=3, forms=(0, 0)),
+        _obs_at("2026-09-22T09:03:00+00:00", None, turn=4, forms=(0, 0)),
+    ]
+    summary = hv.summarize(observations)
+    assert summary.total == 4
+    assert summary.verify_target_total == 2
+    # 전체 분모(25%)와 모집단 분모(50%)가 다르다 — 화면 숫자를 그대로 읽으면 오판한다.
+    assert summary.verdict_ratios["unverifiable"] == pytest.approx(0.25)
+    assert summary.verify_target_ratios["unverifiable"] == pytest.approx(0.5)
+
+
+def test_verify_target_ratios_empty_when_population_zero() -> None:
+    summary = hv.summarize([_obs_at("2026-09-22T09:00:00+00:00", None, turn=1, forms=(0, 0))])
+    assert summary.verify_target_total == 0
+    assert summary.verify_target_ratios == {}  # 0%로 위장하지 않는다
+
+
+def test_form_axis_counts_and_legacy_split() -> None:
+    observations = [
+        _obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(2, 0)),
+        _obs_at("2026-09-22T09:01:00+00:00", "unverifiable", turn=2, forms=(0, 3)),
+        _obs_at("2026-09-22T09:02:00+00:00", "correct", turn=3, forms=(1, 1)),
+        _obs_at("2026-09-22T09:03:00+00:00", "correct", turn=4),  # 구판(축 미보유)
+    ]
+    summary = hv.summarize(observations)
+    assert summary.form_transition_counts == {"equation": 3, "mixed": 4}
+    assert summary.equation_turns == 2  # V3가 읽는 수 — 등호 전이 1건 이상인 턴
+    assert summary.form_records == 3
+    assert summary.form_legacy_records == 1  # 구판을 '0회'로 위장하지 않는다
+
+
+def test_render_shows_window_population_and_form_sections(tmp_path: Path) -> None:
+    log = tmp_path / "records.log"
+    _write_log(
+        log,
+        [
+            _obs_at("2026-07-19T03:00:00+00:00", "correct", turn=1, forms=(1, 0)),
+            _obs_at("2026-09-22T09:00:00+00:00", "unverifiable", turn=2, forms=(0, 1)),
+        ],
+    )
+    report = hv.harvest_files([log], since=datetime.fromisoformat("2026-09-22T00:00:00+00:00"))
+    rendered = hv.render_report(report)
+    assert "[집계 구간]" in rendered
+    assert "구간 밖 제외 1건" in rendered
+    assert "[판정 모집단" in rendered
+    assert "[전이 형태" in rendered
+    assert "등호 전이 >=1 턴" in rendered
+
+
+def test_render_says_when_no_window_given(tmp_path: Path) -> None:
+    # 구간 미지정도 *명시적으로* 말한다 — 침묵하면 사람이 회차 분리된 줄 오해한다.
+    log = tmp_path / "records.log"
+    _write_log(log, [_obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(1, 0))])
+    rendered = hv.render_report(hv.harvest_files([log]))
+    assert "[집계 구간] 미지정" in rendered
+
+
+def test_main_rejects_malformed_since(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # 형식 오류를 무시하면 "필터가 걸린 줄 알았는데 원장 전체를 판정"이 된다 — exit 2로 거부.
+    log = tmp_path / "records.log"
+    _write_log(log, [_obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(1, 0))])
+    assert hv.main([str(log), "--since", "어제"]) == 2
+    assert "--since 파싱 실패" in capsys.readouterr().err
+
+
+def test_main_rejects_inverted_window(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    log = tmp_path / "records.log"
+    _write_log(log, [_obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(1, 0))])
+    exit_code = hv.main(
+        [str(log), "--since", "2026-09-22T10:00:00+00:00", "--until", "2026-09-22T09:00:00+00:00"]
+    )
+    assert exit_code == 2
+    assert "보다 늦다" in capsys.readouterr().err
+
+
+def test_main_warns_on_naive_bound(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # 시간대 없는 입력의 해석 규칙(UTC 간주)을 숨기지 않는다 — KST로 주면 9시간이 어긋난다.
+    log = tmp_path / "records.log"
+    _write_log(log, [_obs_at("2026-09-22T09:00:00+00:00", "correct", turn=1, forms=(1, 0))])
+    assert hv.main([str(log), "--since", "2026-09-22T00:00:00"]) == 0
+    assert "UTC로 해석한다" in capsys.readouterr().err

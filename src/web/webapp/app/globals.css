@@ -1,0 +1,101 @@
+/*
+ * 랜딩 전역 스타일 — 의존성 0(Tailwind·CSS-in-JS 없음).
+ * KWCAG 2.2 고려 사항을 CSS 차원에서 미리 지킨다:
+ *   · 본문 대비비 4.5:1 이상(색 토큰 주석에 실측 비율 기재)
+ *   · rem 단위 — 브라우저 글자 크기 설정(200% 확대)을 따라간다
+ *   · :focus-visible 윤곽선 제거 금지 — 키보드 사용자의 현재 위치 표시
+ *   · prefers-reduced-motion 존중
+ * 최종 접근성 판정은 사람 게이트(변호사 검토 + KWCAG 점검)가 한다 — CSS는 선결일 뿐이다.
+ */
+
+:root {
+  /* 잉크(#16202c) on 종이(#fdfdfb) = 대비비 약 14.8:1 */
+  --wm-ink: #16202c;
+  --wm-ink-soft: #46535f; /* on 종이 = 약 7.4:1 (보조 텍스트도 4.5:1 초과) */
+  --wm-paper: #fdfdfb;
+  --wm-surface: #f2f1ec;
+  --wm-line: #dcdad2;
+  /* 브랜드 남색 — 흰 글자 on 남색 = 약 9.1:1 */
+  --wm-accent: #1d3f6e;
+  --wm-accent-ink: #163257;
+  --wm-radius: 14px;
+  --wm-measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --wm-ink: #eef1f4;
+    --wm-ink-soft: #b6c0cb;
+    --wm-paper: #10151b;
+    --wm-surface: #182029;
+    --wm-line: #2b353f;
+    --wm-accent: #9dc2f2;
+    --wm-accent-ink: #cfe2fb;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* 고정 px 지정 금지 — 사용자 글자 크기 설정을 무시하지 않는다 */
+  font-size: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font-family:
+    "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    system-ui, -apple-system, sans-serif;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+a {
+  color: var(--wm-accent-ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--wm-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* 키보드 사용자용 본문 바로가기 — 포커스 전에는 화면 밖, 포커스되면 나타난다 */
+.wm-skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 10;
+  padding: 0.75rem 1.25rem;
+  background: var(--wm-accent);
+  color: #fff;
+  border-radius: var(--wm-radius);
+  text-decoration: none;
+  transition: top 120ms ease-in-out;
+}
+
+.wm-skip-link:focus-visible {
+  top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -156,6 +156,10 @@ def _cleanup() -> None:
                 text("DELETE FROM problem_embedding WHERE problem_id = :pid"), {"pid": _PID}
             )
             conn.execute(text("DELETE FROM problem_concept WHERE problem_id = :pid"), {"pid": _PID})
+            # LIC-03 — 원장 선삭제(FK NO ACTION). 위 test_populate_integration.py 동형.
+            conn.execute(
+                text("DELETE FROM content_provenance WHERE problem_id = :pid"), {"pid": _PID}
+            )
             conn.execute(text("DELETE FROM problem WHERE slug = :slug"), {"slug": _SLUG})
             conn.execute(text("DELETE FROM concept WHERE source_id = :src"), {"src": _CONCEPT_SRC})
     finally:

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-160-gate-remind-reschedule-path
+title: "게이트 리마인드 주기 정정 경로 부재 — remind_after_days는 gates add 전용이고 이후 수정 CLI가 없다 (HARN-06 동형 설계 공백)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: cancelled
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① backlog.py gates에 리마인드 주기·독촉 기준일 정정 경로 신설 — 예: gates reschedule <G-id> --remind-after-days N --reason <사유>. amend와 같은 규약: 사유 필수, 대장과 이벤트 양쪽에 정정 이력 append(HARN-76 append 전용 설계 승계). waive 재사용 금지 — waive는 status를 waived로 바꿔 대기 태스크를 해금하므로 '요건은 살아 있고 시점만 미뤘다'를 표현할 수 없고, 죽은 면제를 대장에 남긴다\n② 집행 지점(정본화와 별항): 정정이 실제로 SessionStart 브리핑의 독촉 판정을 바꾸는지 확인한다 — 파일에 값이 들어간 것과 브리핑이 그 값을 읽는 것은 다르다. 회귀 테스트로 동결(정정 전 독촉 초과 → 정정 후 미도달)\n③ 변별력: 정정 없이도 같은 화면이 나오면 이 기능은 위장이다. 뮤테이션으로 확인 — 정정 로직을 무력화하면 독촉 판정이 변하지 않는 것을 RED로 잡는다\n④ 실측 트리거 정정: G-web01-landing-legal-review(2026-09-22 등재·remind 30d → 독촉 2026-10-22)를 실제 판정 시점(12/31 내부 앱 완성 이후, 2027-01 초)에 맞춰 조정한다. 선례 = G-not-now-v1-release-recheck의 remind 100d(독촉 2026-12-29)\n⑤ 같은 형태의 미조정 게이트 전수 점검 — pending 게이트의 독촉일과 그 게이트가 막는 태스크의 실제 판정 시점이 어긋난 건을 열거하고, 어긋난 건만 조정한다(전건 일괄 연장 금지 — 그건 독촉 자체를 끄는 것과 같다)"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+  - backlog/gates.yaml
+session: null
+notes: "등재 경위: 2026-09-22 WEB-01 착지 중 G-web01-landing-legal-review를 remind 30d로 등재한 직후, Kiki께서 12/31까지 내부 앱 완성 기간으로 설정하고 변호사 검토를 그 이후로 미루셨다. 그러면 이 게이트는 2026-10-22부터 2027-01까지 두 달 넘게 매 세션 브리핑에 '독촉 초과'로 뜨는데, 그 기간 동안 사람이 할 수 있는 조치가 없다 — CLAUDE.md '상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지'가 경계하는 상태(경고가 습관화돼 소음이 되는 것)를 새로 만드는 셈이다. 고치려 했으나 gates CLI에 경로가 없고(list/add/clear/waive/show), 대장 손편집은 금지이며, waive는 의미가 다르다(요건 면제 = 대기 태스크 해금). 그래서 우회하지 않고 태스크로 등재한다(CLAUDE.md '거부의 우회 금지' ③ CLI 경로 자체가 없는 설계 공백이면 태스크로 등재 — HARN-06 선례).\n\n실측(2026-09-22): pending 게이트 15건 중 12건이 미완료 태스크를 막고 있고, 독촉일이 이미 지난 것이 2건이다. 판정 시점이 독촉일보다 훨씬 뒤인 건은 현재 확인된 것이 G-web01-landing-legal-review 1건이며, 반대로 G-not-now-v1-release-recheck는 remind 100d로 올바르게 조정돼 있다 — 즉 관례는 이미 있고 정정 경로만 없다.\n\n범위 주의: 이 태스크는 독촉 주기의 정정 경로를 만드는 것이고, 게이트를 끄거나 리마인드 자체를 약화하는 것이 아니다. 전건 일괄 연장은 acceptance ⑤가 금지한다.\n\n[취소 2026-09-22] 중복 등재 취소 — HARN-124-gate-title-correction-path가 같은 축을 이미 소유한다. 등재 직후 CLI의 의미 중복 후보 고지(유사도 0.15 · 공유 희소어 '리마인드·손편집은·브리핑이')를 읽고 HARN-124 전문을 확인한 결과, 그 태스크의 acceptance ①이 'gates 서브커맨드에 등재 후 정정 경로를 연다'는 설계(덮어쓰기 아닌 추가 기록 형태·HARN-76 append 전용 근거 승계)를 이미 확정하고 있고, ②가 '정정이 SessionStart 브리핑·gates list까지 닿는지 실측'이라는 집행 별항까지 두고 있다. remind_after_days 재조정은 그 정정 기제에 얹히는 필드 하나이므로 별도 태스크가 아니다. 같은 서브커맨드에 두 태스크가 각각 정정 경로를 여는 것은 2026-09-08 HARN-88(정정 경로를 HARN-76이 이미 소유한 것을 모르고 중복 등재) 형태의 재발이다. 내용은 HARN-124 acceptance에 축으로 편입한다(amend).\n\n[개명 2026-09-22] HARN-133-gate-remind-reschedule-path → HARN-135-gate-remind-reschedule-path: 번호 충돌 해소 — HARN-133을 다른 세션이 같은 창에서 선점했다(main 266c3d55 · HARN-133-rename-bare-number-backreference-scan, status=todo). 내 쪽은 등재 직후 중복으로 취소한 레코드(내용은 HARN-124 축 ⑤⑥⑦로 편입)이므로 미머지인 이쪽을 개명한다(validate 지시·HARN-100). 등재 당시 backlog.py add의 충돌 검사가 HARN-133을 제안했는데, 상대 태스크가 그 시점에 미머지라 인플라이트 번호가 보이지 않았다 — CLAUDE.md가 경계하는 '슬러그가 달라 validate는 통과하고 번호 참조만 결정 불가가 되는' 형태(ARCH-13·OPS-15 선례)이며, 이번에는 validate가 번호 축까지 보도록 개선돼 있어 머지 전에 잡혔다.\n\n[개명 2026-09-22] HARN-135-gate-remind-reschedule-path → HARN-160-gate-remind-reschedule-path: 번호 충돌 3회차 해소 — 순차 구간을 피해 여유 번호로 옮긴다. 경위: 이 레코드는 등재 직후 중복으로 취소한 것이고(내용은 HARN-124 축 ⑤⑥⑦로 편입) 운영상 아무것도 소유하지 않는데, 머지 큐 대기가 회차당 약 1.5시간이라 그 창 동안 다른 세션이 순차 할당으로 내 번호를 가져간다. 실측: HARN-133은 HARN-133-rename-bare-number-backreference-scan에, HARN-135는 HARN-135-battle-audit-incremental-flush에 각각 선점됐고 둘 다 큐 안에서 harness-integrity RED로 드러났다(런 4231·4249). main의 HARN 최대가 135까지 올라왔고 원격 브랜치가 40개 떠 있어 136~140 구간도 같은 위험을 갖는다. 그래서 순차 프런티어에서 떨어진 번호를 쓴다 — 번호 간 공백은 표기상의 것이고 결정 불가 상태보다 비용이 작다. 이 선택은 취소된 레코드에만 적용하며, 살아 있는 태스크의 번호 배정 관례(backlog.py add의 제안값 사용)는 바꾸지 않는다."
+updated: 2026-09-22

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-14-review-queue-jsonl-axis
+title: "검수 큐 JSONL 축 노출 — harness 어댑터 의존 절단 선행"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "검수 큐 JSONL 축(생성 후보)을 `GET /v1/admin/review-queue` 응답에 추가한다 — 적재 문항 축(DB)과 나란히 두는 이중 회계 완성(04 §2 원칙6). 미설정/파일부재/읽기실패/정상을 서로 다른 state로 구분하고 \"0건\"으로 접지 않는다"
+  - "선행 해소: `harness/needs_review_worklist.py`가 `l3.equivalent.orchestrator`(GenerationOutcome)를 직접 import해 `api.* -> harness -> l3.equivalent` 신규 잔여 전이 누수를 만든다. `RESIDUAL_LEAK_BASELINE`(tests/infra/test_eos_core_boundary_probe.py)은 shrink-only 래칫이라 기준선 추가가 금지이므로, 그 모듈의 어댑터 의존을 끊는 것(타입만 필요하면 TYPE_CHECKING 또는 프로토콜 분리)이 선행이다"
+  - "문항 본문(`ReviewQueueEntry.candidate_payload`) 비노출을 테스트로 동결한다 — 응답 직렬화에 본문이 섞이면 RED. 큐 파일 경로 설정 좌석도 함께 신설한다(기본 빈 문자열=미설정)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/admin_bff.py
+  - src/backend/whymath_backend/harness/needs_review_worklist.py
+  - tests/backend/api/test_admin_bff.py
+session: null
+notes: "ADMIN-05에서 의도적으로 축을 줄인 승계분. 구현했다가 CI `infra-contracts`의 잔여 누수 래칫이 RED를 내 되돌렸다(PR #1272 · head 792fb441 실측). 래칫을 늘리는 것은 게이트를 느슨하게 하는 우회라 범위를 줄이는 쪽을 택했다. ADMIN-05가 만든 DB 축은 그대로 살아 있고 이 태스크는 그 위에 JSONL 축을 더한다."
+updated: 2026-09-22

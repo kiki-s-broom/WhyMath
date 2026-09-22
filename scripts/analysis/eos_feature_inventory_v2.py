@@ -427,6 +427,17 @@ CATALOG: tuple[Spec, ...] = (
        "계획서 300 §3 학습 상태 머신 — EOS-105. 미정의 전이는 409로 거부하고 정책 소유 "
        "트리거는 422로 거부한다(클라가 정책을 우회해 임의 상태로 점프하지 못한다)",
        "me", "GET /learning-state", "POST /learning-state/transitions"),
+    _s("WM-S-054", "관리 콘솔 좌측 내비(모듈 레지스트리 파생)", "Admin", "Operations", "P1",
+       "ADMIN-04 · 04 §2 원칙7 — 메뉴를 레지스트리에서 파생시켜 내비·가드 중복 유지보수를 "
+       "제거한다. 권한 없는 사용자는 403이 아니라 빈 메뉴를 받는다(메뉴는 모듈이 아니라 "
+       "모듈 목록)",
+       "admin_menu", "GET /menu"),
+    _s("WM-S-055", "관리 콘솔 운영 조회(모델·비용·검수 큐·사용자)", "Admin", "Operations", "P1",
+       "ADMIN-05 · 04 §2 원칙2 Admin BFF — Phase A read-only. 가드는 레지스트리 파생"
+       "(require_module_roles)이라 메뉴와 어긋날 수 없고, 데모 계정은 역할과 무관하게 403. "
+       "집계·마스킹은 BFF에서 끝내 원자료를 프런트로 내보내지 않는다",
+       "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
+       "GET /users/{user_id}"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -718,9 +729,10 @@ CATALOG: tuple[Spec, ...] = (
        "04 교수학 — Low Threshold High Ceiling", "l4.lthc"),
     _e("WM-E-404", "답 미루기 4단계 힌트·정서 안전 톤필터", "Student", "Pedagogy", "P0",
        "C7 힌트 누설 무관용 — PED-35", "l4.hint_deferral", "l4.tone_filter"),
-    _e("WM-E-405", "메타인지·보정·선수복습 코칭 결정", "Student", "Pedagogy", "P0",
+    _e("WM-E-405", "메타인지·보정·선수복습·오개념복습 코칭 결정", "Student", "Pedagogy", "P0",
        "메타인지 코어 — 페르소나 공유 축", "l4.metacognitive_trigger",
-       "l4.calibration_coaching", "l4.prerequisite_coaching"),
+       "l4.calibration_coaching", "l4.prerequisite_coaching",
+       "l4.misconception_review_coaching"),
     _e("WM-E-406", "완료 상태머신·턴 메타·세션 회상", "Student", "Pedagogy", "P0",
        "S3-32 완료 경로 — attempt 생산자", "l4.completion", "l4.turn_meta",
        "l4.session_recall"),
@@ -834,7 +846,7 @@ CATALOG: tuple[Spec, ...] = (
        "device_store_mode 기본 none", "api._device_store", "api._device_metrics"),
     _e("WM-E-807", "앱 조립·합성 루트·설정·app.state 배관", "Platform", "Operations", "P0",
        "composition = 경계의 유일한 배선 지점(EOS-69)", "composition", "config",
-       "api._l3_state", "api._ocr_state", "api._misconception_state",
+       "api._model_status", "api._l3_state", "api._ocr_state", "api._misconception_state",
        "api._growth_evidence_state", "api._segmentation_state",
        # EOS-89: 과목 능력 5종의 app.state 등록 주소·조회(등록 형태의 배관). `_l3_state`와
        # 같은 성격이라 같은 좌석에 귀속한다 — 판정 로직 0, 키·getter만.
@@ -892,6 +904,10 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·shadow 합성 트래픽", "Admin", "Operations",
        "P1", "ADMIN-01/11", "ops.account_bootstrap_cli", "ops.role_grant_cli",
        "ops.wh1_shadow_probe"),
+    _o("WM-O-916", "관리 모듈 레지스트리·라우트 가드 감사", "Admin", "Operations", "P1",
+       "ADMIN-04 — 내비·가드의 단일 진실 원천(선언)과 그 선언을 CI에서 대조하는 감사기. "
+       "가드는 레지스트리에서 파생되므로 값 불일치가 아니라 *파생 경로 미사용*을 찾는다",
+       "api.admin_module_registry", "ops.admin_guard_audit"),
     _o("WM-O-909", "동등문제 코퍼스 축적·후처리 배치(36 단원 배치 포함)", "Admin", "Content", "P0",
        "C1·C3 — 앵커 CU 물량", "harness.problem_corpus_*", "harness.*_batch",
        "-harness.concept_content_review_batch",

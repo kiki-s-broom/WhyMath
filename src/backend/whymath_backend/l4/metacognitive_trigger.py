@@ -35,8 +35,9 @@ CoachingFocus = Literal[
     "prerequisite_review",
     "calibration_overconfident",
     "calibration_underconfident",
+    "misconception_review",
 ]
-"""메타인지 코칭 포커스 9종.
+"""메타인지 코칭 포커스 10종.
 
 - `verify`: *검산* — 구체적 계산 오류가 감지됨(슬립). 개념 재교육 전에 스스로 계산을 다시
   짚게 한다(슬립 vs 오개념 구분 — 이해는 있는데 계산만 틀린 경우 재교육은 역효과).
@@ -59,6 +60,12 @@ CoachingFocus = Literal[
 - `calibration_underconfident`: *과소신 구간* — 맞았으나 확신이 낮음. 성취를 명시해 효능감을
   회복시킨다(META). prerequisite_review·overconfident와 동일하게 `recommend_coaching` 밖·별도
   결정 함수가 빌드한다(아래 dict 항목은 exhaustiveness용 정본 템플릿).
+- `misconception_review`: *오개념 복습* — 누적된 활성 오개념 *가설*이 충분히 강해 그 오개념
+  자체를 다시 보자고 권한다(ASSUMPTION·가정 재검토). 앞 셋과 동일하게 `recommend_coaching`은
+  *이 포커스를 반환하지 않는다*(BKT/IRT가 아니라 오개념 가설 세트 입력 필요) — 별도 순수 결정
+  함수 `recommend_misconception_review_coaching`(`l4.misconception_review_coaching`)이 빌드한다.
+  **선수 복습과 다른 축이다**: `prerequisite_review`는 "아래 개념이 비어 있다"(결손)이고 이쪽은
+  "규칙을 잘못 알고 있을 수 있다"(오적용)다. 가설은 확정 라벨이 아니므로 발화는 단정하지 않는다.
 """
 
 # 포커스별 근거(rationale)·학생 노출 코칭 발화(prompt) — 답을 주지 않는 메타인지 유도.
@@ -74,6 +81,8 @@ _RATIONALE: dict[CoachingFocus, str] = {
     "calibration_overconfident": "과신 구간(틀렸으나 확신 높음) — 자기점검·가정 재검토 유도"
     "(소크라테스 강화).",
     "calibration_underconfident": "과소신 구간(맞았으나 확신 낮음) — 성취 명시·효능감 회복.",
+    "misconception_review": "누적 오개념 가설이 충분히 강함 — 그 오개념 자체를 다시 점검"
+    "(가정 재검토·확정 라벨 아님).",
 }
 _PROMPT: dict[CoachingFocus, str] = {
     "verify": "계산을 한 단계씩 다시 짚어보면서 어디서 숫자가 어긋났는지 찾아볼래?",
@@ -88,6 +97,8 @@ _PROMPT: dict[CoachingFocus, str] = {
     "같이 한 줄씩 짚어볼까?",
     "calibration_underconfident": "맞았어! 충분히 잘 풀었는데 스스로는 자신이 없었구나. "
     "다음엔 네 풀이를 좀 더 믿어도 돼.",
+    "misconception_review": "혹시 여기서 쓴 규칙이 항상 성립하는지 한 번 더 확인해 볼까? "
+    "간단한 수를 직접 넣어 보면 금방 보일 거야.",
 }
 # verify 포커스의 *단계 자가검산* 변형 — 다단계 대수 슬립(L3 error_kind="solution")일 때만 쓴다.
 # 위치를 *지목하지 않고* 학생이 스스로 인접 줄의 해 일관성을 확인하게 한다(답 미루기·slice 61).
@@ -180,6 +191,7 @@ _SOCRATIC_BY_FOCUS: dict[CoachingFocus, SocraticCategory] = {
     "prerequisite_review": SocraticCategory.CLARIFICATION,  # 기초 지향(선수 명료화)
     "calibration_overconfident": SocraticCategory.ASSUMPTION,  # 가정 재검토(왜 확신?)
     "calibration_underconfident": SocraticCategory.META,  # 메타인지·효능감
+    "misconception_review": SocraticCategory.ASSUMPTION,  # 가정 재검토(그 규칙이 항상 맞나?)
 }
 
 

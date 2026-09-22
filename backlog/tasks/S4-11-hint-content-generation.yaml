@@ -11,7 +11,6 @@ eos_priority: P0
 owner: claude
 depends_on:
   - S4-09-solution-path-materialization
-  - S3-01-pilot-cohort
 requires_gates: []
 acceptance:
   - "SolutionStep(sympy_verified) 원천 오프라인 생성(L1=개념 이름만·L2=단계 흐름·L3=부분 시연)→게이트 3종(level-reveals 정합 invariant·detect_answer_leakage 재사용·정서 톤 필터) 통과분만 verified=true + hints 테이블 실체화(연기 전제 3종 동일 슬라이스: 생성 writer·검증·coach 서빙 reader — MEMORY 2026-07-08 미러 선례 승계) + reveal_score(0~1) 로깅으로 KPI '도달 깊이 2.5+' 측정 기반(S3-04 연동) + Level 4는 Hint 엔티티 밖 안전망 유지(level enum 1~3) + 신규 힌트 유형 enum 미도입(socratic_category 기존 6종·문서 6유형은 기존 3축 crosswalk)"
@@ -22,5 +21,5 @@ paths:
   - "src/backend/whymath_backend/db/models/**"
   - "src/backend/whymath_backend/api/**"
 session: null
-notes: "docs/architecture/solution_module_gap_review.md §3 D3 — 외부 EOS 틀(기능 25) 대조(최대 실행 갭). HintNode Persistence 연기(MEMORY 2026-07-08 Phase 6b) 해제 조건 충족 슬라이스. 학생 대면 서빙 포함 → S3-01 의존(루프 검증 전 기능 확장 금지·S4-05 선례). 스캐폴딩 페이딩·개입 금지 타이머는 §4-①\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/CU★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/solution_module_gap_review.md §3 D3 — 외부 EOS 틀(기능 25) 대조(최대 실행 갭). HintNode Persistence 연기(MEMORY 2026-07-08 Phase 6b) 해제 조건 충족 슬라이스. 학생 대면 서빙 포함 → S3-01 의존 해제(2026-09-22) — 실학생 응답을 입력으로 쓰지 않으므로 12/31 내용 완성 우선 결정에 따라 순서 의존만 떼었다. 루프 검증 전 기능 확장 주의는 유지(S4-05 선례). 스캐폴딩 페이딩·개입 금지 타이머는 §4-①\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/CU★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-22] depends_on 제거 1건: 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다.\nnotes 치환 — 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다."
+updated: 2026-09-22

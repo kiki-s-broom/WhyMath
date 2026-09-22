@@ -421,6 +421,71 @@ PR에만 생긴다는 통설을 실측에서 폐기했다(열린 PR 14건 중 me
 걸려 매 실행 "판정 보류"가 되어 초록인 채 상시 무력이 된다). 배선 실재성은
 `tests/infra/test_stale_branch_scan_ci_wiring.py`가 기계로 동결한다.
 
+### 3b-4. 차단 홀드의 교차 세션 해제 — 정본 경로가 없는 동안의 수동 절차 (HARN-134)
+
+**증상**: `blocked` 태스크를 이어받으려는 세션이 `start`에서 거부당한다.
+
+> `❌ <id> 착수 거부 — 다른 세션이 **차단**해 둔 태스크 (세션: <홀더 브랜치>, <시각>)`
+> `해소는 차단 사유를 없앤 뒤 unblock <id> — claims release --force는 차단 우회이므로 쓰지 않는다`
+
+안내대로 `unblock`을 실행해도 **로컬만 `todo`가 되고 원격 홀드는 남는다.** 그래서 `start`가
+계속 거부하고, 대장(blocked)과 로컬(todo)이 갈라진 무증상 분기 상태가 된다.
+
+**원인**: `cmd_unblock`이 `_release_remote_claim(root, task.id, prev_session)`을 호출하는데
+`prev_session`은 `task.session`이고 **`cmd_block`이 그것을 비운다**. 따라서 항상
+`store.current_branch(root)`로 폴백하고, 그 값은 *지금 세션의* 브랜치다. 홀더 브랜치와
+다르면 `remote_claims.release()`가 `force` 없이는 거부한다. 즉 **차단을 건 세션이 그대로
+살아 있을 때만** `unblock`이 원격까지 걷는다.
+
+그런데 차단 사유는 대부분 *외부 입력 대기*(사람 첨부·게이트·타 PR 착지)이고, 그 해소는
+거의 항상 **다음 세션**이 한다. 보호가 실제로 작동하는 경우가 오히려 드문 쪽이다.
+
+> `HARN-48` ④가 "unblock이 홀드를 해제"를 요구했고 구현도 있으나, 같은 세션 경로만
+> 덮었다. `HARN-134`가 그 미이행 축의 승계다(수정 전까지 아래 절차가 유일한 해제 수단).
+
+**`--force`는 우회가 아니라 사람 소유 액션이다 — 단, 세 조건을 모두 확인한 뒤에만.**
+CLI가 `--force`를 금지어로 안내하는 이유는 *살아 있는 차단을 탈취*하는 것을 막기 위함이다.
+아래 셋이 모두 참이면 탈취가 아니라 **청소**이며, 판정 주체는 세션이 아니라 사람이다.
+
+| # | 확인할 것 | 확인 방법 |
+|---|---|---|
+| ① | 차단 사유가 실제로 해소됐는가 | 태스크 `notes`·`acceptance`의 해제 조건을 읽고 사람이 판정한다. 세션이 스스로 "해소됐다"고 선언하는 것으로는 부족하다 |
+| ② | 홀더 세션이 끝났는가 | 홀더 브랜치의 작업이 트렁크에 있는가(`git merge-base --is-ancestor <tip> origin/main`) 또는 브랜치가 사라졌는가(`git ls-remote origin refs/heads/<브랜치>`가 0줄). **SQUASH 머지 저장소이므로 조상 검사가 False여도 머지됐을 수 있다** — 그럴 땐 커밋 메시지·PR로 확인한다(3b-2 규칙 A와 같은 함정) |
+| ③ | 그 태스크를 다른 세션이 잡고 있지 않은가 | `backlog.py claims list`에 그 id가 **`kind=block`으로만** 있고 진행 중 claim이 아닌지 |
+
+셋 중 하나라도 아니면 해제하지 않는다. 특히 ①이 아니면 그것이 바로 CLI가 막으려는 상황이다.
+
+**수동 절차** (Kiki 머신 · Windows PowerShell · 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`)
+
+쓰기 블록이므로 **스스로 선행 조건을 재검사해 거부**한다(CLAUDE.md v0.2.26). 태스크 id는
+`Read-Host`로 **블록이 멈춰서 묻는다** — 자리표시자를 두면 통째로 붙여넣을 때 치환 없이
+그대로 실행되기 때문이다(CLAUDE.md v0.2.12). 세션이 id를 이미 아는 경우에는 그 줄을
+채워서 보내되, 자리표시자 형태로는 보내지 않는다.
+
+```powershell
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$Py = if (Test-Path ".\.venv\Scripts\python.exe") { ".\.venv\Scripts\python.exe" } else { "python" }
+$TaskId = (Read-Host "해제할 태스크 full-id")
+$Held = ((& $Py scripts\harness\backlog.py claims list | Select-String $TaskId) -ne $null)
+$HasCli = (Test-Path ".\scripts\harness\backlog.py")
+if ($Held -and $HasCli) { & $Py scripts\harness\backlog.py claims release $TaskId --force } else { "WRITE_REFUSED=True — 홀드있음=$Held CLI있음=$HasCli" }
+$After = ((& $Py scripts\harness\backlog.py claims list | Select-String $TaskId) -ne $null)
+"RELEASED=$(-not $After)"
+```
+
+성공 판정은 마지막 줄 `RELEASED=True` 하나다. `WRITE_REFUSED=True`면 이유가 같은 줄에 찍힌다.
+
+**함정 3가지**(전부 2026-09-22 실측):
+
+1. **`git fetch`는 작업 트리를 바꾸지 않는다** — `origin/main`에 태스크 YAML이 있어도
+   체크아웃이 다른 브랜치면 로컬 파일은 없다. 가드 조건에 *태스크 파일 존재*를 넣으면
+   정상 상태에서 거부한다. `claims release`는 **그 파일을 읽지 않으므로** 선행 조건이 아니다.
+2. **출력이 cp949로 깨져 보인다** — 판정 문자열이 ASCII(태스크 id)라 매칭에는 영향이 없다.
+   위 블록 2행의 `OutputEncoding` 설정이 표시를 고친다.
+3. **로컬 `unblock`을 먼저 돌려 두면** 로컬은 `todo`·대장은 `blocked`인 분기 상태가 된다.
+   해제 후 `backlog.py status`로 두 값이 다시 맞는지 확인한다.
+
 ## 3b-1. 중복 방어의 두 축 — 같은 *이름* vs 같은 *문제* (HARN-51)
 
 번호 충돌 가드(HARN-10/15)가 막는 것은 **같은 식별자**를 두 세션이 배정하는 것이다.

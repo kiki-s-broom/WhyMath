@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-133-rename-bare-number-backreference-scan
+title: "개명 후 역참조 스캔이 짧은 번호를 못 본다 — 전체 ID 검색은 실무의 참조 형태에 구조적으로 무력하다"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 짧은 번호 역참조 스캔 — backlog.py rename 이 개명 후 내는 경고를, 전체 ID 검색에서 프리픽스+번호(예: HARN-127) 검색으로 넓힌다. 현행 경고는 \"문서·커밋 메시지의 <전체 ID> 참조는 옮기지 않았다\"고만 말하고 사람이 그 전체 ID로 grep 하게 두는데, 실무의 역참조는 슬러그 없는 짧은 형태가 대부분이라 그 검색은 구조적으로 못 본다. 스캔 범위는 최소한 backlog/tasks/**.yaml 의 notes·acceptance 와 docs/** 로 하고, 찾은 위치를 파일:줄로 열거한다(자동 치환은 하지 않는다 — 문맥에 따라 옳은 새 번호가 다르고, 개명 전 사실을 적은 기록은 바꾸면 안 된다)"
+  - "② 결함 주입 검증(①과 별항) — 정상 상태에서 초록인 것은 보호의 증거가 아니다. 픽스처로 ⓐ 짧은 번호만 참조하는 태스크 notes ⓑ 전체 ID로 참조하는 notes ⓒ 참조가 아예 없는 대조군 세 경우를 만들고, ⓐ에서 반드시 열거되는지 확인한다. 특히 ⓐ가 현행 코드에서 누락되는 것을 RED 로 재현한 뒤 수정한다 — 이 태스크가 존재하는 이유가 바로 ⓐ의 미탐이다. 스캔 대상 0건은 실패로 처리한다(공허한 통과 금지)"
+  - "③ 이벤트 대장은 스캔 대상에서 제외한다 — backlog/events/**.ndjson 의 과거 참조는 그때의 사실이라 고치면 안 된다(HARN-20 · append-only). 제외를 코드에 명시하고, 제외 사유를 주석으로 남긴다. 제외하지 않으면 매 개명마다 고칠 수 없는 항목이 열거돼 그 경고 전체가 소음이 된다(상시 실패하는 보호를 새로 만드는 셈)"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+session: null
+notes: "사고 경위: 2026-09-22 이 세션이 PR #1252 를 main 에 병합하며 번호 충돌을 해소했다. HARN-127-runbook-write-detection-allowlist-blindspot 을 HARN-132-... 로 개명한 뒤, CLI 가 낸 경고(\"문서·커밋의 참조는 옮기지 않았다 — 필요하면 손으로 확인하라\")에 따라 git grep 을 돌렸다. 검색어는 전체 ID 였고 결과는 이벤트 대장 2줄뿐이라, 그것을 append-only 라 그대로 두는 것이 맞다고 판정하고 잔여 참조 0건으로 넘어갔다.\n\n실제로는 HARN-116-runbook-write-vocab-paid-call-redirect 의 notes 가 \"중복 등재한 HARN-127 은 취소\"라고 **짧은 번호로** 참조하고 있었다. 개명 후 그 번호는 main 의 다른 태스크(HARN-127-runbook-guard-glob-scope)를 가리키게 됐다 — 같은 번호가 두 주제를 뜻하는 상태이며 HARN-10 이 겨냥하는 바로 그 결함이다.\n\n실측으로 확인한 검증 스텝의 무력함: `git grep -c \"HARN-127-runbook-write-detection\" origin/main -- backlog/tasks/HARN-116-*.yaml` 은 0건이고, `git grep -o \"HARN-127\" ...` 은 1건이다. 즉 내 검사는 실패 상태에서 실패 신호를 내지 못했다 — 변별력 없는 검증 스텝이었다(CLAUDE.md 2026-07-17 축). 더 좁게는 「식별자 부재를 기능 부재로 단정 금지」의 형태다: 내가 고른 한 표기의 0건을 부재로 읽었다.\n\n발견은 내 검증이 아니라 원 브랜치 세션이었다(PR #1270 이 HARN-116 notes 를 정정한다). 즉 이 건의 피해는 0이지만 그것은 설계가 아니라 다른 세션의 주의 덕이다.\n\n왜 산문이 아니라 코드인가: 「새 산문 규칙 등재 동결」(2026-09-20 Kiki 지정)에 따라 사고 대책은 코드·태스크만으로 등재한다. 개명은 CLI 가 이미 소유한 동작이므로 그 경고를 넓히는 것이 정확한 집행 지점이다 — 사람에게 \"짧은 번호도 찾아보라\"고 적어 두는 것은 같은 실수를 반복시킨다."
+updated: 2026-09-22

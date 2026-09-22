@@ -106,7 +106,7 @@ from typing import Any
 import sympy
 from pydantic import ValidationError
 
-from whymath_backend.config import Settings
+from whymath_backend.config import CloudSeat, Settings
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
@@ -543,6 +543,24 @@ class LLMEquivalentProblemGenerator:
             self._loop = asyncio.new_event_loop()
         return self._loop
 
+    # ── 저작 좌석(ARCH-62) ──
+    def _authoring_seat(self) -> CloudSeat:
+        """이 저작 배치의 클라우드 좌석 — 비용 기록이 **어느 단가표를 읽을지** 정한다.
+
+        저작 경로의 좌석은 `settings.cloud_provider` 셀렉터가 정하고(config 주석·
+        `build_cloud_provider`가 같은 값을 읽어 provider를 만든다), 그 값을 여기서도 읽어
+        비용 회계와 실제 호출 좌석을 **같은 근거**에 묶는다. 둘이 갈라진 상태가 ARCH-62가
+        상환하는 결함이다 — 셀렉터를 openrouter로 두고도 원가는 anthropic 단가로 적혀
+        24.4배 과대 계상됐다.
+
+        한계(명시): provider를 외부에서 주입한 경우(테스트·특수 배치) 그 provider가
+        셀렉터와 다른 좌석일 수 있다. 그 조합은 이 저장소의 저작 계약 밖이며, 좌석을
+        알 수 없게 되면 호출부가 `seat=None`을 넘겨 비용을 '미측정'으로 남기면 된다.
+        """
+        from whymath_backend.l3.providers.factory import cloud_provider_name
+
+        return cloud_provider_name()
+
     # ── 관측(코퍼스 저작 호출도 Langfuse에 남긴다 — 게이트② 관측 공백 보정) ──
     def _record_trace(self, decision: RoutingDecision, usage: Usage | None) -> None:
         """생성 1건의 라우팅·실측(usage·비용)을 sink에 기록 — never-break(배치 비차단).
@@ -558,7 +576,7 @@ class LLMEquivalentProblemGenerator:
         elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
             actual_krw = None
         else:
-            actual_krw = actual_cost_krw(decision, usage)
+            actual_krw = actual_cost_krw(decision, usage, seat=self._authoring_seat())
         try:
             self._trace.record(
                 langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw)
@@ -675,7 +693,7 @@ class LLMEquivalentProblemGenerator:
                 # 종단)이면 둘 다 None=미관측이다(0으로 접지 않는다).
                 served_model=usage.served_model if usage is not None else None,
                 retries=usage.retries if usage is not None else None,
-                cost_usd=actual_cost_usd_or_none(decision, usage),
+                cost_usd=actual_cost_usd_or_none(decision, usage, seat=self._authoring_seat()),
                 latency_ms=latency_ms,
                 success=success,
                 error_detail=error_detail,

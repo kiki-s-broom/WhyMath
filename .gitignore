@@ -226,3 +226,6 @@ backlog/inventory/feature_inventory_v2.csv
 # EOS-118 좌석 신호 라이브 회차 산출(런북 docs/ops/eos118_seat_signal_live_runbook.md)
 # — 회차 JSONL·요약 JSON·stderr 로그. 로컬 실행 결과이지 저장소 자산이 아니다.
 .eos118-out/
+
+# EOS-02 프롬프트 캐시 라이브 계측 회차 산출(docs/ops/eos02_prompt_cache_live_runbook.md)
+.eos02-out/
