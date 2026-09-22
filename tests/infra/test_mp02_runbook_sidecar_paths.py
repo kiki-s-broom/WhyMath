@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -322,6 +324,52 @@ def test_review_runbook_prints_the_denominator_for_the_operator() -> None:
         f"분모를 출력하는 실행 블록이 {len(printing)}건이다(§3·§4 최소 2곳) — 런북이 "
         "`emitted_distinct_slugs`로 판정하라고 적으면서 그 값을 화면에 내주지 않으면 Kiki가 "
         "요약 JSON을 손으로 뒤져야 한다"
+    )
+
+
+_SCANNER = _REPO_ROOT / "scripts" / "ops" / "check_runbook_blocks.py"
+_BLOCK_COUNT = re.compile(r"powershell 블록 (\d+)개")
+_CORPUS_LITERAL = "problem_bank_mp02_first_run_v0"
+
+
+def test_mp02_runbooks_pass_the_block_guard() -> None:
+    """글로브 사각을 우회해 **이 두 런북에 직접** 가드를 돌린다 (MP-11 ③ⓐ).
+
+    `check_runbook_blocks.py`의 기본 글롭은 `docs/ops/*runbook*.md`라 `docs/reviews/` 아래
+    MP-02 런북 2건은 **한 번도 스캔된 적이 없다** — 그 범위 공백은 `HARN-127`이 소유하고,
+    글로브를 넓힐지 런북 거처를 옮길지의 판정도 그 태스크 몫이다. 그 판정을 앞질러 바꾸지 않고,
+    여기서는 파일을 **위치 인자로 직접** 넘겨 CI가 최소한 이 두 개는 보게 한다.
+
+    스캔 0건은 실패다 — 가드가 블록을 하나도 못 찾으면 공허하게 통과한다.
+    """
+    result = subprocess.run(
+        [sys.executable, str(_SCANNER), str(_RUNBOOK), str(_REVIEW_RUNBOOK)],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, f"MP-02 런북이 블록 가드에서 red다:\n{output}"
+    found = _BLOCK_COUNT.search(output)
+    assert found is not None, f"가드 출력에서 블록 수를 읽지 못했다:\n{output}"
+    assert int(found.group(1)) > 0, "powershell 블록 0개 — 가드가 아무것도 보지 않았다"
+
+
+def test_review_runbook_does_not_hardcode_the_round_output_path() -> None:
+    """검수 런북의 **실행 블록**이 회차 산출 폴더를 리터럴로 박지 않는다 (MP-11 ②).
+
+    회차 출력 위치는 실행자가 그때그때 정하는 값이다. 2026-09-22 실측: 초판이 가리키던
+    코퍼스 폴더에는 `accepted 0` 회차 3건뿐이었고 `problems.jsonl`조차 없었으며, 검수 대상
+    회차는 클론 **밖**에 있었다 — 런북대로 실행하면 입력 부재로 멈춘다.
+
+    산문은 검사하지 않는다 — 정정 경위를 설명하려면 그 이름을 인용해야 하기 때문이다
+    (같은 이유로 이 파일의 사이드카 검사도 펜스 안만 본다).
+    """
+    blocks = _fenced_blocks(_REVIEW_RUNBOOK.read_text(encoding="utf-8"))
+    assert blocks, "검수 런북에 실행 블록이 0건이다(스캔 0건은 실패)"
+    offenders = [b for b in blocks if _CORPUS_LITERAL in b]
+    assert not offenders, (
+        f"실행 블록 {len(offenders)}개가 회차 폴더를 리터럴로 박았다 — §1-b의 대장 스캔으로 "
+        "찾아 `$Data`에 담아야 한다"
     )
 
 
