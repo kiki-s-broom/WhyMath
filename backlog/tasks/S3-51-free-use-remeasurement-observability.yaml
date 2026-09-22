@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: review
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 회차 구간 분리 — wh1_shadow_harvest가 --since/--until(관측 시각)로 이번 측정 회차만 집계하고, 필터로 제외된 건수를 리포트에 표기한다(원장 누적분·2026-07 합성 60제출이 이번 판정 분모에 섞이지 않는다)\n② 판정 모집단 회계 — 사전등록 판정문의 모집단(verdict=correct/incorrect/unverifiable·none 제외)을 리포트가 분모로 명시하고 그 분모 기준 unverifiable 비율을 함께 낸다(판정선은 여전히 내지 않는다 — 분포 제시)\n③ V3 측정 가능화 — 등호 방정식 변형 전이(해집합 보존 경로로 판정된 전이)를 verify_step→verify_solution→하네스 트레이스→shadow 레코드→수확 리포트로 비식별 정수 전파해, 사전등록 V3(등호 방정식 변형 턴 >=5건)을 사람 집계 없이 리포트에서 읽을 수 있다. 혼합형태(한쪽만 등식) 전이도 분리 계상해 V3 미달 시 원인(입력 UX)이 보이게 한다\n④ 런북 — docs/ops/s3_02_free_use_remeasurement_runbook.md에 6항목 브리핑 + 실행 블록(자리표시자 0·쓰기 블록 자가거부 가드·단계별 자가검증)으로 Kiki 실행 절차 고정. F1(거짓 incorrect) 관찰 기록법 포함\n⑤ 게이트 등재 — 이 측정 회차를 게이트 대장에 올려 사전등록 판정 기준(V1~V3·P1·P2·F1·F2)이 대장에서 조회되게 한다"
-artifacts: []
+artifacts:
+  - "PR #1273"
+  - 13e8f8a0
 paths:
   - "src/backend/whymath_backend/harness/wh1_shadow*.py"
   - "src/backend/whymath_backend/l3/verify_ste*.py"
   - docs/ops/s3_02_free_use_remeasurement_runbook.md
-session: claude/peaceful-brown-fj6gd9
+session: null
 notes: "S3-02(done)의 잔여 트리거 ③ = \"자연 자유사용 15~30분 대표측정\"(docs/strategy/s3_pilot_briefing.md·2026-07-28 사전등록 판정문). 이 태스크는 그 측정을 *실행 가능·판정 가능*하게 만드는 준비분이다 — 측정 자체는 Kiki 실기기 회차(게이트).\n\n착수 근거(실측 2026-09-22): 사전등록 판정문이 요구하는 세 값 중 둘을 현행 도구가 낼 수 없다.\n  - V3(등호 방정식 변형 턴 >=5건): shadow 관측 레코드(wh1_shadow.py)는 프라이버시 설계상 비식별 요약만 담아 등식 형태 축이 없다. 사람이 자유사용 중에 손으로 세면 \"자연 자유사용\"이 오염된다(대본 금지 전제 위반) — 그래서 기계 집계가 방법론적으로도 옳다.\n  - 회차 분리: wh1_shadow_harvest는 원장 전체 기준으로만 집계하고 시간 필터가 없다. 2026-07-19 합성 60제출(eq 24/24 correct)이 그대로 분모에 남아 있어, 그 원장으로 판정하면 이번 회차와 무관하게 통과가 나온다(거짓 green).\n  - 모집단: 리포트의 unverifiable 비율은 none(verify 미호출) 포함 분모라 사전등록 모집단과 다르다 — 화면 숫자를 그대로 읽으면 오판한다.\n판정 기준은 사전등록분 그대로 두고(사후 이동 금지) 측정 가능성만 복원한다."
 updated: 2026-09-22
