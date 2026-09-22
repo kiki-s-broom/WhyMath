@@ -25,6 +25,20 @@ from typing import Any, Literal
 from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# ──────────────────────────────────────────────────────────────────────────
+# 클라우드 좌석(cloud seat) 리터럴 — **좌석 어휘의 단일 진실 원천**.
+#
+# `Settings.cloud_provider`가 이 별칭을 쓰고, 단가표(`l3.router`)·좌석→핀 매핑
+# (`l3.providers.factory.cloud_model_pins`)이 같은 별칭을 읽는다. 새 enum을 세우지
+# 않는 이유는 그 순간 좌석 어휘가 둘이 되기 때문이다 — `ARCH-58`이 상환한 사고가
+# 정확히 "좌석은 셀렉터로 바뀌는데 기록은 다른 곳의 사본을 봤다"는 형태였다.
+#
+# 좌석을 추가하려면 여기 한 곳만 고치면 되고, 그 순간 단가표의 (티어, 좌석) 조합이
+# 비어서 비용이 None(미측정)으로 떨어진다 — 표를 채우라는 신호가 자동으로 뜬다.
+# ──────────────────────────────────────────────────────────────────────────
+CloudSeat = Literal["anthropic", "openrouter", "deepseek"]
+"""클라우드 좌석 이름 — `cloud_provider` 셀렉터가 고르는 제공자 3종."""
+
 
 class Settings(BaseSettings):
     """환경변수 기반 설정 — `WHYMATH_` 접두사 (예: `WHYMATH_OLLAMA_HOST`).
@@ -537,7 +551,7 @@ class Settings(BaseSettings):
     # 적용 범위는 **저작 경로 한정**이다 — 학생 대면 서빙(`app.py`)은 이 셀렉터를 타지 않는다.
     # 그쪽을 옮기는 것은 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 트래픽 투입
     # 결정)를 실현시키는 행위라 Kiki 판정 사안이다.
-    cloud_provider: Literal["anthropic", "openrouter", "deepseek"] = Field(
+    cloud_provider: CloudSeat = Field(
         default="anthropic",
         description=(
             "저작 경로의 클라우드 슬롯 제공자. `anthropic`(기본·불변 핀 claude-sonnet-4-6) / "

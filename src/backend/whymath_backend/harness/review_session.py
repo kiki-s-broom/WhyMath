@@ -101,7 +101,7 @@ import json
 import sys
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -164,11 +164,20 @@ class ReviewItem:
     `status`·`reasons`는 큐에만 있는 근거이며(코퍼스 레코드는 None·빈 튜플), 검수자에게
     "기계가 왜 이걸 올렸는가"를 보여주는 용도다 — `reviewer_sample_package`의 정본 패턴
     ("근거를 모으기만 하고 판정하지 않는다")을 따른다.
+
+    `payload`는 **문항 본문**(지문·정답·해설·검산 조건)이다. 큐 행의 `candidate_payload`
+    (`needs_review_worklist.ReviewQueueEntry`)이거나, 코퍼스 모드에서는 행 자신이다.
+    본문 없이 slug만 보고 F1~F8(정답 불일치·논리 비약·힌트 정답 누설)을 고르는 것은 판정이
+    아니라 추측이므로, 본문은 화면에 반드시 오른다. 본문이 정말 없는 행(생성 실패 후보 등)은
+    `payload_absent_reason`에 사유를 담아 **그 사실을 화면에 적는다** - 빈 화면으로 넘기면
+    검수자는 "볼 것이 없다"와 "도구가 안 보여준다"를 구분할 수 없다.
     """
 
     slug: str
     status: str | None = None
     reasons: tuple[str, ...] = ()
+    payload: Mapping[str, Any] | None = None
+    payload_absent_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +191,26 @@ class SessionOutcome:
     skipped_completed: int
     events_written: int
     stopped_early: bool
+
+
+def _resolve_payload(row: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str | None]:
+    """행 1건에서 **문항 본문**을 꺼낸다 - (본문, 부재 사유) 중 정확히 한쪽만 채워진다.
+
+    입력 2종을 같은 규칙으로 받는다(모듈 docstring "입력·출력"):
+      - 검수 큐 행 - 본문은 `candidate_payload`에 코퍼스 레코드와 **동일 직렬화**로 들어 있다
+        (`needs_review_worklist.ReviewQueueEntry` 계약 · `canary_slice`도 같은 자리에 싣는다).
+      - 코퍼스 행 - 행 자신이 본문이다(`candidate_payload` 키가 아예 없다).
+
+    `candidate_payload` 키가 **있는데 dict가 아닌** 경우(생성 실패 후보의 `None` 등)를 코퍼스
+    모드로 접지 않는다 - 그러면 큐 메타(`status`·`run_id`·`reasons`)가 문항 본문인 척 화면에
+    오른다. 부재는 부재로 말한다.
+    """
+    if "candidate_payload" in row:
+        payload = row["candidate_payload"]
+        if isinstance(payload, dict):
+            return payload, None
+        return None, f"candidate_payload가 비어 있음(type={type(payload).__name__})"
+    return row, None
 
 
 def load_review_items(path: Path) -> tuple[list[ReviewItem], list[str]]:
@@ -221,11 +250,14 @@ def load_review_items(path: Path) -> tuple[list[ReviewItem], list[str]]:
             reasons: tuple[str, ...] = (
                 tuple(str(r) for r in reasons_raw) if isinstance(reasons_raw, list) else ()
             )
+            payload, absent_reason = _resolve_payload(row)
             items.append(
                 ReviewItem(
                     slug=slug,
                     status=status if isinstance(status, str) else None,
                     reasons=reasons,
+                    payload=payload,
+                    payload_absent_reason=absent_reason,
                 )
             )
     return items, errors
@@ -297,6 +329,67 @@ def _read_line(stream: TextIO, out: TextIO, prompt: str) -> str | None:
     return line.strip()
 
 
+#: 본문 렌더 순서 - (payload 키, 화면 라벨). 판정에 쓰이는 축을 **한 화면에** 모은다.
+#: F2(정답 불일치)는 지문·정답·해설의 대조, F8(힌트 정답 누설)은 정답과 부가 설명의 대조로만
+#: 성립하므로 이 셋이 떨어져 있으면 사람이 구조적으로 판정할 수 없다.
+_BODY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("question_text", "문항"),
+    ("question_text_md", "문항(md)"),
+    ("choices", "선택지"),
+    ("answer", "정답"),
+    ("answer_explanation", "해설"),
+    ("conditions_parsed", "조건"),
+    ("verify", "검산"),
+    ("achievement_standard_codes", "성취기준"),
+    ("unit_codes", "단원"),
+    ("difficulty_overall", "난이도"),
+)
+
+
+def _format_value(value: Any) -> str:
+    """본문 1필드를 한 줄 문자열로 - **자르지 않는다**.
+
+    길다고 줄이면 잘린 뒤쪽에 있는 정답 누설·논리 비약이 화면에서 사라진다(F3·F8은 바로 그
+    뒤쪽에서 난다). 구조체는 `ensure_ascii=False` JSON으로 낸다 - 한글이 이스케이프로 깨져
+    나오면 읽을 수 없고, 읽을 수 없는 본문은 없는 본문과 같다.
+    """
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _render_body(out: TextIO, item: ReviewItem) -> None:
+    """문항 본문 표시 - 판정에 필요한 축 전부. 없으면 **없다고 적는다**.
+
+    끝에 `기타 필드`로 렌더하지 않은 키를 열거하는 이유: 이 회차 코퍼스에는 힌트 필드가 없지만
+    (실측 2026-09-22 - `problem_bank_*/problems.jsonl` 전 파일에 `hint` 키 0건) 설계서 §3의 CU
+    정의는 3단계 힌트를 포함한다. 나중에 힌트가 실리기 시작하면 이 줄에 키 이름이 나타나므로,
+    검수자는 **자기가 못 본 것이 있다는 사실**을 알 수 있다. 화이트리스트 렌더의 구조적 사각을
+    화이트리스트 자신이 고지하게 하는 것이다.
+    """
+    if item.payload is None:
+        reason = item.payload_absent_reason or "사유 미상"
+        out.write(f"  ! 문항 본문 없음: {reason}\n")
+        out.write("    본문 없이 F1~F8을 고르지 마십시오 - 보류(s)가 정직한 판정입니다.\n")
+        return
+    shown: set[str] = set()
+    for key, label in _BODY_FIELDS:
+        if key not in item.payload:
+            continue
+        value = item.payload[key]
+        shown.add(key)
+        if value is None or value == [] or value == {}:
+            continue
+        out.write(f"  {label}: {_format_value(value)}\n")
+    rest = sorted(
+        k
+        for k, v in item.payload.items()
+        if k not in shown and v is not None and v != "" and v != [] and v != {}
+    )
+    if rest:
+        out.write(f"  기타 필드(값 있음·미표시): {', '.join(rest)}\n")
+
+
 def _render_item(out: TextIO, index: int, total: int, item: ReviewItem) -> None:
     """검수 대상 1건의 근거 표시 — 판정은 하지 않는다(AI 자기승인 금지)."""
     out.write(f"\n[{index}/{total}] {item.slug}\n")
@@ -304,6 +397,7 @@ def _render_item(out: TextIO, index: int, total: int, item: ReviewItem) -> None:
         out.write(f"  큐 상태: {item.status}\n")
     for reason in item.reasons:
         out.write(f"  근거: {reason}\n")
+    _render_body(out, item)
 
 
 def _prompt_verdict(stream: TextIO, out: TextIO) -> str | None:

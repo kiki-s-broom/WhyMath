@@ -9,8 +9,7 @@ status: todo
 priority: 5
 eos_priority: P2
 owner: claude
-depends_on:
-  - S3-01-pilot-cohort
+depends_on: []
 requires_gates: []
 acceptance:
   - "concept_definition 프로젝션(복합 PK code+kind·kind 폐쇄 enum 4종·body self-authored·examples/counterexamples·rigorous_internal 학생 비노출 게이팅·review_status=ai_estimated) + L4 코치 레지스터 선택 소비 슬라이스 동반 구현 + kind 폐쇄·본문 슬롯 부재 거버넌스 동결. 정의 레지스터별 chunk 임베딩 도입 여부를 소비 슬라이스에서 판정(CLAUDE.md chunk 축 착륙 트리거)"
@@ -20,5 +19,5 @@ paths:
   - "src/backend/whymath_backend/l4/**"
   - "src/backend/whymath_backend/db/models/**"
 session: null
-notes: "docs/architecture/knowledge_module_gap_review.md §3 D1 — 외부 EOS 틀(모듈 7) 대조 최대 갭. 소비처 없는 저작 선행 금지: 적재·소비 동반 슬라이스로만 착수. 초등·영재 레지스터는 페르소나 v1.5/v2.0 도달 시 enum 추가\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/knowledge_module_gap_review.md §3 D1 — 외부 EOS 틀(모듈 7) 대조 최대 갭. 소비처 없는 저작 선행 금지: 적재·소비 동반 슬라이스로만 착수. 초등·영재 레지스터는 페르소나 v1.5/v2.0 도달 시 enum 추가\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-22] depends_on 제거 1건: 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다."
+updated: 2026-09-22

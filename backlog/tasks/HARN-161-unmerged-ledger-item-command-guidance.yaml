@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-161-unmerged-ledger-item-command-guidance
+title: "Kiki 안내 CLI가 참조하는 대장 항목의 trunk 실재 미확인 — 미머지 항목 안내 2회차(산문 규칙 실패)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 사고 경위 고정 (2026-09-22 · 동일 유형 2회차): 세션이 Kiki께 `python3 scripts/harness/backlog.py start S4-01-math-k12-complete` 를 안내했으나, 그 의존 해제는 PR #1266(미머지)에만 있었고 main에는 없었다. Kiki 머신에서 실행 결과 `착수 거부 — deps: ['S3-01-pilot-cohort']`. 피해는 왕복 1회이며 CLI의 의존 검사가 막았다(설계된 방어가 아니라 우연히 같은 검사가 존재했을 뿐 — `gates clear` 처럼 대상 부재 시 조용히 다른 동작을 하는 명령이었다면 결과가 달랐다). 1회차는 2026-08-31 `HARN-38` 런북이 미머지 브랜치에만 있는 게이트의 clear 를 안내한 건이고, 그때 대책이 CLAUDE.md 산문 규칙(v0.2.6 「대장 신규 항목」 편입)이었으므로 이번이 그 산문 규칙의 실패다. 저장소 선례상 동일 유형 텍스트 규칙 2회 실패 후에는 코드가 착지해야 한다.\n\n② 기계 집행 — 채팅 축: Stop 훅에서 그 턴의 답변 본문을 읽어 대장 조작 CLI 호출(`backlog.py start|done|amend|gates clear|gates waive` 및 동등 형태)을 검출하고, 인자로 넘겨진 태스크 ID·게이트 ID가 `origin/main` 의 `backlog/tasks/` · `backlog/gates.yaml` 에 실재하는지 대조한다. 부재면 종료를 막고 재작성을 요구하며, 건수를 `.claude/logs/` 아래 jsonl 로 남긴다(측정 지표). 기존 `.claude/hooks/fence_guard.py` 가 `transcript_path` 로 같은 일을 하고 있으므로 그 선례를 따른다 — 즉 \"채팅 축은 코드가 닿지 않는다\"는 전제를 쓰지 않는다(2026-09-18 `HARN-114` 에서 그 전제가 거짓으로 판명된 선례).\n\n③ 기계 집행 — 저장소 축: `docs/**/*.md` 의 런북에 적힌 같은 형태의 CLI 호출도 같은 대조를 받게 한다. 기존 런북 스캐너(`scripts/ops/check_runbook_blocks.py`)의 확장과 신규 스크립트 중 어느 쪽이든 무방하나, CI 차단 스텝 배선을 `tests/infra` 배선 동결로 고정한다(존재함과 돌아감은 다르다).\n\n④ 변별력 증명 — 뮤테이션 최소 4종 전건 RED: ⒜ main 에 없는 태스크 ID 를 `start` 인자로 담은 답변 ⒝ main 에 없는 게이트 ID 를 `gates clear` 인자로 담은 답변 ⒞ main 에 있는 ID(정상 대조군 — GREEN 이어야 하며, 전부 RED 로 만드는 과잉 차단은 실패다) ⒟ 검사기 자신의 `origin/main` 조회를 로컬 작업 트리 조회로 바꾸면 RED 가 사라지는지(= 그 조회가 판정의 실질 축인지 확인). 각 주입은 적용 단언(`mutated != original`)과 바이트 동일 원복 단언을 동반한다.\n\n⑤ 오프라인·프록시 환경의 처리를 명시한다: `origin/main` 참조를 못 읽는 환경에서 fail-open 으로 통과시키면 \"상시 실패하는 fail-open 보호\"를 새로 만드는 셈이다. 읽기 실패는 통과가 아니라 **판정 불가**로 구분해 보고하고, 그 상태가 반복 관측되면 태스크로 승격되게 한다.\n\n⑥ 범위 밖(명시): 같은 세션에서 함께 난 안내 결함 3건은 이 태스크 범위가 아니다 — ⒜ 증거용 명령을 실행 펜스에 넣은 건은 `HARN-114`(Stop 훅 fence_guard) 소유 ⒝ Windows 에 Linux 명령(`grep`)을 준 건은 실행 시스템 라벨 축 ⒞ 타 세션 미커밋 작업분이 있는 공유 작업 사본에 `git checkout main` 을 안내한 건은 CLAUDE.md v0.2.26 이 처방한 `git worktree add --detach` 축이다. ⒞ 는 git 이 거부해 피해 0이었으나 **설계가 아니라 운**이므로, 별도 태스크가 필요한지 판정만 이 태스크에서 기록한다."
+  - "⑦ ⑥ⓒ의 귀속 판정 지침(등재 시점 조사분 — 구현 세션이 재도출하지 않게): 인접 태스크는 `HARN-136-git-revert-guard-hook`이며 **같지 않다.** HARN-136은 ⒜ Claude 자신의 Bash 호출을 PreToolUse 훅으로 막고 ⒝ 대상이 경로 단위 원복(`git checkout -- <경로>`·`restore`·`stash`)이다. ⒞는 ⒜ **사람에게 안내한 문장**이고 ⒝ 대상이 브랜치 전환(`git checkout <브랜치>`)이라 훅이 보는 표면도 명령 형태도 다르다. 그러므로 선택지는 둘이다 — ㉠ HARN-136의 명령 목록에 브랜치 전환을 더하고 검사 표면을 답변 본문까지 넓힌다(이 태스크 ②의 Stop 훅과 같은 자리가 되므로 통합 가능) ㉡ 별도 태스크로 분리한다. 구현 시 ㉠을 먼저 검토하되, HARN-136이 in_progress면 그 세션과 조율한다(중복 구현 2회 선례 — 2026-07-27 OPS-07 735줄 폐기 · 2026-09-06 MP-04 전량 폐기)."
+artifacts: []
+paths:
+  - ".claude/hooks/**"
+  - "scripts/ops/**"
+  - "tests/infra/**"
+session: null
+notes: "2026-09-22 S3-01 순서 재배치 세션(PR #1266)에서 자진 등재. 같은 세션의 안내 결함 4건 중 1번의 대책이며, 나머지 3건의 귀속은 acceptance ⑥에 적었다. 1회차 = 2026-08-31 HARN-38(Codex P2 지적·PR #930), 그 대책이 CLAUDE.md v0.2.6 산문 규칙이었고 이번에 그 규칙이 뚫렸다. CLAUDE.md v0.2.30 이후 새 산문 규칙 등재는 동결이므로 대책은 코드뿐이다.\n\n[정정 2026-09-22] 등재 직후 인접 태스크 조사 결과 반영 — CLI의 의미 중복 고지(HARN-136 유사도 0.17)를 따라가 범위 경계를 실측하고, ⑥ⓒ의 귀속 선택지를 명시했다. 구현 세션이 같은 조사를 반복하지 않게 한다."
+updated: 2026-09-22

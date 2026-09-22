@@ -83,7 +83,8 @@ class TestAuthoringCanReachCloud:
 
         # 두 최소비용 **사이**의 예산 — 값을 상수에서 유도한다(단가표가 재보정되면 따라간다).
         budget = (
-            CLOUD_MIN_COST_KRW[CostTier.CLOUD_MID] + CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH]
+            CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")]
+            + CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")]
         ) / 2
 
         def tier(difficulty: str) -> CostTier:

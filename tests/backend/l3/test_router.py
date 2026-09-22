@@ -31,6 +31,7 @@ from whymath_backend.l3.router import (
     LOCAL_LATENCY_MS,
     LOCAL_MODEL_MATRIX,
     QUALITY_MODEL_ID,
+    SERVING_CLOUD_SEAT,
     SLA_GATE_MS,
     USD_TO_KRW,
     Router,
@@ -41,6 +42,7 @@ from whymath_backend.l3.router import (
     cloud_cost,
     cloud_latency,
     cloud_min_cost,
+    cloud_token_price,
     guard_cloud,
     langfuse_fields,
     local_latency,
@@ -452,7 +454,7 @@ class TestGuardCloud:
         # CLOUD_HIGH 최소비용보다 작은 예산
         req = _req(
             student_subscription="premium",
-            budget_krw=CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH] - 1.0,
+            budget_krw=CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")] - 1.0,
         )
         assert guard_cloud(req, CostTier.CLOUD_HIGH) == CostTier.LOCAL
 
@@ -482,7 +484,7 @@ class TestGuardCloud:
             _req(
                 difficulty="killer",
                 student_subscription="premium",
-                budget_krw=CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH] - 1.0,
+                budget_krw=CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")] - 1.0,
             )
         )
         # 단 budget>0이라 규칙1은 통과, 규칙3 가드에서 LOCAL 강등
@@ -577,7 +579,10 @@ class TestEstimators:
     def test_cloud_cost_matches_min(self) -> None:
         """현재 cloud_cost는 placeholder로 최소비용 사용."""
         req = _req(student_subscription="premium", budget_krw=1000.0)
-        assert cloud_cost(req, CostTier.CLOUD_MID) == CLOUD_MIN_COST_KRW[CostTier.CLOUD_MID]
+        assert (
+            cloud_cost(req, CostTier.CLOUD_MID)
+            == CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")]
+        )
 
     def test_route_local_cost_zero(self, router: Router) -> None:
         """로컬 경로는 비용 0원."""
@@ -882,7 +887,8 @@ class TestActualCost:
 class TestEstCostDerivedFromPriceTable:
     """est(사전 추정)가 실측 단가표에서 *유도*됨을 봉인 — 하드코딩 매직넘버 아님(#465).
 
-    CLOUD_MIN_COST_KRW[tier]가 _EST_ASSUMED_* × CLOUD_TOKEN_PRICE_USD_PER_1M[tier] ×
+    CLOUD_MIN_COST_KRW[(tier, seat)]가 _EST_ASSUMED_* ×
+    CLOUD_TOKEN_PRICE_USD_PER_1M[(tier, seat)] ×
     USD_TO_KRW의 단일 공식과 일치해야 한다. 가정 토큰을 튜닝하면 이 값이 자동 재계산되므로,
     이 테스트는 '유도 공식이 봉인됐음'을 지킨다(값 자체가 아니라 유도 관계를 검증).
     """
@@ -890,13 +896,13 @@ class TestEstCostDerivedFromPriceTable:
     @pytest.mark.parametrize("tier", [CostTier.CLOUD_MID, CostTier.CLOUD_HIGH])
     def test_min_cost_equals_price_table_formula(self, tier: CostTier) -> None:
         """CLOUD_MIN_COST_KRW = 가정 토큰 × 단가표 × 환율 (est가 단가표에서 유도됨)."""
-        price_in, price_out = CLOUD_TOKEN_PRICE_USD_PER_1M[tier]
+        price_in, price_out = CLOUD_TOKEN_PRICE_USD_PER_1M[(tier, "anthropic")]
         expected = (
             (_EST_ASSUMED_INPUT_TOKENS * price_in + _EST_ASSUMED_OUTPUT_TOKENS * price_out)
             / 1_000_000
             * USD_TO_KRW
         )
-        assert CLOUD_MIN_COST_KRW[tier] == pytest.approx(expected)
+        assert CLOUD_MIN_COST_KRW[(tier, "anthropic")] == pytest.approx(expected)
 
     def test_calibrated_values(self) -> None:
         """실측 보정 가정(74+358·S1-13 2026-07-14 라이브 p50) → MID≈8.61·HIGH≈14.35.
@@ -905,12 +911,15 @@ class TestEstCostDerivedFromPriceTable:
         """
         assert _EST_ASSUMED_INPUT_TOKENS == 74
         assert _EST_ASSUMED_OUTPUT_TOKENS == 358
-        assert CLOUD_MIN_COST_KRW[CostTier.CLOUD_MID] == pytest.approx(8.61168)
-        assert CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH] == pytest.approx(14.3528)
+        assert CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")] == pytest.approx(8.61168)
+        assert CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")] == pytest.approx(14.3528)
 
     def test_high_gt_mid_invariant(self) -> None:
         """순서 불변식 — CLOUD_HIGH > CLOUD_MID (Opus가 Sonnet보다 비쌈)."""
-        assert CLOUD_MIN_COST_KRW[CostTier.CLOUD_HIGH] > CLOUD_MIN_COST_KRW[CostTier.CLOUD_MID]
+        assert (
+            CLOUD_MIN_COST_KRW[(CostTier.CLOUD_HIGH, "anthropic")]
+            > CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")]
+        )
 
     def test_est_and_actual_share_price_table(self) -> None:
         """est(CLOUD_MIN_COST_KRW)와 actual(actual_cost_*)이 *같은 단가표*를 근거로 삼음(#465).
@@ -925,7 +934,7 @@ class TestEstCostDerivedFromPriceTable:
         )
         for tier in (CostTier.CLOUD_MID, CostTier.CLOUD_HIGH):
             actual = actual_cost_krw(_decision(tier), usage)
-            assert CLOUD_MIN_COST_KRW[tier] == pytest.approx(actual)
+            assert CLOUD_MIN_COST_KRW[(tier, "anthropic")] == pytest.approx(actual)
 
 
 class TestLangfuseActualFields:
@@ -952,3 +961,169 @@ class TestLangfuseActualFields:
         # 추정 키는 그대로(구분 유지 — 실측이 추정을 덮어쓰지 않는다).
         assert f["est_latency_ms"] == d.est_latency_ms
         assert f["est_cost_krw"] == d.est_cost_krw
+
+
+class TestCloudSeatPriceAxis:
+    """단가표 좌석 축(ARCH-62) — 티어만으로 키가 잡히면 좌석 이동이 원가를 거짓으로 만든다.
+
+    종전 표는 `CostTier`만 키였고 `CLOUD_MID = Anthropic Sonnet`이 암묵 가정이었다.
+    MID를 DeepSeek 좌석으로 옮기면 그 가정만 깨지고 표는 그대로라 **24.4배 과대 계상**이
+    되며, 그 값이 `guard_cloud`의 예산 판정 입력이라 결과는 **불필요한 LOCAL 강등**이다.
+    강등된 응답도 200이므로 무증상이다(03c §2.2·§2.3).
+    """
+
+    # 03c §2.2 표의 값 — 가정 토큰 74/358 · 환율 1,540원/USD 기준 1회 호출 비용.
+    _MID_ANTHROPIC_KRW = 8.61168  # claude-sonnet-4-6 $3/$15
+    _MID_OPENROUTER_KRW = 0.353584  # deepseek-v4.1-flash @ deepinfra $0.20/$0.60
+
+    def test_mid_openrouter_seat_is_not_anthropic_price(self) -> None:
+        """⑤ 변별력 — MID를 openrouter 좌석으로 두면 8.612원이 아니라 **0.354원**이다.
+
+        이 한 줄이 이 태스크의 전부다. 종전 코드에서는 좌석을 넘길 자리 자체가 없어
+        두 값이 같았다.
+        """
+        usage = Usage(
+            input_tokens=_EST_ASSUMED_INPUT_TOKENS,
+            output_tokens=_EST_ASSUMED_OUTPUT_TOKENS,
+            latency_ms=None,
+        )
+        d = _decision(CostTier.CLOUD_MID)
+
+        anthropic_krw = actual_cost_krw(d, usage, seat="anthropic")
+        openrouter_krw = actual_cost_krw(d, usage, seat="openrouter")
+
+        assert anthropic_krw == pytest.approx(self._MID_ANTHROPIC_KRW)
+        assert openrouter_krw == pytest.approx(self._MID_OPENROUTER_KRW)
+        # 24.4배 — 좌석 축이 죽으면 이 비가 1.0이 된다.
+        assert anthropic_krw is not None and openrouter_krw is not None
+        assert anthropic_krw / openrouter_krw == pytest.approx(24.36, rel=1e-3)
+
+    def test_default_seat_is_serving_seat_not_selector(self) -> None:
+        """좌석 생략 = 학생 대면 서빙 좌석(anthropic) — 기존 호출부의 뜻이 보존된다.
+
+        `settings.cloud_provider`를 읽지 않는 것이 의도다(그 셀렉터는 저작 경로 전용).
+        읽었다면 저작 좌석 변경이 학생 예산 판정까지 조용히 바꾼다.
+        """
+        assert SERVING_CLOUD_SEAT == "anthropic"
+        usage = Usage(input_tokens=1000, output_tokens=1000, latency_ms=None)
+        d = _decision(CostTier.CLOUD_MID)
+        assert actual_cost_usd(d, usage) == actual_cost_usd(d, usage, seat="anthropic")
+
+    def test_unknown_seat_is_none_not_zero(self) -> None:
+        """③ 좌석 미상 → None(미측정). 0.0이면 '공짜로 돌았다'와 구별되지 않는다."""
+        usage = Usage(input_tokens=1000, output_tokens=1000, latency_ms=None)
+        d = _decision(CostTier.CLOUD_MID)
+        assert actual_cost_usd(d, usage, seat=None) is None
+        assert actual_cost_krw(d, usage, seat=None) is None
+
+    def test_unpriced_combination_is_none_not_zero(self) -> None:
+        """③ 단가 미등재 조합(HIGH×openrouter — 핀 자체가 미확인) → None.
+
+        근거 없는 값을 지어 넣지 않았다는 사실이 조회 결과로 드러나야 한다.
+        """
+        assert (CostTier.CLOUD_HIGH, "openrouter") not in CLOUD_TOKEN_PRICE_USD_PER_1M
+        usage = Usage(input_tokens=1000, output_tokens=1000, latency_ms=None)
+        d = _decision(CostTier.CLOUD_HIGH)
+        assert actual_cost_usd(d, usage, seat="openrouter") is None
+        assert actual_cost_krw(d, usage, seat="openrouter") is None
+
+    def test_local_is_zero_regardless_of_seat(self) -> None:
+        """LOCAL은 좌석과 무관하게 0원 확정 — 미상(None)이 아니다(Phaiakes9은 실제로 0원)."""
+        usage = Usage(input_tokens=999_999, output_tokens=999_999, latency_ms=1.0)
+        d = _decision(CostTier.LOCAL)
+        assert actual_cost_usd(d, usage, seat=None) == 0.0
+        assert actual_cost_krw(d, usage, seat="openrouter") == 0.0
+
+    def test_cloud_token_price_lookup_three_states(self) -> None:
+        """단가 조회의 3상태 — 등재/미등재/좌석 미상. 뒤 둘은 None이고 서로 같게 다뤄도 된다."""
+        assert cloud_token_price(CostTier.CLOUD_MID, "openrouter") == (0.20, 0.60)
+        assert cloud_token_price(CostTier.CLOUD_HIGH, "openrouter") is None
+        assert cloud_token_price(CostTier.CLOUD_MID, None) is None
+
+    def test_every_priced_combination_is_pinned_with_evidence(self) -> None:
+        """단가 근거 드리프트 방어 — 표의 **모든** 등재 조합을 핀으로 고정한다.
+
+        왜 전건인가: 좌석 하나만 테스트가 고정하지 않으면 그 값은 조용히 바뀔 수 있고,
+        단가는 예산 판정 입력이라 바뀐 사실이 응답 200 뒤에 숨는다. 뮤테이션 검증에서
+        `deepseek` 단가만 생존한 것이 이 테스트를 부른 이유다(전건 RED는 커버리지의
+        증거가 아니다 — 픽스처가 없는 절은 주입 목록에도 오르지 않는다).
+
+        값을 바꾸려면 여기 핀과 표 주석의 근거를 **함께** 고쳐야 한다.
+        """
+        expected = {
+            # anthropic — 공개 가격(2026-06-23 확인)
+            (CostTier.CLOUD_MID, "anthropic"): (3.0, 15.0),
+            (CostTier.CLOUD_HIGH, "anthropic"): (5.0, 25.0),
+            # openrouter — deepinfra 고정 공급사 실단가(list price $0.15/$0.60이 아니다)
+            (CostTier.CLOUD_MID, "openrouter"): (0.20, 0.60),
+            # deepseek 공식 API — 피크 단가(보수적 상한). off-peak는 $0.15/$0.60이며,
+            # 예산 판정에서 과소 계상이 한도 초과를 낳으므로 상한을 쓴다.
+            (CostTier.CLOUD_MID, "deepseek"): (0.30, 1.20),
+        }
+        assert CLOUD_TOKEN_PRICE_USD_PER_1M == expected
+
+    def test_deepseek_seat_uses_conservative_peak_bound(self) -> None:
+        """deepseek 좌석만 시간대 이중 단가 — 표는 **비싼 쪽**을 골랐다는 결정을 고정한다.
+
+        off-peak($0.15/$0.60)를 고르면 예산 판정이 과소 계상되고, 그 방향의 오류는
+        한도 초과라 되돌리기 어렵다(과대 계상이 낳는 불필요한 강등보다 나쁘다).
+        """
+        off_peak, peak = (0.15, 0.60), (0.30, 1.20)
+        actual = CLOUD_TOKEN_PRICE_USD_PER_1M[(CostTier.CLOUD_MID, "deepseek")]
+        assert actual == peak
+        assert actual != off_peak
+
+    def test_seat_literal_is_config_single_source(self) -> None:
+        """① 좌석 어휘는 `config.CloudSeat` 하나 — 표의 좌석이 그 리터럴을 벗어나지 않는다.
+
+        새 enum을 세우면 좌석 어휘가 둘이 되고, 그것이 ARCH-58이 상환한 사고다.
+        """
+        from typing import get_args
+
+        from whymath_backend.config import CloudSeat, Settings
+
+        allowed = set(get_args(CloudSeat))
+        assert allowed == {"anthropic", "openrouter", "deepseek"}
+        # 셀렉터 필드가 같은 별칭을 쓴다(사본이 아니라 같은 타입).
+        assert Settings.model_fields["cloud_provider"].annotation is CloudSeat
+        table_seats = {seat for _, seat in CLOUD_TOKEN_PRICE_USD_PER_1M}
+        assert table_seats <= allowed
+
+
+class TestGuardCloudSeatAxis:
+    """④ 예산 판정이 좌석별 값을 쓴다 — 싼 좌석에서 비싼 좌석 임계로 강등하지 않는다."""
+
+    def test_budget_between_seats_demotes_only_for_expensive_seat(self) -> None:
+        """anthropic 임계 미만이지만 openrouter로는 충분한 예산 → 좌석에 따라 판정이 갈린다.
+
+        종전에는 이 예산이 좌석과 무관하게 LOCAL 강등이었다(1,414회 가능한데 58회로 계산).
+        """
+        mid_anthropic = CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")]
+        mid_openrouter = CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "openrouter")]
+        assert mid_openrouter < mid_anthropic  # 전제: 좌석 단가가 실제로 다르다
+
+        # 두 임계 사이의 예산 — 싼 좌석에서는 호출 가능, 비싼 좌석에서는 불가.
+        budget = (mid_anthropic + mid_openrouter) / 2
+        req = _req(student_subscription="premium", budget_krw=budget)
+
+        assert guard_cloud(req, CostTier.CLOUD_MID, "anthropic") == CostTier.LOCAL
+        assert guard_cloud(req, CostTier.CLOUD_MID, "openrouter") == CostTier.CLOUD_MID
+
+    def test_default_seat_preserves_legacy_judgment(self) -> None:
+        """좌석 생략 시 판정은 종전과 동일(서빙 좌석 anthropic) — 학생 트래픽 무변경."""
+        budget = CLOUD_MIN_COST_KRW[(CostTier.CLOUD_MID, "anthropic")] - 1.0
+        req = _req(student_subscription="premium", budget_krw=budget)
+        assert guard_cloud(req, CostTier.CLOUD_MID) == CostTier.LOCAL
+        assert guard_cloud(req, CostTier.CLOUD_MID) == guard_cloud(
+            req, CostTier.CLOUD_MID, SERVING_CLOUD_SEAT
+        )
+
+    def test_unpriced_seat_raises_rather_than_folding_to_default(self) -> None:
+        """단가 미등재 조합의 예산 판정은 **raise** — 기본 좌석 단가로 조용히 접지 않는다.
+
+        `cloud_model_pins`와 같은 규율이다. 접으면 "새 좌석을 골랐는데 옛 좌석 단가로
+        예산을 판정하는" 침묵 실패가 되고, 그것이 이 태스크가 상환하는 사고다.
+        """
+        req = _req(student_subscription="premium", budget_krw=1000.0)
+        with pytest.raises(ValueError, match="단가 미등재 조합"):
+            guard_cloud(req, CostTier.CLOUD_HIGH, "openrouter")
