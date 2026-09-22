@@ -184,3 +184,161 @@ def test_runbook_forces_utf8_stdout() -> None:
     assert (
         "IO_ENCODING" in fenced
     ), "설정만 있고 자가검증 출력이 없다 — 설정이 먹었는지 사람이 확인할 수 없다"
+
+
+# ---------------------------------------------------------------------------
+# MP-10 — 검수 런북의 **완주 판정 분모**가 코드 현실과 맞는지 (양방향 대조)
+#
+# 막는 것: 도달 불가능한 정지 조건. 초판 검수 런북은 완주를 「판정 건수 == `emitted`」로
+# 적었으나, `emitted`는 큐 *파일 행 수*이고 검수 도구는 같은 slug를 한 번만 보여 준다. 회차
+# 안에 중복이 있으면(LLM 저작의 지배적 실패 모드 — 2026-09-21 회차 30 중 20) 그 등식은 성립할
+# 수 없어, **완주한 검수가 영원히 미완주로 보이고** 런북이 지시하는 `--resume`은 아무것도 하지
+# 않는다. 게이트는 증적을 다 갖춘 채 닫히지 않는다.
+#
+# 왜 "금지 문자열 열거"가 아니라 양방향 대조인가: 「`emitted`를 쓰지 마라」 형태는 표기 변형에서
+# 뚫리고, 무엇보다 **어느 쪽이 정본인지 모른다**. 그래서 분모를 코드에서 *계산*한다 — 검수
+# 도구가 dedupe하면 고유 건수가 정본이고, dedupe를 없애면 `emitted`가 정본이 된다. 양쪽 중
+# 무엇이 바뀌어도 런북과 갈리는 순간 RED다.
+# ---------------------------------------------------------------------------
+
+_REVIEW_RUNBOOK = _REPO_ROOT / "docs" / "reviews" / "mp02_canary_review_runbook.md"
+_REVIEW_SESSION = _HARNESS / "review_session.py"
+_CANARY_SLICE = _HARNESS / "canary_slice.py"
+
+# 완주를 *결정하는* 문장만 고른다. 과제 명칭("카나리 30건 100% 검수")과 결함 설명 인용도
+# 같은 낱말을 쓰므로, 판정 키워드만으로 고르면 변별력이 없다 — 등식 어구를 함께 요구한다.
+_VERDICT_KEYWORDS = ("완주", "100% 검수", "성공입니다")
+_EQUALITY_PHRASES = ("같으면", "같은 상태로")
+
+
+def _review_session_dedupes_by_slug() -> bool:
+    """검수 도구가 큐 적재에서 **같은 slug를 건너뛰는지** AST로 판정.
+
+    이 사실 하나가 분모를 결정한다 — 건너뛰면 판정 건수는 고유 slug 수이고, 안 건너뛰면 큐
+    행 수다. import가 아니라 AST인 이유는 이 파일 머리 docstring과 같다(`infra-contracts`
+    잡은 백엔드를 설치하지 않는다).
+    """
+    tree = ast.parse(_REVIEW_SESSION.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        if not (
+            isinstance(test, ast.Compare) and len(test.ops) == 1 and isinstance(test.ops[0], ast.In)
+        ):
+            continue
+        literals = [
+            sub.value
+            for sub in ast.walk(node)
+            if isinstance(sub, ast.Constant) and isinstance(sub.value, str)
+        ]
+        skips = any(isinstance(sub, ast.Continue) for sub in ast.walk(node))
+        if skips and any("DuplicateSlug" in text for text in literals):
+            return True
+    return False
+
+
+def _canary_slice_summary_keys() -> set[str]:
+    """`canary_slice`가 요약 JSON에 싣는 키 집합 — 런북이 인용할 수 있는 필드의 전부.
+
+    요약 dict는 `emitted`와 `canary_size`를 **함께** 가진 유일한 리터럴 dict로 식별한다
+    (`load_errors` 같은 중첩 dict와 구별된다).
+    """
+    tree = ast.parse(_CANARY_SLICE.read_text(encoding="utf-8"))
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        names = {
+            key.value
+            for key in node.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        }
+        if {"emitted", "canary_size"} <= names:
+            keys |= names
+    return keys
+
+
+def _verdict_paragraphs() -> list[str]:
+    text = _REVIEW_RUNBOOK.read_text(encoding="utf-8")
+    return [
+        para
+        for para in re.split(r"\n\s*\n", text)
+        if any(word in para for word in _VERDICT_KEYWORDS)
+        and any(phrase in para for phrase in _EQUALITY_PHRASES)
+    ]
+
+
+def test_review_session_dedupe_fact_is_detectable() -> None:
+    """탐지기가 살아 있는지 — 이것이 무너지면 아래 대조가 **공허하게 통과**한다."""
+    assert _review_session_dedupes_by_slug() is True, (
+        "검수 도구의 slug dedupe 절을 AST에서 찾지 못했다. 정말로 dedupe를 없앤 것이라면 "
+        "검수 런북의 완주 분모는 `emitted`로 되돌려야 한다 — 탐지기가 표류한 것이라면 이 "
+        "함수를 고쳐야 한다. 어느 쪽이든 런북을 그대로 두면 안 된다."
+    )
+
+
+def test_canary_slice_publishes_the_distinct_denominator() -> None:
+    keys = _canary_slice_summary_keys()
+    assert (
+        "emitted" in keys
+    ), "요약 dict를 식별하지 못했다(스캔 0건은 실패) — `canary_slice`의 요약 조립이 바뀌었다"
+    assert "emitted_distinct_slugs" in keys, (
+        "요약에 `emitted_distinct_slugs`가 없다 — 런북이 완주 분모로 그 필드를 인용하는데 "
+        "도구가 내지 않으면 Kiki가 빈 값을 보고 판정하게 된다"
+    )
+
+
+def test_review_runbook_completion_uses_the_denominator_the_code_produces() -> None:
+    """런북의 완주 판정이 **코드가 실제로 만드는 분모**를 인용해야 한다.
+
+    **백틱 정확 일치로 본다** — `emitted`는 `emitted_distinct_slugs`의 부분 문자열이라,
+    단순 `in` 검사는 dedupe를 없애는 방향(기대 분모가 `emitted`로 바뀌는 방향)에서 조용히
+    통과한다. 그러면 양방향 대조라는 주장 자체가 반쪽이 된다(뮤테이션 M4가 살아남는다).
+    """
+    expected = "emitted_distinct_slugs" if _review_session_dedupes_by_slug() else "emitted"
+    assert expected in _canary_slice_summary_keys()
+    token = f"`{expected}`"
+    paragraphs = _verdict_paragraphs()
+    assert len(paragraphs) >= 3, (
+        f"완주 판정 문단을 {len(paragraphs)}건만 찾았다(§0 ④·§4·§5 최소 3곳) — 절이 사라졌거나 "
+        "표현이 바뀌었다. 전수 가드가 공허하게 통과하지 않도록 여기서 멈춘다"
+    )
+    for para in paragraphs:
+        head = para.strip().splitlines()[0][:70]
+        assert token in para, (
+            f"완주 판정 문단이 분모 {token}를 인용하지 않는다 — 「{head}」. "
+            "중복 slug가 있으면 `emitted`와의 등식은 성립할 수 없고, 완주한 검수가 미완주로 "
+            "보여 `--resume`이 무한 공전한다(MP-10)"
+        )
+
+
+def test_review_runbook_prints_the_denominator_for_the_operator() -> None:
+    """실행 블록이 분모를 **출력**해야 한다 — 판정 기준을 눈으로 볼 수 없으면 무용하다."""
+    blocks = _fenced_blocks(_REVIEW_RUNBOOK.read_text(encoding="utf-8"))
+    assert blocks, "검수 런북에 실행 블록이 0건이다(스캔 0건은 실패)"
+    printing = [block for block in blocks if "emitted_distinct_slugs" in block]
+    assert len(printing) >= 2, (
+        f"분모를 출력하는 실행 블록이 {len(printing)}건이다(§3·§4 최소 2곳) — 런북이 "
+        "`emitted_distinct_slugs`로 판정하라고 적으면서 그 값을 화면에 내주지 않으면 Kiki가 "
+        "요약 JSON을 손으로 뒤져야 한다"
+    )
+
+
+@pytest.mark.parametrize(
+    "para",
+    [
+        "**판정**: `승인 + 수정승인 + 반려`의 합이 §2의 `emitted`와 같으면 완주입니다.",
+        "**판정**: `VERDICT_LINES`가 §2의 `emitted`와 같으면 100% 검수입니다.",
+        "§4가 `승인 + 수정승인 + 반려 = 30`과 같은 상태로 끝나면 성공입니다.",
+    ],
+)
+def test_detector_flags_the_original_unreachable_criterion(para: str) -> None:
+    """초판 문면(분모 = 큐 행 수)을 이 검사가 **실제로 고르고 떨어뜨리는지**.
+
+    세 픽스처는 각각 §4·§5·§0 ④의 초판 형태다. 셋째는 `emitted`라는 낱말조차 없이 숫자 30을
+    직접 박은 형태 — 금지 문자열 열거로는 잡히지 않고 *분모 필드 부재*로만 잡힌다.
+    """
+    assert any(word in para for word in _VERDICT_KEYWORDS), "판정 문단으로 선택되지 않는다"
+    assert any(phrase in para for phrase in _EQUALITY_PHRASES), "등식 어구가 없어 선택 밖이다"
+    assert "emitted_distinct_slugs" not in para, "이 픽스처는 초판 형태여야 한다(RED 대상)"
