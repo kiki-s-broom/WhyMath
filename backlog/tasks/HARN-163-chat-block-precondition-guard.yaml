@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-162-chat-block-precondition-guard
+id: HARN-163-chat-block-precondition-guard
 title: "채팅 실행 블록의 선행 판정 자가거부 가드 — 저장소 런북(HARN-106)·펜스 태그(HARN-114) 사이의 사각 (동일 사고 2회차)"
 track: infra-debt
 stage: S3
@@ -23,5 +23,5 @@ paths:
   - "scripts/ops/**"
   - "tests/infra/**"
 session: null
-notes: "사고 경위(2026-09-23, 동일 유형 2회차): G-kg02 게이트 실행을 위해 세션이 채팅으로 건넨 PowerShell 블록이 git checkout main과 git pull origin main으로 시작했는데 **둘 다 미커밋 변경 때문에 실패**했고, 블록이 멈추지 않아 뒤따르는 dry-run과 실제 LLM 회차가 전부 엉뚱한 트리에서 돌았다. 트리는 로컬 전용 브랜치 claude/adoring-mccarthy-sle0uj HEAD 0367fce4였고 그 브랜치는 origin에 없어 실행 코드와 main의 동일성을 세션이 확인할 방법이 없었다. 회차 결과는 게이트 증적으로 쓸 수 없게 됐다(리허설로 강등).\n\n1회차는 2026-09-15 G-skb03이며 **같은 브랜치·같은 커밋**이다. 그때 대책으로 HARN-106이 착지해 done인데, 그 스캐너가 저장소 런북 파일만 본다. 이번 블록은 저장소 파일이 아니라 채팅 메시지였으므로 스캐너에 닿지 않았다.\n\n피해: LLM 회차 1건 낭비(52+2건 평가), Kiki 왕복 1회. 파괴적 쓰기는 없었다 — 배치 CLI가 코퍼스를 건드리지 않고 JSONL 리포트만 쓰는 읽기 전용 도구였던 것이 이유이며, 설계가 아니라 대상 도구의 성질 덕이다.\n\n부수 관찰: 세션이 실행 코드와 main을 비교하려 쓴 스크립트도 변별력이 없었다 — git rev-parse가 실패 시 입력 문자열을 그대로 되돌려주는데 빈 문자열 검사만 해서 전건 '다름'으로 찍혔다. 세션이 재확인해 무효 판정했으나, 검증 스크립트 자신의 변별력을 확인하는 습관이 없으면 그 거짓 결과가 보고될 뻔했다."
+notes: "사고 경위(2026-09-23, 동일 유형 2회차): G-kg02 게이트 실행을 위해 세션이 채팅으로 건넨 PowerShell 블록이 git checkout main과 git pull origin main으로 시작했는데 **둘 다 미커밋 변경 때문에 실패**했고, 블록이 멈추지 않아 뒤따르는 dry-run과 실제 LLM 회차가 전부 엉뚱한 트리에서 돌았다. 트리는 로컬 전용 브랜치 claude/adoring-mccarthy-sle0uj HEAD 0367fce4였고 그 브랜치는 origin에 없어 실행 코드와 main의 동일성을 세션이 확인할 방법이 없었다. 회차 결과는 게이트 증적으로 쓸 수 없게 됐다(리허설로 강등).\n\n1회차는 2026-09-15 G-skb03이며 **같은 브랜치·같은 커밋**이다. 그때 대책으로 HARN-106이 착지해 done인데, 그 스캐너가 저장소 런북 파일만 본다. 이번 블록은 저장소 파일이 아니라 채팅 메시지였으므로 스캐너에 닿지 않았다.\n\n피해: LLM 회차 1건 낭비(52+2건 평가), Kiki 왕복 1회. 파괴적 쓰기는 없었다 — 배치 CLI가 코퍼스를 건드리지 않고 JSONL 리포트만 쓰는 읽기 전용 도구였던 것이 이유이며, 설계가 아니라 대상 도구의 성질 덕이다.\n\n부수 관찰: 세션이 실행 코드와 main을 비교하려 쓴 스크립트도 변별력이 없었다 — git rev-parse가 실패 시 입력 문자열을 그대로 되돌려주는데 빈 문자열 검사만 해서 전건 '다름'으로 찍혔다. 세션이 재확인해 무효 판정했으나, 검증 스크립트 자신의 변별력을 확인하는 습관이 없으면 그 거짓 결과가 보고될 뻔했다.\n\n[개명 2026-09-22] HARN-162-chat-block-precondition-guard → HARN-163-chat-block-precondition-guard: 번호 충돌 해소 (HARN-100). main에 HARN-162-ci-mirror-shell-mismatch 가 착지해 번호가 겹쳤다 — 등재 당시에는 그 태스크가 원격 어디에도 없어 add 가드가 충돌을 볼 수 없었다. 미머지인 이쪽을 개명한다. 내용 변경 없음."
 updated: 2026-09-22
