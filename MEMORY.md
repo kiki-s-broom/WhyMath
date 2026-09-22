@@ -338,6 +338,18 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-22 (결정·착지 · ADMIN-06): **백오피스 웹 셸 — 단일 앱을 `pageExtensions`로 두 타깃으로 가르고, 내비는 레지스트리에서만 파생시킨다** (claude 구현·판정) — 판정 기준 main `42ee1059`(ADMIN-05 착지분)
+
+- **결정 1 — 공개/백오피스 분리 방식 = 타깃별 `pageExtensions`**. web_strategy §2가 "단일 앱 권고 + 공개 산출물에 admin 번들 0"을 요건으로만 남기고 방식은 ADMIN-06에 위임했었다. Next가 라우트 파일(`page`·`layout`·`robots`·`sitemap` …)을 *파일명 확장자*로 식별한다는 성질을 그대로 써서, admin 라우트 파일에만 `.admin.tsx` 접미를 주고 `WHYMATH_WEB_TARGET`으로 목록을 바꾼다(공개 `["tsx","ts"]` / admin `["admin.tsx","admin.ts"]`). 실측(Next 15.5.25): 공개 빌드 라우트 `/`·`/robots.txt`·`/sitemap.xml`(`/admin` 0건) · admin 빌드 라우트 `/admin`(`/` 0건) — **양방향으로 갈린다**. 미설정은 공개 빌드로 수렴한다(실수의 방향이 안전한 쪽).
+- **누출 경로가 둘이고 검사가 서로 다르다 (주입 실측)**: ⓐ 접미 제거 → 공개 `out/admin/` 생성 + 번들 표식 2건(경로·표식 양쪽이 잡는다) ⓑ 공개 **클라이언트** 소스가 `app/admin/`을 import → `out/admin/`은 끝까지 안 생기고 **표식 검사만** 1건으로 잡는다. **두 경우 모두 `next build`는 exit 0**이었다 — 빌드 성공은 판정자가 아니다. 그래서 CI `webapp` 잡이 *산출물*을 검사하고, admin 빌드 쪽에서 **표식 1건 이상**을 요구해 그 검사의 변별력 대조군을 둔다(표식이 사라지면 공개 빌드의 "0건"은 '누출 없음'이 아니라 '검사 무효'가 된다). ⓑ의 *소스* 축은 랜딩 거버넌스 계약 ④(역방향 import)가 본다.
+- **결정 2 — 내비가 눌리는 조건 = `status === "live"`**. 프런트가 '구현된 라우트 목록'을 따로 들면 그것이 두 번째 하드코딩 nav가 되어 레지스트리와 드리프트한다. "화면이 있는가"의 판정도 레지스트리에 맡겼다. **현재 `live` 0건**이라 눌리는 항목이 없다 — 링크가 깨진 게 아니라 화면이 아직 없다는 사실의 정직한 표시이며(ADMIN-04가 `LIVE=0`을 정상으로 적어 둔 그대로), ADMIN-07이 검수 큐 화면을 올리며 엔트리를 `live`로 바꾸면 **프런트를 고치지 않고** 링크가 살아난다. `live`인데 화면이 없는 드리프트는 거버넌스 테스트가 잡고, 그 검사가 지금 공허하므로(`live` 0건) **가짜 `live` 주입 테스트**로 공허함을 메웠다 — 전건 통과를 커버리지로 읽지 않는다.
+- **결정 3 — 셸은 OAuth를 재구현하지 않는다**. 실 신원 경로(`/v1/auth/{provider}/state`→`/callback`)가 이미 있는데 정적 export SPA 안에 왕복을 다시 만들면 **인증 경로가 둘**이 된다. 운영자가 발급받은 액세스 토큰을 붙여 넣고 셸은 **탭 수명 저장소**에만 둔다(탭을 넘어 남는 저장소·쿠키·URL 파라미터 0건을 정적 검사로 동결). 전용 로그인 화면이 필요해지면 별도 태스크로 연다.
+- **집행 추가 — 메뉴 엔드포인트의 데모 차단**: `/v1/admin/menu`는 모듈 가드에서 면제돼 있는데(04 §2 원칙7 — 권한 없으면 403이 아니라 빈 메뉴), 그 면제 범위는 ***역할* 축뿐**이고 04 §4의 실 신원 요구는 면제 대상이 아니다. 셸이 앱 로드 시 가장 먼저 부르는 곳이라 여기가 열려 있으면 데모 토큰으로 콘솔 골격과 모듈 목록이 그려진다 — `is_demo_account` 403을 직접 걸고 **같은 `CONTENT_ADMIN` 역할의 비데모 계정 200을 대조군**으로 뒀다(대조군 없으면 "전부 403" 오구현이 통과한다). 뮤테이션 RED 확인.
+- **CORS는 SEC-26이 이미 놓았고 ADMIN-06은 *집행 지점*을 얹었다**: 미들웨어·deny-by-default·와일드카드+credentials 부팅 거부는 2026-09-11에 착지해 있었다(web_strategy §4의 "CORSMiddleware 0건" 전제는 그때 이미 낡았고 이번에 정정). 새로 동결한 것은 셸이 실제로 보내는 요청 — `/v1/admin/menu`에 `Access-Control-Request-Headers: authorization`을 단 프리플라이트가 origin에 따라 갈리는가다. **allow-origin만으로는 부족하고 allow-headers까지 맞아야 열린다**.
+- **검증**: 웹앱 lint·typecheck·두 타깃 빌드 + 산출물 검사(CI 스텝 그대로 재현) 전건 EXIT=0 · 거버넌스 뮤테이션 **8종 전건 RED**(주입 적용·원복 바이트 동일 각각 단언) · `tests/infra` 1737 passed · backend ruff·black·`mypy --strict`(707 files)·`lint-imports`(4 contracts kept) 전건 통과.
+- **정직한 공백**: ⑴ **실 브라우저에서의 menu 호출은 사람 확인이 남았다** — 서버 축(프리플라이트가 origin에 따라 갈린다)은 테스트로 동결했지만 실제 브라우저·실제 내부망 origin 조합은 Kiki 실행 사안이다(게이트 `G-admin06-browser-menu-call`). ⑵ 셸이 그리는 화면은 내비와 상태뿐이다 — 모듈 화면은 ADMIN-07부터. ⑶ 내부망 배포(리버스 프록시·호스트) 배선은 web_strategy §6이 의도적으로 미등재로 남긴 Phase B 항목이다.
+- **정본**: `src/web/webapp/README.md`(운영 메모) · `docs/architecture/web_strategy.md` §2·§4 · `docs/design/ui/04_admin_console_architecture.md` §2 원칙7·§4·§5.
+
 ### 2026-09-21 (판정 · EOS-02 / G-eos02-prompt-cache-live-run): **프롬프트 캐시 라이브 1회차 — 적중률 89.9%로 작동 확인, 그러나 전역 기본값은 켜지 않는다(측정한 경로가 전체를 대표하지 않는다)** (Kiki 실행, claude 판정) — 판정 기준 main `aa7df278`
 
 - **회차 사실**: Kiki가 Phaiakes9에서 worktree 격리 실행(`HEAD_MATCHES_REMOTE=True`로 자가검증 · 회차 `a7420b217c7b4cb79532fbab18469030`). `state=enabled_working` · `hit_rate=0.8988861386138614` · `calls_with_cache_telemetry=10/10` · `generation_failed=0` · `EXIT=0` · `claude-sonnet-4-6` 10/10.

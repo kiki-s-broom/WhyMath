@@ -13,9 +13,15 @@
 ① 스캔 대상이 실재한다 — 경로가 바뀌면 "위반 0 통과"가 아니라 **실패**(스캔 0건은 실패)
 ② 수학 판정·채점 심볼 0건 (ARCH-10 — 정오 판정의 단일 권위는 백엔드 L3/SymPy)
 ③ 네트워크 호출 0건 (web_strategy §3.2 — v1 랜딩은 백엔드 호출 0·외부 폼 *링크*만)
-④ `app/admin/` 부재 (web_strategy §2 배포 요건 — 공개 산출물에 admin 코드 0)
+④ 공개 소스가 `app/admin/`을 import하지 않는다 (web_strategy §2 배포 요건)
 ⑤ 효과 단정 카피 0건 (§3.4 카피 가드) — **보조 탐지기다**. 문자열 열거는 표현을 바꾸면
    빠져나가므로 최종 판정은 변호사 검토 게이트가 한다(법령 유래 절차의 기계 대체 금지).
+
+**스캔 범위(ADMIN-06에서 갈렸다)**: ②는 웹앱 *전체*를 본다(표현≠의미는 백오피스도 예외가
+아니다 — 04 §2 원칙1). ③④⑤는 **공개 빌드에 실릴 수 있는 소스만** 본다 — 백오피스 셸은
+설계상 BFF를 호출하므로(04 §3) 같은 잣대를 대면 ③이 영구 red가 되고, 그러면 사람이 가드를
+끄게 된다. 공개/admin의 경계는 파일명 규약이며(`app/admin/**`·`*.admin.tsx`) 그 규약 자체와
+빌드 타깃 분리는 `test_webapp_admin_shell_governance.py`가 따로 동결한다.
 ⑥ 정적 export 선언이 살아 있다 (`output: "export"` — 정적 호스팅 전제 자체)
 ⑦ 빌드 산출물·의존성이 커밋 대상에서 제외돼 있다
 ⑦-b 스택 표 정합(Next 15 핀) + postcss 취약점 override 존치 — 둘 다 *의도*라 조용히
@@ -116,6 +122,24 @@ def _repo_sources() -> dict[str, str]:
     return {str(p.relative_to(_WEBAPP)): p.read_text(encoding="utf-8") for p in _source_files()}
 
 
+def is_admin_only(rel: str) -> bool:
+    """`rel`이 **admin 타깃 전용** 소스인가 — 공개 빌드에 실릴 수 없는 파일인가.
+
+    판정 근거는 두 가지 파일명 규약뿐이고, 그 규약이 지켜진다는 것 자체는 여기서 검사하지
+    않는다(`test_webapp_admin_shell_governance.py` 소관). 그래서 이 함수는 *경계의 선언*이지
+    *경계의 증명*이 아니다 — 증명은 빌드 산출물 검사(CI)와 저쪽 파일이 나눠 진다.
+    """
+    parts = rel.replace("\\", "/").split("/")
+    if "admin" in parts[:-1] and parts[0] == "app":
+        return True
+    return ".admin." in parts[-1]
+
+
+def _public_sources() -> dict[str, str]:
+    """공개 빌드에 실릴 수 있는 소스만. 0건이면 `_scan`이 위반으로 보고한다."""
+    return {rel: text for rel, text in _repo_sources().items() if not is_admin_only(rel)}
+
+
 # ── 계약 ① 스캔 실재 ────────────────────────────────────────────────────
 
 
@@ -137,28 +161,78 @@ def test_no_math_judgement_symbols() -> None:
 
 
 def test_no_network_calls() -> None:
-    """계약 ③ — v1 랜딩은 백엔드를 호출하지 않는다(외부 폼 *링크*만·CORS 불요)."""
-    assert _scan(_repo_sources(), _NETWORK_PATTERNS) == []
+    """계약 ③ — v1 랜딩은 백엔드를 호출하지 않는다(외부 폼 *링크*만).
+
+    범위는 공개 소스다. 백오피스 셸의 BFF 호출은 설계 그 자체이므로(04 §3) 여기서 세면
+    이 가드는 영구 red가 되고, 영구 red인 가드는 꺼진다.
+    """
+    assert _scan(_public_sources(), _NETWORK_PATTERNS) == []
 
 
 def test_no_effect_claim_copy() -> None:
-    """계약 ⑤ — 효과·최상급 단정 카피 차단(보조 탐지기·최종 판정은 변호사 게이트)."""
-    assert _scan(_repo_sources(), _COPY_PATTERNS) == []
+    """계약 ⑤ — 효과·최상급 단정 카피 차단(보조 탐지기·최종 판정은 변호사 게이트).
+
+    범위는 공개 소스다 — 이 축이 규율하는 것은 *광고 표현*이고, 내부망 운영 화면은 그
+    수범 대상이 아니다.
+    """
+    assert _scan(_public_sources(), _COPY_PATTERNS) == []
 
 
 # ── 계약 ④ admin 분리 ───────────────────────────────────────────────────
 
 
-def test_public_build_has_no_admin_routes() -> None:
-    """계약 ④ — 공개 산출물에 백오피스 코드 0(web_strategy §2 배포 요건).
+#: 공개 소스가 백오피스 트리로 들어가는 import. 상대·별칭 두 형태를 모두 본다.
+_ADMIN_IMPORT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("상대 경로 admin import", re.compile(r"""from\s+["'][./]*(?:\.\./)*admin/""")),
+    ("별칭 경로 admin import", re.compile(r"""from\s+["']@/app/admin/""")),
+)
 
-    ADMIN-06이 `app/admin/`을 들여오는 순간 이 테스트가 red가 되고, 그때 *공개 빌드에서
-    admin을 어떻게 뺄 것인가*를 강제로 설계하게 된다 — 그것이 이 테스트의 목적이다.
+
+def test_public_sources_do_not_import_admin() -> None:
+    """계약 ④ — 공개 소스가 `app/admin/`을 끌어다 쓰지 않는다 (web_strategy §2).
+
+    **왜 '부재'가 아니라 '역방향 import'인가 (ADMIN-06에서 교체된 축)**: 원래 이 계약은
+    `app/admin/` 디렉터리 자체의 부재였고, "ADMIN-06이 들여오는 순간 red가 되어 공개 빌드
+    분리를 강제로 설계하게 한다"가 목적이었다. 그 설계가 실제로 착지했으므로(빌드 타깃
+    분리 — `next.config.ts`의 `pageExtensions`) 계약은 *디렉터리 부재*에서 *누출 부재*로
+    옮겨간다. 파일명 규약상 `app/admin/**`는 공개 빌드에서 라우트가 되지 않지만, 공개
+    **클라이언트** 소스가 그 트리를 import하면 라우트 없이 번들에만 실린다 — 2026-09-22
+    주입 실측: `app/(public)/page.tsx`가 `AdminShell`을 import하자 `out/admin/` 은
+    끝까지 생기지 않은 채 번들 표식만 1건 나왔다. 즉 **경로 검사로는 안 보이는 누출**이고,
+    이 정적 검사와 CI의 번들 표식 검사가 그 자리를 나눠 맡는다.
     """
-    assert not (_WEBAPP / "app" / "admin").exists(), (
-        "app/admin/이 생겼다 — 공개 빌드 분리 방식(빌드 타깃·라우트 제외)을 설계하고 "
-        "이 계약을 '공개 산출물에 admin 번들 0' 검사로 교체하라 (web_strategy §2)"
-    )
+    assert _scan(_public_sources(), _ADMIN_IMPORT_PATTERNS) == []
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        'import { AdminShell } from "../admin/_components/AdminShell";',
+        'import { ADMIN_BUNDLE_MARKER } from "./admin/_lib/marker";',
+        'import x from "@/app/admin/_lib/adminApi";',
+    ],
+)
+def test_admin_import_judge_detects_injected_violation(fixture: str) -> None:
+    """계약 ⑧(④ 축) — 주입한 역방향 import가 검출된다."""
+    assert _scan({"app/(public)/page.tsx": fixture}, _ADMIN_IMPORT_PATTERNS), fixture
+
+
+def test_admin_import_judge_passes_on_sibling_paths() -> None:
+    """계약 ⑧ 양성 대조 — admin이 아닌 상대 import는 통과한다(무차별 실패가 아니다)."""
+    clean = {"app/(public)/page.tsx": 'import { Hero } from "./_components/Hero";'}
+    assert _scan(clean, _ADMIN_IMPORT_PATTERNS) == []
+
+
+def test_admin_sources_are_excluded_from_public_scope() -> None:
+    """공개/admin 경계 판정이 실제로 갈린다 — 이 함수가 상수 True/False면 위 스코프가 위장이다."""
+    assert is_admin_only("app/admin/_lib/adminApi.ts")
+    assert is_admin_only("app/layout.admin.tsx")
+    assert not is_admin_only("app/layout.tsx")
+    assert not is_admin_only("app/(public)/page.tsx")
+    public = _public_sources()
+    assert public, "공개 소스가 0건 — 경계 판정이 전부를 잘라냈다"
+    assert not any(is_admin_only(rel) for rel in public)
+    assert len(public) < len(_repo_sources()), "admin 소스가 하나도 안 걸러졌다 — 경계가 무효다"
 
 
 # ── 계약 ⑥⑦ 설정 동결 ──────────────────────────────────────────────────

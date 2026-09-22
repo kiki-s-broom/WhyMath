@@ -979,7 +979,10 @@ jobs:
         run: npm run build
 
   # ─────────────────────────────────────────────────────────────────
-  # L5 별도 웹 (webapp — 공개 랜딩·Next.js 15 App Router 단일 앱)
+  # L5 별도 웹 (webapp — 공개 랜딩 + 운영 백오피스·Next.js 15 App Router **단일 앱 2 타깃**)
+  #
+  # 잡 이름(name:)은 브랜치 보호의 required check 식별자이므로 범위가 넓어져도 바꾸지
+  # 않는다 — 이름을 바꾸면 그 체크가 영원히 충족되지 않는다(HARN-82 축).
   #
   # 위 `web` 잡(graphing-calculator)과 **다른 앱**이다: 툴체인(Next vs Vite)·lockfile·
   # 산출물(out/ vs dist/)이 전부 분리돼 있어 한 잡에 얹으면 working-directory만 다른
@@ -987,14 +990,19 @@ jobs:
   #
   # 무엇을 검증하는가:
   #   ① eslint (next/core-web-vitals + next/typescript) — 접근성·Next 규칙 포함
-  #   ② next build = **정적 export**(out/) + 타입 검사. 빌드가 서버 런타임을 요구하게
-  #      되는 회귀(output: "export" 유실 등)가 여기서 red가 된다.
-  #   ③ 산출물 실재 확인 — 빌드 성공만 보면 export 단계가 조용히 비어도 통과한다.
-  #      out/index.html·robots.txt·sitemap.xml 3건의 존재를 exit code로 판정한다.
+  #   ② tsc --noEmit — **두 타깃 소스 전체**. next build는 그 타깃의 빌드 그래프만 타입
+  #      검사하므로 이 스텝이 없으면 admin 소스가 CI에서 한 줄도 검사되지 않는다.
+  #   ③ 두 타깃 빌드 = 정적 export(out/). 빌드가 서버 런타임을 요구하게 되는 회귀
+  #      (output: "export" 유실 등)가 여기서 red가 된다.
+  #   ④ **산출물** 검사 — 빌드 성공만 보면 export가 조용히 비어도, admin이 공개 산출물에
+  #      섞여도 통과한다(주입 실측 2회 모두 next build는 exit 0이었다). 공개 3건 실재 +
+  #      admin 경로·표식 0건, admin 셸 실재 + 표식 생존 + 랜딩 미포함을 exit code로 판정.
   #
-  # 경계 검사(무-수학로직·백엔드 호출 0·admin 분리·카피 가드)는 여기가 아니라
-  # tests/infra/test_webapp_landing_governance.py가 한다 — 이 잡은 paths 필터로 skip될 수
-  # 있고 skip은 red도 green도 아니므로, 경계는 **항상 실행되는** infra-contracts에 둔다.
+  # 경계 검사(무-수학로직·백엔드 호출 0·하드코딩 nav 0·BFF 경유·토큰 취급)는 여기가 아니라
+  # tests/infra/test_webapp_landing_governance.py·test_webapp_admin_shell_governance.py가
+  # 한다 — 이 잡은 paths 필터로 skip될 수 있고 skip은 red도 green도 아니므로, 경계는
+  # **항상 실행되는** infra-contracts에 둔다. 반대로 *산출물*은 빌드를 돌려야 보이므로
+  # 여기에만 있다 — 두 축은 대체 관계가 아니라 분업이다.
   # ─────────────────────────────────────────────────────────────────
   webapp:
     name: webapp — 공개 랜딩 lint·build
@@ -1023,16 +1031,61 @@ jobs:
       - name: ESLint
         run: npm run lint
 
-      - name: Next build (정적 export + 타입 검사)
+      # `next build`는 **그 타깃의 빌드 그래프에 있는 파일만** 타입 검사한다 — 공개 빌드는
+      # `app/admin/**`를 라우트로 안 잡으므로 admin 소스가 한 줄도 검사되지 않는다.
+      # `tsc --noEmit`은 tsconfig include 전체를 보므로 두 타깃 소스를 모두 덮는다.
+      - name: 타입 검사 (tsc — 두 빌드 타깃 소스 전체)
+        run: npm run typecheck
+
+      - name: Next build (공개 타깃 — 정적 export)
         run: npm run build
 
-      - name: 정적 export 산출물 실재 확인
+      - name: 공개 산출물 검사 (실재 3건 + admin 누출 0)
         run: |
           set -e
           for f in out/index.html out/robots.txt out/sitemap.xml; do
             test -s "$f" || { echo "::error::정적 export 산출물 누락 또는 빈 파일: $f"; exit 1; }
           done
-          echo "OK — 정적 export 산출물 3건 실재"
+          # 누출 경로는 둘이고 **서로 다른 검사가 잡는다**(2026-09-22 주입 실측):
+          #  ⓐ admin 라우트 파일의 `.admin` 접미가 떨어짐 → 공개 빌드에 /admin 라우트가 생긴다
+          #     (경로 검사가 잡는다 · 표식도 함께 나온다)
+          #  ⓑ 공개 *클라이언트* 소스가 app/admin/을 import → 라우트는 안 생기고 번들에만 실린다
+          #     (경로 검사는 못 잡는다 — **표식 검사만** 잡는다)
+          # 둘 다 `next build`는 exit 0이다. 빌드 성공은 판정자가 아니다.
+          if [ -e out/admin ]; then
+            echo "::error::공개 산출물에 /admin 라우트가 있다 — 빌드 타깃 분리가 깨졌다(web_strategy §2)"
+            exit 1
+          fi
+          leak=$(grep -rl 'wm-admin-shell-bundle' out/ | wc -l)
+          if [ "$leak" -ne 0 ]; then
+            echo "::error::공개 번들에 admin 코드가 실렸다(표식 $leak건) — 공개 소스가 app/admin/을 import했는지 확인하라"
+            exit 1
+          fi
+          echo "OK — 공개 산출물 3건 실재 · admin 누출 0"
+
+      - name: Next build (admin 타깃)
+        run: |
+          set -e
+          rm -rf out
+          npm run build:admin
+
+      - name: admin 산출물 검사 (셸 실재 + 표식 생존 + 랜딩 미포함)
+        run: |
+          set -e
+          test -s out/admin/index.html || { echo "::error::admin 셸이 빌드되지 않았다"; exit 1; }
+          # **이 줄이 위 누출 검사의 변별력 대조군이다.** 표식 상수가 지워지거나 번들에서
+          # 사라지면 공개 빌드의 "표식 0건"은 '누출 없음'이 아니라 '검사 무효'가 된다 —
+          # 모든 입력에서 초록인 가드와 같은 화면이 나온다. 여기서 1건 이상을 요구해 그
+          # 위장 상태를 red로 만든다.
+          grep -rq 'wm-admin-shell-bundle' out/ || {
+            echo "::error::admin 산출물에 셸 표식이 없다 — 공개 빌드의 누출 검사가 무효 상태다"
+            exit 1
+          }
+          if [ -e out/index.html ]; then
+            echo "::error::admin 산출물에 공개 랜딩이 포함됐다 — 내부망 산출물에 공개 표면이 섞였다"
+            exit 1
+          fi
+          echo "OK — admin 셸 실재 · 표식 생존 · 랜딩 미포함"
 
   # ─────────────────────────────────────────────────────────────────
   # 인프라 계약 테스트 (tests/infra) — hermetic·docker 불요·항상 실행
