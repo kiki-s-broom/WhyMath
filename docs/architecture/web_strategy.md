@@ -104,7 +104,7 @@ src/web/
 | 웹접근성 | 지능정보화기본법 §46은 문언상 *웹사이트* 중심 — 웹을 만들면 적용 범위가 실제로 변동(법률 판단 사항) | [service_operations_gap_review](service_operations_gap_review.md) |
 | 개인정보 | 베타 폼 수집 최소화·처리위탁 고지·처리방침 문구 | PIPA·CLAUDE.md 금기 |
 
-**카피 가이드(1줄 규칙)**: 효과 단정·비교 우위 단정 문구를 랜딩 어디에도 쓰지 않는다 — CLAUDE.md AI·신뢰 금기("확실하지 않을 때 자신 있게 말함" 패턴 금지)의 마케팅 축 적용. gates 대장 등재는 HARN-18(gates add CLI) 착지 후 — 그 전까지 WEB-01 acceptance가 이 선결을 인코딩한다.
+**카피 가이드(1줄 규칙)**: 효과 단정·비교 우위 단정 문구를 랜딩 어디에도 쓰지 않는다 — CLAUDE.md AI·신뢰 금기("확실하지 않을 때 자신 있게 말함" 패턴 금지)의 마케팅 축 적용. gates 대장 등재 완료(2026-09-22) = `G-web01-landing-legal-review`, WEB-02 `requires_gates`에 부착. 코드 쪽 카피 가드는 `tests/infra/test_webapp_landing_governance.py` 계약 ⑤이며 **보조 탐지기**다 — 문자열 열거는 표현 변형에서 뚫리므로 효과 단정 여부의 최종 판정은 사람(변호사)이 한다.
 
 ### §3.5 콘텐츠 원천
 
@@ -157,7 +157,9 @@ src/web/
 
 04 §8의 제안 4건(ADMIN-MODULE-REGISTRY·ADMIN-BFF·ADMIN-REVIEW-UI·ADMIN-WEB)이 위 `ADMIN-04~07`로 번호를 받아 등재됐다.
 
-**미등재로 남긴 것(의도적)**: ⓐ 교사 웹 착수 — `TEACHER` role 부재(dead code 금지·04 §2 원칙3) ⓑ 백오피스 prod 내부망 배선(리버스 프록시 포함) — Phase B 시점 ⓒ 랜딩 공개 전 변호사 게이트의 gates 대장 등재 — HARN-18(gates add CLI 부재) 착지 후.
+**미등재로 남긴 것(의도적)**: ⓐ 교사 웹 착수 — `TEACHER` role 부재(dead code 금지·04 §2 원칙3) ⓑ 백오피스 prod 내부망 배선(리버스 프록시 포함) — Phase B 시점.
+
+**ⓒ 해소(2026-09-22·WEB-01 착지)**: 변호사 게이트는 HARN-18(`gates add` CLI) 착지 후 `G-web01-landing-legal-review`로 등재됐고 **WEB-02의 `requires_gates`에 부착**됐다 — 등재만 하고 부착하지 않으면 selector가 배포 태스크를 착수 후보로 계산한다(선행을 산문에만 적는 형태). 함께 등재: `G-web01-required-check-register`(신규 CI 잡을 라이브 룰셋의 required check로 올리는 UI 조작 — 문서 목록만 고치면 드리프트 탐지기가 상시 red가 된다).
 
 ---
 

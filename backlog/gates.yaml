@@ -620,3 +620,23 @@ gates:
     evidence: "2026-09-14 Kiki 결정 = A안(strict 해제 + 클래식 삭제). 두 축 모두 집행 완료.\n\n[① strict] 룰셋은 이미 strict_required_status_checks_policy=false였고, 문서 선언을 true→false로 정정했다. 근거 셋: ⓐ merge queue가 큐 브랜치를 최신 main 위에 얹어 전건 재검증하므로 개별 PR의 up-to-date 요구는 구조적 중복 ⓑ 2026-09-10 PR #1063/#1092/#1094가 전부 behind로 막혀 main 수동 병합 3회 ⓒ 선행 게이트 G-merge-queue-or-strict-relax가 둘을 택일로 물었고 큐가 채택·활성됐다(PR #1067이 gh-readonly-queue 브랜치에서 검증돼 그 head가 main이 됨).\n\n[② 클래식 삭제] Kiki 머신 실측: DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection 후 재조회가 HTTP 404 Branch not protected. 삭제 전 같은 명령이 JSON 2,512자를 반환했으므로 변별력 있는 확인이다.\n\n[③ 기계 판정] 삭제 직후 python scripts/harness/ruleset_drift.py ruleset.json --record 가 EXIT=0 — \"문서 선언과 라이브 설정이 정합(위반 0)\", 유예 3건은 전부 만료 전 승인 축. 즉 클래식이 사라진 뒤에도 룰셋 단독으로 문서 선언을 충족한다.\n\n[④ 축별 소실 대조] 삭제 직전 클래식 원문을 덤프해 12개 축을 룰셋과 대조했다. required_linear_history/allow_force_pushes(=non_fast_forward)/allow_deletions(=deletion)/required_conversation_resolution(=required_review_thread_resolution)은 룰셋이 덮고, required_signatures/block_creations/lock_branch/allow_fork_syncing은 원래 false였으며 restrictions는 키 자체가 부재했다. 필수 체크 13건은 룰셋 16건의 부분집합. 전문은 .github/branch-protection-setup.md \"삭제 직전 실측\" 표에 남겼다(백업 JSON은 Git 밖이라 사라진다).\n\n[잔여 — 게이트가 묻지 않은 새 발견] enforce_admins=true 한 축만 룰셋 대응이 미확인이다. 룰셋에서 그 역할을 하는 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이는데 세션 토큰으로는 둘 다 읽을 수 없다. 게이트의 두 축과 독립이므로 승계 태스크 HARN-102-ruleset-bypass-actors-unverified(priority 2)로 분리 등재했다. 최악의 경우 관리자 우회 금지가 조용히 풀린 상태일 수 있으므로 이 clear를 \"소실 0 확인\"으로 읽으면 안 된다.\n\n[부수 — 시스템 결함 1건 수정] ④ 첫 시도가 EXIT=2(측정 실패)로 공전했다. 원인은 저장소 문서와 판정기 docstring이 *권하던* 수집 명령 자체다 — PowerShell 5.1이 gh 출력을 cp949로 디코딩 왕복시켜 JSON 구조 문자 41자가 유실됐다(2,659→2,618자, Expecting ',' delimiter: line 1 column 1828). cmd /c 경유로 바꾸자 즉시 EXIT=0. 런북·문서·판정기 메시지를 고치고 tests/infra/test_ruleset_drift.py가 그 형태를 동결한다(뮤테이션 4종 전건 RED — 가드 자신을 지운 M4 포함). CLAUDE.md v0.2.23에 '셸 중계' 축으로 등재(같은 cp949 계열 4회차).\n\n[병렬 처리 사실 2026-09-14] 이 게이트는 두 세션이 병렬로 처리했다. 타 세션이 PR #1157(main b810388b)로 먼저 착지했고 이 세션은 PR #1154로 처리했다. 두 evidence는 ①strict 해제 판정에서 일치하지만 ②클래식 삭제의 *집행 여부*에서 갈린다 — #1157 세션은 토큰이 /branches/main/protection에 403이라 대행 불가로 보고 후속 게이트 G-classic-branch-protection-delete를 신설했으나, 이 세션에서는 Kiki가 자신의 gh 토큰으로 실제로 DELETE를 실행했고 재조회 404로 확인됐다. 따라서 그 후속 게이트는 신설 시점에 이미 충족된 상태였으며 같은 근거로 clear한다. 병렬 중복의 원인은 이 게이트가 4일 연속 독촉 초과 상태였다는 것이고, 두 세션 모두 같은 리마인드를 보고 착수했다."
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-14] 대화 중 즉석 결정(2026-09-14) — strict 해제 + 클래식 삭제 두 축 모두 권고안 채택. 저장소 설정(GitHub 룰셋/클래식 브랜치 보호) 결정이라 커밋 판정 기준 없음"
+  - id: G-web01-landing-legal-review
+    title: "공개 랜딩 v1 공개 전 변호사 검토 (WEB-01 acceptance ③ · web_strategy.md §3.4) — 기계 대체 금지. 검토 항목 3종: ①광고·마케팅 규제(regulatory_checklist.md §4) — RCT 검증 전 \"성적이 오른다\" 류 효과 단정 금지·비교 광고 자문. 현행 카피는 효과 단정을 피하도록 작성했고 tests/infra/test_webapp_landing_governance.py가 금지 문구를 보조 탐지하지만, 문자열 열거는 표현 변형에서 뚫리므로 최종 판정은 사람이 한다 ②웹접근성 — 지능정보화기본법 §46은 문언상 '웹사이트' 중심이라 웹을 개설하는 순간 적용 범위가 실제로 변동한다(법률 판단 사항). 코드 쪽 선결(lang=\"ko\"·본문 바로가기·대비비 4.5:1 초과·확대 제한 없음·prefers-reduced-motion)은 착지했으나 KWCAG 적합성 판정은 아니다 ③개인정보 — 베타 신청은 v1에서 외부 폼 '링크'만 쓰므로(백엔드 호출 0·랜딩 수집 표면 0) 폼 URL을 채우는 순간 처리위탁 고지 대상이 된다. 현재 NEXT_PUBLIC_BETA_FORM_URL 미설정이라 CTA가 \"준비 중\"으로 렌더되며 링크 자체가 존재하지 않는다. 처리방침·수집 최소화 문구도 함께 검토. 검토 대상 산출물: src/web/webapp/ 랜딩 1페이지 전문(app/(public)/) + 법정 표시 푸터 자리. 판정 3택: ①현행 카피로 공개 승인 ②수정 요구 항목 회신 후 재검토 ③공개 보류. 이 게이트가 pending인 동안 랜딩은 비공개다 — 배포는 WEB-02가 소유하며 이 게이트 통과가 그 선결이다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 30
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-web01-required-check-register
+    title: "신규 required check 라이브 등록 — \"webapp — 공개 랜딩 lint·build\" (WEB-01). 문서(.github/branch-protection-setup.md REQUIRED_CHECKS 블록)에는 등재했으나, 라이브 룰셋(rulesets/16623542)에 추가하는 것은 GitHub UI 조작이라 사람 몫이다. 등재하지 않으면 랜딩 잡이 red여도 머지가 막히지 않는다(2026-07-26 backend 잡 미등재 사고와 같은 형태). 방법: GitHub → Settings → Rules → \"main 보호\" → Require status checks → 검색창에 위 이름을 그대로 입력해 추가. 검색 결과가 비면 그 잡이 아직 한 번도 안 돌았다는 뜻이므로, WEB-01 PR의 체크 실행 후 다시 시도한다. 확인: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북으로 ruleset_drift 판정 EXIT 0. 등재 이유: 문서 목록과 라이브 룰셋이 벌어지면 드리프트 탐지기가 상시 red가 되고, 상시 red인 보호는 습관화돼 소음이 된다(CLAUDE.md \"상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지\"). 선행 조건: WEB-01 PR이 main에 머지된 뒤 실행한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""

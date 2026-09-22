@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: web
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - "src/web/webapp/**"
   - ".github/workflows/**"
-session: null
+session: claude/exciting-rubin-c15b6s
 notes: "web_strategy.md §3 정본. ARCH-10 게이트 적용 대상. 학생 학습 경험 아님(슬89 정합 논리는 §1). graphing-calculator 불가침. 외부 폼 채택 시 개인정보 처리위탁 고지도 변호사 검토 항목\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-22
