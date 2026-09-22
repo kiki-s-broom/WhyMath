@@ -110,3 +110,61 @@ class TestCrossReferenceIntegrity:
     def test_declaration_points_back_to_this_freeze(self, declaration: str):
         """선언이 이 동결 장치를 가리켜야 한다 — 다음 세션이 어디서 막히는지 알 수 있게."""
         assert "test_declaration_canon_consistency" in declaration
+
+
+class TestG4StudentSampleExcluded:
+    """G4(12-13) 학생 표본 조건 제외 — 2026-09-22 Kiki 결정(선택지 ⓐ)의 회귀 동결.
+
+    **왜 이 파일인가(경계 확장의 근거)**: 이 파일의 종전 경계는 "G0 확정치의 일치"였다.
+    여기서 넓히는 이유는 *같은 문서의 같은 표류 벡터*이기 때문이다 — 부록 E의 값이
+    선언 본문(§0-2)과 어긋나 있었는데 그것을 읽는 기계 장치가 0건이라 3주 넘게
+    아무도 몰랐다. A7(앵커 8 vs 6)과 글자 그대로 같은 형태이고, A7의 대책이 이
+    파일이었다.
+
+    **무엇이 모순이었나**: §0-2는 "베타 사용자 확보는 전부 2027년 범위"라고 정해
+    두고서, 부록 E의 G4는 12-13에 "학생 표본 >=20명"을 차단 조건으로 요구했다.
+    2026-09-22 지시가 §0-2 쪽으로 확정했고, 그 결정이 되돌려지는 것은 **의식적
+    개정**이어야지 조용한 복원이면 안 된다.
+
+    **동결하지 않는 것**: 실패정의 F-I~F-V와 검증설계서 §5 해시는 여전히
+    `test_failure_definition_freeze.py` 소유다. 이 결정은 그것을 건드리지 않았고,
+    아래 `test_failure_definitions_never_required_student_samples`가 그 사실
+    자체를 단언한다 — 제외가 동결을 침범하지 않았다는 근거가 코드에 남아야 한다.
+    """
+
+    def test_g4_row_does_not_require_student_sample(self, declaration: str):
+        """G4 차단 조건 *본문*에 학생 표본이 있으면 12월 판정이 다시 충족 불가가 된다."""
+        rows = [ln for ln in declaration.splitlines() if ln.startswith("| G4 계측기 완성")]
+        assert len(rows) == 1, f"부록 E의 G4 행이 {len(rows)}건 — 1건이어야 한다"
+        row = rows[0]
+        # 취소선 안(~~...~~)은 보존된 초판 값이므로 제거한 뒤 본문만 본다.
+        body = re.sub(r"~~.*?~~", "", row)
+        assert "학생 표본" not in body, (
+            "G4 차단 조건 본문에 학생 표본이 되살아났다 — 파일럿은 "
+            "G-pilot-defer-2027-recheck로 2027로 연기됐으므로 12-13에 충족 불가다"
+        )
+
+    def test_g4_keeps_its_other_two_conditions(self, declaration: str):
+        """제외가 과도해서 G4 자체가 빈 게이트가 되지 않았는가(대조군)."""
+        row = next(ln for ln in declaration.splitlines() if ln.startswith("| G4 계측기 완성"))
+        assert "수동 개입 0 루프 3연속" in row, "G4의 핵심 조건이 함께 사라졌다"
+        assert "P0 결함 0" in row, "G4의 P0 결함 조건이 함께 사라졌다"
+
+    def test_exclusion_is_documented_not_silent(self, declaration: str):
+        """왜 뺐는지가 문서에 없으면 2027 재개 시 판단 근거가 사라진다."""
+        assert "[^g4-sample]:" in declaration, "G4 제외 각주가 없다"
+        assert "2026-09-22" in declaration, "개정 이력에 결정일이 없다"
+
+    def test_declaration_still_scopes_beta_users_to_2027(self, declaration: str):
+        """이 제외의 *근거 조항*이다 — §0-2가 바뀌면 제외의 전제가 사라진다."""
+        assert "베타 사용자 확보는 전부 2027년 범위다" in declaration
+
+    def test_failure_definitions_never_required_student_samples(self, declaration: str):
+        """제외가 G0 동결(실패정의)을 침범하지 않았다는 근거를 코드에 남긴다."""
+        f_rows = [ln for ln in declaration.splitlines() if re.match(r"- \*\*F-[ⅠⅡⅢⅣⅤ]\*\*", ln)]
+        assert len(f_rows) == 5, f"실패정의가 5건이 아니다({len(f_rows)}건)"
+        for ln in f_rows:
+            assert "학생 표본" not in ln, (
+                "실패정의가 학생 표본을 요구한다면 이 제외는 G0 동결을 건드린 것이 되고, "
+                "그때는 검증설계서 §5와 해시 동결을 함께 개정해야 한다"
+            )

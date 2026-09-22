@@ -300,16 +300,6 @@ gates:
     evidence: null
     cleared_by: null
     notes: "원 요청일 2026-08-11(ph1ad7 905ed311·ASM-12/PR #815) — #822 재생성-머지에서 게이트만 유실돼 2026-08-30 HARN-34가 이관 재등재. 판정 정본 docs/legal/export_prediction_disclosure_verdict.md·뒤집힘 시 export 복원+매트릭스 §2.4 개정+access_matrix #8 동시 반영"
-  - id: G-kg02-review-promotion-llm-session
-    title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
-    kind: human
-    assignee: kiki
-    status: pending
-    requested: 2026-09-21
-    remind_after_days: 14
-    evidence: null
-    cleared_by: null
-    notes: ""
   - id: G-harn121-constitution-token-measure
     title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
     kind: human
@@ -317,6 +307,16 @@ gates:
     status: pending
     requested: 2026-09-21
     remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-kg02-review-promotion-llm-session
+    title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 14
     evidence: null
     cleared_by: null
     notes: ""
@@ -440,6 +440,16 @@ gates:
     evidence: "READY:True (check_status 6모델 전부·2026-07-09) + 라이브 rephrase 184/590 성공. '키 투입'(서버 라이브·도달·첫 파이프라인 동작) 충족. '실측 비용 검증'은 S1-12(클라우드 티어)로 이관"
     cleared_by: null
     notes: "ROADMAP 병목 ② — S1 라이브 선행분 전체의 선결 조건"
+  - id: G-pilot-defer-2027-recheck
+    title: "파일럿·학생 테스트 연말 이후 연기의 재확인 지점 (2026-09-22 Kiki 지시) — \"12/31까지 내부적으로 앱을 완성하는 것을 목표로 하고 그 이후로 테스트 과정을 미루고 있어. 그 연장에서 이 과제도 연말 이후로 연기\". 대상 = S3-01(파일럿 코호트 모집·운영)과 그 하위의 학생 대면 측정 전부. 이 게이트가 pending인 동안 S3-01은 착수 후보에서 제외된다 — 산문 연기는 selector가 읽지 않으므로(depends_on·requires_gates만 본다) 대장이 집행하게 올린 것이며, 만료 없는 유예 금지에 따라 재확인 지점을 동반한다.\n\n정합 근거: EOS 전환 선언 §0-2가 이미 \"2026-12-31은 외부 출시일이 아니라 내부 검증 판정일이며 앱스토어·결제·마케팅·CS·베타 사용자 확보는 전부 2027년 범위\"라고 정해 두었다. 이 지시는 그 선언의 재확인이다.\n\n[해소됨 2026-09-22] 등재 시점의 1번 판정 항목(G4의 \"학생 표본 >=20명\"을 어떻게 할 것인가)은 Kiki가 같은 날 선택지 ⓐ로 확정했다 — G4에서 그 조건을 빼고 12월 판정을 HIT(콘텐츠 생산성) 축으로 한정한다. 집행: 선언 부록 E의 G4 행에서 조건 제외(초판 값은 취소선 보존·각주 [^g4-sample]) + 부록 D의 I3(깊이앵커 학생 표본 20~30명 반응 수집·T2)를 2027 이월 + 개정 이력 등재. 실패정의 F-I~F-V와 검증설계서 §5 해시 동결은 무변경이며(실측: 5개 F 어디도 학생 표본을 요구하지 않는다) 회귀는 tests/backend/schema/test_declaration_canon_consistency.py의 TestG4StudentSampleExcluded가 기계로 막는다.\n\n재확인 시점: 2027-01 첫 계획 세션(12/31 G5 Go/Conditional/No-Go 판정 직후). 판정 3택: (1) 재개 — S3-01 착수 허용, 이 게이트를 clear하고 모집 착수 (2) 추가 연기 — 이 게이트를 재생성해 다음 재확인 지점을 박는다(만료 없는 유예 금지) (3) 폐기·재설계 — 파일럿 형식 자체를 바꾸기로 하면 S3-01을 cancel하고 대체 태스크를 등재한다.\n\n함께 판정할 것 2건(잔여):\n(1) 코호트 크기 — 이 브리핑·S3-01 제목은 5~10명이다. G4의 >=20명이 빠졌으므로 이제 외부 제약이 없고, 재개 시점에 파일럿 목적(KPI 베이스라인·재사용 의향 >=60%)에 맞춰 정한다.\n(2) 파일럿 동의서 변호사 검토 시점 — MGMT-01이 2026-07-27 지시로 blocked(unblock 트리거 = 공개 β 준비 착수)이고, 파일럿이 2027로 가면 두 일정이 나란히 간다. 동의 서류 리드타임이 모집 착수보다 앞서야 하므로 재개 판정 시 함께 본다.\n\n연기로 함께 대기하는 것(대장 실측 2026-09-22): S3-01에 의존하는 todo 태스크 7건 = ASM-11 · S4-01(수학 K-12 완성) · S4-02 · S4-03 · S4-05 · S4-11 · S4-15. 이 중 S4-01은 math-completion 트랙의 상위 노드다. 연기의 비용이 파일럿 1건이 아니라 이 7건이라는 사실을 재개 판정 때 함께 본다.\n\n측정 축 소유권(중복 등재 방지): S3-01 착수 트리거 ③(실기기 자연 자유사용 대표측정)의 게이트 등재는 S3-51-free-use-remeasurement-observability가 acceptance ⑤로 소유한다(2026-09-22 in_progress·claude/peaceful-brown-fj6gd9). 이 게이트는 그것과 별개의 축(연기 결정의 재확인)이며 측정 회차 게이트를 대신하지 않는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 120
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-pr-auto-resync-token
     title: "PR 자동 재동기화용 PAT 발급 — 저장소 시크릿 PR_AUTO_RESYNC_TOKEN (fine-grained PAT · Repository access=doldori7/WhyMath · 권한 Contents:Read and write + Pull requests:Read and write). 없으면 pr-auto-resync 워크플로가 fail-closed로 exit 1(아무것도 바꾸지 않음) — GITHUB_TOKEN이 만든 push는 CI를 재발화시키지 않아 새 head에 체크 0건이 되고 strict 하에서 PR이 영구히 막히기 때문(PR #1040 Codex P1). 발급 경로 = GitHub Settings→Developer settings→Personal access tokens→Fine-grained tokens→Generate new token, 등록 경로 = 저장소 Settings→Secrets and variables→Actions→New repository secret. 자가검증 = Actions 탭 pr-auto-resync를 dry_run=0으로 1회 수동 실행해 '쓰기 자격 없음'이 사라지고 요약 줄(스캔 N건)이 나오는지 확인"
     kind: human
