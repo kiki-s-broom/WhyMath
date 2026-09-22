@@ -63,6 +63,8 @@ from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.api._auth import get_current_user
+from whymath_backend.api.auth import email_hash
+from whymath_backend.api.demo_auth import DEMO_EMAIL
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.schema.enums import Role
 
@@ -492,6 +494,30 @@ def visible_modules(role: Role) -> tuple[AdminModule, ...]:
 GUARD_MODULE_ATTR = "__whymath_admin_module__"
 
 
+#: 데모 계정 차단 시 응답에 나가는 사유. 역할 미달(403)과 **다른 문자열**이어야 한다 —
+#: 둘이 같으면 테스트가 "데모라서 막혔는지 역할이 모자라 막혔는지"를 구분할 수 없고, 그 구분이
+#: 안 되면 데모 차단이 실제로 작동하는지 확인할 방법이 없다(변별력).
+DEMO_ACCOUNT_DENIED_DETAIL = "데모 계정으로는 관리 콘솔에 접근할 수 없습니다(실 신원 필요)."
+
+
+def is_demo_account(user: UserProfile) -> bool:
+    """`user`가 시연용 데모 계정인가 — 04 §4 "데모 토큰(`demo_auth`) 절대 금지"의 집행 수단.
+
+    **왜 이런 방식인가 (정직한 한계)**: 발급 *토큰*만으로는 데모와 정규를 구분할 수 없다.
+    `security.py`의 JWT 클레임은 `sub`·`typ`·`iat`·`exp`(refresh는 `jti`)뿐이고 `iss`·provider·
+    `amr` 같은 발급 출처 표식이 없으며, `api/auth.py::resolve_user`는 provider 이름이나 subject를
+    DB에 저장하지 않는다(`email_hash`만 키). 즉 발급 경로의 영속 흔적이 0이다.
+
+    그래서 *계정 동일성*으로 판정한다 — `demo_auth.DEMO_EMAIL`은 고정 상수이고 `email_hash`는
+    결정론적이므로, 해시가 일치하면 그 사용자는 데모 provider가 만든 그 계정이다. 토큰 축이
+    아니라 계정 축의 판정이라는 점을 명시해 둔다.
+
+    **플래그와 무관하게 항상 막는다.** `demo_auth_enabled`를 끈 뒤에도 그 계정 행은 DB에 남고
+    발급된 토큰은 만료까지 유효하므로, 플래그에 조건을 걸면 "끄면 안전"이 거짓이 된다.
+    """
+    return user.email_hash is not None and user.email_hash == email_hash(DEMO_EMAIL)
+
+
 def require_module_roles(module_id: str) -> Callable[..., Awaitable[UserProfile]]:
     """모듈 `module_id`의 `required_roles`를 강제하는 FastAPI 의존성을 만든다.
 
@@ -509,6 +535,11 @@ def require_module_roles(module_id: str) -> Callable[..., Awaitable[UserProfile]
     async def _dependency(
         user: Annotated[UserProfile, Depends(get_current_user)],
     ) -> UserProfile:
+        if is_demo_account(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=DEMO_ACCOUNT_DENIED_DETAIL,
+            )
         if user.role not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
