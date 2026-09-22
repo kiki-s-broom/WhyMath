@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: web
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -15,10 +15,11 @@ acceptance:
   - "정본화: src/web/webapp/ Next.js 15 앱 골격 + app/(public)/ 랜딩 1페이지 — 정적 export 빌드 성공"
   - "집행: ci.yml에 webapp lint+build 잡 신설(paths 필터) — 파일 존재가 아니라 CI 실행 확인"
   - "공개 전 변호사 검토 게이트(광고 규제 §4.1 효과 단정 금지·KWCAG 웹접근성·개인정보 문구) 등재 — gates add CLI는 HARN-18 착지 후, 그 전까지 비공개 유지"
-artifacts: []
+artifacts:
+  - "PR #1267 (https://github.com/kiki-s-broom/WhyMath/pull/1267) · head 8ed173d9 · base main c919a7c3 · CI 전건 green(체크런 19건 = success 17 · skipped 2[야간 전용 e2e-nightly·backend-serial, if: schedule로 PR에서 항상 skip — 실패 뒤 skipped 아님]) · mergeable_state=clean. acceptance ① src/web/webapp Next.js 15.5.25 + React 19.3.0 App Router + app/(public) 랜딩 1페이지, output=export 정적 산출물(라우트 4건 전부 Static) ② ci.yml webapp 잡 + changes 필터 webapp 축 신설 — CI 실행 확인(잡 41초 success, 산출물 실재 스텝 로그 \"OK — 정적 export 산출물 3건 실재\") ③ 게이트 2건 등재: G-web01-landing-legal-review(WEB-02 requires_gates에 부착) · G-web01-required-check-register. 경계 동결 tests/infra/test_webapp_landing_governance.py(36건) — 뮤테이션 26종 전건 RED"
 paths:
   - "src/web/webapp/**"
   - ".github/workflows/**"
-session: claude/exciting-rubin-c15b6s
+session: null
 notes: "web_strategy.md §3 정본. ARCH-10 게이트 적용 대상. 학생 학습 경험 아님(슬89 정합 논리는 §1). graphing-calculator 불가침. 외부 폼 채택 시 개인정보 처리위탁 고지도 변호사 검토 항목\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
 updated: 2026-09-22
