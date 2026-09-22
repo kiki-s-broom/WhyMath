@@ -237,3 +237,284 @@ python3 scripts/harness/backlog.py audit-deps
 ---
 
 **작성**: 2026-09-20 · `EOS-128-phase3-plan-backlog-conversion` · 판정 기준 main `e91a75d3`
+
+---
+---
+
+# 2회차 (2026-09-22) — 원 문서 본문 수령 후 대조
+
+> **판정 기준: main `266c3d55`** (2026-09-22) · 백로그 **783건** · 게이트 **62건**
+> **이번 회차의 변경: 0건** — 신규 등재도 amend도 하지 않았다. 이 회차는 **대조 전용**이다(사유 §10-2).
+> **1회차 판정 기준(main `e91a75d3`)과 열이 다르다** — 위 §0~§9는 그 시점의 판정이며 갱신하지 않았다.
+
+## §10. 2회차 입력 상태 — 절반이 도착했다
+
+### 10-1. 무엇이 왔고 무엇이 아직 없는가
+
+| 구분 | 1회차(09-20) | 2회차(09-22) |
+|---|---|---|
+| `P3-00a` 지시문 [01/20] | ✅ | ✅ |
+| 실행계획 **본문** (Week 1~4 · 지표 7종 · Gate A~E) | ❌ | ✅ **도착** |
+| `P3-01~P3-14` 기준 분해안 (세트 02~15/20) | ❌ | ❌ **여전히 없음** |
+| 세트 16~20/20 | ❌ | ❌ |
+
+도착한 본문은 저장소에 전사 보존했다 — `docs/strategy/phase3_math_eos_completion_plan_source.md`.
+출처 sha256 `b109941c324d1aa5dbdc112e1878309899d75b9d5bc70cd659b2ea65bee7a012` · 원본 27,032바이트 · 추출 7,108자.
+전사 충실도는 기계 대조했다(원문 고유 항목 91건 전건 존재 · 누락 0). **이 보존이 §0-1이 기록한 "원 문서가 저장소 어디에도 없다"를 영구 해소한다** — 1회차 차단은 세션의 망각이 아니라 입력이 채팅에만 있었던 구조 때문이었다.
+
+### 10-2. 이번 회차가 **등재하지 않은** 이유
+
+`P3-01~P3-14`는 Kiki가 이미 만든 **14개 분해 단위**다. 그것 없이 내가 Phase 3를 임의 단위로 쪼개 등재하면, 나중에 그 분해안이 도착했을 때 **같은 일이 두 번 등재된 대장**이 된다. 그것이 acceptance ②(중복 실측 → 겹치면 신규 등재 금지)가 막으려는 바로 그 상태이고, 태스크 acceptance는 append 전용이라 되돌리기도 어렵다.
+
+그래서 범위를 나눴다 — **(가) 원 문서 항목 전수 열거 + 기존 태스크 대조는 수행**(신규 등재가 없으므로 `P3-01~P3-14`가 와도 버려지지 않는다) · **(나) 신규 태스크 등재는 보류**. 이 회차는 (가)다.
+
+(가)의 부수 효과가 하나 있다: 아래 대조표는 `P3-01~P3-14`가 **무엇을 덮어야 하는지**를 보여준다. 이미 태스크가 있는 항목을 다시 분해하면 그것이 중복이다.
+
+### 10-3. 방법 — §1을 그대로 쓰되 두 가지를 더했다
+
+- **역할 정규식 색인** — 백로그 783건의 `id·title·acceptance·notes·paths·layer·subject·track`을 한 문자열로 합쳐 색인하고, 원 문서 항목마다 **이름이 아니라 역할**로 검색했다(식별자 부재 ≠ 기능 부재). 정규식은 아래 표의 각 행에 그대로 적었으므로 재현·반증이 가능하다.
+- **0건은 2차 검색으로 재확인** — 1차 0건인 항목은 ⓐ다른 관용어 ⓑ소비자측(호출하는 코드) ⓒ실제 소스 파일 순으로 다시 찾았다. **네 항목이 1차 0건이었는데 그중 둘은 2차에서 실재가 확인됐다**(W1-2 대상 범위 → `EOS-52` · W3-2 Tutor output → `CoachResponse` 코드). 즉 1차 0건을 그대로 "부재"로 적었으면 **오판정 2건**이었다. 나머지 둘(W2-1·지표②)은 2차·코드까지 확인해도 0건이라 "대응 없음"으로 판정했다.
+
+---
+
+## §11. 대조표 ④ — Week 1~4 작업 ↔ 태스크 ID
+
+판정 어휘: **대응 있음**(기존 태스크가 그 일을 소유) · **부분 대응**(일부만 소유·나머지는 미소유) · **대응 없음**(내가 찾은 방법으로는 0건).
+
+### 11-1. Week 1 (10/26~11/1) — 대표 과정 동결 + Coverage
+
+| # | 원 문서 항목 | 판정 | 대응 태스크 / 근거 |
+|---|---|---|---|
+| W1-1 | 출시 대표 과정 1개 | **대응 있음** | `EOS-52-anchor-asset-audit`(done) — 앵커 후보 **8단원**의 원자·성취기준·오개념·detection_rule·문항 코퍼스 실측 커버리지. 저장소는 "대표 과정"을 **앵커**라고 부른다 |
+| W1-2 | 대상 학년/과목/단원 범위 | **부분 대응** | 같은 `EOS-52`가 단원 범위를 실사했다. 다만 **"동결한다"는 결정 행위**를 소유한 태스크는 못 찾았다 — 실사는 있고 동결은 없다 |
+| W1-3 | Curriculum Node 목록 | **대응 있음** | `CUR-03`(done·성취수준 A~E·평가기준 반입) · `EOS-82`(done) · `S4-03`(todo) |
+| W1-4 | Concept 목록 | **대응 있음** | `ARCH-13`(done) — `atom_node` **2,697**·`concept_edge` 437 입도 통합. `SKB-03`가 2,683노드 적재 완료(CLAUDE.md 실측) |
+| W1-5 | Skill 목록 | **대응 있음** | `SKB-01`(done·`concept_behavior_skill` 적재) · `EOS-63`(todo·`skill_mastery_tracking` 소비 전환) |
+| W1-6 | 핵심 오개념 목록 | **대응 있음** | 22건 hit. 대표 = `ASM-01`·`ASM-09`·`ARCH-49`·`EOS-05` + 크로스워크 계약 정본 `docs/standards/crosswalk_gate_contract.md` |
+| W1-7 | 필수 Problem Type 목록 | **대응 있음** | `CONT-04`(todo·rephrased_v0 429문 유형 태깅 — **16.2% 미상환**) · `PB-09`(todo·변형 3종 발화) |
+| W1-8 | 문제 수량 목표 | **대응 있음** | `EOS-54`(done·CU 단위 생산 계측) · `CUR-19`·`QUAL-09`(todo) |
+| W1-9 | 콘텐츠 completeness 기준 | **부분 대응** | `EOS-51`(done·CU 스키마 동결)이 *한 CU의* 완전성을 정의한다. 원 문서가 말하는 *과정 전체의* completeness 기준은 미소유 |
+| W1-금지1 | EOS Core 신규 Entity 동결 | **대응 있음** | 좌석 계약 체계 — `ARCH-37`·`ARCH-38`·`ARCH-39`(done) 등. 부재 동결 4종·전수 귀속 스캔이 CI `infra-contracts` 잡에서 집행 |
+| W1-금지2 | 대규모 DB Schema 변경 동결 | **대응 있음** | prod 스키마 프로브(신규 alembic 리비전 미등재 차단) — `HARN-109`(done)·`OPS-72`(done) |
+| W1-금지3 | 새 AI Agent 추가 동결 | **대응 있음** | `NOTNOW-08-complex-agent-collaboration`(todo·P3·게이트 `G-not-now-v1-release-recheck` 부착) — **1회차 산출** |
+| W1-금지4 | 새 Subject Adapter 추가 동결 | **대응 있음** | `subject-expansion` 트랙 15건 전건 `todo`·P3 + `entry_gate` `G-s5-subject-expansion` 하드락 = §6이 판정한 **3중 동결** 그대로 |
+| W1-금지5 | 대규모 UI 구조 변경 동결 | **부분 대응** | `HARN-103-feature-code-freeze-rules`(todo)가 기능 동결 규칙을 소유하나 **미착지**. 현재 UI 구조 변경을 막는 기계 장치는 내가 찾은 방법으로는 0건 |
+| W1-완료 | Curriculum→Concept→Skill→Problem 최소구조 | **대응 있음** | `EOS-07`(done) — **모든 Problem이 최소 1개 Skill 연결**을 계약 테스트로 동결. `EOS-100`·`EOS-03`(done) |
+| W1-완료 | 핵심개념 + Prerequisite/Misconception/Solution/Hint/Pedagogy | **부분 대응** | `ARCH-17`(done·DAG)·`CUR-06`(todo·학교급 경계 연결 **20/2210 = 0.9%**·고→대 0). Hint 저장 좌석은 `ARCH-39`가 "선언 정본 ↔ 저장 실측 불일치 **유일** 엔티티"로 지목 |
+| W1-지표 | Content Coverage Rate ≥95% | **부분 대응** | `ARCH-18`(done·공급측 커버리지 리포트)·`ASM-05`(done·수요측 도달 관측)·`CUR-02`(done). **목표치 95%를 게이트로 거는 장치는 0건** — 관측은 있고 판정은 없다 |
+
+### 11-2. Week 2 (11/2~11/8) — Problem/Solution/Misconception 밀도
+
+| # | 원 문서 항목 | 판정 | 대응 태스크 / 근거 |
+|---|---|---|---|
+| W2-1 | Concept당 문제 6종(대표·기본·응용·오개념유발·진단·숙련도확인) | **대응 없음** | 1차 0건 → 2차(생산 규격 관용어)도 이 **6종 분류 자체**는 0건. 가장 가까운 것이 `EOS-51`의 CU 스키마인데 그것은 *유형 세트*가 아니라 *한 단위의 형식*이다. **이번 회차에서 가장 명확한 공백** |
+| W2-2 | Problem 필드 7종 | **부분 대응** | `difficulty`=`S1-16`(done·IRT)·`concept`/`skill`=`EOS-07`(done)·`solution`/`answer`=문항 스키마 실재. `misconception signature`=`SignaturePattern` enum 실재 · **`hint strategy` 필드는 `ARCH-39`가 저장 좌석 부재로 지목** |
+| W2-3 | Wrong Answer → Error Signature | **대응 있음** | `ASM-06`(done·오답지↔오개념 역링크)·`ASM-09`(done)·`MISC-30`(done) |
+| W2-3b | Misconception Candidate + Confidence | **대응 있음** | 코드 실재 — `MisconceptionMatch.confidence: float(0~1)`·`matched_signals`·`attribution_unclear` (`l4/misconception/models.py:132`) |
+| W2-3c | Remediation Strategy | **부분 대응** | 66건 hit이나 대부분 소음. 확정 대응 = `EOS-123`(todo) — "정답 회차가 오개념 감쇠 시계를 돌리지 않는다 · 채점↔코치 **반증 비대칭**". 즉 교정 경로는 있으나 **반증 축에 알려진 결함**이 있다 |
+
+### 11-3. Week 3 (11/9~11/15) — AI Tutor 품질
+
+| # | 원 문서 항목 | 판정 | 대응 태스크 / 근거 |
+|---|---|---|---|
+| W3-1 | Tutor context 9종 | **대응 있음 (초과)** | `CoachRequest`(`api/coach.py:234`)가 원 문서 9종을 **전부 포함하고 더 받는다** — `polya_state`·`mastery_level`·`bkt_mastery`·`coaching_focus`·`solution_steps`·`solution_step_types`·`ocr_confidence`·`persona`. 컨텍스트 폭주 방어는 `ARCH-11`(blocked·subgraph depth guard) |
+| W3-2 | Tutor output 구조화 | **대응 있음 (초과)** | **1차 0건이었으나 코드에 실재**한다. `CoachResponse`(`api/coach.py:350`)가 원 문서 제안 스키마 8필드를 전부 덮고 초과한다 — 아래 11-4 대조표 |
+| W3-3 | AI 품질 Gate 8축 | **부분 대응** | 아래 11-5 대조표 |
+
+#### 11-4. 원 문서 제안 Tutor output 스키마 ↔ 저장소 실제 (`CoachResponse`)
+
+| 원 문서 제안 필드 | 저장소 실제 | 비고 |
+|---|---|---|
+| `diagnosis.concept_id` / `misconception_id` | `misconceptions: list[MisconceptionMatch]` | 단수 → **복수 후보 리스트**로 확장 |
+| `diagnosis.confidence` | `MisconceptionMatch.confidence: float(0~1)` | 동일 |
+| `response_strategy` | `decision: PedagogyDecision` | `socratic_category`·`polya_stage_to_advance` 포함 |
+| `hint_level` | `PedagogyDecision.hint_level: Literal[1,2,3,4]` | 값 범위까지 동일 |
+| `explanation` | `decision` + `solution_coaching` | |
+| `next_action` | `problem_complete`·`awaiting_reflection`·`intervention` | 분화 |
+| `mastery_update_allowed` | `completion_evidence: AssessmentEvidence`·`completed_attempt_id` | **증거 기반**으로 강화 |
+| (없음) | `match_low_quality`·`match_attribution_unclear`·`no_confident_match`·`lthc`·`prerequisite_coaching`·`answer_form` | 저장소 초과분 6종 |
+
+**판정**: 원 문서가 "가능하면 구조화합니다"라고 권한 것은 **이미 되어 있고 더 나아가 있다.** Week 3에서 이 항목을 새로 만들면 중복이다.
+
+#### 11-5. AI 품질 Gate 8축 ↔ 저장소 판정 장치
+
+| 원 문서 축 | 판정 | 근거 |
+|---|---|---|
+| 수학적 정확성 | **대응 있음** | KPI `수학적 오류율 ≤0.5%`(독립 모델 심판 전수) + Hard Gate `F-Ⅱ`(검수 통과 CU 오류율 >2%) · SymPy 단일 권위 |
+| 정답 누설 | **대응 있음** | KPI `힌트 누설률 L1·L2 (무관용 0%)` + Hard Gate `F-Ⅴ`(의미적 누설 ≥10%) |
+| 오개념 판정 정확도 | **대응 있음** | KPI `오개념 op-code 라벨 정확도 ≥85%` + `EOS-60`(done·혼동행렬 FN율) |
+| Hint 적절성 | **부분 대응** | 누설(위)은 측정하나 *적절성* 자체의 지표는 내가 찾은 방법으로는 0건 |
+| 설명 일관성 | **부분 대응** | `풀이 비약 지적률 ≤10%`(LLM 심판 κ≥0.5)가 인접하나 동일 축은 아니다 |
+| 학생 수준 적합성 | **대응 있음** | KPI `난이도 타당도`(깊이 Spearman ρ≥0.5·폭 전문가 순위 ρ≥0.6) |
+| hallucination | **대응 있음** | PRM/도구 검증 필수 계약 + `수학적 오류율` |
+| Curriculum 범위 이탈 | **대응 있음** | KPI `교육과정 정합률 ≥92%`(블라인드 역매핑) + `MATH-04`(todo·표기 범위 게이트) |
+
+### 11-4b. Week 4 (11/16~11/22) — CMS + QA + Publish
+
+| # | 원 문서 항목 | 판정 | 대응 태스크 / 근거 |
+|---|---|---|---|
+| W4-1 | Draft→Review→QA→Approved→Published→Deprecated/Rollback | **부분 대응** | Draft~Approved는 있다 — `ADMIN-07`(todo·**P0**·DRAFT→PRESCREENED→APPROVED 전이)·`EOS-62`(done·APPROVED_WITH_EDIT)·`CONT-01`(done·검수 게이트). **Published/Rollback은 약하다** — `EOS-50-publish-gate-pipeline`(todo·미착지)·`ADMIN-12`(todo·`problem.is_published`·`publish_at` **소비처 0건 — 게시 축이 선언만 존재**) |
+| W4-2 | CMS 12종 | **부분 대응** | 아래 표 |
+
+**[정정 이력]** 이 표의 1판은 백로그(태스크)만 뒤져 Concept·Problem을 "대응 없음"으로 적었는데 **둘 다 코드에 실재**했다. 부재 판정을 소비자측(실제 라우터)까지 확인하지 않은 오류이며, 아래는 `src/backend/whymath_backend/api/` 실측으로 교체한 2판이다. 측정 명령: 파일별 `@router.(post|put|patch|delete)` 개수.
+
+| 원 문서 CMS | 판정 | 대응 (코드 실측 · main `266c3d55`) |
+|---|---|---|
+| Curriculum (조회·수정·버전) | **부분 대응** | `api/curricula.py` — 읽기 5 · **쓰기 0**. 조회만 되고 수정·버전 표면이 없다 |
+| Concept (CRUD·관계) | **대응 있음** | `api/concepts.py` — POST·PATCH·DELETE 3건, 전부 `RequireContentAdmin`(`Role.CONTENT_ADMIN`) 게이트 (SEC-07 D1) |
+| Skill (Concept 연결) | **대응 없음** | 전용 라우터 0건 |
+| Problem (문제·정답·난이도) | **대응 있음** | `api/problems.py` — POST·PATCH·DELETE 3건 |
+| Solution (풀이 관리) | **부분 대응** | `api/solution_paths.py` — 읽기만, 쓰기 0 |
+| Misconception (Signature·교정) | **대응 없음** | 전용 라우터 0건 |
+| Pedagogy (교수전략) | **대응 없음** | 전용 라우터 0건 |
+| Content (설명/힌트) | **대응 없음** | 전용 라우터 0건 |
+| QA (검수상태) | **부분 대응** | `ADMIN-07`(todo·**P0**·검수 큐 UI·Phase B 진입점) — **미착지** |
+| Version (변경이력) | **대응 있음** | `EOS-49`(done·ConceptVersion 계약·VersionHeader 공유) |
+| Publish (배포) | **부분 대응** | `EOS-50`(todo·미착지)·`ADMIN-12`(todo·`is_published` 소비처 0건) |
+| Rollback (이전 버전 복구) | **대응 없음** | 내가 찾은 방법으로는 0건 |
+
+**집계**: 대응 있음 3 · 부분 대응 4 · 대응 없음 5.
+
+**중요한 단서 — 표면은 있으나 운영자 화면이 아니다**: Concept·Problem 쓰기는 `/v1/admin/*`이 아니라 `/v1/concepts`·`/v1/problems`에 있고, `ADMIN-05`가 적었듯 **`/v1/admin/*` 라우터는 0건**이다(내 실측도 0건). 즉 *API는 있고 CMS는 없다* — 콘텐츠 운영자가 쓰려면 `ADMIN-06`(백오피스 웹 셸)·`ADMIN-04`(모듈 레지스트리)가 필요한데 **둘 다 미착지**다. 원 문서가 Week 4에서 요구하는 것은 API가 아니라 **개발자 없이 쓸 수 있는 화면**이므로, 이 구분이 판정의 핵심이다.
+
+---
+
+## §12. 대조표 ⑤ — 측정 지표 7종 ↔ 저장소 KPI 정본
+
+### 12-1. 핵심 발견 — 두 지표군은 **측정 평면이 다르다**
+
+1회차 §7-②는 "7종을 그냥 얹으면 KPI 정본이 셋이 된다"고 적었다. 원 문서를 받고 보니 **더 정확한 진단은 다르다** — 저장소 KPI 12종은 **생산(저작) 공정**을 재고, 원 문서 7종은 **제품 완성도**를 잰다. 겹치는 축이 거의 없다.
+
+| 저장소 KPI 정본 12종 (`ops/validation_scorecard.py`) | 재는 것 |
+|---|---|
+| HIT(CU당 인간 개입 ≤4분) · 자동검증 1차 통과율 ≥85% · 재작업률 ≤15% · 처리량 ≥30 CU/h · 단위 비용 ≤250원/CU · 실패 유형 분포 ≥60% | **공정 6종** — 콘텐츠를 *얼마나 싸고 빠르게 만드는가* |
+| 수학적 오류율 ≤0.5% · 교육과정 정합률 ≥92% · 오개념 라벨 정확도 ≥85% · 풀이 비약 지적률 ≤10% · 난이도 타당도 · 힌트 누설률 0% | **내용 6종** — 만든 콘텐츠가 *맞는가* |
+
+### 12-2. 7종 개별 대조
+
+| # | 원 문서 지표 | 목표 | 판정 | 저장소 대응 |
+|---|---|---|---|---|
+| ① | Curriculum Coverage | ≥98% | **관측 있음·판정 없음** | `CUR-02`·`EOS-82`(done)·`S4-03`(todo)가 커버리지를 **관측**한다. 98% 임계를 exit code로 거는 게이트는 0건 |
+| ② | Concept Completeness | ≥95% | **대응 없음** | 1차·2차 모두 0건. 인접한 것은 `ARCH-43`(done)인데 그것은 오히려 **"필드 채움 검사는 배제 선언한 과목도 통과한다(반증력 0)"**고 판정한 태스크다 — 즉 저장소는 이 방식의 지표를 *반증력 없음*으로 이미 한 번 기각했다. **7종 중 가장 주의가 필요한 항목** |
+| ③ | Problem Coverage | ≥95% | **부분 대응** | `EOS-52`(done)가 앵커 8단원 문항 코퍼스를 실측. Skill별 문항 확보율을 상시 재는 장치는 0건 |
+| ④ | Solution QA Pass | ≥99% | **대응 있음 (더 엄격)** | 저장소 `수학적 오류율 ≤0.5%` = **99.5% 통과**. 원 문서 99%보다 높다. 측정 근거는 `EOS-60`(done·혼동행렬) |
+| ⑤ | Learning Loop Success | ≥95% | **부분 대응** | `EOS-22`(done·Gate 2 판정 — **무개입 연속 3루프 미충족으로 FAIL**)·`EOS-81`·`EOS-86`(done). E2E 완료*율*을 백분율로 재는 장치는 0건 — 현재는 **연속 N루프 통과/실패**의 이진 판정이다 |
+| ⑥ | Critical Defect | 0 | **대응 있음** | Hard Gate `F-Ⅰ~F-Ⅴ` — 하나라도 triggered면 `NO_GO`. 원 문서의 "0"과 같은 뜻 |
+| ⑦ | Graph Connectivity Coverage (추천) | — | **관측 있음·판정 없음** | `CUR-05`(done)·`CUR-06`(todo) — **학교급 경계 통과 엣지 20/2210 = 0.9%·고→대 0**. 원 문서가 "이 값이 높아야 Education OS"라고 한 바로 그 지표이며, **실측값이 매우 낮다** |
+
+### 12-3. 편입 판정 — 여전히 Kiki 결정 사항
+
+측정 평면이 다르므로 "정본이 셋"이 아니라 **"정본 12종(생산) + 신설 7종(제품)"의 2평면 구조**가 자연스럽다. 다만 ④는 이미 더 엄격한 축이 있어 **중복이고**, ②는 저장소가 반증력 없음으로 기각한 방식이다. 그래서 7종을 그대로 얹으면 안 된다 — **①③⑤⑦ 4종 신설 · ④ 기존 흡수 · ⑥ 기존 흡수 · ② 재설계**가 내 권고이나, 이것은 등재가 아니라 제안이며 판정은 Kiki 몫이다.
+
+---
+
+## §13. 대조표 ⑥ — Release Gate A~E ↔ 저장소
+
+**표기 주의**(§7-③ 유지): 저장소에는 이미 "Gate 0 A~E"(Phase 0)와 `G0~G5`(선언 부록 E)가 있다. 아래는 전부 **`Phase 3 Release Gate X`**를 줄여 쓴 것이며, 등재 시에는 전체 표기가 필요하다.
+
+| Gate | 원 문서 요구 | 판정 | 근거 |
+|---|---|---|---|
+| **A** 학생 폐쇄루프 | 진단→추천→학습→문제→답안→채점→오개념→Hint/Tutor→Mastery→다음추천 **10단, 사람이 DB 미수정** | **부분 대응** | 루프 자체는 있다 — `EOS-100`·`EOS-105`·`EOS-109`·`EOS-116`(done). 무개입 판정은 `EOS-22`가 **FAIL**(무개입 연속 3루프 미충족). 시나리오 회귀는 `EOS-119`(진행 중·`SCENARIO-001~010`) — 다만 `EOS-120`이 **PED-36과 중복 소유**를 지적 중 |
+| **B** 콘텐츠 | 대표 과정 주요 Curriculum/Concept/Skill이 출시 기준 이상 | **부분 대응** | `EOS-52`(done·앵커 8단원 실사)·`EOS-95`·`EOS-79`(done). **"출시 기준"의 수치가 저장소에 없다** — §12-①②③이 전부 판정 장치 부재 |
+| **C** 운영 (수정→QA→승인→Publish) | 콘텐츠 오류를 개발자 없이 고쳐 배포 | **부분 대응** | 4단 중 *수정*은 API로 가능하다(Concept·Problem CRUD·`CONTENT_ADMIN` 게이트). *QA*는 `ADMIN-07`(todo·P0)·*Publish*는 `EOS-50`(todo) 둘 다 **미착지**, *Rollback*은 0건. 결정적으로 **`/v1/admin/*` 라우터가 0건**이라 "개발자 없이"가 성립하지 않는다(§11-4b). **5개 Gate 중 가장 취약** |
+| **D** 데이터 (이벤트) | 8종 이벤트 기록 | **대응 있음 (초과)** | 아래 13-1 |
+| **E** EOS Architecture 경계 | Math 로직이 Core에 침투하지 않음 | **대응 있음** | `lint-imports` 아키텍처 계약이 CI에서 집행 · `ARCH-43`(done·과목 중립성 반증 가능 검사)·`ARCH-48`·`ARCH-59`(done·LLM↔상태 권위 경계 AST 가드)·`EOS-92`(done·Physics 프로브) |
+
+### 13-1. Gate D 이벤트 8종 ↔ 저장소 카탈로그 실측
+
+저장소 카탈로그 = `l2/learning_event_trace.py` **19종**.
+
+| 원 문서 이벤트 | 저장소 | 판정 |
+|---|---|---|
+| `learning_started` | `diagnostic_started` · `learner_state_created` | **이름만 다름** — 역할 대응 |
+| `concept_viewed` | `concept_selected` + `content_viewed` | **둘로 분화** — 역할 대응 |
+| `problem_attempted` | `problem_attempted` | 정확히 일치 |
+| `answer_submitted` | `answer_submitted` | 정확히 일치 |
+| `misconception_detected` | `misconception_detected` | 정확히 일치 |
+| `hint_requested` | `hint_requested` (+`hint_provided`) | 일치 + 초과 |
+| `mastery_updated` | `mastery_updated` (+`skill_mastery_updated`) | 일치 + 초과 |
+| `recommendation_generated` | `recommendation_generated` | 정확히 일치 |
+
+**판정: 8/8 역할 대응** (이름 일치 6 · 이름 상이 2). 저장소 초과분 11종(`assessment_failed`·`ability_measured`·`skills_resolved`·`verification_recorded`·`stuck_detected`·`visualization_interacted`·`diagnostic_completed` 등).
+**단서**: `learning_started`·`concept_viewed`를 이름으로 grep하면 **0건**이다. 이름으로 부재를 판정했으면 "이벤트 2종 미구현"이라는 오판정이 나왔을 자리다.
+
+---
+
+## §14. 2회차 산출 — 4종
+
+### 14-1. 산출 ① 등재·수정된 태스크
+
+**0건.** 이 회차는 대조 전용이다(§10-2). 1회차 산출(신규 11 + amend 1 + 게이트 1)은 §5 그대로이며 변경하지 않았다.
+
+### 14-2. 산출 ② 원 문서 항목 ↔ 태스크 ID 대조표
+
+**주 항목 39건 + 세부 대조표 36행.** 집계는 기계로 셌다(표별 행 수·판정 키워드 파싱 — 수작업 계수는 1차에 틀렸다).
+
+**주 항목 39건**
+
+| 표 | 행 | 대응 있음 | 부분 대응 | 대응 없음 |
+|---|---|---|---|---|
+| §11-1 Week 1 | 17 | 12 | 5 | 0 |
+| §11-2 Week 2 | 5 | 2 | 2 | 1 |
+| §11-3 Week 3 | 3 | 2 | 1 | 0 |
+| §11-4b Week 4 | 2 | 0 | 2 | 0 |
+| §12 지표 7종 | 7 | 2 | 4 | 1 |
+| §13 Gate A~E | 5 | 2 | 3 | 0 |
+| **합계** | **39** | **20 (51%)** | **17 (44%)** | **2 (5%)** |
+
+**세부 대조표 36행** (주 항목 안을 더 쪼갠 것 — 위 39건과 **중복 계상하지 않는다**)
+
+| 표 | 행 | 요지 |
+|---|---|---|
+| §11-4 Tutor output 스키마 | 8 | 원 문서 제안 8필드 전건 대응 + 저장소 초과 6종 |
+| §11-5 AI 품질 Gate 8축 | 8 | 있음 6 · 부분 2 · 없음 0 |
+| §11-4b CMS 12종 | 12 | 있음 3 · 부분 4 · **없음 5** (코드 실측 2판) |
+| §13-1 Gate D 이벤트 8종 | 8 | **8/8 역할 대응**(이름 일치 6 · 상이 2) |
+
+**주 항목 '대응 없음' 2건**: W2-1(Concept당 문제 6종) · 지표②(Concept Completeness). **이 둘이 원 문서가 요구하는 것 중 저장소에 아무 대응도 없는 전부**다.
+
+**세부의 '대응 없음' 5건**은 전부 CMS다 — Skill·Misconception·Pedagogy·Content의 관리 표면과 Rollback. 여기에 **`/v1/admin/*` 라우터 0건**(운영자 화면 부재)이 겹쳐 Gate C를 '부분 대응'에 묶어 두고 있다.
+
+**판정의 무게**: '대응 없음'이 2건뿐이라는 것은 낙관의 근거가 아니다. **'부분 대응' 17건(44%)의 대부분이 "관측은 하는데 판정(게이트)이 없다" 또는 "태스크는 있는데 미착지"**다 — 예: Content Coverage Rate는 관측하지만 95% 임계를 exit code로 거는 장치가 0건이고, CMS의 그릇인 `ADMIN-04`·`ADMIN-06`은 전부 `todo`다. Phase 3의 실제 작업량은 '없음 2건'이 아니라 **'부분 17건을 닫는 것'**에 있다.
+
+### 14-3. 산출 ③ Not Now ∩ 진행중
+
+§3(1회차)에서 갱신 없음 — 이 회차는 Not Now 태스크를 건드리지 않았다. `NOTNOW-01~12`는 전건 `todo`·P3·게이트 `G-not-now-v1-release-recheck`(pending) 부착 상태 유지.
+
+### 14-4. 산출 ④ 등재할 수 없었던 항목과 이유
+
+| # | 항목 | 사유 |
+|---|---|---|
+| ① | `P3-01~P3-14` 대조 | 세트 02~15/20 **여전히 미첨부**. §7-④ 그대로 |
+| ② | Week 1~4 작업의 **신규 태스크 등재** | 입력은 확보했으나 §10-2 — `P3-01~P3-14`와 중복 등재 위험. 등재 자체를 보류한 것이지 판정 불가가 아니다(1회차와 다른 사유) |
+| ③ | 지표 7종 편입 | §12-3 — 2평면 구조·중복 2종·재설계 1종 판정이 선행. Kiki 결정 |
+| ④ | Gate A~E 등재 | §13 표기 주의 + Gate C 실질 부재. 이름 확정이 선행 |
+| ⑤ | 대표 과정 범위 **동결** | §11 W1-2 — 실사(`EOS-52`)는 있으나 동결 행위의 소유자가 없다. `P3-01`의 몫 |
+| ⑥ | 11/22 일정 충돌 해소 | §7-⑥ 그대로 — 저장소 `G3`와 같은 날짜·다른 판정 대상 |
+
+### 14-5. 새로 드러난 쟁점 — Phase 번호 체계 충돌
+
+원 문서는 **"현재 시점인 2026년 8월 27일"**을 전제하고 Phase 2를 9/28~10/25로 잡는다. 그런데 저장소는 2026-09-19에 이미 Phase 2 Gate 2를 판정했다(`docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md` = FAIL). 원 문서 일정표대로면 그 시점에 Phase 2는 **아직 시작 전**이다.
+
+두 해석이 가능하고 **나는 어느 쪽인지 판정하지 못했다**:
+- ⓐ 저장소가 원 문서 일정보다 앞서 있다(Phase 2를 5주 일찍 끝내고 판정)
+- ⓑ 원 문서의 "Phase 2"와 저장소의 "Phase 2"가 서로 다른 체계다
+
+이것이 확정되지 않으면 **§11~§13 대조표 전체가 엉뚱한 단계에 매핑될 수 있다.** 2회차가 대조만 하고 등재하지 않은 또 하나의 이유다. `G2` 이름 충돌 3회차(선언 §1.3) 선례가 있으므로 가볍게 볼 쟁점이 아니다.
+
+---
+
+## §15. 2회차 완료 판정 — **여전히 부분 충족**
+
+| 축 | 1회차 | 2회차 | 근거 |
+|---|---|---|---|
+| Not Now 12종 보류 등재 | 충족 | 충족(유지) | §5·§2-2 |
+| 원 문서 각 항목 ↔ 태스크 ID 대조표 | 미충족 | **충족** | §11~§13 **주 항목 39건 + 세부 36행** 전수 · 판정 기준 main `266c3d55` |
+| `P3-01~P3-14` 대조 | 미충족 | **미충족** | 미첨부 |
+| 분해 단위 신규 등재 | 미충족 | **보류** | §10-2 — 불가가 아니라 **의도적 보류** |
+
+**3회차 재실행 조건**: `P3-01~P3-14`(세트 02~15/20) 첨부. 그때 할 일은 ⓐ 내 주 항목 39건 열거와 Kiki의 14개 분해 단위를 대조 ⓑ §14-2의 **대응 없음 2건 · 부분 대응 17건 · CMS 세부 없음 5건**을 분해안이 덮는지 확인 ⓒ 안 덮는 것만 신규 등재. `done` 처리는 그때 판정한다.
+
+---
+
+**작성**: 2026-09-22 · `EOS-128-phase3-plan-backlog-conversion` 2회차 · 세션 `claude/compassionate-hypatia-chznsu` · 판정 기준 main `266c3d55`
