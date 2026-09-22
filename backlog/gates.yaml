@@ -524,9 +524,19 @@ gates:
     title: "S3-02 자유사용 대표측정 (S3-01 파일럿 착수 트리거 ③ — 마지막 하나) — 실기기에서 대본 없이 15~30분 자연 사용 후 수확 리포트 전문 회신. 실행 절차 = docs/ops/s3_02_free_use_remeasurement_runbook.md (6항목 브리핑 + A~F 블록). 판정 기준은 2026-07-28 사전등록분 그대로(s3_pilot_briefing.md) — 사후 이동 금지: 유효성 전제 V1 parsed>=1 · V2 판정 모집단 n>=10(권장 15~20) · V3 등호 전이>=1 턴 >=5건 / 합격 P1 unverifiable<=50%(모집단 분모) + P2 Wilson 단측 95% 상한표(n=10→7·15→11·20→15·25→19·30→23) 둘 다 / 즉시 환류 F1 거짓 incorrect>=1건(Kiki 관찰로만 들어온다·기계 미검출) · F2 unverifiable>50%. 판정·기록은 서기(claude)가 한다 — 수확 도구는 판정선을 내지 않는다. 선행 조건: S3-51이 main에 머지된 뒤 실행한다(런북 [A] 자가검증이 --since 인자 유무로 그것을 판별한다 — 옛 판으로 돌리면 2026-07 합성 60제출이 분모에 섞여 거짓 통과가 난다). 합격 시 동반 결정 1건: 파일럿 동의서 변호사 검토를 '외부 작업 출시 전 연기'(2026-07-27 지시)의 예외로 앞당길지 — 법령 유래 절차라 기계 대체 불가."
     kind: human
     assignee: kiki
-    status: pending
+    status: waived
     requested: 2026-09-22
     remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: "2026-09-22 Kiki 지시로 라이브 측정을 12/31 내부완성 이후로 연기 — 이 게이트를 '지금 실행 대기'로 두면 3개월간 7일마다 독촉이 떠 다른 게이트 리마인드까지 무뎌진다(상시 울리는 경고는 소음이 된다). 면제가 아니라 시점 이동이며, 재개 판정은 G-s302-free-use-remeasure-restart가 소유한다(리마인드 100일 = 2026-12-31 즈음 발화). 사전등록 판정 기준(V1~V3·P1·P2·F1·F2)은 그대로 살아 있고 이 게이트 제목에 보존돼 있다 — 재개 시 그 문면을 그대로 승계한다. 측정 도구·런북은 S3-51(PR #1273)로 준비 완료 상태다."
+  - id: G-s302-free-use-remeasure-restart
+    title: "S3-02 자유사용 대표측정 재개 판정 (연기 만료 지점 = 2026-12-31 내부완성 이후) — 2026-09-22 Kiki 지시로 라이브 회차를 12/31 이후로 연기했고, 이 게이트가 그 연기의 만료 지점이다(만료 없는 유예 금지). 판정 3택: ①재개 — 런북 docs/ops/s3_02_free_use_remeasurement_runbook.md 그대로 실행하고 사전등록 기준(V1 parsed>=1 · V2 판정 모집단 n>=10 · V3 등호 전이>=1 턴 >=5건 / P1 unverifiable<=50% 모집단 분모 + P2 Wilson 단측 95% 상한표 n=10→7·15→11·20→15·25→19·30→23 / F1 거짓 incorrect>=1건 즉시 환류 · F2 unverifiable>50%)으로 판정 ②기준 재검토 — 12/31 내부완성으로 앱이 달라졌다면 사전등록 기준의 전제(2026-07-17 실사용 unverifiable 89% 기준선)가 유효한지 먼저 판정하고 필요하면 새 기준을 사전등록한 뒤 측정 ③폐기 — 이 측정을 S3-01 파일럿 착수 트리거에서 내린다(그 경우 트리거 ③ 자체를 브리핑에서 제거한다). 선행 사실: 측정 도구는 준비 완료다(S3-51 · PR #1273 — 회차 구간 필터 --since/--until, 판정 모집단 분모 병기, 등호 전이 축). 종전 게이트 G-s302-free-use-remeasure는 같은 날 waive됐고 그 사유에 이 게이트 id가 적혀 있다 — 면제가 아니라 시점 이동이다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 100
     evidence: null
     cleared_by: null
     notes: ""
