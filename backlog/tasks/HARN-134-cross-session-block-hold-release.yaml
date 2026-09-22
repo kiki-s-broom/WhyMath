@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-134-cross-session-block-hold-release
+title: "차단 홀드의 교차 세션 해제 경로 부재 — 차단한 세션이 끝나면 어떤 세션도 정상 경로로 원격 홀드를 걷을 수 없다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 — task.session 이 null 인 blocked 태스크를 다른 브랜치에서 `unblock` 했을 때 원격 홀드가 남는 것을 테스트로 고정한다(현재: `_release_remote_claim` 이 prev_session or current_branch 를 넘겨 홀더 브랜치와 불일치 → release 가 force 필수 error → best-effort 경고만 남고 로컬만 todo 가 된다).\n② 정본 경로 신설 — 차단 홀드는 착수 점유가 아니므로, 차단 사유가 해소됐을 때 홀더가 아닌 세션도 정상 경로로 걷을 수 있어야 한다. `unblock` 이 원격 홀드의 실제 홀더 브랜치를 읽어 kind == block 인 레코드에 한해 해제하도록 고친다(kind == claim 은 지금처럼 force 필수 유지 — 착수 점유 탈취는 계속 막는다).\n③ 실패 주입 — 홀더 브랜치가 살아 있는 경우·이미 머지된 경우·원격 조회 실패(offline/error) 3종을 주입해 각각 RED 를 확인한다. 특히 offline 을 \"홀드 없음\"으로 읽지 않는지(list_claims 상태 무시 금지) 단언한다.\n④ 침묵 금지 — 해제에 실패하면 현재는 stderr 경고 1줄 뒤 로컬만 todo 로 바뀌어, 대장이 blocked 인데 로컬은 todo 인 분기 상태가 무증상으로 남는다. 실패 시 로컬 전이도 되돌리거나(또는) 분기 상태를 status 화면이 드러내게 한다.\n⑤ 배선 확인 — 신규 테스트가 CI 에서 실제로 실행되는지 확인한 뒤 완료로 친다(tests/harness 잡 소속 명시)."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+  - "tests/harness/**"
+session: null
+notes: "사고 경위(2026-09-22 · EOS-128 2회차 착수 시 실측): EOS-128 은 세션 A(브랜치 claude/new-session-fy0wry)가 \"2회차 입력 대기\"로 차단했고, 그 세션의 작업은 PR #1237 로 main 에 병합돼 종료됐다(브랜치 tip 3d534dcc 가 origin/main 조상). 이후 Kiki 가 원 문서를 첨부해 차단 사유가 해소됐으나, 세션 B(claude/compassionate-hypatia-chznsu)가 `unblock` 을 실행하자 로컬만 todo 로 바뀌고 원격 홀드는 남았다. `start` 는 그 원격 홀드를 CAS conflict 로 읽어 착수를 거부했고, 코드 주석이 밝히듯 --ignore-remote-claim 은 읽기측 판정만 끄므로 이 경로에는 애초에 닿지 않는다(실측: 하네스 분류기도 같은 판정으로 거부).\n\n즉 차단을 건 세션이 끝난 뒤 다른 세션이 사유를 해소하는 것은 이 하네스의 정상 흐름인데(차단 사유가 대부분 외부 입력 대기이므로), 그 흐름에 정본 경로가 없다. 남은 수단은 claims release --force 뿐인데 CLI 자신이 그것을 \"차단 우회\"로 금지하고 있어, 규칙을 지키는 세션은 전진할 수 없고 규칙을 어기는 세션만 전진한다.\n\n원인 지점: cmd_unblock → _release_remote_claim(root, task.id, prev_session) 에서 prev_session 은 task.session 이고, 차단 시 cmd_block 이 그것을 비우므로 항상 None 이 되어 current_branch 로 폴백한다. 홀더 브랜치를 읽지 않는 것이 결함의 핵심이다.\n\n관련: HARN-42 가 \"차단 홀드는 착수 점유가 아니다\" 분기를 넣어 --force 탈취 유도를 막았는데, 그 분기가 안내하는 해소 경로(`unblock`)가 교차 세션에서 동작하지 않는다는 것이 이번에 드러났다. HARN-45(게이트 대기와 차단 전이 분리)는 cancelled 이며 반대 축(block 이 claim 을 반납해 병렬 세션이 집어가는 창)을 다뤘다 — 중복 아님.\n\nCLAUDE.md 상시 실패 fail-open 규칙 해당: _release_remote_claim 은 best-effort 이고 실패해도 진행하므로, 이 결함은 무증상으로 \"대장은 blocked · 로컬은 todo\" 분기를 만든다."
+updated: 2026-09-22
