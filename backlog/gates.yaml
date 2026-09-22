@@ -114,11 +114,11 @@ gates:
     title: "클라우드 MID 좌석 컷오버 승인 — cloud_provider 기본값 anthropic → openrouter 전환 + 학생 대면 서빙 노출. 2026-09-21 Kiki 지시(\"학생 대면까지 한 번에\" → \"학생대면도 오픈라우터로 전환\")가 이 전환의 목적지를 확정했고, 그 지시 자체가 G-arch56-availability-trigger의 발동 조건 ⓐ(학생 대면 트래픽 투입 결정)를 실현시킨다. 이 게이트는 그 실현을 대장에 기록하고 실제 컷오버 시점을 Kiki가 쥐게 한다. clear 전 확인할 것 3건: ①ARCH-62(단가표 좌석 축) 착지 — 없으면 MID 원가가 24.4배 과대 계상돼 guard_cloud가 불필요한 LOCAL 강등을 낸다(무증상) ②ARCH-63(좌석 failover) 착지 + 작동 신호 4종 관측 — 공유 풀 429가 학생 화면 오류로 나가지 않는지 ③ARCH-55 판정문(\"기본 핀 불변\")과 tests/backend/l3/test_cloud_provider_selector.py 동결 문면의 갱신안 검토. 판정 3택: ①컷오버 승인(저작+학생 대면 동시) ②저작 경로만 먼저 승인하고 학생 대면은 failover 실측 후 재판정 ③보류. 주의(거부의 우회 금지): test_student_facing_app_does_not_use_the_selector의 docstring이 \"ARCH-56을 끝내고 → 게이트를 clear하고 → 그 근거로 이 테스트를 고친다. 반대 순서는 게이트를 우회하는 것이다\"라고 순서를 못박고 있다. ARCH-63 failover는 ARCH-56이 재려던 리스크를 구조적으로 해소하므로 ARCH-56의 acceptance를 \"차단 판정\"에서 \"운영 지표 기준선\"으로 재정의하는 것이 맞으며, 그 재정의도 이 게이트의 판정 범위에 포함한다. 설계 근거 = docs/architecture/03c_cloud_tier_transition_v2.md"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-21
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main bcbbcd73 — PR #1255 머지 커밋. 이 해시 기준으로 게이트 본문이 trunk에 도달해 있다.\n\n[판정] 2026-09-21 Kiki 판정 = 3택 중 ①컷오버 승인(저작 + 학생 대면 동시). 세션이 3택과 근거를 제시하고 Kiki가 선택했다. 같은 판정으로 ARCH-56의 acceptance 재정의(차단 판정 → 운영 지표 기준선)도 승인 범위에 포함한다 — 게이트 문면이 그 재정의를 이 게이트의 판정 범위로 명시하고 있다.\n\n[게이트 문면이 요구한 clear 전 확인 3건 — 이 시점 상태와 그것이 우회가 아닌 근거]\n① ARCH-62(단가표 좌석 축) 착지 = 미착지(todo). ② ARCH-63(좌석 failover) 착지 + 작동 신호 4종 관측 = 미착지(todo).\n  → 이 clear가 ①②를 건너뛰게 하지 않는다. ARCH-64의 depends_on에 두 태스크가 기계로 집행돼 있어(backlog/tasks/ARCH-64-cloud-mid-seat-cutover.yaml) selector가 ARCH-64를 착수 후보로 계산하지 않는다. 게이트가 유일하게 쥐고 있던 것은 판정 그 자체이고, 그것을 Kiki가 내렸다. 실행 순서는 대장이 계속 지킨다.\n③ ARCH-55 판정문 + tests/backend/l3/test_cloud_provider_selector.py 동결 문면 갱신안 = 미수행.\n  → ARCH-64 acceptance ②가 이 축을 소유한다(\"코드만 바꾸고 동결 문면을 두면 그 테스트가 이유를 잃은 채 실패한다\"). 별도 승계 태스크 불요.\n\n[승인의 범위 한계 — 명시]\n판정 ①은 학생 대면 노출의 방향을 확정하지만 그 시점의 가용성은 아직 측정된 적이 없다. seat_failover_rate는 ARCH-63 착지 전까지 값 자체가 존재하지 않으며, 2026-09-17~18 4회차 실측(429 실패율 30%→15%→0% · limit_source=upstream_provider_shared_pool · is_byok=false · p95 212초)은 표본 20회라 공급사 특성과 공유 풀 잡음을 가르지 못한다. ARCH-64 acceptance ⑤의 라이브 대조 1회에서 failover 비율이 높게 나오면 그것은 \"보호가 작동 중\"이 아니라 1차 좌석 부적합 신호이며(설계문서 03c §3.3), 그때 openrouter_allowed_providers 이중화(baseten/fp8 — 정밀도 동일)를 Kiki에게 다시 묻는다. 이 clear는 그 재질의를 면제하지 않는다.\n\n[부수] 이 지시는 G-arch56-availability-trigger의 발동 조건 ⓐ(OpenRouter 경로가 학생 대면 트래픽을 받기로 결정된 때)를 실현시킨다. 그 게이트는 별도로 판정한다."
+    cleared_by: kiki
     notes: ""
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
