@@ -11,7 +11,8 @@ eos_priority: P2
 owner: claude
 depends_on:
   - WEB-01-landing-static-v1
-requires_gates: []
+requires_gates:
+  - G-web01-landing-legal-review
 acceptance:
   - "web_strategy.md §4 비교표 기반 Kiki 확정이 MEMORY 결정 로그에 기록된 후 착수 — 확정 전 외부 프로비저닝 금지"
   - "HTTPS·커스텀 도메인·배포 자동화(수동 승인 트리거) 실동작 확인 — TLS·프록시 미프로비저닝 전제, deploy.yml 골격과 별개 경로"
@@ -20,5 +21,5 @@ paths:
   - "src/web/webapp/**"
   - ".github/workflows/**"
 session: null
-notes: "web_strategy.md §4 정본. 배포 절차 확정분은 deployment_cd_runbook.md 형식으로 후속 반영\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "web_strategy.md §4 정본. 배포 절차 확정분은 deployment_cd_runbook.md 형식으로 후속 반영\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-22] WEB-01 acceptance ③ 집행 — 공개 전 변호사 검토 게이트를 배포 태스크에 부착한다. 게이트를 등재만 하고 어디에도 붙이지 않으면 selector가 WEB-02를 착수 가능 후보로 계산해(depends_on만 보고 게이트는 requires_gates로만 본다) 검토 없이 공개 배포로 갈 수 있다. G-web01-required-check-register는 부착하지 않는다 — 랜딩 공개의 선결이 아니라 머지 게이트 배선 축이라 WEB-02를 막을 이유가 없다."
+updated: 2026-09-22

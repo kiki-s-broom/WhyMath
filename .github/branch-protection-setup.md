@@ -79,6 +79,7 @@ main
 - `mobile — flutter analyze·test`
 - `concept-reach — mobile 호출 표면 회귀 가드`
 - `web — graphing-calculator test·build`
+- `webapp — 공개 랜딩 lint·build`
 - `infra-contracts — 운영 자산 계약 테스트 (tests/infra)`
 - `docker-build — 이미지 빌드·기동 스모크(/health/live)`
 - `infra/phaiakes9 — bash syntax`

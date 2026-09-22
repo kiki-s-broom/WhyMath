@@ -149,6 +149,16 @@ _NON_CONTRACT_OUTPUT_EXCLUSIONS: dict[str, str] = {
         "최상위 계약이 아니라 data/corpus/ 변경을 재는 축이라 계약 매치 대상이 아니다. "
         "죽은 플래그가 되지 않는지는 계약 ⑦(test_no_dead_changes_flag)이 별도로 강제한다."
     ),
+    "webapp": (
+        "WEB-01 공개 랜딩 잡(webapp — lint·build). 랜딩은 **백엔드 호출 0**이고 data/ 최상위 "
+        "계약을 읽는 코드가 없다 — 실측(2026-09-22): 웹앱 추적 소스 20건 × 계약 파일 8건 "
+        "전수 대조에서 파일명 참조 0건(access_matrix·notation_contract·notation_missing_baseline·"
+        "notation_support_manifest·render_contract·scene_contract·segmentation_contract·"
+        "visual_style_contract). 계약이 바뀌어도 이 잡의 판정(eslint·정적 export 빌드)은 "
+        "달라지지 않는다. 그 전제(호출 0)는 tests/infra/test_webapp_landing_governance.py가 "
+        "동결하므로, 랜딩이 계약을 소비하기 시작하면 그쪽이 먼저 RED가 된다. "
+        "죽은 플래그가 되지 않는지는 계약 ⑦(test_no_dead_changes_flag)이 별도로 강제한다."
+    ),
 }
 
 # backend 잡이 *실제로 읽는* data/ 하위·비-data 입력 루트 → 그 루트가 backend 필터 안에 있어야

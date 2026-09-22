@@ -8,7 +8,9 @@
 
 동결하는 계약
 -------------
-① as-found(항목 22·고유 16·unpinned 7) → 16건 전부 pin·중복 0·변경 7건
+① as-found(문서 체크 전건 + TWINS 중복 = 항목 N) → 고유 전건 pin·중복 0·변경 len(TWINS)+1건
+   (절대 개수를 박지 않는다 — 잡이 하나 늘면 그 자리에서 RED가 나지만 그건 이 테스트가
+   지키려는 불변식이 아니라 목록 길이일 뿐이다. 실측 *구조*만 동결한다.)
 ② 본문에 쓰기 가능 필드만 남고 읽기 전용 필드는 없다
 ③ status 외 규칙·status 규칙의 다른 파라미터·최상위 필드는 바이트 동일
 ④ 거부 4종(규칙 부재·타 앱 pin·branch-rules 형태·항목 형식 이상) → exit 2 + 고유 원인, 본문 미작성
@@ -98,10 +100,19 @@ def _ruleset(checks: list[tuple[str, int | None]]) -> dict[str, Any]:
 
 
 def _as_found() -> dict[str, Any]:
-    """2026-09-05 실측 분포: pinned 15 + unpinned 7(그중 concept-reach는 pin 쌍 없음) = 22."""
-    checks: list[tuple[str, int | None]] = [(n, IID) for n in _documented() if n != GRADE_A]
+    """2026-09-05 실측 *구조*: 문서 체크가 전부 pin된 상태 + TWINS의 unpinned 중복 + GRADE_A 미pin.
+
+    항목 수는 문서 목록 길이에서 파생시킨다. 절대값(2026-09-05 당시 22)을 박아 두면 CI 잡이
+    하나 늘 때마다 이 픽스처가 RED가 되는데, 그건 pin 로직의 결함이 아니라 목록이 자란 것이다
+    (실측: WEB-01이 `webapp` 잡을 추가하자 22→23으로 20건 실패). 대신 **0건·목록 소실**은
+    여전히 실패시킨다 — 그건 측정 실패이지 통과가 아니다.
+    """
+    documented = _documented()
+    assert GRADE_A in documented, f"픽스처 전제 붕괴 — {GRADE_A}가 문서 목록에 없다"
+    assert set(TWINS) <= set(documented), "픽스처 전제 붕괴 — TWINS가 문서 목록 밖이다"
+    checks: list[tuple[str, int | None]] = [(n, IID) for n in documented if n != GRADE_A]
     checks += [(n, None) for n in TWINS] + [(GRADE_A, None)]
-    assert len(checks) == 22
+    assert len(checks) == len(documented) + len(TWINS)
     return _ruleset(checks)
 
 
@@ -131,13 +142,14 @@ def _run(ruleset: Any, tmp_path: Path, encoding: str = "utf-8") -> tuple[int, Pa
 # ---------------------------------------------------------------------------
 
 
-def test_as_found_is_normalized_to_sixteen_pinned(tmp_path: Path) -> None:
+def test_as_found_is_normalized_to_all_documented_pinned(tmp_path: Path) -> None:
     plan = pin.build_plan(_as_found())
     after = _status_checks(plan.body)
-    assert len(after) == 16
+    assert len(after) == len(_documented())
     assert {e["context"] for e in after} == set(_documented())
     assert all(e["integration_id"] == IID for e in after)
-    assert len(plan.changed_rows) == 7, [r.context for r in plan.changed_rows]
+    # 변경 = TWINS 중복 제거 + GRADE_A pin 부여. 이미 pin된 나머지는 변경 0이어야 한다.
+    assert len(plan.changed_rows) == len(TWINS) + 1, [r.context for r in plan.changed_rows]
     assert any(r.context == GRADE_A and r.before == (None,) for r in plan.changed_rows)
 
     code, out = _run(_as_found(), tmp_path)
