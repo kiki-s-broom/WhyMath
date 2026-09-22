@@ -1,6 +1,6 @@
 # 빌드 하네스 (Build Harness) — 작업일정 관리·순차 조율 표준
 
-> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.5 (2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
+> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.6 (2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
 >
 > 이 문서의 "빌드 하네스"는 프로젝트 *구축을 관리하는* 레이어다.
 > `src/backend`의 WH-1(튜터링)·WH-S(솔버)는 **제품 런타임 하네스**로 완전히 별개다.
@@ -759,7 +759,15 @@ python3 scripts/harness/backlog.py start|done <id> --as kiki ...  # 사람-소�
 python3 scripts/harness/backlog.py block <id> --reason "..." / unblock <id>
                     # block은 원격 대장에 kind=block 홀드를 **게시**한다(HARN-42/48) —
                     # 머지 없이 병렬 세션의 start가 즉시 거부된다. unblock이 그 홀드를 걷는다
-python3 scripts/harness/backlog.py gates list|add|clear|waive|show   # add = 게이트 등재 CLI(HARN-18) — gates.yaml 손편집 금지
+python3 scripts/harness/backlog.py gates list|add|amend|clear|waive|show   # add = 게이트 등재 CLI(HARN-18) — gates.yaml 손편집 금지
+python3 scripts/harness/backlog.py gates amend <G-id> --reason "..." [--title "<새 제목>"] [--remind-after-days <N>]
+                    # 등재된 게이트의 **문면·독촉 주기 정정**(HARN-124). 종전에는 --title·--remind-after-days가
+                    # add 전용이라 한 번 등재된 게이트가 틀려도 고칠 CLI가 0이었다(손편집은 금지이므로 수단 자체가 없었다).
+                    # 실효값은 그 자리에 덮어쓰고 **옛 값과 사유는 corrections[]에 append**한다 — 읽는 쪽(브리핑·
+                    # gates list·show)을 한 곳도 고치지 않아야 "정정했는데 화면은 옛 문면"이 구조적으로 불가능해진다.
+                    # waive와 다르다: waive는 status를 바꿔 대기 태스크를 **해금**하므로 '요건은 살아 있고 시점만
+                    # 미뤘다'를 표현할 수 없다. amend는 status·evidence를 건드리지 않는다.
+                    # 거부 4종(게이트 부재·--reason 누락·정정 대상 누락·무변경)은 전부 exit 1 + gates.yaml 바이트 동일.
 python3 scripts/harness/backlog.py gates show <id>   # 사람에게 게이트를 서술할 때는 반드시 이 경로를 거친다(HARN-92) —
                     # title은 등재 시점 질문이라 status가 cleared/waived로 바뀌어도 갱신되지 않는다(append 전용·HARN-76).
                     # `gates list`는 title과 status만 보여줄 뿐 근거는 안 보인다 — title만 옮겨 적으면 이미 뒤집힌
@@ -825,6 +833,8 @@ python3 scripts/harness/board.py                   # 작업 보드 HTML (work/bo
 | depends_on 제거 | `amend <id> --remove-depends <full-id> --reason '...'` | HARN-67 ③ |
 | requires_gates 탈착(오부착) | `amend <id> --remove-gate <G-id> --reason '...'` — 게이트 status 불변 | HARN-67 ⑤ |
 | notes 어구 치환 | `amend <id> --notes-replace "구문자" "신문자" --reason '...'` — 구문자 정확히 1회 | HARN-67 ⑥ |
+| **게이트 제목 정정** | `gates amend <G-id> --title '<새 제목>' --reason '...'` — 실효값 덮어쓰기 + 옛 값 `corrections[]` append | HARN-124 ① |
+| **게이트 독촉 주기 정정** | `gates amend <G-id> --remind-after-days <N> --reason '...'` — status 불변(waive와 구분) | HARN-124 ⑤ |
 | cancelled 복원 | (미구현) | HARN-69 · **todo(미착지)** |
 | **ID 개명(rename)** | **미구현 — 의도적** | 태스크 미등재(상위 세션 결정) |
 

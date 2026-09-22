@@ -248,6 +248,16 @@ class Gate:
     # 스쿼시로 git 저자가 소실됐으므로 사후에 알 수 없다.
     cleared_by: str | None = None
     notes: str = ""
+    #: 등재 후 문면·주기 정정 이력 (HARN-124) — **append-only**.
+    #:
+    #: 실효값은 `title`·`remind_after_days` 그 자리에 덮어쓰고, **옛 값과 사유를 여기 남긴다.**
+    #: 반대 설계(원 필드를 동결하고 정정본을 별도 리스트에 쌓아 표시 시 해석)도 acceptance ①의
+    #: 후보였으나 택하지 않았다 — 그러면 `gates list`·브리핑·selector 등 *읽는 쪽 전부*가
+    #: 해석 로직을 거쳐야 하고, 한 곳이라도 빠뜨리면 "정정했는데 화면은 옛 문면"이 된다.
+    #: 그 미배선이 정확히 acceptance ②가 막으려는 실패라, 읽는 쪽을 0곳 고치는 쪽을 골랐다.
+    #: 이력 보존(HARN-20 이후의 append-only 근거)은 이 리스트가 담당한다 — 원 제목은 첫
+    #: 정정 기록 안에 그대로 남아 복원 가능하다.
+    corrections: list[str] = field(default_factory=list)
 
     def validate(self) -> list[str]:
         errors: list[str] = []
