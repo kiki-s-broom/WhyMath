@@ -1,0 +1,247 @@
+/*
+ * 백오피스 셸 스타일 — 랜딩과 **같은 토큰**(globals.css)을 쓰고 레이아웃만 다르다.
+ * 색을 새로 정의하지 않는 이유: 토큰이 둘이 되면 다크모드·대비비 실측이 두 벌이 된다.
+ * 접근성 기준(대비 4.5:1·rem 단위·focus-visible 유지)은 globals.css의 전제를 승계한다.
+ */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--wm-line);
+  background: var(--wm-surface);
+}
+
+.brand {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.brandTag {
+  font-weight: 500;
+  color: var(--wm-ink-soft);
+}
+
+.headerNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--wm-ink-soft);
+}
+
+.signOut {
+  margin-left: auto;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 999px;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.sidebar {
+  flex: 0 0 18rem;
+  min-width: 15rem;
+  padding: 1.1rem 1rem;
+  border-right: 1px solid var(--wm-line);
+  background: var(--wm-surface);
+}
+
+.sidebarNote {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--wm-ink-soft);
+}
+
+.main {
+  flex: 1 1 24rem;
+  padding: 1.5rem 1.25rem 3rem;
+  max-width: var(--wm-measure);
+}
+
+/* ── 좌측 내비 ───────────────────────────────────────────────────────── */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.navSection {
+  display: block;
+}
+
+.navSectionTitle {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wm-ink-soft);
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.navItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.92rem;
+}
+
+.navLink {
+  color: var(--wm-accent);
+}
+
+/* 비활성은 회색으로만 구분하지 않는다 — 옆의 배지가 사유를 글자로 말한다(색 단독 전달 금지) */
+.navLinkDisabled {
+  color: var(--wm-ink-soft);
+}
+
+.navBadge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--wm-ink-soft);
+  border: 1px solid var(--wm-line);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  white-space: nowrap;
+}
+
+/* ── 상태 알림 ───────────────────────────────────────────────────────── */
+
+.notice {
+  border: 1px solid var(--wm-line);
+  border-left: 4px solid var(--wm-accent);
+  border-radius: var(--wm-radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.75rem;
+  background: var(--wm-surface);
+}
+
+.noticeTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.noticeDetail {
+  margin: 0 0 0.4rem;
+  font-size: 0.92rem;
+}
+
+.noticeAction {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--wm-ink-soft);
+}
+
+/* ── 인증 입력 ───────────────────────────────────────────────────────── */
+
+.gate {
+  max-width: 34rem;
+  border: 1px solid var(--wm-line);
+  border-radius: var(--wm-radius);
+  padding: 1.25rem;
+  background: var(--wm-surface);
+}
+
+.gateTitle {
+  margin: 0 0 0.6rem;
+  font-size: 1.15rem;
+}
+
+.gateNote {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--wm-ink-soft);
+}
+
+.gateLabel {
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 0.3rem;
+}
+
+.gateInput {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 8px;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font: inherit;
+}
+
+.gateError {
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+  color: var(--wm-accent-ink);
+}
+
+.gateSubmit {
+  margin-top: 1rem;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--wm-accent);
+  border-radius: 999px;
+  background: var(--wm-accent);
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ── 홈 ──────────────────────────────────────────────────────────────── */
+
+.home {
+  display: block;
+}
+
+.homeTitle {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+}
+
+.homeLead {
+  margin: 0 0 1.75rem;
+  font-size: 1rem;
+}
+
+.homeSubTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1.02rem;
+}
+
+.homeBody {
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .gateSubmit {
+    color: var(--wm-paper);
+  }
+}

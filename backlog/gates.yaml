@@ -1,5 +1,15 @@
 # 사람 게이트 대장 — clear는 evidence 필수 · 사람이 직접 닫으면 --as <담당자>(HARN-60)
 gates:
+  - id: G-admin06-browser-menu-call
+    title: "백오피스 셸 실 브라우저 menu 호출 확인 — 허용 origin에서 200+내비 렌더 / 비허용 origin에서 차단 (ADMIN-06 acceptance ②의 사람 축)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-22
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-amd395-perf-baseline
     title: "Phaiakes9(AMD 395/8060S) GPU 추론 베이스라인 측정 — docs/ops/amd395_local_llm_performance.md Phase 0~1 실행(evidence_*.txt·bench_*.csv). 라우터 LOCAL_LATENCY_MS 보정·QUALITY 티어 판단의 선결"
     kind: human

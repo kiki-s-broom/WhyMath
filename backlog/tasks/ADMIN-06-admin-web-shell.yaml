@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: web
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,11 +17,13 @@ acceptance:
   - "정본화: src/web/webapp/app/admin/ 셸 — 좌측 내비는 menu API 1회 호출로 파생 렌더, 하드코딩 nav 배열 0을 정적 검사로 동결(04 §2 원칙7)"
   - "집행: 백엔드 CORS 배선(config에 origin 허용 목록·기본 빈 목록=전면 차단·와일드카드+credentials 조합 불가) + 실 브라우저에서 menu API 호출 확인 — 허용/비허용 origin이 다른 결과를 냄을 테스트로 동결"
   - "내부망 한정·demo 토큰 금지·실 신원 로그인만(04 §4·§5) — 공개 노출 배포 설정 부재 확인"
-artifacts: []
+  - "[정정 2026-09-22 · 범위 분할] acceptance ②의 기계 축(백엔드 CORS 배선 + 허용/비허용 origin이 다른 결과를 냄)은 충족했다 — 미들웨어·deny-by-default·와일드카드+credentials 부팅 거부는 SEC-26(2026-09-11)이 선행 착지했고, ADMIN-06은 셸이 실제로 보내는 요청(GET /v1/admin/menu + Access-Control-Request-Headers: authorization)이 origin에 따라 갈리는 것을 tests/backend/test_cors_policy_freeze.py의 TestAdminMenuPreflightForWebShell로 동결했다. 사람 축(실 브라우저에서의 menu 호출 확인)은 게이트 G-admin06-browser-menu-call로 분리했고 ADMIN-07이 그 게이트를 requires_gates로 물고 있다 — 이 태스크의 done은 기계 축까지의 완료를 뜻한다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1288"
 paths:
   - "src/web/webapp/**"
   - "src/backend/whymath_backend/**"
   - "tests/backend/**"
 session: null
-notes: "04 §8 ADMIN-WEB 제안의 등재. WEB-01 앱 골격 공유(단일 코드베이스·배포 도메인만 분리 — 04 §1). CORS는 브라우저→API 첫 실호출 시점인 여기서 배선(실측: CORSMiddleware 0건·2026-08-10)\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "04 §8 ADMIN-WEB 제안의 등재. WEB-01 앱 골격 공유(단일 코드베이스·배포 도메인만 분리 — 04 §1). CORS는 브라우저→API 첫 실호출 시점인 여기서 배선(실측: CORSMiddleware 0건·2026-08-10)\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-22] acceptance 2의 사람 축을 게이트로 분리 — 기계 축과 사람 축의 완료 경계를 대장에 명시"
+updated: 2026-09-22

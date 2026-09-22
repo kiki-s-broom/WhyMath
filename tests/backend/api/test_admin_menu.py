@@ -10,8 +10,13 @@
 ④ **섹션 순서를 서버가 준다** — 프런트가 순서 배열을 들고 있으면 그 자체가 하드코딩 nav의
    재발이다(원칙7).
 
+⑤ **데모 계정은 403** (ADMIN-06) — 04 §4 "콘솔은 실 신원 필수". 이 경로가 모듈 가드에서
+   면제된 것은 *역할* 축의 면제일 뿐 *신원* 축의 면제가 아니다. 백오피스 셸이 앱 로드 시
+   가장 먼저 부르는 곳이라, 여기가 열려 있으면 데모 토큰으로 콘솔 골격이 그려진다.
+
 ①②가 서로의 대조군이다: 같은 엔드포인트가 *인증 없음*에는 401을, *권한 없음*에는 200+빈
 목록을 내야 한다. 한쪽만 보면 "전부 막힌다"·"전부 열린다" 양쪽 오구현이 통과한다.
+②⑤도 대조군이다: 둘 다 "관리 권한이 아닌 호출"인데 결과가 갈려야 한다(빈 메뉴 vs 403).
 """
 
 from __future__ import annotations
@@ -28,12 +33,20 @@ from whymath_backend.api.admin_module_registry import (
     all_modules,
     visible_modules,
 )
+from whymath_backend.api.auth import email_hash
+from whymath_backend.api.demo_auth import DEMO_EMAIL
 from whymath_backend.app import create_app
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.schema.enums import Role
 
 _ADMIN_USER = UserProfile(user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN)
 _STUDENT_USER = UserProfile(user_id=uuid.uuid4(), role=Role.STUDENT)
+# 데모 판정은 *계정 동일성*으로 한다(토큰에 발급 출처 표식이 없다 — `is_demo_account` docstring).
+# 그래서 픽스처도 역할이 아니라 email_hash로 만든다: **관리 역할을 가진 데모 계정**이라야
+# "역할은 되는데 신원이 데모"라는 이 계약의 대상 상태가 된다(역할로 막히면 대조가 무효다).
+_DEMO_ADMIN_USER = UserProfile(
+    user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN, email_hash=email_hash(DEMO_EMAIL)
+)
 
 _MENU_PATH = "/v1/admin/menu"
 
@@ -117,3 +130,22 @@ def test_every_role_gets_a_well_formed_response(role: Role) -> None:
         response = client.get(_MENU_PATH)
     assert response.status_code == 200
     assert isinstance(response.json()["sections"], list)
+
+
+def test_demo_account_is_403_even_with_admin_role() -> None:
+    """계약 ⑤ — 데모 계정은 역할이 맞아도 메뉴를 못 받는다(04 §4 · ADMIN-06).
+
+    대조군은 바로 아래 `test_non_demo_admin_with_same_role_gets_menu`다 — 같은
+    `CONTENT_ADMIN` 역할이 한쪽은 403, 한쪽은 200이어야 이 검사가 *신원* 축을 실제로 보는
+    것이다. 대조군이 없으면 "전부 403" 오구현이 통과한다.
+    """
+    resp = _client(_DEMO_ADMIN_USER).get(_MENU_PATH)
+    assert resp.status_code == 403
+    assert "실 신원" in resp.json()["detail"]
+
+
+def test_non_demo_admin_with_same_role_gets_menu() -> None:
+    """계약 ⑤ 양성 대조 — 같은 역할의 비데모 계정은 200 + 비어 있지 않은 메뉴."""
+    resp = _client(_ADMIN_USER).get(_MENU_PATH)
+    assert resp.status_code == 200
+    assert resp.json()["sections"], "관리 역할인데 메뉴가 비었다 — 대조군이 무효다"

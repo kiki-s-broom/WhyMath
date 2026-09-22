@@ -67,6 +67,10 @@ src/web/
 
 → **단일 앱 권고**. 단, **배포 요건**: 공개(랜딩) 산출물에 admin 번들이 포함되지 않아야 한다 — 빌드 분리 방식(env 기반 라우트 제외·다중 빌드 타깃 등)은 WEB-01·ADMIN-06 구현에서 결정하되, "공개 빌드에 admin 코드 0"을 검증 가능한 acceptance로 취급한다.
 
+**분리 방식 확정 (ADMIN-06 · 2026-09-22)**: **타깃별 `pageExtensions`**를 택했다. Next가 라우트 파일(`page`·`layout`·`robots`·`sitemap` …)을 *파일명 확장자*로 식별한다는 성질을 그대로 써서, admin 라우트 파일에만 `.admin.tsx` 접미를 주고 `WHYMATH_WEB_TARGET`으로 목록을 바꾼다 — 공개 타깃 `["tsx","ts"]` / admin 타깃 `["admin.tsx","admin.ts"]`. 실측(Next 15.5.25): 공개 빌드 라우트에 `/admin` 0건, admin 빌드 라우트에 `/` 0건으로 **양방향으로 갈린다**. 대안(별도 앱 2개)을 택하지 않은 이유는 위 표 그대로이고, env 기반 런타임 라우트 제외는 *산출물*이 아니라 *동작*만 막으므로 배포 요건을 만족하지 못한다.
+
+검증은 **소스 축과 산출물 축이 나뉜다**: 접미 규약·역방향 import 부재는 `tests/infra/test_webapp_admin_shell_governance.py`와 `test_webapp_landing_governance.py`가 정적으로, 공개 `out/`의 `/admin` 경로 0건과 **번들 표식 0건**은 CI `webapp` 잡이 exit code로 본다. 둘 다 필요하다 — 주입 실측(2026-09-22)에서 ⓐ접미 제거는 경로·표식 양쪽에 나타났지만 ⓑ공개 클라이언트 소스가 admin을 import하는 누출은 **표식 검사만** 잡았다(경로는 끝까지 생기지 않는다). 두 경우 모두 `next build`는 exit 0이었다.
+
 **기존 장치 재사용**:
 - **ARCH-10** (done): L5 클라이언트 무-수학로직 CI 게이트가 `src/web/`에 기적용 — 표현≠의미는 웹도 예외 없음(04 §2 원칙1).
 - **CI**: 기존 `web` 잡은 `src/web/graphing-calculator/` 전용(paths 필터) — `webapp/` lint+build 잡 신설은 WEB-01 acceptance의 집행 별항("존재가 아니라 실행 확인").
@@ -114,7 +118,7 @@ src/web/
 
 ## §4. 배치(배포) 비교·권고
 
-**실측 전제 (2026-08-10)**: TLS 종단·리버스 프록시·GCP/AWS 대상 **미프로비저닝** — `docker-compose.prod.yml`은 Phaiakes9 단일 호스트 전제이고 `deploy.yml`은 실 호스트 실행 이력 0의 골격이다(정본: [deployment_cd_runbook](deployment_cd_runbook.md) §8). 백엔드에 **CORSMiddleware 0건**(브라우저 웹이 API를 호출하려면 선결 배선 필요).
+**실측 전제 (2026-08-10)**: TLS 종단·리버스 프록시·GCP/AWS 대상 **미프로비저닝** — `docker-compose.prod.yml`은 Phaiakes9 단일 호스트 전제이고 `deploy.yml`은 실 호스트 실행 이력 0의 골격이다(정본: [deployment_cd_runbook](deployment_cd_runbook.md) §8). ~~백엔드에 **CORSMiddleware 0건**~~ — **정정(2026-09-11 SEC-26)**: CORSMiddleware는 `create_app`에 상시 등록됐고 `WHYMATH_CORS_ALLOWED_ORIGINS`(기본 빈 값)가 deny-by-default를 유지한다. 즉 아래 권고 4의 "선결 배선"은 *미들웨어 부재*가 아니라 **origin 허용 목록의 설정**만 남은 상태이고, 그 집행 지점(브라우저의 첫 실호출)이 ADMIN-06에서 착지했다.
 
 **비교표** (평가 축: 비용 / 운영 부담 / 보안·내부망 요건 / 한국 리전 지연 / 미성년 프라이버시 / TLS·CDN 자동화):
 
@@ -130,6 +134,7 @@ src/web/
 2. **백오피스 = Phaiakes9 내부망.** 공개 금지 원칙(04 §5)상 클라우드가 필요 없다. prod compose 확장·리버스 프록시 배선은 Phase B 시점 별도 태스크(§6 미등재 제안).
 3. **교사 웹 = Phase 3 시점 재평가.** 트래픽·B2B SLA가 실체화되기 전에 확정하지 않는 것 자체가 권고다.
 4. **CORS 선결 시점 = ADMIN-06**(브라우저가 API를 실제 호출하는 첫 지점). origin 허용 목록 **fail-closed**(기본 빈 목록=전면 차단·와일드카드+credentials 조합 불가). 집행 지점 없는 선행 배선은 만들지 않는다("정본화≠집행" 사고 패턴의 역형 방지).
+   - **착지(ADMIN-06)**: 미들웨어·설정·부팅 거부는 SEC-26이 먼저 놓았고, ADMIN-06이 그 위에 *집행 지점*을 얹었다 — 백오피스 셸이 실제로 부르는 `/v1/admin/menu`에 대해 `Authorization` 프리플라이트가 origin에 따라 갈리는 것을 `tests/backend/test_cors_policy_freeze.py::TestAdminMenuPreflightForWebShell`이 동결한다(allow-origin뿐 아니라 **allow-headers까지** 맞아야 실제로 열린다). 남은 것은 값 설정이며, 그것은 배포 결정(§4 권고 2)에 속한다.
 
 ---
 
@@ -152,7 +157,7 @@ src/web/
 | `WEB-02-landing-deploy` | 랜딩 배포 배선 (Kiki 확정 후 집행·확정 전 프로비저닝 금지) | infra | WEB-01 |
 | `ADMIN-04-module-registry` | 모듈 레지스트리 + `GET /v1/admin/menu` (04 §2 원칙7) | backend | — |
 | `ADMIN-05-bff-readonly` | Admin BFF Phase A read-only·마스킹·감사 | backend | ADMIN-04 |
-| `ADMIN-06-admin-web-shell` | 백오피스 셸 (내비=menu API·CORS 배선·내부망 한정) | web | ADMIN-04 · WEB-01 |
+| `ADMIN-06-admin-web-shell` | 백오피스 셸 (내비=menu API·CORS 배선·내부망 한정) — **착지 2026-09-22** | web | ADMIN-04 · WEB-01 |
 | `ADMIN-07-review-ui` | 검수 큐 UI (Phase B·상태 전이+불변 감사) | web | ADMIN-05 · ADMIN-06 |
 
 04 §8의 제안 4건(ADMIN-MODULE-REGISTRY·ADMIN-BFF·ADMIN-REVIEW-UI·ADMIN-WEB)이 위 `ADMIN-04~07`로 번호를 받아 등재됐다.
