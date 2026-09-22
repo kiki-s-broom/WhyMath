@@ -5,6 +5,34 @@
 >
 > 대상 태스크 `MP-02-first-llm-authoring-run` · 작성 2026-09-06 · 실행 주체 **Kiki**
 
+> **[정정 2026-09-11]** §3(stale-file 검사)·§4(산출물 검증)·§5(리콜 리허설)의 사이드카 경로
+> 계산이 전부 틀려 있었다 — `<out>` + `".rounds.jsonl"` 식 **이어붙이기**로 짰지만, 실제 코드
+> (`harness/anchor_round_ledger.py:717`·`harness/problem_corpus_accumulate.py:704,714`
+> — 2026-09-21 회수 시점 main `a71356cd` 실측. 원 정정문의 줄 번호는 그 세션 시점 값이었다)는 파이썬
+> `Path.with_suffix()`로 마지막 확장자를 **교체**한다(`problems.jsonl` → `problems.rounds.jsonl`,
+> `problems.jsonl.rounds.jsonl`이 아니다). 실측 결과: §3의 stale-file 검사가 실제 사이드카
+> 파일을 한 번도 찾지 못해 **재실행을 막지 못했고**(같은 회차가 의도치 않게 2번 기록됨 —
+> 다행히 둘 다 `accepted=0`이라 코퍼스 오염은 없었다), §4·§5도 `FILE_MISSING`을 오보고했다.
+> 아래 세 스크립트는 `with_suffix()`로 고쳤다 — Kiki 실행 로그(2026-09-10)로 실측 검증됨.
+
+> **[정정 2026-09-21 · MP-08]** 2026-09-21 라이브 회차(`run_id c0854e382b50415eb11829d991c93820`)
+> 에서 인코딩 결함 **2건**이 더 드러났다. 둘 다 이 런북의 결함이고 회차 자체는 유효하다.
+>
+> ⓐ **§5가 UTF-8 JSONL을 cp949로 읽었다** — `Get-Content`는 PowerShell 5.1에서 로케일
+> 인코딩(한국어 Windows=cp949)으로 읽으므로, Python이 UTF-8로 쓴 대장 행의 한글이 깨져
+> `ConvertFrom-Json`이 `잘못된 개체가 전달되었습니다`로 실패했다 → `run_id` 추출 실패 →
+> 리콜 리허설 공전. **파일은 온전했다**(같은 파일을 Python이 `encoding='utf-8'`로 읽자
+> 정상 · `HANGUL_OK True`·`CODE_OK True` 실측). 처분: 런북에서 PowerShell JSON 파싱을
+> **전량 제거**하고 Python 경유로 바꿨다 — `-Encoding UTF8`을 덧붙이는 부분 정정이 아닌
+> 이유는 같은 함정이 블록마다 재발하기 때문이다.
+>
+> ⓑ **회차 리포트가 stdout에서 잘렸다** — `problem_corpus_accumulate`가 최종 리포트를
+> stdout에 json.dump하다 `UnicodeEncodeError: 'cp949' codec can't encode character
+> '\u2014'`로 죽어 `mp02_report.json`이 중간에 끊겼고, 그 결과 `ACCUMULATE_EXIT=1`이
+> *카나리 차단*인지 *크래시*인지 구분 불가가 됐다. §1이 `PYTHONIOENCODING`을 설정하는 것이
+> 그 보험이다. **보험이지 해결이 아니다** — 코드 축(진입점 stdout 재구성)은 `OPS-53`이
+> 소유하며, 그것이 착지하면 이 설정이 여전히 필요한지 재판정한다(만료 없는 유예 금지).
+
 ---
 
 ## 0. 사전 브리핑 (6항목)
@@ -63,11 +91,14 @@ git fetch origin main
 git checkout main
 git pull origin main
 $Py = ".\.venv\Scripts\python.exe"
+$env:PYTHONIOENCODING = "utf-8"
+& $Py -c "import sys; print('IO_ENCODING', sys.stdout.encoding)"
 & $Py -c "import whymath_backend, sys; print('PY_OK', sys.executable)"
 & $Py -c "from whymath_backend.harness.anchor_round_ledger import RoundRecord; f=RoundRecord.model_fields; need=['canary_passed','canary_lower_bound','dedup_input_digests','cli_argv']; missing=[k for k in need if k not in f]; print('MANIFEST_MISSING', missing)"
 ```
 
-**자가검증 판정** — 이 두 줄이 보여야 다음으로 갑니다:
+**자가검증 판정** — 이 세 줄이 보여야 다음으로 갑니다:
+- `IO_ENCODING utf-8` ← cp949면 설정이 먹지 않은 것입니다(회차 리포트가 잘립니다)
 - `PY_OK C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe`
 - `MANIFEST_MISSING []`  ← **빈 대괄호**여야 합니다
 
@@ -152,7 +183,8 @@ ollama serve
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Py = ".\.venv\Scripts\python.exe"
 $Out = "data\corpus\problem_bank_mp02_first_run_v0\problems.jsonl"
-$Stale = @($Out, "$Out.rounds.jsonl", "$Out.genlog.jsonl", "$Out.review.jsonl") | Where-Object { Test-Path $_ }
+$Sidecars = & $Py -c "import pathlib; o=pathlib.Path(r'$Out'); print(o.with_suffix('.rounds.jsonl')); print(o.with_suffix('.genlog.jsonl')); print(o.with_suffix('.review.jsonl'))"
+$Stale = @($Out) + $Sidecars | Where-Object { Test-Path $_ }
 "STALE_FILES=$($Stale.Count)"
 if ($Stale.Count -gt 0) { "중단: 앞 시도의 산출물이 남아 있습니다 → $($Stale -join ', ')" }
 if ($Stale.Count -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out) | Out-Null }
@@ -189,7 +221,7 @@ def rows(p):
     q=pathlib.Path(p)
     if not q.exists(): return None
     return [json.loads(l) for l in q.read_text(encoding='utf-8').splitlines() if l.strip()]
-led=rows(str(out)+'.rounds.jsonl'); gen=rows(str(out)+'.genlog.jsonl'); rev=rows(str(out)+'.review.jsonl')
+led=rows(out.with_suffix('.rounds.jsonl')); gen=rows(out.with_suffix('.genlog.jsonl')); rev=rows(out.with_suffix('.review.jsonl'))
 print('LEDGER_ROWS', 'FILE_MISSING' if led is None else len(led))
 print('GENLOG_ROWS', 'FILE_MISSING' if gen is None else len(gen))
 print('REVIEW_ROWS', 'FILE_MISSING' if rev is None else len(rev))
@@ -230,11 +262,12 @@ if led:
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Py = ".\.venv\Scripts\python.exe"
 $Out = "data\corpus\problem_bank_mp02_first_run_v0\problems.jsonl"
-$RunId = (Get-Content "$Out.rounds.jsonl" | Select-Object -Last 1 | ConvertFrom-Json).run_id
+$RunId = & $Py -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]).with_suffix('.rounds.jsonl'); rows=[json.loads(l) for l in p.read_text(encoding='utf-8').splitlines() if l.strip()]; print(rows[-1]['run_id'])" $Out
 "RUN_ID_FOR_RECALL=$RunId"
 $CorpusArgs = @(); if (Test-Path $Out) { $CorpusArgs = @("--corpus", $Out) }
 "CORPUS_ARGS=$($CorpusArgs -join ' ')"
-if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog "$Out.genlog.jsonl" @CorpusArgs --run-id $RunId; "RECALL_EXIT=$LASTEXITCODE" }
+$GenlogPath = & $Py -c "import pathlib; print(pathlib.Path(r'$Out').with_suffix('.genlog.jsonl'))"
+if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog $GenlogPath @CorpusArgs --run-id $RunId; "RECALL_EXIT=$LASTEXITCODE" }
 ```
 
 **판정**: 열거 건수가 §4의 `GENLOG_SAME_RUN`과 **같아야** 합니다(과다·과소 0). 다르면 그
@@ -249,6 +282,11 @@ if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog "$Out.genl
 > `$RunId`를 앞 명령의 출력에서 셸 변수로 받는 이유: 이 블록을 통째로 붙여넣어도 값이
 > 자동으로 이어집니다. `if ($RunId)` 가드는 앞 줄이 실패했을 때 뒤 명령이 빈 인자로
 > 실행되는 것을 막습니다.
+>
+> `run_id`를 **Python으로** 읽는 이유(2026-09-21 정정): `Get-Content`+`ConvertFrom-Json`은
+> 파일을 로케일 인코딩으로 읽어 한글 JSON에서 깨집니다. 이 런북의 코드 블록에는
+> `ConvertFrom-Json`이 **0건**이며, 그것을 `tests/infra/test_mp02_runbook_sidecar_paths.py`
+> 가 기계로 동결합니다(뮤테이션 RED 확인).
 
 ---
 
@@ -260,6 +298,12 @@ if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog "$Out.genl
 ---
 
 ## 7. ⛔ acceptance ②(카나리 30건 검수)는 아직 실행하지 마십시오
+
+> **[정정 2026-09-21 · MP-06]** 아래 처분은 `MP-05` 등재 시점(2026-09-06)의 사실이다.
+> 그 CLI는 이후 **착지 완료**했으므로(`harness/canary_slice.py` · 대장 `MP-05` status=done)
+> "구간을 지목할 수단이 없다"는 지금은 사실이 아니다. 다만 **순서는 그대로다** — 카나리
+> 구간은 *이 회차의 genlog 적재 순서*를 입력으로 잘라내므로 §1~§6 완주가 여전히 선행이다.
+> 회신을 받으면 그 회차 산출물로 검수 큐를 만들어 ② 런북을 따로 드린다.
 
 **실측된 설계 공백입니다.** acceptance ②는 "카나리 30건을 100% 검수"를 요구하는데,
 **그 30건을 지목할 수단이 저장소에 없습니다.**

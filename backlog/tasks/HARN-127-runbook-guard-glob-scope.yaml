@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-127-runbook-guard-glob-scope
+title: "런북 자가거부 가드의 스캔 범위 공백 — docs/reviews 아래 런북 3건이 전수 미스캔(사고가 난 MP-02 런북 포함)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①실측 고정 — scripts/ops/check_runbook_blocks.py의 DEFAULT_GLOB이 'docs/ops/*runbook*.md'라서 docs/reviews/ 아래 런북이 한 건도 스캔되지 않는다. 2026-09-21 실측: docs/ops 스캔 대상 14건 · docs/reviews 런북 3건 · 교집합 0건. 미스캔 3건 = mp02_first_llm_authoring_run_runbook.md · mp02_canary_review_runbook.md · runbook_guard_evaluation_2026-09-01.md.\n②왜 공허한 통과인가 — 이 가드가 겨냥하는 사고 유형이 실제로 발생한 런북이 바로 미스캔 목록에 있다. mp02_first_llm_authoring_run_runbook.md의 사이드카 경로 버그로 §3 재실행 차단이 한 번도 발화하지 못해 2026-09-10에 같은 회차가 두 번 기록됐다(MP-06 acceptance ⑤). 즉 가드는 존재하는데 그 사고가 난 파일을 보지 않는다. CLAUDE.md '스캔 0건은 실패 — 대상을 하나도 못 찾은 전수 가드는 공허하게 통과한다'의 실례다.\n③처분 판정 — 글로브를 넓히는 것이 정답인지 먼저 판정한다. 두 선택지: ⓐ 글로브를 'docs/**/*runbook*.md'로 넓힌다(기존 docs/reviews 런북 3건이 즉시 위반을 낼 수 있으므로 waive 만료일 동반 — 만료 없는 유예 금지) ⓑ 런북의 거처를 docs/ops로 단일화하고 docs/reviews에는 두지 않는다는 규약을 세운 뒤 기존 3건을 이동한다. ⓑ가 근본적이나 문서 참조 링크가 깨지므로 비용 실측이 필요하다. 판정 근거를 태스크 notes에 적는다.\n④변별력 검증(집행 지점) — 글로브를 넓혔다면 '넓히기 전에는 통과하고 넓힌 뒤에는 검출되는' 입력이 실제로 있는지 주입으로 확인한 것까지가 완료다. docs/reviews 런북 중 하나에 가드가 잡는 형태의 쓰기 블록을 일부러 넣어 RED를 확인하고 원복한다(원복은 cp 백업 — git checkout 계열 금지).\n⑤범위 밖(명시) — 쓰기 어휘 공백(출력 리다이렉션·유료 외부 호출이 쓰기로 분류되지 않는 축)은 HARN-116이 이미 소유한다. 이 태스크는 '어떤 파일을 보는가'만 다루고 '무엇을 쓰기로 세는가'는 건드리지 않는다."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - "tests/infra/**"
+  - "docs/reviews/**"
+session: null
+notes: "출처: 2026-09-21 MP-07(카나리 검수 런북) 작업 중 실측 발견. 신규 런북을 docs/reviews에 쓰고 HARN-106 가드를 돌렸더니 '런북 14건 / 위반 0건 / 판정: 통과'가 나왔는데, 그 14건에 내 파일이 들어 있지 않았다 — 통과가 내 파일에 대해서는 아무 말도 하지 않는 상태였다. 파일을 위치 인자로 직접 넘겨야 검사됐다.\n\nHARN-106·HARN-115·HARN-116 세 태스크가 모두 'docs/ops/*runbook*.md'를 스코프로 전제하고 있고, 글로브 자체를 의심한 태스크는 0건이다(대장 전수 grep 실측)."
+updated: 2026-09-21

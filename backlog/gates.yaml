@@ -110,6 +110,16 @@ gates:
     evidence: "이 게이트는 **신설 시점에 이미 충족돼 있었다.** PR #1157(main b810388b · 2026-09-14T11:33Z)이 \"세션 토큰이 /branches/main/protection에 403이라 대행 불가\"로 판단해 이 게이트를 승계로 신설했으나, 같은 날 그보다 앞서 병렬 세션(PR #1154)에서 Kiki가 자신의 gh 토큰으로 삭제를 직접 실행했다.\n\n[실측] Kiki 머신 PowerShell: `gh api -X DELETE repos/kiki-s-broom/WhyMath/branches/main/protection` 실행 후 재조회가 `HTTP 404 Branch not protected`. 삭제 **직전** 같은 조회 명령은 JSON 2,512자를 반환했으므로(백업 덤프로 확보) 이 404는 변별력 있는 확인이다 — 성공/실패 양쪽에서 같은 값을 내는 검사가 아니다. 직후 `python scripts\\harness\\ruleset_drift.py ruleset.json --record`가 EXIT=0(위반 0 · 유예 3건, 전부 만료 전 승인 축)으로 클래식 부재 상태에서도 룰셋 단독이 문서 선언을 충족함을 기계 판정했다.\n\n[삭제 전 12축 소실 대조] 클래식 원문을 덤프해 룰셋과 축별 대조했다. required_linear_history / allow_force_pushes(→non_fast_forward) / allow_deletions(→deletion) / required_conversation_resolution(→required_review_thread_resolution)은 룰셋이 덮고, required_signatures·block_creations·lock_branch·allow_fork_syncing은 원래 false였으며 restrictions는 키 자체가 부재했다. 필수 체크 13건은 룰셋 16건의 부분집합. 전문은 .github/branch-protection-setup.md \"삭제 직전 실측\" 표(백업 JSON은 Git 밖이라 사라지므로 저장소에 남겼다).\n\n[잔여 1건 — 이 게이트가 묻지 않은 축] enforce_admins=true만 룰셋 대응이 미확인이다. 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이는데 세션 토큰은 양쪽 다 403이다. 최악의 경우 관리자 우회 금지가 조용히 풀린 상태일 수 있으므로 이 clear를 \"소실 0 확인\"으로 읽으면 안 된다. 승계 = HARN-102-ruleset-bypass-actors-unverified + 게이트 G-ruleset-bypass-actors-read.\n\n[병렬 중복의 경위] 원 게이트 G-strict-policy-and-classic-cleanup이 4일 연속 독촉 초과 상태였고 두 세션이 같은 리마인드를 보고 동시에 착수했다. 결과물은 판정(strict 해제)에서 일치하고 집행 사실(삭제 완료 여부)에서만 갈렸으며, 병합 시 집행된 현실을 담은 쪽을 정본으로 삼고 양쪽 경위를 문서·게이트 evidence에 함께 남겼다."
     cleared_by: claude
     notes: "[판정기준 없음 2026-09-14] GitHub 저장소 설정(클래식 브랜치 보호) 삭제라 커밋 기반 판정 근거가 없다. 실측 증적은 API 응답(404 Branch not protected)과 판정기 EXIT=0이며, 저장소 몫의 기록은 PR #1154가 담는다."
+  - id: G-cloud-mid-seat-cutover
+    title: "클라우드 MID 좌석 컷오버 승인 — cloud_provider 기본값 anthropic → openrouter 전환 + 학생 대면 서빙 노출. 2026-09-21 Kiki 지시(\"학생 대면까지 한 번에\" → \"학생대면도 오픈라우터로 전환\")가 이 전환의 목적지를 확정했고, 그 지시 자체가 G-arch56-availability-trigger의 발동 조건 ⓐ(학생 대면 트래픽 투입 결정)를 실현시킨다. 이 게이트는 그 실현을 대장에 기록하고 실제 컷오버 시점을 Kiki가 쥐게 한다. clear 전 확인할 것 3건: ①ARCH-62(단가표 좌석 축) 착지 — 없으면 MID 원가가 24.4배 과대 계상돼 guard_cloud가 불필요한 LOCAL 강등을 낸다(무증상) ②ARCH-63(좌석 failover) 착지 + 작동 신호 4종 관측 — 공유 풀 429가 학생 화면 오류로 나가지 않는지 ③ARCH-55 판정문(\"기본 핀 불변\")과 tests/backend/l3/test_cloud_provider_selector.py 동결 문면의 갱신안 검토. 판정 3택: ①컷오버 승인(저작+학생 대면 동시) ②저작 경로만 먼저 승인하고 학생 대면은 failover 실측 후 재판정 ③보류. 주의(거부의 우회 금지): test_student_facing_app_does_not_use_the_selector의 docstring이 \"ARCH-56을 끝내고 → 게이트를 clear하고 → 그 근거로 이 테스트를 고친다. 반대 순서는 게이트를 우회하는 것이다\"라고 순서를 못박고 있다. ARCH-63 failover는 ARCH-56이 재려던 리스크를 구조적으로 해소하므로 ARCH-56의 acceptance를 \"차단 판정\"에서 \"운영 지표 기준선\"으로 재정의하는 것이 맞으며, 그 재정의도 이 게이트의 판정 범위에 포함한다. 설계 근거 = docs/architecture/03c_cloud_tier_transition_v2.md"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
@@ -290,6 +300,26 @@ gates:
     evidence: null
     cleared_by: null
     notes: "원 요청일 2026-08-11(ph1ad7 905ed311·ASM-12/PR #815) — #822 재생성-머지에서 게이트만 유실돼 2026-08-30 HARN-34가 이관 재등재. 판정 정본 docs/legal/export_prediction_disclosure_verdict.md·뒤집힘 시 export 복원+매트릭스 §2.4 개정+access_matrix #8 동시 반영"
+  - id: G-kg02-review-promotion-llm-session
+    title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-harn121-constitution-token-measure
+    title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-kiki-device-demo
     title: "S1 탈출 게이트 ① — 실기기 학습 루프 시연"
     kind: human
@@ -360,6 +390,16 @@ gates:
     evidence: "2026-08-31 Kiki 실행 완료. ① 스키마 정렬: stamp --purge a9b8c7d6e5f4 → upgrade head 22건 → head d4a71c0f9b32 도달, 프로브 재실행 pending_count 0 · present_after_gap 0(백업 whymath_20260831_141321.dump 선행). ② 계정 부트스트랩(ADMIN-11): account_bootstrap_cli create → {\"user_id\": \"5612757b-93c2-4d60-8318-3c85d3d6ff2c\", \"created\": true, \"role\": \"student\"}. ③ 좌석 부여: role_grant_cli grant 5612757b-93c2-4d60-8318-3c85d3d6ff2c content_admin → GRANT_EXIT=0, {\"old_role\": \"student\", \"new_role\": \"content_admin\"}. ④ list → {\"users\": [{\"user_id\": \"5612757b-93c2-4d60-8318-3c85d3d6ff2c\", \"role\": \"content_admin\"}], \"total\": 1}. 좌석 0건 상태 해소 — \"봉인 정상\"과 \"아무도 못 씀\"이 이제 다른 값이다."
     cleared_by: null
     notes: "[목적] 콘텐츠 CUD 6라우터(/v1/concepts·/v1/problems의 POST/PATCH/DELETE)가 전건 403이다.\n  봉인(SEC-07)은 정상 작동 중이지만 좌석이 0건이라 아무도 통과 못 한다. 이 게이트를 통과해야\n  \"봉인 정상\"과 \"아무도 못 씀\"이 비로소 다른 값이 된다.\n\n[중요 — 왜 바로 grant를 하지 않는가] 2026-08-11 1차 실행이 실패했다:\n  `column user_profile.role does not exist`. whymath-pg의 스키마가 코드와 맞지 않는다.\n  PR #800이 정비한 실행 블록(venv $Py 고정·user_id 조회)은 그 자체로 옳지만,\n  **스키마가 이 상태인 한 grant에서 반드시 같은 오류로 실패한다.** 그래서 스키마를 먼저 세운다.\n\n[1단계 결과 — 2026-08-11 Kiki 실측, 완료]\n  · 컨테이너 생존 = true\n  · alembic_version = d6e7f8a9b0c1  ← **현재 코드의 마이그레이션 체인에 없는 값**\n  · misconception_catalog에서 length(mis_id) > 16 인 행 = 0건\n[2단계 결과 — 2026-08-11 Kiki 실측, 완료]\n  · public 테이블 68개\n  · privacy_audit=없음 · defect_report=없음 · concept_visual_style=있음\n  · user_profile 41컬럼 — **role 없음**(c5d6e7f0a2b3 미적용 확정)\n[해석] 실제 스키마는 a9b8c7d6e5f4(concept_visual_style 있음)와 c5d6e7f0a2b3(role 없음)\n  사이다. 즉 밀린 것은 4~5개뿐이고 **전부 additive**다 — 기록된 버전 문자열만 실태와 무관한\n  값이다. 1단계의 mis_id 0건으로 a5b6c7d8e9f0의 DELETE 선행 전제도 이미 충족.\n[실측된 제약] 이 상태에서 alembic은 아예 동작하지 않는다 — 컨테이너에서 동일 상태를 재현해\n  확인: `alembic current`·`alembic upgrade head` 둘 다 exit 255,\n  \"Can't locate revision identified by 'd6e7f8a9b0c1'\". 그래서 upgrade 전에 stamp가 필요하다.\n\n[3단계 결과 — 2026-08-31 Kiki 실측, 완료]\n  · 사전 사고: 8/25 10:08Z 누군가 whymath-pg를 빈 클러스터로 재생성(POSTGRES_USER=postgres·포트 56432·\n    스키마만 899ae0efbb8b·데이터 0). 원본은 dangling 볼륨 ef75415d에 무손실 생존 확인.\n  · 복구 완료(2026-08-31): 원본 볼륨으로 whymath-pg 재생성(5433·whymath 롤·restart unless-stopped)\n    — 재고 재현 concepts 2683 / edges 2210 / misconceptions 841 / standards 895.\n    빈 컨테이너는 whymath-pg-empty-20260825로 개명 보존(삭제 아님). 백업\n    whymath_20260831_120150.dump 확보(-Fc·카탈로그 자가검증·BACKUP_EXIT=0).\n  · A) formula_node constraints/mnemonic = 0행 → stamp 확정 = a9b8c7d6e5f4\n  · B) 뒤쪽 리비전 혼입 = 0행 → stamp 안전\n  · 후보→head 22개 마이그레이션 전수 스캔(세션 실측): upgrade측 파괴 연산 0\n    (a9b8 자체 drop은 stamp 지점이라 재실행 없음 · b8e76fe238d0 UPDATE 2건은 무손실 백필)\n\n[4단계 — 실행 대기. 아래가 복붙 실행 블록 전문(단계별 exit 판정 동봉) — Windows PowerShell·창 1개]\n# 0) 리포 최신화 + venv·DB URL 고정\ncd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath\ngit fetch origin main\ngit checkout -B main origin/main\n$Py = \"C:\\Users\\kiki\\Desktop\\__AI\\WhyMath\\.venv\\Scripts\\python.exe\"\n$env:WHYMATH_DATABASE_URL = \"postgresql+asyncpg://whymath@127.0.0.1:5433/whymath\"\ncd src\\backend\n\n# 1) stamp — 3단계 A=0행으로 확정된 실태 리비전\n& $Py -m alembic stamp a9b8c7d6e5f4\necho \"STAMP_EXIT=$LASTEXITCODE\"\n& $Py -m alembic current\n\n# 2) 밀린 마이그레이션 전체 적용 (사전 전수 스캔: 파괴 연산 0·백업 확보됨)\n& $Py -m alembic upgrade head\necho \"UPGRADE_EXIT=$LASTEXITCODE\"\n& $Py -m alembic current\n\n# 3) 직접 신호 검증 — role 컬럼 실재(버전 문자열 아님) + 데이터 무손상(2683/2210/841/895)\ndocker exec whymath-pg psql -U whymath -d whymath -c \"SELECT column_name FROM information_schema.columns WHERE table_name='user_profile' AND column_name='role';\"\ndocker exec whymath-pg psql -U whymath -d whymath -c \"SELECT (SELECT count(*) FROM concept) AS concepts, (SELECT count(*) FROM concept_edge) AS edges, (SELECT count(*) FROM misconception_catalog) AS misconceptions, (SELECT count(*) FROM achievement_standard) AS standards;\"\n\n# 4) 운영자 계정 부트스트랩 — 앱 로그인과 동일 해시(sha256 소문자)·rollrock.ki@gmail.com\n#    (OAuth 미가동·user_profile 0행 실측 근거의 1회성. 페르소나는 enum 1번값 — 한글 인코딩 회피)\ndocker exec whymath-pg psql -U whymath -d whymath -c \"INSERT INTO user_profile (user_id, email_hash, persona_primary) VALUES (gen_random_uuid(), '26727c7b2e4acb35dbb468ab84a47fff1242b5248e5c67e7c9458f7a7557bb46', (enum_range(NULL::persona_enum))[1]);\"\n$uid = (docker exec whymath-pg psql -U whymath -d whymath -t -A -c \"SELECT user_id FROM user_profile WHERE email_hash='26727c7b2e4acb35dbb468ab84a47fff1242b5248e5c67e7c9458f7a7557bb46';\").Trim()\necho \"UID=$uid\"\n\n# 5) 좌석 1호 grant + list 검증 (list JSON = clear 증적)\n& $Py -m whymath_backend.ops.role_grant_cli grant $uid content_admin\necho \"GRANT_EXIT=$LASTEXITCODE\"\n& $Py -m whymath_backend.ops.role_grant_cli list\necho \"LIST_EXIT=$LASTEXITCODE\"\n\n[성공 기준] STAMP_EXIT=0 → current=a9b8c7d6e5f4 → UPGRADE_EXIT=0 → current=head(단일) →\n  role 컬럼 1행 + 재고 4종 불변 → UID 채워짐 → GRANT_EXIT=0 + list에 content_admin 1건 JSON.\n  실패 시 그 지점에서 중단·출력 전문 보고(백업 whymath_20260831_120150.dump로 복구 가능).\n[clear 증적] 최종 clear는 좌석 부여 후 role_grant_cli list 출력(user_id 포함 JSON)\n  + GRANT_EXIT=0 으로 한다.\n"
+  - id: G-opus5-billing-path-prod-recheck
+    title: "Opus 5 과금 경로의 프로덕션 재확인 지점 — 개발 단계 한정 승인의 만료 지점. 2026-09-21 Kiki 판단으로 개발 단계에서는 Claude Max 요금제 구독 경유로 Opus 5를 쓰기로 했다(이전 세션에서 사용 가능 검토 완료). 이 승인은 개발 단계 한정이므로 만료·재확인 지점을 동반한다(CLAUDE.md 「만료 없는 유예·제외 금지」). 재확인 시점 = 프로덕션 배포 판정 시 또는 학생 대면 트래픽이 개발용 좌석을 넘어설 때 중 먼저 오는 쪽. 확인할 것: ①구독 경유 호출이 프로덕션 트래픽 규모·약관에서 유효한가 ②유효하지 않으면 API 키 과금으로 전환할 때의 비용 영향(Opus 5 $5/$25 · 가정토큰 74/358 기준 1회 14.353원) ③auth_source 관측이 실제로 어느 경로를 쓰고 있는지 말하고 있는가(조용한 폴백이 없는가). 판정 3택: ①개발단계 승인 유지(재확인 게이트 재생성) ②API 키 과금으로 전환 ③좌석 자체 재설계. 근거 = docs/architecture/03c_cloud_tier_transition_v2.md 4.3~4.4절 · ARCH-50 acceptance ⑨"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 90
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-orphan-prod-run
     title: "orphan 진단 스크립트 prod 실행 (scripts/diagnose_atom_orphans.py)"
     kind: human
@@ -500,6 +540,16 @@ gates:
     evidence: "[실측 2026-09-14 · Kiki 머신 Windows PowerShell · C:\\Users\\kiki\\Desktop\\__AI\\WhyMath]\n수집: cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" (파이프 미경유 — cp949 디코딩 왕복 회피)\n판정: python -c \"... json.load ... len(d.get('bypass_actors',[]))\" → **bypass_actors 건수: 0 · 배열 [] **\n\n[판정] 빈 배열 = 룰셋을 우회할 수 있는 주체가 0명 = 저장소 관리자에게도 규칙이 그대로 적용된다. 이는 클래식 브랜치 보호의 enforce_admins=true와 등가다. 따라서 2026-09-14 클래식 삭제로 **소실된 보호 축은 0개**이며, 12축 대조표의 마지막 미확인 칸이 닫혔다. 되돌림(룰셋 재설정·클래식 복원)은 불요하며 HARN-102 acceptance ②(비어 있지 않을 때의 되돌림 판정)는 전제 미성립으로 해당 없음이 됐다.\n\n[변별력] 이 검사는 성공/실패 양쪽에서 같은 값을 내지 않는다 — bypass_actors에 항목이 있으면 건수가 0이 아닌 정수로 나오고 actor_type·bypass_mode가 출력된다. 앞선 같은 조회가 세션 토큰에서는 403이었고 Kiki 토큰에서는 200을 반환한 것도 조회 자체가 실제로 도달했다는 증거다.\n\n[범위 명시 — 추론으로 채운 칸] 룰셋의 enforcement 필드 값은 이번 출력에 담기지 않았다. 다만 앞서 수집한 GET /repos/{owner}/{repo}/rules/branches/main 이 규칙 16건을 반환했고 그 엔드포인트는 **활성(active) 룰셋의 규칙만** 돌려주므로 enforcement=active는 성립한다 — 단, 이는 필드를 직접 읽은 것이 아니라 **API 의미를 읽어 추론한 것**이다. 직접 확인이 필요해지면 같은 ruleset-full.json의 enforcement 키를 보면 된다(재수집 불요).\n\n[남는 것 — 이 게이트가 닫아도 닫히지 않는 축] 지금 상태가 안전하다는 것과 그 상태가 **감시된다**는 것은 다르다. ruleset_drift.py 는 /rules/branches/main 만 읽으므로 bypass_actors 는 선언 축에도 판정기에도 없다 — 누군가 나중에 bypass_actors 를 채워도 기계는 조용하다. 편입 여부 판정은 HARN-102 acceptance ③~⑤가 그대로 소유한다(이 게이트 clear로 그 태스크의 requires_gates 가 풀려 착수 가능해진다)."
     cleared_by: claude
     notes: "[판정기준 없음 2026-09-14] GitHub 룰셋 API 조회 결과라 커밋 기반 판정 근거가 없다. 증적은 Kiki 머신 gh 응답(bypass_actors=[])이며 저장소 몫의 기록은 PR #1161이 담는다."
+  - id: G-s416-round2-live-battle
+    title: "S4-16 2차 강등전 라이브 회차 (v4 프로덕션 모드) — Phaiakes9 실행 + 오검출 천장 판정. 실행 절차 = docs/ops/s4_16_residue_battle_round2_runbook.md (6항목 브리핑 + 4단계, 정본 회차는 --v4 production --sample-n 5 --clean-n 34, 항목 59건 x 9콜 = 531콜). 회신할 것 = 리포트의 검출률/오검출률 두 줄 + BATTLE_EXIT + 감사 JSONL. 주의: BATTLE_EXIT=1(게이트 미달)도 유효한 측정 결과다 -- 2차는 천장을 적용하는 회차가 아니라 천장을 판정하기 위한 측정이다. 함께 판정할 것: 오검출 천장을 얼마로 둘 것인가. acceptance가 요구하는 0.05는 이 코퍼스로 인증 불가다(harness/wilson.py 실측 -- 34문 전건 무오검출이어도 95% 단측 상한은 .0737에서 멈추고, 0.05를 넘기려면 대조군 n>=51이 필요한데 코퍼스가 34문이다). 3택: (1) 천장을 .08 수준으로 재설정하고 n=34 전건 무오검출을 요구 (2) 코퍼스를 확장해 0.05를 겨냥 (3) 이 경로를 인간 검수 대체 후보에서 내린다. 배경: 측정 이력 5회차에서 검출률은 16.7% -> 90%로 올랐는데 오검출은 60% 아래로 내려온 적이 없다 -- 구속 축은 모델 성능이 아니라 프로토콜이다(docs/standards/residue_gate_demotion_battle_history.md). 선행 조건: 이 PR이 main에 머지된 뒤 실행한다 -- 런북이 쓰는 --v4/--clean-n 옵션이 미머지 상태면 Kiki 체크아웃에 그 인자가 없어 argparse 오류가 난다(런북 [A]단계가 그것을 자가검증한다)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-21
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-s5-subject-expansion
     title: "S5 타과목 확장 게이트 — E축 착수 판정 체크리스트 전부 충족 (e_axis_v1 §5)"
     kind: decision

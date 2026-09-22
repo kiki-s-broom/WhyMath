@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-77-selector-eos-priority-ordering
+title: "착수 순서가 12월 검증 등급을 무시한다 — sort_key에 eos_priority가 없어 2027 이월(P2)이 P0보다 앞에 선다 (EOS-80 등급 190건이 순서에 무효)"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① selector.sort_key에 eos_priority를 편입한다. 현행은 (stage_index, priority, -unblock_count, id) 4튜플이고 eos_priority는 selector.py 전체에 등장 0건이다(origin/main 98925b0e 실측). 배치 위치를 근거와 함께 정한다 — stage보다 앞인가 뒤인가, priority와의 우선은 어느 쪽인가. P0~P3의 순서 매핑(미지정 항목 포함)도 명시한다."
+  - "② 변별력(결함 주입 필수): 필드만 추가하고 순서가 그대로인 상태가 초록으로 통과하지 않게 한다. 정렬 변경 전후로 상위 N건의 구성이 실제로 바뀌는지를 단언하는 테스트를 넣는다 — 고정 픽스처(등급이 뒤섞인 태스크 집합)에서 기대 순서를 못박고, sort_key에서 eos_priority 항을 제거하면 RED가 나는지 확인한다. 정상 입력에서 초록인 것은 보호의 증거가 아니다(CLAUDE.md 2026-09-01)."
+  - "③ 판정 기준선 기록: 착지 전 실측을 PR에 남긴다 — 2026-09-07 기준 후보 125건(P0 5·P1 46·P2 74), 상위 10건 중 P2 4건, 최상위 P0은 10위. 착지 후 같은 측정을 재실행해 변화를 대조한다. 수치가 안 바뀌면 ①이 무효다."
+  - "④ blocked를 파킹으로 쓰는 우회의 해소 여부를 판정한다 — CUR-17·CUR-18은 이월 판정인데 unblock하면 next 최상위로 올라간다는 이유로 blocked에 파킹돼 있다(2026-09-06 타 세션). 이 태스크가 착지하면 그 이유가 사라지는지 확인하고, 사라지면 두 태스크를 todo로 되돌린다. 사라지지 않으면 왜 부족한지 적는다(파킹 수단을 별도로 설계할지 판단)."
+  - "⑤ 집행 지점 별항(정본화≠집행): sort_key만 고치는 것과 사람이 그 순서를 실제로 따르는 것은 다르다. next 출력이 각 후보의 eos_priority를 표시하는지 확인한다 — 등급이 안 보이면 순서만 바뀌고 근거는 여전히 안 읽힌다. build_harness.md의 착수 순서 규약도 함께 갱신한다."
+  - "⑥ [2026-09-07 재검토 보강] **eos_priority가 미사용 필드는 아니다** — 이 태스크의 주장은 '순서에 없다'로 한정된다. 실측: backlog.py:1402-1408의 _active_p0가 'P0 && not TERMINAL'로 예산 점유분을 세고, cmd_add의 P0 예산 한도·--swap-out(One In → One Out · 계획서 100 Rule 4)이 그 값을 소비한다. 따라서 ①에서 P0~P3의 순서 매핑이나 등급 의미를 손대면 **그 예산 게이트에 파급**된다. 정렬 편입이 예산 판정을 바꾸지 않는지 확인하고, 바꾼다면 그 사실을 PR에 적는다(회귀 테스트 대상)."
+artifacts: []
+paths:
+  - scripts/harness/selector.py
+  - "tests/harness/test_selector*.py"
+session: null
+notes: "출처: 2026-09-07 검토 요청. 발단은 CUR-17/18의 blocked 파킹 충돌이었고, 원인 추적에서 이 결함이 나왔다.\\n\\n실측(origin/main 98925b0e): selector.py:97 sort_key = (stage_index, priority, -unblock_count, id) — eos_priority 미포함. selector.py 전체 grep 0건. EOS-80(done)이 비종결 190건에 관여도를 부여했으나(P0 11·P1 70·P2 92·P3 15) 그 판정이 착수 순서에 아무 영향을 주지 못한다. 후보 125건 중 상위 10에 P2가 4건이고 P0 5건 중 첫 등장이 10위다.\\n\\n소유자 부재 확인 범위(부재 판정 절차): 태스크 title의 정렬·순서·우선순위·priority 검색 · 리터럴 sort_key 3건(ASM-05·ASM-09·SEC-31 — 전부 JSON sort_keys 오탐으로 배제) · paths에 harness/selector.py를 가진 2건(HARN-20 CLI 전이 배선 · HARN-67 depends 제거 — 둘 다 다른 축). 내가 찾은 방법으로는 0건이다.\\n\\n인접 태스크(중복 아님·조율 대상): HARN-74는 게이트 clear가 부착 blocked 태스크를 안 알리는 축 — 잘못 남은 blocked를 알리는 것이고, 이 태스크는 blocked를 파킹으로 쓸 필요를 없애는 것이다. 두 태스크가 함께 착지해야 CUR-17/18 유형이 정리된다.\\n\\neos_priority를 P1로 둔 이유: 12월 검증 자체의 산출물은 아니지만, 이 결함이 살아 있는 동안 P0 5건이 목록 하단에 묻히므로 검증 준비의 진행 속도에 직접 작용한다.\\n\\n번호: 초판 HARN-76이 로컬 선점(HARN-76-acceptance-supersede-and-title-amend)과 충돌해 CLI 제안대로 77을 받았다.\n\n[정정 2026-09-07] 2026-09-07 재검토 — eos_priority가 '안 쓰인다'로 읽힐 소지 정정. 순서에는 없으나 P0 예산 게이트에는 이미 소비되므로 구현자가 그 결합을 알아야 한다."
+updated: 2026-09-07

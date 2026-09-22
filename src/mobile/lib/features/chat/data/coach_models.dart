@@ -34,6 +34,15 @@ abstract class CoachRequest with _$CoachRequest {
     /// 학생의 *풀이/작업* 텍스트(L5 OCR 산출물 등) — 발화와 분리. 검산 검증 대상.
     @JsonKey(name: 'student_solution') String? studentSolution,
 
+    /// 학생이 *탭한* 객관식 보기의 0-기반 인덱스(ASM-06). 자유 타이핑·주관식이면 null.
+    ///
+    /// `studentInput`엔 그 보기의 **값 문자열**만 실리므로 "몇 번을 골랐는가"가 서버에
+    /// 전달되지 않았고, 그래서 문항의 오답 선지→오개념 매핑이 완비돼 있어도 역추적이
+    /// 원천 불가였다. 서버가 값 문자열로 인덱스를 역산하지 않는 이유는 같은 문자열을
+    /// 직접 타이핑한 학생과 보기를 탭한 학생이 구분되지 않기 때문이다 — 인덱스는
+    /// 클라이언트만 아는 사실이라 여기서 실어 보내는 것 말고 방법이 없다.
+    @JsonKey(name: 'selected_choice_index') int? selectedChoiceIndex,
+
     /// 세션의 현재 Polya 상태(미지정 시 백엔드 기본=이해 진입).
     @JsonKey(name: 'polya_state', includeIfNull: false) PolyaState? polyaState,
 

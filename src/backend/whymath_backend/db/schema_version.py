@@ -158,6 +158,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 인덱스 2종. 같은 시도의 숙달 이중 반영을 DB가 막는다(KPI 2 State Integrity).
     "d2a9e4b71c35",  # EOS-112: generation_log.served_model·retries(관측 좌석). 선언값
     # (model_name)과 별개로 "응답이 실제로 어느 모델에서 왔나"를 적는다 — NULL=미관측·미계측.
+    "5b3e9c27a1f6",  # ASM-06: problem_attempt.selected_choice_index — 학생이 고른 보기
+    # 인덱스(0-기반). distractor_map 역추적으로 오답→오개념 가설을 잇는 포착 슬롯.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

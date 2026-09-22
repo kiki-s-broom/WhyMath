@@ -3,11 +3,13 @@
 // 실측 증상(2026-07-19 실기기): 코치 버블에 결정론 Polya 템플릿의 마크다운 강조가
 // 원문 그대로 노출 — "좋아, 이제 *어떻게 풀지* 계획을 세워보자."의 별표가 평문으로 보였다.
 //
-// 검증 축: ①코치 버블의 짝 별표는 별표 미노출 + 해당 구간 굵게 ②비짝 별표(`3*4`·
-// `*미완`·`**`)는 원문 그대로(안전 폴백) ③학생 버블은 무변경 — 별표 원문 유지
-// (곱셈 기호 보존·변별력: 강조가 적용되면 별표가 사라져 반드시 실패한다).
+// 검증 축: ①코치 버블의 짝 별표는 별표 미노출 + 해당 구간 굵게 ②비짝 별표 중 피연산자
+// 없는 구두점(`*미완`·`**`)은 원문 그대로(안전 폴백)이고 곱셈식(`3*4`)은 강조가 아니라
+// *수식*으로 조판된다(S3-39 회수) ③학생 버블에는 강조(w700)가 절대 생기지 않는다
+// (곱셈 기호 보존·변별력: 강조가 적용되면 굵은 스팬이 생겨 반드시 실패한다).
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:korean_math_app/features/chat/data/coach_api.dart';
@@ -66,6 +68,19 @@ Widget _wrap(String coachPrompt) {
     ],
     child: const MaterialApp(home: ChatScreen()),
   );
+}
+
+/// TextSpan 트리에 w700(강조) 스팬이 하나라도 있는지 재귀 검사한다(학생 버블 무-강조 단언용).
+bool _anyBoldSpan(TextSpan root) {
+  var found = false;
+  root.visitChildren((span) {
+    if (span is TextSpan && span.style?.fontWeight == FontWeight.w700) {
+      found = true;
+      return false; // 조기 종료.
+    }
+    return true;
+  });
+  return found;
 }
 
 /// Text 위젯의 textSpan에서 본문이 있는 TextSpan들을 순서대로 수집한다(굵기 단언용).
@@ -147,14 +162,25 @@ void main() {
   });
 
   group('CoachEmphasisText 위젯 — 렌더 폴백', () {
-    testWidgets('강조가 없으면 원문 그대로의 평문 Text로 렌더된다', (tester) async {
-      for (final String raw in <String>['3*4', '*미완', '**']) {
+    testWidgets('강조 없는 구두점 별표(*미완·**)는 원문 그대로의 평문 Text로 남는다',
+        (tester) async {
+      // 피연산자 없는 별표는 수식으로 오인하지 않는다(구두점 안전 폴백·S3-39).
+      for (final String raw in <String>['*미완', '**']) {
         await tester.pumpWidget(
           MaterialApp(home: Scaffold(body: CoachEmphasisText(raw))),
         );
-        // 안전 폴백 — 별표 포함 원문이 정확히 그대로 보인다.
         expect(find.text(raw), findsOneWidget, reason: '"$raw" 원문 유지');
       }
+    });
+
+    testWidgets('강조 없는 곱셈식(3*4)은 수식으로 조판된다(별표=곱셈·강조 아님·S3-39)',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: CoachEmphasisText('3*4'))),
+      );
+      // 별표는 강조가 아니라 곱셈(\cdot)으로 조판된다 — raw '3*4'는 평문으로 남지 않는다.
+      expect(find.byType(Math), findsOneWidget);
+      expect(find.text('3*4'), findsNothing);
     });
 
     testWidgets('짝 별표는 별표 미노출 + 해당 구간만 굵게 렌더된다', (tester) async {
@@ -206,31 +232,42 @@ void main() {
       );
     });
 
-    testWidgets('코치 버블: 비짝 별표(곱셈 기호 모양)는 원문 그대로 노출된다', (tester) async {
+    testWidgets('코치 버블: 곱셈식은 강조가 아니라 수식으로 조판된다(S3-39)', (tester) async {
       await tester.pumpWidget(_wrap('3*4는 어떻게 계산할까?'));
 
       await tester.enterText(find.byType(TextField), '곱셈이 헷갈려요');
       await tester.tap(find.byIcon(Icons.send));
       await tester.pumpAndSettle();
 
-      // 안전 폴백 — 강조로 오인하지 않고 별표 포함 원문 그대로.
-      expect(find.text('3*4는 어떻게 계산할까?'), findsOneWidget);
+      // '3*4'는 강조로 오인되지 않고 곱셈 수식으로 조판된다 — 한국어 프로즈는 함께 보인다.
+      expect(find.byType(Math), findsWidgets);
+      expect(find.textContaining('는 어떻게 계산할까?'), findsWidgets);
+      // 별표 포함 raw 전체 문자열은 평문으로 남지 않는다(조판됨).
+      expect(find.text('3*4는 어떻게 계산할까?'), findsNothing);
     });
 
-    testWidgets('학생 버블: 별표 원문 유지 — 곱셈 기호가 절대 강조로 해석되지 않는다',
+    testWidgets('학생 버블: 곱셈 기호가 절대 강조(굵게)로 해석되지 않는다(수식 조판)',
         (tester) async {
       await tester.pumpWidget(_wrap('식을 어떻게 세웠는지 말해 줄래?'));
 
-      // 변별력: '3*4*5'가 강조 파서를 타면 "4"가 굵어지며 별표가 사라져
-      // 아래 원문 일치 단언이 반드시 실패한다(우연 통과 불가).
+      // 변별력: '3*4*5'가 강조 파서를 타면 "4"가 굵어진다 — 아래 굵기 부재 단언이 반드시 실패한다.
       await tester.enterText(find.byType(TextField), '3*4*5를 계산했어요');
       await tester.tap(find.byIcon(Icons.send));
       await tester.pumpAndSettle();
 
-      // 학생 버블은 별표 포함 원문 그대로(입력 필드는 전송 시 비워지므로 버블 1개).
-      expect(find.text('3*4*5를 계산했어요'), findsOneWidget);
-      // 별표가 벗겨진 변형본은 어디에도 없다.
+      // 학생 버블의 '3*4*5'는 곱셈 수식으로 조판된다(Math 렌더).
+      expect(find.byType(Math), findsWidgets);
+      // 한국어 프로즈는 그대로 보인다.
+      expect(find.textContaining('를 계산했어요'), findsWidgets);
+      // 별표가 강조로 벗겨진 변형본은 어디에도 없다(곱셈 기호 보존·강조 아님).
       expect(find.text('345를 계산했어요'), findsNothing);
+      // 학생 버블엔 굵은(w700) 강조 스팬이 없다 — 별표는 곱셈이지 강조가 아니다.
+      final bold = find.byWidgetPredicate(
+        (w) => w is Text &&
+            w.textSpan is TextSpan &&
+            _anyBoldSpan(w.textSpan! as TextSpan),
+      );
+      expect(bold, findsNothing);
     });
   });
 }

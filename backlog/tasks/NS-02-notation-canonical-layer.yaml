@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: NS-02-notation-canonical-layer
+title: "표기 canonical 계층 형식화 — 표기 스택 체인 완결(S3-24 버킷B⑨ 회수)"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 회수: 섀도 25ff22d8의 canonical 계층(math_notation.dart·math_text.dart 증분)을 이식. ② docs/architecture/notation_contract.md 갱신분은 main 독자 변경과 3-way 병합 후 훅 전건 검토. ③ 테스트 notation_canonical_test.dart 16건 회수·전건 통과. ④ 검증: CI mobile 5스텝 exit 0."
+artifacts:
+  - "PR #1253 (https://github.com/kiki-s-broom/WhyMath/pull/1253) · 고립 브랜치 k20m0w에서 회수 · CI 전건 green: mobile analyze 0 issues·488 passed(main 기준선 402)·커버리지 83.7% / infra-contracts 1584 passed / concept-reach 17 passed / harness-integrity·policy-guard·declared-unwired-audit success"
+paths:
+  - src/mobile/lib/shared/math/math_notation.dart
+  - src/mobile/lib/shared/widgets/math_text.dart
+  - src/mobile/test/notation_canonical_test.dart
+  - docs/architecture/notation_contract.md
+session: null
+notes: "[S3-24 버킷B 회수] 출처 = 고립 브랜치 claude/whymath-issues-review-k20m0w(42일 미머지·45커밋·PR로 노출된 적 없음). 이식은 파일 단위 수동 재적용이며 통째 머지를 쓰지 않았다(main이 분기점 이후 463커밋 이동). 같은 브랜치의 MOB-12(activeProblemProvider stale 리셋)는 S3-24 소관이 아니라서 전량 제외했다 — 그 회수는 별도 태스크가 소유한다. 검증은 CI mobile 잡 5스텝 전건 재현(pub get --enforce-lockfile / build_runner / analyze / test / 커버리지 게이트)."
+updated: 2026-09-21

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-75-gates-amend-path
+title: "게이트 본문 정정 경로 부재 — gates CLI에 amend가 없어 열린 게이트에 판정 근거·부분 답변을 기록할 수 없다"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: cancelled
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① gates 서브커맨드에 amend 신설 — 최소 --title(본문 정정) + notes 추가. clear/waive와 달리 게이트를 닫지 않는다(열린 채로 본문만 갱신). 대장 손편집 금지(HARN-18)의 정정 경로를 여는 것이 목적이다."
+  - "② 변별력: amend가 없는 상태에서 무엇이 새는지를 회귀 테스트로 고정한다 — 게이트 본문에 '부분 답변됨' 표기가 불가능해 다음 세션이 추론으로 clear할 수 있다는 것. 정상 입력에서 초록인 것은 보호의 증거가 아니다(CLAUDE.md 2026-09-01) — 본문을 바꾸려는 시도가 amend 없이 거부되는지를 RED로 확인한다."
+  - "③ 이벤트 대장 기록 — amend도 clear/waive처럼 events ndjson에 남긴다. 누가 언제 무엇을 왜 고쳤는지가 없으면 본문 변경이 조용한 재해석이 된다."
+  - "④ 집행 지점 별항(정본화≠집행): amend를 만드는 것과 /gates 절차가 그것을 쓰는 것은 다르다. gates 스킬 문서에 '부분 답변·판정 근거는 amend로 게이트에 기록한다'를 넣어 실제 경유 경로를 만든다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/*"
+session: null
+notes: "발단: 2026-09-06 /gates 점검에서 G-eos-task-prefix-exhausted를 clear할 뻔했다. #1000이 MP 접두를 채택(e6d1614d · 게이트 등재 bfd4cb3a보다 나중 커밋)해 게이트 선택지 3(트랙별 프리픽스 분리)을 만족한 것처럼 보였기 때문이다. 실제 답은 'MP는 회차 축 트랙 한정이고 EOS 축 일반의 후속은 미결'(Kiki 확정 2026-09-06)이며, 그 사실은 MEMORY.md에는 적혀 있었으나 게이트 본문에는 없었다. gates CLI는 list/add/clear/waive뿐이라 열린 게이트의 본문을 고칠 경로가 없고 gates.yaml 손편집은 HARN-18 금지다. 즉 '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'(CLAUDE.md 2026-09-01)의 게이트 축 — 그쪽은 태스크 선행이 depends_on에 없어 selector가 못 읽는 문제고, 이쪽은 게이트의 부분 답변·판정 근거가 게이트에 없어 clear 판단자가 못 읽는 문제다. 이번에는 세션이 실측으로 막았지 장치가 막은 것이 아니다(피해 0). 인접: HARN-67(태스크 개명 CLI 경로 부재)과 같은 '정정 경로 부재' 계열이며, 고칠 수 없는 위반을 지적하는 게이트는 사람이 게이트를 끄게 만든다는 HARN-52의 교훈이 그대로 적용된다. 번호: 초판 HARN-73이 원격 선점(claude/drive-eos-81-sequential-wbhw8v)과 충돌해 CLI 제안대로 75로 배정.\n\n[취소 2026-09-06] 중복 등재 — HARN-39-gates-title-notes-edit-cli(2026-08-31 등재·todo·P1)가 같은 문제를 이미 소유한다. add의 의미 중복 후보 고지(유사도 0.14 · 공유 희소어 waive·고칠·events·손편집·gates)가 잡았고 실측 확인했다: HARN-39 acceptance ①이 'gates edit <G-id> [--title] [--notes] 신설', ②가 '대장 손편집 금지 규약의 마지막 구멍 폐색 — 현재 clear/waive만 있어 CLI로 고칠 방법이 없다', ③이 테스트 동결로, 내가 쓴 ①②③과 같다. 오늘 새로 얻은 근거(부분 답변 미표기 → 추론 clear 위험)는 HARN-75를 살리는 대신 HARN-39에 amend로 이관했다. HARN-39가 P1이라 우선순위도 그쪽이 높다."
+updated: 2026-09-06

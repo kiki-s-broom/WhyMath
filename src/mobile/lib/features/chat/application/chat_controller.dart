@@ -64,7 +64,13 @@ class ChatController extends _$ChatController {
   /// ④ 실패 시 에러만 기록(앱은 죽지 않는다·가용성).
   ///
   /// 이 메서드는 *대화 모드* 전용 — 풀이 단계 전송은 [sendSolution]을 쓴다.
-  Future<void> send(String text) async {
+  ///
+  /// [selectedChoiceIndex]는 학생이 객관식 *보기 행을 탭해* 보낸 경우 그 보기의 0-기반
+  /// 인덱스다(ASM-06). 직접 타이핑한 발화면 null이며, 그 구분이 의미를 갖는다 — 서버는
+  /// [text]가 어떤 보기의 값과 같은지로 인덱스를 역산하지 않는다(같은 문자열을 손으로
+  /// 친 학생과 탭한 학생이 구분되지 않기 때문). 인덱스는 클라이언트만 아는 사실이라
+  /// 여기서 실어 보내지 않으면 문항의 오답 선지→오개념 매핑이 영원히 쓰이지 못한다.
+  Future<void> send(String text, {int? selectedChoiceIndex}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || state.isSending) {
       return; // 빈 입력·전송 중 재진입 방지.
@@ -75,6 +81,7 @@ class ChatController extends _$ChatController {
       studentMessage: ChatMessage.student(trimmed),
       request: CoachRequest(
         studentInput: trimmed,
+        selectedChoiceIndex: selectedChoiceIndex,
         polyaState: PolyaState(currentStage: state.polyaState),
       ),
     );

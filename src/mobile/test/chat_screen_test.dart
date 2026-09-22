@@ -3,6 +3,7 @@
 // coachApiProvider를 fake로 override해 네트워크 없이 화면 동작을 확인한다.
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:korean_math_app/features/chat/data/coach_api.dart';
@@ -414,19 +415,17 @@ void main() {
       ),
     );
 
-    // 기본 펼침 — 발문이 보인다.
-    expect(
-      find.text('이차방정식 x^2-5x+6=0의 두 근 중 큰 근을 구하시오.'),
-      findsOneWidget,
-    );
+    // 기본 펼침 — 발문이 보인다(수식 x^2는 조판되므로 프로즈 부분은 textContaining으로 확인·S3-39).
+    expect(find.textContaining('두 근 중 큰 근을 구하시오'), findsOneWidget);
+    // 캐럿 수식(x^2-5x+6=0)은 raw가 아니라 Math로 조판된다.
+    expect(find.byType(Math), findsWidgets);
+    expect(find.textContaining('x^2-5x+6=0'), findsNothing);
 
     // 배너를 탭하면 접혀 발문이 숨고 요약 행만 남는다.
     await tester.tap(find.textContaining('풀이 중인 문제'));
     await tester.pump();
-    expect(
-      find.text('이차방정식 x^2-5x+6=0의 두 근 중 큰 근을 구하시오.'),
-      findsNothing,
-    );
+    expect(find.textContaining('두 근 중 큰 근을 구하시오'), findsNothing);
+    expect(find.byType(Math), findsNothing); // 접히면 수식도 사라진다.
     expect(find.textContaining('풀이 중인 문제'), findsOneWidget);
   });
 
@@ -568,10 +567,78 @@ void main() {
       ),
     );
 
-    // 선택지 목록·안내가 없고, 기존 대화 입력(단일 필드+전송)은 그대로다.
+    // S3-38(원 S3-20): 주관식은 '풀이 단계' 모드로 시작한다 — 대화로 전환해도(선택지 목록이
+    // 뜰 수 있는 모드) 주관식엔 선택지 목록이 없다(주관식 흐름 영향 0). 대화로 전환해 최악
+    // 케이스에서 확인한다.
+    await tester.tap(find.byIcon(Icons.chat_bubble_outline));
+    await tester.pump();
+
+    // 선택지 목록·안내가 없고, 대화 입력(단일 필드+전송)은 그대로다.
     expect(find.byType(OutlinedButton), findsNothing);
     expect(find.text('보기 번호를 골라 보세요'), findsNothing);
     expect(find.byIcon(Icons.send), findsOneWidget);
+  });
+
+  // ── S3-38(원 S3-20) 코치 첫 화면 기본 모드 문제유형별(Kiki 결정) ─────────────
+  // 객관식 → '대화' 모드(선택지 번호 목록 바로 노출)·주관식 → '풀이단계' 모드(단계 풀이 바로 시작)·
+  // 자유 대화 → 기존 기본 '대화'. 학생의 수동 모드 전환은 그대로 가능(토글 UI·기존 동작 불변).
+  testWidgets('S3-38: 객관식 활성 문제는 대화 모드로 시작한다(선택지 목록 바로 노출)',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrapWithProblem(
+        _FakeCoachApi(response: _response()),
+        const Problem(
+          problemId: 'p-mc-start',
+          sourceType: '자체생성',
+          subject: '공통',
+          questionFormat: '객관식',
+          questionText: '서로 다른 실근의 개수는?',
+          choices: ['0', '1', '2', '3'],
+        ),
+      ),
+    );
+
+    // 대화 모드로 시작 — 모드 라벨 '대화'·선택지 번호 목록이 바로 노출된다(풀이 편집기 아님).
+    expect(find.text('대화'), findsOneWidget);
+    expect(find.byType(OutlinedButton), findsNWidgets(4));
+    expect(find.byIcon(Icons.send), findsOneWidget);
+    expect(find.text('풀이 제출'), findsNothing);
+    expect(find.text('단계 추가'), findsNothing);
+  });
+
+  testWidgets('S3-38: 주관식 활성 문제는 풀이단계 모드로 시작한다(단계 풀이 바로 시작)',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrapWithProblem(
+        _FakeCoachApi(response: _response()),
+        const Problem(
+          problemId: 'p-sub-start',
+          sourceType: '자체생성',
+          subject: '공통',
+          questionFormat: '서술형',
+          questionText: '이차방정식 x^2-5x+6=0의 두 근 중 큰 근을 구하시오.',
+          // choices 없음(주관식) → 풀이 단계 모드로 시작.
+        ),
+      ),
+    );
+
+    // 풀이 단계 모드로 시작 — 모드 라벨 '풀이 단계'·단계 편집기(제출/추가 버튼)가 바로 보인다.
+    expect(find.text('풀이 단계'), findsOneWidget);
+    expect(find.text('풀이 제출'), findsOneWidget); // 빈 필드 → "풀이 제출"(비활성).
+    expect(find.text('단계 추가'), findsOneWidget);
+    // 대화 모드 어포던스(단일 전송·선택지 목록)는 없다.
+    expect(find.byIcon(Icons.send), findsNothing);
+    expect(find.byType(OutlinedButton), findsNothing);
+  });
+
+  testWidgets('S3-38: 활성 문제가 없으면(자유 대화) 기존 기본 대화 모드로 시작한다',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_FakeCoachApi(response: _response())));
+
+    // 자유 대화는 기존 기본 — 대화 모드(단일 입력+전송)로 시작한다.
+    expect(find.text('대화'), findsOneWidget);
+    expect(find.byIcon(Icons.send), findsOneWidget);
+    expect(find.text('풀이 제출'), findsNothing);
   });
 
   testWidgets('활성 문제가 없으면(자유 대화) 선택지 목록을 렌더하지 않는다', (tester) async {
@@ -608,5 +675,94 @@ void main() {
     await tester.tap(find.byIcon(Icons.chat_bubble_outline));
     await tester.pump();
     expect(find.byType(OutlinedButton), findsNWidgets(4));
+  });
+
+  // ── NS-01 풀이 단계 편집기 교과서 표기 렌더 프리뷰 ─────────────────────────────
+  // "수식으로 입력"(MathLive)으로 넣은 수식이 단계 필드에 raw LaTeX(f^{\prime\prime}(x))로
+  // 보이던 문제(실기기 2026-07-23). 편집 TextField는 raw를 유지하되, 그 아래에 같은 내용을
+  // 교과서 표기로 조판한 read-only 프리뷰(MathText → Math)를 얹는다. 편집·제출 계약은 불변.
+  // 변별력: _wrap은 활성 문제가 없어 배너가 없으므로 Math 위젯은 *프리뷰에서만* 나온다 —
+  // 빈/프로즈 단계에서 findsNothing, 수식 단계에서 findsWidgets로 대비가 성립한다.
+  testWidgets('NS-01: 단계 필드에 LaTeX 입력 시 교과서 표기 렌더 프리뷰(Math)가 노출된다',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_FakeCoachApi(response: _response())));
+    await tester.tap(find.byIcon(Icons.format_list_numbered));
+    await tester.pump();
+
+    // 초기 빈 2필드 → 프리뷰 없음(빈 공간 최소화).
+    expect(find.byType(Math), findsNothing);
+
+    // MathLive가 낼 법한 raw LaTeX(이계도함수)를 단계 필드에 넣는다.
+    await tester.enterText(find.byType(TextField).at(0), r'f^{\prime\prime}(x)');
+    await tester.pump();
+
+    // 교과서 표기로 조판된 프리뷰(Math)가 생긴다 — raw만 노출되지 않는다(크래시 0).
+    expect(find.byType(Math), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    // 편집 필드는 raw 원문을 그대로 보유한다(편집 가능성 불변 — 필드 값 무변경).
+    final field = tester.widget<TextField>(find.byType(TextField).at(0));
+    expect(field.controller?.text, r'f^{\prime\prime}(x)');
+  });
+
+  testWidgets('NS-01: 단계 필드에 유니코드 수식(x³) 입력 시 렌더 프리뷰가 노출된다',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_FakeCoachApi(response: _response())));
+    await tester.tap(find.byIcon(Icons.format_list_numbered));
+    await tester.pump();
+
+    expect(find.byType(Math), findsNothing);
+    // 유니코드 상첨자(x³)는 캐럿 LaTeX로 정규화돼 조판된다(S3-23).
+    await tester.enterText(find.byType(TextField).at(0), 'x³-3x');
+    await tester.pump();
+    expect(find.byType(Math), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('NS-01: 빈 필드·순수 프로즈 단계엔 렌더 프리뷰가 없다(빈 공간 최소화)',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_FakeCoachApi(response: _response())));
+    await tester.tap(find.byIcon(Icons.format_list_numbered));
+    await tester.pump();
+
+    // 초기 빈 2필드 → 프리뷰 없음.
+    expect(find.byType(Math), findsNothing);
+
+    // 수식 신호가 없는 순수 한국어 단계 → 프리뷰를 만들지 않는다(중복 표시 억제).
+    await tester.enterText(find.byType(TextField).at(0), '식을 표준형으로 정리한다');
+    await tester.pump();
+    expect(find.byType(Math), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('NS-01: 프리뷰가 떠 있어도 제출은 raw 원문을 그대로 sendSolution으로 보낸다',
+      (tester) async {
+    final fake = _FakeCoachApi(response: _response());
+    await tester.pumpWidget(_wrap(fake));
+    await tester.tap(find.byIcon(Icons.format_list_numbered));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField).at(0), r'f^{\prime}(x)=2x');
+    await tester.enterText(find.byType(TextField).at(1), r'f^{\prime}(1)=2');
+    await tester.pump();
+    // 두 단계 모두 교과서 표기 프리뷰(Math)가 떠 있다.
+    expect(find.byType(Math), findsWidgets);
+
+    await tester.tap(find.text('2단계 제출'));
+    await tester.pumpAndSettle();
+
+    // 제출 계약 불변 — 프리뷰는 표시일 뿐, 전송 원문은 raw 그대로다(줄 분해 왕복 무손실).
+    expect(
+      fake.lastRequest?.studentInput,
+      r'f^{\prime}(x)=2x' '\n' r'f^{\prime}(1)=2',
+    );
+    expect(
+      fake.lastRequest?.solutionSteps,
+      <String>[r'f^{\prime}(x)=2x', r'f^{\prime}(1)=2'],
+    );
+
+    // 제출 후 편집기는 초기 상태(빈 2필드)로 돌아온다 — 필드가 비어 프리뷰도 사라진다
+    // (제출된 학생 버블 수식은 S3-21로 조판되어 대화에 남는 것이 정상이라 Math 총량은 검사하지 않는다).
+    expect(find.byType(TextField), findsNWidgets(2));
   });
 }

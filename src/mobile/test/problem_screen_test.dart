@@ -159,4 +159,94 @@ void main() {
     expect(find.textContaining('정답'), findsNothing);
     expect(find.textContaining('틀렸'), findsNothing);
   });
+
+  // ── S3-35: 객관식 보기 = 세로 번호목록 동결 ──────────────────────────────
+  //
+  // 이 UI는 이미 main에 구현돼 있었으나(_ProblemView의 choices 루프 + _circledNumber)
+  // 어떤 테스트도 동결하지 않아 조용히 회귀할 수 있었다 — 예컨대 누가 Wrap/Row로 바꿔
+  // 가로 배치가 되거나, 번호 라벨을 떼거나, 정오 색을 입혀도 스위트는 green이었다.
+  // 아래 4건이 그 세 축(번호·세로·중립)을 각각 잡는다.
+  group('객관식 보기 렌더 (S3-35)', () {
+    /// 보기 [choices]를 가진 객관식 문제 화면을 띄운다.
+    Future<void> pumpWithChoices(
+      WidgetTester tester,
+      List<String> choices,
+    ) async {
+      final api = _FakeProblemsApi(
+        next: const NextProblemResponse(problemId: 'p1'),
+        problem: Problem(
+          problemId: 'p1',
+          sourceType: '자체생성',
+          subject: '수학I',
+          unitCodes: const <String>['ALG'],
+          questionText: '다음 중 옳은 것은?',
+          choices: choices,
+        ),
+      );
+      await tester.pumpWidget(_wrap(api));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('보기는 ①②③ 번호가 붙어 렌더된다', (tester) async {
+      await pumpWithChoices(tester, <String>['둘', '넷', '여섯']);
+
+      expect(find.text('① 둘'), findsOneWidget);
+      expect(find.text('② 넷'), findsOneWidget);
+      expect(find.text('③ 여섯'), findsOneWidget);
+    });
+
+    testWidgets('보기는 가로가 아니라 세로로 쌓인다', (tester) async {
+      await pumpWithChoices(tester, <String>['둘', '넷', '여섯']);
+
+      // Wrap/Row로 바뀌면 y가 같고 x가 증가한다 — 이 단언이 그 회귀를 잡는다.
+      final double y1 = tester.getTopLeft(find.text('① 둘')).dy;
+      final double y2 = tester.getTopLeft(find.text('② 넷')).dy;
+      final double y3 = tester.getTopLeft(find.text('③ 여섯')).dy;
+      expect(y2, greaterThan(y1), reason: '②는 ① 아래에 놓여야 한다(세로 목록)');
+      expect(y3, greaterThan(y2), reason: '③은 ② 아래에 놓여야 한다(세로 목록)');
+    });
+
+    testWidgets('보기가 없는 문제(주관식)에는 번호 라벨이 없다 — 변별력', (tester) async {
+      // 번호 단언이 "항상 통과"가 아님을 반대 사례로 보인다.
+      final api = _FakeProblemsApi(
+        next: const NextProblemResponse(problemId: 'p1'),
+        problem: const Problem(
+          problemId: 'p1',
+          sourceType: '자체생성',
+          subject: '수학I',
+          unitCodes: <String>['ALG'],
+          questionText: '값을 구하시오.',
+        ),
+      );
+      await tester.pumpWidget(_wrap(api));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('①'), findsNothing);
+    });
+
+    testWidgets('보기끼리 색이 달라지지 않는다 — 정오 강조 금기(절대 금기)', (tester) async {
+      await pumpWithChoices(tester, <String>['둘', '넷', '여섯']);
+
+      // "정오 강조 없음"의 실질은 *보기마다 색이 갈리지 않는 것*이다(M3 bodyLarge는
+      // 기본 onSurface 색을 이미 갖고 있으므로 color==null 단언은 성립하지 않는다 — 실측).
+      // 정답 초록·오답 빨강 같은 차등 강조가 들어오면 아래 집합의 크기가 1을 넘는다.
+      final Set<Color?> colors = <Color?>{
+        for (final String label in <String>['① 둘', '② 넷', '③ 여섯'])
+          tester.widget<Text>(find.text(label)).style?.color,
+      };
+      expect(
+        colors,
+        hasLength(1),
+        reason: '보기마다 색이 다르다 — 정오 차등 강조로 읽힌다(정서 안전 금기 위반)',
+      );
+
+      // 그 단일 색이 error 롤(경고색)이어서도 안 된다 — 보기는 경고 대상이 아니다.
+      final ThemeData theme = Theme.of(tester.element(find.text('① 둘')));
+      expect(
+        colors.single,
+        isNot(theme.colorScheme.error),
+        reason: '보기 전체를 error 롤로 칠하는 것도 부정 피드백 강화다',
+      );
+    });
+  });
 }
