@@ -1458,6 +1458,18 @@ jobs:
       - name: 인코딩 무결성 가드 (U+FFFD·비-UTF-8·mojibake·스냅샷 해시)
         run: python3 scripts/ops/cp949_guard.py
 
+      # 커밋된 충돌 마커 전수 차단 (HARN-128).
+      #   사고(2026-09-02 PR #969 · 6209a8b8): 미해소 머지 충돌이 그대로 커밋돼
+      #   ci.yml에 마커가 남았고, GitHub Actions가 워크플로를 **파싱하지 못해** CI가
+      #   실패한 게 아니라 아예 뜨지 않았다(체크 0건 = "아직 안 돌았다"와 같은 화면).
+      #   일반 소스의 마커는 lint/pytest가 즉시 잡지만 워크플로 파일의 마커는
+      #   그 lint를 실행할 주체 자체를 없앤다 — CLAUDE.md 침묵 실패 금지의 CI 설정 축.
+      #   **한계(명시)**: 이 스텝도 ci.yml 안에 있으므로 ci.yml 자신이 깨진 경우는
+      #   함께 죽는다. 그때는 required check가 0건 보고되어 머지가 *막히므로* 무단
+      #   착지는 아니지만 원인이 보이지 않는다 — 스크립트 docstring에 남긴 정직한 공백.
+      - name: 충돌 마커 가드 (커밋된 git 머지 마커 전수 차단)
+        run: python3 scripts/ops/check_conflict_markers.py
+
   # ─────────────────────────────────────────────────────────────────
   # 빌드 하네스 무결성 + 원격 claim 교차 검증 (항상 실행 — 초 단위)
   # 병렬 세션 중복작업 방지: backlog 무결성·stale claim을 PR마다 감시
