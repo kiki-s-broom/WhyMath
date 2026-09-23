@@ -454,19 +454,29 @@ gates:
     title: "P3-G3 — Week 3 Gate 판정 (11/15). AI 품질 8종이 합의된 기준 충족 + LLM이 학습 상태를 못 바꾸는 것이 재확인됨. 선행 P3-08~P3-10. 판정 회차 분리 집행"
     kind: decision
     assignee: kiki
-    status: pending
+    status: waived
     requested: 2026-09-22
     remind_after_days: 60
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "Kiki 결정 2026-09-22 집행 — 통합 게이트 G-p3-w3-release-merged(11/15)로 승계. 요건은 폐기가 아니라 이동이다: Week 3 판정(AI 품질 8종 기준 충족 + LLM이 학습 상태를 못 바꿈 재확인, 선행 P3-08~P3-10)은 통합 게이트의 (가)축으로 그대로 남는다. 면제 사유는 게이트 정정 CLI(gates amend) 부재다 — 게이트 날짜·문면은 제목 문자열에만 있고 정정 경로가 없어 waive + add 로 집행했다(손편집 금지). 이 게이트를 requires_gates로 건 태스크는 재지정 완료(EOS-50 → 통합 게이트)라 이 waive로 열리는 태스크는 없다. EOS-128 4회차 · 판정 기준 main 1671b9d4"
   - id: G-p3-g4-release
     title: "P3-G4 — Phase 3 Release Gate 최종 판정 (11/22). Phase 3 Release Gate A~E 전부 충족 + 성공 기준 3문항 전부 YES → 최종 한 줄 PASS. 선행 P3-11~P3-14. 판정 회차 분리 집행"
     kind: decision
     assignee: kiki
-    status: pending
+    status: waived
     requested: 2026-09-22
     remind_after_days: 60
+    evidence: null
+    cleared_by: null
+    notes: "Kiki 결정 2026-09-22 집행 — Release 판정일 11/22가 저장소 G3(폭 확장·붕괴지점 판정, eos_transition_declaration_2026-08-30.md 부록 E)와 같은 날에 다른 판정 대상을 놓는다. 저장소 G3를 우선하고 Phase 3 Release 판정을 11/15로 옮겨 P3-G3와 통합했다. 요건은 폐기가 아니라 이동이다: Phase 3 Release Gate A~E 전부 충족 + 성공 기준 3문항 전부 YES → 최종 한 줄 PASS(선행 P3-11~P3-14)는 통합 게이트의 (나)축으로 그대로 남는다. 이 게이트를 requires_gates로 건 태스크는 0건이라 이 waive로 열리는 태스크는 없다. EOS-128 4회차 · 판정 기준 main 1671b9d4"
+  - id: G-p3-w3-release-merged
+    title: "P3-G3+G4 — Week 3 + Phase 3 Release 통합 판정 (11/15). 두 판정을 한 회차로 합친다 — 원 계획의 Release 판정일 11/22가 저장소 G3(폭 확장·붕괴지점 판정, 11/22)와 같은 날이라 Kiki가 2026-09-22에 \"저장소 G3 우선·P3-G4를 11/15로 옮겨 P3-G3에 통합\"으로 결정했다. 판정 대상 2축: (가) Week 3 — AI 품질 8종이 합의된 기준 충족 + LLM이 학습 상태를 못 바꾸는 것 재확인(선행 P3-08~P3-10) (나) Phase 3 Release Gate A~E 전부 충족 + 성공 기준 3문항 전부 YES → 최종 한 줄 PASS(선행 P3-11~P3-14). 판정 회차 분리 집행(구현 세션과 다른 세션). 부수 결과: Phase 3 실효 기간이 10/26~11/15로 줄어 Week 4 작업(P3-11~P3-14)이 압축된다 — 구현은 11/14까지 끝나야 한다"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-23
+    remind_after_days: 55
     evidence: null
     cleared_by: null
     notes: ""
