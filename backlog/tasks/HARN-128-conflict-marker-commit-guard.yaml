@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P2
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "② 집행 지점(①과 별항) — policy-guard 잡에 스텝으로 배선한다. '저장소에 존재함'이 아니라 'CI에서 돈다'를 확인한 뒤 완료로 친다."
   - "③ 결함 주입 검증 — 마커를 담은 파일을 실제로 주입해 RED를 확인하고 정상 상태에서 GREEN임을 확인한다(양쪽 변별력). 특히 워크플로 파일 자신에 주입했을 때도 잡히는지 확인 — 그 경우 워크플로가 파싱되지 않아 가드 자신이 안 뜰 수 있다. 이 한계가 실재하면 문서화하고 대안(로컬 훅·별도 워크플로)을 함께 판정한다."
   - "④ 배선 동결 — tests/infra에 이 스텝의 CI 배선 실재성을 고정하는 테스트를 둔다."
-artifacts: []
+artifacts:
+  - "PR #1291 https://github.com/kiki-s-broom/WhyMath/pull/1291 — 커밋 01872c7f"
 paths:
   - scripts/ops/check_conflict_markers.py
   - tests/infra/test_conflict_marker_guard.py
-session: claude/eager-cannon-qb2cu3
+session: null
 notes: "사고 경위: 2026-09-02 PR #969에서 origin/main 머지 충돌이 해소되지 않은 채 커밋·푸시됐다(6209a8b8). .github/workflows/ci.yml에 <<<<<<< HEAD 마커가 남아 GitHub Actions가 워크플로를 파싱하지 못했고, CI가 실패하지 않고 아예 뜨지 않았다 — 체크 0건이라 '아직 안 돌았다'와 화면이 같다. 8135f9d4에서 양측 플래그 병존으로 해소 후 18/18 green. 위험한 이유는 침묵이다: 일반 소스의 마커는 lint/pytest가 즉시 잡지만 워크플로 파일의 마커는 그 lint를 실행할 주체 자체를 없앤다. CLAUDE.md '침묵 실패 금지'·'검증 장치를 만들고 배선 확인 없이 완료 선언 금지'의 CI 설정 파일 축. 파일 범위에 ci.yml을 넣지 않은 것은 의도적이다 — HARN-56(merge queue)·OPS-59 등 다수 태스크와 상시 겹치므로, 배선 스텝 추가는 착수 시점에 그 태스크들과 조율한다.\n\n[개명 2026-09-21] HARN-61-conflict-marker-commit-guard → HARN-128-conflict-marker-commit-guard: ID 번호 충돌 해소 — main의 HARN-61-p0-swap-exemption-clause와 번호가 겹쳐 validate exit 1. 미머지인 이쪽을 개명(CLAUDE.md ID 중복 배정 금지·HARN-100 절차)"
 updated: 2026-09-23
