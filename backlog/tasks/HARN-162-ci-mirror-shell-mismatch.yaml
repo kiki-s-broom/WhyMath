@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-162-ci-mirror-shell-mismatch
+title: "CI 미러의 셸 불일치 — shell 키 없는 스텝을 pipefail로 돌려 거짓 실패(실측: webapp 잡)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "정본화: run_step이 스텝의 shell 키를 읽어 GitHub과 같은 셸을 고른다 — shell 키 없음이면 bash -e (pipefail 없음), shell: bash 면 bash --noprofile --norc -eo pipefail, 그 외 셸은 실행 대상에서 제외하고 사유를 남긴다(모르는 셸을 bash로 돌리면 그 결과는 그 스텝의 것이 아니다)\n집행: 실패 스텝의 stdout 꼬리도 보존한다 — 현재는 stderr만 남아 GitHub 형식 오류 메시지(::error::)가 통째로 사라진다. 실측 2026-09-22: webapp 실패가 exit 1 + stderr 빈 문자열로만 기록돼 원인 판정이 불가능했다\n변별력: 픽스처 4종 전건 검증 — ⒜ pipefail 없이는 통과하고 있으면 실패하는 스텝(grep 파이프)이 shell 키 없음에서 통과 ⒝ 같은 스텝이 shell: bash 선언 시 실패 ⒞ 진짜 실패 스텝은 두 형태 모두에서 실패(과소 검출 방지 대조군) ⒟ 실패 시 stdout 꼬리가 결과 JSON에 실재. ⒞가 필수다 — 셸을 느슨하게 바꾸기만 하면 모든 실패를 놓치는 과잉 수정도 ⒜⒝만으로는 통과한다\n저장소 전수 점검: ci.yml의 run 스텝 중 파이프 마지막이 아닌 명령이 비-0을 낼 수 있는 형태를 열거하고, 각각이 두 셸에서 같은 판정을 내는지 확인한다(이 사고의 원 스텝은 ADMIN-06 후속에서 이미 파이프를 제거했다)"
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+  - "tests/harness/**"
+session: null
+notes: "2026-09-22 ADMIN-06 검증 중 실측. ci_mirror.py의 run_step이 모든 스텝을 bash --noprofile --norc -eo pipefail 로 돌리며 주석에 \"GitHub Actions의 bash 기본과 정확히 맞춘다\"고 적었는데, 그것은 스텝에 shell: bash 를 명시했을 때의 형태다. shell 키가 없는 스텝의 GitHub 기본은 bash -e 이고 pipefail이 없다. 그래서 미러가 CI보다 엄격해지고, 파이프의 마지막이 아닌 명령이 비-0으로 끝날 수 있는 스텝에서 거짓 실패를 낸다.\n\n실측 재현: webapp 잡의 \"공개 산출물 검사\" 스텝이 미러에서 exit 1 (0.01s, stderr 비어 있음)인데 같은 커밋의 실제 CI에서는 success였다. 원인은 그 스텝의 leak=$(grep -rl ... | wc -l) 이 no-match 시 grep exit 1 을 내고 pipefail이 그것을 파이프라인 상태로 삼아 set -e가 스크립트를 죽인 것. 그 스텝 자체는 별건으로 파이프 제거해 고쳤다(두 셸 모두 같은 판정). 그러나 미러의 셸 불일치는 남아 있고, 같은 형태의 스텝이 저장소에 더 있으면 계속 거짓 실패를 낸다.\n\n왜 중요한가: 미러는 측정 도구다. 거짓 실패는 없는 회귀를 쫓게 만들어 통과보다 비싸고(2026-09-07 축), 반복되면 사람이 미러 출력을 무시하게 되어 HARN-119가 만들려던 보호가 상시 무력해진다. 또 미러가 stdout을 보존하지 않아 실패 원인이 남지 않았다 — \"측정·수집 도구를 성공 경로만 보고 설계 금지\" ②(실패 원인이 남는가)에 해당한다.\n\n범위 밖(의도): ci_mirror.py 수정 자체는 HARN-119 소관이라 이 세션이 건드리지 않았다."
+updated: 2026-09-22
