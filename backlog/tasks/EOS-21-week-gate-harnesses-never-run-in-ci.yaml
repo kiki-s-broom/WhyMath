@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - "tests/infra/test_week*_wiring.py"
   - ".github/workflows/ci.yml"
-session: null
+session: claude/compassionate-hypatia-chznsu
 notes: "출처: EOS-116(P-11 필수 API 표면 정리) 수행 중 실측 발견. 별건이므로 범위 규율에 따라 등재만 하고 그 세션에서 고치지 않았다.\n이 부류는 이 저장소의 반복 사고다 — CLAUDE.md '검증 장치를 만들고 배선 확인 없이 완료 선언 금지'가 tests/infra 199건 미실행(OPS-03)·required check 미강제(OPS-08)·infra lint 잡 부재(OPS-11)를 선례로 든다. 이번 건은 그 네 번째 형태이며, 특히 '판정 하네스'라는 이름 때문에 돈다고 읽히기 쉬운 것이 위험하다.\nEOS-116은 자신의 연결 동결 하네스를 e2e-nightly(실 PG 보유)에 배선하고 tests/infra/test_p11_chain_nightly_wiring.py로 동결했으므로, 이 태스크는 그 선례를 Week 1·2에 적용하는 축이다.\n\n[정정 2026-09-19] Gate 2 판정(EOS-22) 실측 — 미배선 하네스가 Week1·2 외에 week3·persona 2종 더 있다"
-updated: 2026-09-19
+updated: 2026-09-23
