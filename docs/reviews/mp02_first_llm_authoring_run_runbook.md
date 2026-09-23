@@ -5,6 +5,15 @@
 >
 > 대상 태스크 `MP-02-first-llm-authoring-run` · 작성 2026-09-06 · 실행 주체 **Kiki**
 
+> **[정정 2026-09-11]** §3(stale-file 검사)·§4(산출물 검증)·§5(리콜 리허설)의 사이드카 경로
+> 계산이 전부 틀려 있었다 — `<out>` + `".rounds.jsonl"` 식 **이어붙이기**로 짰지만, 실제 코드
+> (`anchor_round_ledger.py:530`·`problem_corpus_accumulate.py:497,507`)는 파이썬
+> `Path.with_suffix()`로 마지막 확장자를 **교체**한다(`problems.jsonl` → `problems.rounds.jsonl`,
+> `problems.jsonl.rounds.jsonl`이 아니다). 실측 결과: §3의 stale-file 검사가 실제 사이드카
+> 파일을 한 번도 찾지 못해 **재실행을 막지 못했고**(같은 회차가 의도치 않게 2번 기록됨 —
+> 다행히 둘 다 `accepted=0`이라 코퍼스 오염은 없었다), §4·§5도 `FILE_MISSING`을 오보고했다.
+> 아래 세 스크립트는 `with_suffix()`로 고쳤다 — Kiki 실행 로그(2026-09-10)로 실측 검증됨.
+
 ---
 
 ## 0. 사전 브리핑 (6항목)
@@ -152,7 +161,8 @@ ollama serve
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Py = ".\.venv\Scripts\python.exe"
 $Out = "data\corpus\problem_bank_mp02_first_run_v0\problems.jsonl"
-$Stale = @($Out, "$Out.rounds.jsonl", "$Out.genlog.jsonl", "$Out.review.jsonl") | Where-Object { Test-Path $_ }
+$Sidecars = & $Py -c "import pathlib; o=pathlib.Path(r'$Out'); print(o.with_suffix('.rounds.jsonl')); print(o.with_suffix('.genlog.jsonl')); print(o.with_suffix('.review.jsonl'))"
+$Stale = @($Out) + $Sidecars | Where-Object { Test-Path $_ }
 "STALE_FILES=$($Stale.Count)"
 if ($Stale.Count -gt 0) { "중단: 앞 시도의 산출물이 남아 있습니다 → $($Stale -join ', ')" }
 if ($Stale.Count -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out) | Out-Null }
@@ -189,7 +199,7 @@ def rows(p):
     q=pathlib.Path(p)
     if not q.exists(): return None
     return [json.loads(l) for l in q.read_text(encoding='utf-8').splitlines() if l.strip()]
-led=rows(str(out)+'.rounds.jsonl'); gen=rows(str(out)+'.genlog.jsonl'); rev=rows(str(out)+'.review.jsonl')
+led=rows(out.with_suffix('.rounds.jsonl')); gen=rows(out.with_suffix('.genlog.jsonl')); rev=rows(out.with_suffix('.review.jsonl'))
 print('LEDGER_ROWS', 'FILE_MISSING' if led is None else len(led))
 print('GENLOG_ROWS', 'FILE_MISSING' if gen is None else len(gen))
 print('REVIEW_ROWS', 'FILE_MISSING' if rev is None else len(rev))
@@ -230,11 +240,13 @@ if led:
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Py = ".\.venv\Scripts\python.exe"
 $Out = "data\corpus\problem_bank_mp02_first_run_v0\problems.jsonl"
-$RunId = (Get-Content "$Out.rounds.jsonl" | Select-Object -Last 1 | ConvertFrom-Json).run_id
+$RoundsPath = & $Py -c "import pathlib; print(pathlib.Path(r'$Out').with_suffix('.rounds.jsonl'))"
+$RunId = (Get-Content $RoundsPath | Select-Object -Last 1 | ConvertFrom-Json).run_id
 "RUN_ID_FOR_RECALL=$RunId"
 $CorpusArgs = @(); if (Test-Path $Out) { $CorpusArgs = @("--corpus", $Out) }
 "CORPUS_ARGS=$($CorpusArgs -join ' ')"
-if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog "$Out.genlog.jsonl" @CorpusArgs --run-id $RunId; "RECALL_EXIT=$LASTEXITCODE" }
+$GenlogPath = & $Py -c "import pathlib; print(pathlib.Path(r'$Out').with_suffix('.genlog.jsonl'))"
+if ($RunId) { & $Py -m whymath_backend.ops.generation_recall --genlog $GenlogPath @CorpusArgs --run-id $RunId; "RECALL_EXIT=$LASTEXITCODE" }
 ```
 
 **판정**: 열거 건수가 §4의 `GENLOG_SAME_RUN`과 **같아야** 합니다(과다·과소 0). 다르면 그
