@@ -22,7 +22,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1023,6 +1023,20 @@ class Settings(BaseSettings):
             "`trusted_hosts_list` 프로퍼티 참조."
         ),
     )
+
+    @field_validator("anthropic_api_enabled", mode="before")
+    @classmethod
+    def _empty_anthropic_switch_is_off(cls, value: Any) -> Any:
+        """빈 값은 꺼짐(False)으로 읽는다 — ARCH-66 fail-closed.
+
+        `.env.prod.example`은 값을 비워 두는 계약(`test_env_example_has_no_values`)이라
+        그대로 복사하면 `WHYMATH_ANTHROPIC_API_ENABLED=`(빈 문자열)이 들어온다. pydantic은
+        빈 문자열을 bool로 해석하지 못해 **부팅이 죽는다**. 사용 중단 스위치의 빈 값은
+        "허가하지 않았다"는 뜻이므로 False로 접는다(켜짐으로 접으면 과금 위험).
+        """
+        if isinstance(value, str) and value.strip() == "":
+            return False
+        return value
 
     @model_validator(mode="after")
     def _forbid_cors_wildcard_with_credentials(self) -> "Settings":

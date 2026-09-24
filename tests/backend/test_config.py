@@ -103,6 +103,16 @@ def test_anthropic_api_disabled_by_default_even_with_key() -> None:
     assert s.anthropic_policy_blocked is True
 
 
+def test_anthropic_switch_empty_env_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ARCH-66: .env.prod.example을 그대로 복사한 빈 값이 부팅을 죽이지 않고 꺼짐으로 읽힌다."""
+    monkeypatch.setenv("WHYMATH_ANTHROPIC_API_ENABLED", "")
+    monkeypatch.setenv("WHYMATH_ANTHROPIC_API_KEY", "sk-ant-env")
+    s = Settings()
+    assert s.anthropic_api_enabled is False
+    assert s.anthropic_configured is False
+    assert s.anthropic_policy_blocked is True
+
+
 def test_anthropic_policy_not_blocked_without_key() -> None:
     """키가 없으면 '정책 차단'이 아니라 '미설정'이다 — 두 원인을 섞어 보고하지 않는다."""
     s = Settings(anthropic_api_key=SecretStr(""))
