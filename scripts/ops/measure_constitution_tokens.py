@@ -37,6 +37,11 @@ def _brief_text(root: Path) -> tuple[str, str | None]:
     """SessionStart 브리핑 출력 — (본문, 실패 사유)."""
     import subprocess
 
+    # 자식 stdout을 UTF-8로 강제한다(HARN-169). 한국어 Windows에서 파이프 stdout은 로케일
+    # 인코딩(cp949)이 되어 브리핑의 `—`·`⚠`에서 UnicodeEncodeError로 exit 1이 난다 —
+    # 그러면 브리핑이 '미측정'으로 떨어지고 합계가 하한이 된다. 읽는 쪽이 utf-8이므로
+    # 쓰는 쪽도 맞춘다.
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     try:
         proc = subprocess.run(
             [sys.executable, "scripts/harness/backlog.py", "brief", "--format", "text"],
@@ -44,9 +49,10 @@ def _brief_text(root: Path) -> tuple[str, str | None]:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=env,
             timeout=120,
         )
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:
         return "", f"브리핑 실행 실패 — {type(exc).__name__}: {exc}"
     if proc.returncode != 0:
         return "", f"브리핑 exit {proc.returncode} — {(proc.stderr or '').strip()[:200]}"

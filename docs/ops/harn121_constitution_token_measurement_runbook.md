@@ -85,6 +85,7 @@ if (-not $k) { "KEY=없음 — 이 창에 키가 설정되지 않았습니다 (5
 ```powershell
 $k = $env:ANTHROPIC_API_KEY
 $ok = ($k) -and ($k.Length -ge 100) -and (-not $k.Contains([char]0x2026))
+$env:PYTHONUTF8 = "1"
 if ($ok) { python -m pip install -q anthropic; python scripts\ops\measure_constitution_tokens.py --out metrics\constitution_tokens.json } else { "MEASURE_REFUSED=True — 키가 없거나 자리표시자입니다. 블록 2 결과를 확인하세요." }
 ```
 
@@ -95,13 +96,23 @@ if ($ok) { python -m pip install -q anthropic; python scripts\ops\measure_consti
 
 ## 실패 시 대처
 
-**5-A · 키가 없을 때**: 이 창에만 임시로 넣는 방법입니다(영구 등록 아님).
+**5-A · 키가 없을 때**: 이 창에만 임시로 넣는 방법입니다(영구 등록 아님). 블록이
+입력 줄에서 멈추면 키 전체를 붙여넣고 Enter를 누르세요 — 화면에는 `*`로만 보입니다.
 
 ```powershell
-$env:ANTHROPIC_API_KEY = "여기에_실제_키_전체"
+$s = Read-Host "Anthropic 키 전체를 붙여넣고 Enter" -AsSecureString
+$env:ANTHROPIC_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
+Remove-Variable s
+"KEY 길이 $($env:ANTHROPIC_API_KEY.Length) — 100 이상이어야 정상 (0이면 붙여넣기 실패)"
 ```
 
 > 넣은 뒤 블록 2를 다시 돌려 `생략문자포함 False`를 확인하고 블록 3으로 가세요.
+
+**`PYTHONUTF8` 줄이 있는 이유 (HARN-169)**: 한국어 Windows에서 파이프로 연결된 파이썬
+출력은 cp949가 되어, 스크립트가 내부에서 부르는 브리핑이 `—`·`⚠` 문자에서 죽고
+`SessionStart 브리핑 미측정 — 브리핑 exit 1`로 끝났다(합계가 하한이 되는 실패 B).
+스크립트 자신도 이제 자식 프로세스에 UTF-8을 강제하지만, 이 줄은 그 수정이 들어가기
+전 체크아웃에서도 같은 결과를 내게 하는 이중 안전장치다.
 
 **5-B · SDK가 없을 때**: 블록 3이 이미 `python -m pip install -q anthropic`을 포함합니다.
 그래도 실패하면 콘다 base와 `.venv`가 섞였을 수 있으니 출력 전문을 보내 주세요.
