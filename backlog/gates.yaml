@@ -334,11 +334,11 @@ gates:
     title: "헌법 토큰 실측 (HARN-121 ① · Claude Max 경로) — Claude Code 세션에서 /context를 실행해 Memory files의 CLAUDE.md 토큰 수와 전체 컨텍스트 구성을 측정한다. Anthropic API count_tokens 방식(G-harn121-constitution-token-measure)을 대체한다 — 2026-09-24 Kiki 결정(ARCH-66)으로 Anthropic API를 쓰지 않기 때문이다. /context는 Claude 토크나이저의 실측이므로 '문자 수 대체 금지' 원칙과 양립한다. 한계(명시): AGENTS.md는 Claude Code가 읽지 않아 /context에 나타나지 않으며(Codex 등 타 에이전트 전용), SessionStart 브리핑은 메시지 항목에 합산돼 개별 수치가 분리되지 않을 수 있다 — 분리되지 않으면 그 사실을 증거에 적는다. 회신 = /context 출력 전문. 산출물 = metrics/constitution_tokens.json(세션이 회신에서 기록). 목표 '코어 ≤ 1.5만 토큰'의 분모."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-24
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki가 2026-09-24 세션 claude/keen-pascal-6b9tz0에서 /context 실행 — Memory files: CLAUDE.md 55.6k 토큰(목표 코어 15k의 3.71배). 판정 기준 main fbb6c215 판본(측정 시점 트리는 +711 bytes, 차이 1% 미만). 미측정 2건: AGENTS.md(Claude Code 미로드), SessionStart 브리핑(Messages 합산·분리 불가). 기록 = metrics/constitution_tokens.json, PR #1302"
+    cleared_by: kiki
     notes: ""
   - id: G-kg02-review-promotion-llm-session
     title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
