@@ -11,13 +11,15 @@ eos_priority: P2
 owner: claude
 depends_on:
   - S3-01-pilot-cohort
-requires_gates: []
+requires_gates:
+  - G-student-work-after-internal-completion
 acceptance:
   - "①problem_attempt 집계→historical_correct_rate·rate_top/mid/low_grade·경험 discrimination_D 갱신 배치(calibrate_items 동형 CLI·결정론·갱신 감사 로그·as-found 병기 준용) ②오개념 유발도=distractor_map 선지별 선택률 통계(신규 필드 0·리포트 축) ③AI 재평가 환류는 v2: 초기 난이도-실측 괴리 상위 문항 5축 재추정→검수 큐(자동 덮어쓰기 금지·기계 자율 거부만 — crosswalk 게이트 계약 준용) ④학생 풀이 데이터 사용은 명시적 동의 전제"
+  - "[ARCH-66 ⑥ 2026-09-24] Kiki 결정: 학생(실사용자)과 함께 해야 하는 모든 과정은 2026-12-31 내부 프로젝트 완성 이후로 연기한다. 이 태스크는 게이트 G-student-work-after-internal-completion에 묶여 그 판정 전까지 착수하지 않는다."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l2/**"
   - "src/backend/whymath_backend/harness/**"
 session: null
-notes: "docs/architecture/problem_bank_gap_review.md §3 D9 — 외부 틀 기능 19 자동 업데이트 루프의 미가동 절반(IRT JMLE는 기배선). 실학생 응답 0이라 S3-01 잠금(입력 없는 파이프라인 금지). 구 S4-12에서 재번호(2026-07-29)\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/problem_bank_gap_review.md §3 D9 — 외부 틀 기능 19 자동 업데이트 루프의 미가동 절반(IRT JMLE는 기배선). 실학생 응답 0이라 S3-01 잠금(입력 없는 파이프라인 금지). 구 S4-12에서 재번호(2026-07-29)\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-24] ARCH-66 ⑥: 학생 참여 과정 12/31 이후 연기"
+updated: 2026-09-24
