@@ -338,6 +338,19 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-24 (결정 · Kiki 승인 · S3-16 ③ 부분 번복): **"KPI 5종 중 2종은 구조상 측정 불가"는 사실이지만 원래 측정 불가능한 지표는 아니다 — ①은 7월 결정 하나에 막혀 있었고 ⑤는 별개의 빈 좌석이었다. 세션 행 writer만 되살린다** (Kiki 지적·승인, claude 조사·등재) — 판정 기준 main `5af2097b`
+
+- **발단**: Kiki 지적 "KPI 5종 중 2종은 구조상 측정 불가". 게이트② 판정문(`docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md` §4)이 이미 ①Loop Completion·⑤Traceability를 구조적 미측정으로 판정했고 §6-2에 "세션 writer 배선 + evidence_event 조인 키 도입, 2~4 작업일"을 남은 작업으로 적었으나 **소유 태스크를 등재하지 않았다**(2026-09-24 로컬 대장 + 원격 브랜치 전수 검색에서 미완료 소유자 0건).
+- **숨은 충돌**: 판정문이 남은 작업으로 적은 "세션 writer 배선"은 **2026-07-29 `S3-16` acceptance ③의 "learning_session 행 writer 영구 미신설" 결정과 정면으로 부딪힌다** — 판정문은 그 결정을 인용하지 않았다. 그런데 ③의 사유("단일 스칼라가 정본 5분류와 축 불일치")는 `focus_score`·`engagement_score`에만 해당하고, 세션 행(시작·종료 시각)에는 해당하지 않는다. 한 문장에 묶인 세 대상 중 하나가 사유 없이 같이 묶여 있었다.
+- **영향 범위가 판정문보다 넓다**: 같은 결정이 세 소비처를 막고 있었다 — ⓐ 루프 KPI ①(`ops/loop_kpi_gate`) ⓑ 파일럿 KPI2 재방문율(`harness/pilot_kpi_baseline.py:812` — D7 ≥30%, 문서들이 "가장 먼저 검증할 가설"로 적은 지표의 유일한 측정 경로) ⓒ `harness/surrogate_baseline_report` ③("영구 불가" 표기). 판정문은 ⓐ만 봤다.
+- **결정 1 — S3-16 ③ 부분 번복**: `learning_session` **행** writer는 신설한다. `focus_score`·`engagement_score` 미신설은 **유지**한다(EOS-131 ③이 NULL 유지를 동결).
+- **결정 2 — 세션은 서버가 30분 유휴 간격 규칙으로 연다**: Flutter는 `session_id`를 보내지 않으므로(`src/mobile/lib` 0건) 클라 수정 없이 서버가 인증된 학습 활동 사이 간격으로 세션을 가른다. 종료 신호 누락으로 세션이 영원히 열려 KPI ① 분모를 부풀리는 상태를 구조적으로 막는다.
+- **결정 3 — 추천 기록에 user_id 컬럼을 넣지 않는다**: 판정문 §6-2의 "evidence_event 조인 키 도입(마이그레이션 동반)"을 정정한다. `evidence_event`는 PED-03·REC-03이 "user_id 없음·시그니처에 user_id 슬롯 자체가 없음"으로 설계한 좌석이며, 학습자 결합은 placeholder `uuid4()`를 실 `session_id`로 바꿔 `evidence_event.session_id → learning_session.user_id` 경로로 얻는다. 부수 성질: `session_id`는 FK가 아니므로 삭제권 이행으로 세션 행이 지워지면 추천 기록은 자동으로 학습자와 끊긴다(`learning_session`은 이미 `privacy/erasure.py:116`·`export.py:113` 대상). 활동 중 결합되는 동안의 열람권 편입 여부는 EOS-131 ⑤가 판정한다.
+- **결정 4 — KPI ⑤의 LearnerState hop은 추천 meta의 근거 식별자로 되짚는다**: LearnerState는 매 호출 조립·비영속(EOS-10)이고, 사후 재구성은 숙달 시계열(append-only)엔 되지만 오개념 가설(`updated_at` 덮어쓰기)엔 안 된다. 그래서 추천 시점에 쓴 근거(숙달 최신 `measured_at`·능력치 스냅샷 id·활성 가설 id)를 meta에 싣는다(식별자·시각만 — B1 비민감 원칙 유지). 현행 원천 대장은 이 hop을 `user_state_snapshot`에 매달아 두었는데 `ARCH-51`이 그 좌석의 폐기를 검토 중이라, 폐기 전에 hop 원천을 옮기지 않으면 ⑤가 영구 미측정으로 굳는다 — `ARCH-51` acceptance ⑤로 교차 기록.
+- **등재**: `EOS-131`(세션 writer + 추천 실 session_id 결합 · ①·KPI2·surrogate ③ 동시 해제 · P1) · `EOS-132`(⑤ LearnerState hop 원천 이전 · EOS-131 의존 · P1) · `ARCH-51` ⑤ 추가. P0 승격(예산 swap-out 필요)은 Kiki 판단으로 남겼다 — G4(12/13) 전 착지가 필요하다.
+- **같은 세션의 사고 2건**(대장 `backlog/incidents.ndjson`): ⓐ 번호 확인용으로 실행한 `backlog.py add`가 실제 태스크를 2회 생성(커밋 전 삭제·피해 0) ⓑ 쓰기 CLI 출력을 `| head -3`로 잘라 BrokenPipe exit 1을 "등록 거부"로 오독 — ⓑ가 ⓐ의 2회차를 불렀다. 대책 = `HARN-168`(`add --dry-run` + 중간 종료 시 반쪽 쓰기 방지 + BrokenPipe 별도 종료 코드).
+- **정직한 공백**: 코드 변경 0 — 이 기록은 결정과 소유자 부여까지다. ①⑤는 EOS-131·132가 착지해야 측정이 시작되며, 그 전까지 `loop_kpi_gate`는 계속 exit 2(미측정)를 내는 것이 정상이다.
+
 ### 2026-09-22 (결정·착지 · ADMIN-06): **백오피스 웹 셸 — 단일 앱을 `pageExtensions`로 두 타깃으로 가르고, 내비는 레지스트리에서만 파생시킨다** (claude 구현·판정) — 판정 기준 main `42ee1059`(ADMIN-05 착지분)
 
 - **결정 1 — 공개/백오피스 분리 방식 = 타깃별 `pageExtensions`**. web_strategy §2가 "단일 앱 권고 + 공개 산출물에 admin 번들 0"을 요건으로만 남기고 방식은 ADMIN-06에 위임했었다. Next가 라우트 파일(`page`·`layout`·`robots`·`sitemap` …)을 *파일명 확장자*로 식별한다는 성질을 그대로 써서, admin 라우트 파일에만 `.admin.tsx` 접미를 주고 `WHYMATH_WEB_TARGET`으로 목록을 바꾼다(공개 `["tsx","ts"]` / admin `["admin.tsx","admin.ts"]`). 실측(Next 15.5.25): 공개 빌드 라우트 `/`·`/robots.txt`·`/sitemap.xml`(`/admin` 0건) · admin 빌드 라우트 `/admin`(`/` 0건) — **양방향으로 갈린다**. 미설정은 공개 빌드로 수렴한다(실수의 방향이 안전한 쪽).
