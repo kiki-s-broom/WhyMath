@@ -489,7 +489,8 @@ class Settings(BaseSettings):
         description=(
             "Anthropic API 사용 허가 스위치(ARCH-66 · 기본 False). 2026-09-24 Kiki 결정으로 "
             "2026-12-31까지 Anthropic API 미사용 — 꺼져 있으면 키가 있어도 미설정으로 본다. "
-            "환경변수 WHYMATH_ANTHROPIC_API_ENABLED. 재개 판정 = G-arch66-anthropic-api-pause-review."
+            "환경변수 WHYMATH_ANTHROPIC_API_ENABLED. "
+            "재개 판정 = G-arch66-anthropic-api-pause-review."
         ),
     )
     anthropic_model_mid: str = Field(

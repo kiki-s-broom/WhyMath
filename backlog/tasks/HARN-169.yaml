@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: docs
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,11 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① measure_constitution_tokens.py가 브리핑 서브프로세스를 UTF-8 강제 환경(PYTHONUTF8=1·PYTHONIOENCODING=utf-8)으로 실행한다 — 한국어 Windows(cp949)에서 브리핑이 UnicodeEncodeError로 exit 1이 되어 '미측정'으로 떨어지던 결함 제거 ② 디코딩 오류(UnicodeDecodeError)도 미측정 사유로 남기고 크래시하지 않는다 ③ 회귀 테스트: cp949 강제 환경에서 브리핑 수집이 성공함을 단언(수정 전 RED 확인) ④ 런북 5-A의 자리표시자를 Read-Host로 교체(붙여넣기 블록 자리표시자 금지)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1302 (cp949 브리핑 수정 dd3b 커밋 + 회귀 테스트 4건; 런북 ④ Read-Host 항은 ARCH-66 /context 전환으로 무의미화 — 런북에 키 입력 단계 자체가 없어짐)"
+  - "정정: 앞 증적의 'dd3b 커밋'은 세션의 오기(확인 없이 적은 해시) — 실제 커밋은 ca530cb5, 후속 ARCH-66 커밋 09d7a0e3에서 런북 재작성"
 paths:
   - scripts/ops/measure_constitution_tokens.py
   - docs/ops/harn121_constitution_token_measurement_runbook.md
   - tests/infra/test_measure_constitution_tokens.py
-session: claude/keen-pascal-6b9tz0
-notes: ""
+session: null
+notes: "[정정 2026-09-24] 증적 해시 오기 정정"
 updated: 2026-09-24
