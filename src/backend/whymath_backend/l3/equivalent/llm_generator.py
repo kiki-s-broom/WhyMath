@@ -283,6 +283,7 @@ class LLMEquivalentProblemGenerator:
         temperature: float = 0.9,
         top_p: float | None = None,
         authoring_family: ModelFamily | None = ModelFamily.GENERAL,
+        routing_sync: bool = True,
         slug_prefix: str = "wm-gen",
         subject: Subject = Subject.공통,
         curriculum_version: Curriculum = Curriculum.REVISION_2022,
@@ -345,6 +346,12 @@ class LLMEquivalentProblemGenerator:
                 SymPy 게이트가 검증하므로 로컬 저작은 GENERAL(qwen2.5)로 태운다. 라우터의 비용·
                 크기·모드 결정은 그대로 두고 *로컬 FAST/MID 결정의 패밀리 축만* 이 값으로 바꾼다
                 (불변식 4 유지·`_decide_routing`). None이면 라우터 결정을 그대로 쓴다(옵트아웃).
+            routing_sync: **라우팅 신호의 동기 여부**(MP-02 재회차·기본 True = 종전과 바이트 동일).
+                True면 라우터 규칙 8(동기+medium/hard)이 로컬 MID(qwen2.5:7b)를 고른다. 오프라인
+                배치 저작은 학생 대기가 없으므로 False를 줄 수 있고, 그러면 라우터 규칙 2(비동기 +
+                generate)가 로컬 **QUALITY**(`QUALITY_MODEL_ID`)로 보낸다 — 모델 선택은 여전히
+                라우터가 한다(직접 호출·모델 ID 하드코딩 없음). QUALITY는 패밀리 무관이라
+                `authoring_family` 후처리는 적용되지 않는다(`_decide_routing`).
             slug_prefix: 안정 slug 접두사(결정론 해시와 결합해 멱등 upsert 키 생성).
             subject·curriculum_version·valid_from_year: Problem 필수 메타 기본값(스펙 밖·저작 배선).
             fallback_unit_codes: LLM이 unit_codes를 안 주면 쓰는 폴백(비면 결측 시 생성 실패).
@@ -389,6 +396,7 @@ class LLMEquivalentProblemGenerator:
         self._temperature = temperature
         self._top_p = top_p
         self._authoring_family = authoring_family
+        self._routing_sync = routing_sync
         # 배치용 지속 이벤트 루프(지연 생성) — asyncio.run의 루프 생성·종료 반복이 provider의
         # 캐시 커넥션 풀을 죽여 배치가 격회 실패하던 실측 회귀 방어(_invoke·_ensure_loop 참조).
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -764,7 +772,7 @@ class LLMEquivalentProblemGenerator:
             requires_reasoning=True,
             student_subscription=self._subscription,
             budget_krw=self._budget_krw,  # 기본값=단일 좌석(OPS-18·회귀 0)·호출자 명시 시 override
-            sync=True,
+            sync=self._routing_sync,  # 기본 True(종전)·배치 저작이 False면 QUALITY(규칙 2)
             # 등급: 프롬프트에는 비민감 스펙 요약(성취기준 코드·오개념 id·난이도·답 형태)만
             # 싣고 원본 본문·풀이는 애초에 스펙에 없다(`_build_user_prompt` 참조) — 실리는
             # 것은 자체 저작 메타뿐이다. 코퍼스 provenance가 바뀌면 단일 좌석에서 잠긴다.

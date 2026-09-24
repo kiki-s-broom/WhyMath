@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ artifacts: []
 paths:
   - "data/corpus/**"
   - "docs/reviews/**"
-session: null
+session: claude/wizardly-allen-bqgujn
 notes: "출처: 대체안 A(2026-09-06 Kiki 채택) §6 1행 · §11-5 P1-①. **MP 접두 신설 사유**: EOS 계열 소진(TASK_ID_RE 정확히 2자리·EOS-98/99가 마지막). MP = 마이크로 프로젝트(대체안 A 정의: 1 MP = accumulate 회차 1건). MP-01은 초판 오등재(검수 게이트를 회차 태스크에 걸어 교착 — requires_gates는 착수 조건)로 회수된 번호라 재사용하지 않는다(§11-3). Kiki 머신 실행 필수(실 provider·Phaiakes9) — 세션이 런북(6항목 브리핑·자가검증 동봉)을 제공하고 Kiki가 실행한다. EOS-99(캐시 계측)는 이 태스크의 의존이 아니다(참조만). 골든셋의 시작점이라 P0 논거가 있으나 P0 예산(One In One Out) 때문에 P1 — 승격은 Kiki 판단(amend --priority).\n\n[정정 2026-09-06] PR #1014 Codex P2 — 활성 레코드의 잘못된 소진 근거 정정(HARN-73 실측·Kiki 결정 A). amend에 notes 정정 경로가 없어(HARN-67 ⑥) acceptance 정정 항으로 기록\n\n[차단 2026-09-07] Kiki 머신 실행 대기 — 사람 게이트. 실행 런북은 main 착지 완료(PR #1017 · 머지 커밋 98925b0e · docs/reviews/mp02_first_llm_authoring_run_runbook.md). 회차 자체는 실 LLM·Phaiakes9 몫이라 세션이 대신 수행할 수 없다(샌드박스에 Ollama·실 provider 키 0건). 안내 범위는 런북 1~6절이며, 카나리 검수 절은 구간 식별 도구가 착지한 뒤 별도 런북으로 드린다. 원격 홀드 유지 — Kiki 회신이 이 세션으로 돌아오므로 다른 세션이 이어받을 자리가 아니다.\n\n[정정 2026-09-23] 원격 홀드 해제 후 acceptance 전수 재대조 — ②만 충족, done 미처리"
-updated: 2026-09-23
+updated: 2026-09-24

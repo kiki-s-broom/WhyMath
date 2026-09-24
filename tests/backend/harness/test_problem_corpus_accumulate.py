@@ -609,3 +609,53 @@ class TestSafetyCliWiring:
         with pytest.raises(SystemExit) as excinfo:
             main(["--out", str(out), "--n", "2", flag, value])
         assert excinfo.value.code == 2  # argparse.error
+
+
+class TestAuthoringTierWiring:
+    """--authoring-tier(MP-02 재회차) — 생성기 조립 인자로 실제 전달되는가."""
+
+    def test_default_mid_sends_no_routing_sync_key(self) -> None:
+        """mid(기본)는 routing_sync 키를 싣지 않는다 — 종전 조립과 동일(대조군)."""
+        gen = problem_corpus_accumulate._build_live_generator("힌트")
+        assert gen._routing_sync is True  # type: ignore[attr-defined]
+
+    def test_quality_sets_async_routing(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="quality")
+        assert gen._routing_sync is False  # type: ignore[attr-defined]
+
+    def test_unknown_tier_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="authoring_tier"):
+            problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="cloud")
+
+    def test_cli_passes_tier_to_builder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        def _fake(topic_hint: str, **kwargs: object) -> object:
+            seen.append(kwargs.get("authoring_tier"))
+            return _AlwaysFailingGenerator()
+
+        monkeypatch.setattr(problem_corpus_accumulate, "_build_live_generator", _fake)
+        seed = _seed_corpus(tmp_path, short_n=1)
+        main(
+            [
+                "--seed",
+                str(seed),
+                "--out",
+                str(tmp_path / "a.jsonl"),
+                "--n",
+                "1",
+                "--canary",
+                "0",
+                "--abort-window",
+                "0",
+                "--authoring-tier",
+                "quality",
+            ]
+        )
+        assert seen == ["quality"]
+
+    def test_cli_rejects_unknown_tier(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit):
+            main(["--out", str(tmp_path / "a.jsonl"), "--authoring-tier", "cloud"])
