@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-66
+title: "12/31 내부 완성 집중 방침 반영 — Anthropic API 사용 중단(Claude Max 전환) + 학생 참여 과정 연기"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결정 기록: MEMORY 결정 로그에 2026-09-24 Kiki 결정(Anthropic API 미사용 · Claude Max 구독은 개발 도구 전용 · 기한 2026-12-31 내부 프로젝트 완성 시점)을 기재하고 CLAUDE.md 스택 표의 클라우드 LLM 행에 현행 단서를 병기 ② 집행(코드): Settings에 anthropic_api_enabled(기본 False)를 신설해 anthropic_configured가 키가 있어도 False를 내게 한다 — 키 미설정과 같은 기존 경로(클라우드 불가 보고)로 흐르게 하고, 정책 차단이 원인임을 오류 문구에 남긴다(침묵 실패 금지) ③ 만료 지점: 2026-12-31 재판정 게이트를 등재한다(만료 없는 유예 금지) ④ Anthropic API 키를 전제한 pending 게이트·미완료 태스크·Kiki 런북을 전수 조사해 대체 경로(Claude Max로 가능한 것) 또는 보류로 정리한다 — 특히 G-harn121 헌법 토큰 실측은 Claude Code의 /context로 대체 ⑤ Claude Max 구독은 개인 개발 도구 사용분이며 WhyMath 서비스 런타임(학생 대면·저작 배치)의 API 호출을 대신할 수 없다는 경계를 결정 기록에 명시"
+  - "⑥ [2026-09-24 Kiki 추가 지시] 학생(실사용자)과 함께 해야 하는 모든 과정 — 파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집 등 — 을 2026-12-31 내부 프로젝트 완성 이후로 연기한다. 집행: 해당 미완료 태스크에 연기 게이트를 부착해 selector가 착수 후보로 내놓지 않게 하고(산문 아닌 대장 집행), 학생 없이 가능한 코드·설계 축은 막지 않는다(해당 태스크 acceptance에 분리 명시). 재개 판정 지점을 게이트로 둔다(만료 없는 유예 금지). MEMORY 결정 로그·ROADMAP 학생 참여 일정 표기에 반영."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1302 — 커밋 09d7a0e3(방침·스위치·대장)·e3a6ca17(학생 연기 게이트)·f111eddc(빈 값 fail-closed). 검증: 최종 HEAD f111eddc 전체 백엔드 14268 passed·계층 커버리지 PASS, tests/infra 1750 passed, tests/harness 977 passed. 뮤테이션 3종 RED 확인. 남은 Kiki 판정 = G-arch66-anthropic-api-pause-review · G-student-work-after-internal-completion"
+paths:
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/l3/providers/anthropic.py
+  - MEMORY.md
+  - CLAUDE.md
+  - backlog/gates.yaml
+session: null
+notes: "[정정 2026-09-24] title 'Anthropic API 사용 중단 방침 반영 (2026-09-24 ~ 2026-12-31 · Claude Max 구독 전환)' → '12/31 내부 완성 집중 방침 반영 — Anthropic API 사용 중단(Claude Max 전환) + 학생 참여 과정 연기': Kiki 추가 지시: 학생 참여 과정 12/31 이후 연기"
+updated: 2026-09-24

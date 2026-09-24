@@ -11,13 +11,15 @@ eos_priority: P1
 owner: claude
 depends_on:
   - ARCH-62-cloud-cost-table-seat-axis
-requires_gates: []
+requires_gates:
+  - G-arch66-anthropic-api-pause-review
 acceptance:
   - "① 좌석 failover 경로 배선 — CLOUD_MID 요청이 1차 좌석(openrouter/deepinfra) 실패 시 2차 좌석(anthropic)으로 1회 재시도하고, 그것도 실패하면 기존 LOCAL 강등 경로를 탄다. ② OpenRouter의 `allow_fallbacks=false`는 **그대로 유지**한다 — 이 태스크가 만드는 것은 OpenRouter 내부 폴백이 아니라 우리 라우터 층의 명시적 좌석 전환이다. 둘은 다른 것이며, 전자를 켜면 정밀도(fp8/fp4/unknown)가 섞여 품질 비교가 무효가 된다(ARCH-55 채택 계약). ③ failover 트리거는 429·5xx·타임아웃으로 한정한다 — 4xx(인증·잘못된 요청)는 재시도하지 않는다(같은 실패가 반복될 뿐이고 원인을 가린다). ④ 작동 신호 4종을 리포트가 낸다(CLAUDE.md 「작동한 비율」): seat_primary_success_rate · seat_failover_rate(+사유 분포 429/5xx/timeout) · seat_local_degrade_rate · seat_not_measured. 좌석 미상을 0으로 접지 않는다. ⑤ 변별력 — 1차 좌석이 429를 내도록 주입하면 2차 좌석이 응답하고 seat_failover_rate가 오른다. 주입 없이는 seat_primary_success_rate가 1.0이고 failover 0이다. 두 상태가 서로 다른 값을 내는 것까지 확인한다. ⑥ 뮤테이션 — failover 분기를 제거하면 ⑤의 주입 테스트가 RED. 4xx 재시도 금지 절을 제거하면 인증 실패 주입 테스트가 RED. 두 절 각각에 그 절이 없으면 통과하는 입력을 픽스처로 둔다."
+  - "[ARCH-66 보류 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다(Claude는 Claude Max 구독 개발 도구로만). 이 태스크는 Anthropic 좌석의 런타임 호출을 전제하므로 재판정 게이트 G-arch66-anthropic-api-pause-review에 묶는다. 특히 구독 OAuth 자격증명을 백엔드 런타임에 쓰는 설계(03c 4.3)는 2026-05-20 결정(소비자 구독 = 개인 사용 한정·제품 서빙 불가)과 충돌 소지가 있어 그 게이트에서 함께 판정한다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/providers/composite.py
   - src/backend/whymath_backend/l3/providers/factory.py
 session: null
-notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 3절. 판정 기준: main d10ba109.\n\n이 태스크가 학생 대면 전환(ARCH-64)의 안전 장치다. 실측된 공유 풀 대기열 실패율이 2026-09-17~18 4회차에서 30%→15%→0%로 흔들렸고(limit_source=upstream_provider_shared_pool·is_byok=false) p95 지연이 212초까지 갔다. 저작 경로에서는 명확한 실패가 옳은 선택이지만(사람이 본다) 학생 대면에서는 그 실패가 학생 화면의 오류가 된다.\n\nfailover가 성립하면 가용성 축은 '차단 판정의 입력'이 아니라 '운영 지표'가 된다 — ARCH-56의 acceptance 재정의가 그 위에 선다(Kiki 판정 사안).\n\n주의: seat_failover_rate가 상시 높으면 그것은 보호가 작동 중이라는 뜻이 아니라 1차 좌석이 부적합하다는 신호다. 그때 openrouter_allowed_providers에 정밀도가 같은 곳(baseten — PROVIDER_* 표 등재·Region US·baseten/fp8)을 추가해 이중화한다. 정밀도가 다른 곳을 넣는 것은 이중화가 아니라 오염이다."
-updated: 2026-09-21
+notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 3절. 판정 기준: main d10ba109.\n\n이 태스크가 학생 대면 전환(ARCH-64)의 안전 장치다. 실측된 공유 풀 대기열 실패율이 2026-09-17~18 4회차에서 30%→15%→0%로 흔들렸고(limit_source=upstream_provider_shared_pool·is_byok=false) p95 지연이 212초까지 갔다. 저작 경로에서는 명확한 실패가 옳은 선택이지만(사람이 본다) 학생 대면에서는 그 실패가 학생 화면의 오류가 된다.\n\nfailover가 성립하면 가용성 축은 '차단 판정의 입력'이 아니라 '운영 지표'가 된다 — ARCH-56의 acceptance 재정의가 그 위에 선다(Kiki 판정 사안).\n\n주의: seat_failover_rate가 상시 높으면 그것은 보호가 작동 중이라는 뜻이 아니라 1차 좌석이 부적합하다는 신호다. 그때 openrouter_allowed_providers에 정밀도가 같은 곳(baseten — PROVIDER_* 표 등재·Region US·baseten/fp8)을 추가해 이중화한다. 정밀도가 다른 곳을 넣는 것은 이중화가 아니라 오염이다.\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침"
+updated: 2026-09-24

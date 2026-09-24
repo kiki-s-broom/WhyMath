@@ -148,7 +148,11 @@ def _model_settings() -> Settings:
 
 
 def _configured_settings(**overrides: Any) -> Settings:
-    base: dict[str, Any] = {"anthropic_api_key": SecretStr("sk-ant-test")}
+    # ARCH-66: 사용 중단 방침 스위치(기본 False)도 켜야 "사용 가능" 상태가 된다
+    base: dict[str, Any] = {
+        "anthropic_api_key": SecretStr("sk-ant-test"),
+        "anthropic_api_enabled": True,
+    }
     base.update(overrides)
     return Settings(**base)
 
@@ -542,6 +546,13 @@ class TestConfiguredAndLazy:
     def test_configured_settings_true(self) -> None:
         provider = AnthropicProvider(settings=_configured_settings())
         assert provider.configured is True
+
+    def test_get_client_raises_policy_error_when_key_set_but_disabled(self) -> None:
+        """ARCH-66: 키가 있어도 스위치가 꺼져 있으면 정책 차단 오류 — '키 없음'과 구분된다."""
+        provider = AnthropicProvider(settings=_configured_settings(anthropic_api_enabled=False))
+        assert provider.configured is False
+        with pytest.raises(RuntimeError, match="사용 중단 방침"):
+            provider._get_client()
 
     def test_get_client_raises_when_unconfigured(self) -> None:
         """미설정 시 _get_client는 명확한 RuntimeError(조용한 강등 금지)."""
