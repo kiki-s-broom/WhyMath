@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: docs
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① EOS 선언 G4(12-13) 차단 조건 중 '학생 표본 ≥20명'을 '내부 테스트 계정 표본 ≥20건(실사용자 아님을 판정문에 명시)'으로 교체하고, G4 판정일(12-13)은 유지한다 ② 실제 학생 표본 ≥20명은 12/31 이후 판정(G-student-work-after-internal-completion)으로 이관한다 ③ MEMORY 결정 로그 기록 ④ 테스트 계정 표본은 실사용자 검증으로 계상하지 않는다(판정문·리포트에 기준 명시)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1304 — G4 조건 교체(선언 문서)·MEMORY 결정 로그. 검증: 선언 계약 테스트 25 passed, tests/infra 1750 passed"
 paths:
   - docs/strategy/eos_transition_declaration_2026-08-30.md
   - MEMORY.md
-session: claude/keen-pascal-6b9tz0
+session: null
 notes: ""
 updated: 2026-09-24
