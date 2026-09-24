@@ -22,7 +22,8 @@ tiktoken은 OpenAI BPE이고 Claude의 토크나이저가 아니다. 한국어 �
 
 현재 상태 (2026-09-24 · ARCH-66): Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않으므로
 이 스크립트는 **실행하지 않는다**. 측정은 Claude Code `/context`로 대체됐다(게이트
-`G-harn121-constitution-token-measure-context` · 런북 `docs/ops/harn121_constitution_token_measurement_runbook.md`).
+`G-harn121-constitution-token-measure-context` ·
+런북 `docs/ops/harn121_constitution_token_measurement_runbook.md`).
 API가 재개되면 /context에 잡히지 않는 AGENTS.md 보강 측정에 쓴다.
 """
 
