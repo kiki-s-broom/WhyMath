@@ -56,13 +56,19 @@ python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-S
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 ollama list | Select-String -Pattern "qwen3:30b-a3b"
-$env:OLLAMA_FLASH_ATTENTION="1"
-$env:WHYMATH_OLLAMA_REQUEST_TIMEOUT_S="180"
+"FLASH_ATTENTION_USER=" + [Environment]::GetEnvironmentVariable("OLLAMA_FLASH_ATTENTION","User")
 ```
 
-**확인할 것**: `qwen3:30b-a3b` 줄이 보여야 한다. 안 보이면 `ollama pull qwen3:30b-a3b`(17.3GB)를
-먼저 받는다. `flash attention`은 `docs/ops/amd395_local_llm_performance.md` 확정 조건 3번이다
-(MoE 생성 +20.3%).
+**확인할 것**: ①`qwen3:30b-a3b` 줄이 보여야 한다. 안 보이면 `ollama pull qwen3:30b-a3b`(17.3GB)를
+먼저 받는다. ②`FLASH_ATTENTION_USER=1` 이 보이면 좋다. `flash attention`은
+`docs/ops/amd395_local_llm_performance.md` 확정 조건 3번이다(MoE 생성 +20.3%).
+
+**정정(2026-09-24)**: 종전 문면은 이 창에서 `$env:OLLAMA_FLASH_ATTENTION="1"` 을 설정하게 했는데,
+그 변수는 **Ollama 데몬 프로세스**가 읽는다 — 이미 떠 있는 데몬(트레이 앱)에는 클라이언트 창의
+변수가 닿지 않으므로 그 줄은 아무것도 바꾸지 않았다(변별력 없는 스텝). 비어 있거나 `1` 이 아니면
+위 성능 정본 §확정 조건의 User 환경변수 등록 + Ollama 재시작 절차를 따른다. 켜지지 않아도 측정은
+유효하다 — 느려질 뿐이다. 요청 타임아웃(`WHYMATH_OLLAMA_REQUEST_TIMEOUT_S`)은 측정 프로세스가
+읽는 값이라 [D] 블록 안으로 옮겼다(블록 자기완결).
 
 ---
 
@@ -101,13 +107,14 @@ $PathsMatchMain = ($LASTEXITCODE -eq 0)
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $env:PYTHONUTF8="1"
+$env:WHYMATH_OLLAMA_REQUEST_TIMEOUT_S="180"
 $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
 $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
 git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl
 $PathsMatchMain = ($LASTEXITCODE -eq 0)
-if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain) { python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl 2>&1 | Tee-Object -FilePath battle_v4_production.log ; "BATTLE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
+if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain) { cmd /c "python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl > battle_v4_production.log 2>&1" ; "BATTLE_EXIT=$LASTEXITCODE" ; Get-Content -Encoding UTF8 battle_v4_production.log } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
 ```
 
 - `--v4 production`: 전 관점 세트를 태우고 판정을 합집합한다. **승격 판정은 이 모드로만 한다**
@@ -116,6 +123,18 @@ if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain) { python -m whyma
   실패한 직접 원인이 대조군 n=2였다. 34가 이 코퍼스의 상한이다.
 - 임계(`--min-detection-lower`·`--max-false-alarm-upper`)는 **일부러 주지 않는다.** 2차는
   천장을 판정하기 위한 측정이지 천장을 적용하는 회차가 아니다(§6).
+- **정정(2026-09-24) — 리포트를 PowerShell 파이프에 통과시키지 않는다.** 종전 문면은
+  `2>&1 | Tee-Object` 였다. Windows PowerShell 5.1은 네이티브 명령의 출력을
+  `[Console]::OutputEncoding`(한국어 Windows = cp949)으로 디코딩하는데, `PYTHONUTF8=1` 인
+  Python은 UTF-8을 낸다 — 리포트의 한국어 라벨이 깨지고, 경계가 어긋나면 인접 문자까지 삼킨다
+  (CLAUDE.md 인코딩 규칙 "셸이 중계하는 제3 도구 출력" 축, 2026-09-14 JSON 41자 유실 실측).
+  2시간짜리 회차의 유일한 산출 리포트가 그 경로를 지나면 안 되므로 `cmd /c "… > 로그 2>&1"` 로
+  바이트를 파일에 직접 쓰고 `Get-Content -Encoding UTF8` 로 읽는다. `$LASTEXITCODE` 는
+  `cmd /c` 가 Python의 종료 코드를 그대로 돌려준다. 감사 JSONL은 Python이 UTF-8로 직접 쓰므로
+  종전에도 안전했다. 부수 효과: 실행 중 화면 출력이 없다(원래도 끝날 때 한 번에 나왔다).
+- **세션 사전 검증(2026-09-24, main `fbb6c215`)**: 세션 컨테이너에서 이 인자 그대로 가짜
+  provider(전 호출 실패)로 드라이런 — 호출 **531회** 확인, 라우터가 고르는 검증 모델은
+  `llm:qwen3:30b-a3b`(로컬), 전 호출 실패 시 두 줄 모두 `판정불가` 가 찍히고 exit 0(§1-④와 일치).
 
 ---
 
