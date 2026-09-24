@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 1
 eos_priority: P2
 owner: claude
@@ -17,12 +17,16 @@ acceptance:
   - "③ 변별력 없는 확인 스텝 금지 — 2026-09-23 사고에서 CLI·코퍼스 파일 존재 확인 3줄이 전부 True를 냈는데, 그 파일들은 **두 트리 모두에** 있어 판정력이 0이었다. 확인 스텝은 잘못된 상태에서 실제로 False를 내는 것만 쓴다. 브랜치·커밋 확인은 존재 검사가 아니라 동일성 검사여야 한다."
   - "④ 기계 집행 경로 판정 — HARN-114의 Stop 훅이 이미 transcript를 읽으므로 그 훅에 이 검사를 얹을 수 있는지 먼저 본다. 가능하면 HARN-114 만료(2026-10-02경) 이후 확장으로 붙이고, 불가하면 별도 훅을 설계한다. 어느 쪽이든 **판정 근거를 적는다** — 훅에 얹을 수 있다/없다를 소스 확인 없이 가정하지 않는다."
   - "⑤ 변별력 — 가드 없는 채팅 블록·가드는 있으나 실패 가지가 침묵하는 블록·판정 변수를 참조하지 않는 위장 가드 3종을 주입해 전건 RED를 확인한다. 정상 블록에서는 GREEN. 탐지기가 transcript를 못 읽는 경우는 작업을 막지 않고 통과시킨다(관측 실패가 작업 실패가 되면 안 된다 — HARN-114 ⑥ 선례)."
-artifacts: []
+artifacts:
+  - "PR #1296 — https://github.com/kiki-s-broom/WhyMath/pull/1296 (head d1a8c548)"
+  - ".claude/hooks/chat_block_guard.py — Stop 훅(전환 뒤 동작=동일성 되읽기+비교+같은 줄 else 가드). ④ 판정: fence_guard.last_turn_reply·HARN-106 가드 함수 import 재사용, HARN-114 측정 창 오염 회피로 별도 훅·별도 로그"
+  - "tests/infra/test_chat_block_guard.py — 사각 동결(세 장치 대조)·위반 주입 RED·정상 GREEN·fail-open 2종·배선 · 31 passed"
+  - "변별력: 뮤테이션 17종 전건 RED·생존 0 · tests/infra 1773 passed · tests/harness 973 passed"
 paths:
   - ".claude/hooks/**"
   - "scripts/ops/**"
   - "tests/infra/**"
   - ".claude/settings.json"
-session: claude/stoic-knuth-rv0o0r
+session: null
 notes: "사고 경위(2026-09-23, 동일 유형 2회차): G-kg02 게이트 실행을 위해 세션이 채팅으로 건넨 PowerShell 블록이 git checkout main과 git pull origin main으로 시작했는데 **둘 다 미커밋 변경 때문에 실패**했고, 블록이 멈추지 않아 뒤따르는 dry-run과 실제 LLM 회차가 전부 엉뚱한 트리에서 돌았다. 트리는 로컬 전용 브랜치 claude/adoring-mccarthy-sle0uj HEAD 0367fce4였고 그 브랜치는 origin에 없어 실행 코드와 main의 동일성을 세션이 확인할 방법이 없었다. 회차 결과는 게이트 증적으로 쓸 수 없게 됐다(리허설로 강등).\n\n1회차는 2026-09-15 G-skb03이며 **같은 브랜치·같은 커밋**이다. 그때 대책으로 HARN-106이 착지해 done인데, 그 스캐너가 저장소 런북 파일만 본다. 이번 블록은 저장소 파일이 아니라 채팅 메시지였으므로 스캐너에 닿지 않았다.\n\n피해: LLM 회차 1건 낭비(52+2건 평가), Kiki 왕복 1회. 파괴적 쓰기는 없었다 — 배치 CLI가 코퍼스를 건드리지 않고 JSONL 리포트만 쓰는 읽기 전용 도구였던 것이 이유이며, 설계가 아니라 대상 도구의 성질 덕이다.\n\n부수 관찰: 세션이 실행 코드와 main을 비교하려 쓴 스크립트도 변별력이 없었다 — git rev-parse가 실패 시 입력 문자열을 그대로 되돌려주는데 빈 문자열 검사만 해서 전건 '다름'으로 찍혔다. 세션이 재확인해 무효 판정했으나, 검증 스크립트 자신의 변별력을 확인하는 습관이 없으면 그 거짓 결과가 보고될 뻔했다.\n\n[개명 2026-09-22] HARN-162-chat-block-precondition-guard → HARN-163-chat-block-precondition-guard: 번호 충돌 해소 (HARN-100). main에 HARN-162-ci-mirror-shell-mismatch 가 착지해 번호가 겹쳤다 — 등재 당시에는 그 태스크가 원격 어디에도 없어 add 가드가 충돌을 볼 수 없었다. 미머지인 이쪽을 개명한다. 내용 변경 없음.\n\n[정정 2026-09-24] paths ['.claude/hooks/**', 'scripts/ops/**', 'tests/infra/**'] → ['.claude/hooks/**', 'scripts/ops/**', 'tests/infra/**', '.claude/settings.json']: Stop 훅 배선에 settings.json 편집 필요(HARN-114 측정 창과 무관한 항목 추가만)"
 updated: 2026-09-24
