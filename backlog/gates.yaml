@@ -194,12 +194,12 @@ gates:
     title: "첫 LLM 저작 회차의 카나리 30건 100% 검수 — review_session 이벤트로 기록 (골든셋 승격 원천·대체안 A §6 1행)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-06
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
-    notes: ""
+    evidence: "카나리 30슬롯 중 산출 28건 · 고유 15건 전건 검수(Kiki 수행 2026-09-22). 중복 슬러그 13행·MissingCuSlug 2건은 검수 대상이 아니므로 분모는 고유 15건(MP-09/MP-10 정정 반영).\n판정: 승인 13 · 반려 2(둘 다 F7 문장 수준 부적합) · 보류 0.\n기록: mp02-out/canary_review_events_v3.jsonl 30이벤트 · canary_review_verdicts_v3.jsonl 15판정 — 저장소 함수(start_review/finish_review/append_verdict_jsonl)로 생성. 코퍼스 데이터라 저장소에 커밋하지 않고 Kiki 머신에 보존.\n측정(hit_cu_metrics --edit-aware-since 2026-09-01T04:51:35Z = EOS-62 착지 커밋 744b7015): 타이머 적재율 15/15 = 100%(Wilson 하한 84.7%) · 무손질 승인율 86.7%(하한 66.6%, 판별불가 0).\nHIT 자인: 중앙값 6초·P90 41초로 계측됐으나 이 세션은 재입력 세션이다(최초 검토는 앞선 v2 창에서 수행 — Kiki 확인 2026-09-22). 따라서 F-Ⅰ(중앙값 4분 이하) 달성 근거로 사용하지 않는다. 최초 검토 시간의 계측은 다음 회차 몫.\nF-Ⅲ 유보: 반려 2건이 모두 판단형(F7)이라 판단형 비중 100%로 기준 60%를 넘으나 분모가 2건이라 통계적 판정 불가 — 판정 유보로 기록한다."
+    cleared_by: claude
+    notes: "[판정기준 없음 2026-09-22] 판정 근거가 커밋이 아니라 Kiki 머신의 검수 기록 JSONL과 그 측정 리포트다(코퍼스 데이터라 미커밋)"
   - id: G-eos-g0-verification-design-freeze
     title: "EOS G0 검증설계 동결(2026-09-06) — ①앵커 세트+성취기준 코드 확정(8 vs 6 결정 포함) ②CU 스키마·실패코드 F1~F8 확정 ③실패정의 F-Ⅰ~F-Ⅴ 문서 동결·서명. 미충족 시 W2(되돌릴 수 없는 스키마 주간) 진행 금지 — 실패 정의를 12월에 만들면 확증편향이 된다(전환 설계서 §6.3)"
     kind: human
@@ -627,6 +627,16 @@ gates:
     status: pending
     requested: 2026-09-22
     remind_after_days: 100
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-s401-uni-boundary-edge-review
+    title: "S4-01 고→대 경계 엣지 24건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/cross_band_edges_university_v1.json 과 표 문서 docs/data/cross_band_edges_university_v1.md 의 24행(from 고등 원자 · to 대학 세부개념 · 근거)을 보고 각 행을 승인/반려/보류로 판정한다. 기계로 검증된 것(양끝 실재·방향 고등→대학·세부개념 수준·중복 없음·병합 시 DAG 비순환·과목 계열 정합)은 이미 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 고등 개념이 저 대학 개념의 선수인가\"라는 교수학적 판단이다. 선례 = 2026-07-28 중복 원자 병합 14건(검수 16 중 2건은 사이클 충돌로 실행 보류). 승인분만 병합하며 부분 승인이 정상이다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-23
+    remind_after_days: 14
     evidence: null
     cleared_by: null
     notes: ""
