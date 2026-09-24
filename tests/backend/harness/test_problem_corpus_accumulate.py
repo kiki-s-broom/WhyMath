@@ -14,6 +14,7 @@ import pytest
 
 from whymath_backend.harness import problem_corpus_accumulate
 from whymath_backend.harness.problem_corpus_accumulate import (
+    AccumulateReport,
     load_corpus_index,
     main,
     run_corpus_accumulate,
@@ -688,3 +689,106 @@ class TestMp02RerunSpecPlan:
             assert 1.0 <= spec.difficulty_overall <= 5.0
             assert hint != "폴백"
         assert len({hint for _, _, hint in entries}) == 3  # 유형이 실제로 다르다
+
+
+class TestCanaryBasis:
+    """카나리 표본 기준(MP-02 재회차) — 같은 입력에서 기준만 바꿔 양방향 변별을 본다.
+
+    시드 6건과 같은 풀 순서의 결정론 생성기라 **앞 6회가 전부 중복**(중립)이고 7회째부터 신규다.
+    attempts 기준은 카나리 5건이 전부 중복이라 판정 대상 0(측정 실패) → 차단, judged 기준은
+    중복을 건너뛰어 판정 대상 5건을 채운 뒤 판정한다.
+    """
+
+    def _run(self, tmp_path: Path, basis: str) -> AccumulateReport:
+        seed = _seed_corpus(tmp_path, short_n=6)
+        return run_corpus_accumulate(
+            out_path=tmp_path / f"acc-{basis}.jsonl",
+            seed_paths=[seed],
+            generator=SkeletonEquivalentProblemGenerator(),
+            spec=_spec(),
+            n=20,
+            canary_size=5,
+            canary_threshold=0.0,
+            abort_window=None,
+            canary_basis=basis,
+        )
+
+    def test_attempts_basis_counts_duplicates_into_the_sample(self, tmp_path: Path) -> None:
+        """대조군 — 종전 동작: 시도 5건 시점에 판정, 전건 중복이라 측정 실패로 차단."""
+        report = self._run(tmp_path, "attempts")
+        assert report.canary_basis == "attempts"
+        assert report.canary_attempts == 5
+        assert report.canary is not None and report.canary["trials"] == 0
+        assert report.canary["measurement_failed"] is True
+        assert report.canary_blocked is True
+
+    def test_judged_basis_fills_the_sample_past_duplicates(self, tmp_path: Path) -> None:
+        report = self._run(tmp_path, "judged")
+        assert report.canary_basis == "judged"
+        assert report.canary is not None and report.canary["trials"] == 5
+        assert report.canary_attempts == 11  # 중복 6 + 판정 대상 5
+        assert report.canary_blocked is False
+        assert report.to_json()["canary_attempts"] == 11
+
+    def test_unknown_basis_is_refused(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="canary_basis"):
+            self._run(tmp_path, "vibes")
+
+
+class TestRerunCliWiring:
+    """--avoid-recent·--canary-basis가 생성기 조립·회차 함수까지 실제로 닿는가."""
+
+    def test_cli_passes_avoid_recent_and_basis(
+        self, tmp_path: Path, capsys: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        def _fake(topic_hint: str, **kwargs: object) -> object:
+            seen.append(kwargs.get("avoid_recent"))
+            return _AlwaysFailingGenerator()
+
+        monkeypatch.setattr(problem_corpus_accumulate, "_build_live_generator", _fake)
+        seed = _seed_corpus(tmp_path, short_n=1)
+        main(
+            [
+                "--seed",
+                str(seed),
+                "--out",
+                str(tmp_path / "a.jsonl"),
+                "--n",
+                "3",
+                "--canary",
+                "2",
+                "--abort-window",
+                "0",
+                "--avoid-recent",
+                "10",
+                "--canary-basis",
+                "judged",
+            ]
+        )
+        report = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+        assert seen == [10]
+        assert report["canary_basis"] == "judged"
+        # 대장(회차 manifest)에도 기준·소비 시도 수가 실린다 — 리포트만 있고 대장에 없으면
+        # 회차가 끝난 뒤 "그 카나리가 무엇을 셌는가"를 복원할 수 없다.
+        ledger_rows = [
+            json.loads(line)
+            for line in (tmp_path / "a.rounds.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert ledger_rows[-1]["canary_basis"] == "judged"
+        assert ledger_rows[-1]["canary_attempts"] == 2  # 전건 실패 = 전건 판정 대상
+
+    def test_default_builder_keeps_avoid_off(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트")
+        assert gen._recent_conditions.maxlen == 0  # type: ignore[attr-defined]
+
+    def test_builder_sets_avoid_window(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트", avoid_recent=10)
+        assert gen._recent_conditions.maxlen == 10  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("bad", ["-1", "21"])
+    def test_cli_rejects_out_of_range_avoid(self, tmp_path: Path, bad: str) -> None:
+        with pytest.raises(SystemExit):
+            main(["--out", str(tmp_path / "a.jsonl"), "--avoid-recent", bad])

@@ -99,6 +99,7 @@ import hashlib
 import json
 import logging
 import re
+from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from typing import Any
@@ -231,6 +232,7 @@ _EQUIVALENT_PROMPT_ASSET_IDS: tuple[str, ...] = (
     "l3.equivalent.system",
     "l3.equivalent.user",
     "l3.equivalent.user_topic",
+    "l3.equivalent.user_avoid",
 )
 
 
@@ -252,6 +254,10 @@ def _prompt_version() -> str:
         digest.update(prompt_text(asset_id).encode("utf-8"))
         digest.update(b"\x00")
     return f"l3.equivalent@sha256:{digest.hexdigest()[:12]}"
+
+
+# 회피 목록 상한(MP-02 재회차) — Minimal context 규율. 프롬프트에 싣는 조건식 개수의 천장.
+_AVOID_RECENT_MAX = 20
 
 
 # 학생 요청 라우팅 신호 기본값 — 6개 호출부 공용 단일 좌석(OPS-18, `api/visualization.py` 미러).
@@ -284,6 +290,7 @@ class LLMEquivalentProblemGenerator:
         top_p: float | None = None,
         authoring_family: ModelFamily | None = ModelFamily.GENERAL,
         routing_sync: bool = True,
+        avoid_recent: int = 0,
         slug_prefix: str = "wm-gen",
         subject: Subject = Subject.공통,
         curriculum_version: Curriculum = Curriculum.REVISION_2022,
@@ -352,6 +359,15 @@ class LLMEquivalentProblemGenerator:
                 generate)가 로컬 **QUALITY**(`QUALITY_MODEL_ID`)로 보낸다 — 모델 선택은 여전히
                 라우터가 한다(직접 호출·모델 ID 하드코딩 없음). QUALITY는 패밀리 무관이라
                 `authoring_family` 후처리는 적용되지 않는다(`_decide_routing`).
+            avoid_recent: **회차 내 중복 회피 목록 크기**(MP-02 재회차·0~20·기본 0=끔). 주면 이
+                인스턴스가 조립에 성공한 후보의 조건식을 최근 N개까지 기억했다가 다음 프롬프트 끝에
+                "이미 만든 방정식 — 다시 쓰지 말 것"으로 싣는다. 근거: 2026-09-24 파일럿 2회에서
+                중복이 전부 *회차 내* 구조 signature 충돌(11/30·12/30)이었다 — 모델이 자기가
+                방금 만든 계수를 반복한다. 0이면 프롬프트가 종전과 바이트 단위로 같다(회귀 0).
+                상한 20은
+                Minimal context 규율(플레이북 Part 8 — 넣을수록 모델이 흐려진다) 때문이다. 목록은
+                인스턴스 스코프라 spec 좌석(topic_hint)마다 따로 쌓인다(배치 CLI가 힌트별 생성기를
+                하나씩 만든다).
             slug_prefix: 안정 slug 접두사(결정론 해시와 결합해 멱등 upsert 키 생성).
             subject·curriculum_version·valid_from_year: Problem 필수 메타 기본값(스펙 밖·저작 배선).
             fallback_unit_codes: LLM이 unit_codes를 안 주면 쓰는 폴백(비면 결측 시 생성 실패).
@@ -397,6 +413,12 @@ class LLMEquivalentProblemGenerator:
         self._top_p = top_p
         self._authoring_family = authoring_family
         self._routing_sync = routing_sync
+        if not 0 <= avoid_recent <= _AVOID_RECENT_MAX:
+            raise ValueError(
+                f"avoid_recent는 0~{_AVOID_RECENT_MAX}이어야 한다(받은 값 {avoid_recent})"
+            )
+        # 조립 성공 후보의 조건식(최근 N개) — maxlen이 0이면 아무것도 쌓이지 않는다.
+        self._recent_conditions: deque[str] = deque(maxlen=avoid_recent)
         # 배치용 지속 이벤트 루프(지연 생성) — asyncio.run의 루프 생성·종료 반복이 provider의
         # 캐시 커넥션 풀을 죽여 배치가 격회 실패하던 실측 회귀 방어(_invoke·_ensure_loop 참조).
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -486,7 +508,18 @@ class LLMEquivalentProblemGenerator:
             # — hit_cu_metrics CU당 토큰·비용 조인 정체성(#912 P1-2).
             cu_slug=candidate.problem.slug,
         )
+        self._remember_conditions(candidate.conditions)
         return candidate
+
+    def _remember_conditions(self, conditions: str | list[str]) -> None:
+        """조립 성공 후보의 조건식을 회피 목록에 올린다(avoid_recent=0이면 maxlen 0 deque라 no-op).
+
+        같은 조건식이 이미 목록에 있으면 새로 넣지 않는다 — 목록 칸을 반복으로 채우면 그만큼
+        실제로 피해야 할 다른 구조가 밀려난다.
+        """
+        text = conditions if isinstance(conditions, str) else "; ".join(conditions)
+        if text and text not in self._recent_conditions:
+            self._recent_conditions.append(text)
 
     # ── 동기 경계(async provider.generate를 배치 sync 문맥에서 호출) ─────
     def _invoke(
@@ -818,7 +851,11 @@ class LLMEquivalentProblemGenerator:
             if self._topic_hint
             else ""
         )
-        return fill(prompt_text("l3.equivalent.user"), TOPIC_LINE=topic_line, SPEC_JSON=spec_json)
+        user = fill(prompt_text("l3.equivalent.user"), TOPIC_LINE=topic_line, SPEC_JSON=spec_json)
+        if self._recent_conditions:
+            avoid_list = "\n".join(f"- {item}" for item in self._recent_conditions)
+            user += "\n" + fill(prompt_text("l3.equivalent.user_avoid"), AVOID_LIST=avoid_list)
+        return user
 
     def _label_for(self, misconception_id: str) -> str:
         """오개념 id의 한국어 라벨 — 주입된 카탈로그에 있으면 그 라벨, 없으면 id 자체."""

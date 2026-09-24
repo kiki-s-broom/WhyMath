@@ -244,6 +244,7 @@ L3_PROMPT_RAILS: dict[str, tuple[str, ...]] = {
     "l3.equivalent.system": (RAIL_COPYRIGHT,),
     "l3.equivalent.user": (RAIL_COPYRIGHT,),
     "l3.equivalent.user_topic": (),
+    "l3.equivalent.user_avoid": (),
     "l3.rephrase.system": (RAIL_SEAL,),
     "l3.rephrase.user": (RAIL_SEAL,),
     "l3.visualization.system": (),
@@ -283,6 +284,10 @@ L3_NO_RAIL_REASONS: dict[str, str] = {
     "l3.equivalent.user_topic": (
         "주제 힌트 한 줄(값 전달용) — 금지 지시문의 자리가 아니다. 저작권 레일은 같은 호출에서 "
         "함께 나가는 system·user 자산이 이미 담지한다."
+    ),
+    "l3.equivalent.user_avoid": (
+        "회피 목록(이번 회차에 모델 자신이 만든 조건식) 값 전달 — 금지 지시문의 자리가 아니다. "
+        "저작권 레일은 같은 호출에서 함께 나가는 system·user 자산이 이미 담지한다."
     ),
     "l3.visualization.system": (
         "시각화는 *명세(구조 JSON)* 생성기이지 문항 본문 저작기가 아니다 — 출력이 렌더 파라미터라 "

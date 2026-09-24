@@ -454,3 +454,20 @@ def test_rerun_runbook_pilot_and_round2_use_the_same_decision_rule() -> None:
         "판정 규칙(accepted_stored가 더 많으면 quality·동률이면 mid)이 §5·§6 두 곳에 있어야 한다 "
         f"— 실측 {len(hits)}곳"
     )
+
+
+def test_rerun_runbook_round2_uses_judged_canary_and_avoid_rule() -> None:
+    """개정 §6이 카나리 표본 기준·회피 목록 판정을 **실제 실행 인자**로 싣는다 (MP-02 재회차 2차).
+
+    판정 규칙을 산문에만 적고 블록에 안 실으면 사람이 본 판정과 실제로 돈 회차가 갈린다.
+    """
+    fenced = _rerun_fenced()
+    assert "--canary-basis judged" in fenced, "2회차가 judged 카나리로 돌지 않는다"
+    assert "--avoid-recent $Avoid" in fenced, "회피 목록 판정값이 실행 인자로 전달되지 않는다"
+    assert "'10' if a(v)>a(q) else '0'" in fenced, "회피 목록 판정 규칙(③>② 일 때만 켬)이 없다"
+
+
+def test_rerun_runbook_has_no_tee_object() -> None:
+    """실행 블록에 `Tee-Object`가 없다 — PowerShell 파이프가 UTF-8 출력을 cp949로 되읽어 한글이
+    깨진다(2026-09-24 파일럿 ①② 실측). 판정 재료는 Python이 직접 쓰는 대장이다."""
+    assert "Tee-Object" not in _rerun_fenced()
