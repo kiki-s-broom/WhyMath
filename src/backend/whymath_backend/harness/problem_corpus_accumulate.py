@@ -93,6 +93,7 @@ exit 코드 3값: 0=신규 수용 ≥1 · 1=이번 회차 무진전 · 2=**셋 �
         --seed <기존.jsonl> [--seed <추가.jsonl> ...] --out <축적.jsonl> --n 20 \\
         [--topic-hint "..."] [--standard-code "[10공수1-02-02]"] [--difficulty 2.5] \\
         [--spec-file <계획.jsonl>] [--top-p 0.95 — anthropic 좌석 제외] \\
+        [--authoring-tier mid|quality] \\
         [--generation-log <경로.jsonl>] [--worklist-out <경로.md>] [--stagnation-window 3]
 """
 
@@ -924,6 +925,7 @@ def _build_live_generator(
     subscription: str | None = None,
     budget_krw: float | None = None,
     top_p: float | None = None,
+    authoring_tier: str = "mid",
 ) -> EquivalentProblemGenerator:
     """라이브 LLM 생성기 조립(조성 루트) — L4 카탈로그 라벨 주입·표준 CompositeProvider.
 
@@ -960,6 +962,13 @@ def _build_live_generator(
     # 눈으로도 판정할 수 있다(subscription·budget_krw와 같은 이유).
     if top_p is not None:
         routing_overrides["top_p"] = top_p
+    # 저작 티어(MP-02 재회차) — "mid"(기본)는 키를 싣지 않아 종전과 바이트 동일하다. "quality"는
+    # 라우팅 신호를 비동기로 바꿔 라우터 규칙 2가 로컬 QUALITY 티어를 고르게 한다(모델 ID를
+    # 여기 박지 않는다 — 선택은 라우터 몫이고 실제 모델은 genlog → 회차 매니페스트에 남는다).
+    if authoring_tier == "quality":
+        routing_overrides["routing_sync"] = False
+    elif authoring_tier != "mid":
+        raise ValueError(f"authoring_tier는 mid|quality여야 한다(받은 값 {authoring_tier!r})")
 
     return LLMEquivalentProblemGenerator(
         # 표준 CompositeProvider 지연 구성 — 라이브 환경 전제. 클라우드 좌석은
@@ -1021,6 +1030,17 @@ def main(argv: list[str] | None = None) -> int:
             "동시 지정을 400으로 거부하는데 저작 경로는 temperature(0.9)를 항상 싣기 때문이다. "
             "그 조합이면 이 CLI가 **호출 0건에서** exit 2로 거부한다(2026-09-19 라이브 90호출 "
             "전건 실패 실측). openrouter·로컬 좌석에서는 종전대로 쓸 수 있다."
+        ),
+    )
+    parser.add_argument(
+        "--authoring-tier",
+        choices=["mid", "quality"],
+        default="mid",
+        help=(
+            "로컬 저작 티어(MP-02 재회차). mid(기본)=종전 그대로 동기 라우팅 → 로컬 MID "
+            "(qwen2.5:7b). quality=비동기 라우팅 → 라우터 규칙 2가 로컬 QUALITY 티어 "
+            "(router.QUALITY_MODEL_ID·현 qwen3:30b-a3b)를 고른다. 오프라인 배치라 학생 대기가 "
+            "없으므로 동기일 필요가 없다. 실제로 쓰인 모델은 genlog·회차 대장 manifest에 남는다."
         ),
     )
     parser.add_argument(
@@ -1270,6 +1290,7 @@ def main(argv: list[str] | None = None) -> int:
                 subscription=args.subscription,
                 budget_krw=args.budget_krw,
                 top_p=args.top_p,
+                authoring_tier=args.authoring_tier,
             )
     spec_seats = [
         SpecSeat(

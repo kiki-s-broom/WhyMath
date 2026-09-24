@@ -390,3 +390,67 @@ def test_detector_flags_the_original_unreachable_criterion(para: str) -> None:
     assert any(word in para for word in _VERDICT_KEYWORDS), "판정 문단으로 선택되지 않는다"
     assert any(phrase in para for phrase in _EQUALITY_PHRASES), "등식 어구가 없어 선택 밖이다"
     assert "emitted_distinct_slugs" not in para, "이 픽스처는 초판 형태여야 한다(RED 대상)"
+
+
+# ---------------------------------------------------------------------------
+# MP-02 재회차 런북 (2026-09-24) — 1차 런북이 겪은 결함 3축을 새 런북에도 그대로 건다.
+#
+# 새 런북은 1차 런북과 **다른 파일**이라 위 테스트들이 한 번도 보지 않는다(파일 경로가 상수).
+# 같은 함정(사이드카 이어붙이기·PowerShell JSON 파싱·stdout cp949)이 새 파일로 옮겨 오면
+# 아무것도 막지 못하므로, 여기서 새 경로에 같은 검사를 건다.
+# ---------------------------------------------------------------------------
+_DECISION_RULE = re.compile(
+    r"'quality' if a[\[(]'?q(?:uality)?'?[\])]>a[\[(]'?m(?:id)?'?[\])] else 'mid'"
+)
+_ANY_WITH_SUFFIX = re.compile(r"with_suffix\(\s*['\"]([^'\"]+)['\"]\s*\)")
+_RERUN_RUNBOOK = _REPO_ROOT / "docs" / "reviews" / "mp02_rerun_runbook.md"
+
+
+def _rerun_fenced() -> str:
+    return "\n".join(_fenced_blocks(_RERUN_RUNBOOK.read_text(encoding="utf-8")))
+
+
+def test_rerun_runbook_sidecar_names_match_code() -> None:
+    """재회차 런북의 사이드카 표현도 코드가 만드는 이름만 가리킨다 — 스캔 0건은 실패."""
+    # 알려진 세 이름만 잡는 `_WITH_SUFFIX`로는 오타(`.gen.jsonl`)가 **보이지 않는다**(뮤테이션
+    # 생존 실측) — 그래서 여기서는 `with_suffix` 리터럴을 **전부** 뽑아 코드 이름과 대조한다.
+    names = [_OUT.with_suffix(s).name for s in _ANY_WITH_SUFFIX.findall(_rerun_fenced())]
+    assert names, "재회차 런북 코드 블록에서 사이드카 표현을 하나도 찾지 못했다"
+    assert (
+        set(names) >= _expected_names()
+    ), f"사이드카 3종 중 빠진 것: {_expected_names() - set(names)}"
+    stray = sorted(set(names) - _expected_names())
+    assert not stray, f"코드가 만들지 않는 사이드카 이름: {stray}"
+
+
+def test_rerun_runbook_has_no_powershell_json_parsing_and_forces_utf8() -> None:
+    fenced = _rerun_fenced()
+    assert _PS_JSON_PARSE not in fenced, "재회차 런북에 PowerShell JSON 파싱이 있다(cp949 함정)"
+    assert _IO_ENCODING in fenced and "IO_ENCODING" in fenced
+
+
+def test_rerun_runbook_passes_the_block_guard() -> None:
+    """쓰기 블록 자가거부 가드(HARN-106)를 새 런북에 직접 돌린다 — 0블록은 실패."""
+    result = subprocess.run(
+        [sys.executable, str(_SCANNER), str(_RERUN_RUNBOOK)],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, f"재회차 런북이 블록 가드에서 red다:\n{output}"
+    found = _BLOCK_COUNT.search(output)
+    assert found is not None and int(found.group(1)) > 0, output
+
+
+def test_rerun_runbook_pilot_and_round2_use_the_same_decision_rule() -> None:
+    """§5(판정 출력)와 §6(2회차가 다시 계산)이 **같은 규칙**을 쓴다.
+
+    §6은 앞 출력을 눈으로 옮기지 않으려고 판정을 재계산한다. 두 곳 중 한 곳만 규칙이 바뀌면
+    사람이 본 `CHOSEN_TIER`와 실제로 돈 티어가 갈린다 — 이 단언이 그 표류를 막는다.
+    """
+    fenced = _rerun_fenced()
+    hits = _DECISION_RULE.findall(fenced)
+    assert len(hits) == 2, (
+        "판정 규칙(accepted_stored가 더 많으면 quality·동률이면 mid)이 §5·§6 두 곳에 있어야 한다 "
+        f"— 실측 {len(hits)}곳"
+    )

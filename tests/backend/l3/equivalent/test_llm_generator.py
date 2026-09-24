@@ -559,6 +559,37 @@ class TestAuthoringFamily:
         _gen(provider, authoring_family=ModelFamily.MATH).generate(_spec())
         assert provider.decisions[0].local_family == ModelFamily.MATH.value
 
+
+# ──────────────────────────────────────────────────────────────────────
+# MP-02 재회차: routing_sync=False → 라우터 규칙 2가 로컬 QUALITY 티어를 고른다.
+# ──────────────────────────────────────────────────────────────────────
+class TestRoutingSync:
+    def test_default_sync_keeps_general_mid(self) -> None:
+        """기본값(True)은 종전 결정과 같다 — 대조군(이게 깨지면 기본 회귀)."""
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        decision = provider.decisions[0]
+        assert decision.local_model == LocalModelTier.MID.value
+        assert decision.local_family == ModelFamily.GENERAL.value
+
+    def test_async_routes_to_local_quality_tier(self) -> None:
+        """False면 QUALITY·패밀리 무관(None)·로컬 유지 — 클라우드로 새지 않는다."""
+        provider = FakeProvider([_HAPPY])
+        _gen(provider, routing_sync=False).generate(_spec())
+        decision = provider.decisions[0]
+        assert decision.cost_tier == "local"
+        assert decision.local_model == LocalModelTier.QUALITY.value
+        assert decision.local_family is None  # QUALITY는 패밀리 무관(불변식 4)
+
+    def test_async_quality_resolves_to_router_quality_model(self) -> None:
+        """실제 모델 ID는 라우터 표가 정한다 — 생성기에 하드코딩이 없다."""
+        from whymath_backend.l3.router import QUALITY_MODEL_ID, resolve_model
+
+        provider = FakeProvider([_HAPPY])
+        _gen(provider, routing_sync=False).generate(_spec())
+        decision = provider.decisions[0]
+        assert resolve_model(decision.local_family, decision.local_model) == QUALITY_MODEL_ID
+
     def test_family_override_still_assembles_candidate(self) -> None:
         # 패밀리 갈아타기가 결정을 깨지 않고(불변식 4 유지) 후보 조립이 정상 동작한다.
         candidate = _gen(FakeProvider([_HAPPY])).generate(_spec())

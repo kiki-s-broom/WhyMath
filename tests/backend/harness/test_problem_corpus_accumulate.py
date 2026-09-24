@@ -609,3 +609,82 @@ class TestSafetyCliWiring:
         with pytest.raises(SystemExit) as excinfo:
             main(["--out", str(out), "--n", "2", flag, value])
         assert excinfo.value.code == 2  # argparse.error
+
+
+class TestAuthoringTierWiring:
+    """--authoring-tier(MP-02 재회차) — 생성기 조립 인자로 실제 전달되는가."""
+
+    def test_default_mid_sends_no_routing_sync_key(self) -> None:
+        """mid(기본)는 routing_sync 키를 싣지 않는다 — 종전 조립과 동일(대조군)."""
+        gen = problem_corpus_accumulate._build_live_generator("힌트")
+        assert gen._routing_sync is True  # type: ignore[attr-defined]
+
+    def test_quality_sets_async_routing(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="quality")
+        assert gen._routing_sync is False  # type: ignore[attr-defined]
+
+    def test_unknown_tier_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="authoring_tier"):
+            problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="cloud")
+
+    def test_cli_passes_tier_to_builder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        def _fake(topic_hint: str, **kwargs: object) -> object:
+            seen.append(kwargs.get("authoring_tier"))
+            return _AlwaysFailingGenerator()
+
+        monkeypatch.setattr(problem_corpus_accumulate, "_build_live_generator", _fake)
+        seed = _seed_corpus(tmp_path, short_n=1)
+        main(
+            [
+                "--seed",
+                str(seed),
+                "--out",
+                str(tmp_path / "a.jsonl"),
+                "--n",
+                "1",
+                "--canary",
+                "0",
+                "--abort-window",
+                "0",
+                "--authoring-tier",
+                "quality",
+            ]
+        )
+        assert seen == ["quality"]
+
+    def test_cli_rejects_unknown_tier(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit):
+            main(["--out", str(tmp_path / "a.jsonl"), "--authoring-tier", "cloud"])
+
+
+class TestMp02RerunSpecPlan:
+    """MP-02 재회차 유형 순환 계획(`docs/reviews/mp02_rerun_spec_plan.jsonl`)이 실제로 읽힌다.
+
+    런북 §1이 같은 로더로 `SPEC_PLAN_OK 3`을 자가검증하지만, 그건 Kiki 머신에서만 돈다. 파일이
+    깨지면(허용 외 키·spec_id 중복·BOM) CI에서 먼저 red가 나야 회차 하나를 태우지 않는다.
+    """
+
+    _PLAN = Path(__file__).resolve().parents[3] / "docs" / "reviews" / "mp02_rerun_spec_plan.jsonl"
+
+    def test_plan_loads_three_distinct_specs_on_the_round_standard(self) -> None:
+        entries = problem_corpus_accumulate.load_spec_plan_file(
+            self._PLAN,
+            default_standard_code="[0폴백-00]",
+            default_difficulty=9.9,
+            default_topic_hint="폴백",
+        )
+        assert [spec_id for spec_id, _, _ in entries] == [
+            "quad-larger",
+            "quad-smaller",
+            "quad-double",
+        ]
+        # 폴백 값이 하나라도 쓰였으면 계획 파일이 키를 빠뜨린 것이다(명시 고정이 목적).
+        for _, spec, hint in entries:
+            assert spec.achievement_standard_codes == frozenset({"[9수02-20]"})
+            assert 1.0 <= spec.difficulty_overall <= 5.0
+            assert hint != "폴백"
+        assert len({hint for _, _, hint in entries}) == 3  # 유형이 실제로 다르다
