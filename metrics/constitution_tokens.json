@@ -1,0 +1,25 @@
+{
+  "measured_at": "2026-09-24",
+  "method": "claude_code_context_command",
+  "method_note": "Claude Code /context (Claude Max 구독 세션) — Anthropic API count_tokens 대체 (ARCH-66). Claude 토크나이저 실측이며 문자 수 추정이 아니다.",
+  "model": "claude-opus-5-5",
+  "measured_by": "Kiki가 세션 claude/keen-pascal-6b9tz0 안에서 /context 실행",
+  "basis": "main fbb6c215 판본(117,799 bytes). 측정 시점 작업 트리 판본은 +711 bytes(v0.2.32 스택 표 단서) — 어느 판본이 읽혔든 차이는 1% 미만",
+  "parts": {
+    "CLAUDE.md": {"measured": true, "tokens": 55600, "precision": "0.1k 단위 표기(55.6k)"},
+    "AGENTS.md": {"measured": false, "reason": "Claude Code가 로드하지 않는 파일이라 /context에 나타나지 않는다 — API 재개 시 scripts/ops/measure_constitution_tokens.py로 보강"},
+    "SessionStart 브리핑": {"measured": false, "reason": "훅 출력이 Messages 항목(144.9k, 대화 전체 포함)에 합산돼 분리되지 않는다"}
+  },
+  "total_tokens_measured_only": 55600,
+  "unmeasured": ["AGENTS.md", "SessionStart 브리핑"],
+  "target_core_tokens": 15000,
+  "ratio_to_target": 3.71,
+  "context_breakdown_same_run": {
+    "system_prompt": 10700,
+    "system_tools": 24100,
+    "mcp_tools_loaded": 15700,
+    "memory_files": 55600,
+    "skills": 4600,
+    "custom_agents": 397
+  }
+}

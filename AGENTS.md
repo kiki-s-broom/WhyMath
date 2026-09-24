@@ -67,7 +67,7 @@ WhyMath/
 |---|---|
 | 백엔드 | Python 3.12 · FastAPI + uvicorn · SQLAlchemy 2 (async, asyncpg) · alembic · Celery · pydantic v2 |
 | DB | PostgreSQL 16 + **pgvector**(벡터 통합) · Redis 7 · (조건부 확장: ClickHouse, S3/MinIO). **Neo4j는 런타임 미도입**(2026-08-03 정정 — 개념 그래프 정본은 PG 단일 평면, Neo4j는 data-pipeline 옵셔널 extra의 적재 실험 경로뿐) |
-| LLM | 로컬 Ollama(qwen2-math, qwen2.5, **qwen3:30b-a3b**(QUALITY·MoE), qwen3-vl:8b — 정본 `whymath_backend/l3/router.py` `LOCAL_MODEL_MATRIX`·`QUALITY_MODEL_ID`) · 클라우드 Anthropic(claude-sonnet-4-6 / claude-opus-4-7만 배선됨) — **포트폴리오는 측정 기반 개방 목록**: 신규 프로바이더(OpenRouter 등)·신규 모델(DeepSeek 계열 등)을 전제 배제하지 않고 품질·지연·비용 실측으로 상시 재평가. 채택 조건 = ①라우터 경유 ②실측 근거 ③MEMORY 결정 로그 (2026-08-16 결정, 2026-08-22 QUALITY MoE 채택). 검증 계약(SymPy 단일 권위·학생 제공 전 검증)은 프로바이더 무관 불변 |
+| LLM | 로컬 Ollama(qwen2-math, qwen2.5, **qwen3:30b-a3b**(QUALITY·MoE), qwen3-vl:8b — 정본 `whymath_backend/l3/router.py` `LOCAL_MODEL_MATRIX`·`QUALITY_MODEL_ID`) · 클라우드 Anthropic(claude-sonnet-4-6 / claude-opus-4-7만 배선됨 · **2026-09-24~12-31 사용 중단** — `anthropic_api_enabled=False` 기본, Claude는 Max 구독 개발 도구로만 · ARCH-66) — **포트폴리오는 측정 기반 개방 목록**: 신규 프로바이더(OpenRouter 등)·신규 모델(DeepSeek 계열 등)을 전제 배제하지 않고 품질·지연·비용 실측으로 상시 재평가. 채택 조건 = ①라우터 경유 ②실측 근거 ③MEMORY 결정 로그 (2026-08-16 결정, 2026-08-22 QUALITY MoE 채택). 검증 계약(SymPy 단일 권위·학생 제공 전 검증)은 프로바이더 무관 불변 |
 | 임베딩 | 로컬 bge-m3 기본(sentence-transformers, `[embedding]` extra) · OpenAI text-embedding-3-large 옵션 |
 | 검증·도구 | SymPy(동치·검증 단일 권위) · pdfplumber |
 | 관측성 | Langfuse(`>=2.50,<5` 상한 핀, 실집행 단독) · structlog · **OpenTelemetry는 선언만·import 0건(미배선, 2026-08-11 실측 — 판정은 `OPS-32`)** |

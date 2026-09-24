@@ -12,6 +12,8 @@
 
 ---
 
+> ⏸ **2026-09-24 ~ 2026-12-31 Anthropic API 사용 중단** (Kiki 결정 · ARCH-66). Claude는 Claude Max 구독(개발 도구)으로만 쓰고, 백엔드 Anthropic 좌석은 `anthropic_api_enabled=False`(기본)로 꺼져 있다. 이 문서의 Anthropic 호출·키 등록 서술은 그 기간 실행하지 않는다. 재개 판정 = `G-arch66-anthropic-api-pause-review` · 근거 = MEMORY 2026-09-24 ARCH-66.
+
 ## 0. 이 하드웨어가 바꾸는 것 (한 줄)
 
 통합 LPDDR5X 덕에 **QUALITY 티어(qwen3.5:27b)까지 GPU 메모리 상주**가 현실적 —
