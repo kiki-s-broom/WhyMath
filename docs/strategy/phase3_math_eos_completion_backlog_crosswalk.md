@@ -756,13 +756,13 @@ ID 체계 시험용 태스크를 지우면서 `git checkout -- backlog/events/`�
 
 **게이트 clear는 Kiki 소유다.** `G-p3-entry-gate2-pass`는 `kind: decision` · `assignee: kiki`이고, 재판정 태스크는 그 게이트의 *증거를 만드는* 것이지 닫는 것이 아니다. 에이전트가 `--as kiki`로 대행하지 않았다(거부의 우회 금지).
 
-## §22-4. 이 회차에 낸 사고 1건 — 같은 기능을 두 번 등재 (`HARN-162` 취소)
+## §22-4. 이 회차에 낸 사고 1건 — 같은 기능을 두 번 등재 (`HARN-167`(구 `HARN-162`) 취소)
 
-`gates`에 `amend`가 없음을 실측하고 "게이트 정정 경로가 없다"로 결론해 `HARN-162-gates-amend-missing`을 등재했는데, 등재 직후 harness의 의미 중복 고지가 `HARN-124-gate-title-correction-path`를 similarity 0.15로 지목했다. 확인 결과 **같은 기능을 이미 소유**하고 있었다.
+`gates`에 `amend`가 없음을 실측하고 "게이트 정정 경로가 없다"로 결론해 `HARN-167-gates-amend-missing`을 등재했는데, 등재 직후 harness의 의미 중복 고지가 `HARN-124-gate-title-correction-path`를 similarity 0.15로 지목했다. 확인 결과 **같은 기능을 이미 소유**하고 있었다.
 
 원인은 **부재 판정의 검색 방법 오류**다 — CLI 표면(도구)만 확인하고 태스크 대장(소유자)을 확인하지 않았다. 계보는 3대째다: `HARN-133` → `HARN-135` → `HARN-160`이 등재됐다가 `HARN-124`에 편입·취소됐고, **그 태스크의 notes가 "두 태스크가 각각 경로를 열면 중복이 된다"고 적어 둔 바로 그 중복**을 재생산했다.
 
-`HARN-162`는 `cancel`하고, 새 증거는 버리지 않고 `HARN-124` acceptance ⑧(2026-09-23 통합 집행이 같은 벽에 부딪힌 두 번째 트리거)과 ⑨(이번 중복 등재의 자기 사례화)로 편입했다.
+`HARN-167`(구 `HARN-162`)는 `cancel`하고, 새 증거는 버리지 않고 `HARN-124` acceptance ⑧(2026-09-23 통합 집행이 같은 벽에 부딪힌 두 번째 트리거)과 ⑨(이번 중복 등재의 자기 사례화)로 편입했다.
 
 **재발방지대책 형태**: 새 산문 규칙을 만들지 않았다 — 2026-09-20 Kiki 지정 「새 산문 규칙 등재 동결」에 따라 대책은 **태스크**(`HARN-124` ⑨)와 **MEMORY 결정 로그**로만 등재한다.
 
@@ -775,7 +775,7 @@ ID 체계 시험용 태스크를 지우면서 `git checkout -- backlog/events/`�
 | waive | `G-p3-g3-week3` · `G-p3-g4-release` | ⓐ 집행(요건 승계) |
 | amend | `EOS-50-publish-gate-pipeline` | 게이트 재지정 1회 + 순환 해소 1회 |
 | amend | `HARN-124-gate-title-correction-path` | 실측 트리거 2건 편입(⑧⑨) |
-| cancel | `HARN-162-gates-amend-missing` | 중복 등재 취소 |
+| cancel | `HARN-167-gates-amend-missing` | 중복 등재 취소 |
 | add | `HARN-166-test-local-git-helper-locale-decode` | **별건** — CI 스텝 정합 검증 중 발견한 선재 결함(§22-7 ⑤) |
 
 최종 상태: `validate` green(태스크 819건·게이트 75건·트랙 3건) · `audit-deps` green(위반 0건 · 레거시 그랜드파더 0건 · 소프트 분류 8건).

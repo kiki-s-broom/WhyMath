@@ -134,11 +134,11 @@
 | waive | `G-p3-g3-week3` · `G-p3-g4-release` | ⓐ 집행(요건 승계) |
 | amend | `EOS-50-publish-gate-pipeline` | 게이트 재지정 1회 + 순환 해소 1회 |
 | amend | `HARN-124-gate-title-correction-path` | 실측 트리거 2건 편입(⑧⑨) |
-| cancel | `HARN-162-gates-amend-missing` | **중복 등재 취소** |
+| cancel | `HARN-167-gates-amend-missing` | **중복 등재 취소** |
 
-### 6-1. 중복 등재 1건 — `HARN-162` 취소
+### 6-1. 중복 등재 1건 — `HARN-167`(구 `HARN-162`) 취소
 
-`gates`에 `amend`가 없음을 실측하고 "게이트 정정 경로가 없다"로 결론해 `HARN-162-gates-amend-missing`을 등재했는데, 등재 직후 harness의 의미 중복 고지가 `HARN-124-gate-title-correction-path`를 similarity 0.15로 지목했다. 확인 결과 **같은 기능을 이미 소유**하고 있었다(2026-09-21 등재 · acceptance ①이 `gates`에 정정 경로를 여는 것을 확정 · ⑤⑥⑦이 `remind_after_days`·독촉 기준일 축까지 편입).
+`gates`에 `amend`가 없음을 실측하고 "게이트 정정 경로가 없다"로 결론해 `HARN-167-gates-amend-missing`을 등재했는데, 등재 직후 harness의 의미 중복 고지가 `HARN-124-gate-title-correction-path`를 similarity 0.15로 지목했다. 확인 결과 **같은 기능을 이미 소유**하고 있었다(2026-09-21 등재 · acceptance ①이 `gates`에 정정 경로를 여는 것을 확정 · ⑤⑥⑦이 `remind_after_days`·독촉 기준일 축까지 편입).
 
 원인은 **부재 판정의 검색 방법 오류**다 — CLI 표면(도구)만 확인하고 태스크 대장(소유자)을 확인하지 않았다. 계보는 3대째다: `HARN-133` → `HARN-135` → `HARN-160`이 등재됐다가 `HARN-124`에 편입·취소됐고, **그 태스크의 notes가 "두 태스크가 각각 경로를 열면 중복이 된다"고 적어 둔 바로 그 중복**을 재생산했다.
 
