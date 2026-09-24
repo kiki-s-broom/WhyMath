@@ -380,6 +380,16 @@ gates:
     evidence: "Kiki 판정 2026-09-12 (대화) — 후보 ⓒ 3-state 강등 채택. 근거(원문 취지): \"이 문제의 목표가 정답률 최대화가 아니라 학생에게 잘못된 확신을 주는 오류를 최소화하는 것이다. 오억제 100% ↔ 선행정정 사각 100%의 교환관계라면, 귀속이 불명확한 상황에서 바로 '네가 틀렸다'고 판정하는 것보다 판정을 보류하고 한 번 확인하는 상태를 두는 편이 교육적으로 안전하다.\" 이 판정은 의사결정 우선순위 #1(학생 안전·웰빙)·#3(교수학적 정확성)에 정합하며, models.py::refuting_regex docstring의 기존 선언(\"맞게 안 학생에게 틀렸다고 말하는 쪽이 놓치는 쪽보다 해롭다\")과 같은 축이다. 근거 수치 = MISC-28 acceptance ⓒ의 교환표(현행 lookbehind=12: 오억제 66/66 · 선행정정 사각 0/66 // lookbehind=0: 오억제 2/66 · 선행정정 사각 66/66)."
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
+  - id: G-mp02-rerun-model-pilot
+    title: "MP-02 재회차 (Phaiakes9) — 로컬 저작 모델 비교 파일럿(mid=qwen2.5:7b vs quality=qwen3:30b-a3b, 각 30건 · 문제 유형 3종 순환 · 카나리 끔) → 수용 건수가 많은 티어로 MP-02 2회차 n=60(카나리 기본값). 런북 = docs/reviews/mp02_rerun_runbook.md (착지 PR 머지 후 실행 — 런북 1단계 HAS_TIER_FLAG=True가 머지를 기계 확인). 회신 = 런북 8절 목록(5절·7절 출력 전문 필수). 배경: 1차 회차(run_id c0854e38…)는 30건 중 중복 20건이라 판정 분모 10 — 10/10 만점이어도 Wilson 하한 0.7871 < 0.90으로 통과가 수학적으로 불가능했다(25건 이상 전건 합격이어야 0.9023). 판정 규칙은 런북 5절에 실행 전 고정: accepted_stored가 많은 티어, 동률이면 mid. 전제: Ollama 가동 · qwen3:30b-a3b 설치(없으면 런북 2절에서 pull) · 비용 0원(로컬)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-24
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-not-now-v1-release-recheck
     title: "Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
     kind: decision
