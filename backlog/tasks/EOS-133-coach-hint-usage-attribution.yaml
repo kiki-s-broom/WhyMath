@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-133-coach-hint-usage-attribution
+title: "코치 경로 힌트 사용 귀속 — used_hint NULL·hint_usage writer 0건 (SCENARIO-005 공백 ⓒ)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 코치 대화 경로에서 힌트를 받은 뒤 낸 정답 attempt에 힌트 사용이 귀속된다 — attempt.used_hint가 NULL이 아니고 hint_usage 행이 1개 이상 적재된다(EOS-45가 만든 스키마·ORM의 첫 writer).\n② 귀속된 힌트 신호가 숙달 갱신 경로에서 읽히는지 판정해 적는다 — 기본 추정기 bkt-v1이 힌트 축을 읽지 않는 현행을 유지할지(EOS-108 계약) 결정 근거와 함께.\n③ 집행 지점 — tests/backend/scenarios/test_phase2_scenario_regression_suite.py SCENARIO-005의 정직한 공백 동결(ⓒ)이 이 수정으로 실패하도록 되어 있다. 그 단언을 정상 동작 단언으로 뒤집는다.\n④ writer 제거 뮤테이션이 SCENARIO-005를 RED로 만드는지 주입 확인."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+session: null
+notes: "출처: EOS-119(P-13) SCENARIO-005 실측 — docs/reviews/eos119_scenario_suite_2026-09-24.md §공백 표. 소유 태스크 검색 결과 0건(검색 범위는 그 문서에 기재)."
+updated: 2026-09-24

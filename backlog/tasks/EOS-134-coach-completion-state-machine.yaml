@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-134-coach-completion-state-machine
+title: "코치 완료 경로가 학습 상태 머신을 돌리지 않음 — attempts 경로와 비대칭 (SCENARIO-005 공백 ⓓ)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 코치 대화로 문제를 완료(api/coach.py::_complete_problem)하면 /v1/me/attempts 경로와 같이 학습 상태 머신(advance_on_attempt)이 돌아 전이 원장에 기록된다 — 완료 후 /v1/me/learning-state가 NEW·전이 0건에 머물지 않는다.\n② 두 경로(attempts·coach 완료)의 상태 전이 결과가 동일 입력에서 일치함을 테스트로 동결한다(비대칭 재발 방지).\n③ 집행 지점 — tests/backend/scenarios/test_phase2_scenario_regression_suite.py SCENARIO-005의 정직한 공백 동결(ⓓ)을 정상 동작 단언으로 뒤집는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+session: null
+notes: "출처: EOS-119(P-13) SCENARIO-005 실측 — docs/reviews/eos119_scenario_suite_2026-09-24.md §공백 표. 소유 태스크 검색 결과 0건(검색 범위는 그 문서에 기재)."
+updated: 2026-09-24
