@@ -9,6 +9,18 @@
 > 1차 회차 런북: `docs/reviews/mp02_first_llm_authoring_run_runbook.md` (이 문서는 그것을 대체하지
 > 않는다 — 1차 회차의 기록으로 남는다)
 
+> **[개정 2026-09-24 오후 — 파일럿 ①② 실행 후]** §3·§4는 실행 완료다(`run_id 4fb0ba12…` mid 수용 12 ·
+> `ff50b997…` quality 수용 13 — 판정 규칙대로 `quality`). 두 파일럿 모두 중복률 약 40%·판정 대상
+> 합격률 63~72%라 **이 조건 그대로의 2회차는 카나리 통과 확률이 0.0002% 미만**으로 계산됐다(파일럿
+> 수치로 이항 계산). Kiki 결정("1+2 모두")에 따라 두 가지를 더했다:
+> ① **카나리 표본 기준 `--canary-basis judged`** — 중복을 뺀 판정 대상이 30건 모일 때까지 카나리를
+> 이어 간다(중복 때문에 표본이 10~18건으로 줄어 임계를 수학적으로 못 넘던 문제 해소 · 임계 0.90과
+> 중복 제외 규칙은 그대로) ② **생성기 개선** — `--avoid-recent 10`(이번 회차에 모델이 이미 만든
+> 조건식을 다음 프롬프트에 '다시 쓰지 말 것'으로 싣는다) + 저작 프롬프트에 **근 부호 확인 규칙**
+> (파일럿 ② 실패 5건 중 4건이 중근 부호 반대). 새 순서: **§1 재실행(새 main) → §5-2 파일럿 ③ →
+> §6(개정) 2회차 → §7**. 또한 §3·§4·§6에서 `Tee-Object`를 뺐다 — PowerShell 파이프가 출력을 cp949로
+> 되읽어 화면·사본의 한글이 깨졌다(판정 재료인 대장은 Python이 직접 써서 무관했다).
+
 ---
 
 ## 0. 사전 브리핑 (6항목)
@@ -173,7 +185,7 @@ $Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
 $OutMid = "$Root\pilot-mid\problems.jsonl"
 $StaleMid = @(Get-ChildItem -Path (Split-Path $OutMid) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_MID=$StaleMid"
-if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutMid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutMid --n 30 --spec-file $Plan --authoring-tier mid --canary 0 --abort-window 0 | Tee-Object -FilePath "$Root\pilot-mid\report.json"; "PILOT_MID_EXIT=$LASTEXITCODE"; "PILOT_MID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutMid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ① 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_MID=$StaleMid (앞 둘은 True, 마지막은 0이어야 한다)" }
+if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutMid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutMid --n 30 --spec-file $Plan --authoring-tier mid --canary 0 --abort-window 0; "PILOT_MID_EXIT=$LASTEXITCODE"; "PILOT_MID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutMid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ① 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_MID=$StaleMid (앞 둘은 True, 마지막은 0이어야 한다)" }
 ```
 
 **예상 출력**: 진행 로그 → 리포트 JSON → `PILOT_MID_EXIT=0`(수용 1건 이상) 또는 `1`(수용 0건) →
@@ -192,7 +204,7 @@ if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -
 $OutQuality = "$Root\pilot-quality\problems.jsonl"
 $StaleQuality = @(Get-ChildItem -Path (Split-Path $OutQuality) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_QUALITY=$StaleQuality"
-if ($CodeOk -and $HasTier -and $StaleQuality -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutQuality) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutQuality --n 30 --spec-file $Plan --authoring-tier quality --canary 0 --abort-window 0 | Tee-Object -FilePath "$Root\pilot-quality\report.json"; "PILOT_QUALITY_EXIT=$LASTEXITCODE"; "PILOT_QUALITY_FILES=$(@(Get-ChildItem -Path (Split-Path $OutQuality) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ② 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_QUALITY=$StaleQuality" }
+if ($CodeOk -and $HasTier -and $StaleQuality -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutQuality) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutQuality --n 30 --spec-file $Plan --authoring-tier quality --canary 0 --abort-window 0; "PILOT_QUALITY_EXIT=$LASTEXITCODE"; "PILOT_QUALITY_FILES=$(@(Get-ChildItem -Path (Split-Path $OutQuality) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ② 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_QUALITY=$StaleQuality" }
 ```
 
 30B 모델은 첫 호출에서 로드에 30초~2분이 걸린다. 그 뒤로는 파일럿 ①과 비슷하거나 약간 느리다.
@@ -249,33 +261,73 @@ if ok:
 
 ---
 
-## 6. MP-02 2회차 60건 — 창 ①
+## 5-2. 파일럿 ③ — `quality` + 회피 목록 + 부호 규칙 30건 — 창 ① (10~40분)
 
-이 블록은 §5의 판정을 **다시 계산해서** 쓴다 — 앞 출력을 눈으로 옮겨 적지 않는다. 판정이 서지
-않거나 출력 폴더가 깨끗하지 않으면 **실행을 거부**한다. 카나리 30 · 임계 0.90 · 롤링 창 50 등
-안전장치는 **전부 기본값**이다(1차 회차와 같은 조건 — 바뀐 것은 유형 순환과 모델뿐).
+**먼저 §1 블록을 다시 붙여넣으십시오** — 이 절의 코드(회피 목록·카나리 표본 기준·부호 규칙)는 개정 PR이
+머지된 main에만 있고, §1이 격리 폴더를 새 main으로 옮기고 `$Py`·`$Plan`·`$CodeOk`·`$HasTier`를 다시
+만든다. 이 블록은 그 코드가 실제로 불러와졌는지(`HAS_RERUN2`)를 스스로 확인하고, 아니면 실행을 거부한다.
+
+조건은 파일럿 ②와 같고(`quality` · 유형 3종 순환 · 30건 · 카나리 끔) **달라진 것은 두 가지**다 —
+`--avoid-recent 10`과 프롬프트의 부호 규칙. 부호 규칙은 이제 프롬프트 정본에 들어가 끌 수 없으므로
+이 파일럿은 **둘을 합친 효과**를 잰다(따로 가르지 않는다 — 한계로 기록한다).
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$OutAvoid = "$Root\pilot-quality-avoid\problems.jsonl"
+$Rerun2Probe = & $Py -c "import inspect, whymath_backend.harness.problem_corpus_accumulate as m; print('avoid_recent' in inspect.signature(m._build_live_generator).parameters and 'canary_basis' in inspect.signature(m.run_corpus_accumulate).parameters)"
+$HasRerun2 = ($Rerun2Probe -eq "True")
+"HAS_RERUN2=$HasRerun2"
+$StaleAvoid = @(Get-ChildItem -Path (Split-Path $OutAvoid) -Filter "problems*" -ErrorAction SilentlyContinue).Count
+"STALE_AVOID=$StaleAvoid"
+if ($CodeOk -and $HasRerun2 -and $StaleAvoid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutAvoid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutAvoid --n 30 --spec-file $Plan --authoring-tier quality --avoid-recent 10 --canary 0 --abort-window 0; "PILOT_AVOID_EXIT=$LASTEXITCODE"; "PILOT_AVOID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutAvoid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ③ 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_RERUN2=$HasRerun2 STALE_AVOID=$StaleAvoid (앞 둘은 True, 마지막은 0이어야 한다 · HAS_RERUN2=False면 §1을 다시 붙여넣지 않은 것)" }
+```
+
+**판정 규칙(실행 전 고정)**: 파일럿 ③의 `accepted_stored`가 파일럿 ②보다 **많으면** 2회차에
+`--avoid-recent 10`을 켜고, 같거나 적으면 끈다(0). 두 대장 모두 `attempted=30`이고 모델이 같아야
+비교가 성립한다. 이 판정은 §6 블록이 대장에서 **직접 다시 계산**한다.
+
+---
+
+## 6. MP-02 2회차 60건 — 창 ① (개정)
+
+이 블록은 §5(티어)와 §5-2(회피 목록) 판정을 **다시 계산해서** 쓴다 — 앞 출력을 눈으로 옮겨 적지
+않는다. 판정이 서지 않거나 출력 폴더가 깨끗하지 않으면 **실행을 거부**한다. 카나리 30 · 임계 0.90 ·
+신뢰 0.95 · 롤링 창 50은 **기본값 그대로**이고, 카나리 표본만 `--canary-basis judged`(중복을 뺀 판정
+대상 30건)로 센다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$OutMid = "$Root\pilot-mid\problems.jsonl"
+$OutQuality = "$Root\pilot-quality\problems.jsonl"
+$OutAvoid = "$Root\pilot-quality-avoid\problems.jsonl"
 $Out2 = "$Root\round2\problems.jsonl"
-$Tier = & $Py -c "import json,sys,pathlib
+$Decision = & $Py -c "import json,sys,pathlib
 def last(p):
     q=pathlib.Path(p).with_suffix('.rounds.jsonl')
     rows=[json.loads(l) for l in q.read_text(encoding='utf-8').splitlines() if l.strip()] if q.exists() else []
     return rows[-1] if rows else None
-m,q=last(sys.argv[1]),last(sys.argv[2])
+m,q,v=last(sys.argv[1]),last(sys.argv[2]),last(sys.argv[3])
 ok=m and q and m.get('attempted')==30 and q.get('attempted')==30 and m.get('model_name') and q.get('model_name') and m['model_name']!=q['model_name']
 a=lambda x:(x.get('outcome_counts') or {}).get('accepted_stored',0)
-print(('quality' if a(q)>a(m) else 'mid') if ok else '')
-" $OutMid $OutQuality
+tier=('quality' if a(q)>a(m) else 'mid') if ok else ''
+ok2=v and q and v.get('attempted')==30 and v.get('model_name')==q.get('model_name')
+avoid=('10' if a(v)>a(q) else '0') if ok2 else ''
+print(tier+'|'+avoid)
+" $OutMid $OutQuality $OutAvoid
+$Tier = ($Decision -split '\|')[0]
+$Avoid = ($Decision -split '\|')[1]
 "ROUND2_TIER=$Tier"
+"ROUND2_AVOID=$Avoid"
 $Stale2 = @(Get-ChildItem -Path (Split-Path $Out2) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_ROUND2=$Stale2"
-if ($CodeOk -and $HasTier -and ($Tier -eq "mid" -or $Tier -eq "quality") -and $Stale2 -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out2) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $Out2 --n 60 --spec-file $Plan --authoring-tier $Tier | Tee-Object -FilePath "$Root\round2\report.json"; "ACCUMULATE_EXIT=$LASTEXITCODE"; "ROUND2_FILES=$(@(Get-ChildItem -Path (Split-Path $Out2) -Filter 'problems*').Count)" } else { "REFUSED: 2회차 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier ROUND2_TIER='$Tier'(mid 또는 quality여야 한다) STALE_ROUND2=$Stale2(0이어야 한다)" }
+if ($CodeOk -and $HasRerun2 -and ($Tier -eq "mid" -or $Tier -eq "quality") -and ($Avoid -eq "0" -or $Avoid -eq "10") -and $Stale2 -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out2) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $Out2 --n 60 --spec-file $Plan --authoring-tier $Tier --avoid-recent $Avoid --canary-basis judged; "ACCUMULATE_EXIT=$LASTEXITCODE"; "ROUND2_FILES=$(@(Get-ChildItem -Path (Split-Path $Out2) -Filter 'problems*').Count)" } else { "REFUSED: 2회차 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_RERUN2=$HasRerun2 ROUND2_TIER='$Tier'(mid|quality) ROUND2_AVOID='$Avoid'(0|10 · 비었으면 파일럿 ③ 대장 없음) STALE_ROUND2=$Stale2(0이어야 한다)" }
 ```
 
 **예상 출력**: `ACCUMULATE_EXIT=0`(수용 1건 이상) · `1`(카나리 차단 또는 수용 0) · `2`(연속 무진전
-알람 — 이 출력 폴더는 새로 만들었으므로 나오면 이상 신호). 어느 값이든 §7로 간다.
+알람 — 이 출력 폴더는 새로 만들었으므로 나오면 이상 신호). 어느 값이든 §7로 간다. judged 기준에서는
+카나리가 30건보다 **더 많은 시도**를 쓸 수 있다(중복만큼) — 그 수는 §7의 `canary_attempts`가 말한다.
 
 ---
 
@@ -296,7 +348,7 @@ print('REVIEW_ROWS', 'FILE_MISSING' if rev is None else len(rev))
 if led:
     r=led[-1]
     print('RUN_ID', r.get('run_id'))
-    for k in ('model_name','prompt_version','attempted','accepted','appended','outcome_counts','spec_outcome_counts','duplicate_sources','canary_size','canary_threshold','canary_passed','canary_rate','canary_lower_bound','canary_blocked','aborted','abort_reason'):
+    for k in ('model_name','prompt_version','attempted','accepted','appended','outcome_counts','spec_outcome_counts','duplicate_sources','canary_size','canary_threshold','canary_basis','canary_attempts','canary_passed','canary_rate','canary_lower_bound','canary_blocked','aborted','abort_reason'):
         print(' ', k, '=', json.dumps(r.get(k), ensure_ascii=False))
     if gen: print('GENLOG_SAME_RUN', sum(1 for g in gen if g.get('run_id')==r.get('run_id')))
 " $Out2

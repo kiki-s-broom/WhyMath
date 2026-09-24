@@ -846,3 +846,86 @@ class TestTraceSinkInjection:
         assert spy.flush_count == 1
         # flush 표면이 없는 sink(계약 최소 구현)에도 안전하다.
         _gen(FakeProvider([_HAPPY]), trace=_CrashingTraceSink()).flush_trace()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# MP-02 재회차: avoid_recent — 회차 내 중복 회피 목록(자기 출력 기억).
+# ──────────────────────────────────────────────────────────────────────
+def _happy_with(conditions: str, answer: str) -> str:
+    """_HAPPY에서 조건식·답만 바꾼 응답(다른 방정식 구조)."""
+    data = json.loads(_HAPPY)
+    data["conditions"] = conditions
+    data["answer"] = answer
+    data["answer_map"] = {"x": answer}
+    return json.dumps(data, ensure_ascii=False)
+
+
+_AVOID_MARKER = "이번에 이미 만든 방정식"
+
+
+class TestAvoidRecent:
+    def test_default_never_adds_avoid_block(self) -> None:
+        """기본(0)은 여러 번 생성해도 회피 블록이 없다 — 대조군(기본 프롬프트 회귀 0)."""
+        provider = FakeProvider([_HAPPY, _HAPPY])
+        gen = _gen(provider)
+        gen.generate(_spec())
+        gen.generate(_spec())
+        assert all(_AVOID_MARKER not in prompt for prompt, _ in provider.calls)
+
+    def test_first_prompt_has_no_block_second_lists_previous(self) -> None:
+        provider = FakeProvider([_HAPPY, _happy_with("x**2 - 7*x + 12 = 0", "4")])
+        gen = _gen(provider, avoid_recent=3)
+        assert gen.generate(_spec()) is not None
+        gen.generate(_spec())
+        first, second = provider.calls[0][0], provider.calls[1][0]
+        assert _AVOID_MARKER not in first  # 아직 만든 것이 없으면 블록 자체가 없다
+        assert _AVOID_MARKER in second
+        assert "- x**2 - 5*x + 6 = 0" in second
+
+    def test_keeps_only_last_n_and_skips_repeats(self) -> None:
+        responses = [
+            _happy_with("x**2 - 3*x + 2 = 0", "2"),
+            _happy_with("x**2 - 3*x + 2 = 0", "2"),  # 같은 조건식 반복 — 칸을 차지하지 않는다
+            _happy_with("x**2 - 7*x + 12 = 0", "4"),
+            _happy_with("x**2 - 9*x + 20 = 0", "5"),
+            _HAPPY,
+        ]
+        provider = FakeProvider(responses)
+        gen = _gen(provider, avoid_recent=2)
+        for _ in responses:
+            gen.generate(_spec())
+        last = provider.calls[-1][0]
+        assert "- x**2 - 3*x + 2 = 0" not in last  # 가장 오래된 것은 밀려났다
+        assert "- x**2 - 7*x + 12 = 0" in last
+        assert "- x**2 - 9*x + 20 = 0" in last
+        assert last.count("x**2 - 3*x + 2 = 0") == 0
+
+    def test_failed_generation_is_not_remembered(self) -> None:
+        """조립 실패(JSON 파싱 실패)는 목록에 오르지 않는다 — 존재하지 않는 방정식을 피하라고 하지 않는다."""
+        provider = FakeProvider(["이건 JSON이 아니다", _HAPPY])
+        gen = _gen(provider, avoid_recent=3)
+        assert gen.generate(_spec()) is None
+        gen.generate(_spec())
+        assert _AVOID_MARKER not in provider.calls[1][0]
+
+    @pytest.mark.parametrize("bad", [-1, 21])
+    def test_out_of_range_is_refused(self, bad: int) -> None:
+        with pytest.raises(ValueError, match="avoid_recent"):
+            _gen(FakeProvider([]), avoid_recent=bad)
+
+
+def test_avoid_repeat_does_not_evict_an_older_distinct_equation() -> None:
+    """같은 조건식 반복이 칸을 차지하면 더 오래된 *다른* 방정식이 밀려난다 — 그러지 않아야 한다.
+
+    maxlen 2에서 a, b, b 순서면 반복을 건너뛸 때만 마지막 프롬프트에 a·b가 모두 남는다(반복을
+    그대로 넣으면 [b, b]가 되어 a가 사라진다). 반례를 픽스처로 박아 둔 절.
+    """
+    a = _happy_with("x**2 - 3*x + 2 = 0", "2")
+    b = _happy_with("x**2 - 7*x + 12 = 0", "4")
+    provider = FakeProvider([a, b, b, _HAPPY])
+    gen = _gen(provider, avoid_recent=2)
+    for _ in range(4):
+        gen.generate(_spec())
+    last = provider.calls[-1][0]
+    assert "- x**2 - 3*x + 2 = 0" in last
+    assert "- x**2 - 7*x + 12 = 0" in last

@@ -111,6 +111,7 @@ REQUIRED_ASSET_IDS: tuple[str, ...] = (
     "l3.equivalent.system",
     "l3.equivalent.user",
     "l3.equivalent.user_topic",
+    "l3.equivalent.user_avoid",
     "l3.rephrase.system",
     "l3.rephrase.user",
     "l3.visualization.system",
