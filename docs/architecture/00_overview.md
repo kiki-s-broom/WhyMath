@@ -163,7 +163,7 @@ WhyMath 아키텍처는 *서로 직교하는 두 축*으로 본다:
 | **Client** | Flutter 단일 학생앱(패드 중심·모드 분기) + 별도 웹(교사·SEO·Phase3+) | L5 일부, L6/L7 UI | 앱: Flutter 3.x+Riverpod·MathLive/three.js WebView · 별도 웹: React/Next |
 | **Backend** | FastAPI + uvicorn | L1 서비스·L2·L3·L4·L5 오케스트레이터·L6 모드 로직 | Python 3.12 + FastAPI |
 | **DB** | 다중 저장소 | L1·L2 자산의 영속 계층 | **현재 운영:** PostgreSQL 16 + pgvector, Redis 7 · **조건부 확장:** TimescaleDB, ClickHouse, S3/MinIO (Neo4j는 2026-08-03 정정 — 런타임 미도입, 개념 그래프는 PG 단일 평면) |
-| **ML** | 추론·검증 런타임 | L3 모델 호출, L3 도구 검증 | Claude Sonnet/Opus, Qwen3-Math(Phaiakes9 로컬), SymPy, 임베딩 bge-m3(기본·로컬 — 클라우드 옵션 te-3-large, 정본 = CLAUDE.md 스택 표) |
+| **ML** | 추론·검증 런타임 | L3 모델 호출, L3 도구 검증 | Claude Sonnet/Opus(⏸ 2026-09-24~12-31 Anthropic API 사용 중단 · ARCH-66), Qwen3-Math(Phaiakes9 로컬), SymPy, 임베딩 bge-m3(기본·로컬 — 클라우드 옵션 te-3-large, 정본 = CLAUDE.md 스택 표) |
 | **Content Pipeline** | 배치·ETL | L1 수집·정형화·검증 | Prefect/Airflow, httpx + playwright, PaddleOCR+Qwen3-VL(로컬 OCR — 2026-05-28 Mathpix 대체), pdfplumber |
 
 ### 블록별 보충 메모

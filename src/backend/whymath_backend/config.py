@@ -478,6 +478,20 @@ class Settings(BaseSettings):
             "(CLAUDE.md 보안 금기: 코드 하드코딩 금지). 비면 클라우드 생성 불가."
         ),
     )
+    # ARCH-66 — 2026-09-24 Kiki 결정: 2026-12-31(내부 프로젝트 완성 시점)까지 Anthropic API를
+    # 쓰지 않는다. 개발은 Claude Max 구독(Claude Code)으로 하되, 구독은 개인 개발 도구이지
+    # 서비스 런타임의 API 호출을 대신하지 못한다. 그래서 키가 남아 있어도 이 스위치가 꺼져
+    # 있으면 `anthropic_configured`가 False — 키 미설정과 **같은 기존 경로**(클라우드 불가
+    # 보고·AnthropicProvider 명확한 오류)로 흐른다. 재개는 이 값을 켜는 것이 아니라
+    # 게이트 `G-arch66-anthropic-api-pause-review`(2026-12-31 재판정)를 거친다.
+    anthropic_api_enabled: bool = Field(
+        default=False,
+        description=(
+            "Anthropic API 사용 허가 스위치(ARCH-66 · 기본 False). 2026-09-24 Kiki 결정으로 "
+            "2026-12-31까지 Anthropic API 미사용 — 꺼져 있으면 키가 있어도 미설정으로 본다. "
+            "환경변수 WHYMATH_ANTHROPIC_API_ENABLED. 재개 판정 = G-arch66-anthropic-api-pause-review."
+        ),
+    )
     anthropic_model_mid: str = Field(
         default="claude-sonnet-4-6",
         description=(
@@ -1662,8 +1676,17 @@ class Settings(BaseSettings):
         비어 있으면 미설정으로 보고 AnthropicProvider는 클라우드 결정에 명확한 오류를
         던진다(조용한 LOCAL 강등 금지 — 라우터가 정당한 이유로 클라우드를 택했으므로).
         SecretStr는 `get_secret_value()`로만 평문을 꺼내며, 여기서는 *비어 있는지*만 본다.
+
+        ARCH-66: `anthropic_api_enabled`가 꺼져 있으면 키가 있어도 False다(사용 중단 방침).
+        원인 구분은 `anthropic_policy_blocked`로 한다 — 오류·리포트가 "키 없음"과
+        "정책 차단"을 섞어 보고하지 않게.
         """
-        return bool(self.anthropic_api_key.get_secret_value())
+        return self.anthropic_api_enabled and bool(self.anthropic_api_key.get_secret_value())
+
+    @property
+    def anthropic_policy_blocked(self) -> bool:
+        """키는 있으나 ARCH-66 사용 중단 방침으로 막힌 상태인가."""
+        return (not self.anthropic_api_enabled) and bool(self.anthropic_api_key.get_secret_value())
 
     @property
     def deepseek_configured(self) -> bool:

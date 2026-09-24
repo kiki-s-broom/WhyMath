@@ -89,9 +89,24 @@ def test_anthropic_configured_false_when_empty() -> None:
 
 
 def test_anthropic_configured_true_when_set() -> None:
-    """키가 채워지면 설정 완료(anthropic_configured=True)."""
-    s = Settings(anthropic_api_key=SecretStr("sk-ant-xyz"))
+    """키가 채워지고 사용 스위치가 켜지면 설정 완료(anthropic_configured=True)."""
+    s = Settings(anthropic_api_key=SecretStr("sk-ant-xyz"), anthropic_api_enabled=True)
     assert s.anthropic_configured is True
+    assert s.anthropic_policy_blocked is False
+
+
+def test_anthropic_api_disabled_by_default_even_with_key() -> None:
+    """ARCH-66: 2026-09-24 Kiki 결정 — 기본값은 사용 중단. 키가 있어도 미설정으로 본다."""
+    s = Settings(anthropic_api_key=SecretStr("sk-ant-xyz"))
+    assert s.anthropic_api_enabled is False
+    assert s.anthropic_configured is False
+    assert s.anthropic_policy_blocked is True
+
+
+def test_anthropic_policy_not_blocked_without_key() -> None:
+    """키가 없으면 '정책 차단'이 아니라 '미설정'이다 — 두 원인을 섞어 보고하지 않는다."""
+    s = Settings(anthropic_api_key=SecretStr(""))
+    assert s.anthropic_policy_blocked is False
 
 
 def test_anthropic_secret_not_leaked_in_repr() -> None:
@@ -109,6 +124,7 @@ def test_anthropic_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WHYMATH_ANTHROPIC_MODEL_MID", "claude-sonnet-x")
     monkeypatch.setenv("WHYMATH_ANTHROPIC_MODEL_HIGH", "claude-opus-x")
     monkeypatch.setenv("WHYMATH_ANTHROPIC_MAX_TOKENS", "2048")
+    monkeypatch.setenv("WHYMATH_ANTHROPIC_API_ENABLED", "true")
     s = Settings()
     assert s.anthropic_api_key.get_secret_value() == "sk-ant-env"
     assert s.anthropic_model_mid == "claude-sonnet-x"

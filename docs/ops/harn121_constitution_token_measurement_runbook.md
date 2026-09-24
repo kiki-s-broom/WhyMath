@@ -1,118 +1,72 @@
-# 런북 — 헌법 토큰 실측 (HARN-121 ①)
+# 런북 — 헌법 토큰 실측 (HARN-121 ① · Claude Max 경로)
 
-> 실행 주체: **Kiki** · 실행 머신: **Phaiakes9** (실 Anthropic 키가 있는 유일한 곳)
-> 게이트: `G-harn121-constitution-token-measure`
+> 실행 주체: **Kiki** · 게이트: `G-harn121-constitution-token-measure-context`
+> (구 게이트 `G-harn121-constitution-token-measure`는 2026-09-24 waived — 아래 "방식 변경" 참조)
+
+## 방식 변경 (2026-09-24 · ARCH-66)
+
+Kiki 결정으로 **2026-12-31까지 Anthropic API를 쓰지 않는다**. Claude는 Claude Max 구독
+(Claude Code 등 개발 도구)으로만 쓴다. 그래서 `count_tokens` API 대신 Claude Code의
+`/context` 명령으로 잰다.
+
+- `/context`는 **Claude 토크나이저로 센 실제 수치**다. 문자 수로 짐작한 추정이 아니므로
+  "문자 수 대체 금지" 원칙과 충돌하지 않는다.
+- tiktoken으로 대체하지 않는다. tiktoken은 OpenAI 토크나이저라 Claude와 수가 다르다.
+- `scripts/ops/measure_constitution_tokens.py`(API 방식)는 지우지 않고 남겨 둔다. API가
+  재개되면 AGENTS.md까지 포함한 보강 측정에 쓴다.
 
 ## 1. 과제 명칭
 
-`CLAUDE.md` · `AGENTS.md` · SessionStart 브리핑의 **실토큰 수 측정**.
+`CLAUDE.md`와 세션 시작 컨텍스트의 **실토큰 수 측정**.
 
 ## 2. 목적
 
-반복 실패 보고서는 세션 고정비를 "4.5만~6.8만 토큰"으로 적으면서 **추정임을 명시**한다
-(문자 구성 기반). 헌법 다이어트의 목표가 "코어 ≤ 1.5만 토큰"인데 분모가 추정이면
-달성 여부를 판정할 수 없다. 이 측정이 그 분모를 확정한다.
+헌법 다이어트 목표는 "코어 ≤ 1.5만 토큰"이다. 현재 기준선(4.5만~6.8만)은 문자 수 기반
+추정이라, 이 측정이 진짜 분모를 확정한다. 3분리(HARN-121 ②)의 전후 비교 기준선이 된다.
 
-결과는 `metrics/constitution_tokens.json`에 남고, 3분리(HARN-121 ②)의 전후 비교
-기준선이 된다.
+## 3. 구체적 절차 (1분)
 
-**tiktoken으로 대체하지 않는 이유**: tiktoken은 OpenAI BPE이고 Claude 토크나이저가
-아니다. 한국어 비중이 높은 문서에서 둘의 차이는 작지 않아, 그 수를 "실측"이라 부르면
-보고서가 배제한 추정을 이름만 바꿔 되살리는 것이 된다. 그래서 스크립트는 키가 없으면
-**측정하지 않고 exit 2로 거부**한다.
-
-## 3. 구체적 절차
-
-세 단계이고 전부 합쳐 **2~3분**이다. API 호출 3회(문서 3종)라 비용은 무시할 수준이다.
-
-1. 저장소를 최신 main으로 맞추고 스크립트 실재를 확인한다 (약 20초)
-2. 키 자가검증 — 등록된 키가 온전한지 본다 (약 5초, 키 값은 출력하지 않는다)
-3. 측정 실행 — 표와 JSON이 나온다 (약 30초)
+1. WhyMath 저장소를 연 Claude Code 세션에서 `/context`를 입력한다. 명령어 한 줄뿐이고
+   API 키가 필요 없다.
+2. 표가 나온다. 항목은 System prompt, System tools, Memory files, Messages 등이다.
+3. 출력 전문을 복사해 세션에 회신한다. 세션이 수치를 `metrics/constitution_tokens.json`에
+   기록한다.
 
 ## 4. 성공 기준
 
-- **성공**: `합계(측정분만) NN,NNN 토큰` 줄이 나오고 `metrics/constitution_tokens.json`이 생긴다
-- **실패 A**: `ANTHROPIC_API_KEY 없음` → 키가 현재 셸에 없다. 5-A 참조
-- **실패 B**: `미측정 N건` 이 표시됨 → 합계는 **하한**이다. 사유 문자열을 그대로 회신
-- **실패 C**: `anthropic SDK 없음` → 5-B 참조
+- **성공**: `Memory files` 항목 아래에 `CLAUDE.md`의 토큰 수가 따로 나온다.
+- **부분 성공**: Memory files가 합계로만 나온다. 수치는 그대로 쓰되 "파일별 분리 불가"를
+  증거에 적는다.
+- **실패**: `/context`가 알 수 없는 명령이라고 나온다. Claude Code 버전이 낮다는 뜻이다.
+  출력 전문을 보내 주면 세션이 대안을 찾는다.
 
 ## 5. 실행 환경
 
-Windows PowerShell (= Phaiakes9 그 자체 · SSH 불요). 작업 디렉터리는
-`C:\Users\kiki\Desktop\__AI\WhyMath`. Docker·서버 가동 불요 — 파일만 읽는다.
+Claude Code 세션이면 어디서든 된다(웹 claude.ai/code, 데스크톱 앱, Phaiakes9 터미널).
+Claude Max 구독 로그인 상태면 된다. **이 측정을 요청한 세션 안에서 바로 입력하는 것이
+가장 간단하다.**
 
-## 6. 창 구분
-
-**새 창 1개**로 끝난다. 장기 점유 프로세스가 없으므로 이후 조작 제한도 없다.
-
----
-
-## 실행 블록
-
-### 블록 1 — 저장소 동기화 + 자가검증
-
-이 클론은 여러 세션이 공유하는 단일 작업 사본이라, 다른 세션이 브랜치를 전환해 뒀을
-수 있다. 그래서 **기대 상태를 눈으로 확인**하는 줄을 함께 둔다.
+Phaiakes9 터미널에서 할 때는 아래처럼 연다.
 
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 git fetch origin main
 git checkout -B harn121-token-measure origin/main
 git log -1 --oneline
-Test-Path scripts\ops\measure_constitution_tokens.py
+claude
 ```
 
-> 확인: 마지막 두 줄이 **커밋 1줄**과 **True**를 내야 합니다. `False`가 나오면 이
-> 스크립트가 아직 main에 없다는 뜻이니 중단하고 알려 주세요 (그대로 진행하면 3단계가
-> "파일 없음"으로 끝납니다).
+`claude`가 뜨면 프롬프트에 `/context`를 입력한다. `git log` 줄이 최신 main 해시인지
+눈으로 확인한다. 트리가 다르면 CLAUDE.md 크기가 달라 수치가 바뀐다.
 
-### 블록 2 — 키 자가검증 (키 값은 출력하지 않습니다)
+## 6. 창 구분
 
-```powershell
-$k = $env:ANTHROPIC_API_KEY
-if (-not $k) { "KEY=없음 — 이 창에 키가 설정되지 않았습니다 (5-A 참조)" } else { "KEY=있음 · 길이 $($k.Length) · 생략문자포함 $($k.Contains([char]0x2026))" }
-```
+기존 Claude Code 세션이면 새 창이 필요 없다. 터미널 경로는 **새 PowerShell 창 1개**를 쓴다.
+`claude`가 그 창을 차지하므로 측정이 끝나면 `/exit`로 나온다.
 
-> 확인: `KEY=있음`이고 **길이가 100자 이상**, **생략문자포함 False**여야 합니다.
-> `True`가 나오면 자리표시자(`sk-ant-…` 형태)가 그대로 등록된 것이라 측정이 인증
-> 실패로 끝납니다 — 그 경우 실제 키 전체로 다시 등록해 주세요.
+## 알려진 한계
 
-### 블록 3 — 측정
-
-블록 2가 `KEY=있음`이고 생략문자포함 `False`일 때만 붙여넣으세요. 이 블록은 그것을
-**스스로 다시 확인하고 아니면 거부**합니다.
-
-```powershell
-$k = $env:ANTHROPIC_API_KEY
-$ok = ($k) -and ($k.Length -ge 100) -and (-not $k.Contains([char]0x2026))
-$env:PYTHONUTF8 = "1"
-if ($ok) { python -m pip install -q anthropic; python scripts\ops\measure_constitution_tokens.py --out metrics\constitution_tokens.json } else { "MEASURE_REFUSED=True — 키가 없거나 자리표시자입니다. 블록 2 결과를 확인하세요." }
-```
-
-## 회신해 주실 것
-
-블록 3의 출력 전문(표 + 합계 줄)을 그대로 붙여 주세요. `미측정` 줄이 있으면 그 사유
-문자열도 함께 주세요 — 그것이 다음 조치를 정합니다.
-
-## 실패 시 대처
-
-**5-A · 키가 없을 때**: 이 창에만 임시로 넣는 방법입니다(영구 등록 아님). 블록이
-입력 줄에서 멈추면 키 전체를 붙여넣고 Enter를 누르세요 — 화면에는 `*`로만 보입니다.
-
-```powershell
-$s = Read-Host "Anthropic 키 전체를 붙여넣고 Enter" -AsSecureString
-$env:ANTHROPIC_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
-Remove-Variable s
-"KEY 길이 $($env:ANTHROPIC_API_KEY.Length) — 100 이상이어야 정상 (0이면 붙여넣기 실패)"
-```
-
-> 넣은 뒤 블록 2를 다시 돌려 `생략문자포함 False`를 확인하고 블록 3으로 가세요.
-
-**`PYTHONUTF8` 줄이 있는 이유 (HARN-169)**: 한국어 Windows에서 파이프로 연결된 파이썬
-출력은 cp949가 되어, 스크립트가 내부에서 부르는 브리핑이 `—`·`⚠` 문자에서 죽고
-`SessionStart 브리핑 미측정 — 브리핑 exit 1`로 끝났다(합계가 하한이 되는 실패 B).
-스크립트 자신도 이제 자식 프로세스에 UTF-8을 강제하지만, 이 줄은 그 수정이 들어가기
-전 체크아웃에서도 같은 결과를 내게 하는 이중 안전장치다.
-
-**5-B · SDK가 없을 때**: 블록 3이 이미 `python -m pip install -q anthropic`을 포함합니다.
-그래도 실패하면 콘다 base와 `.venv`가 섞였을 수 있으니 출력 전문을 보내 주세요.
+- **AGENTS.md는 잡히지 않는다.** Claude Code는 AGENTS.md를 읽지 않는다(Codex 등 다른
+  에이전트용). 이 수치는 API 재개 뒤 스크립트로 보강하거나, 판정에 제외 사유를 적는다.
+- **SessionStart 브리핑이 따로 안 나올 수 있다.** 훅 출력은 Messages에 합산된다. 파일별로
+  나뉘지 않으면 그 사실을 증거에 남긴다.
