@@ -169,6 +169,7 @@ CLI: `python -m whymath_backend.ops.loop_kpi_gate --since-hours 24` · **EXIT=2*
 - **끊긴 지점**: `learning_session` writer 0건 · `user_state_snapshot` writer 0건 · `evidence_event`에 학습자 조인 키 부재(`session_id`가 uuid4 placeholder).
 - **남은 작업량**: 세션 writer 배선 1건(중) + `evidence_event` 조인 키 도입 1건(중, 마이그레이션 동반). **대략 2~4 작업일**. KPI 게이트는 원천 대장이 `PRODUCED`로 바뀌면 **스스로 `unmeasured`를 벗도록** 이미 설계돼 있어 게이트 쪽 추가 작업은 없다.
 - **11월 영향**: ①⑤가 없으면 G4에서 "루프 완주율"과 "역추적률"을 보고할 수 없다. G4 이전에 해소돼야 한다.
+- **정정(2026-09-24 · MEMORY 같은 날 결정 로그)**: ⓐ 위 "세션 writer 배선"은 2026-07-29 `S3-16` acceptance ③의 "learning_session 행 writer 영구 미신설" 결정과 충돌했다 — 이 판정문은 그 결정을 인용하지 않았다. Kiki 승인으로 ③ 중 **세션 행 부분만 번복**됐다(점수 미신설은 유지). ⓑ "`evidence_event` 조인 키 도입(마이그레이션 동반)"은 `user_id` 컬럼 추가가 아니라 placeholder `session_id`를 실 세션으로 바꾸는 방식으로 정정한다(PED-03·REC-03의 user_id 비보유 설계 유지). ⓒ 같은 원인이 파일럿 KPI2 재방문율·`surrogate_baseline_report` ③도 막고 있었다. ⓓ 소유자 = `EOS-131`(①) · `EOS-132`(⑤ LearnerState hop · `user_state_snapshot` 대신 추천 meta 근거) · `ARCH-51` ⑤(폐기 선행 조건).
 
 ### 6-3. 판정 하네스 CI 미배선 (§5)
 
