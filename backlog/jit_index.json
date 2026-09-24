@@ -2916,6 +2916,24 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
+   "text": "backlog add 출력을 head -3로 잘라 BrokenPipe exit 1 — 등록 거부로 오독",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
+   "text": "번호 확인용 backlog add가 실제 태스크를 2회 생성 (제목 x·t)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
