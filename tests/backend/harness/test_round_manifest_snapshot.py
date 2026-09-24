@@ -514,6 +514,8 @@ class TestLegacyRowCompatibility:
             "canary_lower_bound",
             "canary_blocked",
             "canary_advisory",
+            "canary_basis",
+            "canary_attempts",
             "aborted",
             "abort_reason",
         ):
