@@ -658,9 +658,10 @@ class RoundRecord(BaseModel):
     canary_basis: str | None = Field(
         default=None,
         description=(
-            "카나리 표본 기준(MP-02 재회차) — `attempts`=앞머리 시도 canary_size건, `judged`=중복을 "
-            "뺀 판정 대상이 canary_size건 모일 때까지. 같은 `canary_rate`라도 기준에 따라 뜻이 "
-            "달라진다. None=이 필드 이전 회차(미기록 — 소급 추정 금지)."
+            "카나리 표본 기준(MP-02 재회차) — `attempts`=앞머리 시도 canary_size건, "
+            "`judged`=중복을 뺀 판정 대상이 canary_size건 모일 때까지. "
+            "같은 `canary_rate`라도 기준에 따라 뜻이 달라진다. "
+            "None=이 필드 이전 회차(미기록 — 소급 추정 금지)."
         ),
     )
     canary_attempts: int | None = Field(
@@ -668,8 +669,8 @@ class RoundRecord(BaseModel):
         ge=0,
         description=(
             "카나리 판정 시점까지 소비한 **시도 수**. attempts 기준이면 canary_size와 같고 judged "
-            "기준이면 중복만큼 크다 — 검수 구간을 자를 때 이 값이 카나리의 실제 경계다. "
-            "판정이 없었으면 None."
+            "기준이면 중복만큼 크다 — 검수 구간을 자를 때 이 값이 카나리의 실제 "
+            "경계다. 판정이 없었으면 None."
         ),
     )
     aborted: bool | None = Field(
