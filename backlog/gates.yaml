@@ -582,8 +582,9 @@ gates:
     corrections:
       - "[2026-09-22] remind_after_days: 40 → 14 — Kiki 지시 1(2026-09-22 — 가능한 한 일정을 앞당긴다) 반영. 이 게이트는 P3-00~P3-14 14건 전부를 selector 후보에서 막는 단일 병목인데, 독촉일이 2026-11-01(Week 1 상한과 같은 날)이라 첫 자동 환기가 Week 1이 끝났어야 할 날에야 온다. 재판정은 구현 세션과 분리된 판정 세션의 일이므로 환기가 늦으면 그만큼 통째로 밀린다. 14일 = 독촉 2026-10-06."
       - "[2026-09-25] depends_on +EOS-130-phase2-gate2-rejudgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: Gate 2 재판정 태스크가 이 게이트의 증거를 만든다(acceptance v2-9 지정) — EOS-130의 선행에 EOS-21·EOS-24·EOS-124가 걸려 있어 대기 경로가 FAIL 원인 두 축까지 이어진다"
+      - "[2026-09-25] depends_on -EOS-130-phase2-gate2-rejudgment · depends_on +EOS-141-phase2-gate2-third-rejudgment — 해소 태스크 재지정 EOS-130 → EOS-141. EOS-130은 PR #1323에서 2차 판정(FAIL · 미충족 1축)을 마쳐 done이 됐고, 이 게이트의 증거를 낼 다음 판정은 3차 재판정 EOS-141이다. done인 EOS-130을 입력으로 남기면 그래프가 '입력 전부 완료 · 결정 대기'로 읽어 실제로는 다음 판정을 기다리는 상태를 가린다."
     depends_on:
-      - EOS-130-phase2-gate2-rejudgment
+      - EOS-141-phase2-gate2-third-rejudgment
   - id: G-p3-g1-week1
     title: "P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다"
     kind: decision
