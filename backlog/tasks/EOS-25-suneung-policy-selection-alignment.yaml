@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-25-suneung-policy-selection-alignment
+title: "수능 모드 추천도 정책 축·선택 축이 어긋난다 — EOS-124 정렬을 수능 정책에 적용할지 판정·집행"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 실재 확인(EOS-124 ⑥ 조사 결과 승계 · 판정 기준 main bbd7c382) — 수능 모드 정책(api/_next_problem_policy.py::SuneungRecommendationPolicy)은 EOS-124 이전 기본 CAT과 같은 구조다: 근거를 L6 게이팅·IRT로 고른 문항의 대표 개념 숙달에서 사후 계산하고, 목표 개념은 resolve_target_concept(측정된 선수 중 최저 숙달 — 숙달 1.0이어도 고른다)로 따로 계산한다. 그래서 EOS-124의 두 형태가 이 경로에 그대로 남아 있다: (가) 숙달 > 0.7 개념 문항에 advance_next + target=그 개념 (나) 선수 숙달 1.0인데 practice_prerequisite + target=그 선수. 추가로 선수가 미측정이면 practice_prerequisite + target=문항 개념(관계 행위가 제자리를 가리킴 — check_intent_alignment R3 위반 형태). 착수 시 이 셋을 주입 테스트로 먼저 재현한다.\n\n② 정렬 적용 — 기본 CAT이 EOS-124에서 채택한 구조(1차 선택 → 앵커 → resolve_policy_intent → 정렬 재선택 → 정직 강등)를 수능 정책에 적용할지, 수능 모드 고유 판정(L6 게이팅·persona_fit·수능 우선순위 가중과 재선택의 상호작용)이 필요한지 먼저 판정한다. 특히 재선택 후보에도 is_suneung_eligible 게이팅이 똑같이 걸려야 한다 — 기본 CAT의 load_target_candidate_rows는 수능 게이트를 모른다.\n\n③ 집행 — 수능 정책 산출이 intent_resolution을 채우면 NextProblemOutcome._aligned_when_declared가 자동으로 정렬을 검증한다(현재는 None이라 면제). 착지 조건 = 수능 정책 산출의 intent_resolution이 None이 아니게 되고 응답·처치 기록에 실린다.\n\n④ 회귀 동결 — tests/backend/api/test_me.py의 수능 응답 키 집합·후보 0 응답(intent_resolution None 단언)이 이 태스크 착지 시 실패해야 한다 — 올바른 값 단언으로 승격한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/_next_problem_policy.py
+  - src/backend/whymath_backend/l2/recommendation_policy.py
+session: null
+notes: "출처: EOS-124 acceptance ⑥(\"수능 모드 정책은 별도 판정이 필요하므로 함께 바꾸지 않는다 — 같은 결함이 그쪽에도 있는지 조사만 하고 적는다\")의 조사 결과. 결함은 있다(acceptance ① 참조). 고치지 않고 분리한 이유 = 수능 정책의 재선택은 L6 게이팅(is_suneung_eligible)·수능 우선순위 가중과 얽혀 기본 CAT과 같은 SQL 후보 조회를 쓸 수 없고, 그 설계 판정은 EOS-124 범위 밖이다. 그동안 수능 응답은 intent_resolution=null로 \"정렬 미적용\"을 정직하게 드러낸다."
+updated: 2026-09-25

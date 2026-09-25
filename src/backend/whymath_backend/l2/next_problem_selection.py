@@ -11,12 +11,17 @@
 candidate_pool_conditions`처럼 기존 경로로 참조하던 소비처(`ops/repeat_recommendation_report.py`·
 테스트)는 손댈 필요가 없다.
 
+**예외 — EOS-124 신규분**: 파일 끝의 정렬 선택 조회 2종(`load_direct_successors`·
+`load_target_candidate_rows`)은 이동분이 아니라 **새로 만든 것**이다. 정책이 다른 개념(막힌
+선수·다음 개념)을 가리켰을 때만 돌고, 위 이동분의 쿼리 모양·순서는 건드리지 않는다.
+
 계층: `l2`. `db.models`·`schema`만 import한다(L3 이상 0건 — import-linter 계약 "EOS Core →
 Math Adapter 금지"·"데이터 접근 금지"의 source_modules에 `l2`는 없다).
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 from dataclasses import dataclass
@@ -27,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
-from whymath_backend.db.models.concept import ProblemConcept
+from whymath_backend.db.models.concept import Concept, ConceptEdge, ProblemConcept
 from whymath_backend.db.models.problem import Problem, ProblemRelation
 from whymath_backend.l2.ability_estimation import (
     _DIFFICULTY_MIDPOINT,
@@ -35,7 +40,7 @@ from whymath_backend.l2.ability_estimation import (
     resolve_item_difficulty_b,
 )
 from whymath_backend.l2.irt import IrtItem, ability_standard_error, estimate_ability
-from whymath_backend.schema.enums import ASSESSED_ROLES, ReviewStatus
+from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole, EdgeType, ReviewStatus
 from whymath_backend.schema.problem import METADATA_ONLY_SOURCES
 
 #: 후보 풀 한 행 — `(problem_id, difficulty_overall, irt_difficulty_b)`.
@@ -63,7 +68,15 @@ __all__ = [
     "load_weak_concept_weights",
     "last_incorrect_problem_id",
     "sibling_weights",
+    "SuccessorRow",
+    "TargetCandidateRow",
+    "build_direct_successors_stmt",
+    "build_target_candidate_stmt",
+    "load_direct_successors",
+    "load_target_candidate_rows",
 ]
+
+_logger = logging.getLogger("whymath.l2.next_problem_selection")
 
 # ── 정책 상수 (이동 전 `api/me.py`의 `_CANDIDATE_POOL_SIZE`·`_TARGET_SE` 등과 같은 값) ──
 CANDIDATE_POOL_SIZE = 50  # θ 근방 후보 풀 크기(SQL로 거리순 선별 후 파이썬 정보량 비교)
@@ -405,4 +418,161 @@ def candidate_items(candidate_rows: list[CandidateRow]) -> list[IrtItem]:
     return [
         IrtItem(difficulty=irt_b if irt_b is not None else difficulty_to_logit(d))
         for _pid, d, irt_b in candidate_rows
+    ]
+
+
+# ── EOS-124: 정책 의도에 맞춘 **정렬 선택**의 조회 2종 ─────────────────────────────────────
+# 기본 CAT의 1차 선택(위 후보 풀 + 정보량 최대)은 그대로 두고, 정책이 *다른 개념*(막힌 선수·다음
+# 개념)을 가리켰을 때만 이 두 조회가 추가로 돈다. 1차 선택의 쿼리 모양·순서는 바뀌지 않는다.
+
+#: 목표 개념 후보 한 행 — `CandidateRow` + **그 행을 목표에 묶은 개념**(PRIMARY 매핑).
+#: 개념 열이 필요한 이유: 여러 목표 개념의 후보를 한 번에 읽고 우선순위 순으로 나눠 고르기 때문이다.
+TargetCandidateRow = tuple[uuid.UUID, float, float | None, uuid.UUID]
+
+
+@dataclass(frozen=True, slots=True)
+class SuccessorRow:
+    """직접 후행 개념 1건 — `concept_edge`(from==앵커·PREREQUISITE)의 `to` 쪽.
+
+    `concept_code`는 학습자 상태의 숙달 키(개념코드)와 맞추려고 함께 읽는다(`concept` 내부
+    조인이라 NOT NULL 컬럼 값이 항상 있다). 숙달 키에 없으면 호출부는 **미측정**으로 다룬다.
+    """
+
+    concept_id: uuid.UUID
+    concept_code: str
+
+
+def build_direct_successors_stmt(
+    concept_id: uuid.UUID, *, limit: int
+) -> Select[tuple[uuid.UUID, str]]:
+    """앵커의 **직접** 후행(1-hop) SELECT — `from_concept_id == 앵커`인 PREREQUISITE 엣지의 `to`.
+
+    `fetch_prerequisites`(to==C → from)와 방향만 반대다. 재귀하지 않는 이유: "다음 개념"은 앵커를
+    선수로 삼는 바로 다음 개념이지 그 다음의 다음이 아니다(전진은 한 칸이다). `limit`은 호출부가
+    `limit+1`을 넘겨 **초과를 탐지**하는 데 쓴다(침묵 절단 금지 — `load_direct_successors` 참조).
+    """
+    return (
+        select(ConceptEdge.to_concept_id, Concept.code)
+        .join(Concept, Concept.concept_id == ConceptEdge.to_concept_id)
+        .where(
+            ConceptEdge.from_concept_id == concept_id,
+            ConceptEdge.edge_type == EdgeType.PREREQUISITE.value,
+        )
+        .order_by(ConceptEdge.to_concept_id)
+        .limit(limit)
+    )
+
+
+async def load_direct_successors(
+    session: AsyncSession, concept_id: uuid.UUID, *, max_nodes: int
+) -> list[SuccessorRow]:
+    """앵커의 직접 후행 개념들 — hub 개념의 fan-out은 `max_nodes`로 자르고 **로그를 남긴다**.
+
+    `max_nodes`는 정책의 그래프 예산(`ConceptGraphBudget.max_nodes`, 천장 20)을 그대로 받는다.
+    한 행 더 읽어(`max_nodes+1`) 초과 여부를 판정하므로, 잘렸다는 사실이 조용히 사라지지 않는다.
+    같은 후행이 엣지 중복으로 두 번 나오면 한 번만 센다(visited — DAG diamond와 같은 규율).
+    """
+    rows = (
+        await session.execute(build_direct_successors_stmt(concept_id, limit=max_nodes + 1))
+    ).all()
+    seen: set[uuid.UUID] = set()
+    result: list[SuccessorRow] = []
+    for to_id, code in rows:
+        if to_id == concept_id or to_id in seen:
+            continue
+        seen.add(to_id)
+        result.append(SuccessorRow(concept_id=to_id, concept_code=code))
+    if len(result) > max_nodes:
+        _logger.warning(
+            "후행 개념 노드 예산 초과 — 앵커 %s의 후행 %d개 이상 중 %d개만 유지",
+            concept_id,
+            len(result),
+            max_nodes,
+        )
+        result = result[:max_nodes]
+    return result
+
+
+def build_target_candidate_stmt(
+    theta: float,
+    *,
+    concept_ids: list[uuid.UUID],
+    attempted_ids: set[uuid.UUID],
+    excluded_ids: set[uuid.UUID],
+) -> Select[Any]:
+    """목표 개념(들)의 후보 SELECT — **기본 후보 풀과 같은 게이트·같은 정렬**, 개념별 상한만 다르다.
+
+    같은 것: 노출 게이트 3축(`candidate_pool_conditions`)·미응답·형제 배제·θ 근방 정렬
+    (`candidate_pool_order_by`). 1차 선택과 게이트가 갈라지면 정렬 선택이 *1차 선택이 막는 문항*
+    (저작권·미검수)을 꺼내 올 수 있다 — 그래서 같은 함수를 재사용한다(REC-06 단일 정의 원칙).
+
+    다른 것 둘:
+      ① 대표 개념(`PRIMARY`) 매핑이 목표 개념인 문항만. TESTED 폴백을 쓰지 않는 이유 — 이
+         문항이 "그 개념의 문항"이라고 설명에 적으려면 그 개념이 문항의 *주된* 개념이어야 한다.
+         PRIMARY=X·TESTED=P인 문항을 P의 연습으로 부르면 설명이 콘텐츠와 다시 어긋난다.
+      ② 상한이 **개념마다** `CANDIDATE_POOL_SIZE`다(윈도 함수). 전체에 한 번 limit을 걸면 θ에
+         가까운 개념이 풀을 다 채워 우선순위가 높은 개념(가장 약한 선수)의 문항이 잘려 나간다.
+    """
+    distance = candidate_pool_order_by(theta)
+    rank = (
+        func.row_number()
+        .over(partition_by=ProblemConcept.concept_id, order_by=list(distance))
+        .label("rank")
+    )
+    inner = (
+        select(
+            Problem.problem_id,
+            Problem.difficulty_overall,
+            Problem.irt_difficulty_b,
+            ProblemConcept.concept_id,
+            rank,
+        )
+        .join(ProblemConcept, ProblemConcept.problem_id == Problem.problem_id)
+        .where(
+            *candidate_pool_conditions(),
+            ProblemConcept.role == ConceptRole.PRIMARY,
+            ProblemConcept.concept_id.in_(concept_ids),
+        )
+    )
+    if attempted_ids:
+        inner = inner.where(Problem.problem_id.notin_(attempted_ids))
+    if excluded_ids:
+        inner = inner.where(Problem.problem_id.notin_(excluded_ids))
+    ranked = inner.subquery("target_candidates")
+    return (
+        select(
+            ranked.c.problem_id,
+            ranked.c.difficulty_overall,
+            ranked.c.irt_difficulty_b,
+            ranked.c.concept_id,
+        )
+        .where(ranked.c.rank <= CANDIDATE_POOL_SIZE)
+        .order_by(ranked.c.concept_id, ranked.c.rank)
+    )
+
+
+async def load_target_candidate_rows(
+    session: AsyncSession,
+    theta: float,
+    *,
+    concept_ids: list[uuid.UUID],
+    attempted_ids: set[uuid.UUID],
+    excluded_ids: set[uuid.UUID],
+) -> list[TargetCandidateRow]:
+    """목표 개념 후보 조회 → `(problem_id, difficulty_overall, irt_difficulty_b, concept_id)`.
+
+    목표가 비면 조회하지 않는다(0건). `difficulty_overall`의 비-optional 근거는
+    `load_candidate_rows`와 같다(같은 게이트 함수가 `IS NOT NULL`을 건다).
+    """
+    if not concept_ids:
+        return []
+    stmt = build_target_candidate_stmt(
+        theta,
+        concept_ids=concept_ids,
+        attempted_ids=attempted_ids,
+        excluded_ids=excluded_ids,
+    )
+    return [
+        (pid, float(difficulty), irt_b, cid)
+        for pid, difficulty, irt_b, cid in (await session.execute(stmt)).all()
     ]

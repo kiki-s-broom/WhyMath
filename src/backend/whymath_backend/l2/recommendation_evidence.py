@@ -89,11 +89,18 @@ META_KEY_GATE_REASON: str = "gate_reason"
 META_KEY_CANDIDATES: str = "candidates"
 META_KEY_POLICY_VERSION: str = "policy_version"
 META_KEY_REASON: str = "reason"
+#: EOS-124 — 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(`IntentResolution` 값 문자열). 이 키가
+#: 있어야 "정렬 재선택이 실제로 일한 비율"(served / 전체)을 사후에 셀 수 있다. 정렬을 적용하지
+#: 않는 정책(수능)은 이 키를 넣지 않는다 — "없음"과 "null로 기록됨"을 구분한다.
+META_KEY_INTENT_RESOLUTION: str = "intent_resolution"
 
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
-POLICY_VERSION_CAT: str = "cat_v1"
+#: `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
+#: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
+#: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
+POLICY_VERSION_CAT: str = "cat_v2"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v1"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
@@ -126,6 +133,7 @@ async def record_recommendation_treatment(
     candidates: list[tuple[uuid.UUID, float]] | None = None,
     policy_version: str | None = None,
     reason: RecommendationReason | None = None,
+    intent_resolution: str | None = None,
     occurred_at: datetime | None = None,
     learning_session_id: uuid.UUID | None = None,
 ) -> EvidenceEvent:
@@ -153,6 +161,10 @@ async def record_recommendation_treatment(
     `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
     (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
 
+    `intent_resolution`(EOS-124): 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(`l2.
+    recommendation_policy.IntentResolution` 값). `l2.recommendation_policy`를 import하지 않고
+    문자열로 받는 이유는 순환 참조다(그쪽이 이 모듈의 `POLICY_VERSION_CAT`을 import한다).
+
     `learning_session_id`(EOS-131): 이 추천이 나간 실 학습 세션. `None`이면 세션 기록 실패
     경로로 보고 결합 불가 placeholder를 발급한다(모듈 docstring 참조 — 가짜 결합 금지).
     """
@@ -176,6 +188,8 @@ async def record_recommendation_treatment(
         meta[META_KEY_POLICY_VERSION] = policy_version
     if reason is not None:
         meta[META_KEY_REASON] = reason.model_dump(mode="json")
+    if intent_resolution is not None:
+        meta[META_KEY_INTENT_RESOLUTION] = intent_resolution
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
@@ -197,6 +211,7 @@ __all__ = [
     "META_KEY_APPLIED_WEIGHTS",
     "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
+    "META_KEY_INTENT_RESOLUTION",
     "META_KEY_MODE",
     "META_KEY_POLICY_VERSION",
     "META_KEY_POOL_SIZE",

@@ -48,6 +48,9 @@
 - **교체 가능성을 타입으로 표현한다.** `RecommendationPolicy` Protocol은 `learner_state`와
   `learning_context`만 받는다 — v1 내부가 if/else 규칙이어도, BKT를 DKT로 갈거나 bandit을
   얹어도 이 시그니처는 그대로다.
+- **설명은 콘텐츠와 어긋나지 않는다**(EOS-124). `target_concept`은 전달된 문항의 대표 개념이고,
+  관계 행위(선수 복귀·전진)는 앵커와 *다른* 개념을 가리킨다 — `check_intent_alignment`가 구조를
+  판정한다. 관계 행위를 실을 수 없으면 `demote_to_current_concept`로 정직하게 내린다.
 - **선택 알고리즘을 여기서 재구현하지 않는다**(acceptance ④·⑥). 후보 선별·가중·정보량 최대
   선택은 기존 좌석(`l2.irt.select_weighted_item`·`l6.suneung.recommend_suneung_index`)이
   유일 권위이고, 이 모듈은 *이미 선택된 결과*에 근거를 붙인다. 그래서 계약 도입이 추천 결과를
@@ -82,7 +85,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "PREREQUISITE_MASTERY_CEILING",
+    "RELATIONAL_ACTIONS",
     "WEAK_CONCEPT_MASTERY_CEILING",
+    "IntentAlignmentError",
     "LearnerStateT",
     "LearningContext",
     "Recommendation",
@@ -93,6 +98,8 @@ __all__ = [
     "ReasonType",
     "action_for",
     "build_reason",
+    "check_intent_alignment",
+    "demote_to_current_concept",
     "no_candidate_reason",
     "select_reason_type",
 ]
@@ -120,7 +127,15 @@ class ReasonType(str, Enum):
     """숙달이 선수 경계 미만 — 현재 개념을 더 밀기 전에 막힌 선수개념을 푼다."""
 
     CURRENT_CONCEPT = "current_concept"
-    """숙달이 학습 구간 — 같은 개념을 계속 연습한다."""
+    """같은 개념을 계속 연습한다 — 숙달이 학습 구간이거나(§8 규칙), **정직 강등**이다.
+
+    정직 강등(EOS-124): 숙달 구간은 선수 복귀·전진을 가리켰으나 그 행위를 실제 문항으로
+    실어 줄 수 없을 때(그래프 근거가 없거나 반증됐거나, 목표 개념에 출제 가능한 문항이
+    없을 때) 전달되는 것은 앵커 개념 자신의 문항이다. 그때 행위를 "선수를 연습하라"·
+    "다음으로 넘어가라"로 적으면 설명이 콘텐츠와 어긋난다 — 그래서 이 값으로 내린다.
+    `mastery`는 실측값 그대로 실리므로(0.4~0.7 밖일 수 있다) 숨기는 것은 없고, 어느 경우인지는
+    정책 관측 메타(`intent_resolution`)가 따로 말한다.
+    """
 
     NEXT_CONCEPT = "next_concept"
     """숙달이 약점 컷 초과 — 다음 개념으로 넘어갈 수 있다."""
@@ -259,9 +274,12 @@ class Recommendation(BaseModel):
     target_concept: uuid.UUID | None = Field(
         default=None,
         description=(
-            "학생이 **다음에 다뤄야 할 개념**. `reason.concept_id`(선택된 문항의 대표 개념)와 "
-            "다르다: 선수개념이 막혔으면(`PREREQUISITE_GAP`) 이 값은 *막힌 선수개념*이고 "
-            "문항의 개념이 아니다. 근거를 댈 개념 자체가 없으면(미매핑·후보 0) None."
+            "학생이 **다음에 다뤄야 할 개념**. `reason.concept_id`(행위의 근거가 된 *앵커* "
+            "개념)와 다를 수 있다: 선수 복귀(`PRACTICE_PREREQUISITE`)면 막힌 선수개념, 전진"
+            "(`ADVANCE_NEXT`)이면 다음 개념이다. 근거를 댈 개념 자체가 없으면(미매핑·후보 0) "
+            "None. 정렬 계약(EOS-124 · `check_intent_alignment`)을 따르는 정책에서는 이 값이 "
+            "**전달된 문항의 대표 개념과 같다** — 설명이 가리키는 개념과 받은 문항이 어긋나지 "
+            "않는다."
         ),
     )
     policy_version: str | None = Field(
@@ -400,3 +418,93 @@ def no_candidate_reason() -> RecommendationReason:
         confidence=0.0,
         basis=ReasonBasis.NO_CANDIDATE_POOL,
     )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# EOS-124 — 정책 축(action·target)과 선택 축(problem_id)의 정렬 계약
+# ────────────────────────────────────────────────────────────────────────────
+#: **관계 행위** — 앵커 개념이 아닌 *다른 개념*을 가리키는 행위(선수로 내려가라·다음으로 넘어가라).
+#: 나머지(연습·진단)는 앵커 개념 자신을 다룬다. 정렬 계약은 이 구분 위에 선다: 관계 행위면 목표가
+#: 앵커와 달라야 하고, 비관계 행위면 같아야 한다.
+RELATIONAL_ACTIONS: Final = frozenset(
+    {RecommendationAction.PRACTICE_PREREQUISITE, RecommendationAction.ADVANCE_NEXT}
+)
+
+
+class IntentAlignmentError(ValueError):
+    """정책 축과 선택 축이 어긋난 추천 — **만들어지지 않아야 하는** 상태(구성 결함)."""
+
+
+def check_intent_alignment(
+    *,
+    problem_id: uuid.UUID | None,
+    action: RecommendationAction,
+    reason_concept_id: uuid.UUID | None,
+    target_concept: uuid.UUID | None,
+    delivered_concept: uuid.UUID | None,
+) -> None:
+    """설명(action·target)이 **전달된 콘텐츠**(problem_id)와 어긋나지 않는지 판정한다(순수).
+
+    EOS-124 실측(main `433ec9ea`): 기본 CAT은 문항을 IRT로 고른 뒤 그 문항의 개념 숙달로 행위를
+    붙였다. 그래서 숙달 0.98 개념의 문항에 `advance_next`가 붙었고(전진을 선언하면서 전진하지
+    않는다), 선수 숙달 1.0인데도 원래 개념 문항에 `practice_prerequisite`가 붙었다(설명이 낡음).
+    이 함수가 막는 것은 그 두 형태의 *일반형*이다.
+
+    규칙 네 개(위반 시 `IntentAlignmentError` — 어느 규칙인지 메시지가 지목한다):
+      R1 추천이 없으면(`problem_id=None`) 행위는 `NONE`이고 목표도 없다.
+      R2 추천이 있으면 목표 = **전달 문항의 대표 개념**(`delivered_concept`, 미매핑이면 None).
+         설명이 가리키는 개념과 학생이 받은 문항이 같은 개념이어야 한다는 것이 이 계약의 핵심이다.
+      R3 관계 행위(`RELATIONAL_ACTIONS`)면 앵커·목표가 모두 있고 **서로 다르다** — 같은 개념을
+         가리키면서 "선수로 가라"·"다음으로 가라"고 말하는 것은 행위가 비어 있다는 뜻이다.
+      R4 비관계 행위(연습·진단)면 목표 = 앵커다(둘 다 None인 미매핑 포함).
+
+    **판정하지 않는 것**: 목표가 앵커의 *실제* 선수·후행인지(그래프 관계)는 이 함수가 보지 않는다
+    — DB가 필요하고, 그 관계는 정책이 그래프에서 목표를 *구성*하는 방식으로 보장된다. 이 함수는
+    구조(같다·다르다)만 본다. 그래서 "관계가 옳다"는 정책 테스트가, "구조가 옳다"는 이 함수가
+    각각 소유한다.
+    """
+    if problem_id is None:
+        if action is not RecommendationAction.NONE or target_concept is not None:
+            raise IntentAlignmentError(
+                f"R1 위반 — 추천이 없는데 action={action.value}·target={target_concept}이다."
+            )
+        return
+    if target_concept != delivered_concept:
+        raise IntentAlignmentError(
+            f"R2 위반 — target_concept({target_concept})이 전달 문항 {problem_id}의 대표 개념"
+            f"({delivered_concept})과 다르다. 설명이 가리키는 개념과 받은 문항이 어긋난다."
+        )
+    if action in RELATIONAL_ACTIONS:
+        if reason_concept_id is None or target_concept is None:
+            raise IntentAlignmentError(
+                f"R3 위반 — 관계 행위 {action.value}인데 앵커({reason_concept_id})나 "
+                f"목표({target_concept})가 없다."
+            )
+        if reason_concept_id == target_concept:
+            raise IntentAlignmentError(
+                f"R3 위반 — 관계 행위 {action.value}가 앵커와 같은 개념({target_concept})을 "
+                "가리킨다. 전진·선수 복귀를 선언하면서 제자리에 있다."
+            )
+        return
+    if target_concept != reason_concept_id:
+        raise IntentAlignmentError(
+            f"R4 위반 — 비관계 행위 {action.value}의 목표({target_concept})가 앵커"
+            f"({reason_concept_id})와 다르다."
+        )
+
+
+def demote_to_current_concept(reason: RecommendationReason) -> RecommendationReason:
+    """관계 행위를 실을 수 없을 때의 **정직 강등** — 같은 앵커·같은 실측으로 `CURRENT_CONCEPT`.
+
+    바꾸는 것은 `type` 하나뿐이다. 개념·숙달·신뢰도·basis를 그대로 두는 이유: 강등은 *무엇을
+    하라는가*를 전달된 콘텐츠에 맞추는 것이지 측정을 고치는 것이 아니다. 숙달 0.12가 0.12로
+    실려 나가므로 "학습 구간이라서 연습"으로 위장되지 않는다(`ReasonType.CURRENT_CONCEPT` 참조).
+
+    측정 근거가 없는 근거(미측정·미매핑·후보 없음)는 강등 대상이 아니다 — 그것들은 애초에 관계
+    행위를 낳지 않는다. 들어오면 `ValueError`다(조용히 통과시키면 호출부의 분기 결함이 가려진다).
+    """
+    if reason.basis is not ReasonBasis.MEASURED_MASTERY or reason.concept_id is None:
+        raise ValueError(
+            f"실측 근거만 강등할 수 있다 — basis={reason.basis.value}·concept={reason.concept_id}."
+        )
+    return reason.model_copy(update={"type": ReasonType.CURRENT_CONCEPT})

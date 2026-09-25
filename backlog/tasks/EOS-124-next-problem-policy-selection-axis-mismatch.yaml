@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/l2/next_problem_selection.py
-session: null
+session: claude/sweet-rubin-fruij1
 notes: "출처: 2026-09-19 EOS-122(P-15 페르소나 3종 완주) 실행 중 실측 발견. 고치지 않고 등재만 한 이유 = 집행 지시문 P-15의 범위 규율(\"발견한 결함은 고치되 범위를 넓히지 마라\")과, ③의 정본 선택이 추천 정책의 설계 판정이라 안정화 세션이 단독으로 정할 사안이 아니기 때문이다.\n\n판정 기준: main 433ec9ea. 실측 하네스 = tests/backend/api/test_e2e_persona_journeys.py (Persona A ⑤-b·⑥ · Persona B ⑧·⑧-b)."
-updated: 2026-09-19
+updated: 2026-09-25
