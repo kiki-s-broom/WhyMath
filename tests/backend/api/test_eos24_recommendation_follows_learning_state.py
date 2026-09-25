@@ -362,11 +362,13 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
             _W2._erase_learner(client)
             auth = _W2._login(client)
 
-            _submit_attempt(client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True})
+            _submit_attempt(
+                client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True}
+            )
             wrong = _W2._submit_wrong(client, auth, content.c_pids[1], _W2._WRONG_ANSWER)
-            assert (
-                wrong["learning_state"]["rule_id"] == "R3-wrong-misconception"
-            ), wrong["learning_state"]
+            assert wrong["learning_state"]["rule_id"] == "R3-wrong-misconception", wrong[
+                "learning_state"
+            ]
             right = _submit_attempt(
                 client, auth, {"problem_id": str(content.c_pids[2]), "is_correct": True}
             )
@@ -383,9 +385,9 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
                 f"읽는 R3 · EOS-138이 그 입력을 좁히면 이 전제가 바뀐다): {third['learning_state']}"
             )
             turns = asyncio.run(_active_hypothesis_turns(third["attempt_id"]))
-            assert turns == [expected_turns], (
-                f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
-            )
+            assert turns == [
+                expected_turns
+            ], f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
 
             rec = _next_problem(client, auth)
             assert rec["learning_state_directive"] == "weak_misconception_evidence", (
@@ -418,19 +420,23 @@ def test_fresh_evidence_after_earlier_attempts_is_still_applied() -> None:
             _W2._erase_learner(client)
             auth = _W2._login(client)
 
-            _submit_attempt(client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True})
+            _submit_attempt(
+                client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True}
+            )
             wrong = _W2._submit_wrong(client, auth, content.p_pids[0], _W2._WRONG_ANSWER)
-            assert (
-                wrong["learning_state"]["rule_id"] == "R3-wrong-misconception"
-            ), wrong["learning_state"]
+            assert wrong["learning_state"]["rule_id"] == "R3-wrong-misconception", wrong[
+                "learning_state"
+            ]
 
             rec = _next_problem(client, auth)
             assert rec["learning_state_directive"] == "applied", rec
             assert rec["reason"]["basis"] == "learning_state", rec
             assert rec["target_concept"] == str(content.p_concept), rec
-            assert rec["problem_id"] == str(content.p_pids[1]), (
-                f"교정 대상 개념 P의 미시도 문항이 아니다: {rec}"
+            assert rec["problem_id"] == str(
+                content.p_pids[1]
+            ), f"교정 대상 개념 P의 미시도 문항이 아니다: {rec}"
+            _step(
+                "fresh", f"앞선 정답 뒤 오개념 오답 → directive={rec['learning_state_directive']}"
             )
-            _step("fresh", f"앞선 정답 뒤 오개념 오답 → directive={rec['learning_state_directive']}")
     finally:
         content.teardown()
