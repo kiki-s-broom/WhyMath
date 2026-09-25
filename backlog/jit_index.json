@@ -3005,6 +3005,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "src/backend/whymath_backend/l2/learning_state_recommendation.py",
+    "tests/backend/api/test_e2e_three_consecutive_loops.py",
+    "tests/backend/api/test_eos24_recommendation_follows_learning_state.py"
+   ],
+   "text": "픽스처가 선수를 유일한 쉬운 개념으로 심어 'R6 진단=선수 진단'을 동작으로 오독 — Kiki 결정 전제 오류",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
