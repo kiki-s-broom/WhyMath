@@ -11165,3 +11165,24 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 4. **KPI ① 시각 축 = 서버 수신 시각**으로 통일하고 분자를 "첫 시도 이후 추천이 있는 세션", 분모를 "시도 1건 이상 세션"으로 재정의(시도 없는 세션 수는 `detail.sessions_without_attempt`로 별도 보고).
 
 **남긴 것**: `wh1_evaluation` ③ 세션 완주율은 서버 세션이 유휴 규칙으로 반드시 닫히므로 "닫힌 활동 묶음 비율"로 의미가 바뀐다 — 정의 재검토는 범위 밖(surrogate 주석에만 명시). KPI ⑤는 여전히 미측정(`EOS-132`).
+
+### 2026-09-25 — HARN-174 착지: 게이트를 태스크 그래프의 노드로 편입 (Kiki 결정 "②+③ 방향" 집행) — 판정 기준 main `ff7c9dcb`
+
+**배경**: 계열 `gate-resolution-path-unlinked` 3회(09-22 P3-00 게이트 경유 순환 · 09-23 EOS-50 통합 게이트 자기 전제 · 09-24 재판정문이 지목한 EOS-24·EOS-124 미연결)가 전부 사람 눈으로만 잡혔다. 게이트에 "여는 작업" 칸이 없었고 순환 검사·선택기가 태스크끼리만 봤다. Kiki가 2026-09-25에 칸+별도 검사기(①~⑧) 대신 그래프 편입(v2-1~v2-12)을 택했다.
+
+**집행된 것(코드)**
+- `Gate.depends_on`·`Gate.no_inputs_reason` — pending 게이트는 정확히 하나(validate). 빈 칸은 gates.yaml에 쓰지 않는다(통과 게이트 62건 무변경 — #1284 `corrections` 도입 때 인접 줄 충돌 비용 실측 선례).
+- `store.dependency_graph` 하나를 validate(강연결 성분으로 전 순환 보고 — 경로에 게이트 ID) · 쓰기 경로 전부(`cycle_if_linked`) · selector · board가 공유. 종전 `amend --depends`의 자체 경로 추적은 삭제했다(검사기 한 벌).
+- 해금 수 = 통합 그래프를 끝까지 따라간 미종결 후속 수. 같은 대장에 옛·새 selector를 돌린 비교 2회: ⓐ main `ff7c9dcb`(EOS-124 미머지) — EOS-124 1→16 · EOS-130 0→15 · S5-01 0→14, 후보 211건 중 18건 순위 변동·상위 20 불변 ⓑ main `63451153` 병합 후(착지 시점 · #1317로 EOS-124 done) — EOS-130이 착수 가능해져 **6위 → 3위**(15건을 여는 병목이 제자리를 찾았다), 후보 212건 중 22건 순위 변동.
+- gates add 입력 필수 · gates amend `--depends/--remove-depends/--no-inputs/--verdict FAIL` · gates clear 입력 미완 거부(waive 예외) · cancel이 pending 게이트 입력이면 거부 · rename이 게이트 입력 갱신.
+- FAIL 기록 형식 `verdict FAIL · owners: … · evidence: …` 고정 — validate가 가장 최근 FAIL의 미종결 소유 태스크가 게이트 상류에 있는지 대조(사고 3의 대장 상태를 기계가 잡는다).
+
+**구현 중 내린 판단 (Kiki 결정 밖 — 여기 남긴다)**
+1. **간선 4종** — 명세의 3종에 트랙 진입 게이트(→ 트랙 전 태스크)를 더했다. selector가 실제로 착수를 막는 조건이라, 빼면 진입 게이트 입력이 트랙 안에 있는 교착을 못 본다. 명세보다 엄격한 쪽의 확장이다.
+2. **cancelled 선행의 비대칭** — 게이트 입력의 cancelled는 validate 오류, 태스크 depends_on의 cancelled는 종전대로 결정 대기(HARN-67). 판정 함수(`dangling_reference`)는 공유하되 오류 승격 범위만 다르다 — 태스크 쪽까지 올리면 cancel 한 번에 대장 전체가 red가 된다.
+3. **`G-mp03-first-promotion-run`은 입력 없음 사유** — MP-03의 done 판정이 그 런북 결과를 쓰므로 입력으로 걸면 clear↔done 의미적 교착이 된다. 입력 간선은 태스크 status만 보며 "PR 머지 후" 같은 시점 조건은 표현하지 못한다(한계로 명시).
+4. **판정 태스크 3건 신규**(P3-15·P3-16·P3-17) — 명세는 G1·G2만 지정했으나 W3+Release 통합 게이트도 판정 소유자가 없어 같은 형태로 등재했다(사고 2의 당사자).
+
+**변별력**: 뮤테이션 34종 전건 RED · 대조군 GREEN(`scripts/harness/verify_gate_graph_discrimination.py` — 주입 1건·`mutated != original`·원복 sha256 단언 내장). 강화 단언이 실제 결함 1건을 잡았다: `gates amend --evidence` 단독 호출 절이 "정정할 것이 없다" 검사에 가려 도달 불가능했다.
+
+**한계(명시)**: 구조적 불가능(순환·막다른 길·입력 없음)만 판정한다. 기준 자체가 달성 가능한지(의미적 불가능)는 그래프로 모른다 — 판정 세션과 실행 가능한 테스트(PED-36 ⑫ 무개입 3루프 상시 하네스)의 몫. 입력 없음 사유의 진위도 사람이 판단한다.

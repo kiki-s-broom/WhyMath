@@ -726,21 +726,25 @@ cleared·waived 게이트는 아무것도 막지 않으므로 요구하지 않�
 
 `selector.unblock_count` = 통합 그래프를 따라간 **미종결 후속 태스크 수**. 이미 끝난 태스크와 이미 통과한 게이트 너머는 이 태스크를 기다리지 않으므로 세지 않는다. `board.py`도 같은 값을 쓴다.
 
-2026-09-25 착지 시점 실측(같은 대장에 옛·새 selector를 각각 돌린 비교):
+2026-09-25 실측(같은 대장에 옛·새 selector를 각각 돌린 비교 — 두 시점):
 
 | 태스크 | 직접(옛) | 전이(새) |
 |---|---|---|
-| `EOS-124-next-problem-policy-selection-axis-mismatch` | 1 | 16 |
+| `EOS-124-next-problem-policy-selection-axis-mismatch` (main `ff7c9dcb` 시점 · 미머지) | 1 | 16 |
 | `EOS-130-phase2-gate2-rejudgment` | 0 | 15 |
 | `S5-01-expansion-gate-judgement` | 0 | 14 |
+| `P3-15-week1-gate-judgment` (백필로 신규) | 0 | 9 |
 
-착수 후보 211건 중 **18건의 순위가 바뀌었고 상위 20건은 그대로**다(정렬 키 순서가 stage → priority → 해금 수라 영향은 같은 stage·priority 안에 머문다).
+- main `ff7c9dcb` 시점: 착수 후보 211건 중 18건의 순위가 바뀌었고 상위 20건은 그대로였다.
+- main `63451153` 병합 후(착지 시점 — #1317로 `EOS-124`가 done): `EOS-130`의 선행이 모두 끝나 착수 후보가 됐고, 옛 정의로는 **6위**, 새 정의로는 **3위**다. 15건을 여는 병목이 제자리를 찾은 것이다. 후보 212건 중 22건의 순위가 바뀌었다.
+
+정렬 키 순서가 stage → priority → 해금 수라 영향은 같은 stage·priority 안에 머문다.
 
 ### 대기 경로 — 게이트 뒤에 누가 있는가
 
 `next`(텍스트)·`status`(텍스트·`--json`의 `gate_waits`)·`gates list`·`gates show`가 게이트 때문에 제외된 태스크에 **무엇을 기다리는지**를 경로로 보인다.
 
-> 실측(2026-09-25): `1건 ← G-p3-entry-gate2-pass ← EOS-130-phase2-gate2-rejudgment ← EOS-124-next-problem-policy-selection-axis-mismatch  [P3-00-phase2-acceptance-check]`
+> 실측(2026-09-25 · main `ff7c9dcb` 시점): `1건 ← G-p3-entry-gate2-pass ← EOS-130-phase2-gate2-rejudgment ← EOS-124-next-problem-policy-selection-axis-mismatch  [P3-00-phase2-acceptance-check]` — `EOS-124`가 done이 된 뒤에는 경로가 `EOS-130`에서 끝난다(재판정이 착수 가능하다는 뜻).
 
 경로는 **아직 안 풀린** 선행만 따라가며, 갈래가 여럿이면 게이트 → ID 순 첫 번째를 택하고 `(외 N)`을 붙인다(대표값이지 전수가 아니다). 경로가 게이트에서 끝나면 입력이 없거나 이미 다 끝났다는 뜻이라 `(사람 판정 대기)`를 붙인다.
 
