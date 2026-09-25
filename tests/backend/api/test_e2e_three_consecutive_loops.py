@@ -64,8 +64,10 @@ EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 �
 판정과 동결 — 이 파일이 초록인 것은 §18 충족이 **아니다**
 ────────────────────────────────────────────────────────────────────────────
 2026-09-25 실측(main `bbd7c382`)으로 §18은 **미충족**이다(Loop 1 `보정` · Loop 3
-`다음concept`). EOS-24(PR #1316) 뒤 재실측에서 오개념 오답의 Loop 1 `보정`은 섰고, 원인 미상
-오답의 Loop 1과 두 종류의 Loop 3은 그대로다(`_FROZEN` 주석). 그래서 테스트를 셋으로 나눈다.
+`다음concept`). 이후 두 변경이 공백을 나눠 메웠다 — EOS-24(PR #1316)가 오개념 오답의 Loop 1
+`보정`을, EOS-124(PR #1317 — 추천 설명을 전달 문항에 정렬)가 두 종류의 Loop 3 `다음concept`을
+세웠다. 남은 공백은 원인 미상 오답(general)의 Loop 1 `보정` 하나다(`_FROZEN` 주석). 그래서
+테스트를 셋으로 나눈다.
 
 - `test_three_loops_are_operator_free_and_continuous` — 무개입·연속성 불변식. 판정과
   무관하게 항상 초록이어야 한다.
@@ -74,8 +76,10 @@ EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 �
   실패하고, 메시지가 *개선*(False→True — 동결을 승격하라)인지 *회귀*(True→False — 이
   변경이 루프를 끊었다)인지를 가른다.
 - `test_plan300_s18_three_consecutive_loops_hold` — §18 문면 그대로의 계약(3루프 전건
-  성립). `xfail(strict=True)`라 CI 요약에 **XFAIL**로 보인다 — "passed"와 같은 화면에서
-  읽히지 않게 하려는 것이다. 해소되면 XPASS가 strict 실패로 바뀌어 동결 해제를 강제한다.
+  성립). 동결 공백이 남은 오답 종류에서만 `xfail(strict=True)`라 CI 요약에 **XFAIL**로
+  보인다 — "passed"와 같은 화면에서 읽히지 않게 하려는 것이다. 해소되면 XPASS가 strict 실패로
+  바뀌어 동결 해제를 강제한다. xfail 대상은 `_FROZEN`에서 유도되므로, 동결표를 올리면 그
+  종류는 표식 없이 반드시 통과해야 하는 계약으로 자동 전환된다.
 
 **판정 밖** — 교정 발화·추천 설명의 교수학적 적절성, 추천 품질(θ 근방이 최선인가)은
 보지 않는다. 보는 것은 루프가 **닫히는가**(연결과 방향)뿐이다. 시나리오 뱅크(`PED-36` ①)가
@@ -287,10 +291,10 @@ def _advance_fires(
 ) -> bool:
     """Loop 3 `다음concept`: 준 문항과 `target_concept`이 **둘 다** 후행 개념.
 
-    `action`은 보지 않는다 — `EOS-124` ③이 해소 방향을 셋 중에서 아직 고르지 않았고, 그중
-    "정책 축을 선택 축에 맞춘다"를 고르면 미측정 후행 개념 문항의 행위는 `diagnose`가 된다.
-    §18이 요구하는 것은 *다음 concept로 간다*이지 *특정 행위 이름*이 아니므로, 해소 방향을
-    이 하네스가 선점하지 않는다.
+    `action`은 보지 않는다 — §18이 요구하는 것은 *다음 concept로 간다*이지 *특정 행위
+    이름*이 아니다. (`EOS-124`가 고른 해소 방향에서는 정렬 재선택이 서면 `advance_next`가
+    나가지만, 후행 개념 문항이 1차 선택으로 바로 나오면 미측정이라 `diagnose`다 — 둘 다
+    다음 concept로 간 것이므로 행위 이름으로 가르지 않는다.)
     """
     return (
         member.get(str(rec["problem_id"])) == succ_tag
@@ -621,13 +625,18 @@ def test_three_loops_are_operator_free_and_continuous(journey: _Journey) -> None
 #: §7-1) 그대로 공백이며, 그것을 보정으로 볼지는 Kiki 결정 게이트
 #: `G-eos24-loop1-undiagnosed-wrong-criterion` 소관이다. 두 종류가 이제 다른 값을 가지므로 표를
 #: 종류별로 나눈다 — 하나로 두면 한쪽을 올리는 순간 다른 쪽이 거짓 해소·거짓 회귀가 된다.
+#:
+#: **EOS-124 승격(2026-09-25 · PR #1317)**: 임계 통과 직후 추천이 현재 개념에 미시도 문항이 남아
+#: 있어도 후행 개념 문항·target을 낸다(정렬 재선택) — 두 종류 모두 Loop 3 `다음concept`
+#: False→True. 이로써 `misconception`은 전 마디가 서서 §18 계약이 성립한다(아래 계약 테스트의
+#: xfail이 그 종류에서 자동으로 풀린다).
 _FROZEN_LOOP2: dict[str, bool] = {
     "보정진입": True,
     "문제·정답": True,
     "mastery상승": True,
     "전진임계통과": True,
 }
-_FROZEN_LOOP3: dict[str, bool] = {"다음concept": False, "문제": True, "평가": True, "추천": True}
+_FROZEN_LOOP3: dict[str, bool] = {"다음concept": True, "문제": True, "평가": True, "추천": True}
 _FROZEN: dict[str, dict[int, dict[str, bool]]] = {
     "misconception": {
         1: {"진단": True, "문제": True, "오답": True, "보정": True},
@@ -642,14 +651,11 @@ _FROZEN: dict[str, dict[int, dict[str, bool]]] = {
 }
 
 #: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳(오답 종류별).
-_EOS124_OWNER = "`EOS-124-next-problem-policy-selection-axis-mismatch`(정책 축·선택 축 불일치)"
 _GAP_OWNERS: dict[tuple[str, int, str], str] = {
     ("general", 1, "보정"): (
         "`EOS-139-undiagnosed-wrong-recommendation-criterion`(원인 미상 오답 R6 직후 추천 — "
         "Kiki 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion` 대기)"
     ),
-    ("misconception", 3, "다음concept"): _EOS124_OWNER,
-    ("general", 3, "다음concept"): _EOS124_OWNER,
 }
 
 
@@ -680,27 +686,62 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
         + f"\n{journey.verdict_line()}"
     )
     assert not improved, (
-        "해소 신호 — 동결된 공백이 메워졌다. `_FROZEN`을 새 값으로 올리고, 전 마디가 True면 "
-        "`test_plan300_s18_three_consecutive_loops_hold`의 xfail을 제거하라: "
+        "해소 신호 — 동결된 공백이 메워졌다. `_FROZEN`을 새 값으로 올려라(§18 계약 테스트의 "
+        "xfail은 동결표에서 유도되므로 그 종류의 전 마디가 True가 되면 자동으로 풀린다): "
         + " · ".join(improved)
         + f"\n{journey.verdict_line()}"
     )
 
 
-# ── §18 계약 — 지금은 미충족(XFAIL로 보인다) ───────────────────────────────────
+# ── §18 계약 — 동결 공백이 남은 오답 종류만 XFAIL ──────────────────────────────
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "계획서 300 §18 무개입 연속 3루프 미충족(2026-09-25 main bbd7c382 실측 · EOS-24 후 재실측) "
-        "— Loop 1 '보정'(general만: 원인 미상 오답 직후 추천이 diagnose · misconception은 EOS-24로 "
-        "해소) · Loop 3 '다음concept'(두 종류 모두: 전진 임계 통과 직후 추천이 현재 개념 문항). "
-        "해소 시 XPASS가 strict 실패로 바뀐다 — 이 표식과 _FROZEN을 함께 올린다."
-    ),
-)
-def test_plan300_s18_three_consecutive_loops_hold(journey: _Journey) -> None:
-    """§18 문면 그대로: 세 루프의 전 마디가 성립한다."""
+def _s18_open_variants() -> set[str]:
+    """동결표에서 한 마디라도 False인 오답 종류 — §18 계약이 아직 미충족인 종류.
+
+    xfail 대상을 따로 적지 않고 `_FROZEN`에서 **유도**한다. 따로 적으면 동결표를 올린 뒤 이
+    목록을 잊을 수 있고, 그러면 계약이 성립한 종류가 계속 XFAIL로 숨거나(표식이 남음) 아직
+    공백인 종류가 FAIL로 드러난다(표식을 뺌). 동결 테스트가 관측 = 동결표를 강제하므로, 여기서
+    동결표를 읽으면 xfail 대상이 곧 관측된 미충족 종류다.
+    """
+    return {
+        variant
+        for variant, loops in _FROZEN.items()
+        if not all(ok for nodes in loops.values() for ok in nodes.values())
+    }
+
+
+def test_s18_xfail_scope_is_derived_from_the_frozen_table() -> None:
+    """2026-09-25(EOS-24·EOS-124 착지 후) 기준 — 미충족은 원인 미상 오답(general) 하나다.
+
+    이 값이 바뀌면 동결표가 바뀐 것이다. 그때는 이 단언과 판정문을 함께 고친다(조용히 넓어지거나
+    좁아지지 않게).
+    """
+    assert _s18_open_variants() == {"general"}
+
+
+def test_plan300_s18_three_consecutive_loops_hold(
+    journey: _Journey, request: pytest.FixtureRequest
+) -> None:
+    """§18 문면 그대로: 세 루프의 전 마디가 성립한다.
+
+    동결 공백이 남은 오답 종류에서는 `xfail(strict=True)`로 돈다 — CI 요약에 **XFAIL**로 보이고,
+    그 종류가 통과해 버리면(XPASS) strict 실패로 바뀌어 동결 해제를 강제한다. 공백이 없는 종류
+    (EOS-24·EOS-124 착지 후 `misconception`)는 표식 없이 **반드시 통과**해야 한다.
+    """
+    if journey.variant in _s18_open_variants():
+        request.applymarker(
+            pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    f"계획서 300 §18 무개입 연속 3루프 미충족({journey.variant}) — 동결표 `_FROZEN`에 "
+                    "False 마디가 남아 있다(2026-09-25 기준: general의 Loop 1 '보정' — 원인 미상 "
+                    "오답 직후 추천이 diagnose · EOS-139/게이트 G-eos24-loop1-undiagnosed-wrong-"
+                    "criterion). 해소 시 XPASS가 strict 실패로 바뀐다 — _FROZEN을 올리면 이 "
+                    "표식은 자동으로 풀린다."
+                ),
+            )
+        )
     broken = [
         f"Loop {lp.number} '{n.name}' ({n.evidence})"
         for lp in journey.loops

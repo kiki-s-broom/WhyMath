@@ -1,4 +1,4 @@
-"""추천 정책 v1 — `recommend(learner_state, learning_context)`의 **첫 구현체** (EOS-19).
+"""추천 정책 — `recommend(learner_state, learning_context)`의 **첫 구현체** (EOS-19 · EOS-124).
 
 `EOS-14`가 계약(`l2.recommendation_contract`)을 세우고 닫았고, 그 시점 `RecommendationPolicy`·
 `LearningContext`·`Recommendation` 세 타입은 **소비처 0건**이었다. 이 모듈이 그 셋의 첫
@@ -17,7 +17,33 @@ BKT→DKT로 갈거나 bandit·LLM 제안을 얹어도 이 시그니처는 바�
 (계약 쪽은 순환 import를 피하려 `object`로 열어 뒀다 — 계약 docstring 참조).
 
 ────────────────────────────────────────────────────────────────────────────
-**추천 결과를 바꾸지 않는다** (acceptance ④ — 이 모듈의 가장 중요한 제약)
+EOS-124 — 설명(정책 축)과 콘텐츠(선택 축)를 **한 자리에서** 맞춘다 (`cat_v2`)
+────────────────────────────────────────────────────────────────────────────
+EOS-19 시점의 v1은 문항을 IRT로 고른 *뒤* 그 문항의 개념 숙달로 행위(action)를 붙였다. 두 축이
+서로를 보지 않아 두 방향으로 어긋났다(2026-09-19 페르소나 실측 · main `433ec9ea`):
+(가) 숙달 0.98 개념의 문항에 `advance_next` — 전진을 선언하면서 전진하지 않는다.
+(나) 선수 숙달 1.0인데 원래 개념 문항에 `practice_prerequisite` — 설명이 낡았다.
+
+**정본 판정**(acceptance ③ — 세 안 중 무엇도 단독으로 채택하지 않았다):
+  - *의도*의 정본은 **정책 축**이다 — 숙달 구간 규칙(계획서 §8 · `select_reason_type`)이 무엇을
+    하라는지 정한다. 선택 축에 맞춰 행위를 사후 계산하면(안 2) 정책 의도가 사후 합리화된다.
+  - *콘텐츠*의 정본은 **선택 축**이다 — 1차 선택(θ·가중·밴드 무변경)이 앵커 개념을 정하고,
+    관계 행위(선수 복귀·전진)는 그 앵커에서 그래프로 목표 개념을 찾아 **그 개념의 문항으로
+    다시 고른다**(안 1). 단, 목표에 문항이 없을 때 후보 0을 만들지 않는다 — 안 1의 약점.
+  - 둘이 맞춰질 수 없으면 **정직 강등**한다(안 3): 1차 선택 문항을 내보내고 행위를 그 콘텐츠에
+    맞게 "현재 개념 연습"으로 내린다. none/diagnose가 아니라 practice_current인 이유는 문항이
+    실제로 나가고 그 개념이 측정돼 있기 때문이다(없는 부재·없는 미측정을 말하지 않는다).
+  - 어느 경로든 **구조 계약**이 산출 생성 시점에 강제된다(`check_intent_alignment` —
+    `NextProblemOutcome._aligned_when_declared`): target = 전달 문항의 개념, 관계 행위면
+    근거 개념 ≠ 목표. 해소 결과는 `IntentResolution`으로 응답·처치 기록 양쪽에 남는다.
+
+그래서 v1의 아래 제약("추천 결과를 바꾸지 않는다")은 **EOS-19 전환에 한정된 것**이고, EOS-124는
+선수·전진 구간에서 선택을 *의도적으로* 바꾼다. 바뀐 알고리즘은 `policy_version=cat_v2`로 구분돼
+소급 평가가 두 규칙을 섞지 않는다. θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은
+게이트·같은 가중·같은 선택기를 쓴다 — 달라지는 것은 후보 집합뿐이다).
+
+────────────────────────────────────────────────────────────────────────────
+**추천 결과를 바꾸지 않는다** (EOS-19 acceptance ④ — 그 전환의 가장 중요한 제약)
 ────────────────────────────────────────────────────────────────────────────
 이 전환은 *배치*를 바꾸는 것이지 *알고리즘*을 바꾸는 것이 아니다. 후보 조회 SQL·가중 축의 곱
 결합 순서·`select_weighted_item` 호출은 이동 전 핸들러와 같고(`l2.next_problem_selection`으로
@@ -31,10 +57,10 @@ BKT→DKT로 갈거나 bandit·LLM 제안을 얹어도 이 시그니처는 바�
 load_attempt_history_state` docstring).
 
 그러면 `learner_state`는 **어디에 쓰이는가**(장식이 아니라는 증거 — "작동한 비율" 원칙):
-`learner_state.mastery`(개념코드 → BKT 숙달)가 **선수개념 목표 판정**의 유일한 입력이다.
-선수 후보들의 숙달을 여기서 읽으므로 숙달 재조회가 0건이고, `learner_state`가 비면
-(콜드스타트) 목표 판정이 문항 개념으로 자연 폴백한다. 그 경로는 `target_concept`으로
-관측된다.
+`learner_state.mastery`(개념코드 → BKT 숙달)가 **정책 의도 판정**(`resolve_policy_intent`)의
+그래프 쪽 입력이다 — 선수가 아직 약한가, 후행이 막혔는가, 다음 개념이 이미 숙달인가를 여기서
+읽는다(숙달 재조회 0건). `learner_state`가 비면(콜드스타트) 목표가 서지 않아 정직 강등되고,
+그 사실은 `intent_resolution=unsupported`로 관측된다.
 
 **EOS-24 — `learner_state.learning_state`(학습 상태 머신 국면)가 두 번째 입력이다.** 상태 머신이
 오개념 교정(R3)을 결정했으면 추천은 그 결정을 *다시 판정하지 않고 집행*한다 — 후보를 교정 대상
@@ -54,9 +80,10 @@ CLAUDE.md 구축 플레이북의 "AI 연동 시" 하드 게이트를 이 모듈�
 visited set은 DAG의 diamond에서 같은 노드를 여러 경로로 다시 세는 것을 막는다 — 이 세
 장치 중 하나라도 없으면 나머지 둘이 통과시킨다.
 
-**전체 그래프를 읽지 않는다**: traversal은 *선택된 문항의 대표 개념 1개*에서 출발하는
-재귀 CTE(`l2.prerequisite_recommendation.fetch_prerequisites`)이고, 그 결과를 다시 예산으로
-자른다. 개념 전수 조회(`SELECT * FROM concept`) 경로는 이 모듈에 없다.
+**전체 그래프를 읽지 않는다**: traversal은 *앵커 개념 1개*에서 출발하는 재귀 CTE(선수 —
+`l2.prerequisite_recommendation.fetch_prerequisites`)와 1-hop 조회(후행 — `l2.next_problem_
+selection.load_direct_successors`)이고, 그 결과를 다시 예산으로 자른다. 두 조회 모두 시간 예산을
+`_within_budget` 한 곳에서 받는다. 개념 전수 조회(`SELECT * FROM concept`) 경로는 이 모듈에 없다.
 
 계층: `l2`. L3~L6을 import하지 않는다 — 수능 모드 정책은 L6 게이팅이 필요해 이 모듈에 둘 수
 없고(l2→l6 역방향 금지), L6은 DB를 만질 수 없어(import-linter "데이터 접근 금지" 계약) 그쪽에도
@@ -70,10 +97,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from enum import Enum
+from typing import TYPE_CHECKING, Protocol, TypedDict, TypeVar
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.irt import (
@@ -98,34 +127,48 @@ from whymath_backend.l2.next_problem_selection import (
     last_incorrect_problem_id,
     load_attempt_history_state,
     load_candidate_rows,
+    load_direct_successors,
     load_sibling_ids,
+    load_target_candidate_rows,
     load_weak_concept_weights,
     sibling_weights,
 )
 from whymath_backend.l2.prerequisite_recommendation import PrerequisiteRow, fetch_prerequisites
 from whymath_backend.l2.recommendation_contract import (
+    PREREQUISITE_MASTERY_CEILING,
+    WEAK_CONCEPT_MASTERY_CEILING,
     LearningContext,
     ReasonType,
     Recommendation,
     RecommendationPolicy,
     RecommendationReason,
     action_for,
+    check_intent_alignment,
+    demote_to_current_concept,
 )
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
     POLICY_VERSION_CAT_STATE_REMEDIATION,
 )
-from whymath_backend.l2.recommendation_reason import collect_recommendation_reason
+from whymath_backend.l2.recommendation_reason import (
+    collect_concept_reason,
+    collect_recommendation_reason,
+)
 
 __all__ = [
     "DEFAULT_GRAPH_BUDGET",
     "CatRecommendationPolicy",
     "ConceptGraphBudget",
+    "IntentResolution",
     "NextProblemOutcome",
     "NextProblemPolicy",
+    "PolicyIntent",
     "PolicyTelemetry",
+    "resolve_policy_intent",
     "resolve_target_concept",
 ]
+
+_T = TypeVar("_T")
 
 _logger = logging.getLogger("whymath.l2.recommendation_policy")
 
@@ -206,6 +249,26 @@ def _apply_node_budget(
     return deduped[: budget.max_nodes]
 
 
+async def _within_budget(budget: ConceptGraphBudget, read: Callable[[], Awaitable[_T]]) -> _T:
+    """그래프 읽기 1건에 **시간 예산**을 건다 — 초과 시 `TimeoutError`(판정은 호출부가 한다).
+
+    시간 예산을 거는 자리를 이 함수 하나로 모은 이유: 호출부마다 `asyncio.timeout`을 직접 쓰면
+    새 그래프 읽기가 추가될 때 예산을 빠뜨려도 아무것도 모른다. 여기를 지나지 않는 그래프 읽기는
+    리뷰에서 눈에 띄고, 여기를 지나는 읽기는 전부 같은 예산을 받는다.
+    """
+    async with asyncio.timeout(budget.timeout_seconds):
+        return await read()
+
+
+async def _budgeted_prerequisites(
+    session: AsyncSession, concept_id: uuid.UUID, budget: ConceptGraphBudget
+) -> list[PrerequisiteRow]:
+    """선수 traversal — 깊이·시간 예산을 **한 곳에서** 건다(목표 판정·정책 의도 두 호출부 공용)."""
+    return await _within_budget(
+        budget, lambda: fetch_prerequisites(session, concept_id, max_depth=budget.max_depth)
+    )
+
+
 async def resolve_target_concept(
     session: AsyncSession,
     *,
@@ -227,6 +290,12 @@ async def resolve_target_concept(
     예산 초과·시간 초과는 **추천을 실패시키지 않는다**: traversal이 타임아웃되면 폴백으로
     내려가고 그 사실을 로그에 남긴다(예외 타입명 포함 — CLAUDE.md 침묵 실패 금지). 근거를
     풍부하게 하는 부가 조회 때문에 학생이 문항을 못 받는 것은 우선순위가 거꾸로다.
+
+    **EOS-124 이후 소비처는 수능 정책뿐이다**(기본 CAT은 `resolve_policy_intent`로 옮겼다).
+    이 함수에는 EOS-124가 실측한 결함이 **그대로 남아 있다** — "최저 숙달"은 선수가 전부 숙달이어도
+    그중 하나를 막힌 선수로 부르고, 선수가 미측정이면 문항 개념으로 폴백해 `practice_prerequisite`가
+    제자리를 가리킨다. 수능 정책의 변경은 별도 판정이 필요해(L6 게이팅과 재선택의 상호작용) 이
+    함수를 고치지 않고 `EOS-25`로 분리했다 — 고치면 수능 추천이 판정 없이 바뀐다.
     """
     if reason.concept_id is None:
         return None
@@ -236,8 +305,7 @@ async def resolve_target_concept(
         return reason.concept_id
 
     try:
-        async with asyncio.timeout(budget.timeout_seconds):
-            rows = await fetch_prerequisites(session, reason.concept_id, max_depth=budget.max_depth)
+        rows = await _budgeted_prerequisites(session, reason.concept_id, budget)
     except (TimeoutError, asyncio.CancelledError) as exc:
         _logger.warning(
             "선수 traversal 예산 초과(%s) — 목표 개념을 문항 개념으로 폴백합니다. concept=%s",
@@ -258,6 +326,227 @@ async def resolve_target_concept(
     # 최저 숙달이 최우선 — 동률이면 가까운 선수(depth 낮은 쪽)·그다음 id로 결정론 고정.
     weakest = min(measured, key=lambda pair: (pair[0], pair[1].depth, str(pair[1].concept_id)))
     return weakest[1].concept_id
+
+
+class IntentResolution(str, Enum):
+    """정책 의도(숙달 구간 규칙)가 **전달된 콘텐츠로 어떻게 해소됐나** — EOS-124 관측 축.
+
+    CLAUDE.md "작동한 비율" 원칙의 이행이다: 정렬 선택을 붙였으면 그것이 실제로 몇 번 일했는지를
+    응답·처치 기록이 말해야 한다. 정상 응답 200은 정렬이 일했다는 증거가 아니다 — 목표 개념에
+    문항이 없어 매번 강등되는 상태도 200이다. 이 값이 그 둘을 가른다.
+
+    강등 사유를 셋으로 나누는 이유(**모른다 ≠ 아니다**): 측정이 관계 행위를 *반증*한 것(`REFUTED`
+    — 선수가 전부 숙달)과 근거가 *없는* 것(`UNSUPPORTED` — 엣지 없음·선수 미측정)과 목표는 섰는데
+    *문항이 없는* 것(`TARGET_UNAVAILABLE`)은 고칠 곳이 다르다. 첫째는 정상 교수학이고, 둘째는
+    그래프·측정 커버리지 공백이며, 셋째는 콘텐츠 공백이다. 한 값으로 접으면 어디를 고칠지 모른다.
+    """
+
+    DIRECT = "direct"
+    """규칙이 앵커 개념 자신을 가리켰다(연습·진단·미매핑) — 1차 선택을 그대로 전달한다."""
+
+    SERVED = "served"
+    """관계 행위(선수 복귀·전진)를 전달 문항이 **실제로 싣는다** — 설명과 콘텐츠가 같은 개념."""
+
+    REFUTED = "refuted"
+    """규칙은 관계 행위를 가리켰으나 **측정이 반증**했다(측정된 선수가 전부 숙달 · 후행이 전부
+    이미 숙달). 앵커 개념 연습으로 정직 강등한다."""
+
+    UNSUPPORTED = "unsupported"
+    """규칙은 관계 행위를 가리켰으나 **근거가 없다**(선수·후행 엣지 없음 · 선수 전부 미측정).
+    반증과 구별한다. 앵커 개념 연습으로 정직 강등한다."""
+
+    GRAPH_TIMEOUT = "graph_timeout"
+    """그래프 조회가 시간 예산을 넘어 판정하지 못했다 — 정직 강등(예외 타입명 로그 동반)."""
+
+    TARGET_UNAVAILABLE = "target_unavailable"
+    """목표 개념은 섰으나 출제 가능한(노출 게이트 통과·미응답) 문항이 없다 — 정직 강등."""
+
+    NO_CANDIDATE = "no_candidate"
+    """후보가 아예 없다 — 추천 자체가 없다(`problem_id=None`)."""
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyIntent:
+    """정책 의도 1건 — 최종 근거 + 해소 판정 + (필요하면) 재선택할 목표 개념 묶음.
+
+    `reselect_groups`가 비어 있으면 1차 선택 문항을 그대로 전달한다(이미 의도와 맞다). 비어 있지
+    않으면 앞 묶음부터 차례로 그 개념들의 문항을 찾고, 처음 찾은 묶음에서 고른다 — 묶음 순서가
+    곧 우선순위다(선수는 가장 약한 것부터 한 개념씩, 전진은 열린 후행 전체를 한 묶음으로).
+    이때 `resolution=SERVED`는 "찾으면 SERVED"라는 뜻이고, 하나도 못 찾으면 호출부가
+    `TARGET_UNAVAILABLE`로 강등한다.
+    """
+
+    reason: RecommendationReason
+    resolution: IntentResolution
+    reselect_groups: tuple[tuple[uuid.UUID, ...], ...] = ()
+
+
+def _demoted(anchor_reason: RecommendationReason, resolution: IntentResolution) -> PolicyIntent:
+    """관계 행위를 실을 수 없다 — 앵커 개념 연습으로 **정직 강등**(재선택 없음)."""
+    return PolicyIntent(reason=demote_to_current_concept(anchor_reason), resolution=resolution)
+
+
+def _mastery_of(code: str | None, learner_state: LearnerState) -> float | None:
+    """개념코드의 실측 숙달 — 코드가 없거나 측정이 없으면 None(0으로 접지 않는다)."""
+    return learner_state.mastery.get(code) if code is not None else None
+
+
+async def resolve_policy_intent(
+    session: AsyncSession,
+    *,
+    anchor_reason: RecommendationReason,
+    learner_state: LearnerState,
+    learner_id: uuid.UUID,
+    budget: ConceptGraphBudget = DEFAULT_GRAPH_BUDGET,
+) -> PolicyIntent:
+    """앵커 개념의 숙달 구간 규칙(계획서 §8)을 **그래프·측정 근거로 확인**해 의도를 세운다.
+
+    앵커 = 1차 선택(기본 CAT — θ·가중·밴드 무변경)이 고른 문항의 대표 개념이다. 구간 규칙
+    (`select_reason_type`)은 그대로 정본이고, 이 함수는 그 규칙이 가리킨 *관계 행위*를 실제
+    목표 개념으로 바꾼다. 관계 행위가 아니면(연습·진단·미매핑) 그래프를 읽지 않는다.
+
+    **선수 구간(숙달 < 0.4)** — 세 갈래를 차례로 본다:
+      (가) 앵커의 측정된 선수 중 **아직 약한 것**(숙달 < `WEAK_CONCEPT_MASTERY_CEILING`)이 있다 →
+           가장 약한 것부터 재선택 목표로. EOS-124 (나)가 여기서 막힌다: 선수가 1.0으로 숙달됐으면
+           목표가 되지 않는다(종전 `resolve_target_concept`는 측정된 선수 중 *최저*를 골라, 전부
+           숙달이어도 그중 하나를 "막힌 선수"로 불렀다).
+      (나) 앵커 자신이 **막힌 후행**(숙달 < 0.4)의 직접 선수다 → 근거를 그 후행으로 옮기고, 목표는
+           이미 전달될 앵커 문항이다(재선택 없음). "원래 개념이 막혀서 선수를 연습한다"는 설명이
+           여기서 선다 — 1차 선택이 이미 선수 문항을 골랐을 때의 정확한 이유다.
+      (다) 둘 다 아니다 → 앵커 개념 연습으로 정직 강등(측정된 선수가 있으면 `REFUTED`, 없으면
+           `UNSUPPORTED`).
+
+    **전진 구간(숙달 > 0.7)** — 앵커의 직접 후행 중 **아직 숙달되지 않은 것**(미측정 포함)을 한
+    묶음으로 재선택 목표로. EOS-124 (가)가 여기서 막힌다: 숙달한 개념의 문항에 `advance_next`를
+    붙이는 대신 다음 개념 문항을 찾는다. 후행이 없거나 전부 숙달이면 정직 강등.
+
+    **미측정 선수는 목표가 아니다**(종전 규율 유지): 측정 없는 선수를 "막혔다"고 부르면 근거
+    없음이 근거로 위장된다. 미측정 선수를 *진단*하러 내려가는 것은 별도 교수학 판정이 필요한
+    선택 변경이라 여기서 하지 않는다.
+
+    **예산**: 선수 traversal은 `_budgeted_prerequisites`(깊이·시간), 후행 조회는 `max_nodes`(너비)
+    와 같은 시간 예산을 탄다. 시간 초과는 추천을 실패시키지 않고 `GRAPH_TIMEOUT` 강등으로 내려가며
+    예외 타입명을 로그에 남긴다(침묵 실패 금지).
+    """
+    anchor = anchor_reason.concept_id
+    if anchor is None or anchor_reason.type not in (
+        ReasonType.PREREQUISITE_GAP,
+        ReasonType.NEXT_CONCEPT,
+    ):
+        return PolicyIntent(reason=anchor_reason, resolution=IntentResolution.DIRECT)
+    try:
+        if anchor_reason.type is ReasonType.PREREQUISITE_GAP:
+            return await _prerequisite_intent(
+                session,
+                anchor_reason=anchor_reason,
+                anchor=anchor,
+                learner_state=learner_state,
+                learner_id=learner_id,
+                budget=budget,
+            )
+        return await _advance_intent(
+            session,
+            anchor_reason=anchor_reason,
+            anchor=anchor,
+            learner_state=learner_state,
+            budget=budget,
+        )
+    except TimeoutError as exc:
+        _logger.warning(
+            "정책 의도 판정 중 그래프 예산 초과(%s) — 앵커 개념 연습으로 정직 강등. concept=%s",
+            type(exc).__name__,
+            anchor,
+        )
+        return _demoted(anchor_reason, IntentResolution.GRAPH_TIMEOUT)
+
+
+async def _prerequisite_intent(
+    session: AsyncSession,
+    *,
+    anchor_reason: RecommendationReason,
+    anchor: uuid.UUID,
+    learner_state: LearnerState,
+    learner_id: uuid.UUID,
+    budget: ConceptGraphBudget,
+) -> PolicyIntent:
+    """선수 구간 의도 — (가) 약한 선수로 내려가기 · (나) 막힌 후행의 선수로 설명 · (다) 강등."""
+    rows = _apply_node_budget(await _budgeted_prerequisites(session, anchor, budget), budget)
+    measured = [
+        (mastery, row)
+        for row in rows
+        if (mastery := _mastery_of(row.concept_code, learner_state)) is not None
+    ]
+    weak = sorted(
+        (pair for pair in measured if pair[0] < WEAK_CONCEPT_MASTERY_CEILING),
+        # 가장 약한 선수가 최우선 — 동률이면 가까운 선수(depth 낮은 쪽)·그다음 id로 결정론 고정.
+        key=lambda pair: (pair[0], pair[1].depth, str(pair[1].concept_id)),
+    )
+    if weak:
+        return PolicyIntent(
+            reason=anchor_reason,
+            resolution=IntentResolution.SERVED,
+            reselect_groups=tuple((row.concept_id,) for _m, row in weak),
+        )
+
+    successors = await _within_budget(
+        budget, lambda: load_direct_successors(session, anchor, max_nodes=budget.max_nodes)
+    )
+    blocked = sorted(
+        (
+            (mastery, succ)
+            for succ in successors
+            if (mastery := _mastery_of(succ.concept_code, learner_state)) is not None
+            and mastery < PREREQUISITE_MASTERY_CEILING
+        ),
+        key=lambda pair: (pair[0], str(pair[1].concept_id)),
+    )
+    if blocked:
+        blocked_concept = blocked[0][1].concept_id
+        blocked_reason = await collect_concept_reason(
+            session, learner_id=learner_id, concept_id=blocked_concept
+        )
+        if blocked_reason.type is ReasonType.PREREQUISITE_GAP:
+            return PolicyIntent(reason=blocked_reason, resolution=IntentResolution.SERVED)
+        # 학습자 상태(진단 스냅샷)와 최신 숙달 이력이 구간을 다르게 말한다 — 둘 중 하나가 낡았다.
+        # 근거를 한쪽에 맞춰 지어내지 않고 (다)로 내려간다(로그로 드러낸다).
+        _logger.warning(
+            "막힌 후행 판정 불일치 — 학습자 상태는 선수 구간, 최신 숙달 근거는 %s. concept=%s",
+            blocked_reason.type.value,
+            blocked_concept,
+        )
+    return _demoted(
+        anchor_reason, IntentResolution.REFUTED if measured else IntentResolution.UNSUPPORTED
+    )
+
+
+async def _advance_intent(
+    session: AsyncSession,
+    *,
+    anchor_reason: RecommendationReason,
+    anchor: uuid.UUID,
+    learner_state: LearnerState,
+    budget: ConceptGraphBudget,
+) -> PolicyIntent:
+    """전진 구간 의도 — 아직 숙달되지 않은 직접 후행을 한 묶음으로 재선택 목표로."""
+    successors = await _within_budget(
+        budget, lambda: load_direct_successors(session, anchor, max_nodes=budget.max_nodes)
+    )
+    open_successors = tuple(
+        succ.concept_id
+        for succ in successors
+        # 전진 구간 경계와 같은 선(> 0.7이면 숙달)이다 — 미측정은 열린 것으로 본다.
+        if (mastery := _mastery_of(succ.concept_code, learner_state)) is None
+        or mastery <= WEAK_CONCEPT_MASTERY_CEILING
+    )
+    if open_successors:
+        return PolicyIntent(
+            reason=anchor_reason,
+            resolution=IntentResolution.SERVED,
+            reselect_groups=(open_successors,),
+        )
+    return _demoted(
+        anchor_reason, IntentResolution.REFUTED if successors else IntentResolution.UNSUPPORTED
+    )
 
 
 class NextProblemOutcome(Recommendation):
@@ -318,9 +607,48 @@ class NextProblemOutcome(Recommendation):
         default_factory=list,
         description=(
             "REC-11 소급 평가 재료 — 후보별 점수(정보량×가중). 학생 응답에는 싣지 않는다"
-            "(처치 기록 meta 전용 — 후보 노출은 출제 보안 축이다)."
+            "(처치 기록 meta 전용 — 후보 노출은 출제 보안 축이다). 정렬 재선택(EOS-124)으로 "
+            "전달된 문항이면 *그 문항을 고른 목표 개념 후보들*의 점수다 — 전달 문항이 비교 집합 "
+            "안에 있어야 소급 평가가 성립한다."
         ),
     )
+    intent_resolution: IntentResolution | None = Field(
+        default=None,
+        description=(
+            "EOS-124 — 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(관측 메타 · `IntentResolution`). "
+            "**None이면 이 정책은 정렬 계약을 아직 적용하지 않는다**(수능 정책 — 후속 태스크)."
+        ),
+    )
+    delivered_concept: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "전달 문항의 대표 개념 — 정렬 판정(`check_intent_alignment`)의 입력. 응답에는 싣지 "
+            "않는다(`target_concept`과 같은 값이어야 하므로 응답에는 그쪽 하나로 충분하다)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _aligned_when_declared(self) -> "NextProblemOutcome":
+        """정렬 계약을 **선언한**(`intent_resolution`이 있는) 산출은 어긋난 채로 만들어지지 않는다.
+
+        EOS-124 집행 지점이다. 계약을 주석으로 적고 정책의 선의에 맡기면 다음 수정이 조용히
+        깬다(EOS-19가 `target_concept`을 문항 개념과 따로 계산한 것이 정확히 그 형태였다) —
+        그래서 산출 객체가 **존재한다는 사실 자체**가 정렬의 증거가 되게 한다. 핸들러는 이
+        객체를 HTTP 응답으로 옮기기만 하므로, 이 검증은 실제 서빙 응답이 반드시 지나가는 자리다.
+
+        `intent_resolution=None`(수능 정책)은 검증하지 않는다 — 그 정책은 아직 정렬하지 않으며,
+        이 검증을 걸면 그 경로가 500으로 죽는다. 정렬하지 않는다는 사실은 응답에 None으로
+        정직하게 드러난다.
+        """
+        if self.intent_resolution is not None:
+            check_intent_alignment(
+                problem_id=self.problem_id,
+                action=self.action,
+                reason_concept_id=self.reason.concept_id,
+                target_concept=self.target_concept,
+                delivered_concept=self.delivered_concept,
+            )
+        return self
 
 
 class PolicyTelemetry(TypedDict):
@@ -372,6 +700,29 @@ if TYPE_CHECKING:  # pragma: no cover — 타입 검사 전용(런타임 코드 
         return policy
 
 
+@dataclass(frozen=True, slots=True)
+class _Delivery:
+    """실제로 학생에게 나갈 문항 1건 — 문항·난이도·**대표 개념**·그 선택의 후보 점수."""
+
+    problem_id: uuid.UUID
+    difficulty: float | None
+    concept_id: uuid.UUID | None
+    scores: list[tuple[uuid.UUID, float]]
+
+
+def _candidate_scores(
+    theta: float,
+    rows: list[CandidateRow],
+    items: list[IrtItem],
+    weights: list[float] | None,
+) -> list[tuple[uuid.UUID, float]]:
+    """REC-11 후보 점수 — `select_weighted_item`과 **같은 공식**(정보량 × 가중)의 관측 재계산."""
+    return [
+        (pid, item_information(theta, item) * (weights[i] if weights is not None else 1.0))
+        for i, ((pid, _d, _b), item) in enumerate(zip(rows, items, strict=True))
+    ]
+
+
 class CatRecommendationPolicy:
     """기본 CAT 추천 정책 v1 — IRT 정보량 최대 × (약점·밴드·형제) 가중.
 
@@ -400,11 +751,12 @@ class CatRecommendationPolicy:
     async def __call__(
         self, learner_state: LearnerState, learning_context: LearningContext
     ) -> NextProblemOutcome:
-        """추천 1건 — 후보 조회 → 가중 결합 → 정보량 최대 선택 → 근거·목표 개념 조립.
+        """추천 1건 — 1차 선택 → 앵커 근거 → 정책 의도 → (필요하면) 정렬 재선택 → 산출.
 
-        이동 전 핸들러의 기본 CAT 경로와 **같은 순서·같은 연산**이다(회귀 0). 달라진 것은 반환
-        타입뿐이다: `NextProblemResponse`(HTTP 스키마)가 아니라 `NextProblemOutcome`(계약 +
-        관측)을 내므로, 이 정책은 HTTP를 모른다.
+        1차 선택(후보 조회 → 가중 결합 → 정보량 최대)은 이동 전 핸들러의 기본 CAT 경로와 **같은
+        순서·같은 연산**이다. 그 뒤가 EOS-124다: 앵커 개념의 숙달 구간이 관계 행위를 가리키면
+        목표 개념의 문항으로 다시 고르고, 못 고르면 정직 강등한다(모듈 docstring "EOS-124" 절).
+        반환은 `NextProblemOutcome`(계약 + 관측)이므로 이 정책은 HTTP를 모른다.
         """
         session = self._session
         user_id = uuid.UUID(learner_state.student_id)
@@ -500,43 +852,147 @@ class CatRecommendationPolicy:
                 action=action_for(no_candidate.type),
                 target_concept=None,
                 candidate_zero_reason=CANDIDATE_ZERO_NO_POOL,
+                intent_resolution=IntentResolution.NO_CANDIDATE,
                 learning_state_directive=directive,
                 **common,
             )
 
         chosen_id, chosen_difficulty, _b = candidate_rows[best]
-        # REC-11: candidates[] 관측 — `select_weighted_item`과 *같은* 점수 공식을 재사용(새 쿼리 0).
-        scores = [
-            (pid, item_information(theta, item) * (weights[i] if weights is not None else 1.0))
-            for i, ((pid, _d, _bb), item) in enumerate(zip(candidate_rows, items, strict=True))
-        ]
-        # 근거는 **선택이 끝난 뒤** 조립된다 — 이 호출이 위 선택에 영향을 줄 수 없는 위치이므로
-        # 근거·목표 배선이 추천 결과를 바꾸지 않는다(acceptance ④의 구조적 보장).
+        delivery = _Delivery(
+            problem_id=chosen_id,
+            difficulty=float(chosen_difficulty) if chosen_difficulty is not None else None,
+            concept_id=None,  # 아래 두 갈래가 각자 채운다
+            # REC-11: candidates[] 관측 — `select_weighted_item`과 *같은* 점수 공식(새 쿼리 0).
+            scores=_candidate_scores(theta, candidate_rows, items, weights),
+        )
         if applied_route is not None:
-            # 집행 경로: 후보가 개념 C로 제한됐으므로 고른 문항의 대표 개념이 곧 C다 — 근거·목표를
-            # 상태 머신 결정에서 채워도 문항과 어긋나지 않는다(판정문 §5).
+            # EOS-24 집행 경로 — 상태 머신 결정이 의도의 정본이다(추천은 재판정하지 않고 집행한다 ·
+            # 판정문 §5). 후보가 개념 C의 **PRIMARY** 문항으로 제한됐으므로 전달 문항의 대표 개념이
+            # 곧 C다. EOS-124 의도 판정은 돌리지 않는다 — 교정은 C 자신을 다루는 비관계 행위라
+            # 정렬 계약 R4(목표 = 앵커 = 전달 개념)로 검증되고, 해소값은 `direct`다.
             reason = await collect_remediation_reason(
                 session, learner_id=user_id, route=applied_route
             )
-            target = applied_route.concept_id
+            resolution = IntentResolution.DIRECT
+            delivery = _Delivery(
+                problem_id=delivery.problem_id,
+                difficulty=delivery.difficulty,
+                concept_id=applied_route.concept_id,
+                scores=delivery.scores,
+            )
         else:
-            reason = await collect_recommendation_reason(
+            # ── EOS-124: 1차 선택 → 앵커 → 정책 의도 → (필요하면) 정렬 재선택 ─────────────
+            # 1차 선택은 위 그대로다(θ·가중·밴드 무변경). 그 문항의 대표 개념이 *앵커*가 되고,
+            # 앵커의 숙달 구간 규칙(§8)이 관계 행위(선수 복귀·전진)를 가리키면 그 목표 개념의
+            # 문항으로 다시 고른다. 못 고르면 1차 선택을 그대로 내보내되 설명을 정직하게 내린다
+            # — 어느 쪽이든 **설명(action·target)은 전달된 문항의 개념을 가리킨다**
+            # (`_aligned_when_declared`가 강제).
+            anchor_reason = await collect_recommendation_reason(
                 session, learner_id=user_id, problem_id=chosen_id
             )
-            target = await resolve_target_concept(
-                session, reason=reason, learner_state=learner_state, budget=self._graph_budget
+            intent = await resolve_policy_intent(
+                session,
+                anchor_reason=anchor_reason,
+                learner_state=learner_state,
+                learner_id=user_id,
+                budget=self._graph_budget,
             )
+            delivery = _Delivery(
+                problem_id=delivery.problem_id,
+                difficulty=delivery.difficulty,
+                concept_id=anchor_reason.concept_id,
+                scores=delivery.scores,
+            )
+            reason, resolution = intent.reason, intent.resolution
+            if intent.reselect_groups:
+                aligned = await self._select_aligned(
+                    intent.reselect_groups,
+                    user_id=user_id,
+                    learning_context=learning_context,
+                    theta=theta,
+                    attempted_ids=attempt_state.attempted_ids,
+                    excluded_ids=excluded_ids,
+                    sibling_ids=sibling_ids,
+                )
+                if aligned is None:
+                    reason = demote_to_current_concept(intent.reason)
+                    resolution = IntentResolution.TARGET_UNAVAILABLE
+                else:
+                    delivery = aligned
         return NextProblemOutcome(
-            problem_id=chosen_id,
+            problem_id=delivery.problem_id,
             reason=reason,
             action=action_for(reason.type),
-            target_concept=target,
-            difficulty=float(chosen_difficulty) if chosen_difficulty is not None else None,
+            target_concept=delivery.concept_id,
+            delivered_concept=delivery.concept_id,
+            intent_resolution=resolution,
+            difficulty=delivery.difficulty,
             candidate_zero_reason=None,
-            candidate_scores=scores,
+            candidate_scores=delivery.scores,
             learning_state_directive=directive,
             **common,
         )
+
+    async def _select_aligned(
+        self,
+        groups: tuple[tuple[uuid.UUID, ...], ...],
+        *,
+        user_id: uuid.UUID,
+        learning_context: LearningContext,
+        theta: float,
+        attempted_ids: set[uuid.UUID],
+        excluded_ids: set[uuid.UUID],
+        sibling_ids: set[uuid.UUID],
+    ) -> _Delivery | None:
+        """정렬 재선택 — 목표 개념 묶음을 우선순위 순으로 보며 **처음 문항이 있는 묶음**에서 고른다.
+
+        선택 연산은 1차 선택과 같다: 같은 게이트·같은 θ 정렬로 읽은 후보에(`load_target_
+        candidate_rows`) 같은 가중 축(`_combine_axes` — 약점·밴드·형제)을 곱하고 같은 선택기
+        (`select_weighted_item`)로 고른다. 달라지는 것은 **후보 집합** 하나뿐이다 — 그래서 CAT θ·
+        난이도 밴드는 이 경로에서도 그대로 작동한다(EOS-124 ⑥ 범위 밖 불변).
+
+        조회는 1건이다: 모든 목표 개념의 후보를 한 번에 읽고(개념별 상한) 파이썬에서 묶음별로
+        나눈다. 묶음마다 조회하면 약한 선수가 여럿이고 전부 문항이 없을 때 조회가 묶음 수만큼 는다.
+        """
+        rows = await load_target_candidate_rows(
+            self._session,
+            theta,
+            concept_ids=[concept for group in groups for concept in group],
+            attempted_ids=attempted_ids,
+            excluded_ids=excluded_ids,
+        )
+        for group in groups:
+            members = set(group)
+            picked: list[CandidateRow] = []
+            concept_of: dict[uuid.UUID, uuid.UUID] = {}
+            for pid, difficulty, irt_b, concept in rows:
+                # 한 문항이 같은 묶음의 두 개념에 PRIMARY로 걸려 두 번 나오면 한 번만 센다.
+                if concept not in members or pid in concept_of:
+                    continue
+                picked.append((pid, difficulty, irt_b))
+                concept_of[pid] = concept
+            if not picked:
+                continue
+            items = candidate_items(picked)
+            weights = await self._combine_axes(
+                user_id=user_id,
+                learning_context=learning_context,
+                candidate_rows=picked,
+                items=items,
+                theta=theta,
+                sibling_ids=sibling_ids,
+            )
+            best = select_weighted_item(theta, items, weights=weights)
+            if best is None:
+                continue
+            chosen_id, chosen_difficulty, _b = picked[best]
+            return _Delivery(
+                problem_id=chosen_id,
+                difficulty=float(chosen_difficulty),
+                concept_id=concept_of[chosen_id],
+                scores=_candidate_scores(theta, picked, items, weights),
+            )
+        return None
 
     async def _combine_axes(
         self,

@@ -177,7 +177,7 @@ class TestCandidatesAndPolicyVersion:
             {"problem_id": str(pid_mid), "score": 0.5},
             {"problem_id": str(pid_low), "score": 0.1},
         ]
-        assert row.meta[META_KEY_POLICY_VERSION] == "cat_v1"
+        assert row.meta[META_KEY_POLICY_VERSION] == "cat_v2"
 
     async def test_candidates_truncated_to_cap(self) -> None:
         """원 풀이 상한보다 크면 점수 상위 `CANDIDATES_META_CAP`건만 남는다."""

@@ -57,6 +57,7 @@ from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
     META_KEY_APPLIED_WEIGHTS,
     META_KEY_CANDIDATES,
+    META_KEY_INTENT_RESOLUTION,
     META_KEY_MODE,
     META_KEY_POLICY_VERSION,
     META_KEY_POOL_SIZE,
@@ -2408,6 +2409,8 @@ class TestNextProblem:
             # EOS-19: 부재도 행위 공간의 한 값이다(none) — 목표 개념은 댈 대상이 없어 null.
             "action": "none",
             "target_concept": None,
+            # EOS-124: 정렬 계약을 적용하는 정책은 부재도 해소값으로 말한다(null이 아니다).
+            "intent_resolution": "no_candidate",
             # EOS-24: 원장이 빈 학습자(NEW)는 상태 머신이 추천을 지시하지 않는다 — null.
             "learning_state_directive": None,
         }
@@ -2965,6 +2968,7 @@ class TestNextProblemSuneungMode:
             "reason",  # EOS-14: 추천 근거 — 기존 관측 메타와 별개 축(옵셔널 아님)
             "action",  # EOS-19: 근거에서 파생된 학습 행위(근거와 어긋나면 생성 자체가 실패)
             "target_concept",  # EOS-19: 다음에 다뤄야 할 개념(선수 막힘이면 막힌 선수)
+            "intent_resolution",  # EOS-124: 행위가 실제 문항으로 어떻게 해소됐나(수능은 null)
             "learning_state_directive",  # EOS-24: 상태 머신 지시 처리 결과(수능은 항상 null)
         }
         # 수능 정책은 상태 머신을 읽지 않는다(EOS-24 판정문 §7-3) — 지시 필드는 항상 null.
@@ -3056,6 +3060,8 @@ class TestNextProblemSuneungMode:
             # EOS-19: 부재의 행위는 none이고 목표 개념은 없다(지어내지 않는다).
             "action": "none",
             "target_concept": None,
+            # EOS-124: 수능 정책은 아직 정렬 계약을 적용하지 않는다 — null이 그 사실을 말한다.
+            "intent_resolution": None,
             "learning_state_directive": None,  # EOS-24: 수능 정책은 상태 머신을 읽지 않는다
         }
         assert session.added == []  # REC-03: null 응답은 처치가 아니다(가짜 처치 금지)
@@ -3164,11 +3170,19 @@ class TestNextProblemReason:
         assert body["problem_id"] == str(pid)
         return cid, body["reason"]
 
-    def test_low_mastery_reports_prerequisite_gap_with_measured_basis(self) -> None:
-        """숙달 0.2(<0.4) → 선수개념으로 돌아가라 · 근거는 실측이고 개념·숙달이 함께 실린다."""
+    def test_low_mastery_without_graph_support_is_honestly_demoted(self) -> None:
+        """숙달 0.2(<0.4)인데 **막힌 선수를 가리킬 근거가 없다** → 현재 개념 연습으로 정직 강등.
+
+        EOS-124 이전에는 여기서 `prerequisite_gap`이 나갔다 — 규칙(0.4 미만 → 선수로)은 선수를
+        가리키는데 전달되는 것은 이 개념의 문항이었다. 이 큐에는 선수 엣지가 없으므로(그래프 조회가
+        빈 결과) 선수로 내려갈 목표가 없고, 그러면 "선수를 연습하라"는 설명은 받은 문항과 어긋난다.
+        숙달 0.2는 **그대로 실린다** — 강등은 행위를 콘텐츠에 맞추는 것이지 측정을 고치는 것이 아니다.
+        선수 목표가 서는 갈래(가)·(나)는 `tests/backend/l2/test_recommendation_policy.py`와 실 PG
+        페르소나 하네스가 전담한다(이 큐 대역으로는 그래프 행을 재현하기 어렵다).
+        """
         cid, reason = self._measured(0.2)
         assert reason == {
-            "type": "prerequisite_gap",
+            "type": "current_concept",
             "confidence": 0.5,
             "basis": "measured_mastery",
             "concept_id": str(cid),
@@ -3180,9 +3194,17 @@ class TestNextProblemReason:
         assert reason["type"] == "current_concept"
         assert reason["basis"] == "measured_mastery"
 
-    def test_high_mastery_reports_next_concept(self) -> None:
-        _, reason = self._measured(0.9)
-        assert reason["type"] == "next_concept"
+    def test_high_mastery_without_open_successor_is_honestly_demoted(self) -> None:
+        """숙달 0.9(>0.7)인데 **넘어갈 다음 개념이 없다** → 현재 개념 연습으로 정직 강등.
+
+        EOS-124 (가)의 반대편이다: 다음 개념이 있으면 그 문항으로 다시 고르고(`served`), 없으면
+        숙달한 개념의 문항에 `advance_next`를 붙이지 않는다 — 전진을 선언하면서 제자리에 있는 설명은
+        만들지 않는다.
+        """
+        cid, reason = self._measured(0.9)
+        assert reason["type"] == "current_concept"
+        assert reason["mastery"] == 0.9
+        assert reason["concept_id"] == str(cid)
 
     def test_cold_start_is_not_reported_as_prerequisite_gap(self) -> None:
         """개념은 매핑됐는데 숙달 이력이 없다 → `cold_start`.
@@ -3274,7 +3296,11 @@ class TestNextProblemReason:
         body = _attempts_client(session).get("/v1/me/next-problem").json()
         assert len(session.added) == 1
         assert session.added[0].meta[META_KEY_REASON] == body["reason"]
-        assert body["reason"]["type"] == "prerequisite_gap"
+        # EOS-124: 그래프 근거가 없어 정직 강등된 근거가 *그대로* 영속된다(응답과 같은 값).
+        assert body["reason"]["type"] == "current_concept"
+        # 해소값도 같은 좌석에 남는다 — "정렬이 일한 비율"을 사후에 셀 재료다.
+        assert body["intent_resolution"] == "unsupported"
+        assert session.added[0].meta[META_KEY_INTENT_RESOLUTION] == "unsupported"
 
     def test_suneung_persisted_treatment_carries_reason_too(self) -> None:
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
@@ -3289,11 +3315,16 @@ class TestNextProblemReason:
         assert body["reason"]["type"] == "next_concept"
 
     def test_reason_does_not_change_the_selected_problem(self) -> None:
-        """acceptance⑥ — 근거를 붙여도 선택은 그대로다.
+        """acceptance⑥ — 근거를 붙여도 선택은 그대로다(**그래프가 목표를 내놓지 않는 한**).
 
         같은 후보 풀에 서로 다른 근거 재료(저숙달 · 고숙달 · 매핑 없음)를 물려도 선택된
         문항이 바뀌지 않는지 본다. 근거 조립이 선택 *뒤에* 오는 구조라 그럴 수밖에 없지만,
         그 구조가 깨지면(예: 근거를 먼저 계산해 가중에 쓰면) 여기서 먼저 드러난다.
+
+        EOS-124 이후 정확한 범위: 숙달 구간이 관계 행위를 가리키고 **그래프가 목표 개념을 내놓으면**
+        정책은 의도적으로 그 개념의 문항을 다시 고른다(설명과 콘텐츠 정렬). 이 큐에는 그래프 행이
+        없으므로 목표가 서지 않고, 그러면 1차 선택이 그대로 나가야 한다 — 이 단언이 그 불변을
+        지킨다(근거 없이 선택을 흔들지 않는다).
         """
         pid_a, pid_b = uuid.uuid4(), uuid.uuid4()
         cid = uuid.uuid4()
