@@ -2385,6 +2385,16 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 잡 스텝을 손으로 재현하다 harness-integrity의 ruff(scripts) 누락 — PR CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "scripts/ops/*",
     "src/backend/pyproject.toml",
     "src/data-pipeline/pyproject.toml",
