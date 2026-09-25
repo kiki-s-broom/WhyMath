@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-174-gate-resolution-path-audit
+title: "게이트 해소 경로 미연결 — 게이트를 열 작업이 대장에 연결되지 않아도, 해소 사슬이 그 게이트 자신을 요구해도(순환) 어떤 검사도 RED 를 내지 않는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - HARN-124-gate-title-correction-path
+requires_gates: []
+acceptance:
+  - "① 해소 경로 필드 — 게이트 모델(scripts/harness/models.py 의 Gate)에 resolved_by(그 게이트의 해소 증거를 만드는 태스크 full-ID 목록)를 추가한다. 설정 경로는 gates add --resolved-by 와 정정 경로(HARN-124 의 gates amend 에 --resolved-by 추가)뿐이다. 대장 손편집 금지는 그대로다.\n\n② 감사 명령 — backlog.py audit-gates 를 신설한다. 판정 대상은 미종결 태스크를 1건 이상 requires_gates 로 막는 pending 게이트다. kind=decision 인데 resolved_by 가 비어 있으면 RED. kind=human·external 은 Kiki 가 직접 행동하는 게이트라 해소 태스크가 없을 수 있으므로 면제할 수 있다. 다만 면제는 게이트 필드(면제 사유)로 명시해야 하고, 사유 없는 공란은 RED 다.\n\n③ 게이트 경유 순환 — resolved_by 태스크 자신, 또는 그 depends_on 추이 폐포(선행의 선행까지)에 속한 태스크가 그 게이트를 requires_gates 로 걸고 있으면 RED. 회귀 픽스처 2건은 실제 사고의 재생이다: (가) P3-00 이 진입 게이트 G-p3-entry-gate2-pass 를 걸고 있어 재판정 소유자가 될 수 없던 상태(2026-09-22) (나) EOS-50 이 자기를 판정 대상으로 삼는 통합 게이트 G-p3-w3-release-merged 를 걸고 있던 상태(2026-09-23).\n\n④ 충족 불가 신호 — resolved_by 가 가리키는 태스크가 대장에 없거나, 그 태스크 또는 선행 폐포 안에 cancelled 태스크가 있으면 RED. 이것이 '영원히 열 수 없는 게이트'의 기계 판정이다.\n\n⑤ CI 배선 — harness-integrity 잡에 audit-gates 스텝을 넣고 배선 동결 테스트를 둔다(tests/infra/test_dep_declaration_wiring.py 선례). 이번 실행에서 그 스텝이 skipped 가 아니라 실제로 도달했는지까지 확인한다.\n\n⑥ 백필 — 착지 시점의 pending 게이트 전수에 resolved_by 또는 면제 사유를 채운다. 2026-09-25 main 3307b64e 기준 pending 21건, 그중 미종결 태스크를 막는 15건이다. 15건 중 7건은 게이트 ID 를 본문에 언급하는 비부착 미종결 태스크가 0건이다(휴리스틱 — 언급 여부만 셌다). 특히 G-p3-g1-week1·G-p3-g2-week2 는 판정 세션이 할 일인데 판정 태스크가 없다. Gate 2 재판정 소유자가 없어 EOS-130 을 신규 등재해야 했던 2026-09-22 상태와 같은 형태다. 만료 없는 그랜드파더로 통과시키지 않는다.\n\n⑦ 변별력 — 절마다(② 필수 · ② 면제 사유 · ③ 순환 2형 · ④ 부재 · ④ 취소) 그 절이 없으면 통과하는 반례 픽스처를 둔다. 절을 하나씩 뮤테이션해 전건 RED, 대조군(정상 연결 게이트)은 GREEN 을 확인한다. 주입 적용 단언(mutated != original)과 원복 바이트 동일 단언을 하네스에 내장한다.\n\n⑧ 한계 명시 — 이 감사는 '연결돼 있는가'만 본다. 연결된 태스크가 다 끝났을 때 실제로 PASS 가 나오는지는 판정하지 못한다(그것은 판정 세션의 몫이다). 이 한계를 docs/standards/build_harness.md 해당 절과 명령 도움말에 적는다."
+artifacts: []
+paths:
+  - scripts/harness/models.py
+  - scripts/harness/backlog.py
+  - scripts/harness/store.py
+  - "tests/harness/test_gate_resolution*"
+  - ".github/workflows/ci.yml"
+  - docs/standards/build_harness.md
+  - backlog/gates.yaml
+session: null
+notes: "출처: 2026-09-25 Kiki 질문 \"가능하지 않은 것을 게이트로 두는 게 맞나? 대책은?\" — G-p3-entry-gate2-pass 점검 세션. 판정 기준 main 3307b64e.\n\n[실측 결론] G-p3-entry-gate2-pass 는 원리상 불가능한 게이트가 아니다. 통과 기준(10조건 + 무개입 연속 3루프 — 2026-09-19 판정문 §7)은 코드로 달성할 수 있는 기능 요건이고, 실학생·외부 기관·비용이 필요하지 않다. 2026-09-24 재판정이 지목한 FAIL 원인 두 축의 수정은 이미 PR 로 올라와 있다(EOS-24 = #1316 · EOS-124 = #1317 · 두 PR 모두 CI green · 2026-09-25 기준 미머지). 게이트를 불가능처럼 보이게 만든 것은 게이트와 해소 작업 사이의 연결이 대장에 없다는 구조 결함이다.\n\n[같은 계열 3회 — 세 번 모두 사람이 읽다가 발견] (1) 2026-09-22 P3-00 게이트 경유 순환 (2) 2026-09-23 EOS-50 게이트 경유 순환 (3) 2026-09-24 재판정문이 PASS 경로로 EOS-24·EOS-124 를 지목했으나 재판정 태스크 EOS-130 의 depends_on 에는 EOS-21 하나만 걸려 있었다 — Kiki 지시로 #1314 가 수동 연결했다(2026-09-25). 기계 검사가 하나도 없었던 이유는 검사할 대상이 없기 때문이다. 게이트 모델 필드는 id·title·kind·assignee·status·requested·remind_after_days·evidence·cleared_by 이고, 해소 경로를 가리키는 필드는 내가 찾은 방법으로 0건이다(models.py Gate 정의 · 역할 키워드로 태스크 대장 검색).\n\n[선행] HARN-124(gates amend) — #1284 브랜치에서 done · 2026-09-25 기준 미머지. 백필(⑥)과 정정(①)에 게이트 정정 CLI 가 필요하다.\n\n[중복 확인] OPS-38(CI 게이트 도달 가능성 계약)은 CI 검사 잡의 도달을 다루는 다른 축이다. HARN-39(게이트 제목·notes 편집 CLI)와 HARN-124(게이트 문면·독촉 정정)는 게이트 필드의 정정 경로이지 해소 경로 연결·순환 검사가 아니다. HARN-52(audit-deps)는 태스크 사이 의존만 보고 게이트는 보지 않는다(dep_declaration.py 354행 주석)."
+updated: 2026-09-25
