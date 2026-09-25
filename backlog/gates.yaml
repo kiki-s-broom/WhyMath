@@ -624,11 +624,11 @@ gates:
     title: "룰셋 전문(bypass_actors) 첫 2입력 라이브 판정 1회 — HARN-102가 감시 축을 넓힌 뒤 처음 도는 회차다. 기록 파일 .github/ruleset-check-state.json의 마지막 verdict=ok는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, 지금은 실제로 측정하지 않은 축(bypass_actors·enforcement)까지 통과로 읽힌다 — 그 범위 불일치를 닫는 것이 이 게이트의 목적이다. 실행: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북(수집 2줄 + --ruleset-full 판정 1줄). 기대 = EXIT 0(2026-09-14 실측 bypass_actors=[] 이 그대로면). EXIT 1이면 우회 주체가 생겼거나 enforcement가 active가 아니라는 뜻이고 출력의 \"시정 순서\"를 따른다. EXIT 2면 수집이 한 줄 빠졌거나 룰셋 id가 바뀐 것(문서 \"id 하드코딩의 취약성과 그 처리\" 참조). 선행 조건: 이 PR이 main에 머지된 뒤에 실행한다 — 런북과 판정기 양쪽이 미머지 상태면 Kiki 체크아웃에 --ruleset-full 인자 자체가 없어 argparse 오류가 난다. 세션이 머지 확인 후 6항목 브리핑과 함께 실행 블록을 안내한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-15
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 578fa9d2 (Kiki 머신 git worktree --detach origin/main · HEAD_IS_MAIN=True · HAS_FLAG=True). [실측 2026-09-25 · Windows PowerShell · 2입력 첫 회차] 수집 cmd /c 2줄(/rules/branches/main + /rulesets/16623542) → ruleset_drift.py ruleset.json --ruleset-full ruleset-full.json --record → EXIT=0 · 위반 0 · 유예 3(승인 축 · 2026-12-31 만료). 직접 판독: ruleset_id=16623542 · bypass_actors=0 · enforcement=active. 기록 파일 verdict=ok(last_checked=2026-09-25)가 이제 2입력 범위로 쓰였다 — 범위 불일치 해소. 변별력: 직전 회차(2026-09-24, main fbb6c215)는 같은 절차로 EXIT=1(webapp 체크 미강제 1건)을 냈다 — 판정기가 실제로 위반을 낸다는 대조군. 기록 파일 반영 PR은 이 브랜치 claude/quirky-hopper-notxx5."
+    cleared_by: claude
     notes: ""
   - id: G-ruleset-bypass-actors-read
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
@@ -794,9 +794,9 @@ gates:
     title: "신규 required check 라이브 등록 — \"webapp — 공개 랜딩 lint·build\" (WEB-01). 문서(.github/branch-protection-setup.md REQUIRED_CHECKS 블록)에는 등재했으나, 라이브 룰셋(rulesets/16623542)에 추가하는 것은 GitHub UI 조작이라 사람 몫이다. 등재하지 않으면 랜딩 잡이 red여도 머지가 막히지 않는다(2026-07-26 backend 잡 미등재 사고와 같은 형태). 방법: GitHub → Settings → Rules → \"main 보호\" → Require status checks → 검색창에 위 이름을 그대로 입력해 추가. 검색 결과가 비면 그 잡이 아직 한 번도 안 돌았다는 뜻이므로, WEB-01 PR의 체크 실행 후 다시 시도한다. 확인: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북으로 ruleset_drift 판정 EXIT 0. 등재 이유: 문서 목록과 라이브 룰셋이 벌어지면 드리프트 탐지기가 상시 red가 되고, 상시 red인 보호는 습관화돼 소음이 된다(CLAUDE.md \"상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지\"). 선행 조건: WEB-01 PR이 main에 머지된 뒤 실행한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 578fa9d2. 2026-09-24 회차(main fbb6c215)에서 ruleset_drift가 EXIT=1 — 미강제 1건 `webapp — 공개 랜딩 lint·build`를 지목. Kiki가 룰셋 \"main 보호\"에 체크를 등록한 뒤 2026-09-25 재판정(2입력 · --record) EXIT=0 · 위반 0 → 문서 REQUIRED_CHECKS 17건과 라이브 정합. 같은 회차가 G-ruleset-bypass-actors-live-watch도 닫았다(bypass_actors=0 · enforcement=active)."
+    cleared_by: claude
     notes: ""
