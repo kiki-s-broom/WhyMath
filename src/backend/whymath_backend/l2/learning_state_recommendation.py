@@ -28,7 +28,9 @@ RT1 > RT2), 추천이 집행만 하면 순서를 바꾸기로 했을 때 고칠 
 R3의 입력은 약하다(학생 전체의 활성 가설 · 신뢰 하한 없음). 추천이 R3를 충실히 집행할수록
 그 약점이 학생에게 그대로 전달되므로, **지금 근거를 확인할 수 있는 결정만** 집행한다.
 
-  ① 이번 회차에 새로 확인된 가설(`turns_since_evidence = 0`)이 있어야 한다.
+  ① 이번 회차에 새로 확인된 가설이 있어야 한다 — `turns_since_evidence = 0` **이고** 직전 다른
+     응답이 원장에 남긴 마지막 전이보다 늦게 증거로 갱신된 가설(EOS-140 — tse만으로는 미스캔
+     회차에서 뚫린다. `_evidence_since_previous_attempt` docstring).
   ② 그 가설의 신뢰가 `MISCONCEPTION_REMEDIATION_FLOOR`를 **넘어야** 한다(하한은 MISC-30 표가
      정본 — 새 숫자를 만들지 않는다).
   ③ 교정 고정은 1문항이다: 교정 국면에서 제출한 응답이 다시 R3면 고정을 풀고 숙달 구간
@@ -57,11 +59,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import Select, desc, select
+from sqlalchemy import ColumnElement, Select, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.concept import ProblemConcept
+from whymath_backend.db.models.learning_state_transition import LearningStateTransition
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l2.learner_state import LearnerState
@@ -158,8 +161,50 @@ class StateRoute:
         return self.outcome is StateDirectiveOutcome.APPLIED
 
 
+def _evidence_since_previous_attempt(
+    user_id: uuid.UUID, attempt_id: uuid.UUID
+) -> ColumnElement[bool]:
+    """가설의 마지막 증거 갱신이 **직전 다른 응답의 마지막 원장 전이보다 늦다** — ①의 회차 경계.
+
+    왜 `turns_since_evidence = 0`만으로는 부족한가(EOS-140 · 실 PG 재현): 그 값은 "가장 최근
+    *스캔* 턴에서 매치됐다"이지 "이 응답에서 매치됐다"가 아니다. 응답 제출 경로의 스캔은 오답 +
+    답안(또는 선지 인덱스) + 지문이 있을 때만 돈다(`api/me.py::_scan_attempt_misconceptions` —
+    정답·답안 미제출·지문 부재는 NOT_RUN이고 NOT_RUN이면 가설을 건드리지 않는다). 그래서
+    오개념 오답(스캔·tse 0) → 정답(미스캔) → 다른 개념의 답안 없는 오답(미스캔)이면 첫 가설의
+    tse가 0으로 남고, 학생 전체 가설을 읽는 R3는 다시 발화한다 — tse만 보면 그 옛 가설이 "이번
+    회차 증거"가 되어 무관한 개념에 교정이 고정된다(판정문 §4 반례 S1이 그대로 통과했다).
+
+    경계를 원장에서 잡는 이유: 응답 제출 경로는 스캔으로 가설을 갱신·commit한 **뒤에** 상태 머신
+    전이를 적재한다. 그러므로 직전 응답이 남긴 마지막 전이보다 늦게 갱신된 가설은 그 뒤의 관측
+    (이번 응답의 스캔, 또는 그 사이의 코치 대화 턴)에서 증거를 받은 것이다. 두 시각은 모두 DB
+    `now()`라 앱·DB 시계 차이가 끼지 않는다 — `problem_attempt`의 수신 시각은 앱이 채우므로 쓰지
+    않는다. 가설 행의 `updated_at`은 매치 때마다 바뀌는 `evidence_count`가 UPDATE를 일으켜
+    반드시 갱신된다(`hypothesis_store._persist_active_set` · `onupdate=now()`).
+
+    결정 응답 자신의 행과 `attempt_id` 없는 생애주기 전이는 경계에서 뺀다 — 둘 다 이번 응답의
+    스캔 *뒤에* 적재될 수 있어(⓪ 학습 진입 · 평가 진입 · 결정) 경계를 이번 증거 너머로 밀어낸다.
+    뒤쪽은 `attempt_id != 결정 응답` 비교가 스스로 뺀다(SQL 3값 논리 — NULL과의 `!=`는 참이
+    아니다). 그래서 `IS NOT NULL`을 따로 두지 않는다: 효과 없는 조건은 반례로 검증할 수 없다.
+    경계가 **가장 늦은** 전이(`max`)인 이유: 옛 스캔이 그 사이 어느 응답 뒤에 있었든 모두 걸러야
+    한다 — `min`이면 첫 응답 이후의 옛 스캔이 전부 "이번 회차"로 통과한다.
+    직전 응답이 없으면(첫 응답) 경계가 없고 tse만으로 판정한다 — 그때는 옛 스캔 자체가 없다.
+
+    남는 한계(정직 표기): 두 응답 **사이의** 코치 대화 턴에서 매치된 가설도 "이번 회차"로 센다.
+    근본 해소는 R3의 입력을 이번 응답의 스캔 결과로 좁히는 것이며 `EOS-138`이 소유한다.
+    """
+    boundary = (
+        select(func.max(LearningStateTransition.occurred_at))
+        .where(
+            LearningStateTransition.user_id == user_id,
+            LearningStateTransition.attempt_id != attempt_id,
+        )
+        .scalar_subquery()
+    )
+    return or_(boundary.is_(None), MisconceptionHypothesisRecord.updated_at > boundary)
+
+
 async def _fresh_misconception_confidence(
-    session: AsyncSession, user_id: uuid.UUID
+    session: AsyncSession, user_id: uuid.UUID, attempt_id: uuid.UUID | None
 ) -> float | None:
     """이번 회차에 증거를 받은 활성 가설 중 최고 신뢰 — 없으면 None(①).
 
@@ -167,14 +212,22 @@ async def _fresh_misconception_confidence(
     (`l4/misconception/hypothesis.py` — 매치되면 0으로 되돌리고, 아니면 경과 턴을 더한다).
     학생 전체에서 가장 높은 가설이 아니라 **방금 관측된** 가설을 보는 것이 이 조회의 요점이다 —
     다른 개념에서 생긴 옛 가설로 지금 개념을 교정 고정하지 않는다(판정문 §4 반례 S1).
+
+    "방금"은 tse만으로 정해지지 않는다 — 결정 응답(`attempt_id`)의 회차 경계를 함께 건다
+    (`_evidence_since_previous_attempt` · EOS-140). 경계는 스칼라 서브쿼리라 조회 수는 1건 그대로다.
+    `attempt_id`가 없으면 경계를 잡을 수 없지만, 그 경우는 바로 뒤의 `ANCHOR_UNRESOLVED`가 집행을
+    막으므로 여기서는 경계 없이 판정한다(조회 순서·결과가 전환 전과 같다).
     """
+    conditions: list[ColumnElement[bool]] = [
+        MisconceptionHypothesisRecord.user_id == user_id,
+        MisconceptionHypothesisRecord.is_active.is_(True),
+        MisconceptionHypothesisRecord.turns_since_evidence == 0,
+    ]
+    if attempt_id is not None:
+        conditions.append(_evidence_since_previous_attempt(user_id, attempt_id))
     stmt = (
         select(MisconceptionHypothesisRecord.confidence)
-        .where(
-            MisconceptionHypothesisRecord.user_id == user_id,
-            MisconceptionHypothesisRecord.is_active.is_(True),
-            MisconceptionHypothesisRecord.turns_since_evidence == 0,
-        )
+        .where(*conditions)
         .order_by(desc(MisconceptionHypothesisRecord.confidence))
         .limit(1)
     )
@@ -249,7 +302,7 @@ async def route_by_learning_state(
         return StateRoute(outcome=StateDirectiveOutcome.RELEASED_AFTER_REPEAT)
 
     user_id = uuid.UUID(learner_state.student_id)
-    confidence = await _fresh_misconception_confidence(session, user_id)
+    confidence = await _fresh_misconception_confidence(session, user_id, directive.attempt_id)
     # "초과"다(이하는 집행하지 않는다) — MISC-30 표의 RT2와 같은 경계 방향.
     if confidence is None or confidence <= MISCONCEPTION_REMEDIATION_FLOOR:
         return StateRoute(outcome=StateDirectiveOutcome.WEAK_MISCONCEPTION_EVIDENCE)

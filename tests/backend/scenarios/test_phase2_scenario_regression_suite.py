@@ -25,7 +25,9 @@ skill_node)만 ORM으로 심는다. 읽기 전용 SELECT는 공개 표면이 그
   - SCENARIO-005 ⓐ 힌트 사용이 그 뒤의 정답 attempt에 귀속되지 않는다(`used_hint` NULL ·
     `hint_usage` 0행) — `EOS-133-coach-hint-usage-attribution`.
   - SCENARIO-005 ⓑ 코치 완료 경로는 학습 상태 머신을 돌리지 않는다 — `EOS-134-coach-completion-state-machine`.
-  - SCENARIO-008 ⓐ `EOS-124` — 추천의 정책 축(action)과 선택 축(problem_id·target) 불일치.
+  - (해소) SCENARIO-008 ⓐ `EOS-124` — 추천의 정책 축(action)과 선택 축(problem_id·target) 불일치.
+    기본 CAT이 설명을 전달 문항에 정렬하면서 해소돼 올바른 값 단언(전진 = 다음 개념 문항)으로
+    승격했다. 같은 변경으로 002·007의 근거 단언도 "그래프 근거가 있을 때만 관계 행위"로 정밀화됐다.
   - (해소) SCENARIO-009 ⓐ `LearningSession` writer 0 — `EOS-131`이 서버 30분 유휴 규칙 writer를
     신설해 정상 동작 단언(재접속이 같은 학습 세션으로 이어진다)으로 승격했다.
 
@@ -382,7 +384,10 @@ def test_scenario_002_low_diagnostic_score() -> None:
       ② 상한 도달 확정 → `assessment.weak_points`에 그 개념이 있고 `strong_points`에는 없다 ·
          학습자 상태 행이 진단 확정으로 생긴다(`provisioned_by=diagnosis_capture`).
       ③ `LearnerState` 숙달 < 선수결손 경계(0.4) · 약점 목록에 그 개념.
-      ④ 추천은 남은 두 문항 중 **쉬운 쪽**을 고르고(θ가 내려갔다) 근거는 `prerequisite_gap`.
+      ④ 추천은 남은 두 문항 중 **쉬운 쪽**을 고른다(θ가 내려갔다). 이 픽스처에는 선수 개념이
+         없으므로 "선수로 내려가라"를 실어 줄 문항이 없다 — 근거는 `current_concept`(정직 강등 ·
+         `intent_resolution=unsupported`)이고 낮은 숙달은 근거에 **그대로** 실린다(EOS-124).
+         선수가 측정돼 약하면 선수로 내려가는 갈래는 SCENARIO-003이 판정한다.
     """
     content, journal = _begin("SCENARIO-002")
     try:
@@ -450,7 +455,14 @@ def test_scenario_002_low_diagnostic_score() -> None:
                 f"낮은 진단 뒤 추천이 쉬운 문항({easy})이 아니다: {rec['problem_id']}"
                 f"(어려운 문항 {hard})"
             )
-            assert rec["reason"]["type"] == "prerequisite_gap", rec["reason"]
+            # EOS-124 — 선수 엣지가 없는 개념에 "선수를 연습하라"를 붙이면 설명이 받은 문항(이
+            # 개념의 쉬운 문항)과 어긋난다. 규칙(0.4 미만 → 선수)은 그대로이고, 실어 줄 근거가
+            # 없다는 사실이 해소값으로 드러난다.
+            assert rec["reason"]["type"] == "current_concept", rec["reason"]
+            assert rec["reason"]["mastery"] < PREREQUISITE_MASTERY_CEILING, rec["reason"]
+            assert rec["action"] == "practice_current", rec
+            assert rec["target_concept"] == str(cid), rec
+            assert rec["intent_resolution"] == "unsupported", rec
         journal.dump()
     finally:
         content.teardown()
@@ -845,12 +857,22 @@ def test_scenario_007_mastery_threshold_crossing() -> None:
     판정은 **궤적 전체**에 걸친다 — 매 회차마다 `(숙달, 추천 근거)` 쌍이 경계 규칙과 일치해야
     한다(0.7 이하 ⇒ next 아님 · 0.7 초과 ⇒ next). 한 점만 보면 "처음부터 next였다"와 "경계에서
     바뀌었다"가 구별되지 않으므로, 경계 **아래** 관측과 **위** 관측이 각각 1건 이상이어야 통과다.
+
+    **후행 개념을 함께 심는 이유(EOS-124)**: 전진(`next_concept`)은 넘어갈 개념이 있어야 문항으로
+    실린다. 후행이 없으면 정책은 숙달한 개념의 문항에 `advance_next`를 붙이지 않고 정직 강등한다
+    — 그래서 경계 통과를 관측하려면 목적지가 필요하다. 후행 문항은 **아주 쉽게** 둔다: 1차 CAT
+    선택(θ 근방)은 경계 아래 동안 현재 개념 문항을 고르고, 경계를 넘는 순간 정책이 다음 개념
+    문항으로 다시 고른다 — 난이도가 아니라 숙달이 이동을 일으켰다는 것이 구별된다.
     """
     content, journal = _begin("SCENARIO-007")
     try:
         cid, code = _seed_concept(content, "s7", "일차함수의 기울기")
+        c_next, _ = _seed_concept(content, "s7next", "일차함수의 그래프 해석")
+        asyncio.run(_add_all(_prereq_edge(cid, c_next)))
         pids = _seed_problems(content, cid, "s7", [3.0 + 0.2 * i for i in range(10)])
+        next_pids = _seed_problems(content, c_next, "s7n", [1.0, 1.2])
         pid_set = {str(p) for p in pids}
+        next_set = {str(p) for p in next_pids}
 
         with _client() as client:
             _erase_learner(client)
@@ -859,7 +881,8 @@ def test_scenario_007_mastery_threshold_crossing() -> None:
             crossed = False
             for step in range(len(pids) - 1):
                 rec = _next_problem(client, auth)
-                assert rec["problem_id"] in pid_set, rec
+                if step == 0:
+                    assert rec["problem_id"] in pid_set, rec
                 if step > 0:
                     mastery = _learner_state(client, auth)["mastery"][code]
                     weak = {w["concept_id"] for w in _get(client, auth, "/v1/me/weak-concepts")}
@@ -872,11 +895,18 @@ def test_scenario_007_mastery_threshold_crossing() -> None:
                         reason=rec["reason"]["type"],
                         action=rec["action"],
                         약점=in_weak,
+                        문항=("다음개념" if rec["problem_id"] in next_set else "현재개념"),
                     )
+                    # 근거는 앵커(현재 개념)의 숙달이다 — 전진 회차에도 같다.
                     assert rec["reason"]["mastery"] == pytest.approx(mastery), (rec, mastery)
                     if mastery > WEAK_CONCEPT_MASTERY_CEILING:
+                        # EOS-124 — 전진은 말뿐이 아니라 문항으로 실린다(목적지 = 다음 개념).
+                        assert rec["problem_id"] in next_set, rec
+                        assert rec["target_concept"] == str(c_next), rec
+                        assert rec["intent_resolution"] == "served", rec
                         crossed = True
                         break
+                    assert rec["problem_id"] in pid_set, rec
                 _attempt(client, auth, uuid.UUID(rec["problem_id"]), correct=True, answer="1")
 
             below = [t for t in trajectory if t[0] <= WEAK_CONCEPT_MASTERY_CEILING]
@@ -905,8 +935,9 @@ def test_scenario_008_move_to_next_concept() -> None:
 
       ① 높은 자기보고 확신도의 정답 → R1 · `ADVANCING` · `ADVANCE_TO_NEXT_CONCEPT`.
       ② 숙달 경계 통과 후 추천 `action=advance_next`.
-      ③ 정직한 공백 동결(`EOS-124`) — 그 순간 고른 문항·target은 아직 **현재** 개념이다.
-      ④ 현재 개념 소진 → 다음 개념 문항 · `target_concept=다음 개념`.
+      ③ 정책·선택 정렬(`EOS-124` 해소 — 동결 승격) — 현재 개념에 미시도 문항이 남아 있어도 그
+         순간 고른 문항·target은 **다음** 개념이다(이동이 후보 고갈의 부산물이 아니라 선택이다).
+      ④ 현재 개념 소진 뒤에도 다음 개념에 머문다 · `target_concept=다음 개념`.
     """
     content, journal = _begin("SCENARIO-008")
     try:
@@ -914,9 +945,10 @@ def test_scenario_008_move_to_next_concept() -> None:
         c_next, _ = _seed_concept(content, "s8next", "이차식의 전개")
         asyncio.run(_add_all(_prereq_edge(c_cur, c_next)))
         # 남겨 둘 현재 개념 문항(cur_pids[5])을 **가장 어렵게** 둔다. 전부 맞힌 학생의 θ는 척도
-        # 상단에 붙으므로 θ 근방 선택은 가장 어려운 문항을 집는다 — 다음 개념 문항이 더 어려우면
-        # ③의 관측 대상이 난이도 배치에 좌우된다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서
-        # 다음 개념 문항이 먼저 나와 ②·③이 판정 불가였다). 다음 개념 문항은 그보다 쉽게 둔다.
+        # 상단에 붙으므로 θ 근방 1차 선택은 가장 어려운 문항 — 즉 **현재 개념** 문항을 집는다.
+        # 그런데도 ③에서 다음 개념 문항이 나오면, 이동을 만든 것은 난이도 배치가 아니라 정책의
+        # 정렬 재선택이다(EOS-124). 다음 개념 문항을 더 어렵게 두면 1차 선택이 먼저 그쪽을 집어
+        # 이 변별력이 사라진다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서 ②·③ 판정 불가).
         cur_pids = _seed_problems(content, c_cur, "s8c", [2.0, 2.4, 2.8, 3.2, 3.6, 5.0])
         next_pids = _seed_problems(content, c_next, "s8n", [3.0, 3.4])
         cur_set = {str(p) for p in cur_pids}
@@ -963,11 +995,15 @@ def test_scenario_008_move_to_next_concept() -> None:
             )
             assert advanced["action"] == "advance_next", advanced
 
-            # ③ 정직한 공백 동결 (EOS-124)
-            assert advanced["problem_id"] in cur_set and advanced["target_concept"] == str(c_cur), (
-                "전진 추천이 다음 개념 문항·target을 골랐다 — `EOS-124`(정책 축·선택 축 불일치)가 "
-                "해소된 것으로 보인다. 이 단언을 다음 개념 단언으로 승격하고 EOS-124를 닫아라."
+            # ③ 정책·선택 정렬 (EOS-124 해소 — 동결 승격)
+            next_set = {str(p) for p in next_pids}
+            assert advanced["problem_id"] in next_set, (
+                f"전진 추천의 문항 {advanced['problem_id']}가 다음 개념 것이 아니다 — 정책은 전진을 "
+                "말하는데 콘텐츠는 제자리다(`EOS-124` 재발)."
             )
+            assert advanced["target_concept"] == str(c_next), advanced
+            assert advanced["reason"]["concept_id"] == str(c_cur), advanced  # 전진의 근거
+            assert advanced["intent_resolution"] == "served", advanced
 
             # ④ 현재 개념 소진 → 다음 개념
             _attempt(client, auth, cur_pids[5], correct=True, answer="정답")

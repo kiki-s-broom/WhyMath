@@ -36,8 +36,8 @@ acceptance가 이름을 댄 기존 e2e 자산 4건 중 둘은 시나리오 10종
 | 004 동일 오개념 반복 | 페르소나 C ②③ · Week 2 | 2회 반복에서 confidence 상승 | 3회 동안 confidence **단조 증가** · 회차마다 그 시도에서 탐지(`ran_with_candidates`) · 정책이 R3에서 **R5로 넘어감**(규칙 우선순위의 상태 증거) | 확장 |
 | 005 힌트 후 정답 | 관통 테스트 7~11(코치 완료) · Week 3 ④(힌트 사다리) | 힌트 없는 코치 완료 · 힌트 사다리 따로 | 막힘 → 힌트 적재 → 정답 풀이는 **돌아보기 대기**(적재 0) → 돌아보기 후 attempt 1행·숙달 첫 측정 · **공백 동결 2건** | 신설(두 자산 결합) |
 | 006 AI Tutor 질문 | Week 3 ④ · 관통 5(다턴) | 좌절 신호에 따른 사다리 상승 | 풀이 없는 **질문**은 채점 상태를 움직이지 않음(시도 0·숙달 미측정·`NEW`) · 대화·턴 영속 · 새 대화가 **원장의 직전 단계를 이어** 오름 | 신설 |
-| 007 mastery threshold 통과 | 페르소나 A ④ · P-11 H4 | 숙달 상승 방향 · 근거=상태 값 | **궤적 전체**에서 `(숙달, 근거)` 쌍이 경계 규칙과 일치 · 경계 아래·위 관측을 각 1건 이상 요구 · 경계 통과 시 약점 목록에서 제외 | 신설 |
-| 008 다음 concept 이동 | 페르소나 A ⑤⑥ | `advance_next` · 소진 후 이동 · EOS-124 동결 | 확신 있는 정답 → R1 · `ADVANCING` · `ADVANCE_TO_NEXT_CONCEPT`(상태 머신 축) + A의 이동·EOS-124 동결 | 확장 |
+| 007 mastery threshold 통과 | 페르소나 A ④ · P-11 H4 | 숙달 상승 방향 · 근거=상태 값 | **궤적 전체**에서 `(숙달, 근거)` 쌍이 경계 규칙과 일치 · 경계 아래·위 관측을 각 1건 이상 요구 · 경계 통과 시 약점 목록에서 제외 · (2026-09-25 `EOS-124`) 후행 개념을 심어 경계 통과 회차에 **다음 개념 문항**이 실제로 나오는지까지 판정 | 신설 |
+| 008 다음 concept 이동 | 페르소나 A ⑤⑥ | `advance_next` · 소진 후 이동 · EOS-124 동결 | 확신 있는 정답 → R1 · `ADVANCING` · `ADVANCE_TO_NEXT_CONCEPT`(상태 머신 축) + A의 이동 · (2026-09-25 `EOS-124` 해소) 미시도 현재 개념 문항이 남아 있어도 **다음 개념 문항을 선택**으로 받음 | 확장 |
 | 009 세션 종료 후 재접속 | 없음(관통 테스트가 `session_id is None`만 동결) | — | 대화 종료(`ended_at`·`resolution`) → **새 앱 인스턴스 + 재로그인** → 같은 user_id · 종료 상태·턴 보존 · 숙달·활성 오개념 동일 · 시도 문항 재추천 없음 · `LearningSession` 0행 동결(S3-16 ③ 결정) | 신설 |
 | 010 학습 상태 복구 | 없음 | — | `REMEDIATING` 학생을 새 앱에서 다시 보면 현재 상태·전이 이력·숙달·오개념·가설 confidence가 동일 · 이어 풀면 `from_state=REMEDIATING`(NEW에서 재시작하지 않음) · 옛 이력 보존 | 신설 |
 
@@ -48,7 +48,7 @@ acceptance가 이름을 댄 기존 e2e 자산 4건 중 둘은 시나리오 10종
 | 동결 | 시나리오 | 현행 동작(실측) | 소유 |
 |---|---|---|---|
 | ⓐ R4 미발화 | 003 | 선수 결손이 확정된 상태에서 원래 개념에 오답을 내도 정책은 `R6-wrong-undiagnosed`(target 없음). `prerequisite_gap_concept_ids` 생산자가 서빙 경로에 배선되지 않았다(`api/me.py` 주석이 스스로 밝힘) | `EOS-127`(todo) |
-| ⓑ 정책·선택 축 불일치 | 008 | 숙달한 뒤 `action=advance_next`인데, 고른 문항과 `target_concept`은 아직 현재 개념 | `EOS-124`(todo) |
+| ~~ⓑ 정책·선택 축 불일치~~ (해소 2026-09-25) | 008 | 숙달한 뒤 `action=advance_next`인데, 고른 문항과 `target_concept`은 아직 현재 개념이었다. `EOS-124`가 설명을 전달 문항에 정렬하면서 올바른 값 단언으로 **승격**했다. 같은 변경으로 002의 근거 단언은 `current_concept`·`intent_resolution=unsupported`(선수 엣지가 없는 픽스처)로 정밀화됐다 | `EOS-124`(해소) |
 | ⓒ 힌트 귀속 공백 | 005 | 힌트를 받은 뒤 코치 대화로 낸 정답 attempt의 `used_hint`가 NULL이고 `hint_usage`가 0행이다. `HintUsage(` 생성 writer가 `src/` 전체에 0건이다(grep 실측). 그래서 힌트 받은 정답과 스스로 푼 정답이 숙달 갱신에서 구별되지 않는다(기본 추정기 `bkt-v1`은 힌트 축을 읽지 않고, 가산 규칙 `HINT_GAIN_FACTOR`는 기본 추정기가 아니다) | `EOS-133-coach-hint-usage-attribution` (2026-09-24 등재) |
 | ⓓ 코치 완료 경로에서 상태 머신 미실행 | 005 | 코치 대화로 문제를 완료해도 `/v1/me/learning-state`가 `NEW`·전이 0건 그대로다. `api/coach.py::_complete_problem`은 attempt·숙달·이벤트를 적재하지만 `advance_on_attempt`를 부르지 않는다(`coach.py`에서 `learning_state`·`record_transition` grep 0건). `/v1/me/attempts` 경로와 비대칭이다 | `EOS-134-coach-completion-state-machine` (2026-09-24 등재) |
 | ⓔ 학습 세션 행 0 | 009 | `GET /v1/me/sessions == []`. `LearningSession(` 생성자 0건 | 결함이 아니다 — `S3-16` acceptance ③의 **미신설 결정**. 결정이 바뀌면 단언이 알린다 |

@@ -302,3 +302,144 @@ def test_remediation_falls_back_when_the_concept_has_no_untried_problem() -> Non
             _step("fallback", f"directive={rec['learning_state_directive']} · 문항≠C")
     finally:
         content.teardown()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-140 — 안전장치 ①의 회차 경계: 미스캔 회차에서 옛 가설이 "방금"으로 읽히지 않는가
+#
+# `turns_since_evidence = 0`은 "가장 최근 *스캔* 턴에서 매치됐다"일 뿐이다. 정답·답안 없는 오답은
+# 스캔하지 않으므로 옛 가설의 값이 0으로 남고, 학생 전체 가설을 읽는 R3는 다시 발화한다. 수정
+# 전에는 아래 첫 변이에서 추천이 `applied`·교정 대상 P로 뚫렸다(2026-09-25 실 PG 재현).
+# ──────────────────────────────────────────────────────────────────────────
+def _submit_attempt(client: Any, auth: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
+    """응답 1건 — Week 2 헬퍼(`_submit_wrong`)가 없는 형태(정답 · 답안 없는 오답)를 낸다."""
+    resp = client.post("/v1/me/attempts", headers=auth, json=body)
+    assert resp.status_code == 201, resp.text
+    out: dict[str, Any] = resp.json()
+    return out
+
+
+async def _active_hypothesis_turns(attempt_id: str) -> list[int]:
+    """그 응답을 낸 학생의 활성 가설 `turns_since_evidence` — 반례의 전제를 눈으로 확인한다."""
+    engine = create_async_engine(_W2._settings().database_url)
+    try:
+        async with engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT h.turns_since_evidence FROM misconception_hypothesis h "
+                        "JOIN problem_attempt a ON a.user_id = h.user_id "
+                        "WHERE a.attempt_id = :aid AND h.is_active"
+                    ),
+                    {"aid": attempt_id},
+                )
+            ).all()
+    finally:
+        await engine.dispose()
+    return [int(row[0]) for row in rows]
+
+
+@pytest.mark.parametrize(
+    ("third_answer", "expected_scan", "expected_turns"),
+    [
+        # 반례 — 답안이 없어 스캔이 돌지 않는다. 옛 가설의 tse가 0으로 **남는다**.
+        pytest.param(None, "not_run", 0, id="unscanned-answerless-wrong"),
+        # 대조군 — 스캔이 돌고 매치가 없다. tse가 1이 되어 경계 없이도 막힌다.
+        pytest.param(_W2._UNMATCHED_WRONG_ANSWER, "ran_no_candidate", 1, id="scanned-no-match"),
+    ],
+)
+def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
+    third_answer: str | None, expected_scan: str, expected_turns: int
+) -> None:
+    """EOS-140 — C에서 관측된 옛 가설로 P에 오개념 교정을 고정하지 않는다(판정문 §4 반례 S1).
+
+    흐름: C 정답 → C 오개념 오답(스캔·매치 → tse 0) → C 정답(미스캔) → P 오답 → 추천.
+    맨 앞의 정답은 경계가 **가장 늦은** 전이여야 걸러지게 만든다 — 그 정답의 전이가 옛 스캔보다
+    앞에 있으므로, 경계를 가장 이른 전이로 잡는 뮤테이션(`max`→`min`)은 옛 가설을 통과시킨다.
+    """
+    _require_pg()
+    content = _Content(c_problems=3)
+    try:
+        content.seed()
+        with _W2._client() as client:
+            _W2._erase_learner(client)
+            auth = _W2._login(client)
+
+            _submit_attempt(
+                client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True}
+            )
+            wrong = _W2._submit_wrong(client, auth, content.c_pids[1], _W2._WRONG_ANSWER)
+            assert wrong["learning_state"]["rule_id"] == "R3-wrong-misconception", wrong[
+                "learning_state"
+            ]
+            right = _submit_attempt(
+                client, auth, {"problem_id": str(content.c_pids[2]), "is_correct": True}
+            )
+            assert right["learning_state"]["to_state"] != "REMEDIATING", right["learning_state"]
+
+            body: dict[str, Any] = {"problem_id": str(content.p_pids[0]), "is_correct": False}
+            if third_answer is not None:
+                body["student_answer"] = third_answer
+            third = _submit_attempt(client, auth, body)
+            coverage = third["evidence"]["coverage"]
+            assert coverage["misconception_scan"] == expected_scan, coverage
+            assert third["learning_state"]["rule_id"] == "R3-wrong-misconception", (
+                "전제 붕괴 — 옛 가설로 R3가 다시 발화해야 이 반례가 성립한다(학생 전체 활성 가설을 "
+                f"읽는 R3 · EOS-138이 그 입력을 좁히면 이 전제가 바뀐다): {third['learning_state']}"
+            )
+            turns = asyncio.run(_active_hypothesis_turns(third["attempt_id"]))
+            assert turns == [
+                expected_turns
+            ], f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
+
+            rec = _next_problem(client, auth)
+            assert rec["learning_state_directive"] == "weak_misconception_evidence", (
+                "옛 가설(C에서 관측)을 '이번 회차 증거'로 읽고 P에 교정을 고정했다 — 안전장치 ①의 "
+                f"회차 경계가 없다: {rec}"
+            )
+            assert rec["reason"]["basis"] != "learning_state", rec
+            assert rec["reason"]["type"] != "misconception_remediation", rec
+            _step(
+                "stale",
+                f"scan={expected_scan} · tse={turns} · R3 재발화 → "
+                f"directive={rec['learning_state_directive']}",
+            )
+    finally:
+        content.teardown()
+
+
+def test_fresh_evidence_after_earlier_attempts_is_still_applied() -> None:
+    """EOS-140 양성 대조 — 회차 경계가 **정상 집행을 막지 않는다**.
+
+    앞선 응답(정답)이 원장에 전이를 남긴 뒤라 경계가 NULL이 아니다. 새 오개념 오답의 스캔이 만든
+    가설은 그 경계보다 늦으므로 집행돼야 한다. 결정 응답 **자신**의 전이까지 경계에 넣는 뮤테이션은
+    경계를 이번 스캔 너머로 밀어 이 테스트를 깨뜨린다(그 행들은 스캔 뒤에 적재된다).
+    """
+    _require_pg()
+    content = _Content(c_problems=3)
+    try:
+        content.seed()
+        with _W2._client() as client:
+            _W2._erase_learner(client)
+            auth = _W2._login(client)
+
+            _submit_attempt(
+                client, auth, {"problem_id": str(content.c_pids[0]), "is_correct": True}
+            )
+            wrong = _W2._submit_wrong(client, auth, content.p_pids[0], _W2._WRONG_ANSWER)
+            assert wrong["learning_state"]["rule_id"] == "R3-wrong-misconception", wrong[
+                "learning_state"
+            ]
+
+            rec = _next_problem(client, auth)
+            assert rec["learning_state_directive"] == "applied", rec
+            assert rec["reason"]["basis"] == "learning_state", rec
+            assert rec["target_concept"] == str(content.p_concept), rec
+            assert rec["problem_id"] == str(
+                content.p_pids[1]
+            ), f"교정 대상 개념 P의 미시도 문항이 아니다: {rec}"
+            _step(
+                "fresh", f"앞선 정답 뒤 오개념 오답 → directive={rec['learning_state_directive']}"
+            )
+    finally:
+        content.teardown()
