@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-96-sympy-event-loop-isolation-cpu-cap
+title: "SymPy 검증의 이벤트 루프 격리 + CPU 시간 상한 — 느린 식 1건이 그 워커의 모든 학생 요청을 멈춘다(상한 초과 = 판정 불가, 통과 아님)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(판정 기준 main `d5438782`): `api/verify.py`의 검증 엔드포인트와 코치 턴의 `verify_final_answer`(`api/coach.py` `_resolve_completion`)가 SymPy를 async 핸들러 안에서 **동기로** 실행한다. 입력 길이 상한(`_MAX_EXPR_LEN=4000`·조건과 변수 각 50)만 있고 CPU 시간 상한은 없다. 단일 이벤트 루프라 느린 식 1건이 그 워커의 모든 요청을 멈춘다 — 지연 문제를 넘은 **가용성 결함**이다. 첫 단계로 학생 대면 경로의 동기 SymPy 호출 지점을 AST로 전수 열거한다(문자열 grep 아님)."
+  - "② 격리 방식 판정 — 동기 SymPy 호출을 이벤트 루프 밖(스레드 또는 프로세스 풀)으로 옮긴다. 선택 근거를 적는다: 스레드는 GIL 때문에 CPU 작업 중 루프를 온전히 풀어주지 못하고 강제 중단도 할 수 없다. CPU 시간 상한을 실제로 강제하려면 프로세스 경계가 필요한지 실측으로 판정한다."
+  - "③ 판정 의미 — 시간 상한 초과는 반드시 **판정 불가(undecidable)** 로 떨어진다. 정답·통과·오답 어느 쪽으로도 처리하지 않는다: SymPy는 검증 단일 권위라 초과를 통과로 처리하면 검증 우회가 되고, 오답으로 처리하면 학생에게 부당한 부정 피드백이 된다(교수학 금기). `verify_final_answer`의 기존 3상태 판정에 판정 불가 상태가 있으면 재사용하고, 검증 엔드포인트 응답 스키마에 없으면 신설 여부를 설계 근거와 함께 적는다. 초과 시 예외 타입명을 로그에 남긴다(침묵 실패 금지)."
+  - "④ 변별력 — 의도적으로 느린 식(고차 다항 전개·중첩 simplify 등)을 주입해 ⓐ상한 초과 시 판정 불가가 나오고 ⓑ그 사이 같은 워커의 가벼운 요청이 막히지 않음을 테스트로 보인다. 격리를 되돌린 뮤테이션에서 ⓑ가 RED인지 확인한다."
+  - "⑤ 범위 밖 동결 — OCR 영역 검출(ONNX 동기 실행)은 `ocr_enabled` 기본 OFF라 포함하지 않는다. `S4-99`(LLM provider 클라이언트의 이벤트 루프 재사용)는 별개 축이다. 상한값(몇 초인가)은 기존 정상 문항 코퍼스의 SymPy 소요 분포를 실측해 정하고, 정상 문항이 판정 불가로 떨어지는 비율을 함께 보고한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/verify.py
+  - src/backend/whymath_backend/l3/verify_step.py
+  - src/backend/whymath_backend/api/coach.py
+  - "tests/backend/api/test_verify*.py"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §5 R6 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 성능보다 가용성·검증 권위 축의 결함이다. 등급 P1 근거: 12월 검증은 성립하지만, 내부 테스트 중 병리적 입력 1건이 서버 전체를 멈출 수 있다."
+updated: 2026-09-25
