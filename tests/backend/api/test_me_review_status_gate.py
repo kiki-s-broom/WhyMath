@@ -93,9 +93,10 @@ class _CapturingQueueSession:
 
 #: EOS-19 — 핸들러가 정책을 부르기 **전에** 조립하는 `LearnerState`가 소비하는 결과 수.
 #: 내역은 `tests/backend/api/test_me.py::_learner_state_results` docstring이 정본이다(개념 진단
-#: 2 · 전과목 θ 1 · 활성 오개념 1 · 스킬 숙달 1). 이 파일은 후보 stmt를 *인덱스로* 집으므로
-#: 그 앞단 수를 상수로 둔다 — 생 인덱스를 박아 두면 앞단이 하나 늘 때 엉뚱한 stmt를 검사한다.
-_NP_STMT_BASE = 5
+#: 2 · 전과목 θ 1 · 활성 오개념 1 · 스킬 숙달 1 · 학습 상태 원장 1 — EOS-24). 이 파일은 후보
+#: stmt를 *인덱스로* 집으므로 그 앞단 수를 상수로 둔다 — 생 인덱스를 박아 두면 앞단이 하나 늘 때
+#: 엉뚱한 stmt를 검사한다(EOS-24에서 실제로 그렇게 드러났다: 5 → 6).
+_NP_STMT_BASE = 6
 
 
 def _learner_state_results() -> list[_AQResult]:

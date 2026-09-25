@@ -64,7 +64,8 @@ EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 �
 판정과 동결 — 이 파일이 초록인 것은 §18 충족이 **아니다**
 ────────────────────────────────────────────────────────────────────────────
 2026-09-25 실측(main `bbd7c382`)으로 §18은 **미충족**이다(Loop 1 `보정` · Loop 3
-`다음concept`). 그래서 테스트를 셋으로 나눈다.
+`다음concept`). EOS-24(PR #1316) 뒤 재실측에서 오개념 오답의 Loop 1 `보정`은 섰고, 원인 미상
+오답의 Loop 1과 두 종류의 Loop 3은 그대로다(`_FROZEN` 주석). 그래서 테스트를 셋으로 나눈다.
 
 - `test_three_loops_are_operator_free_and_continuous` — 무개입·연속성 불변식. 판정과
   무관하게 항상 초록이어야 한다.
@@ -610,25 +611,45 @@ def test_three_loops_are_operator_free_and_continuous(journey: _Journey) -> None
 
 # ── 정직한 공백 동결 — 마디별 현재 판정 ────────────────────────────────────────
 
-#: 2026-09-25 main `bbd7c382` 실측. 두 오답 종류 모두 같은 마디에서 끊긴다 — 오개념 오답은
-#: 상태 머신을 `REMEDIATING`으로 보내지만 추천은 그 상태를 읽지 않는다(판정문 §3-3 ①과 같은
-#: 형태가 오답 종류와 무관하게 재현된다).
-_FROZEN: dict[int, dict[str, bool]] = {
-    1: {"진단": True, "문제": True, "오답": True, "보정": False},
-    2: {"보정진입": True, "문제·정답": True, "mastery상승": True, "전진임계통과": True},
-    3: {"다음concept": False, "문제": True, "평가": True, "추천": True},
+#: 오답 종류별 동결값. 최초 동결(2026-09-25 main `bbd7c382`)은 두 종류 모두 Loop 1 `보정`에서
+#: 끊겼다 — 오개념 오답은 상태 머신을 `REMEDIATING`으로 보내지만 추천이 그 상태를 읽지 않았다.
+#:
+#: **EOS-24 승격(2026-09-25 · PR #1316)**: 추천이 상태 머신의 오개념 교정 결정(R3)을 집행하게
+#: 되어 `misconception`의 Loop 1 `보정`이 섰다(실측: `practice_current · misconception_remediation`
+#: · 문항·target 모두 틀린 개념). `general`(원인 미상 오답 R6)은 EOS-24가 **의도적으로** 배선하지
+#: 않았으므로(판정문 `docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md`
+#: §7-1) 그대로 공백이며, 그것을 보정으로 볼지는 Kiki 결정 게이트
+#: `G-eos24-loop1-undiagnosed-wrong-criterion` 소관이다. 두 종류가 이제 다른 값을 가지므로 표를
+#: 종류별로 나눈다 — 하나로 두면 한쪽을 올리는 순간 다른 쪽이 거짓 해소·거짓 회귀가 된다.
+_FROZEN_LOOP2: dict[str, bool] = {
+    "보정진입": True,
+    "문제·정답": True,
+    "mastery상승": True,
+    "전진임계통과": True,
+}
+_FROZEN_LOOP3: dict[str, bool] = {"다음concept": False, "문제": True, "평가": True, "추천": True}
+_FROZEN: dict[str, dict[int, dict[str, bool]]] = {
+    "misconception": {
+        1: {"진단": True, "문제": True, "오답": True, "보정": True},
+        2: _FROZEN_LOOP2,
+        3: _FROZEN_LOOP3,
+    },
+    "general": {
+        1: {"진단": True, "문제": True, "오답": True, "보정": False},
+        2: _FROZEN_LOOP2,
+        3: _FROZEN_LOOP3,
+    },
 }
 
-#: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳.
-_GAP_OWNERS: dict[tuple[int, str], str] = {
-    (1, "보정"): (
-        "`EOS-24-recommendation-reads-learning-state`(추천 정책이 학습 상태 머신을 읽지 않음 — "
-        "2026-09-24 재판정이 #1295로 등재)"
+#: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳(오답 종류별).
+_EOS124_OWNER = "`EOS-124-next-problem-policy-selection-axis-mismatch`(정책 축·선택 축 불일치)"
+_GAP_OWNERS: dict[tuple[str, int, str], str] = {
+    ("general", 1, "보정"): (
+        "`EOS-139-undiagnosed-wrong-recommendation-criterion`(원인 미상 오답 R6 직후 추천 — "
+        "Kiki 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion` 대기)"
     ),
-    (
-        3,
-        "다음concept",
-    ): "`EOS-124-next-problem-policy-selection-axis-mismatch`(정책 축·선택 축 불일치)",
+    ("misconception", 3, "다음concept"): _EOS124_OWNER,
+    ("general", 3, "다음concept"): _EOS124_OWNER,
 }
 
 
@@ -637,7 +658,11 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
     observed = journey.as_map()
     improved: list[str] = []
     regressed: list[str] = []
-    for number, frozen_nodes in _FROZEN.items():
+    assert journey.variant in _FROZEN, (
+        f"동결표에 없는 오답 종류: {journey.variant} — `_WRONG_ANSWERS`에 종류를 추가했다면 "
+        "`_FROZEN`에도 실측값으로 추가한다."
+    )
+    for number, frozen_nodes in _FROZEN[journey.variant].items():
         assert observed.get(number, {}).keys() == frozen_nodes.keys(), (
             f"Loop {number}의 마디 구성이 바뀌었다: {sorted(observed.get(number, {}))} vs "
             f"{sorted(frozen_nodes)} — 판정 규칙을 바꿨다면 동결표를 함께 고친다."
@@ -645,7 +670,7 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
         for name, was in frozen_nodes.items():
             now = observed[number][name]
             if now and not was:
-                owner = _GAP_OWNERS.get((number, name), "소유자 미상")
+                owner = _GAP_OWNERS.get((journey.variant, number, name), "소유자 미상")
                 improved.append(f"Loop {number} '{name}' False→True (소유자: {owner})")
             elif was and not now:
                 regressed.append(f"Loop {number} '{name}' True→False")
@@ -668,9 +693,10 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "계획서 300 §18 무개입 연속 3루프 미충족(2026-09-25 main bbd7c382 실측) — Loop 1 '보정' "
-        "(오답 직후 추천이 diagnose) · Loop 3 '다음concept'(전진 임계 통과 직후 추천이 현재 개념 "
-        "문항). 해소 시 XPASS가 strict 실패로 바뀐다 — 이 표식과 _FROZEN을 함께 올린다."
+        "계획서 300 §18 무개입 연속 3루프 미충족(2026-09-25 main bbd7c382 실측 · EOS-24 후 재실측) "
+        "— Loop 1 '보정'(general만: 원인 미상 오답 직후 추천이 diagnose · misconception은 EOS-24로 "
+        "해소) · Loop 3 '다음concept'(두 종류 모두: 전진 임계 통과 직후 추천이 현재 개념 문항). "
+        "해소 시 XPASS가 strict 실패로 바뀐다 — 이 표식과 _FROZEN을 함께 올린다."
     ),
 )
 def test_plan300_s18_three_consecutive_loops_hold(journey: _Journey) -> None:

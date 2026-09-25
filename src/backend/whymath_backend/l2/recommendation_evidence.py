@@ -89,6 +89,10 @@ META_KEY_GATE_REASON: str = "gate_reason"
 META_KEY_CANDIDATES: str = "candidates"
 META_KEY_POLICY_VERSION: str = "policy_version"
 META_KEY_REASON: str = "reason"
+#: EOS-24 — 상태 머신 지시의 처리 결과(`l2.learning_state_recommendation.StateDirectiveOutcome`
+#: 값). 지시가 없던 추천에는 키 자체가 없다 — 그래서 "키가 있는 행 중 `applied` 비율"이 곧
+#: 상태 머신 결정을 추천이 집행한 비율이다(CLAUDE.md "작동한 비율").
+META_KEY_LEARNING_STATE_DIRECTIVE: str = "learning_state_directive"
 
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
@@ -97,6 +101,10 @@ POLICY_VERSION_CAT: str = "cat_v1"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v1"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
+POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
+"""EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
+밴드로 고른다. 후보 생성 규칙이 `cat_v1`과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
+지시가 없거나 집행하지 못한 추천은 전환 전과 같은 규칙이라 `cat_v1` 그대로다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -128,6 +136,7 @@ async def record_recommendation_treatment(
     reason: RecommendationReason | None = None,
     occurred_at: datetime | None = None,
     learning_session_id: uuid.UUID | None = None,
+    learning_state_directive: str | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
 
@@ -153,6 +162,9 @@ async def record_recommendation_treatment(
     `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
     (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
 
+    `learning_state_directive`(EOS-24): 상태 머신이 이 추천을 지시했을 때 그 처리 결과
+    (`applied`·`released_after_repeat`·…). 지시가 없었으면 None이고 키를 넣지 않는다.
+
     `learning_session_id`(EOS-131): 이 추천이 나간 실 학습 세션. `None`이면 세션 기록 실패
     경로로 보고 결합 불가 placeholder를 발급한다(모듈 docstring 참조 — 가짜 결합 금지).
     """
@@ -176,6 +188,8 @@ async def record_recommendation_treatment(
         meta[META_KEY_POLICY_VERSION] = policy_version
     if reason is not None:
         meta[META_KEY_REASON] = reason.model_dump(mode="json")
+    if learning_state_directive is not None:
+        meta[META_KEY_LEARNING_STATE_DIRECTIVE] = learning_state_directive
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
@@ -197,6 +211,7 @@ __all__ = [
     "META_KEY_APPLIED_WEIGHTS",
     "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
+    "META_KEY_LEARNING_STATE_DIRECTIVE",
     "META_KEY_MODE",
     "META_KEY_POLICY_VERSION",
     "META_KEY_POOL_SIZE",
@@ -204,6 +219,7 @@ __all__ = [
     "META_KEY_REASON",
     "META_KEY_THETA",
     "POLICY_VERSION_CAT",
+    "POLICY_VERSION_CAT_STATE_REMEDIATION",
     "POLICY_VERSION_SUNEUNG",
     "record_recommendation_treatment",
 ]
