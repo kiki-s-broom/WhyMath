@@ -430,6 +430,26 @@ gates:
     evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 87cb759e (#1306 머지 후). 런북 §7-2: HAS_CODE_FIX=True · ROUND2_MODEL=qwen3:30b-a3b · STALE_ROUND3=0 → 실행 · ACCUMULATE3_EXIT=0 · ROUND3_FILES=5. §7-3: run_id d315c0084d5242f2814b0b92b21ddc0c · LEDGER_ROWS 1 · GENLOG_SAME_RUN 60 · SAME_MODEL_AS_ROUND2 True · PROMPT_CHANGED_FROM_ROUND2 True · canary_passed true(30/30 · 하한 0.9173) · 수용 51 · 중복 9 · 검수필요 0 · RECALL_EXIT=0(matched 60)."
     cleared_by: claude
     notes: ""
+  - id: G-mp03-canary-threshold-decision
+    title: "카나리 임계 결정 (MP-02 3회차 결과 직후) — ⓐ유지(판정 대상 30건·0.90 = 실패 0건 요구) / ⓑ카나리 42건 확대·0.90 유지(실패 1건 허용 · 권장) / ⓒ임계 0.85 완화 중 택1. 근거 docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §3 — ⓑ는 나쁜 생성기(실합격률 85%) 누출이 ⓐ와 같은 0.9% 수준이면서 98% 생성기 헛차단을 45%에서 21%로 줄이고, ⓒ는 90% 생성기 통과를 4.2%에서 18.4%로 올린다. 3회차 전에 바꾸지 않는 이유: 3회차는 예시 코드 정정 한 가지의 효과를 재도록 설정이 고정돼 있다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-25
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+  - id: G-mp03-first-promotion-run
+    title: "MP-03 런북 실행 — 골든 승격 게이트 1차 시도 + 골든 벤치 첫 동결 (docs/ops/mp03_first_golden_promotion_runbook.md · MP-03 PR 머지 후 · Phaiakes9 PowerShell · 약 3~5분 · 0원 · Docker·LLM 불요). 회신 = 런북 6절 목록(GATE_EXIT·REASONS 줄·GOLDEN_EXIT·DIGEST 줄 필수). 승격 게이트는 거부(exit 1)가 정상값이다 — 목적은 15건이 어느 단에서 몇 건씩 막히는가의 실측."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-25
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-not-now-v1-release-recheck
     title: "Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
     kind: decision
