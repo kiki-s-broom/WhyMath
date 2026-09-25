@@ -584,6 +584,7 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
         print(f"착수 가능 태스크 없음 — 사유: {code}")
         for item in detail:
             print(f"  · {item}")
+        _print_gate_waits(backlog, excluded)
         return 0
     shown = min(args.n, len(ready))
     # 분모를 함께 낸다 — "상위 N건"만 적으면 *얼마나* 잘렸는지 안 보이고, 그 출력을
@@ -603,7 +604,22 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
             f"\n※ {len(ready) - shown}건이 표시되지 않았다 — 특정 태스크가 후보인지"
             f" 판정하려면 전건 조회: backlog.py next --n {len(ready)} --json",
         )
+    _print_gate_waits(backlog, excluded)
     return 0
+
+
+def _print_gate_waits(backlog: object, excluded: list) -> None:
+    """게이트 때문에 제외된 todo — **무엇을 기다리는지**를 경로로 (HARN-174 v2-5).
+
+    게이트 ID만 보이면 "누가 그 게이트를 여는가"를 사람이 다시 조사해야 한다. 그 조사를
+    매번 사람이 하다 놓친 것이 게이트 해소 경로 미연결 계열 사고 3회였다. 0건도 찍는다 —
+    줄이 없으면 "게이트 대기가 없다"와 "안 셌다"를 구분할 수 없다.
+    """
+    groups = selector.gate_wait_groups(backlog, excluded)  # type: ignore[arg-type]
+    total = sum(len(ids) for _tail, ids in groups)
+    print(f"\n게이트 대기로 제외 {total}건 — 무엇을 기다리나(대기 경로):")
+    for line in selector.render_gate_wait_groups(groups):
+        print(line)
 
 
 def _warn_cancelled_dep_blocks(backlog: object) -> None:
@@ -1282,6 +1298,22 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
         for t in backlog.tasks.values()
         if task.id in t.depends_on and t.status not in TERMINAL_STATUSES
     )
+    # 막다른 길 선제 거부 (HARN-174 v2-3) — pending 게이트의 입력을 취소하면 그 게이트는
+    # 영원히 판정할 수 없게 되고 validate가 red가 된다. 태스크 후속(위 dependents)은 HARN-67의
+    # 결정 대기로 남길 수 있지만, 게이트 입력은 "취소 = 막다른 길"이라 쓰기 전에 막는다.
+    gate_inputs = sorted(
+        g.id for g in backlog.gates.values() if g.status == "pending" and task.id in g.depends_on
+    )
+    if gate_inputs:
+        return _fail(
+            f"{task.id}: pending 게이트의 입력이라 취소할 수 없다 — {', '.join(gate_inputs)}.\n"
+            "  취소하면 그 게이트는 영원히 판정할 수 없다(막다른 길). 먼저 게이트 입력을 바꿔라:\n"
+            + "\n".join(
+                f"    backlog.py gates amend {gid} --remove-depends {task.id} "
+                "--depends <대체 태스크> --reason '...'"
+                for gid in gate_inputs
+            )
+        )
     prev_session = task.session
     task.status = "cancelled"
     task.session = None
@@ -1402,6 +1434,8 @@ def cmd_gates(root: Path, args: argparse.Namespace) -> int:
             print(f"  {mark} {gate.id} [{gate.assignee}/{gate.kind}]")
             print(f"      {view.status_text()} · {dep}")
             print(f"      {gate.title}")
+            # 여는 작업 (HARN-174) — 이 게이트를 판정하기 전에 끝나야 할 태스크 또는 입력 없음 사유
+            print(f"      {report.gate_inputs_text(backlog, gate)}")
         if others:
             print("✔ 통과/면제:")
             for gate in sorted(others, key=lambda g: g.id):
@@ -1431,6 +1465,20 @@ def cmd_gates(root: Path, args: argparse.Namespace) -> int:
     if args.gate_action == "clear":
         if not args.evidence:
             return _fail(f"{gate.id}: clear에는 --evidence <근거> 필수")
+        # 해소 시점 집행 (HARN-174 v2-7) — 판정 근거가 될 작업이 안 끝났는데 조건 충족을
+        # 기록할 수는 없다. waive(Kiki의 예외 경로)는 이 검사를 받지 않는다.
+        unfinished = [
+            f"{dep}({getattr(backlog.tasks.get(dep), 'status', '대장에 없음')})"
+            for dep in gate.depends_on
+            if getattr(backlog.tasks.get(dep), "status", None) != "done"
+        ]
+        if unfinished:
+            return _fail(
+                f"{gate.id}: 입력 태스크가 아직 done이 아니다 — {', '.join(unfinished)}.\n"
+                "  이 게이트를 판정하기 전에 끝나야 할 작업이다(depends_on). 끝낸 뒤 clear하라.\n"
+                "  입력 자체가 틀렸다면 gates amend --remove-depends 로 정정하고,\n"
+                "  요건을 면제하려면 gates waive(Kiki 예외 경로)를 쓴다."
+            )
         # 판정 기준 게이트 (HARN-68) — evidence가 "언제의 트리로 판정했는가"를 담아야 한다.
         # done의 PR 증적 검사(HARN-23)와 동형이되 탈출구는 **자유 서술**이다: 사람 게이트의
         # 정당한 근거에는 커밋과 무관한 것이 많고(환경 생성·서명·법률 검토·외부 등록),
@@ -1580,6 +1628,15 @@ def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
         print(gate.notes or "(이상 상태 — waived인데 notes 없음)")
     else:
         print("evidence: 없음(아직 결정 전)")
+    # 여는 작업과 대기 경로 (HARN-174 v2-5) — pending이면 무엇이 끝나야 판정할 수 있는지까지
+    print(report.gate_inputs_text(backlog, gate))
+    if gate.status == "pending":
+        graph = store.dependency_graph(backlog)
+        chain = selector.wait_chain_from_gate(backlog, gate.id, graph)
+        if len(chain) > 1:
+            print(f"대기 경로: {selector.render_wait_chain(chain)}")
+        unlocks = store.open_descendant_tasks(backlog, (store.GATE_NODE, gate.id), graph)
+        print(f"이 게이트가 열리면 풀리는 미종결 태스크(끝까지 따라간 수): {len(unlocks)}건")
     print()
     print(f"title(등재 시점 질문 — 최신 판정을 반영하지 않을 수 있다): {gate.title}")
     return 0
@@ -1612,10 +1669,33 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
 
     new_title = args.title
     new_remind = args.remind_after_days
-    if new_title is None and new_remind is None:
+    add_deps = list(dict.fromkeys(getattr(args, "gate_depends", None) or []))
+    remove_deps = list(dict.fromkeys(getattr(args, "gate_remove_depends", None) or []))
+    no_inputs_arg = getattr(args, "no_inputs", None)
+    no_inputs = (no_inputs_arg or "").strip() or None
+    verdict = getattr(args, "verdict", None)
+    if (
+        new_title is None
+        and new_remind is None
+        and not add_deps
+        and not remove_deps
+        and no_inputs_arg is None
+        and verdict is None
+    ):
         return _fail(
-            f"{gate_id}: 정정할 것이 없다 — --title 또는 --remind-after-days 중 하나 이상 필요"
+            f"{gate_id}: 정정할 것이 없다 — --title / --remind-after-days / --depends / "
+            "--remove-depends / --no-inputs / --verdict 중 하나 이상 필요"
         )
+    if no_inputs_arg is not None and no_inputs is None:
+        return _fail(f"{gate_id}: --no-inputs 사유가 비어 있다 — 무사유 면제는 없다")
+    if args.evidence and verdict is None:
+        return _fail(
+            f"{gate_id}: gates amend 의 --evidence 는 --verdict FAIL 과 함께만 쓴다 "
+            "(통과 근거는 gates clear --evidence 의 몫)"
+        )
+    both = sorted(set(add_deps) & set(remove_deps))
+    if both:
+        return _fail(f"{gate_id}: 같은 입력을 붙이고 동시에 뗄 수 없다: {both}")
 
     # 무변경 정정을 거부한다. 허용하면 이력만 늘고 실효는 그대로인 행이 쌓여,
     # corrections 가 "무엇이 실제로 바뀌었나"의 기록이 아니게 된다.
@@ -1624,6 +1704,72 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         changes.append(f"title: {gate.title!r} → {new_title!r}")
     if new_remind is not None and new_remind != gate.remind_after_days:
         changes.append(f"remind_after_days: {gate.remind_after_days} → {new_remind}")
+
+    # ── 입력 간선 (HARN-174 v2-6) — 제거 → 부착 순. 판정은 전부 쓰기 전이다. ──
+    for dep in remove_deps:
+        if dep not in gate.depends_on:
+            return _fail(
+                f"{gate_id}: 입력 '{dep}' 는 depends_on에 없다 — 뗄 것이 없다 "
+                f"(현재: {gate.depends_on or '없음'})"
+            )
+        gate.depends_on.remove(dep)
+        changes.append(f"depends_on -{dep}")
+    for dep in add_deps:
+        rejection = _gate_input_rejection(backlog, gate_id, dep)
+        if rejection:
+            return _fail(rejection)
+        gate.depends_on.append(dep)
+        changes.append(f"depends_on +{dep}")
+    if no_inputs is not None:
+        if gate.depends_on:
+            return _fail(
+                f"{gate_id}: 입력 태스크 {gate.depends_on} 가 남아 있는데 --no-inputs 를 줄 수 "
+                "없다 — 먼저 --remove-depends 로 떼라(둘 다 있으면 대장이 어느 쪽이 참인지 "
+                "말하지 못한다)"
+            )
+        if no_inputs != gate.no_inputs_reason:
+            changes.append(f"no_inputs_reason: {gate.no_inputs_reason!r} → {no_inputs!r}")
+            gate.no_inputs_reason = no_inputs
+    elif add_deps and gate.no_inputs_reason:
+        # 입력이 생기면 "입력 없음" 사유는 거짓이 된다 — 자동 해제하고 옛 사유는 이력에 남긴다.
+        changes.append(f"no_inputs_reason: {gate.no_inputs_reason!r} → None (입력 부착으로 해제)")
+        gate.no_inputs_reason = None
+
+    # ── FAIL 판정 기록 (HARN-174 v2-8) ──
+    # 판정이 FAIL이면 "무엇이 끝나야 다시 판정하는가"가 대장에 있어야 한다. 그것이 없으면
+    # 재판정은 사람이 판정문을 다시 읽어야만 열리는 게이트가 된다 — 2026-09-24 재판정문이
+    # 지목한 EOS-24·EOS-124 가 재판정 태스크에 연결되지 않은 채 방치된 사고(계열
+    # gate-resolution-path-unlinked 3회차)의 집행 지점이다.
+    if verdict is not None:
+        if gate.kind != "decision":
+            return _fail(
+                f"{gate_id}: --verdict 는 decision 게이트 전용이다(현재 kind={gate.kind}) — "
+                "사람·외부 게이트는 판정문이 아니라 행동으로 열린다"
+            )
+        if gate.status != "pending":
+            return _fail(f"{gate_id}: 이미 {gate.status} — FAIL 판정은 pending 게이트에만 기록한다")
+        if not args.evidence:
+            return _fail(
+                f"{gate_id}: --verdict FAIL 에는 --evidence <판정문 경로 · 기준 커밋> 필수"
+            )
+        if not _has_judgment_base(args.evidence):
+            return _fail(
+                f"{gate_id}: --evidence 에 판정 기준이 없다 — 커밋 해시나 PR 참조(#12)를 넣어라 "
+                "(판정은 시점에 종속된다 · HARN-68과 같은 검사)"
+            )
+        owners = [dep for dep in add_deps if backlog.tasks[dep].status not in TERMINAL_STATUSES]
+        if not owners:
+            return _fail(
+                f"{gate_id}: FAIL 판정에 미충족 항목의 소유 태스크가 없다 — --depends <태스크>로 "
+                "**미종결** 태스크를 1건 이상 새로 붙여라.\n"
+                "  FAIL만 적고 여는 작업을 잇지 않으면, 무엇이 끝나야 재판정하는지 대장이 모른다\n"
+                "  (2026-09-24 재판정문이 지목한 EOS-24·EOS-124 가 연결되지 않은 채 방치된 사고)."
+            )
+        changes.append(
+            f"verdict FAIL (evidence: {args.evidence}) — 소유 태스크 {len(owners)}건: "
+            f"{', '.join(owners)}"
+        )
+
     if not changes:
         return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")
 
@@ -1642,10 +1788,18 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         return _fail(f"{gate_id}: 스키마/무결성 위반으로 정정 거부")
 
     store.save_gates(root, sorted(backlog.gates.values(), key=lambda g: g.id))
-    store.append_event(root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes))
+    event_extra: dict[str, object] = {}
+    if add_deps or remove_deps or no_inputs is not None:
+        event_extra.update(depends_on=list(gate.depends_on), no_inputs_reason=gate.no_inputs_reason)
+    if verdict is not None:
+        event_extra.update(verdict=verdict, evidence=args.evidence)
+    store.append_event(
+        root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes), **event_extra
+    )
     print(f"✎ {gate.id} 정정 — {' · '.join(changes)}")
     print(f"  사유: {args.reason}")
     print(f"  이력 {len(gate.corrections)}건 (append-only · 옛 값은 corrections에 보존)")
+    print(f"  {report.gate_inputs_text(backlog, gate)}")
     return 0
 
 
@@ -1671,6 +1825,24 @@ def _cmd_gates_add(root: Path, args: argparse.Namespace, backlog) -> int:
     #    G-* 게이트 id는 애초에 그 대장에 실리지 않는다). 따라서 gates.yaml 내 중복만 본다.
     if gate_id in backlog.gates:
         return _fail(f"게이트 ID 중복: {gate_id} (이미 gates.yaml에 존재)")
+    # ⑥ 입력 간선 필수 (HARN-174 v2-6) — 여는 작업이 대장에 없는 게이트를 **쓰는 순간** 막는다.
+    #    검사는 전부 save 이전이다: 거부되면 대장에 아무것도 쓰이지 않는다.
+    depends = list(dict.fromkeys(args.gate_depends or []))
+    no_inputs = (args.no_inputs or "").strip() or None
+    if not depends and no_inputs is None:
+        return _fail(
+            f"{gate_id}: 여는 작업이 없다 — --depends <태스크 full-id>(반복 지정) 또는 "
+            "--no-inputs '<사유>' 중 하나가 필요하다.\n"
+            "  게이트를 판정하기 전에 끝나야 할 태스크가 대장에 없으면, 게이트가 영원히 안 열려도\n"
+            "  아무 검사도 모른다 — 2026-09-22~24 사고 3건의 공통 형태다(HARN-174).\n"
+            "  사람이 직접 행동하는 게이트(런북 실행·외부 회신 등)라면\n"
+            "  --no-inputs 에 그 사유를 적어라."
+        )
+    if depends and no_inputs is not None:
+        return _fail(
+            f"{gate_id}: --depends 와 --no-inputs 를 함께 줄 수 없다 — 입력 태스크가 있는지 "
+            "없는지 대장이 말하지 못한다"
+        )
 
     gate = Gate(
         id=gate_id,
@@ -1680,8 +1852,14 @@ def _cmd_gates_add(root: Path, args: argparse.Namespace, backlog) -> int:
         status="pending",
         requested=_today(),
         remind_after_days=args.remind_after_days,
+        no_inputs_reason=no_inputs,
     )
     backlog.gates[gate.id] = gate
+    for dep in depends:
+        rejection = _gate_input_rejection(backlog, gate.id, dep)
+        if rejection:
+            return _fail(rejection)
+        gate.depends_on.append(dep)
     # ④ 스키마/무결성 검증 — 새 게이트가 유발한 오류만 걸러 거부(기존 대장의 무관한
     #    경고에 볼모 잡히지 않게 — cmd_add의 own_errors 패턴 답습). id 형식 위반(예:
     #    소문자 kebab·G- 접두 아님)은 여기서 잡힌다.
@@ -1701,11 +1879,45 @@ def _cmd_gates_add(root: Path, args: argparse.Namespace, backlog) -> int:
         kind=gate.kind,
         assignee=gate.assignee,
         title=gate.title,
+        depends_on=list(gate.depends_on),
+        no_inputs_reason=gate.no_inputs_reason,
     )
     print(
         f"＋ 게이트 {gate.id} 추가 " f"(kind={gate.kind}, assignee={gate.assignee}, status=pending)"
     )
+    print(f"  {report.gate_inputs_text(backlog, gate)}")
     return 0
+
+
+def _gate_input_rejection(backlog, gate_id: str, dep: str) -> str | None:
+    """게이트 입력 1건을 붙이기 **전** 판정 — 막다른 길·순환 (HARN-174 v2-3·v2-6).
+
+    막다른 길은 validate와 같은 함수(`store.dangling_reference`), 순환은 통합 그래프의
+    `store.cycle_if_linked` — 판정기를 새로 만들지 않는다. 게이트는 호출 전에 이미
+    `backlog.gates`에 있어야 한다(그래프의 노드여야 경로를 찾는다).
+    """
+    gate = backlog.gates[gate_id]
+    if dep in gate.depends_on:
+        return f"{gate_id}: 입력 '{dep}' 가 이미 있다"
+    verdict = store.dangling_reference(backlog, dep)
+    if verdict == "missing":
+        return (
+            f"{gate_id}: 입력 '{dep}' 가 대장에 없다 — 없는 태스크는 끝날 수 없으므로 이 게이트는 "
+            "영원히 판정할 수 없다(막다른 길). full id로 지정하라"
+        )
+    if verdict == "cancelled":
+        return (
+            f"{gate_id}: 입력 '{dep}' 는 cancelled — 취소된 태스크는 done이 되지 않으므로 이 "
+            "게이트는 영원히 판정할 수 없다(막다른 길). 대체 태스크를 걸어라"
+        )
+    cycle = store.cycle_if_linked(backlog, (store.TASK_NODE, dep), (store.GATE_NODE, gate_id))
+    if cycle is not None:
+        return (
+            f"{gate_id}: 입력 '{dep}' 는 순환을 만든다 ({store.render_path(cycle)}) — 이 게이트를 "
+            "여는 작업이 이 게이트를 기다린다. 입력을 바꾸거나 기다리는 쪽의 부착을 떼라"
+            "(amend <id> --remove-gate / --remove-depends)"
+        )
+    return None
 
 
 def _taken_id_numbers(root: Path, backlog: object, policy: object) -> dict[str, tuple[str, str]]:
@@ -2538,6 +2750,15 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
                 f"{task.id}: 게이트 '{gid}' 가 gates.yaml에 없다 — "
                 "먼저 `gates add` 로 등재하라(존재하지 않는 게이트는 영구 차단이 된다)"
             )
+        # 게이트 경유 순환 (HARN-174 v2-2) — 이 태스크가 그 게이트를 여는 작업(또는 그 선행)
+        # 이면, 부착하는 순간 서로를 기다린다. 2026-09-22 P3-00 · 09-23 EOS-50 사고의 형태다.
+        cycle = store.cycle_if_linked(backlog, (store.GATE_NODE, gid), (store.TASK_NODE, task.id))
+        if cycle is not None:
+            return _fail(
+                f"{task.id}: 게이트 '{gid}' 부착은 순환을 만든다 ({store.render_path(cycle)}) — "
+                "이 태스크가 그 게이트를 여는 사슬 위에 있다. "
+                "게이트를 기다릴 쪽이 아니라 여는 쪽이다"
+            )
         task.requires_gates.append(gid)
         changed.append(f"requires_gates +{gid}")
 
@@ -2612,19 +2833,13 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
                 f"{task.id}: 의존 대상 '{dep}' 가 백로그에 없다 — "
                 "존재하지 않는 의존은 영구 차단이 된다(full id로 지정하라)"
             )
-        # 순환 검사: dep에서 출발해 task.id에 도달하면 사이클이다. 사이클은 양쪽 태스크를
-        # 영구 착수 불가로 만들고, validate가 잡더라도 그때는 이미 대장이 오염된 뒤다.
-        stack, seen = [dep], set()
-        while stack:
-            cur = stack.pop()
-            if cur == task.id:
-                return _fail(f"{task.id}: 의존 '{dep}' 는 순환을 만든다 ({dep} → … → {task.id})")
-            if cur in seen:
-                continue
-            seen.add(cur)
-            nxt = backlog.tasks.get(cur)
-            if nxt is not None:
-                stack.extend(nxt.depends_on)
+        # 순환 검사: 새 간선 dep → task 가 고리를 닫는가. 사이클은 양쪽 태스크를 영구 착수
+        # 불가로 만들고, validate가 잡더라도 그때는 이미 대장이 오염된 뒤다. HARN-174 이후
+        # 종전의 자체 경로 추적(태스크끼리만)을 버리고 **통합 그래프 하나**를 쓴다 — 그래야
+        # 게이트를 지나는 고리(T → G → … → T)도 같은 판정에 걸린다.
+        cycle = store.cycle_if_linked(backlog, (store.TASK_NODE, dep), (store.TASK_NODE, task.id))
+        if cycle is not None:
+            return _fail(f"{task.id}: 의존 '{dep}' 는 순환을 만든다 ({store.render_path(cycle)})")
         task.depends_on.append(dep)
         changed.append(f"depends_on +{dep}")
 
@@ -3122,6 +3337,20 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
         store.save_task(root, other)
         updated_dependents.append(other.id)
 
+    # ②-b 구 ID를 입력으로 가리키는 게이트 (HARN-174) — 빠뜨리면 그 게이트의 입력이 대장에
+    #     없는 ID가 되어 영원히 판정할 수 없는 막다른 길이 된다(validate red).
+    updated_gates: list[str] = []
+    for gate in backlog.gates.values():
+        if old.id not in gate.depends_on:
+            continue
+        gate.depends_on = [args.new_id if d == old.id else d for d in gate.depends_on]
+        gate.corrections = list(gate.corrections) + [
+            f"[{_today()}] depends_on: {args.old_id} → {args.new_id} (태스크 개명) — {args.reason}"
+        ]
+        updated_gates.append(gate.id)
+    if updated_gates:
+        store.save_gates(root, sorted(backlog.gates.values(), key=lambda g: g.id))
+
     # ① 태스크 자신 — 새 파일을 먼저 쓰고 구 파일을 지운다. 순서가 반대면 중간에 죽었을 때
     #    태스크가 통째로 사라진다(새 파일도 구 파일도 없는 상태). 이 순서면 최악이 중복이고,
     #    중복은 validate가 번호 충돌로 즉시 잡는다 — 소실보다 낫다.
@@ -3138,6 +3367,7 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
         previous_id=args.old_id,
         reason=args.reason,
         updated_dependents=updated_dependents,
+        updated_gates=updated_gates,
     )
 
     # ③ 원격 claim — 구 ID의 claim은 이제 존재하지 않는 태스크를 가리킨다.
@@ -3159,6 +3389,11 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
         print(f"  · depends_on 갱신 {len(updated_dependents)}건: {', '.join(updated_dependents)}")
     else:
         print("  · depends_on 갱신 0건 (이 태스크를 선행으로 가리킨 태스크 없음)")
+    # 게이트 입력도 0건까지 찍는다 — 줄이 없으면 "안 봤다"와 "없었다"를 구분할 수 없다.
+    print(
+        f"  · 게이트 입력 갱신 {len(updated_gates)}건"
+        + (f": {', '.join(updated_gates)}" if updated_gates else "")
+    )
     if prev_status == "in_progress":
         print(f"  · 원격 claim: 구 ID 해제 + 새 ID 재claim({reclaimed or '미시도'})")
     # 안 옮긴 것을 반드시 말한다 — 조용한 부분 이행이 이 CLI의 최대 실패 모드다.
@@ -4400,7 +4635,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reason", required=True)
     p.set_defaults(func=cmd_rename)
 
-    p = sub.add_parser("gates", help="사람 게이트 대장")
+    p = sub.add_parser(
+        "gates",
+        help="사람 게이트 대장",
+        description=(
+            "사람 게이트 대장. 게이트는 태스크 그래프의 노드다(HARN-174): pending 게이트는 "
+            "여는 작업(--depends) 또는 입력 없음 사유(--no-inputs) 중 정확히 하나를 가져야 하고, "
+            "순환·막다른 길(대장에 없거나 취소된 입력)은 쓰는 순간 거부된다. "
+            "한계: 기계가 판정하는 것은 구조적 불가능(순환·막다른 길·입력 없음)까지다. "
+            "입력 태스크가 다 끝났을 때 기준이 실제로 PASS하는지(의미적 가능성)는 그래프로 "
+            "알 수 없다 — 그것은 판정 세션과 실행 가능한 테스트의 몫이다."
+        ),
+    )
     p.add_argument(
         "gate_action",
         nargs="?",
@@ -4442,6 +4688,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="gates add: 게이트 종류 (기본 human)",
     )
     p.add_argument("--assignee", default="kiki", help="gates add: 담당자 (기본 kiki)")
+    # 게이트 입력 간선 (HARN-174 v2-6) — 게이트를 태스크 그래프의 노드로 편입한다.
+    # add는 둘 중 하나가 **필수**다(없으면 대장에 아무것도 쓰지 않고 exit 1).
+    p.add_argument(
+        "--depends",
+        dest="gate_depends",
+        action="append",
+        default=None,
+        metavar="TASK_ID",
+        help=(
+            "gates add/amend: 이 게이트를 판정하기 전에 끝나야 할 태스크 full-id (반복 지정). "
+            "gates clear는 이 태스크가 전부 done이어야 통과한다 (HARN-174)"
+        ),
+    )
+    p.add_argument(
+        "--remove-depends",
+        dest="gate_remove_depends",
+        action="append",
+        default=None,
+        metavar="TASK_ID",
+        help="gates amend: 입력 태스크 제거 (반복 지정 · HARN-174)",
+    )
+    p.add_argument(
+        "--no-inputs",
+        dest="no_inputs",
+        default=None,
+        metavar="사유",
+        help=(
+            "gates add/amend: 입력 태스크가 원래 없는 게이트의 사유 — 사람이 직접 행동하는 "
+            "런북·외부 회신 등 (HARN-174)"
+        ),
+    )
+    p.add_argument(
+        "--verdict",
+        choices=["FAIL"],
+        default=None,
+        help=(
+            "gates amend: decision 게이트의 FAIL 판정 기록 — --evidence <판정문·기준 커밋>과 "
+            "--depends <미충족 항목의 소유 태스크>(1건 이상 신규·미종결) 필수 (HARN-174 v2-8)"
+        ),
+    )
     p.add_argument(
         "--remind-after-days",
         type=int,

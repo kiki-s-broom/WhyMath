@@ -17,7 +17,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+import store
 from models import Backlog, Task
+from store import DependencyGraph
 
 
 @dataclass
@@ -212,18 +214,128 @@ def classify_todo(
     return None
 
 
-def unblock_count(backlog: Backlog, task: Task) -> int:
-    """이 태스크 완료가 직접 해금하는 후속 태스크 수 (병목 우선 지표)."""
-    return sum(1 for other in backlog.tasks.values() if task.id in other.depends_on)
+def unblock_count(backlog: Backlog, task: Task, graph: DependencyGraph | None = None) -> int:
+    """이 태스크가 끝나야 풀리는 **미종결 후속 태스크 수** — 병목 우선 지표 (HARN-174 v2-4).
+
+    통합 그래프(태스크·게이트)를 **끝까지** 따라간다. 종전 정의("바로 다음 태스크 수")는
+    게이트 너머를 보지 못해 병목을 과소평가했다 — 2026-09-25 실측에서 EOS-24·EOS-124는
+    직접 후속이 각 1건(EOS-130)이었지만, EOS-130이 여는 진입 게이트 뒤의 P3 태스크까지
+    따라가면 각 13건이었다. 이미 끝난 태스크·이미 통과한 게이트 너머는 이 태스크를
+    기다리지 않으므로 세지 않는다(`store.open_descendant_tasks`).
+
+    `graph`를 넘기면 재사용한다 — 후보 전건을 정렬할 때 그래프를 한 번만 만들기 위해서다.
+    """
+    graph = graph or store.dependency_graph(backlog)
+    return len(store.open_descendant_tasks(backlog, (store.TASK_NODE, task.id), graph))
 
 
-def sort_key(backlog: Backlog, task: Task) -> tuple[int, int, int, str]:
+def unblock_counts(backlog: Backlog) -> dict[str, int]:
+    """전 태스크의 `unblock_count` — 그래프를 한 번만 만든다(보드·정렬 공용)."""
+    graph = store.dependency_graph(backlog)
+    return {tid: unblock_count(backlog, t, graph) for tid, t in backlog.tasks.items()}
+
+
+def sort_key(
+    backlog: Backlog, task: Task, counts: dict[str, int] | None = None
+) -> tuple[int, int, int, str]:
+    """정렬 키 (stage → priority → -해금 수 → id). 키 **순서**는 HARN-174 이후에도 불변이다 —
+    바뀐 것은 해금 수의 정의(직접 → 전이)뿐이라 영향은 같은 stage·priority 안의 순서다."""
+    unlocks = counts[task.id] if counts is not None else unblock_count(backlog, task)
     return (
         backlog.stage_index(task.stage),
         task.priority,
-        -unblock_count(backlog, task),
+        -unlocks,
         task.id,
     )
+
+
+def wait_chain(backlog: Backlog, task: Task, graph: DependencyGraph | None = None) -> list[str]:
+    """이 태스크가 **무엇을 기다리는지**를 통합 그래프로 거슬러 올라간 경로 (HARN-174 v2-5).
+
+    예: `P3-01 ← G-p3-entry-gate2-pass ← EOS-130 ← EOS-124`. 게이트 ID만 보여 주면 사람은
+    "누가 그 게이트를 여는가"를 다시 조사해야 한다 — 그 조사를 매번 사람이 하던 것이
+    사고 3회(게이트 해소 경로 미연결 계열)의 공통 형태였다.
+
+    각 단계에서 **아직 안 풀린** 선행만 따라간다(미종결 태스크 · 미통과 게이트). 갈래가
+    여럿이면 ID 정렬 첫 번째를 택하고 나머지 수를 `(외 N)`으로 붙인다 — 경로는 대표값이지
+    전수가 아니다(전수는 `gates show`·`validate`의 몫). 반환 첫 원소는 이 태스크 자신이다.
+    막힌 선행이 하나도 없으면 `[task.id]`.
+    """
+    return _wait_chain_from((store.TASK_NODE, task.id), backlog, graph)
+
+
+def wait_chain_from_gate(
+    backlog: Backlog, gate_id: str, graph: DependencyGraph | None = None
+) -> list[str]:
+    """게이트에서 출발한 대기 경로 — `gates show`용 (`wait_chain`과 같은 규칙)."""
+    return _wait_chain_from((store.GATE_NODE, gate_id), backlog, graph)
+
+
+def _wait_chain_from(
+    start: store.Node, backlog: Backlog, graph: DependencyGraph | None
+) -> list[str]:
+    graph = graph or store.dependency_graph(backlog)
+    chain: list[str] = [start[1]]
+    seen: set[store.Node] = {start}
+    cur: store.Node = start
+    while True:
+        waiting: list[store.Node] = []
+        for prev in graph.pred.get(cur, ()):
+            kind, pid = prev
+            if kind == store.TASK_NODE:
+                if backlog.tasks[pid].status in ("done", "cancelled"):
+                    continue
+            elif backlog.gates[pid].passed:
+                continue
+            waiting.append(prev)
+        if not waiting:
+            return chain
+        # 게이트를 먼저 — "무엇 때문에 막혔나"의 답은 게이트이고, 게이트 뒤가 여는 작업이다.
+        waiting.sort(key=lambda n: (n[0] != store.GATE_NODE, n[1]))
+        nxt = waiting[0]
+        label = nxt[1] + (f" (외 {len(waiting) - 1})" if len(waiting) > 1 else "")
+        if nxt in seen:
+            # 순환 — validate가 따로 잡는다. 여기서는 무한 루프만 막고 사실을 표시한다.
+            chain.append(f"{label} (순환)")
+            return chain
+        seen.add(nxt)
+        chain.append(label)
+        cur = nxt
+
+
+def render_wait_chain(chain: list[str]) -> str:
+    """`wait_chain` → `P3-01 ← G-x ← EOS-130` 한 줄."""
+    return " ← ".join(chain)
+
+
+def gate_wait_groups(
+    backlog: Backlog, excluded: list[Exclusion]
+) -> list[tuple[list[str], list[str]]]:
+    """게이트 때문에 제외된 todo를 **같은 대기 경로**끼리 묶는다 — `(경로, 태스크 id들)` (v2-5).
+
+    `next`·`status` 화면용이다. 태스크마다 한 줄씩 찍으면 같은 게이트 뒤의 태스크 수만큼
+    같은 경로가 반복된다(2026-09-25 기준 진입 게이트 하나 뒤에 4건 · Not Now 게이트 뒤에 12건).
+    경로의 첫 원소(태스크 자신)를 뺀 꼬리로 묶는다. 결정적: 경로 → 태스크 id 정렬.
+    """
+    graph = store.dependency_graph(backlog)
+    groups: dict[tuple[str, ...], list[str]] = {}
+    for exc in excluded:
+        if exc.reason not in ("gates", "track_gate"):
+            continue
+        chain = wait_chain(backlog, backlog.tasks[exc.task_id], graph)
+        groups.setdefault(tuple(chain[1:]), []).append(exc.task_id)
+    return [(list(tail), sorted(ids)) for tail, ids in sorted(groups.items())]
+
+
+def render_gate_wait_groups(
+    groups: list[tuple[list[str], list[str]]], indent: str = "  "
+) -> list[str]:
+    """`gate_wait_groups` → 화면 줄. 태스크가 많으면 앞 5건 + 건수(분모는 항상 낸다)."""
+    lines: list[str] = []
+    for tail, ids in groups:
+        shown = ", ".join(ids[:5]) + (f" 외 {len(ids) - 5}건" if len(ids) > 5 else "")
+        lines.append(f"{indent}· {len(ids)}건 ← {' ← '.join(tail)}  [{shown}]")
+    return lines
 
 
 def candidates(
@@ -254,16 +366,19 @@ def candidates(
             ready.append(task)
         else:
             excluded.append(exclusion)
-    ready.sort(key=lambda t: sort_key(backlog, t))
+    graph = store.dependency_graph(backlog)
+    counts = {t.id: unblock_count(backlog, t, graph) for t in ready}
+    ready.sort(key=lambda t: sort_key(backlog, t, counts))
     return ready, excluded
 
 
-def selection_rationale(backlog: Backlog, task: Task) -> str:
+def selection_rationale(backlog: Backlog, task: Task, graph: DependencyGraph | None = None) -> str:
     """왜 이 태스크가 지금 최우선인지 한 줄 설명."""
     parts = [f"stage={task.stage}", f"priority={task.priority}"]
-    unlocks = unblock_count(backlog, task)
+    unlocks = unblock_count(backlog, task, graph)
     if unlocks:
-        parts.append(f"완료 시 후속 {unlocks}건 해금")
+        # "해금"은 HARN-174 이후 게이트를 지나 끝까지 센 미종결 후속 수다(직접 후속이 아니다).
+        parts.append(f"완료 시 후속 {unlocks}건 해금(게이트 경유 포함)")
     if task.depends_on:
         parts.append(f"의존성 {len(task.depends_on)}건 전부 해소됨")
     if task.requires_gates:

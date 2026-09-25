@@ -104,7 +104,20 @@ class TestTrunkDependencyGateDrift:
 
         lander = clone("lander-gate")
         self._chdir_seed(lander, monkeypatch)
-        assert cli.main(["gates", "add", self.GATE_ID, "--title", "대기 중 게이트"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    self.GATE_ID,
+                    "--title",
+                    "대기 중 게이트",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         self._add("--id", self.TASK_ID, "--title", "드리프트 대상 태스크", "--gates", self.GATE_ID)
         self._push_to_trunk(lander)
 

@@ -136,7 +136,20 @@ class TestGateAttachment:
         before = selector.classify_todo(backlog, backlog.tasks["T1-05-amend-gate"])
         assert before is None or before.reason != "gates"
 
-        assert cli.main(["gates", "add", "G-harn24-test", "--title", "테스트 게이트"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-harn24-test",
+                    "--title",
+                    "테스트 게이트",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         assert (
             cli.main(
                 [
@@ -181,7 +194,20 @@ class TestGateAttachment:
 
     def test_duplicate_gate_rejected(self, seeded_repo: Path):
         assert _add("T1-07-amend-dupgate") == 0
-        assert cli.main(["gates", "add", "G-harn24-dup", "--title", "테스트"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-harn24-dup",
+                    "--title",
+                    "테스트",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         assert (
             cli.main(["amend", "T1-07-amend-dupgate", "--gate", "G-harn24-dup", "--reason", "1차"])
             == 0
@@ -301,10 +327,16 @@ class TestDependsAttach:
         capsys.readouterr()
         assert cli.main(["amend", "HARN-94-a", "--depends", "HARN-95-b", "--reason", "x"]) == 1
         err = capsys.readouterr().err
-        # validate 폴백은 "depends_on 순환 참조 검출: [...]" 라고만 한다 — "순환"·ID 포함
-        # 여부로는 구별되지 않는다(실측). 선제 검사에만 있는 문구로 고정한다.
+        # validate 폴백은 "…순환 참조 검출…" 이라고 한다 — "순환"·ID 포함 여부로는 구별되지
+        # 않는다(실측). 선제 검사에만 있는 문구로 고정한다.
         assert "순환을 만든다" in err, "선제 검사 문구가 아니다 — validate 폴백과 구별 불가"
-        assert "→ … →" in err, "선제 검사는 순환 경로를 화살표로 지목해야 한다"
+        # HARN-174 갱신 — 종전에는 `A → … → B`(중간 생략)만 확인했다. 선제 검사가 통합
+        # 그래프(`store.cycle_if_linked`)로 옮겨 가면서 **실제 고리 전체**를 적게 됐으므로
+        # 더 강한 단언으로 바꾼다: 새 간선(b → a)과 기존 간선(a → b)이 모두 경로에 보여야 한다.
+        # 중간을 생략하면 게이트를 지나는 고리에서 "어느 게이트가 끼었는지"가 사라진다.
+        assert (
+            "HARN-95-b → HARN-94-a → HARN-95-b" in err
+        ), "선제 검사는 순환 경로 전체를 지목해야 한다"
         # 부착이 실제로 일어나지 않았다 — 거부가 메시지만이 아님
         assert _task(seeded_repo, "HARN-94-a").depends_on == []
 
