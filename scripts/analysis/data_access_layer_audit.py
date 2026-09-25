@@ -222,6 +222,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/learner_state_store.py",
             "l2/learning_event_trace.py",
             "l2/learning_metrics_rollup.py",
+            # EOS-131: learning_session 행의 유일 writer(서버 30분 유휴 규칙). 기존 접근점 중
+            # 이 테이블에 *쓰는* 함수가 0건이라(writer 0 — 2026-09-16 실측) 재사용할 기존 경로가
+            # 없다. 조회 표면(api/me.py)은 그대로 두고 쓰기만 이 모듈에 모은다.
+            "l2/learning_session_writer.py",
             "l2/learning_path.py",
             # EOS-105(학습 상태 머신) — 이 두 모듈은 ARCH-48 baseline 확정과 **병렬로** 만들어져
             # 실측 118파일에 잡히지 않았다(PR #1189가 #1188과 같은 창에서 열려 있었다). 처분 (b)의

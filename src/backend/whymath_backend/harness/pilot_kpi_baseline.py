@@ -8,6 +8,9 @@ S3 파일럿(5~10명) 노출 직전, "무엇을 *지금* 잴 수 있고 무엇�
 
   1. **학습성과(숙달 델타)** — `wh1_evaluation` ⑨ `mastery_gain_rate` **재사용**(신규 계산 0).
   2. **재사용/리텐션** — `LearningSession`(user·started_at) 기반 파일럿 리텐션 지표 **신설**.
+     **무엇을 재는가(EOS-131 계약 1줄)**: 세션은 서버 30분 유휴 규칙이 만드는 *학습 활동 묶음*이라
+     (앱을 열기만 하면 세션이 생기지 않는다) 이 재방문율은 **학습 재방문율** — "다른 날 다시 와서
+     학습 활동(추천 조회·시도·코치 턴)을 했는가"이지 앱 실행 재방문율이 아니다.
   3. **정서안전(톤 위반)** — 현재 아키텍처상 **NO_DATA 정직 표기**. `l4.tone_filter.filter_tone`
      은 존재하나 라이브 경로 미배선(결정론 coach·LLM 생성 0)이라 위반할 발화 자체가 없다.
   4. **세션비용(P&L)** — 코호트 LLM 비용은 `ops.cost_report` **재사용**(부분). per-session
@@ -55,6 +58,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import LearningSession
 from whymath_backend.db.session import get_sessionmaker
@@ -79,6 +83,7 @@ __all__ = [
     "assemble_pilot_baseline",
     "compute_retention",
     "compute_verify_coverage",
+    "load_retention_sessions",
     "main",
     "render_pilot_baseline",
 ]
@@ -120,7 +125,8 @@ class RetentionReport(BaseModel):
     returning_user_rate: Metric = Field(
         description=(
             "복귀 사용자 비율 — 서로 다른 *날*에 2회 이상 세션을 연 사용자 / 전체 사용자. "
-            "핵심 리텐션(다른 날 다시 옴). 사용자 0명이면 NO_DATA."
+            "핵심 리텐션(다른 날 다시 옴). 사용자 0명이면 NO_DATA. 세션=서버 유휴 규칙의 학습 "
+            "활동 묶음이므로 *학습* 재방문율이다(앱만 열고 학습 활동이 없으면 세지 않는다)."
         )
     )
     sessions_per_user: Metric = Field(
@@ -793,6 +799,33 @@ def _resolve_params(
     return resolved_user, resolved_since, resolved_until
 
 
+async def load_retention_sessions(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None,
+    since: datetime | None,
+    until: datetime | None,
+) -> list[tuple[uuid.UUID | None, datetime | None]]:
+    """KPI2 입력 — `LearningSession`의 (user_id, started_at) 행(compute_wh1 세션 필터 패턴 동형).
+
+    EOS-131 이후 이 행은 서버 30분 유휴 규칙 writer(`l2/learning_session_writer`)가 만든다 —
+    `compute_retention`에 그대로 넘기면 KPI2 재방문율이 된다(조회 전용·쓰기 0).
+    """
+    session_conds = []
+    if user_id is not None:
+        session_conds.append(LearningSession.user_id == user_id)
+    if since is not None:
+        session_conds.append(LearningSession.started_at >= since)
+    if until is not None:
+        session_conds.append(LearningSession.started_at <= until)
+    rows = (
+        await session.execute(
+            select(LearningSession.user_id, LearningSession.started_at).where(*session_conds)
+        )
+    ).all()
+    return [(row[0], row[1]) for row in rows]
+
+
 async def _run(  # pragma: no cover — 라이브 PG/Langfuse/원장 glue(단위테스트 아닌 실 통합)
     *,
     user_id: uuid.UUID | None,
@@ -809,20 +842,10 @@ async def _run(  # pragma: no cover — 라이브 PG/Langfuse/원장 glue(단위
         metrics = await compute_wh1_surrogate_metrics(
             session, user_id=user_id, since=since, until=until, mode=mode
         )
-        # KPI2 리텐션 — LearningSession (user, started_at) 조회(compute_wh1 세션 필터 패턴 동형).
-        session_conds = []
-        if user_id is not None:
-            session_conds.append(LearningSession.user_id == user_id)
-        if since is not None:
-            session_conds.append(LearningSession.started_at >= since)
-        if until is not None:
-            session_conds.append(LearningSession.started_at <= until)
-        session_rows = (
-            await session.execute(
-                select(LearningSession.user_id, LearningSession.started_at).where(*session_conds)
-            )
-        ).all()
-        retention = compute_retention([(row[0], row[1]) for row in session_rows])
+        # KPI2 리텐션 — LearningSession (user, started_at) 조회 → 순수 계산.
+        retention = compute_retention(
+            await load_retention_sessions(session, user_id=user_id, since=since, until=until)
+        )
 
     # KPI4 코호트 비용 — Langfuse l3_routing 집계(미설정이면 빈 리스트·NO_DATA).
     cost_report = aggregate_l3_events(fetch_l3_events(days=cost_days))

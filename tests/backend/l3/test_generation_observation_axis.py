@@ -367,7 +367,9 @@ class TestSeatExistsInAllThreePlaces:
         # `EXPECTED_ALEMBIC_HEAD`가 `KNOWN_REVISIONS[-1]`로 *정의*돼 있어 정상·고장 양쪽에서
         # 같은 값을 내는 동어반복이고, 그런 검사는 보호가 아니라 위장이다.
         assert "d2a9e4b71c35" in KNOWN_REVISIONS, "EOS-112 리비전이 대장에서 사라졌다"
-        assert EXPECTED_ALEMBIC_HEAD == "5b3e9c27a1f6"
+        # [2026-09-25 EOS-131] head가 8e4c2a7f1b93(learning_session.last_activity_at + 열린
+        # 서버 세션 부분 유니크 인덱스)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "8e4c2a7f1b93"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

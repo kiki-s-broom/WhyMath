@@ -404,8 +404,18 @@ gates:
     title: "MP-02 재회차 (Phaiakes9) — 로컬 저작 모델 비교 파일럿(mid=qwen2.5:7b vs quality=qwen3:30b-a3b, 각 30건 · 문제 유형 3종 순환 · 카나리 끔) → 수용 건수가 많은 티어로 MP-02 2회차 n=60(카나리 기본값). 런북 = docs/reviews/mp02_rerun_runbook.md (착지 PR 머지 후 실행 — 런북 1단계 HAS_TIER_FLAG=True가 머지를 기계 확인). 회신 = 런북 8절 목록(5절·7절 출력 전문 필수). 배경: 1차 회차(run_id c0854e38…)는 30건 중 중복 20건이라 판정 분모 10 — 10/10 만점이어도 Wilson 하한 0.7871 < 0.90으로 통과가 수학적으로 불가능했다(25건 이상 전건 합격이어야 0.9023). 판정 규칙은 런북 5절에 실행 전 고정: accepted_stored가 많은 티어, 동률이면 mid. 전제: Ollama 가동 · qwen3:30b-a3b 설치(없으면 런북 2절에서 pull) · 비용 0원(로컬)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-24
+    remind_after_days: 3
+    evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 578fa9d2 (런북 착지 #1298 · 재회차 2차 #1303 머지 후). 파일럿 ①(mid=qwen2.5:7b · run_id 4fb0ba12…) 수용 12/30 · 파일럿 ②(quality=qwen3:30b-a3b · run_id ff50b997…) 수용 13/30 → 사전 고정 규칙으로 quality 선택. 이어 Kiki 결정 \"1+2 모두\"로 추가한 파일럿 ③(quality · --avoid-recent 10 · run_id 90208b46…) 수용 29/30 · 중복 0. 2회차(quality · avoid 10 · --canary-basis judged · run_id 42b6ac0f30b4403e881d3597dd354ad2) 실행 — 판정 대상 30 중 수용 27 · 검수필요 3 → Wilson 하한 0.7745 < 0.90 카나리 차단 · ACCUMULATE_EXIT=1. 런북 §7 출력(LEDGER_ROWS 1 · GENLOG_ROWS 30 · REVIEW_ROWS 3 · canary_basis judged · canary_attempts 30 · RECALL_EXIT=0) 회신 확인. 게이트가 요구한 조치(파일럿 → 선택 티어로 2회차)는 끝났다 — 차단은 MP-02의 결과이며 MP-02는 in_progress로 원인(성취기준 코드 불일치 4건) 규명을 이어 간다."
+    cleared_by: claude
+    notes: ""
+  - id: G-mp02-round3-standard-code-fix
+    title: "MP-02 3회차 (Phaiakes9) — 성취기준 예시 제거 후 n=60 재실행. 런북 = docs/reviews/mp02_rerun_runbook.md §1(재실행) → §7-2 → §7-3 (착지 PR 머지 후 — §7-2의 HAS_CODE_FIX=True가 머지를 기계 확인). 설정은 2회차와 동일(quality=qwen3:30b-a3b · --avoid-recent 10 · --canary-basis judged · 카나리 30 · 임계 0.90). 배경: 2회차(run_id 42b6ac0f…)는 판정 대상 30 중 수용 27 · 검수필요 3으로 Wilson 하한 0.7745 < 0.90 카나리 차단 — 실패 4건(파일럿 ③ 포함)이 전부 모델이 저작 프롬프트 예시 코드 [10공수1-02-02]를 베낀 것(스펙 [9수02-20] · 합격 81건은 전부 스펙 코드 · 2026-09-25 Kiki 조회로 확정). 수정 = 예시에서 필드 제거 + 스펙 값 복사 지시(게이트 불변). 회신 = 런북 §8의 3회차 목록(§7-3 출력 전문 필수). 전제: Ollama 가동 · 비용 0원(로컬)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-25
     remind_after_days: 3
     evidence: null
     cleared_by: null

@@ -50,6 +50,14 @@ def _all_produced_registry() -> tuple[trace.SourceCoverage, ...]:
     )
 
 
+def _all_dormant_registry() -> tuple[trace.SourceCoverage, ...]:
+    """모든 원천이 `DORMANT`인 대장 — 선결 가드가 조회 전에 멈추는지 검증하는 주입."""
+    return tuple(
+        c.model_copy(update={"availability": trace.SourceAvailability.DORMANT})
+        for c in trace.source_registry()
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 계약·정본 경계 (acceptance ④)
 # ──────────────────────────────────────────────────────────────────────────
@@ -237,13 +245,14 @@ def test_zero_tolerance_pass_reports_residual_upper_bound() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 # 구조적 선결 — 사실을 원천 대장에서 읽는가 (acceptance ②)
 # ──────────────────────────────────────────────────────────────────────────
-def test_loop_completion_and_traceability_are_blocked_on_main_today() -> None:
-    """2026-09-19 main 기준: 세션 writer 0·추천 결합 불가·LearnerState 시각 부재.
+def test_loop_completion_is_unblocked_and_traceability_still_blocked() -> None:
+    """EOS-131 착지 후: 세션 writer·추천 실 session_id 결합으로 ①의 선결이 **스스로** 풀렸다.
 
-    이 테스트가 깨진다면 그 자체가 좋은 소식이다 — 누군가 그 좌석을 배선했다는 뜻이고, 그러면
-    `_REQUIRED_SOURCES`와 이 단언을 함께 갱신한다.
+    종전 단언(`blocked_preconditions(LOOP_COMPLETION)`이 비어 있지 않다 — 2026-09-19 main)의
+    반대 방향이다. ⑤는 LearnerState 시각 원천(user_state_snapshot DORMANT)이 남아 여전히 막혀
+    있다(EOS-132 소관) — 이것이 풀리면 이 단언과 `_REQUIRED_SOURCES`를 함께 갱신한다.
     """
-    assert gate.blocked_preconditions(gate.LoopKpi.LOOP_COMPLETION)
+    assert gate.blocked_preconditions(gate.LoopKpi.LOOP_COMPLETION) == ()
     assert gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY)
     for kpi in (
         gate.LoopKpi.STATE_INTEGRITY,
@@ -264,11 +273,14 @@ def test_wiring_the_registry_unblocks_the_structural_kpis(monkeypatch: Any) -> N
 
 
 def test_blocked_precondition_names_the_source_and_the_reason() -> None:
-    """미측정 사유가 '미측정'이면 아무 정보도 아니다 — 어느 원천이 왜 막는지 말한다."""
-    blocked = gate.blocked_preconditions(gate.LoopKpi.LOOP_COMPLETION)
+    """미측정 사유가 '미측정'이면 아무 정보도 아니다 — 어느 원천이 왜 막는지 말한다.
+
+    EOS-131 이후 ①은 막혀 있지 않으므로 여전히 막힌 ⑤로 같은 계약을 확인한다.
+    """
+    blocked = gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY)
     joined = " ".join(blocked)
-    assert "learning_session" in joined
-    assert "evidence_event" in joined
+    assert "user_state_snapshot" in joined
+    assert "dormant" in joined
     assert "writer 0건" in joined
 
 
@@ -446,9 +458,14 @@ class _ExplodingSession:
     ],
 )
 def test_blocked_collectors_do_not_query_the_database(
-    collector: gate.CollectFn, kpi: gate.LoopKpi
+    collector: gate.CollectFn, kpi: gate.LoopKpi, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """선결이 막혀 있으면 조회하지 않는다 — 조회해서 나오는 0은 '도달 실패'가 아니다."""
+    """선결이 막혀 있으면 조회하지 않는다 — 조회해서 나오는 0은 '도달 실패'가 아니다.
+
+    EOS-131 이후 ①의 선결은 실제로 풀려 있으므로, 이 가드 자체의 변별력은 대장을 다시
+    DORMANT로 되돌린 주입으로 확인한다(가드가 사라지면 _ExplodingSession이 터진다).
+    """
+    monkeypatch.setattr(gate, "source_registry", _all_dormant_registry)
     observation = asyncio.run(collector(_ExplodingSession(), _WINDOW))  # type: ignore[arg-type]
     assert observation.kpi is kpi
     assert observation.unmeasured_reason is not None

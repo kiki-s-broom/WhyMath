@@ -115,6 +115,7 @@ def _run_export() -> UserDataExport:
             queue.append([])
     queue.append([])  # dialogue_turns 조인
     queue.append([])  # user_profile 단건
+    queue.append([])  # recommendation_events 조인(EOS-131 — 프로필 뒤 마지막)
     session = cast(AsyncSession, _FakeSession(queue))
     return asyncio.run(export_user_data(session, user_id=_USER_ID))
 
