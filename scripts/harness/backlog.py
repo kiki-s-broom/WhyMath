@@ -1674,6 +1674,13 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     no_inputs_arg = getattr(args, "no_inputs", None)
     no_inputs = (no_inputs_arg or "").strip() or None
     verdict = getattr(args, "verdict", None)
+    # --evidence 단독 호출은 "정정할 것이 없다"보다 **먼저** 판정한다 — 순서가 반대면 이 절은
+    # 도달 불가능한 코드가 된다(HARN-174 구현 중 실측: 강화한 단언이 잡았다).
+    if args.evidence and verdict is None:
+        return _fail(
+            f"{gate_id}: gates amend 의 --evidence 는 --verdict FAIL 과 함께만 쓴다 "
+            "(통과 근거는 gates clear --evidence 의 몫)"
+        )
     if (
         new_title is None
         and new_remind is None
@@ -1688,11 +1695,6 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         )
     if no_inputs_arg is not None and no_inputs is None:
         return _fail(f"{gate_id}: --no-inputs 사유가 비어 있다 — 무사유 면제는 없다")
-    if args.evidence and verdict is None:
-        return _fail(
-            f"{gate_id}: gates amend 의 --evidence 는 --verdict FAIL 과 함께만 쓴다 "
-            "(통과 근거는 gates clear --evidence 의 몫)"
-        )
     both = sorted(set(add_deps) & set(remove_deps))
     if both:
         return _fail(f"{gate_id}: 같은 입력을 붙이고 동시에 뗄 수 없다: {both}")
@@ -1765,10 +1767,9 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
                 "  FAIL만 적고 여는 작업을 잇지 않으면, 무엇이 끝나야 재판정하는지 대장이 모른다\n"
                 "  (2026-09-24 재판정문이 지목한 EOS-24·EOS-124 가 연결되지 않은 채 방치된 사고)."
             )
-        changes.append(
-            f"verdict FAIL (evidence: {args.evidence}) — 소유 태스크 {len(owners)}건: "
-            f"{', '.join(owners)}"
-        )
+        # 형식 고정 — validate(`store.fail_verdict_errors`)가 이 줄을 읽어 소유 태스크가
+        # 게이트 상류에 연결돼 있는지 대조한다. evidence는 자유 서술이라 맨 뒤에 둔다.
+        changes.append(store.format_fail_verdict(owners, args.evidence))
 
     if not changes:
         return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")

@@ -728,6 +728,79 @@ def dangling_reference(backlog: Backlog, task_id: str) -> str | None:
     return None
 
 
+# ── FAIL 판정 기록 (HARN-174 v2-8) ────────────────────────────────────────────
+#
+# `gates amend --verdict FAIL`이 corrections에 남기는 줄의 **고정 형식**이다. 판정 이력은 게이트
+# corrections(HARN-124)에 쌓이고, validate가 가장 최근 FAIL 기록을 읽어 두 가지를 본다.
+#   ① 소유 태스크가 0건인 FAIL 기록 — 무엇이 끝나야 재판정하는지 대장이 모른다.
+#   ② 기록이 지목한 **미종결** 소유 태스크가 게이트 상류(입력의 선행 폐포)에 없다 — 판정문은
+#      지목했는데 대장에는 연결이 없다. 이것이 2026-09-24 사고의 정확한 형태다(재판정문이
+#      EOS-24·EOS-124를 지목했으나 재판정 태스크 EOS-130의 depends_on에는 EOS-21뿐이었다).
+# 대장에 없는 소유 ID(개명·오기)는 ②에서 건너뛴다 — 개명은 게이트 입력은 옮기지만 과거
+# corrections 문구는 append-only라 옮기지 않으므로, 여기서 red를 내면 정상 개명이 대장을 깬다.
+
+_FAIL_VERDICT_RE = re.compile(r"verdict FAIL · owners: (?P<owners>[^·]*?) · evidence: ")
+
+
+def format_fail_verdict(owners: list[str], evidence: str) -> str:
+    """FAIL 판정 기록 한 조각 — `verdict FAIL · owners: A, B · evidence: …`."""
+    return f"verdict FAIL · owners: {', '.join(owners)} · evidence: {evidence}"
+
+
+def upstream_tasks(backlog: Backlog, node: Node, graph: DependencyGraph | None = None) -> set[str]:
+    """`node`가 기다리는 태스크 전부(선행 폐포 — 게이트를 지나 끝까지). 상태와 무관."""
+    graph = graph or dependency_graph(backlog)
+    seen: set[Node] = {node}
+    found: set[str] = set()
+    queue = [node]
+    while queue:
+        cur = queue.pop()
+        for prev in graph.pred.get(cur, ()):
+            if prev in seen:
+                continue
+            seen.add(prev)
+            if prev[0] == TASK_NODE:
+                found.add(prev[1])
+            queue.append(prev)
+    return found
+
+
+def fail_verdict_errors(backlog: Backlog, graph: DependencyGraph | None = None) -> list[str]:
+    """pending decision 게이트의 **가장 최근** FAIL 기록이 대장과 맞는가 (v2-8 · 사고 3)."""
+    graph = graph or dependency_graph(backlog)
+    errors: list[str] = []
+    for gid in sorted(backlog.gates):
+        gate = backlog.gates[gid]
+        if gate.status != "pending":
+            continue
+        records = [m for c in gate.corrections for m in [_FAIL_VERDICT_RE.search(c)] if m]
+        if not records:
+            continue
+        owners = [o.strip() for o in records[-1].group("owners").split(",") if o.strip()]
+        if not owners:
+            errors.append(
+                f"{gid}: 최근 FAIL 판정 기록에 소유 태스크가 0건 — 무엇이 끝나야 재판정하는지 "
+                f"대장이 모른다. 처방: gates amend {gid} --verdict FAIL "
+                "--evidence <판정문·기준 커밋> --depends <미충족 항목의 소유 태스크> --reason '...'"
+            )
+            continue
+        upstream = upstream_tasks(backlog, (GATE_NODE, gid), graph)
+        detached = [
+            o
+            for o in owners
+            if o in backlog.tasks
+            and backlog.tasks[o].status not in TERMINAL_STATUSES
+            and o not in upstream
+        ]
+        if detached:
+            errors.append(
+                f"{gid}: 최근 FAIL 판정이 지목한 미종결 소유 태스크 {detached} 가 이 게이트 상류에 "
+                "없다 — 판정문은 지목했는데 대장에는 연결이 없다(2026-09-24 사고 형태). 처방: "
+                f"gates amend {gid} --depends <id> 또는 재판정 태스크에 amend --depends <id>"
+            )
+    return errors
+
+
 def _gate_input_errors(backlog: Backlog) -> list[str]:
     """게이트 입력 간선의 막다른 길 (HARN-174 v2-3) — 영원히 못 여는 게이트."""
     errors: list[str] = []
@@ -808,8 +881,10 @@ def validate_backlog(backlog: Backlog, schema_errors: list[str] | None = None) -
 
     # HARN-174 — 게이트 입력 간선의 막다른 길 + 태스크·게이트 통합 그래프의 순환.
     # 순환 검사기는 이 그래프 하나뿐이다(쓰기 경로도 같은 그래프의 dependency_path를 쓴다).
+    graph = dependency_graph(backlog)
     errors.extend(_gate_input_errors(backlog))
-    errors.extend(graph_cycle_errors(backlog))
+    errors.extend(graph_cycle_errors(backlog, graph))
+    errors.extend(fail_verdict_errors(backlog, graph))
 
     # HARN-72 — 산문에만 적힌 미래 트리거를 대장이 집행하게 한다
     # (selector는 acceptance를 읽지 않는다 — depends_on·requires_gates만 본다)
