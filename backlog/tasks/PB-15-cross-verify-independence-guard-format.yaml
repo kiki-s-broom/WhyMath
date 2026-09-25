@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-15-cross-verify-independence-guard-format
+title: "교차검증 생성자≠검증자 가드가 코퍼스 문항에서 무력 — authored_by(corpus:<유형>)와 signature(llm:<모델>) 형식 불일치로 자기승인을 막지 못한다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(판정 기준 main 9a19ec0c · 2026-09-25 전체 시스템 재검토 §3-4): l3/cross_verify.py의 생성자≠검증자 가드(verify 진입부 `subject.authored_by == self.signature`)는 검증자 서명을 `llm:<모델 id>` 형식으로 만든다(signature 프로퍼티). 그런데 harness/residue_cross_verify_eval.py는 코퍼스 문항의 authored_by를 `corpus:<generation_type>` 형식으로 채운다. 두 형식이 달라 코퍼스 대상에서는 두 값이 같아질 수 없고, 가드는 한 번도 발화할 수 없다. 저작 경로(MP-02 --authoring-tier quality)와 교차검증 경로가 둘 다 로컬 qwen3:30b-a3b로 라우팅되므로, 실제로 막아야 할 자기승인 상태가 존재한다.\n② 처분: LLM 저작분은 provenance에 생성 모델 id를 기록하고(없으면 기록 경로를 만든다), authored_by를 검증자 서명과 같은 형식으로 정규화한다. 결정론 템플릿 생성분은 LLM 생성자가 없으므로 비교 대상이 아님을 명시적 값으로 표현한다(빈 문자열·임의 접두어로 우회하지 않는다).\n③ 회귀 동결: 생성 모델 = 검증 모델 상태를 주입해 IndependenceError가 발화하는지(RED), 다른 모델이면 통과하는지(대조군 GREEN) 단언한다. 형식 불일치를 되돌리는 뮤테이션이 RED인지 확인한다.\n④ 인접 경계: S4-56이 이 하네스를 다른 도메인에 재사용할 계획이므로, 재사용 전에 이 가드가 작동해야 한다. S4-16 강등전 판정(인간 검수 대체 후보 여부)은 이 태스크 소관이 아니다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/cross_verify.py
+  - src/backend/whymath_backend/harness/residue_cross_verify_eval.py
+session: null
+notes: "출처: 전체 시스템 재검토 docs/reviews/system_full_review_2026-09-25.md §3-4·§4 A3 (판정 기준 main 9a19ec0c). S4 접두어 번호 소진으로 PB(문제은행 검증 경로)로 등재. S4-16 강등전·S4-56 재사용과 인접."
+updated: 2026-09-25
