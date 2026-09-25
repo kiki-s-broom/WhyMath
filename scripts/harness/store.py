@@ -128,7 +128,18 @@ def dump_gates(gates: list[Gate]) -> str:
         first = True
         for key in _GATE_KEY_ORDER:
             prefix = "  - " if first else "    "
-            lines.append(f"{prefix}{key}: {_scalar(data[key])}")
+            value = data[key]
+            # 리스트 필드(HARN-124 `corrections`)는 블록 시퀀스로 쓴다. 종전 구현은 전 필드를
+            # `_scalar`로 한 줄에 썼는데, 리스트를 그대로 넘기면 파이썬 repr(`['a', 'b']`)이
+            # 인용돼 **문자열 하나로 되읽히고** 이력이 조용히 뭉개진다.
+            if isinstance(value, list):
+                if not value:
+                    lines.append(f"{prefix}{key}: []")
+                else:
+                    lines.append(f"{prefix}{key}:")
+                    lines.extend(f"      - {_scalar(item)}" for item in value)
+            else:
+                lines.append(f"{prefix}{key}: {_scalar(value)}")
             first = False
     return "\n".join(lines) + "\n"
 

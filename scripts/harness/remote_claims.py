@@ -624,11 +624,30 @@ def hold(root: Path, task_id: str, branch: str, reason: str) -> ClaimResult:
         return ClaimResult("error", message=f"{type(exc).__name__}: {exc}")
 
 
-def release(root: Path, task_id: str, branch: str, force: bool = False) -> ClaimResult:
+def release(
+    root: Path,
+    task_id: str,
+    branch: str,
+    force: bool = False,
+    allow_foreign_kinds: tuple[str, ...] = (),
+) -> ClaimResult:
     """원격 claim 해제 = claim 파일을 지우는 커밋. 남의 claim은 force 필수.
 
     ref 삭제 push를 쓰지 않는다 — 이 환경의 프록시가 삭제를 거부하기 때문이며,
     그 제약이 단일 브랜치 설계를 고른 이유다(모듈 docstring 참조).
+
+    `allow_foreign_kinds` — **홀더 불일치를 conflict로 보지 않을 kind 목록** (HARN-134).
+    기본값은 빈 튜플이므로 기존 호출자의 의미는 그대로다(착수 점유 탈취는 계속 막힌다).
+
+    왜 kind로 나누는가: `claim`(착수 점유)과 `block`(차단 홀드)은 원격 대장에서 같은
+    자료 구조를 쓰지만 **소유 의미가 정반대**다. claim은 "내가 지금 이걸 하고 있다"라
+    남이 걷으면 이중 구현이 되지만, block은 "이건 외부 입력을 기다린다"라 **해소를
+    판정하는 쪽이 거의 항상 다음 세션**이다(차단 사유가 대부분 사람·외부 대기이므로
+    차단을 건 세션은 그때 이미 끝나 있다). 그래서 종전 구현에서 block 해제는 항상
+    홀더 불일치로 막혔고, 유일한 수단이 `--force`였다 — 그런데 force는 *탈취*용
+    탈출구라, 정상 절차가 탈출구를 쓰게 만드는 상태였다(HARN-48 ④의 미이행 축).
+
+    `force`와 다른 점: force는 kind를 묻지 않고 전부 연다. 이 인자는 **block만** 연다.
     """
     task_id, branch = _sanitize_ident(task_id), _sanitize_ident(branch)  # HARN-36
     if not has_remote(root):
@@ -639,7 +658,11 @@ def release(root: Path, task_id: str, branch: str, force: bool = False) -> Claim
     ) -> tuple[list[RemoteClaim], ClaimResult | None]:
         if existing is None:
             return [], ClaimResult("ok", message="원격 claim 없음 (해제 불필요)")
-        if not force and existing.branch and existing.branch != branch:
+        foreign = bool(existing.branch) and existing.branch != branch
+        # kind 판정은 **실제 홀더 레코드**를 읽어서 한다 — 호출자가 "이건 block일
+        # 것이다"라고 가정하면, 메타가 없는 구버전 레코드(= claim)까지 열린다.
+        # RemoteClaim.kind가 이미 "명시된 것만 block" 규약을 쥐고 있으므로 그대로 쓴다.
+        if foreign and not force and existing.kind not in allow_foreign_kinds:
             return [], ClaimResult(
                 "error",
                 claim=existing,
