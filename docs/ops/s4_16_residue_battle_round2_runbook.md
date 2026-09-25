@@ -35,12 +35,21 @@
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $env:PYTHONUTF8="1"
+$env:PYTHONPATH="C:\Users\kiki\Desktop\__AI\WhyMath\src\backend"
 git fetch origin main
 git switch --detach origin/main
 git log -1 --oneline
 python -c "import whymath_backend.harness.residue_gate_demotion_battle as m; print(m.__file__)"
 python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4","--clean-n"
 ```
+
+**정정(2026-09-24 실측) — 다른 작업 사본의 코드가 임포트되는 문제.** Kiki 머신의 `python`
+은 conda base에 **편집 설치(editable install)** 된 `whymath_backend`를 갖고 있고, 그 설치가
+가리키는 곳은 이 클론이 아니라 타 세션의 작업 사본(`WhyMath-mp02-rerun`)이었다 — main으로
+체크아웃해도 실제로 돈 것은 그쪽 파일이다. 그래서 모든 블록이 `PYTHONPATH` 를 이 클론의
+`src\backend` 로 고정한다(`PYTHONPATH` 는 site-packages·편집 설치보다 앞서 검색된다). 편집
+설치 자체는 **건드리지 않는다** — 다시 설치하면 그 사본을 쓰는 다른 세션의 실행이 깨진다. [C]·[D]
+는 `__file__` 을 다시 계산해 `MODULE_OK` 로 판정하고, [D]는 그것이 False면 측정을 거부한다.
 
 **확인할 것** 3가지. ①`git switch` 가 오류 없이 끝난다 — `local changes would be overwritten`
 으로 거부하면 타 세션의 미커밋 변경이 있는 것이니 **진행하지 말고** 그 메시지를 세션에 회신한다
@@ -77,22 +86,26 @@ ollama list | Select-String -Pattern "qwen3:30b-a3b"
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $env:PYTHONUTF8="1"
+$env:PYTHONPATH="C:\Users\kiki\Desktop\__AI\WhyMath\src\backend"
 $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
 $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
-git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl
+git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl docs/prompts
 $PathsMatchMain = ($LASTEXITCODE -eq 0)
+$ModuleFrom = python -c "import whymath_backend.harness.residue_gate_demotion_battle as m; print(m.__file__)"
+$ModuleOk = $ModuleFrom -like "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\*"
 "CORPUS_OK=$CorpusOk"
 "HAS_V4=$HasV4"
 "OLLAMA_OK=$OllamaOk"
 "PATHS_MATCH_MAIN=$PathsMatchMain"
+"MODULE_OK=$ModuleOk  MODULE_FROM=$ModuleFrom"
 ```
 
-네 줄이 전부 `True`여야 다음 단계가 실행된다. 하나라도 `False`면 [D]는 **스스로 거부하고 멈춘다**
+다섯 줄(`MODULE_OK` 포함)이 전부 `True`여야 다음 단계가 실행된다. 하나라도 `False`면 [D]는 **스스로 거부하고 멈춘다**
 — 그래도 위 네 줄을 눈으로 확인하고 넘어가는 편이 낫다.
 
-`PATHS_MATCH_MAIN` 은 **이 측정이 읽는 경로만** main과 비교한다(검증기 2개 + 코퍼스). 무관한
+`PATHS_MATCH_MAIN` 은 **이 측정이 읽는 경로만** main과 비교한다(검증기 2개 + 코퍼스 + `docs/prompts` — 검증 관점의 프롬프트는 임포트된 패키지가 속한 저장소의 `docs/prompts` 에서 읽힌다, 2026-09-24 실측으로 추가). 무관한
 파일이 더러워도 통과하고, 측정 입력이 다르면 막는다 — 변별력이 필요한 자리에 정확히 놓은
 검사다. `False` 면 어느 경로가 다른지
 `git diff --stat origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl` 로 확인해 회신한다.
@@ -107,14 +120,17 @@ $PathsMatchMain = ($LASTEXITCODE -eq 0)
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $env:PYTHONUTF8="1"
+$env:PYTHONPATH="C:\Users\kiki\Desktop\__AI\WhyMath\src\backend"
 $env:WHYMATH_OLLAMA_REQUEST_TIMEOUT_S="180"
 $Corpus = "data\corpus\problem_bank_probability_finite_v0\problems.jsonl"
 $CorpusOk = Test-Path $Corpus
 $HasV4 = (python -m whymath_backend.harness.residue_gate_demotion_battle --help | Select-String -Pattern "--v4").Count -gt 0
 $OllamaOk = (ollama list | Select-String -Pattern "qwen3:30b-a3b").Count -gt 0
-git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl
+git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate_demotion_battle.py src/backend/whymath_backend/l3/cross_verify.py data/corpus/problem_bank_probability_finite_v0/problems.jsonl docs/prompts
 $PathsMatchMain = ($LASTEXITCODE -eq 0)
-if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain) { cmd /c "python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl > battle_v4_production.log 2>&1" ; "BATTLE_EXIT=$LASTEXITCODE" ; Get-Content -Encoding UTF8 battle_v4_production.log } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
+$ModuleFrom = python -c "import whymath_backend.harness.residue_gate_demotion_battle as m; print(m.__file__)"
+$ModuleOk = $ModuleFrom -like "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\*"
+if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain -and $ModuleOk) { cmd /c "python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl > battle_v4_production.log 2>&1" ; "BATTLE_EXIT=$LASTEXITCODE" ; Get-Content -Encoding UTF8 battle_v4_production.log } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain MODULE_OK=$ModuleOk MODULE_FROM=$ModuleFrom (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
 ```
 
 - `--v4 production`: 전 관점 세트를 태우고 판정을 합집합한다. **승격 판정은 이 모드로만 한다**
