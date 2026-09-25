@@ -7,7 +7,8 @@
 ① **무엇을 지시로 읽는가** — R3(`POLICY_REMEDIATE_MISCONCEPTION`)로 들어간 `REMEDIATING`만.
    R5의 `REMEDIATING`·PRACTICING·ADVANCING은 지시가 아니다(판정문 §3). 국면과 트리거를 **둘 다**
    본다 — 한쪽만 보는 뮤테이션을 잡는 반례가 각각 있다.
-② **안전장치 4개가 실제로 막는가** — 교정 국면에서의 재실패(해제) · 이번 회차 가설 없음/하한 이하
+② **안전장치 4개가 실제로 막는가** — 교정 국면에서의 재실패(해제) · 이번 회차 가설 없음(회차 경계 =
+   직전 다른 응답의 마지막 원장 전이 — EOS-140)/하한 이하
    (신뢰 경계는 *리터럴*로 밟는다 — 상수를 import해 픽스처를 만들면 경계가 움직일 때 픽스처도 따라
    움직여 검출이 불가능하다 · MISC-30 1차 실행 교훈) · 교정 대상 개념 미해소 · 개념 안 후보 0.
 ③ **지시가 없으면 조회 0건** — 대다수 요청이 전환 전과 같은 쿼리 수·같은 결과를 낸다.
@@ -235,6 +236,35 @@ class TestRouteByLearningState:
         assert "misconception_hypothesis.turns_since_evidence =" in sql
         assert "misconception_hypothesis.is_active IS true" in sql
         assert "misconception_hypothesis.user_id =" in sql
+
+    async def test_hypothesis_query_bounds_the_turn_by_the_previous_attempt(self) -> None:
+        """①의 회차 경계(EOS-140) — tse=0만으로는 미스캔 회차에서 옛 가설이 '방금'으로 읽힌다.
+
+        조회가 **직전 다른 응답의 마지막 원장 전이 이후에 갱신된 가설**로 좁혀지는가를 문장으로
+        고정한다. 실제로 옛 가설을 걸러내는지는 실 PG 반례
+        (`test_eos24_recommendation_follows_learning_state.py::test_stale_hypothesis_*`)가 판정한다.
+        """
+        fake, session = _session([])
+        await _route(_remediating(), session)
+        stmt = fake.statements[0]
+        compiled = stmt.compile(dialect=postgresql.dialect())
+        sql = str(compiled)
+        assert len(fake.statements) == 1  # 경계는 서브쿼리다 — 조회 수가 늘지 않는다
+        assert "max(learning_state_transition.occurred_at)" in sql
+        assert "learning_state_transition.user_id =" in sql
+        assert "learning_state_transition.attempt_id !=" in sql  # NULL 행도 이 비교가 뺀다
+        assert "misconception_hypothesis.updated_at >" in sql
+        # 경계에서 빠지는 것은 **결정 응답 자신**의 행이다(그 행은 이번 스캔 뒤에 적재된다).
+        assert _ATTEMPT in compiled.params.values()
+
+    async def test_missing_attempt_keeps_the_unbounded_query(self) -> None:
+        """결정 응답을 모르면 경계를 잡을 수 없다 — 그래도 집행되지 않는다(바로 뒤 앵커 미해소)."""
+        fake, session = _session([0.9])
+        route = await _route(_remediating(attempt_id=None), session)
+        sql = str(fake.statements[0].compile(dialect=postgresql.dialect()))
+        assert "learning_state_transition" not in sql
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.ANCHOR_UNRESOLVED
 
     async def test_missing_attempt_is_anchor_unresolved(self) -> None:
         _fake, session = _session([0.9])
