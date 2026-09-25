@@ -70,7 +70,20 @@ def _add(task_id: str) -> int:
 
 
 def _gate_add(gate_id: str) -> None:
-    assert cli.main(["gates", "add", gate_id, "--title", "HARN-74 테스트 게이트"]) == 0
+    assert (
+        cli.main(
+            [
+                "gates",
+                "add",
+                gate_id,
+                "--title",
+                "HARN-74 테스트 게이트",
+                "--no-inputs",
+                "테스트 픽스처 — 입력 태스크 없음",
+            ]
+        )
+        == 0
+    )
 
 
 def _attach(task_id: str, gate_id: str) -> None:
@@ -370,8 +383,13 @@ class TestBriefAndStatusShowStaleGateBlocked:
 def _backlog() -> Backlog:
     backlog = Backlog(stage_order=["S1"])
     backlog.tracks["main"] = Track(id="main", title="기본")
-    backlog.gates["G-a"] = Gate(id="G-a", title="a", requested="2026-09-01")
-    backlog.gates["G-b"] = Gate(id="G-b", title="b", requested="2026-09-01")
+    # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수다
+    backlog.gates["G-a"] = Gate(
+        id="G-a", title="a", requested="2026-09-01", no_inputs_reason="픽스처"
+    )
+    backlog.gates["G-b"] = Gate(
+        id="G-b", title="b", requested="2026-09-01", no_inputs_reason="픽스처"
+    )
     backlog.tasks["S1-01-x"] = Task(
         id="S1-01-x",
         title="둘 다 건 차단",

@@ -126,6 +126,28 @@ def pending_gate_views(backlog: Backlog, today: date) -> list[GateView]:
     return sorted(views, key=GateView.sort_key)
 
 
+def gate_inputs_text(backlog: Backlog, gate: object) -> str:
+    """게이트를 **여는 작업** 한 줄 (HARN-174 v2-1·v2-5) — 입력 태스크와 상태, 또는 입력 없음 사유.
+
+    대기 게이트 목록이 "누가 이 게이트를 여는가"를 말하지 않으면, 게이트는 그저 사람이
+    기다리는 칸으로 읽힌다 — 실제로는 입력 태스크가 끝나야 판정할 수 있는 게이트가 섞여 있다.
+    """
+    deps = list(getattr(gate, "depends_on", []) or [])
+    if deps:
+        parts = []
+        for dep in deps:
+            task = backlog.tasks.get(dep)
+            parts.append(f"{dep}({task.status if task else '대장에 없음'})")
+        waiting = sum(
+            1 for dep in deps if getattr(backlog.tasks.get(dep), "status", None) != "done"
+        )
+        return f"여는 작업 {len(deps)}건 · 미완 {waiting}건: {', '.join(parts)}"
+    reason = getattr(gate, "no_inputs_reason", None)
+    if reason:
+        return f"여는 작업 없음(사람 직접 행동): {reason}"
+    return "여는 작업 미선언 — validate 위반(HARN-174)"
+
+
 def overdue_gates(backlog: Backlog, today: date) -> list[tuple[str, int]]:
     """remind_after_days를 초과한 pending 게이트 (id, 경과일) 목록."""
     result: list[tuple[str, int]] = []
@@ -251,8 +273,16 @@ def render_status(backlog: Backlog, errors: list[str], today: date) -> str:
             mark = "⚠" if view.overdue else "⏳"
             lines.append(f"{mark} {gate.id} [{gate.assignee}] {view.status_text()}{dep}")
             lines.append(f"    {gate.title}")
+            lines.append(f"    {gate_inputs_text(backlog, gate)}")
 
     ready, excluded = selector.candidates(backlog)
+    # 게이트 대기 태스크의 대기 경로 (HARN-174 v2-5) — 게이트 뒤에 *누가* 있는지까지.
+    groups = selector.gate_wait_groups(backlog, excluded)
+    if groups:
+        total = sum(len(ids) for _tail, ids in groups)
+        lines.append("")
+        lines.append(f"── 게이트 대기 {total}건 — 무엇을 기다리나(대기 경로) ──")
+        lines.extend(selector.render_gate_wait_groups(groups))
     lines.append("")
     lines.append("── 다음 착수 후보 (next) ──")
     if ready:
@@ -311,8 +341,19 @@ def render_status_json(backlog: Backlog, errors: list[str], today: date) -> str:
                 "over_by": v.over_by,
                 "remaining": v.remaining,
                 "dependents": v.dependents,
+                # 이 게이트를 여는 작업 (HARN-174 v2-1) — 입력 태스크와 그 상태, 또는 입력 없음 사유
+                "inputs": [
+                    {"id": dep, "status": getattr(backlog.tasks.get(dep), "status", None)}
+                    for dep in v.gate.depends_on
+                ],
+                "no_inputs_reason": v.gate.no_inputs_reason,
             }
             for v in pending_gate_views(backlog, today)
+        ],
+        # 게이트 대기 태스크의 대기 경로 (HARN-174 v2-5) — 텍스트 화면과 같은 사실
+        "gate_waits": [
+            {"chain": tail, "tasks": ids}
+            for tail, ids in selector.gate_wait_groups(backlog, excluded)
         ],
         "next": [t.id for t in ready[:5]],
         "validate_errors": errors,

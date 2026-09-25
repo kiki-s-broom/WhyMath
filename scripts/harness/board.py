@@ -79,7 +79,7 @@ class BoardTask:
     session: str | None
     reason: str  # 대기/차단 사유 라벨 (없으면 "")
     detail: str  # 사유 상세 (의존 태스크 id·게이트 id·차단 노트 발췌)
-    unlocks: int  # 이 태스크 완료가 해금하는 후속 수
+    unlocks: int  # 이 태스크 완료가 해금하는 미종결 후속 수 (게이트 경유 전이 — HARN-174)
     artifacts: list[str]
 
     def as_dict(self) -> dict[str, object]:
@@ -142,6 +142,9 @@ def classify(backlog: Backlog, task: Task) -> tuple[str, str, str]:
 def build_tasks(backlog: Backlog) -> list[BoardTask]:
     """전 태스크를 카드 투영으로 변환 (열 판정 포함)."""
     cards: list[BoardTask] = []
+    # 해금 수는 next 정렬과 **같은 값**이다(HARN-174 v2-4 — 통합 그래프를 끝까지 따라간 미종결
+    # 후속 수). 그래프를 카드마다 다시 만들지 않도록 한 번에 계산한다.
+    unlocks = selector.unblock_counts(backlog)
     for task in backlog.tasks.values():
         column, reason, detail = classify(backlog, task)
         cards.append(
@@ -160,7 +163,7 @@ def build_tasks(backlog: Backlog) -> list[BoardTask]:
                 session=task.session,
                 reason=reason,
                 detail=detail,
-                unlocks=selector.unblock_count(backlog, task),
+                unlocks=unlocks[task.id],
                 artifacts=list(task.artifacts),
             )
         )

@@ -83,7 +83,13 @@ class TestTaskValidation:
 class TestGateValidation:
     def test_valid_gate(self):
         """test_정상_게이트"""
-        gate = Gate(id="G-sample-gate", title="샘플", requested="2026-07-08")
+        # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수다
+        gate = Gate(
+            id="G-sample-gate",
+            title="샘플",
+            requested="2026-07-08",
+            no_inputs_reason="테스트 픽스처",
+        )
         assert gate.validate() == []
 
     def test_cleared_without_evidence_rejected(self):
