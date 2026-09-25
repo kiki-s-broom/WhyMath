@@ -2074,6 +2074,21 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/models.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_resolution*"
+   ],
+   "text": "재판정문이 PASS 경로로 EOS-24·EOS-124를 지목했으나 EOS-130 의존에 미연결 - #1314 수동 정정",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-16",
    "paths": [
     "docs/standards/build_harness.md",
@@ -3428,6 +3443,36 @@
     "tests/backend/ops/test_role_grant_cli*.py"
    ],
    "text": "닫힌 PR #880 브랜치에만 있는 246줄 감사 설계 문서가 대장 어디에도 없어 삭제될 뻔",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-22",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/models.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_resolution*"
+   ],
+   "text": "P3-00이 증거를 대야 할 진입 게이트를 requires_gates로 걸어 Gate 2 재판정 소유자 부재",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-23",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/models.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_resolution*"
+   ],
+   "text": "게이트 병합(G3+G4)으로 EOS-50이 자기를 판정 대상으로 삼는 게이트를 요구하는 순환",
    "weight": 0
   }
  ]
