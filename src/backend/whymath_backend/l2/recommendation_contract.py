@@ -101,6 +101,7 @@ __all__ = [
     "check_intent_alignment",
     "demote_to_current_concept",
     "no_candidate_reason",
+    "remediation_reason",
     "select_reason_type",
 ]
 
@@ -117,10 +118,15 @@ PREREQUISITE_MASTERY_CEILING: Final = 0.4
 
 
 class ReasonType(str, Enum):
-    """**왜 이 문항인가** — 계획서 §8의 추천 종류 + 근거가 없는 두 경우.
+    """**왜 이 문항인가** — 계획서 §8의 추천 종류 + 근거가 없는 두 경우 + 상태 머신 결정 1종.
 
-    앞의 셋은 숙달 구간에서 나오고, 뒤의 둘은 *구간을 판정할 수 없는* 상태다. 넷째·다섯째를
+    앞의 셋은 숙달 구간에서 나오고, 넷째·다섯째는 *구간을 판정할 수 없는* 상태다. 넷째·다섯째를
     셋 중 하나로 접으면 근거 없음이 근거로 위장된다.
+
+    여섯째(`MISCONCEPTION_REMEDIATION`)는 **숙달 구간이 아니라 학습 상태 머신의 결정**에서 나온다
+    (EOS-24). 그래서 숙달이 선수 경계 미만이어도 이 값일 수 있다 — 오개념과 선수 결손 중 무엇이
+    먼저인가는 상태 머신 규칙(`l2/learning_state_policy.py::V1_RULES`)이 정본이고, 추천은 그
+    결정을 다시 판정하지 않고 집행한다.
     """
 
     PREREQUISITE_GAP = "prerequisite_gap"
@@ -146,6 +152,13 @@ class ReasonType(str, Enum):
     NO_CANDIDATE = "no_candidate"
     """추천할 문항이 없다 — 추천의 부재도 이유를 가진다."""
 
+    MISCONCEPTION_REMEDIATION = "misconception_remediation"
+    """학습 상태 머신이 오개념 교정 국면을 결정했다(R3) — 같은 개념에서 교정을 확인한다(EOS-24).
+
+    `basis`는 언제나 `LEARNING_STATE`다(검증기가 강제). `confidence`는 숙달 신뢰도가 아니라
+    *이번 회차에 확인된 오개념 가설의 신뢰*이고, `mastery`는 그 개념의 실측 숙달을 참고로 싣는다.
+    """
+
 
 class ReasonBasis(str, Enum):
     """`type`이 **무엇에 근거**하는가 — 같은 type이라도 근거가 다르면 신뢰도가 다르다."""
@@ -161,6 +174,16 @@ class ReasonBasis(str, Enum):
 
     NO_CANDIDATE_POOL = "no_candidate_pool"
     """후보 자체가 없었다 — 근거를 댈 대상이 없다."""
+
+    LEARNING_STATE = "learning_state"
+    """학습 상태 머신의 결정(원장 최신 전이)을 집행했다 — 숙달 구간 파생이 아니다(EOS-24)."""
+
+
+#: 상태 머신 결정에서만 나오는 근거 종류 ↔ 그 근거 기반. 둘은 **짝으로만** 존재한다 —
+#: 한쪽만 있으면 "상태 머신이 결정했다"와 "숙달 구간에서 나왔다"가 한 근거 안에서 섞인다.
+_STATE_DRIVEN_TYPES: Final[frozenset["ReasonType"]] = frozenset(
+    {ReasonType.MISCONCEPTION_REMEDIATION}
+)
 
 
 class RecommendationReason(BaseModel):
@@ -182,6 +205,23 @@ class RecommendationReason(BaseModel):
     mastery: float | None = Field(
         default=None, description="그 개념의 실측 숙달. 미측정이면 None(0.0으로 접지 않는다)."
     )
+
+    @model_validator(mode="after")
+    def _state_basis_pairs_with_state_type(self) -> "RecommendationReason":
+        """상태 머신 근거 종류 ⟺ `LEARNING_STATE` 기반 — 어긋난 조합은 **만들어지지 않는다**.
+
+        숙달 구간 근거에 `LEARNING_STATE`를 달거나, 오개념 교정 근거에 `MEASURED_MASTERY`를 달면
+        "누가 이 추천을 결정했는가"가 거짓이 된다. 그 거짓은 처치 기록 meta에 그대로 영속되어
+        소급 평가를 오염시키므로 생성 시점에 막는다(EOS-24).
+        """
+        state_type = self.type in _STATE_DRIVEN_TYPES
+        state_basis = self.basis is ReasonBasis.LEARNING_STATE
+        if state_type != state_basis:
+            raise ValueError(
+                f"reason.type({self.type.value})과 basis({self.basis.value})가 어긋납니다 — "
+                "상태 머신 결정 근거는 basis=learning_state와만 짝을 이룹니다."
+            )
+        return self
 
 
 class LearningContext(BaseModel):
@@ -351,6 +391,11 @@ _ACTION_BY_REASON.update(
         ReasonType.NEXT_CONCEPT: RecommendationAction.ADVANCE_NEXT,
         ReasonType.UNMEASURED: RecommendationAction.DIAGNOSE,
         ReasonType.NO_CANDIDATE: RecommendationAction.NONE,
+        # EOS-24 — 오개념 교정은 새 행위가 아니라 "현재 개념 연습"이다. 행위 어휘를 늘리지 않은
+        # 이유: 학생이 할 일(같은 개념 문항을 푼다)은 같고, *왜*가 다를 뿐이다 — 그 차이는
+        # `reason.type`/`basis`가 말한다(이 Enum docstring의 "근거가 늘어도 행위는 기존 다섯 중
+        # 하나일 수 있다"가 처음 실현된 자리).
+        ReasonType.MISCONCEPTION_REMEDIATION: RecommendationAction.PRACTICE_CURRENT,
     }
 )
 
@@ -508,3 +553,24 @@ def demote_to_current_concept(reason: RecommendationReason) -> RecommendationRea
             f"실측 근거만 강등할 수 있다 — basis={reason.basis.value}·concept={reason.concept_id}."
         )
     return reason.model_copy(update={"type": ReasonType.CURRENT_CONCEPT})
+
+
+def remediation_reason(
+    *,
+    concept_id: uuid.UUID,
+    mastery: float | None,
+    misconception_confidence: float,
+) -> RecommendationReason:
+    """상태 머신의 오개념 교정 결정(R3)을 집행한 추천의 근거(순수 · EOS-24).
+
+    `confidence`에 싣는 것은 **이번 회차에 확인된 오개념 가설의 신뢰**다 — 이 근거가 주장하는
+    것("지금은 오개념 교정 국면이다")을 얼마나 믿을 수 있는가이고, 숙달 추정의 신뢰도가 아니다.
+    `mastery`는 그 개념의 실측 숙달을 참고로 싣는다(미측정이면 None — 0.0으로 접지 않는다).
+    """
+    return RecommendationReason(
+        type=ReasonType.MISCONCEPTION_REMEDIATION,
+        confidence=misconception_confidence,
+        basis=ReasonBasis.LEARNING_STATE,
+        concept_id=concept_id,
+        mastery=mastery,
+    )

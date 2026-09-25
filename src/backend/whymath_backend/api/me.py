@@ -155,6 +155,7 @@ from whymath_backend.l2.learning_state_machine import (
     list_transitions,
     record_transition,
 )
+from whymath_backend.l2.learning_state_recommendation import StateDirectiveOutcome
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 
 # 이 블록의 일부 이름은 이 파일 안에서 쓰이지 않고 **재노출**만 된다(아래 별칭 블록 주석).
@@ -2577,6 +2578,16 @@ class NextProblemResponse(BaseModel):
             "— intent_resolution이 null.)"
         ),
     )
+    learning_state_directive: StateDirectiveOutcome | None = Field(
+        default=None,
+        description=(
+            "EOS-24: 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과. `applied`면 상태 "
+            "머신의 오개념 교정 결정(R3)을 집행했다(문항=교정 대상 개념 · reason.basis="
+            "learning_state). 그 외 값은 집행하지 못한 사유다(released_after_repeat · "
+            "weak_misconception_evidence · anchor_unresolved · no_candidate_in_concept) — "
+            "그때 추천은 숙달 구간 경로 그대로다. 상태 머신이 지시하지 않았으면 null."
+        ),
+    )
     reason: RecommendationReason = Field(
         description=(
             "EOS-14: **왜 이 문항인가** — *앵커* 개념과 그 실측 숙달로 판정한 추천 근거. 앵커는 "
@@ -2688,6 +2699,11 @@ async def recommend_next_problem(
                 outcome.intent_resolution.value if outcome.intent_resolution is not None else None
             ),
             learning_session_id=learning_session_id,
+            learning_state_directive=(
+                outcome.learning_state_directive.value
+                if outcome.learning_state_directive is not None
+                else None
+            ),
         )
         await session.commit()
     elif learning_session_id is not None:
@@ -2709,6 +2725,7 @@ async def recommend_next_problem(
         action=outcome.action,
         target_concept=outcome.target_concept,
         intent_resolution=outcome.intent_resolution,
+        learning_state_directive=outcome.learning_state_directive,
     )
 
 

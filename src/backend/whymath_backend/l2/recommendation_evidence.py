@@ -94,6 +94,11 @@ META_KEY_REASON: str = "reason"
 #: 않는 정책(수능)은 이 키를 넣지 않는다 — "없음"과 "null로 기록됨"을 구분한다.
 META_KEY_INTENT_RESOLUTION: str = "intent_resolution"
 
+#: EOS-24 — 상태 머신 지시의 처리 결과(`l2.learning_state_recommendation.StateDirectiveOutcome`
+#: 값). 지시가 없던 추천에는 키 자체가 없다 — 그래서 "키가 있는 행 중 `applied` 비율"이 곧
+#: 상태 머신 결정을 추천이 집행한 비율이다(CLAUDE.md "작동한 비율").
+META_KEY_LEARNING_STATE_DIRECTIVE: str = "learning_state_directive"
+
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
@@ -104,6 +109,12 @@ POLICY_VERSION_CAT: str = "cat_v2"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v1"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
+POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
+"""EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
+밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
+지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-124 이후 `cat_v2`)을
+따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 — EOS-124는 교정 경로를 바꾸지 않았으므로
+(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -136,6 +147,7 @@ async def record_recommendation_treatment(
     intent_resolution: str | None = None,
     occurred_at: datetime | None = None,
     learning_session_id: uuid.UUID | None = None,
+    learning_state_directive: str | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
 
@@ -165,6 +177,9 @@ async def record_recommendation_treatment(
     recommendation_policy.IntentResolution` 값). `l2.recommendation_policy`를 import하지 않고
     문자열로 받는 이유는 순환 참조다(그쪽이 이 모듈의 `POLICY_VERSION_CAT`을 import한다).
 
+    `learning_state_directive`(EOS-24): 상태 머신이 이 추천을 지시했을 때 그 처리 결과
+    (`applied`·`released_after_repeat`·…). 지시가 없었으면 None이고 키를 넣지 않는다.
+
     `learning_session_id`(EOS-131): 이 추천이 나간 실 학습 세션. `None`이면 세션 기록 실패
     경로로 보고 결합 불가 placeholder를 발급한다(모듈 docstring 참조 — 가짜 결합 금지).
     """
@@ -191,6 +206,9 @@ async def record_recommendation_treatment(
     if intent_resolution is not None:
         meta[META_KEY_INTENT_RESOLUTION] = intent_resolution
 
+    if learning_state_directive is not None:
+        meta[META_KEY_LEARNING_STATE_DIRECTIVE] = learning_state_directive
+
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
         # EOS-131: 실 학습 세션. None(세션 기록 실패)일 때만 어떤 세션에도 결합되지 않는
@@ -212,6 +230,7 @@ __all__ = [
     "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
     "META_KEY_INTENT_RESOLUTION",
+    "META_KEY_LEARNING_STATE_DIRECTIVE",
     "META_KEY_MODE",
     "META_KEY_POLICY_VERSION",
     "META_KEY_POOL_SIZE",
@@ -219,6 +238,7 @@ __all__ = [
     "META_KEY_REASON",
     "META_KEY_THETA",
     "POLICY_VERSION_CAT",
+    "POLICY_VERSION_CAT_STATE_REMEDIATION",
     "POLICY_VERSION_SUNEUNG",
     "record_recommendation_treatment",
 ]

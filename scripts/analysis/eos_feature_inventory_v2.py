@@ -656,8 +656,14 @@ CATALOG: tuple[Spec, ...] = (
        "입력으로 받고 `Recommendation`(필수 reason + 파생 action + 목표 개념)을 돌려주며, "
        "핸들러는 그것을 HTTP 응답으로 옮기기만 한다. 알고리즘은 전환 전과 같아 추천 결과가 "
        "바뀌지 않는다(회귀 0). 개념 그래프 조회는 depth<=2·nodes<=20·visited·timeout 예산 "
-       "안에서만 돌며 그 천장은 생성 시점에 강제된다",
-       "l2.next_problem_selection", "l2.recommendation_policy", "api._next_problem_policy"),
+       "안에서만 돌며 그 천장은 생성 시점에 강제된다. EOS-24 — 학습 상태 머신의 오개념 교정 "
+       "결정(R3)을 정책이 LearnerState로 받아 *집행*한다(후보를 교정 대상 개념으로 제한 · "
+       "안전장치 4종 · 집행 결과를 응답·처치 meta에 기록)",
+       "l2.next_problem_selection", "l2.recommendation_policy", "api._next_problem_policy",
+       # EOS-24 — 새 행이 아니라 이 행에 넣는 이유: 상태 경로는 추천 정책의 *입력 한 축*이지
+       # 별도 능력이 아니다(정책 안에서만 호출되고 응답 모양도 같다). 새 번호를 만들면
+       # 병렬 세션과의 번호 충돌 위험만 는다(WM-E-211/212 선례).
+       "l2.learning_state_recommendation"),
     # EOS-105 — 세 모듈이 한 행인 이유: 사용자에게 의미 있는 능력 1단위가 "학습 국면이
     # 증거에 따라 전이한다" 하나이기 때문이다(증거 조립 → 정책 결정 → 전이 적재는 그 능력의
     # 세 절반이 아니라 한 흐름의 세 구간이다 — ETL과 적재기를 한 행에 두는 규약과 동형).
