@@ -120,22 +120,6 @@ EOS-13 시점에는 `AssessmentEvidence` 구체 타입이 아직 없어 이 계�
 정의하고, `l2/mastery_contract.py::AttemptOutcomeEvidence`(2속성 최소 어댑터)를 임시 좌석으로
 두었다. **EOS-12(PR #1187)가 착지하고 EOS-18이 그 어댑터를 폐기**해 이음매가 닫혔다.
 
-<<<<<<< HEAD
-- **EOS-12가 착지하면 그 `AssessmentEvidence`가 `AssessmentEvidenceInput`을 만족해야 한다** —
-  필요한 것은 `correct: bool`·`observed_at: datetime` 두 속성뿐이며, 상속은 필요 없다(구조적
-  타이핑). 다른 필드를 얼마든지 더 들고 있어도 이 계약은 그것을 읽지 않는다.
-  `TestEvidenceProtocolSeam::test_future_assessment_evidence_satisfies_without_inheritance`가
-  그 상황을 미리 재현해 둔다.
-- 그때 `l2/mastery_contract.py::AttemptOutcomeEvidence`(임시 최소 어댑터)는 **폐기 대상**이다.
-  호출부 시그니처는 바뀌지 않는다.
-- **Protocol의 속성을 늘리지 마라** — evidence의 두 번째 진실 원천이 된다.
-  `test_protocol_reads_exactly_two_attributes`가 속성 집합을 동결해, 늘리려면 의식적으로 깨야
-  한다.
-  **[EOS-108 정정]** 그 동결을 **한 번 의식적으로 깼다**(2→3: `attempt_id` 편입). 근거와 그것이
-  두 번째 진실 원천이 아닌 이유는 §9에 있다. 동결 테스트 이름도
-  `test_protocol_reads_exactly_three_attributes`로 바뀌었고, 같은 클래스의
-  `test_landed_assessment_evidence_satisfies_protocol`이 **착지한 실물**로 이음매를 대조한다.
-=======
 - **실 `AssessmentEvidence`가 상속 없이 `AssessmentEvidenceInput`을 만족한다**(구조적 타이핑).
   `AssessmentEvidence`는 `BaseModel`이고 이 Protocol을 상속하지 않는다. 계약은 `correct`·
   `observed_at` 두 속성만 읽으므로 나머지 필드(귀속·coverage·오개념 후보)는 산출에 닿지 않는다.
@@ -170,7 +154,6 @@ EOS-13 시점에는 `AssessmentEvidence` 구체 타입이 아직 없어 이 계�
   *정의한* 클래스를 전수로 훑어 계약이 읽는 속성 집합을 갖춘 것이 있는지 본다(이름을 바꿔
   되살려도 걸린다). 스캔 0건은 실패로 처리한다. 뮤테이션 5종 전건 RED로 변별력을 확인했다
   (어댑터 재도입·귀속 폴백·측정시각 분리·정오답 고정·스캔 대상 전멸).
->>>>>>> origin/main
 - 이름 근거: 2026-09-16 Kiki 판정(A안)으로 계획서 쪽 per-answer 채점 산출의 이름이
   **`AssessmentEvidence`** 로 확정됐다. 저장소 정본 `schema/assessment.py::Assessment`(진단
   세션)와는 다른 객체다 — `schema/learning_loop_contract.py`의 `ASSESSMENT_EVIDENCE` 좌석 주석이
