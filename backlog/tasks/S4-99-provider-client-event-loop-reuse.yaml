@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,12 +13,14 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① `OllamaProvider`·`AnthropicProvider`가 기본 생성한 비동기 클라이언트를 **생성 당시의 이벤트 루프가 아닌 루프**에서 재사용하지 않는다 — 루프가 바뀌면 새로 만든다(주입된 클라이언트는 건드리지 않는다). ② 회귀 테스트: 두 번의 `asyncio.run` 사이에서 기본 클라이언트가 교체되는지, 같은 루프 안에서는 재사용되는지, 주입 클라이언트는 유지되는지를 동결하고, 수정을 되돌리면 RED가 나는지 뮤테이션으로 확인한다. ③ 실물 `ollama` AsyncClient + 로컬 가짜 서버로 수정 전 `Event loop is closed` 재현 / 수정 후 0건을 실측한다(PR 본문에 기록). ④ `residue_gate_demotion_battle_history.md`에 2026-09-24 2차 라이브 회차 수치와 이 결함의 영향(합집합 단조성상 오검출 결론 불변)을 기록한다."
-artifacts: []
+artifacts:
+  - "#1301"
+  - 16da5f09
 paths:
   - src/backend/whymath_backend/l3/providers/ollama.py
   - src/backend/whymath_backend/l3/providers/anthropic.py
   - "tests/backend/l3/**"
   - docs/standards/residue_gate_demotion_battle_history.md
-session: claude/cool-bohr-7mgpsf
+session: null
 notes: "발견 경위(2026-09-24 · 게이트 G-s416-round2-live-battle 라이브 회차): Kiki 실행 로그에서 `missing_condition_checklist`·`multiple_valid_answers_counterexample`·`independent_reconstruction` 3관점이 거의 전 문항 `RuntimeError`로 unclear 처리됐다. 셋은 정확히 v4 관점 세트 3종 각각의 **첫 관점**이다. `CrossVerifier.verify`가 호출마다 `asyncio.run`으로 새 루프를 여는데 provider가 캐시한 httpx 기반 클라이언트의 커넥션 풀이 닫힌 이전 루프에 묶여 있어, 새 루프의 첫 요청이 `RuntimeError: Event loop is closed`로 죽는다(두 번째 요청부터는 풀이 비워져 성공). 컨테이너에서 실물 ollama 0.x AsyncClient + 가짜 서버로 동일 패턴(루프마다 첫 요청만 실패) 재현 완료. 로컬 강등전 전 회차(--local-model 포함)와 anthropic 좌석 회차가 같은 결함 아래서 측정됐을 가능성이 높다 — openrouter·deepseek은 호출마다 클라이언트를 새로 만들어 영향 없음."
 updated: 2026-09-25
