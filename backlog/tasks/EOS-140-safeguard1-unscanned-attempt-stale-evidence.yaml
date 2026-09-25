@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,13 +14,15 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 실측 사실(판정 기준: PR #1316 head `06c8d97f` · 실 PG 16 + pgvector · HTTP 경로) — X 개념 오개념 오답(스캔·매치 → 가설 `distribution-over-power` 신뢰 0.90·`turns_since_evidence` 0) → X 정답(미스캔 → 가설 불변) → Y 개념 **답안 없는** 오답(미스캔 → 가설 불변, 학생 전체 활성 가설로 R3 재발화) → `GET /v1/me/next-problem`이 `learning_state_directive=applied` · 교정 대상 = Y · `reason.confidence=0.9`를 낸다. 판정문 §4 ①이 막는다고 명시한 반례 S1(옛 가설로 엉뚱한 개념에 고정)이 그대로 통과한다. 원인: `turns_since_evidence`는 **스캔한 회차에만** 움직인다(`api/me.py::_scan_attempt_misconceptions` NOT_RUN 조건 = 정답 · 답안 미제출 · 문항 지문 부재 · 킬 스위치). 교과서·평가원 출처 문항은 저작권 레일상 지문이 비어 있어 객관식 선지 채널이 없으면 오답이 구조적으로 미스캔이다. 대조: 같은 흐름에서 Y 오답이 스캔되면(매치 없음) 가설이 0.78·`turns_since_evidence` 1이 되어 `weak_misconception_evidence`로 막힌다.\n② 처분 — 안전장치 ①의 \"이번 회차\"를 `turns_since_evidence = 0`만으로 판정하지 않는다. 결정 응답(`attempt_id`)이 아닌 **직전 다른 응답의 원장 전이 최신 시각** 이후에 증거로 갱신된 가설만 인정한다(시각 비교는 DB 시계끼리). 지시가 없는 요청의 조회 수는 늘리지 않는다.\n③ 회귀 — 실 PG 통합 테스트에 반례(위 흐름 → 집행하지 않고 `weak_misconception_evidence`)와 대조군(스캔됐지만 매치 없는 오답)을 추가한다. 기존 EOS-24 통합 3건 · 3루프 상시 하네스(`tests/backend/api/test_e2e_three_consecutive_loops.py`) · Week 3 게이트가 그대로 통과한다. 경계 조건을 제거하는 뮤테이션에서 반례 테스트가 RED다(주입 실재 · 원복 동일 단언).\n④ 인접 경계 — `EOS-138`(R3 입력 축소)의 처분안 ②도 \"`turns_since_evidence = 0` = 이번 회차\"를 전제하므로 같은 반례에 걸린다. 이 태스크의 경계 판정을 재사용하도록 `EOS-138` acceptance에 반례를 병기한다. `EOS-123`(정답 회차 감쇠 비대칭)은 옛 가설이 오래 남는 원인이며 이 태스크가 대신 고치지 않는다."
-artifacts: []
+artifacts:
+  - "#1322"
+  - docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md
 paths:
   - src/backend/whymath_backend/l2/learning_state_recommendation.py
   - tests/backend/l2/test_learning_state_recommendation.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
   - docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md
   - scripts/analysis/data_access_layer_audit.py
-session: claude/eos-24-72wclg
+session: null
 notes: "출처: 2026-09-25 PR #1316 리뷰(세션 claude/eos-24-72wclg) — 실 PG 재현으로 발견. Kiki 지시: PR 1316 안전장치 ① 수정. PR #1316 위에 쌓아 수정한다(그 PR이 main 대상 CI를 받는 유일한 경로). 분류 LOOP.\n\n[정정 2026-09-25] paths ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/api/test_eos24_recommendation_follows_learning_state.py', 'docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md'] → ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/api/test_eos24_recommendation_follows_learning_state.py', 'docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md', 'scripts/analysis/data_access_layer_audit.py']: 데이터 접근 기준선의 편입 사유 주석(조회 ⓐ 설명)을 회차 경계에 맞추는 1줄 수정 — 판정 불변"
 updated: 2026-09-25
