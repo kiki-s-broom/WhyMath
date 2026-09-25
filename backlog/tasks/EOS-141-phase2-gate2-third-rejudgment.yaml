@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-141-phase2-gate2-third-rejudgment
+title: "Phase 2 Gate 2 3차 재판정 — EOS-139 착지 후 원인 미상 오답 Loop 1 '보정'을 새 기준으로 재실측 (판정 전용·구현 세션 분리)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P0
+owner: claude
+depends_on:
+  - EOS-139-undiagnosed-wrong-recommendation-criterion
+requires_gates: []
+acceptance:
+  - "① 착수 조건 — `EOS-139-undiagnosed-wrong-recommendation-criterion`이 main에 착지한 뒤에만 착수한다(판정 기준 커밋 해시를 판정문 상단에 박는다). EOS-139가 Gate 2 Loop 1 '보정' 기준을 Kiki 결정(게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`)대로 재정의하고 상시 3루프 하네스(`tests/backend/api/test_e2e_three_consecutive_loops.py`)의 `_FROZEN`·판정 규칙에 반영한 상태가 전제다.\n\n② 판정 회차 분리 — 구현 세션과 다른 세션에서 단독 집행한다. production code를 고치지 않고, 발견한 결함은 태스크로 등재만 한다.\n\n③ 재실측 범위 — 2026-09-25 재판정문(`docs/reviews/eos_phase2_gate2_rejudgment_2026-09-25.md`) §8-1 재현 절차 그대로: 10조건 하네스(week1·week3·p11·persona) + 상시 3루프 하네스(general·misconception) + SCENARIO 회귀 스위트 + 일회성 프로브 V1~V4 + `ops/loop_kpi_gate` CLI. 3루프 판정은 **EOS-139가 착지시킨 기준**으로 하되, 9/25 판정문 §3-5가 그 기준의 두 조건(ⓐ 선수 개념 진단 · ⓑ 오답 시 practice_prerequisite 하강)을 main 데이터에 대 본 결과와 일치하는지 대조한다.\n\n④ 대조표 — 9/19(EOS-22)·9/24·9/25(EOS-130) 판정과 조건별로 달라진 점·같은 점을 표로 적는다.\n\n⑤ KPI 5종 실측값 병기 — CLI exit code와 5종 verdict를 그대로 싣고 미측정은 unmeasured로 적는다(Gate 2 문면 밖이지만 판정 규칙이 병기를 요구한다).\n\n⑥ 최종 한 줄 PASS 또는 FAIL — 조건부 PASS 없음. 미충족 조건마다 끊긴 지점·남은 작업량·11월 일정 영향.\n\n⑦ 게이트 clear는 Kiki 소유 — `G-p3-entry-gate2-pass`는 kind=decision·assignee=kiki다. 이 태스크는 증거를 만들 뿐 닫지 않으며 --as kiki로 대행하지 않는다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: EOS-130 판정(2026-09-25 · 판정 기준 main 841ee77d · 최종 FAIL) §6·§8-3. 판정 기준: main 841ee77d.\n\n[왜 신규인가] EOS-130은 FAIL 판정문을 남기는 것으로 완료 조건 ⑧이 충족돼 done이 된다. 그러면 다음 재판정의 소유자가 없다 — 2026-09-19 EOS-22 FAIL 뒤 재판정 소유자가 사흘간 부재했던 사고(사고 대장 gate-resolution-path-unlinked 1회차 · EOS-130 등재로 수습)와 같은 형태가 재생산된다. 그래서 EOS-130 done과 같은 PR에서 후속 재판정을 등재한다.\n\n[의존 근거] 9/25 판정의 유일한 미충족은 무개입 연속 3루프 중 원인 미상 오답(general)의 Loop 1 '보정'이다(10조건·P-13·EOS-124 축은 전부 해소). 그 축의 소유자가 EOS-139이고, EOS-139의 기준 재정의가 main에 없으면 재판정은 같은 FAIL을 반복한다. 그래서 depends_on = EOS-139 하나만 건다. KPI ⑤(EOS-132)·3루프 하네스 CI 도달 동결(EOS-142)은 Gate 2 문면(10조건 + 3루프) 밖이거나 유지 요건이라 걸지 않는다.\n\n[게이트 미부착] G-p3-entry-gate2-pass를 requires_gates로 걸지 않는다 — 자기가 증거를 대야 할 게이트에 막히는 순환(P3-00 선례)을 피한다.\n\n[등급] eos_priority P0 — EOS-130과 같은 근거(재판정 없이는 저장소 G2의 최신 verdict가 FAIL로 고정되고 P3-01~P3-14 14건이 selector에서 막힌다)."
+updated: 2026-09-25
