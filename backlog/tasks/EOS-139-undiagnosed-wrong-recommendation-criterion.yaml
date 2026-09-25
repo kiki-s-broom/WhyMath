@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-139-undiagnosed-wrong-recommendation-criterion
+title: "원인 미상 오답(R6) 직후 추천 기준 — Kiki 결정(G-eos24-loop1-undiagnosed-wrong-criterion)에 따라 판정 기준 재정의 또는 R6 집행 배선"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates:
+  - G-eos24-loop1-undiagnosed-wrong-criterion
+acceptance:
+  - "① 결정 대상(게이트 G-eos24-loop1-undiagnosed-wrong-criterion) — 원인 미상 오답(상태 머신 R6 → PRACTICING · PRACTICE_SAME_CONCEPT) 직후 `GET /v1/me/next-problem`은 θ 하락으로 더 쉬운 개념 문항을 골라 `diagnose · unmeasured`를 낸다(Gate 2 재판정 2026-09-24 §3 V1 · EOS-24 통합 테스트 대조군이 동결). 이것을 Gate 2 Loop 1 \"보정\"으로 인정할지 Kiki가 정한다.\n② 결정이 (가) \"인정한다\"면 — Gate 2 Loop 1 판정 기준을 재정의하고(재판정문 §3-1의 기준 문장), 상시 3루프 하네스(PED-36 ⑫)가 그 기준을 쓰게 한다. 코드 변경 없음.\n③ 결정이 (나) \"인정하지 않는다\"면 — 추천이 R6 결정을 집행하도록 배선한다(EOS-24의 `l2/learning_state_recommendation.py`에 R6 지시 추가). 단 R2(정답+미측정 확신)는 같은 PRACTICING이라도 집행하지 않는다 — 확신도 미보고 학생의 진급이 막힌다(EOS-24 판정문 §3). 집행하면 `tests/backend/api/test_eos24_recommendation_follows_learning_state.py::test_undiagnosed_wrong_answer_is_not_directed`의 `action == \"diagnose\"` 동결 단언을 새 기준으로 승격한다.\n④ 어느 쪽이든 결정 없이 구현하지 않는다(EOS-24 acceptance ② (나) 경로)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_recommendation.py
+  - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
+session: null
+notes: "출처: EOS-24 판정문 §7-1. EOS-24는 R3(오개념 교정)만 배선했다 — R6는 \"오답 직후 선수 개념 진단 출제\"도 교수학적으로 말이 되어(진단 결과가 결손이면 다음 추천이 practice_prerequisite로 내려간다 · 재판정문 V4) 기계가 정할 수 없는 기준 문제이기 때문이다. Gate 2 FAIL의 다른 원인(EOS-124 · P-13 · 상시 하네스)과 독립이다. 분류 LOOP."
+updated: 2026-09-25

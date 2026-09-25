@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-25 (판정·구현 · EOS-24): **추천이 학습 상태 머신을 읽는다 — 단, 오개념 교정(R3) 하나만 '집행'하고 근거를 다시 확인한 뒤에만. 결정자는 상태 머신 하나로 둔다** (claude 판정·구현 · pedagogy-designer 독립 비판 1회 반영) — 판정 기준 main `bbd7c382`
+
+- **문제**: 오개념 오답 직후 상태 머신은 `REMEDIATING`(R3 · 오개념부터)을 결정하는데, `GET /v1/me/next-problem`은 그 결정을 입력으로 받을 경로가 아예 없어(`LearnerState`에 국면 필드 부재) θ 하락만 보고 더 쉬운 개념 문항을 `diagnose · unmeasured`로 냈다. 같은 회차에 학생에게 두 지시가 나갔다(Gate 2 재판정 2026-09-24 V2·V3).
+- **판정**: 추천은 상태 머신을 **다시 판정하지 않고 집행**한다. 오개념 vs 선수 결손의 순서 논쟁(상태 머신 R3>R4 ↔ MISC-30 경로 표 RT1>RT2)은 `V1_RULES` 한 곳에서 정한다 — 추천이 따로 판정하면 한쪽만 고쳤을 때 모순이 되돌아온다. 집행 대상은 R3뿐: R5는 반복 실패 뒤 선수 하강을 막고, R2는 확신도 미보고 학생의 진급을 막고, R6는 Kiki 판정 영역이다.
+- **독립 비판이 바꾼 것**: pedagogy-designer 결론 "수정 채택" — R3의 입력이 약하다(학생 전역 가설·신뢰 하한 없음·정답이 가설을 안 깎음). 그래서 안전장치 4개를 달았다: ① 이번 회차에 증거를 받은 가설(`turns_since_evidence = 0`)만 ② 신뢰가 MISC-30 하한 0.7 초과만 ③ 교정 고정은 1문항(교정 국면에서 또 R3면 해제) ④ 집행·해제·폴백 사유 5값을 응답과 처치 meta에 기록.
+- **구현**: `LearnerState.learning_state`(원장 최신 2행 스냅샷) → `l2/learning_state_recommendation.py`(판정·개념 제한 후보) → `CatRecommendationPolicy`가 집행 시 후보를 교정 대상 개념으로 **제한**하고 학습 밴드로 고른다. 근거는 신설 `reason.type=misconception_remediation` · `basis=learning_state`(짝이 어긋나면 생성 불가), 행위는 기존 `practice_current`. 집행된 추천만 `policy_version=cat_v1_state_remediation`.
+- **검증**: 실 PG 통합 테스트 3건(집행→재실패 해제 · 일반 오답 대조군 · 개념 안 후보 0 폴백) + hermetic 가드 뮤테이션 18종 전건 RED + 통합 테스트 뮤테이션 2종 RED(대조군 GREEN). 실 PG 통합 테스트의 CI 배선은 주간 게이트 하네스들과 같은 상태이며 `EOS-21` 소관이다.
+- **이 판정이 푼 것과 안 푼 것**: Gate 2 Loop 1 중 오개념 오답 변이만 풀린다. 일반 오답(V1·R6)은 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`으로 Kiki에게 넘겼고, R3 입력 자체를 좁히는 근본 수정과 MISC-30 순서 충돌은 후속 태스크 `EOS-138-r3-misconception-input-scope`로 등재했다(R6 결정 뒤 집행은 `EOS-139`). Gate 2는 `EOS-124`·P-13·상시 하네스 때문에 여전히 FAIL이다.
+
 ### 2026-09-25 (측정·완료 · MP-02 3회차): **프롬프트 예시 한 곳을 고치자 카나리 30/30(하한 0.9173) 통과 · n=60 완주 · 리콜 60/60 — MP-02 acceptance 전수 충족** (Kiki 실행, claude 판정) — 판정 기준 main `87cb759e`
 
 - **3회차** (`qwen3:30b-a3b` · `--avoid-recent 10` · `--canary-basis judged` · `run_id d315c008…` · `prompt_version l3.equivalent@sha256:21edd1b06adb`): 시도 60 · 수용 51 · 회차 내 구조 중복 9 · 검수필요 0 · 생성 실패 0 · 게이트 거부 0. 카나리 판정 대상 30/30 → 본배치까지 진행.

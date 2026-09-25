@@ -113,11 +113,11 @@ pedagogy-designer 비판의 요지는 "구조는 옳지만 **R3의 입력이 약
 
 원인 미상 오답(R6)에서 상태 머신은 "같은 개념 연습"(PRACTICING)이라고 하고, 추천은 θ가 내려가 선수 개념 문항을 **진단 목적**으로 낸다(`diagnose`). 둘 다 교수학적으로 말이 된다 — 원인을 모르는 오답이면 선수 개념부터 확인하는 것도 합리적이고, Gate 2 V4가 보여 주듯 그 진단 결과가 결손이면 다음 추천이 `practice_prerequisite`로 내려간다.
 
-그래서 **이 태스크는 R6를 배선하지 않았다.** Gate 2 Loop 1 "보정" 마디가 "오답 직후 선수 개념 진단 출제"를 보정으로 인정할지는 재판정문 §3-4가 이미 Kiki 판단 영역으로 적어 둔 문제이며, acceptance ② (나)의 "Kiki 결정으로 재정의"에 해당한다. 결정 게이트로 등재했다(`G-eos24-loop1-undiagnosed-wrong-criterion`).
+그래서 **이 태스크는 R6를 배선하지 않았다.** Gate 2 Loop 1 "보정" 마디가 "오답 직후 선수 개념 진단 출제"를 보정으로 인정할지는 재판정문 §3-4가 이미 Kiki 판단 영역으로 적어 둔 문제이며, acceptance ② (나)의 "Kiki 결정으로 재정의"에 해당한다. 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`(kind=decision · assignee=kiki)으로 등재했고, 결정 뒤 집행은 `EOS-139-undiagnosed-wrong-recommendation-criterion`이 소유한다(그 게이트를 `requires_gates`로 건다).
 
 ### 7-2. 후속 태스크로 등재한 것
 
-- **R3 입력 품질** — R3가 학생 전체·하한 없는 가설을 읽는다. 이 판정의 안전장치 ①②를 상태 머신 입력(`build_attempt_evidence`)으로 올리면 제출 응답의 `next_action`도 같은 기준을 따르게 된다. 그러면 추천 쪽 방어선은 중복이 되지만 해가 되지 않는다. MISC-30 `select_route`의 순서 충돌도 이 태스크가 함께 판정한다.
+- **R3 입력 품질** → `EOS-138-r3-misconception-input-scope` — R3가 학생 전체·하한 없는 가설을 읽는다. 이 판정의 안전장치 ①②를 상태 머신 입력(`build_attempt_evidence`)으로 올리면 제출 응답의 `next_action`도 같은 기준을 따르게 된다. 그러면 추천 쪽 방어선은 중복이 되지만 해가 되지 않는다. MISC-30 `select_route`의 순서 충돌도 이 태스크가 함께 판정한다.
 
 ### 7-3. 범위 밖
 
@@ -128,4 +128,26 @@ pedagogy-designer 비판의 요지는 "구조는 옳지만 **R3의 입력이 약
 
 ## §8. 검증
 
-(구현 후 기록)
+> 실행 환경: 컨테이너 · PostgreSQL 16 + pgvector · `alembic upgrade head` EXIT=0 · Python 3.12 venv(`pip install -e ".[dev]"`)
+
+| 검증 | 결과 |
+|---|---|
+| 변경 전 기준선 — 통합 6파일(Week 1·3 · 페르소나 여정 · P11 · 학습 상태 · 시나리오 회귀) | 39 passed · EXIT=0 |
+| 신규 통합 `test_eos24_recommendation_follows_learning_state.py`(실 PG · HTTP) | 3 passed · EXIT=0 |
+| 통합 회귀 8파일(위 6 + Week 2 + 신규) | 44 passed · EXIT=0 |
+| CI `backend` 잡 전 스텝 재현(ruff · black · `mypy --strict` · `lint-imports` · pytest+커버리지 · 계층 커버리지 · 게이트 CLI 16종) | pytest 외 전 스텝 EXIT=0 · pytest **2 failed / 14,352 passed** → 아래 |
+| 그 2건 | `test_me_review_status_gate.py`가 `LearnerState` 조회 수(5)를 **세 번째 사본**으로 들고 있었다(`test_me.py`·`test_study.py` 외). 6으로 갱신 후 그 파일 2 passed. 순서 기반 대역이 조회 증가를 설계대로 잡은 것이다 |
+| 커버리지 | 총 90.57%(≥70) · 계층 바닥선 5종 PASS(l2 96.5%) |
+| CI `infra-contracts` 잡 재현 | 처음 2 failed + 21 errors(신규 모듈 미귀속 · 데이터 접근 기준선 밖) → 인벤토리 `WM-E-213` 귀속 + 기준선 ②경로 편입 후 해당 2파일 50 passed. 런북 쓰기 가드·숙달 쓰기 경로 스캔 EXIT=0 |
+| `harness-integrity` · `policy-guard` · `declared-unwired-audit` | `backlog.py validate`·`audit-deps`·`rules lint`·`rules render --check`·`jit check`·ADR 번호·원본 바이너리·cp949 가드·미배선 감사 전부 EXIT=0 |
+
+**변별력(깨뜨려 본 것)**
+
+- hermetic 가드 뮤테이션 **18종 전건 RED**(대조군 GREEN). 순수 Python 하네스로 주입 실재(`mutated != original`)와 원복 sha256 동일을 매 회차 단언했다. 대상: 국면 검사 · 트리거 검사 · 재실패 해제 · 하한 경계(`<=`→`<`) · 이번 회차 조건 · 응답 조회 학습자 범위 · 개념 제한 · PRIMARY 제한 · 교정 밴드 · 정책 버전 · 집행 근거 출처 · 지시 결과 전파 · 제한 후보 사용 · 짝 행 attempt 일치 · 짝 행 트리거 · basis 짝 검증기 · 행위 매핑 · 원장 조회.
+- 통합 테스트 뮤테이션 2종(개념 제한 제거 · 상태 경로 통째 미배선) → 각각 **2 failed / 1 passed**(대조군만 통과). 시딩 배치(C 2.5~3.5 · 더 쉬운 P 1.0~1.5)가 "C 안에 머문 것 = 상태 경로 때문"을 가른다.
+- 신뢰 하한 경계는 상수를 import하지 않고 리터럴 0.70 · 0.71로 밟았다(MISC-30 자기참조 교훈).
+
+**정직한 공백**
+
+- 실 PG 통합 테스트는 CI에서 돌지 않는다(`integration` 마크 · 주간 게이트 하네스들과 같은 상태 · 배선은 `EOS-21` 소관). CI에서 도는 대응분은 hermetic `tests/backend/l2/test_learning_state_recommendation.py`다.
+- Gate 2 3루프 프로브 자체는 다시 돌리지 않았다(재판정 세션의 몫 · 상시 하네스는 `PED-36` ⑫). V2에 해당하는 경로는 신규 통합 테스트 첫 건이 재현한다.
