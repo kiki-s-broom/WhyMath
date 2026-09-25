@@ -244,8 +244,9 @@ BASELINE: dict[str, frozenset[str]] = {
             # 응답 → 문항(학습자 범위 한정) ⓒ 대표 개념이 C인 후보(문장은 `next_problem_selection`
             # 의 `build_candidate_pool_stmt`를 **재사용**해 노출 게이트를 다시 쓰지 않는다 — 실행만
             # 여기서 한다). ①(기존 파일에 함수 추가)을 택하지 않은 이유: 그 자리
-            # (`next_problem_selection`·`learning_state_evidence`)가 같은 날 병렬 claim된 EOS-124·
-            # EOS-127의 좌석 파일이라 충돌한다. 대표 개념·숙달 조회는 `mastery_tracking`을 재사용한다.
+            # (`next_problem_selection`·`learning_state_evidence`)가 같은 날 병렬 claim된
+            # EOS-124·EOS-127의 좌석 파일이라 충돌한다. 대표 개념·숙달 조회는
+            # `mastery_tracking`을 재사용한다.
             "l2/learning_state_recommendation.py",
             "l2/mastery_tracking.py",
             "l2/pedagogy_evidence.py",
