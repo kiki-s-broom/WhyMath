@@ -143,7 +143,8 @@ def gate_inputs_text(backlog: Backlog, gate: object) -> str:
         )
         return f"여는 작업 {len(deps)}건 · 미완 {waiting}건: {', '.join(parts)}"
     reason = getattr(gate, "no_inputs_reason", None)
-    if reason:
+    # 공백뿐인 사유는 사유가 아니다 — 검증기의 `has_reason`(strip 후 판정)과 같은 기준 (HARN-175).
+    if reason and reason.strip():
         return f"여는 작업 없음(사람 직접 행동): {reason}"
     # 위반 주장은 검증기(`Gate.validate`)와 같은 조건에서만 낸다 (HARN-175). 검증기는 pending
     # 게이트에만 입력 선언을 요구한다 — cleared·waived는 아무것도 막지 않으므로 과거 행에

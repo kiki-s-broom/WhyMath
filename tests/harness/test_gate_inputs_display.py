@@ -32,9 +32,12 @@ _VALIDATOR_ERROR = "여는 작업이 없다"
 # 닫힌(종결) 상태 — 검증기가 입력 선언을 요구하지 않는 쪽
 _CLOSED_STATUSES = ("cleared", "waived")
 
-# 입력 3형태 — (depends_on, no_inputs_reason). 둘 다 있는 형태는 별개 오류(모순)라 제외한다.
+# 입력 4형태 — (depends_on, no_inputs_reason). 둘 다 있는 형태는 별개 오류(모순)라 제외한다.
+# "blank"(공백뿐인 사유)는 CLI(add·amend)가 거부하지만 손편집·레거시 행으로는 들어올 수 있고,
+# 검증기는 strip 후 판정해 사유 없음으로 본다 — 표시도 같은 기준이어야 한다.
 _INPUT_SHAPES: dict[str, tuple[list[str], str | None]] = {
     "none": ([], None),
+    "blank": ([], "   "),
     "depends": (["S1-01-fixture-opener"], None),
     "reason": ([], "사람 직접 행동 — 입력 태스크 없음"),
 }
