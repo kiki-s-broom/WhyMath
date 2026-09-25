@@ -20,6 +20,7 @@ paths:
   - tests/backend/l2/test_learning_state_recommendation.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
   - docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md
+  - scripts/analysis/data_access_layer_audit.py
 session: claude/eos-24-72wclg
-notes: "출처: 2026-09-25 PR #1316 리뷰(세션 claude/eos-24-72wclg) — 실 PG 재현으로 발견. Kiki 지시: PR 1316 안전장치 ① 수정. PR #1316 위에 쌓아 수정한다(그 PR이 main 대상 CI를 받는 유일한 경로). 분류 LOOP."
+notes: "출처: 2026-09-25 PR #1316 리뷰(세션 claude/eos-24-72wclg) — 실 PG 재현으로 발견. Kiki 지시: PR 1316 안전장치 ① 수정. PR #1316 위에 쌓아 수정한다(그 PR이 main 대상 CI를 받는 유일한 경로). 분류 LOOP.\n\n[정정 2026-09-25] paths ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/api/test_eos24_recommendation_follows_learning_state.py', 'docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md'] → ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/api/test_eos24_recommendation_follows_learning_state.py', 'docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md', 'scripts/analysis/data_access_layer_audit.py']: 데이터 접근 기준선의 편입 사유 주석(조회 ⓐ 설명)을 회차 경계에 맞추는 1줄 수정 — 판정 불변"
 updated: 2026-09-25
