@@ -622,8 +622,8 @@ _FROZEN: dict[int, dict[str, bool]] = {
 #: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳.
 _GAP_OWNERS: dict[tuple[int, str], str] = {
     (1, "보정"): (
-        "추천 정책의 학습 상태 반영 — 판정문 §6-1 ⓐ의 후속. 2026-09-25 원격 claim 대장 기준 "
-        "`EOS-24-recommendation-reads-learning-state`(main 미등재)"
+        "`EOS-24-recommendation-reads-learning-state`(추천 정책이 학습 상태 머신을 읽지 않음 — "
+        "2026-09-24 재판정이 #1295로 등재)"
     ),
     (
         3,

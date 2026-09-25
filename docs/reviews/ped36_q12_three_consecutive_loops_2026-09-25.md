@@ -3,6 +3,7 @@
 > **판정 기준: main `bbd7c382`** (2026-09-25 · `재발 방지 태스크 3건 + 사고 대장 4건 — PR #1305 회고 (OPS-94·HARN-171·HARN-172) (#1309)`)
 > **태스크**: `PED-36-learning-scenario-bank-schema` acceptance ⑫ (①②③⑨는 이 문서의 범위가 아니다 — §6)
 > **실행 환경**: 컨테이너 · PostgreSQL 16 + pgvector · `alembic upgrade head` EXIT=0 · `WHYMATH_RUN_INTEGRATION=1` · Python 3.12
+> **사후 보정(2026-09-25 12:00Z · main `9a19ec0c` 반영)**: 이 문서를 쓰는 사이 main에 #1295(Gate 2 재판정 · `EOS-24` 등재)가 들어왔다. 측정은 `bbd7c382` 그대로이며, 추천 선택 로직은 두 커밋 사이에 바뀌지 않았다(`5af2097b..bbd7c382` 구간에서 `l2/recommendation_policy.py`·`next_problem_selection.py`·`recommendation_contract.py`·`irt.py` diff 0). 반영한 것은 §2-5 소유자 상태와 §2-6 재판정 대조뿐이다.
 
 ---
 
@@ -130,10 +131,32 @@
 
 | 마디 | 소유자 | 상태(2026-09-25 실측) |
 |---|---|---|
-| Loop 1 보정 | 추천 정책의 학습 상태 반영(판정문 §6-1 ⓐ 후속) | 원격 claim 대장에 `EOS-24-recommendation-reads-learning-state`(`claude/bold-ritchie-q4m0s9`) — **main 미등재**. 이 문서는 그 태스크를 소유자로 *확정*하지 않는다(미머지 존재를 충족으로 단정 금지) |
+| Loop 1 보정 | `EOS-24-recommendation-reads-learning-state`(추천 정책이 학습 상태 머신을 읽지 않음) | main 등재(#1295 · main `9a19ec0c`) · todo. 이 문서 초판(`bbd7c382` 기준)은 원격 claim만 보고 "main 미등재"로 적었고, 그 뒤 등재가 머지됐다 |
 | Loop 3 다음 concept | `EOS-124-next-problem-policy-selection-axis-mismatch` | main 등재 · todo · 원격 claim `claude/sweet-rubin-fruij1` |
 
 두 태스크가 착지하면 동결 테스트가 "해소 신호"로 실패하고 메시지가 위 소유자를 가리킨다. 그때 `_FROZEN`을 올리고, 전 마디가 참이면 §18 계약 테스트의 xfail을 제거한다.
+
+### 2-6. 2026-09-24 재판정(`docs/reviews/eos_phase2_gate2_rejudgment_2026-09-24.md` §3)과의 대조
+
+같은 날 main에 들어온 재판정도 3루프를 **미충족**으로 판정했다. §18 결론은 같다. 다만 **Loop 3의 마디 판정이 갈린다** — 재판정은 V1(일반 오답)·V2(오개념 오답) · 추천을 따라감에서 Loop 3를 ✅(`advance_next · next_concept`)로 봤고, 이 하네스는 같은 형태의 두 변이에서 ✗다. 추천 선택 로직은 두 판정 기준 사이에 바뀌지 않았으므로(머리의 사후 보정 참조) 차이는 **관측점의 정의**에서 온다.
+
+| 항목 | 재판정(09-24) | 이 하네스 |
+|---|---|---|
+| Loop 1 보정 기준 | `action` ∈ 보정 두 종 · `reason` ≠ `unmeasured` | 같은 기준 + ⓑ 대상이 틀린 개념·선수 + ⓒ 준 문항이 그 대상 소속 |
+| Loop 1 관측점 | "첫 오답 직후 추천"(V4는 선수 문항도 틀린 뒤 한 단계 늦은 발화를 ✅로 셌다) | 첫 오답 **직후 첫 추천**만 |
+| Loop 3 기준 | "추천 문항이 다음 개념 소속이고 제출 후 다시 추천이 나온다" | 준 문항 **과** `target_concept`이 둘 다 후행 개념 |
+| Loop 3 관측점 | 명시 없음(프로브 미커밋) | 틀린 개념 숙달이 전진 임계를 넘긴 **직후 첫 추천** |
+
+이 하네스와 같은 픽스처로 추천을 끝까지 따라간 관측 프로브(오답 1회 후 정답 14회 · 15회째에 후보 소진 — 2026-09-25 `bbd7c382` 실측)에서 후행 개념 문항을 준 추천은 순서대로 이렇다.
+
+- 전진 임계 직후 첫 추천: 문항=**현재** · `advance_next` · target=**현재** → 이 하네스의 Loop 3 관측점(✗)
+- 그다음 추천: 문항=후행 · `diagnose · unmeasured` · target=후행(후행 개념 첫 도달 — 설명은 "진단")
+- 그다음: 문항=후행 · `practice_current`
+- 그다음: 문항=후행 · **`advance_next · next_concept`** · target=후행 — 이때 후행 개념 숙달은 이미 0.92다
+
+즉 "`advance_next · next_concept` + 후행 개념 문항" 조합은 이 기록에서 **후행 개념을 이미 숙달한 뒤**에야 처음 나타나며, 그때의 `advance_next`는 "후행 개념으로 가라"가 아니라 "후행 개념을 **넘어가라**"는 뜻이다(`select_reason_type`이 *선택된 문항 개념의 숙달*로 근거를 정하므로). 재판정 V1·V2의 ✅가 이런 지점에서 읽힌 것인지는 **읽어서 그렇게 보인다** 수준이다 — 재판정 프로브는 커밋되지 않아 관측점을 확인할 수 없다. 확인 가능한 사실은 두 가지다: ⓐ 전진을 선언한 바로 그 추천은 현재 개념 문항을 준다(재판정 V4가 Loop 3에서 본 형태 · `EOS-124` ①(가)와 같다) ⓑ 이 하네스는 관측점을 코드로 고정했으므로 재판정 회차가 바뀌어도 같은 자로 잰다.
+
+재판정 §3-4가 Kiki 판단 영역으로 남긴 질문("오답 직후 선수 문항을 진단 목적으로 내는 것을 보정으로 볼 것인가")에 대해 이 하네스는 **재판정과 같은 엄격한 쪽**을 유지한다. 기준을 완화하기로 결정되면 `_REMEDIATION_ACTIONS`와 절별 반례(`test_remediation_rule_requires_every_clause`)를 함께 고치면 된다 — 그 변경은 뮤테이션 M5b가 보여 주듯 동결 테스트의 "해소 신호"로 드러난다.
 
 ---
 
