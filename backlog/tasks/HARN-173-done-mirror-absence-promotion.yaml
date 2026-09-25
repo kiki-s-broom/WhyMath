@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-173-done-mirror-absence-promotion
+title: "done의 CI 미러 부재 경고가 경고에 그친다 — 손 재현이 잡 스텝을 빠뜨려 PR CI red(ci-local-repro-gap 4회차) · block 승격 판정"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(2026-09-25 EOS-24 · PR #1316) — `backlog.py done`은 같은 커밋의 CI 미러 결과(`.claude/cache/ci_mirror.json`)가 없으면 **경고만** 한다(HARN-119 ② \"1단계 warn\"). 이 세션은 미러 대신 잡 스텝을 손으로 골라 재현했고 `harness-integrity` 잡의 `ruff check scripts tests/harness` 스텝을 빠뜨려 PR CI가 E501 1건으로 red가 됐다. 미러를 한 번 띄웠으나 main 병합 때문에 중단한 뒤 다시 돌리지 않고 푸시했다 — 경고는 `done` 시점에 한 번 떴고 푸시 시점에는 아무 신호도 없었다.\n② 처분 — `done`의 미러 부재 경고를 **block으로 승격할지** 판정한다(HARN-122 §3c 승격 절차). 승격하면 예외 경로(`--no-mirror <사유>` · 사유가 notes·이벤트에 남는다)를 함께 둔다 — 남지 않는 탈출구는 게이트를 끄는 것과 같다. 승격하지 않으면 그 근거와 대안(예: `/drive`·PR 생성 직전의 미러 필수화)을 결정 로그에 남긴다.\n③ 푸시 축 — 경고가 `done`에만 있어 \"푸시 전\"에는 신호가 없다. 미러 결과의 커밋 해시와 푸시 대상 HEAD가 다르면 알리는 지점(Stop 훅 또는 PR 생성 프리플라이트)을 검토한다. 변별력: 미러 결과 없음/다른 커밋/같은 커밋 3픽스처.\n④ 계열 — 사고 대장 `ci-local-repro-gap` 4회차다. 1~3회차 대책(HARN-129·HARN-172)은 **도구**를 고쳤고, 이번 회차는 도구가 있는데 **쓰지 않은** 축이다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/ci_mirror.py
+session: null
+notes: "출처: EOS-24 PR #1316 harness-integrity red(E501 1건 · 커밋 9501795d로 수정). 분류 ci-local-repro-gap."
+updated: 2026-09-25
