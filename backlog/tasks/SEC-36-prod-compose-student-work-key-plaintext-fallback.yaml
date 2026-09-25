@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-36-prod-compose-student-work-key-plaintext-fallback
+title: "운영 compose가 학생 답안 암호화 키·OAuth 변수를 전달하지 않아 평문 폴백 — is_production_like 오판으로 fail-closed가 꺼진다"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(판정 기준 main 9a19ec0c · 2026-09-25 전체 시스템 재검토 §3-7): docker-compose.prod.yml의 backend environment 블록은 WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY·WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY를 `:?`로 필수 지정하지만, WHYMATH_STUDENT_WORK_ENCRYPTION_KEY와 KAKAO·NAVER OAuth client 변수는 컨테이너에 전달하지 않는다. config.is_production_like는 kakao_configured 또는 naver_configured 단일 신호로 운영 여부를 판정하므로, 이 공식 운영 스택은 비운영으로 판정된다. 그 결과 api/_crypto.py require_student_work_cipher의 fail-closed가 꺼지고 build_student_work_cipher가 None(평문 폴백)을 돌려줘 학생 답안 3테이블이 평문으로 저장된다. 운영 배포 전이라 잠재 결함이다.\n② 처분: compose에 WHYMATH_STUDENT_WORK_ENCRYPTION_KEY를 `:?` 필수로 추가하고 .env.prod.example에 병기한다. OAuth 변수도 전달한다. is_production_like 다신호화는 MGMT-03 소관이므로 여기서 하지 않는다 — MGMT-03은 MGMT-02(변호사 검토)에 묶여 있어 이 한 줄짜리 수리를 거기에 묶지 않는다.\n③ 회귀 동결: 운영 compose가 학생 데이터 암호화 키 전부(대화·디바이스·학생 답안)를 `:?` 필수로 선언하는지 파싱해 단언하는 테스트를 tests/infra에 둔다. 학생 답안 키 줄을 지우는 뮤테이션이 RED인지 확인한다.\n④ 확인 대상: WHYMATH_EVIDENCE_PAYLOAD_ENCRYPTION_KEY는 `:-`(선택)이다. 그 페이로드가 학생 식별 데이터를 담는지 확인하고, 선택으로 둘지 필수로 올릴지 근거를 notes에 남긴다."
+artifacts: []
+paths:
+  - docker-compose.prod.yml
+  - ".env.prod.example"
+  - "tests/infra/test_prod_compose_*.py"
+session: null
+notes: "출처: 전체 시스템 재검토 docs/reviews/system_full_review_2026-09-25.md §3-7·§4 A1 (판정 기준 main 9a19ec0c). CLAUDE.md 절대 금기 '학생 데이터는 민감 정보로 분류 — 암호화 저장' 축. 운영 배포 전 잠재 결함. MGMT-03(is_production_like 다신호화)과 분리한 이유는 acceptance ②."
+updated: 2026-09-25
