@@ -928,7 +928,11 @@ CATALOG: tuple[Spec, ...] = (
        "harness.canary_slice"),
     _o("WM-O-911", "골든 벤치마크 승격·경로 게이트·앵커 회차 대장", "Admin", "QA", "P0",
        "EOS-60/64 — 판정기의 FN율", "harness.golden_benchmark",
-       "harness.golden_promotion_gate", "harness.anchor_round_ledger"),
+       "harness.golden_promotion_gate", "harness.anchor_round_ledger",
+       # MP-03 — 두 판정기(승격 게이트 --proposal · 골든 벤치 --anchor-map)의 *입력 생산자*.
+       # 판정을 만들지 않고 검수 기록에서 열거·역인덱스만 하므로 판정기 행에 귀속한다
+       # (canary_slice가 검수 워크플로의 입력 생산자로 WM-O-910에 귀속된 것과 같은 규칙).
+       "harness.golden_inputs"),
     _o("WM-O-912", "QA 파이프라인·강등전 게이트(Wilson·결함주입·금칙어)", "Admin", "QA", "P0",
        "초인간 검증 기준 v1 — 기계 게이트 승격 절차", "harness.qa_pipeline", "harness.wilson",
        "harness.*_eval", "harness.*_battle", "harness.corpus_reverify",
