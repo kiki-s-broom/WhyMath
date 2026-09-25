@@ -45,7 +45,7 @@ playwright = [
 ]
 # Phase 2+ PostgreSQL 적재용. Phase 1 (현재) 미배포 상태 → optional.
 postgres = [
-    "sqlalchemy[asyncio]>=2.0.35",
+    "sqlalchemy[asyncio]>=2.0.35,<2.1",  # OPS-91: 2.1.0에서 mypy --strict 34건 실패(2026-09-25) — 이행 전 상한
     "asyncpg>=0.30.0",
 ]
 # 개념 그래프 Neo4j 멱등 적재용(concept_graph load). 메인 deps 오염 금지 → optional extra.
