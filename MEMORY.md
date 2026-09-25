@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-25 (판정 · 게이트 `G-kg02-review-promotion-llm-session`): **KG-02 승격 회차는 보류 — 게이트가 겨냥한 표면(`/concepts/search`)은 이 승격으로 움직이지 않고, 학생 공급(`/study`)은 검수 상태를 아예 읽지 않는다. 노출 게이트 판정을 `CONT-05`로 떼어 이 게이트의 입력으로 걸었다** (Kiki 판정 "보류+대장 정정", claude 조사·실측·집행) — 판정 기준 main `3a7a7315`
+
+- **바뀐 전제 ①**: 재개 경로 ⓐ(S4-16 강등전 통과)가 오늘 S4-16 기각(cancelled)으로 소멸했다. `review_gate.py`의 승격 서명 권한은 `HUMAN_REVIEWERS=("kiki",)` 하나이고 기계 판정자 목록은 비어 있다 — LLM 검수 배치는 선별 보조이며 그 결과로 승격되는 행은 0이다. 9/23 1회차(52건 중 33건 결함 판정·상한 73.5%)는 엉뚱한 트리에서 돌아 리허설로 강등됐고, KG-08 대조군 추가 후 재측정은 없다.
+- **주입 실측 ②(관측 표면)**: 컨테이너에 PG16+pgvector 0.8.0을 띄워 코퍼스 846행·원자 2,683행을 적재하고 실제 승격 CLI로 2건을 올렸다 — `/v1/concepts/content?reviewed_only=true` 0→2, `/v1/concepts/search reviewed_only=true` 0→0. search는 `atom_node`(전 행 `ai_estimated` 상수)를 읽고 콘텐츠 846 code 중 검색 색인에 있는 것은 0건이다. 양성 대조로 원자 1건을 `reviewed`로 바꾸면 search가 1건을 돌려줬다(필터는 살아 있다). KG-02 acceptance ③이 지목한 표면이 처음부터 다른 테이블이었다 → acceptance ⑦ 정정 항.
+- **주입 실측 ③(학생 공급)**: `get_concept_dsl`은 `ai_estimated` 행에도 DSL을 돌려준다(없는 code만 `None`). `review_gate.py` docstring의 "reviewed가 학생 노출 게이팅 기준(`l1/concept_graph`·`l1/atom_graph` retrieval이 거른다)"은 사실이 아니다 — 두 retrieval은 `concept_node`·`atom_node`를 읽는다. `knowledge_module_gap_review.md` §2-③ "무검증 학생 노출 금지"와의 관계 판정·집행 = 신규 `CONT-05`(priority 2 · 기본값 fail-closed · 캐시 적중 경로 포함). 실제 학생 요청 도달은 재지 않았다(CONT-05 ①).
+- **부수 실측**: 승격은 코퍼스 JSON 커밋까지가 한 동작이다 — DB만 바꾸면 다음 적재가 코퍼스 값으로 되돌린다(대조: 승격을 반영한 사본으로 적재하면 유지).
+- **대장 집행**: `CONT-05` 등재 · 게이트 `gates amend`(제목 정정·입력 `CONT-05` 부착·독촉 14→35일=2026-10-26 P3 착수일 — '지금 사람이 실행할 수 있다'는 14일 유지 근거가 소멸) · KG-02 acceptance ⑦. 판정문·재현 스크립트 = `docs/reviews/kg02_gate_premise_recheck_2026-09-25.md`.
+- **재판정 순서**: CONT-05가 ⓐ(공급이 `reviewed`만 통과)면 승격이 학생 공급을 여는 유일한 문이 되므로 그때 사람 검수 회차(Kiki 서명·K-12 우선 — 대학 409는 KG-05 재작성 대상)를 연다. ⓑ면 승격은 내부 표기뿐이라 보류 유지가 기본값이다.
+
 ### 2026-09-25 (결정·착지 · EOS-124): **추천의 설명과 콘텐츠를 한 자리에서 맞췄다 — 의도는 정책 축, 콘텐츠는 선택 축, 둘이 못 맞으면 정직 강등. 기본 CAT `cat_v2`** (claude 판정·구현) — 판정 기준 main `bbd7c382`
 
 - **실측 재현(판정 전)**: 로컬 실 PG에서 `test_e2e_persona_journeys.py`를 main 그대로 돌려 두 불일치를 재현했다 — A⑤ 숙달 0.98 개념 문항에 `advance_next`·target=현재 개념, B⑧ 선수 숙달 1.0인데 원래 개념 문항에 `practice_prerequisite`·target=선수. 원인은 한 줄로 요약된다: 기본 CAT이 문항을 IRT로 고른 *뒤* 그 문항 개념의 숙달 구간으로 행위를 붙였고, target은 `resolve_target_concept`(측정된 선수 중 *최저* — 전부 숙달이어도 고른다)로 따로 계산했다. 두 축이 서로를 보지 않았다.
