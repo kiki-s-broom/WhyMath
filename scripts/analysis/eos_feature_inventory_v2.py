@@ -1034,8 +1034,11 @@ CATALOG: tuple[Spec, ...] = (
        # 합격을 선언하지 않는다. 별 좌석으로 떼면 같은 성격이 두 행으로 갈려 이 장부가
        # 재는 '기능'의 입자가 흔들린다.
        "ops.phase1_structure_report"),
-    _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·shadow 합성 트래픽", "Admin", "Operations",
-       "P1", "ADMIN-01/11", "ops.account_bootstrap_cli", "ops.role_grant_cli",
+    _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·단기 토큰 발급·shadow 합성 트래픽", "Admin",
+       "Operations", "P1", "ADMIN-01/11/15", "ops.account_bootstrap_cli", "ops.role_grant_cli",
+       # ADMIN-15: 좌석 발급 경로의 *신원* 절반 — 계정(11)·역할(01)을 만든 뒤 그 계정으로 콘솔을
+       # 실제로 열어 볼 토큰. 같은 운영자 좌석 묶음이라 별 행으로 떼지 않는다.
+       "ops.operator_token_cli",
        "ops.wh1_shadow_probe"),
     _o("WM-O-916", "관리 모듈 레지스트리·라우트 가드 감사", "Admin", "Operations", "P1",
        "ADMIN-04 — 내비·가드의 단일 진실 원천(선언)과 그 선언을 CI에서 대조하는 감사기. "
