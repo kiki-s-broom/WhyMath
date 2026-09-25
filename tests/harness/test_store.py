@@ -29,7 +29,12 @@ def _write_minimal_backlog(
             gates
             if gates is not None
             else [
-                Gate(id="G-lock", title="잠금 게이트", requested="2026-07-01"),
+                Gate(
+                    id="G-lock",
+                    title="잠금 게이트",
+                    requested="2026-07-01",
+                    no_inputs_reason="테스트 픽스처 — 입력 태스크 없음(HARN-174)",
+                ),
             ]
         ),
     )

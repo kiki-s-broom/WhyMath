@@ -215,7 +215,20 @@ class TestGatesShow:
         padding = "배경 설명 " * 80  # 403자 안팎을 앞에 채워 "뒷부분" 시나리오를 재현
         marker = "재판정 = D 자동 재동기화 워크플로우"
         evidence = f"{padding}{marker} — 커밋 abc1234에서 확정"
-        assert cli.main(["gates", "add", "G-show-cleared", "--title", "낡은 질문 문구"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-show-cleared",
+                    "--title",
+                    "낡은 질문 문구",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         capsys.readouterr()
         assert (
             cli.main(["gates", "clear", "G-show-cleared", "--as", "kiki", "--evidence", evidence])
@@ -230,7 +243,20 @@ class TestGatesShow:
 
     def test_show_waived_gate_prints_notes_not_evidence_label(self, seeded_repo: Path, capsys):
         """waived — 사유는 notes에 있다(evidence 아님). ③ 정정 지점의 직접 검증."""
-        assert cli.main(["gates", "add", "G-show-waived", "--title", "낡은 질문 문구2"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-show-waived",
+                    "--title",
+                    "낡은 질문 문구2",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         capsys.readouterr()
         assert cli.main(["gates", "waive", "G-show-waived", "--reason", "대체 결정 = HARN-85"]) == 0
         capsys.readouterr()
@@ -249,7 +275,20 @@ class TestGatesShow:
         """
         marker = "재판정 = D 자동 재동기화 워크플로우"
         evidence = "배경 " * 50 + marker
-        assert cli.main(["gates", "add", "G-show-contrast", "--title", "대조군 질문"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-show-contrast",
+                    "--title",
+                    "대조군 질문",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         capsys.readouterr()
         assert (
             cli.main(["gates", "clear", "G-show-contrast", "--evidence", evidence + " abc1234"])
@@ -285,6 +324,9 @@ class TestGatesAdd:
                     "kiki",
                     "--remind-after-days",
                     "7",
+                    # HARN-174: 여는 작업(--depends) 또는 입력 없음 사유 중 하나가 필수다
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
                 ]
             )
             == 0
@@ -306,7 +348,20 @@ class TestGatesAdd:
 
     def test_added_gate_keeps_validate_green(self, seeded_repo: Path):
         """add_후_대장_validate_green (기존 대장 무결성 불변)"""
-        assert cli.main(["gates", "add", "G-extra-check", "--title", "추가 점검"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-extra-check",
+                    "--title",
+                    "추가 점검",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         assert cli.main(["validate"]) == 0
         backlog, _ = store.load_backlog(seeded_repo)
         # 기본값 정합 — kind=human, assignee=kiki, pending
@@ -317,7 +372,17 @@ class TestGatesAdd:
         """add한_게이트가_실제로_태스크를_게이팅한다 (배선 실재 확인)"""
         assert (
             cli.main(
-                ["gates", "add", "G-live-gate", "--title", "라이브 게이트", "--kind", "decision"]
+                [
+                    "gates",
+                    "add",
+                    "G-live-gate",
+                    "--title",
+                    "라이브 게이트",
+                    "--kind",
+                    "decision",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
             )
             == 0
         )
@@ -346,24 +411,67 @@ class TestGatesAdd:
 
     def test_duplicate_id_rejected(self, seeded_repo: Path):
         """중복_id_add_거부 (변별력 — 정상 0 대비 실제 거부 1)"""
-        assert cli.main(["gates", "add", "G-phaiakes9-key", "--title", "중복 시도"]) == 1
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-phaiakes9-key",
+                    "--title",
+                    "중복 시도",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 1
+        )
         # 대장 오염 없음 — 기존 게이트 제목이 덮이지 않았다
         backlog, _ = store.load_backlog(seeded_repo)
         assert backlog.gates["G-phaiakes9-key"].title != "중복 시도"
 
     def test_missing_title_rejected(self, seeded_repo: Path):
         """필수_필드(title)_누락_add_거부"""
-        assert cli.main(["gates", "add", "G-no-title"]) == 1
+        assert (
+            cli.main(
+                ["gates", "add", "G-no-title", "--no-inputs", "테스트 픽스처 — 입력 태스크 없음"]
+            )
+            == 1
+        )
         backlog, _ = store.load_backlog(seeded_repo)
         assert "G-no-title" not in backlog.gates
 
     def test_missing_id_rejected(self, seeded_repo: Path):
         """필수_필드(id)_누락_add_거부"""
-        assert cli.main(["gates", "add", "--title", "id 없음"]) == 1
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "--title",
+                    "id 없음",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 1
+        )
 
     def test_invalid_id_format_rejected(self, seeded_repo: Path):
         """잘못된_id_형식_거부 (스키마 무결성 — G- 소문자 kebab 아님)"""
-        assert cli.main(["gates", "add", "BadId", "--title", "형식 위반"]) == 1
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "BadId",
+                    "--title",
+                    "형식 위반",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 1
+        )
         backlog, _ = store.load_backlog(seeded_repo)
         assert "BadId" not in backlog.gates
         assert cli.main(["validate"]) == 0  # 거부됐으므로 대장은 여전히 green

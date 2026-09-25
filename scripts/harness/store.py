@@ -110,6 +110,11 @@ def _dump_mapping(data: dict[str, object], key_order: list[str]) -> str:
 
 _TASK_KEY_ORDER = [f.name for f in dc_fields(Task)]
 _GATE_KEY_ORDER = [f.name for f in dc_fields(Gate)]
+# 비어 있으면 **쓰지 않는** 게이트 필드 (HARN-174). 입력 간선 두 칸은 pending 게이트에만
+# 요구되므로 cleared·waived 게이트 62건에 `depends_on: []`·`no_inputs_reason: null` 두 줄씩을
+# 붙이면 의미 없는 변경이 대장 전체에 퍼진다 — 그 줄들이 병렬 PR의 인접 줄 충돌을 만든 것이
+# `corrections` 도입 때(#1284) 실측된 비용이다. 로드는 기본값으로 채우므로 무손실이다.
+_GATE_OMIT_WHEN_EMPTY = frozenset({"depends_on", "no_inputs_reason"})
 
 
 def dump_task(task: Task) -> str:
@@ -129,6 +134,8 @@ def dump_gates(gates: list[Gate]) -> str:
         for key in _GATE_KEY_ORDER:
             prefix = "  - " if first else "    "
             value = data[key]
+            if key in _GATE_OMIT_WHEN_EMPTY and not value:
+                continue
             # 리스트 필드(HARN-124 `corrections`)는 블록 시퀀스로 쓴다. 종전 구현은 전 필드를
             # `_scalar`로 한 줄에 썼는데, 리스트를 그대로 넘기면 파이썬 repr(`['a', 'b']`)이
             # 인용돼 **문자열 하나로 되읽히고** 이력이 조용히 뭉개진다.
@@ -425,27 +432,396 @@ def append_event(root: Path, action: str, subject_id: str, **extra: object) -> N
 # ── 무결성 검증 ──────────────────────────────────────────────────────────────
 
 
-def detect_cycle(backlog: Backlog) -> list[str]:
-    """depends_on 그래프의 사이클을 Kahn 위상정렬로 검출. 사이클 노드 목록 반환."""
-    indegree = {tid: 0 for tid in backlog.tasks}
-    dependents: dict[str, list[str]] = {tid: [] for tid in backlog.tasks}
-    for task in backlog.tasks.values():
+# ── 통합 의존 그래프 — 태스크와 게이트를 한 그래프로 (HARN-174 v2-2) ──────────
+#
+# 왜 하나여야 하는가: 종전에는 순환 검사가 두 벌(validate의 `detect_cycle` · `amend --depends`의
+# 자체 경로 추적)이었고 둘 다 **태스크끼리만** 봤다. 게이트는 그래프 밖에 있었으므로
+# "태스크 T가 게이트 G를 요구하는데 G를 여는 작업이 T 자신"이라는 교착을 어느 쪽도 볼 수
+# 없었다(2026-09-22 P3-00 · 2026-09-23 EOS-50 — 둘 다 사람이 읽다가 발견). 착수 순서
+# 계산(`selector.unblock_count`)도 같은 이유로 게이트 너머의 후속을 세지 못해 병목을
+# 과소평가했다(2026-09-25 실측: EOS-24·EOS-124 가 1건으로 보였으나 끝까지 따라가면 13건).
+# 게이트를 노드로 넣으면 검사기를 새로 만들 필요 없이 기존 검사기·선택기가 그대로 본다 —
+# 그래서 이 함수를 **한 곳**에 두고 validate·모든 쓰기 경로·selector·board가 공유한다.
+#
+# 간선 방향은 "먼저 끝나야 하는 쪽 → 기다리는 쪽"이다. 간선은 4종이다.
+#   ① task.depends_on       선행 태스크 → 태스크
+#   ② task.requires_gates   게이트 → 태스크
+#   ③ gate.depends_on       입력 태스크 → 게이트      (HARN-174 신설)
+#   ④ track.entry_gate      진입 게이트 → 그 트랙의 모든 태스크
+# ④는 acceptance v2-2가 명시한 3종 밖이지만 selector가 실제로 착수를 막는 조건이다
+# (`classify_todo`의 track_gate 제외). 빼면 "진입 게이트의 입력이 그 트랙 안에 있다"는
+# 교착을 이 그래프가 보지 못한다 — 명세보다 엄격한 쪽으로의 확장이다.
+#
+# 노드는 (종류, ID) 튜플이다. 태스크 ID 규약(`^[A-Z][A-Z0-9]{0,7}-…`)과 게이트 ID 규약
+# (`^G-[a-z0-9]+…`)은 이론상 `G-01-x` 같은 문자열에서 겹칠 수 있으므로 문자열만으로 두면
+# 두 노드가 하나로 붕괴한다(모른다 ≠ 아니다 — 지금 그런 ID가 없다는 것은 보장이 아니다).
+
+TASK_NODE = "task"
+GATE_NODE = "gate"
+Node = tuple[str, str]
+
+
+@dataclass
+class DependencyGraph:
+    """태스크·게이트 통합 의존 그래프 — `dependency_graph()`만 만든다."""
+
+    succ: dict[Node, list[Node]]
+    """선행 → 후행 (이 노드가 끝나면 기다림이 풀리는 쪽)."""
+
+    pred: dict[Node, list[Node]]
+    """후행 → 선행 (이 노드가 기다리는 쪽)."""
+
+    edge_kind: dict[tuple[Node, Node], str]
+    """간선 → 종류(`depends_on`·`requires_gates`·`gate_input`·`entry_gate`) — 경로 설명용."""
+
+
+def dependency_graph(backlog: Backlog) -> DependencyGraph:
+    """backlog → 통합 의존 그래프 (결정적: 노드·간선 모두 ID 정렬).
+
+    대장에 없는 ID를 가리키는 참조는 간선으로 만들지 않는다 — 그것은 순환이 아니라 **막다른
+    길**이며 `validate_backlog`가 따로 판정한다(`dangling_reference`). 한 그래프에 섞으면
+    "없는 노드로 가는 간선"이 순환 검사의 분모를 흐린다.
+    """
+    nodes: list[Node] = [(TASK_NODE, tid) for tid in sorted(backlog.tasks)]
+    nodes += [(GATE_NODE, gid) for gid in sorted(backlog.gates)]
+    succ: dict[Node, list[Node]] = {n: [] for n in nodes}
+    pred: dict[Node, list[Node]] = {n: [] for n in nodes}
+    edge_kind: dict[tuple[Node, Node], str] = {}
+
+    def link(src: Node, dst: Node, kind: str) -> None:
+        if (src, dst) in edge_kind:
+            return  # 같은 간선이 두 경로로 선언돼도(예: 진입 게이트를 명시 부착) 한 번만
+        edge_kind[(src, dst)] = kind
+        succ[src].append(dst)
+        pred[dst].append(src)
+
+    for tid in sorted(backlog.tasks):
+        task = backlog.tasks[tid]
+        me = (TASK_NODE, tid)
         for dep in task.depends_on:
             if dep in backlog.tasks:
-                indegree[task.id] += 1
-                dependents[dep].append(task.id)
-    queue = [tid for tid, deg in indegree.items() if deg == 0]
-    visited = 0
+                link((TASK_NODE, dep), me, "depends_on")
+        for gid in task.requires_gates:
+            if gid in backlog.gates:
+                link((GATE_NODE, gid), me, "requires_gates")
+        track = backlog.tracks.get(task.track)
+        if track is not None and track.entry_gate and track.entry_gate in backlog.gates:
+            link((GATE_NODE, track.entry_gate), me, "entry_gate")
+    for gid in sorted(backlog.gates):
+        gate = backlog.gates[gid]
+        for dep in gate.depends_on:
+            if dep in backlog.tasks:
+                link((TASK_NODE, dep), (GATE_NODE, gid), "gate_input")
+
+    for adjacency in (succ, pred):
+        for key in adjacency:
+            adjacency[key].sort()
+    return DependencyGraph(succ=succ, pred=pred, edge_kind=edge_kind)
+
+
+def render_path(path: list[Node], arrow: str = " → ") -> str:
+    """노드 경로 → `A → G-x → B`. 게이트는 ID 접두 `G-`로 눈에 보인다(v2-2: 경로에 게이트 ID)."""
+    return arrow.join(node_id for _kind, node_id in path)
+
+
+def dependency_path(graph: DependencyGraph, src: Node, dst: Node) -> list[Node] | None:
+    """`src`에서 간선을 따라 `dst`에 닿는 **최단** 경로(양 끝 포함). 없으면 None.
+
+    쓰기 시점 순환 거부의 공통 판정이다: 새 간선 `a → b`를 넣으려 할 때 `b`에서 `a`로
+    이미 가는 길이 있으면 그 간선이 순환을 닫는다. BFS라 경로가 최단이고 이웃 순서가
+    정렬돼 있어 같은 입력에 같은 경로를 낸다(결정적 메시지).
+    """
+    if src == dst:
+        return [src]
+    parent: dict[Node, Node | None] = {src: None}
+    queue = [src]
     while queue:
-        tid = queue.pop()
-        visited += 1
-        for nxt in dependents[tid]:
-            indegree[nxt] -= 1
-            if indegree[nxt] == 0:
-                queue.append(nxt)
-    if visited == len(backlog.tasks):
-        return []
-    return sorted(tid for tid, deg in indegree.items() if deg > 0)
+        nxt_queue: list[Node] = []
+        for cur in queue:
+            for nxt in graph.succ.get(cur, ()):
+                if nxt in parent:
+                    continue
+                parent[nxt] = cur
+                if nxt == dst:
+                    path = [nxt]
+                    back: Node | None = cur
+                    while back is not None:
+                        path.append(back)
+                        back = parent[back]
+                    return list(reversed(path))
+                nxt_queue.append(nxt)
+        queue = nxt_queue
+    return None
+
+
+def cycle_if_linked(backlog: Backlog, src: Node, dst: Node) -> list[Node] | None:
+    """간선 `src → dst`를 **넣으면** 닫히는 순환 경로(`src → dst → … → src`). 안 닫히면 None.
+
+    모든 쓰기 경로(task `amend --depends/--gate` · `add` · `gates add/amend --depends`)의
+    선제 순환 판정이 이것 하나를 쓴다(HARN-174 v2-2 — 순환 검사기를 두 벌 만들지 않는다).
+    `dst`에서 `src`로 이미 가는 길이 있으면 새 간선이 고리를 닫는다. 대장을 **쓰기 전에**
+    부르므로 판정에 쓰는 그래프는 현재 메모리 상태(아직 새 간선이 없는 상태)다.
+    """
+    graph = dependency_graph(backlog)
+    if src not in graph.succ or dst not in graph.succ:
+        return None  # 존재하지 않는 노드 — 순환이 아니라 막다른 길(dangling_reference)의 몫
+    back = dependency_path(graph, dst, src)
+    if back is None:
+        return None
+    return [src, *back]
+
+
+def _strongly_connected(graph: DependencyGraph) -> list[list[Node]]:
+    """Tarjan SCC (반복형 — 대장 850건+ 에서 재귀 한도를 피한다). 순환인 SCC만 반환.
+
+    순환 = 노드 2개 이상인 SCC, 또는 자기 자신으로 가는 간선이 있는 1노드 SCC.
+    """
+    index: dict[Node, int] = {}
+    low: dict[Node, int] = {}
+    on_stack: set[Node] = set()
+    stack: list[Node] = []
+    result: list[list[Node]] = []
+    counter = 0
+
+    for root in sorted(graph.succ):
+        if root in index:
+            continue
+        work: list[tuple[Node, int]] = [(root, 0)]
+        while work:
+            node, child_i = work[-1]
+            if child_i == 0:
+                index[node] = low[node] = counter
+                counter += 1
+                stack.append(node)
+                on_stack.add(node)
+            children = graph.succ[node]
+            if child_i < len(children):
+                work[-1] = (node, child_i + 1)
+                child = children[child_i]
+                if child not in index:
+                    work.append((child, 0))
+                elif child in on_stack:
+                    low[node] = min(low[node], index[child])
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+            if low[node] == index[node]:
+                component: list[Node] = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    component.append(member)
+                    if member == node:
+                        break
+                if len(component) > 1 or node in graph.succ[node]:
+                    result.append(sorted(component))
+    return sorted(result)
+
+
+def graph_cycles(backlog: Backlog, graph: DependencyGraph | None = None) -> list[list[Node]]:
+    """순환마다 **대표 경로** 하나(첫 노드 = 끝 노드) + 그 순환 묶음의 전 노드.
+
+    반환은 `[대표 경로, …]`이고 각 경로의 노드 집합은 SCC의 부분집합이다. 전 노드 목록은
+    `graph_cycle_members`가 낸다 — 오류 메시지가 둘 다 담아야 `own_errors`(ID 포함 여부
+    필터)가 경로 밖의 SCC 구성원을 건드린 쓰기도 잡는다.
+    """
+    graph = graph or dependency_graph(backlog)
+    cycles: list[list[Node]] = []
+    for component in _strongly_connected(graph):
+        start = component[0]
+        members = set(component)
+        inside = _restrict(graph, members)
+        # SCC 안에서만 start → … → start 최단 고리를 찾는다.
+        best: list[Node] | None = None
+        for first in graph.succ[start]:
+            if first not in members:
+                continue
+            tail = dependency_path(inside, first, start)
+            if tail is not None and (best is None or len(tail) + 1 < len(best)):
+                best = [start, *tail]
+        cycles.append(best or [start, start])
+    return cycles
+
+
+def _restrict(graph: DependencyGraph, members: set[Node]) -> DependencyGraph:
+    """그래프를 노드 부분집합으로 제한한 사본 (순환 대표 경로 탐색용)."""
+    succ = {n: [m for m in graph.succ[n] if m in members] for n in members}
+    pred = {n: [m for m in graph.pred[n] if m in members] for n in members}
+    return DependencyGraph(succ=succ, pred=pred, edge_kind=graph.edge_kind)
+
+
+def graph_cycle_errors(backlog: Backlog, graph: DependencyGraph | None = None) -> list[str]:
+    """validate용 순환 오류 문구 — 경로(게이트 ID 포함)와 순환 묶음의 전 노드를 함께 적는다."""
+    graph = graph or dependency_graph(backlog)
+    errors: list[str] = []
+    components = {tuple(c) for c in _strongly_connected(graph)}
+    for path in graph_cycles(backlog, graph):
+        component = next((c for c in components if path[0] in c), tuple(path))
+        member_ids = [node_id for _k, node_id in component]
+        errors.append(
+            "depends_on·게이트 순환 참조 검출(태스크·게이트 통합 그래프 — HARN-174): "
+            f"{render_path(path)} · 순환 묶음 {len(member_ids)}건 {member_ids} — 이 고리의 "
+            "어느 노드도 먼저 끝날 수 없어 전부 영구 착수·판정 불가다. 고리의 간선 하나를 "
+            "떼라(amend --remove-depends / --remove-gate · gates amend --remove-depends)"
+        )
+    return errors
+
+
+def detect_cycle(backlog: Backlog) -> list[str]:
+    """순환에 걸린 노드 ID 목록(정렬) — 통합 그래프 기준 (HARN-174 이후 게이트 ID 포함).
+
+    종전 시그니처(태스크 ID 목록)를 유지하는 호환 창구다. 순환을 *설명*하려면
+    `graph_cycle_errors`를 쓴다.
+    """
+    components = _strongly_connected(dependency_graph(backlog))
+    return sorted({node_id for comp in components for _kind, node_id in comp})
+
+
+def open_descendant_tasks(
+    backlog: Backlog, node: Node, graph: DependencyGraph | None = None
+) -> set[str]:
+    """`node`가 끝나야 풀리는 **미종결 태스크** 전부 — 게이트를 지나 끝까지 따라간다 (v2-4).
+
+    미종결(done·cancelled 아님) 태스크와 미통과(pending) 게이트만 **통과**한다. 이미 끝난
+    태스크나 이미 통과한 게이트 너머의 후속은 이 노드를 기다리지 않으므로(그쪽 간선은 이미
+    풀려 있다) 세지 않는다. 시작 노드 자신은 세지 않는다.
+    """
+    graph = graph or dependency_graph(backlog)
+    seen: set[Node] = {node}
+    found: set[str] = set()
+    queue = [node]
+    while queue:
+        cur = queue.pop()
+        for nxt in graph.succ.get(cur, ()):
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            kind, nid = nxt
+            if kind == TASK_NODE:
+                task = backlog.tasks[nid]
+                if task.status in TERMINAL_STATUSES:
+                    continue
+                found.add(nid)
+            else:
+                if backlog.gates[nid].passed:
+                    continue
+            queue.append(nxt)
+    return found
+
+
+def dangling_reference(backlog: Backlog, task_id: str) -> str | None:
+    """태스크 참조가 막다른 길인가 — `"missing"`(대장에 없음) · `"cancelled"` · None (v2-3).
+
+    태스크 depends_on과 게이트 depends_on이 **같은 판정**을 쓴다. 다만 태스크 쪽은
+    `"missing"`만 오류로 친다 — cancelled 선행은 HARN-67 이후 *결정 대기*(selector가
+    `deps_cancelled`로 드러내고 `amend --remove-depends`로 푸는 상태)이고, 그것을 validate
+    오류로 올리면 cancel 한 번에 대장 전체가 red가 된다. 게이트 쪽은 둘 다 오류다 —
+    pending 게이트의 입력이 취소되면 그 게이트를 판정할 근거가 영원히 생기지 않는다.
+    """
+    task = backlog.tasks.get(task_id)
+    if task is None:
+        return "missing"
+    if task.status == "cancelled":
+        return "cancelled"
+    return None
+
+
+# ── FAIL 판정 기록 (HARN-174 v2-8) ────────────────────────────────────────────
+#
+# `gates amend --verdict FAIL`이 corrections에 남기는 줄의 **고정 형식**이다. 판정 이력은 게이트
+# corrections(HARN-124)에 쌓이고, validate가 가장 최근 FAIL 기록을 읽어 두 가지를 본다.
+#   ① 소유 태스크가 0건인 FAIL 기록 — 무엇이 끝나야 재판정하는지 대장이 모른다.
+#   ② 기록이 지목한 **미종결** 소유 태스크가 게이트 상류(입력의 선행 폐포)에 없다 — 판정문은
+#      지목했는데 대장에는 연결이 없다. 이것이 2026-09-24 사고의 정확한 형태다(재판정문이
+#      EOS-24·EOS-124를 지목했으나 재판정 태스크 EOS-130의 depends_on에는 EOS-21뿐이었다).
+# 대장에 없는 소유 ID(개명·오기)는 ②에서 건너뛴다 — 개명은 게이트 입력은 옮기지만 과거
+# corrections 문구는 append-only라 옮기지 않으므로, 여기서 red를 내면 정상 개명이 대장을 깬다.
+
+_FAIL_VERDICT_RE = re.compile(r"verdict FAIL · owners: (?P<owners>[^·]*?) · evidence: ")
+
+
+def format_fail_verdict(owners: list[str], evidence: str) -> str:
+    """FAIL 판정 기록 한 조각 — `verdict FAIL · owners: A, B · evidence: …`."""
+    return f"verdict FAIL · owners: {', '.join(owners)} · evidence: {evidence}"
+
+
+def upstream_tasks(backlog: Backlog, node: Node, graph: DependencyGraph | None = None) -> set[str]:
+    """`node`가 기다리는 태스크 전부(선행 폐포 — 게이트를 지나 끝까지). 상태와 무관."""
+    graph = graph or dependency_graph(backlog)
+    seen: set[Node] = {node}
+    found: set[str] = set()
+    queue = [node]
+    while queue:
+        cur = queue.pop()
+        for prev in graph.pred.get(cur, ()):
+            if prev in seen:
+                continue
+            seen.add(prev)
+            if prev[0] == TASK_NODE:
+                found.add(prev[1])
+            queue.append(prev)
+    return found
+
+
+def fail_verdict_errors(backlog: Backlog, graph: DependencyGraph | None = None) -> list[str]:
+    """pending decision 게이트의 **가장 최근** FAIL 기록이 대장과 맞는가 (v2-8 · 사고 3)."""
+    graph = graph or dependency_graph(backlog)
+    errors: list[str] = []
+    for gid in sorted(backlog.gates):
+        gate = backlog.gates[gid]
+        if gate.status != "pending":
+            continue
+        records = [m for c in gate.corrections for m in [_FAIL_VERDICT_RE.search(c)] if m]
+        if not records:
+            continue
+        owners = [o.strip() for o in records[-1].group("owners").split(",") if o.strip()]
+        if not owners:
+            errors.append(
+                f"{gid}: 최근 FAIL 판정 기록에 소유 태스크가 0건 — 무엇이 끝나야 재판정하는지 "
+                f"대장이 모른다. 처방: gates amend {gid} --verdict FAIL "
+                "--evidence <판정문·기준 커밋> --depends <미충족 항목의 소유 태스크> --reason '...'"
+            )
+            continue
+        upstream = upstream_tasks(backlog, (GATE_NODE, gid), graph)
+        detached = [
+            o
+            for o in owners
+            if o in backlog.tasks
+            and backlog.tasks[o].status not in TERMINAL_STATUSES
+            and o not in upstream
+        ]
+        if detached:
+            errors.append(
+                f"{gid}: 최근 FAIL 판정이 지목한 미종결 소유 태스크 {detached} 가 이 게이트 상류에 "
+                "없다 — 판정문은 지목했는데 대장에는 연결이 없다(2026-09-24 사고 형태). 처방: "
+                f"gates amend {gid} --depends <id> 또는 재판정 태스크에 amend --depends <id>"
+            )
+    return errors
+
+
+def _gate_input_errors(backlog: Backlog) -> list[str]:
+    """게이트 입력 간선의 막다른 길 (HARN-174 v2-3) — 영원히 못 여는 게이트."""
+    errors: list[str] = []
+    for gid in sorted(backlog.gates):
+        gate = backlog.gates[gid]
+        for dep in gate.depends_on:
+            verdict = dangling_reference(backlog, dep)
+            if verdict == "missing":
+                errors.append(
+                    f"{gid}: depends_on '{dep}' 미존재 — 대장에 없는 태스크는 끝날 수 없으므로 "
+                    "이 게이트는 영원히 판정할 수 없다(막다른 길). full id로 정정하라: "
+                    f"gates amend {gid} --remove-depends {dep} --depends <올바른 id>"
+                )
+            elif verdict == "cancelled" and gate.status == "pending":
+                errors.append(
+                    f"{gid}: depends_on '{dep}' 가 cancelled — 취소된 태스크는 done이 되지 "
+                    "않으므로 "
+                    "이 게이트는 영원히 판정할 수 없다(막다른 길). 대체 입력을 걸어라: "
+                    f"gates amend {gid} --remove-depends {dep} --depends <대체 태스크 id>"
+                )
+    return errors
 
 
 def _trigger_declaration_errors(backlog: Backlog) -> list[str]:
@@ -482,7 +858,9 @@ def validate_backlog(backlog: Backlog, schema_errors: list[str] | None = None) -
         if task.stage not in backlog.stage_order:
             errors.append(f"{task.id}: stage '{task.stage}' 가 stage_order에 없음")
         for dep in task.depends_on:
-            if dep not in backlog.tasks:
+            # 막다른 길 판정은 게이트 입력과 같은 함수를 쓴다(HARN-174 v2-3) — 태스크 쪽은
+            # "missing"만 오류다(cancelled 선행은 HARN-67 결정 대기 · dangling_reference 참조).
+            if dangling_reference(backlog, dep) == "missing":
                 errors.append(f"{task.id}: depends_on '{dep}' 미존재")
             elif backlog.stage_index(backlog.tasks[dep].stage) > backlog.stage_index(task.stage):
                 errors.append(
@@ -501,9 +879,12 @@ def validate_backlog(backlog: Backlog, schema_errors: list[str] | None = None) -
                 f"세션 '{session}' 이 {len(ids)}개 태스크를 동시 claim: {ids} (1세션=1태스크)"
             )
 
-    cycle = detect_cycle(backlog)
-    if cycle:
-        errors.append(f"depends_on 순환 참조 검출: {cycle}")
+    # HARN-174 — 게이트 입력 간선의 막다른 길 + 태스크·게이트 통합 그래프의 순환.
+    # 순환 검사기는 이 그래프 하나뿐이다(쓰기 경로도 같은 그래프의 dependency_path를 쓴다).
+    graph = dependency_graph(backlog)
+    errors.extend(_gate_input_errors(backlog))
+    errors.extend(graph_cycle_errors(backlog, graph))
+    errors.extend(fail_verdict_errors(backlog, graph))
 
     # HARN-72 — 산문에만 적힌 미래 트리거를 대장이 집행하게 한다
     # (selector는 acceptance를 읽지 않는다 — depends_on·requires_gates만 본다)
