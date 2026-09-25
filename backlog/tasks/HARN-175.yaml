@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-175
+title: "gates show가 닫힌 게이트 62건 전부에 'validate 위반(HARN-174)'을 표시 — 검증기는 pending에만 요구하는데 표시는 status를 보지 않는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 표시·검증기 일치 — `report.gate_inputs_text`가 \"validate 위반\"을 주장하는 조건이 `Gate.validate()`의 HARN-174 오류 조건(pending이면서 depends_on·no_inputs_reason 둘 다 없음)과 모든 status(pending·cleared·waived)에서 같다. 입력이 기록되지 않은 닫힌 게이트는 위반이 아니라 사실(종결 게이트라 여는 작업을 요구하지 않음)을 말한다 ② 계약 테스트 — `GATE_STATUSES` 전건 × 입력 3형태(없음·depends_on·no_inputs_reason)에서 \"표시가 위반을 주장한다 ⇔ validate가 HARN-174 오류를 낸다\"를 단언하고, 실 대장 전수 스캔에서 불일치 0건을 단언한다(스캔 대상 0건이면 실패 — 공허 통과 금지) ③ 뮤테이션 — 상태 분기를 지우면(종전 동작) ②가 RED, 위반 문구를 pending에서도 지우면 pending 대조군이 RED ④ 한계 — 표시만 고친다. 닫힌 게이트에 입력을 소급 기입하지 않는다(`store._GATE_OMIT_WHEN_EMPTY` 주석의 인접 줄 충돌 비용 근거)"
+artifacts: []
+paths:
+  - scripts/harness/report.py
+  - tests/harness/test_gate_inputs_display.py
+session: claude/serene-gauss-kf4dtk
+notes: "발견 경위 2026-09-25(판정 기준 main f138f894): Kiki가 G-mp02-rerun-model-pilot 조회를 요청 → `gates show`가 \"여는 작업 미선언 — validate 위반(HARN-174)\"을 출력했는데 같은 시점 `backlog.py validate`는 exit 0이었다. 원인: `Gate.validate()`는 \"cleared·waived 게이트는 아무것도 막지 않으므로 요구하지 않는다(과거 행 소급 금지)\"로 pending에만 입력 선언을 요구하지만, `report.gate_inputs_text()`는 status를 보지 않고 입력이 없으면 무조건 위반 문구를 낸다. 실측: 닫힌 게이트 62건(cleared 56·waived 6) 전부 표시=위반·검증기=무위반(오경보율 100%), pending 22건은 양쪽 일치. 위험: HARN-92가 `gates show`를 게이트 인용의 정본 경로로 만들었으므로 닫힌 게이트를 조회하는 모든 세션이 거짓 위반을 본다. `gates amend`는 status를 가리지 않아 닫힌 게이트에 --no-inputs 소급 기입이 통과하며, 그것은 store.py가 피하려는 대장 전역 무의미 변경이다. 피해 실측 0건(이벤트 대장: 종결 후 입력 amend 0/22) — 사고가 아니라 잠복 결함 발견이다."
+updated: 2026-09-25
