@@ -455,7 +455,20 @@ class TestRemoveGate:
 
     def _gated(self, capsys) -> None:
         assert _add("T7-10-gated") == 0
-        assert cli.main(["gates", "add", "G-harn67-test", "--title", "테스트 게이트"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-harn67-test",
+                    "--title",
+                    "테스트 게이트",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         assert (
             cli.main(["amend", "T7-10-gated", "--gate", "G-harn67-test", "--reason", "부착"]) == 0
         )
@@ -491,7 +504,20 @@ class TestRemoveGate:
 
     def test_unattached_gate_removal_rejected_without_writing(self, seeded_repo, capsys):
         assert _add("T7-11-plain") == 0
-        assert cli.main(["gates", "add", "G-harn67-test", "--title", "테스트 게이트"]) == 0
+        assert (
+            cli.main(
+                [
+                    "gates",
+                    "add",
+                    "G-harn67-test",
+                    "--title",
+                    "테스트 게이트",
+                    "--no-inputs",
+                    "테스트 픽스처 — 입력 태스크 없음",
+                ]
+            )
+            == 0
+        )
         before = _task_bytes(seeded_repo, "T7-11-plain")
         assert (
             cli.main(["amend", "T7-11-plain", "--remove-gate", "G-harn67-test", "--reason", "x"])

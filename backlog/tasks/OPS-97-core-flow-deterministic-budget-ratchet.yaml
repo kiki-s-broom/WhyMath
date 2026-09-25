@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-97-core-flow-deterministic-budget-ratchet
+title: "핵심 흐름 결정론 예산 게이트 + ratchet — DB 문장 수·LLM 호출 수·WH-1 도구 호출 수에 상한을 걸고 개선되면 내린다(벽시계 대신 잡음 없는 대리지표)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-95-route-latency-metrics-slo-s5
+requires_gates: []
+acceptance:
+  - "① 대상 흐름 — 검토 문서(`docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md`) §4의 F2(문제 받기: `GET /v1/me/next-problem`·`GET /v1/problems/{problem_id}`)와 F3(코치 응답: `POST /v1/coach/sessions/{dialogue_id}/turns`)의 서버 경로. 흐름마다 세 수를 결정론적으로 센다: ⓐDB 문장 수(SQLAlchemy `before_cursor_execute` 이벤트) ⓑLLM 호출 수(fake provider 호출 카운터) ⓒWH-1 `tool_calls` 수(고정 시나리오 입력)."
+  - "② 채택 전 상관 검증 — 대리지표가 실제 지연을 대변하는지 실 PG(+ 로컬 LLM 또는 고정 지연 fake provider)에서 벽시계와 함께 재서 상관을 적는다. 벽시계는 `OPS-95`의 경로별 지연을 쓴다. 상관이 약한 지표는 게이트에 넣지 않고 그 판정을 근거와 함께 남긴다(원문 글의 폐기 규칙 — 측정값이 불안정하거나 지연과의 상관이 입증되지 않은 벤치마크는 버린다)."
+  - "③ 상한과 ratchet — 채택된 지표마다 기준선을 파일 1곳(단일 진실 원천)에 두고, 상한을 넘는 PR은 CI에서 실패시킨다. 실측이 기준선보다 낮으면 상한을 낮추는 경로를 둔다(커버리지 계층 floor `scripts/coverage/check_layer_coverage.py` 선례). 상한을 올리는 변경은 사유 필드 없이는 통과하지 않는다."
+  - "④ 기존 단언과 분리 — `tests/backend/api/test_me.py`의 `_NP_STMT_BASE` 같은 정확 일치 단언은 동작 변별용이므로 건드리지 않는다. 예산 게이트는 별도 테스트·스크립트로 만든다."
+  - "⑤ 변별력·배선 — 문장 1개 추가·LLM 호출 1회 추가 뮤테이션 각각에서 RED를 확인하고(주입 적용 `mutated != original` 단언 포함), 게이트가 CI 잡에서 실제로 실행되는지(스텝 존재·앞 스텝 실패로 skipped되지 않음)를 확인한다."
+artifacts: []
+paths:
+  - "tests/backend/perf/**"
+  - "scripts/perf/**"
+  - ".github/workflows/ci.yml"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §5 R2 (PR #1311). 2026-09-25 Kiki 지정 — 검토 문서 미등재 6건 일괄 등재 중 1건. depends_on `OPS-95` 근거: ②의 상관 검증에 경로별 벽시계가 필요하다. 등급 P2 근거: 지킬 개선(`OPS-95`·`MOB-24`·`OPS-96`·코치 턴 예산)이 먼저 있어야 상한이 의미를 갖고, 12월 검증과는 무관하다. 연결(의존 관계 아님): `EOS-114`(next-problem 쿼리 수 실측)는 ①ⓐ의 첫 측정과 겹친다."
+updated: 2026-09-25

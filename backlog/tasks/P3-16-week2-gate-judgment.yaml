@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-16-week2-gate-judgment
+title: "P3-G2 Week 2 Gate 판정 회차 — Problem Coverage 95%+·Solution QA Pass 99%+·오답 1건 교정 전략 도달 (판정 전용·구현 세션 분리)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-04-problem-metadata-and-slots
+  - P3-05-triangle-density
+  - P3-06-wrong-answer-remediation-pipeline
+  - P3-07-solution-qa-machine-verification
+requires_gates: []
+acceptance:
+  - "① 판정 기준 — 판정문 상단에 판정 기준 main 커밋 해시를 박고, P3-G2의 세 조건(Problem Coverage 95%+ · Solution QA Pass 99%+ · 오답 1건이 교정 전략까지 도달)을 main 기준으로 실측한다. 근거는 실파일·명령 출력·태스크 ID 중 하나여야 하고, 문서 언급은 근거가 아니다.\n\n② 판정 회차 분리(지시문 세트 주의 4) — 이 태스크는 판정 전용이며 구현 세션과 다른 세션에서 단독 집행한다. 조건을 충족시키려고 production code를 고치지 않는다. 발견한 결함은 태스크로 등재만 한다.\n\n③ 최종 한 줄은 PASS 또는 FAIL이며 조건부 PASS는 없다. 미충족 조건마다 끊긴 지점과 남은 작업량 추정을 적는다.\n\n④ 기록 — PASS면 판정문을 근거로 게이트 clear를 Kiki께 요청한다(G-p3-g2-week2는 kind=decision·assignee=kiki이며 에이전트가 --as kiki로 대행하지 않는다). FAIL이면 gates amend G-p3-g2-week2 --verdict FAIL --evidence <판정문 경로·기준 커밋> --depends <미충족 항목의 소유 태스크>로 기록한다. 소유 태스크를 잇지 않은 FAIL 기록은 CLI가 거부한다(HARN-174 v2-8).\n\n⑤ 완료 판정 — 판정문이 남고, PASS면 clear 요청이 Kiki께 전달되고, FAIL이면 verdict 기록과 소유 태스크 연결이 대장에 남음."
+artifacts: []
+paths: []
+session: null
+notes: "출처: HARN-174 v2-9 백필(2026-09-25). 게이트 G-p3-g2-week2에는 판정을 수행할 태스크가 대장에 없었다 — 게이트 제목이 판정 회차 분리 집행을 요구하는데 그 회차의 소유자가 없는 상태였다. 이 태스크가 그 게이트의 입력(gate.depends_on)이다.\n\n[게이트 미부착] 이 태스크는 G-p3-g2-week2를 여는 작업이므로 그 게이트를 requires_gates로 걸면 순환이 된다(HARN-174 이후 CLI가 쓰기 시점에 거부한다). Week 1 게이트는 걸지 않는다 — 입력 태스크의 첫 번째가 이미 그 게이트를 요구하므로 전이로 막힌다."
+updated: 2026-09-25

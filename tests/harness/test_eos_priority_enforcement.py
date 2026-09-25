@@ -197,6 +197,8 @@ class TestGrandfatherExpiresByMachine:
                 status=status,
                 requested="2026-08-31",
                 evidence="테스트 픽스처" if status != "pending" else None,
+                # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수다
+                no_inputs_reason="테스트 픽스처" if status == "pending" else None,
             )
         )
         store.save_gates(repo, gates)

@@ -44,6 +44,10 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
     gates = [
         Gate(
             id="G-phaiakes9-key",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason=(
+                "Kiki 머신 작업 — 라이브 키 투입은 사람이 직접 행동한다(입력 태스크 없음)"
+            ),
             title="Phaiakes9 라이브 키 투입 + 실측 비용 검증",
             kind="human",
             assignee="kiki",
@@ -53,6 +57,8 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
         ),
         Gate(
             id="G-kiki-device-demo",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason="Kiki 실기기 시연 — 사람이 직접 행동한다(입력 태스크 없음)",
             title="S1 탈출 게이트 ① — 실기기 학습 루프 시연",
             kind="human",
             assignee="kiki",
@@ -61,6 +67,8 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
         ),
         Gate(
             id="G-orphan-prod-run",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason="Kiki 머신 prod 실행 — 사람이 직접 행동한다(입력 태스크 없음)",
             title="orphan 진단 스크립트 prod 실행 (scripts/diagnose_atom_orphans.py)",
             kind="human",
             assignee="kiki",
@@ -69,6 +77,8 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
         ),
         Gate(
             id="G-domain-partner",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason="외부 인력 영입 — 대장 밖 행동이다(입력 태스크 없음)",
             title="수학 도메인 파트너 영입 (병목 ④ — 검수 큐 가동 조건)",
             kind="human",
             assignee="kiki",
@@ -77,6 +87,8 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
         ),
         Gate(
             id="G-crosswalk-approval",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason="사람 승인 — 검수자가 직접 판정한다(입력 태스크 없음)",
             title="crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)",
             kind="human",
             assignee="kiki",
@@ -85,6 +97,11 @@ def build_seed() -> tuple[list[str], list[Track], list[Gate], list[Task]]:
         ),
         Gate(
             id="G-s5-subject-expansion",
+            # HARN-174: pending 게이트는 여는 작업 또는 입력 없음 사유 중 하나가 필수
+            no_inputs_reason=(
+                "시딩 시점에는 판정 태스크가 없다 — 실대장은 판정 태스크를 입력으로 건다"
+                "(HARN-174 백필)"
+            ),
             title="S5 타과목 확장 게이트 — E축 착수 판정 체크리스트 전부 충족 (e_axis_v1 §5)",
             kind="decision",
             assignee="kiki",

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-142-gate2-loop-harness-ci-reach-freeze
+title: "Gate 2 3루프 상시 하네스·SCENARIO 회귀 스위트의 CI 도달 동결 — EOS-21 동결 목록(6종)에 미편입"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 대상 — Gate 2 판정 근거 중 CI 도달 동결이 없는 두 하네스: `tests/backend/api/test_e2e_three_consecutive_loops.py`(PED-36 ⑫ · 무개입 연속 3루프 §18의 유일한 상시 증거)와 `tests/backend/scenarios/test_phase2_scenario_regression_suite.py`(P-13 · EOS-119 · SCENARIO-001~010).\n\n② 사실(2026-09-25 실측 · main 841ee77d) — 두 파일은 지금 `backend — 마이그레이션·통합 (실 PG)` 잡의 `pytest -m integration --ignore=../../tests/backend/l3`로 실행된다(merge_group 실행 36157270375 · 잡 108144831214 로그: `api/test_e2e_three_consecutive_loops.py ....x............` · `scenarios/test_phase2_scenario_regression_suite.py ..........` · 요약 `400 passed, 13 skipped, 11310 deselected, 1 xfailed`). 그러나 EOS-21이 만든 도달 동결 `tests/infra/test_gate_harness_marker_reach_wiring.py`의 `GATE_HARNESS_PATHS`는 6종뿐이고 이 둘이 없다. 워크플로 참조도 0건(`grep scenario|three_consecutive .github/workflows/*.yml` 0건)이다. 즉 EOS-21 docstring이 적은 세 조건(testpaths·마커·--ignore) 중 하나가 바뀌면 이 둘은 조용히 skip으로 돌아가고 skip은 exit 0이다.\n\n③ 집행 — 두 경로를 도달 동결 대상에 편입한다(기존 가드 재사용 · 재구현 0). 3루프 하네스는 `xfail(strict=True)`를 쓰므로 \"도달\"의 뜻이 skip이 아닌 실행이어야 함을 확인한다(XFAIL은 실행된 것이다).\n\n④ 변별력 — 두 경로 각각에 대해 도달이 끊기는 주입(--ignore에 해당 디렉터리 추가 · 마커 제거)을 넣어 RED가 나는지 확인하고, 주입 실재(mutated != original)와 원복 바이트 동일을 단언한다.\n\n⑤ 범위 밖 — 하네스 내용·판정 규칙·동결값은 건드리지 않는다(PED-36 ⑫·EOS-139 소유)."
+artifacts: []
+paths:
+  - tests/infra/test_gate_harness_marker_reach_wiring.py
+session: null
+notes: "출처: EOS-130 판정(2026-09-25 · 판정 기준 main 841ee77d) §4. EOS-21 처분(배선 확인 + 동결)을 인용하던 중 동결 목록이 6종에서 멈춘 것을 실측했다 — 두 하네스가 EOS-21 측정(2026-09-23) 이후인 09-24(#1300)·09-25(#1315)에 착지했기 때문이다. 판정 회차는 production code를 고치지 않고 등재만 한다는 규율(EOS-130 ②)에 따라 테스트 가드도 고치지 않았다.\n\n[등급] P1 — 지금은 실행되고 있으므로 판정이 틀리지는 않는다. 다만 Gate 2 PASS 이후 11월 Phase 3 동안 이 하네스가 조용히 skip으로 빠지면 \"루프가 여전히 닫혀 있다\"를 아무도 모른다(9/19 판정문 §6-3이 같은 위험을 '가장 싸고 가장 먼저 해야 할 항목'으로 적었다)."
+updated: 2026-09-25

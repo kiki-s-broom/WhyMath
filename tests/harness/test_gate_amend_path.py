@@ -80,6 +80,9 @@ def _overdue_gate(repo: Path, *, days_ago: int = 40, remind: int = 30) -> None:
                 _OLD_TITLE,
                 "--remind-after-days",
                 str(remind),
+                # HARN-174: 여는 작업(--depends) 또는 입력 없음 사유 중 하나가 필수다
+                "--no-inputs",
+                "테스트 픽스처 — 입력 태스크 없음",
             ]
         )
         == 0
