@@ -16,10 +16,11 @@ acceptance:
   - "② S4-16 강등전을 qwen3.5:27b로 재실행해 Wilson 게이트 PASS(검출률 하한 > 0.9·오검출 상한 < 0.05) — 통과 시 S4-16 done 전환 및 KG-02 unblock"
   - "③ 대안: 클라우드 provider(Anthropic/OpenAI)를 Phaiakes9 backend에 배선해 S4-16 강등전 실행 — 이 경우도 ②와 동일한 게이트 PASS가 필요"
   - "④ [2026-09-21 전제 변경 — S4-16 재개 세션 실측] 재판정 선행: ①이 지목한 qwen3.5:27b는 2026-08-22 이후 QUALITY 좌석이 아니다(dense -> MoE qwen3:30b-a3b 교체 · 왕복 지연 상수 13,886ms -> 2,300ms · 생성 11.9 -> 71.5 t/s, router.py LOCAL_LATENCY_MS와 docs/ops/amd395_local_llm_performance.md §A.1). ③(클라우드 배선)은 ARCH-55 채택 + ARCH-57 팩토리로 이미 충족됐다. 따라서 이 태스크를 착수하기 전에 cross_verify 1회 호출 기준 실측(128토큰 벤치가 아니라)으로 ①의 충족 여부를 먼저 판정하고, 충족이면 이 태스크를 종결하거나 존재 이유를 다시 쓴다. 또한 ②(\"통과 시 S4-16 done\")의 전제 자체가 반증됐다 -- 속도 제약 없이 돈 클라우드 2회차가 전부 오검출에서 막혔으므로(2026-08-15 오검출 21%/최악 상한 .6438, 2026-08-24 검출 18/20인데 오검출 3/5) 구속 축은 모델 성능이 아니라 프로토콜이다. 측정 이력 정본 = docs/standards/residue_gate_demotion_battle_history.md §2.2."
+  - "[ARCH-66 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다. 이 태스크의 Anthropic 라이브 호출 축(실측·재측정·대조군)은 재판정 게이트 G-arch66-anthropic-api-pause-review 전까지 수행하지 않는다. 코드·오프라인 축은 진행할 수 있으며, 그 경우 라이브 축은 미수행으로 명시한다(미측정을 통과로 계상 금지)."
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/providers/**"
   - "infra/phaiakes9/**"
 session: null
-notes: "2026-08-14 측정에서 확인: qwen3.5:27b는 Windows+Ollama+ROCm에서 0.5~1 tok/s로 너무 느리고, qwen2.5:7b/qwen2-math:7b는 강등전 구분력이 없다. GMKtec AI Max+ 395/8060S는 32B급을 돌릴 수 있는 하드웨어이므로 소프트웨어 스택 문제로 추정. S4-16 blocked 해소의 전제 조건.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-21] S4-16 재개 세션 실측 — MoE 교체로 acceptance 1의 전제 소멸, 오검출이 실제 구속 축"
-updated: 2026-09-21
+notes: "2026-08-14 측정에서 확인: qwen3.5:27b는 Windows+Ollama+ROCm에서 0.5~1 tok/s로 너무 느리고, qwen2.5:7b/qwen2-math:7b는 강등전 구분력이 없다. GMKtec AI Max+ 395/8060S는 32B급을 돌릴 수 있는 하드웨어이므로 소프트웨어 스택 문제로 추정. S4-16 blocked 해소의 전제 조건.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-21] S4-16 재개 세션 실측 — MoE 교체로 acceptance 1의 전제 소멸, 오검출이 실제 구속 축\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침"
+updated: 2026-09-24

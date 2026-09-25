@@ -390,3 +390,150 @@ def test_detector_flags_the_original_unreachable_criterion(para: str) -> None:
     assert any(word in para for word in _VERDICT_KEYWORDS), "판정 문단으로 선택되지 않는다"
     assert any(phrase in para for phrase in _EQUALITY_PHRASES), "등식 어구가 없어 선택 밖이다"
     assert "emitted_distinct_slugs" not in para, "이 픽스처는 초판 형태여야 한다(RED 대상)"
+
+
+# ---------------------------------------------------------------------------
+# MP-02 재회차 런북 (2026-09-24) — 1차 런북이 겪은 결함 3축을 새 런북에도 그대로 건다.
+#
+# 새 런북은 1차 런북과 **다른 파일**이라 위 테스트들이 한 번도 보지 않는다(파일 경로가 상수).
+# 같은 함정(사이드카 이어붙이기·PowerShell JSON 파싱·stdout cp949)이 새 파일로 옮겨 오면
+# 아무것도 막지 못하므로, 여기서 새 경로에 같은 검사를 건다.
+# ---------------------------------------------------------------------------
+_DECISION_RULE = re.compile(
+    r"'quality' if a[\[(]'?q(?:uality)?'?[\])]>a[\[(]'?m(?:id)?'?[\])] else 'mid'"
+)
+_ANY_WITH_SUFFIX = re.compile(r"with_suffix\(\s*['\"]([^'\"]+)['\"]\s*\)")
+_RERUN_RUNBOOK = _REPO_ROOT / "docs" / "reviews" / "mp02_rerun_runbook.md"
+
+
+def _rerun_fenced() -> str:
+    return "\n".join(_fenced_blocks(_RERUN_RUNBOOK.read_text(encoding="utf-8")))
+
+
+def test_rerun_runbook_sidecar_names_match_code() -> None:
+    """재회차 런북의 사이드카 표현도 코드가 만드는 이름만 가리킨다 — 스캔 0건은 실패."""
+    # 알려진 세 이름만 잡는 `_WITH_SUFFIX`로는 오타(`.gen.jsonl`)가 **보이지 않는다**(뮤테이션
+    # 생존 실측) — 그래서 여기서는 `with_suffix` 리터럴을 **전부** 뽑아 코드 이름과 대조한다.
+    names = [_OUT.with_suffix(s).name for s in _ANY_WITH_SUFFIX.findall(_rerun_fenced())]
+    assert names, "재회차 런북 코드 블록에서 사이드카 표현을 하나도 찾지 못했다"
+    assert (
+        set(names) >= _expected_names()
+    ), f"사이드카 3종 중 빠진 것: {_expected_names() - set(names)}"
+    stray = sorted(set(names) - _expected_names())
+    assert not stray, f"코드가 만들지 않는 사이드카 이름: {stray}"
+
+
+def test_rerun_runbook_has_no_powershell_json_parsing_and_forces_utf8() -> None:
+    fenced = _rerun_fenced()
+    assert _PS_JSON_PARSE not in fenced, "재회차 런북에 PowerShell JSON 파싱이 있다(cp949 함정)"
+    assert _IO_ENCODING in fenced and "IO_ENCODING" in fenced
+
+
+def test_rerun_runbook_passes_the_block_guard() -> None:
+    """쓰기 블록 자가거부 가드(HARN-106)를 새 런북에 직접 돌린다 — 0블록은 실패."""
+    result = subprocess.run(
+        [sys.executable, str(_SCANNER), str(_RERUN_RUNBOOK)],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, f"재회차 런북이 블록 가드에서 red다:\n{output}"
+    found = _BLOCK_COUNT.search(output)
+    assert found is not None and int(found.group(1)) > 0, output
+
+
+def test_rerun_runbook_pilot_and_round2_use_the_same_decision_rule() -> None:
+    """§5(판정 출력)와 §6(2회차가 다시 계산)이 **같은 규칙**을 쓴다.
+
+    §6은 앞 출력을 눈으로 옮기지 않으려고 판정을 재계산한다. 두 곳 중 한 곳만 규칙이 바뀌면
+    사람이 본 `CHOSEN_TIER`와 실제로 돈 티어가 갈린다 — 이 단언이 그 표류를 막는다.
+    """
+    fenced = _rerun_fenced()
+    hits = _DECISION_RULE.findall(fenced)
+    assert len(hits) == 2, (
+        "판정 규칙(accepted_stored가 더 많으면 quality·동률이면 mid)이 §5·§6 두 곳에 있어야 한다 "
+        f"— 실측 {len(hits)}곳"
+    )
+
+
+def test_rerun_runbook_round2_uses_judged_canary_and_avoid_rule() -> None:
+    """개정 §6이 카나리 표본 기준·회피 목록 판정을 **실제 실행 인자**로 싣는다 (MP-02 재회차 2차).
+
+    판정 규칙을 산문에만 적고 블록에 안 실으면 사람이 본 판정과 실제로 돈 회차가 갈린다.
+    """
+    fenced = _rerun_fenced()
+    assert "--canary-basis judged" in fenced, "2회차가 judged 카나리로 돌지 않는다"
+    assert "--avoid-recent $Avoid" in fenced, "회피 목록 판정값이 실행 인자로 전달되지 않는다"
+    assert "'10' if a(v)>a(q) else '0'" in fenced, "회피 목록 판정 규칙(③>② 일 때만 켬)이 없다"
+
+
+def test_rerun_runbook_has_no_tee_object() -> None:
+    """실행 블록에 `Tee-Object`가 없다 — PowerShell 파이프가 UTF-8 출력을 cp949로 되읽어 한글이
+    깨진다(2026-09-24 파일럿 ①② 실측). 판정 재료는 Python이 직접 쓰는 대장이다."""
+    assert "Tee-Object" not in _rerun_fenced()
+
+
+# ---------------------------------------------------------------------------
+# MP-02 3회차 (2026-09-25) — 성취기준 예시 제거 후 재실행 블록.
+#
+# 2회차 카나리 실패 4건이 전부 저작 프롬프트 예시 코드([10공수1-02-02]) 베끼기였다. 3회차 블록은
+# 그 수정이 **실제로 불러와졌는지**(`HAS_CODE_FIX`)를 스스로 확인하고 아니면 거부한다. 그 프로브가
+# 옛 프롬프트에서도 True를 내면 자가검증이 위장이 되므로, 프로브를 정본 프롬프트에 직접 적용해
+# 수정 전(False)·수정 후(True)가 갈리는지 본다.
+# ---------------------------------------------------------------------------
+_PROMPT_DOC = _REPO_ROOT / "docs" / "prompts" / "l3_equivalent_gen.md"
+_FIX_PROBE = re.compile(r'\$FixProbe = & \$Py -c "([^"\n]+)"')
+_ROUND3_ARGS = (
+    "--out $Out3 --n 60 --spec-file $Plan --authoring-tier quality "
+    "--avoid-recent 10 --canary-basis judged"
+)
+
+
+def _system_prompt_block() -> str:
+    text = _PROMPT_DOC.read_text(encoding="utf-8")
+    start = text.index("```prompt:l3.equivalent.system")
+    end = text.index("```", start + 3)
+    return text[start:end]
+
+
+def _probe_parts() -> tuple[str, re.Pattern[str]]:
+    found = _FIX_PROBE.findall(_rerun_fenced())
+    assert (
+        len(found) == 1
+    ), f"3회차 프롬프트 수정 프로브가 정확히 1개여야 한다 — 실측 {len(found)}개"
+    phrase = re.search(r"\('([^']+)' in s\)", found[0])
+    pattern = re.search(r"re\.search\(r'([^']+)', s\)", found[0])
+    assert phrase is not None and pattern is not None, found[0]
+    return phrase.group(1), re.compile(pattern.group(1))
+
+
+def _probe(system: str) -> bool:
+    phrase, pattern = _probe_parts()
+    return phrase in system and pattern.search(system) is None
+
+
+def test_round3_fix_probe_is_true_on_the_current_prompt() -> None:
+    assert _probe(_system_prompt_block()) is True
+
+
+def test_round3_fix_probe_is_false_on_the_old_prompt() -> None:
+    """옛 예시 코드가 돌아오면 프로브가 False — 자가검증이 수정 전후를 가른다."""
+    current = _system_prompt_block()
+    old = current.replace(
+        '"answer_format": "자연수"\n}',
+        '"answer_format": "자연수",\n  "achievement_standard_codes": ["[10공수1-02-02]"]\n}',
+    )
+    assert old != current, "치환 대상(예시 끝줄)이 없다 — 이 테스트가 옛 프롬프트를 만들지 못했다"
+    assert _probe(old) is False
+
+
+def test_round3_block_runs_the_same_settings_and_refuses_without_the_fix() -> None:
+    """3회차는 2회차와 같은 설정이고, 프로브 결과가 쓰기 가드 조건에 실제로 들어 있다."""
+    fenced = _rerun_fenced()
+    assert _ROUND3_ARGS in fenced, "3회차 실행 인자가 2회차 설정(quality·avoid 10·judged)과 다르다"
+    guard = next((line for line in fenced.splitlines() if _ROUND3_ARGS in line), "")
+    assert guard.startswith("if (") and "$HasCodeFix" in guard.split("{", 1)[0], guard
+    assert '} else { "REFUSED: 3회차' in guard, guard
+    assert (
+        "PROMPT_CHANGED_FROM_ROUND2" in fenced
+    ), "3회차가 프롬프트 변경을 대장으로 확인하지 않는다"

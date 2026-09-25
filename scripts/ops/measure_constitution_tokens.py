@@ -19,6 +19,12 @@ tiktoken은 OpenAI BPE이고 Claude의 토크나이저가 아니다. 한국어 �
 없으면 측정하지 않고 그렇게 말한다(모른다 ≠ 0).
 
 실행 환경: Phaiakes9 (Kiki 머신) — 실 API 키가 있는 유일한 곳.
+
+현재 상태 (2026-09-24 · ARCH-66): Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않으므로
+이 스크립트는 **실행하지 않는다**. 측정은 Claude Code `/context`로 대체됐다(게이트
+`G-harn121-constitution-token-measure-context` ·
+런북 `docs/ops/harn121_constitution_token_measurement_runbook.md`).
+API가 재개되면 /context에 잡히지 않는 AGENTS.md 보강 측정에 쓴다.
 """
 
 from __future__ import annotations
@@ -37,6 +43,11 @@ def _brief_text(root: Path) -> tuple[str, str | None]:
     """SessionStart 브리핑 출력 — (본문, 실패 사유)."""
     import subprocess
 
+    # 자식 stdout을 UTF-8로 강제한다(HARN-169). 한국어 Windows에서 파이프 stdout은 로케일
+    # 인코딩(cp949)이 되어 브리핑의 `—`·`⚠`에서 UnicodeEncodeError로 exit 1이 난다 —
+    # 그러면 브리핑이 '미측정'으로 떨어지고 합계가 하한이 된다. 읽는 쪽이 utf-8이므로
+    # 쓰는 쪽도 맞춘다.
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     try:
         proc = subprocess.run(
             [sys.executable, "scripts/harness/backlog.py", "brief", "--format", "text"],
@@ -44,9 +55,10 @@ def _brief_text(root: Path) -> tuple[str, str | None]:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=env,
             timeout=120,
         )
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError) as exc:
         return "", f"브리핑 실행 실패 — {type(exc).__name__}: {exc}"
     if proc.returncode != 0:
         return "", f"브리핑 exit {proc.returncode} — {(proc.stderr or '').strip()[:200]}"

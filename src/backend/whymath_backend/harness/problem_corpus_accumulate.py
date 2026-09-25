@@ -93,6 +93,7 @@ exit 코드 3값: 0=신규 수용 ≥1 · 1=이번 회차 무진전 · 2=**셋 �
         --seed <기존.jsonl> [--seed <추가.jsonl> ...] --out <축적.jsonl> --n 20 \\
         [--topic-hint "..."] [--standard-code "[10공수1-02-02]"] [--difficulty 2.5] \\
         [--spec-file <계획.jsonl>] [--top-p 0.95 — anthropic 좌석 제외] \\
+        [--authoring-tier mid|quality] [--avoid-recent 10] [--canary-basis judged] \\
         [--generation-log <경로.jsonl>] [--worklist-out <경로.md>] [--stagnation-window 3]
 """
 
@@ -136,6 +137,7 @@ from whymath_backend.harness.batch_safety import (
     RollingFailureWindow,
     evaluate_canary,
     is_accepted_status,
+    is_neutral_status,
 )
 from whymath_backend.harness.needs_review_worklist import (
     ReviewQueueEntry,
@@ -280,6 +282,13 @@ class AccumulateReport:
     #: 카나리 판정이 **권고**였는가(n <= canary_size라 막을 본배치가 없던 경우). 판정은
     #: 냈지만 차단력이 없었다는 뜻 — 이걸 안 적으면 운영자가 "게이트가 봐 줬다"고 오독한다.
     canary_advisory: bool = False
+    #: 카나리 표본 기준(MP-02 재회차) — "attempts"(기본·종전)=앞머리 *시도* canary_size건,
+    #: "judged"=중복을 뺀 *판정 대상*이 canary_size건 모일 때까지. 값이 달라지면 같은 카나리
+    #: 수치의 뜻이 달라지므로 리포트에 함께 싣는다.
+    canary_basis: str = "attempts"
+    #: 카나리 판정이 내려진 시점까지 소비한 **시도 수**. attempts 기준이면 canary_size와 같고,
+    #: judged 기준이면 중복만큼 더 크다 — 검수 구간(canary_slice)을 자를 때 이 값을 봐야 한다.
+    canary_attempts: int | None = None
     #: 중복 출처 교차표 + **구분 장치가 실제로 작동한 비율**(EOS-121 선결조건 B·
     #: `anchor_round_ledger.duplicate_source_rates` 산출물 그대로 — 두 벌 산식 금지).
     #: `outcome_counts`와 **같은 층위**에 실린다: 저쪽이 "몇 건이 중복이었나"를 말하면
@@ -317,6 +326,8 @@ class AccumulateReport:
             "canary": self.canary,
             "canary_blocked": self.canary_blocked,
             "canary_advisory": self.canary_advisory,
+            "canary_basis": self.canary_basis,
+            "canary_attempts": self.canary_attempts,
         }
 
 
@@ -443,6 +454,7 @@ def run_corpus_accumulate(
     canary_size: int | None = DEFAULT_CANARY_SIZE,
     canary_threshold: float = DEFAULT_CANARY_THRESHOLD,
     canary_confidence: float = DEFAULT_CANARY_CONFIDENCE,
+    canary_basis: str = "attempts",
 ) -> AccumulateReport:
     """축적 1회차 — 기존 signature 주입 dedup + 수용분 증분 append(생성기 좌석 무관).
 
@@ -485,7 +497,19 @@ def run_corpus_accumulate(
     (`canary_advisory=True`) — 차단력 없는 권고다. 판정 자체를 생략하면 기본 경로
     (`--n 20` · 카나리 30)에서 아무 신호도 남지 않는다(2026-09-06 실측 사고).
     `canary_size=None`이면 관문을 완전히 끈다.
+
+    `canary_basis`(MP-02 재회차): 카나리 표본을 무엇으로 세는가. "attempts"(기본·종전)는 앞머리
+    *시도* `canary_size`건이다. 그런데 중복은 판정 분모에서 빠지므로
+    (`batch_safety.NEUTRAL_STATUSES`) 중복이 많은 회차에서는 판정 대상이 크게 줄어,
+    **품질과 무관하게 임계를 넘을 수 없게** 된다
+    (2026-09-21 1차 회차: 30건 중 중복 20 → 분모 10 → 만점이어도 Wilson 하한 0.7871 < 0.90).
+    "judged"는 **중복이 아닌 판정 대상이 `canary_size`건 모일 때까지** 카나리를 이어 가 표본 크기를
+    보장한다. 임계·신뢰수준·중복 제외 규칙은 그대로이며 바뀌는 것은 *언제 판정하는가*뿐이다.
+    전체 시도 상한은 여전히 `n`이라, 판정 대상이 모이기 전에 `n`이 소진되면 종전처럼 권고 판정만
+    남는다(차단력 없음).
     """
+    if canary_basis not in ("attempts", "judged"):
+        raise ValueError(f"canary_basis는 attempts|judged여야 한다(받은 값 {canary_basis!r})")
     seats = _resolve_spec_seats(generator=generator, spec=spec, spec_seats=spec_seats)
 
     seed_signatures, seed_slugs, seed_total = load_corpus_index(list(seed_paths))
@@ -525,6 +549,9 @@ def run_corpus_accumulate(
     )
     canary_verdict: CanaryVerdict | None = None
     canary_blocked = False
+    canary_attempts: int | None = None
+    # judged 기준의 진행 카운터 — 중립(중복) status를 뺀 판정 대상 수.
+    judged_count = 0
     # 시도 순번 → spec_id(EOS-121 C) — 같은 인덱스로 outcomes와 짝지어 spec별 집계를 낸다.
     # 리스트로 쌓는 이유: 중단(카나리·롤링)으로 회차가 짧아져도 **실제로 돈 만큼만** 남아
     # 집계 분모가 부풀지 않는다(`attempted=len(outcomes)`와 같은 정직 집계 축).
@@ -548,11 +575,15 @@ def run_corpus_accumulate(
                 _LOGGER.warning("검수 큐 행 적재 실패(%s) — 배치 계속", type(exc).__name__)
         if watchdog is not None:
             watchdog.observe_status(outcome.status)
+        if not is_neutral_status(outcome.status):
+            judged_count += 1
+        canary_progress = judged_count if canary_basis == "judged" else len(outcomes)
         if (
             canary_gate_at is not None
             and canary_verdict is None
-            and len(outcomes) >= canary_gate_at
+            and canary_progress >= canary_gate_at
         ):
+            canary_attempts = len(outcomes)
             canary_verdict = evaluate_canary(
                 [item.status for item in outcomes],
                 threshold=canary_threshold,
@@ -582,6 +613,7 @@ def run_corpus_accumulate(
             confidence=canary_confidence,
         )
         canary_advisory = True
+        canary_attempts = len(outcomes)
         if not canary_verdict.passed:
             _LOGGER.warning("[카나리 권고·차단력 없음] %s", canary_verdict.reason)
 
@@ -639,6 +671,8 @@ def run_corpus_accumulate(
         canary=canary_verdict.to_json() if canary_verdict is not None else None,
         canary_blocked=canary_blocked,
         canary_advisory=canary_advisory,
+        canary_basis=canary_basis,
+        canary_attempts=canary_attempts,
         duplicate_sources=duplicate_source_rates(duplicate_pairs),
         spec_outcome_counts=spec_outcome_counts,
         spec_plan=[_spec_plan_entry(seat) for seat in seats],
@@ -924,6 +958,8 @@ def _build_live_generator(
     subscription: str | None = None,
     budget_krw: float | None = None,
     top_p: float | None = None,
+    authoring_tier: str = "mid",
+    avoid_recent: int = 0,
 ) -> EquivalentProblemGenerator:
     """라이브 LLM 생성기 조립(조성 루트) — L4 카탈로그 라벨 주입·표준 CompositeProvider.
 
@@ -960,6 +996,16 @@ def _build_live_generator(
     # 눈으로도 판정할 수 있다(subscription·budget_krw와 같은 이유).
     if top_p is not None:
         routing_overrides["top_p"] = top_p
+    # 저작 티어(MP-02 재회차) — "mid"(기본)는 키를 싣지 않아 종전과 바이트 동일하다. "quality"는
+    # 라우팅 신호를 비동기로 바꿔 라우터 규칙 2가 로컬 QUALITY 티어를 고르게 한다(모델 ID를
+    # 여기 박지 않는다 — 선택은 라우터 몫이고 실제 모델은 genlog → 회차 매니페스트에 남는다).
+    if authoring_tier == "quality":
+        routing_overrides["routing_sync"] = False
+    elif authoring_tier != "mid":
+        raise ValueError(f"authoring_tier는 mid|quality여야 한다(받은 값 {authoring_tier!r})")
+    # 회피 목록(MP-02 재회차) — 0(기본)이면 키를 싣지 않아 종전 프롬프트와 바이트 동일하다.
+    if avoid_recent:
+        routing_overrides["avoid_recent"] = avoid_recent
 
     return LLMEquivalentProblemGenerator(
         # 표준 CompositeProvider 지연 구성 — 라이브 환경 전제. 클라우드 좌석은
@@ -1021,6 +1067,38 @@ def main(argv: list[str] | None = None) -> int:
             "동시 지정을 400으로 거부하는데 저작 경로는 temperature(0.9)를 항상 싣기 때문이다. "
             "그 조합이면 이 CLI가 **호출 0건에서** exit 2로 거부한다(2026-09-19 라이브 90호출 "
             "전건 실패 실측). openrouter·로컬 좌석에서는 종전대로 쓸 수 있다."
+        ),
+    )
+    parser.add_argument(
+        "--authoring-tier",
+        choices=["mid", "quality"],
+        default="mid",
+        help=(
+            "로컬 저작 티어(MP-02 재회차). mid(기본)=종전 그대로 동기 라우팅 → 로컬 MID "
+            "(qwen2.5:7b). quality=비동기 라우팅 → 라우터 규칙 2가 로컬 QUALITY 티어 "
+            "(router.QUALITY_MODEL_ID·현 qwen3:30b-a3b)를 고른다. 오프라인 배치라 학생 대기가 "
+            "없으므로 동기일 필요가 없다. 실제로 쓰인 모델은 genlog·회차 대장 manifest에 남는다."
+        ),
+    )
+    parser.add_argument(
+        "--avoid-recent",
+        type=int,
+        default=0,
+        help=(
+            "회차 내 중복 회피 목록 크기(MP-02 재회차·0~20·기본 0=끔). 주면 생성기가 이번 회차에 "
+            "자신이 이미 만든 조건식 최근 N개를 다음 프롬프트에 '다시 쓰지 말 것'으로 싣는다. "
+            "같은 spec 좌석(topic_hint)끼리만 공유한다. 상한 20은 Minimal context 규율"
+            "(프롬프트에 넣을수록 모델이 흐려진다) 때문이다."
+        ),
+    )
+    parser.add_argument(
+        "--canary-basis",
+        choices=["attempts", "judged"],
+        default="attempts",
+        help=(
+            "카나리 표본 기준(MP-02 재회차). attempts(기본·종전)=앞머리 시도 --canary건. "
+            "judged=중복을 뺀 판정 대상이 --canary건 모일 때까지 — 중복이 많아도 표본 크기가 "
+            "줄지 않는다. 임계·신뢰수준·중복 제외 규칙은 동일하다."
         ),
     )
     parser.add_argument(
@@ -1124,6 +1202,8 @@ def main(argv: list[str] | None = None) -> int:
     # parse_args에도 이 확정값을 넘겨 "기록한 인자"와 "해석한 인자"가 갈라지지 않게 한다.
     effective_argv: list[str] = list(argv) if argv is not None else list(sys.argv[1:])
     args = parser.parse_args(effective_argv)
+    if not 0 <= args.avoid_recent <= 20:
+        parser.error(f"--avoid-recent는 0~20이어야 한다(받은 값 {args.avoid_recent}).")
     if args.canary < 0:
         parser.error(f"--canary는 0 이상이어야 한다(받은 값 {args.canary}).")
     if not 0.0 <= args.canary_threshold <= 1.0:
@@ -1270,6 +1350,8 @@ def main(argv: list[str] | None = None) -> int:
                 subscription=args.subscription,
                 budget_krw=args.budget_krw,
                 top_p=args.top_p,
+                authoring_tier=args.authoring_tier,
+                avoid_recent=args.avoid_recent,
             )
     spec_seats = [
         SpecSeat(
@@ -1300,6 +1382,7 @@ def main(argv: list[str] | None = None) -> int:
         canary_size=args.canary if args.canary > 0 else None,
         canary_threshold=args.canary_threshold,
         canary_confidence=args.canary_confidence,
+        canary_basis=args.canary_basis,
     )
     # 배치 종료 — 관측 전송 확정(2026-07-21 정합성 검토: 생성기 trace 배선). LangfuseSink는
     # 배치 버퍼 전송이라 짧은 CLI는 flush 없이 종료하면 이벤트가 유실된다(cost_probe 동형).
@@ -1410,6 +1493,8 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 canary_blocked=report.canary_blocked,
                 canary_advisory=report.canary_advisory,
+                canary_basis=report.canary_basis,
+                canary_attempts=report.canary_attempts,
                 aborted=report.aborted,
                 abort_reason=report.abort_reason,
                 # 중복 출처(EOS-121 B) — **사후 복원 불가**라 회차 중에 대장으로 흘린다.

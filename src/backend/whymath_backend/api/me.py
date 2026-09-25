@@ -144,6 +144,10 @@ from whymath_backend.l2.learning_path import (
     LearningPath,
     build_learning_path,
 )
+from whymath_backend.l2.learning_session_writer import (
+    close_idle_sessions_best_effort,
+    record_learning_activity,
+)
 from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
 from whymath_backend.l2.learning_state_machine import (
     advance_on_attempt,
@@ -448,7 +452,13 @@ async def list_my_sessions(
     slice 69: `ended_since`/`ended_until`(선택)로 `ended_at` 시간창 — 미종료(NULL)는 제외.
     slice 70: `order`(asc/desc)로 `started_at` 정렬 방향(기본 desc·최신순).
     slice 71: `include_total=true`면 `X-Total-Count` 헤더에 필터 적용 총 건수.
+
+    EOS-131: 조회 *전에* 본인의 유휴 초과 세션을 마지막 활동 시각으로 닫는다(조회 시점 확정 —
+    다음 활동이 오지 않아도 세션이 영원히 열린 채로 보이지 않게). never-break이며 닫은 것이
+    있을 때만 커밋한다.
     """
+    if await close_idle_sessions_best_effort(session, user_id=user.user_id):
+        await session.commit()
     conds = [
         LearningSession.user_id == user.user_id,
         *time_window_conditions(LearningSession.started_at, since, until),
@@ -889,7 +899,13 @@ class AttemptSubmitRequest(BaseModel):
             "미제출 시 NULL=미측정으로 남는다 — 서버 시각으로 대체하지 않는다(EOS-48)."
         ),
     )
-    session_id: uuid.UUID | None = Field(default=None, description="소속 학습 세션(선택).")
+    session_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "소속 학습 세션(선택·하위호환). EOS-131부터 서버가 유휴 규칙으로 세션을 채우므로 "
+            "보내지 않아도 된다 — 서버 세션 기록이 성공하면 이 값은 무시된다."
+        ),
+    )
     confidence_self_reported: float | None = Field(
         default=None, ge=0.0, le=1.0, description="학생 자기보고 확신도 0~1(선택)."
     )
@@ -1147,11 +1163,17 @@ async def submit_attempt(
     student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
         student_work_cipher, body.student_answer
     )
+    # EOS-131: 이 시도가 속한 학습 세션을 **서버가** 정한다(30분 유휴 규칙). 수신 시각을 그대로
+    # 넘겨 `last_activity_at == ingested_at`이 되게 한다 — 보존 파기의 세션 기준이 이 값을 쓴다.
+    # never-break: 세션 기록이 실패해도 채점 제출은 진행하고(None), 그때만 클라 신고값으로 폴백.
+    learning_session_id = await record_learning_activity(
+        session, user_id=user.user_id, now=received_at
+    )
     attempt = ProblemAttempt(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답에 즉시 사용)
         user_id=user.user_id,
         problem_id=body.problem_id,
-        session_id=body.session_id,
+        session_id=learning_session_id if learning_session_id is not None else body.session_id,
         is_correct=body.is_correct,
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
@@ -2602,6 +2624,9 @@ async def recommend_next_problem(
     (가짜 처치 금지 — null 응답은 기록하지 않음). 그 기록에는 후보 점수(`candidates`)와
     `policy_version`이 함께 실린다(소급 평가 재료).
     """
+    # ⓪ 학습 세션 — EOS-131. 추천 조회도 학습 활동이다(세션을 여는 활동에서 빼면 첫 추천이
+    #    세션 없이 기록돼 추천↔학습자 결합이 다시 끊긴다). never-break(실패 시 None).
+    learning_session_id = await record_learning_activity(session, user_id=user.user_id)
     # ① 학습자 상태 — EOS-10이 세운 단일 조회 표면. 핸들러가 θ·숙달·약점을 따로 재계산하지
     #    않는다(전환 전에는 그랬다). 정책이 이것을 *입력으로* 받는 것이 EOS-19의 요지다.
     learner_state = await get_state(session, user.user_id)
@@ -2634,7 +2659,11 @@ async def recommend_next_problem(
             candidates=outcome.candidate_scores,
             policy_version=outcome.policy_version,
             reason=outcome.reason,
+            learning_session_id=learning_session_id,
         )
+        await session.commit()
+    elif learning_session_id is not None:
+        # 추천이 비어도(후보 0) 학습 활동은 있었다 — 세션 개시·갱신은 남긴다.
         await session.commit()
 
     return NextProblemResponse(

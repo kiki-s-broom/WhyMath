@@ -195,9 +195,24 @@ class TestResolveParams:
 class TestClassifyReachState:
     """`classify_reach_state` 순수 함수 — 구조적불가 > 무데이터 > 미도달/도달 우선순위(PED-06)."""
 
-    def test_structurally_impossible_overrides_everything(self) -> None:
-        """③(세션완주율)은 MEASURED·요청 있음이어도 구조적 불가로 고정(생산자 자체 부재)."""
-        state = classify_reach_state("session_completion_rate", MetricStatus.MEASURED, 100)
+    def test_session_completion_is_no_longer_structurally_impossible(self) -> None:
+        """EOS-131: ③(세션완주율)의 "영구 불가" 표기를 걷었다 — 세션 writer가 생겼으므로 ③도
+        다른 지표처럼 상태·요청 수로 판정된다(종전 단언의 반대 방향 — 지우지 않고 뒤집었다)."""
+        reached = classify_reach_state("session_completion_rate", MetricStatus.MEASURED, 100)
+        no_data = classify_reach_state("session_completion_rate", MetricStatus.NO_DATA, 100)
+        assert reached is GrowthEvidenceReachState.REACHED
+        assert no_data is GrowthEvidenceReachState.NO_DATA
+
+    def test_structurally_impossible_branch_still_overrides_everything(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """판정 분기 자체는 남아 있다 — 생산자가 사라진 지표가 다시 등재되면 무엇보다 우선한다."""
+        from whymath_backend.harness import surrogate_baseline_report as report_mod
+
+        monkeypatch.setattr(
+            report_mod, "_STRUCTURALLY_IMPOSSIBLE_FIELDS", frozenset({"verify_pass_rate"})
+        )
+        state = classify_reach_state("verify_pass_rate", MetricStatus.MEASURED, 100)
         assert state is GrowthEvidenceReachState.STRUCTURALLY_IMPOSSIBLE
 
     def test_no_data_when_status_not_measured(self) -> None:
@@ -239,15 +254,16 @@ class TestRenderGrowthEvidenceReachReport:
         assert "미도달" in report
         assert "0건 통과" not in report
 
-    def test_structurally_impossible_labeled_distinctly_from_no_data(self) -> None:
-        """③(구조적 불가)과 다른 NO_DATA 지표가 리포트에서 서로 다른 라벨로 나타난다."""
+    def test_session_completion_section_no_longer_says_structurally_impossible(self) -> None:
+        """EOS-131: ③ 섹션에서 '구조적 불가' 라벨이 사라지고 실제 상태(여기선 측정됨·요청 0 →
+        미도달)로 표시된다. 종전 단언('구조적 불가' 포함)의 반대 방향이다."""
         report = render_growth_evidence_reach_report(_mixed_metrics(), requests_total=0)
-        assert "구조적 불가" in report
         assert "무데이터" in report
-        # ③ 세션 완주율 섹션에 '구조적 불가'가 붙어 있어야 한다(순서 의존 없이 섹션 단위 확인).
         section_start = report.index("## ③ 세션 완주율")
         section_end = report.index("## ④", section_start)
-        assert "구조적 불가" in report[section_start:section_end]
+        section = report[section_start:section_end]
+        assert "구조적 불가" not in section
+        assert "미도달" in section
 
     def test_internal_only_fields_show_suppression_reason(self) -> None:
         report = render_growth_evidence_reach_report(_all_measured_metrics(), requests_total=5)

@@ -15,8 +15,9 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 이벤트 8종이 **실제 학생 세션에서 기록되는지** 확인한다 — learning_started · concept_viewed · problem_attempted · answer_submitted · misconception_detected · hint_requested · mastery_updated · recommendation_generated.\n② 이름 대조가 아니라 **역할 대조**로 확인한다 — 저장소 카탈로그(l2/learning_event_trace.py · 19종)에서 learning_started 는 diagnostic_started/learner_state_created 로, concept_viewed 는 concept_selected + content_viewed 로 분화돼 있다. 이름으로 grep 하면 2종이 0건이라 오판정이 난다.\n③ EOS Core 에 Math 로직 침투 0건을 재확인한다 — **AST 가드에 위반을 주입해 RED 를 확인**한다. 스캔 0건 공허 통과를 경계한다.\n④ 완료 판정 — 이벤트 8종이 실세션에서 기록되고, 경계 위반 주입이 CI 에서 RED."
+  - "[ARCH-66 ⑥ 2026-09-24] 학생 참여 과정 12/31 이후 연기 결정 — ①의 '실제 학생 세션'은 12/31 전까지 테스트용 학생 계정(내부 계정) 세션으로 충족한다. 실제 학생 세션 확인은 게이트 G-student-work-after-internal-completion 판정 이후로 미루며, 판정문에 '테스트 계정 기준'임을 명시한다(실사용자 검증으로 계상 금지)."
 artifacts: []
 paths: []
 session: null
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [13]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측·신규 사유] 경계 축은 다른 태스크가 이미 소유하며 **타 세션이 진행 중**이라 amend 하지 않는다(남의 in-flight 작업에 범위를 얹는 것이 되므로). 대신 선행으로 걸어 그 산출을 입력으로 쓴다. 이벤트 8종 축은 별개이며, 이 태스크를 등재한 3회차 대조표 §13-1 이 8/8 역할 대응(이름 일치 6·상이 2)으로 이미 판정했다 — 이 회차의 실질은 '만들기'가 아니라 **실세션 기록 확인**이다."
-updated: 2026-09-22
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [13]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측·신규 사유] 경계 축은 다른 태스크가 이미 소유하며 **타 세션이 진행 중**이라 amend 하지 않는다(남의 in-flight 작업에 범위를 얹는 것이 되므로). 대신 선행으로 걸어 그 산출을 입력으로 쓴다. 이벤트 8종 축은 별개이며, 이 태스크를 등재한 3회차 대조표 §13-1 이 8/8 역할 대응(이름 일치 6·상이 2)으로 이미 판정했다 — 이 회차의 실질은 '만들기'가 아니라 **실세션 기록 확인**이다.\n\n[정정 2026-09-24] ARCH-66 ⑥: 실학생 세션 확인 연기"
+updated: 2026-09-24

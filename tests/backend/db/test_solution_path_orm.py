@@ -189,7 +189,9 @@ class TestMigrationFileChain:
         # 얹어 head를 다시 이동. 이 리터럴은 head를 고정하는 **세 번째** 좌석이다
         # (schema_version.KNOWN_REVISIONS·probe_prod_schema_revision.sql이 나머지 둘) —
         # 손으로 유지하는 사본이 셋이라 마이그레이션마다 전부 갱신해야 한다(= MISC-31).
-        assert heads == {"5b3e9c27a1f6"}
+        # EOS-131이 그 위에 8e4c2a7f1b93(learning_session.last_activity_at + 학생당 열린 서버
+        # 세션 부분 유니크 인덱스)을 얹어 head를 다시 이동.
+        assert heads == {"8e4c2a7f1b93"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""
