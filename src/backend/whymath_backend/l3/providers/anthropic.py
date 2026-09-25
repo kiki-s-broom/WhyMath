@@ -44,6 +44,7 @@ top_p가 더해지면 100% 400이다. 프롬프트 캐싱·thinking/effort 튜�
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -239,6 +240,14 @@ def _extract_usage(message: Any, latency_ms: float) -> Usage:
     )
 
 
+def _running_loop_or_none() -> asyncio.AbstractEventLoop | None:
+    """지금 실행 중인 이벤트 루프 — 루프 밖(동기 문맥)이면 None (S4-99 클라이언트 루프 결속)."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
 def _build_default_client(settings: Settings) -> _AnthropicClient:
     """기본 anthropic AsyncAnthropic 클라이언트 생성 (지연 import).
 
@@ -291,6 +300,9 @@ class AnthropicProvider:
         # 주입된 클라이언트가 있으면 그것을 쓰고, 없으면 키 설정 시 첫 사용에 지연 생성.
         self._client = client
         self._settings = settings
+        # 기본 생성한 클라이언트가 묶인 이벤트 루프(S4-99 — `OllamaProvider`와 같은 규칙).
+        self._owns_client = client is None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
     @property
     def _resolved_settings(self) -> Settings:
@@ -328,7 +340,14 @@ class AnthropicProvider:
         내려졌는데 키가 없는 것은 설정 오류이며, 학생에게 잘못된 모델로 답하느니
         명확히 실패하는 편이 안전하다(CLAUDE.md "모르면 모른다고").
         """
-        if self._client is not None:
+        if not self._owns_client:
+            assert self._client is not None  # 주입 경로 — 생성자가 보장
+            return self._client
+        # 기본 생성 클라이언트는 만든 이벤트 루프 안에서만 재사용한다(S4-99) — `asyncio.run()`
+        # 을 호출마다 여는 경로에서 닫힌 루프에 묶인 커넥션 풀을 재사용하면 새 루프의 첫
+        # 요청이 `RuntimeError: Event loop is closed`로 죽는다.
+        loop = _running_loop_or_none()
+        if self._client is not None and self._client_loop is loop:
             return self._client
         settings = self._resolved_settings
         if not settings.anthropic_configured:
@@ -339,6 +358,7 @@ class AnthropicProvider:
                 "CompositeProvider(cloud=None)로 구성하세요."
             )
         self._client = _build_default_client(settings)
+        self._client_loop = loop
         return self._client
 
     async def generate(
