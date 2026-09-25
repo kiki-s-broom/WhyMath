@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-136-human-verdict-review-status-bridge
+title: "사람 판정 → 회차 코퍼스 review_status 각인 도구 부재 — 골든 승격 게이트 ③단이 축적 코퍼스에서 영구 0건 (EOS-64 ③ 집행 누락 · MP-03 실측)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 각인 CLI — 검수 판정 이벤트(ReviewTimerEvent finished + verdict)를 근거로 축적 회차 코퍼스 JSONL의 review_status를 slug별로 각인하고, 감사로그 JSONL(slug·review_status·근거 이벤트 id·검수자·검수 시각)을 남긴다. verdict→review_status 변환은 schema/review_timer.review_status_for_verdict 단일 정본을 쓴다. 이미 채워진 review_status는 덮어쓰지 않고(수동 재검수 보호 — 기존 백필 바이트 계약과 동형) 판정 없는 slug는 건드리지 않는다. 입력 손상 1행이면 쓰지 않는다(exit 2)."
+  - "② 게이트 관통 — 축적 CLI 산출 → 검수 이벤트 → 각인 → golden_promotion_gate(--backfill-audit에 이 감사로그)까지 E2E 테스트로 ③단 통과를 실측한다. 음성 대조: 반려·미판정·손각인(감사로그 없음)·각인 후 손편집(감사값≠코퍼스값)은 여전히 차단된다."
+  - "③ ④단 분모 의미 판정 — 반려 제안이 1건이라도 있으면 ②단에서 경로 밖이므로 통과 경로의 결함 수는 항상 0이다(docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §4.3). 의도가 '사람이 개별 검증한 문항의 표본 하한'이면 docstring·리포트 문언을, '생성 배치 품질'이면 분모(검수 배치 전체 반려율)를 고친다 — 어느 쪽인지 판정 문서로 남기고 테스트로 동결한다."
+  - "④ 기존 코퍼스 단위 백필(problem_corpus_review_status_backfill · KNOWN_CORPORA 7종 · 감사 라벨 n≥200)과의 관계를 계약으로 명문화한다 — 같은 review_status 축을 두 도구가 쓰므로 적용 대상(고정 코퍼스 vs 회차 코퍼스)과 충돌 규칙(이미 채워진 값 불가침)을 한 곳에 적고 CI 드리프트 가드(--all --check)가 회차 코퍼스를 오판하지 않음을 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/golden_promotion_gate.py
+  - "src/backend/whymath_backend/harness/*review_status*.py"
+  - tests/backend/harness/test_golden_promotion_gate.py
+  - "tests/backend/harness/test_*review_status*.py"
+session: null
+notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_promotion_gate ③단(review_status 백필 각인)을 채울 수 있는 유일한 도구가 코퍼스 단위·감사 라벨 근거라 사람 판정 이벤트를 읽지 않고, 축적 회차 코퍼스는 KNOWN_CORPORA 밖이라 대상조차 아니다. 따라서 사람이 승인한 수용 문항은 검수 건수와 무관하게 review_status_not_backfilled로 영구 차단된다. EOS-64 ③(P0)이 규정한 경로 중 판정기만 착지하고 ②→③ 집행 도구가 빠진 상태다. eos_priority는 P0 예산(One In One Out) 때문에 P1로 등재 — P0 승격은 Kiki 판단(amend --eos-priority). 검수 도구의 verdicts 파일({slug, review_status})을 게이트 --backfill-audit에 그대로 넣는 우회는 ②단과 ③단을 같은 증거로 이중 계상하는 위장이라 채택하지 않는다."
+updated: 2026-09-25
