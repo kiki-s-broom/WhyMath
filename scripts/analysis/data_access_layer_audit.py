@@ -240,7 +240,7 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/learning_state_machine.py",
             # EOS-24 — 상태 머신 결정 → 추천 이음매. 처분 (b)의 ② 경로다. 조회 셋이 전부 **새
             # 질문**이라 재사용할 기존 reader가 없다: ⓐ 이번 회차에 증거를 받은 가설의 신뢰
-            # (`turns_since_evidence = 0` — 기존 가설 조회 둘은 활성 전체를 읽는다) ⓑ 결정을 낸
+            # (tse 0 + 직전 응답 원장 경계 — EOS-140 · 기존 조회 둘은 활성 전체) ⓑ 결정을 낸
             # 응답 → 문항(학습자 범위 한정) ⓒ 대표 개념이 C인 후보(문장은 `next_problem_selection`
             # 의 `build_candidate_pool_stmt`를 **재사용**해 노출 게이트를 다시 쓰지 않는다 — 실행만
             # 여기서 한다). ①(기존 파일에 함수 추가)을 택하지 않은 이유: 그 자리
