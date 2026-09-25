@@ -24,10 +24,22 @@ eos_phase2_gate2_judgment_2026-09-19.md` §3-1) 시점에 main에 없었고, 판
 추천이 실제로 준 문항의 개념(선택 축: problem_id)이 같은 곳을 가리킬 것.* 한 축만 보면
 EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 통과한다.
 
-- **Loop 1** — 첫 추천(진단)을 틀리고 그 **직후 첫 추천**을 본다. `보정` 마디는
-  ⓐ `action` ∈ {practice_prerequisite, practice_current} ⓑ `target_concept`이 틀린
-  개념 또는 그 선수 개념 ⓒ 준 문항이 그 `target_concept` 소속 — 셋 다일 때만 선다.
-  `diagnose`는 보정이 아니다: 측정이 없다는 뜻이고, 방금 오답이라는 측정이 생겼다.
+- **Loop 1** — 첫 추천(진단)을 틀리고 그 **직후 첫 추천**을 본다. `보정` 마디는 두 경로 중
+  하나로 선다.
+  **직접 보정** — ⓐ `action` ∈ {practice_prerequisite, practice_current} ⓑ `target_concept`이
+  틀린 개념 또는 그 선수 개념 ⓒ 준 문항이 그 `target_concept` 소속 — 셋 다일 때.
+  **진단 보정** (Kiki 결정 `G-eos24-loop1-undiagnosed-wrong-criterion` · 2026-09-25 · (가) 좁힌
+  기준) — 오답이 **원인 미상**(상태 머신 R6)일 때만 `diagnose`를 보정으로 친다. ⓓ `action`이
+  `diagnose` ⓔ `target_concept`과 준 문항이 **둘 다** 틀린 개념의 *선수* 개념(틀린 개념 자신은
+  아니다 — 진단은 원인을 좁히는 행위다) ⓕ **폐루프**: 그 진단 문항을 틀리면 다음 추천이
+  `practice_prerequisite`로 하강하고 대상·문항이 그 선수다(기준 ⓑ) ⓖ **선수 지향**: 선수 관계가
+  없는 더 쉬운 개념이 있어도 진단이 선수로 간다(기준 ⓐ). ⓕ·ⓖ는 관통 학습자(진단 문항을 맞힌다)가
+  밟지 않는 경로라 **프로브 관통 2회**가 따로 잰다(아래 "진단 보정 프로브"). ⓖ가 없으면 이 경로는
+  픽스처가 선수 개념을 유일하게 더 쉬운 개념으로 심었다는 사실만으로 선다 — 추천기는 선수 그래프가
+  아니라 θ 근방 최근접으로 문항을 고르기 때문이다(2026-09-25 실측 · `EOS-26`).
+  오개념 오답(R3)의 `diagnose`는 여전히 보정이 아니다 — R3에는 기준 재정의가 기각됐다(EOS-24
+  판정문 §2). 상태 머신이 오개념 교정을 결정했는데 추천이 측정 없음을 말하면 오답이라는 측정을
+  근거로 삼지 않은 것이다.
 - **Loop 2** — Loop 1 끝의 추천부터 따라 풀며(전부 정답) 틀린 개념의 숙달이 **오답 직후
   값보다 오르는가**(§18 문면)를 본다. 루프의 *출구*는 그 숙달이 추천 정책 자신의 전진
   임계(`WEAK_CONCEPT_MASTERY_CEILING` — 소스에서 읽는다)를 넘는 시점이다. 출구를 임의
@@ -44,6 +56,15 @@ EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 �
 겹치지 않게 둔다(1.0~2.0 / 2.5~3.5 / 4.2~4.8 — 판정문 §8-2와 같은 배치). 틀린 개념의 문항은
 6개를 심고, Loop 3 관측 시점에 **미시도 문항이 남아 있음을 단언**한다. 남은 것이 없으면
 후행 개념 도달이 선택인지 소진인지 구별되지 않으므로 판정 불가로 **실패**시킨다(통과가 아니다).
+
+**진단 보정 프로브** — Loop 1 진단 보정 경로의 ⓕ·ⓖ를 재는 별도 관통 2회(학습자 1명씩 · 같은
+봉인 규약). 둘 다 첫 진단 문항을 원인 미상 오답으로 틀린 뒤 첫 추천을 본다.
+- **폐루프**(방해 개념 없음 · 본 관통과 같은 배치) — 그 추천 문항까지 틀리고 다음 추천을 본다(ⓕ).
+  이 프로브는 아래 선수 지향 프로브의 **대조군**도 겸한다: 방해 개념이 없으면 진단이 선수로 간다.
+- **선수 지향**(방해 개념 있음) — 어느 개념과도 선수 관계가 없는 개념을 **선수보다 쉽게** 심는다.
+  난이도 하한이 1.0이라 방해 개념(1.0·1.1)을 선수보다 쉽게 두려면 이 프로브에서만 선수 대역을 한 칸
+  올린다(1.2~2.0). 진단이 방해 개념으로 가면 추천은 선수를 고른 것이 아니라 가장 쉬운 문항을 고른
+  것이다(ⓖ).
 
 ────────────────────────────────────────────────────────────────────────────
 "운영자 DB 개입 0"을 선언이 아니라 관측으로
@@ -65,7 +86,9 @@ EOS-124의 두 방향 불일치(말만 전진 / 문항만 복귀)가 그대로 �
 ────────────────────────────────────────────────────────────────────────────
 2026-09-25 실측(main `bbd7c382`)으로 §18은 **미충족**이다(Loop 1 `보정` · Loop 3
 `다음concept`). EOS-24(PR #1316) 뒤 재실측에서 오개념 오답의 Loop 1 `보정`은 섰고, 원인 미상
-오답의 Loop 1과 두 종류의 Loop 3은 그대로다(`_FROZEN` 주석). 그래서 테스트를 셋으로 나눈다.
+오답의 Loop 1과 두 종류의 Loop 3은 그대로다(`_FROZEN` 주석). 원인 미상 오답의 Loop 1은 진단 보정
+경로가 생긴 뒤에도(EOS-139) ⓖ 선수 지향에서 끊긴다(`_FROZEN_PROBE`). 그래서 테스트를 셋으로
+나눈다(진단 보정 프로브의 동결은 넷째로 따로 둔다).
 
 - `test_three_loops_are_operator_free_and_continuous` — 무개입·연속성 불변식. 판정과
   무관하게 항상 초록이어야 한다.
@@ -153,9 +176,18 @@ def _load_persona_harness() -> ModuleType:
 
 _P = _load_persona_harness()
 
-#: 보정으로 인정하는 추천 행위 — 측정을 근거로 약점에 개입하는 두 행위.
-#: `diagnose`(측정 없음)·`advance_next`(전진)·`none`(후보 없음)은 보정이 아니다.
+#: 직접 보정으로 인정하는 추천 행위 — 측정을 근거로 약점에 개입하는 두 행위.
+#: `diagnose`(측정 없음)·`advance_next`(전진)·`none`(후보 없음)은 직접 보정이 아니다.
+#: `diagnose`가 보정으로 서는 길은 진단 보정 경로(`_diagnosis_remediation_fires`) 하나뿐이다.
 _REMEDIATION_ACTIONS = frozenset({"practice_prerequisite", "practice_current"})
+
+#: 진단 보정 경로가 열리는 오답 — 상태 머신의 원인 미상 오답 규칙(R6). 오개념 오답(R3)에는 열리지
+#: 않는다(EOS-24 판정문 §2 — R3에는 기준 재정의 기각). 규칙 id는 시도 응답의
+#: `learning_state.rule_id`에서 **관측**한다 — 변이 이름(`general`)으로 추론하지 않는다.
+_UNDIAGNOSED_WRONG_RULE = "R6-wrong-undiagnosed"
+
+#: 진단 보정 선수 지향 프로브의 방해 개념 대역 — 선수보다 쉽다(아래 `_DIRECTED_PROBE_BANDS`).
+_DISTRACTOR_TAG = "side"
 
 #: 개념 3종의 문항 난이도 대역 — 서로 겹치지 않는다(판정문 §8-2와 같은 배치).
 #: 난이도는 1~5 범위 강제다(범위 밖이면 `ProblemSchema`가 거부).
@@ -168,6 +200,15 @@ _DIFFICULTY_BANDS: dict[str, list[float]] = {
 #: *틀린 개념*의 후행이다 — 진단이 어느 개념에서 시작하든 규칙이 같다.
 _SUCCESSOR: dict[str, str | None] = {"pre": "cur", "cur": "next", "next": None}
 _PREDECESSOR: dict[str, str | None] = {"pre": None, "cur": "pre", "next": "cur"}
+
+#: 선수 지향 프로브의 배치 — 방해 개념(어떤 개념과도 엣지 없음)을 선수보다 **엄격히** 쉽게 둔다.
+#: 난이도 하한이 1.0이므로 선수 대역을 한 칸 올린다. 나머지 두 개념은 본 관통과 같다.
+_DIRECTED_PROBE_BANDS: dict[str, list[float]] = {
+    "pre": [1.2, 1.4, 1.6, 1.8, 2.0],
+    "cur": _DIFFICULTY_BANDS["cur"],
+    "next": _DIFFICULTY_BANDS["next"],
+    _DISTRACTOR_TAG: [1.0, 1.1],
+}
 
 #: 오답 두 종 — 같은 루프가 오답의 *종류*에 따라 갈리는지 본다.
 #: `misconception`은 오개념 카탈로그의 거짓형을 인스턴스화해 상태 머신을 `REMEDIATING`으로
@@ -234,6 +275,25 @@ class _Journey:
         return {lp.number: lp.as_map() for lp in self.loops}
 
 
+@dataclass(frozen=True)
+class _DiagnosisProbe:
+    """진단 보정 경로의 ⓕ 폐루프·ⓖ 선수 지향 — 프로브 관통 2회의 판정과 근거."""
+
+    closure_ok: bool
+    directed_ok: bool
+    closure_evidence: str
+    directed_evidence: str
+
+    def as_map(self) -> dict[str, bool]:
+        return {"폐루프": self.closure_ok, "선수지향": self.directed_ok}
+
+    def verdict_line(self) -> str:
+        return (
+            f"DIAGNOSIS_PROBE :: 폐루프={'PASS' if self.closure_ok else 'FAIL'} "
+            f"선수지향={'PASS' if self.directed_ok else 'FAIL'}"
+        )
+
+
 # ── 무개입 봉인 ─────────────────────────────────────────────────────────────────
 
 
@@ -280,6 +340,58 @@ def _remediation_fires(
         and target in remedial_targets
         and member.get(str(rec["problem_id"])) == target
     )
+
+
+def _diagnosis_remediation_fires(
+    rec: dict[str, Any],
+    *,
+    member: dict[str, str],
+    cname: dict[str, str],
+    wrong_tag: str,
+    wrong_rule_id: str | None,
+    probe: _DiagnosisProbe,
+) -> bool:
+    """Loop 1 `보정`의 진단 보정 경로 — Kiki 결정 `G-eos24-loop1-undiagnosed-wrong-criterion`.
+
+    원인 미상 오답(R6)에서만 열리고, ⓓ `diagnose` ⓔ 대상·문항 모두 틀린 개념의 **선수**
+    ⓕ 폐루프 ⓖ 선수 지향 — 전부일 때만 선다. ⓕ·ⓖ는 이 추천 하나로는 관측할 수 없어 프로브
+    판정을 받는다(모듈 docstring "진단 보정 프로브").
+    """
+    predecessor = _PREDECESSOR.get(wrong_tag)
+    return (
+        wrong_rule_id == _UNDIAGNOSED_WRONG_RULE
+        and rec["action"] == "diagnose"
+        and predecessor is not None
+        and cname.get(str(rec["target_concept"])) == predecessor
+        and member.get(str(rec["problem_id"])) == predecessor
+        and probe.closure_ok
+        and probe.directed_ok
+    )
+
+
+def _remediation_node(
+    rec: dict[str, Any],
+    *,
+    member: dict[str, str],
+    cname: dict[str, str],
+    wrong_tag: str,
+    wrong_rule_id: str | None,
+    probe: _DiagnosisProbe,
+) -> tuple[bool, str]:
+    """Loop 1 `보정` 마디 — 직접 보정 **또는** 진단 보정. `(판정, 근거)`를 돌려준다."""
+    direct = _remediation_fires(rec, member=member, cname=cname, wrong_tag=wrong_tag)
+    via_diagnosis = _diagnosis_remediation_fires(
+        rec,
+        member=member,
+        cname=cname,
+        wrong_tag=wrong_tag,
+        wrong_rule_id=wrong_rule_id,
+        probe=probe,
+    )
+    evidence = f"{_describe(rec, member, cname)} · 오답 규칙={wrong_rule_id}"
+    if not direct and wrong_rule_id == _UNDIAGNOSED_WRONG_RULE and rec["action"] == "diagnose":
+        evidence += f" · 진단 보정 경로: {probe.verdict_line()}"
+    return direct or via_diagnosis, evidence
 
 
 def _advance_fires(
@@ -341,28 +453,154 @@ def _describe(rec: dict[str, Any], member: dict[str, str], cname: dict[str, str]
     )
 
 
+def _rule_of(attempt_body: dict[str, Any]) -> str | None:
+    """학습 상태 머신이 이 시도에 적용한 규칙 id(R1~R6) — 시도 응답에서 관측한다."""
+    state = attempt_body.get("learning_state") or {}
+    value: str | None = state.get("rule_id")
+    return value
+
+
+#: 개념 이름 — 방해 개념은 선수 사슬(pre→cur→next)의 어느 개념과도 엣지가 없다.
+_CONCEPT_NAMES: dict[str, str] = {
+    "pre": "일차식의 계산",
+    "cur": "일차방정식",
+    "next": "연립일차방정식",
+    _DISTRACTOR_TAG: "좌표평면",
+}
+
+
+def _seed_layout(
+    content: Any, bands: dict[str, list[float]]
+) -> tuple[dict[str, str], dict[str, str]]:
+    """배치 시딩 — 로그인 *전*에 끝낸다. `(문항→개념 태그, 개념 id→개념 태그)`를 돌려준다.
+
+    선수 엣지는 pre→cur→next 사슬 둘뿐이다. `bands`에 방해 개념이 있으면 개념과 문항만 심고
+    엣지는 심지 않는다 — 그것이 "선수가 아닌 더 쉬운 개념"의 정의다.
+    """
+    cids: dict[str, uuid.UUID] = {}
+    for tag in bands:
+        cids[tag], _ = _P._seed_concept(content, f"l3-{tag}", _CONCEPT_NAMES[tag])
+    asyncio.run(_P._add_all(_P._prereq_edge(cids["pre"], cids["cur"])))
+    asyncio.run(_P._add_all(_P._prereq_edge(cids["cur"], cids["next"])))
+    member: dict[str, str] = {}
+    for tag, difficulties in bands.items():
+        for pid in _P._seed_problems(content, cids[tag], f"l3{tag[0]}", difficulties):
+            member[str(pid)] = tag
+    cname = {str(cid): tag for tag, cid in cids.items()}
+    return member, cname
+
+
+# ── 진단 보정 프로브 (ⓕ 폐루프 · ⓖ 선수 지향) ─────────────────────────────────────
+
+
+def _probe_undiagnosed_wrong(
+    bands: dict[str, list[float]], *, label: str, fail_diagnosis: bool
+) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, str], dict[str, str]]:
+    """원인 미상 오답 1건 → 첫 추천 `r1` [→ `r1`도 원인 미상 오답 → 다음 추천 `r2`].
+
+    판정은 호출측이 한다. 본 관통과 같은 규약이다 — 시딩은 로그인 전, 학습 중 봉인, 학습자
+    상태는 HTTP로만 움직인다.
+    """
+    content, _journal = _P._begin(f"L3-probe-{label}")
+    try:
+        member, cname = _seed_layout(content, bands)
+        with _P._client() as client:
+            _P._erase_learner(client)
+            auth = _P._login(client)
+            with _Seal() as seal:
+                r0 = _P._next_problem(client, auth)
+                assert member.get(str(r0["problem_id"])) == "cur", (
+                    f"[{label}] 진단이 현재 개념에서 시작하지 않았다({_describe(r0, member, cname)}) — "
+                    "선수가 있는 개념의 오답이어야 진단 보정을 판정할 수 있다. 배치를 점검하라"
+                    "(판정 불가이지 통과가 아니다)."
+                )
+                wrong = _P._attempt(
+                    client,
+                    auth,
+                    uuid.UUID(str(r0["problem_id"])),
+                    correct=False,
+                    answer=_P._UNMATCHED_WRONG_ANSWER,
+                )
+                assert _rule_of(wrong) == _UNDIAGNOSED_WRONG_RULE, (
+                    f"[{label}] 전제 붕괴 — 원인 미상 오답인데 규칙이 {_rule_of(wrong)}다(오개념 채널이 "
+                    "이 답에 반응했다). 진단 보정 경로는 R6에서만 판정한다."
+                )
+                r1 = _P._next_problem(client, auth)
+                r2: dict[str, Any] | None = None
+                if fail_diagnosis and r1["problem_id"] is not None:
+                    _P._attempt(
+                        client,
+                        auth,
+                        uuid.UUID(str(r1["problem_id"])),
+                        correct=False,
+                        answer=_P._UNMATCHED_WRONG_ANSWER,
+                    )
+                    r2 = _P._next_problem(client, auth)
+            assert seal.blocked == 0, f"[{label}] 학습 도중 DB 직접 쓰기가 시도됐다(봉인 발동)."
+        return r1, r2, member, cname
+    finally:
+        content.teardown()
+
+
+def _on_prerequisite(rec: dict[str, Any] | None, member: dict[str, str], cname: dict[str, str]) -> bool:
+    """추천의 대상과 문항이 **둘 다** 선수 개념(`pre`)인가 — 현재 개념 `cur`의 선수."""
+    return (
+        rec is not None
+        and cname.get(str(rec["target_concept"])) == "pre"
+        and member.get(str(rec["problem_id"])) == "pre"
+    )
+
+
+def _run_diagnosis_probe() -> _DiagnosisProbe:
+    """진단 보정 프로브 관통 2회 — ⓕ 폐루프(방해 개념 없음)·ⓖ 선수 지향(방해 개념 있음)."""
+    # ⓕ 폐루프 — 본 관통과 같은 배치. 진단 문항까지 틀리면 선수 연습으로 하강하는가.
+    # 첫 추천이 선수 진단이 아니면 폐루프를 판정할 전제가 없으므로 False다(통과가 아니다).
+    c_r1, c_r2, c_member, c_cname = _probe_undiagnosed_wrong(
+        _DIFFICULTY_BANDS, label="closure", fail_diagnosis=True
+    )
+    closure_ok = (
+        c_r1["action"] == "diagnose"
+        and _on_prerequisite(c_r1, c_member, c_cname)
+        and c_r2 is not None
+        and c_r2["action"] == "practice_prerequisite"
+        and _on_prerequisite(c_r2, c_member, c_cname)
+    )
+    closure_evidence = (
+        f"진단 {_describe(c_r1, c_member, c_cname)} → 진단 오답 뒤 "
+        f"{_describe(c_r2, c_member, c_cname) if c_r2 is not None else '추천 없음'}"
+    )
+
+    # ⓖ 선수 지향 — 선수보다 쉬운 방해 개념(엣지 0)이 있어도 진단이 선수로 가는가. 위 폐루프
+    # 프로브가 대조군이다: 방해 개념이 없을 때 진단이 선수로 간다는 것을 거기서 이미 봤다.
+    d_r1, _unused, d_member, d_cname = _probe_undiagnosed_wrong(
+        _DIRECTED_PROBE_BANDS, label="directed", fail_diagnosis=False
+    )
+    directed_ok = _on_prerequisite(d_r1, d_member, d_cname)
+    directed_evidence = (
+        f"방해 개념(난이도 {_DIRECTED_PROBE_BANDS[_DISTRACTOR_TAG]} · 엣지 0) 존재 시 진단 "
+        f"{_describe(d_r1, d_member, d_cname)} · 기대 대상·문항=pre"
+    )
+    return _DiagnosisProbe(
+        closure_ok=closure_ok,
+        directed_ok=directed_ok,
+        closure_evidence=closure_evidence,
+        directed_evidence=directed_evidence,
+    )
+
+
 # ── 3루프 관통 ──────────────────────────────────────────────────────────────────
 
 
-def _run_journey(variant: str) -> _Journey:
-    """학습자 1명이 추천을 따라 3루프를 도는 1회 관통 — 판정은 호출측이 한다."""
+def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
+    """학습자 1명이 추천을 따라 3루프를 도는 1회 관통 — 판정은 호출측이 한다.
+
+    `probe`는 Loop 1 진단 보정 경로의 ⓕ·ⓖ 판정이다(이 관통의 학습자는 밟지 않는 경로).
+    """
     content, _journal = _P._begin(f"L3-{variant}")
     try:
         # ① 저작 콘텐츠 시딩 — 로그인 *전*에 끝낸다(그 뒤로는 봉인).
-        cids: dict[str, uuid.UUID] = {}
-        for tag, name in (
-            ("pre", "일차식의 계산"),
-            ("cur", "일차방정식"),
-            ("next", "연립일차방정식"),
-        ):
-            cids[tag], _ = _P._seed_concept(content, f"l3-{tag}", name)
-        asyncio.run(_P._add_all(_P._prereq_edge(cids["pre"], cids["cur"])))
-        asyncio.run(_P._add_all(_P._prereq_edge(cids["cur"], cids["next"])))
-        member: dict[str, str] = {}
-        for tag, bands in _DIFFICULTY_BANDS.items():
-            for pid in _P._seed_problems(content, cids[tag], f"l3{tag[0]}", bands):
-                member[str(pid)] = tag
-        cname = {str(cid): tag for tag, cid in cids.items()}
+        member, cname = _seed_layout(content, _DIFFICULTY_BANDS)
+        cids = {tag: uuid.UUID(cid) for cid, tag in cname.items()}
 
         steps: list[str] = []
         submitted: list[str] = []
@@ -412,8 +650,14 @@ def _run_journey(variant: str) -> _Journey:
                 r1 = _P._next_problem(client, auth)
                 loop1.add(
                     "보정",
-                    _remediation_fires(r1, member=member, cname=cname, wrong_tag=wrong_tag),
-                    _describe(r1, member, cname),
+                    *_remediation_node(
+                        r1,
+                        member=member,
+                        cname=cname,
+                        wrong_tag=wrong_tag,
+                        wrong_rule_id=_rule_of(wrong_body),
+                        probe=probe,
+                    ),
                 )
 
                 # ── Loop 2: 보정 → 문제 → 정답 → mastery 상승 (출구 = 정책 전진 임계) ──
@@ -524,23 +768,41 @@ def _dump(journey: _Journey) -> None:
     print(journey.verdict_line())
 
 
+@pytest.fixture(scope="module")
+def diagnosis_probe() -> _DiagnosisProbe:
+    """진단 보정 프로브 관통 2회 — 모듈에서 한 번만 돈다(본 관통 두 변이가 같은 판정을 본다)."""
+    result = _run_diagnosis_probe()
+    print("\n=== 진단 보정 프로브 ===")
+    print(f"ⓕ 폐루프   {'✓' if result.closure_ok else '✗'} | {result.closure_evidence}")
+    print(f"ⓖ 선수지향 {'✓' if result.directed_ok else '✗'} | {result.directed_evidence}")
+    print(result.verdict_line())
+    return result
+
+
 @pytest.fixture(scope="module", params=sorted(_WRONG_ANSWERS))
-def journey(request: pytest.FixtureRequest) -> Iterator[_Journey]:
+def journey(
+    request: pytest.FixtureRequest, diagnosis_probe: _DiagnosisProbe
+) -> Iterator[_Journey]:
     """오답 종류별 3루프 관통 1회 — 세 테스트가 같은 관통을 본다(재실행 0)."""
-    result = _run_journey(request.param)
+    result = _run_journey(request.param, diagnosis_probe)
     _dump(result)
     yield result
 
 
 # ── 판정 규칙의 절별 변별력 — 관통 데이터가 밟지 않는 절을 여기서 밟는다 ─────────
 
-#: 합성 추천의 개념 표 — 관통과 같은 태그 체계(pre·cur·next).
-_SYN_MEMBER = {"p-pre": "pre", "p-cur": "cur", "p-next": "next"}
-_SYN_CNAME = {"c-pre": "pre", "c-cur": "cur", "c-next": "next"}
+#: 합성 추천의 개념 표 — 관통과 같은 태그 체계(pre·cur·next + 방해 개념).
+_SYN_MEMBER = {"p-pre": "pre", "p-cur": "cur", "p-next": "next", "p-side": _DISTRACTOR_TAG}
+_SYN_CNAME = {"c-pre": "pre", "c-cur": "cur", "c-next": "next", "c-side": _DISTRACTOR_TAG}
 
 
 def _syn(action: str, target: str, problem: str) -> dict[str, Any]:
-    return {"action": action, "target_concept": f"c-{target}", "problem_id": f"p-{problem}"}
+    return {
+        "action": action,
+        "target_concept": f"c-{target}",
+        "problem_id": f"p-{problem}",
+        "reason": {"type": "synthetic"},
+    }
 
 
 @pytest.mark.parametrize(
@@ -548,7 +810,11 @@ def _syn(action: str, target: str, problem: str) -> dict[str, Any]:
     [
         (_syn("practice_prerequisite", "pre", "pre"), True, "선언·대상·문항이 모두 선수"),
         (_syn("practice_current", "cur", "cur"), True, "선언·대상·문항이 모두 틀린 개념"),
-        (_syn("diagnose", "pre", "pre"), False, "ⓐ 행위 — diagnose는 보정이 아니다(현행 관측)"),
+        (
+            _syn("diagnose", "pre", "pre"),
+            False,
+            "ⓐ 행위 — 직접 보정 경로에서 diagnose는 보정이 아니다(진단 보정은 별도 규칙)",
+        ),
         (_syn("practice_current", "next", "next"), False, "ⓑ 대상 — 후행 개념은 보정 대상 밖"),
         (_syn("practice_prerequisite", "pre", "cur"), False, "ⓒ 문항 — EOS-124 형태(말만 선수)"),
     ],
@@ -561,6 +827,151 @@ def test_remediation_rule_requires_every_clause(rec: dict[str, Any], fires: bool
     """
     got = _remediation_fires(rec, member=_SYN_MEMBER, cname=_SYN_CNAME, wrong_tag="cur")
     assert got is fires, why
+
+
+_PROBE_OK = _DiagnosisProbe(True, True, "합성", "합성")
+_PROBE_NO_CLOSURE = _DiagnosisProbe(False, True, "합성", "합성")
+_PROBE_NOT_DIRECTED = _DiagnosisProbe(True, False, "합성", "합성")
+_R6 = _UNDIAGNOSED_WRONG_RULE
+
+
+@pytest.mark.parametrize(
+    ("rec", "wrong_tag", "rule", "probe", "fires", "why"),
+    [
+        (_syn("diagnose", "pre", "pre"), "cur", _R6, _PROBE_OK, True, "전 절 성립"),
+        (
+            _syn("diagnose", "pre", "pre"),
+            "cur",
+            "R3-wrong-misconception",
+            _PROBE_OK,
+            False,
+            "범위 — 오개념 오답(R3)에는 진단 보정이 열리지 않는다(EOS-24 판정문 §2)",
+        ),
+        (
+            _syn("diagnose", "pre", "pre"),
+            "cur",
+            None,
+            _PROBE_OK,
+            False,
+            "범위 — 규칙을 관측하지 못했으면 열지 않는다(모름 ≠ R6)",
+        ),
+        (_syn("advance_next", "pre", "pre"), "cur", _R6, _PROBE_OK, False, "ⓓ 행위 — diagnose 아님"),
+        (
+            _syn("diagnose", "cur", "cur"),
+            "cur",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓔ 대상 — 틀린 개념 자신의 진단은 원인을 좁히지 않는다",
+        ),
+        (
+            _syn("diagnose", "pre", "cur"),
+            "cur",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓔ 문항 — 말만 선수(EOS-124 형태)",
+        ),
+        (
+            _syn("diagnose", "cur", "pre"),
+            "cur",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓔ 대상 — 문항만 선수(설명이 틀린 개념)",
+        ),
+        (
+            _syn("diagnose", _DISTRACTOR_TAG, _DISTRACTOR_TAG),
+            "cur",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓔ 무관 개념 — 선수가 아닌 더 쉬운 개념의 진단(2026-09-25 방해 개념 프로브 형태)",
+        ),
+        (
+            _syn("diagnose", "pre", "pre"),
+            "pre",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓔ 선수 없는 개념의 오답 — 좁힐 선수가 없다",
+        ),
+        (
+            _syn("diagnose", "pre", "pre"),
+            "cur",
+            _R6,
+            _PROBE_NO_CLOSURE,
+            False,
+            "ⓕ 폐루프 — 진단 오답 뒤 선수 연습으로 하강하지 않으면 진단은 보정이 아니다",
+        ),
+        (
+            _syn("diagnose", "pre", "pre"),
+            "cur",
+            _R6,
+            _PROBE_NOT_DIRECTED,
+            False,
+            "ⓖ 선수 지향 — 선수가 가장 쉬울 때만 선수로 가면 픽스처가 통과시킨 것이다(현행 · EOS-26)",
+        ),
+    ],
+)
+def test_diagnosis_remediation_rule_requires_every_clause(
+    rec: dict[str, Any],
+    wrong_tag: str,
+    rule: str | None,
+    probe: _DiagnosisProbe,
+    fires: bool,
+    why: str,
+) -> None:
+    """Loop 1 진단 보정 규칙(Kiki 결정 2026-09-25)의 절마다 그 절이 없으면 통과해 버리는 반례.
+
+    관통 데이터는 ⓖ에서 먼저 끊겨(방해 개념 프로브) 나머지 절이 관통 판정을 바꾸지 않는다 —
+    그래서 절별 변별력은 여기서 합성 입력으로 밟는다.
+    """
+    got = _diagnosis_remediation_fires(
+        rec,
+        member=_SYN_MEMBER,
+        cname=_SYN_CNAME,
+        wrong_tag=wrong_tag,
+        wrong_rule_id=rule,
+        probe=probe,
+    )
+    assert got is fires, why
+
+
+@pytest.mark.parametrize(
+    ("rec", "rule", "probe", "fires", "why"),
+    [
+        (_syn("practice_current", "cur", "cur"), _R6, _PROBE_NOT_DIRECTED, True, "직접 보정 경로"),
+        (_syn("diagnose", "pre", "pre"), _R6, _PROBE_OK, True, "진단 보정 경로"),
+        (_syn("diagnose", "pre", "pre"), _R6, _PROBE_NOT_DIRECTED, False, "두 경로 모두 불성립(현행)"),
+    ],
+)
+def test_remediation_node_joins_both_paths(
+    rec: dict[str, Any], rule: str, probe: _DiagnosisProbe, fires: bool, why: str
+) -> None:
+    """`보정` 마디가 두 경로를 **둘 다** 합치는가 — 관통 데이터는 진단 경로가 서지 않아(ⓖ 미충족)
+    마디 조립이 진단 경로를 빠뜨려도 관통만으로는 안 보인다."""
+    ok, _evidence = _remediation_node(
+        rec, member=_SYN_MEMBER, cname=_SYN_CNAME, wrong_tag="cur", wrong_rule_id=rule, probe=probe
+    )
+    assert ok is fires, why
+
+
+@pytest.mark.parametrize(
+    ("rec", "on_pre", "why"),
+    [
+        (_syn("diagnose", "pre", "pre"), True, "대상·문항 모두 선수"),
+        (_syn("diagnose", "pre", _DISTRACTOR_TAG), False, "문항만 무관 개념 — 말만 선수"),
+        (_syn("diagnose", _DISTRACTOR_TAG, "pre"), False, "대상만 무관 개념 — 문항만 선수"),
+        (None, False, "추천 없음"),
+    ],
+)
+def test_probe_prerequisite_check_requires_both_axes(
+    rec: dict[str, Any] | None, on_pre: bool, why: str
+) -> None:
+    """프로브 판정 헬퍼 — 방해 개념 프로브의 실 응답은 두 축이 같이 움직여 한 축만 어긋나는 절을
+    밟지 않는다(2026-09-25 실측: 대상·문항 모두 방해 개념)."""
+    assert _on_prerequisite(rec, _SYN_MEMBER, _SYN_CNAME) is on_pre, why
 
 
 @pytest.mark.parametrize(
@@ -621,6 +1032,11 @@ def test_three_loops_are_operator_free_and_continuous(journey: _Journey) -> None
 #: §7-1) 그대로 공백이며, 그것을 보정으로 볼지는 Kiki 결정 게이트
 #: `G-eos24-loop1-undiagnosed-wrong-criterion` 소관이다. 두 종류가 이제 다른 값을 가지므로 표를
 #: 종류별로 나눈다 — 하나로 두면 한쪽을 올리는 순간 다른 쪽이 거짓 해소·거짓 회귀가 된다.
+#:
+#: **EOS-139(2026-09-25 · main `81070ed5`)**: 게이트가 (가) 좁힌 기준으로 닫혀 `diagnose`가 진단
+#: 보정 경로로 설 수 있게 됐다. 그래도 `general`의 `보정`은 **False 그대로다** — 방해 개념 프로브가
+#: ⓖ 선수 지향 미충족을 잰다(`_FROZEN_PROBE`). 본 관통의 진단이 선수로 간 것은 픽스처가 선수를
+#: 유일하게 더 쉬운 개념으로 심었기 때문이지 추천기가 선수를 골랐기 때문이 아니다.
 _FROZEN_LOOP2: dict[str, bool] = {
     "보정진입": True,
     "문제·정답": True,
@@ -643,11 +1059,12 @@ _FROZEN: dict[str, dict[int, dict[str, bool]]] = {
 
 #: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳(오답 종류별).
 _EOS124_OWNER = "`EOS-124-next-problem-policy-selection-axis-mismatch`(정책 축·선택 축 불일치)"
+_EOS26_OWNER = (
+    "`EOS-26-r6-diagnosis-prerequisite-directed`(원인 미상 오답 직후 진단이 선수 개념이 아니라 "
+    "가장 쉬운 문항으로 간다 — Kiki 기준 ⓐ)"
+)
 _GAP_OWNERS: dict[tuple[str, int, str], str] = {
-    ("general", 1, "보정"): (
-        "`EOS-139-undiagnosed-wrong-recommendation-criterion`(원인 미상 오답 R6 직후 추천 — "
-        "Kiki 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion` 대기)"
-    ),
+    ("general", 1, "보정"): _EOS26_OWNER,
     ("misconception", 3, "다음concept"): _EOS124_OWNER,
     ("general", 3, "다음concept"): _EOS124_OWNER,
 }
@@ -687,6 +1104,44 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
     )
 
 
+#: 진단 보정 프로브 동결값(EOS-139 · 2026-09-25 · main `81070ed5` 실측).
+#: - 폐루프 True — 선수 진단 문항까지 틀리면 다음 추천이 `practice_prerequisite`(대상·문항 모두
+#:   선수)로 하강한다(기준 ⓑ). 이것이 깨지면 공백이 아니라 회귀다.
+#: - 선수지향 False — 선수보다 쉬운 방해 개념이 있으면 진단이 방해 개념으로 간다(기준 ⓐ 미충족).
+#:   후보 조회가 θ 근방 정렬뿐이고 선수 그래프는 문항 선택 뒤에만 읽힌다(소유자 `EOS-26`).
+_FROZEN_PROBE: dict[str, bool] = {"폐루프": True, "선수지향": False}
+_PROBE_GAP_OWNERS: dict[str, str] = {"선수지향": _EOS26_OWNER}
+
+
+def test_diagnosis_probe_matches_frozen(diagnosis_probe: _DiagnosisProbe) -> None:
+    """진단 보정 프로브의 ⓕ·ⓖ가 동결값과 같은가 — 개선인지 회귀인지 갈라서 말한다."""
+    observed = diagnosis_probe.as_map()
+    assert observed.keys() == _FROZEN_PROBE.keys(), (
+        f"프로브 판정 구성이 바뀌었다: {sorted(observed)} vs {sorted(_FROZEN_PROBE)}"
+    )
+    evidence = (
+        f"\n폐루프: {diagnosis_probe.closure_evidence}"
+        f"\n선수지향: {diagnosis_probe.directed_evidence}"
+        f"\n{diagnosis_probe.verdict_line()}"
+    )
+    improved = [
+        f"'{name}' False→True (소유자: {_PROBE_GAP_OWNERS.get(name, '소유자 미상')})"
+        for name, was in _FROZEN_PROBE.items()
+        if observed[name] and not was
+    ]
+    regressed = [
+        f"'{name}' True→False" for name, was in _FROZEN_PROBE.items() if was and not observed[name]
+    ]
+    assert not regressed, (
+        "회귀 — 성립하던 진단 보정 조건이 끊겼다. Kiki 결정(`G-eos24-loop1-undiagnosed-wrong-criterion`)"
+        "의 기준 ⓑ가 더 이상 성립하지 않는다: " + " · ".join(regressed) + evidence
+    )
+    assert not improved, (
+        "해소 신호 — `_FROZEN_PROBE`를 새 값으로 올리고, 전 조건이 True면 `general` Loop 1 `보정` "
+        "동결(`_FROZEN`)도 해소 신호를 낼 것이다: " + " · ".join(improved) + evidence
+    )
+
+
 # ── §18 계약 — 지금은 미충족(XFAIL로 보인다) ───────────────────────────────────
 
 
@@ -694,8 +1149,9 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
     strict=True,
     reason=(
         "계획서 300 §18 무개입 연속 3루프 미충족(2026-09-25 main bbd7c382 실측 · EOS-24 후 재실측) "
-        "— Loop 1 '보정'(general만: 원인 미상 오답 직후 추천이 diagnose · misconception은 EOS-24로 "
-        "해소) · Loop 3 '다음concept'(두 종류 모두: 전진 임계 통과 직후 추천이 현재 개념 문항). "
+        "— Loop 1 '보정'(general만: 원인 미상 오답 직후 추천이 diagnose — 진단 보정 기준(Kiki "
+        "2026-09-25)의 선수 지향 미충족 · EOS-26 · misconception은 EOS-24로 해소) · Loop 3 "
+        "'다음concept'(두 종류 모두: 전진 임계 통과 직후 추천이 현재 개념 문항). "
         "해소 시 XPASS가 strict 실패로 바뀐다 — 이 표식과 _FROZEN을 함께 올린다."
     ),
 )

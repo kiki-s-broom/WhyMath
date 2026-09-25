@@ -245,8 +245,11 @@ def test_undiagnosed_wrong_answer_is_not_directed() -> None:
     오개념 오답에서 C 안에 머문 것은 상태 경로 때문이다.
 
     **정직한 공백 동결**: 일반 오답(R6) 직후의 `diagnose · unmeasured`는 이 태스크가 고치지 않았다.
-    그것을 보정으로 인정할지는 Kiki 판정(`G-eos24-loop1-undiagnosed-wrong-criterion` · 판정문 §7-1)
-    이다. 아래 단언이 깨지면 그 결정이 구현됐다는 뜻이므로 단언을 새 기준으로 승격하라.
+    Kiki가 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`을 (가) 좁힌 기준으로 닫았다(2026-09-25 ·
+    EOS-139) — R6 직후 `diagnose`는 **선수 개념 진단**일 때만 보정이다. 그런데 추천기는 선수 그래프가
+    아니라 θ 근방 최근접으로 고르므로, 이 시딩의 P(더 쉬운 개념)로 가는 것은 선수 진단의 증거가 아니다.
+    그 공백은 3루프 하네스의 방해 개념 프로브가 재고, 서빙 변경은 `EOS-26`이 소유한다. 아래 단언이
+    깨지면 R6 경로가 바뀐 것이므로 `EOS-26` 기준으로 단언을 승격하라.
     """
     _require_pg()
     content = _Content(c_problems=3)
@@ -270,9 +273,9 @@ def test_undiagnosed_wrong_answer_is_not_directed() -> None:
                 "증거가 되지 못한다(시딩 배치가 변별력을 잃었다)."
             )
             assert rec["action"] == "diagnose", (
-                "일반 오답 직후 추천이 더 이상 diagnose가 아니다 — "
-                "`G-eos24-loop1-undiagnosed-wrong-criterion` 결정이 구현된 것으로 보인다. "
-                "이 단언을 새 기준으로 승격하라."
+                "일반 오답 직후 추천이 더 이상 diagnose가 아니다 — R6 경로가 바뀌었다(`EOS-26` 선수 "
+                "진단 배선으로 보인다). Kiki 기준(`G-eos24-loop1-undiagnosed-wrong-criterion` · 선수 "
+                "진단 + 진단 오답 시 선수 연습 하강)으로 이 단언을 승격하라."
             )
             _step("control", f"R6 → directive=None · action={rec['action']} · 문항∉C")
     finally:
