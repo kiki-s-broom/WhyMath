@@ -2383,6 +2383,29 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/ops/*",
+    "src/backend/pyproject.toml",
+    "src/data-pipeline/pyproject.toml",
+    "tests/infra/*"
+   ],
+   "text": "SQLAlchemy 2.1.0 배포로 무상한 pin이 mypy --strict 34건 red — PR #1305 CI 재실행",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/ci_job_coverage.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_job_coverage*.py"
+   ],
+   "text": "ci_job_coverage scope에 stdin 입력·출력 tail 절단 — 0건 판정을 읽지 못해 backend 잡 누락",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-30",
    "paths": [
     "src/backend/pyproject.toml"
@@ -2927,9 +2950,30 @@
    "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
+    ".claude/skills/gates/SKILL.md",
+    "scripts/harness/backlog.py",
+    "tests/harness/test_gates_related*.py"
+   ],
+   "text": "게이트 안내 전 같은 판정기를 공유하는 선행 대기 게이트 미확인 — Kiki 왕복 1회",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
     "scripts/harness/backlog.py"
    ],
    "text": "번호 확인용 backlog add가 실제 태스크를 2회 생성 (제목 x·t)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/**",
+    "tests/harness/**"
+   ],
+   "text": "태스크 번호 OPS-92 병렬 중복 배정 — add 충돌 검사 통과 후 타 세션이 같은 번호를 먼저 머지",
    "weight": 1
   },
   {
