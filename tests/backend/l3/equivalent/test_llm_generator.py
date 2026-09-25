@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Mapping, Sequence
 
 import pytest
@@ -27,6 +28,7 @@ from whymath_backend.l1.problem_bank.populate import (
     ProblemBankPopulateReport,
     ProblemBankRecord,
 )
+from whymath_backend.l3.equivalent import llm_generator
 from whymath_backend.l3.equivalent.acceptance import (
     EquivalenceSpec,
     evaluate_equivalent_candidate,
@@ -41,6 +43,7 @@ from whymath_backend.l3.models import (
     RoutingDecision,
     Usage,
 )
+from whymath_backend.l3.prompt_assets import prompt_text
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.schema.enums import AnswerFormat, LicenseType, SourceType
 
@@ -929,3 +932,66 @@ def test_avoid_repeat_does_not_evict_an_older_distinct_equation() -> None:
     last = provider.calls[-1][0]
     assert "- x**2 - 3*x + 2 = 0" in last
     assert "- x**2 - 7*x + 12 = 0" in last
+
+
+# ──────────────────────────────────────────────────────────────────────
+# MP-02 재회차 3차 — 프롬프트의 성취기준 코드 베끼기 함정 제거.
+# 2026-09-25 실측: 2회차 카나리 실패 4건이 전부 시스템 프롬프트 예시의 코드([10공수1-02-02])를
+# 베껴 성취기준 점수 0.00 → 검수필요였다. 합격 81건은 전부 스펙 코드를 적었다.
+# ──────────────────────────────────────────────────────────────────────
+# 고시 성취기준 코드 형태 — `[10공수1-02-02]`·`[9수02-20]`·`[12미적01-01]` (숫자 학년 + 한글 과목 +
+# 숫자·하이픈). 조건식 금지 예시 `[중3 이차방정식 예제 16]`처럼 한글로 시작하는 괄호는 제외된다.
+_STANDARD_CODE_LITERAL = re.compile(r"\[\d{1,2}[가-힣]+\d[\d-]*\]")
+
+
+class TestStandardCodeCopyTrap:
+    def test_pattern_catches_the_old_trap_and_the_spec_code(self) -> None:
+        # 가드의 변별력 — 이 정규식이 옛 함정 코드와 실제 스펙 코드를 **잡지 못하면** 아래 전수
+        # 검사는 공허하게 초록이다. 조건식 금지 예시(한글 시작 괄호)는 잡지 않아야 한다.
+        for code in ("[10공수1-02-02]", "[9수02-20]", _STANDARD):
+            assert _STANDARD_CODE_LITERAL.search(code), code
+        assert not _STANDARD_CODE_LITERAL.search("[중3 이차방정식 예제 16]")
+
+    @pytest.mark.parametrize("asset_id", llm_generator._EQUIVALENT_PROMPT_ASSET_IDS)
+    def test_no_prompt_asset_carries_a_concrete_standard_code(self, asset_id: str) -> None:
+        # 성취기준 코드는 호출마다 스펙(SPEC_JSON)에서만 와야 한다 — 고정 문구에 박힌 코드는 스펙이
+        # 다를 때 모델이 베끼는 함정이 된다(옛 예시가 기본 스펙 코드와 같아서 1차에는 안 보였다).
+        text = prompt_text(asset_id)
+        assert text, asset_id  # 빈 자산이면 아래 검사가 공허하게 통과한다
+        found = _STANDARD_CODE_LITERAL.findall(text)
+        assert found == [], f"{asset_id}에 구체 성취기준 코드가 있습니다: {found}"
+
+    def test_system_prompt_tells_to_copy_spec_codes(self) -> None:
+        # 예시에서 필드를 뺀 만큼, 무엇을 적어야 하는지는 지시문이 말해야 한다.
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        _, system = provider.calls[0]
+        assert "achievement_standard_codes" in system
+        assert "그대로 복사" in system
+
+    def test_wrong_code_still_goes_to_review_not_silently_fixed(self) -> None:
+        # 고친 것은 프롬프트뿐이다 — 생성기가 모델의 코드를 스펙 코드로 **몰래 바꾸지 않고**, 게이트가
+        # 여전히 성취기준 0점으로 검수필요를 낸다(검증 약화 없음). 스펙 코드를 적으면 통과한다.
+        wrong = json.loads(_HAPPY)
+        wrong["achievement_standard_codes"] = ["[10공수1-02-02]"]
+        for payload, expected in ((wrong, False), (json.loads(_HAPPY), True)):
+            candidate = _gen(FakeProvider([json.dumps(payload, ensure_ascii=False)])).generate(
+                _spec()
+            )
+            assert candidate is not None
+            assert list(candidate.problem.achievement_standard_codes) == list(
+                payload["achievement_standard_codes"]
+            )
+            verdict = evaluate_equivalent_candidate(
+                _spec(),
+                candidate.problem,
+                provenance=candidate.provenance,
+                conditions=candidate.conditions,
+                answer_map=candidate.answer_map,
+                answer_selection=candidate.answer_selection,
+                solution_steps=candidate.solution_steps,
+            )
+            assert verdict.accepted is expected
+            if not expected:
+                assert verdict.equivalence == "검수필요"
+                assert any("성취기준 0.00" in reason for reason in verdict.reasons)
