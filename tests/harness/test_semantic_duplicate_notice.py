@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import similar
+import store
 
 import backlog as cli
 
@@ -294,6 +295,83 @@ class TestNoticeIsANoticeNotAGate:
         assert exit_code == 0, "고지는 차단이 아니다 — 등재를 막으면 안 된다"
         assert "의미 중복 후보" in err
         assert "S9-20-prior" in err
+        # 라벨의 반례 (HARN-134 ⑥) — `S9-20-prior`는 todo다. 이 단언이 없으면 "전부
+        # 완료됨으로 찍는다"는 구현이 통과하고, 그러면 라벨이 구별을 못 하므로 존재
+        # 이유가 사라진다. 절을 하나 둘 때마다 그 절의 반례를 픽스처에 둔다.
+        assert "완료됨" not in err, "미완 후보에 완료됨 라벨이 붙었다 — 구별이 무의미해진다"
+
+    def test_done_task_surfaces_with_a_completed_label(self, bare_remote, monkeypatch, capsys):
+        """완료된_태스크도_고지에_뜨되_구분되는_라벨을_단다 (HARN-134 ⑥ 판정 ⓐ).
+
+        종전 pool은 in-flight 4종뿐이라 `done`을 **구조적으로 못 봤다**. 그 사각에
+        들어가는 것이 *미이행 acceptance를 남긴 done 태스크의 승계*이며, 2026-09-22에
+        실제로 `HARN-48`(done)을 이 고지가 침묵했다 — 잡아낸 것은 등재가 아니라 CI였다.
+
+        라벨을 함께 재는 이유: 그냥 pool에 넣으면 완료된 태스크가 "지금 누가 하고 있다"와
+        같은 색으로 나와, 읽는 사람이 병렬 충돌로 오독하고 엉뚱하게 cancel할 수 있다.
+        고지의 목적은 *행동을 고르게* 하는 것이므로 두 경우가 구별돼야 한다.
+
+        변별력: pool에서 done을 빼면 고지 자체가 사라지고, 라벨을 지우면 "로컬"로 나온다
+        — 두 뮤테이션이 각각 다른 단언을 RED로 만든다.
+        """
+        _, clone = bare_remote
+        repo = clone("owner")
+        monkeypatch.chdir(repo)
+        assert cli.main(["seed"]) == 0
+
+        assert (
+            cli.main(
+                [
+                    "add",
+                    "--eos-priority",
+                    "P2",
+                    "--id",
+                    "S9-22-finished",
+                    "--title",
+                    HARN48_TITLE,
+                    "--track",
+                    "math-completion",
+                    "--stage",
+                    "S2",
+                    "--note",
+                    HARN48_NOTES,
+                    *sum((["--acceptance", a] for a in HARN48_ACCEPTANCE), []),
+                ]
+            )
+            == 0
+        )
+        # 완료 상태로 만든다 — CLI done은 증적·claim 경로를 타므로 여기서는 대장에
+        # 직접 쓴다(이 테스트가 재는 것은 done 처리 절차가 아니라 pool 필터다).
+        backlog, _ = store.load_backlog(repo)
+        finished = backlog.tasks["S9-22-finished"]
+        finished.status = "done"
+        store.save_task(repo, finished)
+        capsys.readouterr()
+
+        assert (
+            cli.main(
+                [
+                    "add",
+                    "--eos-priority",
+                    "P2",
+                    "--id",
+                    "S9-23-successor",
+                    "--title",
+                    HARN45_TITLE,
+                    "--track",
+                    "math-completion",
+                    "--stage",
+                    "S2",
+                    "--note",
+                    HARN45_NOTES,
+                    *sum((["--acceptance", a] for a in HARN45_ACCEPTANCE), []),
+                ]
+            )
+            == 0
+        )
+        err = capsys.readouterr().err
+        assert "S9-22-finished" in err, "완료된 태스크가 고지에 안 뜬다 — 사각 그대로"
+        assert "완료됨" in err, "완료됨 라벨이 없으면 병렬 충돌과 구별되지 않는다"
 
     def test_unrelated_add_prints_no_duplicate_notice(self, bare_remote, monkeypatch, capsys):
         """무관한_add에서는_중복_고지가_아예_안_뜬다 — 조용할 때는 조용하다"""
