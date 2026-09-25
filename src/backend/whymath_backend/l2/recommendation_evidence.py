@@ -89,6 +89,11 @@ META_KEY_GATE_REASON: str = "gate_reason"
 META_KEY_CANDIDATES: str = "candidates"
 META_KEY_POLICY_VERSION: str = "policy_version"
 META_KEY_REASON: str = "reason"
+#: EOS-124 — 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(`IntentResolution` 값 문자열). 이 키가
+#: 있어야 "정렬 재선택이 실제로 일한 비율"(served / 전체)을 사후에 셀 수 있다. 정렬을 적용하지
+#: 않는 정책(수능)은 이 키를 넣지 않는다 — "없음"과 "null로 기록됨"을 구분한다.
+META_KEY_INTENT_RESOLUTION: str = "intent_resolution"
+
 #: EOS-24 — 상태 머신 지시의 처리 결과(`l2.learning_state_recommendation.StateDirectiveOutcome`
 #: 값). 지시가 없던 추천에는 키 자체가 없다 — 그래서 "키가 있는 행 중 `applied` 비율"이 곧
 #: 상태 머신 결정을 추천이 집행한 비율이다(CLAUDE.md "작동한 비율").
@@ -97,14 +102,19 @@ META_KEY_LEARNING_STATE_DIRECTIVE: str = "learning_state_directive"
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
-POLICY_VERSION_CAT: str = "cat_v1"
+#: `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
+#: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
+#: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
+POLICY_VERSION_CAT: str = "cat_v2"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v1"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
-밴드로 고른다. 후보 생성 규칙이 `cat_v1`과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
-지시가 없거나 집행하지 못한 추천은 전환 전과 같은 규칙이라 `cat_v1` 그대로다."""
+밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
+지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-124 이후 `cat_v2`)을
+따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 — EOS-124는 교정 경로를 바꾸지 않았으므로
+(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -134,6 +144,7 @@ async def record_recommendation_treatment(
     candidates: list[tuple[uuid.UUID, float]] | None = None,
     policy_version: str | None = None,
     reason: RecommendationReason | None = None,
+    intent_resolution: str | None = None,
     occurred_at: datetime | None = None,
     learning_session_id: uuid.UUID | None = None,
     learning_state_directive: str | None = None,
@@ -162,6 +173,10 @@ async def record_recommendation_treatment(
     `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
     (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
 
+    `intent_resolution`(EOS-124): 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(`l2.
+    recommendation_policy.IntentResolution` 값). `l2.recommendation_policy`를 import하지 않고
+    문자열로 받는 이유는 순환 참조다(그쪽이 이 모듈의 `POLICY_VERSION_CAT`을 import한다).
+
     `learning_state_directive`(EOS-24): 상태 머신이 이 추천을 지시했을 때 그 처리 결과
     (`applied`·`released_after_repeat`·…). 지시가 없었으면 None이고 키를 넣지 않는다.
 
@@ -188,6 +203,9 @@ async def record_recommendation_treatment(
         meta[META_KEY_POLICY_VERSION] = policy_version
     if reason is not None:
         meta[META_KEY_REASON] = reason.model_dump(mode="json")
+    if intent_resolution is not None:
+        meta[META_KEY_INTENT_RESOLUTION] = intent_resolution
+
     if learning_state_directive is not None:
         meta[META_KEY_LEARNING_STATE_DIRECTIVE] = learning_state_directive
 
@@ -211,6 +229,7 @@ __all__ = [
     "META_KEY_APPLIED_WEIGHTS",
     "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
+    "META_KEY_INTENT_RESOLUTION",
     "META_KEY_LEARNING_STATE_DIRECTIVE",
     "META_KEY_MODE",
     "META_KEY_POLICY_VERSION",
