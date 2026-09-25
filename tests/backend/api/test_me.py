@@ -989,11 +989,17 @@ def _reason_results() -> list[_AQResult]:
 
 
 def _learner_state_results() -> list[_AQResult]:
-    """EOS-19: 핸들러가 정책을 부르기 **전에** 조립하는 `LearnerState`가 소비하는 결과 5건.
+    """EOS-19: 핸들러가 정책을 부르기 **전에** 조립하는 `LearnerState`가 소비하는 결과 6건.
 
     내역(2026-09-18 실측 — `get_state`를 계수 대역으로 호출해 셈): 개념 진단(`compute_concept_
-    diagnoses`) 2건 · 전과목 θ 1건 · 활성 오개념 1건 · 스킬 숙달 1건. 프로필은 `execute`가
-    아니라 `session.get`이라 이 큐를 소비하지 않는다(위 `_QueueSession.get` 대역).
+    diagnoses`) 2건 · 전과목 θ 1건 · 활성 오개념 1건 · 스킬 숙달 1건 · 학습 상태 원장 1건
+    (EOS-24 — 2026-09-25 추가). 프로필은 `execute`가 아니라 `session.get`이라 이 큐를 소비하지
+    않는다(위 `_QueueSession.get` 대역).
+
+    원장이 빈 결과라 학습 국면은 `NEW`다 — 상태 머신이 추천을 지시하지 않으므로 정책은 **조회를
+    하나도 더하지 않고** 전환 전 경로를 그대로 탄다. 이 파일의 시나리오 큐가 바뀌지 않는 이유이며,
+    그 자체가 "지시 없는 요청은 회귀 0"의 관측 지점이다(지시가 있는 경로는
+    `tests/backend/l2/test_learning_state_recommendation.py`·통합 테스트가 전담).
 
     전부 빈 결과인 것은 이 파일의 시나리오가 **선택**을 재기 때문이다 — 이력 없는 학생의
     `LearnerState`는 빈 숙달·θ None이고, 그 상태에서 추천 결과는 이동 전과 같아야 한다
@@ -1003,13 +1009,13 @@ def _learner_state_results() -> list[_AQResult]:
     **개수가 틀리면 조용히 통과하지 않는다**: 큐가 앞에서 어긋나면 후보 풀 결과가 θ 추정
     자리로 들어가 시나리오가 깨진다(실제로 EOS-19 전환 시 45건이 그렇게 깨졌다).
     """
-    return [_AQResult([]) for _ in range(5)]
+    return [_AQResult([]) for _ in range(6)]
 
 
 def _next_problem_session(
     results: list[_AQResult], *, question_text: str | None = None
 ) -> _QueueSession:
-    """`GET /v1/me/next-problem` 시나리오용 큐 — 앞에 LearnerState 조회 5건을 채운다.
+    """`GET /v1/me/next-problem` 시나리오용 큐 — 앞에 LearnerState 조회 6건을 채운다.
 
     시나리오 쪽 큐는 이동 전과 **똑같이** 쓴다(①채점 이력 ②후보 풀 …) — 이 생성기가 앞단만
     책임지므로 각 테스트의 의미가 바뀌지 않는다.
@@ -1018,7 +1024,7 @@ def _next_problem_session(
 
 
 def _next_problem_recording_session(results: list[_AQResult]) -> "_RecordingQueueSession":
-    """`_next_problem_session`의 stmt 캡처판 — 캡처 인덱스도 5만큼 밀린다.
+    """`_next_problem_session`의 stmt 캡처판 — 캡처 인덱스도 6만큼 밀린다.
 
     그래서 이 생성기를 쓰는 테스트는 `statements[_NP_STMT_BASE + n]`으로 읽는다(생 인덱스를
     박아 두면 LearnerState 조회가 하나 늘 때 엉뚱한 stmt를 단언하게 된다).
@@ -1027,8 +1033,8 @@ def _next_problem_recording_session(results: list[_AQResult]) -> "_RecordingQueu
 
 
 #: `_next_problem_recording_session`이 캡처한 stmt에서 *시나리오 첫 쿼리*의 인덱스.
-#: 앞의 5건은 LearnerState 조립분이다(`_learner_state_results` 참조).
-_NP_STMT_BASE = 5
+#: 앞의 6건은 LearnerState 조립분이다(`_learner_state_results` 참조).
+_NP_STMT_BASE = 6
 
 
 def _attempts_client(session: _QueueSession) -> TestClient:
@@ -2402,6 +2408,8 @@ class TestNextProblem:
             # EOS-19: 부재도 행위 공간의 한 값이다(none) — 목표 개념은 댈 대상이 없어 null.
             "action": "none",
             "target_concept": None,
+            # EOS-24: 원장이 빈 학습자(NEW)는 상태 머신이 추천을 지시하지 않는다 — null.
+            "learning_state_directive": None,
         }
 
     def test_requires_auth(self) -> None:
@@ -2957,7 +2965,10 @@ class TestNextProblemSuneungMode:
             "reason",  # EOS-14: 추천 근거 — 기존 관측 메타와 별개 축(옵셔널 아님)
             "action",  # EOS-19: 근거에서 파생된 학습 행위(근거와 어긋나면 생성 자체가 실패)
             "target_concept",  # EOS-19: 다음에 다뤄야 할 개념(선수 막힘이면 막힌 선수)
+            "learning_state_directive",  # EOS-24: 상태 머신 지시 처리 결과(수능은 항상 null)
         }
+        # 수능 정책은 상태 머신을 읽지 않는다(EOS-24 판정문 §7-3) — 지시 필드는 항상 null.
+        assert body["learning_state_directive"] is None
         assert body["problem_id"] == str(problem.problem_id)
         assert body["difficulty"] == 3.0
         assert body["theta"] == 0.0
@@ -3045,6 +3056,7 @@ class TestNextProblemSuneungMode:
             # EOS-19: 부재의 행위는 none이고 목표 개념은 없다(지어내지 않는다).
             "action": "none",
             "target_concept": None,
+            "learning_state_directive": None,  # EOS-24: 수능 정책은 상태 머신을 읽지 않는다
         }
         assert session.added == []  # REC-03: null 응답은 처치가 아니다(가짜 처치 금지)
         assert session.commits == 0
@@ -3218,7 +3230,7 @@ class TestNextProblemReason:
     def test_absent_recommendation_asks_nothing(self) -> None:
         """추천이 없으면 근거 조회 0건 — 소비된 쿼리 수를 변별력으로 쓴다.
 
-        EOS-19 이후 기준선은 `_NP_STMT_BASE`(LearnerState 조립 5건)이다. 시나리오가 쓰는 것은
+        EOS-19 이후 기준선은 `_NP_STMT_BASE`(LearnerState 조립 6건 — EOS-24 이후)이다. 시나리오가 쓰는 것은
         그 뒤의 2건(①채점 이력 ②후보 풀)뿐이고, 근거가 한 건이라도 물었으면 그보다 커진다.
         """
         session = _next_problem_session([_AQResult([]), _AQResult([])])
@@ -4362,6 +4374,7 @@ def _learner_state_client(
             _AQResult(theta_rows or []),
             _AQResult(misconception_rows or []),
             _AQResult(skill_rows or []),
+            _AQResult([]),  # 학습 상태 원장(EOS-24)
         ],
         profile=profile,
     )
@@ -4375,7 +4388,7 @@ class TestLearnerStateSurface:
         app = create_app()
 
         async def _sess() -> AsyncIterator[_LearnerStateSession]:
-            yield _LearnerStateSession([_AQResult([]) for _ in range(5)])
+            yield _LearnerStateSession([_AQResult([]) for _ in range(6)])
 
         app.dependency_overrides[get_session] = _sess
         assert TestClient(app).get("/v1/me/learner-state").status_code == 401

@@ -16,12 +16,14 @@ import ast
 import importlib
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.learner_state import FieldStatus, LearnerState, get_state
+from whymath_backend.schema.learning_state import LearningState, TransitionTrigger
 
 _UID = uuid.uuid4()
 
@@ -70,6 +72,7 @@ class _QueueSession:
     ③전과목 θ(`get_current_theta`)
     ④활성 오개념 id(`_get_active_misconception_ids`)
     ⑤스킬별 최신 숙달(`get_all_current_skill_mastery` — EOS-10)
+    ⑥학습 상태 원장 최신 2행(`list_transitions(limit=2)` — EOS-24)
     그 뒤 `session.get(UserProfile, user_id)` 1회(execute 큐와 별개).
 
     **순서가 계약이다** — 큐가 위치로 결과를 돌려주므로 `get_state()`가 호출 순서를 바꾸면
@@ -95,6 +98,7 @@ def _session(
     theta_rows: list[Any] | None = None,
     misconception_rows: list[Any] | None = None,
     skill_rows: list[Any] | None = None,
+    transition_rows: list[Any] | None = None,
     profile: _FakeProfile | None = None,
 ) -> AsyncSession:
     return cast(
@@ -106,6 +110,7 @@ def _session(
                 theta_rows or [],
                 misconception_rows or [],
                 skill_rows or [],
+                transition_rows or [],
             ],
             profile,
         ),
@@ -394,3 +399,117 @@ def test_get_state_does_not_touch_user_state_snapshot_seat() -> None:
             "쓰지 않는다'이며, 쓰기로 결정을 바꿨다면 docstring의 좌석 판정 절과 이 가드를 "
             "함께 갱신하라"
         )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-24 — 학습 상태 머신 국면(`learning_state`)이 조립되는가
+# ──────────────────────────────────────────────────────────────────────────
+def _transition(
+    *,
+    to_state: LearningState,
+    trigger: TransitionTrigger,
+    from_state: LearningState = LearningState.ASSESSING,
+    attempt_id: uuid.UUID | None = None,
+    rule_id: str | None = None,
+) -> SimpleNamespace:
+    """원장 행 대역 — `_learning_state_snapshot`이 실제로 읽는 속성만."""
+    return SimpleNamespace(
+        to_state=to_state,
+        from_state=from_state,
+        trigger=trigger,
+        rule_id=rule_id,
+        attempt_id=attempt_id,
+        concept_id=None,
+        occurred_at=datetime(2026, 9, 25, tzinfo=UTC),
+    )
+
+
+class TestLearningStateSnapshot:
+    """추천이 상태 머신을 읽을 유일한 입구 — 여기가 비면 EOS-24 이전으로 돌아간다."""
+
+    async def test_empty_ledger_is_new_with_no_data_origin(self) -> None:
+        state = await get_state(_session(), _UID)
+        assert state.learning_state is not None, "get_state()는 국면을 항상 채워야 한다"
+        assert state.learning_state.state is LearningState.NEW
+        assert state.learning_state.trigger is None
+        assert state.origins["learning_state"].status is FieldStatus.NO_DATA
+
+    async def test_policy_decision_pairs_with_its_own_assessment_entry(self) -> None:
+        attempt = uuid.uuid4()
+        rows = [
+            _transition(
+                to_state=LearningState.REMEDIATING,
+                trigger=TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+                attempt_id=attempt,
+                rule_id="R3-wrong-misconception",
+            ),
+            _transition(
+                to_state=LearningState.ASSESSING,
+                trigger=TransitionTrigger.ATTEMPT_SUBMITTED,
+                from_state=LearningState.REMEDIATING,
+                attempt_id=attempt,
+            ),
+        ]
+        state = await get_state(_session(transition_rows=rows), _UID)
+        snap = state.learning_state
+        assert snap is not None
+        assert snap.state is LearningState.REMEDIATING
+        assert snap.trigger is TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION
+        assert snap.rule_id == "R3-wrong-misconception"
+        assert snap.attempt_id == attempt
+        # 짝 행(같은 응답의 평가 진입)의 출발 국면 — 교정 고정 해제의 근거(EOS-24 안전장치 ③)
+        assert snap.assessed_from is LearningState.REMEDIATING
+        assert state.origins["learning_state"].status is FieldStatus.MEASURED
+        assert state.origins["learning_state"].seat == "l2.learning_state_machine.list_transitions"
+
+    async def test_entry_from_another_attempt_is_not_paired(self) -> None:
+        """다른 응답의 행을 짝으로 읽으면 앞 회차의 국면을 이번 결정의 출발점으로 오독한다."""
+        rows = [
+            _transition(
+                to_state=LearningState.REMEDIATING,
+                trigger=TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+                attempt_id=uuid.uuid4(),
+            ),
+            _transition(
+                to_state=LearningState.ASSESSING,
+                trigger=TransitionTrigger.ATTEMPT_SUBMITTED,
+                from_state=LearningState.REMEDIATING,
+                attempt_id=uuid.uuid4(),
+            ),
+        ]
+        state = await get_state(_session(transition_rows=rows), _UID)
+        assert state.learning_state is not None
+        assert state.learning_state.assessed_from is None
+
+    async def test_non_entry_second_row_is_not_paired(self) -> None:
+        """같은 응답이어도 둘째 행이 평가 진입(`ATTEMPT_SUBMITTED`)이 아니면 짝이 아니다."""
+        attempt = uuid.uuid4()
+        rows = [
+            _transition(
+                to_state=LearningState.REMEDIATING,
+                trigger=TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+                attempt_id=attempt,
+            ),
+            _transition(
+                to_state=LearningState.LEARNING,
+                trigger=TransitionTrigger.LEARNING_STARTED,
+                from_state=LearningState.REMEDIATING,
+                attempt_id=attempt,
+            ),
+        ]
+        state = await get_state(_session(transition_rows=rows), _UID)
+        assert state.learning_state is not None
+        assert state.learning_state.assessed_from is None
+
+    async def test_single_row_has_no_pair(self) -> None:
+        rows = [
+            _transition(
+                to_state=LearningState.LEARNING,
+                trigger=TransitionTrigger.LEARNING_STARTED,
+                from_state=LearningState.NEW,
+            )
+        ]
+        state = await get_state(_session(transition_rows=rows), _UID)
+        assert state.learning_state is not None
+        assert state.learning_state.state is LearningState.LEARNING
+        assert state.learning_state.assessed_from is None

@@ -42,7 +42,7 @@ class _Result:
 
 
 class _QueueSession:
-    """`get_state()`가 여는 4회 execute() + 1회 get()(user_profile — study.py는 미사용)."""
+    """`get_state()`가 여는 6회 execute() + 1회 get()(user_profile — study.py는 미사용)."""
 
     def __init__(self, results: list[list[Any]]) -> None:
         self._results = list(results)
@@ -64,9 +64,10 @@ def _session(
 ) -> AsyncSession:
     """`_build_signals` → `get_state()`의 execute 큐 — 순서가 조립기 계약이다.
 
-    ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬별 최신 숙달(EOS-10).
+    ①BKT 숙달 ②개념별 IRT ③전과목 θ ④활성 오개념 ⑤스킬별 최신 숙달(EOS-10)
+    ⑥학습 상태 원장 최신 2행(EOS-24 — 이 파일은 읽지 않으므로 항상 빈 결과).
     큐가 마르면 `IndexError`가 나므로 조립기의 쿼리가 *늘어나면* 반드시 발각된다 —
-    실제로 EOS-10이 ⑤를 추가했을 때 이 하네스가 그렇게 잡았다.
+    실제로 EOS-10이 ⑤를, EOS-24가 ⑥을 추가했을 때 이 하네스가 그렇게 잡았다.
     """
     return cast(
         AsyncSession,
@@ -77,6 +78,7 @@ def _session(
                 theta_rows or [],
                 misconception_rows or [],
                 skill_rows or [],
+                [],  # ⑥ 학습 상태 원장(EOS-24)
             ]
         ),
     )

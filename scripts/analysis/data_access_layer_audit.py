@@ -238,6 +238,15 @@ BASELINE: dict[str, frozenset[str]] = {
             #     직접 쿼리한다 — 즉 이 편입은 기존 선례의 연장이지 새 관행이 아니다.
             "l2/learning_state_evidence.py",
             "l2/learning_state_machine.py",
+            # EOS-24 — 상태 머신 결정 → 추천 이음매. 처분 (b)의 ② 경로다. 조회 셋이 전부 **새
+            # 질문**이라 재사용할 기존 reader가 없다: ⓐ 이번 회차에 증거를 받은 가설의 신뢰
+            # (`turns_since_evidence = 0` — 기존 가설 조회 둘은 활성 전체를 읽는다) ⓑ 결정을 낸
+            # 응답 → 문항(학습자 범위 한정) ⓒ 대표 개념이 C인 후보(문장은 `next_problem_selection`
+            # 의 `build_candidate_pool_stmt`를 **재사용**해 노출 게이트를 다시 쓰지 않는다 — 실행만
+            # 여기서 한다). ①(기존 파일에 함수 추가)을 택하지 않은 이유: 그 자리
+            # (`next_problem_selection`·`learning_state_evidence`)가 같은 날 병렬 claim된 EOS-124·
+            # EOS-127의 좌석 파일이라 충돌한다. 대표 개념·숙달 조회는 `mastery_tracking`을 재사용한다.
+            "l2/learning_state_recommendation.py",
             "l2/mastery_tracking.py",
             "l2/pedagogy_evidence.py",
             "l2/prerequisite_recommendation.py",

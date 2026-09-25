@@ -36,6 +36,11 @@ load_attempt_history_state` docstring).
 (콜드스타트) 목표 판정이 문항 개념으로 자연 폴백한다. 그 경로는 `target_concept`으로
 관측된다.
 
+**EOS-24 — `learner_state.learning_state`(학습 상태 머신 국면)가 두 번째 입력이다.** 상태 머신이
+오개념 교정(R3)을 결정했으면 추천은 그 결정을 *다시 판정하지 않고 집행*한다 — 후보를 교정 대상
+개념으로 제한하고 학습 밴드로 고른다. 집행 조건·안전장치는 `l2.learning_state_recommendation`
+docstring이 정본이다. 지시가 없는 요청은 조회 0건이 추가되고 결과는 전환 전과 같다.
+
 ────────────────────────────────────────────────────────────────────────────
 개념 그래프 예산 — depth ≤ 2 · nodes ≤ 20 · visited · timeout
 ────────────────────────────────────────────────────────────────────────────
@@ -78,6 +83,12 @@ from whymath_backend.l2.irt import (
     select_weighted_item,
 )
 from whymath_backend.l2.learner_state import LearnerState
+from whymath_backend.l2.learning_state_recommendation import (
+    StateDirectiveOutcome,
+    StateRoute,
+    collect_remediation_reason,
+    route_by_learning_state,
+)
 from whymath_backend.l2.next_problem_selection import (
     CANDIDATE_ZERO_NO_POOL,
     WEIGHT_AXIS_WEAK_CONCEPT,
@@ -100,7 +111,10 @@ from whymath_backend.l2.recommendation_contract import (
     RecommendationReason,
     action_for,
 )
-from whymath_backend.l2.recommendation_evidence import POLICY_VERSION_CAT
+from whymath_backend.l2.recommendation_evidence import (
+    POLICY_VERSION_CAT,
+    POLICY_VERSION_CAT_STATE_REMEDIATION,
+)
 from whymath_backend.l2.recommendation_reason import collect_recommendation_reason
 
 __all__ = [
@@ -292,6 +306,14 @@ class NextProblemOutcome(Recommendation):
     band_calibrated: bool | None = Field(
         default=None, description="purpose=learning일 때만 False(문헌값·실측 미보정)."
     )
+    learning_state_directive: StateDirectiveOutcome | None = Field(
+        default=None,
+        description=(
+            "EOS-24 — 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과(`applied`=집행 · 그 외="
+            "집행하지 못한 사유). 상태 머신이 지시하지 않았으면 null. 수능 정책은 상태 머신을 "
+            "읽지 않으므로 항상 null이다(판정문 §7-3)."
+        ),
+    )
     candidate_scores: list[tuple[uuid.UUID, float]] = Field(
         default_factory=list,
         description=(
@@ -397,21 +419,45 @@ class CatRecommendationPolicy:
             if last_wrong is not None:
                 sibling_ids = await load_sibling_ids(session, last_wrong)
 
-        # REC-04: purpose=learning일 때만 False(문헌값·미보정 — S4-15 전까지).
-        band_calibrated = False if learning_context.purpose == "learning" else None
-
-        candidate_rows = await load_candidate_rows(
+        excluded_ids = sibling_ids if self._sibling_filter == "exclude" else set()
+        # EOS-24 — 학습 상태 머신이 오개념 교정(R3)을 결정했으면 추천은 그 결정을 *집행*한다:
+        # 후보를 교정 대상 개념으로 제한하고, 목적이 측정이 아니라 교정 확인이므로 학습 밴드로
+        # 고른다. 지시가 없으면 `state_route`는 None이고 조회 0건 — 아래는 전환 전과 같다.
+        state_route = await route_by_learning_state(
             session,
-            theta,
+            learner_state,
+            theta=theta,
             attempted_ids=attempt_state.attempted_ids,
-            excluded_ids=sibling_ids if self._sibling_filter == "exclude" else set(),
+            excluded_ids=excluded_ids,
+        )
+        applied_route: StateRoute | None = (
+            state_route if state_route is not None and state_route.applied else None
+        )
+        effective_context = (
+            learning_context.model_copy(update={"purpose": "learning"})
+            if applied_route is not None
+            else learning_context
+        )
+
+        # REC-04: purpose=learning일 때만 False(문헌값·미보정 — S4-15 전까지).
+        band_calibrated = False if effective_context.purpose == "learning" else None
+
+        candidate_rows = (
+            list(applied_route.candidate_rows)
+            if applied_route is not None
+            else await load_candidate_rows(
+                session,
+                theta,
+                attempted_ids=attempt_state.attempted_ids,
+                excluded_ids=excluded_ids,
+            )
         )
         candidate_pool_size = len(candidate_rows)
         items = candidate_items(candidate_rows)
 
         weights = await self._combine_axes(
             user_id=user_id,
-            learning_context=learning_context,
+            learning_context=effective_context,
             candidate_rows=candidate_rows,
             items=items,
             theta=theta,
@@ -433,8 +479,15 @@ class CatRecommendationPolicy:
             "candidate_pool_size": candidate_pool_size,
             "weak_concept_signal_count": weak_signal,
             "band_calibrated": band_calibrated,
-            "policy_version": self.policy_version,
+            # 집행된 추천만 다른 버전을 적는다 — 후보 생성 규칙이 다르므로(개념 제한 + 학습 밴드)
+            # 소급 평가가 두 규칙의 로그를 섞지 않게 한다.
+            "policy_version": (
+                POLICY_VERSION_CAT_STATE_REMEDIATION
+                if applied_route is not None
+                else self.policy_version
+            ),
         }
+        directive = state_route.outcome if state_route is not None else None
         if best is None:
             no_candidate = await collect_recommendation_reason(
                 session, learner_id=user_id, problem_id=None
@@ -447,6 +500,7 @@ class CatRecommendationPolicy:
                 action=action_for(no_candidate.type),
                 target_concept=None,
                 candidate_zero_reason=CANDIDATE_ZERO_NO_POOL,
+                learning_state_directive=directive,
                 **common,
             )
 
@@ -458,12 +512,20 @@ class CatRecommendationPolicy:
         ]
         # 근거는 **선택이 끝난 뒤** 조립된다 — 이 호출이 위 선택에 영향을 줄 수 없는 위치이므로
         # 근거·목표 배선이 추천 결과를 바꾸지 않는다(acceptance ④의 구조적 보장).
-        reason = await collect_recommendation_reason(
-            session, learner_id=user_id, problem_id=chosen_id
-        )
-        target = await resolve_target_concept(
-            session, reason=reason, learner_state=learner_state, budget=self._graph_budget
-        )
+        if applied_route is not None:
+            # 집행 경로: 후보가 개념 C로 제한됐으므로 고른 문항의 대표 개념이 곧 C다 — 근거·목표를
+            # 상태 머신 결정에서 채워도 문항과 어긋나지 않는다(판정문 §5).
+            reason = await collect_remediation_reason(
+                session, learner_id=user_id, route=applied_route
+            )
+            target = applied_route.concept_id
+        else:
+            reason = await collect_recommendation_reason(
+                session, learner_id=user_id, problem_id=chosen_id
+            )
+            target = await resolve_target_concept(
+                session, reason=reason, learner_state=learner_state, budget=self._graph_budget
+            )
         return NextProblemOutcome(
             problem_id=chosen_id,
             reason=reason,
@@ -472,6 +534,7 @@ class CatRecommendationPolicy:
             difficulty=float(chosen_difficulty) if chosen_difficulty is not None else None,
             candidate_zero_reason=None,
             candidate_scores=scores,
+            learning_state_directive=directive,
             **common,
         )
 
