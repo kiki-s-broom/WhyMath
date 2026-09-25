@@ -45,7 +45,8 @@
 조건식·SymPy 표기·여러 개면 배열), answer_map(조건에 답을 대입할 치환맵),
 answer_selection(largest/smallest/unique — 항상 넣으세요), unit_codes(단원 코드 배열·최소 1개).
 필드(권장): answer_explanation(간결 해설), difficulty_overall(1.0~5.0 숫자),
-answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열).
+answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열 — **참고 스펙의
+`achievement_standard_codes` 값을 한 글자도 바꾸지 말고 그대로 복사**).
 선택: distractor_map·concept_tags.
 
 ## ⚠️ 가장 흔한 실패 원인 — `conditions`·`answer_map`을 절대 비우지 마세요
@@ -74,8 +75,7 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
   "answer_selection": "largest",
   "difficulty_overall": 2.0,
   "unit_codes": ["QUAD-EQ"],
-  "answer_format": "자연수",
-  "achievement_standard_codes": ["[10공수1-02-02]"]
+  "answer_format": "자연수"
 }
 
 ## 규칙
@@ -88,6 +88,9 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
   `(1+sqrt(5))/2`). 반올림하면 대입 잔차가 0이 아니어서 기계 검산이 실패합니다. `answer`(사람이
   읽는 값)는 소수로 써도 되지만 `answer_map`은 정확값이어야 합니다.
 - `conditions`에 `answer_map`을 대입하면 반드시 성립해야 합니다(**answer가 conditions의 해**).
+- **`achievement_standard_codes`는 참고 스펙의 값을 그대로 복사하세요** — 위 예시에 이 필드가 없는 것은
+  일부러 뺀 것입니다(문제마다 값이 다릅니다). 스펙과 다른 코드를 적으면 다른 단원의 문제로 분류돼
+  검수 대기로 빠집니다(2026-09-25 실측: 옛 예시의 코드를 베낀 4건이 전부 이 이유로 빠졌습니다).
 - **근의 부호를 반드시 확인하세요** — `(x+5)**2 = 0`의 근은 `5`가 아니라 **`-5`**, `(x-3)*(x+2) = 0`의
   근은 `3`과 **`-2`**입니다. 괄호 안의 수와 근은 부호가 반대입니다. 답을 적기 전에 그 값을 방정식에
   직접 대입해 0이 되는지 확인하세요(2026-09-24 파일럿 실측: 중근 문제 실패 4건이 전부 부호 반대).
