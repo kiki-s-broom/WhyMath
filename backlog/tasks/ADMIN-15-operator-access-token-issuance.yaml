@@ -19,6 +19,14 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/**"
+  - "src/backend/alembic/versions/**"
+  - "src/backend/whymath_backend/privacy/**"
+  - "src/backend/whymath_backend/schema/**"
+  - "src/backend/whymath_backend/db/**"
+  - src/backend/whymath_backend/api/me.py
+  - "scripts/analysis/**"
+  - scripts/ops/probe_prod_schema_revision.sql
+  - docs/ops/g_admin06_browser_menu_call_runbook.md
 session: claude/optimistic-euler-wckia8
-notes: "2026-09-25 ADMIN-07 착수 거부(G-admin06-browser-menu-call pending) 후 게이트 런북 작성 중 발견. 게이트 제목의 '허용 origin에서 200+내비 렌더' 축은 비데모 실 신원 액세스 토큰이 필요한데(admin_menu.py가 데모 계정 403), 저장소에서 토큰을 발급하는 경로는 OAuth 콜백(api/auth.py)과 demo_auth 둘뿐이다. Kiki의 content_admin 계정(G-operator-seat-first-grant evidence의 user_id 5612757b…)은 account_bootstrap_cli로 만들어져 OAuth 로그인 이력이 없다. 즉 게이트 B단계는 현재 실행 경로가 없다 — CLAUDE.md 거부 처리 ③(CLI 경로 자체가 없는 설계 공백 → 태스크 등재, HARN-06 선례). 런북 docs/ops/g_admin06_browser_menu_call_runbook.md의 A단계(CORS 축)는 이 태스크와 무관하게 지금 실행 가능하다"
+notes: "2026-09-25 ADMIN-07 착수 거부(G-admin06-browser-menu-call pending) 후 게이트 런북 작성 중 발견. 게이트 제목의 '허용 origin에서 200+내비 렌더' 축은 비데모 실 신원 액세스 토큰이 필요한데(admin_menu.py가 데모 계정 403), 저장소에서 토큰을 발급하는 경로는 OAuth 콜백(api/auth.py)과 demo_auth 둘뿐이다. Kiki의 content_admin 계정(G-operator-seat-first-grant evidence의 user_id 5612757b…)은 account_bootstrap_cli로 만들어져 OAuth 로그인 이력이 없다. 즉 게이트 B단계는 현재 실행 경로가 없다 — CLAUDE.md 거부 처리 ③(CLI 경로 자체가 없는 설계 공백 → 태스크 등재, HARN-06 선례). 런북 docs/ops/g_admin06_browser_menu_call_runbook.md의 A단계(CORS 축)는 이 태스크와 무관하게 지금 실행 가능하다\n\n[정정 2026-09-25] paths ['src/backend/whymath_backend/ops/**', 'tests/backend/**'] → ['src/backend/whymath_backend/ops/**', 'tests/backend/**', 'src/backend/alembic/versions/**', 'src/backend/whymath_backend/privacy/**', 'src/backend/whymath_backend/schema/**', 'src/backend/whymath_backend/db/**', 'src/backend/whymath_backend/api/me.py', 'scripts/analysis/**', 'scripts/ops/probe_prod_schema_revision.sql', 'docs/ops/g_admin06_browser_menu_call_runbook.md']: 구현이 감사 스키마(마이그레이션·모델·enum)·인벤토리 귀속 스크립트·런북 B단계까지 닿아 작업 범위를 실제 변경 경로로 정정(기존 2패턴 유지)"
 updated: 2026-09-25
