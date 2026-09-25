@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-38-wh1-fast-path-simple-turn-bypass
+title: "WH-1 fast path(04a §5.3) 배선 — 풀이 없는 단순 턴은 도구 루프를 건너뛰고 즉답(기본 OFF · 애매하면 풀 루프)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-98-coach-turn-tool-call-latency-distribution
+requires_gates: []
+acceptance:
+  - "① 착수 판정 — 선행 실측 태스크(depends_on)의 ② 분포에서 단순 턴의 풀 루프 비용이 유의한지 먼저 판정한다. 유의하지 않거나 그 태스크 ③에서 Kiki가 (다)를 고르지 않았으면, 코드를 바꾸지 않고 판정 근거와 기준 커밋을 적어 cancel한다(추측 최적화 금지 — `EOS-114` 선례)."
+  - "② 배선 — 설계 정본은 `docs/architecture/04a_wh1_tutoring_harness.md` §5.3이고, 코드상 자리는 `harness/wh1_primary.py:39`의 \"범위 밖(후속): fast path\" 주석이다. 턴 사전 분류기를 두고 단순 턴만 도구 루프 없이 결정론 즉답 경로로 보낸다. 기본 OFF 플래그로 넣고 킬스위치 환경변수를 둔다 — 기존 `config.py` `*_enabled` 규약을 확장하며 신규 플래그 프레임워크는 만들지 않는다."
+  - "③ 안전 방향(fail-closed) — 분류가 애매하면 **풀 루프**로 보낸다. 풀이 턴을 단순 턴으로 오분류하면 검증(verify 의무·정답 억제 백스톱·톤필터)을 건너뛸 위험이 있으므로, 즉답 경로도 L4 톤필터를 거치고 수식·숫자·정답 판정을 담지 않는다. 풀이 제출이 포함된 턴은 분류기와 무관하게 풀 루프로 간다는 불변식을 테스트로 고정한다."
+  - "④ 측정 — 라벨이 붙은 턴 표본으로 분류기 오분류율을 두 방향으로 낸다: 풀이 턴→단순(위험 방향)과 단순→풀이(비용 방향). 위험 방향은 Wilson 상한으로 보고하고 그 상한이 허용치를 넘으면 기본값을 켜지 않는다. 플래그 ON/OFF에서 단순 턴 지연이 실제로 달라지는지 대조한다(양쪽에서 같은 값이면 플래그가 분기하지 않는 것이다)."
+  - "⑤ 범위 밖 — 기본값 전환(GA flip)은 포함하지 않는다. 측정과 실기기 확인을 거친 별도 커밋으로 한다(S1-11 선례)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_primary.py
+  - src/backend/whymath_backend/config.py
+  - "tests/backend/harness/**"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ② (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. 설계가 `04a` §5.3과 `wh1_primary.py` docstring에만 있고 담당 태스크가 없었다(`backlog/tasks/`에서 `fast.path`·`fast_path` 검색 0건 — main `d5438782` 기준). depends_on 실측 태스크 근거: 단순 턴 비용이 유의할 때만 착수한다. 등급 P1 근거: 코치 턴이 학생 대기의 지배 구간이다."
+updated: 2026-09-25
