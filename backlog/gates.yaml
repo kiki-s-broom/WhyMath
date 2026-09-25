@@ -414,11 +414,11 @@ gates:
     title: "MP-02 3회차 (Phaiakes9) — 성취기준 예시 제거 후 n=60 재실행. 런북 = docs/reviews/mp02_rerun_runbook.md §1(재실행) → §7-2 → §7-3 (착지 PR 머지 후 — §7-2의 HAS_CODE_FIX=True가 머지를 기계 확인). 설정은 2회차와 동일(quality=qwen3:30b-a3b · --avoid-recent 10 · --canary-basis judged · 카나리 30 · 임계 0.90). 배경: 2회차(run_id 42b6ac0f…)는 판정 대상 30 중 수용 27 · 검수필요 3으로 Wilson 하한 0.7745 < 0.90 카나리 차단 — 실패 4건(파일럿 ③ 포함)이 전부 모델이 저작 프롬프트 예시 코드 [10공수1-02-02]를 베낀 것(스펙 [9수02-20] · 합격 81건은 전부 스펙 코드 · 2026-09-25 Kiki 조회로 확정). 수정 = 예시에서 필드 제거 + 스펙 값 복사 지시(게이트 불변). 회신 = 런북 §8의 3회차 목록(§7-3 출력 전문 필수). 전제: Ollama 가동 · 비용 0원(로컬)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-25
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 87cb759e (#1306 머지 후). 런북 §7-2: HAS_CODE_FIX=True · ROUND2_MODEL=qwen3:30b-a3b · STALE_ROUND3=0 → 실행 · ACCUMULATE3_EXIT=0 · ROUND3_FILES=5. §7-3: run_id d315c0084d5242f2814b0b92b21ddc0c · LEDGER_ROWS 1 · GENLOG_SAME_RUN 60 · SAME_MODEL_AS_ROUND2 True · PROMPT_CHANGED_FROM_ROUND2 True · canary_passed true(30/30 · 하한 0.9173) · 수용 51 · 중복 9 · 검수필요 0 · RECALL_EXIT=0(matched 60)."
+    cleared_by: claude
     notes: ""
   - id: G-mp03-canary-threshold-decision
     title: "카나리 임계 결정 (MP-02 3회차 결과 직후) — ⓐ유지(판정 대상 30건·0.90 = 실패 0건 요구) / ⓑ카나리 42건 확대·0.90 유지(실패 1건 허용 · 권장) / ⓒ임계 0.85 완화 중 택1. 근거 docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §3 — ⓑ는 나쁜 생성기(실합격률 85%) 누출이 ⓐ와 같은 0.9% 수준이면서 98% 생성기 헛차단을 45%에서 21%로 줄이고, ⓒ는 90% 생성기 통과를 4.2%에서 18.4%로 올린다. 3회차 전에 바꾸지 않는 이유: 3회차는 예시 코드 정정 한 가지의 효과를 재도록 설정이 고정돼 있다."
