@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-171
+title: "gates show에 관련 대기 게이트 표시 — 같은 판정기·런북을 공유하는 선행 게이트를 안내 전에 드러낸다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `backlog.py gates show <id>`가 pending 게이트를 보일 때 **관련 대기 게이트** 절을 함께 출력한다. 관련 판정 = 두 게이트 title·notes에 나오는 저장소 경로(`.github/…`·`scripts/…`·`docs/…`)·스크립트 파일명·런북 절 이름의 교집합 1건 이상(문자열 부분일치가 아니라 경로 토큰 추출 결과로 비교) ② 관련 게이트가 0건이면 \"관련 대기 게이트 0건(검사한 토큰 N개)\"을 명시한다 — 토큰 0개로 검사한 경우는 \"판정 불가\"로 구분해 적는다(스캔 0건 = 통과 위장 금지) ③ `/gates` 스킬 문서의 Kiki 안내 절차에 \"안내 전 `gates show`의 관련 게이트 절을 읽고, 같은 판정기를 공유하는 게이트는 선행 조치를 먼저 안내한다\"를 1줄 추가(집행 지점 = ①의 출력) ④ 변별력: 2026-09-24 실례(`G-ruleset-bypass-actors-live-watch` ↔ `G-web01-required-check-register`, 공유 토큰 `.github/branch-protection-setup.md`·`ruleset_drift`)를 픽스처로 재현해 관련 게이트로 나오는지 단언 + 무관 게이트 대조군이 안 나오는지 단언 + 경로 토큰 추출 제거 뮤테이션 RED ⑤ 한계 명시: 제목에 경로를 안 적은 게이트끼리의 관계는 못 잡는다"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/test_gates_related*.py"
+  - ".claude/skills/gates/SKILL.md"
+session: null
+notes: "사고 2026-09-24(series gate-sibling-precondition-missed, 1회차): G-ruleset-bypass-actors-live-watch 실행 안내 전에 같은 판정기(ruleset_drift)·같은 런북(.github/branch-protection-setup.md)을 공유하는 대기 게이트 G-web01-required-check-register(2026-09-22 등재·webapp 체크 미등록)를 확인하지 않아, 1회차 판정이 EXIT=1로 끝나고 Kiki 왕복 1회가 추가됐다. 먼저 체크 등록을 안내했으면 한 번에 끝났다. 산문 규칙 등재 동결(2026-09-20)에 따라 대책은 코드(gates show 출력)로만 낸다. PR #1305 참조."
+updated: 2026-09-25

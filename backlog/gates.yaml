@@ -414,11 +414,11 @@ gates:
     title: "MP-02 3회차 (Phaiakes9) — 성취기준 예시 제거 후 n=60 재실행. 런북 = docs/reviews/mp02_rerun_runbook.md §1(재실행) → §7-2 → §7-3 (착지 PR 머지 후 — §7-2의 HAS_CODE_FIX=True가 머지를 기계 확인). 설정은 2회차와 동일(quality=qwen3:30b-a3b · --avoid-recent 10 · --canary-basis judged · 카나리 30 · 임계 0.90). 배경: 2회차(run_id 42b6ac0f…)는 판정 대상 30 중 수용 27 · 검수필요 3으로 Wilson 하한 0.7745 < 0.90 카나리 차단 — 실패 4건(파일럿 ③ 포함)이 전부 모델이 저작 프롬프트 예시 코드 [10공수1-02-02]를 베낀 것(스펙 [9수02-20] · 합격 81건은 전부 스펙 코드 · 2026-09-25 Kiki 조회로 확정). 수정 = 예시에서 필드 제거 + 스펙 값 복사 지시(게이트 불변). 회신 = 런북 §8의 3회차 목록(§7-3 출력 전문 필수). 전제: Ollama 가동 · 비용 0원(로컬)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-25
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 87cb759e (#1306 머지 후). 런북 §7-2: HAS_CODE_FIX=True · ROUND2_MODEL=qwen3:30b-a3b · STALE_ROUND3=0 → 실행 · ACCUMULATE3_EXIT=0 · ROUND3_FILES=5. §7-3: run_id d315c0084d5242f2814b0b92b21ddc0c · LEDGER_ROWS 1 · GENLOG_SAME_RUN 60 · SAME_MODEL_AS_ROUND2 True · PROMPT_CHANGED_FROM_ROUND2 True · canary_passed true(30/30 · 하한 0.9173) · 수용 51 · 중복 9 · 검수필요 0 · RECALL_EXIT=0(matched 60)."
+    cleared_by: claude
     notes: ""
   - id: G-not-now-v1-release-recheck
     title: "Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
