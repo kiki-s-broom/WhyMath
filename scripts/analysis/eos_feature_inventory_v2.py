@@ -14,7 +14,9 @@ v1(`eos_feature_inventory.py`)은 모집단을 *라우터 1개 = 기능 1개*(23
   전수성: 모든 엔드포인트가 정확히 1행에 귀속. 미귀속·중복 귀속은 exit 1.
 - **E 백엔드 엔진** — `whymath_backend` 하위 모듈 *가족*(l1~l6·whs·harness 런타임·schema·db·
   infra). 전수성: 모든 `.py` 모듈이 정확히 1행에 귀속(S 평면의 라우터 모듈 제외). 미귀속·
-  중복은 exit 1.
+  중복은 exit 1. **귀속은 파일 단위 명시로만 성립한다**(ARCH-52) — 행이 패키지·fnmatch를
+  항목으로 받으면 그 이름 아래 *나중에 생기는* 모듈까지 조용히 흡수해, 위 전수성 검사가 그
+  패키지에서는 구조적으로 RED를 낼 수 없었다(2026-09-25 프로브 66종 주입 중 50종 GREEN).
 - **C 클라이언트** — Flutter `lib/features/*`·`lib/core`·web 그래핑 계산기. 전수성: 모든
   feature 디렉터리가 1행에 귀속.
 - **O 운영자 도구** — `ops`·`privacy` CLI·`harness` 배치/게이트/리포트 가족. E 평면과 같은
@@ -84,7 +86,6 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
-import fnmatch
 import importlib.util
 import io
 import pathlib
@@ -246,7 +247,7 @@ class Spec:
     seat: str
     router: str = ""  # S: api 모듈명(또는 "app")
     routes: tuple[str, ...] = ()  # S: "METHOD /path" — 라우터 prefix 제외·루트는 "/"
-    modules: tuple[str, ...] = ()  # E/O: whymath_backend 점 경로(패키지·fnmatch 허용·"-x"는 제외)
+    modules: tuple[str, ...] = ()  # E/O: whymath_backend 점 경로 — **파일 모듈만**(ARCH-52)
     pipelines: tuple[str, ...] = ()  # data_pipeline 패키지(E-L1 행의 ETL 절반)
     client: tuple[str, ...] = ()  # C: src/ 기준 상대 경로
     flag: str = ""  # config.Settings 필드 — 기본값 실측으로 status 덮기
@@ -522,40 +523,66 @@ CATALOG: tuple[Spec, ...] = (
        "RPT-01 — 무인증 append-only", "reports", "POST /defects"),
     # ════════════════════ E 백엔드 엔진 — L1 데이터 기반 ════════════════════
     _e("WM-E-101", "원자 백본 그래프 적재·검색·중복 검수", "Platform", "Knowledge Graph", "P0",
-       "B3 선수 그래프 2,683노드·2,210엣지", "l1.atom_graph", pipelines=("atom_graph",)),
+       "B3 선수 그래프 2,683노드·2,210엣지", "l1.atom_graph.atom_backend_concept",
+       "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_node_projection",
+       "l1.atom_graph.axis", "l1.atom_graph.dedup_candidates", "l1.atom_graph.embedding",
+       "l1.atom_graph.populate", "l1.atom_graph.retrieval", pipelines=("atom_graph",)),
     _e("WM-E-102", "구 개념그래프 적재·임베딩·검색", "Platform", "Knowledge Graph", "P1",
-       "B4 개념 437 — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — 동일 기능 중복", "l1.concept_graph",
+       "B4 개념 437 — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — 동일 기능 중복",
+       "l1.concept_graph.backend_concept", "l1.concept_graph.backend_edge",
+       "l1.concept_graph.embedding", "l1.concept_graph.locale",
+       "l1.concept_graph.node_projection", "l1.concept_graph.populate",
+       "l1.concept_graph.retrieval",
        "api._concept_orchestration", pipelines=("concept_graph",), duplicate_of="WM-E-101"),
     _e("WM-E-103", "개념↔원자 크로스워크 이전", "Platform", "Knowledge Graph", "P1",
-       "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk", pipelines=("concept_atom_crosswalk",)),
+       "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk.populate",
+       "l1.concept_atom_crosswalk.transfer", pipelines=("concept_atom_crosswalk",)),
     _e("WM-E-104", "개념 콘텐츠 4종 적재·해석", "Platform", "Content", "P0",
-       "Gate2 ⑤ — 정의·비유·예시·직관", "l1.concept_content",
+       "Gate2 ⑤ — 정의·비유·예시·직관", "l1.concept_content.populate",
+       "l1.concept_content.projection", "l1.concept_content.resolve",
+       "l1.concept_content.review_gate",
        pipelines=("concept_content", "concept_content_university")),
     _e("WM-E-105", "교육과정 프레임워크 로더·해석", "Platform", "Curriculum", "P0",
-       "B1 — CUR-10", "l1.curriculum"),
+       "B1 — CUR-10", "l1.curriculum.curriculum_loader", "l1.curriculum.curriculum_resolve",
+       "l1.curriculum.populate"),
     _e("WM-E-106", "성취기준·평가기준 적재·정렬 질의·앵커 레지스트리", "Platform", "Curriculum",
-       "P0", "B1·F1 앵커 성취기준 코드셋", "l1.standards",
+       "P0", "B1·F1 앵커 성취기준 코드셋", "l1.standards.alignment_query",
+       "l1.standards.anchor_registry", "l1.standards.criteria_loader",
+       "l1.standards.learning_map", "l1.standards.populate", "l1.standards.standard_loader",
        pipelines=("ncic", "standards_university")),
     _e("WM-E-107", "오개념 카탈로그·크로스링크 적재·승인 게이트", "Platform", "Pedagogy", "P0",
-       "B6 오개념 843 + 게이트 계약 동결", "l1.misconception", pipelines=("misconception",)),
+       "B6 오개념 843 + 게이트 계약 동결", "l1.misconception.atom_catalog",
+       "l1.misconception.catalog_loader", "l1.misconception.crosslink_gate",
+       "l1.misconception.crosslink_loader", "l1.misconception.crosslink_resolve",
+       "l1.misconception.populate", "l1.misconception.populate_atom", "l1.misconception.resolve",
+       pipelines=("misconception",)),
     _e("WM-E-108", "교수법 팩·단원 DSL 컴파일·적재", "Platform", "Pedagogy", "P0",
-       "PED-01 팩 — 프롬프트 4계층 입력", "l1.pedagogy"),
+       "PED-01 팩 — 프롬프트 4계층 입력", "l1.pedagogy.compile", "l1.pedagogy.pack_loader",
+       "l1.pedagogy.populate", "l1.pedagogy.unit_compiler"),
     _e("WM-E-109", "문제은행 적재·임베딩·시그니처·페르소나 적합·정답분포", "Platform", "Content",
-       "P0", "B7 코퍼스 2,647문", "l1.problem_bank"),
+       "P0", "B7 코퍼스 2,647문", "l1.problem_bank.answer_distribution",
+       "l1.problem_bank.embedding", "l1.problem_bank.persona_fit_rules",
+       "l1.problem_bank.populate", "l1.problem_bank.probe_candidates",
+       "l1.problem_bank.provenance_gate", "l1.problem_bank.signature_tagger"),
     _e("WM-E-110", "공식 그래프 적재", "Platform", "Knowledge Graph", "P2",
-       "S4-06 — 수식 엔티티 적재(MIXED)", "l1.formula_graph", pipelines=("formula_graph",)),
+       "S4-06 — 수식 엔티티 적재(MIXED)", "l1.formula_graph.formula_node_projection",
+       "l1.formula_graph.populate", pipelines=("formula_graph",)),
     _e("WM-E-111", "스킬 그래프 적재·해석", "Platform", "Knowledge Graph", "P0",
-       "계획서 300 Skill 27건 — 얇음", "l1.skill_graph", pipelines=("skill_graph",)),
+       "계획서 300 Skill 27건 — 얇음", "l1.skill_graph.populate", "l1.skill_graph.resolve",
+       "l1.skill_graph.skill_node_projection", pipelines=("skill_graph",)),
     _e("WM-E-112", "풀이 전략 그래프 적재", "Platform", "Pedagogy", "P2",
-       "전략 카탈로그(MIXED)", "l1.strategy_graph", pipelines=("strategy_graph",)),
+       "전략 카탈로그(MIXED)", "l1.strategy_graph.populate",
+       "l1.strategy_graph.strategy_node_projection", pipelines=("strategy_graph",)),
     _e("WM-E-113", "문제 유형 그래프 적재", "Platform", "Content", "P1",
-       "S3-27 유형 태깅", "l1.problem_type_graph", pipelines=("problem_type_graph",)),
+       "S3-27 유형 태깅", "l1.problem_type_graph.populate",
+       "l1.problem_type_graph.problem_type_node_projection", pipelines=("problem_type_graph",)),
     _e("WM-E-114", "진단문항·소크라테스 프로브 적재", "Platform", "Assessment", "P1",
-       "Phase 3 Slice 3", "l1.atom_probe"),
+       "Phase 3 Slice 3", "l1.atom_probe.populate", "l1.atom_probe.projection"),
     _e("WM-E-115", "저작권 게이트웨이·정책 엔진·귀속", "Platform", "Content", "P0",
-       "A4 저작권 원장 — LIC-01", "l1.rights"),
+       "A4 저작권 원장 — LIC-01", "l1.rights.attribution", "l1.rights.gateway",
+       "l1.rights.integration", "l1.rights.permission_map", "l1.rights.policy_engine"),
     _e("WM-E-116", "개념 시각화·시각 스타일 오버레이", "Platform", "Interaction", "P2",
-       "VIZ 축", "l1.concept_visualization", "l1.concept_visual_style"),
+       "VIZ 축", "l1.concept_visualization.overlay", "l1.concept_visual_style.overlay"),
     _e("WM-E-117", "임베딩 제공자 셀렉터(bge-m3·OpenAI·fake)", "Platform", "AI Orchestration",
        "P1", "MEMORY 슬105 — 최종 확정 미결", "l1.embedding_provider",
        "l1.embedding_primitives"),
@@ -664,22 +691,29 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-302", "LLM 제공자(Ollama·Anthropic·DeepSeek·OpenRouter·복합)", "Platform",
        "AI Orchestration", "P0",
        "A5 — 로컬 우선. DeepSeek 2경로는 ARCH-49 배선이며 채택은 미판정(ARCH-55 실측 대기)",
-       "l3.providers"),
+       "l3.providers._openai_compat", "l3.providers._response_fields", "l3.providers.anthropic",
+       "l3.providers.cloud_status", "l3.providers.composite", "l3.providers.deepseek",
+       "l3.providers.factory", "l3.providers.ollama", "l3.providers.openrouter"),
     _e("WM-E-303", "생성 파이프라인·Redis 캐시·Langfuse 관측", "Platform", "AI Orchestration",
-       "P0", "C1 사슬 골격 — 캐싱·추적 불변 계약", "l3.pipeline", "l3.cache", "l3.interfaces",
-       "l3.trace"),
+       "P0", "C1 사슬 골격 — 캐싱·추적 불변 계약", "l3.pipeline", "l3.cache.redis_cache",
+       "l3.interfaces", "l3.trace.langfuse_sink"),
     _e("WM-E-304", "QUALITY 티어 비동기 큐(Celery)", "Platform", "AI Orchestration", "P1",
-       "OPS-27 워커 미배포 — 202 영구 pending", "l3.queue"),
+       "OPS-27 워커 미배포 — 202 영구 pending", "l3.queue.celery_app", "l3.queue.celery_job_queue",
+       "l3.queue.tasks"),
     _e("WM-E-305", "데이터 등급 → 국외 반출 게이트 + 프로바이더 관할 축", "Platform",
        "Security", "P0",
        "EOS-59 — AI Hub 반출 무해화(선언 §6-3) · ARCH-49 — 관할별 허용 등급(CN 합성 프로브 한정)",
        "l3.data_export_policy", "l3.data_grade_defaults", "l3.provider_jurisdiction"),
     _e("WM-E-306", "빌드타임 캐시 사전생성(pre-warm)·시드 검증", "Admin", "AI Orchestration",
-       "P1", "S1 비용 게이트 재료", "l3.pregenerate", status="Batch"),
+       "P1", "S1 비용 게이트 재료", "l3.pregenerate.__main__", "l3.pregenerate.models",
+       "l3.pregenerate.prewarmer", "l3.pregenerate.provenance_bridge",
+       "l3.pregenerate.validator", status="Batch"),
     _e("WM-E-307", "DSL 콘텐츠 생성기(컴파일·검증·복구·변수 엔진)", "Admin", "Content", "P0",
-       "C2 DSL — 1건→다건 인스턴스", "l3.dsl"),
+       "C2 DSL — 1건→다건 인스턴스", "l3.dsl.compiler", "l3.dsl.math_verifier", "l3.dsl.models",
+       "l3.dsl.quality_gate", "l3.dsl.repair", "l3.dsl.validators", "l3.dsl.variable_engine"),
     _e("WM-E-308", "교수법 렌더 어댑터 5종·평가 재료 뱅크", "Platform", "Pedagogy", "P0",
-       "E1 render-vs-generate", "l3.render"),
+       "E1 render-vs-generate", "l3.render.adapter", "l3.render.adapters",
+       "l3.render.assessment_bank", "l3.render.dsl", "l3.render.registry"),
     _e("WM-E-309", "교수 콘텐츠 슬롯 파이프라인(생성→예심→검수)", "Admin", "QA", "P0",
        "D1·D2 Publish Gate 계열", "l3.pedagogy.slot_generator", "l3.pedagogy.prescreen",
        "l3.pedagogy.review", "l3.pedagogy.diag_item_projector"),
@@ -707,8 +741,47 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
        "l3.equivalent.defect_seeder"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대)", "Admin", "Math Engine", "P0",
-       "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.*_skeleton_generator",
-       "l3.equivalent.*_mc_generator"),
+       "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
+       "l3.equivalent.calculus1_integral_skeleton_generator",
+       "l3.equivalent.calculus2_trig_integral_skeleton_generator",
+       "l3.equivalent.calculus_chain_quotient_rule_skeleton_generator",
+       "l3.equivalent.calculus_product_rule_skeleton_generator",
+       "l3.equivalent.calculus_skeleton_generator",
+       "l3.equivalent.combination_binomial_skeleton_generator",
+       "l3.equivalent.complex_number_arithmetic_skeleton_generator",
+       "l3.equivalent.conic_section_focus_skeleton_generator",
+       "l3.equivalent.coordinate_geometry_skeleton_generator",
+       "l3.equivalent.discrete_expected_value_skeleton_generator",
+       "l3.equivalent.elementary_addsub_skeleton_generator",
+       "l3.equivalent.elementary_area_measure_skeleton_generator",
+       "l3.equivalent.elementary_division_remainder_skeleton_generator",
+       "l3.equivalent.elementary_gcd_lcm_skeleton_generator",
+       "l3.equivalent.elementary_rounding_skeleton_generator",
+       "l3.equivalent.elementary_volume_measure_skeleton_generator",
+       "l3.equivalent.exp_log_skeleton_generator",
+       "l3.equivalent.finite_probability_skeleton_generator",
+       "l3.equivalent.highschool_quotient_rule_skeleton_generator",
+       "l3.equivalent.inductive_sequence_skeleton_generator",
+       "l3.equivalent.linear_function_value_skeleton_generator",
+       "l3.equivalent.linear_inequality_system_skeleton_generator",
+       "l3.equivalent.matrix_ops_skeleton_generator",
+       "l3.equivalent.measurement_unit_conversion_skeleton_generator",
+       "l3.equivalent.permutation_combination_skeleton_generator",
+       "l3.equivalent.polynomial_arithmetic_skeleton_generator",
+       "l3.equivalent.polynomial_factoring_skeleton_generator",
+       "l3.equivalent.probability_law_skeleton_generator",
+       "l3.equivalent.quadratic_inequality_boundary_skeleton_generator",
+       "l3.equivalent.radian_conversion_skeleton_generator",
+       "l3.equivalent.root_aggregate_skeleton_generator",
+       "l3.equivalent.sample_mean_distribution_skeleton_generator",
+       "l3.equivalent.sequence_sigma_skeleton_generator",
+       "l3.equivalent.sequence_skeleton_generator",
+       "l3.equivalent.sequence_sum_skeleton_generator",
+       "l3.equivalent.trig_equation_skeleton_generator",
+       "l3.equivalent.trig_skeleton_generator",
+       "l3.equivalent.vector_operations_skeleton_generator",
+       "l3.equivalent.conceptual_count_mc_generator",
+       "l3.equivalent.misconception_eval_mc_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -724,14 +797,15 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-358", "표기 커버리지 게이트", "Admin", "Math Engine", "P1",
        "NS-03 — 교육과정 표기 범위", "l3.notation_coverage", status="Batch"),
     _e("WM-E-359", "수식 낭독(AST→한국어)·역파서·학년별 프로파일", "Student", "Math Engine", "P2",
-       "접근성 축", "l3.speech", "l3.speech_parse", "l4.speech"),
+       "접근성 축", "l3.speech", "l3.speech_parse", "l4.speech.profiles", "l4.speech.symbols"),
     # ════════════════════ E — L4 교수학 엔진 ════════════════════
     _e("WM-E-401", "Polya 4단계 코칭 엔진·전이", "Student", "Pedagogy", "P0",
-       "절대 원칙 — 모든 학습 경로 Polya 매핑", "l4.polya"),
+       "절대 원칙 — 모든 학습 경로 Polya 매핑", "l4.polya.engine", "l4.polya.prompts",
+       "l4.polya.transitions"),
     _e("WM-E-402", "소크라테스 6카테고리 선택", "Student", "Pedagogy", "P0",
-       "E2 코칭 발화 구조", "l4.socratic"),
+       "E2 코칭 발화 구조", "l4.socratic.categories", "l4.socratic.select"),
     _e("WM-E-403", "LTHC 적응(진입점·확장·비계)", "Student", "Pedagogy", "P1",
-       "04 교수학 — Low Threshold High Ceiling", "l4.lthc"),
+       "04 교수학 — Low Threshold High Ceiling", "l4.lthc.adapt", "l4.lthc.models"),
     _e("WM-E-404", "답 미루기 4단계 힌트·정서 안전 톤필터", "Student", "Pedagogy", "P0",
        "C7 힌트 누설 무관용 — PED-35", "l4.hint_deferral", "l4.tone_filter"),
     _e("WM-E-405", "메타인지·보정·선수복습·오개념복습 코칭 결정", "Student", "Pedagogy", "P0",
@@ -751,7 +825,8 @@ CATALOG: tuple[Spec, ...] = (
        "l4.pedagogy.prompt_assembler", "l4.pedagogy.k_type_resolver", "l4.pedagogy.mode_guard",
        flag="pedagogy_pack_prompt_enabled"),
     _e("WM-E-410", "적응 교수법 policy(Thompson sampling·안전제약)", "Student", "Pedagogy", "P1",
-       "PED-03 — 승격 게이트 대기", "l4.pedagogy.adaptive"),
+       "PED-03 — 승격 게이트 대기", "l4.pedagogy.adaptive.effectiveness",
+       "l4.pedagogy.adaptive.policy"),
     _e("WM-E-411", "오개념 진단·개입·매칭 게이트·distractor 카탈로그·오답 서명 채널", "Student",
        "Pedagogy", "P0",
        "B6·Gate2 ⑦ 오개념 기록 (오답 서명 채널 = EOS-104 · 킬스위치 "
@@ -769,7 +844,9 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.probes", "l4.misconception.warmstart",
        "l4.misconception.evidence_store"),
     _e("WM-E-413", "오개념 의미(임베딩) 매칭 + shadow", "Student", "Pedagogy", "P1",
-       "slice 104~111 — 방향맹 FP 측정 중", "l4.misconception.semantic",
+       "slice 104~111 — 방향맹 FP 측정 중", "l4.misconception.semantic.index",
+       "l4.misconception.semantic.matcher", "l4.misconception.semantic.pgvector_index",
+       "l4.misconception.semantic.populate", "l4.misconception.semantic.provider",
        "l4.misconception.semantic_eval", "l4.misconception.semantic_shadow_harvest",
        "l4.misconception.shadow", flag="misconception_semantic_mode", status="Shadow"),
     _e("WM-E-414", "오개념 방향 판별 LLM-judge + shadow", "Student", "Pedagogy", "P1",
@@ -777,7 +854,12 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.judge_seam", "l4.misconception.judge_shadow_harvest",
        flag="misconception_judge_enabled", status="Shadow"),
     _e("WM-E-415", "오개념 크로스링크(kebab↔M-id) 후보·트리아지·검수·shadow", "Admin", "Pedagogy",
-       "P0", "crosswalk_gate_contract.md 코드 동결", "l4.misconception.crosslink_*",
+       "P0", "crosswalk_gate_contract.md 코드 동결", "l4.misconception.crosslink_candidates",
+       "l4.misconception.crosslink_coverage", "l4.misconception.crosslink_demotion_seeder",
+       "l4.misconception.crosslink_machine_reject", "l4.misconception.crosslink_review",
+       "l4.misconception.crosslink_review_aid", "l4.misconception.crosslink_shadow",
+       "l4.misconception.crosslink_shadow_harvest",
+       "l4.misconception.crosslink_standard_signal", "l4.misconception.crosslink_triage",
        "l4.misconception.anchor_seat_gap",
        flag="misconception_crosslink_mode", status="Shadow"),
     _e("WM-E-416", "오답 형태 SymPy 매칭(canonical_wrong_form) + shadow", "Student", "Math Engine",
@@ -799,16 +881,20 @@ CATALOG: tuple[Spec, ...] = (
        "l4.pedagogy.age_band_explanation"),
     # ════════════════════ E — L5·L6 ════════════════════
     _e("WM-E-501", "OCR 파이프라인(검출→라우팅→인식→조립·검증)", "Student", "Math Engine", "P2",
-       "PaddleOCR+Qwen3-VL — 라이브 정확도 미검증", "l5.ocr", "api.ocr_handoff",
+       "PaddleOCR+Qwen3-VL — 라이브 정확도 미검증", "l5.ocr.assemble", "l5.ocr.detect",
+       "l5.ocr.factory", "l5.ocr.pipeline", "l5.ocr.recognize", "l5.ocr.router",
+       "l5.ocr.text_segmentation", "l5.ocr.verify", "api.ocr_handoff",
        flag="ocr_enabled"),
     _e("WM-E-601", "L6 모드 게이팅 로직 5종(재수·학교진도·사고력·메타인지·영재)", "Student",
        "Application Mode", "P2",
-       "L6 — 수학 신호 0(Physics 무수정 구역) · 수능 모드는 WM-E-602", "l6.gifted",
-       "l6.metacognition", "l6.retake", "l6.school_progress", "l6.thinking"),
+       "L6 — 수학 신호 0(Physics 무수정 구역) · 수능 모드는 WM-E-602", "l6.gifted.gating",
+       "l6.metacognition.gating", "l6.retake.gating", "l6.school_progress.gating",
+       "l6.thinking.gating"),
     _e("WM-E-602", "수능 모드 게이팅·적응 추천(게이팅×IRT CAT)", "Student", "Recommendation", "P1",
-       "next-problem이 소비 — 공용 게이팅 헬퍼 포함", "l6.suneung", "l6._shared"),
+       "next-problem이 소비 — 공용 게이팅 헬퍼 포함", "l6.suneung.gating",
+       "l6.suneung.recommendation", "l6._shared"),
     _e("WM-E-603", "평가 청사진 테스트셋 조립", "Student", "Assessment", "P0",
-       "ASM-04 — assemble 표면의 엔진", "l6.blueprint"),
+       "ASM-04 — assemble 표면의 엔진", "l6.blueprint.assembly"),
     # ════════════════════ E — WH-S·WH-1 하네스(런타임) ════════════════════
     _e("WM-E-701", "WH-S 솔버 하네스(루프·판정·저장소·코퍼스 replay)", "Platform", "Math Engine",
        "P1", "03b 설계 — 솔버 자기진화 플랫폼(PRM 라벨 공급) — 12월 폐쇄루프 밖·장기 연구",
@@ -835,10 +921,46 @@ CATALOG: tuple[Spec, ...] = (
        "harness.pilot_kpi_baseline"),
     # ════════════════════ E — 계약·영속·횡단 인프라 ════════════════════
     _e("WM-E-801", "Pydantic 계약 스키마(문항·활동·이벤트·권리 등 40종)", "Platform",
-       "Versioning", "P0", "A2 Subject-neutral Contract — S1-16 후에도 MIXED", "schema",
-       "-schema.subject_adapter"),
+       "Versioning", "P0", "A2 Subject-neutral Contract — S1-16 후에도 MIXED", "schema.activity",
+       "schema.analytics_event", "schema.answer_form", "schema.answer_submission",
+       "schema.assessment", "schema.assessment_evidence", "schema.audit", "schema.auth",
+       "schema.concept", "schema.concept_content", "schema.concept_version",
+       "schema.corpus_provenance", "schema.curriculum_entry", "schema.curriculum_framework",
+       "schema.curriculum_version", "schema.dialogue", "schema.enums",
+       "schema.event_data_contract", "schema.evidence_link", "schema.hint_usage",
+       "schema.learning_loop_contract", "schema.learning_state", "schema.mastery_contract",
+       "schema.misconception_catalog", "schema.misconception_crosslink",
+       "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
+       "schema.parental_consent", "schema.pedagogy_pack", "schema.pedagogy_strategy",
+       "schema.problem", "schema.provenance", "schema.review_timer", "schema.rights",
+       "schema.speech", "schema.standard", "schema.student_solution_step",
+       "schema.textbook_mapping", "schema.timeseries", "schema.unit_dsl", "schema.user",
+       "schema.verification_capabilities", "schema.version_header", "schema.visualization"),
     _e("WM-E-802", "ORM 모델 54종·세션·스키마 버전·alembic", "Platform", "Versioning", "P0",
-       "W2 되돌릴 수 없는 스키마 — 91 리비전", "db"),
+       "W2 되돌릴 수 없는 스키마 — 91 리비전", "db.base", "db.models._orm_enum",
+       "db.models._schema_seam", "db.models.achievement_level_unit",
+       "db.models.achievement_standard",
+       "db.models.activity", "db.models.answer_submission", "db.models.assessment",
+       "db.models.atom_embedding", "db.models.atom_node", "db.models.atom_probe",
+       "db.models.audit", "db.models.concept", "db.models.concept_content",
+       "db.models.concept_embedding", "db.models.concept_node",
+       "db.models.concept_standard_link", "db.models.concept_version",
+       "db.models.concept_visual_style", "db.models.concept_visualization",
+       "db.models.curriculum_entry", "db.models.curriculum_framework",
+       "db.models.curriculum_version", "db.models.dead_end_log", "db.models.device",
+       "db.models.dialogue", "db.models.evidence_event", "db.models.evidence_link",
+       "db.models.formula_node", "db.models.hint_usage", "db.models.job_ownership",
+       "db.models.learner_state", "db.models.learning_state_transition",
+       "db.models.misconception_catalog", "db.models.misconception_crosslink",
+       "db.models.misconception_embedding", "db.models.misconception_hypothesis",
+       "db.models.misconception_relation", "db.models.parental_consent",
+       "db.models.pedagogy_dsl", "db.models.problem", "db.models.problem_embedding",
+       "db.models.problem_type_node", "db.models.provenance", "db.models.refresh_token_session",
+       "db.models.review_timer_event", "db.models.rights", "db.models.skill_node",
+       "db.models.solution_node", "db.models.solution_path", "db.models.strategy_node",
+       "db.models.student_solution_step", "db.models.textbook_mapping", "db.models.timeseries",
+       "db.models.user", "db.models.verified_lemma", "db.models.verified_solution",
+       "db.schema_version", "db.session"),
     _e("WM-E-803", "인증·인가·암호화·레이트리밋·동시성 배관", "Platform", "Security", "P0",
        "JWT·디바이스 서명·봉투 암호화 — 불변 계약", "security", "api._auth", "api._crypto",
        "api._rate_limit", "api._concurrency", "api._degradation", "api._query_filters"),
@@ -861,7 +983,7 @@ CATALOG: tuple[Spec, ...] = (
        # 교육적 판정 로직이 0이라 같은 배관 좌석에 귀속한다.
        "api._l6_mode_reach_state"),
     _e("WM-E-808", "한국어 조사 유틸", "Platform", "Content", "P1",
-       "EOS-69 B분류 해소처 — 과목 무관", "lang"),
+       "EOS-69 B분류 해소처 — 과목 무관", "lang.josa"),
     _e("WM-E-809", "데모 인증(시연 전용 가짜 OAuth provider)", "Admin", "Identity", "P1",
        "S1 탈출 게이트 ① 실기기 시연 인에이블먼트 — 기본 OFF", "api.demo_auth",
        flag="demo_auth_enabled"),
@@ -914,8 +1036,28 @@ CATALOG: tuple[Spec, ...] = (
        "가드는 레지스트리에서 파생되므로 값 불일치가 아니라 *파생 경로 미사용*을 찾는다",
        "api.admin_module_registry", "ops.admin_guard_audit"),
     _o("WM-O-909", "동등문제 코퍼스 축적·후처리 배치(36 단원 배치 포함)", "Admin", "Content", "P0",
-       "C1·C3 — 앵커 CU 물량", "harness.problem_corpus_*", "harness.*_batch",
-       "-harness.concept_content_review_batch",
+       "C1·C3 — 앵커 CU 물량", "harness.problem_corpus_accumulate", "harness.problem_corpus_batch",
+       "harness.problem_corpus_persona_fit_backfill", "harness.problem_corpus_rephrase",
+       "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
+       "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
+       "harness.problem_corpus_tag", "harness.binomial_distribution_batch",
+       "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
+       "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
+       "harness.conceptual_count_mc_batch", "harness.conic_section_focus_batch",
+       "harness.coordinate_geometry_batch", "harness.discrete_ev_batch",
+       "harness.elementary_addsub_batch", "harness.elementary_area_measure_batch",
+       "harness.elementary_division_remainder_batch", "harness.elementary_gcd_lcm_batch",
+       "harness.elementary_rounding_batch", "harness.elementary_volume_measure_batch",
+       "harness.finite_probability_batch", "harness.highschool_quotient_rule_batch",
+       "harness.linear_inequality_system_batch", "harness.matrix_ops_batch",
+       "harness.measurement_unit_conversion_batch", "harness.middle_function_batch",
+       "harness.misconception_mc_batch", "harness.permutation_combination_batch",
+       "harness.polynomial_arithmetic_batch", "harness.polynomial_factoring_batch",
+       "harness.probability_law_batch", "harness.problem_corpus_batch",
+       "harness.quad_ineq_batch", "harness.radian_conversion_batch",
+       "harness.root_aggregate_batch", "harness.sample_mean_distribution_batch",
+       "harness.sequence_sigma_batch", "harness.university_calc1_batch",
+       "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",
@@ -935,7 +1077,16 @@ CATALOG: tuple[Spec, ...] = (
        "harness.golden_inputs"),
     _o("WM-O-912", "QA 파이프라인·강등전 게이트(Wilson·결함주입·금칙어)", "Admin", "QA", "P0",
        "초인간 검증 기준 v1 — 기계 게이트 승격 절차", "harness.qa_pipeline", "harness.wilson",
-       "harness.*_eval", "harness.*_battle", "harness.corpus_reverify",
+       "harness.analogy_fidelity_eval", "harness.anchor_detection_channel_eval",
+       "harness.banned_words_pii_eval", "harness.coach_prose_leak_eval",
+       "harness.corpus_audit_eval", "harness.crosslink_demotion_eval",
+       "harness.defect_detection_eval", "harness.explanation_f7_eval",
+       "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
+       "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
+       "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       "harness.answer_distribution_battle",
+       "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
+       "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
        # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
@@ -943,8 +1094,14 @@ CATALOG: tuple[Spec, ...] = (
        "harness.prompt_asset_audit", "harness.generation_seed_replay_probe",
        "harness.batch_safety"),
     _o("WM-O-913", "커버리지·도달률 관측 리포트 가족", "Admin", "Analytics", "P1",
-       "OPS-19 — 리포트 11개 중 러너 배선은 별도", "harness.*_report",
-       "-harness.surrogate_baseline_report",
+       "OPS-19 — 리포트 11개 중 러너 배선은 별도", "harness.assessment_seat_reach_report",
+       "harness.attempt_grading_shadow_report", "harness.attempt_skill_event_reach_report",
+       "harness.concept_reach_report", "harness.curriculum_revision_crosswalk_report",
+       "harness.distractor_signal_dormancy_report",
+       "harness.eos_unit_structure_observation_report", "harness.formula_reach_report",
+       "harness.generation_seed_adoption_report", "harness.learning_path_orderability_report",
+       "harness.recommendation_outcome_report", "harness.standard_attainment_report",
+       "harness.visualization_reach_report",
        "harness.problem_bank_coverage", "harness.objective_coverage",
        # OPS-68 — `*_report` 와일드카드에 안 걸리는 짝(표본 *생성*기라 이름이 _probe다).
        # 리포트가 볼 표본을 만드는 도구이므로 관측 가족에 함께 귀속한다.
@@ -1039,16 +1196,25 @@ def _module_path(mod: str) -> pathlib.Path | None:
     return pkg if pkg.is_dir() else None
 
 
-def _resolve_modules(entry: str, universe: list[str]) -> list[str]:
-    """카탈로그 항목 → 실제 모듈 목록. 파일·패키지·fnmatch 세 형태를 받는다."""
-    if "*" in entry:
-        return [m for m in universe if fnmatch.fnmatchcase(m, entry)]
+def _entry_error(entry: str) -> str | None:
+    """카탈로그 모듈 항목 1개의 결함 — 없으면 None.
+
+    **파일 모듈만 받는다(ARCH-52).** 예전에는 패키지(`"schema"`)·fnmatch(`"harness.*_batch"`)·
+    제외(`"-schema.subject_adapter"`) 세 형태를 더 받았는데, 앞의 둘은 *측정 시점의* universe를
+    펼치므로 그 패키지·패턴 아래 **새로 생기는 모듈을 조용히 흡수**했다. 흡수된 모듈은
+    `module_owner`에 들어가 `_completeness_errors`의 "미귀속 모듈" 검사를 영원히 통과한다 —
+    즉 "모든 모듈이 정확히 1행에 귀속"이라는 전수성 주장이 패밀리 항목 49개 아래에서는 거짓이었다
+    (프로브 주입 실측: `schema/`에 신규 모듈 GREEN · `l2/`에 신규 모듈 RED — EOS-13 발견).
+    제외 형태는 패밀리 항목을 전제로만 의미가 있어 함께 폐지한다.
+    """
+    if "*" in entry or entry.startswith("-"):
+        return f"모듈 항목 {entry!r}은 fnmatch·제외 형태다"
     p = _module_path(entry)
     if p is None:
-        return []
-    if p.is_file():
-        return [entry]
-    return [m for m in universe if m == entry or m.startswith(entry + ".")]
+        return f"모듈 항목 {entry!r} 해석 0건"
+    if not p.is_file():
+        return f"모듈 항목 {entry!r}은 패키지다"
+    return None
 
 
 _INIT_SYMBOLS: dict[str, dict[str, str]] = {}
@@ -1688,6 +1854,35 @@ def _measure_serving(
     )
 
 
+def _attribute_modules(
+    spec: Spec, universe: list[str], module_owner: dict[str, str], errors: list[str]
+) -> list[str]:
+    """E/O 행 1개의 모듈 귀속 — `module_owner`를 채우고 자기 모듈 목록을 돌려준다.
+
+    측정(`_measure_modules`)과 분리해 둔 이유: 전수 귀속 판정은 파일 I/O 없이 universe만으로
+    결정되므로, 가짜 모듈을 universe에 주입해 "이 자리에 새 모듈이 생기면 RED인가"를 저장소에
+    파일을 쓰지 않고 검사할 수 있다(ARCH-52 프로브 테스트).
+    """
+    own_acc: set[str] = set()
+    for entry in spec.modules:
+        problem = _entry_error(entry)
+        if problem is None and entry not in universe:
+            problem = f"모듈 항목 {entry!r}은 모집단(`__init__` 제외 .py) 밖이다"
+        if problem is not None:
+            errors.append(
+                f"{spec.fid}: {problem} — 귀속은 파일 모듈 단위로만 적는다(패키지·패턴 항목은 "
+                "신규 모듈을 조용히 흡수해 전수 귀속 검사를 무력화한다 · ARCH-52)"
+            )
+            continue
+        own_acc.add(entry)
+    own = sorted(own_acc)
+    for m in own:
+        if m in module_owner:
+            errors.append(f"{spec.fid}: 모듈 {m}은 {module_owner[m]}에 이미 귀속")
+        module_owner[m] = spec.fid
+    return own
+
+
 def _measure_modules(
     spec: Spec,
     universe: list[str],
@@ -1697,23 +1892,7 @@ def _measure_modules(
     module_owner: dict[str, str],
     errors: list[str],
 ) -> Row:
-    own_acc: set[str] = set()
-    for entry in spec.modules:
-        if entry.startswith("-"):
-            excluded = set(_resolve_modules(entry[1:], universe))
-            if not excluded & own_acc:
-                errors.append(f"{spec.fid}: 제외 항목 {entry!r}이 아무것도 빼지 않는다")
-            own_acc -= excluded
-            continue
-        resolved = _resolve_modules(entry, universe)
-        if not resolved:
-            errors.append(f"{spec.fid}: 모듈 항목 {entry!r} 해석 0건")
-        own_acc |= set(resolved)
-    own = sorted(own_acc)
-    for m in own:
-        if m in module_owner:
-            errors.append(f"{spec.fid}: 모듈 {m}은 {module_owner[m]}에 이미 귀속")
-        module_owner[m] = spec.fid
+    own = _attribute_modules(spec, universe, module_owner, errors)
     loc = 0
     mutations = 0
     imports: set[str] = set()
@@ -1748,10 +1927,10 @@ def _measure_modules(
             text = p.read_text(encoding="utf-8")
             loc += text.count("\n") + 1
             mutations += len(_DB_MUTATION.findall(text))
-    closure = sorted(m for m in imports if m not in own_acc)
+    closure = sorted(m for m in imports if m not in own)
     adapter = [m for m in closure if classify(m)[0] == "ADAPTER"]
     mixed = [m for m in closure if classify(m)[0] == "MIXED"]
-    tf, tfn = tests.fns_importing(own_acc)
+    tf, tfn = tests.fns_importing(set(own))
     for pkg in spec.pipelines:
         pf, pfn = tests.fns_under(TESTS / "data_pipeline" / pkg)
         tf, tfn = tf + pf, tfn + pfn
@@ -1866,6 +2045,22 @@ def _test_index() -> TestIndex:
     return _TEST_INDEX[0]
 
 
+def _router_module(spec: Spec) -> str:
+    """S 행이 소유하는 라우터 모듈 이름(모듈 귀속 검사에서 E/O 행 대신 이것이 소유자다)."""
+    return "app" if spec.router == "app" else f"api.{spec.router}"
+
+
+def _unowned_modules(
+    universe: list[str], module_owner: dict[str, str], router_modules_seen: set[str]
+) -> list[str]:
+    """전수 귀속 검사의 모듈 축 — 어느 행에도 속하지 않은 모듈마다 오류 1줄."""
+    return [
+        f"미귀속 모듈: {m}"
+        for m in universe
+        if m not in module_owner and m not in router_modules_seen
+    ]
+
+
 def _completeness_errors(
     endpoint_cache: dict[str, list[Endpoint]],
     endpoint_owner: dict[tuple[str, str, str], str],
@@ -1882,9 +2077,7 @@ def _completeness_errors(
     for alias_name in set(re.findall(r"app\.include_router\((\w+)\)", app_src)):
         if alias_name.removesuffix("_router") not in endpoint_cache:
             errors.append(f"include_router({alias_name}) 라우터에 S 행이 하나도 없다")
-    for m in universe:
-        if m not in module_owner and m not in router_modules_seen:
-            errors.append(f"미귀속 모듈: {m}")
+    errors += _unowned_modules(universe, module_owner, router_modules_seen)
     for m, fid in module_owner.items():
         if m in router_modules_seen:
             errors.append(f"라우터 모듈 {m}이 E/O 행({fid})에도 귀속")
@@ -1979,7 +2172,7 @@ def measure(log: Any) -> tuple[list[Row], dict[str, Any]]:
         _STATUS_CACHE[spec.fid] = _status(spec, defaults)
         if spec.plane == "S":
             eps = endpoint_cache.setdefault(spec.router, _endpoints(spec.router))
-            router_modules_seen.add("app" if spec.router == "app" else f"api.{spec.router}")
+            router_modules_seen.add(_router_module(spec))
             rows.append(_measure_serving(spec, eps, classify, tests, endpoint_owner, errors))
         elif spec.plane in ("E", "O"):
             rows.append(_measure_modules(spec, universe, classify, v1, tests, module_owner, errors))
