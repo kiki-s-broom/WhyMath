@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MOB-24-client-latency-confirmed-waste-removal
+title: "학생앱 체감 지연의 확정 낭비 4종 제거 — 미사용 진단 왕복·요청마다 토큰 저장소 읽기·전송 중 입력창 잠김·키보드 프레임마다 버블 재빌드"
+track: math-completion
+stage: S3
+subject: math
+layer: mobile
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 미사용 진단 왕복 — `diagnosis_controller.dart:41-59`가 `getNextProblem` → `getProblem` → `getDiagnosisConcepts`를 순서대로 기다리는데, 3번째 결과(`diagnoses`)는 problems·chat 화면 어디에도 표시되지 않는다(판정 기준 main `d5438782`). 경위: `MOB-10`은 나 탭이 이 적재분을 재사용하는 설계였으나 현재 나 탭은 `me_tab_controller.dart:49`에서 따로 불러온다. 제거 직전에 `src/mobile/lib` 전수 검색으로 표시처 0건을 실측 근거로 남기고 호출을 제거한다. 표시처가 생겨 있으면 제거 대신 `getProblem`과 병렬화한다(`Future.wait` — 나 탭 선례). `diagnosis_controller_test.dart`의 3단 로드 단언은 새 동작에 맞게 고치되, API 호출 횟수를 단언으로 남긴다."
+  - "② 액세스 토큰 메모리 캐시 — `core/auth_interceptor.dart:50`이 요청마다 `flutter_secure_storage`에서 토큰을 읽는다(플랫폼 채널 왕복). 메모리 캐시를 두되 **무효화가 핵심**이다: 로그인·토큰 갱신(`_inFlightRefresh` 회전)·로그아웃·401 경로 각각에서 캐시가 저장소와 어긋나지 않음을 테스트로 고정한다. 캐시가 낡은 토큰을 내는 뮤테이션에서 RED를 확인한다(보안 축 — 1회용 리프레시 토큰 회전과 어긋나면 재사용 탐지로 전체 세션이 취소된다)."
+  - "③ 전송 중 입력창 — `chat_screen.dart:387`의 `enabled: !state.isSending`이 응답 대기 동안 입력창 자체를 잠근다. 잠그는 대상을 전송 동작으로 좁히고 입력은 허용한다. 대기 중 전송 시도가 중복 요청을 만들지 않음을 테스트로 고정한다."
+  - "④ 버블 재빌드 범위 — `chat_screen.dart:832`의 `MediaQuery.of(context).size`가 키보드 애니메이션 프레임마다 버블을 다시 빌드시킨다(`coach_signal_card.dart:111` 동형). `MediaQuery.sizeOf`로 좁힌다. 위젯 테스트에서 키보드 inset 변화 시 버블 build 횟수가 늘지 않음을 단언한다 — 벽시계가 아니라 build 횟수라는 결정론적 대리지표로 판정한다."
+  - "⑤ 범위 밖 동결 — 다음 문제 prefetch는 포함하지 않는다(`GET /v1/me/next-problem`이 호출마다 `record_recommendation_treatment`로 처치를 기록하므로 미리 부르면 학생이 보지 않은 추천이 처치로 남는다 — 조회와 기록의 분리가 먼저다). 단계 패널 prefetch는 SOL-02 교수학 계약으로 금지다(`step_panel_controller.dart:6-10`). `MathText` 파싱 캐시(`Math.tex` 파싱 시점 미확인)와 MathLive WebView 사전 워밍도 포함하지 않는다."
+  - "⑥ 검증 — CI mobile 잡의 스텝 목록(`flutter analyze`·`flutter test`·커버리지 게이트)을 로컬에서 그대로 재현해 exit 0을 확인한다."
+artifacts: []
+paths:
+  - src/mobile/lib/features/problems/application/diagnosis_controller.dart
+  - src/mobile/lib/features/problems/application/diagnosis_state.dart
+  - src/mobile/lib/core/auth_interceptor.dart
+  - src/mobile/lib/core/token_store.dart
+  - src/mobile/lib/features/chat/presentation/chat_screen.dart
+  - src/mobile/lib/features/chat/presentation/coach_signal_card.dart
+  - "src/mobile/test/**"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §3-2·§5 R4 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 네 항목 모두 정적 분석만으로 낭비가 확정된 것만 골랐다(실측 계측 없이도 효과 판정 가능). 등급 P1 근거: 12월 내부 테스트 계정 표본 수집 중 학생앱 체감 품질을 높이지만 없어도 검증은 성립한다."
+updated: 2026-09-25
