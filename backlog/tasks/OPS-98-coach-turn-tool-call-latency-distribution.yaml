@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-98-coach-turn-tool-call-latency-distribution
+title: "코치 턴 도구 호출 수·지연 분포 실측 + 예산 정합 — 타임아웃 15초·도구 16회가 SLO T1 p95 5초·PRD 3초의 3~5배이고 분포를 잰 적이 없다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - SEC-34-phaiakes9-cryptominer-incident-response
+requires_gates: []
+acceptance:
+  - "① 실측 전제(판정 기준 main `63451153`): 세션 턴(`POST /v1/coach/sessions/{dialogue_id}/turns`)은 `wh1_primary_enabled` 기본 True로 WH-1 도구 루프를 탄다. 도구 1회가 LLM 1회(`harness/wh1_llm_policy.py` `LLMTutorPolicy.next_action`)이고 최대 `max_tool_calls=16`회 직렬이며, 한 턴 전체가 `wh1_primary_timeout_seconds=15.0`으로 감싸진다. 목표는 SLO S5 T1 p95 ≤ 5s(`docs/standards/incident_response_slo.md`)와 PRD 「Socratic 응답 < 3초」다. 한 턴이 도구를 실제로 몇 번 부르는지는 분포가 없다."
+  - "② 측정 — 고정 시나리오 턴(최소 30턴)을 로컬 LLM으로 돌려 턴별 도구 호출 수와 턴 지연을 기록한다. **단순 턴**(인사·\"네\"·격려 요청·진행 확인 등 풀이 제출 없음)과 **풀이 턴**을 나눠 각각 분포(중앙값·p75·p95)를 낸다. 타임아웃으로 결정론 폴백된 턴 비율도 함께 낸다 — 폴백은 지연을 잘라 낮은 수치로 위장하기 때문이다. 측정은 감염이 정리된 머신에서만 하고 감염 기간 수치는 인용하지 않는다(`SEC-34`)."
+  - "③ 판정 제시 — 결과로 세 선택지를 Kiki께 제시한다: (가) 기본값(`wh1_primary_timeout_seconds`·`max_tool_calls`)을 SLO에 맞춰 낮춤 (나) SLO T1을 실측에 맞춰 정정 (다) fast path(`04a` §5.3)로 단순 턴 분리. 각 선택지의 교수학적 비용(폴백 증가 = 덜 개인화된 코칭)을 함께 적는다. 결정은 MEMORY 결정 로그에 남긴다."
+  - "④ 기본값 동결 — 결정된 `wh1_primary_timeout_seconds`·`wh1_prose_timeout_seconds`·`max_tool_calls` 기본값을 테스트로 동결한다(판정 기준 시점에 두 타임아웃 기본값을 참조하는 테스트 0건). 값을 바꾸는 뮤테이션에서 RED를 확인한다."
+  - "⑤ 수집 도구 설계 — 수집 스크립트는 턴마다 즉시 기록하고(중단돼도 증거 보존), 실패 원인(예외 타입명·타임아웃 사실)을 남기며, 실행 식별자로 이번 실행분만 집계한다(CLAUDE.md 「측정·수집 도구를 성공 경로만 보고 설계 금지」). 외부 프로세스 호출에는 전부 타임아웃을 건다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+  - "tests/backend/harness/**"
+  - "scripts/perf/**"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ①③④ (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. depends_on `SEC-34` 근거: 측정 머신(Phaiakes9)이 깨끗해야 지연 수치가 유효하다. `OPS-75`(감염 기간 벤치마크 전면 재실측, P2)는 이 태스크의 조건이 아니다 — 범위가 달라 병행할 수 있다. 등급 P1 근거: 12월 내부 테스트 계정 표본 수집에서 코치 대기 시간이 체감 품질을 크게 좌우하지만, 없어도 검증 자체는 성립한다. Kiki 머신 실행이 필요하며 런북은 6항목 브리핑 규칙을 따른다."
+updated: 2026-09-25

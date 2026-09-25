@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: REC-12-next-problem-treatment-split-and-prefetch
+title: "다음 문제 미리 불러오기(prefetch) — 선행으로 next-problem의 '추천 조회'와 '처치 기록'을 분리(미리 부른 추천이 가짜 처치로 남지 않게)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-95-route-latency-metrics-slo-s5
+requires_gates: []
+acceptance:
+  - "① 착수 판정 — `OPS-95`의 경로별 지연으로 '다음 문항' 왕복(F2: next-problem + problem)의 서버 p75를 먼저 본다. SLO T2 p95 ≤ 1s 안이고 체감 문제가 없으면 코드를 바꾸지 않고 판정 근거와 기준 커밋을 적어 cancel한다."
+  - "② 실측 전제(판정 기준 main `63451153`): `GET /v1/me/next-problem`은 호출마다 `record_learning_activity`와 `record_recommendation_treatment`를 실행하고 commit한다(`src/backend/whymath_backend/api/me.py`). 코드 주석이 \"학생에게 실제로 반환되는 추천만 기록한다(가짜 처치 금지)\"라고 적고 있으므로, 그대로 미리 부르면 학생이 보지 않은 추천이 처치로 남아 추천 효과 분석이 오염된다."
+  - "③ 분리 설계 — 조회(부작용 없음)와 노출 확정(처치 기록)을 나눈다. 노출 확정은 학생 화면에 문제가 실제로 표시된 시점에 클라이언트가 알린다. 미리 조회만 되고 표시되지 않은 추천은 처치 기록 0건임을 테스트로 고정한다. `learning_session` 활동 기록도 같은 기준(실제 표시)으로 맞춘다. `docs/standards/loop_kpi_contract.md` KPI ①(추천 기록 기준)의 의미가 바뀌는지 대조하고, 바뀌면 계약 문서를 함께 고친다."
+  - "④ 클라이언트 prefetch — 분리 후 `diagnosis_controller.dart`가 문제 풀이 중(돌아보기·완료 신호 시점)에 다음 추천을 미리 조회해 '다음 문항으로'가 즉시 반응하게 한다. 단계 패널(`step_panel_controller.dart`)은 SOL-02 교수학 계약으로 prefetch 금지이며 이 태스크가 건드리지 않는다."
+  - "⑤ 변별력 — 조회만 하고 표시하지 않는 경로에서 처치 기록이 생기는 뮤테이션으로 RED를 확인한다(주입 적용 `mutated != original` 단언 포함)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/l2/recommendation_evidence.py
+  - "src/mobile/lib/features/problems/**"
+  - tests/backend/api/test_me.py
+  - docs/standards/loop_kpi_contract.md
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-D·§5 R4 prefetch 행 (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. `MOB-24` ⑤가 범위 밖으로 동결한 축을 받는다. depends_on `OPS-95` 근거: ①의 착수 판정에 경로별 지연이 필요하다. 등급 P2 근거: 실사용자가 없는 동안의 UX 개선이며, 데이터 계약(처치 기록)을 건드리므로 12월 검증 전에 서두를 이유가 없다."
+updated: 2026-09-25
