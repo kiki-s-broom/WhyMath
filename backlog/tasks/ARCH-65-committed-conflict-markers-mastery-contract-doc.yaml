@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ acceptance:
 artifacts: []
 paths:
   - docs/architecture/mastery_update_contract_v1.md
-session: null
+session: claude/admiring-wright-obipz1
 notes: "발견 경위: 2026-09-21~22 세션이 PR #1252(G-eos02 게이트)를 main 에 병합하는 과정에서 병합 결과에 충돌 마커가 남았는지 전수 스캔하다가 걸렸다. 스캔은 1건을 냈고, 출처를 따져 보니 **그 병합이 만든 것이 아니었다** — origin/main · PR 브랜치 · 병합 기준점 d10ba109 **전부**에 같은 3줄이 있다. 즉 이전 어느 시점에 해소되지 않은 충돌이 그대로 커밋·푸시됐고, 그 뒤 여러 번의 머지를 통과했다.\n\n왜 아무도 못 봤는가: 마크다운 문서라 lint·pytest 가 읽지 않는다. HARN-128 의 사고(워크플로 파일 마커)와 같은 침묵 축이며, 그래서 HARN-128 acceptance ①이 \"추적 대상 텍스트 파일 전수 스캔\"을 요구한다. 이 태스크는 그 가드가 착지하면 첫 RED 가 될 실재 사례의 **내용 해소**를 맡는다 — 가드만 만들고 이 파일을 안 고치면 가드가 상시 red 가 되어 사람이 가드를 끄게 된다(만료 없는 유예 금지의 역형).\n\n위험도: 낮지 않다. 이 문서는 숙달 갱신 계약의 정본이고, 마커 안의 두 산문이 **서로 모순되는 판정**을 담고 있다(Protocol 속성을 2개로 유지한다 vs 2→3 으로 깼다). 읽는 사람이 어느 쪽을 정본으로 볼지 알 수 없는 상태가 최소 며칠 이상 지속됐다."
-updated: 2026-09-22
+updated: 2026-09-25
