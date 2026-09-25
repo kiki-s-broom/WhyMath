@@ -199,4 +199,3 @@ def test_real_ollama_client_survives_repeated_asyncio_run(fake_ollama_host: str)
 
     for _ in range(3):
         assert asyncio.run(_batch()) == ["ok", "ok", "ok"]
-
