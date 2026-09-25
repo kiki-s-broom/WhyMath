@@ -1,6 +1,6 @@
 # 빌드 하네스 (Build Harness) — 작업일정 관리·순차 조율 표준
 
-> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.5 (2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
+> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.8 (2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
 >
 > 이 문서의 "빌드 하네스"는 프로젝트 *구축을 관리하는* 레이어다.
 > `src/backend`의 WH-1(튜터링)·WH-S(솔버)는 **제품 런타임 하네스**로 완전히 별개다.
@@ -447,70 +447,62 @@ PR에만 생긴다는 통설을 실측에서 폐기했다(열린 PR 14건 중 me
 걸려 매 실행 "판정 보류"가 되어 초록인 채 상시 무력이 된다). 배선 실재성은
 `tests/infra/test_stale_branch_scan_ci_wiring.py`가 기계로 동결한다.
 
-### 3b-4. 차단 홀드의 교차 세션 해제 — 정본 경로가 없는 동안의 수동 절차 (HARN-134)
+### 3b-4. 차단 홀드의 교차 세션 해제 (HARN-134 — 착지 완료)
 
-**증상**: `blocked` 태스크를 이어받으려는 세션이 `start`에서 거부당한다.
+**현행**: `unblock`이 홀더가 아닌 세션에서도 차단 홀드를 **정상 경로로** 걷는다.
+별도 절차도 `--force`도 필요 없다.
 
-> `❌ <id> 착수 거부 — 다른 세션이 **차단**해 둔 태스크 (세션: <홀더 브랜치>, <시각>)`
-> `해소는 차단 사유를 없앤 뒤 unblock <id> — claims release --force는 차단 우회이므로 쓰지 않는다`
-
-안내대로 `unblock`을 실행해도 **로컬만 `todo`가 되고 원격 홀드는 남는다.** 그래서 `start`가
-계속 거부하고, 대장(blocked)과 로컬(todo)이 갈라진 무증상 분기 상태가 된다.
-
-**원인**: `cmd_unblock`이 `_release_remote_claim(root, task.id, prev_session)`을 호출하는데
-`prev_session`은 `task.session`이고 **`cmd_block`이 그것을 비운다**. 따라서 항상
-`store.current_branch(root)`로 폴백하고, 그 값은 *지금 세션의* 브랜치다. 홀더 브랜치와
-다르면 `remote_claims.release()`가 `force` 없이는 거부한다. 즉 **차단을 건 세션이 그대로
-살아 있을 때만** `unblock`이 원격까지 걷는다.
-
-그런데 차단 사유는 대부분 *외부 입력 대기*(사람 첨부·게이트·타 PR 착지)이고, 그 해소는
-거의 항상 **다음 세션**이 한다. 보호가 실제로 작동하는 경우가 오히려 드문 쪽이다.
-
-> `HARN-48` ④가 "unblock이 홀드를 해제"를 요구했고 구현도 있으나, 같은 세션 경로만
-> 덮었다. `HARN-134`가 그 미이행 축의 승계다(수정 전까지 아래 절차가 유일한 해제 수단).
-
-**`--force`는 우회가 아니라 사람 소유 액션이다 — 단, 세 조건을 모두 확인한 뒤에만.**
-CLI가 `--force`를 금지어로 안내하는 이유는 *살아 있는 차단을 탈취*하는 것을 막기 위함이다.
-아래 셋이 모두 참이면 탈취가 아니라 **청소**이며, 판정 주체는 세션이 아니라 사람이다.
-
-| # | 확인할 것 | 확인 방법 |
-|---|---|---|
-| ① | 차단 사유가 실제로 해소됐는가 | 태스크 `notes`·`acceptance`의 해제 조건을 읽고 사람이 판정한다. 세션이 스스로 "해소됐다"고 선언하는 것으로는 부족하다 |
-| ② | 홀더 세션이 끝났는가 | 홀더 브랜치의 작업이 트렁크에 있는가(`git merge-base --is-ancestor <tip> origin/main`) 또는 브랜치가 사라졌는가(`git ls-remote origin refs/heads/<브랜치>`가 0줄). **SQUASH 머지 저장소이므로 조상 검사가 False여도 머지됐을 수 있다** — 그럴 땐 커밋 메시지·PR로 확인한다(3b-2 규칙 A와 같은 함정) |
-| ③ | 그 태스크를 다른 세션이 잡고 있지 않은가 | `backlog.py claims list`에 그 id가 **`kind=block`으로만** 있고 진행 중 claim이 아닌지 |
-
-셋 중 하나라도 아니면 해제하지 않는다. 특히 ①이 아니면 그것이 바로 CLI가 막으려는 상황이다.
-
-**수동 절차** (Kiki 머신 · Windows PowerShell · 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`)
-
-쓰기 블록이므로 **스스로 선행 조건을 재검사해 거부**한다(CLAUDE.md v0.2.26). 태스크 id는
-`Read-Host`로 **블록이 멈춰서 묻는다** — 자리표시자를 두면 통째로 붙여넣을 때 치환 없이
-그대로 실행되기 때문이다(CLAUDE.md v0.2.12). 세션이 id를 이미 아는 경우에는 그 줄을
-채워서 보내되, 자리표시자 형태로는 보내지 않는다.
-
-```powershell
-cd C:\Users\kiki\Desktop\__AI\WhyMath
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-$Py = if (Test-Path ".\.venv\Scripts\python.exe") { ".\.venv\Scripts\python.exe" } else { "python" }
-$TaskId = (Read-Host "해제할 태스크 full-id")
-$Held = ((& $Py scripts\harness\backlog.py claims list | Select-String $TaskId) -ne $null)
-$HasCli = (Test-Path ".\scripts\harness\backlog.py")
-if ($Held -and $HasCli) { & $Py scripts\harness\backlog.py claims release $TaskId --force } else { "WRITE_REFUSED=True — 홀드있음=$Held CLI있음=$HasCli" }
-$After = ((& $Py scripts\harness\backlog.py claims list | Select-String $TaskId) -ne $null)
-"RELEASED=$(-not $After)"
+```bash
+python3 scripts/harness/backlog.py unblock <task-id>
 ```
 
-성공 판정은 마지막 줄 `RELEASED=True` 하나다. `WRITE_REFUSED=True`면 이유가 같은 줄에 찍힌다.
+계약 3가지 — 동결은 `tests/harness/test_cross_session_block_release.py`(뮤테이션 10종
+전건 일치 · RED 9 · 대조군 GREEN 1):
 
-**함정 3가지**(전부 2026-09-22 실측):
+| 축 | 동작 |
+|---|---|
+| kind 경계 | `kind=block`만 홀더 불일치를 허용한다. `kind=claim`(착수 점유)은 여전히 `--force` 없이 못 걷는다 — 판정은 호출자의 가정이 아니라 **실제 홀더 레코드의 kind**로 한다(메타 없는 구버전 레코드는 규약상 claim이므로 자동으로 막힌다) |
+| 실패 시 전이 없음 | 원격 해제가 `error`/`conflict`면 **로컬 전이를 하지 않고** exit 1로 멈춘다. 태스크 파일은 바이트 동일하게 `blocked`로 남는다 — 되돌리기가 아니라 *쓰기 전에 판정*하는 순서라, 되돌릴 상태가 애초에 생기지 않는다 |
+| offline은 통과 | `origin`이 없으면 교차 세션 채널 자체가 없어 분기할 상태가 없다. 조회만 실패한 `error`와 한 색으로 접지 않는다 — 접으면 둘 중 하나가 반드시 틀린다 |
 
-1. **`git fetch`는 작업 트리를 바꾸지 않는다** — `origin/main`에 태스크 YAML이 있어도
-   체크아웃이 다른 브랜치면 로컬 파일은 없다. 가드 조건에 *태스크 파일 존재*를 넣으면
-   정상 상태에서 거부한다. `claims release`는 **그 파일을 읽지 않으므로** 선행 조건이 아니다.
-2. **출력이 cp949로 깨져 보인다** — 판정 문자열이 ASCII(태스크 id)라 매칭에는 영향이 없다.
-   위 블록 2행의 `OutputEncoding` 설정이 표시를 고친다.
-3. **로컬 `unblock`을 먼저 돌려 두면** 로컬은 `todo`·대장은 `blocked`인 분기 상태가 된다.
-   해제 후 `backlog.py status`로 두 값이 다시 맞는지 확인한다.
+**과거에 이랬다 (2026-09-22 이전)**: `cmd_unblock`이 `_release_remote_claim`에
+`task.session`을 넘겼는데 `cmd_block`이 그 필드를 비우므로 항상 `current_branch`로
+폴백했다. 홀더 브랜치와 어긋나면 `release()`가 거부했고, 로컬만 `todo`가 돼
+"대장은 blocked · 로컬은 todo"인 무증상 분기가 남았다. 유일한 해제 수단이
+`claims release --force`였는데 그것은 *탈취*용 탈출구라, **정상 절차가 탈출구를 쓰게
+만드는 상태**였다(Kiki 왕복 1회 소모). 차단 사유가 대부분 외부 입력 대기라 해소를
+판정하는 쪽이 거의 항상 다음 세션이므로, `HARN-48` ④의 보호가 실제로 작동하는 경우가
+오히려 드문 쪽이었다.
+
+### 3b-5. git 원복 계열 가드 — 미커밋 작업분 삼킴 차단 (HARN-136)
+
+`git checkout -- <경로>` · `git restore <경로>` · `git stash` 는 아직 커밋되지 않은
+작업분을 **무증상으로** 지운다(에러도 경고도 없고 `git status` 에서 파일이 조용히
+사라질 뿐이다). 이 저장소에서 두 번 났다 — 2026-08-10 `OPS-24`(미커밋 구현분
++59/-6 소실) · 2026-09-22 `EOS-128`(이벤트 약 10건 소실 · 감사 추적 단절).
+
+**집행 지점**: PreToolUse(Bash) 훅 `.claude/hooks/git_revert_guard.py`
+(`.claude/settings.json` 등록 · 배선 동결 `tests/infra/test_git_revert_guard.py`).
+
+**판정 기준은 "git 원복 명령인가"가 아니라 "그 경로에 잃을 것이 있는가"다.**
+전건 차단하면 정상 브랜치 전환까지 막혀 사람이 게이트를 끈다. 대상 경로에 실제
+미커밋 변경이 있을 때만 exit 2로 막고, 깨끗한 트리에서는 한 번도 발화하지 않는다.
+
+| 상황 | 동작 |
+|---|---|
+| 대상 경로에 미커밋 변경 있음 | **차단** + 변경 목록 + 대안(뮤테이션 원복은 `cp` 백업 경유) |
+| 대상 경로가 깨끗함 (다른 경로가 더러워도) | 통과 — 판정은 경로 단위다 |
+| `checkout -b`·`-B`·`stash pop|list|show` | 통과 — 경로를 되돌리지 않거나 오히려 되살린다 |
+| `restore --staged` 단독 | 통과 — 인덱스만 되돌리므로 작업 트리 손실이 아니다 |
+| `stash drop`·`clear` | 스태시가 비어 있지 않으면 차단 |
+| 명령 파싱 실패 · `git status` 조회 실패 | **차단** — 모른다를 '없다'로 접지 않는다 |
+| 탈출구 `#버려도됨` / `#discard-ok` | 통과하되 `.claude/logs/git_revert_blocks.jsonl` 에 기록 |
+
+**한계(막지 못하는 것을 막는다고 말하지 않는다)**: 이 훅은 **Bash 도구를 경유하는
+명령만** 본다 — 스크립트 안에서 호출되는 git, 다른 도구가 부르는 git, 사람이 자기
+터미널에서 치는 git 에는 닿지 않는다. 탐지는 명령 문자열 파싱이므로 변수·`eval`·
+별칭으로 감싸면 보이지 않는다. 즉 이것은 *세션이 무심코 치는* 경로를 막는 장치이며,
+뮤테이션 검증에서 `cp` 백업을 뜨는 규율을 대체하지 않는다.
 
 ## 3b-1. 중복 방어의 두 축 — 같은 *이름* vs 같은 *문제* (HARN-51)
 
@@ -785,7 +777,15 @@ python3 scripts/harness/backlog.py start|done <id> --as kiki ...  # 사람-소�
 python3 scripts/harness/backlog.py block <id> --reason "..." / unblock <id>
                     # block은 원격 대장에 kind=block 홀드를 **게시**한다(HARN-42/48) —
                     # 머지 없이 병렬 세션의 start가 즉시 거부된다. unblock이 그 홀드를 걷는다
-python3 scripts/harness/backlog.py gates list|add|clear|waive|show   # add = 게이트 등재 CLI(HARN-18) — gates.yaml 손편집 금지
+python3 scripts/harness/backlog.py gates list|add|amend|clear|waive|show   # add = 게이트 등재 CLI(HARN-18) — gates.yaml 손편집 금지
+python3 scripts/harness/backlog.py gates amend <G-id> --reason "..." [--title "<새 제목>"] [--remind-after-days <N>]
+                    # 등재된 게이트의 **문면·독촉 주기 정정**(HARN-124). 종전에는 --title·--remind-after-days가
+                    # add 전용이라 한 번 등재된 게이트가 틀려도 고칠 CLI가 0이었다(손편집은 금지이므로 수단 자체가 없었다).
+                    # 실효값은 그 자리에 덮어쓰고 **옛 값과 사유는 corrections[]에 append**한다 — 읽는 쪽(브리핑·
+                    # gates list·show)을 한 곳도 고치지 않아야 "정정했는데 화면은 옛 문면"이 구조적으로 불가능해진다.
+                    # waive와 다르다: waive는 status를 바꿔 대기 태스크를 **해금**하므로 '요건은 살아 있고 시점만
+                    # 미뤘다'를 표현할 수 없다. amend는 status·evidence를 건드리지 않는다.
+                    # 거부 4종(게이트 부재·--reason 누락·정정 대상 누락·무변경)은 전부 exit 1 + gates.yaml 바이트 동일.
 python3 scripts/harness/backlog.py gates show <id>   # 사람에게 게이트를 서술할 때는 반드시 이 경로를 거친다(HARN-92) —
                     # title은 등재 시점 질문이라 status가 cleared/waived로 바뀌어도 갱신되지 않는다(append 전용·HARN-76).
                     # `gates list`는 title과 status만 보여줄 뿐 근거는 안 보인다 — title만 옮겨 적으면 이미 뒤집힌
@@ -851,6 +851,8 @@ python3 scripts/harness/board.py                   # 작업 보드 HTML (work/bo
 | depends_on 제거 | `amend <id> --remove-depends <full-id> --reason '...'` | HARN-67 ③ |
 | requires_gates 탈착(오부착) | `amend <id> --remove-gate <G-id> --reason '...'` — 게이트 status 불변 | HARN-67 ⑤ |
 | notes 어구 치환 | `amend <id> --notes-replace "구문자" "신문자" --reason '...'` — 구문자 정확히 1회 | HARN-67 ⑥ |
+| **게이트 제목 정정** | `gates amend <G-id> --title '<새 제목>' --reason '...'` — 실효값 덮어쓰기 + 옛 값 `corrections[]` append | HARN-124 ① |
+| **게이트 독촉 주기 정정** | `gates amend <G-id> --remind-after-days <N> --reason '...'` — status 불변(waive와 구분) | HARN-124 ⑤ |
 | cancelled 복원 | (미구현) | HARN-69 · **todo(미착지)** |
 | **ID 개명(rename)** | **미구현 — 의도적** | 태스크 미등재(상위 세션 결정) |
 

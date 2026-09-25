@@ -678,6 +678,14 @@ jobs:
           WHYMATH_DB_DISABLE_POOL: "1"
         # l3는 라이브 Ollama/Redis/Langfuse/Anthropic 필요(도달성 단정) → CI 제외.
         # api·l2 통합테스트는 PG만 필요(미도달 자원은 각자 graceful skip).
+        # EOS-21: 이 한 줄이 **Gate 2 판정 하네스 6종의 유일한 PR 시점 실행 경로**다.
+        # week1·week2·week3 게이트, persona 3종, P-11 연결, 관통 슬라이스 — 전부 여기서
+        # *마커로* 수집된다(`testpaths = ["../../tests/backend"]` + `@pytest.mark.integration`).
+        # 워크플로에 파일명이 안 보이므로 "안 돈다"로 오독되기 쉽다 — 실제로 2026-09-19
+        # Gate 2 판정문이 그렇게 읽고 "어느 CI 잡에서도 돌지 않는다"로 기록했다.
+        # `--ignore`에 `api`를 더하거나 마커·testpaths·WHYMATH_RUN_INTEGRATION을 건드리면
+        # 6종이 조용히 skip으로 돌아가고 skip은 exit 0이다. 그 회귀를
+        # `tests/infra/test_gate_harness_marker_reach_wiring.py`가 기계로 막는다.
         run: pytest -m integration --ignore=../../tests/backend/l3
 
   # ─────────────────────────────────────────────────────────────────

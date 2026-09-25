@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import ast
 import csv
 import importlib.util
 import io
@@ -640,3 +641,134 @@ def test_dependency_and_build_directories_are_excluded_from_client_scans(
     assert ignored_dirs, "web .gitignore에서 디렉터리 항목을 하나도 못 읽었다 — 스캔 0건은 실패"
     missing = ignored_dirs - set(gen._EXCLUDED_CLIENT_DIRS)
     assert not missing, f"web .gitignore가 무시하는 디렉터리를 제외 목록이 안 덮는다: {missing}"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ⑤ 사각 없는 전수성 — 어느 패키지에 새 모듈이 생겨도 RED인가 (ARCH-52)
+# ──────────────────────────────────────────────────────────────────────
+# 발견 경위: EOS-13이 `schema/mastery_contract.py`와 `l2/mastery_contract.py`를 함께 신설했는데
+# l2 쪽만 "미귀속 모듈"로 RED가 났다. 원인은 카탈로그의 패키지·fnmatch 항목(`"schema"`·
+# `"harness.*_batch"` 등 49개)이 *측정 시점의* universe를 펼쳐 그 아래 **새로 생기는 모듈까지
+# 조용히 흡수**한 것이다 — 2026-09-25 실제 트리 주입 실측에서 프로브 66종 중 50종이 GREEN이었다.
+# 귀속을 파일 단위 명시로만 받도록 닫은 뒤, 같은 주입을 저장소에 파일을 쓰지 않고 universe에
+# 가짜 모듈명을 넣는 형태로 여기에 영구화한다.
+
+# 패키지 디렉터리가 아니라 *이름 모양*으로 흡수하던 fnmatch 패밀리 자리 — 디렉터리 프로브만으로는
+# 이 이름 모양이 안 생기므로 따로 둔다(닫기 전 실측에서 8종 전부 GREEN이었다).
+_GLOB_SHAPED_PROBES = (
+    "l3.equivalent.arch52_probe_skeleton_generator",
+    "l3.equivalent.arch52_probe_mc_generator",
+    "l4.misconception.crosslink_arch52_probe",
+    "harness.problem_corpus_arch52_probe",
+    "harness.arch52_probe_batch",
+    "harness.arch52_probe_eval",
+    "harness.arch52_probe_battle",
+    "harness.arch52_probe_report",
+)
+# 2026-09-25 실측 백엔드 디렉터리 58개(루트 포함). 하한은 스캔 붕괴(경로 오류로 0~소수)를 잡기
+# 위한 것이지 정확한 수 동결이 아니다 — 패키지가 줄어드는 정상 리팩터링을 막지 않게 여유를 둔다.
+_MIN_PROBE_DIRS = 40
+
+
+def _backend_probe_modules(gen: Any) -> list[str]:
+    """백엔드 트리의 *모든* 디렉터리(루트 포함)마다 가짜 모듈 1개 + fnmatch 모양 8종."""
+    dirs = {p for p in gen.BACKEND.rglob("*") if p.is_dir() and "__pycache__" not in p.parts} | {
+        gen.BACKEND
+    }
+    probes = [
+        ".".join((*d.relative_to(gen.BACKEND).parts, "arch52_probe_module")) for d in sorted(dirs)
+    ]
+    return probes + list(_GLOB_SHAPED_PROBES)
+
+
+def _attribution_errors(gen: Any, universe: list[str]) -> list[str]:
+    """`measure()`의 모듈 귀속 축만 파일 I/O 없이 재현한다(같은 함수를 부른다)."""
+    owner: dict[str, str] = {}
+    errors: list[str] = []
+    routers: set[str] = set()
+    for spec in gen.CATALOG:
+        if spec.plane == "S":
+            routers.add(gen._router_module(spec))
+        elif spec.plane in ("E", "O"):
+            gen._attribute_modules(spec, universe, owner, errors)
+    return errors + gen._unowned_modules(universe, owner, routers)
+
+
+def test_probe_mirror_calls_the_same_functions_as_measure() -> None:
+    """아래 프로브 검사가 `measure()`와 *같은 코드*를 본다는 전제를 AST로 동결한다.
+
+    측정 경로가 `_attribute_modules`·`_unowned_modules`·`_router_module`을 우회하도록 바뀌면
+    프로브 검사는 실제 가드와 무관한 사본을 검사하게 된다 — 그때 여기서 먼저 RED가 된다.
+    """
+    tree = ast.parse(_SCRIPT.read_text(encoding="utf-8"))
+    calls: dict[str, set[str]] = {}
+    for fn in tree.body:
+        if isinstance(fn, ast.FunctionDef):
+            calls[fn.name] = {
+                n.func.id
+                for n in ast.walk(fn)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            }
+    assert "_attribute_modules" in calls["_measure_modules"]
+    assert "_measure_modules" in calls["measure"]
+    assert "_router_module" in calls["measure"]
+    assert "_unowned_modules" in calls["_completeness_errors"]
+    assert "_completeness_errors" in calls["measure"]
+
+
+def test_attribution_mirror_is_green_on_the_real_tree(gen: Any) -> None:
+    """대조군 — 주입 없이는 귀속 오류 0건이어야 아래 RED가 프로브 때문이라고 말할 수 있다."""
+    universe = gen._backend_modules()
+    assert len(universe) > 100, f"백엔드 모집단 {len(universe)}건 — 스캔 붕괴"
+    assert _attribution_errors(gen, universe) == []
+
+
+def test_new_module_in_any_backend_package_is_unowned(gen: Any) -> None:
+    """어느 디렉터리·어느 이름 모양으로 새 모듈이 생겨도 "미귀속 모듈"로 RED가 나야 한다."""
+    real = gen._backend_modules()
+    probes = _backend_probe_modules(gen)
+    dir_probes = len(probes) - len(_GLOB_SHAPED_PROBES)
+    assert dir_probes >= _MIN_PROBE_DIRS, f"프로브 디렉터리 {dir_probes}개 — 스캔 0건·붕괴는 실패"
+    clash = sorted(set(probes) & set(real))
+    assert not clash, f"프로브 이름이 실재 모듈과 겹친다(주입이 아니게 된다): {clash}"
+    absorbed = []
+    for probe in probes:
+        universe = sorted([*real, probe])
+        assert probe in universe  # 주입 실재
+        errors = _attribution_errors(gen, universe)
+        if f"미귀속 모듈: {probe}" not in errors:
+            absorbed.append(probe)
+    assert (
+        not absorbed
+    ), "새 모듈이 기존 행에 조용히 흡수됐다 — 패키지·fnmatch 귀속이 되살아났다:\n" + "\n".join(
+        absorbed
+    )
+
+
+@pytest.mark.parametrize(
+    ("entry", "needle"),
+    [
+        ("schema", "패키지다"),
+        ("l3.providers", "패키지다"),
+        ("harness.*_batch", "fnmatch·제외"),
+        ("-schema.subject_adapter", "fnmatch·제외"),
+        ("schema.no_such_module_arch52", "해석 0건"),
+    ],
+)
+def test_family_entries_are_rejected_not_expanded(gen: Any, entry: str, needle: str) -> None:
+    """패밀리 항목은 오류로 거부되고, 그 아래 모듈을 소유자 표에 올리지 않는다."""
+    spec = replace(gen.CATALOG[-1], fid="WM-X-FAM", plane="E", modules=(entry,), client=())
+    owner: dict[str, str] = {}
+    errors: list[str] = []
+    own = gen._attribute_modules(spec, gen._backend_modules(), owner, errors)
+    assert own == [] and owner == {}, (own, owner)
+    assert any(needle in e and "ARCH-52" in e for e in errors), errors
+
+
+def test_catalog_family_entry_turns_the_real_measure_red(gen: Any) -> None:
+    """실제 `measure()` 경로에서도 — WM-E-801에 `"schema"`를 되살리면 전수성 검사가 RED다."""
+    revived = tuple(
+        replace(s, modules=("schema",)) if s.fid == "WM-E-801" else s for s in gen.CATALOG
+    )
+    errors = _run_with_catalog(gen, revived)
+    assert any("WM-E-801" in e and "패키지다" in e for e in errors), errors
