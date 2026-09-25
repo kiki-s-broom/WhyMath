@@ -5,12 +5,11 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
-depends_on:
-  - MP-02-first-llm-authoring-run
+depends_on: []
 requires_gates:
   - G-eos-first-run-canary-review
 acceptance:
@@ -18,10 +17,11 @@ acceptance:
   - "② 작동한 비율 — 승격 시도 수 대비 승격 수와 탈락 사유 분포(Wilson 상한 수치 포함)를 낸다. 0건 승격이면 그 사유(표본 부족·계약 위반·이벤트 형식)를 규명한다 — 0건은 통과가 아니다"
   - "③ 임계 현실 판정 — MP-02가 대장에 기록한 카나리 통과율·Wilson 하한으로 0.90(사실상 만점 요구)이 현실에 맞는지 판정을 MEMORY 결정 로그에 남긴다. 임계 변경은 Kiki 결정 사항으로 올리고 여기서 바꾸지 않는다"
   - "④ 골든 벤치 시계열 첫 점 — golden_benchmark를 1회 돌려 시계열 첫 레코드를 남긴다(설계서 §7 모델 표류 감지의 시작점). 골든 0건이면 '측정 불가'로 기록(0점 위장 금지)"
+  - "[의존 해제 2026-09-25 · 판정 기준 main f5db0e68 · Kiki 결정] depends_on에서 저작 회차 태스크를 제거했다(이벤트 대장에 제거 대상 full id가 남는다). 판정 입력 범위는 저작 1회차(run_id c0854e382b50415eb11829d991c93820 · 카나리 차단)와 2회차(카나리 차단 27/30 · Wilson 하한 0.7745)의 회차 대장·검수 이벤트로 한정한다. ③의 임계 현실 판정은 이 2개 회차 기준의 1차 판정이며, 3회차 이후 결과는 재판정 입력으로 남긴다(이 태스크는 3회차를 기다리지 않는다). 임계 변경 금지·as-found 계약은 불변."
 artifacts: []
 paths:
   - "data/corpus/**"
   - "docs/reviews/**"
-session: null
-notes: "출처: 대체안 A §6 1~2행 · §11-5 P1-②. requires_gates=G-eos-first-run-canary-review — Kiki의 카나리 30건 검수(MP-02 ②)가 끝나야 착수 가능하도록 게이트를 **이 태스크에** 건다(회차 태스크에 걸면 교착 — §11-3). 카나리 30 vs 승격 133의 격차는 Kiki 결정 사항(ⓐ 5회차 누적 ⓑ 첫 승격 임계 완화 0.05→59건+백필 동일값 ⓒ 카나리 확대 — 게이트 docstring은 ⓐ 처방)."
-updated: 2026-09-06
+session: claude/admiring-bell-6814st
+notes: "출처: 대체안 A §6 1~2행 · §11-5 P1-②. requires_gates=G-eos-first-run-canary-review — Kiki의 카나리 30건 검수(MP-02 ②)가 끝나야 착수 가능하도록 게이트를 **이 태스크에** 건다(회차 태스크에 걸면 교착 — §11-3). 카나리 30 vs 승격 133의 격차는 Kiki 결정 사항(ⓐ 5회차 누적 ⓑ 첫 승격 임계 완화 0.05→59건+백필 동일값 ⓒ 카나리 확대 — 게이트 docstring은 ⓐ 처방).\n\n[정정 2026-09-25] depends_on 제거 1건: Kiki 결정 2026-09-25 — 저작 회차 태스크의 종료를 기다리지 않고 1·2회차 자료만으로 이 태스크를 먼저 진행한다. 근거: 검수 이벤트(게이트 G-eos-first-run-canary-review clear · 판정 15건)와 회차 대장 2건(1회차 카나리 차단 · 2회차 27/30 하한 0.7745)이 이미 실재하고, acceptance ①(a)가 1차 시도·거부 기록만으로 done을 허용한다. 저작 회차 태스크는 3회차 진행 중이라 in_progress를 유지한다."
+updated: 2026-09-25
