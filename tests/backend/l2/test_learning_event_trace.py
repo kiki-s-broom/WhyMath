@@ -6,6 +6,8 @@
   ② **가용성 배정의 실측 일치** — `DORMANT`로 선언한 원천에 정말 writer가 0건인지를 저장소
      **AST 전수 스캔**으로 확인한다. 누군가 `LearningSession` writer를 배선하면 이 테스트가
      깨져서 대장을 고치게 한다 — 배정이 산문 주장이 아니라 기계 판정이 되는 지점이다.
+     (EOS-131이 실제로 그렇게 했다 — `l2/learning_session_writer`가 `insert(LearningSession)`로
+     생산하므로 스캐너가 `insert(X)` 형태도 생산 지점으로 센다.)
   ③ **투영 의미** — 전후 값·첫 측정(None≠0)·오답 파생·발생/수신 폴백.
   ④ **PII 경계** — 봉투에 답안 슬롯이 없고, `event_data`는 allowlist 스칼라만 통과한다.
   ⑤ **침묵 실패 금지** — 읽기 경로는 실패를 삼키지 않고, 투영이 행을 버릴 때는 로그가 남는다.
@@ -47,6 +49,8 @@ from whymath_backend.l2.learning_event_trace import (
     project_attempt_rows,
     project_mastery_rows,
     project_misconception_rows,
+    project_recommendation_rows,
+    project_session_rows,
     render_trace_lines,
     sort_entries,
 )
@@ -181,14 +185,15 @@ _ORM_CLASS_BY_SOURCE: dict[TraceSource, str] = {
     TraceSource.MISCONCEPTION_HYPOTHESIS: "MisconceptionHypothesisRecord",
     TraceSource.LEARNING_SESSION: "LearningSession",
     TraceSource.USER_STATE_SNAPSHOT: "UserStateSnapshot",
+    # EOS-131: 추천 처치의 writer(`EvidenceEvent(...)`)는 종전에도 있었고 결합 키만 없었다 —
+    # 실 session_id로 결합되면서 PRODUCED가 됐으므로 이제 생산 지점 스캔 축에 오른다.
+    TraceSource.EVIDENCE_EVENT: "EvidenceEvent",
 }
 
 #: 스캔 대상이 아닌 원천과 그 사유(빠뜨린 것과 의도적 제외를 구분한다).
 _SOURCES_WITHOUT_ORM_SCAN: dict[TraceSource, str] = {
     # 열람 로그 테이블 자체가 없다 — 셀 ORM 클래스가 없으므로 스캔 축에 오르지 않는다.
     TraceSource.CONCEPT_CONTENT: "학습자별 열람 로그 테이블 부재",
-    # writer는 실재하지만 학습자 축 조인 키가 없다 — 아래 전용 테스트가 그 사실을 동결한다.
-    TraceSource.EVIDENCE_EVENT: "UNJOINABLE — 별도 테스트가 user_id 컬럼 부재를 동결",
 }
 
 
@@ -207,8 +212,15 @@ def _module_aliases(tree: ast.AST) -> dict[str, str]:
     return aliases
 
 
+#: `insert(X)` 형태의 생산 — SQLAlchemy core `insert`와 PostgreSQL 방언 `insert`(흔히
+#: `pg_insert`로 별칭). EOS-131 writer가 `ON CONFLICT DO NOTHING` 때문에 이 형태를 쓴다.
+_INSERT_CALL_NAMES = frozenset({"insert"})
+
+
 def _construction_sites(class_name: str) -> list[str]:
-    """`ClassName(...)`·`ClassName.from_schema(...)` 호출 지점 전수 스캔(별칭 해소 포함).
+    """`ClassName(...)`·`ClassName.from_schema(...)`·`insert(ClassName)` 호출 지점 전수 스캔.
+
+    별칭을 해소한다(`from ... import insert as pg_insert` 포함).
 
     모델·스키마 정의 자신은 제외한다(정의는 생산이 아니다). 스캔 대상이 0파일이면 경로가
     틀린 것이므로 그 자체를 실패로 만든다(공허한 통과 금지).
@@ -227,7 +239,15 @@ def _construction_sites(class_name: str) -> list[str]:
                 continue
             func = node.func
             local: str | None = None
-            if isinstance(func, ast.Name):
+            if (
+                isinstance(func, ast.Name)
+                and aliases.get(func.id, func.id) in _INSERT_CALL_NAMES
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+            ):
+                # `insert(X)` — 생산 대상은 호출 이름이 아니라 첫 인자다.
+                local = node.args[0].id
+            elif isinstance(func, ast.Name):
                 local = func.id
             elif (
                 isinstance(func, ast.Attribute)
@@ -297,18 +317,37 @@ class TestAvailabilityAssignmentMatchesReality:
             registered - covered == set()
         ), f"스캔 축에도 제외 목록에도 없는 원천: {sorted(s.value for s in registered - covered)}"
 
-    def test_unjoinable_source_really_lacks_a_learner_column(self) -> None:
-        """`UNJOINABLE` 주장의 실측 — evidence_event에 정말 학습자 축 컬럼이 없는가.
+    def test_the_scanner_counts_insert_statements_as_production(self) -> None:
+        """`insert(X)` 형태 생산의 변별력 — EOS-131 세션 writer는 이 형태로만 생산한다.
 
-        user_id가 생기면 이 원천은 조인 가능해지고 추천이 트레이스에 실려야 한다 —
-        그때 이 테스트가 깨져 대장을 고치게 한다.
+        이 형태를 못 보면 실재 writer가 있는 `learning_session`이 '생산 0'으로 읽혀, PRODUCED
+        배정이 거짓 RED가 되거나(대장이 옳을 때) 거짓 DORMANT가 통과한다(대장이 틀릴 때).
         """
+        sites = _construction_sites("LearningSession")
+        assert any(
+            site.startswith("l2/learning_session_writer.py") for site in sites
+        ), f"insert(LearningSession) 생산 지점을 못 찾았다: {sites}"
+
+    def test_recommendation_is_joinable_only_through_the_session(self) -> None:
+        """EOS-131 ④: 추천은 PRODUCED가 됐지만 **user_id 컬럼·슬롯 없이** 결합된다.
+
+        종전 `UNJOINABLE` 동결(학습자 축 컬럼 부재)의 반대 방향 단언이다 — 컬럼 부재는 그대로
+        지키고(PED-03·REC-03 구조적 차단), 결합 경로가 `session_id` 하나임을 고정한다.
+        """
+        import inspect
+
         from whymath_backend.db.models.evidence_event import EvidenceEvent
+        from whymath_backend.l2.recommendation_evidence import record_recommendation_treatment
 
         columns = set(EvidenceEvent.__table__.columns.keys())
         assert "user_id" not in columns
         assert "learner_id" not in columns
-        assert _availability_of(TraceSource.EVIDENCE_EVENT) is SourceAvailability.UNJOINABLE
+        assert "session_id" in columns
+        params = set(inspect.signature(record_recommendation_treatment).parameters)
+        assert "user_id" not in params and "learner_id" not in params
+        assert "learning_session_id" in params
+        assert _availability_of(TraceSource.EVIDENCE_EVENT) is SourceAvailability.PRODUCED
+        assert _availability_of(TraceSource.LEARNING_SESSION) is SourceAvailability.PRODUCED
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -595,7 +634,8 @@ class _QueueSession:
     """`execute()`가 호출 순서대로 미리 준 결과를 반환(`test_learner_state.py` 관례).
 
     `build_trace`의 질의 순서: ①assessment ②problem_attempt ③attempt_event
-    ④concept_mastery ⑤skill_mastery ⑥misconception ⑦ability_snapshot.
+    ④concept_mastery ⑤skill_mastery ⑥misconception ⑦ability_snapshot
+    ⑧learning_session ⑨evidence_event 추천(세션 조인 — EOS-131).
     `fail_at`(1-based)을 주면 그 순번의 질의가 예외를 던진다(실패 주입).
     """
 
@@ -632,6 +672,40 @@ def _mastery_view(
 
 
 _CONCEPT = uuid.uuid4()
+
+
+@dataclass
+class _SessionRow:
+    session_id: uuid.UUID
+    started_at: datetime | None
+    target_concept_id: uuid.UUID | None
+
+
+@dataclass
+class _RecommendationRow:
+    time: datetime
+    session_id: uuid.UUID
+    meta: dict[str, Any] | None
+
+
+class TestSessionAndRecommendationProjection:
+    """EOS-131 — 세션 개시·추천 처치 투영의 의미."""
+
+    def test_session_start_without_time_is_skipped_not_invented(self) -> None:
+        rows = [
+            _SessionRow(session_id=uuid.uuid4(), started_at=None, target_concept_id=None),
+            _SessionRow(session_id=uuid.uuid4(), started_at=_at(2), target_concept_id=_CONCEPT),
+        ]
+        (event,) = project_session_rows(_UID, rows)
+        assert event.event_type is TraceEventType.CONCEPT_SELECTED
+        assert event.concept_id == _CONCEPT
+        assert event.time_basis is TimeBasis.INGESTED
+
+    def test_malformed_problem_id_is_none_not_fabricated(self) -> None:
+        rows = [_RecommendationRow(time=_at(3), session_id=uuid.uuid4(), meta={"problem_id": "x"})]
+        (event,) = project_recommendation_rows(_UID, rows)
+        assert event.problem_id is None
+        assert event.detail is None
 
 
 def _full_queue() -> list[list[Any]]:
@@ -694,12 +768,43 @@ class TestBuildTrace:
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
         unmeasured = {c.event_type: c.availability for c in trace.unmeasured_sources}
         assert unmeasured[TraceEventType.LEARNER_STATE_CREATED] is SourceAvailability.DORMANT
-        assert unmeasured[TraceEventType.CONCEPT_SELECTED] is SourceAvailability.DORMANT
         assert unmeasured[TraceEventType.CONTENT_VIEWED] is SourceAvailability.DORMANT
-        assert unmeasured[TraceEventType.RECOMMENDATION_GENERATED] is SourceAvailability.UNJOINABLE
+        # EOS-131: 세션·추천은 이제 생산 중이다 — 미측정 목록에 있으면 실재 활동이 은폐된다.
+        assert TraceEventType.CONCEPT_SELECTED not in unmeasured
+        assert TraceEventType.RECOMMENDATION_GENERATED not in unmeasured
         # 생산 중인 축은 이 목록에 없어야 한다 — 있으면 실재 데이터가 '미측정'으로 은폐된다.
         assert TraceEventType.PROBLEM_ATTEMPTED not in unmeasured
         assert TraceEventType.MASTERY_UPDATED not in unmeasured
+
+    async def test_session_and_recommendation_rows_are_projected(self) -> None:
+        """EOS-131 ⑥: ⑧세션 ⑨추천 질의 결과가 시간선·coverage 건수에 실린다."""
+        sid = uuid.uuid4()
+        pid = uuid.uuid4()
+        queue = _full_queue() + [
+            [_SessionRow(session_id=sid, started_at=_at(1), target_concept_id=None)],
+            [
+                _RecommendationRow(
+                    time=_at(13),
+                    session_id=sid,
+                    meta={
+                        "problem_id": str(pid),
+                        "policy_version": "cat_v1",
+                        "candidates": [{"problem_id": str(pid), "score": 1.0}],
+                    },
+                )
+            ],
+        ]
+        trace = await build_trace(cast(AsyncSession, _QueueSession(queue)), learner_id=_UID)
+        counts = {c.event_type: c.count for c in trace.coverage}
+        assert counts[TraceEventType.CONCEPT_SELECTED] == 1
+        assert counts[TraceEventType.RECOMMENDATION_GENERATED] == 1
+        (rec,) = [
+            e for e in trace.entries if e.event_type is TraceEventType.RECOMMENDATION_GENERATED
+        ]
+        assert rec.session_id == sid and rec.problem_id == pid
+        # 후보 목록(리스트)은 싣지 않는다 — 비식별 스칼라만.
+        assert rec.detail == {"policy_version": "cat_v1"}
+        assert trace.entries[-1].event_type is TraceEventType.RECOMMENDATION_GENERATED
 
     async def test_truncation_is_disclosed_and_keeps_the_recent_end(self) -> None:
         session = _QueueSession(_full_queue())
@@ -720,12 +825,13 @@ class TestBuildTrace:
             await build_trace(cast(AsyncSession, session), learner_id=_UID, limit=limit)
 
     async def test_empty_learner_returns_empty_entries_with_full_coverage(self) -> None:
-        session = _QueueSession([[] for _ in range(7)])
+        session = _QueueSession([[] for _ in range(9)])
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
         assert trace.entries == ()
         assert len(trace.coverage) == len(TraceEventType)
 
-    @pytest.mark.parametrize("failing_query", range(1, 8))
+    # EOS-131: ⑧learning_session ⑨추천 조인 질의가 더해져 9개 — 새 두 질의의 실패도 삼키지 않는다.
+    @pytest.mark.parametrize("failing_query", range(1, 10))
     async def test_source_failure_is_never_swallowed(self, failing_query: int) -> None:
         """주입 검증 — 어느 원천 질의가 깨져도 조용한 부분 결과가 나오지 않는다.
 
@@ -740,7 +846,7 @@ class TestBuildTrace:
         """주입 자체의 실재 — 주입 없이 같은 입력이 성공해야 위 테스트가 의미를 갖는다."""
         session = _QueueSession(_full_queue())
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
-        assert session.calls == 7
+        assert session.calls == 9
         assert trace.entries
 
 
@@ -756,7 +862,9 @@ class TestRender:
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
         lines = render_trace_lines(trace)
         assert any("[dormant] content_viewed" in line for line in lines)
-        assert any("[unjoinable] recommendation_generated" in line for line in lines)
+        assert any("[dormant] learner_state_created" in line for line in lines)
+        # EOS-131: 추천은 이제 생산 중이라 미측정 목록에 렌더되지 않는다(종전 [unjoinable]의 반대).
+        assert not any("recommendation_generated —" in line for line in lines)
 
     async def test_truncation_notice_is_rendered(self) -> None:
         session = _QueueSession(_full_queue())

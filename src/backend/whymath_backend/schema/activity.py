@@ -69,7 +69,10 @@ from whymath_backend.schema.enums import (
 # 핵심: LearningSession (§6.1 learning_session — 한 번 앱 열고 닫을 때까지)
 # ──────────────────────────────────────────────────────────────────────────
 class LearningSession(BaseModel):
-    """학습 세션 — §6.1 `learning_session`(앱 진입~종료 한 단위).
+    """학습 세션 — §6.1 `learning_session`.
+
+    EOS-131 이후 의미: 서버 측 30분 유휴 규칙이 만드는 **학습 활동 묶음**이다(§6.1 원문의 "앱
+    진입~종료"가 아니다 — 학습 활동 없이 앱만 열면 세션이 생기지 않는다).
 
     PK `session_id`만 있고 나머지는 모두 nullable/기본값(DDL 그대로 — `started_at`도
     DDL은 `DEFAULT NOW()`지만 클라이언트가 시작 시각을 채우는 운영 메타라 Optional로
@@ -108,6 +111,11 @@ class LearningSession(BaseModel):
         default=None,
         description="세션 지속 시간(초). DDL에 범위 미명시 → 시간 길이라 음수 불가 ge=0만 설정.",
         ge=0,
+    )
+    last_activity_at: datetime | None = Field(
+        default=None,
+        description="마지막 학습 활동 시각(서버 수신 — EOS-131 유휴 규칙 입력). "
+        "None=서버 writer가 만든 세션이 아님.",
     )
 
     # ===== 세션 유형·목표 =====

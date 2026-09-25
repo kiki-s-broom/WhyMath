@@ -25,11 +25,18 @@ PED-03(`l2/pedagogy_evidence.py`)이 이미 세운 `evidence_event` 좌석(sessi
 걸러 읽는다(실측 확인) — `EVENT_TYPE_RECOMMENDATION_TREATMENT`는 그 필터에 애초에 걸리지
 않는다. 즉 event_type 축이 두 도메인을 완전히 분리한다.
 
-`session_id`도 같은 이유로 placeholder다 — 매 호출마다 `uuid.uuid4()`로 새로 발급한다.
-`/me/next-problem`에는 아직 결합 가능한 실 학습 세션 개념이 없다(`learning_session` writer
-0·`AttemptSubmitRequest.session_id`를 클라가 보내지 않음 — `REC-01` 실측). 결과 결합(처치→
-정답 여부 조인)은 실 session_id가 배선된 뒤(S3-01 파일럿 이후)의 후속 범위이며, 이 좌석은
-지금은 "이 추천이 실제로 나갔다"는 처치 존재 자체만 관측한다(acceptance④ 범위 밖 동결).
+`session_id`는 **실 학습 세션**이다(EOS-131 — 종전에는 매 호출 `uuid.uuid4()` placeholder라
+이 추천이 어느 학생 것인지 집어낼 조인 키가 없었다). 호출자(`api/me.py`)가 서버 측 유휴 규칙
+writer(`l2/learning_session_writer.record_learning_activity`)로 얻은 `learning_session.session_id`를
+넘긴다. **학습자 결합은 `evidence_event.session_id → learning_session.user_id` 경로로만 얻는다** —
+이 테이블에 `user_id` 컬럼을 추가하지 않고, 이 함수의 시그니처에도 `user_id` 슬롯이 없다
+(PED-03·REC-03의 구조적 차단 유지). 부수 성질: `session_id`는 FK가 아니므로 삭제권 이행으로
+세션 행이 지워지면 추천 기록은 자동으로 학습자와 끊긴다(`privacy/erasure`).
+
+세션 기록이 실패해 `learning_session_id=None`이 오면(never-break 경로 — writer가 예외 타입명을
+이미 로그했다) 그때만 종전처럼 placeholder를 발급한다. 처치 존재 자체(KPI ③ 설명 가능성의 분모)는
+잃지 않되, 그 행은 어떤 세션에도 결합되지 않으므로 KPI ① 분자에 들어가지 않는다 — 가짜 결합을
+만들지 않는다.
 
 B1(미성년 원문 발화 평문 저장 금지): `meta`에는 problem_id·theta·pool_size·applied_weights·
 mode·gate_reason·candidates·policy_version·reason 등 비민감 메타만 넣는다. 이 모듈의 함수
@@ -51,10 +58,10 @@ REC-11: candidates[]·policy_version — 추천 오프라인 평가의 소급 �
 — 알고리즘이 바뀌면 새 버전 문자열을 쓴다(과거 로그는 그대로, 무엇이 바뀌었는지는 이 축이
 구분).
 
-**followed 결과 결합(추천→정답 여부 조인)은 이 태스크의 범위 밖**이다(REC-03 docstring이
-이미 동결한 것과 동일 이유 — 실 session_id 미배선). `candidates`·`policy_version`은 그
-결합이 배선된 뒤에 "무엇과 비교해 선택했는가"를 재구성할 수 있게 하는 선행 재료일 뿐,
-이 좌석 자체가 결과를 결합하지 않는다.
+**followed 결과 결합(추천→정답 여부 조인)은 이 좌석의 범위 밖**이다. EOS-131로 실 session_id가
+배선돼 조인 *키*는 생겼지만, 결과를 결합하는 집계는 이 좌석이 아니라 소비자(`ops/loop_kpi_gate`
+KPI ① 등)의 몫이다. `candidates`·`policy_version`은 "무엇과 비교해 선택했는가"를 재구성하는
+선행 재료일 뿐, 이 좌석 자체가 결과를 결합하지 않는다.
 """
 
 from __future__ import annotations
@@ -120,6 +127,7 @@ async def record_recommendation_treatment(
     policy_version: str | None = None,
     reason: RecommendationReason | None = None,
     occurred_at: datetime | None = None,
+    learning_session_id: uuid.UUID | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
 
@@ -144,6 +152,9 @@ async def record_recommendation_treatment(
     숙달 때문에 골랐나*를 남긴다 — 소급 평가에서 두 질문은 다르다. 직렬화는 계약 모델의
     `model_dump(mode="json")`이라 enum·UUID가 JSONB에 그대로 들어간다. 여전히 비민감이다
     (개념 id·숙달 수치이고 학생 원문·식별자가 아니다 — B1 불변).
+
+    `learning_session_id`(EOS-131): 이 추천이 나간 실 학습 세션. `None`이면 세션 기록 실패
+    경로로 보고 결합 불가 placeholder를 발급한다(모듈 docstring 참조 — 가짜 결합 금지).
     """
     meta: dict[str, Any] = {
         META_KEY_PROBLEM_ID: str(problem_id),
@@ -168,7 +179,9 @@ async def record_recommendation_treatment(
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
-        session_id=uuid.uuid4(),
+        # EOS-131: 실 학습 세션. None(세션 기록 실패)일 때만 어떤 세션에도 결합되지 않는
+        # placeholder — 학습자와 이어 붙일 키를 지어내지 않는다.
+        session_id=learning_session_id if learning_session_id is not None else uuid.uuid4(),
         objective_id=_OBJECTIVE_ID_PLACEHOLDER,
         k_type=_K_TYPE_PLACEHOLDER,
         event_type=EVENT_TYPE_RECOMMENDATION_TREATMENT,
