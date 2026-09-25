@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MOB-25-client-flow-timing-markers
+title: "학생앱 핵심 흐름 구간 마커(F1~F4) — 앱 시작·문제 받기·코치 응답·수식 입력 준비 시간을 기기 안에서 잰다(외부 전송 없음)"
+track: math-completion
+stage: S4
+subject: math
+layer: mobile
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(판정 기준 main `63451153`): `src/mobile`에서 `Stopwatch`·`Timeline`·`FrameTiming`·`traceAction` 검색 0건 — 클라이언트 구간 계측이 없다. 목표 수치(앱 시작 < 2초 · 전송 → 응답 첫 토큰 < 2초 · 60fps 95%+)는 `.claude/agents/flutter-engineer.md`에만 있고 재는 코드가 없다."
+  - "② 구간 정의 — 검토 문서 §4의 F1(콜드 스타트 → 첫 입력 가능)·F2(진단 진입·'다음 문항' 탭 → 문제 발문 표시)·F3(전송 탭 → 코치 버블 표시)·F4('수식으로 입력' 탭 → MathLive 입력 가능)를 코드상 시작·끝 지점으로 고정한다. 응답에 `Server-Timing` 헤더가 있으면(`OPS-95`) 서버 구간을 빼서 클라이언트 몫을 나누고, 없으면 전체 구간만 낸다."
+  - "③ 기기 안 기록만 — 결과는 profile 빌드의 개발용 화면(또는 로그)에만 남기고 외부로 보내지 않는다. 사용자 식별자·문제 내용·입력 내용을 담지 않으며 릴리스 빌드에서는 비활성이다. 서버 전송(현장 계측)은 범위 밖이다 — 미성년자 데이터 정책 검토가 먼저 필요하다(`docs/standards/security_privacy.md`)."
+  - "④ CI 동결(대리지표) — 위젯 테스트에서 빌드 횟수 상한을 건다: 채팅 입력 키 1회당 `MathText` build 횟수, 키보드 inset 변화 시 버블 build 횟수(`MOB-24` ④와 같은 방식). 벽시계 단언은 쓰지 않는다. 상한을 넘기는 뮤테이션에서 RED를 확인한다."
+  - "⑤ 실기기 측정 1회 — Kiki 실기기(패드)에서 profile 빌드로 F1~F4를 각 5회 재서 중앙값을 검토 문서 §4 표에 적는다. 안내 명령은 실기기 백엔드 도달성·인증 선결 규칙(`run_demo.ps1`·`--dart-define`)과 6항목 브리핑 규칙을 따른다."
+artifacts: []
+paths:
+  - src/mobile/lib/main.dart
+  - "src/mobile/lib/core/**"
+  - "src/mobile/test/**"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §4·§5 R5 1단계 (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. 등급 P2 근거: 실사용자가 없는 동안 클라이언트 체감 지연의 기준선을 만드는 일이라 12월 검증과 무관하다. 연결(의존 관계 아님): `OPS-95`(서버 구간 분리 재료), `MOB-24`(빌드 횟수 대리지표 방식 공유)."
+updated: 2026-09-25

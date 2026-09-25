@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-39-coach-wait-experience-design
+title: "코치 응답 대기 경험 설계 — 2px 진행 막대 대신 '지금 무엇을 하는 중인지' 보여 주기(검증 전 텍스트 노출 금지 · 토큰 스트리밍 아님)"
+track: math-completion
+stage: S4
+subject: math
+layer: mobile
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(판정 기준 main `63451153`): 코치 응답 대기 표시는 `src/mobile/lib/features/chat/presentation/chat_screen.dart:350`의 2px 진행 막대뿐이다. 지금 대기는 발화 생성이 아니라 WH-1 도구 선택 루프에서 생기므로, 토큰 스트리밍은 체감 대기를 줄이지 못한다(검토 문서 §2-C)."
+  - "② 교수학 설계 먼저 — `pedagogy-designer`가 대기 표시의 문구·단계를 설계하고 결과를 `docs/`에 남긴다. 원칙: ⓐ검증을 통과하지 않은 LLM 텍스트는 어떤 형태로도 노출하지 않는다(헌법 「LLM 응답을 검증 없이 학생에게 제공 금지」) ⓑ정답·풀이 내용을 암시하지 않는다 ⓒ부정 피드백을 예고하지 않는다(\"틀린 곳을 찾는 중\" 같은 표현 금지 — 정서 안전) ⓓ학생의 생각 시간을 재촉하지 않는다."
+  - "③ 구현 — 클라이언트는 경과 시간 기반의 중립 문구로 시작한다. 서버가 턴 처리 단계를 알려 주는 신호는 ②의 설계가 그 필요성을 입증할 때만 신설한다(수학·교수학 판단을 클라이언트에 넣지 않는다). 대기 표시에 위젯 테스트를 둔다(문구 전환 시점·접근성 라벨)."
+  - "④ 범위 밖 — 검증 단위(문장·블록) 부분 노출과 토큰 스트리밍은 포함하지 않는다. 프로즈 rephrase(`wh1_prose_rephrase_enabled`)가 기본 OFF인 동안은 줄여 줄 발화 생성 대기가 없기 때문이다."
+artifacts: []
+paths:
+  - src/mobile/lib/features/chat/presentation/chat_screen.dart
+  - "src/mobile/test/**"
+  - "docs/design/**"
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-C·§5 R3 교수학 축 (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. 등급 P2 근거: 12월 검증과 무관한 UX 개선이며, UX는 의사결정 우선순위 5순위다."
+updated: 2026-09-25
