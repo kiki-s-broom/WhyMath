@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/learning_state_recommendation.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
-session: null
+session: claude/kind-allen-v50857
 notes: "출처: EOS-24 판정문 §7-1. EOS-24는 R3(오개념 교정)만 배선했다 — R6는 \"오답 직후 선수 개념 진단 출제\"도 교수학적으로 말이 되어(진단 결과가 결손이면 다음 추천이 practice_prerequisite로 내려간다 · 재판정문 V4) 기계가 정할 수 없는 기준 문제이기 때문이다. Gate 2 FAIL의 다른 원인(EOS-124 · P-13 · 상시 하네스)과 독립이다. 분류 LOOP."
 updated: 2026-09-25

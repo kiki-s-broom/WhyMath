@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-26-r6-diagnosis-prerequisite-directed
+title: "원인 미상 오답(R6) 직후 진단이 선수 개념이 아니라 가장 쉬운 문항으로 간다 — Kiki 기준 ⓐ를 구조적으로 충족하도록 후보를 선수 개념으로 향하게"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-139-undiagnosed-wrong-recommendation-criterion
+requires_gates: []
+acceptance:
+  - "① 실측 사실(main `81070ed5` · 2026-09-25 방해 개념 프로브) — 원인 미상 오답(상태 머신 R6) 직후 `GET /v1/me/next-problem`은 θ 근방 정렬(`l2/next_problem_selection.py::candidate_pool_order_by`)과 정보량 최대화로 **가장 쉬운 문항**을 고르며, 개념 그래프의 선수 관계를 보지 않는다(선수 그래프는 문항을 고른 **뒤** `resolve_target_concept`이 목표 개념을 붙일 때만 읽는다). 오답 1회 뒤 θ는 하한 -4.0이고, 선수 관계가 없는 개념이 가장 쉬운 문항을 가지면 진단(`diagnose · unmeasured`)이 그 무관 개념으로 간다. 3루프 하네스 `tests/backend/api/test_e2e_three_consecutive_loops.py`의 방해 개념 프로브가 이 공백을 동결한다(EOS-139).\n② 목표 — Kiki 결정 `G-eos24-loop1-undiagnosed-wrong-criterion`의 (가) 좁힌 기준 ⓐ(R6 직후 진단 문항의 대표 개념이 오답 개념의 선수 개념일 것)를 시스템이 **구조적으로** 충족하게 한다. 지금은 픽스처의 난이도 배치가 선수 개념을 가장 쉬운 개념으로 둘 때만 우연히 충족된다.\n③ 설계 판정 선행(EOS-24 판정문 형식) — ⓐ 오답 개념에 선수가 없거나 선수에 미시도 문항이 없을 때의 폴백 ⓑ 선수가 여럿일 때 무엇을 고르는가(직접 선수 우선 · 측정 여부) ⓒ 고정 범위(EOS-24 안전장치 ③처럼 1문항) ⓓ R2(정답+미측정 확신)는 같은 PRACTICING이라도 집행하지 않는다(확신도 미보고 학생의 진급 차단 — EOS-24 판정문 §3) ⓔ R3 경로(EOS-24)와의 합성 ⓕ 그래프 예산(depth ≤ 2 · nodes ≤ 20 · timeout) ⓖ 작동 비율 기록(`learning_state_directive` 값 추가).\n④ 집행 지점 별항 — `l2/learning_state_recommendation.py::route_by_learning_state`(EOS-24의 R3 집행과 같은 자리)에서 후보를 선수 개념으로 제한하고, 그 제한이 서빙 응답(`GET /v1/me/next-problem`)을 실제로 지나가는지 통합 테스트로 확인한다.\n⑤ 해소 신호 — 3루프 하네스의 방해 개념 프로브 동결(`prerequisite_directed=False`)이 해소 신호를 내고, `general` Loop 1 `보정` 동결이 True로 승격된다. EOS-24 통합 테스트 대조군 `test_undiagnosed_wrong_answer_is_not_directed`의 단언도 새 동작으로 승격한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_recommendation.py
+  - tests/backend/api/test_e2e_three_consecutive_loops.py
+  - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
+session: null
+notes: "출처: EOS-139 실측(2026-09-25). Kiki가 (가)를 고른 뒤 방해 개념 프로브로 전제가 픽스처 의존임이 드러났고, Kiki가 두 번째 질문에서 '(가) 유지 + 정직 판정'을 골라 서빙 변경을 이 태스크로 분리했다(세션 https://claude.ai/code/session_01E3jbbaeprQQfa8rxLaFKTF). EOS-124(정책 축↔선택 축 불일치)와 겹치지 않는다 — 이 공백에서는 두 축이 서로 일치한 채(target=무관 개념 · 문항=무관 개념) 무관 개념으로 간다. 부수 관측: 무관 개념 진단 문항까지 틀리면 action=practice_prerequisite · reason=prerequisite_gap · target=그 무관 개념이 나온다 — reason 종류는 문항 개념의 숙달 구간(recommendation_contract.select_reason_type · < 0.4)에서 나오고 선수 그래프와 무관하기 때문이다(계획서 §8 설계). ③ⓐ 폴백 판정 때 이 이름표 의미를 함께 본다. 분류 LOOP."
+updated: 2026-09-25
