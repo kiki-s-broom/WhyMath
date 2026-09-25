@@ -1,6 +1,6 @@
 # 빌드 하네스 (Build Harness) — 작업일정 관리·순차 조율 표준
 
-> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.8 (2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
+> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.9 (2026-09-25 HARN-174 — **게이트를 태스크 그래프의 노드로 편입**: 게이트에 입력 간선(`depends_on`) 또는 입력 없음 사유(`no_inputs_reason`)를 두고, 태스크·게이트 통합 그래프 하나를 validate·모든 쓰기 경로·selector·board가 공유한다. 해금 수가 게이트 너머까지 전이로 세지고, next·status·gates show가 대기 경로를 보인다. §3e 신설 · §3 정렬 설명 · §7·§7a 갱신. 이전 1.8: 2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
 >
 > 이 문서의 "빌드 하네스"는 프로젝트 *구축을 관리하는* 레이어다.
 > `src/backend`의 WH-1(튜터링)·WH-S(솔버)는 **제품 런타임 하네스**로 완전히 별개다.
@@ -205,6 +205,9 @@ L4가 이 인덱스를 장식이 아니게 만드는 자리다. `enforced_by`에
 착수 가능 = `todo` ∧ 의존성 전부 done ∧ 게이트 전부 cleared/waived
 ∧ owner=claude ∧ 트랙 entry_gate 통과 ∧ 미claim.
 정렬 = (stage 순서, priority, −해금 후속 수, id) — **결정적**.
+해금 후속 수 = 이 태스크가 끝나야 풀리는 **미종결 태스크 수를 태스크·게이트 통합 그래프로 끝까지
+따라가 센 값**이다(HARN-174 · §3e). 종전의 "바로 다음 태스크 수"는 게이트 너머를 보지 못해 병목을
+과소평가했다. 키 순서는 그대로라 영향은 같은 stage·priority 안의 순서다.
 
 - **owner=claude는 *자동 착수 후보*의 조건**이다(next/status/brief). 사람-소유
   태스크(owner=kiki/partner)는 자동 후보에 절대 오르지 않지만, **소유자 본인이
@@ -666,6 +669,98 @@ CUR-18이 게이트 해소 뒤 5일 이상 방치·`/status`가 Kiki 대기로 �
 
 ---
 
+## 3e. 게이트는 태스크 그래프의 노드다 — 여는 작업·순환·막다른 길·병목 (HARN-174)
+
+> 판정 기준: main `ff7c9dcb`(2026-09-25) · 코드 정본 `scripts/harness/store.py`(`dependency_graph`) · 계약 동결 `tests/harness/test_gate_graph.py`
+
+### 왜 필요했나
+
+2026-09-22~24 사흘 동안 같은 계열 사고가 3번 났고(`gate-resolution-path-unlinked`), **세 번 모두 사람이 읽다가** 잡았다.
+
+| 회차 | 날짜 | 형태 |
+|---|---|---|
+| 1 | 09-22 | `P3-00`이 자기가 증거를 대야 할 진입 게이트를 `requires_gates`로 걸었다 — 게이트를 여는 작업이 그 게이트를 기다리는 교착 |
+| 2 | 09-23 | 게이트 병합 뒤 `EOS-50`이 자기를 판정 대상으로 삼는 통합 게이트를 요구했다 |
+| 3 | 09-24 | 재판정문이 FAIL 원인으로 `EOS-24`·`EOS-124`를 지목했지만 재판정 태스크에 연결되지 않았다 |
+
+기계 검사가 하나도 없었던 이유는 **검사할 대상이 없었기 때문**이다. 게이트에는 "무엇이 끝나야 판정할 수 있는가"를 담는 칸이 없었고, 순환 검사(`detect_cycle`·`amend --depends`의 경로 추적)와 선택기(`unblock_count`)는 **태스크끼리만** 봤다. 게이트는 그래프 밖에 있었다.
+
+### 설계 — 칸과 검사기를 덧대지 않고 그래프에 넣는다
+
+첫 설계(등재 시 ①~⑧)는 게이트에 `resolved_by` 칸을 달고 별도 검사기 `audit-gates`를 만드는 것이었다. Kiki 결정(2026-09-25 "②+③ 방향")으로 **게이트를 노드로 편입**하는 설계로 바꿨다. 그러면 순환 검사기가 두 벌이 되지 않고, 선택기의 병목 과소평가도 같은 변경으로 풀린다.
+
+**간선은 "먼저 끝나야 하는 쪽 → 기다리는 쪽"** 방향이고 4종이다.
+
+| 간선 | 뜻 | 비고 |
+|---|---|---|
+| 선행 태스크 → 태스크 | `task.depends_on` | 종전부터 |
+| 게이트 → 태스크 | `task.requires_gates` | 종전부터(착수 조건) |
+| 입력 태스크 → 게이트 | `gate.depends_on` | **신설** — 게이트를 여는 작업 |
+| 진입 게이트 → 트랙의 모든 태스크 | `track.entry_gate` | 명세 3종 밖이지만 selector가 실제로 착수를 막는 조건이라 넣었다 — 빼면 "진입 게이트의 입력이 그 트랙 안에 있다"는 교착을 못 본다 |
+
+**게이트 필드 2종** — pending 게이트는 **정확히 하나**를 가져야 한다(둘 다 비었거나 둘 다 있으면 validate 오류).
+
+- `depends_on` — 이 게이트를 판정·해소하기 전에 끝나야 하는 태스크 full-ID 목록
+- `no_inputs_reason` — 입력 태스크가 원래 없는 게이트의 사유(Kiki 머신 런북·외부 회신·시점 트리거 재확인 등)
+
+cleared·waived 게이트는 아무것도 막지 않으므로 요구하지 않는다(과거 행 소급 금지). 두 칸은 **비어 있으면 gates.yaml에 쓰지 않는다** — 통과 게이트 62건에 빈 줄을 퍼뜨리면 병렬 PR의 인접 줄 충돌이 는다(`corrections` 도입 때 #1284에서 실측된 비용).
+
+### 어디서 무엇을 막는가 — 그래프는 하나, 판정 지점은 여럿
+
+| 지점 | 막는 것 | 거부 방식 |
+|---|---|---|
+| `validate` | 입력 미선언 pending 게이트 · 순환(경로에 게이트 ID 포함) · 막다른 길(대장에 없는 입력 · pending 게이트의 cancelled 입력) · FAIL 기록의 소유 태스크 0건/미연결 | exit 1 (CI `harness-integrity`의 기존 validate 스텝 — 새 CI 스텝 없음) |
+| `gates add` | 입력도 사유도 없음 · 둘 다 줌 · 막다른 입력 · 순환 | exit 1 + 대장 무변경 |
+| `gates amend --depends/--remove-depends/--no-inputs` | 같은 판정. 입력이 생기면 옛 입력 없음 사유는 자동 해제되고 `corrections`에 남는다 | exit 1 + 대장 무변경 |
+| `amend <id> --depends` · `amend <id> --gate` · `add --depends/--gates` | 게이트를 지나는 고리까지 포함한 순환(사고 1·2의 형태) | exit 1 + 파일 무변경 |
+| `gates clear` | 입력 태스크가 전부 done이 아니면 거부 — 판정 근거가 될 작업이 안 끝났는데 충족을 기록할 수 없다 | exit 1 (`gates waive`는 Kiki 예외 경로라 검사하지 않는다) |
+| `gates amend --verdict FAIL` | 미종결 소유 태스크를 1건 이상 **새로** 붙이지 않은 FAIL 기록(사고 3의 형태) · decision 아닌 게이트 · 판정 기준 없는 evidence | exit 1 + 대장 무변경 |
+| `cancel` | pending 게이트의 입력 태스크 취소(막다른 길을 만든다) — 입력 교체 명령을 함께 낸다 | exit 1 |
+| `rename` | — (막는 것이 아니라 게이트 입력의 구 ID를 새 ID로 옮긴다) | 갱신 건수를 0건까지 출력 |
+
+쓰기 경로의 순환 판정은 전부 `store.cycle_if_linked` 하나(통합 그래프의 최단 경로)를 쓰고, validate는 같은 그래프의 강연결 성분으로 전 순환을 보고한다. **순환 검사기를 새로 만들지 않았다.**
+
+**FAIL 판정 기록 형식** — `gates amend <G> --verdict FAIL --evidence <판정문·기준 커밋> --depends <소유 태스크> --reason ...`이 `corrections`에 `verdict FAIL · owners: A, B · evidence: …`를 남긴다. validate는 pending decision 게이트의 **가장 최근** FAIL 기록을 읽어, 지목된 미종결 소유 태스크가 그 게이트 **상류**(입력의 선행 폐포 — 재판정 태스크의 선행으로 걸어도 된다)에 있는지 대조한다.
+
+### 병목 — 해금 수를 끝까지 센다
+
+`selector.unblock_count` = 통합 그래프를 따라간 **미종결 후속 태스크 수**. 이미 끝난 태스크와 이미 통과한 게이트 너머는 이 태스크를 기다리지 않으므로 세지 않는다. `board.py`도 같은 값을 쓴다.
+
+2026-09-25 착지 시점 실측(같은 대장에 옛·새 selector를 각각 돌린 비교):
+
+| 태스크 | 직접(옛) | 전이(새) |
+|---|---|---|
+| `EOS-124-next-problem-policy-selection-axis-mismatch` | 1 | 16 |
+| `EOS-130-phase2-gate2-rejudgment` | 0 | 15 |
+| `S5-01-expansion-gate-judgement` | 0 | 14 |
+
+착수 후보 211건 중 **18건의 순위가 바뀌었고 상위 20건은 그대로**다(정렬 키 순서가 stage → priority → 해금 수라 영향은 같은 stage·priority 안에 머문다).
+
+### 대기 경로 — 게이트 뒤에 누가 있는가
+
+`next`(텍스트)·`status`(텍스트·`--json`의 `gate_waits`)·`gates list`·`gates show`가 게이트 때문에 제외된 태스크에 **무엇을 기다리는지**를 경로로 보인다.
+
+> 실측(2026-09-25): `1건 ← G-p3-entry-gate2-pass ← EOS-130-phase2-gate2-rejudgment ← EOS-124-next-problem-policy-selection-axis-mismatch  [P3-00-phase2-acceptance-check]`
+
+경로는 **아직 안 풀린** 선행만 따라가며, 갈래가 여럿이면 게이트 → ID 순 첫 번째를 택하고 `(외 N)`을 붙인다(대표값이지 전수가 아니다). 경로가 게이트에서 끝나면 입력이 없거나 이미 다 끝났다는 뜻이라 `(사람 판정 대기)`를 붙인다.
+
+### 백필 (착지 시점 pending 22건 전수 — 그랜드파더 없음)
+
+- **입력 연결 12건** — 예: `G-p3-entry-gate2-pass ← EOS-130` · `G-eos02-default-flip-recheck ← OPS-89`(제목에 산문으로만 있던 발동 조건) · `G-s5-subject-expansion ← S5-01`
+- **판정 태스크 신규 3건** — 판정 회차 분리 집행을 요구하는데 소유자가 없던 게이트: `P3-15`(G1) · `P3-16`(G2) · `P3-17`(W3+Release 통합 — 사고 2의 당사자)
+- **입력 없음 사유 10건** — 시점·발동 조건 트리거 재확인과 Kiki 직접 행동. 게이트마다 근거를 적었다. `G-mp03-first-promotion-run`은 입력을 **일부러** 걸지 않았다: MP-03의 done 판정이 그 런북 결과를 쓰므로, 걸면 clear가 MP-03 done을 기다리고 MP-03 done이 런북 결과를 기다리는 의미적 교착이 된다.
+
+### 변별력
+
+`scripts/harness/verify_gate_graph_discrimination.py` — 절 34개를 하나씩 끊어 `test_gate_graph.py`가 RED를 내는지 본다(주입 대상 정확히 1건 · `mutated != original` · 원복 sha256 동일을 하네스가 단언). 2026-09-25 실측 **34종 전건 RED · 대조군 GREEN**. 하네스는 무거워 CI에서 돌리지 않는 대신 `tests/harness/test_gate_graph_mutation_anchors.py`가 주입 대상이 코드에 그대로 있는지를 매 CI마다 확인한다(대상이 사라지면 하네스가 조용히 썩는다).
+
+### 한계 (명시)
+
+1. **기계가 판정하는 것은 구조적 불가능까지다** — 순환 · 막다른 길 · 입력 없음. 입력 태스크가 다 끝났을 때 기준이 **실제로 PASS하는지**(기준 자체가 현 정책에서 달성 가능한지)는 그래프로 알 수 없다. 그것은 기준을 실행 가능한 테스트로 두는 방식(예: PED-36 ⑫의 무개입 3루프 상시 하네스 — `xfail(strict=True)`라 PASS에 닿으면 XPASS로 CI가 알린다)과 판정 세션의 몫이다.
+2. **done ≠ PR 머지** — 입력 간선은 태스크 status만 본다. "PR 머지 후 실행" 같은 시점 조건은 표현하지 못하고, 억지로 걸면 위 `G-mp03-first-promotion-run`처럼 의미적 교착이 된다.
+3. **입력 없음 사유의 진위는 사람이 판단한다** — 칸이 비어 있지 않은지만 기계가 본다. 사유를 핑계로 입력을 숨기는 것은 막지 못한다(리뷰 몫).
+4. **FAIL 기록 대조는 대장에 있는 소유 ID만** — 개명된 소유 ID는 `corrections`가 append-only라 옛 문구에 남으므로 건너뛴다.
+
 ## 4. 일상 워크플로우
 
 ```
@@ -778,6 +873,13 @@ python3 scripts/harness/backlog.py block <id> --reason "..." / unblock <id>
                     # block은 원격 대장에 kind=block 홀드를 **게시**한다(HARN-42/48) —
                     # 머지 없이 병렬 세션의 start가 즉시 거부된다. unblock이 그 홀드를 걷는다
 python3 scripts/harness/backlog.py gates list|add|amend|clear|waive|show   # add = 게이트 등재 CLI(HARN-18) — gates.yaml 손편집 금지
+python3 scripts/harness/backlog.py gates add <G-id> --title "..." --kind decision --depends <여는 태스크> [--depends ...]
+python3 scripts/harness/backlog.py gates add <G-id> --title "..." --kind human --no-inputs "<입력 태스크가 없는 사유>"
+                    # 둘 중 하나가 **필수**다(HARN-174 · §3e) — 없으면 exit 1, 대장에 아무것도 쓰지 않는다.
+                    # 순환·막다른 길(대장에 없거나 cancelled인 입력)도 쓰는 순간 거부된다
+python3 scripts/harness/backlog.py gates amend <G-id> --reason "..." [--depends <id>] [--remove-depends <id>] [--no-inputs "..."]
+python3 scripts/harness/backlog.py gates amend <G-id> --reason "..." --verdict FAIL --evidence "<판정문 · 기준 커밋>" --depends <미충족 항목의 소유 태스크>
+                    # FAIL 판정 기록(HARN-174 v2-8) — 미종결 소유 태스크를 1건 이상 새로 붙이지 않으면 exit 1
 python3 scripts/harness/backlog.py gates amend <G-id> --reason "..." [--title "<새 제목>"] [--remind-after-days <N>]
                     # 등재된 게이트의 **문면·독촉 주기 정정**(HARN-124). 종전에는 --title·--remind-after-days가
                     # add 전용이라 한 번 등재된 게이트가 틀려도 고칠 CLI가 0이었다(손편집은 금지이므로 수단 자체가 없었다).
@@ -794,6 +896,7 @@ python3 scripts/harness/backlog.py gates show <id>   # 사람에게 게이트를
                     # 낸다 — cleared는 evidence, waived는 notes(waive 사유는 evidence가 아니라 notes에 저장된다),
                     # pending은 "없음(아직 결정 전)"을 명시한다(모른다 ≠ 아니다).
 python3 scripts/harness/backlog.py gates clear <id> --as kiki --evidence "..."  # 사람이 본인 게이트를 닫을 때 주체 명시(HARN-60)
+# clear는 게이트의 입력 태스크(depends_on)가 전부 done이어야 통과한다 — 아니면 exit 1 (HARN-174 v2-7). waive는 예외 경로다
 # clear·waive 직후 그 게이트를 기다리던 blocked 태스크(unblock 명령)·산문 참조가 출력된다 — 0건도 명시 (HARN-74 · §3d)
 # evidence에는 판정 기준(커밋 해시·PR 참조)이 있어야 한다 — 없으면 exit 1 (HARN-68).
 # 판정은 시점에 종속되므로 "무엇을 봤나"가 아니라 "언제의 트리로 봤나"가 근거다.
@@ -853,6 +956,9 @@ python3 scripts/harness/board.py                   # 작업 보드 HTML (work/bo
 | notes 어구 치환 | `amend <id> --notes-replace "구문자" "신문자" --reason '...'` — 구문자 정확히 1회 | HARN-67 ⑥ |
 | **게이트 제목 정정** | `gates amend <G-id> --title '<새 제목>' --reason '...'` — 실효값 덮어쓰기 + 옛 값 `corrections[]` append | HARN-124 ① |
 | **게이트 독촉 주기 정정** | `gates amend <G-id> --remind-after-days <N> --reason '...'` — status 불변(waive와 구분) | HARN-124 ⑤ |
+| **게이트 입력(여는 작업) 연결·제거** | `gates amend <G-id> --depends <id> / --remove-depends <id> --reason '...'` — 순환·막다른 길은 쓰기 전 거부 · 옛 값 `corrections[]` | HARN-174 v2-6 |
+| **게이트 입력 없음 사유** | `gates amend <G-id> --no-inputs '<사유>' --reason '...'` — 입력이 남아 있으면 거부 | HARN-174 v2-6 |
+| **FAIL 판정 기록** | `gates amend <G-id> --verdict FAIL --evidence '<판정문·기준 커밋>' --depends <소유 태스크> --reason '...'` | HARN-174 v2-8 |
 | cancelled 복원 | (미구현) | HARN-69 · **todo(미착지)** |
 | **ID 개명(rename)** | **미구현 — 의도적** | 태스크 미등재(상위 세션 결정) |
 

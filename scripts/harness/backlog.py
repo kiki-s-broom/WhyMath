@@ -4965,7 +4965,16 @@ def build_parser() -> argparse.ArgumentParser:
     jp.add_argument("path", help="레포 상대 경로")
     p.set_defaults(func=cmd_jit)
 
-    p = sub.add_parser("validate", help="백로그 무결성 전수 검증")
+    p = sub.add_parser(
+        "validate",
+        help="백로그 무결성 전수 검증",
+        description=(
+            "백로그 무결성 전수 검증 — 태스크·게이트·트랙 스키마, 태스크·게이트 통합 그래프의 순환, "
+            "게이트 입력의 막다른 길, FAIL 판정 기록의 소유 태스크 연결(HARN-174) 등. "
+            "한계: 구조적 불가능(순환·막다른 길·입력 없음)만 판정한다 — 입력이 다 끝났을 때 게이트 "
+            "기준이 실제로 PASS하는지는 그래프로 알 수 없다(판정 세션·실행 가능한 테스트의 몫)."
+        ),
+    )
     p.add_argument("--quiet", action="store_true")
     p.set_defaults(func=cmd_validate)
 
