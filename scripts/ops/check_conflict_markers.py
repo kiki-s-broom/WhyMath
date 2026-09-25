@@ -106,13 +106,7 @@ DECISIVE_KINDS = frozenset({"start", "base", "end"})
 
 #: 상태 만료 면제. 값은 **소유 태스크와 사유**다 — 사유 없는 면제는 면제가 아니라 구멍이다.
 #: 등재된 경로에서 마커가 사라지면 그 순간 위반이 되어 이 항목의 삭제를 강제한다.
-KNOWN_MARKERS: dict[str, str] = {
-    "docs/architecture/mastery_update_contract_v1.md": (
-        "ARCH-65 소유 — 2026-09-02 PR #969 사고의 잔존분(§6에 모순되는 두 판정이 마커째로 "
-        "남아 있다). 어느 쪽이 현행인지는 계약 판정이라 이 가드가 정할 수 없다. "
-        "ARCH-65가 정리하면 이 항목은 자동으로 위반이 되므로 함께 지운다."
-    ),
-}
+KNOWN_MARKERS: dict[str, str] = {}
 
 BINARY_SUFFIXES = frozenset(
     {
