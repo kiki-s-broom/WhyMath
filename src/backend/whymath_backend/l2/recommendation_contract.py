@@ -48,6 +48,9 @@
 - **교체 가능성을 타입으로 표현한다.** `RecommendationPolicy` Protocol은 `learner_state`와
   `learning_context`만 받는다 — v1 내부가 if/else 규칙이어도, BKT를 DKT로 갈거나 bandit을
   얹어도 이 시그니처는 그대로다.
+- **설명은 콘텐츠와 어긋나지 않는다**(EOS-124). `target_concept`은 전달된 문항의 대표 개념이고,
+  관계 행위(선수 복귀·전진)는 앵커와 *다른* 개념을 가리킨다 — `check_intent_alignment`가 구조를
+  판정한다. 관계 행위를 실을 수 없으면 `demote_to_current_concept`로 정직하게 내린다.
 - **선택 알고리즘을 여기서 재구현하지 않는다**(acceptance ④·⑥). 후보 선별·가중·정보량 최대
   선택은 기존 좌석(`l2.irt.select_weighted_item`·`l6.suneung.recommend_suneung_index`)이
   유일 권위이고, 이 모듈은 *이미 선택된 결과*에 근거를 붙인다. 그래서 계약 도입이 추천 결과를
@@ -82,7 +85,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "PREREQUISITE_MASTERY_CEILING",
+    "RELATIONAL_ACTIONS",
     "WEAK_CONCEPT_MASTERY_CEILING",
+    "IntentAlignmentError",
     "LearnerStateT",
     "LearningContext",
     "Recommendation",
@@ -93,7 +98,10 @@ __all__ = [
     "ReasonType",
     "action_for",
     "build_reason",
+    "check_intent_alignment",
+    "demote_to_current_concept",
     "no_candidate_reason",
+    "remediation_reason",
     "select_reason_type",
 ]
 
@@ -110,17 +118,30 @@ PREREQUISITE_MASTERY_CEILING: Final = 0.4
 
 
 class ReasonType(str, Enum):
-    """**왜 이 문항인가** — 계획서 §8의 추천 종류 + 근거가 없는 두 경우.
+    """**왜 이 문항인가** — 계획서 §8의 추천 종류 + 근거가 없는 두 경우 + 상태 머신 결정 1종.
 
-    앞의 셋은 숙달 구간에서 나오고, 뒤의 둘은 *구간을 판정할 수 없는* 상태다. 넷째·다섯째를
+    앞의 셋은 숙달 구간에서 나오고, 넷째·다섯째는 *구간을 판정할 수 없는* 상태다. 넷째·다섯째를
     셋 중 하나로 접으면 근거 없음이 근거로 위장된다.
+
+    여섯째(`MISCONCEPTION_REMEDIATION`)는 **숙달 구간이 아니라 학습 상태 머신의 결정**에서 나온다
+    (EOS-24). 그래서 숙달이 선수 경계 미만이어도 이 값일 수 있다 — 오개념과 선수 결손 중 무엇이
+    먼저인가는 상태 머신 규칙(`l2/learning_state_policy.py::V1_RULES`)이 정본이고, 추천은 그
+    결정을 다시 판정하지 않고 집행한다.
     """
 
     PREREQUISITE_GAP = "prerequisite_gap"
     """숙달이 선수 경계 미만 — 현재 개념을 더 밀기 전에 막힌 선수개념을 푼다."""
 
     CURRENT_CONCEPT = "current_concept"
-    """숙달이 학습 구간 — 같은 개념을 계속 연습한다."""
+    """같은 개념을 계속 연습한다 — 숙달이 학습 구간이거나(§8 규칙), **정직 강등**이다.
+
+    정직 강등(EOS-124): 숙달 구간은 선수 복귀·전진을 가리켰으나 그 행위를 실제 문항으로
+    실어 줄 수 없을 때(그래프 근거가 없거나 반증됐거나, 목표 개념에 출제 가능한 문항이
+    없을 때) 전달되는 것은 앵커 개념 자신의 문항이다. 그때 행위를 "선수를 연습하라"·
+    "다음으로 넘어가라"로 적으면 설명이 콘텐츠와 어긋난다 — 그래서 이 값으로 내린다.
+    `mastery`는 실측값 그대로 실리므로(0.4~0.7 밖일 수 있다) 숨기는 것은 없고, 어느 경우인지는
+    정책 관측 메타(`intent_resolution`)가 따로 말한다.
+    """
 
     NEXT_CONCEPT = "next_concept"
     """숙달이 약점 컷 초과 — 다음 개념으로 넘어갈 수 있다."""
@@ -130,6 +151,13 @@ class ReasonType(str, Enum):
 
     NO_CANDIDATE = "no_candidate"
     """추천할 문항이 없다 — 추천의 부재도 이유를 가진다."""
+
+    MISCONCEPTION_REMEDIATION = "misconception_remediation"
+    """학습 상태 머신이 오개념 교정 국면을 결정했다(R3) — 같은 개념에서 교정을 확인한다(EOS-24).
+
+    `basis`는 언제나 `LEARNING_STATE`다(검증기가 강제). `confidence`는 숙달 신뢰도가 아니라
+    *이번 회차에 확인된 오개념 가설의 신뢰*이고, `mastery`는 그 개념의 실측 숙달을 참고로 싣는다.
+    """
 
 
 class ReasonBasis(str, Enum):
@@ -146,6 +174,16 @@ class ReasonBasis(str, Enum):
 
     NO_CANDIDATE_POOL = "no_candidate_pool"
     """후보 자체가 없었다 — 근거를 댈 대상이 없다."""
+
+    LEARNING_STATE = "learning_state"
+    """학습 상태 머신의 결정(원장 최신 전이)을 집행했다 — 숙달 구간 파생이 아니다(EOS-24)."""
+
+
+#: 상태 머신 결정에서만 나오는 근거 종류 ↔ 그 근거 기반. 둘은 **짝으로만** 존재한다 —
+#: 한쪽만 있으면 "상태 머신이 결정했다"와 "숙달 구간에서 나왔다"가 한 근거 안에서 섞인다.
+_STATE_DRIVEN_TYPES: Final[frozenset["ReasonType"]] = frozenset(
+    {ReasonType.MISCONCEPTION_REMEDIATION}
+)
 
 
 class RecommendationReason(BaseModel):
@@ -167,6 +205,23 @@ class RecommendationReason(BaseModel):
     mastery: float | None = Field(
         default=None, description="그 개념의 실측 숙달. 미측정이면 None(0.0으로 접지 않는다)."
     )
+
+    @model_validator(mode="after")
+    def _state_basis_pairs_with_state_type(self) -> "RecommendationReason":
+        """상태 머신 근거 종류 ⟺ `LEARNING_STATE` 기반 — 어긋난 조합은 **만들어지지 않는다**.
+
+        숙달 구간 근거에 `LEARNING_STATE`를 달거나, 오개념 교정 근거에 `MEASURED_MASTERY`를 달면
+        "누가 이 추천을 결정했는가"가 거짓이 된다. 그 거짓은 처치 기록 meta에 그대로 영속되어
+        소급 평가를 오염시키므로 생성 시점에 막는다(EOS-24).
+        """
+        state_type = self.type in _STATE_DRIVEN_TYPES
+        state_basis = self.basis is ReasonBasis.LEARNING_STATE
+        if state_type != state_basis:
+            raise ValueError(
+                f"reason.type({self.type.value})과 basis({self.basis.value})가 어긋납니다 — "
+                "상태 머신 결정 근거는 basis=learning_state와만 짝을 이룹니다."
+            )
+        return self
 
 
 class LearningContext(BaseModel):
@@ -259,9 +314,12 @@ class Recommendation(BaseModel):
     target_concept: uuid.UUID | None = Field(
         default=None,
         description=(
-            "학생이 **다음에 다뤄야 할 개념**. `reason.concept_id`(선택된 문항의 대표 개념)와 "
-            "다르다: 선수개념이 막혔으면(`PREREQUISITE_GAP`) 이 값은 *막힌 선수개념*이고 "
-            "문항의 개념이 아니다. 근거를 댈 개념 자체가 없으면(미매핑·후보 0) None."
+            "학생이 **다음에 다뤄야 할 개념**. `reason.concept_id`(행위의 근거가 된 *앵커* "
+            "개념)와 다를 수 있다: 선수 복귀(`PRACTICE_PREREQUISITE`)면 막힌 선수개념, 전진"
+            "(`ADVANCE_NEXT`)이면 다음 개념이다. 근거를 댈 개념 자체가 없으면(미매핑·후보 0) "
+            "None. 정렬 계약(EOS-124 · `check_intent_alignment`)을 따르는 정책에서는 이 값이 "
+            "**전달된 문항의 대표 개념과 같다** — 설명이 가리키는 개념과 받은 문항이 어긋나지 "
+            "않는다."
         ),
     )
     policy_version: str | None = Field(
@@ -333,6 +391,11 @@ _ACTION_BY_REASON.update(
         ReasonType.NEXT_CONCEPT: RecommendationAction.ADVANCE_NEXT,
         ReasonType.UNMEASURED: RecommendationAction.DIAGNOSE,
         ReasonType.NO_CANDIDATE: RecommendationAction.NONE,
+        # EOS-24 — 오개념 교정은 새 행위가 아니라 "현재 개념 연습"이다. 행위 어휘를 늘리지 않은
+        # 이유: 학생이 할 일(같은 개념 문항을 푼다)은 같고, *왜*가 다를 뿐이다 — 그 차이는
+        # `reason.type`/`basis`가 말한다(이 Enum docstring의 "근거가 늘어도 행위는 기존 다섯 중
+        # 하나일 수 있다"가 처음 실현된 자리).
+        ReasonType.MISCONCEPTION_REMEDIATION: RecommendationAction.PRACTICE_CURRENT,
     }
 )
 
@@ -399,4 +462,115 @@ def no_candidate_reason() -> RecommendationReason:
         type=ReasonType.NO_CANDIDATE,
         confidence=0.0,
         basis=ReasonBasis.NO_CANDIDATE_POOL,
+    )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# EOS-124 — 정책 축(action·target)과 선택 축(problem_id)의 정렬 계약
+# ────────────────────────────────────────────────────────────────────────────
+#: **관계 행위** — 앵커 개념이 아닌 *다른 개념*을 가리키는 행위(선수로 내려가라·다음으로 넘어가라).
+#: 나머지(연습·진단)는 앵커 개념 자신을 다룬다. 정렬 계약은 이 구분 위에 선다: 관계 행위면 목표가
+#: 앵커와 달라야 하고, 비관계 행위면 같아야 한다.
+RELATIONAL_ACTIONS: Final = frozenset(
+    {RecommendationAction.PRACTICE_PREREQUISITE, RecommendationAction.ADVANCE_NEXT}
+)
+
+
+class IntentAlignmentError(ValueError):
+    """정책 축과 선택 축이 어긋난 추천 — **만들어지지 않아야 하는** 상태(구성 결함)."""
+
+
+def check_intent_alignment(
+    *,
+    problem_id: uuid.UUID | None,
+    action: RecommendationAction,
+    reason_concept_id: uuid.UUID | None,
+    target_concept: uuid.UUID | None,
+    delivered_concept: uuid.UUID | None,
+) -> None:
+    """설명(action·target)이 **전달된 콘텐츠**(problem_id)와 어긋나지 않는지 판정한다(순수).
+
+    EOS-124 실측(main `433ec9ea`): 기본 CAT은 문항을 IRT로 고른 뒤 그 문항의 개념 숙달로 행위를
+    붙였다. 그래서 숙달 0.98 개념의 문항에 `advance_next`가 붙었고(전진을 선언하면서 전진하지
+    않는다), 선수 숙달 1.0인데도 원래 개념 문항에 `practice_prerequisite`가 붙었다(설명이 낡음).
+    이 함수가 막는 것은 그 두 형태의 *일반형*이다.
+
+    규칙 네 개(위반 시 `IntentAlignmentError` — 어느 규칙인지 메시지가 지목한다):
+      R1 추천이 없으면(`problem_id=None`) 행위는 `NONE`이고 목표도 없다.
+      R2 추천이 있으면 목표 = **전달 문항의 대표 개념**(`delivered_concept`, 미매핑이면 None).
+         설명이 가리키는 개념과 학생이 받은 문항이 같은 개념이어야 한다는 것이 이 계약의 핵심이다.
+      R3 관계 행위(`RELATIONAL_ACTIONS`)면 앵커·목표가 모두 있고 **서로 다르다** — 같은 개념을
+         가리키면서 "선수로 가라"·"다음으로 가라"고 말하는 것은 행위가 비어 있다는 뜻이다.
+      R4 비관계 행위(연습·진단)면 목표 = 앵커다(둘 다 None인 미매핑 포함).
+
+    **판정하지 않는 것**: 목표가 앵커의 *실제* 선수·후행인지(그래프 관계)는 이 함수가 보지 않는다
+    — DB가 필요하고, 그 관계는 정책이 그래프에서 목표를 *구성*하는 방식으로 보장된다. 이 함수는
+    구조(같다·다르다)만 본다. 그래서 "관계가 옳다"는 정책 테스트가, "구조가 옳다"는 이 함수가
+    각각 소유한다.
+    """
+    if problem_id is None:
+        if action is not RecommendationAction.NONE or target_concept is not None:
+            raise IntentAlignmentError(
+                f"R1 위반 — 추천이 없는데 action={action.value}·target={target_concept}이다."
+            )
+        return
+    if target_concept != delivered_concept:
+        raise IntentAlignmentError(
+            f"R2 위반 — target_concept({target_concept})이 전달 문항 {problem_id}의 대표 개념"
+            f"({delivered_concept})과 다르다. 설명이 가리키는 개념과 받은 문항이 어긋난다."
+        )
+    if action in RELATIONAL_ACTIONS:
+        if reason_concept_id is None or target_concept is None:
+            raise IntentAlignmentError(
+                f"R3 위반 — 관계 행위 {action.value}인데 앵커({reason_concept_id})나 "
+                f"목표({target_concept})가 없다."
+            )
+        if reason_concept_id == target_concept:
+            raise IntentAlignmentError(
+                f"R3 위반 — 관계 행위 {action.value}가 앵커와 같은 개념({target_concept})을 "
+                "가리킨다. 전진·선수 복귀를 선언하면서 제자리에 있다."
+            )
+        return
+    if target_concept != reason_concept_id:
+        raise IntentAlignmentError(
+            f"R4 위반 — 비관계 행위 {action.value}의 목표({target_concept})가 앵커"
+            f"({reason_concept_id})와 다르다."
+        )
+
+
+def demote_to_current_concept(reason: RecommendationReason) -> RecommendationReason:
+    """관계 행위를 실을 수 없을 때의 **정직 강등** — 같은 앵커·같은 실측으로 `CURRENT_CONCEPT`.
+
+    바꾸는 것은 `type` 하나뿐이다. 개념·숙달·신뢰도·basis를 그대로 두는 이유: 강등은 *무엇을
+    하라는가*를 전달된 콘텐츠에 맞추는 것이지 측정을 고치는 것이 아니다. 숙달 0.12가 0.12로
+    실려 나가므로 "학습 구간이라서 연습"으로 위장되지 않는다(`ReasonType.CURRENT_CONCEPT` 참조).
+
+    측정 근거가 없는 근거(미측정·미매핑·후보 없음)는 강등 대상이 아니다 — 그것들은 애초에 관계
+    행위를 낳지 않는다. 들어오면 `ValueError`다(조용히 통과시키면 호출부의 분기 결함이 가려진다).
+    """
+    if reason.basis is not ReasonBasis.MEASURED_MASTERY or reason.concept_id is None:
+        raise ValueError(
+            f"실측 근거만 강등할 수 있다 — basis={reason.basis.value}·concept={reason.concept_id}."
+        )
+    return reason.model_copy(update={"type": ReasonType.CURRENT_CONCEPT})
+
+
+def remediation_reason(
+    *,
+    concept_id: uuid.UUID,
+    mastery: float | None,
+    misconception_confidence: float,
+) -> RecommendationReason:
+    """상태 머신의 오개념 교정 결정(R3)을 집행한 추천의 근거(순수 · EOS-24).
+
+    `confidence`에 싣는 것은 **이번 회차에 확인된 오개념 가설의 신뢰**다 — 이 근거가 주장하는
+    것("지금은 오개념 교정 국면이다")을 얼마나 믿을 수 있는가이고, 숙달 추정의 신뢰도가 아니다.
+    `mastery`는 그 개념의 실측 숙달을 참고로 싣는다(미측정이면 None — 0.0으로 접지 않는다).
+    """
+    return RecommendationReason(
+        type=ReasonType.MISCONCEPTION_REMEDIATION,
+        confidence=misconception_confidence,
+        basis=ReasonBasis.LEARNING_STATE,
+        concept_id=concept_id,
+        mastery=mastery,
     )

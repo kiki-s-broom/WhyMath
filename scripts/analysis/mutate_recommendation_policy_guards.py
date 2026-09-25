@@ -18,6 +18,8 @@ CLAUDE.md "보호 장치를 실패 주입 없이 '보호 있음'으로 선언 �
 
 사용: `python3 scripts/analysis/mutate_recommendation_policy_guards.py`
 종료 코드 0 = 전건 검출(가드가 실제로 막는다) · 1 = 생존한 뮤테이션 있음(가드가 위장이다).
+
+축 D(M14~M24)는 EOS-124 정렬 계약이다 — 실측된 두 불일치 형태를 되살리거나 가드 절을 뺀다.
 """
 
 from __future__ import annotations
@@ -165,6 +167,87 @@ MUTATIONS: list[Mutation] = [
         old="asyncio.timeout(budget.timeout_seconds)",
         new="asyncio.timeout(3600)",
         axis="시간 예산",
+    ),
+    # ── 축 D: EOS-124 정책 축·선택 축 정렬 — 실측된 두 불일치 형태를 되살리고 가드 절을 뺀다 ──
+    Mutation(
+        name="M14-alignment-validator-disabled",
+        path=POLICY,
+        old="        if self.intent_resolution is not None:\n            check_intent_alignment(",
+        new="        if False:\n            check_intent_alignment(",
+        axis="정렬 집행 지점(생성 시점 검증)",
+    ),
+    Mutation(
+        name="M15-relational-action-may-stay-in-place",
+        path=CONTRACT,
+        old="        if reason_concept_id == target_concept:",
+        new="        if False:",
+        axis="정렬 R3(전진하며 제자리 — EOS-124 가)",
+    ),
+    Mutation(
+        name="M16-target-may-differ-from-delivered",
+        path=CONTRACT,
+        old="    if target_concept != delivered_concept:",
+        new="    if False:",
+        axis="정렬 R2(설명≠콘텐츠 — EOS-124 나)",
+    ),
+    Mutation(
+        name="M17-non-relational-target-may-drift",
+        path=CONTRACT,
+        old="    if target_concept != reason_concept_id:",
+        new="    if False:",
+        axis="정렬 R4",
+    ),
+    Mutation(
+        name="M18-mastered-prerequisite-called-blocked",
+        path=POLICY,
+        old="        (pair for pair in measured if pair[0] < WEAK_CONCEPT_MASTERY_CEILING),",
+        new="        (pair for pair in measured if True),",
+        axis="약점 컷(EOS-124 나의 근원 — 숙달 선수를 막힌 선수로)",
+    ),
+    Mutation(
+        name="M19-mastered-successor-kept-open",
+        path=POLICY,
+        old="        or mastery <= WEAK_CONCEPT_MASTERY_CEILING",
+        new="        or True",
+        axis="전진 목표(이미 숙달한 후행 배제)",
+    ),
+    Mutation(
+        name="M20-reselection-skipped",
+        path=POLICY,
+        old="        if intent.reselect_groups:",
+        new="        if False:",
+        axis="정렬 재선택(EOS-124 가 재발)",
+    ),
+    Mutation(
+        name="M21-demotion-skipped-when-target-unavailable",
+        path=POLICY,
+        old="                reason = demote_to_current_concept(intent.reason)",
+        new="                reason = intent.reason",
+        axis="정직 강등",
+    ),
+    Mutation(
+        name="M22-blocked-successor-band-widened",
+        path=POLICY,
+        old="            and mastery < PREREQUISITE_MASTERY_CEILING",
+        new="            and mastery < 1.01",
+        axis="막힌 후행 판정(선수 구간만)",
+    ),
+    Mutation(
+        name="M23-refuted-folded-into-unsupported",
+        path=POLICY,
+        old=(
+            "        anchor_reason, IntentResolution.REFUTED if measured else "
+            "IntentResolution.UNSUPPORTED"
+        ),
+        new="        anchor_reason, IntentResolution.UNSUPPORTED",
+        axis="모른다≠아니다(반증·근거없음 분리)",
+    ),
+    Mutation(
+        name="M24-intent-timeout-not-caught",
+        path=POLICY,
+        old="    except TimeoutError as exc:",
+        new="    except ZeroDivisionError as exc:",
+        axis="의도 판정 시간 예산 강등",
     ),
 ]
 

@@ -258,11 +258,45 @@ class Gate:
     #: 이력 보존(HARN-20 이후의 append-only 근거)은 이 리스트가 담당한다 — 원 제목은 첫
     #: 정정 기록 안에 그대로 남아 복원 가능하다.
     corrections: list[str] = field(default_factory=list)
+    #: 이 게이트를 판정·해소하기 **전에 끝나야 하는 태스크** full-ID 목록 (HARN-174 v2-1).
+    #:
+    #: 게이트를 태스크 그래프의 노드로 편입하는 입력 간선이다(태스크 → 게이트). 이 칸이 없던
+    #: 동안 게이트는 그래프 밖에 있었고, 그래서 순환 검사(`store.detect_cycle`)도 착수 순서
+    #: 계산(`selector.unblock_count`)도 게이트를 지나는 경로를 보지 못했다 — 2026-09-22~24
+    #: 사고 3건(게이트 경유 순환 2 · 재판정 입력 미연결 1)이 전부 사람이 읽다가 발견됐다.
+    #: 쓰기 경로는 `gates add --depends` · `gates amend --depends/--remove-depends` 뿐이다.
+    depends_on: list[str] = field(default_factory=list)
+    #: 입력 태스크가 **원래 없는** 게이트의 사유 (HARN-174 v2-1) — 예: Kiki가 자기 머신에서
+    #: 직접 실행하는 런북, 외부 기관 회신. pending 게이트는 `depends_on`과 이 칸 중 **정확히
+    #: 하나**를 가져야 한다. 둘 다 비면 "여는 작업이 대장에 없다"는 사고 형태이고, 둘 다
+    #: 있으면 어느 쪽이 참인지 대장이 말하지 못한다.
+    no_inputs_reason: str | None = None
 
     def validate(self) -> list[str]:
         errors: list[str] = []
         if not GATE_ID_RE.match(self.id):
             errors.append(f"{self.id}: 게이트 ID 형식 위반 (예: G-phaiakes9-key)")
+        # HARN-174 v2-1 — 입력 간선 선언. 둘 다 있으면 상태와 무관하게 모순이다.
+        has_inputs = bool(self.depends_on)
+        has_reason = bool(self.no_inputs_reason and self.no_inputs_reason.strip())
+        if has_inputs and has_reason:
+            errors.append(
+                f"{self.id}: depends_on 과 no_inputs_reason 이 둘 다 있다 — 입력 태스크가 있는지"
+                " 없는지 대장이 말하지 못한다. 하나를 떼라: gates amend "
+                f"{self.id} --remove-depends <id> 또는 --depends <id>(사유는 자동 해제)"
+            )
+        # cleared·waived 게이트는 아무것도 막지 않으므로 요구하지 않는다(과거 행 소급 금지).
+        if self.status == "pending" and not has_inputs and not has_reason:
+            errors.append(
+                f"{self.id}: pending 게이트에 여는 작업이 없다 — depends_on(판정 전에 끝나야 할"
+                " 태스크)과 no_inputs_reason(사람이 직접 행동하는 게이트의 사유) 중 하나가"
+                " 필요하다."
+                f" 처방: gates amend {self.id} --depends <태스크 full-id> 또는 "
+                "--no-inputs '<사유>' --reason '<정정 사유>' (HARN-174)"
+            )
+        for dep in self.depends_on:
+            if not isinstance(dep, str) or not dep.strip():
+                errors.append(f"{self.id}: depends_on 에 빈 항목")
         if not self.title.strip():
             errors.append(f"{self.id}: title 누락")
         if self.kind not in GATE_KINDS:

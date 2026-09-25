@@ -2074,6 +2074,34 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/board.py",
+    "scripts/harness/models.py",
+    "scripts/harness/report.py",
+    "scripts/harness/seed_data.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "scripts/harness/verify_gate_graph_discrimination.py",
+    "tests/harness/test_amend_cli.py",
+    "tests/harness/test_cli.py",
+    "tests/harness/test_correction_paths.py",
+    "tests/harness/test_eos_priority_enforcement.py",
+    "tests/harness/test_gate_amend_path.py",
+    "tests/harness/test_gate_clear_reminder.py",
+    "tests/harness/test_gate_graph*.py",
+    "tests/harness/test_models.py",
+    "tests/harness/test_start_preflight_trunk_drift.py",
+    "tests/harness/test_store.py"
+   ],
+   "text": "재판정문이 PASS 경로로 EOS-24·EOS-124를 지목했으나 EOS-130 의존에 미연결 - #1314 수동 정정",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-16",
    "paths": [
     "docs/standards/build_harness.md",
@@ -2379,6 +2407,16 @@
     "tests/harness/test_mutate_harness.py"
    ],
    "text": "뮤테이션 실행 중 커밋 — 주입된 소스가 커밋돼 CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 잡 스텝을 손으로 재현하다 harness-integrity의 ruff(scripts) 누락 — PR CI red",
    "weight": 2
   },
   {
@@ -3428,6 +3466,72 @@
     "tests/backend/ops/test_role_grant_cli*.py"
    ],
    "text": "닫힌 PR #880 브랜치에만 있는 246줄 감사 설계 문서가 대장 어디에도 없어 삭제될 뻔",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-22",
+   "paths": [
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/board.py",
+    "scripts/harness/models.py",
+    "scripts/harness/report.py",
+    "scripts/harness/seed_data.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "scripts/harness/verify_gate_graph_discrimination.py",
+    "tests/harness/test_amend_cli.py",
+    "tests/harness/test_cli.py",
+    "tests/harness/test_correction_paths.py",
+    "tests/harness/test_eos_priority_enforcement.py",
+    "tests/harness/test_gate_amend_path.py",
+    "tests/harness/test_gate_clear_reminder.py",
+    "tests/harness/test_gate_graph*.py",
+    "tests/harness/test_models.py",
+    "tests/harness/test_start_preflight_trunk_drift.py",
+    "tests/harness/test_store.py"
+   ],
+   "text": "P3-00이 증거를 대야 할 진입 게이트를 requires_gates로 걸어 Gate 2 재판정 소유자 부재",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-23",
+   "paths": [
+    "backlog/gates.yaml",
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/board.py",
+    "scripts/harness/models.py",
+    "scripts/harness/report.py",
+    "scripts/harness/seed_data.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "scripts/harness/verify_gate_graph_discrimination.py",
+    "tests/harness/test_amend_cli.py",
+    "tests/harness/test_cli.py",
+    "tests/harness/test_correction_paths.py",
+    "tests/harness/test_eos_priority_enforcement.py",
+    "tests/harness/test_gate_amend_path.py",
+    "tests/harness/test_gate_clear_reminder.py",
+    "tests/harness/test_gate_graph*.py",
+    "tests/harness/test_models.py",
+    "tests/harness/test_start_preflight_trunk_drift.py",
+    "tests/harness/test_store.py"
+   ],
+   "text": "게이트 병합(G3+G4)으로 EOS-50이 자기를 판정 대상으로 삼는 게이트를 요구하는 순환",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
    "weight": 0
   }
  ]

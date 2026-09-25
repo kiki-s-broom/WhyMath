@@ -37,7 +37,7 @@ from whymath_backend.l2.recommendation_contract import (
     no_candidate_reason,
 )
 
-__all__ = ["collect_recommendation_reason"]
+__all__ = ["collect_concept_reason", "collect_recommendation_reason"]
 
 
 async def collect_recommendation_reason(
@@ -65,7 +65,22 @@ async def collect_recommendation_reason(
     concept_id = await get_primary_concept_id(session, problem_id)
     if concept_id is None:
         return build_reason(concept_id=None, mastery=None, confidence=None)
+    return await collect_concept_reason(session, learner_id=learner_id, concept_id=concept_id)
 
+
+async def collect_concept_reason(
+    session: AsyncSession,
+    *,
+    learner_id: uuid.UUID,
+    concept_id: uuid.UUID,
+) -> RecommendationReason:
+    """**개념 하나**의 근거 — 문항을 거치지 않고 그 개념의 최신 숙달·신뢰도로 판정한다(읽기 전용).
+
+    `collect_recommendation_reason`의 뒷부분을 떼어 낸 것이다(같은 `_latest_mastery`·같은
+    `build_reason` — 재구현 0). 따로 부를 자리가 생긴 이유는 EOS-124다: 추천 근거의 *앵커*가
+    전달 문항의 개념이 아닐 수 있다. 예컨대 학생이 막힌 개념 W의 선수 K 문항을 받으면, 근거는
+    "W가 막혔다"이고 그 숙달은 W의 것이어야 한다 — K 문항의 개념 조회로는 W에 닿지 않는다.
+    """
     row = await _latest_mastery(session, learner_id, concept_id)
     mastery = float(row.mastery) if row is not None and row.mastery is not None else None
     confidence = float(row.confidence) if row is not None and row.confidence is not None else None

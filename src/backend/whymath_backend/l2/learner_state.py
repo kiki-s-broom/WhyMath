@@ -32,15 +32,24 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.db.models.learning_state_transition import LearningStateTransition
 from whymath_backend.db.models.misconception_hypothesis import (
     MisconceptionHypothesisRecord,
 )
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.l2.ability_tracking import get_current_theta
 from whymath_backend.l2.concept_diagnosis import compute_concept_diagnoses
+from whymath_backend.l2.learning_state_machine import INITIAL_STATE, list_transitions
 from whymath_backend.l2.skill_mastery_tracking import get_all_current_skill_mastery
+from whymath_backend.schema.learning_state import LearningState, TransitionTrigger
 
-__all__ = ["FieldOrigin", "FieldStatus", "LearnerState", "get_state"]
+__all__ = [
+    "FieldOrigin",
+    "FieldStatus",
+    "LearnerState",
+    "LearningStateSnapshot",
+    "get_state",
+]
 
 # LTHC 숙달도 임계값의 **값만 미러링**(import 아님) — `l4/lthc/adapt.py`의 `_DEVELOPING_THRESHOLD`
 # (0.4)·`_MASTERED_THRESHOLD`(0.8)와 반드시 같은 값을 유지해야 하지만, L2는 L4를 import할 수
@@ -104,6 +113,13 @@ _SEAT_ABILITY = "l2.ability_tracking.get_current_theta"
 _SEAT_SKILL = "l2.skill_mastery_tracking.get_all_current_skill_mastery"
 _SEAT_MISCONCEPTION = "db.models.misconception_hypothesis.MisconceptionHypothesisRecord"
 _SEAT_PROFILE = "db.models.user.UserProfile"
+_SEAT_LEARNING_STATE = "l2.learning_state_machine.list_transitions"
+
+#: 학습 국면 스냅샷이 원장에서 읽는 최신 전이 수. **2인 이유**: 정책 결정 1건은 원장에 두 행을
+#: 남긴다(`ATTEMPT_SUBMITTED`로 평가 진입 → 정책 결정). 최신 1행만 보면 "그 결정을 낸 응답이
+#: *어느 국면에서* 제출됐는가"(`assessed_from`)를 알 수 없고, 추천은 그것으로 교정 고정을 푼다
+#: (EOS-24 판정문 §4 안전장치 ③).
+_LEARNING_STATE_ROWS = 2
 
 
 def _origin(
@@ -119,6 +135,75 @@ def _origin(
         status=FieldStatus.MEASURED if has_value else FieldStatus.NO_DATA,
         estimator=estimator,
         seat=seat,
+    )
+
+
+class LearningStateSnapshot(BaseModel):
+    """학습 상태 머신의 **현재 국면 + 그 국면을 만든 최신 결정** — 원장 최신 전이의 요약 (EOS-24).
+
+    왜 `LearnerState` 안에 두는가: 추천 정책의 계약은 `(learner_state, learning_context)` 둘만
+    받는다(`l2.recommendation_contract.RecommendationPolicy`). 상태 머신의 국면은 *학습자 상태*이지
+    요청 상황이 아니므로, 정책이 DB를 따로 읽지 않고 이 필드로 받는 것이 계약에 맞는 배선이다.
+    이 필드가 생기기 전에는 추천이 상태 머신을 읽을 경로 자체가 없었다(EOS-24 acceptance ①).
+
+    파생값이다 — 원장(`learning_state_transition`)이 정본이고 이것은 호출 시점의 읽기 사본이다.
+    이 스냅샷은 어떤 테이블에도 쓰이지 않는다.
+    """
+
+    state: LearningState = Field(
+        description="현재 학습 국면 — 원장 최신 행의 `to_state`. 원장이 비었으면 `NEW`."
+    )
+    trigger: TransitionTrigger | None = Field(
+        default=None,
+        description="그 국면으로 들어온 사유. 원장이 비었으면 None — "
+        "`POLICY_*`면 정책 결정(규칙 id는 `rule_id`)이다.",
+    )
+    rule_id: str | None = Field(
+        default=None, description="결정을 낸 정책 규칙 id(예 `R3-wrong-misconception`)."
+    )
+    attempt_id: uuid.UUID | None = Field(
+        default=None, description="그 전이를 일으킨 응답 id. 생애주기 전이면 None."
+    )
+    concept_id: str | None = Field(
+        default=None,
+        description="전이에 기록된 개념 id. 응답 제출 경로는 현재 비워 두므로 대개 None이다 — "
+        "추천은 이 값 대신 `attempt_id`에서 개념을 찾는다.",
+    )
+    changed_at: datetime | None = Field(default=None, description="그 전이의 시각(UTC).")
+    assessed_from: LearningState | None = Field(
+        default=None,
+        description="최신 행이 **정책 결정**일 때, 그 결정을 낸 응답이 제출되던 시점의 국면 "
+        "(같은 `attempt_id`의 `ATTEMPT_SUBMITTED` 행의 `from_state`). 짝 행을 찾지 못하면 None — "
+        "모르는 것을 추측으로 채우지 않는다.",
+    )
+
+
+def _learning_state_snapshot(rows: list[LearningStateTransition]) -> LearningStateSnapshot:
+    """원장 최신 행(최신순) → 스냅샷. 순수 — 조회는 호출부가 한다.
+
+    `assessed_from`은 **같은 응답에서 나온 짝 행**일 때만 채운다(`attempt_id` 일치 + 트리거가
+    `ATTEMPT_SUBMITTED`). 두 행이 다른 응답에서 왔는데 채우면, 앞 응답의 국면을 이번 결정의
+    출발점으로 오독한다 — 그러면 교정 고정 해제(EOS-24 안전장치 ③)가 엉뚱한 회차에 걸린다.
+    """
+    if not rows:
+        return LearningStateSnapshot(state=INITIAL_STATE)
+    latest = rows[0]
+    assessed_from: LearningState | None = None
+    if latest.attempt_id is not None and len(rows) > 1:
+        entry = rows[1]
+        if (
+            entry.trigger is TransitionTrigger.ATTEMPT_SUBMITTED
+            and entry.attempt_id == latest.attempt_id
+        ):
+            assessed_from = entry.from_state
+    return LearningStateSnapshot(
+        state=latest.to_state,
+        trigger=latest.trigger,
+        rule_id=latest.rule_id,
+        attempt_id=latest.attempt_id,
+        concept_id=latest.concept_id,
+        changed_at=latest.occurred_at,
+        assessed_from=assessed_from,
     )
 
 
@@ -209,10 +294,19 @@ class LearnerState(BaseModel):
         "스킬은 키 자체가 없다(`mastery`와 같은 규약).",
     )
 
+    # ===== EOS-24 — 학습 상태 머신의 국면 =====
+    learning_state: LearningStateSnapshot | None = Field(
+        default=None,
+        description="학습 상태 머신의 현재 국면과 그것을 만든 최신 결정(`LearningStateSnapshot`). "
+        "`get_state()`는 **항상 채운다**(원장이 비었으면 `state=NEW`·`origins`가 `no_data`). "
+        "None은 조립기를 거치지 않고 손으로 만든 상태(테스트 등)뿐이며, 추천은 None을 '상태 머신이 "
+        "아무 결정도 하지 않았다'로 읽는다.",
+    )
+
     # ===== 유래 축 — 어느 필드가 실제로 작동했는가 =====
     origins: dict[str, FieldOrigin] = Field(
         default_factory=dict,
-        description="필드명 → 그 값의 유래(`FieldOrigin`). 데이터 필드 11개 전건에 대해 채워진다 "
+        description="필드명 → 그 값의 유래(`FieldOrigin`). 데이터 필드 12개 전건에 대해 채워진다 "
         "— 값이 없는 필드도 *왜* 없는지(`no_data` = 이 학생의 이력 부재 / `no_producer` = "
         "저장소에 생산자 부재)를 말하므로, 소비처는 `status == 'measured'`의 비율로 **이 조립이 "
         "실제로 작동한 비율**을 셀 수 있다. 추정기 교체(BKT→DKT)는 이 dict의 `estimator` 값만 "
@@ -321,12 +415,18 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
     # 스킬 축은 **조립**이다 — "최신 1건" 규칙은 소유 모듈이 갖고 여기서 다시 쓰지 않는다.
     skill_mastery = await get_all_current_skill_mastery(session, user_id)
 
+    # EOS-24 — 상태 머신 국면. 조회는 **마지막 execute**로 둔다: 순서 기반 테스트 대역이 앞의
+    # 다섯 조회를 그대로 소비하고, 늘어난 1건이 끝에 붙는 형태가 가장 덜 흔든다.
+    transitions = await list_transitions(session, user_id, limit=_LEARNING_STATE_ROWS)
+    learning_state = _learning_state_snapshot(transitions)
+
     profile = await session.get(UserProfile, user_id)
     grade = profile.grade if profile is not None else None
     goals = _build_goals(profile) if profile is not None else {}
 
-    # 데이터 필드 11개 전건의 유래. 생산자가 없는 둘만 리터럴 `NO_PRODUCER`이고(그 줄을 지우는
-    # 것이 생산자가 붙는 날 변경의 전부다), 나머지는 값 유무로 MEASURED/NO_DATA가 갈린다.
+    # 데이터 필드 12개 전건의 유래(EOS-24 `learning_state` 포함). 생산자가 없는 둘만 리터럴
+    # `NO_PRODUCER`이고(그 줄을 지우는 것이 생산자가 붙는 날 변경의 전부다), 나머지는 값 유무로
+    # MEASURED/NO_DATA가 갈린다.
     origins: dict[str, FieldOrigin] = {
         "mastery": _origin(bool(mastery), estimator=_EST_BKT, seat=_SEAT_DIAGNOSIS),
         "general_ability": _origin(
@@ -344,6 +444,7 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
             bool(recent_successes), estimator=_EST_BKT, seat=_SEAT_DIAGNOSIS
         ),
         "grade": _origin(grade is not None, seat=_SEAT_PROFILE),
+        "learning_state": _origin(bool(transitions), seat=_SEAT_LEARNING_STATE),
         "goals": _origin(bool(goals), seat=_SEAT_PROFILE),
         # ── 생산자 0건(2026-09-16 실측) — 근거는 각 필드 description 참조 ──
         "curriculum_id": FieldOrigin(status=FieldStatus.NO_PRODUCER),
@@ -364,5 +465,6 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
         curriculum_id=None,
         current_objective_id=None,
         skill_mastery=skill_mastery,
+        learning_state=learning_state,
         origins=origins,
     )

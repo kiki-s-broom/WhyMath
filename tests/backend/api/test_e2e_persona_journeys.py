@@ -34,11 +34,15 @@ problem_concept·skill_node)만 ORM으로 심는다. 헬퍼는 Week 1·2 하네�
 이 파일의 조립기를 경로 로딩으로 재사용하므로, 여기서 헬퍼 이름을 바꾸면 그쪽이 수집 단계에서
 이름을 지목하며 깨진다.
 
-**정직한 공백 동결** — 아래 두 가지는 *현행 동작*을 단언한다. 고쳐지면 이 테스트가 실패하며,
-실패 메시지가 승계 태스크 id를 가리킨다(조용히 낡지 않게).
+**정직한 공백 동결** — 아래는 *현행 동작*을 단언한다. 고쳐지면 이 테스트가 실패하며, 실패
+메시지가 승계 태스크 id를 가리킨다(조용히 낡지 않게).
   ⓐ `EOS-123` — 정답 제출은 오개념 감쇠 시계를 돌리지 않는다(`apply_candidates` 미호출).
-  ⓑ `EOS-124` — 보정이 끝나 선수 결손이 해소된 뒤에도 추천의 `action`/`target_concept`이
-     `practice_prerequisite`/선수개념으로 남는다(고른 *문항*은 원래 concept인데 *설명*만 낡음).
+
+**해소된 공백 — `EOS-124`(정책 축·선택 축 불일치)**: 이 하네스가 2026-09-19에 두 자리(A ⑤-b ·
+B ⑧-b)에서 동결했던 불일치 — 숙달한 개념 문항에 `advance_next`가 붙고, 선수 결손이 해소된
+뒤에도 원래 개념 문항에 `practice_prerequisite`가 붙던 것 — 는 기본 CAT 정책이 설명을 전달
+문항에 정렬하면서 해소됐다. 두 자리는 **올바른 값 단언으로 승격**됐다(A는 다음 개념 문항을
+*선택*으로 받고, B는 복귀 문항에 맞는 `practice_current`를 받는다).
 """
 
 from __future__ import annotations
@@ -572,29 +576,40 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
                 "판정하지 못했다."
             )
 
-            # ⑤-b 정직한 공백 동결 (`EOS-124`) — 그런데 *고른 것*은 현재 개념의 문항이고
-            #      `target_concept`도 방금 숙달한 **현재** 개념을 가리킨다. 즉 정책 축과 선택
-            #      축이 따로 계산되고 서로를 보지 않는다. 고쳐지면 이 단언이 실패하며, 그때는
-            #      이 자리를 "다음 개념 문항"으로 올려 쓰는 것이 맞다.
-            assert picked in {str(x) for x in cur_pids}, (
-                "추천이 다음 개념 문항을 골랐다 — `EOS-124`(정책 축·선택 축 불일치)가 해소된 "
-                "것으로 보인다. 이 단언을 다음 개념 문항 단언으로 승격하고 EOS-124를 닫아라."
+            # ⑤-b 정책·선택 정렬 (`EOS-124` 해소 — 2026-09-19 동결을 승격) — 현재 개념에 미시도
+            #      문항이 **남아 있는데도** 다음 개념 문항을 받는다. 즉 이동은 후보 고갈의 부산물이
+            #      아니라 선택이다. 설명도 그 문항을 가리킨다: target은 다음 개념이고, 근거(reason)는
+            #      "방금 숙달한 현재 개념"이다 — 전진의 이유와 전진의 목적지가 각자 제자리에 있다.
+            assert picked in {str(x) for x in next_pids}, (
+                f"숙달 {mid}인데 추천 문항 {picked}가 다음 개념 것이 아니다 — 정책은 전진을 "
+                "말하는데 콘텐츠는 제자리다(`EOS-124` 재발)."
             )
-            assert advanced["target_concept"] == str(c_cur), (
-                "`advance_next`의 target_concept이 더 이상 현재 개념이 아니다 — `EOS-124` "
-                "해소 신호. 위 단언과 함께 승격하라."
+            assert advanced["target_concept"] == str(c_next), (
+                f"advance_next의 target이 {advanced['target_concept']}다 — 다음 개념이 아니면 "
+                "설명이 받은 문항과 어긋난다(`EOS-124` 재발)."
+            )
+            assert advanced["reason"]["concept_id"] == str(c_cur), (
+                "전진의 근거는 숙달한 현재 개념이어야 한다 — 근거가 다른 개념을 가리키면 "
+                "'왜 넘어가는가'에 답하지 못한다."
+            )
+            assert advanced["reason"]["type"] == "next_concept"
+            assert advanced["intent_resolution"] == "served", (
+                f"intent_resolution={advanced['intent_resolution']} — 전진이 문항으로 실렸는데 "
+                "관측값이 그것을 말하지 않으면 '정렬이 일한 비율'을 셀 수 없다."
             )
             journal.record(
-                "⑤-b정책·선택불일치",
-                "EOS-124 정직한 공백 — action은 전진, 문항·target은 현재 개념",
+                "⑤-b정책·선택정렬",
+                "EOS-124 해소 — action은 전진, 문항·target도 다음 개념",
                 action=advanced["action"],
-                target=("현재개념" if advanced["target_concept"] == str(c_cur) else "다음개념"),
-                문항소속=("현재개념" if picked in {str(x) for x in cur_pids} else "다음개념"),
+                target=("다음개념" if advanced["target_concept"] == str(c_next) else "현재개념"),
+                문항소속=("다음개념" if picked in {str(x) for x in next_pids} else "현재개념"),
+                근거개념=("현재개념" if advanced["reason"]["concept_id"] == str(c_cur) else "기타"),
+                해소=advanced["intent_resolution"],
             )
 
-            # ⑥ 완주 — 현재 개념 문항을 소진하면 다음 개념으로 넘어간다. 이동이 *일어난다*는
-            #    것과 그것이 *숙달 때문*이라는 것은 다르다. 이 하네스는 전자만 판정하고,
-            #    후자가 아직 아니라는 사실은 ⑤-b가 동결한다.
+            # ⑥ 완주 — 현재 개념 문항까지 소진한 뒤에도 다음 개념에 머문다. ⑤-b가 이동이
+            #    *선택*임을 이미 판정했으므로, 여기서 보는 것은 고갈 경로에서도 목적지가 같은가다
+            #    (다음 개념이 미측정이면 진단 문항으로 나간다 — 행위는 diagnose, target은 다음 개념).
             _attempt(client, auth, cur_pids[5], correct=True, answer="정답5")
             drained = _next_problem(client, auth)
             journal.record(
@@ -709,6 +724,17 @@ def test_persona_b_prerequisite_gap_remediates_and_returns_to_origin() -> None:
             assert down["problem_id"] in {
                 str(x) for x in pre_pids
             }, f"추천 문항 {down['problem_id']}가 선수 개념 것이 아니다 — 하위 concept 이동이 말뿐이다."
+            # EOS-124 — 설명도 콘텐츠와 맞아야 한다: 목표는 받은 문항의 개념(선수)이고, 근거는
+            # "원래 개념이 막혔다"이다. 종전에는 선수 문항 자신의 숙달로 근거를 대고 목표가 우연히
+            # 맞았다(선수의 선수가 없어 폴백) — 여기서 그 우연이 아니라 이유를 판정한다.
+            assert down["target_concept"] == str(
+                c_pre
+            ), f"선수 연습인데 target이 {down['target_concept']}다 — 받은 선수 문항과 어긋난다."
+            assert down["reason"]["concept_id"] == str(c_main), (
+                "선수로 내려간 근거는 막힌 원래 개념이어야 한다 — 선수 자신을 근거로 대면 "
+                "'왜 이 선수인가'에 답하지 못한다."
+            )
+            assert down["intent_resolution"] == "served"
 
             # ⑥ 보정 — 선수 개념을 정답으로 메운다. pre_pids[2]는 **미시도로 남긴다**.
             for i in range(6):
@@ -740,16 +766,33 @@ def test_persona_b_prerequisite_gap_remediates_and_returns_to_origin() -> None:
                 "하위 concept에서 멈췄다면 B 여정 미통과다(원 지시문 3번)."
             )
 
-            # ⑧-b 정직한 공백 동결 (`EOS-124`) — 문항은 복귀했는데 *설명*은 낡았다.
-            assert back["action"] == "practice_prerequisite", (
-                "복귀 후 action이 더 이상 practice_prerequisite가 아니다 — `EOS-124`(정책 축·"
-                "선택 축 불일치) 해소 신호. 이 단언을 올바른 값 단언으로 승격하고 EOS-124를 닫아라."
+            # ⑧-b 정책·선택 정렬 (`EOS-124` 해소 — 2026-09-19 동결을 승격) — 문항이 복귀했으면
+            #      *설명*도 복귀해야 한다. 선수가 1.0으로 숙달됐으므로 "선수를 연습하라"는 측정이
+            #      반증한 설명이고, 받은 것은 원래 개념 문항이다 → 원래 개념 연습(practice_current).
+            #      원래 개념 숙달은 여전히 낮다 — 그 수치는 근거에 **그대로** 실린다(강등은 행위를
+            #      콘텐츠에 맞추는 것이지 측정을 고치는 것이 아니다).
+            assert back["action"] == "practice_current", (
+                f"복귀 후 action이 {back['action']}다 — 선수 결손이 해소됐는데 선수 연습을 말하면 "
+                "설명이 받은 문항과 어긋난다(`EOS-124` 재발)."
+            )
+            assert back["target_concept"] == str(
+                c_main
+            ), f"복귀 후 target이 {back['target_concept']}다 — 받은 문항은 원래 개념 것이다."
+            assert back["reason"]["concept_id"] == str(c_main)
+            assert back["reason"]["type"] == "current_concept"
+            assert (
+                back["reason"]["mastery"] is not None and back["reason"]["mastery"] < 0.4
+            ), "원래 개념의 실측 숙달이 근거에 그대로 실려야 한다 — 강등이 수치를 바꾸면 위장이다."
+            assert back["intent_resolution"] == "refuted", (
+                f"intent_resolution={back['intent_resolution']} — 선수가 측정으로 숙달이 확인된 "
+                "경우는 '근거 없음'이 아니라 '반증'이다(모른다 ≠ 아니다)."
             )
             journal.record(
-                "⑧-b정책·선택불일치",
-                "EOS-124 정직한 공백 — 문항은 원래 개념인데 action·target은 선수 개념",
+                "⑧-b정책·선택정렬",
+                "EOS-124 해소 — 문항·action·target 모두 원래 개념(선수 결손은 측정이 반증)",
                 action=back["action"],
-                target=("선수개념" if back["target_concept"] == str(c_pre) else "원래개념"),
+                target=("원래개념" if back["target_concept"] == str(c_main) else "선수개념"),
+                해소=back["intent_resolution"],
             )
         journal.dump()
     finally:

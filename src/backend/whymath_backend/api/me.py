@@ -155,6 +155,7 @@ from whymath_backend.l2.learning_state_machine import (
     list_transitions,
     record_transition,
 )
+from whymath_backend.l2.learning_state_recommendation import StateDirectiveOutcome
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 
 # 이 블록의 일부 이름은 이 파일 안에서 쓰이지 않고 **재노출**만 된다(아래 별칭 블록 주석).
@@ -188,7 +189,11 @@ from whymath_backend.l2.recommendation_contract import (
 from whymath_backend.l2.recommendation_evidence import (
     record_recommendation_treatment,
 )
-from whymath_backend.l2.recommendation_policy import CatRecommendationPolicy, NextProblemPolicy
+from whymath_backend.l2.recommendation_policy import (
+    CatRecommendationPolicy,
+    IntentResolution,
+    NextProblemPolicy,
+)
 from whymath_backend.l2.review_queue import ReviewQueue, fetch_review_queue
 from whymath_backend.l2.skill_mastery_tracking import (
     record_problem_attempt_skill_mastery,
@@ -2565,19 +2570,45 @@ class NextProblemResponse(BaseModel):
     target_concept: uuid.UUID | None = Field(
         default=None,
         description=(
-            "EOS-19: 학생이 **다음에 다뤄야 할 개념**. 선수개념이 막혔으면"
-            "(action=practice_prerequisite) 개념 그래프에서 찾은 *막힌 선수개념*이고, 그 외에는 "
-            "선택된 문항의 대표 개념이다(=reason.concept_id). 측정된 선수가 없거나 문항에 개념 "
-            "매핑이 없으면 null — 없는 근거를 지어내지 않는다."
+            "EOS-19: 학생이 **다음에 다뤄야 할 개념**. EOS-124 이후 기본 CAT에서는 **추천 문항의 "
+            "대표 개념과 항상 같다** — 설명이 가리키는 개념과 받은 문항이 어긋나지 않는다. "
+            "action=practice_prerequisite면 막힌 선수개념(=문항의 개념), advance_next면 다음 "
+            "개념(=문항의 개념)이고, 그 외에는 reason.concept_id와 같다. 문항에 개념 매핑이 "
+            "없으면 null — 없는 근거를 지어내지 않는다. (수능 모드는 아직 이 정렬을 하지 않는다 "
+            "— intent_resolution이 null.)"
+        ),
+    )
+    learning_state_directive: StateDirectiveOutcome | None = Field(
+        default=None,
+        description=(
+            "EOS-24: 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과. `applied`면 상태 "
+            "머신의 오개념 교정 결정(R3)을 집행했다(문항=교정 대상 개념 · reason.basis="
+            "learning_state). 그 외 값은 집행하지 못한 사유다(released_after_repeat · "
+            "weak_misconception_evidence · anchor_unresolved · no_candidate_in_concept) — "
+            "그때 추천은 숙달 구간 경로 그대로다. 상태 머신이 지시하지 않았으면 null."
         ),
     )
     reason: RecommendationReason = Field(
         description=(
-            "EOS-14: **왜 이 문항인가** — 선택된 문항의 대표 개념·그 개념의 실측 숙달로 판정한 "
-            "추천 근거. 위 5필드(weight_axes_applied·candidate_pool_size·"
-            "weak_concept_signal_count·candidate_zero_reason·band_calibrated)가 *추천기가 "
-            "어떻게 돌았나*의 관측 메타라면, 이 필드는 *선택된 문항의 근거*다 — 둘은 다른 질문에 "
-            "답하므로 합치지 않는다. `problem_id`가 null이어도 비지 않는다(type=no_candidate)."
+            "EOS-14: **왜 이 문항인가** — *앵커* 개념과 그 실측 숙달로 판정한 추천 근거. 앵커는 "
+            "보통 추천 문항의 대표 개념이지만, 관계 행위면 행위의 근거가 된 개념이다(전진이면 "
+            "숙달한 현재 개념, 선수 복귀면 막힌 원래 개념 — EOS-124). 위 5필드(weight_axes_"
+            "applied·candidate_pool_size·weak_concept_signal_count·candidate_zero_reason·"
+            "band_calibrated)가 *추천기가 어떻게 돌았나*의 관측 메타라면, 이 필드는 *이 추천의 "
+            "근거*다 — 둘은 다른 질문에 답하므로 합치지 않는다. `problem_id`가 null이어도 비지 "
+            "않는다(type=no_candidate)."
+        ),
+    )
+    intent_resolution: IntentResolution | None = Field(
+        default=None,
+        description=(
+            "EOS-124: 숙달 구간 규칙(계획서 §8)이 가리킨 행위가 **실제 문항으로 어떻게 "
+            '해소됐나**("작동한 비율" 관측). direct=앵커 개념 자체(연습·진단) · served=관계 '
+            "행위(선수 복귀·전진)를 문항이 실제로 싣는다 · refuted=측정이 관계 행위를 반증(선수 "
+            "전부 숙달 등)해 현재 개념 연습으로 강등 · unsupported=근거 없음(엣지 없음·선수 "
+            "미측정)으로 강등 · graph_timeout=그래프 조회 예산 초과로 강등 · target_unavailable="
+            "목표 개념에 출제 가능한 문항이 없어 강등 · no_candidate=추천 없음. null=이 정렬을 "
+            "아직 적용하지 않는 정책(수능 모드)."
         ),
     )
 
@@ -2609,16 +2640,21 @@ async def recommend_next_problem(
     CatRecommendationPolicy`, 수능 모드는 `api._next_problem_policy.SuneungRecommendationPolicy`
     (두 계층 합성이 필요해 위치가 다른 이유는 그 모듈 docstring 참조). 두 정책의 알고리즘은
     전환 전 이 함수 안에 있던 것과 **같다** — 배치만 바뀌었고 추천 결과는 바뀌지 않는다
-    (EOS-19 acceptance ④).
+    (EOS-19 acceptance ④). **예외 — EOS-124**: 기본 CAT은 그 뒤 의도적으로 바뀌었다. 숙달 구간
+    규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면 그 개념의 문항으로 다시 고른다
+    (설명과 콘텐츠 정렬 — 해소 결과는 `intent_resolution`이 응답·처치 기록 양쪽에 남긴다).
 
     정책이 무엇을 하는지(θ 추정·후보 조회·약점/밴드/형제 가중·CAT 중단 규칙·수능 L6 게이팅)는
     각 정책 모듈의 docstring이 정본이다. 여기에 다시 적으면 알고리즘이 바뀔 때 두 설명이
     갈라진다.
 
     응답 계약은 전환 전과 동일하다(회귀 0): `problem_id`·`theta`·`difficulty`·`standard_error`·
-    `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. **신규 2필드**는
-    `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이며, 둘 다
-    `reason`에서 파생되거나 개념 그래프에서 조회된 값이라 선택 결과를 바꾸지 않는다.
+    `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. EOS-19 신규 2필드는
+    `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
+    EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
+    기본 CAT에서 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
+    그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
+    오지 못한다.
 
     REC-03/REC-11: `problem_id`가 확정되면(null이 아니면) `evidence_event`에 처치 1건을 기록한다
     (가짜 처치 금지 — null 응답은 기록하지 않음). 그 기록에는 후보 점수(`candidates`)와
@@ -2659,7 +2695,15 @@ async def recommend_next_problem(
             candidates=outcome.candidate_scores,
             policy_version=outcome.policy_version,
             reason=outcome.reason,
+            intent_resolution=(
+                outcome.intent_resolution.value if outcome.intent_resolution is not None else None
+            ),
             learning_session_id=learning_session_id,
+            learning_state_directive=(
+                outcome.learning_state_directive.value
+                if outcome.learning_state_directive is not None
+                else None
+            ),
         )
         await session.commit()
     elif learning_session_id is not None:
@@ -2680,6 +2724,8 @@ async def recommend_next_problem(
         reason=outcome.reason,
         action=outcome.action,
         target_concept=outcome.target_concept,
+        intent_resolution=outcome.intent_resolution,
+        learning_state_directive=outcome.learning_state_directive,
     )
 
 
