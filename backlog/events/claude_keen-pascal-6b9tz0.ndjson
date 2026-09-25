@@ -191,3 +191,4 @@
 {"ts": "2026-09-25T00:33:23+00:00", "actor": "claude/keen-pascal-6b9tz0", "action": "policy_warn", "id": "OPS-91", "rule": "path_overlap", "other": "OPS-83-ci-backend-job-sharding", "detail": "실파일 교집합 1건 예: src/backend/pyproject.toml", "mode": "warn"}
 {"ts": "2026-09-25T00:33:24+00:00", "actor": "claude/keen-pascal-6b9tz0", "action": "policy_warn", "id": "OPS-91", "rule": "path_overlap", "other": "S4-01-math-k12-complete", "detail": "실파일 교집합 1건 예: src/data-pipeline/pyproject.toml · 프리픽스 포함: src/data-pipeline/** ⊇ src/data-pipeline/pyproject.toml", "mode": "warn"}
 {"ts": "2026-09-25T00:33:27+00:00", "actor": "claude/keen-pascal-6b9tz0", "action": "start", "id": "OPS-91", "session": "claude/keen-pascal-6b9tz0", "remote": "ok"}
+{"ts": "2026-09-25T00:38:19+00:00", "actor": "claude/keen-pascal-6b9tz0", "action": "done", "id": "OPS-91", "artifacts": ["https://github.com/kiki-s-broom/WhyMath/pull/1304 — 재현 2.1.0 mypy 34 errors → 상한 후 exit 0, tests/infra 1752 passed"]}
