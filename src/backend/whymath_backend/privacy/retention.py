@@ -29,6 +29,22 @@ SEC-33 — `ProblemAttempt`만 예외: 클라가 `started_at`을 신고하지 �
 `G-attempt-retention-purge-backfill-decision`(법령 유래 판단·Kiki 소유)의 몫이며 이 모듈은
 그 행에 손대지 않는다(신규 회피 통로만 닫는다).
 
+EOS-131 ⑪ — 서버 세션의 연쇄 파기가 시도를 *조기에* 지우지 않게 한다:
+  `problem_attempt.session_id`는 `learning_session`에 `ON DELETE CASCADE`로 걸려 있다. 서버 writer
+  (`l2/learning_session_writer`) 이전에는 이 값이 항상 NULL이라 연쇄가 한 번도 작동하지 않았다.
+  이제 서버가 값을 채우므로, 세션을 `started_at` 기준으로 지우면 세션 시작은 파기 기준을 넘었지만
+  *그 세션의 뒤쪽 시도는 아직 기준 안쪽*인 경우 그 시도가 연쇄로 함께 지워진다(세션 길이만큼 조기
+  파기 — 그리고 파기 리포트의 `problem_attempt` 건수가 실제보다 적게 집계된다). 두 선택지(기준
+  맞추기 / 연쇄 건수 계상) 중 **기준 맞추기**를 택했다 — 연쇄 건수를 세는 것은 조기 파기를 *보고*할
+  뿐 막지 못한다. 규칙(서버 세션 = `last_activity_at IS NOT NULL`인 행에만 적용):
+    ① 파기 기준 시각은 `last_activity_at`(세션의 마지막 활동)이다 — 세션 안 모든 시도의 수신
+       시각 이상이다(writer가 시도 수신 시각으로 `last_activity_at`을 갱신한다).
+    ② 그리고 **그 세션에 남은 시도가 하나도 없을 때만** 지운다. 시도는 이 플랜에서 세션보다 먼저
+       파기되므로, 남아 있는 시도는 정의상 아직 기준 안쪽이다 — 클라 신고 `started_at`이 수신보다
+       최대 5분 앞선(허용 오차) 경계 사례에서도 ①만으로는 뚫릴 틈을 ②가 닫는다.
+  writer 이전의 행(`last_activity_at IS NULL`)은 종전 규칙(`started_at` 기준·조건 없음) 그대로다 —
+  그 행들의 시도는 `session_id`가 NULL이라 연쇄 대상 자체가 아니고, 동작을 바꿀 이유가 없다.
+
 감사 2테이블 의도적 제외 — 무기한 보존의 *명문화된* 침묵 (ADMIN-03):
   `deletion_audit`(`DeletionAudit`)·`privacy_audit`(`PrivacyAudit`, `db/models/audit.py`)는
   이 `_RETENTION_PLAN`에도, 삭제권 `_ERASURE_PLAN`에도 **의도적으로 넣지 않는다**. 두 테이블은
@@ -51,7 +67,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, cast
 
-from sqlalchemy import ColumnElement, CursorResult, delete, func
+from sqlalchemy import ColumnElement, CursorResult, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.config import get_settings
@@ -121,6 +137,31 @@ def _effective_timestamp(model: type[Base], column: str) -> ColumnElement[Any]:
     return cast("ColumnElement[Any]", ts_column)
 
 
+def _purge_condition(model: type[Base], column: str, cutoff: date) -> ColumnElement[bool]:
+    """이 모델의 파기 조건 — 기본은 `기준시각 < cutoff`, 서버 세션만 EOS-131 ⑪ 규칙.
+
+    `LearningSession`은 두 갈래다(모듈 docstring 「EOS-131 ⑪」):
+      - writer 이전 행(`last_activity_at IS NULL`): 종전대로 `started_at < cutoff`.
+      - 서버 세션: `last_activity_at < cutoff` **그리고** 그 세션을 가리키는 시도가 남아 있지 않음.
+    """
+    ts_expr = _effective_timestamp(model, column)
+    if model is not LearningSession:
+        return ts_expr < cutoff
+    remaining_attempt = exists(
+        select(ProblemAttempt.attempt_id).where(
+            ProblemAttempt.session_id == LearningSession.session_id
+        )
+    )
+    return or_(
+        and_(LearningSession.last_activity_at.is_(None), ts_expr < cutoff),
+        and_(
+            LearningSession.last_activity_at.is_not(None),
+            LearningSession.last_activity_at < cutoff,
+            ~remaining_attempt,
+        ),
+    )
+
+
 def retention_cutoff(as_of: date, *, years: int) -> date:
     """보존 만료 기준일 = `as_of − years`년(순수·윤년 안전·2/29→2/28 클램프).
 
@@ -151,7 +192,6 @@ async def purge_expired_records(
     cutoff = retention_cutoff(as_of, years=resolved_years)
     counts: dict[str, int] = {}
     for model, column in _RETENTION_PLAN:
-        ts_expr = _effective_timestamp(model, column)
-        result = await session.execute(delete(model).where(ts_expr < cutoff))
+        result = await session.execute(delete(model).where(_purge_condition(model, column, cutoff)))
         counts[model.__tablename__] = cast("CursorResult[Any]", result).rowcount or 0
     return counts

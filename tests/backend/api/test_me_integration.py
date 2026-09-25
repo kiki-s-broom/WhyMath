@@ -97,6 +97,10 @@ async def _cleanup(user_ids: list[uuid.UUID]) -> None:
                 text("DELETE FROM deletion_audit WHERE user_id = ANY(:ids)"),
                 {"ids": ids},
             )
+            # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+            await conn.execute(
+                text("DELETE FROM learning_session WHERE user_id = ANY(:ids)"), {"ids": ids}
+            )
             await conn.execute(
                 text("DELETE FROM user_profile WHERE user_id = ANY(:ids)"), {"ids": ids}
             )
@@ -522,6 +526,8 @@ def test_submit_attempt_records_and_propagates_mastery_on_live_pg() -> None:
                         "DELETE FROM learning_state_transition WHERE user_id=:u",
                         {"u": str(uid)},
                     ),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
@@ -734,6 +740,8 @@ def test_me_ability_estimates_theta_from_attempts_on_live_pg() -> None:
                 for sql in (
                     "DELETE FROM problem_attempt WHERE user_id=:u",
                     "DELETE FROM problem WHERE problem_id=:p",
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    "DELETE FROM learning_session WHERE user_id=:u",
                     "DELETE FROM user_profile WHERE user_id=:u",
                 ):
                     await conn.execute(text(sql), {"u": str(uid), "p": str(pid)})
@@ -927,6 +935,10 @@ def test_me_next_problem_recommends_unattempted_on_live_pg() -> None:
                         text("DELETE FROM problem WHERE problem_id=:p"),
                         {"p": str(pid)},
                     )
+                # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
                 await conn.execute(
                     text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
                 )
@@ -997,6 +1009,10 @@ def test_me_next_problem_suneung_persona_fit_only_candidate_on_live_pg() -> None
         try:
             async with engine.begin() as conn:
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
                 await conn.execute(
                     text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
                 )
@@ -1061,6 +1077,10 @@ def test_me_next_problem_suneung_persona_fit_below_threshold_excluded_on_live_pg
         try:
             async with engine.begin() as conn:
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
                 await conn.execute(
                     text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
                 )
@@ -1157,6 +1177,8 @@ def test_me_next_problem_weak_concept_priority_on_live_pg() -> None:
                         "DELETE FROM concept WHERE concept_id = ANY(:c)",
                         {"c": [str(c_strong), str(c_weak)]},
                     ),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
@@ -1245,6 +1267,10 @@ def test_me_next_problem_sibling_exclude_on_live_pg() -> None:
                     await conn.execute(
                         text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)}
                     )
+                # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
                 await conn.execute(
                     text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
                 )
@@ -1338,6 +1364,10 @@ def test_me_next_problem_sibling_include_on_live_pg() -> None:
                     await conn.execute(
                         text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)}
                     )
+                # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
                 await conn.execute(
                     text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
                 )
@@ -1437,6 +1467,8 @@ def test_me_ability_by_concept_on_live_pg() -> None:
                         "DELETE FROM concept WHERE concept_id = ANY(:c)",
                         {"c": [str(c_strong), str(c_weak)]},
                     ),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
@@ -1538,6 +1570,8 @@ def test_me_concept_diagnosis_cross_check_on_live_pg() -> None:
                         "DELETE FROM concept WHERE concept_id = ANY(:c)",
                         {"c": [str(c1), str(c2)]},
                     ),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
@@ -1602,6 +1636,8 @@ def test_me_ability_snapshot_capture_and_list_on_live_pg() -> None:
                     "DELETE FROM ability_snapshot WHERE user_id=:u",
                     "DELETE FROM problem_attempt WHERE user_id=:u",
                     "DELETE FROM problem WHERE problem_id=:p",
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    "DELETE FROM learning_session WHERE user_id=:u",
                     "DELETE FROM user_profile WHERE user_id=:u",
                 ):
                     await conn.execute(text(sql), {"u": str(uid), "p": str(pid)})
@@ -1688,6 +1724,8 @@ def test_me_ability_snapshot_per_concept_on_live_pg() -> None:
                     ),
                     ("DELETE FROM problem WHERE problem_id=:p", {"p": str(pid)}),
                     ("DELETE FROM concept WHERE concept_id=:c", {"c": str(cid)}),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)
@@ -1755,6 +1793,8 @@ def test_me_session_end_auto_captures_snapshot_on_live_pg() -> None:
                     "DELETE FROM problem_attempt WHERE user_id=:u",
                     "DELETE FROM learning_session WHERE user_id=:u",
                     "DELETE FROM problem WHERE problem_id=:p",
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    "DELETE FROM learning_session WHERE user_id=:u",
                     "DELETE FROM user_profile WHERE user_id=:u",
                 ):
                     await conn.execute(text(sql), {"u": str(uid), "p": str(pid)})
@@ -1859,6 +1899,8 @@ def test_me_session_end_auto_captures_concept_snapshots_on_live_pg() -> None:
                     ),
                     ("DELETE FROM problem WHERE problem_id=:p", {"p": str(pid)}),
                     ("DELETE FROM concept WHERE concept_id=:c", {"c": str(cid)}),
+                    # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+                    ("DELETE FROM learning_session WHERE user_id=:u", {"u": str(uid)}),
                     ("DELETE FROM user_profile WHERE user_id=:u", {"u": str(uid)}),
                 ):
                     await conn.execute(text(sql), params)

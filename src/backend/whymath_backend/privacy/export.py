@@ -25,6 +25,17 @@ data access·portability)이다. 삭제권이 이미 *어떤 테이블이 사용
 `AttemptEvent`(세부 시도 이벤트)를 동기 export로 포함(Phase1·완전성 우선) — 매우 큰 이력은 후속
 스트리밍으로 최적화 가능.
 
+**EOS-131 ⑤ — 추천 기록(`recommendation_events`) 포함 판정**: `evidence_event`에는 `user_id`가
+없다(PED-03·REC-03 구조적 차단). 그러나 EOS-131부터 추천 처치 행의 `session_id`가 실 학습 세션을
+가리키므로, **세션 행이 살아 있는 동안** `evidence_event.session_id → learning_session.user_id`
+경로로 그 추천은 이 학생의 것으로 식별된다 — 식별 가능한 정보는 개인정보이고(PIPA §2 1호 나목 —
+다른 정보와 쉽게 결합해 알아볼 수 있는 정보), 열람권(PIPA §35·GDPR Art.15)의 대상이다. 그래서
+포함한다. 내용은 비민감 메타(문항 id·θ·후보 점수·정책 버전·추천 사유)뿐이라 본인에게 그대로
+안전하다(B1 — 원문 발화 0). 조인으로만 얻으므로 삭제권 이행 뒤(세션 행 소멸)에는 이 목록에 더 이상
+나타나지 않는다 — 그때는 결합이 끊겨 더 이상 이 학생의 정보가 아니다(열람권과 삭제권의 범위가
+같은 조인 한 줄로 일치한다). 교수법 처치(`pedagogy_render`·`pedagogy_outcome`)는 여전히 세션 결합이
+없는 좌석이라 포함하지 않는다 — 이 조인은 `recommendation_render`만 본다.
+
 외부 store(Redis 캐시·큐 · Langfuse 트레이스 SaaS)는 RDB 밖이라 이 export(PostgreSQL)에 *포함되지
 않는다* — `external_export_pending`으로 *구조화*해 ops가 가시화한다(#252 `external_erasure_targets`
 미러·정보 누출 방지로 student-facing 응답엔 인프라 store명/locator 미노출·ops 로그만).
@@ -64,6 +75,7 @@ from whymath_backend.db.models.assessment import (
     SkillMasteryHistory,
 )
 from whymath_backend.db.models.dialogue import Dialogue, DialogueTurn
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.evidence_link import EvidenceLink
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
@@ -76,6 +88,7 @@ from whymath_backend.db.models.user import (
     UserStateSnapshot,
     UserTrackHistory,
 )
+from whymath_backend.l2.recommendation_evidence import EVENT_TYPE_RECOMMENDATION_TREATMENT
 from whymath_backend.schema.activity import ProblemAttempt as SchemaProblemAttempt
 from whymath_backend.schema.answer_submission import AnswerSubmission as SchemaAnswerSubmission
 from whymath_backend.schema.student_solution_step import (
@@ -350,6 +363,20 @@ def _row_to_json(row: Any) -> dict[str, Any]:
     return cast("dict[str, Any]", row.to_schema().model_dump(mode="json"))
 
 
+def _recommendation_event_json(row: Any) -> dict[str, Any]:
+    """추천 처치 1행 → JSON-safe dict. 비민감 메타만(B1) — 암호문·파기 스케줄 컬럼은 싣지 않는다.
+
+    `objective_id`·`k_type`은 NOT NULL 제약을 채우는 네임스페이스 placeholder라(
+    `recommendation_evidence` 모듈 docstring) 학생에게 의미가 없어 뺀다.
+    """
+    return {
+        "time": row.time.isoformat() if row.time is not None else None,
+        "session_id": str(row.session_id),
+        "event_type": row.event_type,
+        "meta": row.meta,
+    }
+
+
 async def export_user_data(session: AsyncSession, *, user_id: uuid.UUID) -> UserDataExport:
     """본인의 학습/진단 데이터를 `_EXPORT_PLAN`대로 모아 구조화 export로 반환한다(읽기 전용).
 
@@ -427,6 +454,22 @@ async def export_user_data(session: AsyncSession, *, user_id: uuid.UUID) -> User
     )
     profile_row = profile_result.scalars().first()
     user_profile = _row_to_json(profile_row) if profile_row is not None else None
+
+    # EOS-131 ⑤: 추천 기록 — user_id가 없어 학습 세션으로 조인한다(모듈 docstring 판정 근거).
+    # 기존 조회 순서(계획 19종 → 대화 턴 → 프로필)를 바꾸지 않도록 맨 뒤에 둔다.
+    # (time, event_id) 정렬로 결정적. 세션 행이 없으면(삭제권 이행 후) 조인이 비어 0건이다.
+    recommendation_result = await session.execute(
+        select(EvidenceEvent)
+        .join(LearningSession, EvidenceEvent.session_id == LearningSession.session_id)
+        .where(
+            LearningSession.user_id == user_id,
+            EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT,
+        )
+        .order_by(EvidenceEvent.time, EvidenceEvent.event_id)
+    )
+    data["recommendation_events"] = [
+        _recommendation_event_json(row) for row in recommendation_result.scalars().all()
+    ]
 
     return UserDataExport(
         user_id=user_id,

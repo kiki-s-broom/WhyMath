@@ -26,7 +26,8 @@ skill_node)만 ORM으로 심는다. 읽기 전용 SELECT는 공개 표면이 그
     `hint_usage` 0행) — `EOS-133-coach-hint-usage-attribution`.
   - SCENARIO-005 ⓑ 코치 완료 경로는 학습 상태 머신을 돌리지 않는다 — `EOS-134-coach-completion-state-machine`.
   - SCENARIO-008 ⓐ `EOS-124` — 추천의 정책 축(action)과 선택 축(problem_id·target) 불일치.
-  - SCENARIO-009 ⓐ `LearningSession` writer 0 — `S3-16` acceptance ③의 **미신설 결정**(결함 아님).
+  - (해소) SCENARIO-009 ⓐ `LearningSession` writer 0 — `EOS-131`이 서버 30분 유휴 규칙 writer를
+    신설해 정상 동작 단언(재접속이 같은 학습 세션으로 이어진다)으로 승격했다.
 
 대조표·실행 시간·회귀 주입 결과 = `docs/reviews/eos119_scenario_suite_2026-09-24.md`.
 회귀 주입 하네스 = `scripts/ops/verify_scenario_suite_discrimination.py`.
@@ -997,8 +998,10 @@ def test_scenario_009_reconnect_after_session_end() -> None:
       ② 종료: `ended_at`·`resolution`이 채워진다.
       ③ 재접속(새 앱·새 토큰): 같은 user_id · 종료된 대화가 목록에 종료 상태로 · 턴 보존 ·
          숙달·활성 오개념 동일 · 시도한 문항은 다시 추천되지 않는다.
-      ④ 정직한 공백 동결 — `LearningSession`(학습 세션) 행은 만들어지지 않는다. writer 미신설은
-         `S3-16` acceptance ③의 **결정**이다(결함 아님). 결정이 바뀌면 이 단언이 알린다.
+      ④ 학습 세션 이어짐(EOS-131 — 종전 '세션 행 0' 공백 동결의 승격) — 서버 30분 유휴 규칙이
+         연 `LearningSession`은 재접속(새 앱·새 토큰) 뒤에도 **같은 세션**으로 이어진다. 대화 종료는
+         학습 세션 종료가 아니다(세션은 학습 활동 묶음). 점수(`focus_score`·`engagement_score`)는
+         계속 비어 있다(S3-16 ③ 점수 미신설 유지).
     """
     content, journal = _begin("SCENARIO-009")
     uids: list[uuid.UUID] = []
@@ -1012,6 +1015,9 @@ def test_scenario_009_reconnect_after_session_end() -> None:
             uid = _user_id(client, auth)
             uids.append(uid)
             _attempt(client, auth, pids[0], correct=False, answer=_WRONG_ANSWER)
+            first_sessions = _get(client, auth, "/v1/me/sessions")
+            assert len(first_sessions) == 1, first_sessions
+            learning_session_id = first_sessions[0]["session_id"]
             opened = client.post(
                 "/v1/coach/sessions",
                 headers=auth,
@@ -1072,14 +1078,16 @@ def test_scenario_009_reconnect_after_session_end() -> None:
             )
             assert rec["problem_id"] != str(pids[0]), rec
 
-            # ④ 정직한 공백 동결 — 학습 세션 행 writer 미신설(S3-16 ③ 결정)
+            # ④ 학습 세션 이어짐(EOS-131) — 재접속 뒤에도 30분 안이면 같은 학습 세션이다.
             sessions = _get(client2, auth2, "/v1/me/sessions")
-            journal.record("④학습세션", "S3-16 ③ 미신설 결정", 세션수=len(sessions))
-            assert sessions == [], (
-                "학습 세션(LearningSession) 행이 생겼다 — `S3-16` acceptance ③의 writer 미신설 "
-                "결정이 바뀐 것으로 보인다. 이 단언을 '세션 종료→재접속이 세션 행으로 이어진다'로 "
-                "승격하라."
+            journal.record("④학습세션", "EOS-131 서버 유휴 규칙", 세션수=len(sessions))
+            assert [s["session_id"] for s in sessions] == [learning_session_id], (
+                "재접속이 같은 학습 세션으로 이어지지 않았다 — `EOS-131` 서버 30분 유휴 규칙 "
+                "writer(`l2/learning_session_writer`)를 확인하라."
             )
+            assert sessions[0]["ended_at"] is None, sessions
+            assert sessions[0]["focus_score"] is None, sessions
+            assert sessions[0]["engagement_score"] is None, sessions
             _erase_learner(client2)
         journal.dump()
     finally:

@@ -17,14 +17,12 @@ attempt를 적재하고 완료 신호를 응답에 싣는다 → (나) 그 attem
 원자성 미해결을 자인). 그래서 아래 관측은 네 축을 **개별 단언**한다 — "attempt만 남고 숙달은
 그대로"인 상태는 통과하지 못한다.
 
-**LearningSession 축은 이 관통이 지나가지 않는다(정직한 공백·기계 집행 없음)**: `learning_session`
-스키마(`schema/activity.py` §6.1 DDL)는 정본화됐으나 **writer가 0**이고(`src/` 전체에서
-`LearningSession(...)` 생성 0건 — `harness/surrogate_baseline_report.py:142`가 같은 실측을 기록),
-`l2/recommendation_evidence.py:109`는 `session_id`를 매 호출 `uuid.uuid4()` placeholder로 발급한다.
-`_complete_problem`도 `ProblemAttempt.session_id`를 채우지 않는다. 게다가 그 writer는 *미완*이
-아니라 **영구 미신설이 결정된 좌석**이다(`S3-16` acceptance ③ — MEMORY 2026-08-11 기록:
-"`S3-16`이 영구 미신설을 결정"). 그러므로 이 테스트는 세션 축을 배선하지 않고 그 공백을 *기계로
-고정*만 한다(아래 `session_id is None` 단언) — 이 관통에 세션 축의 **기계 집행은 없다**.
+**LearningSession 축도 이 관통이 지나간다(EOS-131 — 종전 정직한 공백의 해소)**: 종전에는
+`learning_session` writer가 0이라 `_complete_problem`이 `ProblemAttempt.session_id`를 채우지 않았고,
+이 테스트는 그 공백을 `session_id is None`으로 동결했다(`S3-16` ③ 미신설 결정). 2026-09-24 결정
+(MEMORY "S3-16 ③ 부분 번복")으로 행 writer가 신설됐다 — 서버가 30분 유휴 규칙
+(`l2/learning_session_writer`)으로 세션을 열고 완료 attempt도 그 세션에 결합한다. 그래서 같은 단언
+자리를 **반대 방향**(서버가 채운 세션이 이 학생의 실 `learning_session` 행이다)으로 교체했다.
 
 핵심 원칙:
 
@@ -64,7 +62,7 @@ from whymath_backend.api.me import _CANDIDATE_POOL_SIZE
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.consent import current_year_kst, derive_is_minor
-from whymath_backend.db.models.activity import AttemptEvent, ProblemAttempt
+from whymath_backend.db.models.activity import AttemptEvent, LearningSession, ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory, SkillMasteryHistory
 from whymath_backend.db.models.atom_node import AtomNode
 from whymath_backend.db.models.concept import Concept, ConceptEdge, ProblemConcept
@@ -352,6 +350,15 @@ async def _fetch_attempts(uid: uuid.UUID) -> list[ProblemAttempt]:
     )
 
 
+async def _fetch_sessions(uid: uuid.UUID) -> list[LearningSession]:
+    """이 유저의 `learning_session` 전 행 — 서버 writer(EOS-131) 결합 관측."""
+    return await _fetch_all(
+        select(LearningSession)
+        .where(LearningSession.user_id == uid)
+        .order_by(LearningSession.started_at)
+    )
+
+
 async def _fetch_completion_events(attempt_id: uuid.UUID) -> list[AttemptEvent]:
     """이 attempt의 `문제시도` 이벤트 — 스킬 배열 영속(EOS-57 writer) 도달 관측."""
     return await _fetch_all(
@@ -405,6 +412,11 @@ async def _cleanup(
             # 완료 경로 적재분 — dialogue(SET NULL) 정리 뒤·problem/user 정리 앞에 지운다.
             await conn.execute(
                 text("DELETE FROM problem_attempt WHERE user_id = :uid"),
+                {"uid": str(uid)},
+            )
+            # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 정리 앞에 지운다.
+            await conn.execute(
+                text("DELETE FROM learning_session WHERE user_id = :uid"),
                 {"uid": str(uid)},
             )
             await conn.execute(
@@ -473,8 +485,8 @@ def test_full_loop_onboarding_to_verify_on_live_pg() -> None:
            변별력이 없다) — 그래서 값 델타는 (다)에서 DB로 직접 단언하고, 여기서는 가중 축이
            실제로 적용됐다는 사실(`weight_axes_applied`)까지만 단언한다.
 
-    **LearningSession 축은 관통하지 않는다**(모듈 docstring 참조·기계 집행 없음): writer가 0이라
-    `problem_attempt.session_id`는 NULL로 남는다 — 그 사실 자체를 단언해 공백을 동결한다.
+    **LearningSession 축도 관통한다**(모듈 docstring 참조·EOS-131): 서버가 유휴 규칙으로 연
+    세션에 완료 attempt가 결합된다 — `problem_attempt.session_id`가 이 학생의 실 세션 행이다.
     """
     if not asyncio.run(_pg_reachable()):
         pytest.skip("PostgreSQL 미도달 — 통합 테스트 건너뜀 (WHYMATH_DATABASE_URL 확인)")
@@ -742,8 +754,14 @@ def test_full_loop_onboarding_to_verify_on_live_pg() -> None:
             # 이미 서버가 확인했고 이 필드는 *완료 턴 재제출* 기록용이라는 현행 계약의 고정
             # (`api/coach.py::_complete_problem` docstring).
             assert attempt.student_answer is None
-            # LearningSession writer 부재(정직한 공백·모듈 docstring) — 세션 축은 비어 있다.
-            assert attempt.session_id is None, "세션 축 writer 0 — 이 관통은 세션을 만들지 않는다"
+            # EOS-131: 종전 공백 동결(`session_id is None`)의 반대 방향 — 서버가 세션을 채운다.
+            assert attempt.session_id is not None, "서버 유휴 규칙 세션이 완료 attempt에 결합된다"
+            sessions = asyncio.run(_fetch_sessions(uid))
+            assert [row.session_id for row in sessions] == [
+                attempt.session_id
+            ], "관통 전체(추천·코치 턴·완료)가 30분 안의 한 학습 세션이다"
+            assert sessions[0].ended_at is None, "활동 중인 세션은 아직 닫히지 않는다"
+            assert sessions[0].focus_score is None and sessions[0].engagement_score is None
 
             # ⑵ 개념 축 숙달 델타(별도 commit) — 값이 실제로 올라갔다.
             mastery_after = asyncio.run(_latest_concept_mastery(uid, c_main))

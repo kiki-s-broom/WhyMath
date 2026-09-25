@@ -23,7 +23,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from whymath_backend.config import Settings
-from whymath_backend.l2 import learning_event_trace as trace
 from whymath_backend.ops import loop_kpi_gate as gate
 
 pytestmark = pytest.mark.integration
@@ -262,62 +261,190 @@ class TestStateIntegrityDelegation:
 
 
 class TestLoopCompletionOnceTheSessionAxisIsWired:
-    """KPI① — 원천 대장이 PRODUCED가 되면 조인이 실제로 도는가(설계 주장의 실 DB 검증)."""
+    """KPI① — EOS-131 착지 후 실제로 측정되는가, 그리고 ⑨ 재정의가 옳은 세션을 세는가.
 
-    async def test_join_counts_only_sessions_that_reached_a_recommendation(
+    원천 대장은 이제 **패치 없이** `PRODUCED`다(세션 writer·추천 실 session_id 결합). 그러므로
+    이 클래스는 대장을 조작하지 않는다 — 조작해야 통과한다면 그것은 착지가 아니다.
+
+    ⑨ 실패 주입 3종(EOS-131 acceptance ⑨): 옛 정의("추천이 하나라도 있는 세션")로 되돌리면
+    (가)가 RED다 — 시도 전에 나간 첫 추천만으로 '도달'이 되기 때문이다.
+    """
+
+    async def _seed_session(
         self,
-        db_session: AsyncSession,
-        window: gate.ObservationWindow,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr(
-            gate,
-            "source_registry",
-            lambda: tuple(
-                c.model_copy(update={"availability": trace.SourceAvailability.PRODUCED})
-                for c in trace.source_registry()
+        db: AsyncSession,
+        *,
+        started_at: datetime,
+        attempt_at: datetime | None,
+        rec_at: datetime | None,
+        objective: str,
+        ktype: str,
+    ) -> uuid.UUID:
+        """세션 1개 + (선택) 시도 1건(서버 수신 시각) + (선택) 추천 1건을 심는다."""
+        session_id = uuid.uuid4()
+        await db.execute(
+            text(
+                "INSERT INTO learning_session (session_id, started_at, last_activity_at)"
+                " VALUES (:s, :t, :t)"
             ),
+            {"s": session_id, "t": started_at},
         )
+        if attempt_at is not None:
+            await db.execute(
+                text(
+                    "INSERT INTO problem_attempt (attempt_id, session_id, ingested_at)"
+                    " VALUES (gen_random_uuid(), :s, :t)"
+                ),
+                {"s": session_id, "t": attempt_at},
+            )
+        if rec_at is not None:
+            await db.execute(
+                text(
+                    "INSERT INTO evidence_event (time, session_id, objective_id, k_type,"
+                    " event_type, meta) VALUES (:t, :s, :o, CAST(:k AS knowledge_type),"
+                    " 'recommendation_render', '{\"reason\": {}}'::jsonb)"
+                ),
+                {"t": rec_at, "s": session_id, "o": objective, "k": ktype},
+            )
+        return session_id
+
+    async def _cleanup(
+        self, db: AsyncSession, session_ids: list[uuid.UUID], objective: str
+    ) -> None:
+        # problem_attempt는 session_id CASCADE로 함께 지워진다.
+        for session_id in session_ids:
+            await db.execute(
+                text("DELETE FROM learning_session WHERE session_id = :s"), {"s": session_id}
+            )
+        await db.execute(
+            text("DELETE FROM evidence_event WHERE objective_id = :o"), {"o": objective}
+        )
+        await db.commit()
+
+    async def _delta(
+        self,
+        db: AsyncSession,
+        window: gate.ObservationWindow,
+        *,
+        attempt: bool,
+        rec_offset: timedelta | None,
+    ) -> tuple[int, int, int]:
+        """세션 1개를 심고 (분자 증감, 분모 증감, 시도 없는 세션 증감)을 돌려준다."""
+        objective = f"kpi1-{_RUN_TAG}-{uuid.uuid4().hex[:6]}"
+        ktype = await _knowledge_type(db)
+        t0 = datetime.now(UTC) - timedelta(minutes=10)
+        ids: list[uuid.UUID] = []
+        try:
+            before = await gate.collect_loop_completion(db, window)
+            ids.append(
+                await self._seed_session(
+                    db,
+                    started_at=t0 - timedelta(minutes=5),
+                    attempt_at=t0 if attempt else None,
+                    rec_at=None if rec_offset is None else t0 + rec_offset,
+                    objective=objective,
+                    ktype=ktype,
+                )
+            )
+            await db.commit()
+            after = await gate.collect_loop_completion(db, window)
+            assert before.detail is not None and after.detail is not None
+            return (
+                (after.numerator or 0) - (before.numerator or 0),
+                (after.denominator or 0) - (before.denominator or 0),
+                after.detail["sessions_without_attempt"]
+                - before.detail["sessions_without_attempt"],
+            )
+        finally:
+            await self._cleanup(db, ids, objective)
+
+    async def test_precondition_is_open_without_patching_the_registry(self) -> None:
+        """EOS-131 ⑦(가): 대장을 건드리지 않아도 선결이 비어 있다."""
         assert gate.blocked_preconditions(gate.LoopKpi.LOOP_COMPLETION) == ()
 
-        reached = [uuid.uuid4() for _ in range(3)]
-        missed = [uuid.uuid4() for _ in range(2)]
-        objective = f"kpi1-{_RUN_TAG}"
+    async def test_a_recommendation_only_before_the_first_attempt_is_not_reached(
+        self, db_session: AsyncSession, window: gate.ObservationWindow
+    ) -> None:
+        """(가) 시도 *전* 추천만 있는 세션 → 분모엔 들어가지만 미도달. 옛 정의면 RED."""
+        num, den, _ = await self._delta(
+            db_session, window, attempt=True, rec_offset=-timedelta(minutes=1)
+        )
+        assert (num, den) == (0, 1)
+
+    async def test_b_recommendation_after_the_first_attempt_is_reached(
+        self, db_session: AsyncSession, window: gate.ObservationWindow
+    ) -> None:
+        """(나) 시도 *후* 추천이 있는 세션 → 도달."""
+        num, den, _ = await self._delta(
+            db_session, window, attempt=True, rec_offset=timedelta(minutes=1)
+        )
+        assert (num, den) == (1, 1)
+
+    async def test_c_attempt_without_a_later_recommendation_is_not_reached(
+        self, db_session: AsyncSession, window: gate.ObservationWindow
+    ) -> None:
+        """(다) 시도는 있으나 이후 추천이 없는 세션 → 미도달."""
+        num, den, _ = await self._delta(db_session, window, attempt=True, rec_offset=None)
+        assert (num, den) == (0, 1)
+
+    async def test_session_without_attempt_leaves_the_denominator_but_is_reported(
+        self, db_session: AsyncSession, window: gate.ObservationWindow
+    ) -> None:
+        """시도 없는 세션은 분모에서 빠지되 **조용히** 빠지지 않는다(detail로 보고)."""
+        num, den, without = await self._delta(
+            db_session, window, attempt=False, rec_offset=timedelta(minutes=1)
+        )
+        assert (num, den, without) == (0, 0, 1)
+
+    async def test_m_over_n_across_mixed_sessions(
+        self, db_session: AsyncSession, window: gate.ObservationWindow
+    ) -> None:
+        """EOS-131 ⑦(가): 세션 N건·추천 도달 M건 관측창에서 M/N이 나온다(도달 2 / 시도 세션 4)."""
+        objective = f"kpi1-mn-{_RUN_TAG}"
         ktype = await _knowledge_type(db_session)
+        t0 = datetime.now(UTC) - timedelta(minutes=20)
+        plan = [
+            (True, timedelta(minutes=1)),  # 도달
+            (True, timedelta(minutes=2)),  # 도달
+            (True, -timedelta(minutes=1)),  # 시도 전 추천만 — 미도달
+            (True, None),  # 추천 없음 — 미도달
+            (False, timedelta(minutes=1)),  # 시도 없음 — 분모 제외
+        ]
+        ids: list[uuid.UUID] = []
         try:
             before = await gate.collect_loop_completion(db_session, window)
-            for session_id in reached + missed:
-                await db_session.execute(
-                    text(
-                        "INSERT INTO learning_session (session_id, started_at)"
-                        " VALUES (:s, now())"
-                    ),
-                    {"s": session_id},
-                )
-            for session_id in reached:
-                await db_session.execute(
-                    text(
-                        "INSERT INTO evidence_event (time, session_id, objective_id, k_type,"
-                        " event_type, meta) VALUES (now(), :s, :o,"
-                        " CAST(:k AS knowledge_type), 'recommendation_render',"
-                        " '{\"reason\": {}}'::jsonb)"
-                    ),
-                    {"s": session_id, "o": objective, "k": ktype},
+            for attempt, offset in plan:
+                ids.append(
+                    await self._seed_session(
+                        db_session,
+                        started_at=t0 - timedelta(minutes=5),
+                        attempt_at=t0 if attempt else None,
+                        rec_at=None if offset is None else t0 + offset,
+                        objective=objective,
+                        ktype=ktype,
+                    )
                 )
             await db_session.commit()
-
             after = await gate.collect_loop_completion(db_session, window)
-            assert after.denominator == (before.denominator or 0) + 5
-            assert after.numerator == (before.numerator or 0) + 3
+            assert (after.numerator or 0) - (before.numerator or 0) == 2
+            assert (after.denominator or 0) - (before.denominator or 0) == 4
+            assert after.unmeasured_reason is None
         finally:
-            for session_id in reached + missed:
-                await db_session.execute(
-                    text("DELETE FROM learning_session WHERE session_id = :s"), {"s": session_id}
-                )
-            await db_session.execute(
-                text("DELETE FROM evidence_event WHERE objective_id = :o"), {"o": objective}
-            )
-            await db_session.commit()
+            await self._cleanup(db_session, ids, objective)
+
+    async def test_empty_window_is_still_unmeasured_exit_2(self, db_session: AsyncSession) -> None:
+        """EOS-131 ⑦(가): 세션 0건 관측창 → 분모 0 → '0% 미달'이 아니라 미측정(exit 2)."""
+        far = datetime(2100, 1, 1, tzinfo=UTC)
+        empty = gate.ObservationWindow(start=far, end=far + timedelta(hours=1))
+        observation = await gate.collect_loop_completion(db_session, empty)
+        assert observation.denominator == 0
+        assert observation.unmeasured_reason is None  # 구조적 선결 때문이 아니다
+        report = gate.evaluate({observation.kpi: observation}, window=empty, run_id="it")
+        outcome = next(o for o in report.outcomes if o.kpi is gate.LoopKpi.LOOP_COMPLETION)
+        assert outcome.verdict is gate.KpiVerdict.unmeasured
+        assert "분모가 0" in outcome.reason
+        assert not report.failed  # 0건을 '미달'로 위장하지 않는다
+        assert report.exit_code == gate.EXIT_UNMEASURED == 2
 
 
 class TestSchemaSmoke:

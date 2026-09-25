@@ -35,10 +35,10 @@
 관측치(분자·분모)만 낸다(자기 합격선을 써 내면 그것은 판정이 아니라 자기 신고다).
 
   KPI① Loop Completion Rate  (≥95%)
-      분자 = 시작된 학습 루프 중 Recommendation 단계까지 도달한 수
-      분모 = 관측창에 시작된 학습 루프 수
-      출처 = `learning_session` × `evidence_event`(recommendation_render)
-      **현행 구조적 미측정** — 아래 「분모 판정」.
+      분자 = 시도가 있는 세션 중 **첫 시도 이후** Recommendation까지 도달한 세션 수
+      분모 = 관측창에 시작된 세션 중 시도가 1건 이상 있는 세션 수(시도 없는 세션은 따로 보고)
+      출처 = `learning_session` × `problem_attempt` × `evidence_event`(recommendation_render)
+      EOS-131로 측정 가능해졌다 — 아래 「KPI① 정의」(재정의 근거)·「분모 판정 이력」.
 
   KPI② State Integrity       (불일치 ≤1%)
       분자 = 무결성 위반 행 수(7종 합)   분모 = 스캔 대상 행 수(7종 합)
@@ -56,13 +56,34 @@
   KPI⑤ Traceability          (역추적 실패 = 0 · 무관용)
       분자 = 5홉 체인이 끊기는 recommendation 건수   분모 = recommendation 전체
       체인 = Recommendation → LearnerState → Assessment → Attempt → Problem
-      출처 = `l2/learning_event_trace`의 원천 대장. **현행 구조적 미측정**(2홉 파손).
+      출처 = `l2/learning_event_trace`의 원천 대장. **현행 구조적 미측정** — EOS-131로 추천 결합
+      홉은 풀렸고 LearnerState 시각 홉(user_state_snapshot DORMANT)이 남았다(EOS-132 소관).
 
 ────────────────────────────────────────────────────────────────────────────
-분모 판정 — KPI①의 분모는 오늘 정의되지 않는다 (EOS-15 acceptance ②)
+KPI① 정의 (EOS-131 ⑨ — 2026-09-25 재정의)
 ────────────────────────────────────────────────────────────────────────────
-계획서는 분모를 "시작한 학습 세션"이라고 적었는데, 이 저장소에서 그 단위는 **아무도 쓰지
-않는다**. 두 사실이 겹친다:
+  분자 = 관측창에 시작된 세션 중 **그 세션의 첫 시도 이후에** 기록된 `recommendation_render`가
+         관측창 끝 이전에 1건 이상 있는 세션 수
+  분모 = 관측창에 시작된 세션 중 **시도(`problem_attempt`)가 1건 이상** 있는 세션 수
+  별도 보고 = 시도가 없는 세션 수(`detail.sessions_without_attempt`) — 분모에서 빼되 조용히
+         빼지 않는다.
+왜 바꿨나: 서버 유휴 규칙(`l2/learning_session_writer`)은 `/me/next-problem`도 세션을 여는
+활동으로 친다. 앱은 첫 문제를 추천으로 받으므로, 옛 정의("추천이 하나라도 있는 세션")로는 거의
+모든 세션이 **시작 순간** '도달'로 계상돼 KPI①이 동어반복이 된다 — 재려던 흐름(Attempt →
+Assessment → Mastery → Recommendation)을 전혀 보지 않는다. 시도 이후의 추천만 루프가 한 바퀴
+돈 증거다. 시도가 없는 세션은 루프가 *시작되지 않은* 것이므로 분모에서 뺀다(시작 안 한 루프를
+미완주로 세면 '추천만 보고 떠난 학생'이 루프 결함으로 읽힌다). 대안("next-problem을 세션 개시
+활동에서 제외")은 채택하지 않았다 — 첫 추천이 세션 없이 기록돼 추천↔학습자 결합이 다시 끊긴다.
+시각 축은 전부 **서버 수신**이다(추천 `evidence_event.time`·시도 `COALESCE(ingested_at,
+created_at)`) — 클라 신고 `started_at`을 섞으면 서로 다른 시계를 비교하게 된다.
+
+────────────────────────────────────────────────────────────────────────────
+분모 판정 이력 — KPI①의 분모는 EOS-131 전까지 정의되지 않았다 (EOS-15 acceptance ②)
+────────────────────────────────────────────────────────────────────────────
+아래는 2026-09-19 판정 기록이다. **EOS-131이 두 사실을 모두 해소했다** — 세션 writer 신설,
+추천 기록의 실 `session_id` 결합. 원천 대장이 `PRODUCED`로 바뀌어 이 KPI는 설계대로 스스로
+`unmeasured`를 벗었다. 계획서는 분모를 "시작한 학습 세션"이라고 적었는데, 당시 이 저장소에서 그
+단위는 **아무도 쓰지 않았다**. 두 사실이 겹쳤다:
 
   1. `learning_session`에 **writer가 0건**이다(조회·종료·삭제 표면만 있다).
   2. 추천은 적재되지만 `evidence_event`에 `user_id` 컬럼이 없고 `session_id`는 호출마다
@@ -132,13 +153,13 @@ import json
 import sys
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Final
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import LearningSession, ProblemAttempt
@@ -286,10 +307,13 @@ LOOP_KPI_SPECS: Final[tuple[LoopKpiSpec, ...]] = (
     LoopKpiSpec(
         kpi=LoopKpi.LOOP_COMPLETION,
         title="Loop Completion Rate — 시작한 학습 루프 중 Recommendation까지 도달한 비율",
-        numerator_def="관측창에 시작된 learning_session 중 같은 session_id의 "
-        "recommendation_render 증거가 관측창 안에 존재하는 세션 수",
-        denominator_def="관측창에 started_at을 가진 learning_session 행 수",
-        source="db.models.activity.LearningSession × db.models.evidence_event.EvidenceEvent",
+        numerator_def="관측창에 시작된 learning_session 중 그 세션의 첫 시도(problem_attempt 수신 "
+        "시각) 이후·관측창 끝 이전에 같은 session_id의 recommendation_render가 1건 이상 "
+        "있는 세션 수",
+        denominator_def="관측창에 시작된 learning_session 중 시도(problem_attempt)가 1건 이상 있는 "
+        "세션 수(시도 없는 세션 수는 detail.sessions_without_attempt로 따로 보고)",
+        source="db.models.activity.LearningSession × ProblemAttempt × "
+        "db.models.evidence_event.EvidenceEvent",
         seat_task="EOS-15-loop-completion-and-manual-intervention-kpi",
         threshold=0.95,
         direction=Direction.AT_LEAST,
@@ -430,8 +454,13 @@ class Observation:
     error_type: str | None = None
     """수집이 예외로 끝났을 때 그 **예외 타입명**(침묵 실패 금지). 값·시크릿은 싣지 않는다."""
 
+    detail: Mapping[str, int] | None = None
+    """분자·분모 밖의 보조 계수(예: KPI① 시도 없는 세션 수) — 판정에 쓰지 않고 함께 보고만 한다.
+
+    분모에서 뺀 것을 *조용히* 빼지 않기 위한 좌석이다(EOS-131 ⑨)."""
+
     def as_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "kpi": self.kpi.value,
             "numerator": self.numerator,
             "denominator": self.denominator,
@@ -439,6 +468,9 @@ class Observation:
             "source": self.source,
             "error_type": self.error_type,
         }
+        if self.detail is not None:
+            payload["detail"] = dict(self.detail)
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -460,6 +492,9 @@ class KpiOutcome:
     error_type: str | None = None
     residual_upper_bound: float | None = None
     """무관용 축이 통과했을 때의 Wilson 상한 — 관측 0을 확정 0으로 과신하지 않기 위한 표기."""
+
+    detail: Mapping[str, int] | None = None
+    """관측치의 보조 계수를 그대로 운반(판정 무관 — `Observation.detail`)."""
 
     def as_dict(self) -> dict[str, Any]:
         spec = spec_for(self.kpi)
@@ -484,11 +519,21 @@ class KpiOutcome:
         }
         if spec.coverage_note is not None:
             payload["coverage_note"] = spec.coverage_note
+        if self.detail is not None:
+            payload["detail"] = dict(self.detail)
         return payload
 
 
 def _evaluate_one(observation: Observation) -> KpiOutcome:
-    """관측치 1건 → 판정 1건. 순수 함수(입출력 외 부작용 0)."""
+    """관측치 1건 → 판정 1건. 순수 함수(입출력 외 부작용 0). 보조 계수는 판정 뒤에 덧붙인다."""
+    outcome = _judge(observation)
+    if observation.detail is None:
+        return outcome
+    return replace(outcome, detail=observation.detail)
+
+
+def _judge(observation: Observation) -> KpiOutcome:
+    """관측치 1건의 판정 본체 — `detail`은 보지 않는다(보조 계수는 판정 근거가 아니다)."""
     spec = spec_for(observation.kpi)
     num, den = observation.numerator, observation.denominator
 
@@ -753,44 +798,65 @@ def _precondition_observation(kpi: LoopKpi, source: str) -> Observation | None:
 
 
 async def collect_loop_completion(session: AsyncSession, window: ObservationWindow) -> Observation:
-    """KPI① — 세션 축이 배선되기 전까지는 조회하지 않고 미측정을 낸다.
+    """KPI① — 시도가 있는 세션 중 **첫 시도 이후** 추천까지 도달한 비율(EOS-131 ⑨ 재정의).
 
-    조회해서 나오는 0은 "도달 실패"가 아니라 "아무도 세션을 만들지 않는다"이고, 그 둘을 같은
-    숫자로 내면 0%라는 거짓 미달이 보고된다. 선결이 풀리면(원천 대장이 PRODUCED로 바뀌면)
-    아래 실 조회가 자동으로 살아난다.
+    정의는 모듈 docstring 「KPI① 정의」가 정본이다. 구조적 선결(원천 대장)이 막혀 있으면 조회하지
+    않고 미측정을 낸다 — 조회해서 나오는 0은 "도달 실패"가 아니라 "아무도 세션을 만들지 않는다"다.
+    세션이 0건인 관측창은 분모 0 → `_judge`가 미측정(exit 2)으로 판정한다.
     """
     source = "collect_loop_completion"
     blocked = _precondition_observation(LoopKpi.LOOP_COMPLETION, source)
     if blocked is not None:
         return blocked
 
+    in_window = (
+        LearningSession.started_at >= window.start,
+        LearningSession.started_at < window.end,
+    )
+    # 세션별 첫 시도 — 서버 수신 축(클라 신고 started_at 아님·모듈 docstring 참조).
+    attempt_at = func.coalesce(ProblemAttempt.ingested_at, ProblemAttempt.created_at)
+    first_attempt = (
+        select(
+            ProblemAttempt.session_id.label("session_id"),
+            func.min(attempt_at).label("first_attempt_at"),
+        )
+        .where(ProblemAttempt.session_id.is_not(None))
+        .group_by(ProblemAttempt.session_id)
+        .subquery()
+    )
+    started_total = await session.scalar(
+        select(func.count()).select_from(LearningSession).where(*in_window)
+    )
     denominator = await session.scalar(
         select(func.count())
         .select_from(LearningSession)
-        .where(
-            LearningSession.started_at >= window.start,
-            LearningSession.started_at < window.end,
-        )
+        .join(first_attempt, first_attempt.c.session_id == LearningSession.session_id)
+        .where(*in_window)
     )
-    reached = select(EvidenceEvent.session_id).where(
-        EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT,
-        EvidenceEvent.time >= window.start,
-        EvidenceEvent.time < window.end,
+    reached_after_attempt = exists(
+        select(EvidenceEvent.event_id).where(
+            EvidenceEvent.session_id == LearningSession.session_id,
+            EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT,
+            EvidenceEvent.time > first_attempt.c.first_attempt_at,
+            EvidenceEvent.time < window.end,
+        )
     )
     numerator = await session.scalar(
         select(func.count())
         .select_from(LearningSession)
-        .where(
-            LearningSession.started_at >= window.start,
-            LearningSession.started_at < window.end,
-            LearningSession.session_id.in_(reached),
-        )
+        .join(first_attempt, first_attempt.c.session_id == LearningSession.session_id)
+        .where(*in_window, reached_after_attempt)
     )
+    den = int(denominator or 0)
     return Observation(
         kpi=LoopKpi.LOOP_COMPLETION,
         numerator=int(numerator or 0),
-        denominator=int(denominator or 0),
+        denominator=den,
         source=source,
+        detail={
+            "sessions_started": int(started_total or 0),
+            "sessions_without_attempt": int(started_total or 0) - den,
+        },
     )
 
 
@@ -885,7 +951,9 @@ async def collect_manual_intervention(
 
 
 async def collect_traceability(session: AsyncSession, window: ObservationWindow) -> Observation:
-    """KPI⑤ — 5홉 체인의 해소율. 현행은 2홉(추천 결합·LearnerState 시각)이 구조적으로 끊겨 있다.
+    """KPI⑤ — 5홉 체인의 해소율. 현행은 LearnerState 시각 1홉이 구조적으로 끊겨 있다.
+
+    (EOS-131 전에는 추천 결합까지 2홉이었다 — 추천이 실 session_id로 결합되면서 1홉이 풀렸다.)
 
     끊긴 홉이 하나라도 있으면 조회하지 않는다. 남은 3홉만 재서 "100% 역추적"이라고 적으면
     그것이 정확히 이 게이트가 막으려는 거짓말이다.
@@ -1083,6 +1151,9 @@ def render(report: LoopKpiReport) -> str:
                 f"        잔여상한  : {outcome.residual_upper_bound:.4f}"
                 " (관측 0이 확정 0은 아니다)"
             )
+        if outcome.detail:
+            extra = " · ".join(f"{k}={v}" for k, v in sorted(outcome.detail.items()))
+            lines.append(f"        보조계수  : {extra}")
         if outcome.error_type is not None:
             lines.append(f"        예외타입  : {outcome.error_type}")
         lines.append(f"        출처      : {outcome.source} · 좌석 {spec.seat_task}")

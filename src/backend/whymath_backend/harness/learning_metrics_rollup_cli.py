@@ -37,6 +37,7 @@ from whymath_backend.l2.learning_metrics_rollup import (
     RollupReport,
     run_daily_rollup,
 )
+from whymath_backend.l2.learning_session_writer import close_idle_sessions
 
 __all__ = ["main", "resolve_window", "run"]
 
@@ -83,6 +84,11 @@ async def run(
     engine = create_async_engine(settings.database_url)
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            # EOS-131: 롤업 전에 유휴 초과 서버 세션을 마지막 활동 시각으로 닫는다(배치 시점 확정 —
+            # 다시 오지 않는 학생의 세션이 영원히 열려 있지 않게). 롤업이 ended_at−started_at 폴백을
+            # 쓰므로 순서가 중요하다. 배치 경로라 never-break가 아니다(실패는 호출자에게 전파).
+            closed = await close_idle_sessions(session)
+            _logger.info("유휴 초과 학습 세션 종료 확정 %d건(dry_run=%s).", closed, dry_run)
             report = await run_daily_rollup(
                 session,
                 start_date=start_date,

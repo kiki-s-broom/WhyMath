@@ -41,6 +41,12 @@
 2026-09-16 main 기준 실측 배정은 `_SOURCE_REGISTRY`에 인용과 함께 고정돼 있고, 그 배정이
 실제 코드와 어긋나면 `tests/backend/l2/test_learning_event_trace.py`의 거버넌스 테스트가 깬다.
 
+EOS-131(2026-09-25)이 두 원천을 `PRODUCED`로 옮겼다 — `learning_session`(서버 30분 유휴 규칙
+writer 신설 → `concept_selected`)과 `evidence_event`의 추천 처치(실 `session_id` 결합 →
+`recommendation_generated`). 추천은 `evidence_event`에 `user_id`가 없으므로 **`learning_session`
+조인으로만** 이 학습자 것으로 집어낸다(`_recommendation_stmt`). 세션 행이 지워지면(삭제권) 그
+추천은 이 시간선에서 사라진다 — 결합이 끊긴 것이 정확한 상태다.
+
 ────────────────────────────────────────────────────────────────────────────
 개인정보 경계 (acceptance ④ · DP-02 payload allowlist 승계)
 ────────────────────────────────────────────────────────────────────────────
@@ -70,15 +76,22 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from whymath_backend.db.models.activity import AttemptEvent, ProblemAttempt
+from whymath_backend.db.models.activity import AttemptEvent, LearningSession, ProblemAttempt
 from whymath_backend.db.models.assessment import (
     AbilitySnapshot,
     Assessment,
     ConceptMasteryHistory,
     SkillMasteryHistory,
 )
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
 from whymath_backend.l2.learning_metrics_rollup import effective_event_moment
+from whymath_backend.l2.recommendation_evidence import (
+    EVENT_TYPE_RECOMMENDATION_TREATMENT,
+    META_KEY_MODE,
+    META_KEY_POLICY_VERSION,
+    META_KEY_PROBLEM_ID,
+)
 from whymath_backend.schema.enums import EventType
 
 __all__ = [
@@ -191,10 +204,11 @@ class SourceCoverage(BaseModel):
     reason: str
 
 
-_REASON_DORMANT_LEARNING_SESSION = (
-    "learning_session에 생성 경로가 없다 — 조회·종료·삭제 표면만 있고 writer 0건"
-    "(2026-09-16 실측: session.add 전수 스캔에서 LearningSession 생성 0건). "
-    "따라서 세션 축·목표개념 선택 이벤트는 아무에게도 기록되지 않는다."
+_REASON_PRODUCED_LEARNING_SESSION = (
+    "l2/learning_session_writer가 인증된 학습 활동(/me/next-problem·/me/attempts·코치 턴)마다 "
+    "서버 30분 유휴 규칙으로 learning_session을 잇거나 연다(EOS-131). 세션 개시(started_at)를 "
+    "이 이벤트로 투영한다 — target_concept_id는 이 writer가 채우지 않으므로 concept_id는 비어 "
+    "있을 수 있고, 그 None은 '목표 개념을 지정하지 않은 활동 묶음'이라는 사실이다."
 )
 _REASON_DORMANT_USER_STATE = (
     "user_state_snapshot에 생성 경로가 없다 — ORM·스키마는 있으나 writer 0건"
@@ -205,10 +219,12 @@ _REASON_DORMANT_CONTENT_VIEW = (
     "학습자별 콘텐츠 열람 로그가 없다 — concept_content는 조회 표면만 있고 "
     "'누가 언제 봤다'를 남기는 좌석이 0건이다(2026-09-16 실측)."
 )
-_REASON_UNJOINABLE_RECOMMENDATION = (
-    "evidence_event에 user_id 컬럼이 없고 session_id는 호출마다 uuid4 placeholder다"
-    "(l2/recommendation_evidence.record_recommendation_treatment). 추천은 적재되지만 "
-    "'이 학생의 추천'을 집어낼 조인 키가 없다 — 0건은 추천이 없었다는 뜻이 아니다."
+_REASON_PRODUCED_RECOMMENDATION = (
+    "l2/recommendation_evidence.record_recommendation_treatment가 실 learning_session.session_id로 "
+    "기록한다(EOS-131 — 종전 uuid4 placeholder). evidence_event에는 여전히 user_id가 없고 "
+    "(구조적 차단 유지) 학습자 결합은 evidence_event.session_id → learning_session.user_id "
+    "조인으로 "
+    "얻는다. 세션 기록이 실패한 드문 호출은 placeholder로 남아 이 시간선에 실리지 않는다."
 )
 
 _SOURCE_REGISTRY: Final[tuple[tuple[TraceEventType, TraceSource, SourceAvailability, str], ...]] = (
@@ -233,8 +249,8 @@ _SOURCE_REGISTRY: Final[tuple[tuple[TraceEventType, TraceSource, SourceAvailabil
     (
         TraceEventType.CONCEPT_SELECTED,
         TraceSource.LEARNING_SESSION,
-        SourceAvailability.DORMANT,
-        _REASON_DORMANT_LEARNING_SESSION,
+        SourceAvailability.PRODUCED,
+        _REASON_PRODUCED_LEARNING_SESSION,
     ),
     (
         TraceEventType.CONTENT_VIEWED,
@@ -271,8 +287,8 @@ _SOURCE_REGISTRY: Final[tuple[tuple[TraceEventType, TraceSource, SourceAvailabil
     (
         TraceEventType.RECOMMENDATION_GENERATED,
         TraceSource.EVIDENCE_EVENT,
-        SourceAvailability.UNJOINABLE,
-        _REASON_UNJOINABLE_RECOMMENDATION,
+        SourceAvailability.PRODUCED,
+        _REASON_PRODUCED_RECOMMENDATION,
     ),
     (
         TraceEventType.SKILL_MASTERY_UPDATED,
@@ -738,6 +754,71 @@ def project_ability_rows(learner_id: uuid.UUID, rows: Sequence[Any]) -> list[Lea
     ]
 
 
+def project_session_rows(learner_id: uuid.UUID, rows: Sequence[Any]) -> list[LearningEvent]:
+    """`learning_session` 행 → `concept_selected`(세션 개시 — EOS-131 서버 유휴 규칙).
+
+    `started_at`은 서버가 첫 활동을 *수신*한 시각이라 `INGESTED`다. `started_at`이 없는 행
+    (writer 이전의 수동 적재 등)은 시간선에 놓을 수 없어 건너뛰고 경고한다(날조 금지).
+    """
+    events: list[LearningEvent] = []
+    for row in rows:
+        if row.started_at is None:
+            _logger.warning(
+                "트레이스 투영 건너뜀 — learning_session에 started_at이 없음 (session_id=%s).",
+                getattr(row, "session_id", None),
+            )
+            continue
+        events.append(
+            LearningEvent(
+                event_type=TraceEventType.CONCEPT_SELECTED,
+                learner_id=learner_id,
+                occurred_at=row.started_at,
+                time_basis=TimeBasis.INGESTED,
+                source=TraceSource.LEARNING_SESSION,
+                session_id=row.session_id,
+                concept_id=row.target_concept_id,
+            )
+        )
+    return events
+
+
+def _recommendation_detail(meta: Mapping[str, Any] | None) -> dict[str, str | int | float | bool]:
+    """추천 meta에서 비식별 스칼라만 — 정책 버전·모드(후보 목록·사유 객체는 싣지 않는다)."""
+    picked: dict[str, str | int | float | bool] = {}
+    for key in (META_KEY_POLICY_VERSION, META_KEY_MODE):
+        value = (meta or {}).get(key)
+        if isinstance(value, _ALLOWED_DETAIL_VALUE_TYPES):
+            picked[key] = value
+    return picked
+
+
+def _parse_uuid(value: Any) -> uuid.UUID | None:
+    """meta의 문항 id 문자열 → UUID(형식이 깨졌으면 None — 날조하지 않는다)."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
+def project_recommendation_rows(learner_id: uuid.UUID, rows: Sequence[Any]) -> list[LearningEvent]:
+    """`evidence_event` 추천 처치 행(세션 조인으로 이 학습자 것만) → `recommendation_generated`."""
+    return [
+        LearningEvent(
+            event_type=TraceEventType.RECOMMENDATION_GENERATED,
+            learner_id=learner_id,
+            occurred_at=row.time,
+            time_basis=TimeBasis.INGESTED,
+            source=TraceSource.EVIDENCE_EVENT,
+            session_id=row.session_id,
+            problem_id=_parse_uuid((row.meta or {}).get(META_KEY_PROBLEM_ID)),
+            detail=_recommendation_detail(row.meta) or None,
+        )
+        for row in rows
+    ]
+
+
 #: 같은 시각 동률의 정렬 순서 — **인과 순서**다(사전순 아님).
 #: 채점은 제출과 같은 시각에 기록되므로 사전순으로 묶으면 `assessment_failed`가
 #: `problem_attempted`보다 앞에 온다 — 원인보다 결과가 먼저 보이는 시간선은 읽는 사람을
@@ -974,6 +1055,40 @@ async def build_trace(
         .all()
     )
 
+    # EOS-131 ⑧ learning_session(세션 개시) ⑨ 추천 처치 — 추천은 user_id가 없어 세션 조인으로만.
+    session_rows = (
+        (
+            await session.execute(
+                select(LearningSession)
+                .where(
+                    LearningSession.user_id == learner_id,
+                    *_window(LearningSession.started_at, since, until),
+                )
+                .order_by(LearningSession.started_at.desc())
+                .limit(probe)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    recommendation_rows = (
+        (
+            await session.execute(
+                select(EvidenceEvent)
+                .join(LearningSession, EvidenceEvent.session_id == LearningSession.session_id)
+                .where(
+                    LearningSession.user_id == learner_id,
+                    EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT,
+                    *_window(EvidenceEvent.time, since, until),
+                )
+                .order_by(EvidenceEvent.time.desc())
+                .limit(probe)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
     collected: list[LearningEvent] = []
     collected += project_assessment_rows(learner_id, assessment_rows)
     collected += project_attempt_rows(learner_id, attempt_rows)
@@ -990,6 +1105,8 @@ async def build_trace(
     )
     collected += project_misconception_rows(learner_id, misconception_rows)
     collected += project_ability_rows(learner_id, ability_rows)
+    collected += project_session_rows(learner_id, session_rows)
+    collected += project_recommendation_rows(learner_id, recommendation_rows)
 
     ordered = sort_entries(collected)
     truncated = len(ordered) > limit

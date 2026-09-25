@@ -196,6 +196,10 @@ async def _cleanup(
             await conn.execute(
                 text("DELETE FROM problem WHERE problem_id = ANY(:ids)"), {"ids": pids}
             )
+            # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
+            await conn.execute(
+                text("DELETE FROM learning_session WHERE user_id = :uid"), {"uid": str(uid)}
+            )
             await conn.execute(
                 text("DELETE FROM user_profile WHERE user_id = :uid"), {"uid": str(uid)}
             )

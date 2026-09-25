@@ -11080,3 +11080,14 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 **집행**: ① 정본 = `docs/standards/build_harness.md` §3a ② CLAUDE.md 워크플로 절에 1줄 + v0.2.31 ③ 코드 = `tests/harness/test_schedule_is_target_not_limit.py`(selector 날짜 비의존 AST 동결 · 주입 6형태 + 대조군 · 실파일 주입 시 RED 확인) ④ 대장 = `EOS-50`의 `P3-10` 부착 제거(→ 즉시 착수 후보) · `P3-04`·`P3-08`의 주차 게이트는 품질 판정이라 유지하되 조기 판정 허용 ⑤ 대조표 §22-9.
 
 **남긴 것**: 게이트 제목의 날짜 문자열 정정(정정 CLI 부재 · `HARN-124` 소유) · Not Now 13건의 "11월 착수 금지" 문구(실질이 스코프라 방침 대상 아님).
+
+### 2026-09-25 — EOS-131 구현 선택 4건 (claude 집행 · 2026-09-24 S3-16 ③ 부분 번복 결정의 집행) — 판정 기준 main `578fa9d2`
+
+**배경**: `learning_session` 서버 측 writer(30분 유휴 규칙)와 추천 기록의 실 `session_id` 결합을 착지시키며 acceptance가 저자 재량으로 남긴 선택 4건을 내렸다. 근거는 코드 docstring·`docs/standards/loop_kpi_contract.md`에도 있으나, 되돌릴 때 함께 봐야 할 묶음이라 여기에 모은다.
+
+1. **열린 세션 유일성 = 부분 유니크 인덱스** `uq_learning_session_open_per_user (user_id) WHERE ended_at IS NULL AND last_activity_at IS NOT NULL` + `INSERT … ON CONFLICT DO NOTHING` 후 승자 합류. 술어를 `last_activity_at IS NOT NULL`로 한정한 이유: writer 이전 행(`last_activity_at` NULL·`ended_at` NULL 가능)이 인덱스 생성을 막거나 서버 세션과 충돌하지 않게 하려는 것. 행 잠금만으로는 *없는* 행의 경합을 못 막는다(주입 M1·M7 RED 실측).
+2. **보존 파기 = 기준 맞추기**(연쇄 건수 계상안 기각): 서버 세션은 `last_activity_at < cutoff` 그리고 잔여 시도 0일 때만 파기. 계상안은 조기 파기를 *보고*할 뿐 *막지* 못한다. writer 이전 행은 종전 `started_at` 규칙.
+3. **열람권(export) 포함**: 세션 행이 살아 있는 동안 `evidence_event.session_id → learning_session.user_id` 조인으로 학생이 식별되므로 결합 식별 정보로 판정(`privacy/export.py` docstring). 삭제권 이행 후에는 조인 0건이 되어 추천 행은 비식별로 남는다(실 PG 테스트).
+4. **KPI ① 시각 축 = 서버 수신 시각**으로 통일하고 분자를 "첫 시도 이후 추천이 있는 세션", 분모를 "시도 1건 이상 세션"으로 재정의(시도 없는 세션 수는 `detail.sessions_without_attempt`로 별도 보고).
+
+**남긴 것**: `wh1_evaluation` ③ 세션 완주율은 서버 세션이 유휴 규칙으로 반드시 닫히므로 "닫힌 활동 묶음 비율"로 의미가 바뀐다 — 정의 재검토는 범위 밖(surrogate 주석에만 명시). KPI ⑤는 여전히 미측정(`EOS-132`).
