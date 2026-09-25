@@ -14,9 +14,11 @@ remediation 계열(`practice_current`)이고 `reason.type`이 `unmeasured`가 �
 **시딩 경계**: Week 1~3 게이트와 같다 — 학습자 상태는 한 줄도 직접 쓰지 않는다(전부 HTTP
 부수효과). 저작 콘텐츠만 ORM으로 심는다. 픽스처 조립기는 Week 2 하네스에서 빌린다(재구현 0).
 
-**CI 배선(정직 표기)**: 이 파일은 `integration` 마크라 `WHYMATH_RUN_INTEGRATION=1` + 실 PG에서만
-돈다. 주간 게이트 하네스들과 같은 상태이며, 그 CI 배선은 `EOS-21`이 소유한다. CI 백엔드 잡에서
-도는 hermetic 대응분은 `tests/backend/l2/test_learning_state_recommendation.py`다.
+**CI 배선**: 이 파일은 `integration` 마크라 `WHYMATH_RUN_INTEGRATION=1` + 실 PG에서만 돈다 —
+그리고 CI의 `backend-migrations` 잡(`pytest -m integration --ignore=../../tests/backend/l3`)이
+**마커로 수집해 PR마다 실행한다**(`scripts/harness/ci_job_coverage.py scope`로 확인). 워크플로에
+파일명이 안 보인다고 "CI에서 안 돈다"로 읽지 않는다 — 초판 docstring이 그렇게 틀렸다(2026-09-25
+정정 · 사고 대장). hermetic 대응분은 `tests/backend/l2/test_learning_state_recommendation.py`다.
 """
 
 from __future__ import annotations

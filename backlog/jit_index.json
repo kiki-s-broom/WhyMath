@@ -3439,6 +3439,16 @@
    ],
    "text": "닫힌 PR #880 브랜치에만 있는 246줄 감사 설계 문서가 대장 어디에도 없어 삭제될 뻔",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
+   "weight": 0
   }
  ]
 }

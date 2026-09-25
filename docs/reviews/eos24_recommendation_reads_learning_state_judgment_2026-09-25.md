@@ -149,5 +149,6 @@ pedagogy-designer 비판의 요지는 "구조는 옳지만 **R3의 입력이 약
 
 **정직한 공백**
 
-- 실 PG 통합 테스트는 CI에서 돌지 않는다(`integration` 마크 · 주간 게이트 하네스들과 같은 상태 · 배선은 `EOS-21` 소관). CI에서 도는 대응분은 hermetic `tests/backend/l2/test_learning_state_recommendation.py`다.
+- ~~실 PG 통합 테스트는 CI에서 돌지 않는다~~ — **정정(2026-09-25)**: 틀린 주장이었다. CI `backend-migrations` 잡이 `pytest -m integration --ignore=../../tests/backend/l3`로 `integration` 마커 테스트를 PR마다 실행하며, 이 판정문 착수 전부터 그랬다(main `bbd7c382`에 이미 있음). 워크플로 파일명 grep으로 판단한 오독이다 — `scripts/harness/ci_job_coverage.py scope`가 답을 갖고 있었다. 사고 대장 `absence-misjudgement` 2회차로 기록했다.
+- **Gate 2 3루프 상시 하네스(`PED-36` ⑫ · PR #1315)와의 정합**: 그 하네스가 동결해 둔 "오개념 오답 Loop 1 `보정` = False"가 이 PR로 True가 되어 해소 신호가 났다. 동결표를 오답 종류별로 나눠 `misconception` 보정만 True로 올렸다(`general`은 §7-1 그대로 · 두 종류의 Loop 3은 `EOS-124` 그대로). 재실측: `misconception` LOOP1=PASS LOOP2=PASS LOOP3=FAIL · `general` LOOP1=FAIL LOOP2=PASS LOOP3=FAIL.
 - Gate 2 3루프 프로브 자체는 다시 돌리지 않았다(재판정 세션의 몫 · 상시 하네스는 `PED-36` ⑫). V2에 해당하는 경로는 신규 통합 테스트 첫 건이 재현한다.

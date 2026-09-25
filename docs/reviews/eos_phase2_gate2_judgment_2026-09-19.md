@@ -152,6 +152,29 @@ CLI: `python -m whymath_backend.ops.loop_kpi_gate --since-hours 24` · **EXIT=2*
 
 **§2의 10조건 중 1·4·5·7·8의 증거를 내는 하네스는 어느 CI 잡에서도 돌지 않는다.** `backend` 잡에는 postgres service도 `WHYMATH_RUN_INTEGRATION`도 없어 이 파일들은 `10 skipped · exit 0`으로 끝난다 — 컨테이너에서 그 조건을 재현해 확인했고, 실 PG + 플래그를 주자 `10 passed`로 바뀌었다. **skip이 통과로 위장하던 상태**다.
 
+> **[정정 2026-09-23 · EOS-21 재측정 — 판정 기준 main `f4926588`]** 위 표의 "실제 실행" 열과
+> 굵은 문장은 **거짓이다.** 5종은 `backend — 마이그레이션·통합 (실 PG)` 잡에서 실제로 돈다.
+>
+> 원 측정은 워크플로에서 *파일명*을 셌는데, 그 잡은 **마커로 수집**한다 —
+> `cd src/backend && pytest -m integration --ignore=../../tests/backend/l3` 이고
+> `src/backend/pyproject.toml`의 `testpaths = ["../../tests/backend"]`이므로
+> `tests/backend` 전체를 수집해 `integration` 마커로 거른다. 5종은 전부 그 아래 있고
+> 전부 그 마커를 달고 있다. 즉 **파일명 0건은 "이름으로 안 부른다"이지 "안 돈다"가 아니다.**
+> 그 잡은 `WHYMATH_RUN_INTEGRATION=1`·실 PG·`alembic upgrade head`를 갖추고, PR(backend
+> 변경 시)과 push 양쪽에서 발화한다 — schedule 전용이 아니다.
+>
+> 실행 실측(그 잡의 명령·env·선행 스텝을 그대로 재현): 5종 전부 **실행·통과**,
+> SKIPPED 0 · FAILED 0. 본문이 인용한 "10 skipped → 실 PG 주면 10 passed"는 `backend` 잡
+> 조건의 재현이며 맞다 — 다만 그것이 *유일한* 경로라는 추론이 틀렸다. 해당 스텝은 이 판정문이
+> 적은 기준 커밋 `77ee1992`에도 이미 있었으므로 시점 차이가 아니라 **측정 방법**의 문제다.
+>
+> **Gate 2 판정은 뒤집히지 않는다.** §5는 10조건의 판정이 아니라 배선 지속성 관측이고,
+> FAIL 근거는 §3(무개입 연속 3루프)·§4(KPI ①⑤ 구조적 미측정)이며 그 둘은 이 정정과 무관하다.
+>
+> 남은 실 결함은 **그 배선을 동결하는 가드가 0건**이었다는 것이다 — `--ignore`에 `api`가
+> 추가되거나 마커·`testpaths`·`WHYMATH_RUN_INTEGRATION`이 바뀌면 5종은 조용히 skip으로
+> 돌아간다. 그 동결이 `tests/infra/test_gate_harness_marker_reach_wiring.py`(EOS-21)다.
+
 이 축의 소유자는 `EOS-21-week-gate-harnesses-never-run-in-ci`(todo · P1)이며, 그 태스크가 적은 범위는 Week 1·2뿐이었다. 이번 판정 실측으로 **week3·persona 2종을 범위에 추가**했다(`backlog.py amend` · 이 PR에 포함).
 
 ---

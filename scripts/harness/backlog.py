@@ -1299,12 +1299,30 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def _release_remote_claim(root: Path, task_id: str, prev_session: str | None) -> None:
-    """done/block 후 원격 claim 해제 — best-effort (실패해도 진행, reap이 나중에 청소)."""
+def _release_remote_claim(
+    root: Path,
+    task_id: str,
+    prev_session: str | None,
+    allow_foreign_kinds: tuple[str, ...] = (),
+) -> remote_claims.ClaimResult:
+    """done/block 후 원격 claim 해제 — best-effort (실패해도 진행, reap이 나중에 청소).
+
+    결과를 **돌려준다**(HARN-134 ④) — 종전에는 None을 반환해 호출자가 실패를 알 수
+    없었고, 그래서 `unblock`이 해제 실패 뒤에도 로컬을 todo로 바꿔 "대장은 차단인데
+    로컬은 todo"인 분기 상태를 무증상으로 남겼다. 경고 1줄은 화면에서 휘발한다.
+
+    `allow_foreign_kinds`는 그대로 전달한다 — 판정은 `remote_claims.release`가
+    실제 홀더 레코드를 읽어서 한다(여기서 kind를 추측하지 않는다).
+    """
     policy, _ = store.load_policy(root)
     if not policy.remote_claims:
-        return
-    result = remote_claims.release(root, task_id, prev_session or store.current_branch(root))
+        return remote_claims.ClaimResult("ok", message="원격 claim 비활성")
+    result = remote_claims.release(
+        root,
+        task_id,
+        prev_session or store.current_branch(root),
+        allow_foreign_kinds=allow_foreign_kinds,
+    )
     if result.status not in ("ok", "offline"):
         print(
             f"⚠ 원격 claim 해제 실패({result.status}): {result.message} — "
@@ -1312,6 +1330,7 @@ def _release_remote_claim(root: Path, task_id: str, prev_session: str | None) ->
             file=sys.stderr,
         )
         store.append_event(root, "claim_release_failed", task_id, status=result.status)
+    return result
 
 
 def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
@@ -1331,13 +1350,35 @@ def cmd_unblock(root: Path, args: argparse.Namespace) -> int:
     if error:
         return _fail(error)
     prev_session = task.session
+    # 차단 홀드를 **로컬 전이보다 먼저** 걷는다 (HARN-134 ②④).
+    #
+    # 순서가 계약이다: 종전은 로컬을 todo로 바꾼 뒤 best-effort로 해제해서, 해제가
+    # 실패하면 "원격 대장은 차단 · 로컬 파일은 todo"인 분기 상태가 남았다. 되돌리기
+    # (rollback)로 고칠 수도 있었지만 그건 실패 경로에만 도는 코드라 정작 필요할 때
+    # 돌지 않을 위험이 있다 — 아예 **쓰기 전에 판정**하면 되돌릴 상태가 생기지 않는다.
+    #
+    # `allow_foreign_kinds=("block",)` — 차단 홀드는 착수 점유가 아니므로 홀더가 아닌
+    # 세션도 정상 경로로 걷는다. 차단 사유는 대부분 외부 입력 대기라 **해소를 판정하는
+    # 쪽이 거의 항상 다음 세션**이고, 그 경우가 예외가 아니라 기본이다. `claim`은 이
+    # 목록에 없으므로 착수 점유 탈취는 여전히 --force 없이는 막힌다.
+    release = _release_remote_claim(root, task.id, prev_session, allow_foreign_kinds=("block",))
+    if release.status not in ("ok", "offline"):
+        # `offline`은 통과시킨다 — 원격이 없으면 교차 세션 신호 자체가 없어 분기할
+        # 상태가 없다. 반대로 error/conflict는 **홀드가 살아 있다**는 뜻이므로,
+        # 여기서 통과시키면 다른 세션의 start가 계속 거부된다.
+        holder = release.claim.branch if release.claim else "(홀더 미상)"
+        return _fail(
+            f"{task.id}: 원격 차단 홀드를 걷지 못해 차단 해제를 중단한다 "
+            f"({release.status}) — 로컬은 blocked 그대로다.\n"
+            f"  홀더: {holder} · 사유: {release.message}\n"
+            f"  → 원격 조회가 되는 환경에서 다시 시도하거나, 홀드가 claim(착수 점유)이면\n"
+            f"     `claims release {task.id} --force`로 청소한 뒤 다시 unblock 하라."
+        )
     task.status = "todo"
     task.session = None
     task.updated = _today()
     store.save_task(root, task)
-    store.append_event(root, "unblock", task.id)
-    # 차단 홀드도 함께 걷는다 — 안 걷으면 해제된 태스크가 영구 차단으로 보인다(HARN-42)
-    _release_remote_claim(root, task.id, prev_session)
+    store.append_event(root, "unblock", task.id, release_status=release.status)
     print(f"· {task.id} 차단 해제 → todo")
     return 0
 
@@ -1374,6 +1415,9 @@ def cmd_gates(root: Path, args: argparse.Namespace) -> int:
 
     if args.gate_action == "add":
         return _cmd_gates_add(root, args, backlog)
+
+    if args.gate_action == "amend":
+        return _cmd_gates_amend(root, args, backlog)
 
     if args.gate_action == "show":
         return _cmd_gates_show(args, backlog)
@@ -1538,6 +1582,70 @@ def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
         print("evidence: 없음(아직 결정 전)")
     print()
     print(f"title(등재 시점 질문 — 최신 판정을 반영하지 않을 수 있다): {gate.title}")
+    return 0
+
+
+def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
+    """등재된 게이트의 **문면·독촉 주기를 정정**한다 (HARN-124).
+
+    왜 필요했나: `--title`·`--remind-after-days`가 `add` 전용이라, 한 번 등재된 게이트가
+    틀려도 고칠 CLI가 0이었다(대장 손편집은 금지이므로 정정 수단 자체가 없었다). 게이트
+    제목은 매 세션 SessionStart 브리핑에 그대로 노출되고 그것이 Kiki께 드리는 실행 안내의
+    원본이 되므로, 틀린 문면은 그대로 틀린 조작을 부른다.
+
+    **실효값을 그 자리에 덮어쓰고 옛 값을 `corrections`에 append**한다. 반대 설계(원 필드를
+    동결하고 표시 시 해석)를 택하지 않은 이유는 `Gate.corrections` 주석에 적었다 — 요지는
+    읽는 쪽을 한 곳도 고치지 않아야 "정정했는데 화면은 옛 문면"(acceptance ②가 막으려는
+    실패)이 구조적으로 불가능해진다는 것이다.
+
+    `waive`와 다르다: waive는 status를 바꿔 **대기 태스크를 해금**하므로 "요건은 살아 있고
+    시점만 미뤘다"를 표현할 수 없다. amend는 status를 건드리지 않는다.
+    """
+    gate_id = args.gate_id
+    if not gate_id:
+        return _fail("gates amend <G-id> — 게이트 ID 필수")
+    gate = backlog.gates.get(gate_id)
+    if gate is None:
+        return _fail(f"게이트 '{gate_id}' 없음")
+    if not args.reason:
+        return _fail(f"{gate_id}: gates amend 에는 --reason <사유> 필수 (정정 이력의 근거)")
+
+    new_title = args.title
+    new_remind = args.remind_after_days
+    if new_title is None and new_remind is None:
+        return _fail(
+            f"{gate_id}: 정정할 것이 없다 — --title 또는 --remind-after-days 중 하나 이상 필요"
+        )
+
+    # 무변경 정정을 거부한다. 허용하면 이력만 늘고 실효는 그대로인 행이 쌓여,
+    # corrections 가 "무엇이 실제로 바뀌었나"의 기록이 아니게 된다.
+    changes: list[str] = []
+    if new_title is not None and new_title != gate.title:
+        changes.append(f"title: {gate.title!r} → {new_title!r}")
+    if new_remind is not None and new_remind != gate.remind_after_days:
+        changes.append(f"remind_after_days: {gate.remind_after_days} → {new_remind}")
+    if not changes:
+        return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")
+
+    record = f"[{_today()}] " + " · ".join(changes) + f" — {args.reason}"
+    gate.corrections = list(gate.corrections) + [record]
+    if new_title is not None:
+        gate.title = new_title
+    if new_remind is not None:
+        gate.remind_after_days = new_remind
+
+    errors = store.validate_backlog(backlog)
+    own_errors = [e for e in errors if gate_id in e]
+    if own_errors:
+        for e in own_errors:
+            print(f"  · {e}", file=sys.stderr)
+        return _fail(f"{gate_id}: 스키마/무결성 위반으로 정정 거부")
+
+    store.save_gates(root, sorted(backlog.gates.values(), key=lambda g: g.id))
+    store.append_event(root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes))
+    print(f"✎ {gate.id} 정정 — {' · '.join(changes)}")
+    print(f"  사유: {args.reason}")
+    print(f"  이력 {len(gate.corrections)}건 (append-only · 옛 값은 corrections에 보존)")
     return 0
 
 
@@ -1904,13 +2012,34 @@ def _print_similar_notice(root: Path, backlog, task: Task, policy: object) -> No
         tid: similar.task_text(other.title, other.notes, other.acceptance)
         for tid, other in backlog.tasks.items()
     }
+    # 대조군 상태 (HARN-134 ⑥ 판정) — in-flight **+ done**.
+    #
+    # 종전 pool은 in-flight 4종뿐이라 `done`을 **구조적으로 보지 않았다.** 병렬 이중
+    # 구현 방지라는 원 목적에는 맞는 필터지만, 실측으로 다른 축이 그 사각에 그대로
+    # 들어간다는 것이 드러났다: **미이행 acceptance를 남긴 done 태스크의 승계**다.
+    # 2026-09-22 `HARN-134` 등재 때 `HARN-48`(done, acceptance ④가 같은 축)을 이 고지가
+    # 침묵했고, 잡아낸 것은 등재 시점이 아니라 CI의 실코퍼스 보정 테스트였다.
+    #
+    # 세 안 중 ⓐ를 골랐다: ⓑ(미이행 acceptance 승계 탐지를 별도 축으로)는 어느 항이
+    # 미이행인지를 기계가 알아야 하는데 그 판정 자체가 사람 몫이라 새 프레임워크가 되고,
+    # ⓒ(현행 유지)는 실사고가 이미 반증했다. ⓐ는 pool 한 줄과 라벨로 끝난다.
+    #
+    # `cancelled`는 넣지 않는다 — 취소 사유의 상당수가 *중복이라서*이므로, 살아남은
+    # 쌍둥이와 높은 유사도를 내며 상시 오탐이 된다(고칠 수 없는 경고는 소음이 된다).
+    pool_statuses = ("todo", "in_progress", "blocked", "review", "done")
     pool = {
         tid: text
         for tid, text in corpus.items()
-        if tid != task.id
-        and backlog.tasks[tid].status in ("todo", "in_progress", "blocked", "review")
+        if tid != task.id and backlog.tasks[tid].status in pool_statuses
     }
-    origins: dict[str, str] = {}
+    # done은 라벨로 구분한다 — "지금 누가 하고 있다"(조율 대상)와 "이미 끝났다"
+    # (승계 여부 확인 대상)는 읽는 사람이 할 행동이 다르다. 한 색으로 내면
+    # 완료된 태스크를 병렬 충돌로 오독하고 엉뚱하게 cancel할 수 있다.
+    origins: dict[str, str] = {
+        tid: "로컬·완료됨"
+        for tid in pool
+        if backlog.tasks.get(tid) is not None and backlog.tasks[tid].status == "done"
+    }
     remote_status = "disabled"
     if getattr(policy, "remote_claims", False):
         # 고지는 관측 기능이다 — 원격 조회가 어떤 식으로 죽든 `add` 자체를 막지 않는다.
@@ -4272,7 +4401,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_rename)
 
     p = sub.add_parser("gates", help="사람 게이트 대장")
-    p.add_argument("gate_action", nargs="?", choices=["list", "add", "clear", "waive", "show"])
+    p.add_argument(
+        "gate_action",
+        nargs="?",
+        choices=["list", "add", "amend", "clear", "waive", "show"],
+    )
     p.add_argument("gate_id", nargs="?")
     p.add_argument("--evidence")
     p.add_argument("--reason")
@@ -4297,7 +4430,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="gates clear: 판정 기준(커밋·PR)이 없는 근거일 때 사유 명시 (HARN-68)",
     )
     # gates add 전용 플래그 (다른 액션에서는 무시됨 — 기본값이 간섭하지 않음)
-    p.add_argument("--title", help="gates add: 게이트 제목 (필수)")
+    p.add_argument(
+        "--title",
+        help="gates add: 게이트 제목 (필수) · gates amend: 제목 정정 "
+        "(옛 값은 corrections에 남는다)",
+    )
     p.add_argument(
         "--kind",
         choices=list(GATE_KINDS),
@@ -4310,7 +4447,10 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         dest="remind_after_days",
         default=None,
-        help="gates add: 경과 시 SessionStart 브리핑 리마인드 일수",
+        help=(
+            "gates add: 경과 시 SessionStart 브리핑 리마인드 일수 · "
+            "gates amend: 독촉 주기 정정 (옛 값은 corrections에 남는다)"
+        ),
     )
     p.set_defaults(func=cmd_gates)
 

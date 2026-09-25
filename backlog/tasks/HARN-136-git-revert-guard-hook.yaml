@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,7 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 재현 고정 — 미커밋 변경이 있는 상태에서 `git checkout -- <경로>` / `git restore <경로>` / `git stash` 가 그 변경을 무증상으로 삼키는 것을 테스트로 고정한다. 특히 대장 경로(backlog/events/·backlog/tasks/·backlog/gates.yaml)와 스크래치가 아닌 산출물 경로를 대상으로.\n② PreToolUse 훅 신설 — `.claude/hooks/` 에 Bash 명령을 검사하는 훅을 두어, 명령이 git 원복 계열(`checkout --`·`restore`·`stash`)이고 대상 경로에 **미커밋 변경이 실재하면** 차단한다. 차단 메시지는 대안을 함께 낸다(뮤테이션 원복은 `cp` 백업 경유 · 의도적 폐기면 명시적 사유와 함께 사람이 실행). 선례 = `.claude/hooks/fence_guard.py`(HARN-114) 의 Stop 훅 구조.\n③ 변별력 — 정상 케이스(미커밋 변경이 없는 경로의 checkout·다른 git 명령·경로 없는 `git checkout <branch>`)에서 통과하는지, 위반 케이스(대장 경로에 변경이 있는 상태의 원복)에서 실제로 차단하는지 **양쪽을 주입해 확인**한다. 전건 차단하면 정상 브랜치 전환이 막혀 워크플로가 깨진다 — 탐지 기준은 \"git 원복 명령\"이 아니라 \"**그 경로에 잃을 것이 있는가**\"다.\n④ 사각 명시 — 훅은 Bash 도구를 경유하는 명령만 본다. 스크립트 안에서 호출되는 git, 다른 도구가 부르는 git 은 닿지 않는다. 그 한계를 훅 docstring 과 build_harness.md 에 적는다(막지 못하는 것을 막는다고 말하지 않는다).\n⑤ 배선 확인 — 훅이 settings.json 에 실제로 등록돼 발화하는지 확인한 뒤 완료로 친다. \"파일이 존재함\"과 \"돌아감\"은 다르다."
-artifacts: []
+artifacts:
+  - "PR #1284 — https://github.com/kiki-s-broom/WhyMath/pull/1284"
+  - "49b24f76 .claude/hooks/git_revert_guard.py + settings.json PreToolUse(Bash) 등록"
+  - "tests/infra/test_git_revert_guard.py 40건 · 뮤테이션 13종 전건 일치(RED 12·대조군 GREEN 1)"
+  - "실저장소 발화 실측 — 더러운 경로 exit 2 · 깨끗한 경로 exit 0 · 조회 명령 exit 0"
+  - "build_harness.md v1.8 §3b-5 — 판정표 + 한계(Bash 도구 경유 명령만)"
 paths:
   - ".claude/hooks/**"
   - "tests/harness/**"
