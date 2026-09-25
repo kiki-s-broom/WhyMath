@@ -48,7 +48,8 @@ async def _get_twice(provider: Any) -> tuple[Any, Any]:
 
 
 def _anthropic_settings() -> Settings:
-    return Settings(anthropic_api_key=SecretStr("sk-ant-test"))
+    # ARCH-66: 사용 중단 방침 스위치(기본 False)를 켜야 클라이언트 생성 경로에 도달한다
+    return Settings(anthropic_api_key=SecretStr("sk-ant-test"), anthropic_api_enabled=True)
 
 
 # ── OllamaProvider ────────────────────────────────────────────────────────
