@@ -1,5 +1,7 @@
 # L3a. 라우터 설계서 — 입력 분류기 + fast/mid/quality 분기 로직
 
+> ⏸ **2026-09-24 ~ 2026-12-31 Anthropic API 사용 중단** (Kiki 결정 · ARCH-66). Claude는 Claude Max 구독(개발 도구)으로만 쓰고, 백엔드 Anthropic 좌석은 `anthropic_api_enabled=False`(기본)로 꺼져 있다. 이 문서의 Anthropic 호출·키 등록 서술은 그 기간 실행하지 않는다. 재개 판정 = `G-arch66-anthropic-api-pause-review` · 근거 = MEMORY 2026-09-24 ARCH-66.
+
 > `docs/architecture/03_content_generation.md`(L3 캐논)의 **상세 하위 설계서**.
 > 03 문서 §1 "모델 라우터"·"모델 풀" 표를 *데이터 기반 분기 로직*으로 구체화한다.
 > 근거 데이터: `MEMORY.md` 2026-05-19 결정 로그(qwen2-math:1.5b GPU 측정, fast/mid/quality 3단계 라인업 확정) + 2026-05-16 로그(7b·27b GPU baseline).

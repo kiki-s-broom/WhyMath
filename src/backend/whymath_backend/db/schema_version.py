@@ -160,6 +160,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # (model_name)과 별개로 "응답이 실제로 어느 모델에서 왔나"를 적는다 — NULL=미관측·미계측.
     "5b3e9c27a1f6",  # ASM-06: problem_attempt.selected_choice_index — 학생이 고른 보기
     # 인덱스(0-기반). distractor_map 역추적으로 오답→오개념 가설을 잇는 포착 슬롯.
+    "8e4c2a7f1b93",  # EOS-131: learning_session.last_activity_at + 학생당 열린 서버 세션 1개
+    # 부분 유니크 인덱스(uq_learning_session_open_per_user). 서버 30분 유휴 규칙 writer의 좌석.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

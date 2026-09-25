@@ -95,6 +95,8 @@
 - [ ] **자동 커리큘럼 정렬 엔진 MVP** — 학생 프로필 → 교과서 단원 → 콘텐츠 라우팅
 - [ ] Manim 서버 렌더 PoC
 
+> ⏸ **학생 참여 과정 연기 (2026-09-24 Kiki 결정 · ARCH-66 ⑥)**: 이 문서에 적힌 파일럿·시범 사용자·베타·실사용 KPI 수집 등 학생(실사용자)과 함께 하는 과정은 2026-12-31 내부 프로젝트 완성 이후로 연기한다. 재개 판정 = `G-student-work-after-internal-completion`(자동 재개 없음).
+
 ### Day 76~90: 통합·시범
 - [ ] End-to-end 시나리오 1개 작동 (학생 사진 → OCR → 진단 → Polya 응답)
 - [ ] 시범 사용자 5~10명 (지인 학생)
@@ -115,7 +117,7 @@
 ### 마일스톤
 - M1.1 (월 1): 90일 작업 완료, MVP 설계 확정. 개념 그래프 v0·교과서 매핑 파일럿·자동 정렬 엔진 MVP 동작
 - M1.2 (월 2): L1+L2+L3 통합, 첫 5개 시나리오 (`SolutionPath` 다중 풀이 포함)
-  - L3 라우터 라이브 연동 *진행*: Ollama(S1)·Redis(S2)·Langfuse(S3)·Celery QUALITY 큐(S4)·클라우드 Anthropic(S5) 완료 (2026-05, 상세 MEMORY.md). 잔여: 비용/지연 실측 보정·프롬프트 캐싱(라이브 키 후속)
+  - L3 라우터 라이브 연동 *진행*: Ollama(S1)·Redis(S2)·Langfuse(S3)·Celery QUALITY 큐(S4)·클라우드 Anthropic(S5) 완료 (2026-05, 상세 MEMORY.md) — ⏸ 2026-09-24~12-31 Anthropic API 사용 중단(ARCH-66 · Claude Max 구독 전환). 잔여: 비용/지연 실측 보정·프롬프트 캐싱(라이브 키 후속)
 - M1.3 (월 3): L4 교수학 엔진 안정화(PED-31 EOS 교수전략 라이브러리 갭 설계 포함), 사용자 10명. 도메인 파트너 검수 라운드
 - M1.4 (월 4): L5 학생 앱 베타 (Flutter 단일·패드 중심·반응형 큰 화면; 폰 동반; 온보딩+자동 정렬), 사용자 50명
 - M1.5 (월 5): 사용자 100~200명, KPI 수집 (D7 retention·답 미루기 단계 깊이)
@@ -292,7 +294,7 @@
 - **S0 정합성 회복** ✅ 완료 — 원자 백본이 runtime truth source 단일화. 크로스워크 코퍼스(S0-1)·437-키 자산 원자 이전(S0-2)·원자 검색 좌석+`/concepts/search` 전환(S0-4a)·L2 mastery enrich 원자 전환(S0-4d)·**구 437 = legacy_snapshot 격하**(readonly·non_runtime·audit_only·S0-4b/c). 연기/위임: problem_concept 재연결(→S2)·orphan 129 진단(prod 실행은 Kiki).
 - **S1 E2E 수직 슬라이스** ✅ **탈출 선언(2026-07-16)** — 탈출 게이트 3종 전부 PASS: ①실기기 15분 루프 시연(G-kiki-device-demo) ②루프당 비용 실측·로컬 90.0%/92.0%(`ops/cost_probe` 대표 믹스·티어별 비용/지연 실측 — `s1_exit_gate_judgement_2026-07.md`) ③검증 통과 코드 경로 증명(결정론 템플릿+도구 게이팅·기계 봉인 3종). 잔여 이월(탈출과 독립): S1-11 coach→하네스 완전 수렴(flip — 별건 게이트·shadow 분포 누적 대기).
 - **S2 콘텐츠 공장** — 동등문제 100문+·WH-S 가동·도메인 파트너
-- **S3 파일럿** — L6 수능 엔진·시범 5~10명·측정 하네스
+- **S3 파일럿** — L6 수능 엔진·시범 5~10명·측정 하네스 — ⏸ 학생 참여분(시범 5~10명·파일럿 코호트 `S3-01`)은 12/31 내부 완성 이후로 연기(ARCH-66 ⑥ · `G-student-work-after-internal-completion`)
 - **S4 수학 K-12 완성** · **S5 타과목 확장 게이트**(물리)
 
 **병목 Top 5**: ①이중 truth source(S0에서 legacy_snapshot 격하로 해소 중) ②Phaiakes9 라이브 검증(Kiki 수동) ③E2E 루프 부재 ④도메인 파트너(Kiki 수동) ⑤L6 수능 모드 얇음.

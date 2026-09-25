@@ -1,5 +1,7 @@
 # 클라우드 티어 전환 설계 v2 — HIGH=Opus 5 · MAIN=DeepSeek V4.1(OpenRouter) · LOW=로컬
 
+> ⏸ **2026-09-24 ~ 2026-12-31 Anthropic API 사용 중단** (Kiki 결정 · ARCH-66). Claude는 Claude Max 구독(개발 도구)으로만 쓰고, 백엔드 Anthropic 좌석은 `anthropic_api_enabled=False`(기본)로 꺼져 있다. 이 문서의 Anthropic 호출·키 등록 서술은 그 기간 실행하지 않는다. 재개 판정 = `G-arch66-anthropic-api-pause-review` · 근거 = MEMORY 2026-09-24 ARCH-66.
+
 > **판정 기준: main `d10ba109`** (2026-09-21 조회). 이 문서의 "현재" 서술은 전부 그 시점 trunk 기준이다.
 > **결정 주체**: Kiki (2026-09-21 대화). **설계·실측**: claude 세션.
 > 상위 정본: `docs/architecture/03a_l3_router_design.md` · `CLAUDE.md` 기술 스택 표.

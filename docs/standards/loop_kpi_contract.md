@@ -39,13 +39,23 @@
 
 | KPI | 분자 | 분모 | 출처 | 판정 |
 |---|---|---|---|---|
-| ① Loop Completion Rate | 관측창에 시작된 세션 중 같은 `session_id`의 `recommendation_render` 증거가 있는 세션 수 | 관측창에 `started_at`을 가진 `learning_session` 행 수 | `learning_session` × `evidence_event` | Wilson **하한** ≥ 0.95 |
+| ① Loop Completion Rate | 관측창에 시작된 세션 중 **그 세션의 첫 시도 이후**(서버 수신 시각)·관측창 끝 이전에 같은 `session_id`의 `recommendation_render`가 1건 이상 있는 세션 수 | 관측창에 시작된 세션 중 **시도(`problem_attempt`)가 1건 이상** 있는 세션 수 — 시도 없는 세션 수는 `detail.sessions_without_attempt`로 따로 보고(조용히 빼지 않는다) | `learning_session` × `problem_attempt` × `evidence_event` | Wilson **하한** ≥ 0.95 |
 | ② State Integrity | 무결성 위반 행 수(7종 합) | 스캔 대상 행 수(7종 합) | `ops/integrity_violations_gate.scan_integrity` | Wilson **상한** ≤ 0.01 |
 | ③ Explainability | `meta.reason`이 없는 `recommendation_render` 건수 | 그 전체 건수 | `evidence_event`(REC-11) | **무관용** — 분자 > 0이면 미달 |
 | ④ Manual Intervention | 운영자 계열 감사 3종(`admin_access`·`role_change`·`content_mutation`) 행 수 | 관측창에 적재된 `problem_attempt` 행 수 | `privacy_audit` × `problem_attempt` | **무관용** |
 | ⑤ Traceability | 5홉 체인이 끊기는 recommendation 건수 | recommendation 전체 건수 | `l2/learning_event_trace` 원천 대장 × `evidence_event` | **무관용** |
 
 ⑤의 체인: `Recommendation → LearnerState → Assessment → Attempt → Problem`.
+
+**①의 재정의(EOS-131 ⑨ · 2026-09-25)**: 종전 분자는 "추천 기록이 **하나라도** 있는 세션"이었다.
+서버 유휴 규칙 세션 writer는 `/me/next-problem`도 세션을 여는 활동으로 치고, 앱은 첫 문제를
+추천으로 받으므로 옛 정의로는 거의 모든 세션이 **시작 순간** '도달'이 된다 — 동어반복이다. 재려는
+것은 Attempt → Assessment → Mastery → Recommendation 흐름이므로, **첫 시도 뒤의 추천**만 도달로
+센다. 시도가 없는 세션은 루프가 시작되지 않은 것이라 분모에서 뺀다. 대안("next-problem을 세션 개시
+활동에서 제외")은 첫 추천이 세션 없이 기록돼 추천↔학습자 결합이 다시 끊기므로 채택하지 않았다.
+실패 주입 3종(시도 전 추천만 → 미도달 · 시도 후 추천 → 도달 · 시도 뒤 추천 없음 → 미도달)은
+`tests/backend/ops/test_loop_kpi_gate_integration.py`가 실 PG로 동결하며, 옛 정의로 되돌리면
+첫 번째가 RED다.
 
 ### 산출 명령
 
@@ -72,10 +82,20 @@ python -m whymath_backend.ops.loop_kpi_gate --no-db --input observations.json
 
 ---
 
-## 3. 분모 판정 — ①은 오늘 측정 불가다 (구조적 사실)
+## 3. 분모 판정 — ①은 EOS-131 전까지 측정 불가였다 (이력)
 
-계획서는 ①의 분모를 "시작한 학습 세션"이라고 적었는데, 이 저장소에서 그 단위는 아무도 쓰지
-않는다. 두 사실이 겹친다(2026-09-16 `l2/learning_event_trace` 실측·2026-09-19 재확인):
+**해소(2026-09-25 EOS-131)**: 아래 두 사실이 모두 사라졌다 — `l2/learning_session_writer`가 서버
+30분 유휴 규칙으로 세션 행을 만들고, 추천 기록이 실 `session_id`로 결합된다. 원천 대장이
+`PRODUCED`로 바뀌어 ①은 설계대로 **스스로 미측정을 벗었다**(세션이 0건인 관측창은 여전히 분모 0 →
+미측정 exit 2). ⑤는 LearnerState 시각 원천(`user_state_snapshot` DORMANT)이 남아 여전히 미측정이다
+(EOS-132 소관). 아래는 2026-09-19 판정 기록이다.
+
+**세션의 의미(재방문율 KPI2와 공유)**: 서버 추론 세션은 "앱 진입~종료"가 아니라 **학습 활동 묶음**
+(마지막 학습 활동으로부터 30분 이내의 활동들)이다. 앱을 열기만 하고 학습 활동이 없으면 세션이
+생기지 않는다.
+
+계획서는 ①의 분모를 "시작한 학습 세션"이라고 적었는데, 당시 이 저장소에서 그 단위는 아무도 쓰지
+않았다. 두 사실이 겹쳤다(2026-09-16 `l2/learning_event_trace` 실측·2026-09-19 재확인):
 
 1. `learning_session`에 **writer가 0건**이다(조회·종료·삭제 표면만 있다).
 2. `evidence_event`에 `user_id` 컬럼이 없고 `session_id`는 호출마다 `uuid.uuid4()`
@@ -92,7 +112,8 @@ python -m whymath_backend.ops.loop_kpi_gate --no-db --input observations.json
 **다른 분모로 갈아타지 않은 이유**: `problem_attempt` 건수를 분모로 쓰면 "시도마다 추천이
 하나씩 나와야 한다"는, 계획서가 말한 적 없는 계약이 새로 생긴다. 그건 지표가 아니라 설계 변경이다.
 
-⑤도 같은 이유로 미측정이다. 끊긴 2홉(추천 결합·LearnerState 시각)을 빼고 남은 3홉만 재서
+⑤도 같은 이유로 미측정이었다(EOS-131 이후 추천 결합 홉은 풀렸고 LearnerState 시각 홉이 남아 여전히
+미측정이다). 끊긴 2홉(추천 결합·LearnerState 시각)을 빼고 남은 3홉만 재서
 "100% 역추적"이라고 적는 것이 정확히 이 게이트가 막으려는 거짓말이다.
 
 ---

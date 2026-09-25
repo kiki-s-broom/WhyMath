@@ -585,9 +585,14 @@ CATALOG: tuple[Spec, ...] = (
        "Gate2 ④·⑨ — ASM-13 강개념(strong_points) 편입", "l2.weak_concept_recommendation",
        "l2.strong_concept_recommendation", "l2.prerequisite_recommendation",
        "l2.learning_path", "l2.review_queue", "l2.axis_exclusions"),
-    _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계)", "Student", "Event", "P0",
-       "E3 Event — REC-03·PED-03·EOS-57", "l2.evidence_event_store", "l2.attempt_skill_event",
-       "l2.pedagogy_evidence", "l2.recommendation_evidence"),
+    # EOS-131: 학습 세션 writer(l2.learning_session_writer)를 **같은 기능번호**에 귀속시킨다 —
+    # §15가 신규 EOS 기능번호 추가를 동결했고, 세션 행은 이 행이 적재하는 추천 회계의 결합 키
+    # (`evidence_event.session_id → learning_session.user_id`)라 같은 기능의 적재 축이다.
+    _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계·학습 세션)", "Student", "Event",
+       "P0",
+       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer",
+       "l2.evidence_event_store", "l2.attempt_skill_event",
+       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer"),
     _e("WM-E-207", "목표 진행 조회 좌석", "Student", "Learning Model", "P2",
        "수능 D-day 축", "l2.target_progress"),
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",

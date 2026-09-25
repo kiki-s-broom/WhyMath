@@ -33,6 +33,8 @@ description: L3 콘텐츠 생성·검증 — LLM 라우팅·PRM 단계검증·�
 | **클라우드 고급** | — | — | Claude Opus 4.7 | Anthropic | ~$0.015/$0.075 | 어려운 진단 |
 | **클라우드 최고** | — | — | GPT-5 / o3 | OpenAI | 비쌈 | 킬러 문항·증명 |
 
+> ⏸ **2026-09-24 ~ 2026-12-31 Anthropic API 사용 중단** (Kiki 결정 · ARCH-66): 위 표의 Claude 행(Sonnet·Opus)은 그 기간 백엔드에서 호출하지 않는다 — `anthropic_api_enabled=False` 기본. Claude는 Claude Max 구독(Claude Code 등 개발 도구)으로만 쓴다. 이 기간 설계·구현에서 Anthropic 라이브 호출을 전제하지 말 것. 재개 판정 = `G-arch66-anthropic-api-pause-review`.
+
 목표 분포(비용·위치 축): **로컬 80% / 중급 18% / 최고 2%**
 
 > **패밀리 축(2026-05-20 Phaiakes9 태스크 인지 실측 근거)**: 로컬은 *크기만*으로 부족 — 태스크 유형(수학 vs NLP)으로 *패밀리*를 먼저 갈라야 한다. NLP(추출·정규화·매칭·분류)를 수학 특화 모델(qwen2-math)로 돌리면 7b조차 0%, 일반 모델(qwen2.5)로 바꾸니 match 3b=100%·translate 7b=75%였다. 따라서 로컬 실제 모델 = (MATH/GENERAL) × (fast/mid). quality(27b)는 패밀리 무관. 상세는 03a §0.2·§A.0·§C.0.

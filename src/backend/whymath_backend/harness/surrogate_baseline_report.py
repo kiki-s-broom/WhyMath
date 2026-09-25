@@ -138,11 +138,15 @@ def render_baseline_report(metrics: SurrogateMetrics) -> str:
 
 
 # ── PED-06 — 도달 3상태 + 노출 계약 확장 ──────────────────────────────────────────
-# `docs/architecture/gamification_module_gap_review.md` §3 D1 ③. 세션완주율(③)만 구조적
-# 불가로 고정한다 — LearningSession 생성자 호출이 src/ 전체에서 0건이고(실측), writer는
-# 2026-07-29 영구 미신설 결정(S3-16 소유). 다른 지표는 전부 좌석이 살아 있어 표본만 쌓이면
-# MEASURED가 된다(구조적 불가가 아니다).
-_STRUCTURALLY_IMPOSSIBLE_FIELDS: frozenset[str] = frozenset({"session_completion_rate"})
+# `docs/architecture/gamification_module_gap_review.md` §3 D1 ③. 종전에는 세션완주율(③)을 구조적
+# 불가로 고정했다(LearningSession 생성자 0건·2026-07-29 S3-16 ③ "영구 미신설"). **정정(EOS-131 ·
+# 2026-09-25)**: 그 결정은 2026-09-24 부분 번복됐고(MEMORY "S3-16 ③ 부분 번복" — 점수는 계속 미신설,
+# 행은 신설), `l2/learning_session_writer`가 서버 30분 유휴 규칙으로 세션 행을 만든다. 그래서 ③도
+# 다른 지표처럼 표본이 쌓이면 MEASURED가 되는 축이며, 지금 구조적 불가 지표는 **없다**. 빈 집합과
+# 이 판정 분기는 남긴다 — 생산자가 사라지는 지표가 다시 생기면 여기에 사유와 함께 올린다.
+# 의미 주의: 서버 세션은 유휴 규칙으로 *반드시* 닫히므로(다음 세션 개시·조회 시점 확정) ③은
+# "학생이 끝까지 했는가"가 아니라 "닫힌 활동 묶음의 비율"에 가깝다 — 해석은 wh1_evaluation 소관.
+_STRUCTURALLY_IMPOSSIBLE_FIELDS: frozenset[str] = frozenset()
 
 # calibration_brier가 NO_DATA일 때 REC-01(attempt 제출 자체 미도달)과 구분해 붙이는 부기 —
 # "확신도 필드를 받을 입력 UI가 없다"는 *다른 층*의 이유임을 리포트가 명시한다(gap review ④).
@@ -161,7 +165,8 @@ class GrowthEvidenceReachState(str, Enum):
     """
 
     STRUCTURALLY_IMPOSSIBLE = "structurally_impossible"
-    """생산자 자체가 없음(예: ③ LearningSession writer 영구 미신설) — 표본을 기다려도 안 참."""
+    """생산자 자체가 없음 — 표본을 기다려도 안 참. 현재 해당 지표 0개(종전 ③ 세션 완주율은
+    EOS-131 세션 writer 신설로 해제 — `_STRUCTURALLY_IMPOSSIBLE_FIELDS` 주석 참조)."""
 
     NO_DATA = "no_data"
     """계측 좌석은 있는데 표본이 0(또는 부족) — MetricStatus가 MEASURED가 아님."""
