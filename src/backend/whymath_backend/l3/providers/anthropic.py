@@ -350,6 +350,12 @@ class AnthropicProvider:
         if self._client is not None and self._client_loop is loop:
             return self._client
         settings = self._resolved_settings
+        if settings.anthropic_policy_blocked:
+            raise RuntimeError(
+                "Anthropic API 사용 중단 방침(ARCH-66 · 2026-09-24 ~ 2026-12-31)으로 클라우드 "
+                "생성을 막았습니다 — 키는 있으나 WHYMATH_ANTHROPIC_API_ENABLED가 꺼져 있습니다. "
+                "재개는 게이트 G-arch66-anthropic-api-pause-review를 거칩니다."
+            )
         if not settings.anthropic_configured:
             raise RuntimeError(
                 "Anthropic API 키가 미설정이라 클라우드 생성을 할 수 없습니다 "

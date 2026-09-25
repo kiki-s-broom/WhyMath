@@ -102,6 +102,7 @@ from whymath_backend.l2 import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.learning_session_writer import record_learning_activity
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import recommend_prerequisite_gaps
 from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
@@ -1153,9 +1154,13 @@ async def _complete_problem(
     student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
         student_work_cipher, final_answer
     )
+    # EOS-131: 완료 확정 attempt도 서버가 학습 세션에 결합한다(submit_attempt와 같은 규칙). 같은
+    # 턴 앞에서 이미 세션을 이었으므로 대개 같은 세션을 갱신할 뿐이다. never-break(실패 시 NULL).
+    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답·dialogue 링크에 즉시 사용).
         user_id=user_id,
+        session_id=learning_session_id,
         problem_id=problem_id,
         is_correct=True,  # 서버 권위 판정(turn A correct) — 클라 보고 아님.
         student_answer=student_answer_plain,
@@ -2401,6 +2406,9 @@ async def create_session(
     """
     # NLP-03 acceptance ③ — 클라가 실어 보낸 solution_steps의 0-전이(<=1) 비율 관측.
     segmentation_counters.record(body.solution_steps)
+    # EOS-131: 코치 턴은 학습 활동이다 — 서버 유휴 규칙으로 학습 세션을 잇거나 연다. never-break
+    # (실패해도 코칭은 진행·예외 타입명 로그). 커밋은 이 핸들러의 기존 커밋이 함께 가져간다.
+    await record_learning_activity(session, user_id=user.user_id)
     # slice 64: 문항 기대정답을 서버 DB에서 조회해 step shadow 진단 맥락으로 주입(비노출 — 응답엔
     # 결코 싣지 않음·정답 누출 차단). 문항 부재/없음이면 None(graceful).
     expected_answer = await _expected_answer_for(session, body.problem_id)
@@ -2813,6 +2821,8 @@ async def append_turns(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="대화를 찾을 수 없습니다."
         )
+    # EOS-131: 코치 턴 = 학습 활동(소유권 확인 *뒤* — 남의 대화 id로 세션을 갱신하지 않는다).
+    await record_learning_activity(session, user_id=user.user_id)
 
     # PED-04 D1·D2: **이번 턴을 적재하기 전에** 직전 턴들의 평문 메타를 읽는다(순서가 계약 —
     # `_turn_meta_rows` docstring 참조). 여기서 Polya 상태를 서버가 파생하고, 발문 회전용

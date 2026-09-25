@@ -60,6 +60,7 @@ _CATEGORIES = {
     "hint_usages",
     "student_solution_steps",
     "dialogue_turns",
+    "recommendation_events",  # EOS-131 ⑤ — 추천 기록(학습 세션 조인)
 }
 
 
@@ -187,6 +188,20 @@ _SSS_ROW = StudentSolutionStep(
 )
 
 
+class _RecRow:
+    """`evidence_event` 추천 처치 행 흉내 — export가 읽는 4속성만(EOS-131 ⑤)."""
+
+    def __init__(self) -> None:
+        self.time = datetime(2026, 9, 25, 9, 0, tzinfo=UTC)
+        self.session_id = uuid.uuid4()
+        self.event_type = "recommendation_render"
+        self.meta = {"problem_id": "p1", "policy_version": "cat_v1"}
+        self.payload_encrypted = b"never-exported"
+
+
+_REC_ROW = _RecRow()
+
+
 class TestExportUserData:
     def test_assembles_categories_and_profile(self) -> None:
         """20종 카테고리(+대화 턴 조인) 직렬화 + user_profile 단건 + exported_at + 읽기 전용."""
@@ -228,6 +243,7 @@ class TestExportUserData:
                     )
                 ],
                 [_StubRow({"cat": "profile"})],
+                [_REC_ROW],  # EOS-131 ⑤ recommendation_events(세션 조인 — 프로필 뒤 마지막)
             ]
         )
         out = _run(fake, uid)
@@ -263,12 +279,23 @@ class TestExportUserData:
         ]
         assert out.user_profile == {"cat": "profile"}
         assert len(out.not_included) >= 1  # 부분 export 정직 고지
+        # EOS-131 ⑤: 추천 기록 — 비민감 메타만(암호문·placeholder 목표 id는 싣지 않는다).
+        assert out.data["recommendation_events"] == [
+            {
+                "time": _REC_ROW.time.isoformat(),
+                "session_id": str(_REC_ROW.session_id),
+                "event_type": "recommendation_render",
+                "meta": {"problem_id": "p1", "policy_version": "cat_v1"},
+            }
+        ]
         assert fake.commits == 0 and fake.flushes == 0  # 읽기 전용(저장소 패턴)
-        assert len(fake.executed) == 21
+        # _EXPORT_PLAN(19) + dialogue_turns 조인(1) + recommendation_events 조인(1·EOS-131)
+        # + profile(1) = 22.
+        assert len(fake.executed) == 22
 
     def test_no_profile_yields_none(self) -> None:
         """프로필 행이 없으면 user_profile=None·각 카테고리 빈 리스트."""
-        fake = _FakeSession([[] for _ in range(21)])
+        fake = _FakeSession([[] for _ in range(22)])  # +1 = recommendation_events(EOS-131)
         out = _run(fake, uuid.uuid4())
         assert out.user_profile is None
         assert all(rows == [] for rows in out.data.values())
@@ -276,7 +303,7 @@ class TestExportUserData:
 
     def test_multiple_rows_preserved(self) -> None:
         """카테고리당 다행 직렬화 보존(리스트 순서)."""
-        fake = _FakeSession([[_StubRow({"n": 1}), _StubRow({"n": 2})], *([[]] * 20)])
+        fake = _FakeSession([[_StubRow({"n": 1}), _StubRow({"n": 2})], *([[]] * 21)])
         out = _run(fake, uuid.uuid4())
         assert out.data["learning_sessions"] == [{"n": 1}, {"n": 2}]
 

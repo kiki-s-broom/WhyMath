@@ -65,7 +65,12 @@ from whymath_backend.schema.enums import (
 # 핵심: LearningSession (§6.1 learning_session — 앱 진입~종료 한 단위)
 # ──────────────────────────────────────────────────────────────────────────
 class LearningSession(Base):
-    """학습 세션 영속 ORM — §6.1 `learning_session`(앱 진입~종료 한 단위).
+    """학습 세션 영속 ORM — §6.1 `learning_session`.
+
+    **현행 의미(EOS-131)**: §6.1은 "앱 진입~종료 한 단위"로 적었지만, 이 테이블의 유일한 writer는
+    서버 측 유휴 규칙(`l2/learning_session_writer` — 마지막 학습 활동으로부터 30분)이다. 그러므로
+    행 1개 = **학습 활동 묶음**이다. 앱을 열기만 하고 학습 활동(추천 조회·시도 제출·코치 턴)이
+    없으면 행이 생기지 않는다. `last_activity_at`이 NULL인 행은 이 writer가 만든 행이 아니다.
 
     PK `session_id`만 있고 나머지는 nullable/기본값(DDL 그대로). `user_id`→user_profile FK.
     `target_concept_id`는 §6.1 DDL에 `REFERENCES`가 없어 *FK가 아니다*(느슨참조 — schema
@@ -90,6 +95,13 @@ class LearningSession(Base):
     )
     ended_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     duration_seconds: Mapped[int | None] = mapped_column(sa.Integer)
+    # EOS-131: 이 세션의 마지막 학습 활동 시각(서버 수신 시각). 유휴 간격 판정의 입력이다.
+    # NULL = 서버 writer(`l2/learning_session_writer`)가 만든 행이 아님 — 부분 유니크 인덱스
+    # (`uq_learning_session_open_per_user`)와 writer의 열린 세션 조회가 모두 이 값으로
+    # 범위를 좁힌다.
+    last_activity_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
     # ===== 세션 유형·목표 =====
     session_type: Mapped[SessionType | None] = mapped_column(
@@ -121,7 +133,17 @@ class LearningSession(Base):
     network_type: Mapped[str | None] = mapped_column(sa.String(20))
 
     # ── 인덱스 (§6.1 CREATE INDEX — started_at DESC) ──
-    __table_args__ = (sa.Index("idx_session_user", "user_id", sa.desc("started_at")),)
+    __table_args__ = (
+        sa.Index("idx_session_user", "user_id", sa.desc("started_at")),
+        # EOS-131 ⑩: 학생당 *열린 서버 세션* 1개 — 동시 요청 2건이 세션을 둘 여는 경합을 DB가
+        # 막는다(마이그레이션 8e4c2a7f1b93). writer 이전 행(last_activity_at NULL)은 대상 밖.
+        sa.Index(
+            "uq_learning_session_open_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=sa.text("ended_at IS NULL AND last_activity_at IS NOT NULL"),
+        ),
+    )
 
     # ── 변환 헬퍼 (schema↔db seam, problem.py 패턴) ──────────────────────
     @classmethod

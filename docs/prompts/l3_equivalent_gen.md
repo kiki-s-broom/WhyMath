@@ -45,7 +45,8 @@
 조건식·SymPy 표기·여러 개면 배열), answer_map(조건에 답을 대입할 치환맵),
 answer_selection(largest/smallest/unique — 항상 넣으세요), unit_codes(단원 코드 배열·최소 1개).
 필드(권장): answer_explanation(간결 해설), difficulty_overall(1.0~5.0 숫자),
-answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열).
+answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열 — **참고 스펙의
+`achievement_standard_codes` 값을 한 글자도 바꾸지 말고 그대로 복사**).
 선택: distractor_map·concept_tags.
 
 ## ⚠️ 가장 흔한 실패 원인 — `conditions`·`answer_map`을 절대 비우지 마세요
@@ -74,8 +75,7 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
   "answer_selection": "largest",
   "difficulty_overall": 2.0,
   "unit_codes": ["QUAD-EQ"],
-  "answer_format": "자연수",
-  "achievement_standard_codes": ["[10공수1-02-02]"]
+  "answer_format": "자연수"
 }
 
 ## 규칙
@@ -88,6 +88,12 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
   `(1+sqrt(5))/2`). 반올림하면 대입 잔차가 0이 아니어서 기계 검산이 실패합니다. `answer`(사람이
   읽는 값)는 소수로 써도 되지만 `answer_map`은 정확값이어야 합니다.
 - `conditions`에 `answer_map`을 대입하면 반드시 성립해야 합니다(**answer가 conditions의 해**).
+- **`achievement_standard_codes`는 참고 스펙의 값을 그대로 복사하세요** — 위 예시에 이 필드가 없는 것은
+  일부러 뺀 것입니다(문제마다 값이 다릅니다). 스펙과 다른 코드를 적으면 다른 단원의 문제로 분류돼
+  검수 대기로 빠집니다(2026-09-25 실측: 옛 예시의 코드를 베낀 4건이 전부 이 이유로 빠졌습니다).
+- **근의 부호를 반드시 확인하세요** — `(x+5)**2 = 0`의 근은 `5`가 아니라 **`-5`**, `(x-3)*(x+2) = 0`의
+  근은 `3`과 **`-2`**입니다. 괄호 안의 수와 근은 부호가 반대입니다. 답을 적기 전에 그 값을 방정식에
+  직접 대입해 0이 되는지 확인하세요(2026-09-24 파일럿 실측: 중근 문제 실패 4건이 전부 부호 반대).
 - **LaTeX 백슬래시(`\(`·`\)`·`\frac`·`\sqrt` 등) 절대 금지** — JSON이 깨집니다. 수식은
   `x^2`·`(x-2)(x-3)`처럼 일반 텍스트로 쓰고, 문자열에 백슬래시 자체를 넣지 마세요.
 - 발문에 예시 문구·설명·플레이스홀더("발문", "자작", "Calculation" 등)를 그대로 쓰지 말고
@@ -110,4 +116,15 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
 
 ```prompt:l3.equivalent.user_topic
 주제(반드시 이 주제의 문제를 만드세요): {{TOPIC}}
+```
+
+회피 목록(선택·MP-02 재회차) — 생성기가 `avoid_recent > 0`으로 구성됐고 이번 회차에 이미 만든
+조건식이 있을 때만 사용자 프롬프트 **맨 끝**에 붙는다. 값(`{{AVOID_LIST}}`)은 이 생성기가 직전에
+조립에 성공한 조건식 최근 N개(상한 20)의 줄 목록이다. 근거: 2026-09-24 파일럿에서 중복이 전부
+*회차 내* 구조 충돌이었다 — 모델이 방금 자기가 만든 계수를 반복한다. 목록에는 방정식만 싣고 발문·
+해설은 싣지 않는다(Minimal context).
+
+```prompt:l3.equivalent.user_avoid
+이번에 이미 만든 방정식입니다 — 아래와 **같은 방정식(계수만 몇 배 한 것 포함)은 다시 쓰지 말고** 계수·근을 새로 골라 다른 방정식을 만드세요:
+{{AVOID_LIST}}
 ```

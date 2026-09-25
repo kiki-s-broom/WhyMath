@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-93
+title: "SQLAlchemy 2.1 이행 — mypy strict 34건 타입 표기 대응 후 상한 <2.2로 전 지점 동시 상향"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-92
+requires_gates: []
+acceptance:
+  - "① SQLAlchemy 2.1.x에서 mypy --strict 오류(2026-09-25 실측 34건·16파일 — OPS-91 재현)를 타입 표기 대응으로 해소한다 ② 해소 후 src/backend·src/data-pipeline pyproject와 CI 직설치 지점의 상한을 검증된 다음 범위(<2.2)로 함께 올린다 — OPS-92 동일 상한 동결 테스트가 한 곳만 올리면 RED를 낸다 ③ 백엔드 전체 스위트·mypy --strict·lint-imports·infra-contracts 잡을 2.1.x에서 exit 0으로 확인(CI 잡 목록 전수 대조) ④ 2.1 변경 이력(릴리스 노트)의 동작 변경 중 이 저장소가 쓰는 표면을 열거하고 영향 유무를 기록"
+artifacts: []
+paths:
+  - src/backend/pyproject.toml
+  - src/data-pipeline/pyproject.toml
+  - ".github/workflows/ci.yml"
+session: null
+notes: "OPS-91 acceptance ③ '2.1 이행은 별건으로 남긴다'의 추적 좌석 — 산문에만 있고 대장에 없던 후속을 2026-09-25 등재"
+updated: 2026-09-25

@@ -11,10 +11,12 @@ eos_priority: P3
 owner: claude
 depends_on:
   - E4-01-history-social-pack
-requires_gates: []
+requires_gates:
+  - G-student-work-after-internal-completion
 acceptance:
   - "지문 4트랙 법무 승인 + 오독 진단 검수자 일치율 + 파일럿 D7"
   - "선행 과목과의 교차 과목 prerequisite 엣지 실증 (수치 목표는 E1 실측 후 확정 — knowledge_fabric_vision_v1.md §3)"
+  - "[ARCH-66 ⑥ 2026-09-24] Kiki 결정: 학생(실사용자)과 함께 해야 하는 모든 과정은 2026-12-31 내부 프로젝트 완성 이후로 연기한다. 이 태스크는 게이트 G-student-work-after-internal-completion에 묶여 그 판정 전까지 착수하지 않는다."
 artifacts: []
 paths:
   - "src/data-pipeline/**"
@@ -22,5 +24,5 @@ paths:
   - "docs/data/**"
   - "tests/data_pipeline/**"
 session: null
-notes: "[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "[정정 2026-09-01] eos_priority null → P3: 판정표 N/E축 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-24] ARCH-66 ⑥: 학생 참여 과정 12/31 이후 연기"
+updated: 2026-09-24

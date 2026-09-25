@@ -183,7 +183,9 @@ class TestLearningTraceSurface:
         body = client.get("/v1/me/learning-trace").json()
         by_type = {c["event_type"]: c for c in body["coverage"]}
         assert by_type["content_viewed"]["availability"] == "dormant"
-        assert by_type["recommendation_generated"]["availability"] == "unjoinable"
+        # EOS-131: 추천은 실 session_id 결합으로 생산 중이다(종전 "unjoinable"의 반대 방향).
+        assert by_type["recommendation_generated"]["availability"] == "produced"
+        assert by_type["learner_state_created"]["availability"] == "dormant"
         assert by_type["problem_attempted"]["availability"] == "produced"
         assert by_type["problem_attempted"]["count"] == 1
 
@@ -191,7 +193,9 @@ class TestLearningTraceSurface:
         client = _client(_scenario_queue())
         body = client.get("/v1/me/learning-trace").json()
         by_type = {c["event_type"]: c for c in body["coverage"]}
-        assert by_type["concept_selected"]["reason"]
+        # EOS-131로 concept_selected는 생산 중이 됐다 — 여전히 휴면인 원천으로 같은 계약을 본다.
+        assert by_type["content_viewed"]["availability"] == "dormant"
+        assert by_type["content_viewed"]["reason"]
 
     def test_empty_learner_still_reports_coverage(self) -> None:
         client = _client()

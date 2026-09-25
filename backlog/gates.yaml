@@ -40,6 +40,16 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
+  - id: G-arch66-anthropic-api-pause-review
+    title: "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-24
+    remind_after_days: 98
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-attempt-retention-purge-backfill-decision
     title: "Kiki 결정: ProblemAttempt PII 보존기한 파기 대상 소급 확인 — started_at 상시 NULL 버그로 지금까지 파기 0건 (원 PED-16이 7n9n72에 고립·main ID 충돌로 유실 → 2026-09-07 감사가 게이트로 재등재). 배경: privacy/retention.py:80이 ProblemAttempt 파기 기준 컬럼으로 started_at을 쓰는데 두 writer(api/coach.py·api/me.py) 어디서도 채우지 않아 상시 NULL — 근본수정은 PED-37(회수 태스크)이 소유하며 착지 후 신규 행부터 정상. 결정 3항(claude가 판단할 사안 아님 — 법령 유래 절차의 기계 대체 금지): (a) 이 컨테이너·개발 환경·Phaiakes9 prod DB(whymath-pg 5433)에 실제 학생 개인정보가 쌓인 적이 있는가(2026-09-03 복구 리허설 실측 problem_attempt 0행·user_profile 1행이면 실무 영향 0 가능성 높음) (b) 있다면 기존 NULL 행의 소급 파기 기준을 무엇으로 볼 것인가(ended_at 대체 등) (c) 소급 파기 스크립트가 필요하면 별도 태스크로 claude에게 위임. clear evidence에 (a)의 실측 행수와 (b)(c)의 결정을 적는다"
     kind: decision
@@ -314,11 +324,21 @@ gates:
     title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: waived
     requested: 2026-09-21
     remind_after_days: 3
     evidence: null
     cleared_by: null
+    notes: "2026-09-24 Kiki 결정(ARCH-66): Anthropic API 미사용 — count_tokens API 방식을 Claude Code /context 방식으로 대체. 후속 게이트 = G-harn121-constitution-token-measure-context"
+  - id: G-harn121-constitution-token-measure-context
+    title: "헌법 토큰 실측 (HARN-121 ① · Claude Max 경로) — Claude Code 세션에서 /context를 실행해 Memory files의 CLAUDE.md 토큰 수와 전체 컨텍스트 구성을 측정한다. Anthropic API count_tokens 방식(G-harn121-constitution-token-measure)을 대체한다 — 2026-09-24 Kiki 결정(ARCH-66)으로 Anthropic API를 쓰지 않기 때문이다. /context는 Claude 토크나이저의 실측이므로 '문자 수 대체 금지' 원칙과 양립한다. 한계(명시): AGENTS.md는 Claude Code가 읽지 않아 /context에 나타나지 않으며(Codex 등 타 에이전트 전용), SessionStart 브리핑은 메시지 항목에 합산돼 개별 수치가 분리되지 않을 수 있다 — 분리되지 않으면 그 사실을 증거에 적는다. 회신 = /context 출력 전문. 산출물 = metrics/constitution_tokens.json(세션이 회신에서 기록). 목표 '코어 ≤ 1.5만 토큰'의 분모."
+    kind: human
+    assignee: kiki
+    status: cleared
+    requested: 2026-09-24
+    remind_after_days: 3
+    evidence: "Kiki가 2026-09-24 세션 claude/keen-pascal-6b9tz0에서 /context 실행 — Memory files: CLAUDE.md 55.6k 토큰(목표 코어 15k의 3.71배). 판정 기준 main fbb6c215 판본(측정 시점 트리는 +711 bytes, 차이 1% 미만). 미측정 2건: AGENTS.md(Claude Code 미로드), SessionStart 브리핑(Messages 합산·분리 불가). 기록 = metrics/constitution_tokens.json, PR #1302"
+    cleared_by: kiki
     notes: ""
   - id: G-kg02-review-promotion-llm-session
     title: "KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다."
@@ -384,11 +404,21 @@ gates:
     title: "MP-02 재회차 (Phaiakes9) — 로컬 저작 모델 비교 파일럿(mid=qwen2.5:7b vs quality=qwen3:30b-a3b, 각 30건 · 문제 유형 3종 순환 · 카나리 끔) → 수용 건수가 많은 티어로 MP-02 2회차 n=60(카나리 기본값). 런북 = docs/reviews/mp02_rerun_runbook.md (착지 PR 머지 후 실행 — 런북 1단계 HAS_TIER_FLAG=True가 머지를 기계 확인). 회신 = 런북 8절 목록(5절·7절 출력 전문 필수). 배경: 1차 회차(run_id c0854e38…)는 30건 중 중복 20건이라 판정 분모 10 — 10/10 만점이어도 Wilson 하한 0.7871 < 0.90으로 통과가 수학적으로 불가능했다(25건 이상 전건 합격이어야 0.9023). 판정 규칙은 런북 5절에 실행 전 고정: accepted_stored가 많은 티어, 동률이면 mid. 전제: Ollama 가동 · qwen3:30b-a3b 설치(없으면 런북 2절에서 pull) · 비용 0원(로컬)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-24
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 578fa9d2 (런북 착지 #1298 · 재회차 2차 #1303 머지 후). 파일럿 ①(mid=qwen2.5:7b · run_id 4fb0ba12…) 수용 12/30 · 파일럿 ②(quality=qwen3:30b-a3b · run_id ff50b997…) 수용 13/30 → 사전 고정 규칙으로 quality 선택. 이어 Kiki 결정 \"1+2 모두\"로 추가한 파일럿 ③(quality · --avoid-recent 10 · run_id 90208b46…) 수용 29/30 · 중복 0. 2회차(quality · avoid 10 · --canary-basis judged · run_id 42b6ac0f30b4403e881d3597dd354ad2) 실행 — 판정 대상 30 중 수용 27 · 검수필요 3 → Wilson 하한 0.7745 < 0.90 카나리 차단 · ACCUMULATE_EXIT=1. 런북 §7 출력(LEDGER_ROWS 1 · GENLOG_ROWS 30 · REVIEW_ROWS 3 · canary_basis judged · canary_attempts 30 · RECALL_EXIT=0) 회신 확인. 게이트가 요구한 조치(파일럿 → 선택 티어로 2회차)는 끝났다 — 차단은 MP-02의 결과이며 MP-02는 in_progress로 원인(성취기준 코드 불일치 4건) 규명을 이어 간다."
+    cleared_by: claude
+    notes: ""
+  - id: G-mp02-round3-standard-code-fix
+    title: "MP-02 3회차 (Phaiakes9) — 성취기준 예시 제거 후 n=60 재실행. 런북 = docs/reviews/mp02_rerun_runbook.md §1(재실행) → §7-2 → §7-3 (착지 PR 머지 후 — §7-2의 HAS_CODE_FIX=True가 머지를 기계 확인). 설정은 2회차와 동일(quality=qwen3:30b-a3b · --avoid-recent 10 · --canary-basis judged · 카나리 30 · 임계 0.90). 배경: 2회차(run_id 42b6ac0f…)는 판정 대상 30 중 수용 27 · 검수필요 3으로 Wilson 하한 0.7745 < 0.90 카나리 차단 — 실패 4건(파일럿 ③ 포함)이 전부 모델이 저작 프롬프트 예시 코드 [10공수1-02-02]를 베낀 것(스펙 [9수02-20] · 합격 81건은 전부 스펙 코드 · 2026-09-25 Kiki 조회로 확정). 수정 = 예시에서 필드 제거 + 스펙 값 복사 지시(게이트 불변). 회신 = 런북 §8의 3회차 목록(§7-3 출력 전문 필수). 전제: Ollama 가동 · 비용 0원(로컬)."
+    kind: human
+    assignee: kiki
+    status: cleared
+    requested: 2026-09-25
+    remind_after_days: 3
+    evidence: "2026-09-25 Kiki 실행 완료 · 판정 기준 main 87cb759e (#1306 머지 후). 런북 §7-2: HAS_CODE_FIX=True · ROUND2_MODEL=qwen3:30b-a3b · STALE_ROUND3=0 → 실행 · ACCUMULATE3_EXIT=0 · ROUND3_FILES=5. §7-3: run_id d315c0084d5242f2814b0b92b21ddc0c · LEDGER_ROWS 1 · GENLOG_SAME_RUN 60 · SAME_MODEL_AS_ROUND2 True · PROMPT_CHANGED_FROM_ROUND2 True · canary_passed true(30/30 · 하한 0.9173) · 수용 51 · 중복 9 · 검수필요 0 · RECALL_EXIT=0(matched 60)."
+    cleared_by: claude
     notes: ""
   - id: G-not-now-v1-release-recheck
     title: "Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
@@ -604,11 +634,11 @@ gates:
     title: "룰셋 전문(bypass_actors) 첫 2입력 라이브 판정 1회 — HARN-102가 감시 축을 넓힌 뒤 처음 도는 회차다. 기록 파일 .github/ruleset-check-state.json의 마지막 verdict=ok는 2026-09-14의 *단일 입력* 실행이 쓴 것이라, 지금은 실제로 측정하지 않은 축(bypass_actors·enforcement)까지 통과로 읽힌다 — 그 범위 불일치를 닫는 것이 이 게이트의 목적이다. 실행: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북(수집 2줄 + --ruleset-full 판정 1줄). 기대 = EXIT 0(2026-09-14 실측 bypass_actors=[] 이 그대로면). EXIT 1이면 우회 주체가 생겼거나 enforcement가 active가 아니라는 뜻이고 출력의 \"시정 순서\"를 따른다. EXIT 2면 수집이 한 줄 빠졌거나 룰셋 id가 바뀐 것(문서 \"id 하드코딩의 취약성과 그 처리\" 참조). 선행 조건: 이 PR이 main에 머지된 뒤에 실행한다 — 런북과 판정기 양쪽이 미머지 상태면 Kiki 체크아웃에 --ruleset-full 인자 자체가 없어 argparse 오류가 난다. 세션이 머지 확인 후 6항목 브리핑과 함께 실행 블록을 안내한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-15
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 578fa9d2 (Kiki 머신 git worktree --detach origin/main · HEAD_IS_MAIN=True · HAS_FLAG=True). [실측 2026-09-25 · Windows PowerShell · 2입력 첫 회차] 수집 cmd /c 2줄(/rules/branches/main + /rulesets/16623542) → ruleset_drift.py ruleset.json --ruleset-full ruleset-full.json --record → EXIT=0 · 위반 0 · 유예 3(승인 축 · 2026-12-31 만료). 직접 판독: ruleset_id=16623542 · bypass_actors=0 · enforcement=active. 기록 파일 verdict=ok(last_checked=2026-09-25)가 이제 2입력 범위로 쓰였다 — 범위 불일치 해소. 변별력: 직전 회차(2026-09-24, main fbb6c215)는 같은 절차로 EXIT=1(webapp 체크 미강제 1건)을 냈다 — 판정기가 실제로 위반을 낸다는 대조군. 기록 파일 반영 PR은 이 브랜치 claude/quirky-hopper-notxx5."
+    cleared_by: claude
     notes: ""
   - id: G-ruleset-bypass-actors-read
     title: "룰셋 bypass_actors 1회 조회 — 클래식 삭제로 사라진 enforce_admins=true의 대응 축 확인. 2026-09-14 클래식 브랜치 보호 삭제 시 12개 축 중 11개는 룰셋이 덮거나 원래 꺼져 있어 소실 0이었으나, enforce_admins(관리자 우회 금지)만 미확인으로 남았다 — 룰셋의 대응 축 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이며 세션 토큰으로는 둘 다 403이다. 최악의 경우 관리자 우회가 조용히 열린 상태다. 실행(Windows PowerShell · cd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath): cmd /c \"gh api repos/kiki-s-broom/WhyMath/rulesets/16623542 > ruleset-full.json\" 후 파일의 bypass_actors 배열을 회신. ⚠ 파이프(| Out-File) 금지 — cp949 디코딩 왕복으로 JSON이 손상된다(2026-09-14 실측 41자 유실). 빈 배열이면 소실 0으로 확정되고 게이트는 그대로 clear, 비어 있지 않으면 HARN-102가 되돌림 여부 판정을 올린다. 판정·후속은 HARN-102-ruleset-bypass-actors-unverified가 소유한다."
@@ -750,6 +780,16 @@ gates:
     evidence: "2026-09-14 Kiki 결정 = A안(strict 해제 + 클래식 삭제). 두 축 모두 집행 완료.\n\n[① strict] 룰셋은 이미 strict_required_status_checks_policy=false였고, 문서 선언을 true→false로 정정했다. 근거 셋: ⓐ merge queue가 큐 브랜치를 최신 main 위에 얹어 전건 재검증하므로 개별 PR의 up-to-date 요구는 구조적 중복 ⓑ 2026-09-10 PR #1063/#1092/#1094가 전부 behind로 막혀 main 수동 병합 3회 ⓒ 선행 게이트 G-merge-queue-or-strict-relax가 둘을 택일로 물었고 큐가 채택·활성됐다(PR #1067이 gh-readonly-queue 브랜치에서 검증돼 그 head가 main이 됨).\n\n[② 클래식 삭제] Kiki 머신 실측: DELETE /repos/kiki-s-broom/WhyMath/branches/main/protection 후 재조회가 HTTP 404 Branch not protected. 삭제 전 같은 명령이 JSON 2,512자를 반환했으므로 변별력 있는 확인이다.\n\n[③ 기계 판정] 삭제 직후 python scripts/harness/ruleset_drift.py ruleset.json --record 가 EXIT=0 — \"문서 선언과 라이브 설정이 정합(위반 0)\", 유예 3건은 전부 만료 전 승인 축. 즉 클래식이 사라진 뒤에도 룰셋 단독으로 문서 선언을 충족한다.\n\n[④ 축별 소실 대조] 삭제 직전 클래식 원문을 덤프해 12개 축을 룰셋과 대조했다. required_linear_history/allow_force_pushes(=non_fast_forward)/allow_deletions(=deletion)/required_conversation_resolution(=required_review_thread_resolution)은 룰셋이 덮고, required_signatures/block_creations/lock_branch/allow_fork_syncing은 원래 false였으며 restrictions는 키 자체가 부재했다. 필수 체크 13건은 룰셋 16건의 부분집합. 전문은 .github/branch-protection-setup.md \"삭제 직전 실측\" 표에 남겼다(백업 JSON은 Git 밖이라 사라진다).\n\n[잔여 — 게이트가 묻지 않은 새 발견] enforce_admins=true 한 축만 룰셋 대응이 미확인이다. 룰셋에서 그 역할을 하는 bypass_actors는 /rules/branches/main 응답에 없고 /rulesets/{id}(admin 뷰)에서만 보이는데 세션 토큰으로는 둘 다 읽을 수 없다. 게이트의 두 축과 독립이므로 승계 태스크 HARN-102-ruleset-bypass-actors-unverified(priority 2)로 분리 등재했다. 최악의 경우 관리자 우회 금지가 조용히 풀린 상태일 수 있으므로 이 clear를 \"소실 0 확인\"으로 읽으면 안 된다.\n\n[부수 — 시스템 결함 1건 수정] ④ 첫 시도가 EXIT=2(측정 실패)로 공전했다. 원인은 저장소 문서와 판정기 docstring이 *권하던* 수집 명령 자체다 — PowerShell 5.1이 gh 출력을 cp949로 디코딩 왕복시켜 JSON 구조 문자 41자가 유실됐다(2,659→2,618자, Expecting ',' delimiter: line 1 column 1828). cmd /c 경유로 바꾸자 즉시 EXIT=0. 런북·문서·판정기 메시지를 고치고 tests/infra/test_ruleset_drift.py가 그 형태를 동결한다(뮤테이션 4종 전건 RED — 가드 자신을 지운 M4 포함). CLAUDE.md v0.2.23에 '셸 중계' 축으로 등재(같은 cp949 계열 4회차).\n\n[병렬 처리 사실 2026-09-14] 이 게이트는 두 세션이 병렬로 처리했다. 타 세션이 PR #1157(main b810388b)로 먼저 착지했고 이 세션은 PR #1154로 처리했다. 두 evidence는 ①strict 해제 판정에서 일치하지만 ②클래식 삭제의 *집행 여부*에서 갈린다 — #1157 세션은 토큰이 /branches/main/protection에 403이라 대행 불가로 보고 후속 게이트 G-classic-branch-protection-delete를 신설했으나, 이 세션에서는 Kiki가 자신의 gh 토큰으로 실제로 DELETE를 실행했고 재조회 404로 확인됐다. 따라서 그 후속 게이트는 신설 시점에 이미 충족된 상태였으며 같은 근거로 clear한다. 병렬 중복의 원인은 이 게이트가 4일 연속 독촉 초과 상태였다는 것이고, 두 세션 모두 같은 리마인드를 보고 착수했다."
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-14] 대화 중 즉석 결정(2026-09-14) — strict 해제 + 클래식 삭제 두 축 모두 권고안 채택. 저장소 설정(GitHub 룰셋/클래식 브랜치 보호) 결정이라 커밋 판정 기준 없음"
+  - id: G-student-work-after-internal-completion
+    title: "학생 참여 과정 재개 판정 (ARCH-66 ⑥ · 2026-12-31 내부 프로젝트 완성 이후) — 2026-09-24 Kiki 결정으로 학생(실사용자)과 함께 해야 하는 모든 과정(파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집)을 12/31 내부 프로젝트 완성 이후로 연기한다. 이 게이트가 부착된 태스크는 selector 착수 후보에서 빠진다. 날짜가 지나도 자동 재개하지 않는다 — 내부 완성 확인 후 이 게이트를 clear해야 풀린다. 부착 = S3-01(파일럿 코호트)·S4-15(실응답 난이도 루프)·E5-01·E6-01(과목 팩 파일럿). 학생 없이 가능한 축은 막지 않는다: ASM-11은 ⑵ ASM-10 분기로, P3-13 ①은 테스트용 학생 계정으로 진행. 판정 3택: ①재개(파일럿 착수) ②연기 연장(새 기한으로 재생성) ③범위 축소 재개(예: 지인 학생 소수 먼저). 함께 판정할 것: EOS 선언 G4(12-13) 차단 조건 '학생 표본 ≥20명'은 이 연기로 12/31 전 충족 불가 — G4 조건 재정의 또는 12/31 이후 이동. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-24
+    remind_after_days: 98
+    evidence: null
+    cleared_by: null
+    notes: ""
   - id: G-web01-landing-legal-review
     title: "공개 랜딩 v1 공개 전 변호사 검토 (WEB-01 acceptance ③ · web_strategy.md §3.4) — 기계 대체 금지. 검토 항목 3종: ①광고·마케팅 규제(regulatory_checklist.md §4) — RCT 검증 전 \"성적이 오른다\" 류 효과 단정 금지·비교 광고 자문. 현행 카피는 효과 단정을 피하도록 작성했고 tests/infra/test_webapp_landing_governance.py가 금지 문구를 보조 탐지하지만, 문자열 열거는 표현 변형에서 뚫리므로 최종 판정은 사람이 한다 ②웹접근성 — 지능정보화기본법 §46은 문언상 '웹사이트' 중심이라 웹을 개설하는 순간 적용 범위가 실제로 변동한다(법률 판단 사항). 코드 쪽 선결(lang=\"ko\"·본문 바로가기·대비비 4.5:1 초과·확대 제한 없음·prefers-reduced-motion)은 착지했으나 KWCAG 적합성 판정은 아니다 ③개인정보 — 베타 신청은 v1에서 외부 폼 '링크'만 쓰므로(백엔드 호출 0·랜딩 수집 표면 0) 폼 URL을 채우는 순간 처리위탁 고지 대상이 된다. 현재 NEXT_PUBLIC_BETA_FORM_URL 미설정이라 CTA가 \"준비 중\"으로 렌더되며 링크 자체가 존재하지 않는다. 처리방침·수집 최소화 문구도 함께 검토. 검토 대상 산출물: src/web/webapp/ 랜딩 1페이지 전문(app/(public)/) + 법정 표시 푸터 자리. 판정 3택: ①현행 카피로 공개 승인 ②수정 요구 항목 회신 후 재검토 ③공개 보류. 이 게이트가 pending인 동안 랜딩은 비공개다 — 배포는 WEB-02가 소유하며 이 게이트 통과가 그 선결이다."
     kind: human
@@ -764,9 +804,9 @@ gates:
     title: "신규 required check 라이브 등록 — \"webapp — 공개 랜딩 lint·build\" (WEB-01). 문서(.github/branch-protection-setup.md REQUIRED_CHECKS 블록)에는 등재했으나, 라이브 룰셋(rulesets/16623542)에 추가하는 것은 GitHub UI 조작이라 사람 몫이다. 등재하지 않으면 랜딩 잡이 red여도 머지가 막히지 않는다(2026-07-26 backend 잡 미등재 사고와 같은 형태). 방법: GitHub → Settings → Rules → \"main 보호\" → Require status checks → 검색창에 위 이름을 그대로 입력해 추가. 검색 결과가 비면 그 잡이 아직 한 번도 안 돌았다는 뜻이므로, WEB-01 PR의 체크 실행 후 다시 시도한다. 확인: .github/branch-protection-setup.md \"재발 탐지 실행법\" 런북으로 ruleset_drift 판정 EXIT 0. 등재 이유: 문서 목록과 라이브 룰셋이 벌어지면 드리프트 탐지기가 상시 red가 되고, 상시 red인 보호는 습관화돼 소음이 된다(CLAUDE.md \"상시 실패하는 fail-open 보호를 보호 있음으로 신뢰 금지\"). 선행 조건: WEB-01 PR이 main에 머지된 뒤 실행한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 578fa9d2. 2026-09-24 회차(main fbb6c215)에서 ruleset_drift가 EXIT=1 — 미강제 1건 `webapp — 공개 랜딩 lint·build`를 지목. Kiki가 룰셋 \"main 보호\"에 체크를 등록한 뒤 2026-09-25 재판정(2입력 · --record) EXIT=0 · 위반 0 → 문서 REQUIRED_CHECKS 17건과 라이브 정합. 같은 회차가 G-ruleset-bypass-actors-live-watch도 닫았다(bypass_actors=0 · enforcement=active)."
+    cleared_by: claude
     notes: ""

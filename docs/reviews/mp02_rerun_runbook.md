@@ -9,6 +9,28 @@
 > 1차 회차 런북: `docs/reviews/mp02_first_llm_authoring_run_runbook.md` (이 문서는 그것을 대체하지
 > 않는다 — 1차 회차의 기록으로 남는다)
 
+> **[개정 2026-09-24 오후 — 파일럿 ①② 실행 후]** §3·§4는 실행 완료다(`run_id 4fb0ba12…` mid 수용 12 ·
+> `ff50b997…` quality 수용 13 — 판정 규칙대로 `quality`). 두 파일럿 모두 중복률 약 40%·판정 대상
+> 합격률 63~72%라 **이 조건 그대로의 2회차는 카나리 통과 확률이 0.0002% 미만**으로 계산됐다(파일럿
+> 수치로 이항 계산). Kiki 결정("1+2 모두")에 따라 두 가지를 더했다:
+> ① **카나리 표본 기준 `--canary-basis judged`** — 중복을 뺀 판정 대상이 30건 모일 때까지 카나리를
+> 이어 간다(중복 때문에 표본이 10~18건으로 줄어 임계를 수학적으로 못 넘던 문제 해소 · 임계 0.90과
+> 중복 제외 규칙은 그대로) ② **생성기 개선** — `--avoid-recent 10`(이번 회차에 모델이 이미 만든
+> 조건식을 다음 프롬프트에 '다시 쓰지 말 것'으로 싣는다) + 저작 프롬프트에 **근 부호 확인 규칙**
+> (파일럿 ② 실패 5건 중 4건이 중근 부호 반대). 새 순서: **§1 재실행(새 main) → §5-2 파일럿 ③ →
+> §6(개정) 2회차 → §7**. 또한 §3·§4·§6에서 `Tee-Object`를 뺐다 — PowerShell 파이프가 출력을 cp949로
+> 되읽어 화면·사본의 한글이 깨졌다(판정 재료인 대장은 Python이 직접 써서 무관했다).
+
+> **[개정 2026-09-25 — 2회차 실행 후 · 3회차 추가]** 파일럿 ③(`run_id 90208b46…`)은 수용 29/30 · 중복
+> 0 · 생성 실패 0이었고, 2회차(`run_id 42b6ac0f…`)는 판정 대상 30 중 수용 27 · 검수필요 3으로 Wilson
+> 하한 0.7745 < 0.90 — **카나리 차단**이었다. 실패 4건(파일럿 ③ 1 + 2회차 3)은 전부 `성취기준 0.00`
+> 한 가지 사유였고, Kiki 조회로 원인이 확정됐다: 4건 모두 모델이 **저작 프롬프트 예시에 박혀 있던 코드
+> `[10공수1-02-02]`를 그대로 베꼈다**(스펙 코드는 `[9수02-20]` · 합격 81건은 전부 스펙 코드). 그 예시
+> 코드는 1차 회차의 기본 스펙 코드와 같아서 그때는 드러나지 않았다. 처방: 예시에서 그 필드를 빼고 "참고
+> 스펙의 값을 그대로 복사" 지시를 넣었다(검증 게이트는 그대로 — 모델이 틀린 코드를 적으면 여전히
+> 검수필요로 간다). 새 순서: **§1 재실행(새 main) → §7-2 3회차 → §7-3**. 3회차 설정은 2회차와 같고
+> 달라지는 것은 프롬프트 한 곳뿐이다.
+
 ---
 
 ## 0. 사전 브리핑 (6항목)
@@ -173,7 +195,7 @@ $Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
 $OutMid = "$Root\pilot-mid\problems.jsonl"
 $StaleMid = @(Get-ChildItem -Path (Split-Path $OutMid) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_MID=$StaleMid"
-if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutMid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutMid --n 30 --spec-file $Plan --authoring-tier mid --canary 0 --abort-window 0 | Tee-Object -FilePath "$Root\pilot-mid\report.json"; "PILOT_MID_EXIT=$LASTEXITCODE"; "PILOT_MID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutMid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ① 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_MID=$StaleMid (앞 둘은 True, 마지막은 0이어야 한다)" }
+if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutMid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutMid --n 30 --spec-file $Plan --authoring-tier mid --canary 0 --abort-window 0; "PILOT_MID_EXIT=$LASTEXITCODE"; "PILOT_MID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutMid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ① 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_MID=$StaleMid (앞 둘은 True, 마지막은 0이어야 한다)" }
 ```
 
 **예상 출력**: 진행 로그 → 리포트 JSON → `PILOT_MID_EXIT=0`(수용 1건 이상) 또는 `1`(수용 0건) →
@@ -192,7 +214,7 @@ if ($CodeOk -and $HasTier -and $StaleMid -eq 0) { New-Item -ItemType Directory -
 $OutQuality = "$Root\pilot-quality\problems.jsonl"
 $StaleQuality = @(Get-ChildItem -Path (Split-Path $OutQuality) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_QUALITY=$StaleQuality"
-if ($CodeOk -and $HasTier -and $StaleQuality -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutQuality) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutQuality --n 30 --spec-file $Plan --authoring-tier quality --canary 0 --abort-window 0 | Tee-Object -FilePath "$Root\pilot-quality\report.json"; "PILOT_QUALITY_EXIT=$LASTEXITCODE"; "PILOT_QUALITY_FILES=$(@(Get-ChildItem -Path (Split-Path $OutQuality) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ② 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_QUALITY=$StaleQuality" }
+if ($CodeOk -and $HasTier -and $StaleQuality -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutQuality) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutQuality --n 30 --spec-file $Plan --authoring-tier quality --canary 0 --abort-window 0; "PILOT_QUALITY_EXIT=$LASTEXITCODE"; "PILOT_QUALITY_FILES=$(@(Get-ChildItem -Path (Split-Path $OutQuality) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ② 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier STALE_QUALITY=$StaleQuality" }
 ```
 
 30B 모델은 첫 호출에서 로드에 30초~2분이 걸린다. 그 뒤로는 파일럿 ①과 비슷하거나 약간 느리다.
@@ -249,33 +271,73 @@ if ok:
 
 ---
 
-## 6. MP-02 2회차 60건 — 창 ①
+## 5-2. 파일럿 ③ — `quality` + 회피 목록 + 부호 규칙 30건 — 창 ① (10~40분)
 
-이 블록은 §5의 판정을 **다시 계산해서** 쓴다 — 앞 출력을 눈으로 옮겨 적지 않는다. 판정이 서지
-않거나 출력 폴더가 깨끗하지 않으면 **실행을 거부**한다. 카나리 30 · 임계 0.90 · 롤링 창 50 등
-안전장치는 **전부 기본값**이다(1차 회차와 같은 조건 — 바뀐 것은 유형 순환과 모델뿐).
+**먼저 §1 블록을 다시 붙여넣으십시오** — 이 절의 코드(회피 목록·카나리 표본 기준·부호 규칙)는 개정 PR이
+머지된 main에만 있고, §1이 격리 폴더를 새 main으로 옮기고 `$Py`·`$Plan`·`$CodeOk`·`$HasTier`를 다시
+만든다. 이 블록은 그 코드가 실제로 불러와졌는지(`HAS_RERUN2`)를 스스로 확인하고, 아니면 실행을 거부한다.
+
+조건은 파일럿 ②와 같고(`quality` · 유형 3종 순환 · 30건 · 카나리 끔) **달라진 것은 두 가지**다 —
+`--avoid-recent 10`과 프롬프트의 부호 규칙. 부호 규칙은 이제 프롬프트 정본에 들어가 끌 수 없으므로
+이 파일럿은 **둘을 합친 효과**를 잰다(따로 가르지 않는다 — 한계로 기록한다).
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$OutAvoid = "$Root\pilot-quality-avoid\problems.jsonl"
+$Rerun2Probe = & $Py -c "import inspect, whymath_backend.harness.problem_corpus_accumulate as m; print('avoid_recent' in inspect.signature(m._build_live_generator).parameters and 'canary_basis' in inspect.signature(m.run_corpus_accumulate).parameters)"
+$HasRerun2 = ($Rerun2Probe -eq "True")
+"HAS_RERUN2=$HasRerun2"
+$StaleAvoid = @(Get-ChildItem -Path (Split-Path $OutAvoid) -Filter "problems*" -ErrorAction SilentlyContinue).Count
+"STALE_AVOID=$StaleAvoid"
+if ($CodeOk -and $HasRerun2 -and $StaleAvoid -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $OutAvoid) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $OutAvoid --n 30 --spec-file $Plan --authoring-tier quality --avoid-recent 10 --canary 0 --abort-window 0; "PILOT_AVOID_EXIT=$LASTEXITCODE"; "PILOT_AVOID_FILES=$(@(Get-ChildItem -Path (Split-Path $OutAvoid) -Filter 'problems*').Count)" } else { "REFUSED: 파일럿 ③ 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_RERUN2=$HasRerun2 STALE_AVOID=$StaleAvoid (앞 둘은 True, 마지막은 0이어야 한다 · HAS_RERUN2=False면 §1을 다시 붙여넣지 않은 것)" }
+```
+
+**판정 규칙(실행 전 고정)**: 파일럿 ③의 `accepted_stored`가 파일럿 ②보다 **많으면** 2회차에
+`--avoid-recent 10`을 켜고, 같거나 적으면 끈다(0). 두 대장 모두 `attempted=30`이고 모델이 같아야
+비교가 성립한다. 이 판정은 §6 블록이 대장에서 **직접 다시 계산**한다.
+
+---
+
+## 6. MP-02 2회차 60건 — 창 ① (개정)
+
+이 블록은 §5(티어)와 §5-2(회피 목록) 판정을 **다시 계산해서** 쓴다 — 앞 출력을 눈으로 옮겨 적지
+않는다. 판정이 서지 않거나 출력 폴더가 깨끗하지 않으면 **실행을 거부**한다. 카나리 30 · 임계 0.90 ·
+신뢰 0.95 · 롤링 창 50은 **기본값 그대로**이고, 카나리 표본만 `--canary-basis judged`(중복을 뺀 판정
+대상 30건)로 센다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$OutMid = "$Root\pilot-mid\problems.jsonl"
+$OutQuality = "$Root\pilot-quality\problems.jsonl"
+$OutAvoid = "$Root\pilot-quality-avoid\problems.jsonl"
 $Out2 = "$Root\round2\problems.jsonl"
-$Tier = & $Py -c "import json,sys,pathlib
+$Decision = & $Py -c "import json,sys,pathlib
 def last(p):
     q=pathlib.Path(p).with_suffix('.rounds.jsonl')
     rows=[json.loads(l) for l in q.read_text(encoding='utf-8').splitlines() if l.strip()] if q.exists() else []
     return rows[-1] if rows else None
-m,q=last(sys.argv[1]),last(sys.argv[2])
+m,q,v=last(sys.argv[1]),last(sys.argv[2]),last(sys.argv[3])
 ok=m and q and m.get('attempted')==30 and q.get('attempted')==30 and m.get('model_name') and q.get('model_name') and m['model_name']!=q['model_name']
 a=lambda x:(x.get('outcome_counts') or {}).get('accepted_stored',0)
-print(('quality' if a(q)>a(m) else 'mid') if ok else '')
-" $OutMid $OutQuality
+tier=('quality' if a(q)>a(m) else 'mid') if ok else ''
+ok2=v and q and v.get('attempted')==30 and v.get('model_name')==q.get('model_name')
+avoid=('10' if a(v)>a(q) else '0') if ok2 else ''
+print(tier+'|'+avoid)
+" $OutMid $OutQuality $OutAvoid
+$Tier = ($Decision -split '\|')[0]
+$Avoid = ($Decision -split '\|')[1]
 "ROUND2_TIER=$Tier"
+"ROUND2_AVOID=$Avoid"
 $Stale2 = @(Get-ChildItem -Path (Split-Path $Out2) -Filter "problems*" -ErrorAction SilentlyContinue).Count
 "STALE_ROUND2=$Stale2"
-if ($CodeOk -and $HasTier -and ($Tier -eq "mid" -or $Tier -eq "quality") -and $Stale2 -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out2) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $Out2 --n 60 --spec-file $Plan --authoring-tier $Tier | Tee-Object -FilePath "$Root\round2\report.json"; "ACCUMULATE_EXIT=$LASTEXITCODE"; "ROUND2_FILES=$(@(Get-ChildItem -Path (Split-Path $Out2) -Filter 'problems*').Count)" } else { "REFUSED: 2회차 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_TIER_FLAG=$HasTier ROUND2_TIER='$Tier'(mid 또는 quality여야 한다) STALE_ROUND2=$Stale2(0이어야 한다)" }
+if ($CodeOk -and $HasRerun2 -and ($Tier -eq "mid" -or $Tier -eq "quality") -and ($Avoid -eq "0" -or $Avoid -eq "10") -and $Stale2 -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out2) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $Out2 --n 60 --spec-file $Plan --authoring-tier $Tier --avoid-recent $Avoid --canary-basis judged; "ACCUMULATE_EXIT=$LASTEXITCODE"; "ROUND2_FILES=$(@(Get-ChildItem -Path (Split-Path $Out2) -Filter 'problems*').Count)" } else { "REFUSED: 2회차 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_RERUN2=$HasRerun2 ROUND2_TIER='$Tier'(mid|quality) ROUND2_AVOID='$Avoid'(0|10 · 비었으면 파일럿 ③ 대장 없음) STALE_ROUND2=$Stale2(0이어야 한다)" }
 ```
 
 **예상 출력**: `ACCUMULATE_EXIT=0`(수용 1건 이상) · `1`(카나리 차단 또는 수용 0) · `2`(연속 무진전
-알람 — 이 출력 폴더는 새로 만들었으므로 나오면 이상 신호). 어느 값이든 §7로 간다.
+알람 — 이 출력 폴더는 새로 만들었으므로 나오면 이상 신호). 어느 값이든 §7로 간다. judged 기준에서는
+카나리가 30건보다 **더 많은 시도**를 쓸 수 있다(중복만큼) — 그 수는 §7의 `canary_attempts`가 말한다.
 
 ---
 
@@ -296,7 +358,7 @@ print('REVIEW_ROWS', 'FILE_MISSING' if rev is None else len(rev))
 if led:
     r=led[-1]
     print('RUN_ID', r.get('run_id'))
-    for k in ('model_name','prompt_version','attempted','accepted','appended','outcome_counts','spec_outcome_counts','duplicate_sources','canary_size','canary_threshold','canary_passed','canary_rate','canary_lower_bound','canary_blocked','aborted','abort_reason'):
+    for k in ('model_name','prompt_version','attempted','accepted','appended','outcome_counts','spec_outcome_counts','duplicate_sources','canary_size','canary_threshold','canary_basis','canary_attempts','canary_passed','canary_rate','canary_lower_bound','canary_blocked','aborted','abort_reason'):
         print(' ', k, '=', json.dumps(r.get(k), ensure_ascii=False))
     if gen: print('GENLOG_SAME_RUN', sum(1 for g in gen if g.get('run_id')==r.get('run_id')))
 " $Out2
@@ -320,11 +382,101 @@ if ($RunId2) { & $Py -m whymath_backend.ops.generation_recall --genlog $Genlog2 
 
 ---
 
+## 7-2. MP-02 3회차 60건 — 성취기준 예시 제거 후 — 창 ① (20~60분)
+
+**먼저 §1 블록을 다시 붙여넣으십시오** — 프롬프트 수정은 이 절을 착지시킨 PR이 머지된 main에만 있고,
+§1이 격리 폴더를 새 main으로 옮기고 `$Py`·`$Plan`·`$CodeOk`를 다시 만든다. 이 블록은 수정된 프롬프트가
+실제로 불러와지는지(`HAS_CODE_FIX`)를 스스로 확인하고, 아니면 실행을 거부한다.
+
+설정은 **2회차와 같다** — `quality`(`qwen3:30b-a3b`) · 유형 3종 순환 · `--avoid-recent 10` ·
+`--canary-basis judged` · 카나리 30 · 임계 0.90 · 신뢰 0.95 · 롤링 창 50. 달라지는 것은 저작 프롬프트의
+예시(성취기준 코드 필드 제거 + 복사 지시)뿐이다. 그래서 3회차 결과는 **그 한 가지 수정의 효과**로 읽는다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$Out2 = "$Root\round2\problems.jsonl"
+$Out3 = "$Root\round3\problems.jsonl"
+$FixProbe = & $Py -c "import re; from whymath_backend.l3.prompt_assets import prompt_text as t; s=t('l3.equivalent.system'); print(('그대로 복사' in s) and re.search(r'\[\d{1,2}[가-힣]+\d[\d-]*\]', s) is None)"
+$HasCodeFix = ($FixProbe -eq "True")
+"HAS_CODE_FIX=$HasCodeFix"
+$Round2Model = & $Py -c "import json,sys,pathlib; p=pathlib.Path(sys.argv[1]).with_suffix('.rounds.jsonl'); rows=[json.loads(l) for l in p.read_text(encoding='utf-8').splitlines() if l.strip()] if p.exists() else []; print(rows[-1].get('model_name') or '' if rows else '')" $Out2
+"ROUND2_MODEL=$Round2Model"
+$Stale3 = @(Get-ChildItem -Path (Split-Path $Out3) -Filter "problems*" -ErrorAction SilentlyContinue).Count
+"STALE_ROUND3=$Stale3"
+if ($CodeOk -and $HasCodeFix -and $Round2Model -eq "qwen3:30b-a3b" -and $Stale3 -eq 0) { New-Item -ItemType Directory -Force -Path (Split-Path $Out3) | Out-Null; & $Py -m whymath_backend.harness.problem_corpus_accumulate --out $Out3 --n 60 --spec-file $Plan --authoring-tier quality --avoid-recent 10 --canary-basis judged; "ACCUMULATE3_EXIT=$LASTEXITCODE"; "ROUND3_FILES=$(@(Get-ChildItem -Path (Split-Path $Out3) -Filter 'problems*').Count)" } else { "REFUSED: 3회차 미실행 — CODE_FROM_WORKTREE=$CodeOk HAS_CODE_FIX=$HasCodeFix(False면 §1을 다시 붙여넣지 않았거나 수정 PR 머지 전) ROUND2_MODEL='$Round2Model'(qwen3:30b-a3b여야 한다 · 비었으면 2회차 대장 없음) STALE_ROUND3=$Stale3(0이어야 한다)" }
+```
+
+**자가검증의 변별력**: `HAS_CODE_FIX`는 수정 전 main에서 `False`다 — 옛 프롬프트에는 `그대로 복사`가
+없고 예시 코드 `[10공수1-02-02]`가 정규식에 걸린다. 성공·실패가 서로 다른 화면을 낸다.
+
+**예상 출력**: `ACCUMULATE3_EXIT=0`(카나리 통과 · 본배치까지 진행) · `1`(카나리 차단 또는 수용 0) ·
+`2`(연속 무진전 알람 — 새 출력 폴더라 나오면 이상 신호). 어느 값이든 §7-3으로 간다.
+
+---
+
+## 7-3. 3회차 산출 자가검증 + 리콜 리허설 (acceptance ①③④) — 창 ①
+
+§7과 같은 검사를 3회차 경로로 돌리고, 두 가지를 더 본다 — 2회차와 **같은 모델**로 돌았는지, 그리고
+프롬프트가 **실제로 바뀌었는지**(`prompt_version`이 2회차와 달라야 한다). 검수필요가 나오면 그 코드
+분포도 함께 찍는다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ①
+$Root = "C:\Users\kiki\Desktop\__AI\mp02-rerun"
+$Out2 = "$Root\round2\problems.jsonl"
+$Out3 = "$Root\round3\problems.jsonl"
+& $Py -c "import json,sys,pathlib,collections
+out=pathlib.Path(sys.argv[1]); prev=pathlib.Path(sys.argv[2])
+def rows(p):
+    q=pathlib.Path(p)
+    if not q.exists(): return None
+    return [json.loads(l) for l in q.read_text(encoding='utf-8').splitlines() if l.strip()]
+led=rows(out.with_suffix('.rounds.jsonl')); gen=rows(out.with_suffix('.genlog.jsonl')); rev=rows(out.with_suffix('.review.jsonl')); led2=rows(prev.with_suffix('.rounds.jsonl'))
+print('LEDGER_ROWS', 'FILE_MISSING' if led is None else len(led))
+print('GENLOG_ROWS', 'FILE_MISSING' if gen is None else len(gen))
+print('REVIEW_ROWS', 'FILE_MISSING' if rev is None else len(rev))
+if led:
+    r=led[-1]
+    print('RUN_ID', r.get('run_id'))
+    for k in ('model_name','prompt_version','attempted','accepted','appended','outcome_counts','spec_outcome_counts','duplicate_sources','canary_size','canary_threshold','canary_basis','canary_attempts','canary_passed','canary_rate','canary_lower_bound','canary_blocked','aborted','abort_reason'):
+        print(' ', k, '=', json.dumps(r.get(k), ensure_ascii=False))
+    if gen: print('GENLOG_SAME_RUN', sum(1 for g in gen if g.get('run_id')==r.get('run_id')))
+    if led2:
+        p2=led2[-1]
+        print('SAME_MODEL_AS_ROUND2', r.get('model_name')==p2.get('model_name'))
+        print('PROMPT_CHANGED_FROM_ROUND2', r.get('prompt_version')!=p2.get('prompt_version'))
+if rev:
+    print('REVIEW_STATUS', dict(collections.Counter(x.get('status') for x in rev)))
+    print('REVIEW_CODES', dict(collections.Counter(json.dumps((x.get('candidate_payload') or {}).get('achievement_standard_codes'), ensure_ascii=False) for x in rev if x.get('candidate_payload'))))
+" $Out3 $Out2
+$RunId3 = & $Py -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]).with_suffix('.rounds.jsonl'); rows=[json.loads(l) for l in p.read_text(encoding='utf-8').splitlines() if l.strip()] if p.exists() else []; print(rows[-1]['run_id'] if rows else '')" $Out3
+"RUN_ID_FOR_RECALL=$RunId3"
+$CorpusArgs3 = @(); if (Test-Path $Out3) { $CorpusArgs3 = @("--corpus", $Out3) }
+$Genlog3 = & $Py -c "import pathlib,sys; print(pathlib.Path(sys.argv[1]).with_suffix('.genlog.jsonl'))" $Out3
+if ($RunId3) { & $Py -m whymath_backend.ops.generation_recall --genlog $Genlog3 @CorpusArgs3 --run-id $RunId3; "RECALL_EXIT=$LASTEXITCODE" } else { "REFUSED: 리콜 미실행 — 3회차 대장에 run_id가 없다(LEDGER_ROWS를 확인)" }
+```
+
+**판정**:
+
+| 보이는 것 | 뜻 |
+|---|---|
+| `SAME_MODEL_AS_ROUND2 True` + `PROMPT_CHANGED_FROM_ROUND2 True` | ✅ 비교가 성립한다 — 바뀐 것은 프롬프트뿐 |
+| `PROMPT_CHANGED_FROM_ROUND2 False` | ❌ 옛 프롬프트로 돌았다 — 결과를 3회차로 쓰지 않는다 |
+| `canary_passed = true` + `GENLOG_SAME_RUN 60` | ✅ acceptance ① 충족 |
+| `canary_passed = false` + `canary_blocked = true` | 차단도 결과다 — `REVIEW_CODES`로 성취기준 사유가 남았는지 본다 |
+| `RECALL_EXIT=0` + 리콜 열거 건수 = `GENLOG_SAME_RUN` | ✅ acceptance ③ 충족(과다·과소 0) |
+
+---
+
 ## 8. 회신 — 이것만 붙여넣어 주십시오
 
 §1의 판정 표 5줄 · §2의 `MODEL_*`·`*_PRESENT`·`OLLAMA_CONTEXT_LENGTH` · §3·§4의 `*_EXIT`·`*_FILES`
 · **§5 출력 전문** · §6의 `ROUND2_TIER`·`ACCUMULATE_EXIT` · **§7 출력 전문**.
 출력을 자르지 말고 그대로 주십시오.
+
+**3회차(§7-2·§7-3)를 돌렸으면** 이것만 주십시오: §1의 판정 표 5줄 · §7-2의 `HAS_CODE_FIX`·`ROUND2_MODEL`·
+`STALE_ROUND3`·`ACCUMULATE3_EXIT`·`ROUND3_FILES` · **§7-3 출력 전문**.
 
 회신을 받으면 세션이 하는 일: ①모델 판정을 MEMORY 결정 로그에 기록(모델 채택 조건 ②③ —
 실측 근거·결정 로그) ②acceptance 전수 재대조 ③카나리 30건 검수가 필요하면 검수 런북

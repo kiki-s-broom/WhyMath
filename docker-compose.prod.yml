@@ -60,6 +60,8 @@ services:
       # 선택(빈 값 허용): 비면 해당 기능이 스스로 비활성/폴백된다(클라우드 LLM 미배선·
       # Langfuse no-op). 관측 장애가 학생 경로를 깨뜨리지 않는다는 기존 설계 그대로.
       WHYMATH_ANTHROPIC_API_KEY: ${WHYMATH_ANTHROPIC_API_KEY:-}
+      # ARCH-66 — 2026-12-31까지 Anthropic API 사용 중단. 기본 false(키가 있어도 좌석 꺼짐)
+      WHYMATH_ANTHROPIC_API_ENABLED: ${WHYMATH_ANTHROPIC_API_ENABLED:-false}
       WHYMATH_LANGFUSE_PUBLIC_KEY: ${WHYMATH_LANGFUSE_PUBLIC_KEY:-}
       WHYMATH_LANGFUSE_SECRET_KEY: ${WHYMATH_LANGFUSE_SECRET_KEY:-}
       WHYMATH_LANGFUSE_HOST: ${WHYMATH_LANGFUSE_HOST:-https://cloud.langfuse.com}
