@@ -653,6 +653,16 @@ class TestWaitChain:
         out = capsys.readouterr().out
         assert "3건 ← G-harn174-bottleneck ← S1-81-judgment ← S1-80-fix-a" in out
 
+    def test_chain_ending_at_gate_says_a_person_is_next(self, repo: Path, capsys):
+        """입력이 모두 끝난 게이트에서 경로가 멈추면, 막고 있는 것은 작업이 아니라 사람 판정이다."""
+        _bottleneck_fixture(repo)
+        _set_status(repo, "S1-80-fix-a", "done")
+        _set_status(repo, "S1-81-judgment", "done")
+        capsys.readouterr()
+        assert cli.main(["next", "--no-remote"]) == 0
+        out = capsys.readouterr().out
+        assert "3건 ← G-harn174-bottleneck (사람 판정 대기)" in out
+
     def test_status_json_carries_chain_and_inputs(self, repo: Path, capsys):
         _bottleneck_fixture(repo)
         capsys.readouterr()

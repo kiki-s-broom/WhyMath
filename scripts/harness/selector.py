@@ -334,7 +334,11 @@ def render_gate_wait_groups(
     lines: list[str] = []
     for tail, ids in groups:
         shown = ", ".join(ids[:5]) + (f" 외 {len(ids) - 5}건" if len(ids) > 5 else "")
-        lines.append(f"{indent}· {len(ids)}건 ← {' ← '.join(tail)}  [{shown}]")
+        # 경로가 게이트에서 끝나면 그 게이트의 입력이 없거나 이미 다 끝났다는 뜻이다 — 지금
+        # 막고 있는 것은 작업이 아니라 사람 판정이다. 그 사실을 화면에서 바로 읽게 한다.
+        waiting_on_person = bool(tail) and tail[-1].startswith("G-")
+        suffix = " (사람 판정 대기)" if waiting_on_person else ""
+        lines.append(f"{indent}· {len(ids)}건 ← {' ← '.join(tail)}{suffix}  [{shown}]")
     return lines
 
 
