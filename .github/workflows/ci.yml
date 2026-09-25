@@ -1130,9 +1130,11 @@ jobs:
       # 전건 통과함을 실측하고 배선했다(2026-07-27).
       # ruff·black(OPS-11) — 아래 lint 스텝용. 버전 핀은 backend `dev` extra와 같은 정책
       # (상한을 걸어 메이저 변경 시 재검증을 강제).
+      # sqlalchemy 상한은 두 pyproject와 같아야 한다(OPS-91 핀·OPS-92 동결 —
+      # tests/infra/test_sqlalchemy_upper_bound.py가 전 지점 동일 상한을 검사한다).
       - name: Install deps (실측 최소 7종 — 백엔드 전체 설치 불요)
         run: |
-          pip install pytest pytest-asyncio pytest-randomly pyyaml "sqlalchemy>=2.0" \
+          pip install pytest pytest-asyncio pytest-randomly pyyaml "sqlalchemy>=2.0,<2.1" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
 
       # OPS-11 — `tests/infra`를 lint/format하는 잡이 **하나도 없었다**. backend 잡은

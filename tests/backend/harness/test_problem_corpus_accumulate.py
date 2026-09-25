@@ -14,6 +14,7 @@ import pytest
 
 from whymath_backend.harness import problem_corpus_accumulate
 from whymath_backend.harness.problem_corpus_accumulate import (
+    AccumulateReport,
     load_corpus_index,
     main,
     run_corpus_accumulate,
@@ -609,3 +610,185 @@ class TestSafetyCliWiring:
         with pytest.raises(SystemExit) as excinfo:
             main(["--out", str(out), "--n", "2", flag, value])
         assert excinfo.value.code == 2  # argparse.error
+
+
+class TestAuthoringTierWiring:
+    """--authoring-tier(MP-02 재회차) — 생성기 조립 인자로 실제 전달되는가."""
+
+    def test_default_mid_sends_no_routing_sync_key(self) -> None:
+        """mid(기본)는 routing_sync 키를 싣지 않는다 — 종전 조립과 동일(대조군)."""
+        gen = problem_corpus_accumulate._build_live_generator("힌트")
+        assert gen._routing_sync is True  # type: ignore[attr-defined]
+
+    def test_quality_sets_async_routing(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="quality")
+        assert gen._routing_sync is False  # type: ignore[attr-defined]
+
+    def test_unknown_tier_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="authoring_tier"):
+            problem_corpus_accumulate._build_live_generator("힌트", authoring_tier="cloud")
+
+    def test_cli_passes_tier_to_builder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        def _fake(topic_hint: str, **kwargs: object) -> object:
+            seen.append(kwargs.get("authoring_tier"))
+            return _AlwaysFailingGenerator()
+
+        monkeypatch.setattr(problem_corpus_accumulate, "_build_live_generator", _fake)
+        seed = _seed_corpus(tmp_path, short_n=1)
+        main(
+            [
+                "--seed",
+                str(seed),
+                "--out",
+                str(tmp_path / "a.jsonl"),
+                "--n",
+                "1",
+                "--canary",
+                "0",
+                "--abort-window",
+                "0",
+                "--authoring-tier",
+                "quality",
+            ]
+        )
+        assert seen == ["quality"]
+
+    def test_cli_rejects_unknown_tier(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit):
+            main(["--out", str(tmp_path / "a.jsonl"), "--authoring-tier", "cloud"])
+
+
+class TestMp02RerunSpecPlan:
+    """MP-02 재회차 유형 순환 계획(`docs/reviews/mp02_rerun_spec_plan.jsonl`)이 실제로 읽힌다.
+
+    런북 §1이 같은 로더로 `SPEC_PLAN_OK 3`을 자가검증하지만, 그건 Kiki 머신에서만 돈다. 파일이
+    깨지면(허용 외 키·spec_id 중복·BOM) CI에서 먼저 red가 나야 회차 하나를 태우지 않는다.
+    """
+
+    _PLAN = Path(__file__).resolve().parents[3] / "docs" / "reviews" / "mp02_rerun_spec_plan.jsonl"
+
+    def test_plan_loads_three_distinct_specs_on_the_round_standard(self) -> None:
+        entries = problem_corpus_accumulate.load_spec_plan_file(
+            self._PLAN,
+            default_standard_code="[0폴백-00]",
+            default_difficulty=9.9,
+            default_topic_hint="폴백",
+        )
+        assert [spec_id for spec_id, _, _ in entries] == [
+            "quad-larger",
+            "quad-smaller",
+            "quad-double",
+        ]
+        # 폴백 값이 하나라도 쓰였으면 계획 파일이 키를 빠뜨린 것이다(명시 고정이 목적).
+        for _, spec, hint in entries:
+            assert spec.achievement_standard_codes == frozenset({"[9수02-20]"})
+            assert 1.0 <= spec.difficulty_overall <= 5.0
+            assert hint != "폴백"
+        assert len({hint for _, _, hint in entries}) == 3  # 유형이 실제로 다르다
+
+
+class TestCanaryBasis:
+    """카나리 표본 기준(MP-02 재회차) — 같은 입력에서 기준만 바꿔 양방향 변별을 본다.
+
+    시드 6건과 같은 풀 순서의 결정론 생성기라 **앞 6회가 전부 중복**(중립)이고 7회째부터 신규다.
+    attempts 기준은 카나리 5건이 전부 중복이라 판정 대상 0(측정 실패) → 차단, judged 기준은
+    중복을 건너뛰어 판정 대상 5건을 채운 뒤 판정한다.
+    """
+
+    def _run(self, tmp_path: Path, basis: str) -> AccumulateReport:
+        seed = _seed_corpus(tmp_path, short_n=6)
+        return run_corpus_accumulate(
+            out_path=tmp_path / f"acc-{basis}.jsonl",
+            seed_paths=[seed],
+            generator=SkeletonEquivalentProblemGenerator(),
+            spec=_spec(),
+            n=20,
+            canary_size=5,
+            canary_threshold=0.0,
+            abort_window=None,
+            canary_basis=basis,
+        )
+
+    def test_attempts_basis_counts_duplicates_into_the_sample(self, tmp_path: Path) -> None:
+        """대조군 — 종전 동작: 시도 5건 시점에 판정, 전건 중복이라 측정 실패로 차단."""
+        report = self._run(tmp_path, "attempts")
+        assert report.canary_basis == "attempts"
+        assert report.canary_attempts == 5
+        assert report.canary is not None and report.canary["trials"] == 0
+        assert report.canary["measurement_failed"] is True
+        assert report.canary_blocked is True
+
+    def test_judged_basis_fills_the_sample_past_duplicates(self, tmp_path: Path) -> None:
+        report = self._run(tmp_path, "judged")
+        assert report.canary_basis == "judged"
+        assert report.canary is not None and report.canary["trials"] == 5
+        assert report.canary_attempts == 11  # 중복 6 + 판정 대상 5
+        assert report.canary_blocked is False
+        assert report.to_json()["canary_attempts"] == 11
+
+    def test_unknown_basis_is_refused(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="canary_basis"):
+            self._run(tmp_path, "vibes")
+
+
+class TestRerunCliWiring:
+    """--avoid-recent·--canary-basis가 생성기 조립·회차 함수까지 실제로 닿는가."""
+
+    def test_cli_passes_avoid_recent_and_basis(
+        self, tmp_path: Path, capsys: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        def _fake(topic_hint: str, **kwargs: object) -> object:
+            seen.append(kwargs.get("avoid_recent"))
+            return _AlwaysFailingGenerator()
+
+        monkeypatch.setattr(problem_corpus_accumulate, "_build_live_generator", _fake)
+        seed = _seed_corpus(tmp_path, short_n=1)
+        main(
+            [
+                "--seed",
+                str(seed),
+                "--out",
+                str(tmp_path / "a.jsonl"),
+                "--n",
+                "3",
+                "--canary",
+                "2",
+                "--abort-window",
+                "0",
+                "--avoid-recent",
+                "10",
+                "--canary-basis",
+                "judged",
+            ]
+        )
+        report = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+        assert seen == [10]
+        assert report["canary_basis"] == "judged"
+        # 대장(회차 manifest)에도 기준·소비 시도 수가 실린다 — 리포트만 있고 대장에 없으면
+        # 회차가 끝난 뒤 "그 카나리가 무엇을 셌는가"를 복원할 수 없다.
+        ledger_rows = [
+            json.loads(line)
+            for line in (tmp_path / "a.rounds.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert ledger_rows[-1]["canary_basis"] == "judged"
+        assert ledger_rows[-1]["canary_attempts"] == 2  # 전건 실패 = 전건 판정 대상
+
+    def test_default_builder_keeps_avoid_off(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트")
+        assert gen._recent_conditions.maxlen == 0  # type: ignore[attr-defined]
+
+    def test_builder_sets_avoid_window(self) -> None:
+        gen = problem_corpus_accumulate._build_live_generator("힌트", avoid_recent=10)
+        assert gen._recent_conditions.maxlen == 10  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("bad", ["-1", "21"])
+    def test_cli_rejects_out_of_range_avoid(self, tmp_path: Path, bad: str) -> None:
+        with pytest.raises(SystemExit):
+            main(["--out", str(tmp_path / "a.jsonl"), "--avoid-recent", bad])

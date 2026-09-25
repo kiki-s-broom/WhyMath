@@ -185,6 +185,64 @@ def _injected_defects() -> list[ConceptContentRecord]:
     ]
 
 
+def _control_records() -> list[ConceptContentRecord]:
+    """rubric 오검출(false positive) 확인용 **깨끗한** 대조 레코드.
+
+    주입 결함과 1:1로 짝을 이룬다 — 같은 scope·같은 결함 축을 다루되 정답이 반대다.
+    `_injected_defects()`만 있으면 "결함을 놓쳤는가"(false negative)만 측정되고
+    "멀쩡한 것을 결함으로 찍었는가"(false positive)는 측정되지 않는다. 그러면 표본
+    결함율이 콘텐츠 품질인지 rubric 과민인지 가릴 수 없다(2026-09-23 1회차 실측:
+    표본 52건 중 33건 결함 판정이 어느 쪽인지 판정 불가였다).
+
+    이 레코드들은 `_RUBRIC_SYSTEM`의 6기준을 전부 만족하도록 만들었다 — 정확한 정의,
+    학년 적합 은유, 비난 없는 오개념, 크롤링 잔류 없음, 필수 필드 완비, 모순 없음.
+    """
+    return [
+        ConceptContentRecord(
+            code="__CONTROL_GOOD_METAPHOR__",
+            scope=CONTENT_SCOPE_K12,
+            name="대조: 적절 은유",
+            subject="초등수학",
+            unit="수와 연산",
+            metaphor="나눗셈은 사탕을 친구들에게 똑같이 나누어 주는 일과 같다.",
+            misconception="나머지가 있으면 나눗셈이 틀린 것이라고 생각하기 쉽다.",
+            formal_definition_internal=(
+                "자연수 a를 b로 나누면 a = b × q + r (0 ≤ r < b)를 만족하는 몫 q와 나머지 r이 "
+                "유일하게 정해진다."
+            ),
+            accepted_expressions="a ÷ b = q … r",
+            explanation=(
+                "똑같이 나누어 주고 남는 것이 나머지다. 남는 양이 나누는 수보다 작아야 "
+                "더 나누어 줄 수 없다는 뜻이므로, 나머지는 항상 나누는 수보다 작다."
+            ),
+            standard_codes=(),
+            flashcards=(),
+            review_status=CONTENT_REVIEW_STATUS_AI_ESTIMATED,
+        ),
+        ConceptContentRecord(
+            code="__CONTROL_CORRECT_MATH__",
+            scope=CONTENT_SCOPE_UNIVERSITY,
+            name="대조: 올바른 정의",
+            subject="미적분학",
+            unit="극한",
+            metaphor="극한은 목적지에 닿지 않고도 얼마든지 가까워질 수 있다는 약속이다.",
+            misconception="극한값이 그 점의 함수값과 항상 같다고 생각하기 쉽다.",
+            formal_definition_internal=(
+                "임의의 ε > 0에 대해 δ > 0이 존재하여 0 < |x - a| < δ이면 |f(x) - L| < ε일 때, "
+                "lim_{x→a} f(x) = L이라 한다."
+            ),
+            accepted_expressions="lim_{x→a} f(x) = L",
+            explanation=(
+                "극한은 x = a에서의 값이 아니라 a에 가까워질 때의 경향을 말한다. 따라서 "
+                "f(a)가 정의되지 않아도 극한은 존재할 수 있고, 정의되더라도 극한값과 다를 수 있다."
+            ),
+            standard_codes=(),
+            flashcards=(),
+            review_status=CONTENT_REVIEW_STATUS_AI_ESTIMATED,
+        ),
+    ]
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # LLM rubric
 # ──────────────────────────────────────────────────────────────────────────
@@ -247,6 +305,8 @@ class Assessment:
     reason: str
     sampled: bool
     injected: bool
+    control: bool
+    expected_pass: bool | None
     model: str
     latency_ms: float
     timestamp: str
@@ -261,6 +321,8 @@ class Assessment:
             "reason": self.reason,
             "sampled": self.sampled,
             "injected": self.injected,
+            "control": self.control,
+            "expected_pass": self.expected_pass,
             "model": self.model,
             "latency_ms": self.latency_ms,
             "timestamp": self.timestamp,
@@ -273,6 +335,7 @@ async def _assess_one(
     *,
     model_tier: str,
     injected: bool = False,
+    control: bool = False,
     sampled: bool = True,
 ) -> Assessment:
     """단일 레코드에 대해 LLM rubric을 평가한다."""
@@ -316,15 +379,21 @@ async def _assess_one(
     latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000.0
 
     parsed = _parse_llm_response(result.text, record.code)
+    # `passed`는 **LLM이 말한 그대로**다. 여기서 주입 결함을 False로 덮어쓰면
+    # `missed_injected`(주입을 놓친 수)가 구조적으로 항상 0이 되어 변별력 검사가
+    # 위장이 된다 — LLM이 주입 결함을 통째로 놓쳐도 같은 숫자가 나온다.
+    # 참값은 `expected_pass`가 따로 들고, 판정은 둘을 비교해서 한다.
     return Assessment(
         code=record.code,
         scope=record.scope,
         subject=record.subject,
-        passed=parsed["passed"] and not injected,  # 주입 결함은 무조건 실패로 기록
+        passed=parsed["passed"],
         defects=tuple(parsed["defects"]) if not parsed["passed"] else (),
         reason=parsed["reason"],
         sampled=sampled,
         injected=injected,
+        control=control,
+        expected_pass=(False if injected else True if control else None),
         model=decision.local_model or "quality",
         latency_ms=latency_ms,
         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -382,12 +451,18 @@ class BatchReport:
     assessed: list[Assessment]
     threshold: float
     confidence: float
+    control_count: int = 0
+    discrimination_measured: bool = True
+    """LLM이 실제로 돌았는가. dry-run은 False — 그때의 변별력 수치는 측정이 아니다."""
 
     def sampled_assessments(self) -> list[Assessment]:
-        return [a for a in self.assessed if a.sampled and not a.injected]
+        return [a for a in self.assessed if a.sampled and not a.injected and not a.control]
 
     def injected_assessments(self) -> list[Assessment]:
         return [a for a in self.assessed if a.injected]
+
+    def control_assessments(self) -> list[Assessment]:
+        return [a for a in self.assessed if a.control]
 
     @property
     def defective_sampled(self) -> int:
@@ -395,7 +470,13 @@ class BatchReport:
 
     @property
     def missed_injected(self) -> int:
+        """주입 결함을 **놓친** 수 (false negative). 통과하면 안 되는데 통과시킨 것."""
         return sum(1 for a in self.injected_assessments() if a.passed)
+
+    @property
+    def false_positive_controls(self) -> int:
+        """깨끗한 대조군을 **결함으로 찍은** 수 (false positive). rubric 과민의 직접 측정."""
+        return sum(1 for a in self.control_assessments() if not a.passed)
 
     def defect_rate_upper(self) -> float | None:
         n = len(self.sampled_assessments())
@@ -410,8 +491,11 @@ class BatchReport:
             "injected_count": self.injected_count,
             "threshold": self.threshold,
             "confidence": self.confidence,
+            "control_count": self.control_count,
+            "discrimination_measured": self.discrimination_measured,
             "defective_sampled": self.defective_sampled,
             "missed_injected": self.missed_injected,
+            "false_positive_controls": self.false_positive_controls,
             "defect_rate_upper": self.defect_rate_upper(),
             "assessed_count": len(self.assessed),
         }
@@ -422,14 +506,26 @@ class BatchReport:
             "개념 콘텐츠 LLM 배치 검수 리포트",
             "=" * 72,
             f"전체 레코드: {self.total_records}건",
-            f"표본: {self.sample_size}건 + 주입 결함: {self.injected_count}건",
+            f"표본: {self.sample_size}건 + 주입 결함: {self.injected_count}건"
+            f" + 깨끗한 대조군: {self.control_count}건",
             f"임계: {self.threshold*100:.1f}% (confidence={self.confidence*100:.0f}%)",
             f"표본 결함 수: {self.defective_sampled}",
             f"표본 결함율 상한(Wilson): {self._fmt_upper()}",
-            f"누락된 주입 결함: {self.missed_injected}",
+            f"누락된 주입 결함(false negative): {self.missed_injected} / {self.injected_count}",
+            f"오검출된 대조군(false positive): {self.false_positive_controls}"
+            f" / {self.control_count}",
         ]
+        if not self.discrimination_measured:
+            lines.append("  → dry-run: LLM을 부르지 않았으므로 위 두 줄은 측정값이 아니다")
         if self.missed_injected > 0:
-            lines.append("  → rubric 변별력 의심: 주입한 결함을 LLM이 모두 잡지 못함")
+            lines.append("  → rubric 변별력 부족: 주입한 결함을 LLM이 모두 잡지 못함")
+        if self.false_positive_controls > 0:
+            lines.append(
+                "  → rubric 과민: 깨끗한 대조군을 결함으로 찍었다."
+                " 표본 결함율은 콘텐츠 품질이 아니라 rubric 판정을 재고 있을 수 있다"
+            )
+        if self.control_count == 0 and self.discrimination_measured:
+            lines.append("  → 대조군 0건: 오검출을 측정하지 않았다(표본 결함율 해석 불가)")
         lines.append("=" * 72)
         return "\n".join(lines)
 
@@ -506,9 +602,11 @@ async def run_batch_review(
     sampled = stratified_sample(records, sample_size, seed=seed)
     sampled_codes = {r.code for r in sampled}
     injected = _injected_defects()
+    controls = _control_records()
 
-    # 주입 표본은 표본 집합에 포함시키지 않고 별도 평가(누락 확인용).
-    to_assess = list(sampled) + list(injected)
+    # 주입 결함(통과하면 안 됨)과 깨끗한 대조군(통과해야 함)은 표본 집합에 넣지 않고
+    # 별도 평가한다 — 전자는 false negative를, 후자는 false positive를 측정한다.
+    to_assess = list(sampled) + list(injected) + list(controls)
 
     provider: Any
     if dry_run:
@@ -519,11 +617,20 @@ async def run_batch_review(
                 code=r.code,
                 scope=r.scope,
                 subject=r.subject,
-                passed=False if r.code.startswith("__INJECT") else True,
+                # dry-run은 LLM을 부르지 않으므로 참값을 그대로 채운다. 그 결과
+                # 변별력 수치가 0/0으로 나오지만 그것은 "측정했더니 완벽"이 아니라
+                # "측정하지 않았다"이며, `discrimination_measured=False`가 그것을 말한다.
+                passed=not r.code.startswith("__INJECT"),
                 defects=("dry-run: injected defect",) if r.code.startswith("__INJECT") else (),
                 reason="dry-run: 평가 생략",
                 sampled=r.code in sampled_codes,
                 injected=r.code.startswith("__INJECT"),
+                control=r.code.startswith("__CONTROL"),
+                expected_pass=(
+                    False
+                    if r.code.startswith("__INJECT")
+                    else True if r.code.startswith("__CONTROL") else None
+                ),
                 model="dry-run",
                 latency_ms=0.0,
                 timestamp=datetime.now(timezone.utc).isoformat(),
@@ -543,6 +650,7 @@ async def run_batch_review(
                 r,
                 model_tier=model_tier,
                 injected=r.code.startswith("__INJECT"),
+                control=r.code.startswith("__CONTROL"),
                 sampled=r.code in sampled_codes,
             )
             assessments.append(a)
@@ -554,6 +662,8 @@ async def run_batch_review(
         assessed=assessments,
         threshold=threshold,
         confidence=confidence,
+        control_count=len(controls),
+        discrimination_measured=not dry_run,
     )
 
     if output_path is not None:
@@ -617,9 +727,22 @@ def main(argv: list[str] | None = None) -> int:
     print(report.render())
 
     upper = report.defect_rate_upper()
+    # 게이트는 **세 방향**으로 따로 판정한다. 셋을 한 숫자로 합치면 "rubric이 둔한 것"과
+    # "rubric이 과민한 것"과 "콘텐츠가 나쁜 것"이 같은 실패로 보이고, 그러면 결과를 보고
+    # 무엇을 고쳐야 할지 알 수 없다.
     if report.missed_injected > 0:
         print(
-            f"게이트 실패: 주입 결함 {report.missed_injected}건 누락 — rubric 변별력 부족.",
+            f"게이트 실패: 주입 결함 {report.missed_injected}/{report.injected_count}건 누락"
+            " — rubric 변별력 부족(false negative).",
+            file=sys.stderr,
+        )
+        return _EXIT_GATE_FAIL
+    if report.false_positive_controls > 0:
+        print(
+            f"게이트 실패: 깨끗한 대조군"
+            f" {report.false_positive_controls}/{report.control_count}건을"
+            " 결함으로 판정 — rubric 과민(false positive)."
+            " 표본 결함율은 콘텐츠 품질이 아니라 rubric 판정을 재고 있을 수 있다.",
             file=sys.stderr,
         )
         return _EXIT_GATE_FAIL

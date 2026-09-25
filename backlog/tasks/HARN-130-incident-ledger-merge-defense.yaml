@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-130-incident-ledger-merge-defense
+title: "사고 대장 머지 충돌 구조적 제거 — incidents.ndjson이 union 드라이버·샤딩 둘 다 못 받았다 (HARN-46 동형 2회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 진단 고정 — `backlog/incidents.ndjson`이 `.gitattributes`의 union 목록에 없고 샤딩도 안 돼 있음을 실측으로 고정한다. 현행 union 대상은 `MEMORY.md`·`backlog/events.ndjson`·`backlog/events/*.ndjson` 3종뿐이며, HARN-118로 착지한 사고 대장만 두 방어 중 어느 것도 못 받았다. 1회차 실사고 = 2026-09-21 PR #1255가 머지 큐에서 `MERGE_CONFLICT`로 이탈했고 충돌 파일이 정확히 이 파일 하나였다(base 676줄에 양쪽이 각각 2줄·3줄 append)."
+  - "② 방어 선택의 근거를 적는다 — union 드라이버 추가만으로는 부족하다. `.gitattributes` 자신의 주석이 이미 \"GitHub 서버는 merge driver를 적용하지 않는다(사고 원인)\"를 적고 있으므로 union은 로컬 머지만 돕고 머지 큐 충돌은 그대로 남는다. HARN-46이 이벤트 대장에서 택한 '충돌 불가능 구조'(세션별 샤드)와 같은 축을 택하거나, 택하지 않는다면 왜 이 대장은 달라도 되는지를 근거와 함께 적는다."
+  - "③ 쓰기 경로 이관 — 사고 등재 CLI(`backlog.py incident add`)가 공용 파일이 아니라 세션(=브랜치)별 샤드에 쓴다. 서로 다른 브랜치가 같은 파일을 동시에 append하는 상황 자체가 사라져야 하며, 드라이버에 의존하는 형태로 끝내지 않는다(HARN-46 acceptance 동형)."
+  - "④ 읽기 합집합 무손실 — `incident report`·`series`·nth 계산과 `tests/harness/test_incidents.py`의 계약이 레거시 `backlog/incidents.ndjson` + 신규 샤드 전부를 읽어 기존 676+ 기록을 하나도 잃지 않는다. nth는 파일 순서가 아니라 date 순서를 유지한다(`TestNth::test_nth_follows_date_order_not_file_order` 계약 보존). 시드 재계산 계약(`TestSeedRecalculationMatchesReport`, total 676)은 시드 JSONL을 읽으므로 영향받지 않아야 한다."
+  - "⑤ 변별력 — 두 브랜치가 각각 사고를 등재한 상태를 실제로 만들어 머지가 충돌 없이 성립하는지 확인한다. 그 전에 **이관 전 상태에서 같은 시나리오가 실제로 충돌을 내는 것을 먼저 재현**해 검사의 변별력을 보인다(정상 입력에서 초록인 것은 보호의 증거가 아니다 — CLAUDE.md 「보호 장치를 실패 주입 없이 '보호 있음'으로 선언 금지」). 샤딩을 되돌리는 뮤테이션에서 그 테스트가 RED여야 한다."
+artifacts: []
+paths:
+  - ".gitattributes"
+  - scripts/harness/incidents.py
+  - scripts/harness/store.py
+  - backlog/incidents.ndjson
+  - tests/harness/test_incidents.py
+session: null
+notes: "근거: 2026-09-21 PR #1255 머지 큐 이탈 실측(`github-merge-queue[bot]` · reason=MERGE_CONFLICT). 판정 기준 main `27db64c4`. 충돌 재현·해소는 임시 워크트리에서 확인했고 합집합 681줄(676+3+2)에서 `backlog.py validate`·`audit-deps`·`incident report --json` 전건 exit 0이었다. 해소 자체는 그 PR 소유 세션에 맡겼다(2026-09-21 Kiki 판단) — 이 태스크는 재발 방지 축만 소유한다.\n\n선례: HARN-46(이벤트 대장 세션 샤딩 · done)이 같은 유형의 1회차이고 이것이 2회차다. 그때의 교훈(드라이버 의존이 아니라 충돌 불가능 구조로 이관)이 신설 대장에 승계되지 않은 것이 이번 원인이다 — 즉 개별 파일의 누락이 아니라 \"append-only 대장을 새로 만들 때 머지 방어를 함께 설계한다\"는 규약의 부재일 수 있다. 그 일반화가 필요한지는 이 태스크가 판단한다.\n\n소유 경계: HARN-118(사고 대장 구조화)은 done이라 여기에 부착할 수 없어 신규 등재한다(만료된 좌석에 매다는 대신 분리 — CLAUDE.md 중복 소유 회피)."
+updated: 2026-09-21

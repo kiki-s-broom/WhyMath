@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-60-uni-boundary-edge-merge
+title: "고→대 경계 엣지 승인분 정본 병합 — 검수 판정 반영 + 스키마 처리 결정 (S4-01 슬라이스 1 승계)"
+track: math-completion
+stage: S4
+subject: math
+layer: data-pipeline
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates:
+  - G-s401-uni-boundary-edge-review
+acceptance:
+  - "① 검수 결과 반영 — 게이트 G-s401-uni-boundary-edge-review 의 판정(승인/반려/보류)을 엣지 24건 각각에 대해 확정한다. 반려분은 저작 목록 상수(scripts/build_cross_band_edges_s4_01.py)에서 제거한 뒤 제안 파일을 재생성한다(손편집 금지 — 생성 스크립트가 정본이고 --check 가 바이트 동일을 보증한다). 부분 승인이 정상 결과이며 전건 승인을 전제하지 않는다.\n\n② 정본 변동 선검사 — 병합 직전 제안 _meta.source_graph_sha256 을 그 시점 data/corpus/atom_graph_v1/graph.json 의 sha256 과 대조한다. 다르면 그 사이 정본이 바뀐 것이므로 병합을 진행하지 않고 검증기(python -m data_pipeline.atom_graph.cross_band_edges)부터 재실행해 error 0 을 재확인한다. 착지 시점 값은 1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f 이다.\n\n③ 스키마 처리 결정 — AtomEdge 모델이 extra=forbid 라 rationale 필드를 그대로 받지 못한다. 세 선택지 중 하나를 명시적으로 고르고 근거를 남긴다: ⒜ rationale 을 evidence 에 합성 ⒝ 모델에 필드 추가 ⒞ 제안 파일을 근거 원장으로 남기고 정본에는 스키마 호환 필드만 넣는다. 정본 docs/data/cross_band_edges_university_v1.md §5 가 세 안을 기술한다. 결정하지 않고 병합하면 안 된다.\n\n④ 병합 후 실측 재확인 — 병합 뒤 학교급 경계 통과 엣지 수를 재측정해 기대값과 대조한다(전건 승인 시 20/2,210 → 44/2,234 = 1.97%. 부분 승인이면 승인 건수로 재계산하며 수치를 사후에 맞추지 않는다). 대학 노드가 K-12 에서 실제로 도달 가능해졌는지 그래프 탐색으로 확인하고, 기존 atom_graph 검증기(validate.py)의 prerequisite_cycle·dangling_edge_endpoint 가 error 0 인지 재실행한다.\n\n⑤ 범위 밖(명시) — 대학 과목 간 32개 고립 사슬 연결·대학 문항 저작·K-12 0문 4과목·traversal 실부하 측정은 이 태스크가 아니라 S4-01 본체가 소유한다. 이 태스크는 이미 저작·검증된 24건(또는 그 승인 부분집합)을 정본에 반영하는 한 동작만 다룬다."
+artifacts: []
+paths:
+  - "data/corpus/atom_graph_v1/**"
+  - scripts/build_cross_band_edges_s4_01.py
+  - docs/data/cross_band_edges_university_v1.md
+session: null
+notes: "2026-09-23 등재. 근거 산출물(제안 24건·검증기·뮤테이션 테스트)은 PR #1292 스쿼시 63b8441e 로 이미 main 에 있다 — 이 태스크가 다루는 것은 그것을 정본에 반영하는 한 동작이고, 기다리는 것은 게이트뿐이다(depends_on 비어 있음이 의도). 분리 이유: 검수 게이트를 S4-01 본체의 requires_gates 에 붙였더니 검수와 무관한 나머지 범위(대학 과목 간 엣지·대학 문항·K-12 0문 4과목·traversal 실부하)까지 전부 사람 검수 대기로 막혔다. 게이트가 실제로 관할하는 것은 승인분 병합 한 동작이므로 그 동작을 소유하는 태스크로 옮긴다. 참고 사례 = 2026-07-28 중복 원자 병합(검수 승인 16 중 2건은 사이클 충돌로 실행 보류 — 부분 승인·부분 실행이 정상)."
+updated: 2026-09-23
