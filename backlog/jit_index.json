@@ -2402,6 +2402,16 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 잡 스텝을 손으로 재현하다 harness-integrity의 ruff(scripts) 누락 — PR CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "scripts/ops/*",
     "src/backend/pyproject.toml",
     "src/data-pipeline/pyproject.toml",
@@ -3479,6 +3489,16 @@
     "tests/harness/test_selector.py"
    ],
    "text": "게이트 병합(G3+G4)으로 EOS-50이 자기를 판정 대상으로 삼는 게이트를 요구하는 순환",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
    "weight": 0
   }
  ]
