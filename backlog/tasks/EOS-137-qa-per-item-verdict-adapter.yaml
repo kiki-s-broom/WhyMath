@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-137-qa-per-item-verdict-adapter
+title: "QA 엔진 문항별 판정(predictions) 생산자 부재 — 골든 셋이 있어도 qa_confusion_matrix·평가 원장이 돌 수 없다 (MP-03 ④ 실측)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 문항별 판정 어댑터 — 코퍼스 JSONL(축적 회차 코퍼스 포함 · problem_bank_* glob에 묶이지 않고 경로 지정)을 받아 QA 엔진이 문항마다 내린 pass/fail을 golden_benchmark_contract.md가 정한 predictions 형식(cu_slug · qa_verdict)으로 낸다. 판정은 기존 QA 엔진 경로를 재사용한다(재구현 금지) — harness/qa_pipeline에 문항 단위 판정 좌석이 없으면 그 좌석부터 만든다. 판정 불가 문항은 pass로 채우지 않고 사유와 함께 별도 집계한다(미측정 ≠ 통과)."
+  - "② 첫 평가 — MP-03이 동결한 골든 v1(rotation 0)로 ops/qa_confusion_matrix를 --ledger --engine-revision과 함께 1회 돌려 평가 원장 첫 행과 혼동행렬 JSON을 남긴다. 골든·코퍼스가 Kiki 머신 데이터라 실행은 런북으로 드리고, 결과 수치(재현율·FN 상한·커버리지)를 MEMORY에 적는다."
+  - "③ 표류 시계열 설계 판정 — 재채점 금지 계약(같은 digest × 다른 engine_revision = exit 1)과 '모델 표류 감지'의 관계를 판정해 문서로 남긴다. 회전(rotation)마다 --exclude-golden으로 만든 새 독립 표본에 점을 찍는 형태를 정본으로 할지, 원장 행에 지표 값이 없는 현 구조(digest·리비전·시각만)를 보강할지 결정하고 테스트로 동결한다."
+  - "④ 대용 입력의 의미 명기 — 생성 파이프라인 outcome(accepted_stored·needs_review)을 predictions로 쓰는 대용안을 채택한다면, 그것이 재는 것이 QA 엔진이 아니라 생성 게이트라는 사실을 리포트 헤더와 원장 행에 명시한다. 명시 없이 섞으면 '어느 판정기의 FN율인가'가 결정 불가가 된다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - "src/backend/whymath_backend/harness/qa_*verdict*.py"
+  - src/backend/whymath_backend/ops/qa_confusion_matrix.py
+  - "tests/backend/harness/test_qa_*.py"
+  - tests/backend/ops/test_qa_confusion_matrix.py
+session: null
+notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_benchmark는 정답지를 동결할 뿐 append 원장이 없고, 저장소의 유일한 append 원장(qa_confusion_matrix의 평가 원장)은 --predictions를 요구하는데 그것을 만드는 도구가 저장소에 0건이다(qa_verdict 키는 그 모듈·테스트·계약 문서에만 나온다). 그래서 MP-03 ④의 첫 레코드는 동결 지문(버전·회전·동결 시각·digest·라벨 분포)으로 한정되고 QA 엔진 FN율은 측정 불가로 남는다. EOS-60(done)이 골든·혼동행렬 계산기를 만들었으나 입력 생산자는 범위 밖이었던 것으로 읽힌다(읽어서 그렇게 보인다 — EOS-60 acceptance 전수 대조는 이 태스크 착수 시 수행)."
+updated: 2026-09-25
