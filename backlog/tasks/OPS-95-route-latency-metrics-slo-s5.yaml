@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-95-route-latency-metrics-slo-s5
+title: "경로별 서버 지연 계측 — SLO S5 미측정 해소(전역 p95 창 하나로는 느린 흐름을 가릴 수 없다) + Server-Timing"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제(판정 기준 main `d5438782`): `ServiceMetrics`(`ops/service_health.py:280-349`)는 고정 창 500건의 **전역 p95 하나**만 낸다 — 라우트 차원이 없어 코치 LLM 턴과 가벼운 GET이 한 창에 섞인다. `docs/standards/incident_response_slo.md` §1-2의 S5(T1 p95 ≤ 5s · T2 p95 ≤ 1s · T3 p95 ≤ 10s)는 문서 스스로 미측정이고, `OPS-30` ④는 경로별 분해를 범위 밖으로 명시해 **소유자가 없다**. 이 태스크가 S5를 인수한다."
+  - "② 라우트 템플릿 차원 — 원시 경로 문자열이 아니라 FastAPI 라우트 템플릿(예: `/v1/coach/sessions/{dialogue_id}/turns`) 단위로 모은다(카디널리티 폭발 방지). 라우트에 매칭되지 않은 요청은 단일 버킷으로 모은다. 경로별 p50/p75/p95와 표본 수를 `/health/ready`의 metrics에 노출하고, 표본 0이면 `None`으로 둔다(미측정과 0.0 구분 — 기존 규약 유지). 기존 전역 창과 알림 판정(S1·S2)은 비트동일로 유지한다."
+  - "③ `Server-Timing` 응답 헤더 — 서버 처리 시간을 응답에 실어 클라이언트가 서버 구간과 나머지(네트워크·디코드·렌더)를 나눌 수 있게 한다. 헤더에는 시간 값만 싣고 사용자 식별자·요청 내용·내부 처리 세부는 싣지 않는다(미성년자 데이터 정책). 헬스 프로브 경로는 기존 제외 규칙(`_OPS_PROBE_PATHS`)을 따른다."
+  - "④ 계약 동결 — `incident_response_slo.md`의 S5 상태를 '측정 가능'으로 정정하고, `tests/backend/ops/test_slo_contract.py`가 그 문면과 코드의 경로 차원 실재를 대조하게 한다. 변별력: 경로 차원을 제거하는 뮤테이션과 두 경로의 지연을 한 버킷에 섞는 뮤테이션 각각에서 RED를 확인한다(주입 적용 여부 `mutated != original` 단언 포함)."
+  - "⑤ 범위 밖 동결 — 지표 영속화(ClickHouse)·다중 워커 합산·외부 알림 채널(`OPS-30` 소유)·클라이언트 측 계측은 포함하지 않는다. 계측 비용은 요청당 상수 시간이어야 한다 — 백분위 계산(정렬)은 요청 경로가 아니라 조회 시점에만 한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/service_health.py
+  - src/backend/whymath_backend/app.py
+  - "tests/backend/ops/**"
+  - docs/standards/incident_response_slo.md
+session: null
+notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §5 R1 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 등급 P1 근거: 12월 검증은 이것 없이도 성립하지만(우회 가능), 경로별 지연이 없으면 코치 턴(T1)이 느린지 판정할 수단이 없다. 연결(의존 관계 아님): `OPS-30`은 알림 채널·외부 프로브를, `EOS-114`는 next-problem 쿼리 비용을 다룬다 — 이 태스크의 경로별 지연은 `EOS-114`의 판정 재료로 쓰일 수 있다."
+updated: 2026-09-25
