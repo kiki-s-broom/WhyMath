@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-165-required-checks-contract-scope
+title: "required 여부 판단 강제 계약이 ci.yml 한 파일만 본다 — 워크플로 파일을 새로 만들면 판단 자체가 발생하지 않는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 범위 실측 — .github/workflows/*.yml 전건을 파싱해 PR에서 실행되는 잡(on: pull_request)을 전수 열거하고, 그중 required 목록에도 _INTENTIONAL_EXCLUSIONS에도 없는 잡을 지목한다. 스캔 0건은 실패(공허한 통과 금지)."
+  - "② 계약 확장 — tests/infra/test_required_checks_doc.py의 _ci_job_names()가 ci.yml 단일 파일이 아니라 PR 트리거 워크플로 전건을 읽게 한다. 확장으로 새로 unaccounted가 되는 잡은 required 등재 또는 사유 있는 제외 중 하나로 판정한다."
+  - "③ 결함 주입 — PR 트리거 워크플로 파일을 하나 새로 추가한 상태를 주입해 테스트가 RED가 되는지 확인하고(그 잡 이름을 지목하는가), 등재 후 GREEN이 되는지 확인한다. 주입 적용·바이트 동일 원복을 단언한다."
+artifacts: []
+paths:
+  - tests/infra/test_required_checks_doc.py
+session: null
+notes: "발견 경위(2026-09-23 · HARN-128 작업 중): 충돌 마커 가드를 ci.yml 밖 별도 워크플로(.github/workflows/conflict-guard.yml)로도 배선하면서, tests/infra/test_required_checks_doc.py의 계약 ②(\"required 목록에도 제외 목록에도 없는 CI 잡이 있으면 실패 — 새 잡을 만들면 required 여부를 판단하도록 강제\")가 _ci_job_names()에서 .github/workflows/ci.yml 한 파일만 읽는다는 것을 확인했다.\n\n왜 구멍인가: 그 계약이 막으려는 것은 \"잡은 늘었는데 목록은 그대로\"인 침묵 누락(2026-07-26 사고의 구조적 원인)인데, 잡을 *다른 워크플로 파일*에 만들면 그 판단 자체가 발생하지 않는다. 파일을 하나 더 만드는 것이 곧 면제가 된다 — 제외 목록에 이름을 올리는 것보다 쉬운 우회 경로이며, 사유를 남길 필요도 없다.\n\n현재 실태: conflict-guard가 PR 트리거 워크플로 중 ci.yml이 아닌 유일한 잡이다(branch-cleanup·deploy·harness-audit·pr-auto-resync·weekly-metrics는 push/schedule/dispatch 전용이라 PR 머지 게이트 후보가 아니다). 그 잡의 required 미승격 판단은 conflict-guard.yml 상단 주석에 명문화해 두었으나, 산문에는 집행 지점이 없다 — 이 태스크가 그 판단을 기계가 강제하게 만든다.\n\n인접: HARN-82는 룰셋의 required 목록 자체가 실측과 어긋나는 축(전제 드리프트)이고 blocked 상태다. 이 태스크는 그와 독립이다 — 여기서 묻는 것은 룰셋의 내용이 아니라 \"판단이 강제되는 범위\"다."
+updated: 2026-09-23

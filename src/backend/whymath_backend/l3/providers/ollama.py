@@ -14,6 +14,7 @@ bench_latency.py(`_OllamaClientProtocol` 경유 가짜 클라이언트 주입)�
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -198,6 +199,14 @@ def _extract_usage(generate_response: Any, latency_ms: float) -> Usage:
     )
 
 
+def _running_loop_or_none() -> asyncio.AbstractEventLoop | None:
+    """지금 실행 중인 이벤트 루프 — 루프 밖(동기 문맥)이면 None (S4-99 클라이언트 루프 결속)."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
 def _build_default_client(settings: Settings) -> _OllamaClient:
     """기본 ollama AsyncClient 생성 (지연 import).
 
@@ -244,6 +253,10 @@ class OllamaProvider:
         # 주입된 클라이언트가 있으면 그것을 쓰고, 없으면 첫 사용 시 기본 생성(지연).
         self._client = client
         self._settings = settings
+        # 기본 생성한 클라이언트가 묶인 이벤트 루프(S4-99). 주입 클라이언트는 None으로 두고
+        # 루프 추적을 하지 않는다 — 주입한 쪽이 수명을 책임진다.
+        self._owns_client = client is None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
     @property
     def _resolved_settings(self) -> Settings:
@@ -264,9 +277,21 @@ class OllamaProvider:
         return Jurisdiction.DOMESTIC
 
     def _get_client(self) -> _OllamaClient:
-        """클라이언트 지연 해석 — 주입 우선, 없으면 기본 AsyncClient 생성."""
-        if self._client is None:
+        """클라이언트 지연 해석 — 주입 우선, 없으면 기본 AsyncClient 생성.
+
+        기본 생성 클라이언트는 **만든 이벤트 루프 안에서만** 재사용한다(S4-99). httpx 커넥션
+        풀은 생성 루프에 묶이므로, `asyncio.run()`을 호출마다 여는 경로(`CrossVerifier.verify`
+        등)에서 이전 루프의 클라이언트를 재사용하면 새 루프의 첫 요청이
+        `RuntimeError: Event loop is closed`로 죽는다 — 2026-09-24 강등전 라이브 회차에서
+        관점 세트마다 첫 관점이 이렇게 소실됐다. 루프가 바뀌면 새로 만든다.
+        """
+        if not self._owns_client:
+            assert self._client is not None  # 주입 경로 — 생성자가 보장
+            return self._client
+        loop = _running_loop_or_none()
+        if self._client is None or self._client_loop is not loop:
             self._client = _build_default_client(self._resolved_settings)
+            self._client_loop = loop
         return self._client
 
     async def generate(
