@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-91
+title: "SQLAlchemy 2.1.0 배포로 mypy strict 34건 실패 — 의존 상한 <2.1 핀 (main CI 차단 해소)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① src/backend·src/data-pipeline pyproject의 sqlalchemy 의존에 검증된 메이저 범위 상한(<2.1)을 건다 — 2026-09-25 SQLAlchemy 2.1.0 배포로 mypy --strict 오류 34건(16파일)이 나 merge_group CI가 red(PR #1304 대기열 탈락)였다. CLAUDE.md '의존성 pin은 검증된 메이저 범위로 상한' 준수 ② 로컬 재현(2.1.0 → 34 errors) 후 상한 적용 버전으로 mypy exit 0 확인 ③ 2.1 이행은 별건(타입 표기 대응)으로 남긴다"
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1304 — 재현 2.1.0 mypy 34 errors → 상한 후 exit 0, tests/infra 1752 passed"
+paths:
+  - src/backend/pyproject.toml
+  - src/data-pipeline/pyproject.toml
+session: null
+notes: ""
+updated: 2026-09-25

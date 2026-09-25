@@ -10,7 +10,7 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
     # 데이터베이스
-    "sqlalchemy[asyncio]>=2.0.35",
+    "sqlalchemy[asyncio]>=2.0.35,<2.1",  # OPS-91: 2.1.0에서 mypy --strict 34건 실패(2026-09-25) — 이행 전 상한
     "asyncpg>=0.30.0",
     # psycopg(sync) — 슬105 PgVectorIndex 전용(벡터 store 좌석에 한정된 sync 드라이버).
     # 앱 본체는 async(asyncpg)이고, 이 sync 드라이버는 VectorIndex Protocol이 sync라 *영속
