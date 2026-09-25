@@ -542,7 +542,9 @@ def _probe_undiagnosed_wrong(
         content.teardown()
 
 
-def _on_prerequisite(rec: dict[str, Any] | None, member: dict[str, str], cname: dict[str, str]) -> bool:
+def _on_prerequisite(
+    rec: dict[str, Any] | None, member: dict[str, str], cname: dict[str, str]
+) -> bool:
     """추천의 대상과 문항이 **둘 다** 선수 개념(`pre`)인가 — 현재 개념 `cur`의 선수."""
     return (
         rec is not None
@@ -780,9 +782,7 @@ def diagnosis_probe() -> _DiagnosisProbe:
 
 
 @pytest.fixture(scope="module", params=sorted(_WRONG_ANSWERS))
-def journey(
-    request: pytest.FixtureRequest, diagnosis_probe: _DiagnosisProbe
-) -> Iterator[_Journey]:
+def journey(request: pytest.FixtureRequest, diagnosis_probe: _DiagnosisProbe) -> Iterator[_Journey]:
     """오답 종류별 3루프 관통 1회 — 세 테스트가 같은 관통을 본다(재실행 0)."""
     result = _run_journey(request.param, diagnosis_probe)
     _dump(result)
@@ -855,7 +855,14 @@ _R6 = _UNDIAGNOSED_WRONG_RULE
             False,
             "범위 — 규칙을 관측하지 못했으면 열지 않는다(모름 ≠ R6)",
         ),
-        (_syn("advance_next", "pre", "pre"), "cur", _R6, _PROBE_OK, False, "ⓓ 행위 — diagnose 아님"),
+        (
+            _syn("advance_next", "pre", "pre"),
+            "cur",
+            _R6,
+            _PROBE_OK,
+            False,
+            "ⓓ 행위 — diagnose 아님",
+        ),
         (
             _syn("diagnose", "cur", "cur"),
             "cur",
@@ -943,7 +950,13 @@ def test_diagnosis_remediation_rule_requires_every_clause(
     [
         (_syn("practice_current", "cur", "cur"), _R6, _PROBE_NOT_DIRECTED, True, "직접 보정 경로"),
         (_syn("diagnose", "pre", "pre"), _R6, _PROBE_OK, True, "진단 보정 경로"),
-        (_syn("diagnose", "pre", "pre"), _R6, _PROBE_NOT_DIRECTED, False, "두 경로 모두 불성립(현행)"),
+        (
+            _syn("diagnose", "pre", "pre"),
+            _R6,
+            _PROBE_NOT_DIRECTED,
+            False,
+            "두 경로 모두 불성립(현행)",
+        ),
     ],
 )
 def test_remediation_node_joins_both_paths(
@@ -1116,9 +1129,9 @@ _PROBE_GAP_OWNERS: dict[str, str] = {"선수지향": _EOS26_OWNER}
 def test_diagnosis_probe_matches_frozen(diagnosis_probe: _DiagnosisProbe) -> None:
     """진단 보정 프로브의 ⓕ·ⓖ가 동결값과 같은가 — 개선인지 회귀인지 갈라서 말한다."""
     observed = diagnosis_probe.as_map()
-    assert observed.keys() == _FROZEN_PROBE.keys(), (
-        f"프로브 판정 구성이 바뀌었다: {sorted(observed)} vs {sorted(_FROZEN_PROBE)}"
-    )
+    assert (
+        observed.keys() == _FROZEN_PROBE.keys()
+    ), f"프로브 판정 구성이 바뀌었다: {sorted(observed)} vs {sorted(_FROZEN_PROBE)}"
     evidence = (
         f"\n폐루프: {diagnosis_probe.closure_evidence}"
         f"\n선수지향: {diagnosis_probe.directed_evidence}"
