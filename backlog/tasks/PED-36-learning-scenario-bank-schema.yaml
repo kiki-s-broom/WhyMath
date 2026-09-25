@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -22,6 +22,6 @@ paths:
   - docs/standards/prompt_engineering.md
   - src/backend/whymath_backend/harness/coach_prose_leak_eval.py
   - tests/backend/harness/test_coach_prose_leak_eval.py
-session: null
+session: claude/nice-mccarthy-7goafu
 notes: "출처: LearnLM 검토 차용 후보 4 — 적대 검증 2렌즈 생존. SSM #12 루브릭(채점기) 축과 직교하는 시험지(입력) 축.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-16] priority 3 → 2: 계획서 300 §16(SCENARIO-001~010)·§11(페르소나 3인 완주)·§18(연속 3루프) 편입 — EOS-09 변환 대조 결과 이 축들의 소유자가 PED-36 외에 없어 신규 등재 대신 acceptance를 덧붙인다. priority 3→2는 계획서 §22가 테스트 전략을 P1급으로 둔 것을 반영\n\n[정정 2026-09-19] P-15 축 분리 — EOS-120 ③ 해소 3택 중 (다)를 Kiki 판정으로 집행. ⑪ 소유권을 EOS-122로 승계하고 폐기 표시"
-updated: 2026-09-19
+updated: 2026-09-25
