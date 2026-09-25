@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-94
+title: "무상한 의존 pin CI 차단 — pyproject·워크플로 전 의존에 상한 요구(만료 있는 허용 목록만 예외)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-92
+requires_gates: []
+acceptance:
+  - "① `src/backend/pyproject.toml`·`src/data-pipeline/pyproject.toml`의 **런타임·dev 의존 전건**을 파싱해(문자열 grep이 아니라 `packaging.requirements.Requirement`로 specifier 구성 결과를 검사) 상한(`<`·`<=`·`~=`·`==`) 없는 항목을 열거하는 검사기 신설. 상한 없음 = exit 1, 파싱 실패·대상 파일 0건 = exit 2(스캔 0건은 통과가 아니다) ② 예외는 **만료일 있는 허용 목록**으로만 둔다(사유·만료일 필수 — 만료 없는 유예 금지 규칙 준수). 등재 시점 무상한 항목은 일괄 상한을 걸거나 허용 목록에 사유와 함께 올린다 ③ CI 배선: 두 pyproject를 모두 보는 잡(`infra-contracts` 권장)에 스텝 추가 + 배선 실재를 `tests/infra`로 동결 ④ 변별력: 상한 제거·`~=`→`>=` 치환·허용 목록 만료일 과거화·대상 파일 경로 오타 4종 주입이 전건 RED, 정상 상태 GREEN(과잉 수정 대조군) ⑤ 워크플로 인라인 설치(`.github/workflows/*.yml`의 `pip install \"pkg>=x\"`)도 같은 규칙으로 열거·판정한다 — SQLAlchemy 한 패키지의 전 지점 동일 상한 동결은 `OPS-92`(`test_sqlalchemy_upper_bound.py`)가 이미 소유하므로, 이 태스크는 그것을 **전 패키지로 일반화**하되 중복 검사를 만들지 않도록 그 테스트를 흡수하거나 명시적으로 위임한다"
+artifacts: []
+paths:
+  - src/backend/pyproject.toml
+  - src/data-pipeline/pyproject.toml
+  - "scripts/ops/*"
+  - "tests/infra/*"
+session: null
+notes: "재발 3회차 계열(series unbounded-dependency-pin): langfuse v2/v4 혼재(CLAUDE.md 선례) → pytest-asyncio 1.4.0 로컬 575 failed(ARCH-22, 2026-07-30) → SQLAlchemy 2.1.0 배포로 mypy --strict 34건·merge_group red(OPS-91, 2026-09-25, PR #1304 대기열 탈락 + PR #1305 CI 재실행 1회). CLAUDE.md 'pin은 검증된 메이저 범위로 상한' 규칙은 산문뿐이라 매번 사후 개별 핀으로만 수습됐다 — 규칙 자체의 기계 집행이 이 태스크다. 번호 이력: 최초 OPS-92로 등재했으나 병렬 세션이 같은 번호로 SQLAlchemy 단일 패키지 태스크(PR #1308)를 먼저 머지해 재번호."
+updated: 2026-09-25
