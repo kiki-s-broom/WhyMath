@@ -3036,6 +3036,27 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red·뒤 스텝 7건 미실행",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/**/mutations/*.yaml",
+    "tests/infra/test_mutate_runner*.py"
+   ],
+   "text": "뮤테이션 하네스가 .pyc 캐시로 앞 뮤테이션 코드를 실행 — M29 간헐 생존(거짓 신호)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
