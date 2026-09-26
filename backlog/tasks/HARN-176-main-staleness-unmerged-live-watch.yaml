@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-176-main-staleness-unmerged-live-watch
+title: "main 낡음·미머지 작업 실시간 감시기 — 로컬 체크아웃 신선도와 미머지 PR·브랜치를 한 화면에 주기 갱신하고 변화를 이벤트로 알린다 (Kiki 요청)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 계약(두 축 한 스냅샷) — (가) main 낡음 축: 이번 주기 fetch 성공 여부, remote-tracking ref 나이, 로컬 main 대 origin/main의 behind/ahead, 현재 HEAD 대 origin/main의 behind/ahead, 현재 브랜치의 미푸시 커밋 수, 작업 트리 변경 파일 수. (나) 미머지 축: 열린 PR 목록(토큰이 있으면 pr_delivery_audit.classify로 처방까지, 없으면 목록만 + 'CI 상태 미측정' 명시), PR 없는 미머지 원격 브랜치(scan_stale_branches 재사용 — shallow면 미측정), 원격에 없는 커밋을 가진 로컬 브랜치. 겹치는 판정 로직은 재구현하지 않고 HARN-30·HARN-47의 기존 함수를 호출한다"
+  - "② 실시간 집행 지점 — --watch 모드가 --interval 초마다 fetch→측정→직전 스냅샷 비교를 반복하고, 변화가 있을 때만 시각이 찍힌 변화 이벤트를 출력한다: origin/main 전진(새 커밋 제목 목록), 체크아웃 브랜치 전환(타 세션 런북의 브랜치 전환 — 2026-08-09 사고 유형), 로컬 main 낡음의 발생·해소, 열린 PR의 신규·사라짐·상태 전이, 미머지 브랜치의 신규·해소. 변화 없는 주기는 하트비트 한 줄이고 Ctrl+C는 정상 종료다"
+  - "③ 측정 실패 ≠ 이상 없음 — fetch 실패·shallow·토큰 부재·API 오류는 신호별 '미측정'(예외 타입명·HTTP 상태 포함)으로 표시한다. fetch가 실패한 주기의 behind 수치에는 '마지막 성공 fetch 기준(N분 전)'을 병기한다 — main을 못 봤음과 main이 안 바뀌었음은 다른 진술이다. 1회 실행 모드의 종료 코드는 0(이상 없음)·1(주의 필요)·2(측정 실패)이고, watch 모드에서도 측정 실패 주기는 하트비트가 아니라 실패 줄로 보인다. 모든 서브프로세스에 타임아웃을 건다"
+  - "④ 읽기 전용 — 작업 트리·로컬 브랜치·HEAD를 바꾸지 않는다. 허용되는 쓰기는 git fetch의 remote-tracking ref 갱신뿐이며 --no-fetch로 끌 수 있다. pull·merge·push·브랜치 삭제는 실행하지 않고 처방 문구로만 제시한다 — Kiki 공유 클론에서 돌아도 타 세션의 브랜치·미커밋 변경을 건드리지 않는다. 이 성질을 테스트로 동결한다(실행 전후 HEAD·작업 트리·로컬 브랜치 ref 동일)"
+  - "⑤ Phaiakes9 실행 — Windows PowerShell 5.1에서 .venv 인터프리터로 동작한다: git 서브프로세스 출력은 UTF-8 명시 디코드(HARN-19), 표준출력이 cp949 파일·파이프로 리다이렉트돼도 인코딩 예외로 죽지 않는다(글자 치환은 허용, 프로세스 종료는 불허)"
+  - "⑥ 변별력 양방향 — hermetic 임시 bare 원격 픽스처로 다음 쌍이 서로 다른 출력·종료 코드를 내는 테스트를 둔다: behind 있음/없음, 브랜치 전환 이벤트 있음/없음, main 전진 이벤트 있음/없음, fetch 실패(미측정)/fetch 성공(이상 없음). 비교 로직을 무력화하는 뮤테이션을 주입해 RED를 확인한다(주입 적용 단언 포함). 테스트가 실제로 CI 잡에서 도는지 배선을 확인한다"
+  - "⑦ Kiki 런북 — docs/ops에 6항목 브리핑(과제명·목적·절차·성공기준·실행환경·창 구분) + 자리표시자 없는 PowerShell 블록(작업 경로 C:\\Users\\kiki\\Desktop\\__AI\\WhyMath · python -m 형태 · 실행 직전 자가검증)을 둔다. 감시 창은 점유 창이므로 이후 조작 금지 경고를 동봉한다"
+artifacts: []
+paths:
+  - scripts/ops/main_watch.py
+  - tests/infra/test_main_watch.py
+  - docs/ops/main_watch_runbook.md
+session: claude/elegant-davinci-182i26
+notes: "Kiki 요청(2026-09-26): '메인이 아웃데이트된 상황이라든가 미머지 프로그램을 실시간으로 체크하는 프로그램'. 경계: HARN-28(고립 스캔 CI 이설·브리핑 소비) · HARN-54(next·start의 낡은 로컬 대장 고지) · HARN-30(pr_delivery_audit — PR 배송 분류) · HARN-47(branches — 브랜치 소유 판정) · flow_health(원격 브랜치 전수 drift·충돌)는 전부 1회성 측정기다. 이 태스크는 그것들을 재구현하지 않고 호출해 (1) 지금 이 체크아웃이 main보다 낡았는가라는 로컬 축을 새로 재고 (2) 주기 반복·변화 이벤트라는 실시간 축을 더한다. 관련 사고: 2026-07-14 fill_live_cost_table.py 부재(낡은 클론) · 2026-08-09 타 세션 런북의 브랜치 전환 · 2026-09-01 EOS-69 중복 구현(낡은 로컬 대장) · 미병합 고립 4회차."
+updated: 2026-09-26
