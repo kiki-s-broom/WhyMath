@@ -335,11 +335,11 @@ gates:
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-25
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 81070ed5 (EOS-24 착지 #1316). 2026-09-25 Kiki 판정 (가) 인정 — 좁힌 기준 (세션 https://claude.ai/code/session_01E3jbbaeprQQfa8rxLaFKTF · AskUserQuestion '(가) 인정 — 좁힌 기준' 선택). 근거 문서: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · docs/reviews/eos_phase2_gate2_rejudgment_2026-09-24.md §3-4.\n[결정] 원인 미상 오답(상태 머신 R6) 직후 추천이 내는 diagnose를 Gate 2 Loop 1 '보정'으로 인정한다. 단 두 조건을 모두 만족할 때만: ⓐ 진단 문항의 대표 개념이 오답 개념의 prerequisite 선수 개념일 것 ⓑ 그 진단 문항을 틀리면 다음 추천이 practice_prerequisite로 하강할 것. 하나라도 어긋나면 보정이 아니다(아무 개념의 diagnose나 통과시키지 않는다). 서빙 코드 무변경 — 기준 문장 재정의와 PED-36 ⑫ 상시 하네스 반영은 EOS-139 소유.\n[판단에 쓴 실측] 모바일 NextProblemResponse(src/mobile/lib/features/problems/data/problem_models.dart)는 problem_id·theta·difficulty·standard_error·measurement_sufficient 5필드만 파싱한다 — action·reason·learning_state는 src/mobile·src/web grep 0건(이 검색 방법 기준). 따라서 두 선택지의 학생 체감 차이는 다음 문항 선택뿐이다.\n[남는 부채] 상태 머신 R6의 next_action=PRACTICE_SAME_CONCEPT와 추천의 diagnose가 API 수준에서 다른 말을 한다 — 후속 태스크로 등재한다. [범위] Gate 2 FAIL은 이 결정과 무관하게 유지된다(V4 Loop 3 = EOS-124 · P-13 미착지 — 재판정문 §3-4)."
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +EOS-24-recommendation-reads-learning-state — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 재료(EOS-24 판정문 §7-1)를 만든 작업이 EOS-24다(done)"
