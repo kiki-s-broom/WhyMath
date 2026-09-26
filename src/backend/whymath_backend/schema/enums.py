@@ -1542,7 +1542,7 @@ class AuditResourceType(str, Enum):
 
 
 class AuditEventKind(str, Enum):
-    """`privacy_audit.event_kind` — SEC-09 개인정보 감사 폐쇄 택소노미(현 5종).
+    """`privacy_audit.event_kind` — SEC-09 개인정보 감사 폐쇄 택소노미(현 6종).
 
     `docs/architecture/account_security_gap_review.md` D3의 경계 확정: `security_privacy.md:
     88-100`의 "모든 PII 접근 로그"는 **채택하지 않는다**(본인 조회 29개 엔드포인트 전수 감사는
@@ -1554,7 +1554,8 @@ class AuditEventKind(str, Enum):
     (부기에 값을 추가할 때 이 enum도 함께 늘린다 — 단일 진실원천).
 
     **4번째 값 `role_change`는 ADMIN-01(2026-08-11 회수)이, 5번째 값 `content_mutation`은
-    SEC-29(2026-09-11)가 추가**했다. SEC-09 시점의 "3종"은 그 시점 실측이었을 뿐 상한이 아니다
+    SEC-29(2026-09-11)가, 6번째 값 `operator_token_issued`는 ADMIN-15(2026-09-25)가 추가**했다.
+    SEC-09 시점의 "3종"은 그 시점 실측이었을 뿐 상한이 아니다
     — 폐쇄 택소노미의 뜻은 "임의 문자열 금지"이지 "영원히 3개"가 아니다.
 
     `deletion_audit`(별도 테이블·`DeletionAudit`)이 **학생 소유 데이터 삭제** 감사의 단일
@@ -1605,6 +1606,26 @@ class AuditEventKind(str, Enum):
     create/update/delete를 구분한다. `reason`류 자유텍스트는 넣지 않는다(`PrivacyAudit`
     모델 docstring의 "자유텍스트 필드는 두지 않는다" 불변식 — 무엇을 했는지는 action+resource로
     충분히 특정된다).
+    """
+
+    operator_token_issued = "operator_token_issued"
+    """`ops/operator_token_cli.py`(ADMIN-15) — 운영자 계정에 단기 액세스 토큰 발급.
+
+    **인증 경로가 둘이 되는 것의 대가다.** 액세스 토큰을 만드는 경로는 원래 OAuth 콜백
+    (`api/auth.py`)과 데모 로그인 둘뿐이었고, 둘 다 사용자 본인의 로그인 행위가 선행한다. 이
+    CLI는 DB에 접근할 수 있는 운영자가 로그인 없이 토큰을 만들어 내는 세 번째 경로이므로,
+    발급 1건마다 이 값으로 감사 1행을 **토큰 출력 전에 커밋**한다(커밋이 실패하면 토큰은 출력되지
+    않는다 — 흔적 없는 발급 0).
+
+    `user_id`는 토큰을 받은 계정(= 토큰의 `sub`)이다 — `role_change`와 같은 이유(셸 실행이라
+    인증된 행위자 `UserProfile`이 없다)로 *대상 계정 본인의 사건*으로 적재해, 그 계정 소유자가
+    `GET /v1/me/privacy-audit`로 "언제 내 이름으로 토큰이 나갔는지"를 조회할 수 있다.
+    `token_expires_at`(만료)·`issued_by`(발급을 실행한 셸 로그인 식별자)가 이 값 전용 typed
+    컬럼이다. 토큰 값은 어떤 컬럼에도 담지 않는다.
+
+    루프 KPI④(`ops/loop_kpi_gate.OPERATOR_AUDIT_KINDS` — 운영자 *데이터* 개입)에는 넣지 않는다:
+    토큰 발급 자체는 학습 데이터를 바꾸지 않고, 그 토큰으로 한 콘텐츠 변경은 `content_mutation`
+    으로 따로 계상된다(넣으면 같은 개입이 두 번 세어진다).
     """
 
 

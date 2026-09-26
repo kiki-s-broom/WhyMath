@@ -1,5 +1,5 @@
-"""개인정보·콘텐츠 감사(SEC-09, SEC-29) — 반출·동의변경·관리자접근·역할변경·콘텐츠CUD 5종
-writer + IP 해싱.
+"""개인정보·콘텐츠 감사(SEC-09, SEC-29, ADMIN-15) — 반출·동의변경·관리자접근·역할변경·
+콘텐츠CUD·운영자토큰발급 6종 writer + IP 해싱.
 
 설계 정본: `docs/architecture/account_security_gap_review.md` D3. `security_privacy.md:88-100`의
 "모든 PII 접근 로그"는 **채택하지 않는다**(정정 경위는 `docs/standards/security_privacy.md`
@@ -18,6 +18,9 @@ writer + IP 해싱.
      `RequireContentAdmin` 게이팅 6라우터가 **첫 호출부**. `AuditEventKind.content_mutation`
      docstring 참조 — SEC-29가 "관리자 콘텐츠 CUD에 감사 로그가 없다"는, ADMIN-06과 무관하게
      *오늘* 실재하는 별도 갭을 메운다)
+  6. **운영자 토큰 발급**(`record_operator_token_audit` — `ops/operator_token_cli.py`(ADMIN-15)가
+     **유일 호출부**. `AuditEventKind.operator_token_issued` docstring 참조 — OAuth 밖의 인증 경로가
+     생긴 대가로 발급마다 흔적을 남긴다)
 
 `erasure.py`·`export.py`와 같은 저장소 패턴: `AsyncSession` 주입·`session.add()`만 하고
 **commit은 호출자**(엔드포인트/CLI 트랜잭션과 합류) — 감사 행과 주행위(반출/동의기록/역할변경/
@@ -32,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +57,7 @@ __all__ = [
     "record_consent_change_audit",
     "record_content_mutation_audit",
     "record_export_audit",
+    "record_operator_token_audit",
     "record_role_change_audit",
 ]
 
@@ -238,6 +243,42 @@ def record_content_mutation_audit(
         resource_id=resource_id,
         action=action.value,
         ip_hash=hash_client_ip(ip, settings=settings),
+    )
+    session.add(row)
+    return row
+
+
+def record_operator_token_audit(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    issued_at: datetime,
+    expires_at: datetime,
+    issued_by: str,
+) -> PrivacyAudit:
+    """운영자 토큰발급 감사 1행을 `session.add()`한다(commit은 호출자) — ADMIN-15.
+
+    `ops/operator_token_cli.py`가 토큰을 *만든 뒤·출력하기 전에* 이 함수를 호출하고 커밋한다.
+    커밋이 실패하면 CLI는 토큰을 출력하지 않는다 — 감사 행 없이 쓸 수 있는 토큰이 나가는 경로가
+    없다(부분 성공 0).
+
+    - `user_id` — 토큰을 받은 계정(토큰 `sub`). `role_change`와 같은 이유로 대상 계정 본인의
+      사건으로 적재한다(`target_user_id` NULL — 셸 실행에는 인증된 행위자가 없다).
+    - `occurred_at` — `issued_at`(토큰 `iat`)으로 **명시** 설정한다. DB `now()`에 맡기면 감사 행의
+      "언제"가 토큰의 실제 발급 시각과 어긋난다(같은 사건을 두 시각으로 기록하지 않는다).
+    - `token_expires_at` — 토큰 `exp`.
+    - `issued_by` — 발급을 실행한 셸 로그인 식별자(형식 검증은 호출자 CLI 책임).
+    - `ip_hash` — NULL. 셸 실행이라 클라이언트 IP가 없다.
+
+    토큰 값은 받지도 저장하지도 않는다 — 이 함수 시그니처에 토큰 인자가 없는 것이 그 계약이다.
+    """
+    row = PrivacyAudit(
+        user_id=user_id,
+        event_kind=AuditEventKind.operator_token_issued.value,
+        occurred_at=issued_at,
+        token_expires_at=expires_at,
+        issued_by=issued_by,
+        ip_hash=None,
     )
     session.add(row)
     return row

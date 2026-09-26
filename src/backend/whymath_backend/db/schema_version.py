@@ -162,6 +162,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 인덱스(0-기반). distractor_map 역추적으로 오답→오개념 가설을 잇는 포착 슬롯.
     "8e4c2a7f1b93",  # EOS-131: learning_session.last_activity_at + 학생당 열린 서버 세션 1개
     # 부분 유니크 인덱스(uq_learning_session_open_per_user). 서버 30분 유휴 규칙 writer의 좌석.
+    "8c19e8a611e4",  # ADMIN-15: privacy_audit.token_expires_at/issued_by — 운영자 토큰 발급
+    # 감사(누가·누구에게·언제·만료)의 "만료·누가" 좌석. ops/operator_token_cli가 유일 생산자.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

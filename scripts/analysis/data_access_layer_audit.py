@@ -287,6 +287,9 @@ BASELINE: dict[str, frozenset[str]] = {
             # EOS-15 — 루프 KPI 5종 수집기. 관측 CLI라 DB 직접 조회가 본질이며(관측 대상이
             # 실 운영 데이터다), `recommendation_reach_report`·`service_health`와 같은 부류다.
             "ops/loop_kpi_gate.py",
+            # ADMIN-15 — 운영자 토큰 발급 CLI. 대상 계정(역할·데모 여부) 조회 + 감사 행 적재를
+            # 한 트랜잭션으로 하는 ops CLI라 role_grant_cli·account_bootstrap_cli와 같은 부류다.
+            "ops/operator_token_cli.py",
             "ops/pedagogy_content_slot_reach_report.py",
             "ops/recommendation_reach_report.py",
             "ops/repeat_recommendation_report.py",

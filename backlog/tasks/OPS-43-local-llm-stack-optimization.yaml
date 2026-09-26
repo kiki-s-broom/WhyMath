@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: cancelled
 priority: 3
 eos_priority: P2
 owner: claude
@@ -22,5 +22,5 @@ paths:
   - "src/backend/whymath_backend/l3/providers/**"
   - "infra/phaiakes9/**"
 session: null
-notes: "2026-08-14 측정에서 확인: qwen3.5:27b는 Windows+Ollama+ROCm에서 0.5~1 tok/s로 너무 느리고, qwen2.5:7b/qwen2-math:7b는 강등전 구분력이 없다. GMKtec AI Max+ 395/8060S는 32B급을 돌릴 수 있는 하드웨어이므로 소프트웨어 스택 문제로 추정. S4-16 blocked 해소의 전제 조건.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-21] S4-16 재개 세션 실측 — MoE 교체로 acceptance 1의 전제 소멸, 오검출이 실제 구속 축\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침"
-updated: 2026-09-24
+notes: "2026-08-14 측정에서 확인: qwen3.5:27b는 Windows+Ollama+ROCm에서 0.5~1 tok/s로 너무 느리고, qwen2.5:7b/qwen2-math:7b는 강등전 구분력이 없다. GMKtec AI Max+ 395/8060S는 32B급을 돌릴 수 있는 하드웨어이므로 소프트웨어 스택 문제로 추정. S4-16 blocked 해소의 전제 조건.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-21] S4-16 재개 세션 실측 — MoE 교체로 acceptance 1의 전제 소멸, 오검출이 실제 구속 축\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침\n\n[취소 2026-09-25] Kiki 결정(2026-09-25) — 게이트 G-s416-round2-live-battle 기각(3안)으로 S4-16이 cancelled되어 이 태스크의 존재 이유(제목: S4-16 강등전 재개 조건)가 소멸했다. acceptance ②③은 S4-16 재실행 통과를 요구하므로 달성 경로가 없고, ①(qwen3.5:27b 1회 호출 60초)은 2026-08-22 QUALITY 좌석이 MoE qwen3:30b-a3b로 교체되며(왕복 지연 상수 13,886ms → 2,300ms) 대상 모델 자체가 서빙 경로에서 빠졌다. 로컬 LLM 속도 개선이 다시 필요해지면 S4-16과 무관한 목표로 새로 등재한다. 기록 = docs/standards/residue_gate_demotion_battle_history.md §5-2. 판정 기준: main f138f894"
+updated: 2026-09-25

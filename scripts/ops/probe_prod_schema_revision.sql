@@ -109,7 +109,8 @@ WITH expected(seq, revision, obj_table, obj_column, polarity, obj_kind) AS (
         (102, 'c1f5a8b2d740', 'concept_mastery_history', 'attempt_id',           '+', 'object'),
         (103, 'd2a9e4b71c35', 'generation_log',      'served_model',             '+', 'object'),
         (104, '5b3e9c27a1f6', 'problem_attempt',     'selected_choice_index',    '+', 'object'),
-        (105, '8e4c2a7f1b93', 'learning_session',    'last_activity_at',         '+', 'object')
+        (105, '8e4c2a7f1b93', 'learning_session',    'last_activity_at',         '+', 'object'),
+        (106, '8c19e8a611e4', 'privacy_audit',       'token_expires_at',         '+', 'object')
 )
 SELECT
     e.seq,

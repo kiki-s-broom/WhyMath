@@ -191,7 +191,9 @@ class TestMigrationFileChain:
         # 손으로 유지하는 사본이 셋이라 마이그레이션마다 전부 갱신해야 한다(= MISC-31).
         # EOS-131이 그 위에 8e4c2a7f1b93(learning_session.last_activity_at + 학생당 열린 서버
         # 세션 부분 유니크 인덱스)을 얹어 head를 다시 이동.
-        assert heads == {"8e4c2a7f1b93"}
+        # ADMIN-15가 그 위에 8c19e8a611e4(privacy_audit.token_expires_at/issued_by — 운영자
+        # 토큰 발급 감사)를 얹어 head를 다시 이동.
+        assert heads == {"8c19e8a611e4"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

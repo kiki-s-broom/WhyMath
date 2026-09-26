@@ -88,8 +88,8 @@ class DeletionAudit(Base):
 
 
 class PrivacyAudit(Base):
-    """SEC-09 개인정보·콘텐츠 감사 1행 — 반출·동의변경·관리자접근·역할변경·콘텐츠CUD 5종 중
-    1건의 append-only 기록.
+    """SEC-09 개인정보·콘텐츠 감사 1행 — 반출·동의변경·관리자접근·역할변경·콘텐츠CUD·운영자
+    토큰발급 6종 중 1건의 append-only 기록.
 
     `user_id`는 **행위자**(action을 수행한 주체)다 — 본인 반출·동의변경이면 본인, 관리자접근·
     콘텐츠CUD면 그 관리자. `target_user_id`는 *행위자와 다른 사용자의 데이터가 대상일 때만*
@@ -126,6 +126,9 @@ class PrivacyAudit(Base):
       - `resource_type`/`action`도 `event_kind`/`consent_scope`와 동일하게 `sa.String`
         (네이티브 PG enum 미생성) — 코드 안전성은 Pydantic `PrivacyAuditResourceType`/
         `PrivacyAuditAction`(.value 저장)으로, DB는 단순 문자열.
+      - `token_expires_at`/`issued_by`(ADMIN-15)도 nullable — `event_kind=operator_token_issued`
+        일 때만 채워진다. `issued_by`는 자유서술이 아니라 운영자 셸 로그인 *식별자*다(형식은
+        `ops/operator_token_cli.py`가 검증 — 공백·줄바꿈·산문 불가). 토큰 값은 어디에도 없다.
       - `resource_type`/`resource_id`/`action` 셋 다 nullable — `event_kind=content_mutation`
         일 때만 채워진다. 별도 인덱스는 두지 않는다(target_user_id와 동일 판단 — 이 컬럼들을
         조건으로 한 조회 소비처가 아직 없다. 필요해지면 실 쿼리 부하로 다시 판단 — YAGNI).
@@ -148,6 +151,12 @@ class PrivacyAudit(Base):
     resource_type: Mapped[str | None] = mapped_column(sa.String(32), nullable=True)
     resource_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
     action: Mapped[str | None] = mapped_column(sa.String(16), nullable=True)
+    # ADMIN-15: event_kind=operator_token_issued 전용 — 발급한 단기 액세스 토큰의 만료 시각과
+    # 발급을 실행한 운영자 셸 로그인 이름(식별자·형식은 CLI가 검증). 토큰 자체는 저장하지 않는다.
+    token_expires_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    issued_by: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     ip_hash: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),

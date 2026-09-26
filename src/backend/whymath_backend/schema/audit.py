@@ -60,8 +60,8 @@ class DeletionAudit(BaseModel):
 
 
 class PrivacyAudit(BaseModel):
-    """SEC-09 개인정보·콘텐츠 감사 5종(반출·동의변경·관리자접근·역할변경·콘텐츠CUD) 1행(읽기)
-    — append-only 표현.
+    """SEC-09 개인정보·콘텐츠 감사 6종(반출·동의변경·관리자접근·역할변경·콘텐츠CUD·운영자
+    토큰발급) 1행(읽기) — append-only 표현.
 
     본문·PII 값·평문 IP는 어떤 필드에도 담지 않는다(`docs/architecture/account_security_gap_
     review.md` D3·CLAUDE.md 미성년 PII 보호). `target_user_id`는 행위자(`user_id`)와 다른
@@ -70,6 +70,7 @@ class PrivacyAudit(BaseModel):
     CLI라 인증된 행위자 신원이 없어 `admin_access`와 달리 대상 계정 본인의 사건으로 적재된다
     (`privacy/audit.py::record_role_change_audit` 참조). `resource_type`/`resource_id`/`action`
     은 콘텐츠CUD 전용(SEC-29) — 대상이 사용자가 아니라 콘텐츠 리소스일 때 그 역할을 대신한다.
+    `token_expires_at`/`issued_by`는 운영자 토큰발급 전용(ADMIN-15) — 토큰 값은 담지 않는다.
     """
 
     model_config = ConfigDict(
@@ -94,7 +95,7 @@ class PrivacyAudit(BaseModel):
         default=None,
         description=(
             "감사 이벤트 종류(export_data/consent_change/admin_access/"
-            "role_change/content_mutation)"
+            "role_change/content_mutation/operator_token_issued)"
         ),
     )
     consent_scope: ConsentScope | None = Field(
@@ -112,6 +113,20 @@ class PrivacyAudit(BaseModel):
     action: PrivacyAuditAction | None = Field(
         default=None,
         description="event_kind=content_mutation일 때만 — CRUD 동작(create/update/delete)",
+    )
+    token_expires_at: datetime | None = Field(
+        default=None,
+        description=(
+            "event_kind=operator_token_issued일 때만 — 발급한 단기 액세스 토큰의 만료 시각"
+            "(토큰 값 자체는 저장하지 않는다)"
+        ),
+    )
+    issued_by: str | None = Field(
+        default=None,
+        max_length=64,
+        description=(
+            "event_kind=operator_token_issued일 때만 — 발급을 실행한 운영자 셸 로그인 식별자"
+        ),
     )
     ip_hash: str | None = Field(
         default=None,

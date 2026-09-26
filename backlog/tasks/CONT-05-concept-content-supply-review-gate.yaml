@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONT-05-concept-content-supply-review-gate
+title: "학생 학습 공급(/study)이 개념 콘텐츠의 검수 상태를 보지 않는다 — ai_estimated 은유·오개념·설명이 reviewed와 똑같이 공급된다(검수 게이트 판정·집행)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 도달 실측 먼저 — 함수 수준 사실은 2026-09-25에 주입으로 확인됐다(get_concept_dsl이 ai_estimated 행에도 DSL을 돌려주고, 없는 code에만 None). 이 태스크는 그것이 **실제 학생 요청까지 닿는가**를 잰다: POST /v1/me/objectives/{objective_id}/study 가 쓰는 objective.concept_nodes[0] 코드 가운데 concept_content 행으로 해석되는 수를 scope별(K-12·대학)로 센다. 코드 공간 사실(같은 날 실측): K-12 콘텐츠 437 code는 원자 graph.json에 0건, 대학 409 code는 전부 소단원 노드다. 도달 0이면 '잠복(현재 비활성)', 1 이상이면 '활성'으로 적고 우선순위를 다시 매긴다(활성이면 priority 1)."
+  - "② 택1 판정(현 상태 방치만 금지) — ⓐ 공급 경로가 review_status == reviewed만 통과시킨다(fail-closed: ai_estimated는 DSL 없음과 같게 취급해 기존 폴백·404로 간다) ⓑ ai_estimated 공급을 정책으로 허용한다. 기본값은 ⓐ다 — knowledge_module_gap_review.md 표의 '자동 정의 생성: 무검증 학생 노출 금지 — review_status=ai_estimated + 검수 게이팅 필수(의도적 제약 §2-③)'가 이미 그렇게 정했다. ⓑ는 그 의도적 제약을 뒤집으므로 Kiki 판정 + MEMORY 결정 로그 없이는 택할 수 없다. 판정 시 반드시 함께 적을 비용: ⓐ를 켜면 검수 전까지 개념 콘텐츠가 학생 공급에서 사라진다 — SKB-04(prod 적재)·P3-02/P3-03의 Content Coverage 정의가 reviewed만 셀지와 충돌하는지 확인한다."
+  - "③ 집행 지점 별항(정본화와 분리) — ⓐ를 택하면 검사는 l4/content_supply.py 공급 경로 안에 있어야 한다(문서·docstring만으로는 집행이 아니다). 캐시 히트 경로도 같은 검사를 거쳐야 한다 — get_concept_dsl은 DSL을 TTL 캐시에 넣으므로, 적중 경로가 검사를 건너뛰면 강등된 행이 TTL 동안 계속 공급된다."
+  - "④ 변별력 — ai_estimated 행 주입 시 공급 거부, reviewed 행은 공급(성공 방향 대조), 없는 code는 기존대로 None을 테스트로 동결한다. 게이트 제거·캐시 적중 경로 우회 두 뮤테이션에서 RED를 확인한다(주입 적용·원복 바이트 동일 단언 포함)."
+  - "⑤ 문서 주장 정정 — l1/concept_content/review_gate.py 와 harness/concept_content_review_apply.py 의 docstring은 'reviewed가 학생 노출 게이팅 기준이며 l1/concept_graph/retrieval.py·l1/atom_graph/retrieval.py가 이 값으로 검색 히트를 거른다'고 적는다. 2026-09-25 실측으로 두 retrieval은 concept_content가 아니라 concept_node·atom_node의 review_status를 읽는다. ② 결과에 맞게 고친다(ⓐ면 집행 지점을 content_supply로 지목, ⓑ면 노출 게이팅 주장을 철회)."
+  - "⑥ 게이트 연동 — 이 태스크는 G-kg02-review-promotion-llm-session 의 입력 작업이다. 완료 후 그 게이트를 재판정한다: ⓐ였다면 승격이 학생 공급을 여는 유일한 문이 되므로 KG-02 사람 검수(Kiki 서명)의 범위·순서를 정해야 하고, ⓑ였다면 승격은 내부 표면(/v1/concepts/content?reviewed_only=true) 표기뿐이라 게이트 보류 유지가 기본값이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/content_supply.py
+  - src/backend/whymath_backend/api/study.py
+  - src/backend/whymath_backend/l1/concept_content/review_gate.py
+  - src/backend/whymath_backend/harness/concept_content_review_apply.py
+  - "tests/backend/l4/test_content_supply*.py"
+session: null
+notes: "발견 경위(2026-09-25 · 게이트 G-kg02-review-promotion-llm-session 점검 세션 · 판정 기준 main 3a7a7315 — 실측은 f138f894에서 했고 두 커밋 사이 관련 경로 diff 0). 게이트는 'KG-02 승격이 미검증 AI 콘텐츠의 학생 노출을 막는다'를 전제로 했는데, 로컬 PostgreSQL 16 + pgvector 0.8.0에 코퍼스 846행·원자 2,683행을 적재하고 실제 승격 CLI로 주입해 보니 전제가 두 겹으로 틀렸다. (1) /v1/concepts/search 는 atom_node(전 행 ai_estimated 상수)를 읽어 승격 후에도 reviewed_only=true 결과가 0 그대로였고(양성 대조: 원자 1건을 reviewed로 바꾸면 1건 반환), 승격이 바꾸는 곳은 /v1/concepts/content?reviewed_only=true(0→2)뿐이었다. (2) 학생 대면 /study 공급 경로의 get_concept_dsl 은 review_status를 보지 않는다 — ai_estimated 행에도 DSL이 나온다. 이 태스크는 (2)를 소유한다. 유사 선례: CONT-01(같은 /study 경로의 평가 재료 축 검수 비대칭 — done). 역할 분리: CONT-02는 QA 오케스트레이터의 감사 축 거취, KG-02는 승격 실행, 이 태스크는 공급 경로의 노출 게이트. 판정문 = docs/reviews/kg02_gate_premise_recheck_2026-09-25.md"
+updated: 2026-09-25
