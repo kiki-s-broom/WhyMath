@@ -345,7 +345,8 @@
 - **흡수처 이동**: 처음(main `42a77272`)엔 `EOS-130`에 흡수했으나, PR #1321이 머지되기 전에 다른 세션이 `EOS-130` 2차 재판정(FAIL · 미충족 1축)을 마쳐(#1323) done이 됐다. 그래서 미머지 변경을 되돌리고 진입 게이트를 열 수 있는 3차 재판정 `EOS-141`에 다시 적용했다 — 판정이 끝난 태스크에 완료 조건을 덧붙이면 "done인데 조건 미충족"이 된다.
 - **집행(CLI)**: `EOS-141` acceptance ⑧~⑪ 추가(SCENARIO CI 확인 · 미충족마다 P3 태스크 지목 + `--depends` · 3루프 소유 태스크 · 완료 판정 문구 승계) + 제목 정정 · `P3-01` 선행 `P3-00` → `EOS-141`(취소 선행은 `deps_cancelled` 영구 제외) · `P3-00` cancel · `gates amend G-p3-entry-gate2-pass` 해소 태스크 `EOS-130` → `EOS-141` · 대조표 §18-1 02행 정정 + §23(`docs/strategy/phase3_math_eos_completion_backlog_crosswalk.md`).
 - **교차 PR 공백**: `EOS-141`(#1323)의 선행은 `EOS-139`뿐인데, #1327이 Kiki 기준 ⓐ 미충족을 실측하고 수정 소유를 `EOS-26`으로 등재했다. 두 PR이 서로를 몰라 연결이 없었다 — #1327 착지(main `a60a1a9a`) 뒤 `EOS-141 --depends EOS-26`을 부착했다(#1314와 같은 형태의 재발 방지).
-- **하지 않은 것**: 게이트 clear(Kiki 소유) · `EOS-26` 등급 조정(P1·priority 3 — Gate 2 PASS의 유일한 기능 결함이지만 판단 사항).
+- **등급 상향(Kiki 승인 2026-09-26)**: `EOS-26` `eos_priority` P1 → P0 · `priority` 3 → 1 — Gate 2 PASS의 유일한 기능 결함. 상향 직후 `next` 1순위(완료 시 후속 15건 해금).
+- **하지 않은 것**: 게이트 clear(Kiki 소유).
 
 ### 2026-09-25 (판정 · 게이트 `G-kg02-review-promotion-llm-session`): **KG-02 승격 회차는 보류 — 게이트가 겨냥한 표면(`/concepts/search`)은 이 승격으로 움직이지 않고, 학생 공급(`/study`)은 검수 상태를 아예 읽지 않는다. 노출 게이트 판정을 `CONT-05`로 떼어 이 게이트의 입력으로 걸었다** (Kiki 판정 "보류+대장 정정", claude 조사·실측·집행) — 판정 기준 main `3a7a7315`
 
