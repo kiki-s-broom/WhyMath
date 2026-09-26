@@ -356,15 +356,18 @@ class IntentResolution(str, Enum):
 
     REFUTED = "refuted"
     """규칙은 관계 행위를 가리켰으나 **측정이 반증**했다(측정된 선수가 전부 숙달 · 후행이 전부
-    이미 숙달). 앵커 개념 연습으로 정직 강등한다.
-
-    EOS-26 — R6(원인 미상 오답) 집행 경로에서 앵커가 전진 구간이면 이 값으로 강등한다. 상태 머신이
-    방금 오답을 관측했고(R6), 그 관측이 "숙달 · 다음으로"를 반증한다(사전 숙달이 높은 학생은 오답
-    1회로 0.7 아래로 안 떨어진다)."""
+    이미 숙달). 앵커 개념 연습으로 정직 강등한다."""
 
     UNSUPPORTED = "unsupported"
     """규칙은 관계 행위를 가리켰으나 **근거가 없다**(선수·후행 엣지 없음 · 선수 전부 미측정).
     반증과 구별한다. 앵커 개념 연습으로 정직 강등한다."""
+
+    STATE_WITHHELD = "state_withheld"
+    """규칙은 전진을 가리켰으나 **상태 머신 결정이 막았다**(EOS-26) — R6(원인 미상 오답) 집행
+    경로에서 앵커가 전진 구간(> 0.7)이면 전진하지 않고 앵커 개념 연습으로 정직 강등한다. 측정이
+    반증한 것(`REFUTED`)과 다르다: 오답은 이미 숙달에 반영됐고 반영된 숙달이 여전히 전진을
+    말한다 — 막은 주체는 측정이 아니라 R6 결정("같은 개념 연습")이다. 사전 숙달이 높은 학생은
+    오답 1회로 0.7 아래로 안 떨어져 여기에 닿는다(BKT 기본값 사전 0.95 → 오답 뒤 약 0.73)."""
 
     GRAPH_TIMEOUT = "graph_timeout"
     """그래프 조회가 시간 예산을 넘어 판정하지 못했다 — 정직 강등(예외 타입명 로그 동반)."""
@@ -798,15 +801,19 @@ class CatRecommendationPolicy:
         applied_route: StateRoute | None = (
             state_route if state_route is not None and state_route.applied else None
         )
-        # EOS-26 — R6(원인 미상 오답)를 **후보 제한으로** 집행한 경로. 근거·밴드는 바꾸지 않는다:
-        # 제한된 후보(선수 탐침 또는 같은 개념)에서 같은 선택 연산을 하고, 이름표는 아래 EOS-124
-        # 갈래가 붙인다. 요청 목적도 그대로다 — 탐침은 측정 자체라 정보량 최대가 맞다(판정문 §4).
+        # EOS-26 — R6(원인 미상 오답)를 **후보 제한으로** 집행한 경로. 근거는 바꾸지 않는다: 제한된
+        # 후보(선수 탐침 또는 같은 개념)에서 같은 선택 연산을 하고, 이름표는 아래 EOS-124 갈래가
+        # 붙인다. 밴드는 경로에 따라 다르다(바로 아래).
         undiagnosed_route: StateRoute | None = (
             state_route if state_route is not None and state_route.undiagnosed_applied else None
         )
+        # R3 교정과 R6 **연습** 경로(탐침 제외)는 요청 목적과 무관하게 학습 밴드로 고른다 — 오답
+        # 직후의 연습에 정보량 최대(정답 확률 ~50% 지향)를 쓰지 않는다(REC-04 · 판정문 §4). 탐침은
+        # 측정 자체라 요청 목적 그대로다.
         effective_context = (
             learning_context.model_copy(update={"purpose": "learning"})
             if applied_route is not None
+            or (undiagnosed_route is not None and undiagnosed_route.undiagnosed_practice)
             else learning_context
         )
 
@@ -913,11 +920,10 @@ class CatRecommendationPolicy:
                 session, learner_id=user_id, problem_id=chosen_id
             )
             if undiagnosed_route is not None and anchor_reason.type is ReasonType.NEXT_CONCEPT:
-                # EOS-26 — R6 경로에서는 전진하지 않는다. 상태 머신이 방금 오답을 관측했고(R6),
-                # 그 관측이 "숙달 · 다음으로"를 반증한다 — 앵커 개념 연습으로 강등(`refuted`).
-                # 사전 숙달이 높은 학생은 오답 1회로 0.7 아래로 안 떨어져 같은 개념 연습의
-                # 앵커가 여기 닿는다.
-                intent = _demoted(anchor_reason, IntentResolution.REFUTED)
+                # EOS-26 — R6 경로에서는 전진하지 않는다. R6 결정("같은 개념 연습")이 전진을 막는다
+                # — 앵커 개념 연습으로 강등(`state_withheld`). 측정 반증(`refuted`)이 아니다:
+                # 오답은 이미 숙달에 반영됐고 반영된 숙달이 여전히 전진을 말한다.
+                intent = _demoted(anchor_reason, IntentResolution.STATE_WITHHELD)
             else:
                 intent = await resolve_policy_intent(
                     session,
@@ -937,7 +943,9 @@ class CatRecommendationPolicy:
                 aligned = await self._select_aligned(
                     intent.reselect_groups,
                     user_id=user_id,
-                    learning_context=learning_context,
+                    # 1차 선택과 같은 요청 상황(밴드 포함)으로 다시 고른다 — R6 연습 경로가 학습
+                    # 밴드를 강제했으면 재선택도 같은 밴드다. 지시가 없으면 원래 요청 그대로다.
+                    learning_context=effective_context,
                     theta=theta,
                     attempted_ids=attempt_state.attempted_ids,
                     excluded_ids=excluded_ids,

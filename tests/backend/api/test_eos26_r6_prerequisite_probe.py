@@ -4,12 +4,18 @@ acceptance ④의 집행 확인이다: `l2/learning_state_recommendation.py::rou
 선수 개념으로 제한하고, 그 제한이 서빙 응답(`GET /v1/me/next-problem`)을 **실제로 지나가는가**.
 설계 정본은 `docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md`.
 
-**변별력은 배치에서 나온다** — 오답 개념 C(2.5~3.3) · C의 직접 선수 P(1.2~1.8) · 어느 개념과도
-엣지가 없는 방해 개념 D(1.0·1.1)를 심는다. 오답 뒤 θ는 하한 -4.0이라 기본 경로는 가장 쉬운 D 문항을
-고른다(EOS-26 이전 동작 — 판정문 §1-1). 그러므로 추천이 P 안에 있다는 것은 "R6 경로가 후보를
+**변별력은 배치에서 나온다** — 오답 개념 C(2.5~3.3 · 5문항) · C의 직접 선수 P(1.2~1.8) · 어느
+개념과도 엣지가 없는 방해 개념 D(1.0·1.1)를 심는다. 오답 뒤 θ는 하한 -4.0이라 기본 경로는 가장 쉬운 D
+문항을 고른다(EOS-26 이전 동작 — 판정문 §1-1). 그러므로 추천이 P 안에 있다는 것은 "R6 경로가 후보를
 선수로 제한했다"의 증거다. P에는 자기 선수 R(1.3·1.5)을 하나 더 둔다 — 탐침을 틀린 뒤 연속 판정이
 빠지면 추천이 P를 연습하는 대신 R을 탐침하러 더 내려가므로, **그 절을 이 배치가 밟는다**(R이 없으면
-연속 판정을 지워도 P에 선수가 없어 같은 결과가 나온다 — 절을 밟지 않는 픽스처).
+연속 판정을 지워도 P에 선수가 없어 같은 결과가 나온다 — 절을 밟지 않는 픽스처). C가 5문항인 이유는
+정답 2회 + 오답 1회 뒤에도 같은 개념 연습 후보가 남아야 해서다(막힘 문턱 시나리오).
+
+**판정 트리의 갈래마다 한 여정** — 탐침 → 하강 → 해제(연속 첫·둘째·셋째), 막히지 않은 오답(숙달
+높음 → 같은 개념), 아는 결손(측정된 약한 선수 → 탐침 없이 선수 연습), 숙달된 선수(반증 → 같은 개념),
+탐침 오개념(R6 → R3). 연습 갈래는 요청 목적과 무관하게 학습 밴드(`band_calibrated=false`)이고
+탐침만 요청 목적 그대로(`null`)다.
 
 **요청 형태 2종**(`prioritize_weak_concepts` 전송 · 미전송 — 실제 모바일 앱은 미전송)으로 같은 여정을
 돈다. 한 형태에서만 서는 하강은 약점 가중의 우연이다(판정문 §1-2).
@@ -112,7 +118,7 @@ def _seed(content: Any, bands: dict[str, list[float]], edges: list[tuple[str, st
 
 #: 탐침 배치 — C의 직접 선수 P · P의 선수 R · 엣지 없는 방해 개념 D(가장 쉽다).
 _PROBE_BANDS: dict[str, list[float]] = {
-    "C": [2.5, 2.9, 3.3],
+    "C": [2.5, 2.7, 2.9, 3.1, 3.3],
     "P": [1.2, 1.4, 1.6, 1.8],
     "R": [1.3, 1.5],
     "D": [1.0, 1.1],
@@ -187,6 +193,7 @@ def test_probe_then_descend_then_release(weak_first: bool) -> None:
             assert probe["target_concept"] == str(layout.concept["P"]), probe
             assert probe["reason"]["type"] == "unmeasured", probe
             assert probe["reason"]["basis"] != "learning_state", probe  # 근거는 숙달 파생이다
+            assert probe["band_calibrated"] is None, probe  # 탐침은 측정 — 요청 목적 그대로
             meta = asyncio.run(_treatment_meta(probe["problem_id"]))
             assert meta is not None, "탐침 추천이 나갔는데 처치 기록이 없다"
             assert meta[META_KEY_LEARNING_STATE_DIRECTIVE] == "prerequisite_probe", meta
@@ -210,6 +217,7 @@ def test_probe_then_descend_then_release(weak_first: bool) -> None:
             assert descend["reason"]["concept_id"] == str(layout.concept["C"]), descend
             assert descend["reason"]["type"] == "prerequisite_gap", descend
             assert descend["intent_resolution"] == "served", descend
+            assert descend["band_calibrated"] is False, descend  # 연습 — 학습 밴드
 
             # ⑤ 셋째 오답은 R5(반복 실패) — 이 경로를 타지 않는다(집행하지 않는 규칙 · 판정문 §3 ⓒ).
             third = _wrong(client, auth, descend["problem_id"])
@@ -238,7 +246,8 @@ def test_correct_answer_is_not_directed() -> None:
 
 
 def test_mastered_prerequisite_is_not_probed() -> None:
-    """ⓐ 폴백(반증) — 직접 선수가 이미 숙달이면 원인 후보가 아니다. 같은 개념 C를 연습한다.
+    """ⓐ 폴백(반증) — 직접 선수가 이미 숙달(측정 ≥ 0.7)이면 원인 후보가 아니다. 같은 개념 C를
+    연습한다(학습 밴드).
 
     선수 숙달은 HTTP 정답 2회로 만든다(BKT 기본값에서 1회 0.693 · 2회 0.919 — 경계 0.7을 넘는다).
     """
@@ -256,6 +265,74 @@ def test_mastered_prerequisite_is_not_probed() -> None:
             assert rec["learning_state_directive"] == "same_concept_probe_refuted", rec
             assert rec["problem_id"] in layout.ids("C"), rec
             assert rec["target_concept"] == str(layout.concept["C"]), rec
+            assert rec["action"] == "practice_current", rec
+            assert rec["intent_resolution"] == "refuted", rec  # EOS-124 (다) — 측정된 선수가 숙달
+            assert rec["band_calibrated"] is False, rec
+    finally:
+        content.teardown()
+
+
+def test_high_mastery_slip_is_not_probed() -> None:
+    """ⓐ 막힘 문턱 — 숙달이 높던 개념의 오답 1회는 선수 결손 신호가 아니다. 같은 개념을 연습한다.
+
+    C를 HTTP 정답 2회로 올린 뒤(0.3 → 0.69 → 0.92) 틀린다 — 오답 뒤 약 0.63으로 선수 구간(< 0.4)
+    위에 남는다. 여기서 탐침이 나가면 한 번 삐끗한 학생을 선수로 끌어내린다(판정문 §5 발견 2).
+    """
+    content, _journal = _P._begin("E26-slip")
+    try:
+        layout = _seed(content, _PROBE_BANDS, _PROBE_EDGES)
+        with _P._client() as client:
+            _P._erase_learner(client)
+            auth = _P._login(client)
+            for pid in layout.items["C"][:2]:
+                right = _P._attempt(client, auth, pid, correct=True, answer="정답")
+                assert _rule(right) == "R2-correct-low-confidence", right
+            wrong = _wrong(client, auth, layout.items["C"][2])
+            assert _rule(wrong) == _R6, wrong
+            rec = _next_problem(client, auth, weak_first=False)
+            assert rec["learning_state_directive"] == "same_concept_not_blocked", rec
+            assert rec["problem_id"] in layout.ids(
+                "C"
+            ), f"막히지 않은 오답인데 C 밖으로 나갔다({rec['problem_id']}) — P면 탐침, D면 기본 경로."
+            assert rec["target_concept"] == str(layout.concept["C"]), rec
+            assert rec["action"] == "practice_current", rec
+            assert rec["band_calibrated"] is False, rec
+    finally:
+        content.teardown()
+
+
+@pytest.mark.parametrize("weak_first", list(_REQUEST_SHAPES.values()), ids=list(_REQUEST_SHAPES))
+def test_known_prerequisite_deficit_is_practiced_not_probed(weak_first: bool) -> None:
+    """ⓐ 아는 결손 — 직접 선수가 이미 **측정된 약점**이면 잴 것이 없다. 탐침 없이 그 선수를 연습한다.
+
+    P를 먼저 틀려 약점(≈ 0.15)으로 측정해 두고, D 정답 1회로 연속 오답을 끊은 뒤(R2 — 끊지 않으면 C
+    오답이 연속 두 번째가 된다) C를 틀린다. 추천은 탐침(`diagnose`)이 아니라, C로 제한한 후보에서
+    EOS-124 (가)가 약한 선수 P로 다시 고른 연습이다(판정문 §5 발견 8 — 측정된 약점을 다시 재지 않는다).
+    재선택도 1차 선택과 같은 학습 밴드다.
+    """
+    content, _journal = _P._begin("E26-deficit")
+    try:
+        layout = _seed(content, _PROBE_BANDS, _PROBE_EDGES)
+        with _P._client() as client:
+            _P._erase_learner(client)
+            auth = _P._login(client)
+            gap = _wrong(client, auth, layout.items["P"][0])
+            assert _rule(gap) == _R6, gap
+            reset = _P._attempt(client, auth, layout.items["D"][0], correct=True, answer="정답")
+            assert _rule(reset) == "R2-correct-low-confidence", reset
+            wrong = _wrong(client, auth, layout.items["C"][0])
+            assert _rule(wrong) == _R6, wrong
+            rec = _next_problem(client, auth, weak_first=weak_first)
+            assert rec["learning_state_directive"] == "known_prerequisite_deficit", rec
+            assert rec["problem_id"] in layout.ids("P"), (
+                f"아는 결손인데 P 연습이 아니다({rec['problem_id']}) — C면 (가) 재선택 누락, "
+                "D면 기본 경로."
+            )
+            assert rec["action"] == "practice_prerequisite", rec
+            assert rec["target_concept"] == str(layout.concept["P"]), rec
+            assert rec["reason"]["concept_id"] == str(layout.concept["C"]), rec
+            assert rec["intent_resolution"] == "served", rec
+            assert rec["band_calibrated"] is False, rec
     finally:
         content.teardown()
 
@@ -266,7 +343,8 @@ def test_misconception_on_the_probe_hands_over_to_remediation() -> None:
     요청마다 지시는 하나다(원장 최신 결정). 교정 대상은 탐침 문항의 개념 P다. 반대 방향(R3 → R6)은
     HTTP로 곧바로 만들 수 없다 — R3는 학생 전체의 활성 가설을 읽어, 교정 문항을 매칭 없이 틀려도
     가설이 살아 있는 한 R3가 다시 발화한다(`EOS-138` 범위). 그 방향은 hermetic 테스트
-    (`test_non_r6_previous_decision_probes[...R3...]`)가 판정 트리 수준에서 잰다.
+    (`test_second_consecutive_wrong_restricts_to_the_concept_just_failed`의 R3 매개변수)가 판정
+    트리 수준에서 잰다 — R3 직후의 R6는 연속 두 번째 오답이라 탐침하지 않고 방금 틀린 개념을 연습한다.
     """
     content, _journal = _P._begin("E26-r6r3")
     try:

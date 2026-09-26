@@ -53,22 +53,28 @@ EOS-26 — R6(원인 미상 오답)도 집행한다
 
 R6의 결정은 "같은 개념 연습"(`PRACTICE_SAME_CONCEPT`)이다. Kiki 결정(게이트
 `G-eos24-loop1-undiagnosed-wrong-criterion` · (가) 좁힌 기준)은 그 앞에 한 걸음을 인정했다 — 원인을
-모르는 오답이면 가장 가까운 구조적 원인(선수 결손)을 먼저 확인한다. 그래서:
+모르는 오답이면 가장 가까운 구조적 원인(선수 결손)을 먼저 확인한다. 그 한 걸음은 **근거가 설 때만**
+딛는다(판정문 §2-1 트리 · 독립 교수학 비판 반영):
 
-  · **연속 오답의 첫 R6** → 오답 개념 C의 **직접 선수 중 숙달되지 않은(미측정 포함) 개념**의
-    문항으로 후보를 제한한다(선수 탐침 1문항). Kiki 기준 ⓐ(진단 문항 = 선수)가 여기서 선다.
-  · **연속 두 번째 R6**(직전 정책 결정도 R6) → 방금 틀린 개념으로 제한한다 — R6 문면 그대로다.
-    탐침을 틀렸으면 그 개념은 선수 P이고, EOS-124 의도 해소 (나)가 `practice_prerequisite`(근거 =
-    막힌 C · 목표 = P)를 붙인다. Kiki 기준 ⓑ(진단 오답 → 선수 연습 하강)가 여기서 선다.
-  · 셋째 연속 오답은 R5(임계 3)라 이 경로를 타지 않는다 — 개입은 구조적으로 최대 2문항이다.
-  · 탐침할 선수가 없으면(엣지 없음 · 전부 숙달 · 문항 없음 · 조회 시간 초과) 첫 R6도 같은 개념
-    연습이다(R6 문면). 같은 개념에도 문항이 없을 때만 기본 경로로 돌아간다.
+  · **연속 두 번째 오답**(직전 정책 결정이 R3·R6) → 방금 틀린 개념으로 제한한다(R6 문면). 탐침을
+    틀린 경우 그 개념은 선수 P이고, EOS-124 의도 해소 (나)가 `practice_prerequisite`(목표 = P)를
+    붙인다 — Kiki 기준 ⓑ. 셋째 연속 오답은 R5(임계 3)라 여기 오지 않는다. 그래서 탐침은 연속의
+    **첫** 오답에서만 나간다: 둘째에서 탐침하면 그 결과를 쓸 다음 수(하강)가 없다.
+  · **첫 오답인데 오답 개념 C가 막히지 않았다**(사후 숙달 ≥ 0.4) → 같은 개념. 숙달한 학생의 1회
+    실수를 선수 결손으로 읽지 않는다. 막힘 판정은 계획서 §8의 선수 경계(0.4)와 같은 선이다.
+  · **첫 오답 · C가 막혔다(< 0.4)** → C의 직접 선수를 본다:
+      - 이미 측정된 약점(< 0.7)이 있으면 **진단하지 않는다** — C로 제한해 EOS-124 (가)가 가장 약한
+        선수로 연습을 잇게 한다(아는 결손이 먼저다).
+      - 아니면 **미측정** 직접 선수의 문항으로 제한한다(선수 탐침 1문항 — 진단은 모르는 것을 잰다).
+        Kiki 기준 ⓐ가 여기서 선다. 한 선수는 한 번 재면 측정된 것이 되어 다시 탐침되지 않는다.
+      - 탐침할 것이 없으면(엣지 없음 · 전부 숙달 · 문항 없음 · 조회 시간 초과) 같은 개념이다.
+  · 같은 개념에도 문항이 없을 때만 기본 경로로 돌아간다.
   · R2(정답+미측정 확신)의 PRACTICING은 지시가 아니다 — 국면과 트리거를 둘 다 본다.
 
 R3 경로와 달리 **근거를 새로 만들지 않는다** — 후보 집합만 바꾸고 이름표는 기본 경로의 연산
 (숙달 파생 근거 + EOS-124 의도 해소)이 붙인다. 전달 문항에 대해 그 이름표가 참이기 때문이다(미측정
 선수를 진단하러 내면 `diagnose · unmeasured`가 사실이다). 상태 머신이 한 일(후보 생성)은
-`StateDirectiveOutcome`과 `policy_version`이 기록한다(판정문 §2-2 근거 3).
+`StateDirectiveOutcome`과 `policy_version`이 기록한다(판정문 §2-2 근거 4).
 
 그래프 예산은 **정책이 소유한다** — 이 모듈은 예산(깊이·노드·시간)을 건 선수 읽기 함수를 주입받는다
 (`PrerequisiteReader`). 여기서 예산을 다시 정의하면 예산 정의가 두 곳이 된다(천장 상수와 그
@@ -111,6 +117,7 @@ from whymath_backend.l2.next_problem_selection import (
 )
 from whymath_backend.l2.prerequisite_recommendation import PrerequisiteRow
 from whymath_backend.l2.recommendation_contract import (
+    PREREQUISITE_MASTERY_CEILING,
     WEAK_CONCEPT_MASTERY_CEILING,
     RecommendationReason,
     remediation_reason,
@@ -160,6 +167,16 @@ POLICY_DECISION_TRIGGERS: Final[frozenset[TransitionTrigger]] = frozenset(
     }
 )
 
+#: 직전 정책 결정이 이 둘 중 하나면 이번 R6는 **연속 두 번째 오답**이다(오답을 낳는 결정은 R3·R4·
+#: R5·R6이고, R4는 서빙에서 발화하지 않으며(EOS-127) R5 뒤에는 R6가 올 수 없다 — 연속 3회 이상이면
+#: 계속 R5다). 둘째 오답에서는 탐침하지 않는다: 탐침을 틀리면 셋째가 R5라 그 결과를 쓸 하강이 없다.
+_WRONG_ANSWER_DECISIONS: Final[frozenset[TransitionTrigger]] = frozenset(
+    {
+        TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+        TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED,
+    }
+)
+
 
 class StateDirectiveOutcome(str, Enum):
     """상태 머신이 추천을 지시했을 때 **실제로 무슨 일이 일어났는가** — 작동 비율의 원자료.
@@ -186,29 +203,46 @@ class StateDirectiveOutcome(str, Enum):
 
     R6 경로에서도 같은 뜻으로 쓴다(같은 개념 연습으로 제한하려 했으나 그 개념에 문항이 없다)."""
 
-    # ── R6(원인 미상 오답) 집행 — EOS-26. 아래 6값은 **후보를 제한했다**(집행했다) ──────────────
+    # ── R6(원인 미상 오답) 집행 — EOS-26. 아래 9값은 **후보를 제한했다**(집행했다) ──────────────
     # 사유를 하나로 뭉치지 않는 이유는 위와 같다: 고칠 곳이 다르다(EOS-124 `IntentResolution`과
     # 같은 분리 — 반증은 정상 교수학, 근거 없음은 그래프 커버리지, 문항 없음은 콘텐츠, 시간 초과는
     # 성능). 그래서 `prerequisite_probe / (R6 값 전체)`가 곧 "선수 탐침이 실제로 나간 비율"이다.
 
     PREREQUISITE_PROBE = "prerequisite_probe"
-    """연속 오답의 첫 R6 — 오답 개념의 직접 선수 중 숙달되지 않은 개념의 문항으로 제한했다."""
+    """연속 첫 오답 · 오답 개념이 막혔다(< 0.4) · 아는 선수 결손 없음 — 오답 개념의 **미측정** 직접
+    선수 문항으로 제한했다(선수 탐침 · 측정이 목적이라 요청 목적 그대로)."""
 
     SAME_CONCEPT_REPEAT = "same_concept_repeat"
-    """연속 두 번째 R6(직전 정책 결정도 R6) — 방금 틀린 개념으로 제한했다(R6 문면 집행)."""
+    """연속 두 번째 오답(직전 정책 결정이 R3·R6) — 방금 틀린 개념으로 제한했다(R6 문면 집행)."""
+
+    SAME_CONCEPT_NOT_BLOCKED = "same_concept_not_blocked"
+    """연속 첫 오답인데 오답 개념의 사후 숙달이 선수 경계 이상(≥ 0.4)이다 — 1회 실수를 선수 결손으로
+    읽지 않고 같은 개념으로 제한했다."""
+
+    SAME_CONCEPT_ANCHOR_UNMEASURED = "same_concept_anchor_unmeasured"
+    """연속 첫 오답인데 오답 개념의 숙달 측정이 없다(오답 직후라 정상이면 있어야 한다 — 숙달 전파
+    공백) — 막힘을 세울 근거가 없어 같은 개념으로 제한했다(경고 로그 동반)."""
+
+    KNOWN_PREREQUISITE_DEFICIT = "known_prerequisite_deficit"
+    """연속 첫 오답 · 오답 개념이 막혔다 · 직접 선수 중 이미 측정된 약점(< 0.7)이 있다 — 진단하지
+    않고 오답 개념으로 제한했다. 그 개념 앵커의 EOS-124 선수 구간 의도 (가)가 가장 약한 선수로
+    연습을 잇는다(`intent_resolution=served`로 관측된다)."""
 
     SAME_CONCEPT_PROBE_UNSUPPORTED = "same_concept_probe_unsupported"
-    """첫 R6인데 오답 개념에 선수 엣지가 없다 — 같은 개념으로 제한했다(그래프 커버리지 공백일 수
-    있다)."""
+    """첫 오답 · 막힘인데 오답 개념에 선수 엣지가 없다 — 같은 개념으로 제한했다(그래프 커버리지
+    공백일 수 있다)."""
 
     SAME_CONCEPT_PROBE_REFUTED = "same_concept_probe_refuted"
-    """첫 R6인데 직접 선수가 전부 숙달이다 — 원인 후보가 선수에 없다. 같은 개념으로 제한했다."""
+    """첫 오답 · 막힘인데 직접 선수가 전부 이미 숙달(≥ 0.7)이다 — 원인 후보가 선수에 없다. 같은
+    개념으로 제한했다."""
 
     SAME_CONCEPT_PROBE_UNAVAILABLE = "same_concept_probe_unavailable"
-    """첫 R6인데 숙달되지 않은 선수에 출제 가능한 미시도 문항이 없다 — 같은 개념으로 제한했다."""
+    """첫 오답 · 막힘인데 미측정 직접 선수에 출제 가능한 미시도 문항이 없다 — 같은 개념으로
+    제한했다."""
 
     SAME_CONCEPT_GRAPH_TIMEOUT = "same_concept_graph_timeout"
-    """첫 R6인데 선수 조회가 시간 예산을 넘었다 — 같은 개념으로 제한했다(예외 타입명 로그 동반)."""
+    """첫 오답 · 막힘인데 선수 조회가 시간 예산을 넘었다 — 같은 개념으로 제한했다(예외 타입명
+    로그)."""
 
 
 #: R6 경로가 **후보를 제한한**(=상태 머신 결정을 집행한) 결과. 나머지 R6 결과(`ANCHOR_UNRESOLVED`·
@@ -217,12 +251,22 @@ _UNDIAGNOSED_RESTRICTING: Final[frozenset[StateDirectiveOutcome]] = frozenset(
     {
         StateDirectiveOutcome.PREREQUISITE_PROBE,
         StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+        StateDirectiveOutcome.SAME_CONCEPT_NOT_BLOCKED,
+        StateDirectiveOutcome.SAME_CONCEPT_ANCHOR_UNMEASURED,
+        StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT,
         StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED,
         StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED,
         StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNAVAILABLE,
         StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT,
     }
 )
+
+#: 그중 **연습**(측정이 아니다) — 탐침을 뺀 전부. 정책은 이 경로들을 요청 목적과 무관하게 학습
+#: 밴드(정답 확률 70~85%)로 고른다(EOS-24 교정 경로와 같은 이유 — 정보량 최대는 학생이 절반을
+#: 틀리도록 설계된 출제라 오답 직후의 연습에 쓰지 않는다 · REC-04). 탐침은 측정 자체라 제외한다.
+_UNDIAGNOSED_PRACTICE: Final[frozenset[StateDirectiveOutcome]] = _UNDIAGNOSED_RESTRICTING - {
+    StateDirectiveOutcome.PREREQUISITE_PROBE
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,6 +351,12 @@ class StateRoute:
         """R6(원인 미상 오답) 결정을 **후보 제한으로** 집행했다 — 이름표는 기본 경로 연산이
         붙인다."""
         return self.outcome in _UNDIAGNOSED_RESTRICTING
+
+    @property
+    def undiagnosed_practice(self) -> bool:
+        """R6 집행 중 **연습** 경로(탐침 제외) — 정책이 학습 밴드로 고른다
+        (`_UNDIAGNOSED_PRACTICE`)."""
+        return self.outcome in _UNDIAGNOSED_PRACTICE
 
 
 def _evidence_since_previous_attempt(
@@ -460,16 +510,33 @@ async def _previous_decision_trigger(
     return value
 
 
-def _is_mastered(row: PrerequisiteRow, learner_state: LearnerState) -> bool:
-    """선수가 **이미 숙달**인가 — 숙달 구간 경계(> 0.7)와 같은 선이다(`select_reason_type`).
+class _PrerequisiteStatus(str, Enum):
+    """직접 선수 1건의 측정 상태 — 탐침 트리의 입력(판정문 §3 ⓑ)."""
 
-    판정 입력은 `learner_state.mastery`(개념코드 키)다 — EOS-124 선수 구간 의도(가)와 같은 입력.
-    코드가 없거나 측정이 없으면 숙달이 **아니다**(미측정 선수는 탐침 대상이다 — 모른다 ≠ 숙달).
+    UNMEASURED = "unmeasured"
+    """측정이 없다(코드 없음 포함) — **탐침(진단) 대상**이다. 진단은 모르는 것을 잰다."""
+
+    WEAK = "weak"
+    """측정된 약점(< 0.7) — 이미 아는 결손이다. 진단하지 않고 연습으로 잇는다(EOS-124 (가)와 같은
+    선 · 같은 입력 — 그래서 넘기면 그쪽이 반드시 이 선수를 찾는다)."""
+
+    STRONG = "strong"
+    """측정된 숙달(≥ 0.7) — 원인 후보가 아니다."""
+
+
+def _prerequisite_status(row: PrerequisiteRow, learner_state: LearnerState) -> _PrerequisiteStatus:
+    """선수 1건의 측정 상태. 입력은 `learner_state.mastery`(개념코드 키) — EOS-124 선수 구간 의도
+    (가)와 같은 입력·같은 경계(`< WEAK_CONCEPT_MASTERY_CEILING`면 약점)다. 경계를 따로 두면 "아는
+    결손이 있다"고 넘겼는데 (가)가 그 선수를 찾지 못하는 틈이 생긴다.
+
+    코드가 없거나 측정이 없으면 미측정이다(모른다 ≠ 숙달 · 모른다 ≠ 약점).
     """
-    if row.concept_code is None:
-        return False
-    mastery = learner_state.mastery.get(row.concept_code)
-    return mastery is not None and mastery > WEAK_CONCEPT_MASTERY_CEILING
+    mastery = learner_state.mastery.get(row.concept_code) if row.concept_code is not None else None
+    if mastery is None:
+        return _PrerequisiteStatus.UNMEASURED
+    if mastery < WEAK_CONCEPT_MASTERY_CEILING:
+        return _PrerequisiteStatus.WEAK
+    return _PrerequisiteStatus.STRONG
 
 
 def _item_b(row: CandidateRow) -> float:
@@ -536,8 +603,8 @@ async def _route_undiagnosed_wrong(
 ) -> StateRoute:
     """R6 결정 → 선수 탐침 또는 같은 개념 연습(판정문 §2-1 트리).
 
-    검사 순서는 **싼 것부터**: 앵커(2~3건) → 직전 결정(1건) → [연속이면 같은 개념 후보(1건)]
-    → 선수(주입 읽기 1건) → 선수 후보(1건) → [없으면 같은 개념 후보(1건)].
+    검사 순서는 **싼 것부터**: 앵커(2~3건) → 직전 결정(1건) → 오답 개념 숙달(1건) → 선수(주입
+    읽기 1건) → 탐침 후보(1건). 앞에서 같은 개념으로 정해지면 그 개념 후보(1건)만 더 묻는다.
     """
     if directive.attempt_id is None:
         return StateRoute(outcome=StateDirectiveOutcome.ANCHOR_UNRESOLVED)
@@ -556,16 +623,33 @@ async def _route_undiagnosed_wrong(
             excluded_ids=excluded_ids,
         )
 
-    # ⓒ 연속 두 번째 R6 — 탐침(또는 첫 오답 뒤 무엇이든)을 또 원인 미상으로 틀렸다. R6 문면대로 방금
-    # 틀린 개념을 연습한다. 셋째 연속 오답은 R5라 여기에 오지 않는다(개입은 최대 2문항).
+    # ⓒ 연속 두 번째 오답(직전 정책 결정이 R3·R6) — R6 문면대로 방금 틀린 개념을 연습한다. 탐침을
+    # 틀린 경우가 여기다(ⓑ의 근원). 둘째에서 탐침하지 않는 이유: 셋째 오답은 R5라 탐침 결과를 쓸
+    # 하강이 없다(판정문 §3 ⓒ). 셋째 연속 오답은 R5라 이 함수에 오지 않는다(개입은 최대 2문항).
     previous = await _previous_decision_trigger(
         session, user_id=user_id, attempt_id=directive.attempt_id
     )
-    if previous is TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED:
+    if previous in _WRONG_ANSWER_DECISIONS:
         return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_REPEAT)
 
-    # ⓑ 첫 R6 — 직접 선수 중 숙달되지 않은 개념을 탐침한다. 예산(시간·노드·깊이 천장)은 주입된
-    # 읽기 함수가 건다. 시간 초과는 추천을 실패시키지 않는다(같은 개념 연습 + 예외 타입명 로그).
+    # 첫 오답 — 오답 개념이 **막혔을 때만** 선수 쪽으로 간다(계획서 §8 선수 경계 0.4와 같은 선).
+    # 숙달이 높은 학생의 1회 실수를 선수 결손으로 읽지 않는다. 입력은 최신 숙달 이력이다 — 아래
+    # 기본 경로 이름표(EOS-124)가 앵커 구간을 같은 값으로 판정하므로 두 판정이 갈라지지 않는다.
+    row = await _latest_mastery(session, user_id, concept_id)
+    anchor_mastery = float(row.mastery) if row is not None and row.mastery is not None else None
+    if anchor_mastery is None:
+        _logger.warning(
+            "R6 선수 탐침 — 오답 직후인데 오답 개념의 숙달 측정이 없다(숙달 전파 공백) · 같은 개념 "
+            "연습으로 집행. concept=%s attempt=%s",
+            concept_id,
+            directive.attempt_id,
+        )
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_ANCHOR_UNMEASURED)
+    if anchor_mastery >= PREREQUISITE_MASTERY_CEILING:
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_NOT_BLOCKED)
+
+    # ⓑ 막힌 개념의 직접 선수 — 예산(시간·노드·깊이 천장)은 주입된 읽기 함수가 건다. 시간 초과는
+    # 추천을 실패시키지 않는다(같은 개념 연습 + 예외 타입명 로그).
     try:
         prerequisites = await read_prerequisites(concept_id, _PROBE_DEPTH)
     except TimeoutError as exc:
@@ -577,14 +661,20 @@ async def _route_undiagnosed_wrong(
         return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT)
     if not prerequisites:
         return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED)
-    open_ids = [row.concept_id for row in prerequisites if not _is_mastered(row, learner_state)]
-    if not open_ids:
+    statuses = [(row, _prerequisite_status(row, learner_state)) for row in prerequisites]
+    # 아는 결손이 먼저다 — 진단하지 않고 오답 개념 앵커로 EOS-124 (가)가 가장 약한 선수를 잇게 한다.
+    if any(status is _PrerequisiteStatus.WEAK for _row, status in statuses):
+        return await same_concept(StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT)
+    unmeasured = [
+        row.concept_id for row, status in statuses if status is _PrerequisiteStatus.UNMEASURED
+    ]
+    if not unmeasured:
         return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED)
     probe_rows = _probe_candidates(
         await load_target_candidate_rows(
             session,
             theta,
-            concept_ids=open_ids,
+            concept_ids=unmeasured,
             attempted_ids=attempted_ids,
             excluded_ids=excluded_ids,
         ),

@@ -601,10 +601,11 @@ class TestPolicySeam:
 # ══════════════════════════════════════════════════════════════════════════
 # EOS-26 — R6(원인 미상 오답) 집행
 #
-# ⑤ 무엇을 지시로 읽는가(R2 제외 — 국면·트리거 둘 다) ⑥ 판정 트리(연속 · 탐침 · 폴백 4사유)와
-# 선택 축(직접 선수 · 숙달 제외 · 병합 정렬) ⑦ 정책 이음매(후보 제한 · 정책 버전 · 전진 금지 ·
-# 예산을 건 선수 읽기). 설계 정본은 EOS-26 판정문 §2~§4. 숙달 경계는 상수를 import하지 않고
-# 리터럴(0.70 · 0.71)로 밟는다(MISC-30 자기참조 교훈 — 파일 머리 ②와 같은 규율).
+# ⑤ 무엇을 지시로 읽는가(R2 제외 — 국면·트리거 둘 다) ⑥ 판정 트리(연속 둘째 · 막힘 문턱 · 아는
+# 결손 · 미측정 선수 탐침 · 같은 개념 폴백)와 선택 축(직접 선수 · 미측정만 · 병합 정렬) ⑦ 정책
+# 이음매(후보 제한 · 연습 경로 학습 밴드 · 정책 버전 · 전진 보류 · 예산을 건 선수 읽기). 설계
+# 정본은 EOS-26 판정문 §2~§4. 경계는 상수를 import하지 않고 리터럴(막힘 0.39·0.40 · 선수 약점
+# 0.69·0.70)로 밟는다(MISC-30 자기참조 교훈 — 파일 머리 ②와 같은 규율).
 # ══════════════════════════════════════════════════════════════════════════
 R6 = TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED
 R2 = TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE
@@ -705,6 +706,47 @@ class TestReadUndiagnosedWrongDirective:
         assert TransitionTrigger.ATTEMPT_SUBMITTED not in lsr.POLICY_DECISION_TRIGGERS
 
 
+@dataclass
+class _MasteryRow:
+    mastery: float | None
+
+
+@pytest.fixture
+def anchor_mastery(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """오답 개념의 최신 숙달 조회를 대역으로 — `[값]`을 바꿔 막힘 여부를 정한다(기본 0.15 = 오답 1회 뒤
+    콜드스타트 값). 조회 인자(학생·개념)를 기록한다. 숙달 좌석 자체는 숙달 모듈 테스트가 검증한다."""
+    state: list[Any] = [0.15]
+    asked: list[tuple[uuid.UUID, uuid.UUID]] = []
+
+    async def _latest(_s: Any, learner: uuid.UUID, concept_id: uuid.UUID) -> _MasteryRow | None:
+        asked.append((learner, concept_id))
+        return None if state[0] is None else _MasteryRow(mastery=state[0])
+
+    monkeypatch.setattr(lsr, "_latest_mastery", _latest)
+    state.append(asked)
+    return state
+
+
+class TestPrerequisiteStatus:
+    """직접 선수의 측정 상태 — EOS-124 (가)와 같은 입력·같은 경계(< 0.7 약점). 리터럴로 밟는다."""
+
+    @pytest.mark.parametrize(
+        ("code", "mastery", "status"),
+        [
+            ("UC-A", None, "unmeasured"),
+            (None, None, "unmeasured"),  # 코드가 없으면 숙달을 찾을 수 없다 — 미측정
+            ("UC-A", 0.69, "weak"),
+            ("UC-A", 0.15, "weak"),
+            ("UC-A", 0.70, "strong"),  # 경계 자체 — (가)도 0.70을 약점으로 보지 않는다
+            ("UC-A", 0.95, "strong"),
+        ],
+    )
+    def test_status(self, code: str | None, mastery: float | None, status: str) -> None:
+        values = {} if mastery is None or code is None else {code: mastery}
+        row = _prereq(code, _PRE_A)
+        assert lsr._prerequisite_status(row, _undiagnosed(mastery=values)).value == status
+
+
 class TestRouteUndiagnosedWrong:
     async def test_r2_issues_no_query_and_reads_no_prerequisite(self) -> None:
         fake, session = _session()
@@ -730,11 +772,16 @@ class TestRouteUndiagnosedWrong:
         assert anchored == []
         assert reader.calls == []
 
-    async def test_repeat_restricts_to_the_concept_just_failed(
-        self, anchored: list[uuid.UUID]
+    @pytest.mark.parametrize("previous", [R6, R3])
+    async def test_second_consecutive_wrong_restricts_to_the_concept_just_failed(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any], previous: TransitionTrigger
     ) -> None:
-        """ⓒ — 직전 정책 결정도 R6면 탐침하지 않고 방금 틀린 개념으로 간다(R6 문면 · ⓑ의 근원)."""
-        fake, session = _session([_PROBLEM], [R6], [(_SAME, 3.0, None)])
+        """ⓒ — 직전 정책 결정이 오답 결정(R6·R3)이면 연속 두 번째 오답이다. 탐침하지 않고 방금 틀린
+        개념으로 간다(R6 문면 · ⓑ의 근원). 셋째는 R5라 탐침 결과를 쓸 하강이 없기 때문이다.
+
+        R3가 핵심 반례다 — "직전이 R6일 때만 연속"으로 좁히는 뮤테이션은 R3→R6에서 탐침을 내보낸다.
+        """
+        fake, session = _session([_PROBLEM], [previous], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
         route = await _route_r6(_undiagnosed(), session, reader)
         assert route == lsr.StateRoute(
@@ -743,21 +790,26 @@ class TestRouteUndiagnosedWrong:
             candidate_rows=((_SAME, 3.0, None),),
         )
         assert route.undiagnosed_applied
+        assert route.undiagnosed_practice  # 연습 경로 — 정책이 학습 밴드로 고른다
         assert not route.applied  # R3 근거 경로가 아니다
         assert reader.calls == []  # 연속이면 선수를 읽지 않는다
-        assert anchored == [_PROBLEM]
+        assert anchor_mastery[1] == []  # 오답 개념 숙달도 묻지 않는다
         assert _CONCEPT in _param_values(fake.statements[2])  # 같은 개념 제한 문장
 
     @pytest.mark.parametrize(
         "previous",
-        [None, R3, R2, TransitionTrigger.POLICY_ADVANCE, TransitionTrigger.POLICY_REPEATED_FAILURE],
+        [None, R2, TransitionTrigger.POLICY_ADVANCE, TransitionTrigger.POLICY_REPEATED_FAILURE],
     )
-    async def test_non_r6_previous_decision_probes(
-        self, anchored: list[uuid.UUID], previous: TransitionTrigger | None
+    async def test_non_wrong_previous_decision_is_a_first_wrong(
+        self,
+        anchored: list[uuid.UUID],
+        anchor_mastery: list[Any],
+        previous: TransitionTrigger | None,
     ) -> None:
-        """직전이 R6가 아니면 첫 R6다 — R3(교정 문항을 원인 미상으로 또 틀림)도 탐침한다(ⓔ).
+        """직전이 오답 결정(R3·R6)이 아니면 연속 첫 오답이다 — 탐침으로 간다.
 
-        "직전 결정이 있기만 하면 연속"으로 접는 뮤테이션을 R3·R2·R1·R5가 각각 잡는다.
+        "직전 결정이 있기만 하면 연속"으로 접는 뮤테이션을 R2·R1·R5가 각각 잡는다(R5 뒤에는 연속
+        안에서 R6가 올 수 없다 — 연속 3회 이상이면 계속 R5다).
         """
         previous_rows = [] if previous is None else [previous]
         _fake, session = _session([_PROBLEM], previous_rows, [(_PROBE_ITEM, 1.2, None, _PRE_A)])
@@ -782,8 +834,62 @@ class TestRouteUndiagnosedWrong:
         assert _ATTEMPT in values  # 빠지는 것은 결정 응답 자신의 행이다
         assert TransitionTrigger.ATTEMPT_SUBMITTED not in values
 
+    @pytest.mark.parametrize("mastery", [0.40, 0.63])
+    async def test_unblocked_anchor_practices_the_same_concept(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
+    ) -> None:
+        """첫 오답인데 오답 개념이 선수 구간이 아니다(≥ 0.4) — 1회 실수를 선수 결손으로 읽지 않는다.
+
+        0.40이 핵심 반례다(선수 경계 자체 — `select_reason_type`도 0.4를 current로 본다).
+        """
+        anchor_mastery[0] = mastery
+        _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_NOT_BLOCKED,
+            concept_id=_CONCEPT,
+            candidate_rows=((_SAME, 3.0, None),),
+        )
+        assert reader.calls == []  # 막히지 않았으면 선수를 읽지도 않는다
+
+    async def test_blocked_anchor_just_below_the_boundary_proceeds(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
+    ) -> None:
+        """0.39 — 선수 경계 **미만**의 반례. `<`→`<=` 뒤바뀜 뮤테이션을 0.40과 함께 가른다."""
+        anchor_mastery[0] = 0.39
+        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+
+    async def test_anchor_mastery_is_read_for_this_learner_and_the_failed_concept(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
+    ) -> None:
+        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        await _route_r6(_undiagnosed(), session, _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)]))
+        assert anchor_mastery[1] == [(_UID, _CONCEPT)]
+
+    async def test_unmeasured_anchor_practices_the_same_concept_and_warns(
+        self,
+        anchored: list[uuid.UUID],
+        anchor_mastery: list[Any],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """오답 직후인데 오답 개념의 숙달이 없다 — 막힘을 세울 근거가 없다(모른다 ≠ 막힘 · 경고 로그)."""
+        anchor_mastery[0] = None
+        _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        with caplog.at_level(logging.WARNING, logger="whymath.l2.learning_state_recommendation"):
+            route = await _route_r6(_undiagnosed(), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.SAME_CONCEPT_ANCHOR_UNMEASURED
+        assert reader.calls == []
+        assert "숙달 측정이 없다" in caplog.text
+
     async def test_probe_reads_direct_prerequisites_of_the_failed_concept(
-        self, anchored: list[uuid.UUID]
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
     ) -> None:
         """ⓑ — 탐침은 오답 개념의 **직접** 선수(깊이 1)만 읽는다. 깊이 뮤테이션을 잡는다."""
         _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
@@ -792,7 +898,7 @@ class TestRouteUndiagnosedWrong:
         assert reader.calls == [(_CONCEPT, 1)]
 
     async def test_probe_route_carries_the_prerequisite_pool(
-        self, anchored: list[uuid.UUID]
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
     ) -> None:
         _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
@@ -803,9 +909,10 @@ class TestRouteUndiagnosedWrong:
             candidate_rows=((_PROBE_ITEM, 1.2, None),),
         )
         assert route.undiagnosed_applied
+        assert not route.undiagnosed_practice  # 탐침은 측정이다 — 요청 목적 그대로
 
     async def test_no_prerequisite_edge_practices_the_same_concept(
-        self, anchored: list[uuid.UUID]
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
     ) -> None:
         """ⓐ — 선수 엣지가 없으면 기본 경로가 아니라 같은 개념(R6 문면 · 사유 unsupported)."""
         _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
@@ -816,32 +923,51 @@ class TestRouteUndiagnosedWrong:
             candidate_rows=((_SAME, 3.0, None),),
         )
 
-    @pytest.mark.parametrize("mastery", [0.71, 0.95])
-    async def test_all_mastered_prerequisites_practice_the_same_concept(
-        self, anchored: list[uuid.UUID], mastery: float
+    @pytest.mark.parametrize("mastery", [0.70, 0.95])
+    async def test_measured_strong_prerequisites_are_refuted(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
     ) -> None:
-        """숙달(> 0.7) 선수는 원인 후보가 아니다 — 전부 숙달이면 같은 개념(사유 refuted).
-
-        0.71이 핵심 반례다(`>`를 빼서 전부 열린 것으로 보는 뮤테이션을 잡는다).
-        """
+        """숙달(≥ 0.7) 선수만 있으면 원인 후보가 선수에 없다 — 같은 개념(사유 refuted)."""
         fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
         route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": mastery}), session, reader)
         assert route is not None
         assert route.outcome is lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED
-        assert len(fake.statements) == 3  # 앵커 · 직전 결정 · 같은 개념 — 선수 후보는 묻지 않는다
+        assert len(fake.statements) == 3  # 앵커 · 직전 결정 · 같은 개념 — 탐침 후보는 묻지 않는다
 
-    async def test_boundary_mastery_is_still_open(self, anchored: list[uuid.UUID]) -> None:
-        """0.70은 숙달이 아니다(학습 구간 상한 — `select_reason_type`). `>`→`>=` 뮤테이션의 반례."""
-        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
-        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
-        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": 0.70}), session, reader)
-        assert route is not None
-        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
-
-    async def test_mastered_prerequisites_are_left_out_of_the_probe_pool(
-        self, anchored: list[uuid.UUID]
+    @pytest.mark.parametrize("mastery", [0.69, 0.15])
+    async def test_measured_weak_prerequisite_is_a_known_deficit(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
     ) -> None:
+        """이미 측정된 약점(< 0.7) — 진단하지 않고 오답 개념으로 제한한다(EOS-124 (가)가 잇는다).
+
+        0.69가 핵심 반례다(`<`를 `<=`로 바꾸거나 경계를 0.4로 옮기는 뮤테이션을 가른다).
+        """
+        fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": mastery}), session, reader)
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT,
+            concept_id=_CONCEPT,
+            candidate_rows=((_SAME, 3.0, None),),
+        )
+        assert route.undiagnosed_practice
+        assert _CONCEPT in _param_values(fake.statements[2])  # 탐침 후보가 아니라 같은 개념 문장
+
+    async def test_known_deficit_takes_precedence_over_probing(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
+    ) -> None:
+        """아는 결손이 먼저다 — 미측정 선수가 함께 있어도 탐침하지 않는다(판정문 §3 ⓑ)."""
+        _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": 0.3}), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT
+
+    async def test_probe_pool_holds_only_unmeasured_prerequisites(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
+    ) -> None:
+        """진단은 모르는 것을 잰다 — 숙달된 선수는 탐침 후보 문장에 들어가지 않는다."""
         fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
         await _route_r6(_undiagnosed(mastery={"UC-PRE-B": 0.9}), session, reader)
@@ -849,18 +975,18 @@ class TestRouteUndiagnosedWrong:
         assert _PRE_A in values
         assert _PRE_B not in values
 
-    async def test_unmeasured_and_codeless_prerequisites_are_open(
-        self, anchored: list[uuid.UUID]
+    async def test_codeless_prerequisite_is_probed_as_unmeasured(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
     ) -> None:
-        """모른다 ≠ 숙달 — 측정 없는 선수와 코드 없는 선수는 탐침 대상이다."""
         fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
-        reader = _Reader(rows=[_prereq(None, _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
-        await _route_r6(_undiagnosed(mastery={}), session, reader)
-        values = _param_values(fake.statements[2])
-        assert {_PRE_A, _PRE_B} <= values
+        reader = _Reader(rows=[_prereq(None, _PRE_A)])
+        route = await _route_r6(_undiagnosed(mastery={}), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+        assert _PRE_A in _param_values(fake.statements[2])
 
-    async def test_open_prerequisites_without_items_practice_the_same_concept(
-        self, anchored: list[uuid.UUID]
+    async def test_unmeasured_prerequisites_without_items_practice_the_same_concept(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
     ) -> None:
         _fake, session = _session([_PROBLEM], [], [], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
@@ -872,7 +998,10 @@ class TestRouteUndiagnosedWrong:
         )
 
     async def test_graph_timeout_practices_the_same_concept_and_logs_the_type(
-        self, anchored: list[uuid.UUID], caplog: pytest.LogCaptureFixture
+        self,
+        anchored: list[uuid.UUID],
+        anchor_mastery: list[Any],
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """ⓕ — 시간 예산 초과는 추천을 실패시키지 않는다. 예외 타입명을 남긴다(침묵 실패 금지)."""
         _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
@@ -930,6 +1059,7 @@ _ANCHOR = uuid.uuid4()
 class _R6Spies:
     loaded_default_pool: int = 0
     intent_calls: int = 0
+    band_calls: int = 0
     route_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -972,12 +1102,32 @@ def r6_policy_env(
         result: PolicyIntent = await real_intent(*args, **kwargs)
         return result
 
+    real_band = policy_module.learning_band_weight
+
+    def _band(theta: float, item: Any) -> float:
+        spies.band_calls += 1
+        return real_band(theta, item)
+
     monkeypatch.setattr(policy_module, "load_attempt_history_state", _history)
     monkeypatch.setattr(policy_module, "route_by_learning_state", _route_stub)
     monkeypatch.setattr(policy_module, "load_candidate_rows", _default_pool)
     monkeypatch.setattr(policy_module, "collect_recommendation_reason", _anchor_reason)
     monkeypatch.setattr(policy_module, "resolve_policy_intent", _intent)
+    monkeypatch.setattr(policy_module, "learning_band_weight", _band)
     return spies, routes, anchor_reasons
+
+
+# 연습 경로(탐침 제외) 8종 — 구현의 집합을 import하지 않고 리터럴로 적는다(자기참조 방지).
+_PRACTICE_OUTCOMES = [
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_NOT_BLOCKED,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_ANCHOR_UNMEASURED,
+    lsr.StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNAVAILABLE,
+    lsr.StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT,
+]
 
 
 def _probe_route() -> lsr.StateRoute:
@@ -997,7 +1147,7 @@ class TestUndiagnosedPolicySeam:
         self,
         r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
     ) -> None:
-        """후보는 R6 경로에서, 이름표는 기본 연산(숙달 파생 + EOS-124)에서 — 판정문 §2-2 근거 3."""
+        """후보는 R6 경로에서, 이름표는 기본 연산(숙달 파생 + EOS-124)에서 — 판정문 §2-2 근거 4."""
         spies, routes, anchor_reasons = r6_policy_env
         routes.append(_probe_route())
         anchor_reasons.append(build_reason(concept_id=_PRE_A, mastery=None, confidence=None))
@@ -1010,8 +1160,88 @@ class TestUndiagnosedPolicySeam:
         assert outcome.intent_resolution is IntentResolution.DIRECT
         assert spies.intent_calls == 1  # EOS-124 해소가 돈다(R3 경로와 다르다)
         assert outcome.band_calibrated is None  # 요청 목적(diagnosis) 그대로 — 탐침은 측정이다
+        assert spies.band_calls == 0
         assert outcome.policy_version == POLICY_VERSION_CAT_STATE_UNDIAGNOSED
         assert outcome.learning_state_directive is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+
+    def test_route_sets_are_frozen_by_literal(self) -> None:
+        """집행 집합(후보 제한)과 연습 집합(학습 밴드)의 경계 — 새 R6 결과값이 생기면 여기서 밴드를
+        정하게 만든다. 탐침만 '제한하되 연습이 아니다'."""
+        applied = {
+            o for o in lsr.StateDirectiveOutcome if lsr.StateRoute(outcome=o).undiagnosed_applied
+        }
+        practice = {
+            o for o in lsr.StateDirectiveOutcome if lsr.StateRoute(outcome=o).undiagnosed_practice
+        }
+        assert practice == set(_PRACTICE_OUTCOMES)
+        assert applied == practice | {lsr.StateDirectiveOutcome.PREREQUISITE_PROBE}
+
+    @pytest.mark.parametrize("outcome_kind", _PRACTICE_OUTCOMES)
+    async def test_practice_routes_select_with_the_learning_band(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+        outcome_kind: lsr.StateDirectiveOutcome,
+    ) -> None:
+        """연습 경로는 요청 목적(diagnosis)과 무관하게 학습 밴드로 고른다 — 오답 직후 연습에 정보량
+        최대(정답 확률 ~50% 지향)를 쓰지 않는다(판정문 §4 · R3 교정과 같은 규칙)."""
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(
+            lsr.StateRoute(
+                outcome=outcome_kind, concept_id=_CONCEPT, candidate_rows=((_SAME, 3.0, None),)
+            )
+        )
+        anchor_reasons.append(build_reason(concept_id=_CONCEPT, mastery=0.55, confidence=0.6))
+        outcome = await self._call()
+        assert outcome.problem_id == _SAME
+        assert spies.loaded_default_pool == 0
+        assert spies.band_calls == 1
+        assert outcome.band_calibrated is False
+        assert outcome.policy_version == POLICY_VERSION_CAT_STATE_UNDIAGNOSED
+        assert outcome.learning_state_directive is outcome_kind
+
+    @pytest.mark.parametrize(
+        ("route_outcome", "purpose"),
+        [
+            (lsr.StateDirectiveOutcome.SAME_CONCEPT_REPEAT, "learning"),
+            (lsr.StateDirectiveOutcome.PREREQUISITE_PROBE, "diagnosis"),
+            (None, "diagnosis"),
+        ],
+    )
+    async def test_reselection_keeps_the_first_selection_context(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+        monkeypatch: pytest.MonkeyPatch,
+        route_outcome: lsr.StateDirectiveOutcome | None,
+        purpose: str,
+    ) -> None:
+        """EOS-124 정렬 재선택도 1차 선택과 **같은 요청 상황**으로 고른다 — 연습 경로가 학습 밴드를
+        강제했으면 선수로 내려가는 재선택도 학습 밴드다. 지시가 없으면 원래 요청 그대로(대조군)."""
+        _spies, routes, anchor_reasons = r6_policy_env
+        routes.append(
+            None
+            if route_outcome is None
+            else lsr.StateRoute(
+                outcome=route_outcome, concept_id=_CONCEPT, candidate_rows=((_SAME, 3.0, None),)
+            )
+        )
+        weak = build_reason(concept_id=_CONCEPT, mastery=0.15, confidence=0.6)
+        anchor_reasons.append(weak)
+        purposes: list[str] = []
+
+        async def _reselecting(*_a: Any, **_k: Any) -> PolicyIntent:
+            return PolicyIntent(
+                reason=weak, resolution=IntentResolution.SERVED, reselect_groups=((_PRE_A,),)
+            )
+
+        async def _select_aligned(_self: Any, _groups: Any, **kwargs: Any) -> None:
+            purposes.append(kwargs["learning_context"].purpose)
+            return None
+
+        monkeypatch.setattr(policy_module, "resolve_policy_intent", _reselecting)
+        monkeypatch.setattr(CatRecommendationPolicy, "_select_aligned", _select_aligned)
+        outcome = await self._call()
+        assert purposes == [purpose]
+        assert outcome.intent_resolution is IntentResolution.TARGET_UNAVAILABLE
 
     async def test_policy_injects_its_own_budgeted_prerequisite_reader(
         self,
@@ -1029,11 +1259,15 @@ class TestUndiagnosedPolicySeam:
         self,
         r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
     ) -> None:
-        """부가 안전장치 — R6 경로의 앵커가 전진 구간이어도 전진하지 않는다(해소 `refuted`)."""
+        """부가 안전장치 — R6 경로의 앵커가 전진 구간이어도 전진하지 않는다(해소 `state_withheld`).
+
+        닿는 경로는 막히지 않은 오답이다: 사전 숙달 0.95인 학생은 오답 1회로 약 0.73까지만
+        내려가 막힘 문턱(0.4) 위에 남고, 같은 개념 연습의 앵커가 전진 구간이 된다. 막은 주체는
+        측정이 아니라 R6 결정이므로 `refuted`(측정 반증)와 구별한다."""
         spies, routes, anchor_reasons = r6_policy_env
         routes.append(
             lsr.StateRoute(
-                outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+                outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_NOT_BLOCKED,
                 concept_id=_ANCHOR,
                 candidate_rows=((_SAME, 3.0, None),),
             )
@@ -1046,7 +1280,8 @@ class TestUndiagnosedPolicySeam:
         assert outcome.reason.type is ReasonType.CURRENT_CONCEPT
         assert outcome.reason.mastery == 0.73  # 실측은 그대로 — 강등은 행위만 바꾼다
         assert outcome.target_concept == _ANCHOR
-        assert outcome.intent_resolution is IntentResolution.REFUTED
+        assert outcome.intent_resolution is IntentResolution.STATE_WITHHELD
+        assert outcome.band_calibrated is False  # 연습 경로 — 학습 밴드
 
     async def test_advance_guard_is_confined_to_the_r6_path(
         self,
