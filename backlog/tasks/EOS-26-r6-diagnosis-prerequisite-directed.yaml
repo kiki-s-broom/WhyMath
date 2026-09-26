@@ -6,8 +6,8 @@ stage: S3
 subject: math
 layer: backend
 status: todo
-priority: 3
-eos_priority: P1
+priority: 1
+eos_priority: P0
 owner: claude
 depends_on:
   - EOS-139-undiagnosed-wrong-recommendation-criterion
@@ -20,5 +20,5 @@ paths:
   - tests/backend/api/test_e2e_three_consecutive_loops.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
 session: null
-notes: "출처: EOS-139 실측(2026-09-25). Kiki가 (가)를 고른 뒤 방해 개념 프로브로 전제가 픽스처 의존임이 드러났고, Kiki가 두 번째 질문에서 '(가) 유지 + 정직 판정'을 골라 서빙 변경을 이 태스크로 분리했다(세션 https://claude.ai/code/session_01E3jbbaeprQQfa8rxLaFKTF). EOS-124(정책 축↔선택 축 불일치)와 겹치지 않는다 — 이 공백에서는 두 축이 서로 일치한 채(target=무관 개념 · 문항=무관 개념) 무관 개념으로 간다. 부수 관측: 무관 개념 진단 문항까지 틀리면 action=practice_prerequisite · reason=prerequisite_gap · target=그 무관 개념이 나온다 — reason 종류는 문항 개념의 숙달 구간(recommendation_contract.select_reason_type · < 0.4)에서 나오고 선수 그래프와 무관하기 때문이다(계획서 §8 설계). ③ⓐ 폴백 판정 때 이 이름표 의미를 함께 본다. 분류 LOOP."
-updated: 2026-09-25
+notes: "출처: EOS-139 실측(2026-09-25). Kiki가 (가)를 고른 뒤 방해 개념 프로브로 전제가 픽스처 의존임이 드러났고, Kiki가 두 번째 질문에서 '(가) 유지 + 정직 판정'을 골라 서빙 변경을 이 태스크로 분리했다(세션 https://claude.ai/code/session_01E3jbbaeprQQfa8rxLaFKTF). EOS-124(정책 축↔선택 축 불일치)와 겹치지 않는다 — 이 공백에서는 두 축이 서로 일치한 채(target=무관 개념 · 문항=무관 개념) 무관 개념으로 간다. 부수 관측: 무관 개념 진단 문항까지 틀리면 action=practice_prerequisite · reason=prerequisite_gap · target=그 무관 개념이 나온다 — reason 종류는 문항 개념의 숙달 구간(recommendation_contract.select_reason_type · < 0.4)에서 나오고 선수 그래프와 무관하기 때문이다(계획서 §8 설계). ③ⓐ 폴백 판정 때 이 이름표 의미를 함께 본다. 분류 LOOP.\n\n[정정 2026-09-26] priority 3 → 1: Kiki 승인 2026-09-26(권고 승인) — 등급 상향 P1·priority 3 → P0·priority 1. 근거: 이 태스크는 Phase 2 Gate 2 PASS를 막는 유일한 남은 기능 결함이다(2026-09-25 2차 재판정 미충족 1축 = general 오답 Loop 1 '보정', #1327 실측 DIAGNOSIS_PROBE 선수지향=FAIL). 3차 재판정은 이 태스크가 done이 된 뒤에야 착수 후보가 되고(PR #1321에서 그쪽 depends_on에 부착), 그 판정이 진입 게이트의 증거라 Phase 3 착수 태스크 14건이 여기에 막혀 있다. eos_priority P0 정의(\"없으면 12월 검증(G0~G5)이 성립하지 않는다\")에 해당한다. P1·priority 3이면 착수 후보 순위에서 뒤로 밀려 임계 경로가 늦어진다.\neos_priority P1 → P0: Kiki 승인 2026-09-26(권고 승인) — 등급 상향 P1·priority 3 → P0·priority 1. 근거: 이 태스크는 Phase 2 Gate 2 PASS를 막는 유일한 남은 기능 결함이다(2026-09-25 2차 재판정 미충족 1축 = general 오답 Loop 1 '보정', #1327 실측 DIAGNOSIS_PROBE 선수지향=FAIL). 3차 재판정은 이 태스크가 done이 된 뒤에야 착수 후보가 되고(PR #1321에서 그쪽 depends_on에 부착), 그 판정이 진입 게이트의 증거라 Phase 3 착수 태스크 14건이 여기에 막혀 있다. eos_priority P0 정의(\"없으면 12월 검증(G0~G5)이 성립하지 않는다\")에 해당한다. P1·priority 3이면 착수 후보 순위에서 뒤로 밀려 임계 경로가 늦어진다."
+updated: 2026-09-26
