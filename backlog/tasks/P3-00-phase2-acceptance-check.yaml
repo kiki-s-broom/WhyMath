@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: cancelled
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,5 +19,5 @@ acceptance:
 artifacts: []
 paths: []
 session: null
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [00]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-22(done·Gate 2 최종 판정 FAIL)는 *판정*이고 EOS-21(todo·주간 게이트 하네스 CI 미배선)은 *배선*이다. 이 회차가 요구하는 '10조건·KPI 5종 main 재실측 + 미충족분 선행 등재'는 둘 중 어느 것도 아니다 — 신규. 다만 EOS-21 이 미배선으로 지목한 하네스 3종이 재실측의 입력이므로 실무상 선행이다."
-updated: 2026-09-22
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [00]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-22(done·Gate 2 최종 판정 FAIL)는 *판정*이고 EOS-21(todo·주간 게이트 하네스 CI 미배선)은 *배선*이다. 이 회차가 요구하는 '10조건·KPI 5종 main 재실측 + 미충족분 선행 등재'는 둘 중 어느 것도 아니다 — 신규. 다만 EOS-21 이 미배선으로 지목한 하네스 3종이 재실측의 입력이므로 실무상 선행이다.\n\n[취소 2026-09-25] Kiki 결정 2026-09-25 — Phase 2 Gate 2 3차 재판정 EOS-141-phase2-gate2-third-rejudgment에 흡수. 지시문 [02] P3-00b의 시작 조건은 P3-00a 완료뿐이고 내용도 FAIL 상태에서 미충족분을 등재하도록 쓰였는데, 대장은 진입 게이트 G-p3-entry-gate2-pass를 걸어 이 태스크가 자기가 증거를 대야 할 게이트에 막혔다(순환 — 사고 대장 gate-resolution-path-unlinked 1회차). 그 순환을 풀려고 등재한 재판정 태스크(EOS-130 → 후속 EOS-141)가 이 태스크의 acceptance ①~③을 겹쳐 가져, 게이트가 열린 뒤 이 태스크를 돌리면 같은 판정을 두 번 하게 된다. 요구 전부(①~④ + 누락돼 있던 지시문 [02] 3번 SCENARIO CI 확인)는 EOS-141 acceptance ⑧~⑪로 옮겼고, 이 태스크에 의존하던 P3-01은 EOS-141로 재지정했다."
+updated: 2026-09-25
