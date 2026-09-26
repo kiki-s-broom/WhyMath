@@ -11,7 +11,7 @@ eos_priority: P1
 owner: claude
 depends_on:
   - EOS-128-phase3-plan-backlog-conversion
-  - P3-00-phase2-acceptance-check
+  - EOS-141-phase2-gate2-third-rejudgment
 requires_gates:
   - G-p3-entry-gate2-pass
 acceptance:
@@ -19,5 +19,5 @@ acceptance:
 artifacts: []
 paths: []
 session: null
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [01]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-52(done·앵커 후보 8단원 자산 실사)·EOS-56(done·앵커 세트 1급 등록)이 인접 자산을 이미 가진다. 그러나 ⓐ앵커 세트는 8단원이고 대표 과정은 1개 과정이라 분모가 다르며 ⓑ 9항 명세 데이터 파일과 로더 스키마 검증은 내가 찾은 방법으로는 0건이다. 신규로 등재하되 EOS-52 의 실측 표와 EOS-56 의 성취기준 코드셋을 입력으로 승계한다(새 ID 체계를 만들지 않는다)."
-updated: 2026-09-22
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [01]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] EOS-52(done·앵커 후보 8단원 자산 실사)·EOS-56(done·앵커 세트 1급 등록)이 인접 자산을 이미 가진다. 그러나 ⓐ앵커 세트는 8단원이고 대표 과정은 1개 과정이라 분모가 다르며 ⓑ 9항 명세 데이터 파일과 로더 스키마 검증은 내가 찾은 방법으로는 0건이다. 신규로 등재하되 EOS-52 의 실측 표와 EOS-56 의 성취기준 코드셋을 입력으로 승계한다(새 ID 체계를 만들지 않는다).\n\n[정정 2026-09-25] depends_on 제거 1건: P3-00 취소(Kiki 결정 2026-09-25 — P3-00b를 Phase 2 Gate 2 3차 재판정 EOS-141에 흡수)에 따른 의존 재지정. 취소된 태스크를 depends_on에 남기면 이 태스크가 deps_cancelled로 영구 제외된다(selector.cancelled_dependencies). Phase 2 인수 점검 산출은 EOS-141 판정문이 낸다. EOS-130이 아니라 EOS-141인 이유: EOS-130은 PR #1323에서 2차 판정(FAIL)을 마쳤고, 진입 게이트를 열 수 있는 판정은 3차다."
+updated: 2026-09-25
