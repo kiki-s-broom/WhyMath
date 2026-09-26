@@ -1,6 +1,7 @@
-"""EOS-24 — 추천이 학습 상태 머신의 결정을 **집행**하는가 (hermetic · DB 0).
+"""EOS-24 · EOS-26 — 추천이 학습 상태 머신의 결정을 **집행**하는가 (hermetic · DB 0).
 
-설계 정본: `docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md`.
+설계 정본: `docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md`(R3) ·
+`docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md`(R6 — 파일 끝 ⑤~⑦절).
 
 이 파일이 지키는 넷:
 
@@ -21,6 +22,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -33,7 +36,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.l2 import learning_state_recommendation as lsr
 from whymath_backend.l2 import recommendation_policy as policy_module
 from whymath_backend.l2.learner_state import LearnerState, LearningStateSnapshot
-from whymath_backend.l2.next_problem_selection import AttemptHistoryState
+from whymath_backend.l2.next_problem_selection import CANDIDATE_POOL_SIZE, AttemptHistoryState
+from whymath_backend.l2.prerequisite_recommendation import PrerequisiteRow
 from whymath_backend.l2.recommendation_contract import (
     LearningContext,
     ReasonBasis,
@@ -48,8 +52,14 @@ from whymath_backend.l2.recommendation_contract import (
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
     POLICY_VERSION_CAT_STATE_REMEDIATION,
+    POLICY_VERSION_CAT_STATE_UNDIAGNOSED,
 )
-from whymath_backend.l2.recommendation_policy import CatRecommendationPolicy
+from whymath_backend.l2.recommendation_policy import (
+    CatRecommendationPolicy,
+    ConceptGraphBudget,
+    IntentResolution,
+    PolicyIntent,
+)
 from whymath_backend.schema.learning_state import LearningState, TransitionTrigger
 
 _UID = uuid.uuid4()
@@ -138,9 +148,19 @@ def anchored(monkeypatch: pytest.MonkeyPatch) -> list[uuid.UUID]:
     return seen
 
 
+async def _no_prerequisite_read(concept_id: uuid.UUID, max_depth: int) -> list[Any]:
+    """R3 경로는 선수를 읽지 않는다 — 읽으면 그 자체가 결함이다(EOS-26 이후 이음매 공용 인자)."""
+    raise AssertionError(f"R3 경로가 선수를 읽었다: concept={concept_id} depth={max_depth}")
+
+
 async def _route(learner_state: LearnerState, session: AsyncSession) -> lsr.StateRoute | None:
     return await lsr.route_by_learning_state(
-        session, learner_state, theta=-1.0, attempted_ids=set(), excluded_ids=set()
+        session,
+        learner_state,
+        theta=-1.0,
+        attempted_ids=set(),
+        excluded_ids=set(),
+        read_prerequisites=_no_prerequisite_read,
     )
 
 
@@ -576,3 +596,536 @@ class TestPolicySeam:
         assert outcome.policy_version == POLICY_VERSION_CAT
         assert outcome.learning_state_directive is None
         assert spies.remediation_reason_calls == 0
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EOS-26 — R6(원인 미상 오답) 집행
+#
+# ⑤ 무엇을 지시로 읽는가(R2 제외 — 국면·트리거 둘 다) ⑥ 판정 트리(연속 · 탐침 · 폴백 4사유)와
+# 선택 축(직접 선수 · 숙달 제외 · 병합 정렬) ⑦ 정책 이음매(후보 제한 · 정책 버전 · 전진 금지 ·
+# 예산을 건 선수 읽기). 설계 정본은 EOS-26 판정문 §2~§4. 숙달 경계는 상수를 import하지 않고
+# 리터럴(0.70 · 0.71)로 밟는다(MISC-30 자기참조 교훈 — 파일 머리 ②와 같은 규율).
+# ══════════════════════════════════════════════════════════════════════════
+R6 = TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED
+R2 = TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE
+_PRE_A = uuid.uuid4()
+_PRE_B = uuid.uuid4()
+_SAME = uuid.uuid4()  # 같은 개념(오답 개념) 문항
+_PROBE_ITEM = uuid.uuid4()  # 선수 문항
+
+
+def _undiagnosed(
+    *,
+    trigger: TransitionTrigger = R6,
+    state: LearningState = LearningState.PRACTICING,
+    attempt_id: uuid.UUID | None = _ATTEMPT,
+    mastery: dict[str, float] | None = None,
+) -> LearnerState:
+    snapshot = LearningStateSnapshot(
+        state=state,
+        trigger=trigger,
+        rule_id="R6-wrong-undiagnosed" if trigger is R6 else "R2-correct-low-confidence",
+        attempt_id=attempt_id,
+        assessed_from=LearningState.LEARNING,
+    )
+    return _state(snapshot).model_copy(update={"mastery": mastery or {}})
+
+
+def _prereq(code: str | None, concept_id: uuid.UUID, *, depth: int = 1) -> PrerequisiteRow:
+    return PrerequisiteRow(
+        concept_id=concept_id, concept_code=code, name_ko=None, edge_strength=None, depth=depth
+    )
+
+
+@dataclass
+class _Reader:
+    """주입되는 선수 읽기 함수의 대역 — 호출(개념·깊이)을 기록하고 행을 주거나 예외를 낸다."""
+
+    rows: list[PrerequisiteRow] = field(default_factory=list)
+    raises: BaseException | None = None
+    calls: list[tuple[uuid.UUID, int]] = field(default_factory=list)
+
+    async def __call__(self, concept_id: uuid.UUID, max_depth: int) -> list[PrerequisiteRow]:
+        self.calls.append((concept_id, max_depth))
+        if self.raises is not None:
+            raise self.raises
+        return list(self.rows)
+
+
+async def _route_r6(
+    learner_state: LearnerState, session: AsyncSession, reader: _Reader
+) -> lsr.StateRoute | None:
+    return await lsr.route_by_learning_state(
+        session,
+        learner_state,
+        theta=-4.0,
+        attempted_ids=set(),
+        excluded_ids=set(),
+        read_prerequisites=reader,
+    )
+
+
+def _param_values(stmt: Any) -> set[Any]:
+    """컴파일 파라미터를 평평하게 — `IN` 목록 파라미터(리스트 값)도 원소로 펼친다."""
+    values: set[Any] = set()
+    for value in stmt.compile(dialect=postgresql.dialect()).params.values():
+        if isinstance(value, list | tuple):
+            values.update(value)
+        else:
+            values.add(value)
+    return values
+
+
+class TestReadUndiagnosedWrongDirective:
+    def test_r6_practicing_is_a_directive(self) -> None:
+        directive = lsr.read_undiagnosed_wrong_directive(_undiagnosed())
+        assert directive == lsr.UndiagnosedWrongDirective(attempt_id=_ATTEMPT)
+
+    def test_r2_practicing_is_not_a_directive(self) -> None:
+        """ⓓ — **국면만 보는** 뮤테이션의 반례. 확신도 미보고 정답(R2)마다 탐침이 나가면 안 된다."""
+        assert lsr.read_undiagnosed_wrong_directive(_undiagnosed(trigger=R2)) is None
+
+    def test_r6_trigger_outside_practicing_is_not_a_directive(self) -> None:
+        """**트리거만 보는** 뮤테이션의 반례 — R6 뒤 국면이 바뀌었으면 지시가 아니다."""
+        changed = _undiagnosed(state=LearningState.LEARNING)
+        assert lsr.read_undiagnosed_wrong_directive(changed) is None
+
+    def test_unassembled_or_empty_ledger_is_not_a_directive(self) -> None:
+        assert lsr.read_undiagnosed_wrong_directive(_state(None)) is None
+        empty = _state(LearningStateSnapshot(state=LearningState.NEW))
+        assert lsr.read_undiagnosed_wrong_directive(empty) is None
+
+    def test_r3_remediating_is_not_an_undiagnosed_directive(self) -> None:
+        assert lsr.read_undiagnosed_wrong_directive(_remediating()) is None
+
+    def test_policy_decision_triggers_cover_every_policy_trigger(self) -> None:
+        """연속 판정이 보는 '정책 결정' 집합 — 새 `POLICY_*` 트리거가 생기면 여기서 드러난다."""
+        derived = frozenset(t for t in TransitionTrigger if t.name.startswith("POLICY_"))
+        assert lsr.POLICY_DECISION_TRIGGERS == derived
+        assert TransitionTrigger.ATTEMPT_SUBMITTED not in lsr.POLICY_DECISION_TRIGGERS
+
+
+class TestRouteUndiagnosedWrong:
+    async def test_r2_issues_no_query_and_reads_no_prerequisite(self) -> None:
+        fake, session = _session()
+        reader = _Reader()
+        assert await _route_r6(_undiagnosed(trigger=R2), session, reader) is None
+        assert fake.statements == []
+        assert reader.calls == []
+
+    async def test_missing_attempt_is_anchor_unresolved_without_query(self) -> None:
+        fake, session = _session()
+        reader = _Reader()
+        route = await _route_r6(_undiagnosed(attempt_id=None), session, reader)
+        assert route == lsr.StateRoute(outcome=lsr.StateDirectiveOutcome.ANCHOR_UNRESOLVED)
+        assert fake.statements == []
+        assert reader.calls == []
+
+    async def test_attempt_not_found_is_anchor_unresolved(self, anchored: list[uuid.UUID]) -> None:
+        fake, session = _session([])
+        reader = _Reader()
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route == lsr.StateRoute(outcome=lsr.StateDirectiveOutcome.ANCHOR_UNRESOLVED)
+        assert len(fake.statements) == 1  # 직전 결정을 묻지 않는다(앵커가 먼저다)
+        assert anchored == []
+        assert reader.calls == []
+
+    async def test_repeat_restricts_to_the_concept_just_failed(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        """ⓒ — 직전 정책 결정도 R6면 탐침하지 않고 방금 틀린 개념으로 간다(R6 문면 · ⓑ의 근원)."""
+        fake, session = _session([_PROBLEM], [R6], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+            concept_id=_CONCEPT,
+            candidate_rows=((_SAME, 3.0, None),),
+        )
+        assert route.undiagnosed_applied
+        assert not route.applied  # R3 근거 경로가 아니다
+        assert reader.calls == []  # 연속이면 선수를 읽지 않는다
+        assert anchored == [_PROBLEM]
+        assert _CONCEPT in _param_values(fake.statements[2])  # 같은 개념 제한 문장
+
+    @pytest.mark.parametrize(
+        "previous",
+        [None, R3, R2, TransitionTrigger.POLICY_ADVANCE, TransitionTrigger.POLICY_REPEATED_FAILURE],
+    )
+    async def test_non_r6_previous_decision_probes(
+        self, anchored: list[uuid.UUID], previous: TransitionTrigger | None
+    ) -> None:
+        """직전이 R6가 아니면 첫 R6다 — R3(교정 문항을 원인 미상으로 또 틀림)도 탐침한다(ⓔ).
+
+        "직전 결정이 있기만 하면 연속"으로 접는 뮤테이션을 R3·R2·R1·R5가 각각 잡는다.
+        """
+        previous_rows = [] if previous is None else [previous]
+        _fake, session = _session([_PROBLEM], previous_rows, [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+
+    async def test_previous_decision_query_is_scoped_and_excludes_this_attempt(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        """연속 판정 조회 — 이 학생 · 결정 응답 **밖** · 정책 결정만 · 최신순."""
+        fake, session = _session([_PROBLEM], [R6], [])
+        await _route_r6(_undiagnosed(), session, _Reader())
+        stmt = fake.statements[1]
+        sql = str(stmt.compile(dialect=postgresql.dialect()))
+        assert "learning_state_transition.user_id =" in sql
+        assert "learning_state_transition.attempt_id !=" in sql
+        assert "learning_state_transition.trigger IN" in sql
+        assert "ORDER BY learning_state_transition.occurred_at DESC" in sql
+        values = _param_values(stmt)
+        assert _ATTEMPT in values  # 빠지는 것은 결정 응답 자신의 행이다
+        assert TransitionTrigger.ATTEMPT_SUBMITTED not in values
+
+    async def test_probe_reads_direct_prerequisites_of_the_failed_concept(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        """ⓑ — 탐침은 오답 개념의 **직접** 선수(깊이 1)만 읽는다. 깊이 뮤테이션을 잡는다."""
+        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        await _route_r6(_undiagnosed(), session, reader)
+        assert reader.calls == [(_CONCEPT, 1)]
+
+    async def test_probe_route_carries_the_prerequisite_pool(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.PREREQUISITE_PROBE,
+            concept_id=_CONCEPT,
+            candidate_rows=((_PROBE_ITEM, 1.2, None),),
+        )
+        assert route.undiagnosed_applied
+
+    async def test_no_prerequisite_edge_practices_the_same_concept(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        """ⓐ — 선수 엣지가 없으면 기본 경로가 아니라 같은 개념(R6 문면 · 사유 unsupported)."""
+        _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        route = await _route_r6(_undiagnosed(), session, _Reader(rows=[]))
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED,
+            concept_id=_CONCEPT,
+            candidate_rows=((_SAME, 3.0, None),),
+        )
+
+    @pytest.mark.parametrize("mastery", [0.71, 0.95])
+    async def test_all_mastered_prerequisites_practice_the_same_concept(
+        self, anchored: list[uuid.UUID], mastery: float
+    ) -> None:
+        """숙달(> 0.7) 선수는 원인 후보가 아니다 — 전부 숙달이면 같은 개념(사유 refuted).
+
+        0.71이 핵심 반례다(`>`를 빼서 전부 열린 것으로 보는 뮤테이션을 잡는다).
+        """
+        fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": mastery}), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED
+        assert len(fake.statements) == 3  # 앵커 · 직전 결정 · 같은 개념 — 선수 후보는 묻지 않는다
+
+    async def test_boundary_mastery_is_still_open(self, anchored: list[uuid.UUID]) -> None:
+        """0.70은 숙달이 아니다(학습 구간 상한 — `select_reason_type`). `>`→`>=` 뮤테이션의 반례."""
+        _fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": 0.70}), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+
+    async def test_mastered_prerequisites_are_left_out_of_the_probe_pool(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
+        await _route_r6(_undiagnosed(mastery={"UC-PRE-B": 0.9}), session, reader)
+        values = _param_values(fake.statements[2])
+        assert _PRE_A in values
+        assert _PRE_B not in values
+
+    async def test_unmeasured_and_codeless_prerequisites_are_open(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        """모른다 ≠ 숙달 — 측정 없는 선수와 코드 없는 선수는 탐침 대상이다."""
+        fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_A)])
+        reader = _Reader(rows=[_prereq(None, _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
+        await _route_r6(_undiagnosed(mastery={}), session, reader)
+        values = _param_values(fake.statements[2])
+        assert {_PRE_A, _PRE_B} <= values
+
+    async def test_open_prerequisites_without_items_practice_the_same_concept(
+        self, anchored: list[uuid.UUID]
+    ) -> None:
+        _fake, session = _session([_PROBLEM], [], [], [(_SAME, 3.0, None)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
+        route = await _route_r6(_undiagnosed(), session, reader)
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNAVAILABLE,
+            concept_id=_CONCEPT,
+            candidate_rows=((_SAME, 3.0, None),),
+        )
+
+    async def test_graph_timeout_practices_the_same_concept_and_logs_the_type(
+        self, anchored: list[uuid.UUID], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """ⓕ — 시간 예산 초과는 추천을 실패시키지 않는다. 예외 타입명을 남긴다(침묵 실패 금지)."""
+        _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
+        reader = _Reader(raises=TimeoutError())
+        with caplog.at_level(logging.WARNING, logger="whymath.l2.learning_state_recommendation"):
+            route = await _route_r6(_undiagnosed(), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT
+        assert "TimeoutError" in caplog.text
+
+    async def test_same_concept_without_items_falls_back(self, anchored: list[uuid.UUID]) -> None:
+        """같은 개념에도 미시도 문항이 없으면 제한하지 못한 것이다 — 기본 경로(집행 아님)."""
+        _fake, session = _session([_PROBLEM], [R6], [])
+        route = await _route_r6(_undiagnosed(), session, _Reader())
+        assert route == lsr.StateRoute(
+            outcome=lsr.StateDirectiveOutcome.NO_CANDIDATE_IN_CONCEPT, concept_id=_CONCEPT
+        )
+        assert not route.undiagnosed_applied
+        assert not route.applied
+
+
+class TestProbeCandidates:
+    """탐침 후보 병합 — 기본 후보 풀과 같은 키(|b−θ| → problem_id)로 정렬 · 중복 제거 · 상한."""
+
+    def test_dedups_and_sorts_like_the_default_pool(self) -> None:
+        a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        rows = [
+            (a, 2.0, None, _PRE_A),  # b = -1.0 → |b−θ| 3.0
+            (b, 1.2, None, _PRE_A),  # b = -1.8 → 2.2
+            (c, 5.0, -3.0, _PRE_B),  # 보정 b 우선 = -3.0 → 1.0
+            (b, 1.2, None, _PRE_B),  # 같은 문항이 두 선수의 PRIMARY — 한 번만
+        ]
+        got = lsr._probe_candidates(rows, -4.0)
+        assert [pid for pid, _d, _b in got] == [c, b, a]
+
+    def test_ties_break_by_problem_id(self) -> None:
+        low, high = sorted((uuid.uuid4(), uuid.uuid4()), key=str)
+        got = lsr._probe_candidates([(high, 1.5, None, _PRE_A), (low, 1.5, None, _PRE_B)], -4.0)
+        assert [pid for pid, _d, _b in got] == [low, high]
+
+    def test_caps_at_the_default_pool_size(self) -> None:
+        rows = [
+            (uuid.uuid4(), 1.0 + i * 0.01, None, _PRE_A) for i in range(CANDIDATE_POOL_SIZE + 7)
+        ]
+        assert len(lsr._probe_candidates(rows, -4.0)) == CANDIDATE_POOL_SIZE
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑦ 정책 이음매 — R6 제한 후보 · 정책 버전 · 전진 금지 · 예산을 건 선수 읽기
+# ──────────────────────────────────────────────────────────────────────────
+_ANCHOR = uuid.uuid4()
+
+
+@dataclass
+class _R6Spies:
+    loaded_default_pool: int = 0
+    intent_calls: int = 0
+    route_kwargs: dict[str, Any] = field(default_factory=dict)
+
+
+@pytest.fixture
+def r6_policy_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]]:
+    """정책의 DB 좌석을 대역으로 — R6 경로가 **무엇을 바꾸고 무엇을 그대로 두는가**를 잰다."""
+    spies = _R6Spies()
+    routes: list[lsr.StateRoute | None] = []
+    anchor_reasons: list[RecommendationReason] = []
+
+    async def _history(_s: Any, _uid: uuid.UUID) -> AttemptHistoryState:
+        return AttemptHistoryState(
+            attempted_ids=set(),
+            theta=-4.0,
+            standard_error=None,
+            measurement_sufficient=False,
+            administered_count=1,
+        )
+
+    async def _route_stub(*_a: Any, **kwargs: Any) -> lsr.StateRoute | None:
+        spies.route_kwargs = kwargs
+        return routes[0]
+
+    async def _default_pool(*_a: Any, **_k: Any) -> list[tuple[uuid.UUID, float, float | None]]:
+        spies.loaded_default_pool += 1
+        return [(_FALLBACK, 1.0, None)]
+
+    async def _anchor_reason(*_a: Any, **_k: Any) -> RecommendationReason:
+        return anchor_reasons[0]
+
+    real_intent = policy_module.resolve_policy_intent
+
+    async def _intent(*args: Any, **kwargs: Any) -> PolicyIntent:
+        spies.intent_calls += 1
+        if kwargs["anchor_reason"].type is ReasonType.NEXT_CONCEPT:
+            # 기본 경로의 전진 갈래는 그래프를 읽는다 — 여기서는 "불렸다"만 재고 강등으로 끝낸다.
+            return policy_module._demoted(kwargs["anchor_reason"], IntentResolution.UNSUPPORTED)
+        result: PolicyIntent = await real_intent(*args, **kwargs)
+        return result
+
+    monkeypatch.setattr(policy_module, "load_attempt_history_state", _history)
+    monkeypatch.setattr(policy_module, "route_by_learning_state", _route_stub)
+    monkeypatch.setattr(policy_module, "load_candidate_rows", _default_pool)
+    monkeypatch.setattr(policy_module, "collect_recommendation_reason", _anchor_reason)
+    monkeypatch.setattr(policy_module, "resolve_policy_intent", _intent)
+    return spies, routes, anchor_reasons
+
+
+def _probe_route() -> lsr.StateRoute:
+    return lsr.StateRoute(
+        outcome=lsr.StateDirectiveOutcome.PREREQUISITE_PROBE,
+        concept_id=_CONCEPT,
+        candidate_rows=((_PROBE_ITEM, 1.2, None),),
+    )
+
+
+class TestUndiagnosedPolicySeam:
+    async def _call(self, policy: CatRecommendationPolicy | None = None) -> Any:
+        policy = policy or CatRecommendationPolicy(cast(AsyncSession, object()))
+        return await policy(_undiagnosed(), LearningContext(purpose="diagnosis"))
+
+    async def test_probe_route_supplies_the_pool_but_not_the_reason(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+    ) -> None:
+        """후보는 R6 경로에서, 이름표는 기본 연산(숙달 파생 + EOS-124)에서 — 판정문 §2-2 근거 3."""
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(_probe_route())
+        anchor_reasons.append(build_reason(concept_id=_PRE_A, mastery=None, confidence=None))
+        outcome = await self._call()
+        assert outcome.problem_id == _PROBE_ITEM  # 제한 후보에서 골랐다
+        assert spies.loaded_default_pool == 0  # 기본 후보 풀은 묻지도 않았다
+        assert outcome.action is RecommendationAction.DIAGNOSE  # 미측정 선수 → 진단
+        assert outcome.reason.basis is ReasonBasis.COLD_START  # 근거는 상태 머신 몫이 아니다
+        assert outcome.target_concept == _PRE_A
+        assert outcome.intent_resolution is IntentResolution.DIRECT
+        assert spies.intent_calls == 1  # EOS-124 해소가 돈다(R3 경로와 다르다)
+        assert outcome.band_calibrated is None  # 요청 목적(diagnosis) 그대로 — 탐침은 측정이다
+        assert outcome.policy_version == POLICY_VERSION_CAT_STATE_UNDIAGNOSED
+        assert outcome.learning_state_directive is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+
+    async def test_policy_injects_its_own_budgeted_prerequisite_reader(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+    ) -> None:
+        """예산은 정책이 소유한다 — 이음매에 넘기는 읽기 함수가 정책 자신의 `_read_prerequisites`다."""
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(None)
+        anchor_reasons.append(build_reason(concept_id=_ANCHOR, mastery=None, confidence=None))
+        policy = CatRecommendationPolicy(cast(AsyncSession, object()))
+        await self._call(policy)
+        assert spies.route_kwargs["read_prerequisites"] == policy._read_prerequisites
+
+    async def test_advance_band_anchor_is_demoted_on_the_r6_path(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+    ) -> None:
+        """부가 안전장치 — R6 경로의 앵커가 전진 구간이어도 전진하지 않는다(해소 `refuted`)."""
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(
+            lsr.StateRoute(
+                outcome=lsr.StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+                concept_id=_ANCHOR,
+                candidate_rows=((_SAME, 3.0, None),),
+            )
+        )
+        anchor_reasons.append(build_reason(concept_id=_ANCHOR, mastery=0.73, confidence=0.6))
+        outcome = await self._call()
+        assert spies.intent_calls == 0  # 전진 재선택(그래프 읽기)을 돌리지 않는다
+        assert outcome.problem_id == _SAME
+        assert outcome.action is RecommendationAction.PRACTICE_CURRENT
+        assert outcome.reason.type is ReasonType.CURRENT_CONCEPT
+        assert outcome.reason.mastery == 0.73  # 실측은 그대로 — 강등은 행위만 바꾼다
+        assert outcome.target_concept == _ANCHOR
+        assert outcome.intent_resolution is IntentResolution.REFUTED
+
+    async def test_advance_guard_is_confined_to_the_r6_path(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+    ) -> None:
+        """대조군 — 지시가 없으면 전진 구간 앵커는 EOS-124 해소로 간다(가드가 새지 않는다)."""
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(None)
+        anchor_reasons.append(build_reason(concept_id=_ANCHOR, mastery=0.73, confidence=0.6))
+        outcome = await self._call()
+        assert spies.intent_calls == 1
+        assert outcome.policy_version == POLICY_VERSION_CAT
+        assert outcome.learning_state_directive is None
+
+    @pytest.mark.parametrize(
+        "outcome_kind",
+        [
+            lsr.StateDirectiveOutcome.ANCHOR_UNRESOLVED,
+            lsr.StateDirectiveOutcome.NO_CANDIDATE_IN_CONCEPT,
+        ],
+    )
+    async def test_unrestricted_r6_takes_the_default_path_but_reports_why(
+        self,
+        r6_policy_env: tuple[_R6Spies, list[lsr.StateRoute | None], list[RecommendationReason]],
+        outcome_kind: lsr.StateDirectiveOutcome,
+    ) -> None:
+        spies, routes, anchor_reasons = r6_policy_env
+        routes.append(lsr.StateRoute(outcome=outcome_kind, concept_id=_CONCEPT))
+        anchor_reasons.append(build_reason(concept_id=_ANCHOR, mastery=None, confidence=None))
+        outcome = await self._call()
+        assert outcome.problem_id == _FALLBACK
+        assert spies.loaded_default_pool == 1
+        assert outcome.policy_version == POLICY_VERSION_CAT
+        assert outcome.learning_state_directive is outcome_kind
+
+
+class TestPolicyPrerequisiteReader:
+    """`CatRecommendationPolicy._read_prerequisites` — 이음매에 주입되는 선수 읽기의 예산 3장치."""
+
+    async def test_depth_is_the_request_capped_by_the_budget_ceiling(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        depths: list[int] = []
+
+        async def _fetch(_s: Any, _cid: uuid.UUID, *, max_depth: int) -> list[PrerequisiteRow]:
+            depths.append(max_depth)
+            return []
+
+        monkeypatch.setattr(policy_module, "fetch_prerequisites", _fetch)
+        policy = CatRecommendationPolicy(
+            cast(AsyncSession, object()), graph_budget=ConceptGraphBudget(max_depth=2)
+        )
+        await policy._read_prerequisites(_CONCEPT, 1)
+        await policy._read_prerequisites(_CONCEPT, 5)
+        assert depths == [1, 2]
+
+    async def test_visited_and_node_budget_apply(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        rows = [_prereq(f"UC-{i}", uuid.uuid4()) for i in range(5)]
+
+        async def _fetch(_s: Any, _cid: uuid.UUID, *, max_depth: int) -> list[PrerequisiteRow]:
+            return [rows[0], *rows]  # 첫 행이 두 경로로 두 번 온다(diamond)
+
+        monkeypatch.setattr(policy_module, "fetch_prerequisites", _fetch)
+        policy = CatRecommendationPolicy(
+            cast(AsyncSession, object()), graph_budget=ConceptGraphBudget(max_nodes=3)
+        )
+        got = await policy._read_prerequisites(_CONCEPT, 1)
+        assert [row.concept_id for row in got] == [row.concept_id for row in rows[:3]]
+
+    async def test_time_budget_raises_for_the_caller_to_judge(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def _slow(_s: Any, _cid: uuid.UUID, *, max_depth: int) -> list[PrerequisiteRow]:
+            await asyncio.sleep(1.0)
+            return []
+
+        monkeypatch.setattr(policy_module, "fetch_prerequisites", _slow)
+        policy = CatRecommendationPolicy(
+            cast(AsyncSession, object()), graph_budget=ConceptGraphBudget(timeout_seconds=0.01)
+        )
+        with pytest.raises(TimeoutError):
+            await policy._read_prerequisites(_CONCEPT, 1)

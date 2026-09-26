@@ -115,6 +115,13 @@ POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-124 이후 `cat_v2`)을
 따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 — EOS-124는 교정 경로를 바꾸지 않았으므로
 (집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다."""
+POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"
+"""EOS-26 — 상태 머신 R6(원인 미상 오답)를 집행한 추천: 후보를 오답 개념의 직접 선수(연속 첫
+오답 — 선수 탐침) 또는 방금 틀린 개념(연속 두 번째 · 탐침 불가 폴백)으로 **제한**한다. 후보 생성
+규칙이 기본 CAT과 다르므로 따로 적는다. 이름표·재선택은 기본 CAT의 `cat_v2`(EOS-124) 규칙 그대로라
+`v2`다 — R3 교정 경로(`cat_v1_state_remediation`)와 달리 근거를 바꾸지 않는다. 제한하지 못한
+R6(`anchor_unresolved`·`no_candidate_in_concept`)는 기본 CAT 규칙을 따르므로
+`POLICY_VERSION_CAT`이다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -239,6 +246,7 @@ __all__ = [
     "META_KEY_THETA",
     "POLICY_VERSION_CAT",
     "POLICY_VERSION_CAT_STATE_REMEDIATION",
+    "POLICY_VERSION_CAT_STATE_UNDIAGNOSED",
     "POLICY_VERSION_SUNEUNG",
     "record_recommendation_treatment",
 ]

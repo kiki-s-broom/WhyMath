@@ -2584,7 +2584,12 @@ class NextProblemResponse(BaseModel):
         description=(
             "EOS-24: 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과. `applied`면 상태 "
             "머신의 오개념 교정 결정(R3)을 집행했다(문항=교정 대상 개념 · reason.basis="
-            "learning_state). 그 외 값은 집행하지 못한 사유다(released_after_repeat · "
+            "learning_state). EOS-26: 원인 미상 오답(R6)은 후보 제한으로 집행한다 — "
+            "`prerequisite_probe`(연속 첫 오답 · 문항=오답 개념의 직접 선수) · "
+            "`same_concept_repeat`(연속 두 번째 · 문항=방금 틀린 개념) · "
+            "`same_concept_probe_unsupported`/`_refuted`/`_unavailable`/`same_concept_graph_timeout`"
+            "(탐침할 선수가 없어 같은 개념으로 · 뒤는 그 사유). R6의 이름표(action·reason)는 "
+            "숙달 구간 경로가 붙인다. 그 외 값은 집행하지 못한 사유다(released_after_repeat · "
             "weak_misconception_evidence · anchor_unresolved · no_candidate_in_concept) — "
             "그때 추천은 숙달 구간 경로 그대로다. 상태 머신이 지시하지 않았으면 null."
         ),

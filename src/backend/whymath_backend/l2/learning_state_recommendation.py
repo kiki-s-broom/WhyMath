@@ -47,6 +47,34 @@ R3의 입력은 약하다(학생 전체의 활성 가설 · 신뢰 하한 없음
 `build_candidate_pool_stmt`(저작권·검수 노출 게이트 + 미시도 + θ 근방)에 WHERE를 **덧붙이는**
 방식이라 노출 게이트를 다시 쓰지 않는다(REC-06 "한 곳에서만 정의").
 
+EOS-26 — R6(원인 미상 오답)도 집행한다
+-----------------------------------------
+설계 정본: `docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md`.
+
+R6의 결정은 "같은 개념 연습"(`PRACTICE_SAME_CONCEPT`)이다. Kiki 결정(게이트
+`G-eos24-loop1-undiagnosed-wrong-criterion` · (가) 좁힌 기준)은 그 앞에 한 걸음을 인정했다 — 원인을
+모르는 오답이면 가장 가까운 구조적 원인(선수 결손)을 먼저 확인한다. 그래서:
+
+  · **연속 오답의 첫 R6** → 오답 개념 C의 **직접 선수 중 숙달되지 않은(미측정 포함) 개념**의
+    문항으로 후보를 제한한다(선수 탐침 1문항). Kiki 기준 ⓐ(진단 문항 = 선수)가 여기서 선다.
+  · **연속 두 번째 R6**(직전 정책 결정도 R6) → 방금 틀린 개념으로 제한한다 — R6 문면 그대로다.
+    탐침을 틀렸으면 그 개념은 선수 P이고, EOS-124 의도 해소 (나)가 `practice_prerequisite`(근거 =
+    막힌 C · 목표 = P)를 붙인다. Kiki 기준 ⓑ(진단 오답 → 선수 연습 하강)가 여기서 선다.
+  · 셋째 연속 오답은 R5(임계 3)라 이 경로를 타지 않는다 — 개입은 구조적으로 최대 2문항이다.
+  · 탐침할 선수가 없으면(엣지 없음 · 전부 숙달 · 문항 없음 · 조회 시간 초과) 첫 R6도 같은 개념
+    연습이다(R6 문면). 같은 개념에도 문항이 없을 때만 기본 경로로 돌아간다.
+  · R2(정답+미측정 확신)의 PRACTICING은 지시가 아니다 — 국면과 트리거를 둘 다 본다.
+
+R3 경로와 달리 **근거를 새로 만들지 않는다** — 후보 집합만 바꾸고 이름표는 기본 경로의 연산
+(숙달 파생 근거 + EOS-124 의도 해소)이 붙인다. 전달 문항에 대해 그 이름표가 참이기 때문이다(미측정
+선수를 진단하러 내면 `diagnose · unmeasured`가 사실이다). 상태 머신이 한 일(후보 생성)은
+`StateDirectiveOutcome`과 `policy_version`이 기록한다(판정문 §2-2 근거 3).
+
+그래프 예산은 **정책이 소유한다** — 이 모듈은 예산(깊이·노드·시간)을 건 선수 읽기 함수를 주입받는다
+(`PrerequisiteReader`). 여기서 예산을 다시 정의하면 예산 정의가 두 곳이 된다(천장 상수와 그
+뮤테이션 하네스는 `l2/recommendation_policy.py`를 가리킨다). 정책 → 이 모듈 → 정책 순환 import도
+이 주입으로 피한다.
+
 계층: `l2`. L3~L6을 import하지 않는다. 오개념 가설은 `db.models`(공유 인프라)를 직접 읽는다 —
 `l2/learner_state.py`·`l2/learning_state_evidence.py`와 같은 선례다(L4 `hypothesis_store` import
 금지).
@@ -54,10 +82,12 @@ R3의 입력은 약하다(학생 전체의 활성 가설 · 신뢰 하한 없음
 
 from __future__ import annotations
 
+import logging
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import ColumnElement, Select, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,25 +97,68 @@ from whymath_backend.db.models.concept import ProblemConcept
 from whymath_backend.db.models.learning_state_transition import LearningStateTransition
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
 from whymath_backend.db.models.problem import Problem
+from whymath_backend.l2.ability_estimation import difficulty_to_logit
 from whymath_backend.l2.learner_state import LearnerState
 
 # 재구현 0 — 대표 개념·최신 숙달 조회는 숙달 좌석이 소유한다(`l2.recommendation_reason` 선례).
 from whymath_backend.l2.mastery_tracking import _latest_mastery, get_primary_concept_id
-from whymath_backend.l2.next_problem_selection import CandidateRow, build_candidate_pool_stmt
-from whymath_backend.l2.recommendation_contract import RecommendationReason, remediation_reason
+from whymath_backend.l2.next_problem_selection import (
+    CANDIDATE_POOL_SIZE,
+    CandidateRow,
+    TargetCandidateRow,
+    build_candidate_pool_stmt,
+    load_target_candidate_rows,
+)
+from whymath_backend.l2.prerequisite_recommendation import PrerequisiteRow
+from whymath_backend.l2.recommendation_contract import (
+    WEAK_CONCEPT_MASTERY_CEILING,
+    RecommendationReason,
+    remediation_reason,
+)
 from whymath_backend.l2.remediation_policy import MISCONCEPTION_REMEDIATION_FLOOR
 from whymath_backend.schema.enums import ConceptRole
 from whymath_backend.schema.learning_state import LearningState, TransitionTrigger
 
 __all__ = [
+    "POLICY_DECISION_TRIGGERS",
+    "PrerequisiteReader",
     "RemediationDirective",
     "StateDirectiveOutcome",
     "StateRoute",
+    "UndiagnosedWrongDirective",
     "build_concept_candidate_pool_stmt",
     "collect_remediation_reason",
     "read_remediation_directive",
+    "read_undiagnosed_wrong_directive",
     "route_by_learning_state",
 ]
+
+_logger = logging.getLogger("whymath.l2.learning_state_recommendation")
+
+#: 선수 읽기 함수 — `(오답 개념, 최대 깊이) → 선수 목록`. 그래프 예산(깊이 천장·노드 상한·시간)은
+#: **호출부(정책)가 소유**한다. 이 모듈은 예산을 건 함수를 주입받아 부르기만 한다(모듈 docstring
+#: "EOS-26" 절). 시간 예산 초과는 `TimeoutError`로 올라온다.
+PrerequisiteReader = Callable[[uuid.UUID, int], Awaitable[Sequence[PrerequisiteRow]]]
+
+#: 선수 탐침의 깊이 — **직접 선수만**. 예산 천장(2)이 아니라 교수학이 정한 값이다: depth 2 행은
+#: 경로를 싣지 않아, 숙달된 직접 선수 뒤의 기초(이미 덮인 것)와 약한 직접 선수 뒤의 기초를 가를 수
+#: 없다(판정문 §3 ⓑ). 더 깊은 하강은 탐침을 틀린 뒤의 측정이 이끈다(EOS-124 의도 해소 (가)).
+_PROBE_DEPTH: Final = 1
+
+#: 상태 머신 **정책 결정** 트리거 — `V1_RULES`가 내는 전이만(`ATTEMPT_SUBMITTED`·생애주기 전이
+#: 제외). 연속 R6 판정은 "직전 정책 결정"을 봐야 한다: 국면(`assessed_from`)은 R2와 R6가 둘 다
+#: PRACTICING이라 가를 수 없다(판정문 §1-4). 새 정책 트리거가 생기면 이 집합도 함께 고친다 —
+#: 거버넌스 테스트가 `POLICY_` 접두 전수와 대조해 누락을 잡는다.
+POLICY_DECISION_TRIGGERS: Final[frozenset[TransitionTrigger]] = frozenset(
+    {
+        TransitionTrigger.POLICY_ADVANCE,
+        TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE,
+        TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
+        TransitionTrigger.POLICY_PREREQUISITE_GAP,
+        TransitionTrigger.POLICY_REPEATED_FAILURE,
+        TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED,
+    }
+)
 
 
 class StateDirectiveOutcome(str, Enum):
@@ -109,7 +182,47 @@ class StateDirectiveOutcome(str, Enum):
     """결정의 응답·문항·대표 개념 중 하나를 찾지 못했다 — 무엇을 교정할지 모른다."""
 
     NO_CANDIDATE_IN_CONCEPT = "no_candidate_in_concept"
-    """개념 C에 노출 가능한 미시도 문항이 없다 — 기존 추천으로 돌아갔다."""
+    """개념 C에 노출 가능한 미시도 문항이 없다 — 기존 추천으로 돌아갔다.
+
+    R6 경로에서도 같은 뜻으로 쓴다(같은 개념 연습으로 제한하려 했으나 그 개념에 문항이 없다)."""
+
+    # ── R6(원인 미상 오답) 집행 — EOS-26. 아래 6값은 **후보를 제한했다**(집행했다) ──────────────
+    # 사유를 하나로 뭉치지 않는 이유는 위와 같다: 고칠 곳이 다르다(EOS-124 `IntentResolution`과
+    # 같은 분리 — 반증은 정상 교수학, 근거 없음은 그래프 커버리지, 문항 없음은 콘텐츠, 시간 초과는
+    # 성능). 그래서 `prerequisite_probe / (R6 값 전체)`가 곧 "선수 탐침이 실제로 나간 비율"이다.
+
+    PREREQUISITE_PROBE = "prerequisite_probe"
+    """연속 오답의 첫 R6 — 오답 개념의 직접 선수 중 숙달되지 않은 개념의 문항으로 제한했다."""
+
+    SAME_CONCEPT_REPEAT = "same_concept_repeat"
+    """연속 두 번째 R6(직전 정책 결정도 R6) — 방금 틀린 개념으로 제한했다(R6 문면 집행)."""
+
+    SAME_CONCEPT_PROBE_UNSUPPORTED = "same_concept_probe_unsupported"
+    """첫 R6인데 오답 개념에 선수 엣지가 없다 — 같은 개념으로 제한했다(그래프 커버리지 공백일 수
+    있다)."""
+
+    SAME_CONCEPT_PROBE_REFUTED = "same_concept_probe_refuted"
+    """첫 R6인데 직접 선수가 전부 숙달이다 — 원인 후보가 선수에 없다. 같은 개념으로 제한했다."""
+
+    SAME_CONCEPT_PROBE_UNAVAILABLE = "same_concept_probe_unavailable"
+    """첫 R6인데 숙달되지 않은 선수에 출제 가능한 미시도 문항이 없다 — 같은 개념으로 제한했다."""
+
+    SAME_CONCEPT_GRAPH_TIMEOUT = "same_concept_graph_timeout"
+    """첫 R6인데 선수 조회가 시간 예산을 넘었다 — 같은 개념으로 제한했다(예외 타입명 로그 동반)."""
+
+
+#: R6 경로가 **후보를 제한한**(=상태 머신 결정을 집행한) 결과. 나머지 R6 결과(`ANCHOR_UNRESOLVED`·
+#: `NO_CANDIDATE_IN_CONCEPT`)는 제한하지 못해 기본 경로로 돌아간 것이다.
+_UNDIAGNOSED_RESTRICTING: Final[frozenset[StateDirectiveOutcome]] = frozenset(
+    {
+        StateDirectiveOutcome.PREREQUISITE_PROBE,
+        StateDirectiveOutcome.SAME_CONCEPT_REPEAT,
+        StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED,
+        StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED,
+        StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNAVAILABLE,
+        StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,20 +258,55 @@ def read_remediation_directive(learner_state: LearnerState) -> RemediationDirect
 
 
 @dataclass(frozen=True, slots=True)
+class UndiagnosedWrongDirective:
+    """상태 머신의 R6 결정 1건 — 추천이 집행을 **검토할** 대상(EOS-26)."""
+
+    attempt_id: uuid.UUID | None
+    """결정을 낸 응답(방금 틀린 응답). None이면 어느 개념을 봐야 할지 모른다
+    (`ANCHOR_UNRESOLVED`)."""
+
+
+def read_undiagnosed_wrong_directive(
+    learner_state: LearnerState,
+) -> UndiagnosedWrongDirective | None:
+    """`LearnerState`의 학습 국면 → R6 집행 검토 대상(순수 · DB 0).
+
+    **국면과 트리거를 둘 다 본다**(판정문 §3 ⓓ). 국면만 보면 R2(정답+미측정 확신)의 PRACTICING을
+    지시로 오독한다 — 확신도를 보내지 않는 클라이언트(모바일 앱)의 모든 정답이 R2라, 정답마다 선수
+    탐침이 나가게 된다. 트리거만 보면 R6 뒤에 생애주기 전이가 끼어 국면이 바뀌어도 지시가 살아 있는
+    것처럼 읽힌다(`read_remediation_directive`와 같은 이유).
+    """
+    snapshot = learner_state.learning_state
+    if snapshot is None or snapshot.state is not LearningState.PRACTICING:
+        return None
+    if snapshot.trigger is not TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED:
+        return None
+    return UndiagnosedWrongDirective(attempt_id=snapshot.attempt_id)
+
+
+@dataclass(frozen=True, slots=True)
 class StateRoute:
     """상태 머신 지시의 처리 결과 — 집행했으면 제한된 후보까지 함께 담는다."""
 
     outcome: StateDirectiveOutcome
     concept_id: uuid.UUID | None = None
-    """교정 대상 개념 C. 찾지 못했으면 None."""
+    """R3: 교정 대상 개념 C. R6: 오답 개념(탐침이면 그 선수를 본 개념 · 같은 개념 연습이면 제한한
+    그 개념). 찾지 못했으면 None."""
     candidate_rows: tuple[CandidateRow, ...] = ()
-    """C로 제한된 후보(집행했을 때만 비지 않는다)."""
+    """제한된 후보(집행했을 때만 비지 않는다). R3는 C의 문항, R6 탐침은 선수들의 문항."""
     misconception_confidence: float | None = None
     """집행 근거가 된 가설의 신뢰(②를 넘은 값). 집행하지 않았으면 None."""
 
     @property
     def applied(self) -> bool:
+        """R3(오개념 교정) 결정을 집행했다 — 근거까지 상태 머신 몫으로 바꾸는 경로."""
         return self.outcome is StateDirectiveOutcome.APPLIED
+
+    @property
+    def undiagnosed_applied(self) -> bool:
+        """R6(원인 미상 오답) 결정을 **후보 제한으로** 집행했다 — 이름표는 기본 경로 연산이
+        붙인다."""
+        return self.outcome in _UNDIAGNOSED_RESTRICTING
 
 
 def _evidence_since_previous_attempt(
@@ -279,6 +427,178 @@ def build_concept_candidate_pool_stmt(
     ).where(Problem.problem_id.in_(members))
 
 
+# ── R6 집행 (EOS-26) ────────────────────────────────────────────────────────────────────────
+
+
+async def _previous_decision_trigger(
+    session: AsyncSession, *, user_id: uuid.UUID, attempt_id: uuid.UUID
+) -> TransitionTrigger | None:
+    """결정 응답이 **아닌** 응답이 원장에 남긴 가장 늦은 정책 결정의 트리거 — 없으면 None.
+
+    연속 R6 판정의 입력이다(판정문 §3 ⓒ). 국면으로 판정하지 않는 이유: R2와 R6가 둘 다 PRACTICING에
+    도착해 `assessed_from`으로는 "직전이 원인 미상 오답이었나"를 가를 수 없다(§1-4).
+
+    정렬은 `list_transitions`와 같은 키다. 원장 writer(`record_transition`)가 행마다 commit하므로
+    `occurred_at`(DB `now()` = 트랜잭션 시작 시각)은 응답 사이에서 단조 증가한다. `attempt_id !=`는
+    NULL(생애주기 전이) 행도 스스로 뺀다(SQL 3값 논리 — EOS-140 `_evidence_since_previous_attempt`와
+    같은 이유로 `IS NOT NULL`을 따로 두지 않는다).
+    """
+    stmt = (
+        select(LearningStateTransition.trigger)
+        .where(
+            LearningStateTransition.user_id == user_id,
+            LearningStateTransition.attempt_id != attempt_id,
+            LearningStateTransition.trigger.in_(POLICY_DECISION_TRIGGERS),
+        )
+        .order_by(
+            desc(LearningStateTransition.occurred_at),
+            desc(LearningStateTransition.transition_id),
+        )
+        .limit(1)
+    )
+    value: TransitionTrigger | None = (await session.execute(stmt)).scalar_one_or_none()
+    return value
+
+
+def _is_mastered(row: PrerequisiteRow, learner_state: LearnerState) -> bool:
+    """선수가 **이미 숙달**인가 — 숙달 구간 경계(> 0.7)와 같은 선이다(`select_reason_type`).
+
+    판정 입력은 `learner_state.mastery`(개념코드 키)다 — EOS-124 선수 구간 의도(가)와 같은 입력.
+    코드가 없거나 측정이 없으면 숙달이 **아니다**(미측정 선수는 탐침 대상이다 — 모른다 ≠ 숙달).
+    """
+    if row.concept_code is None:
+        return False
+    mastery = learner_state.mastery.get(row.concept_code)
+    return mastery is not None and mastery > WEAK_CONCEPT_MASTERY_CEILING
+
+
+def _item_b(row: CandidateRow) -> float:
+    """후보 행의 IRT 난이도 b — 보정 b 우선, 없으면 전문가 난이도의 logit(`candidate_items`와
+    같다)."""
+    _pid, difficulty, irt_b = row
+    return irt_b if irt_b is not None else difficulty_to_logit(difficulty)
+
+
+def _probe_candidates(rows: Sequence[TargetCandidateRow], theta: float) -> tuple[CandidateRow, ...]:
+    """선수들의 후보(개념별로 나뉘어 온다) → 탐침 후보 풀 1개.
+
+    한 문항이 두 선수의 PRIMARY로 걸려 두 번 오면 한 번만 센다. 합친 뒤 **기본 후보 풀과 같은 키**
+    (|b−θ| 오름차순 → `problem_id`)로 정렬하고 같은 크기로 자른다 — 선택기가 동률에서 낮은 인덱스를
+    고르므로, 키가 같아야 동률 처리까지 기본 경로와 같다(`candidate_pool_order_by`).
+    """
+    seen: set[uuid.UUID] = set()
+    merged: list[CandidateRow] = []
+    for pid, difficulty, irt_b, _concept in rows:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        merged.append((pid, difficulty, irt_b))
+    merged.sort(key=lambda row: (abs(_item_b(row) - theta), str(row[0])))
+    return tuple(merged[:CANDIDATE_POOL_SIZE])
+
+
+async def _same_concept_route(
+    session: AsyncSession,
+    *,
+    concept_id: uuid.UUID,
+    outcome: StateDirectiveOutcome,
+    theta: float,
+    attempted_ids: set[uuid.UUID],
+    excluded_ids: set[uuid.UUID],
+) -> StateRoute:
+    """R6 문면 집행 — 후보를 그 개념의 PRIMARY 문항으로 제한한다(R3와 같은 제한 문장 · 조회 1건).
+
+    그 개념에 미시도 문항이 없으면 제한하지 못한 것이다 — 기본 경로로 돌아가고 사유를 남긴다.
+    """
+    stmt = build_concept_candidate_pool_stmt(
+        theta, concept_id=concept_id, attempted_ids=attempted_ids, excluded_ids=excluded_ids
+    )
+    rows: tuple[CandidateRow, ...] = tuple(
+        (pid, float(difficulty), irt_b)
+        for pid, difficulty, irt_b in (await session.execute(stmt)).all()
+    )
+    if not rows:
+        return StateRoute(
+            outcome=StateDirectiveOutcome.NO_CANDIDATE_IN_CONCEPT, concept_id=concept_id
+        )
+    return StateRoute(outcome=outcome, concept_id=concept_id, candidate_rows=rows)
+
+
+async def _route_undiagnosed_wrong(
+    session: AsyncSession,
+    learner_state: LearnerState,
+    directive: UndiagnosedWrongDirective,
+    *,
+    theta: float,
+    attempted_ids: set[uuid.UUID],
+    excluded_ids: set[uuid.UUID],
+    read_prerequisites: PrerequisiteReader,
+) -> StateRoute:
+    """R6 결정 → 선수 탐침 또는 같은 개념 연습(판정문 §2-1 트리).
+
+    검사 순서는 **싼 것부터**: 앵커(2~3건) → 직전 결정(1건) → [연속이면 같은 개념 후보(1건)]
+    → 선수(주입 읽기 1건) → 선수 후보(1건) → [없으면 같은 개념 후보(1건)].
+    """
+    if directive.attempt_id is None:
+        return StateRoute(outcome=StateDirectiveOutcome.ANCHOR_UNRESOLVED)
+    user_id = uuid.UUID(learner_state.student_id)
+    concept_id = await _anchor_concept(session, user_id=user_id, attempt_id=directive.attempt_id)
+    if concept_id is None:
+        return StateRoute(outcome=StateDirectiveOutcome.ANCHOR_UNRESOLVED)
+
+    async def same_concept(outcome: StateDirectiveOutcome) -> StateRoute:
+        return await _same_concept_route(
+            session,
+            concept_id=concept_id,
+            outcome=outcome,
+            theta=theta,
+            attempted_ids=attempted_ids,
+            excluded_ids=excluded_ids,
+        )
+
+    # ⓒ 연속 두 번째 R6 — 탐침(또는 첫 오답 뒤 무엇이든)을 또 원인 미상으로 틀렸다. R6 문면대로 방금
+    # 틀린 개념을 연습한다. 셋째 연속 오답은 R5라 여기에 오지 않는다(개입은 최대 2문항).
+    previous = await _previous_decision_trigger(
+        session, user_id=user_id, attempt_id=directive.attempt_id
+    )
+    if previous is TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED:
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_REPEAT)
+
+    # ⓑ 첫 R6 — 직접 선수 중 숙달되지 않은 개념을 탐침한다. 예산(시간·노드·깊이 천장)은 주입된
+    # 읽기 함수가 건다. 시간 초과는 추천을 실패시키지 않는다(같은 개념 연습 + 예외 타입명 로그).
+    try:
+        prerequisites = await read_prerequisites(concept_id, _PROBE_DEPTH)
+    except TimeoutError as exc:
+        _logger.warning(
+            "R6 선수 탐침 — 선수 조회 시간 예산 초과(%s) · 같은 개념 연습으로 집행. concept=%s",
+            type(exc).__name__,
+            concept_id,
+        )
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_GRAPH_TIMEOUT)
+    if not prerequisites:
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNSUPPORTED)
+    open_ids = [row.concept_id for row in prerequisites if not _is_mastered(row, learner_state)]
+    if not open_ids:
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED)
+    probe_rows = _probe_candidates(
+        await load_target_candidate_rows(
+            session,
+            theta,
+            concept_ids=open_ids,
+            attempted_ids=attempted_ids,
+            excluded_ids=excluded_ids,
+        ),
+        theta,
+    )
+    if not probe_rows:
+        return await same_concept(StateDirectiveOutcome.SAME_CONCEPT_PROBE_UNAVAILABLE)
+    return StateRoute(
+        outcome=StateDirectiveOutcome.PREREQUISITE_PROBE,
+        concept_id=concept_id,
+        candidate_rows=probe_rows,
+    )
+
+
 async def route_by_learning_state(
     session: AsyncSession,
     learner_state: LearnerState,
@@ -286,18 +606,33 @@ async def route_by_learning_state(
     theta: float,
     attempted_ids: set[uuid.UUID],
     excluded_ids: set[uuid.UUID],
+    read_prerequisites: PrerequisiteReader,
 ) -> StateRoute | None:
-    """상태 머신의 R3 결정을 추천이 집행할 수 있는지 판정하고, 되면 제한 후보까지 낸다.
+    """상태 머신의 결정(R3 · R6)을 추천이 집행할 수 있는지 판정하고, 되면 제한 후보까지 낸다.
 
     None이면 상태 머신이 추천을 지시하지 않았다 — **조회 0건**이다(순수 판정에서 끝난다). 이 덕에
-    지시가 없는 모든 요청(대다수)은 전환 전과 같은 쿼리 수·같은 결과를 낸다.
+    지시가 없는 요청(R1·R2·R5·생애주기 · 원장 없음)은 전환 전과 같은 쿼리 수·같은 결과를 낸다.
 
-    검사 순서는 **싼 것부터**다: 해제(순수) → 가설 신뢰(1건) → 교정 대상 개념(2~3건) → 후보(1건).
-    앞에서 멈추면 뒤의 조회는 돌지 않는다.
+    지시는 요청마다 하나다 — 판독은 원장 최신 결정 하나를 보고, R3(REMEDIATING)와 R6(PRACTICING)는
+    동시에 성립하지 않는다. R3를 먼저 읽는다(EOS-24 순서 유지 · 판정문 §3 ⓔ).
+
+    R3 검사 순서는 **싼 것부터**다: 해제(순수) → 가설 신뢰(1건) → 교정 대상 개념(2~3건) → 후보(1건).
+    앞에서 멈추면 뒤의 조회는 돌지 않는다. R6 순서는 `_route_undiagnosed_wrong` docstring.
     """
     directive = read_remediation_directive(learner_state)
     if directive is None:
-        return None
+        undiagnosed = read_undiagnosed_wrong_directive(learner_state)
+        if undiagnosed is None:
+            return None
+        return await _route_undiagnosed_wrong(
+            session,
+            learner_state,
+            undiagnosed,
+            theta=theta,
+            attempted_ids=attempted_ids,
+            excluded_ids=excluded_ids,
+            read_prerequisites=read_prerequisites,
+        )
     if directive.repeated_in_remediation:
         return StateRoute(outcome=StateDirectiveOutcome.RELEASED_AFTER_REPEAT)
 

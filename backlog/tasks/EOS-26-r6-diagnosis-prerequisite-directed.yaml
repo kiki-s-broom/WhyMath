@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - src/backend/whymath_backend/l2/learning_state_recommendation.py
   - tests/backend/api/test_e2e_three_consecutive_loops.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
-session: null
+session: claude/magical-maxwell-hja5kh
 notes: "출처: EOS-139 실측(2026-09-25). Kiki가 (가)를 고른 뒤 방해 개념 프로브로 전제가 픽스처 의존임이 드러났고, Kiki가 두 번째 질문에서 '(가) 유지 + 정직 판정'을 골라 서빙 변경을 이 태스크로 분리했다(세션 https://claude.ai/code/session_01E3jbbaeprQQfa8rxLaFKTF). EOS-124(정책 축↔선택 축 불일치)와 겹치지 않는다 — 이 공백에서는 두 축이 서로 일치한 채(target=무관 개념 · 문항=무관 개념) 무관 개념으로 간다. 부수 관측: 무관 개념 진단 문항까지 틀리면 action=practice_prerequisite · reason=prerequisite_gap · target=그 무관 개념이 나온다 — reason 종류는 문항 개념의 숙달 구간(recommendation_contract.select_reason_type · < 0.4)에서 나오고 선수 그래프와 무관하기 때문이다(계획서 §8 설계). ③ⓐ 폴백 판정 때 이 이름표 의미를 함께 본다. 분류 LOOP."
-updated: 2026-09-25
+updated: 2026-09-26
