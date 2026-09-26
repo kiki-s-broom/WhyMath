@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-177-gate-verdict-handoff-on-done
+title: "게이트 입력 태스크의 done이 판정 결과를 게이트에 넘기지 않는다 — FAIL로 끝난 재판정이 게이트를 '사람 판정 대기'로 오표시하고 후속 재판정을 병목에서 뺀다 (HARN-174 사각)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 인계의 집행 지점 — pending decision 게이트의 입력 태스크를 backlog.py done 할 때, 그 게이트에 대한 판정 결과를 같은 호출에서 남기게 한다. 선택지는 셋이다: FAIL(미충족 항목의 미종결 소유 태스크 1건 이상 — gates amend --verdict FAIL 과 같은 함수로 기록) · PASS(판정문 근거 기록 — clear 는 여전히 게이트 담당자 몫) · 판정과 무관한 입력(사유 필수). 셋 중 아무것도 없으면 exit 1 이고 대장에 아무것도 쓰지 않는다. 판정 결과는 태스크 증적이 아니라 게이트 corrections 에 남아야 한다 — 증적에만 있으면 그래프가 읽지 못한다.\n\n② 표시 정직성 — pending decision 게이트의 입력이 전부 done 인데 그 이후 판정 기록(FAIL 또는 PASS)이 없으면, next·status·gates show 가 '(사람 판정 대기)' 대신 '판정 결과 미기록'을 낸다. 판정이 기록되지 않은 상태를 사람 차례로 안내하지 않는다.\n\n③ 재현 픽스처 — 2026-09-25 실측 상태를 그대로 쓴다: 게이트 입력(재판정 태스크)이 FAIL 판정문과 함께 done 이 되고 후속 재판정 태스크가 게이트에 연결되지 않은 상태. ①은 그 done 을 거부해야 하고 ②는 경고를 내야 한다. 정상 인계(FAIL + 소유 태스크 연결) 대조군은 GREEN 이어야 한다.\n\n④ 변별력 — 절마다(① 세 선택지와 무선택 거부 · ② 경고 조건) 그 절이 없으면 통과하는 반례를 두고 뮤테이션 전건 RED 를 확인한다. 주입 적용 단언(mutated != original)과 원복 바이트 동일 단언을 하네스에 내장한다(verify_gate_graph_discrimination.py 선례).\n\n⑤ 한계 명시 — 이 집행은 판정 태스크가 done 을 거칠 때만 작동한다. 판정문만 쓰고 태스크를 닫지 않거나, 대장 밖에서 판정한 경우는 막지 못한다. 이 한계를 docs/standards/build_harness.md §3e 와 done 도움말에 적는다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/report.py
+  - scripts/harness/selector.py
+  - scripts/harness/store.py
+  - "tests/harness/test_gate_verdict_handoff*.py"
+  - docs/standards/build_harness.md
+session: null
+notes: "출처: 2026-09-26 HARN-174 착지 후 정상작동 점검(Kiki 요청) — 판정 기준 main bd87b30d.\n\n[실측] HARN-174(#1324)가 21:41 UTC 에 main 에 착지한 뒤 22:10 UTC 에 2차 재판정 결과(#1323)가 착지했다. 판정은 FAIL(미충족 = 원인 미상 오답 Loop 1 보정 1축)이고, 판정 세션은 3차 재판정 태스크를 새로 등재했다. 그러나 게이트 G-p3-entry-gate2-pass 에는 FAIL 판정도 3차 재판정 입력도 기록되지 않았다. FAIL 기록 장치(gates amend --verdict FAIL)는 이미 main 에 있었지만, 판정 태스크를 done 으로 닫는 경로가 그 호출을 요구하지 않았다.\n\n[결과] 대장은 게이트의 입력이 전부 끝났다고 보고 next·status 가 이 게이트를 '(사람 판정 대기)'로 안내했다 — 실제로는 FAIL 이고 다음 작업은 3차 재판정이다. 그 3차 재판정 태스크는 게이트에 연결되지 않아 해금 수가 0 으로 계산됐다(연결 시 15). HARN-174 v2-4 가 고치려던 병목 과소평가가 이 경로로 되살아났다.\n\n[계열] gate-resolution-path-unlinked 4회차. 1~3회차의 대책(HARN-174)은 FAIL 을 기록하는 도구를 만들었지만, 도구를 부르게 만드는 집행 지점은 없었다 — 도구 존재 ≠ 호출 강제. 이 태스크가 그 집행 지점이다.\n\n[즉시 정정] 이 태스크 등재와 같은 PR 에서 게이트에 FAIL 판정과 3차 재판정 입력을 CLI 로 기록했다(gates amend --verdict FAIL). 이 태스크는 재발 방지이지 그 정정이 아니다.\n\n[정정 2026-09-26] title 'x' → '게이트 입력 태스크의 done이 판정 결과를 게이트에 넘기지 않는다 — FAIL로 끝난 재판정이 게이트를 '사람 판정 대기'로 오표시하고 후속 재판정을 병목에서 뺀다 (HARN-174 사각)': 등재 직후 정정 — 진단용 재실행이 임시 제목으로 등재됐다\n\n[정정 2026-09-26] paths ['scripts/harness/backlog.py'] → ['scripts/harness/backlog.py', 'scripts/harness/report.py', 'scripts/harness/selector.py', 'scripts/harness/store.py', 'tests/harness/test_gate_verdict_handoff*.py', 'docs/standards/build_harness.md']: 등재 직후 정정 — 작업 범위 전체(표시·집행·문서)"
+updated: 2026-09-26
