@@ -344,7 +344,7 @@
 - **판정**: 판정 트리(판정문 §2-1) · 새 근거 종류 없음(후보 제한만 · 이름표는 EOS-124 해소) · 연습 경로 8종은 학습 밴드 · 탐침만 요청 목적 · 재선택도 같은 요청 상황 · 전진 보류 해소값 `state_withheld` 신설 · `policy_version=cat_v2_state_undiagnosed` · 지시값 9종 추가. 판정 위치는 `l2/learning_state_recommendation.py::route_by_learning_state` 하나(예산은 정책이 소유해 읽기 함수를 주입).
 - **독립 비판(pedagogy-designer · "수정 채택" · 발견 13)**: 채택 — 막힘 게이트(발견 2) · 연습 학습 밴드(6) · `state_withheld`(12) · 아는 결손 우선(8) · 미측정만 탐침(3) · R3 직후를 연속 두 번째로(4B). 정직 표기·후속 — 앱 도달 0(1 → `EOS-146`) · R5 인계(4 → `EOS-148`) · 탐침 정답 뒤 C 미복귀(5 → `EOS-144` ④) · 활성 가설 학생 공백(9 → `EOS-138` 병기) · 측정 효율(10 → `EOS-146` ④) · 시간 창(3④ → `EOS-145` ④). 미채택 — 제한 밖 재선택 금지(7) · meta 앵커(11) · 요청 단위 마감(13) · "R6 문면만" 대안(acceptance가 선수 진단을 요구).
 - **해소 신호**: 3루프 `선수지향` FAIL→PASS · `general` LOOP1 FAIL→PASS · §18 xfail 1→0 · EOS-24 대조군 승격 · R6 전용 통합 테스트 8건(실 PG). 뮤테이션 55종 전건 RED(`scripts/analysis/mutate_eos26_r6_guards.py` · 서빙 경로 10종 포함) · 선례 하네스 24/24 유지.
-- **Kiki 판단 대기**: 3루프 승격은 API 계약 수준이다 — 앱은 `POST /v1/me/attempts`를 부르지 않고 코치 정답 완료는 상태 머신을 거치지 않는다. 앱 오답 원천(`EOS-146`)이 생길 때까지 승격을 보류할지는 게이트 소유자 판단(PR 본문 명기).
+- **Kiki 판단 대기**: 3루프 승격은 API 계약 수준이다 — 앱은 `POST /v1/me/attempts`를 부르지 않고 코치 정답 완료는 상태 머신을 거치지 않는다. 앱 오답 원천(`EOS-146`)이 생길 때까지 승격을 보류할지는 게이트 소유자 판단(PR 본문 명기 · Gate 2 3차 재판정 `EOS-141` ⑫에 판정 수준 명기를 인계).
 - **사고 2건**: `nondiscriminating-check` 7회차 — 판정문 초안이 요청 형태만 앱과 대조하고 이벤트 원천을 빠뜨렸다(머지 전 독립 비판이 발견 · 대책 `EOS-146`). `verification-tree-mutation-during-check` 2회차 — 장기 검증(백엔드 잡 재현 · 뮤테이션) 도중 트리를 두 번 고쳤다(결과 폐기·재실행 · 대책 `HARN-126`). 요청 형태 축(EOS-139 폐루프)은 같은 날 앞서 기록했다(`request-shape-coincidence-as-mechanism`).
 - **범위 밖 부수**: 정답만 있는 이력의 θ가 상한 4.0에 고정된다(앱 학생은 영구) → `EOS-147`.
 - 판정문 = `docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md`.
