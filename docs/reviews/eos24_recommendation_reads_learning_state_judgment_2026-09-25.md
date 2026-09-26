@@ -121,6 +121,8 @@ pedagogy-designer 비판의 요지는 "구조는 옳지만 **R3의 입력이 약
 
 그래서 **이 태스크는 R6를 배선하지 않았다.** Gate 2 Loop 1 "보정" 마디가 "오답 직후 선수 개념 진단 출제"를 보정으로 인정할지는 재판정문 §3-4가 이미 Kiki 판단 영역으로 적어 둔 문제이며, acceptance ② (나)의 "Kiki 결정으로 재정의"에 해당한다. 결정 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`(kind=decision · assignee=kiki)으로 등재했고, 결정 뒤 집행은 `EOS-139-undiagnosed-wrong-recommendation-criterion`이 소유한다(그 게이트를 `requires_gates`로 건다).
 
+> **사후 보정 (2026-09-25 · main `81070ed5` · `EOS-139`)** — Kiki가 (가) **좁힌 기준**으로 결정했다: 원인 미상 오답(R6) 직후의 `diagnose`를 보정으로 인정하되 ⓐ 진단 문항이 오답 개념의 선수 개념 ⓑ 진단 오답 시 `practice_prerequisite` 하강 두 조건 모두. 이어서 한 방해 개념 프로브가 이 절과 §1 표의 전제("θ가 내려가면 **선수 개념** 문항을 고른다")를 정정한다 — 추천기는 선수 그래프가 아니라 θ 근방 최근접으로 문항을 고르고, 선수 개념으로 간 것은 픽스처의 난이도 배치 때문이었다. 선수 관계가 없는 더 쉬운 개념이 있으면 진단은 그쪽으로 간다. 그래서 ⓑ는 성립하고 ⓐ는 시스템이 보장하지 않는다. Kiki가 이 정정을 들은 뒤 "(가) 유지 + 정직 판정"을 골라 서빙 코드는 바꾸지 않았고, ⓐ를 구조적으로 충족시키는 배선은 `EOS-26-r6-diagnosis-prerequisite-directed`로 분리했다. 상시 판정은 3루프 하네스의 진단 보정 프로브(`_FROZEN_PROBE`)다.
+
 ### 7-2. 후속 태스크로 등재한 것
 
 - **R3 입력 품질** → `EOS-138-r3-misconception-input-scope` — R3가 학생 전체·하한 없는 가설을 읽는다. 이 판정의 안전장치 ①②를 상태 머신 입력(`build_attempt_evidence`)으로 올리면 제출 응답의 `next_action`도 같은 기준을 따르게 된다. 그러면 추천 쪽 방어선은 중복이 되지만 해가 되지 않는다. MISC-30 `select_route`의 순서 충돌도 이 태스크가 함께 판정한다.
