@@ -348,6 +348,16 @@
 - **사고 2건**: `nondiscriminating-check` 7회차 — 판정문 초안이 요청 형태만 앱과 대조하고 이벤트 원천을 빠뜨렸다(머지 전 독립 비판이 발견 · 대책 `EOS-146`). `verification-tree-mutation-during-check` 2회차 — 장기 검증(백엔드 잡 재현 · 뮤테이션) 도중 트리를 두 번 고쳤다(결과 폐기·재실행 · 대책 `HARN-126`). 요청 형태 축(EOS-139 폐루프)은 같은 날 앞서 기록했다(`request-shape-coincidence-as-mechanism`).
 - **범위 밖 부수**: 정답만 있는 이력의 θ가 상한 4.0에 고정된다(앱 학생은 영구) → `EOS-147`.
 - 판정문 = `docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md`.
+### 2026-09-25 (결정 · Kiki 지정 · P3-00 처분): **Phase 3 회차 02 `P3-00b`(Phase 2 인수 점검)를 Phase 2 Gate 2 3차 재판정 `EOS-141`에 흡수 — `P3-00` 취소. 두 태스크가 같은 판정을 겹쳐 가졌고, 지시문 [02] 3번(SCENARIO-001~010 CI 실행 확인)은 어느 쪽에도 없었다** (Kiki 결정, claude 실측·집행) — 판정 기준 main `a60a1a9a`
+
+- **계기**: `P3-00` 착수 요청 → 착수 후보 전수(192건)에 없음. 막은 것은 `requires_gates`의 `G-p3-entry-gate2-pass`(pending · 9/24 재판정 FAIL).
+- **실측**: 지시문 원문 [02]의 시작 조건은 `P3-00a` 완료뿐이고 4번이 미충족 항목을 전제한다 — FAIL 상태에서 도는 작업이다. 대장이 진입 게이트를 부착해 순환이 생겼고(사고 대장 `gate-resolution-path-unlinked` 1회차), 그 순환을 풀려고 등재한 재판정 태스크가 acceptance ①~③을 겹쳐 가졌다. 게이트가 열린 뒤 `P3-00`을 돌리면 같은 판정을 두 번 한다.
+- **흡수처 이동**: 처음(main `42a77272`)엔 `EOS-130`에 흡수했으나, PR #1321이 머지되기 전에 다른 세션이 `EOS-130` 2차 재판정(FAIL · 미충족 1축)을 마쳐(#1323) done이 됐다. 그래서 미머지 변경을 되돌리고 진입 게이트를 열 수 있는 3차 재판정 `EOS-141`에 다시 적용했다 — 판정이 끝난 태스크에 완료 조건을 덧붙이면 "done인데 조건 미충족"이 된다.
+- **집행(CLI)**: `EOS-141` acceptance ⑧~⑪ 추가(SCENARIO CI 확인 · 미충족마다 P3 태스크 지목 + `--depends` · 3루프 소유 태스크 · 완료 판정 문구 승계) + 제목 정정 · `P3-01` 선행 `P3-00` → `EOS-141`(취소 선행은 `deps_cancelled` 영구 제외) · `P3-00` cancel · `gates amend G-p3-entry-gate2-pass` 해소 태스크 `EOS-130` → `EOS-141` · 대조표 §18-1 02행 정정 + §23(`docs/strategy/phase3_math_eos_completion_backlog_crosswalk.md`).
+- **교차 PR 공백**: `EOS-141`(#1323)의 선행은 `EOS-139`뿐인데, #1327이 Kiki 기준 ⓐ 미충족을 실측하고 수정 소유를 `EOS-26`으로 등재했다. 두 PR이 서로를 몰라 연결이 없었다 — #1327 착지(main `a60a1a9a`) 뒤 `EOS-141 --depends EOS-26`을 부착했다(#1314와 같은 형태의 재발 방지).
+- **등급 상향(Kiki 승인 2026-09-26)**: `EOS-26` `eos_priority` P1 → P0 · `priority` 3 → 1 — Gate 2 PASS의 유일한 기능 결함. 상향 직후 `next` 1순위(완료 시 후속 15건 해금).
+- **하지 않은 것**: 게이트 clear(Kiki 소유).
+
 ### 2026-09-25 (판정 · 게이트 `G-kg02-review-promotion-llm-session`): **KG-02 승격 회차는 보류 — 게이트가 겨냥한 표면(`/concepts/search`)은 이 승격으로 움직이지 않고, 학생 공급(`/study`)은 검수 상태를 아예 읽지 않는다. 노출 게이트 판정을 `CONT-05`로 떼어 이 게이트의 입력으로 걸었다** (Kiki 판정 "보류+대장 정정", claude 조사·실측·집행) — 판정 기준 main `3a7a7315`
 
 - **바뀐 전제 ①**: 재개 경로 ⓐ(S4-16 강등전 통과)가 오늘 S4-16 기각(cancelled)으로 소멸했다. `review_gate.py`의 승격 서명 권한은 `HUMAN_REVIEWERS=("kiki",)` 하나이고 기계 판정자 목록은 비어 있다 — LLM 검수 배치는 선별 보조이며 그 결과로 승격되는 행은 0이다. 9/23 1회차(52건 중 33건 결함 판정·상한 73.5%)는 엉뚱한 트리에서 돌아 리허설로 강등됐고, KG-08 대조군 추가 후 재측정은 없다.
