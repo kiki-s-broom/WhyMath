@@ -27,6 +27,7 @@ import signal
 import subprocess
 import sys
 import time
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -243,7 +244,7 @@ class TestWatchEvents:
     def test_no_switch_emits_no_switch_event_but_a_heartbeat(self, repos: Repos):
         out, code = _watch(repos, 2)
         assert "체크아웃 전환" not in out
-        assert "[12:00:00] 변화 없음 · main " in out
+        assert "[12:00:00] 변화 없음 | main " in out
         assert code == 0
 
     def test_trunk_advance_emits_event_with_new_commit_subjects(self, repos: Repos):
@@ -285,7 +286,35 @@ class TestWatchEvents:
             body = beat.rstrip("\n")
             assert "변화 없음" in body
             assert sum(mw._char_width(ch) for ch in body) == mw.HEARTBEAT_WIDTH
+            # 모호 폭 문자('·' 등)는 콘솔마다 1칸/2칸이 달라 덮어쓰기 폭 계산을 깨뜨린다
+            assert all(unicodedata.east_asian_width(ch) != "A" for ch in body), body
         assert out.endswith("\n"), "끝난 뒤에는 덮어쓰던 줄을 닫아야 한다"
+
+    def test_carried_slow_axis_failure_is_not_repeated_every_fast_cycle(self, repos: Repos):
+        """느린 축(PR)의 이어지는 '미측정'은 매분 실패 줄로 되풀이하지 않는다 — 습관화 방지.
+
+        대신 하트비트 끝의 '미측정 N'으로 계속 보이고(침묵 아님), 느린 주기에 다시 재서
+        또 실패하면 그때 실패 줄을 낸다. 여기서 PR 축은 저장소 이름을 몰라 항상 실패한다.
+        """
+        out = _Out(False)
+        times = iter([0.0, 10.0, 20.0, 4000.0])  # 4주기째에만 느린 축 주기(3600초)가 돌아온다
+        code = mw.watch(
+            repos.work,
+            mw.Options(skip=frozenset({"branches"}), repo_slug=""),
+            trunk_ref=TRUNK_REF,
+            interval=0,
+            slow_interval=3600,
+            out=out,
+            sleep=lambda _s: None,
+            now=lambda: next(times),
+            clock=lambda: "12:00:00",
+            max_cycles=4,
+        )
+        text = out.getvalue()
+        assert text.count("[12:00:00] [미측정] 열린 PR") == 1  # 느린 주기(4주기째)에서만
+        beats = [line for line in text.splitlines() if "변화 없음" in line]
+        assert len(beats) == 2 and all(line.endswith("| 미측정 1") for line in beats), beats
+        assert code == 2
 
     def test_file_heartbeat_is_one_line_per_quiet_cycle(self, repos: Repos):
         out, _ = _watch(repos, 3, tty=False)

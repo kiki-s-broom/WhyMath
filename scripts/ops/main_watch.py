@@ -128,6 +128,8 @@ STATE_LABEL = {OK: "정상", ATTENTION: "주의", UNMEASURED: "미측정", SKIPP
 INFO = "info"  # 이벤트 수준(주의가 아닌 변화)
 
 AXES = ("prs", "branches")  # --skip으로 끌 수 있는 축(로컬 축은 끌 수 없다 — 이 도구의 본체)
+# 느린 주기에만 다시 재는 신호 — 그 사이 빠른 주기에는 직전 값을 이어 쓴다.
+SLOW_SIGNAL_KEYS = frozenset({"prs", "branches"})
 
 # 원격 브랜치 스캔의 상태 → 사람용 이름. 즉시 조치가 필요한 것은 URGENT_BRANCH_STATUSES.
 BRANCH_STATUS_LABEL = {
@@ -1419,8 +1421,8 @@ def render_event(event: Event, clock: str) -> str:
     return "\n".join(lines)
 
 
-def render_unmeasured(snap: Snapshot, clock: str) -> str:
-    items = [f"{s.label}({s.detail})" for s in snap.signals if s.state == UNMEASURED]
+def render_unmeasured(signals: list[Signal], clock: str) -> str:
+    items = [f"{s.label}({s.detail})" for s in signals]
     return f"[{clock}] [미측정] " + " · ".join(items)
 
 
@@ -1435,7 +1437,13 @@ def render_heartbeat(snap: Snapshot, clock: str) -> str:
     if snap.prs.status in ("ok", "list_only"):
         parts.append(f"PR {len(snap.prs.entries)}")
     parts.append(f"주의 {sum(s.state == ATTENTION for s in snap.signals)}")
-    return " · ".join(parts)
+    unmeasured = sum(s.state == UNMEASURED for s in snap.signals)
+    if unmeasured:
+        # 이어지는 미측정은 실패 줄을 매분 되풀이하지 않고 여기서 계속 보인다(침묵 아님).
+        parts.append(f"미측정 {unmeasured}")
+    # 구분자는 ASCII — '·'는 한국어 콘솔에서 2칸으로 그려질 수 있는 모호 폭 문자라
+    # 제자리 덮어쓰기(\r)의 폭 계산을 어긋나게 한다.
+    return " | ".join(parts)
 
 
 def _char_width(ch: str) -> int:
@@ -1532,7 +1540,15 @@ def watch(
                 )
             else:
                 events = diff_events(prev, snap)
-                unmeasured = any(s.state == UNMEASURED for s in snap.signals)
+                # 이번 주기에 **실제로 재려다 실패한** 신호만 실패 줄로 낸다. PR·원격 브랜치
+                # 축은 느린 주기에만 다시 재므로, 그 사이 이어지는 '미측정'을 매분 되풀이하면
+                # 같은 경고가 벽지가 된다(습관화 — CLAUDE.md 상시 실패 fail-open 항목).
+                # 이어지는 상태는 하트비트 끝의 '미측정 N'이 계속 말한다.
+                unmeasured = [
+                    s
+                    for s in snap.signals
+                    if s.state == UNMEASURED and (slow or s.key not in SLOW_SIGNAL_KEYS)
+                ]
                 if events or unmeasured:
                     if pending_heartbeat:
                         out.write("\n")
@@ -1541,7 +1557,7 @@ def watch(
                     for event in events:
                         out.write(render_event(event, stamp) + "\n")
                     if unmeasured:
-                        out.write(render_unmeasured(snap, stamp) + "\n")
+                        out.write(render_unmeasured(unmeasured, stamp) + "\n")
                 elif is_tty:
                     out.write("\r" + fit_width(render_heartbeat(snap, clock()), HEARTBEAT_WIDTH))
                     pending_heartbeat = True
