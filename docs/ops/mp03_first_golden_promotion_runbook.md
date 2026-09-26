@@ -63,25 +63,32 @@ Phaiakes9 = 평소 쓰시는 **Windows PowerShell**. 작업 디렉터리 `C:\Use
 클론은 여러 세션이 공유하는 작업 사본이라 브랜치를 옮기지 않고 **별도 워크트리**에서 돕니다.
 
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ① — 워크트리 생성 + 코드 출처 검증
+# Windows PowerShell (= Phaiakes9) · 창 ① — 워크트리 생성 + 생성 결과 되읽기 + 코드 출처 검증
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 git fetch origin main
 if (Test-Path C:\Users\kiki\Desktop\__AI\WhyMath-mp03) { git worktree remove --force C:\Users\kiki\Desktop\__AI\WhyMath-mp03 } else { "기존 워크트리 없음 — 새로 만듭니다" }
 git worktree add --detach C:\Users\kiki\Desktop\__AI\WhyMath-mp03 origin/main
-cd C:\Users\kiki\Desktop\__AI\WhyMath-mp03
-$env:PYTHONUTF8 = "1"
-$env:PYTHONIOENCODING = "utf-8"
-$env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-mp03\src\backend"
-$PyExe = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
-$Src = & $PyExe -c "import whymath_backend.harness.golden_inputs as m; print(m.__file__)"
-$CodeOk = ($Src -like "*WhyMath-mp03*")
-"LOADED_FROM=$Src"
-"CODE_FROM_WORKTREE=$CodeOk"
-"HEAD_MATCHES_REMOTE=$((git rev-parse HEAD) -eq (git rev-parse origin/main))"
-"HEAD=$(git rev-parse --short HEAD)"
+$Expected = (git rev-parse origin/main)
+$Head = (git -C C:\Users\kiki\Desktop\__AI\WhyMath-mp03 rev-parse HEAD)
+if ($Head -and ($Head -eq $Expected)) {
+  cd C:\Users\kiki\Desktop\__AI\WhyMath-mp03
+  $env:PYTHONUTF8 = "1"
+  $env:PYTHONIOENCODING = "utf-8"
+  $env:PYTHONPATH = "C:\Users\kiki\Desktop\__AI\WhyMath-mp03\src\backend"
+  $PyExe = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+  $Src = & $PyExe -c "import whymath_backend.harness.golden_inputs as m; print(m.__file__)"
+  $CodeOk = ($Src -like "*WhyMath-mp03*")
+  "HEAD_MATCHES_REMOTE=True"
+  "HEAD=$($Head.Substring(0,8))"
+  "LOADED_FROM=$Src"
+  "CODE_FROM_WORKTREE=$CodeOk"
+} else { $Src = ""; "REFUSED — 워크트리 생성 실패 또는 커밋 불일치. HEAD=$Head EXPECTED=$Expected. 이 출력을 회신해 주십시오. 뒤 단계는 실행하지 마십시오." }
 ```
 
-**판정**: `CODE_FROM_WORKTREE`·`HEAD_MATCHES_REMOTE`가 둘 다 `True`여야 §2로 갑니다.
+**판정**: `HEAD_MATCHES_REMOTE=True`와 `CODE_FROM_WORKTREE=True`가 둘 다 보여야 §2로 갑니다.
+`REFUSED`가 나오면 워크트리가 만들어지지 않았거나 `origin/main`과 다른 커밋입니다 — 이때 `$Src`를
+비워 두므로 실수로 §3 이후를 붙여넣어도 그 블록들이 스스로 거부합니다. (2026-09-26 정정: 초판은
+`git worktree add`가 실패해도 뒤 명령이 계속 도는 형태였다 — 판정 문서 §8.6.)
 `ModuleNotFoundError`가 나고 `CODE_FROM_WORKTREE=False`면 MP-03 PR이 아직 머지되지 않은
 것입니다 — 멈추고 회신해 주십시오. 편집 설치된 **원 클론의 옛 코드**가 임포트되는 상황도 이
 줄이 막습니다(`PYTHONPATH`가 편집 설치를 이기는지 `__file__`로 확인).

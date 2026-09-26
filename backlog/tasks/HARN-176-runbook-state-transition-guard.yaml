@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-176-runbook-state-transition-guard
+title: "런북 파일 속 상태 전환 가드 — HARN-106 스캐너는 쓰기 어휘만, HARN-163 훅은 채팅만 봐서 저장소 런북의 무가드 git worktree add·checkout이 두 장치를 모두 통과한다 (같은 계열 3회차 · 실해 0)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 사각 동결 — 2026-09-26 MP-03 런북 §1 초판(워크트리 생성 직후 되읽기 없이 cd·환경 설정·임포트가 이어지는 블록)을 픽스처로, scripts/ops/check_runbook_blocks.py는 통과하고 .claude/hooks/chat_block_guard.py의 판정 함수는 위반을 내는 것을 테스트로 고정한다(세 장치에 같은 블록을 넣는 HARN-163 test_blind_spot_* 형태)."
+  - "② 집행 — 런북 스캐너가 상태 전환 어휘(git checkout·switch·pull·worktree add·환경 활성화)를 인식하고, 마지막 전환 뒤의 동작 명령이 HARN-163 계약(동일성 되읽기 변수 + 비교 연산 조건 + 단일 최상위 if와 같은 줄 else)의 가드 안에 있지 않으면 위반으로 낸다. 판정 함수는 chat_block_guard의 것을 재사용한다(판정기를 둘로 만들지 않는다). CI infra-contracts 잡의 HARN-106 스텝이 그대로 집행 지점이다."
+  - "③ 실패 주입 — 전환 뒤 가드 제거·되읽기를 Test-Path로 바꿈·비교 연산 제거·else 줄바꿈의 4종 뮤테이션이 전건 RED, 수정된 MP-03 런북 §1과 기존 docs/ops 런북 전수가 GREEN(기존 런북에 위반이 있으면 그 목록을 판정 입력으로 보고 — 조용한 그랜드파더 금지, 면제는 만료 동반)."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - ".claude/hooks/chat_block_guard.py"
+  - "tests/infra/**"
+session: null
+notes: "사고 경위(2026-09-26, 실해 0): 게이트 G-mp03-first-promotion-run 실행 안내 중 세션이 저장소 런북 docs/ops/mp03_first_golden_promotion_runbook.md §1 블록을 채팅으로 옮기자 Stop 훅 chat_block_guard(HARN-163)가 \"git worktree add 뒤 6행이 자가거부 가드 밖\"이라고 막았다. 같은 블록은 저장소에서는 check_runbook_blocks.py(HARN-106) 판정 통과 상태로 main에 있었다 — 그 스캐너의 판정 축이 쓰기 명령뿐이라 상태 전환을 보지 않기 때문이다(HARN-163 모듈 docstring이 이미 명기한 사각의 런북 파일 쪽 절반). 세션이 가드 버전으로 고쳐 Kiki가 실행했고(HEAD_MATCHES_REMOTE=True), 초판이었어도 §3 이후 블록이 $Src 경로를 재검사해 쓰기는 거부됐을 것이므로 피해 가능성은 낮았다. 계열: 2026-09-15 G-skb03(런북·쓰기) → 2026-09-23 G-kg02(채팅·상태 전환) → 이번(런북·상태 전환). 기록: MEMORY 2026-09-26 MP-03 항 · 판정 문서 docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §8.6."
+updated: 2026-09-26

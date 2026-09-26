@@ -3562,6 +3562,17 @@
    ],
    "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    ".claude/hooks/chat_block_guard.py",
+    "scripts/ops/check_runbook_blocks.py",
+    "tests/infra/**"
+   ],
+   "text": "MP-03 런북 §1의 무가드 git worktree add가 런북 스캐너를 통과 — 채팅 재전달 시 HARN-163 훅이 검출",
+   "weight": 0
   }
  ]
 }
