@@ -2104,6 +2104,20 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_verdict_handoff*.py"
+   ],
+   "text": "2차 재판정 FAIL이 게이트에 미기록 — 대장이 진입 게이트를 '사람 판정 대기'로 오표시",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 없는 세션에도 가짜 policy_warn 3줄 기록 — main에 같은 서명 350건 기커밋",
