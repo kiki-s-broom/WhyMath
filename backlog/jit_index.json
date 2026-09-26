@@ -2102,6 +2102,15 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 없는 세션에도 가짜 policy_warn 3줄 기록 — main에 같은 서명 350건 기커밋",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-16",
    "paths": [
     "docs/standards/build_harness.md",
@@ -3533,6 +3542,15 @@
     "tests/harness/test_store.py"
    ],
    "text": "게이트 병합(G3+G4)으로 EOS-50이 자기를 판정 대상으로 삼는 게이트를 요구하는 순환",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(2회 · 커밋 전 되돌림)",
    "weight": 0
   },
   {
