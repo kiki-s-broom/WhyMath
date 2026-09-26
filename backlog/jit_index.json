@@ -3583,6 +3583,15 @@
    ],
    "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(3회차 · CI 미러 중 · 커밋 전 되돌림)",
+   "weight": 0
   }
  ]
 }
