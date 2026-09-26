@@ -596,6 +596,9 @@ def test_operator_audit_kinds_exclude_the_students_own_actions() -> None:
     assert AuditEventKind.consent_change.value not in gate.OPERATOR_AUDIT_KINDS
     assert AuditEventKind.role_change.value in gate.OPERATOR_AUDIT_KINDS
     assert AuditEventKind.content_mutation.value in gate.OPERATOR_AUDIT_KINDS
+    # ADMIN-15: 토큰 발급은 데이터 개입이 아니다 — 그 토큰으로 한 콘텐츠 변경이 content_mutation
+    # 으로 따로 세어지므로, 발급까지 세면 같은 개입이 두 번 계상된다.
+    assert AuditEventKind.operator_token_issued.value not in gate.OPERATOR_AUDIT_KINDS
 
 
 # ──────────────────────────────────────────────────────────────────────────

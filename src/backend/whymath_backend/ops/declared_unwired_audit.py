@@ -1302,6 +1302,10 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 속한다 — 좌석을 줄 대상(user_profile)이 0행이라 grant가 성립하지 않던 구멍을 메운다.
         # 같은 사유로 HTTP 미노출·CI 미배선이 설계 확정값이다(운영자가 실 PG 앞에서 1회 실행).
         "ops.account_bootstrap_cli": _PRIVILEGE_ESCALATION_CLI,
+        # ADMIN-15(2026-09-25): 좌석 발급 경로의 *신원* 절반 — 로그인 없이 운영자 액세스 토큰을
+        # 만드는 CLI다. OAuth 밖의 인증 경로라 HTTP 노출·CI 자동 실행은 둘 다 설계상 금지이고
+        # (발급마다 privacy_audit 1행), 운영자가 실 PG·서버 시크릿 앞에서 수동 실행한다.
+        "ops.operator_token_cli": _PRIVILEGE_ESCALATION_CLI,
         # PB-11(2026-08-11): 코퍼스 사이드카 생성·갱신 저작 CLI. `ops.provenance_audit`이 집행하는
         # 계약을 만족하는 파일을 만들어 주는 도구가 저장소에 0개였던 부재를 메운다 — 저자가 손으로
         # 돌리는 쓰기 도구이므로 CI 상시 실행 대상이 아니다(사유 상수 참조).
