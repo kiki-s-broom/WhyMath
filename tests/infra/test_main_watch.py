@@ -558,7 +558,23 @@ class TestLocalOnlyCommits:
         _git(repos.work, "commit", "-q", "--allow-empty", "-m", "아직 안 올림")
         r = _cli(repos.work, *LOCAL_ONLY)
         assert r.returncode == 1, r.stdout + r.stderr
-        assert "원격 브랜치에 아직 올리지 않은 커밋 1개" in r.stdout
+        assert "feat에 원격 어디에도 없는 커밋 1개" in r.stdout
+
+    def test_branch_tracking_main_but_pushed_to_its_own_branch_is_not_unpushed(self, repos: Repos):
+        """upstream이 origin/main이면 `[ahead N]`은 main 대비 커밋 수다 — 미푸시가 아니다.
+
+        `origin/main`에서 딴 브랜치를 `-u` 없이 push하면 upstream이 계속 origin/main이라,
+        앞섬으로 세면 이미 `origin/feat`에 올라간 커밋을 '이 PC에만 있다'로 오경보한다.
+        """
+        _git(repos.work, "switch", "-q", "-c", "feat", "--track", "origin/main")
+        _git(repos.work, "commit", "-q", "--allow-empty", "-m", "원격 브랜치에는 올림")
+        _git(repos.work, "push", "-q", "origin", "feat")
+        # 픽스처가 이 절을 실제로 밟는가 — upstream이 정말 origin/main이고 앞섬이 1이다
+        assert _git(repos.work, "rev-parse", "--abbrev-ref", "feat@{upstream}") == "origin/main"
+        assert _git(repos.work, "rev-list", "--count", "origin/main..feat") == "1"
+        r = _cli(repos.work, *LOCAL_ONLY)
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert "[정상] 이 PC에만 있는 커밋(현재 브랜치): 없음" in r.stdout
 
     def test_other_never_pushed_branch_is_attention(self, repos: Repos):
         _git(repos.work, "switch", "-q", "-c", "side")

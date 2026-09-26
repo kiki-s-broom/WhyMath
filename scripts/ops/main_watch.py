@@ -113,7 +113,7 @@ DEFAULT_SLOW_INTERVAL = 300
 DEFAULT_MAX_REF_AGE_MIN = 30  # --no-fetch일 때 믿을 수 있는 원격 ref 나이(분)
 
 # ── 목록 상한 (한 화면·한 주기의 비용을 묶는다) ─────────────────────────────
-MAX_NEVER_PUSHED_PROBES = 300  # upstream 없는 로컬 브랜치의 rev-list 호출 상한
+MAX_BRANCH_PROBES = 300  # 로컬 브랜치의 '원격에 없는 커밋' rev-list 호출 상한
 MAX_LISTED = 10  # 이벤트·보고서에 펼쳐 보이는 항목 수
 TRUNK_LOG_LIMIT = 200  # main 전진 시 읽는 새 커밋 수 상한
 PR_PAGE_SIZE = 100  # 열린 PR 목록 1페이지 — 이 저장소 실측 한 자릿수
@@ -444,6 +444,10 @@ def _measure_local_branches(root: Path, lf: LocalFacts) -> None:
     뜻이다. 스쿼시 머지 후 정리된 브랜치가 대부분 이 상태인데, 그 커밋들은 main의 조상이
     아니라서 '원격 어디에도 없는 커밋'으로 세면 **머지된 작업이 미푸시로 오경보**된다.
     그래서 gone은 따로 모아 '정리 후보'로만 보인다(주의로 올리지 않는다).
+
+    나머지는 upstream 대비 앞섬(`[ahead N]`)이 아니라 **원격 어디에도 없는 커밋 수**로 센다.
+    upstream이 `origin/main`인 브랜치(`origin/main`에서 딴 뒤 `-u` 없이 push)는 앞섬이 곧
+    main 대비 커밋 수라서, 이미 `origin/<브랜치>`에 올라간 커밋을 미푸시로 오경보한다.
     """
     trunk_branch = _trunk_branch(lf.trunk_ref)
     fmt = "%(refname)%09%(upstream)%09%(upstream:track)%09%(objectname)"
@@ -472,15 +476,12 @@ def _measure_local_branches(root: Path, lf: LocalFacts) -> None:
             except GitQueryError as exc:
                 lf.local_trunk_error = str(exc)
             continue  # 트렁크는 미머지 목록에 넣지 않는다 — 위 대조가 따로 본다
-        ahead_match = re.search(r"ahead (\d+)", track)
         commits: int | None
         if upstream and "gone" in track:
             kind, commits = "gone", None
-        elif upstream:
-            kind, commits = "unpushed", int(ahead_match.group(1)) if ahead_match else 0
         else:
-            kind = "never_pushed"
-            if probes >= MAX_NEVER_PUSHED_PROBES:
+            kind = "unpushed" if upstream else "never_pushed"
+            if probes >= MAX_BRANCH_PROBES:
                 lf.branches_truncated = True
                 continue
             probes += 1
@@ -944,7 +945,6 @@ def _local_signals(lf: LocalFacts, opts: Options) -> list[Signal]:
         if lf.head_unpushed is None:
             add("head_unpushed", label, UNMEASURED, lf.head_unpushed_error or "재지 못했다")
         elif lf.head_unpushed > 0:
-            where = "원격 브랜치에 아직 올리지 않은" if lf.head_upstream else "원격 어디에도 없는"
             advice = (
                 f"git push -u origin {lf.head_branch}"
                 if lf.head_branch
@@ -954,7 +954,8 @@ def _local_signals(lf: LocalFacts, opts: Options) -> list[Signal]:
                 "head_unpushed",
                 label,
                 ATTENTION,
-                f"{_where(lf)}에 {where} 커밋 {lf.head_unpushed}개 — push 전에는 이 PC에만 있다",
+                f"{_where(lf)}에 원격 어디에도 없는 커밋 {lf.head_unpushed}개 — "
+                "push 전에는 이 PC에만 있다",
                 advice,
             )
         else:
@@ -1017,10 +1018,10 @@ def _local_branch_signal(lf: LocalFacts) -> Signal:
     if len(lf.gone_branches) > MAX_LISTED:
         lines.append(f"[정리 후보] … 외 {len(lf.gone_branches) - MAX_LISTED}개")
     if lf.branches_truncated:
-        lines.append(f"(upstream 없는 브랜치가 많아 앞 {MAX_NEVER_PUSHED_PROBES}개만 쟀다)")
+        lines.append(f"(로컬 브랜치가 많아 앞 {MAX_BRANCH_PROBES}개만 쟀다)")
     if not lf.unpushed_branches:
         return Signal("local_branches", "unmerged", label, OK, f"없음{gone}", lines=lines)
-    kind_label = {"unpushed": "원격보다 앞섬", "never_pushed": "push한 적 없음"}
+    kind_label = {"unpushed": "push 안 한 커밋", "never_pushed": "push한 적 없는 브랜치"}
     items = [
         f"[{kind_label.get(b.kind, b.kind)}] {b.name} — {b.commits}커밋"
         for b in lf.unpushed_branches
