@@ -2,7 +2,8 @@
 
 > 작성: 2026-09-25 · 판정 기준: main `63451153`
 > 대상 게이트: `G-admin06-browser-menu-call` (ADMIN-06 acceptance ②의 사람 축 · ADMIN-07 착수 선결)
-> 이 런북은 **읽기 전용**이다 — DB 쓰기·대장 조작·배포가 없다. 서버 두 개를 잠깐 띄웠다가 끈다.
+> A 단계는 **읽기 전용**이다(DB 쓰기·대장 조작·배포 없음). B 단계는 `whymath-pg`에 백업 후 스키마 업그레이드 1회와 토큰 발급 감사 1행을 쓴다(§5 B2·B3 — 둘 다 자가거부 가드 안).
+> 개정: 2026-09-25 §5 B 단계 채움(ADMIN-15 착지 · 판정 기준: 브랜치 `claude/optimistic-euler-wckia8`, main `f138f894` 병합본)
 
 ## 0. 먼저 알아 둘 것 — 이 게이트는 두 단계로 나뉜다
 
@@ -11,9 +12,9 @@
 | 단계 | 확인 내용 | 지금 실행 가능? |
 |---|---|---|
 | **A. CORS 축** | 허용 origin에서는 브라우저가 서버 응답을 **받고**, 비허용 origin에서는 브라우저가 **차단한다** | ✅ 가능 (이 런북 §2~§4) |
-| **B. 렌더 축** | 허용 origin에서 **200 + 좌측 내비 렌더** | ❌ **불가** — 실행 경로 공백 (§5) |
+| **B. 렌더 축** | 허용 origin에서 **200 + 좌측 내비 렌더** | ✅ `ADMIN-15` 머지 후 가능 (§5) |
 
-B가 불가한 이유: `GET /v1/admin/menu`는 **데모 계정이 아닌** 실 신원 토큰을 요구한다(`api/admin_menu.py` — 데모 계정 403). 저장소에서 액세스 토큰을 발급하는 경로는 OAuth 콜백(`api/auth.py`)과 데모 로그인 둘뿐이고, Kiki의 content_admin 계정(`account_bootstrap_cli`로 생성 — 게이트 `G-operator-seat-first-grant` 증적)에는 OAuth 로그인 이력이 없다. 이 공백은 태스크 **`ADMIN-15-operator-access-token-issuance`**로 등재했다. 그 태스크가 착지하면 §5를 채운다.
+B가 불가한 이유: `GET /v1/admin/menu`는 **데모 계정이 아닌** 실 신원 토큰을 요구한다(`api/admin_menu.py` — 데모 계정 403). 저장소에서 액세스 토큰을 발급하는 경로는 OAuth 콜백(`api/auth.py`)과 데모 로그인 둘뿐이고, Kiki의 content_admin 계정(`account_bootstrap_cli`로 생성 — 게이트 `G-operator-seat-first-grant` 증적)에는 OAuth 로그인 이력이 없다. 이 공백은 태스크 **`ADMIN-15-operator-access-token-issuance`**가 운영자 토큰 발급 CLI로 메웠다(§5).
 
 **A 단계만으로 게이트를 닫지 않는다.** A의 결과는 게이트 notes에 부분 증적으로 남기고, B까지 끝난 뒤 clear한다.
 
@@ -171,13 +172,114 @@ A-2에서 페이지 자체가 안 열리면(연결 거부), `localhost`가 IPv6�
 
 세션이 이 내용을 게이트 notes에 **A 단계 부분 증적**으로 기록한다. 게이트는 §5(B 단계)까지 끝난 뒤 clear한다.
 
-## 5. B 단계 — 200 + 내비 렌더 (현재 실행 불가 · `ADMIN-15` 대기)
+## 5. B 단계 — 200 + 내비 렌더 (`ADMIN-15` 착지 후 실행 가능)
 
-필요한 것: Kiki의 content_admin 계정(`G-operator-seat-first-grant` 증적의 user_id)에 대한 **비데모 액세스 토큰**. 이 토큰은 창②의 서버와 **같은 `WHYMATH_JWT_SECRET_KEY`**로 서명돼야 하고, 서버는 `whymath-pg`(5433)에서 그 계정을 조회해야 한다.
+A 단계와 **따로** 실행한다(A의 블록 6이 worktree를 지웠으므로 준비부터 다시 한다). 새로 필요한 것은 세 가지다.
 
-`ADMIN-15`가 착지하면 이 절에 다음을 채운다: ①창②에 `WHYMATH_DATABASE_URL`(whymath-pg) 추가 ②토큰 발급 블록(창②와 같은 시크릿 공유 방식 포함) ③브라우저 B-1: 허용 origin에서 실 토큰 → 좌측 내비가 서버 레지스트리 섹션대로 렌더, Network `menu` 200.
+- **운영자 토큰** — `ops/operator_token_cli.py`(ADMIN-15)가 content_admin 계정에 단기 토큰(기본 30분·상한 60분)을 발급하고, 발급마다 `privacy_audit`에 `operator_token_issued` 1행(누가·누구에게·언제·만료)을 남긴다. 데모 계정·content_admin이 아닌 계정·없는 계정은 exit 1로 거부한다.
+- **스키마 업그레이드** — 위 감사 행이 쓰는 컬럼 2개(`token_expires_at`·`issued_by`)가 마이그레이션 `8c19e8a611e4`로 추가됐다. `whymath-pg`에 적용돼 있지 않으면 CLI가 빠진 컬럼 이름을 적고 exit 1로 거부한다. 그래서 블록 B2가 **백업 후 `alembic upgrade head`**를 한다(이 런북에서 유일한 DB 쓰기).
+- **같은 JWT 시크릿** — 토큰은 창②의 서버와 같은 `WHYMATH_JWT_SECRET_KEY`로 서명돼야 한다. 그래서 토큰 발급을 **창② 안에서** 서버 기동 직전에 하고, 토큰은 화면에 찍지 않고 **클립보드**로만 넘긴다.
 
-OAuth(카카오·네이버) 실 로그인으로 토큰을 얻는 경로가 Phaiakes9에서 동작한다는 것이 실측되면, `ADMIN-15`는 취소하고 이 절을 그 경로로 채운다.
+> 실측(2026-09-25 컨테이너, 로컬 PG16): `account_bootstrap_cli create` → `role_grant_cli grant … content_admin` → `operator_token_cli issue … --ttl-minutes 30` exit 0 → 그 토큰으로 `GET /v1/admin/menu` **HTTP 200**, 섹션이 채워진 응답 · `--ttl-minutes 90`은 exit 2로 거부. 통합 테스트 `tests/backend/ops/test_operator_token_cli_integration.py` 5건(메뉴 200 + sections 비어 있지 않음 · 무토큰 401 대조 · 감사 1행 · 거부 3종 감사 0)이 같은 흐름을 동결한다.
+
+### B0 — 창① [준비·빌드]: §2의 블록 1·2를 그대로 다시 실행
+
+블록 1의 `WORKTREE_HEAD`가 **ADMIN-15 머지 커밋 이후**여야 한다(B1의 `HAS_TOKEN_CLI=True`가 그것을 확인한다). `BUILD_EXIT=0`·`OUT_ADMIN=True`까지 확인한 뒤 B1로 간다.
+
+### B1 — 창① [DB 상태 확인 — 읽기 전용]
+
+선행 조건: Docker Desktop 가동, `whymath-pg` 컨테이너 실행 중.
+
+```powershell
+# [창① B1 DB 상태 확인 — 읽기 전용] Windows PowerShell — Phaiakes9
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Wt = Join-Path $env:TEMP "whymath-g-admin06"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$env:PYTHONPATH = Join-Path $Wt "src\backend"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+"HAS_TOKEN_CLI=" + (Test-Path (Join-Path $Wt "src\backend\whymath_backend\ops\operator_token_cli.py"))
+"PG_RUNNING=" + [bool](docker ps --filter "name=^whymath-pg$" --format "{{.Names}}")
+cd (Join-Path $Wt "src\backend")
+& $Py -m alembic current
+"CURRENT_EXIT=$LASTEXITCODE"
+& $Py -m alembic heads
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Admins = @(docker exec whymath-pg psql -U whymath -d whymath -tAc "select user_id from user_profile where role::text='content_admin'" | Where-Object { $_ -match '^[0-9a-f-]{36}$' })
+"CONTENT_ADMIN_COUNT=" + $Admins.Count
+```
+
+판정: `HAS_TOKEN_CLI=True`·`PG_RUNNING=True`·`CURRENT_EXIT=0`·`CONTENT_ADMIN_COUNT=1`. `alembic heads`는 `8c19e8a611e4 (head)`(또는 그 이후)를 낸다. `alembic current`가 이미 같은 값이면 B2를 건너뛰어도 된다. content_admin 계정은 **정확히 1개**여야 한다(B3가 그 1개를 자동으로 고른다 — 0개나 2개 이상이면 B3가 거부한다). 계정 조회는 읽기 전용 `select` 한 줄이다.
+
+### B2 — 창① [백업 + 스키마 업그레이드 — 쓰기]
+
+B1의 판정값을 눈으로 확인한 다음에 붙여넣는다. 이 블록은 조건(worktree 코드·컨테이너 가동·CLI 실재)을 **스스로 다시 검사해** 하나라도 어긋나면 아무것도 쓰지 않는다. 백업이 실패하면 업그레이드도 하지 않는다. 백업 파일은 저장소 밖 `C:\Users\kiki\whymath_backups`에 남는다(PowerShell `>`로 받으면 바이너리 덤프가 깨지므로 컨테이너 안에서 파일로 만든 뒤 `docker cp`로 꺼낸다).
+
+```powershell
+# [창① B2 백업 + alembic upgrade head — 쓰기] Windows PowerShell — Phaiakes9
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Wt = Join-Path $env:TEMP "whymath-g-admin06"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$env:PYTHONPATH = Join-Path $Wt "src\backend"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+$CliFile = (& $Py -c "import whymath_backend.ops.operator_token_cli as m; print(m.__file__)")
+$FromWt = ($CliFile -eq (Join-Path $Wt "src\backend\whymath_backend\ops\operator_token_cli.py"))
+$PgUp = [bool](docker ps --filter "name=^whymath-pg$" --format "{{.Names}}")
+$BackupDir = Join-Path $env:USERPROFILE "whymath_backups"
+New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
+$Dump = "whymath_before_admin15_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".dump"
+"FROM_WORKTREE=$FromWt"
+"PG_RUNNING=$PgUp"
+if ($FromWt -and $PgUp) { docker exec whymath-pg pg_dump -U whymath -Fc -f "/tmp/$Dump" whymath; $DumpExit = $LASTEXITCODE; docker cp "whymath-pg:/tmp/$Dump" (Join-Path $BackupDir $Dump); $CpExit = $LASTEXITCODE; $DumpSize = if (Test-Path (Join-Path $BackupDir $Dump)) { (Get-Item (Join-Path $BackupDir $Dump)).Length } else { 0 }; "DUMP_EXIT=$DumpExit"; "CP_EXIT=$CpExit"; "DUMP_BYTES=$DumpSize"; if (($DumpExit -eq 0) -and ($CpExit -eq 0) -and ($DumpSize -gt 0)) { cd (Join-Path $Wt "src\backend"); & $Py -m alembic upgrade head; "UPGRADE_EXIT=$LASTEXITCODE"; & $Py -m alembic current; cd C:\Users\kiki\Desktop\__AI\WhyMath } else { "UPGRADE_REFUSED=True — 백업 실패(DUMP_EXIT·CP_EXIT·DUMP_BYTES 확인). DB는 바뀌지 않았다" } } else { "WRITE_REFUSED=True — FROM_WORKTREE=$FromWt PG_RUNNING=$PgUp. False인 쪽을 해결한 뒤 B1부터 다시" }
+```
+
+판정: `DUMP_EXIT=0`·`CP_EXIT=0`·`DUMP_BYTES`가 0보다 큼 → `UPGRADE_EXIT=0` → 마지막 `alembic current`가 `8c19e8a611e4 (head)`(또는 그 이후). 거부 줄(`WRITE_REFUSED`·`UPGRADE_REFUSED`)이 보이면 DB는 바뀌지 않은 것이다.
+
+### B3 — 창② [토큰 발급 + 백엔드 — 점유]
+
+**이 창은 블록을 붙여넣은 뒤 서버가 점유한다. 이후 조작 금지. Ctrl+C는 서버 중단 신호다.**
+
+A 단계 블록 3과 다른 점: ①서버가 `whymath-pg`를 본다(계정 조회) ②서버를 띄우기 직전에 **같은 셸·같은 시크릿**으로 토큰을 발급해 클립보드에 넣는다 ③content_admin 계정을 DB 읽기 조회로 스스로 찾는다(정확히 1개가 아니면 거부). 토큰 발급은 감사 1행을 쓰므로 가드 안에서만 한다.
+
+```powershell
+# [창② B3 토큰 발급 + 백엔드 — 이 창은 서버가 점유합니다. 붙여넣은 뒤 조작 금지]
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Wt = Join-Path $env:TEMP "whymath-g-admin06"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$env:PYTHONPATH = Join-Path $Wt "src\backend"
+$env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath?ssl=disable"
+$env:WHYMATH_CORS_ALLOWED_ORIGINS = "http://127.0.0.1:3001"
+$env:WHYMATH_JWT_SECRET_KEY = (& $Py -c "import secrets;print(secrets.token_urlsafe(48))")
+$AppFile = (& $Py -c "import whymath_backend.app as a; print(a.__file__)")
+$FromWt = ($AppFile -eq (Join-Path $Wt "src\backend\whymath_backend\app.py"))
+$PortBusy = [bool](Get-NetTCPConnection -LocalPort 8010 -State Listen -ErrorAction SilentlyContinue)
+$Admins = @(docker exec whymath-pg psql -U whymath -d whymath -tAc "select user_id from user_profile where role::text='content_admin'" | Where-Object { $_ -match '^[0-9a-f-]{36}$' })
+"FROM_WORKTREE=$FromWt"
+"PORT_8010_BUSY=$PortBusy"
+"CONTENT_ADMIN_COUNT=" + $Admins.Count
+if ($FromWt -and (-not $PortBusy) -and ($Admins.Count -eq 1)) { $Issued = (& $Py -m whymath_backend.ops.operator_token_cli issue $Admins[0] --ttl-minutes 30 | ConvertFrom-Json); "ISSUE_EXIT=$LASTEXITCODE"; "TOKEN_LENGTH=" + "$($Issued.access_token)".Length; "EXPIRES_AT=$($Issued.expires_at)"; if ("$($Issued.access_token)".Length -gt 0) { Set-Clipboard -Value $Issued.access_token; "TOKEN_IN_CLIPBOARD=True"; & $Py -m uvicorn whymath_backend.app:create_app --factory --host 127.0.0.1 --port 8010 } else { "SERVER_REFUSED=True — 토큰 발급 실패. 위 stderr의 error 사유 확인(스키마 미적용이면 B2)" } } else { "WRITE_REFUSED=True — FROM_WORKTREE=$FromWt PORT_8010_BUSY=$PortBusy CONTENT_ADMIN_COUNT=$($Admins.Count). CONTENT_ADMIN_COUNT가 1이 아니면 B1의 계정 조회 결과 확인" }
+```
+
+판정: `ISSUE_EXIT=0`·`TOKEN_LENGTH`가 0보다 큼·`TOKEN_IN_CLIPBOARD=True` → `Uvicorn running on http://127.0.0.1:8010`. 토큰 값 자체는 화면에 찍지 않는다. **만료(`EXPIRES_AT`, 30분) 전에** 브라우저 확인을 끝낸다 — 지나면 이 블록을 새 창에서 다시 실행한다(서버를 다시 띄우면 시크릿이 바뀌어 이전 토큰은 무효다).
+
+### B4 — 창③ [정적 서버]: §3의 블록 4를 그대로 실행
+
+### 브라우저 B-1 — 허용 origin + 실 토큰
+
+1. Chrome에서 `http://127.0.0.1:3001/admin/` 을 연다(A 단계에서 연 탭이면 로그아웃 후 새로고침).
+2. 「운영자 인증」 칸에 **Ctrl+V**(클립보드의 토큰)를 붙이고 「콘솔 열기」.
+3. **기대**: 왼쪽에 서버가 준 메뉴 섹션이 그려진다(예: 「시스템 설정·권한(기능 플래그·RBAC)」 · 「앱·다과목 관리」 — `planned` 항목은 회색 「준비 중」으로 보이고 눌리지 않는다).
+4. F12 → Network 탭에서 `menu` 요청의 Status가 **`200`**.
+
+실패 시 대처: 「이 계정으로는 콘솔을 열 수 없습니다 (403)」이면 토큰 대상이 데모 계정이다(발급 CLI가 먼저 거부했어야 하므로 B3 출력 전문을 회신) · 「토큰이 유효하지 않습니다 (401)」이면 토큰과 서버의 시크릿이 다르거나 만료다(B3를 새 창에서 다시).
+
+### B 단계 회신할 내용
+
+- B1의 `HAS_TOKEN_CLI`·`PG_RUNNING`·`CURRENT_EXIT`·`CONTENT_ADMIN_COUNT` 줄과 `alembic current` 출력
+- B2의 `DUMP_EXIT`·`CP_EXIT`·`DUMP_BYTES`·`UPGRADE_EXIT` 줄과 마지막 `alembic current` 출력(건너뛰었으면 그 사실)
+- B3의 `CONTENT_ADMIN_COUNT`·`ISSUE_EXIT`·`TOKEN_LENGTH`·`EXPIRES_AT` 줄(**토큰 값은 보내지 않는다**)
+- B-1 화면의 왼쪽 메뉴 섹션 이름들과 Network `menu` 상태 코드(가능하면 스크린샷)
+
+세션이 A·B 결과를 증적으로 게이트를 clear한다. 정리는 §6과 같다(백업 파일은 남겨 둔다).
 
 ## 6. 정리
 

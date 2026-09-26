@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,10 +15,19 @@ acceptance:
   - "정본화: 운영자(content_admin) 계정에 단기 액세스 토큰을 발급하는 ops CLI 1개 — HTTP 미노출·운영자 셸 전용(role_grant_cli·account_bootstrap_cli 컨벤션 미러). 발급 대상 거부 조건: 데모 계정(is_demo_account)·content_admin 아닌 역할·존재하지 않는 user_id — 전부 비0 종료 + stderr 사유 + 발급 0. 만료는 기본 설정보다 짧게 상한(예: 60분)"
   - "집행: 발급 1건마다 감사 1행(누가·누구에게·언제·만료) — 인증 경로가 OAuth와 CLI 둘이 되는 것의 대가로 CLI 경로는 반드시 흔적을 남긴다. 거부 3종·성공 1종·감사 행을 테스트로 동결하고, 발급된 토큰으로 GET /v1/admin/menu가 200 + 비어 있지 않은 sections를 내는 것을 통합 테스트로 확인"
   - "대안 검토 기록: OAuth(카카오·네이버) 실 로그인으로 토큰을 받는 경로도 있으나 백오피스 셸은 로그인 화면을 의도적으로 만들지 않았고(OperatorTokenGate.tsx docstring), Phaiakes9에 provider 자격증명이 구성됐는지 미확인이다. OAuth 경로로 해소 가능함이 실측되면 이 태스크는 cancel하고 런북 B단계를 그 경로로 교체한다"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1331"
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/**"
+  - "src/backend/alembic/versions/**"
+  - "src/backend/whymath_backend/privacy/**"
+  - "src/backend/whymath_backend/schema/**"
+  - "src/backend/whymath_backend/db/**"
+  - src/backend/whymath_backend/api/me.py
+  - "scripts/analysis/**"
+  - scripts/ops/probe_prod_schema_revision.sql
+  - docs/ops/g_admin06_browser_menu_call_runbook.md
 session: null
-notes: "2026-09-25 ADMIN-07 착수 거부(G-admin06-browser-menu-call pending) 후 게이트 런북 작성 중 발견. 게이트 제목의 '허용 origin에서 200+내비 렌더' 축은 비데모 실 신원 액세스 토큰이 필요한데(admin_menu.py가 데모 계정 403), 저장소에서 토큰을 발급하는 경로는 OAuth 콜백(api/auth.py)과 demo_auth 둘뿐이다. Kiki의 content_admin 계정(G-operator-seat-first-grant evidence의 user_id 5612757b…)은 account_bootstrap_cli로 만들어져 OAuth 로그인 이력이 없다. 즉 게이트 B단계는 현재 실행 경로가 없다 — CLAUDE.md 거부 처리 ③(CLI 경로 자체가 없는 설계 공백 → 태스크 등재, HARN-06 선례). 런북 docs/ops/g_admin06_browser_menu_call_runbook.md의 A단계(CORS 축)는 이 태스크와 무관하게 지금 실행 가능하다"
+notes: "2026-09-25 ADMIN-07 착수 거부(G-admin06-browser-menu-call pending) 후 게이트 런북 작성 중 발견. 게이트 제목의 '허용 origin에서 200+내비 렌더' 축은 비데모 실 신원 액세스 토큰이 필요한데(admin_menu.py가 데모 계정 403), 저장소에서 토큰을 발급하는 경로는 OAuth 콜백(api/auth.py)과 demo_auth 둘뿐이다. Kiki의 content_admin 계정(G-operator-seat-first-grant evidence의 user_id 5612757b…)은 account_bootstrap_cli로 만들어져 OAuth 로그인 이력이 없다. 즉 게이트 B단계는 현재 실행 경로가 없다 — CLAUDE.md 거부 처리 ③(CLI 경로 자체가 없는 설계 공백 → 태스크 등재, HARN-06 선례). 런북 docs/ops/g_admin06_browser_menu_call_runbook.md의 A단계(CORS 축)는 이 태스크와 무관하게 지금 실행 가능하다\n\n[정정 2026-09-25] paths ['src/backend/whymath_backend/ops/**', 'tests/backend/**'] → ['src/backend/whymath_backend/ops/**', 'tests/backend/**', 'src/backend/alembic/versions/**', 'src/backend/whymath_backend/privacy/**', 'src/backend/whymath_backend/schema/**', 'src/backend/whymath_backend/db/**', 'src/backend/whymath_backend/api/me.py', 'scripts/analysis/**', 'scripts/ops/probe_prod_schema_revision.sql', 'docs/ops/g_admin06_browser_menu_call_runbook.md']: 구현이 감사 스키마(마이그레이션·모델·enum)·인벤토리 귀속 스크립트·런북 B단계까지 닿아 작업 범위를 실제 변경 경로로 정정(기존 2패턴 유지)"
 updated: 2026-09-25

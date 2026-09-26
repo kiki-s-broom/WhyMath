@@ -293,7 +293,8 @@ EventKindFilter = Annotated[
     Query(
         description=(
             "개인정보·콘텐츠 감사 이벤트 종류 필터(export_data·consent_change·admin_access·"
-            "role_change·content_mutation). 반복 지정 시 OR(IN). 생략 시 전체."
+            "role_change·content_mutation·operator_token_issued). 반복 지정 시 OR(IN). "
+            "생략 시 전체."
         )
     ),
 ]
