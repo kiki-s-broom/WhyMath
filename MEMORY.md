@@ -347,6 +347,7 @@
 - **④ 시계열 첫 점**: `v1` · rotation 0 · `frozen_at 2026-09-26T02:38:09.311755Z` · digest `55105757519f790e9ca95100fd5042085ba28b7f37bc4a31812e29c4385e1a1c` · 15건(clean 13 · defective 2 · A4 15 · `edit_aware_verdict` 13 · `rejected_failure_code` 2). QA 엔진 혼동행렬 = **측정 불가**(문항별 판정 생산자 부재 · `EOS-137`).
 - **런북 결함 1건(실해 0)**: §1이 `git worktree add` 실패 시에도 뒤 명령이 도는 형태였다. 채팅 재전달 때 HARN-163 훅이 잡아 가드 버전으로 실행했고 런북 파일도 고쳤다. 런북 스캐너(HARN-106)는 쓰기 어휘만 봐서 통과시켰다 — 런북 파일 속 상태 전환은 두 장치의 사각. 대책 = `HARN-178`(등재 시 `HARN-176` — 푸시 전 시차에 다른 세션과 번호가 겹쳐 개명), 사고 대장 계열 `unguarded-state-transition-block`.
 - **MP-03 인수·완료**: 원 세션(`claude/admiring-bell-6814st`)의 브랜치는 #1312 머지로 삭제됐고 원격 claim은 reap됐다 → `unblock`→`start`(HARN-95 경로)로 인수. ③ 임계 판정은 2026-09-25 항(유지 권고)에 있고 결정은 게이트 `G-mp03-canary-threshold-decision`(Kiki)로 올라가 있다 → acceptance ①~④ 전수 충족. 기록 = 판정 문서 `docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md` §8.
+- **Kiki 결정 (같은 날 · 게이트 `G-mp03-canary-threshold-decision` clear)**: 카나리 임계 **ⓐ 유지** — 판정 대상 30건 · 0.90 · 신뢰 0.95 그대로. 근거는 판정 문서 §3.3(차단 2회 모두 체계적 결함의 참양성 · 우연 차단 0건 · 원인 정정 뒤 3회차 30/30 통과). ⓑ 카나리 42건 확대는 **예비안**으로 남긴다 — 체계적 원인 없는 실패 1~2건으로 차단되는 첫 사례가 재판정 지점이다. ⓒ 임계 0.85 완화는 비권고(90% 생성기 누출 4.2% → 18.4%).
 
 ### 2026-09-25 (판정 · 게이트 `G-kg02-review-promotion-llm-session`): **KG-02 승격 회차는 보류 — 게이트가 겨냥한 표면(`/concepts/search`)은 이 승격으로 움직이지 않고, 학생 공급(`/study`)은 검수 상태를 아예 읽지 않는다. 노출 게이트 판정을 `CONT-05`로 떼어 이 게이트의 입력으로 걸었다** (Kiki 판정 "보류+대장 정정", claude 조사·실측·집행) — 판정 기준 main `3a7a7315`
 

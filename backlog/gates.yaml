@@ -500,11 +500,11 @@ gates:
     title: "카나리 임계 결정 (MP-02 3회차 결과 직후) — ⓐ유지(판정 대상 30건·0.90 = 실패 0건 요구) / ⓑ카나리 42건 확대·0.90 유지(실패 1건 허용 · 권장) / ⓒ임계 0.85 완화 중 택1. 근거 docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §3 — ⓑ는 나쁜 생성기(실합격률 85%) 누출이 ⓐ와 같은 0.9% 수준이면서 98% 생성기 헛차단을 45%에서 21%로 줄이고, ⓒ는 90% 생성기 통과를 4.2%에서 18.4%로 올린다. 3회차 전에 바꾸지 않는 이유: 3회차는 예시 코드 정정 한 가지의 효과를 재도록 설정이 고정돼 있다."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-25
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 결정 2026-09-26(채팅 · \"유지\"): ⓐ 현행 유지 — 카나리 판정 대상 30건 · 임계 0.90 · 신뢰 0.95를 바꾸지 않는다. 근거 = 판정 문서 docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md §3.3: 차단 2회(1회차 수학 오류 2건 · 2회차 예시 성취기준 코드 복사 3건)가 모두 체계적 결함의 참양성이었고 우연 차단은 0건, 원인 정정 뒤 3회차가 같은 임계에서 30/30(Wilson 하한 0.9173)으로 통과했다. 임계 0.85 완화는 실합격률 90% 생성기 누출을 4.2%에서 18.4%로 올려 비권고. ⓑ 카나리 42건 확대(0.90 유지 · 실패 1건 허용)는 폐기가 아니라 예비안 — 체계적 원인이 없는 실패 1~2건으로 차단되는 첫 사례가 나오면 재판정한다. 판정 기준 main bd87b30d · PR #1334."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +MP-03-first-golden-promotion — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 임계 결정의 판정 재료(MP-03 acceptance ③ 임계 현실 판정·판정 문서)를 만드는 작업이 MP-03이다 — MP-03은 임계를 바꾸지 않고 Kiki 결정으로 올리므로 순환이 없다"
