@@ -143,8 +143,15 @@ def gate_inputs_text(backlog: Backlog, gate: object) -> str:
         )
         return f"여는 작업 {len(deps)}건 · 미완 {waiting}건: {', '.join(parts)}"
     reason = getattr(gate, "no_inputs_reason", None)
-    if reason:
+    # 공백뿐인 사유는 사유가 아니다 — 검증기의 `has_reason`(strip 후 판정)과 같은 기준 (HARN-175).
+    if reason and reason.strip():
         return f"여는 작업 없음(사람 직접 행동): {reason}"
+    # 위반 주장은 검증기(`Gate.validate`)와 같은 조건에서만 낸다 (HARN-175). 검증기는 pending
+    # 게이트에만 입력 선언을 요구한다 — cleared·waived는 아무것도 막지 않으므로 과거 행에
+    # 소급하지 않는다. 이 분기가 없던 동안 닫힌 게이트 62건(cleared 56·waived 6) 전부가
+    # `gates show`에서 거짓 위반으로 보였다(같은 시점 validate는 exit 0 — 2026-09-25 실측).
+    if getattr(gate, "status", None) != "pending":
+        return "여는 작업 기록 없음 — 종결 게이트라 요구하지 않음(HARN-174 입력 선언은 pending에만)"
     return "여는 작업 미선언 — validate 위반(HARN-174)"
 
 
