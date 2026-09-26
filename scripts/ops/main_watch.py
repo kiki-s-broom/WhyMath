@@ -90,6 +90,12 @@ _CODE_ROOT = Path(__file__).resolve().parents[2]
 for _dir in (_CODE_ROOT / "scripts" / "harness", _CODE_ROOT / "scripts" / "ops"):
     if str(_dir) not in sys.path:
         sys.path.insert(0, str(_dir))
+if __name__ == "__main__":
+    # 단독 실행이면 바이트코드 캐시(__pycache__)도 쓰지 않는다 — 감시기는 흔적을 남기지
+    # 않는다. 실측(2026-09-26 런북 시뮬레이션): 캐시가 전용 worktree를 '미추적 파일 있음'
+    # 으로 만들어 정리 단계의 `git worktree remove`가 거부됐다. 테스트가 import할 때는
+    # 프로세스 전역 설정을 건드리지 않도록 __main__일 때만 켠다.
+    sys.dont_write_bytecode = True
 
 import pr_delivery_audit as pda  # noqa: E402 — HARN-30: PR 배송 분류·처방·API 조회
 import remote_claims  # noqa: E402 — HARN-19·47: git 호출(UTF-8)·원격 브랜치 스캔
@@ -1490,9 +1496,29 @@ def watch(
         while True:
             started = now()
             slow = last_slow is None or started - last_slow >= slow_interval
-            snap = take_snapshot(
-                root, opts, trunk_ref=trunk_ref, prev=prev, slow=slow, last_fetch_ok=last_fetch_ok
-            )
+            try:
+                snap = take_snapshot(
+                    root,
+                    opts,
+                    trunk_ref=trunk_ref,
+                    prev=prev,
+                    slow=slow,
+                    last_fetch_ok=last_fetch_ok,
+                )
+            except Exception as exc:  # noqa: BLE001 — 한 주기의 내부 오류로 감시를 죽이지 않는다
+                # 트레이스백으로 죽으면 종료 코드 1(= '주의 필요'와 같은 값)이 되고 감시가
+                # 멈춘 줄도 모른다. 이 주기를 '미측정'으로 크게 알리고 다음 주기를 계속 돈다.
+                if pending_heartbeat:
+                    out.write("\n")
+                    pending_heartbeat = False
+                out.write(f"[{clock()}] [미측정] 감시기 내부 오류 — {type(exc).__name__}: {exc}\n")
+                out.flush()
+                last_code = EXIT_UNMEASURED
+                cycles += 1
+                if max_cycles is not None and cycles >= max_cycles:
+                    return last_code
+                sleep(interval)
+                continue
             if snap.local.fetch_state == "ok":
                 last_fetch_ok = started
             if slow:
@@ -1523,12 +1549,13 @@ def watch(
                     out.write(render_heartbeat(snap, clock()) + "\n")
             out.flush()
             prev = snap
+            last_code = exit_code(snap.signals)
             cycles += 1
             if max_cycles is not None and cycles >= max_cycles:
                 if pending_heartbeat:
                     out.write("\n")  # 덮어쓰던 하트비트 줄을 닫는다 — 뒤 출력이 이어 붙지 않게
                     out.flush()
-                return exit_code(snap.signals)
+                return last_code
             sleep(interval)
     except KeyboardInterrupt:
         if pending_heartbeat:
@@ -1623,13 +1650,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_root(given: Path | None) -> Path | None:
+def _resolve_root(given: Path | None) -> tuple[Path | None, str]:
+    """감시할 저장소 루트와, 못 찾았다면 그 사유 — '저장소 아님'과 'git 미설치'를 가른다."""
     base = (given or Path.cwd()).expanduser()
     try:
         top = _git_out(base.resolve(), "rev-parse", "--show-toplevel").strip()
-    except (GitQueryError, OSError):
-        return None
-    return Path(top) if top else None
+    except (GitQueryError, OSError) as exc:
+        return None, str(exc)
+    return (Path(top), "") if top else (None, "git rev-parse가 빈 경로를 냈다")
 
 
 def _safe_stdio() -> None:
@@ -1656,10 +1684,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"--slow-interval은 {MIN_SLOW_INTERVAL}초 이상이어야 한다")
     if args.stale_days < 0 or args.max_ref_age < 1:
         parser.error("--stale-days는 0 이상, --max-ref-age는 1 이상이어야 한다")
-    root = _resolve_root(args.repo_root)
+    root, reason = _resolve_root(args.repo_root)
     if root is None:
         where = args.repo_root or Path.cwd()
-        print(f"git 저장소를 찾지 못했다: {where}", file=sys.stderr)
+        print(f"git 저장소를 찾지 못했다: {where} — {reason}", file=sys.stderr)
         return EXIT_USAGE
 
     skip = frozenset(args.skip)
@@ -1688,7 +1716,12 @@ def main(argv: list[str] | None = None) -> int:
             out=sys.stdout,
             max_cycles=args.max_cycles,
         )
-    snap = take_snapshot(root, opts, trunk_ref=trunk_ref)
+    try:
+        snap = take_snapshot(root, opts, trunk_ref=trunk_ref)
+    except Exception as exc:  # noqa: BLE001 — 내부 오류는 '측정 실패'다
+        # 트레이스백으로 끝나면 종료 코드가 1이 되어 '주의 필요'와 구별되지 않는다.
+        print(f"측정 실패 — 감시기 내부 오류({type(exc).__name__}: {exc})", file=sys.stderr)
+        return EXIT_UNMEASURED
     if args.json:
         print(json.dumps(snapshot_to_dict(snap), ensure_ascii=True, indent=2))
     else:

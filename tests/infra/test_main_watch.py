@@ -23,6 +23,7 @@ import importlib.util
 import io
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -300,6 +301,83 @@ def test_fit_width_counts_hangul_as_two_columns():
     assert sum(mw._char_width(ch) for ch in mw.fit_width(long, 78)) == 78
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX 신호(SIGINT)로 Ctrl+C를 모사한다")
+def test_ctrl_c_ends_the_watch_cleanly_with_exit_0(repos: Repos, tmp_path: Path):
+    """② Ctrl+C는 정상 종료다 — 트레이스백 없이 '감시 종료' 줄과 종료 코드 0.
+
+    SIGINT를 **기본 동작으로 되돌려** 띄운다. 비대화형 셸이 `&`로 띄운 프로세스는 SIGINT가
+    '무시'로 상속되고, 그러면 파이썬은 Ctrl+C 처리기를 아예 설치하지 않는다(2026-09-26
+    런북 시뮬레이션에서 이것 때문에 첫 모사가 무효였다). 그 상태로 재면 이 테스트는
+    감시기가 아니라 하네스의 신호 상속을 재게 된다.
+    """
+    log = tmp_path / "watch.log"
+    env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_TOKEN", "GH_TOKEN")}
+    env["PYTHONUTF8"] = "1"
+    cmd = [
+        sys.executable,
+        str(_SCRIPT),
+        "--repo-root",
+        str(repos.work),
+        "--no-gh",
+        "--watch",
+        "--interval",
+        "10",
+        *LOCAL_ONLY,
+    ]
+    with log.open("wb") as out:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+            env=env,
+            preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL),
+        )
+        try:
+            deadline = time.monotonic() + 60
+            while "감시 시작" not in log.read_text(encoding="utf-8", errors="replace"):
+                assert proc.poll() is None, log.read_text(encoding="utf-8", errors="replace")
+                assert time.monotonic() < deadline, "60초 안에 감시가 시작되지 않았다"
+                time.sleep(0.2)
+            proc.send_signal(signal.SIGINT)
+            code = proc.wait(timeout=30)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+    text = log.read_text(encoding="utf-8", errors="replace")
+    assert code == 0, text
+    assert text.rstrip().endswith("감시 종료(Ctrl+C)"), text
+    assert "Traceback" not in text
+
+
+def test_standalone_run_leaves_no_bytecode_cache(tmp_path: Path):
+    """④ 흔적 없음 — 단독 실행은 `__pycache__`도 쓰지 않는다.
+
+    실측(2026-09-26 런북 시뮬레이션): 캐시가 전용 worktree를 '미추적 파일 있음'으로 만들어
+    정리 단계의 `git worktree remove`가 거부됐다. 스크립트 사본을 임시 폴더에 두고 돌려
+    그 폴더에 캐시가 생기지 않는지 본다(저장소 원본은 다른 테스트가 이미 캐시를 만든다).
+    """
+    copy = tmp_path / "code"
+    for sub in ("harness", "ops"):
+        src = _REPO_ROOT / "scripts" / sub
+        dst = copy / "scripts" / sub
+        dst.mkdir(parents=True)
+        for path in src.glob("*.py"):
+            (dst / path.name).write_bytes(path.read_bytes())
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    r = subprocess.run(
+        [sys.executable, str(copy / "scripts" / "ops" / "main_watch.py"), "--help"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        timeout=60,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr  # --help는 sibling import 이후에 끝난다
+    caches = sorted(p.relative_to(copy) for p in copy.rglob("__pycache__"))
+    assert caches == [], f"감시기가 바이트코드 캐시를 남겼다: {caches}"
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # ③ 측정 실패 ≠ 이상 없음
 # ─────────────────────────────────────────────────────────────────────────
@@ -331,6 +409,36 @@ class TestMeasurementFailure:
         out, code = _watch(repos, 3)
         assert "[미측정]" not in out
         assert code == 0
+
+    def test_internal_error_in_one_cycle_is_reported_and_the_watch_survives(
+        self, repos: Repos, monkeypatch
+    ):
+        real = mw.take_snapshot
+        calls = {"n": 0}
+
+        def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("주입된 오류")
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(mw, "take_snapshot", flaky)
+        out, code = _watch(repos, 3)
+        assert "[12:00:00] [미측정] 감시기 내부 오류 — RuntimeError: 주입된 오류" in out
+        # 오류 다음 주기는 다시 정상으로 돈다 — 감시가 죽지 않았다
+        assert out.index("감시기 내부 오류") < out.index("변화 없음")
+        assert code == 0
+
+    def test_internal_error_in_one_shot_is_exit_2_not_1(self, repos: Repos, monkeypatch, capsys):
+        """트레이스백으로 끝나면 종료 코드 1 — '주의 필요'와 같은 값이라 위장이 된다."""
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("주입된 오류")
+
+        monkeypatch.setattr(mw, "take_snapshot", broken)
+        code = mw.main(["--repo-root", str(repos.work), "--no-gh", *LOCAL_ONLY])
+        assert code == 2
+        assert "감시기 내부 오류(RuntimeError: 주입된 오류)" in capsys.readouterr().err
 
     def test_no_fetch_with_fresh_refs_is_skipped_not_unmeasured(self, repos: Repos):
         r = _cli(repos.work, "--no-fetch", *LOCAL_ONLY)
