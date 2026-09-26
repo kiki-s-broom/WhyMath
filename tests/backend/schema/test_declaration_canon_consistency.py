@@ -110,3 +110,70 @@ class TestCrossReferenceIntegrity:
     def test_declaration_points_back_to_this_freeze(self, declaration: str):
         """선언이 이 동결 장치를 가리켜야 한다 — 다음 세션이 어디서 막히는지 알 수 있게."""
         assert "test_declaration_canon_consistency" in declaration
+
+
+class TestG4ConditionFreeze:
+    """부록 E G4(12-13) 차단 조건 동결 — EOS-135(2026-09-24 Kiki 결정)의 회귀 방어.
+
+    **왜 이 파일의 경계를 넓히는가**: 종전 경계는 "G0 확정치의 일치"였다. 넓히는 이유는
+    *같은 문서의 같은 표류 벡터*이기 때문이다 — 선언 §0-2는 "베타 사용자 확보는 전부
+    2027년 범위"라고 정해 두고서 부록 E의 G4는 12-13에 "학생 표본 >=20명"을 요구했고,
+    **부록 E를 읽는 기계 장치가 0건**이라 8/30 선언 이래 3주 넘게 아무도 그 모순을 보지
+    못했다. 이는 A7(앵커 8 vs 6)과 같은 형태이고, A7의 대책이 바로 이 파일이었다 —
+    같은 파일이 같은 문서의 다른 표를 아직 안 보고 있었다.
+
+    EOS-135가 그 모순을 조건 *교체*로 닫았다(삭제가 아니다 — 판정일 12-13은 유지하고
+    실제 학생 표본은 12/31 이후 게이트로 이관). 그 결정이 되돌려지는 것은 **의식적
+    개정**이어야지 조용한 복원이면 안 된다.
+
+    **동결하지 않는 것**: 실패정의 F-Ⅰ~F-Ⅴ와 검증설계서 §5 해시는 여전히
+    `test_failure_definition_freeze.py` 소유다. EOS-135는 그것을 건드리지 않았고,
+    `test_failure_definitions_require_no_sample`이 그 사실을 단언한다 — 표본 조건이
+    나중에 F로 흘러들어가면 그것은 G0 개정이라 별도 절차를 밟아야 한다.
+    """
+
+    @staticmethod
+    def _g4_row(declaration: str) -> str:
+        rows = [ln for ln in declaration.splitlines() if ln.startswith("| G4 계측기 완성")]
+        assert len(rows) == 1, f"부록 E의 G4 행이 {len(rows)}건 — 1건이어야 한다"
+        return rows[0]
+
+    def test_g4_requires_internal_test_account_sample(self, declaration: str):
+        """교체된 조건 본문. 사라지면 G4에 표본 축이 통째로 없어진다."""
+        assert "내부 테스트 계정 표본 ≥20건" in self._g4_row(declaration), (
+            "G4의 표본 조건이 EOS-135가 정한 형태가 아니다 — 학생 참여는 12/31 이후"
+            "(G-student-work-after-internal-completion)라 12-13에는 내부 계정 표본만 성립한다"
+        )
+
+    def test_g4_marks_the_sample_as_not_real_users(self, declaration: str):
+        """이 단서가 없으면 테스트 계정 표본이 실사용자 검증으로 계상된다(EOS-135 ④)."""
+        assert "실사용자 아님" in self._g4_row(declaration)
+
+    def test_g4_keeps_the_judgment_date(self, declaration: str):
+        """EOS-135는 '조건을 교체하고 판정일은 유지'다 — 날짜가 밀리면 다른 결정이 된다."""
+        assert self._g4_row(declaration).startswith("| G4 계측기 완성 | 12-13(일) |")
+
+    def test_g4_keeps_its_other_two_conditions(self, declaration: str):
+        """교체가 과도해 G4가 빈 게이트가 되지 않았는가(대조군)."""
+        row = self._g4_row(declaration)
+        assert "수동 개입 0 루프 3연속" in row, "G4의 핵심 조건이 함께 사라졌다"
+        assert "P0 결함 0" in row, "G4의 P0 결함 조건이 함께 사라졌다"
+
+    def test_real_student_sample_is_deferred_to_the_named_gate(self, declaration: str):
+        """이관처가 이름으로 남아야 한다 — 없으면 '테스트 계정으로 충분하다'는 오독이 열린다."""
+        assert "G-student-work-after-internal-completion" in self._g4_row(declaration)
+
+    def test_failure_definitions_require_no_sample(self, declaration: str):
+        """경계 보존 — 이 교체가 G0 동결(실패정의)을 건드리지 않았다는 근거를 코드에 남긴다."""
+        f_rows = [ln for ln in declaration.splitlines() if re.match(r"- \*\*F-[ⅠⅡⅢⅣⅤ]\*\*", ln)]
+        assert len(f_rows) == 5, f"실패정의가 5건이 아니다({len(f_rows)}건)"
+        for ln in f_rows:
+            assert "표본 ≥" not in ln and "학생 표본" not in ln, (
+                "실패정의가 표본 수를 요구하게 되면 그것은 G0 개정이다 — "
+                "검증설계서 §5와 해시 동결(test_failure_definition_freeze.py)을 함께 밟아야 한다"
+            )
+
+    def test_revision_history_records_the_replacement(self, declaration: str):
+        """개정 이력에 없으면 이력만 읽는 사람은 마지막 변경을 2026-08-31로 안다."""
+        assert "2026-09-24 G4 학생 표본 조건 교체" in declaration
+        assert "EOS-135" in declaration
