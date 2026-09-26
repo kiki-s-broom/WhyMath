@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-145-r5-consecutive-failure-scope
+title: "R5 반복 실패 규칙 설명('같은 개념에서')과 연속 오답 계산(개념 무관)의 불일치 — 의도 판정(EOS-26 발견)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실 — `l2/learning_state_policy.py::V1_RULES`의 R5 설명과 `schema/learning_state.py::REPEATED_FAILURE_THRESHOLD` docstring은 \"같은 개념에서 연속 오답\"이라 적지만, 입력을 만드는 `l2/learning_state_evidence.py::_count_consecutive_failures`는 개념을 가리지 않고 학생의 최근 응답을 센다. 그래서 개념 A 오답 → 개념 B 오답 → 개념 C 오답이면 셋째에서 R5(설명·힌트)가 발화한다(2026-09-26 코드 대조 · EOS-26 판정문 §1-5).\n② 의도 판정 선행 — 설명이 의도면 계산을 개념별로 바꾸고, 계산이 의도면 설명·docstring을 고친다. 결정 없이 한쪽을 고치지 않는다.\n③ 파급 — EOS-26의 \"R6 개입은 구조적으로 최대 2문항\"은 현 계산(개념 무관 — 셋째 연속 오답이 R5)에 선다. 계산을 개념별로 바꾸면 탐침 오답 뒤 선수 개념에서 R6가 반복될 수 있으므로(연속 두 번째 경로가 여러 번 발화), 그 영향과 3루프 하네스·EOS-26 통합 테스트(`test_probe_then_descend_then_release`의 셋째 오답 R5 단언)의 갱신을 함께 판정한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_evidence.py
+  - src/backend/whymath_backend/l2/learning_state_policy.py
+  - src/backend/whymath_backend/schema/learning_state.py
+session: null
+notes: "출처: EOS-26 판정문 §1-5·§7-3 — 판정 중 코드 대조로 발견. 분류 LOOP."
+updated: 2026-09-26
