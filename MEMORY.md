@@ -11274,3 +11274,18 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 **변별력**: 뮤테이션 26종(신규 `verify_gate_verdict_handoff_discrimination.py` — 러너는 HARN-174 하네스를 매개변수화해 재사용) 전건 RED · 대조군 GREEN, 옛 34종도 리팩터링 후 재실측 전건 RED. 앵커 동결 `test_gate_verdict_handoff_mutation_anchors.py`. 하네스 전체 스위트 1,161 passed(신규 60건 포함).
 
 **한계(⑤·명시)**: 판정 태스크가 `done`을 거칠 때만 작동한다. 판정문만 쓰고 닫지 않거나 대장 밖에서 판정한 경우는 `(판정 결과 미기록)` 표시가 드러낼 뿐 막지 못한다. `--no-verdict` 사유의 진위는 사람이 판단한다. 정본 = `docs/standards/build_harness.md` §3e 「판정 인계」 · `done --help`.
+
+### 2026-09-27 — CONT-05 착지: 학생 `/study` 공급이 검수 통과(`reviewed`) 콘텐츠만 공급한다 (ⓐ fail-closed · 의도적 제약 §2-③의 집행) — 판정 기준 main `0e7b4f6b`
+
+**결정**: acceptance ②의 기본값 ⓐ를 택했다. `knowledge_module_gap_review.md` 표가 이미 "무검증 학생 노출 금지 — 검수 게이팅 필수(의도적 제약 §2-③)"로 정했는데 공급 코드가 집행하지 않았던 것을 고쳤다. ⓑ(ai_estimated 허용)는 그 제약을 뒤집는 결정이라 택하지 않았다. 판정문 = `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md`.
+
+**구현 중 내린 판단**
+1. **게이트는 캐시보다 먼저** — `l4/content_supply.py::resolve_concept_dsl`이 행 → 게이트 → 캐시 순으로 판정한다. 판정을 DSL 캐시(TTL 24h)에 맡기면 강등된 행이 하루 동안 계속 공급된다. 대가로 캐시 적중도 PK 조회 1회를 치르고, 기존 테스트 `test_cache_hit_skips_db`("적중이면 DB를 안 탄다")를 의도를 적어 바꿨다.
+2. **차단 사유 분리** — 처리는 `NO_DSL`과 같게(렌더 없이 폴백·404) 두되 사유를 `UNREVIEWED`로 따로 센다. 한 사유로 합치면 게이트가 몇 번 막았는지 집계에서 사라진다(작동한 비율 원칙).
+3. **술어 정본은 L1** — `l1/concept_content/review_gate.is_supply_eligible`(`"reviewed"` 완전 일치만 True). 승격 게이트와 같은 모듈에 둬 "reviewed" 리터럴의 진실 원천을 하나로 유지했다. 표기 변형은 정규화하지 않고 거부한다(allowlist와 같은 이유).
+
+**도달 실측(①)**: 잠복 — 저장소 유일 소단원 DSL의 학습목표 4건이 콘텐츠 행에 닿는 수 0(K-12 콘텐츠 437은 원자 코드와 키 공간이 다르고, 대학 409는 그것을 쓰는 DSL이 없다). 그래서 오늘 학생 화면 변화는 0이고 priority는 2 유지. 운영 DB의 학습목표는 재지 않았다.
+
+**변별력**: 신규 테스트 18건(서빙 경로 2건은 `supply()`를 대역으로 바꾸지 않는다) + 뮤테이션 7/7 RED. 서빙 경로 테스트 단독으로 게이트 제거·술어 완화를, 강등 테스트 단독으로 캐시 적중 우회를 잡는다.
+
+**파생 등재**: `CONT-06`(공급 조회가 크로스워크 `atom_codes`를 역조회하지 않아 K-12 콘텐츠가 구조적으로 닿지 않음 — 파일럿 목표의 원자가 K-12 콘텐츠 2행에 연결돼 있는데도 NO_DSL) · `CONT-07`(학생 비노출로 규정된 `formal_definition_internal`이 DIRECT·WORKED_EXAMPLE 렌더 조각으로 나감 — 현재 `/study` 미도달·잠복) · `P3-02`·`PED-17` acceptance 연동 항 · `G-kg02` 제목에 재판정 자료(승격이 유일한 공급 문이 됐지만 도달 0이라 지금 승격해도 학생 효과 0 · "K-12 우선" 순서 전제 재고). 게이트는 pending 그대로다.

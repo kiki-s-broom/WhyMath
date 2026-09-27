@@ -1,9 +1,16 @@
 """개념 콘텐츠 검수 승격 Gate Contract — `ai_estimated → reviewed` 승인 조건의 단일 정본.
 
-`review_status == "reviewed"`는 단순 표기가 아니라 **학생 노출 게이팅 기준**이다 —
-`l1/concept_graph/retrieval.py`·`l1/atom_graph/retrieval.py`가 이 값으로 검색 히트를 거른다.
-따라서 서명 없는 승격은 "메타데이터 부정확"이 아니라 **미검증 AI 콘텐츠의 학생 노출**이며,
-CLAUDE.md 의사결정 우선순위 #1(학생 안전)·금기 "AI 자기승인 금지"(협상 불가)에 직접 걸린다.
+`review_status == "reviewed"`는 단순 표기가 아니라 **학생 공급 게이트 기준**이다 — 판정 술어는
+아래 `is_supply_eligible`이고, 집행 지점은 `l4/content_supply.py::resolve_concept_dsl`(학생 `/study`
+공급 경로 · 캐시 적중 포함)이다(CONT-05 ⓐ fail-closed · 2026-09-27). 즉 이 승격이 학생 공급을 여는
+유일한 문이다. 따라서 서명 없는 승격은 "메타데이터 부정확"이 아니라 **미검증 AI 콘텐츠의 학생
+공급**이며, CLAUDE.md 의사결정 우선순위 #1(학생 안전)·금기 "AI 자기승인 금지"(협상 불가)에
+직접 걸린다.
+
+검색 표면은 이 값을 보지 않는다 — `l1/concept_graph/retrieval.py`·`l1/atom_graph/retrieval.py`의
+`reviewed_only` 필터는 `concept_content`가 아니라 `concept_node`·`atom_node`의 `review_status`를
+읽는다(2026-09-25 주입 실측 · `docs/reviews/kg02_gate_premise_recheck_2026-09-25.md` §3 — 종전 판의
+"이 값으로 검색 히트를 거른다"는 틀린 주장이었다).
 
 그동안 그 규칙은 `concept_content_review_apply` docstring("사람이 검수한")에만 있었고 **코드가
 검사하지 않았다** — 실측(2026-09-21): `reviewed_by` 누락·`"claude"`·빈 문자열 라벨 3건이
@@ -47,6 +54,20 @@ HUMAN_REVIEWERS: Final[tuple[str, ...]] = ("kiki",)
 def known_reviewers() -> tuple[str, ...]:
     """승격 권위를 가진 검수자 전체 — 사람 검수자 + 강등전 통과 기계 판정자."""
     return tuple(HUMAN_REVIEWERS) + tuple(CERTIFIED_MACHINE_REVIEWERS)
+
+
+def is_supply_eligible(review_status: str | None) -> bool:
+    """학생 공급 경로를 통과할 수 있는 검수 상태인가 — `APPROVED_STATUS`와 **완전 일치**만 True.
+
+    CONT-05 ⓐ(fail-closed): `ai_estimated`·`rejected`·빈 값·None·표기 변형(`"Reviewed"`·
+    `" reviewed"`)은 전부 False다. 정규화하지 않는 이유 — 적재·승격 경로(`ConceptContentStore`·
+    `concept_content_review_apply`)는 리터럴을 그대로 쓰므로 변형 값은 오염 입력이고, 오염 입력을
+    관대하게 통과시키면 게이트가 표기 변형에서 뚫린다(검수자 allowlist와 같은 이유).
+
+    이 술어를 정의하는 것만으로는 집행이 아니다 — 집행 지점은 `l4/content_supply.py::
+    resolve_concept_dsl`이다(CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지").
+    """
+    return review_status == APPROVED_STATUS
 
 
 def _normalize(handle: str | None) -> str:
