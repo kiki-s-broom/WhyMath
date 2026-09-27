@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-182-open-work-flow-graph
+title: "열린 작업 흐름 그래프 — 태스크·게이트 선후 관계를 흐름별 그래프로 한 화면 가시화 (backlog/ 읽기 전용 투영)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "scripts/harness/work_graph.py 신설 — 열린 태스크(todo·in_progress·review·blocked)와 미통과 게이트를 노드로, store.dependency_graph의 간선(depends_on·requires_gates·entry_gate·gate_input)을 그대로 써서 연결 성분(작업 흐름)별 좌→우 계층 그래프를 자기완결 HTML(work/graph.html)로 낸다 — 외부 CDN·폰트·서버 요청 0"
+  - "판정 무복제 — 노드 상태(착수 가능·진행·대기·차단·미머지 완료)는 board.build_tasks(=selector.classify_todo)와 board.apply_remote_done, 간선은 store.dependency_graph, 해금 수는 selector.unblock_counts, 대기 경로는 selector.wait_chain을 그대로 호출한다(그래프 자체 판정 금지)"
+  - "무손실·결정성 계약 — 열린 노드 전수가 흐름 또는 독립 작업 목록 중 정확히 한 곳에 배치되고 열린 노드 사이 간선 전수가 그려지며, 같은 입력이면 같은 좌표·같은 계층 안 노드 겹침 0·간선은 항상 계층이 증가하는 방향임을 테스트가 동결"
+  - "노드를 누르면 선행(기다리는 것)·후속(끝나면 풀리는 것) 사슬 전체를 강조하고 상세 패널에 대기 경로·선행/후속 목록·착수 명령(backlog.py start)·게이트 해소 명령(gates clear, 담당자 --as 포함)을 보여준다 — 검색·스테이지·레이어·트랙 필터, 키보드 조작, 휴대폰 폭에서 가로 페이지 스크롤 없음"
+  - "읽기 전용 계약 — 그래프 생성이 backlog/ 파일 mtime을 바꾸지 않음을 테스트가 동결(상태 변경 창구는 backlog.py CLI 단독) + --json·--text·--fragment 출력 + docs/standards/build_harness.md 정본화·CLI 요약 등재"
+artifacts: []
+paths:
+  - scripts/harness/work_graph.py
+  - tests/harness/test_work_graph.py
+  - docs/standards/build_harness.md
+session: claude/focused-ramanujan-2p5q8w
+notes: "Kiki 요청(2026-09-27): 열린 작업을 그래프로 확인하는 프로그램 — 어떤 작업이 어떤 흐름으로 작업 가능한지 한 눈에 보이지 않아 눈뜬 장님 같다, 쉽고 편하게 전체 작업에 접근할 수 있는 그래프 인터페이스가 필요하다. 기존 작업 보드(HARN-40·41)는 5열 칸반이라 상태는 보이지만 태스크 사이·게이트 사이의 선후 관계(흐름)는 화면에 없다. 실측(main 0e7b4f6b): 열린 태스크 310건·미통과 게이트 19건, 열린 노드 사이 간선 115건, 2개 이상 노드가 이어진 흐름 26개(최대 32노드·25노드), 이어진 선후가 없는 독립 노드 214건."
+updated: 2026-09-27
