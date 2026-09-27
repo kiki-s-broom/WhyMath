@@ -10,7 +10,9 @@
 
 규율은 선례 `scripts/analysis/mutate_recommendation_policy_guards.py`와 같다 — 주입 실재 단언
 (앵커 1건 · 치환 후 원본과 다름) · 순수 Python 치환 · 백업 복사 원복(git 원복 금지)과 바이트
-동일성 단언 · 중단(시그널)에도 원복 · 성공 방향 대조군 · 판정은 pytest 종료 코드.
+동일성 단언 · 중단(시그널)에도 원복 · 성공 방향 대조군 · 판정은 pytest 종료 코드. 여기에 더해
+실행마다 대상 모듈의 바이트코드 캐시를 지운다(`drop_bytecode` — 캐시가 앞 뮤테이션 코드를 실행하는
+함정 · `HARN-120` ⑤).
 
 표면이 둘이다:
 
@@ -471,9 +473,24 @@ MUTATIONS: list[Mutation] = [
 ]
 
 
+def drop_bytecode() -> None:
+    """대상 모듈의 바이트코드 캐시를 지운다 — 디스크의 뮤테이션과 실행되는 코드를 일치시킨다.
+
+    `.pyc` 무효화 검사는 '초 단위 수정 시각 + 소스 크기'라, 크기 변화가 같은 두 뮤테이션이 같은 1초
+    안에 쓰이면 앞 뮤테이션의 캐시가 뒤 실행에 재사용된다(디스크엔 뒤 뮤테이션, 실행된 코드는 앞
+    뮤테이션 — 거짓 생존도 거짓 검출도 가능). 2026-09-26 HARN-176 실측 · 처방은 `HARN-120` ⑤다.
+    실행마다 여기서 지우고 `PYTHONDONTWRITEBYTECODE=1`로 돌려 새 캐시도 남기지 않는다.
+    """
+    for target in (LSR, POLICY):
+        for cached in (target.parent / "__pycache__").glob(f"{target.stem}.*.pyc"):
+            cached.unlink()
+
+
 def run_pytest(*, integration: bool) -> int:
     """대상 표면을 돌리고 **종료 코드**를 돌려준다(화면 문자열로 판정하지 않는다)."""
+    drop_bytecode()
     env = dict(os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     targets = UNIT_TESTS
     if integration:
         env.update(WHYMATH_RUN_INTEGRATION="1", WHYMATH_DB_DISABLE_POOL="1")

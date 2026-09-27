@@ -281,7 +281,8 @@ pedagogy-designer 서브에이전트 1회 · 결론 "수정 채택" · 발견 13
 - **`nondiscriminating-check` 계열 — 요청 형태**(§1-2): EOS-139의 폐루프 True가 방해 개념 부재 + 하네스 전용 요청 형태에 기댔다. 대책은 코드(강화된 프로브 — 두 요청 형태 × 방해 개념 · R6 전용 통합 테스트)와 태스크(`PED-40`).
 - **`nondiscriminating-check` 계열 — 이벤트 원천**(§1-6): 이 판정문 초안이 요청 형태만 앱과 대조하고 "실제 앱에서 선다"고 적었다. 앱은 오답을 상태 머신에 보내지 않는다 — 같은 계열이 한 층 아래에서 재발했고, 머지 전 독립 비판이 잡았다. 대책은 태스크(`EOS-146`)와 해소 수준 명기(동결 주석 · 이 문서 · PR).
 - **`verification-tree-mutation-during-check` 계열**: 이 세션에서 두 번, 오래 도는 검증(백엔드 잡 재현 · 커밋본 뮤테이션 하네스)이 도는 동안 작업 트리를 고쳤다. 두 실행 결과 모두 폐기하고 수정이 끝난 뒤 다시 돌렸다(§9). 대책 태스크는 기존 `HARN-126`(주입을 임시 worktree에서만)이다.
-- 세 건 모두 사고 대장(`backlog/incidents.ndjson`)에 기록했다.
+- **파생 인덱스 미재생성 · 하네스 테스트의 대장 누출**: CI 잡 재현에서 두 가지를 더 밟았다 — ① 사고 추가·경로 정정 뒤 `backlog/jit_index.json`을 재생성하지 않아 harness-integrity가 red였다(`backlog.py jit build`로 해소) ② 로컬 `pytest tests/harness`가 이 세션의 이벤트 대장에 가짜 `policy_warn` 7줄을 두 번 남겼다(커밋 전 되돌림). 둘 다 main이 같은 날 등재한 계열(`derived-index-not-rebuilt` · `harness-test-live-ledger-write`)의 재발이고, 대책 태스크는 기존 `HARN-179`·`HARN-170`이다.
+- 다섯 건 모두 사고 대장(`backlog/incidents.ndjson`)에 기록했다.
 
 ---
 

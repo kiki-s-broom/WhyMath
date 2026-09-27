@@ -3069,10 +3069,50 @@
    "kind": "incident",
    "ref": "2026-09-26",
    "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red·뒤 스텝 7건 미실행",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/**/mutations/*.yaml",
+    "tests/infra/test_mutate_runner*.py"
+   ],
+   "text": "뮤테이션 하네스가 .pyc 캐시로 앞 뮤테이션 코드를 실행 — M29 간헐 생존(거짓 신호)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
     "scripts/harness/mutate.py",
     "tests/harness/test_mutate_harness.py"
    ],
    "text": "장기 검증(백엔드 잡 재현·커밋본 뮤테이션) 도중 작업 트리 수정 — 이 세션 2회 · 두 결과 폐기 후 재실행",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "로컬 pytest tests/harness가 이 세션 이벤트 대장에 가짜 policy_warn 7줄 — CI 미러 중 2회 · 커밋 전 되돌림",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "사고 추가·경로 정정 뒤 jit_index.json 미재생성 — 로컬 CI 미러에서 harness-integrity red(push 전 발견)",
    "weight": 1
   },
   {
@@ -3612,6 +3652,15 @@
     "src/backend/whymath_backend/l2/learning_state_machine.py"
    ],
    "text": "EOS-26 판정문 초안이 '실제 앱' 해소를 주장 — 앱은 오답을 상태 머신에 보내지 않아 R6 도달 0",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(3회차 · CI 미러 중 · 커밋 전 되돌림)",
    "weight": 0
   }
  ]
