@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-179-incident-write-jit-index-rebuild
+title: "사고 대장 쓰기 CLI가 파생 인덱스(jit_index.json)를 재생성하지 않는다 — 사고를 기록한 PR이 CI harness-integrity에서 red(뒤 스텝 7건 미실행)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① backlog.py incident add(와 사고·규칙 대장을 바꾸는 다른 쓰기 CLI)가 쓰기 직후 backlog/jit_index.json을 재생성한다. 재생성이 실패하면 쓰기는 유지하되 실패 사유(예외 타입명 포함)와 재생성 명령(backlog.py jit build)을 stderr로 고지한다 — 무증상 금지"
+  - "② 변별력 양방향 — hermetic 대장 픽스처에서 사고 1건 add 직후 jit check가 exit 0임을 동결하고, 재생성 배선을 제거하는 뮤테이션을 주입하면 같은 테스트가 RED가 됨을 확인한다(주입 적용 단언 포함)"
+  - "③ 경계 — 인덱스 형식·주입 로직·check-edit 훅은 HARN-121 소관이다. 이 태스크는 쓰기 경로에서 렌더 결과를 함께 갱신하는 배선만 한다"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/test_jit*.py"
+session: null
+notes: "실측 2026-09-26(HARN-176 세션): incident add로 사고 1건을 기록한 뒤 CI 미러(ci_mirror.py)의 harness-integrity 잡이 '적시 주입 인덱스 대조' 스텝에서 'jit_index.json 이 대장과 어긋났다'로 실패했고, 뒤 스텝 7건(ADR 번호·claim 교차·고립 브랜치·EOS 리포트·ruff·black·하네스 테스트)이 미실행이었다. 같은 시점 origin/main worktree에서는 jit check가 통과(주입 후보 296건)해 원인이 사고 추가임을 대조로 확인했다. backlog.py jit build 재생성(+11줄·사고 1건) 후 통과. incident add 출력에는 재생성 안내가 없어, 사고를 기록하는 세션은 CI red로만 알게 된다."
+updated: 2026-09-26
