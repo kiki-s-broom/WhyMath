@@ -1086,7 +1086,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.golden_inputs",
        # EOS-136 — 승격 경로 ③단의 *집행 도구*(사람 판정 → 회차 코퍼스 review_status 각인 +
        # 감사로그)와 두 각인 도구의 적용 대상 계약(코퍼스 부류 판정·거부 술어). 게이트가 판정하는
-       # 바로 그 단을 채우는 도구라 게이트와 같은 행에 귀속한다(입력 생산자 golden_inputs와 같은 규칙).
+       # 바로 그 단을 채우는 도구라 게이트와 같은 행에 귀속한다(입력 생산자 golden_inputs와 같은
+       # 규칙).
        "harness.review_status_verdict_bridge", "harness.review_status_domains"),
     _o("WM-O-912", "QA 파이프라인·강등전 게이트(Wilson·결함주입·금칙어)", "Admin", "QA", "P0",
        "초인간 검증 기준 v1 — 기계 게이트 승격 절차", "harness.qa_pipeline", "harness.wilson",

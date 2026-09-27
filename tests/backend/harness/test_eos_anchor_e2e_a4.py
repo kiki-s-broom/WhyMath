@@ -52,7 +52,6 @@ from whymath_backend.harness import (
     problem_corpus_review_status_backfill as review_status_backfill,
 )
 from whymath_backend.harness import review_status_verdict_bridge as verdict_bridge
-from whymath_backend.harness.review_session import load_review_items, run_review_session
 from whymath_backend.harness.anchor_round_ledger import (
     OUTCOME_STATUSES,
     load_round_ledger,
@@ -65,6 +64,7 @@ from whymath_backend.harness.problem_corpus_accumulate import (
     default_worklist_path,
     main,
 )
+from whymath_backend.harness.review_session import load_review_items, run_review_session
 from whymath_backend.l1.problem_bank.populate import (
     ProblemBankRecord,
     load_problem_bank_records,

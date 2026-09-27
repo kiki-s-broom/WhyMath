@@ -3640,6 +3640,15 @@
    "kind": "incident",
    "ref": "2026-09-27",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — 커밋 전 백업 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
     "scripts/harness/**",
     "scripts/harness/backlog.py",
     "tests/harness/**",
