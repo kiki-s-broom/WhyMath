@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ paths:
   - scripts/harness/store.py
   - "tests/harness/test_gate_verdict_handoff*.py"
   - docs/standards/build_harness.md
-session: null
+session: claude/harn-177-zxm2ox
 notes: "출처: 2026-09-26 HARN-174 착지 후 정상작동 점검(Kiki 요청) — 판정 기준 main bd87b30d.\n\n[실측] HARN-174(#1324)가 21:41 UTC 에 main 에 착지한 뒤 22:10 UTC 에 2차 재판정 결과(#1323)가 착지했다. 판정은 FAIL(미충족 = 원인 미상 오답 Loop 1 보정 1축)이고, 판정 세션은 3차 재판정 태스크를 새로 등재했다. 그러나 게이트 G-p3-entry-gate2-pass 에는 FAIL 판정도 3차 재판정 입력도 기록되지 않았다. FAIL 기록 장치(gates amend --verdict FAIL)는 이미 main 에 있었지만, 판정 태스크를 done 으로 닫는 경로가 그 호출을 요구하지 않았다.\n\n[결과] 대장은 게이트의 입력이 전부 끝났다고 보고 next·status 가 이 게이트를 '(사람 판정 대기)'로 안내했다 — 실제로는 FAIL 이고 다음 작업은 3차 재판정이다. 그 3차 재판정 태스크는 게이트에 연결되지 않아 해금 수가 0 으로 계산됐다(연결 시 15). HARN-174 v2-4 가 고치려던 병목 과소평가가 이 경로로 되살아났다.\n\n[계열] gate-resolution-path-unlinked 4회차. 1~3회차의 대책(HARN-174)은 FAIL 을 기록하는 도구를 만들었지만, 도구를 부르게 만드는 집행 지점은 없었다 — 도구 존재 ≠ 호출 강제. 이 태스크가 그 집행 지점이다.\n\n[즉시 정정] 게이트 입력 재지정(재판정 태스크 교체)은 Kiki 결정으로 #1321 이 main 에 먼저 착지했다. 이 태스크를 등재한 PR 도 같은 게이트에 FAIL 기록과 입력 부착을 했으나, main 병합 충돌에서 Kiki 결정 쪽(main)을 택했다. 그 결과 FAIL 판정은 게이트 corrections 에 기계 판독 형식으로 남지 않았다 — 소유 태스크가 이미 붙어 있어 gates amend --verdict FAIL 이 '새 소유 태스크 없음'으로 거부되기 때문이다(⑥ 참조). 이 태스크는 재발 방지이지 그 정정이 아니다.\n\n[정정 2026-09-26] title 'x' → '게이트 입력 태스크의 done이 판정 결과를 게이트에 넘기지 않는다 — FAIL로 끝난 재판정이 게이트를 '사람 판정 대기'로 오표시하고 후속 재판정을 병목에서 뺀다 (HARN-174 사각)': 등재 직후 정정 — 진단용 재실행이 임시 제목으로 등재됐다\n\n[정정 2026-09-26] paths ['scripts/harness/backlog.py'] → ['scripts/harness/backlog.py', 'scripts/harness/report.py', 'scripts/harness/selector.py', 'scripts/harness/store.py', 'tests/harness/test_gate_verdict_handoff*.py', 'docs/standards/build_harness.md']: 등재 직후 정정 — 작업 범위 전체(표시·집행·문서)\n\n[정정 2026-09-26] notes 치환 — main 병합 충돌 해소 반영 — 게이트 재지정은 Kiki 결정(#1321)이 먼저 착지해 main 쪽을 택했다. 이미 붙은 소유 태스크로는 FAIL을 기록할 수 없는 공백을 완료 조건에 덧붙인다"
 updated: 2026-09-26

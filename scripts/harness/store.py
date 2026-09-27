@@ -728,27 +728,155 @@ def dangling_reference(backlog: Backlog, task_id: str) -> str | None:
     return None
 
 
-# ── FAIL 판정 기록 (HARN-174 v2-8) ────────────────────────────────────────────
+# ── 판정 기록 (HARN-174 v2-8 · HARN-177 ①②⑥) ──────────────────────────────
 #
-# `gates amend --verdict FAIL`이 corrections에 남기는 줄의 **고정 형식**이다. 판정 이력은 게이트
-# corrections(HARN-124)에 쌓이고, validate가 가장 최근 FAIL 기록을 읽어 두 가지를 본다.
+# `gates amend --verdict FAIL|PASS`와 `done` 인계(HARN-177 ①)가 corrections에 남기는 줄의
+# **고정 형식**이다. 판정 이력은 게이트 corrections(HARN-124)에 쌓이고, validate가 가장 최근
+# 판정 기록이 FAIL이면 두 가지를 본다.
 #   ① 소유 태스크가 0건인 FAIL 기록 — 무엇이 끝나야 재판정하는지 대장이 모른다.
-#   ② 기록이 지목한 **미종결** 소유 태스크가 게이트 상류(입력의 선행 폐포)에 없다 — 판정문은
-#      지목했는데 대장에는 연결이 없다. 이것이 2026-09-24 사고의 정확한 형태다(재판정문이
-#      EOS-24·EOS-124를 지목했으나 재판정 태스크 EOS-130의 depends_on에는 EOS-21뿐이었다).
+#   ② 기록이 지목한 **미종결** 소유 태스크가 게이트의 **열린 상류**(미종결 태스크·pending
+#      게이트만 지나는 선행 폐포)에 없다 — 판정문은 지목했는데 대장에는 연결이 없다. 이것이
+#      2026-09-24 사고의 정확한 형태다(재판정문이 EOS-24·EOS-124를 지목했으나 재판정 태스크
+#      EOS-130의 depends_on에는 EOS-21뿐이었다). 상류가 **열린** 경로여야 하는 이유(HARN-177 ⑥):
+#      끝난 태스크 너머의 연결은 선택기(해금 수)도 대기 경로도 따라가지 않으므로 화면에서는
+#      없는 연결이다 — 2026-09-25 사고의 대장 상태(EOS-130 done · 소유 태스크는 그 선행에만)가
+#      바로 그것이었다.
 # 대장에 없는 소유 ID(개명·오기)는 ②에서 건너뛴다 — 개명은 게이트 입력은 옮기지만 과거
 # corrections 문구는 append-only라 옮기지 않으므로, 여기서 red를 내면 정상 개명이 대장을 깬다.
+#
+# **입력 스냅샷(`inputs:`)** — 기록 시점에 done이던 입력 태스크의 집합(HARN-177 ②). 판정
+# 기록이 *지금의* 입력 상태에 대한 판정인지를 시각 없이 판정하는 열쇠다: 현재 done인 입력
+# 집합과 스냅샷이 같으면 그 기록이 현행 판정이고, 다르면(그 뒤에 입력이 더 끝났다) 판정 결과
+# 미기록이다. 날짜 `[YYYY-MM-DD]`는 같은 날의 두 사건을 가르지 못하고 이벤트 대장은 세션
+# 샤드라 로컬에 다 없을 수 있다 — 그래서 순서가 아니라 **집합 동일성**으로 판정한다.
 
-_FAIL_VERDICT_RE = re.compile(r"verdict FAIL · owners: (?P<owners>[^·]*?) · evidence: ")
+_VERDICT_RE = re.compile(
+    r"verdict (?P<verdict>FAIL|PASS) · "
+    r"(?:owners: (?P<owners>[^·]*?) · )?"
+    r"inputs: (?P<inputs>[^·]*?) · evidence: "
+)
 
 
-def format_fail_verdict(owners: list[str], evidence: str) -> str:
-    """FAIL 판정 기록 한 조각 — `verdict FAIL · owners: A, B · evidence: …`."""
-    return f"verdict FAIL · owners: {', '.join(owners)} · evidence: {evidence}"
+def _ids_text(ids: object) -> str:
+    """ID 목록 → `A, B` (비면 `-` — 빈 문자열은 정규식이 구분자로 삼키므로 자리를 채운다)."""
+    items = sorted(dict.fromkeys(str(x) for x in ids))  # type: ignore[union-attr]
+    return ", ".join(items) if items else "-"
 
 
-def upstream_tasks(backlog: Backlog, node: Node, graph: DependencyGraph | None = None) -> set[str]:
-    """`node`가 기다리는 태스크 전부(선행 폐포 — 게이트를 지나 끝까지). 상태와 무관."""
+def _ids_from_text(text: str) -> tuple[str, ...]:
+    return tuple(o.strip() for o in text.split(",") if o.strip() and o.strip() != "-")
+
+
+def format_fail_verdict(owners: list[str], evidence: str, inputs: object) -> str:
+    """FAIL 판정 기록 한 조각 — `verdict FAIL · owners: A, B · inputs: J · evidence: …`.
+
+    `inputs`는 기록 시점에 done이던 입력 태스크(스냅샷 — 위 주석). 기본값을 두지 않는다:
+    잊고 비워 두면 '입력이 하나도 안 끝난 시점의 판정'으로 **거짓 기록**이 된다.
+    """
+    return (
+        f"verdict FAIL · owners: {', '.join(owners)} · inputs: {_ids_text(inputs)} · "
+        f"evidence: {evidence}"
+    )
+
+
+def format_pass_verdict(inputs: object, evidence: str) -> str:
+    """PASS 판정 기록 한 조각 — `verdict PASS · inputs: J · evidence: …`.
+
+    PASS는 게이트를 닫지 않는다 — clear는 여전히 게이트 담당자 몫(HARN-177 ①). 이 기록은
+    "입력이 다 끝났고 판정도 났다 — 이제 정말 사람 차례"를 대장이 말할 수 있게 한다.
+    """
+    return f"verdict PASS · inputs: {_ids_text(inputs)} · evidence: {evidence}"
+
+
+@dataclass(frozen=True)
+class VerdictRecord:
+    """corrections 한 줄에서 읽은 판정 기록."""
+
+    verdict: str  # "FAIL" | "PASS"
+    owners: tuple[str, ...]  # FAIL의 미충족 항목 소유 태스크 (PASS는 빈 튜플)
+    inputs: tuple[str, ...]  # 기록 시점에 done이던 입력 스냅샷
+
+
+def verdict_records(gate: object) -> list[VerdictRecord]:
+    """게이트 corrections의 판정 기록 전부 — 기록 순서대로 (FAIL·PASS 모두)."""
+    records: list[VerdictRecord] = []
+    for line in getattr(gate, "corrections", []) or []:
+        m = _VERDICT_RE.search(line)
+        if not m:
+            continue
+        records.append(
+            VerdictRecord(
+                verdict=m.group("verdict"),
+                owners=_ids_from_text(m.group("owners") or ""),
+                inputs=_ids_from_text(m.group("inputs")),
+            )
+        )
+    return records
+
+
+def latest_verdict(gate: object) -> VerdictRecord | None:
+    """가장 최근 판정 기록 — 없으면 None."""
+    records = verdict_records(gate)
+    return records[-1] if records else None
+
+
+JUDGMENT_OPEN = "open"
+JUDGMENT_UNRECORDED = "unrecorded"
+
+
+def gate_judgment_state(backlog: Backlog, gate: object) -> str | None:
+    """pending decision 게이트의 판정 기록 상태 (HARN-177 ②) — 화면 전부가 이 한 판정을 쓴다.
+
+    반환:
+      · None — 판정 개념이 없는 게이트(pending 아님 · decision 아님 · 입력 태스크 없음)
+      · "open" — 입력이 아직 남았다(판정할 때가 아니다)
+      · "unrecorded" — 입력이 전부 done인데 **그 상태에 대한** FAIL/PASS 기록이 없다
+      · "judged:PASS" / "judged:FAIL" — 현행 기록이 있다(스냅샷 == 지금 done인 입력 집합)
+
+    왜 필요한가: 종전 화면은 "경로가 게이트에서 끝나면 사람 판정 대기"로 읽었다. 그런데
+    입력 태스크가 판정문만 남기고 게이트에 아무것도 넘기지 않은 채 done이 되면 같은 화면이
+    난다 — 2026-09-25 2차 재판정이 FAIL로 끝났는데 대장은 진입 게이트를 Kiki 차례로 안내했다.
+    판정이 기록되지 않은 상태를 사람 차례로 안내하지 않는다.
+    """
+    if getattr(gate, "status", None) != "pending" or getattr(gate, "kind", None) != "decision":
+        return None
+    deps = list(getattr(gate, "depends_on", []) or [])
+    if not deps:
+        return None
+    done_inputs = {d for d in deps if getattr(backlog.tasks.get(d), "status", None) == "done"}
+    if done_inputs != set(deps):
+        return JUDGMENT_OPEN
+    record = latest_verdict(gate)
+    if record is None or set(record.inputs) != done_inputs:
+        return JUDGMENT_UNRECORDED
+    return f"judged:{record.verdict}"
+
+
+def judgment_state_label(state: str | None) -> str:
+    """판정 상태 → 화면 문구. next·status·gates list/show가 같은 글자를 낸다."""
+    if state == JUDGMENT_UNRECORDED:
+        return (
+            "판정 결과 미기록 — 입력은 전부 끝났는데 그 상태의 FAIL/PASS 기록이 없다"
+            "(done 인계 --verdict 또는 gates amend --verdict)"
+        )
+    if state == "judged:PASS":
+        return "사람 판정 대기 — PASS 기록 있음(clear는 담당자 몫)"
+    if state == "judged:FAIL":
+        return "FAIL 기록 있음 — 소유 태스크가 열린 경로에 없다(validate 참조)"
+    if state == JUDGMENT_OPEN:
+        return "입력 미완"
+    return "사람 판정 대기"
+
+
+def upstream_tasks(
+    backlog: Backlog, node: Node, graph: DependencyGraph | None = None, *, open_only: bool = False
+) -> set[str]:
+    """`node`가 기다리는 태스크 전부(선행 폐포 — 게이트를 지나 끝까지).
+
+    `open_only=True`면 **열린 경로**만 — 미종결 태스크와 pending 게이트만 지나고, 끝난
+    태스크·통과한 게이트는 세지도 넘지도 않는다. 선택기(`open_descendant_tasks`)와 대기
+    경로가 보는 시야와 같다(HARN-177 ⑥). 기본값은 상태 무관.
+    """
     graph = graph or dependency_graph(backlog)
     seen: set[Node] = {node}
     found: set[str] = set()
@@ -759,24 +887,32 @@ def upstream_tasks(backlog: Backlog, node: Node, graph: DependencyGraph | None =
             if prev in seen:
                 continue
             seen.add(prev)
-            if prev[0] == TASK_NODE:
-                found.add(prev[1])
+            kind, pid = prev
+            if kind == TASK_NODE:
+                if open_only and backlog.tasks[pid].status in TERMINAL_STATUSES:
+                    continue
+                found.add(pid)
+            elif open_only and backlog.gates[pid].passed:
+                continue
             queue.append(prev)
     return found
 
 
 def fail_verdict_errors(backlog: Backlog, graph: DependencyGraph | None = None) -> list[str]:
-    """pending decision 게이트의 **가장 최근** FAIL 기록이 대장과 맞는가 (v2-8 · 사고 3)."""
+    """pending decision 게이트의 **가장 최근** 판정 기록이 FAIL이면 대장과 맞는가 (v2-8 · 사고 3).
+
+    최근 기록이 PASS면 볼 것이 없다 — 그 앞의 FAIL이 지목한 소유 태스크는 이미 소화됐다.
+    """
     graph = graph or dependency_graph(backlog)
     errors: list[str] = []
     for gid in sorted(backlog.gates):
         gate = backlog.gates[gid]
         if gate.status != "pending":
             continue
-        records = [m for c in gate.corrections for m in [_FAIL_VERDICT_RE.search(c)] if m]
-        if not records:
+        record = latest_verdict(gate)
+        if record is None or record.verdict != "FAIL":
             continue
-        owners = [o.strip() for o in records[-1].group("owners").split(",") if o.strip()]
+        owners = list(record.owners)
         if not owners:
             errors.append(
                 f"{gid}: 최근 FAIL 판정 기록에 소유 태스크가 0건 — 무엇이 끝나야 재판정하는지 "
@@ -784,7 +920,7 @@ def fail_verdict_errors(backlog: Backlog, graph: DependencyGraph | None = None) 
                 "--evidence <판정문·기준 커밋> --depends <미충족 항목의 소유 태스크> --reason '...'"
             )
             continue
-        upstream = upstream_tasks(backlog, (GATE_NODE, gid), graph)
+        upstream = upstream_tasks(backlog, (GATE_NODE, gid), graph, open_only=True)
         detached = [
             o
             for o in owners
@@ -794,9 +930,10 @@ def fail_verdict_errors(backlog: Backlog, graph: DependencyGraph | None = None) 
         ]
         if detached:
             errors.append(
-                f"{gid}: 최근 FAIL 판정이 지목한 미종결 소유 태스크 {detached} 가 이 게이트 상류에 "
-                "없다 — 판정문은 지목했는데 대장에는 연결이 없다(2026-09-24 사고 형태). 처방: "
-                f"gates amend {gid} --depends <id> 또는 재판정 태스크에 amend --depends <id>"
+                f"{gid}: 최근 FAIL 판정이 지목한 미종결 소유 태스크 {detached} 가 이 게이트의 "
+                "열린 상류에 없다 — 판정문은 지목했는데 대장에는 (선택기가 따라갈 수 있는) 연결이 "
+                "없다(2026-09-24 사고 형태 · 끝난 태스크 너머의 연결은 연결이 아니다). 처방: "
+                f"gates amend {gid} --depends <id> 또는 미종결 재판정 태스크에 amend --depends <id>"
             )
     return errors
 
