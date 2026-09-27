@@ -3602,6 +3602,26 @@
    "kind": "incident",
    "ref": "2026-09-26",
    "paths": [
+    ".claude/hooks/chat_block_guard.py",
+    "scripts/ops/check_runbook_blocks.py",
+    "tests/infra/**"
+   ],
+   "text": "MP-03 런북 §1의 무가드 git worktree add가 런북 스캐너를 통과 — 채팅 재전달 시 HARN-163 훅이 검출",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트 가짜 policy_warn 19줄이 세션 샤드에 쌓여 16줄 커밋 — 미머지 PR에서 전량 제거",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(3회차 · CI 미러 중 · 커밋 전 되돌림)",
