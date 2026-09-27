@@ -1,7 +1,8 @@
 # ADR-004 — Subject Contract v1은 잠정(Provisional)이다: 교차과목 프로브 통과 후 Freeze
 
-- **상태:** **Provisional — pending cross-subject probe (target 2026-09-27)**
-- **결정일:** 2026-09-05
+- **상태:** **Frozen (unexercised)** — 2026-09-27 G1 판정(Kiki · 게이트 `G-required-tier-caller-recheck` ①) · 아래 §판정 기록
+  - 이전 상태: Provisional — pending cross-subject probe (target 2026-09-27)
+- **결정일:** 2026-09-05 (동결 판정 2026-09-27)
 - **대상:** Subject Contract v1 (`schema/subject_adapter.py` 필수층 · `schema/verification_capabilities.py` 선택층)
 - **관련:** `EOS-66`(계약 정본·#924) · `EOS-69`(경유 배선) · `EOS-70`(explain 능력 판정·todo) · **`EOS-91`(코드 축 상태 라벨·필드 래칫·#986 미머지)** · **`EOS-92`(프로브 실행 태스크·todo)** · `EOS-65`/`eos_core_adapter_boundary.md`(Core↔Adapter 경계) · 게이트 **G1(2026-09-27)** "계측 가능한 파이프라인 — Core→Math 정적 의존 0"
 
@@ -152,10 +153,45 @@ acceptance ④는 "깨진 필드 1건 이상이면 강등 반영 후 재판정"�
 
 ---
 
+## 판정 기록 — 2026-09-27 G1 (결정 ①·②의 집행 결과)
+
+**판정 기준: main `0e7b4f6b`.** 결정 ②가 예고한 Freeze를 예정일에 집행했다 — 단 한정어를 붙였다.
+
+| 항목 | 결과 |
+|---|---|
+| 프로브(`EOS-92` · 2026-09-06) | Physics 15/15 ○ · ✗ 0 · 강등 0 · Core 확장 0 → 결정 ④ 중단 상한 미도달 |
+| 필수층 3메서드의 Core 호출자 (9/27 재측정) | **0건** — 프로브 문서 부록 ① 3상태 스캔 `ZERO_CALLERS` · 변별력 실측(주입 시 `CALLERS_FOUND` · 경로 제거 시 `SCAN_ERROR`) |
+| Core의 불투명 페이로드 해석 | 0건 — `ARCH-43` 기계 게이트 exit 0(CORE 355모듈) |
+| 판정 | **`Frozen (unexercised)`** — 판정 주체 Kiki(게이트 `G-required-tier-caller-recheck` 3택 중 ①) |
+
+**왜 한정어를 붙였나.** 결정 ④는 ✗ > 3일 때 `Frozen (math-only, acknowledged)`를 두었다 — 인지된
+한계를 라벨에 남기는 형식이다. 이번에는 ✗가 0이었지만 **다른 종류의 한계**가 남았다: 필수층을
+부르는 Core 코드가 0이라 중립성이 *사용*으로 시험된 적이 없다. 반증 시도의 통과를 사용에 의한 검증과
+같은 이름으로 부르지 않기 위해 같은 형식을 따랐다. 게다가 9/27 재측정은 그 0이 과도기가 아니라
+설계 경로의 결과임을 보였다 — Core가 필수층과 같은 일을 해야 했던 두 번 모두 선택층 능력이 새로
+생겼다(`EOS-69` ⑦ 답 채점 · `EOS-104` #1195 오개념 감지).
+
+**한정어의 관리 — 사건 축과 시간 축.**
+- 사건 축: 첫 호출자가 생기면 `tests/backend/schema/test_subject_adapter_two_tier_contract.py`의
+  라벨-사실 일치 검사가 그 PR에서 RED를 낸다. 그 PR이 `EOS-92` §4-1을 재측정하고 한정어를 뗀다.
+- 시간 축: 호출자 0이 이어지면 G5 데이터 동결(2026-12-27)에 게이트
+  `G-required-tier-caller-recheck-g5`가 다시 판정한다(유지 · 필수층 축소·재설계 · 종결 3택).
+  재확인 작업 = `ARCH-67`.
+
+**결과에 추가되는 것.** 동결 이후 필수층 메서드 추가는 곧 동결 해제다. `EOS-70`(explain)의 필수층
+편입은 Kiki의 동결 해제 결정을 전제로 하고, 기본 행선지는 선택층 또는 어댑터 내부 공개 API다.
+
+근거 전문 = [`subject_contract_cross_probe.md`](../subject_contract_cross_probe.md) 부록 C.
+
+---
+
 ## 미결
 
 - 계획서 003 §9 주차표와 전환 선언서 주차표의 정합(둘 중 하나를 정본으로 지정하거나, 주차 라벨 자체를 폐기) — 이 ADR 범위 밖. 별도 등재 필요.
-- 프로브 판정자: Kiki 단독인가, 물리 도메인 확인이 필요한가 — `EOS-92`에서 확정.
-- **`EOS-92` acceptance ④에 ✗ > 3 중단 규칙을 반영**해야 한다(현재 상한 없음). `EOS-92`는 다른
-  브랜치 소유라 이 세션이 amend하지 않았다 — 그쪽 세션 또는 머지 후 `backlog.py amend`로 처리.
-- PR #986 머지 후 `main`에서 코드 축 상태 라벨과 이 ADR의 상태 표기가 일치하는지 재확인.
+- ~~프로브 판정자: Kiki 단독인가, 물리 도메인 확인이 필요한가 — `EOS-92`에서 확정.~~
+  → **해소**: `EOS-92` §5 "물리 도메인 전문가 확인은 불요 — Kiki 단독으로 성립".
+- ~~**`EOS-92` acceptance ④에 ✗ > 3 중단 규칙을 반영**해야 한다.~~
+  → **해소**: `EOS-92` acceptance ⑤로 반영됨(2026-09-06).
+- ~~PR #986 머지 후 `main`에서 코드 축 상태 라벨과 이 ADR의 상태 표기가 일치하는지 재확인.~~
+  → **해소**(2026-09-27): 코드 축(계약 모듈 상태 제목)과 이 ADR이 모두 `Frozen (unexercised)`다.
+  둘의 일치는 계약 모듈 쪽이 동결 테스트로 기계 집행되고, 이 ADR은 사람이 맞춘다.
