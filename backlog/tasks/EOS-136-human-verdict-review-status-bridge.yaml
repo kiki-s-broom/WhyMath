@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,8 +20,14 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/harness/golden_promotion_gate.py
   - "src/backend/whymath_backend/harness/*review_status*.py"
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
   - tests/backend/harness/test_golden_promotion_gate.py
   - "tests/backend/harness/test_*review_status*.py"
-session: null
-notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_promotion_gate ③단(review_status 백필 각인)을 채울 수 있는 유일한 도구가 코퍼스 단위·감사 라벨 근거라 사람 판정 이벤트를 읽지 않고, 축적 회차 코퍼스는 KNOWN_CORPORA 밖이라 대상조차 아니다. 따라서 사람이 승인한 수용 문항은 검수 건수와 무관하게 review_status_not_backfilled로 영구 차단된다. EOS-64 ③(P0)이 규정한 경로 중 판정기만 착지하고 ②→③ 집행 도구가 빠진 상태다. eos_priority는 P0 예산(One In One Out) 때문에 P1로 등재 — P0 승격은 Kiki 판단(amend --eos-priority). 검수 도구의 verdicts 파일({slug, review_status})을 게이트 --backfill-audit에 그대로 넣는 우회는 ②단과 ③단을 같은 증거로 이중 계상하는 위장이라 채택하지 않는다."
-updated: 2026-09-25
+  - tests/backend/harness/test_eos_anchor_e2e_a4.py
+  - tests/backend/harness/test_golden_inputs.py
+  - docs/standards/review_status_stamping_contract.md
+  - docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md
+session: claude/eos-136-9awu8z
+notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_promotion_gate ③단(review_status 백필 각인)을 채울 수 있는 유일한 도구가 코퍼스 단위·감사 라벨 근거라 사람 판정 이벤트를 읽지 않고, 축적 회차 코퍼스는 KNOWN_CORPORA 밖이라 대상조차 아니다. 따라서 사람이 승인한 수용 문항은 검수 건수와 무관하게 review_status_not_backfilled로 영구 차단된다. EOS-64 ③(P0)이 규정한 경로 중 판정기만 착지하고 ②→③ 집행 도구가 빠진 상태다. eos_priority는 P0 예산(One In One Out) 때문에 P1로 등재 — P0 승격은 Kiki 판단(amend --eos-priority). 검수 도구의 verdicts 파일({slug, review_status})을 게이트 --backfill-audit에 그대로 넣는 우회는 ②단과 ③단을 같은 증거로 이중 계상하는 위장이라 채택하지 않는다.\n\n[정정 2026-09-27] paths ['src/backend/whymath_backend/harness/golden_promotion_gate.py', 'src/backend/whymath_backend/harness/*review_status*.py', 'tests/backend/harness/test_golden_promotion_gate.py', 'tests/backend/harness/test_*review_status*.py'] → ['src/backend/whymath_backend/harness/golden_promotion_gate.py', 'src/backend/whymath_backend/harness/*review_status*.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'tests/backend/harness/test_golden_promotion_gate.py', 'tests/backend/harness/test_*review_status*.py', 'tests/backend/harness/test_eos_anchor_e2e_a4.py', 'tests/backend/harness/test_golden_inputs.py', 'docs/standards/review_status_stamping_contract.md', 'docs/reviews/mp03_canary_threshold_and_promotion_path_2026-09-25.md']: EOS-136 실작업 범위 반영 — 게이트·각인 도구·적용 대상 모듈 외에 기존 E2E(test_eos_anchor_e2e_a4)의 3단 경로 교체, golden_inputs 기대값 1건, 계약 문서·MP-03 판정 문서 추기, 인벤토리·선언≠배선 감사기 등재가 acceptance 이행에 필요했다(편집 훅 scope_drift 경고 반영)"
+updated: 2026-09-27
