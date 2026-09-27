@@ -576,6 +576,16 @@ def _resolve_jobs(args: argparse.Namespace, workflow: dict[str, Any], repo_root:
     skipped = [n for n in required if n not in runnable]
     if skipped:
         print(f"ⓘ 재현 불가라 미러 대상에서 제외: {', '.join(skipped)} (CI가 최종 판정)")
+    # 경로 필터 잡은 이 미러의 잡 선택이 대신한다(HARN-180) — 위 required가 바로 그 잡의 filter
+    # 스텝을 정본으로 읽어 계산한 결과다. 돌리면 filter 스텝이 GitHub 식 때문에 매번 미실행으로
+    # 세어져 자동 선택 실행이 전부 exit 3이 된다 — 상시 켜진 경고는 보호가 아니라 소음이다.
+    # `--job`으로 직접 지정하면 돌리고 미실행을 그대로 보고한다(위 분기).
+    if coverage.FILTER_JOB in runnable:
+        runnable.remove(coverage.FILTER_JOB)
+        print(
+            f"ⓘ {coverage.FILTER_JOB} 잡은 미러 대상에서 제외: 경로 필터 계산 잡이며 이 미러의 "
+            f"잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 대신했다 (CI가 최종 판정)"
+        )
     return runnable
 
 

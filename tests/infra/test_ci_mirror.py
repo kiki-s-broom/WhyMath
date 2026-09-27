@@ -163,6 +163,42 @@ def _blocking_non_infra_actions(workflow: dict) -> list[str]:
     return found
 
 
+def _auto_selected(module, monkeypatch, tmp_path: Path, changed: list[str]) -> list[str]:
+    """`--job` 없이 run을 부를 때 고르는 잡 — 실제 ci.yml·실제 열거기로 계산한다."""
+    monkeypatch.chdir(_REPO_ROOT)
+    workflow = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
+    args = module.build_parser().parse_args(
+        ["--workflow", str(_CI_PATH), "--result", str(tmp_path / "r.json"), "run"]
+    )
+    monkeypatch.setattr(module.coverage, "changed_files_from_git", lambda base, root: list(changed))
+    return module._resolve_jobs(args, workflow, _REPO_ROOT)
+
+
+def _static_not_executed(job: dict, repo_root: Path) -> list[str]:
+    """돌려 보지 않고도 알 수 있는 미실행 — 원리상 로컬에서 못 도는 run 스텝(식·조건·디렉터리)."""
+    found: list[str] = []
+    for step in job.get("steps") or []:
+        runnable, reason = mirror.step_is_runnable(step)
+        if not runnable:
+            if mirror.not_run_status(step) == mirror.NOT_EXECUTED:
+                found.append(f"{step.get('name')}: {reason}")
+            continue
+        cwd, why = mirror.step_working_directory(job, step, repo_root)
+        if cwd is None or not cwd.is_dir():
+            found.append(f"{step.get('name')}: {why or cwd}")
+    return found
+
+
+def _assert_auto_selection_has_no_structural_not_executed(module, monkeypatch, tmp_path) -> None:
+    """상시 잡(문서만 바뀐 변경에서도 고르는 잡)에 구조적 미실행이 0건이다 — 있으면 모든 실행이
+    exit 3이다. 깨지면 그 스텝을 해석 가능하게 만들거나(HARN-180 ②처럼) 잡 선택을 다시 본다."""
+    names = _auto_selected(module, monkeypatch, tmp_path, ["docs/reviews/x.md"])
+    assert len(names) >= 4, f"상시 잡 열거가 비었다 — 스캔 0건은 통과가 아니다: {names}"
+    workflow = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
+    offenders = {n: _static_not_executed(workflow["jobs"][n], _REPO_ROOT) for n in names}
+    assert {n: v for n, v in offenders.items() if v} == {}
+
+
 def _assert_old_format_is_unknown(module, tmp_path: Path) -> None:
     """옛 형식은 exit 0이어도 통과로 읽지 않는다 — 미실행 수를 판정할 수 없기 때문이다."""
     path = tmp_path / "r.json"
@@ -881,6 +917,16 @@ class TestMutationSelfCheck:
         assert_fn(mirror, tmp_path / "control")
         assert _MIRROR_PATH.read_text(encoding="utf-8") == original
 
+    def test_m15_running_filter_job_makes_every_run_exit_3(self, tmp_path, monkeypatch):
+        """M15: 경로 필터 잡 제외를 지우면 상시 잡에 구조적 미실행이 생겨 RED(상시 exit 3)."""
+        mutant, original = self._mutated_module(
+            tmp_path, "    if coverage.FILTER_JOB in runnable:\n", "    if False:\n"
+        )
+        with pytest.raises(AssertionError):
+            _assert_auto_selection_has_no_structural_not_executed(mutant, monkeypatch, tmp_path)
+        _assert_auto_selection_has_no_structural_not_executed(mirror, monkeypatch, tmp_path)
+        assert _MIRROR_PATH.read_text(encoding="utf-8") == original
+
     def test_m14_done_folding_not_executed_into_rerun_advice(self, tmp_path, monkeypatch, capsys):
         """M14: done 프리플라이트의 미실행 분기를 지우면 done 축 단언이 RED(backlog.py 변이)."""
         monkeypatch.setattr(sys, "path", [str(_BACKLOG_CLI.parent), *sys.path])
@@ -935,6 +981,24 @@ class TestAgainstRealWorkflow:
         names = mirror._resolve_jobs(args, workflow, _REPO_ROOT)
         assert "docker-build" not in names
         assert "재현 불가" in capsys.readouterr().out, "제외 사실을 침묵하면 사람이 통과로 읽는다"
+
+    def test_filter_job_is_replaced_not_run_in_auto(self, monkeypatch, tmp_path, capsys):
+        """경로 필터 잡(changes)은 미러의 잡 선택이 대신한다 — 자동 선택에서 사유와 함께 빠진다.
+
+        돌리면 그 filter 스텝(GitHub 식)이 매번 미실행이 되어 자동 선택 실행이 전부 exit 3이
+        된다(HARN-180 착지 중 실측 — 첫 미러 실행이 changes를 골랐다).
+        """
+        names = _auto_selected(mirror, monkeypatch, tmp_path, ["docs/reviews/x.md"])
+        assert mirror.coverage.FILTER_JOB not in names
+        out = capsys.readouterr().out
+        assert (
+            f"{mirror.coverage.FILTER_JOB} 잡은 미러 대상에서 제외" in out
+        ), "제외를 침묵하면 빠뜨림과 구분되지 않는다"
+
+    def test_always_on_jobs_have_no_structural_not_executed(self, monkeypatch, tmp_path):
+        """매 실행에 들어가는 잡에 원리상 못 도는 run 스텝이 있으면 모든 미러 실행이 exit 3이
+        되어 경고가 상시 소음이 된다 — 문서만 바뀐 변경의 자동 선택에서 0건이어야 한다."""
+        _assert_auto_selection_has_no_structural_not_executed(mirror, monkeypatch, tmp_path)
 
     def test_workspace_working_directories_resolve_to_real_dirs(self):
         """HARN-180 ①의 실물 대조 — 2026-09-27에 건너뛰어진 OPS-24 게이트 2개가 이제 저장소
