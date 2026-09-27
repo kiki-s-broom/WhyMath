@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-09-student-input-cas-parse-guard
+title: "학생 입력 CAS 파싱 안전 진입점 — sympify/parse_expr 56곳에 크기·지수·시간 가드 없음(진단 기준선 BL-004 · KR-06 ① 9^9^9 서버 정지 · 코딩 헌법 R22-03 집행 장치)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 발견 근거 = 2026-09-27 진단 기준선 BL-004(높음·E2): 학생 입력이 닿는 sympify/parse_expr/parse_latex 비테스트 56곳(verify_answer.py 30 · canonicalize.py 4 · dsl 3 · symbolic_equivalence.py 2 · l5/ocr/verify.py 1 등)에 식 크기·지수 상한·시간 가드가 없고 API 진입은 길이 상한(4000자)뿐이다(KR-06 ① '9^9^9 서버 멈춤' 재현 대상). 먼저 재현한다: 학생 답안 경로에 9^9^9 류 입력을 넣어 응답 시간·CPU를 실측하고 결과를 notes에 적는다(재현 안 되면 그 사실도 적는다)."
+  - "② 코딩 헌법 R22-03(학생 입력 수식은 허용 문자 검사를 통과한 뒤에만 CAS로 파싱)의 집행 장치 = 단일 안전 파싱 진입점(허용 문자·길이·지수 크기 상한·evaluate=False·시간 예산)을 l3에 두고, 학생 입력이 닿는 경로가 전부 그 진입점을 경유하도록 AST 거버넌스 테스트로 동결한다(직접 sympify 호출 0건 또는 허용목록 사유 필수)."
+  - "③ 변별력 — 가드 제거·우회 경로 추가 두 뮤테이션에서 RED, 정상 입력 GREEN(대조군). 성능 예산(예: 200ms) 초과 입력은 거부 응답(학생 문구는 부정적 강화 금지 규칙 준수)으로 끝난다."
+  - "④ 완료 = tests/backend 배선 + 재현 기록 + CONST-07(R22-03 좌석)에 증적 연결. 의사결정 우선순위 1(학생 안전·웰빙) 항목이라 P1."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/safe_parse.py
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - src/backend/whymath_backend/l3/equivalent/canonicalize.py
+  - "tests/backend/l3/test_safe_parse*.py"
+  - tests/infra/test_cas_parse_entrypoint_governance.py
+session: null
+notes: "출처 = docs/reviews/coding_diagnosis_baseline_2026-09-27.md BL-004(높음·E2). 의사결정 우선순위 1(학생 안전). CONST-08(파트 VII)의 R22-03 좌석과 증적을 공유한다.\n\n[정정 2026-09-27] acceptance 분할 등재 2/4\n\n[정정 2026-09-27] acceptance 분할 등재 3/4\n\n[정정 2026-09-27] acceptance 분할 등재 4/4"
+updated: 2026-09-27

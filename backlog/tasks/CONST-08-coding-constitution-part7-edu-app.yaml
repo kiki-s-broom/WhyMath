@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-08-coding-constitution-part7-edu-app
+title: "코딩 헌법 이식 3단계 — 파트 VII(20~29장) — 교육앱 특화 집행 장치 착지 (규칙 34건)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - CONST-03-coding-constitution-stage3-part1-enforcement
+requires_gates:
+  - G-const-a0002-adoption
+acceptance:
+  - "① 대상 규칙 34건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'code_exists': 1, 'partial': 24, 'none': 9}): R20-01(code_exists·st1·S) → tests/data_pipeline/atom_graph/test_atom_corpus_governance.py / R20-02(partial·st2·S) → tests/data_pipeline/atom_graph/test_atom_corpus_governance.py / R20-03(partial·st3·M) → src/data-pipeline/data_pipeline/atom_graph/validate.py / R20-04(none·st3·S) → src/data-pipeline/data_pipeline/graph_analytics/analytics.py / R20-05(partial·st3·M) → tests/infra/test_graph_id_history_governance.py / R21-01(partial·st2·M) → src/backend/whymath_backend/harness/content_lint.py / R21-02(none·st5·L) → tests/backend/db/test_attempt_version_pinning.py / R21-03(none·st5·L) → src/backend/whymath_backend/ops/content_release_manifest.py / R21-04(partial·st2·S) → scripts/ops/cp949_guard.py / R22-01(partial·st3·M) → tests/backend/l1/problem_bank/test_single_correct_choice.py / R22-02(partial·st3·M) → src/mobile/test/corpus_katex_parse_test.dart / R22-03(partial·st3·S) → tests/backend/l3/test_safe_parse.py / R23-01(none·st5·M) → tests/backend/db/test_responses_append_only.py / R23-02(partial·st3·M) → tests/backend/l2/test_mastery_model_version.py / R23-03(partial·st3·S) → tests/backend/l2/test_bkt.py / R23-04(none·st6·M) → src/backend/whymath_backend/harness/mastery_replay_compare.py / R24-01(partial·st6·M) → src/backend/whymath_backend/ops/item_stats_report.py / R24-02(partial·st6·M) → src/backend/whymath_backend/ops/item_stats_report.py / R24-03(partial·st3·S) → tests/backend/schema/test_difficulty_source.py / R25-01(partial·st3·M) → tests/backend/harness/test_wh1_primary.py + tests/backend/harness/test / R25-02(partial·st4·L) → src/backend/whymath_backend/harness/tutor_eval.py / R25-03(none·st3·M) → src/backend/whymath_backend/l4/crisis_guard.py / R25-04(partial·st3·M) → src/backend/whymath_backend/harness/prompt_asset_audit.py / R26-01(partial·st3·M) → tests/backend/privacy/test_pii_field_inventory.py / R26-02(partial·st3·M) → src/backend/whymath_backend/l3/pii_scrubber.py / R26-03(partial·st3·S) → src/mobile/test/governance/sdk_allowlist_governance_test.dart / R26-04(partial·st3·M) → tests/backend/api/test_consent_gate_route_coverage.py / R27-01(partial·st3·S) → src/backend/whymath_backend/ops/provenance_audit.py / R27-02(partial·st4·M) → src/backend/whymath_backend/harness/golden_promotion_gate.py / R27-03(none·st3·S) → scripts/ops/check_asset_licenses.py / R29-01(partial·st5·M) → src/mobile/integration_test/perf_budget_test.dart / R29-02(none·st3·M) → src/mobile/lib/features/chat/data/answer_draft_store.dart + src/mobile / R29-03(partial·st3·M) → src/backend/whymath_backend/harness/content_a11y_lint.py / R29-04(none·st5·M) → scripts/perf/loadtest_classroom.py"
+  - "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열)."
+  - "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다."
+  - "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다."
+  - "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+artifacts: []
+paths:
+  - "scripts/constitution/**"
+  - "tests/infra/test_coding_constitution_*.py"
+  - "docs/constitution_proposals/**"
+session: null
+notes: "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5"
+updated: 2026-09-27

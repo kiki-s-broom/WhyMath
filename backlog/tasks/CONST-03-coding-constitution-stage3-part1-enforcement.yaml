@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-03-coding-constitution-stage3-part1-enforcement
+title: "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - CONST-02-coding-constitution-transplant-stage1-2
+requires_gates:
+  - G-const-sources-registry-adopt
+acceptance:
+  - "① 대상 규칙 10건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'partial': 9, 'none': 1}): R0-02(partial·st3·S) → scripts/constitution/check_amendment.py / R1-01(partial·st3·M) → pipeline.yaml / R1-02(partial·st3·S) → scripts/constitution/pipeline_check.py / R1-03(partial·st3·M) → pipeline.yaml / R2-02(partial·st3·M) → tests/backend/harness/test_review_gate_independence.py / R2-03(partial·st3·M) → tests/backend/schema/test_gate_record_schema.py / R2-04(partial·st3·S) → src/backend/whymath_backend/ops/hit_cu_metrics.py / R3-01(partial·st3·M) → tests/infra/test_batch_idempotency_coverage.py / R4-02(none·st3·M) → scripts/ops/check_generated_schemas.py / R4-03(partial·st2·S) → tests/infra/test_docs_numbers.py"
+  - "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열)."
+  - "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다."
+  - "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다."
+  - "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+artifacts: []
+paths:
+  - "scripts/constitution/**"
+  - "tests/infra/test_coding_constitution_*.py"
+  - "tests/harness/test_constitution_*.py"
+  - ".github/workflows/ci.yml"
+  - ".claude/settings.json"
+  - "docs/constitution_proposals/**"
+session: null
+notes: "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5"
+updated: 2026-09-27
