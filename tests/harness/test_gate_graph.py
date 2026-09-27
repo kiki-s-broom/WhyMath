@@ -503,7 +503,9 @@ class TestFailVerdict:
         gate = _load(repo).gates["G-harn174-gate2"]
         assert gate.depends_on == ["S1-40-rejudgment", "S1-42-fix-a"]
         assert gate.status == "pending"
-        assert "verdict FAIL · owners: S1-42-fix-a · evidence: " in gate.corrections[-1]
+        # [갱신 HARN-177 ②] 기록에 입력 스냅샷 `inputs:`가 들어간다 — 기록 시점에 done인 입력이
+        # 없으므로 `-`. 형식의 정본은 store.format_fail_verdict.
+        assert "verdict FAIL · owners: S1-42-fix-a · inputs: - · evidence: " in gate.corrections[-1]
         assert _errors(repo) == []
 
     def test_verdict_rejected_on_human_gate(self, repo: Path):
@@ -550,8 +552,10 @@ class TestFailVerdict:
     def _inject_record(self, repo: Path, owners: list[str]) -> None:
         backlog = _load(repo)
         gate = backlog.gates["G-harn174-gate2"]
+        # 스냅샷 `inputs`(HARN-177 ②)는 빈 집합 — 이 픽스처의 입력 S1-40은 todo라 기록 시점에
+        # done인 입력이 없다. 이 파일의 관심사는 소유 태스크 연결이지 스냅샷이 아니다.
         gate.corrections = [
-            "[2026-09-24] " + store.format_fail_verdict(owners, self._EVIDENCE) + " — 재판정"
+            "[2026-09-24] " + store.format_fail_verdict(owners, self._EVIDENCE, []) + " — 재판정"
         ]
         _save_gates(repo, backlog)
 
@@ -654,14 +658,36 @@ class TestWaitChain:
         assert "3건 ← G-harn174-bottleneck ← S1-81-judgment ← S1-80-fix-a" in out
 
     def test_chain_ending_at_gate_says_a_person_is_next(self, repo: Path, capsys):
-        """입력이 모두 끝난 게이트에서 경로가 멈추면, 막고 있는 것은 작업이 아니라 사람 판정이다."""
+        """입력이 모두 끝나고 **판정이 기록된** 게이트에서 경로가 멈추면, 막고 있는 것은 작업이
+        아니라 사람 판정이다.
+
+        [갱신 HARN-177 ②] 종전 픽스처는 입력만 done으로 주입하고 `(사람 판정 대기)`를 기대했다.
+        그 상태는 정확히 2026-09-25 사고의 대장 상태(판정 없이 입력만 끝남)이므로 이제
+        '판정 결과 미기록'이 나와야 한다 — 그 축은 test_gate_verdict_handoff.py가 동결한다.
+        여기서는 PASS를 기록해 "정말 사람 차례"인 상태를 만든다.
+        """
         _bottleneck_fixture(repo)
         _set_status(repo, "S1-80-fix-a", "done")
         _set_status(repo, "S1-81-judgment", "done")
+        rc = cli.main(
+            [
+                "gates",
+                "amend",
+                "G-harn174-bottleneck",
+                "--verdict",
+                "PASS",
+                "--evidence",
+                "docs/reviews/judgment.md · main abc1234",
+                "--reason",
+                "판정 PASS",
+            ]
+        )
+        assert rc == 0
         capsys.readouterr()
         assert cli.main(["next", "--no-remote"]) == 0
         out = capsys.readouterr().out
-        assert "3건 ← G-harn174-bottleneck (사람 판정 대기)" in out
+        assert "3건 ← G-harn174-bottleneck (사람 판정 대기" in out
+        assert "미기록" not in out
 
     def test_status_json_carries_chain_and_inputs(self, repo: Path, capsys):
         _bottleneck_fixture(repo)
