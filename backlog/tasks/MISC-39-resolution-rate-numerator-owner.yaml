@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-39-resolution-rate-numerator-owner
+title: "⑩ 오개념 해소율 분자 전환(is_active=false 전체 → RESOLVED) 소유자 부재 — MISC-20 ③-c 유보분 승계"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-123-correct-attempt-misconception-refutation-asymmetry
+requires_gates: []
+acceptance:
+  - "① 실측 — ⑩(`harness/wh1_evaluation.py` 오개념 해소율)은 is_active=false 전체를 분자로 센다. MISC-20 ③-c가 RESOLVED 전용 산식을 재승격 판정과 함께 하도록 유보했으나 그 판정을 소유한 열린 태스크·게이트가 없다(2026-09-28 대장 실측: 관련 태스크 전부 done/cancelled · gates.yaml 해당 항목 0건)."
+  - "② 판정·집행 — 분자를 RESOLVED 전용으로 바꿀지, DECAYED만 빼는 중간안을 둘지, 표본 부족(분자 0) 기간의 표기를 어떻게 할지 정하고 집행한다. 학생 노출 재승격은 MISC-20 ③대로 명시적 판정만 — 자동 재승격 금지."
+  - "③ 시한 — POST /v1/me/attempts에 첫 클라이언트가 붙기 전에 산식을 바꾸거나, 그 전까지 못 바꾸면 EOS-123 머지 시점을 \"정책 변경 산물\" 경계로 ⑩ 리포트에 표시한다. 근거: EOS-123이 정답 회차 감쇠를 열어 DECAYED 분자 유입 경로를 넓혔고, 감쇠 UPDATE가 updated_at을 갱신해 ⑩ 시간창의 분모 구성도 바뀐다(EOS-123 판정문 §4-2)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_evaluation.py
+  - src/backend/whymath_backend/harness/growth_evidence_exposure.py
+session: null
+notes: "출처: EOS-123 판정문 §7-1 ④ · 독립 비판 F3. ⑩은 학생 비노출 PROVISIONAL(growth_evidence_exposure.py)이라 학생 피해는 없고, 오염되는 것은 운영 KPI와 재승격 판정 표본이다. 분류 LOOP."
+updated: 2026-09-28
