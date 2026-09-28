@@ -1482,19 +1482,24 @@ jobs:
         run: python3 scripts/ops/check_conflict_markers.py
 
   # ─────────────────────────────────────────────────────────────────
-  # 빌드 하네스 무결성 + 원격 claim 교차 검증 (항상 실행 — 초 단위)
+  # 빌드 하네스 무결성 + 원격 claim 교차 검증 (항상 실행 — 약 5분, 시간 예산은 아래 timeout-minutes 주석)
   # 병렬 세션 중복작업 방지: backlog 무결성·stale claim을 PR마다 감시
   # ─────────────────────────────────────────────────────────────────
   harness-integrity:
     name: harness-integrity — backlog 무결성·claim 교차 검증
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 시간 예산(OPS-69 · 2026-09-28 실측): 설치 약 50초 + 하네스 테스트 약 3분 36초(1,268건)
+    # = 약 5분 6초. 종전 상한 5분은 이 잡이 초 단위이던 시절 값이라, 테스트가 늘자(#1345 +107건)
+    # 머지 큐 실행 2건(#1344·#1341)이 테스트 전건 통과 직후 cancelled됐다 — 상시 잡이라 모든
+    # PR의 머지가 막힌다. 12분 = 최대 표본 기준 여유 약 57%(OPS-47 기준 '상한의 30% 이상').
+    # 하한은 tests/infra/test_ci_harness_integrity_timeout.py가 동결한다.
+    timeout-minutes: 12
 
     steps:
       # fetch-depth: 0 — HARN-47 브랜치 스캔은 trunk 히스토리와 ahead count를 읽는다.
       # 기본값(depth=1)이면 `is_shallow_repo` 가드에 걸려 **매 실행 "판정 보류"**가
       # 된다. 그건 보호가 아니라 상시 무력 상태다(CLAUDE.md: 상시 실패하는 fail-open
-      # 보호를 "보호 있음"으로 신뢰 금지). 이 잡은 초 단위라 full depth 비용을 감당한다.
+      # 보호를 "보호 있음"으로 신뢰 금지). full depth 체크아웃은 수 초라 이 잡의 시간 예산에 비해 작다.
       - name: Checkout
         uses: actions/checkout@v4
         with:
