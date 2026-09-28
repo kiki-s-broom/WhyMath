@@ -207,10 +207,12 @@ class TestProposal:
         assert gate["reviewed"] == summary["selected"] == gate["proposed"]
         assert "no_human_verdict" not in reasons.values()
         # 게이트의 탈락 사유 분포가 실물 구조를 그대로 보여 준다(MP-03 ②의 형태).
+        # `wm-c`(손질 승인)는 EOS-136부터 ②단의 `human_verdict_needs_edit`다 — "손질하면 쓸 수
+        # 있다"는 지금 코퍼스 내용의 승인이 아니므로 ③단(각인)까지 가지 않는다.
         assert reasons == {
             "wm-a": "review_status_not_backfilled",
             "wm-b": "not_in_corpus",
-            "wm-c": "review_status_not_backfilled",
+            "wm-c": "human_verdict_needs_edit",
             "wm-re": "not_in_corpus",
         }
 

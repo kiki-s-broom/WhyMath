@@ -3075,6 +3075,15 @@
    "paths": [
     "scripts/harness/backlog.py"
    ],
+   "text": "backlog add 출력을 head -20으로 잘라 BrokenPipe 반쪽 쓰기 — 산출물 확인으로 오독 회피",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
    "text": "번호 확인용 backlog add 가 실제 태스크 CONST-01-x 생성 — rename 거부로 cancel 처리(2회차)",
    "weight": 1
   },
@@ -3644,6 +3653,37 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(3회차 · CI 미러 중 · 커밋 전 되돌림)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 도달 잡을 손으로 골라 data-pipeline·infra-shell 누락 — PR 본문에 틀린 제외 근거 기재",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — 커밋 전 백업 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/**",
+    "scripts/harness/backlog.py",
+    "tests/harness/**",
+    "tests/harness/test_next_free_number_format_guard.py"
+   ],
+   "text": "등재 전 추정 번호 EOS-138을 계약 문서에 먼저 기재 — add 충돌 검사가 거부(이미 다른 태스크)",
    "weight": 0
   },
   {

@@ -1,6 +1,6 @@
 # 빌드 하네스 (Build Harness) — 작업일정 관리·순차 조율 표준
 
-> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.11 (2026-09-28 CONST-02 — **코딩 헌법과의 맞물림**: §2e 신설. 하네스는 `constitution/`에 쓰지 않고(제9조 · 가드 훅), 코딩 헌법 규칙 등록부는 §2d 규칙 인덱스와 다른 대장으로 교차 참조만 한다. CI `harness-integrity`에 위헌 심사 래칫·가드 자가시험·파이프라인 검사 스텝 3개, 이식 추적 = `CONST-*` 태스크 + 사람 게이트 4건, 이식 단계(STAGE 1~6)와 스테이지(S0~E6)의 이름 충돌 고정. 이전 1.10: 2026-09-26 HARN-177 — **판정 인계**: pending decision 게이트의 입력 태스크를 `done`할 때 그 게이트에 대한 판정(FAIL·PASS·판정 무관)을 같은 호출에서 넘기게 한다. 셋 다 없으면 exit 1 + 대장 무변경. 판정 기록에 입력 스냅샷이 실려 '입력 전부 done인데 그 상태의 판정 기록 없음'을 next·status·gates show가 `(판정 결과 미기록)`으로 낸다(종전 `(사람 판정 대기)`). FAIL 소유 태스크를 이미 열린 상류에 있는 태스크로 `--owner` 지목 가능(⑥). §3e 「판정 인계」 절 신설 · §7·§7a 갱신. 이전 1.9: 2026-09-25 HARN-174 — **게이트를 태스크 그래프의 노드로 편입**: 게이트에 입력 간선(`depends_on`) 또는 입력 없음 사유(`no_inputs_reason`)를 두고, 태스크·게이트 통합 그래프 하나를 validate·모든 쓰기 경로·selector·board가 공유한다. 해금 수가 게이트 너머까지 전이로 세지고, next·status·gates show가 대기 경로를 보인다. §3e 신설 · §3 정렬 설명 · §7·§7a 갱신. 이전 1.8: 2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
+> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.12 (2026-09-28 CONST-02 — **코딩 헌법과의 맞물림**: §2e 신설. 하네스는 `constitution/`에 쓰지 않고(제9조 · 가드 훅), 코딩 헌법 규칙 등록부는 §2d 규칙 인덱스와 다른 대장으로 교차 참조만 한다. CI `harness-integrity`에 위헌 심사 래칫·가드 자가시험·파이프라인 검사 스텝 3개, 이식 추적 = `CONST-*` 태스크 + 사람 게이트 4건, 이식 단계(STAGE 1~6)와 스테이지(S0~E6)의 이름 충돌 고정. 이전 1.11: 2026-09-28 HARN-182 — **작업 흐름 그래프**: 열린 작업·사람 작업(사람 소유 태스크·미통과 게이트)·미머지 작업(원격 브랜치의 완료분·claim·고립 판정)을 창(윈도우)과 연결선으로 한 캔버스에 통합하는 읽기 전용 도구 `work_graph.py` 신설. 판정은 board·selector·store·remote_claims를 그대로 호출하고 배치·화면만 새로 만든다. §4c 신설 · §7 갱신. 이전 1.10: 2026-09-26 HARN-177 — **판정 인계**: pending decision 게이트의 입력 태스크를 `done`할 때 그 게이트에 대한 판정(FAIL·PASS·판정 무관)을 같은 호출에서 넘기게 한다. 셋 다 없으면 exit 1 + 대장 무변경. 판정 기록에 입력 스냅샷이 실려 '입력 전부 done인데 그 상태의 판정 기록 없음'을 next·status·gates show가 `(판정 결과 미기록)`으로 낸다(종전 `(사람 판정 대기)`). FAIL 소유 태스크를 이미 열린 상류에 있는 태스크로 `--owner` 지목 가능(⑥). §3e 「판정 인계」 절 신설 · §7·§7a 갱신. 이전 1.9: 2026-09-25 HARN-174 — **게이트를 태스크 그래프의 노드로 편입**: 게이트에 입력 간선(`depends_on`) 또는 입력 없음 사유(`no_inputs_reason`)를 두고, 태스크·게이트 통합 그래프 하나를 validate·모든 쓰기 경로·selector·board가 공유한다. 해금 수가 게이트 너머까지 전이로 세지고, next·status·gates show가 대기 경로를 보인다. §3e 신설 · §3 정렬 설명 · §7·§7a 갱신. 이전 1.8: 2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
 >
 > 이 문서의 "빌드 하네스"는 프로젝트 *구축을 관리하는* 레이어다.
 > `src/backend`의 WH-1(튜터링)·WH-S(솔버)는 **제품 런타임 하네스**로 완전히 별개다.
@@ -893,6 +893,65 @@ python3 scripts/harness/board.py --out docs/reviews/board_2026-08-31.html   # �
 CLI 단독이라는 규약이 그대로 유지된다. 기본 출력 경로 `work/`는 gitignore 대상이라
 생성물이 저장소를 오염시키지 않는다(스냅샷을 남기려면 `--out`으로 명시 경로를 준다).
 
+## 4c. 작업 흐름 그래프 — 열린·사람·미머지 작업을 창과 연결선으로 (`work_graph.py`, HARN-182)
+
+작업 보드(§4b)가 *상태별 칸반*이라면 흐름 그래프는 **선후 관계 지도**다. 칸반은 "무엇이
+막혔나"를 보여 주지만 "무엇이 끝나면 무엇이 풀리나"는 보여 주지 못한다 — 그 흐름은
+`depends_on`·`requires_gates`·게이트 입력·트랙 `entry_gate`, 그리고 저장소 밖(다른 브랜치의
+완료분·원격 claim)에 흩어져 있다. 이 도구는 그것을 노드 편집기처럼 한 캔버스에 그린다.
+
+```bash
+python3 scripts/harness/work_graph.py              # work/graph.html 생성 (+ 터미널 요약)
+python3 scripts/harness/work_graph.py --text       # HTML 없이 흐름별 요약만
+python3 scripts/harness/work_graph.py --json       # 페이로드 JSON (좌표 포함)
+python3 scripts/harness/work_graph.py --no-remote  # 원격 조회 3종 생략 (배너로 판정 불가 표기)
+```
+
+**창 세 종류** (Kiki 지시 2026-09-27 — 열린·사람·미머지 작업 통합):
+
+| 창 | 무엇인가 | 상태 판정 근거 |
+|---|---|---|
+| 작업 | 열린 태스크(todo·in_progress·review·blocked). owner가 claude가 아니면 "사람 소유" | `board.build_tasks`(=`selector.classify_todo`) + `board.apply_remote_done` + 원격 claim은 `selector.classify_todo(remote_claimed=…)` |
+| 게이트 | 미통과(pending) 게이트 = 사람이 움직여야 풀리는 관문. 여는 작업이 남았으면 "선행 작업 대기", 없으면 "사람 차례" | `store.dependency_graph`의 게이트 입력 + `store.gate_judgment_state` |
+| 브랜치 | 트렁크에 흡수되지 않은 원격 브랜치 = 미머지 작업. 들고 있는 완료분·진행 중 claim·고립/PR 판정 | `remote_claims.scan_remote_done`·`list_claims`·`scan_stale_branches` |
+
+창 본문에는 **작업 내용 일부**(완료 조건 앞 2개, 없으면 노트 첫 문단)가 실린다. 연결선은
+창 오른쪽 출력 포트 → 다음 창 왼쪽 입력 포트이며 왼쪽 → 오른쪽이 곧 먼저 → 나중이다.
+브랜치 창은 그 브랜치가 들고 있는 태스크 창의 **선행**이다(머지되면 그 태스크가 풀린다) —
+이 간선은 저장소 밖 사실이라 `validate`·`selector`가 쓰는 그래프에는 섞지 않고 그래프 화면
+에서만 덧붙인다.
+
+**배치**: 서로 이어진 창 묶음마다 "흐름" 프레임(최장 경로 층 배정 → 두 층 이상 건너는 선에
+빈 자리 삽입 → 무게중심법 교차 줄이기), 이어진 것이 없는 창은 상태별 묶음 프레임(진행 중 ·
+지금 시작 가능 · 사람 작업 · 차단 · 대기 · 미머지 브랜치)에 격자로 놓인다. 프레임은 크기순
+으로 선반 배치된다. 좌표는 전부 Python이 계산한다(결정적 — 같은 입력이면 같은 좌표).
+
+**화면 조작**: 배경 끌기 = 이동 · 휠/핀치/± = 확대 축소 · 창 끌기 = 옮기기(위치는 보는
+사람 브라우저에만 저장, "배치 초기화"로 되돌림) · 창 누르기 = 선행 사슬(기다리는 것)과 후속
+사슬(끝나면 풀리는 것)만 남기고 흐리게 + 오른쪽 상세 패널(이유·대기 경로·선행/후속·완료
+조건·노트·착수/해소 명령 복사) · 왼쪽 목록(지금 시작 가능 = next 순서 · 사람 차례 · 미머지
+브랜치 · 흐름 · 묶음) · 상태 칩·검색·스테이지·레이어로 걸러 보기 · 미니맵 · 주소
+`#<태스크 ID>`로 바로 열기. 멀리서 볼 때(42% 미만)는 창 본문을 접고 ID만 크게 보인다.
+
+**계약** (`tests/harness/test_work_graph.py`가 동결):
+1. **판정 무복제** — 위 표의 근거 함수를 그대로 호출한다. 그래프가 자기만의 "착수 가능"
+   판정을 갖는 순간 이중 진실원천이 된다.
+2. **무손실** — 열린 태스크 전부 + pending 게이트 전부 + 브랜치 창 전부가 정확히 한 프레임에
+   들어가고, 열린 노드 사이 간선 전부가 그려진다(끝난 선행은 선을 그리지 않되 상세 패널에
+   "완료·해소"로 남는다).
+3. **기하** — 창끼리·프레임끼리 겹치지 않고, 창은 자기 프레임 안에 있으며, 순환이 아닌
+   연결선은 항상 왼쪽 → 오른쪽이다. 순환(대장이 거부해야 할 상태)이 들어와도 무한 루프 없이
+   끝나고 순환을 닫는 선은 붉은 점선으로 드러난다.
+4. **판정 불가 표기** — 원격 스캔 3종(미머지 완료·원격 claim·고립 브랜치)의 상태가 `ok`가
+   아니면(offline·shallow·error·skipped) 페이로드·화면 배너·터미널 요약이 전부 그 사실을
+   말한다. 빈 결과를 "없음"으로 위장하지 않는다. **shallow 클론**(클라우드 세션 기본)에서는
+   고립 브랜치 판정이 `shallow`로 불가하다 — 완료분·claim 축은 그대로 동작한다.
+5. **읽기 전용** — `backlog/`를 일절 쓰지 않는다(mtime 불변 테스트). 네트워크도 원격 claim
+   조회(`list_claims`) 외에는 캐시된 원격 ref만 본다.
+
+화면 템플릿은 `scripts/harness/work_graph_page.html`(`<!--BODY-->`·`__PAYLOAD__` 표식 각 1개)
+이며, 산출물은 외부 요청 0의 자기완결 HTML 1파일이다. 기본 출력 `work/`는 gitignore 대상이다.
+
 ## 5. 다과목 확장과의 관계 (비침투 원칙)
 
 백로그의 `subject` 필드는 **빌드 관리 메타데이터**다. 런타임 `Subject` enum·
@@ -1002,6 +1061,7 @@ python3 scripts/harness/backlog.py branches         # 미머지 브랜치 — �
 python3 scripts/harness/backlog.py overlap <id>    # 착수 전 겹침 진단
 python3 scripts/harness/backlog.py policy show|report      # 정책 값·warn 측정 리포트
 python3 scripts/harness/board.py                   # 작업 보드 HTML (work/board.html)
+python3 scripts/harness/work_graph.py              # 작업 흐름 그래프 HTML (work/graph.html · HARN-182)
 ```
 
 ### 7a. 정정 경로 표 — 대장 손편집 없이 고칠 수 있는 것 (HARN-57·59·67)

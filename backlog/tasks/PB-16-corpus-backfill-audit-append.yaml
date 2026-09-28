@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-16-corpus-backfill-audit-append
+title: "코퍼스 단위 review_status 백필이 재실행 때 감사로그를 덮어쓴다 — 고정 코퍼스에 레코드를 더하고 다시 돌리면 이전 각인 기록이 감사 파일에서 사라져 승격 게이트가 그 레코드를 손각인 의심으로 읽는다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 감사로그 append 전환 — problem_corpus_review_status_backfill.run_review_status_backfill이 감사 JSONL을 write_text(덮어쓰기)가 아니라 append로 쓴다. 재실행 멱등(채울 것 0건이면 아무것도 쓰지 않음)은 유지한다. 실측 재현(판정 기준 main 0e7b4f6b): 3건 각인 → 1건 추가 → 재실행하면 감사 파일에 새 1건만 남았다."
+  - "② 쓰기 순서 — 사람 판정 각인 도구(review_status_verdict_bridge)와 같은 규칙(감사로그 먼저 → 코퍼스 원자 교체)을 적용하고, 중간 실패 뒤 재실행이 복구되는지 테스트로 동결한다. 순서를 뒤집으면 코퍼스에만 값이 남아 재실행이 감사 행을 만들지 않는다(세탁 금지 규칙)."
+  - "③ 기존 감사 파일 7종(docs/data/review_status_backfill_audit/*.jsonl)이 현재 코퍼스의 채워진 레코드를 전부 덮는지 실측한다 — 덮지 못하면 git 이력에서 복원할지, 재각인할지 판정 문서로 남긴다. 음성 대조: 레코드 추가 후 재실행에서 이전 각인 기록이 사라지면 RED."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_review_status_backfill.py
+  - tests/backend/harness/test_corpus_backfill_check_mode.py
+  - "tests/backend/harness/test_review_status_backfill_*.py"
+  - "docs/data/review_status_backfill_audit/*.jsonl"
+session: null
+notes: "출처: EOS-136 세션 실측(2026-09-27) — docs/standards/review_status_stamping_contract.md §8 한계. 현행 승격 게이트는 회차 코퍼스(사람 판정 각인 도구의 append 전용 감사로그)에 쓰이고 고정 코퍼스에는 아직 쓰이지 않아 즉시 피해는 없다. 고정 코퍼스에 레코드가 추가되는 시점(예: 생성 코퍼스 확장)부터 감사 추적이 끊긴다. git 이력에는 이전 감사 파일이 남는다."
+updated: 2026-09-27

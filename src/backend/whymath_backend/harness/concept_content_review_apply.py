@@ -6,8 +6,14 @@
 
 **승인 행은 검수 게이트를 통과해야 한다** — `l1.concept_content.review_gate`가 승격 권위를
 검사한다(`reviewed_by`가 등재 검수자 + `reviewed_at` ISO 8601). `review_status='reviewed'`는
-학생 노출 게이팅 기준이라(`l1/*/retrieval.py`) 서명 없는 승격은 미검증 AI 콘텐츠의 학생 노출이
-된다. 위반이 1건이라도 있으면 **전체를 거부**한다(부분 적용 금지).
+학생 공급 게이트 기준이라(집행 지점 `l4/content_supply.py::resolve_concept_dsl` — CONT-05 ⓐ)
+서명 없는 승격은 미검증 AI 콘텐츠의 학생 공급이 된다. 위반이 1건이라도 있으면 **전체를 거부**한다
+(부분 적용 금지). 검색 표면(`l1/*/retrieval.py`)은 이 테이블이 아니라 `concept_node`·`atom_node`의
+검수 상태를 읽으므로 이 승격에 반응하지 않는다(2026-09-25 주입 실측 — 종전 판의 주장 정정).
+
+승격은 **코퍼스 커밋까지가 한 동작**이다 — `ConceptContentStore.upsert`가 코퍼스의 `review_status`를
+그대로 쓰므로, DB만 바꾸면 다음 적재가 되돌린다(같은 실측 §3.4). 이 CLI가 코퍼스 JSON과 DB를 함께
+바꾸는 이유이며, 바뀐 코퍼스는 PR로 커밋해야 남는다.
 
 사용:
     python -m whymath_backend.harness.concept_content_review_apply \
