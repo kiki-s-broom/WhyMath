@@ -43,7 +43,9 @@ def _add(task_id: str, *extra: str, acceptance: str = "원래 조건 ①") -> in
         [
             "add",
             "--eos-priority",
-            "P2",
+            # P1 — 이월 등급(P2·P3)은 `next` 후보에서 기본 숨김(HARN-77). 이 스위트는 정정
+            # 경로가 피검체라 후보에 보이는 등급으로 등재한다.
+            "P1",
             "--id",
             task_id,
             "--title",
@@ -594,7 +596,7 @@ def _add_titled(task_id: str, title: str, *extra: str) -> int:
         [
             "add",
             "--eos-priority",
-            "P2",
+            "P1",  # 후보 노출 문자열 검사 — 이월 등급(P2·P3)은 기본 숨김이라 안 보인다(HARN-77)
             "--id",
             task_id,
             "--title",
