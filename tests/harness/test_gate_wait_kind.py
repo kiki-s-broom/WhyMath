@@ -207,6 +207,16 @@ class TestWorkGraphGateWindows:
     def test_open_input_window_waits(self):
         assert _gate_node(_graph(_backlog(input_status="todo")))["state"] == "gate_wait"
 
+    def test_open_input_human_gate_window_says_work_remains(self):
+        """판정 개념이 없는 게이트의 사유 문구도 분류를 따른다 — 입력이 남았으면 작업 차례다."""
+        node = _gate_node(_graph(_backlog(input_status="todo", kind="human")))
+        assert (node["state"], node["reason"]) == (
+            "gate_wait",
+            "이 게이트를 여는 작업이 아직 남았다",
+        )
+        control = _gate_node(_graph(_backlog(kind="human")))
+        assert (control["state"], control["reason"]) == ("gate_turn", "담당 kiki의 행동을 기다린다")
+
     def test_counts_keep_verdict_out_of_the_humans_turn(self):
         counts = _graph(_incident())["counts"]
         assert counts["gate_verdict"] == 1
@@ -317,9 +327,10 @@ class TestBoardAndStall:
         assert board.gate_wait_label(b, ["G-h184-person"]) == "사람 게이트 대기"
 
     def test_gate_card_carries_the_wait_kind(self):
-        detail = board.gate_detail(_incident(), _incident().gates[_GATE], TODAY)
+        incident, passed = _incident(), _passed()
+        detail = board.gate_detail(incident, incident.gates[_GATE], TODAY)
         assert (detail["wait_kind"], detail["wait_label"]) == ("verdict", f"게이트 {VERDICT_MARK}")
-        control = board.gate_detail(_passed(), _passed().gates[_GATE], TODAY)
+        control = board.gate_detail(passed, passed.gates[_GATE], TODAY)
         assert (control["wait_kind"], control["wait_label"]) == ("person", "사람 게이트 대기")
 
     def test_board_page_does_not_call_every_pending_gate_a_human_action(self):
@@ -341,6 +352,23 @@ class TestBoardAndStall:
         )
         b.tasks["S1-52-phase-2"].requires_gates = ["G-h184-person"]
         assert _stall(b) == ("gate_verdict", [_GATE])
+
+    @pytest.mark.parametrize(
+        ("make", "expected"),
+        [(_incident, "gate_verdict"), (_passed, "human_gate")],
+        ids=["incident", "pass-control"],
+    )
+    def test_stall_with_other_blockers_takes_the_second_site(self, make, expected):
+        """정지 사유가 게이트를 말하는 **두 번째 지점**(선행 대기가 섞여도 게이트로 접는 경로).
+
+        선행 대기 태스크가 하나라도 있으면 첫 지점(게이트만 남음)을 건너뛰고 두 번째 지점으로
+        간다 — 그 지점만 종전 human_gate 로 남으면 이 반례가 RED를 낸다.
+        """
+        b = _stalled(make())
+        b.tasks["S1-54-after"] = _task("S1-54-after", depends_on=[_BEHIND[0]])
+        _, excluded = selector.candidates(b)
+        assert {e.reason for e in excluded} == {"gates", "deps"}  # 픽스처가 두 번째 지점을 밟는다
+        assert _stall(b) == (expected, [_GATE])
 
     def test_session_brief_does_not_announce_a_human_gate(self):
         text = report.render_brief(_stalled(_incident()), [], "claude/h184", TODAY)
