@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/me.py
-session: null
+session: claude/magical-maxwell-hja5kh-eos17
 notes: "EOS-13 구현 중 발견(범위 밖이라 손대지 않음 — 행동 동결 준수). L2 숙달 계약은 미측정을 None으로 보존하는데 API 응답 경계에서 0.0으로 접히므로 그 구분이 클라이언트에 도달하지 않는다. CLAUDE.md 'None != 0' 축(S3-07 선례)의 표현 계층 판. 기존 동작이므로 정책 변경이며 리팩터가 아니다."
-updated: 2026-09-16
+updated: 2026-09-28
