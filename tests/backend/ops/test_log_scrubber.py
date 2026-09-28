@@ -275,3 +275,53 @@ def test_install_log_scrubber_is_idempotent() -> None:
     second = install_log_scrubber(logger)
     assert first is second
     assert sum(isinstance(f, PiiSecretScrubberFilter) for f in logger.filters) == 1
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# SEC-38 — 한글 인접 경계: 정규식 `\b`가 한글을 단어 문자로 봐서 한국어 문장 속 PII·시크릿을
+# 놓치던 사각. 2026-09-28 실측에서 아래 입력이 전부 원문 그대로 통과했다(수정 전 RED 확인).
+# ──────────────────────────────────────────────────────────────────────────
+_KOREAN_ADJACENT_CASES: tuple[tuple[str, str], ...] = (
+    # (입력 문장, 마스킹돼야 할 부분)
+    ("연락처 010-1234-5678로 문의", "010-1234-5678"),  # 조사가 뒤에 붙은 휴대전화
+    ("전화 01012345678입니다", "01012345678"),  # 하이픈 없는 휴대전화 + 조사
+    ("메일 kid@test.com으로", "kid@test.com"),  # 조사가 뒤에 붙은 이메일
+    ("메일은kid@test.com", "kid@test.com"),  # 한글이 바로 앞에 붙은 이메일
+    ("키sk-ant-abcdefgh1234 노출", "sk-ant-abcdefgh1234"),  # 한글 직후 API 키
+    ("토큰eyJhbGciOi.eyJzdWIiOi.c2lnbmF0dXJl", "eyJhbGciOi.eyJzdWIiOi.c2lnbmF0dXJl"),  # JWT
+    ("헤더Bearer abcdefgh12345", "abcdefgh12345"),  # 한글 직후 Bearer 토큰
+)
+
+
+@pytest.mark.parametrize(("text", "secret"), _KOREAN_ADJACENT_CASES)
+def test_korean_adjacent_pii_and_secrets_are_masked(text: str, secret: str) -> None:
+    """한글이 앞뒤에 붙어도 PII·시크릿이 가려진다 — 로그는 한국어 문장이 기본이다."""
+    out = scrub_text(text)
+    assert secret not in out
+    assert "***MASKED***" in out
+
+
+def test_korean_adjacent_env_secret_masks_value_and_keeps_name() -> None:
+    """한글 직후의 `WHYMATH_*_KEY=` 대입도 값만 가리고 키 이름은 진단용으로 남긴다."""
+    out = scrub_text("설정WHYMATH_JWT_SECRET_KEY=abc123xyz")
+    assert "abc123xyz" not in out
+    assert "WHYMATH_JWT_SECRET_KEY" in out
+
+
+def test_korean_adjacent_sensitive_field_value_is_masked() -> None:
+    """한글 직후의 학생 원문 필드명(`student_text=`)도 값이 가려진다."""
+    out = scrub_text("필드student_text=학생원문풀이")
+    assert "학생원문풀이" not in out
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "주문번호 A01012345678 참조",  # 영문자 바로 뒤 숫자열 — 전화번호가 아니다(종전과 같음)
+        "일련번호 9901012345678 참조",  # 더 긴 숫자열의 일부 — 전화번호가 아니다(종전과 같음)
+        "변수 mysk-abcdefgh123 확인",  # 영문자 바로 뒤 sk- — API 키 접두가 아니다(종전과 같음)
+    ],
+)
+def test_ascii_alnum_adjacency_still_not_masked(text: str) -> None:
+    """대조군 — 경계 수정은 한글 인접만 푼다. 영숫자 인접 판정은 수정 전과 같아야 한다."""
+    assert scrub_text(text) == text
