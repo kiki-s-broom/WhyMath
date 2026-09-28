@@ -1109,10 +1109,17 @@ class TestAttemptMisconceptionScan:
         assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
         assert body["evidence"]["possible_misconceptions"] == []
 
-    def test_correct_answer_is_not_scanned(self) -> None:
-        """정답 시도는 훑지 않는다 — 오개념은 *틀린 방식*의 이름이다."""
+    def test_correct_answer_is_scanned_like_a_wrong_one(self) -> None:
+        """정답 시도도 **같은 조건으로** 훑는다(EOS-123) — 참 정답은 후보 0건으로 *측정*된다.
+
+        종전엔 정답이면 `not_run`이었다. 그러면 호출자가 정답 회차의 가설을 전혀 움직이지 못해
+        "다르게 틀리면 신뢰가 내려가고 맞히면 그대로"인 역방향 비대칭이 생겼다. 참 정답은 텍스트
+        채널의 ⓪ 거짓 등식 가드가 막아 후보가 없어야 정상이다 — 이 단언이 그 정상 상태를 고정한다
+        (후보가 나오면 오탐이며, 그때 가설 쪽 처리는 `TestAttemptCorrectAnswerHypothesis`가 본다).
+        """
         body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
-        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["evidence"]["possible_misconceptions"] == []
 
     def test_missing_answer_is_not_scanned(self) -> None:
         """답안 미제출은 재료 부족 — 0건을 '오개념 없음'으로 위장하지 않는다."""
@@ -1253,17 +1260,39 @@ class TestAttemptMisconceptionReviewCoaching:
         assert body["misconception_review_coaching"] is None
         assert calls[0] == 1  # 불렀으나 보류 — "안 불렀다"와 구분된다.
 
-    def test_correct_answer_does_not_even_read_hypotheses(
+    def test_correct_answer_decays_but_never_coaches(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """정답 회차는 가설을 1턴 감쇠시키지만 **코칭은 만들지 않는다** — 가설이 아무리 강해도 null.
+
+        이 단언이 코칭 결정의 *위치*를 고정한다(EOS-123 · MISC-35 결론 유지). 결정을 오답·훑음
+        분기 밖으로 옮기면(예: 정답 감쇠 분기와 공유) 0.99 가설로 코칭이 채워져 깨진다 — 방금
+        맞힌 학생에게 지난 오개념의 복습을 권하는 형태다. `received == [()]`가 두 가지를 함께
+        가른다: 호출 1회("부르고 나서 코칭만 보류" — 안 부른 것과 구분) · 빈 후보(정답 답안의
+        관측을 강화에 쓰지 않았다).
+        """
+        received: list[tuple[Any, ...]] = []
+        strong = self._hyp(self._STRONG, 0.99)
+
+        async def _fake(_session: Any, _user_id: Any, candidates: Any, **_kw: Any) -> list[Any]:
+            received.append(tuple(candidates))
+            return [strong]
+
+        monkeypatch.setattr("whymath_backend.api.me.apply_candidates", _fake)
+        body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["misconception_review_coaching"] is None
+        assert received == [()]
+
+    def test_correct_answer_without_material_does_not_even_read_hypotheses(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """정답 회차(훑지 않음)는 **조회 자체를 하지 않는다** — 가설이 아무리 강해도 null.
+        """답안 없는 정답(훑지 않음)은 **조회 자체를 하지 않는다** — 가설이 아무리 강해도 null.
 
-        이 단언이 분기 *위치*를 고정한다. 결정을 `if scan is not NOT_RUN` 밖으로 옮기면
-        카운터가 1이 되어 깨진다 — 그 상태는 *이번에 관측하지도 않은* 과거 가설로 코칭이
-        나가는 형태다.
+        종전 `test_correct_answer_does_not_even_read_hypotheses`의 의도(관측하지 않은 회차는
+        가설을 건드리지 않는다)는 그대로다 — EOS-123 이후 그 회차를 가르는 기준이 "정답"에서
+        "볼 재료가 없음"으로 바뀌었을 뿐이다. 카운터 0이 "안 불렀다"를 고정한다.
         """
         calls = self._patch_hypotheses(monkeypatch, [self._hyp(self._STRONG, 0.99)])
-        body = self._post(is_correct=True, answer="x²+4x+4", question="(x+2)²을 전개하시오.")
+        body = self._post(is_correct=True, answer=None, question="(x+2)²을 전개하시오.")
         assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
         assert body["misconception_review_coaching"] is None
         assert calls[0] == 0
@@ -1371,15 +1400,24 @@ class TestAttemptDistractorLink:
         assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
         assert body["evidence"]["possible_misconceptions"] == []
 
-    def test_correct_attempt_is_not_scanned_even_with_index(self) -> None:
-        """정답 회차는 선지 채널도 돌지 않는다 — 감쇠 시계를 새로 돌리지 않기 위해서다.
+    def test_correct_attempt_is_scanned_with_index(self) -> None:
+        """정답 회차도 선지 채널이 **같은 조건으로** 돈다(EOS-123) — 본 것을 그대로 보고한다.
 
-        여기서 `ran_*`을 내면 호출자가 `apply_candidates`를 부르게 되고, 그러면 *정답이
-        기존 가설을 감쇠시키는* 동작이 이 변경에 딸려 새로 생긴다. 채점/코치 경로의 반증
-        비대칭은 별건(EOS-123)의 소관이라 여기서 건드리지 않는다.
+        정답 선지(매핑에 없는 인덱스)는 `ran_no_candidate`, 매핑된 오답 선지는
+        `ran_with_candidates`다. 뒤쪽은 정답 보고와 서버 관측의 **충돌**인데, 증거는 그것을
+        숨기지 않는다(숨기면 "훑었는데 없었다"는 거짓 보고). 충돌 회차에 가설을 건드리지 않는
+        것은 증거가 아니라 가설 정책의 몫이라 `TestAttemptCorrectAnswerHypothesis`가 본다.
         """
-        body = self._post(is_correct=True, selected_choice_index=1, distractor_map=self._dmap())
-        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        correct_option = self._post(
+            is_correct=True, selected_choice_index=3, distractor_map=self._dmap(index=1)
+        )
+        assert correct_option["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert correct_option["evidence"]["possible_misconceptions"] == []
+
+        conflict = self._post(is_correct=True, selected_choice_index=1, distractor_map=self._dmap())
+        evidence = conflict["evidence"]
+        assert evidence["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert [c["misconception_id"] for c in evidence["possible_misconceptions"]] == [self._MID]
 
     # ── 두 채널의 독립·합류 ───────────────────────────────────────────────
     def test_both_channels_contribute_distinct_candidates(self) -> None:
@@ -1505,6 +1543,231 @@ class TestAttemptDistractorLink:
                 os.environ[var] = prev
             get_settings.cache_clear()
         assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
+
+
+class TestAttemptCorrectAnswerHypothesis:
+    """EOS-123 — 채점 1회차가 오개념 **가설**에 무엇을 하는가(정오답 × 훑기 3상태)의 서빙 경로.
+
+    정책 자체(6칸 표)는 `tests/backend/l4/misconception/test_attempt_hypothesis_policy.py`가 본다.
+    여기서 재는 것은 *배선*이다 — 핸들러가 그 정책대로 `apply_candidates`를 부르는가, 부른다면
+    무엇을 넘기는가. `apply_candidates`를 기록 대역으로 바꿔 호출 목록(`list[tuple[후보…]]`)을
+    본다: `[]`=안 불렀다(가설 무변화) · `[()]`=빈 후보로 1회(1턴 감쇠) · `[(M,)]`=후보 반영.
+    감쇠 수치(0.74 → 0.64)는 실 PG 통합 테스트 `test_eos123_correct_attempt_decay_pg.py`와
+    페르소나 C ⑥이 본다.
+
+    **절마다 반례·대조군**(CLAUDE.md 픽스처 접촉 규칙): 정답 전용 조건이 오답 조건보다 넓어지는
+    회귀(독립 비판 F1)는 "같은 입력의 오답도 안 부른다"는 대조로만 드러나고, 충돌 보류(F2)는
+    "같은 입력의 오답은 후보를 반영한다"는 대조로만 보류가 *정답 때문*임이 드러난다.
+    """
+
+    _Q = "(x+2)²을 전개하시오."
+    #: 연산자 없는 지문 — 텍스트 채널이 식을 못 뽑는다(판정문 §1 ⑧ 실측).
+    _Q_NO_OPERATOR = "넓이가 36인 정사각형의 한 변의 길이는?"
+    #: 유니코드 마이너스가 토큰을 끊어 lhs가 `(x+2)^2`로 잘리는 지문 — 참 정답 `x^2+4`가 오탐된다.
+    _Q_UNICODE_MINUS = "(x+2)^2 − 4x를 간단히 하시오"
+    _MID_CHOICE = "absolute-value-keeps-sign"
+    _MID_TEXT = "distribution-over-power"
+
+    class _Spy:
+        """`apply_candidates` 기록 대역 — 호출마다 받은 후보 id 튜플과 경과 턴을 쌓는다.
+
+        경과 턴까지 기록하는 이유: 후보만 보면 "정답을 2턴으로 과대 감쇠"하는 회귀가 같은
+        `[()]`로 보인다 — 강도 상한(정답 1회 = 오답 1회와 같은 1턴)은 이 값으로만 드러난다.
+        """
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, ...]] = []
+            self.turns: list[int] = []
+
+    @classmethod
+    def _spy(cls, monkeypatch: pytest.MonkeyPatch) -> _Spy:
+        spy = cls._Spy()
+
+        async def _fake(_session: Any, _user_id: Any, candidates: Any, **kw: Any) -> list[Any]:
+            spy.calls.append(tuple(c.misconception_id for c in candidates))
+            spy.turns.append(int(kw.get("turns_elapsed", 1)))
+            return []
+
+        monkeypatch.setattr("whymath_backend.api.me.apply_candidates", _fake)
+        return spy
+
+    @staticmethod
+    def _post(
+        *,
+        is_correct: bool,
+        answer: str | None = None,
+        question: str | None = None,
+        index: int | None = None,
+        dmap: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        session = _QueueSession([], question_text=question, distractor_map=dmap)
+        client = _attempts_client(session)
+        payload: dict[str, Any] = {"problem_id": str(uuid.uuid4()), "is_correct": is_correct}
+        if answer is not None:
+            payload["student_answer"] = answer
+        if index is not None:
+            payload["selected_choice_index"] = index
+        resp = client.post("/v1/me/attempts", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body
+
+    @staticmethod
+    @contextmanager
+    def _flag(var: str, value: str) -> Iterator[None]:
+        prev = os.environ.get(var)
+        os.environ[var] = value
+        get_settings.cache_clear()
+        try:
+            yield
+        finally:
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+            get_settings.cache_clear()
+
+    def _dmap(self) -> list[dict[str, Any]]:
+        return [{"choice_index": 1, "misconception_id": self._MID_CHOICE}]
+
+    # ── DECAY_ONLY: 정답 + 훑었는데 후보 없음 ─────────────────────────────────
+    def test_targeted_correct_answer_decays_with_empty_candidates(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """겨냥 문항의 참 정답 → 빈 후보로 1회 호출(1턴 감쇠) · 코칭 없음.
+
+        대조군: 같은 문항의 오개념 오답은 그 후보를 싣고 부른다(APPLY). 둘이 같으면 정답과 오답을
+        구분하지 못하는 것이다.
+        """
+        spy = self._spy(monkeypatch)
+        body = self._post(is_correct=True, answer="x²+4x+4", question=self._Q)
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert body["misconception_review_coaching"] is None
+        assert spy.calls == [()]
+        assert spy.turns == [1]  # 강도 상한 — 오답과 같은 1턴(정답을 반증으로 과대 계상 금지)
+
+        spy.calls.clear()
+        self._post(is_correct=False, answer="x²+4", question=self._Q)
+        assert spy.calls == [(self._MID_TEXT,)]
+
+    def test_correct_option_index_decays(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """정답 선지(매핑에 없는 인덱스)만 보낸 정답 → 선지 채널이 돌아 빈 후보로 1회 호출."""
+        spy = self._spy(monkeypatch)
+        body = self._post(is_correct=True, index=3, dmap=self._dmap())
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert spy.calls == [()]
+
+    # ── NONE: 훑지 않음 — 정답 쪽 조건이 오답 쪽보다 넓지 않다(F1) ─────────────
+    def test_operator_less_question_is_untouched_for_both_answers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """연산자 없는 지문 → 정답도 오답도 `not_run`·호출 0(거울상 비대칭이 없다 — F1 반례 1).
+
+        정답 전용 조건("공백 아닌 답안이면 감쇠")이었다면 정답 `6`만 감쇠하고 오답 `9`는 못
+        내린다. 오답 쪽 대조가 있어야 그 회귀가 드러난다.
+        """
+        spy = self._spy(monkeypatch)
+        correct = self._post(is_correct=True, answer="6", question=self._Q_NO_OPERATOR)
+        wrong = self._post(is_correct=False, answer="9", question=self._Q_NO_OPERATOR)
+        assert correct["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert wrong["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert spy.calls == []
+
+    def test_choice_flag_off_index_only_is_untouched_for_both_answers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """선지 플래그 OFF + 인덱스만 → 정답·오답 모두 호출 0(F1 반례 2) · 플래그 ON 대조는 감쇠.
+
+        선지 채널을 껐는데 선지 기반 감쇠가 정답에만 살아 있으면 그것이 F1의 거울상이다.
+        """
+        spy = self._spy(monkeypatch)
+        with self._flag("WHYMATH_L4_DISTRACTOR_LINK_ENABLED", "false"):
+            off_correct = self._post(is_correct=True, index=3, dmap=self._dmap())
+            off_wrong = self._post(is_correct=False, index=1, dmap=self._dmap())
+        assert off_correct["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert off_wrong["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert spy.calls == []
+
+        on_correct = self._post(is_correct=True, index=3, dmap=self._dmap())
+        assert on_correct["evidence"]["coverage"]["misconception_scan"] == "ran_no_candidate"
+        assert spy.calls == [()]
+
+    def test_correct_answer_without_material_is_untouched(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """답안·인덱스 모두 없는 정답 → `not_run`·호출 0(관측하지 않은 것을 근거로 깎지 않는다)."""
+        spy = self._spy(monkeypatch)
+        body = self._post(is_correct=True, question=self._Q)
+        assert body["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert spy.calls == []
+
+    def test_kill_switch_off_correct_is_untouched(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """상위 킬 스위치 OFF → 정답 회차도 `not_run`·호출 0 · ON 대조는 감쇠."""
+        spy = self._spy(monkeypatch)
+        with self._flag("WHYMATH_L4_ATTEMPT_MISCONCEPTION_SCAN_ENABLED", "false"):
+            off = self._post(is_correct=True, answer="x²+4x+4", question=self._Q)
+        assert off["evidence"]["coverage"]["misconception_scan"] == "not_run"
+        assert spy.calls == []
+
+        self._post(is_correct=True, answer="x²+4x+4", question=self._Q)
+        assert spy.calls == [()]
+
+    # ── HOLD_CONFLICT: 정답 보고 + 서버가 오개념을 읽음 ─────────────────────────
+    def test_correct_report_on_mapped_distractor_is_held(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """정답 보고 + 매핑된 오답 선지 → 호출 0(감쇠도 강화도 없음) · 충돌 로그 · 코칭 없음(F2).
+
+        감쇠했다면 학생이 **방금 고른** 오개념을 거꾸로 내린다. 대조군: 같은 입력을 오답으로
+        보내면 그 후보를 싣고 부른다 — 보류가 *정답 보고 때문*임을 가른다.
+        """
+        spy = self._spy(monkeypatch)
+        with caplog.at_level("WARNING", logger="whymath.api.me"):
+            body = self._post(is_correct=True, index=1, dmap=self._dmap())
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert body["misconception_review_coaching"] is None
+        assert spy.calls == []
+        conflict_logs = [r.getMessage() for r in caplog.records if "EOS-123 보류" in r.getMessage()]
+        assert len(conflict_logs) == 1, caplog.text
+        assert self._MID_CHOICE in conflict_logs[0]
+        assert f"problem_id={body['evidence']['problem_id']}" in conflict_logs[0]
+
+        self._post(is_correct=False, index=1, dmap=self._dmap())
+        assert spy.calls == [(self._MID_CHOICE,)]
+
+    def test_correct_report_with_wrong_form_answer_is_held_without_leaking_answer(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """정답 보고 + 그 오개념의 거짓형 답 → 보류 · 로그에 답안 원문이 실리지 않는다(PII).
+
+        대조군: 같은 답을 오답으로 보내면 후보를 반영한다.
+        """
+        spy = self._spy(monkeypatch)
+        with caplog.at_level("WARNING", logger="whymath.api.me"):
+            body = self._post(is_correct=True, answer="x²+4", question=self._Q)
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert spy.calls == []
+        conflict_logs = [r.getMessage() for r in caplog.records if "EOS-123 보류" in r.getMessage()]
+        assert len(conflict_logs) == 1, caplog.text
+        assert self._MID_TEXT in conflict_logs[0]
+        assert "x²+4" not in caplog.text
+
+        self._post(is_correct=False, answer="x²+4", question=self._Q)
+        assert spy.calls == [(self._MID_TEXT,)]
+
+    def test_measured_false_positive_is_vetoed_not_reinforced(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """실측 오탐(유니코드 마이너스 지문의 참 정답) → 보류로 묶인다 — 강화로 새지 않는다.
+
+        추출기가 lhs를 `(x+2)^2`로 잘라 참 정답 `x^2+4`를 거짓형으로 읽는다(판정문 §1 ⑧). 충돌을
+        강화에 썼다면 정답을 낸 학생의 오개념 신뢰가 **올라간다**. 거부권으로만 쓰면 비용은 감쇠
+        1회 보류다 — 호출 0이 그것을 고정한다.
+        """
+        spy = self._spy(monkeypatch)
+        body = self._post(is_correct=True, answer="x^2+4", question=self._Q_UNICODE_MINUS)
+        assert body["evidence"]["coverage"]["misconception_scan"] == "ran_with_candidates"
+        assert spy.calls == []
 
 
 class TestSubmitAttempt:
