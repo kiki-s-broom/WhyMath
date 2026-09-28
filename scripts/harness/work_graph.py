@@ -824,8 +824,12 @@ def build_graph(
     layouts: list[FlowLayout] = []
     singles: list[str] = []
     for members in components(nodes, edges):
-        if len(members) == 1:
-            singles.append(node_key(members[0]))
+        # 창 1개짜리 성분이라도 자기 자신을 가리키는 간선(validate가 거부하는 자기 순환)이
+        # 있으면 흐름으로 배치한다 — 연결 없는 묶음으로 보내면 그 간선이 edge_total에는
+        # 세지고 화면에는 안 그려져 간선 전수 계약이 깨진다(순환은 숨기지 않고 드러낸다).
+        solo = members[0]
+        if len(members) == 1 and not any(e[0] == e[1] == solo for e in edges):
+            singles.append(node_key(solo))
             continue
         member_set = set(members)
         flow_edges = [e for e in edges if e[0] in member_set and e[1] in member_set]
