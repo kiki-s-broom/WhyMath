@@ -10,6 +10,7 @@
       "Bash(flutter:*)",
       "Bash(dart:*)",
       "Bash(python3 scripts/harness/*)",
+      "Bash(python3 scripts/constitution/*)",
       "Bash(git:status)",
       "Bash(git:diff)",
       "Bash(git:log)",
@@ -38,7 +39,11 @@
       "Bash(psql:DROP*)",
       "Bash(redis-cli:FLUSHALL*)"
     ],
-    "deny": [],
+    "deny": [
+      "Edit(/constitution/**)",
+      "Write(/constitution/**)",
+      "MultiEdit(/constitution/**)"
+    ],
     "defaultMode": "plan"
   },
   "model": "claude-opus-4-7",
@@ -65,6 +70,15 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/git_revert_guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_constitution.py\""
           }
         ]
       }
