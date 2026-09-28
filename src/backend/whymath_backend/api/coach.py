@@ -81,6 +81,7 @@ from whymath_backend.db.models.activity import ProblemAttempt as ProblemAttemptO
 from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.dialogue import Dialogue as DialogueORM
 from whymath_backend.db.models.dialogue import DialogueTurn as DialogueTurnORM
+from whymath_backend.db.models.hint_usage import HintUsage as HintUsageORM
 from whymath_backend.db.models.problem import Problem as ProblemORM
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
@@ -132,8 +133,13 @@ from whymath_backend.l4 import (
 from whymath_backend.l4.completion import (
     CompletionAction,
     decide_completion,
+    review_turns_on_entry,
 )
-from whymath_backend.l4.hint_deferral import is_answer_demand, is_stuck_turn_count
+from whymath_backend.l4.hint_deferral import (
+    counts_as_hint_usage,
+    is_answer_demand,
+    is_stuck_turn_count,
+)
 from whymath_backend.l4.misconception import (
     InterventionDecision,
     MisconceptionMatch,
@@ -185,6 +191,7 @@ from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
 from whymath_backend.schema.dialogue import DialogueTurn as DialogueTurnSchema
 from whymath_backend.schema.enums import ContentType, EventType, Persona, StepType, TurnRole
 from whymath_backend.schema.event_data_contract import build_event_data
+from whymath_backend.schema.hint_usage import HintUsage as HintUsageSchema
 from whymath_backend.schema.pedagogy_pack import PedagogyPack
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
@@ -1107,6 +1114,132 @@ async def _final_answer_state(
     return result.state, form
 
 
+class _HintAttribution(NamedTuple):
+    """완료 attempt에 귀속할 힌트 판정(EOS-133) — `used_hint` 3상태와 적재할 행 재료.
+
+    `hints`는 (공급 시각, 단계) 쌍을 공급 시각순으로 담는다. `used_hint`가 True일 때만 비어
+    있지 않다 — `hint_usage` 행 존재 = used_hint True. EOS-45가 전제한 병행 파생 규칙
+    (`tests/backend/l2/test_hint_rate_mastery_input.derive_used_hint`)과 같다.
+    """
+
+    used_hint: bool | None
+    hints: tuple[tuple[datetime, int], ...] = ()
+
+
+#: 판정 불가 — 창을 모르거나 판독 불가 공급 행 때문에 "안 썼다"로 확정할 수 없다(NULL 유지).
+_HINT_ATTRIBUTION_UNKNOWN = _HintAttribution(used_hint=None)
+
+
+async def _hint_attribution_window(
+    session: AsyncSession, *, dialogue_id: uuid.UUID | None, started_at: datetime | None
+) -> tuple[datetime, datetime] | None:
+    """힌트 귀속 창 `[대화 시작, 정답을 처음 낸 학생 턴의 발화 시각)` — 모르면 None(EOS-133).
+
+    상한이 완료 시각이 아니라 **정답 제출 턴**인 이유: 정답을 낸 턴과 돌아보기 턴에서도 핸들러는
+    그 턴의 결정 단계를 공급 원장(`힌트제공`)에 적는다(`_log_hint_event`는 완료 판정 *뒤*에
+    불린다). 그 행들은 학생이 답을 낸 *다음*에 나온 것이라 이 풀이에 쓰였을 수 없다 — 완료
+    시각까지 세면 스스로 푼 학생도 돌아보기 턴의 공급 때문에 '힌트 사용'이 된다.
+
+    정답 제출 턴 찾기: 완료 턴의 학생 발화는 아직 적재 전이고, 이미 적재된 학생 턴 중 마지막
+    (돌아보기 턴 수 − 1)개가 돌아보기 응답이다 — 턴 수는 상태 머신과 같은 정본
+    (`review_turns_on_entry`). 그 바로 앞 학생 턴이 정답을 처음 낸 턴이다. 상한 비교는 `<`
+    (엄격)다: 같은 턴의 공급 행은 그 턴의 발화 시각(핸들러의 `now`) *뒤*에 찍히고, 저해상도
+    시계에서 두 값이 같아져도 엄격 비교가 그 행을 뺀다. 첫 메시지에서 바로 정답을 낸 경우
+    상한 = 시작 시각이라 창이 비고 `used_hint=False`가 된다(도움 없이 풀었다는 사실).
+
+    None(= used_hint 미상)인 경우: dialogue를 모른다(생성 턴 — 완료가 나지 않는다) · 시작 시각이
+    NULL(PED-37 미측정) · 정답 제출 턴 행이 없거나 발화 시각이 비었거나 시작보다 앞선다(정합
+    깨짐 — 창을 추정하지 않는다).
+    """
+    if dialogue_id is None or started_at is None or started_at.tzinfo is None:
+        return None
+    stmt = (
+        select(DialogueTurnORM.spoken_at)
+        .where(
+            DialogueTurnORM.dialogue_id == dialogue_id,
+            DialogueTurnORM.role == TurnRole.student,
+        )
+        .order_by(DialogueTurnORM.turn_order.desc())
+        .offset(review_turns_on_entry() - 1)
+        .limit(1)
+    )
+    boundary = (await session.execute(stmt)).scalar_one_or_none()
+    if not isinstance(boundary, datetime) or boundary.tzinfo is None or boundary < started_at:
+        return None
+    return started_at, boundary
+
+
+def _supplied_hint_level(payload: object) -> int | None:
+    """`힌트제공` 이벤트 페이로드의 공급 단계(1~4) — 읽을 수 없으면 None.
+
+    `bool`은 `int`의 하위형이라 `True`가 단계 1로 읽히는 것을 따로 막는다.
+    """
+    if not isinstance(payload, dict):
+        return None
+    level = payload.get("hint_level")
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 4:
+        return None
+    return level
+
+
+async def _attribute_hints(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    problem_id: uuid.UUID,
+    window: tuple[datetime, datetime] | None,
+) -> _HintAttribution:
+    """귀속 창 안의 공급 원장(`힌트제공`)에서 '힌트 사용'으로 셀 행을 고른다(EOS-133).
+
+    센다 = 단계가 `counts_as_hint_usage`(2 이상)인 공급이다. 1(방향)은 막힘 신호가 없어도 매 턴
+    나가는 기본 단계라 세지 않는다 — 근거는 정본(`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다.
+
+    `used_hint` 3상태(CLAUDE.md "모른다 ≠ 아니다"):
+      - True  — 셀 행이 1개 이상.
+      - False — 창을 알고, 창 안 공급 행의 단계를 전부 읽었고, 셀 행이 0개.
+      - None  — 창을 모르거나, 셀 행이 0개인데 단계를 못 읽은 공급 행이 섞였다(그 행이 2 이상
+        이었을 수 있으므로 "안 썼다"로 확정하지 않는다).
+
+    **한계(명시)**: 공급 원장 기준이다. 완료 상태 머신이 발화를 가로챈 턴(재고 유도 등)에서도
+    핸들러는 그 턴의 결정 단계를 원장에 적으므로, 그 턴의 단계가 2 이상이면 학생이 실제로 받은
+    발화가 재고 템플릿이었어도 여기서 센다. 원장 쪽을 고치는 일은 이 함수의 범위 밖이다.
+    """
+    if window is None:
+        return _HINT_ATTRIBUTION_UNKNOWN
+    since, until = window
+    rows = (
+        await session.execute(
+            select(AttemptEventORM.event_at, AttemptEventORM.event_data)
+            .where(
+                AttemptEventORM.user_id == user_id,
+                AttemptEventORM.problem_id == problem_id,
+                AttemptEventORM.event_type == EventType.힌트제공,
+                AttemptEventORM.event_at >= since,
+                AttemptEventORM.event_at < until,
+            )
+            .order_by(AttemptEventORM.event_at)
+        )
+    ).all()
+    hints: list[tuple[datetime, int]] = []
+    unreadable = 0
+    for event_at, payload in rows:
+        level = _supplied_hint_level(payload)
+        if level is None:
+            unreadable += 1
+        elif counts_as_hint_usage(level):
+            hints.append((event_at, level))
+    if unreadable:
+        # 값은 싣지 않는다(학습 행동 데이터) — 건수와 결과 판정만 남겨 원장 결함을 추적한다.
+        logger.warning(
+            "힌트 귀속: 창 안 공급 행 %d건의 단계를 읽지 못했다 — used_hint=%s (EOS-133)",
+            unreadable,
+            "True" if hints else "미상",
+        )
+    if hints:
+        return _HintAttribution(used_hint=True, hints=tuple(hints))
+    return _HINT_ATTRIBUTION_UNKNOWN if unreadable else _HintAttribution(used_hint=False)
+
+
 async def _complete_problem(
     session: AsyncSession,
     *,
@@ -1114,6 +1247,7 @@ async def _complete_problem(
     problem_id: uuid.UUID | None,
     final_answer: str | None,
     started_at: datetime | None,
+    dialogue_id: uuid.UUID | None = None,
 ) -> tuple[uuid.UUID | None, AssessmentEvidence | None]:
     """완료 확정 — ProblemAttempt(is_correct=True) 적재 + 숙달 전파(L2 헬퍼 재사용·중복 로직 0).
 
@@ -1141,6 +1275,16 @@ async def _complete_problem(
     32_learning_history §EOS-48-2가 금지하는 날조다(NULL=미측정이 정직한 상태). 이 컬럼이 비면
     `harness/wh1_evaluation`의 since/until 집계와 `privacy/retention`의 파기 창이 조용히 0행이
     되므로, 값이 *있을 때* 채우는 것이 이 인자의 존재 이유다.
+
+    EOS-133 `dialogue_id`: 이 풀이에 쓰인 힌트를 attempt에 귀속한다 — `used_hint`(3상태)를
+    채우고, 센 공급마다 `hint_usage` 1행(`hint_id`=None: 동적 생성 힌트라 식별자가 없다 ·
+    `view_duration_ms`=None: 코치 경로에는 열람 종료 신호가 없다)을 attempt와 **같은 commit**으로
+    적재한다. 창·셈 규칙은 `_hint_attribution_window`·`_attribute_hints`. None이면(생성 턴·
+    dialogue를 모르는 호출) 판정하지 않고 `used_hint`를 NULL로 둔다 — 이 인자가 생기기 전과
+    같은 값이다.
+    귀속된 신호를 숙달 갱신이 읽는가는 별개 판단이다: 기본 추정기 `bkt-v1`은 힌트 축을 읽지
+    않고 채점 증거(`AssessmentEvidence`)에도 그 축이 없다(`docs/architecture/
+    mastery_update_contract_v1.md` §12).
     """
     if problem_id is None:
         return None, None  # 방어 — 완료는 problem_id가 있을 때만 진입(도달 안 함).
@@ -1157,6 +1301,15 @@ async def _complete_problem(
     # EOS-131: 완료 확정 attempt도 서버가 학습 세션에 결합한다(submit_attempt와 같은 규칙). 같은
     # 턴 앞에서 이미 세션을 이었으므로 대개 같은 세션을 갱신할 뿐이다. never-break(실패 시 NULL).
     learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    # EOS-133: attempt보다 먼저 판정한다 — used_hint는 attempt 행의 컬럼이다.
+    hint_attribution = await _attribute_hints(
+        session,
+        user_id=user_id,
+        problem_id=problem_id,
+        window=await _hint_attribution_window(
+            session, dialogue_id=dialogue_id, started_at=started_at
+        ),
+    )
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답·dialogue 링크에 즉시 사용).
         user_id=user_id,
@@ -1167,6 +1320,7 @@ async def _complete_problem(
         student_answer_encrypted=student_answer_encrypted,
         student_answer_nonce=student_answer_nonce,
         used_socratic=True,  # 코치 대화(돌아보기)로 도달.
+        used_hint=hint_attribution.used_hint,  # EOS-133: 3상태(None=판정 불가·날조 금지).
         # PED-37: 발생 시작 시각은 *넘어온 값 그대로*(대화 시작 시각) — 없으면 NULL(날조 금지).
         started_at=started_at,
         # `ended_at`은 기존 동작(서버 now) 그대로 둔다 — 이 경로는 완료 턴이 곧 종료 시점이라
@@ -1177,6 +1331,24 @@ async def _complete_problem(
         ingested_at=received_at,
     )
     session.add(attempt)
+    if hint_attribution.hints:
+        # hint_usage는 attempt를 (attempt_id, user_id) 복합 FK로 참조한다. 관계 매핑이 없어 UOW의
+        # 삽입 순서에 기대지 않고 부모 행을 먼저 내보낸 뒤 자식 행을 더한다 — 둘은 같은 commit으로
+        # durable해져, 힌트가 빠진 attempt나 attempt 없는 힌트가 반쪽으로 남지 않는다.
+        await session.flush()
+        session.add_all(
+            [
+                HintUsageORM.from_schema(
+                    HintUsageSchema(
+                        attempt_id=attempt.attempt_id,
+                        user_id=user_id,
+                        hint_level=level,
+                        requested_at=supplied_at,
+                    )
+                )
+                for supplied_at, level in hint_attribution.hints
+            ]
+        )
     await session.commit()  # attempt 우선 durable(submit_attempt 패턴).
     # EOS-12: 증거를 **숙달 전파보다 먼저** 조립한다(읽기 전용·session.add·commit 0). 이 순서가
     # Answer → Evidence → State를 호출 지점에서 성립시킨다 — 뒤에 두면 증거가 갱신 결과의 사후
@@ -1252,6 +1424,7 @@ async def _resolve_completion(
     decision: PedagogyDecision,
     capabilities: _SubjectCapabilityDeps,
     attempt_started_at: datetime | None,
+    dialogue_id: uuid.UUID | None = None,
 ) -> _CompletionResult:
     """완료 상태머신 결선(L5 오케스트레이션) — 정답/오답 감지(L3)·완료 판정(L4)·attempt 적재(L2)를
     잇는다(중복 로직은 L2 헬퍼 재사용).
@@ -1269,6 +1442,8 @@ async def _resolve_completion(
     PED-37 `attempt_started_at`: 적재할 attempt의 *발생* 시작 시각. `_complete_problem`이 자체로
     구할 수 없어(이 함수도 dialogue를 모른다) 호출자가 넘긴다 — append_turn은 `dialogue.started_at`,
     create_session은 None(그 턴에는 dialogue가 아직 없고, 애초에 COMPLETE가 나지 않는다).
+    EOS-133 `dialogue_id`도 같은 이유로 호출자가 넘긴다 — 힌트 귀속 창의 상한을 그 대화의
+    턴에서 찾는다.
 
     반환의 `handled`는 완료 상태머신이 발화를 가로챘는지다 — True면 호출자가 WH-1 primary flip을
     건너뛴다(결정론 메타인지/재고 템플릿을 LLM으로 재작성 금지).
@@ -1341,6 +1516,7 @@ async def _resolve_completion(
             problem_id=problem_id,
             final_answer=_last_solution_step(body),
             started_at=attempt_started_at,
+            dialogue_id=dialogue_id,
         )
     return _CompletionResult(
         decision=new_decision,
@@ -2975,6 +3151,8 @@ async def append_turns(
         # 풀이에 착수한 시점이라 발생 시각끼리의 이관이고(추정 아님), 완료가 나는 유일한 경로가
         # 여기다. dialogue.started_at이 비어 있으면 그대로 None(NULL=미측정).
         attempt_started_at=dialogue.started_at,
+        # EOS-133: 힌트 귀속 창의 상한(정답을 처음 낸 학생 턴)을 이 대화의 턴에서 찾는다.
+        dialogue_id=dialogue_id,
     )
     decision = completion.decision
     # 완료 상태머신이 계산한 남은 돌아보기 턴 수를 세션에 먼저 반영한다(다음 턴 상태). 완료 시
