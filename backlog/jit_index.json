@@ -3455,6 +3455,8 @@
    "kind": "incident",
    "ref": "2026-09-06",
    "paths": [
+    "docs/architecture/adr/ADR-004-subject-contract-v1-provisional.md",
+    "docs/architecture/adr/README.md",
     "docs/architecture/subject_contract_cross_probe.md",
     "scripts/analysis/eos_core_adapter_boundary_scan.py",
     "src/backend/whymath_backend/schema/subject_adapter.py",
