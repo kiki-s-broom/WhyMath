@@ -2104,6 +2104,20 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_gate_verdict_handoff*.py"
+   ],
+   "text": "2차 재판정 FAIL이 게이트에 미기록 — 대장이 진입 게이트를 '사람 판정 대기'로 오표시",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 없는 세션에도 가짜 policy_warn 3줄 기록 — main에 같은 서명 350건 기커밋",
@@ -3036,6 +3050,27 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red·뒤 스텝 7건 미실행",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/**/mutations/*.yaml",
+    "tests/infra/test_mutate_runner*.py"
+   ],
+   "text": "뮤테이션 하네스가 .pyc 캐시로 앞 뮤테이션 코드를 실행 — M29 간헐 생존(거짓 신호)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
@@ -3561,6 +3596,44 @@
     "scripts/harness/ci_mirror.py"
    ],
    "text": "통합 테스트가 CI에서 안 돈다고 오기재 — 마커 수집 잡을 파일명 grep으로 놓침",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    ".claude/hooks/chat_block_guard.py",
+    "scripts/ops/check_runbook_blocks.py",
+    "tests/infra/**"
+   ],
+   "text": "MP-03 런북 §1의 무가드 git worktree add가 런북 스캐너를 통과 — 채팅 재전달 시 HARN-163 훅이 검출",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트 가짜 policy_warn 19줄이 세션 샤드에 쌓여 16줄 커밋 — 미머지 PR에서 전량 제거",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(3회차 · CI 미러 중 · 커밋 전 되돌림)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 4줄 기록(HARN-180 검증 중 · 커밋 전 cp 백업 복원)",
    "weight": 0
   }
  ]

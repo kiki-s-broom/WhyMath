@@ -55,7 +55,10 @@ python -c "import secrets;print('REDIS', secrets.token_hex(24))"
 python -c "import secrets;print('JWT  ', secrets.token_hex(32))"
 python -c "import base64,os;print('DIALOG', base64.b64encode(os.urandom(32)).decode())"
 python -c "import base64,os;print('DEVICE', base64.b64encode(os.urandom(32)).decode())"
+python -c "import base64,os;print('STUDENT_WORK', base64.b64encode(os.urandom(32)).decode())"
 ```
+
+> **SEC-36 (2026-09-27)**: `WHYMATH_STUDENT_WORK_ENCRYPTION_KEY`(학생 답안·풀이 본문 키)가 필수다 — 비어 있으면 compose가 기동을 거부한다. 실 운영 스택에는 카카오·네이버 OAuth 변수(`WHYMATH_KAKAO_CLIENT_ID` 등)도 채운다. 앱은 이 client_id로 '운영'을 판정하므로 둘 다 비면 운영 전용 안전장치가 꺼진다(템플릿 주석 참조).
 
 출력된 값을 `notepad .\deploy\staging.env`로 열어 해당 키에 붙여넣는다. 함께 채울 값:
 
@@ -82,18 +85,20 @@ Get-Content $envFile | Where-Object { $_ -match '^\s*[A-Z_]+=' } | ForEach-Objec
 }
 $required = 'DEPLOY_ENV','COMPOSE_PROJECT_NAME','WHYMATH_IMAGE_TAG','APP_PORT',
             'WHYMATH_DB_PASSWORD','WHYMATH_REDIS_PASSWORD','WHYMATH_JWT_SECRET_KEY',
-            'WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY','WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY'
+            'WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY','WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY',
+            'WHYMATH_STUDENT_WORK_ENCRYPTION_KEY'
 foreach ($k in $required) {
   $v = $map[$k]
   $len = if ($null -eq $v) { -1 } else { $v.Length }
   $bad = ($len -le 0) -or ($v -match '…') -or ($v -match '\.\.\.') -or ($v -match 'PUT_REAL_VALUE_HERE')
   "{0,-42} len={1,-4} {2}" -f $k, $len, $(if ($bad) { 'FAIL' } else { 'OK' })
 }
-# 암호화 키 분리 확인 (한 키 유출이 다른 자산으로 번지지 않게) - True 여야 함
-$map['WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY'] -ne $map['WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY']
+# 암호화 키 분리 확인 (한 키 유출이 다른 자산으로 번지지 않게) - 세 쌍 모두 달라야 True
+$kd = $map['WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY']; $ks = $map['WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY']; $kw = $map['WHYMATH_STUDENT_WORK_ENCRYPTION_KEY']
+($kd -ne $ks) -and ($kd -ne $kw) -and ($ks -ne $kw)
 ```
 
-- **성공**: 9줄 전부 `OK`(비밀번호 48자, JWT 64자, base64 키 44자 근처) + 마지막 줄 `True`. 값은 화면에 나오지 않는다.
+- **성공**: 10줄 전부 `OK`(비밀번호 48자, JWT 64자, base64 키 44자 근처) + 마지막 줄 `True`. 값은 화면에 나오지 않는다.
 - **실패 시 대처**: `FAIL`이 난 키를 다시 붙여넣는다. `len`이 기대보다 짧으면 붙여넣기 절단이다 — 생성 명령을 다시 돌려 **전체**를 복사한다.
 - **변별력 근거**: 이 검사는 형식만 본다. 최종 판정은 compose 자신이 한다 — 값이 비면 §3에서 **기동을 거부**한다. 그 fail-closed 동작은 CI(`docker-build` 잡의 "compose.prod fail-closed" 스텝)가 매 PR에서 실제로 검사한다(빈 env로 통과하면 CI가 실패).
 

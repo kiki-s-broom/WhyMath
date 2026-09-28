@@ -54,9 +54,29 @@ services:
       WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY: ${WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY:?WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY 미설정 - 미성년 대화 평문 저장 금지(CLAUDE.md 절대 금기)}
       # 디바이스 secret at-rest 키(대화 키와 **분리** — 한 키 유출이 다른 자산으로 안 번지게).
       WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY: ${WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY:?WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY 미설정 - 디바이스 secret 평문 저장 금지}
+      # ★ SEC-36 — 학생 답안·풀이 본문(problem_attempt·answer_submission·student_solution_step)
+      #   at-rest 키. 운영에서 *필수*로 건다 — 비면 평문 저장 폴백이다. 앱 쪽 방어선
+      #   (`require_student_work_cipher`)은 `is_production_like`(OAuth 구성 여부)에 기대는데, 이
+      #   compose가 OAuth 변수를 넘기지 않던 동안 운영 스택이 '비운영'으로 판정돼 그 방어선이 꺼져
+      #   있었다. compose 수준 `:?`는 앱의 운영 판정과 무관하게 기동 자체를 막는다.
+      WHYMATH_STUDENT_WORK_ENCRYPTION_KEY: ${WHYMATH_STUDENT_WORK_ENCRYPTION_KEY:?WHYMATH_STUDENT_WORK_ENCRYPTION_KEY 미설정 - 학생 답안·풀이 평문 저장 금지(CLAUDE.md 절대 금기)}
       # 선택(빈 값 허용): 비면 증거는 *메타 전용*으로만 적재된다(원문 payload 미저장) —
-      # 평문 노출 경로가 아니므로 fail-closed 대상이 아니다.
+      # `evidence_event`에는 평문 컬럼이 없어 키 부재는 "평문 저장"이 아니라 "원문 미저장"이다.
+      # 그래서 fail-closed 대상이 아니다. 원문 payload를 만드는 호출부도 아직 0건이다
+      # (`encrypt_evidence_payload` · SEC-36 ④ 2026-09-27) — 생산자가 생기는 변경에서 원문 보존이
+      # 기능상 필요하면 그때 필수로 올린다.
       WHYMATH_EVIDENCE_PAYLOAD_ENCRYPTION_KEY: ${WHYMATH_EVIDENCE_PAYLOAD_ENCRYPTION_KEY:-}
+      # SEC-36 — 실 OAuth provider(카카오·네이버). 비면 해당 로그인이 미등록된다(콜백 404).
+      #   `config.is_production_like`는 이 client_id 두 개로 '운영'을 판정한다 — 넘기지 않으면
+      #   운영 전용 안전장치(암호화 키 fail-closed·스키마 버전 가드)가 조용히 꺼진다. 운영 판정을
+      #   OAuth 한 신호에 기대지 않게 바꾸는 일(다신호화)은 MGMT-03 소관이다.
+      WHYMATH_KAKAO_CLIENT_ID: ${WHYMATH_KAKAO_CLIENT_ID:-}
+      WHYMATH_KAKAO_CLIENT_SECRET: ${WHYMATH_KAKAO_CLIENT_SECRET:-}
+      WHYMATH_NAVER_CLIENT_ID: ${WHYMATH_NAVER_CLIENT_ID:-}
+      WHYMATH_NAVER_CLIENT_SECRET: ${WHYMATH_NAVER_CLIENT_SECRET:-}
+      # OAuth redirect_uri 허용 목록(콤마 구분 · 공개 URI) — 비면 모든 redirect_uri를 거부한다
+      # (deny-by-default · SEC-08). client_id만 넘기고 이것을 빼면 로그인이 400으로 막힌다.
+      WHYMATH_OAUTH_REDIRECT_URI_ALLOWLIST: ${WHYMATH_OAUTH_REDIRECT_URI_ALLOWLIST:-}
       # 선택(빈 값 허용): 비면 해당 기능이 스스로 비활성/폴백된다(클라우드 LLM 미배선·
       # Langfuse no-op). 관측 장애가 학생 경로를 깨뜨리지 않는다는 기존 설계 그대로.
       WHYMATH_ANTHROPIC_API_KEY: ${WHYMATH_ANTHROPIC_API_KEY:-}

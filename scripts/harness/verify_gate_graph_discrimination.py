@@ -194,18 +194,18 @@ MUTATIONS: list[Mutation] = [
     # ── v2-8 FAIL 판정 기록 (사고 3) ──
     Mutation(
         "M20-fail-needs-owner",
-        "FAIL 판정은 미종결 소유 태스크 1건 이상을 새로 붙여야 한다",
+        "FAIL 판정은 미종결 소유 태스크 1건 이상(새 부착 또는 열린 상류 --owner)이 있어야 한다",
         CLI,
-        "        if not owners:\n            return _fail(\n",
-        "        if False:  # MUTANT\n            return _fail(\n",
+        "    if not owners:\n        raise _VerdictRejectedError(\n",
+        "    if False:  # MUTANT\n        raise _VerdictRejectedError(\n",
     ),
     Mutation(
         "M21-fail-owner-must-be-open",
         "이미 끝난 태스크는 FAIL 소유자로 세지 않는다",
         CLI,
-        "        owners = [dep for dep in add_deps if backlog.tasks[dep].status not in "
+        "    owners = [dep for dep in add_deps if backlog.tasks[dep].status not in "
         "TERMINAL_STATUSES]\n",
-        "        owners = list(add_deps)  # MUTANT\n",
+        "    owners = list(add_deps)  # MUTANT\n",
     ),
     Mutation(
         "M22-fail-attaches-owner",
@@ -218,15 +218,15 @@ MUTATIONS: list[Mutation] = [
         "M23-verdict-decision-only",
         "--verdict 는 decision 게이트 전용이다",
         CLI,
-        '        if gate.kind != "decision":\n',
-        "        if False:  # MUTANT\n",
+        '    if gate.kind != "decision":\n',
+        "    if False:  # MUTANT\n",
     ),
     Mutation(
         "M24-verdict-judgment-base",
         "FAIL 판정 evidence 는 판정 기준(커밋·PR)을 담아야 한다",
         CLI,
-        "        if not _has_judgment_base(args.evidence):\n",
-        "        if False:  # MUTANT\n",
+        "    if not _has_judgment_base(evidence):\n",
+        "    if False:  # MUTANT\n",
     ),
     Mutation(
         "M25-evidence-needs-verdict",
@@ -308,14 +308,14 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _run_tests() -> tuple[int, str]:
+def _run_tests(test_file: str = TEST_FILE) -> tuple[int, str]:
     """대상 테스트 파일을 돌린다 — (종료 코드, 출력 꼬리). 첫 실패에서 멈춘다(-x)."""
     proc = subprocess.run(
         [
             sys.executable,
             "-m",
             "pytest",
-            TEST_FILE,
+            test_file,
             "-q",
             "-x",
             "-p",
@@ -348,10 +348,21 @@ def check_anchor(mutation: Mutation) -> str:
     return original
 
 
-def run(names: set[str] | None = None) -> int:
-    targets = [m for m in MUTATIONS if names is None or m.name in names]
+def run(
+    names: set[str] | None = None,
+    *,
+    mutations: list[Mutation] | None = None,
+    test_file: str = TEST_FILE,
+) -> int:
+    """주입 목록을 하나씩 적용해 `test_file`이 RED를 내는지 본다 — 러너는 하네스마다 공유한다.
+
+    `mutations`·`test_file`은 다른 하네스(HARN-177 `verify_gate_verdict_handoff_discrimination.py`)
+    가 같은 단언 3종(주입 1건 · mutated != original · 원복 sha256)을 재사용하기 위한 매개변수다.
+    """
+    pool = MUTATIONS if mutations is None else mutations
+    targets = [m for m in pool if names is None or m.name in names]
     # 대조군 — 무주입 GREEN이 아니면 뮤테이션 결과는 아무것도 말하지 않는다.
-    rc, tail = _run_tests()
+    rc, tail = _run_tests(test_file)
     print(
         f"대조군(무주입): {'GREEN' if rc == 0 else 'RED'} — {tail.splitlines()[-1] if tail else ''}"
     )
@@ -372,7 +383,7 @@ def run(names: set[str] | None = None) -> int:
             )
             if _sha(mutation.path.read_bytes()) == before_sha:
                 raise AssertionError(f"{mutation.name}: 쓰기 후 파일이 원본과 같다 — 주입 실패")
-            rc, tail = _run_tests()
+            rc, tail = _run_tests(test_file)
         finally:
             mutation.path.write_bytes(raw)
         # 단언 ③ — 원복 바이트 동일

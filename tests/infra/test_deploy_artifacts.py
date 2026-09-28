@@ -214,6 +214,9 @@ def test_dsn_urls_interpolate_credentials() -> None:
 #   DB/REDIS PASSWORD → 무인증 운영 DB 차단
 #   JWT → 인증 불가 상태로 뜨는 것 차단
 #   DIALOGUE/DEVICE 암호화 키 → 미성년 대화·디바이스 secret 평문 저장 차단(절대 금기)
+#   STUDENT_WORK 암호화 키 → 학생 답안·풀이 평문 저장 차단(SEC-36 · 절대 금기). 새 키가 이
+#     목록을 거치지 않고 빠지는 것은 `test_prod_compose_student_data_keys.py`가 Settings에서
+#     유도해 막는다(손으로 적는 이 목록만으로는 SEC-31 키 누락을 못 잡았다).
 _MUST_FAIL_CLOSED = {
     "DEPLOY_ENV",
     "WHYMATH_IMAGE_TAG",
@@ -223,6 +226,7 @@ _MUST_FAIL_CLOSED = {
     "WHYMATH_JWT_SECRET_KEY",
     "WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY",
     "WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY",
+    "WHYMATH_STUDENT_WORK_ENCRYPTION_KEY",
 }
 
 
