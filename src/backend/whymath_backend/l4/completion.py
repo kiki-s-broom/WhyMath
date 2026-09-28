@@ -44,6 +44,7 @@ __all__ = [
     "CompletionAction",
     "CompletionDecision",
     "decide_completion",
+    "review_turns_on_entry",
     # 재고 발화 상수 2종 — 테스트가 exact 비교용 단일 진실원천으로 import한다.
     "_REDIRECT_PROMPT",
     "_REDIRECT_PROMPT_SPECIFIC",
@@ -53,6 +54,16 @@ __all__ = [
 # 기본 돌아보기 턴 수 — MVP는 정확히 1턴(왜→학생답→완료). "1~2차례"의 2턴 확장은 이 상수만
 # 올리면 되도록 설계했다(`decide_completion(reflection_turns=2)`·상태머신은 감소 루프라 N턴 일반).
 REFLECTION_TURNS: int = 1
+
+
+def review_turns_on_entry(reflection_turns: int = REFLECTION_TURNS) -> int:
+    """정답 첫 도달(`ENTER_REVIEW`) 때 세션에 심는 돌아보기 턴 수 — 최소 1(단일 정본).
+
+    `decide_completion`의 진입 분기와, 완료 턴에서 "정답을 처음 낸 턴이 몇 턴 전이었나"를
+    역산하는 호출자(`api/coach._hint_attribution_window` — EOS-133)가 **같은 값**을 써야 한다.
+    둘이 각자 `max(1, …)`를 적으면 한쪽만 바뀌었을 때 힌트 귀속 경계가 조용히 한 턴 밀린다.
+    """
+    return max(1, reflection_turns)
 
 
 class CompletionAction(str, Enum):
@@ -224,7 +235,7 @@ def decide_completion(
     if final_answer_correct:
         return CompletionDecision(
             action=CompletionAction.ENTER_REVIEW,
-            review_turns_remaining_after=max(1, reflection_turns),
+            review_turns_remaining_after=review_turns_on_entry(reflection_turns),
             problem_complete=False,
             awaiting_reflection=True,
             prompt=_REFLECTION_PROMPT,

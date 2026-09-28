@@ -19,7 +19,9 @@ CLAUDE.md "보호 장치를 실패 주입 없이 '보호 있음'으로 선언 �
 사용: `python3 scripts/analysis/mutate_recommendation_policy_guards.py`
 종료 코드 0 = 전건 검출(가드가 실제로 막는다) · 1 = 생존한 뮤테이션 있음(가드가 위장이다).
 
-축 D(M14~M24)는 EOS-124 정렬 계약이다 — 실측된 두 불일치 형태를 되살리거나 가드 절을 뺀다.
+축 D(M14~M25)는 EOS-124 정렬 계약이다 — 실측된 두 불일치 형태를 되살리거나 가드 절을 뺀다.
+M25는 EOS-25가 닫은 면제 경로(정렬 선언 누락 → 검증 건너뜀)를 되살린다. 수능 정책 자체의 정렬
+가드는 `mutate_eos25_suneung_alignment_guards.py`가 따로 잰다.
 """
 
 from __future__ import annotations
@@ -172,8 +174,9 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="M14-alignment-validator-disabled",
         path=POLICY,
-        old="        if self.intent_resolution is not None:\n            check_intent_alignment(",
-        new="        if False:\n            check_intent_alignment(",
+        # EOS-25 이후 검증기는 조건 없이 부른다 — 호출 자체를 무동작 람다로 바꿔 끈다.
+        old="        check_intent_alignment(\n            problem_id=self.problem_id,",
+        new="        (lambda **_kw: None)(\n            problem_id=self.problem_id,",
         axis="정렬 집행 지점(생성 시점 검증)",
     ),
     Mutation(
@@ -248,6 +251,16 @@ MUTATIONS: list[Mutation] = [
         old="    except TimeoutError as exc:",
         new="    except ZeroDivisionError as exc:",
         axis="의도 판정 시간 예산 강등",
+    ),
+    Mutation(
+        name="M25-alignment-declaration-optional-again",
+        path=POLICY,
+        old="    intent_resolution: IntentResolution = Field(\n        description=(",
+        new=(
+            "    intent_resolution: IntentResolution | None = Field(\n"
+            "        default=None,\n        description=("
+        ),
+        axis="정렬 선언 필수(면제 경로 폐쇄 — EOS-25)",
     ),
 ]
 

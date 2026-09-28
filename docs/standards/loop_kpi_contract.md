@@ -43,9 +43,9 @@
 | ② State Integrity | 무결성 위반 행 수(7종 합) | 스캔 대상 행 수(7종 합) | `ops/integrity_violations_gate.scan_integrity` | Wilson **상한** ≤ 0.01 |
 | ③ Explainability | `meta.reason`이 없는 `recommendation_render` 건수 | 그 전체 건수 | `evidence_event`(REC-11) | **무관용** — 분자 > 0이면 미달 |
 | ④ Manual Intervention | 운영자 계열 감사 3종(`admin_access`·`role_change`·`content_mutation`) 행 수 | 관측창에 적재된 `problem_attempt` 행 수 | `privacy_audit` × `problem_attempt` | **무관용** |
-| ⑤ Traceability | 5홉 체인이 끊기는 recommendation 건수 | recommendation 전체 건수 | `l2/learning_event_trace` 원천 대장 × `evidence_event` | **무관용** |
+| ⑤ Traceability | 체인이 끊기는 recommendation 건수(첫 끊긴 홉 1개로 계상 — `detail.break_*`) | 근거 기록 개시 이후의 recommendation 건수 — 그 전의 소급 불가 기록은 `detail.excluded_pre_basis`로 따로 보고 | `evidence_event`(`meta.learner_state_basis`) × `learning_session` × `concept_mastery_history` × `problem_attempt` × `problem` | **무관용** |
 
-⑤의 체인: `Recommendation → LearnerState → Assessment → Attempt → Problem`.
+⑤의 체인: `Recommendation → LearnerState → Assessment → Attempt → Problem`. 홉 정의·조인 키는 §2-1.
 
 **①의 재정의(EOS-131 ⑨ · 2026-09-25)**: 종전 분자는 "추천 기록이 **하나라도** 있는 세션"이었다.
 서버 유휴 규칙 세션 writer는 `/me/next-problem`도 세션을 여는 활동으로 치고, 앱은 첫 문제를
@@ -56,6 +56,70 @@
 실패 주입 3종(시도 전 추천만 → 미도달 · 시도 후 추천 → 도달 · 시도 뒤 추천 없음 → 미도달)은
 `tests/backend/ops/test_loop_kpi_gate_integration.py`가 실 PG로 동결하며, 옛 정의로 되돌리면
 첫 번째가 RED다.
+
+### 2-1. ⑤ 역추적 — 홉 정의·조인 키·경계 (EOS-132 · 판정 기준 main `a0e60965`)
+
+**LearnerState 홉은 추천 기록에 남긴 근거로만 되짚는다.** `LearnerState`는 매 호출 조립되고
+영속하지 않는다(EOS-10). 종전 원천 대장은 이 홉을 `user_state_snapshot`에 매달아 두었는데 그 좌석은
+writer 0건 빈 좌석이라 ⑤가 구조적 미측정이었다. 이제 `/v1/me/next-problem`이 추천을 기록할 때 그
+추천이 본 상태의 근거 식별자(`l2.learner_state.LearnerStateBasis`)를 `meta.learner_state_basis`에
+싣는다 — 최신 숙달 행 키 `(concept_id, measured_at)` · 전과목 θ 스냅샷 id · 활성 오개념 가설 행 id ·
+조립 시각. 식별자와 시각만 싣는다(B1). 이 좌석은 `user_state_snapshot`을 쓰지 않으므로 ARCH-51의
+그 좌석 처분이 ⑤를 막지 않는다.
+
+| 홉 | 조인 키 | 끊김 코드(`detail.break_*`) |
+|---|---|---|
+| ① 추천 → 학습자 | `evidence_event.session_id → learning_session.user_id` | `learner_unjoined` — 세션 기록 실패 placeholder·삭제권으로 지워진 세션(둘은 구별 불가) |
+| ② → LearnerState | `meta.learner_state_basis`(키 부재 · 형식 불량 · 가리키는 θ 스냅샷/가설 행이 없거나 다른 학생 것) | `basis_missing` · `basis_malformed` · `basis_row_missing` |
+| ③ → Assessment | 근거 숙달 행 `(학습자, concept_id, measured_at)` — µs까지 정확히 일치 | `assessment_missing` |
+| ④ → Attempt | 그 행의 `concept_mastery_history.attempt_id → problem_attempt`(같은 학생) | `attempt_missing` |
+| ⑤ → Problem | `problem_attempt.problem_id → problem` | `problem_missing` |
+
+홉 판정의 정본은 `ops/loop_kpi_gate.classify_trace`(순수 함수)이고, 수집기는 근거가 가리키는 행을
+**추천마다가 아니라 한 번씩 모아** 읽는다(`_trace_lookups` — IN 목록 500건 단위).
+
+**Assessment 홉은 `assessment` 테이블이 아니다 (⑦ 실측 판정).** ⓐ `problem_attempt`에 assessment
+참조 컬럼이 없어 진단 세션(`assessment` 행)은 시도에 닿지 않는다 ⓑ EOS-79 4층 경계
+(`docs/architecture/evidence_layer_boundary.md`)가 "`assessment` 테이블은 Assessment 층이 아니다"를
+이미 정본화했다 — 그 테이블은 진단 1회의 결과 묶음이다 ⓒ Assessment 층의 정의("그 결과가 어느
+개념의 어떤 증거인가")를 체인에서 실현하는 것은 **근거 숙달 행의 귀속(개념 × 시도)**이다. 그래서
+`_REQUIRED_SOURCES`의 ⑤ 항목도 `DIAGNOSTIC_COMPLETED`(assessment 테이블)에서 `MASTERY_UPDATED`
+(숙달 행)로 바로잡았다. 진단 시도만 Assessment에 속하는 것이 아니다 — 채점되는 모든 시도
+(`/v1/me/attempts`·코치 완료)가 평가 개념마다 `attempt_id`를 채운 숙달 행을 남긴다(EOS-108 이후).
+
+**이어지지 않는 추천 유형과 그 판정**:
+- 숙달 측정 이력이 없는 학생의 추천(사전값) — 근거가 `{"absent": "no_mastery_history"}`로 적힌다.
+  ③~⑤는 **해당 없음**이며 끊김이 아니다(`detail.traced_prior_only`).
+- θ 스냅샷이 아직 없는 학생 — `{"absent": "no_ability_snapshot"}`. 스냅샷은 시도마다 찍히지 않으므로
+  (루프 writer = EOS-125) 정상 상태다. 끊김이 아니다.
+- EOS-108 이전에 `attempt_id` 없이 적재된 숙달 행을 근거로 삼은 추천 — **끊김**(`attempt_missing`).
+  그 행에서 시도로 가는 길이 실제로 없다.
+- 세션 기록 실패·삭제권 이행 — **끊김**(`learner_unjoined`). 관측창 안에서 삭제권이 이행되면 그 창의
+  ⑤가 미달로 나온다 — 알려진 사각이며 `coverage_note`가 항상 함께 말한다.
+
+**"근거 없음"과 "근거 모름"을 같은 글자로 세지 않는다 (⑧).** 근거가 비어 있는 것은 키 안의
+`absent` 사유로 말하고(정상), 근거 키 자체가 없는 기록은 끊김(`basis_missing`)이다. 기록 경로는
+근거를 넘겨받지 못하면 키를 **넣지 않는다**(null로 쓰지 않는다).
+
+**소급 불가 기록 (⑥).** 근거 기록 개시 = 근거가 실린 **첫** 추천의 시각(관측창과 무관한 전역
+최솟값). 그 이전의 근거 없는 추천은 분모에서 빼고 `detail.excluded_pre_basis`로 센다 — 조용히
+실패로 계상하지도, 조용히 빼지도 않는다. 개시 이후의 근거 부재는 끊김이다. 관측창 전부가 개시
+이전이면 분모 0 → 미측정(exit 2). 개시를 코드 상수로 두지 않은 이유: 배포 시각을 코드가 모르므로
+상수는 배포 전후 하루를 미달로 만들거나(너무 이르면) 진짜 회귀를 제외로 삼킨다(너무 늦으면). 대신
+치르는 비용 — 기록 경로가 처음부터 근거를 안 쓰면 ⑤는 미달이 아니라 미측정으로 머문다. 이 축은
+서빙 경로 통합테스트(`tests/backend/api/test_eos132_learner_state_basis_integration.py` — 실 HTTP로
+추천을 불러 근거가 DB의 최신 숙달 행과 같은지 확인)가 CI `backend-migrations` 잡에서 막는다.
+
+**사후 재구성을 채택하지 않은 근거 (③).** 추천 시각 T의 상태를 나중에 재구성하는 방식은 숙달
+시계열(append-only)과 θ 스냅샷(append-only)에는 되지만, 오개념 가설 레코드는 `updated_at`으로
+덮어써져 T 시점의 활성 집합을 복원할 수 없다. 한 축이라도 복원이 안 되면 그 홉은 "되짚었다"가
+아니라 "추정했다"가 된다. 그래서 조립 시점에 쓴 근거를 기록한다.
+
+**알려진 한계**: 근거는 `get_state`와 같은 요청·같은 트랜잭션의 **별도 문장**으로 읽는다(세 근거는
+한 문장이라 서로 일관). 두 문장 사이에 같은 학생의 채점이 커밋되면 근거가 측정 한 번 앞선 행을
+가리킬 수 있다 — 가리키는 행은 실재하므로 역추적은 성립한다. 앱은 다음 문항을 받은 뒤 답을 내므로
+정상 흐름에서는 생기지 않는다. 근거는 **추천이 소비한 상태만** 남긴다 — 학습·코치·상태 조회가
+조립한 상태는 기록되지 않는다.
 
 ### 산출 명령
 
@@ -87,8 +151,9 @@ python -m whymath_backend.ops.loop_kpi_gate --no-db --input observations.json
 **해소(2026-09-25 EOS-131)**: 아래 두 사실이 모두 사라졌다 — `l2/learning_session_writer`가 서버
 30분 유휴 규칙으로 세션 행을 만들고, 추천 기록이 실 `session_id`로 결합된다. 원천 대장이
 `PRODUCED`로 바뀌어 ①은 설계대로 **스스로 미측정을 벗었다**(세션이 0건인 관측창은 여전히 분모 0 →
-미측정 exit 2). ⑤는 LearnerState 시각 원천(`user_state_snapshot` DORMANT)이 남아 여전히 미측정이다
-(EOS-132 소관). 아래는 2026-09-19 판정 기록이다.
+미측정 exit 2). ⑤는 LearnerState 시각 원천(`user_state_snapshot` DORMANT)이 남아 여전히 미측정이었다
+— **2026-09-28 EOS-132가 해소했다**(§2-1: 원천을 추천 기록의 근거로 옮기고 분자 쿼리를 채웠다).
+아래는 2026-09-19 판정 기록이다.
 
 **세션의 의미(재방문율 KPI2와 공유)**: 서버 추론 세션은 "앱 진입~종료"가 아니라 **학습 활동 묶음**
 (마지막 학습 활동으로부터 30분 이내의 활동들)이다. 앱을 열기만 하고 학습 활동이 없으면 세션이
@@ -112,9 +177,9 @@ python -m whymath_backend.ops.loop_kpi_gate --no-db --input observations.json
 **다른 분모로 갈아타지 않은 이유**: `problem_attempt` 건수를 분모로 쓰면 "시도마다 추천이
 하나씩 나와야 한다"는, 계획서가 말한 적 없는 계약이 새로 생긴다. 그건 지표가 아니라 설계 변경이다.
 
-⑤도 같은 이유로 미측정이었다(EOS-131 이후 추천 결합 홉은 풀렸고 LearnerState 시각 홉이 남아 여전히
-미측정이다). 끊긴 2홉(추천 결합·LearnerState 시각)을 빼고 남은 3홉만 재서
-"100% 역추적"이라고 적는 것이 정확히 이 게이트가 막으려는 거짓말이다.
+⑤도 같은 이유로 미측정이었다(EOS-131이 추천 결합 홉을, EOS-132가 LearnerState 홉을 풀었다 — §2-1).
+끊긴 홉을 빼고 남은 홉만 재서 "100% 역추적"이라고 적는 것이 정확히 이 게이트가 막으려는 거짓말이며,
+그래서 EOS-132 전까지 ⑤는 조회 없이 미측정을 냈다.
 
 ---
 
@@ -164,6 +229,9 @@ python -m whymath_backend.ops.loop_kpi_gate --no-db --input observations.json
 | 수집기 | 실 PG 통합테스트 8건(주입 전/후/정리 3단) | 전건 통과 |
 | 실 DB 드릴 | ②고아 15건 ③reason 누락 1건 ④역할변경 1건 주입 | 각각 해당 KPI만 FAIL·exit 1 |
 | 스키마 스모크 | `evidence_event.meta` 개명 주입 | exit 1, 되돌리면 exit 0 |
+| ⑤ 판정기(EOS-132 · 2026-09-28) | hermetic — 홉마다 **그 홉만 끊긴** 반례 + ⑧ 1쌍 + 개시 경계 | 전건 통과 |
+| ⑤ 수집기(EOS-132) | 실 PG — 전용 과거 관측창에 7건(제외 1·이어짐 1·사전값 1·끊김 4종) | 홉별 1건씩 정확히 계수·분자 4/분모 6·미달 판정 |
+| ⑤ 서빙 경로(EOS-132) | 실 HTTP — 추천→오답→추천 | 근거 = DB 최신 숙달 행 · 사전값 1·이어짐 1·끊김 0 |
 
 **"뮤테이션 전건 RED"를 커버리지로 읽지 않는다**(CLAUDE.md 2026-09-08) — 주입 목록에 없는 절은
 애초에 검사되지 않는다. 그래서 픽스처가 없던 분기(DB 접속 실패 폴백·입력 타입 검사·리포트

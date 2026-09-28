@@ -41,6 +41,10 @@ L4를 import하면 7계층 역방향 의존이다(CLAUDE.md "L_n은 L_{n+1}을 �
 
 거부가 사라진 것은 아니다. 자동 진입 대상이 아닌 상태(`DIAGNOSING`)에서는 거부가 그대로
 응답에 실리며, 응답 적재·숙달 전파는 예전처럼 그와 무관하게 성공한다.
+
+채점 서빙 경로는 `advance_on_graded_attempt` **하나**로 들어온다(EOS-134) — 클라 자가보고
+`/v1/me/attempts`와 서버 판정 코치 완료가 같은 함수를 불러 같은 입력에 같은 전이를 낸다.
+코치 완료 경로가 상태 머신을 아예 부르지 않던 비대칭(SCENARIO-005 ⓓ)이 그 계기다.
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.learning_state_transition import LearningStateTransition
+from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
 from whymath_backend.l2.learning_state_policy import LearningStatePolicy, default_policy
 from whymath_backend.schema.learning_state import (
     ALLOWED_TRANSITIONS,
@@ -68,6 +73,7 @@ __all__ = [
     "INITIAL_STATE",
     "StateReconciliation",
     "advance_on_attempt",
+    "advance_on_graded_attempt",
     "assert_transition_allowed",
     "ensure_learning_context",
     "get_current_state",
@@ -374,6 +380,43 @@ async def advance_on_attempt(
         final_state=decision.next_state,
         rejected_transition=None,
         entered_learning_from=entered_learning_from,
+    )
+
+
+async def advance_on_graded_attempt(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    attempt_id: uuid.UUID,
+    is_correct: bool,
+    confidence: float | None = None,
+    policy: LearningStatePolicy | None = None,
+) -> AttemptTransitionResult:
+    """채점이 끝난 시도 1건을 상태 머신에 통과시킨다 — **채점 서빙 경로의 공용 진입점**(EOS-134).
+
+    정책 증거 조립(`build_attempt_evidence`) → 주 진입점(`advance_on_attempt`). 채점 경로는
+    둘이다 — 클라 자가보고 `/v1/me/attempts`(`api/me.submit_attempt`)와 서버 판정 코치 완료
+    (`api/coach._complete_problem`). 두 경로가 이 함수 **하나**를 불러야 같은 입력에 같은 전이가
+    난다. 경로마다 두 호출을 따로 적으면 한쪽만 증거 축(선수 결손 id·개념 id 등)을 늘렸을 때
+    비대칭이 조용히 재발한다 — 코치 완료 경로가 상태 머신을 아예 부르지 않던 것이 그 첫 형태였다
+    (SCENARIO-005 ⓓ). 두 경로가 이 함수를 부르고 둘 다 하위 함수를 직접 부르지 않는다는 사실은
+    `tests/backend/api/test_me_learning_state.py`가 AST로 동결한다.
+
+    호출 시점: 이번 attempt가 **commit된 뒤**다 — 연속 오답 카운트가 `offset(1)`로 이번 행을
+    건너뛰도록 설계돼 있다(`l2/learning_state_evidence` docstring).
+
+    `confidence`: 학생 자기보고 확신도(0~1). 코치 경로에는 그 입력이 없어 None(미측정)이다 —
+    0.0으로 채우지 않는다(정책은 미측정을 "높은 확신"으로 읽지 않으므로 R1이 아니라 R2다).
+    """
+    policy_evidence = await build_attempt_evidence(
+        session, user_id=user_id, is_correct=is_correct, confidence=confidence
+    )
+    return await advance_on_attempt(
+        session,
+        user_id=user_id,
+        evidence=policy_evidence,
+        attempt_id=attempt_id,
+        policy=policy,
     )
 
 
