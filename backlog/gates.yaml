@@ -817,15 +817,27 @@ gates:
     title: "필수층(SubjectAdapter 3메서드) 첫 호출자 등장 여부 재확인 (재확인 지점 = G1 2026-09-27) — EOS-92 프로브 §4-2가 '해석 지점 0건'을 실측했으나 그 0은 '계약이 막아서'가 아니라 '필수층을 아직 아무도 안 써서' 성립한다. 중립성은 사용으로 깨지므로 사용 0이면 그 축은 시험된 적이 없다. 확인 방법 = subject_contract_cross_probe.md 부록 ①(세 상태 구별: ZERO_CALLERS / CALLERS_FOUND / SCAN_ERROR). 판정 3택: ①여전히 0 → 9/27 라벨을 Frozen (unexercised) 류로 표기하고 ARCH-41을 재생성해 감시 지속 ②호출자 생김 → EOS-92 §4-1을 재측정해 페이로드 해석 여부 확인 후 라벨 판정 ③계약 폐기·재설계. 등재 이유: Codex P1(PR #999) — ARCH-41이 depends_on·requires_gates 없이 즉시 착수 후보라, 호출자가 0인 상태에서 누가 완료해 버리면 미래 전이가 미추적으로 남는다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-06
     remind_after_days: 21
-    evidence: null
-    cleared_by: null
+    evidence: "판정 3택 중 ①(여전히 0 → Frozen (unexercised) 표기 + ARCH-41을 재생성해 감시 지속). 판정 주체 = Kiki (2026-09-27 세션에서 재측정 결과와 3택을 제시받고 ① 선택 · 감시 방식은 '라벨-사실 일치 테스트 + G5 재확인 게이트' 선택). 집행 = claude.\n\n판정 기준: main 0e7b4f6b (작업 트리 소스가 그 커밋과 동일함을 git diff --quiet HEAD origin/main -- src/backend/whymath_backend/ tests/backend/schema/ 로 확인).\n\n[재측정 — 프로브 문서 부록 B 표 7항목 재실행 + 추가 4항목]\n1. 부록 ① 3상태 스캔: ZERO_CALLERS (첫 grep rc=1)\n2. 1의 변별력(작업 트리 밖 복사본에서 실패 주입): 주입 시 rc=0·CALLERS_FOUND(api/coach.py:3258 검출) · cp 원복 후 sha256 바이트 동일·rc=1 · 소스 경로 제거 시 SCAN_ERROR exit 2 — 3상태 전부 실측 구별\n3. MathSubjectAdapter 인스턴스화 0건 (산문 언급 2건뿐)\n4. composition.py __all__ 8종 전부 선택층 Protocol 반환 — 필수층 팩토리 0\n5. getattr 동적 호출 0건\n6. DEMOTED_FIELDS = {} (강등 0)\n7. 부록 ② 계약 동결 테스트 EXIT=0 · 22 passed\n추가: 범위 확장(src/ 전체 + scripts/, tests 제외) 0건 · §4-1 둘째 grep(SubjectAdapter 언급) 7건 전부 산문 · ARCH-43 불투명 페이로드 게이트 exit 0 위반 0(CORE 355/711 · 기준선 0 — 유일 위반은 EOS-85 #1015가 해소) · 물리 스텁 반증기 5 passed · 경계 스캔 CORE→ADAPTER 위반 0\n\n[새 발견] 필수층 3기능 중 2개는 Core가 실제로 쓰는 선택층 쌍둥이가 있다 — evaluate_answer ↔ FinalAnswerVerifier·AssessmentAnswerVerifier·AnswerFormVerifier(EOS-69 ⑦), detect_misconception ↔ AttemptMisconceptionDetector(EOS-104 #1195, 2026-09-18: 필수층 시그니처가 서술 기반이라 답만 있는 채점 경로에 맞지 않아 선택층 신설). 호출자 0은 '아직'보다 '우회'에 가깝다 — G5 재확인의 판정 ②(필수층 축소·재설계) 입력으로 넘긴다.\n\n[집행 · 이 브랜치 claude/brave-ptolemy-y9p65p의 PR] 계약 상태 제목 Frozen (unexercised) + 라벨-사실 일치 테스트 · ADR-004·ADR README 상태 · 프로브 문서 부록 C(판정 기록) · 계약 파일 집행 상태 절 층 구분 정정(ARCH-41 ③) · 후속 게이트 G-required-tier-caller-recheck-g5(G5 2026-12-27) + 후속 감시 태스크 ARCH-67-required-tier-unexercised-watch-r2(ARCH-41 재생성분) · MEMORY 결정 로그."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '시점 트리거(재확인 지점 G1 2026-09-27) — 확인 방법(프로브 부록 ①)은 이미 있고 먼저 끝나야 할 태스크가 없다. 재확인 작업은 이 게이트를 기다리는 ARCH-41이 한다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
     no_inputs_reason: "시점 트리거(재확인 지점 G1 2026-09-27) — 확인 방법(프로브 부록 ①)은 이미 있고 먼저 끝나야 할 태스크가 없다. 재확인 작업은 이 게이트를 기다리는 ARCH-41이 한다"
+  - id: G-required-tier-caller-recheck-g5
+    title: "필수층(SubjectAdapter 3메서드) 미사용 재확인 2회차 (재확인 지점 = G5 데이터 동결 2026-12-27) — 2026-09-27 G1 판정 ①(상태 Frozen (unexercised))의 만료 지점. 첫 호출자 등장은 라벨-사실 일치 테스트(tests/backend/schema/test_subject_adapter_two_tier_contract.py)가 그 PR에서 즉시 RED로 잡으므로, 이 게이트는 호출자 0이 계속된 경우의 판정용이다. 판정 3택: ①유지(Frozen (unexercised) 유지 · 이 게이트를 재생성해 감시 지속) ②필수층 축소·재설계 착수(2027 과목 확장 설계 전 — 9/27 새 발견: 필수층 3기능 중 evaluate_answer·detect_misconception은 Core가 실제로 쓰는 선택층 쌍둥이가 따로 있다, EOS-69 ⑦·EOS-104 #1195) ③그 사이 호출자가 생겨 라벨이 이미 Frozen으로 바뀐 경우 — 그 PR의 재측정 기록(프로브 문서)을 확인하고 종결. 근거 = docs/architecture/subject_contract_cross_probe.md 부록 C. 등재 이유: 9/27 판정 ①이 Frozen에 한정어를 붙인 유예이므로 만료·재확인 지점이 필요하다(만료 없는 유예 금지) — Kiki가 감시 방식으로 '테스트 + G5 게이트'를 선택"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 91
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "시점 트리거(재확인 지점 G5 데이터 동결 2026-12-27) — 확인 방법(프로브 부록 ①·② + 라벨-사실 일치 테스트)은 이미 있고 먼저 끝나야 할 태스크가 없다. 재확인 작업은 이 게이트를 기다리는 후속 감시 태스크(ARCH-41 재생성분)가 한다"
   - id: G-retired-atom-prod-cleanup
     title: "prod(whymath-pg) 은퇴 원자 14행 정리 실행 (scripts/cleanup_atom_orphans.py --retired-from-ledger)"
     kind: human
