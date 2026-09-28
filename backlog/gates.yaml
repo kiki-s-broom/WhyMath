@@ -331,6 +331,18 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-eos129-prod-response-distribution
+    title: "EOS-129 ⑤ 운영 DB 문항당 응답 수 분포 실측 — 변별도 a를 추정할 만큼 응답이 쌓인 문항이 몇 건인지(읽기 전용 SELECT · 런북 docs/ops/eos129_prod_response_distribution_runbook.md · 결과 표 2개를 세션에 전달)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "Kiki 머신 운영 DB(whymath-pg) 읽기 전용 실측 — 클라우드 세션은 운영 DB에 닿을 수 없다"
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision
