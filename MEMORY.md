@@ -338,6 +338,14 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-28 (판정·착지 · EOS-17): **채점 응답의 숙달 갱신은 빈 값을 null로 낸다 — 0.0으로 접으면 writer 결함이 "숙달 0"으로 위장된다. 추천 근거의 신뢰도 0.0은 의도된 표현으로 유지**
+
+- **실측 범위(판정 기준 main `ed3d14da`)**: 응답 경계에서 학습자 숙달의 None을 숫자로 접는 곳은 `api/me.py::submit_attempt`의 개념·스킬 숙달 갱신 2모델(`mastery` 0.0 · `sample_size` 0)뿐이었다. 백엔드 전역 `else 0`·`or 0`·`coalesce(…, 0)` 113건을 역할로 분류하면 나머지는 횟수(없음 = 0이 사실) · 내부 계산(정렬 키의 존재 비트 · 추정기 가산) · 학습자 측정이 아닌 영역(OCR 인식 신뢰도 · 하네스 집계) · 의도된 표현(추천 근거 `confidence`)이다. 읽기 표면(`/v1/me/mastery/current` · `bkt_mastery` · `irt_mastery_proxy` · 추천 근거 `mastery`)은 이미 null을 보존하고 있었다.
+- **판정**: 갱신 행은 추정기 계약상 값을 가지므로(`MasteryUpdate.mastery` 0~1 · 표본 1 이상 · 멱등 재조회·경합 승자 행도 같은 writer) 접기 가지는 오늘 발화하지 않는다. 그러나 "구조적으로 안 나온다"는 접을 이유가 아니라 **접어도 들키지 않는다**는 뜻일 뿐이다 — 발화하는 순간 클라이언트는 거짓 측정 "숙달 0"을 받는다. 그래서 스키마를 `float | None`·`int | None`으로 열고 빈 값은 null로 내며, 계약상 불가한 상태이므로 경고 로그로 드러낸다(값·식별자 미기록). 기각한 대안: 빈 행을 목록에서 빼기(갱신 0건과 값을 모르는 갱신 1건이 같은 모양 · 하네스 프로브가 목록 길이로 도달을 센다) · 500 실패(attempt는 이미 commit됐다 — 표현 문제로 제출을 실패처럼 보이게 하면 재시도가 중복 제출을 낳는다).
+- **클라이언트 영향 0**: 모바일은 `POST /v1/me/attempts`를 부르지 않고(코치 완료가 대신 적재) `mastery_updates`·`skill_mastery_updates`를 파싱하는 코드가 없다. 모바일이 읽는 숙달 필드는 이미 전부 `double?`다.
+- **유지한 접기**: 추천 근거 `confidence` 0.0 — 근거가 없으면 신뢰도 0이 뜻 그대로이고("중간값으로 채우면 모른다가 반쯤 안다로 읽힌다" · `l2/recommendation_contract.py`), 미측정 자체는 `type=UNMEASURED` · `basis` · `mastery=None`이 따로 말한다.
+- **동결**: `api/` 전수 AST 가드(`tests/backend/api/test_mastery_response_zero_fold_guard.py` — 숙달 이름 자리의 None→숫자 접기) + HTTP 수준 null/0.0 구별 테스트 + 경고 로그 테스트. 뮤테이션 15종 전건 검출.
+
 ### 2026-09-27 (결정 · Kiki 판정 · 게이트 `G-required-tier-caller-recheck` / ARCH-41): **Subject Contract v1을 G1 예정일에 동결 — 단 `Frozen (unexercised)`. 필수층 3메서드의 Core 호출자는 여전히 0이고, 그 0은 과도기가 아니라 우회였다: Core가 필수층과 같은 일을 해야 했던 두 번 모두 선택층 능력이 새로 생겼다** (Kiki 판정 ①·감시 방식 선택, claude 재측정·집행) — 판정 기준 main `0e7b4f6b`
 
 - **무엇**: 게이트 재확인 지점(G1 9/27) 당일, 프로브 문서 부록 B 표 7항목 + 추가 5항목을 재실행했다. 필수층 호출자 `ZERO_CALLERS`(변별력 3상태 실측 — 작업 트리 밖 복사본 주입 시 `CALLERS_FOUND` · 경로 제거 시 `SCAN_ERROR` exit 2) · 계약 동결 테스트 22 passed · 해석 축 게이트(`ARCH-43`) 위반 0(CORE 355) · 경계 스캔 위반 0 · `DEMOTED_FIELDS` 빈 dict. 기록 = `docs/architecture/subject_contract_cross_probe.md` 부록 C

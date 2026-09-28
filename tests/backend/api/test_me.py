@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import math
 import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -4476,3 +4479,118 @@ class TestLearnerStateSurface:
         )
         assert body["origins"]["skill_mastery"]["estimator"] == "bkt.v1"
         assert body["origins"]["general_ability"]["estimator"] == "irt.2pl"
+
+
+# ── EOS-17 — 응답 경계의 미측정(None) vs 숙달 0 ──────────────────────────────────
+
+
+class TestMasteryUpdateNullBoundary:
+    """EOS-17: 숙달이 비어 있으면 응답은 null이지 0.0이 아니다 — 두 값이 구별된다.
+
+    채점 응답(`POST /v1/me/attempts`)의 갱신 행은 추정기 계약상 값을 가지므로 실 흐름에서는
+    None이 나오지 않는다. 그래서 이 클래스는 L2 기록 함수를 **값이 빈 행을 돌려주도록** 바꿔
+    끼워, 그 불변식이 깨졌을 때 응답이 무엇을 말하는지를 잰다. 종전 응답은 그 행을
+    `mastery 0.0 · sample_size 0`으로 내 "숙달 0"과 구별할 수 없었다.
+    """
+
+    @staticmethod
+    def _post_with_rows(
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        concept_rows: list[Any],
+        skill_rows: list[Any],
+    ) -> dict[str, Any]:
+        async def _concept(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return concept_rows
+
+        async def _skill(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return skill_rows
+
+        monkeypatch.setattr(me_module, "record_problem_attempt_mastery", _concept)
+        monkeypatch.setattr(me_module, "record_problem_attempt_skill_mastery", _skill)
+        # EOS-12 증거 조립 질의 3건(#1 PRIMARY · #2 TESTED · #3 스킬 해소)만 큐에 둔다 — 숙달
+        # 기록 함수는 위에서 바꿔 끼웠으므로 그 질의는 돌지 않고, 뒤쪽 상태 머신 질의는 빈 결과다.
+        session = _QueueSession([_AQResult([uuid.uuid4()]), _AQResult([]), _AQResult([])])
+        resp = _attempts_client(session).post(
+            "/v1/me/attempts", json={"problem_id": str(uuid.uuid4()), "is_correct": True}
+        )
+        assert resp.status_code == 201, resp.text
+        return cast(dict[str, Any], resp.json())
+
+    def test_empty_update_rows_are_null_not_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """값이 빈 갱신 행은 null, 실제 0.0 행은 0.0 — 개념·스킬 두 축 모두 구별된다."""
+        empty_cid, zero_cid = uuid.uuid4(), uuid.uuid4()
+        body = self._post_with_rows(
+            monkeypatch,
+            concept_rows=[
+                SimpleNamespace(concept_id=empty_cid, mastery=None, sample_size=None),
+                SimpleNamespace(concept_id=zero_cid, mastery=Decimal("0.00"), sample_size=3),
+            ],
+            skill_rows=[
+                SimpleNamespace(skill_id="skill.empty", mastery=None, sample_size=None),
+                SimpleNamespace(skill_id="skill.zero", mastery=0.0, sample_size=1),
+            ],
+        )
+        concepts = {u["concept_id"]: u for u in body["mastery_updates"]}
+        assert concepts[str(empty_cid)]["mastery"] is None
+        assert concepts[str(empty_cid)]["sample_size"] is None
+        # 대조군 — 진짜 0.0은 0.0으로 남는다(null로 과잉 변환하지 않는다).
+        assert concepts[str(zero_cid)]["mastery"] == 0.0
+        assert concepts[str(zero_cid)]["sample_size"] == 3
+        skills = {u["skill_id"]: u for u in body["skill_mastery_updates"]}
+        assert skills["skill.empty"]["mastery"] is None
+        assert skills["skill.empty"]["sample_size"] is None
+        assert skills["skill.zero"]["mastery"] == 0.0
+        assert skills["skill.zero"]["sample_size"] == 1
+
+    def test_measured_row_passes_through_as_number(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """양성 대조 — ORM의 Decimal 숙달은 JSON 숫자로 그대로 나간다(문자열·null 아님)."""
+        cid = uuid.uuid4()
+        body = self._post_with_rows(
+            monkeypatch,
+            concept_rows=[SimpleNamespace(concept_id=cid, mastery=Decimal("0.69"), sample_size=1)],
+            skill_rows=[],
+        )
+        assert body["mastery_updates"] == [
+            {"concept_id": str(cid), "mastery": 0.69, "sample_size": 1}
+        ]
+
+    def test_empty_update_row_logs_writer_defect(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """빈 갱신 행은 경고로 드러난다(계약상 불가 = writer 결함 신호) — 값이 있으면 조용하다."""
+        with caplog.at_level(logging.WARNING, logger="whymath.api.me"):
+            self._post_with_rows(
+                monkeypatch,
+                concept_rows=[
+                    SimpleNamespace(concept_id=uuid.uuid4(), mastery=Decimal("0.69"), sample_size=1)
+                ],
+                skill_rows=[],
+            )
+        assert [r for r in caplog.records if "EOS-17" in r.getMessage()] == []
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="whymath.api.me"):
+            self._post_with_rows(
+                monkeypatch,
+                concept_rows=[
+                    SimpleNamespace(concept_id=uuid.uuid4(), mastery=None, sample_size=2)
+                ],
+                skill_rows=[SimpleNamespace(skill_id="skill.x", mastery=0.4, sample_size=None)],
+            )
+        messages = [r.getMessage() for r in caplog.records if "EOS-17" in r.getMessage()]
+        assert len(messages) == 2, messages
+        assert "개념 축" in messages[0]
+        assert "mastery 비어 있음" in messages[0] and "sample_size 있음" in messages[0]
+        assert "스킬 축" in messages[1]
+        assert "mastery 있음" in messages[1] and "sample_size 비어 있음" in messages[1]
+        # 값·식별자는 로그에 싣지 않는다(학습 데이터·미성년 PII 경계).
+        assert all("skill.x" not in m and "0.4" not in m for m in messages)
+
+    def test_snapshot_distinguishes_unmeasured_from_zero(self) -> None:
+        """읽기 표면(`/mastery/current`)도 미측정 행은 null · 숙달 0 행은 0.0으로 구별한다."""
+        client, _ = _client([_snapshot_row(None), _snapshot_row(0.0)])
+        resp = client.get("/v1/me/mastery/current")
+        assert resp.status_code == 200, resp.text
+        values = [row["mastery"] for row in resp.json()]
+        assert values.count(None) == 1
+        assert [v for v in values if v is not None] == [0.0]

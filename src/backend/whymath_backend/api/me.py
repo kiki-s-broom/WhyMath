@@ -918,22 +918,68 @@ class AttemptSubmitRequest(BaseModel):
 
 
 class ConceptMasteryUpdate(BaseModel):
-    """채점으로 갱신된 한 개념의 숙달 측정 — 응답에 포함(학습 곡선 즉시 피드백)."""
+    """채점으로 갱신된 한 개념의 숙달 측정 — 응답에 포함(학습 곡선 즉시 피드백).
+
+    EOS-17: `mastery`·`sample_size`는 비어 있으면 **null**이다(0.0·0으로 접지 않는다).
+    갱신 행은 추정기 계약상 항상 값을 갖지만(`MasteryUpdate.mastery`는 0~1 실수·표본 1 이상),
+    그 불변식이 깨진 행을 0.0으로 내면 클라이언트는 "숙달 0"이라는 거짓 측정을 받는다.
+    """
 
     concept_id: uuid.UUID
-    mastery: float
-    sample_size: int
+    mastery: float | None = Field(
+        description="갱신된 숙달 0~1. 값이 비면 null(0.0으로 접지 않는다)."
+    )
+    sample_size: int | None = Field(description="그 추정의 관측 수. 값이 비면 null.")
 
 
 class SkillMasteryUpdate(BaseModel):
     """채점으로 갱신된 한 스킬의 숙달 측정 — 응답에 포함(행동 축 학습 곡선 즉시 피드백).
 
     `ConceptMasteryUpdate`의 스킬 축 짝 — 키가 `concept_id`(UUID)가 아니라 `skill_id`(str)다.
+    null 규약도 같다(EOS-17).
     """
 
     skill_id: str
-    mastery: float
-    sample_size: int
+    mastery: float | None = Field(
+        description="갱신된 숙달 0~1. 값이 비면 null(0.0으로 접지 않는다)."
+    )
+    sample_size: int | None = Field(description="그 추정의 관측 수. 값이 비면 null.")
+
+
+def _mastery_update_values(
+    mastery: float | None, sample_size: int | None, *, axis: str
+) -> tuple[float | None, int | None]:
+    """갱신 행의 숙달·표본 수를 응답 값으로 옮긴다 — 비어 있으면 0이 아니라 None(EOS-17).
+
+    숙달 계약(`docs/architecture/mastery_update_contract_v1.md`)은 미측정을 None으로 지키는데,
+    종전 응답 경계는 여기서 0.0·0으로 접었다. 오늘은 그 가지가 발화하지 않는다 — 이 목록은
+    *이번 채점으로 갱신된* 행만 담고, 갱신 행은 추정기 계약상 값을 갖는다(멱등 재조회·경합
+    승자 행도 같은 writer가 쓴 행이다). 그래서 None은 "모른다"가 아니라 **writer 결함의 신호**다.
+    접으면 그 신호가 "숙달 0"이라는 그럴듯한 숫자로 덮이므로, None 그대로 내고 경고로 드러낸다.
+    로그에는 값·식별자를 싣지 않는다(학습 데이터·미성년 PII 경계) — 어느 축의 어느 값이
+    비었는지만 남긴다.
+    """
+    if mastery is None or sample_size is None:
+        _logger.warning(
+            "숙달 갱신 응답: %s 축 갱신 행에 값이 비어 있다(mastery %s · sample_size %s) — "
+            "추정기 계약상 불가한 상태라 writer 결함 신호다. 0으로 접지 않고 null로 낸다(EOS-17).",
+            axis,
+            "비어 있음" if mastery is None else "있음",
+            "비어 있음" if sample_size is None else "있음",
+        )
+    return (float(mastery) if mastery is not None else None), sample_size
+
+
+def _concept_mastery_update(row: ConceptMasteryHistory) -> ConceptMasteryUpdate:
+    """개념 축 갱신 행 → 응답 항목(EOS-17 null 규약)."""
+    mastery, sample_size = _mastery_update_values(row.mastery, row.sample_size, axis="개념")
+    return ConceptMasteryUpdate(concept_id=row.concept_id, mastery=mastery, sample_size=sample_size)
+
+
+def _skill_mastery_update(row: SkillMasteryHistory) -> SkillMasteryUpdate:
+    """스킬 축 갱신 행 → 응답 항목(개념 축과 같은 null 규약)."""
+    mastery, sample_size = _mastery_update_values(row.mastery, row.sample_size, axis="스킬")
+    return SkillMasteryUpdate(skill_id=row.skill_id, mastery=mastery, sample_size=sample_size)
 
 
 # EOS-105 학습 상태 머신 — 정책이 소유하는 트리거(클라이언트가 이 표면으로 적재 금지).
@@ -1330,24 +1376,9 @@ async def submit_attempt(
     return AttemptSubmitResponse(
         attempt_id=attempt.attempt_id,
         is_correct=body.is_correct,
-        mastery_updates=[
-            ConceptMasteryUpdate(
-                concept_id=r.concept_id,
-                # record_problem_attempt_mastery는 항상 mastery를 채우나 ORM 타입이 float|None.
-                mastery=float(r.mastery) if r.mastery is not None else 0.0,
-                sample_size=r.sample_size if r.sample_size is not None else 0,
-            )
-            for r in records
-        ],
-        skill_mastery_updates=[
-            SkillMasteryUpdate(
-                skill_id=r.skill_id,
-                # 순수 커널이 항상 mastery를 채우나 ORM 타입이 float|None(개념 축 동형).
-                mastery=float(r.mastery) if r.mastery is not None else 0.0,
-                sample_size=r.sample_size if r.sample_size is not None else 0,
-            )
-            for r in skill_records
-        ],
+        # EOS-17: 비어 있는 값은 null로 낸다 — 0.0으로 접으면 writer 결함이 "숙달 0"으로 위장된다.
+        mastery_updates=[_concept_mastery_update(r) for r in records],
+        skill_mastery_updates=[_skill_mastery_update(r) for r in skill_records],
         calibration_coaching=calibration_coaching,
         misconception_review_coaching=misconception_review_coaching,
         evidence=evidence,
