@@ -1021,6 +1021,10 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-905", "12월 검증 스코어카드·QA 혼동행렬·HIT/CU 계측", "Admin", "QA", "P0",
        "EOS-54/60/61 — Go/No-Go 판정기", "ops.validation_scorecard",
        "ops.qa_confusion_matrix", "ops.hit_cu_metrics",
+       # EOS-137 — 혼동행렬 `--predictions`의 *입력 생산자*(QA 엔진 문항별 판정 어댑터).
+       # 판정은 qa_pipeline.judge_item의 것이고 이 도구는 읽기·정체성 확정·계약 형식 쓰기만
+       # 하므로, 그 산출을 먹는 판정기 행에 귀속한다(golden_inputs → WM-O-911과 같은 규칙).
+       "harness.qa_item_verdicts",
        # OPS-56: EOS-51 §6 "기술 KPI 6종" 주간 cron 집계기 — hit_cu_metrics.aggregate()를
        # 재사용하는 소비자라 같은 좌석(같은 Go/No-Go 계측 묶음)에 귀속한다.
        "ops.weekly_metrics_report"),
