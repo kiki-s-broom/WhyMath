@@ -132,7 +132,7 @@ from whymath_backend.l2.irt import (
     ability_standard_error,
     estimate_ability,
 )
-from whymath_backend.l2.learner_state import LearnerState, get_state
+from whymath_backend.l2.learner_state import LearnerState, capture_state_basis, get_state
 from whymath_backend.l2.learner_state_store import provision_learner_state
 from whymath_backend.l2.learning_event_trace import (
     DEFAULT_TRACE_LIMIT,
@@ -2686,6 +2686,11 @@ async def recommend_next_problem(
 
     # ④ 처치 기록 — 학생에게 실제로 반환되는 추천만 기록한다(가짜 처치 금지).
     if outcome.problem_id is not None:
+        # EOS-132 — 이 추천이 본 LearnerState의 근거 식별자(KPI ⑤ LearnerState 홉). 기록할 추천이
+        # 있을 때만 한 문장을 더 쓴다(추천이 비면 되짚을 대상도 없다). 조립 시각은 ①의 것이다.
+        state_basis = await capture_state_basis(
+            session, user.user_id, assembled_at=learner_state.timestamp
+        )
         await record_recommendation_treatment(
             session,
             problem_id=outcome.problem_id,
@@ -2705,6 +2710,7 @@ async def recommend_next_problem(
                 if outcome.learning_state_directive is not None
                 else None
             ),
+            learner_state_basis=state_basis,
         )
         await session.commit()
     elif learning_session_id is not None:

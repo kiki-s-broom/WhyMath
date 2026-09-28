@@ -14,9 +14,11 @@ hermetic 스위트(`test_loop_kpi_gate.py`)는 *판정기*가 관측치에 반�
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import text
@@ -445,6 +447,220 @@ class TestLoopCompletionOnceTheSessionAxisIsWired:
         assert "분모가 0" in outcome.reason
         assert not report.failed  # 0건을 '미달'로 위장하지 않는다
         assert report.exit_code == gate.EXIT_UNMEASURED == 2
+
+
+class TestTraceabilityOnTheLiveSchema:
+    """KPI⑤ — EOS-132 착지 후 실 스키마에서 체인을 끝까지 따라가 끊김을 **홉별로** 세는가.
+
+    다른 통합테스트와 행이 섞이지 않게 **과거 시각대의 전용 관측창**에 심는다. 근거 기록 개시는
+    전역 최솟값이므로, 창 시작을 기존 근거 행보다 이르게 잡아 이 테스트의 근거 행이 개시가 되게
+    한다(그래야 개시 이전 기록의 제외를 이 창 안에서 확인할 수 있다).
+
+    심는 추천(창 안 7건): ⓐ 개시 이전 근거 없음 → 제외 ⓑ 전 홉 이어짐 ⓒ 사전값(숙달 이력 없음)
+    ⓓ 개시 이후 근거 없음 ⓔ 세션 없음 ⓕ 근거 숙달 행이 1µs 어긋남 ⓖ 숙달 행에 attempt_id 없음.
+    """
+
+    async def _enum_label(self, db: AsyncSession, typname: str) -> str:
+        return str(
+            (
+                await db.execute(
+                    text(
+                        "SELECT min(e.enumlabel) FROM pg_enum e JOIN pg_type t"
+                        " ON t.oid = e.enumtypid WHERE t.typname = :t"
+                    ),
+                    {"t": typname},
+                )
+            ).scalar_one()
+        )
+
+    async def test_each_broken_hop_is_counted_once_and_prior_is_not_a_break(
+        self, db_session: AsyncSession
+    ) -> None:
+        db = db_session
+        earliest = (
+            await db.execute(
+                text(
+                    "SELECT min(time) FROM evidence_event WHERE event_type = 'recommendation_render'"
+                    " AND meta ? 'learner_state_basis'"
+                )
+            )
+        ).scalar_one()
+        floor = datetime(2001, 1, 1, tzinfo=UTC)
+        t0 = min(floor, earliest) - timedelta(days=1) if earliest is not None else floor
+        t0 = t0.replace(microsecond=0)
+        window = gate.ObservationWindow(start=t0, end=t0 + timedelta(minutes=30))
+
+        uid, sid, pid, aid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        concept, legacy_concept = uuid.uuid4(), uuid.uuid4()
+        snapshot, hypothesis = uuid.uuid4(), uuid.uuid4()
+        measured = t0 + timedelta(minutes=1, microseconds=123456)
+        legacy_measured = t0 + timedelta(minutes=1, seconds=30)
+        objective = f"kpi5-{_RUN_TAG}"
+        ktype = await _knowledge_type(db)
+
+        def basis(**override: Any) -> str:
+            value: dict[str, Any] = {
+                "schema": 1,
+                "assembled_at": (t0 + timedelta(minutes=2)).isoformat(),
+                "mastery": {"concept_id": str(concept), "measured_at": measured.isoformat()},
+                "ability_snapshot": {"snapshot_id": str(snapshot)},
+                "misconception_hypothesis_ids": [str(hypothesis)],
+            }
+            value.update(override)
+            return json.dumps({"learner_state_basis": value, "reason": {}})
+
+        plan: list[tuple[int, uuid.UUID, str]] = [
+            (0, sid, '{"reason": {}}'),  # ⓐ 개시 이전 · 근거 없음 → 제외
+            (2, sid, basis()),  # ⓑ 전 홉 이어짐
+            (
+                3,
+                sid,
+                basis(
+                    mastery={"absent": "no_mastery_history"},
+                    ability_snapshot={"absent": "no_ability_snapshot"},
+                    misconception_hypothesis_ids=[],
+                ),
+            ),  # ⓒ 사전값 — 끊김 아님
+            (4, sid, '{"reason": {}}'),  # ⓓ 개시 이후 근거 없음 → basis_missing
+            (5, uuid.uuid4(), basis()),  # ⓔ 세션 행 없음 → learner_unjoined
+            (
+                6,
+                sid,
+                basis(
+                    mastery={
+                        "concept_id": str(concept),
+                        "measured_at": (measured + timedelta(microseconds=1)).isoformat(),
+                    }
+                ),
+            ),  # ⓕ 근거 숙달 행 없음 → assessment_missing
+            (
+                7,
+                sid,
+                basis(
+                    mastery={
+                        "concept_id": str(legacy_concept),
+                        "measured_at": legacy_measured.isoformat(),
+                    }
+                ),
+            ),  # ⓖ attempt_id 없는 숙달 행 → attempt_missing
+        ]
+        try:
+            await db.execute(
+                text(
+                    "INSERT INTO user_profile (user_id, persona_primary) VALUES (:u, 'A_일반고고3')"
+                ),
+                {"u": uid},
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO problem (problem_id, source_type, curriculum_version,"
+                    " valid_from_year, subject, unit_codes) VALUES (:p,"
+                    " CAST(:st AS source_type_enum), CAST(:cv AS curriculum_enum), 2015,"
+                    " CAST(:sj AS subject_enum), '{}')"
+                ),
+                {
+                    "p": pid,
+                    "st": await self._enum_label(db, "source_type_enum"),
+                    "cv": await self._enum_label(db, "curriculum_enum"),
+                    "sj": await self._enum_label(db, "subject_enum"),
+                },
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO learning_session (session_id, user_id, started_at,"
+                    " last_activity_at) VALUES (:s, :u, :t, :t)"
+                ),
+                {"s": sid, "u": uid, "t": t0},
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO problem_attempt (attempt_id, user_id, session_id, problem_id,"
+                    " is_correct, ingested_at) VALUES (:a, :u, :s, :p, false, :t)"
+                ),
+                {"a": aid, "u": uid, "s": sid, "p": pid, "t": measured},
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO concept_mastery_history (user_id, concept_id, measured_at,"
+                    " mastery, attempt_id) VALUES (:u, :c, :m, 0.30, :a),"
+                    " (:u, :lc, :lm, 0.50, NULL)"
+                ),
+                {
+                    "u": uid,
+                    "c": concept,
+                    "m": measured,
+                    "a": aid,
+                    "lc": legacy_concept,
+                    "lm": legacy_measured,
+                },
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO ability_snapshot (snapshot_id, user_id, theta, response_count,"
+                    " measured_at) VALUES (:sn, :u, 0.1, 1, :m)"
+                ),
+                {"sn": snapshot, "u": uid, "m": measured},
+            )
+            await db.execute(
+                text(
+                    "INSERT INTO misconception_hypothesis (id, user_id, misconception_id,"
+                    " confidence) VALUES (:h, :u, :mid, 0.40)"
+                ),
+                {"h": hypothesis, "u": uid, "mid": f"M-{_RUN_TAG}"},
+            )
+            for minute, session_id, meta in plan:
+                await db.execute(
+                    text(
+                        "INSERT INTO evidence_event (time, session_id, objective_id, k_type,"
+                        " event_type, meta) VALUES (:t, :s, :o, CAST(:k AS knowledge_type),"
+                        " 'recommendation_render', CAST(:m AS jsonb))"
+                    ),
+                    {
+                        "t": t0 + timedelta(minutes=minute),
+                        "s": session_id,
+                        "o": objective,
+                        "k": ktype,
+                        "m": meta,
+                    },
+                )
+            await db.commit()
+
+            observation = await gate.collect_traceability(db, window)
+            assert observation.unmeasured_reason is None  # 선결이 풀렸다 — 대장을 패치하지 않고
+            detail = dict(observation.detail or {})
+            assert detail["recommendations_in_window"] == 7
+            assert detail["excluded_pre_basis"] == 1
+            assert detail["traced_full"] == 1
+            assert detail["traced_prior_only"] == 1
+            assert detail["break_basis_missing"] == 1
+            assert detail["break_learner_unjoined"] == 1
+            assert detail["break_assessment_missing"] == 1
+            assert detail["break_attempt_missing"] == 1
+            assert (observation.numerator, observation.denominator) == (4, 6)
+
+            report = gate.evaluate({observation.kpi: observation}, window=window, run_id="it")
+            outcome = next(o for o in report.outcomes if o.kpi is gate.LoopKpi.TRACEABILITY)
+            assert outcome.verdict is gate.KpiVerdict.failed  # 무관용 — 1건이면 미달
+        finally:
+            await db.rollback()
+            await db.execute(
+                text("DELETE FROM evidence_event WHERE objective_id = :o"), {"o": objective}
+            )
+            for table in (
+                "concept_mastery_history",
+                "ability_snapshot",
+                "misconception_hypothesis",
+            ):
+                await db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": uid})
+            await db.execute(text("DELETE FROM learning_session WHERE user_id = :u"), {"u": uid})
+            await db.execute(text("DELETE FROM problem_attempt WHERE user_id = :u"), {"u": uid})
+            await db.execute(text("DELETE FROM problem WHERE problem_id = :p"), {"p": pid})
+            await db.execute(text("DELETE FROM user_profile WHERE user_id = :u"), {"u": uid})
+            await db.commit()
+
+        # 정리 후 — 이 창에 남은 것이 없다(잔존 0).
+        after = await gate.collect_traceability(db, window)
+        assert dict(after.detail or {})["recommendations_in_window"] == 0
 
 
 class TestSchemaSmoke:
