@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-99-integration-marker-explicit-select-without-flag
+title: "통합 마커를 명시 선택했는데 WHYMATH_RUN_INTEGRATION이 없으면 전부 skip·exit 0 — 명시 선택은 멈춰야 한다(nondiscriminating-check)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 — `tests/backend/conftest.py::pytest_collection_modifyitems`는 플래그가 없으면 integration 마커 테스트를 전부 skip으로 바꾼다. 사람이 `-m integration`으로 **명시 선택**했을 때도 같아서, 고른 테스트가 전부 skip이고 종료 코드는 0이다(2026-09-28 EOS-123 세션 실측: `2 skipped, 4 deselected` · exit 0). 판정을 종료 코드로 하는 규칙 아래에서 이 실행은 \"통과\"로 읽힌다."
+  - "② 집행 — 마커 식이 integration을 양의 방향으로 고른 실행(`-m integration` · `-m \"integration and ...\"`)에서 플래그가 없으면 skip 대신 사용 오류(`pytest.UsageError` · exit 4)로 멈추고 켜는 방법을 출력한다. 마커 식이 없거나 `not integration`이면 현행 기본 skip을 유지한다(CI backend 잡의 전체 수집을 깨지 않는다). `tests/data_pipeline/conftest.py`도 같은 형태이므로 함께 처리한다."
+  - "③ 변별력 — 네 경우를 서브프로세스 테스트로 동결한다: 명시 선택 + 플래그 없음 → exit 4 · 명시 선택 + 플래그 있음 → 실행 · 마커 식 없음 → 기존 skip(exit 0) · `-m \"not integration\"` → 영향 없음. 가드 제거 뮤테이션이 RED인지 확인한다(주입 실재 단언 포함)."
+  - "④ 범위 밖 — CI 워크플로가 플래그를 켜는 방식(backend-migrations 잡의 env)은 그대로 둔다. CI 쪽 도달 동결은 EOS-21·EOS-142 소관이다."
+artifacts: []
+paths:
+  - tests/backend/conftest.py
+  - tests/data_pipeline/conftest.py
+  - "tests/infra/test_integration_marker_*.py"
+session: null
+notes: "출처: EOS-123 세션 사고(nondiscriminating-check 계열 · 피해 0 · 판정 줄을 읽어 발견 — 로그의 `2 skipped`). 사고 대장의 같은 계열 선례: 2026-08-11 \"마커 축 변별력 없음(로컬 skip)\" · 2026-08-11 \"통합 테스트 skip 공백\" · 2026-07-02 \"침묵 skip(가짜 green)\". 인접 좌석: EOS-21·EOS-142(CI 도달 동결) · OPS-59(실행기 호출 형태)."
+updated: 2026-09-28
