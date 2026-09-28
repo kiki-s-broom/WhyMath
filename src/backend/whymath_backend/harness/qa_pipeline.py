@@ -68,6 +68,28 @@ import-linter 7계층 계약(`[tool.importlinter]`)은 `root_package = "whymath_
 `not_measured_axes`에 "검사 안 함"으로 명시한다(침묵 통과 금지, CLAUDE.md). 금칙어/PII
 축은 2026-08-03 ARCH-24로 이 목록에서 빠져 실축(`banned_words_pii`)으로 승격됐다.
 
+문항 단위 판정 좌석 (EOS-137 ①)
+------------------------------
+위 9축은 **코퍼스·시험지 단위**로 게이트를 낸다 — "이 문항을 엔진이 통과시켰는가"는 어디에도
+없었다. 그래서 골든 혼동행렬(`ops/qa_confusion_matrix`)이 요구하는 문항별 판정(predictions)을
+만들 방법이 저장소에 0건이었다. `judge_item`이 그 좌석이다. 새 판정 로직은 없다 — 9축 중
+**문항 입력을 받는 판정 함수가 이미 있는 3축**만 문항 1건에 그대로 적용한다:
+
+  - `equivalence_canonicalize` — `condition_dsl_violation`(축 2와 같은 대상 선별
+    `_dsl_checked_conditions`를 공유 — 선별 규칙이 두 벌이 되지 않게 축 2도 이 헬퍼를 쓴다)
+  - `banned_words_pii` — `banned_words_pii_eval`의 문제은행 필드 추출·`scan_field`
+  - `content_provenance` — 레코드 단위 필드 결손(`provenance_audit`의 ③만. 사이드카 ①②는
+    코퍼스 디렉터리 단위라 문항 좌석 밖)
+
+나머지 6축은 문항을 판정하지 않는다 — `CORPUS_LEVEL_ONLY_AXES`가 축별 사유를 적는다(9축
+분할의 전수성은 테스트가 `AXIS_NAMES`·`build_report` 키와 대조해 동결한다). 즉 이 좌석이 내는
+pass는 "엔진의 문항 단위 3축이 이의 없음"이지 "9축 전부 통과"가 아니다 — 골든 대비 FN율은
+바로 그 좁은 표면의 FN율이다(정직한 범위).
+
+판정 규칙: 어느 축이든 `violation`이면 **fail**(나머지 축이 판정 불가여도 결론은 선다) ·
+위반 없이 `unjudgeable`이 하나라도 있으면 **판정 불가(None)** — pass로 채우지 않는다
+(미측정 ≠ 통과) · 그 밖(`ok`·`not_applicable`만)이면 **pass**.
+
 각 축 실행은 개별 try/except로 격리된다 — 한 축의 예외가 나머지 축 실행을 막지 않고,
 그 축은 `{"measured": false, "status": "error", "detail": {"error_type": ...}}`로
 보고된다(CLAUDE.md "침묵 실패 금지" — 예외 타입명을 반드시 포함). "검사 안 함"(no_snapshot·
@@ -87,8 +109,8 @@ import dataclasses
 import json
 import os
 import sys
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -116,7 +138,17 @@ from whymath_backend.l3.equivalent.canonicalize import condition_dsl_violation
 from whymath_backend.l3.equivalent.defect_seeder import build_defect_seeded_set
 from whymath_backend.ops import provenance_audit
 
-__all__ = ["build_report", "main"]
+__all__ = [
+    "AXIS_NAMES",
+    "CORPUS_LEVEL_ONLY_AXES",
+    "ITEM_AXIS_SCOPE",
+    "ITEM_LEVEL_AXES",
+    "ItemAxisResult",
+    "ItemJudgement",
+    "build_report",
+    "judge_item",
+    "main",
+]
 
 _EXIT_OK = 0
 _EXIT_GATE_FAIL = 1
@@ -279,30 +311,41 @@ _NON_EQUATION_DSL_ANSWER_KINDS = frozenset(
 )
 
 
+def _dsl_checked_conditions(problem: Mapping[str, Any]) -> str | None:
+    """문항 1건에서 등식 DSL 폐쇄 검사 대상 조건 문자열을 꺼낸다 — 비대상이면 None.
+
+    축 2(코퍼스 순회)와 문항 단위 좌석(`judge_item`)이 **같은 선별 규칙**을 쓰도록 한 곳에
+    둔다(EOS-137 — 두 벌이 되면 좌석의 판정이 게이트와 조용히 갈라진다). `conditions`는
+    레코드 최상위 또는 `verify.conditions`(실측 — 현재 커밋 코퍼스는 전부 후자) 양쪽을
+    방어적으로 읽고, `answer_kind`가 `_NON_EQUATION_DSL_ANSWER_KINDS`면 대상에서 뺀다(S3-28).
+    """
+    raw_verify = problem.get("verify")
+    verify: Mapping[str, Any] = raw_verify if isinstance(raw_verify, dict) else {}
+    answer_kind = verify.get("answer_kind") or problem.get("answer_kind")
+    if answer_kind in _NON_EQUATION_DSL_ANSWER_KINDS:
+        return None
+    conditions = problem.get("conditions")
+    if not isinstance(conditions, str):
+        conditions = verify.get("conditions")
+    if not isinstance(conditions, str) or not conditions.strip():
+        return None
+    return conditions
+
+
 def _axis_equivalence_canonicalize(corpus_root: Path) -> AxisResult:
     """코퍼스 전 문제의 `conditions`에 폐쇄 검증 DSL 위반이 있는지 순회 검사한다.
 
     새 판정 로직이 아니라 기존 순수함수(`condition_dsl_violation`)를 코퍼스에 반복
-    적용하는 것뿐이다(acceptance 위반 아님). `conditions` 필드는 스키마가 다양해
-    레코드 최상위 또는 `verify.conditions`(실측 확인 — 현재 커밋 코퍼스는 전부
-    `verify.conditions`에 있다) 양쪽을 방어적으로 읽고, 둘 다 없으면 스킵(에러로
-    만들지 않는다). `answer_kind`가 `_NON_EQUATION_DSL_ANSWER_KINDS`에 속하면 이
-    축의 검사 대상에서 제외한다(S3-28 — 등식 DSL 폐쇄성 검사이지 그 answer_kind의
-    전용 DSL 폐쇄성은 각자의 파서가 이미 보증).
+    적용하는 것뿐이다(acceptance 위반 아님). 검사 대상 선별(`conditions` 위치·S3-28
+    answer_kind 제외)은 `_dsl_checked_conditions`가 정본이며, 대상이 아니면 스킵(에러로
+    만들지 않는다).
     """
     total = 0
     violations = 0
     for path in sorted(corpus_root.glob("problem_bank_*/problems.jsonl")):
         for problem in _load_jsonl(path):
-            verify = problem.get("verify")
-            verify = verify if isinstance(verify, dict) else {}
-            answer_kind = verify.get("answer_kind") or problem.get("answer_kind")
-            if answer_kind in _NON_EQUATION_DSL_ANSWER_KINDS:
-                continue
-            conditions = problem.get("conditions")
-            if not isinstance(conditions, str):
-                conditions = verify.get("conditions")
-            if not isinstance(conditions, str) or not conditions.strip():
+            conditions = _dsl_checked_conditions(problem)
+            if conditions is None:
                 continue
             total += 1
             if condition_dsl_violation(conditions) is not None:
@@ -714,6 +757,193 @@ def build_report(corpus_root: Path, *, repo_root: Path | None = None) -> dict[st
         "not_measured_axes": [dataclasses.asdict(axis) for axis in _NOT_MEASURED_AXES],
         "overall": overall.to_json(),
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 문항 단위 판정 좌석 (EOS-137 ①) — 골든 혼동행렬의 predictions 원천
+# ──────────────────────────────────────────────────────────────────────────
+
+AXIS_NAMES: tuple[str, ...] = (
+    "corpus_audit",
+    "equivalence_canonicalize",
+    "concept_graph_reachability",
+    "misconception_crosslink_demotion",
+    "coach_prose_leak",
+    "content_provenance",
+    "defect_injection_demotion",
+    "banned_words_pii",
+    "defect_report_intake",
+)
+"""`build_report`가 조립하는 9축 이름 — 문항 좌석 분할의 전수성 대조 기준(테스트가 동결)."""
+
+ITEM_AXIS_EQUIVALENCE = "equivalence_canonicalize"
+ITEM_AXIS_BANNED_WORDS_PII = "banned_words_pii"
+ITEM_AXIS_CONTENT_PROVENANCE = "content_provenance"
+
+ITEM_LEVEL_AXES: tuple[str, ...] = (
+    ITEM_AXIS_EQUIVALENCE,
+    ITEM_AXIS_BANNED_WORDS_PII,
+    ITEM_AXIS_CONTENT_PROVENANCE,
+)
+"""문항 1건을 판정할 수 있는 축 — 판정 함수가 이미 문항 입력을 받는 것만(재구현 0)."""
+
+ITEM_AXIS_SCOPE: Mapping[str, str] = {
+    ITEM_AXIS_EQUIVALENCE: "조건 DSL 폐쇄성(condition_dsl_violation) — 축 2와 같은 대상 선별",
+    ITEM_AXIS_BANNED_WORDS_PII: (
+        "문제은행 산문 필드 2종(question_text·answer_explanation)의 금칙어·타인 PII — "
+        "개념 콘텐츠·오개념 산문은 문항이 아니라 대상 밖"
+    ),
+    ITEM_AXIS_CONTENT_PROVENANCE: (
+        "레코드 필드 결손(license·source_type)만 — 사이드카 부재·스키마(①②)는 코퍼스 "
+        "디렉터리 단위라 문항 좌석 밖"
+    ),
+}
+"""문항 좌석 3축이 **각각 무엇까지만** 보는가 — 부분 적용을 전체 적용으로 읽지 않게."""
+
+CORPUS_LEVEL_ONLY_AXES: Mapping[str, str] = {
+    "corpus_audit": (
+        "사람 감사자 라벨 스냅샷의 재검산 — 엔진 판정이 아니라 사람 라벨이라 판정기 좌석이 "
+        "될 수 없다"
+    ),
+    "concept_graph_reachability": "원자 백본 그래프 전역 구조(순환·dangling) — 문항 입력이 없다",
+    "misconception_crosslink_demotion": "오개념 crosswalk 강등전 시험지 — 코퍼스 문항 비대상",
+    "coach_prose_leak": "코치 발화 합성 시험지 — 문항 비대상",
+    "defect_injection_demotion": "결함주입 합성 셋 강등전 — 코퍼스 문항 비대상",
+    "defect_report_intake": "학생 결함 신고 대장 행 수(DB) — 문항 판정이 아니다",
+}
+"""문항 단위 판정을 내지 않는 6축과 그 사유 — 좌석 3축 + 이 6축 = `AXIS_NAMES`(전수)."""
+
+ItemAxisStatus = Literal["ok", "violation", "not_applicable", "unjudgeable"]
+
+
+@dataclass(slots=True, frozen=True)
+class ItemAxisResult:
+    """문항 1건 × 축 1개의 판정 — 사유에는 필드 이름·위반 범주만(문항 본문·매치 값 미포함)."""
+
+    status: ItemAxisStatus
+    reason: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class ItemJudgement:
+    """문항 1건의 QA 엔진 판정 — 축별 결과와 그로부터 유도된 최종 판정."""
+
+    axes: dict[str, ItemAxisResult] = field(default_factory=dict)
+
+    @property
+    def failed_axes(self) -> tuple[str, ...]:
+        return tuple(name for name, r in self.axes.items() if r.status == "violation")
+
+    @property
+    def unjudgeable_axes(self) -> tuple[str, ...]:
+        return tuple(name for name, r in self.axes.items() if r.status == "unjudgeable")
+
+    @property
+    def verdict(self) -> Literal["pass", "fail"] | None:
+        """fail(위반 1축 이상) · None(위반 없이 판정 불가 1축 이상) · pass(그 밖).
+
+        None을 pass로 접지 않는다 — 판정하지 못한 문항을 통과로 세면 골든 대비 FN이 그만큼
+        사라진다(골든의 존재 이유 훼손 · 계약 §6 "미평가를 pass로 간주 금지"와 같은 원칙).
+        """
+        if self.failed_axes:
+            return "fail"
+        if self.unjudgeable_axes:
+            return None
+        return "pass"
+
+
+def _item_equivalence(problem: Mapping[str, Any]) -> ItemAxisResult:
+    """축 2의 문항 단위 적용 — 대상 선별은 `_dsl_checked_conditions`(축 2와 공유)."""
+    conditions = _dsl_checked_conditions(problem)
+    if conditions is None:
+        return ItemAxisResult(status="not_applicable")
+    try:
+        violation = condition_dsl_violation(conditions)
+    except Exception as exc:  # noqa: BLE001 — 판정 불가로 격리하되 타입명 보존(침묵 실패 금지)
+        return ItemAxisResult(
+            status="unjudgeable", reason=f"{type(exc).__name__}: condition_dsl_violation 예외"
+        )
+    if violation is not None:
+        return ItemAxisResult(status="violation", reason=f"condition_dsl_violation: {violation}")
+    return ItemAxisResult(status="ok")
+
+
+def _item_banned_words_pii(problem: Mapping[str, Any]) -> ItemAxisResult:
+    """축 8의 문항 단위 적용 — 필드 추출·스캔 모두 `banned_words_pii_eval` 함수 그대로.
+
+    위반 기준은 축 8 게이트의 분자와 같다: 금칙어 히트 또는 타인(third_party) PII 히트.
+    `self_reflection`은 게이트 분자에 넣지 않으므로(그 모듈 docstring) 여기서도 위반이 아니다.
+    """
+    fields: list[banned_words_pii_eval.FieldRecord] = []
+    errors: list[banned_words_pii_eval.ParseError] = []
+    record = dict(problem)
+    record_id = str(record.get("slug") or record.get("problem_id") or "item")
+    for field_name in banned_words_pii_eval._PROBLEM_BANK_FIELDS:
+        banned_words_pii_eval._extract_string_field(
+            record,
+            field_name,
+            corpus="item",
+            record_id=record_id,
+            fields=fields,
+            errors=errors,
+        )
+    hits: list[str] = []
+    for scanned in fields:
+        try:
+            result = banned_words_pii_eval.scan_field(scanned.text)
+        except Exception as exc:  # noqa: BLE001 — 판정 불가로 격리하되 타입명 보존
+            errors.append(
+                banned_words_pii_eval.ParseError(
+                    corpus="item",
+                    location=f"{record_id}:{scanned.field}",
+                    error_type=type(exc).__name__,
+                    detail="scan_field 예외",
+                )
+            )
+            continue
+        if result.banned_word_hit:
+            hits.append(f"{scanned.field}:banned_word")
+        if result.pii_third_party_hit:
+            hits.append(f"{scanned.field}:pii_third_party")
+    if hits:
+        return ItemAxisResult(status="violation", reason=", ".join(hits))
+    if errors:
+        reasons = ", ".join(f"{e.error_type}: {e.location}" for e in errors)
+        return ItemAxisResult(status="unjudgeable", reason=reasons)
+    if not fields:
+        return ItemAxisResult(status="not_applicable")
+    return ItemAxisResult(status="ok")
+
+
+def _item_content_provenance(problem: Mapping[str, Any]) -> ItemAxisResult:
+    """축 6의 레코드 단위 부분(③)만 — 필드 목록은 `provenance_audit`의 상수 그대로.
+
+    결손 술어(`not record.get(f)`)는 `provenance_audit._check_record_fields`와 같고, 두 쪽의
+    일치는 테스트가 같은 입력으로 대조해 동결한다(술어가 갈라지면 RED).
+    """
+    missing = [f for f in provenance_audit._REQUIRED_RECORD_FIELDS if not problem.get(f)]
+    if missing:
+        return ItemAxisResult(
+            status="violation", reason=f"RECORD_FIELDS_MISSING: {', '.join(missing)}"
+        )
+    return ItemAxisResult(status="ok")
+
+
+_ITEM_JUDGES: dict[str, Callable[[Mapping[str, Any]], ItemAxisResult]] = {
+    ITEM_AXIS_EQUIVALENCE: _item_equivalence,
+    ITEM_AXIS_BANNED_WORDS_PII: _item_banned_words_pii,
+    ITEM_AXIS_CONTENT_PROVENANCE: _item_content_provenance,
+}
+
+
+def judge_item(problem: Mapping[str, Any]) -> ItemJudgement:
+    """문항 1건(코퍼스 레코드 직렬화 = 검수 큐 `candidate_payload`와 같은 형태)을 판정한다.
+
+    문항 단위 3축(`ITEM_LEVEL_AXES`)을 전부 돌린다 — 한 축이 fail이어도 나머지를 멈추지
+    않는다(어느 축이 무엇을 봤는지가 리포트의 축별 분포로 남아야 한다). 판정 규칙은
+    `ItemJudgement.verdict`.
+    """
+    return ItemJudgement(axes={name: _ITEM_JUDGES[name](problem) for name in ITEM_LEVEL_AXES})
 
 
 def main(argv: list[str] | None = None) -> int:

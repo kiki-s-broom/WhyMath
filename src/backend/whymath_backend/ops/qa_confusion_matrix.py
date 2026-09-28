@@ -54,6 +54,20 @@ EOS-51 §6 내용 KPI 중 4종이 이 골든을 정답지로 쓴다. 어느 라�
 확보 현황(라벨 축별 건수)** 과 함께 상시 출력한다 — 골든이 있어도 F4 라벨이 0건이면 교육과정
 정합률 KPI는 여전히 계산 근거가 없다는 사실이 그 자리에서 보인다.
 
+판정기 종류 · 재현성 · 표류 시계열 (EOS-137 ③④)
+-----------------------------------------------
+  - **판정기 종류(`verdict_source`)** — 예측 행이 자기 판정기를 밝힌다(`qa_engine` =
+    `harness/qa_item_verdicts` 산출 · `generation_gate` = 생성 게이트 outcome 대용). 리포트
+    머리와 원장 행에 그대로 싣는다 — 섞이면 "어느 판정기의 FN율인가"가 결정 불가이므로 한 파일
+    안에서 판정기가 둘 이상(밝힌 행과 안 밝힌 행의 혼재 포함)이면 파싱 실패로 센다(exit 1).
+  - **재현성 대조** — 같은 골든 × 같은 리비전 재실행은 허용이지만 이제 **대조한다**: 원장
+    행이 문항별 판정 digest(`EvaluationSnapshot.verdict_digest`)를 실으므로, 같은 키의 이전
+    기록과 digest가 다르면 exit 1(리비전 고정 하 표류 신호). 초판 원장은 값이 없어 이 대조가
+    불가능했고, 리비전 표기를 올리지 않은 채 예측만 바꿔 다시 재면 재채점 금지도 비켜 갔다.
+  - **시계열** — 원장 행마다 혼동행렬 4칸·지표 경계를 실어 원장 자체가 시계열이 된다. 판정기
+    리비전 간 비교의 정본 축은 회전별 독립 표본이다(계약 §9 — 같은 골든으로 리비전을 비교하는
+    것은 재채점이라 금지다).
+
 측정 도구 실패 경로 설계 (2026-08-22 규칙)
 ------------------------------------------
 단계별 즉시 flush 출력 · 파싱 실패는 예외 타입명+줄 번호로 전건 보존(값 미출력) ·
@@ -70,6 +84,7 @@ EOS-51 §6 내용 KPI 중 4종이 이 골든을 정답지로 쓴다. 어느 라�
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import sys
@@ -80,15 +95,21 @@ from pathlib import Path
 from typing import Any
 
 from whymath_backend.harness.golden_benchmark import (
+    VERDICT_SOURCE_GENERATION_GATE,
+    VERDICT_SOURCE_QA_ENGINE,
+    VERDICT_SOURCES,
     EvaluationRecord,
+    EvaluationSnapshot,
     GoldenItem,
     GoldenLabel,
     GoldenSet,
     append_evaluation_ledger,
     canonical_value,
+    find_reproducibility_violation,
     find_rescore_violation,
     load_evaluation_ledger,
     load_golden_set,
+    possibly_same_judge,
 )
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.schema.enums import GenerationFailureCode
@@ -99,11 +120,16 @@ __all__ = [
     "ContentKpiConsumer",
     "MatrixReport",
     "Prediction",
+    "ReproducibilityCheck",
+    "assess_reproducibility",
     "build_report",
+    "compute_verdict_digest",
     "evaluate",
     "main",
     "parse_predictions",
     "render_report",
+    "resolve_verdict_source",
+    "snapshot_from_report",
 ]
 
 _EXIT_OK = 0
@@ -195,17 +221,35 @@ class Prediction:
     passed: bool
     failure_code: GenerationFailureCode | None = None
     """엔진이 붙인 실패코드(있으면). 라벨 정확도 분해에 쓰지만 혼동행렬 판정에는 쓰지 않는다."""
+    verdict_source: str | None = None
+    """이 판정을 낸 판정기 종류(EOS-137 ④) — None = 행이 밝히지 않았다(모름)."""
 
 
 _PASS_TOKENS = frozenset({"pass", "passed", "ok", "approved", "accept", "accepted", "true"})
 _FAIL_TOKENS = frozenset({"fail", "failed", "reject", "rejected", "block", "blocked", "false"})
+
+_VERDICT_SOURCE_HEADERS: Mapping[str | None, str] = {
+    VERDICT_SOURCE_QA_ENGINE: (
+        "`qa_engine` — QA 엔진 문항 단위 좌석(`harness/qa_pipeline.judge_item` · 문항 단위 3축). "
+        "이 FN율은 그 좌석의 FN율이다(9축 전체가 아니다)"
+    ),
+    VERDICT_SOURCE_GENERATION_GATE: (
+        "`generation_gate` — ⚠ **대용 입력**: 생성 파이프라인 outcome을 판정으로 썼다. 이 "
+        "혼동행렬이 재는 것은 QA 엔진이 아니라 **생성 게이트**다"
+    ),
+    None: (
+        "**미기재** — 예측 파일이 판정기를 밝히지 않았다. 어느 판정기의 FN율인지 이 리포트만으로는 "
+        "결정할 수 없다(원장에는 '모름'으로 남고, 재채점 금지에서는 모든 판정기와 같은 것으로 본다)"
+    ),
+}
 
 
 def parse_predictions(rows: Iterable[Mapping[str, Any]]) -> tuple[list[Prediction], list[str]]:
     """예측 JSONL 파싱 — 어휘 밖 판정은 삼키지 않고 실패로 센다(pass로 관용하면 FN이 위장된다).
 
     식별 키는 cu_slug/slug/code, 판정 키는 qa_verdict/verdict/status(문자열) 또는
-    passed/qa_pass(불리언).
+    passed/qa_pass(불리언). 판정기 키 `verdict_source`는 선택이며, 있으면 폐쇄 어휘
+    (`golden_benchmark.VERDICT_SOURCES`) 안이어야 한다 — 밖이면 파싱 실패다.
     """
     parsed: list[Prediction] = []
     errors: list[str] = []
@@ -238,8 +282,99 @@ def parse_predictions(rows: Iterable[Mapping[str, Any]]) -> tuple[list[Predictio
             except ValueError as exc:
                 errors.append(f"{type(exc).__name__}: 예측 {index}번째 행(실패코드 어휘 밖)")
                 continue
-        parsed.append(Prediction(cu_slug=str(cu_slug), passed=passed, failure_code=code))
+        raw_source = row.get("verdict_source")
+        source: str | None = None
+        if raw_source is not None:
+            if not isinstance(raw_source, str) or raw_source not in VERDICT_SOURCES:
+                errors.append(f"ValueError: 예측 {index}번째 행(verdict_source 어휘 밖)")
+                continue
+            source = raw_source
+        parsed.append(
+            Prediction(
+                cu_slug=str(cu_slug), passed=passed, failure_code=code, verdict_source=source
+            )
+        )
     return parsed, errors
+
+
+def resolve_verdict_source(predictions: Sequence[Prediction]) -> tuple[str | None, list[str]]:
+    """예측 파일 전체의 판정기 종류 — (종류, 오류). 섞였으면 종류 None + 오류 1건.
+
+    "밝힌 행"과 "안 밝힌 행"의 혼재도 섞임이다 — 안 밝힌 행이 다른 판정기에서 왔을 수
+    있고, 그러면 한 혼동행렬에 두 판정기의 FN이 합산된다(EOS-137 ④가 막으려는 바로 그 상태).
+    전부 안 밝혔으면 None(미기재 — 오류는 아니지만 리포트 머리가 결정 불가를 자인한다).
+    """
+    kinds = {p.verdict_source for p in predictions}
+    if len(kinds) <= 1:
+        return (next(iter(kinds)) if kinds else None), []
+    shown = sorted("(미기재)" if k is None else k for k in kinds)
+    return None, [f"ValueError: verdict_source 혼재 {shown} — 판정기가 섞인 예측은 판정하지 않는다"]
+
+
+def compute_verdict_digest(items: Sequence[GoldenItem], predictions: Sequence[Prediction]) -> str:
+    """골든 문항별 판정(pass/fail/미평가)의 sha256 — 재현성 대조의 정확한 키 (EOS-137 ③).
+
+    `evaluate`와 같은 규칙(같은 CU 중복 예측은 마지막 것이 이긴다·골든 밖 예측 무시)으로
+    골든 항목마다 판정을 하나 정한다. 혼동행렬 4칸은 판정이 서로 뒤바뀐 두 문항을 구별하지
+    못하지만 이 digest는 구별한다.
+    """
+    by_slug: dict[str, Prediction] = {}
+    for prediction in predictions:
+        by_slug[prediction.cu_slug] = prediction
+    pairs = sorted(
+        (
+            item.cu_slug,
+            (
+                "unevaluated"
+                if (matched := by_slug.get(item.cu_slug)) is None
+                else ("pass" if matched.passed else "fail")
+            ),
+        )
+        for item in items
+    )
+    blob = json.dumps(pairs, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class ReproducibilityCheck:
+    """같은 골든 × 같은 리비전 × 같을 수 있는 판정기의 이전 기록과의 대조 결과."""
+
+    prior_same_key: int
+    """같은 키의 이전 기록 수(0이면 이번이 최초 평가)."""
+    comparable: int
+    """그중 스냅샷이 있어 대조할 수 있던 수 — 나머지는 EOS-137 이전 형식(대조 불가)."""
+    mismatch: EvaluationRecord | None
+    """판정 digest가 다른 첫 이전 기록 — 있으면 재현성 위반(exit 1)."""
+
+
+def assess_reproducibility(
+    records: Sequence[EvaluationRecord],
+    *,
+    digest: str,
+    engine_revision: str,
+    verdict_source: str | None,
+    verdict_digest: str,
+) -> ReproducibilityCheck:
+    """재현성 대조(순수) — 위반 판정 자체는 `golden_benchmark.find_reproducibility_violation`."""
+    same_key = [
+        r
+        for r in records
+        if r.digest == digest
+        and r.engine_revision == engine_revision
+        and possibly_same_judge(r.verdict_source, verdict_source)
+    ]
+    return ReproducibilityCheck(
+        prior_same_key=len(same_key),
+        comparable=sum(1 for r in same_key if r.snapshot is not None),
+        mismatch=find_reproducibility_violation(
+            records,
+            digest=digest,
+            engine_revision=engine_revision,
+            verdict_source=verdict_source,
+            verdict_digest=verdict_digest,
+        ),
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -366,6 +501,12 @@ class MatrixReport:
     ledger_enforced: bool
     parse_errors: tuple[str, ...] = field(default=())
     confidence: float = _CONFIDENCE
+    verdict_source: str | None = None
+    """판정기 종류(EOS-137 ④) — None = 미기재(리포트 머리가 결정 불가를 자인한다)."""
+    verdict_digest: str = ""
+    """골든 문항별 판정 digest — 재현성 대조 키(`compute_verdict_digest`)."""
+    reproducibility: ReproducibilityCheck | None = None
+    """원장 대조 결과 — None = 원장 미제공(재현성 대조 미집행)."""
 
     @property
     def coverage_rate(self) -> float | None:
@@ -389,6 +530,8 @@ def build_report(
     ledger_enforced: bool = False,
     parse_errors: Sequence[str] = (),
     confidence: float = _CONFIDENCE,
+    verdict_source: str | None = None,
+    reproducibility: ReproducibilityCheck | None = None,
 ) -> MatrixReport:
     """골든 셋 + 예측 → 리포트(순수). I/O·게이트 판정 없음 — 판정은 `main`이 한다."""
     matrix, unevaluated, extraneous = evaluate(golden.items, predictions)
@@ -441,6 +584,29 @@ def build_report(
         ledger_enforced=ledger_enforced,
         parse_errors=tuple(parse_errors),
         confidence=confidence,
+        verdict_source=verdict_source,
+        verdict_digest=compute_verdict_digest(golden.items, predictions),
+        reproducibility=reproducibility,
+    )
+
+
+def snapshot_from_report(report: MatrixReport) -> EvaluationSnapshot:
+    """리포트 → 원장 스냅샷(EOS-137 ③) — 표류 시계열의 점 1개."""
+    m = report.matrix
+    return EvaluationSnapshot(
+        verdict_digest=report.verdict_digest,
+        tp=m.tp,
+        fn=m.fn,
+        fp=m.fp,
+        tn=m.tn,
+        unevaluated=len(report.unevaluated),
+        golden_total=report.golden_total,
+        confidence=report.confidence,
+        recall_lower=m.recall_lower(report.confidence),
+        precision_lower=m.precision_lower(report.confidence),
+        fn_rate_upper=m.fn_rate_upper(report.confidence),
+        false_alarm_upper=m.false_alarm_upper(report.confidence),
+        coverage_lower=report.coverage_lower,
     )
 
 
@@ -452,13 +618,20 @@ def _fmt(value: float | None) -> str:
 def render_report(report: MatrixReport) -> str:
     """혼동행렬 리포트 markdown — FN을 별도 절로 세우고, 미측정·미집행을 상시 자인한다."""
     m = report.matrix
-    lines: list[str] = ["# QA 엔진 혼동행렬 (EOS-60)", ""]
+    title = (
+        "# 생성 게이트 혼동행렬 — 대용 입력 (EOS-60 · EOS-137 ④)"
+        if report.verdict_source == VERDICT_SOURCE_GENERATION_GATE
+        else "# QA 엔진 혼동행렬 (EOS-60)"
+    )
+    lines: list[str] = [title, ""]
+    lines.append(f"- 판정기(verdict_source): {_VERDICT_SOURCE_HEADERS[report.verdict_source]}")
     lines.append(
         f"- 골든: version={report.golden_version} · rotation={report.rotation} · "
         f"digest={report.golden_digest[:12]}… · 동결 {report.frozen_at.isoformat()}"
     )
     lines.append(f"- 과목 축(subject_id): {report.subject_id}")
     lines.append(f"- 엔진 리비전: {report.engine_revision or '미지정'}")
+    lines.append(f"- 문항별 판정 digest: {report.verdict_digest[:12]}…")
     lines.append(f"- Wilson 신뢰수준(단측): {report.confidence}")
     lines.append("")
 
@@ -549,6 +722,36 @@ def render_report(report: MatrixReport) -> str:
             "- **미집행** — `--ledger`(+`--engine-revision`) 미제공. 이 실행은 S2-11 재채점 금지를 "
             "강제하지 않는다(정본화≠집행 자인)."
         )
+    lines.append("")
+    lines.append("## 재현성·표류 대조 (EOS-137 ③ — 같은 골든 × 같은 리비전 × 같은 판정기)")
+    check = report.reproducibility
+    if check is None:
+        lines.append("- **미집행** — 원장 미제공. 이전 평가와의 대조를 하지 않았다.")
+    elif check.prior_same_key == 0:
+        lines.append("- 최초 평가 — 같은 키의 이전 기록 없음(이번 행이 대조 기준이 된다).")
+    else:
+        unmatched = check.prior_same_key - check.comparable
+        verdict = (
+            "**불일치(재현성 위반 — 리비전 고정 하 표류 신호)**"
+            if check.mismatch is not None
+            else "일치"
+        )
+        lines.append(
+            f"- 같은 키의 이전 기록 {check.prior_same_key}건 · 대조 가능 {check.comparable}건 → "
+            f"{verdict}"
+        )
+        if unmatched:
+            lines.append(
+                f"  - 대조 불가 {unmatched}건 — 판정치 스냅샷이 없는 EOS-137 이전 형식 행"
+                "(위반으로도 일치로도 세지 않는다)"
+            )
+        if check.mismatch is not None:
+            prior_snapshot = check.mismatch.snapshot
+            prior_digest = prior_snapshot.verdict_digest if prior_snapshot is not None else ""
+            lines.append(
+                f"  - 기준 기록: {check.mismatch.evaluated_at.isoformat()} · 판정 digest "
+                f"{prior_digest[:12]}…"
+            )
     if report.parse_errors:
         lines.append("")
         lines.append(f"## 파싱 실패 {len(report.parse_errors)}건 (사유 보존)")
@@ -652,8 +855,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _EXIT_MEASUREMENT_FAIL
     raw_rows, load_errors = _load_jsonl_dicts(predictions_path)
     predictions, parse_errors = parse_predictions(raw_rows)
-    all_errors = [*load_errors, *parse_errors]
-    _say(f"[② 예측] {len(predictions)}건 · 파싱 실패 {len(all_errors)}건 — {predictions_path}")
+    verdict_source, source_errors = resolve_verdict_source(predictions)
+    all_errors = [*load_errors, *parse_errors, *source_errors]
+    _say(
+        f"[② 예측] {len(predictions)}건 · 파싱 실패 {len(all_errors)}건 · 판정기 "
+        f"{verdict_source or '미기재'} — {predictions_path}"
+    )
     for reason in all_errors:
         _say(f"  · {reason}")
     if not predictions:
@@ -663,6 +870,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # 재채점 금지(acceptance ③) — 원장이 있으면 *평가 전에* 위반을 막는다.
     ledger_enforced = False
     ledger_path: Path | None = None
+    reproducibility: ReproducibilityCheck | None = None
     if args.ledger:
         if not args.engine_revision:
             _say("[측정 실패] --ledger에는 --engine-revision이 필요하다(재채점 식별 축 없음).")
@@ -681,7 +889,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return _EXIT_MEASUREMENT_FAIL
         violation = find_rescore_violation(
-            records, digest=golden.digest, engine_revision=args.engine_revision
+            records,
+            digest=golden.digest,
+            engine_revision=args.engine_revision,
+            verdict_source=verdict_source,
         )
         if violation is not None:
             _say(
@@ -692,6 +903,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return _EXIT_MEASUREMENT_FAIL
         ledger_enforced = True
+        reproducibility = assess_reproducibility(
+            records,
+            digest=golden.digest,
+            engine_revision=args.engine_revision,
+            verdict_source=verdict_source,
+            verdict_digest=compute_verdict_digest(golden.items, predictions),
+        )
 
     report = build_report(
         golden,
@@ -700,6 +918,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_enforced=ledger_enforced,
         parse_errors=all_errors,
         confidence=args.confidence,
+        verdict_source=verdict_source,
+        reproducibility=reproducibility,
     )
     rendered = render_report(report)
     # 데이터는 stdout(리포트 본문), 진행·판정은 stderr(_say) — 분리.
@@ -733,6 +953,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         _say("[측정 실패] 골든과 겹치는 예측 0건 — 평가쌍이 없다(exit 1).")
         return _EXIT_MEASUREMENT_FAIL
 
+    # 재현성 대조(EOS-137 ③) — 같은 골든 × 같은 리비전 × 같은 판정기인데 문항별 판정이 이전
+    # 기록과 다르면 "같은 리비전 재실행 = 재현성 확인"이라는 허용의 전제가 무너진 것이다.
+    # 원장에 append하지 않는다 — 첫 관측이 기준으로 남아야 하고, 어긋난 행을 쌓으면 이후 모든
+    # 재실행이 둘 중 하나와 영구히 어긋난다. 증거는 위에서 이미 출력한 리포트·JSON에 있다.
+    if reproducibility is not None and reproducibility.mismatch is not None:
+        prior = reproducibility.mismatch
+        _say(
+            "[재현성 위반] 같은 골든·같은 리비전 "
+            f"'{args.engine_revision}'의 이전 평가({prior.evaluated_at.isoformat()})와 문항별 "
+            "판정이 다르다 — 리비전 표기 밖에서 판정기·입력이 바뀌었다(표류 신호). 원인을 찾기 "
+            "전에는 이 결과로 판정하지 않는다. 판정기를 실제로 바꿨다면 새 리비전 + "
+            "--exclude-golden으로 만든 신규 독립 표본으로 재판정하라(원장 미기록)."
+        )
+        return _EXIT_MEASUREMENT_FAIL
+
     # 원장 append는 *측정이 성립한 뒤*에만 한다 — 측정 실패 회차를 재채점 이력으로 남기지 않는다.
     if ledger_enforced and ledger_path is not None and args.engine_revision:
         append_evaluation_ledger(
@@ -743,9 +978,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 evaluated_at=datetime.now(UTC),
                 golden_version=golden.golden_version,
                 rotation=golden.rotation,
+                verdict_source=verdict_source,
+                snapshot=snapshot_from_report(report),
             ),
         )
-        _say(f"[원장] 평가 기록 append — {ledger_path}")
+        _say(f"[원장] 평가 기록 append(판정기·판정치 스냅샷 포함) — {ledger_path}")
 
     m = report.matrix
     conf = args.confidence
@@ -783,6 +1020,17 @@ def _report_payload(report: MatrixReport) -> dict[str, Any]:
             "total": report.golden_total,
         },
         "engine_revision": report.engine_revision,
+        "verdict_source": report.verdict_source,
+        "verdict_digest": report.verdict_digest,
+        "reproducibility": (
+            None
+            if report.reproducibility is None
+            else {
+                "prior_same_key": report.reproducibility.prior_same_key,
+                "comparable": report.reproducibility.comparable,
+                "mismatch": report.reproducibility.mismatch is not None,
+            }
+        ),
         "confidence": report.confidence,
         "matrix": {"tp": m.tp, "fn": m.fn, "fp": m.fp, "tn": m.tn},
         "coverage": {
