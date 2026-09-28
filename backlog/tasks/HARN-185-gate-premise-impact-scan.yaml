@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-185-gate-premise-impact-scan
+title: "결정·취소가 게이트 전제를 무효화해도 영향받는 게이트를 찾는 장치가 없다 — 취소·판정 시 인용 게이트 자동 경고 + 전제 영향 조회(gates impact)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 인용 스캔(자동 · 경고): backlog.py cancel <태스크>와 gates clear|waive <게이트>가 실행될 때, 그 ID를 문면(title·notes·no_inputs_reason)에 인용하는 pending 게이트와, pending 게이트에 부착된(requires_gates) 미종결 태스크 중 acceptance·notes에 그 ID를 인용하는 것을 나열해 경고한다. 거부가 아니라 경고다 — 인용이 곧 의존은 아니며 판단은 판정 세션의 몫이다. 출력에 검색 범위(어느 필드를 봤는가)를 적는다: 부재 판정이 아니라 열거이므로 0건이면 '이 범위에서 0건'으로 말한다"
+  - "② 전제 영향 조회(수동): backlog.py gates impact <패턴> [<패턴>...] — 결정 세션이 전제 변경(예: '학생 표본'·'12월 출시')의 영향 범위를 찾을 때 쓴다. pending 게이트 문면 + 그 게이트가 막는 태스크(requires_gates)와 입력 태스크(depends_on)의 acceptance·notes까지 한 번에 훑고, 적중마다 어느 게이트를 거쳐 걸렸는지(경로)를 출력한다. 2026-09-28 사례는 전제가 게이트 문면이 아니라 부착 태스크 acceptance ③에 있어 게이트만 보면 안 걸렸다 — 그 한 홉이 이 조회의 존재 이유다"
+  - "③ 변별력(주입): 두 실사례를 픽스처로 재현한다 — ⓐ S4-16 취소 ↔ G-kg02-review-promotion-llm-session 문면 인용(①이 경고해야 한다) ⓑ '학생 표본' ↔ NOTNOW acceptance ③ 경유 G-not-now-v1-release-recheck(②가 적중해야 한다). 인용이 없는 대조군에서는 경고·적중이 0건이어야 한다. 스캔 함수를 무력화하는 뮤테이션에서 두 픽스처가 RED가 되는 것을 확인하고, 주입이 실제로 적용됐는지(변경 전후 다름)와 원복이 바이트 동일한지를 각각 단언한다"
+  - "④ 한계 명시(과장 금지): ID 인용이 없는 의미 수준의 전제 변경 — ARCH-66처럼 새 방침이 조건을 바꾸는 경우 — 은 ①이 잡지 못하고 ②를 결정 세션이 돌려야 한다. 이 한계를 CLI 도움말과 docs/standards/build_harness.md 게이트 절에 적는다"
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/report.py
+  - "tests/harness/test_gate_premise_impact*.py"
+  - docs/standards/build_harness.md
+session: null
+notes: "발견 경위(2026-09-28 · 게이트 G-not-now-v1-release-recheck 전제 재점검 · 판정 기준 main 919865d4): 게이트 등재(09-20) 뒤 ARCH-66 ⑥(09-24)이 학생 참여 과정 전부를 12/31 이후로 미뤄, 이 게이트의 재개(②) 분기가 요구하는 'v1.0 운영 실측(학생 표본·KPI·비용)'(NOTNOW 11건 acceptance ③)이 연말 판정 회차에 존재할 수 없게 됐다. ARCH-66 세션은 EOS G4('학생 표본 ≥20명') 충돌은 찾았으나 이 게이트는 찾지 못했다 — 전제가 게이트 문면이 아니라 부착 태스크 acceptance에 있었다. 같은 형태의 다른 사례(사고 대장 계열 gate-premise-drift-after-decision · 발생일 순으로 이 건이 1회차 09-24, 아래 건이 2회차 09-25)는 2026-09-25 G-kg02-review-promotion-llm-session이다: S4-16 기각이 그 게이트 문면이 인용한 재개 경로를 닫았는데 기각 세션은 그 게이트를 갱신하지 않았고, 별도 전제 재점검(PR #1332)이 같은 날 발견했다. 두 번 모두 피해는 0(판정 전에 발견)이었고, 발견은 사람이 그 게이트를 꺼냈을 때의 우연이었다 — 장치가 아니라 순서가 막았다.\n\n중복 실측(trunk 기준): 역할 검색 '영향 게이트|영향 범위|impact|인용하는 게이트|게이트 문면.*인용|취소.*게이트.*경고' — 해당 축 태스크 0건(적중한 HARN-104는 PR 템플릿의 impact 칸 · 다른 축). 인접: HARN-174(입력 간선의 막다른 길 — 취소된 입력은 쓰는 순간 거부하지만 문면 인용은 보지 않는다) · HARN-84(사람 게이트 실행 절차 부재 탐지 — 다른 축) · HARN-177(판정 인계 — 다른 축).\n\n[정정 2026-09-28] notes 치환 — 회차 표기를 사고 대장(발생일 순)과 일치시킴 — 발견 순서(09-25 G-kg02 → 09-28 이 건)로 적었던 '1회차'를 정정"
+updated: 2026-09-28

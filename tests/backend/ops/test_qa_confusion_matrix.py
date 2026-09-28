@@ -41,10 +41,12 @@ from whymath_backend.ops.qa_confusion_matrix import (
     Prediction,
     _report_payload,
     build_report,
+    compute_verdict_digest,
     evaluate,
     main,
     parse_predictions,
     render_report,
+    resolve_verdict_source,
 )
 from whymath_backend.schema.enums import GenerationFailureCode
 
@@ -707,3 +709,329 @@ class TestFailureCodeKeyContract:
 
         row = next(line for line in rendered.splitlines() if "수학적 오류율" in line)
         assert "| 1건 |" in row, row
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-137 ④ — 판정기 종류(verdict_source): 섞이면 "어느 판정기의 FN율인가"가 결정 불가다.
+# ──────────────────────────────────────────────────────────────────────────
+class TestVerdictSource:
+    """예측이 자기 판정기를 밝히고, 리포트 머리·JSON·원장이 그것을 그대로 싣는다."""
+
+    def test_parser_reads_source_and_rejects_out_of_vocabulary(self) -> None:
+        parsed, errors = parse_predictions(
+            [
+                {"cu_slug": "a", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+                {"cu_slug": "b", "qa_verdict": "fail", "verdict_source": "human_guess"},
+            ]
+        )
+
+        assert [p.verdict_source for p in parsed] == ["qa_engine"]
+        assert len(errors) == 1 and "verdict_source" in errors[0]
+
+    def test_mixed_sources_are_an_error_including_undeclared_rows(self) -> None:
+        """밝힌 행과 안 밝힌 행의 혼재도 섞임이다 — 안 밝힌 행이 다른 판정기일 수 있다."""
+        declared = Prediction("a", passed=True, verdict_source="qa_engine")
+        undeclared = Prediction("b", passed=True)
+        gate = Prediction("c", passed=True, verdict_source="generation_gate")
+
+        assert resolve_verdict_source([declared, declared]) == ("qa_engine", [])
+        assert resolve_verdict_source([undeclared]) == (None, [])
+        for mixed in ([declared, undeclared], [declared, gate]):
+            source, errors = resolve_verdict_source(mixed)
+            assert source is None and len(errors) == 1
+
+    def test_mixed_source_file_is_measurement_failure(self, tmp_path: Path) -> None:
+        golden_path = tmp_path / "golden.json"
+        predictions_path = tmp_path / "predictions.jsonl"
+        write_golden_set(
+            golden_path,
+            _golden([_item("d1", GoldenLabel.DEFECTIVE), _item("c1", GoldenLabel.CLEAN)]),
+        )
+        _write_predictions(
+            predictions_path,
+            [
+                {"cu_slug": "d1", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "c1", "qa_verdict": "pass", "verdict_source": "generation_gate"},
+            ],
+        )
+        argv = ["--golden", str(golden_path), "--predictions", str(predictions_path)]
+        assert main(argv) == 1
+
+        # 변별력 대조군 — 같은 판정기로 통일하면 통과한다(위 exit 1이 다른 이유가 아님).
+        _write_predictions(
+            predictions_path,
+            [
+                {"cu_slug": "d1", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "c1", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+            ],
+        )
+        assert main(argv) == 0
+
+    def test_report_header_names_the_judge(self) -> None:
+        golden = _golden([_item("a", GoldenLabel.DEFECTIVE)])
+
+        engine = render_report(
+            build_report(golden, [Prediction("a", passed=True)], verdict_source="qa_engine")
+        )
+        gate = render_report(
+            build_report(golden, [Prediction("a", passed=True)], verdict_source="generation_gate")
+        )
+        unknown = render_report(build_report(golden, [Prediction("a", passed=True)]))
+
+        assert engine.startswith("# QA 엔진 혼동행렬") and "`qa_engine`" in engine
+        # 대용 입력은 제목부터 다르다 — 머리만 읽고도 QA 엔진이 아님을 안다.
+        assert gate.startswith("# 생성 게이트 혼동행렬") and "대용 입력" in gate
+        assert "QA 엔진이 아니라" in gate
+        assert "**미기재**" in unknown and "결정할 수 없다" in unknown
+
+    def test_json_payload_carries_source(self) -> None:
+        golden = _golden([_item("a", GoldenLabel.DEFECTIVE)])
+        payload = _report_payload(
+            build_report(golden, [Prediction("a", passed=False)], verdict_source="qa_engine")
+        )
+
+        assert payload["verdict_source"] == "qa_engine"
+        assert len(payload["verdict_digest"]) == 64
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-137 ③ — 표류 시계열 설계 판정의 동결(계약 §9).
+#   정본 시계열 축 = 회전별 독립 표본(같은 골든 × 다른 리비전 = 재채점 = 금지 · 불변)
+#   원장 보강     = 행마다 판정기 종류 + 판정치 스냅샷(문항별 판정 digest·4칸·경계)
+#   재현성 집행   = 같은 골든 × 같은 리비전 × 같은 판정기인데 판정 digest가 다르면 exit 1
+# ──────────────────────────────────────────────────────────────────────────
+class TestDriftTimeSeriesDesign:
+    @pytest.fixture()
+    def workspace(self, tmp_path: Path) -> tuple[Path, Path, Path]:
+        golden_path = tmp_path / "golden.json"
+        predictions_path = tmp_path / "predictions.jsonl"
+        ledger_path = tmp_path / "ledger.jsonl"
+        write_golden_set(
+            golden_path,
+            _golden(
+                [
+                    _item("d1", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F1),
+                    _item("d2", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2),
+                    _item("c1", GoldenLabel.CLEAN),
+                ]
+            ),
+        )
+        _write_predictions(
+            predictions_path,
+            [
+                {"cu_slug": "d1", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "d2", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+                {"cu_slug": "c1", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+            ],
+        )
+        return golden_path, predictions_path, ledger_path
+
+    @staticmethod
+    def _argv(golden: Path, predictions: Path, ledger: Path, revision: str) -> list[str]:
+        return [
+            "--golden",
+            str(golden),
+            "--predictions",
+            str(predictions),
+            "--ledger",
+            str(ledger),
+            "--engine-revision",
+            revision,
+        ]
+
+    def test_ledger_row_is_a_time_series_point(self, workspace: tuple[Path, Path, Path]) -> None:
+        """원장 행이 지표 값을 싣는다 — 초판(digest·리비전·시각만)은 시계열이 되지 못했다."""
+        golden_path, predictions_path, ledger_path = workspace
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 0
+
+        records, errors = load_evaluation_ledger(ledger_path)
+        assert errors == [] and len(records) == 1
+        record = records[0]
+        assert record.verdict_source == "qa_engine"
+        snapshot = record.snapshot
+        assert snapshot is not None
+        assert (snapshot.tp, snapshot.fn, snapshot.fp, snapshot.tn) == (1, 1, 0, 1)
+        assert snapshot.unevaluated == 0 and snapshot.golden_total == 3
+        assert snapshot.fn_rate_upper == pytest.approx(wilson_upper_bound(1, 2, 0.95))
+        assert snapshot.recall_lower == pytest.approx(wilson_lower_bound(1, 2, 0.95))
+        assert len(snapshot.verdict_digest) == 64
+        raw = json.loads(ledger_path.read_text(encoding="utf-8").splitlines()[0])
+        assert raw["verdict_source"] == "qa_engine" and raw["snapshot"]["fn"] == 1
+
+    def test_same_revision_reproduces_and_appends_a_new_point(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        golden_path, predictions_path, ledger_path = workspace
+        json_path = golden_path.parent / "report.json"
+        argv = self._argv(golden_path, predictions_path, ledger_path, "rev-a")
+        assert main(argv) == 0
+        assert main([*argv, "--json", str(json_path)]) == 0
+
+        records, _ = load_evaluation_ledger(ledger_path)
+        assert len(records) == 2
+        assert records[0].snapshot == records[1].snapshot
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["reproducibility"] == {
+            "prior_same_key": 1,
+            "comparable": 1,
+            "mismatch": False,
+        }
+
+    def test_same_revision_with_changed_verdicts_is_blocked_and_not_recorded(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """재채점 금지의 우회로 봉쇄 — 리비전 표기를 올리지 않고 예측만 바꿔 다시 재면 막힌다."""
+        golden_path, predictions_path, ledger_path = workspace
+        argv = self._argv(golden_path, predictions_path, ledger_path, "rev-a")
+        assert main(argv) == 0
+
+        _write_predictions(
+            predictions_path,
+            [
+                {"cu_slug": "d1", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "d2", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "c1", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+            ],
+        )
+        assert main(argv) == 1
+        records, _ = load_evaluation_ledger(ledger_path)
+        assert len(records) == 1  # 첫 관측이 기준으로 남는다 — 어긋난 행을 쌓지 않는다
+
+    def test_swap_with_identical_counts_is_still_detected(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """4칸이 같아도 문항이 바뀌면 다른 판정이다 — digest가 키인 이유."""
+        golden_path, predictions_path, ledger_path = workspace
+        argv = self._argv(golden_path, predictions_path, ledger_path, "rev-a")
+        assert main(argv) == 0
+
+        _write_predictions(
+            predictions_path,
+            [
+                {"cu_slug": "d1", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+                {"cu_slug": "d2", "qa_verdict": "fail", "verdict_source": "qa_engine"},
+                {"cu_slug": "c1", "qa_verdict": "pass", "verdict_source": "qa_engine"},
+            ],
+        )
+        assert main(argv) == 1
+
+    def test_legacy_row_without_snapshot_is_not_compared(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """EOS-60 초판 형식 행은 대조할 값이 없다 — 위반으로도 일치로도 세지 않고 드러낸다."""
+        golden_path, predictions_path, ledger_path = workspace
+        json_path = golden_path.parent / "report.json"
+        digest = json.loads(golden_path.read_text(encoding="utf-8"))["digest"]
+        ledger_path.write_text(
+            json.dumps(
+                {"digest": digest, "engine_revision": "rev-a", "evaluated_at": _T0.isoformat()}
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        argv = self._argv(golden_path, predictions_path, ledger_path, "rev-a")
+        assert main([*argv, "--json", str(json_path)]) == 0
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["reproducibility"] == {
+            "prior_same_key": 1,
+            "comparable": 0,
+            "mismatch": False,
+        }
+
+    def test_rescore_ban_is_unchanged_same_digest_new_revision(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """정본 판정 유지 — 같은 골든으로 리비전을 비교하는 것은 표류 측정이 아니라 재채점이다."""
+        golden_path, predictions_path, ledger_path = workspace
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 0
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-b")) == 1
+
+    def test_rotation_is_the_canonical_axis_for_revision_drift(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """리비전 간 표류의 점은 회전별 독립 표본 위에 찍힌다 — 새 digest면 새 리비전이 통과."""
+        golden_path, predictions_path, ledger_path = workspace
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 0
+        rotated = golden_path.parent / "golden_rot1.json"
+        write_golden_set(
+            rotated,
+            _golden(
+                [_item("d9", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F1)], rotation=1
+            ),
+        )
+        _write_predictions(
+            predictions_path,
+            [{"cu_slug": "d9", "qa_verdict": "fail", "verdict_source": "qa_engine"}],
+        )
+
+        assert main(self._argv(rotated, predictions_path, ledger_path, "rev-b")) == 0
+        records, _ = load_evaluation_ledger(ledger_path)
+        assert [(r.rotation, r.engine_revision) for r in records] == [(0, "rev-a"), (1, "rev-b")]
+
+    def test_different_judge_is_not_a_rescore(self, workspace: tuple[Path, Path, Path]) -> None:
+        """재채점 금지가 막는 것은 *같은 판정기*의 과적합 — 다른 판정기는 서로의 교정 대상이 아니다."""
+        golden_path, predictions_path, ledger_path = workspace
+        digest = json.loads(golden_path.read_text(encoding="utf-8"))["digest"]
+        append_evaluation_ledger(
+            ledger_path,
+            EvaluationRecord(
+                digest=digest,
+                engine_revision="gate-rev",
+                evaluated_at=_T0,
+                verdict_source="generation_gate",
+            ),
+        )
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 0
+
+    def test_unknown_judge_is_treated_as_possibly_the_same(
+        self, workspace: tuple[Path, Path, Path]
+    ) -> None:
+        """판정기를 모르는 이전 행은 같은 판정기일 수 있다 — 보수적으로 재채점에 산입한다."""
+        golden_path, predictions_path, ledger_path = workspace
+        digest = json.loads(golden_path.read_text(encoding="utf-8"))["digest"]
+        append_evaluation_ledger(
+            ledger_path,
+            EvaluationRecord(digest=digest, engine_revision="old-rev", evaluated_at=_T0),
+        )
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 1
+
+    @pytest.mark.parametrize(
+        "damage",
+        [
+            {"verdict_source": "human_guess"},
+            {"snapshot": {"verdict_digest": "x"}},
+            {"snapshot": "not-an-object"},
+        ],
+    )
+    def test_damaged_extension_fields_are_ledger_damage(
+        self, workspace: tuple[Path, Path, Path], damage: dict[str, object]
+    ) -> None:
+        """확장 필드가 *있는데* 깨졌으면 손상이다 — None으로 접으면 대조가 조용히 빠진다."""
+        golden_path, predictions_path, ledger_path = workspace
+        digest = json.loads(golden_path.read_text(encoding="utf-8"))["digest"]
+        row: dict[str, object] = {
+            "digest": digest,
+            "engine_revision": "rev-a",
+            "evaluated_at": _T0.isoformat(),
+            **damage,
+        }
+        ledger_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+        records, errors = load_evaluation_ledger(ledger_path)
+        assert records == [] and len(errors) == 1
+        assert main(self._argv(golden_path, predictions_path, ledger_path, "rev-a")) == 1
+
+    def test_verdict_digest_ignores_extraneous_and_counts_unevaluated(self) -> None:
+        items = [_item("a", GoldenLabel.DEFECTIVE), _item("b", GoldenLabel.CLEAN)]
+        base = compute_verdict_digest(items, [Prediction("a", passed=False)])
+
+        with_extra = compute_verdict_digest(
+            items, [Prediction("a", passed=False), Prediction("zzz", passed=True)]
+        )
+        now_evaluated = compute_verdict_digest(
+            items, [Prediction("a", passed=False), Prediction("b", passed=True)]
+        )
+
+        assert with_extra == base  # 골든 밖 예측은 측정을 바꾸지 않는다
+        assert now_evaluated != base  # 미평가 → 평가는 판정이 바뀐 것이다

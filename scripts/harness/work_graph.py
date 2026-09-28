@@ -9,7 +9,9 @@ depends_on·requires_gates, 게이트의 depends_on, 트랙 entry_gate, 그리�
 
 세 종류의 창(Kiki 지시 2026-09-27 — 열린 작업·사람 작업·미머지 작업의 통합):
     · 작업 창   — 열린 태스크(todo·in_progress·review·blocked). 사람 소유 태스크는 "사람 작업"
-    · 게이트 창 — 미통과 게이트(pending) = 사람이 움직여야 풀리는 관문
+    · 게이트 창 — 미통과 게이트(pending). 상태는 셋: 여는 작업이 남았다(선행 작업 대기) ·
+                  입력은 끝났는데 판정 기록이 빠졌다(판정 결과 미기록) · 담당자 차례(사람
+                  차례). 판정 결과 미기록은 사람 차례가 아니다(HARN-184 — store.gate_wait_kind)
     · 브랜치 창 — 트렁크에 아직 흡수되지 않은 원격 브랜치 = 미머지 작업. 그 브랜치가 어떤
                   태스크를 done으로 들고 있는지(미머지 완료분), 어떤 태스크를 claim 중인지
                   (다른 세션의 진행), 고립/PR 제출/PR 닫힘 판정을 싣는다
@@ -30,7 +32,8 @@ depends_on·requires_gates, 게이트의 depends_on, 트랙 entry_gate, 그리�
     · 판정 로직 무복제 — 작업 창 상태는 board.build_tasks(=selector.classify_todo)·
       board.apply_remote_done, 원격 claim은 selector.classify_todo(remote_claimed=…), 태스크·게이트
       간선은 store.dependency_graph, 해금 수는 selector.unblock_counts, 대기 경로는
-      selector.wait_chain, 게이트 판정 상태는 store.gate_judgment_state, 정렬은 selector.sort_key,
+      selector.wait_chain, 게이트 창 상태는 store.gate_wait_kind(판정 기록 상태는 그 안의
+      store.gate_judgment_state), 정렬은 selector.sort_key,
       미머지 완료분·원격 claim·고립 브랜치는 remote_claims의 스캔 결과를 그대로 쓴다.
       이 모듈이 새로 만드는 것은 **브랜치 창의 조립, 배치(좌표), 화면**뿐이다.
     · 판정 불가는 숨기지 않는다 — 원격 스캔 3종의 상태가 `ok`가 아니면 페이로드·화면 배너·
@@ -89,7 +92,8 @@ EXCERPT_CHARS = 96  # 발췌 한 줄 상한
 NOTES_CHARS = 1600  # 상세 패널에 싣는 노트 상한 (전문은 YAML에 있다)
 
 # 상태 키 → 화면 라벨. 작업 창은 board 열 판정을 그대로 쓰고(사람 소유만 따로 이름을 붙인다),
-# 게이트 창은 두 갈래(여는 작업이 남았는가 / 담당자 차례인가), 브랜치 창은 한 상태다.
+# 게이트 창은 세 갈래(여는 작업이 남았는가 / 판정 기록이 빠졌는가 / 담당자 차례인가 —
+# `store.gate_wait_kind` 그대로 · HARN-184), 브랜치 창은 한 상태다.
 STATE_LABEL: dict[str, str] = {
     "ready": "시작 가능",
     "in_progress": "진행 중",
@@ -98,8 +102,17 @@ STATE_LABEL: dict[str, str] = {
     "blocked": "차단",
     "human": "사람 소유",
     "gate_turn": "사람 차례",
+    "gate_verdict": "판정 결과 미기록",
     "gate_wait": "선행 작업 대기",
     "branch": "미머지 브랜치",
+}
+
+# 게이트 대기 분류(store) → 게이트 창 상태. 판정 결과 미기록은 '사람 차례'가 아니다 — 판정이
+# 이미 났는데 기록만 빠졌을 수 있다(HARN-177 ② · 2026-09-25 사고). 그래프가 스스로 가르지 않는다.
+GATE_STATE: dict[str, str] = {
+    store.GATE_WAITS_INPUTS: "gate_wait",
+    store.GATE_WAITS_VERDICT: "gate_verdict",
+    store.GATE_WAITS_PERSON: "gate_turn",
 }
 
 # 브랜치 창의 고립 판정 라벨 — remote_claims.StaleBranch.status 그대로 + 미판정 2종.
@@ -120,7 +133,8 @@ GROUP_ORDER: tuple[tuple[str, str, str], ...] = (
     (
         "human",
         "사람 작업",
-        "Kiki 소유 태스크와 아무 작업도 걸려 있지 않은 게이트 — 사람이 움직여야 한다",
+        "Kiki 소유 태스크와 아무 작업도 걸려 있지 않은 게이트 — 사람이 움직이거나 판정 기록을 "
+        "기다린다(창의 상태 표시가 어느 쪽인지 말한다)",
     ),
     ("blocked", "차단", "사유가 붙어 멈춰 있다"),
     ("waiting", "대기", "다른 세션 claim 등 그래프 밖 사유로 기다린다"),
@@ -678,13 +692,15 @@ def build_nodes(
         elif kind == store.GATE_NODE:
             gate = backlog.gates[nid]
             detail = board.gate_detail(backlog, gate, today)
-            waits = any(is_open(backlog, p) for p in graph.pred[node])
-            state = "gate_wait" if waits else "gate_turn"
+            # 창 상태는 공용 분류를 그대로 받는다(HARN-184 — 그래프 자체 판정 금지). 종전의
+            # "열린 선행이 있는가"만으로는 판정 결과 미기록 게이트가 '사람 차례'로 떨어졌다.
+            wait_kind = store.gate_wait_kind(backlog, gate)
+            state = GATE_STATE[str(wait_kind)]
             judgment = store.gate_judgment_state(backlog, gate)
             chain = selector.wait_chain_from_gate(backlog, nid, graph)
             if judgment is not None:
                 reason = store.judgment_state_label(judgment)
-            elif waits:
+            elif wait_kind == store.GATE_WAITS_INPUTS:
                 reason = "이 게이트를 여는 작업이 아직 남았다"
             else:
                 reason = f"담당 {gate.assignee}의 행동을 기다린다"
@@ -773,7 +789,7 @@ def _state_counts(keys: list[str], info: dict[str, dict[str, object]]) -> dict[s
 
 
 def _independent_group(state: str) -> str:
-    if state in ("gate_turn", "gate_wait", "human"):
+    if state in ("gate_turn", "gate_verdict", "gate_wait", "human"):
         return "human"
     if state == "review":
         return "in_progress"
@@ -953,6 +969,7 @@ def build_graph(
             "blocked": all_counts.get("blocked", 0),
             "human": all_counts.get("human", 0),
             "gate_turn": all_counts.get("gate_turn", 0),
+            "gate_verdict": all_counts.get("gate_verdict", 0),
             "gate_wait": all_counts.get("gate_wait", 0),
             "branch": all_counts.get("branch", 0),
         },
@@ -1024,7 +1041,8 @@ def render_text(payload: dict[str, object]) -> str:
         f"· 미머지 브랜치 {payload['branch_total']} · 연결선 {payload['edge_total']}",
         f"  시작 가능 {counts['ready']} · 진행 중 {counts['in_progress']} "
         f"· 대기 {counts['waiting']} · 차단 {counts['blocked']} · 사람 소유 {counts['human']} "
-        f"· 사람 차례 {counts['gate_turn']} · 게이트 선행 대기 {counts['gate_wait']}",
+        f"· 사람 차례 {counts['gate_turn']} · 판정 결과 미기록 {counts['gate_verdict']} "
+        f"· 게이트 선행 대기 {counts['gate_wait']}",
         f"  이어진 흐름 {payload['flow_count']}개(창 {payload['flow_node_total']}) "
         f"· 연결 없는 창 {payload['independent_total']}",
     ]
@@ -1047,6 +1065,7 @@ def render_text(payload: dict[str, object]) -> str:
         for state, label in (
             ("ready", "시작 가능"),
             ("gate_turn", "사람 차례"),
+            ("gate_verdict", "판정 결과 미기록"),
             ("branch", "미머지"),
         ):
             picked = [k for k in frame["keys"] if nodes[k]["state"] == state]
