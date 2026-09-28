@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ requires_gates: []
 acceptance:
   - "① 원인 보존: 키는 있으나 anthropic_api_enabled가 꺼진 상태(ARCH-66 사용 중단 기간의 기본 시나리오)에서 운영자가 보는 표면이 원인을 '키 없음/미설정'이 아니라 '정책 차단(ARCH-66)'으로 말한다 — ⓐ AnthropicProvider.check_status(→ /status의 cloud_error) ⓑ ops/live_preflight의 판정 줄·스모크 skip 사유·리포트 필드 ⓒ harness/provider_accuracy_battle의 arm 준비 상태 detail ⓓ ops/cost_probe가 클라우드 archetype을 자동 제외할 때의 리포트. 문구의 단일 좌석은 Settings 속성 1개로 두고 네 표면은 그것을 읽는다(표면마다 문구를 새로 만들지 않는다)."
   - "② 회귀 0: 키 미설정 경로(스위치와 무관)의 기존 출력·종료 코드·필드값은 그대로다 — check_status는 여전히 error=None, live_preflight는 exit 0(정보), 네트워크 호출 추가 없음. ③ 변별력: 정책 분기를 제거하는 뮤테이션에서 신규 테스트가 RED, cp 백업으로 바이트 동일 원복 후 GREEN. ④ 전수: src의 anthropic_configured 소비자를 전수 열거해(착수 시점 4곳) 원인을 말하는 표면은 모두 ①을 따르고, 분기 조건으로만 쓰는 소비자는 분류 사유를 증적에 적는다 — 소비자 집합은 테스트로 동결해 새 소비자가 분류 없이 추가되면 RED가 된다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1357 — 커밋 ba8e3958(원인 문구 단일 좌석·4표면·소비자 전수 동결)·4a7035ce(jit 재생성)·d27e1e90(런북 §10·HARN-170 7회차 등재). 검증: 4a7035ce 전체 백엔드 14577 passed·커버리지 90.58%·계층 게이트 PASS·게이트 16종 exit 0 / d27e1e90 tests/infra 1997 passed·tests/harness 1268 passed·policy-guard·harness-integrity 전 스텝 exit 0 / migrations 왕복·통합 424 passed. 뮤테이션 15종 전건 RED."
 paths:
   - src/backend/whymath_backend/config.py
   - src/backend/whymath_backend/l3/providers/anthropic.py
@@ -30,6 +31,6 @@ paths:
   - src/backend/whymath_backend/api/admin_bff.py
   - tests/backend/test_anthropic_policy_block_surfaces.py
   - infra/phaiakes9/LIVE_LLM_ACTIVATION.md
-session: claude/practical-tesla-0gdcpa
+session: null
 notes: "발견 경위(2026-09-28): ARCH-66 PR #1302가 '상위 호출부(api/coach)가 RuntimeError를 잡아 강등하는지 끝까지 추적하지 않았다'를 정직한 공백으로 남겼다. 추적 결과 학생 경로는 escalation_defaults(구독 free·예산 0)로 router 규칙 1·2에서 구조적 LOCAL이라 정책 차단 RuntimeError에 도달하지 않는다(공백 무해 확인 — 결제 배선 시 재점검). 대신 ARCH-66 acceptance ②('정책 차단이 원인임을 오류 문구에 남긴다')가 provider의 RuntimeError에만 적용되고 운영 표면에는 적용되지 않은 것을 발견했다: live_preflight가 'anthropic 미설정(키 없음)'을, provider_accuracy_battle이 '키 미설정(WHYMATH_ANTHROPIC_API_KEY)'을 출력하고, /status는 cloud_error=None으로 원인을 비운다 — 키가 남아 있는 사용 중단 기간의 기본 상황에서 틀린 원인을 말한다.\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/providers/anthropic.py', 'src/backend/whymath_backend/ops/live_preflight.py', 'src/backend/whymath_backend/ops/cost_probe.py', 'src/backend/whymath_backend/harness/provider_accuracy_battle.py', 'tests/backend/test_config.py', 'tests/backend/l3/test_anthropic_provider.py', 'tests/backend/ops/test_live_preflight.py', 'tests/backend/ops/test_cost_probe.py', 'tests/backend/harness/test_provider_accuracy_battle.py'] → ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/providers/anthropic.py', 'src/backend/whymath_backend/ops/live_preflight.py', 'src/backend/whymath_backend/ops/cost_probe.py', 'src/backend/whymath_backend/harness/provider_accuracy_battle.py', 'tests/backend/test_config.py', 'tests/backend/l3/test_anthropic_provider.py', 'tests/backend/ops/test_live_preflight.py', 'tests/backend/ops/test_cost_probe.py', 'tests/backend/harness/test_provider_accuracy_battle.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/api/admin_bff.py', 'tests/backend/test_anthropic_policy_block_surfaces.py']: 구현 중 /status 응답 스키마 설명(app.py StatusBody·admin_bff)이 ARCH-66 이후 부정확('키 설정 여부')함을 확인해 범위에 포함 + 소비자 전수 동결 테스트 신설 파일 — 기존 10개 경로 유지\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/providers/anthropic.py', 'src/backend/whymath_backend/ops/live_preflight.py', 'src/backend/whymath_backend/ops/cost_probe.py', 'src/backend/whymath_backend/harness/provider_accuracy_battle.py', 'tests/backend/test_config.py', 'tests/backend/l3/test_anthropic_provider.py', 'tests/backend/ops/test_live_preflight.py', 'tests/backend/ops/test_cost_probe.py', 'tests/backend/harness/test_provider_accuracy_battle.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/api/admin_bff.py', 'tests/backend/test_anthropic_policy_block_surfaces.py'] → ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/providers/anthropic.py', 'src/backend/whymath_backend/ops/live_preflight.py', 'src/backend/whymath_backend/ops/cost_probe.py', 'src/backend/whymath_backend/harness/provider_accuracy_battle.py', 'tests/backend/test_config.py', 'tests/backend/l3/test_anthropic_provider.py', 'tests/backend/ops/test_live_preflight.py', 'tests/backend/ops/test_cost_probe.py', 'tests/backend/harness/test_provider_accuracy_battle.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/api/admin_bff.py', 'tests/backend/test_anthropic_policy_block_surfaces.py', 'infra/phaiakes9/LIVE_LLM_ACTIVATION.md']: Kiki 런북(LIVE_LLM_ACTIVATION.md §10)이 ①을 '키 감지'로만, skip을 '키 없음'으로만 설명해 같은 오해를 산문으로 재생산 — 범위 편입 · 기존 13개 경로 유지"
 updated: 2026-09-28
