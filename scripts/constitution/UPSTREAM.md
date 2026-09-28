@@ -32,6 +32,7 @@
 | `pipeline_check.py` | `--direct-upstream-of TARGET:NODE` | 원본 `--upstream-of`는 추이적이라 우회 간선이 있어도 통과했다(주입 실측) |
 | `pipeline_check.py` | 노드 0개·설정 오류는 exit 2 | '0건 통과' 위장 금지 |
 | `merge_rules.py` | 줄 단위 `rules:` 탐색 · `--bump-stage-note` · 경로 안내 | 원본은 CRLF·뒤 공백에서 IndexError, 머리말 단계 표기는 손편집을 요구했다 |
+| `merge_rules.py` | `--apply` 는 AI 세션(`CLAUDECODE`)에서 exit 3 거부 | 가드 훅은 명령 문자열만 보므로 '스크립트가 constitution/ 에 쓰는' 경로를 못 본다 — 제9조 이중 방어 |
 
 ## 이 저장소가 새로 만든 도구
 
@@ -41,6 +42,7 @@
 | `selftest_guard.py` | 규칙 R0-01의 run — `.claude/hooks/guard_constitution.py`를 픽스처로 실행(차단·통과 양방향) |
 | `diag/` | 260927 EOS 통합정밀진단 묶음의 진단 도구 벤더링(`diag/UPSTREAM.md`) |
 | `run_baseline.py` | 진단 도구 일괄 실행 러너(출력은 gitignore된 `work/diag/`) |
+| `adopt_amendment.py` | **사람 전용** 개정 채택 도우미 — A0003(원본 등록부 절만 교체·규칙 불변 단언·단계 1칸 상향)·A0002(조문 삽입 제안본·규칙 병합). UTF-8(BOM 없음)·LF로만 쓰고, AI 세션에서는 `--apply` 거부(exit 3) |
 
 ## Kiki가 새 꾸러미를 주면 — 재동기화 절차
 

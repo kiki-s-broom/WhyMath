@@ -22,12 +22,20 @@
 -------------------------
 - 헌법 본문의 바이트 고정(sha256 핀). 헌법은 Kiki가 개정할 수 있어야 하므로 내용을 테스트에
   얼리지 않는다 — 개정 절차(개정 기록 동반)는 R0-02 집행 장치(CONST-03)의 몫이다.
-- 원본 등록부의 경로 정합(현재 차단 7건). 그것은 래칫(test_coding_constitution_audit_wiring)이
+- 원본 등록부의 경로 정합(설치 시 차단 7건). 그것은 래칫(test_coding_constitution_audit_wiring)이
   '늘지 않음'으로 지키고, 0으로 만드는 일은 게이트 G-const-sources-registry-adopt 의 몫이다.
+
+⑥은 저장소 헌법의 **현재 내용에 기대지 않는다**
+---------------------------------------------
+결함 주입은 전부 *합성 항목*(규칙 RX-··· · 외부 원본 '주입 …' · 합성 파이프라인)을 tmp 사본에
+넣어 잰다. 초판은 설치본에 남아 있던 자리표시자 version·R1-01의 run 줄을 주입 대상으로 삼았는데,
+그러면 Kiki가 원본 등록부를 정정하는 **정상 개정(A0003) PR이 이 테스트 때문에 red**가 된다 —
+사람이 헌법을 고칠 수 없게 막는 테스트는 제11조 위반이다(2026-09-28 자기 점검에서 발견).
 """
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -184,32 +192,59 @@ def test_rule_appended_to_file_end_is_refused(tmp_path: Path) -> None:
     assert "규칙처럼 보이는 항목" in proc.stderr
 
 
+def _synthetic_rule(run: str) -> str:
+    return (
+        "\nrules:\n  - id: RX-02\n    article: 제10조\n    chapter: 0\n    axis: 확신\n"
+        "    statement: 주입 — 빈 run 판정 시험용\n    level: L5\n"
+        f"    check: scripts/constitution/pipeline_check.py\n    run: {run}\n    stage: 1\n"
+    )
+
+
 def test_empty_run_is_not_silently_passed(tmp_path: Path) -> None:
-    """패치 ⓑ — run 이 빈 L5 규칙은 '집행 장치 없음'이어야 한다(원본은 침묵 통과)."""
+    """패치 ⓑ — run 이 빈 L5 규칙은 '집행 장치 없음'이어야 한다(원본은 침묵 통과). 대조군 포함."""
     root = _sandbox(tmp_path)
     rules = root / "constitution" / "rules.yaml"
-    _mutate(
-        rules,
-        "    run: python scripts/constitution/pipeline_check.py\n    stage: 3\n",
-        '    run: ""\n    stage: 3\n',
+    _mutate(rules, "\nrules:\n", _synthetic_rule('""'))
+    proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run"], root)
+    assert re.search(r"\| RX-02 \| L5 \| 📭 집행 장치 없음 \| run 미지정", proc.stdout), proc.stdout
+    _mutate(rules, '    run: ""\n', "    run: python scripts/constitution/pipeline_check.py\n")
+    proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run"], root)
+    assert re.search(r"\| RX-02 \| L5 \| ✅ 통과", proc.stdout), proc.stdout
+
+
+def _source_result(root: Path, name: str, tmp_path: Path) -> dict:
+    """audit.py --sources-only --json 결과에서 원본 1건의 판정을 꺼낸다(없으면 실패)."""
+    report = tmp_path / f"audit_{abs(hash(name))}.json"
+    proc = _run(
+        [sys.executable, "scripts/constitution/audit.py", "--sources-only", "--json", str(report)],
+        root,
     )
-    (root / "scripts" / "constitution" / "pipeline_check.py").touch()
-    proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run", "--stage", "3"], root)
-    assert "run 미지정" in proc.stdout, proc.stdout
-    assert re.search(r"\| R1-01 \| L5 \| 📭 집행 장치 없음 \| run 미지정", proc.stdout)
+    assert proc.returncode in (0, 1), proc.stdout + proc.stderr
+    found = [
+        r
+        for r in json.loads(report.read_text(encoding="utf-8"))["results"]
+        if r["rule_id"] == f"원본:{name}"
+    ]
+    assert len(found) == 1, f"원본:{name} 판정이 1건이어야 한다: {found}"
+    return found[0]
+
+
+_PLACEHOLDER_SOURCE = (
+    "sources:\n  - name: 주입 외부 원본\n    external: true\n"
+    '    version: "주입 판 확인 후 기입"\n'
+)
 
 
 def test_placeholder_version_is_a_violation(tmp_path: Path) -> None:
     """패치 ⓒ — 외부 원본 version 자리표시자는 위반. 실값으로 바꾸면 통과(대조군)."""
     root = _sandbox(tmp_path)
     rules = root / "constitution" / "rules.yaml"
-    text = rules.read_text(encoding="utf-8")
-    assert "확인 후 기입" in text, "전제: 설치본에 자리표시자 version이 있다"
-    proc = _run([sys.executable, "scripts/constitution/audit.py", "--sources-only"], root)
-    assert "version이 자리표시자" in proc.stdout
-    _mutate(rules, 'version: "고시 번호·판 확인 후 기입"', 'version: "교육부 고시 제2022-33호"')
-    proc = _run([sys.executable, "scripts/constitution/audit.py", "--sources-only"], root)
-    assert "version이 자리표시자" not in proc.stdout
+    _mutate(rules, "sources:\n", _PLACEHOLDER_SOURCE)
+    bad = _source_result(root, "주입 외부 원본", tmp_path)
+    assert bad["blocking"] and "version이 자리표시자" in bad["detail"], bad
+    _mutate(rules, 'version: "주입 판 확인 후 기입"', 'version: "교육부 고시 제2022-33호"')
+    good = _source_result(root, "주입 외부 원본", tmp_path)
+    assert not good["blocking"] and good["status"] == "통과", good
 
 
 def test_stage_preview_does_not_touch_stage_file(tmp_path: Path) -> None:
@@ -222,16 +257,30 @@ def test_stage_preview_does_not_touch_stage_file(tmp_path: Path) -> None:
     assert (root / "constitution" / "STAGE").read_bytes() == before
 
 
+_SYNTH_PIPELINE = """\
+nodes:
+  standards: { source: true }
+  concept_graph: { needs: [standards] }
+  copyright: { needs: [concept_graph] }
+  promotion_gate: { needs: [copyright] }
+  signature_tagging: { needs: [concept_graph] }
+  publish: { needs: [promotion_gate, copyright, signature_tagging] }
+"""
+
+
 def test_direct_upstream_catches_bypass_that_transitive_misses(tmp_path: Path) -> None:
     """--upstream-of(추이적)는 우회를 못 잡고 --direct-upstream-of 는 잡는다."""
     root = _sandbox(tmp_path)
     pipe = root / "pipeline.yaml"
+    pipe.write_text(_SYNTH_PIPELINE, encoding="utf-8")
+    base = [sys.executable, "scripts/constitution/pipeline_check.py"]
+    ok = _run(base + ["--direct-upstream-of", "publish:copyright"], root)
+    assert ok.returncode == 0, "대조군: 직접 선행이 있으면 통과"
     _mutate(
         pipe,
         "publish: { needs: [promotion_gate, copyright, signature_tagging] }",
         "publish: { needs: [promotion_gate, signature_tagging] }",
     )
-    base = [sys.executable, "scripts/constitution/pipeline_check.py"]
     transitive = _run(base + ["--upstream-of", "publish:copyright"], root)
     direct = _run(base + ["--direct-upstream-of", "publish:copyright"], root)
     assert transitive.returncode == 0, "전제: 추이적 검사는 다른 경로로 통과한다"
@@ -240,12 +289,12 @@ def test_direct_upstream_catches_bypass_that_transitive_misses(tmp_path: Path) -
 
 def test_pipeline_cycle_is_detected(tmp_path: Path) -> None:
     root = _sandbox(tmp_path)
-    _mutate(
-        root / "pipeline.yaml",
-        "  concept_graph: { needs: [standards] }",
-        "  concept_graph: { needs: [standards, publish] }",
-    )
-    proc = _run([sys.executable, "scripts/constitution/pipeline_check.py"], root)
+    pipe = root / "pipeline.yaml"
+    pipe.write_text(_SYNTH_PIPELINE, encoding="utf-8")
+    base = [sys.executable, "scripts/constitution/pipeline_check.py"]
+    assert _run(base, root).returncode == 0, "대조군: 합성 그래프는 순환이 없다"
+    _mutate(pipe, "concept_graph: { needs: [standards] }", "concept_graph: { needs: [publish] }")
+    proc = _run(base, root)
     assert proc.returncode == 1 and "[순환]" in proc.stdout
 
 

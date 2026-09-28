@@ -9,12 +9,21 @@
 
 검증 계약
 --------
-① ci.yml harness-integrity 잡에 래칫·파이프라인 검사 스텝이 실재한다(잡·스텝 0건이면 예외)
+① ci.yml harness-integrity 잡에 래칫·파이프라인 검사·가드 자가시험 스텝이 실재한다(잡·스텝 0건이면 예외)
 ② 기준선 JSON 형식(단계 1~6 · blocking == len(items) · 판정 기준 표기)
 ③ 저장소 현재 상태에서 래칫 exit 0
-④ 변별력(tmp 사본): 새 차단 → 1 · 동일 → 0 · 바꿔치기(하나 해소 + 하나 신규) → 1 ·
+④ 변별력(tmp 합성 등록부): 새 차단 → 1 · 동일 → 0 · 바꿔치기(하나 해소 + 하나 신규) → 1 ·
    등록부 파손 → 2 · 단계 불일치 → 2 · 증가 갱신 거부(파일 불변) → 1 · 하향 갱신 → 기록 1건 추가 ·
-   audit.py 부재 → 2
+   단계 상향은 새 단계 규칙의 집행 장치가 있을 때만 기준선 이동 · audit.py 부재 → 2
+
+④가 저장소의 헌법이 아니라 **합성 등록부**로 재는 이유
+-----------------------------------------------------
+헌법은 Kiki가 개정한다(제11조). 변별력 시험이 저장소의 현재 상태(단계 1·차단 7건)를 전제로
+삼으면, Kiki가 원본 등록부를 정정하거나 단계를 올리는 **정상 개정 PR이 이 테스트 때문에 red**가
+된다 — 사람이 헌법을 고칠 수 없게 막는 테스트는 보호가 아니라 제11조 위반이다(2026-09-28 자기
+점검에서 발견: 초판이 '차단 7건'·'1→2단계'를 전제로 짜여 있었다). 그래서 ④는 규칙 1건·원본
+2건짜리 합성 등록부를 tmp에 만들고, 기준선도 그 상태에서 `--init`으로 새로 만든다. 저장소 상태에
+대한 판정은 ③(현재 상태 exit 0)이 맡는다.
 """
 
 from __future__ import annotations
@@ -63,6 +72,14 @@ def test_pipeline_check_step_wired_in_harness_integrity() -> None:
     assert any(all(part in run for part in _PIPE_RUN_PARTS) for run in runs), runs
 
 
+def test_guard_selftest_step_wired_in_harness_integrity() -> None:
+    """R0-01 의 run 명령이 **등록 문자열 그대로** CI 스텝에 있어야 3단계 심사에서 '연결됨'이다."""
+    rules = yaml.safe_load((_REPO_ROOT / "constitution" / "rules.yaml").read_text(encoding="utf-8"))
+    registered = [r["run"] for r in rules["rules"] if r["id"] == "R0-01"]
+    assert len(registered) == 1, "R0-01 이 등록부에 정확히 1건이어야 한다"
+    assert registered[0] in _job_runs("harness-integrity"), registered
+
+
 # ── ② 기준선 형식 ──────────────────────────────────────────────────────────
 
 
@@ -96,16 +113,40 @@ def test_ratchet_passes_on_repo() -> None:
 # ── ④ 변별력 ───────────────────────────────────────────────────────────────
 
 
+_SYNTH_RULES = """\
+version: "test"
+rules:
+  - id: RT-01
+    article: 제9조
+    chapter: 0
+    axis: 경계
+    statement: 합성 규칙 — 2단계 L5, 집행 장치 파일이 있어야 통과
+    level: L5
+    check: hook/guard.py
+    run: python hook/guard.py
+    stage: 2
+sources:
+  - name: 기준 원본 A
+    path: data/a.yaml
+  - name: 기준 원본 B
+    path: data/b.yaml
+"""
+
+
 @pytest.fixture
 def sandbox(tmp_path: Path) -> Path:
+    """합성 등록부(단계 1 · 차단 2건: 원본 A·B 부재)와 그 상태의 기준선을 가진 tmp 저장소."""
     root = tmp_path / "repo"
-    shutil.copytree(_REPO_ROOT / "constitution", root / "constitution")
+    (root / "constitution").mkdir(parents=True)
+    (root / "constitution" / "rules.yaml").write_text(_SYNTH_RULES, encoding="utf-8")
+    (root / "constitution" / "STAGE").write_text("1\n", encoding="utf-8")
     (root / "scripts" / "constitution").mkdir(parents=True)
     shutil.copy2(_AUDIT, root / "scripts" / "constitution" / "audit.py")
     shutil.copy2(_RATCHET, root / "scripts" / "constitution" / "audit_ratchet.py")
-    (root / "metrics").mkdir()
-    shutil.copy2(_BASELINE, root / "metrics" / _BASELINE.name)
-    shutil.copy2(_REPO_ROOT / "pipeline.yaml", root / "pipeline.yaml")
+    init = _run(root, "--init")
+    assert init.returncode == 0, init.stdout + init.stderr
+    base = json.loads((root / "metrics" / _BASELINE.name).read_text(encoding="utf-8"))
+    assert base["items"] == ["원본:기준 원본 A", "원본:기준 원본 B"], "전제: 합성 차단 2건"
     return root
 
 
@@ -117,7 +158,21 @@ def _mutate(path: Path, old: str, new: str) -> None:
     path.write_text(mutated, encoding="utf-8")
 
 
+def _touch(root: Path, rel: str) -> None:
+    target = root / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("{}\n", encoding="utf-8")
+
+
 _NEW_SOURCE = "sources:\n  - name: 주입 원본\n    path: no/such/file.yaml\n"
+
+
+def test_init_refuses_when_baseline_exists(sandbox: Path) -> None:
+    baseline = sandbox / "metrics" / _BASELINE.name
+    before = baseline.read_bytes()
+    proc = _run(sandbox, "--init")
+    assert proc.returncode == 1 and "이미 있다" in proc.stderr
+    assert baseline.read_bytes() == before
 
 
 def test_identical_state_passes(sandbox: Path) -> None:
@@ -132,12 +187,12 @@ def test_new_blocking_item_fails(sandbox: Path) -> None:
 
 def test_swap_is_caught(sandbox: Path) -> None:
     """하나를 고치고 하나를 새로 만들면 개수는 같지만 red여야 한다(집합 비교)."""
-    (sandbox / "schemas").mkdir()
-    (sandbox / "schemas" / "item.schema.json").write_text("{}", encoding="utf-8")
+    _touch(sandbox, "data/a.yaml")
     _mutate(sandbox / "constitution" / "rules.yaml", "sources:\n", _NEW_SOURCE)
     proc = _run(sandbox, "--json")
-    verdict = json.loads(proc.stdout.split("\n✅")[0].split("⛔")[0])
+    verdict = json.loads(proc.stdout)
     assert verdict["current_blocking"] == verdict["baseline_blocking"], "전제: 개수는 같다"
+    assert verdict["new_blocking"] == ["원본:주입 원본"]
     assert proc.returncode == 1
 
 
@@ -165,13 +220,13 @@ def test_update_baseline_refuses_increase(sandbox: Path) -> None:
 
 
 def test_update_baseline_lowers_and_records(sandbox: Path) -> None:
-    (sandbox / "schemas").mkdir()
-    (sandbox / "schemas" / "item.schema.json").write_text("{}", encoding="utf-8")
+    _touch(sandbox, "data/a.yaml")
     baseline = sandbox / "metrics" / _BASELINE.name
     before = json.loads(baseline.read_text(encoding="utf-8"))
     proc = _run(sandbox, "--update-baseline")
     assert proc.returncode == 0, proc.stderr
     after = json.loads(baseline.read_text(encoding="utf-8"))
+    assert after["items"] == ["원본:기준 원본 B"]
     assert after["blocking"] == before["blocking"] - 1
     assert len(after["history"]) == len(before["history"]) + 1
 
@@ -181,14 +236,12 @@ def test_stage_raise_moves_baseline_only_without_new_blocking(sandbox: Path) -> 
     (sandbox / "constitution" / "STAGE").write_text("2\n", encoding="utf-8")
     baseline = sandbox / "metrics" / _BASELINE.name
     before = baseline.read_bytes()
-    # ① 2단계 규칙 R0-01 의 집행 장치(가드 훅)가 없으면 새 차단 → 거부, 파일 불변
+    # ① 2단계 규칙 RT-01 의 집행 장치가 없으면 새 차단 → 거부, 파일 불변
     refused = _run(sandbox, "--update-baseline")
-    assert refused.returncode == 1 and "R0-01" in refused.stderr
+    assert refused.returncode == 1 and "RT-01" in refused.stderr
     assert baseline.read_bytes() == before
-    # ② 가드 훅을 두면 새 차단 없음 → 기준선이 2단계로 이동하고 기록이 남는다
-    hooks = sandbox / ".claude" / "hooks"
-    hooks.mkdir(parents=True)
-    shutil.copy2(_REPO_ROOT / ".claude" / "hooks" / "guard_constitution.py", hooks)
+    # ② 집행 장치를 두면 새 차단 없음 → 기준선이 2단계로 이동하고 기록이 남는다
+    _touch(sandbox, "hook/guard.py")
     moved = _run(sandbox, "--update-baseline")
     assert moved.returncode == 0, moved.stdout + moved.stderr
     after = json.loads(baseline.read_text(encoding="utf-8"))

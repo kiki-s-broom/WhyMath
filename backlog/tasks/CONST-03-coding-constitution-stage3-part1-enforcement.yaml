@@ -19,6 +19,8 @@ acceptance:
   - "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다."
   - "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다."
   - "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+  - "⑥ (CONST-02 대조표 비평가 처분 #2·#3·#4 승계) audit.py 판정 논리를 이 저장소 구조에 맞게 고친다 — ⓐ 배선 판정을 전역 STAGE가 아니라 규칙 자신의 stage 기준으로 ⓑ 워크플로 텍스트 부분 문자열 일치(주석·무관 워크플로도 연결로 셈) 대신 잡 스텝의 run 명령 단위 대조 ⓒ 파일 단위 pytest run(35건)이 디렉터리 단위 CI 잡에서 구조적 미연결이 되지 않는 판정 방식 ⓓ 저장소 루트 cwd·180초 타임아웃·shell=True 실행의 규칙별 설정 ⓔ L4 비대칭(파일 없음 차단·미배선 침묵·실패 경고) 정리. 근거 = docs/standards/coding_constitution_transplant.md §4. 이것이 끝나야 R4-01(래칫이 CI에서 audit.py를 실제로 돌리는데도 3단계에서 미연결로 보임)이 정당하게 해소된다 — 문자열을 맞추려는 주석·형식 스텝 추가는 금지(검사기를 속이는 것)."
+  - "⑦ (처분 #2 승계) Claude Code 밖 경로의 헌법 보호 — 가드 훅은 AI 세션의 명령만 본다. 사람 push·GitHub 웹 편집·다른 AI 도구 경로는 브랜치 룰셋 또는 CODEOWNERS(constitution/** 필수 리뷰어 = Kiki)로 막는다. 룰셋·CODEOWNERS 변경은 되돌리기 어려운 저장소 설정이므로 Kiki 게이트로 분리하고, 가용성(조직 소유·플랜)을 먼저 실측한다(CLAUDE.md 설정 부재를 설정 가능으로 단정 금지)."
 artifacts: []
 paths:
   - "scripts/constitution/**"
@@ -28,5 +30,5 @@ paths:
   - ".claude/settings.json"
   - "docs/constitution_proposals/**"
 session: null
-notes: "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5"
-updated: 2026-09-27
+notes: "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계"
+updated: 2026-09-28

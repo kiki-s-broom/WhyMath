@@ -19,11 +19,12 @@ acceptance:
   - "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다."
   - "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다."
   - "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+  - "⑥ (CONST-02 대조표 비평가 처분 #8·#11 승계) ⓐ 판정 장소 축 — 백업(R16 계열)처럼 실물이 Kiki 머신에만 있는 규칙은 CI에서 영구 '집행 장치 없음' 또는 거짓 통과가 된다. 규칙에 판정 장소(ci / kiki-machine)를 구분하는 방법을 개정 초안으로 제안하고, 머신 로컬 규칙은 점검 스크립트 출력을 Kiki가 첨부하는 사람 게이트로 판정한다. 진단 D-07의 어긋남 3점(스케줄 04:00 vs 진술 03:00 · 보존 14일 vs 30개 · git bundle 부재)은 Get-ScheduledTask 실측 후 정정한다. ⓑ pipeline.yaml 범위 — 현재 28노드는 콘텐츠 파이프라인만 담는다. 관측(Langfuse)·LLM 라우팅 노드 추가 여부를 결정하고, 추가하면 pipeline_check 통과와 테스트 동결을 함께 한다."
 artifacts: []
 paths:
   - "scripts/constitution/**"
   - "tests/infra/test_coding_constitution_*.py"
   - "docs/constitution_proposals/**"
 session: null
-notes: "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5"
-updated: 2026-09-27
+notes: "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계"
+updated: 2026-09-28

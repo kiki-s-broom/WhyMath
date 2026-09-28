@@ -18,6 +18,8 @@ L5(자동 차단)다. 집행 장치는 `.claude/hooks/guard_constitution.py`(Pre
    그 이름에 반응한다는 증거). 주입 적용은 mutated != original 로 단언한다
 ⑤ 파싱 실패는 '변경 없음'으로 접지 않는다 — 헌법 경로+변경 동사가 보이면 막고, 아니면 통과
 ⑥ 차단은 로그에 남는다(남지 않는 차단은 사후 추적이 안 된다)
+⑦ 콘솔 인코딩이 cp949(한국어 Windows 기본)여도 한글·'—' 가 섞인 명령을 막는다 — 초판은 stdin 을
+   로캘 인코딩으로 해독해 UnicodeDecodeError → '입력 파싱 실패 — 통과'(fail-open)였다(2026-09-28 재현)
 
 의도적으로 검증하지 않는 것
 -------------------------
@@ -240,3 +242,33 @@ def test_block_is_logged(tmp_path: Path) -> None:
     log = log_dir / "constitution_guard.jsonl"
     records = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
     assert len(records) == 1 and records[0]["tool"] == "Write"
+
+
+# ── ⑦ 콘솔 인코딩 ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("rm -rf constitution  # 한글 주석 — 대시", 2),
+        ("cat constitution/STAGE  # 한글 주석 — 대시(대조군)", 0),
+    ],
+)
+def test_guard_blocks_under_cp949_console(tmp_path: Path, command: str, expected: int) -> None:
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(_REPO_ROOT)}
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    assert b"\xe2\x80\x94" in raw, "전제: cp949 로 해독되지 않는 UTF-8 바이트('—')가 들어 있다"
+    proc = subprocess.run(
+        [sys.executable, str(_GUARD)],
+        input=raw,
+        capture_output=True,
+        timeout=30,
+        env={
+            "CLAUDE_PROJECT_DIR": str(_REPO_ROOT),
+            "CLAUDE_GUARD_LOG_DIR": str(tmp_path),
+            "PYTHONIOENCODING": "cp949",
+            "PATH": "",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+    )
+    assert proc.returncode == expected, proc.stderr.decode("utf-8", errors="replace")

@@ -1567,6 +1567,17 @@ jobs:
           --upstream-of publish:copyright
           --direct-upstream-of publish:copyright
 
+      # CONST-02 — 헌법 제9조 ①·R0-01: AI의 constitution/ 수정을 막는 PreToolUse 가드를 훅과 같은
+      # 방식(stdin JSON → 종료 코드)으로 픽스처 44건 실행한다(차단 기대 28 · 통과 기대 16 — 한쪽만
+      # 재면 전건 차단·전건 통과 구현이 초록이 된다). 헌법 제10조 ①("집행 장치가 존재하고 연결")의
+      # 연결 판정은 R0-01 의 run 명령이 워크플로에 있는가로 하므로, tests/infra 안에서만 돌면
+      # 3단계에서 '미연결'로 판정된다(2026-09-28 --stage 3 미리보기 실측). 그래서 `python3`가 아니라
+      # rules.yaml R0-01 에 등록된 run 문자열 **그대로**(`python …`) 실행한다 — setup-python 이
+      # `python`을 제공한다. 등록 명령과 CI 명령이 글자까지 같아야 심사의 연결 판정과 실제 실행이
+      # 같은 것을 가리킨다(판정 논리 자체의 부분 문자열 한계는 CONST-03 이 고친다).
+      - name: 헌법 보호 가드 자가시험 (CONST-02 — 헌법 제9조·R0-01)
+        run: python scripts/constitution/selftest_guard.py
+
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
       # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날

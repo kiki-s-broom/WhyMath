@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -199,10 +200,12 @@ def run_fixture(tool: str, tool_input: dict[str, str]) -> int:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        # 환경은 상속한다 — Windows 는 SYSTEMROOT 가 없으면 파이썬이 시작조차 못 한다(초판은 PATH 만
+        # 남겨 비웠는데, 그러면 Kiki 머신의 위헌 심사 R0-01 이 전건 불일치로 red 가 된다).
         env={
+            **os.environ,
             "CLAUDE_PROJECT_DIR": str(ROOT),
             "CLAUDE_GUARD_LOG_DIR": LOG_DIR,
-            "PATH": "",
             "PYTHONDONTWRITEBYTECODE": "1",
         },
         timeout=30,

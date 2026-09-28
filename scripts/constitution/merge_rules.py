@@ -16,6 +16,7 @@ AI 세션은 .claude/hooks/guard_constitution.py가 constitution/ 편집을 막�
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sys
@@ -101,6 +102,12 @@ def main() -> int:
     if "--apply" not in sys.argv:
         print("반영하려면 --apply 를 붙여 다시 실행하세요.")
         return 0
+    # whymath 패치(CONST-02): AI 세션(Claude Code 셸은 CLAUDECODE 를 켠다)에서는 반영을 거부한다.
+    # 가드 훅은 명령 문자열만 보므로 '스크립트가 constitution/ 에 쓰는' 경로는 못 본다 — 제9조의
+    # 이중 방어를 스크립트 쪽에 둔다. 미리보기는 읽기 전용이라 막지 않는다.
+    if os.environ.get("CLAUDECODE"):
+        print("⛔ AI 세션(CLAUDECODE)에서는 --apply 를 실행할 수 없다 — 헌법 제9조·제11조")
+        return 3
     shutil.copy2(RULES, BACKUP)
     RULES.write_text(merged_text, encoding="utf-8")
     print(f"✅ 반영 완료 (백업: {BACKUP}). 이어서: python scripts/constitution/audit.py --no-run")
