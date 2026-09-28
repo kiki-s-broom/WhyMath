@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONT-07-formal-definition-internal-render-exposure
+title: "내부 정식정의(formal_definition_internal — 학생 비노출 규정)가 렌더 definition 조각으로 나간다 — DIRECT·WORKED_EXAMPLE 어댑터, 소비계층 게이팅 부재(현재 /study 미도달·잠복)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(2026-09-27 · 판정 기준 main `0e7b4f6b`): `db/models/concept_content.py`·`schema/concept_content.py`·`api/concepts.py` docstring과 `docs/architecture/phase2_required_api_surface_map.md`가 `formal_definition_internal`을 학생 비노출(노출 게이팅은 소비계층 책임)로 규정한다. 그러나 `l3/render/dsl.py::from_concept_content`가 그 값을 `ConceptDSL.definition`으로 투영하고, `l3/render/adapters.py`의 `DirectAdapter`·`WorkedExampleAdapter`가 `kind=definition` 조각으로 렌더한다. 주입 실측: 표지 문자열을 `formal_definition_internal`에 넣고 `supply()`를 신호 조합 전수로 돌리자 `WORKED_EXAMPLE`(hint_level=3)에서 조각에 표지가 나왔다(`SOCRATIC`·`ANALOGY`는 정의를 싣지 않음). `/study`는 `_build_signals`가 힌트 축을 채우지 않아 지금은 `SOCRATIC`이 골라져 미도달(잠복)이다.\n② 판정 택1: ⓐ 비노출 규정 집행 — 학생 대면 렌더로 가는 `definition`을 투영 또는 소비 경계에서 막는다(학생용 정의 원천이 없으면 `DIRECT`·`WORKED_EXAMPLE`의 `can_render`·렌더 결과가 어떻게 바뀌는지 함께 확인) ⓑ 규정 변경 — 검수(reviewed)를 거친 정식정의는 학생 노출 가능으로 정하고 문서 4곳을 정정(설계 의도 번복이라 Kiki 판정 필요) ⓒ `S4-05-concept-definition-registers`(정의 레지스터·rigorous_internal 게이팅)로 흡수 — S4-05는 2027 이월이므로 흡수 시 그때까지의 잠복 노출을 명시한다.\n③ 공개 표면 병기 — `GET /v1/concepts/content`·`/content/{code}`(무인증 공개 카탈로그 · SEC-07 D1이 GET 무인증 유지를 결정)도 같은 필드를 응답에 싣는다. 이 표면을 판정 범위에 넣을지 명시한다.\n④ ⓐ면 표지 문자열 주입이 어떤 전략에서도 학생 조각에 나오지 않음을 전략 전수 테스트로 동결하고, 차단 제거 뮤테이션 RED를 확인한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/render/**"
+  - src/backend/whymath_backend/l4/content_supply.py
+  - "tests/backend/l3/render/**"
+  - "tests/backend/l4/test_content_supply*.py"
+session: null
+notes: "출처: CONT-05 판정문 docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §7 부수 발견. CONT-05(행 단위 검수 게이트)와 축이 다르다 — reviewed 행이라도 필드 단위 비노출 규정은 남는다. 우선순위는 잠복(현재 /study 미도달) 기준이며, 힌트 축을 가진 공급 호출자가 생기면 즉시 활성화된다."
+updated: 2026-09-27
