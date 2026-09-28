@@ -26,12 +26,15 @@ from __future__ import annotations
 
 import enum
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timezone
+from typing import Any, Final
 
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.db.models.assessment import AbilitySnapshot, ConceptMasteryHistory
 from whymath_backend.db.models.learning_state_transition import LearningStateTransition
 from whymath_backend.db.models.misconception_hypothesis import (
     MisconceptionHypothesisRecord,
@@ -44,10 +47,15 @@ from whymath_backend.l2.skill_mastery_tracking import get_all_current_skill_mast
 from whymath_backend.schema.learning_state import LearningState, TransitionTrigger
 
 __all__ = [
+    "LEARNER_STATE_BASIS_SCHEMA",
+    "BasisAbsence",
     "FieldOrigin",
     "FieldStatus",
     "LearnerState",
+    "LearnerStateBasis",
     "LearningStateSnapshot",
+    "MasteryBasis",
+    "capture_state_basis",
     "get_state",
 ]
 
@@ -467,4 +475,208 @@ async def get_state(session: AsyncSession, user_id: uuid.UUID) -> LearnerState:
         skill_mastery=skill_mastery,
         learning_state=learning_state,
         origins=origins,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-132 — 추천이 소비한 LearnerState의 **근거 식별자** (KPI ⑤ LearnerState hop)
+# ──────────────────────────────────────────────────────────────────────────
+#: 근거 meta 형태 판본 — 필드 의미를 바꾸면 올린다(과거 기록이 어느 형태인지 읽는 축).
+LEARNER_STATE_BASIS_SCHEMA: Final = 1
+
+
+class BasisAbsence(str, enum.Enum):
+    """근거가 비어 있는 **정상** 사유 — "모른다"가 아니라 "없었다"다 (EOS-132 ⑧).
+
+    이력이 없는 학생의 추천은 사전값(prior)으로 나간다. 그 사실을 사유와 함께 남겨야 역추적
+    게이트가 그것을 끊김으로 세지 않는다. 반대로 근거 필드 자체가 빠진 기록은 **모르는 것**이라
+    끊김으로 센다(`ops/loop_kpi_gate`) — 두 경우가 같은 글자로 보이면 안 된다.
+    """
+
+    NO_MASTERY_HISTORY = "no_mastery_history"
+    NO_ABILITY_SNAPSHOT = "no_ability_snapshot"
+
+
+class MasteryBasis(BaseModel):
+    """근거 숙달 행의 키 — `concept_mastery_history`의 PK는 `(user_id, concept_id, measured_at)`.
+
+    학습자는 추천 기록의 세션으로 결합하므로 여기엔 싣지 않는다(meta에 user_id 슬롯 0 — PED-03·
+    REC-03 구조적 차단 유지). 이 행의 `attempt_id`가 다음 홉(시도)으로 가는 조인 키다.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    concept_id: uuid.UUID
+    measured_at: datetime
+
+
+class LearnerStateBasis(BaseModel):
+    """추천 1건이 소비한 `LearnerState`의 근거 — **식별자와 시각만**(B1 비민감 원칙).
+
+    왜 필요한가: `LearnerState`는 매 호출 조립되고 영속하지 않는다(EOS-10 좌석 판정). 그래서
+    "이 추천은 어떤 상태를 보고 나왔나"를 사후에 되짚으려면 조립 시점에 쓴 근거를 추천 기록에
+    함께 남겨야 한다. **사후 재구성은 채택하지 않았다** — 숙달 시계열은 append-only라 시점
+    재구성이 되지만, 오개념 가설 레코드는 `updated_at`으로 덮어써져 과거의 활성 집합을 복원할 수
+    없다(2026-09-24 결정 로그 결정 4 · `docs/standards/loop_kpi_contract.md` §2-1).
+
+    - `mastery` — 이 학생의 **가장 최근 숙달 측정 행**의 키. 채점 1건이 여러 개념을 같은
+      `measured_at`으로 적재하므로 동률은 `concept_id`로 끊는다(결정론). None이면
+      `BasisAbsence.NO_MASTERY_HISTORY`(측정 이력 없음 — 사전값 추천).
+    - `ability_snapshot_id` — 전과목 θ 최신 스냅샷(`get_current_theta`와 같은 범위·정렬). None이면
+      `BasisAbsence.NO_ABILITY_SNAPSHOT` — θ 스냅샷은 시도마다 찍히지 않으므로(루프 writer =
+      EOS-125) 이력이 있어도 없을 수 있고, 그것은 역추적 실패가 아니다.
+    - `misconception_hypothesis_ids` — 활성 오개념 가설 레코드 id(가설 코드가 아니라 행 id).
+      빈 튜플은 "활성 가설 없음"이라는 사실이다.
+    - `assembled_at` — `LearnerState.timestamp`(조립 시각). 트레이스가 이 시각에 상태 생성을 놓는다.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    assembled_at: datetime
+    mastery: MasteryBasis | None
+    ability_snapshot_id: uuid.UUID | None
+    misconception_hypothesis_ids: tuple[uuid.UUID, ...]
+
+    def to_meta(self) -> dict[str, Any]:
+        """JSONB에 싣는 형태 — 비어 있는 근거는 **사유를 함께** 적는다(None 한 글자로 접지 않음)."""
+        mastery: dict[str, str] = (
+            {
+                "concept_id": str(self.mastery.concept_id),
+                "measured_at": self.mastery.measured_at.isoformat(),
+            }
+            if self.mastery is not None
+            else {"absent": BasisAbsence.NO_MASTERY_HISTORY.value}
+        )
+        ability: dict[str, str] = (
+            {"snapshot_id": str(self.ability_snapshot_id)}
+            if self.ability_snapshot_id is not None
+            else {"absent": BasisAbsence.NO_ABILITY_SNAPSHOT.value}
+        )
+        return {
+            "schema": LEARNER_STATE_BASIS_SCHEMA,
+            "assembled_at": self.assembled_at.isoformat(),
+            "mastery": mastery,
+            "ability_snapshot": ability,
+            "misconception_hypothesis_ids": [str(h) for h in self.misconception_hypothesis_ids],
+        }
+
+    @classmethod
+    def from_meta(cls, value: Any) -> LearnerStateBasis | None:
+        """`to_meta` 형태를 되읽는다 — **형식이 하나라도 어긋나면 None**(추측으로 채우지 않는다).
+
+        None은 "근거가 없다"가 아니라 "근거를 읽을 수 없다"이다. 호출부(역추적 게이트)는 키 부재와
+        형식 불량을 따로 세고, 둘 다 끊김으로 계상한다.
+        """
+        if not isinstance(value, Mapping) or value.get("schema") != LEARNER_STATE_BASIS_SCHEMA:
+            return None
+        try:
+            assembled_at = _parse_aware(value.get("assembled_at"))
+            mastery = _parse_mastery_basis(value.get("mastery"))
+            snapshot_id = _parse_ability_basis(value.get("ability_snapshot"))
+            raw_ids = value.get("misconception_hypothesis_ids")
+            if not isinstance(raw_ids, list):
+                return None
+            hypothesis_ids = tuple(uuid.UUID(str(h)) for h in raw_ids)
+        except (KeyError, TypeError, ValueError):
+            # KeyError — 키가 빠진 객체(예: 개념만 있고 측정 시각이 없는 숙달 근거).
+            return None
+        return cls(
+            assembled_at=assembled_at,
+            mastery=mastery,
+            ability_snapshot_id=snapshot_id,
+            misconception_hypothesis_ids=hypothesis_ids,
+        )
+
+
+def _parse_aware(value: Any) -> datetime:
+    """ISO 시각 → aware datetime. 시간대가 없으면 거부(조인 비교가 어긋난다)."""
+    if not isinstance(value, str):
+        raise TypeError("시각 문자열이 아니다")
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        raise ValueError("시간대 없는 시각")
+    return parsed
+
+
+def _parse_mastery_basis(value: Any) -> MasteryBasis | None:
+    """숙달 근거 — 행 키 또는 정상 부재 사유. 둘 다 아니면 형식 불량(ValueError)."""
+    if not isinstance(value, Mapping):
+        raise TypeError("숙달 근거가 객체가 아니다")
+    if "absent" in value:
+        if value["absent"] != BasisAbsence.NO_MASTERY_HISTORY.value or len(value) != 1:
+            raise ValueError("알 수 없는 숙달 부재 사유")
+        return None
+    return MasteryBasis(
+        concept_id=uuid.UUID(str(value["concept_id"])),
+        measured_at=_parse_aware(value["measured_at"]),
+    )
+
+
+def _parse_ability_basis(value: Any) -> uuid.UUID | None:
+    """능력치 근거 — 스냅샷 id 또는 정상 부재 사유. 둘 다 아니면 형식 불량(ValueError)."""
+    if not isinstance(value, Mapping):
+        raise TypeError("능력치 근거가 객체가 아니다")
+    if "absent" in value:
+        if value["absent"] != BasisAbsence.NO_ABILITY_SNAPSHOT.value or len(value) != 1:
+            raise ValueError("알 수 없는 능력치 부재 사유")
+        return None
+    return uuid.UUID(str(value["snapshot_id"]))
+
+
+def _latest_mastery_column(user_id: uuid.UUID, column: Any) -> Any:
+    """이 학생의 최신 숙달 행에서 한 컬럼 — 두 컬럼이 **같은 행**을 가리키도록 정렬을 공유한다."""
+    return (
+        select(column)
+        .where(ConceptMasteryHistory.user_id == user_id)
+        .order_by(ConceptMasteryHistory.measured_at.desc(), ConceptMasteryHistory.concept_id)
+        .limit(1)
+        .scalar_subquery()
+    )
+
+
+async def capture_state_basis(
+    session: AsyncSession, user_id: uuid.UUID, *, assembled_at: datetime
+) -> LearnerStateBasis:
+    """추천이 소비한 `LearnerState`의 근거 식별자를 **한 문장**으로 읽는다(쓰기 0).
+
+    세 근거(최신 숙달 행 · 최신 전과목 θ 스냅샷 · 활성 가설 id)를 스칼라 서브쿼리 하나의 SELECT로
+    읽는다. 한 문장이라 셋이 **같은 스냅샷**을 본다(READ COMMITTED에서도 문장 단위로 일관).
+
+    **한계(명시)**: `get_state`와는 별도 문장이다. 두 문장 사이에 같은 학생의 채점이 커밋되면
+    근거가 그 새 행을 가리킬 수 있다 — 가리키는 행은 실재하는 측정이라 역추적은 성립하지만, 추천이
+    실제로 본 값보다 측정 한 번 앞선다. 앱은 다음 문항을 받은 뒤에 답을 내므로 정상 흐름에서는
+    생기지 않는다. `get_state`에 합치지 않은 이유: 모든 소비처(학습·코치·상태 조회)의 조회 수를
+    늘리지 않고, 기록이 필요한 추천 경로에서만 한 문장을 더 쓰기 위해서다.
+    """
+    stmt = select(
+        _latest_mastery_column(user_id, ConceptMasteryHistory.concept_id),
+        _latest_mastery_column(user_id, ConceptMasteryHistory.measured_at),
+        select(AbilitySnapshot.snapshot_id)
+        .where(AbilitySnapshot.user_id == user_id, AbilitySnapshot.concept_id.is_(None))
+        .order_by(AbilitySnapshot.measured_at.desc(), AbilitySnapshot.snapshot_id)
+        .limit(1)
+        .scalar_subquery(),
+        select(func.array_agg(MisconceptionHypothesisRecord.id))
+        .where(
+            MisconceptionHypothesisRecord.user_id == user_id,
+            MisconceptionHypothesisRecord.is_active.is_(True),
+        )
+        .scalar_subquery(),
+    )
+    row = (await session.execute(stmt)).first()
+    # 스칼라 서브쿼리 SELECT는 실 DB에서 항상 1행이다. 행이 없으면(테스트 대역) 전부 부재로 읽는다.
+    concept_id, measured_at, snapshot_id, hypothesis_ids = (
+        row if row is not None else (None, None, None, None)
+    )
+    mastery = (
+        MasteryBasis(concept_id=concept_id, measured_at=measured_at)
+        if concept_id is not None and measured_at is not None
+        else None
+    )
+    return LearnerStateBasis(
+        assembled_at=assembled_at,
+        mastery=mastery,
+        ability_snapshot_id=snapshot_id,
+        # 순서는 의미가 없다(집합) — 기록이 재현되도록 문자열 순으로 고정한다.
+        misconception_hypothesis_ids=tuple(sorted(hypothesis_ids or (), key=str)),
     )

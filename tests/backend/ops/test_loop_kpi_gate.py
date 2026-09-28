@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,7 @@ from typing import Any
 import pytest
 
 from whymath_backend.l2 import learning_event_trace as trace
+from whymath_backend.l2.learner_state import LearnerStateBasis, MasteryBasis
 from whymath_backend.ops import loop_kpi_gate as gate
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -245,15 +247,14 @@ def test_zero_tolerance_pass_reports_residual_upper_bound() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 # 구조적 선결 — 사실을 원천 대장에서 읽는가 (acceptance ②)
 # ──────────────────────────────────────────────────────────────────────────
-def test_loop_completion_is_unblocked_and_traceability_still_blocked() -> None:
-    """EOS-131 착지 후: 세션 writer·추천 실 session_id 결합으로 ①의 선결이 **스스로** 풀렸다.
+def test_no_kpi_is_structurally_blocked_any_more() -> None:
+    """EOS-131·EOS-132 착지 후: ①·⑤의 선결이 **대장을 패치하지 않고** 스스로 풀렸다.
 
-    종전 단언(`blocked_preconditions(LOOP_COMPLETION)`이 비어 있지 않다 — 2026-09-19 main)의
-    반대 방향이다. ⑤는 LearnerState 시각 원천(user_state_snapshot DORMANT)이 남아 여전히 막혀
-    있다(EOS-132 소관) — 이것이 풀리면 이 단언과 `_REQUIRED_SOURCES`를 함께 갱신한다.
+    ①은 세션 writer·추천 실 session_id 결합(EOS-131)으로, ⑤는 LearnerState 홉 원천을 추천 기록의
+    근거로 옮기면서(EOS-132) 풀렸다. 종전 단언(⑤가 막혀 있다 — 2026-09-25 main)의 반대 방향이다.
     """
     assert gate.blocked_preconditions(gate.LoopKpi.LOOP_COMPLETION) == ()
-    assert gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY)
+    assert gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY) == ()
     for kpi in (
         gate.LoopKpi.STATE_INTEGRITY,
         gate.LoopKpi.EXPLAINABILITY,
@@ -272,16 +273,46 @@ def test_wiring_the_registry_unblocks_the_structural_kpis(monkeypatch: Any) -> N
     assert gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY) == ()
 
 
-def test_blocked_precondition_names_the_source_and_the_reason() -> None:
+def test_blocked_precondition_names_the_source_and_the_reason(monkeypatch: Any) -> None:
     """미측정 사유가 '미측정'이면 아무 정보도 아니다 — 어느 원천이 왜 막는지 말한다.
 
-    EOS-131 이후 ①은 막혀 있지 않으므로 여전히 막힌 ⑤로 같은 계약을 확인한다.
+    EOS-132 이후 실제로 막힌 KPI가 없으므로, ⑤의 원천 하나를 DORMANT로 되돌린 주입으로 같은
+    계약을 확인한다(막힌 원천의 이름·원천 테이블·상태·사유가 전부 문장에 실린다).
     """
-    blocked = gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY)
-    joined = " ".join(blocked)
-    assert "user_state_snapshot" in joined
+
+    def _state_dormant() -> tuple[trace.SourceCoverage, ...]:
+        return tuple(
+            (
+                c.model_copy(
+                    update={
+                        "availability": trace.SourceAvailability.DORMANT,
+                        "reason": "주입 사유 — writer 0건",
+                    }
+                )
+                if c.event_type is trace.TraceEventType.LEARNER_STATE_CREATED
+                else c
+            )
+            for c in trace.source_registry()
+        )
+
+    monkeypatch.setattr(gate, "source_registry", _state_dormant)
+    joined = " ".join(gate.blocked_preconditions(gate.LoopKpi.TRACEABILITY))
+    assert "learner_state_created(evidence_event)" in joined
     assert "dormant" in joined
-    assert "writer 0건" in joined
+    assert "주입 사유 — writer 0건" in joined
+
+
+def test_traceability_assessment_hop_is_the_mastery_row_not_the_assessment_table() -> None:
+    """EOS-132 ⑦ — Assessment 홉 원천은 근거 숙달 행이다(`assessment` 테이블 = 진단 세션 아님).
+
+    `problem_attempt`에 assessment 참조가 없어 진단 세션은 시도에 닿지 않는다. 그 테이블을 선결로
+    두면 체인과 무관한 원천이 ⑤를 막거나 풀게 된다.
+    """
+    required = gate._REQUIRED_SOURCES[gate.LoopKpi.TRACEABILITY]
+    assert trace.TraceEventType.MASTERY_UPDATED in required
+    assert trace.TraceEventType.LEARNER_STATE_CREATED in required
+    assert trace.TraceEventType.DIAGNOSTIC_COMPLETED not in required
+    assert trace.TraceEventType.DIAGNOSTIC_STARTED not in required
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -808,3 +839,249 @@ def test_schema_smoke_refuses_input_instead_of_ignoring_it(tmp_path: Path) -> No
     """스모크는 판정 전에 끝난다 — 조용히 무시하면 제출자는 자기 관측치가 쓰였다고 믿는다."""
     argv = ["--schema-smoke", "--input", _write_input(tmp_path, _clean_input())]
     assert gate.main(argv) == gate.EXIT_RUNTIME_ERROR
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-132 — KPI⑤ 역추적 판정기(순수 함수). 홉마다 **그 홉만 끊긴** 반례를 둔다.
+# ──────────────────────────────────────────────────────────────────────────
+_L = uuid.uuid4()  # 학습자
+_OTHER = uuid.uuid4()  # 다른 학습자
+_C = uuid.uuid4()  # 개념
+_A = uuid.uuid4()  # 시도
+_P = uuid.uuid4()  # 문항
+_S = uuid.uuid4()  # θ 스냅샷
+_H = uuid.uuid4()  # 오개념 가설
+_MEASURED = datetime(2026, 9, 28, 8, 0, 0, 123456, tzinfo=UTC)
+_SINCE = datetime(2026, 9, 28, 0, 0, tzinfo=UTC)
+_AFTER = _SINCE + timedelta(hours=9)
+
+
+def _basis(
+    *, mastery: bool = True, snapshot: bool = True, hypotheses: tuple[uuid.UUID, ...] = (_H,)
+) -> dict[str, Any]:
+    return LearnerStateBasis(
+        assembled_at=_AFTER,
+        mastery=MasteryBasis(concept_id=_C, measured_at=_MEASURED) if mastery else None,
+        ability_snapshot_id=_S if snapshot else None,
+        misconception_hypothesis_ids=hypotheses,
+    ).to_meta()
+
+
+def _rec(
+    meta: dict[str, Any] | None, *, learner: uuid.UUID | None = _L, time: datetime = _AFTER
+) -> gate.TraceRecommendation:
+    return gate.TraceRecommendation(time=time, meta=meta, learner_id=learner)
+
+
+def _lookups(**override: Any) -> gate.TraceLookups:
+    """전 홉이 이어진 조회 결과 — 각 테스트가 **한 홉만** 끊는다."""
+    base: dict[str, Any] = {
+        "mastery_attempt": {(_L, _C, _MEASURED): _A},
+        "attempts": {_A: (_L, _P)},
+        "problems": frozenset({_P}),
+        "snapshot_owner": {_S: _L},
+        "hypothesis_owner": {_H: _L},
+    }
+    base.update(override)
+    return gate.TraceLookups(**base)
+
+
+def _classify(
+    rec: gate.TraceRecommendation, lookups: gate.TraceLookups | None = None, since: Any = _SINCE
+) -> tuple[gate.TraceOutcome, gate.TraceBreak | None]:
+    return gate.classify_trace(rec, basis_since=since, lookups=lookups or _lookups())
+
+
+class TestTraceClassification:
+    """체인 추천 →① 학습자 →② LearnerState →③ Assessment →④ Attempt →⑤ Problem."""
+
+    def test_full_chain_is_traced(self) -> None:
+        assert _classify(_rec({"learner_state_basis": _basis()})) == (
+            gate.TraceOutcome.TRACED,
+            None,
+        )
+
+    def test_unjoined_learner_breaks_the_first_hop(self) -> None:
+        outcome = _classify(_rec({"learner_state_basis": _basis()}, learner=None))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.LEARNER_UNJOINED)
+
+    def test_first_broken_hop_wins(self) -> None:
+        # 학습자도 끊기고 근거도 없다 — 체인 순서상 앞의 홉 하나로만 센다.
+        outcome = _classify(_rec({"problem_id": "x"}, learner=None))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.LEARNER_UNJOINED)
+
+    @pytest.mark.parametrize(
+        "broken_mastery",
+        [
+            {"concept_id": "not-a-uuid", "measured_at": _MEASURED.isoformat()},
+            # 키가 빠진 근거 — 예외로 수집 전체를 멈추지 않고 이 추천 하나의 끊김으로 센다.
+            {"concept_id": str(_C)},
+        ],
+    )
+    def test_malformed_basis_is_a_break_not_a_guess(self, broken_mastery: dict[str, Any]) -> None:
+        bad = _basis()
+        bad["mastery"] = broken_mastery
+        outcome = _classify(_rec({"learner_state_basis": bad}))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.BASIS_MALFORMED)
+
+    @pytest.mark.parametrize(
+        "lookups",
+        [
+            _lookups(snapshot_owner={}),  # 스냅샷 행 없음
+            _lookups(snapshot_owner={_S: _OTHER}),  # 다른 학생의 스냅샷
+            _lookups(hypothesis_owner={}),  # 가설 행 없음
+            _lookups(hypothesis_owner={_H: _OTHER}),  # 다른 학생의 가설
+            _lookups(hypothesis_owner={_H: None}),  # 소유자 없는 가설
+        ],
+    )
+    def test_basis_rows_must_exist_for_this_learner(self, lookups: gate.TraceLookups) -> None:
+        outcome = _classify(_rec({"learner_state_basis": _basis()}), lookups)
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.BASIS_ROW_MISSING)
+
+    def test_missing_mastery_row_breaks_the_assessment_hop(self) -> None:
+        outcome = _classify(_rec({"learner_state_basis": _basis()}), _lookups(mastery_attempt={}))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.ASSESSMENT_MISSING)
+
+    def test_mastery_row_is_looked_up_by_the_exact_measurement_instant(self) -> None:
+        # 1µs만 달라도 다른 행이다 — 근처 행을 대신 잡으면 없는 연결을 만든다.
+        shifted = {(_L, _C, _MEASURED + timedelta(microseconds=1)): _A}
+        outcome = _classify(
+            _rec({"learner_state_basis": _basis()}), _lookups(mastery_attempt=shifted)
+        )
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.ASSESSMENT_MISSING)
+
+    @pytest.mark.parametrize(
+        "lookups",
+        [
+            _lookups(mastery_attempt={(_L, _C, _MEASURED): None}),  # EOS-108 이전 적재(NULL)
+            _lookups(attempts={}),  # 시도 행 없음
+            _lookups(attempts={_A: (_OTHER, _P)}),  # 다른 학생의 시도
+        ],
+    )
+    def test_attempt_hop(self, lookups: gate.TraceLookups) -> None:
+        outcome = _classify(_rec({"learner_state_basis": _basis()}), lookups)
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.ATTEMPT_MISSING)
+
+    @pytest.mark.parametrize(
+        "lookups",
+        [
+            _lookups(attempts={_A: (_L, None)}),  # 시도에 문항 없음
+            _lookups(problems=frozenset()),  # 문항 행 없음
+        ],
+    )
+    def test_problem_hop(self, lookups: gate.TraceLookups) -> None:
+        outcome = _classify(_rec({"learner_state_basis": _basis()}), lookups)
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.PROBLEM_MISSING)
+
+    def test_no_mastery_history_ends_the_chain_normally(self) -> None:
+        # 사전값 추천 — ③~⑤는 해당 없음. 조회 결과가 비어 있어도 끊김이 아니다.
+        outcome = _classify(
+            _rec({"learner_state_basis": _basis(mastery=False)}),
+            _lookups(mastery_attempt={}, attempts={}, problems=frozenset()),
+        )
+        assert outcome == (gate.TraceOutcome.TRACED_PRIOR, None)
+
+
+class TestKnowingVersusAbsent:
+    """EOS-132 ⑧ 실패 주입 1쌍 — "근거 없음(사유)"과 "근거 필드 부재"를 같은 글자로 세지 않는다."""
+
+    def test_absent_ability_with_a_reason_is_not_a_break(self) -> None:
+        outcome = _classify(
+            _rec({"learner_state_basis": _basis(snapshot=False)}), _lookups(snapshot_owner={})
+        )
+        assert outcome == (gate.TraceOutcome.TRACED, None)
+
+    def test_missing_basis_field_after_the_cutover_is_a_break(self) -> None:
+        outcome = _classify(_rec({"problem_id": str(_P)}))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.BASIS_MISSING)
+
+
+class TestPreBasisCutover:
+    """EOS-132 ⑥ — 근거 기록 개시 이전의 기록은 소급 불가라 빼되, 조용히 빼지 않는다."""
+
+    def test_record_before_the_cutover_is_excluded(self) -> None:
+        outcome = _classify(_rec({"problem_id": "x"}, time=_SINCE - timedelta(seconds=1)))
+        assert outcome == (gate.TraceOutcome.EXCLUDED_PRE_BASIS, None)
+
+    def test_record_exactly_at_the_cutover_is_judged(self) -> None:
+        outcome = _classify(_rec({"problem_id": "x"}, time=_SINCE))
+        assert outcome == (gate.TraceOutcome.BROKEN, gate.TraceBreak.BASIS_MISSING)
+
+    def test_no_basis_anywhere_excludes_everything_without_a_basis(self) -> None:
+        outcome = _classify(_rec({"problem_id": "x"}), since=None)
+        assert outcome == (gate.TraceOutcome.EXCLUDED_PRE_BASIS, None)
+
+    def test_a_record_with_a_basis_is_never_excluded(self) -> None:
+        outcome = _classify(
+            _rec({"learner_state_basis": _basis()}, time=_SINCE - timedelta(days=1)), since=None
+        )
+        assert outcome == (gate.TraceOutcome.TRACED, None)
+
+
+class _TraceSession:
+    """`collect_traceability`의 두 조회만 흉내 — 개시 시각(scalar)과 관측창 추천 행(execute)."""
+
+    def __init__(self, since: datetime | None, rows: list[tuple[Any, ...]]) -> None:
+        self._since = since
+        self._rows = rows
+
+    async def scalar(self, _stmt: Any) -> datetime | None:
+        return self._since
+
+    async def execute(self, _stmt: Any) -> Any:
+        rows = self._rows
+
+        class _Result:
+            def all(self) -> list[tuple[Any, ...]]:
+                return rows
+
+        return _Result()
+
+
+class TestTraceabilityAggregation:
+    """집계 — 분자는 끊긴 추천 수, 분모는 개시 이후 추천 수, 뺀 것과 끊긴 홉은 detail로."""
+
+    async def test_numerator_denominator_and_detail(self, monkeypatch: Any) -> None:
+        rows = [
+            (_AFTER, {"learner_state_basis": _basis()}, _L),  # 이어짐
+            (_AFTER, {"learner_state_basis": _basis(mastery=False)}, _L),  # 사전값
+            (_AFTER, {"problem_id": "x"}, _L),  # 근거 부재 → 끊김
+            (_AFTER, {"learner_state_basis": _basis()}, None),  # 학습자 끊김
+            (_SINCE - timedelta(hours=1), {"problem_id": "y"}, _L),  # 개시 이전 → 제외
+        ]
+
+        async def _fixed_lookups(_session: Any, _recs: Any) -> gate.TraceLookups:
+            return _lookups()
+
+        monkeypatch.setattr(gate, "_trace_lookups", _fixed_lookups)
+        observation = await gate.collect_traceability(
+            _TraceSession(_SINCE, rows), _WINDOW  # type: ignore[arg-type]
+        )
+        assert (observation.numerator, observation.denominator) == (2, 4)
+        detail = dict(observation.detail or {})
+        assert detail["recommendations_in_window"] == 5
+        assert detail["excluded_pre_basis"] == 1
+        assert detail["traced_full"] == 1
+        assert detail["traced_prior_only"] == 1
+        assert detail["break_basis_missing"] == 1
+        assert detail["break_learner_unjoined"] == 1
+        # 끊긴 홉 계수의 합이 곧 분자다(한 추천을 두 번 세지 않는다).
+        assert sum(v for k, v in detail.items() if k.startswith("break_")) == 2
+        assert {f"break_{b.value}" for b in gate.TraceBreak} <= set(detail)
+
+    async def test_window_before_the_cutover_is_unmeasured_not_passed(
+        self, monkeypatch: Any
+    ) -> None:
+        rows = [(_SINCE - timedelta(hours=2), {"problem_id": "x"}, _L)] * 3
+
+        async def _no_lookups(_session: Any, _recs: Any) -> gate.TraceLookups:
+            return _lookups()
+
+        monkeypatch.setattr(gate, "_trace_lookups", _no_lookups)
+        observation = await gate.collect_traceability(
+            _TraceSession(_SINCE, rows), _WINDOW  # type: ignore[arg-type]
+        )
+        assert (observation.numerator, observation.denominator) == (0, 0)
+        assert dict(observation.detail or {})["excluded_pre_basis"] == 3
+        outcome = _evaluate_one(observation)
+        assert outcome.verdict is gate.KpiVerdict.unmeasured  # 0건 통과로 위장하지 않는다
