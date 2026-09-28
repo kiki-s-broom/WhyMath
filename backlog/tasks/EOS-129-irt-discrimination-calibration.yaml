@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - src/backend/whymath_backend/l2/item_calibration.py
   - src/backend/whymath_backend/l2/irt.py
   - src/backend/whymath_backend/l2/next_problem_selection.py
-session: null
+session: claude/focused-ramanujan-2p5q8w
 notes: "출처: EOS-126(CAT 중단 규칙 도달 비용) 해소 중 실측 발견. EOS-126은 문항 수 상한(2차 중단 규칙)으로 학습 진입 차단을 풀었으나, 그것은 도달 비용을 *우회*한 것이지 *줄인* 것이 아니다. 수렴 속도 자체를 올리는 축(EOS-126 처분 3택의 '나')이 이 태스크다.\n\nEOS-126이 (나)를 고르지 않은 이유: a 추정 경로가 저장소에 없고 문항당 응답 축적이 선행돼야 해 그 회차에 실행 불가였다. (가) 임계 완화는 acceptance ③의 금지선(측정 근거 상실)이라 배제했고, 남은 (다)를 집행하며 이 태스크를 근본 원인 후속으로 분리했다.\n\n코드 참조: `l2/next_problem_selection.py`의 MAX_ADMINISTERED_ITEMS 주석이 이 id를 인용한다."
-updated: 2026-09-22
+updated: 2026-09-28
