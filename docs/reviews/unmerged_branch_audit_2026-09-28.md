@@ -248,11 +248,14 @@ SessionStart 브리핑은 EOS-129를 **다음 착수 후보 1위**로 내놓았�
    - `HARN-186` — `claims reap` 판정 순서: 태스크 부재가 홀더 브랜치 소멸을 가려 고아 claim이
      자동 청소를 빠져나간다(아래 ①).
    - `HARN-187` — 미머지 부분 이행 비가시(§5).
-3. **사고 대장 3건** — `parallel-duplicate-implementation` 10회차 · `orphan-claim-reap-blindspot`
+3. **사고 대장 4건** — `parallel-duplicate-implementation` 10회차 · `orphan-claim-reap-blindspot`
    (12회차 관측과 합치면 2회차 — `series_raw`에 명기) · `derived-index-not-rebuilt` **2회차**(이 감사 자신의
    검증에서 발생: 위 두 건을 `incident add`로 쓴 뒤 `backlog/jit_index.json`을 재생성하지 않아 로컬 CI 미러의
    harness-integrity가 "적시 주입 인덱스 대조"에서 exit 1 · 뒤 스텝 7건 미실행. 푸시 전 발견 · origin/main
-   워크트리 대조로 원인 확정 · `backlog.py jit build`로 재생성 · 대책 태스크 `HARN-179`는 이미 등재돼 있다).
+   워크트리 대조로 원인 확정 · `backlog.py jit build`로 재생성 · 대책 태스크 `HARN-179`는 이미 등재돼 있다) ·
+   `harness-test-live-ledger-write` **7회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
+   `scripts/harness/backlog.py`에 대한 가짜 `policy_warn` 3줄을 씀 — 커밋본 앞부분 바이트 동일·추가분 전부 가짜임을
+   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 7회 재발했는데 아직 우선순위 3·EOS P2다).
 4. **직전 배치 집행 확인** — 잔존 0/8.
 
 ### ① claim 대장 이상의 원인 — 12회차가 "보고만" 한 건

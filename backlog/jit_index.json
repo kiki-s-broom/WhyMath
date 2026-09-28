@@ -3719,6 +3719,15 @@
    ],
    "text": "incident add 2건 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 7건 미실행(푸시 전 발견)",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness(CI 미러) 실행이 세션 샤드에 가짜 policy_warn 3줄(scripts/harness/backlog.py) 기록 — 커밋 전 제거",
+   "weight": 0
   }
  ]
 }
