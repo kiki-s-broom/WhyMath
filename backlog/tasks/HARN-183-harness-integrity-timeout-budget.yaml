@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: cancelled
 priority: 1
 eos_priority: P1
 owner: claude
@@ -21,5 +21,5 @@ paths:
   - ".github/workflows/ci.yml"
   - scripts/analysis/measure_backend_job_timeout_headroom.py
 session: null
-notes: "출처: PR #1344(ARCH-41) 대기열 실패 원인 규명(2026-09-28 · claude/brave-ptolemy-y9p65p). 같은 날 #1341도 같은 형태로 취소됐고 재시도에서 통과했다 — 재등록은 우회일 뿐 원인 해소가 아니다. 대기열은 모든 PR의 필수 경로이므로 이 결함은 특정 PR이 아니라 저장소 전체의 머지 처리량을 확률적으로 깎는다. 경계: OPS-47은 backend 잡의 시간 여유를, HARN-170은 tests/harness의 실저장소 쓰기 누출을 다룬다 — 이 태스크는 harness-integrity 잡의 시간 예산이다(병렬 실행 축을 고르면 HARN-170과 선후 관계가 생긴다)"
+notes: "출처: PR #1344(ARCH-41) 대기열 실패 원인 규명(2026-09-28 · claude/brave-ptolemy-y9p65p). 같은 날 #1341도 같은 형태로 취소됐고 재시도에서 통과했다 — 재등록은 우회일 뿐 원인 해소가 아니다. 대기열은 모든 PR의 필수 경로이므로 이 결함은 특정 PR이 아니라 저장소 전체의 머지 처리량을 확률적으로 깎는다. 경계: OPS-47은 backend 잡의 시간 여유를, HARN-170은 tests/harness의 실저장소 쓰기 누출을 다룬다 — 이 태스크는 harness-integrity 잡의 시간 예산이다(병렬 실행 축을 고르면 HARN-170과 선후 관계가 생긴다)\n\n[취소 2026-09-28] 중복 등재 — 같은 문제를 타 세션이 10분 먼저 OPS-69-harness-integrity-timeout-budget로 등재·착수했다(2026-09-28 08:05:31Z · 브랜치 claude/harness-integrity-timeout · 슬러그 harness-integrity-timeout-budget까지 동일). 그쪽 notes의 Kiki 결정(같은 날): 별도 수정 PR을 만들어 먼저 머지한다 — OPS-69가 정본이다. 이 태스크는 08:15Z에 등재됐고, 그때 add의 의미 중복 고지는 OPS-69를 보지 못했다(원인은 사고 대장 parallel-duplicate-implementation 계열 · 대책 HARN-111 ⑦). 이 태스크에만 있던 실측 ②(PR 기여 배제: main a0e60965 317.8초 대 대기열 커밋 3a557592 314.5초, 둘 다 1268 passed·1 skipped)는 PR #1344 코멘트에 남아 있다. ③의 소요 감축·여유 측정 일반화 축은 OPS-69 acceptance에 없다 — 필요 여부는 OPS-69 착지 후 그 세션의 재발방지 판단에 맡기고, 중복 대장을 만들지 않기 위해 이 태스크로 추적하지 않는다."
 updated: 2026-09-28
