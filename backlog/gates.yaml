@@ -199,7 +199,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
   - id: G-const-sources-registry-adopt
