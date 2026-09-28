@@ -11394,3 +11394,14 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 - **⑩ 해소율**: 현행 산식이 `DECAYED`를 분자로 세므로 과대 해석이 정답 회차로 넓어진다 — 산식 전환 소유자가 없어 `MISC-39` 등재.
 - **더 큰 비대칭**: 채점 경로 가설은 증거 그래프 지지가 0이라 코치 clean 1턴에 REFUTED(`MISC-37`) · 재활성화 시 `evidence_count` 리셋(`MISC-38`).
 - **사고 1건(피해 0)**: 통합 테스트를 `WHYMATH_RUN_INTEGRATION` 없이 `-m integration`으로 돌려 `2 skipped`·exit 0 — 판정 줄을 읽어 발견. `nondiscriminating-check` 계열이라 대장 기록 + 코드 대책 태스크 `OPS-99` 등재. 이 PR의 뮤테이션 하네스는 서빙 경로 skip을 판정 불가로 센다.
+
+### 2026-09-28 — PR #1352 머지 후속: EOS-129·EOS-137 병렬 중복 경위 + 게이트 ID 중복 무검출(HARN-192) — 판정 기준 main `e674f6d7`
+
+- **머지**: #1352가 main `e674f6d7`로 머지됐다(머지 큐 CI 17잡 성공). SEC-38 done · EOS-137 ②·EOS-129 ⑤는 Kiki 게이트 대기.
+- **병렬 중복(이 세션이 원인 제공)**: 이 세션은 EOS-129·EOS-137에서 `start` → `gates add` → `amend`(requires_gates) → `unblock`(원격 claim 반납) 순서를 밟았다. 게이트 부착은 미머지 브랜치에만 있어 main 기준으로는 두 태스크가 게이트 없는 착수 후보로 보였다.
+  - EOS-129: 07:14Z 첫 세션이 PR #1346으로 ⑤ 실측 도구·게이트 `G-eos129-item-response-census`를 만들고 claim을 반납했다. 이 세션은 그것을 보지 못하고 11:28Z 같은 ⑤용 게이트 `G-eos129-prod-response-distribution`을 따로 만들었다(두 번째 중복). 세 번째 세션이 PR #1358로 ③을 구현하며 **같은 ID의 게이트를 다른 정의로** 또 추가했다.
+  - EOS-137: 이 세션이 ①③④를 구현한 뒤 12:38Z claim을 반납했고, 13:46Z 다른 세션(`claude/busy-franklin-q5s7f4`)이 재착수해 ①을 다시 구현했다(미푸시 관측).
+- **대책 소유**: 원인 축은 `HARN-186-unmerged-gate-attach-claim-release-gap`(타 세션 등재 · 미머지)이 소유한다. 이 세션이 등재한 `HARN-191`은 `add`의 의미 중복 고지로 등재 직후 발견해 취소했다. 새 축 `HARN-192-gate-id-duplicate-validate`: `validate`가 게이트 ID 중복을 잡지 않는다 — 격리 사본에 같은 블록을 주입하자 exit 0이었고 뒤 정의가 앞 정의를 조용히 덮어썼다.
+- **사고 대장**: `parallel-duplicate-implementation` 11회차(이 브랜치 기준)로 EOS-137 실현분만 기록했다. EOS-129분은 HARN-186·187 브랜치의 기록과 겹치지 않게 따로 적지 않았다.
+- **남은 판단(Kiki)**: EOS-129 ⑤의 게이트가 셋이다 — main의 `G-eos129-prod-response-distribution`(SQL 런북) · #1346의 `G-eos129-item-response-census`(도구·가드 런북) · #1358의 같은 ID 다른 정의(dry-run CLI). HARN-187 판정문은 #1346을 상위 집합으로 봤다(읽어서 그렇게 보인다 — 실행 대조 없음). 하나로 정리해야 한다. EOS-137을 다시 구현 중인 세션은 중단을 권한다.
+- **교훈**: 게이트를 붙인 직후의 `unblock`은 다른 세션에게 "대기"가 아니라 "빈 자리"로 읽힌다. HARN-186이 집행되기 전까지는 게이트 부착이 trunk에 닿기 전에 claim을 반납하지 않는다(사람 규율).
