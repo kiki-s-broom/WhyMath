@@ -83,6 +83,9 @@ from whymath_backend.harness.qa_pipeline import (
     CORPUS_LEVEL_ONLY_AXES,
     ITEM_AXIS_SCOPE,
     ITEM_LEVEL_AXES,
+    ITEM_REQUIRED_AXES,
+    ITEM_SEAT_AXES,
+    ITEM_VERIFICATION_SCOPE,
     judge_item,
 )
 from whymath_backend.harness.review_session import load_review_items
@@ -280,7 +283,7 @@ def build_item_verdicts(inputs: Sequence[Path]) -> AdapterResult:
         )
 
     verdicts: list[ItemVerdictRow] = []
-    axis_counts: dict[str, Counter[str]] = {name: Counter() for name in ITEM_LEVEL_AXES}
+    axis_counts: dict[str, Counter[str]] = {name: Counter() for name in ITEM_SEAT_AXES}
     for slug in sorted(chosen):
         candidate = chosen[slug]
         if candidate.payload is None:
@@ -312,7 +315,7 @@ def build_item_verdicts(inputs: Sequence[Path]) -> AdapterResult:
             detail = "; ".join(
                 f"{name}: {judgement.axes[name].reason or '사유 미기재'}"
                 for name in judgement.unjudgeable_axes
-            )
+            ) or "; ".join(f"{name}: 필수 성분 미확인" for name in judgement.missing_required_axes)
             unjudgeable.append(
                 UnjudgeableItem(
                     cu_slug=slug,
@@ -358,10 +361,13 @@ def _summary(result: AdapterResult, inputs: Sequence[Path], out: Path) -> dict[s
         "engine_scope": {
             "item_level_axes": list(ITEM_LEVEL_AXES),
             "item_axis_scope": dict(ITEM_AXIS_SCOPE),
+            "item_verification_scope": dict(ITEM_VERIFICATION_SCOPE),
+            "item_required_axes": list(ITEM_REQUIRED_AXES),
             "corpus_level_only_axes": dict(CORPUS_LEVEL_ONLY_AXES),
             "total_axes": len(AXIS_NAMES),
             "note": (
-                f"pass = 문항 단위 {len(ITEM_LEVEL_AXES)}축이 이의 없음(9축 전부 통과가 아니다) — "
+                "pass = 정답 재검산 통과 + 문항 단위 "
+                f"{len(ITEM_LEVEL_AXES)}축이 이의 없음(9축 전부 통과가 아니다) — "
                 "골든 대비 FN율은 이 좌석의 FN율이다"
             ),
         },

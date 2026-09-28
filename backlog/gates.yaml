@@ -406,8 +406,10 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
-    no_inputs_reason: "골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다"
+    corrections:
+      - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
+    depends_on:
+      - EOS-150
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision
