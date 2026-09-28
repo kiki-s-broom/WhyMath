@@ -2076,6 +2076,27 @@
    "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
+    "src/backend/whymath_backend/api/admin_bff.py",
+    "src/backend/whymath_backend/app.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/harness/provider_accuracy_battle.py",
+    "src/backend/whymath_backend/l3/providers/anthropic.py",
+    "src/backend/whymath_backend/ops/cost_probe.py",
+    "src/backend/whymath_backend/ops/live_preflight.py",
+    "tests/backend/harness/test_provider_accuracy_battle.py",
+    "tests/backend/l3/test_anthropic_provider.py",
+    "tests/backend/ops/test_cost_probe.py",
+    "tests/backend/ops/test_live_preflight.py",
+    "tests/backend/test_anthropic_policy_block_surfaces.py",
+    "tests/backend/test_config.py"
+   ],
+   "text": "ARCH-66 원인 구분 선언이 운영 표면에 미집행 — 키가 있는데 preflight·정확도 대결이 '키 없음' 출력",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
     "backlog/gates.yaml",
     "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
