@@ -896,7 +896,10 @@ class TestTraceClassification:
     """체인 추천 →① 학습자 →② LearnerState →③ Assessment →④ Attempt →⑤ Problem."""
 
     def test_full_chain_is_traced(self) -> None:
-        assert _classify(_rec({"learner_state_basis": _basis()})) == (gate.TraceOutcome.TRACED, None)
+        assert _classify(_rec({"learner_state_basis": _basis()})) == (
+            gate.TraceOutcome.TRACED,
+            None,
+        )
 
     def test_unjoined_learner_breaks_the_first_hop(self) -> None:
         outcome = _classify(_rec({"learner_state_basis": _basis()}, learner=None))
