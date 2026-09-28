@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-28 (판정·착지 · EOS-132): **KPI ⑤의 LearnerState 홉은 추천 기록에 남긴 근거로 되짚는다 — Assessment 홉은 `assessment` 테이블이 아니라 근거 숙달 행이고, 근거 기록 이전의 추천은 소급 불가로 빼되 따로 센다** (claude 판정·구현) — 판정 기준 main `a0e60965`
+
+- **발단**: ⑤는 LearnerState 홉 원천(`user_state_snapshot`)이 writer 0건 빈 좌석이라 구조적 미측정이었고, 분자 쿼리는 소유자 없이 비어 있었다(2026-09-24 결정 4의 집행).
+- **결정 1 — 근거는 추천을 기록할 때 한 문장으로 읽는다**: 최신 숙달 행 키 `(concept_id, measured_at)` · 전과목 θ 스냅샷 id · 활성 가설 행 id를 스칼라 서브쿼리 SELECT 하나로 읽어(세 근거가 같은 스냅샷) 조립 시각과 함께 `meta.learner_state_basis`에 싣는다. `get_state`에 합치지 않았다 — 학습·코치·상태 조회까지 조회 수가 늘기 때문이다. 대가: `get_state`와는 별도 문장이라 그 사이 같은 학생의 채점이 커밋되면 근거가 측정 한 번 앞선 행을 가리킬 수 있다(행은 실재하므로 역추적은 성립).
+- **결정 2 — Assessment 홉 = 근거 숙달 행의 귀속(개념 × 시도)**: 실측 — `problem_attempt`에 assessment 참조가 없어 진단 세션은 시도에 닿지 않고, EOS-79 4층 경계가 "`assessment` 테이블은 Assessment 층이 아니다"를 이미 정본화했다. 그래서 `_REQUIRED_SOURCES` ⑤의 `DIAGNOSTIC_COMPLETED`를 `MASTERY_UPDATED`로 바로잡았다. 채점되는 모든 시도(`/me/attempts`·코치 완료)가 `attempt_id`를 채운 숙달 행을 남긴다(EOS-108 이후) — EOS-108 이전 NULL 행을 근거로 삼은 추천은 끊김(`attempt_missing`)으로 센다.
+- **결정 3 — 근거 기록 개시는 데이터에서 읽는다**: 근거가 실린 첫 추천의 시각(전역 최솟값). 그 이전 기록은 분모에서 빼고 `detail.excluded_pre_basis`로 보고, 이후의 근거 부재는 끊김이다. 코드 상수로 두면 배포 전후 하루가 미달이 되거나 진짜 회귀가 제외로 삼켜진다. 대가: 기록 경로가 처음부터 근거를 안 쓰면 ⑤는 미달이 아니라 미측정에 머문다 — 이 축은 서빙 경로 통합테스트(실 HTTP 추천 → 근거 = DB 최신 숙달 행)가 CI에서 막는다.
+- **결정 4 — "근거 없음"과 "근거 모름"을 가른다**: 비어 있는 근거는 `absent` 사유(`no_mastery_history`·`no_ability_snapshot`)로 적고 끊김이 아니다(사전값 추천은 ③~⑤ 해당 없음). 근거 키 자체가 없는 기록은 끊김(`basis_missing`)이다. 기록 경로는 근거를 받지 못하면 키를 **넣지 않는다**(null 금지).
+- **부수**: `TraceSource.USER_STATE_SNAPSHOT`을 트레이스 어휘에서 지웠다 — PR이 main에 들어가면 ARCH-51 처분이 ⑤를 막지 않는다(ARCH-51 acceptance 교차 기록). 새 되읽기 테스트가 결함 1건을 잡았다 — 키가 빠진 근거가 `KeyError`로 새어 ⑤ 수집 전체를 멈출 수 있었다(형식 불량 끊김으로 계상하도록 수정).
+- **정직한 공백**: 운영 DB에서 ⑤를 재지 않았다(근거가 실린 추천이 쌓여야 분모가 생긴다). 관측창 안에서 삭제권이 이행되면 `learner_unjoined`로 미달이 나온다 — 알려진 사각이며 리포트의 `coverage_note`가 항상 함께 말한다.
 ### 2026-09-28 (결정·착지 · CONST-02 / Kiki 지시 2026-09-26): **코딩 헌법을 이식 1단계로 설치하고 2단계 규칙(R0-01 AI의 헌법 수정 차단)의 집행 장치까지 착지 — 헌법 파일은 원본 바이트 동일, 정정·상향·A0002 채택은 초안 + 사람 전용 채택 도우미 + 런북으로 Kiki에게 넘겼다. 기계 검증은 CI(래칫·파이프라인·가드 자가시험), 사람 검증은 진단 S00~S10 게이트** (Kiki 지시, claude 조사·구현) — 판정 기준 main `a0e60965`
 
 - **무엇이 들어왔나**: `constitution/`(헌법 11개 조·규칙 14·원본 9·STAGE=1·A0001·P0001) · `docs/standard-book/`(48장) · `scripts/constitution/`(심사 도구 패치 5종·래칫·가드 자가시험·채택 도우미·진단 도구 7종 벤더링·러너) · `.claude/hooks/guard_constitution.py`(PreToolUse) · `pipeline.yaml` 28노드 · 래칫 기준선(단계 1·차단 7) · CI `harness-integrity` 스텝 3개 · `tests/infra/test_coding_constitution_*.py` 5파일 107건.
