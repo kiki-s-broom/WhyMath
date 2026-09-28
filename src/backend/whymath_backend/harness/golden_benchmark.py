@@ -564,25 +564,38 @@ def load_golden_set(path: Path) -> GoldenSet:
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True, slots=True)
 class EvaluationRecord:
-    """평가 1회의 기록 — (골든 digest, 엔진 리비전, 시각)."""
+    """평가 1회의 기록 — (골든 digest, 엔진 리비전, 시각) + 판정기·지표(EOS-137 ③④).
+
+    `predictor`·`metrics`는 표류 시계열을 **원장만으로** 읽게 하는 필드다
+    (`golden_benchmark_contract.md` §9). 옛 행에는 없으므로 기본값은 비어 있음(""/None)이고,
+    비어 있으면 원장에 쓰지 않는다 — 옛 형식 행과 바이트 단위로 같다.
+    """
 
     digest: str
     engine_revision: str
     evaluated_at: datetime
     golden_version: str = ""
     rotation: int = 0
+    predictor: str = ""
+    """판정기 식별자(예: `qa_pipeline.item_verdict/v1`) — 어느 판정기의 점인지. 빈 값 = 옛 행."""
+    metrics: Mapping[str, Any] | None = None
+    """혼동행렬 4칸·적재율·Wilson 경계 — 시계열의 값. None = 옛 행(지표 미기록)."""
 
 
 def append_evaluation_ledger(path: Path, record: EvaluationRecord) -> None:
     """원장 1줄 append + 즉시 flush — 마지막 일괄 저장 금지(중간 중단에도 증거 잔존)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    row = {
+    row: dict[str, Any] = {
         "digest": record.digest,
         "engine_revision": record.engine_revision,
         "evaluated_at": record.evaluated_at.isoformat(),
         "golden_version": record.golden_version,
         "rotation": record.rotation,
     }
+    if record.predictor:
+        row["predictor"] = record.predictor
+    if record.metrics is not None:
+        row["metrics"] = dict(record.metrics)
     with path.open("a", encoding="utf-8") as fp:
         fp.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
         fp.flush()
@@ -601,6 +614,9 @@ def load_evaluation_ledger(path: Path) -> tuple[list[EvaluationRecord], list[str
                 continue
             try:
                 row = json.loads(text)
+                metrics = row.get("metrics")
+                if metrics is not None and not isinstance(metrics, dict):
+                    raise TypeError("metrics가 객체가 아님")
                 records.append(
                     EvaluationRecord(
                         digest=str(row["digest"]),
@@ -608,6 +624,8 @@ def load_evaluation_ledger(path: Path) -> tuple[list[EvaluationRecord], list[str
                         evaluated_at=datetime.fromisoformat(str(row["evaluated_at"])),
                         golden_version=str(row.get("golden_version", "")),
                         rotation=int(row.get("rotation", 0)),
+                        predictor=str(row.get("predictor", "")),
+                        metrics=metrics,
                     )
                 )
             except (ValueError, TypeError, KeyError) as exc:

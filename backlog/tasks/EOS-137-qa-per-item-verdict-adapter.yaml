@@ -5,12 +5,13 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-eos137-first-qa-eval-run
 acceptance:
   - "① 문항별 판정 어댑터 — 코퍼스 JSONL(축적 회차 코퍼스 포함 · problem_bank_* glob에 묶이지 않고 경로 지정)을 받아 QA 엔진이 문항마다 내린 pass/fail을 golden_benchmark_contract.md가 정한 predictions 형식(cu_slug · qa_verdict)으로 낸다. 판정은 기존 QA 엔진 경로를 재사용한다(재구현 금지) — harness/qa_pipeline에 문항 단위 판정 좌석이 없으면 그 좌석부터 만든다. 판정 불가 문항은 pass로 채우지 않고 사유와 함께 별도 집계한다(미측정 ≠ 통과)."
   - "② 첫 평가 — MP-03이 동결한 골든 v1(rotation 0)로 ops/qa_confusion_matrix를 --ledger --engine-revision과 함께 1회 돌려 평가 원장 첫 행과 혼동행렬 JSON을 남긴다. 골든·코퍼스가 Kiki 머신 데이터라 실행은 런북으로 드리고, 결과 수치(재현율·FN 상한·커버리지)를 MEMORY에 적는다."
@@ -23,6 +24,12 @@ paths:
   - src/backend/whymath_backend/ops/qa_confusion_matrix.py
   - "tests/backend/harness/test_qa_*.py"
   - tests/backend/ops/test_qa_confusion_matrix.py
-session: null
-notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_benchmark는 정답지를 동결할 뿐 append 원장이 없고, 저장소의 유일한 append 원장(qa_confusion_matrix의 평가 원장)은 --predictions를 요구하는데 그것을 만드는 도구가 저장소에 0건이다(qa_verdict 키는 그 모듈·테스트·계약 문서에만 나온다). 그래서 MP-03 ④의 첫 레코드는 동결 지문(버전·회전·동결 시각·digest·라벨 분포)으로 한정되고 QA 엔진 FN율은 측정 불가로 남는다. EOS-60(done)이 골든·혼동행렬 계산기를 만들었으나 입력 생산자는 범위 밖이었던 것으로 읽힌다(읽어서 그렇게 보인다 — EOS-60 acceptance 전수 대조는 이 태스크 착수 시 수행)."
-updated: 2026-09-25
+  - src/backend/whymath_backend/harness/golden_benchmark.py
+  - tests/backend/harness/test_golden_benchmark.py
+  - docs/standards/golden_benchmark_contract.md
+  - docs/ops/eos137_first_qa_eval_runbook.md
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+session: claude/busy-franklin-q5s7f4
+notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_benchmark는 정답지를 동결할 뿐 append 원장이 없고, 저장소의 유일한 append 원장(qa_confusion_matrix의 평가 원장)은 --predictions를 요구하는데 그것을 만드는 도구가 저장소에 0건이다(qa_verdict 키는 그 모듈·테스트·계약 문서에만 나온다). 그래서 MP-03 ④의 첫 레코드는 동결 지문(버전·회전·동결 시각·digest·라벨 분포)으로 한정되고 QA 엔진 FN율은 측정 불가로 남는다. EOS-60(done)이 골든·혼동행렬 계산기를 만들었으나 입력 생산자는 범위 밖이었던 것으로 읽힌다(읽어서 그렇게 보인다 — EOS-60 acceptance 전수 대조는 이 태스크 착수 시 수행).\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py'] → ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py', 'src/backend/whymath_backend/harness/golden_benchmark.py', 'tests/backend/harness/test_golden_benchmark.py', 'docs/standards/golden_benchmark_contract.md', 'docs/ops/eos137_first_qa_eval_runbook.md']: ③ 결정(원장 행에 판정기·지표 적재)의 집행 지점이 golden_benchmark.EvaluationRecord이고, 결정 문서는 계약 정본 §9, ② 실행은 런북 — 착수 실측으로 범위 확정\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py', 'src/backend/whymath_backend/harness/golden_benchmark.py', 'tests/backend/harness/test_golden_benchmark.py', 'docs/standards/golden_benchmark_contract.md', 'docs/ops/eos137_first_qa_eval_runbook.md'] → ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py', 'src/backend/whymath_backend/harness/golden_benchmark.py', 'tests/backend/harness/test_golden_benchmark.py', 'docs/standards/golden_benchmark_contract.md', 'docs/ops/eos137_first_qa_eval_runbook.md', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py']: 신규 모듈 harness.qa_item_verdict의 전수 귀속 — infra-contracts 인벤토리(WM-O-905)와 선언≠배선 감사 by-design 면제에 등재\n\n[정정 2026-09-28] acceptance ② 첫 평가는 Kiki 머신 데이터(골든 v1·카나리 검수 큐)라 런북 실행 게이트로 분리"
+updated: 2026-09-28

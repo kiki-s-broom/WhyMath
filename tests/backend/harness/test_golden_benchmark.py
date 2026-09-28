@@ -429,6 +429,72 @@ class TestEvaluationLedger:
         assert records == []
         assert len(errors) == 1 and "KeyError" in errors[0]
 
+    def test_predictor_and_metrics_round_trip(self, tmp_path: Path) -> None:
+        """EOS-137 ③ — 원장 행이 판정기·지표를 실어 시계열을 원장만으로 읽는다."""
+        path = tmp_path / "ledger.jsonl"
+        metrics = {"tp": 1, "fn": 0, "fp": 0, "tn": 2, "fn_rate_upper": 0.7, "recall_lower": None}
+        append_evaluation_ledger(
+            path,
+            EvaluationRecord(
+                digest="d" * 64,
+                engine_revision="abc123",
+                evaluated_at=_T0,
+                predictor="qa_pipeline.item_verdict/v1",
+                metrics=metrics,
+            ),
+        )
+        records, errors = load_evaluation_ledger(path)
+
+        assert errors == []
+        assert records[0].predictor == "qa_pipeline.item_verdict/v1"
+        assert records[0].metrics == metrics
+
+    def test_legacy_row_without_new_fields_loads_with_empty_defaults(self, tmp_path: Path) -> None:
+        path = tmp_path / "ledger.jsonl"
+        path.write_text(
+            json.dumps({"digest": "d", "engine_revision": "r", "evaluated_at": _T0.isoformat()})
+            + "\n",
+            encoding="utf-8",
+        )
+        records, errors = load_evaluation_ledger(path)
+
+        assert errors == []
+        assert records[0].predictor == "" and records[0].metrics is None
+
+    def test_row_without_new_fields_is_written_in_legacy_shape(self, tmp_path: Path) -> None:
+        """판정기·지표가 없는 기록은 옛 형식 그대로 쓴다(옛 소비자와 바이트 호환)."""
+        path = tmp_path / "ledger.jsonl"
+        append_evaluation_ledger(
+            path, EvaluationRecord(digest="d" * 64, engine_revision="abc123", evaluated_at=_T0)
+        )
+
+        row = json.loads(path.read_text(encoding="utf-8"))
+        assert set(row) == {
+            "digest",
+            "engine_revision",
+            "evaluated_at",
+            "golden_version",
+            "rotation",
+        }
+
+    def test_non_object_metrics_is_a_parse_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "ledger.jsonl"
+        path.write_text(
+            json.dumps(
+                {
+                    "digest": "d",
+                    "engine_revision": "r",
+                    "evaluated_at": _T0.isoformat(),
+                    "metrics": [1, 2],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        records, errors = load_evaluation_ledger(path)
+
+        assert records == [] and len(errors) == 1 and "TypeError" in errors[0]
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # 스키마·파서 계약

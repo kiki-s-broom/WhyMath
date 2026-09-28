@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-28 (구현·판정 · EOS-137): **QA 엔진 문항별 판정(predictions) 생산자 착지 — 골든 v1로 QA 엔진을 처음 잴 수 있게 됐다. 표류 시계열은 "회전별 독립 표본에 점 1개 + 원장 행이 그 점의 지표를 싣는다"로 판정했고, 재채점 금지는 풀지 않았다. 생성 게이트 outcome 대용은 채택하지 않았다** (claude 판정·구현) — 판정 기준 main `6c880b67`
+
+- **무엇**: 문항 판정 좌석 `harness/qa_pipeline.judge_item` + 생산자 CLI `harness/qa_item_verdict`(코퍼스·검수 큐 JSONL 경로 지정 → predictions / 판정 불가 분리) + 혼동행렬 판정기 식별(`predictor`) + 원장 행 지표 적재(`EvaluationRecord.predictor`·`metrics`). 계약 정본 `docs/standards/golden_benchmark_contract.md` §9.
+- **좌석 구성(재구현 0)**: 집계 9축 중 문항으로 투영 가능한 축 2·6·8의 판정 함수 + S6 재검산(`corpus_reverify._reverify_one` — 필수 성분). 축 2는 집계와 문항이 같은 함수를 돈다. 투영 불가 6축은 사유와 함께 `ITEM_NON_PROJECTABLE_AXES`에 있고 대응 전수를 테스트가 동결한다. 판정: fail 우선 → 판정 불가 → 정답 재검산 pass일 때만 pass(미측정 ≠ 통과).
+- **실측(저장소 문제은행)**: 14,034건 전건 판정 · 판정 불가 0 · fail 0(야간 S6 재검산이 이미 지키는 코퍼스라 예상대로). 골든 v1 실측은 Kiki 머신 데이터라 게이트 `G-eos137-first-qa-eval-run`(런북 `docs/ops/eos137_first_qa_eval_runbook.md`)으로 분리 — 결과 수치는 회신 후 이 항 아래에 추기한다.
+- **예상되는 사각(정직)**: 좌석은 수학 기계 판정 중심이라 F3·F4·F6·F7 결함을 거의 못 본다. 골든 v1의 결함 2건 중 1건이 F7 반려라 FN 1건이 나와도 좌석의 알려진 한계다 — `fn_by_failure_code`가 그 분포를 드러낸다.
+- **③ 판정**: 같은 표본에 리비전별 점을 쌓으면 교정이 그 표본에 맞춰졌는지 가를 수 없어 표류와 과적합이 구분 불가다 → 점의 독립성은 회전(`--exclude-golden`)이, 점의 값은 원장 행 `metrics`가 맡는다. 같은 digest × 다른 리비전은 계속 exit 1. 대가: 점 사이 차이에 표본 교체가 섞이므로 Wilson 구간끼리만 비교한다.
+- **④ 판정**: 대용(생성 outcome)은 수록 문항이 정의상 전부 생성 게이트 통과라 FN율이 표본 결함률로 퇴화한다 → 미채택. 들어오면 리포트 머리에 "생성 게이트의 FN율"을 명시하고, 판정기가 섞이면 exit 1, 원장은 판정기 선언을 요구한다.
+- **검증**: 뮤테이션 12종 전건 RED(필수 성분 무시·skip→pass·축 2 사본·판정 불가 유입·본문 불일치 무시·판정기 혼재·원장 판정기 불요·지표 누락·판정기 미기록·대용 경고 삭제·골든 부재 미집계·입력 손상 후 산출). 런북 PowerShell 블록 5개 pwsh 7.4.6 파서 오류 0 · 가짜 `mp02-out`(큐 28행·골든 15건)으로 §3·§4 모의 실행 — 기대 출력과 일치, 다른 리비전 재실행은 재채점 금지 exit 1.
+
 ### 2026-09-27 (결정 · Kiki 판정 · 게이트 `G-required-tier-caller-recheck` / ARCH-41): **Subject Contract v1을 G1 예정일에 동결 — 단 `Frozen (unexercised)`. 필수층 3메서드의 Core 호출자는 여전히 0이고, 그 0은 과도기가 아니라 우회였다: Core가 필수층과 같은 일을 해야 했던 두 번 모두 선택층 능력이 새로 생겼다** (Kiki 판정 ①·감시 방식 선택, claude 재측정·집행) — 판정 기준 main `0e7b4f6b`
 
 - **무엇**: 게이트 재확인 지점(G1 9/27) 당일, 프로브 문서 부록 B 표 7항목 + 추가 5항목을 재실행했다. 필수층 호출자 `ZERO_CALLERS`(변별력 3상태 실측 — 작업 트리 밖 복사본 주입 시 `CALLERS_FOUND` · 경로 제거 시 `SCAN_ERROR` exit 2) · 계약 동결 테스트 22 passed · 해석 축 게이트(`ARCH-43`) 위반 0(CORE 355) · 경계 스캔 위반 0 · `DEMOTED_FIELDS` 빈 dict. 기록 = `docs/architecture/subject_contract_cross_probe.md` 부록 C

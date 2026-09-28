@@ -47,6 +47,15 @@ append하고, **같은 골든을 다른 엔진 리비전으로 다시 재는 것
 기록이면 빈 이력을 보고 재채점을 허용하게 되어, 금지 규율이 그 증거가 손상된 바로 그
 순간에 무력화된다.
 
+판정기 식별 — "어느 판정기의 FN율인가" (EOS-137 ④)
+--------------------------------------------------
+예측 행의 `predictor`(판정기 식별자)를 리포트 머리·JSON·평가 원장 행에 싣는다. 판정기 종류는
+`PREDICTOR_KINDS`가 정한다 — QA 엔진 문항 좌석(`qa_pipeline.item_verdict`)과, 채택하지 않았지만
+들어오면 표시해야 하는 대용(`generation_gate.outcome` — 생성 파이프라인 outcome을 예측으로 쓴 것:
+재는 것이 QA 엔진이 아니라 **생성 게이트**다). 한 예측 파일에 판정기가 섞이면 파싱 실패와 같이
+**판정하지 않는다**(exit 1 — 섞인 혼동행렬은 어느 판정기의 것도 아니다). 원장(`--ledger`)에 쓰려면
+판정기가 선언돼 있어야 한다 — 시계열의 점이 어느 판정기의 것인지 모르면 표류를 읽을 수 없다.
+
 집행 별항 — 내용 KPI 4종의 소비 지점 (acceptance ⑤)
 ----------------------------------------------------
 EOS-51 §6 내용 KPI 중 4종이 이 골든을 정답지로 쓴다. 어느 라벨 축이 어느 KPI의 정답지이고
@@ -95,12 +104,15 @@ from whymath_backend.schema.enums import GenerationFailureCode
 
 __all__ = [
     "CONTENT_KPI_CONSUMERS",
+    "PREDICTOR_KINDS",
     "ConfusionMatrix",
     "ContentKpiConsumer",
     "MatrixReport",
     "Prediction",
     "build_report",
+    "describe_predictor",
     "evaluate",
+    "ledger_metrics",
     "main",
     "parse_predictions",
     "render_report",
@@ -195,6 +207,38 @@ class Prediction:
     passed: bool
     failure_code: GenerationFailureCode | None = None
     """엔진이 붙인 실패코드(있으면). 라벨 정확도 분해에 쓰지만 혼동행렬 판정에는 쓰지 않는다."""
+    predictor: str | None = None
+    """판정기 식별자(`qa_pipeline.item_verdict/v1` 등). None = 미선언(옛 형식 예측)."""
+
+
+PREDICTOR_KINDS: dict[str, tuple[str, str]] = {
+    "qa_pipeline.item_verdict": (
+        "qa_engine",
+        "QA 엔진 문항 단위 좌석(harness/qa_pipeline.judge_item · 생산자 harness/qa_item_verdict)",
+    ),
+    "generation_gate.outcome": (
+        "generation_gate_proxy",
+        "생성 파이프라인 outcome(accepted_stored·needs_review) 대용 — 재는 것은 QA 엔진이 아니라 "
+        "생성 게이트다(EOS-137 ④ · 정본 채택 아님)",
+    ),
+}
+"""판정기 계열(식별자의 `/` 앞) → (종류, 설명).
+
+버전 접미(`/v1`)·옵션(`+fuzz`)은 계열을 바꾸지 않는다."""
+
+
+def describe_predictor(predictor: str | None) -> tuple[str, str]:
+    """판정기 식별자 → (종류, 설명). 미선언·미등록도 값으로 돌려준다(추정해 채우지 않는다)."""
+    if not predictor:
+        return (
+            "undeclared",
+            "어느 판정기의 FN율인지 결정 불가(EOS-137 ④) — 원장에 기록할 수 없다",
+        )
+    family = predictor.split("/", 1)[0].split("+", 1)[0]
+    known = PREDICTOR_KINDS.get(family)
+    if known is None:
+        return ("unknown", f"미등록 판정기 — PREDICTOR_KINDS에 없는 계열({family})")
+    return known
 
 
 _PASS_TOKENS = frozenset({"pass", "passed", "ok", "approved", "accept", "accepted", "true"})
@@ -205,7 +249,7 @@ def parse_predictions(rows: Iterable[Mapping[str, Any]]) -> tuple[list[Predictio
     """예측 JSONL 파싱 — 어휘 밖 판정은 삼키지 않고 실패로 센다(pass로 관용하면 FN이 위장된다).
 
     식별 키는 cu_slug/slug/code, 판정 키는 qa_verdict/verdict/status(문자열) 또는
-    passed/qa_pass(불리언).
+    passed/qa_pass(불리언). `predictor`(선택)는 비어 있지 않은 문자열이어야 한다.
     """
     parsed: list[Prediction] = []
     errors: list[str] = []
@@ -238,7 +282,20 @@ def parse_predictions(rows: Iterable[Mapping[str, Any]]) -> tuple[list[Predictio
             except ValueError as exc:
                 errors.append(f"{type(exc).__name__}: 예측 {index}번째 행(실패코드 어휘 밖)")
                 continue
-        parsed.append(Prediction(cu_slug=str(cu_slug), passed=passed, failure_code=code))
+        raw_predictor = row.get("predictor")
+        if raw_predictor is not None and not (
+            isinstance(raw_predictor, str) and raw_predictor.strip()
+        ):
+            errors.append(f"TypeError: 예측 {index}번째 행(predictor가 빈 값이거나 문자열 아님)")
+            continue
+        parsed.append(
+            Prediction(
+                cu_slug=str(cu_slug),
+                passed=passed,
+                failure_code=code,
+                predictor=raw_predictor.strip() if isinstance(raw_predictor, str) else None,
+            )
+        )
     return parsed, errors
 
 
@@ -366,6 +423,8 @@ class MatrixReport:
     ledger_enforced: bool
     parse_errors: tuple[str, ...] = field(default=())
     confidence: float = _CONFIDENCE
+    predictor: str | None = None
+    """이 리포트의 판정기 식별자(EOS-137 ④). None = 미선언."""
 
     @property
     def coverage_rate(self) -> float | None:
@@ -389,6 +448,7 @@ def build_report(
     ledger_enforced: bool = False,
     parse_errors: Sequence[str] = (),
     confidence: float = _CONFIDENCE,
+    predictor: str | None = None,
 ) -> MatrixReport:
     """골든 셋 + 예측 → 리포트(순수). I/O·게이트 판정 없음 — 판정은 `main`이 한다."""
     matrix, unevaluated, extraneous = evaluate(golden.items, predictions)
@@ -441,7 +501,30 @@ def build_report(
         ledger_enforced=ledger_enforced,
         parse_errors=tuple(parse_errors),
         confidence=confidence,
+        predictor=predictor,
     )
+
+
+def ledger_metrics(report: MatrixReport) -> dict[str, Any]:
+    """원장 행에 싣는 지표 — 표류 시계열의 값(`golden_benchmark_contract.md` §9 · EOS-137 ③).
+
+    `_report_payload`의 판정치와 같은 계산을 쓴다(재계산 경로 1개). 미산출은 None 그대로다.
+    """
+    m = report.matrix
+    return {
+        "tp": m.tp,
+        "fn": m.fn,
+        "fp": m.fp,
+        "tn": m.tn,
+        "golden_total": report.golden_total,
+        "evaluated": m.evaluated,
+        "coverage_lower": report.coverage_lower,
+        "recall_lower": m.recall_lower(report.confidence),
+        "precision_lower": m.precision_lower(report.confidence),
+        "fn_rate_upper": m.fn_rate_upper(report.confidence),
+        "false_alarm_upper": m.false_alarm_upper(report.confidence),
+        "confidence": report.confidence,
+    }
 
 
 def _fmt(value: float | None) -> str:
@@ -459,6 +542,12 @@ def render_report(report: MatrixReport) -> str:
     )
     lines.append(f"- 과목 축(subject_id): {report.subject_id}")
     lines.append(f"- 엔진 리비전: {report.engine_revision or '미지정'}")
+    kind, description = describe_predictor(report.predictor)
+    lines.append(f"- 판정기(predictor): {report.predictor or '미선언'} — {description}")
+    if kind == "generation_gate_proxy":
+        lines.append(
+            "  - **주의: 이 FN율은 생성 게이트의 FN율이다 — QA 엔진 FN율로 읽지 말 것**(EOS-137 ④)"
+        )
     lines.append(f"- Wilson 신뢰수준(단측): {report.confidence}")
     lines.append("")
 
@@ -653,7 +742,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw_rows, load_errors = _load_jsonl_dicts(predictions_path)
     predictions, parse_errors = parse_predictions(raw_rows)
     all_errors = [*load_errors, *parse_errors]
+    predictor_ids = sorted({p.predictor or "(미선언)" for p in predictions})
+    if len(predictor_ids) > 1:
+        # 판정기가 섞인 혼동행렬은 어느 판정기의 것도 아니다 — 파싱 실패처럼 판정하지 않는다.
+        all_errors.append(
+            f"MixedPredictor: 판정기 {len(predictor_ids)}종 혼재({', '.join(predictor_ids)})"
+        )
+    predictor = predictions[0].predictor if len(predictor_ids) == 1 and predictions else None
     _say(f"[② 예측] {len(predictions)}건 · 파싱 실패 {len(all_errors)}건 — {predictions_path}")
+    _say(f"  · 판정기: {predictor or '미선언'} — {describe_predictor(predictor)[1]}")
     for reason in all_errors:
         _say(f"  · {reason}")
     if not predictions:
@@ -666,6 +763,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.ledger:
         if not args.engine_revision:
             _say("[측정 실패] --ledger에는 --engine-revision이 필요하다(재채점 식별 축 없음).")
+            return _EXIT_MEASUREMENT_FAIL
+        if predictor is None:
+            # 원장 행은 시계열의 점이다 — 어느 판정기의 점인지 모르면 표류를 읽을 수 없다(④).
+            _say(
+                "[측정 실패] --ledger에는 판정기 선언이 필요하다 — 예측 행에 단일 `predictor`가 "
+                "없다(미선언 또는 혼재). harness/qa_item_verdict 산출물을 쓰거나 판정기를 적어라."
+            )
             return _EXIT_MEASUREMENT_FAIL
         ledger_path = Path(args.ledger)
         records, ledger_errors = load_evaluation_ledger(ledger_path)
@@ -700,6 +804,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_enforced=ledger_enforced,
         parse_errors=all_errors,
         confidence=args.confidence,
+        predictor=predictor,
     )
     rendered = render_report(report)
     # 데이터는 stdout(리포트 본문), 진행·판정은 stderr(_say) — 분리.
@@ -743,6 +848,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 evaluated_at=datetime.now(UTC),
                 golden_version=golden.golden_version,
                 rotation=golden.rotation,
+                predictor=predictor or "",
+                metrics=ledger_metrics(report),
             ),
         )
         _say(f"[원장] 평가 기록 append — {ledger_path}")
@@ -783,6 +890,11 @@ def _report_payload(report: MatrixReport) -> dict[str, Any]:
             "total": report.golden_total,
         },
         "engine_revision": report.engine_revision,
+        "predictor": {
+            "id": report.predictor,
+            "kind": describe_predictor(report.predictor)[0],
+            "description": describe_predictor(report.predictor)[1],
+        },
         "confidence": report.confidence,
         "matrix": {"tp": m.tp, "fn": m.fn, "fp": m.fp, "tn": m.tn},
         "coverage": {

@@ -74,9 +74,33 @@ import-linter 7계층 계약(`[tool.importlinter]`)은 `root_package = "whymath_
 not_measured_axes)과 "에러로 못 함"(error)은 구분해서 보고하되, 게이트 판정(`overall.pass`)
 에는 둘 다 실패로 집계한다(단 `no_snapshot`은 정당한 상태라 집계에서 제외).
 
+문항 단위 판정 좌석 (EOS-137)
+-----------------------------
+위 9축은 **코퍼스 집계** 판정이라 골든 정답지(`harness/golden_benchmark`)와 대조할 문항별
+pass/fail을 내지 못한다. `judge_item`이 그 좌석이다 — 집계 축 중 *문항으로 투영 가능한* 축의
+판정 함수를 문항 1건에 그대로 적용한다(새 판정 로직 0 · 재구현 금지):
+
+    answer_reverify          — `corpus_reverify._reverify_one`(S6 상시 재검산 — Tier1·근 선택·
+                               Tier2 단계·개념형·옵션 fuzz). 집계 9축 목록 밖이지만 CI 야간 잡이
+                               코퍼스 전수에 돌리는 기계 검증 스택의 문항 판정이다. **필수 성분**.
+    condition_dsl            — 축 2 `equivalence_canonicalize`의 문항 판정(`_item_condition_dsl`
+                               — 축 2 자신도 이 함수를 돈다. 두 경로가 갈라지지 않는다)
+    record_provenance_fields — 축 6 `content_provenance`의 레코드 레벨 검사(`license`·`source_type`)
+    banned_words_pii         — 축 8 `banned_words_pii`의 필드 스캔(`scan_field` — 금칙어·타인 PII)
+
+투영 불가 축과 그 사유는 `ITEM_NON_PROJECTABLE_AXES`가 적는다(사람 라벨 스냅샷·그래프·합성
+시험지·DB 건수는 "이 문항"에 대해 말하지 않는다). 집계 축과 문항 좌석의 대응은
+`tests/backend/harness/test_qa_item_verdict.py`가 전수로 동결한다 — 집계 축이 새로 생기면 문항
+좌석에 넣거나 투영 불가 사유를 적어야 테스트가 통과한다.
+
+판정 규칙(미측정 ≠ 통과): 성분 하나라도 `fail`이면 **fail** · 아니면 `undetermined` 성분이
+있거나 필수 성분이 `pass`가 아니면 **undetermined**(사유 동반) · 그 밖에만 **pass**. 즉
+"아무것도 못 걸렀다"는 pass가 아니다 — 정답 재검산이 실제로 통과해야 pass다.
+
 사용:
     python -m whymath_backend.harness.qa_pipeline
     python -m whymath_backend.harness.qa_pipeline --corpus-root data/corpus --json report.json
+    # 문항별 판정(predictions) — CLI는 harness/qa_item_verdict
 """
 
 from __future__ import annotations
@@ -87,7 +111,7 @@ import dataclasses
 import json
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -109,6 +133,7 @@ from whymath_backend.harness import (
     banned_words_pii_eval,
     coach_prose_leak_eval,
     corpus_audit_eval,
+    corpus_reverify,
     crosslink_demotion_eval,
     defect_detection_eval,
 )
@@ -116,7 +141,18 @@ from whymath_backend.l3.equivalent.canonicalize import condition_dsl_violation
 from whymath_backend.l3.equivalent.defect_seeder import build_defect_seeded_set
 from whymath_backend.ops import provenance_audit
 
-__all__ = ["build_report", "main"]
+__all__ = [
+    "ITEM_NON_PROJECTABLE_AXES",
+    "ITEM_REQUIRED_COMPONENT",
+    "ITEM_SEAT_COMPONENTS",
+    "ITEM_SEAT_PREDICTOR",
+    "ItemCheck",
+    "ItemVerdict",
+    "build_report",
+    "item_seat_predictor",
+    "judge_item",
+    "main",
+]
 
 _EXIT_OK = 0
 _EXIT_GATE_FAIL = 1
@@ -179,6 +215,33 @@ _NOT_MEASURED_AXES: tuple[NotMeasuredAxis, ...] = (
     NotMeasuredAxis("statistical_outlier", "코드 미구현(실측)"),
     NotMeasuredAxis("performance", "코드 미구현(실측)"),
 )
+
+
+ItemCheckState = Literal["pass", "fail", "not_applicable", "undetermined"]
+ItemVerdictValue = Literal["pass", "fail", "undetermined"]
+
+
+@dataclass(slots=True, frozen=True)
+class ItemCheck:
+    """문항 좌석 성분 1개의 판정 — 상태와 사유(값·원문 대신 판정 근거만)."""
+
+    name: str
+    state: ItemCheckState
+    reason: str | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        return {"state": self.state, "reason": self.reason}
+
+
+@dataclass(slots=True, frozen=True)
+class ItemVerdict:
+    """문항 1건의 QA 판정 — 성분 판정을 규칙대로 접은 결과(모듈 docstring "문항 단위 판정 좌석")."""
+
+    cu_slug: str
+    verdict: ItemVerdictValue
+    checks: tuple[ItemCheck, ...]
+    reason: str | None = None
+    """fail이면 실패 성분 요약, undetermined면 판정 불가 사유. pass면 None."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -279,6 +342,30 @@ _NON_EQUATION_DSL_ANSWER_KINDS = frozenset(
 )
 
 
+def _item_condition_dsl(problem: Mapping[str, Any]) -> ItemCheck:
+    """문항 1건의 조건 DSL 폐쇄성 — 축 2의 문항 판정이자 문항 좌석의 `condition_dsl` 성분.
+
+    `conditions`는 레코드 최상위 또는 `verify.conditions`를 방어적으로 읽는다. 등식 DSL 대상 밖
+    answer_kind(S3-28)·조건 없음은 `not_applicable`이다 — 검사 대상이 아니지 통과가 아니다.
+    """
+    verify = problem.get("verify")
+    verify = verify if isinstance(verify, dict) else {}
+    answer_kind = verify.get("answer_kind") or problem.get("answer_kind")
+    if answer_kind in _NON_EQUATION_DSL_ANSWER_KINDS:
+        return ItemCheck(
+            "condition_dsl", "not_applicable", f"등식 DSL 대상 밖 answer_kind({answer_kind})"
+        )
+    conditions = problem.get("conditions")
+    if not isinstance(conditions, str):
+        conditions = verify.get("conditions")
+    if not isinstance(conditions, str) or not conditions.strip():
+        return ItemCheck("condition_dsl", "not_applicable", "conditions 없음")
+    violation = condition_dsl_violation(conditions)
+    if violation is not None:
+        return ItemCheck("condition_dsl", "fail", f"조건 DSL 위반: {violation}")
+    return ItemCheck("condition_dsl", "pass")
+
+
 def _axis_equivalence_canonicalize(corpus_root: Path) -> AxisResult:
     """코퍼스 전 문제의 `conditions`에 폐쇄 검증 DSL 위반이 있는지 순회 검사한다.
 
@@ -294,18 +381,12 @@ def _axis_equivalence_canonicalize(corpus_root: Path) -> AxisResult:
     violations = 0
     for path in sorted(corpus_root.glob("problem_bank_*/problems.jsonl")):
         for problem in _load_jsonl(path):
-            verify = problem.get("verify")
-            verify = verify if isinstance(verify, dict) else {}
-            answer_kind = verify.get("answer_kind") or problem.get("answer_kind")
-            if answer_kind in _NON_EQUATION_DSL_ANSWER_KINDS:
-                continue
-            conditions = problem.get("conditions")
-            if not isinstance(conditions, str):
-                conditions = verify.get("conditions")
-            if not isinstance(conditions, str) or not conditions.strip():
+            # 문항 판정은 문항 좌석(`judge_item`)과 같은 함수 — 집계와 문항 판정이 갈라지지 않는다.
+            check = _item_condition_dsl(problem)
+            if check.state == "not_applicable":
                 continue
             total += 1
-            if condition_dsl_violation(conditions) is not None:
+            if check.state == "fail":
                 violations += 1
     status: AxisStatus = "ok" if violations == 0 else "gate_fail"
     return AxisResult(
@@ -714,6 +795,152 @@ def build_report(corpus_root: Path, *, repo_root: Path | None = None) -> dict[st
         "not_measured_axes": [dataclasses.asdict(axis) for axis in _NOT_MEASURED_AXES],
         "overall": overall.to_json(),
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 문항 단위 판정 좌석 (EOS-137) — 골든 정답지와 대조할 문항별 pass/fail
+# ──────────────────────────────────────────────────────────────────────────
+
+
+ITEM_SEAT_PREDICTOR = "qa_pipeline.item_verdict/v1"
+"""문항 좌석의 판정기 식별자 — 예측 JSONL·혼동행렬 리포트·평가 원장이 "어느 판정기의 FN율인가"를
+가리키는 값이다(EOS-137 ④). 성분 구성·판정 규칙이 바뀌면 버전을 올린다."""
+
+ITEM_REQUIRED_COMPONENT = "answer_reverify"
+"""pass의 필요조건 — 정답 재검산이 실제로 통과하지 않은 문항은 pass가 될 수 없다."""
+
+ITEM_SEAT_COMPONENTS: dict[str, str] = {
+    "answer_reverify": "corpus_reverify(S6 상시 재검산 — 집계 9축 밖의 기계 검증 스택)",
+    "condition_dsl": "equivalence_canonicalize",
+    "record_provenance_fields": "content_provenance",
+    "banned_words_pii": "banned_words_pii",
+}
+"""문항 좌석 성분 → 출처(집계 축 이름 또는 검증 스택). 판정 순서도 이 순서다."""
+
+ITEM_NON_PROJECTABLE_AXES: dict[str, str] = {
+    "corpus_audit": "커밋된 사람 감사 라벨 스냅샷의 재검산 — 이 문항에 대한 기계 판정이 아니다",
+    "concept_graph_reachability": "원자 백본 그래프 전체의 구조 무결성 — 문항 속성이 아니다",
+    "misconception_crosslink_demotion": "합성 crosswalk 강등전 셋 — 입력이 코퍼스 문항이 아니다",
+    "coach_prose_leak": "합성 코치 발화 시험지 — 입력이 코퍼스 문항이 아니다",
+    "defect_injection_demotion": "결함 주입 합성 시험지 — 입력이 코퍼스 문항이 아니다",
+    "defect_report_intake": "학생 결함 신고 테이블 건수 — 문항 판정이 아니라 수집 현황이다",
+}
+"""집계 축 중 문항으로 투영할 수 없는 축과 그 사유 — 조용한 누락 금지.
+
+투영 가능 축과 합쳐 집계 축 전수와 같은지는 테스트가 대조한다."""
+
+
+def item_seat_predictor(*, use_fuzz: bool) -> str:
+    """판정기 식별자 — fuzz 여부가 판정을 바꾸므로 식별자에도 싣는다(같은 이름 다른 판정기 방지)."""
+    return f"{ITEM_SEAT_PREDICTOR}+fuzz" if use_fuzz else ITEM_SEAT_PREDICTOR
+
+
+def _item_answer_reverify(record: Mapping[str, Any], *, use_fuzz: bool) -> ItemCheck:
+    """S6 재검산 1건 — `corpus_reverify._reverify_one`을 그대로 부르고 skip을 undetermined로 옮긴다.
+
+    skip(재료 없음·unverifiable)은 "오염 아님"이지 "정답 확인"이 아니다 — 문항 판정에서는 판정
+    불가다(pass로 접으면 확인 못 한 문항이 통과로 세어져 FN이 위장된다).
+    """
+    state, reason = corpus_reverify._reverify_one(dict(record), use_fuzz=use_fuzz)
+    if state == "pass":
+        return ItemCheck("answer_reverify", "pass")
+    if state == "fail":
+        return ItemCheck("answer_reverify", "fail", reason)
+    return ItemCheck("answer_reverify", "undetermined", reason or "재검산 판정 불가")
+
+
+def _item_record_provenance(record: Mapping[str, Any]) -> ItemCheck:
+    """축 6의 레코드 레벨 검사 — 필수 출처 필드(`provenance_audit._REQUIRED_RECORD_FIELDS`) 결손."""
+    missing = [f for f in provenance_audit._REQUIRED_RECORD_FIELDS if not record.get(f)]
+    if missing:
+        return ItemCheck(
+            "record_provenance_fields", "fail", f"출처 필드 결손: {', '.join(missing)}"
+        )
+    return ItemCheck("record_provenance_fields", "pass")
+
+
+def _item_banned_words_pii(record: Mapping[str, Any]) -> ItemCheck:
+    """축 8의 문항 필드 스캔 — 축 8과 같은 필드 목록·같은 `scan_field`·같은 위반 정의.
+
+    위반 = 금칙어 또는 타인 PII(축 8 게이트 분자와 동일 — 자기 반영 PII는 위반이 아니다).
+    사유에는 필드명과 위반 종류만 적는다(원문·매치 값 미출력 — 축 8 렌더 규약).
+    """
+    hits: list[str] = []
+    scanned = 0
+    for field in banned_words_pii_eval._PROBLEM_BANK_FIELDS:
+        value = record.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            return ItemCheck(
+                "banned_words_pii",
+                "undetermined",
+                f"{field} 형식 위반(type={type(value).__name__})",
+            )
+        scanned += 1
+        result = banned_words_pii_eval.scan_field(value)
+        if result.banned_word_hit:
+            hits.append(f"{field}:금칙어")
+        if result.pii_third_party_hit:
+            hits.append(f"{field}:타인PII")
+    if scanned == 0:
+        return ItemCheck("banned_words_pii", "not_applicable", "스캔 대상 산문 필드 없음")
+    if hits:
+        return ItemCheck("banned_words_pii", "fail", ", ".join(hits))
+    return ItemCheck("banned_words_pii", "pass")
+
+
+def _run_item_check(func: Callable[[], ItemCheck], *, name: str) -> ItemCheck:
+    """성분 1개를 예외로부터 격리 — 예외는 통과가 아니라 undetermined(예외 타입명 동반)."""
+    try:
+        return func()
+    except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지(CLAUDE.md): 타입명을 반드시 남김.
+        print(
+            f"[qa_pipeline] 문항 성분 '{name}' 실행 중 예외 — {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return ItemCheck(name, "undetermined", f"성분 실행 예외: {type(exc).__name__}")
+
+
+def judge_item(record: Mapping[str, Any], *, cu_slug: str, use_fuzz: bool = False) -> ItemVerdict:
+    """문항 1건(코퍼스 레코드 직렬화)을 좌석 성분 전부로 판정해 pass/fail/undetermined로 접는다.
+
+    판정 규칙은 모듈 docstring "문항 단위 판정 좌석" 절 — fail 우선, 그다음 판정 불가,
+    필수 성분(`ITEM_REQUIRED_COMPONENT`)이 pass일 때만 pass.
+    """
+    runners: dict[str, Callable[[], ItemCheck]] = {
+        "answer_reverify": lambda: _item_answer_reverify(record, use_fuzz=use_fuzz),
+        "condition_dsl": lambda: _item_condition_dsl(record),
+        "record_provenance_fields": lambda: _item_record_provenance(record),
+        "banned_words_pii": lambda: _item_banned_words_pii(record),
+    }
+    checks = tuple(_run_item_check(runners[name], name=name) for name in ITEM_SEAT_COMPONENTS)
+
+    failed = [c for c in checks if c.state == "fail"]
+    if failed:
+        return ItemVerdict(
+            cu_slug=cu_slug,
+            verdict="fail",
+            checks=checks,
+            reason="; ".join(f"{c.name}: {c.reason}" for c in failed),
+        )
+    undetermined = [c for c in checks if c.state == "undetermined"]
+    if undetermined:
+        return ItemVerdict(
+            cu_slug=cu_slug,
+            verdict="undetermined",
+            checks=checks,
+            reason="; ".join(f"{c.name}: {c.reason}" for c in undetermined),
+        )
+    required = next(c for c in checks if c.name == ITEM_REQUIRED_COMPONENT)
+    if required.state != "pass":
+        return ItemVerdict(
+            cu_slug=cu_slug,
+            verdict="undetermined",
+            checks=checks,
+            reason=f"{ITEM_REQUIRED_COMPONENT}: 필수 성분 미통과({required.state})",
+        )
+    return ItemVerdict(cu_slug=cu_slug, verdict="pass", checks=checks)
 
 
 def main(argv: list[str] | None = None) -> int:

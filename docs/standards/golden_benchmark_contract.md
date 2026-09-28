@@ -3,6 +3,8 @@
 > **지위**: `EOS-60-golden-benchmark-qa-confusion-matrix` 산출물 · 코드 정본 =
 > `src/backend/whymath_backend/harness/golden_benchmark.py`(승격·동결) +
 > `src/backend/whymath_backend/ops/qa_confusion_matrix.py`(혼동행렬 판정).
+> 입력 생산자(EOS-137): `src/backend/whymath_backend/harness/qa_item_verdict.py`(문항별 predictions) ·
+> 문항 판정 좌석 = `harness/qa_pipeline.judge_item`.
 > 상위 계약: `docs/standards/eos_verification_design_v1.md` §6(내용 KPI 동결) ·
 > `docs/standards/superhuman_verification_standard.md` §4.5(재채점 금지).
 > 갭 근거: `docs/reviews/eos_validation_n1_n10_gap_review_2026-08-30.md` §3.7(N8).
@@ -166,7 +168,12 @@ python -m whymath_backend.harness.golden_benchmark \
     --golden-version v1 --rotation 0 \
     --out data/corpus/golden_benchmark_v1/golden.json --report golden_promotion.md
 
-# ② 골든 대비 QA 엔진 혼동행렬(재채점 금지 집행 포함)
+# ② QA 엔진 문항별 판정 — 코퍼스·검수 큐 JSONL(경로 지정) → predictions (EOS-137)
+python -m whymath_backend.harness.qa_item_verdict \
+    --input canary_review_queue.jsonl --golden data/corpus/golden_benchmark_v1/golden.json \
+    --out qa_verdicts.jsonl --undetermined qa_undetermined.jsonl
+
+# ③ 골든 대비 QA 엔진 혼동행렬(재채점 금지 집행 포함)
 python -m whymath_backend.ops.qa_confusion_matrix \
     --golden data/corpus/golden_benchmark_v1/golden.json \
     --predictions qa_verdicts.jsonl \
@@ -175,8 +182,10 @@ python -m whymath_backend.ops.qa_confusion_matrix \
     --json qa_confusion.json
 ```
 
-`--predictions`는 QA 판정 JSONL이다: `{"cu_slug": ..., "qa_verdict": "pass"|"fail"}`
+`--predictions`는 QA 판정 JSONL이다: `{"cu_slug": ..., "qa_verdict": "pass"|"fail", "predictor": ...}`
 (`passed`/`qa_pass` 불리언 형식도 수용). 어휘 밖 판정은 pass로 관용하지 않고 파싱 실패로 센다.
+`predictor`(판정기 식별자)는 선택이지만 `--ledger`를 쓰려면 필수다(§9.3). ②의 판정 불가 문항은
+predictions에 없고 `qa_undetermined.jsonl`에 사유와 함께 있다 — 혼동행렬은 그 문항을 `미평가`로 센다.
 
 ---
 
@@ -190,3 +199,75 @@ python -m whymath_backend.ops.qa_confusion_matrix \
    defective 편중(clean 0건)일 수 있고, 그때 Precision 축은 미산출로 남는다.
 4. **QA 판정 입력은 파일 기반이다** — 현행 검수·감사 흐름이 JSONL이라 그 관례를 따른다.
    DB 직접 조회 모드는 미구현(정직한 공백 — 소비처가 생기면 확장).
+5. **문항 좌석은 수학 기계 판정이 중심이다(EOS-137)** — 필수 성분이 정답 재검산이고 나머지는
+   조건 DSL·출처 필드·금칙어/PII다. 즉 F1·F2(기계형) 결함은 볼 수 있지만 **F3(풀이 비약)·F4(성취기준
+   이탈)·F6(오개념 오연결)·F7(문장 수준) 결함은 좌석이 거의 보지 못한다** — 그 결함류의 FN은 좌석의
+   알려진 사각이고, `fn_by_failure_code`가 그 분포를 드러낸다. §5 결선표의 미착지 채점기가 그 자리다.
+
+---
+
+## §9. 표류 시계열과 판정기 식별 — 설계 판정 (EOS-137 ③④)
+
+> 판정 기준: main `6c880b67`(이 판정을 쓴 브랜치의 분기점). 동결 테스트 =
+> `tests/backend/ops/test_qa_confusion_matrix.py::TestDriftSeriesDesign`·`::TestPredictorIdentity` ·
+> `tests/backend/harness/test_golden_benchmark.py::TestEvaluationLedger` ·
+> `tests/backend/harness/test_qa_item_verdict.py`.
+
+### §9.1 질문
+
+"모델 표류 감지"는 같은 잣대로 시간에 따라 여러 번 재는 것이다. 그런데 §4는 **같은 골든(digest)을
+다른 엔진 리비전으로 재면 exit 1**로 막는다. 둘 중 무엇을 양보하는가, 그리고 원장 행에 지표 값이
+없는 현 구조(digest·리비전·시각만)로 시계열을 읽을 수 있는가.
+
+### §9.2 판정 — 회전별 독립 표본이 정본, 원장 행이 그 점의 값을 싣는다
+
+두 선택지는 대안이 아니라 **서로 다른 결손을 메운다**. 둘 다 채택한다.
+
+| 축 | 결정 | 이유 |
+|---|---|---|
+| 점의 **독립성** | 회전(rotation)마다 `--exclude-golden`으로 만든 **새 독립 표본에 점 1개** | 같은 표본에 리비전별 점을 쌓으면, 그 사이의 엔진 교정이 바로 그 표본에 맞춰졌을 수 있다. 그러면 "FN율이 줄었다"가 표류(엔진이 나아짐)인지 과적합(표본을 외움)인지 **구분 불가**다 — S2-11이 금지한 바로 그 상황이다. 표류 감지는 재채점 금지를 풀 이유가 아니다 |
+| 점의 **값** | 원장 행에 `predictor`와 `metrics`(혼동행렬 4칸·평가 건수·골든 건수·적재율 하한·recall/precision 하한·FN율/오검출률 상한·신뢰수준)를 싣는다 | 종전 행에는 digest·리비전·시각만 있어, 시계열을 그리려면 과거 회차의 골든·예측 파일을 다시 찾아 재실행해야 했다 — 파일이 Kiki 머신에만 있으면 사실상 재현 불가다. 원장 한 파일로 시계열이 읽혀야 한다 |
+| 재채점 금지 | **불변** — 같은 digest × 다른 리비전은 계속 exit 1이고, 막힌 시도는 원장에 점을 남기지 않는다 | 위 첫 줄 |
+
+**대가(숨기지 않는다)**: 점 사이의 차이에는 *엔진 변화*와 *표본 교체*가 섞인다. 점 하나는 30~35건
+× 6앵커 규모의 새 표본이므로, 두 점의 차이는 반드시 **Wilson 구간끼리** 비교한다(점추정 비교 금지 —
+§6). 표본 잡음보다 작은 표류는 이 설계로 보이지 않는다(§8-1과 같은 검출력 한계). 그리고 점 하나를
+찍는 비용은 **검수를 더 쌓아 후보를 늘리는 것**이다(§4 "재추출의 독립성은 제외에서 온다").
+
+### §9.3 판정기 식별 — "어느 판정기의 FN율인가"
+
+예측 행의 `predictor`가 판정기를 가리킨다. 계열(식별자의 `/`·`+` 앞)은
+`ops/qa_confusion_matrix.PREDICTOR_KINDS`가 닫힌 표로 정한다.
+
+| 계열 | 종류 | 뜻 |
+|---|---|---|
+| `qa_pipeline.item_verdict` | `qa_engine` | QA 엔진 문항 좌석 — **정본**. 생산자 `harness/qa_item_verdict`. fuzz를 켜면 `+fuzz` |
+| `generation_gate.outcome` | `generation_gate_proxy` | 생성 파이프라인 outcome(`accepted_stored`·`needs_review`) 대용 — **채택하지 않음** |
+
+- **대용안을 채택하지 않는 이유**: 대용 예측이 재는 것은 QA 엔진이 아니라 **생성 게이트**다. 게다가
+  코퍼스에 수록된 문항은 정의상 전부 생성 게이트를 통과했으므로(`accepted_stored`), 수록 문항만으로
+  만든 골든에서 대용 FN율은 "수록 문항 중 사람이 결함으로 본 비율"로 퇴화한다 — 판정기의 성능이
+  아니라 표본의 결함률이다. 정본 좌석(`judge_item`)이 생겼으므로 대용이 필요하지 않다.
+- 그래도 대용 예측이 **들어오면 표시한다** — 리포트 머리에 "이 FN율은 생성 게이트의 FN율이다"를
+  굵게 적고, JSON `predictor.kind`와 원장 행 `predictor`에 그대로 남는다.
+- **섞으면 판정하지 않는다** — 한 예측 파일에 판정기가 2종 이상이면 `MixedPredictor`로 파싱 실패와
+  같이 exit 1이다. 섞인 혼동행렬은 어느 판정기의 것도 아니다.
+- **원장은 판정기를 요구한다** — `--ledger`인데 예측에 단일 `predictor`가 없으면 exit 1(원장에 아무것도
+  쓰지 않음). 원장 없이 재는 것은 여전히 가능하되 리포트가 "미선언"을 자인한다(옛 형식 예측 호환).
+
+### §9.4 문항 좌석의 구성과 판정 불가
+
+`judge_item`은 집계 QA 엔진 9축 중 **문항으로 투영 가능한 축**의 판정 함수를 문항 1건에 그대로
+적용한다(새 판정 로직 0 — 축 2는 집계와 문항이 같은 함수를 돈다). 투영 불가 축과 사유는
+`qa_pipeline.ITEM_NON_PROJECTABLE_AXES`에 있고, 대응 전수는 테스트가 동결한다.
+
+| 성분 | 출처 | 필수 |
+|---|---|---|
+| `answer_reverify` | `corpus_reverify._reverify_one` — S6 상시 재검산(집계 9축 밖의 기계 검증 스택) | ✅ |
+| `condition_dsl` | 축 2 `equivalence_canonicalize` | |
+| `record_provenance_fields` | 축 6 `content_provenance`의 레코드 레벨 검사 | |
+| `banned_words_pii` | 축 8 `banned_words_pii` | |
+
+판정: 성분 하나라도 fail → **fail** · 아니면 판정 불가 성분이 있거나 필수 성분이 pass가 아니면
+**판정 불가** · 그 밖에만 **pass**. 판정 불가 문항은 predictions에 넣지 않는다 — pass로 채우면 FN이
+위장되고 fail로 채우면 검출률이 부풀려진다. 어댑터가 사유 범주별로 따로 센다.

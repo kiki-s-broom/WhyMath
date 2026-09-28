@@ -38,9 +38,11 @@ from whymath_backend.harness.golden_benchmark import (
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.ops.qa_confusion_matrix import (
     CONTENT_KPI_CONSUMERS,
+    PREDICTOR_KINDS,
     Prediction,
     _report_payload,
     build_report,
+    describe_predictor,
     evaluate,
     main,
     parse_predictions,
@@ -252,6 +254,10 @@ class TestContentKpiConsumerTable:
             assert (tasks_dir / f"{consumer.seat_task}.yaml").exists(), consumer.seat_task
 
 
+_PREDICTOR = "qa_pipeline.item_verdict/v1"
+"""원장 경로 테스트의 판정기 선언 — 원장은 판정기가 선언된 예측만 받는다(EOS-137 ④)."""
+
+
 def _write_predictions(path: Path, rows: list[dict[str, object]]) -> None:
     path.write_text(
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8"
@@ -400,7 +406,9 @@ class TestRescoreLedgerEnforcement:
             golden_path,
             _golden([_item("d1", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2)]),
         )
-        _write_predictions(predictions_path, [{"cu_slug": "d1", "qa_verdict": "fail"}])
+        _write_predictions(
+            predictions_path, [{"cu_slug": "d1", "qa_verdict": "fail", "predictor": _PREDICTOR}]
+        )
         return golden_path, predictions_path, ledger_path
 
     def test_first_evaluation_records_ledger_entry(
@@ -488,7 +496,9 @@ class TestRescoreLedgerEnforcement:
                 [_item("d2", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2)], rotation=1
             ),
         )
-        _write_predictions(predictions_path, [{"cu_slug": "d2", "qa_verdict": "fail"}])
+        _write_predictions(
+            predictions_path, [{"cu_slug": "d2", "qa_verdict": "fail", "predictor": _PREDICTOR}]
+        )
 
         code = main(
             [
@@ -589,7 +599,9 @@ class TestRescoreLedgerEnforcement:
             golden_path,
             _golden([_item("d1", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2)]),
         )
-        _write_predictions(predictions_path, [{"cu_slug": "other", "qa_verdict": "fail"}])
+        _write_predictions(
+            predictions_path, [{"cu_slug": "other", "qa_verdict": "fail", "predictor": _PREDICTOR}]
+        )
 
         assert (
             main(
@@ -707,3 +719,164 @@ class TestFailureCodeKeyContract:
 
         row = next(line for line in rendered.splitlines() if "수학적 오류율" in line)
         assert "| 1건 |" in row, row
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-137 ④ — 판정기 식별: "어느 판정기의 FN율인가"
+# ──────────────────────────────────────────────────────────────────────────
+def _run(golden_path: Path, predictions_path: Path, *extra: str) -> int:
+    return main(["--golden", str(golden_path), "--predictions", str(predictions_path), *extra])
+
+
+class TestPredictorIdentity:
+    @pytest.fixture()
+    def golden_path(self, tmp_path: Path) -> Path:
+        path = tmp_path / "golden.json"
+        write_golden_set(
+            path,
+            _golden(
+                [
+                    _item("d1", GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F2),
+                    _item("c1", GoldenLabel.CLEAN),
+                ]
+            ),
+        )
+        return path
+
+    def test_families_and_suffixes(self) -> None:
+        assert describe_predictor("qa_pipeline.item_verdict/v1")[0] == "qa_engine"
+        assert describe_predictor("qa_pipeline.item_verdict/v1+fuzz")[0] == "qa_engine"
+        assert describe_predictor("generation_gate.outcome")[0] == "generation_gate_proxy"
+        assert describe_predictor(None)[0] == "undeclared"
+        assert describe_predictor("somebody.else/v9")[0] == "unknown"
+        assert "생성 게이트" in PREDICTOR_KINDS["generation_gate.outcome"][1]
+
+    def test_empty_predictor_value_is_a_parse_error(self) -> None:
+        parsed, errors = parse_predictions(
+            [{"cu_slug": "a", "qa_verdict": "pass", "predictor": ""}]
+        )
+
+        assert parsed == [] and len(errors) == 1 and "TypeError" in errors[0]
+
+    def test_mixed_predictors_are_not_judged(self, tmp_path: Path, golden_path: Path) -> None:
+        """섞인 혼동행렬은 어느 판정기의 것도 아니다 — 파싱 실패처럼 exit 1."""
+        preds = tmp_path / "p.jsonl"
+        _write_predictions(
+            preds,
+            [
+                {"cu_slug": "d1", "qa_verdict": "fail", "predictor": _PREDICTOR},
+                {"cu_slug": "c1", "qa_verdict": "pass", "predictor": "generation_gate.outcome"},
+            ],
+        )
+
+        assert _run(golden_path, preds) == 1
+
+    def test_ledger_requires_declared_predictor(self, tmp_path: Path, golden_path: Path) -> None:
+        preds, ledger = tmp_path / "p.jsonl", tmp_path / "ledger.jsonl"
+        _write_predictions(preds, [{"cu_slug": "d1", "qa_verdict": "fail"}])
+
+        assert _run(golden_path, preds, "--ledger", str(ledger), "--engine-revision", "r") == 1
+        assert not ledger.exists()  # 판정기 모르는 점은 원장에 남지 않는다
+
+    def test_undeclared_without_ledger_still_reports_but_says_so(
+        self, tmp_path: Path, golden_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """옛 형식 예측은 원장 없이 여전히 잴 수 있다 — 대신 리포트가 미선언을 자인한다."""
+        preds = tmp_path / "p.jsonl"
+        _write_predictions(preds, [{"cu_slug": "d1", "qa_verdict": "fail"}])
+
+        assert _run(golden_path, preds) == 0
+        assert "판정기(predictor): 미선언" in capsys.readouterr().out
+
+    def test_proxy_predictor_header_warns_it_is_the_generation_gate(
+        self, tmp_path: Path, golden_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        preds, json_path = tmp_path / "p.jsonl", tmp_path / "r.json"
+        _write_predictions(
+            preds, [{"cu_slug": "d1", "qa_verdict": "pass", "predictor": "generation_gate.outcome"}]
+        )
+
+        assert _run(golden_path, preds, "--json", str(json_path)) == 0
+        out = capsys.readouterr().out
+        assert "생성 게이트의 FN율이다 — QA 엔진 FN율로 읽지 말 것" in out
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["predictor"]["kind"] == "generation_gate_proxy"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-137 ③ — 표류 시계열 설계 판정의 동결 (golden_benchmark_contract.md §9)
+# ──────────────────────────────────────────────────────────────────────────
+class TestDriftSeriesDesign:
+    """정본 = 회전마다 새 독립 표본에 점 1개. 원장 행이 그 점의 지표를 싣는다.
+
+    같은 정답지 위에 리비전별 점을 쌓는 설계는 재채점 금지와 충돌하므로 **채택하지 않는다** —
+    그 경로는 계속 exit 1이어야 한다(표류 감지를 이유로 재채점 금지를 풀지 않는다).
+    """
+
+    def _golden(self, tmp_path: Path, name: str, slug: str, version: str, rotation: int) -> Path:
+        path = tmp_path / name
+        write_golden_set(
+            path,
+            _golden(
+                [_item(slug, GoldenLabel.DEFECTIVE, code=GenerationFailureCode.F1)],
+                version=version,
+                rotation=rotation,
+            ),
+        )
+        return path
+
+    def test_each_rotation_adds_one_point_with_metrics(self, tmp_path: Path) -> None:
+        ledger = tmp_path / "ledger.jsonl"
+        g1 = self._golden(tmp_path, "g1.json", "a1", "v1", 0)
+        g2 = self._golden(tmp_path, "g2.json", "b1", "v2", 1)  # 서로소 표본(--exclude-golden)
+        p1, p2 = tmp_path / "p1.jsonl", tmp_path / "p2.jsonl"
+        _write_predictions(p1, [{"cu_slug": "a1", "qa_verdict": "fail", "predictor": _PREDICTOR}])
+        _write_predictions(p2, [{"cu_slug": "b1", "qa_verdict": "pass", "predictor": _PREDICTOR}])
+
+        assert _run(g1, p1, "--ledger", str(ledger), "--engine-revision", "rev-a") == 0
+        assert _run(g2, p2, "--ledger", str(ledger), "--engine-revision", "rev-b") == 0
+
+        records, errors = load_evaluation_ledger(ledger)
+        assert errors == []
+        series = [(r.rotation, r.engine_revision, r.metrics) for r in records]
+        assert [(rot, rev) for rot, rev, _ in series] == [(0, "rev-a"), (1, "rev-b")]
+        # 시계열의 값이 원장에 있다 — 재실행 없이 표류(TP→FN)를 읽는다.
+        assert [(m or {}).get("fn") for _, _, m in series] == [0, 1]
+        assert all(r.predictor == _PREDICTOR for r in records)
+        assert all(
+            set(r.metrics or {})
+            >= {"tp", "fn", "fp", "tn", "evaluated", "golden_total", "fn_rate_upper", "confidence"}
+            for r in records
+        )
+
+    def test_same_golden_new_revision_is_still_blocked_for_drift(self, tmp_path: Path) -> None:
+        ledger = tmp_path / "ledger.jsonl"
+        g1 = self._golden(tmp_path, "g1.json", "a1", "v1", 0)
+        p1 = tmp_path / "p1.jsonl"
+        _write_predictions(p1, [{"cu_slug": "a1", "qa_verdict": "fail", "predictor": _PREDICTOR}])
+
+        assert _run(g1, p1, "--ledger", str(ledger), "--engine-revision", "rev-a") == 0
+        assert _run(g1, p1, "--ledger", str(ledger), "--engine-revision", "rev-b") == 1
+        records, _ = load_evaluation_ledger(ledger)
+        assert len(records) == 1  # 막힌 재채점은 점을 남기지 않는다
+
+    def test_ledger_metrics_match_json_report(self, tmp_path: Path) -> None:
+        """원장 지표와 리포트 JSON 지표가 같은 계산이다 — 두 경로가 갈라지면 시계열이 거짓이 된다."""
+        ledger, json_path = tmp_path / "ledger.jsonl", tmp_path / "r.json"
+        g1 = self._golden(tmp_path, "g1.json", "a1", "v1", 0)
+        p1 = tmp_path / "p1.jsonl"
+        _write_predictions(p1, [{"cu_slug": "a1", "qa_verdict": "pass", "predictor": _PREDICTOR}])
+
+        assert (
+            _run(
+                g1, p1, "--ledger", str(ledger), "--engine-revision", "r", "--json", str(json_path)
+            )
+            == 0
+        )
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        (record,) = load_evaluation_ledger(ledger)[0]
+        metrics = record.metrics or {}
+        assert {k: metrics[k] for k in ("tp", "fn", "fp", "tn")} == payload["matrix"]
+        for key in ("recall_lower", "precision_lower", "fn_rate_upper", "false_alarm_upper"):
+            assert metrics[key] == payload["metrics"][key]
+        assert metrics["coverage_lower"] == payload["coverage"]["wilson_lower"]
