@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-31-suneung-gate-grade-scope-blind
+title: "수능 적격 게이트가 학년·출제범위를 보지 않는다 — persona_fit이 난이도 구간만의 함수라 라벨 있는 승인 문항 전부가 고3(A) 수능 적격(초·중 문항 포함)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(판정 기준 main 78a8edff · EOS-25 독립 비판 F1) — 코드로 확인: `l1/problem_bank/persona_fit_rules.py`의 `_BAND_BASE_FIT`는 난이도 구간 하나만 입력으로 받고, 페르소나 A(일반고 고3)는 라벨이 있는 모든 구간에서 0.70 이상이다. `l6/suneung/gating.py::is_suneung_eligible` ③(c)가 persona_fit ≥ 0.5를 OR 신호로 인정하므로 **난이도 라벨이 있는 승인 문항은 전부 A에게 수능 적격**이다. 수능 SQL 사전필터(`api/_next_problem_policy.py`)도 같은 OR다. 독립 비판의 코퍼스 파일 집계(실 DB 미확인): 승인 2,480건 전부 A 적격 · 그중 초·중 성취기준 전용 1,122건 · 기출 exam_type 0건 · exam_authority_weight 전량 null · 시그니처 30건. **착수 시 실 DB로 같은 집계를 다시 낸다**(집계 명령과 결과를 판정문에 첨부).\n\n② 학생 영향 — 수능 모드 1차 선택이 고3에게 중학교 성취기준 문항을 낼 수 있다(난이도 라벨이 학년 기준이 아니라 θ 근방 정렬이 학년을 가르지 못한다 — 비판 집계: 초·중 전용 승인 문항 난이도 중앙 3.0 vs 고교 과목 전용 2.9). 2026-09-28 현재 학생 앱은 mode=suneung을 호출하지 않으므로(`src/mobile/lib/features/problems/data/problems_api.dart`) 오늘 학생에게 닿는 경로는 없다 — 앱이 수능 모드를 배선하는 순간 우선순위를 다시 본다.\n\n③ 판정 — 무엇이 \"수능 적합\"인가. 선택과목 틀이 아니라 **학년도별 출제 범위**가 올바른 추상이다(비판 놓친 것 2): 2027학년도는 2015 개정 수학Ⅰ·Ⅱ + 선택, 2028학년도부터는 2022 개정 대수·미적분Ⅰ·확률과 통계. 코퍼스는 2022_REVISION이다. 범위 판정을 성취기준 코드 접두어로 할 수 있는지 먼저 본다 — `Problem.subject`는 전부 \"공통\"이고 교과 축(E1-02)은 2027 이월이라 그것에 기대면 막힌다.\n\n④ 집행 — 게이트(L6)와 SQL 사전필터(api)가 **같은 정의**를 쓴다(REC-06 원칙 — 한쪽만 고치면 사전필터가 막은 문항을 게이트가 통과시키거나 그 반대). 1차 선택 결과가 바뀌므로 수능 policy_version을 올리고 회귀 테스트로 동결한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l6/suneung/gating.py
+  - src/backend/whymath_backend/l1/problem_bank/persona_fit_rules.py
+  - src/backend/whymath_backend/api/_next_problem_policy.py
+session: null
+notes: "출처: EOS-25 판정(docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md) 중 pedagogy-designer 독립 비판 F1·놓친 것 1·2. EOS-25는 이 결함 때문에 수능 모드의 관계 재선택을 보류했다(mode_withheld) — \"수능 모드 안에서 다시 고른다\"가 이 게이트로는 성립하지 않기 때문이다. 그 재선택의 재판정 태스크가 이 태스크에 의존한다."
+updated: 2026-09-28

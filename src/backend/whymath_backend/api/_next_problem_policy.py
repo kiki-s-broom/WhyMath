@@ -1,4 +1,4 @@
-"""수능 모드 추천 정책 — L6 게이팅 × L2 CAT의 **합성 지점** (EOS-19).
+"""수능 모드 추천 정책 — L6 게이팅 × L2 CAT의 **합성 지점** (EOS-19 · EOS-25).
 
 왜 `l2`도 `l6`도 아닌 여기인가(위치 선택의 근거를 코드에 남긴다):
 
@@ -17,6 +17,37 @@ API 패키지의 `_` 접두 모듈이다(`api/_l6_mode_reach_state.py`·`api/_co
 기본 CAT 정책(`l2.recommendation_policy.CatRecommendationPolicy`)과 **같은 Protocol**을
 구현하므로 핸들러가 보는 모양은 같다. 알고리즘은 이동 전 핸들러의 수능 분기와 동일하다
 (회귀 0 — 후보 SQL·게이팅·가중 결합 순서·선택기 호출이 모두 그대로다).
+
+────────────────────────────────────────────────────────────────────────────
+EOS-25 — 설명은 전달 문항에 맞추고, 콘텐츠 재선택은 보류한다
+────────────────────────────────────────────────────────────────────────────
+EOS-124가 기본 CAT에서 고친 결함이 이 정책에도 있었다(2026-09-28 재현 · main `78a8edff`). 문항을
+수능 CAT으로 고른 *뒤* 그 문항 개념의 숙달 구간으로 행위를 붙이고 목표 개념은 따로 계산해서, 세
+형태가 나갔다 — (가) 숙달 0.98 개념 문항에 `advance_next`·target=그 개념(정렬 R3 위반) (나) 선수
+숙달
+1.0인데 `practice_prerequisite`·target=그 선수(R2 위반) (다) 선수가 미측정이면 target=문항 개념(R3
+위반). 산출이 `intent_resolution=None`이라 생성 시점 정렬 검증도 면제됐다.
+
+판정(`docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md`):
+
+  - **진단은 하나다.** 의도는 기본 CAT과 같은 함수(`resolve_policy_intent`)로 세우고, 산출은 정렬을
+    선언해 생성 시점 검증(`NextProblemOutcome._aligned_when_declared`)을 받는다.
+  - **처방은 모드가 정한다 — 수능 모드는 콘텐츠를 다른 개념으로 옮기지 않는다.** 의도가 목표 개념의
+    문항으로 다시 고르라고 해도(`reselect_groups`) 1차 선택 문항을 그대로 내보내고, 설명을 앵커 개념
+    연습으로 정직하게 내린다(`IntentResolution.MODE_WITHHELD`). 지금 재선택을 켜지 않는 이유는
+    둘이다(독립 비판 F1·F2 — 코드로 확인). ① 수능 게이트가 학년·출제범위를 보지 않는다 —
+    persona_fit이
+    난이도 구간만의 함수라 난이도 라벨이 있는 문항은 전부 페르소나 A에게 0.70 이상, 곧 수능
+    적격이다.
+    "수능 모드 안에서 다시 고른다"가 성립하지 않는다(`EOS-31`). ② 구간 규칙의 입력(BKT)에 신뢰
+    하한이
+    없다 — 숙달 0.55에서 오답 1개면 0.219(선수 복귀), 정답 1개면 0.862(전진)다. 응답 하나로 콘텐츠를
+    옮기게 된다(`EOS-33`). 재선택의 재판정은 `EOS-35`가 소유한다.
+
+그래서 이 정책의 **선택은 바뀌지 않는다** — 같은 입력에서 같은 문항이 나가고, `policy_version`도
+`suneung_v1` 그대로다(REC-11: 후보 생성·선택 규칙의 식별자). 바뀌는 것은
+설명(reason·action·target)과,
+그 설명이 전달 문항으로 어떻게 해소됐는지를 말하는 `intent_resolution`이다.
 """
 
 from __future__ import annotations
@@ -44,14 +75,19 @@ from whymath_backend.l2.next_problem_selection import (
     load_weak_concept_weights,
     sibling_weights,
 )
-from whymath_backend.l2.recommendation_contract import LearningContext, action_for
+from whymath_backend.l2.recommendation_contract import (
+    LearningContext,
+    action_for,
+    demote_to_current_concept,
+)
 from whymath_backend.l2.recommendation_evidence import POLICY_VERSION_SUNEUNG
 from whymath_backend.l2.recommendation_policy import (
     DEFAULT_GRAPH_BUDGET,
     ConceptGraphBudget,
+    IntentResolution,
     NextProblemOutcome,
     PolicyTelemetry,
-    resolve_target_concept,
+    resolve_policy_intent,
 )
 from whymath_backend.l2.recommendation_reason import collect_recommendation_reason
 from whymath_backend.l6.suneung import (
@@ -188,6 +224,7 @@ class SuneungRecommendationPolicy:
                     if not candidates
                     else CANDIDATE_ZERO_ALL_GATED_INELIGIBLE
                 ),
+                intent_resolution=IntentResolution.NO_CANDIDATE,
                 **common,
             )
 
@@ -210,17 +247,33 @@ class SuneungRecommendationPolicy:
                     item_information(theta, IrtItem(difficulty=b)) * suneung_item_weight(p) * extra,
                 )
             )
-        reason = await collect_recommendation_reason(
+        # ── EOS-25: 설명은 전달 문항에 맞추고, 콘텐츠 재선택은 보류한다 ──────────────────
+        # 1차 선택 문항의 대표 개념이 *앵커*다. 의도는 기본 CAT과 같은 함수로 세운다(진단은 모드와
+        # 무관하게 하나다). 의도가 목표 개념의 문항으로 다시 고르라고 해도(`reselect_groups`) 수능
+        # 모드는 고르지 않는다 — 1차 문항을 그대로 내보내고 설명을 앵커 개념 연습으로 정직하게
+        # 내린다. 재선택하지 않는 이유는 모듈 docstring "EOS-25" 절.
+        anchor_reason = await collect_recommendation_reason(
             session, learner_id=user_id, problem_id=picked.problem_id
         )
-        target = await resolve_target_concept(
-            session, reason=reason, learner_state=learner_state, budget=self._graph_budget
+        intent = await resolve_policy_intent(
+            session,
+            anchor_reason=anchor_reason,
+            learner_state=learner_state,
+            learner_id=user_id,
+            budget=self._graph_budget,
         )
+        reason, resolution = intent.reason, intent.resolution
+        if intent.reselect_groups:
+            reason = demote_to_current_concept(intent.reason)
+            resolution = IntentResolution.MODE_WITHHELD
         return NextProblemOutcome(
             problem_id=picked.problem_id,
             reason=reason,
             action=action_for(reason.type),
-            target_concept=target,
+            # 설명이 가리키는 개념 = 전달 문항의 대표 개념(정렬 계약 R2 — 생성 시점에 검증된다).
+            target_concept=anchor_reason.concept_id,
+            delivered_concept=anchor_reason.concept_id,
+            intent_resolution=resolution,
             # SQL이 difficulty_overall NOT NULL을 보장하나, 스키마 타입(Optional) 정합 방어.
             difficulty=(
                 None if picked.difficulty_overall is None else float(picked.difficulty_overall)
