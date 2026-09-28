@@ -682,13 +682,15 @@ CATALOG: tuple[Spec, ...] = (
     # 있는가"를 정하고 이 행은 "막힌 학생에게 무엇을, 얼마나 세게 줄 것인가"를 정한다.
     # 반복 축의 입력도 다르다(그쪽 R5 = 원인 무관 연속 오답, 이쪽 = 같은 오개념 누적 증거).
     # 번호 주의: 213은 원격 브랜치가 선점해 214를 쓴다(전수 스캔 2026-09-18).
-    _e("WM-E-214", "보정 정책 표(경로 선택 + 반복 오류 개입 사다리)", "Student",
+    # EOS-138 ③: 경로 선택(`select_route`)은 소비처 0건인 채 상태 머신과 반대 순서를 선언하고
+    # 있어 폐기했다 — 이 행의 이름·설명에서 "경로 선택"을 뺀다(모듈 귀속은 그대로).
+    _e("WM-E-214", "보정 정책 표(오개념 교정 신뢰 하한 + 반복 오류 개입 사다리)", "Student",
        "Learning Model", "P1",
        "MISC-30 — 계획서 300 §9. 임계값을 코드에 흩뿌리지 않고 주입 가능한 표 하나"
        "(`REMEDIATION_POLICY_V1`)로 모은다. 사다리(≥2 교정설명·≥3 쉬운문제·≥4 선수개념)는 "
        "`l4/misconception/intervene.py`가 focus 가설의 evidence_count로 읽어 배선돼 있고, "
-       "경로 선택(`select_route`)은 아직 소비처 0건이다 — 숙달 축은 WM-E-211의 "
-       "`select_reason_type`에 위임하므로 재구현이 아니다",
+       "하한(0.7 초과)은 상태 머신 R3 입력 필터와 추천 안전장치가 읽는다. 경로 선택은 "
+       "EOS-138 판정으로 폐기 — 정본 WM-E-212 상태 머신",
        "l2.remediation_policy"),
     # ════════════════════ E — L3 콘텐츠 생성·검증 (Core) ════════════════════
     _e("WM-E-301", "LLM 라우터(3축 결정·모델 매트릭스·seed 정책)", "Platform", "AI Orchestration",
@@ -1112,7 +1114,11 @@ CATALOG: tuple[Spec, ...] = (
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
        "harness.generator_space_overlap_audit",
        "harness.prompt_asset_audit", "harness.generation_seed_replay_probe",
-       "harness.batch_safety"),
+       "harness.batch_safety",
+       # EOS-23 — 검수 큐의 Tier1 검산 거부 행을 재검산해 산술 오류/표현 불일치/판정불가로
+       # 전수 분류하는 읽기 전용 진단 CLI. `corpus_reverify`(코퍼스 Tier1 재검산)와 같은
+       # 검산 재료·같은 판정 함수를 쓰는 짝이라 같은 행에 귀속한다.
+       "harness.tier1_rejection_classifier"),
     _o("WM-O-913", "커버리지·도달률 관측 리포트 가족", "Admin", "Analytics", "P1",
        "OPS-19 — 리포트 11개 중 러너 배선은 별도", "harness.assessment_seat_reach_report",
        "harness.attempt_grading_shadow_report", "harness.attempt_skill_event_reach_report",

@@ -26,6 +26,7 @@ from whymath_backend.l2.ability_estimation import (
     difficulty_to_logit,
     estimate_global_ability,
     resolve_item_difficulty_b,
+    resolve_item_discrimination_a,
 )
 from whymath_backend.l2.ability_tracking import (
     AbilityReading,
@@ -140,6 +141,7 @@ __all__ = [
     "registered_estimator_ids",
     "resolve_estimator",
     "resolve_item_difficulty_b",
+    "resolve_item_discrimination_a",
     "theta_to_mastery_proxy",
     "total_information",
     "update_mastery",

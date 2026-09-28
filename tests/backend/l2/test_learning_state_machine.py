@@ -779,7 +779,13 @@ async def test_graded_entry_with_unmeasured_confidence_practices_not_advances(
         session, user_id=_UID, attempt_id=attempt_id, is_correct=True, confidence=None
     )
 
-    assert spy.kwargs == {"user_id": _UID, "is_correct": True, "confidence": None}
+    assert spy.kwargs == {
+        "user_id": _UID,
+        "is_correct": True,
+        "confidence": None,
+        # EOS-138 ②: 코치 완료는 답안 스캔이 없어 빈 값 — R3 입력이 비어 있다.
+        "this_attempt_misconceptions": (),
+    }
     assert result.rejected_transition is None
     assert result.from_state is LearningState.NEW
     assert result.final_state is LearningState.PRACTICING
@@ -808,6 +814,30 @@ async def test_graded_entry_passes_reported_confidence_through(
     assert result.final_state is LearningState.ADVANCING
     assert result.decision is not None
     assert result.decision.rule_id == "R1-correct-high-confidence"
+
+
+@pytest.mark.asyncio
+async def test_graded_entry_passes_this_attempt_misconceptions_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EOS-138 ② — 이번 응답 스캔의 (오개념 id, 신뢰) 쌍이 공용 진입점을 지나 조립기에 그대로 닿는다.
+
+    이 전달이 끊기면 제출 경로가 쌍을 넘겨도 R3 입력이 비어 교정이 영원히 발화하지 않는다
+    (EOS-134가 진입점을 합치며 병합 시 실제로 끊긴 적이 있다 — 2026-09-28 PR #1358 병합).
+    """
+    spy = _EvidenceSpy()
+    monkeypatch.setattr(machine_module, "build_attempt_evidence", spy)
+    pairs = (("M-frac-01", 0.9),)
+    await advance_on_graded_attempt(
+        _session(),
+        user_id=_UID,
+        attempt_id=uuid.uuid4(),
+        is_correct=False,
+        confidence=None,
+        this_attempt_misconceptions=pairs,
+    )
+    assert spy.kwargs is not None
+    assert spy.kwargs["this_attempt_misconceptions"] == pairs
 
 
 @pytest.mark.asyncio
