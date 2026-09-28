@@ -3699,6 +3699,15 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러의 tests/harness 가 세션 샤드에 가짜 policy_warn 6줄(backlog.py) 기록 — 실행 전 백업으로 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     ".claude/hooks/git_revert_guard.py",
     "tests/infra/test_git_revert_guard.py"
    ],
