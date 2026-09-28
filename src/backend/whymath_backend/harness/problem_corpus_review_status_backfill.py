@@ -55,6 +55,20 @@ CI 배선 판정(OPS-24 — 왜 `--check`인가):
      CI가 레포 데이터를 재작성해서는 안 된다. 백필 자체는 사람이 돌려 커밋하고, CI는 "빠진 게
      있다"만 빨갛게 알린다.
 
+적용 대상(EOS-136 — 계약 정본 `docs/standards/review_status_stamping_contract.md`):
+  이 CLI의 대상은 **고정 코퍼스**(`KNOWN_CORPORA`)뿐이다. 코퍼스 판정은 그 코퍼스의 감사 라벨
+  표본에서 나온 것이라 다른 코퍼스에 옮기면 **근거 차용**이 된다 — 아무도 보지 않은 문항이
+  `approved`로 노출 가능해진다. 그래서 `harness/review_status_domains.corpus_backfill_refusal`이
+  ⑴ 축적 CLI의 **회차 코퍼스**(회차 대장 사이드카 실재 — 그 review_status는 사람 판정 각인 도구
+  `review_status_verdict_bridge`가 쓴다) ⑵ 코퍼스 키와 다른 고정 코퍼스·레포 `data/corpus/` 아래
+  다른 코퍼스를 **거부(exit 2 · 무기록)** 한다. `--all`의 대상 전건에도 같은 검사를 거는 이유:
+  누군가 회차 코퍼스를 `KNOWN_CORPORA`에 등재하면 CI 드리프트 가드가 그것을 "미백필"로 읽고
+  코퍼스 단위 각인을 권하는 대신 **계약 위반으로 빨개져야** 한다(그 뒤에는 사람 판정이 영영
+  각인될 수 없다 — 먼저 채운 쪽이 이기는 불가침 규칙 때문에).
+
+exit 코드: 0 = 정상(기본·`--dry-run`) 또는 `--check`에서 미백필 0건 · 1 = `--check`에서 미백필
+1건 이상 · 2 = 적용 대상 위반(회차 코퍼스·근거 차용·사이드카 확인 불가 — 아무것도 쓰지 않는다).
+
 harness는 import-linter 계약 밖(조성/ops 층·상위 호출 정상 — persona_fit 백필 선례).
 """
 
@@ -71,6 +85,7 @@ from whymath_backend.harness.corpus_audit_eval import load_audit, summarize
 from whymath_backend.harness.problem_corpus_persona_fit_backfill import (
     KNOWN_CORPORA,
 )
+from whymath_backend.harness.review_status_domains import corpus_backfill_refusal
 from whymath_backend.schema.enums import ReviewStatus
 
 __all__ = [
@@ -330,7 +345,8 @@ def main(argv: list[str] | None = None) -> int:
     실행 전제(상대경로 규약).
 
     Returns:
-      `--check`에서 미백필 레코드가 1건 이상이면 1, 그 밖에는 0(기본·`--dry-run`은 항상 0).
+      적용 대상 위반(회차 코퍼스·근거 차용·사이드카 확인 불가)이면 2(무기록), `--check`에서
+      미백필 레코드가 1건 이상이면 1, 그 밖에는 0(기본·`--dry-run`은 항상 0).
     """
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.problem_corpus_review_status_backfill",
@@ -384,6 +400,18 @@ def main(argv: list[str] | None = None) -> int:
     targets: list[tuple[str, Path]] = (
         list(KNOWN_CORPORA.items()) if args.all else [(args.corpus_key, args.in_path)]
     )
+    # 적용 대상 검사(EOS-136) — 판정·쓰기 **전에** 전건을 본다. 한 건이라도 위반이면 아무것도
+    # 쓰지 않는다(일부만 각인된 코퍼스가 남으면 어느 쪽이 정본인지 사람이 가려야 한다).
+    refusals = [
+        refusal
+        for corpus_key, in_path in targets
+        if (refusal := corpus_backfill_refusal(in_path, corpus_key)) is not None
+    ]
+    if refusals:
+        for refusal in refusals:
+            sys.stderr.write(f"[적용 대상 위반] {refusal}\n")
+        sys.stderr.write("아무것도 쓰지 않았다(exit 2).\n")
+        return 2
     reports = []
     for corpus_key, in_path in targets:
         verdict = compute_corpus_verdict(corpus_key)
