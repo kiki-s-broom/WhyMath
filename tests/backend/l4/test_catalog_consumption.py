@@ -468,6 +468,9 @@ class _FakeRow:
     standard_codes: list[str] = field(default_factory=list)
     atom_codes: list[str] = field(default_factory=list)
     flashcards: list[dict[str, object]] = field(default_factory=list)
+    # 렌더 경로 테스트는 검수 통과 행을 전제한다(CONT-05 공급 게이트 — 게이트 자체는
+    # test_content_supply.py::TestSupplyReviewGate가 검사한다).
+    review_status: str = "reviewed"
 
 
 class _FakeSession:

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -13,10 +13,14 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 실측 사실(2026-09-27 · EOS-26 PR #1338 작업 중 · 판정 기준 commit `db42b6b2`) — `scripts/harness/ci_mirror.py`는 스텝 수준 `working-directory: ${{ github.workspace }}`를 해석하지 않는다. 그래서 `declared-unwired-audit` 잡의 OPS-24 드리프트 게이트 2개(`problem_corpus_review_status_backfill --all --check` · `problem_corpus_persona_fit_backfill --all --check`)가 \"작업 디렉터리 없음\"으로 건너뛰어진다. 미러는 이를 \"로컬 실행 대상 아님 — 통과로 계상하지 않는다\"고 표기하지만, 최종 줄은 `✔ 전 잡 통과`이고 `ci_mirror.py verdict`도 exit 0이라 `backlog.py done`의 CI 미러 경고가 이를 \"통과\"로 읽는다. 두 스텝은 로컬에서 돌 수 있다 — `${{ github.workspace }}`를 저장소 루트로 바꾸면 둘 다 exit 0(EOS-26 세션 스크래치 재현 실측).\n② 해석 — 잡·스텝 `working-directory`의 `${{ github.workspace }}`를 저장소 루트로 해석한다. 다른 `${{ }}` 식은 지금처럼 로컬 실행 대상 아님으로 남긴다(추측 해석 금지).\n③ 판정 줄 정직화 — 액션 스텝(`uses:`)처럼 원래 로컬 대상이 아닌 것과, 로컬에서 돌 수 있는데 못 돌린 스텝을 구분한다. 후자가 1건이라도 있으면 최종 줄과 `verdict`가 그 수를 드러낸다(예: \"통과 · 미실행 N건\"). `verdict` 종료 코드를 바꿀지는 `backlog.py done` 경고 단계와 함께 판정하고 근거를 남긴다(CLAUDE.md \"안 돌린 검사와 통과한 검사를 같은 화면에서 읽지 않는다\").\n④ 회귀·변별력 — `tests/harness/`에 ⑴ `${{ github.workspace }}` 스텝이 실제로 실행되는지 ⑵ 해석 불가 식 스텝이 미실행으로 남고 판정 줄에 보이는지를 둔다. 해석을 제거하는 뮤테이션에서 ⑴이 RED인지 확인한다."
-artifacts: []
+  - "④ 위치 정정(2026-09-27 · 착수 세션) — 회귀 테스트는 기존 ci_mirror 계약 파일 tests/infra/test_ci_mirror.py에 둔다(HARN-119 paths와 같음 · infra-contracts 잡이 needs 게이팅 없이 모든 PR에서 수집). 등재 문면의 tests/harness/는 매칭 파일 0건인 위치 오기이며, 내용 요구(⑴ github.workspace 스텝 실제 실행 ⑵ 해석 불가 식 스텝의 미실행 유지·판정 줄 노출 ⑶ 해석 제거 뮤테이션에서 ⑴ RED)는 그대로다."
+artifacts:
+  - "e5d38d20 · https://github.com/kiki-s-broom/WhyMath/pull/1340 — ② ci_mirror가 working-directory의 github.workspace를 저장소 루트로 해석(그 밖의 식은 미실행 유지) · ③ 환경 전제(액션)와 미실행(식·조건·작업 디렉터리) 분리, 미실행 있으면 최종 줄·verdict가 수·이름을 말하고 종료 코드 3 · done 경고는 1단계 warn 유지하되 미실행을 별도 문구로 · 경로 필터 잡(changes)은 자동 선택에서 사유와 함께 제외(상시 exit 3 방지) · ④ tests/infra/test_ci_mirror.py 78 passed, 뮤테이션 M4~M15 전건 RED(M4 = 해석 제거 → ⑴ RED) · CI 미러 5잡 전 스텝 exit 0(OPS-24 게이트 2개 실제 실행·통과) · tests/infra 1979 passed · 하네스 1161 passed"
 paths:
   - scripts/harness/ci_mirror.py
-  - "tests/harness/test_ci_mirror*.py"
+  - "tests/infra/test_ci_mirror*.py"
+  - scripts/harness/backlog.py
+  - ".claude/commands/drive.md"
 session: null
-notes: "출처: EOS-26(PR #1338) 세션이 공식 CI 미러와 자체 재현기를 함께 돌리며 발견 — 자체 재현기도 같은 지점에서 처음 멈췄다(FileNotFoundError). HARN-119(CI 미러) 후속. 분류 HARNESS."
+notes: "출처: EOS-26(PR #1338) 세션이 공식 CI 미러와 자체 재현기를 함께 돌리며 발견 — 자체 재현기도 같은 지점에서 처음 멈췄다(FileNotFoundError). HARN-119(CI 미러) 후속. 분류 HARNESS.\n\n[정정 2026-09-27] paths ['scripts/harness/ci_mirror.py', 'tests/harness/test_ci_mirror*.py'] → ['scripts/harness/ci_mirror.py', 'tests/infra/test_ci_mirror*.py', 'scripts/harness/backlog.py', '.claude/commands/drive.md']: 실제 대상 반영 — ci_mirror 계약 테스트의 기존 위치는 tests/infra/test_ci_mirror.py(HARN-119 paths와 같음 · infra-contracts 잡이 모든 PR에서 수집)이고 tests/harness/test_ci_mirror*.py는 매칭 파일 0건인 위치 오기다. acceptance ③의 done 경고 단계 판정을 위해 scripts/harness/backlog.py의 _warn_if_ci_mirror_missing, 종료 코드 3의 의미를 안내하는 .claude/commands/drive.md를 범위에 넣는다.\npaths 제거 1건: ['tests/harness/test_ci_mirror*.py']\n\n[정정 2026-09-27] acceptance ④의 테스트 위치 문면을 실제 계약 파일 위치와 맞춘다(paths 정정과 짝)."
 updated: 2026-09-27

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 
 import selector
+import store
 from models import Backlog
 
 # 상태별 표시 기호 (터미널 폭 절약)
@@ -141,7 +142,13 @@ def gate_inputs_text(backlog: Backlog, gate: object) -> str:
         waiting = sum(
             1 for dep in deps if getattr(backlog.tasks.get(dep), "status", None) != "done"
         )
-        return f"여는 작업 {len(deps)}건 · 미완 {waiting}건: {', '.join(parts)}"
+        text = f"여는 작업 {len(deps)}건 · 미완 {waiting}건: {', '.join(parts)}"
+        # 입력이 다 끝난 decision 게이트는 **판정 기록 상태**까지 말한다 (HARN-177 ②) — "미완
+        # 0건"만 보이면 사람 차례로 읽히는데, 판정이 기록되지 않은 상태가 같은 글자를 낸다.
+        state = store.gate_judgment_state(backlog, gate)
+        if state is not None and state != store.JUDGMENT_OPEN:
+            text += f" · {store.judgment_state_label(state)}"
+        return text
     reason = getattr(gate, "no_inputs_reason", None)
     # 공백뿐인 사유는 사유가 아니다 — 검증기의 `has_reason`(strip 후 판정)과 같은 기준 (HARN-175).
     if reason and reason.strip():
@@ -289,7 +296,7 @@ def render_status(backlog: Backlog, errors: list[str], today: date) -> str:
         total = sum(len(ids) for _tail, ids in groups)
         lines.append("")
         lines.append(f"── 게이트 대기 {total}건 — 무엇을 기다리나(대기 경로) ──")
-        lines.extend(selector.render_gate_wait_groups(groups))
+        lines.extend(selector.render_gate_wait_groups(backlog, groups))
     lines.append("")
     lines.append("── 다음 착수 후보 (next) ──")
     if ready:
@@ -354,6 +361,9 @@ def render_status_json(backlog: Backlog, errors: list[str], today: date) -> str:
                     for dep in v.gate.depends_on
                 ],
                 "no_inputs_reason": v.gate.no_inputs_reason,
+                # 판정 기록 상태 (HARN-177 ②) — None(판정 개념 없음) · open · unrecorded ·
+                # judged:PASS · judged:FAIL. 텍스트 화면의 꼬리 문구와 같은 판정이다.
+                "judgment": store.gate_judgment_state(backlog, v.gate),
             }
             for v in pending_gate_views(backlog, today)
         ],

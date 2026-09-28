@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONT-06-study-content-lookup-crosswalk-unused
+title: "/study 콘텐츠 해석이 학습목표 원자 코드를 콘텐츠 PK로만 조회한다 — 크로스워크(concept_content.atom_codes)를 채워 두고도 역조회하지 않아 K-12 콘텐츠 437이 구조적으로 닿지 않는다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(2026-09-27 · CONT-05 도달 실측 · 판정 기준 main `0e7b4f6b`): `/study`의 콘텐츠 해석(`l4/content_supply.py::resolve_concept_dsl`)은 학습목표의 `concept_nodes[0]`(원자 코드)을 `concept_content` PK로만 조회한다. (A) K-12 콘텐츠 437 code 중 원자 백본(`atom_graph_v1/graph.json`)에 있는 것 0건 · 대학 409는 전부 소단원 레벨 (B) 저장소 유일 소단원 DSL(`quadratic_maxmin.unit.yaml`)의 목표 4건은 전부 세부개념 원자라 NO_DSL. 그런데 K-12 콘텐츠 행의 `atom_codes`(크로스워크 전이 `l1/concept_atom_crosswalk/transfer.py`)는 파일럿 원자 3종(`10공수1-02-06-1`·`-2`·`-3`)을 K-12 콘텐츠 2행(`10기수1-02-05`·`HK11` 이차함수의 최대·최소)에 연결한다. `atom_codes`의 소비자는 `l3/render/dsl.py`의 `relations` 투영뿐이다(선언≠배선).\n② 판정 택1(현 상태 방치만 금지): ⓐ 해석에 역조회 추가 — PK 미스 시 `atom_codes`에 그 원자를 포함하는 K-12 행을 찾는다. 1:N이면 대표 선택 규칙(크로스워크 `primary_atom_code`·`confidence` 등)을 명시하고 선택 근거를 결과·로그에 남긴다 ⓑ 학습목표 쪽을 콘텐츠 코드로 정렬(컴파일러가 콘텐츠 코드를 개념 노드로 허용) ⓒ by-design 확정 — K-12 콘텐츠는 `/study` 비대상임을 근거와 함께 명문화. 크로스워크 437행은 전건 `ai_estimated`(confidence 0.6~0.75)이므로 ⓐ는 검수 전 매핑으로 콘텐츠를 고르는 것을 어떻게 다룰지 함께 정한다(CONT-05 게이트와 같은 축의 질문).\n③ 어느 쪽이든 CONT-05 검수 게이트(행 → 게이트 → 캐시 순서)를 우회하지 않는다 — 역조회로 고른 행도 같은 게이트를 지나는지 테스트로 동결한다.\n④ 변별력: 파일럿 목표 1건에 대해 역조회 전 NO_DSL → 역조회 후 해석(검수 통과 행 대역) → ai_estimated 행이면 UNREVIEWED의 3상태를 테스트로 확인하고, 역조회 제거 뮤테이션 RED를 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/content_supply.py
+  - "src/backend/whymath_backend/l1/concept_content/**"
+  - "tests/backend/l4/test_content_supply*.py"
+session: null
+notes: "출처: CONT-05 판정문 docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §1.3·§7. 이 태스크가 착지하면 CONT-05의 공급 게이트가 활성화된다(현재 잠복 — 도달 0/4). 그래서 G-kg02(검수 승격 회차) 재판정의 전제이기도 하다: 착지 전에는 K-12 승격의 학생 효과가 0이다."
+updated: 2026-09-27

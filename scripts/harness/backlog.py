@@ -618,7 +618,7 @@ def _print_gate_waits(backlog: object, excluded: list) -> None:
     groups = selector.gate_wait_groups(backlog, excluded)  # type: ignore[arg-type]
     total = sum(len(ids) for _tail, ids in groups)
     print(f"\n게이트 대기로 제외 {total}건 — 무엇을 기다리나(대기 경로):")
-    for line in selector.render_gate_wait_groups(groups):
+    for line in selector.render_gate_wait_groups(backlog, groups):  # type: ignore[arg-type]
         print(line)
 
 
@@ -1085,6 +1085,141 @@ def _check_path_overlap(
     return block_message
 
 
+@dataclass
+class _GateHandoff:
+    """done 인계 계획 — 판정은 끝났고 아직 아무것도 쓰지 않은 상태."""
+
+    gate: object  # models.Gate
+    changes: list[str]
+    verdict: str | None  # "FAIL" | "PASS" | None(판정 무관 입력)
+    reason: str | None  # 판정 무관 사유
+    evidence: str | None
+    others: list[str]  # 이 태스크를 입력으로 둔 **다른** pending decision 게이트(경고용)
+
+
+def _plan_gate_handoff(backlog, task, args: argparse.Namespace) -> _GateHandoff | None:
+    """done이 pending decision 게이트의 입력을 닫을 때 요구하는 판정 인계 — 판정만, 쓰기 없음
+    (HARN-177 ①).
+
+    왜 done에 있는가: HARN-174는 FAIL을 기록하는 도구(`gates amend --verdict`)를 만들었지만
+    도구를 부르게 만드는 지점이 없었다. 2026-09-25 2차 재판정(EOS-130)이 FAIL로 done되면서
+    게이트에는 아무것도 남지 않아, 대장이 진입 게이트를 "입력 다 끝남 · 사람 판정 대기"로
+    오표시하고 3차 재판정의 해금 수를 15→0으로 계산했다(계열 gate-resolution-path-unlinked
+    4회차). 도구 존재 ≠ 호출 강제 — 입력 태스크를 닫는 순간이 판정을 넘길 마지막 기계 지점이다.
+
+    셋 중 하나가 필수다: FAIL(+근거 +소유 태스크) · PASS(+근거) · 판정 무관(+사유). 아무것도
+    없으면 거부하고, 거부는 `_VerdictRejectedError`로 난다 — 호출부는 그때 대장에 아무것도 쓰지
+    않는다.
+    이 태스크의 status는 호출 전에 메모리에서 이미 done이어야 한다(입력 스냅샷·열린 상류 판정이
+    *끝난 뒤의* 대장을 본다).
+
+    한계(⑤): 판정 태스크가 done을 거칠 때만 작동한다. 판정문만 쓰고 태스크를 닫지 않거나 대장
+    밖에서 판정한 경우는 막지 못한다 — 그 상태는 ②의 '판정 결과 미기록' 표시가 드러낸다.
+    """
+    verdict = getattr(args, "verdict", None)
+    no_verdict = getattr(args, "no_verdict", None)
+    evidence = getattr(args, "evidence", None)
+    named_owners = list(dict.fromkeys(getattr(args, "verdict_owners", None) or []))
+    attach = list(dict.fromkeys(getattr(args, "attach", None) or []))
+    gate_id = getattr(args, "gate_id", None)
+    flags_given = bool(verdict or no_verdict or evidence or gate_id or named_owners or attach)
+    targets = [
+        g
+        for g in sorted(backlog.gates.values(), key=lambda g: g.id)
+        if g.status == "pending" and g.kind == "decision" and task.id in g.depends_on
+    ]
+    if not targets:
+        if flags_given:
+            raise _VerdictRejectedError(
+                f"{task.id}: pending decision 게이트의 입력이 아니다 — --verdict/--no-verdict/"
+                "--gate/--evidence/--owner/--attach 는 게이트 입력 태스크의 done 에만 쓴다"
+            )
+        return None
+    if len(targets) > 1 and gate_id is None:
+        raise _VerdictRejectedError(
+            f"{task.id}: pending decision 게이트 {[g.id for g in targets]} 의 입력이다 — done 은 "
+            "게이트 하나의 판정만 받는다. --gate <G-id> 로 지정하고, 나머지 게이트의 판정은 "
+            "gates amend <G> --verdict ... 로 따로 기록하라"
+        )
+    if gate_id is not None:
+        gate = next((g for g in targets if g.id == gate_id), None)
+        if gate is None:
+            raise _VerdictRejectedError(
+                f"{task.id}: --gate {gate_id} 는 이 태스크를 입력으로 둔 pending decision 게이트가 "
+                f"아니다 (후보: {[g.id for g in targets]})"
+            )
+    else:
+        gate = targets[0]
+    others = [g.id for g in targets if g.id != gate.id]
+    if verdict is None and no_verdict is None:
+        raise _VerdictRejectedError(
+            f"{task.id}: pending decision 게이트 {gate.id} 의 입력이다 — 이 done 이 그 게이트에 "
+            "대한 판정 결과를 넘겨야 한다(HARN-177 ①). 셋 중 하나:\n"
+            "  · --verdict FAIL --evidence '<판정문 · 기준 커밋>' --attach <미충족 항목의 소유 "
+            "태스크>  (이미 열린 경로에 있으면 --owner <id>)\n"
+            "  · --verdict PASS --evidence '<판정문 · 기준 커밋>'  (clear 는 게이트 담당자 몫)\n"
+            "  · --no-verdict '<이 태스크가 판정과 무관한 사유>'\n"
+            "  아무것도 없으면 대장에 아무것도 쓰지 않는다 — 판정문만 쓰고 닫힌 재판정이 게이트를 "
+            "'사람 판정 대기'로 위장한 사고(2026-09-25)의 집행 지점"
+        )
+    if verdict is not None and no_verdict is not None:
+        raise _VerdictRejectedError(
+            f"{task.id}: --verdict 와 --no-verdict 는 함께 쓸 수 없다 — 판정인지 무관인지 하나만"
+        )
+    changes: list[str] = []
+    if no_verdict is not None:
+        if not no_verdict.strip():
+            raise _VerdictRejectedError(
+                f"{task.id}: --no-verdict 사유가 비어 있다 — 무사유 면제는 없다"
+            )
+        if evidence or named_owners or attach:
+            raise _VerdictRejectedError(
+                f"{task.id}: --no-verdict 에는 --evidence/--owner/--attach 를 붙일 수 없다 — "
+                "판정이 아니라면서 판정 재료를 내면 어느 쪽이 참인지 대장이 말하지 못한다"
+            )
+        changes.append(f"input done · {task.id} · 판정 무관: {no_verdict.strip()}")
+        return _GateHandoff(gate, changes, None, no_verdict.strip(), None, others)
+    rejection = _attach_gate_inputs(backlog, gate, attach, changes)
+    if rejection:
+        raise _VerdictRejectedError(rejection)
+    changes.extend(
+        _gate_verdict_changes(
+            backlog,
+            gate,
+            verdict=verdict,
+            evidence=evidence,
+            add_deps=attach,
+            named_owners=named_owners,
+        )
+    )
+    return _GateHandoff(gate, changes, verdict, None, evidence, others)
+
+
+def _write_gate_handoff(root: Path, backlog, task, handoff: _GateHandoff) -> None:
+    """인계 계획을 대장에 쓴다 — corrections는 호출 전에 이미 붙어 있다(무결성 검증 뒤)."""
+    gate = handoff.gate
+    store.save_gates(root, sorted(backlog.gates.values(), key=lambda g: g.id))
+    store.append_event(
+        root,
+        "gate_verdict",
+        gate.id,
+        task=task.id,
+        verdict=handoff.verdict,
+        reason=handoff.reason,
+        evidence=handoff.evidence,
+        changes=" · ".join(handoff.changes),
+        depends_on=list(gate.depends_on),
+    )
+    print(f"✎ {gate.id} 판정 인계 — {' · '.join(handoff.changes)}")
+    print(f"  {report.gate_inputs_text(backlog, gate)}")
+    for other in handoff.others:
+        print(
+            f"⚠ {other} 도 이 태스크를 입력으로 둔 pending decision 게이트다 — 그 판정은 "
+            f"gates amend {other} --verdict ... 로 따로 기록하라",
+            file=sys.stderr,
+        )
+
+
 def cmd_done(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     task = backlog.tasks.get(args.id)
@@ -1126,6 +1261,24 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
         return _fail(error)
     prev_session = task.session
     task.status = "done"
+    # ── 게이트 판정 인계 (HARN-177 ①) — 판정만 한다. 거부면 아무것도 쓰지 않는다(위 status
+    # 변경은 메모리뿐이고 이 함수는 거기서 끝난다). status를 먼저 done으로 두는 이유: 소유
+    # 태스크의 "열린 상류" 판정과 입력 스냅샷이 **이 태스크가 끝난 뒤의** 대장을 봐야 한다.
+    try:
+        handoff = _plan_gate_handoff(backlog, task, args)
+    except _VerdictRejectedError as exc:
+        return _fail(str(exc))
+    if handoff is not None:
+        gate = handoff.gate
+        record = f"[{_today()}] " + " · ".join(handoff.changes) + f" — done {task.id} 인계"
+        gate.corrections = list(gate.corrections) + [record]
+        own_errors = [e for e in store.validate_backlog(backlog) if gate.id in e]
+        if own_errors:
+            for e in own_errors:
+                print(f"  · {e}", file=sys.stderr)
+            return _fail(
+                f"{task.id}: 게이트 {gate.id} 판정 인계가 무결성 위반 — 대장에 아무것도 쓰지 않았다"
+            )
     task.artifacts = list(dict.fromkeys(task.artifacts + args.artifact))
     task.session = None
     if no_pr_reason is not None:
@@ -1140,6 +1293,8 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
     if no_pr_reason is not None:
         done_extra["no_pr_reason"] = no_pr_reason
     store.append_event(root, "done", task.id, **done_extra)
+    if handoff is not None:
+        _write_gate_handoff(root, backlog, task, handoff)
     _release_remote_claim(root, task.id, prev_session)
     print(f"✔ {task.id} 완료 — 증적: {', '.join(args.artifact)}")
     if no_pr_reason is not None:
@@ -1162,17 +1317,22 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
 
 
 def _warn_if_ci_mirror_missing(root: Path) -> None:
-    """이번 커밋의 CI 미러 결과가 없거나 실패면 경고한다(HARN-119 ② 집행 지점).
+    """이번 커밋의 CI 미러 결과가 없거나 실패거나 미실행을 남겼으면 경고한다(HARN-119 ②).
 
     조회 자체가 실패하는 환경(미러 미설치·git 없음)에서도 done을 막지 않는다 —
     다만 그 경우에도 **사유를 말한다**. 무타입 침묵은 이 저장소가 금지한 형태다.
+
+    미실행(HARN-180)은 실패와 다르게 안내한다 — 다시 돌려도 같은 스텝은 또 돌지 않으므로
+    "재현 후 다시 부르라"는 처방이 맞지 않는다. 그래도 통과로 접지는 않는다: 2026-09-27
+    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다. 1단계 warn은 그대로다(승격은
+    HARN-173 소관).
     """
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import ci_mirror  # noqa: PLC0415  (선택 의존 — 없으면 경고만)
 
         commit = ci_mirror.current_commit(root)
-        ok, reason = ci_mirror.verdict_for_commit(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
+        verdict = ci_mirror.mirror_verdict(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
     except (ImportError, OSError, subprocess.SubprocessError) as exc:
         print(
             f"⚠ CI 미러 상태를 확인하지 못했습니다({type(exc).__name__}) — "
@@ -1180,13 +1340,22 @@ def _warn_if_ci_mirror_missing(root: Path) -> None:
             file=sys.stderr,
         )
         return
-    if not ok:
+    if verdict.state == ci_mirror.VERDICT_PASS:
+        return
+    if verdict.state == ci_mirror.VERDICT_NOT_EXECUTED:
         print(
-            f"⚠ {reason}\n"
-            f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
-            f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+            f"⚠ {verdict.reason}\n"
+            f"  → 위 스텝은 로컬에서 **돌지 않은 검사**입니다 — 통과로 적지 말고, 그 명령을 직접 "
+            f"돌리거나 PR 본문에 'CI가 판정'으로 명기하세요(1단계 warn — 거부하지 않습니다)",
             file=sys.stderr,
         )
+        return
+    print(
+        f"⚠ {verdict.reason}\n"
+        f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
+        f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+        file=sys.stderr,
+    )
 
 
 def cmd_block(root: Path, args: argparse.Namespace) -> int:
@@ -1642,6 +1811,114 @@ def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
     return 0
 
 
+class _VerdictRejectedError(Exception):
+    """판정 기록·인계의 거부 사유 — 호출부가 `_fail`로 낸다.
+
+    대장에 아무것도 쓰기 **전**에만 난다(거부 = exit 1 + 파일 무변경).
+    """
+
+
+def _attach_gate_inputs(backlog, gate, deps: list[str], changes: list[str]) -> str | None:
+    """게이트 입력을 순서대로 붙인다 — 막다른 길·순환은 붙이기 **전** 거부(사유 반환).
+
+    `gates amend --depends`와 done 인계의 `--attach`(HARN-177 ①)가 같은 경로다.
+    """
+    for dep in deps:
+        rejection = _gate_input_rejection(backlog, gate.id, dep)
+        if rejection:
+            return rejection
+        gate.depends_on.append(dep)
+        changes.append(f"depends_on +{dep}")
+    return None
+
+
+def _gate_verdict_changes(
+    backlog,
+    gate,
+    *,
+    verdict: str,
+    evidence: str | None,
+    add_deps: list[str],
+    named_owners: list[str],
+) -> list[str]:
+    """decision 게이트의 판정(FAIL·PASS) 기록 조각 — `gates amend --verdict`와 `done` 인계가
+    **같은 함수**를 쓴다 (HARN-174 v2-8 · HARN-177 ①⑥).
+
+    호출 전에 `add_deps`는 이미 `gate.depends_on`에 붙어 있어야 한다(`_attach_gate_inputs`) —
+    소유 태스크의 상류 판정이 그 간선을 본다. 거부는 `_VerdictRejectedError`로 낸다.
+
+    FAIL의 소유 태스크는 두 경로로 지목한다:
+      · 새로 붙인 입력(`add_deps`) 중 미종결 태스크 — HARN-174 v2-8 그대로
+      · `named_owners` — **이미 게이트의 열린 상류에 있는** 미종결 태스크(HARN-177 ⑥). 사람이
+        먼저 입력을 재지정한 게이트(2026-09-25 #1321)에 FAIL을 기계 판독 형식으로 남길 유일한
+        길이다. 열린 경로에 없으면 거부한다 — 끝난 태스크 너머의 연결은 선택기가 따라가지
+        않으므로(사고 3 방지 축 유지).
+    둘 다 비면 거부한다.
+    """
+    if gate.kind != "decision":
+        raise _VerdictRejectedError(
+            f"{gate.id}: --verdict 는 decision 게이트 전용이다(현재 kind={gate.kind}) — "
+            "사람·외부 게이트는 판정문이 아니라 행동으로 열린다"
+        )
+    if gate.status != "pending":
+        raise _VerdictRejectedError(
+            f"{gate.id}: 이미 {gate.status} — 판정은 pending 게이트에만 기록한다"
+        )
+    if not evidence:
+        raise _VerdictRejectedError(
+            f"{gate.id}: --verdict {verdict} 에는 --evidence <판정문 경로 · 기준 커밋> 필수"
+        )
+    if not _has_judgment_base(evidence):
+        raise _VerdictRejectedError(
+            f"{gate.id}: --evidence 에 판정 기준이 없다 — 커밋 해시나 PR 참조(#12)를 넣어라 "
+            "(판정은 시점에 종속된다 · HARN-68과 같은 검사)"
+        )
+    # 입력 스냅샷 — 기록 시점에 done인 입력(HARN-177 ②). done 인계 중이면 닫히는 태스크는
+    # 이미 메모리에서 done이다(cmd_done이 그렇게 부른다).
+    done_inputs = [d for d in gate.depends_on if backlog.tasks[d].status == "done"]
+    if verdict == "PASS":
+        if add_deps or named_owners:
+            raise _VerdictRejectedError(
+                f"{gate.id}: PASS 판정에는 소유 태스크가 없다 — --depends/--attach/--owner 를 "
+                "빼라. 미충족 항목이 남았다면 그것은 FAIL이다"
+            )
+        return [store.format_pass_verdict(done_inputs, evidence)]
+    owners = [dep for dep in add_deps if backlog.tasks[dep].status not in TERMINAL_STATUSES]
+    reachable = store.upstream_tasks(backlog, (store.GATE_NODE, gate.id), open_only=True)
+    for owner in named_owners:
+        task = backlog.tasks.get(owner)
+        if task is None:
+            raise _VerdictRejectedError(
+                f"{gate.id}: --owner '{owner}' 가 대장에 없다 — full id로 지정하라"
+            )
+        if task.status in TERMINAL_STATUSES:
+            raise _VerdictRejectedError(
+                f"{gate.id}: --owner '{owner}' 는 {task.status} — 끝난 태스크는 미충족 항목을 "
+                "소유할 수 없다"
+            )
+        if owner not in reachable:
+            raise _VerdictRejectedError(
+                f"{gate.id}: --owner '{owner}' 가 이 게이트의 열린 상류에 없다 — 판정문이 지목해도 "
+                "대장에 (선택기가 따라갈 수 있는) 연결이 없으면 재판정은 사람이 판정문을 다시 "
+                f"읽어야만 열린다. --depends/--attach {owner} 로 입력에 직접 붙이거나 미종결 "
+                f"재판정 태스크의 선행으로 걸어라. 지금 열린 상류: {sorted(reachable) or '없음'}"
+            )
+        if owner not in owners:
+            owners.append(owner)
+    if not owners:
+        raise _VerdictRejectedError(
+            f"{gate.id}: FAIL 판정에 미충족 항목의 소유 태스크가 없다 — --depends/--attach "
+            "<태스크>로 **미종결** 태스크를 새로 붙이거나, 이미 열린 상류에 있는 태스크를 "
+            "--owner <id> 로 지목하라.\n"
+            "  FAIL만 적고 여는 작업을 잇지 않으면, 무엇이 끝나야 재판정하는지 대장이 모른다\n"
+            "  (2026-09-24 재판정문이 지목한 EOS-24·EOS-124 가 연결되지 않은 채 방치된 사고).\n"
+            f"  지금 열린 상류: {sorted(reachable) or '없음'}"
+        )
+    # 형식 고정 — validate(`store.fail_verdict_errors`)가 이 줄을 읽어 소유 태스크가 게이트의
+    # 열린 상류에 연결돼 있는지 대조한다. evidence는 자유 서술이라 맨 뒤에 둔다.
+    return [store.format_fail_verdict(owners, evidence, done_inputs)]
+
+
 def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     """등재된 게이트의 **문면·독촉 주기를 정정**한다 (HARN-124).
 
@@ -1674,6 +1951,7 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     no_inputs_arg = getattr(args, "no_inputs", None)
     no_inputs = (no_inputs_arg or "").strip() or None
     verdict = getattr(args, "verdict", None)
+    named_owners = list(dict.fromkeys(getattr(args, "verdict_owners", None) or []))
     # --evidence 단독 호출은 "정정할 것이 없다"보다 **먼저** 판정한다 — 순서가 반대면 이 절은
     # 도달 불가능한 코드가 된다(HARN-174 구현 중 실측: 강화한 단언이 잡았다).
     if args.evidence and verdict is None:
@@ -1681,6 +1959,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
             f"{gate_id}: gates amend 의 --evidence 는 --verdict FAIL 과 함께만 쓴다 "
             "(통과 근거는 gates clear --evidence 의 몫)"
         )
+    if named_owners and verdict is None:
+        return _fail(f"{gate_id}: gates amend 의 --owner 는 --verdict FAIL 과 함께만 쓴다")
     if (
         new_title is None
         and new_remind is None
@@ -1716,12 +1996,9 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
             )
         gate.depends_on.remove(dep)
         changes.append(f"depends_on -{dep}")
-    for dep in add_deps:
-        rejection = _gate_input_rejection(backlog, gate_id, dep)
-        if rejection:
-            return _fail(rejection)
-        gate.depends_on.append(dep)
-        changes.append(f"depends_on +{dep}")
+    rejection = _attach_gate_inputs(backlog, gate, add_deps, changes)
+    if rejection:
+        return _fail(rejection)
     if no_inputs is not None:
         if gate.depends_on:
             return _fail(
@@ -1737,39 +2014,21 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         changes.append(f"no_inputs_reason: {gate.no_inputs_reason!r} → None (입력 부착으로 해제)")
         gate.no_inputs_reason = None
 
-    # ── FAIL 판정 기록 (HARN-174 v2-8) ──
-    # 판정이 FAIL이면 "무엇이 끝나야 다시 판정하는가"가 대장에 있어야 한다. 그것이 없으면
-    # 재판정은 사람이 판정문을 다시 읽어야만 열리는 게이트가 된다 — 2026-09-24 재판정문이
-    # 지목한 EOS-24·EOS-124 가 재판정 태스크에 연결되지 않은 채 방치된 사고(계열
-    # gate-resolution-path-unlinked 3회차)의 집행 지점이다.
+    # ── 판정 기록 (HARN-174 v2-8 · HARN-177 ⑥) — 공용 함수. done 인계(①)도 같은 함수다. ──
     if verdict is not None:
-        if gate.kind != "decision":
-            return _fail(
-                f"{gate_id}: --verdict 는 decision 게이트 전용이다(현재 kind={gate.kind}) — "
-                "사람·외부 게이트는 판정문이 아니라 행동으로 열린다"
+        try:
+            changes.extend(
+                _gate_verdict_changes(
+                    backlog,
+                    gate,
+                    verdict=verdict,
+                    evidence=args.evidence,
+                    add_deps=add_deps,
+                    named_owners=named_owners,
+                )
             )
-        if gate.status != "pending":
-            return _fail(f"{gate_id}: 이미 {gate.status} — FAIL 판정은 pending 게이트에만 기록한다")
-        if not args.evidence:
-            return _fail(
-                f"{gate_id}: --verdict FAIL 에는 --evidence <판정문 경로 · 기준 커밋> 필수"
-            )
-        if not _has_judgment_base(args.evidence):
-            return _fail(
-                f"{gate_id}: --evidence 에 판정 기준이 없다 — 커밋 해시나 PR 참조(#12)를 넣어라 "
-                "(판정은 시점에 종속된다 · HARN-68과 같은 검사)"
-            )
-        owners = [dep for dep in add_deps if backlog.tasks[dep].status not in TERMINAL_STATUSES]
-        if not owners:
-            return _fail(
-                f"{gate_id}: FAIL 판정에 미충족 항목의 소유 태스크가 없다 — --depends <태스크>로 "
-                "**미종결** 태스크를 1건 이상 새로 붙여라.\n"
-                "  FAIL만 적고 여는 작업을 잇지 않으면, 무엇이 끝나야 재판정하는지 대장이 모른다\n"
-                "  (2026-09-24 재판정문이 지목한 EOS-24·EOS-124 가 연결되지 않은 채 방치된 사고)."
-            )
-        # 형식 고정 — validate(`store.fail_verdict_errors`)가 이 줄을 읽어 소유 태스크가
-        # 게이트 상류에 연결돼 있는지 대조한다. evidence는 자유 서술이라 맨 뒤에 둔다.
-        changes.append(store.format_fail_verdict(owners, args.evidence))
+        except _VerdictRejectedError as exc:
+            return _fail(str(exc))
 
     if not changes:
         return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")
@@ -1793,7 +2052,7 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     if add_deps or remove_deps or no_inputs is not None:
         event_extra.update(depends_on=list(gate.depends_on), no_inputs_reason=gate.no_inputs_reason)
     if verdict is not None:
-        event_extra.update(verdict=verdict, evidence=args.evidence)
+        event_extra.update(verdict=verdict, evidence=args.evidence, owners=named_owners)
     store.append_event(
         root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes), **event_extra
     )
@@ -4585,7 +4844,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=cmd_start)
 
-    p = sub.add_parser("done", help="태스크 완료 (증적 필수 · PR 참조 필수)")
+    p = sub.add_parser(
+        "done",
+        help="태스크 완료 (증적 필수 · PR 참조 필수 · decision 게이트 입력이면 판정 인계 필수)",
+        description=(
+            "태스크 완료. 이 태스크가 pending decision 게이트의 입력(gate.depends_on)이면 그 "
+            "게이트에 대한 판정 결과를 같은 호출에서 넘겨야 한다(HARN-177 ①): "
+            "--verdict FAIL --evidence ... 에 소유 태스크(--attach 신규 부착 또는 --owner 열린 "
+            "상류) · --verdict PASS --evidence ... · --no-verdict <사유>. 셋 다 없으면 exit 1이고 "
+            "대장에 "
+            "아무것도 쓰지 않는다. 판정 결과는 태스크 증적이 아니라 게이트 corrections에 남는다. "
+            "한계(⑤): 이 집행은 판정 태스크가 done을 거칠 때만 작동한다 — 판정문만 쓰고 태스크를 "
+            "닫지 않거나 대장 밖에서 판정한 경우는 막지 못하며, 그 상태는 next·status·gates show의 "
+            "'판정 결과 미기록' 표시가 드러낸다."
+        ),
+    )
     p.add_argument("id")
     p.add_argument("--artifact", action="append", default=[])
     p.add_argument(
@@ -4601,6 +4874,52 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=list(NO_PR_REASONS),
         help="PR 없이 완료하는 예외 사유 (HARN-23 — 예외 4종만 허용)",
+    )
+    # ── 게이트 판정 인계 (HARN-177 ①) — pending decision 게이트의 입력 태스크에만 뜻이 있다 ──
+    p.add_argument(
+        "--gate",
+        dest="gate_id",
+        default=None,
+        metavar="G-ID",
+        help="이 태스크를 입력으로 둔 pending decision 게이트가 2건 이상일 때 어느 게이트의 "
+        "판정인지 (1건이면 자동)",
+    )
+    p.add_argument(
+        "--verdict",
+        choices=["FAIL", "PASS"],
+        default=None,
+        help="게이트 판정 결과 — FAIL은 --evidence + 소유 태스크(--attach/--owner), "
+        "PASS는 --evidence 필수 (clear 는 여전히 게이트 담당자 몫)",
+    )
+    p.add_argument(
+        "--evidence",
+        default=None,
+        help="판정 근거 — 판정문 경로와 판정 기준(커밋 해시·PR 참조) · --verdict 와 함께",
+    )
+    p.add_argument(
+        "--attach",
+        action="append",
+        default=None,
+        metavar="TASK_ID",
+        help="FAIL: 미충족 항목의 소유 태스크를 게이트 입력으로 **새로** 붙인다 (반복 지정 · "
+        "gates amend --depends 와 같은 경로)",
+    )
+    p.add_argument(
+        "--owner",
+        dest="verdict_owners",
+        action="append",
+        default=None,
+        metavar="TASK_ID",
+        help="FAIL: 이미 게이트의 열린 상류에 있는 미종결 소유 태스크를 지목 (반복 지정 · "
+        "HARN-177 ⑥ — 열린 경로에 없으면 거부)",
+    )
+    p.add_argument(
+        "--no-verdict",
+        dest="no_verdict",
+        default=None,
+        metavar="사유",
+        help="이 태스크가 그 게이트의 판정과 무관한 입력일 때의 사유 (예: 수정 태스크 — "
+        "재판정은 별도 태스크가 한다)",
     )
     p.set_defaults(func=cmd_done)
 
@@ -4722,11 +5041,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--verdict",
-        choices=["FAIL"],
+        choices=["FAIL", "PASS"],
         default=None,
         help=(
-            "gates amend: decision 게이트의 FAIL 판정 기록 — --evidence <판정문·기준 커밋>과 "
-            "--depends <미충족 항목의 소유 태스크>(1건 이상 신규·미종결) 필수 (HARN-174 v2-8)"
+            "gates amend: decision 게이트의 판정 기록 — FAIL은 --evidence <판정문·기준 커밋>과 "
+            "미종결 소유 태스크 1건 이상(--depends 신규 부착 또는 --owner 열린 상류) 필수 "
+            "(HARN-174 v2-8 · HARN-177 ⑥) · PASS는 --evidence 만 (clear 는 담당자 몫)"
+        ),
+    )
+    p.add_argument(
+        "--owner",
+        dest="verdict_owners",
+        action="append",
+        default=None,
+        metavar="TASK_ID",
+        help=(
+            "gates amend --verdict FAIL: 이미 이 게이트의 열린 상류에 있는 미종결 소유 태스크를 "
+            "지목 (반복 지정 · HARN-177 ⑥ — 열린 경로에 없으면 거부)"
         ),
     )
     p.add_argument(

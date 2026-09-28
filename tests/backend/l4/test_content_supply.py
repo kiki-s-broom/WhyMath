@@ -17,6 +17,7 @@ from whymath_backend.composition import (
     default_assessment_answer_verifier,
     default_expression_seal,
 )
+from whymath_backend.l1.concept_content.review_gate import is_supply_eligible
 from whymath_backend.l3.models import RoutingRequest
 from whymath_backend.l3.render.adapter import RenderContext
 from whymath_backend.l3.render.dsl import ConceptDSL
@@ -24,8 +25,10 @@ from whymath_backend.l4.content_supply import (
     DSL_CACHE_PREFIX,
     REASON_CANNOT_RENDER,
     REASON_NO_DSL,
+    REASON_UNREVIEWED,
     SupplyTally,
     get_concept_dsl,
+    resolve_concept_dsl,
     supply,
 )
 from whymath_backend.l4.models import PolyaStage
@@ -51,6 +54,9 @@ class _FakeRow:
     standard_codes: list[str] = field(default_factory=list)
     atom_codes: list[str] = field(default_factory=list)
     flashcards: list[dict[str, object]] = field(default_factory=list)
+    # 렌더·폴백·집계 테스트는 검수 통과 행을 전제한다(CONT-05 공급 게이트 통과). 게이트 자체는
+    # `TestSupplyReviewGate`가 `ai_estimated`를 명시해 검사한다 — 실 코퍼스 846행은 전부 ai_estimated다.
+    review_status: str = "reviewed"
 
 
 class _FakeSession:
@@ -131,13 +137,19 @@ class TestConceptDslCache:
         assert session.get_calls == 1
 
     @pytest.mark.asyncio
-    async def test_cache_hit_skips_db(self) -> None:
-        session, cache = _session_with_content(), _FakeCache()
+    async def test_cache_hit_rereads_review_status_but_serves_cached_body(self) -> None:
+        # CONT-05 ③ — 종전 계약("적중이면 DB를 안 탄다")을 의도적으로 바꿨다. 적중도 검수 게이트
+        # 판정을 위해 행을 읽는다(get_calls 2): 판정을 캐시에 맡기면 강등된 행이 TTL(24h) 동안
+        # 계속 공급된다. 캐시가 여전히 쓰인다는 대조로, 두 호출 사이에 DB 본문을 바꿔도 적중은
+        # 캐시 본문을 준다 — 캐시가 아끼는 것은 투영·주입이지 게이트 판정이 아니다.
+        row = _FakeRow()
+        session, cache = _FakeSession({"A1": row}), _FakeCache()
         await get_concept_dsl("A1", session=session, cache=cache)
+        row.name = "바뀐 이름"
         again = await get_concept_dsl("A1", session=session, cache=cache)
 
-        assert again is not None
-        assert session.get_calls == 1  # 두 번째는 DB를 안 탄다.
+        assert again is not None and again.name == "일차식"  # 캐시 본문
+        assert session.get_calls == 2  # 적중도 게이트 판정을 위해 행을 읽는다.
 
     @pytest.mark.asyncio
     async def test_corrupt_cache_falls_back_to_db(self) -> None:
@@ -160,6 +172,128 @@ class TestConceptDslCache:
         first = await get_concept_dsl("A1", session=session, cache=cache)
         second = await get_concept_dsl("A1", session=session, cache=cache)
         assert first == second  # 직렬화 왕복이 계약을 보존한다.
+
+
+# ── 검수 게이트(CONT-05) ──────────────────────────────────────────
+
+
+class TestSupplyReviewGate:
+    """CONT-05 ⓐ — 공급은 `reviewed`만 통과(fail-closed)하고, 캐시 적중 경로도 같은 검사를 지난다.
+
+    변별력 축 셋(acceptance ④): ai_estimated 거부 · reviewed 공급(성공 방향 대조) · 없는 code는
+    기존대로 None. 거기에 캐시 적중 우회 차단(강등 즉시 반영)과 사유 분리(집계 관측)를 더한다.
+    """
+
+    @pytest.mark.asyncio
+    async def test_ai_estimated_row_is_refused_and_not_cached(self) -> None:
+        session = _FakeSession({"A1": _FakeRow(review_status="ai_estimated")})
+        cache = _FakeCache()
+        dsl, reason = await resolve_concept_dsl("A1", session=session, cache=cache)
+
+        assert dsl is None
+        assert reason == REASON_UNREVIEWED
+        assert cache.store == {}  # 검수 전 본문은 캐시에도 남기지 않는다.
+        assert await get_concept_dsl("A1", session=session, cache=cache) is None
+
+    @pytest.mark.asyncio
+    async def test_reviewed_row_is_supplied(self) -> None:
+        # 성공 방향 대조 — 같은 형태의 행이 reviewed면 공급된다(게이트가 항상 막는 위장이 아니다).
+        session = _FakeSession({"A1": _FakeRow(review_status="reviewed")})
+        dsl, reason = await resolve_concept_dsl("A1", session=session, cache=_FakeCache())
+
+        assert dsl is not None and dsl.code == "A1"
+        assert reason is None
+
+    @pytest.mark.asyncio
+    async def test_missing_code_keeps_no_dsl_reason(self) -> None:
+        # 없는 code는 기존대로 None — 사유는 검수 전(UNREVIEWED)과 구분된다.
+        dsl, reason = await resolve_concept_dsl("NOPE", session=_FakeSession(), cache=_FakeCache())
+
+        assert dsl is None
+        assert reason == REASON_NO_DSL
+
+    @pytest.mark.asyncio
+    async def test_demoted_row_is_refused_even_on_cache_hit(self) -> None:
+        # 캐시 적중 경로 우회 차단 — reviewed일 때 적재된 캐시 항목이 TTL 안에 남아 있어도 행이
+        # 강등되면 즉시 공급이 멈춘다(판정은 캐시보다 먼저, DB의 현재 상태로 한다).
+        row = _FakeRow(review_status="reviewed")
+        session, cache = _FakeSession({"A1": row}), _FakeCache()
+        assert await get_concept_dsl("A1", session=session, cache=cache) is not None
+        assert f"{DSL_CACHE_PREFIX}A1" in cache.store  # 전제 — 캐시가 채워져 있다.
+
+        row.review_status = "ai_estimated"  # 강등(코퍼스 재적재가 DB 승격을 되돌리는 경로 등)
+        dsl, reason = await resolve_concept_dsl("A1", session=session, cache=cache)
+
+        assert dsl is None
+        assert reason == REASON_UNREVIEWED
+
+    @pytest.mark.parametrize(
+        "status",
+        ["ai_estimated", "rejected", "", "Reviewed", " reviewed", "reviewed ", "REVIEWED", None],
+    )
+    def test_only_exact_reviewed_is_eligible(self, status: str | None) -> None:
+        # fail-closed — 완전 일치만 통과. 표기 변형·빈 값·None은 오염 입력으로 보고 거부한다.
+        assert is_supply_eligible(status) is False
+
+    def test_exact_reviewed_is_eligible(self) -> None:
+        assert is_supply_eligible("reviewed") is True
+
+    @pytest.mark.asyncio
+    async def test_supply_refuses_unreviewed_and_counts_reason(self) -> None:
+        # 공급 경로 — 렌더하지 않고(학생이 볼 조각 0) 사유 UNREVIEWED를 집계에 남긴다.
+        tally = SupplyTally()
+        result = await supply(
+            code="A1",
+            signals=StudentSignals(),
+            session=_FakeSession({"A1": _FakeRow(review_status="ai_estimated")}),
+            cache=_FakeCache(),
+            tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+        )
+
+        assert result.rendered is None
+        assert result.text is None
+        assert result.fallback_reason == REASON_UNREVIEWED
+        assert tally.by_fallback_reason == {REASON_UNREVIEWED: 1}
+        assert "dsl_render" not in tally.counts
+
+    @pytest.mark.asyncio
+    async def test_unreviewed_takes_existing_generate_fallback(self) -> None:
+        # "DSL 없음과 같게"(acceptance ②ⓐ) — 생성 폴백을 켠 호출자에게는 기존 폴백 경로 그대로다.
+        provider, trace = _FakeProvider(), _RecordingTrace()
+        result = await supply(
+            code="A1",
+            signals=StudentSignals(),
+            session=_FakeSession({"A1": _FakeRow(review_status="ai_estimated")}),
+            cache=_FakeCache(),
+            generate_request=_routing_request(),
+            provider=provider,
+            trace=trace,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+        )
+
+        assert result.content_source == "generate"
+        assert result.fallback_reason == REASON_UNREVIEWED
+        assert provider.calls == 1
+
+    @pytest.mark.asyncio
+    async def test_review_status_alone_flips_outcome(self) -> None:
+        # 변별력 — 같은 행에서 review_status 하나만 바꿨을 때 결과가 뒤집힌다(캐시는 호출마다 새로).
+        async def run(status: str) -> str | None:
+            result = await supply(
+                code="A1",
+                signals=StudentSignals(),
+                session=_FakeSession({"A1": _FakeRow(review_status=status)}),
+                cache=_FakeCache(),
+                seal=default_expression_seal(),
+                assessment_verifier=default_assessment_answer_verifier(),
+            )
+            return result.content_source if result.rendered is not None else result.fallback_reason
+
+        assert await run("reviewed") == "dsl_render"
+        assert await run("ai_estimated") == REASON_UNREVIEWED
 
 
 # ── 공급 분기 ─────────────────────────────────────────────────────

@@ -327,17 +327,33 @@ def gate_wait_groups(
     return [(list(tail), sorted(ids)) for tail, ids in sorted(groups.items())]
 
 
+def gate_tail_suffix(backlog: Backlog, label: str) -> str:
+    """경로가 게이트에서 끝날 때 붙이는 꼬리 — **판정 기록 상태**로 갈린다 (HARN-177 ②).
+
+    종전에는 무조건 `(사람 판정 대기)`였다. 경로가 게이트에서 끝나는 것은 "입력이 없거나 다
+    끝났다"는 뜻일 뿐, 판정이 났다는 뜻이 아니다 — 입력 태스크가 판정문만 남기고 게이트에
+    아무것도 넘기지 않은 채 done이 되면 정확히 같은 화면이 난다(2026-09-25 실측: 2차 재판정
+    FAIL 뒤 진입 게이트가 Kiki 차례로 안내됐다). 판정 개념이 없는 게이트(사람·외부 게이트,
+    입력 없는 decision 게이트)는 종전 문구 그대로다.
+    """
+    gate_id = label.split(" ", 1)[0]  # "G-x (외 N)" · "G-x (순환)" 의 ID 부분
+    gate = backlog.gates.get(gate_id)
+    state = store.gate_judgment_state(backlog, gate) if gate is not None else None
+    return f" ({store.judgment_state_label(state)})"
+
+
 def render_gate_wait_groups(
-    groups: list[tuple[list[str], list[str]]], indent: str = "  "
+    backlog: Backlog, groups: list[tuple[list[str], list[str]]], indent: str = "  "
 ) -> list[str]:
     """`gate_wait_groups` → 화면 줄. 태스크가 많으면 앞 5건 + 건수(분모는 항상 낸다)."""
     lines: list[str] = []
     for tail, ids in groups:
         shown = ", ".join(ids[:5]) + (f" 외 {len(ids) - 5}건" if len(ids) > 5 else "")
         # 경로가 게이트에서 끝나면 그 게이트의 입력이 없거나 이미 다 끝났다는 뜻이다 — 지금
-        # 막고 있는 것은 작업이 아니라 사람 판정이다. 그 사실을 화면에서 바로 읽게 한다.
+        # 막고 있는 것은 작업이 아니다. 그것이 사람 판정인지, 아직 기록되지 않은 판정인지는
+        # 게이트의 판정 기록 상태가 가른다(HARN-177 ② · `gate_tail_suffix`).
         waiting_on_person = bool(tail) and tail[-1].startswith("G-")
-        suffix = " (사람 판정 대기)" if waiting_on_person else ""
+        suffix = gate_tail_suffix(backlog, tail[-1]) if waiting_on_person else ""
         lines.append(f"{indent}· {len(ids)}건 ← {' ← '.join(tail)}{suffix}  [{shown}]")
     return lines
 
