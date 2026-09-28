@@ -86,9 +86,13 @@ class AdminModelsResponse(BaseModel):
     models: tuple[AdminModelRow, ...] = Field(..., description="모델별 적재 여부.")
     missing: tuple[str, ...] = Field(..., description="빠진 필수 모델 태그.")
     error: str | None = Field(None, description="로컬 점검 실패 사유(성공이면 None).")
-    cloud_configured: bool | None = Field(None, description="클라우드 키 구성 여부(미노출=None).")
+    cloud_configured: bool | None = Field(
+        None, description="클라우드 전송 가능 구성 여부(키 + 사용 허가 · 미노출=None)."
+    )
     cloud_reachable: bool | None = Field(None, description="클라우드 도달성(**미측정=None**).")
-    cloud_error: str | None = Field(None, description="클라우드 점검 실패 사유.")
+    cloud_error: str | None = Field(
+        None, description="클라우드 점검 실패 사유 — 사용 중단 방침 차단 사유 포함(ARCH-68)."
+    )
 
 
 @router.get(

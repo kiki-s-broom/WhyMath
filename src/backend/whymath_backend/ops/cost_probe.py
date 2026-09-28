@@ -51,7 +51,8 @@ PRD v1.2 §3의 첫 노출 페르소나 **A(일반고 고3·MVP)**는 대다수�
 - **의존성 묶음**(`ProbeDeps`)은 팩토리로 주입 가능 — 테스트가 가짜 provider·스파이
   sink로 라이브 없이 파이프라인을 태운다(pipeline.generate 자체는 순수라 실물 그대로).
 - 클라우드 archetype은 `anthropic_configured`일 때만 태운다(미설정 시 provider 오류
-  회피) — live_preflight의 cloud_configured 게이팅과 동형.
+  회피) — live_preflight의 cloud_configured 게이팅과 동형. 키는 있으나 ARCH-66 정책
+  차단으로 빠진 경우 그 사유를 `cloud_excluded_reason`에 싣는다(ARCH-68).
 
 시크릿·비용 경계
 ----------------
@@ -319,6 +320,10 @@ class ProbeReport:
     # None은 "0건"이 아니라 "이 호출은 사유를 계상하지 않았다"(레거시 순수 tier_values 호출
     # 호환·회귀 0, OPS-18 acceptance②).
     local_reason_counts: dict[str, int] | None = None
+    # 자동 결정(include_cloud=None)이 ARCH-66 정책 차단 때문에 클라우드 archetype을 뺐을 때의
+    # 사유(ARCH-68). `cloud_included=False`만으로는 키가 없어서인지·막혀서인지·--no-cloud인지
+    # 모른다. 키 미설정·--no-cloud면 None(종전 출력 그대로).
+    cloud_excluded_reason: str | None = None
 
     def to_json(self) -> dict[str, object]:
         data = dataclasses.asdict(self)
@@ -537,6 +542,10 @@ async def run_probe(
     한 요청 실패가 전체 측정을 깨지 않는다). flush 실패도 삼킨다(LangfuseSink 방침 동형).
     """
     cloud = settings.anthropic_configured if include_cloud is None else include_cloud
+    # 자동 결정이 정책 차단 때문에 클라우드를 뺐다면 그 사유를 리포트에 남긴다(ARCH-68).
+    # --no-cloud(include_cloud=False)는 사람이 고른 것이라 사유를 붙이지 않는다.
+    policy_block = settings.anthropic_policy_block_reason
+    excluded_reason = policy_block if include_cloud is None and not cloud else None
     plan = build_probe_plan(mix, rounds, include_cloud=cloud)
     deps = deps_factory(settings)
 
@@ -562,7 +571,7 @@ async def run_probe(
     # 짧게 끝나는 CLI — 배치 유실 방지로 전송을 지금 확정한다(LangfuseSink.flush는 오류를 삼킴).
     deps.trace.flush()
 
-    return summarize_decisions(
+    report = summarize_decisions(
         outcome.tier_values,
         errors=outcome.errors,
         error_samples=outcome.error_samples,
@@ -570,6 +579,7 @@ async def run_probe(
         rounds=rounds,
         requests=outcome.requests,
     )
+    return dataclasses.replace(report, cloud_excluded_reason=excluded_reason)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -587,6 +597,8 @@ def render_report(report: ProbeReport) -> str:
     lines.append("WhyMath L3 대표 트래픽 프로브 — 로컬 비율 실측(게이트② 판정)")
     lines.append("=" * 64)
     lines.append(f"라운드: {report.rounds}  ·  클라우드 archetype 포함: {report.cloud_included}")
+    if report.cloud_excluded_reason is not None:
+        lines.append(f"  ↳ 클라우드 제외 사유: {report.cloud_excluded_reason}")
     succeeded = report.total - report.errors
     lines.append(f"총 요청: {report.total}건  ·  성공: {succeeded}  ·  오류: {report.errors}")
     if report.error_samples:

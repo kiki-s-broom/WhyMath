@@ -9,12 +9,14 @@ LIVE_LLM_ACTIVATION.md §10 "활성 확인/스모크"를 이 단일 명령으로
 
 판정 항목
 --------
-① cloud_configured   — `Settings().anthropic_configured`(config.py). Anthropic 키가 채워졌는가.
+① cloud_configured   — `Settings().anthropic_configured`(config.py). Anthropic 키가 채워졌고
+   ARCH-66 사용 허가 스위치가 켜졌는가. 키는 있으나 스위치가 꺼졌으면(정책 차단) 그 사유를
+   `cloud_policy_block`에 따로 싣는다 — "키 없음"과 섞어 보고하지 않는다(ARCH-68).
 ② langfuse_configured — `Settings().langfuse_configured`(config.py). 공개키·시크릿키가 둘 다인가.
    도달성      — Anthropic·Ollama `check_status()`(reachable/error)를 /status 없이 직접 점검.
 ③ 클라우드 스모크    — (스모크 on·anthropic 설정 시) 실 클라우드 CLOUD_MID(Sonnet) 1콜 →
    실측 usage(토큰·지연) → `actual_cost_krw`로 실측 비용(원) 산출. anthropic 미설정이면
-   "키 없음"을 명시하고 조용한 실패 없이 graceful skip 한다.
+   원인("키 없음" 또는 정책 차단 사유)을 명시하고 조용한 실패 없이 graceful skip 한다.
 
 실행
 ----
@@ -178,7 +180,7 @@ class Report:
     """프리플라이트 종합 리포트 — 사람용 출력·JSON 직렬화의 단일 진실."""
 
     cloud_configured: bool
-    """① Anthropic 키 설정 여부(Settings 기준·정본)."""
+    """① Anthropic 사용 가능 여부 — 키 설정 + ARCH-66 사용 허가(Settings 기준·정본)."""
 
     langfuse_configured: bool
     """② Langfuse 공개키·시크릿키 둘 다 설정 여부(Settings 기준)."""
@@ -200,6 +202,13 @@ class Report:
 
     exit_code: int
     """종료 코드 — 0(정상·미설정) / 2(설정됐는데 도달 불가·스모크 실패)."""
+
+    cloud_policy_block: str | None = None
+    """① 키는 있으나 ARCH-66 사용 중단 방침으로 막힌 경우 그 사유(ARCH-68). 그 외 None.
+
+    `cloud_configured=False`만으로는 "키 없음"과 "정책 차단"이 같은 화면이다 — 키를 넣은
+    직후 이 도구를 돌린 운영자가 왜 꺼져 있는지 알 수 있게 원인을 따로 싣는다. 정보이므로
+    종료 코드에는 영향이 없다(미설정과 같은 0)."""
 
 
 def _cloud_mid_decision() -> RoutingDecision:
@@ -407,19 +416,25 @@ def _opt_int(value: object) -> int | None:
     return None
 
 
-async def _run_pipeline_smoke(*, cloud_configured: bool, deps: PipelineDeps) -> SmokeResult:
+async def _run_pipeline_smoke(
+    *, cloud_configured: bool, deps: PipelineDeps, policy_block: str | None = None
+) -> SmokeResult:
     """스모크를 pipeline.generate로 태워 Langfuse에 기록·flush 한다.
 
     anthropic 설정 시 CLOUD_MID(sync) 목표 요청을, 미설정 시 LOCAL 폴백 요청을 쓴다.
     호출 후 `trace.flush()`로 전송을 확정하고, trace가 갈무리한 record dict에서 실측
     cost_krw·토큰을 읽는다(pipeline은 결과로 usage를 돌려주지 않음). 예외는 리포트로
-    흡수해 종료 코드(2)로 표면화한다(_run_smoke와 동일 방침)."""
+    흡수해 종료 코드(2)로 표면화한다(_run_smoke와 동일 방침).
+
+    `policy_block`이 있으면(키는 있으나 ARCH-66 정책 차단) 폴백 메모가 "미설정" 대신 그
+    사유를 말한다(ARCH-68) — 폴백 동작 자체는 같다."""
     if cloud_configured:
         req = _cloud_mid_smoke_request()
         note = "CLOUD_MID(sync) 목표 — 실 클라우드 1콜"
     else:
         req = _local_smoke_request()
-        note = "LOCAL 폴백(anthropic 미설정) — 로컬 1콜, cost_tier=LOCAL·0원이라도 기록 증명 성립"
+        cause = policy_block if policy_block is not None else "anthropic 미설정"
+        note = f"LOCAL 폴백({cause}) — 로컬 1콜, cost_tier=LOCAL·0원이라도 기록 증명 성립"
 
     try:
         result = await deps.generate(
@@ -477,6 +492,9 @@ async def run_preflight(
     # ①② 판정 — Settings가 정본(키 값은 읽지 않고 '채워졌는지'만 본다).
     cloud_configured = settings.anthropic_configured
     langfuse_configured = settings.langfuse_configured
+    # ① 원인 — 키는 있으나 ARCH-66 정책 차단이면 그 사유(ARCH-68). 키 미설정이면 None이라
+    # 아래 기존 문구("키 없음")가 그대로 쓰인다.
+    policy_block = settings.anthropic_policy_block_reason
 
     # 클라우드 도달성 — 설정된 경우만 의미가 있다(미설정이면 None=미점검).
     cloud = cloud_provider_factory(settings)
@@ -505,11 +523,13 @@ async def run_preflight(
             smoke_result = await _run_pipeline_smoke(
                 cloud_configured=cloud_configured,
                 deps=pipeline_deps_factory(settings),
+                policy_block=policy_block,
             )
     elif not cloud_configured:
-        smoke_result = SmokeResult(
-            ran=False, skipped_reason="anthropic 미설정(키 없음) — 스모크 skip"
-        )
+        # 원인을 섞지 않는다 — 키가 있는데 "키 없음"이라고 말하면 운영자가 키를 다시 넣는
+        # 헛수고로 간다(ARCH-68).
+        skip_cause = policy_block if policy_block is not None else "anthropic 미설정(키 없음)"
+        smoke_result = SmokeResult(ran=False, skipped_reason=f"{skip_cause} — 스모크 skip")
     else:
         smoke_result = await _run_smoke(cloud)
 
@@ -529,6 +549,7 @@ async def run_preflight(
         ollama_error=local_status.error,
         smoke=smoke_result,
         exit_code=exit_code,
+        cloud_policy_block=policy_block,
     )
 
 
@@ -554,6 +575,9 @@ def _render_stdout(report: Report) -> str:
     lines.append("=" * 60)
     lines.append("[판정]")
     lines.append(f"  ① cloud_configured (Anthropic 키)      : {_fmt_bool(report.cloud_configured)}")
+    if report.cloud_policy_block is not None:
+        # 키가 있는데 위 줄이 "아니오"인 이유 — 이 줄이 없으면 "키 없음"으로 읽힌다(ARCH-68).
+        lines.append(f"     ↳ 정책 차단: {report.cloud_policy_block}")
     lines.append(
         f"  ② langfuse_configured (공개·시크릿키)  : {_fmt_bool(report.langfuse_configured)}"
     )

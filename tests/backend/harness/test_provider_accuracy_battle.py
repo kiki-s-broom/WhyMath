@@ -219,6 +219,7 @@ class TestArmReadinessPreflight:
         """이 테스트가 보는 Settings를 환경변수로 구성하고 캐시를 비운다."""
         for name in (
             "WHYMATH_ANTHROPIC_API_KEY",
+            "WHYMATH_ANTHROPIC_API_ENABLED",  # ARCH-66 스위치 — 환경에 남아 있으면 판정이 바뀐다
             "WHYMATH_DEEPSEEK_API_KEY",
             "DEEPSEEK_API_KEY",
             "WHYMATH_OPENROUTER_API_KEY",
@@ -235,6 +236,35 @@ class TestArmReadinessPreflight:
         ready, detail = battle.arm_readiness("anthropic")
         assert ready is False
         assert "WHYMATH_ANTHROPIC_API_KEY" in detail
+        config.get_settings.cache_clear()
+
+    def test_policy_blocked_anthropic_names_policy_not_missing_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ARCH-68: 키는 있으나 사용 중단 방침으로 꺼져 있으면 '키 미설정'이 아니라 정책 사유.
+
+        '키 미설정'이라고 하면 운영자가 이미 있는 키를 다시 넣는 헛수고로 간다. 키 값은 출력에
+        나오지 않는다.
+        """
+        self._settings(monkeypatch, WHYMATH_ANTHROPIC_API_KEY="sk-ant-test-not-a-real-key")
+        ready, detail = battle.arm_readiness("anthropic")
+        assert ready is False
+        assert detail == config.get_settings().anthropic_policy_block_reason
+        assert "사용 중단 방침" in detail
+        assert "키 미설정" not in detail
+        assert "sk-ant-test-not-a-real-key" not in detail
+        config.get_settings.cache_clear()
+
+    def test_enabled_anthropic_with_key_is_ready(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """대조군: 키와 스위치가 둘 다 있으면 준비 완료 — 위 차단 판정이 과잉이 아님을 확인."""
+        self._settings(
+            monkeypatch,
+            WHYMATH_ANTHROPIC_API_KEY="sk-ant-test-not-a-real-key",
+            WHYMATH_ANTHROPIC_API_ENABLED="true",
+        )
+        ready, detail = battle.arm_readiness("anthropic")
+        assert ready is True
+        assert detail == ""
         config.get_settings.cache_clear()
 
     def test_present_deepseek_key_is_ready(self, monkeypatch: pytest.MonkeyPatch) -> None:
