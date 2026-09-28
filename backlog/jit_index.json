@@ -2137,6 +2137,26 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/commands/drive.md",
+    "docs/standards/build_harness.md",
+    "scripts/harness/board.py",
+    "scripts/harness/report.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "scripts/harness/verify_gate_wait_kind_discrimination.py",
+    "scripts/harness/work_graph.py",
+    "scripts/harness/work_graph_page.html",
+    "tests/harness/test_board.py",
+    "tests/harness/test_gate_wait_kind*.py",
+    "tests/harness/test_work_graph.py"
+   ],
+   "text": "공용 판정이 있는데 작업 흐름 그래프가 자체 판정 — 판정 결과 미기록 게이트를 '사람 차례'로 분류",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-16",
    "paths": [
     "docs/standards/build_harness.md",
@@ -3116,6 +3136,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
@@ -3764,6 +3794,15 @@
     "tests/harness/*.py"
    ],
    "text": "HARN-183이 9분 먼저 claim된 OPS-69와 같은 문제를 중복 등재 — 슬러그까지 동일(머지 전 cancel)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — CI 미러 중 · 커밋 전 복원",
    "weight": 0
   },
   {

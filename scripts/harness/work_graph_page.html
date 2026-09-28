@@ -168,6 +168,9 @@ svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .s-human .pill,.s-gate_turn .pill{background:var(--human)}
 .s-gate_wait .bar{border-top-color:var(--human);background:var(--wait-bg)}
 .s-gate_wait .pill{background:transparent;color:var(--human);box-shadow:0 0 0 1px var(--human) inset}
+/* 판정 결과 미기록(HARN-184) — 사람 차례가 아니다: 입력은 끝났는데 판정이 게이트에 없다 */
+.s-gate_verdict .bar{border-top-color:var(--block);background:var(--block-bg)}
+.s-gate_verdict .pill{background:transparent;color:var(--block);box-shadow:0 0 0 1px var(--block) inset}
 .s-branch .bar{border-top-color:var(--branch);background:var(--branch-bg)} .s-branch .pill{background:var(--branch)}
 .s-ready{border-color:color-mix(in srgb,var(--ready) 45%,var(--line))}
 .win.overdue .pill::after{content:" · 초과"}
@@ -240,6 +243,7 @@ svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .c-ready{background:var(--ready)!important} .c-in_progress,.c-review{background:var(--run)!important}
 .c-waiting{background:var(--wait)!important} .c-blocked{background:var(--block)!important}
 .c-human,.c-gate_turn,.c-gate_wait{background:var(--human)!important} .c-branch{background:var(--branch)!important}
+.c-gate_verdict{background:var(--block)!important}
 
 /* ── 좁은 화면: 목록은 덮개, 상세는 아래 시트 ── */
 @media (max-width:860px){
@@ -288,6 +292,7 @@ svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
         <span><i class="c-waiting"></i>대기</span>
         <span><i class="c-blocked"></i>차단</span>
         <span><i class="c-human"></i>사람 작업·게이트</span>
+        <span><i class="c-gate_verdict"></i>판정 결과 미기록(게이트)</span>
         <span><i class="c-branch"></i>미머지 브랜치</span>
         <span><svg viewBox="0 0 26 8"><path d="M1 4H25" stroke="currentColor" stroke-width="2" fill="none"/></svg>선행 태스크</span>
         <span><svg viewBox="0 0 26 8"><path d="M1 4H25" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3" fill="none"/></svg>게이트</span>
@@ -316,7 +321,8 @@ const store = {
 };
 const KIND_LABEL = {task: '작업', gate: '게이트', branch: '브랜치'};
 const STATE_NAME = {ready: '시작 가능', in_progress: '진행 중', review: '검토 대기', waiting: '대기',
-  blocked: '차단', human: '사람 소유', gate_turn: '사람 차례', gate_wait: '게이트(선행 대기)',
+  blocked: '차단', human: '사람 소유', gate_turn: '사람 차례', gate_verdict: '판정 결과 미기록',
+  gate_wait: '게이트(선행 대기)',
   branch: '미머지 브랜치'};
 
 /* ── 상태: 보기(이동·배율) · 선택 · 걸러 보기 · 옮긴 창 위치 ── */
@@ -339,7 +345,7 @@ function header() {
     ['', '전체', KEYS.length, ''],
     ['ready', '시작 가능', c.ready, 'c-ready'],
     ['in_progress', '진행 중', c.in_progress, 'c-in_progress'],
-    ['human', '사람 작업', c.human + c.gate_turn + c.gate_wait, 'c-human'],
+    ['human', '사람 작업', c.human + c.gate_turn + c.gate_verdict + c.gate_wait, 'c-human'],
     ['branch', '미머지', c.branch, 'c-branch'],
     ['blocked', '차단', c.blocked, 'c-blocked'],
     ['waiting', '대기', c.waiting, 'c-waiting'],
@@ -361,7 +367,7 @@ function header() {
 }
 
 /* ── 걸러 보기 판정 ── */
-const stateGroup = n => ['human', 'gate_turn', 'gate_wait'].includes(n.state) ? 'human'
+const stateGroup = n => ['human', 'gate_turn', 'gate_verdict', 'gate_wait'].includes(n.state) ? 'human'
   : n.state === 'review' ? 'in_progress' : n.state;
 function matches(n) {
   if (stateFilter && stateGroup(n) !== stateFilter) return false;
@@ -421,6 +427,7 @@ function frameHtml(f) {
     if (c.ready) bits.push(`시작 가능 ${c.ready}`);
     const human = (c.human || 0) + (c.gate_turn || 0);
     if (human) bits.push(`사람 ${human}`);
+    if (c.gate_verdict) bits.push(`판정 미기록 ${c.gate_verdict}`);
     if (c.branch) bits.push(`미머지 ${c.branch}`);
     count = bits.join(' · ');
   } else {
@@ -662,7 +669,8 @@ const mini = $('mini');
 let miniBase = null, miniQueued = false, miniScale = 1;
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 const STATE_VAR = {ready: '--ready', in_progress: '--run', review: '--run', waiting: '--wait',
-  blocked: '--block', human: '--human', gate_turn: '--human', gate_wait: '--human', branch: '--branch'};
+  blocked: '--block', human: '--human', gate_turn: '--human', gate_verdict: '--block',
+  gate_wait: '--human', branch: '--branch'};
 function buildMini() {
   const W = DATA.canvas.w, H = DATA.canvas.h;
   miniScale = Math.min(230 / W, 170 / H);
@@ -741,6 +749,12 @@ function renderSide() {
       .sort((a, b) => (NODES[b].unlocks - NODES[a].unlocks) || a.localeCompare(b));
     html += section('사람 차례', human.length, 'Kiki가 움직여야 풀리는 게이트·사람 소유 작업',
       human.map(k => itemHtml(k, NODES[k].days != null ? `${NODES[k].days}일` : '')).join('') || '<p class="hint">없음</p>');
+    // 판정 결과 미기록(HARN-184) — 사람 차례 목록에 넣지 않는다. 판정이 이미 났는데 기록만
+    // 빠졌을 수 있다(2026-09-25 사고: FAIL 판정문이 있었는데 대장은 Kiki 차례로 안내했다).
+    const unrecorded = KEYS.filter(k => NODES[k].state === 'gate_verdict').sort();
+    if (unrecorded.length) html += section('판정 결과 미기록', unrecorded.length,
+      '입력은 끝났는데 그 상태의 판정(FAIL/PASS)이 게이트에 없다 — 판정문이 있으면 gates amend --verdict로 기록부터',
+      unrecorded.map(k => itemHtml(k, NODES[k].days != null ? `${NODES[k].days}일` : '')).join(''));
     const RANK = {isolated: 0, pr_closed: 1, unresolved: 2, unscanned: 3, active: 4, pr_filed: 5, ported: 6};
     const br = KEYS.filter(k => NODES[k].kind === 'branch')
       .sort((a, b) => ((RANK[NODES[a].verdict] ?? 9) - (RANK[NODES[b].verdict] ?? 9)) || a.localeCompare(b));

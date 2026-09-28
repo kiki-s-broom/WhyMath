@@ -350,7 +350,7 @@
 - **재발 방지 (반복 2회차 → 등재 의무)**: 형태는 "결정이 pending 게이트의 전제를 무효화했는데 결정 세션이 그 게이트를 갱신하지 않음"이다. 1회차 = 2026-09-24 ARCH-66 → 이 게이트(발견 09-28). 2회차 = 2026-09-25 S4-16 기각 → `G-kg02-review-promotion-llm-session`(당일 전제 재점검 PR #1332가 발견). 두 번 다 피해는 0이었고, 발견은 사람이 그 게이트를 꺼냈을 때의 우연이었다. 대책 태스크는 `HARN-185-gate-premise-impact-scan`이다 — 취소·판정 시 인용 게이트를 자동 경고하고, `gates impact`로 전제 영향을 조회한다. 한계는 ID 인용이 없는 의미 수준의 변경이며, 이 경우 조회는 결정 세션이 직접 돌려야 한다. 사고 대장 계열 `gate-premise-drift-after-decision`에 2건을 기록했고, `jit_index.json`을 재생성했다(HARN-179 미착지).
 - **남긴 것 (정직 고지)**: ① NOTNOW 11건 notes의 "12월 출시 이후로 보낸"·"v1.0 이후, 11월 착수 금지"는 등재 지시 원문 인용이라 고치지 않았다 — 재확인 지점의 정본은 게이트 문면이다. ② `build_harness.md` §3a "한계(명시)"의 "게이트 정정 CLI 부재 · `HARN-124` 소유"는 HARN-124 done(`gates amend` 실재)으로 이미 낡았다. 이 결정의 범위 밖이라 기록만 남긴다. ③ 연말 회차에서 재개를 원하면 조건 ③을 바꾸는 결정이 재개 판정보다 먼저다.
 - **NOT(범위)**: 코드 0 · 테스트 0 · 게이트 상태·독촉일·부착 태스크 변경 0 · NOTNOW 태스크 변경 0.
-- **검증 중 사고 2건 (사고 대장 기록)**: ⓐ CI 미러의 tests/harness가 세션 샤드에 가짜 `path_overlap` 3줄을 썼다(`harness-test-live-ledger-write` 9회차 — main 병합 후 발생일 순 기준, 등재 당시 표시는 7회차 · 대책 소유 `HARN-170` · 커밋 전 백업 복원, 바이트 동일). ⓑ backend-migrations 재현용 PostgreSQL(5432)을 띄워 둔 채 backend 잡을 미러했다. 그래서 `_pg_reachable()`로 skip을 판정하는 `test_export_attempt_events_scoped_by_user_on_live_pg`가 실행돼 1 failed가 났고, 21분 실행을 폐기했다. DB를 내리고 재실행하자 0 failed · 456 skipped(+1)였다. 이것은 `ci-local-repro-gap` 6회차이며, 대책 축을 `HARN-164` ⑥으로 편입했다. 통합 테스트 표식만 보고 "DB가 떠 있어도 backend 잡엔 영향 없다"고 판단한 것이 원인이었다 — 도달성 탐침 테스트는 표식 게이트 밖에 있다.
+- **검증 중 사고 2건 (사고 대장 기록)**: ⓐ CI 미러의 tests/harness가 세션 샤드에 가짜 `path_overlap` 3줄을 썼다(`harness-test-live-ledger-write` 재발 — 같은 날 다른 세션 기록과 섞여 회차 번호가 병합 때마다 밀리므로(등재 당시 7회차 → 병합 후 9 → 10) 정본은 `backlog.py incident series harness-test-live-ledger-write` · 대책 소유 `HARN-170` · 커밋 전 백업 복원, 바이트 동일). ⓑ backend-migrations 재현용 PostgreSQL(5432)을 띄워 둔 채 backend 잡을 미러했다. 그래서 `_pg_reachable()`로 skip을 판정하는 `test_export_attempt_events_scoped_by_user_on_live_pg`가 실행돼 1 failed가 났고, 21분 실행을 폐기했다. DB를 내리고 재실행하자 0 failed · 456 skipped(+1)였다. 이것은 `ci-local-repro-gap` 6회차이며, 대책 축을 `HARN-164` ⑥으로 편입했다. 통합 테스트 표식만 보고 "DB가 떠 있어도 backend 잡엔 영향 없다"고 판단한 것이 원인이었다 — 도달성 탐침 테스트는 표식 게이트 밖에 있다.
 ### 2026-09-27 (결정 · Kiki 판정 · 게이트 `G-required-tier-caller-recheck` / ARCH-41): **Subject Contract v1을 G1 예정일에 동결 — 단 `Frozen (unexercised)`. 필수층 3메서드의 Core 호출자는 여전히 0이고, 그 0은 과도기가 아니라 우회였다: Core가 필수층과 같은 일을 해야 했던 두 번 모두 선택층 능력이 새로 생겼다** (Kiki 판정 ①·감시 방식 선택, claude 재측정·집행) — 판정 기준 main `0e7b4f6b`
 
 - **무엇**: 게이트 재확인 지점(G1 9/27) 당일, 프로브 문서 부록 B 표 7항목 + 추가 5항목을 재실행했다. 필수층 호출자 `ZERO_CALLERS`(변별력 3상태 실측 — 작업 트리 밖 복사본 주입 시 `CALLERS_FOUND` · 경로 제거 시 `SCAN_ERROR` exit 2) · 계약 동결 테스트 22 passed · 해석 축 게이트(`ARCH-43`) 위반 0(CORE 355) · 경계 스캔 위반 0 · `DEMOTED_FIELDS` 빈 dict. 기록 = `docs/architecture/subject_contract_cross_probe.md` 부록 C
@@ -11342,6 +11342,27 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 
 **착지 중 추가 판단(첫 미러 실행에서 발견)**: 자동 선택이 경로 필터 잡 `changes`를 "재현 가능"으로 골랐다(`ci_job_coverage`는 docker·서비스 컨테이너만 재현 불가로 본다). 그 잡의 filter 스텝은 `${{ github.event_name }}`을 써서 새 분류에서는 매번 미실행이므로, 그대로면 **모든 자동 미러 실행이 exit 3**이 되어 경고가 상시 소음이 된다. 그 잡이 하는 일(영역 플래그 계산)은 미러의 잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 이미 대신하므로 사각지대가 아니다 — 자동 선택에서 사유를 출력하며 제외했다(`--job changes`로 직접 지정하면 돌리고 미실행을 보고). 재발 방지 동결: 문서만 바뀐 변경의 자동 선택 잡에 "원리상 못 도는 run 스텝" 0건(`test_always_on_jobs_have_no_structural_not_executed`) + 제외 절 제거 뮤테이션 M15 RED.
 
+### 2026-09-28 — HARN-177 착지 후 정상작동 점검 + HARN-184: 게이트 대기 분류를 공용 판정 하나로 (계열 `canon-vs-enforcement` 6회차) — 판정 기준 main `919865d4`
+
+**점검 요청**: Kiki가 태스크 ID `HARN-177-gate-verdict-handoff-on-done`을 지목했다. 태스크는 이미 done(#1337 · `0e7b4f6b`)이라 착지 후 정상작동 점검으로 수행했다.
+
+**HARN-177 자체 — 정상**: main `919865d4`에서 harness-integrity 잡 스텝 8종(validate · audit-deps · rules lint · rules render --check · jit check · ruff · black · pytest tests/harness) 전건 exit 0 — pytest 1,268 passed · 1 skipped. 뮤테이션 재실측: HARN-177 26종 · HARN-174 34종 전건 RED, 대조군 GREEN, 작업 사본 무변경. 실제 대장: pending decision 게이트 14건 중 입력 있는 6건 전부 `open`, `unrecorded` 0건, 판정 기록 0건. 태스크를 done으로 바꾸는 코드 경로는 `cmd_done` 하나뿐이다(인계를 우회하는 CLI 경로 없음).
+
+**발견 — HARN-184**: HARN-177 ②의 원칙("판정이 기록되지 않은 상태를 사람 차례로 안내하지 않는다")이 착지 뒤 생긴 화면(HARN-182 작업 흐름 그래프 · #1345)에서 되살아났다. 그래프는 게이트 창을 "열린 선행이 있는가"로만 갈라 판정 결과 미기록 게이트를 `gate_turn`('사람 차례')으로 그렸다 — 합성 대장 재현에서 PASS 대조군과 상태·라벨·집계가 같고 이유 문구만 달랐다. 원인은 HARN-177 ② acceptance가 화면을 열거한 것이다. 같은 축의 옛 화면도 있었다: 보드 카드 라벨 '사람 게이트 대기', 게이트 패널 '사람 게이트 — 행동 대기'(실측 미통과 19건 중 6건이 입력 작업이 남은 게이트), 정지 사유 `human_gate`. 실제 대장에는 해당 게이트가 0건이라 잠복 상태였다. 사고 대장 등재 = `canon-vs-enforcement` 6회차(fix_form=code).
+
+**집행된 것(코드)**
+- `store.gate_wait_kind` — 미통과 게이트가 기다리는 것을 `inputs` · `verdict` · `person` 중 하나로 낸다(판정 기록 상태는 `gate_judgment_state` 그대로).
+- 작업 흐름 그래프: 새 상태 `gate_verdict`('판정 결과 미기록') — 사이드 패널 '사람 차례' 목록과 `--text` 집계에서 빼고 자기 목록·범례·요약으로 보인다.
+- 보드: 카드 라벨('사람 게이트 대기'는 막는 게이트가 전부 사람 차례일 때만 · verdict > inputs > person), 게이트 카드 요약 줄, 패널 제목(세 분류 집계).
+- 정지 사유: 판정 결과 미기록 게이트가 섞이면 `gate_verdict`(/drive 정지 규약 등재) · 세션 브리핑 문구.
+- 전 화면 대조 테스트(사고 대장 상태 하나 + PASS 대조군) + 사람 차례 문구를 내는 하네스 모듈 전수 등재 검사(`SURFACE_REGISTRY`) — 새 화면이 계약 밖으로 새면 RED.
+
+**구현 중 내린 판단**
+1. 화면 목록을 acceptance에 다시 열거하는 대신 **분류 함수 하나 + 등재 검사**로 막았다 — 열거가 뚫린 입구였으므로 열거를 늘리면 같은 구멍이 넓어질 뿐이다. 등재 검사는 문구 스캔이라 다른 낱말로 사람 차례를 말하는 화면과 하네스 밖 프롬프트(`.claude/commands/status.md`의 `[사람 게이트 대기]` 제목)는 못 잡는다(한계 명시 · build_harness.md §3e 한계 6).
+2. 영원히 끝나지 않는 입력(취소 · 대장 부재)은 `person`으로 떨어뜨렸다 — 막다른 길은 validate가 이미 잡으므로 분류가 새 상태를 만들지 않는다(테스트로 동결).
+3. `G-p3-entry-gate2-pass`의 2차 재판정 FAIL은 여전히 기계 판독 형식으로 기록되지 않았다(HARN-177이 의도적으로 손대지 않은 부분). 소유 연결(게이트 ← EOS-141 ← EOS-26)은 대장에 있어 선택기·해금 수는 정상이다. `gates amend --verdict FAIL --owner`로 남길 수는 있지만 판정 기록은 판정 세션의 몫이라 이 세션은 쓰지 않았다.
+
+**변별력**: 뮤테이션 25종(`scripts/harness/verify_gate_wait_kind_discrimination.py` — HARN-174 러너 재사용) 전건 RED · 대조군 GREEN · 원복 바이트 동일. 앵커 동결 `tests/harness/test_gate_wait_kind_mutation_anchors.py`. 신규 테스트 46건은 수정 전 main에서 36건 RED를 확인했다(나머지 10건은 PASS 대조군 4 · 종전 동작 유지 3 · 등재 검사 3이라 수정 전후 모두 GREEN이 정상). 정본 = `docs/standards/build_harness.md` §3e 「게이트 대기 분류」.
 ### 2026-09-28 — EOS-123 착지: 정답 회차도 오답과 같은 조건으로 오개념을 훑어, 후보가 없으면 1턴 감쇠·후보가 나오면(정답 보고와 관측의 충돌) 보류 — 판정 기준 main `a17e92c7`
 
 **배경(실측)**: 채점 경로(`POST /v1/me/attempts`)는 정답이면 오개념 훑기를 조기 반환해 가설 감쇠 시계를 돌리지 않았다. 페르소나 C 재실측: 오개념 미관측 **오답** 0.85 → 0.74, 바로 뒤 **정답** 0.74 → 0.74. 다르게 틀린 답은 신뢰를 내리는데 맞힌 답은 못 내리는 역방향 비대칭이고, 채점 경로만 쓰는 학생에게는 가설이 영구히 남는다(낙인 방지 역행). 코치 경로는 매 교환 감쇠 + 도구 검증 clean 턴에 −1 증거를 쓴다.
