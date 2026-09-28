@@ -323,7 +323,11 @@ class AttemptMisconceptionScan(Protocol):
 
 
 class AttemptMisconceptionDetector(Protocol):
-    """채점된 **오답 1건**에서 오개념 후보를 뽑는 능력 — **선택적**.
+    """채점된 **답안 1건**에서 오개념 후보를 뽑는 능력 — **선택적**.
+
+    정답 회차도 넘어온다(EOS-123 — 정답·오답을 같은 조건으로 훑는다). 정답 답안에서 없는
+    오개념을 지어내지 않는 것이 구현의 책임이고, 정답으로 보고된 답에서 후보를 내면 Core는
+    그것을 정답 보고와 관측의 **충돌**로 다룬다(가설 갱신 보류 — 강화에도 감쇠에도 쓰지 않는다).
 
     왜 `SubjectAdapter` 필수 3종이 아닌가: 필수층의 `detect_misconception`은 *학생이 쓴 서술*을
     본다. 그런데 서술 없이 답만 제출되는 채점 경로가 있고, 거기서 오개념을 읽으려면 **문항과 답을
@@ -338,7 +342,7 @@ class AttemptMisconceptionDetector(Protocol):
     def scan_attempt_answer(
         self, *, question_text: str, student_answer: str | None
     ) -> AttemptMisconceptionScan:
-        """오답 1건을 훑어 게이트 통과 후보를 3상태와 함께 돌려준다.
+        """답안 1건(정답·오답 모두)을 훑어 게이트 통과 후보를 3상태와 함께 돌려준다.
 
         `question_text`·`student_answer`는 Core에게 **불투명 문자열**이다 — Core는 이 값을
         해석하거나 분기 기준으로 쓰지 않고 그대로 전달만 한다(불투명 페이로드 원칙).

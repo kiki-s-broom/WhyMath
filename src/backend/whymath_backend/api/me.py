@@ -207,6 +207,10 @@ from whymath_backend.l4.calibration_coaching import recommend_calibration_coachi
 from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.metacognitive_trigger import CoachingTrigger, recommend_coaching
+from whymath_backend.l4.misconception.attempt_hypothesis_policy import (
+    AttemptHypothesisAction,
+    decide_attempt_hypothesis_action,
+)
 from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
@@ -741,7 +745,9 @@ class _AttemptMisconceptionScan:
 
 
 _NOT_SCANNED = _AttemptMisconceptionScan(scan=MisconceptionScan.NOT_RUN, candidates=())
-"""훑지 않음 — 정답·답안 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**"""
+"""훑지 않음 — 답안·선지 인덱스 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**
+
+정답은 사유가 아니다 — 정답 회차도 오답과 같은 조건으로 훑는다(EOS-123)."""
 
 
 async def _scan_attempt_misconceptions(
@@ -749,7 +755,6 @@ async def _scan_attempt_misconceptions(
     detector: AttemptMisconceptionDetector,
     *,
     problem_id: uuid.UUID,
-    correct: bool,
     answer: str | None,
     selected_choice_index: int | None,
 ) -> _AttemptMisconceptionScan:
@@ -765,20 +770,25 @@ async def _scan_attempt_misconceptions(
          없다 — 인덱스와 매핑만 있으면 된다. 그래서 "보기만 탭하고 아무것도 쓰지 않은"
          제출에서 **유일하게** 도는 채널이다(종전엔 그런 제출이 통째로 not_run이었다).
 
-    훑지 않는 조건(두 채널 *모두* 미실행일 때만 `NOT_RUN`): 킬 스위치 OFF · 정답 시도 ·
-    (텍스트 채널) 답안 미제출·문항 지문 부재 · (선지 채널) 인덱스 미보고·매핑 부재. 이들을
-    빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면 하류가 *미측정*을 *측정된 0*으로 읽기
-    때문이다(`MisconceptionScan` 3상태의 존재 이유).
+    훑지 않는 조건(두 채널 *모두* 미실행일 때만 `NOT_RUN`): 킬 스위치 OFF ·
+    (텍스트 채널) 답안 미제출·문항 지문 부재(또는 지문에서 식 추출 실패) · (선지 채널) 인덱스
+    미보고·선지 플래그 OFF·매핑 부재. 이들을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면
+    하류가 *미측정*을 *측정된 0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
 
-    정답 시도를 **두 채널 모두에서** 제외하는 것은 성능이 아니라 정직 때문이다 — 오개념은
-    *틀린 방식*의 이름이라 정답에 붙일 대상이 아니고, 붙지 않은 것과 보지 않은 것은 다른
-    사실이다. 선지 채널도 같은 규칙을 따른다: 정답 회차에 이 함수가 `NOT_RUN`을 벗어나면
-    호출자가 `apply_candidates`를 부르게 되어 **정답이 기존 가설을 감쇠시키는** 동작이
-    새로 생긴다 — 그 비대칭은 별건(EOS-123)의 소관이라 여기서 바꾸지 않는다.
+    **정답 회차도 같은 조건으로 훑는다(EOS-123).** 이 함수는 정오답을 받지 않는다. 종전에는
+    정답을 두 채널 모두에서 조기 반환했는데, 그러면 호출자가 정답 회차의 가설을 전혀 움직이지
+    못해 "다르게 틀리면 신뢰가 내려가고 맞히면 그대로"인 역방향 비대칭이 생겼다(페르소나 C
+    0.85 → 0.74 → 0.74). 정답 전용 조건을 따로 두지 않고 조기 반환만 걷은 이유는, 그래야 정답이
+    감쇠를 받는 조건과 오답이 감쇠를 받는 조건이 **이 함수 하나로 같게** 정해지기 때문이다 —
+    정답 쪽 조건이 넓으면 같은 문항에서 오답은 못 내리는데 정답만 내리는 거울상 비대칭이 된다.
+
+    정답 답안은 텍스트 채널의 ⓪ 거짓 등식 가드가 막아 후보가 없는 것이 정상이고(`RAN_NO_CANDIDATE`),
+    정답 선지 인덱스는 `distractor_map`(오답 선지만 담는다)에 없어 역시 후보가 없다. 정답으로
+    보고됐는데 후보가 나오면 그것은 보고와 서버 관측의 **충돌**이다. 훑기 결과를 가설에 어떻게
+    반영할지(충돌이면 보류)는 호출자가 `l4.misconception.attempt_hypothesis_policy`로 정한다 —
+    이 함수는 본 것을 그대로 보고할 뿐이다.
     """
     if not get_settings().l4_attempt_misconception_scan_enabled:
-        return _NOT_SCANNED
-    if correct:
         return _NOT_SCANNED
 
     # ── 채널 ②(선지) — 텍스트보다 먼저. DB 1회(distractor_map 단일 컬럼)이고, 인덱스를
@@ -1069,10 +1079,13 @@ class AttemptSubmitResponse(BaseModel):
         description=(
             "오개념 복습 코칭(MISC-35) — 누적 활성 오개념 *가설*의 초점이 보류 바닥(0.5)을 넘고 "
             "정본 카탈로그로 해소될 때만 채워진다. `calibration_coaching`과 나란한 별개 신호이며 "
-            "축이 다르다: 보정은 *확신↔정오답* 어긋남, 이쪽은 *규칙 오적용* 의심이다. **이번 "
-            "회차에 오개념을 실제로 훑은 경우에만** 계산한다 — 훑지 않은 회차의 null은 '의심이 "
-            "없다'가 아니라 '보지 않았다'이며 그 구분은 `evidence.coverage`가 말한다. 가설은 "
-            "확정 라벨이 아니므로 발화는 가정형이고 오개념 본문·신뢰도 수치는 실리지 않는다."
+            "축이 다르다: 보정은 *확신↔정오답* 어긋남, 이쪽은 *규칙 오적용* 의심이다. "
+            "**오답이면서 이번 회차에 오개념을 실제로 훑은 경우에만** 계산한다 — 훑지 않은 회차의 "
+            "null은 '의심이 없다'가 아니라 '보지 않았다'이며 그 구분은 `evidence.coverage`가 "
+            "말한다. 정답 회차는 "
+            "훑어도 계산하지 않는다(방금 맞힌 학생에게 지난 오개념의 복습을 권하지 않는다 · "
+            "EOS-123). 가설은 확정 라벨이 아니므로 발화는 가정형이고 오개념 본문·신뢰도 수치는 "
+            "실리지 않는다."
         ),
     )
     evidence: AssessmentEvidence | None = Field(
@@ -1082,7 +1095,10 @@ class AttemptSubmitResponse(BaseModel):
             "`mastery_updates`가 *쓰기 이후*의 결과라면 이 필드는 *쓰기 이전*의 관측이라, 둘을 "
             "나란히 실어 두 단계가 각각 보이게 한다(부분 쓰기 구조를 한 트랜잭션처럼 가리지 "
             "않는다). `coverage`를 함께 읽어라 — 0건이 '이 답에는 없었다'인지 '보지 않았다'인지 "
-            "거기에만 적혀 있다."
+            "거기에만 적혀 있다. 정답 회차도 오개념을 훑는다(EOS-123). 정답 보고 회차에 후보가 "
+            "실리면(`is_correct=true` + `coverage.misconception_scan=ran_with_candidates`) "
+            "그것은 정답 보고와 서버 관측의 **충돌 신호**다 — 가설은 갱신하지 않았고, 학생 화면에 "
+            "오개념으로 그려서는 안 된다."
         ),
     )
     learning_state: LearningStateBlock = Field(
@@ -1217,7 +1233,6 @@ async def submit_attempt(
         session,
         misconception_detector,
         problem_id=body.problem_id,
-        correct=body.is_correct,
         answer=body.student_answer,
         selected_choice_index=body.selected_choice_index,
     )
@@ -1234,12 +1249,22 @@ async def submit_attempt(
     # 학습자 상태 반영 — 증거 조립(읽기 전용)과 **분리된 단계**다. 증거는 관측이고 상태 변경은
     # 엔진의 몫이라, 둘을 한 함수에 넣으면 "한 트랜잭션처럼 보이기" 문제가 생긴다(EOS-12 ⑤).
     #
-    # 훑은 회차에만 부른다. 후보가 0건이어도 부르는 것이 중요하다 — 그 호출이 이번 회차에
-    # 증거를 못 받은 기존 가설을 감쇠시킨다(Persona C: 오개념이 재관측되지 않으면 confidence가
-    # *내려가야* 한다). 반대로 훑지 않은 회차(정답·답안 없음·능력 부재)에 부르면 관측하지도
-    # 않은 것을 근거로 신뢰를 깎는 셈이라 부르지 않는다.
+    # 무엇을 할지는 L4 정책이 정한다(EOS-123 — 정오답 × 훑기 3상태 6칸 ·
+    # `l4.misconception.attempt_hypothesis_policy`). 여기는 그 값으로만 분기한다:
+    #   · APPLY(오답·훑음) — 후보로 갱신한다. 후보가 0건이어도 부르는 것이 중요하다 — 그 호출이
+    #     이번 회차에 증거를 못 받은 기존 가설을 감쇠시킨다(페르소나 C ⑤: 오개념이 재관측되지
+    #     않으면 confidence가 *내려가야* 한다).
+    #   · DECAY_ONLY(정답·훑었는데 후보 없음) — 후보 없이 부른다. 오답 회차와 같은 조건·같은
+    #     강도의 1턴 감쇠다(페르소나 C ⑥). 증거 그래프에는 쓰지 않는다 — 반증이 아니라 활동
+    #     시계이고, 반박·확정은 서버 도구 검증을 거친 코치 경로가 소유한다(EOS-104 ④).
+    #   · HOLD_CONFLICT(정답 보고인데 서버가 이 답에서 오개념을 읽음) — 가설을 건드리지 않는다.
+    #   · NONE(훑지 않음 — 답안 없음·능력 부재 등) — 관측하지도 않은 것을 근거로 신뢰를 깎지
+    #     않는다.
     misconception_review_coaching: CoachingTrigger | None = None
-    if misconception_scan_result.scan is not MisconceptionScan.NOT_RUN:
+    hypothesis_action = decide_attempt_hypothesis_action(
+        is_correct=body.is_correct, scan=misconception_scan_result.scan
+    )
+    if hypothesis_action is AttemptHypothesisAction.APPLY:
         active_hypotheses = await apply_candidates(
             session, user.user_id, misconception_scan_result.candidates
         )
@@ -1254,12 +1279,32 @@ async def submit_attempt(
         # 하나 더 끼우면 위치 기반으로 결과를 큐잉하는 테스트 대역들의 순서를 밀어 *이 변경과
         # 무관한* 실패를 만든다(실측: 그 형태로 프라이버시 경계 테스트 1건이 깨졌다).
         #
-        # 훑은 회차 안에 둔 이유: 밖에 두면 *이번에 관측하지도 않은* 과거 가설로 코칭이 나간다
-        # (정답 회차에 지난 오개념을 꺼내는 형태). 훑은 회차로 좁히면 코칭이 항상 *이번 관측*에
-        # 뿌리를 두며, 이는 오개념 reactive retrieval 원칙과 같은 방향이다. 그래서 이 필드의
-        # null은 두 뜻을 가진다 — 훑었는데 의심이 약함 / 아예 훑지 않음. 그 구분은 응답의
-        # `evidence.coverage`에 이미 적혀 있으므로 여기서 또 만들지 않는다.
+        # APPLY(오답·훑음) 안에 둔 이유: 훑지 않은 회차에 두면 *이번에 관측하지도 않은* 과거
+        # 가설로 코칭이 나가고, 정답 회차에 두면 *이번 관측과 반대 방향*으로 나간다 — 방금 맞힌
+        # 학생에게 지난 오개념의 복습을 권하는 형태라 증거를 거스르고 정서 안전을 해친다(EOS-123
+        # 판정 §4). 오답·훑음으로 좁히면 코칭이 항상 이번 관측에 뿌리를 두며, 이는 오개념 reactive
+        # retrieval 원칙과 같은 방향이다. 그래서 이 필드의 null은 세 뜻을 가진다 — 의심이 약함 /
+        # 훑지 않음 / 정답 회차. 앞의 둘은 `evidence.coverage`가, 셋째는 `is_correct`가 이미
+        # 말하므로 여기서 또 만들지 않는다.
         misconception_review_coaching = recommend_misconception_review_coaching(active_hypotheses)
+    elif hypothesis_action is AttemptHypothesisAction.DECAY_ONLY:
+        # 반환값을 쓰지 않는다 — 정답 회차는 복습 코칭을 만들지 않는다(바로 위 APPLY 분기 주석).
+        await apply_candidates(session, user.user_id, ())
+        await session.commit()
+    elif hypothesis_action is AttemptHypothesisAction.HOLD_CONFLICT:
+        # 정답으로 보고됐는데 서버가 이 답에서 오개념을 읽었다(그 오개념의 오답 선지 인덱스 ·
+        # 그 오개념의 거짓형 답). 감쇠하면 학생이 방금 보인 오개념을 거꾸로 내리게 되므로
+        # 건드리지 않는다. 강화에도 쓰지 않는다 — 지문식 추출 휴리스틱에 실측 오탐이 있다(유니코드
+        # 마이너스 지문에서 참 정답이 후보로 잡힌다 · EOS-123 판정 §1 ⑧). 그래서 거부권으로만
+        # 쓰고, 오탐 비용은 "감쇠 1회 보류"로 묶인다. 후보는 증거
+        # (`evidence.possible_misconceptions`)에 그대로 남는다 — 숨기면 "훑었는데 없었다"는 거짓
+        # 보고가 된다. 로그에는 문항·오개념 id만 싣는다(답안 원문·학생 id는 PII라 제외).
+        _logger.warning(
+            "정답 보고와 오개념 관측이 충돌 — 가설을 갱신하지 않는다(EOS-123 보류). "
+            "problem_id=%s misconception_ids=%s",
+            body.problem_id,
+            ",".join(c.misconception_id for c in misconception_scan_result.candidates),
+        )
     # 숙달 전파(평가 개념별 측정 적재·개념 매핑 없으면 빈 리스트)
     # EOS-18: 위에서 조립한 **그 증거**를 그대로 넘긴다 — 학습자·문항·정오답·관측시각을 다시
     # 인자로 풀면 같은 사실의 사본이 둘이 되고, 어긋나도 아무도 모른다.
