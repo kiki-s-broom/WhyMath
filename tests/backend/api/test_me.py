@@ -3264,7 +3264,7 @@ class TestNextProblemSuneungMode:
         assert session.commits == 1
 
     def test_recommendation_records_candidates_and_policy_version_suneung(self) -> None:
-        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v2가 실린다.
+        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v1이 실린다.
 
         적격(시그니처 보유)·부적격(수능 신호 전무) 후보를 함께 넣어 candidates[]가 부적격을
         빼고 적격만 담는지(진실 게이트 재적용)까지 함께 확인한다.

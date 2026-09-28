@@ -2653,7 +2653,8 @@ class NextProblemResponse(BaseModel):
             "전부 숙달 등)해 현재 개념 연습으로 강등 · unsupported=근거 없음(엣지 없음·선수 "
             "미측정)으로 강등 · graph_timeout=그래프 조회 예산 초과로 강등 · target_unavailable="
             "목표 개념에 출제 가능한 문항이 없어 강등 · no_candidate=추천 없음. null=이 정렬을 "
-            "적용하지 않는 정책의 표기였다(EOS-25 이후 모든 정책이 적용하므로 나오지 않는다)."
+            "적용하지 않는 정책의 표기였다(EOS-25 이후 나오지 않는다) · mode_withheld=수능 모드가 "
+            "관계 행위의 콘텐츠 재선택을 보류해 현재 개념 연습으로 강등(EOS-25)."
         ),
     )
 
@@ -2685,10 +2686,10 @@ async def recommend_next_problem(
     CatRecommendationPolicy`, 수능 모드는 `api._next_problem_policy.SuneungRecommendationPolicy`
     (두 계층 합성이 필요해 위치가 다른 이유는 그 모듈 docstring 참조). 두 정책의 알고리즘은
     전환 전 이 함수 안에 있던 것과 **같다** — 배치만 바뀌었고 추천 결과는 바뀌지 않는다
-    (EOS-19 acceptance ④). **예외 — EOS-124·EOS-25**: 두 정책은 그 뒤 의도적으로 바뀌었다. 숙달
-    구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면 그 개념의 문항으로 다시
-    고른다(설명과 콘텐츠 정렬 — 해소 결과는 `intent_resolution`이 응답·처치 기록 양쪽에 남긴다).
-    수능 모드의 재선택 후보는 수능 게이트·가중을 그대로 탄다(EOS-25).
+    (EOS-19 acceptance ④). **예외 — EOS-124**: 기본 CAT은 그 뒤 의도적으로 바뀌었다. 숙달 구간
+    규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면 그 개념의 문항으로 다시 고른다
+    (설명과 콘텐츠 정렬 — 해소 결과는 `intent_resolution`이 응답·처치 기록 양쪽에 남긴다). 수능
+    모드는 설명만 전달 문항에 맞추고 콘텐츠 재선택은 보류한다(EOS-25 — `mode_withheld`).
 
     정책이 무엇을 하는지(θ 추정·후보 조회·약점/밴드/형제 가중·CAT 중단 규칙·수능 L6 게이팅)는
     각 정책 모듈의 docstring이 정본이다. 여기에 다시 적으면 알고리즘이 바뀔 때 두 설명이

@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """EOS-25 수능 정렬 가드의 **결함 주입 검증** — 막으려는 상태를 실제로 주입해 RED를 본다.
 
-대상은 수능 모드 추천(`api/_next_problem_policy.py::SuneungRecommendationPolicy`)이 설명과 콘텐츠를
-맞추는 방식이다: 정책 의도(`resolve_policy_intent`) → 수능 정렬 재선택(`_select_aligned` ·
-`load_suneung_target_candidates`) → 정직 강등 → 정렬 선언. 설계 정본은
-`docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md`(§8이 이 하네스의 실행 결과를
-인용한다). 산출 필드 필수화(면제 경로 폐쇄)는 기존 하네스
+대상은 수능 모드 추천(`api/_next_problem_policy.py::SuneungRecommendationPolicy`)이 설명을 전달
+문항에
+맞추는 방식이다: 정책 의도(`resolve_policy_intent`) → 콘텐츠 재선택 **보류**(`mode_withheld`) → 정직
+강등 → 정렬 선언. 설계 정본은 `docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md`
+(§5가 이 하네스의 실행 결과를 인용한다). 산출 필드 필수화(면제 경로 폐쇄)는 기존 하네스
 `mutate_recommendation_policy_guards.py`의 M14·M25가 맡는다.
+
+가장 위험한 형태는 **설명은 현재 개념이라고 선언한 채 콘텐츠만 옮기는 것**이다 — 정렬 판정기는
+선언된
+`delivered_concept`만 보므로 이 형태를 잡지 못한다(W12·I02). 그래서 단위 테스트의 세션 대역은 1차
+후보
+조회를 한 번만 허용하고, 실 PG 테스트는 목표 개념에 적격 문항을 실제로 심어 둔다.
 
 규율은 선례 `scripts/analysis/mutate_eos123_attempt_hypothesis_guards.py`와 같다 — 주입 실재 단언
 (앵커 1건 · 치환 후 원본과 다름) · 순수 Python 치환 · 백업 복사 원복(git 원복 금지)과 바이트 동일성
@@ -15,9 +21,8 @@
 
 표면이 둘이다:
 
-- **단위**(기본): 수능 정책 오케스트레이션 테스트 + `test_me.py`의 수능 응답 클래스 + 정책 버전
-  동결. DB 없이 오케스트레이션·배선을 잰다(조회는 전부 대역).
-- **서빙 경로**(`--with-integration`): 실 PostgreSQL — 수능 목표 후보 SQL과 정책 전체. 환경변수
+- **단위**(기본): 수능 정책 오케스트레이션 테스트 + `test_me.py`의 수능 응답·근거 클래스.
+- **서빙 경로**(`--with-integration`): 실 PostgreSQL — 실제 그래프·숙달 이력으로 정책 전체. 환경변수
   `WHYMATH_DATABASE_URL`(asyncpg URL · 마이그레이션 적용된 DB)이 필요하다.
 
 사용: `python3 scripts/analysis/mutate_eos25_suneung_alignment_guards.py [--with-integration]
@@ -43,14 +48,13 @@ REPO = Path(__file__).resolve().parents[2]
 BACKEND = REPO / "src" / "backend"
 
 SUNEUNG = BACKEND / "whymath_backend" / "api" / "_next_problem_policy.py"
-EVIDENCE = BACKEND / "whymath_backend" / "l2" / "recommendation_evidence.py"
+POLICY = BACKEND / "whymath_backend" / "l2" / "recommendation_policy.py"
 
 _TEST_ME = "../../tests/backend/api/test_me.py"
 UNIT_TESTS = [
     "../../tests/backend/api/test_next_problem_policy_suneung.py",
     f"{_TEST_ME}::TestNextProblemSuneungMode",
     f"{_TEST_ME}::TestNextProblemReason",
-    "../../tests/backend/l2/test_recommendation_evidence.py",
 ]
 INTEGRATION_TESTS = [
     "../../tests/backend/api/test_eos25_suneung_alignment_integration.py",
@@ -69,239 +73,138 @@ class Mutation:
     integration: bool = False  # True면 실 PG 서빙 경로 표면에서 판정한다
 
 
-_RESELECT_BRANCH = (
-    "        if intent.reselect_groups:\n            aligned = await self._select_aligned("
+_WITHHOLD = (
+    "        if intent.reselect_groups:\n"
+    "            reason = demote_to_current_concept(intent.reason)\n"
+    "            resolution = IntentResolution.MODE_WITHHELD\n"
 )
-_RESELECT_PICK = (
-    "            index = recommend_suneung_index(theta, picked, persona, extra_weights=weights)\n"
-)
-#: 진실 게이트 없이 정보량 × 추가 가중만으로 고르는 선택 — 기본 CAT 재선택의 모양이다.
-_UNGATED_PICK = (
-    '            index = __import__("whymath_backend.l2.irt", fromlist=["x"]).select_weighted_item('
-    "theta, [IrtItem(difficulty=resolve_item_difficulty_b(p.irt_difficulty_b, "
-    "p.difficulty_overall) or 0.0) for p in picked], weights=weights)\n"
-)
-_TARGET_QUERY_ARGS = (
-    "            attempted_ids=attempted_ids,\n"
-    "            excluded_ids=excluded_ids,\n"
-    "        )\n"
-    "        for group in groups:"
-)
-_TARGET_WHERE = (
-    "            *suneung_pool_conditions(persona),\n"
-    "            ProblemConcept.role == ConceptRole.PRIMARY,\n"
+_DELIVERED = "            problem_id=picked.problem_id,\n            reason=reason,\n"
+#: 설명은 앵커(현재 개념)라고 선언한 채 콘텐츠만 목표 개념 문항으로 옮긴다 — 정렬 판정기는 선언된
+#: `delivered_concept`만 보므로 이 형태를 잡지 못한다. 기본 CAT의 재선택 조회를 빌려 쓴다.
+_SILENT_MOVE = (
+    "            problem_id=(await __import__(\n"
+    '                "whymath_backend.l2.next_problem_selection", fromlist=["x"]\n'
+    "            ).load_target_candidate_rows(\n"
+    "                session, theta,\n"
+    "                concept_ids=[c for g in intent.reselect_groups for c in g],\n"
+    "                attempted_ids=set(), excluded_ids=set(),\n"
+    "            ) or [(picked.problem_id,)])[0][0],\n"
+    "            reason=reason,\n"
 )
 
 MUTATIONS: list[Mutation] = [
     # ── 축 A: 결함 형태를 되살린다 ─────────────────────────────────────────────
     Mutation(
-        "S01-reselection-skipped",
+        "W01-withhold-removed",
         SUNEUNG,
-        _RESELECT_BRANCH,
-        _RESELECT_BRANCH.replace("if intent.reselect_groups:", "if False:"),
-        "정렬 재선택((가) 재발)",
+        _WITHHOLD,
+        _WITHHOLD.replace("if intent.reselect_groups:", "if False:"),
+        "보류·강등((가) 재발 — 관계 행위가 제자리)",
     ),
     Mutation(
-        "S02-posthoc-reason-restored",
+        "W02-posthoc-reason-restored",
         SUNEUNG,
         "        reason, resolution = intent.reason, intent.resolution\n",
         "        reason, resolution = anchor_reason, IntentResolution.DIRECT\n",
         "사후 근거(EOS-25 이전 구조)",
     ),
     Mutation(
-        "S03-demotion-skipped",
+        "W03-withheld-without-demotion",
         SUNEUNG,
-        "                reason = demote_to_current_concept(intent.reason)\n",
-        "                reason = intent.reason\n",
-        "정직 강등",
+        _WITHHOLD,
+        _WITHHOLD.replace("demote_to_current_concept(intent.reason)", "intent.reason"),
+        "보류 시 정직 강등",
     ),
     Mutation(
-        "S04-unavailable-mislabeled",
+        "W04-target-drifts-from-delivered",
         SUNEUNG,
-        "                resolution = IntentResolution.TARGET_UNAVAILABLE\n",
-        "                resolution = IntentResolution.REFUTED\n",
-        "강등 사유(콘텐츠 공백≠반증)",
+        "            target_concept=anchor_reason.concept_id,\n",
+        "            target_concept=None,\n",
+        "정렬 R2(설명≠콘텐츠)",
     ),
     Mutation(
-        "S05-delivered-concept-dropped",
+        "W05-delivered-concept-dropped",
         SUNEUNG,
-        "            delivered_concept=delivery.concept_id,\n",
+        "            delivered_concept=anchor_reason.concept_id,\n",
         "            delivered_concept=None,\n",
         "정렬 판정 입력",
     ),
     Mutation(
-        "S06-no-candidate-undeclared",
+        "W06-no-candidate-undeclared",
         SUNEUNG,
         "                intent_resolution=IntentResolution.NO_CANDIDATE,\n",
         "                intent_resolution=None,\n",
         "부재의 정렬 선언",
     ),
-    # ── 축 B: 재선택이 수능 모드를 벗어난다 ────────────────────────────────────
+    # ── 축 B: "안 했다"와 "못 했다"를 섞는다 ────────────────────────────────────
     Mutation(
-        "S07-truth-gate-bypassed-on-reselection",
+        "W07-withheld-mislabeled-as-unavailable",
         SUNEUNG,
-        _RESELECT_PICK,
-        _UNGATED_PICK,
-        "재선택 진실 게이트",
+        _WITHHOLD,
+        _WITHHOLD.replace("IntentResolution.MODE_WITHHELD", "IntentResolution.TARGET_UNAVAILABLE"),
+        "보류≠콘텐츠 공백",
     ),
     Mutation(
-        "S08-persona-dropped-from-reselection-gate",
-        SUNEUNG,
-        _RESELECT_PICK,
-        _RESELECT_PICK.replace("picked, persona,", "picked, Persona.A_일반고고3,"),
-        "재선택 게이트 페르소나",
+        "W08-withheld-wire-value-aliased",
+        POLICY,
+        '    MODE_WITHHELD = "mode_withheld"\n',
+        '    MODE_WITHHELD = "target_unavailable"\n',
+        "응답·기록 문자열 고유성",
     ),
     Mutation(
-        "S09-persona-dropped-from-reselection-query",
+        "W09-withhold-condition-widened-to-served",
         SUNEUNG,
-        "            persona=persona,\n            concept_ids=[concept for group in groups",
-        "            persona=Persona.A_일반고고3,\n"
-        "            concept_ids=[concept for group in groups",
-        "재선택 조회 페르소나",
+        _WITHHOLD,
+        _WITHHOLD.replace(
+            "if intent.reselect_groups:", "if intent.resolution is IntentResolution.SERVED:"
+        ),
+        "보류 조건(콘텐츠 이동 여부)",
     ),
     Mutation(
-        "S10-gated-group-stops-search",
-        SUNEUNG,
-        "            if index is None:\n                continue\n",
-        "            if index is None:\n                return None\n",
-        "게이트에 막힌 묶음 건너뛰기",
-    ),
-    Mutation(
-        "S11-empty-group-stops-search",
-        SUNEUNG,
-        "            if not picked:\n                continue\n",
-        "            if not picked:\n                return None\n",
-        "문항 없는 묶음 건너뛰기(약한 순서)",
-    ),
-    # ── 축 C: 수능 장치가 재선택에서 빠진다 ────────────────────────────────────
-    Mutation(
-        "S12-suneung-priority-cancelled-on-reselection",
-        SUNEUNG,
-        _RESELECT_PICK,
-        "            index = recommend_suneung_index(theta, picked, persona, extra_weights=["
-        "(weights[i] if weights is not None else 1.0) / suneung_item_weight(p) "
-        "for i, p in enumerate(picked)])\n",
-        "재선택 수능 우선순위 가중",
-    ),
-    Mutation(
-        "S13-extra-axes-skipped-on-reselection",
-        SUNEUNG,
-        "            weights, _weak_signal = await self._combine_axes(\n"
-        "                user_id=user_id,\n",
-        "            weights, _weak_signal = None, 0\n"
-        "            _unused = dict(\n"
-        "                user_id=user_id,\n",
-        "재선택 약점·밴드·형제 가중",
-    ),
-    Mutation(
-        "S14-attempted-not-passed-to-reselection",
-        SUNEUNG,
-        _TARGET_QUERY_ARGS,
-        _TARGET_QUERY_ARGS.replace("attempted_ids=attempted_ids,", "attempted_ids=set(),"),
-        "재선택 미응답 배제",
-    ),
-    Mutation(
-        "S15-siblings-not-passed-to-reselection",
-        SUNEUNG,
-        _TARGET_QUERY_ARGS,
-        _TARGET_QUERY_ARGS.replace("excluded_ids=excluded_ids,", "excluded_ids=set(),"),
-        "재선택 형제 배제",
-    ),
-    Mutation(
-        "S16-reselected-scores-not-its-comparison-set",
-        SUNEUNG,
-        "                scores=_suneung_candidate_scores(theta, picked, persona, weights),\n",
-        "                scores=[],\n",
-        "소급 평가 비교 집합",
-    ),
-    Mutation(
-        "S17-graph-budget-not-passed",
+        "W10-graph-budget-not-passed",
         SUNEUNG,
         "            budget=self._graph_budget,\n",
         "",
         "그래프 예산 전달",
     ),
-    # ── 축 D: 1차 선택 관측 불변 · 규칙 식별자 ─────────────────────────────────
+    # ── 축 C: 콘텐츠가 옮겨진다 ─────────────────────────────────────────────────
     Mutation(
-        "S18-weak-signal-counted-after-band",
+        "W11-extra-query-in-withheld-branch",
         SUNEUNG,
-        "        return extra_weights, weak_signal\n",
-        "        return extra_weights, (sum(1 for w in extra_weights if w != 1.0) "
-        "if extra_weights is not None else 0)\n",
-        "약점 신호 정의(1차 관측 불변)",
+        _WITHHOLD,
+        _WITHHOLD + "            await session.execute(select(Problem))\n",
+        "재선택 조회 재유입 탐지",
     ),
     Mutation(
-        "S19-policy-version-not-bumped",
-        EVIDENCE,
-        'POLICY_VERSION_SUNEUNG: str = "suneung_v2"',
-        'POLICY_VERSION_SUNEUNG: str = "suneung_v1"',
-        "정책 버전(REC-11)",
-    ),
-    # ── 서빙 경로(실 PG) — SQL과 정책 전체 ──────────────────────────────────────
-    Mutation(
-        "I01-primary-filter-dropped",
+        "W12-content-moved-silently",
         SUNEUNG,
-        _TARGET_WHERE,
-        "            *suneung_pool_conditions(persona),\n",
-        "대표 개념 한정",
+        _DELIVERED,
+        _SILENT_MOVE,
+        "설명은 그대로·콘텐츠만 이동",
+    ),
+    # ── 서빙 경로(실 PG) ─────────────────────────────────────────────────────────
+    Mutation(
+        "I01-withhold-removed-on-live-path",
+        SUNEUNG,
+        _WITHHOLD,
+        _WITHHOLD.replace("if intent.reselect_groups:", "if False:"),
+        "보류·강등(실 PG)",
         True,
     ),
     Mutation(
-        "I02-prefilter-dropped-in-target-query",
+        "I02-content-moved-silently-on-live-path",
         SUNEUNG,
-        _TARGET_WHERE,
-        "            ProblemConcept.role == ConceptRole.PRIMARY,\n",
-        "재선택 사전필터",
+        _DELIVERED,
+        _SILENT_MOVE,
+        "설명은 그대로·콘텐츠만 이동(실 PG)",
         True,
     ),
     Mutation(
-        "I03-persona-hardcoded-in-target-query",
+        "I03-withheld-mislabeled-on-live-path",
         SUNEUNG,
-        _TARGET_WHERE,
-        _TARGET_WHERE.replace("(persona)", "(Persona.A_일반고고3)"),
-        "사전필터 페르소나",
-        True,
-    ),
-    Mutation(
-        "I04-cap-is-global-not-per-concept",
-        SUNEUNG,
-        ".over(partition_by=ProblemConcept.concept_id, order_by=list(distance))",
-        ".over(order_by=list(distance))",
-        "개념별 상한",
-        True,
-    ),
-    Mutation(
-        "I05-attempted-not-excluded-in-sql",
-        SUNEUNG,
-        "    if attempted_ids:\n"
-        "        inner = inner.where(Problem.problem_id.notin_(attempted_ids))\n",
-        "    if False:\n        inner = inner.where(Problem.problem_id.notin_(attempted_ids))\n",
-        "SQL 미응답 배제",
-        True,
-    ),
-    Mutation(
-        "I06-siblings-not-excluded-in-sql",
-        SUNEUNG,
-        "    if excluded_ids:\n"
-        "        inner = inner.where(Problem.problem_id.notin_(excluded_ids))\n",
-        "    if False:\n        inner = inner.where(Problem.problem_id.notin_(excluded_ids))\n",
-        "SQL 형제 배제",
-        True,
-    ),
-    Mutation(
-        "I07-truth-gate-bypassed-on-live-path",
-        SUNEUNG,
-        _RESELECT_PICK,
-        _UNGATED_PICK,
-        "재선택 진실 게이트(실 PG)",
-        True,
-    ),
-    Mutation(
-        "I08-reselection-skipped-on-live-path",
-        SUNEUNG,
-        _RESELECT_BRANCH,
-        _RESELECT_BRANCH.replace("if intent.reselect_groups:", "if False:"),
-        "정렬 재선택(실 PG)",
+        _WITHHOLD,
+        _WITHHOLD.replace("IntentResolution.MODE_WITHHELD", "IntentResolution.REFUTED"),
+        "보류≠반증(실 PG)",
         True,
     ),
 ]
@@ -309,7 +212,7 @@ MUTATIONS: list[Mutation] = [
 
 def drop_bytecode() -> None:
     """대상 모듈의 바이트코드 캐시를 지운다 — 디스크의 뮤테이션과 실행되는 코드를 일치시킨다."""
-    for target in (SUNEUNG, EVIDENCE):
+    for target in (SUNEUNG, POLICY):
         for cached in (target.parent / "__pycache__").glob(f"{target.stem}.*.pyc"):
             cached.unlink()
 

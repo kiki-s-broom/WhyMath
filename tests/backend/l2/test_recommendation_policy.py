@@ -16,8 +16,9 @@
 
 **변별력 확인**: 이 파일의 가드들은 정상 입력에서 초록인 것으로 충분하다고 보지 않는다.
 막으려는 상태를 실제로 주입해 RED가 나오는지는
-`scripts/analysis/mutate_recommendation_policy_guards.py`가 뮤테이션 24종으로 검증한다
-(EOS-124 정렬 계약 축 D 11종 포함 · 2026-09-25 실측 24/24 검출)
+`scripts/analysis/mutate_recommendation_policy_guards.py`가 뮤테이션 25종으로 검증한다
+(EOS-124 정렬 계약 축 D 12종 포함 · EOS-25가 M14를 재앵커하고 M25(정렬 선언 필수)를 더했다 ·
+2026-09-28 실측 25/25 검출)
 (CLAUDE.md "보호 장치를 실패 주입 없이 '보호 있음'으로 선언 금지").
 """
 
@@ -446,7 +447,7 @@ class TestOutcomeEnforcesAlignment:
             "problem_id": None,
             "reason": no_candidate_reason(),
             "theta": 0.0,
-            "policy_version": "suneung_v2",
+            "policy_version": "suneung_v1",
         }
         if not omit:
             base["intent_resolution"] = None

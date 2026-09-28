@@ -89,9 +89,9 @@ selection.load_direct_successors`)이고, 그 결과를 다시 예산으로 자�
 없고(l2→l6 역방향 금지), L6은 DB를 만질 수 없어(import-linter "데이터 접근 금지" 계약) 그쪽에도
 둘 수 없다. 그래서 수능 정책은 두 계층을 합법적으로 합성할 수 있는 유일한 자리인 API 합성
 지점(`api/_next_problem_policy.py`)에 산다. 같은 Protocol을 구현하므로 핸들러가 보는 모양은
-같다. EOS-25부터 수능 정책도 의도 판정(`resolve_policy_intent`)을 이 모듈에서 **그대로** 가져다
-쓴다 — 모드마다 규칙 사본을 두지 않는다. 수능 쪽에 따로 두는 것은 재선택 후보 조회뿐이다(L6
-게이트를 알아야 하므로).
+같다. EOS-25부터 수능 정책도 의도 판정(`resolve_policy_intent`)과 정렬 계약을 이 모듈에서
+**그대로** 쓴다 — 진단은 모드와 무관하게 하나다. 다만 콘텐츠 재선택(처방)은 수능 모드에서 보류한다
+(`IntentResolution.MODE_WITHHELD` — 이유는 그 정책 모듈의 docstring "EOS-25" 절).
 """
 
 from __future__ import annotations
@@ -302,6 +302,15 @@ class IntentResolution(str, Enum):
 
     TARGET_UNAVAILABLE = "target_unavailable"
     """목표 개념은 섰으나 출제 가능한(노출 게이트 통과·미응답) 문항이 없다 — 정직 강등."""
+
+    MODE_WITHHELD = "mode_withheld"
+    """규칙은 관계 행위를 가리켰고 목표 개념도 섰으나 **출제 모드가 콘텐츠 재선택을 보류했다**
+    (EOS-25 · 수능 모드). 1차 선택 문항을 내보내고 앵커 개념 연습으로 정직 강등한다.
+    반증(`REFUTED`)·
+    근거 없음(`UNSUPPORTED`)·콘텐츠 공백(`TARGET_UNAVAILABLE`)과 다르다 — 목표는 있었고 문항도
+    있었을
+    수 있지만 모드의 판정으로 가지 않았다. 한 값으로 접으면 "못 했다"와 "안 했다"가 같은 글자가
+    된다."""
 
     NO_CANDIDATE = "no_candidate"
     """후보가 아예 없다 — 추천 자체가 없다(`problem_id=None`)."""
