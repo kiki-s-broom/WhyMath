@@ -33,6 +33,17 @@ REND-01(렌더 어댑터)과 PED-02(교수법 선택·게이트)를 잇는 마�
   (2) 프롬프트-해시 Redis   ← 기존 `l3/pipeline`(`llm:cache:{sha}`). 키 축 = 프롬프트.
   (3) generate             ← 기존 라우터 경유.
 (1)은 렌더 시점 조립을 전제하므로 캐시여도 몰개인화되지 않는다 — 개인화는 어댑터·바인딩이 맡는다.
+
+────────────────────────────────────────────────────────────────────────────
+검수 게이트 — 캐시보다 먼저, 매 호출 (CONT-05 ⓐ · 2026-09-27)
+────────────────────────────────────────────────────────────────────────────
+학생 공급은 `review_status == "reviewed"`인 콘텐츠 행만 통과시킨다(술어 정본 =
+`l1/concept_content/review_gate.is_supply_eligible`). `ai_estimated`는 DSL 없음과 같게 처리해 기존
+폴백·404로 가되, 폴백 사유는 `UNREVIEWED`로 따로 센다 — 게이트가 몇 번 막았는지가 집계에 보여야
+한다(작동한 비율 원칙). 판정은 **캐시 조회보다 먼저** DB의 현재 상태로 한다: DSL 캐시(TTL 24h)에
+판정을 맡기면 강등된 행이 TTL 동안 계속 공급된다. 그래서 캐시 적중도 PK 조회 1회를 치른다 — 학생
+안전(#1)이 비용(#6)보다 위다.
+판정문 = `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md`.
 """
 
 from __future__ import annotations
@@ -47,6 +58,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.config import get_settings
 from whymath_backend.harness.wilson import wilson_lower_bound
 from whymath_backend.l1.concept_content import get_concept_content
+from whymath_backend.l1.concept_content.review_gate import is_supply_eligible
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l3.models import RoutingRequest
@@ -77,7 +89,11 @@ ContentSource = Literal["dsl_render", "prompt_cache", "generate"]
 
 # 폴백 사유 — 왜 렌더가 아니라 생성으로 갔는지(조용한 폴백 금지·집계 가능).
 REASON_NO_DSL = "NO_DSL"
-"""개념 콘텐츠가 아직 없다(캐시·DB 모두 미스)."""
+"""개념 콘텐츠 행이 아직 없다(DB 미적재 — 게이트가 캐시보다 먼저 행을 읽는다)."""
+
+REASON_UNREVIEWED = "UNREVIEWED"
+"""콘텐츠 행은 있으나 검수 전이다(`review_status != "reviewed"` — CONT-05 ⓐ). 처리는 `NO_DSL`과
+같다(렌더하지 않고 폴백·404) — 사유만 따로 세어 게이트 작동 횟수를 관측 가능하게 둔다."""
 
 REASON_CANNOT_RENDER = "CANNOT_RENDER"
 """DSL은 있으나 이 전략이 렌더할 재료가 부족하다(`can_render` False)."""
@@ -225,6 +241,54 @@ def reset_process_tally() -> None:
     _PROCESS_TALLY.by_fallback_reason.clear()
 
 
+async def resolve_concept_dsl(
+    code: str,
+    *,
+    session: AsyncSession,
+    cache: CacheBackend,
+    ttl_s: int = DSL_CACHE_TTL_S,
+) -> tuple[ConceptDSL | None, str | None]:
+    """개념 DSL 해석 + **검수 게이트** — 공급 가능하면 `(DSL, None)`, 아니면 `(None, 사유)`.
+
+    순서가 계약이다(CONT-05 ③):
+      ① DB에서 행을 읽는다 — 없으면 `(None, REASON_NO_DSL)`.
+      ② 검수 게이트 — 공급 가능 상태(`is_supply_eligible`)가 아니면 `(None, REASON_UNREVIEWED)`.
+      ③ 그다음에야 캐시를 본다 — 적중이면 캐시 DSL, 미스면 행을 투영해 적재한다.
+
+    ②를 ③ 뒤로 옮기면(= 미스일 때만 검사) 강등된 행의 DSL이 TTL(24h) 동안 계속 공급된다. 그래서
+    캐시 적중도 ①의 PK 조회를 치른다 — 캐시가 아끼는 것은 투영·평가 재료 주입이지 게이트 판정이
+    아니다. 차단된 행은 캐시에 적재하지 않는다(적재해도 ②가 먼저 막지만, 검수 전 본문을 캐시에 남길
+    이유가 없다).
+
+    캐시(`CacheBackend`)는 **str 전용**이라 pydantic `model_dump_json()`으로 직렬화한다. 역직렬화가
+    실패하면(계약 변경·손상) **미스로 취급**해 행에서 다시 만든다 — 낡은 형태를 억지로 쓰는 조용한
+    오작동보다 재적재가 낫다.
+
+    `from_concept_content`은 `assessment=None`을 남긴다(concept_content에 평가 재료가 없다). 그
+    자리를 `l3/render/assessment_bank`가 채운다 — 검증 통과 자체 저작 문항의 verify 앵커를 개념
+    태그로 이어둔 *참조* 뱅크이며 LLM·신규 저작이 0이다. **캐시 적중 경로에도 주입한다**: 뱅크가
+    나중에 채워졌는데 TTL이 남은 낡은 캐시 항목이 계속 빈 평가 재료를 돌려주면, 그 개념만 조용히
+    렌더 불가로 남는다(주입은 이미 있는 값을 덮지 않으므로 적중 경로에서도 안전하다).
+    """
+    row = await get_concept_content(session, code)
+    if row is None:
+        return None, REASON_NO_DSL
+    if not is_supply_eligible(row.review_status):
+        return None, REASON_UNREVIEWED
+
+    key = f"{DSL_CACHE_PREFIX}{code}"
+    cached = await cache.get(key)
+    if cached is not None:
+        try:
+            return attach_assessment(ConceptDSL.model_validate_json(cached)), None
+        except ValidationError:
+            pass  # 계약 변경 등 — 미스 취급 후 아래에서 재생성.
+
+    dsl = attach_assessment(from_concept_content(row))
+    await cache.set(key, dsl.model_dump_json(), ttl_s)
+    return dsl, None
+
+
 async def get_concept_dsl(
     code: str,
     *,
@@ -232,32 +296,13 @@ async def get_concept_dsl(
     cache: CacheBackend,
     ttl_s: int = DSL_CACHE_TTL_S,
 ) -> ConceptDSL | None:
-    """개념 주소화 DSL 조회 — 캐시 → DB read-through 후 **평가 재료 참조 주입**. 미적재면 None.
+    """개념 DSL 조회 — 공급 가능하면 DSL, 아니면 None(행 없음·검수 전을 구분하지 않는다).
 
-    캐시(`CacheBackend`)는 **str 전용**이라 pydantic `model_dump_json()`으로 직렬화한다. 역직렬화가
-    실패하면(계약 변경·손상) **미스로 취급**해 DB에서 다시 만든다 — 낡은 형태를 억지로 쓰는 조용한
-    오작동보다 재적재가 낫다.
-
-    `from_concept_content`은 `assessment=None`을 남긴다(concept_content에 평가 재료가 없다). 그
-    자리를 `l3/render/assessment_bank`가 채운다 — 검증 통과 자체 저작 문항의 verify 앵커를 개념
-    태그로 이어둔 *참조* 뱅크이며 LLM·신규 저작이 0이다. **캐시 히트 경로에도 주입한다**: 뱅크가
-    나중에 채워졌는데 TTL이 남은 낡은 캐시 항목이 계속 빈 평가 재료를 돌려주면, 그 개념만 조용히
-    렌더 불가로 남는다(주입은 이미 있는 값을 덮지 않으므로 히트 경로에서도 안전하다).
+    `resolve_concept_dsl`의 얇은 래퍼다. 사유가 필요한 호출자(`supply`)는 `resolve_concept_dsl`을
+    직접 부른다. 게이트 판정을 래퍼가 아니라 해석 함수에 둔 이유 — 어느 진입점으로 들어와도 같은
+    순서(행 → 게이트 → 캐시)를 지나게 해, 래퍼가 게이트를 우회할 길을 만들지 않는다.
     """
-    key = f"{DSL_CACHE_PREFIX}{code}"
-    cached = await cache.get(key)
-    if cached is not None:
-        try:
-            return attach_assessment(ConceptDSL.model_validate_json(cached))
-        except ValidationError:
-            pass  # 계약 변경 등 — 미스 취급 후 아래에서 재생성.
-
-    row = await get_concept_content(session, code)
-    if row is None:
-        return None
-
-    dsl = attach_assessment(from_concept_content(row))
-    await cache.set(key, dsl.model_dump_json(), ttl_s)
+    dsl, _reason = await resolve_concept_dsl(code, session=session, cache=cache, ttl_s=ttl_s)
     return dsl
 
 
@@ -312,7 +357,7 @@ async def supply(
 
     흐름:
       ① `decide()` — 전략 선택 + 교수학 게이트(내부 호출이라 우회 불가).
-      ② 개념 주소화 DSL 조회(캐시 → DB).
+      ② 개념 주소화 DSL 해석 — 검수 게이트(CONT-05)를 캐시보다 먼저 통과해야 한다.
       ③ 렌더 가능·검증 통과면 반환(`dsl_render`·LLM 0원).
       ④ 아니면 `l3.pipeline.generate` 폴백(`prompt_cache` 또는 `generate`).
 
@@ -327,9 +372,10 @@ async def supply(
     strategy = gate_result.strategy
     render_ctx = ctx if ctx is not None else RenderContext()
 
-    dsl = await get_concept_dsl(code, session=session, cache=cache)
+    dsl, dsl_reason = await resolve_concept_dsl(code, session=session, cache=cache)
     if dsl is None:
-        reason: str | None = REASON_NO_DSL
+        # 행 없음(NO_DSL)·검수 전(UNREVIEWED) — 처리는 같고(렌더 없이 폴백·404) 사유만 다르다.
+        reason: str | None = dsl_reason
         unit: RenderedUnit | None = None
     else:
         unit, reason = _render_or_reason(
@@ -429,11 +475,13 @@ __all__ = [
     "REASON_NO_ADAPTER",
     "REASON_NO_DSL",
     "REASON_RENDER_UNVERIFIED",
+    "REASON_UNREVIEWED",
     "ContentSource",
     "SupplyResult",
     "SupplyTally",
     "get_concept_dsl",
     "get_process_tally",
     "reset_process_tally",
+    "resolve_concept_dsl",
     "supply",
 ]

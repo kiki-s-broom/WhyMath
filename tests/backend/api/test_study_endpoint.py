@@ -32,6 +32,7 @@ from fastapi.testclient import TestClient
 from whymath_backend.api import study as study_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.app import create_app
+from whymath_backend.db.models.concept_content import ConceptContent
 from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.learner_state import LearnerStateRecord
 from whymath_backend.db.models.pedagogy_dsl import LearningObjective
@@ -472,3 +473,68 @@ class TestStudyRequiresLearnerState:
         resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
         assert resp.status_code == 201, resp.text
         assert len(calls) == 1
+
+
+def _content_client(review_status: str) -> tuple[TestClient, _FakeSession]:
+    """`supply()`를 대역으로 바꾸지 **않는** 클라이언트 — 세션 대역에 콘텐츠 행만 심는다.
+
+    위 `_client`는 `supply()`를 대역으로 바꿔 라우터 배선만 본다. 이 클라이언트는 실 공급 사슬
+    (`supply` → `resolve_concept_dsl` → 검수 게이트 → 렌더)을 그대로 태운다 — CONT-05의 집행 지점이
+    서빙 경로에서 실제로 호출되는지를 보려면 그 사슬을 대역으로 덮으면 안 된다.
+    """
+    row = ConceptContent(
+        code=_CONCEPT_CODE,
+        scope="대학",
+        name="극한",
+        subject="미적분",
+        unit="함수의 극한",
+        metaphor="점점 다가가는 목표 지점 — 닿지 않아도 방향은 정해진다.",
+        misconception="극한값을 함숫값과 같은 것으로 본다.",
+        formal_definition_internal=None,
+        accepted_expressions=r"\lim_{x \to a} f(x) = L",
+        explanation=None,
+        standard_codes=[],
+        atom_codes=[],
+        flashcards=[],
+        review_status=review_status,
+    )
+    get_map: dict[Any, Any] = {
+        _OBJECTIVE_ID: _objective(),
+        (LearnerStateRecord, _USER_ID): _learner_state(),
+        (ConceptContent, _CONCEPT_CODE): row,
+    }
+    fake = _FakeSession(get_map=get_map)
+
+    app = create_app()
+    app.dependency_overrides[get_consented_user] = _user
+
+    async def _sess() -> AsyncIterator[_FakeSession]:
+        yield fake
+
+    app.dependency_overrides[get_session] = _sess
+    return TestClient(app), fake
+
+
+class TestStudyReviewGateReach:
+    """CONT-05 ③ — 검수 게이트가 `/study` 서빙 경로에서 실제로 작동하는가(정본화 ≠ 집행).
+
+    같은 콘텐츠 행에서 `review_status` 하나만 바꿔 201/404가 뒤집히는지 본다. 대조군(reviewed → 201)이
+    없으면 "전부 404"라는 과잉 차단도 거부 쪽 검사를 통과한다.
+    """
+
+    def test_reviewed_content_is_served(self) -> None:
+        """성공 방향 대조 — 검수 통과 행은 렌더돼 201로 나간다."""
+        client, fake = _content_client("reviewed")
+        resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["content_source"] == "dsl_render"
+        assert body["segments"], "렌더 조각이 비어 있다"
+        assert any(isinstance(row, EvidenceEvent) for row in fake.added)  # 처치 기록됨
+
+    def test_ai_estimated_content_is_refused(self) -> None:
+        """검수 전 행은 공급되지 않는다 — 404 · 처치 행 0건(학생이 본 것이 없으면 처치가 아니다)."""
+        client, fake = _content_client("ai_estimated")
+        resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
+        assert resp.status_code == 404, resp.text
+        assert not any(isinstance(row, EvidenceEvent) for row in fake.added)
