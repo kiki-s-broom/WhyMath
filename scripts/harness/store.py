@@ -868,6 +868,43 @@ def judgment_state_label(state: str | None) -> str:
     return "사람 판정 대기"
 
 
+# ── 게이트 대기 분류 (HARN-184) ─────────────────────────────────────────────────
+#
+# 미통과 게이트가 **지금 무엇을 기다리는가** — 화면은 이 한 판정에 이름만 붙인다. HARN-177 ②는
+# 판정 기록 상태를 next·status·gates show 에 실었지만 화면을 열거했다. 그 뒤 착지한 작업 흐름
+# 그래프(HARN-182)는 "열린 선행이 있는가"만 보고 판정 미기록 게이트를 '사람 차례'로 분류했다 —
+# 공용 판정이 있는데 새 화면이 자체 판정을 한 것이다. 그래서 분류 자체를 여기 하나로 모은다.
+
+GATE_WAITS_INPUTS = "inputs"  # 미종결 입력 태스크가 남았다 — 작업 차례
+GATE_WAITS_VERDICT = "verdict"  # 입력은 끝났는데 그 상태의 판정 기록이 없거나 FAIL 기록이 끊겼다
+GATE_WAITS_PERSON = "person"  # 담당자 차례 — 판정 개념이 없는 게이트이거나 PASS 기록이 있다
+
+
+def gate_wait_kind(backlog: Backlog, gate: object) -> str | None:
+    """미통과 게이트가 기다리는 것 — inputs · verdict · person 중 하나 (통과한 게이트는 None).
+
+    판정 기록 상태는 `gate_judgment_state`를 그대로 쓴다(여기서 새로 판정하지 않는다):
+      · inputs  — 입력 태스크 중 미종결(done·cancelled 아님)이 남았다. 게이트 종류와 무관하다
+      · verdict — 입력은 끝났는데 판정 기록이 현행이 아니다(`unrecorded`) 또는 최근 FAIL 기록의
+                  소유 태스크가 열린 경로에 없다(`judged:FAIL` — 입력이 전부 끝난 게이트에서는
+                  열린 상류가 비므로 validate가 잡는 상태다). 둘 다 **사람 차례가 아니다**: 판정이
+                  이미 났는데 기록만 빠졌을 수 있다(2026-09-25 사고 — FAIL 판정문이 있었는데 대장은
+                  Kiki 차례로 안내했다)
+      · person  — 그 밖 전부: 판정 개념이 없는 게이트(사람·외부 게이트 · 입력 없는 decision) ·
+                  PASS 기록이 있는 decision 게이트. 입력이 취소돼 영원히 판정할 수 없는 게이트도
+                  여기로 온다 — 그 상태는 validate가 막다른 길로 따로 잡는다(`_gate_input_errors`)
+    """
+    if getattr(gate, "passed", False):
+        return None
+    for dep in getattr(gate, "depends_on", []) or []:
+        task = backlog.tasks.get(dep)
+        if task is not None and task.status not in TERMINAL_STATUSES:
+            return GATE_WAITS_INPUTS
+    if gate_judgment_state(backlog, gate) in (JUDGMENT_UNRECORDED, "judged:FAIL"):
+        return GATE_WAITS_VERDICT
+    return GATE_WAITS_PERSON
+
+
 def upstream_tasks(
     backlog: Backlog, node: Node, graph: DependencyGraph | None = None, *, open_only: bool = False
 ) -> set[str]:
