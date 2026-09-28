@@ -18,6 +18,10 @@
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
+import pytest
 from pydantic import BaseModel
 
 from whymath_backend.schema import subject_adapter, verification_capabilities
@@ -288,17 +292,24 @@ def test_demotion_ledger_entries_prove_actual_removal() -> None:
 
 
 # 상태 절의 **제목 줄** — 이 한 줄이 계약의 상태를 말한다.
-# 문서 어딘가에 "Provisional"이 있는지 보면 안 된다: 아래 "왜 Frozen이 아니라 Provisional인가"
-# 절이 그 단어를 품고 있어, 제목만 Frozen으로 바꿔도 토큰 검사는 초록이다(실측 확인·PR #986
-# Codex P2). 상태는 제목이 말하는 것이므로 제목을 정확히 동결한다.
-STATUS_HEADING = "## 🚧 상태: **Provisional** — pending cross-subject probe (9/27)"
+# 문서 어딘가에 어떤 단어가 있는지 보면 안 된다: 상태 절 아래 설명들이 "Provisional"·"Frozen"을
+# 모두 품고 있어, 제목만 바꿔도 토큰 검사는 초록이다(실측 확인·PR #986 Codex P2). 상태는 제목이
+# 말하는 것이므로 제목을 정확히 동결한다.
+#
+# 이력: 2026-09-05 `Provisional — pending cross-subject probe (9/27)`(EOS-91) →
+# 2026-09-27 `Frozen (unexercised)`(G1 판정 · 게이트 G-required-tier-caller-recheck ① · Kiki).
+# 한정어 `(unexercised)`는 사실 주장이라 아래 라벨-사실 일치 검사가 매 PR 실측과 대조한다.
+STATUS_HEADING = (
+    "## 🧊 상태: **Frozen (unexercised)** — 2026-09-27 G1 동결 · 필수층 Core 호출자 0건"
+)
 
 
-def test_contract_status_heading_is_provisional_until_probe() -> None:
-    """상태 **제목 줄** 동결 — 프로브(EOS-92) 없이 Provisional을 되돌리면 RED.
+def test_contract_status_heading_matches_recorded_verdict() -> None:
+    """상태 **제목 줄** 동결 — 기록된 판정(G1 2026-09-27 · Kiki) 없이 상태를 바꾸면 RED.
 
-    이 검사가 없으면 상태 절은 산문일 뿐이라 다음 세션이 무심코 'Frozen'으로 되돌린다.
-    제목 줄 자체를 계약으로 고정해, 되돌리려면 이 테스트를 함께 고치는 **의도적 행위**를 요구한다.
+    이 검사가 없으면 상태 절은 산문일 뿐이라 다음 세션이 무심코 한정어를 떼거나 되돌린다.
+    제목 줄 자체를 계약으로 고정해, 바꾸려면 이 테스트를 함께 고치는 **의도적 행위**를 요구한다.
+    (종전 이름 `test_contract_status_heading_is_provisional_until_probe` — Provisional 시기의 판정.)
     """
     doc = subject_adapter.__doc__ or ""
     headings = [ln.strip() for ln in doc.splitlines() if ln.lstrip().startswith("## ")]
@@ -311,8 +322,9 @@ def test_contract_status_heading_is_provisional_until_probe() -> None:
     )
     assert status_headings[0] == STATUS_HEADING, (
         f"계약 상태 제목이 바뀌었다:\n  실제: {status_headings[0]}\n  기대: {STATUS_HEADING}\n"
-        "교차 과목 프로브(EOS-92) 통과 전까지 이 계약은 Math 단일 과목에서 도출된 가설이다.\n"
-        "되돌리려면 프로브 결과를 근거로 이 상수와 계약 docstring을 함께 고쳐라."
+        "이 제목은 2026-09-27 G1 판정(Kiki)의 기록이다. 한정어 (unexercised)는 필수층 첫 호출자가\n"
+        "생겼을 때만 뗀다(계약 docstring '한정어를 떼는 절차'). 그 밖의 상태 변경은 새 판정을\n"
+        "근거로 이 상수와 계약 docstring을 함께 고쳐라."
     )
     for clause in ("강등", "Core 확장 금지", "ADR", "중복 구현", "3건을 초과"):
         assert clause in doc, f"프로브 결과 처리 규칙 3조가 상태 절에 없다: {clause!r}"
@@ -335,3 +347,153 @@ def test_contract_status_heading_is_provisional_until_probe() -> None:
         "eos_opaque_payload_gate.py" in doc and "ARCH-43" in doc
     ), "해석 축의 기계 집행(ARCH-43 게이트) 지목이 한계 절에서 사라졌다 — 실재하는 집행을 없는 척 금지"
     assert "해석 축" in doc and "의미 축" in doc, "한계 절의 해석 축/의미 축 구분이 사라졌다"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# G1 판정(2026-09-27 · Kiki) — 한정어 `(unexercised)`는 **사실 주장**이다: 라벨-사실 일치
+#
+# 상태 제목의 `(unexercised)`는 "필수층 3메서드를 쓰는 백엔드 코드가 없다"는 주장이다. 주장은
+# 시간이 지나면 조용히 거짓이 된다 — 첫 호출자가 생기는 날에도 라벨은 그대로 남는다. 그래서
+# 주장과 실측을 매 PR 대조한다. 양방향이다:
+#   · 한정어가 있는데 호출자가 생겼다 → RED (첫 호출자 — 계약 docstring "한정어를 떼는 절차")
+#   · 한정어가 없는데 호출자가 0이다 → RED (시험되지 않은 중립성을 시험된 것처럼 부름 · EOS-92 §5)
+#
+# 스캔 범위는 프로브 문서 부록 ①(사람용 grep)과 같다 — 백엔드 패키지 전체에서 계약 파일과 Math
+# 구현 파일만 뺀다. 다만 grep의 `.메서드(` 텍스트가 아니라 **AST**를 본다: 속성 참조 전부(호출뿐
+# 아니라 콜백으로 넘기는 참조도 사용이다)와 `getattr(x, "메서드")`의 상수 문자열.
+# 한계(있는 척 금지): 이름 기반이다. 문자열을 조립하는 동적 호출은 못 보고, 같은 이름의 무관한
+# 메서드가 생기면 호출자로 센다 — 그때는 그 메서드의 이름을 바꾼다(필수층 이름을 다른 뜻으로
+# 쓰면 사람도 헷갈린다).
+# ══════════════════════════════════════════════════════════════════════════
+
+UNEXERCISED_QUALIFIER = "(unexercised)"
+
+_BACKEND_PACKAGE = Path(subject_adapter.__file__).resolve().parents[1]
+"""스캔 루트 = `whymath_backend` 패키지 — 설치 방식과 무관하게 계약 모듈의 위치에서 파생한다."""
+
+_SCAN_EXCLUDED: frozenset[str] = frozenset(
+    {
+        "schema/subject_adapter.py",  # 계약 자신 — 정의이지 사용이 아니다
+        "l4/subject_adapter_math.py",  # Math 구현 — 구현이지 호출이 아니다
+    }
+)
+
+
+class RequiredTierScanError(RuntimeError):
+    """측정 실패 — "호출자 0"으로 읽으면 안 되는 상태(스캔 대상 0건·파싱 실패)."""
+
+
+def find_required_tier_uses(root: Path) -> list[str]:
+    """`root` 아래 `.py`에서 필수층 메서드를 쓰는 자리를 `상대경로:줄:메서드`로 모은다.
+
+    측정 실패는 빈 목록이 아니라 예외다. 스캔 대상이 0건이면 결과가 "호출자 0"과 화면이 같고,
+    파싱에 실패한 파일을 건너뛰면 그 파일 안의 호출자를 못 본 채 0을 낸다 — 둘 다 공허한 통과다.
+    """
+    scanned = 0
+    uses: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel in _SCAN_EXCLUDED:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            raise RequiredTierScanError(f"파싱 실패 {rel}: {type(exc).__name__}: {exc}") from exc
+        scanned += 1
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in REQUIRED_METHODS:
+                uses.append(f"{rel}:{node.lineno}:{node.attr}")
+            elif (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value in REQUIRED_METHODS
+            ):
+                uses.append(f"{rel}:{node.lineno}:getattr({node.args[1].value!r})")
+    if scanned == 0:
+        raise RequiredTierScanError(f"스캔 대상 0건: {root} — 호출자 0이 아니라 측정 실패다")
+    return uses
+
+
+def _status_heading() -> str:
+    doc = subject_adapter.__doc__ or ""
+    status = [
+        ln.strip() for ln in doc.splitlines() if ln.lstrip().startswith("## ") and "상태:" in ln
+    ]
+    assert len(status) == 1, f"상태 제목 줄이 {len(status)}개다(1개여야 한다): {status}"
+    return status[0]
+
+
+def test_unexercised_qualifier_matches_required_tier_callers() -> None:
+    """라벨-사실 일치 — 상태 제목의 `(unexercised)` ⟺ 필수층 호출자 0 (G1 판정 2026-09-27)."""
+    heading = _status_heading()
+    uses = find_required_tier_uses(_BACKEND_PACKAGE)
+    if UNEXERCISED_QUALIFIER in heading:
+        assert not uses, (
+            "필수층 첫 호출자가 생겼다 — 상태 제목의 (unexercised)가 이제 거짓이다:\n  "
+            + "\n  ".join(uses)
+            + "\n\n중립성이 처음으로 *사용*에 의해 시험되는 순간이다. 이 PR에서 계약 docstring의\n"
+            "'한정어를 떼는 절차'를 밟아라: ①EOS-92 §4-1 재측정(해석 축은 CI의\n"
+            "eos_opaque_payload_gate가 판정 · 의미 축은 사람 판정을 프로브 문서에 기록)\n"
+            "②상태 제목에서 (unexercised)를 떼고 STATUS_HEADING을 함께 고친다\n"
+            "③감시 태스크(ARCH-67 또는 그 후속)에 기록한다.\n"
+            "같은 이름의 무관한 메서드라면 그 메서드의 이름을 바꿔라."
+        )
+    else:
+        assert uses, (
+            "필수층 호출자가 0인데 상태 제목에 (unexercised)가 없다 — 사용으로 시험되지 않은\n"
+            "중립성을 시험된 것처럼 부르는 상태다(EOS-92 §5 · G1 판정 2026-09-27).\n"
+            f"상태 제목: {heading}"
+        )
+
+
+def _write_py(root: Path, rel: str, body: str) -> None:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
+def test_required_tier_scan_counts_calls_references_and_getattr(tmp_path: Path) -> None:
+    """스캐너의 각 절이 자기 반례를 실제로 잡는가 — 절마다 그 절이 없으면 놓치는 입력을 둔다."""
+    _write_py(tmp_path, "api/call.py", "adapter.evaluate_answer(problem, answer)\n")
+    # 호출이 아닌 참조 — 콜백으로 넘기는 것도 사용이다(Call만 보면 놓친다)
+    _write_py(tmp_path, "l3/ref.py", "hook = adapter.detect_misconception\n")
+    # 속성 노드가 없는 사용 — getattr 절이 없으면 놓친다
+    _write_py(tmp_path, "l6/dyn.py", 'getattr(adapter, "validate_problem")(problem)\n')
+    # 대조군(세지 않아야 한다): 정의·같은 이름의 지역 변수·상수가 아닌 getattr 인자
+    _write_py(
+        tmp_path,
+        "l2/control.py",
+        "def evaluate_answer():\n    return 1\n\n"
+        "detect_misconception = 0\n"
+        "name = 'validate_problem'\n"
+        "getattr(adapter, name)\n",
+    )
+    # 제외 경로 — 계약 자신과 Math 구현은 사용처가 아니다(제외 절이 없으면 여기가 잡힌다)
+    _write_py(tmp_path, "schema/subject_adapter.py", "x.evaluate_answer(p, a)\n")
+    _write_py(tmp_path, "l4/subject_adapter_math.py", "self.validate_problem(p)\n")
+
+    assert find_required_tier_uses(tmp_path) == [
+        "api/call.py:1:evaluate_answer",
+        "l3/ref.py:1:detect_misconception",
+        "l6/dyn.py:1:getattr('validate_problem')",
+    ]
+
+
+def test_required_tier_scan_reports_zero_targets_as_failure(tmp_path: Path) -> None:
+    """스캔 대상 0건은 "호출자 0"이 아니라 측정 실패다 — 제외 파일만 있는 경우도 같다."""
+    with pytest.raises(RequiredTierScanError, match="스캔 대상 0건"):
+        find_required_tier_uses(tmp_path)
+    _write_py(tmp_path, "schema/subject_adapter.py", "x.evaluate_answer(p, a)\n")
+    with pytest.raises(RequiredTierScanError, match="스캔 대상 0건"):
+        find_required_tier_uses(tmp_path)
+
+
+def test_required_tier_scan_reports_parse_error_as_failure(tmp_path: Path) -> None:
+    """파싱 실패 파일을 건너뛰지 않는다 — 건너뛰면 그 파일의 호출자를 못 본 채 0을 낸다."""
+    _write_py(tmp_path, "api/ok.py", "x = 1\n")
+    _write_py(tmp_path, "api/broken.py", "def f(:\n    adapter.evaluate_answer(p, a)\n")
+    with pytest.raises(RequiredTierScanError, match="파싱 실패 api/broken.py"):
+        find_required_tier_uses(tmp_path)
