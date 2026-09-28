@@ -29,6 +29,7 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.l2.learner_state import LearnerStateBasis, MasteryBasis
 from whymath_backend.l2.learning_event_trace import (
     _ATTEMPT_EVENT_TYPE_MAP,
     _DETAIL_ALLOWLIST,
@@ -47,6 +48,7 @@ from whymath_backend.l2.learning_event_trace import (
     project_assessment_rows,
     project_attempt_event_rows,
     project_attempt_rows,
+    project_learner_state_rows,
     project_mastery_rows,
     project_misconception_rows,
     project_recommendation_rows,
@@ -184,7 +186,8 @@ _ORM_CLASS_BY_SOURCE: dict[TraceSource, str] = {
     TraceSource.ABILITY_SNAPSHOT: "AbilitySnapshot",
     TraceSource.MISCONCEPTION_HYPOTHESIS: "MisconceptionHypothesisRecord",
     TraceSource.LEARNING_SESSION: "LearningSession",
-    TraceSource.USER_STATE_SNAPSHOT: "UserStateSnapshot",
+    # EOS-132: `user_state_snapshot`은 더 이상 트레이스 원천이 아니다(writer 0건 빈 좌석 → 상태
+    # 생성 사건은 추천 처치 기록의 근거로 옮겼다). 원천에서 빠졌으므로 스캔 축에서도 뺀다.
     # EOS-131: 추천 처치의 writer(`EvidenceEvent(...)`)는 종전에도 있었고 결합 키만 없었다 —
     # 실 session_id로 결합되면서 PRODUCED가 됐으므로 이제 생산 지점 스캔 축에 오른다.
     TraceSource.EVIDENCE_EVENT: "EvidenceEvent",
@@ -767,8 +770,9 @@ class TestBuildTrace:
         session = _QueueSession(_full_queue())
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
         unmeasured = {c.event_type: c.availability for c in trace.unmeasured_sources}
-        assert unmeasured[TraceEventType.LEARNER_STATE_CREATED] is SourceAvailability.DORMANT
         assert unmeasured[TraceEventType.CONTENT_VIEWED] is SourceAvailability.DORMANT
+        # EOS-132: 상태 생성은 추천 기록의 근거로 생산된다 — 미측정 목록에 있으면 은폐다.
+        assert TraceEventType.LEARNER_STATE_CREATED not in unmeasured
         # EOS-131: 세션·추천은 이제 생산 중이다 — 미측정 목록에 있으면 실재 활동이 은폐된다.
         assert TraceEventType.CONCEPT_SELECTED not in unmeasured
         assert TraceEventType.RECOMMENDATION_GENERATED not in unmeasured
@@ -862,9 +866,10 @@ class TestRender:
         trace = await build_trace(cast(AsyncSession, session), learner_id=_UID)
         lines = render_trace_lines(trace)
         assert any("[dormant] content_viewed" in line for line in lines)
-        assert any("[dormant] learner_state_created" in line for line in lines)
         # EOS-131: 추천은 이제 생산 중이라 미측정 목록에 렌더되지 않는다(종전 [unjoinable]의 반대).
         assert not any("recommendation_generated —" in line for line in lines)
+        # EOS-132: 상태 생성도 생산 중이다(종전 [dormant]의 반대) — 미측정으로 렌더되면 은폐다.
+        assert not any("learner_state_created —" in line for line in lines)
 
     async def test_truncation_notice_is_rendered(self) -> None:
         session = _QueueSession(_full_queue())
@@ -900,3 +905,99 @@ class TestCausalTieOrder:
             TraceEventType.ASSESSMENT_FAILED,
         ]
         assert events[0].occurred_at == events[1].occurred_at
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-132 — 추천이 소비한 LearnerState의 생성 사건(원천 = 추천 기록의 근거)
+# ──────────────────────────────────────────────────────────────────────────
+def _basis_meta(
+    *, mastery: bool = True, ability: bool = False, hypotheses: int = 0, assembled_min: int = 12
+) -> dict[str, Any]:
+    """추천 기록에 실리는 근거 meta — 실제 writer와 같은 `to_meta()` 형태."""
+    return LearnerStateBasis(
+        assembled_at=_at(assembled_min),
+        mastery=MasteryBasis(concept_id=_CONCEPT, measured_at=_at(5)) if mastery else None,
+        ability_snapshot_id=uuid.uuid4() if ability else None,
+        misconception_hypothesis_ids=tuple(uuid.uuid4() for _ in range(hypotheses)),
+    ).to_meta()
+
+
+def _rec_with(meta: dict[str, Any] | None, *, minute: int = 13) -> _RecommendationRow:
+    return _RecommendationRow(time=_at(minute), session_id=uuid.uuid4(), meta=meta)
+
+
+class TestLearnerStateProjection:
+    """EOS-132 ⑤ — 상태 생성 사건은 추천 기록의 근거에서 나오고, 없는 것을 지어내지 않는다."""
+
+    def test_basis_becomes_a_state_event_at_assembly_time(self) -> None:
+        row = _rec_with({"learner_state_basis": _basis_meta(hypotheses=2)})
+        (event,) = project_learner_state_rows(_UID, [row])
+        assert event.event_type is TraceEventType.LEARNER_STATE_CREATED
+        # 조립 시각이다 — 추천 기록 시각(13분)을 빌려 쓰지 않는다.
+        assert event.occurred_at == _at(12)
+        assert event.time_basis is TimeBasis.INGESTED
+        assert event.source is TraceSource.EVIDENCE_EVENT
+        assert event.session_id == row.session_id
+        assert event.detail == {
+            "mastery_basis": "measured",
+            "ability_basis": "no_ability_snapshot",
+            "active_hypotheses": 2,
+        }
+
+    def test_absent_basis_is_reported_with_its_reason(self) -> None:
+        row = _rec_with({"learner_state_basis": _basis_meta(mastery=False, ability=True)})
+        (event,) = project_learner_state_rows(_UID, [row])
+        assert event.detail == {
+            "mastery_basis": "no_mastery_history",
+            "ability_basis": "measured",
+            "active_hypotheses": 0,
+        }
+
+    def test_recommendation_without_basis_invents_no_state(self) -> None:
+        # EOS-132 이전 기록·근거 없이 기록된 추천 — 조립 시각을 모르므로 사건을 만들지 않는다.
+        rows = [_rec_with({"problem_id": str(uuid.uuid4())}), _rec_with(None, minute=14)]
+        assert project_learner_state_rows(_UID, rows) == []
+
+    def test_malformed_basis_is_skipped_with_a_warning(self, caplog: Any) -> None:
+        bad = _basis_meta()
+        bad["schema"] = 99
+        with caplog.at_level(logging.WARNING, logger="whymath.l2.learning_event_trace"):
+            assert project_learner_state_rows(_UID, [_rec_with({"learner_state_basis": bad})]) == []
+        assert "learner_state_basis" in caplog.text
+
+    def test_detail_carries_no_identifiers(self) -> None:
+        meta = _basis_meta(ability=True, hypotheses=3)
+        (event,) = project_learner_state_rows(_UID, [_rec_with({"learner_state_basis": meta})])
+        dumped = repr(event.detail)
+        identifiers = [
+            meta["mastery"]["concept_id"],
+            meta["ability_snapshot"]["snapshot_id"],
+            *meta["misconception_hypothesis_ids"],
+        ]
+        for identifier in identifiers:
+            assert identifier not in dumped
+
+    async def test_build_trace_puts_the_state_before_its_recommendation(self) -> None:
+        sid = uuid.uuid4()
+        pid = uuid.uuid4()
+        queue = _full_queue() + [
+            [_SessionRow(session_id=sid, started_at=_at(1), target_concept_id=None)],
+            [
+                _RecommendationRow(
+                    time=_at(13),
+                    session_id=sid,
+                    meta={
+                        "problem_id": str(pid),
+                        "learner_state_basis": _basis_meta(assembled_min=13),
+                    },
+                )
+            ],
+        ]
+        trace = await build_trace(cast(AsyncSession, _QueueSession(queue)), learner_id=_UID)
+        counts = {c.event_type: c.count for c in trace.coverage}
+        assert counts[TraceEventType.LEARNER_STATE_CREATED] == 1
+        # 같은 시각이면 인과 순서 — 상태가 먼저, 그 상태를 본 추천이 뒤.
+        same_moment = [e.event_type for e in trace.entries if e.occurred_at == _at(13)]
+        assert same_moment.index(TraceEventType.LEARNER_STATE_CREATED) < same_moment.index(
+            TraceEventType.RECOMMENDATION_GENERATED
+        )
