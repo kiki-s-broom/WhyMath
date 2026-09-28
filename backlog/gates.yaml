@@ -331,6 +331,19 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-eos129-prod-response-distribution
+    title: "EOS-129 ⑤ 운영 코퍼스 문항당 응답 분포 실측 — Kiki 머신 prod DB(whymath-pg·5433)에서 `python -m whymath_backend.l2.calibrate_items --dry-run --json`을 돌려 추정 가능 문항 수(응답≥5 b 대상·응답≥50 a 후보·a 채택 수)와 폴백 사유 분포를 적는다. 쓰기 0건(읽기 전용). **주의: CLI 기본 DB URL은 5432(타 프로젝트 점유)라 WHYMATH_DATABASE_URL을 postgresql+asyncpg://whymath@127.0.0.1:5433/whymath로 지정해야 한다** — 그대로 돌리면 엉뚱한 DB를 잰다. 판정 3택: ①a 채택 0건 → 데이터 축적 대기(그 사실이 산출물·다음 재측정 시점 기재) ②채택 >0 → dry-run 없이 1회 실행해 irt_a를 영속하고 폴백 비율을 기록 ③응답 자체 0건 → ①과 같이 처리. 근거: docs/reviews/eos129_irt_discrimination_calibration_2026-09-28.md §5"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - EOS-129-irt-discrimination-calibration
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision

@@ -38,6 +38,7 @@ from whymath_backend.l2.ability_estimation import (
     _DIFFICULTY_MIDPOINT,
     difficulty_to_logit,
     resolve_item_difficulty_b,
+    resolve_item_discrimination_a,
 )
 from whymath_backend.l2.irt import IrtItem, ability_standard_error, estimate_ability
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole, EdgeType, ReviewStatus
@@ -87,11 +88,11 @@ TARGET_SE = 0.3
 # EOS-126: CAT **2차 중단 규칙** — 출제 문항 수 상한. `TARGET_SE`(정밀도 축)에 닿지 못해도
 # 이 수만큼 채점되면 진단을 *확정 가능*으로 본다(`AttemptHistoryState.diagnosis_confirmable`).
 #
-# **왜 필요한가 — 실측**: 이 경로의 θ 추정은 모든 응답을 Rasch(a=1.0)로 다룬다
-# (`load_attempt_history_state`가 `IrtItem(difficulty=b)`만 만들고 변별도를 넘기지 않는다).
-# a=1.0이면 문항 하나가 주는 최대 정보량이 a²·0.25 = 0.25이고, SE ≤ 0.3은 총정보량
-# I ≥ 1/0.3² = 11.11을 요구한다 → **최소 45문항**(11.11/0.25 = 44.4). 이 45는 튜닝 여지가
-# 아니라 *모든 문항의 난이도가 학생 능력과 완전히 일치(P=0.5)할 때의 이론적 하한*이다.
+# **왜 필요한가 — 실측**: 이 경로의 θ 추정은 보정된 변별도가 없으면 응답을 Rasch(a=1.0)로
+# 다룬다(EOS-129 착수 전에는 `irt_a` 쓰기 경로가 없어 *항상* 그랬다). a=1.0이면 문항 하나가
+# 주는 최대 정보량이 a²·0.25 = 0.25이고, SE ≤ 0.3은 총정보량 I ≥ 1/0.3² = 11.11을 요구한다
+# → **최소 45문항**(11.11/0.25 = 44.4). 이 45는 튜닝 여지가 아니라 *모든 문항의 난이도가
+# 학생 능력과 완전히 일치(P=0.5)할 때의 이론적 하한*이다.
 # 실측이 그 하한을 확인했다: 난이도 1.0~5.0 균등 코퍼스에서 `select_next_item`으로 이상적
 # 적응 출제를 돌리면 46문항(SE 0.2973), EOS-22 판정 프로브(정답률 2/3 고정)는 67문항이었다
 # (`docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md` §2-1). 즉 **완벽한 적응 알고리즘도
@@ -106,11 +107,11 @@ TARGET_SE = 0.3
 # 참칭하지 않고 **별도의 중단 사유**를 하나 더 둘 뿐이다 — 상한으로 끝난 진단은 응답·적재 양쪽에
 # `measurement_sufficient=False`와 달성 SE를 그대로 달고 나간다(침묵 실패 금지).
 #
-# **근본 원인은 따로 있다**: 수렴 속도 자체를 올리려면 문항 변별도 a를 실측·소비해야 하는데,
-# `Problem.irt_a` 컬럼은 존재하지만 **쓰기 경로가 저장소 어디에도 없고**(항상 NULL) 보정기
-# `l2/item_calibration.py`는 `fit_jmle`(1PL·a 고정)로 b만 적합한다. a=1.5면 하한이 20문항,
-# a=2.0이면 12문항으로 내려간다. 그 2PL 보정은 문항당 응답 축적이 선행돼야 하므로 별건이다
-# = `EOS-129`.
+# **근본 원인 축 = `EOS-129`(배선됨)**: 보정기 `l2/item_calibration.py`가 응답이 충분한 문항의
+# 2PL a를 `Problem.irt_a`에 영속하고, `load_attempt_history_state`가 그것을 소비한다
+# (`resolve_item_discrimination_a` — 없으면 a=1.0 폴백). a가 채워질수록 하한이 내려간다
+# (a=1.5 → 20문항·a=2.0 → 12문항). 운영 a 채움률은 `python -m whymath_backend.l2.calibrate_items
+# --dry-run`이 말하며, 채워지기 전까지는 위 45문항 하한과 이 상한이 그대로 유효하다.
 MAX_ADMINISTERED_ITEMS = 20
 # slice 16/17: 약점 개념 가중 출제 — BKT 개념별 숙달이 낮을수록(약점) 후보 문항 정보량에
 # 곱하는 가중치를 키운다. weight = 1 + BOOST·(1 - 최저숙달). BOOST=1.0이면 완전 미숙달(숙달 0)
@@ -304,6 +305,10 @@ class AttemptHistoryState:
     #: `attempted_ids`와 다르다 — 난이도 라벨도 보정 b도 없는 문항은 θ·SE에 기여하지 못하므로
     #: 여기서도 세지 않는다(상한과 SE가 *같은 문항 집합*을 가리키게 한다).
     administered_count: int
+    #: EOS-129: `administered_count` 중 보정 변별도 a(≠ Rasch 폴백)가 실제로 적용된 응답 수.
+    #: "작동한 비율" 원칙 — a 보정이 이 학생의 θ·SE에 얼마나 닿았는지를 소비측이 알 수 있게 한다.
+    #: 기본값 0은 a 소비 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
+    discrimination_applied_count: int = 0
 
     @property
     def item_cap_reached(self) -> bool:
@@ -343,6 +348,7 @@ async def load_attempt_history_state(
             ProblemAttempt.is_correct,
             Problem.difficulty_overall,
             Problem.irt_difficulty_b,
+            Problem.irt_a,
         )
         .join(Problem, ProblemAttempt.problem_id == Problem.problem_id)
         .where(
@@ -352,12 +358,17 @@ async def load_attempt_history_state(
     )
     attempt_rows = (await session.execute(attempt_stmt)).all()
     responses: list[tuple[IrtItem, bool]] = []
-    for _pid, is_correct, difficulty, irt_b in attempt_rows:
+    discrimination_applied = 0
+    for _pid, is_correct, difficulty, irt_b, irt_a in attempt_rows:
         b = resolve_item_difficulty_b(irt_b, difficulty)
         if b is not None:
-            responses.append((IrtItem(difficulty=b), bool(is_correct)))
+            # EOS-129: 보정 a 우선·없으면 a=1.0(Rasch) — a가 전부 NULL이면 종전과 같은 θ·SE.
+            a = resolve_item_discrimination_a(irt_a)
+            if a != 1.0:
+                discrimination_applied += 1
+            responses.append((IrtItem(difficulty=b, discrimination=a), bool(is_correct)))
     theta = estimate_ability(responses)
-    attempted_ids = {pid for pid, _ic, _d, _b in attempt_rows}
+    attempted_ids = {row[0] for row in attempt_rows}
     # slice 15: 응답한 문항(administered) 기준 측정 정밀도 — CAT 중단 규칙 신호.
     administered_items = [item for item, _ in responses]
     se = ability_standard_error(theta, administered_items)
@@ -369,6 +380,7 @@ async def load_attempt_history_state(
         standard_error=standard_error,
         measurement_sufficient=measurement_sufficient,
         administered_count=len(administered_items),
+        discrimination_applied_count=discrimination_applied,
     )
 
 
