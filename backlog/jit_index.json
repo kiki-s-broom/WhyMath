@@ -3170,6 +3170,17 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_mirror.py"
+   ],
+   "text": "CI 미러 실행 중 통합 테스트 정리 코드 수정 — 미러 결과 오염, 스스로 중단·폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     ".claude/hooks/job_log_truncation_guard.py",
     ".claude/settings.json",
     "tests/infra/test_job_log_truncation_guard.py"
@@ -3196,6 +3207,17 @@
     "tests/harness/test_jit*.py"
    ],
    "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "개명 목적지 HARN-191까지 다른 세션 PR(#1365)이 먼저 머지 — 같은 태스크를 하루에 두 번 개명(185→191→194)",
    "weight": 1
   },
   {

@@ -20,6 +20,7 @@ import logging
 import uuid
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -335,6 +336,10 @@ async def _no_session(*_args: Any, **_kwargs: Any) -> None:
     return None
 
 
+async def _no_transition(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
+    return SimpleNamespace(rejected_transition=None)
+
+
 @pytest.fixture(autouse=True)
 def _stub_side_effects(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """숙달·스킬·학습 세션 부수효과는 no-op — 이 파일의 관심은 힌트 귀속 적재뿐이다."""
@@ -342,6 +347,8 @@ def _stub_side_effects(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(coach_module, "record_problem_attempt_skill_mastery", _noop_list)
     monkeypatch.setattr(coach_module, "record_attempt_skill_event", _noop)
     monkeypatch.setattr(coach_module, "record_learning_activity", _no_session)
+    # EOS-134: 학습 상태 머신도 no-op — 그 배선은 test_coach_completion_state_machine.py가 본다.
+    monkeypatch.setattr(coach_module, "advance_on_graded_attempt", _no_transition)
     yield
 
 

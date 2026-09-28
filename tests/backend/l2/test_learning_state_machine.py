@@ -30,10 +30,12 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import whymath_backend.l2.learning_state_machine as machine_module
 from whymath_backend.l2.learning_state_machine import (
     _LEARNING_ENTRY_TRIGGERS,
     INITIAL_STATE,
     advance_on_attempt,
+    advance_on_graded_attempt,
     assert_transition_allowed,
     ensure_learning_context,
     get_current_state,
@@ -740,3 +742,99 @@ def test_auto_entry_states_are_never_already_assessable() -> None:
     assessable = {src for src, dst in ALLOWED_TRANSITIONS if dst is LearningState.ASSESSING}
     overlap = assessable & set(_LEARNING_ENTRY_TRIGGERS)
     assert overlap == set(), f"자동 진입 대상이 이미 평가 가능합니다: {overlap}"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-134 — 채점 경로 공용 진입점(`advance_on_graded_attempt`)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class _EvidenceSpy:
+    """증거 조립을 대신한다 — 받은 입력으로 증거를 만들어 돌려주고 입력을 기록한다.
+
+    실제 조립기는 연속 오답·오개념을 DB에서 읽는데, 이 파일의 가짜 세션은 원장만 흉내 내므로
+    그 조회를 여기서 대신한다. 입력 전달과 정책까지의 연결은 그대로 실제 코드가 돈다.
+    """
+
+    def __init__(self) -> None:
+        self.kwargs: dict[str, Any] | None = None
+
+    async def __call__(self, _session: Any, **kwargs: Any) -> AttemptEvidence:
+        self.kwargs = kwargs
+        return AttemptEvidence(is_correct=kwargs["is_correct"], confidence=kwargs["confidence"])
+
+
+@pytest.mark.asyncio
+async def test_graded_entry_with_unmeasured_confidence_practices_not_advances(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """코치 완료의 입력(정답 · 확신도 None) — R2 "같은 개념 연습"으로 간다(정답만으로 진급 금지)."""
+    spy = _EvidenceSpy()
+    monkeypatch.setattr(machine_module, "build_attempt_evidence", spy)
+    session = _session()
+    fake = cast(_FakeSession, session)
+    attempt_id = uuid.uuid4()
+
+    result = await advance_on_graded_attempt(
+        session, user_id=_UID, attempt_id=attempt_id, is_correct=True, confidence=None
+    )
+
+    assert spy.kwargs == {"user_id": _UID, "is_correct": True, "confidence": None}
+    assert result.rejected_transition is None
+    assert result.from_state is LearningState.NEW
+    assert result.final_state is LearningState.PRACTICING
+    assert result.decision is not None
+    assert result.decision.rule_id == "R2-correct-low-confidence"
+    # 새 학습자: 학습 진입 → 평가 진입 → 정책 전이, 셋 다 이번 attempt에 묶인다(진입 행 제외).
+    assert [(w.from_state, w.to_state) for w in fake.added] == [
+        (LearningState.NEW, LearningState.LEARNING),
+        (LearningState.LEARNING, LearningState.ASSESSING),
+        (LearningState.ASSESSING, LearningState.PRACTICING),
+    ]
+    assert [w.attempt_id for w in fake.added[1:]] == [attempt_id, attempt_id]
+
+
+@pytest.mark.asyncio
+async def test_graded_entry_passes_reported_confidence_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """클라 자가보고 확신도는 그대로 정책에 닿는다 — 높으면 R1 진급(같은 함수, 다른 입력)."""
+    spy = _EvidenceSpy()
+    monkeypatch.setattr(machine_module, "build_attempt_evidence", spy)
+    result = await advance_on_graded_attempt(
+        _session(), user_id=_UID, attempt_id=uuid.uuid4(), is_correct=True, confidence=0.95
+    )
+    assert spy.kwargs is not None and spy.kwargs["confidence"] == 0.95
+    assert result.final_state is LearningState.ADVANCING
+    assert result.decision is not None
+    assert result.decision.rule_id == "R1-correct-high-confidence"
+
+
+@pytest.mark.asyncio
+async def test_graded_entry_forwards_evidence_attempt_and_policy_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """조립한 증거 객체·attempt id·정책을 주 진입점에 **그대로** 넘긴다(사본·재조립 없음)."""
+    built = AttemptEvidence(is_correct=False, confidence=None)
+
+    async def _build(_session: Any, **_kwargs: Any) -> AttemptEvidence:
+        return built
+
+    seen: dict[str, Any] = {}
+
+    async def _advance(_session: Any, **kwargs: Any) -> str:
+        seen.update(kwargs)
+        return "sentinel"
+
+    monkeypatch.setattr(machine_module, "build_attempt_evidence", _build)
+    monkeypatch.setattr(machine_module, "advance_on_attempt", _advance)
+    policy = default_policy()
+    attempt_id = uuid.uuid4()
+    result = await advance_on_graded_attempt(
+        _session(), user_id=_UID, attempt_id=attempt_id, is_correct=False, policy=policy
+    )
+    assert result == "sentinel"
+    assert seen["evidence"] is built
+    assert seen["attempt_id"] == attempt_id
+    assert seen["policy"] is policy
+    assert seen["user_id"] == _UID

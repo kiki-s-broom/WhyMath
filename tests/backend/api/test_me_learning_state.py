@@ -313,28 +313,78 @@ def test_policy_owned_trigger_set_covers_every_policy_trigger() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_submit_attempt_actually_calls_the_state_machine() -> None:
-    """`submit_attempt` 본문이 `advance_on_attempt`를 호출한다 — AST 판정.
+_API_DIR = _ME_SOURCE.parent
+
+#: 채점 서빙 경로 — (모듈 파일, 함수 이름). 두 경로가 상태 머신 공용 진입점을 부른다(EOS-134).
+_GRADING_PATHS: tuple[tuple[str, str], ...] = (
+    ("me.py", "submit_attempt"),
+    ("coach.py", "_complete_problem"),
+)
+
+#: 공용 진입점 안에서만 불려야 하는 하위 함수 — 서빙 모듈이 직접 부르면 그 경로만의 증거
+#: 조립이 생겨 두 채점 경로가 다시 갈라진다.
+_STATE_MACHINE_INTERNALS = frozenset({"advance_on_attempt", "build_attempt_evidence"})
+
+
+def _called_names(node: ast.AST) -> set[str]:
+    """노드 안의 호출 이름 — `f(...)`와 `mod.f(...)`를 모두 센다(별칭 우회 방지)."""
+    names: set[str] = set()
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        if isinstance(sub.func, ast.Name):
+            names.add(sub.func.id)
+        elif isinstance(sub.func, ast.Attribute):
+            names.add(sub.func.attr)
+    return names
+
+
+@pytest.mark.parametrize(("module_file", "func_name"), _GRADING_PATHS)
+def test_grading_paths_call_the_shared_state_machine_entry(
+    module_file: str, func_name: str
+) -> None:
+    """채점 서빙 경로가 상태 머신 공용 진입점(`advance_on_graded_attempt`)을 부른다 — AST 판정.
 
     이 가드가 없으면 상태 머신 모듈·전이표·정책이 전부 존재하는데 **아무 학생의 상태도
     움직이지 않는** 상태가 통과한다(CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지" ·
-    PED-06 선례).
+    PED-06 선례). 코치 완료 경로가 바로 그 상태였다(SCENARIO-005 ⓓ · EOS-134).
     """
-    tree = ast.parse(_ME_SOURCE.read_text(encoding="utf-8"))
+    tree = ast.parse((_API_DIR / module_file).read_text(encoding="utf-8"))
     handlers = [
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "submit_attempt"
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == func_name
     ]
-    assert len(handlers) == 1, f"submit_attempt 핸들러를 찾지 못했습니다(실측 {len(handlers)}개)"
+    assert len(handlers) == 1, f"{func_name}를 찾지 못했습니다(실측 {len(handlers)}개)"
+    called = _called_names(handlers[0])
+    assert "advance_on_graded_attempt" in called, f"{func_name}가 상태 머신을 부르지 않습니다"
 
-    called = {
-        node.func.id
-        for node in ast.walk(handlers[0])
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "advance_on_attempt" in called, "서빙 경로가 상태 머신을 부르지 않습니다"
-    assert "build_attempt_evidence" in called, "서빙 경로가 증거를 조립하지 않습니다"
+
+def test_no_serving_module_calls_the_state_machine_internals_directly() -> None:
+    """`api/` 어느 모듈도 `advance_on_attempt`·`build_attempt_evidence`를 직접 부르지 않는다.
+
+    두 채점 경로가 같은 입력에 같은 전이를 내는 것은 **같은 함수를 부르기 때문**이다(EOS-134
+    acceptance ②). 한 경로가 하위 두 함수를 따로 부르기 시작하면, 그 경로에만 증거 축(선수
+    결손 id·개념 id 등)이 붙어도 이 가드 말고는 아무것도 알리지 않는다.
+    """
+    modules = sorted(_API_DIR.glob("*.py"))
+    assert modules, f"스캔 대상이 0개다 — 경로가 틀렸다: {_API_DIR}"
+    offenders: list[str] = []
+    for py in modules:
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+        offenders += [
+            f"{py.name}: 호출 {n}" for n in sorted(_called_names(tree) & _STATE_MACHINE_INTERNALS)
+        ]
+        # import 자체도 본다 — `import advance_on_attempt as _a`처럼 별칭으로 부르면 호출 이름
+        # 검사를 빠져나간다. 서빙 모듈이 하위 함수를 가져올 이유가 없으므로 가져오는 것부터 막는다.
+        offenders += [
+            f"{py.name}: import {alias.name}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+            if alias.name in _STATE_MACHINE_INTERNALS
+        ]
+    assert offenders == [], f"공용 진입점을 우회한 직접 사용: {offenders}"
 
 
 def test_attempt_response_carries_the_state_block_as_a_required_field() -> None:
