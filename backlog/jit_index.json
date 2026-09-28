@@ -1540,12 +1540,19 @@
    "kind": "incident",
    "ref": "2026-08-11",
    "paths": [
+    ".github/workflows/ci.yml",
+    "backlog/jit_index.json",
     "data/**",
     "docs/data/**",
+    "scripts/analysis/data_access_layer_audit.py",
+    "scripts/analysis/eos_feature_inventory_v2.py",
     "src/backend/whymath_backend/harness/**",
+    "src/backend/whymath_backend/harness/traversal_load_probe.py",
     "src/data-pipeline/**",
     "tests/backend/harness/**",
-    "tests/data_pipeline/**"
+    "tests/backend/harness/test_traversal_load_probe.py",
+    "tests/data_pipeline/**",
+    "tests/infra/test_traversal_load_probe_wiring.py"
    ],
    "text": "선수 그래프 학교급 경계 엣지 20/2,210·고→대 0 — S4-01 acceptance가 노드 존재만으로 통과시키는 구조",
    "weight": 4

@@ -118,7 +118,9 @@ def _carrier(spec: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 def _mutate_remove_probe(spec: dict[str, Any]) -> None:
     _, job = _carrier(spec)
-    job["steps"] = [s for s in job["steps"] if not _runs_module(str(s.get("run", "")), PROBE_MODULE)]
+    job["steps"] = [
+        s for s in job["steps"] if not _runs_module(str(s.get("run", "")), PROBE_MODULE)
+    ]
 
 
 def _mutate_remove_populate(spec: dict[str, Any]) -> None:
@@ -183,7 +185,9 @@ def test_runs_module_ignores_mentions_outside_python_m() -> None:
     assert _runs_module(f"python3 -m {PROBE_MODULE} --concurrency 1,8", PROBE_MODULE)
 
 
-def test_unparseable_workflow_is_not_a_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unparseable_workflow_is_not_a_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     empty = tmp_path / "ci.yml"
     empty.write_text("name: x\n", encoding="utf-8")
     monkeypatch.setitem(globals(), "_CI_PATH", empty)
