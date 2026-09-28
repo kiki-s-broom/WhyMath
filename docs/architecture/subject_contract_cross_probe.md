@@ -9,6 +9,10 @@
 > **`ZERO_CALLERS`**. 따라서 이 문서의 판정을 갱신하지 않는다.
 > 판정 *기준* 해시는 실측 시점 그대로 둔다 — 뒤늦게 바꾸면 재현 불가가 된다.
 >
+> **G1 판정(2026-09-27): main `0e7b4f6b` — 상태 `Frozen (unexercised)`.** 필수층 Core 호출자가
+> 여전히 0건이라 게이트 `G-required-tier-caller-recheck` 3택 중 ①을 Kiki가 택했다. 재측정 표·새
+> 발견·감시 설계는 **부록 C**. 이 머리말 아래 본문(§0~§6)은 2026-09-06 프로브 시점의 기록이다.
+>
 > **`EOS-90`과의 축 구분(중복 아님)**: 그쪽
 > ([`subject_contract_v1_candidate_verdicts_2026-09-04.md`](../reviews/subject_contract_v1_candidate_verdicts_2026-09-04.md))은
 > *"계획서 후보 9종 중 무엇이 계약에 **들어가는가**"*를 판정했고, 이 문서는 *"이미 들어간
@@ -436,3 +440,94 @@ origin/main -- src/backend/whymath_backend/`로 확인). 게이트
    셋 다 `default_*` 선택층이라 **층 구분 결론은 불변**이지만, 선택층은 계속 자라는데
    필수층은 0에 머물러 있다는 사실 자체가 ④ 라벨 권고(`Frozen (unexercised)`)를 **약화가
    아니라 강화**한다. 필수층 미사용이 과도기가 아니라 정착 상태로 보인다는 뜻이다.
+
+---
+
+## 부록 C. G1 재확인 판정 기록 — 2026-09-27 (판정)
+
+**판정 기준: main `0e7b4f6b`** (작업 트리 소스가 그 커밋과 동일함을 `git diff --quiet HEAD
+origin/main -- src/backend/whymath_backend/ tests/backend/schema/`로 확인). 게이트
+`G-required-tier-caller-recheck`(kind=decision · assignee=kiki)의 재확인 지점 **당일** 실행이며,
+부록 B(9/20 · 판정의 입력)와 달리 이것은 **판정**이다.
+
+### C-1. 재측정 — 부록 B 표 7항목 재실행 + 추가 5항목
+
+| # | 확인 항목 | 명령 | 9/27 결과 | 9/20 대비 |
+|---|---|---|---|---|
+| 1 | 필수층 3메서드 Core 호출자 | 부록 ① bash 블록 | **`ZERO_CALLERS`** (첫 grep rc=1) | 동일 |
+| 2 | 1의 변별력 | 작업 트리 **밖** 복사본에서 `api/coach.py`에 호출 1줄 주입 · 소스 경로 제거 | 주입 시 rc=0·`CALLERS_FOUND`(coach.py:3258 검출) · `cp` 원복 후 sha256 바이트 동일·rc=1 · 경로 제거 시 `SCAN_ERROR` exit 2 | 동일 + `SCAN_ERROR` 분기 실측 추가 |
+| 3 | `MathSubjectAdapter` 인스턴스화 | grep(구현 파일 제외 · `src/`+`scripts/`) | **0건** — 언급 2건 모두 산문(계약 docstring · 경계 스캔의 설명 문자열) | 동일 |
+| 4 | 합성 루트의 필수층 팩토리 | `composition.py` `__all__` 전수 + 반환 타입 | **0건** — 8종 전부 선택층 Protocol 반환(`TYPE_CHECKING` import가 전부 `verification_capabilities`) | 동일 |
+| 5 | 동적 호출 | `getattr(…메서드)` grep | **0건** | 동일 |
+| 6 | `DEMOTED_FIELDS` | 정의 실측 | **`{}`** — 강등 0 | 동일 |
+| 7 | 계약 동결 테스트 | 부록 ② 정정판 | **EXIT=0 · 22 passed** | 동일 |
+| + | 범위 확장 스캔 | 부록 ① 패턴을 `src/` 전체 + `scripts/`로(tests 제외) | **0건** | 신규 |
+| + | §4-1 둘째 grep | `SubjectAdapter` 언급(계약·구현 제외) | 7건 **전부 산문**(docstring·주석) — import·타입 주석·호출 0 | 9/6 2건 → 7건(설명문 증가) |
+| + | 해석 축 기계 게이트 | `eos_opaque_payload_gate.py` | exit 0 · **위반 0** · CORE 355/711 · 기준선 0건(등재 당시 1건은 `EOS-85` #1015가 해소) | 신규 |
+| + | 물리 어댑터 스텁(살아 있는 반증기 · `ARCH-43` ②-b) | `test_subject_adapter_physics_stub.py` | 5 passed | 신규 |
+| + | Core→Adapter 정적 의존(G1 조건) | `eos_core_adapter_boundary_scan.py` | **위반 0건** | 신규 |
+
+### C-2. 새 발견 — 호출자 0은 "아직"보다 "우회"에 가깝다
+
+부록 B는 선택층이 5→8종으로 자란 것을 "층 구분 결론 불변"으로 적었다. 9/27에 선택층 능력의
+**출처**를 추적하자 필수층과 기능이 겹치는 것이 드러났다:
+
+| 필수층 메서드 | Core가 실제로 쓰는 선택층 쌍둥이 | 경위 |
+|---|---|---|
+| `evaluate_answer` | `FinalAnswerVerifier`·`AssessmentAnswerVerifier`·`AnswerFormVerifier` | `EOS-69` ⑦ — 하나로 접으면 'unverifiable을 fail로 접기'가 생겨 능력별로 분리(#916·#945) |
+| `detect_misconception` | `AttemptMisconceptionDetector` | `EOS-104` #1195(2026-09-18) — 필수층은 *학생 서술*을 보는데 채점 경로엔 답만 있다. 필수층을 넓히는 대신 규칙 (나)에 따라 선택층에 신설 |
+| `validate_problem` | 없음 | — |
+
+Core가 필수층과 같은 일을 해야 했던 **두 번 모두** 필수층 시그니처가 맞지 않아 선택층이 새로
+생겼다. 필수층 미사용은 과도기가 아니라 **설계 경로의 결과**다. 이것이 상태 라벨에 한정어를 붙인
+두 번째 근거이고, G5 재확인에서 "필수층의 존재 이유"를 판정할 때(게이트
+`G-required-tier-caller-recheck-g5` 판정 ②)의 입력이 된다.
+
+### C-3. 판정
+
+- **게이트 3택 중 ①** — 판정 주체 Kiki(2026-09-27 세션에서 C-1·C-2와 3택을 제시받고 선택).
+  ②(호출자 생김)는 C-1 #1로 해당 없음. ③(계약 폐기·재설계)은 두 번째 과목 착수 전(S5 하드락)까지
+  필수층 미사용이 아무것도 깨뜨리지 않고 ADR-004의 "일정 연기 금지"와 충돌하므로 G5 재확인으로
+  넘겼다.
+- **상태 라벨**: `Provisional — pending cross-subject probe (9/27)` → **`Frozen (unexercised)`**.
+  계약 모듈 상태 제목 = `## 🧊 상태: **Frozen (unexercised)** — 2026-09-27 G1 동결 · 필수층 Core
+  호출자 0건`. 세션이 제시한 미리보기에는 괄호 설명 "(중립성은 사용으로 시험된 적 없음)"이
+  제목에 붙어 있었으나, ruff `E501`(100칸 · 한글 2칸 계산) 때문에 본문 첫 줄로 옮겼다 — 뜻은 같다.
+- **§5 체크리스트 대조**: §4-1 재측정 → 0건(C-1 #1·해석 게이트) ✓ · 필수층 실사용 호출자 →
+  없음 ✓ · `DEMOTED_FIELDS` 비어 있음 ✓ · `EOS-70` 종속 → 확인: 동결 이후 필수층 편입은 동결
+  해제 결정이 전제(계약 docstring "`explain`을 v1에서 뺀 이유" 절과 `EOS-70` acceptance에 반영) ✓
+
+### C-4. 감시 설계 — 사건 축은 테스트, 시간 축은 게이트 (Kiki 선택)
+
+| 축 | 장치 | 무엇이 일어나면 |
+|---|---|---|
+| **사건**(첫 호출자) | `test_subject_adapter_two_tier_contract.py`의 `test_unexercised_qualifier_matches_required_tier_callers` | 상태 제목의 `(unexercised)` 유무와 필수층 사용 유무가 어긋나면 RED. 첫 호출자를 넣는 PR이 그 자리에서 계약 docstring "한정어를 떼는 절차"를 밟는다 |
+| **시간**(0 지속) | 게이트 `G-required-tier-caller-recheck-g5` + 태스크 `ARCH-67` | G5 데이터 동결 2026-12-27에 재판정: 유지 · 필수층 축소·재설계 · 종결 |
+
+라벨-사실 일치 검사는 부록 ①(사람용 grep)과 **같은 범위**를 **AST**로 본다 — 속성 참조
+전부(호출뿐 아니라 콜백으로 넘기는 참조도 사용이다)와 `getattr(x, "메서드")`의 상수 문자열.
+그래서 grep보다 넓다(`.메서드(` 없이 넘기는 참조도 센다). 측정 실패(스캔 대상 0건·파싱 실패)는
+"호출자 0"이 아니라 예외다.
+
+**변별력 — 실패 주입 8종 전건 기대 위치에서 RED** (2026-09-27 · 순수 Python 하네스 · 매 회
+`mutated != orig` 단언과 원복 sha256 동일 단언 · 기준선과 원복 후 모두 초록):
+
+| # | 주입 | RED가 난 검사 |
+|---|---|---|
+| M1 | `api/coach.py` 함수 본문에 `adapter.evaluate_answer(…)` | 라벨-사실 일치 |
+| M2 | `l3/pedagogy/slot_generator.py` 함수 본문에 `getattr(adapter, "detect_misconception")` | 라벨-사실 일치 |
+| M3 | 호출자 0인 채 한정어 제거(제목 상수도 함께 바꿔 제목 검사는 통과시킴) | 라벨-사실 일치(역방향) |
+| M4 | 스캐너의 "스캔 0건" 검사 제거 | 0건 유닛 테스트 |
+| M5 | 스캐너의 `getattr` 절 무력화 | 절별 반례 유닛 테스트 |
+| M6 | 스캐너의 제외 경로 절 제거 | 절별 반례 + 0건 유닛 테스트(제외 파일만 있는 사례) |
+| M7 | 속성 참조 절 무력화 | 절별 반례 유닛 테스트(참조 반례) |
+| M8 | 파싱 실패를 삼키고 계속 | 파싱 실패 유닛 테스트 |
+
+하네스 자체의 결함 1건도 적는다: 초회 M1은 모듈 최상위에 호출을 넣어 **import 시 `NameError`**로
+실패했다 — 라벨 검사가 아니라 import가 깨진 것이다. 하네스가 `FAILED` 줄만 세고 있어 겉으로는
+RED처럼 보일 수 있었는데, 실패 목록이 비어 있어 드러났다. 주입을 함수 본문으로 옮기고, 하네스가
+`ERROR` 줄(수집·설정 오류)을 검출로 세지 않도록 단언을 추가한 뒤 재실행했다.
+
+**한계(있는 척 금지)**: 이름 기반이다 — 문자열을 조립하는 동적 호출은 못 보고, 같은 이름의
+무관한 메서드가 생기면 호출자로 센다(그때는 그 메서드의 이름을 바꾼다). 의미 축(값의 뜻이
+뒤틀리는가)은 여전히 사람 판정이다.
