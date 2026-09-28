@@ -132,12 +132,12 @@
 
 ### 4-1. 하류 소비자 지도 (정량 · F4 · 놓친 것 2)
 
-초안은 상태 머신 R3의 가지치기만 계산했다. 같은 `confidence`·`evidence_count`를 읽는 실시간 결정이 더 있다. 감쇠 수열은 `hypothesis.decay`로 계산했다(1턴 `×0.8706`).
+초안은 상태 머신 R3의 가지치기만 계산했다. 같은 `confidence`·`evidence_count`를 읽는 실시간 결정이 더 있다. 감쇠 수열은 `hypothesis.decay`(1턴 `×0.8706`)에 **저장 반올림**을 넣어 계산했다 — `confidence`는 `Numeric(3,2)`라 매 회 소수 둘째 자리로 저장되고, 다음 회차는 그 저장값에서 감쇠한다(가지치기 판정은 반올림 전 값). 반올림을 빼고 계산해도 아래 회수는 같다.
 
 | 소비자 | 읽는 값 | 임계 | 정답(또는 오개념 미관측 오답)이 몇 회 쌓이면 바뀌나 |
 |---|---|---|---|
-| 상태 머신 R3 (`l2/learning_state_evidence.py` L146 · 오답일 때만 활성 id 목록) | 활성 여부 | 가지치기 0.1 | 0.74 → **15회**(0.0925) · 0.9 → **16회** · 0.98 → 17회 |
-| 코치 개입 등급 (`l4/misconception/intervene.py` · `_HIGH_CONFIDENCE=0.8` · `_LOW_CONFIDENCE=0.5`) | confidence | >0.8 반례 · ≥0.5 거꾸로 · <0.5 보류 | 0.9 → **1회**에 0.7835(반례 → 거꾸로) · 0.9 → **5회**(0.45) · 0.74 → **3회**(0.644 → 0.561 → 0.488)에 보류 |
+| 상태 머신 R3 (`l2/learning_state_evidence.py` L146 · 오답일 때만 활성 id 목록) | 활성 여부 | 가지치기 0.1 | 0.74 → **15회** · 0.9 → **16회** · 0.98 → 17회 (저장값 0.10에서 한 번 더 감쇠하면 0.087 < 0.1) |
+| 코치 개입 등급 (`l4/misconception/intervene.py` · `_HIGH_CONFIDENCE=0.8` · `_LOW_CONFIDENCE=0.5`) | confidence | >0.8 반례 · ≥0.5 거꾸로 · <0.5 보류 | 0.9 → **1회**에 0.78(반례 → 거꾸로) · 0.9 → **5회**(0.78 → 0.68 → 0.59 → 0.51 → 0.44) · 0.74 → **3회**(0.64 → 0.56 → 0.49)에 보류 |
 | 오개념 복습 코칭 (`l4/misconception_review_coaching.py` 바닥 0.5) | confidence | 0.5 | 위와 같은 회수에서 꺼진다 |
 | MISC-30 반복 오류 사다리 (`l2/remediation_policy.py` · 2·3·4회) | `evidence_count` | 2·3·4 | 가지치기 뒤 재관측되면 신규 가설로 `evidence_count=1`부터 다시 센다 — M을 5번 보인 학생도 "첫 오류" 등급(§7-1 ③) |
 | EOS-140 신선도 (`l2/learning_state_recommendation.py` · `turns_since_evidence == 0` + 회차 경계) | tse | — | **이득**: 정답 감쇠가 옛 가설의 tse를 1로 올리므로 docstring의 "오개념 오답 → 정답(미스캔)" 잔존 시나리오가 답안 있는 정답에서는 해소된다 |
@@ -200,7 +200,7 @@ pedagogy-designer 1회 · 결론 **"수정 채택"**(방향은 옳다 — 정답
   - `NONE` → 아무것도 하지 않는다
 - **설명문 정정**(정답을 "훑지 않는다"로 적은 곳 — F7): `api/me.py`(`_NOT_SCANNED` · 훑기 docstring · 호출부 주석 · 응답 필드 `misconception_review_coaching`·`evidence` 설명) · `config.py`(두 킬 스위치 설명) · `schema/assessment_evidence.py`(`NOT_RUN` 설명) · `schema/verification_capabilities.py`(`AttemptMisconceptionDetector` — "오답 1건") · `l4/subject_adapter_math.py` · `l4/misconception/answer_signature.py`(모듈 docstring "정답이거나 … NOT_RUN" · `scan_attempt_answer` — "오답일 때만 부른다") · `l4/misconception/hypothesis_store.py`(`apply_candidates` — 정답 회차의 후보 없는 호출) · `l2/learning_state_recommendation.py`(EOS-140 docstring의 "오답 + 답안" 전제 2줄 — 미머지 PR #1338과 같은 파일이지만 그 PR이 고치는 줄과 겹치지 않는다. 시험 병합으로 확인한다)
 - **서빙 경로 확인**: `POST /v1/me/attempts` 통합 경로(실 PG)에서 정답+답안 회차 전후 신뢰도가 실제로 내려가는지 본다.
-- **페르소나 C ⑥ 승격**: `conf_correct == conf_post` → `conf_correct < conf_post`(예상 0.74 → 0.644). 실패 메시지는 이 태스크를 지목한다.
+- **페르소나 C ⑥ 승격**: `conf_correct == conf_post` → `conf_correct < conf_post`(예상 0.74 → 0.64 — 저장 정밀도 소수 둘째 자리). 실패 메시지는 이 태스크를 지목한다.
 - **픽스처(절마다 그 절의 반례 · F1·F2·F10)**: 겨냥 문항 정답 → 감쇠 / 연산자 없는 지문 정답 → 무변화 / 선지 스위치 OFF + 인덱스만 보낸 정답 → 무변화 / 정답 보고 + M 오답 선지 인덱스 → 보류 / 정답 보고 + M 거짓형 답 → 보류 / 정답 선지 인덱스 → 감쇠 / 정답 회차 코칭 0회 / 활성 가설 0건 정답 → 응답 정상 · 부작용 0. 각각 대조군을 둔다.
 
 ---
@@ -238,4 +238,15 @@ pedagogy-designer 1회 · 결론 **"수정 채택"**(방향은 옳다 — 정답
 
 ## §9. 검증
 
-(구현 뒤 채운다)
+구현 뒤 이 브랜치에서 돌린 결과다. 판정은 전부 종료 코드다. 전체 스위트와 CI 잡 전수 재현 결과는 이 문서를 확정한 **뒤에** 돌리므로 PR 본문에 싣는다 — 이 파일을 그 뒤에 고치면 그 실행이 어느 트리의 것인지 흐려진다.
+
+- **단위(DB 없음)**: 정책 표 `tests/backend/l4/misconception/test_attempt_hypothesis_policy.py` **17 passed** — 6칸을 리터럴로(표를 import하지 않는다) · 6칸 전수 덮기 · `not_run` 불변식 · 보류는 한 칸뿐 · 정답은 `APPLY`가 되지 않음 · bool이 아닌 정오답 거부(`None`·`1`·`0`·문자열·실수) · 표에 없는 상태는 `ValueError`. 채점 경로 배선 `tests/backend/api/test_me.py`의 4개 클래스 **35 passed** — 새 `TestAttemptCorrectAnswerHypothesis` 9건은 §6 픽스처 목록을 절마다 반례·대조군과 함께 밟는다(연산자 없는 지문과 선지 플래그 OFF는 **오답 쪽 대조**로 거울상 비대칭이 없음을 보인다 · 충돌 2종은 **같은 입력의 오답**이 후보를 반영함을 대조로 둔다 · 기록 대역이 경과 턴까지 기록해 "정답 2턴 감쇠"를 가른다).
+- **실 PG 서빙 경로**(PostgreSQL 16 · 마이그레이션 head · `WHYMATH_RUN_INTEGRATION=1`): `tests/backend/api/test_eos123_correct_attempt_decay_pg.py` — 한 학습자로 차례로 재어 반출 표면(`/v1/me/export`)에서 읽었다.
+  > 「실측」 기준 0.90 → 정답 보고+거짓형 답(보류) 0.90 · 행 전체(`updated_at` 포함) 불변 → 답안 없는 정답 0.90 · 행 불변 → 참 정답 0.78(tse 0→1 · evidence_count 1 불변) → 오개념 미관측 오답 0.68(같은 1턴) · 증거 그래프 0행 유지 · 가설 없는 학습자의 정답은 201·행 0건
+
+  페르소나 C ⑥은 감소 단언으로 승격해 통과했다.
+  > 「실측」 ⑤ 오개념 미관측 오답 0.85 → 0.74 · ⑥ 정답 0.74 → 0.64(감소폭 0.1 · 1턴 저장값과 일치)
+- **결함 주입**(`scripts/analysis/mutate_eos123_attempt_hypothesis_guards.py --with-integration`): **18종 전건 RED** — 단위 13(정책 표 5칸 변이 · 형 검사 제거 · 정답 감쇠 분기의 코칭·무효화·2턴 · 보류 분기의 감쇠·로그 제거·답안 원문 누출 · 정답 훑기 건너뛰기) + 서빙 5(정답 감쇠 제거 · 보류 회차 감쇠 · 미관측 정답 감쇠 · 2턴 감쇠 · 정답 훑기 건너뛰기). 두 표면 모두 무주입 대조군 GREEN · 앵커 1건·치환 실재 단언 · 원복 후 대상 2파일 sha256 일치. 판정 규칙: exit 1만 검출로 센다 — 수집 오류·테스트 0건·**서빙 경로 skip**은 "판정 불가"다(아래 사고와 같은 이유).
+  - 넣지 않은 것: `DECAY_ONLY` 분기가 빈 튜플 대신 훑기 후보를 넘기는 변형은 **등가 뮤테이션**이다 — 그 분기는 `ran_no_candidate`에서만 나오고 그때 후보는 구성상 0건이다.
+- **기능 인벤토리 전수 귀속**: 새 모듈을 `WM-E-412`(활성 오개념 가설 행)에 편입했다. 편입 전 `scripts/analysis/eos_feature_inventory_v2.py`가 "미귀속 모듈: l4.misconception.attempt_hypothesis_policy"로 exit 1, 편입 후 exit 0.
+- **검증 중 사고 1건(피해 0)**: 실 PG 판정의 첫 실행을 `WHYMATH_RUN_INTEGRATION` 없이 `-m integration`으로 돌려 선택한 테스트가 **전부 skip이고 exit 0**이었다(`2 skipped, 4 deselected`). 판정 줄을 읽어 발견했다. `nondiscriminating-check` 계열이라 사고 대장에 기록하고 코드 대책을 `OPS-99-integration-marker-explicit-select-without-flag`로 등재했다(명시 선택인데 플래그가 없으면 skip 대신 사용 오류로 멈춘다).
