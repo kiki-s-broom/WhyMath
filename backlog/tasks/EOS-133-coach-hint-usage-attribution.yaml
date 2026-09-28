@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ requires_gates: []
 acceptance:
   - "① 코치 대화 경로에서 힌트를 받은 뒤 낸 정답 attempt에 힌트 사용이 귀속된다 — attempt.used_hint가 NULL이 아니고 hint_usage 행이 1개 이상 적재된다(EOS-45가 만든 스키마·ORM의 첫 writer).\n② 귀속된 힌트 신호가 숙달 갱신 경로에서 읽히는지 판정해 적는다 — 기본 추정기 bkt-v1이 힌트 축을 읽지 않는 현행을 유지할지(EOS-108 계약) 결정 근거와 함께.\n③ 집행 지점 — tests/backend/scenarios/test_phase2_scenario_regression_suite.py SCENARIO-005의 정직한 공백 동결(ⓒ)이 이 수정으로 실패하도록 되어 있다. 그 단언을 정상 동작 단언으로 뒤집는다.\n④ writer 제거 뮤테이션이 SCENARIO-005를 RED로 만드는지 주입 확인."
   - "[이행 기록 2026-09-28 · 판정 기준 main `6b91d11e`] ① 충족 — `api/coach._complete_problem`이 정답을 처음 낸 학생 턴 이전에 공급된 단계 2 이상 힌트를 귀속한다(`used_hint` 3상태 + `hint_usage` 행 · attempt와 같은 commit · `hint_id`·`view_duration_ms` NULL). 실 PG 통합 4건(`tests/backend/api/test_eos133_hint_attribution_integration.py` — 귀속·방향만·정답 턴 공급 제외·첫 메시지 정답) + SCENARIO-005. ② 판정 — 기본 추정기 `bkt-v1`이 힌트 축을 읽지 않는 현행 유지(측정 없는 기본 전환 금지 · `mastery_update_contract_v1.md` 기본 추정기 처분). 소비 배선은 `EOS-29-assessment-evidence-hint-axis-producer`가 소유하고 SCENARIO-005 ④ⓒ 정직한 공백(완료 채점 증거에 `hint_used` 키 없음)이 그 착지를 알린다. ③ 충족 — SCENARIO-005 ④ⓐ를 정상 동작 단언(`used_hint=True` · `hint_usage` 단계 = ①의 공급)으로 승격. ④ 충족 — 기록 행 제거(M1)·`used_hint` 미설정(M2)·`dialogue_id` 미전달(M4)이 SCENARIO-005를 RED로 만든다(뮤테이션 12종 결과는 PR 본문). 부수 등재: `EOS-30-handled-turn-hint-supply-ledger`(가로챈 턴의 유령 공급)."
-artifacts: []
+artifacts:
+  - "PR #1351 — 코치 완료 attempt 힌트 사용 귀속(used_hint 3상태 + hint_usage 첫 writer) · SCENARIO-005 ④ⓐ 승격 · 후속 EOS-29/EOS-30 (커밋 8787dfdb·9dc5b33a·293f4d26)"
 paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/l4/completion.py
@@ -24,6 +25,6 @@ paths:
   - tests/backend/scenarios/test_phase2_scenario_regression_suite.py
   - docs/reviews/eos119_scenario_suite_2026-09-24.md
   - docs/architecture/32_learning_history.md
-session: claude/magical-maxwell-hja5kh-eos133
+session: null
 notes: "출처: EOS-119(P-13) SCENARIO-005 실측 — docs/reviews/eos119_scenario_suite_2026-09-24.md §공백 표. 소유 태스크 검색 결과 0건(검색 범위는 그 문서에 기재).\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/api/coach.py'] → ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/l4/completion.py', 'src/backend/whymath_backend/l4/hint_deferral.py', 'tests/backend/api/test_coach_hint_attribution.py', 'tests/backend/api/test_eos133_hint_attribution_integration.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'docs/reviews/eos119_scenario_suite_2026-09-24.md', 'docs/architecture/32_learning_history.md']: 구현 범위 확정 — L4 정본 상수·헬퍼 2곳, 신규 테스트 2파일, 시나리오 승격, 문서 2건\n\n[정정 2026-09-28] acceptance ①~④ 이행 기록(판정 기준 main 6b91d11e)"
 updated: 2026-09-28
