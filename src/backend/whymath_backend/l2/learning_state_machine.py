@@ -50,6 +50,7 @@ L4를 import하면 7계층 역방향 의존이다(CLAUDE.md "L_n은 L_{n+1}을 �
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import desc, select
@@ -390,6 +391,7 @@ async def advance_on_graded_attempt(
     attempt_id: uuid.UUID,
     is_correct: bool,
     confidence: float | None = None,
+    this_attempt_misconceptions: Sequence[tuple[str, float]] = (),
     policy: LearningStatePolicy | None = None,
 ) -> AttemptTransitionResult:
     """채점이 끝난 시도 1건을 상태 머신에 통과시킨다 — **채점 서빙 경로의 공용 진입점**(EOS-134).
@@ -407,9 +409,19 @@ async def advance_on_graded_attempt(
 
     `confidence`: 학생 자기보고 확신도(0~1). 코치 경로에는 그 입력이 없어 None(미측정)이다 —
     0.0으로 채우지 않는다(정책은 미측정을 "높은 확신"으로 읽지 않으므로 R1이 아니라 R2다).
+
+    `this_attempt_misconceptions`: **이번 응답의 오개념 스캔**에서 갱신된 가설의 (id, 신뢰) 쌍
+    (EOS-138 ②). R3의 유일한 입력이다 — 조립기는 학생 전체 활성 가설을 다시 읽지 않는다.
+    코치 완료 경로는 완료 시점에 답안 스캔을 하지 않으므로 빈 값이고, 따라서 그 경로의 오답은
+    R3로 가지 않는다(R5·R6). 대화 턴에서 매치된 가설을 교정 근거로 쓰지 않는 것은 EOS-138의
+    의도된 결정이다(판정문 §1 — 턴 단위 매치는 "이 답안의 오개념"이 아니다).
     """
     policy_evidence = await build_attempt_evidence(
-        session, user_id=user_id, is_correct=is_correct, confidence=confidence
+        session,
+        user_id=user_id,
+        is_correct=is_correct,
+        confidence=confidence,
+        this_attempt_misconceptions=this_attempt_misconceptions,
     )
     return await advance_on_attempt(
         session,
