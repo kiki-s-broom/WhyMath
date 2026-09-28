@@ -2344,6 +2344,18 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "EOS-137 중복 착수 — 구현은 미머지 #1352에 있는데 unblock으로 main에서 무주 todo가 돼 네 번째 세션이 claim",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
