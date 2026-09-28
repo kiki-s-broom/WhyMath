@@ -1,0 +1,37 @@
+{
+  "_설명": "pyproject [tool.importlinter] 계약 1(7계층 layers: api > l6 > l5 > l4 > l3 > l2 > l1 > schema)을 그대로 옮긴 보조 설정. 아래 계층은 위→아래 방향만 허용되고, 아래→위(역방향)는 전부 금지다. composition/app.py는 계약이 별도 취급(면제 1건)하므로 별도 계층으로 두고 core 계층→composition을 금지에 넣는다.",
+  "python_roots": ["src/backend", "src/data-pipeline", ""],
+  "layers": {
+    "api": ["src/backend/whymath_backend/api/**"],
+    "l6": ["src/backend/whymath_backend/l6/**"],
+    "l5": ["src/backend/whymath_backend/l5/**"],
+    "l4": ["src/backend/whymath_backend/l4/**"],
+    "l3": ["src/backend/whymath_backend/l3/**"],
+    "l2": ["src/backend/whymath_backend/l2/**"],
+    "l1": ["src/backend/whymath_backend/l1/**"],
+    "schema": ["src/backend/whymath_backend/schema/**"],
+    "lang": ["src/backend/whymath_backend/lang/**"],
+    "composition": ["src/backend/whymath_backend/composition.py", "src/backend/whymath_backend/app.py"],
+    "db": ["src/backend/whymath_backend/db/**"],
+    "backend_other": ["src/backend/whymath_backend/**"]
+  },
+  "forbidden": [
+    ["l6","api"],
+    ["l5","api"],["l5","l6"],
+    ["l4","api"],["l4","l6"],["l4","l5"],
+    ["l3","api"],["l3","l6"],["l3","l5"],["l3","l4"],
+    ["l2","api"],["l2","l6"],["l2","l5"],["l2","l4"],["l2","l3"],
+    ["l1","api"],["l1","l6"],["l1","l5"],["l1","l4"],["l1","l3"],["l1","l2"],
+    ["schema","api"],["schema","l6"],["schema","l5"],["schema","l4"],["schema","l3"],["schema","l2"],["schema","l1"],
+    ["l4","composition"],["l3","composition"],["l2","composition"],["l1","composition"],["schema","composition"],
+    ["schema","db"],["lang","db"],["l5","db"],["l6","db"]
+  ],
+  "math_only_libs": ["sympy", "latex2sympy2", "antlr4", "texteller", "mpmath"],
+  "math_free_layers": ["l2", "l6", "schema", "lang"],
+  "ai_sdks": ["anthropic", "openai", "google.generativeai", "google.genai", "ollama", "litellm", "langchain", "langchain_core", "groq", "mistralai", "cohere"],
+  "dart_ai_packages": ["google_generative_ai", "dart_openai", "openai_dart", "anthropic_sdk_dart", "langchain", "firebase_vertexai"],
+  "ai_gateway": ["src/backend/whymath_backend/l3/router.py", "src/backend/whymath_backend/l3/providers/**"],
+  "db_drivers": ["psycopg", "psycopg2", "asyncpg", "sqlalchemy", "sqlite3", "pymongo", "supabase"],
+  "db_allowed": ["src/backend/whymath_backend/db/**", "src/backend/alembic/**", "**/migrations/**", "scripts/**", "infra/**", "src/data-pipeline/**", "src/backend/whymath_backend/l1/**", "src/backend/whymath_backend/l2/**", "src/backend/whymath_backend/l3/**", "src/backend/whymath_backend/l4/**", "src/backend/whymath_backend/api/**", "src/backend/whymath_backend/ops/**", "src/backend/whymath_backend/harness/**", "src/backend/whymath_backend/privacy/**", "src/backend/whymath_backend/whs/**", "src/backend/whymath_backend/*.py"],
+  "test_paths": ["tests/**", "**/tests/**", "**/test_*.py", "**/*_test.py", "**/*_test.dart", "**/integration_test/**"]
+}

@@ -1,0 +1,231 @@
+# constitution/rules.yaml — WhyMath 법률: 규칙 등록부 (v1.0)
+# ─────────────────────────────────────────────────────────────
+# 이 파일은 사람만 수정한다 (헌법 제9조·제11조).
+# 표준북 각 장의 ⑥칸(자동 검사)을 기계가 읽는 형태로 옮긴 것이다.
+#
+# 필드 설명
+#   id        : R[표준북 장]-[번호]. R0은 헌법 자체를 지키는 규칙
+#   article   : 근거 조문
+#   chapter   : 해설서(표준북) 장 번호
+#   axis      : 결함 6축 (흐름·진실·경계·변경·확신·회복)
+#   statement : 규칙 한 문장
+#   level     : 목표 통제 강도 (L1~L5)
+#   check     : 집행 장치 파일 경로 (저장소 최상위 기준). 이 파일이 없으면 '집행 장치 없음'
+#   run       : 검사 실행 명령. 성공 = 종료 코드 0. L5 규칙은 위헌 심사 때 실제로 실행됨
+#   stage     : 이식 단계 (1~5). 해당 단계 전까지는 '집행 장치 없음'이 정상
+#   precedent : (선택) 이 규칙을 만든 판례 번호
+#
+# ⚠ check·run의 경로는 '제안 경로'다. 실제 저장소 구조에 맞게 사람이 조정한다.
+# ─────────────────────────────────────────────────────────────
+
+version: "1.0.1"
+
+rules:
+
+  # ── R0: 헌법 자체의 보호 ─────────────────────────────
+  - id: R0-01
+    article: 제9조
+    chapter: 0
+    axis: 경계
+    statement: AI는 constitution/ 폴더를 수정·삭제·이동할 수 없다
+    level: L5
+    check: .claude/hooks/guard_constitution.py
+    run: python scripts/constitution/selftest_guard.py
+    stage: 2
+
+  - id: R0-02
+    article: 제11조
+    chapter: 0
+    axis: 변경
+    statement: constitution/ 이 바뀐 커밋에는 amendments/ 의 새 개정 기록이 함께 있어야 한다
+    level: L5
+    check: scripts/constitution/check_amendment.py
+    run: python scripts/constitution/check_amendment.py
+    stage: 3
+
+  # ── 1장 의존성 그래프 (헌법 제4조) ──────────────────────
+  - id: R1-01
+    article: 제4조
+    chapter: 1
+    axis: 흐름
+    statement: 파이프라인 실행 순서는 pipeline.yaml 한 곳에만 선언하며, 누락·순환·섬 노드가 없어야 한다
+    level: L5
+    check: scripts/constitution/pipeline_check.py
+    run: python scripts/constitution/pipeline_check.py
+    stage: 3
+
+  - id: R1-02
+    article: 제4조
+    chapter: 1
+    axis: 흐름
+    statement: 어떤 노드를 바꿨을 때 다시 실행할 하류 노드를 명령 한 줄로 구할 수 있어야 한다
+    level: L4
+    check: scripts/constitution/pipeline_check.py
+    run: python scripts/constitution/pipeline_check.py --downstream standards
+    stage: 3
+
+  - id: R1-03
+    article: 제4조
+    chapter: 1
+    axis: 흐름
+    statement: 저작권 판정·백업·교육과정 정합성 검토는 pipeline.yaml의 노드이며, 저작권 판정은 게시의 상류에 있어야 한다
+    level: L5
+    check: scripts/constitution/pipeline_check.py
+    run: python scripts/constitution/pipeline_check.py --require copyright,backup,curriculum_review --upstream-of publish:copyright
+    stage: 3
+
+  # ── 2장 게이트는 노드다 (헌법 제5조·제8조) ──────────────
+  - id: R2-01
+    article: 제5조
+    chapter: 2
+    axis: 흐름
+    statement: 게시 테이블은 중복·품질·저작권 게이트 통과 기록이 없는 문항을 DB 수준에서 거부한다
+    level: L5
+    check: db/constraints/publish_gate_trigger.sql
+    run: pytest -q tests/constitution/test_publish_gate.py
+    stage: 5
+
+  - id: R2-02
+    article: 제5조
+    chapter: 2
+    axis: 확신
+    statement: 중복 게이트 판정과 무관하게 모든 후보 문항은 사람 품질 판정(F1~F8)을 받는다
+    level: L5
+    check: tests/constitution/test_gate_independence.py
+    run: pytest -q tests/constitution/test_gate_independence.py
+    stage: 3
+    precedent: P0001
+
+  - id: R2-03
+    article: 제5조
+    chapter: 2
+    axis: 확신
+    statement: 게이트 기록에는 판정자·일시·근거·우회 여부 필드가 있어야 한다
+    level: L4
+    check: tests/constitution/test_gate_schema.py
+    run: pytest -q tests/constitution/test_gate_schema.py
+    stage: 3
+
+  - id: R2-04
+    article: 제9조
+    chapter: 19
+    axis: 확신
+    statement: 사람 검토 세션의 검토 소요 시간 중앙값이 10초 미만이거나 반려율이 0%이면 경고한다 (도장 찍기 조기 경보)
+    level: L4
+    check: scripts/constitution/review_health.py
+    run: python scripts/constitution/review_health.py
+    stage: 4
+    precedent: P0001
+
+  # ── 3장 멱등성 (헌법 제6조) ────────────────────────────
+  - id: R3-01
+    article: 제6조
+    chapter: 3
+    axis: 흐름
+    statement: 모든 배치 스크립트는 두 번 실행해도 행 수와 결과가 같아야 한다 ('두 번 실행 테스트' 필수)
+    level: L5
+    check: tests/test_idempotency.py
+    run: pytest -q tests/test_idempotency.py
+    stage: 3
+
+  - id: R3-02
+    article: 제6조
+    chapter: 3
+    axis: 흐름
+    statement: AI 문항 생성은 출력이 아니라 생성 자리(slot_key) 기준으로 중복을 막으며, items.slot_key에 UNIQUE 제약이 있다
+    level: L5
+    check: tests/constitution/test_slot_key_unique.py
+    run: pytest -q tests/constitution/test_slot_key_unique.py
+    stage: 5
+
+  # ── 4장 단일 진실 원천 (헌법 제7조) ────────────────────
+  - id: R4-01
+    article: 제7조
+    chapter: 4
+    axis: 진실
+    statement: 저장소 안의 원본은 모두 아래 sources에 등록되어 있고 실제로 존재한다
+    level: L5
+    check: scripts/constitution/audit.py        # 위헌 심사가 원본 등록부를 직접 검사함
+    run: python scripts/constitution/audit.py --sources-only
+    stage: 1
+
+  - id: R4-02
+    article: 제7조
+    chapter: 4
+    axis: 진실
+    statement: Python·Dart 데이터 모델은 schemas/ 의 JSON Schema에서 자동 생성되며, 재생성 결과가 커밋된 것과 같아야 한다
+    level: L5
+    check: scripts/check_generated.sh
+    run: bash scripts/check_generated.sh
+    stage: 3
+
+  - id: R4-03
+    article: 제7조
+    chapter: 4
+    axis: 진실
+    statement: 문서에 적힌 핵심 숫자(개념 노드 수·오개념 수·시그니처 패턴 수)는 원본에서 센 실제 값과 같아야 한다
+    level: L5
+    check: tests/test_docs_numbers.py
+    run: pytest -q tests/test_docs_numbers.py
+    stage: 3
+
+# ─────────────────────────────────────────────────────────────
+# 원본 등록부 (헌법 제7조) — 여기 없는 원본은 인정하지 않는다
+#   external: true  → 저장소 밖 원본 (존재 검사 생략, 판·버전 표기 필수)
+#   derived         → 이 원본에서 만들어지는 파생물 (직접 수정 금지)
+# ⚠ path는 제안 경로. 실제 위치로 바꾼 뒤 위헌 심사를 돌리면 누락이 드러난다.
+# ─────────────────────────────────────────────────────────────
+sources:
+  # ── v1.0.1 정정 (개정 초안 A0003 · CONST-02 · 판정 기준: 조사 main b8af6f26) ──
+  # 제안 경로 6/9가 이 저장소에 없어 위헌 심사 R4-01이 차단 7건을 냈다. 아래는 1차 조사가 코드의
+  # 실제 소비 경로(grep)로 찾고 독립 검증이 재확인한 정본 위치다. 근거 = docs/constitution_proposals/
+  # A0003_sources_registry_draft.md 와 docs/reviews/coding_constitution_crosswalk_2026-09-27.md §2.
+  - name: 성취기준
+    path: data/corpus/standards_v1/standards.json
+    version: "교육부 고시 제2022-33호(2022 개정 435건) + 제2015-74호(2015 개정 460건) · 코퍼스 원본 sha256 4e21d6d4424c… (2026-06-20)"
+    derived: [PG achievement_standard, PG concept_standard_link, PG curriculum_entry KR 셀, 커버리지 리포트 분모]
+
+  - name: 개념 그래프 (노드·선수 관계)
+    path: data/corpus/atom_graph_v1/graph.json
+    version: "atom_graph_v1 — 원자 백본 2,683노드·2,210엣지 (legacy 437개념 concept_graph_v1 은 감사 전용 스냅샷)"
+    derived: [PG concept·concept_edge, PG atom_node, PG atom_embedding, 시각화 Overlay]
+
+  - name: 오개념 DB·오답 op-code
+    path: data/corpus/misconceptions_v1/misconceptions.json
+    version: "M-id 카탈로그 843건 · kebab 탐지 카탈로그 67종(정본 docs/prompts/misconception_diagnosis.md) · op-code 10종(l4/misconception/distractor.py)"
+    derived: [PG misconception_catalog, Problem.distractor_map, 크로스링크 게이트 적재본]
+
+  - name: 수능 시그니처 패턴
+    path: src/backend/whymath_backend/schema/enums.py
+    version: "SignaturePattern 10종 폐쇄 enum (설계 정본 schemas/v1.0/schema_v1.0.md §14.3 · 태깅 규칙 3종 signature_tagger.py)"
+    derived: [Problem.signature_patterns 배열, 코퍼스 signature_patterns 태그, L6 suneung 게이팅]
+
+  - name: 문항 데이터 구조
+    path: src/backend/whymath_backend/schema/problem.py
+    version: "Problem.schema_version whymath-problem 1.1.0 (설계 정본 schemas/v1.0/schema_v1.0.md §3.1)"
+    derived: [PG problem·problem_step·problem_relation (ORM), Dart problem_models.dart, API 응답 모델]
+
+  - name: 파이프라인 실행 순서
+    path: pipeline.yaml
+    derived: [런북·docstring의 적재 순서 설명(파생 — pipeline.yaml 이 정본)]
+
+  - name: 저작권 허용 기준
+    path: docs/data/licensing_safety.md
+    version: "매트릭스 정본 (원문 docs/legal/copyright_guide_v2.md v2.0 2026-05-27 · 값 정본 docs/legal/copyright_gradient.md §4.2)"
+    derived: [ContentPool enum, METADATA_ONLY_SOURCES 검증자, 약관 스냅샷 TIER1_SOURCES, CI policy-guard]
+
+  - name: EOS 기능 목록
+    path: scripts/analysis/eos_feature_inventory_v2.py
+    version: "기계 도출 장부 v2 (162행 · 2026-09-03) — 외부 xlsx(52·120·382 항목)와의 개수 정합은 판정 대상 아님"
+    derived: [backlog/inventory/feature_inventory_v2.yaml (비커밋 산출), backlog 태스크]
+
+  - name: 학습자 응답·지식 추적 상태
+    external: true
+    path: "PostgreSQL 운영 DB whymath-pg (Phaiakes9 Docker · 호스트 5433)"
+    version: "코드 기대 스키마 alembic head 8c19e8a611e4 · 운영 DB 스탬프 d6e7f8a9b0c1 (probe_prod_schema_revision.sql 로 확정)"
+    derived: [분석용 내보내기, 일일 학습 지표 롤업]
+
+  # ── Kiki 판단 요청(채택 시 위 목록에 추가) — 정본이 두 곳 이상인 데이터 종류 3건 ──
+  # ① 규칙 등록부: CLAUDE.md 원문 · backlog/rules.ndjson(데이터) · docs/standards/rule_index.md(렌더) · 이 파일
+  # ② LLM 모델 핀: src/backend/whymath_backend/l3/router.py LOCAL_MODEL_MATRIX · config.py · CLAUDE.md 스택 표
+  # ③ 단원·소단원 위계: atom_graph_v1(단원 217·소단원 643) · achievement_criteria_v1 · units_v1 · textbook_unit
