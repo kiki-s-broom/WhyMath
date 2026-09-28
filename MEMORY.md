@@ -11344,7 +11344,7 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 `test-driven-development-03elxp`(49d9d76a — main 조상, MP-02 홀드 09-23 해제) · `relaxed-fermat-8dui3u`(03e45689 — MP-06
 done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이벤트 · EOS-117 증적 상세)은 판정 문서 §4에 원문 보존.
 
-**감사 중 발견 — 실시간 중복(사고 대장 `parallel-duplicate-implementation` 10회차)**: 열린 PR #1346이 EOS-129를 부분
+**감사 중 발견 — 실시간 중복(사고 대장 `parallel-duplicate-implementation` 11회차)**: 열린 PR #1346이 EOS-129를 부분
 이행(⑤ 운영 DB 응답 분포 실측 도구 + 게이트 `G-eos129-item-response-census` + 가드 런북)하고 08:43Z에 "게이트 대기로 claim
 해제(todo)"했는데, 11:25Z 다른 세션 `focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트**
 `G-eos129-prod-response-distribution`를 4분 만에 신설했다. `start` 프리플라이트(HARN-11)는 미머지 **done**만 보고,
@@ -11363,8 +11363,9 @@ done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이�
 인덱스 대조"에서 exit 1을 냈다(뒤 스텝 7건 미실행 — 하네스 테스트 포함). origin/main 워크트리에서는 통과해 원인을
 대조로 확정했고 `backlog.py jit build`로 재생성했다. 대책 태스크 `HARN-179`(쓰기 CLI가 인덱스를 함께 재생성)는
 2026-09-26 1회차 때 이미 등재돼 있다 — 푸시 전에 미러를 돌리지 않았다면 CI red였다. 재검증 미러에서는
-`tests/harness`가 이 세션 샤드에 가짜 `policy_warn` 3줄을 썼다(`harness-test-live-ledger-write` **7회차** · 커밋 전 제거) —
-대책 `HARN-170`은 09-24 이후 7회 재발했는데 우선순위 3·EOS P2에 머물러 있다.
+`tests/harness`가 이 세션 샤드에 가짜 `policy_warn` 3줄을 썼다(`harness-test-live-ledger-write` **8회차** · 커밋 전 제거) —
+대책 `HARN-170`은 09-24 이후 8회 재발했는데 우선순위 3·EOS P2에 머물러 있다. (두 계열의 회차는 main `ed3d14da`
+머지 후 대장 기준이다 — 이 브랜치에서 기록할 때는 10회차·7회차였고, 같은 날 main에 같은 계열 사고가 1건씩 먼저 들어왔다.)
 
 **부수 발견 — `HARN-185`**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상
 `03elxp`를 체크아웃 대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면
