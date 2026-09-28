@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/log_scrubber.py
   - "tests/backend/ops/test_log_scrubber*.py"
-session: null
+session: claude/focused-ramanujan-2p5q8w
 notes: "출처: 2026-09-28 EOS-137(QA 문항별 판정 어댑터) 구현 중 서브에이전트가 금칙어·PII 축의 전화번호 사각을 발견(계약 golden_benchmark_contract.md §8-6에 기록) → 메인 세션이 같은 패턴이 로그 마스킹(ops/log_scrubber.scrub_text)에도 쓰임을 확인하고 이메일까지 같은 사각임을 실측. CLAUDE.md 보안 금기(미성년자 데이터 평문 저장 금지·PII 외부 노출 금지) 축이라 priority 1."
 updated: 2026-09-28
