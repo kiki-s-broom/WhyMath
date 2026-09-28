@@ -1,0 +1,19 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-01-x
+title: t
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: cancelled
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths: []
+session: null
+notes: "[취소 2026-09-27] 번호 제안 확인용 프로브가 실제 등재됐다(add에 dry-run 없음). rename은 같은 번호 슬러그 교체를 거부하므로 취소하고 CONST-02부터 실제 등재"
+updated: 2026-09-27
