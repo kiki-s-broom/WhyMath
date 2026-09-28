@@ -106,6 +106,7 @@ whymath/
 
 ### 1. CLAUDE.md를 항상 컨텍스트에 둔다
 새 세션마다 Claude가 자동 로드. 프로젝트 정체성·결정사항·금기·표준이 모두 여기에.
+코딩 구조 결함 규범은 별도의 **코딩 헌법** `constitution/`에 있고 사람(Kiki)만 고친다(AI는 읽기만 — 가드 훅). 두 규범의 관계는 `docs/standards/coding_constitution_transplant.md`.
 
 ### 2. MEMORY.md를 결정 로그로 활용
 새로운 결정, 폐기된 접근, 핵심 인사이트는 MEMORY.md에 추가. *대화의 휘발성*을 막는 핵심 도구.

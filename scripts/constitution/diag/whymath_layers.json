@@ -1,0 +1,67 @@
+{
+  "_설명": "WhyMath 기준선 측정용 계층 설정. src/backend/pyproject.toml [tool.importlinter]의 EOS Core→Math Adapter 계약 2개(forbidden_modules 20개)를 adapter_math로, 7계층 layers 계약의 역방향(L_n→L_{n+1})을 core/core_l3/ai_gateway→app 금지로 옮겼다. 파일은 위에서부터 처음 맞는 계층으로 분류되므로 adapter_math·ai_gateway를 먼저 둔다. 지시문의 app={api,l5,l6,composition.py,app.py}는 pyproject가 셋을 다르게 다루므로(api·l6=CORE source / l5=비source / composition=합성 루트) app·app_l5·composition으로 나눴다.",
+  "python_roots": ["src/backend", "src/data-pipeline", ""],
+  "layers": {
+    "adapter_math": [
+      "src/backend/whymath_backend/l3/equivalent/**",
+      "src/backend/whymath_backend/l3/finite_probability.py",
+      "src/backend/whymath_backend/l3/multi_solution.py",
+      "src/backend/whymath_backend/l3/notation_coverage.py",
+      "src/backend/whymath_backend/l3/solution_set.py",
+      "src/backend/whymath_backend/l3/speech.py",
+      "src/backend/whymath_backend/l3/speech_parse.py",
+      "src/backend/whymath_backend/l3/statistical_claim.py",
+      "src/backend/whymath_backend/l3/symbolic_equivalence.py",
+      "src/backend/whymath_backend/l3/verifier.py",
+      "src/backend/whymath_backend/l3/verify_answer.py",
+      "src/backend/whymath_backend/l3/verify_answer_form.py",
+      "src/backend/whymath_backend/l3/verify_final_answer.py",
+      "src/backend/whymath_backend/l3/verify_solution.py",
+      "src/backend/whymath_backend/l3/verify_step.py",
+      "src/backend/whymath_backend/l4/misconception/answer_signature.py",
+      "src/backend/whymath_backend/l4/misconception/wrong_form_match.py",
+      "src/backend/whymath_backend/l4/misconception/wrong_form_shadow_harvest.py",
+      "src/backend/whymath_backend/l4/subject_adapter_math.py",
+      "src/backend/whymath_backend/l5/ocr/**"
+    ],
+    "ai_gateway": [
+      "src/backend/whymath_backend/l3/router.py",
+      "src/backend/whymath_backend/l3/providers/**"
+    ],
+    "db": ["src/backend/whymath_backend/db/**", "src/backend/alembic/**"],
+    "app": ["src/backend/whymath_backend/api/**", "src/backend/whymath_backend/l6/**"],
+    "app_l5": ["src/backend/whymath_backend/l5/**"],
+    "composition": ["src/backend/whymath_backend/composition.py", "src/backend/whymath_backend/app.py"],
+    "core": [
+      "src/backend/whymath_backend/l1/**",
+      "src/backend/whymath_backend/l2/**",
+      "src/backend/whymath_backend/l4/**",
+      "src/backend/whymath_backend/lang/**",
+      "src/backend/whymath_backend/schema/**"
+    ],
+    "core_l3": ["src/backend/whymath_backend/l3/**"],
+    "backend_other": ["src/backend/whymath_backend/**"]
+  },
+  "forbidden": [
+    ["core", "adapter_math"],
+    ["core_l3", "adapter_math"],
+    ["ai_gateway", "adapter_math"],
+    ["app", "adapter_math"],
+    ["core", "app"],
+    ["core_l3", "app"],
+    ["ai_gateway", "app"],
+    ["core", "app_l5"],
+    ["core_l3", "app_l5"],
+    ["core", "composition"],
+    ["core_l3", "composition"],
+    ["app_l5", "app"]
+  ],
+  "math_only_libs": ["sympy", "latex2sympy2", "antlr4", "texteller", "mpmath"],
+  "math_free_layers": ["core", "core_l3", "ai_gateway", "app", "composition", "db"],
+  "ai_sdks": ["anthropic", "openai", "google.generativeai", "google.genai", "ollama", "litellm", "langchain", "langchain_core", "groq", "mistralai", "cohere", "openrouter", "deepseek"],
+  "dart_ai_packages": ["google_generative_ai", "dart_openai", "openai_dart", "anthropic_sdk_dart", "langchain", "firebase_vertexai"],
+  "ai_gateway": ["src/backend/whymath_backend/l3/router.py", "src/backend/whymath_backend/l3/providers/**"],
+  "db_drivers": ["psycopg", "psycopg2", "asyncpg", "sqlalchemy", "sqlite3", "pymongo", "supabase"],
+  "db_allowed": ["src/backend/whymath_backend/db/**", "src/backend/alembic/**", "**/migrations/**", "scripts/**", "infra/**", "src/data-pipeline/**"],
+  "test_paths": ["tests/**", "**/tests/**", "**/test_*.py", "**/*_test.py", "**/*_test.dart", "**/integration_test/**"]
+}

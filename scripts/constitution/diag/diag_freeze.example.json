@@ -1,0 +1,100 @@
+{
+  "_설명": "S01에서 결과 폴더로 복사해(diag_freeze.json) S01 '동결 항목 정의 위치표'의 실제 파일 경로로 바꾼다. 아래 패턴은 예시다. DB 마이그레이션 파일도 해당 테이블을 바꾸면 paths에 넣는다.",
+  "_판정_주의": "동결일 이후 '변경'이 곧 위반은 아니다. 하위 호환 추가인지 깨는 변경인지, 결정 기록이 있는지는 S04에서 diff를 읽고 판정한다 (FZ-RULE).",
+  "FZ-01 EOS Core Boundary": {
+    "date": "2026-09-06",
+    "paths": [
+      "eos/core/__init__.py",
+      "docs/architecture/**"
+    ]
+  },
+  "FZ-02 Subject Contract": {
+    "date": "2026-09-06",
+    "paths": [
+      "eos/contracts/subject/**",
+      "**/subject_contract*"
+    ]
+  },
+  "FZ-03 Math Adapter Boundary": {
+    "date": "2026-09-06",
+    "paths": [
+      "eos/adapters/math/__init__.py",
+      "**/math_adapter*"
+    ]
+  },
+  "FZ-04 Entity ID 규칙": {
+    "date": "2026-09-06",
+    "paths": [
+      "eos/core/entity/**",
+      "**/*entity_id*"
+    ]
+  },
+  "FZ-05 ConceptNode": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*concept_node*",
+      "**/knowledge/*concept*"
+    ]
+  },
+  "FZ-06 SkillNode": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*skill_node*",
+      "**/knowledge/*skill*"
+    ]
+  },
+  "FZ-07 MisconceptionNode": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*misconception*"
+    ]
+  },
+  "FZ-08 ProblemNode": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*problem_node*",
+      "**/assessment/*problem*"
+    ]
+  },
+  "FZ-09 CurriculumNode": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*curriculum_node*",
+      "eos/core/curriculum/**"
+    ]
+  },
+  "FZ-10 LearnerState": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*learner_state*",
+      "eos/core/learner/**"
+    ]
+  },
+  "FZ-11 AssessmentEvent": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*assessment_event*"
+    ]
+  },
+  "FZ-12 LearningEvent": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*learning_event*",
+      "eos/core/event/**"
+    ]
+  },
+  "FZ-13 Content Version": {
+    "date": "2026-09-06",
+    "paths": [
+      "**/*content_version*",
+      "eos/core/governance/**"
+    ]
+  },
+  "FZ-14 AI 호출 규약": {
+    "date": "2026-09-06",
+    "paths": [
+      "eos/core/ai/**",
+      "**/*gateway*"
+    ]
+  }
+}

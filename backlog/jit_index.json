@@ -2076,6 +2076,18 @@
    "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "ARCH-66 학생 참여 연기가 G-not-now 재개 분기 전제(학생 표본)를 무효화 — 결정 세션이 게이트 미갱신",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
     "backlog/gates.yaml",
     "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
@@ -2483,6 +2495,17 @@
     "tests/harness/test_ci_job_coverage*.py"
    ],
    "text": "ci_job_coverage scope에 stdin 입력·출력 tail 절단 — 0건 판정을 읽지 못해 backend 잡 누락",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/ops/pip_install_resilient.py",
+    "tests/infra/test_ci_pip_install_resilience.py"
+   ],
+   "text": "PyPI 인덱스 python-dateutil 97.8초 무응답 → pip이 '의존성 충돌'로 위장 보고해 CI red",
    "weight": 2
   },
   {
@@ -3113,12 +3136,64 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
+   "text": "번호 확인용 backlog add 가 실제 태스크 CONST-01-x 생성 — rename 거부로 cancel 처리(2회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "CI 실패 원인을 잡 로그 끝 120줄(원본 398줄)만 보고 PR 코멘트로 단정 — 시간 초과 횟수 오기(5→실제 6)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**"
+   ],
+   "text": "backend 잡 미러 중 로컬 PG(5432)를 띄워 둬 도달성 skip 테스트가 실행 — 거짓 실패 1건·21분 실행 폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
     "scripts/harness/backlog.py",
     "tests/harness/test_jit*.py"
    ],
    "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/git_revert_guard.py",
+    "tests/infra/test_git_revert_guard.py"
+   ],
+   "text": "기존 git_revert_guard 가 태스크 등재 heredoc 본문의 설명 문구를 git 원복 명령으로 오판해 차단",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "등재한 HARN-184를 16분간 push하지 않는 사이 타 세션이 같은 번호로 등재·착수 — 186으로 개명",
    "weight": 1
   },
   {
@@ -3646,6 +3721,18 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "S4-16 기각이 G-kg02 게이트 문면의 재개 경로 전제를 닫았으나 기각 세션이 게이트 미갱신",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/ci_mirror.py"
    ],
@@ -3745,6 +3832,24 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄(backlog.py·HARN-121 캐시) — 커밋 전 백업 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러의 tests/harness 가 세션 샤드에 가짜 policy_warn 6줄(backlog.py) 기록 — 실행 전 백업으로 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
@@ -3759,6 +3864,16 @@
     "tests/harness/**"
    ],
    "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — CI 미러 중 · 커밋 전 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/git_revert_guard.py",
+    "tests/infra/test_git_revert_guard.py"
+   ],
+   "text": "신설 헌법 가드가 cp949 콘솔에서 한글·— 섞인 명령을 통과(fail-open) — stdin 을 로캘 인코딩으로 해독",
    "weight": 0
   },
   {
