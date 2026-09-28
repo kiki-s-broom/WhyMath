@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import math
 import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -3231,11 +3234,14 @@ class TestNextProblemSuneungMode:
             "reason",  # EOS-14: 추천 근거 — 기존 관측 메타와 별개 축(옵셔널 아님)
             "action",  # EOS-19: 근거에서 파생된 학습 행위(근거와 어긋나면 생성 자체가 실패)
             "target_concept",  # EOS-19: 다음에 다뤄야 할 개념(선수 막힘이면 막힌 선수)
-            "intent_resolution",  # EOS-124: 행위가 실제 문항으로 어떻게 해소됐나(수능은 null)
+            "intent_resolution",  # EOS-124: 행위가 실제 문항으로 어떻게 해소됐나(EOS-25: 수능도)
             "learning_state_directive",  # EOS-24: 상태 머신 지시 처리 결과(수능은 항상 null)
         }
         # 수능 정책은 상태 머신을 읽지 않는다(EOS-24 판정문 §7-3) — 지시 필드는 항상 null.
         assert body["learning_state_directive"] is None
+        # EOS-25: 수능 정책도 정렬을 선언한다 — 종전엔 null(정렬 미적용)이었다. 이 픽스처는
+        # 개념 매핑이 없어 관계 행위가 서지 않으므로 1차 선택 그대로(`direct`)다.
+        assert body["intent_resolution"] == "direct"
         assert body["problem_id"] == str(problem.problem_id)
         assert body["difficulty"] == 3.0
         assert body["theta"] == 0.0
@@ -3279,6 +3285,8 @@ class TestNextProblemSuneungMode:
         assert row.meta[META_KEY_POLICY_VERSION] == POLICY_VERSION_SUNEUNG
         candidates = row.meta[META_KEY_CANDIDATES]
         assert {c["problem_id"] for c in candidates} == {str(eligible.problem_id)}
+        # EOS-25: 수능 처치 기록에도 정렬 해소값이 실린다("작동한 비율"의 원자료).
+        assert row.meta[META_KEY_INTENT_RESOLUTION] == "direct"
 
     def test_purpose_learning_applies_in_suneung_mode_too(self) -> None:
         """REC-04 — purpose는 mode와 직교한다: 수능 모드에서도 밴드 안 후보가 선택된다."""
@@ -3323,8 +3331,8 @@ class TestNextProblemSuneungMode:
             # EOS-19: 부재의 행위는 none이고 목표 개념은 없다(지어내지 않는다).
             "action": "none",
             "target_concept": None,
-            # EOS-124: 수능 정책은 아직 정렬 계약을 적용하지 않는다 — null이 그 사실을 말한다.
-            "intent_resolution": None,
+            # EOS-25: 수능 정책도 정렬 계약을 선언한다 — 추천 부재는 `no_candidate`다(종전 null).
+            "intent_resolution": "no_candidate",
             "learning_state_directive": None,  # EOS-24: 수능 정책은 상태 머신을 읽지 않는다
         }
         assert session.added == []  # REC-03: null 응답은 처치가 아니다(가짜 처치 금지)
@@ -3495,7 +3503,13 @@ class TestNextProblemReason:
         assert reason == _REASON_UNMAPPED
 
     def test_suneung_branch_carries_reason_too(self) -> None:
-        """수능 분기도 같은 근거를 싣는다 — 한쪽 분기만 배선하면 그 경로가 조용히 빈다."""
+        """수능 분기도 같은 근거를 싣는다 — 한쪽 분기만 배선하면 그 경로가 조용히 빈다.
+
+        EOS-25 이후 값: 숙달 0.2(<0.4)인데 **막힌 선수를 가리킬 근거가 없다**(이 큐에는 그래프 행이
+        없다) → 현재 개념 연습으로 정직 강등(`unsupported`). 종전에는 `prerequisite_gap`이 나갔고
+        target은 문항 자신의 개념이었다 — "선수로 가라"면서 제자리를 가리키는 EOS-25 (다) 형태다.
+        숙달 0.2는 **그대로 실린다**(강등은 행위를 콘텐츠에 맞추는 것이지 측정을 고치는 것이 아니다).
+        """
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         cid = uuid.uuid4()
         session = _next_problem_session(
@@ -3505,12 +3519,15 @@ class TestNextProblemReason:
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
         assert body["problem_id"] == str(problem.problem_id)
         assert body["reason"] == {
-            "type": "prerequisite_gap",
+            "type": "current_concept",
             "confidence": 0.75,
             "basis": "measured_mastery",
             "concept_id": str(cid),
             "mastery": 0.2,
         }
+        assert body["action"] == "practice_current"
+        assert body["target_concept"] == str(cid)
+        assert body["intent_resolution"] == "unsupported"
 
     def test_absent_recommendation_asks_nothing(self) -> None:
         """추천이 없으면 근거 조회 0건 — 소비된 쿼리 수를 변별력으로 쓴다.
@@ -3575,7 +3592,11 @@ class TestNextProblemReason:
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
         assert len(session.added) == 1
         assert session.added[0].meta[META_KEY_REASON] == body["reason"]
-        assert body["reason"]["type"] == "next_concept"
+        # EOS-25: 숙달 0.9인데 넘어갈 다음 개념이 없다(그래프 행 없음) → 정직 강등. 종전에는
+        # `next_concept`·`advance_next`로 숙달한 개념의 문항에 전진을 붙였다(EOS-25 가 형태).
+        assert body["reason"]["type"] == "current_concept"
+        assert body["intent_resolution"] == "unsupported"
+        assert session.added[0].meta[META_KEY_INTENT_RESOLUTION] == "unsupported"
 
     def test_reason_does_not_change_the_selected_problem(self) -> None:
         """acceptance⑥ — 근거를 붙여도 선택은 그대로다(**그래프가 목표를 내놓지 않는 한**).
@@ -4739,3 +4760,118 @@ class TestLearnerStateSurface:
         )
         assert body["origins"]["skill_mastery"]["estimator"] == "bkt.v1"
         assert body["origins"]["general_ability"]["estimator"] == "irt.2pl"
+
+
+# ── EOS-17 — 응답 경계의 미측정(None) vs 숙달 0 ──────────────────────────────────
+
+
+class TestMasteryUpdateNullBoundary:
+    """EOS-17: 숙달이 비어 있으면 응답은 null이지 0.0이 아니다 — 두 값이 구별된다.
+
+    채점 응답(`POST /v1/me/attempts`)의 갱신 행은 추정기 계약상 값을 가지므로 실 흐름에서는
+    None이 나오지 않는다. 그래서 이 클래스는 L2 기록 함수를 **값이 빈 행을 돌려주도록** 바꿔
+    끼워, 그 불변식이 깨졌을 때 응답이 무엇을 말하는지를 잰다. 종전 응답은 그 행을
+    `mastery 0.0 · sample_size 0`으로 내 "숙달 0"과 구별할 수 없었다.
+    """
+
+    @staticmethod
+    def _post_with_rows(
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        concept_rows: list[Any],
+        skill_rows: list[Any],
+    ) -> dict[str, Any]:
+        async def _concept(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return concept_rows
+
+        async def _skill(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return skill_rows
+
+        monkeypatch.setattr(me_module, "record_problem_attempt_mastery", _concept)
+        monkeypatch.setattr(me_module, "record_problem_attempt_skill_mastery", _skill)
+        # EOS-12 증거 조립 질의 3건(#1 PRIMARY · #2 TESTED · #3 스킬 해소)만 큐에 둔다 — 숙달
+        # 기록 함수는 위에서 바꿔 끼웠으므로 그 질의는 돌지 않고, 뒤쪽 상태 머신 질의는 빈 결과다.
+        session = _QueueSession([_AQResult([uuid.uuid4()]), _AQResult([]), _AQResult([])])
+        resp = _attempts_client(session).post(
+            "/v1/me/attempts", json={"problem_id": str(uuid.uuid4()), "is_correct": True}
+        )
+        assert resp.status_code == 201, resp.text
+        return cast(dict[str, Any], resp.json())
+
+    def test_empty_update_rows_are_null_not_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """값이 빈 갱신 행은 null, 실제 0.0 행은 0.0 — 개념·스킬 두 축 모두 구별된다."""
+        empty_cid, zero_cid = uuid.uuid4(), uuid.uuid4()
+        body = self._post_with_rows(
+            monkeypatch,
+            concept_rows=[
+                SimpleNamespace(concept_id=empty_cid, mastery=None, sample_size=None),
+                SimpleNamespace(concept_id=zero_cid, mastery=Decimal("0.00"), sample_size=3),
+            ],
+            skill_rows=[
+                SimpleNamespace(skill_id="skill.empty", mastery=None, sample_size=None),
+                SimpleNamespace(skill_id="skill.zero", mastery=0.0, sample_size=1),
+            ],
+        )
+        concepts = {u["concept_id"]: u for u in body["mastery_updates"]}
+        assert concepts[str(empty_cid)]["mastery"] is None
+        assert concepts[str(empty_cid)]["sample_size"] is None
+        # 대조군 — 진짜 0.0은 0.0으로 남는다(null로 과잉 변환하지 않는다).
+        assert concepts[str(zero_cid)]["mastery"] == 0.0
+        assert concepts[str(zero_cid)]["sample_size"] == 3
+        skills = {u["skill_id"]: u for u in body["skill_mastery_updates"]}
+        assert skills["skill.empty"]["mastery"] is None
+        assert skills["skill.empty"]["sample_size"] is None
+        assert skills["skill.zero"]["mastery"] == 0.0
+        assert skills["skill.zero"]["sample_size"] == 1
+
+    def test_measured_row_passes_through_as_number(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """양성 대조 — ORM의 Decimal 숙달은 JSON 숫자로 그대로 나간다(문자열·null 아님)."""
+        cid = uuid.uuid4()
+        body = self._post_with_rows(
+            monkeypatch,
+            concept_rows=[SimpleNamespace(concept_id=cid, mastery=Decimal("0.69"), sample_size=1)],
+            skill_rows=[],
+        )
+        assert body["mastery_updates"] == [
+            {"concept_id": str(cid), "mastery": 0.69, "sample_size": 1}
+        ]
+
+    def test_empty_update_row_logs_writer_defect(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """빈 갱신 행은 경고로 드러난다(계약상 불가 = writer 결함 신호) — 값이 있으면 조용하다."""
+        with caplog.at_level(logging.WARNING, logger="whymath.api.me"):
+            self._post_with_rows(
+                monkeypatch,
+                concept_rows=[
+                    SimpleNamespace(concept_id=uuid.uuid4(), mastery=Decimal("0.69"), sample_size=1)
+                ],
+                skill_rows=[],
+            )
+        assert [r for r in caplog.records if "EOS-17" in r.getMessage()] == []
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="whymath.api.me"):
+            self._post_with_rows(
+                monkeypatch,
+                concept_rows=[
+                    SimpleNamespace(concept_id=uuid.uuid4(), mastery=None, sample_size=2)
+                ],
+                skill_rows=[SimpleNamespace(skill_id="skill.x", mastery=0.4, sample_size=None)],
+            )
+        messages = [r.getMessage() for r in caplog.records if "EOS-17" in r.getMessage()]
+        assert len(messages) == 2, messages
+        assert "개념 축" in messages[0]
+        assert "mastery 비어 있음" in messages[0] and "sample_size 있음" in messages[0]
+        assert "스킬 축" in messages[1]
+        assert "mastery 있음" in messages[1] and "sample_size 비어 있음" in messages[1]
+        # 값·식별자는 로그에 싣지 않는다(학습 데이터·미성년 PII 경계).
+        assert all("skill.x" not in m and "0.4" not in m for m in messages)
+
+    def test_snapshot_distinguishes_unmeasured_from_zero(self) -> None:
+        """읽기 표면(`/mastery/current`)도 미측정 행은 null · 숙달 0 행은 0.0으로 구별한다."""
+        client, _ = _client([_snapshot_row(None), _snapshot_row(0.0)])
+        resp = client.get("/v1/me/mastery/current")
+        assert resp.status_code == 200, resp.text
+        values = [row["mastery"] for row in resp.json()]
+        assert values.count(None) == 1
+        assert [v for v in values if v is not None] == [0.0]

@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-191-gate-attach-claim-release-hold
+title: "게이트를 붙이고 claim을 반납하면 게이트가 미머지 브랜치에만 있어 main 기준으로 태스크가 비어 보인다 — 병렬 세션이 EOS-129·EOS-137을 다시 구현(HARN-48 block 홀드의 amend·unblock 입구)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: cancelled
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 재현 고정 — `amend --gate`로 requires_gates를 붙인 in_progress 태스크를 `unblock`하면 원격 claim을 release한다(현 동작). 그 게이트 부착이 trunk(origin/main)에 없는 동안 main 기준 selector는 그 태스크를 게이트 없는 착수 가능 후보로 본다. 이 경로를 테스트로 동결한다(수정 전 동작 복원 시 RED)."
+  - "② 게이트 대기 홀드 — 게이트 부착으로 claim을 놓을 때 그 부착이 trunk에 아직 없으면 원격 claim을 지우지 않고 게이트 대기 홀드로 바꾼다(HARN-48 `remote_claims.hold()` 재사용 · 레코드에 게이트 ID·브랜치·사유). 부착이 이미 trunk에 있으면 종전대로 release한다(과잉 점유 금지 — 양방향 변별력)."
+  - "③ 홀드 해제 지점 — 게이트 부착이 trunk에 착지하면 홀드를 걷는다(`claims reap`·세션 브리핑이 origin/main의 requires_gates를 확인). 걷히지 않으면 영구 점유가 되므로 착지 후 해제를 테스트로 동결한다(HARN-48 ⑦ 양방향 원칙)."
+  - "④ 착수 안내 — 다른 세션이 홀드된 태스크를 `start`하면 '게이트 대기 홀드 — 게이트 G-…가 브랜치 X에만 있고 미머지'로 안내하고 거부한다. 차단 홀드(HARN-48)와 문구·종류를 구별한다. 게시 실패는 침묵하지 않는다(stderr + 이벤트 · HARN-48 ⑤와 같은 규율)."
+  - "⑤ 변별력 — ①~④ 절마다 그 절을 끊는 뮤테이션을 두고 전건 RED를 확인한다(주입 적용 단언 · 원복 바이트 동일 · HARN-174 러너 재사용)."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+  - "tests/harness/test_*claim*.py"
+session: null
+notes: "출처: 2026-09-28 PR #1352 머지 대기 중 실측(판정 기준 main e674f6d7). 사고 대장 계열 parallel-duplicate-implementation 11·12회차.\n\n[경위 — 이벤트 대장 실측] 세션 claude/focused-ramanujan-2p5q8w가 ① EOS-129를 11:25 start → 11:28 amend(requires_gates +G-eos129-prod-response-distribution) → 11:28 unblock(release_status ok) ② EOS-137을 11:41 start → ①③④ 구현 → 12:38 amend(+G-eos137-first-eval) → 12:38 unblock(release_status ok). 두 게이트 부착은 미머지 브랜치에만 있었고, 원격 claim은 사라졌다. 결과: 다른 세션이 main 기준 후보로 EOS-129를 가져가 PR #1358에서 ③을 구현하며 같은 게이트 ID를 따로 추가했고(HARN-192 참조), 또 다른 세션(claude/busy-franklin-q5s7f4)이 13:46 EOS-137을 claim해 ①을 다시 구현했다(미푸시·승인 대기로 정지 관측).\n\n[기존 대책과의 관계] HARN-48(done)은 block 경로의 claim 반납을 홀드로 바꿨다. HARN-45(cancelled → HARN-48 흡수)는 '게이트 대기와 차단을 같은 전이로 표현'을 지적했으나, 집행은 block 명령에만 들어갔다. amend --gate + unblock 경로는 여전히 반납한다 — 같은 뿌리의 두 번째 입구.\n\n[한계] 홀드는 claim 대장을 읽는 세션에만 보인다. claim 대장을 읽지 않는 경로(사람이 직접 착수 등)는 막지 못한다.\n\n[취소 2026-09-28] 중복 — 같은 결함을 HARN-193-unmerged-gate-attach-claim-release-gap(구 ID HARN-186-unmerged-gate-attach-claim-release-gap — CONST-02의 HARN-186과 번호가 겹쳐 개명)(브랜치 claude/magical-maxwell-hja5kh-gate-release-gap · 미머지)이 먼저 등재했다. 그 태스크가 이 세션의 EOS-137 사례(12:38Z amend+unblock)까지 실측해 담고 있다. add의 의미 중복 고지로 등재 직후 발견 · HARN-183 선례대로 취소\n\n[정정 2026-09-28] notes 치환 — 개명 전 ID 참조 정정 — 흡수한 태스크가 HARN-186→HARN-193으로 개명됐다(PR #1356)"
+updated: 2026-09-28

@@ -102,6 +102,9 @@ worktrees/
 # 로컬 작업/실험 디렉토리 (런타임 산출물, 대용량 wheel 등 — git 미추적)
 /work/
 
+# 코딩 헌법 규칙 병합 백업 (scripts/constitution/merge_rules.py --apply 가 저장소 최상위에 남긴다 · CONST-02)
+/rules.yaml.bak
+
 
 # WhyMath 추가 보안 패턴 (자동 생성)
 # 대용량 아카이브 파일 (의도적 추가 시 git add -f 사용)

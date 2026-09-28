@@ -163,6 +163,59 @@ gates:
     cleared_by: kiki
     notes: ""
     corrections: []
+  - id: G-const-a0002-adoption
+    title: "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-diagnosis-s00-s10-run
+    title: "260927 EOS 통합정밀진단 S00~S10을 Kiki 머신에서 실행해 이식 완성 결과를 독립 검증한다(공통규칙: 읽기 전용·증거 등급·단계마다 새 세션·S09는 다른 모델). 이 저장소에 이식된 헌법·집행 장치가 진단의 기준(기준/헌법·기준_코딩규칙)에 비춰 어디까지 충족되는지 S02·S07이 판정하고, S08이 'Phase 2 완료' 주장을 Gate 2 증거로 대조한다(저장소 기록: 계획서 300 Gate 2 판정 3회 FAIL — 9/19·9/24·9/25, 미충족 1축). 세션 측 사전 검증(기계 축)은 docs/standards/coding_constitution_transplant.md §5 프로토콜대로 CI가 상시 수행한다. evidence = 결과/S10_통합진단서.md 경로 + 기준 커밋 해시 + 차단·높음 건수."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-precedence-declaration
+    title: "3중 '헌법' 문서의 서열 확정 — 코딩 헌법(constitution/CONSTITUTION.md 제2조 '최고 규범')과 CLAUDE.md(마스터 가이드 · '충돌 시 CLAUDE.md 우선' 373행) · dev_constitution.md(경량 요약) · AGENTS.md가 서로 최우선을 선언한다. 3택: ① 코딩 헌법 최상위(A0001 제2조 원문대로 — 기본값·권고) ② CLAUDE.md 최상위·헌법은 코딩 구조 규범에 한정 ③ 범위 분할(법령·아키텍처·검증=CLAUDE.md / 코딩 구조·파이프라인·변경·검증 독립=헌법, 같은 주제 충돌 시 헌법). 판정 재료 = docs/standards/coding_constitution_transplant.md §1 관계 선언 + 충돌 문장 12곳 목록(crosswalk 문서). evidence에 선택지 번호와 정정 커밋 해시."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-sources-registry-adopt
+    title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
@@ -331,6 +384,30 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-eos129-prod-response-distribution
+    title: "EOS-129 ⑤ 운영 DB 문항당 응답 수 분포 실측 — 변별도 a를 추정할 만큼 응답이 쌓인 문항이 몇 건인지(읽기 전용 SELECT · 런북 docs/ops/eos129_prod_response_distribution_runbook.md · 결과 표 2개를 세션에 전달)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "Kiki 머신 운영 DB(whymath-pg) 읽기 전용 실측 — 클라우드 세션은 운영 DB에 닿을 수 없다"
+  - id: G-eos137-first-eval
+    title: "EOS-137 ② QA 엔진 첫 평가 실행 — 문항별 판정 어댑터를 MP-03 골든 v1(rotation 0)과 검수 큐에 돌려 혼동행렬·평가 원장 첫 행을 남긴다(런북 docs/ops/eos137_first_eval_runbook.md · EOS-137 PR main 머지 후에만 실행 가능 · 출력 전체를 세션에 전달하면 세션이 수치를 MEMORY에 기록하고 EOS-137을 닫는다)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다"
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision
@@ -526,7 +603,7 @@ gates:
       - "[2026-09-25] no_inputs_reason: None → 'Kiki 머신 런북 실행(사람 직접 행동). 런북 실재의 선행(MP-03 PR 머지)은 입력 간선으로 걸지 않는다 — MP-03의 done 판정이 이 런북 결과를 쓰므로(acceptance ①②④) 걸면 clear가 MP-03 done을 기다리고 MP-03 done이 런북 결과를 기다리는 의미적 교착이 된다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
     no_inputs_reason: "Kiki 머신 런북 실행(사람 직접 행동). 런북 실재의 선행(MP-03 PR 머지)은 입력 간선으로 걸지 않는다 — MP-03의 done 판정이 이 런북 결과를 쓰므로(acceptance ①②④) 걸면 clear가 MP-03 done을 기다리고 MP-03 done이 런북 결과를 기다리는 의미적 교착이 된다"
   - id: G-not-now-v1-release-recheck
-    title: "Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
+    title: "Not Now List 12종 재확인 지점 — 12/31 내부 완성 판정 이후 첫 계획 세션에서 유지·재개·폐기 3택 판정. 12/31은 외부 출시일이 아니다(외부 출시는 2027년 · EOS 전환 선언 2026-08-30 §0-2). Not Now 범위 결정의 집행 지점이며, 잠금은 달력(11월·Phase 3 기간)이 아니라 이 게이트 판정까지 간다(build_harness §3a): pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다(E1-01은 트랙 게이트 G-s5-subject-expansion이 따로 한 번 더 잠근다). 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 재개 제약: NOTNOW 11건 acceptance ③은 재개 근거로 v1.0 운영 실측(학생 표본·KPI·비용)을 요구하는데, ARCH-66 ⑥(2026-09-24)으로 학생 참여 과정 전부가 12/31 이후로 연기돼(G-student-work-after-internal-completion) 연말 회차에는 그 실측이 없다 — 그 회차의 실질 선택지는 ①·③이고, ②는 파일럿(S3-01) 실측이 나온 뒤이거나 그 조건 자체를 먼저 바꾸는 결정이 있어야 한다. 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)"
     kind: decision
     assignee: kiki
     status: pending
@@ -537,7 +614,8 @@ gates:
     notes: ""
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '시점 트리거(v1.0 12월 출시 이후 첫 계획 세션) — 재개·폐기·유지 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
-    no_inputs_reason: "시점 트리거(v1.0 12월 출시 이후 첫 계획 세션) — 재개·폐기·유지 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다"
+      - "[2026-09-28] title: 'Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' → 'Not Now List 12종 재확인 지점 — 12/31 내부 완성 판정 이후 첫 계획 세션에서 유지·재개·폐기 3택 판정. 12/31은 외부 출시일이 아니다(외부 출시는 2027년 · EOS 전환 선언 2026-08-30 §0-2). Not Now 범위 결정의 집행 지점이며, 잠금은 달력(11월·Phase 3 기간)이 아니라 이 게이트 판정까지 간다(build_harness §3a): pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다(E1-01은 트랙 게이트 G-s5-subject-expansion이 따로 한 번 더 잠근다). 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 재개 제약: NOTNOW 11건 acceptance ③은 재개 근거로 v1.0 운영 실측(학생 표본·KPI·비용)을 요구하는데, ARCH-66 ⑥(2026-09-24)으로 학생 참여 과정 전부가 12/31 이후로 연기돼(G-student-work-after-internal-completion) 연말 회차에는 그 실측이 없다 — 그 회차의 실질 선택지는 ①·③이고, ②는 파일럿(S3-01) 실측이 나온 뒤이거나 그 조건 자체를 먼저 바꾸는 결정이 있어야 한다. 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' · no_inputs_reason: '시점 트리거(v1.0 12월 출시 이후 첫 계획 세션) — 재개·폐기·유지 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다' → '시점 트리거(12/31 내부 완성 판정 이후 첫 계획 세션) — 유지·폐기 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다. 재개(②)만은 파일럿(S3-01) 실측이 사실상 선행이지만 입력 간선으로 걸지 않는다 — 걸면 유지·폐기 판정까지 파일럿 완료에 묶인다(2026-09-28 Kiki 선택: 보류 + 문구 정정)' — 게이트 전제 재점검(2026-09-28 · Kiki 선택: 보류 + 문구 정정 · 판정 기준 main 919865d4) — 등재(09-20) 문면의 낡은 사실 3건 정정: ⓐ 'v1.0(12월 출시)' → 12/31은 외부 출시일이 아니라 내부 검증 판정일(EOS 전환 선언 2026-08-30 §0-2) ⓑ '11월(Phase 3 기간 2026-10-26~11-22) 착수 금지' → Phase 3 최종 판정은 11/15로 통합(G-p3-w3-release-merged)됐고 이 게이트의 실질은 범위 결정(build_harness §3a) ⓒ ARCH-66 ⑥(09-24)으로 학생 참여 과정이 12/31 이후로 연기돼 연말 회차에 재개 근거(v1.0 운영 실측)가 없다는 사실 명시. 잠금 실측: 착수 후보 218건 중 부착 12건 0건 · 격리 사본 clear 주입 시 NOTNOW 11/11 등장(E1-01은 G-s5-subject-expansion 2차 잠금) · 원복 바이트 동일. 상태·독촉(100일=2026-12-29)·부착 태스크 무변경"
+    no_inputs_reason: "시점 트리거(12/31 내부 완성 판정 이후 첫 계획 세션) — 유지·폐기 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다. 재개(②)만은 파일럿(S3-01) 실측이 사실상 선행이지만 입력 간선으로 걸지 않는다 — 걸면 유지·폐기 판정까지 파일럿 완료에 묶인다(2026-09-28 Kiki 선택: 보류 + 문구 정정)"
   - id: G-operator-seat-first-grant
     title: "운영자 좌석 1호 발급 (whymath-pg) — 1~3단계 완료(2026-08-31 원본 볼륨 복귀·stamp 확정 a9b8c7d6e5f4·백업 확보). 4단계 실행 대기: stamp→upgrade head→운영자 부트스트랩→content_admin grant — 복붙 블록은 notes에 전문 수록"
     kind: human

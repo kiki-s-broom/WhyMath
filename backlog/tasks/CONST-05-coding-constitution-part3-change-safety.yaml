@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-05-coding-constitution-part3-change-safety
+title: "코딩 헌법 이식 3단계 — 파트 III(9~11장) — 커밋 규율·마이그레이션·래칫 집행 장치 착지 (규칙 8건)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - CONST-03-coding-constitution-stage3-part1-enforcement
+requires_gates:
+  - G-const-a0002-adoption
+acceptance:
+  - "① 대상 규칙 8건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'none': 3, 'partial': 5}): R9-01(none·st3·S) → scripts/ops/check_commit_msg.py / R9-02(partial·st3·S) → scripts/ops/check_commit_msg.py / R9-03(none·st4·S) → scripts/ops/check_commit_msg.py / R10-01(partial·st3·S) → scripts/ops/check_migrations.py / R10-02(none·st4·M) → scripts/ops/check_migrations.py / R10-03(partial·st4·M) → scripts/backup/migrate_whymath_pg.ps1 / R11-01(partial·st3·M) → scripts/ops/lint_ratchet.py / R11-02(partial·st3·S) → scripts/ops/lint_ratchet.py"
+  - "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열)."
+  - "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다."
+  - "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다."
+  - "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+  - "⑥ (CONST-02 대조표 비평가 처분 #7 승계) DB 제약 규칙(R2-01 등)의 check 경로를 꾸러미 제안(db/constraints/*.sql)이 아니라 이 저장소 관례(alembic 리비전 + tests/backend/db 계약 테스트)로 재지정하는 개정 초안을 docs/constitution_proposals/ 에 둔다. 제약이 운영 DB에 실제로 걸려 있는지는 저장소만으로 판정할 수 없으므로 scripts/ops/probe_prod_schema_revision.sql 을 Kiki 머신에서 실행하는 사람 게이트(6항목 브리핑 동봉)로 분리한다."
+artifacts: []
+paths:
+  - "scripts/constitution/**"
+  - "tests/infra/test_coding_constitution_*.py"
+  - "docs/constitution_proposals/**"
+session: null
+notes: "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계"
+updated: 2026-09-28

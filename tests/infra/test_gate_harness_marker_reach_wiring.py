@@ -1,4 +1,4 @@
-"""[EOS-21] Gate 2 판정 하네스 6종이 **CI에서 실제 판정에 도달하는가**를 동결한다.
+"""[EOS-21 · EOS-142] Gate 2 판정 하네스가 **CI에서 실제 판정에 도달하는가**를 동결한다.
 
 전제 정정 (2026-09-23 실측 · 판정 기준 main f4926588)
 ------------------------------------------------------
@@ -34,6 +34,20 @@ skip은 exit 0이다. 즉 `EOS-21`이 막으려던 상태가 **아무 경고 없
 같은 테스트를 두 번 돌리는 쪽(실행 시간 추가)은 택하지 않았다 — 비용 없이 같은 보호를
 얻을 수 있고, 명시 스텝을 더해도 *그것이 도달하는지*는 결국 이 형태의 가드가 봐야 한다.
 
+EOS-142 편입 (2026-09-28)
+-------------------------
+EOS-21 측정(2026-09-23) 뒤에 착지한 Gate 2 상시 증거 2종이 목록에 없었다 — 무개입 연속
+3루프 하네스(`test_e2e_three_consecutive_loops.py` · §18의 유일한 상시 증거)와 SCENARIO
+회귀 스위트(`test_phase2_scenario_regression_suite.py` · SCENARIO-001~010). 둘 다 같은 마커
+수집으로 돌고 있었으나(판정은 틀리지 않았다) 세 조건 중 하나가 바뀌면 조용히 빠지는 상태였다.
+
+3루프 하네스는 동결 공백이 남은 오답 종류에서 `xfail(strict=True)`로 돈다. **XFAIL은 실행된
+것이다** — 표식은 본문 안에서 `request.applymarker`로 붙고 본문은 끝까지 돈 뒤 단언에서
+실패한다. 그 성질이 깨지는 형태 셋을 이 파일이 막는다(`strict_xfail_violations`): 엄격하지
+않은 xfail(통과해도 초록 · 실패해도 초록) · `run=False`(실행하지 않고 XFAIL로 보고) · 본문
+중간의 `pytest.xfail(...)`(거기서 멈추고 XFAIL로 보고). 셋 다 "도달했다"를 "실행했다"와
+다르게 만든다.
+
 재사용 (acceptance ③ '재구현 0')
 --------------------------------
 `test_p11_chain_nightly_wiring.real_pg_violations`가 "그 잡이 실 PG에 도달하는가"를 이미
@@ -44,6 +58,7 @@ skip은 exit 0이다. 즉 `EOS-21`이 막으려던 상태가 **아무 경고 없
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
 import shlex
@@ -52,13 +67,14 @@ from collections.abc import Mapping
 from types import ModuleType
 from typing import Any
 
+import pytest
 import yaml
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _CI_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _PG_GUARD_PATH = pathlib.Path(__file__).with_name("test_p11_chain_nightly_wiring.py")
 
-#: Gate 2 판정 하네스 — EOS-22 Gate 2 10조건의 근거가 되는 6종.
+#: Gate 2 판정 하네스 — EOS-22 Gate 2 10조건의 근거 6종(EOS-21) + 상시 루프 증거 2종(EOS-142).
 GATE_HARNESS_PATHS: tuple[str, ...] = (
     "tests/backend/api/test_week1_gate_closed_loop.py",
     "tests/backend/api/test_week2_gate_wrong_answer_propagation.py",
@@ -66,6 +82,16 @@ GATE_HARNESS_PATHS: tuple[str, ...] = (
     "tests/backend/api/test_e2e_persona_journeys.py",
     "tests/backend/api/test_p11_five_stage_loop_chain.py",
     "tests/backend/api/test_e2e_vertical_slice_integration.py",
+    # EOS-142 — 무개입 연속 3루프(§18)의 유일한 상시 증거 · SCENARIO-001~010 회귀 스위트.
+    "tests/backend/api/test_e2e_three_consecutive_loops.py",
+    "tests/backend/scenarios/test_phase2_scenario_regression_suite.py",
+)
+
+#: EOS-142로 편입된 두 하네스 — 목록에서 **유도하지 않고** 리터럴로 적는다. 유도하면 목록에서
+#: 빠질 때 반례 픽스처도 따라 움직여 아무것도 잡지 못한다(뮤테이션 I6 생존으로 실측).
+EOS142_HARNESS_PATHS: tuple[str, ...] = (
+    "tests/backend/api/test_e2e_three_consecutive_loops.py",
+    "tests/backend/scenarios/test_phase2_scenario_regression_suite.py",
 )
 
 #: 마커 수집 스텝이 도는 작업 디렉터리와 그 디렉터리의 pytest 설정.
@@ -208,7 +234,7 @@ def _workdir_of(job: Mapping[str, Any], step: Mapping[str, Any]) -> str | None:
 def marker_reach_violations(
     spec: Mapping[str, Any], *, harness_paths: tuple[str, ...] = GATE_HARNESS_PATHS
 ) -> list[str]:
-    """6종이 **마커 수집으로 판정에 도달하는가** (순수 함수).
+    """게이트 하네스가 **마커 수집으로 판정에 도달하는가** (순수 함수).
 
     도달 = ⑴ 그 파일을 수집하는 pytest 스텝이 있고 ⑵ 그 스텝의 잡이 실 PG를 준다.
     ⑵의 판정은 `real_pg_violations`를 그대로 호출한다(재구현 0).
@@ -272,6 +298,49 @@ def marker_reach_violations(
     return violations
 
 
+def _is_pytest_attr(node: ast.AST, *names: str) -> bool:
+    """`pytest.<a>.<b>...`의 속성 사슬이 `names`와 같은가 — `pytest.mark.xfail` 같은 이름 판정."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    return isinstance(node, ast.Name) and node.id == "pytest" and tuple(reversed(parts)) == names
+
+
+def strict_xfail_violations(source: str, *, path: str) -> list[str]:
+    """하네스 소스에서 "XFAIL = 실행됨"을 깨는 형태를 찾는다 (순수 함수 · EOS-142 ③).
+
+    ⑴ `pytest.mark.xfail(...)`에 `strict=True`가 없다 — 통과해도(XPASS) 실패해도(XFAIL) 초록이다.
+       이 저장소는 전역 `xfail_strict`를 켜지 않으므로 표식마다 명시해야 한다.
+    ⑵ `run=False`가 있다 — 실행하지 않고 XFAIL로 보고한다.
+    ⑶ 호출 없이 쓴 `@pytest.mark.xfail` — ⑴과 같다(기본값이 느슨하다).
+    ⑷ 본문의 `pytest.xfail(...)` — 거기서 멈추고 XFAIL로 보고한다. 뒤의 단언은 돌지 않는다.
+    """
+    tree = ast.parse(source)
+    found: list[str] = []
+    marked_calls: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _is_pytest_attr(node.func, "mark", "xfail"):
+            marked_calls.add(id(node.func))
+            kw = {k.arg: k.value for k in node.keywords if k.arg}
+            strict = kw.get("strict")
+            if not (isinstance(strict, ast.Constant) and strict.value is True):
+                found.append(f"{path}:{node.lineno} xfail에 strict=True가 없다")
+            run = kw.get("run")
+            if run is not None and not (isinstance(run, ast.Constant) and run.value is True):
+                found.append(f"{path}:{node.lineno} xfail(run=...)이 실행을 끈다")
+        elif isinstance(node, ast.Call) and _is_pytest_attr(node.func, "xfail"):
+            found.append(f"{path}:{node.lineno} 본문의 pytest.xfail(...)이 실행을 중간에 멈춘다")
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and id(node) not in marked_calls
+            and _is_pytest_attr(node, "mark", "xfail")
+        ):
+            found.append(f"{path}:{node.lineno} 호출 없는 @pytest.mark.xfail(느슨한 기본값)")
+    return found
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 실 워크플로 판정
 # ══════════════════════════════════════════════════════════════════════════
@@ -298,6 +367,23 @@ def test_gate_harnesses_carry_the_integration_marker() -> None:
         "integration 마커가 없는 하네스: " + ", ".join(unmarked) + " — `-m integration` "
         "수집에서 빠지므로 실행되지 않는다."
     )
+
+
+def test_gate_harness_xfails_are_strict_and_executed() -> None:
+    """③-b XFAIL은 실행된 것이어야 한다 — 느슨한·미실행·중도 정지 xfail이 없다(EOS-142).
+
+    도달 계약은 "수집된다"까지다. 수집된 테스트가 XFAIL로 끝났을 때 그것이 **돌다 실패한 것**
+    이어야 도달이 판정이 된다 — 아니면 skip과 같은 침묵이 XFAIL 이름을 달고 초록으로 남는다.
+    """
+    scanned = 0
+    violations: list[str] = []
+    for rel in GATE_HARNESS_PATHS:
+        violations += strict_xfail_violations(
+            (_REPO_ROOT / rel).read_text(encoding="utf-8"), path=rel
+        )
+        scanned += 1
+    assert scanned == len(GATE_HARNESS_PATHS) > 0, "스캔한 하네스가 0개다 — 공허 통과 금지"
+    assert violations == [], "XFAIL이 실행을 뜻하지 않는 표식:\n" + "\n".join(violations)
 
 
 def test_backend_testpaths_cover_the_gate_harnesses() -> None:
@@ -426,3 +512,55 @@ def test_detects_marker_filter_removed() -> None:
         )
         != []
     )
+
+
+# ── EOS-142 — 편입한 두 하네스 각각의 도달 끊김 · xfail 엄격성 반례 ─────────────────
+
+
+def test_eos142_harnesses_are_in_the_frozen_list() -> None:
+    """편입이 되돌려지지 않는다 — 두 하네스가 도달 동결 목록에서 빠지면 RED."""
+    missing = [p for p in EOS142_HARNESS_PATHS if p not in GATE_HARNESS_PATHS]
+    assert not missing, f"도달 동결 목록에서 빠진 Gate 2 상시 하네스: {missing}"
+
+
+@pytest.mark.parametrize("harness_path", EOS142_HARNESS_PATHS)
+def test_eos142_positive_control_per_path(harness_path: str) -> None:
+    """양성 대조 — 정상 합성 배선에서 두 하네스 각각 위반 0."""
+    assert marker_reach_violations(_synthetic(), harness_paths=(harness_path,)) == []
+
+
+@pytest.mark.parametrize("harness_path", EOS142_HARNESS_PATHS)
+def test_eos142_detects_ignore_of_the_harness_directory(harness_path: str) -> None:
+    """그 하네스의 디렉터리를 `--ignore`하면 도달이 끊긴다 — SCENARIO 스위트는 `scenarios/`라
+    기존 6종(`api/`)과 디렉터리가 달라, 목록에 없던 동안 이 형태의 끊김은 아무도 못 봤다."""
+    directory = harness_path.rsplit("/", 1)[0].removeprefix("tests/backend/")
+    run = f"pytest -m integration --ignore=../../tests/backend/{directory}"
+    violations = marker_reach_violations(_synthetic(run=run), harness_paths=(harness_path,))
+    assert violations != [] and "마커 수집으로 잡는 pytest 스텝이 없다" in violations[0]
+
+
+@pytest.mark.parametrize("harness_path", EOS142_HARNESS_PATHS)
+def test_eos142_detects_ignore_of_the_harness_file(harness_path: str) -> None:
+    """파일 하나만 `--ignore`해도 끊긴다 — 디렉터리 단위만 보면 이 형태가 빠진다."""
+    run = f"pytest -m integration --ignore=../../{harness_path}"
+    assert marker_reach_violations(_synthetic(run=run), harness_paths=(harness_path,)) != []
+
+
+@pytest.mark.parametrize(
+    ("source", "expect"),
+    [
+        ("pytest.mark.xfail(strict=True, reason='x')", []),
+        ("request.applymarker(pytest.mark.xfail(strict=True, reason='x'))", []),
+        ("pytest.mark.xfail(reason='x')", ["strict=True가 없다"]),
+        ("pytest.mark.xfail(strict=False, reason='x')", ["strict=True가 없다"]),
+        ("pytest.mark.xfail(strict=True, run=False)", ["실행을 끈다"]),
+        ("pytest.xfail('중간에 멈춤')", ["실행을 중간에 멈춘다"]),
+        ("@pytest.mark.xfail\ndef test_x():\n    pass\n", ["느슨한 기본값"]),
+    ],
+)
+def test_strict_xfail_checker_discriminates(source: str, expect: list[str]) -> None:
+    """③-b 검사기의 변별력 — 절마다 그 절이 없으면 통과하는 반례를 둔다."""
+    found = strict_xfail_violations(source, path="x.py")
+    assert len(found) == len(expect), found
+    for needle, message in zip(expect, found, strict=True):
+        assert needle in message, (needle, message)

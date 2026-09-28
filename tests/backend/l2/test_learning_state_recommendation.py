@@ -492,9 +492,6 @@ def policy_env(monkeypatch: pytest.MonkeyPatch) -> tuple[_PolicySpies, list[lsr.
     async def _band_reason(*_a: Any, **_k: Any) -> RecommendationReason:
         return build_reason(concept_id=uuid.uuid4(), mastery=None, confidence=None)
 
-    async def _target(*_a: Any, reason: RecommendationReason, **_k: Any) -> uuid.UUID | None:
-        return reason.concept_id
-
     real_band = policy_module.learning_band_weight
 
     def _band(theta: float, item: Any) -> float:
@@ -506,7 +503,6 @@ def policy_env(monkeypatch: pytest.MonkeyPatch) -> tuple[_PolicySpies, list[lsr.
     monkeypatch.setattr(policy_module, "load_candidate_rows", _default_pool)
     monkeypatch.setattr(policy_module, "collect_remediation_reason", _remediation)
     monkeypatch.setattr(policy_module, "collect_recommendation_reason", _band_reason)
-    monkeypatch.setattr(policy_module, "resolve_target_concept", _target)
     monkeypatch.setattr(policy_module, "learning_band_weight", _band)
     return spies, routes
 
