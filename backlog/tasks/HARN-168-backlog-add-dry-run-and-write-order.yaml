@@ -6,7 +6,7 @@ stage: S3
 subject: cross
 layer: infra
 status: todo
-priority: 3
+priority: 2
 eos_priority: P2
 owner: claude
 depends_on: []
@@ -17,5 +17,5 @@ artifacts: []
 paths:
   - scripts/harness/backlog.py
 session: null
-notes: "출처: 2026-09-24 세션(EOS-131/132 등재) 사고 2건. ⓐ 태스크 번호가 비어 있는지 확인하려고 실행한 `add`가 제목 \"x\"·\"t\"인 **실제 태스크를 두 번 만들었다** — `add`에 쓰기 없는 경로가 없어서 확인 수단이 곧 쓰기였다. 두 번 다 커밋 전에 발견해 파일을 지워 피해 0. ⓑ 실제 등록 명령의 출력을 `| head -3`으로 잘라 받았더니 경고 출력 중 BrokenPipe로 exit 1 — 태스크 파일 없이 `policy_warn` 이벤트 4줄만 남았고, 세션은 이를 \"등록 거부\"로 오독해 ⓐ의 두 번째 탐침을 실행했다. 즉 ⓑ가 ⓐ의 2회차를 불렀다.\n사고 기록 = `backlog/incidents.ndjson` 2026-09-24 2건(series cli-probe-real-write · check-output-truncation)."
-updated: 2026-09-24
+notes: "출처: 2026-09-24 세션(EOS-131/132 등재) 사고 2건. ⓐ 태스크 번호가 비어 있는지 확인하려고 실행한 `add`가 제목 \"x\"·\"t\"인 **실제 태스크를 두 번 만들었다** — `add`에 쓰기 없는 경로가 없어서 확인 수단이 곧 쓰기였다. 두 번 다 커밋 전에 발견해 파일을 지워 피해 0. ⓑ 실제 등록 명령의 출력을 `| head -3`으로 잘라 받았더니 경고 출력 중 BrokenPipe로 exit 1 — 태스크 파일 없이 `policy_warn` 이벤트 4줄만 남았고, 세션은 이를 \"등록 거부\"로 오독해 ⓐ의 두 번째 탐침을 실행했다. 즉 ⓑ가 ⓐ의 2회차를 불렀다.\n사고 기록 = `backlog/incidents.ndjson` 2026-09-24 2건(series cli-probe-real-write · check-output-truncation).\n\n[정정 2026-09-28] priority 3 → 2: 사고 계열 cli-probe-real-write 2회차(CONST-02 · 2026-09-27) — 1회차 뒤에도 dry-run 부재로 재발"
+updated: 2026-09-28
