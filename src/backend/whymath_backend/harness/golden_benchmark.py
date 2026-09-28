@@ -108,7 +108,12 @@ __all__ = [
     "ANCHOR_QUOTA_MIN",
     "DEFAULT_SUBJECT_ID",
     "GOLDEN_SCHEMA_VERSION",
+    "VERDICT_SOURCES",
+    "VERDICT_SOURCE_GENERATION_GATE",
+    "VERDICT_SOURCE_QA_ENGINE",
     "AsFoundBasis",
+    "EvaluationRecord",
+    "EvaluationSnapshot",
     "GoldenItem",
     "GoldenLabel",
     "GoldenSet",
@@ -116,11 +121,13 @@ __all__ = [
     "append_evaluation_ledger",
     "compute_digest",
     "edit_aware_verdict_available",
+    "find_reproducibility_violation",
     "find_rescore_violation",
     "freeze_golden_set",
     "load_evaluation_ledger",
     "load_golden_set",
     "main",
+    "possibly_same_judge",
     "promote_from_events",
     "render_promotion_report",
     "select_by_anchor",
@@ -562,26 +569,159 @@ def load_golden_set(path: Path) -> GoldenSet:
 # ──────────────────────────────────────────────────────────────────────────
 # 평가 원장 — 재채점 금지(acceptance ③)의 집행 부품. 소비처 = ops/qa_confusion_matrix.
 # ──────────────────────────────────────────────────────────────────────────
+
+# 판정기 종류 어휘(EOS-137 ④) — "어느 판정기의 FN율인가"를 원장·리포트가 말하게 하는 축.
+# 폐쇄 2값이다. 어휘 밖 값은 원장 손상으로 센다(추측 수용 금지).
+#   qa_engine        — `harness/qa_pipeline.judge_item`(문항 단위 좌석)이 낸 판정.
+#                      생산자 = `harness/qa_item_verdicts`.
+#   generation_gate  — 생성 파이프라인 outcome(accepted_stored·needs_review 등)을 판정으로 쓰는
+#                      **대용 입력**. 재는 것이 QA 엔진이 아니라 생성 게이트다. 생산자는
+#                      저장소에 없다(EOS-137 ④ 판정: 대용안 미채택 — 계약 §10). 어휘만 두는
+#                      이유는 손으로 만든 대용 파일이라도 자기 정체를 밝히지 않고는 섞이지
+#                      못하게 하기 위해서다.
+VERDICT_SOURCE_QA_ENGINE = "qa_engine"
+VERDICT_SOURCE_GENERATION_GATE = "generation_gate"
+VERDICT_SOURCES: frozenset[str] = frozenset(
+    {VERDICT_SOURCE_QA_ENGINE, VERDICT_SOURCE_GENERATION_GATE}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationSnapshot:
+    """평가 1회의 판정치 — 표류 시계열의 점이자 재현성 대조의 기준 (EOS-137 ③).
+
+    EOS-60 초판 원장은 (digest, 리비전, 시각)만 적었다. 그러면 ① 원장이 시계열이 되지 못하고
+    (값이 없는 점) ② "같은 리비전 재실행은 재현성 확인이라 허용"이 **대조할 이전 값이 없어**
+    선언만 있고 집행이 없었다 — 리비전 표기를 올리지 않은 채 예측만 바꿔 다시 재면 재채점
+    금지도 비켜 간다. 이 스냅샷이 두 공백을 메운다(계약 §9).
+
+    `verdict_digest`가 재현성의 **정확한** 판정 키다. 혼동행렬 4칸만 비교하면 두 문항의 판정이
+    서로 뒤바뀐 경우(TP↔FN 한 쌍씩)를 같은 값으로 본다 — 개수는 보존되고 문항은 바뀐다.
+    지표 경계는 사람이 시계열을 읽기 위한 부기다(판정에는 digest만 쓴다).
+    """
+
+    verdict_digest: str
+    """골든 문항별 판정(pass/fail/미평가)의 sha256 — 골든 밖 예측은 넣지 않는다."""
+    tp: int
+    fn: int
+    fp: int
+    tn: int
+    unevaluated: int
+    golden_total: int
+    confidence: float
+    recall_lower: float | None
+    precision_lower: float | None
+    fn_rate_upper: float | None
+    false_alarm_upper: float | None
+    coverage_lower: float | None
+
+
 @dataclass(frozen=True, slots=True)
 class EvaluationRecord:
-    """평가 1회의 기록 — (골든 digest, 엔진 리비전, 시각)."""
+    """평가 1회의 기록 — (골든 digest, 엔진 리비전, 시각) + 판정기 종류·판정치 스냅샷.
+
+    `verdict_source`·`snapshot`이 None이면 **모른다**(EOS-137 이전 형식의 행)이지 "없다"가
+    아니다. 판정기를 모르는 행은 어느 판정기와도 같은 판정기일 수 있다고 보고(보수적) 재채점
+    금지에 산입하며, 스냅샷 없는 행은 재현성 대조에서 "대조 불가"로 따로 센다.
+    """
 
     digest: str
     engine_revision: str
     evaluated_at: datetime
     golden_version: str = ""
     rotation: int = 0
+    verdict_source: str | None = None
+    snapshot: EvaluationSnapshot | None = None
+
+
+_SNAPSHOT_INT_FIELDS = ("tp", "fn", "fp", "tn", "unevaluated", "golden_total")
+_SNAPSHOT_BOUND_FIELDS = (
+    "recall_lower",
+    "precision_lower",
+    "fn_rate_upper",
+    "false_alarm_upper",
+    "coverage_lower",
+)
+
+
+def _snapshot_to_row(snapshot: EvaluationSnapshot) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "verdict_digest": snapshot.verdict_digest,
+        "confidence": snapshot.confidence,
+    }
+    for name in (*_SNAPSHOT_INT_FIELDS, *_SNAPSHOT_BOUND_FIELDS):
+        row[name] = getattr(snapshot, name)
+    return row
+
+
+def _optional_bound(raw: Any, name: str) -> float | None:
+    """경계값 1개 — None(미산출)은 그대로, 수가 아니면 손상(`TypeError`)이다."""
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int | float):
+        raise TypeError(f"스냅샷 {name}가 수가 아님")
+    return float(raw)
+
+
+def _snapshot_from_row(raw: Any) -> EvaluationSnapshot | None:
+    """원장 행의 스냅샷 해석 — 키 부재(구형식)는 None, **있는데 깨졌으면 예외**(손상)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise TypeError("snapshot이 객체가 아님")
+    digest = raw["verdict_digest"]
+    if not isinstance(digest, str) or not digest:
+        raise ValueError("snapshot.verdict_digest가 비어 있음")
+    counts: dict[str, int] = {}
+    for name in _SNAPSHOT_INT_FIELDS:
+        value = raw[name]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"snapshot.{name}가 음이 아닌 정수가 아님")
+        counts[name] = value
+    confidence = _optional_bound(raw["confidence"], "confidence")
+    if confidence is None:
+        raise ValueError("snapshot.confidence 누락")
+    return EvaluationSnapshot(
+        verdict_digest=digest,
+        tp=counts["tp"],
+        fn=counts["fn"],
+        fp=counts["fp"],
+        tn=counts["tn"],
+        unevaluated=counts["unevaluated"],
+        golden_total=counts["golden_total"],
+        confidence=confidence,
+        recall_lower=_optional_bound(raw["recall_lower"], "recall_lower"),
+        precision_lower=_optional_bound(raw["precision_lower"], "precision_lower"),
+        fn_rate_upper=_optional_bound(raw["fn_rate_upper"], "fn_rate_upper"),
+        false_alarm_upper=_optional_bound(raw["false_alarm_upper"], "false_alarm_upper"),
+        coverage_lower=_optional_bound(raw["coverage_lower"], "coverage_lower"),
+    )
+
+
+def _verdict_source_from_row(raw: Any) -> str | None:
+    """판정기 종류 해석 — 부재(구형식)는 None, 어휘 밖은 손상(`ValueError`)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or raw not in VERDICT_SOURCES:
+        raise ValueError("verdict_source 어휘 밖")
+    return raw
 
 
 def append_evaluation_ledger(path: Path, record: EvaluationRecord) -> None:
-    """원장 1줄 append + 즉시 flush — 마지막 일괄 저장 금지(중간 중단에도 증거 잔존)."""
+    """원장 1줄 append + 즉시 flush — 마지막 일괄 저장 금지(중간 중단에도 증거 잔존).
+
+    `verdict_source`·`snapshot`은 None이어도 **키를 쓴다**(null) — 키 부재는 "EOS-137 이전
+    형식"이라는 뜻으로 남겨 두고, 새 행에서 값이 없다는 사실은 null로 명시한다.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    row = {
+    row: dict[str, Any] = {
         "digest": record.digest,
         "engine_revision": record.engine_revision,
         "evaluated_at": record.evaluated_at.isoformat(),
         "golden_version": record.golden_version,
         "rotation": record.rotation,
+        "verdict_source": record.verdict_source,
+        "snapshot": _snapshot_to_row(record.snapshot) if record.snapshot is not None else None,
     }
     with path.open("a", encoding="utf-8") as fp:
         fp.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
@@ -589,7 +729,12 @@ def append_evaluation_ledger(path: Path, record: EvaluationRecord) -> None:
 
 
 def load_evaluation_ledger(path: Path) -> tuple[list[EvaluationRecord], list[str]]:
-    """원장 로드 — 파싱 실패는 삼키지 않고 예외 타입명+줄 번호로 돌려준다(침묵 실패 금지)."""
+    """원장 로드 — 파싱 실패는 삼키지 않고 예외 타입명+줄 번호로 돌려준다(침묵 실패 금지).
+
+    EOS-137 확장 필드(`verdict_source`·`snapshot`)는 **키가 없으면 None**(구형식 호환)이고,
+    키가 있는데 값이 깨졌으면 그 줄 전체를 손상으로 센다 — 깨진 스냅샷을 None으로 접으면
+    재현성 대조가 조용히 "대조 불가"로 빠진다(모른다 ≠ 아니다).
+    """
     records: list[EvaluationRecord] = []
     errors: list[str] = []
     if not path.exists():
@@ -608,6 +753,8 @@ def load_evaluation_ledger(path: Path) -> tuple[list[EvaluationRecord], list[str
                         evaluated_at=datetime.fromisoformat(str(row["evaluated_at"])),
                         golden_version=str(row.get("golden_version", "")),
                         rotation=int(row.get("rotation", 0)),
+                        verdict_source=_verdict_source_from_row(row.get("verdict_source")),
+                        snapshot=_snapshot_from_row(row.get("snapshot")),
                     )
                 )
             except (ValueError, TypeError, KeyError) as exc:
@@ -615,16 +762,62 @@ def load_evaluation_ledger(path: Path) -> tuple[list[EvaluationRecord], list[str
     return records, errors
 
 
+def possibly_same_judge(recorded: str | None, current: str | None) -> bool:
+    """두 기록이 같은 판정기일 수 있는가 — 한쪽이라도 모르면 **같을 수 있다**(보수적)."""
+    return recorded is None or current is None or recorded == current
+
+
 def find_rescore_violation(
-    records: Sequence[EvaluationRecord], *, digest: str, engine_revision: str
+    records: Sequence[EvaluationRecord],
+    *,
+    digest: str,
+    engine_revision: str,
+    verdict_source: str | None = None,
 ) -> EvaluationRecord | None:
     """재채점 금지 위반 탐지 — 같은 골든을 *다른* 엔진 리비전으로 다시 재는 첫 기록을 돌려준다.
 
-    같은 리비전 재실행은 위반이 아니다(재현성 S4 확인 — 판정이 바뀌면 안 되는 쪽). 위반이면
-    호출자는 통과가 아니라 **exit 1**로 막고 rotation을 올린 신규 표본을 요구한다.
+    같은 리비전 재실행은 위반이 아니다(재현성 S4 확인 — 판정이 바뀌면 안 되는 쪽이며, 그
+    대조는 `find_reproducibility_violation`이 한다). 위반이면 호출자는 통과가 아니라 **exit 1**로
+    막고 `--exclude-golden`으로 만든 신규 독립 표본을 요구한다.
+
+    판정기 축(EOS-137 ④): 재채점 금지가 막는 것은 "같은 판정기를 같은 표본에 맞춰 교정"하는
+    과적합이다. 서로 다른 판정기(QA 엔진 ↔ 생성 게이트)는 서로의 교정 대상이 아니므로 판정기가
+    **확실히 다를 때만** 제외하고, 한쪽이라도 모르면(None) 같은 판정기로 보고 막는다.
     """
     for record in records:
-        if record.digest == digest and record.engine_revision != engine_revision:
+        if record.digest != digest:
+            continue
+        if not possibly_same_judge(record.verdict_source, verdict_source):
+            continue
+        if record.engine_revision != engine_revision:
+            return record
+    return None
+
+
+def find_reproducibility_violation(
+    records: Sequence[EvaluationRecord],
+    *,
+    digest: str,
+    engine_revision: str,
+    verdict_source: str | None,
+    verdict_digest: str,
+) -> EvaluationRecord | None:
+    """재현성 위반(= 리비전 고정 하 표류 신호) 탐지 — EOS-137 ③.
+
+    같은 골든 × 같은 리비전 × 같을 수 있는 판정기의 이전 기록 중 **스냅샷이 있는** 것과
+    문항별 판정 digest가 다르면 그 첫 기록을 돌려준다. 결정론 판정기에서 이것은 입력·환경이
+    리비전 표기 밖에서 바뀌었다는 뜻이고, 모델 판정기에서는 모델 표류다. 어느 쪽이든 "같은
+    리비전 재실행은 재현성 확인"이라는 허용의 전제가 무너졌으므로 호출자는 **exit 1**로 막는다.
+
+    스냅샷 없는 이전 기록(구형식)은 대조할 값이 없어 여기서 판정하지 않는다 — 호출자가
+    "대조 불가"로 따로 보고한다(위반으로도 통과로도 접지 않는다).
+    """
+    for record in records:
+        if record.digest != digest or record.engine_revision != engine_revision:
+            continue
+        if not possibly_same_judge(record.verdict_source, verdict_source):
+            continue
+        if record.snapshot is not None and record.snapshot.verdict_digest != verdict_digest:
             return record
     return None
 

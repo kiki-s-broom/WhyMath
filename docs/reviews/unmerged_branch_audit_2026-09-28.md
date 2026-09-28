@@ -279,20 +279,25 @@ SessionStart 브리핑은 EOS-129를 **다음 착수 후보 1위**로 내놓았�
    — `add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 바로 그 창이다. 원격 전 브랜치·claim
    대장에서 188~199가 비어 있음을 실측한 뒤 `backlog.py rename`으로 185→188 · 186→189를 옮겼다
    (과거 이벤트의 옛 ID 참조는 CLI가 의도적으로 그대로 두고 `rename` 이벤트로 잇는다).
+   *추가(main `09501c5f` 병합 시 실측)*: 같은 번호를 쓴 다른 태스크 `HARN-186-job-log-truncation-warning-hook`이
+   PR #1349로 먼저 main에 들어왔다. 그래서 §5가 가리키는 PR #1356의 `HARN-186-unmerged-gate-attach-claim-release-gap`은
+   머지 전에 번호가 바뀔 수 있다 — 이 문서는 그 태스크를 **PR #1356과 슬러그**로 식별한다.
 3. **사고 대장 4건**(이 브랜치 순증) — `orphan-claim-reap-blindspot`(12회차 관측과 합치면 2회차 —
    `series_raw`에 명기 · 대책 `HARN-189`) · `ported-classification-false-positive`(선례 2건과 합치면
    3회차 — `series_raw`에 명기 · 대책 `HARN-190`) · `derived-index-not-rebuilt` **3회차**(이 감사 자신의
    검증에서 발생: 사고를 `incident add`로 쓴 뒤 `backlog/jit_index.json`을 재생성하지 않아 로컬 CI 미러의
    harness-integrity가 "적시 주입 인덱스 대조"에서 exit 1 · 뒤 스텝 7건 미실행. 푸시 전 발견 · origin/main
    워크트리 대조로 원인 확정 · `backlog.py jit build`로 재생성 · 대책 태스크 `HARN-179`는 이미 등재돼 있다) ·
-   `harness-test-live-ledger-write` **10회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
+   `harness-test-live-ledger-write` **12회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
    `scripts/harness/backlog.py`에 대한 가짜 `policy_warn` 3줄을 씀 — 커밋본 앞부분 바이트 동일·추가분 전부 가짜임을
-   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 10회 재발했는데 아직 우선순위 3·EOS P2다).
-   *회차 표기 주의(스냅샷 — main `6c880b67` 병합 후 `backlog.py incident series` 실측)*: 두 검증 사고는 이 브랜치에서
+   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 12회 기록됐는데 아직 우선순위 3·EOS P2다).
+   *회차 표기 주의(스냅샷 — main `09501c5f` 병합 후 `backlog.py incident series` 실측)*: 두 검증 사고는 이 브랜치에서
    기록할 때 각각 2회차·7회차였다(이벤트 샤드의 `nth` 값). 그런데 같은 날 다른 세션들이 **같은 두 계열을 계속 기록**해
-   세 번의 main 병합(`ed3d14da` · `78a8edff` · `6c880b67`)마다 앞에 끼어들었고, 지금 대장 기준 3회차·10회차다 —
-   즉 HARN-179·HARN-170의 결함을 오늘만 여러 세션이 겪고 있다. 병합 시 CLI와 같은 날짜 안정 정렬을 썼고 같은 날짜는
-   main 쪽 기록을 앞에 두었다. 대장은 회차를 저장하지 않고 읽을 때 계산하므로, 이 숫자는 머지 시점에 또 바뀔 수
+   main을 병합할 때마다 앞에 끼어들었고(`harness-test-live-ledger-write` 기준 `ed3d14da` 8 · `78a8edff` 9 ·
+   `6c880b67` 10 · `de3f5487` 11 · `09501c5f` 12), 지금 대장 기준 3회차·12회차다 —
+   즉 HARN-179·HARN-170의 결함을 오늘만 여러 세션이 겪고 있다. 병합 시 main 쪽 기록을 그대로 앞에 두고 이 브랜치 줄 4개를
+   끝에 붙였다(main 대비 순수 추가). `de3f5487` 병합 때는 이 표기를 갱신하지 않아 이 문서가 한동안 실제
+   11회차를 10회차로 적고 있었다 — 병합할 때마다 `incident series`로 다시 재야 한다. 대장은 회차를 저장하지 않고 읽을 때 계산하므로, 이 숫자는 머지 시점에 또 바뀔 수
    있다. EOS-129 중복 사고는 #1356 쪽 1건으로 일원화했다(§5).
 4. **직전 배치 집행 확인** — 잔존 0/8.
 
