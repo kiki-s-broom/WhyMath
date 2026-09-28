@@ -11319,3 +11319,44 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 **남은 것(정직)**: data-pipeline 잡의 QA 오케스트레이터 게이트(`if: needs.changes.outputs.corpus == 'true'`)는 계속 미실행(exit 3)으로 나온다 — 코퍼스가 안 바뀐 경우엔 CI도 건너뛰므로 소음이 될 수 있다. path filter로 조건을 평가하는 후속 = `HARN-181`. 부수: 검증 중 하네스 테스트의 실제 대장 누출이 재발해(5회차 · 가짜 경고 4줄) cp 백업으로 복원하고 사고 대장에 기록했다(대책 `HARN-170`).
 
 **착지 중 추가 판단(첫 미러 실행에서 발견)**: 자동 선택이 경로 필터 잡 `changes`를 "재현 가능"으로 골랐다(`ci_job_coverage`는 docker·서비스 컨테이너만 재현 불가로 본다). 그 잡의 filter 스텝은 `${{ github.event_name }}`을 써서 새 분류에서는 매번 미실행이므로, 그대로면 **모든 자동 미러 실행이 exit 3**이 되어 경고가 상시 소음이 된다. 그 잡이 하는 일(영역 플래그 계산)은 미러의 잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 이미 대신하므로 사각지대가 아니다 — 자동 선택에서 사유를 출력하며 제외했다(`--job changes`로 직접 지정하면 돌리고 미실행을 보고). 재발 방지 동결: 문서만 바뀐 변경의 자동 선택 잡에 "원리상 못 도는 run 스텝" 0건(`test_always_on_jobs_have_no_structural_not_executed`) + 제외 절 제거 뮤테이션 M15 RED.
+
+## 2026-09-28: 미머지 브랜치 전수 감사 13회차 — 회수 0건 · 삭제 12차 배치 5건 · 감사 중 실시간 중복 1건 발견 · 대책 태스크 3건
+
+**판정 기준: main `919865d4`**. 세션 시작 시 shallow였고 `git fetch --unshallow origin` + `--prune`
+재동기화로 전제를 복구한 뒤에만 판정했다(1,319커밋). 판정 정본 = `docs/reviews/unmerged_branch_audit_2026-09-28.md`.
+
+**모집단**: 원격 ref 39 = 감사 대상 20 + 제외 19(열린 PR 소유 15 · 원격 claim 활성 2 · `main`/`harness-claims` 2).
+유령 PR 0건(열린 PR 15건 head 전부 실재·SHA 일치). **판정 4분류**: ① 회수 **0** · ② 추적 중 **15**(좌석 상실 0) ·
+③ 삭제 가능 **5** · ④ 제외 19. 직전 배치(9·10·11차 + 수동 2) 잔존 **0/8**.
+
+**③ 삭제 12차 배치 5건**(`claude/*`, 전부 main이 더 새로운 판): `adoring-mccarthy-sle0uj`(a737df74 — strict 해제 커밋은
+#1161로 착지, 두 번째 커밋은 **Kiki 로컬 잔여분 보존 커밋**으로 내용은 MP-06이 회수한 뒤 main이 더 고침) ·
+`new-session-fy0wry`(3d534dcc — main 조상) · `new-session-jchdr8`(f34b7478 — #1215 머지 3분 뒤 커밋, main이 09-24 이관) ·
+`test-driven-development-03elxp`(49d9d76a — main 조상, MP-02 홀드 09-23 해제) · `relaxed-fermat-8dui3u`(03e45689 — MP-06
+done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이벤트 · EOS-117 증적 상세)은 판정 문서 §4에 원문 보존.
+
+**감사 중 발견 — 실시간 중복(사고 대장 `parallel-duplicate-implementation` 10회차)**: 열린 PR #1346이 EOS-129를 부분
+이행(⑤ 운영 DB 응답 분포 실측 도구 + 게이트 `G-eos129-item-response-census` + 가드 런북)하고 08:43Z에 "게이트 대기로 claim
+해제(todo)"했는데, 11:25Z 다른 세션 `focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트**
+`G-eos129-prod-response-distribution`를 4분 만에 신설했다. `start` 프리플라이트(HARN-11)는 미머지 **done**만 보고,
+부분 이행 후 해제는 main·claim 대장 어디에도 흔적이 없어 브리핑이 EOS-129를 후보 1위로 노출했다(이 감사 세션 브리핑도
+같았다). 대책 = **`HARN-187`**(프리플라이트·`next` 후보에 "부분 이행 미머지" 표지). 두 게이트의 처분은 두 세션·Kiki 몫이며
+**Kiki는 두 런북을 모두 실행할 필요가 없다.**
+
+**두 회차 연속 원인 미상이던 claim 대장 이상의 원인 확정**: `OPS-73-generated-inventory-conflict-blocks-ci` → 부재 브랜치
+`status-38gu4d` claim이 16일째 남은 것은 ⓐ 09-12 수동 개명(→`OPS-76`, done)이 claim을 옮기지 않았고 ⓑ
+`remote_claims.stale_claims()`가 태스크 부재(`task_missing`)를 먼저 판정해 홀더 브랜치 소멸(`branch_gone`) 판정에 도달하지
+않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다. 대책 = **`HARN-186`**(사고 대장
+`orphan-claim-reap-blindspot` — 12회차 관측과 합치면 2회차).
+
+**부수 발견 — `HARN-185`**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상
+`03elxp`를 체크아웃 대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면
+09-07 트리의 옛 판정기(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를
+요구해 정정에 테스트 변경이 따르므로 별도 태스크로 분리했다.
+
+**정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계). 스킬 §3의 main 언급 grep을
+`.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-185를 찾았다 — 스킬 원문 범위(`backlog/tasks docs`)로는 보이지 않는다.
+claim 활성 2건(block 홀드, TTL 초과)은 판정 보류를 유지했다. 떠돌이 좌석 3건(HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은
+4분류 밖이라 관측만 남겼다.
+
+---

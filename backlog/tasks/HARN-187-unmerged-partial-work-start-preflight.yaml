@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-187-unmerged-partial-work-start-preflight
+title: "start 프리플라이트가 미머지 '부분 이행 후 claim 해제(todo)'를 못 본다 — 열린 PR의 EOS-129 ⑤ 게이트를 다른 세션이 4분 만에 중복 신설 (중복 구현 계열 10회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — 열린 PR #1346(`claude/magical-maxwell-hja5kh-eos129` · head `c5983e59`)이 EOS-129를 부분 이행(⑤ 실측 도구 `src/backend/whymath_backend/l2/item_response_census.py` 216줄 + 게이트 `G-eos129-item-response-census` + 가드 런북 `docs/ops/eos129_item_response_census_runbook.md` 206줄 + ① Rasch 하한 동결 테스트)한 뒤 2026-09-28T08:43Z \"게이트 대기로 claim 해제(todo)\"했다. main에는 그 부분 이행이 없고 claim도 없으므로 SessionStart 브리핑이 EOS-129를 \"다음 착수 후보 1위\"로 내놓았고, 11:25:20Z 세션 `claude/focused-ramanujan-2p5q8w`가 착수해 4분 만에 **같은 ⑤ 측정**의 두 번째 게이트 `G-eos129-prod-response-distribution` + 런북 `docs/ops/eos129_prod_response_distribution_runbook.md`(52줄)를 신설했다(head `46fe6ffb`). 두 게이트 모두 Kiki 머신에서 운영 DB(whymath-pg) 문항당 응답 분포를 읽기 전용으로 재는 같은 측정이다. `backlog.py start`의 프리플라이트 0(HARN-11)은 미머지 브랜치의 **done**만 본다 — **todo로 되돌려진 부분 이행**(artifacts에 PR 증적이 붙은 todo·게이트 신설·acceptance amend)은 보지 않는다. 재현: `git diff origin/main...origin/claude/magical-maxwell-hja5kh-eos129 -- backlog/tasks/EOS-129-irt-discrimination-calibration.yaml backlog/gates.yaml`.\n② 탐지 확장 — 프리플라이트(및 `next` 후보 표지)가 미머지 브랜치(열린 PR head 포함)의 같은 태스크에서 \"부분 이행\" 신호를 읽는다. 신호 후보: ⓐ 브랜치 쪽 태스크 YAML의 artifacts가 main보다 많다 ⓑ 브랜치가 그 태스크를 입력으로 하는 게이트를 신설했다 ⓒ acceptance amend가 있다 ⓓ 브랜치의 이벤트 샤드에 그 태스크의 start 이후 claim 해제가 있다. 어느 신호를 쓰는지와 경고/거부 중 무엇으로 할지(거부라면 `--ignore-unmerged-partial` 탈출구 + 사유 기록)의 근거를 적는다. HARN-11의 미머지 done 탐지와 같은 조회 경로를 재사용한다(조회 실패 시 기존 규약대로 fail-open 경고).\n③ 변별력 — 픽스처: ⓐ 미머지 부분 이행(todo + artifacts 증가) → 경고 또는 거부 ⓑ 미머지 브랜치에 그 태스크 변경 없음 → 통과(대조군 — 이것이 없으면 \"미머지 브랜치가 있으면 전부 막는다\"는 과잉 수정이 통과한다) ⓒ 미머지 done → 기존 거부 유지 ⓓ 조회 실패 → fail-open 경고. 신호 판정을 되돌리는 뮤테이션이 ⓐ에서 RED인지 확인하고, 주입 실재·원복 바이트 동일을 단언한다.\n④ 집행 지점(정본화와 별항) — 착수 전에 **보이는 것**이 핵심이다: SessionStart 브리핑의 \"다음 착수 후보\"와 `next` 출력에 \"부분 이행 미머지: PR #…\" 표지가 실제로 붙는지 확인한다. 프리플라이트 거부만 있고 후보 표지가 없으면 세션은 후보 1위를 고른 뒤에야 막힌다."
+artifacts: []
+paths:
+  - scripts/harness/remote_claims.py
+  - scripts/harness/backlog.py
+  - tests/harness/test_cli.py
+session: null
+notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 감사 중 재fetch에서 새 브랜치 `claude/focused-ramanujan-2p5q8w`가 나타났고, 그 커밋이 열린 PR #1346과 같은 EOS-129 ⑤ 게이트를 따로 만든 것을 확인했다. 이 감사 세션의 SessionStart 브리핑도 EOS-129를 후보 1위로 보여 줬다 — 즉 두 세션 모두 같은 화면을 봤고, 그 화면에는 PR #1346의 부분 이행이 없었다.\n\n사고 대장 계열 `parallel-duplicate-implementation`의 10회차로 등재했다. 선행 대책들은 각자 다른 입구를 막았다 — HARN-11(미머지 done), HARN-14(미머지 설계 문서), HARN-09/07(원격 claim), CLAUDE.md 착수 순서 규칙(claim 전 코드 열람 금지). 이번 입구는 \"부분 이행 후 claim 해제\"이며, 이것은 정상 흐름이다(게이트 대기로 세션을 끝낼 때 claim을 붙들고 있으면 HARN-134류 홀드가 생긴다). 그러므로 대책은 해제를 막는 것이 아니라 해제 뒤에도 부분 이행이 보이게 하는 것이다.\n\n두 게이트의 처분(어느 쪽을 남길지)은 이 태스크의 범위가 아니다 — 두 세션·Kiki가 판단한다. 판정 문서는 PR #1346 쪽이 도구·거부 가드까지 갖춘 상위 집합으로 보인다고만 적었다(읽어서 그렇게 보인다 — 실행 대조는 하지 않았다).\n\n인접: HARN-11(미머지 done 탐지·done) · HARN-125(claim 거부 후 정보 공백·todo — 막힌 뒤의 가시성, 이 태스크는 막히기 전의 가시성) · HARN-176(미머지 실시간 감시기·done) · HARN-182(열린 작업 통합 그래프·done)."
+updated: 2026-09-28

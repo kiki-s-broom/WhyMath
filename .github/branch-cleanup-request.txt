@@ -256,3 +256,41 @@ claude/backend-misc-12-16-misconception-review-impl
 claude/ops-02-offsite-backup-move
 claude/clever-bell-8lh19k
 claude/laughing-faraday-opgsjg
+
+# ── 2026-09-28 12차 배치 (5건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-09-28.md §3-③ ──
+# 직전 배치 집행 확인(2026-09-28 ls-remote 실측): 9·10·11차 + 패턴 밖 수동 삭제분 8건
+#   (backend-misc-12-16-* · ops-02-offsite-backup-move · clever-bell-8lh19k · laughing-faraday-opgsjg ·
+#    ops-50-51-52-moe-rocm-followup · misc-24-* · backend-eos-204-* · s1-17-*) 전건 **잔존 0/8**.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   adoring-mccarthy-sle0uj = a737df74
+#     근거: diff 7파일 main 부재 0. 커밋 0367fce4(strict 해제 집행)는 PR #1161로 착지했고 고유 줄 46개는
+#     main이 대체한 옛 판(`Out-File -Encoding utf8` 조회 → main은 `cmd /c` · "⏳ Kiki 실행 대기" → main "✅ 완료").
+#     커밋 a737df74는 **Kiki의 로컬 잔여분 보존 커밋**(2026-09-23)이다 — 런북·프롬프트 정정은 MP-06(PR #1249)이
+#     회수한 뒤 main이 더 고쳤고, ruleset-check-state는 main이 09-25로 새롭다. 이벤트 1줄(EOS-128 forced
+#     release)은 harness-claims 56828b0a가 정본이며 판정 문서 §4에 원문 보존했다. Kiki 로컬 클론에는 남는다.
+#   new-session-fy0wry = 3d534dcc
+#     근거: main의 조상(고유 커밋 0 · diff 0). PR #1233·#1237 머지. HARN-134 notes가 같은 사실을 기록.
+#   new-session-jchdr8 = f34b7478
+#     근거: PR #1215 머지 3분 뒤의 후속 커밋 1개 — main이 2026-09-24 이관 완료(EOS-117 증적에 "고립 브랜치
+#     claude/new-session-jchdr8 f34b7478에만 있어 main으로 이관" 명기 · EOS-119 main done/#1300).
+#     EOS-117 증적 상세 원문 1줄은 판정 문서 §4에 보존했다.
+#   test-driven-development-03elxp = 49d9d76a
+#     근거: main의 조상(고유 커밋 0 · diff 0). PR 9건(#981~#1036) 전건 머지. MP-02 block 홀드는 2026-09-23
+#     Kiki 승인 claims release --force로 해제됐다(MP-02 done). 3회차 연속 "claim 해제 시 즉시 삭제 후보".
+#     ⚠ .github/branch-protection-setup.md §트러블슈팅 「판정기 파일이 없다」가 이 브랜치를 체크아웃 대상으로
+#     지명한다 — 전제("미병합")는 #981(2026-09-05)로 소멸했고, 지금 따르면 옛 판정기로 판정한다. 정정 = HARN-185.
+#   relaxed-fermat-8dui3u = 03e45689
+#     근거: 회수 태스크 MP-06 done(PR #1249 — 파일 단위 이식 2건 + 표류 가드). main 부재 1 = policy_warn 5줄뿐인
+#     세션 이벤트 파일(MP-06 acceptance ②가 이식 대상 아님을 명시) · 고유 줄 7개는 옛 판.
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 11차 배치 승계 전건 유지:
+#   7n9n72(**삭제 절대 금지**) · trjg5x(ADMIN-02·PATH-03·PB-14 — PB-13은 done) ·
+#   k20m0w(MOB-18·MOB-11·MOB-23·SEC-19·SEC-30) · gdmwhk/uqyg79(PED-26) · 34zvse(CUR-07·HARN-80) ·
+#   5t5lmv(OPS-40) · iws58k(ARCH-30) · t608mk/azdnov(OPS-41) · 6eejrv(PB-08) · e98dw4(VIZ-11) ·
+#   q8tvcx(OPS-38·OPS-67) · vafylb(OPS-53·KG-02·NLP-05) · 29ac1b(ADMIN-10 ⑦ — 90_audit_log.md main 부재 지속)
+# ⚠ 원격 claim 활성 2건은 다른 세션 소유라 판정 보류 — status-f6qz0c(EOS-63 block 홀드 · ahead 0·diff 0) ·
+#   status-f9lp65(HARN-56 block 홀드 · ahead 2·diff 5). 둘 다 claims reap 기준 TTL 초과(자동 청소 사유 아님).
+claude/adoring-mccarthy-sle0uj
+claude/new-session-fy0wry
+claude/new-session-jchdr8
+claude/test-driven-development-03elxp
+claude/relaxed-fermat-8dui3u
