@@ -29,6 +29,13 @@
   ⓐ 사람 판정 없는 후보는 통과가 아니라 `no_human_verdict` 거부다(미측정≠정상).
   ⓑ 사람 판정을 우회하는 CLI 플래그가 **없다**(`--force`·`--skip-review` 류 부재).
   ⓒ 이 CLI는 쓰기 경로가 없다 — 입력 파일이 실행 후 바이트 불변이다.
+
+EOS-136에서 더한 축(각각 음성 대조로 동결):
+  ⓓ ④단 분모는 **검수 배치 전체**다 — 제안에서 빠진 반려·손질 승인도 결함으로 센다. 제안만
+    세던 초판은 통과 경로의 결함 수가 항상 0이라 ④단이 "승인 ≥ 133건" 표본 하한으로 퇴화했다.
+  ⓔ 손질 승인(`approved_with_edit`)은 ②단 `human_verdict_needs_edit`다 — 지금 내용의 승인이 아니다.
+  ⓕ 검수 도구 판정 파일을 감사로그 자리에 넣으면 입력 손상(exit 2) — ②·③단 이중 계상 차단
+    (CLI 대조는 `test_review_status_verdict_bridge.py::TestReviewVerdictFileIsNotTheAudit`).
 """
 
 from __future__ import annotations
@@ -39,12 +46,17 @@ from pathlib import Path
 import pytest
 
 from whymath_backend.harness.golden_promotion_gate import (
+    AS_FOUND_DEFECT_VERDICTS,
     HUMAN_REVIEW_NOTICE,
     PromotionGateReport,
+    _human_verdicts,
+    certifies_current_content,
     evaluate_promotion,
+    latest_human_verdict_events,
     main,
     render_gate_report,
 )
+from whymath_backend.harness.wilson import wilson_upper_bound
 
 # 슬러그 200건짜리 배치 — Wilson 상한(기본 임계 0.02)을 통과할 만큼 큰 표본.
 # 작은 배치가 통과 못 하는 것은 설계이므로(모듈 docstring), 양성 대조는 표본을 키워서 만든다.
@@ -235,6 +247,173 @@ class TestWilsonGate:
         assert report.wilson_passed is False
 
 
+class TestReviewBatchDenominator:
+    """[EOS-136 ③] ④단 분모 = 검수 배치 전체 — 제안에서 빠진 결함도 센다.
+
+    판정 근거: `docs/standards/review_status_stamping_contract.md` §5. 핵심 회귀 감지 지점은
+    "승인분만 제안하면 통과"가 다시 열리는가다 — 분모를 제안으로 되돌리면 아래 첫 테스트가 빨개진다.
+    """
+
+    def test_rejections_left_out_of_the_proposal_still_count(self) -> None:
+        """200 승인 제안 + 제안 밖 반려 5 → 5/205 상한 0.0492 > 0.02로 거부(제안 분모면 0/200 통과)."""
+        batch = {slug: "approved" for slug in _BATCH}
+        batch.update({f"rej-{i}": "rejected" for i in range(5)})
+        report = _eval(human_verdicts=batch)
+        assert report.off_path == []  # 제안 200건은 경로 3단을 전부 통과했다
+        assert report.reviewed == 205 and report.defects == 5
+        assert report.defect_rate_upper == pytest.approx(wilson_upper_bound(5, 205, 0.95))
+        assert report.wilson_passed is False and report.approved is False
+
+    def test_edited_approvals_are_as_found_defects(self) -> None:
+        """손질 승인은 손질 전 내용이 결함이었다 — 제안 밖에 있어도 분자에 들어간다."""
+        batch = {slug: "approved" for slug in _BATCH}
+        batch.update({f"edit-{i}": "approved_with_edit" for i in range(5)})
+        report = _eval(human_verdicts=batch)
+        assert report.batch_edited == 5 and report.batch_rejected == 0
+        assert report.defects == 5 and report.wilson_passed is False
+
+    def test_as_found_defect_vocabulary_is_rejection_plus_edit(self) -> None:
+        """분자의 어휘는 반려 + 손질 승인이다(골든 계약 as-found와 같은 규칙) — 줄이면 빨개진다."""
+        assert AS_FOUND_DEFECT_VERDICTS == frozenset({"rejected", "approved_with_edit"})
+
+    def test_mp03_section_4_3_example_is_now_refused(self) -> None:
+        """300건 검수·30건 반려 배치에서 승인 270건만 제안 — 제안 분모면 0/270(0.0099) 통과였다."""
+        approved = tuple(f"ok-{i:03d}" for i in range(270))
+        batch = {slug: "approved" for slug in approved}
+        batch.update({f"rej-{i:02d}": "rejected" for i in range(30)})
+        report = _eval(approved, human_verdicts=batch)
+        assert report.off_path == []
+        assert report.defect_rate_upper == pytest.approx(0.1322, abs=1e-4)
+        assert report.approved is False
+        # 대조: 같은 제안을 제안 분모로 쟀다면 통과했을 값이다(이 판정이 막는 형태).
+        assert wilson_upper_bound(0, 270, 0.95) <= 0.02
+
+    def test_a_measured_defect_can_ride_a_passing_batch(self) -> None:
+        """결함 1건 허용 222건 — 배치 분모에서만 성립하는 문장이다(제안 분모는 결함을 못 센다)."""
+        approved = tuple(f"ok-{i:03d}" for i in range(221))
+        batch = {slug: "approved" for slug in approved}
+        batch["rej-0"] = "rejected"
+        report = _eval(approved, human_verdicts=batch)
+        assert report.reviewed == 222 and report.defects == 1
+        assert report.approved is True
+
+    def test_report_discloses_the_denominator(self) -> None:
+        """분모가 무엇이었는지 산출물이 자백한다 — 범위 표식·제안 밖 수·결함 내역."""
+        batch = {slug: "approved" for slug in _BATCH}
+        batch.update({"rej-0": "rejected", "edit-0": "approved_with_edit"})
+        report = _eval(human_verdicts=batch)
+        payload = report.to_json()
+        assert payload["defect_scope"] == "review_batch"
+        assert payload["batch_outside_proposal"] == 2
+        assert (payload["batch_rejected"], payload["batch_edited"], payload["defects"]) == (1, 1, 2)
+        rendered = render_gate_report(report)
+        assert "검수 배치 202건(제안 밖 2건 포함)" in rendered
+        assert "as-found 결함 2건(최신 반려 1 · 손질 대기 1 · 손질 후 재승인 0)" in rendered
+
+    def test_reapproval_after_a_fix_does_not_erase_the_as_found_defect(self) -> None:
+        """손질 → 재검수(approved)는 승격 경로지만 배치 결함은 남는다(이력 기준 분자).
+
+        최신 판정만 세면 200건 중 5건을 손질·재승인한 배치가 0/200(0.0133)으로 통과한다 — 손질이
+        잦은 생성기의 배치가 무결점으로 보이는 형태다. 이력을 넘기면 5/200(0.0505)로 거부된다.
+        """
+        latest = {slug: "approved" for slug in _BATCH}  # 5건은 손질 후 재승인되어 최신이 approved
+        fixed = set(_BATCH[:5])
+        with_history = _eval(human_verdicts=latest, as_found_defective=fixed)
+        latest_only = _eval(human_verdicts=latest)
+        assert with_history.off_path == []  # ②단은 최신 판정(approved)으로 통과한다
+        assert with_history.batch_reapproved == 5 and with_history.defects == 5
+        assert with_history.defect_rate_upper == pytest.approx(0.0505, abs=1e-4)
+        assert with_history.wilson_passed is False
+        # 대조: 이력 없이 최신 판정만 넘기면 같은 배치가 0/200으로 통과한다.
+        assert latest_only.defects == 0 and latest_only.wilson_passed is True
+
+
+class TestEditedApprovalIsNotPromotable:
+    """[EOS-136] 손질 승인은 ②단 통과가 아니다 — 각인·코퍼스가 approved여도 막힌다."""
+
+    def test_edited_approval_is_blocked_at_stage_two(self) -> None:
+        verdicts = {slug: "approved" for slug in _BATCH}
+        verdicts[_BATCH[0]] = "approved_with_edit"
+        report = _eval(human_verdicts=verdicts)  # 감사·코퍼스는 전건 approved(손각인 가정)
+        assert [(v.slug, v.blocked_reason) for v in report.off_path] == [
+            (_BATCH[0], "human_verdict_needs_edit")
+        ]
+
+    def test_only_an_as_is_approval_certifies_current_content(self) -> None:
+        """각인 도구와 공유하는 술어 — approved만 참이다."""
+        assert certifies_current_content("approved") is True
+        for verdict in ("approved_with_edit", "rejected", None):
+            assert certifies_current_content(verdict) is False
+
+
+class TestSingleVerdictAuthority:
+    """판정 해석은 한 함수 — 이벤트 투영(`_human_verdicts`)과 전체 이벤트판이 같은 집합을 낸다."""
+
+    def test_cli_counts_the_defect_history_not_just_the_latest_verdict(
+        self, tmp_path: Path
+    ) -> None:
+        """CLI 관통 — 반려 후 재승인된 제안은 ②단을 통과하되 ④단 분자에 남는다."""
+        args = _fixture_files(tmp_path, _BATCH)
+        events = tmp_path / "review_timer.jsonl"
+        rejected_first = [
+            json.dumps(
+                {
+                    "review_session_id": f"00000000-0000-4000-9000-{i:012d}",
+                    "cu_slug": slug,
+                    "reviewer_id": "kiki",
+                    "event_type": "finished",
+                    "verdict": "rejected",
+                    "failure_code": "F2",
+                }
+            )
+            for i, slug in enumerate(_BATCH[:5])
+        ]
+        # 반려가 먼저, 재승인(원 픽스처의 approved 종결)이 나중 — 최신 판정은 approved다.
+        events.write_text(
+            "\n".join(rejected_first) + "\n" + events.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        report_path = tmp_path / "gate.json"
+        assert main([*args, "--json", str(report_path)]) == 1
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["off_path"] == 0
+        assert (payload["defects"], payload["batch_reapproved"]) == (5, 5)
+        assert payload["wilson_passed"] is False
+
+    def test_projection_matches_latest_events_and_keeps_first_seen_order(
+        self, tmp_path: Path
+    ) -> None:
+        events = tmp_path / "events.jsonl"
+        rows = [
+            ("wm-b", "finished", "approved"),
+            ("wm-a", "finished", "rejected"),
+            ("wm-b", "finished", "rejected"),  # 재검수 — 값만 갱신, 순서는 첫 등장
+            ("wm-c", "started", None),
+        ]
+        events.write_text(
+            "".join(
+                json.dumps(
+                    {
+                        "review_session_id": f"00000000-0000-4000-8000-{i:012d}",
+                        "cu_slug": slug,
+                        "reviewer_id": "kiki",
+                        "event_type": etype,
+                        **({"verdict": verdict} if verdict else {}),
+                        **({"failure_code": "F2"} if verdict == "rejected" else {}),
+                    }
+                )
+                + "\n"
+                for i, (slug, etype, verdict) in enumerate(rows)
+            ),
+            encoding="utf-8",
+        )
+        latest, errors = latest_human_verdict_events([events])
+        projected, projected_errors = _human_verdicts([events])
+        assert errors == projected_errors == []
+        assert list(latest) == ["wm-b", "wm-a"]
+        assert projected == {slug: str(event.verdict) for slug, event in latest.items()}
+        assert projected == {"wm-b": "rejected", "wm-a": "rejected"}
+
+
 class TestDamagedInputInvalidatesTheVerdict:
     """[2026-09-01 codex P1 ③] 입력 손상은 판정보다 앞선다 — 손상 위의 통과는 없다."""
 
@@ -264,6 +443,7 @@ class TestReportRendering:
         assert "① 코퍼스 실재" in rendered
         assert "검수 큐 등재가 아니다" in rendered  # P1 ①의 정정이 산출물에 자백된다
         assert "④ Wilson 결함율 상한 게이트" in rendered
+        assert "검수 배치 전체" in rendered  # EOS-136 ③ 판정이 산출물에 자백된다
 
     def test_unmeasured_is_rendered_as_such(self) -> None:
         """분모 0은 '0.0000'이 아니라 '측정 불가'로 렌더된다 — 두 상태가 같은 글자면 위장이다."""
