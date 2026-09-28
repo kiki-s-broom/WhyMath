@@ -2358,12 +2358,11 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
-    "scripts/harness/backlog.py",
-    "scripts/harness/remote_claims.py",
-    "scripts/harness/selector.py",
-    "tests/harness/test_*gate*claim*.py"
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
    ],
-   "text": "EOS-137 중복 착수 — 구현은 미머지 #1352에 있는데 unblock으로 main에서 무주 todo가 돼 네 번째 세션이 claim",
+   "text": "EOS-137 게이트 부착 후 claim 반납 → 다른 세션이 13:46 재착수해 ①을 다시 구현(미푸시)",
    "weight": 3
   },
   {

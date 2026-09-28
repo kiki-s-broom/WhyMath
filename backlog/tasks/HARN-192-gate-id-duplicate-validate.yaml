@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-192-gate-id-duplicate-validate
+title: "게이트 ID 중복을 validate가 잡지 않는다 — 같은 ID 블록 두 개면 뒤 정의가 앞 정의를 조용히 덮어쓴다(실측 exit 0) · PR #1352·#1358이 같은 게이트 ID를 따로 추가"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 중복 검출 — `store.load_backlog`가 gates.yaml에서 같은 id를 두 번 만나면 오류 '게이트 ID 중복 G-…'를 errors에 넣고 `validate`가 exit 1로 끝난다(태스크 ID 중복 검사 store.py '태스크 ID 중복'의 대칭). 현재는 사전 대입(`backlog.gates[gate.id] = gate`)이라 뒤 정의가 앞 정의를 조용히 덮어쓴다."
+  - "② 회귀 테스트 — 같은 ID 블록 2개 픽스처는 RED(수정 전 코드에서 GREEN임을 먼저 확인해 결함 재현을 증명), 서로 다른 ID 2개 대조군은 GREEN. 뒤 정의가 이기는 조용한 덮어쓰기를 단언으로 드러낸다."
+  - "③ 교차 브랜치 충돌 판정 — 두 미머지 브랜치가 같은 게이트 ID를 각자 추가하는 경로(`gates add`는 자기 대장만 본다)를 막을지 조사하고 결론을 적는다. HARN-111(태스크 번호 경합)의 게이트 축으로 흡수할지 여기서 집행할지 판정한다."
+  - "④ 변별력 — ①의 검사를 제거하는 뮤테이션이 ②의 테스트를 RED로 만드는지 확인한다(주입 적용 단언 · 원복 바이트 동일)."
+artifacts: []
+paths:
+  - scripts/harness/store.py
+  - "tests/harness/test_store*.py"
+session: null
+notes: "출처: 2026-09-28 PR #1352 머지 대기 중 실측(판정 기준 main e674f6d7).\n\n[실측] 격리 사본에서 gates.yaml의 G-eos129-prod-response-distribution 블록을 한 번 더 붙여 넣고 validate를 돌렸다 — '백로그 무결성 green · 게이트 87건' exit 0. 중복이 한 건으로 접혀 보고됐다.\n\n[계기] PR #1352(main 머지)와 PR #1358(미머지)이 같은 게이트 ID G-eos129-prod-response-distribution을 서로 다른 정의(title·depends_on)로 따로 추가했다. 두 PR이 같은 자리에 삽입해 git 충돌은 나지만, 충돌을 '둘 다 유지'로 풀면 validate가 통과시키고 뒤 정의가 이긴다. 병렬 중복의 원인 축은 HARN-186(미머지 · 게이트 부착 후 claim 반납 공백)이다. 같은 ⑤에 세 번째 게이트 G-eos129-item-response-census(PR #1346 · 미머지)도 있다 — 이름이 달라 이 검사로는 잡히지 않는 의미 중복이며 HARN-186·187 소관이다."
+updated: 2026-09-28
