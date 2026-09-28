@@ -163,6 +163,59 @@ gates:
     cleared_by: kiki
     notes: ""
     corrections: []
+  - id: G-const-a0002-adoption
+    title: "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-diagnosis-s00-s10-run
+    title: "260927 EOS 통합정밀진단 S00~S10을 Kiki 머신에서 실행해 이식 완성 결과를 독립 검증한다(공통규칙: 읽기 전용·증거 등급·단계마다 새 세션·S09는 다른 모델). 이 저장소에 이식된 헌법·집행 장치가 진단의 기준(기준/헌법·기준_코딩규칙)에 비춰 어디까지 충족되는지 S02·S07이 판정하고, S08이 'Phase 2 완료' 주장을 Gate 2 증거로 대조한다(저장소 기록: 계획서 300 Gate 2 판정 3회 FAIL — 9/19·9/24·9/25, 미충족 1축). 세션 측 사전 검증(기계 축)은 docs/standards/coding_constitution_transplant.md §5 프로토콜대로 CI가 상시 수행한다. evidence = 결과/S10_통합진단서.md 경로 + 기준 커밋 해시 + 차단·높음 건수."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-precedence-declaration
+    title: "3중 '헌법' 문서의 서열 확정 — 코딩 헌법(constitution/CONSTITUTION.md 제2조 '최고 규범')과 CLAUDE.md(마스터 가이드 · '충돌 시 CLAUDE.md 우선' 373행) · dev_constitution.md(경량 요약) · AGENTS.md가 서로 최우선을 선언한다. 3택: ① 코딩 헌법 최상위(A0001 제2조 원문대로 — 기본값·권고) ② CLAUDE.md 최상위·헌법은 코딩 구조 규범에 한정 ③ 범위 분할(법령·아키텍처·검증=CLAUDE.md / 코딩 구조·파이프라인·변경·검증 독립=헌법, 같은 주제 충돌 시 헌법). 판정 재료 = docs/standards/coding_constitution_transplant.md §1 관계 선언 + 충돌 문장 12곳 목록(crosswalk 문서). evidence에 선택지 번호와 정정 커밋 해시."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-sources-registry-adopt
+    title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human

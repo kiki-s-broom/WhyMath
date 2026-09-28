@@ -69,6 +69,11 @@ known-first-party = ["whymath_backend"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]   # 테스트 픽스처에 긴 한국어 문자열 허용
+# CONST-02 — 260927 EOS 통합정밀진단 묶음(Kiki 제공)의 진단 도구 벤더링. 원본 동작을 바꾸지
+# 않기 위해 형식(black)·미사용 import만 정리하고, 고치면 동작이 달라질 수 있는 4종(람다 대입·
+# 한 글자 변수명·zip strict·raise from)과 긴 주석 줄은 이 폴더에 한해 허용한다. 재동기화 절차와
+# 원본 sha256 = scripts/constitution/diag/UPSTREAM.md. 이 폴더 밖으로 넓히지 않는다.
+"scripts/constitution/diag/**" = ["E501", "E731", "E741", "B904", "B905"]
 
 [tool.black]
 line-length = 100
