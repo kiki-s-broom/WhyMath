@@ -3640,6 +3640,16 @@
    "kind": "incident",
    "ref": "2026-09-27",
    "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 도달 잡을 손으로 골라 data-pipeline·infra-shell 누락 — PR 본문에 틀린 제외 근거 기재",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — 커밋 전 백업 복원",
