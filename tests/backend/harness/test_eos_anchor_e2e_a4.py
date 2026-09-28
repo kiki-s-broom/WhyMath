@@ -39,9 +39,11 @@ EOS-64 확장(회차 계측 — `TestNightlyRoundInstrumentation`): 이 관통�
 
 from __future__ import annotations
 
+import io
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -49,6 +51,7 @@ from whymath_backend.harness import golden_promotion_gate, problem_corpus_accumu
 from whymath_backend.harness import (
     problem_corpus_review_status_backfill as review_status_backfill,
 )
+from whymath_backend.harness import review_status_verdict_bridge as verdict_bridge
 from whymath_backend.harness.anchor_round_ledger import (
     OUTCOME_STATUSES,
     load_round_ledger,
@@ -61,6 +64,7 @@ from whymath_backend.harness.problem_corpus_accumulate import (
     default_worklist_path,
     main,
 )
+from whymath_backend.harness.review_session import load_review_items, run_review_session
 from whymath_backend.l1.problem_bank.populate import (
     ProblemBankRecord,
     load_problem_bank_records,
@@ -772,15 +776,23 @@ class TestGoldenPromotionGateOnPipelineOutput:
     인위적으로 써 넣은 탓에 "게이트가 실 산출물을 한 건도 통과시키지 못한다"는 결함이 초록
     아래 숨었다(큐=비수용·코퍼스=수용이라 두 집합은 **정의상 서로소**).
 
-    그래서 이 관통은 게이트 입력을 **실 CLI 3종의 산출물**로 만든다(가짜는 여전히 LLM
-    provider 하나뿐):
-      ① `problem_corpus_accumulate.main` — 코퍼스 JSONL + 검수 큐 JSONL(①단 재료)
-      ② `problem_corpus_review_status_backfill.main` — review_status 각인 + 감사로그(③단 재료)
-      ③ `golden_promotion_gate.main` — 판정
+    그래서 이 관통은 게이트 입력을 **실 도구 4종의 산출물**로 만든다(가짜는 LLM provider와
+    사람의 판정 키 입력 대본 둘뿐):
+      ① `problem_corpus_accumulate.main` — 코퍼스 JSONL + 검수 큐 JSONL + 회차 대장(①단 재료)
+      ② `review_session.run_review_session` — 검수 타이머 이벤트(②단 재료). 사람이 누르는 판정
+         키(`a`·`r`·`e`·`s`)만 대본이고, 이벤트 형식·페어링·시각은 실 도구가 만든다.
+      ③ `review_status_verdict_bridge.main` — review_status 각인 + 각인 감사로그(③단 재료)
+      ④ `golden_promotion_gate.main` — 판정
 
-    ②단(사람 검수 판정)만 이 테스트가 쓴다 — 그것이 정직하다. `ReviewTimerEvent`는 사람의
-    착석 기록이고 **어떤 CLI도 만들지 않는다**(`TestGenerationLogAnchorHonesty`가 파이프라인이
-    그것을 날조하지 않음을 동결한다). 게이트가 확인하는 것은 그 기록의 *실재*뿐이다.
+    EOS-136 이전에는 ③을 **코퍼스 단위 백필**(`--corpus generated_v0`)로 채웠다. 그것은 다른
+    코퍼스의 감사 라벨 판정을 회차 코퍼스에 빌려 쓰는 것이라 — 사람 판정이 몇 건이든 수용분 전원이
+    approved로 찍혔다(MP-03 판정 문서 §4.2 "남의 감사 근거로 각인"). 게이트 ③단이 통과한 것은
+    사람 판정 때문이 아니라 차용된 근거 때문이었다. 그 경로는 이제 도구가 exit 2로 거부하고
+    (`test_corpus_level_backfill_refuses_pipeline_output`), ③단은 사람 판정 각인만 채운다.
+
+    음성 대조(EOS-136 ②): 반려·미판정·손질 승인·손각인(감사로그 없음)·각인 후 손편집(감사값 ≠
+    코퍼스값)이 실 산출물 위에서도 여전히 차단되는가 — 각 테스트가 같은 회차 안에 **양성 대조**
+    1건을 함께 둬 무차별 거부가 아님을 보인다.
     """
 
     def _pipeline_outputs(
@@ -806,68 +818,97 @@ class TestGoldenPromotionGateOnPipelineOutput:
         queue_slugs = {entry.slug for entry in queue_entries if entry.slug is not None}
         return out, corpus_slugs, queue_slugs
 
-    def _human_review_events(self, tmp_path: Path, slugs: Sequence[str]) -> Path:
-        """사람 검수 종결 이벤트 JSONL — 이 테스트가 쓰는 **유일한** 비-CLI 입력(②단)."""
-        path = tmp_path / "review_timer.jsonl"
-        path.write_text(
-            "".join(
-                json.dumps(
-                    {
-                        "review_session_id": f"00000000-0000-4000-8000-{i:012d}",
-                        "cu_slug": slug,
-                        "reviewer_id": "kiki",
-                        "event_type": "finished",
-                        "verdict": "approved",
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
-                for i, slug in enumerate(slugs)
-            ),
-            encoding="utf-8",
-        )
-        return path
+    # 판정 키 대본 — `review_session`의 입력 규약 그대로(판정 → 코드 → 메모 순서).
+    _KEY_APPROVE = "a\n"
+    _KEY_REJECT = "r\nF2\n\n"  # 반려는 F1~F8 필수(스키마 강제) → 메모 생략
+    _KEY_EDIT = "e\n\n\n"  # 손질 승인 — 코드 선택(생략) → 메모 생략
+    _KEY_SKIP = "s\n"  # 보류 = aborted(판정 아님)
 
-    def _backfill(
+    def _review(
         self,
         tmp_path: Path,
         corpus: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
+        keys: Sequence[str],
+        *,
+        only: Sequence[str] | None = None,
     ) -> Path:
-        """백필 CLI 실 관통 — 코퍼스에 review_status를 각인하고 감사로그를 낸다(③단 재료).
+        """검수 CLI 실 관통 — 코퍼스 항목을 순서대로 보이고 판정 키 대본을 먹인다(②단 재료).
 
-        `--corpus generated_v0`의 판정 근거(`docs/data/corpus_audit_240.jsonl`)는 레포 루트
-        상대경로 규약이라 cwd를 레포 루트로 옮긴다. 산출물(`--out`·`--audit-out`)은 전부
-        tmp_path이므로 레포에는 아무것도 쓰지 않는다.
-
-        **전제 자가검증**: 그 판정이 approved가 아니면 이 관통은 ③단에서 막히는데, 그것은
-        게이트 결함이 아니라 *전제*가 깨진 것이다. 두 실패가 같은 색으로 보이지 않게 여기서
-        먼저 잡고 사유를 말한다(간접 신호로 원인 오독 금지).
+        `ReviewTimerEvent`는 사람의 착석 기록이라 **파이프라인은 만들지 않는다**
+        (`TestGenerationLogAnchorHonesty`가 동결). 여기서도 기계가 판정하지 않는다 — 판정은 이
+        테스트가 쥔 키 대본(항목당 1개)이고, 이벤트는 실 검수 도구가 만든다. 같은 파일에
+        append하므로 두 번 부르면 재검수 이력이 쌓인다(`only`로 재검수할 항목만 고른다).
         """
-        monkeypatch.chdir(_REPO_ROOT)  # 판정 근거 조회부터 레포 루트 상대경로 규약을 따른다
-        verdict = review_status_backfill.compute_corpus_verdict("generated_v0")
-        assert verdict.review_status.value == "approved", (
-            "이 관통의 전제(코퍼스 감사 판정 = approved)가 깨졌다 — 현재 "
-            f"{verdict.review_status.value}({verdict.reason}). 승격 게이트 결함이 아니라 "
-            "docs/data/corpus_audit_240.jsonl 판정이 바뀐 것이다."
+        items, errors = load_review_items(corpus)
+        assert errors == []
+        if only is not None:
+            items = [item for item in items if item.slug in only]
+        chosen = items[: len(keys)]
+        assert len(chosen) == len(keys)  # 대본과 항목 수가 어긋나면 키가 엉뚱한 항목에 간다
+        events = tmp_path / "review_timer.jsonl"
+        run_review_session(
+            chosen,
+            events_path=events,
+            verdicts_path=tmp_path / "review_verdicts.jsonl",
+            reviewer_id="kiki",
+            stream_in=io.StringIO("".join(keys)),
+            stream_out=io.StringIO(),
         )
-        audit = tmp_path / "backfill_audit.jsonl"
-        code = review_status_backfill.main(
+        return events
+
+    def _stamp(
+        self, corpus: Path, events: Path, capsys: pytest.CaptureFixture[str]
+    ) -> dict[str, Any]:
+        """각인 도구 실 관통 — 사람 판정을 review_status로 옮기고 감사로그를 낸다(③단 재료)."""
+        code = verdict_bridge.main(["--corpus", str(corpus), "--review-events", str(events)])
+        report: dict[str, Any] = json.loads(capsys.readouterr().out)
+        assert code == report["exit_code"]
+        return report
+
+    def _gate(
+        self,
+        tmp_path: Path,
+        out: Path,
+        events: Path,
+        proposal_slugs: Sequence[str],
+        capsys: pytest.CaptureFixture[str],
+        *extra: str,
+    ) -> tuple[int, dict[str, Any], str]:
+        """승격 게이트 실 관통 — (exit, 리포트 JSON, stdout). 감사로그는 각인 도구의 사이드카."""
+        proposal = tmp_path / "proposal.txt"
+        proposal.write_text("\n".join(proposal_slugs) + "\n", encoding="utf-8")
+        report_path = tmp_path / "gate.json"
+        code = golden_promotion_gate.main(
             [
-                "--in",
-                str(corpus),
-                "--corpus",
-                "generated_v0",
-                "--out",
-                str(corpus),
-                "--audit-out",
-                str(audit),
+                "--proposal", str(proposal),
+                "--review-queue", str(default_review_queue_path(out)),
+                "--review-events", str(events),
+                "--corpus", str(out),
+                "--backfill-audit", str(verdict_bridge.default_stamp_audit_path(out)),
+                "--json", str(report_path),
+                *extra,
             ]
-        )
-        assert code == 0
-        capsys.readouterr()  # 백필 리포트 JSON을 비운다 — 뒤 단언이 게이트 출력만 보게
-        return audit
+        )  # fmt: skip
+        stdout = capsys.readouterr().out
+        return code, json.loads(report_path.read_text(encoding="utf-8")), stdout
+
+    @staticmethod
+    def _reasons(payload: dict[str, Any]) -> dict[str, str | None]:
+        return {row["slug"]: row["blocked_reason"] for row in payload["verdicts"]}
+
+    @staticmethod
+    def _set_review_status(corpus: Path, slug: str, value: str) -> None:
+        """손편집 흉내 — 한 레코드의 review_status만 바꾼다(다른 줄은 그대로)."""
+        lines = corpus.read_text(encoding="utf-8").splitlines()
+        rewritten = []
+        for line in lines:
+            row = json.loads(line)
+            if row["slug"] == slug:
+                row["review_status"] = value
+                line = json.dumps(row, ensure_ascii=False)
+            rewritten.append(line)
+        assert len(rewritten) == len(lines)  # 줄 수 보존(제자리 편집 절단 방지)
+        corpus.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
 
     def test_corpus_and_review_queue_slugs_are_disjoint(
         self,
@@ -895,7 +936,7 @@ class TestGoldenPromotionGateOnPipelineOutput:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """실 산출물이 경로 3단을 통과한다 — 기계가 "통과 가능한가"에 답한다.
+        """실 산출물이 경로 ①~③단을 통과한다 — 사람 승인 → 각인 도구 → 게이트(EOS-136 ②).
 
         임계(`--max-defect-rate`)는 완화한다: 수용 2건짜리 회차의 Wilson 상한은 구조적으로
         크고(작은 표본으로 결함 부재를 주장할 수 없다 — 그것이 ④단의 설계다), 여기서 재는
@@ -903,32 +944,14 @@ class TestGoldenPromotionGateOnPipelineOutput:
         존재하지 않으므로 이 완화로 ②단이 우회되지는 않는다.
         """
         out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
-        events = self._human_review_events(tmp_path, corpus_slugs)
-        audit = self._backfill(tmp_path, out, monkeypatch, capsys)
-        proposal = tmp_path / "proposal.txt"
-        proposal.write_text("\n".join(corpus_slugs) + "\n", encoding="utf-8")
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["exit_code"] == 0
+        assert stamp["stamped_by_status"] == {"approved": 2}  # 사람이 승인한 2건만 각인됐다
 
-        report_path = tmp_path / "gate.json"
-        code = golden_promotion_gate.main(
-            [
-                "--proposal",
-                str(proposal),
-                "--review-queue",
-                str(default_review_queue_path(out)),
-                "--review-events",
-                str(events),
-                "--corpus",
-                str(out),
-                "--backfill-audit",
-                str(audit),
-                "--max-defect-rate",
-                "0.9",
-                "--json",
-                str(report_path),
-            ]
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.9"
         )
-        capsys.readouterr()
-        payload = json.loads(report_path.read_text(encoding="utf-8"))
         assert payload["off_path"] == 0, payload["verdicts"]  # 경로 밖 0건 — P1이 살아 있으면 2건
         assert payload["input_damaged"] is False
         assert payload["approved"] is True
@@ -947,26 +970,147 @@ class TestGoldenPromotionGateOnPipelineOutput:
         아무것도 통과시키지 못하는 것. 그래서 사유까지 단언한다(변별력 있는 검증).
         """
         out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
-        events = self._human_review_events(tmp_path, corpus_slugs)
-        audit = self._backfill(tmp_path, out, monkeypatch, capsys)
-        proposal = tmp_path / "proposal.txt"
-        proposal.write_text("\n".join(corpus_slugs) + "\n", encoding="utf-8")
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        self._stamp(out, events, capsys)
 
-        code = golden_promotion_gate.main(
-            [
-                "--proposal",
-                str(proposal),
-                "--review-queue",
-                str(default_review_queue_path(out)),
-                "--review-events",
-                str(events),
-                "--corpus",
-                str(out),
-                "--backfill-audit",
-                str(audit),
-            ]
-        )
-        stdout = capsys.readouterr().out
+        code, _payload, stdout = self._gate(tmp_path, out, events, corpus_slugs, capsys)
         assert code == 1
         assert "결함율 Wilson 상한" in stdout  # ④단에서 막혔다
         assert "경로 밖 제안" not in stdout  # ①~③단은 통과했다
+
+    # ── EOS-136 ② 음성 대조 — 실 산출물 위에서도 경로 밖은 여전히 막힌다 ──────────────
+    def test_rejected_and_unjudged_candidates_stay_blocked(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """반려 → rejected 각인(노출 차단 기록) + ②단 차단 · 보류(판정 없음) → 무변경 + ②단 차단."""
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        rejected, skipped = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_REJECT, self._KEY_SKIP])
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["stamped_by_status"] == {"rejected": 1} and stamp["no_verdict"] == 1
+        rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line]
+        assert {row["slug"]: row.get("review_status") for row in rows} == {
+            rejected: "rejected",
+            skipped: None,
+        }
+
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert code == 1
+        assert self._reasons(payload) == {
+            rejected: "human_verdict_rejected",
+            skipped: "no_human_verdict",
+        }
+
+    def test_edited_approval_is_held_until_rereview(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """손질 승인은 각인 보류 → ②단 차단. 재검수(approved) 뒤에야 각인·통과(양성 대조 포함).
+
+        각인 도구가 보류를 뚫으면(손질 승인을 approved로 찍으면) 첫 게이트가 경로 밖 0건이 된다.
+        """
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        edited, approved = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_EDIT, self._KEY_APPROVE])
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["held_edit_pending"] == [edited]
+        assert stamp["stamped_slugs"] == [approved]
+
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert code == 1
+        assert self._reasons(payload) == {edited: "human_verdict_needs_edit", approved: None}
+
+        # 손질을 반영했다고 보고 재검수 → approved. 재검수 종결이 최신 판정이 된다.
+        self._review(tmp_path, out, [self._KEY_APPROVE], only=[edited])
+        restamp = self._stamp(out, events, capsys)
+        assert restamp["stamped_slugs"] == [edited]
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert payload["off_path"] == 0 and code == 0
+        # 재승인이 as-found 결함을 지우지 않는다 — ④단 분자는 판정 이력 기준이다.
+        assert (payload["defects"], payload["batch_reapproved"]) == (1, 1)
+
+    def test_hand_stamp_without_stamp_audit_is_blocked(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """손각인 — 각인 도구가 돌기 전에 손으로 approved를 찍은 레코드는 감사 행이 없다.
+
+        각인 도구는 같은 값이어도 그 레코드에 감사 행을 만들지 않으므로(세탁 금지) 게이트가
+        `review_status_not_backfilled`로 막는다. 같은 회차의 다른 레코드는 정상 통과(양성 대조).
+        """
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        stamped, hand = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        self._set_review_status(out, hand, "approved")
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["already_stamped"] == [hand] and stamp["stamped_slugs"] == [stamped]
+
+        _code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert self._reasons(payload) == {stamped: None, hand: "review_status_not_backfilled"}
+
+    def test_hand_edit_after_stamping_is_blocked(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """각인 후 손편집 — 감사 각인값(approved) ≠ 코퍼스 현재값 → `review_status_audit_mismatch`."""
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        intact, edited = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        self._stamp(out, events, capsys)
+        self._set_review_status(out, edited, "pending")
+
+        _code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert self._reasons(payload) == {intact: None, edited: "review_status_audit_mismatch"}
+
+    def test_corpus_level_backfill_refuses_pipeline_output(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """EOS-136 이전의 ③단 경로(다른 코퍼스의 감사 근거 차용)는 이제 거부된다(exit 2·무기록).
+
+        이 경로가 살아 있으면 사람 판정과 무관하게 수용분 전원이 approved로 찍힌다 — 그리고
+        먼저 채운 쪽이 이기는 불가침 규칙 때문에 사람 판정은 그 뒤 영영 각인될 수 없다.
+        """
+        out, _corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        before = out.read_bytes()
+        monkeypatch.chdir(_REPO_ROOT)  # 코퍼스 단위 백필은 레포 루트 상대경로 규약
+        audit = tmp_path / "borrowed_audit.jsonl"
+        code = review_status_backfill.main(
+            [
+                "--in", str(out),
+                "--corpus", "generated_v0",
+                "--out", str(out),
+                "--audit-out", str(audit),
+            ]
+        )  # fmt: skip
+        err = capsys.readouterr().err
+        assert code == 2
+        assert "회차 코퍼스" in err and "review_status_verdict_bridge" in err
+        assert out.read_bytes() == before
+        assert not audit.exists()
