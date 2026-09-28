@@ -28,6 +28,8 @@ segments를 내므로(SOCRATIC=질문 중심·DIRECT=설명 중심…) 응답은
   CACHE-01 불변식을 API 층에서도 지킨다.
 - 생성 폴백(LLM)은 이 좌석에서 **켜지 않는다**(`generate_request` 미주입). DSL이 없으면 렌더 실패
   사유를 담아 404로 돌려준다 — 학습 공급 첫 배선에서 LLM 비용·환각 표면을 열지 않는다(후속 결정).
+  검수 전 콘텐츠(`review_status != "reviewed"`)도 같은 404다 — 공급 게이트가 `supply()` 안쪽
+  (`resolve_concept_dsl`)에 있어 이 라우터가 건너뛸 수 없다(CONT-05 ⓐ · 폴백 사유 `UNREVIEWED`).
 - 미성년자: 요청·응답 어디에도 학생 원문 발화가 없다. 기록되는 것은 전략명·공급 경로·개념 code뿐.
 - SEC-24(원 SEC-16): `/outcome`은 `/study`가 그 학생에게 발급한 `session_id`만 받는다 —
   소유권 검증은 유일 outcome writer(`record_pedagogy_outcome`) 안쪽에서 일어나고,
@@ -209,7 +211,7 @@ async def post_study_unit(
     흐름: 목표 로드(k_type·concept) → L2 신호 조립 → `supply()`(선택·게이트·렌더가 그 안에서
     일어난다) → 처치 기록(`evidence_event`) → 응답.
 
-    에러: 목표 없음 404 · 목표에 개념 미연결 404 · 렌더 불가(DSL 미적재) 404.
+    에러: 목표 없음 404 · 목표에 개념 미연결 404 · 렌더 불가(DSL 미적재·검수 전 콘텐츠) 404.
     렌더 불가를 500이 아니라 404로 내는 이유는 서버 결함이 아니라 *그 개념의 콘텐츠가 아직 없다*는
     데이터 상태이기 때문이다(정직한 구분).
     """

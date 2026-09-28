@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,13 +18,18 @@ acceptance:
   - "④ 변별력 — ai_estimated 행 주입 시 공급 거부, reviewed 행은 공급(성공 방향 대조), 없는 code는 기존대로 None을 테스트로 동결한다. 게이트 제거·캐시 적중 경로 우회 두 뮤테이션에서 RED를 확인한다(주입 적용·원복 바이트 동일 단언 포함)."
   - "⑤ 문서 주장 정정 — l1/concept_content/review_gate.py 와 harness/concept_content_review_apply.py 의 docstring은 'reviewed가 학생 노출 게이팅 기준이며 l1/concept_graph/retrieval.py·l1/atom_graph/retrieval.py가 이 값으로 검색 히트를 거른다'고 적는다. 2026-09-25 실측으로 두 retrieval은 concept_content가 아니라 concept_node·atom_node의 review_status를 읽는다. ② 결과에 맞게 고친다(ⓐ면 집행 지점을 content_supply로 지목, ⓑ면 노출 게이팅 주장을 철회)."
   - "⑥ 게이트 연동 — 이 태스크는 G-kg02-review-promotion-llm-session 의 입력 작업이다. 완료 후 그 게이트를 재판정한다: ⓐ였다면 승격이 학생 공급을 여는 유일한 문이 되므로 KG-02 사람 검수(Kiki 서명)의 범위·순서를 정해야 하고, ⓑ였다면 승격은 내부 표면(/v1/concepts/content?reviewed_only=true) 표기뿐이라 게이트 보류 유지가 기본값이다."
-artifacts: []
+  - "[판정 결과 2026-09-27 · 판정 기준 main `0e7b4f6b` · 판정문 `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md`] ① 잠복(현재 비활성) — 학습목표 4건 중 콘텐츠 행 도달 0건(K-12 0 · 대학 0), priority 2 유지. 활성화 트리거 = 대학 소단원 코드를 쓰는 소단원 DSL 등장 또는 크로스워크 역조회(`CONT-06`). ② ⓐ 채택(fail-closed). 비용: 오늘 학생 화면 변화 0 · SKB-04 충돌 없음(적재는 필요하나 공급을 열지 않음) · P3-02 Content Coverage 정의 충돌 가능 → P3-02 acceptance 덧붙임 · PED-17 생성 폴백 판정에 `UNREVIEWED` 항 덧붙임. ③ 집행 = `l4/content_supply.py::resolve_concept_dsl`(행 → 게이트 → 캐시 · 캐시 적중도 PK 조회 · 차단 행 미캐시 · 사유 `UNREVIEWED`), 술어 정본 = `l1/concept_content/review_gate.is_supply_eligible`(완전 일치). ④ 신규 테스트 18건(단위 16 · 서빙 경로 2 — `supply()` 대역 없이 reviewed 201 / ai_estimated 404) + 캐시 테스트 계약 변경 1건, 뮤테이션 7/7 RED(서빙 경로 테스트 단독으로 게이트 제거·술어 완화 RED, 강등 테스트 단독으로 캐시 적중 우회 RED). ⑤ docstring 정정 3파일. ⑥ G-kg02 제목에 결과 반영(재판정 자료 · 게이트 pending 유지). 부수 발견 = `CONT-06`(크로스워크 미사용)·`CONT-07`(내부 정식정의 렌더 노출)."
+artifacts:
+  - "PR #1342 — 공급 검수 게이트 ⓐ fail-closed(l4/content_supply.py::resolve_concept_dsl 행→게이트→캐시 · 사유 UNREVIEWED) · 서빙 경로 테스트 포함 18건 · 뮤테이션 7/7 RED · 도달 실측 잠복(0/4) · 후속 CONT-06·CONT-07 등재 · 판정문 docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md"
 paths:
   - src/backend/whymath_backend/l4/content_supply.py
   - src/backend/whymath_backend/api/study.py
   - src/backend/whymath_backend/l1/concept_content/review_gate.py
   - src/backend/whymath_backend/harness/concept_content_review_apply.py
   - "tests/backend/l4/test_content_supply*.py"
+  - tests/backend/l4/test_catalog_consumption.py
+  - tests/backend/api/test_study_endpoint.py
+  - "docs/reviews/cont05_*.md"
 session: null
-notes: "발견 경위(2026-09-25 · 게이트 G-kg02-review-promotion-llm-session 점검 세션 · 판정 기준 main 3a7a7315 — 실측은 f138f894에서 했고 두 커밋 사이 관련 경로 diff 0). 게이트는 'KG-02 승격이 미검증 AI 콘텐츠의 학생 노출을 막는다'를 전제로 했는데, 로컬 PostgreSQL 16 + pgvector 0.8.0에 코퍼스 846행·원자 2,683행을 적재하고 실제 승격 CLI로 주입해 보니 전제가 두 겹으로 틀렸다. (1) /v1/concepts/search 는 atom_node(전 행 ai_estimated 상수)를 읽어 승격 후에도 reviewed_only=true 결과가 0 그대로였고(양성 대조: 원자 1건을 reviewed로 바꾸면 1건 반환), 승격이 바꾸는 곳은 /v1/concepts/content?reviewed_only=true(0→2)뿐이었다. (2) 학생 대면 /study 공급 경로의 get_concept_dsl 은 review_status를 보지 않는다 — ai_estimated 행에도 DSL이 나온다. 이 태스크는 (2)를 소유한다. 유사 선례: CONT-01(같은 /study 경로의 평가 재료 축 검수 비대칭 — done). 역할 분리: CONT-02는 QA 오케스트레이터의 감사 축 거취, KG-02는 승격 실행, 이 태스크는 공급 경로의 노출 게이트. 판정문 = docs/reviews/kg02_gate_premise_recheck_2026-09-25.md"
-updated: 2026-09-25
+notes: "발견 경위(2026-09-25 · 게이트 G-kg02-review-promotion-llm-session 점검 세션 · 판정 기준 main 3a7a7315 — 실측은 f138f894에서 했고 두 커밋 사이 관련 경로 diff 0). 게이트는 'KG-02 승격이 미검증 AI 콘텐츠의 학생 노출을 막는다'를 전제로 했는데, 로컬 PostgreSQL 16 + pgvector 0.8.0에 코퍼스 846행·원자 2,683행을 적재하고 실제 승격 CLI로 주입해 보니 전제가 두 겹으로 틀렸다. (1) /v1/concepts/search 는 atom_node(전 행 ai_estimated 상수)를 읽어 승격 후에도 reviewed_only=true 결과가 0 그대로였고(양성 대조: 원자 1건을 reviewed로 바꾸면 1건 반환), 승격이 바꾸는 곳은 /v1/concepts/content?reviewed_only=true(0→2)뿐이었다. (2) 학생 대면 /study 공급 경로의 get_concept_dsl 은 review_status를 보지 않는다 — ai_estimated 행에도 DSL이 나온다. 이 태스크는 (2)를 소유한다. 유사 선례: CONT-01(같은 /study 경로의 평가 재료 축 검수 비대칭 — done). 역할 분리: CONT-02는 QA 오케스트레이터의 감사 축 거취, KG-02는 승격 실행, 이 태스크는 공급 경로의 노출 게이트. 판정문 = docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\n\n[정정 2026-09-27] paths ['src/backend/whymath_backend/l4/content_supply.py', 'src/backend/whymath_backend/api/study.py', 'src/backend/whymath_backend/l1/concept_content/review_gate.py', 'src/backend/whymath_backend/harness/concept_content_review_apply.py', 'tests/backend/l4/test_content_supply*.py'] → ['src/backend/whymath_backend/l4/content_supply.py', 'src/backend/whymath_backend/api/study.py', 'src/backend/whymath_backend/l1/concept_content/review_gate.py', 'src/backend/whymath_backend/harness/concept_content_review_apply.py', 'tests/backend/l4/test_content_supply*.py', 'tests/backend/l4/test_catalog_consumption.py', 'tests/backend/api/test_study_endpoint.py', 'docs/reviews/cont05_*.md']: 공급 게이트가 콘텐츠 행의 review_status를 읽으므로 같은 행 대역을 쓰는 기존 테스트 2파일(카탈로그 소비·study 엔드포인트)의 대역에 검수 상태를 넣어야 하고, 서빙 경로 도달 증명 테스트를 study 엔드포인트 파일에 둔다. 판정문 경로 추가(5경로 유지 + 3경로 추가)\n\n[정정 2026-09-27] 판정 결과 기록(acceptance ① 잠복 명기 포함)"
+updated: 2026-09-28
