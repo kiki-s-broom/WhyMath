@@ -2467,6 +2467,19 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/analysis/measure_backend_job_timeout_headroom.py",
+    "scripts/analysis/measure_ci_job_timeout_headroom.py",
+    "tests/infra/test_ci_harness_integrity_timeout.py",
+    "tests/infra/test_ci_job_timeout_headroom.py"
+   ],
+   "text": "harness-integrity 5분 상한 소진 — 테스트 증가로 머지 큐 PR 2건 연속 cancelled(상시 잡이라 전면 차단)",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-30",
    "paths": [
     "src/backend/pyproject.toml"
