@@ -585,6 +585,9 @@ def render_brief(
         label = {
             "all_done": "모든 태스크 완료 — 스테이지 전환 계획 필요",
             "human_gate": "사람 게이트 대기 중",
+            # HARN-184 — 입력은 끝났는데 판정 기록이 빠진 게이트. 사람 차례로 부르지 않는다.
+            "gate_verdict": "게이트 판정 결과 미기록 — 입력은 끝났는데 판정이 게이트에 없다"
+            "(판정문이 있으면 gates amend --verdict 로 기록부터)",
             "in_progress": "다른 세션 진행 중",
             "blocked": "차단 상태 — /status 로 원인 확인",
         }.get(code, code)
