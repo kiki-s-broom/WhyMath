@@ -107,10 +107,11 @@ TARGET_SE = 0.3
 # `measurement_sufficient=False`와 달성 SE를 그대로 달고 나간다(침묵 실패 금지).
 #
 # **근본 원인은 따로 있다**: 수렴 속도 자체를 올리려면 문항 변별도 a를 실측·소비해야 하는데,
-# `Problem.irt_a` 컬럼은 존재하지만 **쓰기 경로가 저장소 어디에도 없고**(항상 NULL) 보정기
-# `l2/item_calibration.py`는 `fit_jmle`(1PL·a 고정)로 b만 적합한다. a=1.5면 하한이 20문항,
-# a=2.0이면 12문항으로 내려간다. 그 2PL 보정은 문항당 응답 축적이 선행돼야 하므로 별건이다
-# = `EOS-129`.
+# `Problem.irt_a` 컬럼은 존재하지만 **a를 추정해 쓰는 경로가 저장소 어디에도 없고**(스키마→ORM
+# 일괄 복사 `Problem.from_schema`가 외부 값을 옮길 뿐이고 코퍼스 값이 전부 NULL이라
+# 사실상 항상 NULL) 보정기 `l2/item_calibration.py`는 `fit_jmle`(1PL·a 고정)로 b만 적합한다.
+# a=1.5면 하한이 20문항, a=2.0이면 12문항으로 내려간다. 그 2PL 보정은 문항당 응답 축적이
+# 선행돼야 하므로 별건이다 = `EOS-129`.
 MAX_ADMINISTERED_ITEMS = 20
 # slice 16/17: 약점 개념 가중 출제 — BKT 개념별 숙달이 낮을수록(약점) 후보 문항 정보량에
 # 곱하는 가중치를 키운다. weight = 1 + BOOST·(1 - 최저숙달). BOOST=1.0이면 완전 미숙달(숙달 0)

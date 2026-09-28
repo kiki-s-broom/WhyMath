@@ -331,6 +331,18 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-eos129-item-response-census
+    title: "EOS-129 ⑤ 데이터 게이트 — 운영 DB(whymath-pg) 문항당 응답 축적 실측(읽기 전용 · Kiki 머신 1회 · 약 5분). 런북 = docs/ops/eos129_item_response_census_runbook.md (블록 [A]~[E] · 자리표시자 없음 · main 워크트리에서 실행 · 전제가 거짓이면 [D]가 실행 거부). 도구 = whymath_backend.l2.item_response_census (조회 전 READ ONLY 선언 · 학생·문항 식별자 비출력 · 측정 실패는 exit 3으로 0건 위장 금지). 결과 JSON의 a_estimable_items_by_min_students(학생 30·100·200·500명 이상이면서 정답·오답이 둘 다 있는 문항 수)로 EOS-129 ③(2PL 변별도 a 보정 구현) 착수 여부를 판정한다 — 0에 가까우면 데이터 축적 대기가 산출물(acceptance ⑤). 몇 명이면 추정 가능한지는 도구가 정하지 않는다(결과를 본 뒤 사람이 정함). 전제: 도구가 main에 착지해야 실행 가능(이 게이트를 등재한 PR 머지 후)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "사람 직접 행동 — 운영 DB 읽기는 Kiki 머신에서만 가능하다. 측정 도구는 EOS-129 부분 이행 PR로 착지하고, 런북 [B]가 main 워크트리에 도구가 없으면 [D] 실행을 거부한다. EOS-129를 입력으로 걸지 않는 이유는 순환 의존이다(EOS-129가 이 게이트를 기다린다)."
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision

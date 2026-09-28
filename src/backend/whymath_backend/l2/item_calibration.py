@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import Select, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
@@ -24,6 +24,24 @@ from whymath_backend.l2.irt import fit_jmle
 # 보정 b를 영속할 최소 응답 수 — 미만은 b 추정 불안정(전부 정답/오답 → 경계값)이라 보류하고
 # 휴리스틱(`difficulty_to_logit`)을 유지한다. 데이터 축적에 맞춰 상향(현재는 프로토타입 floor).
 _MIN_RESPONSES_FOR_CALIBRATION = 5
+
+
+def graded_response_stmt() -> Select[tuple[uuid.UUID | None, uuid.UUID | None, bool | None]]:
+    """보정 모집단 조회문 — 채점됨·학생·문항 식별 가능한 `problem_attempt` 전수(학생·문항·정답).
+
+    b 보정기(`calibrate_item_difficulties`)와 응답 축적 실측(`l2/item_response_census` —
+    EOS-129 ⑤)이 **같은 모집단**을 보도록 조회문을 한 곳에 둔다. 둘이 따로 조건을 적으면
+    실측이 "보정기가 실제로 먹는 데이터"와 다른 것을 세게 된다(진실 원천 이원화).
+    """
+    return select(
+        ProblemAttempt.user_id,
+        ProblemAttempt.problem_id,
+        ProblemAttempt.is_correct,
+    ).where(
+        ProblemAttempt.is_correct.isnot(None),
+        ProblemAttempt.user_id.isnot(None),
+        ProblemAttempt.problem_id.isnot(None),
+    )
 
 
 def _compute_calibrated_b(
@@ -61,19 +79,7 @@ async def calibrate_item_difficulties(session: AsyncSession) -> int:
     `_compute_calibrated_b`로 보정 b를 산출하고, 응답 충분 문항만 UPDATE한다. 보정한 문항 수
     반환. commit은 내부 수행(`mastery_tracking` 선례). 운영 트리거는 후속 — 현재는 호출형.
     """
-    rows = (
-        await session.execute(
-            select(
-                ProblemAttempt.user_id,
-                ProblemAttempt.problem_id,
-                ProblemAttempt.is_correct,
-            ).where(
-                ProblemAttempt.is_correct.isnot(None),
-                ProblemAttempt.user_id.isnot(None),
-                ProblemAttempt.problem_id.isnot(None),
-            )
-        )
-    ).all()
+    rows = (await session.execute(graded_response_stmt())).all()
     calibrated = _compute_calibrated_b(
         [(user_id, problem_id, bool(is_correct)) for user_id, problem_id, is_correct in rows]
     )
@@ -85,4 +91,4 @@ async def calibrate_item_difficulties(session: AsyncSession) -> int:
     return len(calibrated)
 
 
-__all__ = ["calibrate_item_difficulties"]
+__all__ = ["calibrate_item_difficulties", "graded_response_stmt"]
