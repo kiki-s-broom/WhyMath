@@ -11,14 +11,34 @@
 하나라도 빠지면 **exit 1**을 낸다. 정본 경로:
 
     ① 코퍼스 실재(축적 CLI가 수용·저장한 후보)  →  ② 사람 검수 판정(HIT 이벤트)  →
-    ③ review_status 백필 각인(감사로그 값 = 코퍼스 값 = approved)  →
-    ④ Wilson 결함율 상한 게이트(배치 단위)
+    ③ review_status 각인(각인 도구 감사로그 값 = 코퍼스 값 = approved)  →
+    ④ Wilson 결함율 상한 게이트(검수 배치 전체 — 제안만이 아니다)
 
-경로 밖 승격의 구체형 6종을 각각 다른 사유로 거부한다(뭉뚱그린 "거부" 금지 — 조치가 다르다):
+③단의 각인 도구는 코퍼스 부류마다 하나다(EOS-136 — 계약 정본
+`docs/standards/review_status_stamping_contract.md`): 축적 CLI의 **회차 코퍼스**는 사람 판정을
+slug별로 옮기는 `harness/review_status_verdict_bridge`, 고정 코퍼스 7종(`KNOWN_CORPORA`)은
+감사 라벨 표본으로 코퍼스 전체를 판정하는 `harness/problem_corpus_review_status_backfill`이다.
+이 게이트는 어느 도구의 감사로그든 같은 형식(`slug`·`review_status`)으로 읽는다.
+
+경로 밖 승격의 구체형 7종을 각각 다른 사유로 거부한다(뭉뚱그린 "거부" 금지 — 조치가 다르다):
 `not_in_corpus` · `no_human_verdict` · `human_verdict_rejected` ·
-`review_status_not_backfilled`(백필 감사로그에 각인 기록 없음 = 손각인 의심) ·
+`human_verdict_needs_edit`(사람이 "손질하면 쓸 수 있다"로 판정 — 지금 내용은 승인되지 않았다) ·
+`review_status_not_backfilled`(각인 감사로그에 각인 기록 없음 = 손각인 의심) ·
 `review_status_audit_mismatch`(감사로그 각인값 ≠ 코퍼스 현재값 = 각인 후 손편집 의심) ·
-`review_status_not_approved`(백필·코퍼스가 일치하되 값이 approved가 아님).
+`review_status_not_approved`(감사로그·코퍼스가 일치하되 값이 approved가 아님).
+
+왜 `approved_with_edit`는 ②단을 통과하지 못하는가 (EOS-136)
+----------------------------------------------------------
+검수 CLI(`harness/review_session`)의 `e` 키는 "손질하면 쓸 수 있다"이고(MP-02 검수 런북 판정
+키 표), 그 도구는 **손질 내용을 저장하지 않는다** — 판정만 이벤트로 남는다. 따라서 코퍼스에
+있는 것은 여전히 *손질 전* 내용이며, 골든 계약도 그 내용을 as-found `defective`로 라벨링한다
+(`docs/standards/golden_benchmark_contract.md` — `edit_aware_verdict`). 그 내용을 승격시키면
+사람이 "이대로는 못 쓴다"고 본 문항이 학생에게 나간다. `schema/review_timer.
+review_status_for_verdict`가 이 판정을 `approved`로 옮기는 것은 *손질이 반영된 내용*에 대한
+노출 어휘 변환이고, 여기서 막는 것은 *손질이 반영되지 않은 내용*이다 — 두 축은 충돌하지 않는다.
+승격 경로는 "손질 반영 → 재검수(`approved`)"다(재검수의 종결이 최신 판정이 된다).
+판정 술어는 `certifies_current_content` 하나이며 각인 도구가 같은 술어를 import해 쓴다(게이트와
+각인 도구가 한 판정을 다르게 읽지 않게).
 
 왜 ①단이 "검수 큐 등재"가 아니라 "코퍼스 실재"인가 (2026-09-01 codex P1 실측)
 --------------------------------------------------------------------------
@@ -49,8 +69,9 @@
 *확인*하는 것뿐이고, 판정 자체를 만들어 내거나 추론하지 않는다. 구조적 표현 3가지:
 
   - **쓰기 경로가 없다.** 이 모듈은 `review_status`를 각인하지 않고 코퍼스·검수 큐·이벤트
-    JSONL을 수정하지 않는다(`--json` 리포트 출력만 쓴다). 승격 *집행*은 사람이 백필 CLI로
-    한다 — 게이트는 그 뒤에 서서 "경로를 거쳤는가"만 판정한다.
+    JSONL을 수정하지 않는다(`--json` 리포트 출력만 쓴다). 승격 *집행*은 사람이 각인 도구로
+    한다(회차 코퍼스 = `review_status_verdict_bridge`) — 게이트는 그 뒤에 서서 "경로를
+    거쳤는가"만 판정한다.
   - **사람 판정을 우회하는 플래그가 없다.** `--force`·`--skip-review` 류를 두지 않는다. 임계값
     (`--max-defect-rate`)은 완화할 수 있어도 ②단(사람 판정 실재)은 인자로 끌 수 없다.
   - **검수 부재는 통과가 아니라 거부다.** 사람 판정이 없는 후보는 "결함 미관측"이 아니라
@@ -61,25 +82,50 @@ CLAUDE.md 절대 금기 "*측정 없는* 기계 게이트를 인간 검수 대�
 의 as-found fail-closed·재채점 금지와도 같은 방향이다 — 그쪽이 *판정기를 재는* 정답지의 무결성
 을 지킨다면, 이 모듈은 *학생 노출로 가는 문*의 무결성을 지킨다(대상이 다르고 원칙이 같다).
 
-④단 Wilson 게이트 — 왜 작은 배치는 통과할 수 없는가
---------------------------------------------------
-배치 결함율은 점추정으로 보지 않는다. 사람 검수를 받은 제안 slug 중 `rejected` 판정 비율의
-**Wilson 단측 상한**(`harness/wilson.wilson_upper_bound` 재사용 — 재구현 0)이 `--max-defect-rate`
-이하일 때만 통과한다. "낮을수록 좋은" 지표라 상한이다(하한을 쓰면 0/5 관측이 0.0으로 통과해
-나쁜 값이 그대로 지나간다).
+④단 Wilson 게이트 — 분모는 제안이 아니라 **검수 배치 전체**다 (EOS-136 판정)
+-------------------------------------------------------------------------
+배치 결함율은 점추정으로 보지 않는다. **검수 배치**(= `--review-events`로 넘긴 검수 기록의 사람
+종결 판정이 있는 slug **전건** — 제안 여부·코퍼스 수록 여부 무관)의 as-found 결함 비율의 **Wilson
+단측 상한**(`harness/wilson.wilson_upper_bound` 재사용 — 재구현 0)이 `--max-defect-rate` 이하일
+때만 통과한다. as-found 결함 = 종결 판정 **이력 중 한 번이라도** `rejected`·`approved_with_edit`
+(손질 전 내용이 결함이었다 — 골든 계약의 as-found 라벨과 같은 어휘). 최신 판정이 아니라 이력인
+이유: 손질 → 재검수(`approved`)는 승격의 정본 경로인데, 최신 판정만 세면 그 재승인이 원래의
+결함을 **지워** 손질이 잦은 배치가 무결점 배치로 보인다. ②단·각인은 *지금 내용*의 판정이라
+최신 판정을, ④단은 *생성 배치의 품질*이라 이력을 본다. "낮을수록 좋은" 지표라 상한이다(하한을
+쓰면 0/5 관측이 0.0으로 통과해 나쁜 값이 그대로 지나간다).
+
+초판은 분모를 **제안 slug**로 잡았다. 그런데 반려된 제안은 ②단에서 이미 경로 밖이므로 통과
+가능한 모든 경우에 결함 수가 0이 되고, ④단은 "승인 제안 ≥ 133건"이라는 **표본 하한**으로
+퇴화했다 — 결과로 걸러 낸 집합의 결함율을 재는 것이라(선택 편향) 결함율이 아니었다. 예: 300건을
+검수해 30건(10%)을 반려한 배치에서 승인 270건만 제안하면 0/270 → 상한 0.0099로 **통과**했다.
+배치 분모로는 30/300 → 상한 0.1322로 거부된다(수치는 이 저장소 `wilson_upper_bound` 실측).
+사람 검수는 결함을 놓치는 검출기이고 그 놓침은 결함 유병률에 비례하므로, 배치 결함율이 낮음을
+보인 배치의 승인분만 올린다 — 이것이 `problem_corpus_review_status_backfill`의 코퍼스 판정과
+"같은 교리"(표본의 결함을 분모에 넣는 로트 판정)라는 선언의 실제 뜻이다.
+판정 근거 전문: `docs/standards/review_status_stamping_contract.md` §5.
+
+배치는 운영자가 넘긴 검수 기록이 정한다 — 여러 회차의 기록을 합치면 합친 배치로 잰다. 리포트가
+배치 크기와 **제안 밖 판정 수**를 따로 싣는 이유다(무엇을 분모로 삼았는지 산출물이 자백한다).
 
 기본 임계 0.02·신뢰 0.95는 `problem_corpus_review_status_backfill`의 코퍼스 판정 규칙과 **같은
-값**이다(같은 교리를 두 곳이 다른 숫자로 말하지 않게). 그 귀결: 무결점 5건짜리 제안도 상한이
+값**이다(같은 교리를 두 곳이 다른 숫자로 말하지 않게). 그 귀결: 무결점 5건짜리 배치도 상한이
 ≈0.35라 **통과하지 못한다**. 이것은 버그가 아니라 설계다 — 작은 표본으로 "결함 없음"을 주장할
 수 없다는 것이 Wilson 경계를 쓰는 이유 자체다(`harness/wilson` docstring). 통과하려면 표본을
-키워야 한다.
+키워야 한다(0결함 133건 · 결함 1건이면 222건).
 
 측정 실패는 통과가 아니다
 ------------------------
-사람 검수를 받은 제안 slug가 0건이면 결함율의 **분모가 없다** — 이때는 "결함 0%"가 아니라
-측정 실패이므로 exit 1이다. 입력 파일 부재·**행 파싱 실패 1건 이상**처럼 판정 재료가 손상되면
-판정이 아니라 **입력 오류(exit 2)** 로 구분한다(`ops/declared_unwired_audit`의 수집기 파손
-exit 2 선례).
+검수 배치가 0건이면 결함율의 **분모가 없다** — 이때는 "결함 0%"가 아니라 측정 실패이므로
+exit 1이다. 입력 파일 부재·**행 파싱 실패 1건 이상**처럼 판정 재료가 손상되면 판정이 아니라
+**입력 오류(exit 2)** 로 구분한다(`ops/declared_unwired_audit`의 수집기 파손 exit 2 선례).
+
+검수 도구의 판정 파일은 각인 감사로그가 아니다 (EOS-136)
+------------------------------------------------------
+`review_session --verdicts` 파일도 `{slug, review_status}`를 담는다. 그것을 `--backfill-audit`에
+넣으면 ②단(사람 판정)과 ③단(각인)이 **같은 증거로 이중 계상**된다 — 각인이 실제로 일어났는지는
+아무도 확인하지 않은 채 ③단이 통과한다. 그래서 감사 행에 판정 파일 고유 키(`verdict`)가 있으면
+각인 기록으로 세지 않고 **입력 손상(exit 2)** 으로 신고한다. 각인 도구의 감사 행은 그 키를 쓰지
+않는다(사람 판정 원값은 `human_verdict`에 싣는다).
 
 손상된 입력에 exit 0을 주지 않는 이유 (2026-09-01 codex P1 실측): 초판은 `load_errors`를 모아
 리포트에 **렌더만** 하고 반환값에는 반영하지 않았다. 그러면 이런 형태가 조용히 통과한다 —
@@ -95,8 +141,11 @@ exit 코드: 0=전건 경로 내 + Wilson 통과 · 1=경로 밖 1건 이상 또
     python -m whymath_backend.harness.golden_promotion_gate \\
         --proposal <승격제안.txt> --review-queue <acc>.review.jsonl \\
         --review-events <review_timer.jsonl> --corpus <acc>.jsonl \\
-        --backfill-audit <docs/data/review_status_backfill_audit/*.jsonl> \\
+        --backfill-audit <acc>.review_status_audit.jsonl \\
         [--max-defect-rate 0.02] [--confidence 0.95] [--json <리포트.json>]
+
+    (`--backfill-audit`는 각인 도구의 감사로그 — 회차 코퍼스는 `review_status_verdict_bridge`가
+    낸 `<acc>.review_status_audit.jsonl`, 고정 코퍼스는 `docs/data/review_status_backfill_audit/`)
 """
 
 from __future__ import annotations
@@ -104,7 +153,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -113,14 +162,20 @@ from whymath_backend.harness.needs_review_worklist import load_review_queue_json
 from whymath_backend.harness.review_timer import load_events_jsonl
 from whymath_backend.harness.wilson import wilson_upper_bound
 from whymath_backend.schema.enums import is_review_status_cleared
+from whymath_backend.schema.review_timer import VERDICT_APPROVED_WITH_EDIT, ReviewTimerEvent
 
 __all__ = [
+    "AS_FOUND_DEFECT_VERDICTS",
     "HUMAN_REVIEW_NOTICE",
     "PROMOTION_PATH_STAGES",
+    "HumanVerdictLedger",
     "PromotionGateReport",
     "SlugVerdict",
+    "certifies_current_content",
     "evaluate_promotion",
+    "latest_human_verdict_events",
     "main",
+    "read_human_verdict_ledger",
     "render_gate_report",
 ]
 
@@ -128,18 +183,20 @@ __all__ = [
 # `tests/backend/harness/test_golden_promotion_gate.py`가 빨개진다(선언을 코드가 붙든다).
 HUMAN_REVIEW_NOTICE = (
     "이 게이트는 사람 검수를 대체하지 않는다 — 사람 판정 기록의 *실재*를 확인할 뿐이고, "
-    "판정을 만들거나 추론하지 않는다. 쓰기 경로 없음(review_status 각인은 백필 CLI가 한다)·"
-    "사람 판정 우회 플래그 없음. 법정·검수 절차의 기계 대체 금지(CLAUDE.md)."
+    "판정을 만들거나 추론하지 않는다. 쓰기 경로 없음(review_status 각인은 각인 도구가 한다 — "
+    "회차 코퍼스는 review_status_verdict_bridge)·사람 판정 우회 플래그 없음. "
+    "법정·검수 절차의 기계 대체 금지(CLAUDE.md)."
 )
 
 # 정본 경로 4단 — 리포트 헤더에 그대로 렌더한다(경로가 무엇인지 산출물이 자백하게).
 # ①단이 "검수 큐 등재"가 아닌 이유는 모듈 docstring 참조(큐와 코퍼스는 정의상 서로소라
 # 큐 멤버십을 전제로 걸면 게이트가 구조적으로 아무것도 통과시키지 못한다 — 2026-09-01 P1).
+# ④단의 "검수 배치 전체"는 EOS-136 판정(분모가 제안이면 통과 경로의 결함 수가 항상 0이다).
 PROMOTION_PATH_STAGES = (
     "① 코퍼스 실재(축적 CLI가 수용·저장한 후보 — 검수 큐 등재가 아니다)",
-    "② 사람 검수 판정(ReviewTimerEvent finished + verdict)",
-    "③ review_status 백필 각인(감사로그 각인값 = 코퍼스 값 = approved)",
-    "④ Wilson 결함율 상한 게이트(배치 단위)",
+    "② 사람 검수 판정(ReviewTimerEvent finished + verdict=approved — 손질 승인은 재검수 대상)",
+    "③ review_status 각인(각인 도구 감사로그 각인값 = 코퍼스 값 = approved)",
+    "④ Wilson 결함율 상한 게이트(검수 배치 전체 — 판정 이력의 반려·손질 승인 = as-found 결함)",
 )
 
 # 기본 임계 — `problem_corpus_review_status_backfill.verdict_from_audit_labels`와 같은 값
@@ -149,6 +206,31 @@ _DEFAULT_CONFIDENCE = 0.95
 
 # 사람 검수 종결 이벤트 — `ReviewTimerEventType.FINISHED` 값(use_enum_values=True라 문자열).
 _FINISHED = "finished"
+
+# `review_session.append_verdict_jsonl` 행의 고유 키 — 사람 판정 원값. 각인 감사 행은 이 이름을
+# 쓰지 않는다(각인 도구는 `human_verdict`로 싣는다). 이 키가 곧 "판정 파일이 감사로그 자리에
+# 들어왔다"의 식별자다(`_load_backfill_audit` docstring — EOS-136).
+_REVIEW_VERDICT_ROW_KEY = "verdict"
+
+# 지금 코퍼스에 있는 내용을 **그대로** 승인하는 유일한 판정(모듈 docstring "왜
+# approved_with_edit는 ②단을 통과하지 못하는가"). 각인 도구(`review_status_verdict_bridge`)도
+# 이 값만 approved로 각인한다.
+_AS_IS_APPROVAL = "approved"
+
+#: ④단 분자 — as-found 결함 판정. 반려는 정의상 결함이고, 손질 승인은 *손질 전* 내용이 결함이었다는
+#: 뜻이다(골든 계약 `edit_aware_verdict` → defective와 같은 규칙 — 같은 사실을 두 곳이 다르게 세지
+#: 않게). 이 집합을 줄이면 손질이 잦은 생성기의 배치가 결함 없는 배치로 보인다.
+AS_FOUND_DEFECT_VERDICTS: frozenset[str] = frozenset({"rejected", VERDICT_APPROVED_WITH_EDIT})
+
+
+def certifies_current_content(verdict: str | None) -> bool:
+    """사람 판정이 **지금 코퍼스에 있는 내용 그대로**를 승인하는가 — `approved`만 참.
+
+    `approved_with_edit`는 "손질하면 쓸 수 있다"라 손질 전 내용을 승인하지 않는다(검수 CLI는 손질
+    내용을 저장하지 않는다). 게이트 ②단과 각인 도구의 approved 각인 조건이 이 술어 하나를 공유한다
+    — 두 곳이 같은 판정을 다르게 읽으면 "게이트는 막는데 코퍼스는 노출 가능" 같은 갈라짐이 생긴다.
+    """
+    return verdict == _AS_IS_APPROVAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,10 +249,11 @@ class SlugVerdict:
     """
 
     human_verdict: str | None
-    """②단 — 사람 검수 종결 판정(approved|rejected). 없으면 None(= 검수 기록 없음)."""
+    """②단 — 사람 검수 최신 종결 판정(approved|approved_with_edit|rejected). 없으면 None(= 검수
+    기록 없음). ②단 통과는 `approved`뿐이다(`certifies_current_content`)."""
 
     backfill_stamped: bool
-    """③단 전반 — 백필 감사로그가 이 slug를 **approved로** 각인했다고 기록하는가.
+    """③단 전반 — 각인 감사로그가 이 slug를 **approved로** 각인했다고 기록하는가.
 
     "각인 기록의 존재"가 아니라 "각인값이 approved"까지를 뜻한다 — 감사로그에 pending으로
     적힌 기록을 '각인됨'으로 세면, 그 뒤 코퍼스만 손으로 approved가 돼도 통과한다(P1 ②).
@@ -191,7 +274,7 @@ class SlugVerdict:
     """①단 — 코퍼스 JSONL에 이 slug 레코드가 실재하는가(승격 후보의 전제)."""
 
     blocked_reason: str | None
-    """차단 사유(경로 밖 6종 중 하나). None이면 경로 내."""
+    """차단 사유(경로 밖 7종 중 하나). None이면 경로 내."""
 
     @property
     def on_path(self) -> bool:
@@ -232,6 +315,20 @@ class PromotionGateReport:
     입력으로는 승격 허용도 거부도 권위가 없다.
     """
 
+    batch_verdicts: dict[str, str] = field(default_factory=dict)
+    """④단 분모 — **검수 배치**: 넘긴 검수 기록의 사람 최신 종결 판정 전건 {slug: 판정}.
+
+    제안 slug만이 아니라 제안 밖 판정(반려되어 제안에서 빠진 것·코퍼스에 없는 것)까지 담는다.
+    제안만 세면 반려분이 ②단에서 먼저 빠져 통과 경로의 결함 수가 항상 0이 된다(EOS-136 판정 —
+    모듈 docstring ④단 절).
+    """
+
+    batch_defective: frozenset[str] = frozenset()
+    """④단 분자 — 검수 배치 중 종결 판정 **이력**에 as-found 결함(반려·손질 승인)이 있는 slug.
+
+    최신 판정이 아니라 이력이다 — 손질 후 재승인이 원래의 결함을 지우지 않게(모듈 docstring).
+    """
+
     @property
     def input_damaged(self) -> bool:
         """입력 재료가 손상됐는가 — 참이면 판정 자체가 성립하지 않는다(CLI exit 2).
@@ -253,13 +350,41 @@ class PromotionGateReport:
 
     @property
     def reviewed(self) -> int:
-        """사람 검수 판정이 실재하는 제안 수 — 결함율의 **분모**(0이면 측정 불가)."""
-        return sum(1 for v in self.verdicts if v.human_verdict is not None)
+        """검수 배치 크기 — 결함율의 **분모**(0이면 측정 불가). 제안 수가 아니다(EOS-136)."""
+        return len(self.batch_verdicts)
+
+    def _defective_with_latest(self, latest: str) -> int:
+        return sum(
+            1
+            for slug, verdict in self.batch_verdicts.items()
+            if slug in self.batch_defective and verdict == latest
+        )
+
+    @property
+    def batch_rejected(self) -> int:
+        """as-found 결함 중 최신 판정이 `rejected`인 수."""
+        return self._defective_with_latest("rejected")
+
+    @property
+    def batch_edited(self) -> int:
+        """as-found 결함 중 최신 판정이 `approved_with_edit`(손질 대기)인 수."""
+        return self._defective_with_latest(VERDICT_APPROVED_WITH_EDIT)
+
+    @property
+    def batch_reapproved(self) -> int:
+        """as-found 결함 중 손질 후 재검수로 최신 판정이 `approved`가 된 수 — 결함으로 센다."""
+        return self._defective_with_latest(_AS_IS_APPROVAL)
 
     @property
     def defects(self) -> int:
-        """사람이 `rejected`로 판정한 제안 수 — 결함율의 분자."""
-        return sum(1 for v in self.verdicts if v.human_verdict == "rejected")
+        """검수 배치의 as-found 결함 수(판정 이력 기준) — 결함율의 분자."""
+        return sum(1 for slug in self.batch_verdicts if slug in self.batch_defective)
+
+    @property
+    def batch_outside_proposal(self) -> int:
+        """**정보** — 검수 배치 중 제안에 없는 판정 수(무엇을 분모로 삼았는지의 자백)."""
+        proposed = {v.slug for v in self.verdicts}
+        return sum(1 for slug in self.batch_verdicts if slug not in proposed)
 
     @property
     def defect_rate_upper(self) -> float | None:
@@ -288,8 +413,14 @@ class PromotionGateReport:
             "off_path": len(self.off_path),
             "previously_queued": len(self.previously_queued),
             "input_damaged": self.input_damaged,
+            # ④단 분모·분자 — 검수 배치 기준(EOS-136). `defect_scope`가 그 사실을 산출물에 싣는다.
+            "defect_scope": "review_batch",
             "reviewed": self.reviewed,
+            "batch_outside_proposal": self.batch_outside_proposal,
             "defects": self.defects,
+            "batch_rejected": self.batch_rejected,
+            "batch_edited": self.batch_edited,
+            "batch_reapproved": self.batch_reapproved,
             "defect_rate_upper": self.defect_rate_upper,
             "max_defect_rate": self.max_defect_rate,
             "confidence": self.confidence,
@@ -310,6 +441,7 @@ def evaluate_promotion(
     max_defect_rate: float = _DEFAULT_MAX_DEFECT_RATE,
     confidence: float = _DEFAULT_CONFIDENCE,
     load_errors: Sequence[str] = (),
+    as_found_defective: Collection[str] | None = None,
 ) -> PromotionGateReport:
     """승격 제안을 정본 경로 4단에 대조한다(순수 — 파일 I/O 0·쓰기 0).
 
@@ -323,9 +455,17 @@ def evaluate_promotion(
     `backfilled_status`는 slug 집합이 아니라 **{slug: 감사로그 각인값}** 맵이다 — 값을 버리면
     "감사=pending인데 코퍼스=approved"(각인 후 손편집)를 볼 수 없다.
 
+    `human_verdicts`는 제안 slug의 ②단 판정원이면서 **④단의 분모(검수 배치)** 다 — 넘긴 검수
+    기록의 최신 종결 판정 전건을 그대로 받는다(제안 밖 판정을 걸러 넣으면 반려분이 분모에서
+    사라져 통과 경로의 결함 수가 항상 0이 된다 — EOS-136 판정).
+
+    `as_found_defective`는 ④단 분자 — 판정 **이력**에 as-found 결함이 있는 slug 집합
+    (`read_human_verdict_ledger`가 만든다). 생략하면 최신 판정값에서만 유도한다(이력을 모르는
+    호출자용 — 그 경우 손질 후 재승인은 결함으로 세지 못하므로 CLI는 항상 이력을 넘긴다).
+
     차단 사유는 **첫 번째로 막힌 단**을 낸다(뭉뚱그리지 않는다 — 조치가 단마다 다르다):
-    코퍼스에 없다 → 사람 판정이 없다 → 사람이 반려했다 → 백필을 안 거쳤다 →
-    감사값과 코퍼스값이 어긋난다 → 각인값이 approved가 아니다.
+    코퍼스에 없다 → 사람 판정이 없다 → 사람이 반려했다 → 사람이 손질을 요구했다 →
+    각인을 안 거쳤다 → 감사값과 코퍼스값이 어긋난다 → 각인값이 approved가 아니다.
     """
     verdicts: list[SlugVerdict] = []
     for slug in proposed_slugs:
@@ -346,10 +486,15 @@ def evaluate_promotion(
             reason = "no_human_verdict"
         elif verdict == "rejected":
             reason = "human_verdict_rejected"
+        elif not certifies_current_content(verdict):
+            # 손질 승인 — "손질하면 쓸 수 있다"는 지금 내용의 승인이 아니다(검수 CLI는 손질을
+            # 저장하지 않는다). 조치: 손질을 코퍼스에 반영하고 재검수(approved)를 받는다.
+            # 각인 도구도 같은 술어로 이 판정을 각인하지 않는다(모듈 docstring — EOS-136).
+            reason = "human_verdict_needs_edit"
         elif audit_status is None:
-            # 코퍼스 값은 approved인데 백필 감사로그에 각인 기록이 없다 = 백필 CLI를 안 거친
+            # 코퍼스 값은 approved인데 각인 감사로그에 기록이 없다 = 각인 도구를 안 거친
             # 각인(손편집 의심). 값만 보고 통과시키면 "경로 밖 승격"의 가장 쉬운 형태가 열린다.
-            # 조치: 백필 CLI를 돌려 각인을 정본 경로로 다시 만든다.
+            # 조치: 각인 도구를 돌려 각인을 정본 경로로 다시 만든다.
             reason = "review_status_not_backfilled"
         elif audit_status != status:
             # 각인은 거쳤는데 **지금 코퍼스 값이 그때 각인값과 다르다** = 각인 이후 누군가
@@ -375,11 +520,20 @@ def evaluate_promotion(
                 blocked_reason=reason,
             )
         )
+    defective = (
+        frozenset(as_found_defective)
+        if as_found_defective is not None
+        else frozenset(
+            slug for slug, verdict in human_verdicts.items() if verdict in AS_FOUND_DEFECT_VERDICTS
+        )
+    )
     return PromotionGateReport(
         verdicts=verdicts,
         max_defect_rate=max_defect_rate,
         confidence=confidence,
         load_errors=list(load_errors),
+        batch_verdicts=dict(human_verdicts),
+        batch_defective=defective,
     )
 
 
@@ -399,7 +553,11 @@ def render_gate_report(report: PromotionGateReport) -> str:
             "",
             f"- 제안 {len(report.verdicts)}건 · 경로 내 "
             f"{len(report.verdicts) - len(report.off_path)}건 · 경로 밖 {len(report.off_path)}건",
-            f"- 사람 검수 판정 {report.reviewed}건 · 반려 {report.defects}건 · "
+            # ④단 분모는 제안이 아니라 검수 배치다(EOS-136) — 제안 밖 판정 수를 함께 적어
+            # 분모가 무엇이었는지 산출물이 자백하게 한다.
+            f"- 검수 배치 {report.reviewed}건(제안 밖 {report.batch_outside_proposal}건 포함) · "
+            f"as-found 결함 {report.defects}건(최신 반려 {report.batch_rejected} · "
+            f"손질 대기 {report.batch_edited} · 손질 후 재승인 {report.batch_reapproved}) · "
             f"결함율 Wilson 상한(신뢰 {report.confidence}) {upper_text} "
             f"(임계 {report.max_defect_rate})",
             # 큐 이력은 **정보**로만 싣는다(차단 조건 아님) — 승격 후보가 한때 반려·검수필요
@@ -441,18 +599,23 @@ def _read_proposal(path: Path) -> list[str]:
 
 
 def _load_backfill_audit(path: Path) -> tuple[dict[str, str], list[str]]:
-    """백필 감사로그 JSONL → {slug: 각인된 review_status}. (맵, 실패 사유[타입명+줄 번호]).
+    """각인 감사로그 JSONL → {slug: 각인된 review_status}. (맵, 실패 사유[타입명+줄 번호]).
 
-    **slug 집합으로 축약하지 않는 이유**(2026-09-01 codex P1 ②): 감사 레코드는
-    `problem_corpus_review_status_backfill._backfill_line`이 쓴 `{problem_id, slug,
-    review_status}`라 각인 *값*을 이미 갖고 있다. 그 값을 버리고 slug만 남기면 "이전 백필이
-    pending을 각인했는데 나중에 코퍼스를 손으로 approved로 고친" 경우가 그대로 통과한다 —
-    이 모듈의 존재 이유(백필 각인 vs 손각인 구분)가 정확히 그 지점에서 무너진다.
+    **slug 집합으로 축약하지 않는 이유**(2026-09-01 codex P1 ②): 감사 레코드는 각인 도구가 쓴
+    `{slug, review_status, ...}`라 각인 *값*을 이미 갖고 있다(코퍼스 단위 백필의 `_backfill_line`·
+    회차 각인 도구 `review_status_verdict_bridge` 공통). 그 값을 버리고 slug만 남기면 "이전 각인이
+    pending이었는데 나중에 코퍼스를 손으로 approved로 고친" 경우가 그대로 통과한다 — 이 모듈의
+    존재 이유(도구 각인 vs 손각인 구분)가 정확히 그 지점에서 무너진다.
 
-    같은 slug가 여러 줄/여러 파일에 나오면 **마지막 기록이 이긴다**(백필 재실행이 이전 각인을
-    갱신한다 — `_human_verdicts`의 "마지막 종결이 현재 판정"과 같은 규칙). 파싱 실패 줄은
-    삼키지 않고 파일명·줄 번호·예외 타입명을 남긴다(필드 *값*은 남기지 않는다 — 침묵 실패
+    같은 slug가 여러 줄/여러 파일에 나오면 **마지막 기록이 이긴다**(각인 재실행이 이전 각인을
+    갱신한다 — `latest_human_verdict_events`의 "마지막 종결이 현재 판정"과 같은 규칙). 파싱 실패
+    줄은 삼키지 않고 파일명·줄 번호·예외 타입명을 남긴다(필드 *값*은 남기지 않는다 — 침묵 실패
     금지 규약의 로그 위생).
+
+    **검수 도구의 판정 행은 각인 기록이 아니다**(EOS-136): `review_session --verdicts` 행도
+    `{slug, review_status}`를 담지만 그것은 *사람 판정*이지 *각인 사실*이 아니다. 그 파일을 감사로그
+    자리에 넣으면 ②단과 ③단이 같은 증거로 이중 계상된다. 판정 행의 고유 키 `verdict`가 있는 행은
+    각인으로 세지 않고 손상으로 신고한다(게이트 exit 2). 각인 도구의 감사 행은 그 키를 쓰지 않는다.
     """
     statuses: dict[str, str] = {}
     errors: list[str] = []
@@ -470,6 +633,11 @@ def _load_backfill_audit(path: Path) -> tuple[dict[str, str], list[str]]:
                 continue
             slug = parsed.get("slug")
             if not (isinstance(slug, str) and slug):
+                continue
+            if _REVIEW_VERDICT_ROW_KEY in parsed:
+                # 검수 도구 판정 파일의 행 — 각인 사실이 아니라 사람 판정이다(docstring). 각인으로
+                # 세면 ③단이 각인 없이 통과한다. 조치: 각인 도구의 감사로그를 넘긴다.
+                errors.append(f"{path.name} line {line_no}: ReviewVerdictRowNotStampAudit")
                 continue
             raw = parsed.get("review_status")
             if not (isinstance(raw, str) and raw):
@@ -510,14 +678,33 @@ def _load_corpus_review_status(path: Path) -> tuple[dict[str, str | None], list[
     return statuses, errors
 
 
-def _human_verdicts(paths: Iterable[Path]) -> tuple[dict[str, str], list[str]]:
-    """검수 타이머 이벤트 → {cu_slug: 최신 종결 판정}. `finished` + verdict만 센다.
+@dataclass(frozen=True, slots=True)
+class HumanVerdictLedger:
+    """검수 기록의 사람 종결 판정 — 최신 판정(②단·각인)과 as-found 결함 이력(④단 분자)."""
+
+    latest: dict[str, ReviewTimerEvent]
+    """{cu_slug: 최신 종결 이벤트} — 키 순서는 첫 등장 순서(재검수는 값만 갱신한다)."""
+
+    as_found_defective: frozenset[str]
+    """종결 판정 이력 중 한 번이라도 as-found 결함(반려·손질 승인)이었던 cu_slug."""
+
+
+def read_human_verdict_ledger(paths: Iterable[Path]) -> tuple[HumanVerdictLedger, list[str]]:
+    """검수 타이머 이벤트 → 판정 원장. `finished` + verdict만 센다(**사람 판정 해석의 단일 권위**).
+
+    게이트 ②단·④단, 제안 파생(`golden_inputs` — `_human_verdicts` 경유), 각인 도구
+    (`review_status_verdict_bridge` — `latest_human_verdict_events` 경유)가 전부 이 함수로 읽는다.
+    각인 도구가 판정을 따로 읽으면 "게이트가 본 판정"과 "각인된 판정"이 갈라질 수 있다.
 
     같은 CU가 여러 세션으로 검수되면(시작→중단→재시작→종결) **파일 순서상 마지막 종결**이
     현재 판정이다 — 재검수가 이전 판정을 갱신한다. started/aborted는 판정이 아니므로 무시한다
     (그 상태를 approved로 읽으면 그것이 곧 "기계가 사람 판정을 대신하는" 형태다).
+
+    as-found 결함은 **이력**으로 모은다 — 손질 → 재검수(approved)가 최신 판정을 바꿔도 원래의
+    결함은 배치 품질(④단)에서 지워지지 않아야 한다(모듈 docstring ④단 절).
     """
-    verdicts: dict[str, str] = {}
+    latest: dict[str, ReviewTimerEvent] = {}
+    defective: set[str] = set()
     errors: list[str] = []
     for path in paths:
         events, load_errors = load_events_jsonl(path)
@@ -525,8 +712,28 @@ def _human_verdicts(paths: Iterable[Path]) -> tuple[dict[str, str], list[str]]:
         for event in events:
             if event.event_type != _FINISHED or event.verdict is None:
                 continue
-            verdicts[event.cu_slug] = str(event.verdict)
-    return verdicts, errors
+            latest[event.cu_slug] = event
+            if str(event.verdict) in AS_FOUND_DEFECT_VERDICTS:
+                defective.add(event.cu_slug)
+    return HumanVerdictLedger(latest=latest, as_found_defective=frozenset(defective)), errors
+
+
+def latest_human_verdict_events(
+    paths: Iterable[Path],
+) -> tuple[dict[str, ReviewTimerEvent], list[str]]:
+    """검수 타이머 이벤트 → {cu_slug: 최신 종결 이벤트} — `read_human_verdict_ledger`의 최신판.
+
+    이벤트 *전체*를 돌려주는 이유: 각인 도구의 감사로그가 근거 이벤트 id·검수자·검수 시각을
+    싣는다(판정 값만 돌려주면 그 근거를 다시 찾는 두 번째 해석 경로가 생긴다).
+    """
+    ledger, errors = read_human_verdict_ledger(paths)
+    return ledger.latest, errors
+
+
+def _human_verdicts(paths: Iterable[Path]) -> tuple[dict[str, str], list[str]]:
+    """검수 타이머 이벤트 → {cu_slug: 최신 종결 판정 값} — `latest_human_verdict_events` 투영."""
+    latest, errors = latest_human_verdict_events(paths)
+    return {slug: str(event.verdict) for slug, event in latest.items()}, errors
 
 
 def _say(message: str) -> None:
@@ -539,7 +746,7 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.golden_promotion_gate",
         description=(
-            "골든 승격 경로 게이트 — 워크리스트 검수→사람 판정→review_status 백필→Wilson "
+            "골든 승격 경로 게이트 — 코퍼스 실재→사람 판정→review_status 각인→검수 배치 Wilson "
             "게이트를 전부 거친 제안만 통과시킨다(경로 밖 승격은 exit 1). 사람 검수를 "
             "대체하지 않는다."
         ),
@@ -570,16 +777,22 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
         action="append",
         required=True,
         help=(
-            "review_status 백필 감사로그 JSONL(복수 지정 가능) — ③단 각인이 백필 CLI를 거쳤음의 "
-            "근거. 필수인 이유: 코퍼스의 값만 보면 손편집 각인을 구분할 수 없다. 각인 *값*까지 "
-            "읽어 코퍼스 현재값과 대조한다(불일치는 review_status_audit_mismatch)."
+            "review_status 각인 감사로그 JSONL(복수 지정 가능) — ③단 각인이 각인 도구를 거쳤음의 "
+            "근거(회차 코퍼스 = review_status_verdict_bridge의 "
+            "<corpus>.review_status_audit.jsonl). "
+            "필수인 이유: 코퍼스의 값만 보면 손편집 각인을 구분할 수 없다. 각인 *값*까지 읽어 "
+            "코퍼스 현재값과 대조한다(불일치는 review_status_audit_mismatch). 검수 도구의 "
+            "--verdicts 파일은 각인 기록이 아니다(넣으면 입력 손상 exit 2)."
         ),
     )
     parser.add_argument(
         "--max-defect-rate",
         type=float,
         default=_DEFAULT_MAX_DEFECT_RATE,
-        help=f"④단 결함율 Wilson 상한 임계(기본 {_DEFAULT_MAX_DEFECT_RATE} — 백필 CLI와 동일).",
+        help=(
+            f"④단 결함율 Wilson 상한 임계(기본 {_DEFAULT_MAX_DEFECT_RATE} — 백필 CLI와 동일). "
+            "분모는 검수 배치 전체(--review-events의 종결 판정 전건)다."
+        ),
     )
     parser.add_argument(
         "--confidence", type=float, default=_DEFAULT_CONFIDENCE, help="Wilson 단측 신뢰수준."
@@ -608,7 +821,8 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
     load_errors.extend(f"{args.review_queue.name} {err}" for err in queue_errors)
     queue_slugs = {entry.slug for entry in queue_entries if entry.slug is not None}
 
-    verdict_map, verdict_errors = _human_verdicts(args.review_events)
+    ledger, verdict_errors = read_human_verdict_ledger(args.review_events)
+    verdict_map = {slug: str(event.verdict) for slug, event in ledger.latest.items()}
     load_errors.extend(verdict_errors)
 
     backfilled: dict[str, str] = {}
@@ -629,6 +843,7 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
         max_defect_rate=args.max_defect_rate,
         confidence=args.confidence,
         load_errors=load_errors,
+        as_found_defective=ledger.as_found_defective,
     )
     _say(render_gate_report(report))
     if args.json_out is not None:
@@ -658,8 +873,8 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
     if not report.wilson_passed:
         _say(
             f"[승격 거부] 결함율 Wilson 상한 {report.defect_rate_upper:.4f} > "
-            f"임계 {report.max_defect_rate} — 표본 {report.reviewed}건으로는 결함 없음을 "
-            "주장할 수 없다(exit 1)."
+            f"임계 {report.max_defect_rate} — 검수 배치 {report.reviewed}건(as-found 결함 "
+            f"{report.defects}건)으로는 결함 없음을 주장할 수 없다(exit 1)."
         )
         return 1
     _say(f"[승격 허용] 제안 {len(proposed)}건 전건이 정본 경로 4단을 통과했다(exit 0).")
