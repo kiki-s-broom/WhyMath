@@ -11373,12 +11373,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 (`add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 창). 원격 전 브랜치·claim 대장에서 188~199가 비어 있음을 실측한 뒤
 `backlog.py rename`으로 185→188 · 186→189를 옮겼다.
 
-**감사 자신의 검증에서 난 사고 2건**: ⓐ `derived-index-not-rebuilt` 2회차 — 사고를 `incident add`로 쓴 뒤
+**감사 자신의 검증에서 난 사고 2건**: ⓐ `derived-index-not-rebuilt` 3회차 — 사고를 `incident add`로 쓴 뒤
 `backlog/jit_index.json`을 재생성하지 않아 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입 인덱스
 대조"에서 exit 1(뒤 스텝 7건 미실행). origin/main 워크트리 대조로 원인을 확정하고 `jit build`로 재생성했다(대책 `HARN-179`
-기등재 — 미러를 안 돌렸으면 CI red였다) ⓑ `harness-test-live-ledger-write` 9회차 — 재검증 미러의 `tests/harness`가 이 세션
-샤드에 가짜 `policy_warn` 3줄을 썼다(커밋 전 제거). 대책 `HARN-170`은 09-24 이후 9회 재발했는데 우선순위 3·EOS P2에 머물러
-있다(회차는 main `78a8edff` 머지 후 대장 기준 — 기록 당시 7회차였고, 같은 날 main에 더 이른 시각의 같은 계열 기록 2건이 있다).
+기등재 — 미러를 안 돌렸으면 CI red였다) ⓑ `harness-test-live-ledger-write` 10회차 — 재검증 미러의 `tests/harness`가 이 세션
+샤드에 가짜 `policy_warn` 3줄을 썼다(커밋 전 제거). 대책 `HARN-170`은 09-24 이후 10회 재발했는데 우선순위 3·EOS P2에 머물러
+있다. (두 회차는 main `6c880b67` 병합 후 대장 기준 스냅샷 — 기록 당시 2회차·7회차였으나 같은 날 다른 세션들이 같은 두 계열을
+계속 기록해 병합마다 앞에 끼어들었다. HARN-179·HARN-170 결함을 오늘만 여러 세션이 겪고 있다는 신호다.)
 
 **정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계 — 단 `vafylb`는 §5-1에서 좌석을 다시 봤다).
 스킬 §3의 main 언급 grep을 `.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-188을 찾았다 — 스킬 원문 범위
@@ -11386,6 +11387,27 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 (HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은 4분류 밖이라 관측만 남겼다.
 
 ---
+### 2026-09-28 — HARN-177 착지 후 정상작동 점검 + HARN-184: 게이트 대기 분류를 공용 판정 하나로 (계열 `canon-vs-enforcement` 6회차) — 판정 기준 main `919865d4`
+
+**점검 요청**: Kiki가 태스크 ID `HARN-177-gate-verdict-handoff-on-done`을 지목했다. 태스크는 이미 done(#1337 · `0e7b4f6b`)이라 착지 후 정상작동 점검으로 수행했다.
+
+**HARN-177 자체 — 정상**: main `919865d4`에서 harness-integrity 잡 스텝 8종(validate · audit-deps · rules lint · rules render --check · jit check · ruff · black · pytest tests/harness) 전건 exit 0 — pytest 1,268 passed · 1 skipped. 뮤테이션 재실측: HARN-177 26종 · HARN-174 34종 전건 RED, 대조군 GREEN, 작업 사본 무변경. 실제 대장: pending decision 게이트 14건 중 입력 있는 6건 전부 `open`, `unrecorded` 0건, 판정 기록 0건. 태스크를 done으로 바꾸는 코드 경로는 `cmd_done` 하나뿐이다(인계를 우회하는 CLI 경로 없음).
+
+**발견 — HARN-184**: HARN-177 ②의 원칙("판정이 기록되지 않은 상태를 사람 차례로 안내하지 않는다")이 착지 뒤 생긴 화면(HARN-182 작업 흐름 그래프 · #1345)에서 되살아났다. 그래프는 게이트 창을 "열린 선행이 있는가"로만 갈라 판정 결과 미기록 게이트를 `gate_turn`('사람 차례')으로 그렸다 — 합성 대장 재현에서 PASS 대조군과 상태·라벨·집계가 같고 이유 문구만 달랐다. 원인은 HARN-177 ② acceptance가 화면을 열거한 것이다. 같은 축의 옛 화면도 있었다: 보드 카드 라벨 '사람 게이트 대기', 게이트 패널 '사람 게이트 — 행동 대기'(실측 미통과 19건 중 6건이 입력 작업이 남은 게이트), 정지 사유 `human_gate`. 실제 대장에는 해당 게이트가 0건이라 잠복 상태였다. 사고 대장 등재 = `canon-vs-enforcement` 6회차(fix_form=code).
+
+**집행된 것(코드)**
+- `store.gate_wait_kind` — 미통과 게이트가 기다리는 것을 `inputs` · `verdict` · `person` 중 하나로 낸다(판정 기록 상태는 `gate_judgment_state` 그대로).
+- 작업 흐름 그래프: 새 상태 `gate_verdict`('판정 결과 미기록') — 사이드 패널 '사람 차례' 목록과 `--text` 집계에서 빼고 자기 목록·범례·요약으로 보인다.
+- 보드: 카드 라벨('사람 게이트 대기'는 막는 게이트가 전부 사람 차례일 때만 · verdict > inputs > person), 게이트 카드 요약 줄, 패널 제목(세 분류 집계).
+- 정지 사유: 판정 결과 미기록 게이트가 섞이면 `gate_verdict`(/drive 정지 규약 등재) · 세션 브리핑 문구.
+- 전 화면 대조 테스트(사고 대장 상태 하나 + PASS 대조군) + 사람 차례 문구를 내는 하네스 모듈 전수 등재 검사(`SURFACE_REGISTRY`) — 새 화면이 계약 밖으로 새면 RED.
+
+**구현 중 내린 판단**
+1. 화면 목록을 acceptance에 다시 열거하는 대신 **분류 함수 하나 + 등재 검사**로 막았다 — 열거가 뚫린 입구였으므로 열거를 늘리면 같은 구멍이 넓어질 뿐이다. 등재 검사는 문구 스캔이라 다른 낱말로 사람 차례를 말하는 화면과 하네스 밖 프롬프트(`.claude/commands/status.md`의 `[사람 게이트 대기]` 제목)는 못 잡는다(한계 명시 · build_harness.md §3e 한계 6).
+2. 영원히 끝나지 않는 입력(취소 · 대장 부재)은 `person`으로 떨어뜨렸다 — 막다른 길은 validate가 이미 잡으므로 분류가 새 상태를 만들지 않는다(테스트로 동결).
+3. `G-p3-entry-gate2-pass`의 2차 재판정 FAIL은 여전히 기계 판독 형식으로 기록되지 않았다(HARN-177이 의도적으로 손대지 않은 부분). 소유 연결(게이트 ← EOS-141 ← EOS-26)은 대장에 있어 선택기·해금 수는 정상이다. `gates amend --verdict FAIL --owner`로 남길 수는 있지만 판정 기록은 판정 세션의 몫이라 이 세션은 쓰지 않았다.
+
+**변별력**: 뮤테이션 25종(`scripts/harness/verify_gate_wait_kind_discrimination.py` — HARN-174 러너 재사용) 전건 RED · 대조군 GREEN · 원복 바이트 동일. 앵커 동결 `tests/harness/test_gate_wait_kind_mutation_anchors.py`. 신규 테스트 46건은 수정 전 main에서 36건 RED를 확인했다(나머지 10건은 PASS 대조군 4 · 종전 동작 유지 3 · 등재 검사 3이라 수정 전후 모두 GREEN이 정상). 정본 = `docs/standards/build_harness.md` §3e 「게이트 대기 분류」.
 ### 2026-09-28 — EOS-123 착지: 정답 회차도 오답과 같은 조건으로 오개념을 훑어, 후보가 없으면 1턴 감쇠·후보가 나오면(정답 보고와 관측의 충돌) 보류 — 판정 기준 main `a17e92c7`
 
 **배경(실측)**: 채점 경로(`POST /v1/me/attempts`)는 정답이면 오개념 훑기를 조기 반환해 가설 감쇠 시계를 돌리지 않았다. 페르소나 C 재실측: 오개념 미관측 **오답** 0.85 → 0.74, 바로 뒤 **정답** 0.74 → 0.74. 다르게 틀린 답은 신뢰를 내리는데 맞힌 답은 못 내리는 역방향 비대칭이고, 채점 경로만 쓰는 학생에게는 가설이 영구히 남는다(낙인 방지 역행). 코치 경로는 매 교환 감쇠 + 도구 검증 clean 턴에 −1 증거를 쓴다.

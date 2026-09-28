@@ -281,17 +281,19 @@ SessionStart 브리핑은 EOS-129를 **다음 착수 후보 1위**로 내놓았�
    (과거 이벤트의 옛 ID 참조는 CLI가 의도적으로 그대로 두고 `rename` 이벤트로 잇는다).
 3. **사고 대장 4건**(이 브랜치 순증) — `orphan-claim-reap-blindspot`(12회차 관측과 합치면 2회차 —
    `series_raw`에 명기 · 대책 `HARN-189`) · `ported-classification-false-positive`(선례 2건과 합치면
-   3회차 — `series_raw`에 명기 · 대책 `HARN-190`) · `derived-index-not-rebuilt` **2회차**(이 감사 자신의
+   3회차 — `series_raw`에 명기 · 대책 `HARN-190`) · `derived-index-not-rebuilt` **3회차**(이 감사 자신의
    검증에서 발생: 사고를 `incident add`로 쓴 뒤 `backlog/jit_index.json`을 재생성하지 않아 로컬 CI 미러의
    harness-integrity가 "적시 주입 인덱스 대조"에서 exit 1 · 뒤 스텝 7건 미실행. 푸시 전 발견 · origin/main
    워크트리 대조로 원인 확정 · `backlog.py jit build`로 재생성 · 대책 태스크 `HARN-179`는 이미 등재돼 있다) ·
-   `harness-test-live-ledger-write` **9회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
+   `harness-test-live-ledger-write` **10회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
    `scripts/harness/backlog.py`에 대한 가짜 `policy_warn` 3줄을 씀 — 커밋본 앞부분 바이트 동일·추가분 전부 가짜임을
-   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 9회 재발했는데 아직 우선순위 3·EOS P2다).
-   *회차 표기 주의*: 마지막 건은 이 브랜치에서 기록할 때 7회차였다(이벤트 샤드의 `nth` 값). 같은 날 main에 같은
-   계열 사고가 2건 먼저 기록돼 들어와(`ed3d14da` · `78a8edff` — 둘 다 이 기록보다 이른 시각) 머지 후 대장 기준
-   9회차가 됐다. 병합 시 CLI와 같은 날짜 안정 정렬을 쓰고 같은 날짜는 기록 시각 순으로 두었다 — 대장은 회차를 저장하지 않고 읽을 때
-   계산하므로 대장 자체는 정정할 것이 없다. EOS-129 중복 사고는 #1356 쪽 1건으로 일원화했다(§5).
+   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 10회 재발했는데 아직 우선순위 3·EOS P2다).
+   *회차 표기 주의(스냅샷 — main `6c880b67` 병합 후 `backlog.py incident series` 실측)*: 두 검증 사고는 이 브랜치에서
+   기록할 때 각각 2회차·7회차였다(이벤트 샤드의 `nth` 값). 그런데 같은 날 다른 세션들이 **같은 두 계열을 계속 기록**해
+   세 번의 main 병합(`ed3d14da` · `78a8edff` · `6c880b67`)마다 앞에 끼어들었고, 지금 대장 기준 3회차·10회차다 —
+   즉 HARN-179·HARN-170의 결함을 오늘만 여러 세션이 겪고 있다. 병합 시 CLI와 같은 날짜 안정 정렬을 썼고 같은 날짜는
+   main 쪽 기록을 앞에 두었다. 대장은 회차를 저장하지 않고 읽을 때 계산하므로, 이 숫자는 머지 시점에 또 바뀔 수
+   있다. EOS-129 중복 사고는 #1356 쪽 1건으로 일원화했다(§5).
 4. **직전 배치 집행 확인** — 잔존 0/8.
 
 ### ① claim 대장 이상의 원인 — 12회차가 "보고만" 한 건

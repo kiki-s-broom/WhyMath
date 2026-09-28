@@ -58,6 +58,34 @@ WAIT_LABEL: dict[str, str] = {
     "done_elsewhere": "미머지 완료(다른 브랜치)",
 }
 
+# 게이트 대기 분류 → 카드 라벨 (HARN-184). 종전에는 막는 게이트의 상태와 무관하게 전부
+# "사람 게이트 대기"였다 — 입력 작업이 남은 게이트도, 판정 기록이 빠진 게이트도 사람 차례로
+# 읽혔다. 분류는 store.gate_wait_kind 한 곳이고 보드는 이름만 붙인다.
+GATE_WAIT_LABEL: dict[str, str] = {
+    store.GATE_WAITS_PERSON: "사람 게이트 대기",
+    store.GATE_WAITS_VERDICT: "게이트 판정 결과 미기록",
+    store.GATE_WAITS_INPUTS: "게이트 선행 작업 대기",
+}
+
+
+def gate_wait_label(backlog: Backlog, gate_ids: list[str]) -> str:
+    """카드를 막는 게이트들의 대기 라벨 — 사람 차례는 **모든** 게이트가 사람 차례일 때만.
+
+    우선순위 verdict > inputs > person: 여러 게이트가 막으면 사람 차례가 아닌 쪽을 먼저 말한다.
+    판정 결과 미기록이 가장 앞인 이유는 그것이 화면에서 가장 쉽게 사람 차례로 위장되기
+    때문이다(2026-09-25 사고). 상세(게이트 ID 전부)는 카드의 사유 상세에 그대로 남는다.
+    """
+    kinds = {
+        store.gate_wait_kind(backlog, backlog.gates[gid])
+        for gid in gate_ids
+        if gid in backlog.gates
+    }
+    for kind in (store.GATE_WAITS_VERDICT, store.GATE_WAITS_INPUTS, store.GATE_WAITS_PERSON):
+        if kind in kinds:
+            return GATE_WAIT_LABEL[kind]
+    return WAIT_LABEL["gates"]
+
+
 _NOTE_MAX = 220  # 카드에 싣는 사유 발췌 상한 (전문은 yaml에 있다)
 
 
@@ -136,6 +164,8 @@ def classify(backlog: Backlog, task: Task) -> tuple[str, str, str]:
     if exclusion is None:
         return "ready", "", ""
     label = WAIT_LABEL.get(exclusion.reason, exclusion.reason)
+    if exclusion.reason == "gates":
+        label = gate_wait_label(backlog, list(exclusion.detail))
     return "waiting", label, ", ".join(exclusion.detail)
 
 
@@ -238,6 +268,8 @@ def gate_detail(backlog: Backlog, gate: Gate, today: date) -> dict[str, object]:
     """게이트 1건의 카드 + 펼침 상세 — 화면에서 "무엇을 하면 풀리는가"까지 읽히게 한다."""
     days = report._days_pending(gate.requested, today)
     tasks, tracks = gate_dependents(backlog, gate.id)
+    # 무엇을 기다리나(HARN-184) — 미통과 게이트만(통과한 게이트는 빈 문자열)
+    wait_kind = store.gate_wait_kind(backlog, gate) or ""
     return {
         "id": gate.id,
         "title": gate.title,
@@ -255,6 +287,8 @@ def gate_detail(backlog: Backlog, gate: Gate, today: date) -> dict[str, object]:
         "evidence": gate.evidence or "",
         "notes": gate.notes,
         "blocks_now": gate.status == "pending",
+        "wait_kind": wait_kind,
+        "wait_label": GATE_WAIT_LABEL.get(wait_kind, ""),
         "dependent_tasks": tasks,
         "dependent_tracks": tracks,
     }
@@ -443,6 +477,8 @@ input[type=search]{min-width:240px;flex:1}
 .gate > summary:hover{background:var(--chip);border-radius:6px}
 .gate .g{font-size:10.8px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
 .gate .gt{margin-top:4px;font-size:12.5px;overflow-wrap:anywhere}
+.gate .wk{margin-left:8px;font-size:10.5px;color:var(--muted)}
+.gate .wk.verdict{color:var(--block);font-weight:650}
 .gate .d{float:right;font-size:11.5px;color:var(--block);font-variant-numeric:tabular-nums}
 .gate .body{padding:2px 11px 11px;border-top:1px solid var(--line);margin-top:2px}
 .gate .body h4{margin:11px 0 5px;font-size:10.5px;color:var(--muted);text-transform:uppercase;
@@ -494,7 +530,7 @@ _CONTENT = """<div class="wrap">
 
   <div class="board" id="board"></div>
 
-  <div class="section" id="gates-title">사람 게이트 — 행동 대기</div>
+  <div class="section" id="gates-title">미통과 게이트</div>
   <div class="gates" id="gates"></div>
   <div id="gates-resolved"></div>
 
@@ -571,6 +607,7 @@ function head() {
 
 function gateBody(g) {
   const meta = [
+    g.wait_label ? `<span class="chip">${esc(g.wait_label)}</span>` : '',
     `<span class="chip">${esc(g.kind)}</span>`,
     `<span class="chip">담당 ${esc(g.assignee)}</span>`,
     g.requested ? `<span class="chip">요청 ${esc(g.requested)}</span>` : '',
@@ -621,8 +658,11 @@ function gateCard(g) {
   const badge = g.status === 'pending'
     ? (g.days != null ? `<span class="d">${g.days}일 경과</span>` : '')
     : `<span class="d" style="color:var(--done)">${esc(g.status)}</span>`;
+  // 무엇을 기다리나(HARN-184) — 펼치지 않아도 요약 줄에서 보인다. 판정 결과 미기록은 차단 색.
+  const wkCls = g.wait_kind === 'verdict' ? 'wk verdict' : 'wk';
+  const wk = g.wait_label ? `<span class="${wkCls}">${esc(g.wait_label)}</span>` : '';
   return `<details class="gate${cls}">
-    <summary><span class="g">${esc(g.id)}</span>${badge}
+    <summary><span class="g">${esc(g.id)}</span>${wk}${badge}
       <div class="gt">${esc(g.title)}</div></summary>
     ${gateBody(g)}
   </details>`;
@@ -632,7 +672,12 @@ function renderGates() {
   const pending = DATA.gates.filter(g => g.status === 'pending');
   const resolved = DATA.gates.filter(g => g.status !== 'pending');
   const overdue = pending.filter(g => g.overdue).length;
-  document.getElementById('gates-title').textContent = `사람 게이트 — 행동 대기 ${pending.length}건`
+  // 미통과 게이트 전부가 사람 차례는 아니다 — 입력 작업이 남았거나 판정 기록이 빠진 게이트를
+  // '행동 대기'에 섞으면 Kiki가 할 일이 부풀려 보인다(HARN-184 · 분류는 store.gate_wait_kind).
+  const byKind = k => pending.filter(g => g.wait_kind === k).length;
+  document.getElementById('gates-title').textContent = `미통과 게이트 ${pending.length}건 — `
+    + `사람 차례 ${byKind('person')} · 판정 결과 미기록 ${byKind('verdict')} · `
+    + `선행 작업 대기 ${byKind('inputs')}`
     + (overdue ? ` (리마인드 초과 ${overdue}건)` : '');
   document.getElementById('gates').innerHTML =
     pending.map(gateCard).join('') || '<div class="sub">대기 중인 게이트 없음</div>';
