@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-193-unmerged-gate-attach-claim-release-gap
+title: "게이트를 붙이고 claim을 푼 태스크가 main에서는 무주 todo로 보인다 — 미머지 브랜치에만 있는 requires_gates를 next·start가 못 봐 같은 태스크가 연쇄 착수된다(EOS-129 3세션)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-28 · 판정 기준 main `ed3d14da`): `EOS-129-irt-discrimination-calibration`이 하루에 세 세션에서 착수됐다. 앞의 두 세션은 같은 순서를 밟았다 — `start` → `gates add`(각자 다른 게이트) → `amend`(requires_gates 추가) → `unblock`(원격 claim 해제 `release_status: ok`). ⓐ `claude/magical-maxwell-hja5kh-eos129`: start 07:14:50Z · 게이트 `G-eos129-item-response-census` · unblock 08:43:03Z · PR #1346 ⓑ `claude/focused-ramanujan-2p5q8w`: start 11:25:20Z(ⓐ 해제 2시간 42분 뒤) · 게이트 `G-eos129-prod-response-distribution` · unblock 11:28:46Z · PR #1352 ⓒ `claude/gallant-euler-blngpj`: start 12:11:37Z(ⓑ 해제 43분 뒤) · in_progress. 세 시점 모두 origin/main의 EOS-129는 `status: todo` · `session: None` · `requires_gates: []`였다(근거: 각 브랜치의 `backlog/events/*.ndjson` 전이 이벤트).\n② 원인 축(실측): 태스크 착수 차단은 세 겹이다 — ⑴ 원격 claim(refs/claims) ⑵ 트렁크 사본의 requires_gates·depends_on(HARN-91이 origin/main을 fetch해 본다) ⑶ 미머지 done(HARN-11 `scan_remote_done`). 게이트를 붙인 뒤의 `unblock`은 ⑴을 즉시 걷는데, 그 자리를 대신할 ⑵는 브랜치에만 있어 PR이 머지되기 전까지 어느 세션에도 보이지 않는다. 즉 보호를 교대하는 순간에 공백이 생긴다. HARN-11이 \"미머지 done\"에서 막은 노출과 같은 형태인데 게이트 축에는 대칭 검사가 없다.\n③ 설계 판정: 후보를 비용과 함께 판정한다 — ⓐ 쓰기측: `unblock`(과 → todo 전이 전반)이 트렁크에 없는 게이트를 requires_gates로 가진 태스크의 원격 claim을 걷지 않고 게이트 대기 홀드로 바꾼다(차단 홀드 `kind: block`과 같은 방식 · HARN-134). 트렁크 사본에 그 게이트가 실린 뒤에는 누구나 홀드를 걷을 수 있다. ⓑ 읽기측: `next`·`start`가 원격 브랜치 사본에서 트렁크에 없는 requires_gates 추가를 찾아(`scan_remote_done`과 같은 스캔) 착수 후보에서 빼고 착수를 거부한다. ⓒ 둘 다. 판정 근거에는 refs/claims push가 CCR 프록시에서 상시 실패하던 이력(HARN-07)처럼 쓰기측이 무력한 환경을 반드시 넣는다 — 쓰기측만 두면 그 환경에서 같은 공백이 다시 열린다.\n④ 실패 주입 검증: 픽스처가 세 상태를 모두 밟는다 — 게이트가 트렁크에 있음(정상 차단) / 게이트가 원격 브랜치에만 있음(이번 사고) / 게이트 없음(착수 가능 대조군). 이번 사고 상태를 주입해 `start` 거부(또는 `next` 제외)가 실제로 나는지 RED/GREEN을 가르고, 대조군에서 착수가 막히지 않는지도 함께 확인한다(과잉 차단 방지). 뮤테이션은 매 회 앵커 1건·주입 실재·원복 바이트 동일을 단언한다.\n⑤ 표시 정직성: 원격 스캔 상태가 ok가 아니면(offline·shallow·error) \"미머지 게이트 없음\"이 아니라 판정 불가로 표시한다(HARN-11·HARN-182와 같은 규약).\n⑥ 범위 밖: 이미 벌어진 EOS-129 3중 착수의 정리(#1346·#1352 중 택일, `claude/gallant-euler-blngpj` 산출물 처리)는 Kiki 판단이며 이 태스크가 아니다. 사람 게이트의 중복 안내는 HARN-105가 소유한다."
+  - "[추가 실측 2026-09-28 13:30Z · 판정 기준 main `6c880b67`] ⓒ의 세 번째 세션(`claude/gallant-euler-blngpj`)이 EOS-129 ③(2PL 변별도 보정 배선)을 구현해 PR #1358로 열고 13:16:41Z에 `done` 처리했다. ⑤(착수 전 운영 DB 응답 분포 실측)는 PR #1352의 게이트 `G-eos129-prod-response-distribution`으로 넘겼는데, 그 게이트 역시 미머지 브랜치에만 있다 — 즉 미머지 게이트가 다른 미머지 PR의 근거로 인용됐다. 결과적으로 한 태스크에 PR 셋(#1346 측정 도구·게이트 · #1352 SQL 런북·게이트 · #1358 ③ 구현)이 열렸고, #1346과 #1358은 같은 `l2/item_calibration.py`를 서로 다르게 고쳐 병합 시 충돌한다. 피해 추정을 \"PR 1건 폐기 예정\"에서 \"경쟁 PR 3건 중 택일 · 서로 다른 게이트 2건 중 택일\"로 정정한다. 대책 판정(③)에는 이 형태 — 미머지 게이트를 다른 세션이 근거로 인용하는 경우 — 도 포함한다."
+  - "[추가 실측 2026-09-28 13:35Z · 판정 기준 main `6c880b67`] 같은 공백이 다른 태스크에서 지금 열려 있다 — `claude/focused-ramanujan-2p5q8w`가 `EOS-137-qa-per-item-verdict-adapter`에 대해 12:38Z에 같은 순서(`start` → `gates add G-eos137-first-eval` → `amend` requires_gates → `unblock` `release_status: ok`)를 밟았고, 작업은 PR #1352 브랜치에 있으나 main의 EOS-137은 `requires_gates: []` · 무주 todo라 `next` 1순위 후보로 노출되고 있다. 즉 이 공백은 한 세션의 실수가 아니라 게이트 부착 뒤 `unblock`이라는 **표준 작업 흐름 자체**가 만든다 — 하루에 세 세션이 두 태스크에서 같은 순서를 밟았다."
+  - "⑦ 흡수 기록(2026-09-28 · main `48138a88`) — 같은 결함을 따로 등재한 두 태스크가 이 태스크로 일원화됐다: `HARN-191-gate-attach-claim-release-hold`(main · #1365 · cancelled)와 `HARN-187-unmerged-partial-work-start-preflight`(#1361 · cancelled). 둘 다 개명 전 ID(`HARN-186-unmerged-gate-attach-claim-release-gap`)로 이 태스크를 가리킨다. HARN-191의 acceptance ②~④(게이트 대기 홀드 · trunk 착지 시 해제 · 착수 거부 안내)는 이 태스크 ②의 쓰기측 판정과 같은 축이므로 설계 시 대조한다. 사고 대장의 EOS-137 기록은 #1365가 먼저 main에 넣었으므로 이 PR은 싣지 않는다 — 그 줄의 fix_ref가 개명 전 ID라 JIT가 번호 `HARN-186`(다른 태스크)으로 푸는 오주입은 `HARN-195`가 소유한다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+  - scripts/harness/selector.py
+  - "tests/harness/test_*gate*claim*.py"
+session: null
+notes: "출처: 2026-09-28 /drive 3차 중 열린 PR 점검에서 PR #1352(EOS-129 ⑤)를 발견하고, 세 브랜치의 대장 이벤트로 전이 순서를 실측했다. 사고 대장 계열 `parallel-duplicate-implementation` 11회차. 축 구분 — HARN-91은 트렁크에 새로 실린 의존·게이트를, HARN-11은 미머지 done을, HARN-105는 사람 게이트의 중복 안내를 본다. 이 태스크는 미머지 브랜치의 게이트 부착과 claim 해제가 겹친 공백이다.\n\n[정정 2026-09-28] 추가 실측 — 세 번째 세션의 EOS-129 done(#1358)과 미머지 게이트 인용 형태 기록\n\n[정정 2026-09-28] 추가 실측 — EOS-137이 같은 공백으로 next 1순위 노출 중(표준 흐름이 만드는 공백)\n\n[개명 2026-09-28] HARN-186-unmerged-gate-attach-claim-release-gap → HARN-193-unmerged-gate-attach-claim-release-gap: 번호 충돌 정정 — main(#1349 CONST-02)이 HARN-186-job-log-truncation-warning-hook을 먼저 머지했다. 187~190(#1361)·191(#1353)·192(타 브랜치)는 미머지 브랜치가 쓰고 있어 원격 전 브랜치 기준 첫 빈 번호 193으로 옮긴다\n\n[정정 2026-09-28] 중복 등재 2건(HARN-191 main·HARN-187 #1361) 흡수 기록 + EOS-137 사고 기록은 #1365 줄로 일원화"
+updated: 2026-09-28

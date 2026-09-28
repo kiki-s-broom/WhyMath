@@ -2346,6 +2346,18 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "EOS-129 3세션 연쇄 착수 — 게이트 부착 뒤 unblock이 claim을 풀었는데 게이트는 미머지 브랜치에만 있었다",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     ".claude/hooks/job_log_truncation_guard.py",
     ".claude/settings.json",
     "tests/infra/test_job_log_truncation_guard.py"
@@ -3218,6 +3230,17 @@
     "tests/harness/test_incidents.py"
    ],
    "text": "병합 큐 MERGE_CONFLICT 이탈 — 사고 대장 끝 추가 충돌(EOS-25 PR #1363 · 재병합 직후 1회 더 재현)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "하루에 태스크 번호 충돌 2건 — 등재한 HARN-185·186을 다른 세션 미머지 PR이 먼저 머지해 개명(191·193)",
    "weight": 1
   },
   {
