@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-35-suneung-relational-reselection-rejudgment
+title: "수능 모드의 관계 재선택 보류(mode_withheld) 재판정 — 게이트가 학년·범위를 보고 구간 입력에 신뢰 하한이 선 뒤 켤지 정한다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-31-suneung-gate-grade-scope-blind
+  - EOS-33-mastery-band-relational-evidence-floor
+requires_gates: []
+acceptance:
+  - "① 무엇이 보류됐나(판정 기준 main 78a8edff · EOS-25 판정문 §3) — 수능 모드는 숙달 구간 규칙이 관계 행위(선수 복귀·전진)를 가리키고 목표 개념이 서도 **콘텐츠를 그 개념의 문항으로 다시 고르지 않는다.** 1차 선택 문항을 그대로 내보내고 설명을 앵커 개념 연습으로 정직하게 내린다(`intent_resolution=mode_withheld`). 보류 사유는 두 결함이다 — 수능 게이트가 학년·출제범위를 보지 않아 \"수능 모드 안에서 다시 고른다\"가 성립하지 않는다(EOS-31), 구간 입력에 신뢰 하한이 없어 응답 1~2개로 콘텐츠가 옮겨진다(EOS-33). 이 태스크는 **두 결함이 해소된 뒤** 재선택을 켤지 다시 판정한다(depends_on).\n\n② 재선택을 켠다면 지킬 요건 — EOS-25 독립 비판 처분표 승계: ⓐ 재선택 후보에 1차 선택과 **같은** 사전필터·L6 진실 게이트·페르소나를 건다(기본 CAT의 `load_target_candidate_rows`는 수능 게이트를 모른다 — 빌려 쓰지 않는다) ⓑ 재선택 SQL에는 검수 조건(approved)도 넣는다(미검수 킬러 문항이 개념별 상위 50 자리를 차지해 거짓 target_unavailable을 만드는 것을 막는다 · F8) ⓒ 선수 재선택은 학습 밴드로 고른다(교정 목적 — EOS-24 §5 선례 · F7) ⓓ 전진은 출제 범위 안의 후행으로 제한하거나 계속 보류한다(범위 밖 후행 누출 · F3) ⓔ 학습 상태 머신이 R5·R3를 결정한 회차에는 보류한다(EOS-34와 조율 · F5) ⓕ 조회 비용 — 전체 ORM 최대 1,000행(20개념×50)을 읽지 않게 열을 투영하거나 묶음 순서대로 찾으면 멈춘다(F9) ⓖ 관측 — 재선택 풀 크기·묶음별 가용 여부·강등 하위 사유를 처치 meta에 남긴다(F10).\n\n③ 출발점 — EOS-25 PR의 참고용 초안 커밋 `97b7f992`(안 A)에 수능 목표 후보 SQL(별칭 엔티티 · 개념별 윈도 상한)·실 PG 테스트·뮤테이션 27종이 있다. 그대로 되살리지 말고 ②를 반영해 고친다.\n\n④ 교수학 결과를 잰다(비판 놓친 것 8) — 구조 정렬만이 아니라 수능 페르소나 여정에서 선수·전진 발화율·학년 차·범위 위반율을 측정한다. 학교급을 넘는 선수 복귀는 설명 틀(L4 발화)이 필요한지도 함께 판정한다(놓친 것 6 — 정서 안전).\n\n⑤ 트리거 보조 — 수능 고유 콘텐츠(기출 유형·권위 가중·시그니처·킬러)가 승인되거나 학생 앱이 mode=suneung을 호출하기 시작하면 우선순위를 다시 본다(2026-09-28 현재 둘 다 0)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/_next_problem_policy.py
+session: null
+notes: "출처: EOS-25 판정 — 초안(안 A · 재선택 적용)이 pedagogy-designer 독립 비판에서 차단 2건(F1·F2)을 받아 안 B′(설명만 정렬 · 재선택 보류)로 전환했다. 보류는 만료 없는 유예가 되면 안 되므로(CLAUDE.md) 재판정 소유자를 여기에 둔다."
+updated: 2026-09-28

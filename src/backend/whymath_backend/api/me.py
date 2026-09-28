@@ -132,7 +132,7 @@ from whymath_backend.l2.irt import (
     ability_standard_error,
     estimate_ability,
 )
-from whymath_backend.l2.learner_state import LearnerState, get_state
+from whymath_backend.l2.learner_state import LearnerState, capture_state_basis, get_state
 from whymath_backend.l2.learner_state_store import provision_learner_state
 from whymath_backend.l2.learning_event_trace import (
     DEFAULT_TRACE_LIMIT,
@@ -148,9 +148,8 @@ from whymath_backend.l2.learning_session_writer import (
     close_idle_sessions_best_effort,
     record_learning_activity,
 )
-from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
 from whymath_backend.l2.learning_state_machine import (
-    advance_on_attempt,
+    advance_on_graded_attempt,
     get_current_state,
     list_transitions,
     record_transition,
@@ -1383,27 +1382,24 @@ async def submit_attempt(
     # 아무 학생의 상태도 움직이지 않는다 — 서빙 경로가 그것을 실제로 부르는 이 줄이 계약을
     # 집행으로 바꾼다.
     #
-    # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
+    # EOS-134: 증거 조립 + 전이는 채점 경로 **공용 진입점** 하나로 부른다 — 코치 완료
+    # (`api/coach._complete_problem`)도 같은 함수를 불러 같은 입력에 같은 전이가 난다.
+    # 여기서 하위 두 함수를 직접 부르면 두 경로가 다시 갈라진다(AST 가드가 막는다).
+    #
+    # 순서 주의: 증거 조립은 이번 attempt가 **이미 commit된 뒤**여야 한다
     # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
     #
     # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
     # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
     # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
-    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
-    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
-    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
-    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
-    policy_evidence = await build_attempt_evidence(
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 쓰고 있다. 상태 머신이
+    # 읽는 정책 입력(`AttemptEvidence`)은 공용 진입점 안에서 조립되어 이 함수에 이름이 없다.
+    transition = await advance_on_graded_attempt(
         session,
         user_id=user.user_id,
+        attempt_id=attempt.attempt_id,
         is_correct=body.is_correct,
         confidence=body.confidence_self_reported,
-    )
-    transition = await advance_on_attempt(
-        session,
-        user_id=user.user_id,
-        evidence=policy_evidence,
-        attempt_id=attempt.attempt_id,
     )
     decision = transition.decision
     learning_state_block = LearningStateBlock(
@@ -2647,12 +2643,11 @@ class NextProblemResponse(BaseModel):
     target_concept: uuid.UUID | None = Field(
         default=None,
         description=(
-            "EOS-19: 학생이 **다음에 다뤄야 할 개념**. EOS-124 이후 기본 CAT에서는 **추천 문항의 "
-            "대표 개념과 항상 같다** — 설명이 가리키는 개념과 받은 문항이 어긋나지 않는다. "
-            "action=practice_prerequisite면 막힌 선수개념(=문항의 개념), advance_next면 다음 "
-            "개념(=문항의 개념)이고, 그 외에는 reason.concept_id와 같다. 문항에 개념 매핑이 "
-            "없으면 null — 없는 근거를 지어내지 않는다. (수능 모드는 아직 이 정렬을 하지 않는다 "
-            "— intent_resolution이 null.)"
+            "EOS-19: 학생이 **다음에 다뤄야 할 개념**. EOS-124(기본 CAT)·EOS-25(수능 모드) 이후 "
+            "**추천 문항의 대표 개념과 항상 같다** — 설명이 가리키는 개념과 받은 문항이 어긋나지 "
+            "않는다. action=practice_prerequisite면 막힌 선수개념(=문항의 개념), advance_next면 "
+            "다음 개념(=문항의 개념)이고, 그 외에는 reason.concept_id와 같다. 문항에 개념 매핑이 "
+            "없으면 null — 없는 근거를 지어내지 않는다."
         ),
     )
     learning_state_directive: StateDirectiveOutcome | None = Field(
@@ -2685,7 +2680,8 @@ class NextProblemResponse(BaseModel):
             "전부 숙달 등)해 현재 개념 연습으로 강등 · unsupported=근거 없음(엣지 없음·선수 "
             "미측정)으로 강등 · graph_timeout=그래프 조회 예산 초과로 강등 · target_unavailable="
             "목표 개념에 출제 가능한 문항이 없어 강등 · no_candidate=추천 없음. null=이 정렬을 "
-            "아직 적용하지 않는 정책(수능 모드)."
+            "적용하지 않는 정책의 표기였다(EOS-25 이후 나오지 않는다) · mode_withheld=수능 모드가 "
+            "관계 행위의 콘텐츠 재선택을 보류해 현재 개념 연습으로 강등(EOS-25)."
         ),
     )
 
@@ -2719,7 +2715,8 @@ async def recommend_next_problem(
     전환 전 이 함수 안에 있던 것과 **같다** — 배치만 바뀌었고 추천 결과는 바뀌지 않는다
     (EOS-19 acceptance ④). **예외 — EOS-124**: 기본 CAT은 그 뒤 의도적으로 바뀌었다. 숙달 구간
     규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면 그 개념의 문항으로 다시 고른다
-    (설명과 콘텐츠 정렬 — 해소 결과는 `intent_resolution`이 응답·처치 기록 양쪽에 남긴다).
+    (설명과 콘텐츠 정렬 — 해소 결과는 `intent_resolution`이 응답·처치 기록 양쪽에 남긴다). 수능
+    모드는 설명만 전달 문항에 맞추고 콘텐츠 재선택은 보류한다(EOS-25 — `mode_withheld`).
 
     정책이 무엇을 하는지(θ 추정·후보 조회·약점/밴드/형제 가중·CAT 중단 규칙·수능 L6 게이팅)는
     각 정책 모듈의 docstring이 정본이다. 여기에 다시 적으면 알고리즘이 바뀔 때 두 설명이
@@ -2729,7 +2726,7 @@ async def recommend_next_problem(
     `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. EOS-19 신규 2필드는
     `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
     EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
-    기본 CAT에서 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
+    두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
 
@@ -2762,6 +2759,11 @@ async def recommend_next_problem(
 
     # ④ 처치 기록 — 학생에게 실제로 반환되는 추천만 기록한다(가짜 처치 금지).
     if outcome.problem_id is not None:
+        # EOS-132 — 이 추천이 본 LearnerState의 근거 식별자(KPI ⑤ LearnerState 홉). 기록할 추천이
+        # 있을 때만 한 문장을 더 쓴다(추천이 비면 되짚을 대상도 없다). 조립 시각은 ①의 것이다.
+        state_basis = await capture_state_basis(
+            session, user.user_id, assembled_at=learner_state.timestamp
+        )
         await record_recommendation_treatment(
             session,
             problem_id=outcome.problem_id,
@@ -2772,15 +2774,14 @@ async def recommend_next_problem(
             candidates=outcome.candidate_scores,
             policy_version=outcome.policy_version,
             reason=outcome.reason,
-            intent_resolution=(
-                outcome.intent_resolution.value if outcome.intent_resolution is not None else None
-            ),
+            intent_resolution=outcome.intent_resolution.value,
             learning_session_id=learning_session_id,
             learning_state_directive=(
                 outcome.learning_state_directive.value
                 if outcome.learning_state_directive is not None
                 else None
             ),
+            learner_state_basis=state_basis,
         )
         await session.commit()
     elif learning_session_id is not None:
