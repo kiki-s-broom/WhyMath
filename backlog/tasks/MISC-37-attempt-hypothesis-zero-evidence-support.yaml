@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-37-attempt-hypothesis-zero-evidence-support
+title: "채점 경로로 세운 오개념 가설은 증거 그래프 지지가 0 — 코치 clean 검증 1턴(−0.5)에 REFUTED (두 원장 분리의 시스템 수준 비대칭)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실 고정 — `apply_candidates`는 `log_evidence`를 부르지 않아(EOS-104 ④) 채점 경로 가설의 `net_support`는 0이다. 코치 경로 가설은 매치 때 `+match.confidence`(구조 정합 0.9 등)가 쌓인다(`api/coach.py` 매치 지지 적재). 그래서 같은 오개념이라도 채점 경로 출신은 코치 clean 검증 1턴(`_REFUTE_WEIGHT`=0.5)만으로 다음 턴 `curate_hypothesis`에서 REFUTED가 되고, 코치 경로 출신은 그렇지 않다. 이 차이를 테스트로 재현한다."
+  - "② 판정 — 채점 경로 관측을 증거 그래프에 어떤 형태로 반영할지(지지 증거 적재 · 출처 표식 · 가중), 또는 코치 경로 반박이 증거 기록 없는 가설을 다르게 다룰지를 정한다. 제약: 반박·확정 권한은 코치 경로(EOS-104 ④) · RESOLVED는 출처 표식만 본다(MISC-20 ⑨) · 검증 없는 신호로 보관 판정을 움직이지 않는다(EOS-123 판정문 §3-1)."
+  - "③ 반박된 가설의 부활 순서 — `curate_hypothesis`는 net_support가 양으로 돌아서기 전엔 새 매치로 부활시키지 않지만, 채점 경로 `apply_candidates`는 net_support를 보지 않고 재활성화한다. 두 경로가 같은 가설의 활성 여부를 서로 다르게 판정하는 순서를 실측하고 처분한다."
+  - "④ 우선순위 근거 명시 — 실제 학생 트래픽은 코치 경로에만 있다(학생 앱이 POST /v1/me/attempts를 부르지 않는다 · completion_signal.dart). 채점 경로 가설이 운영 DB에 실재하는지 먼저 세고, 0건이면 그 사실을 판정문에 적는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - src/backend/whymath_backend/l4/misconception/evidence_store.py
+  - src/backend/whymath_backend/api/coach.py
+session: null
+notes: "출처: EOS-123 판정문 §7-1 ② · 독립 비판 '놓친 것 3'(코드 확인: hypothesis_store.curate_hypothesis · evidence_store.net_support · api/coach.py 매치 지지 +match.confidence). EOS-123 이전부터 있던 성질이라 그 태스크와 무관하게 착수 가능. 분류 LOOP."
+updated: 2026-09-28
