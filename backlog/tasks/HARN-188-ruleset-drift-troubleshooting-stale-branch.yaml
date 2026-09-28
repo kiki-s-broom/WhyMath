@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-188-ruleset-drift-troubleshooting-stale-branch
+title: "branch-protection-setup.md 「판정기 파일이 없다」 절의 전제 소멸 — 삭제 배치된 브랜치를 체크아웃하라고 안내한다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 전제 소멸 실측 고정 — 판정기 `scripts/harness/ruleset_drift.py`는 HARN-63(PR #981 · 2026-09-05)으로 main에 병합됐다. 그런데 `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」는 여전히 \"아직 main에 병합되지 않은 상태\"라고 적고, 그 PR 브랜치 `claude/test-driven-development-03elxp`를 fetch + checkout -B 하라고 안내한다. 그 브랜치는 main의 조상(내용 0 · head `49d9d76a` · 2026-09-07)이 됐고 2026-09-28 stray-code 13회차가 12차 삭제 배치에 올렸다. 재현: `git show origin/main:.github/branch-protection-setup.md | grep -n test-driven-development-03elxp` (651~667행 절) · `git cat-file -e origin/main:scripts/harness/ruleset_drift.py`(실재). 지금 이 안내를 따르면 삭제 전에는 3주 묵은 트리(옛 판정기 — bypass_actors·merge queue 축 이전)로 판정하게 되고, 삭제 후에는 fetch가 실패한다.\n② 문서 정정 — 절의 전제를 \"판정기는 main에 있다 → 이 오류는 지금 체크아웃이 main보다 낡았다는 뜻(공유 작업 사본을 다른 세션 런북이 옮겨 뒀을 수 있다)\"으로 고치고, 복구 블록을 main 복귀로 바꾼다. 방식은 fetch + checkout -B origin/main 과 CLAUDE.md 2026-09-15 「공유 작업 사본 우회」(worktree add --detach) 중 택일하되 **택일 근거를 적는다**(판정기 `--record`가 저장소 파일 `.github/ruleset-check-state.json`을 쓰므로 worktree에서 돌리면 기록이 어디에 남는지가 쟁점이다). Kiki 머신 안내 규칙(진입 경로·자리표시자 0·`git log -1 --oneline` 자가검증·실행용/증거 블록 분리)을 지킨다. 옛 안내는 지우지 말고 \"왜 바뀌었나\" 1줄로 강등한다.\n③ 가드 갱신 — `tests/infra/test_ruleset_drift.py::test_doc_documents_recovery_for_missing_detector`의 `\"git checkout -B claude/\" in text` 단언은 **특정 브랜치 접두**를 요구하므로 main 복귀형 복구를 받아들이지 못한다(지금 이 단언을 만족시키는 유일한 줄이 삭제 대상 브랜치 체크아웃이다). 단언을 \"fetch + checkout -B … origin/…\" 형태(pull 금지 — 원래 취지) 검사로 바꾸고 제목 존재 검사는 유지한다. 뮤테이션 ⓐ절 제목 삭제 ⓑcheckout -B를 pull로 교체 ⓒ복구 블록 통째 삭제 각각 RED, 주입 실재(mutated != original)·원복 바이트 동일을 단언한다.\n④ 집행 지점(정본화와 별항) — 정정된 블록이 `test_doc_runbook_block_runs_on_windows_powershell`·`scripts/harness/check_runbook_blocks.py`의 스캔 대상에 실제로 들어가는지(스캔 0건이 아닌지) 확인한다. infra-contracts 잡 스텝을 CI 명령 그대로 재현해 exit code로 판정한다."
+artifacts: []
+paths:
+  - ".github/branch-protection-setup.md"
+  - tests/infra/test_ruleset_drift.py
+session: null
+notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): claim 해제로 감사 대상에 새로 편입된 `claude/test-driven-development-03elxp`는 main의 조상(고유 커밋 0 · diff 0파일)이라 삭제 후보다. 스킬 §3의 main 언급 grep 범위(backlog/tasks·docs)를 `.github`까지 넓혀 돌리자, 이 브랜치를 **체크아웃 대상으로 지명하는 실행 안내**가 `.github/branch-protection-setup.md`에 남아 있음이 드러났다(스킬 원래 범위로는 보이지 않는 위치).\n\n왜 브랜치를 남겨 두지 않고 삭제 배치에 올렸나: 이 안내는 삭제 여부와 무관하게 이미 틀렸다. 브랜치를 남기면 안내가 조용히 3주 묵은 트리로 데려가고(옛 판정기로 판정), 지우면 fetch 단계에서 실패가 보인다 — 삭제가 위험을 늘리지 않는다. 다만 Kiki 클론에 옛 원격 추적 ref가 남아 있으면 checkout -B 줄은 여전히 성공할 수 있으므로(각 줄이 독립 실행되는 붙여넣기 특성) 문서 정정이 근본 대책이다.\n\n왜 감사 PR에서 바로 고치지 않았나: 정정에는 가드 테스트 단언 변경이 따르고(③), Kiki 머신 런북은 CLAUDE.md 사고 유래 규칙이 가장 촘촘한 표면이라 택일 판단(②)에 별도 검증이 필요하다. 감사 세션의 범위(판정·등재)를 넓히지 않는다.\n\n인접: HARN-101(같은 문서의 「대신 하는 것」 절 — 별개 절) · HARN-63(done — 이 절을 만든 태스크).\n\n[개명 2026-09-28] HARN-185-ruleset-drift-troubleshooting-stale-branch → HARN-188-ruleset-drift-troubleshooting-stale-branch: 번호 충돌 해소 — push 전 사이 다른 세션 2곳(claude/magical-maxwell-hja5kh-eos134 · claude/vibrant-rubin-tp7jfw)이 HARN-185를 각자 등재했다(HARN-111 경합). 원격 전 브랜치·claim 대장 실측으로 188 비어 있음 확인"
+updated: 2026-09-28

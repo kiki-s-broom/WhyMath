@@ -5,12 +5,13 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: docs
-status: blocked
+status: todo
 priority: 1
 eos_priority: P1
 owner: kiki
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-external-counsel-restart-after-internal-completion
 acceptance:
   - "이용약관·개인정보처리방침 문안 확정 — 법률 판단이라 기계 대체 불가(CLAUDE.md '법령 유래 절차의 기계 대체 금지')"
   - "동의 scope 범위 확정(학습데이터 활용·마케팅·AI 활용을 별도 동의로 받을지·문구) — enums.py:1122-1126의 '변호사 자문으로 범위·문구가 확정된 뒤 추가' 이행"
@@ -19,5 +20,5 @@ artifacts: []
 paths:
   - "docs/legal/**"
 session: null
-notes: "공개 β 준비 착수 전까지 보류 — 변호사 회신 등 외부 작업이 미완성 제품의 병목이 되지 않게(2026-07-27 Kiki 지시·MGMT-01 동형). unblock 트리거 = 공개 β 준비 착수. 사실관계 교차기록(MOB-08·2026-08-03): firebase_messaging·firebase_core(푸시) 제거로 현재 모바일 앱에는 네트워크·데이터수집 표면을 가진 제3자 SDK가 남아 있지 않다 — 앱이 통신하는 대상은 자체 백엔드와 이미 별도로 고지된 OAuth 로그인 제공자뿐이다.\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 약관·처리방침 문안은 동의 버전 원장이 요구하는 항목 — 등급은 중요도이지 착수 가능성이 아니며 변호사 검토 대기 상태다. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "공개 β 준비 착수 전까지 보류 — 변호사 회신 등 외부 작업이 미완성 제품의 병목이 되지 않게(2026-07-27 Kiki 지시·MGMT-01 동형). unblock 트리거 = 공개 β 준비 착수. 사실관계 교차기록(MOB-08·2026-08-03): firebase_messaging·firebase_core(푸시) 제거로 현재 모바일 앱에는 네트워크·데이터수집 표면을 가진 제3자 SDK가 남아 있지 않다 — 앱이 통신하는 대상은 자체 백엔드와 이미 별도로 고지된 OAuth 로그인 제공자뿐이다.\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 약관·처리방침 문안은 동의 버전 원장이 요구하는 항목 — 등급은 중요도이지 착수 가능성이 아니며 변호사 검토 대기 상태다. EOS-80 일괄 백필\n\n[정정 2026-09-28] 2026-09-28 정리 — 2026-07-27 '외부 작업 출시 전 일괄' 결정의 만료 지점을 게이트로 집행(종전: 게이트 없는 blocked 파킹)"
+updated: 2026-09-28

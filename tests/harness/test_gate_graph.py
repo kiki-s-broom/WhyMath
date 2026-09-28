@@ -49,7 +49,9 @@ def _add(task_id: str, *extra: str, track: str = "math-completion", stage: str =
         [
             "add",
             "--eos-priority",
-            "P2",
+            # P1 — 이월 등급(P2·P3)은 `next` 후보에서 기본 숨김(HARN-77). 이 스위트는 그래프·
+            # 해금 수·대기 경로가 피검체라 후보에 보이는 등급으로 등재한다.
+            "P1",
             "--id",
             task_id,
             "--title",

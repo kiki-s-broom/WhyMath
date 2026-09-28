@@ -2171,6 +2171,16 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_remote_claims.py"
+   ],
+   "text": "개명(OPS-73→OPS-76)으로 남은 고아 claim이 16일째 자동 청소를 빠져나감 — task_missing이 branch_gone을 가림",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     ".claude/commands/drive.md",
     "docs/standards/build_harness.md",
     "scripts/harness/board.py",
@@ -3962,6 +3972,16 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 2건 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 7건 미실행(푸시 전 발견)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — CI 미러 중 · 커밋 전 복원",
@@ -3973,7 +3993,26 @@
    "paths": [
     "tests/harness/**"
    ],
+   "text": "tests/harness(CI 미러) 실행이 세션 샤드에 가짜 policy_warn 3줄(scripts/harness/backlog.py) 기록 — 커밋 전 제거",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
    "text": "tests/harness가 claim 세션 샤드에 가짜 policy_warn 7줄을 씀 — ARCH-68 CI 재현 중",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_remote_claims.py"
+   ],
+   "text": "브리핑이 vafylb를 '이미 포팅됨·결정 불요'로 표시 — 근거 커밋이 브랜치 자신의 앞선 머지분이고 그 뒤 cp949 수정은 main에 없음",
    "weight": 0
   },
   {

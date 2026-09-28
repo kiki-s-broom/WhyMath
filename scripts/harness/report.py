@@ -301,10 +301,12 @@ def render_status(backlog: Backlog, errors: list[str], today: date) -> str:
     lines.append("── 다음 착수 후보 (next) ──")
     if ready:
         for i, task in enumerate(ready[:3], start=1):
-            lines.append(f"  {i}. {task.id} ({task.layer}) {task.title}")
+            grade = task.eos_priority or "미지정"
+            lines.append(f"  {i}. {task.id} [EOS {grade}] ({task.layer}) {task.title}")
     else:
         code, detail = selector.stall_reason(backlog, excluded)
         lines.append(f"(후보 없음 — 사유: {code} {detail})")
+    lines.append(f"  {selector.eos_hidden_notice(excluded)}")
 
     if errors:
         lines.append("")
@@ -589,9 +591,13 @@ def render_brief(
             "gate_verdict": "게이트 판정 결과 미기록 — 입력은 끝났는데 판정이 게이트에 없다"
             "(판정문이 있으면 gates amend --verdict 로 기록부터)",
             "in_progress": "다른 세션 진행 중",
+            # HARN-77 — 남은 착수 가능분이 전부 12월 검증 이월 등급이다. 차단이 아니다.
+            "eos_deferred": "12월 검증 관여(P0·P1) 후보 없음 — 이월분은 next --all-eos 로 조회",
             "blocked": "차단 상태 — /status 로 원인 확인",
         }.get(code, code)
         lines.append(f"착수 가능 태스크 없음: {label} {detail}")
+    # 이월 등급 숨김 고지(HARN-77) — 후보 유무와 무관하게 항상 한 줄(0건 포함).
+    lines.append(selector.eos_hidden_notice(excluded))
 
     # 취소된 선행에 차단된 todo (HARN-67 ②) — 훅은 stderr를 버리므로(`2>/dev/null`) 이 줄이
     # stdout(반환 문자열)에 있어야 세션이 실제로 본다. 0건이면 아무것도 내지 않는다.

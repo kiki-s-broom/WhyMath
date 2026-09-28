@@ -9,7 +9,19 @@
     ∧ session == null          (다른 세션이 claim하지 않음)
 
 정렬 (결정적 — 같은 입력이면 항상 같은 순서):
-    (stage_order 인덱스, priority, -해금 후속 수, id)
+    (EOS 등급 순위, stage_order 인덱스, priority, -해금 후속 수, id)
+
+EOS 등급(`eos_priority`)이 **첫 키**다 (HARN-77). 등급은 "12월 검증(G0~G5)에 필요한가"를
+Kiki가 판정한 값이고(2026-09-01 트리아지 · `G-eos-verification-relevance-triage`), 계획이
+12/31 내부 완성으로 바뀐 뒤에는 그것이 착수 순서의 1차 기준이다. stage(S0~S5 수학 완성
+단계)는 그 안에서의 순서다 — 종전 1차 키였던 stage를 앞에 두면 S3의 P2(2027 이월)가 S4의
+P0(12월 검증 필수)보다 앞에 선다(착지 전 실측: 후보 195건 중 상위 10건에 P2 7건 · 첫 P0가
+40위). 등급 미지정(null)은 맨 뒤다 — 모른다 ≠ 필수.
+
+이월 등급(P2·P3 = 판정 이후 2027 Q1~Q2 · 장기)은 `next`/`status`/`brief` 후보에서 **기본
+숨김**이다(`EOS_DEFERRED`). 순서만 바꾸면 이월분은 여전히 후보로 보이고, 실제로 그것이
+`blocked`를 파킹 수단으로 쓰는 우회를 낳았다(CUR-17·CUR-18 · HARN-77 ④). 숨김은 착수 금지가
+아니다 — `start`는 그대로 허용하고 경고만 낸다(등급 재판정은 `amend --eos-priority`).
 """
 
 from __future__ import annotations
@@ -27,8 +39,37 @@ class Exclusion:
     """todo 태스크가 후보에서 제외된 사유 (정지 사유 판별·설명에 사용)."""
 
     task_id: str
-    reason: str  # deps|deps_cancelled|gates|owner|track_gate|claimed|claimed_remote|path_overlap
+    # deps|deps_cancelled|gates|owner|track_gate|claimed|claimed_remote|path_overlap|eos_deferred
+    reason: str
     detail: list[str] = field(default_factory=list)
+
+
+# EOS 등급 → 정렬 순위 (HARN-77). 미지정(null)은 등록 등급 수(=4)로 맨 뒤.
+_EOS_RANK: dict[str, int] = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+# 12월 검증 이월 등급 — 후보 화면(next·status·brief)에서 기본 숨김. P2 = 판정 이후(2027
+# Q1~Q2) · P3 = 장기 연구·플랫폼(`backlog.py add --eos-priority` 도움말이 정본).
+EOS_DEFERRED: frozenset[str] = frozenset({"P2", "P3"})
+
+
+def eos_rank(task: Task) -> int:
+    """정렬용 EOS 등급 순위 — P0(0) < P1 < P2 < P3 < 미지정(4)."""
+    return _EOS_RANK.get(task.eos_priority or "", len(_EOS_RANK))
+
+
+def eos_hidden(excluded: list[Exclusion]) -> list[Exclusion]:
+    """`candidates`가 이월 등급 때문에 숨긴 제외 항목만 (id 정렬)."""
+    return sorted((e for e in excluded if e.reason == "eos_deferred"), key=lambda e: e.task_id)
+
+
+def eos_hidden_notice(excluded: list[Exclusion]) -> str:
+    """후보 화면에 붙이는 숨김 고지 한 줄 — 0건이어도 낸다(안 센 것과 구분)."""
+    hidden = eos_hidden(excluded)
+    if not hidden:
+        return "※ 12월 검증 이월 등급(P2·P3) 숨김 0건"
+    return (
+        f"※ 12월 검증 이월 등급(P2·P3) {len(hidden)}건은 기본 숨김 — 포함하려면"
+        " backlog.py next --all-eos · 등급 재판정은 amend --eos-priority"
+    )
 
 
 def track_gate_passed(backlog: Backlog, task: Task) -> bool:
@@ -237,11 +278,15 @@ def unblock_counts(backlog: Backlog) -> dict[str, int]:
 
 def sort_key(
     backlog: Backlog, task: Task, counts: dict[str, int] | None = None
-) -> tuple[int, int, int, str]:
-    """정렬 키 (stage → priority → -해금 수 → id). 키 **순서**는 HARN-174 이후에도 불변이다 —
-    바뀐 것은 해금 수의 정의(직접 → 전이)뿐이라 영향은 같은 stage·priority 안의 순서다."""
+) -> tuple[int, int, int, int, str]:
+    """정렬 키 (EOS 등급 → stage → priority → -해금 수 → id).
+
+    EOS 등급이 첫 키인 이유는 모듈 docstring에 있다(HARN-77). 등급 안에서는 종전 순서
+    (stage → priority → 해금 수)가 그대로다 — HARN-174가 바꾼 해금 수의 정의(직접 → 전이)도
+    그대로이며, 영향은 같은 등급·stage·priority 안의 순서다."""
     unlocks = counts[task.id] if counts is not None else unblock_count(backlog, task)
     return (
+        eos_rank(task),
         backlog.stage_index(task.stage),
         task.priority,
         -unlocks,
@@ -366,8 +411,15 @@ def candidates(
     *,
     remote_claimed: dict[str, str] | None = None,
     overlap_block: dict[str, list[str]] | None = None,
+    eos_hide: frozenset[str] = EOS_DEFERRED,
 ) -> tuple[list[Task], list[Exclusion]]:
-    """(정렬된 착수 가능 후보, 제외 사유 목록) 반환."""
+    """(정렬된 착수 가능 후보, 제외 사유 목록) 반환.
+
+    eos_hide: 이 EOS 등급의 태스크는 착수 가능이어도 후보에서 빼고 `eos_deferred`로 제외
+        목록에 둔다(HARN-77). 기본 = `EOS_DEFERRED`(P2·P3). 전부 보려면 `frozenset()`
+        (`next --all-eos`). 게이트·선행 등 다른 제외 사유가 먼저다 — 이월 등급이면서 게이트
+        대기인 태스크는 종전대로 `gates`로 센다(게이트 대기 경로 화면이 그대로 보게).
+    """
     ready: list[Task] = []
     excluded: list[Exclusion] = []
     for task in backlog.tasks.values():
@@ -382,6 +434,8 @@ def candidates(
         exclusion = classify_todo(
             backlog, task, remote_claimed=remote_claimed, overlap_block=overlap_block
         )
+        if exclusion is None and task.eos_priority in eos_hide:
+            exclusion = Exclusion(task.id, "eos_deferred", [task.eos_priority or ""])
         if exclusion is None:
             ready.append(task)
         else:
@@ -393,8 +447,13 @@ def candidates(
 
 
 def selection_rationale(backlog: Backlog, task: Task, graph: DependencyGraph | None = None) -> str:
-    """왜 이 태스크가 지금 최우선인지 한 줄 설명."""
-    parts = [f"stage={task.stage}", f"priority={task.priority}"]
+    """왜 이 태스크가 지금 최우선인지 한 줄 설명 — 등급이 첫 자리다(HARN-77 ⑤: 순서만
+    바뀌고 근거가 안 보이면 사람은 여전히 옛 기준으로 읽는다)."""
+    parts = [
+        f"eos={task.eos_priority or '미지정'}",
+        f"stage={task.stage}",
+        f"priority={task.priority}",
+    ]
     unlocks = unblock_count(backlog, task, graph)
     if unlocks:
         # "해금"은 HARN-174 이후 게이트를 지나 끝까지 센 미종결 후속 수다(직접 후속이 아니다).
@@ -436,6 +495,9 @@ def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list
                       없다)이 있다 → 사람 게이트 대기로 부르지 않고 그 게이트 목록을 낸다
                       (HARN-184 · `_gate_stall`)
         in_progress : 다른 세션이 진행 중 → 대기 또는 다른 layer 선택
+        eos_deferred: 착수 가능한 것은 12월 검증 이월 등급(P2·P3)뿐 → 기본 숨김이다
+                      (HARN-77). 이월분을 열려면 `next --all-eos`, 등급이 틀렸으면
+                      `amend --eos-priority`
         blocked     : 나머지 (blocked 태스크·미해소 의존성 연쇄)
     """
     active = [t for t in backlog.tasks.values() if t.status in ("in_progress", "review")]
@@ -454,6 +516,8 @@ def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list
     # 게이트 정보가 사라지지 않게 태스크별로 따로 둔다(PR #1025 Codex P2-1).
     gate_detail: dict[str, list[str]] = {}
     other_reasons = False
+    # 이월 등급 숨김(HARN-77) — 차단이 아니다. 다른 사유가 하나도 없을 때만 정지 사유가 된다.
+    deferred: list[str] = []
     for exc in excluded:
         if exc.reason in ("gates", "track_gate"):
             gate_ids.extend(exc.detail)
@@ -466,11 +530,15 @@ def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list
         elif exc.reason == "deps_cancelled":
             cancelled_detail[exc.task_id] = list(exc.detail)
             other_reasons = True
+        elif exc.reason == "eos_deferred":
+            deferred.append(f"{exc.task_id} ({exc.detail[0] if exc.detail else '?'})")
         else:
             other_reasons = True
     pending_gates = sorted(
         {g for g in gate_ids if g in backlog.gates and not backlog.gates[g].passed}
     )
+    if deferred and not pending_gates and not other_reasons and not active and not remote_held:
+        return "eos_deferred", sorted(deferred)
     if pending_gates and not other_reasons:
         return _gate_stall(backlog, pending_gates)
 
