@@ -1546,6 +1546,27 @@ jobs:
       - name: 적시 주입 인덱스 대조 (HARN-121 ③)
         run: python3 scripts/harness/backlog.py jit check
 
+      # CONST-02 — 코딩 헌법(constitution/) 위헌 심사 래칫. 왜 이 잡인가: 상시 실행(needs:
+      # changes 게이팅 없음)·pyyaml 설치·fetch-depth 0 — 헌법 파일만 바뀌는 PR에서도 돈다.
+      # 왜 "차단 0"이 아니라 래칫인가: 설치 첫날 원본 등록부 제안 경로가 이 저장소와 달라
+      # 차단 7건이 나온다(정정은 Kiki 게이트 G-const-sources-registry-adopt의 몫 — AI는
+      # constitution/ 을 고칠 수 없다). 차단 0을 요구하면 상시 red라 사람이 끄고, 요구하지
+      # 않으면 헌법이 산문이 된다. 그래서 기준선(metrics/coding_constitution_audit_baseline.json)
+      # 에 없는 차단 사유가 **새로** 생기면 red다(항목 집합 비교 — 바꿔치기도 잡는다).
+      # 판정은 exit code: 0 통과 · 1 새 위반 · 2 측정 실패(심사 불가를 통과로 위장하지 않는다).
+      - name: 코딩 헌법 위헌 심사 래칫 (CONST-02 — 차단 사유 증가 금지)
+        run: python3 scripts/constitution/audit_ratchet.py
+
+      # CONST-02 — 헌법 제4조·R1-01/R1-03: 콘텐츠 파이프라인 그래프(pipeline.yaml)에 누락 참조·
+      # 순환·섬 노드가 없고, 저작권 게이트가 게시의 직접 선행인지 본다. --upstream-of 는
+      # 추이적이라 우회 간선을 못 잡으므로 --direct-upstream-of 를 함께 건다.
+      - name: 콘텐츠 파이프라인 그래프 검사 (CONST-02 — 헌법 제4조·R1-01/R1-03)
+        run: >-
+          python3 scripts/constitution/pipeline_check.py
+          --require copyright,backup,curriculum_review
+          --upstream-of publish:copyright
+          --direct-upstream-of publish:copyright
+
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
       # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날
