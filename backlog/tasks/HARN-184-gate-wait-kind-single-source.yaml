@@ -1,0 +1,36 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-184-gate-wait-kind-single-source
+title: "게이트 대기 분류가 화면마다 제각각이다 — 작업 흐름 그래프(HARN-182)가 판정 결과 미기록 decision 게이트를 '사람 차례'로 분류한다 (HARN-177 ② 표시 정직성이 착지 후 새 화면에서 재발)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 단일 판정 — store.gate_wait_kind(backlog, gate) 가 미통과 게이트가 지금 무엇을 기다리는지를 셋 중 하나로 낸다: inputs(미종결 입력 태스크가 남았다) · verdict(입력은 끝났는데 그 상태의 판정 기록이 없거나 FAIL 기록이 끊겼다 — gate_judgment_state 가 unrecorded 또는 judged:FAIL) · person(담당자 차례 — 판정 개념이 없는 게이트 또는 PASS 기록). 판정 기록 상태는 gate_judgment_state 를 그대로 쓰고 새로 판정하지 않는다."
+  - "② 작업 흐름 그래프 — 게이트 창의 상태를 ①에서 받는다(그래프 자체 판정 금지 · HARN-182 acceptance ②를 게이트 창까지 적용). verdict 게이트는 '사람 차례'(gate_turn)가 아니라 별도 상태 '판정 결과 미기록'으로 그리고, 사이드 패널 '사람 차례' 목록과 --text 요약의 '사람 차례 N' 집계에서 뺀다. inputs 는 종전 gate_wait, person 은 종전 gate_turn 그대로다."
+  - "③ 보드·정지 사유 — 보드 카드의 게이트 대기 라벨(종전: 게이트 상태와 무관하게 '사람 게이트 대기')과 next·SessionStart 브리핑의 정지 사유(human_gate '사람 게이트 대기 중')도 ①을 거친다. 막는 게이트가 verdict 면 '사람 게이트'로 부르지 않는다. 보드는 inputs 게이트를 선행 작업 대기로 부른다. /drive 정지 규약(.claude/commands/drive.md)에 새 정지 사유를 적는다."
+  - "④ 전 화면 대조 픽스처 — HARN-177 ③의 사고 대장 상태(판정 태스크가 인계 없이 done · 판정 기록 없음) 하나로 next·status(텍스트·JSON)·gates list/show·작업 흐름 그래프(JSON·텍스트)·보드·정지 사유가 전부 '사람 차례/사람 판정 대기'로 부르지 않음을 확인하고, PASS 기록 대조군은 전부 사람 차례로 부른다. 새 화면이 그 목록에서 빠지지 않게, 하네스 모듈 중 사람 차례 문구를 내는 모듈이 목록에 모두 등재됐는지 검사한다(빠지면 RED — 문구 스캔이라 다른 낱말로 사람 차례를 말하는 화면은 못 잡는다는 한계를 테스트에 적는다)."
+  - "⑤ 변별력 — 절마다(① 세 갈래 · ② 그래프 상태·집계 · ③ 보드 라벨·정지 사유 · ④ 전수 등재) 그 절을 끊는 뮤테이션을 두고 전건 RED를 확인한다. 주입 적용 단언(mutated != original)과 원복 바이트 동일 단언은 HARN-174 러너를 재사용하고, 앵커 동결 테스트를 CI에서 돌린다(verify_gate_verdict_handoff_discrimination.py 선례)."
+artifacts: []
+paths:
+  - scripts/harness/store.py
+  - scripts/harness/work_graph.py
+  - scripts/harness/work_graph_page.html
+  - scripts/harness/board.py
+  - scripts/harness/selector.py
+  - scripts/harness/report.py
+  - "tests/harness/test_gate_wait_kind*.py"
+  - tests/harness/test_work_graph.py
+  - tests/harness/test_board.py
+  - scripts/harness/verify_gate_wait_kind_discrimination.py
+  - docs/standards/build_harness.md
+  - ".claude/commands/drive.md"
+session: claude/fervent-goldberg-s8y8ws
+notes: "출처: 2026-09-28 HARN-177 착지 후 정상작동 점검(Kiki 요청 — 태스크 ID 지목) · 판정 기준 main 919865d4.\n\n[점검 결과 — HARN-177 자체] 착지 확인(0e7b4f6b · #1337). main 919865d4 에서 harness-integrity 잡 스텝 8종(validate · audit-deps · rules lint · rules render --check · jit check · ruff · black · pytest tests/harness) 전건 exit 0, pytest 1268 passed · 1 skipped. 실제 대장: pending decision 게이트 14건 중 입력 있는 6건 전부 open(나머지 8건은 입력 없음 → 판정 개념 없음) · unrecorded 0건 · 판정 기록 0건.\n\n[실측 — 이 태스크의 결함] HARN-177 은 next·status·gates list/show 에 판정 기록 상태를 싣고 '판정이 기록되지 않은 상태를 사람 차례로 안내하지 않는다'를 원칙으로 적었다. 그 뒤 착지한 작업 흐름 그래프(HARN-182 · #1345)는 게이트 창의 상태를 '열린 선행이 있는가'로만 가른다(work_graph.build_nodes 의 waits). 합성 대장 재현: 입력이 done 이고 판정 기록이 없는 decision 게이트 → store.gate_judgment_state = unrecorded 인데 그래프 상태 gate_turn · 라벨 '사람 차례' · 텍스트 요약 '사람 차례 1'. PASS 기록 대조군과 상태·라벨·집계가 똑같고 이유 문구만 다르다. 실제 대장은 지금 unrecorded 0건이라 현재 오표시는 없다(잠복).\n\n[같은 축의 옛 화면] 보드 대기 라벨 '사람 게이트 대기'(board.WAIT_LABEL)와 정지 사유 human_gate 도 게이트의 판정 기록 상태를 보지 않는다. 실측: 지금 실제 대장에서 그 라벨이 붙은 카드 21건은 전부 입력 없는 게이트 10개에 걸려 있어 현재는 맞게 읽힌다 — 역시 잠복.\n\n[계열] 공용 판정이 있는데 새 화면이 자체 판정으로 분류한다. HARN-177 ② acceptance 가 화면을 열거(next·status·gates show)했기 때문에 그 뒤 생긴 화면은 계약 밖이었다. ④의 등재 검사가 그 입구를 막는다."
+updated: 2026-09-28
