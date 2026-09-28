@@ -11,8 +11,9 @@ EOS-129 ③(문항 변별도 a를 추정해 `Problem.irt_a`에 영속하고 CAT�
 ────────────────────────────────────────────────────────────────────────────
 무엇을 세는가
 ────────────────────────────────────────────────────────────────────────────
-- 모집단은 b 보정기와 **같다** — `item_calibration.graded_response_stmt()`(채점됨·학생·문항
-  식별 가능). 따로 조건을 적으면 "보정기가 실제로 먹는 데이터"와 다른 것을 센다.
+- 모집단은 b 보정기와 **같다** — 보정기와 같은 로더 `item_calibration.load_graded_responses`
+  (채점됨·학생·문항 식별 가능)로 읽는다. 따로 조건을 적으면 "보정기가 실제로 먹는 데이터"와 다른
+  것을 센다. 이 모듈은 DB를 직접 잡지 않는다(세션 메서드 호출 0건 — ARCH-48 처분 (b)).
 - 문항별 **응답 수**와 **서로 다른 학생 수**를 둘 다 센다. 같은 학생의 반복 응답은 a 추정에
   새 정보를 거의 주지 않으므로, a 쪽 판단은 학생 수로 한다.
 - **정답·오답이 둘 다 있는 문항**만 a 추정 후보로 센다. 한쪽 결과만 있는 문항은 어떤 모수도
@@ -49,16 +50,12 @@ from collections.abc import Hashable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.config import get_settings
-from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
-from whymath_backend.l2.item_calibration import (
-    _MIN_RESPONSES_FOR_CALIBRATION,
-    graded_response_stmt,
-)
+from whymath_backend.l2 import item_calibration
+from whymath_backend.l2.item_calibration import _MIN_RESPONSES_FOR_CALIBRATION
 
 # 출력 형태 판본 — 필드 의미를 바꾸면 올린다(런북·게이트 증적이 어느 형태를 읽었는지 추적).
 CENSUS_SCHEMA_VERSION = 1
@@ -108,8 +105,8 @@ def summarize_item_responses(
 ) -> dict[str, object]:
     """(학생, 문항, 정답) 응답 → 문항당 응답 축적 집계. 순수·DB 무관·식별자 비출력.
 
-    `rows`는 `graded_response_stmt()`가 내는 형태다. `problems_total`은 문항 은행 전체 문항 수
-    (응답이 한 건도 없는 문항까지 포함한 분모) — 모르면 None.
+    `rows`는 `item_calibration.load_graded_responses`가 내는 형태다. `problems_total`은 문항
+    은행 전체 문항 수(응답이 한 건도 없는 문항까지 포함한 분모) — 모르면 None.
     """
     responses: Counter[Hashable] = Counter()
     correct: Counter[Hashable] = Counter()
@@ -157,17 +154,13 @@ def summarize_item_responses(
 async def collect_census(session: AsyncSession) -> dict[str, object]:
     """운영 DB에서 모집단을 읽어 집계한다 — 트랜잭션을 먼저 `READ ONLY`로 선언한다.
 
-    `SET TRANSACTION READ ONLY`는 PostgreSQL에서 그 트랜잭션의 첫 문장이어야 한다. 원시 SQL은
-    이 한 줄뿐이며(ORM에 해당 표현이 없다), 목적은 방어다 — 조회 코드에 쓰기가 섞여 들어와도 DB가
-    거부한다.
+    조회는 보정기 모듈의 공용 로더가 한다(`read_only=True` — 선언이 이 트랜잭션의 첫 문장이 되도록
+    로더를 **먼저** 부른다). 이 함수 자신은 세션 메서드를 부르지 않는다. 로더는 모듈 속성으로
+    불러 테스트가 "보정기와 같은 로더를 탄다"를 대역으로 확인할 수 있게 한다.
     """
-    await session.execute(text("SET TRANSACTION READ ONLY"))
-    rows = (await session.execute(graded_response_stmt())).all()
-    problems_total = (await session.execute(select(func.count()).select_from(Problem))).scalar_one()
-    return summarize_item_responses(
-        ((user_id, problem_id, bool(is_correct)) for user_id, problem_id, is_correct in rows),
-        problems_total=int(problems_total),
-    )
+    rows = await item_calibration.load_graded_responses(session, read_only=True)
+    problems_total = await item_calibration.count_problems(session)
+    return summarize_item_responses(rows, problems_total=problems_total)
 
 
 async def _run() -> dict[str, object]:

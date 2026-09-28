@@ -601,7 +601,8 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
        "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
     # EOS-129 ⑤: 응답 축적 실측(읽기 전용)은 이 보정 배치의 **데이터 게이트**다 — 같은 모집단
-    # (`graded_response_stmt`)을 읽고 "보정 가능한 문항이 몇 건인가"만 답하므로 같은 좌석에 둔다.
+    # (공용 로더 `load_graded_responses`)을 읽고 "보정 가능한 문항이 몇 건인가"만 답하므로 같은
+    # 좌석에 둔다.
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items",
        "l2.item_response_census", status="Batch"),

@@ -125,9 +125,54 @@ class TestCountingRules:
 
 
 class TestPopulationIsShared:
-    def test_census_reads_the_calibrator_population(self) -> None:
-        # 모집단 조회문은 한 곳에 있다 — 실측이 보정기가 먹는 데이터와 다른 것을 세지 않게.
-        assert census.graded_response_stmt is item_calibration.graded_response_stmt
+    """두 소비자가 **같은 로더를 실제로 탄다** — 조회문 동일성이 아니라 실행 경로로 확인한다.
+
+    실측이 보정기와 다른 것을 세면(따로 조건을 적으면) 그 결과는 보정기가 먹는 데이터의 증거가
+    아니다. 그리고 실측이 DB를 직접 잡으면 데이터 접근 지점이 하나 늘어난다(ARCH-48 처분 (b)).
+    둘 다 "공용 로더를 거친다" 하나로 막힌다.
+    """
+
+    @pytest.mark.asyncio
+    async def test_census_reads_through_the_calibrator_loader_read_only(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[bool] = []
+
+        async def _loader(_session: Any, *, read_only: bool = False) -> list[Any]:
+            calls.append(read_only)
+            return _rows("A", _mixed(7))
+
+        async def _count(_session: Any) -> int:
+            return 11
+
+        monkeypatch.setattr(item_calibration, "load_graded_responses", _loader)
+        monkeypatch.setattr(item_calibration, "count_problems", _count)
+        summary = await census.collect_census(object())  # type: ignore[arg-type]
+        assert calls == [True]  # 실측은 읽기 전용으로 부른다
+        assert summary["graded_responses"] == 7
+        assert summary["problems_total"] == 11
+
+    @pytest.mark.asyncio
+    async def test_calibrator_reads_through_the_same_loader_writable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[bool] = []
+
+        async def _loader(_session: Any, *, read_only: bool = False) -> list[Any]:
+            calls.append(read_only)
+            return []
+
+        class _CommitOnly:
+            async def commit(self) -> None:
+                return None
+
+        monkeypatch.setattr(item_calibration, "load_graded_responses", _loader)
+        calibrated = await item_calibration.calibrate_item_difficulties(
+            _CommitOnly()  # type: ignore[arg-type]
+        )
+        assert calibrated == 0
+        # 보정기는 같은 트랜잭션에서 UPDATE하므로 읽기 전용 선언 없이 부른다.
+        assert calls == [False]
 
 
 class _Result:
@@ -164,11 +209,21 @@ class _RecordingSession:
 class TestCollectIsReadOnly:
     @pytest.mark.asyncio
     async def test_transaction_is_declared_read_only_before_any_query(self) -> None:
+        # 대역 없이 실제 로더를 탄다 — 선언이 이 트랜잭션의 **첫 문장**인지 본다.
         session = _RecordingSession(_rows("A", _mixed(6)), problems_total=9)
         summary = await census.collect_census(session)  # type: ignore[arg-type]
         assert "SET TRANSACTION READ ONLY" in session.statements[0]
         assert summary["graded_responses"] == 6
         assert summary["problems_total"] == 9
+
+    @pytest.mark.asyncio
+    async def test_loader_default_does_not_declare_read_only(self) -> None:
+        # 기본값이 읽기 전용이면 보정기의 UPDATE가 운영 DB에서 거부된다 — 대역 세션은 그것을
+        # 모르므로 여기서 직접 막는다.
+        session = _RecordingSession(_rows("A", _mixed(6)), problems_total=9)
+        rows = await item_calibration.load_graded_responses(session)  # type: ignore[arg-type]
+        assert len(rows) == 6
+        assert not any("READ ONLY" in stmt for stmt in session.statements)
 
 
 class TestCliExitCodes:
