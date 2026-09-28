@@ -22,12 +22,14 @@ skill_node)만 ORM으로 심는다. 읽기 전용 SELECT는 공개 표면이 그
 **정직한 공백 동결** — 현행 코드로 성립하지 않는 마디는 `skip`으로 위장하지 않는다. *현행 동작*을
 단언하고, 고쳐지면 그 단언이 실패하며 메시지가 소유 태스크를 가리킨다.
   - SCENARIO-003 ⓐ `EOS-127` — 상태 머신 R4(선수결손)는 서빙 경로에서 발화하지 않는다.
-  - SCENARIO-005 ⓑ 코치 완료 경로는 학습 상태 머신을 돌리지 않는다 — `EOS-134-coach-completion-state-machine`.
   - SCENARIO-005 ⓒ 귀속된 힌트를 숙달 갱신이 읽지 않는다(완료 채점 증거에 `hint_used` 축이 없다) —
     `EOS-29-assessment-evidence-hint-axis-producer`.
   - (해소) SCENARIO-005 ⓐ 힌트 귀속 — `EOS-133`이 코치 완료 경로에 `hint_usage`의 첫 writer를
     세워, 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 `used_hint=True`·`hint_usage`로
     남는다는 정상 동작 단언으로 승격했다.
+  - (해소) SCENARIO-005 ⓑ 코치 완료 경로의 상태 머신 — `EOS-134`가 코치 완료를 `/v1/me/attempts`와
+    같은 공용 진입점(`advance_on_graded_attempt`)에 배선해, 원장이 `NEW → LEARNING → ASSESSING →
+    PRACTICING`(R2)으로 움직인다는 정상 동작 단언으로 승격했다.
   - (해소) SCENARIO-008 ⓐ `EOS-124` — 추천의 정책 축(action)과 선택 축(problem_id·target) 불일치.
     기본 CAT이 설명을 전달 문항에 정렬하면서 해소돼 올바른 값 단언(전진 = 다음 개념 문항)으로
     승격했다. 같은 변경으로 002·007의 근거 단언도 "그래프 근거가 있을 때만 관계 행위"로 정밀화됐다.
@@ -627,8 +629,9 @@ def test_scenario_005_correct_after_hint() -> None:
       ④ⓐ 힌트 귀속(`EOS-133` 해소) — 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 그
          attempt에 남는다(`used_hint=True` · `hint_usage` 단계 = ①의 공급). ②·③ 턴의 공급은
          답이 나온 뒤라 세지 않는다.
-      ④ 정직한 공백 동결 2건(ⓑ `EOS-134` · ⓒ `EOS-29`):
-         ⓑ 코치 완료 경로는 학습 상태 머신을 돌리지 않는다 — 원장이 `NEW` 그대로다.
+      ④ⓑ 상태 머신(`EOS-134` 해소) — 코치 완료도 `/v1/me/attempts`와 같은 공용 진입점을 돌아
+         `NEW → LEARNING → ASSESSING → PRACTICING`이 된다(R2 — 확신도 미측정 정답은 같은 개념 연습).
+      ④ 정직한 공백 동결 1건(ⓒ `EOS-29`):
          ⓒ 귀속된 힌트를 숙달 갱신이 읽지 않는다 — 완료 채점 증거에 `hint_used` 축이 없다
             (그래서 힌트 받은 정답과 스스로 푼 정답이 아직 같은 숙달 이득을 받는다).
     """
@@ -738,20 +741,20 @@ def test_scenario_005_correct_after_hint() -> None:
             assert rows[0][3] is True, rows
             assert [r[0] for r in hint_rows] == [hint], hint_rows
 
-            # ④ⓑ 정직한 공백 동결 — 코치 완료 경로는 학습 상태 머신을 돌리지 않는다.
+            # ④ⓑ 상태 머신(EOS-134 해소) — 코치 완료도 `/v1/me/attempts`와 같은 공용 진입점을 돈다.
+            # 새 학생 · 서버 판정 정답 · 확신도 미측정 → 학습 진입 → 평가 → R2(같은 개념 연습).
+            # 원장은 최신순이라 뒤집어 시간순으로 본다.
             ls = _learning_state(client, auth)
-            journal.record(
-                "④ⓑ상태머신",
-                "정직한 공백 — EOS-134",
-                current=ls["current_state"],
-                전이수=len(ls["transitions"]),
-            )
-            assert ls["current_state"] == "NEW" and ls["transitions"] == [], (
-                f"코치 완료 뒤 학습 상태 원장이 움직였다: {ls['current_state']} · "
-                f"{len(ls['transitions'])}건 — 코치 완료 경로에 상태 머신이 배선된 것으로 보인다. "
-                "이 단언을 `/v1/me/attempts`와 같은 전이(… → PRACTICING) 단언으로 승격하라"
-                "(소유 태스크 EOS-134-coach-completion-state-machine)."
-            )
+            chain = [
+                (t["from_state"], t["to_state"], t["rule_id"]) for t in reversed(ls["transitions"])
+            ]
+            journal.record("④ⓑ상태머신", "EOS-134 해소", current=ls["current_state"], 전이=chain)
+            assert ls["current_state"] == "PRACTICING", ls
+            assert chain == [
+                ("NEW", "LEARNING", None),
+                ("LEARNING", "ASSESSING", None),
+                ("ASSESSING", "PRACTICING", "R2-correct-low-confidence"),
+            ], chain
 
             # ④ⓒ 정직한 공백 동결 — 귀속된 힌트를 숙달 갱신이 읽지 않는다(EOS-133 acceptance ②
             # 판정: 기본 추정기 bkt-v1은 힌트 축을 읽지 않고, 채점 증거에도 그 축이 없다).

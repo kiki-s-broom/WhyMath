@@ -148,9 +148,8 @@ from whymath_backend.l2.learning_session_writer import (
     close_idle_sessions_best_effort,
     record_learning_activity,
 )
-from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
 from whymath_backend.l2.learning_state_machine import (
-    advance_on_attempt,
+    advance_on_graded_attempt,
     get_current_state,
     list_transitions,
     record_transition,
@@ -1292,27 +1291,24 @@ async def submit_attempt(
     # 아무 학생의 상태도 움직이지 않는다 — 서빙 경로가 그것을 실제로 부르는 이 줄이 계약을
     # 집행으로 바꾼다.
     #
-    # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
+    # EOS-134: 증거 조립 + 전이는 채점 경로 **공용 진입점** 하나로 부른다 — 코치 완료
+    # (`api/coach._complete_problem`)도 같은 함수를 불러 같은 입력에 같은 전이가 난다.
+    # 여기서 하위 두 함수를 직접 부르면 두 경로가 다시 갈라진다(AST 가드가 막는다).
+    #
+    # 순서 주의: 증거 조립은 이번 attempt가 **이미 commit된 뒤**여야 한다
     # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
     #
     # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
     # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
     # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
-    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 이미 쓰고 있다.
-    # 상태 머신이 읽는 것은 정책 입력(`AttemptEvidence`)으로 **다른 타입·다른 목적**이므로
-    # 이름을 분리한다 — 같은 이름을 재사용하면 응답의 `evidence=evidence`가 조용히 다른
-    # 객체를 받는다(2026-09-17 main 병합에서 실제로 그 상태가 만들어졌다).
-    policy_evidence = await build_attempt_evidence(
+    # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 쓰고 있다. 상태 머신이
+    # 읽는 정책 입력(`AttemptEvidence`)은 공용 진입점 안에서 조립되어 이 함수에 이름이 없다.
+    transition = await advance_on_graded_attempt(
         session,
         user_id=user.user_id,
+        attempt_id=attempt.attempt_id,
         is_correct=body.is_correct,
         confidence=body.confidence_self_reported,
-    )
-    transition = await advance_on_attempt(
-        session,
-        user_id=user.user_id,
-        evidence=policy_evidence,
-        attempt_id=attempt.attempt_id,
     )
     decision = transition.decision
     learning_state_block = LearningStateBlock(

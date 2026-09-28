@@ -104,6 +104,7 @@ from whymath_backend.l2 import (
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
 from whymath_backend.l2.learning_session_writer import record_learning_activity
+from whymath_backend.l2.learning_state_machine import advance_on_graded_attempt
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import recommend_prerequisite_gaps
 from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
@@ -1285,6 +1286,10 @@ async def _complete_problem(
     귀속된 신호를 숙달 갱신이 읽는가는 별개 판단이다: 기본 추정기 `bkt-v1`은 힌트 축을 읽지
     않고 채점 증거(`AssessmentEvidence`)에도 그 축이 없다(`docs/architecture/
     mastery_update_contract_v1.md` §12).
+
+    EOS-134: 숙달 전파 뒤 학습 상태 머신을 `/v1/me/attempts`와 **같은 공용 진입점**
+    (`advance_on_graded_attempt`)으로 돌린다 — 두 채점 경로가 같은 입력에 같은 전이를 낸다.
+    이 경로가 상태 머신을 부르지 않던 동안 코치로 푼 학생의 원장은 `NEW`에 머물렀다.
     """
     if problem_id is None:
         return None, None  # 방어 — 완료는 problem_id가 있을 때만 진입(도달 안 함).
@@ -1382,6 +1387,24 @@ async def _complete_problem(
         skill_ids=[r.skill_id for r in skill_records],
         source=AttemptSource.coach_completion,
     )
+    # EOS-134: 학습 상태 머신 — `/v1/me/attempts`와 같은 공용 진입점(같은 입력 → 같은 전이).
+    # 정오답은 서버 판정 정답, 확신도는 코치 경로에 입력이 없어 None(미측정 → R2 "같은 개념
+    # 연습" · 정답만으로 진급시키지 않는다). 이번 attempt는 위에서 이미 commit됐다(연속 오답
+    # 카운트의 전제). 결과는 응답에 싣지 않는다 — 상태는 `/v1/me/learning-state`가 원장에서
+    # 읽는다. 다만 평가 진입이 거부되면(예: 진단 중인 학습자) 원장에 아무것도 남지 않으므로
+    # 그 사실을 경고로 남긴다(attempts 경로는 응답의 `rejected_transition`으로 드러낸다).
+    transition = await advance_on_graded_attempt(
+        session,
+        user_id=user_id,
+        attempt_id=attempt.attempt_id,
+        is_correct=True,
+        confidence=None,
+    )
+    if transition.rejected_transition is not None:
+        logger.warning(
+            "코치 완료: 학습 상태 전이 거부 — %s (EOS-134 · attempt는 적재됨)",
+            transition.rejected_transition,
+        )
     return attempt.attempt_id, completion_evidence
 
 
