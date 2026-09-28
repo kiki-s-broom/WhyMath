@@ -2322,17 +2322,6 @@
   },
   {
    "kind": "incident",
-   "ref": "2026-09-28",
-   "paths": [
-    "scripts/harness/backlog.py",
-    "scripts/harness/remote_claims.py",
-    "tests/harness/test_cli.py"
-   ],
-   "text": "열린 PR #1346의 EOS-129 부분 이행(⑤ 게이트)을 못 보고 다른 세션이 같은 게이트를 4분 만에 중복 신설",
-   "weight": 3
-  },
-  {
-   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
@@ -3760,6 +3749,16 @@
     "tests/harness/**"
    ],
    "text": "tests/harness(CI 미러) 실행이 세션 샤드에 가짜 policy_warn 3줄(scripts/harness/backlog.py) 기록 — 커밋 전 제거",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_remote_claims.py"
+   ],
+   "text": "브리핑이 vafylb를 '이미 포팅됨·결정 불요'로 표시 — 근거 커밋이 브랜치 자신의 앞선 머지분이고 그 뒤 cp949 수정은 main에 없음",
    "weight": 0
   }
  ]

@@ -11329,9 +11329,9 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 
 **착지 중 추가 판단(첫 미러 실행에서 발견)**: 자동 선택이 경로 필터 잡 `changes`를 "재현 가능"으로 골랐다(`ci_job_coverage`는 docker·서비스 컨테이너만 재현 불가로 본다). 그 잡의 filter 스텝은 `${{ github.event_name }}`을 써서 새 분류에서는 매번 미실행이므로, 그대로면 **모든 자동 미러 실행이 exit 3**이 되어 경고가 상시 소음이 된다. 그 잡이 하는 일(영역 플래그 계산)은 미러의 잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 이미 대신하므로 사각지대가 아니다 — 자동 선택에서 사유를 출력하며 제외했다(`--job changes`로 직접 지정하면 돌리고 미실행을 보고). 재발 방지 동결: 문서만 바뀐 변경의 자동 선택 잡에 "원리상 못 도는 run 스텝" 0건(`test_always_on_jobs_have_no_structural_not_executed`) + 제외 절 제거 뮤테이션 M15 RED.
 
-## 2026-09-28: 미머지 브랜치 전수 감사 13회차 — 회수 0건 · 삭제 12차 배치 5건 · 감사 중 실시간 중복 1건 발견 · 대책 태스크 3건
+## 2026-09-28: 미머지 브랜치 전수 감사 13회차 — 회수 0건 · 삭제 12차 배치 5건 · 감사 중 실시간 중복·오분류 발견 · 대책 태스크 3건
 
-**판정 기준: main `919865d4`**. 세션 시작 시 shallow였고 `git fetch --unshallow origin` + `--prune`
+**판정 기준: main `919865d4`**(이후 `ed3d14da` 머지 반영). 세션 시작 시 shallow였고 `git fetch --unshallow origin` + `--prune`
 재동기화로 전제를 복구한 뒤에만 판정했다(1,319커밋). 판정 정본 = `docs/reviews/unmerged_branch_audit_2026-09-28.md`.
 
 **모집단**: 원격 ref 39 = 감사 대상 20 + 제외 19(열린 PR 소유 15 · 원격 claim 활성 2 · `main`/`harness-claims` 2).
@@ -11344,37 +11344,45 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 `test-driven-development-03elxp`(49d9d76a — main 조상, MP-02 홀드 09-23 해제) · `relaxed-fermat-8dui3u`(03e45689 — MP-06
 done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이벤트 · EOS-117 증적 상세)은 판정 문서 §4에 원문 보존.
 
-**감사 중 발견 — 실시간 중복(사고 대장 `parallel-duplicate-implementation` 11회차)**: 열린 PR #1346이 EOS-129를 부분
-이행(⑤ 운영 DB 응답 분포 실측 도구 + 게이트 `G-eos129-item-response-census` + 가드 런북)하고 08:43Z에 "게이트 대기로 claim
-해제(todo)"했는데, 11:25Z 다른 세션 `focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트**
-`G-eos129-prod-response-distribution`를 4분 만에 신설했다. `start` 프리플라이트(HARN-11)는 미머지 **done**만 보고,
-부분 이행 후 해제는 main·claim 대장 어디에도 흔적이 없어 브리핑이 EOS-129를 후보 1위로 노출했다(이 감사 세션 브리핑도
-같았다). 대책 = **`HARN-187`**(프리플라이트·`next` 후보에 "부분 이행 미머지" 표지). 두 게이트의 처분은 두 세션·Kiki 몫이며
-**Kiki는 두 런북을 모두 실행할 필요가 없다.**
+**감사 중 발견 ① — EOS-129 연쇄 착수(이 감사는 소유하지 않음)**: 열린 PR #1346이 EOS-129를 부분 이행(⑤ 운영 DB 응답 분포
+실측 도구 + 게이트 `G-eos129-item-response-census`)하고 08:43Z에 "게이트 대기로 claim 해제(todo)"했는데, 11:25Z 다른 세션
+`focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트** `G-eos129-prod-response-distribution`를
+4분 만에 신설했다(세 번째 세션도 12:11Z 착수). 이 감사도 사고 1건 + 대책 태스크(HARN-187)를 등재했으나, 푸시 전에 PR #1346의
+세션이 같은 사건을 3세션 실측으로 먼저 기록한 **PR #1356**(`HARN-186-unmerged-gate-attach-claim-release-gap` + 사고 1건)을
+발견해 **이 브랜치의 사고 1줄은 빼고 HARN-187은 취소**했다(같은 사고의 이중 계수 방지). **Kiki는 두 런북을 모두 실행할
+필요가 없다.**
 
-**두 회차 연속 원인 미상이던 claim 대장 이상의 원인 확정**: `OPS-73-generated-inventory-conflict-blocks-ci` → 부재 브랜치
-`status-38gu4d` claim이 16일째 남은 것은 ⓐ 09-12 수동 개명(→`OPS-76`, done)이 claim을 옮기지 않았고 ⓑ
+**감사 중 발견 ② — 브리핑 "이미 포팅됨" 오분류 3회차(`HARN-190`)**: 세션 재개 브리핑이 `vafylb`를 "이미 포팅됨·결정 불요"로
+표시했다. 근거 `9905fdc4`(08-03 · #683)는 **그 브랜치 자신의 앞선 머지분**이고, 브랜치는 그 뒤 `f4c6f69c`(08-09)로 같은 파일
+(`harness/residue_gate_demotion_battle.py`)의 cp949 콘솔 출력 크래시를 고쳤는데 그 수정은 main에 없다(main판 출력·도움말
+16줄에 U+2014 · stdout 재구성 없음). `_find_ported_evidence()`가 근거 커밋이 건드린 **파일 경로**만 교집합으로 세 1/1 전건
+착지로 판정한다(메모리 재현). 실제 좌석은 `OPS-53`(todo)이며 **이 브랜치는 삭제하면 안 된다**. 40xspg(08-11)·7n9n72(08-30 →
+HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
+
+**두 회차 연속 원인 미상이던 claim 대장 이상의 원인 확정(`HARN-189`)**: `OPS-73-generated-inventory-conflict-blocks-ci` → 부재
+브랜치 `status-38gu4d` claim이 16일째 남은 것은 ⓐ 09-12 수동 개명(→`OPS-76`, done)이 claim을 옮기지 않았고 ⓑ
 `remote_claims.stale_claims()`가 태스크 부재(`task_missing`)를 먼저 판정해 홀더 브랜치 소멸(`branch_gone`) 판정에 도달하지
-않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다. 대책 = **`HARN-186`**(사고 대장
-`orphan-claim-reap-blindspot` — 12회차 관측과 합치면 2회차).
+않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다(메모리 재현 — 태스크 유무만 바꾸면 사유가 갈린다).
 
-**감사 자신의 검증에서 난 사고 — `derived-index-not-rebuilt` 2회차**: 위 두 사고를 `incident add`로 쓴 뒤
-`backlog/jit_index.json`을 재생성하지 않아, 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입
-인덱스 대조"에서 exit 1을 냈다(뒤 스텝 7건 미실행 — 하네스 테스트 포함). origin/main 워크트리에서는 통과해 원인을
-대조로 확정했고 `backlog.py jit build`로 재생성했다. 대책 태스크 `HARN-179`(쓰기 CLI가 인덱스를 함께 재생성)는
-2026-09-26 1회차 때 이미 등재돼 있다 — 푸시 전에 미러를 돌리지 않았다면 CI red였다. 재검증 미러에서는
-`tests/harness`가 이 세션 샤드에 가짜 `policy_warn` 3줄을 썼다(`harness-test-live-ledger-write` **8회차** · 커밋 전 제거) —
-대책 `HARN-170`은 09-24 이후 8회 재발했는데 우선순위 3·EOS P2에 머물러 있다. (두 계열의 회차는 main `ed3d14da`
-머지 후 대장 기준이다 — 이 브랜치에서 기록할 때는 10회차·7회차였고, 같은 날 main에 같은 계열 사고가 1건씩 먼저 들어왔다.)
+**부수 발견(`HARN-188`)**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상 `03elxp`를 체크아웃
+대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면 09-07 트리의 옛 판정기
+(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를 요구해 정정에 테스트 변경이
+따르므로 별도 태스크로 분리했다.
 
-**부수 발견 — `HARN-185`**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상
-`03elxp`를 체크아웃 대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면
-09-07 트리의 옛 판정기(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를
-요구해 정정에 테스트 변경이 따르므로 별도 태스크로 분리했다.
+**태스크 번호 경합(HARN-111 실례)**: 처음 받은 번호 185·186이 푸시 전 사이 다른 세션들에 **각각 2건씩** 등재돼 있었다
+(`add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 창). 원격 전 브랜치·claim 대장에서 188~199가 비어 있음을 실측한 뒤
+`backlog.py rename`으로 185→188 · 186→189를 옮겼다.
 
-**정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계). 스킬 §3의 main 언급 grep을
-`.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-185를 찾았다 — 스킬 원문 범위(`backlog/tasks docs`)로는 보이지 않는다.
-claim 활성 2건(block 홀드, TTL 초과)은 판정 보류를 유지했다. 떠돌이 좌석 3건(HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은
-4분류 밖이라 관측만 남겼다.
+**감사 자신의 검증에서 난 사고 2건**: ⓐ `derived-index-not-rebuilt` 2회차 — 사고를 `incident add`로 쓴 뒤
+`backlog/jit_index.json`을 재생성하지 않아 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입 인덱스
+대조"에서 exit 1(뒤 스텝 7건 미실행). origin/main 워크트리 대조로 원인을 확정하고 `jit build`로 재생성했다(대책 `HARN-179`
+기등재 — 미러를 안 돌렸으면 CI red였다) ⓑ `harness-test-live-ledger-write` 8회차 — 재검증 미러의 `tests/harness`가 이 세션
+샤드에 가짜 `policy_warn` 3줄을 썼다(커밋 전 제거). 대책 `HARN-170`은 09-24 이후 8회 재발했는데 우선순위 3·EOS P2에 머물러
+있다(회차는 main `ed3d14da` 머지 후 대장 기준 — 기록 당시 7회차).
+
+**정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계 — 단 `vafylb`는 §5-1에서 좌석을 다시 봤다).
+스킬 §3의 main 언급 grep을 `.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-188을 찾았다 — 스킬 원문 범위
+(`backlog/tasks docs`)로는 보이지 않는다. claim 활성 2건(block 홀드, TTL 초과)은 판정 보류를 유지했다. 떠돌이 좌석 3건
+(HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은 4분류 밖이라 관측만 남겼다.
 
 ---

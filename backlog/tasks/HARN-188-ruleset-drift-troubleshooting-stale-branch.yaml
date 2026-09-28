@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-185-ruleset-drift-troubleshooting-stale-branch
+id: HARN-188-ruleset-drift-troubleshooting-stale-branch
 title: "branch-protection-setup.md 「판정기 파일이 없다」 절의 전제 소멸 — 삭제 배치된 브랜치를 체크아웃하라고 안내한다"
 track: infra-debt
 stage: S3
@@ -18,5 +18,5 @@ paths:
   - ".github/branch-protection-setup.md"
   - tests/infra/test_ruleset_drift.py
 session: null
-notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): claim 해제로 감사 대상에 새로 편입된 `claude/test-driven-development-03elxp`는 main의 조상(고유 커밋 0 · diff 0파일)이라 삭제 후보다. 스킬 §3의 main 언급 grep 범위(backlog/tasks·docs)를 `.github`까지 넓혀 돌리자, 이 브랜치를 **체크아웃 대상으로 지명하는 실행 안내**가 `.github/branch-protection-setup.md`에 남아 있음이 드러났다(스킬 원래 범위로는 보이지 않는 위치).\n\n왜 브랜치를 남겨 두지 않고 삭제 배치에 올렸나: 이 안내는 삭제 여부와 무관하게 이미 틀렸다. 브랜치를 남기면 안내가 조용히 3주 묵은 트리로 데려가고(옛 판정기로 판정), 지우면 fetch 단계에서 실패가 보인다 — 삭제가 위험을 늘리지 않는다. 다만 Kiki 클론에 옛 원격 추적 ref가 남아 있으면 checkout -B 줄은 여전히 성공할 수 있으므로(각 줄이 독립 실행되는 붙여넣기 특성) 문서 정정이 근본 대책이다.\n\n왜 감사 PR에서 바로 고치지 않았나: 정정에는 가드 테스트 단언 변경이 따르고(③), Kiki 머신 런북은 CLAUDE.md 사고 유래 규칙이 가장 촘촘한 표면이라 택일 판단(②)에 별도 검증이 필요하다. 감사 세션의 범위(판정·등재)를 넓히지 않는다.\n\n인접: HARN-101(같은 문서의 「대신 하는 것」 절 — 별개 절) · HARN-63(done — 이 절을 만든 태스크)."
+notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): claim 해제로 감사 대상에 새로 편입된 `claude/test-driven-development-03elxp`는 main의 조상(고유 커밋 0 · diff 0파일)이라 삭제 후보다. 스킬 §3의 main 언급 grep 범위(backlog/tasks·docs)를 `.github`까지 넓혀 돌리자, 이 브랜치를 **체크아웃 대상으로 지명하는 실행 안내**가 `.github/branch-protection-setup.md`에 남아 있음이 드러났다(스킬 원래 범위로는 보이지 않는 위치).\n\n왜 브랜치를 남겨 두지 않고 삭제 배치에 올렸나: 이 안내는 삭제 여부와 무관하게 이미 틀렸다. 브랜치를 남기면 안내가 조용히 3주 묵은 트리로 데려가고(옛 판정기로 판정), 지우면 fetch 단계에서 실패가 보인다 — 삭제가 위험을 늘리지 않는다. 다만 Kiki 클론에 옛 원격 추적 ref가 남아 있으면 checkout -B 줄은 여전히 성공할 수 있으므로(각 줄이 독립 실행되는 붙여넣기 특성) 문서 정정이 근본 대책이다.\n\n왜 감사 PR에서 바로 고치지 않았나: 정정에는 가드 테스트 단언 변경이 따르고(③), Kiki 머신 런북은 CLAUDE.md 사고 유래 규칙이 가장 촘촘한 표면이라 택일 판단(②)에 별도 검증이 필요하다. 감사 세션의 범위(판정·등재)를 넓히지 않는다.\n\n인접: HARN-101(같은 문서의 「대신 하는 것」 절 — 별개 절) · HARN-63(done — 이 절을 만든 태스크).\n\n[개명 2026-09-28] HARN-185-ruleset-drift-troubleshooting-stale-branch → HARN-188-ruleset-drift-troubleshooting-stale-branch: 번호 충돌 해소 — push 전 사이 다른 세션 2곳(claude/magical-maxwell-hja5kh-eos134 · claude/vibrant-rubin-tp7jfw)이 HARN-185를 각자 등재했다(HARN-111 경합). 원격 전 브랜치·claim 대장 실측으로 188 비어 있음 확인"
 updated: 2026-09-28

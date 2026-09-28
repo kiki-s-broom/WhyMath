@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-186-reap-task-missing-masks-branch-gone
+id: HARN-189-reap-task-missing-masks-branch-gone
 title: "claims reap — 태스크 부재(task_missing)가 홀더 브랜치 소멸(branch_gone)을 가려 고아 claim이 자동 청소에서 영구히 빠진다"
 track: infra-debt
 stage: S3
@@ -18,5 +18,5 @@ paths:
   - scripts/harness/remote_claims.py
   - tests/harness/test_remote_claims.py
 session: null
-notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 12회차가 \"claim 대장 이상 — 존재하지 않는 브랜치를 가리키는 활성 claim\"으로 보고만 하고 원인을 밝히지 않았던 건이 13회차에도 그대로 남아 있었다. 원인 추적 결과 ⓐ 개명(OPS-73→OPS-76)이 claim을 옮기지 않았고 ⓑ 그렇게 생긴 고아를 자동 청소가 판정 순서 때문에 못 보는 두 결함의 합성이었다. ⓐ는 HARN-100 개명 CLI가 이후 개명분에 대해 막는다 — 이 태스크는 **이전되지 않은 잔재를 청소하는 축**만 소유한다.\n\n반복 관측(감사 2회 연속)이라 CLAUDE.md 「실수 관리」에 따라 관측 기록이 아니라 태스크로 등재한다.\n\n인접: HARN-26(branch_gone 기준 신설·done) · HARN-27(reap 집행 지점·done — AUTO_REAP_REASONS 동결 테스트가 있다) · HARN-21(task_missing 경합 유예·done) · HARN-100(개명 CLI·done)."
+notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 12회차가 \"claim 대장 이상 — 존재하지 않는 브랜치를 가리키는 활성 claim\"으로 보고만 하고 원인을 밝히지 않았던 건이 13회차에도 그대로 남아 있었다. 원인 추적 결과 ⓐ 개명(OPS-73→OPS-76)이 claim을 옮기지 않았고 ⓑ 그렇게 생긴 고아를 자동 청소가 판정 순서 때문에 못 보는 두 결함의 합성이었다. ⓐ는 HARN-100 개명 CLI가 이후 개명분에 대해 막는다 — 이 태스크는 **이전되지 않은 잔재를 청소하는 축**만 소유한다.\n\n반복 관측(감사 2회 연속)이라 CLAUDE.md 「실수 관리」에 따라 관측 기록이 아니라 태스크로 등재한다.\n\n인접: HARN-26(branch_gone 기준 신설·done) · HARN-27(reap 집행 지점·done — AUTO_REAP_REASONS 동결 테스트가 있다) · HARN-21(task_missing 경합 유예·done) · HARN-100(개명 CLI·done).\n\n[개명 2026-09-28] HARN-186-reap-task-missing-masks-branch-gone → HARN-189-reap-task-missing-masks-branch-gone: 번호 충돌 해소 — push 전 사이 다른 세션 2곳(claude/ecstatic-feynman-bxxxvd · claude/magical-maxwell-hja5kh-gate-release-gap)이 HARN-186을 각자 등재했다(HARN-111 경합). 원격 전 브랜치·claim 대장 실측으로 189 비어 있음 확인"
 updated: 2026-09-28
