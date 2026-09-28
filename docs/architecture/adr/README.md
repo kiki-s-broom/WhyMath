@@ -62,7 +62,7 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-001](./ADR-001-event-storage-postgresql-first.md) | 이벤트 저장소 PostgreSQL 우선 | 채택 | main |
 | [ADR-002](./ADR-002-student-solution-step-entity.md) | 학생 풀이 step = 별도 정규 엔티티 | 채택 | main |
 | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 노드 ID의 과목 접두사는 규약이지 Subject 엔티티 참조가 아니다 | 채택 | main |
-| [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Provisional** (target 2026-09-27) | main |
+| [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Frozen (unexercised)** (2026-09-27 G1 판정 · 이전 Provisional) | main |
 | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
 | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) | 학습 상태 머신 8상태 채택 · 상태를 저장하지 않고 전이 원장에서 파생 | 채택 (2026-09-03 보류의 번복 · 게이트 판정 ②) | main |
 
@@ -77,7 +77,7 @@ python3 scripts/harness/adr_number_check.py
 | 계획서 주제 | 저장소 문서 | 상태 |
 |---|---|---|
 | ADR-001 EOS Core Boundary | `docs/architecture/eos_core_adapter_boundary.md` + `scripts/analysis/eos_core_adapter_boundary_scan.py`(`BOUNDARY_MAP`) | 충족 — ADR 형식은 아니나 556모듈 전수 배정으로 결정 내용이 정본화됨(EOS-65 done) |
-| ADR-002 Subject Adapter | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | 오늘 작성 — Provisional |
+| ADR-002 Subject Adapter | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | 2026-09-05 작성 — 당시 Provisional (현행 상태는 위 계열 표) |
 | ADR-003 Entity ID | [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 주제 일치 확인 — 노드 ID 접두사 규약 축 |
 | ADR-004 Event Model | | 미확인 |
 | ADR-005 LearnerState | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) (학습 국면 축) + `l2/learner_state.py`(요약 상태 조립기 축) | **부분** — 학습 *국면*의 상태·전이 계약은 ADR-006이 덮는다. 요약 LearnerState의 단일 조회 표면·영속 좌석은 `EOS-10`·`EOS-103`이 소유하며 아직 ADR 형식의 기록이 없다 |
@@ -115,7 +115,7 @@ Versioning·Curriculum Mapping·Concept/Skill separation·Problem/Answer·Miscon
 | ADR-001 EOS Core Boundary | `docs/architecture/eos_core_adapter_boundary.md` + `scripts/analysis/eos_core_adapter_boundary_scan.py`(`BOUNDARY_MAP` 64항목) | 충족 — ADR 형식은 아니나 전수 배정으로 정본화(`EOS-65`) |
 | ADR-002 Entity ID Strategy | `docs/standards/eos_identity_layer_011_1_decision.md` + [ADR-003](./ADR-003-subject-prefix-is-convention-not-entity.md) | 충족 — 2026-08-17 판정(부분 수용·부분 거부) + 접두사 규약 |
 | ADR-003 Entity Versioning | `docs/architecture/44_eos_version_management.md` + `schema/version_header.py`(`VersionStatus` 6종) | 충족 — `EOS-44`(설계)·`EOS-49`(`concept_version` 착지) |
-| ADR-004 Subject Contract | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | **Provisional** — 9/27 Freeze 판정 대기 |
+| ADR-004 Subject Contract | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | **Frozen (unexercised)** — 2026-09-27 G1 판정(필수층 Core 호출자 0 · ADR-004 §판정 기록) |
 | ADR-005 Curriculum Mapping | `docs/architecture/eos_curriculum_semantic_backbone_adr.md` | 충족 — Overlay 방식(개념 백본 위에 Framework/Version/Alignment 레이어) |
 | ADR-006 Concept/Skill separation | `docs/architecture/canonical_entity_model_v1.md` §1-5·§1-6 | 충족 — 이다/아니다 쌍으로 판정 가능하게 정의 |
 | ADR-007 Problem/Answer Contract | `docs/architecture/adr_answer_form_contract.md` + `schema/answer_form.py` | 충족 — `EOS-28` |
