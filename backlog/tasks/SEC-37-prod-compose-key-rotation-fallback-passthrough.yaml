@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-37-prod-compose-key-rotation-fallback-passthrough
+title: "운영 compose가 암호화 키 회전용 복호 fallback 변수(*_DECRYPTION_FALLBACK_KEYS)를 넘기지 않는다 — 운영에서 키 회전이 곧 lockout"
+track: math-completion
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(2026-09-27 · SEC-36 작업 중 · 판정 기준 main `0e7b4f6b` + SEC-36 브랜치) — `config.py` Settings에는 학생 데이터 at-rest 키마다 회전용 *복호 전용* fallback 필드가 있다(`dialogue_content_decryption_fallback_keys` · `device_secret_decryption_fallback_keys` · `evidence_payload_decryption_fallback_keys` · `student_work_decryption_fallback_keys` — env `WHYMATH_*_DECRYPTION_FALLBACK_KEYS`). 운영 compose(`docker-compose.prod.yml`)는 primary 키만 넘기고 fallback 변수는 하나도 넘기지 않는다. 그래서 운영에서 primary 키를 회전하면(새 키로 암호화 · 옛 행은 fallback으로 복호) 옛 행을 복호할 방법이 없다 — 회전이 곧 lockout(복호 불가)이다. 회전 이력이 아직 없어 현재 피해는 0이다.\n② 처분 — fallback 변수 4종을 운영 compose `app`에 `:-`(선택)로 전달하고 `.env.prod.example`(ASCII)에 병기한다. 운영 런북에 회전 절차(새 키 생성 → 옛 primary를 fallback으로 이동 → 재암호화 백필 → fallback 제거)와 각 단계의 자가검증을 둔다.\n③ 회귀 — `tests/infra/test_prod_compose_student_data_keys.py`의 유도식을 확장해 Settings의 `*_decryption_fallback_keys` 전부가 운영 compose `app`에 `:-`로 전달되는지 단언한다. 한 변수 전달을 지우는 뮤테이션이 RED인지 확인한다."
+artifacts: []
+paths:
+  - docker-compose.prod.yml
+  - ".env.prod.example"
+  - docs/architecture/deployment_cd_runbook.md
+  - "tests/infra/test_prod_compose_*.py"
+session: null
+notes: "출처: SEC-36(학생 답안 키 compose 필수화) 작업 중 발견 — 같은 compose 블록이 primary 키만 넘긴다. 운영 배포 전이라 잠재 결함. SEC-31(학생 답안 봉투 암호화)이 fallback 필드를 만들었으나 운영 전달은 범위 밖이었다."
+updated: 2026-09-27

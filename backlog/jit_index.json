@@ -3666,6 +3666,15 @@
    ],
    "text": "등재 전 추정 번호 EOS-138을 계약 문서에 먼저 기재 — add 충돌 검사가 거부(이미 다른 태스크)",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 4줄 기록(HARN-180 검증 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
   }
  ]
 }

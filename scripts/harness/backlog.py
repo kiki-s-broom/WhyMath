@@ -1317,17 +1317,22 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
 
 
 def _warn_if_ci_mirror_missing(root: Path) -> None:
-    """이번 커밋의 CI 미러 결과가 없거나 실패면 경고한다(HARN-119 ② 집행 지점).
+    """이번 커밋의 CI 미러 결과가 없거나 실패거나 미실행을 남겼으면 경고한다(HARN-119 ②).
 
     조회 자체가 실패하는 환경(미러 미설치·git 없음)에서도 done을 막지 않는다 —
     다만 그 경우에도 **사유를 말한다**. 무타입 침묵은 이 저장소가 금지한 형태다.
+
+    미실행(HARN-180)은 실패와 다르게 안내한다 — 다시 돌려도 같은 스텝은 또 돌지 않으므로
+    "재현 후 다시 부르라"는 처방이 맞지 않는다. 그래도 통과로 접지는 않는다: 2026-09-27
+    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다. 1단계 warn은 그대로다(승격은
+    HARN-173 소관).
     """
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import ci_mirror  # noqa: PLC0415  (선택 의존 — 없으면 경고만)
 
         commit = ci_mirror.current_commit(root)
-        ok, reason = ci_mirror.verdict_for_commit(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
+        verdict = ci_mirror.mirror_verdict(root / ci_mirror.DEFAULT_RESULT_PATH, commit)
     except (ImportError, OSError, subprocess.SubprocessError) as exc:
         print(
             f"⚠ CI 미러 상태를 확인하지 못했습니다({type(exc).__name__}) — "
@@ -1335,13 +1340,22 @@ def _warn_if_ci_mirror_missing(root: Path) -> None:
             file=sys.stderr,
         )
         return
-    if not ok:
+    if verdict.state == ci_mirror.VERDICT_PASS:
+        return
+    if verdict.state == ci_mirror.VERDICT_NOT_EXECUTED:
         print(
-            f"⚠ {reason}\n"
-            f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
-            f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+            f"⚠ {verdict.reason}\n"
+            f"  → 위 스텝은 로컬에서 **돌지 않은 검사**입니다 — 통과로 적지 말고, 그 명령을 직접 "
+            f"돌리거나 PR 본문에 'CI가 판정'으로 명기하세요(1단계 warn — 거부하지 않습니다)",
             file=sys.stderr,
         )
+        return
+    print(
+        f"⚠ {verdict.reason}\n"
+        f"  → `python3 scripts/harness/ci_mirror.py run`으로 이 커밋을 재현한 뒤 "
+        f"done을 다시 부르는 것이 기본값입니다(1단계 warn — 거부하지 않습니다)",
+        file=sys.stderr,
+    )
 
 
 def cmd_block(root: Path, args: argparse.Namespace) -> int:

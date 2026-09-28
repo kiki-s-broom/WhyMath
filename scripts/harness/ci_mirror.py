@@ -24,7 +24,14 @@
   나쁘다. 서비스 컨테이너·docker 빌드가 필요한 잡도 같은 이유로 실행 대상에서 제외된다
   (HARN-109가 '재현 불가'로 판정한 잡).
 
+  환경 전제와 **미실행**은 다르다(HARN-180). 액션 스텝은 원래 로컬 대상이 아니지만, `run`
+  스텝이 식·조건·작업 디렉터리 때문에 돌지 못했다면 그것은 CI에서는 도는 *검사*를 이번에
+  빠뜨린 것이다. 미실행이 1건이라도 있으면 "전 잡 통과"라고 말하지 않는다 — 안 돌린 검사와
+  통과한 검사를 같은 화면에 두면 사람이 통과로 읽는다(2026-09-27 EOS-26 실측: OPS-24 드리프트
+  게이트 2개가 건너뛰어졌는데 최종 줄은 "✔ 전 잡 통과"였다).
+
 exit code: 0 전 스텝 통과 · 1 실패 스텝 존재 · 2 사용 오류(잡 이름 오타·파싱 0건)
+  · 3 실행한 스텝은 전부 통과했지만 미실행 검사 스텝 존재(HARN-180 — 통과가 아니다)
 """
 
 from __future__ import annotations
@@ -52,10 +59,25 @@ DEFAULT_RESULT_PATH = Path(".claude/cache/ci_mirror.json")
 #: 스텝 하나의 기본 상한(초). CI 잡 자체가 35분 상한이므로 그보다 넉넉히 두되 무한은 아니다.
 DEFAULT_STEP_TIMEOUT = 2400
 
+#: 결과 JSON 형식 판. 2 = 미실행(`not_executed`)을 환경 전제와 분리해 기록하는 형식(HARN-180).
+#: 판이 다른 결과는 미실행 수를 판정할 수 없으므로 verdict가 "모른다"로 답한다 — 옛 형식은
+#: 건너뛴 검사를 환경 전제와 같은 칸에 넣었기 때문이다.
+RESULT_SCHEMA = 2
+
+#: 실행한 스텝은 전부 통과했지만 미실행 검사 스텝이 있다 — 통과(0)도 실패(1)도 아니다.
+#: 실패와 코드를 나누는 이유는 처방이 다르기 때문이다: 실패는 고칠 대상이고, 미실행은
+#: 목록을 읽고 CI 판정에 맡길 대상이다(같은 코드면 어느 쪽인지 출력을 다시 읽어야 한다).
+EXIT_NOT_EXECUTED = 3
+
 PASSED = "passed"
 FAILED = "failed"
 SKIPPED_AFTER_FAILURE = "skipped_after_failure"
+#: 환경 전제 — 액션 스텝(`uses:`). 원래 로컬 실행 대상이 아니다(체크아웃은 이미 된 트리가,
+#: setup-python은 `--prepend-path`가 대신한다). 통과로도 미실행 검사로도 세지 않는다.
 NOT_RUNNABLE = "not_runnable"
+#: 미실행 — CI에서는 도는 `run` 스텝인데 이번 로컬 실행에서 돌리지 못했다(식·조건·작업
+#: 디렉터리). 이 검사에 대해서는 아무것도 모른다 — 최종 줄과 verdict가 그 수를 드러낸다.
+NOT_EXECUTED = "not_executed"
 
 
 class MirrorUsageError(RuntimeError):
@@ -100,7 +122,12 @@ class JobResult:
         return [s for s in self.steps if s.status == NOT_RUNNABLE]
 
     @property
+    def not_executed(self) -> list[StepResult]:
+        return [s for s in self.steps if s.status == NOT_EXECUTED]
+
+    @property
     def exit_code(self) -> int:
+        """잡 단위는 실패 여부만 말한다(0/1). 미실행은 실행 전체 판정(`payload_exit`)이 센다."""
         return 1 if self.failed_steps else 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,6 +139,7 @@ class JobResult:
             "failed": len(self.failed_steps),
             "skipped_after_failure": len(self.skipped_after_failure),
             "not_runnable": len(self.not_runnable),
+            "not_executed": len(self.not_executed),
             "steps": [s.to_dict() for s in self.steps],
         }
 
@@ -139,15 +167,52 @@ def step_is_runnable(step: dict[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
-def step_working_directory(job: dict[str, Any], step: dict[str, Any], repo_root: Path) -> Path:
-    """잡 defaults와 스텝 오버라이드를 합쳐 실행 디렉터리를 정한다(acceptance ⑤ 계승)."""
+def not_run_status(step: Any) -> str:
+    """돌리지 않은 스텝이 '환경 전제'인가 '미실행 검사'인가 (HARN-180).
+
+    액션 스텝만 환경 전제다. 그 밖에 돌지 않은 스텝(식·조건·작업 디렉터리·run 없음)은
+    CI에서는 도는 무언가를 이번에 빠뜨린 것이므로 미실행으로 센다 — 모르는 쪽으로 분류해야
+    통과로 새지 않는다.
+    """
+    if isinstance(step, dict) and step.get("uses"):
+        return NOT_RUNNABLE
+    return NOT_EXECUTED
+
+
+#: `${{ github.workspace }}` — 러너 작업공간의 절대경로. 중괄호 안 공백은 GitHub 문법상 자유다.
+_WORKSPACE_EXPR_RE = re.compile(r"\$\{\{\s*github\.workspace\s*\}\}")
+
+
+def step_working_directory(
+    job: dict[str, Any], step: dict[str, Any], repo_root: Path
+) -> tuple[Path | None, str]:
+    """잡 defaults와 스텝 오버라이드를 합쳐 실행 디렉터리를 정한다(acceptance ⑤ 계승).
+
+    `${{ github.workspace }}`는 저장소 루트로 해석한다(HARN-180). 새 가정이 아니다 — 미러는
+    상대 working-directory를 이미 저장소 루트 기준으로 풀고 있고, GitHub도 상대경로를
+    github.workspace 기준으로 풀며 actions/checkout은 `path:`가 없으면 그 자리에 받는다
+    (2026-09-27 실측: 워크플로 7개 전부 checkout `path:` 0건). 둘은 같은 전제다.
+
+    그 밖의 식은 해석하지 않고 (None, 사유)를 돌려준다 — 추측한 경로에서 돌린 결과를 이
+    스텝의 것으로 보고하면 위장이다. 실제로 OPS-24 게이트는 잡 기본값(src/backend)에서 돌리면
+    FileNotFoundError로 거짓 실패한다.
+    """
     wd = None
     defaults = (job.get("defaults") or {}).get("run") or {}
     if isinstance(defaults.get("working-directory"), str):
         wd = defaults["working-directory"]
     if isinstance(step.get("working-directory"), str):
         wd = step["working-directory"]
-    return (repo_root / wd) if wd else repo_root
+    if not wd:
+        return repo_root, ""
+    root_text = str(repo_root.resolve())
+    # 치환값을 함수로 넘긴다 — 문자열로 넘기면 Windows 경로의 `\U` 같은 역슬래시가 치환
+    # 이스케이프로 해석돼 re.error가 난다.
+    resolved = _WORKSPACE_EXPR_RE.sub(lambda _match: root_text, wd)
+    if _EXPRESSION_RE.search(resolved):
+        return None, f"작업 디렉터리에 해석하지 않는 GitHub 식: {wd}"
+    # 치환 결과가 절대경로면 `/` 결합은 오른쪽을 그대로 쓴다.
+    return repo_root / resolved, ""
 
 
 def step_env(
@@ -186,11 +251,13 @@ def run_step(
     name = str(step.get("name") or "(이름 없음)")
     runnable, reason = step_is_runnable(step)
     if not runnable:
-        return StepResult(name=name, status=NOT_RUNNABLE, reason=reason)
+        return StepResult(name=name, status=not_run_status(step), reason=reason)
 
-    cwd = step_working_directory(job, step, repo_root)
+    cwd, wd_reason = step_working_directory(job, step, repo_root)
+    if cwd is None:
+        return StepResult(name=name, status=NOT_EXECUTED, reason=wd_reason)
     if not cwd.is_dir():
-        return StepResult(name=name, status=NOT_RUNNABLE, reason=f"작업 디렉터리 없음: {cwd}")
+        return StepResult(name=name, status=NOT_EXECUTED, reason=f"작업 디렉터리 없음: {cwd}")
 
     started = time.monotonic()
     try:
@@ -289,6 +356,15 @@ def current_commit(repo_root: Path) -> str:
     return proc.stdout.decode("utf-8", errors="replace").strip()
 
 
+def payload_exit(jobs: list[JobResult]) -> int:
+    """실행 전체의 판정 코드 — 실패가 미실행보다 앞선다(실패는 그 자체로 고칠 대상)."""
+    if any(j.exit_code for j in jobs):
+        return 1
+    if any(j.not_executed for j in jobs):
+        return EXIT_NOT_EXECUTED
+    return 0
+
+
 def build_payload(
     jobs: list[JobResult],
     repo_root: Path,
@@ -297,12 +373,14 @@ def build_payload(
 ) -> dict[str, Any]:
     commit = current_commit(repo_root)
     return {
+        "schema": RESULT_SCHEMA,
         "run_id": f"{commit[:12]}-{int(time.time())}",
         "commit": commit,
         "workflow": str(workflow_path),
         "prepend_path": list(prepend_path or []),
         "jobs": [j.to_dict() for j in jobs],
-        "exit": 1 if any(j.exit_code for j in jobs) else 0,
+        "not_executed": sum(len(j.not_executed) for j in jobs),
+        "exit": payload_exit(jobs),
     }
 
 
@@ -321,26 +399,106 @@ def load_payload(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def verdict_for_commit(path: Path, commit: str) -> tuple[bool, str]:
-    """`backlog.py done` 프리플라이트용 — 이 커밋에 대한 미러 결과가 있고 통과했는가.
+VERDICT_PASS = "pass"
+#: 실행한 스텝은 전부 통과 · 미실행 검사 스텝 존재 — 통과가 아니다(HARN-180).
+VERDICT_NOT_EXECUTED = "not_executed"
+VERDICT_FAIL = "fail"
+#: 결과 없음·다른 커밋·형식 불일치·잡 0건 — 측정되지 않았다.
+VERDICT_UNKNOWN = "unknown"
 
-    없거나 커밋이 다르면 "모른다"이며, 그 사실을 문장으로 돌려준다. 호출측이 이것을
-    통과로 접지 않도록 bool과 사유를 함께 낸다.
+#: 사유 문장에 늘어놓는 미실행 스텝 수 상한 — 넘으면 "외 N건"으로 줄이되 총수는 항상 말한다.
+_LISTED_NOT_EXECUTED = 8
+
+
+@dataclass
+class Verdict:
+    state: str
+    reason: str
+    #: "잡 › 스텝 (사유)" 목록 — 호출측이 무엇을 모르는지 이름으로 말할 수 있게 한다.
+    not_executed: list[str] = field(default_factory=list)
+
+    @property
+    def exit_code(self) -> int:
+        """verdict 서브커맨드의 종료 코드. run과 같은 체계다(0 통과 · 3 미실행 · 1 그 밖)."""
+        if self.state == VERDICT_PASS:
+            return 0
+        if self.state == VERDICT_NOT_EXECUTED:
+            return EXIT_NOT_EXECUTED
+        return 1
+
+
+def mirror_verdict(path: Path, commit: str) -> Verdict:
+    """이 커밋에 대한 미러 결과를 네 상태로 판정한다 — 통과·미실행·실패·모름.
+
+    없거나 커밋이 다르면 "모른다"이며, 그 사실을 문장으로 돌려준다. 미실행을 통과와 따로
+    두는 이유는 HARN-180 실측 때문이다: 건너뛴 검사 2개가 있었는데 결과가 exit 0이었고,
+    `backlog.py done`의 경고가 그것을 통과로 읽었다. 미실행 수는 스텝 기록에서 직접 센다 —
+    최상위 요약값보다 스텝 기록이 원자료다.
     """
     payload = load_payload(path)
     if payload is None:
-        return False, f"CI 미러 결과 없음({path}) — 이 변경에 대해 어느 잡도 돌리지 않았다"
+        return Verdict(
+            VERDICT_UNKNOWN, f"CI 미러 결과 없음({path}) — 이 변경에 대해 어느 잡도 돌리지 않았다"
+        )
     recorded = str(payload.get("commit", ""))
     if recorded != commit:
-        return False, (
+        return Verdict(
+            VERDICT_UNKNOWN,
             f"CI 미러 결과가 다른 커밋의 것이다(기록 {recorded[:12]} ≠ 현재 {commit[:12]}) — "
-            f"이번 변경은 측정되지 않았다"
+            f"이번 변경은 측정되지 않았다",
         )
-    if payload.get("exit") != 0:
-        failed_jobs = [j["name"] for j in payload.get("jobs", []) if j.get("exit")]
-        return False, f"CI 미러가 실패로 끝났다(잡: {', '.join(failed_jobs) or '?'})"
-    names = [j["name"] for j in payload.get("jobs", [])]
-    return True, f"CI 미러 통과 — 잡 {len(names)}건: {', '.join(names)}"
+    if payload.get("schema") != RESULT_SCHEMA:
+        return Verdict(
+            VERDICT_UNKNOWN,
+            f"CI 미러 결과 형식이 이 도구와 다르다(schema {payload.get('schema')!r} ≠ "
+            f"{RESULT_SCHEMA}) — 옛 형식은 건너뛴 검사를 환경 전제와 구분하지 않아 미실행 수를 "
+            f"판정할 수 없다. 다시 돌려라",
+        )
+    raw_jobs = payload.get("jobs")
+    # 스텝 기록이 빠진 잡을 "미실행 0건"으로 읽으면 모르는 것을 아니라고 접는 것이다.
+    if not isinstance(raw_jobs, list) or not all(
+        isinstance(j, dict) and isinstance(j.get("steps"), list) for j in raw_jobs
+    ):
+        # 손상된 결과로 done 프리플라이트가 예외를 내며 죽으면 판정 대신 크래시가 남는다.
+        return Verdict(VERDICT_UNKNOWN, "CI 미러 결과의 잡·스텝 형식이 깨졌다 — 다시 돌려라")
+    jobs: list[dict[str, Any]] = raw_jobs
+    if not jobs:
+        return Verdict(VERDICT_UNKNOWN, "CI 미러 결과에 잡이 0건이다 — 스캔 0건은 통과가 아니다")
+    names = [str(j.get("name", "?")) for j in jobs]
+    failed_jobs = [str(j.get("name", "?")) for j in jobs if j.get("exit")]
+    if failed_jobs or payload.get("exit") not in (0, EXIT_NOT_EXECUTED):
+        return Verdict(
+            VERDICT_FAIL, f"CI 미러가 실패로 끝났다(잡: {', '.join(failed_jobs) or '?'})"
+        )
+    not_executed = [
+        f"{j.get('name', '?')} › {s.get('name', '?')} ({s.get('reason', '')})"
+        for j in jobs
+        for s in j.get("steps") or []
+        if isinstance(s, dict) and s.get("status") == NOT_EXECUTED
+    ]
+    if not_executed:
+        shown = not_executed[:_LISTED_NOT_EXECUTED]
+        more = len(not_executed) - len(shown)
+        listing = "\n".join(f"    · {item}" for item in shown)
+        if more:
+            listing += f"\n    · 외 {more}건"
+        return Verdict(
+            VERDICT_NOT_EXECUTED,
+            f"CI 미러: 실행한 스텝은 전부 통과 · 미실행 {len(not_executed)}건 — 전 잡 통과가 "
+            f"아니다(잡 {len(names)}건: {', '.join(names)})\n{listing}",
+            not_executed,
+        )
+    return Verdict(VERDICT_PASS, f"CI 미러 통과 — 잡 {len(names)}건: {', '.join(names)}")
+
+
+def verdict_for_commit(path: Path, commit: str) -> tuple[bool, str]:
+    """`mirror_verdict`를 bool로 접은 호환 창구 — 미실행은 **통과가 아니다**(False).
+
+    bool로 접으면 미실행과 실패가 같은 값이 되므로, 둘을 다르게 안내해야 하는 호출측
+    (`backlog.py done`)은 `mirror_verdict`를 직접 쓴다.
+    """
+    verdict = mirror_verdict(path, commit)
+    return verdict.state == VERDICT_PASS, verdict.reason
 
 
 # ── 출력 ───────────────────────────────────────────────────────────────────
@@ -349,13 +507,16 @@ _STATUS_MARK = {
     FAILED: "✗",
     SKIPPED_AFTER_FAILURE: "⃠",
     NOT_RUNNABLE: "–",
+    NOT_EXECUTED: "○",
 }
 
 
 def render(jobs: list[JobResult]) -> str:
     lines: list[str] = []
     for job in jobs:
-        lines.append(f"── {job.name} (exit {job.exit_code})")
+        # 잡 머리말에도 미실행 수를 붙인다 — "(exit 0)"만 있으면 그 줄이 통과로 읽힌다.
+        header_tail = f" · 미실행 {len(job.not_executed)}" if job.not_executed else ""
+        lines.append(f"── {job.name} (exit {job.exit_code}{header_tail})")
         for step in job.steps:
             mark = _STATUS_MARK.get(step.status, "?")
             suffix = ""
@@ -371,13 +532,35 @@ def render(jobs: list[JobResult]) -> str:
                 f"  ⚠ 앞 스텝 실패로 미실행 {len(job.skipped_after_failure)}건 — "
                 f"이 검사들에 대해서는 아무것도 모른다"
             )
+        if job.not_executed:
+            lines.append(
+                f"  ⚠ 미실행 {len(job.not_executed)}건(식·조건·작업 디렉터리) — CI에서는 도는 "
+                f"검사인데 이번에 돌지 않았다. 통과로 계상하지 않는다"
+            )
         if job.not_runnable:
             lines.append(
-                f"  ⓘ 로컬 실행 대상 아님 {len(job.not_runnable)}건(액션·식·조건 스텝) — "
+                f"  ⓘ 환경 전제 {len(job.not_runnable)}건(액션 스텝) — 로컬 실행 대상이 아니며 "
                 f"통과로 계상하지 않는다"
             )
         lines.append("")
     return "\n".join(lines)
+
+
+def final_line(jobs: list[JobResult]) -> str:
+    """실행 전체의 한 줄 판정. 미실행이 있으면 "전 잡 통과"라고 쓰지 않는다(HARN-180)."""
+    failed = [j.name for j in jobs if j.exit_code]
+    by_job = [f"{j.name} {len(j.not_executed)}" for j in jobs if j.not_executed]
+    count = sum(len(j.not_executed) for j in jobs)
+    if failed:
+        tail = f" · 미실행 {count}건({', '.join(by_job)})" if count else ""
+        return f"✗ 실패 잡: {', '.join(failed)}{tail}"
+    if count:
+        return (
+            f"⚠ 실행한 스텝은 전부 통과 · 미실행 {count}건({', '.join(by_job)}) — 전 잡 통과가 "
+            f"아니다(exit {EXIT_NOT_EXECUTED}). 미실행 스텝은 로컬에서 돌지 않았다: 직접 돌리거나 "
+            f"CI 판정으로 넘긴다고 적어라"
+        )
+    return "✔ 전 잡 통과"
 
 
 # ── 서브커맨드 ─────────────────────────────────────────────────────────────
@@ -393,6 +576,16 @@ def _resolve_jobs(args: argparse.Namespace, workflow: dict[str, Any], repo_root:
     skipped = [n for n in required if n not in runnable]
     if skipped:
         print(f"ⓘ 재현 불가라 미러 대상에서 제외: {', '.join(skipped)} (CI가 최종 판정)")
+    # 경로 필터 잡은 이 미러의 잡 선택이 대신한다(HARN-180) — 위 required가 바로 그 잡의 filter
+    # 스텝을 정본으로 읽어 계산한 결과다. 돌리면 filter 스텝이 GitHub 식 때문에 매번 미실행으로
+    # 세어져 자동 선택 실행이 전부 exit 3이 된다 — 상시 켜진 경고는 보호가 아니라 소음이다.
+    # `--job`으로 직접 지정하면 돌리고 미실행을 그대로 보고한다(위 분기).
+    if coverage.FILTER_JOB in runnable:
+        runnable.remove(coverage.FILTER_JOB)
+        print(
+            f"ⓘ {coverage.FILTER_JOB} 잡은 미러 대상에서 제외: 경로 필터 계산 잡이며 이 미러의 "
+            f"잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 대신했다 (CI가 최종 판정)"
+        )
     return runnable
 
 
@@ -420,15 +613,23 @@ def cmd_run(args: argparse.Namespace) -> int:
     else:
         print(render(results))
         print(f"결과 저장: {args.result} (commit {payload['commit'][:12]})")
-        failed = [j.name for j in results if j.exit_code]
-        print(f"✗ 실패 잡: {', '.join(failed)}" if failed else "✔ 전 잡 통과")
+        print(final_line(results))
     return int(payload["exit"])
 
 
 def cmd_verdict(args: argparse.Namespace) -> int:
-    ok, reason = verdict_for_commit(args.result, current_commit(Path.cwd()))
-    print(("✔ " if ok else "⚠ ") + reason)
-    return 0 if ok else 1
+    """0 통과 · 3 실행분 통과+미실행 존재 · 1 실패·결과 없음·다른 커밋·형식 불일치.
+
+    종료 코드를 바꾼 근거(HARN-180 ③): 이 저장소의 판정 규칙은 "exit code로 판정한다"이므로,
+    미실행이 있는데 0을 내면 문장을 아무리 바꿔도 코드를 읽는 쪽에는 통과로 보인다 — 2026-09-27
+    실측이 정확히 그 형태였다. 그렇다고 1(실패)로 접지 않는 이유는 처방이 달라서다.
+    `backlog.py done`은 이 판정을 경고로만 쓴다(1단계 warn — block 승격은 HARN-173/HARN-122
+    절차 소관). 지금 막으면 조건 스텝(`if:`)처럼 로컬에서 원리상 평가할 수 없는 검사를 가진
+    잡이 영구히 done을 막아, 사람이 경고 자체를 끄게 된다.
+    """
+    verdict = mirror_verdict(args.result, current_commit(Path.cwd()))
+    print(("✔ " if verdict.state == VERDICT_PASS else "⚠ ") + verdict.reason)
+    return verdict.exit_code
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -454,7 +655,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--json", action="store_true")
     pr.set_defaults(func=cmd_run)
 
-    pv = sub.add_parser("verdict", help="현재 커밋에 대한 미러 결과가 있고 통과했는지")
+    pv = sub.add_parser(
+        "verdict",
+        help="현재 커밋에 대한 미러 결과가 있고 통과했는지 (0 통과 · 3 미실행 존재 · 1 그 밖)",
+    )
     pv.set_defaults(func=cmd_verdict)
     return p
 
