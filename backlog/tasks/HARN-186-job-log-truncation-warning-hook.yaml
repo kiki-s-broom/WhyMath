@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-184-job-log-truncation-warning-hook
+id: HARN-186-job-log-truncation-warning-hook
 title: "CI 잡 로그 부분 조회로 원인을 판정하지 않게 — get_job_logs 응답이 원본보다 짧으면 PostToolUse 훅이 '잘린 로그' 경고를 주입"
 track: infra-debt
 stage: S3
@@ -22,5 +22,5 @@ paths:
   - ".claude/settings.json"
   - tests/infra/test_job_log_truncation_guard.py
 session: null
-notes: "2026-09-28 CONST-02 세션의 CI 원인 진단 사고(check-output-truncation 계열 재관통)의 재발 방지 대책으로 등재. 같은 계열의 기존 대책은 사람이 붙이는 `| tail`(2026-08-09 규칙)과 도구가 기본값으로 자르는 조회(2026-09-01 `backlog.py next` 분모 표기)였는데, 이번 입구는 MCP 도구 인자 `tail_lines`라 두 대책 모두 닿지 않았다. 응답에 `original_length`가 실려 오므로 절단 여부를 기계가 판정할 수 있다 — 판정 가능한 것을 사람 규율에 맡기지 않는다."
+notes: "2026-09-28 CONST-02 세션의 CI 원인 진단 사고(check-output-truncation 계열 재관통)의 재발 방지 대책으로 등재. 같은 계열의 기존 대책은 사람이 붙이는 `| tail`(2026-08-09 규칙)과 도구가 기본값으로 자르는 조회(2026-09-01 `backlog.py next` 분모 표기)였는데, 이번 입구는 MCP 도구 인자 `tail_lines`라 두 대책 모두 닿지 않았다. 응답에 `original_length`가 실려 오므로 절단 여부를 기계가 판정할 수 있다 — 판정 가능한 것을 사람 규율에 맡기지 않는다.\n\n[개명 2026-09-28] HARN-184-job-log-truncation-warning-hook → HARN-186-job-log-truncation-warning-hook: 번호 충돌 — 타 세션(claude/fervent-goldberg-s8y8ws)이 11:30:45Z에 HARN-184-gate-wait-kind-single-source를 등재·진행 중. 내 add(11:22:47Z)는 push 전이라 서로 보이지 않았다(HARN-111 사각). 185도 claude/vibrant-rubin-tp7jfw가 선점해 원격 브랜치 43개 전수 대조로 186 선택"
 updated: 2026-09-28

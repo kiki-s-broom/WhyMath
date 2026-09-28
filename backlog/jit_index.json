@@ -3134,6 +3134,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "등재한 HARN-184를 16분간 push하지 않는 사이 타 세션이 같은 번호로 등재·착수 — 186으로 개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
