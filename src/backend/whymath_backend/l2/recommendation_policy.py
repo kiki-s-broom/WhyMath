@@ -95,7 +95,9 @@ selection.load_direct_successors`)이고, 그 결과를 다시 예산으로 자�
 없고(l2→l6 역방향 금지), L6은 DB를 만질 수 없어(import-linter "데이터 접근 금지" 계약) 그쪽에도
 둘 수 없다. 그래서 수능 정책은 두 계층을 합법적으로 합성할 수 있는 유일한 자리인 API 합성
 지점(`api/_next_problem_policy.py`)에 산다. 같은 Protocol을 구현하므로 핸들러가 보는 모양은
-같다.
+같다. EOS-25부터 수능 정책도 의도 판정(`resolve_policy_intent`)과 정렬 계약을 이 모듈에서
+**그대로** 쓴다 — 진단은 모드와 무관하게 하나다. 다만 콘텐츠 재선택(처방)은 수능 모드에서 보류한다
+(`IntentResolution.MODE_WITHHELD` — 이유는 그 정책 모듈의 docstring "EOS-25" 절).
 """
 
 from __future__ import annotations
@@ -172,7 +174,6 @@ __all__ = [
     "PolicyIntent",
     "PolicyTelemetry",
     "resolve_policy_intent",
-    "resolve_target_concept",
 ]
 
 _T = TypeVar("_T")
@@ -270,69 +271,10 @@ async def _within_budget(budget: ConceptGraphBudget, read: Callable[[], Awaitabl
 async def _budgeted_prerequisites(
     session: AsyncSession, concept_id: uuid.UUID, budget: ConceptGraphBudget
 ) -> list[PrerequisiteRow]:
-    """선수 traversal — 깊이·시간 예산을 **한 곳에서** 건다(목표 판정·정책 의도 두 호출부 공용)."""
+    """선수 traversal — 깊이·시간 예산을 **한 곳에서** 건다(정책 의도 판정의 선수 조회)."""
     return await _within_budget(
         budget, lambda: fetch_prerequisites(session, concept_id, max_depth=budget.max_depth)
     )
-
-
-async def resolve_target_concept(
-    session: AsyncSession,
-    *,
-    reason: RecommendationReason,
-    learner_state: LearnerState,
-    budget: ConceptGraphBudget = DEFAULT_GRAPH_BUDGET,
-) -> uuid.UUID | None:
-    """**다음에 다뤄야 할 개념** — 선수 막힘이면 막힌 선수개념, 아니면 문항의 개념.
-
-    계획서 §8의 `PRACTICE_PREREQUISITE`는 "선수개념을 연습하라"는 행위인데, *어느* 선수개념인지를
-    말하지 않으면 그 행위는 실행할 수 없다. 이 함수가 그 목적어를 채운다.
-
-    판정: 선수 후보 중 `learner_state.mastery`(개념코드 키)에 **측정이 있는 것들** 중 최저 숙달.
-    측정 없는 선수는 고르지 않는다 — 콜드스타트 선수를 "막혔다"고 부르면 근거 없음이 근거로
-    위장된다(계약의 `UNMEASURED`/`COLD_START` 분리와 같은 규율). 측정된 선수가 하나도 없으면
-    문항 자신의 개념으로 폴백한다(그쪽은 실측 숙달이 있는 것이 확정이다 — `PREREQUISITE_GAP`은
-    측정에서만 나온다).
-
-    예산 초과·시간 초과는 **추천을 실패시키지 않는다**: traversal이 타임아웃되면 폴백으로
-    내려가고 그 사실을 로그에 남긴다(예외 타입명 포함 — CLAUDE.md 침묵 실패 금지). 근거를
-    풍부하게 하는 부가 조회 때문에 학생이 문항을 못 받는 것은 우선순위가 거꾸로다.
-
-    **EOS-124 이후 소비처는 수능 정책뿐이다**(기본 CAT은 `resolve_policy_intent`로 옮겼다).
-    이 함수에는 EOS-124가 실측한 결함이 **그대로 남아 있다** — "최저 숙달"은 선수가 전부 숙달이어도
-    그중 하나를 막힌 선수로 부르고, 선수가 미측정이면 문항 개념으로 폴백해 `practice_prerequisite`가
-    제자리를 가리킨다. 수능 정책의 변경은 별도 판정이 필요해(L6 게이팅과 재선택의 상호작용) 이
-    함수를 고치지 않고 `EOS-25`로 분리했다 — 고치면 수능 추천이 판정 없이 바뀐다.
-    """
-    if reason.concept_id is None:
-        return None
-    if reason.type is not ReasonType.PREREQUISITE_GAP:
-        # 선수로 되돌아가라는 추천이 아니면 목표는 문항의 개념 그대로다 — 그래프를 읽지 않는다
-        # (읽을 이유가 없는 조회를 "있으면 좋으니" 넣지 않는다).
-        return reason.concept_id
-
-    try:
-        rows = await _budgeted_prerequisites(session, reason.concept_id, budget)
-    except (TimeoutError, asyncio.CancelledError) as exc:
-        _logger.warning(
-            "선수 traversal 예산 초과(%s) — 목표 개념을 문항 개념으로 폴백합니다. concept=%s",
-            type(exc).__name__,
-            reason.concept_id,
-        )
-        return reason.concept_id
-
-    measured: list[tuple[float, PrerequisiteRow]] = []
-    for row in _apply_node_budget(rows, budget):
-        if row.concept_code is None:
-            continue
-        mastery = learner_state.mastery.get(row.concept_code)
-        if mastery is not None:
-            measured.append((mastery, row))
-    if not measured:
-        return reason.concept_id
-    # 최저 숙달이 최우선 — 동률이면 가까운 선수(depth 낮은 쪽)·그다음 id로 결정론 고정.
-    weakest = min(measured, key=lambda pair: (pair[0], pair[1].depth, str(pair[1].concept_id)))
-    return weakest[1].concept_id
 
 
 class IntentResolution(str, Enum):
@@ -374,6 +316,15 @@ class IntentResolution(str, Enum):
 
     TARGET_UNAVAILABLE = "target_unavailable"
     """목표 개념은 섰으나 출제 가능한(노출 게이트 통과·미응답) 문항이 없다 — 정직 강등."""
+
+    MODE_WITHHELD = "mode_withheld"
+    """규칙은 관계 행위를 가리켰고 목표 개념도 섰으나 **출제 모드가 콘텐츠 재선택을 보류했다**
+    (EOS-25 · 수능 모드). 1차 선택 문항을 내보내고 앵커 개념 연습으로 정직 강등한다.
+    반증(`REFUTED`)·
+    근거 없음(`UNSUPPORTED`)·콘텐츠 공백(`TARGET_UNAVAILABLE`)과 다르다 — 목표는 있었고 문항도
+    있었을
+    수 있지만 모드의 판정으로 가지 않았다. 한 값으로 접으면 "못 했다"와 "안 했다"가 같은 글자가
+    된다."""
 
     NO_CANDIDATE = "no_candidate"
     """후보가 아예 없다 — 추천 자체가 없다(`problem_id=None`)."""
@@ -422,7 +373,8 @@ async def resolve_policy_intent(
     **선수 구간(숙달 < 0.4)** — 세 갈래를 차례로 본다:
       (가) 앵커의 측정된 선수 중 **아직 약한 것**(숙달 < `WEAK_CONCEPT_MASTERY_CEILING`)이 있다 →
            가장 약한 것부터 재선택 목표로. EOS-124 (나)가 여기서 막힌다: 선수가 1.0으로 숙달됐으면
-           목표가 되지 않는다(종전 `resolve_target_concept`는 측정된 선수 중 *최저*를 골라, 전부
+           목표가 되지 않는다(종전 목표 판정 `resolve_target_concept` — EOS-25에서 제거 — 는 측정된
+           선수 중 *최저*를 골라, 전부
            숙달이어도 그중 하나를 "막힌 선수"로 불렀다).
       (나) 앵커 자신이 **막힌 후행**(숙달 < 0.4)의 직접 선수다 → 근거를 그 후행으로 옮기고, 목표는
            이미 전달될 앵커 문항이다(재선택 없음). "원래 개념이 막혀서 선수를 연습한다"는 설명이
@@ -627,11 +579,12 @@ class NextProblemOutcome(Recommendation):
             "안에 있어야 소급 평가가 성립한다."
         ),
     )
-    intent_resolution: IntentResolution | None = Field(
-        default=None,
+    intent_resolution: IntentResolution = Field(
         description=(
             "EOS-124 — 정책 의도가 전달 콘텐츠로 어떻게 해소됐나(관측 메타 · `IntentResolution`). "
-            "**None이면 이 정책은 정렬 계약을 아직 적용하지 않는다**(수능 정책 — 후속 태스크)."
+            "**필수**다(EOS-25): 정렬 선언은 모든 정책의 의무이고, 선언 없는 산출은 만들어지지 "
+            "않는다. 수능 정책이 정렬을 적용하기 전에는 None을 허용해 검증을 면제했다 — 그 면제의 "
+            "소비처가 사라졌으므로 남겨 두면 다음 정책이 None을 내는 순간 검증이 조용히 빠진다."
         ),
     )
     delivered_concept: uuid.UUID | None = Field(
@@ -644,25 +597,25 @@ class NextProblemOutcome(Recommendation):
 
     @model_validator(mode="after")
     def _aligned_when_declared(self) -> "NextProblemOutcome":
-        """정렬 계약을 **선언한**(`intent_resolution`이 있는) 산출은 어긋난 채로 만들어지지 않는다.
+        """정렬을 선언한 산출은 어긋난 채로 만들어지지 않는다 — 그리고 선언은 **필수**다(EOS-25).
 
         EOS-124 집행 지점이다. 계약을 주석으로 적고 정책의 선의에 맡기면 다음 수정이 조용히
         깬다(EOS-19가 `target_concept`을 문항 개념과 따로 계산한 것이 정확히 그 형태였다) —
         그래서 산출 객체가 **존재한다는 사실 자체**가 정렬의 증거가 되게 한다. 핸들러는 이
         객체를 HTTP 응답으로 옮기기만 하므로, 이 검증은 실제 서빙 응답이 반드시 지나가는 자리다.
 
-        `intent_resolution=None`(수능 정책)은 검증하지 않는다 — 그 정책은 아직 정렬하지 않으며,
-        이 검증을 걸면 그 경로가 500으로 죽는다. 정렬하지 않는다는 사실은 응답에 None으로
-        정직하게 드러난다.
+        EOS-124 시점에는 `intent_resolution=None`(수능 정책)을 면제했다. 그 정책이 아직 정렬하지
+        않아 검증을 걸면 서빙 경로가 500으로 죽었기 때문이다. EOS-25가 수능 정책에 정렬을 적용해
+        면제의 소비처가 0이 됐으므로 면제를 닫았다 — 필드가 필수라 None 산출은 생성 단계에서
+        거부되고, 모든 산출이 이 검증을 지난다. 메서드 이름은 참조가 많아 유지한다.
         """
-        if self.intent_resolution is not None:
-            check_intent_alignment(
-                problem_id=self.problem_id,
-                action=self.action,
-                reason_concept_id=self.reason.concept_id,
-                target_concept=self.target_concept,
-                delivered_concept=self.delivered_concept,
-            )
+        check_intent_alignment(
+            problem_id=self.problem_id,
+            action=self.action,
+            reason_concept_id=self.reason.concept_id,
+            target_concept=self.target_concept,
+            delivered_concept=self.delivered_concept,
+        )
         return self
 
 

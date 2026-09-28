@@ -62,6 +62,16 @@ REC-11: candidates[]·policy_version — 추천 오프라인 평가의 소급 �
 배선돼 조인 *키*는 생겼지만, 결과를 결합하는 집계는 이 좌석이 아니라 소비자(`ops/loop_kpi_gate`
 KPI ① 등)의 몫이다. `candidates`·`policy_version`은 "무엇과 비교해 선택했는가"를 재구성하는
 선행 재료일 뿐, 이 좌석 자체가 결과를 결합하지 않는다.
+
+────────────────────────────────────────────────────────────────────────────
+EOS-132: learner_state_basis — 이 추천이 본 LearnerState의 근거 식별자 (KPI ⑤)
+────────────────────────────────────────────────────────────────────────────
+`LearnerState`는 매 호출 조립되고 영속하지 않는다. 그래서 역추적 체인
+`Recommendation → LearnerState → Assessment → Attempt → Problem`의 LearnerState 홉은 **이 기록에
+남긴 근거**로만 되짚을 수 있다(`l2.learner_state.LearnerStateBasis` — 최신 숙달 행 키 · θ 스냅샷
+id · 활성 가설 id · 조립 시각). 식별자와 시각만 싣는다(B1 불변). 근거가 비어 있으면 사유를 함께
+적고(`absent`), 호출자가 근거를 넘기지 않으면 **키 자체를 넣지 않는다** — 역추적 게이트는 키 부재를
+"모른다"로 읽고 끊김으로 센다(`ops/loop_kpi_gate.collect_traceability`).
 """
 
 from __future__ import annotations
@@ -73,6 +83,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.evidence_event import EvidenceEvent
+from whymath_backend.l2.learner_state import LearnerStateBasis
 from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.schema.enums import KnowledgeType
 
@@ -98,6 +109,11 @@ META_KEY_INTENT_RESOLUTION: str = "intent_resolution"
 #: 값). 지시가 없던 추천에는 키 자체가 없다 — 그래서 "키가 있는 행 중 `applied` 비율"이 곧
 #: 상태 머신 결정을 추천이 집행한 비율이다(CLAUDE.md "작동한 비율").
 META_KEY_LEARNING_STATE_DIRECTIVE: str = "learning_state_directive"
+
+#: EOS-132 — 이 추천이 소비한 `LearnerState`의 근거 식별자(`LearnerStateBasis.to_meta()` 형태).
+#: 키가 없으면 "근거를 모른다"이다(역추적 끊김). 근거가 비어 있는 것은 키 안의 `absent` 사유로
+#: 말한다 — 두 상태를 같은 글자로 쓰지 않는다(EOS-132 ⑧).
+META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
@@ -155,6 +171,7 @@ async def record_recommendation_treatment(
     occurred_at: datetime | None = None,
     learning_session_id: uuid.UUID | None = None,
     learning_state_directive: str | None = None,
+    learner_state_basis: LearnerStateBasis | None = None,
 ) -> EvidenceEvent:
     """`/me/next-problem`이 학생에게 실제로 반환한 추천 1건을 stage한다(commit 0).
 
@@ -189,6 +206,9 @@ async def record_recommendation_treatment(
 
     `learning_session_id`(EOS-131): 이 추천이 나간 실 학습 세션. `None`이면 세션 기록 실패
     경로로 보고 결합 불가 placeholder를 발급한다(모듈 docstring 참조 — 가짜 결합 금지).
+
+    `learner_state_basis`(EOS-132): 이 추천이 소비한 `LearnerState`의 근거 식별자. None이면 키를
+    넣지 않는다 — 역추적 게이트가 그 부재를 끊김으로 센다(모른다 ≠ 없었다).
     """
     meta: dict[str, Any] = {
         META_KEY_PROBLEM_ID: str(problem_id),
@@ -215,6 +235,8 @@ async def record_recommendation_treatment(
 
     if learning_state_directive is not None:
         meta[META_KEY_LEARNING_STATE_DIRECTIVE] = learning_state_directive
+    if learner_state_basis is not None:
+        meta[META_KEY_LEARNER_STATE_BASIS] = learner_state_basis.to_meta()
 
     row = EvidenceEvent(
         time=occurred_at if occurred_at is not None else _now(),
@@ -237,6 +259,7 @@ __all__ = [
     "META_KEY_CANDIDATES",
     "META_KEY_GATE_REASON",
     "META_KEY_INTENT_RESOLUTION",
+    "META_KEY_LEARNER_STATE_BASIS",
     "META_KEY_LEARNING_STATE_DIRECTIVE",
     "META_KEY_MODE",
     "META_KEY_POLICY_VERSION",

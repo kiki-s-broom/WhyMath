@@ -2354,6 +2354,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "EOS-137 게이트 부착 후 claim 반납 → 다른 세션이 13:46 재착수해 ①을 다시 구현(미푸시)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
@@ -3244,6 +3255,19 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".gitattributes",
+    "backlog/incidents.ndjson",
+    "scripts/harness/incidents.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_incidents.py"
+   ],
+   "text": "병합 큐 MERGE_CONFLICT 이탈 — 사고 대장 끝 추가 충돌(EOS-25 PR #1363 · 재병합 직후 1회 더 재현)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
@@ -3941,6 +3965,24 @@
     "tests/infra/test_integration_marker_*.py"
    ],
    "text": "통합 테스트를 플래그 없이 -m integration으로 돌려 전부 skip·exit 0 — 판정 줄을 읽어 발견",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 샤드에 가짜 path_overlap 3줄 기록(EOS-25 병합 재검증 미러 중 · 커밋본 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 샤드에 가짜 policy_warn 7줄 기록(EOS-25 CI 미러 중 · 커밋본 복원)",
    "weight": 0
   },
   {
