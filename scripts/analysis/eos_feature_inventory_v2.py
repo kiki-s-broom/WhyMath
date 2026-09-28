@@ -1110,7 +1110,11 @@ CATALOG: tuple[Spec, ...] = (
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
        "harness.generator_space_overlap_audit",
        "harness.prompt_asset_audit", "harness.generation_seed_replay_probe",
-       "harness.batch_safety"),
+       "harness.batch_safety",
+       # EOS-23 — 검수 큐의 Tier1 검산 거부 행을 재검산해 산술 오류/표현 불일치/판정불가로
+       # 전수 분류하는 읽기 전용 진단 CLI. `corpus_reverify`(코퍼스 Tier1 재검산)와 같은
+       # 검산 재료·같은 판정 함수를 쓰는 짝이라 같은 행에 귀속한다.
+       "harness.tier1_rejection_classifier"),
     _o("WM-O-913", "커버리지·도달률 관측 리포트 가족", "Admin", "Analytics", "P1",
        "OPS-19 — 리포트 11개 중 러너 배선은 별도", "harness.assessment_seat_reach_report",
        "harness.attempt_grading_shadow_report", "harness.attempt_skill_event_reach_report",

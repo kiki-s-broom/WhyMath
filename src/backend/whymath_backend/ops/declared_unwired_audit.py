@@ -1086,6 +1086,17 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "PowerShell이 바이트를 중계하면 한국어가 cp949 왕복으로 깨지므로 런북 [F]가 "
             "이 CLI를 경유한다(Python이 읽고 Python이 쓴다)"
         ),
+        # EOS-23(2026-09-28): 검수 큐 → Tier1 거부 행 전수 분류. `problem_corpus_round_reply`와
+        # 같은 부류다 — 입력이 *특정 회차의 검수 큐 사이드카*(`<좌석>.review.jsonl`)이고 그 파일은
+        # Phaiakes9의 gitignore 폴더에만 있어 레포에 상주하지 않는다. 대상 행이 없으면 도구가
+        # exit 2로 거부한다(공허한 통과 금지). 판정 로직(ⓐ/ⓑ/판정불가·재현 선행·0건 가드)은
+        # backend 잡이 수집하는 tests/backend/harness/test_tier1_rejection_classifier.py가
+        # 실제 게이트·실제 직렬화 경로로 만든 행과 뮤테이션 대조로 상시 검증한다.
+        "harness.tier1_rejection_classifier": (
+            "by-design:회차 검수 큐를 읽어 Tier1 검산 거부 행을 산술 오류/표현 불일치로 전수 "
+            "분류하는 읽기 전용 진단 도구(EOS-23 ③) — 상주 입력이 없고, 회차 산출물이 있는 "
+            "운영자 머신에서 런북(eos23_rejected_quad_sum_classification_runbook)으로 한 번 돌린다"
+        ),
         # 운영 집계 배치 — COLLAB-03(done)이 신설한 일별 학습지표 롤업 실행기
         "harness.learning_metrics_rollup_cli": _OPERATIONS_BATCH,
         # OPS-56(2026-09-11): 주간 KPI 6종 집계 cron — `ci_executed_modules()`가 `.github/

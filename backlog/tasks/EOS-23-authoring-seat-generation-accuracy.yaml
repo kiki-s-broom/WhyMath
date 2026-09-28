@@ -5,12 +5,13 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: blocked
 priority: 2
 eos_priority: P2
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-eos23-rejected-quad-sum-classification
 acceptance:
   - "① 실측 근거 고정 (EOS-121 라이브 회차 `6ea0b38ab0f840e5b70bae6b1ba7dd77` · 판정 기준 main `217119dc` · 2026-09-20 Phaiakes9) — anthropic 좌석 90호출 중 `rejected_gate` 30건이고 **전건 `quad-sum` spec**이다(`quad-largest`·`quad-smallest`는 각 0건). 사유는 다양성이 아니라 검산 실패다: `정확성 실패 — Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0: -6`(`l3/equivalent/acceptance.py:357` ← `l3/verify_answer.py:392` — 단일 조건·자유변수 전건 치환된 직접 수치 평가 분기). 같은 회차 openrouter는 같은 spec에서 수용 14·게이트 거부 0이고, 그 좌석의 실패는 **생성 단계**에 몰린다(`generation_failed` 8건 = conditions DSL 위반). **30/30은 우연이 아니라 체계적**이며 그것이 이 태스크의 존재 이유다. 근거 문서 = `docs/ops/eos121_seat_generation_diversity_verdict.md`."
   - "② 첫 행위는 재측정이 아니라 **회수**다 — 거부된 30건의 본문은 이미 영속돼 있다. `.eos121-out/anthropic.review.jsonl`의 `ReviewQueueEntry` 행이 `candidate_payload`(문항·정답·해설·**검산 조건** 전문 = 코퍼스 레코드 동일 직렬화)와 `spec_id`·`reasons`를 담는다(`harness/needs_review_worklist.py:163-202`). `.genlog.jsonl`은 입력 스냅샷만 있고 **출력이 없으므로** 거기서는 규명되지 않는다. 그 파일은 Phaiakes9의 gitignore 폴더에만 있으므로 회수에 Kiki 회신이 필요하고, 착수 세션이 그 회신을 게이트 또는 런북 블록으로 등재한다. **회수 전에 유료 회차를 계획하면 180호출을 또 태운다.**"
@@ -27,6 +28,10 @@ paths:
   - "docs/ops/**"
   - src/backend/whymath_backend/l3/verify_answer.py
   - src/backend/whymath_backend/l3/equivalent/acceptance.py
-session: claude/gallant-euler-blngpj
-notes: "등재 경위(2026-09-20): EOS-121 라이브 회차(180호출) 집행 중 부수로 드러났다. 그 회차의 목표는 다양성 축이었고 판정은 `docs/ops/eos121_seat_generation_diversity_verdict.md`가 소유한다 — 이 태스크는 **같은 회차에서 같이 나왔지만 아무도 소유하지 않은 축**이다. 채팅·PR 본문에만 남기면 만료 없는 유예가 되므로(CLAUDE.md) 소유자를 만든다.\n\n왜 별건인가: 다양성 결함은 \"같은 것을 또 만든다\"이고 처방이 샘플링·프롬프트 다양화다. 정확성 결함은 \"틀린 것을 만든다(또는 옳은 것을 틀리게 표현한다)\"이고 처방이 검산 계약 또는 생성 지시다. 두 축은 원인도 처방도 겹치지 않는다.\n\n**depends_on을 비워 둔 이유(명시)**: 이 태스크가 쓸 증거 파일(`.eos121-out/anthropic.review.jsonl`)은 **이미 생성돼 있다**. 다양성 축 태스크의 종결 여부와 무관하므로 그것을 의존으로 걸면 실재하지 않는 차단이 생기며, `depends_on`을 비워 두는 것이 정확한 상태 표현이다. 다만 판정 서술이 판정문을 인용하므로 그 문서가 main에 있는지 착수 세션이 먼저 확인한다(2026-09-20 현재 `e91a75d3`에 있다).\n\n측정 한계 승계: 판정문 「정직한 한계」가 이 축에도 그대로 걸린다 — 각 좌석 1회차 · 단일 성취기준 `[10공수1-02-02]`·이차방정식 한정 · `top_p` 미통제(대칭이되 통제되지 않음). 따라서 \"anthropic이 산술에 약하다\"로 일반화하지 않는다. 확정된 것은 *이 워크로드에서 이 좌석이 이 spec을 전건 거부당했다*이다.\n\n주의: 이 태스크도 ARCH-56의 발동 조건 ⓐ(학생 대면 또는 상시 배치 트래픽 투입)를 건드리지 않는다.\n\n[개명 2026-09-20] EOS-128-authoring-seat-generation-accuracy → EOS-23-authoring-seat-generation-accuracy: 번호 충돌 해소 — 타 세션(claude/new-session-fy0wry)이 EOS-128-phase3-plan-backlog-conversion을 07:44Z에 등재·in_progress claim. 내 등재는 07:24Z로 앞서지만 claim이 없고 status=todo라 개명 비용이 훨씬 낮다(상대는 PR #1233·하위 태스크 11건·게이트 1건이 번호를 참조). 대상 번호는 CLI 제안(HARN-73 하위 미사용 재사용)을 그대로 따랐다 — 손추론 금지.\n\n[정정 2026-09-20] 개명 기록 부착 — 번호 재사용의 과거 참조 모호성을 태스크 안에서 해소(PR #1229 본문의 'EOS-23 취소'와 이 태스크가 다른 것임을 명시)\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침"
+  - src/backend/whymath_backend/harness/tier1_rejection_classifier.py
+  - tests/backend/harness/test_tier1_rejection_classifier.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+session: null
+notes: "등재 경위(2026-09-20): EOS-121 라이브 회차(180호출) 집행 중 부수로 드러났다. 그 회차의 목표는 다양성 축이었고 판정은 `docs/ops/eos121_seat_generation_diversity_verdict.md`가 소유한다 — 이 태스크는 **같은 회차에서 같이 나왔지만 아무도 소유하지 않은 축**이다. 채팅·PR 본문에만 남기면 만료 없는 유예가 되므로(CLAUDE.md) 소유자를 만든다.\n\n왜 별건인가: 다양성 결함은 \"같은 것을 또 만든다\"이고 처방이 샘플링·프롬프트 다양화다. 정확성 결함은 \"틀린 것을 만든다(또는 옳은 것을 틀리게 표현한다)\"이고 처방이 검산 계약 또는 생성 지시다. 두 축은 원인도 처방도 겹치지 않는다.\n\n**depends_on을 비워 둔 이유(명시)**: 이 태스크가 쓸 증거 파일(`.eos121-out/anthropic.review.jsonl`)은 **이미 생성돼 있다**. 다양성 축 태스크의 종결 여부와 무관하므로 그것을 의존으로 걸면 실재하지 않는 차단이 생기며, `depends_on`을 비워 두는 것이 정확한 상태 표현이다. 다만 판정 서술이 판정문을 인용하므로 그 문서가 main에 있는지 착수 세션이 먼저 확인한다(2026-09-20 현재 `e91a75d3`에 있다).\n\n측정 한계 승계: 판정문 「정직한 한계」가 이 축에도 그대로 걸린다 — 각 좌석 1회차 · 단일 성취기준 `[10공수1-02-02]`·이차방정식 한정 · `top_p` 미통제(대칭이되 통제되지 않음). 따라서 \"anthropic이 산술에 약하다\"로 일반화하지 않는다. 확정된 것은 *이 워크로드에서 이 좌석이 이 spec을 전건 거부당했다*이다.\n\n주의: 이 태스크도 ARCH-56의 발동 조건 ⓐ(학생 대면 또는 상시 배치 트래픽 투입)를 건드리지 않는다.\n\n[개명 2026-09-20] EOS-128-authoring-seat-generation-accuracy → EOS-23-authoring-seat-generation-accuracy: 번호 충돌 해소 — 타 세션(claude/new-session-fy0wry)이 EOS-128-phase3-plan-backlog-conversion을 07:44Z에 등재·in_progress claim. 내 등재는 07:24Z로 앞서지만 claim이 없고 status=todo라 개명 비용이 훨씬 낮다(상대는 PR #1233·하위 태스크 11건·게이트 1건이 번호를 참조). 대상 번호는 CLI 제안(HARN-73 하위 미사용 재사용)을 그대로 따랐다 — 손추론 금지.\n\n[정정 2026-09-20] 개명 기록 부착 — 번호 재사용의 과거 참조 모호성을 태스크 안에서 해소(PR #1229 본문의 'EOS-23 취소'와 이 태스크가 다른 것임을 명시)\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침\n\n[정정 2026-09-28] ② 회수를 파일 이송 대신 Kiki 머신 현지 분류로 대체 — 결과 회신 게이트\n\n[정정 2026-09-28] paths ['docs/ops/**', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/l3/equivalent/acceptance.py'] → ['docs/ops/**', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/l3/equivalent/acceptance.py', 'src/backend/whymath_backend/harness/tier1_rejection_classifier.py', 'tests/backend/harness/test_tier1_rejection_classifier.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py']: 오프라인 분류기·테스트·인벤토리 귀속 파일을 실제 범위로 추가\n\n[차단 2026-09-28] 오프라인 축(현지 분류기·런북) 착지 — PR #1358. ③ 분류는 게이트 G-eos23-rejected-quad-sum-classification(Kiki 런북 실행·결과 회신) 대기. 라이브 축(④ 좌석당 15회)은 ARCH-66으로 미수행"
 updated: 2026-09-28
