@@ -12,7 +12,7 @@
 ③ **개념 그래프 예산은 생성 시점에 강제된다** — depth ≤ 2 · nodes ≤ 20을 넘는 예산 객체는
    *존재할 수 없다*. 호출부의 선의에 맡기지 않는다(CLAUDE.md 구축 플레이북 하드 게이트).
 ④ **목표 개념은 측정된 선수에서만 나온다** — 측정 없는 선수를 "막혔다"고 부르면 근거 없음이
-   근거로 위장된다.
+   근거로 위장된다(`resolve_policy_intent` — 종전 `resolve_target_concept`는 EOS-25에서 제거).
 
 **변별력 확인**: 이 파일의 가드들은 정상 입력에서 초록인 것으로 충분하다고 보지 않는다.
 막으려는 상태를 실제로 주입해 RED가 나오는지는
@@ -57,7 +57,6 @@ from whymath_backend.l2.recommendation_policy import (
     NextProblemOutcome,
     NextProblemPolicy,
     resolve_policy_intent,
-    resolve_target_concept,
 )
 
 _CONCEPT = uuid.uuid4()
@@ -249,106 +248,6 @@ class _SpyFetch:
         return self._rows
 
 
-@pytest.fixture
-def spy(monkeypatch: pytest.MonkeyPatch) -> Any:
-    def _install(rows: list[PrerequisiteRow], *, hang: bool = False) -> _SpyFetch:
-        s = _SpyFetch(rows, hang=hang)
-        monkeypatch.setattr(policy_module, "fetch_prerequisites", s)
-        return s
-
-    return _install
-
-
-class TestResolveTargetConcept:
-    async def test_prerequisite_gap_targets_the_weakest_measured_prerequisite(
-        self, spy: Any
-    ) -> None:
-        """'선수를 연습하라'는 행위에 *어느* 선수인지가 없으면 실행할 수 없다."""
-        s = spy([_row(_PREREQ_A, "UC-A"), _row(_PREREQ_B, "UC-B")])
-        target = await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=_CONCEPT, mastery=0.1, confidence=0.5),
-            learner_state=_state({"UC-A": 0.6, "UC-B": 0.2}),
-        )
-        assert target == _PREREQ_B  # 더 약한 쪽
-        assert s.calls[0]["max_depth"] == DEFAULT_GRAPH_BUDGET.max_depth
-
-    async def test_traversal_never_exceeds_the_depth_budget(self, spy: Any) -> None:
-        """예산이 *전달되는지*를 본다 — 천장 테스트만으로는 미사용 예산을 못 잡는다."""
-        s = spy([_row(_PREREQ_A, "UC-A")])
-        await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=_CONCEPT, mastery=0.1, confidence=0.5),
-            learner_state=_state({"UC-A": 0.3}),
-        )
-        assert s.calls, "선수 traversal이 아예 호출되지 않았다 — 예산 검사가 공허해진다"
-        assert s.calls[0]["max_depth"] <= policy_module._DEPTH_CEILING
-
-    async def test_unmeasured_prerequisites_are_not_called_blocked(self, spy: Any) -> None:
-        """측정 없는 선수를 목표로 삼으면 근거 없음이 근거로 위장된다 — 문항 개념으로 폴백."""
-        spy([_row(_PREREQ_A, "UC-A")])
-        target = await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=_CONCEPT, mastery=0.1, confidence=0.5),
-            learner_state=_state({}),  # 선수 숙달 이력 없음
-        )
-        assert target == _CONCEPT
-
-    @pytest.mark.parametrize("mastery", [0.5, 0.9])
-    async def test_non_prerequisite_bands_do_not_touch_the_graph(
-        self, spy: Any, mastery: float
-    ) -> None:
-        """읽을 이유가 없는 조회를 "있으면 좋으니" 넣지 않는다(비용은 학생 대기시간이다)."""
-        s = spy([_row(_PREREQ_A, "UC-A")])
-        target = await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=_CONCEPT, mastery=mastery, confidence=0.5),
-            learner_state=_state({"UC-A": 0.1}),
-        )
-        assert target == _CONCEPT
-        assert s.calls == []
-
-    async def test_unmapped_problem_has_no_target(self, spy: Any) -> None:
-        """개념 매핑이 없으면 목표도 없다 — 없는 근거를 지어내지 않는다."""
-        s = spy([])
-        target = await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=None, mastery=None, confidence=None),
-            learner_state=_state({"UC-A": 0.1}),
-        )
-        assert target is None
-        assert s.calls == []
-
-    async def test_timeout_falls_back_instead_of_failing_the_recommendation(
-        self, spy: Any, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """근거를 풍부하게 하는 부가 조회 때문에 학생이 문항을 못 받는 것은 우선순위가 거꾸로다."""
-        spy([_row(_PREREQ_A, "UC-A")], hang=True)
-        with caplog.at_level("WARNING"):
-            target = await resolve_target_concept(
-                object(),  # type: ignore[arg-type]
-                reason=build_reason(concept_id=_CONCEPT, mastery=0.1, confidence=0.5),
-                learner_state=_state({"UC-A": 0.1}),
-                budget=ConceptGraphBudget(timeout_seconds=0.01),
-            )
-        assert target == _CONCEPT
-        # 침묵 실패 금지 — 예외 타입명이 로그에 남아야 8가지 실패가 같은 글자로 보이지 않는다.
-        assert "TimeoutError" in caplog.text
-
-    async def test_node_budget_bounds_what_the_target_search_sees(self, spy: Any) -> None:
-        """예산 밖 선수는 목표 후보가 되지 않는다 — 너비 폭발이 판정을 오염시키지 않는다."""
-        far = uuid.uuid4()
-        rows = [_row(uuid.uuid4(), f"UC-{i}") for i in range(20)] + [_row(far, "UC-FAR")]
-        spy(rows)
-        target = await resolve_target_concept(
-            object(),  # type: ignore[arg-type]
-            reason=build_reason(concept_id=_CONCEPT, mastery=0.1, confidence=0.5),
-            # 예산(20) 밖 21번째 선수만 측정이 있다 → 잘렸으므로 폴백이어야 한다.
-            learner_state=_state({"UC-FAR": 0.01}),
-        )
-        assert target == _CONCEPT
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # ⑤ Protocol 적합 — EOS-14의 동결이 이 구현체를 실제로 제약하는가
 # ──────────────────────────────────────────────────────────────────────────
@@ -386,7 +285,11 @@ class TestPolicyConformance:
         """관측 메타를 실었다고 계약에서 벗어나면 정책 교체가 불가능해진다."""
         assert issubclass(NextProblemOutcome, Recommendation)
         outcome = NextProblemOutcome(
-            problem_id=None, reason=no_candidate_reason(), theta=0.0, policy_version="cat_v1"
+            problem_id=None,
+            reason=no_candidate_reason(),
+            theta=0.0,
+            policy_version="cat_v1",
+            intent_resolution=IntentResolution.NO_CANDIDATE,
         )
         assert isinstance(outcome, Recommendation)
         assert outcome.action is RecommendationAction.NONE
@@ -530,14 +433,29 @@ class TestOutcomeEnforcesAlignment:
         assert outcome.action is RecommendationAction.ADVANCE_NEXT
         assert outcome.target_concept == _NEXT_A
 
-    def test_policies_that_do_not_declare_alignment_are_not_checked(self) -> None:
-        """수능 정책은 아직 정렬하지 않는다 — 검증을 걸면 그 경로가 500으로 죽는다.
+    @pytest.mark.parametrize("omit", [True, False])
+    def test_outcome_without_declared_alignment_cannot_be_constructed(self, omit: bool) -> None:
+        """EOS-25 — 정렬 선언은 **필수**다. 빼거나 None을 넣은 산출은 만들어지지 않는다.
 
-        정렬하지 않는다는 사실은 `intent_resolution=None`으로 응답에 드러난다(정직 표기).
-        이 면제가 사라지면(검증을 무조건 걸면) 이 테스트가 RED가 된다.
+        EOS-124 시점에는 None을 면제했다(수능 정책이 정렬하지 않아 검증을 걸면 500). 수능 정책이
+        정렬을 선언하면서 면제의 소비처가 0이 됐다. 면제를 남겨 두면 다음 정책(또는 수능 정책의
+        회귀)이 None을 내는 순간 검증이 **조용히** 빠진다 — 그래서 필드 자체를 필수로 닫았다.
+        아래 두 형태(키 생략 · 명시적 None) 중 어느 하나라도 통과하면 면제가 되살아난 것이다.
         """
-        outcome = self._outcome(intent_resolution=None)
-        assert outcome.intent_resolution is None
+        base: dict[str, Any] = {
+            "problem_id": None,
+            "reason": no_candidate_reason(),
+            "theta": 0.0,
+            "policy_version": "suneung_v2",
+        }
+        if not omit:
+            base["intent_resolution"] = None
+        with pytest.raises(ValidationError, match="intent_resolution"):
+            NextProblemOutcome(**base)
+
+    def test_intent_resolution_is_required_by_name(self) -> None:
+        """필드 자체의 필수성 — 다른 필수 필드의 실패에 가려지지 않게 이름으로 단언한다."""
+        assert NextProblemOutcome.model_fields["intent_resolution"].is_required() is True
 
 
 class _Fakes:

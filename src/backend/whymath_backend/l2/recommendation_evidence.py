@@ -107,8 +107,12 @@ META_KEY_LEARNING_STATE_DIRECTIVE: str = "learning_state_directive"
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
 POLICY_VERSION_CAT: str = "cat_v2"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
-POLICY_VERSION_SUNEUNG: str = "suneung_v1"
-"""수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
+POLICY_VERSION_SUNEUNG: str = "suneung_v2"
+"""수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
+
+`suneung_v2`(EOS-25): 기본 CAT의 `cat_v2`와 같은 전환이다 — 숙달 구간 규칙이 선수 복귀·전진을
+가리키면 목표 개념의 **수능 적격** 문항으로 다시 고른다. `suneung_v1` 로그와 섞어 평가하면 두 선택
+규칙이 한 정책으로 읽힌다. 전환 시점 이후 수능 기록도 `intent_resolution` 키를 가진다."""
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.

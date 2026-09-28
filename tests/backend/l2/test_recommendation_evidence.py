@@ -213,7 +213,8 @@ class TestCandidatesAndPolicyVersion:
             occurred_at=_AT,
         )
         assert row.meta is not None
-        assert row.meta[META_KEY_POLICY_VERSION] == "suneung_v1"
+        # EOS-25: 수능 정책도 정렬 재선택으로 선택 규칙이 바뀌어 v2다(REC-11 규약).
+        assert row.meta[META_KEY_POLICY_VERSION] == "suneung_v2"
         # candidates는 생략됐으므로 policy_version만 실린다(둘은 독립 선택 인자).
         assert META_KEY_CANDIDATES not in row.meta
 
