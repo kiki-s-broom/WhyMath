@@ -355,13 +355,18 @@ class StatusBody(BaseModel):
     error: str | None = Field(default=None, description="도달 실패 시 사유(비크래시)")
     # ── 클라우드(Anthropic, S5) — 선택적. None이면 클라우드 상태 미노출 ──
     cloud_configured: bool | None = Field(
-        default=None, description="Anthropic API 키 설정 여부(전송 가능). None=미노출"
+        default=None,
+        description="Anthropic 전송 가능 여부(키 설정 + ARCH-66 사용 허가). None=미노출",
     )
     cloud_reachable: bool | None = Field(
         default=None, description="Anthropic 도달·인증 확인(models.list). None=미노출"
     )
     cloud_error: str | None = Field(
-        default=None, description="클라우드 도달/인증 실패 사유(비크래시). None=미노출"
+        default=None,
+        description=(
+            "클라우드 도달/인증 실패 사유, 또는 키는 있으나 사용 중단 방침으로 막힌 사유"
+            "(비크래시 · ARCH-68). None=미노출 또는 사유 없음"
+        ),
     )
 
 

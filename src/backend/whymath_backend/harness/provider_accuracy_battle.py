@@ -136,7 +136,15 @@ def arm_readiness(arm: str) -> tuple[bool, str]:
     settings = get_settings()
     if arm == "anthropic":
         ready = settings.anthropic_configured
-        detail = "" if ready else f"키 미설정({_ARM_KEY_ENV[arm]})"
+        # 키는 있으나 ARCH-66 정책으로 막혔으면 그 사유를 말한다 — "키 미설정"이라고 하면
+        # 운영자가 이미 있는 키를 다시 넣는 헛수고로 간다(ARCH-68).
+        policy_block = settings.anthropic_policy_block_reason
+        if ready:
+            detail = ""
+        elif policy_block is not None:
+            detail = policy_block
+        else:
+            detail = f"키 미설정({_ARM_KEY_ENV[arm]})"
     elif arm == "deepseek":
         ready = settings.deepseek_configured
         detail = "" if ready else f"키 미설정({_ARM_KEY_ENV[arm]})"

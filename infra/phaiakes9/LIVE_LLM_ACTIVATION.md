@@ -241,11 +241,14 @@ python -m whymath_backend.ops.live_preflight            # 스모크 on(기본) �
 > (0원이라도 기록 증명 성립), Langfuse 미설정이면 graceful skip. 실행 후 §11 대시보드에서 레코드 확인.
 이 한 명령이 서버 기동 없이 방금 넣은 키의 계측 흐름을 즉석 검증한다(내부적으로 /status가 하는
 `check_status()`를 provider 직접 호출로 대체):
-- **① cloud_configured** = `Settings().anthropic_configured`(config.py:965) — Anthropic 키 감지.
+- **① cloud_configured** = `Settings().anthropic_configured`(config.py:965) — Anthropic 키 감지 **+ ARCH-66
+  사용 허가 스위치**(`WHYMATH_ANTHROPIC_API_ENABLED`). 키는 있는데 스위치가 꺼져 있으면 `아니오` 바로 아래에
+  `↳ 정책 차단: …` 줄이 나온다(ARCH-68) — 이 경우 키를 다시 넣을 필요가 없다. 원인은 사용 중단 방침이다.
 - **② langfuse_configured** = `Settings().langfuse_configured`(config.py:956) — 공개키+시크릿키 둘 다.
 - **도달성** — Anthropic `check_status()`(anthropic.py:362)·Ollama `check_status()`(ollama.py:317).
 - **③ 클라우드 스모크** — 스모크 on·키 설정 시 실 **CLOUD_MID(Sonnet)** 1콜 → 실측 `cost_krw`·토큰
-  출력(`actual_cost_krw`, router.py:154). 키 없으면 "스모크 skip(키 없음)"으로 graceful skip.
+  출력(`actual_cost_krw`, router.py:154). 키 없으면 "스모크 skip(키 없음)"으로, 키는 있으나 사용 중단
+  방침으로 꺼져 있으면 그 정책 사유로 graceful skip(ARCH-68).
 - 종료 코드: **0**=정상(미설정은 정보) · **2**=설정됐는데 도달 불가/스모크 실패. 시크릿 값은 절대
   출력하지 않는다(설정 여부 bool·비용·토큰만). 출력의 **③ 실측 비용·토큰**을 아래 §11 판독과 대조한다.
 

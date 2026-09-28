@@ -464,6 +464,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py"
+   ],
+   "text": "CI 도달 잡을 손으로 골라 data-pipeline·infra-shell 누락 — PR 본문 과대 주장(ARCH-68)",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     "docs/standards/incident_response_slo.md",
@@ -2070,6 +2080,28 @@
     "tests/harness/test_cli.py"
    ],
    "text": "claim 대장이 존재하지 않는 브랜치 2건 지목·in_progress 좌석 2건 완료 표기 누락·notes 사실 오류 1건",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
+    "infra/phaiakes9/LIVE_LLM_ACTIVATION.md",
+    "src/backend/whymath_backend/api/admin_bff.py",
+    "src/backend/whymath_backend/app.py",
+    "src/backend/whymath_backend/config.py",
+    "src/backend/whymath_backend/harness/provider_accuracy_battle.py",
+    "src/backend/whymath_backend/l3/providers/anthropic.py",
+    "src/backend/whymath_backend/ops/cost_probe.py",
+    "src/backend/whymath_backend/ops/live_preflight.py",
+    "tests/backend/harness/test_provider_accuracy_battle.py",
+    "tests/backend/l3/test_anthropic_provider.py",
+    "tests/backend/ops/test_cost_probe.py",
+    "tests/backend/ops/test_live_preflight.py",
+    "tests/backend/test_anthropic_policy_block_surfaces.py",
+    "tests/backend/test_config.py"
+   ],
+   "text": "ARCH-66 원인 구분 선언이 운영 표면에 미집행 — 키가 있는데 preflight·정확도 대결이 '키 없음' 출력",
    "weight": 4
   },
   {
@@ -3962,6 +3994,15 @@
     "tests/harness/**"
    ],
    "text": "tests/harness(CI 미러) 실행이 세션 샤드에 가짜 policy_warn 3줄(scripts/harness/backlog.py) 기록 — 커밋 전 제거",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness가 claim 세션 샤드에 가짜 policy_warn 7줄을 씀 — ARCH-68 CI 재현 중",
    "weight": 0
   },
   {

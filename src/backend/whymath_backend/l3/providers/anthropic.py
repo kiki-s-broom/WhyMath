@@ -112,9 +112,11 @@ class _AnthropicClient(Protocol):
 class AnthropicStatus:
     """Anthropic 클라우드 준비 상태 보고 (/status 엔드포인트용).
 
-    `configured`=키 존재 여부(전송 가능). `reachable`=라이브 도달·인증 확인(models.list
-    성공). 키 미설정이면 네트워크 없이 configured=False, reachable=False로 보고한다 —
-    /status는 클라우드가 미구성이거나 도달 불가여도 500을 던지지 않고 *보고*한다.
+    `configured`=전송 가능한 구성인가(키 존재 + ARCH-66 사용 허가 스위치). `reachable`=라이브
+    도달·인증 확인(models.list 성공). 키 미설정이면 네트워크 없이 configured=False,
+    reachable=False로 보고한다 — /status는 클라우드가 미구성이거나 도달 불가여도 500을 던지지
+    않고 *보고*한다. `error`=도달·인증 실패 사유, 또는 키는 있으나 사용 중단 방침으로 막힌
+    사유(ARCH-68). 키 미설정이면 None이다.
     """
 
     configured: bool
@@ -327,7 +329,8 @@ class AnthropicProvider:
         """클라우드 생성 가능 여부 — 클라이언트가 주입됐거나 API 키가 있는가.
 
         주입된 클라이언트가 있으면(테스트·DI) 키 설정과 무관하게 활성으로 본다. 그 외에는
-        Settings.anthropic_configured(키 존재)를 따른다. 네트워크를 타지 않고 내성만 한다.
+        Settings.anthropic_configured(키 존재 + ARCH-66 사용 허가)를 따른다. 네트워크를 타지
+        않고 내성만 한다.
         """
         if self._client is not None:
             return True
@@ -350,12 +353,11 @@ class AnthropicProvider:
         if self._client is not None and self._client_loop is loop:
             return self._client
         settings = self._resolved_settings
-        if settings.anthropic_policy_blocked:
-            raise RuntimeError(
-                "Anthropic API 사용 중단 방침(ARCH-66 · 2026-09-24 ~ 2026-12-31)으로 클라우드 "
-                "생성을 막았습니다 — 키는 있으나 WHYMATH_ANTHROPIC_API_ENABLED가 꺼져 있습니다. "
-                "재개는 게이트 G-arch66-anthropic-api-pause-review를 거칩니다."
-            )
+        # 문구는 Settings의 단일 좌석에서 읽는다(ARCH-68) — /status·live_preflight가 같은 문구를
+        # 쓰므로, 여기서 따로 쓰면 원인 표기가 표면마다 갈라진다.
+        policy_block = settings.anthropic_policy_block_reason
+        if policy_block is not None:
+            raise RuntimeError(f"{policy_block} — 클라우드 생성을 하지 않습니다.")
         if not settings.anthropic_configured:
             raise RuntimeError(
                 "Anthropic API 키가 미설정이라 클라우드 생성을 할 수 없습니다 "
@@ -499,9 +501,19 @@ class AnthropicProvider:
         로 도달성·인증을 확인하되, 실패(인증·네트워크)는 *흡수*하고 reachable=False로
         보고한다 — /status는 클라우드가 죽어 있어도 500을 던지지 않는다(ollama check_status
         와 동일한 비크래시 보고 패턴).
+
+        키는 있으나 ARCH-66 사용 중단 방침으로 막혔으면(ARCH-68) 역시 네트워크 없이
+        configured=False로 보고하되, 그 사유를 `error`에 싣는다. 키 미설정과 같은 화면
+        (error=None)을 내면 /status를 읽는 운영자가 "키를 넣었는데 왜 꺼져 있나"를 구분할 수
+        없다 — OpenRouter가 "설정은 됐는데 아무것도 못 보낸다"를 error에 싣는 것과 같은 축이다.
+        키 미설정은 종전대로 error=None이다(원인은 configured=False 자체가 말한다).
         """
         if not self.configured:
-            return AnthropicStatus(configured=False, reachable=False, error=None)
+            return AnthropicStatus(
+                configured=False,
+                reachable=False,
+                error=self._resolved_settings.anthropic_policy_block_reason,
+            )
         try:
             await self._get_client().models.list()
         except Exception as exc:  # noqa: BLE001 — 도달/인증 실패를 비크래시 상태로 흡수

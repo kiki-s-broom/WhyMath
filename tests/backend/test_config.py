@@ -119,6 +119,38 @@ def test_anthropic_policy_not_blocked_without_key() -> None:
     assert s.anthropic_policy_blocked is False
 
 
+def test_anthropic_policy_block_reason_names_policy_not_missing_key() -> None:
+    """ARCH-68: 키는 있으나 꺼져 있으면 사유 문구가 정책·스위치·재개 게이트를 말한다.
+
+    '키 없음'·'미설정'이라는 말이 들어가면 안 된다 — 이 문구가 막으려는 오보고가 바로 그것이다.
+    키 값은 문구 어디에도 나오지 않는다(시크릿 비노출).
+    """
+    s = Settings(anthropic_api_key=SecretStr("sk-ant-secret-value"))
+    reason = s.anthropic_policy_block_reason
+    assert reason is not None
+    assert "사용 중단 방침" in reason
+    assert "ARCH-66" in reason
+    assert "WHYMATH_ANTHROPIC_API_ENABLED" in reason
+    assert "G-arch66-anthropic-api-pause-review" in reason
+    assert "키 없음" not in reason
+    assert "미설정" not in reason
+    assert "sk-ant-secret-value" not in reason
+
+
+@pytest.mark.parametrize(
+    ("key", "enabled"),
+    [
+        ("", False),  # 키 미설정(기본) — 원인은 '키 없음'이지 정책이 아니다
+        ("", True),  # 스위치만 켜고 키 없음 — 역시 정책 차단 아님
+        ("sk-ant-xyz", True),  # 정상 사용 가능 — 막힌 것이 없다
+    ],
+)
+def test_anthropic_policy_block_reason_none_unless_blocked(key: str, enabled: bool) -> None:
+    """ARCH-68: 정책 차단 상태가 아니면 사유는 None — 키 미설정 경로의 기존 문구를 바꾸지 않는다."""
+    s = Settings(anthropic_api_key=SecretStr(key), anthropic_api_enabled=enabled)
+    assert s.anthropic_policy_block_reason is None
+
+
 def test_anthropic_secret_not_leaked_in_repr() -> None:
     """API 키는 SecretStr — repr/str에 평문이 새어나오지 않는다(보안 금기)."""
     s = Settings(anthropic_api_key=SecretStr("sk-ant-supersecret"))

@@ -1699,7 +1699,8 @@ class Settings(BaseSettings):
 
         ARCH-66: `anthropic_api_enabled`가 꺼져 있으면 키가 있어도 False다(사용 중단 방침).
         원인 구분은 `anthropic_policy_blocked`로 한다 — 오류·리포트가 "키 없음"과
-        "정책 차단"을 섞어 보고하지 않게.
+        "정책 차단"을 섞어 보고하지 않게. 사용자에게 보이는 문구는
+        `anthropic_policy_block_reason` 하나만 쓴다(ARCH-68).
         """
         return self.anthropic_api_enabled and bool(self.anthropic_api_key.get_secret_value())
 
@@ -1707,6 +1708,25 @@ class Settings(BaseSettings):
     def anthropic_policy_blocked(self) -> bool:
         """키는 있으나 ARCH-66 사용 중단 방침으로 막힌 상태인가."""
         return (not self.anthropic_api_enabled) and bool(self.anthropic_api_key.get_secret_value())
+
+    @property
+    def anthropic_policy_block_reason(self) -> str | None:
+        """정책 차단 사유 문구 — 막혀 있지 않으면 None (ARCH-68 · 원인 문구의 단일 좌석).
+
+        `anthropic_policy_blocked`(키는 있으나 스위치가 꺼짐)일 때만 문구를 낸다. 운영 점검
+        표면(/status·live_preflight·정확도 대결·cost_probe)과 생성 시 오류가 모두 이 문구를
+        읽는다 — 표면마다 문구를 따로 만들면 원인 표기가 갈라지고, 그중 하나가 "키 없음"으로
+        남아 운영자를 오도한다(2026-09-28 실측: 키가 있는데도 live_preflight가 "anthropic
+        미설정(키 없음)"을 출력했다). 키 미설정이면 None이다 — 그 경로의 기존 문구("키 미설정"·
+        "키 없음")는 이미 원인을 맞게 말하므로 건드리지 않는다.
+        """
+        if not self.anthropic_policy_blocked:
+            return None
+        return (
+            "Anthropic API 사용 중단 방침(ARCH-66 · 2026-09-24 ~ 2026-12-31)으로 차단됨 — "
+            "키는 있으나 WHYMATH_ANTHROPIC_API_ENABLED가 꺼져 있음. "
+            "재개 판정 = 게이트 G-arch66-anthropic-api-pause-review"
+        )
 
     @property
     def deepseek_configured(self) -> bool:

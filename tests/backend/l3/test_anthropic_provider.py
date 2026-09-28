@@ -527,6 +527,33 @@ class TestCheckStatus:
         assert st.reachable is False
         assert st.error is None
 
+    async def test_policy_blocked_reports_reason_without_network(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ARCH-68: 키는 있으나 사용 중단 방침으로 막히면 configured=False + 사유(네트워크 없음).
+
+        키 미설정(위 테스트)과 같은 화면(error=None)을 내면 /status를 읽는 운영자가 "키를
+        넣었는데 왜 꺼져 있나"를 구분할 수 없다. 클라이언트 생성기가 불리면 실패하게 해서
+        네트워크 0을 강제한다.
+        """
+
+        def _must_not_build(_settings: Settings) -> Any:
+            raise AssertionError("정책 차단 상태에서 클라이언트를 만들면 안 된다")
+
+        monkeypatch.setattr(
+            "whymath_backend.l3.providers.anthropic._build_default_client", _must_not_build
+        )
+        settings = _configured_settings(anthropic_api_enabled=False)
+        provider = AnthropicProvider(settings=settings)
+
+        st = await provider.check_status()
+
+        assert st.configured is False
+        assert st.reachable is False
+        assert st.error is not None
+        assert st.error == settings.anthropic_policy_block_reason
+        assert "사용 중단 방침" in st.error
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # configured·지연 생성·기본 클라이언트
@@ -553,6 +580,19 @@ class TestConfiguredAndLazy:
         assert provider.configured is False
         with pytest.raises(RuntimeError, match="사용 중단 방침"):
             provider._get_client()
+
+    def test_policy_error_reuses_settings_reason(self) -> None:
+        """ARCH-68: 생성 오류 문구는 Settings의 단일 좌석 문구를 그대로 쓴다.
+
+        표면마다 문구를 따로 쓰면 원인 표기가 갈라진다 — /status·live_preflight와 같은 문장이다.
+        """
+        settings = _configured_settings(anthropic_api_enabled=False)
+        reason = settings.anthropic_policy_block_reason
+        assert reason is not None
+        provider = AnthropicProvider(settings=settings)
+        with pytest.raises(RuntimeError) as excinfo:
+            provider._get_client()
+        assert str(excinfo.value).startswith(reason)
 
     def test_get_client_raises_when_unconfigured(self) -> None:
         """미설정 시 _get_client는 명확한 RuntimeError(조용한 강등 금지)."""
