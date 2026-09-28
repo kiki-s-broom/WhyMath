@@ -3209,6 +3209,19 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".gitattributes",
+    "backlog/incidents.ndjson",
+    "scripts/harness/incidents.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_incidents.py"
+   ],
+   "text": "병합 큐 MERGE_CONFLICT 이탈 — 사고 대장 끝 추가 충돌(EOS-25 PR #1363 · 재병합 직후 1회 더 재현)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
