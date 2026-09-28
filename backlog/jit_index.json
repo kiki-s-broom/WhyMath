@@ -2470,6 +2470,17 @@
    "ref": "2026-09-28",
    "paths": [
     ".github/workflows/ci.yml",
+    "scripts/ops/pip_install_resilient.py",
+    "tests/infra/test_ci_pip_install_resilience.py"
+   ],
+   "text": "PyPI 인덱스 python-dateutil 97.8초 무응답 → pip이 '의존성 충돌'로 위장 보고해 CI red",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".github/workflows/ci.yml",
     "scripts/analysis/measure_backend_job_timeout_headroom.py",
     "scripts/analysis/measure_ci_job_timeout_headroom.py",
     "tests/infra/test_ci_harness_integrity_timeout.py",
@@ -3098,6 +3109,17 @@
     "scripts/harness/backlog.py"
    ],
    "text": "번호 확인용 backlog add 가 실제 태스크 CONST-01-x 생성 — rename 거부로 cancel 처리(2회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "CI 실패 원인을 잡 로그 끝 120줄(원본 398줄)만 보고 PR 코멘트로 단정 — 시간 초과 횟수 오기(5→실제 6)",
    "weight": 1
   },
   {
