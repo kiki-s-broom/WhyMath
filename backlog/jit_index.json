@@ -3105,6 +3105,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**"
+   ],
+   "text": "backend 잡 미러 중 로컬 PG(5432)를 띄워 둬 도달성 skip 테스트가 실행 — 거짓 실패 1건·21분 실행 폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
@@ -3711,6 +3722,15 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 4줄 기록(HARN-180 검증 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄(backlog.py·HARN-121 캐시) — 커밋 전 백업 복원",
    "weight": 0
   }
  ]
