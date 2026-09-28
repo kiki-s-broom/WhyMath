@@ -30,6 +30,7 @@ python3 scripts/harness/backlog.py next --n 1 [--layer L] [--subject S]
 ```
 후보가 없으면 정지 사유를 그대로 보고하고 루프 종료:
 - `human_gate` → `/gates` 요약을 출력하고 정지 (Kiki 행동 필요 항목 명시)
+- `gate_verdict` → 판정 결과가 게이트에 기록되지 않은 게이트 목록을 출력하고 정지 — 사람 차례로 안내하지 않는다. 판정문이 이미 있으면 그 판정을 `gates amend <G> --verdict FAIL|PASS --evidence ...`로 기록하는 것이 다음 행동이고, 판정문이 없으면 판정 세션의 몫이다(drive가 판정을 대신 내리지 않는다 · HARN-184)
 - `all_done` → 스테이지 전환 계획(`/plan`)을 제안하고 정지
 - `in_progress` → 다른 세션 진행 중 — 대기 또는 `--layer` 변경 제안
 
@@ -101,7 +102,7 @@ python3 scripts/harness/backlog.py done <id> --artifact "<PR 번호를 담은 �
 🏁 /drive 종료 — N건 처리
 [완료] <id> — <PR 링크 또는 번호>  (각 건 · PR 없이 종결했다면 예외 사유 명시)
 [차단] <id> — <사유>     (있다면)
-[정지 사유] human_gate: G-... / max 도달 / all_done
+[정지 사유] human_gate: G-... / gate_verdict: G-... / max 도달 / all_done
 [게이트 리마인드] ⏳ G-... (Kiki, N일 경과)
 [다음 next 미리보기] 1. <id> ...
 ```
