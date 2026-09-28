@@ -3760,6 +3760,26 @@
    ],
    "text": "브리핑이 vafylb를 '이미 포팅됨·결정 불요'로 표시 — 근거 커밋이 브랜치 자신의 앞선 머지분이고 그 뒤 cp949 수정은 main에 없음",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/backend/conftest.py",
+    "tests/data_pipeline/conftest.py",
+    "tests/infra/test_integration_marker_*.py"
+   ],
+   "text": "통합 테스트를 플래그 없이 -m integration으로 돌려 전부 skip·exit 0 — 판정 줄을 읽어 발견",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(EOS-123 미러 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
   }
  ]
 }
