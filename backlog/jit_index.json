@@ -2125,6 +2125,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_remote_claims.py"
+   ],
+   "text": "개명(OPS-73→OPS-76)으로 남은 고아 claim이 16일째 자동 청소를 빠져나감 — task_missing이 branch_gone을 가림",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-16",
    "paths": [
     "docs/standards/build_harness.md",
@@ -2308,6 +2318,17 @@
     "tests/harness/test_cli.py"
    ],
    "text": "add EOS-98이 타 세션 #994 선등재를 못 봐 merge conflict → CI 미발화·초판 3커밋 폐기",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "tests/harness/test_cli.py"
+   ],
+   "text": "열린 PR #1346의 EOS-129 부분 이행(⑤ 게이트)을 못 보고 다른 세션이 같은 게이트를 4분 만에 중복 신설",
    "weight": 3
   },
   {
@@ -3687,6 +3708,16 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 4줄 기록(HARN-180 검증 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 2건 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 7건 미실행(푸시 전 발견)",
    "weight": 0
   }
  ]

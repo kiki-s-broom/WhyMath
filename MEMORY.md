@@ -11349,6 +11349,12 @@ done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이�
 않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다. 대책 = **`HARN-186`**(사고 대장
 `orphan-claim-reap-blindspot` — 12회차 관측과 합치면 2회차).
 
+**감사 자신의 검증에서 난 사고 — `derived-index-not-rebuilt` 2회차**: 위 두 사고를 `incident add`로 쓴 뒤
+`backlog/jit_index.json`을 재생성하지 않아, 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입
+인덱스 대조"에서 exit 1을 냈다(뒤 스텝 7건 미실행 — 하네스 테스트 포함). origin/main 워크트리에서는 통과해 원인을
+대조로 확정했고 `backlog.py jit build`로 재생성했다. 대책 태스크 `HARN-179`(쓰기 CLI가 인덱스를 함께 재생성)는
+2026-09-26 1회차 때 이미 등재돼 있다 — 푸시 전에 미러를 돌리지 않았다면 CI red였다.
+
 **부수 발견 — `HARN-185`**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상
 `03elxp`를 체크아웃 대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면
 09-07 트리의 옛 판정기(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를
