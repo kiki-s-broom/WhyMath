@@ -1332,9 +1332,11 @@ async def _complete_problem(
     )
     session.add(attempt)
     if hint_attribution.hints:
-        # hint_usage는 attempt를 (attempt_id, user_id) 복합 FK로 참조한다. 관계 매핑이 없어 UOW의
-        # 삽입 순서에 기대지 않고 부모 행을 먼저 내보낸 뒤 자식 행을 더한다 — 둘은 같은 commit으로
-        # durable해져, 힌트가 빠진 attempt나 attempt 없는 힌트가 반쪽으로 남지 않는다.
+        # hint_usage는 attempt를 (attempt_id, user_id) 복합 FK로 참조한다. SQLAlchemy UOW도
+        # 테이블 FK를 보고 부모를 먼저 넣지만(실 PG 확인), 관계 매핑이 없는 두 테이블의 쓰기
+        # 순서를 라이브러리 내부 정렬에 맡기지 않고 코드에서 읽히게 부모 행을 먼저 내보낸다.
+        # 둘은 같은 commit으로 durable해져 힌트가 빠진 attempt나 attempt 없는 힌트가 반쪽으로
+        # 남지 않는다.
         await session.flush()
         session.add_all(
             [
