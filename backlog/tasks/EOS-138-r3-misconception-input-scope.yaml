@@ -20,6 +20,15 @@ paths:
   - src/backend/whymath_backend/l2/learning_state_policy.py
   - src/backend/whymath_backend/l2/remediation_policy.py
   - src/backend/whymath_backend/l2/learning_state_recommendation.py
+  - src/backend/whymath_backend/api/me.py
+  - tests/backend/api/test_eos138_r3_input_scope.py
+  - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
+  - tests/backend/l2/test_learning_state_evidence.py
+  - tests/backend/l2/test_remediation_policy.py
+  - tests/backend/l2/test_recommendation_contract.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - scripts/analysis/data_access_layer_audit.py
+  - docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md
 session: claude/gallant-euler-blngpj
-notes: "출처: EOS-24 정책 설계 판정(docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §4·§7-2) + pedagogy-designer 적대적 비판 1회(결론 \"수정 채택\"). EOS-24는 추천이 R3를 집행하기 전에 근거를 재확인하는 방어선만 두었다 — 상태 머신 입력 축은 EOS-127(R4 입력)과 같은 부류라 범위 밖이었다. 분류 LOOP.\n\n[정정 2026-09-25] EOS-140 실측 — 처분안 ②의 tse 0 전제가 미스캔 회차에서 성립하지 않음(같은 반례가 상태 머신 입력에도 걸린다)"
+notes: "출처: EOS-24 정책 설계 판정(docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §4·§7-2) + pedagogy-designer 적대적 비판 1회(결론 \"수정 채택\"). EOS-24는 추천이 R3를 집행하기 전에 근거를 재확인하는 방어선만 두었다 — 상태 머신 입력 축은 EOS-127(R4 입력)과 같은 부류라 범위 밖이었다. 분류 LOOP.\n\n[정정 2026-09-25] EOS-140 실측 — 처분안 ②의 tse 0 전제가 미스캔 회차에서 성립하지 않음(같은 반례가 상태 머신 입력에도 걸린다)\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/l2/learning_state_evidence.py', 'src/backend/whymath_backend/l2/learning_state_policy.py', 'src/backend/whymath_backend/l2/remediation_policy.py', 'src/backend/whymath_backend/l2/learning_state_recommendation.py'] → ['src/backend/whymath_backend/l2/learning_state_evidence.py', 'src/backend/whymath_backend/l2/learning_state_policy.py', 'src/backend/whymath_backend/l2/remediation_policy.py', 'src/backend/whymath_backend/l2/learning_state_recommendation.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/api/test_eos138_r3_input_scope.py', 'tests/backend/api/test_eos24_recommendation_follows_learning_state.py', 'tests/backend/l2/test_learning_state_evidence.py', 'tests/backend/l2/test_remediation_policy.py', 'tests/backend/l2/test_recommendation_contract.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'scripts/analysis/data_access_layer_audit.py', 'docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md']: 실제 변경 범위로 paths 정정(me.py·테스트·인벤토리 스크립트·판정문 추가)"
 updated: 2026-09-28

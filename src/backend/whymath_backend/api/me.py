@@ -1262,6 +1262,12 @@ async def submit_attempt(
     #   · NONE(훑지 않음 — 답안 없음·능력 부재 등) — 관측하지도 않은 것을 근거로 신뢰를 깎지
     #     않는다.
     misconception_review_coaching: CoachingTrigger | None = None
+    # EOS-138 ② — 상태 머신 R3의 입력. **이번 응답의 스캔**이 게이트 통과시킨 후보가 가설 갱신 뒤
+    # 어떤 신뢰에 도달했는지만 담는다. 스캔이 돌지 않았거나(NONE) 정답 회차(DECAY_ONLY·HOLD_
+    # CONFLICT)면 빈 채로 남아 R3가 발화하지 않는다 — 학생 전체의 옛 가설이 이번 오답의 교정
+    # 대상으로 새어 들어오는 입구를 여기서 닫는다(판정문 `eos138_r3_input_scope_and_route_order_
+    # judgment_2026-09-28.md`). 하한(0.7 초과) 필터·정렬은 조립기(`build_attempt_evidence`)가 한다.
+    this_attempt_misconceptions: tuple[tuple[str, float], ...] = ()
     hypothesis_action = decide_attempt_hypothesis_action(
         is_correct=body.is_correct, scan=misconception_scan_result.scan
     )
@@ -1288,6 +1294,20 @@ async def submit_attempt(
         # 훑지 않음 / 정답 회차. 앞의 둘은 `evidence.coverage`가, 셋째는 `is_correct`가 이미
         # 말하므로 여기서 또 만들지 않는다.
         misconception_review_coaching = recommend_misconception_review_coaching(active_hypotheses)
+        # 같은 반환값에서 R3 입력을 뽑는다(EOS-138 ②). 갱신된 가설 전부가 아니라 **이번 스캔의
+        # 게이트 통과 후보 id에 든 것**만 — 갱신 세트에는 이번에 증거를 못 받고 감쇠만 한 옛
+        # 가설도 들어 있기 때문이다. 신뢰는 후보 원값이 아니라 **갱신 후 가설 신뢰**다: 같은
+        # 오개념이 앞서 쌓였다면 이번 증거로 강화된 값이 교정 경로의 근거가 된다.
+        # `apply_candidates`와 같은 조건(`gate_passed`)으로 거른다 — 저장소가 무시한 후보를 여기서
+        # 되살리지 않는다(카탈로그 밖 id는 저장소가 이미 뺐으므로 갱신 세트에 나타나지 않는다).
+        scanned_ids = {
+            c.misconception_id for c in misconception_scan_result.candidates if c.gate_passed
+        }
+        this_attempt_misconceptions = tuple(
+            (h.misconception_id, h.confidence)
+            for h in active_hypotheses
+            if h.misconception_id in scanned_ids
+        )
     elif hypothesis_action is AttemptHypothesisAction.DECAY_ONLY:
         # 반환값을 쓰지 않는다 — 정답 회차는 복습 코칭을 만들지 않는다(바로 위 APPLY 분기 주석).
         await apply_candidates(session, user.user_id, ())
@@ -1339,6 +1359,9 @@ async def submit_attempt(
     #
     # 순서 주의: `build_attempt_evidence`는 이번 attempt가 **이미 commit된 뒤** 호출된다
     # (연속 오답 카운트가 `offset(1)`로 이번 행을 건너뛰도록 설계됨 — 그 모듈 docstring 참조).
+    # 또한 위 가설 갱신(`apply_candidates`) **뒤**에 호출된다 — R3 입력은 그 갱신이 반환한 이번
+    # 스캔 후보의 가설 신뢰이기 때문이다(`this_attempt_misconceptions` · EOS-138 ②). 조립기는 가설
+    # 테이블을 다시 읽지 않는다: 학생 전체 활성 가설을 읽던 종전 방식이 옛 가설로 R3를 발화시켰다.
     #
     # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
     # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
@@ -1352,6 +1375,7 @@ async def submit_attempt(
         user_id=user.user_id,
         is_correct=body.is_correct,
         confidence=body.confidence_self_reported,
+        this_attempt_misconceptions=this_attempt_misconceptions,
     )
     transition = await advance_on_attempt(
         session,

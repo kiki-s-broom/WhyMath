@@ -308,8 +308,15 @@ def test_remediation_falls_back_when_the_concept_has_no_untried_problem() -> Non
 # EOS-140 — 안전장치 ①의 회차 경계: 미스캔 회차에서 옛 가설이 "방금"으로 읽히지 않는가
 #
 # `turns_since_evidence = 0`은 "가장 최근 *스캔* 턴에서 매치됐다"일 뿐이다. 정답·답안 없는 오답은
-# 스캔하지 않으므로 옛 가설의 값이 0으로 남고, 학생 전체 가설을 읽는 R3는 다시 발화한다. 수정
+# 스캔하지 않으므로 옛 가설의 값이 0으로 남고, 학생 전체 가설을 읽는 R3는 다시 발화했다. 수정
 # 전에는 아래 첫 변이에서 추천이 `applied`·교정 대상 P로 뚫렸다(2026-09-25 실 PG 재현).
+#
+# EOS-138 ② 이후: R3 입력이 "이번 응답 스캔 후보 중 하한 초과"로 좁혀져, 같은 흐름에서 **R3 자체가
+# 발화하지 않는다**(R6). 그래서 이 반례는 이제 추천 안전장치 ①이 아니라 상태 머신 입구가 막는다.
+# 흐름·tse 전제는 그대로 두고 기대만 옮겼다 — 안전장치 ①은 배포 전 원장에 남은 옛 R3 결정을
+# 위한 방어선으로 유지되며, HTTP 경로로는 더 이상 도달하지 않는다(hermetic SQL 계약이 남는다:
+# `tests/backend/l2/test_learning_state_recommendation.py`). 반례 3종 정본은
+# `tests/backend/api/test_eos138_r3_input_scope.py`.
 # ──────────────────────────────────────────────────────────────────────────
 def _submit_attempt(client: Any, auth: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
     """응답 1건 — Week 2 헬퍼(`_submit_wrong`)가 없는 형태(정답 · 답안 없는 오답)를 낸다."""
@@ -351,9 +358,10 @@ async def _active_hypothesis_turns(attempt_id: str) -> list[int]:
 def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
     third_answer: str | None, expected_scan: str, expected_turns: int
 ) -> None:
-    """EOS-140 — C에서 관측된 옛 가설로 P에 오개념 교정을 고정하지 않는다(판정문 §4 반례 S1).
+    """EOS-140/EOS-138 — C에서 관측된 옛 가설로 P에 오개념 교정을 고정하지 않는다(반례 S1).
 
     흐름: C 정답 → C 오개념 오답(스캔·매치 → tse 0) → C 정답(미스캔) → P 오답 → 추천.
+    EOS-138 이후 P 오답은 R3가 아니라 R6으로 가고, 추천에는 상태 머신 지시가 없다.
     맨 앞의 정답은 경계가 **가장 늦은** 전이여야 걸러지게 만든다 — 그 정답의 전이가 옛 스캔보다
     앞에 있으므로, 경계를 가장 이른 전이로 잡는 뮤테이션(`max`→`min`)은 옛 가설을 통과시킨다.
     """
@@ -383,25 +391,29 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
             third = _submit_attempt(client, auth, body)
             coverage = third["evidence"]["coverage"]
             assert coverage["misconception_scan"] == expected_scan, coverage
-            assert third["learning_state"]["rule_id"] == "R3-wrong-misconception", (
-                "전제 붕괴 — 옛 가설로 R3가 다시 발화해야 이 반례가 성립한다(학생 전체 활성 가설을 "
-                f"읽는 R3 · EOS-138이 그 입력을 좁히면 이 전제가 바뀐다): {third['learning_state']}"
+            # EOS-138 ② — 옛 가설(C)은 이번 스캔 후보가 아니므로 R3 입력이 아니다.
+            assert third["learning_state"]["rule_id"] == "R6-wrong-undiagnosed", (
+                "옛 가설(C에서 관측)로 P 오답에 R3가 발화했다 — R3 입력이 이번 응답 스캔 후보로 "
+                f"좁혀지지 않았다(EOS-138 ②): {third['learning_state']}"
             )
+            assert third["learning_state"]["target_misconception_id"] is None, third[
+                "learning_state"
+            ]
             turns = asyncio.run(_active_hypothesis_turns(third["attempt_id"]))
             assert turns == [
                 expected_turns
             ], f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
 
             rec = _next_problem(client, auth)
-            assert rec["learning_state_directive"] == "weak_misconception_evidence", (
-                "옛 가설(C에서 관측)을 '이번 회차 증거'로 읽고 P에 교정을 고정했다 — 안전장치 ①의 "
-                f"회차 경계가 없다: {rec}"
+            assert rec["learning_state_directive"] is None, (
+                "R3가 없는데 추천이 상태 머신 지시를 읽었다 — 옛 가설이 교정 고정으로 샜다: "
+                f"{rec}"
             )
             assert rec["reason"]["basis"] != "learning_state", rec
             assert rec["reason"]["type"] != "misconception_remediation", rec
             _step(
                 "stale",
-                f"scan={expected_scan} · tse={turns} · R3 재발화 → "
+                f"scan={expected_scan} · tse={turns} · R6(옛 가설 무시) → "
                 f"directive={rec['learning_state_directive']}",
             )
     finally:
