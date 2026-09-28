@@ -2467,6 +2467,19 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/analysis/measure_backend_job_timeout_headroom.py",
+    "scripts/analysis/measure_ci_job_timeout_headroom.py",
+    "tests/infra/test_ci_harness_integrity_timeout.py",
+    "tests/infra/test_ci_job_timeout_headroom.py"
+   ],
+   "text": "harness-integrity 5분 상한 소진 — 테스트 증가로 머지 큐 PR 2건 연속 cancelled(상시 잡이라 전면 차단)",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-30",
    "paths": [
     "src/backend/pyproject.toml"
@@ -3464,6 +3477,8 @@
    "kind": "incident",
    "ref": "2026-09-06",
    "paths": [
+    "docs/architecture/adr/ADR-004-subject-contract-v1-provisional.md",
+    "docs/architecture/adr/README.md",
     "docs/architecture/subject_contract_cross_probe.md",
     "scripts/analysis/eos_core_adapter_boundary_scan.py",
     "src/backend/whymath_backend/schema/subject_adapter.py",
@@ -3671,9 +3686,40 @@
    "kind": "incident",
    "ref": "2026-09-27",
    "paths": [
+    "scripts/harness/mutate.py",
+    "tests/**/mutations/*.yaml",
+    "tests/infra/test_mutate_runner*.py"
+   ],
+   "text": "뮤테이션 M1 모듈 최상위 주입이 import NameError로 RED처럼 보임 — 검출이 아닌 주입 결함",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 샤드에 가짜 policy_warn 7줄 기록(ARCH-41 CI 미러 중 · 커밋본 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 4줄 기록(HARN-180 검증 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "HARN-183이 9분 먼저 claim된 OPS-69와 같은 문제를 중복 등재 — 슬러그까지 동일(머지 전 cancel)",
    "weight": 0
   }
  ]
