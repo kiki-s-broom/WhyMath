@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - src/backend/whymath_backend/ops/qa_confusion_matrix.py
   - "tests/backend/harness/test_qa_*.py"
   - tests/backend/ops/test_qa_confusion_matrix.py
-session: null
+session: claude/focused-ramanujan-2p5q8w
 notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_benchmark는 정답지를 동결할 뿐 append 원장이 없고, 저장소의 유일한 append 원장(qa_confusion_matrix의 평가 원장)은 --predictions를 요구하는데 그것을 만드는 도구가 저장소에 0건이다(qa_verdict 키는 그 모듈·테스트·계약 문서에만 나온다). 그래서 MP-03 ④의 첫 레코드는 동결 지문(버전·회전·동결 시각·digest·라벨 분포)으로 한정되고 QA 엔진 FN율은 측정 불가로 남는다. EOS-60(done)이 골든·혼동행렬 계산기를 만들었으나 입력 생산자는 범위 밖이었던 것으로 읽힌다(읽어서 그렇게 보인다 — EOS-60 acceptance 전수 대조는 이 태스크 착수 시 수행)."
-updated: 2026-09-25
+updated: 2026-09-28
