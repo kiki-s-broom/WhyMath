@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-181-ci-mirror-changes-condition-eval
+title: "ci_mirror가 if: needs.changes.outputs 조건을 평가하지 않아, CI도 건너뛰는 조건 거짓 스텝까지 미실행(exit 3)으로 센다 — changes 잡 path filter로 평가"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-180-ci-mirror-workspace-workdir
+requires_gates: []
+acceptance:
+  - "① 실측(2026-09-27 · HARN-180 착지 세션) — HARN-180이 못 돌린 run 스텝을 미실행으로 분리한 뒤, data-pipeline 잡의 `게이트 — QA 파이프라인 오케스트레이터` 스텝(`if: needs.changes.outputs.corpus == 'true'`)은 미러에서 **항상** 미실행이고 그 잡을 고른 실행은 항상 exit 3이다. 코퍼스가 바뀌지 않은 변경에서는 CI도 이 스텝을 건너뛰므로 그 미실행은 사각지대가 아니라 소음이고, 바뀐 변경에서는 로컬에서 돌 수 있는데 못 돌린 **강제 게이트**다(ci.yml 주석: 이제 PR을 막는 강제 게이트). 상시 켜진 경고는 습관화돼 exit 3 전체를 소음으로 만든다.\n② 평가 — `needs.changes.outputs.<플래그> == 'true'`(와 `!= 'true'`) 형태만 ci_job_coverage의 changes 잡 path filter 정본 읽기와 이번 변경 파일 목록으로 평가한다. 참이면 실행하고, 거짓이면 \"조건 거짓 — CI도 건너뜀\"으로 표기하되 미실행으로 세지 않는다. 그 밖의 조건식(always()·failure()·github.event_name 등)과 복합식은 지금처럼 미실행으로 남긴다(추측 해석 금지). 변경 파일 목록을 모르는 경로(`--job` 직접 지정 등)에서는 평가하지 않는다 — 모른다 ≠ 거짓.\n③ 변별력 — 조건 참(실행됨)·조건 거짓(미실행 0건·exit 0)·평가 불가(미실행 유지) 3픽스처와, 평가를 제거하는 뮤테이션·거짓을 참으로 뒤집는 뮤테이션에서 각각 RED."
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+  - "tests/infra/test_ci_mirror*.py"
+session: null
+notes: "출처: HARN-180 착지 세션(2026-09-27). HARN-180 ③이 환경 전제와 미실행을 분리하면서 드러난 상시 exit 3 원천이다 — HARN-180 acceptance ②가 working-directory 밖의 식 해석을 범위에서 뺐으므로 별건으로 둔다. 분류 HARNESS."
+updated: 2026-09-27

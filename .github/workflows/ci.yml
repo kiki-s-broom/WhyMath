@@ -1307,6 +1307,7 @@ jobs:
             echo "WHYMATH_JWT_SECRET_KEY=$(openssl rand -hex 32)"
             echo "WHYMATH_DIALOGUE_CONTENT_ENCRYPTION_KEY=$(openssl rand -base64 32)"
             echo "WHYMATH_DEVICE_SECRET_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "WHYMATH_STUDENT_WORK_ENCRYPTION_KEY=$(openssl rand -base64 32)"
           } > /tmp/deploy.env
           # 렌더 결과는 *출력하지 않는다*(생성 값이 로그에 남지 않게) — 검사만 한다.
           docker compose --env-file /tmp/deploy.env -f docker-compose.prod.yml config \
