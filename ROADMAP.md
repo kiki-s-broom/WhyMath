@@ -13,6 +13,8 @@
 > 12월까지의 목표 2축: ① EOS 아키텍처 검증 ② **AI 콘텐츠 생산 가능성의 기술적·내용적 확인**(최우선 — 주 기준 = CU당 인간 개입 시간 HIT, 폐쇄루프는 계측기로 강등).
 >
 > **정본**: `docs/strategy/eos_transition_declaration_2026-08-30.md` (선언·D0/W1 계획·게이트 G0~G5·52항목 부록). 주간 일정·게이트는 이 정본이 우선하며, 아래 Phase 축(1~5)의 기간·조건 표기는 12/31 판정 결과에 따라 재정렬된다. MVP 최종 베이스라인 태그: `whymath-mvp-final-2026-08-30`.
+>
+> **"12/31 내부 프로젝트 완성"의 정의 (2026-09-28 Kiki 결정)**: ① Phase 3 Release Gate A~E PASS(`G-p3-w3-release-merged`) ② EOS G5 판정 완료 ③ 12월 검증 P0 태스크 전건 종결 — 학생·변호사·Anthropic API 없이 성립하는 조건만. 판정 게이트 = `G-internal-completion-2026-12-31`. 이 판정 *이후*에 재개하는 것: 학생 참여(`G-student-work-after-internal-completion`) · 외부 의존 작업/변호사(`G-external-counsel-restart-after-internal-completion`) · Anthropic API(`G-arch66-anthropic-api-pause-review`). 아래 Phase 1 종료 게이트(β 사용자·재방문율·도메인 파트너)와 Day 76~90 시범 사용자 항목은 전부 그 이후의 것이다.
 
 ---
 
@@ -147,6 +149,7 @@
 | **Phase 3~4** | 관리자 MFA·IP 허용목록·감사 통합 · 조직(학교·학원·반) 테넌시 | 관리자 계정이 **실제 발급**될 때 / B2B 계약 시(`04_admin_console_architecture.md` 승계) |
 
 ### Phase 1 종료 게이트 (Phase 2 진입 조건)
+> ⏸ 아래 게이트는 실사용자(β 사용자·재방문율)와 외부 검수(도메인 파트너)를 전제한다 — 12/31 내부 완성 판정(`G-internal-completion-2026-12-31`) 이후 `G-student-work-after-internal-completion` 재개 판정을 거쳐야 측정을 시작할 수 있다(2026-09-24 ARCH-66 ⑥ · 2026-09-28 정리).
 - ✅ β 사용자 100명 이상
 - ✅ 사용자 *재방문율* 30%+ (7일 기준)
 - ✅ Polya 답 미루기 단계 평균 2.5+ 도달
@@ -305,5 +308,5 @@
 
 ---
 
-**최종 수정**: 2026-07-16 (**S1 탈출 선언** — 탈출 게이트 3종 PASS·게이트 ② 대표 트래픽 실측 로컬 90.0%/92.0%)  
-**다음 검토**: S3 파일럿 착수 시 (S2는 완료 — 다음 무게중심 = L6 수능 엔진·시범 학생·측정 하네스)
+**최종 수정**: 2026-09-28 (12/31 내부 완성 정의 등재 · 학생·외부 작업 연기 반영 — 상단 「현재 국면」 참조) · 이전: 2026-07-16 (**S1 탈출 선언** — 탈출 게이트 3종 PASS·게이트 ② 대표 트래픽 실측 로컬 90.0%/92.0%)  
+**다음 검토**: 12/31 내부 완성 판정(`G-internal-completion-2026-12-31`) 시 — Phase 축(1~5)의 기간·조건 재정렬. S3 파일럿 착수는 그 이후 `G-student-work-after-internal-completion` 판정에 따른다

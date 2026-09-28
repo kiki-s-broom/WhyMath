@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ artifacts: []
 paths:
   - scripts/harness/selector.py
   - "tests/harness/test_selector*.py"
-session: null
+session: claude/bold-hawking-78c9g3
 notes: "출처: 2026-09-07 검토 요청. 발단은 CUR-17/18의 blocked 파킹 충돌이었고, 원인 추적에서 이 결함이 나왔다.\\n\\n실측(origin/main 98925b0e): selector.py:97 sort_key = (stage_index, priority, -unblock_count, id) — eos_priority 미포함. selector.py 전체 grep 0건. EOS-80(done)이 비종결 190건에 관여도를 부여했으나(P0 11·P1 70·P2 92·P3 15) 그 판정이 착수 순서에 아무 영향을 주지 못한다. 후보 125건 중 상위 10에 P2가 4건이고 P0 5건 중 첫 등장이 10위다.\\n\\n소유자 부재 확인 범위(부재 판정 절차): 태스크 title의 정렬·순서·우선순위·priority 검색 · 리터럴 sort_key 3건(ASM-05·ASM-09·SEC-31 — 전부 JSON sort_keys 오탐으로 배제) · paths에 harness/selector.py를 가진 2건(HARN-20 CLI 전이 배선 · HARN-67 depends 제거 — 둘 다 다른 축). 내가 찾은 방법으로는 0건이다.\\n\\n인접 태스크(중복 아님·조율 대상): HARN-74는 게이트 clear가 부착 blocked 태스크를 안 알리는 축 — 잘못 남은 blocked를 알리는 것이고, 이 태스크는 blocked를 파킹으로 쓸 필요를 없애는 것이다. 두 태스크가 함께 착지해야 CUR-17/18 유형이 정리된다.\\n\\neos_priority를 P1로 둔 이유: 12월 검증 자체의 산출물은 아니지만, 이 결함이 살아 있는 동안 P0 5건이 목록 하단에 묻히므로 검증 준비의 진행 속도에 직접 작용한다.\\n\\n번호: 초판 HARN-76이 로컬 선점(HARN-76-acceptance-supersede-and-title-amend)과 충돌해 CLI 제안대로 77을 받았다.\n\n[정정 2026-09-07] 2026-09-07 재검토 — eos_priority가 '안 쓰인다'로 읽힐 소지 정정. 순서에는 없으나 P0 예산 게이트에는 이미 소비되므로 구현자가 그 결합을 알아야 한다."
-updated: 2026-09-07
+updated: 2026-09-28

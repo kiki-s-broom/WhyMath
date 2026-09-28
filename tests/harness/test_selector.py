@@ -259,3 +259,141 @@ class TestHumanOwnerPath:
         task = backlog.tasks["S1-01-alpha"]
         exclusion = selector.classify_todo(backlog, task, allow_human_owner=True)
         assert exclusion is not None and exclusion.reason == "gates"
+
+
+class TestEosPriorityOrdering:
+    """EOS 등급이 착수 순서의 첫 키다 (HARN-77).
+
+    변별력(acceptance ②): 아래 첫 테스트의 픽스처는 **stage·priority가 등급과 반대 방향**이라,
+    `sort_key`에서 `eos_rank` 항을 빼면(종전 4튜플) 기대 순서가 뒤집혀 RED가 난다 — 필드만
+    추가하고 순서가 그대로인 상태는 초록으로 통과하지 못한다. 실측(2026-09-28·착지 전 코드에
+    같은 픽스처): `["S1-01-later-p2", "S2-01-must-p0"]` → 이 단언 실패.
+    """
+
+    def test_eos_grade_beats_stage_and_priority(self):
+        """test_등급이_스테이지와_priority보다_우선 — S2·priority 5의 P0가 S1·priority 1의 P2보다 앞"""
+        backlog = _backlog(
+            [
+                _task(id="S1-01-later-p2", stage="S1", priority=1, eos_priority="P2"),
+                _task(id="S2-01-must-p0", stage="S2", priority=5, eos_priority="P0"),
+            ]
+        )
+        ready, _ = selector.candidates(backlog, eos_hide=frozenset())
+        assert [t.id for t in ready] == ["S2-01-must-p0", "S1-01-later-p2"]
+
+    def test_within_same_grade_previous_order_holds(self):
+        """test_같은_등급_안에서는_종전_순서 — stage → priority 그대로 (대조군)"""
+        backlog = _backlog(
+            [
+                _task(id="S2-01-p1-early", stage="S2", priority=1, eos_priority="P1"),
+                _task(id="S1-02-p1-low", stage="S1", priority=4, eos_priority="P1"),
+                _task(id="S1-01-p1-high", stage="S1", priority=2, eos_priority="P1"),
+            ]
+        )
+        ready, _ = selector.candidates(backlog)
+        assert [t.id for t in ready] == ["S1-01-p1-high", "S1-02-p1-low", "S2-01-p1-early"]
+
+    def test_unspecified_grade_sorts_last(self):
+        """test_등급_미지정은_맨_뒤 — 모른다 ≠ 필수"""
+        backlog = _backlog(
+            [
+                _task(id="S1-01-none", stage="S1", priority=1, eos_priority=None),
+                _task(id="S1-02-p1", stage="S1", priority=5, eos_priority="P1"),
+            ]
+        )
+        ready, _ = selector.candidates(backlog)
+        assert [t.id for t in ready] == ["S1-02-p1", "S1-01-none"]
+        assert selector.eos_rank(backlog.tasks["S1-01-none"]) == 4
+
+    def test_eos_rank_mapping_matches_registered_grades(self):
+        """test_등급_순위_매핑 — P0<P1<P2<P3<미지정, 예산 게이트가 쓰는 등급 문자열과 같은 집합"""
+        from models import EOS_PRIORITIES
+
+        ranks = [selector.eos_rank(_task(eos_priority=g)) for g in EOS_PRIORITIES]
+        assert ranks == sorted(ranks) == [0, 1, 2, 3]
+        assert set(selector.EOS_DEFERRED) < set(EOS_PRIORITIES)
+
+    def test_rationale_shows_grade_first(self):
+        """test_선정_사유에_등급이_첫_자리 (acceptance ⑤ — 순서만 바뀌고 근거가 안 보이면 무효)"""
+        backlog = _backlog([_task(eos_priority="P0")])
+        rationale = selector.selection_rationale(backlog, backlog.tasks["S1-01-alpha"])
+        assert rationale.startswith("eos=P0 · ")
+        backlog2 = _backlog([_task()])
+        assert selector.selection_rationale(backlog2, backlog2.tasks["S1-01-alpha"]).startswith(
+            "eos=미지정 · "
+        )
+
+
+class TestEosDeferredHidden:
+    """이월 등급(P2·P3)은 후보에서 기본 숨김 — 착수 금지가 아니라 화면 규칙 (HARN-77 ④).
+
+    blocked를 파킹으로 쓰던 우회(CUR-17·CUR-18)가 사라지는 조건은 "unblock해도 next 최상위로
+    올라가지 않는다"이며, 그것은 정렬이 아니라 숨김이 보장한다.
+    """
+
+    def test_deferred_grades_hidden_by_default_with_reason(self):
+        """test_이월_등급_기본_숨김 — 제외 사유 eos_deferred·detail에 등급"""
+        backlog = _backlog(
+            [
+                _task(id="S1-01-p1", eos_priority="P1"),
+                _task(id="S1-02-p2", eos_priority="P2"),
+                _task(id="S1-03-p3", eos_priority="P3"),
+            ]
+        )
+        ready, excluded = selector.candidates(backlog)
+        assert [t.id for t in ready] == ["S1-01-p1"]
+        hidden = selector.eos_hidden(excluded)
+        assert [(e.task_id, e.detail) for e in hidden] == [
+            ("S1-02-p2", ["P2"]),
+            ("S1-03-p3", ["P3"]),
+        ]
+        assert "2건은 기본 숨김" in selector.eos_hidden_notice(excluded)
+
+    def test_all_eos_shows_deferred_after_relevant(self):
+        """test_전건_모드에서는_이월분이_뒤에_보인다 (대조군 — 숨김을 끄면 순서로만 뒤로 간다)"""
+        backlog = _backlog(
+            [
+                _task(id="S1-01-p2", priority=1, eos_priority="P2"),
+                _task(id="S1-02-p1", priority=5, eos_priority="P1"),
+            ]
+        )
+        ready, excluded = selector.candidates(backlog, eos_hide=frozenset())
+        assert [t.id for t in ready] == ["S1-02-p1", "S1-01-p2"]
+        assert selector.eos_hidden(excluded) == []
+        assert selector.eos_hidden_notice(excluded) == "※ 12월 검증 이월 등급(P2·P3) 숨김 0건"
+
+    def test_other_exclusions_take_precedence_over_hiding(self):
+        """test_게이트_대기가_숨김보다_먼저 — 이월 등급이라도 게이트 대기 경로 화면에는 남는다"""
+        from models import Gate
+
+        backlog = _backlog(
+            [_task(id="S1-01-p2-gated", eos_priority="P2", requires_gates=["G-key"])],
+            gates=[Gate(id="G-key", title="키")],
+        )
+        _ready, excluded = selector.candidates(backlog)
+        assert [e.reason for e in excluded] == ["gates"]
+
+    def test_stall_reason_is_eos_deferred_when_only_hidden_remain(self):
+        """test_정지_사유_eos_deferred — 남은 착수 가능분이 전부 이월 등급이면 차단이 아니다"""
+        backlog = _backlog([_task(id="S1-01-p2", eos_priority="P2")])
+        ready, excluded = selector.candidates(backlog)
+        assert ready == []
+        code, detail = selector.stall_reason(backlog, excluded)
+        assert code == "eos_deferred"
+        assert detail == ["S1-01-p2 (P2)"]
+
+    def test_stall_reason_prefers_gate_over_hidden(self):
+        """test_게이트_정지가_숨김보다_우선 (대조군 — 사람 게이트가 있으면 그것이 정지 사유)"""
+        from models import Gate
+
+        backlog = _backlog(
+            [
+                _task(id="S1-01-p2", eos_priority="P2"),
+                _task(id="S1-02-gated", eos_priority="P1", requires_gates=["G-key"]),
+            ],
+            gates=[Gate(id="G-key", title="키")],
+        )
+        ready, excluded = selector.candidates(backlog)
+        assert ready == []
+        code, _detail = selector.stall_reason(backlog, excluded)
+        assert code != "eos_deferred"

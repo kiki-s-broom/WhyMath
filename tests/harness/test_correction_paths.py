@@ -51,7 +51,9 @@ def _add(task_id: str, *extra: str) -> int:
         [
             "add",
             "--eos-priority",
-            "P2",
+            # P1 — 이월 등급(P2·P3)은 `next` 후보에서 기본 숨김이라(HARN-77) 후보 복귀를
+            # 검사하는 이 스위트의 피검체가 될 수 없다. 등급은 이 스위트의 관심사가 아니다.
+            "P1",
             "--id",
             task_id,
             "--title",

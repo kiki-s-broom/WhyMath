@@ -1,5 +1,7 @@
 # 현단계 완수 체크리스트 — Phase 1(MVP) 진행 중 + 다과목 확장 준비
 
+> ⚠️ **현행 국면과의 관계 (2026-09-28 정리)**: 이 문서의 "Phase 1(MVP) 진행 중" 전제는 **2026-08-30 EOS 전환 선언**(MVP 종료 · `docs/strategy/eos_transition_declaration_2026-08-30.md`)으로 낡았다. 현행 목표는 **12/31 내부 프로젝트 완성**(정의 = Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결 · 판정 게이트 `G-internal-completion-2026-12-31`)이며, 아래 C부의 Phase 1 종료 게이트(β 사용자 100명·재방문율·도메인 파트너 검수)는 실사용자 전제라 그 판정 *이후* `G-student-work-after-internal-completion` 재개 판정에 따른다(2026-09-24 ARCH-66 ⑥). A부·B부(확장 준비·선결 부채)의 완료 표시는 그대로 유효하다. 작업일정 정본은 이 문서가 아니라 `backlog/`(`backlog.py next`)다.
+
 > **현단계 정의**: 저장소 ROADMAP.md 기준 **Phase 1(MVP) 진행 중**, 여기에 다과목 확장 로드맵의 P0(공통 기반화)에 해당하는 **확장 준비 작업**이 겹친 상태.
 > **정본 관계**: Phase 게이트 수치의 정본은 `ROADMAP.md`(본 문서는 대조표). 확장 준비의 설계 정본은 `docs/architecture/subject_expansion_readiness.md`·검토 근거는 `docs/strategy/subject_expansion_roadmap_review.md`.
 > **완료 판정 공통 게이트**(모든 코드 항목): pytest 전체 green(현행 ~4,600건) · ruff · black(ll=100) · mypy --strict · import-linter 계약 유지 · 커버리지 70%+.
