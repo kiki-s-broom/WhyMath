@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-27 (결정 · Kiki 판정 · 게이트 `G-required-tier-caller-recheck` / ARCH-41): **Subject Contract v1을 G1 예정일에 동결 — 단 `Frozen (unexercised)`. 필수층 3메서드의 Core 호출자는 여전히 0이고, 그 0은 과도기가 아니라 우회였다: Core가 필수층과 같은 일을 해야 했던 두 번 모두 선택층 능력이 새로 생겼다** (Kiki 판정 ①·감시 방식 선택, claude 재측정·집행) — 판정 기준 main `0e7b4f6b`
+
+- **무엇**: 게이트 재확인 지점(G1 9/27) 당일, 프로브 문서 부록 B 표 7항목 + 추가 5항목을 재실행했다. 필수층 호출자 `ZERO_CALLERS`(변별력 3상태 실측 — 작업 트리 밖 복사본 주입 시 `CALLERS_FOUND` · 경로 제거 시 `SCAN_ERROR` exit 2) · 계약 동결 테스트 22 passed · 해석 축 게이트(`ARCH-43`) 위반 0(CORE 355) · 경계 스캔 위반 0 · `DEMOTED_FIELDS` 빈 dict. 기록 = `docs/architecture/subject_contract_cross_probe.md` 부록 C
+- **새 발견**: `evaluate_answer` ↔ 선택층 답 검증기 3종(`EOS-69` ⑦), `detect_misconception` ↔ `AttemptMisconceptionDetector`(`EOS-104` #1195 — 필수층은 학생 서술을 보는데 채점 경로엔 답만 있다). 9/20 사전 실행(부록 B)은 선택층 5→8종 증가를 "층 구분 결론 불변"으로만 적었다 — 출처를 추적하니 기능 겹침이었다. 필수층 미사용은 정착 상태가 아니라 설계 경로의 결과다
+- **판정**: 3택 중 ① — 상태 `Provisional` → `Frozen (unexercised)`. ②(호출자 생김)는 해당 없음. ③(재설계)은 두 번째 과목 착수(S5 하드락) 전까지 깨지는 것이 없고 ADR-004의 "일정 연기 금지"와 충돌하므로 G5로 넘겼다. 상태 제목은 세션이 보여 준 미리보기에서 괄호 설명을 본문으로 옮겼다(ruff `E501` 100칸 · 한글 2칸 계산 — 뜻 동일)
+- **감시(Kiki 선택 '테스트 + G5 게이트')**: 사건 축 = 라벨-사실 일치 테스트(`(unexercised)` ⟺ 필수층 사용 0 · 양방향 · AST로 속성 참조 전부 + `getattr` 상수 문자열 · 측정 실패는 예외 · 실패 주입 8종 전건 기대 위치 RED). 시간 축 = 게이트 `G-required-tier-caller-recheck-g5`(G5 데이터 동결 2026-12-27 · 3택: 유지 / 필수층 축소·재설계 / 종결) + 태스크 `ARCH-67`(ARCH-41 재생성분)
+- **부수 정정**: 동결 이후 필수층 메서드 추가 = 동결 해제 → `EOS-70`(explain) acceptance ⑤로 전제 명시. 계약 docstring의 낡은 사실 2건(해석 게이트 기준선 "현행 1건" → 0건 · `MIXED` 34 → 33)과 집행 상태 절의 층 미구분(`ARCH-41` ③)을 고쳤다. ADR-004 상태·§판정 기록, ADR 색인 갱신
+- **하네스 결함 1건(실해 0) → 재발방지 = `HARN-120` ⑥**: 실패 주입 초회 M1이 모듈 최상위 주입이라 conftest의 import가 `NameError`로 깨졌다 — 라벨 검사가 아니라 import가 실패한 것. 하네스가 `FAILED` 줄만 세고 exit code로 RED를 판정해 검출처럼 보일 수 있었고, 실패 목록이 비어 있어 드러났다. 주입을 함수 본문으로 옮기고 `ERROR` 줄을 검출로 세지 않는 단언을 넣어 재실행(8/8). 공용 뮤테이션 러너(`HARN-120`)의 RED 판정 축에 "RED의 출처 단언"이 없어 acceptance ⑥으로 덧붙였다(각 뮤테이션의 크기 변화가 서로 달라 `.pyc` 재사용 위험 — `HARN-120` ⑤ — 은 이번 실행에 해당 없음)
+
 ### 2026-09-27 (구현·판정 · EOS-136): **사람 판정을 회차 코퍼스 `review_status`로 옮기는 각인 도구 착지 — 승격 경로 ③단이 처음으로 채워질 수 있게 됐다. ④단은 "생성 배치 품질"로 판정(분모 = 검수 배치 전체 · 분자 = 판정 이력의 반려·손질 승인)했고, 손질 승인은 재검수 전까지 각인하지 않는다** (claude 판정·구현) — 판정 기준 main `0e7b4f6b`
 
 - **무엇**: 각인 CLI `harness/review_status_verdict_bridge` · 두 각인 도구의 적용 대상 계약 `harness/review_status_domains`(코드 정본) · 승격 게이트 수정 · 계약 문서 `docs/standards/review_status_stamping_contract.md`. MP-03 실측("승격 가능 후보 7건 전부 ③단 차단 — 각인 도구 부재")의 집행 도구다.

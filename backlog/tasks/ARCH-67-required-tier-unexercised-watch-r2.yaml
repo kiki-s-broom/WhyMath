@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-67-required-tier-unexercised-watch-r2
+title: "필수층 미사용 감시 2회차 — G5(12/27) 재확인: 호출자 0 지속 여부 기록 + 선택층 쌍둥이 현황표 갱신(필수층 축소·재설계 판정의 입력)"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates:
+  - G-required-tier-caller-recheck-g5
+acceptance:
+  - "① 전제(2026-09-27 · main 0e7b4f6b · G1 판정 ① Kiki): 계약 상태 = Frozen (unexercised). 필수층 SubjectAdapter 3메서드의 Core 호출자 0건. 라벨-사실 일치 테스트(tests/backend/schema/test_subject_adapter_two_tier_contract.py)가 상태 제목의 (unexercised) 한정어와 실제 호출자 유무가 어긋나면 RED를 낸다 — 첫 호출자 등장(사건)은 그 PR에서 잡히고, 이 태스크는 호출자 0이 G5까지 계속된 경우(시간)의 재확인을 맡는다. ARCH-41의 재생성분이다"
+  - "② G5 재확인 시 docs/architecture/subject_contract_cross_probe.md 부록 ①(3상태 스캔)·부록 ②(계약 동결 테스트)·라벨-사실 일치 테스트의 결과를 판정 기준 main 해시와 함께 새 부록에 기록한다. 재확인 지점보다 이른 실행은 판정이 아니라 입력으로 표기한다(부록 B 선례)"
+  - "③ 필수층 3기능 각각에 대해 Core가 실제로 쓰는 선택층 쌍둥이 현황표를 갱신한다. 9/27 기준: evaluate_answer ↔ FinalAnswerVerifier·AssessmentAnswerVerifier·AnswerFormVerifier(EOS-69 ⑦) / detect_misconception ↔ AttemptMisconceptionDetector(EOS-104 #1195 — 필수층 시그니처가 서술 기반이라 답만 있는 채점 경로에 맞지 않아 선택층 신설) / validate_problem ↔ 없음. 쌍둥이의 증감이 게이트 판정 ②(필수층 축소·재설계)의 핵심 입력이다"
+  - "④ 그 사이 호출자가 생겨 라벨이 이미 바뀌었다면, 그 PR이 남긴 재측정 기록(해석 축 = eos_opaque_payload_gate CI 판정 · 의미 축 = 사람 판정)이 프로브 문서에 있는지 대조하고 빠진 것을 보완한다"
+  - "⑤ 판정은 Kiki 소유(게이트 G-required-tier-caller-recheck-g5) — 이 태스크는 근거만 갱신한다. requires_gates로 차단하는 이유는 ARCH-41 ⑤와 같다: 호출자 0 상태에서 조기 완료되면 G5 재확인이 미추적으로 남는다"
+artifacts: []
+paths:
+  - docs/architecture/subject_contract_cross_probe.md
+  - src/backend/whymath_backend/schema/subject_adapter.py
+  - tests/backend/schema/test_subject_adapter_two_tier_contract.py
+session: null
+notes: "출처: 게이트 G-required-tier-caller-recheck 2026-09-27 판정 ①(Kiki) — '9/27 라벨을 Frozen (unexercised) 류로 표기하고 ARCH-41을 재생성해 감시 지속'의 집행. ARCH-41은 9/27 회차(재측정 기록·계약 파일 층 구분 정정·라벨 적용)를 끝내고 완료되며, 감시는 이 태스크가 승계한다. 감시 방식은 Kiki 선택 '테스트 + G5 게이트' — 사건(첫 호출자)은 라벨-사실 일치 테스트가, 시간(0 지속)은 이 태스크와 게이트가 맡는다. 판정 근거 = subject_contract_cross_probe.md 부록 C"
+updated: 2026-09-27
