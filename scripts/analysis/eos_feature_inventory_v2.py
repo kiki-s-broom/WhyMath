@@ -1122,7 +1122,11 @@ CATALOG: tuple[Spec, ...] = (
        # OPS-68 — `*_report` 와일드카드에 안 걸리는 짝(표본 *생성*기라 이름이 _probe다).
        # 리포트가 볼 표본을 만드는 도구이므로 관측 가족에 함께 귀속한다.
        "harness.attempt_skill_reach_probe",
-       "harness.concept_assessment_index"),
+       "harness.concept_assessment_index",
+       # S4-01 슬라이스 2 — 개념 그래프 traversal 성능 예산 실부하 판정(실 PG 전수 측정).
+       # 리포트이자 게이트(exit 0/1/2)지만, 측정 대상이 *도달·커버리지*가 아니라 *탐색 부하*라
+       # QA 게이트 행(WM-O-912)이 아니라 관측 가족에 귀속한다 — 이름이 _probe인 짝(OPS-68 선례).
+       "harness.traversal_load_probe"),
     _o("WM-O-914", "데이터 무결성 게이트(orphan·dangling·duplicate 6종)", "Admin", "QA", "P0",
        "OPS-55 — 느슨참조 드리프트 감사(v_integrity_violations) · 주간 지표 #4 산출원",
        "ops.integrity_violations_gate"),
