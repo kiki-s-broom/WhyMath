@@ -2346,13 +2346,10 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
-    ".claude/hooks/job_log_truncation_guard.py",
-    ".claude/settings.json",
     "scripts/harness/backlog.py",
     "scripts/harness/remote_claims.py",
     "scripts/harness/selector.py",
-    "tests/harness/test_*gate*claim*.py",
-    "tests/infra/test_job_log_truncation_guard.py"
+    "tests/harness/test_*gate*claim*.py"
    ],
    "text": "EOS-129 3세션 연쇄 착수 — 게이트 부착 뒤 unblock이 claim을 풀었는데 게이트는 미머지 브랜치에만 있었다",
    "weight": 3
@@ -2361,13 +2358,10 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
-    ".claude/hooks/job_log_truncation_guard.py",
-    ".claude/settings.json",
     "scripts/harness/backlog.py",
     "scripts/harness/remote_claims.py",
     "scripts/harness/selector.py",
-    "tests/harness/test_*gate*claim*.py",
-    "tests/infra/test_job_log_truncation_guard.py"
+    "tests/harness/test_*gate*claim*.py"
    ],
    "text": "EOS-137 중복 착수 — 구현은 미머지 #1352에 있는데 unblock으로 main에서 무주 todo가 돼 네 번째 세션이 claim",
    "weight": 3
@@ -3179,10 +3173,6 @@
    "paths": [
     ".claude/hooks/job_log_truncation_guard.py",
     ".claude/settings.json",
-    "scripts/harness/backlog.py",
-    "scripts/harness/remote_claims.py",
-    "scripts/harness/selector.py",
-    "tests/harness/test_*gate*claim*.py",
     "tests/infra/test_job_log_truncation_guard.py"
    ],
    "text": "CI 실패 원인을 잡 로그 끝 120줄(원본 398줄)만 보고 PR 코멘트로 단정 — 시간 초과 횟수 오기(5→실제 6)",
@@ -3228,6 +3218,17 @@
     "tests/harness/*.py"
    ],
    "text": "등재한 HARN-184를 16분간 push하지 않는 사이 타 세션이 같은 번호로 등재·착수 — 186으로 개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "하루에 태스크 번호 충돌 2건 — 등재한 HARN-185·186을 다른 세션 미머지 PR이 먼저 머지해 개명(191·193)",
    "weight": 1
   },
   {

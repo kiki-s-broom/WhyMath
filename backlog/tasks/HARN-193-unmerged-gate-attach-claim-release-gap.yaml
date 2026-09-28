@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-186-unmerged-gate-attach-claim-release-gap
+id: HARN-193-unmerged-gate-attach-claim-release-gap
 title: "게이트를 붙이고 claim을 푼 태스크가 main에서는 무주 todo로 보인다 — 미머지 브랜치에만 있는 requires_gates를 next·start가 못 봐 같은 태스크가 연쇄 착수된다(EOS-129 3세션)"
 track: infra-debt
 stage: S3
@@ -22,5 +22,5 @@ paths:
   - scripts/harness/selector.py
   - "tests/harness/test_*gate*claim*.py"
 session: null
-notes: "출처: 2026-09-28 /drive 3차 중 열린 PR 점검에서 PR #1352(EOS-129 ⑤)를 발견하고, 세 브랜치의 대장 이벤트로 전이 순서를 실측했다. 사고 대장 계열 `parallel-duplicate-implementation` 11회차. 축 구분 — HARN-91은 트렁크에 새로 실린 의존·게이트를, HARN-11은 미머지 done을, HARN-105는 사람 게이트의 중복 안내를 본다. 이 태스크는 미머지 브랜치의 게이트 부착과 claim 해제가 겹친 공백이다.\n\n[정정 2026-09-28] 추가 실측 — 세 번째 세션의 EOS-129 done(#1358)과 미머지 게이트 인용 형태 기록\n\n[정정 2026-09-28] 추가 실측 — EOS-137이 같은 공백으로 next 1순위 노출 중(표준 흐름이 만드는 공백)"
+notes: "출처: 2026-09-28 /drive 3차 중 열린 PR 점검에서 PR #1352(EOS-129 ⑤)를 발견하고, 세 브랜치의 대장 이벤트로 전이 순서를 실측했다. 사고 대장 계열 `parallel-duplicate-implementation` 11회차. 축 구분 — HARN-91은 트렁크에 새로 실린 의존·게이트를, HARN-11은 미머지 done을, HARN-105는 사람 게이트의 중복 안내를 본다. 이 태스크는 미머지 브랜치의 게이트 부착과 claim 해제가 겹친 공백이다.\n\n[정정 2026-09-28] 추가 실측 — 세 번째 세션의 EOS-129 done(#1358)과 미머지 게이트 인용 형태 기록\n\n[정정 2026-09-28] 추가 실측 — EOS-137이 같은 공백으로 next 1순위 노출 중(표준 흐름이 만드는 공백)\n\n[개명 2026-09-28] HARN-186-unmerged-gate-attach-claim-release-gap → HARN-193-unmerged-gate-attach-claim-release-gap: 번호 충돌 정정 — main(#1349 CONST-02)이 HARN-186-job-log-truncation-warning-hook을 먼저 머지했다. 187~190(#1361)·191(#1353)·192(타 브랜치)는 미머지 브랜치가 쓰고 있어 원격 전 브랜치 기준 첫 빈 번호 193으로 옮긴다"
 updated: 2026-09-28
