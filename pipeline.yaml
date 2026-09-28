@@ -1,0 +1,196 @@
+# pipeline.yaml — WhyMath 콘텐츠 파이프라인 (코딩 헌법 제4조: 실행 순서의 유일한 원본)
+# ─────────────────────────────────────────────────────────────────────────────
+# version: 1.0 (2026-09-27 · CONST-02) · 판정 기준: main b8af6f26 (조사) · 반영 정정 6건(독립 검증)
+# 조사 방식 = 저장소 코드·CI·문서 실측 (E3=실행 출력 / E2=파일·줄 직접 확인 / E1=정황 추정 / E0=문서 주장뿐)
+# 형식: nodes: <이름>: { source: true } | { needs: [<선행 노드>...] }
+# 검사: python3 scripts/constitution/pipeline_check.py --require copyright,backup,curriculum_review \
+#         --upstream-of publish:copyright   (CI harness-integrity 잡이 상시 실행)
+# 필수 이름(constitution/rules.yaml R1-02·R1-03 run 명령에 박혀 있다 — 개명 금지):
+#   standards · copyright · backup · curriculum_review · publish
+# 규칙: DAG · 섬 없음 · copyright → publish 직접 상류 · backup 은 publish 하류 ·
+#       사람 검수(human_review)를 건너뛰는 publish 경로 없음(promotion_gate 경유)
+#
+# 범위 한계(명시): 이 그래프는 '콘텐츠 생산·검증·게시' 파이프라인만 담는다. 개인정보(privacy)·
+#   임베딩(pgvector)·학습자 모델(BKT·learner_state)·관측(Langfuse)·LLM 라우팅·모바일 릴리스는
+#   노드가 아니다 — 그 축의 규칙(파트 V·VII)이 매달릴 노드는 CONST-07·CONST-08이 추가 여부를 정한다.
+# 실행 순서의 다른 원천과의 경계: 작업 일정은 backlog/(태스크·게이트 그래프), CI 잡 순서는
+#   .github/workflows/ci.yml 이 정본이다. 이 파일은 '데이터가 어느 단계를 거쳐 학생에게 가는가'만 선언한다.
+#
+# 표기 규약
+#   [집행] = 이 노드를 실제로 도는 코드·CLI·CI 스텝이 있다   [부분] = 일부 축만 기계 집행
+#   [미구현] = 집행 장치 없음(이름만 노드로 예약)   경로는 저장소 상대경로:줄번호 · CI = .github/workflows/ci.yml
+# ─────────────────────────────────────────────────────────────────────────────
+nodes:
+
+  # ───────────── 원천(source) ─────────────
+  # [집행·E2] NCIC 성취기준 크롤·추출: src/data-pipeline/data_pipeline/ncic/__main__.py:1-11
+  #   (`python -m data_pipeline.ncic crawl|load|check-robots` · "실 크롤링은 Kiki가 직접 실행. 결과는 5% 사람 검수 후 git 커밋")
+  #   산출 코퍼스(E3 ls): data/corpus/standards_v1 · standards_university_v1 · achievement_criteria_v1(KICE 평가기준·CUR-05)
+  #   라이선스 근거: docs/data/licensing_safety.md:8 (NCIC = 공공누리 1유형)
+  standards: { source: true }
+
+  # [집행·E2] 전문가 저작 원본(xlsx·7계층 JSON) — 원본은 미커밋·산출물이 진실 원천:
+  #   원자 xlsx → src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-14 (`transform-v1 --source <원자_xlsx>`)
+  #   오개념 7계층 JSON → src/data-pipeline/data_pipeline/misconception/__main__.py:1-9 ("원본 JSON은 커밋하지 않고 산출물이 진실 원천")
+  #   스킬 그래프 → src/backend/whymath_backend/l1/skill_graph/populate.py:7-8 (`python -m data_pipeline.skill_graph transform-v1`)
+  expert_masters: { source: true }
+
+  # [집행·E2] 코치 응답 시드 명세(JSONL) — l3/pregenerate 가 읽는 입력 원천(문항 은행과 별개 축)
+  coach_seed_specs: { source: true }
+
+  # ───────────── L1 지식 그래프 적재 ─────────────
+  # [집행·E2] 개념 그래프: seed(NCIC 후보)→전문가 채움→validate(§5 invariant)→transform-v1 graph.json
+  #   src/data-pipeline/data_pipeline/concept_graph/__main__.py:1-17 · 적재 3투영(임베딩·concept_node·concept UUID 브리지)
+  #   src/backend/whymath_backend/l1/concept_graph/populate.py:1-22 · 코퍼스 data/corpus/concept_graph_v1 (E3 ls)
+  concept_graph: { needs: [standards] }
+
+  # [집행·E2] 원자 백본(2,683노드): transform-v1(xlsx→graph.json, --standards 성취기준 결선) src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-20
+  #   적재 ①concept ②parent ③선수엣지 ④⑤시각화 Overlay ⑥atom_node(SKB-03) src/backend/whymath_backend/l1/atom_graph/populate.py:1-22
+  #   중복 원자 검수 게이트(사람 검수 후보·자동 병합 아님) src/backend/whymath_backend/l1/atom_graph/dedup_candidates.py:1-12
+  #   사람 게이트: backlog/gates.yaml:903 G-skb03-atom-node-populate · 런북 docs/ops/skb03_atom_node_populate_runbook.md:1-12
+  atom_graph: { needs: [expert_masters, standards] }
+
+  # [집행·E2] 437↔원자 크로스워크 derive/validate src/data-pipeline/data_pipeline/concept_atom_crosswalk/__main__.py:1-20
+  #   원자 축 이전(behavior_skills·atom_codes) src/backend/whymath_backend/l1/concept_atom_crosswalk/populate.py:1-18
+  concept_atom_crosswalk: { needs: [concept_graph, atom_graph] }
+
+  # [집행·E2] 스킬 노드 메타 프로젝션 src/backend/whymath_backend/l1/skill_graph/populate.py:1-16
+  #   사람 게이트 backlog/gates.yaml:870 G-skb01-bridge-populate · :881 G-skb01-concept-behavior-skills-populate
+  skill_graph: { needs: [expert_masters, atom_graph] }
+
+  # [집행·E2] 개념 콘텐츠 4종(K-12 437 + 대학 409) src/backend/whymath_backend/l1/concept_content/populate.py:1-16
+  #   사람 게이트 backlog/gates.yaml:925 G-skb04-concept-content-populate
+  concept_content: { needs: [concept_graph, concept_atom_crosswalk] }
+
+  # [집행·E2] 성취기준 DB 적재(achievement_standard·concept_standard_link — 링크 해석은 concept 선적재 전제)
+  #   src/backend/whymath_backend/l1/standards/populate.py:1-22 · standard_loader.py:1-14 · KICE 평가기준 criteria_loader.py:1-10 (CUR-07)
+  standards_load: { needs: [standards, concept_graph] }
+
+  # [집행·E2] 교육과정 Overlay(curriculum_entry KR 셀 + 원자 축) src/backend/whymath_backend/l1/curriculum/populate.py:1-22
+  curriculum_overlay: { needs: [concept_graph, concept_atom_crosswalk] }
+
+  # [부분·E2] 교육과정 정합성 검토 게이트 (R1-03 필수 이름)
+  #   기계 축(집행): ops/integrity_violations_gate ④ DANGLING_CURRICULUM_REF — concept_node/skill_node.standard_codes ↔ achievement_standard.official_code
+  #     src/backend/whymath_backend/ops/integrity_violations_gate.py:1-30 · CI backend-migrations 잡 .github/workflows/ci.yml:660-661
+  #     배선 동결 tests/infra/test_integrity_violations_gate_wiring.py (E3 ls)
+  #   기계 축(집행): data_pipeline.concept_graph validate(§5 invariant·strict) src/data-pipeline/data_pipeline/concept_graph/__main__.py:6-16
+  #   관측(게이트 아님): 개정판 어휘 crosswalk 리포트 harness/curriculum_revision_crosswalk_report.py:1-12 (CUR-01) ·
+  #     성취기준 커버리지 harness/problem_bank_coverage.py:1-12 (ARCH-18 "게이트가 아니다") · objective_coverage.py:1-12
+  #   미구현: "교육과정 정합성"의 *사람 검토* 축(교사·전문가 서명 게이트)은 내가 찾은 방법(gates.yaml id grep review|curriculum, harness/ l1/ 역할 grep)으로는 0건 —
+  #     인접 사람 게이트는 backlog/gates.yaml:832 G-s401-uni-boundary-edge-review(대학 경계 엣지 검토·E1)뿐
+  curriculum_review: { needs: [standards_load, concept_graph, atom_graph, skill_graph, curriculum_overlay] }
+
+  # ───────────── 오개념 ─────────────
+  # [집행·E2] 오개념 839 Collection 추출 src/data-pipeline/data_pipeline/misconception/__main__.py:1-9
+  #   적재 src/backend/whymath_backend/l1/misconception/populate.py:1-14 · 코퍼스 data/corpus/misconceptions_v1 (E3 ls)
+  #   (제안본 misconceptions 대응 — 선행은 concept_graph 가 아니라 전문가 원본이다)
+  misconceptions: { needs: [expert_masters] }
+
+  # [집행·E2] kebab↔M-id 크로스워크 = 후보 생성(임베딩) → 기계 트리아지/자율 거부 → 사람 승인(서명) → 승격 → 게이트 적재
+  #   l4/misconception/crosslink_candidates.py:1-9 · crosslink_triage.py:1-8 · crosslink_machine_reject.py:1-13 · crosslink_review.py:1-16
+  #   게이트 정본 src/backend/whymath_backend/l1/misconception/crosslink_gate.py:1-18 · 적재 crosslink_loader.py:1-14
+  #   계약 docs/standards/crosswalk_gate_contract.md:1-6 · 강등전 측정 harness/crosslink_demotion_eval.py:1-8
+  #   사람 게이트 backlog/gates.yaml:166 G-crosswalk-approval (status: cleared)
+  misconception_crosswalk: { needs: [misconceptions] }
+
+  # ───────────── 문항 생성 ─────────────
+  # [집행·E2] 두 생성 경로가 같은 오케스트레이터(생성→수용 게이트→canonical dedup→JSONL 저장→검수 큐)를 탄다
+  #   조합 정본 src/backend/whymath_backend/l3/equivalent/orchestrator.py:1-15 (S2-d 4단계)
+  #   (a) 결정론 스켈레톤 배치(LLM 0·바이트 동일) harness/problem_corpus_batch.py:1-20 + 도메인별 *_batch.py 36종(E3 ls · is_published=false 유지)
+  #   (b) LLM 축적 배치(라우터 경유·회차 간 dedup·증분 append·GenerationLog 사이드카·검수 큐 즉시 flush) harness/problem_corpus_accumulate.py:1-45
+  #       생성기 l3/equivalent/llm_generator.py:1-14 · 수용 게이트 4종(저작권·정확성·위생·동등성) l3/equivalent/acceptance.py:1-30
+  #   생성 로그(재현 좌석) l3/pregenerate/provenance_bridge.py:1-24 (EOS-55)
+  #   상시 관통 검증: tests/backend/harness/test_eos_anchor_e2e_a4.py:1-22 · CI e2e-nightly 잡 .github/workflows/ci.yml:1886 (EOS-64)
+  #   선행 근거: 스켈레톤/LLM 배치가 L4 오개념 정본(CATALOG_BY_ID)을 주입(problem_corpus_batch.py:20-23) · 성취기준 코드 태그(EquivalenceSpec)
+  generate: { needs: [curriculum_review, misconceptions, concept_atom_crosswalk] }
+
+  # [집행·E2] 발문 다양화(LLM·Phaiakes9 전용·fail-closed) harness/problem_corpus_rephrase.py:1-28 · l3/equivalent/rephrase.py:1-14
+  #   계보 동기화(identity_id·problem_relation) scripts/backfill_rephrase_lineage_s4_18.py:1-16 · 위생 스윕 harness/rephrased_corpus_hygiene.py:1-10
+  #   수정 전파 scripts/reconcile_rephrased_corpus_s2_08.py:1-16 · 코퍼스 data/corpus/problem_bank_rephrased_v0 (E3 ls)
+  rephrase: { needs: [generate] }
+
+  # [집행·E2] 수능 시그니처·유형·페르소나 결정론 태깅(제안본 csat_patterns 대응 — 생성 *입력*이 아니라 생성 *후* 구조에서 유도)
+  #   태거 단일 권위 src/backend/whymath_backend/l1/problem_bank/signature_tagger.py:1-18 (S2-06) · 후처리 CLI harness/problem_corpus_tag.py:1-18
+  #   문제 유형 harness/problem_type_backfill.py:1-10 · 페르소나 적합도 harness/problem_corpus_persona_fit_backfill.py:1-18
+  #   CI 드리프트 가드 .github/workflows/ci.yml:1722 (persona_fit --all --check) · 소비처 l6/suneung/gating.py:114,164
+  signature_tagging: { needs: [generate, rephrase] }
+
+  # ───────────── 검증 게이트 ─────────────
+  # [집행·E2] 정답 재도출·상시 재검증: 전 코퍼스 SymPy Tier1+Tier2+fuzz 재검산(fail 1건 → exit 1)
+  #   harness/corpus_reverify.py:1-20 · CI 야간 .github/workflows/ci.yml:1852-1859 (S6 상시성)
+  #   코퍼스 = S2-a 게이트 통과분 계약 봉인 tests/backend/l1/problem_bank/test_corpus_quality.py:1-8 (CI backend 잡)
+  #   검증기 정본 l3/verify_answer.py · verify_solution.py · l3/equivalent/counterexample_fuzz.py (E3 ls)
+  derive_verify: { needs: [generate, rephrase] }
+
+  # [집행·E2] 중복 게이트 3층: ①생성 루프 내 canonical signature(l3/equivalent/canonicalize.py:1-14 · accumulate.py:153,351,519)
+  #   ②DB 후 pgvector 과유사 게이트 l1/problem_bank/embedding.py:1-14 (S2-c) ③사후 감사 T1·T2 harness/problem_duplication_audit.py:1-30 (QUAL-01)
+#     — T3(verify.conditions 서명)은 문서화만 하고 코드로 계산하지 않는다(problem_duplication_audit.py:36)
+  #   생성기 파라미터 공간 겹침 감사(QUAL-08) .github/workflows/ci.yml:478 · 유사 관계 부여 scripts/attach_similar_relations_s4_14.py:1-16
+  #   처분 기록 docs/data/problem_duplicate_disposition_2026-08.md·2026-09.md (E3 ls)
+  #   ⚠ 판례 P0001(중복 게이트가 품질 판정을 대체) 방지: human_review 는 dedup_gate 와 *독립*으로 publish 상류에 있다
+  dedup_gate: { needs: [generate, rephrase] }
+
+  # [집행·E2] 저작권 판정 (R1-03 필수 이름 · publish 상류) — 4등급 그라데이션(docs/legal/copyright_gradient.md:1-25)의 코드 집행 4층
+  #   ①생성 시점: Pydantic 불변식(schema/provenance.py·schema/problem.py) + 수용 게이트 copyright_ok l3/equivalent/acceptance.py:11-15
+  #   ②코퍼스 사이드카 게이트(pool 필드·서지 ≥1) ops/provenance_audit.py:1-25 · CI .github/workflows/ci.yml:536-537 · 배선 동결 tests/infra/test_provenance_audit_wiring.py
+  #     사이드카 생성 CLI ops/corpus_provenance_sidecar.py:1-10 (PB-11) · 약관 스냅샷 scripts/ops/license_snapshot_archiver.py:1-12 · coverage.py:1-10 (LIC-02, gates.yaml:433 cleared)
+  #   ③DB 적재 관문: 생성물은 content_provenance 없이 problem 행 불가 l1/problem_bank/provenance_gate.py:1-30 · 호출 populate.py:370,670
+  #     AST 전수 동결 tests/backend/db/test_problem_write_provenance_single_gate.py · 판정 문서 docs/standards/provenance_enforcement_layer_decision.md:1-12 (LIC-03)
+  #   ④런타임 노출: is_exposable(메타 전용 출처 차단) src/backend/whymath_backend/l6/_shared.py:147-170 · CI policy-guard(검정교과서 본문 패턴) ci.yml:1375-1441
+  #   권리 정책 엔진(fail-closed) l1/rights/policy_engine.py:1-12 (LIC-01)
+  copyright: { needs: [generate, rephrase] }
+
+  # [집행·E2] QA 파이프라인 오케스트레이터 9축(corpus_audit·canonicalize·graph reachability·crosslink 강등·prose leak·provenance·결함주입·금칙어PII·결함신고)
+  #   harness/qa_pipeline.py:1-40 · CI 코퍼스 변경 시 .github/workflows/ci.yml:224,327-330 · 배선 동결 tests/infra/test_qa_pipeline_wiring.py
+  #   결함 주입 강등전 harness/defect_detection_eval.py:1-16 · CI ci.yml:433
+  qa_pipeline: { needs: [derive_verify, dedup_gate, copyright, misconception_crosswalk] }
+
+  # [부분·E2] 사람 품질 검토 F1~F8 — CLI/JSONL 매체로 집행, 웹 UI(ADMIN-07)는 미구현(review_session.py:11-15 자인)
+  #   검수 큐(비수용 후보 내구 저장·워크리스트) harness/needs_review_worklist.py:1-14 (EOS-58)
+  #   판정 기입 + HIT 타이머(verdict approved/rejected/approved_with_edit · failure_code F1~F8) harness/review_session.py:1-40 (EOS-78) · review_timer.py:1-16
+  #   표본 패키지 harness/reviewer_sample_package.py:1-16 · 합격 로트 샘플링 Wilson 상한 게이트(exit 1) harness/corpus_audit_eval.py:1-16 (S5)
+  #   감사 라벨 실물 docs/data/corpus_audit_*.jsonl · reviewer_sample_*.md (E3 ls)
+  #   R2-02 독립성: 이 노드는 dedup_gate 판정과 무관하게 모든 후보에 적용된다(needs 에 dedup_gate 를 두는 것은 실행 순서이지 대체가 아니다)
+  human_review: { needs: [derive_verify, dedup_gate, qa_pipeline] }
+
+  # [집행·E2] 승격 게이트: review_status 각인(사람 입력 0·corpus_audit_eval 측정값만) harness/problem_corpus_review_status_backfill.py:1-30
+  #   CI 드리프트 가드 .github/workflows/ci.yml:1716-1718 (--all --check) · 동결 tests/infra/test_corpus_backfill_drift_guard_wiring.py
+  #   경로 밖 승격 차단(코퍼스 실재→사람 판정→각인 일치→Wilson) harness/golden_promotion_gate.py:1-30 (EOS-64 ③)
+  #   상태 어휘 schema/enums.py:703-725 ReviewStatus · 사람 게이트 backlog/gates.yaml:513 G-mp03-first-promotion-run (status: pending)
+  promotion_gate: { needs: [human_review] }
+
+  # [집행·E2] 판정기를 판정: 골든 셋 승격·동결 harness/golden_benchmark.py:1-30 · 혼동행렬(FN율) ops/qa_confusion_matrix.py:1-16
+  #   계약 docs/standards/golden_benchmark_contract.md:1-30 (EOS-60) · 첫 동결 런북 docs/ops/mp03_first_golden_promotion_runbook.md:1-8
+  golden_benchmark: { needs: [human_review, qa_pipeline] }
+
+  # ───────────── 게시·운영 ─────────────
+  # [부분·E2] 게시 (R1-03 필수 이름) = ①코퍼스→DB 멱등 적재(provenance 관문 경유) l1/problem_bank/populate.py:1-25,80-92 (`--all`)
+  #   ②런타임 노출 게이트 2축(독립 if): is_exposable(저작권) + is_review_cleared(review_status==approved) src/backend/whymath_backend/l6/_shared.py:147-197
+  #     소비처 l6/{school_progress,suneung,metacognition,gifted,retake,thinking}/gating.py · l6/blueprint/assembly.py (E3 grep 7곳)
+  #   미구현: problem.is_published / publish_at 컬럼(db/models/problem.py:248-251)의 *쓰기 경로 0건* — src 전수 grep(E3) 히트는 schema 기본값 False·ORM 컬럼뿐,
+  #     테스트는 전건 `is_published is False` 단언(tests/backend/schema/test_problem.py:190 등). 즉 "게시 플래그 플립"이라는 단계는 존재하지 않고
+  #     사실상의 게시 = review_status=approved 각인 + DB 적재 + 노출 게이트 통과. R2-01(게시 테이블 DB 수준 거부 트리거)도 집행 장치 없음(rules.yaml stage 5)
+  publish: { needs: [promotion_gate, copyright, signature_tagging] }
+
+  # [집행·E2] 결함 문항 비파괴 격리(사후 회수): genlog 선별→PATCH /v1/problems/{id}(RequireContentAdmin) ops/generation_recall.py:1-30 (EOS-97 · dry-run 기본)
+  #   서빙 배제(무인증 GET 4종 · IS DISTINCT FROM) src/backend/whymath_backend/api/problems.py:28-33,99-135 (EOS-71)
+  #   상태값 schema/enums.py:725-737 quarantined ≠ rejected · 계약 docs/standards/problem_quarantine_contract.md:1-40
+  quarantine: { needs: [publish] }
+
+  # [집행·E2] 백업 (R1-03 필수 이름 · publish 하류): 컨테이너 내 pg_dump→pg_restore --list 검증→보존 정책→age 암호화(fail-closed)
+  #   scripts/backup/backup_whymath_pg.ps1:1-22 (OPS-02/31) · 스케줄 등록(S4U·StartWhenAvailable) register_backup_schedule.ps1:1-22
+  #   신선도 판정(exit 1) backup_status.py:1-14 · check_backup_freshness.ps1:1-20 · 암호화 양방향 검증 verify_encrypted_backup.py:1-20
+  #   런북 docs/architecture/db_backup_dr_runbook.md:1-14 · 동결 tests/infra/test_backup_script.py · test_backup_encryption.py (E3 ls)
+  #   사람 게이트 backlog/gates.yaml:89 G-backup-offsite-move · :100 G-backup-restore-rehearsal (둘 다 cleared)
+  #   집행 주체 = Phaiakes9 Windows 작업 스케줄러(CI 잡 없음 — workflows grep 'backup' 히트는 주석 ci.yml:1114,1152 뿐·E3)
+  backup: { needs: [publish] }
+
+  # [집행·E2] DB 무결성 게이트 7종(orphan concept/skill/problem·dangling curriculum·duplicate canonical·event schema·발행 포인터)
+  #   ops/integrity_violations_gate.py:1-30 (OPS-55·EOS-07) · CI backend-migrations 잡 .github/workflows/ci.yml:660-661
+  integrity_gate: { needs: [publish] }
+
+  # [집행·E2] 코치 응답 시드 사전적재(문항 은행이 아니라 L3 캐시 콘텐츠): JSONL 스펙→라우터 동일 키→SymPy 시드 검증→Redis
+  #   src/backend/whymath_backend/l3/pregenerate/__main__.py:1-17 · prewarmer.py:1-14 · validator.py:1-10 · GenerationLog 사이드카(EOS-55)
+  #   선행 근거 정정(독립 검증 E3): l3/pregenerate/*.py 는 오개념·개념 콘텐츠를 import 하지 않는다(grep 0건).
+#   실제 입력은 JSONL 시드 명세 + 라우터 + Redis 이므로 원천 노드 coach_seed_specs 를 선행으로 둔다.
+  coach_seed_prewarm: { needs: [coach_seed_specs] }
