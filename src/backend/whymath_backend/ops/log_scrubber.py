@@ -73,14 +73,23 @@ from collections.abc import Callable
 
 _MASK = "***MASKED***"
 
+# SEC-38: 이 모듈의 모든 정규식은 `re.ASCII`로 컴파일한다. 파이썬 `re`는 기본값(유니코드)에서
+# 한글을 단어 문자(`\w`)로 보기 때문에, `\b` 경계가 "010-1234-5678로"·"kid@test.com으로"·
+# "키sk-ant-…"처럼 한글이 붙은 자리에서 성립하지 않아 한국어 로그 문장 속 PII·시크릿을 통째로
+# 놓쳤다(2026-09-28 실측 — `scrub_text`가 원문 그대로 반환). 패턴의 문자 클래스는 전부 ASCII라
+# 경계만 ASCII 기준으로 되돌리면 된다 — 영숫자에 붙은 경우의 판정(비매칭)은 수정 전과 같고,
+# 한글에 붙은 경우만 새로 잡힌다(`tests/backend/ops/test_log_scrubber.py`의 SEC-38 절이 대조군과
+# 함께 동결한다).
+_ASCII = re.ASCII
+
 # ── 1a) 시크릿(자격증명) 형태 패턴 — `SECRET_LITERAL_PATTERNS`로 공개(하드코딩 스캔 재사용) ──
 CREDENTIAL_SHAPE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # API 키류: Anthropic `sk-ant-…`, OpenAI `sk-…`, Langfuse `pk-lf-…`/`sk-lf-…` 등.
-    re.compile(r"\b(?:sk|pk)-[A-Za-z0-9_-]{6,}"),
+    re.compile(r"\b(?:sk|pk)-[A-Za-z0-9_-]{6,}", _ASCII),
     # Authorization 헤더 `Bearer <token>` — 토큰 문자(base64url·JWT 마침표 포함) 전체.
-    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE),
+    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE | _ASCII),
     # JWT 3-세그먼트(header.payload.signature, base64url) — Bearer 접두 없이 단독 로그된 경우.
-    re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}", _ASCII),
 )
 
 # ── 1b) PII 형태 패턴 — 로그 마스킹 전용으로 신설됐으나(시크릿 하드코딩 스캔에는 재사용하지
@@ -88,12 +97,13 @@ CREDENTIAL_SHAPE_PATTERNS: tuple[re.Pattern[str], ...] = (
 #      오탐 유발), ARCH-24(`harness/banned_words_pii_eval.py`)가 학생 대면 산문의 타인 PII
 #      하드코딩·자기 PII 반사 스캔에 재사용하는 두 번째 소비처가 되어 공개(`_` 제거)했다.
 #      정규식 값 자체는 변경하지 않는다(재구현 금지 — 두 소비처 모두 같은 "PII의 모양"을
-#      봐야 한다, 단일 진실 원천).
+#      봐야 한다, 단일 진실 원천). SEC-38로 경계 판정만 `re.ASCII`로 바꿨고, 두 소비처가
+#      같은 객체를 쓰므로 수정도 함께 받는다.
 PII_SHAPE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # 이메일.
-    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", _ASCII),
     # 한국 휴대전화(010-1234-5678 / 01012345678 등).
-    re.compile(r"\b01[016789]-?\d{3,4}-?\d{4}\b"),
+    re.compile(r"\b01[016789]-?\d{3,4}-?\d{4}\b", _ASCII),
 )
 
 # 로그 마스킹(scrub_text)이 실제 검사하는 전체 패턴 집합 — 자격증명 + PII.
@@ -108,7 +118,7 @@ SECRET_LITERAL_PATTERNS = CREDENTIAL_SHAPE_PATTERNS
 
 # ── 2) WHYMATH_*_KEY/SECRET/SALT 환경변수 대입 — 키 *이름*은 진단용으로 보존, 값만 마스킹 ──
 _ENV_SECRET_PATTERN = re.compile(
-    r"\b(WHYMATH_[A-Z0-9_]*(?:KEY|SECRET|SALT)[A-Z0-9_]*)\s*[:=]\s*(\S+)"
+    r"\b(WHYMATH_[A-Z0-9_]*(?:KEY|SECRET|SALT)[A-Z0-9_]*)\s*[:=]\s*(\S+)", _ASCII
 )
 
 
@@ -135,7 +145,8 @@ _SENSITIVE_FIELD_NAMES: tuple[str, ...] = (
 _FIELD_PATTERN = re.compile(
     r"\b(?P<key>" + "|".join(re.escape(name) for name in _SENSITIVE_FIELD_NAMES) + r")"
     r'(?P<sep>"?\s*[:=]\s*)'
-    r"(?P<value>\"[^\"]*\"|'[^']*'|\S+)"
+    r"(?P<value>\"[^\"]*\"|'[^']*'|\S+)",
+    _ASCII,
 )
 
 
