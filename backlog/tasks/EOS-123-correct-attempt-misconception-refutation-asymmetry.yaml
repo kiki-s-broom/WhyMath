@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/api/me.py
   - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
-session: null
+session: claude/harn-180-424n4m
 notes: "출처: 2026-09-19 EOS-122(P-15 페르소나 3종 완주) 실행 중 실측 발견. 고치지 않고 등재만 한 이유 = 집행 지시문 P-15의 범위 규율(\"발견한 결함은 고치되 범위를 넓히지 마라 · 새 기능이 필요하다고 판단되면 태스크로 등재만 하고 보고하라\")과, 교수학 판정(④)이 코드 수정보다 선행해야 하기 때문이다.\n\n판정 기준: main 433ec9ea. 실측 하네스 = tests/backend/api/test_e2e_persona_journeys.py::test_persona_c_misconception_confidence_declines_after_targeted_problem (단계 ⑤·⑥)."
-updated: 2026-09-19
+updated: 2026-09-28
