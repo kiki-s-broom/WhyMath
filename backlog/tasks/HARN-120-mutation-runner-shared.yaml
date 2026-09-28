@@ -17,11 +17,12 @@ acceptance:
   - "③ 이관·자기검증 — 뮤테이션 하네스가 인라인(bash heredoc·임시 스크립트)으로 존재하는 기존 파일 중 상위 10건(`grep -rlE \"뮤테이션|mutation\" tests scripts` 101파일에서 선정 근거 병기)을 spec.yaml로 이관. CI `harness-integrity` 잡에 러너 자기검증 1스텝(러너 자신의 단언 4종을 각각 깨뜨린 픽스처 → RED) 배선을 `tests/infra/test_test_suite_wiring.py`가 동결."
   - "④ 집행 지점(정본화 ①~③과 별항) — 러너가 존재하는 것과 쓰이는 것은 다르다. 신규 가드(tests/infra·tests/harness에 추가되는 회귀 테스트, scripts/*의 게이트 CLI)에 대응하는 mutations/*.yaml 명세가 없으면 CI `harness-integrity` 잡이 \"미검증 가드\"로 계상한다(1단계 warn·측정 후 block 승격은 HARN-122 절차). 그 배선을 `tests/infra/test_test_suite_wiring.py`가 동결하고, 뮤테이션으로 \"명세 없는 신규 가드 1건 주입 → 계상 1건\"을 실증한다. (2026-09-20 반박 검증 지적 — 보고서 §3 B ⑤가 약속한 강제 지점이 acceptance에 없었다)"
   - "⑤ 바이트코드 캐시 무효화 — 러너는 건마다 테스트 실행 전에 대상 모듈의 __pycache__/<모듈>.*.pyc를 지우고 PYTHONDONTWRITEBYTECODE=1로 실행한다. .pyc 무효화 검사는 '초 단위 수정 시각 + 소스 크기'라서, 크기 변화가 같은 두 뮤테이션이 같은 1초 안에 쓰이면 앞 뮤테이션의 캐시가 뒤 실행에 재사용된다(디스크엔 뒤 뮤테이션, 실행된 코드는 앞 뮤테이션). 변별력 실증: 크기 변화가 같은 뮤테이션 2건을 1초 안에 연달아 주입하는 픽스처에서 캐시 제거를 끄면 뒤 건 판정이 뒤바뀌는 것을 RED로 확인한다. (실측 2026-09-26 HARN-176: M28·M29가 둘 다 +8자라 5회 중 3회 M29가 '생존'으로 오판됐고, 캐시 제거 후 3회 연속 29/29 검출)"
+  - "⑥ [2026-09-27 실측 · 게이트 G-required-tier-caller-recheck 집행 중] RED의 출처를 단언한다 — 지정 테스트 선택자의 FAILED만 검출로 센다. 수집·import·픽스처 설정 단계의 ERROR, 또는 지정하지 않은 테스트의 실패로 끝난 실행은 검출이 아니라 주입 결함으로 분류하고 exit 1로 낸다. 사례: 모듈 최상위에 호출 1줄을 주입하자 conftest가 그 모듈을 import하며 NameError로 실행 전체가 깨졌고, exit code만 보면 RED(검출)로 읽혔다 — 실패 목록이 비어 있어서 발견했다. 주입을 함수 본문으로 옮기자 지정 테스트가 제대로 RED를 냈다. ①(c)의 'RED 확인'이 exit code 기반이면 이 형태를 검출로 오독한다(①의 'N passed 오독'과 반대 방향의 위장)"
 artifacts: []
 paths:
   - scripts/harness/mutate.py
   - "tests/infra/test_mutate_runner*.py"
   - "tests/**/mutations/*.yaml"
 session: null
-notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §3 B(177건·26%·최다). 보호 장치 실패 주입 계열 3회차(5개 날짜)·하네스 자신의 셸 이스케이프 결함(09-06)·픽스처 미접촉 2건(MISC-07·23)·전건 RED≠커버리지(HARN-01). 사고마다 하네스를 손으로 다시 짜는 것이 원인.\n\n[정정 2026-09-20] 반박 검증 지적: 정본화≠집행 별항 누락(집행 지점 추가)\n\n[정정 2026-09-26] HARN-176 실측: .pyc 캐시가 뮤테이션 주입을 가린 사고(사고 대장 mutation-injection-unreal) — 공용 러너 요건으로 편입"
-updated: 2026-09-26
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §3 B(177건·26%·최다). 보호 장치 실패 주입 계열 3회차(5개 날짜)·하네스 자신의 셸 이스케이프 결함(09-06)·픽스처 미접촉 2건(MISC-07·23)·전건 RED≠커버리지(HARN-01). 사고마다 하네스를 손으로 다시 짜는 것이 원인.\n\n[정정 2026-09-20] 반박 검증 지적: 정본화≠집행 별항 누락(집행 지점 추가)\n\n[정정 2026-09-26] HARN-176 실측: .pyc 캐시가 뮤테이션 주입을 가린 사고(사고 대장 mutation-injection-unreal) — 공용 러너 요건으로 편입\n\n[정정 2026-09-27] 재발방지 등재(실수 관리) — 2026-09-27 뮤테이션 하네스가 import 오류를 검출로 오독할 뻔한 실측 사례. 공용 러너 설계의 RED 판정 축에 없던 항목"
+updated: 2026-09-27
