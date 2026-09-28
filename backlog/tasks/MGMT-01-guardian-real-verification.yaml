@@ -5,12 +5,13 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: blocked
+status: todo
 priority: 1
 eos_priority: P1
 owner: kiki
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-external-counsel-restart-after-internal-completion
 acceptance:
   - "실 본인확인 방식(휴대폰 본인인증 등) 법적 적정성 변호사 자문 — 법령 유래 사람 의사표시"
   - "자문 결과 기반 verification_method 실구현으로 StubGuardianVerifier 대체 (consent_grant.py)"
@@ -21,5 +22,5 @@ paths:
   - src/backend/whymath_backend/schema/parental_consent.py
   - "docs/legal/**"
 session: null
-notes: "제품 출시(공개 β) 전으로 일괄 연기 — 2026-07-27 Kiki 지시: 변호사 회신·외부인 리뷰 등 외부 작업이 미완성 제품의 병목이 되는 것 반대. 자문 준비물(docs/legal/guardian_verification_counsel_brief.md)은 완비 — 출시 준비 단계에서 그대로 사용. unblock 트리거 = 공개 β 준비 착수\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 학생 표본 수집의 법적 전제(법정대리인 동의) — 등급≠착수, 변호사 자문에 막혀 있음. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "제품 출시(공개 β) 전으로 일괄 연기 — 2026-07-27 Kiki 지시: 변호사 회신·외부인 리뷰 등 외부 작업이 미완성 제품의 병목이 되는 것 반대. 자문 준비물(docs/legal/guardian_verification_counsel_brief.md)은 완비 — 출시 준비 단계에서 그대로 사용. unblock 트리거 = 공개 β 준비 착수\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 학생 표본 수집의 법적 전제(법정대리인 동의) — 등급≠착수, 변호사 자문에 막혀 있음. EOS-80 일괄 백필\n\n[정정 2026-09-28] 2026-09-28 정리 — 2026-07-27 '외부 작업 출시 전 일괄' 결정의 만료 지점을 게이트로 집행(종전: 게이트 없는 blocked 파킹)"
+updated: 2026-09-28

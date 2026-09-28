@@ -54,6 +54,8 @@ WAIT_LABEL: dict[str, str] = {
     "claimed": "다른 세션 claim",
     "claimed_remote": "원격 claim",
     "path_overlap": "경로 충돌",
+    # HARN-77 — 착수 가능하지만 12월 검증 이월 등급(P2·P3)이라 후보 화면에서 기본 숨김
+    "eos_deferred": "12월 검증 이월 등급(기본 숨김)",
     # selector가 내지 않는 축 — 원격 브랜치 사본이 done인 태스크(HARN-11 미머지 done 필터)
     "done_elsewhere": "미머지 완료(다른 브랜치)",
 }

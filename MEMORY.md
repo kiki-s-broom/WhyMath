@@ -346,6 +346,18 @@
 - **실측**: 저장소 문제은행 14,034건 — 재검산 ok 14,034 · 새 fail 0 · 판정 불가 0(판정 결과 불변). 뮤테이션 3종(성분 제거·필수 조건 제거·skip→ok) 전건 RED.
 - **선행 집행**: 게이트 `G-eos137-first-eval`에 `EOS-150` 입력 간선을 걸었다 — 재검산 없이 원장 첫 행이 찍히면 같은 골든을 다른 리비전으로 다시 잴 수 없다(재채점 금지). 런북 머리에도 선행을 적었다.
 - **main 설계와의 차이(기록)**: 선행 세션은 좌석을 3축으로 의도적으로 좁히고 "재현율이 낮게 나오는 것이 측정 목적"이라 적었다(계약 §8-5). 이 판정은 그 취지를 유지하되, 엔진이 이미 가진 검증기(S6)를 빼고 재는 것은 "엔진이 못 보는 것"이 아니라 "좌석이 안 부른 것"을 재는 것이라 보고 넓혔다.
+### 2026-09-28 (결정·정리 · Kiki 지시 "변경 계획에 걸림돌이 되는 절차들을 싹 정리" · HARN-77): **"12/31 내부 프로젝트 완성"을 정의하고(Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결), 이전 계획의 잔재 7건을 대장·문서·하네스에서 걷었다 — 셀렉터가 이제 12월 검증 등급을 첫 키로 쓰고 이월 등급(P2·P3)을 기본 숨긴다** (Kiki 결정 2건, claude 조사·집행) — 판정 기준 main `6c880b67`
+
+- **발단**: 게이트 `G-student-work-after-internal-completion` 점검 요청 → Kiki 지시 "12/31 내부완성으로 계획을 변경하기로 한 이상 이전 계획과의 차이가 없으면 변경 계획에 차질 … 걸림돌이 되는 절차들을 싹 정리".
+- **실측(정리 전)**: ① "내부 프로젝트 완성"의 정의 0건(내가 찾은 방법: docs·MEMORY·gates.yaml·README에서 `내부 (프로젝트 )?완성(의 정의|이란|=|:| 기준| 조건)` 검색) — EOS 선언 §0-2는 12/31을 AI 콘텐츠 전략 Go/No-Go 판정일로만 정의하는데, 그 "내부 완성 이후"를 전제한 대기 게이트가 5종(학생 재개·S3-02 재측정·Anthropic 재개·랜딩 변호사·Not Now) ② `next` 후보 195건 중 P2(판정 이후) 125·P3 5 = **67%가 2027 이월분**, 상위 10건에 P2 7건, 첫 P0 40위 — `selector.sort_key`에 `eos_priority`가 없었다(`HARN-77`이 09-07에 등재돼 있었으나 미착수) ③ `S3-01`이 12/31 이후로 연기됐는데 eos P0("없으면 12월 검증 불성립") ④ `ARCH-64`(09-21 Kiki 승인 컷오버)가 `ARCH-63`(ARCH-66 게이트에 보류)에 의존해 잠김 → 중단 기간 내내 클라우드 결정 요청이 오류 ⑤ `MGMT-01/02`(변호사·P1)가 게이트 없이 blocked 파킹 — 07-27 "출시 전 일괄" 결정의 만료 지점 부재 ⑥ `CUR-17/18`이 이월 판정인데 "unblock하면 next 최상위"라는 이유로 blocked 파킹(09-06) ⑦ 문면 잔재: 학생 게이트 제목의 "G4 조건 함께 판정"(EOS-135로 09-24 이미 결정) · Not Now 게이트의 "v1.0(12월 출시)"(§0-2와 모순) · `current_phase_checklist.md` "Phase 1(MVP) 진행 중"(08-30 MVP 종료 선언과 모순) · ROADMAP Phase 1 종료 게이트·status_roadmap S3/S5 탈출 게이트의 학생 조건에 연기 표시 없음.
+- **Kiki 결정 ①(내부 완성 정의)**: 권장안 채택 — ① Phase 3 Release Gate A~E PASS(`G-p3-w3-release-merged`) ② EOS G5 판정 완료 ③ 12월 검증 P0 전건 종결. 학생·변호사·Anthropic API 없이 성립하는 조건만. 집행 = `G-internal-completion-2026-12-31`(decision · 여는 작업 `P3-17` · 독촉 94일). §0-2의 판정은 ②로 흡수(개정 아님). 대안(G5만 · Kiki 별도 정의문)은 기각.
+- **Kiki 결정 ②(클라우드 좌석)**: 중단 기간에도 컷오버 착수 허용 — `ARCH-64`의 `ARCH-63` 의존 제거, 이 기간 failover는 LOCAL 강등만(acceptance에 명시 · "2차 좌석 있음"으로 위장 금지). ARCH-66 로그가 "Kiki 판단으로 남긴" 항목의 해소.
+- **집행(대장 · 전부 CLI · 손편집 0)**: `gates add` 2건(`G-internal-completion-2026-12-31` · `G-external-counsel-restart-after-internal-completion`(no-inputs · 독촉 95일 · MGMT-01/02 부착)) · `gates amend --title` 2건(학생·Not Now) + `--no-inputs` 1건 · `amend S3-01 --eos-priority P2` · `amend ARCH-64 --remove-depends ARCH-63 --acceptance` · `amend MGMT-01/02 --gate` · `unblock` 4건(MGMT-01·02·CUR-17·18). `validate`·`audit-deps` green.
+- **집행(코드 · HARN-77)**: `selector.sort_key` = (EOS 등급, stage, priority, −해금 수, id) — **등급이 stage보다 앞**인 이유: stage는 이전 계획(S0~S5 수학 완성)의 축이고 12/31 계획의 축은 12월 검증 관여도다. 미지정은 맨 뒤(모른다 ≠ 필수). `candidates(eos_hide=EOS_DEFERRED)`가 P2·P3를 `eos_deferred`로 제외(게이트·선행 등 다른 사유가 먼저) · `next --all-eos` · 숨긴 건수 0건 포함 항상 고지(`--json`은 stderr) · `start`는 경고만 · 정지 사유 `eos_deferred` 신설 · next/status/brief에 `[EOS 등급]` 표시 · board 라벨. 예산 게이트(`_active_p0`)는 건드리지 않았다(acceptance ⑥).
+- **변별력**: `TestEosPriorityOrdering.test_eos_grade_beats_stage_and_priority` 픽스처는 stage·priority가 등급과 반대 방향 — `eos_rank` 항을 빼면 2/5 RED 실측(원복 `cp` 바이트 동일 · 5/5 GREEN). 기존 `TestUnmergedDoneDetection` 픽스처의 P2를 P1로 바꿨다(숨김이 미머지 done 스캔보다 먼저라 P2 피검체는 스캔에 안 든다 — 그 스위트의 피검체는 등급이 아니다).
+- **측정(acceptance ③)**: 착지 전 `next --n 500 --json`(원격 claim·미머지 done 제외) 후보 195 = P0 2·P1 63·P2 125·P3 5, 상위 10 중 P2 7, 첫 P0 40위 → 착지 후(`--no-remote`) 후보 77 = P0 3·P1 74, 상위 10 = P0 3 + P1 7, 첫 P0 1위, 숨김 147건. 09-07 기준선(후보 125·P0 5·첫 P0 10위)과 방향 일치.
+- **정본 갱신**: `build_harness.md` v1.13(§3·§3a·§7) · EOS 선언 개정 이력 · ROADMAP 「현재 국면」+Phase 1 게이트+각주 · status_roadmap S3/S5 · current_phase_checklist 헤더. CLAUDE.md는 무변경(산문 등재 동결).
+- **남긴 것(정직한 공백)**: ⓐ 정의 ③(P0 전건 종결)은 기계 집행 없음 — 게이트 `--depends`는 `P3-17`만 걸었다(P0 집합은 유동) ⓑ P0인데 priority가 낮은 3건(`S4-11` 5·`ADMIN-07` 3·`EOS-50` 3)은 등급 첫 키로 이제 상위에 오르지만 priority 값 자체는 손대지 않았다(`amend --priority`는 Kiki 판단) ⓒ Phase 3 지시문 원문의 "Not Now(12월 출시 이후)" 문구는 Kiki 지시문이라 고치지 않았다 ⓓ `G-p3-entry-gate2-pass`(Phase 2 Gate 2 PASS)가 P3-01~17 14건을 잠그는 것은 품질 게이트라 유지 — 임계 경로는 `EOS-26-r6`(미머지 done · `claude/magical-maxwell-hja5kh`) → `EOS-141` 3차 재판정 → 게이트 → P3 ⓔ MGMT-01/02는 owner=kiki라 원래도 자동 후보가 아니었다 — 게이트 부착의 효과는 만료 지점의 기계 가시화다.
 
 ### 2026-09-28 (판정·착지 · EOS-17): **채점 응답의 숙달 갱신은 빈 값을 null로 낸다 — 0.0으로 접으면 writer 결함이 "숙달 0"으로 위장된다. 추천 근거의 신뢰도 0.0은 의도된 표현으로 유지**
 
@@ -11396,6 +11408,64 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 
 **착지 중 추가 판단(첫 미러 실행에서 발견)**: 자동 선택이 경로 필터 잡 `changes`를 "재현 가능"으로 골랐다(`ci_job_coverage`는 docker·서비스 컨테이너만 재현 불가로 본다). 그 잡의 filter 스텝은 `${{ github.event_name }}`을 써서 새 분류에서는 매번 미실행이므로, 그대로면 **모든 자동 미러 실행이 exit 3**이 되어 경고가 상시 소음이 된다. 그 잡이 하는 일(영역 플래그 계산)은 미러의 잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 이미 대신하므로 사각지대가 아니다 — 자동 선택에서 사유를 출력하며 제외했다(`--job changes`로 직접 지정하면 돌리고 미실행을 보고). 재발 방지 동결: 문서만 바뀐 변경의 자동 선택 잡에 "원리상 못 도는 run 스텝" 0건(`test_always_on_jobs_have_no_structural_not_executed`) + 제외 절 제거 뮤테이션 M15 RED.
 
+## 2026-09-28: 미머지 브랜치 전수 감사 13회차 — 회수 0건 · 삭제 12차 배치 5건 · 감사 중 실시간 중복·오분류 발견 · 대책 태스크 3건
+
+**판정 기준: main `919865d4`**(이후 `ed3d14da` 머지 반영). 세션 시작 시 shallow였고 `git fetch --unshallow origin` + `--prune`
+재동기화로 전제를 복구한 뒤에만 판정했다(1,319커밋). 판정 정본 = `docs/reviews/unmerged_branch_audit_2026-09-28.md`.
+
+**모집단**: 원격 ref 39 = 감사 대상 20 + 제외 19(열린 PR 소유 15 · 원격 claim 활성 2 · `main`/`harness-claims` 2).
+유령 PR 0건(열린 PR 15건 head 전부 실재·SHA 일치). **판정 4분류**: ① 회수 **0** · ② 추적 중 **15**(좌석 상실 0) ·
+③ 삭제 가능 **5** · ④ 제외 19. 직전 배치(9·10·11차 + 수동 2) 잔존 **0/8**.
+
+**③ 삭제 12차 배치 5건**(`claude/*`, 전부 main이 더 새로운 판): `adoring-mccarthy-sle0uj`(a737df74 — strict 해제 커밋은
+#1161로 착지, 두 번째 커밋은 **Kiki 로컬 잔여분 보존 커밋**으로 내용은 MP-06이 회수한 뒤 main이 더 고침) ·
+`new-session-fy0wry`(3d534dcc — main 조상) · `new-session-jchdr8`(f34b7478 — #1215 머지 3분 뒤 커밋, main이 09-24 이관) ·
+`test-driven-development-03elxp`(49d9d76a — main 조상, MP-02 홀드 09-23 해제) · `relaxed-fermat-8dui3u`(03e45689 — MP-06
+done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이벤트 · EOS-117 증적 상세)은 판정 문서 §4에 원문 보존.
+
+**감사 중 발견 ① — EOS-129 연쇄 착수(이 감사는 소유하지 않음)**: 열린 PR #1346이 EOS-129를 부분 이행(⑤ 운영 DB 응답 분포
+실측 도구 + 게이트 `G-eos129-item-response-census`)하고 08:43Z에 "게이트 대기로 claim 해제(todo)"했는데, 11:25Z 다른 세션
+`focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트** `G-eos129-prod-response-distribution`를
+4분 만에 신설했다(세 번째 세션도 12:11Z 착수). 이 감사도 사고 1건 + 대책 태스크(HARN-187)를 등재했으나, 푸시 전에 PR #1346의
+세션이 같은 사건을 3세션 실측으로 먼저 기록한 **PR #1356**(`HARN-193-unmerged-gate-attach-claim-release-gap` — PR 당시 `HARN-186`, 머지 `3dbe54d3` 때 개명 — + 사고 1건)을
+발견해 **이 브랜치의 사고 1줄은 빼고 HARN-187은 취소**했다(같은 사고의 이중 계수 방지). **Kiki는 두 런북을 모두 실행할
+필요가 없다.**
+
+**감사 중 발견 ② — 브리핑 "이미 포팅됨" 오분류 3회차(`HARN-190`)**: 세션 재개 브리핑이 `vafylb`를 "이미 포팅됨·결정 불요"로
+표시했다. 근거 `9905fdc4`(08-03 · #683)는 **그 브랜치 자신의 앞선 머지분**이고, 브랜치는 그 뒤 `f4c6f69c`(08-09)로 같은 파일
+(`harness/residue_gate_demotion_battle.py`)의 cp949 콘솔 출력 크래시를 고쳤는데 그 수정은 main에 없다(main판 출력·도움말
+16줄에 U+2014 · stdout 재구성 없음). `_find_ported_evidence()`가 근거 커밋이 건드린 **파일 경로**만 교집합으로 세 1/1 전건
+착지로 판정한다(메모리 재현). 실제 좌석은 `OPS-53`(todo)이며 **이 브랜치는 삭제하면 안 된다**. 40xspg(08-11)·7n9n72(08-30 →
+HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
+
+**두 회차 연속 원인 미상이던 claim 대장 이상의 원인 확정(`HARN-189`)**: `OPS-73-generated-inventory-conflict-blocks-ci` → 부재
+브랜치 `status-38gu4d` claim이 16일째 남은 것은 ⓐ 09-12 수동 개명(→`OPS-76`, done)이 claim을 옮기지 않았고 ⓑ
+`remote_claims.stale_claims()`가 태스크 부재(`task_missing`)를 먼저 판정해 홀더 브랜치 소멸(`branch_gone`) 판정에 도달하지
+않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다(메모리 재현 — 태스크 유무만 바꾸면 사유가 갈린다).
+
+**부수 발견(`HARN-188`)**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상 `03elxp`를 체크아웃
+대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면 09-07 트리의 옛 판정기
+(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를 요구해 정정에 테스트 변경이
+따르므로 별도 태스크로 분리했다.
+
+**태스크 번호 경합(HARN-111 실례)**: 처음 받은 번호 185·186이 푸시 전 사이 다른 세션들에 **각각 2건씩** 등재돼 있었다
+(`add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 창). 원격 전 브랜치·claim 대장에서 188~199가 비어 있음을 실측한 뒤
+`backlog.py rename`으로 185→188 · 186→189를 옮겼다.
+
+**감사 자신의 검증에서 난 사고 2건**: ⓐ `derived-index-not-rebuilt` 3회차 — 사고를 `incident add`로 쓴 뒤
+`backlog/jit_index.json`을 재생성하지 않아 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입 인덱스
+대조"에서 exit 1(뒤 스텝 7건 미실행). origin/main 워크트리 대조로 원인을 확정하고 `jit build`로 재생성했다(대책 `HARN-179`
+기등재 — 미러를 안 돌렸으면 CI red였다) ⓑ `harness-test-live-ledger-write` 14회차 — 재검증 미러의 `tests/harness`가 이 세션
+샤드에 가짜 `policy_warn` 3줄을 썼다(커밋 전 제거). 대책 `HARN-170`은 09-24 이후 14회 기록됐는데 우선순위 3·EOS P2에 머물러
+있다. (두 회차는 main `559be84e` 병합 후 대장 기준 스냅샷 — 기록 당시 2회차·7회차였으나 같은 날 다른 세션들이 같은 두 계열을
+계속 기록해 병합마다 앞에 끼어들었다 — 병합 7회 동안 8→9→10→11→12→12→14. HARN-179·HARN-170 결함을 오늘만 여러 세션이 겪고 있다는 신호다.)
+
+**정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계 — 단 `vafylb`는 §5-1에서 좌석을 다시 봤다).
+스킬 §3의 main 언급 grep을 `.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-188을 찾았다 — 스킬 원문 범위
+(`backlog/tasks docs`)로는 보이지 않는다. claim 활성 2건(block 홀드, TTL 초과)은 판정 보류를 유지했다. 떠돌이 좌석 3건
+(HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은 4분류 밖이라 관측만 남겼다.
+
+---
 ### 2026-09-28 — SEC-38 착지: 로그 마스킹 정규식을 `re.ASCII`로 — 한국어 문장 속 PII·시크릿이 평문으로 남던 사각 (판정 기준 main `919865d4`)
 
 **결함(실측)**: `ops/log_scrubber`의 패턴 7종(이메일·휴대전화·sk-/pk- 키·Bearer·JWT·`WHYMATH_*_KEY=`·학생 원문 필드명)이 전부 `\b` 경계를 썼는데, 파이썬 `re`는 기본값에서 한글을 단어 문자로 본다. 그래서 `010-1234-5678로`·`01012345678입니다`·`kid@test.com으로`·`키sk-ant-…`·`토큰eyJ…`·`설정WHYMATH_JWT_SECRET_KEY=…`처럼 **한글이 붙은 자리에서 경계가 성립하지 않아** `scrub_text`가 원문을 그대로 반환했다. 단독 번호·메일만 가려졌다. 기존 금칙어/PII 검출기 테스트는 `student.example@test.com 으로`처럼 띄어 써서 이 사각을 비껴가고 있었다. 발견 경위: EOS-137 서브에이전트가 금칙어 축 전화번호 사각을 보고 → 메인 세션이 같은 패턴이 로그 마스킹에 쓰임을 확인하고 이메일·시크릿·환경변수·필드명까지 확장 실측.

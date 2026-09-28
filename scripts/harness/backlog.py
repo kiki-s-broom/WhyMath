@@ -530,6 +530,8 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
         track=args.track,
         remote_claimed=remote_claimed,
         overlap_block=_overlap_block_map(root, backlog, policy),
+        # 이월 등급(P2·P3) 기본 숨김 (HARN-77) — --all-eos 로만 연다.
+        eos_hide=frozenset() if getattr(args, "all_eos", False) else selector.EOS_DEFERRED,
     )
     if remote_status not in ("ok", "disabled"):
         print(
@@ -561,7 +563,12 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
     # 조사한다(2026-09-05 EOS-96 실측). stderr에 내는 이유는 위 두 경고와 같다 — --json의
     # stdout은 기계가 읽으므로 오염하면 안 된다.
     _warn_cancelled_dep_blocks(backlog)
+    # 이월 등급 숨김 고지 (HARN-77) — 숨긴 건수를 **항상** 낸다(0건 포함). 건수가 없으면
+    # "이월분이 없다"와 "안 셌다"를 구분할 수 없고, 그 출력을 부재 판정에 쓰는 순간 무효가
+    # 된다(`next`의 절단 고지와 같은 원칙). --json은 stdout이 기계용이라 stderr로 낸다.
+    hidden_notice = selector.eos_hidden_notice(excluded)
     if args.json:
+        print(hidden_notice, file=sys.stderr)
         print(
             json.dumps(
                 [
@@ -569,6 +576,7 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
                         "id": t.id,
                         "layer": t.layer,
                         "subject": t.subject,
+                        "eos_priority": t.eos_priority,
                         "title": t.title,
                         "rationale": selector.selection_rationale(backlog, t),
                     }
@@ -584,6 +592,7 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
         print(f"착수 가능 태스크 없음 — 사유: {code}")
         for item in detail:
             print(f"  · {item}")
+        print(hidden_notice)
         _print_gate_waits(backlog, excluded)
         return 0
     shown = min(args.n, len(ready))
@@ -597,13 +606,17 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
     else:
         print(f"착수 가능 후보 (전체 {len(ready)}건):")
     for i, task in enumerate(ready[: args.n], start=1):
-        print(f"{i}. {task.id} [{task.layer}/{task.subject}] {task.title}")
+        print(
+            f"{i}. {task.id} [EOS {task.eos_priority or '미지정'}]"
+            f" [{task.layer}/{task.subject}] {task.title}"
+        )
         print(f"   사유: {selector.selection_rationale(backlog, task)}")
     if shown < len(ready):
         print(
             f"\n※ {len(ready) - shown}건이 표시되지 않았다 — 특정 태스크가 후보인지"
             f" 판정하려면 전건 조회: backlog.py next --n {len(ready)} --json",
         )
+    print(hidden_notice)
     _print_gate_waits(backlog, excluded)
     return 0
 
@@ -876,6 +889,13 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
         start_extra["as_owner"] = as_owner
     store.append_event(root, "start", task.id, **start_extra)
     print(f"▶ {task.id} 착수 (세션: {task.session}, 원격 claim: {remote_status})")
+    if task.eos_priority in selector.EOS_DEFERRED:
+        # 숨김은 금지가 아니다(HARN-77) — 다만 12/31 전에 이월분을 잡는 것은 예외이므로
+        # 근거를 남기게 한다. 등급이 틀렸으면 착수가 아니라 등급 정정이 먼저다.
+        print(
+            f"  ⚠ 12월 검증 이월 등급({task.eos_priority}) 태스크다 — 12/31 내부 완성 전 착수"
+            " 근거를 PR 본문에 적어라. 등급이 틀렸으면 amend --eos-priority 로 먼저 정정"
+        )
     print(f"  완료 조건: {task.acceptance or '(acceptance 미정의 — 정의 권장)'}")
     if not task.paths:
         print(
@@ -4811,6 +4831,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--subject")
     p.add_argument("--track")
     p.add_argument("--json", action="store_true")
+    p.add_argument(
+        "--all-eos",
+        action="store_true",
+        dest="all_eos",
+        help="12월 검증 이월 등급(P2·P3) 태스크도 후보에 포함 (기본은 숨김 · HARN-77)",
+    )
     p.add_argument(
         "--no-remote",
         action="store_true",

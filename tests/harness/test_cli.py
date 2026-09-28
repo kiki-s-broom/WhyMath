@@ -1877,7 +1877,9 @@ class TestUnmergedDoneDetection:
                 [
                     "add",
                     "--eos-priority",
-                    "P2",
+                    # P1 — 이월 등급(P2·P3)은 next 후보에서 기본 숨김이라(HARN-77) 미머지 done
+                    # 스캔 대상에 들지 않는다. 이 스위트의 피검체는 등급이 아니라 done 탐지다.
+                    "P1",
                     "--id",
                     self.TASK_ID,
                     "--title",
@@ -2796,3 +2798,78 @@ class TestTransitionRejectionGuidance:
             "in_progress",
             "review",
         ]
+
+
+class TestNextEosDeferredHidden:
+    """`next`가 12월 검증 이월 등급(P2·P3)을 기본 숨기고, 숨긴 건수를 항상 고지한다 (HARN-77).
+
+    이 스위트의 피검체는 CLI 종단이다 — selector 단위 검증은 `test_selector.py`의
+    `TestEosDeferredHidden`이 맡는다. 숨김 고지는 0건일 때도 나와야 한다(안 센 것과 구분 —
+    `next` 절단 고지와 같은 원칙).
+    """
+
+    TASK_ID = "S1-90-deferred-p2"
+
+    def _add_deferred(self) -> None:
+        assert (
+            cli.main(
+                [
+                    "add",
+                    "--eos-priority",
+                    "P2",
+                    "--id",
+                    self.TASK_ID,
+                    "--title",
+                    "이월 등급 태스크 — 12/31 이후",
+                    "--track",
+                    "math-completion",
+                    "--stage",
+                    "S1",
+                ]
+            )
+            == 0
+        )
+
+    def test_deferred_task_hidden_and_counted(self, seeded_repo: Path, capsys):
+        """이월 태스크는 --json 후보에 없고, 숨김 건수가 stderr에 난다"""
+        self._add_deferred()
+        capsys.readouterr()
+        assert cli.main(["next", "--n", "50", "--json", "--no-remote"]) == 0
+        captured = capsys.readouterr()
+        ids = [item["id"] for item in json.loads(captured.out)]
+        assert self.TASK_ID not in ids
+        assert "이월 등급(P2·P3) 1건은 기본 숨김" in captured.err
+        assert "--all-eos" in captured.err
+
+    def test_all_eos_includes_deferred_with_grade(self, seeded_repo: Path, capsys):
+        """--all-eos 는 이월 태스크를 포함하고 등급을 함께 낸다 (대조군)"""
+        self._add_deferred()
+        capsys.readouterr()
+        assert cli.main(["next", "--n", "50", "--json", "--no-remote", "--all-eos"]) == 0
+        captured = capsys.readouterr()
+        items = {item["id"]: item for item in json.loads(captured.out)}
+        assert self.TASK_ID in items
+        assert items[self.TASK_ID]["eos_priority"] == "P2"
+        assert "숨김 0건" in captured.err
+
+    def test_text_output_shows_grade_and_notice(self, seeded_repo: Path, capsys):
+        """사람용 출력은 후보마다 [EOS 등급]을 붙이고 숨김 고지를 낸다 — 0건일 때도"""
+        assert cli.main(["next", "--n", "2", "--no-remote"]) == 0
+        out = capsys.readouterr().out
+        assert "[EOS " in out
+        assert "이월 등급(P2·P3) 숨김 0건" in out
+        self._add_deferred()
+        capsys.readouterr()
+        assert cli.main(["next", "--n", "2", "--no-remote"]) == 0
+        out = capsys.readouterr().out
+        assert "이월 등급(P2·P3) 1건은 기본 숨김" in out
+
+    def test_start_on_deferred_warns_but_proceeds(self, seeded_repo: Path, capsys):
+        """숨김은 착수 금지가 아니다 — start는 경고를 내고 진행한다"""
+        self._add_deferred()
+        capsys.readouterr()
+        assert cli.main(["start", self.TASK_ID, "--session", "test-branch", "--no-remote"]) == 0
+        out = capsys.readouterr().out
+        assert "이월 등급(P2)" in out and "amend --eos-priority" in out
+        backlog, _ = store.load_backlog(seeded_repo)
+        assert backlog.tasks[self.TASK_ID].status == "in_progress"
