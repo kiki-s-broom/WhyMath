@@ -16,8 +16,9 @@
 판정 요지 — 추천은 상태 머신을 **다시 판정하지 않고 집행한다**
 ---------------------------------------------------------------
 "다음에 무엇을 할까"의 결정자는 상태 머신(`l2/learning_state_policy.py::V1_RULES`) 하나다.
-오개념과 선수 결손 중 무엇이 먼저인가는 논쟁 중이지만(상태 머신 R3 > R4 ↔ MISC-30 경로 표
-RT1 > RT2), 추천이 집행만 하면 순서를 바꾸기로 했을 때 고칠 곳이 `V1_RULES` 한 곳이다.
+오개념과 선수 결손 중 무엇이 먼저인가는 EOS-138 ③이 상태 머신 순서(R3 > R4)로 판정했고
+MISC-30 경로 표(RT1 > RT2)는 삭제됐다. 추천이 집행만 하므로 순서를 바꾸기로 하면 고칠 곳은
+`V1_RULES` 한 곳이다.
 
 집행 대상은 **R3 하나**다(트리거 `POLICY_REMEDIATE_MISCONCEPTION`). R5·R6·R2·R1을 읽지 않는
 이유는 판정문 §3에 있다 — 요지: R5를 따르면 반복 실패 뒤 선수 하강이 막히고, R2를 따르면
@@ -25,8 +26,10 @@ RT1 > RT2), 추천이 집행만 하면 순서를 바꾸기로 했을 때 고칠 
 
 안전장치 4개 (판정문 §4 — 독립 교수학 비판 반영)
 ------------------------------------------------
-R3의 입력은 약하다(학생 전체의 활성 가설 · 신뢰 하한 없음). 추천이 R3를 충실히 집행할수록
+R3의 입력은 약했다(학생 전체의 활성 가설 · 신뢰 하한 없음). 추천이 R3를 충실히 집행할수록
 그 약점이 학생에게 그대로 전달되므로, **지금 근거를 확인할 수 있는 결정만** 집행한다.
+EOS-138 ② 이후 R3 입력 자체가 "이번 응답 스캔 후보 중 하한 초과"로 좁혀져 ①②는 중복이지만 유지한다 —
+해가 없고, 배포 전에 원장에 적힌 옛 R3 결정(좁히기 전 입력)을 추천이 읽을 때 여전히 방어선이다.
 
   ① 이번 회차에 새로 확인된 가설이 있어야 한다 — `turns_since_evidence = 0` **이고** 직전 다른
      응답이 원장에 남긴 마지막 전이보다 늦게 증거로 갱신된 가설(EOS-140 — tse만으로는 미스캔
@@ -191,7 +194,8 @@ def _evidence_since_previous_attempt(
     직전 응답이 없으면(첫 응답) 경계가 없고 tse만으로 판정한다 — 그때는 옛 스캔 자체가 없다.
 
     남는 한계(정직 표기): 두 응답 **사이의** 코치 대화 턴에서 매치된 가설도 "이번 회차"로 센다.
-    근본 해소는 R3의 입력을 이번 응답의 스캔 결과로 좁히는 것이며 `EOS-138`이 소유한다.
+    근본 해소는 R3 입력 쪽에서 이뤄졌다(`EOS-138` ② — 이번 응답의 스캔 후보만 R3 입력). 이 경계는
+    그 이전에 적재된 R3 결정을 위한 방어선으로 남는다.
     """
     boundary = (
         select(func.max(LearningStateTransition.occurred_at))
@@ -304,7 +308,7 @@ async def route_by_learning_state(
 
     user_id = uuid.UUID(learner_state.student_id)
     confidence = await _fresh_misconception_confidence(session, user_id, directive.attempt_id)
-    # "초과"다(이하는 집행하지 않는다) — MISC-30 표의 RT2와 같은 경계 방향.
+    # "초과"다(이하는 집행하지 않는다) — R3 입력 필터(`learning_state_evidence`)와 같은 경계 방향.
     if confidence is None or confidence <= MISCONCEPTION_REMEDIATION_FLOOR:
         return StateRoute(outcome=StateDirectiveOutcome.WEAK_MISCONCEPTION_EVIDENCE)
 

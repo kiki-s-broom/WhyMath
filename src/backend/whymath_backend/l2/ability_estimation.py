@@ -51,6 +51,18 @@ def resolve_item_difficulty_b(
     return None
 
 
+def resolve_item_discrimination_a(irt_a: float | None) -> float:
+    """문항 IRT 변별도 a 결정 — *보정값 우선·Rasch 폴백*(`resolve_item_difficulty_b`의 대칭축).
+
+    EOS-129: 2PL 보정(`item_calibration`)이 채택한 a(`Problem.irt_a`)가 **양수·유한**이면 그대로
+    쓰고, 그 외(NULL·0 이하·nan·inf)는 1.0(Rasch)으로 폴백한다. b와 달리 None을 돌려주지 않는
+    이유: a가 없어도 응답은 θ 추정에 쓸 수 있다 — a=1.0은 "변별도를 모른다"의 중립값이다.
+    """
+    if irt_a is not None and math.isfinite(irt_a) and irt_a > 0.0:
+        return float(irt_a)
+    return 1.0
+
+
 class ConceptAbilityItem(BaseModel):
     """개념별 IRT 능력 — `GET /v1/me/ability/by-concept`의 한 개념 항목."""
 
@@ -154,4 +166,5 @@ __all__ = [
     "difficulty_to_logit",
     "estimate_global_ability",
     "resolve_item_difficulty_b",
+    "resolve_item_discrimination_a",
 ]

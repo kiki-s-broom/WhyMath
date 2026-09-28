@@ -232,10 +232,11 @@ BASELINE: dict[str, frozenset[str]] = {
             # ② 경로로 편입한다 — ①(기존 조회 함수 재사용)이 불가한 이유는 각각 다르다:
             #   · learning_state_machine: `learning_state_transition`이 이 PR이 신설한 테이블이라
             #     재사용할 기존 reader가 존재하지 않는다(유일 writer·유일 reader가 이 모듈이다).
-            #   · learning_state_evidence: `problem_attempt` 연속 오답 계수와 활성 오개념 조회는
+            #   · learning_state_evidence: `problem_attempt` 연속 오답 계수는
             #     `l2/learner_state.py`(이미 baseline)와 같은 모양의 SELECT를 쓰지만, L2는 L4의
             #     `hypothesis_store`를 import할 수 없어(역방향 의존 금지) 그 모듈도 같은 이유로
-            #     직접 쿼리한다 — 즉 이 편입은 기존 선례의 연장이지 새 관행이 아니다.
+            #     직접 쿼리한다 — 즉 이 편입은 기존 선례의 연장이지 새 관행이 아니다. (활성
+            #     오개념 조회는 EOS-138 ②로 제거됐다 — R3 입력은 호출부가 넘기는 이번 스캔 후보다.)
             "l2/learning_state_evidence.py",
             "l2/learning_state_machine.py",
             # EOS-24 — 상태 머신 결정 → 추천 이음매. 처분 (b)의 ② 경로다. 조회 셋이 전부 **새

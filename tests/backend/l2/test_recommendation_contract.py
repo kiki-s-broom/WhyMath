@@ -180,6 +180,14 @@ class TestThresholdSingleSource:
         """통합은 *이름*을 모으는 것이지 값을 바꾸는 것이 아니다(회귀 0 · acceptance ⑥)."""
         assert WEAK_CONCEPT_MASTERY_CEILING == 0.7
 
+    def test_prerequisite_ceiling_value_is_pinned(self) -> None:
+        """선수 경계 0.4를 리터럴로 못 박는다(EOS-138 ③ — 종전 `test_remediation_policy`의 고정 이관).
+
+        상수로 파생한 픽스처만 두면 경계가 옮겨질 때 픽스처도 함께 옮겨져 아무것도 잡지 못한다
+        (2026-09-18 실측: 0.4·0.7 ±0.01 뮤테이션 4종 생존). 경로 표 삭제로 옛 고정이 사라져 여기로 옮긴다.
+        """
+        assert PREREQUISITE_MASTERY_CEILING == 0.4
+
     def test_lthc_band_is_not_folded_into_the_weak_cut(self) -> None:
         """`learner_state`의 LTHC 밴드는 **다른 축**이다 — 상한이 0.8이라 합치면 한쪽이 움직인다.
 

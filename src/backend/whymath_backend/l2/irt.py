@@ -312,14 +312,174 @@ def select_next_item(
     return select_weighted_item(theta, items, administered=administered)
 
 
+# ── EOS-129: 문항 2PL 모수 (a, b) 동시 추정 ──────────────────────────────────────────────
+# 변별도 a의 탐색 구간. 하한 0.25는 "거의 변별하지 못하는 문항"(정보량이 a² 배로 줄어든다),
+# 상한 4.0은 계단 함수에 가까운 비현실 영역이다. 경계에 닿은 추정은 데이터가 그 방향으로
+# 발산하려 한다는 신호라 채택하지 않는다(`ItemFit.a_clamped`).
+_A_LOWER = 0.25
+_A_UPPER = 4.0
+# Newton 스텝 한 번의 좌표별 최대 이동 — 초기값이 멀 때 한 스텝에 경계로 튀는 것을 막는다.
+_MAX_NEWTON_STEP = 1.0
+# 로그우도가 줄어드는 스텝을 절반씩 줄여 보는 최대 횟수(단조 증가 보장용 안정화).
+_MAX_STEP_HALVINGS = 20
+
+
+class ItemFit(BaseModel):
+    """문항 2PL 적합 결과 — 추정값과 **그 추정을 믿어도 되는지**를 함께 싣는다(불변).
+
+    `converged=False`이거나 `discrimination_se=inf`이면 추정값은 초기값 그대로이거나 신뢰할 수
+    없는 값이다. 호출부(보정기)는 이 필드들로 채택 여부를 판정하고, 탈락하면 a=1.0(Rasch)으로
+    폴백한다 — 이 객체 자체는 폴백을 하지 않는다(판정과 추정의 분리).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    discrimination: float = Field(description="추정 a(변별도). 추정 불가면 초기값.")
+    difficulty: float = Field(description="추정 b(난이도, logit). 추정 불가면 초기값.")
+    discrimination_se: float = Field(
+        description="a의 표준오차 — 관측 Fisher 정보행렬 역행렬의 a 대각 제곱근. 특이면 inf."
+    )
+    converged: bool = Field(description="Newton 반복이 tol 안에서 수렴했는가.")
+    a_clamped: bool = Field(description="최종 a가 탐색 구간 경계에 닿았는가(발산 신호).")
+    b_clamped: bool = Field(description="최종 b가 탐색 구간 경계에 닿았는가(발산 신호).")
+
+
+def _log_likelihood(responses: list[tuple[float, bool]], a: float, b: float) -> float:
+    """2PL 로그우도 Σ y·log P + (1-y)·log(1-P) — 수치 안정형(log1p·exp 분기)."""
+    total = 0.0
+    for theta, correct in responses:
+        z = a * (theta - b)
+        # log σ(z) = -log(1+e^{-z}), log(1-σ(z)) = -log(1+e^{z}) — 큰 |z|에서 overflow 회피.
+        log_p = -math.log1p(math.exp(-z)) if z >= 0 else z - math.log1p(math.exp(z))
+        log_q = log_p - z
+        total += log_p if correct else log_q
+    return total
+
+
+def _item_fisher(
+    responses: list[tuple[float, bool]], a: float, b: float
+) -> tuple[float, float, float, float, float]:
+    """(dL/da, dL/db, I_aa, I_bb, I_ab) — 2PL 문항 모수의 기울기와 Fisher 정보행렬 원소.
+
+    dL/da = Σ(y−P)(θ−b) · dL/db = −a·Σ(y−P)
+    I_aa = Σ(θ−b)²P(1−P) · I_bb = a²ΣP(1−P) · I_ab = −aΣ(θ−b)P(1−P)
+    """
+    grad_a = grad_b = i_aa = i_bb = i_ab = 0.0
+    for theta, correct in responses:
+        d = theta - b
+        p = 1.0 / (1.0 + math.exp(-a * d))
+        w = p * (1.0 - p)
+        resid = (1.0 if correct else 0.0) - p
+        grad_a += resid * d
+        grad_b += -a * resid
+        i_aa += d * d * w
+        i_bb += a * a * w
+        i_ab += -a * d * w
+    return grad_a, grad_b, i_aa, i_bb, i_ab
+
+
+def _discrimination_se(i_aa: float, i_bb: float, i_ab: float) -> float:
+    """정보행렬 역행렬의 a 대각 = I_bb / det → SE = √. 행렬식이 0 이하(특이)면 inf."""
+    det = i_aa * i_bb - i_ab * i_ab
+    if det <= 1e-12 or i_bb <= 0.0:
+        return math.inf
+    return math.sqrt(i_bb / det)
+
+
+def estimate_item_parameters(
+    responses: list[tuple[float, bool]],
+    *,
+    initial_a: float = 1.0,
+    initial_b: float = 0.0,
+    max_iter: int = 50,
+    tol: float = 1e-6,
+    a_bounds: tuple[float, float] = (_A_LOWER, _A_UPPER),
+    b_bounds: tuple[float, float] = (_THETA_LOWER, _THETA_UPPER),
+) -> ItemFit:
+    """학생 능력 θ를 **고정**한 조건부 MLE로 문항 2PL 모수 (a, b)를 동시 추정 — EOS-129.
+
+    `responses`는 `(학생 능력 θ, 정답 여부)` 쌍(`estimate_difficulty`와 같은 모양). 2차원
+    Newton(Fisher scoring): `Δ = I⁻¹·∇L`. 안정화 3종 — ① 좌표별 스텝 상한 ② 로그우도가 줄면
+    스텝 절반(최대 `_MAX_STEP_HALVINGS`회) ③ 매 스텝 bounds clamp. 결정론(같은 입력→같은 결과).
+
+    **추정 불가 표시**(폴백은 호출부 책임): 빈 응답·전부 정답·전부 오답이면 반복 없이
+    `converged=False`·`discrimination_se=inf`로 초기값을 돌려준다(MLE가 ±∞로 발산하는 구간).
+    모든 θ가 같으면 정보행렬이 특이(행렬식 0)라 역시 추정 불가다.
+    """
+    a_lo, a_hi = a_bounds
+    b_lo, b_hi = b_bounds
+    a = min(max(initial_a, a_lo), a_hi)
+    b = min(max(initial_b, b_lo), b_hi)
+
+    def _unfit() -> ItemFit:
+        return ItemFit(
+            discrimination=a,
+            difficulty=b,
+            discrimination_se=math.inf,
+            converged=False,
+            a_clamped=False,
+            b_clamped=False,
+        )
+
+    if not responses:
+        return _unfit()
+    if all(correct for _, correct in responses) or not any(c for _, c in responses):
+        return _unfit()
+
+    converged = False
+    ll = _log_likelihood(responses, a, b)
+    for _ in range(max_iter):
+        grad_a, grad_b, i_aa, i_bb, i_ab = _item_fisher(responses, a, b)
+        det = i_aa * i_bb - i_ab * i_ab
+        if det <= 1e-12:
+            break  # 특이 정보행렬(θ 분산 0 등) — 방향을 정할 수 없다 → 미수렴
+        step_a = (i_bb * grad_a - i_ab * grad_b) / det
+        step_b = (i_aa * grad_b - i_ab * grad_a) / det
+        scale = max(abs(step_a), abs(step_b)) / _MAX_NEWTON_STEP
+        if scale > 1.0:
+            step_a /= scale
+            step_b /= scale
+        new_a = min(max(a + step_a, a_lo), a_hi)
+        new_b = min(max(b + step_b, b_lo), b_hi)
+        new_ll = _log_likelihood(responses, new_a, new_b)
+        halvings = 0
+        while new_ll < ll - 1e-12 and halvings < _MAX_STEP_HALVINGS:
+            step_a /= 2.0
+            step_b /= 2.0
+            new_a = min(max(a + step_a, a_lo), a_hi)
+            new_b = min(max(b + step_b, b_lo), b_hi)
+            new_ll = _log_likelihood(responses, new_a, new_b)
+            halvings += 1
+        if new_ll < ll - 1e-12:
+            break  # 절반 줄이기를 다 써도 우도가 줄어든다 — 수치적으로 막힘 → 미수렴
+        moved = max(abs(new_a - a), abs(new_b - b))
+        a, b, ll = new_a, new_b, new_ll
+        if moved < tol:
+            converged = True
+            break
+
+    _, _, i_aa, i_bb, i_ab = _item_fisher(responses, a, b)
+    edge = 1e-9
+    return ItemFit(
+        discrimination=a,
+        difficulty=b,
+        discrimination_se=_discrimination_se(i_aa, i_bb, i_ab),
+        converged=converged,
+        a_clamped=a <= a_lo + edge or a >= a_hi - edge,
+        b_clamped=b <= b_lo + edge or b >= b_hi - edge,
+    )
+
+
 __all__ = [
     "IrtItem",
+    "ItemFit",
     "LEARNING_BAND_HIGH",
     "LEARNING_BAND_LOW",
     "LEARNING_BAND_OUT_OF_RANGE_WEIGHT",
     "ability_standard_error",
     "estimate_ability",
     "estimate_difficulty",
+    "estimate_item_parameters",
     "fit_jmle",
     "item_information",
     "learning_band_weight",

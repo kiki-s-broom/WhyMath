@@ -408,6 +408,18 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다"
+  - id: G-eos23-rejected-quad-sum-classification
+    title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "PR #1358(분류기 포함) 머지 후 Kiki가 런북을 실행하는 사람 행동 게이트 — 선행 태스크 없음"
   - id: G-eos24-loop1-undiagnosed-wrong-criterion
     title: "Gate 2 Loop 1 '보정' 기준 — 원인 미상 오답(R6) 직후 추천이 더 쉬운 개념 문항을 진단 목적(diagnose)으로 내는 것을 보정으로 인정할지. (가) 인정 → 판정 기준 재정의·코드 무변경 (나) 불인정 → 추천이 R6를 집행하도록 배선. 근거: docs/reviews/eos24_recommendation_reads_learning_state_judgment_2026-09-25.md §7-1 · 재판정문 2026-09-24 §3-4"
     kind: decision
