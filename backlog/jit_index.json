@@ -2076,6 +2076,18 @@
    "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "ARCH-66 학생 참여 연기가 G-not-now 재개 분기 전제(학생 표본)를 무효화 — 결정 세션이 게이트 미갱신",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
     "backlog/gates.yaml",
     "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
@@ -3608,6 +3620,18 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 실제 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(2회 · 커밋 전 되돌림)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "S4-16 기각이 G-kg02 게이트 문면의 재개 경로 전제를 닫았으나 기각 세션이 게이트 미갱신",
    "weight": 0
   },
   {
