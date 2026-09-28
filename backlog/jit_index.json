@@ -2354,6 +2354,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "EOS-137 게이트 부착 후 claim 반납 → 다른 세션이 13:46 재착수해 ①을 다시 구현(미푸시)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
