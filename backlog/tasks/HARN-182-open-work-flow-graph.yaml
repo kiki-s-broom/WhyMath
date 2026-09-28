@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,12 +19,14 @@ acceptance:
   - "읽기 전용 계약 — 그래프 생성이 backlog/ 파일 mtime을 바꾸지 않음을 테스트가 동결(상태 변경 창구는 backlog.py CLI 단독) + --json·--text·--fragment 출력 + docs/standards/build_harness.md 정본화·CLI 요약 등재"
   - "윈도우 연결 그래프 인터페이스(Kiki 지시 2026-09-27) — 각 작업·게이트를 제목 표시줄(ID·상태)과 본문(작업 내용 일부: 제목·완료 조건 또는 노트 발췌·스테이지/레이어/우선순위)을 가진 창으로 그리고, 선후 관계를 창 사이 연결선(포트→포트)으로 잇는다. 한 캔버스에서 끌어 이동·휠/핀치/버튼 확대 축소·창 끌어 옮기기(위치는 보는 사람 브라우저에만 저장, 초기화 가능)·미니맵·목록 패널에서 선택 시 해당 창으로 이동"
   - "작업 종류 통합(Kiki 지시 2026-09-27 2차) — 열린 작업(태스크)·사람 작업(owner가 claude가 아닌 태스크 + 미통과 게이트)·미머지 작업(트렁크에 흡수되지 않은 원격 브랜치: 미머지 완료분 remote_claims.scan_remote_done · 다른 세션 claim remote_claims.list_claims · 고립/PR 판정 remote_claims.scan_stale_branches)을 한 캔버스의 창으로 통합한다. 브랜치 창은 그 브랜치가 들고 있는 태스크 창의 선행으로 연결한다. 세 원격 스캔의 상태가 ok가 아니면(offline·shallow·error·skipped) 페이로드·화면 배너·터미널 요약이 판정 불가를 명시한다(빈 결과를 없음으로 위장 금지)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1345"
+  - 81d81efb
 paths:
   - scripts/harness/work_graph.py
   - scripts/harness/work_graph_page.html
   - tests/harness/test_work_graph.py
   - docs/standards/build_harness.md
-session: claude/focused-ramanujan-2p5q8w
+session: null
 notes: "Kiki 요청(2026-09-27): 열린 작업을 그래프로 확인하는 프로그램 — 어떤 작업이 어떤 흐름으로 작업 가능한지 한 눈에 보이지 않아 눈뜬 장님 같다, 쉽고 편하게 전체 작업에 접근할 수 있는 그래프 인터페이스가 필요하다. 기존 작업 보드(HARN-40·41)는 5열 칸반이라 상태는 보이지만 태스크 사이·게이트 사이의 선후 관계(흐름)는 화면에 없다. 실측(main 0e7b4f6b): 열린 태스크 310건·미통과 게이트 19건, 열린 노드 사이 간선 115건, 2개 이상 노드가 이어진 흐름 26개(최대 32노드·25노드), 이어진 선후가 없는 독립 노드 214건.\n\n[정정 2026-09-27] paths ['scripts/harness/work_graph.py', 'tests/harness/test_work_graph.py', 'docs/standards/build_harness.md'] → ['scripts/harness/work_graph.py', 'scripts/harness/work_graph_page.html', 'tests/harness/test_work_graph.py', 'docs/standards/build_harness.md']: Kiki 지시(2026-09-27 세션 중간): 인터페이스는 윈도우 연결 그래프 방식, 작업 내용 일부 표시 — 흐름별 정적 그래프 대신 창·연결선 노드 편집기형 캔버스로 전환하고 창 본문에 작업 내용 발췌를 싣는다. 화면 템플릿을 별도 파일로 분리한다.\n\n[정정 2026-09-28] title '열린 작업 흐름 그래프 — 태스크·게이트 선후 관계를 흐름별 그래프로 한 화면 가시화 (backlog/ 읽기 전용 투영)' → '작업 흐름 그래프 — 열린·사람·미머지 작업을 창(윈도우)과 연결선으로 한 캔버스에 통합 가시화 (backlog/ 읽기 전용 투영)': Kiki 지시(2026-09-27 2차): 프로젝트 진행 중 발생하는 미머지 작업·열린 작업·사람 작업 등을 통합하여 그래프 인터페이스 윈도우 형식으로 — 브랜치 창·사람 작업 분류를 범위에 넣고 제목을 통합 범위에 맞춘다."
 updated: 2026-09-28
