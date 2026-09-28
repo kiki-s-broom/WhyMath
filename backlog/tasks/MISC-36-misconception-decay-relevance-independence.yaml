@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-36-misconception-decay-relevance-independence
+title: "오개념 감쇠의 두 의미 분리 — 관련성(겨냥·비진단 문항)·재제출 독립성·경로별 반감기 (채점·코치 두 경로 공통)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-123-correct-attempt-misconception-refutation-asymmetry
+requires_gates: []
+acceptance:
+  - "① 측정 먼저 — 감쇠가 일어나는 회차마다 (a) 감쇠된 각 활성 가설이 그 문항의 겨냥 대상이었는가(`distractor_map`에 그 오개념 선지가 있었는가 · 자유응답은 거짓형 정합 적용 가능 여부) (b) 같은 (user, problem) 재제출인가 (c) EOS-123의 충돌 보류(`AttemptHypothesisAction.HOLD_CONFLICT`) 빈도를 집계할 좌석을 둔다. 채점 경로의 앱 트래픽이 0인 동안(EOS-123 판정문 §1 ⑩)은 코치 경로·하네스로 표본을 모은다 — 표본 0건인 측정을 \"측정 완료\"로 세지 않는다."
+  - "② 판정 — 감쇠라는 곱셈 하나가 나르는 두 의미(stale 정리용 활동 시계 · 부재 관측 증거)를 분리할지 정한다. 분리한다면 비겨냥·비진단 문항의 감쇠 범위와 겨냥 문항 정답의 강도(EOS-123 선택지 (다) 유보분)를 오답·정답·코치 세 경로 공통으로 정한다. 클라이언트 보고 정답을 강한 반증으로 믿을 근거(NLP-02 서버 채점 커버리지 · 현재 파생 0/2,647)를 전제 조건으로 명시한다."
+  - "③ 재제출 독립성 — `problem_attempt`에 (user, problem) 유일 제약이 없어 같은 문항을 다시 내도 매번 1턴 감쇠다(해설을 본 뒤의 정답은 \"스스로 적용\"이 아니라 \"보여 준 풀이 재현\"). 제한한다면 오답·정답 두 경로를 함께 정의한다 — 한쪽만 막으면 반대 방향 비대칭이 생긴다(EOS-123 판정문 §5 F6 처분)."
+  - "④ 경로별 반감기 — `_HALF_LIFE_TURNS=5`는 대화 턴 단위(`hypothesis.py` 설계 §8.4)인데 채점 경로에서는 회차 단위로 쓰인다. 정답률 0.8이면 EOS-123 이후 회차 단위 반감기가 25 → 5회차다(EOS-123 판정문 §4-3). 조정 여부를 ①의 표본으로 정한다."
+  - "⑤ probe 대안 — 정답 뒤 남는 불확실성을 줄이는 인지적으로 맞는 행동은 가설을 눈감고 내리는 것이 아니라 그 규칙이 발화하는 겨냥 문항을 한 번 내는 것이다(`l1/problem_bank/probe_candidates.py` · `distractor_map` 보유 61.1%). 기존 select_probe·REC-02 좌석과의 관계를 정한다(중복 구현 금지)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/hypothesis.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - src/backend/whymath_backend/l4/misconception/attempt_hypothesis_policy.py
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/api/coach.py
+session: null
+notes: "출처: EOS-123 판정문(docs/reviews/eos123_correct_attempt_refutation_judgment_2026-09-28.md) §7-1 ① + 독립 비판 F5·F6·F8·놓친 것 1. 판정 기준 main a17e92c7. 인접 좌석: MISC-06(재발 신호 — select_probe 우선순위 전용) · REC-02(probe 공급). 분류 LOOP."
+updated: 2026-09-28

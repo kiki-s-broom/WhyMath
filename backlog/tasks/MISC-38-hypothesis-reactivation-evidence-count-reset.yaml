@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-38-hypothesis-reactivation-evidence-count-reset
+title: "가지치기 후 재관측된 오개념 가설의 evidence_count가 1로 리셋 — MISC-30 반복 오류 사다리가 '첫 오류'로 돌아간다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-123-correct-attempt-misconception-refutation-asymmetry
+requires_gates: []
+acceptance:
+  - "① 실측 — `update_hypotheses`는 활성 세트에 없는 오개념의 매치를 신규 가설(evidence_count=1)로 만들고, `_persist_active_set`은 기존 비활성 행을 그 값으로 덮어쓴다. 그래서 M을 5번 보인 뒤 감쇠로 가지치기된 학생이 다시 M을 보이면 MISC-30 사다리(`l2/remediation_policy.py` 2·3·4회)가 1회로 읽는다. 코치 경로(`curate_hypothesis`)와 채점 경로(`apply_candidates`) 양쪽에서 테스트로 재현한다."
+  - "② 판정 — 재활성화 때 누적 횟수를 보존할지(비활성 행의 evidence_count 승계), 보존한다면 사다리가 읽는 값이 \"평생 누적\"인지 \"이번 활성 구간\"인지 교수학적으로 정한다(낙인 방지와 반복 오류 대응의 균형 · MISC-30 same error 정의). 새 카운터를 만들지 않는다는 MISC-30 ②를 따른다."
+  - "③ 빈도 근거 — EOS-123이 정답 회차에도 감쇠를 열어 가지치기가 앞당겨지므로 이 리셋이 더 자주 드러난다(신선 매치 0.9는 감쇠 16회에 가지치기 · EOS-123 판정문 §4-1·§4-3). 판정 근거에 그 빈도 변화를 포함한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/hypothesis.py
+  - src/backend/whymath_backend/l4/misconception/hypothesis_store.py
+  - src/backend/whymath_backend/l2/remediation_policy.py
+session: null
+notes: "출처: EOS-123 판정문 §7-1 ③ · 독립 비판 F4. 인접 좌석: MISC-06(재발 신호 — 재활성화 자체가 재발 사건이며, 그 고립 구현이 hypothesis_store.py를 건드린다 — 같은 파일이면 조율). MISC-30(done)은 사다리 reader를 소유했고 리셋은 다루지 않았다. 분류 LOOP."
+updated: 2026-09-28
