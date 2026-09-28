@@ -162,11 +162,20 @@ class TestGateWaitKind:
         """판정 기록은 decision 게이트의 개념 — 사람 게이트는 입력이 끝나면 정말 사람 차례다."""
         assert _kind(_backlog(kind="human")) == store.GATE_WAITS_PERSON
 
-    def test_cancelled_input_falls_to_person_and_validate_names_the_dead_end(self):
-        """취소된 입력은 열린 입력이 아니다 — 분류는 person, 막다른 길은 validate가 따로 잡는다."""
-        b = _backlog(input_status="cancelled")
+    @pytest.mark.parametrize(
+        ("dead_end", "marker"), [("cancelled", "cancelled"), ("missing", "미존재")]
+    )
+    def test_dead_end_input_falls_to_person_and_validate_names_it(self, dead_end: str, marker: str):
+        """영원히 끝나지 않는 입력(취소·대장에 없음)은 열린 입력이 아니다 — 분류는 person 이고,
+        막다른 길은 validate가 따로 잡는다(`_gate_input_errors`). 분류가 막다른 길을 숨기지 않는다는
+        것까지가 계약이다."""
+        if dead_end == "cancelled":
+            b = _backlog(input_status="cancelled")
+        else:
+            b = _incident()
+            del b.tasks[_JUDGMENT]
         assert _kind(b) == store.GATE_WAITS_PERSON
-        assert any(_GATE in e and "cancelled" in e for e in store.validate_backlog(b))
+        assert any(_GATE in e and marker in e for e in store.validate_backlog(b))
 
     @pytest.mark.parametrize("status", ["cleared", "waived"])
     def test_passed_gate_waits_for_nothing(self, status: str):
