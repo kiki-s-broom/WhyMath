@@ -3,6 +3,7 @@
 > 이 파일은 AI 코딩 에이전트가 이 저장소에서 작업할 때 필요한 사실만 모은 안내다.
 > **정본은 `CLAUDE.md`**(프로젝트 마스터 가이드 — 정체성·절대 금기·7계층 아키텍처·검증 규칙)이며,
 > 충돌 시 CLAUDE.md가 우선한다. 작업 전 반드시 CLAUDE.md를 먼저 읽을 것.
+> 코딩 헌법(`constitution/` — 코딩 구조 결함 규범, 사람만 개정)과의 서열은 게이트 `G-const-precedence-declaration` 결정 전까지 잠정 해석을 따른다: 더 엄격한 쪽을 따르고, 판단할 수 없으면 멈추고 Kiki에게 보고한다(`docs/standards/coding_constitution_transplant.md` §1-2). `constitution/`은 AI가 수정할 수 없다(가드 훅이 막는다).
 > 결정 로그·현재 상태는 `MEMORY.md`, 일정은 `ROADMAP.md` 참조.
 
 ---
@@ -234,7 +235,8 @@ python3 scripts/harness/backlog.py gates        # 사람 게이트 대장
 
 ## 주요 문서 포인터
 
-- `CLAUDE.md` — 마스터 가이드(7계층·금기·검증 규칙·워크플로우). **충돌 시 최우선.**
+- `CLAUDE.md` — 마스터 가이드(7계층·금기·검증 규칙·워크플로우). **충돌 시 최우선.** (코딩 헌법과의 서열은 위 머리말의 잠정 해석)
+- `constitution/` — 코딩 헌법(읽기 전용 · 사람만 개정) · 이식 정본 `docs/standards/coding_constitution_transplant.md` · 해설 `docs/standard-book/`
 - `MEMORY.md` — 결정 로그·슬라이스 히스토리(대형 파일 — 필요한 부분만 검색해서 읽기)
 - `docs/architecture/00_overview.md` + `01`~`07` — 계층별 상세 명세
 - `docs/standards/dev_constitution.md` — 경량 개발 헌법 · `testing.md` · `security_privacy.md` · `build_harness.md` · `coding_flutter.md`
