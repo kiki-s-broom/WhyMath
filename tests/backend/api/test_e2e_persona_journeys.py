@@ -35,8 +35,14 @@ problem_concept·skill_node)만 ORM으로 심는다. 헬퍼는 Week 1·2 하네�
 이름을 지목하며 깨진다.
 
 **정직한 공백 동결** — 아래는 *현행 동작*을 단언한다. 고쳐지면 이 테스트가 실패하며, 실패
-메시지가 승계 태스크 id를 가리킨다(조용히 낡지 않게).
-  ⓐ `EOS-123` — 정답 제출은 오개념 감쇠 시계를 돌리지 않는다(`apply_candidates` 미호출).
+메시지가 승계 태스크 id를 가리킨다(조용히 낡지 않게). 현재 동결 중인 공백은 없다.
+
+**해소된 공백 — `EOS-123`(정답 반증 비대칭)**: 이 하네스가 2026-09-19에 C ⑥에서 동결했던 공백 —
+정답 제출이 오개념 감쇠 시계를 돌리지 않던 것(정답이면 훑기 자체를 건너뛰어 `apply_candidates`
+미호출) — 은 정답 회차도 오답과 같은 조건으로 훑어 후보가 없으면 1턴 감쇠하는 정책으로 해소됐다
+(`l4.misconception.attempt_hypothesis_policy` · 판정문
+`docs/reviews/eos123_correct_attempt_refutation_judgment_2026-09-28.md`). ⑥은 **감소 단언으로
+승격**됐다.
 
 **해소된 공백 — `EOS-124`(정책 축·선택 축 불일치)**: 이 하네스가 2026-09-19에 두 자리(A ⑤-b ·
 B ⑧-b)에서 동결했던 불일치 — 숙달한 개념 문항에 `advance_next`가 붙고, 선수 결손이 해소된
@@ -919,23 +925,36 @@ def test_persona_c_misconception_confidence_declines_after_targeted_problem() ->
                 "원 지시문 2번 — 올라가기만 하면 보정이 작동하지 않은 것이다(C 여정 미통과)."
             )
 
-            # ⑥ 정직한 공백 동결 (`EOS-123`) — *정답* 회차는 감쇠 시계를 돌리지 않는다.
-            #    `_scan_attempt_misconceptions`가 correct=True에서 NOT_RUN을 돌려주고,
-            #    호출부가 그 값으로 `apply_candidates`를 건너뛰기 때문이다. 즉 "교정 문항을
-            #    맞혔다" 자체는 신뢰를 1도 깎지 못한다 — 같은 반증을 코치 경로는 반영하는데
-            #    (clean verify + 무매치 → −1 증거) 채점 경로만 비대칭이다.
+            # ⑥ **정답 회차 → confidence 감소** (`EOS-123` 해소 — 2026-09-19 동결의 승격).
+            #    정답도 오답과 같은 조건으로 훑고, 후보가 없으면(참 정답은 ⓪ 거짓 등식 가드가
+            #    막는다) 오개념 미관측 오답(⑤)과 같은 1턴 감쇠를 받는다. 증거 그래프에는 쓰지
+            #    않는다 — 반증이 아니라 활동 시계다. 그래서 감소폭은 ⑤와 같은 강도(×0.87 ·
+            #    저장 정밀도 소수 둘째 자리)여야 하고, 그보다 크면 정답을 반증으로 과대 계상한 것이다.
             _attempt(client, auth, pids[3], correct=True, answer="x^2+4x+4")
             conf_correct = _hypothesis_confidence(client, auth, _EXPECTED_MISCONCEPTION)
             journal.record(
-                "⑥정답회차",
-                "EOS-123 정직한 공백 — 정답은 감쇠 시계를 돌리지 않는다",
+                "⑥정답회차→감소",
+                "EOS-123 — 교정 문항을 맞힌 회차도 오답과 같은 1턴 감쇠를 받는다",
                 직전=conf_post,
                 직후=conf_correct,
+                감소폭=(
+                    None
+                    if conf_post is None or conf_correct is None
+                    else round(conf_post - conf_correct, 4)
+                ),
             )
-            assert conf_correct == conf_post, (
-                f"정답 회차가 오개념 신뢰를 바꿨다: {conf_post} → {conf_correct}. "
-                "`EOS-123`(정답 반증 비대칭)이 해소된 것으로 보인다 — 이 단언을 감소 단언으로 "
-                "승격하고 EOS-123을 닫아라."
+            assert conf_correct is not None and conf_post is not None
+            assert conf_correct < conf_post, (
+                f"정답 회차 이후에도 오개념 신뢰가 내려가지 않았다: {conf_post} → {conf_correct}. "
+                "`EOS-123` 회귀 — 정답이 다시 감쇠 시계를 돌리지 않는다(다르게 틀리면 내려가고 "
+                "맞히면 그대로인 역방향 비대칭)."
+            )
+            # 강도 상한 — 정답 1회는 오답 1회(⑤)와 **같은 1턴**이다. 반올림(소수 둘째 자리) 때문에
+            # 비율이 정확히 같지 않으므로 1턴 감쇠의 저장값 범위로 잰다.
+            expected_one_turn = round(conf_post * 0.5 ** (1 / 5), 2)
+            assert conf_correct == pytest.approx(expected_one_turn, abs=0.011), (
+                f"정답 회차 감쇠가 1턴이 아니다: {conf_post} → {conf_correct} "
+                f"(1턴이면 {expected_one_turn}). 정답을 반증 증거로 과대 계상하면 안 된다(EOS-123 §3-2)."
             )
         journal.dump()
     finally:
