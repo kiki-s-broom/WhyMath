@@ -845,8 +845,10 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
        "l4.misconception.answer_signature"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
-       "WH-1 §8.4 — 가설 감쇠·ε 규칙", "l4.misconception.hypothesis",
-       "l4.misconception.hypothesis_store", "l4.misconception.probe_selection",
+       "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
+       "l4.misconception.hypothesis",
+       "l4.misconception.hypothesis_store", "l4.misconception.attempt_hypothesis_policy",
+       "l4.misconception.probe_selection",
        "l4.misconception.probes", "l4.misconception.warmstart",
        "l4.misconception.evidence_store"),
     _e("WM-E-413", "오개념 의미(임베딩) 매칭 + shadow", "Student", "Pedagogy", "P1",
@@ -1019,6 +1021,10 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-905", "12월 검증 스코어카드·QA 혼동행렬·HIT/CU 계측", "Admin", "QA", "P0",
        "EOS-54/60/61 — Go/No-Go 판정기", "ops.validation_scorecard",
        "ops.qa_confusion_matrix", "ops.hit_cu_metrics",
+       # EOS-137 — 혼동행렬 `--predictions`의 *입력 생산자*(QA 엔진 문항별 판정 어댑터).
+       # 판정은 qa_pipeline.judge_item의 것이고 이 도구는 읽기·정체성 확정·계약 형식 쓰기만
+       # 하므로, 그 산출을 먹는 판정기 행에 귀속한다(golden_inputs → WM-O-911과 같은 규칙).
+       "harness.qa_item_verdicts",
        # OPS-56: EOS-51 §6 "기술 KPI 6종" 주간 cron 집계기 — hit_cu_metrics.aggregate()를
        # 재사용하는 소비자라 같은 좌석(같은 Go/No-Go 계측 묶음)에 귀속한다.
        "ops.weekly_metrics_report"),

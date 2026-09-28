@@ -384,3 +384,15 @@ class TestCliMain:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+class TestKoreanAdjacentPii:
+    """SEC-38 — 조사가 붙은 PII도 검출한다(종전 테스트는 `… 으로`처럼 띄어 써서 사각을 비껴갔다)."""
+
+    def test_phone_followed_by_particle_is_detected(self) -> None:
+        result = bwp.scan_field("보호자 연락처는 010-1234-5678로 문의하세요.")
+        assert result.pii_third_party_hit is True
+
+    def test_email_followed_by_particle_is_detected(self) -> None:
+        result = bwp.scan_field("문의는 student.example@test.com으로 연락하세요.")
+        assert result.pii_third_party_hit is True

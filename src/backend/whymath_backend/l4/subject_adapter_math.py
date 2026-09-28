@@ -299,7 +299,7 @@ class MathAttemptMisconceptionDetector:
     def scan_attempt_answer(
         self, *, question_text: str, student_answer: str | None
     ) -> AttemptMisconceptionScanResult:
-        """오답 1건의 오개념 훑기 — 판정·게이트는 전부 위임(재구현 0)."""
+        """답안 1건(정답·오답 모두 — EOS-123)의 오개념 훑기 — 판정·게이트는 전부 위임(재구현 0)."""
         return scan_attempt_answer(question_text=question_text, student_answer=student_answer)
 
 
