@@ -2076,6 +2076,18 @@
    "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "ARCH-66 학생 참여 연기가 G-not-now 재개 분기 전제(학생 표본)를 무효화 — 결정 세션이 게이트 미갱신",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-24",
+   "paths": [
     "backlog/gates.yaml",
     "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
@@ -2121,6 +2133,26 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 없는 세션에도 가짜 policy_warn 3줄 기록 — main에 같은 서명 350건 기커밋",
+   "weight": 4
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/commands/drive.md",
+    "docs/standards/build_harness.md",
+    "scripts/harness/board.py",
+    "scripts/harness/report.py",
+    "scripts/harness/selector.py",
+    "scripts/harness/store.py",
+    "scripts/harness/verify_gate_wait_kind_discrimination.py",
+    "scripts/harness/work_graph.py",
+    "scripts/harness/work_graph_page.html",
+    "tests/harness/test_board.py",
+    "tests/harness/test_gate_wait_kind*.py",
+    "tests/harness/test_work_graph.py"
+   ],
+   "text": "공용 판정이 있는데 작업 흐름 그래프가 자체 판정 — 판정 결과 미기록 게이트를 '사람 차례'로 분류",
    "weight": 4
   },
   {
@@ -3093,6 +3125,27 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**"
+   ],
+   "text": "backend 잡 미러 중 로컬 PG(5432)를 띄워 둬 도달성 skip 테스트가 실행 — 거짓 실패 1건·21분 실행 폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
@@ -3616,6 +3669,18 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "docs/standards/build_harness.md",
+    "scripts/harness/backlog.py",
+    "scripts/harness/report.py",
+    "tests/harness/test_gate_premise_impact*.py"
+   ],
+   "text": "S4-16 기각이 G-kg02 게이트 문면의 재개 경로 전제를 닫았으나 기각 세션이 게이트 미갱신",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-25",
+   "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/ci_mirror.py"
    ],
@@ -3715,11 +3780,29 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄(backlog.py·HARN-121 캐시) — 커밋 전 백업 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
    "text": "HARN-183이 9분 먼저 claim된 OPS-69와 같은 문제를 중복 등재 — 슬러그까지 동일(머지 전 cancel)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "tests/harness 실행이 세션 샤드에 가짜 policy_warn 7줄(README.md·backlog.py)을 씀 — CI 미러 중 · 커밋 전 복원",
    "weight": 0
   },
   {

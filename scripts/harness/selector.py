@@ -406,12 +406,35 @@ def selection_rationale(backlog: Backlog, task: Task, graph: DependencyGraph | N
     return " · ".join(parts)
 
 
+def _gate_stall(backlog: Backlog, pending_gates: list[str]) -> tuple[str, list[str]]:
+    """게이트만 남은 정체의 사유 — 판정 결과 미기록 게이트가 있으면 사람 게이트 대기가 아니다.
+
+    종전에는 게이트만 남으면 무조건 `human_gate`("사람 게이트 대기 중")였다. 그런데 입력이
+    끝났는데 판정이 게이트에 기록되지 않은 decision 게이트도 같은 신호를 냈다 — /drive는
+    그때 Kiki 행동을 요구하며 정지한다(HARN-177 ②의 원칙 "판정이 기록되지 않은 상태를 사람
+    차례로 안내하지 않는다"의 정지 사유 축 · HARN-184). 분류는 `store.gate_wait_kind` 한 곳이다.
+    판정 결과 미기록 게이트만 상세로 낸다 — 그 기록이 먼저이고, 나머지 사람 게이트는 /gates가
+    전부 보여 준다.
+    """
+    verdict = [
+        gid
+        for gid in pending_gates
+        if store.gate_wait_kind(backlog, backlog.gates[gid]) == store.GATE_WAITS_VERDICT
+    ]
+    if verdict:
+        return "gate_verdict", verdict
+    return "human_gate", pending_gates
+
+
 def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list[str]]:
     """후보 0일 때의 정지 사유 판별 — /drive 정지 신호.
 
     반환: (사유 코드, 상세 목록)
         all_done    : 진행할 태스크 자체가 없음 → 스테이지/트랙 전환 제안
         human_gate  : 사람 게이트만 해소되면 진행 가능 → 게이트 목록 제시
+        gate_verdict: 게이트만 남았는데 그중 판정 결과 미기록(입력은 끝났는데 판정 기록이
+                      없다)이 있다 → 사람 게이트 대기로 부르지 않고 그 게이트 목록을 낸다
+                      (HARN-184 · `_gate_stall`)
         in_progress : 다른 세션이 진행 중 → 대기 또는 다른 layer 선택
         blocked     : 나머지 (blocked 태스크·미해소 의존성 연쇄)
     """
@@ -449,7 +472,7 @@ def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list
         {g for g in gate_ids if g in backlog.gates and not backlog.gates[g].passed}
     )
     if pending_gates and not other_reasons:
-        return "human_gate", pending_gates
+        return _gate_stall(backlog, pending_gates)
 
     if active or remote_held:
         local = [f"{t.id} ({t.session or '?'})" for t in active]
@@ -458,7 +481,7 @@ def stall_reason(backlog: Backlog, excluded: list[Exclusion]) -> tuple[str, list
     # 태스크는 남으므로 "사람 게이트만 해소되면 진행 가능"은 거짓 정지 사유가 된다
     # (PR #1025 Codex P2-1: 혼합 정체는 blocked). 일반 deps만 섞인 경우는 종전 동작(human_gate).
     if pending_gates and not cancelled_detail:
-        return "human_gate", pending_gates
+        return _gate_stall(backlog, pending_gates)
 
     def _label(task: Task) -> str:
         # 취소된 선행 표기 — 정정 경로(amend --remove-depends)가 있음을 목록에서 바로 알린다.
