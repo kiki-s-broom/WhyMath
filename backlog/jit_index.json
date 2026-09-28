@@ -3129,6 +3129,17 @@
    "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_mirror.py"
+   ],
+   "text": "CI 미러 실행 중 통합 테스트 정리 코드 수정 — 미러 결과 오염, 스스로 중단·폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
     "tests/harness/**"
    ],
    "text": "backend 잡 미러 중 로컬 PG(5432)를 띄워 둬 도달성 skip 테스트가 실행 — 거짓 실패 1건·21분 실행 폐기",
