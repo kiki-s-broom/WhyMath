@@ -47,6 +47,13 @@ writer 신설 → `concept_selected`)과 `evidence_event`의 추천 처치(실 `
 조인으로만** 이 학습자 것으로 집어낸다(`_recommendation_stmt`). 세션 행이 지워지면(삭제권) 그
 추천은 이 시간선에서 사라진다 — 결합이 끊긴 것이 정확한 상태다.
 
+EOS-132(2026-09-28)가 `learner_state_created`의 원천을 옮겼다. 종전 원천 `user_state_snapshot`은
+writer가 0건인 빈 좌석이었고(DORMANT), `LearnerState`는 매 호출 조립·비영속이라 "상태가 만들어진
+순간"이 어디에도 기록되지 않았다. 이제 추천 처치 기록이 **그 추천이 소비한 상태의 근거 식별자**
+(`learner_state_basis` — 조립 시각 포함)를 싣고, 이 모듈은 그것을 상태 생성 사건으로 투영한다.
+**범위는 추천이 소비한 상태뿐이다** — 학습(`/study`)·코치·상태 조회가 조립한 상태는 기록되지
+않으므로 여기에 나오지 않는다(0건은 "이 창에 추천이 소비한 상태가 없다"이다).
+
 ────────────────────────────────────────────────────────────────────────────
 개인정보 경계 (acceptance ④ · DP-02 payload allowlist 승계)
 ────────────────────────────────────────────────────────────────────────────
@@ -85,9 +92,11 @@ from whymath_backend.db.models.assessment import (
 )
 from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
+from whymath_backend.l2.learner_state import BasisAbsence, LearnerStateBasis
 from whymath_backend.l2.learning_metrics_rollup import effective_event_moment
 from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
+    META_KEY_LEARNER_STATE_BASIS,
     META_KEY_MODE,
     META_KEY_POLICY_VERSION,
     META_KEY_PROBLEM_ID,
@@ -163,7 +172,6 @@ class TraceSource(str, Enum):
     ABILITY_SNAPSHOT = "ability_snapshot"
     MISCONCEPTION_HYPOTHESIS = "misconception_hypothesis"
     LEARNING_SESSION = "learning_session"
-    USER_STATE_SNAPSHOT = "user_state_snapshot"
     CONCEPT_CONTENT = "concept_content"
     EVIDENCE_EVENT = "evidence_event"
 
@@ -210,10 +218,13 @@ _REASON_PRODUCED_LEARNING_SESSION = (
     "이 이벤트로 투영한다 — target_concept_id는 이 writer가 채우지 않으므로 concept_id는 비어 "
     "있을 수 있고, 그 None은 '목표 개념을 지정하지 않은 활동 묶음'이라는 사실이다."
 )
-_REASON_DORMANT_USER_STATE = (
-    "user_state_snapshot에 생성 경로가 없다 — ORM·스키마는 있으나 writer 0건"
-    "(2026-09-16 실측). LearnerState는 l2/learner_state.get_state가 매 호출 조립하고 "
-    "영속하지 않으므로 '상태가 만들어진 순간'이라는 시각 자체가 기록되지 않는다."
+_REASON_PRODUCED_LEARNER_STATE = (
+    "l2/recommendation_evidence.record_recommendation_treatment가 추천 처치 meta에 그 추천이 "
+    "소비한 LearnerState의 근거 식별자(learner_state_basis — 최신 숙달 행 키·θ 스냅샷 id·활성 "
+    "가설 id·조립 시각)를 싣는다(EOS-132). 조립 시각을 상태 생성 사건으로 투영하며, 학습자 결합은 "
+    "추천과 같은 세션 조인이다. 범위는 추천이 소비한 상태뿐 — 학습·코치·상태 조회가 조립한 상태는 "
+    "기록되지 않는다(LearnerState 비영속). 종전 원천 user_state_snapshot은 writer 0건 빈 "
+    "좌석이었다."
 )
 _REASON_DORMANT_CONTENT_VIEW = (
     "학습자별 콘텐츠 열람 로그가 없다 — concept_content는 조회 표면만 있고 "
@@ -242,9 +253,9 @@ _SOURCE_REGISTRY: Final[tuple[tuple[TraceEventType, TraceSource, SourceAvailabil
     ),
     (
         TraceEventType.LEARNER_STATE_CREATED,
-        TraceSource.USER_STATE_SNAPSHOT,
-        SourceAvailability.DORMANT,
-        _REASON_DORMANT_USER_STATE,
+        TraceSource.EVIDENCE_EVENT,
+        SourceAvailability.PRODUCED,
+        _REASON_PRODUCED_LEARNER_STATE,
     ),
     (
         TraceEventType.CONCEPT_SELECTED,
@@ -819,6 +830,55 @@ def project_recommendation_rows(learner_id: uuid.UUID, rows: Sequence[Any]) -> l
     ]
 
 
+def _learner_state_detail(basis: LearnerStateBasis) -> dict[str, str | int | float | bool]:
+    """근거의 **모양**만 — 무엇으로 조립했나(측정 있음/부재 사유·활성 가설 수). 식별자는 뺀다."""
+    return {
+        "mastery_basis": (
+            "measured" if basis.mastery is not None else BasisAbsence.NO_MASTERY_HISTORY.value
+        ),
+        "ability_basis": (
+            "measured"
+            if basis.ability_snapshot_id is not None
+            else BasisAbsence.NO_ABILITY_SNAPSHOT.value
+        ),
+        "active_hypotheses": len(basis.misconception_hypothesis_ids),
+    }
+
+
+def project_learner_state_rows(learner_id: uuid.UUID, rows: Sequence[Any]) -> list[LearningEvent]:
+    """추천 처치 행의 `learner_state_basis` → `learner_state_created`(EOS-132).
+
+    근거가 없는 행(EOS-132 이전 기록·근거 없이 기록된 추천)은 사건을 만들지 않는다 — 조립 시각을
+    모르므로 지어내지 않는다. 형식이 깨진 근거도 건너뛰되 **경고를 남긴다**(키 이름만 — 값 없음).
+    시각은 서버가 상태를 조립한 순간(`assembled_at`)이라 `INGESTED`다.
+    """
+    events: list[LearningEvent] = []
+    for row in rows:
+        meta = row.meta or {}
+        if META_KEY_LEARNER_STATE_BASIS not in meta:
+            continue
+        basis = LearnerStateBasis.from_meta(meta[META_KEY_LEARNER_STATE_BASIS])
+        if basis is None:
+            _logger.warning(
+                "트레이스 투영 건너뜀 — 추천 기록의 %s 형식을 읽을 수 없음 (session_id=%s).",
+                META_KEY_LEARNER_STATE_BASIS,
+                getattr(row, "session_id", None),
+            )
+            continue
+        events.append(
+            LearningEvent(
+                event_type=TraceEventType.LEARNER_STATE_CREATED,
+                learner_id=learner_id,
+                occurred_at=basis.assembled_at,
+                time_basis=TimeBasis.INGESTED,
+                source=TraceSource.EVIDENCE_EVENT,
+                session_id=row.session_id,
+                detail=_learner_state_detail(basis),
+            )
+        )
+    return events
+
+
 #: 같은 시각 동률의 정렬 순서 — **인과 순서**다(사전순 아님).
 #: 채점은 제출과 같은 시각에 기록되므로 사전순으로 묶으면 `assessment_failed`가
 #: `problem_attempted`보다 앞에 온다 — 원인보다 결과가 먼저 보이는 시간선은 읽는 사람을
@@ -1106,6 +1166,8 @@ async def build_trace(
     collected += project_misconception_rows(learner_id, misconception_rows)
     collected += project_ability_rows(learner_id, ability_rows)
     collected += project_session_rows(learner_id, session_rows)
+    # EOS-132 — 같은 추천 행에서 그 추천이 소비한 상태의 생성 사건을 함께 투영한다(조회 추가 0).
+    collected += project_learner_state_rows(learner_id, recommendation_rows)
     collected += project_recommendation_rows(learner_id, recommendation_rows)
 
     ordered = sort_entries(collected)

@@ -380,8 +380,8 @@ async def _cleanup(
 ) -> None:
     """FK 안전 순서 정리 — 자식부터 부모로:
     dialogue_turn→attempt_event→misconception_hypothesis→dialogue→problem_attempt→
-    problem_concept→concept_edge→concept_mastery_history→skill_mastery_history→skill_node→
-    atom_node→problem→concept→user_profile.
+    learning_session→learning_state_transition→problem_concept→concept_edge→
+    concept_mastery_history→skill_mastery_history→skill_node→atom_node→problem→concept→user_profile.
 
     EOS-81 추가분: 완료 경로가 적재하는 `problem_attempt`(problem·user_profile의 자식·dialogue가
     `ON DELETE SET NULL`로 참조)와 스킬 축 좌석(`skill_mastery_history`·`skill_node`)을 함께
@@ -417,6 +417,13 @@ async def _cleanup(
             # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 정리 앞에 지운다.
             await conn.execute(
                 text("DELETE FROM learning_session WHERE user_id = :uid"),
+                {"uid": str(uid)},
+            )
+            # EOS-134: 코치 완료가 학습 상태 전이를 적재한다(user_profile의 자식 · NO ACTION FK).
+            # 남기면 아래 user_profile 삭제가 FK로 막혀 이 트랜잭션 전체가 롤백되고, 저작
+            # 콘텐츠(problem·concept)까지 남아 뒤 테스트의 추천 후보를 오염시킨다(실측 2026-09-28).
+            await conn.execute(
+                text("DELETE FROM learning_state_transition WHERE user_id = :uid"),
                 {"uid": str(uid)},
             )
             await conn.execute(

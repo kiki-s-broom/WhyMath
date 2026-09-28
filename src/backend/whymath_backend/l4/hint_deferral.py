@@ -34,7 +34,7 @@ ID 파일 없음) — 이 태스크(PED-35)가 그 자리를 선점하거나 중
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Final, Literal, cast
 
 from whymath_backend.l4.lthc.models import MasteryLevel
 
@@ -50,6 +50,21 @@ REVEALS: dict[HintLevel, str] = {
     3: "partial_steps_demo",  # "일부 단계를 *실제로 시연*" — L49
     4: "full_solution",  # "마지막 수단 — PRD 척도 밖, 학습 곡선 분석과 함께만" — L52
 }
+
+
+#: 학습 기록에서 **힌트 사용**으로 세는 최소 단계(EOS-133). 1(방향)은 "주목할 대상"만 가리키는
+#: 단계이고, 막힘 신호가 없으면 매 턴 기본으로 나간다(`decide_hint_level` 4번 규칙 "그 외 → 1").
+#: 그것까지 세면 코치 대화로 푼 모든 풀이가 '힌트 사용'이 되어 신호가 사라진다. 2 이상은 풀이의
+#: *단계 흐름*이 드러난 공급이다(`REVEALS[2]`) — 좌절·답 요구·5회+ 막힘으로 올라갔든 '초보' 라벨로
+#: 세분화됐든(5번 규칙이 기본 1을 2로 올린다) 학생이 받은 도움의 양은 같다.
+#: `l4/pedagogy/runtime_selector.StudentSignals.is_stuck`이 "2 이상 = 도움을 구했다"로 읽는
+#: 경계와도 같다. 공급 원장(`attempt_event`의 힌트제공)에는 1을 포함한 전 단계가 그대로 남는다.
+HINT_USAGE_MIN_LEVEL: Final[int] = 2
+
+
+def counts_as_hint_usage(hint_level: int) -> bool:
+    """이 단계의 공급 힌트를 학습 기록의 '힌트 사용'으로 세는가 — 2(단계 흐름) 이상만(EOS-133)."""
+    return hint_level >= HINT_USAGE_MIN_LEVEL
 
 
 # 좌절 신호 — `docs/prompts/socratic_template.md` 시나리오 4(`affect=frustrated`).

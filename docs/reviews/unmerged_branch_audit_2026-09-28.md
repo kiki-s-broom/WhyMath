@@ -236,7 +236,8 @@ SessionStart 브리핑은 EOS-129를 **다음 착수 후보 1위**로 내놓았�
 **조치 — 이 감사는 소유하지 않는다(중복 등재 철회)**: 처음에는 사고 대장 1건 + 대책 태스크
 `HARN-187`을 이 브랜치에 등재했다. 그런데 푸시 전에 원격을 다시 보니 PR #1346의 세션이 같은 사건을
 **더 넓게**(EOS-129가 하루에 **세 세션**에서 착수 — 세 번째는 12:11Z `gallant-euler-blngpj`) 이미
-기록하고 대책 태스크를 올려 두었다 — **PR #1356** · `HARN-186-unmerged-gate-attach-claim-release-gap`
+기록하고 대책 태스크를 올려 두었다 — **PR #1356** · `HARN-193-unmerged-gate-attach-claim-release-gap`(PR 당시 번호
+`HARN-186` — 머지 `3dbe54d3` 때 개명)
 · 같은 사고 대장 1건(12:39Z). 같은 사고를 두 번 세면 계열 회차가 부풀므로 이 브랜치의 사고 1줄은
 뺐고(푸시 전 제 추가분), `HARN-187`은 `backlog.py cancel`로 취소하며 사유에 #1356을 적었다.
 두 게이트 중 어느 쪽을 남길지도 이 감사의 범위가 아니다 — PR #1346 쪽이 도구·실행 거부 가드까지
@@ -272,29 +273,31 @@ SessionStart 브리핑은 EOS-129를 **다음 착수 후보 1위**로 내놓았�
    - `HARN-189` — `claims reap` 판정 순서: 태스크 부재가 홀더 브랜치 소멸을 가려 고아 claim이
      자동 청소를 빠져나간다(아래 ①).
    - `HARN-190` — 브리핑 "이미 포팅됨" 오분류: 근거 커밋 이후의 같은 파일 변경을 보지 않는다(§5-1).
-   - `HARN-187` **취소** — PR #1356의 `HARN-186-unmerged-gate-attach-claim-release-gap`과 중복(§5).
+   - `HARN-187` **취소** — PR #1356의 `HARN-193-unmerged-gate-attach-claim-release-gap`(구 `HARN-186`)과 중복(§5).
    **번호 경합(HARN-111 실례)**: 처음 받은 번호는 185·186·187이었다. 푸시 전 원격 전 브랜치를 다시
    보니 그사이 다른 세션들이 185를 2건(`magical-maxwell-hja5kh-eos134` · `vibrant-rubin-tp7jfw`),
    186을 2건(`ecstatic-feynman-bxxxvd` · `magical-maxwell-hja5kh-gate-release-gap`) 각자 등재해 두었다
    — `add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 바로 그 창이다. 원격 전 브랜치·claim
    대장에서 188~199가 비어 있음을 실측한 뒤 `backlog.py rename`으로 185→188 · 186→189를 옮겼다
    (과거 이벤트의 옛 ID 참조는 CLI가 의도적으로 그대로 두고 `rename` 이벤트로 잇는다).
-   *추가(main `09501c5f` 병합 시 실측)*: 같은 번호를 쓴 다른 태스크 `HARN-186-job-log-truncation-warning-hook`이
-   PR #1349로 먼저 main에 들어왔다. 그래서 §5가 가리키는 PR #1356의 `HARN-186-unmerged-gate-attach-claim-release-gap`은
-   머지 전에 번호가 바뀔 수 있다 — 이 문서는 그 태스크를 **PR #1356과 슬러그**로 식별한다.
+   *추가(main `559be84e` 병합 시 실측)*: 같은 번호를 쓴 다른 태스크 `HARN-186-job-log-truncation-warning-hook`이
+   PR #1349로 먼저 main에 들어왔고, PR #1356은 머지(`3dbe54d3`) 때 자기 태스크를 `HARN-193-unmerged-gate-attach-claim-release-gap`으로
+   개명했다. 그래서 지금 main에서 `HARN-186`은 **다른 태스크**를 가리킨다 — 이 문서의 §5·§6 참조와 취소한 `HARN-187`의
+   취소 사유(`amend --notes-replace` · 원문은 이벤트에 보존)를 `HARN-193`으로 고쳤다. 개명이 옛 번호 참조를 따라가지 않는
+   축(사고 줄 `fix_ref`)은 main의 `HARN-195-incident-fix-ref-rename-misroute`가 소유한다.
 3. **사고 대장 4건**(이 브랜치 순증) — `orphan-claim-reap-blindspot`(12회차 관측과 합치면 2회차 —
    `series_raw`에 명기 · 대책 `HARN-189`) · `ported-classification-false-positive`(선례 2건과 합치면
    3회차 — `series_raw`에 명기 · 대책 `HARN-190`) · `derived-index-not-rebuilt` **3회차**(이 감사 자신의
    검증에서 발생: 사고를 `incident add`로 쓴 뒤 `backlog/jit_index.json`을 재생성하지 않아 로컬 CI 미러의
    harness-integrity가 "적시 주입 인덱스 대조"에서 exit 1 · 뒤 스텝 7건 미실행. 푸시 전 발견 · origin/main
    워크트리 대조로 원인 확정 · `backlog.py jit build`로 재생성 · 대책 태스크 `HARN-179`는 이미 등재돼 있다) ·
-   `harness-test-live-ledger-write` **12회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
+   `harness-test-live-ledger-write` **14회차**(재검증 미러의 `tests/harness`가 이 세션 샤드에 편집한 적 없는
    `scripts/harness/backlog.py`에 대한 가짜 `policy_warn` 3줄을 씀 — 커밋본 앞부분 바이트 동일·추가분 전부 가짜임을
-   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 12회 기록됐는데 아직 우선순위 3·EOS P2다).
-   *회차 표기 주의(스냅샷 — main `09501c5f` 병합 후 `backlog.py incident series` 실측)*: 두 검증 사고는 이 브랜치에서
+   단언한 뒤 제거. 대책 `HARN-170`은 09-24 이후 14회 기록됐는데 아직 우선순위 3·EOS P2다).
+   *회차 표기 주의(스냅샷 — main `559be84e` 병합 후 `backlog.py incident series` 실측)*: 두 검증 사고는 이 브랜치에서
    기록할 때 각각 2회차·7회차였다(이벤트 샤드의 `nth` 값). 그런데 같은 날 다른 세션들이 **같은 두 계열을 계속 기록**해
    main을 병합할 때마다 앞에 끼어들었고(`harness-test-live-ledger-write` 기준 `ed3d14da` 8 · `78a8edff` 9 ·
-   `6c880b67` 10 · `de3f5487` 11 · `09501c5f` 12), 지금 대장 기준 3회차·12회차다 —
+   `6c880b67` 10 · `de3f5487` 11 · `09501c5f` 12 · `48138a88` 12 · `559be84e` 14), 지금 대장 기준 3회차·14회차다 —
    즉 HARN-179·HARN-170의 결함을 오늘만 여러 세션이 겪고 있다. 병합 시 main 쪽 기록을 그대로 앞에 두고 이 브랜치 줄 4개를
    끝에 붙였다(main 대비 순수 추가). `de3f5487` 병합 때는 이 표기를 갱신하지 않아 이 문서가 한동안 실제
    11회차를 10회차로 적고 있었다 — 병합할 때마다 `incident series`로 다시 재야 한다. 대장은 회차를 저장하지 않고 읽을 때 계산하므로, 이 숫자는 머지 시점에 또 바뀔 수

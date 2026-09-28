@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from whymath_backend.l2 import recommendation_evidence
+from whymath_backend.l2.learner_state import LearnerStateBasis, MasteryBasis
 from whymath_backend.l2.pedagogy_evidence import (
     EVENT_TYPE_OUTCOME as PEDAGOGY_EVENT_TYPE_OUTCOME,
 )
@@ -29,6 +30,7 @@ from whymath_backend.l2.recommendation_evidence import (
     META_KEY_APPLIED_WEIGHTS,
     META_KEY_CANDIDATES,
     META_KEY_GATE_REASON,
+    META_KEY_LEARNER_STATE_BASIS,
     META_KEY_MODE,
     META_KEY_POLICY_VERSION,
     META_KEY_POOL_SIZE,
@@ -312,3 +314,43 @@ class TestB1PlaintextProhibition:
         )
         assert row.payload_encrypted is None
         assert row.payload_nonce is None
+
+
+class TestLearnerStateBasisPersistence:
+    """EOS-132 — 추천이 본 LearnerState의 근거를 싣는다. 넘기지 않으면 **키를 넣지 않는다**.
+
+    역추적 게이트는 키 부재를 "모른다"(끊김)로, 키 안의 `absent` 사유를 "없었다"(정상)로 읽는다.
+    그래서 None을 null로 기록하면 두 상태가 같은 글자가 된다.
+    """
+
+    async def test_basis_is_stored_in_its_meta_form(self) -> None:
+        basis = LearnerStateBasis(
+            assembled_at=_AT,
+            mastery=MasteryBasis(concept_id=uuid.uuid4(), measured_at=_AT),
+            ability_snapshot_id=None,
+            misconception_hypothesis_ids=(uuid.uuid4(),),
+        )
+        row = await record_recommendation_treatment(
+            _FakeSession(),  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            occurred_at=_AT,
+            learner_state_basis=basis,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_LEARNER_STATE_BASIS] == basis.to_meta()
+        assert LearnerStateBasis.from_meta(row.meta[META_KEY_LEARNER_STATE_BASIS]) == basis
+
+    async def test_no_basis_means_no_key_not_null(self) -> None:
+        row = await record_recommendation_treatment(
+            _FakeSession(),  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert META_KEY_LEARNER_STATE_BASIS not in row.meta

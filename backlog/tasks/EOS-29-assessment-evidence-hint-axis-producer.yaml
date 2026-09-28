@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-29-assessment-evidence-hint-axis-producer
+title: "채점 증거에 힌트 축 생산자 배선 — 코치 완료 attempt의 힌트 귀속을 숙달 추정기가 읽을 수 있게 (simple-additive-v1 기본 전환의 전제)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-133-coach-hint-usage-attribution
+requires_gates: []
+acceptance:
+  - "① 코치 완료 경로의 채점 증거가 힌트 사용을 3상태로 싣는다 — `hint_used_of(evidence)`가 그 attempt의 `problem_attempt.used_hint`와 같은 값을 돌려준다(None은 None 그대로 — 모른다를 안 썼다로 접지 않는다). `/v1/me/attempts`(클라 자가보고 used_hint) 경로의 처분도 판정해 적는다.\n② 기본 추정기는 이 태스크가 바꾸지 않는다 — `bkt-v1` 유지(측정 없는 기본 전환 금지 · `docs/architecture/mastery_update_contract_v1.md` 기본 추정기 처분 절). 연속 정답 축(`StreakSignal`)은 범위 밖.\n③ 집행 지점 — 시나리오 스위트 SCENARIO-005 ④ⓒ의 정직한 공백 동결(완료 응답의 `completion_evidence`에 `hint_used` 키가 없다)이 이 수정으로 실패하도록 되어 있다. 그 단언을 정상 동작 단언으로 뒤집는다.\n④ 생산자 제거 뮤테이션이 ③을 RED로 만드는지 주입 확인."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/schema/assessment_evidence.py
+  - src/backend/whymath_backend/l2/assessment_evidence.py
+  - src/backend/whymath_backend/api/coach.py
+  - tests/backend/scenarios/test_phase2_scenario_regression_suite.py
+session: null
+notes: "출처: EOS-133 acceptance ② 판정(2026-09-28). 코치 완료 attempt에 힌트 사용이 귀속되지만(used_hint·hint_usage), 그 신호는 오늘 숙달 갱신에서 읽히지 않는다 — 기본 추정기 bkt-v1은 힌트 축을 읽지 않고, 채점 증거(AssessmentEvidence)에도 그 축이 없다. mastery_update_contract_v1.md §12가 소유자 없이 범위 밖으로 적어 둔 '힌트 생산자 배선' 항목을 이 태스크가 소유한다."
+updated: 2026-09-28

@@ -348,7 +348,15 @@ import에서 뚫린다. AST는 그 표기 변형을 같은 노드로 본다.
   0이지만, `simple-additive-v1`을 기본으로 올리려면 이 배선이 선행한다. **감추지 않고 적어
   둔다**(CLAUDE.md 「작동한 비율」 원칙). 신호 자체는 `EOS-45`(HintUsage 엔티티)·
   `l2/learning_state_evidence.py`(연속 카운트)가 이미 갖고 있어 생산자 배선은 조회 결선이다.
-- **응답 경계의 `None` vs `0.0`** — `EOS-17` 소유.
+- **응답 경계의 `None` vs `0.0`** — `EOS-17`이 해소했다(2026-09-28). `POST /v1/me/attempts`의
+  개념·스킬 숙달 갱신 응답이 값이 빈 행을 **null**로 낸다(종전 `mastery 0.0 · sample_size 0`).
+  갱신 행은 이 계약상 값을 가지므로(`MasteryUpdate.mastery` 0~1 · 표본 1 이상) 빈 값은
+  "모른다"가 아니라 writer 결함의 신호이고, 0.0으로 접으면 그 신호가 "숙달 0"으로 위장된다 —
+  그래서 null로 내고 경고 로그로 드러낸다. 읽기 표면(`/v1/me/mastery/current`·`bkt_mastery`
+  등)은 이미 null을 보존하고 있었다. 재발은 `api/` 전수 AST 가드
+  `tests/backend/api/test_mastery_response_zero_fold_guard.py`가 막는다(숙달 이름 자리의
+  None→숫자 접기). 추천 근거의 `confidence` 0.0은 **의도된 표현으로 유지**한다 — 근거가
+  없으면 신뢰도 0이고, 미측정 자체는 `type`·`basis`·`mastery=None`이 따로 말한다.
 - **숙달 임계값 상수 복제** — `ARCH-53` 소유.
 - **스킬 축 소비 전환** — `EOS-63` 소유.
 - **DKT·IRT 실구현** — 계획서 §15 동결("복잡한 ML 추천") 준수. 이 태스크가 늘린 것은 *꽂을
