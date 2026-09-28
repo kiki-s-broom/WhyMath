@@ -185,7 +185,9 @@ class TestLearningTraceSurface:
         assert by_type["content_viewed"]["availability"] == "dormant"
         # EOS-131: 추천은 실 session_id 결합으로 생산 중이다(종전 "unjoinable"의 반대 방향).
         assert by_type["recommendation_generated"]["availability"] == "produced"
-        assert by_type["learner_state_created"]["availability"] == "dormant"
+        # EOS-132: 상태 생성 사건은 추천 기록 meta의 근거 식별자로 생산 중이다(종전 "dormant"는
+        # writer 0건 빈 좌석 `user_state_snapshot`을 원천으로 가리키던 시절의 값이다).
+        assert by_type["learner_state_created"]["availability"] == "produced"
         assert by_type["problem_attempted"]["availability"] == "produced"
         assert by_type["problem_attempted"]["count"] == 1
 

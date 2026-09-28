@@ -163,6 +163,59 @@ gates:
     cleared_by: kiki
     notes: ""
     corrections: []
+  - id: G-const-a0002-adoption
+    title: "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-diagnosis-s00-s10-run
+    title: "260927 EOS 통합정밀진단 S00~S10을 Kiki 머신에서 실행해 이식 완성 결과를 독립 검증한다(공통규칙: 읽기 전용·증거 등급·단계마다 새 세션·S09는 다른 모델). 이 저장소에 이식된 헌법·집행 장치가 진단의 기준(기준/헌법·기준_코딩규칙)에 비춰 어디까지 충족되는지 S02·S07이 판정하고, S08이 'Phase 2 완료' 주장을 Gate 2 증거로 대조한다(저장소 기록: 계획서 300 Gate 2 판정 3회 FAIL — 9/19·9/24·9/25, 미충족 1축). 세션 측 사전 검증(기계 축)은 docs/standards/coding_constitution_transplant.md §5 프로토콜대로 CI가 상시 수행한다. evidence = 결과/S10_통합진단서.md 경로 + 기준 커밋 해시 + 차단·높음 건수."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 21
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-precedence-declaration
+    title: "3중 '헌법' 문서의 서열 확정 — 코딩 헌법(constitution/CONSTITUTION.md 제2조 '최고 규범')과 CLAUDE.md(마스터 가이드 · '충돌 시 CLAUDE.md 우선' 373행) · dev_constitution.md(경량 요약) · AGENTS.md가 서로 최우선을 선언한다. 3택: ① 코딩 헌법 최상위(A0001 제2조 원문대로 — 기본값·권고) ② CLAUDE.md 최상위·헌법은 코딩 구조 규범에 한정 ③ 범위 분할(법령·아키텍처·검증=CLAUDE.md / 코딩 구조·파이프라인·변경·검증 독립=헌법, 같은 주제 충돌 시 헌법). 판정 재료 = docs/standards/coding_constitution_transplant.md §1 관계 선언 + 충돌 문장 12곳 목록(crosswalk 문서). evidence에 선택지 번호와 정정 커밋 해시."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-sources-registry-adopt
+    title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-27
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-02-coding-constitution-transplant-stage1-2
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
@@ -332,18 +385,29 @@ gates:
     notes: ""
     corrections: []
   - id: G-eos129-prod-response-distribution
-    title: "EOS-129 ⑤ 운영 코퍼스 문항당 응답 분포 실측 — Kiki 머신 prod DB(whymath-pg·5433)에서 `python -m whymath_backend.l2.calibrate_items --dry-run --json`을 돌려 추정 가능 문항 수(응답≥5 b 대상·응답≥50 a 후보·a 채택 수)와 폴백 사유 분포를 적는다. 쓰기 0건(읽기 전용). **주의: CLI 기본 DB URL은 5432(타 프로젝트 점유)라 WHYMATH_DATABASE_URL을 postgresql+asyncpg://whymath@127.0.0.1:5433/whymath로 지정해야 한다** — 그대로 돌리면 엉뚱한 DB를 잰다. 판정 3택: ①a 채택 0건 → 데이터 축적 대기(그 사실이 산출물·다음 재측정 시점 기재) ②채택 >0 → dry-run 없이 1회 실행해 irt_a를 영속하고 폴백 비율을 기록 ③응답 자체 0건 → ①과 같이 처리. 근거: docs/reviews/eos129_irt_discrimination_calibration_2026-09-28.md §5"
+    title: "EOS-129 ⑤ 운영 DB 문항당 응답 수 분포 실측 — 변별도 a를 추정할 만큼 응답이 쌓인 문항이 몇 건인지(읽기 전용 SELECT · 런북 docs/ops/eos129_prod_response_distribution_runbook.md · 결과 표 2개를 세션에 전달)"
     kind: human
     assignee: kiki
     status: pending
     requested: 2026-09-28
-    remind_after_days: null
+    remind_after_days: 7
     evidence: null
     cleared_by: null
     notes: ""
     corrections: []
-    depends_on:
-      - EOS-129-irt-discrimination-calibration
+    no_inputs_reason: "Kiki 머신 운영 DB(whymath-pg) 읽기 전용 실측 — 클라우드 세션은 운영 DB에 닿을 수 없다"
+  - id: G-eos137-first-eval
+    title: "EOS-137 ② QA 엔진 첫 평가 실행 — 문항별 판정 어댑터를 MP-03 골든 v1(rotation 0)과 검수 큐에 돌려 혼동행렬·평가 원장 첫 행을 남긴다(런북 docs/ops/eos137_first_eval_runbook.md · EOS-137 PR main 머지 후에만 실행 가능 · 출력 전체를 세션에 전달하면 세션이 수치를 MEMORY에 기록하고 EOS-137을 닫는다)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-28
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다"
   - id: G-eos23-rejected-quad-sum-classification
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human

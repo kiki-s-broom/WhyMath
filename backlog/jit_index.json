@@ -2344,6 +2344,29 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "EOS-129 3세션 연쇄 착수 — 게이트 부착 뒤 unblock이 claim을 풀었는데 게이트는 미머지 브랜치에만 있었다",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "EOS-137 게이트 부착 후 claim 반납 → 다른 세션이 13:46 재착수해 ①을 다시 구현(미푸시)",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
@@ -2495,6 +2518,17 @@
     "tests/harness/test_ci_job_coverage*.py"
    ],
    "text": "ci_job_coverage scope에 stdin 입력·출력 tail 절단 — 0건 판정을 읽지 못해 backend 잡 누락",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".github/workflows/ci.yml",
+    "scripts/ops/pip_install_resilient.py",
+    "tests/infra/test_ci_pip_install_resilience.py"
+   ],
+   "text": "PyPI 인덱스 python-dateutil 97.8초 무응답 → pip이 '의존성 충돌'로 위장 보고해 CI red",
    "weight": 2
   },
   {
@@ -3125,6 +3159,37 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
+   "text": "번호 확인용 backlog add 가 실제 태스크 CONST-01-x 생성 — rename 거부로 cancel 처리(2회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_mirror.py"
+   ],
+   "text": "CI 미러 실행 중 통합 테스트 정리 코드 수정 — 미러 결과 오염, 스스로 중단·폐기",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/job_log_truncation_guard.py",
+    ".claude/settings.json",
+    "tests/infra/test_job_log_truncation_guard.py"
+   ],
+   "text": "CI 실패 원인을 잡 로그 끝 120줄(원본 398줄)만 보고 PR 코멘트로 단정 — 시간 초과 횟수 오기(5→실제 6)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
     "scripts/harness/backlog.py",
@@ -3142,6 +3207,62 @@
     "tests/harness/test_jit*.py"
    ],
    "text": "incident add 뒤 jit_index.json 미재생성 — CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "개명 목적지 HARN-191까지 다른 세션 PR(#1365)이 먼저 머지 — 같은 태스크를 하루에 두 번 개명(185→191→194)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".claude/hooks/git_revert_guard.py",
+    "tests/infra/test_git_revert_guard.py"
+   ],
+   "text": "기존 git_revert_guard 가 태스크 등재 heredoc 본문의 설명 문구를 git 원복 명령으로 오판해 차단",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "등재한 HARN-184를 16분간 push하지 않는 사이 타 세션이 같은 번호로 등재·착수 — 186으로 개명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    ".gitattributes",
+    "backlog/incidents.ndjson",
+    "scripts/harness/incidents.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_incidents.py"
+   ],
+   "text": "병합 큐 MERGE_CONFLICT 이탈 — 사고 대장 끝 추가 충돌(EOS-25 PR #1363 · 재병합 직후 1회 더 재현)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/store.py",
+    "tests/harness/*.py"
+   ],
+   "text": "하루에 태스크 번호 충돌 2건 — 등재한 HARN-185·186을 다른 세션 미머지 PR이 먼저 머지해 개명(191·193)",
    "weight": 1
   },
   {
@@ -3789,6 +3910,15 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러의 tests/harness 가 세션 샤드에 가짜 policy_warn 6줄(backlog.py) 기록 — 실행 전 백업으로 복원",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     "scripts/harness/backlog.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
@@ -3809,11 +3939,39 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    ".claude/hooks/git_revert_guard.py",
+    "tests/infra/test_git_revert_guard.py"
+   ],
+   "text": "신설 헌법 가드가 cp949 콘솔에서 한글·— 섞인 명령을 통과(fail-open) — stdin 을 로캘 인코딩으로 해독",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
     "tests/backend/conftest.py",
     "tests/data_pipeline/conftest.py",
     "tests/infra/test_integration_marker_*.py"
    ],
    "text": "통합 테스트를 플래그 없이 -m integration으로 돌려 전부 skip·exit 0 — 판정 줄을 읽어 발견",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 샤드에 가짜 path_overlap 3줄 기록(EOS-25 병합 재검증 미러 중 · 커밋본 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-28",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "하네스 테스트가 claim 세션 샤드에 가짜 policy_warn 7줄 기록(EOS-25 CI 미러 중 · 커밋본 복원)",
    "weight": 0
   },
   {

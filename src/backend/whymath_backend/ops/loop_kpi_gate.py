@@ -54,10 +54,12 @@
       출처 = `privacy_audit` × `problem_attempt`. **관측 범위는 부분이다** — 아래 「④의 사각」.
 
   KPI⑤ Traceability          (역추적 실패 = 0 · 무관용)
-      분자 = 5홉 체인이 끊기는 recommendation 건수   분모 = recommendation 전체
+      분자 = 체인이 끊기는 recommendation 건수(첫 끊긴 홉 1개로 계상)
+      분모 = 근거 기록 개시 이후의 recommendation(그 전 기록은 detail.excluded_pre_basis)
       체인 = Recommendation → LearnerState → Assessment → Attempt → Problem
-      출처 = `l2/learning_event_trace`의 원천 대장. **현행 구조적 미측정** — EOS-131로 추천 결합
-      홉은 풀렸고 LearnerState 시각 홉(user_state_snapshot DORMANT)이 남았다(EOS-132 소관).
+      조인 = 세션(학습자) → meta.learner_state_basis(근거) → 근거 숙달 행 → 그 행의 attempt_id →
+             problem_attempt.problem_id. 홉 판정 정본은 `classify_trace`(EOS-132 — 종전 LearnerState
+             홉 원천 user_state_snapshot은 writer 0건 빈 좌석이라 구조적 미측정이었다).
 
 ────────────────────────────────────────────────────────────────────────────
 KPI① 정의 (EOS-131 ⑨ — 2026-09-25 재정의)
@@ -159,14 +161,18 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import exists, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import LearningSession, ProblemAttempt
+from whymath_backend.db.models.assessment import AbilitySnapshot, ConceptMasteryHistory
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.evidence_event import EvidenceEvent
+from whymath_backend.db.models.misconception_hypothesis import MisconceptionHypothesisRecord
+from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
+from whymath_backend.l2.learner_state import LearnerStateBasis
 from whymath_backend.l2.learning_event_trace import (
     SourceAvailability,
     TraceEventType,
@@ -174,6 +180,7 @@ from whymath_backend.l2.learning_event_trace import (
 )
 from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
+    META_KEY_LEARNER_STATE_BASIS,
     META_KEY_REASON,
 )
 from whymath_backend.ops.integrity_violations_gate import IntegrityReport, scan_integrity
@@ -198,7 +205,12 @@ __all__ = [
     "LoopKpiSpec",
     "Observation",
     "ObservationWindow",
+    "TraceBreak",
+    "TraceLookups",
+    "TraceOutcome",
+    "TraceRecommendation",
     "blocked_preconditions",
+    "classify_trace",
     "collect_all",
     "collect_explainability",
     "collect_loop_completion",
@@ -303,6 +315,12 @@ _COVERAGE_NOTE_INTEGRITY = (
     "막는 축과, 그 7종이 스캔하지 않는 테이블의 불일치는 여기 나타나지 않는다."
 )
 
+_COVERAGE_NOTE_TRACEABILITY = (
+    "근거 기록 개시 전의 추천은 LearnerState 근거가 없어 소급 역추적이 불가능하다 — 분모에서 빼고 "
+    "excluded_pre_basis로 센다. 삭제권 이행으로 세션 행이 지워진 추천은 학습자 결합이 끊겨 "
+    "break_learner_unjoined로 잡힌다(세션 기록 실패 placeholder와 구별할 수 없다)."
+)
+
 LOOP_KPI_SPECS: Final[tuple[LoopKpiSpec, ...]] = (
     LoopKpiSpec(
         kpi=LoopKpi.LOOP_COMPLETION,
@@ -359,13 +377,18 @@ LOOP_KPI_SPECS: Final[tuple[LoopKpiSpec, ...]] = (
         kpi=LoopKpi.TRACEABILITY,
         title="Traceability — Recommendation → LearnerState → Assessment → Attempt → Problem "
         "역추적 100%",
-        numerator_def="관측창의 recommendation 중 5홉 체인이 한 군데라도 끊기는 건수",
-        denominator_def="관측창의 recommendation 전체 건수",
-        source="whymath_backend.l2.learning_event_trace(원천 대장) × evidence_event",
-        seat_task="EOS-11 / EOS-79 (트레이스 좌석 — 이 게이트는 그 체인의 해소율을 판정한다)",
+        numerator_def="관측창의 recommendation 중 체인이 한 군데라도 끊기는 건수(첫 끊긴 홉 "
+        "1개로 계상 — detail.break_*)",
+        denominator_def="관측창의 recommendation 중 근거 기록 개시(learner_state_basis가 실린 첫 "
+        "추천) 이후 건수 — 그 전의 소급 불가 기록은 detail.excluded_pre_basis로 따로 보고",
+        source="evidence_event(meta.learner_state_basis) × learning_session × "
+        "concept_mastery_history × problem_attempt × problem (+ ability_snapshot · "
+        "misconception_hypothesis)",
+        seat_task="EOS-132-traceability-learner-state-hop-basis",
         threshold=0.0,
         direction=Direction.AT_MOST,
         zero_tolerance=True,
+        coverage_note=_COVERAGE_NOTE_TRACEABILITY,
     ),
 )
 
@@ -394,10 +417,14 @@ _REQUIRED_SOURCES: Final[Mapping[LoopKpi, tuple[TraceEventType, ...]]] = {
     # 추천이 UNJOINABLE인 것과 reason이 실렸는지는 별개 축이다.
     LoopKpi.EXPLAINABILITY: (),
     LoopKpi.MANUAL_INTERVENTION: (),
+    # EOS-132 — 체인의 각 홉 원천. Assessment 홉은 `assessment` 테이블(진단 세션 결과 묶음 —
+    # DIAGNOSTIC_*)이 **아니라** 근거 숙달 행의 증거 귀속(개념 × 시도)이다: `problem_attempt`에
+    # assessment 참조 컬럼이 없어 진단 세션은 시도에 닿지 않고, EOS-79 4층 경계가 "assessment
+    # 테이블은 Assessment 층이 아니다"를 이미 정본화했다(`loop_kpi_contract.md` §2-1).
     LoopKpi.TRACEABILITY: (
         TraceEventType.RECOMMENDATION_GENERATED,
         TraceEventType.LEARNER_STATE_CREATED,
-        TraceEventType.DIAGNOSTIC_COMPLETED,
+        TraceEventType.MASTERY_UPDATED,
         TraceEventType.PROBLEM_ATTEMPTED,
     ),
 }
@@ -950,35 +977,302 @@ async def collect_manual_intervention(
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# KPI⑤ 역추적 — 홉 판정은 순수 함수, 조회는 그 재료만 모은다 (EOS-132 ⑦)
+# ──────────────────────────────────────────────────────────────────────────
+class TraceBreak(str, Enum):
+    """역추적이 **처음** 끊긴 홉 — 체인 순서대로 하나만 계상한다(분자 = 끊긴 추천 수).
+
+    체인: 추천 →① 학습자 →② LearnerState(근거) →③ Assessment(근거 숙달 행) →④ Attempt →⑤ Problem.
+    """
+
+    LEARNER_UNJOINED = "learner_unjoined"
+    """① `evidence_event.session_id → learning_session` 조인 실패(세션 기록 실패 placeholder ·
+    삭제권으로 지워진 세션 — 둘을 구별할 수 없다)."""
+
+    BASIS_MISSING = "basis_missing"
+    """② 근거 기록 개시 **이후**인데 `learner_state_basis` 키가 없다 — 모른다(끊김)."""
+
+    BASIS_MALFORMED = "basis_malformed"
+    """② 근거를 읽을 수 없다(형식 불량 — 추측으로 채우지 않는다)."""
+
+    BASIS_ROW_MISSING = "basis_row_missing"
+    """② 근거가 가리키는 θ 스냅샷·오개념 가설 행이 없거나 다른 학생의 것이다."""
+
+    ASSESSMENT_MISSING = "assessment_missing"
+    """③ 근거 숙달 행 `(학습자, concept_id, measured_at)`이 없다."""
+
+    ATTEMPT_MISSING = "attempt_missing"
+    """④ 숙달 행에 `attempt_id`가 없거나(EOS-108 이전 적재) 그 시도가 없거나 다른 학생의 것이다."""
+
+    PROBLEM_MISSING = "problem_missing"
+    """⑤ 시도에 `problem_id`가 없거나 그 문항 행이 없다."""
+
+
+class TraceOutcome(str, Enum):
+    """추천 1건의 역추적 결과."""
+
+    TRACED = "traced"
+    """5홉 전부 이어졌다."""
+
+    TRACED_PRIOR = "traced_prior"
+    """LearnerState에서 **정상 종료** — 숙달 측정 이력이 없어 사전값으로 추천했고 근거가 그 사실을
+    사유와 함께 적었다. ③~⑤는 끊긴 것이 아니라 해당 없음이다(EOS-132 ⑧)."""
+
+    BROKEN = "broken"
+    EXCLUDED_PRE_BASIS = "excluded_pre_basis"
+    """근거 기록 개시 **이전**의 추천 — 소급 불가라 분모에서 빼되 따로 센다(EOS-132 ⑥)."""
+
+
+@dataclass(frozen=True, slots=True)
+class TraceRecommendation:
+    """역추적 판정 대상 추천 1건 — 기록 시각·meta·세션 조인으로 얻은 학습자(없으면 None)."""
+
+    time: datetime
+    meta: Mapping[str, Any] | None
+    learner_id: uuid.UUID | None
+
+
+@dataclass(frozen=True, slots=True)
+class TraceLookups:
+    """근거가 가리키는 행들의 실재 — 조회 결과만 담는다(판정은 `classify_trace`가 한다).
+
+    키가 있으면 그 행이 실재한다. 값은 다음 홉으로 가는 조인 키 또는 소유 학생이다.
+    """
+
+    mastery_attempt: Mapping[tuple[uuid.UUID, uuid.UUID, datetime], uuid.UUID | None]
+    """(학습자, 개념, measured_at) → 그 숙달 행의 `attempt_id`(느슨참조 — NULL 가능)."""
+
+    attempts: Mapping[uuid.UUID, tuple[uuid.UUID | None, uuid.UUID | None]]
+    """attempt_id → (user_id, problem_id)."""
+
+    problems: frozenset[uuid.UUID]
+    snapshot_owner: Mapping[uuid.UUID, uuid.UUID]
+    hypothesis_owner: Mapping[uuid.UUID, uuid.UUID | None]
+
+
+def _basis_of(recommendation: TraceRecommendation) -> tuple[bool, LearnerStateBasis | None]:
+    """(근거 키가 있는가, 읽은 근거 — 형식 불량이면 None)."""
+    meta = recommendation.meta or {}
+    if META_KEY_LEARNER_STATE_BASIS not in meta:
+        return False, None
+    return True, LearnerStateBasis.from_meta(meta[META_KEY_LEARNER_STATE_BASIS])
+
+
+def classify_trace(
+    recommendation: TraceRecommendation,
+    *,
+    basis_since: datetime | None,
+    lookups: TraceLookups,
+) -> tuple[TraceOutcome, TraceBreak | None]:
+    """추천 1건의 체인을 앞에서부터 따라가 **처음 끊긴 홉**을 돌려준다. 순수 함수(DB 무접근).
+
+    `basis_since`는 근거 기록 개시 시각(근거가 실린 첫 추천의 시각)이다. 그 이전의 근거 없는 기록은
+    소급할 수 없으므로 판정 대상에서 뺀다(`EXCLUDED_PRE_BASIS` — 따로 센다). 개시 **이후**의 근거
+    부재는 끊김이다 — 기록 경로가 근거를 빠뜨리기 시작하면 여기서 드러나야 한다.
+    """
+    has_basis_key, basis = _basis_of(recommendation)
+    if not has_basis_key and (basis_since is None or recommendation.time < basis_since):
+        return TraceOutcome.EXCLUDED_PRE_BASIS, None
+
+    learner = recommendation.learner_id
+    if learner is None:
+        return TraceOutcome.BROKEN, TraceBreak.LEARNER_UNJOINED
+    if not has_basis_key:
+        return TraceOutcome.BROKEN, TraceBreak.BASIS_MISSING
+    if basis is None:
+        return TraceOutcome.BROKEN, TraceBreak.BASIS_MALFORMED
+
+    # ② LearnerState — 근거가 가리키는 행이 **이 학생의 것으로** 실재해야 되짚을 수 있다.
+    if (
+        basis.ability_snapshot_id is not None
+        and lookups.snapshot_owner.get(basis.ability_snapshot_id) != learner
+    ):
+        return TraceOutcome.BROKEN, TraceBreak.BASIS_ROW_MISSING
+    if any(
+        lookups.hypothesis_owner.get(hypothesis_id, _MISSING) != learner
+        for hypothesis_id in basis.misconception_hypothesis_ids
+    ):
+        return TraceOutcome.BROKEN, TraceBreak.BASIS_ROW_MISSING
+    if basis.mastery is None:
+        # 측정 이력 없음(사유 기록) — ③~⑤는 해당 없음. 끊김이 아니다(EOS-132 ⑧).
+        return TraceOutcome.TRACED_PRIOR, None
+
+    # ③ Assessment — 근거 숙달 행(개념 × 시도 귀속).
+    key = (learner, basis.mastery.concept_id, basis.mastery.measured_at)
+    if key not in lookups.mastery_attempt:
+        return TraceOutcome.BROKEN, TraceBreak.ASSESSMENT_MISSING
+    # ④ Attempt — 숙달 행의 느슨참조 attempt_id. 다른 학생의 시도를 가리키면 끊김이다.
+    attempt_id = lookups.mastery_attempt[key]
+    attempt = lookups.attempts.get(attempt_id) if attempt_id is not None else None
+    if attempt is None or attempt[0] != learner:
+        return TraceOutcome.BROKEN, TraceBreak.ATTEMPT_MISSING
+    # ⑤ Problem.
+    problem_id = attempt[1]
+    if problem_id is None or problem_id not in lookups.problems:
+        return TraceOutcome.BROKEN, TraceBreak.PROBLEM_MISSING
+    return TraceOutcome.TRACED, None
+
+
+#: 가설 소유 조회에서 "행이 없다"를 "소유자 NULL"과 구별하는 표식.
+_MISSING: Final = object()
+
+#: IN 목록 한 번에 싣는 최대 키 수 — 관측창이 커도 문장 하나가 비대해지지 않게 나눠 읽는다.
+_LOOKUP_CHUNK: Final = 500
+
+
+def _chunks(items: list[Any]) -> list[list[Any]]:
+    return [items[i : i + _LOOKUP_CHUNK] for i in range(0, len(items), _LOOKUP_CHUNK)]
+
+
+async def _trace_lookups(
+    session: AsyncSession, recommendations: list[TraceRecommendation]
+) -> TraceLookups:
+    """근거가 가리키는 행들을 **한 번씩만** 모아 읽는다(추천마다 조회하지 않는다)."""
+    mastery_keys: set[tuple[uuid.UUID, uuid.UUID, datetime]] = set()
+    snapshot_ids: set[uuid.UUID] = set()
+    hypothesis_ids: set[uuid.UUID] = set()
+    for recommendation in recommendations:
+        _, basis = _basis_of(recommendation)
+        if basis is None or recommendation.learner_id is None:
+            continue
+        if basis.mastery is not None:
+            mastery_keys.add(
+                (recommendation.learner_id, basis.mastery.concept_id, basis.mastery.measured_at)
+            )
+        if basis.ability_snapshot_id is not None:
+            snapshot_ids.add(basis.ability_snapshot_id)
+        hypothesis_ids.update(basis.misconception_hypothesis_ids)
+
+    mastery_attempt: dict[tuple[uuid.UUID, uuid.UUID, datetime], uuid.UUID | None] = {}
+    for chunk in _chunks(sorted(mastery_keys, key=str)):
+        rows = await session.execute(
+            select(
+                ConceptMasteryHistory.user_id,
+                ConceptMasteryHistory.concept_id,
+                ConceptMasteryHistory.measured_at,
+                ConceptMasteryHistory.attempt_id,
+            ).where(
+                tuple_(
+                    ConceptMasteryHistory.user_id,
+                    ConceptMasteryHistory.concept_id,
+                    ConceptMasteryHistory.measured_at,
+                ).in_(chunk)
+            )
+        )
+        for user_id, concept_id, measured_at, attempt_id in rows.all():
+            mastery_attempt[(user_id, concept_id, measured_at)] = attempt_id
+
+    attempt_ids = sorted({a for a in mastery_attempt.values() if a is not None}, key=str)
+    attempts: dict[uuid.UUID, tuple[uuid.UUID | None, uuid.UUID | None]] = {}
+    for chunk in _chunks(attempt_ids):
+        rows = await session.execute(
+            select(
+                ProblemAttempt.attempt_id, ProblemAttempt.user_id, ProblemAttempt.problem_id
+            ).where(ProblemAttempt.attempt_id.in_(chunk))
+        )
+        for attempt_id, user_id, problem_id in rows.all():
+            attempts[attempt_id] = (user_id, problem_id)
+
+    problem_ids = sorted({p for _, p in attempts.values() if p is not None}, key=str)
+    problems: set[uuid.UUID] = set()
+    for chunk in _chunks(problem_ids):
+        rows = await session.execute(
+            select(Problem.problem_id).where(Problem.problem_id.in_(chunk))
+        )
+        problems.update(rows.scalars().all())
+
+    snapshot_owner: dict[uuid.UUID, uuid.UUID] = {}
+    for chunk in _chunks(sorted(snapshot_ids, key=str)):
+        rows = await session.execute(
+            select(AbilitySnapshot.snapshot_id, AbilitySnapshot.user_id).where(
+                AbilitySnapshot.snapshot_id.in_(chunk)
+            )
+        )
+        for snapshot_id, user_id in rows.all():
+            snapshot_owner[snapshot_id] = user_id
+
+    hypothesis_owner: dict[uuid.UUID, uuid.UUID | None] = {}
+    for chunk in _chunks(sorted(hypothesis_ids, key=str)):
+        rows = await session.execute(
+            select(MisconceptionHypothesisRecord.id, MisconceptionHypothesisRecord.user_id).where(
+                MisconceptionHypothesisRecord.id.in_(chunk)
+            )
+        )
+        for hypothesis_id, user_id in rows.all():
+            hypothesis_owner[hypothesis_id] = user_id
+
+    return TraceLookups(
+        mastery_attempt=mastery_attempt,
+        attempts=attempts,
+        problems=frozenset(problems),
+        snapshot_owner=snapshot_owner,
+        hypothesis_owner=hypothesis_owner,
+    )
+
+
 async def collect_traceability(session: AsyncSession, window: ObservationWindow) -> Observation:
-    """KPI⑤ — 5홉 체인의 해소율. 현행은 LearnerState 시각 1홉이 구조적으로 끊겨 있다.
+    """KPI⑤ — 관측창 추천 중 체인이 끊긴 비율(무관용). 홉 정의는 `classify_trace`가 정본이다.
 
-    (EOS-131 전에는 추천 결합까지 2홉이었다 — 추천이 실 session_id로 결합되면서 1홉이 풀렸다.)
+    EOS-132 전에는 LearnerState 홉의 원천(`user_state_snapshot`)이 빈 좌석이라 조회 전에
+    미측정이었고, 분자 쿼리는 소유자 없이 비어 있었다. 이제 추천 기록이 그 추천이 본 상태의 근거
+    식별자를 싣고, 이 수집기가 근거가 가리키는 행을 끝까지 따라간다.
 
-    끊긴 홉이 하나라도 있으면 조회하지 않는다. 남은 3홉만 재서 "100% 역추적"이라고 적으면
-    그것이 정확히 이 게이트가 막으려는 거짓말이다.
+    **분모에서 빼는 것은 소급 불가 기록뿐이고, 조용히 빼지 않는다** — 근거 기록 개시 이전의 추천
+    수를 `detail.excluded_pre_basis`로 낸다. 관측창 전부가 개시 이전이면 분모 0 → 미측정(exit 2).
     """
     source = "collect_traceability"
     blocked = _precondition_observation(LoopKpi.TRACEABILITY, source)
     if blocked is not None:
         return blocked
 
-    denominator = await session.scalar(
-        select(func.count())
+    # 근거 기록 개시 — 근거가 실린 **첫** 추천의 시각(관측창과 무관한 전역 최솟값).
+    basis_since = await session.scalar(
+        select(func.min(EvidenceEvent.time)).where(
+            EvidenceEvent.event_type == EVENT_TYPE_RECOMMENDATION_TREATMENT,
+            EvidenceEvent.meta.has_key(META_KEY_LEARNER_STATE_BASIS),
+        )
+    )
+    rows = await session.execute(
+        select(EvidenceEvent.time, EvidenceEvent.meta, LearningSession.user_id)
         .select_from(EvidenceEvent)
+        .outerjoin(LearningSession, LearningSession.session_id == EvidenceEvent.session_id)
         .where(*_recommendation_rows_in_window(window))
     )
-    # 선결이 풀린 뒤의 실 체인 해소는 그 배선이 어떤 조인 키를 남기느냐에 달려 있다. 지금
-    # 추측해 짜 두면 *검증된 적 없는* 쿼리가 통과 판정을 내게 된다 — 그래서 분자를 미측정으로
-    # 남기고 배선 좌석(EOS-11/EOS-79)이 그 조인 키를 확정할 때 함께 채운다.
+    recommendations = [
+        TraceRecommendation(time=time, meta=meta, learner_id=learner_id)
+        for time, meta, learner_id in rows.all()
+    ]
+    lookups = await _trace_lookups(session, recommendations)
+
+    detail: dict[str, int] = {
+        "recommendations_in_window": len(recommendations),
+        "excluded_pre_basis": 0,
+        "traced_full": 0,
+        "traced_prior_only": 0,
+    }
+    detail.update({f"break_{b.value}": 0 for b in TraceBreak})
+    for recommendation in recommendations:
+        outcome, broken_at = classify_trace(
+            recommendation, basis_since=basis_since, lookups=lookups
+        )
+        if outcome is TraceOutcome.EXCLUDED_PRE_BASIS:
+            detail["excluded_pre_basis"] += 1
+        elif outcome is TraceOutcome.TRACED:
+            detail["traced_full"] += 1
+        elif outcome is TraceOutcome.TRACED_PRIOR:
+            detail["traced_prior_only"] += 1
+        else:
+            assert broken_at is not None  # BROKEN이면 끊긴 홉이 있다(classify_trace 계약)
+            detail[f"break_{broken_at.value}"] += 1
+
+    numerator = sum(v for k, v in detail.items() if k.startswith("break_"))
     return Observation(
         kpi=LoopKpi.TRACEABILITY,
-        denominator=int(denominator or 0),
-        unmeasured_reason=(
-            "5홉 체인의 조인 키가 확정되기 전까지 분자(역추적 실패 건수)를 세지 않는다 — "
-            "검증된 적 없는 쿼리가 100%를 선언하지 않게 한다."
-        ),
+        numerator=numerator,
+        denominator=len(recommendations) - detail["excluded_pre_basis"],
         source=source,
+        detail=detail,
     )
 
 

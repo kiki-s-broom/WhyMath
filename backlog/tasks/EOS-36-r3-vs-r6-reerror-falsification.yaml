@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: EOS-31-r3-vs-r6-reerror-falsification
+id: EOS-36-r3-vs-r6-reerror-falsification
 title: "R3(오개념 교정) 직후 재오답률이 R6(원인 미상) 직후보다 높은지 계측 — EOS-138 순서 판정의 반증 조건"
 track: math-completion
 stage: S3
@@ -18,5 +18,5 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/ops/**"
 session: null
-notes: "출처: EOS-138 판정문(docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md) §7 반례 S-B — 전개를 아예 모르는 학생(부재 개념)이 오개념과 같은 표면형 답을 내면 R3가 0.7 초과로 발화하지만, 필요한 것은 교정이 아니라 선수 학습이다. 신뢰 하한은 매치 품질만 재고 원인 유형(오개념 vs 결손)은 재지 않는다. 이 태스크는 그 판정의 반증 조건을 라이브 데이터로 재는 장치다('작동한 비율' 원칙). 운영 응답이 쌓여야 의미 있는 판정이 나오므로, 리포트는 표본 부족을 정직하게 표기해야 한다."
+notes: "출처: EOS-138 판정문(docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md) §7 반례 S-B — 전개를 아예 모르는 학생(부재 개념)이 오개념과 같은 표면형 답을 내면 R3가 0.7 초과로 발화하지만, 필요한 것은 교정이 아니라 선수 학습이다. 신뢰 하한은 매치 품질만 재고 원인 유형(오개념 vs 결손)은 재지 않는다. 이 태스크는 그 판정의 반증 조건을 라이브 데이터로 재는 장치다('작동한 비율' 원칙). 운영 응답이 쌓여야 의미 있는 판정이 나오므로, 리포트는 표본 부족을 정직하게 표기해야 한다.\n\n[개명 2026-09-28] EOS-31-r3-vs-r6-reerror-falsification → EOS-36-r3-vs-r6-reerror-falsification: 번호 충돌 — main에 EOS-31-suneung-gate-grade-scope-blind가 먼저 머지됨(HARN-100 미머지 쪽 개명)"
 updated: 2026-09-28
