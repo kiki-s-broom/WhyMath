@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ requires_gates: []
 acceptance:
   - "① 코치 대화로 문제를 완료(api/coach.py::_complete_problem)하면 /v1/me/attempts 경로와 같이 학습 상태 머신(advance_on_attempt)이 돌아 전이 원장에 기록된다 — 완료 후 /v1/me/learning-state가 NEW·전이 0건에 머물지 않는다.\n② 두 경로(attempts·coach 완료)의 상태 전이 결과가 동일 입력에서 일치함을 테스트로 동결한다(비대칭 재발 방지).\n③ 집행 지점 — tests/backend/scenarios/test_phase2_scenario_regression_suite.py SCENARIO-005의 정직한 공백 동결(ⓓ)을 정상 동작 단언으로 뒤집는다."
   - "[이행 기록 2026-09-28 · 판정 기준 main `919865d4` + EOS-133 브랜치 `612d43a0` 위] ① 충족 — `api/coach._complete_problem`이 숙달·스킬 기록 뒤 `l2/learning_state_machine.advance_on_graded_attempt`를 부른다(서버 판정 정답 · 확신도 None). 새 학생의 코치 완료 뒤 원장 = `NEW → LEARNING → ASSESSING → PRACTICING`(R2). ② 충족 — 두 채점 경로가 같은 공용 진입점을 부른다(`/v1/me/attempts`도 교체). 구조 동결 = `tests/backend/api/test_me_learning_state.py` AST 가드(공용 진입점 호출 · 하위 두 함수의 직접 호출·import 금지). 실측 동결 = `tests/backend/api/test_eos134_coach_state_machine_integration.py`(같은 신원 · 정답 2회 · 전이 목록 완전 일치). ③ 충족 — SCENARIO-005 ④ⓑ를 정상 동작 단언으로 승격. 평가 진입 거부는 경고 로그로 드러낸다(`test_coach_completion_state_machine.py`)."
-artifacts: []
+artifacts:
+  - "PR #1353 — 코치 완료 경로 학습 상태 머신(공용 진입점 advance_on_graded_attempt) · 두 채점 경로 동치 AST·실 PG 동결 · SCENARIO-005 ④ⓑ 승격 (커밋 acd63770·cf83a32f·872ca0a4 · #1351 위에 쌓음)"
 paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/api/me.py
@@ -28,6 +29,6 @@ paths:
   - tests/backend/api/test_e2e_vertical_slice_integration.py
   - tests/backend/scenarios/test_phase2_scenario_regression_suite.py
   - docs/reviews/eos119_scenario_suite_2026-09-24.md
-session: claude/magical-maxwell-hja5kh-eos134
+session: null
 notes: "출처: EOS-119(P-13) SCENARIO-005 실측 — docs/reviews/eos119_scenario_suite_2026-09-24.md §공백 표. 소유 태스크 검색 결과 0건(검색 범위는 그 문서에 기재).\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/api/coach.py'] → ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/l2/learning_state_machine.py', 'tests/backend/api/test_coach_completion_state_machine.py', 'tests/backend/api/test_eos134_coach_state_machine_integration.py', 'tests/backend/api/test_me_learning_state.py', 'tests/backend/l2/test_learning_state_machine.py', 'tests/backend/api/test_coach_completion_student_work_encryption.py', 'tests/backend/api/test_coach_hint_attribution.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'docs/reviews/eos119_scenario_suite_2026-09-24.md']: 구현 범위 확정 — 공용 진입점(L2)·두 서빙 경로·AST 가드·동치 통합 테스트·시나리오 승격\n\n[정정 2026-09-28] acceptance ①~③ 이행 기록\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/l2/learning_state_machine.py', 'tests/backend/api/test_coach_completion_state_machine.py', 'tests/backend/api/test_eos134_coach_state_machine_integration.py', 'tests/backend/api/test_me_learning_state.py', 'tests/backend/l2/test_learning_state_machine.py', 'tests/backend/api/test_coach_completion_student_work_encryption.py', 'tests/backend/api/test_coach_hint_attribution.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'docs/reviews/eos119_scenario_suite_2026-09-24.md'] → ['src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/l2/learning_state_machine.py', 'tests/backend/api/test_coach_completion_state_machine.py', 'tests/backend/api/test_eos134_coach_state_machine_integration.py', 'tests/backend/api/test_me_learning_state.py', 'tests/backend/l2/test_learning_state_machine.py', 'tests/backend/api/test_coach_completion_student_work_encryption.py', 'tests/backend/api/test_coach_hint_attribution.py', 'tests/backend/api/test_e2e_vertical_slice_integration.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'docs/reviews/eos119_scenario_suite_2026-09-24.md']: backend-migrations 재현이 잡은 관통 테스트 정리(상태 전이 FK)를 작업 범위에 편입"
 updated: 2026-09-28
