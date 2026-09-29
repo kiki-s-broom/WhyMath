@@ -3309,6 +3309,15 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py"
+   ],
+   "text": "start 출력을 | head -80으로 잘라 BrokenPipe 중단 — 경고 이벤트 82줄만 남고 claim 없음·사유 없는 exit 1",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
