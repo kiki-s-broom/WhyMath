@@ -436,6 +436,18 @@ gates:
       - "[2026-09-25] depends_on +EOS-24-recommendation-reads-learning-state — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 재료(EOS-24 판정문 §7-1)를 만든 작업이 EOS-24다(done)"
     depends_on:
       - EOS-24-recommendation-reads-learning-state
+  - id: G-eos37-erasure-kpi-disposition
+    title: "KPI ⑤ 삭제권 잔여 처분 선택(가·나·다) — 삭제 원장 기반 excluded_erased / 삭제 시 추천 이벤트 삭제·익명 tombstone / 현행 유지(하네스 teardown만 조정)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-29
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5·§7-1 P-2(판정 기준 main a82f9449). 선택지는 EOS-37 acceptance ②. PIPA 삭제권 표면이라 기계가 대신 고르지 않는다(CLAUDE.md 법령 유래 절차 기계 대체 금지)"
   - id: G-eos49-content-version-seat
     title: "EOS-49(ConceptVersion 버전 테이블)·EOS-50(Publish Gate) ↔ ARCH-37 핵심 엔티티 동결 충돌 판정 — ARCH-37(#984·09-05)은 ContentVersion을 '좌석 부재'(canonical_entity_model_v1.md §3-D)로 동결하고 검사 ③/③-b(tests/backend/db/test_canonical_entity_model_freeze.py — 예약 이름 content_version·entity_version 금지 + ContentVersion 좌석 tuple 비어 있음 강제)가 그 좌석 테이블을 RED로 막는다. §4-5는 EOS-49를 '기존 좌석의 컬럼 추가이지 새 엔티티가 아니다'로 적었으나, EOS-49 acceptance ①은 VersionHeader를 공유하는 concept_version 버전 테이블 신설(Pydantic+ORM+alembic)이고 acceptance ②(Published=immutable DB 집행)와 EOS-50(publish 전이 검증 파이프라인)은 그 테이블 위에 선다 — 두 정본 중 하나를 고쳐야 착수 가능. 선택지: ①ARCH-37 §5 절차로 ContentVersion 좌석을 9월에 개통(§1·§2 표 + 테스트 상수 + MEMORY 동반 정정 — '9월 스키마에 넣지 않는다' 지시의 예외 승인) ②EOS-49·50을 동결 해제 지점(10월 이후)으로 연기하고 그때 §5 절차 ③EOS-49 ①을 테이블 없는 계약(VersionHeader Pydantic + concept.current_published_version_id 컬럼 + content_hash — ARCH-37 §4-5의 '컬럼 추가' 해석)으로 축소 재정의하고 EOS-50은 ReviewStatus 축 재사용으로 재정의. 출처: canonical_entity_model_v1.md §3-D·§4-5·§5 · 44_eos_version_management.md §6.3·§7 · EOS-49 acceptance ①②③"
     kind: decision
