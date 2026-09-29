@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - ".claude/hooks/git_revert_guard.py"
   - tests/infra/test_git_revert_guard.py
-session: null
+session: claude/magical-maxwell-hja5kh-const10
 notes: "CONST-02 이식 중 발견(2026-09-28). guard_constitution.py 가 json.load(sys.stdin) 으로 훅 입력을 읽어, 한국어 Windows(cp949) 콘솔에서 한글과 '—'가 섞인 명령이 UnicodeDecodeError → except ValueError → '입력 파싱 실패 — 통과'(fail-open)로 샜다(PYTHONIOENCODING=cp949 재현). 같은 형태가 git_revert_guard.py 의 main 입력 해독에 있다 — 이 가드가 막는 것은 미커밋 작업분을 지우는 git 원복(CLAUDE.md 뮤테이션 원복 금지 규칙의 집행 장치)이라, Windows 세션에서 그 보호가 조용히 꺼질 수 있다. 참고: 같은 세션에서 이 가드가 태스크 등재 heredoc 본문의 설명 문구를 명령으로 오판해 막은 일도 있었다(heredoc 본문을 데이터로 분리하지 않음) — 판정 범위 개선 여부는 이 태스크에서 함께 검토한다."
-updated: 2026-09-28
+updated: 2026-09-29
