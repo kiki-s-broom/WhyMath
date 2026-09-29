@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① `l2/learning_state_recommendation.py::_prerequisite_status`의 약점(WEAK) 판정을 `recommendation_contract.is_prerequisite_deficit`(BKT 사전값 0.3 미만)로 교체한다 — EOS-26은 그 판정을 \"(가)와 같은 선 · 같은 입력\"으로 정의했고 EOS-33이 (가)의 선을 0.7에서 사전값으로 옮겼다. EOS-26 단위 테스트의 경계 리터럴(0.69 약점 · 0.70 숙달)은 0.29/0.30으로 바뀌고, 0.30~0.69는 \"측정됐고 결손 아님\"(원인 후보가 아님 → 미측정 선수가 있으면 탐침, 없으면 같은 개념 `refuted`)이 된다.\n\n② 정책 식별자 `cat_v2_state_undiagnosed` → `cat_v3_state_undiagnosed` — 이름표·재선택이 기본 CAT 규칙을 따른다는 전제의 이름이므로 기본 CAT(`cat_v3`)에 맞춘다(소급 평가가 두 규칙을 섞지 않게).\n\n③ 병합 순서 트립와이어 `tests/backend/l2/test_recommendation_policy.py::TestParallelMergeTripwire`의 skip 분기를 지워 상시 불변식 테스트로 승격한다(분류기가 트리에 있는 한 두 좌석의 술어 일치를 단언).\n\n④ S-1 조합 검토(EOS-33 판정문 §8): 오답 원천(`EOS-146`)이 생기면 정보량 최대 출제(정답 ≈ 50%)와 난이도를 모르는 BKT가 만나 모형상 능력과 무관하게 같은 개념 6문항 안 75%가 선수 구간에 든다 — 판정하거나 측정 태스크로 분리한다.\n\n⑤ `scripts/analysis/mutate_eos26_r6_guards.py`의 경계 앵커(0.69·0.70)를 새 술어로 재앵커하고 전건 검출을 다시 확인한다."
-artifacts: []
+artifacts:
+  - "PR #1377 (https://github.com/kiki-s-broom/WhyMath/pull/1377) · 커밋 8c8c0418(분류기 술어 정합·식별자 cat_v3_state_undiagnosed·트립와이어 상시화·하네스 재앵커·EOS-153 분리) · main 병합 00a1071b(EOS-26 포함) 후 헤드 8c8c0418에서 CI 미러 11잡 exit 0(mobile은 Flutter 부재로 CI 판정) + backend-migrations 8스텝 exit 0(통합 458 passed) · 뮤테이션 EOS-26 56/56 · EOS-33 21/21 · 추천정책 25/25 · 래칫 exit 0 차단 7≤7"
 paths:
   - src/backend/whymath_backend/l2/learning_state_recommendation.py
   - src/backend/whymath_backend/l2/recommendation_evidence.py
@@ -23,6 +24,6 @@ paths:
   - scripts/analysis/mutate_eos26_r6_guards.py
   - MEMORY.md
   - docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md
-session: claude/harn-180-424n4m
+session: null
 notes: "출처: EOS-33 판정문 §6·§9(docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md). 정합은 **나중에 착지하는 쪽**이 한다 — EOS-33이 먼저 머지되면 EOS-26 PR(#1338)의 머지 큐 빌드에서 트립와이어가 RED가 되므로 그 PR에서 ①②를 하고, 이 태스크는 그 PR을 증적으로 닫는다(③~⑤는 남으면 이어서). 두 브랜치의 텍스트 병합은 충돌 0건이라(2026-09-29 임시 사본 실측) 트립와이어가 없으면 이 틈은 조용히 main에 들어간다.\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'src/backend/whymath_backend/l2/recommendation_evidence.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/l2/test_recommendation_policy.py', 'scripts/analysis/mutate_eos26_r6_guards.py'] → ['src/backend/whymath_backend/l2/learning_state_recommendation.py', 'src/backend/whymath_backend/l2/recommendation_evidence.py', 'tests/backend/l2/test_learning_state_recommendation.py', 'tests/backend/l2/test_recommendation_policy.py', 'scripts/analysis/mutate_eos26_r6_guards.py', 'MEMORY.md', 'docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md']: EOS-151 집행이 실제로 닿은 문서 2건을 더한다(기존 5건 유지). 정책 결정이라 MEMORY 결정 로그를 남겼고, EOS-26 판정문의 경계(0.7)와 식별자가 바뀌어 판정문 끝에 후속 정정 절(§10)을 덧붙였다."
 updated: 2026-09-29
