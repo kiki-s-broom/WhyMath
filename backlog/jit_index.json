@@ -2416,6 +2416,18 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*sibling*claim*.py"
+   ],
+   "text": "S4-11 재착수 — done이 claim을 놓은 뒤 done 기록 push 전 46분 공백에 서브에이전트가 같은 슬라이스를 구현",
+   "weight": 3
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-26",
    "paths": [
     ".github/workflows/ci.yml",
