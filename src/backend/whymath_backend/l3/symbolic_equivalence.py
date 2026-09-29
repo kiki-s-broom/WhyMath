@@ -17,6 +17,7 @@ canonical/CAS 정규화가 아니다(Part 4 항목4·`math_dsl_part4_ast_review.
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -25,11 +26,15 @@ import sympy
 from sympy.parsing.sympy_parser import (
     convert_xor,
     implicit_multiplication,
-    parse_expr,
     standard_transformations,
 )
 
+from whymath_backend.l3.safe_parse import ensure_within_budget, safe_parse_expr
 from whymath_backend.schema.verification_capabilities import EquivalenceOutcome
+
+# 침묵 실패 금지(CLAUDE.md) — 파싱·계산 실패를 parse_error로 접을 때 예외 *타입명*을 남긴다
+# (학생 식은 로그에 싣지 않는다 — 미성년 PII).
+logger = logging.getLogger("whymath.l3.symbolic_equivalence")
 
 # 유니코드 위첨자 → SymPy 거듭제곱(소스 정규화). caret(^)은 convert_xor가 처리하고,
 # 위첨자는 파서가 못 읽으므로(→ SympifyError) 파싱 전에 치환해야 한다. 학생 손글씨·MathLive
@@ -233,8 +238,11 @@ def _parse(src: str) -> sympy.Expr:
 
     `sympify(convert_xor=True)`를 대체한다 — `2x`·`(x+1)(x-1)` 같은 계수 병치를 학생/LLM이 흔히
     쓰므로 파싱 단계에서 explicit `*`로 접는다(입력 정규화·Parsing 경계이지 canonical/CAS 아님).
+
+    CONST-09: 학생 식이 곧바로 닿는 자리라 안전 진입점(`safe_parse_expr`)을 거친다 — `9^9^9`·
+    전개 폭발·허용 밖 이름(`exec` 등)은 여기서 거부되고 호출부가 parse_error로 접는다.
     """
-    return parse_expr(src, transformations=_PARSE_TRANSFORMS)
+    return safe_parse_expr(src, transformations=_PARSE_TRANSFORMS)
 
 
 def to_sympy_source(raw: str) -> str:
@@ -309,12 +317,14 @@ def identity_status_detail(lhs: str, rhs: str) -> IdentityDetail:
     try:
         left = _parse(lhs_src)
         right = _parse(rhs_src)
-        diff = sympy.sympify(left - right)
+        # 계산 후 재검사 — 두 변을 빼서 합친 식도 예산(차수·전개 항 수) 안이어야 전개·단순화한다.
+        diff = ensure_within_budget(left - right)
         expanded = sympy.expand(diff)  # 다항식은 전개가 완전한 정규형(항등식이면 0).
         is_zero = sympy.simplify(diff).is_zero  # 비다항 항등식(삼각 등)까지 보강 판정.
         is_poly = bool(diff.is_polynomial())  # 다항식이면 전개 0-여부로 결정 가능.
         same_symbols = left.free_symbols == right.free_symbols
-    except Exception:  # noqa: BLE001 — 파싱·계산 실패는 보수적으로 parse_error(위장 금지)
+    except Exception as exc:  # noqa: BLE001 — 파싱·계산 실패는 보수적으로 parse_error(위장 금지)
+        logger.debug("identity_status 보수 회피(parse_error): %s", type(exc).__name__)
         return IdentityDetail(IdentityVerdict.parse_error)
 
     if expanded == 0 or is_zero is True:
