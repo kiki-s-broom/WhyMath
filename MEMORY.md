@@ -11551,3 +11551,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **사고 대장**: `parallel-duplicate-implementation` 11회차(이 브랜치 기준)로 EOS-137 실현분만 기록했다. EOS-129분은 HARN-186·187 브랜치의 기록과 겹치지 않게 따로 적지 않았다.
 - **남은 판단(Kiki)**: EOS-129 ⑤의 게이트가 셋이다 — main의 `G-eos129-prod-response-distribution`(SQL 런북) · #1346의 `G-eos129-item-response-census`(도구·가드 런북) · #1358의 같은 ID 다른 정의(dry-run CLI). HARN-187 판정문은 #1346을 상위 집합으로 봤다(읽어서 그렇게 보인다 — 실행 대조 없음). 하나로 정리해야 한다. EOS-137을 다시 구현 중인 세션은 중단을 권한다.
 - **교훈**: 게이트를 붙인 직후의 `unblock`은 다른 세션에게 "대기"가 아니라 "빈 자리"로 읽힌다. HARN-186이 집행되기 전까지는 게이트 부착이 trunk에 닿기 전에 claim을 반납하지 않는다(사람 규율).
+
+### 2026-09-29 — EOS-129 ⑤ 운영 실측 완료: a 추정 가능 문항 0건 → 2PL 배선은 데이터 축적 대기 — 판정 기준 main `9308cf4c`
+
+- **실측**(Kiki 머신 운영 DB `whymath-pg`:5433 · 런북 `docs/ops/eos129_prod_response_distribution_runbook.md` 그대로 · 읽기 전용): problem 1703건 · 채점 응답 80건 · 응답 있는 문항 80건 · 응답 학생 1명. 문항당 응답 구간은 `1-4`건에 80문항, 5건 이상 문항은 0건.
+- **판정**: b 보정 최소선(`_MIN_RESPONSES_FOR_CALIBRATION = 5`)을 넘는 문항조차 0건이므로 변별도 a 추정 가능 문항은 0건이다. PR #1358의 ③ 배선은 a=1.0 폴백으로 휴면하고, 폴백 비율 리포트가 그 사실을 말한다. EOS-129의 실효는 **데이터 축적 대기**다(acceptance ⑤가 예고한 결론).
+- **재측정 조건**: 날짜가 아니라 데이터다 — 운영 학생 응답이 쌓여 5건 이상 문항이 생기면 `python -m whymath_backend.l2.calibrate_items --dry-run --json`(`WHYMATH_DATABASE_URL` 5433 지정)으로 다시 잰다. 그 조건이 충족됐는지 알리는 자동 트리거는 아직 없다.
+- **미조사(추정 금지)**: 응답 학생 1명의 출처(시연·개발 계정 여부)는 조사하지 않았다. 운영 학생 데이터가 아직 사실상 없다는 것은 실측 표가 말하는 범위(80건·1명)까지만 주장한다.
+- **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
+- **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).
