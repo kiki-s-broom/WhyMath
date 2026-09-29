@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/config.py
   - src/backend/whymath_backend/app.py
   - tests/backend/l3/test_cloud_provider_selector.py
-session: null
+session: claude/gallant-euler-blngpj
 notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 1절·5절. 판정 기준: main d10ba109.\n\n이 태스크에서 새로 짜는 클라우드 코드는 없다 — Kiki가 지정한 네 조건(OpenRouter·특정 공급사·US·fp8)이 config.py에 이미 구현·동결돼 있다(openrouter_model_mid=deepseek/deepseek-v4.1-flash · openrouter_allowed_providers=(deepinfra,) · provider.only + allow_fallbacks=false + data_collection=deny 3종 계약). 바꾸는 것은 기본값 한 줄이고, 그것이 ARCH-55 판정문이 못박은 값이라 코드 변경이 아니라 판정 번복이다.\n\n적용 범위는 저작 경로와 학생 대면 양쪽이다 — 2026-09-21 Kiki 2회 확인.\n\n[정정 2026-09-28] depends_on 제거 1건: 2026-09-28 Kiki 결정: Anthropic 중단 기간에도 컷오버 착수 허용 — 보류 태스크(ARCH-63)에 승인된 작업이 잠겨 있던 결함 해소"
-updated: 2026-09-28
+updated: 2026-09-29
