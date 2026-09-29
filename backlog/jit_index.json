@@ -3131,7 +3131,8 @@
    "ref": "2026-09-22",
    "paths": [
     "scripts/harness/ci_mirror.py",
-    "tests/harness/**"
+    "tests/harness/**",
+    "tests/infra/test_ci_mirror.py"
    ],
    "text": "CI 미러가 선언 없는 스텝에도 pipefail을 걸어 거짓 실패 — stdout 미보존으로 원인 불명",
    "weight": 1
@@ -3322,6 +3323,16 @@
     "tests/harness/*.py"
    ],
    "text": "하루에 태스크 번호 충돌 2건 — 등재한 HARN-185·186을 다른 세션 미머지 PR이 먼저 머지해 개명(191·193)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red(push 전 검출)",
    "weight": 1
   },
   {
