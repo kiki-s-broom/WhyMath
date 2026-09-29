@@ -388,11 +388,11 @@ gates:
     title: "EOS-129 ⑤ 운영 DB 문항당 응답 수 분포 실측 — 변별도 a를 추정할 만큼 응답이 쌓인 문항이 몇 건인지(읽기 전용 SELECT · 런북 docs/ops/eos129_prod_response_distribution_runbook.md · 결과 표 2개를 세션에 전달)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 머신 운영 DB(whymath-pg, 5433) 읽기 전용 실측(2026-09-29, 런북 docs/ops/eos129_prod_response_distribution_runbook.md 그대로). 판정 기준: main 9308cf4c. 표1: problems=1703, graded_attempts=80, items_with_responses=80, students=1. 표2: 구간 '2: 1-4' 80문항 · 5건 이상 문항 0건. 판정: a 추정 가능 문항 0건(b 보정 최소 5건도 0건) — EOS-129 ③ 2PL 배선은 휴면, 데이터 축적 대기. 응답 학생은 1명뿐(출처 미조사)."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "Kiki 머신 운영 DB(whymath-pg) 읽기 전용 실측 — 클라우드 세션은 운영 DB에 닿을 수 없다"

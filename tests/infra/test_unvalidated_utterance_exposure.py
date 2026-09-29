@@ -76,7 +76,13 @@ _UTTERANCE_FIELD = "prompt"  # 학생 대면 발화 본문 필드(ARCH-59와 같
 
 # 2026-09-19 실측 baseline — `filter_tone`을 *호출*하는 프로덕션 모듈 전수.
 # 재수출(`l4/__init__.py`)·docstring 언급은 호출이 아니므로 대상이 아니다.
-_TONE_GATE_SEATS = frozenset({"harness/wh1_primary.py", "l4/polya/engine.py"})
+# S4-11(2026-09-29) 의도적 추가 1건 — `l4/hint_content/gates.py`: 오프라인 생성 graded 힌트의
+# 게이트 C(정서 톤). **LLM 발화 좌석이 아니다**(템플릿 생성·LLM 0) — 톤필터를 *치환*이 아니라
+# *거부* 판정으로 쓰고, 그 판정이 verified=false로 이어지는지는 절 A·E 대신
+# `tests/backend/l4/hint_content/test_gates.py`(부정 톤 주입 → 거부·대조군 통과)가 동결한다.
+_TONE_GATE_SEATS = frozenset(
+    {"harness/wh1_primary.py", "l4/polya/engine.py", "l4/hint_content/gates.py"}
+)
 
 # 2026-09-19 실측 baseline — 정책 명시 발화를 억제하는 verdict 집합(§3.4).
 # 줄어들면 LLM이 정답을 실어 보낼 수 있는 턴이 늘어난다.
