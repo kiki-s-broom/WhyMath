@@ -930,8 +930,9 @@ def top_p_seat_precheck(
       ⓑ 좌석이 anthropic이다 — openrouter·로컬(ollama)은 둘의 동시 지정을 받는다.
       ⓒ 이 회차가 실제로 클라우드에 닿는다 — LOCAL 강제 회차의 top_p는 Ollama로 간다.
 
-    ⓑ만 보고 막으면 **기본 좌석이 anthropic이라 로컬 회차 전부가 막힌다**(`config.py`의
-    `cloud_provider` 기본값). 그래서 ⓒ가 대조군 축으로 반드시 함께 있어야 한다.
+    ⓑ만 보고 막으면 **좌석을 anthropic으로 둔 배치에서 로컬 회차 전부가 막힌다**(ARCH-64 이전에는
+    그것이 `config.py`의 `cloud_provider` 기본값이었다 — 지금 기본은 openrouter). 그래서 ⓒ가
+    대조군 축으로 반드시 함께 있어야 한다.
     """
     if top_p is None or seat != _ANTHROPIC_SEAT:
         return None

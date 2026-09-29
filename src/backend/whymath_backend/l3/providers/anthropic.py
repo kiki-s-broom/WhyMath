@@ -48,9 +48,9 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, ClassVar, Protocol, cast, runtime_checkable
 
-from whymath_backend.config import Settings, get_settings
+from whymath_backend.config import CloudSeat, Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers._response_fields import read_response_model_id
@@ -292,6 +292,11 @@ class AnthropicProvider:
     generate()는 *명확한 오류*를 던진다 — 라우터가 정당한 이유로 클라우드를 택했으므로
     조용한 LOCAL 강등은 하지 않는다(가용성보다 정확성이 먼저인 경로 — CLAUDE.md #3).
     """
+
+    # 이 제공자가 앉는 클라우드 좌석 이름(ARCH-64) — `CompositeProvider.cloud_seat`가 읽어
+    # 기록 원가를 **실제로 꽂힌 좌석**의 단가로 계상하게 한다. 값은 `build_cloud_provider()`가
+    # 이 클래스를 만드는 셀렉터 값과 같아야 한다(`test_cloud_mid_seat_cutover.py`가 대조한다).
+    seat: ClassVar[CloudSeat] = "anthropic"
 
     def __init__(
         self,

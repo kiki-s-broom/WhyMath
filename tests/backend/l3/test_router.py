@@ -999,10 +999,13 @@ class TestCloudSeatPriceAxis:
         assert anthropic_krw / openrouter_krw == pytest.approx(24.36, rel=1e-3)
 
     def test_default_seat_is_serving_seat_not_selector(self) -> None:
-        """좌석 생략 = 학생 대면 서빙 좌석(anthropic) — 기존 호출부의 뜻이 보존된다.
+        """좌석 생략 = `SERVING_CLOUD_SEAT`(anthropic) — 좌석을 말하지 않은 호출부의 종전 뜻 보존.
 
-        `settings.cloud_provider`를 읽지 않는 것이 의도다(그 셀렉터는 저작 경로 전용).
-        읽었다면 저작 좌석 변경이 학생 예산 판정까지 조용히 바꾼다.
+        ARCH-64 이후 이 상수는 "학생 대면 서빙 좌석"이 **아니다** — 학생 대면도 팩토리 경유라
+        서빙 좌석은 셀렉터(기본 openrouter)를 따르고, 파이프라인 원가 기록은 꽂힌 provider의
+        좌석(`pipeline.served_cloud_seat`)을 명시해 넘긴다(`test_cloud_mid_seat_cutover.py`).
+        이 순수 함수들이 `settings.cloud_provider`를 **읽지 않는 것**은 여전히 의도다 — 읽으면
+        좌석이 프로세스 설정에 숨어 호출부가 어느 단가로 기록되는지 못 본다.
         """
         assert SERVING_CLOUD_SEAT == "anthropic"
         usage = Usage(input_tokens=1000, output_tokens=1000, latency_ms=None)
