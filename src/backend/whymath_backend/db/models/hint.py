@@ -9,8 +9,9 @@
 **연기 해제 근거(MEMORY 2026-07-08 "Phase 6b = HintNode Persistence 연기")**: 그때 이 테이블을
 만들지 않은 이유는 writer 0·reader 0(dead code)였고, 도입 전제는 ① generation ② validation
 ③ serving 중 실 writer+reader가 함께 실재하는 것이었다. 이 슬라이스가 셋을 한 번에 세운다 —
-writer = `l4/hint_content/populate.py`(오프라인 생성 CLI) → `store.write_hints`, validation =
-`l4/hint_content/gates.py`(게이트 3종), reader = `store.find_served_hint` ← `api/coach.py` 세션 2경로.
+writer = `l4/hint_content/populate.py`(오프라인 생성 CLI) → `store.write_hints`,
+validation = `l4/hint_content/gates.py`(게이트 3종), reader = `store.find_served_hint`
+← `api/coach.py` 세션 2경로.
 그때 적어 둔 미러 선례도 그대로 승계한다: 구조 = `curriculum_entry.py`(string PK·느슨참조
 가능), payload = `verified_solution.py`(JSONB). 그때 "`SolutionPath` 실테이블 부재 → FK 금지"였던
 전제는 S4-09가 `solution_paths`를 세우며 해소됐으므로 이제 FK를 건다(아래).
@@ -38,7 +39,9 @@ writer = `l4/hint_content/populate.py`(오프라인 생성 CLI) → `store.write
   - `generator_version` TEXT NOT NULL — 어떤 템플릿 판이 만든 본문인지(재현·재생성 추적).
     yaml `generated_by_tier`(LLM 티어)는 **두지 않는다** — 이 생성기는 LLM 호출 0(템플릿)이라
     항상 NULL인 죽은 컬럼이 된다. LLM 생성 경로가 생기면 그때 라우터 결정과 함께 더한다.
-  - `created_at`·`updated_at` TIMESTAMPTZ NOT NULL default now() — 재생성 시 updated_at 갱신.
+  - `created_at`·`updated_at` TIMESTAMPTZ NOT NULL default now() — `updated_at`은 ORM
+    `onupdate=now()`로 **UPDATE가 실제로 일어날 때만** 갱신된다(writer가 손으로 대입하지 않는다 —
+    내용이 같으면 UPDATE도 없으니 '두 번 실행' 시 값이 그대로다).
 
 인덱스: `idx_hints_serving (problem_id, level, step_order)` — coach reader가 "이 문제·이 레벨·
 이 단계 이후 첫 검수 힌트"를 찾는 접근 패턴 그대로. `uq_hints_step_level` — 한 단계·한 레벨에
@@ -126,8 +129,12 @@ class Hint(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
+    # UPDATE 시에만 ORM이 갱신(onupdate) — writer 코드의 수동 대입 없음(모듈 docstring).
     updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
     )
 
     __table_args__ = (

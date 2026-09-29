@@ -64,9 +64,7 @@ GENERATOR_VERSION = "s4-11-template-v1"
 """오프라인 템플릿 생성기 판 — 본문 템플릿을 바꾸면 올린다(재생성 추적)."""
 
 
-def disclosure_tier(
-    *, concept_names: bool, step_flow: bool, partial_computation: bool
-) -> int:
+def disclosure_tier(*, concept_names: bool, step_flow: bool, partial_computation: bool) -> int:
     """노출 플래그 → 최고 노출 단계(0~3). 누적 척도라 가장 깊은 노출이 단계를 정한다."""
     if partial_computation:
         return 3

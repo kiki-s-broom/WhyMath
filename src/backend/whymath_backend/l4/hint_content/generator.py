@@ -104,7 +104,8 @@ class StepSource:
     problem_id: uuid.UUID
     step_order: int
     step_contents: tuple[str, ...]
-    sympy_verified: bool
+    # 직전 단계 → 이 단계 전이가 기계 검증을 통과했는가(`problem_step.sympy_verified` 승계).
+    transition_verified: bool
     concept: ConceptRef | None
 
     @property
@@ -172,7 +173,8 @@ def _partial_text(source: StepSource) -> str:
         parts.append(f"{k - 1}번째 단계까지 정리한 식은 다음과 같아: {contents[k - 2]}")
         parts.append(f"이것을 한 번 바꾸면 {k}번째 단계의 식이 돼: {contents[k - 1]}")
     parts.append("왜 이렇게 바뀌는지 근거를 말해 줄 수 있을까? 그다음 단계는 네가 이어 가 보자.")
-    return " ".join(parts)
+    # 식이 문장 중간에 조사 없이 끼지 않도록 줄 단위로 잇는다(식은 각 줄의 끝에만 온다).
+    return "\n".join(parts)
 
 
 def _draft(
@@ -214,7 +216,8 @@ def generate_step_hints(source: StepSource) -> StepGeneration:
     """한 단계의 L1~L3 초안을 만든다(순수·결정론·LLM 0).
 
     건너뜀(사유를 반드시 남긴다):
-      - 단계가 sympy_verified가 아니면 레벨 전부(`SKIP_UNVERIFIED_STEP`).
+      - 단계 전이가 검증되지 않았으면(`transition_verified` False) 레벨 전부
+        (`SKIP_UNVERIFIED_STEP`).
       - 개념이 없으면 L1(`SKIP_NO_CONCEPT`) — 개념 이름 힌트를 개념 없이 만들 수 없다.
       - 마지막 단계면 L3(`SKIP_FINAL_STEP_PARTIAL`) — 마지막 전이의 시연 = 전체 풀이(Level 4).
     단계 order가 경로 밖이면 ValueError — 원천 조립 결함이지 건너뛸 사유가 아니다.
@@ -223,7 +226,7 @@ def generate_step_hints(source: StepSource) -> StepGeneration:
     n = source.total_steps
     if not 1 <= k <= n:
         raise ValueError(f"step_order={k}가 경로 단계 범위 [1, {n}] 밖이다 — 원천 조립 결함")
-    if not source.sympy_verified:
+    if not source.transition_verified:
         return StepGeneration(
             drafts=(),
             skipped=tuple((level, SKIP_UNVERIFIED_STEP) for level in (1, 2, 3)),

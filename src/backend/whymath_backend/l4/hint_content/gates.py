@@ -216,7 +216,7 @@ def check_answer_leakage(hint: Hint, ctx: GateContext) -> GateVerdict:
     """게이트 B — `detect_answer_leakage` 재사용(leaked 거부·정답 원천 부재 거부)."""
     if ctx.final_answer is None:
         return _verdict(
-            ["정답 원천이 없어 누출을 판정할 수 없다(fail-closed — 판정 불가를 통과로 두지 않는다)"],
+            ["정답 원천이 없어 누출을 판정할 수 없다(fail-closed — 판정 불가 ≠ 통과)"],
             {"verdict": "not_run"},
         )
     verdict = detect_answer_leakage(hint.content, ctx.final_answer)

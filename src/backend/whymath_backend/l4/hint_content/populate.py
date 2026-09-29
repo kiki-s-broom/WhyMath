@@ -75,7 +75,7 @@ def build_path_hints(path: PathInput) -> PathHints:
             problem_id=path.problem_id,
             step_order=order,
             step_contents=path.step_contents,
-            sympy_verified=verified,
+            transition_verified=verified,
             concept=concept,
         )
         generation = generate_step_hints(source)

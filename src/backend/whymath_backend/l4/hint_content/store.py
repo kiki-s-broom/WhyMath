@@ -10,7 +10,8 @@ baseline에 이 파일 1줄이 느는 대신 그 테이블의 접근점은 영�
   - 경로·단계 읽기는 L3 `solution_path_store`를 **다운콜**한다(경로 읽기 단일 표면 — 재구현
     금지). L4→L3 방향이라 계층 계약 그대로다.
   - 개념: 단계 `concept_node_id` → `concept_node.name_ko`(사람 검수로 채워진 단계 개념). 없으면
-    문제 대표 개념(`l2.mastery_tracking.get_primary_concept_id` 재사용 — PRIMARY→TESTED) →
+    문제 대표 개념(`l2.get_primary_concept_id` 재사용 — PRIMARY→TESTED ·
+    `api/coach.py`와 같은 공개 export 경유 — 숙달 *writer* 모듈은 임포트하지 않는다) →
     `concept.code`·`name_ko`. 둘 다 없으면 None(L1을 만들지 않는다 — 날조 금지).
   - 정답: `problem.answer`를 **들고 넘기기만** 한다(게이트 B의 판정 함수로 — EOS 불투명 페이로드
     원칙: Core는 이 값을 해석하지 않는다).
@@ -38,7 +39,6 @@ import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -48,7 +48,7 @@ from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.concept_node import ConceptNode
 from whymath_backend.db.models.hint import Hint as HintORM
 from whymath_backend.db.models.problem import Problem
-from whymath_backend.l2.mastery_tracking import get_primary_concept_id
+from whymath_backend.l2 import get_primary_concept_id
 from whymath_backend.l3.solution_path_store import (
     get_solution_path,
     get_solution_path_steps,
@@ -269,10 +269,10 @@ async def write_hints(
     """힌트를 멱등 upsert하고, 처리한 경로에서 사라진 기존 힌트를 은퇴시킨다(flush만).
 
     commit은 호출자(`persist_generation`) — 저장소 패턴. 내용 동일 행은 건드리지 않는다
-    (updated_at도 그대로 — '두 번 실행' 시 결과가 같아야 한다).
+    (updated_at도 그대로 — '두 번 실행' 시 결과가 같아야 한다). `updated_at`은 이 모듈이 대입하지
+    않는다 — ORM `onupdate`가 UPDATE 발생 시에만 갱신한다(내용 변경 = UPDATE = 갱신이 한 축).
     """
     counts = HintWriteCounts()
-    now = datetime.now(UTC)
     ids = [hint.hint_id for hint in hints]
     existing: dict[str, HintORM] = {}
     if ids:
@@ -290,7 +290,6 @@ async def write_hints(
             continue
         for key, value in columns.items():
             setattr(row, key, value)
-        row.updated_at = now
         counts.updated += 1
 
     path_ids = sorted(set(processed_path_ids))
@@ -311,7 +310,6 @@ async def write_hints(
                 _RETIRED_KEY: "재생성에서 더는 만들어지지 않아 서빙에서 내림(삭제 아님)",
                 "passed": False,
             }
-            row.updated_at = now
             counts.retired += 1
     await session.flush()
     return counts

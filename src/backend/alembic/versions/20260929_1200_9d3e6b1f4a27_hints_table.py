@@ -53,9 +53,7 @@ def upgrade() -> None:
         sa.Column("level", sa.SmallInteger(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("socratic_category", sa.Text(), nullable=True),
-        sa.Column(
-            "reveals_concept_names", sa.Boolean(), server_default=sa.false(), nullable=False
-        ),
+        sa.Column("reveals_concept_names", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("reveals_step_flow", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column(
             "reveals_partial_computation",
