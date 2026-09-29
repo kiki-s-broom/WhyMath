@@ -1191,6 +1191,13 @@ jobs:
       - name: 게이트 — 런북 쓰기 블록 자가거부 가드 (HARN-106)
         run: python3 scripts/ops/check_runbook_blocks.py
 
+      # HARN-115 — 런북 붙여넣기 블록 자기완결성(라벨·절대 경로 cd·세션 변수·DB 목적지)과
+      # Read-Host 손상. 위 HARN-106과 같은 이유로 이 잡에 붙인다(docs만 바뀐 PR에서도 돈다).
+      # DB 도달 판정이 백엔드 소스를 **텍스트(AST)로** 읽으므로 백엔드 설치는 불요하다.
+      # 변별력은 `tests/infra/test_runbook_block_self_containment.py`의 입력 뮤테이션이 봉인한다.
+      - name: 게이트 — 런북 붙여넣기 블록 자기완결성 (HARN-115)
+        run: python3 scripts/ops/check_runbook_self_containment.py
+
       # EOS-108 — 숙달 단일 쓰기 경로 AST 전수 스캔. 이 잡에 붙이는 이유: 스캐너가 stdlib만
       # 쓰고 백엔드 소스를 *텍스트로* 읽으므로 백엔드 설치가 불요하며, 이 잡은 `needs: changes`
       # 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — 우회 경로는 정확히 "숙달과 무관해 보이는"
