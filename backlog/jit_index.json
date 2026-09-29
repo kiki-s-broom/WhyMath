@@ -2607,6 +2607,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_mirror*.py"
+   ],
+   "text": "CONST-09 안전 파서가 파싱 비용 2배 — CI backend 잡 35분 상한 소진(pytest 99%에서 cancelled), 로컬 미러는 통과 표시",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-30",
    "paths": [
     "src/backend/pyproject.toml"
@@ -4196,6 +4206,19 @@
     "tests/harness/**"
    ],
    "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄 기록(EOS-30 병합 재검증)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    ".gitattributes",
+    "backlog/incidents.ndjson",
+    "scripts/harness/incidents.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_incidents.py"
+   ],
+   "text": "PR #1380 main 병합에서 사고 대장 충돌 — main이 날짜순 중간 삽입 6줄이라 끝 추가 합집합 단언 실패",
    "weight": 0
   },
   {

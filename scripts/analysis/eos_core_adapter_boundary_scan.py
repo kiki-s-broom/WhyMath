@@ -97,6 +97,14 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "l3.generation_seed": ("CORE", "생성 재현 seed 정책 — 경로별 지원·값 추출(과목 무관)"),
     "l3.equivalent": ("ADAPTER", "수식 동치 판정·정규화 — doc-100 Adapter 'equation equivalence'"),
     "l3.symbolic_equivalence": ("ADAPTER", "기호 조작 — doc-100 'symbolic manipulation'"),
+    "l3.safe_parse": (
+        "MIXED",
+        "SymPy 파싱 단일 안전 진입점(R22-03·CONST-09) — 예산 골격(길이·문자·중첩·크기 상한)은 "
+        "입력 안전 일반이나 허용 식별자·지수·차수 규칙은 SymPy 전제. 이미 sympy를 직접 쓰던 MIXED "
+        "모듈(l3.dsl·l3.pregenerate)도 호출하므로 ADAPTER로 두면 그 경유 CORE 전이 도달 ~20건이 "
+        "*새로 보인다* — 새 의존이 아니라 기존 sympy 직접 의존의 가시화다. 가르기(과목 중립 예산 ↔ "
+        "SymPy 파서 결합)는 MIXED 해소 경로를 따른다",
+    ),
     "l3.verifier": ("ADAPTER", "모듈 스스로 '통합 *수학* 검증기 v2'로 자인"),
     "l3.verify_answer_form": (
         "ADAPTER",

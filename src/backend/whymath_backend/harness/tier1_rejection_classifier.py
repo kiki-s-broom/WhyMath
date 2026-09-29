@@ -74,6 +74,7 @@ from whymath_backend.harness.needs_review_worklist import (
     ReviewQueueEntry,
     load_review_queue_jsonl,
 )
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import (
     _parse_condition,  # 게이트와 같은 파서 — 표기 drift 0(counterexample_fuzz 선례)
     verify_answer,
@@ -394,7 +395,8 @@ def classify_entry(entry: ReviewQueueEntry) -> RowClassification:
         return _undecidable(row, "claimed_missing", f"answer_map에 변수 {var}의 값이 없다")
     row.claimed = claimed_text
     try:
-        claimed = sympy.sympify(claimed_text, convert_xor=True)
+        # CONST-09: 주장값은 LLM 생성물(신뢰 입력 아님) — 안전 진입점으로 파싱한다.
+        claimed = safe_sympify(claimed_text)
     except Exception as exc:  # noqa: BLE001
         logger.debug("tier1_rejection_classifier 주장값 회피: %s", type(exc).__name__)
         return _undecidable(row, "claimed_unparseable", f"주장값 파싱 불가 {type(exc).__name__}")
