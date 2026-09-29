@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 실측 고정 — SessionStart 브리핑(HARN-47 고립 브랜치 관측)이 `claude/whymath-ai-content-design-vafylb`(head `b1218739`)를 \"(참고) 이미 포팅됨 — 원본 정리만 필요, 결정 불요\"로 분류한다. 근거로 노출되는 커밋은 `9905fdc4`(2026-08-03 · #683)인데, 이 커밋은 **그 브랜치 자신의 이력 안에 있는 앞선 머지분**이다(`git merge-base --is-ancestor 9905fdc4 origin/claude/whymath-ai-content-design-vafylb` 참). 브랜치는 그 뒤 `f4c6f69c`(2026-08-09 · 강등전 리포트 출력의 cp949 크래시 해소)로 같은 파일 `src/backend/whymath_backend/harness/residue_gate_demotion_battle.py`를 다시 고쳤고, 그 변경은 main에 없다 — main판은 출력·도움말 줄 16곳에 U+2014가 남아 있고 stdout 재구성도 없다(브랜치판 0곳). 그런데 `remote_claims._find_ported_evidence()`는 근거 커밋이 건드린 **파일 경로**와 브랜치 코드 파일의 교집합만 세므로 1/1 전건 착지(`is_full_port=True`)로 판정한다. 재현: `PYTHONDONTWRITEBYTECODE=1 python3 -c` 로 `_find_ported_evidence(Path('.'), 'origin/main', 'claude/whymath-ai-content-design-vafylb', 'origin/claude/whymath-ai-content-design-vafylb')` 호출 → landed 1 / total 1. 같은 오분류 계열 3회차다(2026-08-11 40xspg — 문서 커밋 근거 · 2026-08-30 7n9n72 #770 — 다른 파일을 옮긴 커밋 근거 → HARN-37이 파일 교집합으로 막음 · 이번 — 같은 파일을 옮겼지만 **그 뒤의 변경은 안 옮긴** 커밋 근거).\n② 판정 정정 — 파일을 \"착지\"로 세는 조건에 시간 축을 넣는다: 근거 커밋 이후 브랜치가 그 파일을 다시 고친 커밋이 있으면(`git log <근거>..<브랜치> -- <파일>`이 비어 있지 않으면) 그 파일은 착지가 아니다. 근거 커밋이 브랜치의 조상(브랜치 자신의 앞선 머지분)인 경우를 특히 다룬다. 대안(파일별 브랜치 고유 줄이 트렁크에 전부 있는가 — 내용 대조)을 검토하고 택일 근거를 적는다. 오탐(잘못된 \"결정 불요\")이 미탐보다 위험하다는 기존 docstring 원칙을 유지한다.\n③ 변별력 — 픽스처: ⓐ 근거 커밋 후 브랜치가 같은 파일을 다시 수정 → 부분 착지(결정 불요 아님) ⓑ 근거 커밋이 브랜치의 마지막 수정보다 뒤 → 전건 착지 유지(대조군 — 이것이 없으면 \"근거 커밋이 있으면 전부 부분\"이라는 과잉 수정이 통과한다) ⓒ 코드 파일 0개 브랜치(0/0) → 현행 유지 ⓓ 분모 산출 실패 → 현행대로 판정 불가. 시간 축 검사를 되돌리는 뮤테이션이 ⓐ에서 RED인지 확인하고, 주입 실재·원복 바이트 동일을 단언한다.\n④ 집행 지점(정본화와 별항) — 착지 후 SessionStart 브리핑의 \"(참고) 이미 포팅됨\" 목록에서 `vafylb`가 빠지고(잔여가 흡수되기 전까지) \"부분 착지 — 잔여분 확인 필요\" 쪽으로 옮겨 가는지 브리핑 출력으로 확인한다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1393"
 paths:
   - scripts/harness/remote_claims.py
   - tests/harness/test_remote_claims.py
-session: claude/exciting-wozniak-3mw0xw
+session: null
 notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 세션 재개 브리핑이 vafylb를 \"이미 포팅됨 · 결정 불요\"로 표시했는데, 같은 감사는 그 브랜치를 좌석이 있는 추적 중으로 두고 있었다. 스킬이 요구하는 대로 근거 커밋을 열어 보니, 근거가 브랜치 자신의 앞선 머지분이고 그 뒤 변경이 main에 없었다.\n\n위험: 브리핑은 매 세션 모든 세션에 노출된다. \"결정 불요\"로 표시된 브랜치는 정리 대상으로 읽히므로, 스킬 절차(근거 커밋 확인)를 건너뛴 세션이 삭제 배치에 올리면 cp949 콘솔 출력 수정이 사라진다. 그 축의 좌석은 OPS-53(todo)이고 그 notes가 vafylb를 원 출처로 지목한다.\n\n인접: HARN-37(done · 파일 교집합 도입 — 이번은 그 교집합이 시간 축을 보지 않는 사각) · HARN-17(done · 3분류 도입) · OPS-53(cp949 출력 축 좌석)."
 updated: 2026-09-29
