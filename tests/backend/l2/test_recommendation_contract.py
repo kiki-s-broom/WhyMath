@@ -10,6 +10,8 @@
    생기고, 비는 경로가 규칙을 무력화한다.
 ④ **임계 정본** — 약점 컷 0.7이 두 추천 모듈의 기본값과 *같은 상수*인가. 값이 갈라지면
    "약점"의 정의가 모듈마다 달라진다.
+⑥ **증거 요건**(EOS-33) — 선수 결손 경계(사전값 0.3)와 전진 하한(채점 응답 3개)의 값·술어·
+   운반을 리터럴로 동결한다. 상수를 import한 픽스처는 상수 뮤테이션을 따라 움직인다(MISC-30).
 
 DB·상위 계층 의존 0 — 전부 순수 함수다.
 """
@@ -21,9 +23,13 @@ import typing
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from whymath_backend.l2 import prerequisite_recommendation, weak_concept_recommendation
+from whymath_backend.l2.bkt import BktParameters
 from whymath_backend.l2.recommendation_contract import (
+    ADVANCE_EVIDENCE_MIN_RESPONSES,
+    PREREQUISITE_DEFICIT_CEILING,
     PREREQUISITE_MASTERY_CEILING,
     WEAK_CONCEPT_MASTERY_CEILING,
     LearningContext,
@@ -33,9 +39,13 @@ from whymath_backend.l2.recommendation_contract import (
     RecommendationPolicy,
     RecommendationReason,
     build_reason,
+    demote_to_current_concept,
+    has_advance_evidence,
+    is_prerequisite_deficit,
     no_candidate_reason,
     select_reason_type,
 )
+from whymath_backend.schema.learning_state import REPEATED_FAILURE_THRESHOLD
 
 _CONCEPT = uuid.uuid4()
 
@@ -242,3 +252,108 @@ class TestPolicyProtocolShape:
         rec = Recommendation(reason=no_candidate_reason())
         with pytest.raises(Exception):  # noqa: B017 — pydantic ValidationError
             rec.problem_id = uuid.uuid4()  # type: ignore[misc]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑥ 증거 요건 — 결손 경계·전진 하한 (EOS-33)
+# ──────────────────────────────────────────────────────────────────────────
+class TestEvidenceRequirements:
+    """관계 행위가 콘텐츠를 옮기기 위한 증거 요건 두 개의 **값·술어·운반**을 동결한다.
+
+    경계는 상수를 import하지 않고 리터럴로 밟는다 — 상수를 import한 픽스처는 상수 뮤테이션을
+    따라 움직여 아무것도 잡지 못한다(MISC-30 · 2026-09-18 실측). 근거·기각안은 판정문
+    `docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md`.
+    """
+
+    def test_deficit_ceiling_is_the_bkt_prior_pinned_as_a_literal(self) -> None:
+        """새 수치가 아니라 BKT 사전값이다 — 그리고 그 값을 리터럴로도 못 박는다.
+
+        두 단언이 서로 다른 것을 지킨다. 첫째는 "이 경계는 사전값에서 파생된다"(누가 0.3을 손으로
+        적으면 사전값이 바뀔 때 갈라진다), 둘째는 "사전값이 바뀌면 추천 경계도 함께 움직인다는
+        사실을 조용히 넘기지 않는다"(바뀌면 여기서 멈춰 `policy_version` 상향 여부를 판단한다).
+        """
+        assert PREREQUISITE_DEFICIT_CEILING == BktParameters().p_init
+        assert PREREQUISITE_DEFICIT_CEILING == 0.3
+
+    @pytest.mark.parametrize(
+        ("mastery", "expected"),
+        [
+            (0.0, True),
+            (0.15, True),  # 오답 1회(사전값에서) — 결손의 직접 증거
+            (0.29, True),
+            (0.30, False),  # 경계 자체 — 사전값은 "증거 없음"이지 결손이 아니다
+            (0.50, False),  # 엇갈린 증거
+            (0.69, False),  # 정답 1회(사전값에서 약 0.693) — cat_v2의 비단조 반례
+            (0.70, False),
+            (1.0, False),
+        ],
+    )
+    def test_deficit_predicate_boundary(self, mastery: float, expected: bool) -> None:
+        assert is_prerequisite_deficit(mastery) is expected
+
+    def test_advance_floor_is_pinned_and_equals_the_r5_threshold(self) -> None:
+        """하한 3은 **따로 둔 상수**다 — 그러나 상태 머신 R5의 3과 갈라지면 여기서 멈춘다.
+
+        import로 묶지 않은 이유(계약 주석): R5를 바꾸는 교수학 판단이 기본 CAT의 전진을
+        `policy_version` 변경 없이 바꾸면 안 된다. 두 값을 바꿀 때는 둘 다 의식적으로 바꾼다.
+        """
+        assert ADVANCE_EVIDENCE_MIN_RESPONSES == 3
+        assert ADVANCE_EVIDENCE_MIN_RESPONSES == REPEATED_FAILURE_THRESHOLD
+
+    @pytest.mark.parametrize(
+        ("sample_size", "expected"),
+        [
+            (None, False),  # 레거시 행 — 모른다 ≠ 충분하다
+            (0, False),
+            (1, False),
+            (2, False),  # BKT 기본값에서 정답 2회면 숙달 약 0.92 — 전진 구간이지만 증거는 얇다
+            (3, True),  # 경계 자체 — `>`로 뒤바뀌면 여기서 갈린다
+            (4, True),
+            (40, True),
+        ],
+    )
+    def test_advance_evidence_predicate(self, sample_size: int | None, expected: bool) -> None:
+        reason = build_reason(
+            concept_id=_CONCEPT, mastery=0.95, confidence=0.5, sample_size=sample_size
+        )
+        assert has_advance_evidence(reason) is expected
+
+    def test_floor_reads_the_sample_size_not_the_confidence(self) -> None:
+        """두 축을 섞지 않는다 — 신뢰도가 높아도 표본 수가 없으면, 낮아도 3이면 판정은 표본 수다."""
+        high_confidence = build_reason(
+            concept_id=_CONCEPT, mastery=0.95, confidence=0.9, sample_size=None
+        )
+        low_confidence = build_reason(
+            concept_id=_CONCEPT, mastery=0.95, confidence=0.1, sample_size=3
+        )
+        assert has_advance_evidence(high_confidence) is False
+        assert has_advance_evidence(low_confidence) is True
+
+    def test_sample_size_is_carried_only_on_measured_reasons(self) -> None:
+        """측정이 없으면 표본 수도 없다 — 붙으면 "응답 5개인데 모른다"는 모순이 된다."""
+        measured = build_reason(concept_id=_CONCEPT, mastery=0.9, confidence=0.44, sample_size=4)
+        cold = build_reason(concept_id=_CONCEPT, mastery=None, confidence=0.4, sample_size=5)
+        unmapped = build_reason(concept_id=None, mastery=None, confidence=None, sample_size=5)
+        assert measured.sample_size == 4
+        assert cold.sample_size is None
+        assert unmapped.sample_size is None
+        assert no_candidate_reason().sample_size is None
+
+    def test_negative_sample_size_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="sample_size"):
+            RecommendationReason(
+                type=ReasonType.NEXT_CONCEPT,
+                confidence=0.5,
+                basis=ReasonBasis.MEASURED_MASTERY,
+                concept_id=_CONCEPT,
+                mastery=0.9,
+                sample_size=-1,
+            )
+
+    def test_demotion_keeps_the_sample_size(self) -> None:
+        """정직 강등은 행위만 바꾼다 — 표본 수가 떨어지면 "왜 옮기지 않았나"를 사후에 못 센다."""
+        thin = build_reason(concept_id=_CONCEPT, mastery=0.95, confidence=0.29, sample_size=2)
+        demoted = demote_to_current_concept(thin)
+        assert demoted.type is ReasonType.CURRENT_CONCEPT
+        assert demoted.sample_size == 2
+        assert demoted.mastery == 0.95

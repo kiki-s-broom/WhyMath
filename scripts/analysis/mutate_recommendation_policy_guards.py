@@ -203,9 +203,12 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="M18-mastered-prerequisite-called-blocked",
         path=POLICY,
-        old="        (pair for pair in measured if pair[0] < WEAK_CONCEPT_MASTERY_CEILING),",
+        # EOS-33에서 앵커가 옮겨졌다 — 컷이 `WEAK_CONCEPT_MASTERY_CEILING`(0.7)에서 계약 술어
+        # `is_prerequisite_deficit`(사전값 0.3)로 바뀌었다. 주입(컷 제거)은 그대로다. 경계 수치
+        # 자체의 뮤테이션은 `mutate_eos33_evidence_floor_guards.py`가 잰다.
+        old="        (pair for pair in measured if is_prerequisite_deficit(pair[0])),",
         new="        (pair for pair in measured if True),",
-        axis="약점 컷(EOS-124 나의 근원 — 숙달 선수를 막힌 선수로)",
+        axis="결손 컷(EOS-124 나의 근원 — 숙달 선수를 막힌 선수로)",
     ),
     Mutation(
         name="M19-mastered-successor-kept-open",

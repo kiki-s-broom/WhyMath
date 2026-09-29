@@ -268,7 +268,9 @@ class TestPolicyConformance:
     def test_policy_version_is_declared_by_the_policy_not_the_handler(self) -> None:
         """소급 평가는 "어느 정책이 냈는가"를 알아야 한다 — 핸들러가 붙이면 정책과 갈라진다."""
         # EOS-124: 정렬 재선택으로 선택 규칙이 바뀌었으므로 식별자도 바뀐다(REC-11 규약).
-        assert CatRecommendationPolicy.policy_version == "cat_v2"
+        # EOS-33: 관계 행위에 증거 요건(전진 하한 · 결손 경계)이 붙어 같은 입력에서 다른 문항이
+        # 나가므로 다시 올린다.
+        assert CatRecommendationPolicy.policy_version == "cat_v3"
         assert SuneungRecommendationPolicy.policy_version
 
     def test_learning_context_carries_the_request_axes(self) -> None:
@@ -547,10 +549,10 @@ class TestResolvePolicyIntent:
     async def test_weak_prerequisites_become_reselection_targets_weakest_first(
         self, fakes: Any
     ) -> None:
-        """(가) 측정된 약한 선수 — 가장 약한 것부터 한 개념씩 묶음이 된다."""
+        """(가) 결손 증거가 있는 선수(사전값 0.3 미만) — 가장 약한 것부터 한 개념씩 묶음이 된다."""
         f = fakes(prereqs=[_row(_PREREQ_A, "UC-A"), _row(_PREREQ_B, "UC-B", depth=2)])
         anchor = build_reason(concept_id=_ANCHOR, mastery=0.1, confidence=0.5)
-        intent = await _intent(anchor, {"UC-A": 0.6, "UC-B": 0.2})
+        intent = await _intent(anchor, {"UC-A": 0.25, "UC-B": 0.2})
         assert intent.resolution is IntentResolution.SERVED
         assert intent.reason == anchor  # 근거는 막힌 앵커
         assert intent.reselect_groups == ((_PREREQ_B,), (_PREREQ_A,))
@@ -567,14 +569,60 @@ class TestResolvePolicyIntent:
         assert intent.reason.mastery == 0.12  # 숫자는 그대로
         assert intent.reselect_groups == ()
 
-    async def test_weak_cut_is_the_weak_concept_ceiling_exactly(self, fakes: Any) -> None:
-        """경계 — 0.7은 약점이 아니다(`WEAK_CONCEPT_MASTERY_CEILING` 이상이면 약점 아님)."""
+    async def test_deficit_cut_is_the_bkt_prior_exactly(self, fakes: Any) -> None:
+        """경계 — 0.30은 결손이 아니다(사전값 = 증거 없음). 리터럴로 밟는다(MISC-30).
+
+        EOS-33 이전(`cat_v2`)의 경계는 0.7이었다 — 이 테스트의 옛 이름이
+        `test_weak_cut_is_the_weak_concept_ceiling_exactly`였다.
+        """
         fakes(prereqs=[_row(_PREREQ_A, "UC-A"), _row(_PREREQ_B, "UC-B")])
         anchor = build_reason(concept_id=_ANCHOR, mastery=0.1, confidence=0.5)
-        at_cut = await _intent(anchor, {"UC-A": 0.7, "UC-B": 0.9})
+        at_cut = await _intent(anchor, {"UC-A": 0.30, "UC-B": 0.9})
         assert at_cut.resolution is IntentResolution.REFUTED
-        just_below = await _intent(anchor, {"UC-A": 0.69, "UC-B": 0.9})
+        assert at_cut.reselect_groups == ()
+        just_below = await _intent(anchor, {"UC-A": 0.29, "UC-B": 0.9})
+        assert just_below.resolution is IntentResolution.SERVED
         assert just_below.reselect_groups == ((_PREREQ_A,),)
+
+    @pytest.mark.parametrize("prereq_mastery", [0.50, 0.69])
+    async def test_mixed_evidence_prerequisite_is_not_a_target(
+        self, fakes: Any, prereq_mastery: float
+    ) -> None:
+        """엇갈린 증거의 선수로는 내려가지 않는다 — cat_v2의 비단조를 닫는다(EOS-33 · 판정문 §3-3).
+
+        0.69는 사전값에서 **정답 1회**로 도달하는 값이다(BKT 기본값 약 0.693). `cat_v2`는 이 선수를
+        0.7 미만이라 약점으로 불러, 선수를 맞힌 것이 오히려 그 선수로의 복귀를 불렀다. 강등은
+        반증(`REFUTED`)이다 — 측정된 선수가 있고, 그 측정이 결손을 지지하지 않는다.
+        """
+        fakes(prereqs=[_row(_PREREQ_A, "UC-A")])
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.12, confidence=0.5)
+        intent = await _intent(anchor, {"UC-A": prereq_mastery})
+        assert intent.resolution is IntentResolution.REFUTED
+        assert intent.reason.type is ReasonType.CURRENT_CONCEPT
+        assert intent.reselect_groups == ()
+
+    @pytest.mark.parametrize("anchor_samples", [None, 1])
+    async def test_prerequisite_side_has_no_anchor_floor(
+        self, fakes: Any, anchor_samples: int | None
+    ) -> None:
+        """선수 복귀에는 앵커 하한이 없다 — 막힌 학생의 하강을 응답 3개까지 늦추지 않는다(판정문 §3-3).
+
+        (가)·(나) 두 갈래 모두 앵커 응답이 1개(또는 미상)여도 선다. 선수 쪽 증거는 목표 P의
+        경계가 맡는다 — 대칭 하한(선수에도 3)은 막힌 학생의 거짓 전진을 두 배로 만들어 기각됐다.
+        """
+        fakes(prereqs=[_row(_PREREQ_A, "UC-A")])
+        anchor = build_reason(
+            concept_id=_ANCHOR, mastery=0.15, confidence=0.17, sample_size=anchor_samples
+        )
+        down = await _intent(anchor, {"UC-A": 0.15})
+        assert down.resolution is IntentResolution.SERVED
+        assert down.reselect_groups == ((_PREREQ_A,),)
+
+        blocked_reason = build_reason(concept_id=_BLOCKED, mastery=0.12, confidence=0.6)
+        fakes(successors=[_succ(_BLOCKED, "UC-W")], concept_reasons={_BLOCKED: blocked_reason})
+        explained = await _intent(anchor, {"UC-W": 0.12})
+        assert explained.resolution is IntentResolution.SERVED
+        assert explained.reason == blocked_reason
 
     async def test_unmeasured_prerequisites_are_unsupported_not_refuted(self, fakes: Any) -> None:
         """모른다 ≠ 아니다 — 선수가 미측정이면 반증이 아니라 근거 없음이다."""
@@ -636,11 +684,74 @@ class TestResolvePolicyIntent:
                 _succ(_NEXT_B, "UC-N2"),
             ]
         )
-        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7)
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7, sample_size=12)
         intent = await _intent(anchor, {"UC-DONE": 0.95, "UC-N2": 0.7})
         assert intent.resolution is IntentResolution.SERVED
         assert intent.reason == anchor  # 전진의 근거는 숙달한 현재 개념
         assert intent.reselect_groups == ((_NEXT_A, _NEXT_B),)
+
+    @pytest.mark.parametrize("anchor_samples", [None, 0, 1, 2])
+    async def test_thin_advance_is_insufficient_evidence_not_served(
+        self, fakes: Any, anchor_samples: int | None
+    ) -> None:
+        """EOS-33 — 앵커 응답이 3개 미만이면 열린 후행이 있어도 옮기지 않는다(정직 강등).
+
+        BKT 기본값에서 정답 2회면 숙달이 약 0.92로 전진 구간이다 — 그 0.92는 사전 설정의 산물일 수
+        있다. 강등은 반증도 근거 없음도 아닌 별도 값이다(응답이 쌓이면 스스로 풀린다).
+        """
+        f = fakes(successors=[_succ(_NEXT_A, "UC-N1")])
+        anchor = build_reason(
+            concept_id=_ANCHOR, mastery=0.92, confidence=0.29, sample_size=anchor_samples
+        )
+        intent = await _intent(anchor, {})
+        assert intent.resolution is IntentResolution.INSUFFICIENT_EVIDENCE
+        assert intent.reason.type is ReasonType.CURRENT_CONCEPT
+        assert intent.reason.mastery == 0.92  # 숫자는 그대로 — 강등은 행위만 바꾼다
+        assert intent.reason.sample_size == anchor_samples
+        assert intent.reselect_groups == ()
+        assert len(f.successor_calls) == 1  # 그래프를 먼저 읽었다(하한은 그 뒤)
+
+    def test_insufficient_evidence_is_its_own_wire_value(self) -> None:
+        """응답·처치 기록에 실리는 문자열이 다른 해소값과 겹치지 않는다(Enum 별칭 금지).
+
+        값이 겹치면 파이썬 Enum은 **별칭**을 만든다 — 그러면 `is` 비교도, 값 목록의 중복 검사도
+        통과한다(별칭은 순회에 나오지 않는다). 그래서 문자열 자체를 못 박는다.
+        """
+        assert IntentResolution.INSUFFICIENT_EVIDENCE.value == "insufficient_evidence"
+        assert IntentResolution("insufficient_evidence") is IntentResolution.INSUFFICIENT_EVIDENCE
+        assert len(IntentResolution.__members__) == len({m.value for m in IntentResolution})
+
+    async def test_advance_floor_boundary_three_responses_is_enough(self, fakes: Any) -> None:
+        """경계 자체 — 응답 3개면 옮긴다(`>=`가 `>`로 뒤바뀌면 여기서 갈린다)."""
+        fakes(successors=[_succ(_NEXT_A, "UC-N1")])
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.97, confidence=0.38, sample_size=3)
+        intent = await _intent(anchor, {})
+        assert intent.resolution is IntentResolution.SERVED
+        assert intent.reselect_groups == ((_NEXT_A,),)
+
+    @pytest.mark.parametrize(
+        ("successors", "mastery", "expected"),
+        [
+            ([_succ(_NEXT_A, "UC-N1")], {"UC-N1": 0.9}, IntentResolution.REFUTED),
+            ([], {}, IntentResolution.UNSUPPORTED),
+        ],
+    )
+    async def test_floor_is_checked_only_after_open_successors_are_found(
+        self,
+        fakes: Any,
+        successors: list[Any],
+        mastery: dict[str, float],
+        expected: IntentResolution,
+    ) -> None:
+        """순서가 계약이다 — 하한을 그래프 앞에 두면 반증·근거 없음까지 하한이 흡수한다.
+
+        그러면 `insufficient_evidence` 비율(하한이 실제로 막은 이동)이 부풀려져 작동 비율 관측이
+        거짓이 된다(판정문 F5). 응답이 얇아도 옮길 곳이 없으면 원래 해소값이 나와야 한다.
+        """
+        fakes(successors=successors)
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.17, sample_size=1)
+        intent = await _intent(anchor, mastery)
+        assert intent.resolution is expected
 
     async def test_advance_with_every_successor_mastered_is_refuted(self, fakes: Any) -> None:
         fakes(successors=[_succ(_NEXT_A, "UC-N1")])
@@ -732,7 +843,7 @@ class TestCatPolicyAlignedSelection:
     ) -> None:
         """페르소나 A ⑤의 모양 — 숙달 개념 문항이 1차 선택돼도 다음 개념 문항이 나간다."""
         cur_pid, next_pid = uuid.uuid4(), uuid.uuid4()
-        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7)
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7, sample_size=12)
         seen = self._install(
             monkeypatch,
             pool=[(cur_pid, 3.0, 0.0)],
@@ -758,7 +869,7 @@ class TestCatPolicyAlignedSelection:
     ) -> None:
         """목표 개념에 문항이 없다 — 1차 선택을 내보내되 전진을 말하지 않는다."""
         cur_pid = uuid.uuid4()
-        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7)
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7, sample_size=12)
         self._install(
             monkeypatch,
             pool=[(cur_pid, 3.0, 0.0)],
@@ -772,6 +883,32 @@ class TestCatPolicyAlignedSelection:
         assert outcome.target_concept == _ANCHOR
         assert outcome.intent_resolution is IntentResolution.TARGET_UNAVAILABLE
         assert outcome.reason.mastery == 0.98
+
+    async def test_thin_advance_keeps_the_first_pass_problem(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """EOS-33 — 응답 2개의 전진은 콘텐츠를 옮기지 않는다: 1차 선택 문항·재선택 조회 0건.
+
+        목표 개념에 문항이 **있어도** 옮기지 않는다는 것이 요점이다(`TARGET_UNAVAILABLE`과 다른
+        이유의 강등). 관측 메타도 1차 선택의 비교 집합이다 — 재선택이 없었으니까.
+        """
+        cur_pid, next_pid = uuid.uuid4(), uuid.uuid4()
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.92, confidence=0.29, sample_size=2)
+        seen = self._install(
+            monkeypatch,
+            pool=[(cur_pid, 3.0, 0.0)],
+            anchor_reason=anchor,
+            successors=[_succ(_NEXT_A, "UC-N")],
+            target_rows=[(next_pid, 3.5, 0.5, _NEXT_A)],
+        )
+        outcome = await self._run()
+        assert outcome.problem_id == cur_pid
+        assert outcome.action is RecommendationAction.PRACTICE_CURRENT
+        assert outcome.target_concept == _ANCHOR
+        assert outcome.intent_resolution is IntentResolution.INSUFFICIENT_EVIDENCE
+        assert outcome.reason.sample_size == 2
+        assert seen["target_calls"] == []  # 재선택 조회 자체가 없다
+        assert [pid for pid, _ in outcome.candidate_scores] == [cur_pid]
 
     async def test_prerequisite_groups_are_tried_in_weakness_order(
         self, monkeypatch: pytest.MonkeyPatch

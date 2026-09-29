@@ -84,4 +84,8 @@ async def collect_concept_reason(
     row = await _latest_mastery(session, learner_id, concept_id)
     mastery = float(row.mastery) if row is not None and row.mastery is not None else None
     confidence = float(row.confidence) if row is not None and row.confidence is not None else None
-    return build_reason(concept_id=concept_id, mastery=mastery, confidence=confidence)
+    # EOS-33 — 같은 행의 표본 수(추가 조회 0건). 전진 하한은 신뢰도가 아니라 이것을 읽는다.
+    sample_size = int(row.sample_size) if row is not None and row.sample_size is not None else None
+    return build_reason(
+        concept_id=concept_id, mastery=mastery, confidence=confidence, sample_size=sample_size
+    )

@@ -282,9 +282,13 @@ class TestDefectShapesStayClosed:
     async def test_mastered_anchor_with_open_next_concept_is_withheld_not_advanced(
         self, env: Any
     ) -> None:
-        """(가) — 넘어갈 다음 개념이 있어도 수능 모드는 옮기지 않는다: 현재 개념 연습 · 보류."""
+        """(가) — 넘어갈 다음 개념이 있어도 수능 모드는 옮기지 않는다: 현재 개념 연습 · 보류.
+
+        앵커 응답은 하한(3) 이상이다(EOS-33) — 그래야 "옮길 의도가 섰는데 모드가 보류했다"가 된다.
+        얇은 응답의 같은 모양은 아래 `test_thin_advance_is_insufficient_evidence_not_withheld`.
+        """
         first = _problem()
-        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7)
+        anchor = build_reason(concept_id=_ANCHOR, mastery=0.98, confidence=0.7, sample_size=12)
         e = env(anchor_reason=anchor, successors=[_succ(_NEXT, "UC-N")])
         outcome, session = await _run([first])
         assert outcome.action is RecommendationAction.PRACTICE_CURRENT
@@ -402,6 +406,27 @@ class TestWithheldIsDistinctFromOtherDemotions:
         assert outcome.intent_resolution is IntentResolution.GRAPH_TIMEOUT
         assert "TimeoutError" in caplog.text
         _assert_first_pass_delivered(outcome, first, session)
+
+    async def test_thin_advance_is_insufficient_evidence_not_withheld(self, env: Any) -> None:
+        """EOS-33 — 응답이 얇으면 옮길 의도 자체가 서지 않는다: "안 했다"(보류)가 아니라 증거 부족.
+
+        진단은 모드와 무관하게 하나다(`resolve_policy_intent`). 하한이 의도를 먼저 내리므로 수능
+        정책이 보류할 재선택 묶음이 없다 — 그래서 `mode_withheld`로 적으면 모드가 막은 이동이 실제보다
+        많게 세어진다(보류 비율 관측이 거짓이 된다).
+        """
+        first = _problem()
+        env(
+            anchor_reason=build_reason(
+                concept_id=_ANCHOR, mastery=0.92, confidence=0.29, sample_size=2
+            ),
+            successors=[_succ(_NEXT, "UC-N")],
+        )
+        outcome, session = await _run([first])
+        assert outcome.intent_resolution is IntentResolution.INSUFFICIENT_EVIDENCE
+        assert outcome.action is RecommendationAction.PRACTICE_CURRENT
+        assert outcome.target_concept == _ANCHOR
+        _assert_first_pass_delivered(outcome, first, session)
+        _assert_aligned(outcome)
 
     def test_withheld_is_its_own_wire_value(self) -> None:
         """응답·처치 기록에 실리는 문자열이 다른 해소값과 겹치지 않는다(Enum 별칭 금지)."""

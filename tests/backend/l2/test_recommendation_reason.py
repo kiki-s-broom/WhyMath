@@ -32,6 +32,8 @@ _CONCEPT = uuid.uuid4()
 class _MasteryRow:
     mastery: float | None
     confidence: float | None
+    # EOS-33 — 실제 행(`ConceptMasteryHistory.sample_size`)과 같은 모양. 기본값 None은 레거시 행이다.
+    sample_size: int | None = None
     measured_at: datetime = datetime(2026, 9, 17, tzinfo=UTC)
 
 
@@ -144,6 +146,40 @@ class TestCollect:
         reason = await _collect(session)
         assert reason.basis is ReasonBasis.COLD_START
         assert reason.mastery is None
+
+
+class TestSampleSizeCarriage:
+    """EOS-33 — 전진 하한이 읽는 표본 수를 **같은 행에서** 옮긴다(추가 조회 0건).
+
+    신뢰도가 아니라 표본 수를 옮기는 이유는 계약 docstring(`RecommendationReason`)에 있다. 여기서
+    재는 것은 세 가지다: 값이 그대로 실린다 · 없으면 0이 아니라 None이다 · 숙달이 없으면 표본
+    수도 싣지 않는다(측정 없는 근거에 표본 수가 붙으면 "응답 5개인데 모른다"는 모순이 된다).
+    """
+
+    async def test_sample_size_is_carried_from_the_latest_row(self) -> None:
+        session = _FakeSession(primary=[_CONCEPT], mastery_row=_MasteryRow(0.9, 0.44, 4))
+        reason = await _collect(session)
+        assert reason.type is ReasonType.NEXT_CONCEPT
+        assert reason.sample_size == 4
+        assert session.executes == 2  # 표본 수를 싣는 데 조회가 늘지 않는다
+
+    async def test_null_sample_size_column_is_none_not_zero(self) -> None:
+        """레거시 행(표본 수 NULL) — 0으로 접으면 "응답 0개"라는 없는 사실이 생긴다."""
+        session = _FakeSession(primary=[_CONCEPT], mastery_row=_MasteryRow(0.9, 0.44, None))
+        reason = await _collect(session)
+        assert reason.basis is ReasonBasis.MEASURED_MASTERY
+        assert reason.sample_size is None
+
+    async def test_sample_size_is_dropped_when_mastery_is_null(self) -> None:
+        session = _FakeSession(primary=[_CONCEPT], mastery_row=_MasteryRow(None, 0.4, 5))
+        reason = await _collect(session)
+        assert reason.basis is ReasonBasis.COLD_START
+        assert reason.sample_size is None
+
+    async def test_cold_start_has_no_sample_size(self) -> None:
+        session = _FakeSession(primary=[_CONCEPT], mastery_row=None)
+        reason = await _collect(session)
+        assert reason.sample_size is None
 
 
 class TestCollectorDoesNotTouchSelection:

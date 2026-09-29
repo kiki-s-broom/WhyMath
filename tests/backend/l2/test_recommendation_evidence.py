@@ -179,7 +179,7 @@ class TestCandidatesAndPolicyVersion:
             {"problem_id": str(pid_mid), "score": 0.5},
             {"problem_id": str(pid_low), "score": 0.1},
         ]
-        assert row.meta[META_KEY_POLICY_VERSION] == "cat_v2"
+        assert row.meta[META_KEY_POLICY_VERSION] == "cat_v3"
 
     async def test_candidates_truncated_to_cap(self) -> None:
         """원 풀이 상한보다 크면 점수 상위 `CANDIDATES_META_CAP`건만 남는다."""
@@ -262,7 +262,24 @@ class TestReasonPersistence:
             "basis": "measured_mastery",
             "concept_id": str(concept_id),
             "mastery": 0.25,
+            "sample_size": None,  # EOS-33 — 모르면 0이 아니라 None으로 남는다
         }
+
+    async def test_reason_sample_size_is_persisted_for_offline_floor_audit(self) -> None:
+        """EOS-33 — 처치 기록에 표본 수가 남아야 전진 하한이 막은 비율을 사후에 셀 수 있다."""
+        session = _FakeSession()
+        reason = build_reason(concept_id=uuid.uuid4(), mastery=0.93, confidence=0.29, sample_size=2)
+        row = await record_recommendation_treatment(
+            session,  # type: ignore[arg-type]
+            problem_id=uuid.uuid4(),
+            theta=0.0,
+            pool_size=1,
+            applied_weights=False,
+            reason=reason,
+            occurred_at=_AT,
+        )
+        assert row.meta is not None
+        assert row.meta[META_KEY_REASON]["sample_size"] == 2
 
     async def test_unmeasured_reason_keeps_none_instead_of_zero(self) -> None:
         """미측정은 영속에서도 None이다 — 0.0으로 접히면 로그가 없는 약점을 만든다(S3-07)."""

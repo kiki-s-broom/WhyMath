@@ -58,6 +58,7 @@ from whymath_backend.api._rate_limit import reset_store
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l2.next_problem_selection import MAX_ADMINISTERED_ITEMS
 from whymath_backend.l2.recommendation_contract import (
+    ADVANCE_EVIDENCE_MIN_RESPONSES,
     PREREQUISITE_MASTERY_CEILING,
     WEAK_CONCEPT_MASTERY_CEILING,
 )
@@ -873,12 +874,18 @@ def test_scenario_006_ai_tutor_question() -> None:
 
 
 def test_scenario_007_mastery_threshold_crossing() -> None:
-    """SCENARIO-007 mastery threshold 통과 — 정답이 쌓여 숙달이 경계(0.7)를 넘는 순간 추천 근거가
-    `current_concept`에서 `next_concept`로, 약점 목록에서 그 개념이 빠진다.
+    """SCENARIO-007 mastery threshold 통과 — 정답이 쌓여 숙달이 경계(0.7)를 넘으면 약점 목록에서 그
+    개념이 빠지고, **응답이 3개 쌓인 뒤** 추천 근거가 `current_concept`에서 `next_concept`로 바뀐다.
 
-    판정은 **궤적 전체**에 걸친다 — 매 회차마다 `(숙달, 추천 근거)` 쌍이 경계 규칙과 일치해야
-    한다(0.7 이하 ⇒ next 아님 · 0.7 초과 ⇒ next). 한 점만 보면 "처음부터 next였다"와 "경계에서
-    바뀌었다"가 구별되지 않으므로, 경계 **아래** 관측과 **위** 관측이 각각 1건 이상이어야 통과다.
+    판정은 **궤적 전체**에 걸친다 — 매 회차마다 `(숙달, 표본 수, 추천 근거)`가 규칙과 일치해야
+    한다(0.7 초과 **이고** 응답 3개 이상 ⇒ next · 그 외 ⇒ next 아님). 한 점만 보면 "처음부터 next였다"와
+    "경계에서 바뀌었다"가 구별되지 않으므로, 경계 **아래** · 경계 위지만 **응답이 얇은** 회차 · 경계
+    위이고 **응답이 충분한** 회차의 관측이 각각 1건 이상이어야 통과다.
+
+    **두 축이 한 회차 어긋나는 것이 설계다(EOS-33)**: BKT 기본값에서 정답 2회면 숙달이 약 0.92로
+    경계를 넘는다. 약점 목록은 숙달만 보므로 그 회차에 빠지지만, 전진은 응답 2개로 콘텐츠를 옮기지
+    않는다(`insufficient_evidence` — 현재 개념 문항 그대로). 응답 1~2개의 0.7 초과는 사전 설정의 산물일
+    수 있어서다(판정문 `eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md` §3-2).
 
     **후행 개념을 함께 심는 이유(EOS-124)**: 전진(`next_concept`)은 넘어갈 개념이 있어야 문항으로
     실린다. 후행이 없으면 정책은 숙달한 개념의 문항에 `advance_next`를 붙이지 않고 정직 강등한다
@@ -899,48 +906,71 @@ def test_scenario_007_mastery_threshold_crossing() -> None:
         with _client() as client:
             _erase_learner(client)
             auth = _login(client)
-            trajectory: list[tuple[float, str, bool]] = []
+            trajectory: list[tuple[float, int | None, str, bool]] = []
             crossed = False
+
+            def _enough(samples: int | None) -> bool:
+                return samples is not None and samples >= ADVANCE_EVIDENCE_MIN_RESPONSES
+
             for step in range(len(pids) - 1):
                 rec = _next_problem(client, auth)
                 if step == 0:
                     assert rec["problem_id"] in pid_set, rec
                 if step > 0:
                     mastery = _learner_state(client, auth)["mastery"][code]
+                    samples = rec["reason"]["sample_size"]
                     weak = {w["concept_id"] for w in _get(client, auth, "/v1/me/weak-concepts")}
                     in_weak = str(cid) in weak
-                    trajectory.append((mastery, rec["reason"]["type"], in_weak))
+                    trajectory.append((mastery, samples, rec["reason"]["type"], in_weak))
                     journal.record(
                         f"회차{step}",
                         "정답 누적",
                         숙달=mastery,
+                        표본=samples,
                         reason=rec["reason"]["type"],
                         action=rec["action"],
+                        해소=rec["intent_resolution"],
                         약점=in_weak,
                         문항=("다음개념" if rec["problem_id"] in next_set else "현재개념"),
                     )
                     # 근거는 앵커(현재 개념)의 숙달이다 — 전진 회차에도 같다.
                     assert rec["reason"]["mastery"] == pytest.approx(mastery), (rec, mastery)
-                    if mastery > WEAK_CONCEPT_MASTERY_CEILING:
+                    # 표본 수는 정답을 낸 횟수다(이 시나리오는 정답만 낸다) — 근거가 같은 행을 읽는다.
+                    assert samples == step, (rec, step)
+                    if mastery > WEAK_CONCEPT_MASTERY_CEILING and _enough(samples):
                         # EOS-124 — 전진은 말뿐이 아니라 문항으로 실린다(목적지 = 다음 개념).
                         assert rec["problem_id"] in next_set, rec
                         assert rec["target_concept"] == str(c_next), rec
                         assert rec["intent_resolution"] == "served", rec
                         crossed = True
                         break
+                    if mastery > WEAK_CONCEPT_MASTERY_CEILING:
+                        # EOS-33 — 경계는 넘었지만 응답이 얇다: 옮기지 않고 현재 개념 연습으로 정직 강등.
+                        # 다음 개념에 출제 가능한 문항이 있어도 그렇다(콘텐츠 공백이 아니라 증거 부족).
+                        assert rec["intent_resolution"] == "insufficient_evidence", rec
+                        assert rec["action"] == "practice_current", rec
+                        assert rec["target_concept"] == str(cid), rec
                     assert rec["problem_id"] in pid_set, rec
                 _attempt(client, auth, uuid.UUID(rec["problem_id"]), correct=True, answer="1")
 
-            below = [t for t in trajectory if t[0] <= WEAK_CONCEPT_MASTERY_CEILING]
-            above = [t for t in trajectory if t[0] > WEAK_CONCEPT_MASTERY_CEILING]
-            assert (
-                crossed and below and above
-            ), f"경계 아래·위 관측이 모두 있어야 판정할 수 있다: {trajectory}"
-            for mastery, reason_type, in_weak in trajectory:
-                expected_next = mastery > WEAK_CONCEPT_MASTERY_CEILING
-                assert (reason_type == "next_concept") is expected_next, (mastery, reason_type)
-                assert in_weak is not expected_next, (mastery, in_weak)
-            for mastery, reason_type, _ in below:
+            above_limit = WEAK_CONCEPT_MASTERY_CEILING
+            below = [t for t in trajectory if t[0] <= above_limit]
+            held = [t for t in trajectory if t[0] > above_limit and not _enough(t[1])]
+            above = [t for t in trajectory if t[0] > above_limit and _enough(t[1])]
+            assert crossed and below and held and above, (
+                "경계 아래 · 경계 위(응답 얇음) · 경계 위(응답 충분) 관측이 모두 있어야 판정할 수 "
+                f"있다: {trajectory}"
+            )
+            for mastery, samples, reason_type, in_weak in trajectory:
+                expected_next = mastery > above_limit and _enough(samples)
+                assert (reason_type == "next_concept") is expected_next, (
+                    mastery,
+                    samples,
+                    reason_type,
+                )
+                # 약점 목록은 숙달만 본다 — 증거 하한과 무관하게 경계를 넘으면 빠진다.
+                assert in_weak is not (mastery > above_limit), (mastery, in_weak)
+            for mastery, _samples, reason_type, _ in below:
                 if mastery >= PREREQUISITE_MASTERY_CEILING:
                     assert reason_type == "current_concept", (mastery, reason_type)
         journal.dump()

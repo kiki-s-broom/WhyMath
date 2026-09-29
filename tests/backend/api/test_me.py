@@ -970,6 +970,7 @@ _REASON_UNMAPPED: dict[str, Any] = {
     "basis": "concept_unmapped",
     "concept_id": None,
     "mastery": None,
+    "sample_size": None,  # EOS-33 — 측정이 없으면 표본 수도 없다(0으로 접지 않는다)
 }
 #: 추천 자체가 없을 때의 근거 — 부재도 이유를 가진다(조회 0건).
 _REASON_NO_CANDIDATE: dict[str, Any] = {
@@ -978,6 +979,7 @@ _REASON_NO_CANDIDATE: dict[str, Any] = {
     "basis": "no_candidate_pool",
     "concept_id": None,
     "mastery": None,
+    "sample_size": None,
 }
 
 
@@ -3405,11 +3407,17 @@ class TestNextProblemSuneungMode:
 
 # ── EOS-14: 추천 근거(`reason`)가 응답에 **실제로** 실리는가 ────────────────────────
 class _MasteryRow:
-    """`_latest_mastery`가 돌려주는 ORM 행의 최소 시뮬 — 근거가 읽는 두 필드만 가진다."""
+    """`_latest_mastery`가 돌려주는 ORM 행의 최소 시뮬 — 근거가 읽는 세 필드만 가진다.
 
-    def __init__(self, mastery: float | None, confidence: float | None) -> None:
+    `sample_size`(EOS-33)의 기본값 None은 레거시 행이다 — 전진 하한은 None을 "부족"으로 읽는다.
+    """
+
+    def __init__(
+        self, mastery: float | None, confidence: float | None, sample_size: int | None = None
+    ) -> None:
         self.mastery = mastery
         self.confidence = confidence
+        self.sample_size = sample_size
 
 
 def _reason_results_measured(concept_id: uuid.UUID, row: _MasteryRow | None) -> list[_AQResult]:
@@ -3458,7 +3466,23 @@ class TestNextProblemReason:
             "basis": "measured_mastery",
             "concept_id": str(cid),
             "mastery": 0.2,
+            "sample_size": None,
         }
+
+    def test_sample_size_reaches_the_response_surface(self) -> None:
+        """EOS-33 — 전진 하한이 읽는 표본 수가 응답 근거에도 실린다(행에 있으면 그 값 그대로).
+
+        응답에 실어 두는 이유: 학생 화면이 "왜 아직 다음 개념으로 안 넘어가나"를 설명하려면
+        근거가 무엇에 기반했는지를 알아야 한다. 선택에는 관여하지 않는다(같은 1차 선택).
+        """
+        pid, cid = uuid.uuid4(), uuid.uuid4()
+        session = _next_problem_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])]
+            + _reason_results_measured(cid, _MasteryRow(0.2, 0.44, 4))
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem").json()
+        assert body["problem_id"] == str(pid)
+        assert body["reason"]["sample_size"] == 4
 
     def test_mid_mastery_reports_current_concept(self) -> None:
         _, reason = self._measured(0.55)
@@ -3524,6 +3548,7 @@ class TestNextProblemReason:
             "basis": "measured_mastery",
             "concept_id": str(cid),
             "mastery": 0.2,
+            "sample_size": None,
         }
         assert body["action"] == "practice_current"
         assert body["target_concept"] == str(cid)
