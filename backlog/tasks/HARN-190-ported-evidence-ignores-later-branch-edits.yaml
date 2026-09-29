@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - scripts/harness/remote_claims.py
   - tests/harness/test_remote_claims.py
-session: null
+session: claude/exciting-wozniak-3mw0xw
 notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 세션 재개 브리핑이 vafylb를 \"이미 포팅됨 · 결정 불요\"로 표시했는데, 같은 감사는 그 브랜치를 좌석이 있는 추적 중으로 두고 있었다. 스킬이 요구하는 대로 근거 커밋을 열어 보니, 근거가 브랜치 자신의 앞선 머지분이고 그 뒤 변경이 main에 없었다.\n\n위험: 브리핑은 매 세션 모든 세션에 노출된다. \"결정 불요\"로 표시된 브랜치는 정리 대상으로 읽히므로, 스킬 절차(근거 커밋 확인)를 건너뛴 세션이 삭제 배치에 올리면 cp949 콘솔 출력 수정이 사라진다. 그 축의 좌석은 OPS-53(todo)이고 그 notes가 vafylb를 원 출처로 지목한다.\n\n인접: HARN-37(done · 파일 교집합 도입 — 이번은 그 교집합이 시간 축을 보지 않는 사각) · HARN-17(done · 3분류 도입) · OPS-53(cp949 출력 축 좌석)."
-updated: 2026-09-28
+updated: 2026-09-29
