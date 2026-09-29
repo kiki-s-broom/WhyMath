@@ -17,6 +17,21 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/l2/recommendation_contract.py
+  - src/backend/whymath_backend/l2/recommendation_reason.py
+  - src/backend/whymath_backend/l2/recommendation_evidence.py
+  - src/backend/whymath_backend/api/me.py
+  - tests/backend/l2/test_recommendation_policy.py
+  - tests/backend/l2/test_recommendation_contract.py
+  - tests/backend/l2/test_recommendation_reason.py
+  - tests/backend/l2/test_recommendation_evidence.py
+  - tests/backend/l2/test_eos33_evidence_floor_integration.py
+  - tests/backend/api/test_me.py
+  - tests/backend/api/test_next_problem_policy_suneung.py
+  - tests/backend/scenarios/test_phase2_scenario_regression_suite.py
+  - scripts/analysis/eos33_relational_evidence_floor_rates.py
+  - scripts/analysis/mutate_eos33_evidence_floor_guards.py
+  - scripts/analysis/mutate_recommendation_policy_guards.py
+  - docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md
 session: claude/harn-180-424n4m
-notes: "출처: EOS-25 판정 독립 비판 F2(차단)·놓친 것 4. 수능 모드는 이 결함 때문에 관계 재선택을 보류했다(mode_withheld). 기본 CAT에는 같은 입력 결함이 이미 서빙 경로에 있으므로 EOS-25 범위 밖의 별건이다."
+notes: "출처: EOS-25 판정 독립 비판 F2(차단)·놓친 것 4. 수능 모드는 이 결함 때문에 관계 재선택을 보류했다(mode_withheld). 기본 CAT에는 같은 입력 결함이 이미 서빙 경로에 있으므로 EOS-25 범위 밖의 별건이다.\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/l2/recommendation_contract.py'] → ['src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/l2/recommendation_contract.py', 'src/backend/whymath_backend/l2/recommendation_reason.py', 'src/backend/whymath_backend/l2/recommendation_evidence.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/l2/test_recommendation_policy.py', 'tests/backend/l2/test_recommendation_contract.py', 'tests/backend/l2/test_recommendation_reason.py', 'tests/backend/l2/test_recommendation_evidence.py', 'tests/backend/l2/test_eos33_evidence_floor_integration.py', 'tests/backend/api/test_me.py', 'tests/backend/api/test_next_problem_policy_suneung.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'scripts/analysis/eos33_relational_evidence_floor_rates.py', 'scripts/analysis/mutate_eos33_evidence_floor_guards.py', 'scripts/analysis/mutate_recommendation_policy_guards.py', 'docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md']: EOS-33 집행이 실제로 닿은 파일로 paths를 넓힌다(기존 2건 유지 + 추가). 편집 훅의 scope_drift 경고 11건이 가리킨 파일 전부와 판정문·분석·뮤테이션 하네스·통합 테스트를 포함한다 — 겹침 검사가 이 태스크의 실제 범위를 보게 하기 위함이다."
 updated: 2026-09-29

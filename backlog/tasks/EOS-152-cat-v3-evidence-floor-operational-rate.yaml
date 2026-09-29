@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-152-cat-v3-evidence-floor-operational-rate
+title: "cat_v3 증거 요건의 운영 작동 비율·회복률 측정 — insufficient_evidence 비율과 그 뒤 전진 회복률 (사전 등록: 회복률 < 50%면 EOS-33 재판정)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-33-mastery-band-relational-evidence-floor
+requires_gates: []
+acceptance:
+  - "① 처치 기록(REC-11 · `policy_version=cat_v3` · meta `intent_resolution` · `reason.sample_size`)에서 전진 구간 앵커 추천 중 `insufficient_evidence` 비율, 그리고 관계 구간 점검 중 앵커 표본 3 미만 비율을 산출하는 읽기 전용 CLI를 만든다(EOS-33 판정문 S-3: 합성 서빙 모의에서 94~95%가 표본 3 미만).\n\n② 회복률: `insufficient_evidence`를 받은 (학생, 앵커 개념) 쌍 중 이후 같은 앵커에서 `served` 전진에 도달한 비율. **사전 등록 트리거 — 회복률 < 50%면 EOS-33 판정을 다시 연다**(하한이 전진을 늦추는 게 아니라 막고 있다는 뜻).\n\n③ 측정 실패를 0건으로 위장하지 않는다 — DB 미도달·`cat_v3` 기록 0건·표본 부족은 exit 2 \"판정 불가\"로 가르고, 판정은 Wilson 단측 경계로 낸다(점추정 판정 금지).\n\n④ 결과를 EOS-33 판정문 부록에 판정 기준 커밋 해시와 함께 기록한다."
+artifacts: []
+paths:
+  - scripts/analysis/eos33_evidence_floor_operational_rate.py
+  - tests/backend/ops/test_eos33_evidence_floor_operational_rate.py
+  - docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md
+session: null
+notes: "출처: EOS-33 판정문 §8 S-2·S-3·§9. 운영(또는 파일럿) 처치 기록이 필요하다 — 학생 앱은 오답을 적재하지 않으므로 앱 트래픽에서는 전진 쪽만 관측된다(선수 쪽은 EOS-146 이후). 3은 R5와 같은 단위일 뿐 같은 질문이 아니라서 '보정 대상 정책 수치'로 표기했고, 이 측정이 그 보정의 근거다."
+updated: 2026-09-29

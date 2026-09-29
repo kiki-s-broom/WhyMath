@@ -254,3 +254,39 @@
 | R3 | 참고 | (나)와 하한의 순서 | **해소** — (나)에는 하한을 걸지 않는다 |
 | R4 | 참고 | 첫 행위 방향이 바뀐다 | **참고** — 대칭 하한의 효과. 전진 전용 하한은 정당 전진 비율을 바꾸지 않는다(§3-2) |
 | 놓친 것 1~8 | — | 앱 정답 적재·결손 학생·비용 비대칭·작동 비율·R5 상호작용·비대칭 하한·추정기 편향·수능 SQL 창 | **수용** — 각각 §0-6·§3-3·§3-2·S-3·§3-3·§4-1·§4-2/S-6·§7에 반영 |
+
+---
+
+## §11. 집행 결과
+
+> **기준**: 브랜치 커밋 `4d44c5a7`(판정 기준 main `543489cc` 위 · 코드 변경분) — 이 절의 수치는 그 트리에서 낸 것이다.
+
+**코드**(판정 §0과 1:1)
+
+| 판정 | 집행 지점 |
+|---|---|
+| 전진 하한 3 | `l2/recommendation_contract.py` `ADVANCE_EVIDENCE_MIN_RESPONSES`·`has_advance_evidence` → `l2/recommendation_policy.py::_advance_intent`(열린 후행 확인 **뒤**) |
+| 선수 목표 경계 = 사전값 | `PREREQUISITE_DEFICIT_CEILING = BktParameters().p_init`·`is_prerequisite_deficit` → `_prerequisite_intent` (가) |
+| 표본 수로 판정 | `RecommendationReason.sample_size`(같은 행 · 조회 0건 추가) ← `l2/recommendation_reason.py::collect_concept_reason` |
+| 신설 해소값 | `IntentResolution.INSUFFICIENT_EVIDENCE` · API 필드 설명 · 처치 기록 meta(`reason.sample_size` 포함) |
+| 식별자 | `POLICY_VERSION_CAT = "cat_v3"` · `suneung_v1` 유지 |
+
+**§7 예측 대조**(실 PG · HTTP)
+
+| 항목 | 예측 | 실측 |
+|---|---|---|
+| 페르소나 A ⑤ | 불변(표본 5 → 하한 충족) | `advance_next` · 해소 `served` — 불변 |
+| 페르소나 B ⑤ | 불변((나) 경로) | `practice_prerequisite` · 문항 = 선수 개념 — 불변 |
+| 페르소나 B ⑧ | `refuted` 불변 | `practice_current` · `refuted` — 불변 |
+| 3루프 판정 줄 | CI가 최종 판정 | general `LOOP1=FAIL LOOP2=PASS LOOP3=PASS` · misconception 전부 PASS — main과 같다(LOOP1은 EOS-26 소유 기존 결함). 두 루프 모두 앵커 표본 3에서 전진 |
+| SCENARIO-007 | (예측 없음) | 표본 1 → 0.69 제자리(`direct`) · 표본 2 → 0.92 **`insufficient_evidence`**(약점 목록에서는 빠짐) · 표본 3 → 0.98 `served` 전진 |
+
+SCENARIO-007은 cat_v2 기준 "0.7을 넘는 순간 전진"을 단언하고 있어 갱신했다 — 약점 목록(숙달만 본다)과 전진(표본도 본다)이 **한 회차 어긋나는 것이 이 판정의 설계**다.
+
+**실 PG 통합**(`tests/backend/l2/test_eos33_evidence_floor_integration.py` · 목표 개념에 문항을 심은 대조군) — 응답 2개·레거시 NULL 전진 → 1차 문항 유지 `insufficient_evidence` · 응답 3개 → 다음 개념 문항 `served` · 앵커 응답 1개 + P 0.69 → 1차 문항 `refuted` · 앵커 응답 1개 + P 0.15 → P 문항 `served`. 5건 통과.
+
+**변별력**: `scripts/analysis/mutate_eos33_evidence_floor_guards.py --with-integration` **21/21 RED**(단위 17 · 실 PG 4). 기존 하네스 `mutate_recommendation_policy_guards.py` 25/25(M18 앵커만 새 술어로 이동) · `mutate_eos25_suneung_alignment_guards.py --with-integration` 15/15 · 시나리오 변별력 `verify_scenario_suite_discrimination.py` **10/10**(지목 시나리오 전건 RED · 원복 전건 바이트 동일 — SCENARIO-007의 결함 M007 포함). 대조군 GREEN · 원복 sha256 일치.
+
+**병합 순서 트립와이어**(§6 EOS-26 정합의 기계 축): `tests/backend/l2/test_recommendation_policy.py::TestParallelMergeTripwire`. EOS-26 분류기가 트리에 없으면 skip(통과가 아니다), 들어오면 술어 일치를 단언한다. EOS-26 브랜치(`c636f562`)를 이 브랜치에 합친 임시 사본에서 **RED**(숙달 0.30: R6 분류 결손 · (가) 술어 아님)였고, 그 사본의 분류기를 `is_prerequisite_deficit`로 바꾸면 **GREEN**이었다 — 합쳐졌는데 맞추지 않은 상태만 잡는다. 두 브랜치의 텍스트 병합은 충돌 0건이었다(그래서 이 틈은 사람도 도구도 볼 수 없었다).
+
+**수능 모드**: 얇은 전진은 `mode_withheld`가 아니라 `insufficient_evidence`로 남는다 — 하한이 의도를 먼저 내려 보류할 재선택 묶음이 없기 때문이다(보류 비율이 부풀려지지 않는다 · `test_next_problem_policy_suneung.py`).

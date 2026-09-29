@@ -18,7 +18,8 @@
 막으려는 상태를 실제로 주입해 RED가 나오는지는
 `scripts/analysis/mutate_recommendation_policy_guards.py`가 뮤테이션 25종으로 검증한다
 (EOS-124 정렬 계약 축 D 12종 포함 · EOS-25가 M14를 재앵커하고 M25(정렬 선언 필수)를 더했다 ·
-2026-09-28 실측 25/25 검출)
+2026-09-28 실측 25/25 검출 · EOS-33이 M18을 새 술어로 재앵커 — 2026-09-29 25/25). EOS-33 증거
+요건(전진 하한·결손 경계·순서·운반)은 `mutate_eos33_evidence_floor_guards.py`가 21종으로 따로 잰다
 (CLAUDE.md "보호 장치를 실패 주입 없이 '보호 있음'으로 선언 금지").
 """
 
@@ -48,6 +49,7 @@ from whymath_backend.l2.recommendation_contract import (
     build_reason,
     check_intent_alignment,
     demote_to_current_concept,
+    is_prerequisite_deficit,
     no_candidate_reason,
 )
 from whymath_backend.l2.recommendation_policy import (
@@ -957,3 +959,36 @@ class TestCatPolicyAlignedSelection:
         outcome = await self._run()
         assert outcome.problem_id is None
         assert outcome.intent_resolution is IntentResolution.NO_CANDIDATE
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 병합 순서 트립와이어 — 두 좌석이 결손 경계를 다르게 보는 순간 RED (EOS-33 × EOS-26)
+# ──────────────────────────────────────────────────────────────────────────
+class TestParallelMergeTripwire:
+    def test_r6_known_deficit_classifier_shares_the_deficit_predicate(self) -> None:
+        """EOS-26의 R6 선수 분류는 (가)와 **같은 술어**여야 한다 — 이 테스트 작성 시점 미머지(PR #1338).
+
+        EOS-26은 `_prerequisite_status`의 약점 판정을 "(가)와 같은 선 · 같은 입력 — 넘기면 그쪽이 반드시
+        이 선수를 찾는다"로 정의했다. EOS-33이 (가)의 선을 0.7 → 사전값 0.3으로 옮겼으므로, 그 분류가
+        0.7을 계속 쓰면 0.3~0.7의 선수를 "아는 결손"(`known_prerequisite_deficit`)으로 넘기고 (가)는 그
+        선수를 찾지 못한다 — 지시값과 전달 문항이 **조용히** 어긋난다. EOS-26의 테스트는 자기 함수를
+        리터럴로 재므로 이 조합을 잡지 못한다.
+
+        분류기가 트리에 없으면 판정 대상이 없어 skip이다(**통과가 아니다**). 들어오면 두 좌석의 술어
+        일치를 단언한다 — 나중에 착지하는 PR의 머지 큐 빌드가 RED가 된다. 정합이 끝나면 skip 분기를
+        지워 상시 불변식으로 승격한다(정합 태스크 EOS-151).
+        """
+        from whymath_backend.l2 import learning_state_recommendation as lsr
+
+        classify = getattr(lsr, "_prerequisite_status", None)
+        status = getattr(lsr, "_PrerequisiteStatus", None)
+        if classify is None or status is None:
+            pytest.skip("EOS-26 R6 선수 분류 미착지 — 판정 대상 없음(통과가 아니다 · EOS-151)")
+        for mastery in (0.0, 0.15, 0.29, 0.30, 0.50, 0.69, 0.70, 0.95):
+            called_deficit = (
+                classify(_row(_PREREQ_A, "UC-TRIP"), _state({"UC-TRIP": mastery})) is status.WEAK
+            )
+            assert called_deficit is is_prerequisite_deficit(mastery), (
+                f"숙달 {mastery}: R6 분류 결손={called_deficit} · (가) 술어="
+                f"{is_prerequisite_deficit(mastery)} — 두 좌석이 결손 경계를 다르게 본다(EOS-151 정합)"
+            )
