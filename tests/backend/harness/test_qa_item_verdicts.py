@@ -80,7 +80,7 @@ def _run(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict
 # 좌석 — qa_pipeline.judge_item
 # ──────────────────────────────────────────────────────────────────────────
 class TestJudgeItem:
-    def test_clean_problem_passes_with_all_three_axes_applied(self) -> None:
+    def test_clean_problem_passes_with_all_seat_axes_applied(self) -> None:
         judgement = qp.judge_item(_clean_problem())
 
         assert judgement.verdict == "pass"
@@ -88,6 +88,7 @@ class TestJudgeItem:
             "equivalence_canonicalize": "ok",
             "banned_words_pii": "ok",
             "content_provenance": "ok",
+            "answer_reverify": "ok",
         }
 
     def test_dsl_violation_fails(self) -> None:
@@ -152,16 +153,23 @@ class TestJudgeItem:
         assert judgement.unjudgeable_axes == ("banned_words_pii",)
 
     def test_exempt_answer_kind_is_not_applicable(self) -> None:
-        """S3-28 제외 answer_kind는 축 2 대상이 아니다 — 좌석도 같은 선별을 쓴다."""
-        problem = _clean_problem()
-        problem["verify"] = {
-            "answer_kind": "finite_probability",
-            "conditions": "space=...; event=...",
-        }
+        """S3-28 제외 answer_kind는 축 2 대상이 아니다 — 좌석도 같은 선별을 쓴다.
+
+        실코퍼스 확률 문항을 쓴다 — 축 2는 not_applicable이어도 정답 재검산(전용 검증기)이
+        ok라서 pass가 선다. 가짜 조건식이면 재검산이 판정 불가라 pass가 설 수 없다(EOS-150).
+        """
+        corpus = _REPO_ROOT / "data" / "corpus" / "problem_bank_probability_finite_v0"
+        with (corpus / "problems.jsonl").open(encoding="utf-8") as handle:
+            problem = next(
+                row
+                for row in map(json.loads, handle)
+                if (row.get("verify") or {}).get("answer_kind") == "finite_probability"
+            )
 
         judgement = qp.judge_item(problem)
 
         assert judgement.axes["equivalence_canonicalize"].status == "not_applicable"
+        assert judgement.axes["answer_reverify"].status == "ok"
         assert judgement.verdict == "pass"
 
     def test_judge_function_exception_is_unjudgeable_with_type_name(
@@ -471,6 +479,92 @@ class TestAdapter:
         assert scope["total_axes"] == 9
         assert summary["verdict_source"] == "qa_engine"
         assert summary["axis_status_counts"]["content_provenance"] == {"ok": 1}
+
+
+class TestAnswerReverifyComponent:
+    """EOS-150 — 좌석이 정답을 재검산한다. 정답만 틀린 문항이 pass가 되면 수학 결함이 FN으로 쌓인다."""
+
+    @staticmethod
+    def _wrong_answer(slug: str = "wm-wrong") -> dict[str, Any]:
+        """정답만 틀린 문항 — 조건·산문·출처는 실코퍼스 그대로 정상(나머지 3축은 전부 ok)."""
+        corpus = _REPO_ROOT / "data" / "corpus" / "problem_bank_generated_v0"
+        with (corpus / "problems.jsonl").open(encoding="utf-8") as handle:
+            row: dict[str, Any] = json.loads(handle.readline())
+        assert row["verify"]["answer_map"] == {"x": "5"}  # 픽스처 전제(x²−5x=0의 큰 근) 고정
+        row["verify"]["answer_map"] = {"x": "4"}
+        row["answer"] = "4"
+        row["slug"] = slug
+        return row
+
+    def test_wrong_answer_alone_fails_on_the_reverify_component(self) -> None:
+        judgement = qp.judge_item(self._wrong_answer())
+
+        assert judgement.verdict == "fail"
+        assert judgement.failed_axes == ("answer_reverify",)
+        others = {n: r.status for n, r in judgement.axes.items() if n != "answer_reverify"}
+        assert set(others.values()) <= {"ok", "not_applicable"}  # 3축만으로는 통과였다
+
+    def test_missing_verify_material_is_unjudgeable_not_pass(self) -> None:
+        problem = _clean_problem()
+        del problem["verify"]
+
+        judgement = qp.judge_item(problem)
+
+        assert judgement.verdict is None
+        assert "answer_reverify" in judgement.unjudgeable_axes
+
+    def test_required_component_not_ok_blocks_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """필수 성분이 not_applicable로 빠져도 pass가 아니다 — 답을 확인하지 못한 문항이다."""
+        monkeypatch.setitem(
+            qp._ITEM_JUDGES,
+            "answer_reverify",
+            lambda _p: qp.ItemAxisResult(status="not_applicable"),
+        )
+        judgement = qp.judge_item(_clean_problem())
+
+        assert judgement.verdict is None
+        assert judgement.missing_required_axes == ("answer_reverify",)
+
+    def test_reverify_exception_is_unjudgeable_with_type_name(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _boom(_record: dict[str, object], *, use_fuzz: bool) -> tuple[str, str | None]:
+            raise RuntimeError("합성 실패")
+
+        monkeypatch.setattr(qp.corpus_reverify, "_reverify_one", _boom)
+        judgement = qp.judge_item(_clean_problem())
+
+        assert judgement.verdict is None
+        reason = judgement.axes["answer_reverify"].reason
+        assert reason is not None and reason.startswith("RuntimeError")
+
+    def test_verification_axes_stay_outside_the_nine_axis_partition(self) -> None:
+        verification = set(qp.ITEM_VERIFICATION_AXES)
+
+        assert not verification & set(qp.AXIS_NAMES)
+        assert qp.ITEM_SEAT_AXES == qp.ITEM_LEVEL_AXES + qp.ITEM_VERIFICATION_AXES
+        assert set(qp.ITEM_REQUIRED_AXES) <= set(qp.ITEM_SEAT_AXES)
+        assert set(qp.ITEM_VERIFICATION_SCOPE) == verification
+
+    def test_adapter_writes_the_wrong_answer_as_fail_and_declares_the_component(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        queue = _write_jsonl(
+            tmp_path / "q.jsonl",
+            [_queue_row(_clean_problem("wm-ok")), _queue_row(self._wrong_answer("wm-bad"))],
+        )
+        out = tmp_path / "p.jsonl"
+        code, summary = _run(["--input", str(queue), "--out", str(out)], capsys)
+
+        assert code == 0
+        rows = {
+            r["cu_slug"]: r for r in map(json.loads, out.read_text(encoding="utf-8").splitlines())
+        }
+        assert rows["wm-ok"]["qa_verdict"] == "pass"
+        assert rows["wm-bad"]["qa_verdict"] == "fail"
+        assert summary["axis_status_counts"]["answer_reverify"] == {"ok": 1, "violation": 1}
+        assert summary["engine_scope"]["item_required_axes"] == ["answer_reverify"]
+        assert set(summary["engine_scope"]["item_verification_scope"]) == {"answer_reverify"}
 
 
 class TestRoundTripIntoConfusionMatrix:
