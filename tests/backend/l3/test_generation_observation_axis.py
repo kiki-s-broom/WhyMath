@@ -371,7 +371,9 @@ class TestSeatExistsInAllThreePlaces:
         # 서버 세션 부분 유니크 인덱스)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-09-25 ADMIN-15] head가 8c19e8a611e4(privacy_audit.token_expires_at/issued_by —
         # 운영자 토큰 발급 감사)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
-        assert EXPECTED_ALEMBIC_HEAD == "8c19e8a611e4"
+        # [2026-09-29 S4-11] head가 9d3e6b1f4a27(hints 테이블 — graded 힌트 카탈로그)로
+        # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "9d3e6b1f4a27"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

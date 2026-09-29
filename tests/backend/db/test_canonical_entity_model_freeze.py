@@ -3,7 +3,9 @@
 이 파일이 **강제하는 것**(정본화≠집행 — CLAUDE.md):
   ① 81테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
   ② 좌석 실재 — 19종의 좌석 테이블이 사라지거나 개명되면 RED.
-  ③ 좌석 부재 4종 — Subject·Hint·AssessmentResult·ContentVersion용 테이블이 생기면 RED.
+  ③ 좌석 부재 3종 — Subject·AssessmentResult·ContentVersion용 테이블이 생기면 RED.
+     (Hint는 S4-11이 `hints` 좌석을 실체화해 부재 동결에서 **의도적으로** 걷어냈다 — 정본 §3-B.
+     본문 좌석이 `hints` 하나뿐임은 ③-c 컬럼 축 가드가 계속 동결한다.)
   ④ 문서 정합 — 정본 문서가 81테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
 
 이 파일이 **강제하지 않는 것**(있는 척 금지):
@@ -50,7 +52,7 @@ def _load_all_models() -> None:
 # EOS-49가 concept_version을 Concept 좌석 4번째 테이블로 추가해 2026-09-14 80테이블로,
 # EOS-103이 learner_state를 LearnerState 좌석 2번째로, EOS-105가 learning_state_transition을
 # 3번째로 추가해 2026-09-17 82테이블 — 둘은 서로 다른 브랜치에서 각각 +1로 착지했으므로 병합
-# 결과는 81이 아니라 82다)
+# 결과는 81이 아니라 82다. S4-11이 `hints`를 Hint 좌석 1번째로 실체화해 2026-09-29 83테이블)
 # ──────────────────────────────────────────────────────────────────────────
 
 # 핵심 19종 → 좌석 테이블. 빈 tuple = **좌석 부재 동결**(정본 §3).
@@ -70,7 +72,9 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
     "Misconception": ("misconception_catalog",),
     "Problem": ("problem", "problem_step"),
     "Solution": ("solution_paths", "solution_nodes", "verified_solutions", "verified_lemmas"),
-    "Hint": (),
+    # S4-11(2026-09-29): 좌석 부재 동결을 의도적으로 걷어내고 실체화(정본 §3-B — HintNode 연기
+    # 해제 전제 3종 = 생성 writer·게이트·coach 서빙 reader를 한 슬라이스로 충족).
+    "Hint": ("hints",),
     "Content": ("concept_content", "pedagogy_content_slot"),
     "Learner": ("user_profile",),
     # LearnerState 좌석은 3테이블이며 **셋이 담는 사실이 다르다**(같은 사실의 복제가 아니다):
@@ -154,20 +158,17 @@ NON_CORE_TABLES: dict[str, str] = {
     "job_ownership": "인증(작업 소유권) — 학습 도메인 엔티티 아님",
 }
 
-# 좌석 부재 4종(정본 §3) — **좌석 tuple이 비어 있다는 사실 자체**를 동결한다.
+# 좌석 부재 3종(정본 §3) — **좌석 tuple이 비어 있다는 사실 자체**를 동결한다.
 # 아래 RESERVED_ABSENT_TABLE_NAMES는 *이름을 맞힌 경우만* 잡으므로, 예약어를 피한 이름
-# (`hint_content` 등)을 좌석에 등재하면 그대로 통과한다 — 그 구멍을 이 상수가 막는다.
-ABSENT_ENTITIES: frozenset[str] = frozenset(
-    {"Subject", "Hint", "AssessmentResult", "ContentVersion"}
-)
+# (`assessment_outcome` 등)을 좌석에 등재하면 그대로 통과한다 — 그 구멍을 이 상수가 막는다.
+# Hint는 S4-11이 걷어냈다(2026-09-29 — 정본 §3-B "명시적 결정 요구"의 이행).
+ABSENT_ENTITIES: frozenset[str] = frozenset({"Subject", "AssessmentResult", "ContentVersion"})
 
-# 좌석 부재 4종이 테이블을 얻으려 할 때 쓸 법한 이름 — 하나라도 생기면 RED.
+# 좌석 부재 3종이 테이블을 얻으려 할 때 쓸 법한 이름 — 하나라도 생기면 RED.
 # 전수 귀속 검사(①)도 잡지만, 이쪽은 *어느 동결 결정을 깼는지*를 이름으로 지목한다.
 RESERVED_ABSENT_TABLE_NAMES: dict[str, str] = {
     "subject": "Subject",
     "subjects": "Subject",
-    "hint": "Hint",
-    "hints": "Hint",
     "assessment_result": "AssessmentResult",
     "assessment_results": "AssessmentResult",
     "content_version": "ContentVersion",
@@ -178,10 +179,11 @@ RESERVED_ABSENT_TABLE_NAMES: dict[str, str] = {
 # 힌트 **본문** 컬럼 예약(ARCH-39 · 2026-09-06) — 좌석이 *조용히* 생기는 것을 막는다.
 #
 # ⚠ 이것은 **금지가 아니라 명시적 결정 요구**다(2026-09-07 정정). `hints` 좌석의 신설은
-# `S4-11-hint-content-generation`(P0·todo)이 소유하며, 그 태스크는 아래 상수와
-# `RESERVED_ABSENT_TABLE_NAMES`·`ABSENT_ENTITIES`의 `Hint` 항목을 **의도적으로 걷어내면서**
-# 착수한다(다른 부재 4종과 같은 규약). 한때 이 주석이 "영구 부재"라고 적혀 있었으나 그 판정은
-# 틀렸다 — 좌석은 포기된 것이 아니라 연기된 것이다.
+# `S4-11-hint-content-generation`이 소유했고, S4-11(2026-09-29)은 `RESERVED_ABSENT_TABLE_NAMES`·
+# `ABSENT_ENTITIES`의 `Hint` 항목을 **의도적으로 걷어내며** `hints` 테이블을 세웠다.
+# 이 컬럼 축 가드는 **남긴다** — 이제 뜻이 '좌석 부재'에서 **'본문 좌석 단일'**로 바뀐다: 힌트
+# 본문은 `hints.content`에만 살아야 하고, 다른 테이블에 `hint_text` 같은 컬럼이 생기면 본문이 두
+# 곳에 사는 이중 진실 원천이 된다. (`hints.content`는 이름에 `hint`가 없어 이 검사 대상이 아니다.)
 #
 # 위 두 검사(③ 이름 예약 · ③-b 좌석 tuple)는 둘 다 **테이블** 축이다. 그런데 Hint 좌석을
 # 우회하는 가장 값싼 길은 새 테이블이 아니라 **기존 테이블에 컬럼 하나를 더하는 것**이다
@@ -280,7 +282,7 @@ def test_canonical_entity_list_is_frozen_at_nineteen() -> None:
 
 
 def test_every_seat_table_exists_in_metadata() -> None:
-    """19종의 좌석 테이블이 전부 실재한다(좌석 부재 4종은 검사 대상 아님)."""
+    """19종의 좌석 테이블이 전부 실재한다(좌석 부재 3종은 검사 대상 아님)."""
     _load_all_models()
     actual = set(Base.metadata.tables)
     missing = {
@@ -292,10 +294,10 @@ def test_every_seat_table_exists_in_metadata() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ③ 좌석 부재 동결 — 4종이 몰래 좌석을 얻지 못한다
+# ③ 좌석 부재 동결 — 3종이 몰래 좌석을 얻지 못한다
 # ──────────────────────────────────────────────────────────────────────────
 def test_absent_entities_have_no_seat_table() -> None:
-    """정본 §3의 좌석 부재 4종에 예약된 테이블 이름이 등장하면 RED."""
+    """정본 §3의 좌석 부재 3종에 예약된 테이블 이름이 등장하면 RED."""
     _load_all_models()
     actual = set(Base.metadata.tables)
     breached = {
@@ -311,7 +313,7 @@ def test_absent_entities_have_no_seat_table() -> None:
 # ③-b 좌석 부재 동결 — 예약어를 피한 이름으로도 좌석을 얻지 못한다
 # ──────────────────────────────────────────────────────────────────────────
 def test_absent_entities_keep_empty_seats() -> None:
-    """정본 §3의 4종은 좌석 tuple이 **비어 있어야** 한다.
+    """정본 §3의 3종은 좌석 tuple이 **비어 있어야** 한다.
 
     바로 위 예약어 검사(③)는 *이름을 맞힌 경우만* 잡는다 — `hint_content`처럼 예약어를 피한
     이름을 좌석에 등재하면 전수 귀속·좌석 실재·문서 정합을 전부 만족하며 통과한다(실측 확인).
@@ -362,9 +364,9 @@ def test_no_table_gains_a_hint_body_column() -> None:
         "0건 통과와 측정 실패는 같은 색이면 안 된다."
     )
     assert not breached, (
-        f"Hint 좌석 부재 동결이 컬럼 축에서 깨졌다: {breached}\n"
-        f"힌트 본문 좌석의 신설은 `S4-11-hint-content-generation`이 소유한다(정본 §3-B) — "
-        f"의도한 신설이면 {_CANON_HINT}"
+        f"Hint 본문 좌석 단일 동결이 컬럼 축에서 깨졌다: {breached}\n"
+        f"힌트 본문은 S4-11이 세운 `hints.content` 한 곳에만 산다(정본 §3-B) — "
+        f"의도한 변경이면 {_CANON_HINT}"
     )
 
 

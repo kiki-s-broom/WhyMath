@@ -233,6 +233,9 @@ def test_hint_shape() -> None:
         "persona": None,
         # PED-04 D2: 불일치 태그 — 미지정 시 기본 False(기존 픽스처 무손상).
         "client_state_mismatch": False,
+        # S4-11: 검수 힌트 미서빙 턴은 reveal_score·hint_id가 None(0으로 날조 금지).
+        "reveal_score": None,
+        "hint_id": None,
     }
 
 
@@ -244,6 +247,8 @@ def test_hint_mode_persona_tag() -> None:
         "mode": "suneung",
         "persona": None,
         "client_state_mismatch": False,
+        "reveal_score": None,
+        "hint_id": None,
     }
 
 
@@ -255,6 +260,8 @@ def test_hint_client_state_mismatch_tag() -> None:
         "mode": None,
         "persona": None,
         "client_state_mismatch": True,
+        "reveal_score": None,
+        "hint_id": None,
     }
 
 

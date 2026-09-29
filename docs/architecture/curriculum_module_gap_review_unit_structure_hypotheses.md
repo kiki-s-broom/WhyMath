@@ -36,11 +36,25 @@ glob) ⑶ 원자 백본 코퍼스(`data/corpus/atom_graph_v1/graph.json`)를 **�
 
 | # | 측정 | 실측 결과 (2026-08-30~31) | 동결 단언 |
 |---|---|---|---|
-| **M1** | 순서(ordering) 컬럼 | 제안 이름(`order_index`·`sequence_order`·`sort_order`·`display_order`·`unit_order`) **전 테이블 0개**. ordering-족 광역 패턴(`seq/order/position/rank/sort`) 전수 = **7개**, 전부 런타임 이벤트·콘텐츠 내부 순서(`answer_submission.sequence_no`·`student_solution_step.sequence_no`·`dialogue_turn.turn_order`·`problem_step.step_order`·`problem.session_position`·`solution_paths.concept_sequence`·`device_credential.seq`). 커리큘럼 구조 테이블 16종(`unit_spec`·`learning_objective`·`curriculum_entry`·`achievement_standard`·`atom_node`·`concept`·`textbook_unit` 등) 위에는 **0개** | 제안 이름 0 등식 + 광역 전수 allowlist 등식 + 구조 테이블 0 |
+| **M1** | 순서(ordering) 컬럼 | 제안 이름(`order_index`·`sequence_order`·`sort_order`·`display_order`·`unit_order`) **전 테이블 0개**. ordering-족 광역 패턴(`seq/order/position/rank/sort`) 전수 = **8개**(2026-09-29 S4-11 +1 — 각주 ¹), 전부 런타임 이벤트·콘텐츠 내부 순서(`answer_submission.sequence_no`·`student_solution_step.sequence_no`·`dialogue_turn.turn_order`·`problem_step.step_order`·`hints.step_order`¹·`problem.session_position`·`solution_paths.concept_sequence`·`device_credential.seq`). 커리큘럼 구조 테이블 16종(`unit_spec`·`learning_objective`·`curriculum_entry`·`achievement_standard`·`atom_node`·`concept`·`textbook_unit` 등) 위에는 **0개** | 제안 이름 0 등식 + 광역 전수 allowlist 등식 + 구조 테이블 0 |
 | **M2** | 계층 표현 | parent-족 컬럼 전수 = **9개**. 커리큘럼 축은 3개 — `atom_node.parent_code`(백본 트리 원문)·`concept.parent_concept_id`(같은 parent_code의 UUID 해소 **프로젝션** — `l1/atom_graph/atom_backend_concept.py` 2-pass가 채움·제2 원천 아님)·`textbook_unit.parent_unit_id`(교과서 목차 **Overlay** 트리 — 외부 사실의 별도 축). 나머지 6개는 비커리큘럼(선수 코드 배열·풀이 트리·변형 계보·보호자 필드). **1급 트리 테이블(course·unit_node·subject·curriculum_node·unit_edge·unit_alignment·unit_concept) 0개** | parent-족 전수 등식 + 1급 트리 테이블 부재 |
 | **M3** | Unit 간 의미 관계 | 코퍼스 실적재 엣지 **2,210건 전건 `relation: prerequisite`**(타 관계 0). 단원급(단원 217·소단원 643) 노드 **사이** 엣지 **0건**(전 엣지가 세부개념 축). `EdgeType` 선언 어휘는 6종(PREREQUISITE·COMPOSED_OF·ANALOGOUS_TO·EXTENDS·CONTRASTS·TRIGGERS_DISTRACTOR)이나 적재는 PREREQUISITE 단일 — 적재기측 동결은 `test_edge_relation_governance.py`(상보) | 관계 타입 = {prerequisite} 등식 + 단원급 간 0 + 어휘 6종 등식 |
 | **M4** | unit_concept 역할 | 제안 6값 집합(CORE/SUPPORTING/PREREQUISITE/EXTENSION/ENRICHMENT/REVIEW)과 일치하는 enum **0개**(`schema/enums.py` 62종 전수 스윕·`UnitConceptRole` 이름도 부재). 인접 축은 존재하나 다른 축 — `ConceptRole` 4종(문제-개념)·`KnowledgeType` 7종(목표 유형). `unit_spec.concept_nodes`·`learning_objective.concept_nodes`는 **스칼라 TEXT 배열**(role 동반 불가형)·연결 테이블 부재. DSL(`quadratic_maxmin.unit.yaml`) `role` 키 0개. `UnitDSL`/`ObjectiveDSL` 모델 표면에도 부재 | enum 스윕 0 + 스칼라 배열 타입 + DSL 관측 0 + 모델 표면 0 |
 | **M5** | unit↔standard coverage_weight | 컬럼명 `coverage_weight` **전 테이블 0개**. weight-족 전수 = **3개**, 전부 노드/헤더 **속성**(`concept.weight_in_curriculum` 단일축 중요도·`evidence_links.weight` L2 증거·`problem.exam_authority_weight` 기출 권위) — **N:M 링크 배분 가중치는 0개**(`concept_standard_link` 컬럼: link_id·concept_code·norm_id·link_type·note뿐). DSL `coverage_weight` 키 0개. **기반 사실**: 성취기준→원자 1:N은 이미 실재 — 코퍼스에서 성취기준 844종 중 **510종이 복수 원자에 매핑**(최다 [2수01-06] 7원자) → 오늘의 도달률 계산은 균등 가중일 수밖에 없다 | coverage_weight 0 등식 + weight-족 allowlist 등식 + DSL 관측 0 + 1:N 실재(≥1) |
+
+¹ **`hints.step_order` 편입 판정(2026-09-29 · S4-11 · 가설 1 비발화)**: `hints` 테이블(graded
+힌트 카탈로그)의 `step_order`는 힌트가 **어느 풀이 단계의 것인지** 가리키는 참조 키다 —
+`schemas/v1.1/hint.schema.yaml`의 `SolutionStepRef`(= `solution_path_id` + `step_order`)를 그대로
+영속한 것이고, 값의 출처는 기존 allowlist 항목 `problem_step.step_order`(풀이 경로 단계 order)다.
+따라서 ⑴ 새 순서 *축*이 아니라 이미 동결된 콘텐츠 내부 순서의 사본이고 ⑵ 커리큘럼 형제(단원
+간) 순서·진도와 무관하며 ⑶ `hints`는 커리큘럼 구조 테이블이 아니다(M1 본체 단언 "구조 테이블 위
+0개"는 그대로 성립). 가설 1(§1)의 채택 트리거(T1-a·b·c) 어느 것도 발화하지 않았으므로 §6의
+스키마 태스크 승격 대상이 아니라 **allowlist 편입**(테스트 docstring이 지시하는 "런타임/콘텐츠
+내부 순서면 allowlist에 스코프 주석과 함께 추가")이다. 검토한 대안: 복합 FK
+`(solution_path_id, step_order) → problem_step`은 `problem_step`에 해당 UNIQUE가 없어 불가하고,
+`problem_step.step_id`(UUID) FK로 바꾸면 yaml 정본 참조 형태(경로+order)와 결정론 `hint_id`·
+서빙 범위 조회(`step_order >= k`)가 조인 의존이 된다 — 컬럼을 없애는 쪽이 더 옳다는 근거는 찾지
+못했다.
 
 **동결 구조 — red가 나면**: 위 등식·0-단언은 "가설이 현실이 됐다"의 기계 신호다. 누군가
 순서 컬럼·역할 필드·가중치를 추가하면 해당 단언이 red가 나고, 단언 메시지가 이 문서를
