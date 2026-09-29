@@ -1,6 +1,10 @@
-"""CI 미러의 계약 동결 — HARN-119 · HARN-180.
+"""CI 미러의 계약 동결 — HARN-119 · HARN-180 · HARN-162.
 
 이 파일이 지키는 것:
+  · 스텝을 **GitHub가 그 스텝에 쓰는 셸**로 돌리는가 — `shell:` 키 없음은 `bash -e`(pipefail
+    없음), `shell: bash`는 `-eo pipefail`, 그 밖의 셸은 실행하지 않고 미실행으로 센다.
+    그리고 실패 스텝의 stderr·stdout 꼬리가 모두 남는가 (HARN-162 — 2026-09-22 실측: webapp
+    잡의 `leak=$(grep … | wc -l)`이 CI는 통과인데 미러는 pipefail 때문에 exit 1, 원인 미기록)
   · 앞 스텝이 실패하면 뒤 스텝을 **skipped로 계상**하는가 (2026-09-10 축의 핵심)
   · 실행할 수 없는 스텝을 **통과로 세지 않는가** (액션·식·조건 스텝)
   · 잡 이름 오타·스텝 0건을 사용 오류(exit 2)로 거부하는가
@@ -174,14 +178,19 @@ def _auto_selected(module, monkeypatch, tmp_path: Path, changed: list[str]) -> l
     return module._resolve_jobs(args, workflow, _REPO_ROOT)
 
 
-def _static_not_executed(job: dict, repo_root: Path) -> list[str]:
-    """돌려 보지 않고도 알 수 있는 미실행 — 원리상 로컬에서 못 도는 run 스텝(식·조건·디렉터리)."""
+def _static_not_executed(job: dict, repo_root: Path, default_shell=None) -> list[str]:
+    """돌려 보지 않고도 알 수 있는 미실행 — 원리상 로컬에서 못 도는 run 스텝(식·조건·디렉터리·
+    미러가 재현하지 않는 셸). `run_step`의 판정 순서를 그대로 따른다."""
     found: list[str] = []
     for step in job.get("steps") or []:
         runnable, reason = mirror.step_is_runnable(step)
         if not runnable:
             if mirror.not_run_status(step) == mirror.NOT_EXECUTED:
                 found.append(f"{step.get('name')}: {reason}")
+            continue
+        argv, shell_why = mirror.step_shell_argv(job, step, default_shell)
+        if argv is None:
+            found.append(f"{step.get('name')}: {shell_why}")
             continue
         cwd, why = mirror.step_working_directory(job, step, repo_root)
         if cwd is None or not cwd.is_dir():
@@ -195,7 +204,10 @@ def _assert_auto_selection_has_no_structural_not_executed(module, monkeypatch, t
     names = _auto_selected(module, monkeypatch, tmp_path, ["docs/reviews/x.md"])
     assert len(names) >= 4, f"상시 잡 열거가 비었다 — 스캔 0건은 통과가 아니다: {names}"
     workflow = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
-    offenders = {n: _static_not_executed(workflow["jobs"][n], _REPO_ROOT) for n in names}
+    default_shell = mirror._run_defaults(workflow).get("shell")
+    offenders = {
+        n: _static_not_executed(workflow["jobs"][n], _REPO_ROOT, default_shell) for n in names
+    }
     assert {n: v for n, v in offenders.items() if v} == {}
 
 
@@ -206,6 +218,149 @@ def _assert_old_format_is_unknown(module, tmp_path: Path) -> None:
     verdict = module.mirror_verdict(path, "a" * 40)
     assert verdict.state == module.VERDICT_UNKNOWN, verdict
     assert "형식" in verdict.reason
+
+
+#: 원 사고(2026-09-22 webapp 잡 "공개 산출물 검사")와 같은 형태 — 파이프의 마지막이 아닌 grep이
+#: no-match에서 exit 1을 낸다. pipefail이 없으면 wc의 0이 그것을 가려 통과하고, 있으면 그
+#: 1이 파이프라인 상태가 되어 `set -e`가 스크립트를 판정 전에 죽인다.
+_GREP_PIPE_RUN = "leak=$(printf 'abc\\n' | grep zzz | wc -l)\ntest \"$leak\" = 0\n"
+
+#: (워크플로 defaults shell, 잡 defaults shell, 스텝 shell) → 같은 grep 파이프 스텝의 결과.
+#: 우선순위는 GitHub와 같다 — 스텝 > 잡 > 워크플로. `pipefail` = FAILED(exit 1) · `loose` =
+#: PASSED · `excluded` = 실행하지 않음(NOT_EXECUTED). 빈 문자열과 `sh`는 의도된 제외다: 빈 값도
+#: '선언'이며(falsy 판별로 접으면 선언 없음으로 새어 loose가 된다), 미러는 bash 두 형태만 재현한다.
+_SHELL_CASES = [
+    (None, None, None, "loose"),
+    (None, None, "bash", "pipefail"),
+    (None, "bash", None, "pipefail"),
+    ("bash", None, None, "pipefail"),
+    ("pwsh", "bash", None, "pipefail"),  # 잡이 워크플로를 이긴다
+    ("pwsh", None, "bash", "pipefail"),  # 스텝이 워크플로를 이긴다
+    (None, "pwsh", "bash", "pipefail"),  # 스텝이 잡을 이긴다
+    (None, "bash", "pwsh", "excluded"),  # 그 반대 방향도 스텝이 이긴다
+    (None, None, "pwsh", "excluded"),
+    (None, None, "sh", "excluded"),
+    (None, None, "", "excluded"),
+]
+
+
+def _shell_outcome(module, tmp_path: Path, *, workflow=None, job=None, step=None) -> str:
+    """같은 grep 파이프 스텝을 세 곳의 `shell` 선언 조합으로 돌려 결과를 한 단어로 돌려준다."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    step_def: dict = {"name": "grep-pipe", "run": _GREP_PIPE_RUN}
+    if step is not None:
+        step_def["shell"] = step
+    extra = {"defaults": {"run": {"shell": job}}} if job is not None else {}
+    wf = _wf([step_def], **extra)
+    if workflow is not None:
+        wf["defaults"] = {"run": {"shell": workflow}}
+    result = module.run_job(wf, "demo", tmp_path).steps[0]
+    if result.status == module.NOT_EXECUTED:
+        return "excluded"
+    if result.status == module.PASSED:
+        return "loose"
+    assert result.status == module.FAILED and result.exit_code == 1, result
+    return "pipefail"
+
+
+def _assert_grep_pipe_matches_github(module, tmp_path: Path) -> None:
+    """HARN-162 ⒜⒝ — 같은 스텝이 shell 키 없음에서는 통과하고 `shell: bash`에서는 실패한다."""
+    unset = _shell_outcome(module, tmp_path / "unset")
+    assert (
+        unset == "loose"
+    ), f"shell 키 없는 스텝은 GitHub 기본(bash -e · pipefail 없음)처럼 통과해야 한다: {unset}"
+    explicit = _shell_outcome(module, tmp_path / "bash", step="bash")
+    assert (
+        explicit == "pipefail"
+    ), f"`shell: bash`는 pipefail이 켜진 형태(-eo pipefail)라 실패해야 한다: {explicit}"
+
+
+def _assert_real_failure_fails_in_both_shells(module, tmp_path: Path) -> None:
+    """HARN-162 ⒞ — 진짜 실패 스텝은 두 형태 모두에서 실패한다(과소 검출 방지 대조군).
+
+    `false` 뒤에 `echo`가 이어지는 스크립트는 `-e`가 꺼져 있으면 마지막 명령의 0으로 통과한다.
+    셸을 느슨하게 바꾸다 `-e`까지 잃은 과잉 수정은 ⒜⒝만으로는 통과하므로 이 절이 필요하다.
+    """
+    for shell in (None, "bash"):
+        workdir = tmp_path / f"real-{shell}"
+        workdir.mkdir(parents=True, exist_ok=True)
+        step: dict = {"name": "real", "run": "echo before\nfalse\necho after"}
+        if shell is not None:
+            step["shell"] = shell
+        result = module.run_job(_wf([step]), "demo", workdir).steps[0]
+        assert result.status == module.FAILED and result.exit_code == 1, (shell, result)
+        assert "after" not in result.stdout_tail, f"실패 뒤 명령이 계속 돌았다: {shell}"
+
+
+def _assert_failure_keeps_both_output_tails(module, tmp_path: Path) -> None:
+    """HARN-162 ⒟ — 실패 스텝의 stdout 꼬리가 결과 JSON에 실재한다(stderr와 섞이지도 않는다).
+
+    GitHub 형식 오류(`::error::`)는 stdout으로 나온다. 2026-09-22 실측에서 원인이 남지 않은
+    상태(stderr 빈 문자열)를 그대로 재현하고, stderr가 함께 있어도 stdout이 사라지지 않는지
+    본다. 대조군: 통과 스텝은 stdout을 싣지 않는다(설치 로그가 JSON을 부풀리는 것을 막는다).
+    """
+    tmp_path.mkdir(parents=True, exist_ok=True)
+
+    def run_one(script: str):
+        wf = _wf([{"name": "s", "run": script}])
+        return module.run_job(wf, "demo", tmp_path).steps[0]
+
+    only_stdout = run_one('echo "::error::구체적 원인"; exit 3')
+    assert only_stdout.exit_code == 3
+    assert only_stdout.stderr_tail == "", "stderr가 비어 있는 것이 원 사고 상태다 — 섞으면 안 된다"
+    assert "::error::구체적 원인" in only_stdout.stdout_tail
+    job = module.JobResult(name="demo", steps=[only_stdout])
+    payload = module.build_payload([job], tmp_path, Path("ci.yml"))
+    saved_path = tmp_path / "saved.json"
+    module.save_payload(payload, saved_path)
+    saved = module.load_payload(saved_path)
+    assert saved is not None
+    assert "::error::구체적 원인" in saved["jobs"][0]["steps"][0]["stdout_tail"]
+
+    both = run_one("echo 표준출력원인; echo 표준에러원인 >&2; exit 4")
+    assert "표준출력원인" in both.stdout_tail and "표준에러원인" in both.stderr_tail
+    assert "표준출력원인" not in both.stderr_tail
+
+    ok = run_one("echo 소음")
+    assert ok.status == module.PASSED and ok.stdout_tail == ""
+
+
+def _assert_unsupported_shell_is_not_run(module, tmp_path: Path) -> None:
+    """HARN-162 — 모르는 셸은 bash로 돌리지 않고 미실행으로 센다(통과로 새지 않는다).
+
+    표식 파일이 생기면 스텝이 실제로 돈 것이다. 대조군: 같은 스크립트가 `shell: bash`에서는
+    돈다 — 제외가 모든 스텝을 안 돌리는 과잉 수정이 아님을 보인다.
+    """
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    wf = _wf(
+        [
+            {"name": "ok", "run": "true"},
+            {"name": "py", "shell": "pwsh", "run": "touch ran.marker"},
+        ]
+    )
+    result = module.run_job(wf, "demo", tmp_path)
+    step = result.steps[1]
+    assert step.status == module.NOT_EXECUTED, step
+    assert "pwsh" in step.reason
+    assert not (tmp_path / "ran.marker").exists(), "모르는 셸을 bash로 돌렸다"
+    assert module.payload_exit([result]) == 3, "미실행이 통과(exit 0)로 새 나갔다"
+
+    control = tmp_path / "control"
+    control.mkdir()
+    wf_bash = _wf([{"name": "bash", "shell": "bash", "run": "touch ran.marker"}])
+    assert module.run_job(wf_bash, "demo", control).steps[0].status == module.PASSED
+    assert (control / "ran.marker").exists()
+
+
+def _assert_shell_precedence(module, tmp_path: Path) -> None:
+    """HARN-162 — 스텝 > 잡 defaults > 워크플로 defaults, 선언의 유무는 `is None`으로 가른다."""
+    for index, (wf_shell, job_shell, step_shell, expected) in enumerate(_SHELL_CASES):
+        got = _shell_outcome(
+            module, tmp_path / f"case-{index}", workflow=wf_shell, job=job_shell, step=step_shell
+        )
+        assert (
+            got == expected
+        ), f"워크플로={wf_shell!r} 잡={job_shell!r} 스텝={step_shell!r}: 기대 {expected} · 실제 {got}"
 
 
 # ── ① 스텝 순차 실행 · skipped 계상 ───────────────────────────────────────
@@ -496,10 +651,21 @@ class TestExitCodeIsTheVerdict:
     def test_quiet_and_tail_do_not_hide_failure(self, tmp_path):
         """2026-08-09 축 재현 — `-q`와 `| tail`이 섞여도 판정은 exit code다.
 
-        pipefail이 걸려 있어야 파이프 앞단의 실패가 보존된다. 이 절이 없으면
-        tail의 exit 0이 앞 명령의 실패를 덮는다.
+        파이프 앞단의 실패가 보존되는가는 **스텝의 셸 선언**이 정한다(HARN-162). `shell: bash`는
+        pipefail이 켜져 있어 tail의 exit 0이 앞 명령의 실패를 덮지 못한다. 선언 없는 스텝은
+        GitHub도 pipefail 없이 돌리므로 이 형태가 CI에서도 가려진다 — 그 대조는
+        `TestShellMatchesGitHub`가 맡는다. (종전 이 테스트는 선언 없는 스텝에도 pipefail을 기대해
+        미러가 CI보다 엄격하다는 전제를 굳히고 있었다.)
         """
-        wf = _wf([{"name": "quiet-fail", "run": "bash -c 'echo x >&2; exit 5' | tail -1"}])
+        wf = _wf(
+            [
+                {
+                    "name": "quiet-fail",
+                    "shell": "bash",
+                    "run": "bash -c 'echo x >&2; exit 5' | tail -1",
+                }
+            ]
+        )
         step = mirror.run_job(wf, "demo", tmp_path).steps[0]
         assert step.status == mirror.FAILED, "파이프가 실패를 삼켰다 — pipefail 미적용"
         assert step.exit_code == 5
@@ -510,10 +676,56 @@ class TestExitCodeIsTheVerdict:
         assert mirror.run_job(wf, "demo", tmp_path).steps[0].status == mirror.PASSED
 
     def test_shell_flags_match_github_actions(self):
-        """`-u`를 더하면 CI보다 엄격해져 거짓 실패를 낸다 — 플래그를 형태로 동결한다."""
-        source = _MIRROR_PATH.read_text(encoding="utf-8")
-        assert '"--noprofile", "--norc", "-eo", "pipefail"' in source
-        assert '"-euo"' not in source, "CI 기본에 없는 -u를 쓰면 거짓 실패가 난다"
+        """`-u`를 더하면 CI보다 엄격해져 거짓 실패를 낸다 — 두 형태의 인자열을 동결한다.
+
+        소스 문자열이 아니라 `step_shell_argv`가 돌려주는 **실제 인자열**을 본다(HARN-162): 종전
+        문자열 검사는 pipefail 인자열이 소스에 '있기만 하면' 통과해, 그것이 모든 스텝에
+        적용되는 오류를 못 봤다.
+        """
+        unset, _ = mirror.step_shell_argv({}, {"run": "x"})
+        explicit, _ = mirror.step_shell_argv({}, {"shell": "bash", "run": "x"})
+        assert unset == ["bash", "-e"]
+        assert explicit == ["bash", "--noprofile", "--norc", "-eo", "pipefail"]
+        for argv in (unset, explicit):
+            assert not any(
+                re.fullmatch(r"-[a-z]*u[a-z]*", arg) for arg in argv
+            ), f"CI 기본에 없는 -u를 쓰면 거짓 실패가 난다: {argv}"
+
+
+# ── ④-b 스텝의 셸은 GitHub가 그 스텝에 쓰는 셸이다 (HARN-162) ──────────────
+class TestShellMatchesGitHub:
+    """미러가 CI보다 엄격하면 거짓 실패가 나고, 느슨하면 진짜 실패를 놓친다 — 양쪽을 다 묶는다.
+
+    실측(2026-09-22): 미러가 모든 스텝을 `bash -eo pipefail`로 돌리며 주석에 "GitHub Actions의
+    bash 기본과 정확히 맞춘다"고 적었는데, 그것은 `shell: bash`를 **명시**했을 때의 형태다.
+    선언 없는 스텝의 기본은 `bash -e`(pipefail 없음)다. 각 절마다 그 절이 없으면 통과하는 입력을
+    픽스처로 둔다 — 아래 뮤테이션(M16~)이 절마다 RED를 확인한다.
+    """
+
+    def test_grep_pipe_passes_without_shell_key_and_fails_with_bash(self, tmp_path):
+        """⒜⒝ — 원 사고 형태. 선언 없음에서 통과하고 `shell: bash`에서 실패한다."""
+        _assert_grep_pipe_matches_github(mirror, tmp_path)
+
+    def test_real_failure_fails_in_both_shells(self, tmp_path):
+        """⒞ — 진짜 실패는 두 형태 모두에서 실패한다(셸을 느슨하게 하다 -e를 잃은 과잉 수정 방지)."""
+        _assert_real_failure_fails_in_both_shells(mirror, tmp_path)
+
+    def test_failure_keeps_stdout_and_stderr_tails(self, tmp_path):
+        """⒟ — stdout 꼬리가 결과 JSON에 실재하고 stderr와 섞이지 않는다."""
+        _assert_failure_keeps_both_output_tails(mirror, tmp_path)
+
+    def test_unsupported_shell_is_not_run_as_bash(self, tmp_path):
+        """모르는 셸을 bash로 돌리면 그 결과는 그 스텝의 것이 아니다 — 실행하지 않고 미실행으로 센다."""
+        _assert_unsupported_shell_is_not_run(mirror, tmp_path)
+
+    def test_shell_precedence_is_step_then_job_then_workflow(self, tmp_path):
+        _assert_shell_precedence(mirror, tmp_path)
+
+    def test_run_step_direct_call_keeps_default_shell_optional(self, tmp_path):
+        """`default_shell`은 뒤에 붙인 선택 인자다 — 기존 호출 형태가 그대로 돈다."""
+        step = {"name": "s", "run": "true"}
+        result = mirror.run_step({"steps": [step]}, step, tmp_path, 30)
+        assert result.status == mirror.PASSED
 
 
 # ── ⑤ 결과 JSON · done 프리플라이트 ───────────────────────────────────────
@@ -769,13 +981,16 @@ class TestMutationSelfCheck:
         assert _MIRROR_PATH.read_text(encoding="utf-8") == original
 
     def test_m3_dropping_pipefail_hides_failure(self, tmp_path):
-        """M3: pipefail을 빼면 `| tail`이 앞 명령의 실패를 삼킨다(2026-08-09 축)."""
+        """M3: `shell: bash`에서 pipefail을 빼면 `| tail`이 앞 명령의 실패를 삼킨다(2026-08-09 축).
+
+        HARN-162 이후 pipefail은 `shell: bash` 명시 스텝의 몫이라 그 스텝으로 겨냥한다.
+        """
         mutant, original = self._mutated_module(
             tmp_path,
-            '["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", step["run"]]',
-            '["bash", "--noprofile", "--norc", "-c", step["run"]]',
+            self._BASH,
+            '_SHELL_ARGV_BASH = ["bash", "--noprofile", "--norc", "-e"]\n',
         )
-        wf = _wf([{"name": "quiet-fail", "run": "bash -c 'exit 5' | tail -1"}])
+        wf = _wf([{"name": "quiet-fail", "shell": "bash", "run": "bash -c 'exit 5' | tail -1"}])
         assert (
             mutant.run_job(wf, "demo", tmp_path).steps[0].status == mutant.PASSED
         ), "뮤테이션이 적용되지 않았다 — pipefail 제거가 반영되어야 한다"
@@ -950,6 +1165,106 @@ class TestMutationSelfCheck:
         )
         assert hashlib.sha256(_BACKLOG_CLI.read_bytes()).hexdigest() == digest
 
+    # ── HARN-162 — 셸 선택·출력 보존 절마다: 그 절을 깨뜨리면 그 절을 밟는 단언이 RED인가 ──
+    _UNSET = '_SHELL_ARGV_UNSET = ["bash", "-e"]\n'
+    _BASH = '_SHELL_ARGV_BASH = ["bash", "--noprofile", "--norc", "-eo", "pipefail"]\n'
+
+    @pytest.mark.parametrize(
+        ("label", "old", "new", "assert_fn"),
+        [
+            (
+                "M16-선언 없는 스텝에도 pipefail(원래 결함 형태)",
+                _UNSET,
+                '_SHELL_ARGV_UNSET = ["bash", "--noprofile", "--norc", "-eo", "pipefail"]\n',
+                _assert_grep_pipe_matches_github,
+            ),
+            (
+                "M17-`shell: bash`에서 pipefail이 빠짐",
+                _BASH,
+                '_SHELL_ARGV_BASH = ["bash", "-e"]\n',
+                _assert_grep_pipe_matches_github,
+            ),
+            (
+                "M18-선언 없는 기본이 -e를 잃음(과잉 완화)",
+                _UNSET,
+                '_SHELL_ARGV_UNSET = ["bash"]\n',
+                _assert_real_failure_fails_in_both_shells,
+            ),
+            (
+                "M19-`shell: bash`가 -e를 잃음",
+                _BASH,
+                '_SHELL_ARGV_BASH = ["bash", "--noprofile", "--norc", "-o", "pipefail"]\n',
+                _assert_real_failure_fails_in_both_shells,
+            ),
+            (
+                "M20-모르는 셸을 bash로 돌림",
+                '    if declared == "bash":\n        return list(_SHELL_ARGV_BASH), ""\n',
+                '    if True:\n        return list(_SHELL_ARGV_BASH), ""\n',
+                _assert_unsupported_shell_is_not_run,
+            ),
+            (
+                "M21-모르는 셸을 환경 전제로 접음(미실행이 아님)",
+                "        return StepResult(name=name, status=NOT_EXECUTED, reason=shell_reason)\n",
+                "        return StepResult(name=name, status=NOT_RUNNABLE, reason=shell_reason)\n",
+                _assert_unsupported_shell_is_not_run,
+            ),
+            (
+                "M22-잡 defaults의 shell을 무시",
+                '        declared = _run_defaults(job).get("shell")\n',
+                "        declared = None\n",
+                _assert_shell_precedence,
+            ),
+            (
+                "M23-워크플로 defaults의 shell을 무시",
+                '    default_shell = _run_defaults(workflow).get("shell")\n',
+                "    default_shell = None\n",
+                _assert_shell_precedence,
+            ),
+            (
+                "M24-선언 유무를 falsy로 판별(빈 문자열이 선언 없음으로 샘)",
+                '    if declared is None:\n        declared = _run_defaults(job).get("shell")\n',
+                '    if not declared:\n        declared = _run_defaults(job).get("shell")\n',
+                _assert_shell_precedence,
+            ),
+            (
+                "M25-잡 선언이 스텝 선언을 이김(우선순위 역전)",
+                '    declared = step.get("shell")\n    if declared is None:\n'
+                '        declared = _run_defaults(job).get("shell")\n',
+                '    declared = _run_defaults(job).get("shell")\n    if declared is None:\n'
+                '        declared = step.get("shell")\n',
+                _assert_shell_precedence,
+            ),
+            (
+                "M26-stdout 꼬리를 버림(원래 결함 형태)",
+                '        stdout_tail=stdout if code != 0 else "",\n',
+                '        stdout_tail="",\n',
+                _assert_failure_keeps_both_output_tails,
+            ),
+            (
+                "M27-통과 스텝의 stdout까지 싣음",
+                '        stdout_tail=stdout if code != 0 else "",\n',
+                "        stdout_tail=stdout,\n",
+                _assert_failure_keeps_both_output_tails,
+            ),
+            (
+                "M28-stdout을 stderr 칸에 합침(종전 형태)",
+                "        stderr_tail=stderr,\n",
+                "        stderr_tail=(stderr or stdout),\n",
+                _assert_failure_keeps_both_output_tails,
+            ),
+        ],
+        ids=[f"M{n}" for n in range(16, 29)],
+    )
+    def test_m16_to_m28_shell_selection_and_output_tails(
+        self, tmp_path, label, old, new, assert_fn
+    ):
+        """M16~M28: 셸 선택·우선순위·출력 보존 중 한 절을 깨뜨리면 그 절의 단언이 RED, 원본은 GREEN."""
+        mutant, original = self._mutated_module(tmp_path, old, new)
+        with pytest.raises(AssertionError):
+            assert_fn(mutant, tmp_path / "mutant")
+        assert_fn(mirror, tmp_path / "control")
+        assert _MIRROR_PATH.read_text(encoding="utf-8") == original, label
+
 
 # ── ⑧ 실제 ci.yml 연동 ────────────────────────────────────────────────────
 class TestAgainstRealWorkflow:
@@ -1051,3 +1366,25 @@ class TestAgainstRealWorkflow:
             {"name": "Checkout", "uses": "actions/checkout@v4"},
         ]
         assert _blocking_non_infra_actions({"jobs": {"j": {"steps": steps}}}) == ["j › lint"]
+
+    def test_every_run_step_resolves_to_a_shell_the_mirror_reproduces(self):
+        """HARN-162 — 실제 ci.yml의 모든 run 스텝이 미러가 재현하는 셸로 풀린다.
+
+        `shell:` 선언이 없는 스텝은 `bash -e`(pipefail 없음)로 풀려야 한다. ci.yml에 미러가 모르는
+        셸(`pwsh`·`python` 등)이 들어오면 그 스텝은 조용히 미실행이 되므로, 이 테스트가 먼저 RED가
+        되어 미러 분류를 다시 보게 한다. 스캔 0건은 통과가 아니므로 최소 건수를 단언한다.
+        """
+        workflow = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
+        default_shell = mirror._run_defaults(workflow).get("shell")
+        scanned = 0
+        unresolved: list[str] = []
+        for job_name, job in workflow["jobs"].items():
+            for step in job.get("steps") or []:
+                if not isinstance(step.get("run"), str):
+                    continue
+                scanned += 1
+                argv, why = mirror.step_shell_argv(job, step, default_shell)
+                if argv is None:
+                    unresolved.append(f"{job_name} › {step.get('name')}: {why}")
+        assert scanned >= 50, f"run 스텝 열거가 비었다 — 스캔 0건은 통과가 아니다: {scanned}"
+        assert unresolved == [], f"미러가 재현하지 않는 셸이 ci.yml에 생겼다: {unresolved}"
