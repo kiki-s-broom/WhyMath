@@ -476,6 +476,49 @@ class TestLedgerWritesNeedNoRebuild:
         assert "경로가 옮겨 갈 사고" in err_new
         assert "경로가 옮겨 갈 사고" not in err_old
 
+    def test_rule_enforcer_path_amend_moves_the_injection_immediately(
+        self, git_repo, monkeypatch, capsys
+    ) -> None:
+        """규칙 축도 같다 — `enforced_by`가 가리키는 태스크의 paths를 옮기면 규칙 주입도 따라간다.
+
+        사고의 상환 태스크(위 테스트)와 규칙의 집행 태스크는 같은 `_task_paths`를 거치지만
+        별개 입력이다. 옛 설계에서는 규칙 쪽 태스크 paths 정정도 재생성을 요구했다
+        (2026-09-29 두 세션이 HARN-179 ④로 따로 실측). 대조: 옮기기 전에는 옛 경로에 뜬다.
+        """
+        root = _ledger_repo(git_repo, monkeypatch)
+        title = "집행 태스크 경로를 따라 옮겨 가는 픽스처 규칙"
+        rule = {
+            "id": "R-901",
+            "slug": "fixture-rule",
+            "title": title,
+            "origin": "incident",
+            "status": "task",
+            "enforced_by": ["HARN-901"],
+        }
+        (root / "backlog" / "rules.ndjson").write_text(
+            json.dumps(rule, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        _, err_before = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert title in err_before  # 양성 대조 — 규칙이 집행 태스크 경로로 주입된다
+        assert (
+            cli.main(
+                [
+                    "amend",
+                    "HARN-901-fix",
+                    "--path",
+                    "src/y/**",
+                    "--drop-scope",
+                    "--reason",
+                    "픽스처 — 집행 범위 이동",
+                ]
+            )
+            == 0
+        )
+        _, err_new = _edit(root, "src/y/b.py", monkeypatch, capsys)
+        _, err_old = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert title in err_new
+        assert title not in err_old
+
 
 # ── ⑦ CLI ───────────────────────────────────────────────────────────────────
 
