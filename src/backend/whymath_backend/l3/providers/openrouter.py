@@ -64,6 +64,7 @@ from whymath_backend.l3.providers._openai_compat import (
     retries_in_current_call,
     retries_since,
 )
+from whymath_backend.l3.providers.seat_failure import SeatNotConfiguredError
 from whymath_backend.l3.router import _as_cost_tier
 
 __all__ = [
@@ -353,7 +354,9 @@ class OpenRouterProvider:
         settings = self._resolved_settings
         model_id = self._resolve_model(cost, settings)
         if not self.configured:
-            raise RuntimeError(
+            # 타입화(ARCH-69) — `SeatNotConfiguredError`는 RuntimeError 하위라 종전 문구·except
+            # 계약은 그대로고, 런타임 LOCAL 강등의 분류기가 메시지가 아니라 **타입**으로 안다.
+            raise SeatNotConfiguredError(
                 "OpenRouter가 미설정이라 생성을 할 수 없습니다 — 키"
                 "(WHYMATH_OPENROUTER_API_KEY 또는 OPENROUTER_API_KEY)와 허용 공급사 목록"
                 "(WHYMATH_OPENROUTER_ALLOWED_PROVIDERS)이 둘 다 필요합니다."
@@ -427,10 +430,17 @@ class OpenRouterProvider:
             # 결정이 전부 실패하는 상태가 됐다. `configured=False`만 두고 사유를 비우면 /status가
             # 원인을 말하지 않는다. 그리고 **다른 좌석으로 대체되지 않는다**는 사실을 함께 적는다 —
             # 운영자가 "anthropic이 대신 받겠지"라고 읽지 않게(2차 좌석 없음 · ARCH-66 기간).
+            # ARCH-69 — 다만 학생 대면 서빙 조립은 런타임 LOCAL 강등이 켜져 있어
+            # (`cloud_local_degrade`) 이 상태의 클라우드 결정은 LOCAL이 대신 답하고
+            # `not_configured`로 표기된다. 저작·측정 조립은 강등이 없어 실패한다. 이 provider는
+            # 자기가 어느 조립에 꽂혔는지 모르므로 둘 다 적는다.
             error = (
                 "OpenRouter 키 미설정(WHYMATH_OPENROUTER_API_KEY 또는 OPENROUTER_API_KEY) — "
-                "클라우드 결정은 명확한 오류로 실패한다. 다른 클라우드 좌석으로 대체되지 않는다"
-                "(2차 좌석 없음 · ARCH-63은 G-arch66-anthropic-api-pause-review 재개 판정 뒤)"
+                "클라우드 호출은 이 좌석에서 실패한다(SeatNotConfiguredError). 다른 클라우드 "
+                "좌석으로 대체되지 않는다(2차 좌석 없음 · ARCH-63은 "
+                "G-arch66-anthropic-api-pause-review 재개 판정 뒤). 런타임 LOCAL 강등이 장착된 "
+                "학생 대면 조립에서는 LOCAL이 대신 답하며 `not_configured`로 표기되고, 강등이 없는 "
+                "저작·측정 조립에서는 실패로 남는다"
             )
         return OpenRouterStatus(
             configured=self.configured,

@@ -52,6 +52,7 @@ from whymath_backend.l3.providers._openai_compat import (
     retries_in_current_call,
     retries_since,
 )
+from whymath_backend.l3.providers.seat_failure import SeatNotConfiguredError
 from whymath_backend.l3.router import _as_cost_tier
 
 __all__ = [
@@ -203,7 +204,7 @@ class DeepSeekProvider:
         settings = self._resolved_settings
         model_id = self._resolve_model(cost, settings)
         if not self.configured:
-            raise RuntimeError(
+            raise SeatNotConfiguredError(  # 타입화(ARCH-69) — RuntimeError 하위·문구 무변경
                 "DeepSeek API 키가 미설정이라 생성을 할 수 없습니다 "
                 "(WHYMATH_DEEPSEEK_API_KEY 또는 DEEPSEEK_API_KEY)."
             )
