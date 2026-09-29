@@ -401,6 +401,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_hint_content_serving_enabled: bool = Field(
+        default=True,
+        description=(
+            "S4-11 — 코치 세션(/v1/coach/sessions·turns)이 **검수 통과(verified) graded 힌트**를 "
+            "`hints` 카탈로그에서 찾아 응답의 `served_hint`로 실을지(정식기능·킬 스위치). "
+            "True(기본)면 결정된 hint_level이 1~3이고 문항 맥락이 있을 때, 학생이 아직 적지 않은 "
+            "첫 단계 이후의 가장 이른 검수 힌트 1개를 싣고 그 reveal_score·hint_id를 "
+            "`attempt_event`(힌트제공)에 함께 적재한다(KPI 도달 깊이 정밀화). 카탈로그가 비어 "
+            "있으면(오프라인 생성 `l4.hint_content.populate --apply` 미실행) 항상 null이다 — "
+            "데이터가 곧 두 번째 게이트다. 학생 대면 발화(`decision.prompt`)는 **바꾸지 않는다** "
+            "(추가 필드일 뿐 — WH-1 primary·정적 템플릿 경로 불변). Level 4(전체 풀이)는 Hint "
+            "엔티티 밖이라 조회하지 않는다. stateless /v1/coach는 DB가 없어 무관. False면 조회 0·"
+            "served_hint 항상 null·reveal_score 미적재(완전 되돌리기). "
+            "WHYMATH_L4_HINT_CONTENT_SERVING_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_theta_min_responses: int = Field(
         default=3,
         ge=0,

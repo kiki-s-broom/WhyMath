@@ -338,6 +338,24 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-29 (판정·착지 · S4-11): **HintNode 영속 연기(2026-07-08 Phase 6b)를 해제한다 — `hints` 테이블을 생성 writer·게이트 3종 검증·coach 서빙 reader 한 슬라이스로 세웠다. 힌트 본문은 검증된 풀이 단계에서 템플릿으로 만들고(LLM 호출 0), 새 힌트 유형 enum은 두지 않으며, Level 4는 Hint 밖 안전망으로 남긴다** (claude 판정·구현) — 판정 기준 main `120bd7c5`
+
+- **무엇**: 리비전 `9d3e6b1f4a27`. `l4/hint_content`(generator·gates·store·populate) — L1 개념 이름만 · L2 단계 흐름(위치·남은 단계, 계산 결과 없음) · L3 검증된 전이 1개 시연(마지막 단계는 L3 없음). `store.py`가 `hints`의 유일한 writer·reader다. 재생성에서 사라진 힌트는 지우지 않고 `verified=false`로 은퇴시킨다.
+- **게이트 3종(모두 통과해야 verified=true)**: A 레벨-노출 정합 — 선언이 아니라 *본문에서 파생한* 노출로 판정하고 최종 결과 노출을 금지 · B 정답 누출 — `detect_answer_leakage` 재사용(정답 없으면 fail-closed 거부) · C 정서 톤 — `filter_tone`을 치환이 아니라 거부로 사용. 거부 사유는 `gate_report`에 게이트별로 남는다.
+- **서빙**: coach 세션·턴 응답에 `served_hint` 추가 필드로 나간다. `decision.prompt`(발화)는 바꾸지 않는다 — WH-1 primary와 정적 템플릿 봉인 테스트가 그대로 유지된다. 킬 스위치 `l4_hint_content_serving_enabled`(기본 ON) · 카탈로그가 비어 있으면 서빙 0.
+- **reveal_score**: 본문에 실제로 드러난 최고 노출 단계 ÷ 3(깊이 환산 3×, KPI '도달 깊이 2.5+'와 같은 척도). 검수 힌트가 **실제로 서빙된 턴에만** 힌트제공 이벤트에 적재하고 미서빙 턴은 0이 아니라 None. wh1 ⑧은 지표 값을 바꾸지 않고 note에 병기(S3-04 연동). 게이트 A 때문에 검수 힌트는 항상 level/3 — 이 값의 몫은 "결정된 레벨"이 아니라 "본문에서 검증된 실제 전달 노출"이다.
+- **Level 4·유형**: Level 4는 `Literal[1,2,3]`·DB CHECK·reader 3층에서 표현 불가. 유형은 기존 `SocraticCategory`(L1=PERSPECTIVE·L2=IMPLICATION·L3=EVIDENCE)를 쓰고 모델·테이블에 type 필드가 없음을 테스트로 동결.
+- **canonical entity**: Hint 좌석을 `("hints",)`로 바꿔 부재 엔티티가 3종이 됐다. 컬럼 가드는 '본문 좌석 단일' 의미로 남겼다.
+- **미결(의도적)**: ① 단계 개념(`concept_node_id`)이 전부 사람 검수 대기라 실데이터 L1은 문제 대표 개념에 기대고, 그것도 없으면 L2·L3만 생성된다 ② `hint_usage.hint_id`는 FK로 조이지 않았다(열람 writer가 hint_id를 채울 때 판정) ③ `populate --apply`를 실데이터로 돌린 적은 없다 — 적재는 운영 실행이며 통합 테스트는 심은 경로로만 관통을 확인했다.
+
+### 2026-09-28 (구현·판정 · EOS-150 / EOS-137 병렬 중복 처분): **QA 엔진 문항 좌석에 정답 재검산을 필수 성분으로 추가 — 3축 좌석은 정답만 틀린 문항을 pass로 판정해, 골든의 수학 결함이 엔진의 한계가 아니라 부르지 않은 검증기의 몫으로 FN에 쌓일 구조였다. 첫 평가 전이라 재채점 금지와 충돌 없음. 병렬 중복 PR #1364는 닫았다** (Kiki 결정 "닫고 재검산만 이식", claude 구현) — 판정 기준 main `559be84e`
+
+- **경위**: EOS-137을 두 세션이 구현했다. 선행 세션(`focused-ramanujan`)이 11:41 착수 → 12:38 ②를 게이트로 넘기며 `unblock`(원격 claim 해제) → 이 세션이 13:46 빈 claim을 보고 착수 → 선행 구현이 #1352로 14:48 머지 → 이 세션의 #1364(푸시·PR까지 진행)가 8파일 전면 충돌. 사고 대장 계열 `parallel-duplicate-implementation` 11회차로 **이미 등재돼 있다**(대책 `HARN-186`). 대장 문언의 "미푸시"는 실제로는 푸시·PR 개설 후 닫힘이다 — 폐기 규모는 PR #1364 한 건(+1,896줄).
+- **처분**: #1364의 나머지(원장 지표·판정기 식별·런북)는 main에 동등물이 있어 버렸다. main 좌석과 실질적으로 달랐던 한 가지 — 정답 재검산 — 만 `EOS-150`으로 이식했다.
+- **무엇**: `qa_pipeline.judge_item`이 `corpus_reverify._reverify_one`(S6 야간 재검산과 같은 함수)을 부른다. fail→violation · skip→unjudgeable. `ITEM_REQUIRED_AXES`로 이 성분이 ok가 아니면 pass 불가. 9축 전수 분할(`ITEM_LEVEL_AXES`+`CORPUS_LEVEL_ONLY_AXES`=`AXIS_NAMES`)은 건드리지 않고 `ITEM_VERIFICATION_AXES`로 따로 표기했다.
+- **실측**: 저장소 문제은행 14,034건 — 재검산 ok 14,034 · 새 fail 0 · 판정 불가 0(판정 결과 불변). 뮤테이션 3종(성분 제거·필수 조건 제거·skip→ok) 전건 RED.
+- **선행 집행**: 게이트 `G-eos137-first-eval`에 `EOS-150` 입력 간선을 걸었다 — 재검산 없이 원장 첫 행이 찍히면 같은 골든을 다른 리비전으로 다시 잴 수 없다(재채점 금지). 런북 머리에도 선행을 적었다.
+- **main 설계와의 차이(기록)**: 선행 세션은 좌석을 3축으로 의도적으로 좁히고 "재현율이 낮게 나오는 것이 측정 목적"이라 적었다(계약 §8-5). 이 판정은 그 취지를 유지하되, 엔진이 이미 가진 검증기(S6)를 빼고 재는 것은 "엔진이 못 보는 것"이 아니라 "좌석이 안 부른 것"을 재는 것이라 보고 넓혔다.
 ### 2026-09-28 (결정·정리 · Kiki 지시 "변경 계획에 걸림돌이 되는 절차들을 싹 정리" · HARN-77): **"12/31 내부 프로젝트 완성"을 정의하고(Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결), 이전 계획의 잔재 7건을 대장·문서·하네스에서 걷었다 — 셀렉터가 이제 12월 검증 등급을 첫 키로 쓰고 이월 등급(P2·P3)을 기본 숨긴다** (Kiki 결정 2건, claude 조사·집행) — 판정 기준 main `6c880b67`
 
 - **발단**: 게이트 `G-student-work-after-internal-completion` 점검 요청 → Kiki 지시 "12/31 내부완성으로 계획을 변경하기로 한 이상 이전 계획과의 차이가 없으면 변경 계획에 차질 … 걸림돌이 되는 절차들을 싹 정리".
@@ -11555,3 +11573,11 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: 동작 계약 `tests/backend/l3/test_cloud_mid_seat_cutover.py`는 가짜 HTTP 전송층으로 네트워크 0이다. 학생 대면과 저작이 각각 OpenRouter 본문(모델·`provider.only=[deepinfra]`·`allow_fallbacks=false`·`data_collection=deny`)으로 나가고 좌석 단가 원가로 기록되는지, 키 부재·429 실패의 무대체를 확인한다. 뮤테이션 3종(기본값 되돌림·app.py 팩토리 우회·2차 좌석 위장 문구)은 전건 RED였다.
 - **⑤ 라이브 대조 미수행**: 컨테이너에 OpenRouter 키가 없고 라이브 호출은 금지다. Kiki 머신에서 저작 1회차와 학생 대면 1회차를 돌리고 `cloud_seat`·기록 원가(≈0.354원 × 토큰 비율)를 확인해야 한다. `seat_primary_success_rate`는 코드에 아직 **없다**(ARCH-63 몫 — 회차 관측은 None을 명시). 게이트 등재는 오케스트레이터 세션이 한다.
 - **남은 하드코딩(범위 밖·관측)**: `ops/cost_probe.py`·`ops/live_preflight.py`·`harness/wh1_llm_seam.py`가 여전히 `AnthropicProvider()`를 직접 만든다. 이 기간 이 셋의 클라우드 경로는 정책 차단 오류를 낸다.
+### 2026-09-29 — EOS-129 ⑤ 운영 실측 완료: a 추정 가능 문항 0건 → 2PL 배선은 데이터 축적 대기 — 판정 기준 main `9308cf4c`
+
+- **실측**(Kiki 머신 운영 DB `whymath-pg`:5433 · 런북 `docs/ops/eos129_prod_response_distribution_runbook.md` 그대로 · 읽기 전용): problem 1703건 · 채점 응답 80건 · 응답 있는 문항 80건 · 응답 학생 1명. 문항당 응답 구간은 `1-4`건에 80문항, 5건 이상 문항은 0건.
+- **판정**: b 보정 최소선(`_MIN_RESPONSES_FOR_CALIBRATION = 5`)을 넘는 문항조차 0건이므로 변별도 a 추정 가능 문항은 0건이다. PR #1358의 ③ 배선은 a=1.0 폴백으로 휴면하고, 폴백 비율 리포트가 그 사실을 말한다. EOS-129의 실효는 **데이터 축적 대기**다(acceptance ⑤가 예고한 결론).
+- **재측정 조건**: 날짜가 아니라 데이터다 — 운영 학생 응답이 쌓여 5건 이상 문항이 생기면 `python -m whymath_backend.l2.calibrate_items --dry-run --json`(`WHYMATH_DATABASE_URL` 5433 지정)으로 다시 잰다. 그 조건이 충족됐는지 알리는 자동 트리거는 아직 없다.
+- **미조사(추정 금지)**: 응답 학생 1명의 출처(시연·개발 계정 여부)는 조사하지 않았다. 운영 학생 데이터가 아직 사실상 없다는 것은 실측 표가 말하는 범위(80건·1명)까지만 주장한다.
+- **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
+- **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).

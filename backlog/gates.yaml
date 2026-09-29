@@ -388,11 +388,11 @@ gates:
     title: "EOS-129 ⑤ 운영 DB 문항당 응답 수 분포 실측 — 변별도 a를 추정할 만큼 응답이 쌓인 문항이 몇 건인지(읽기 전용 SELECT · 런북 docs/ops/eos129_prod_response_distribution_runbook.md · 결과 표 2개를 세션에 전달)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 머신 운영 DB(whymath-pg, 5433) 읽기 전용 실측(2026-09-29, 런북 docs/ops/eos129_prod_response_distribution_runbook.md 그대로). 판정 기준: main 9308cf4c. 표1: problems=1703, graded_attempts=80, items_with_responses=80, students=1. 표2: 구간 '2: 1-4' 80문항 · 5건 이상 문항 0건. 판정: a 추정 가능 문항 0건(b 보정 최소 5건도 0건) — EOS-129 ③ 2PL 배선은 휴면, 데이터 축적 대기. 응답 학생은 1명뿐(출처 미조사)."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "Kiki 머신 운영 DB(whymath-pg) 읽기 전용 실측 — 클라우드 세션은 운영 DB에 닿을 수 없다"
@@ -406,8 +406,10 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
-    no_inputs_reason: "골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다"
+    corrections:
+      - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
+    depends_on:
+      - EOS-150
   - id: G-eos23-rejected-quad-sum-classification
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human

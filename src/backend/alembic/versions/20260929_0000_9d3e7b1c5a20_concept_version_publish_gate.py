@@ -23,7 +23,7 @@ downgrade: 컬럼 drop(대칭). enum 값은 PG가 제거를 지원하지 않아 
   단 `67cf48ad3bce`(EOS-49)까지 내려가면 그 downgrade가 타입 자체를 drop하므로 잔존하지 않는다.
 
 Revision ID: 9d3e7b1c5a20
-Revises: 8c19e8a611e4
+Revises: 9d3e6b1f4a27
 Create Date: 2026-09-29 00:00:00.000000
 """
 
@@ -38,7 +38,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "9d3e7b1c5a20"
-down_revision: str | None = "8c19e8a611e4"
+down_revision: str | None = "9d3e6b1f4a27"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
