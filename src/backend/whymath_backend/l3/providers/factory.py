@@ -7,15 +7,23 @@
 뿐이었다 — 판정은 났는데 집행 지점이 없는 상태이며, CLAUDE.md 「정본화를 집행으로 착각한 완료
 선언 금지」가 겨냥하는 바로 그 형태다. 이 팩토리가 그 간극을 닫는다.
 
-**기본값은 `anthropic`이고 이 태스크가 그것을 바꾸지 않는다.** ARCH-55 채택 판정문:
-"이 판정은 선택지를 넓힌 것이지 기본값을 옮긴 것이 아니며, (d)가 보류인 채로 기본 경로를 옮기면
-미판정 구성이 곧 기본값이 된다." 판정 기준 (d)(지연·가용성)는 `ARCH-56`이 소유한다. 즉 이
-모듈은 *고를 수 있게* 만들 뿐 *고르지* 않는다.
+**기본값은 `openrouter`다 (ARCH-64 · ARCH-55 "기본 핀 불변" 조항 번복).** ARCH-57 도입 당시에는
+ARCH-55 채택 판정문("이 판정은 선택지를 넓힌 것이지 기본값을 옮긴 것이 아니며…")에 따라
+`anthropic`에 고정했다. 2026-09-21 Kiki가 "학생 대면까지 한 번에" → "학생대면도 오픈라우터로
+전환"으로 목적지를 확정했고 게이트 `G-cloud-mid-seat-cutover`가 판정 ①(저작+학생 대면 동시
+컷오버)로 clear돼, 그 조항이 번복됐다. 판정문 원문은 남기고 번복 표기를 덧붙였다
+(`docs/ops/arch55_provider_battle_smoke_runbook.md` 「채택 판정」 절). 이 모듈은 여전히 셀렉터를
+**읽기만** 한다 — 기본값은 `config.py`에 있고 `test_cloud_provider_selector.py`가 동결한다.
 
-**적용 범위 = 저작 경로 한정**. 학생 대면 서빙(`app.py`)은 이 팩토리를 경유하지 않는다 —
-그쪽 슬롯을 옮기는 것은 게이트 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 또는
-상시 배치 트래픽 투입 결정)를 실현시키는 행위이고, 그것은 코드 판단이 아니라 Kiki 판정이다.
-이 제외는 `tests/backend/l3/test_cloud_provider_selector.py`가 계약으로 동결한다.
+**적용 범위 = 저작 경로 + 학생 대면 서빙(`app.py`)**. ARCH-57 시절에는 학생 대면을 이 팩토리에서
+제외해 두었다(`G-arch56-availability-trigger` 발동 조건 ⓐ를 코드가 실현하지 않도록). 그 제외는
+게이트 clear 뒤 ARCH-64가 풀었고, 이제는 **반대 방향**이 계약이다 — 학생 대면 앱은 반드시 이
+팩토리로 좌석을 조립한다(`test_cloud_provider_selector.py`가 AST로 동결). 한 셀렉터가 두 경로를
+함께 움직이므로 저작과 학생 대면이 다른 좌석을 쓰는 불일치가 생기지 않는다.
+
+**2차 좌석은 없다** (2026-09-28 Kiki 결정 · ARCH-66 기간). 이 팩토리는 좌석 **하나**를 만든다.
+Anthropic 2차 좌석 failover는 `ARCH-63`이 `G-arch66-anthropic-api-pause-review` 재개 판정 뒤
+추가한다 — 그 전까지 1차 좌석 실패는 `CompositeProvider`가 "2차 좌석 없음" note를 붙여 올린다.
 
 **관할 게이트는 이 모듈이 아니라 `CompositeProvider`가 세운다**(기존 설계 유지). 팩토리가
 자기 자신을 검열하면 팩토리를 우회해 provider를 직접 쥐는 경로가 게이트까지 함께 우회한다 —
@@ -40,7 +48,7 @@ __all__ = ["build_cloud_provider", "cloud_model_pins", "cloud_provider_name"]
 
 
 def build_cloud_provider(settings: Settings | None = None) -> LLMProvider:
-    """`settings.cloud_provider`가 지목한 클라우드 제공자를 만든다(저작 경로 전용).
+    """`settings.cloud_provider`가 지목한 클라우드 제공자를 만든다(저작 경로 + 학생 대면 공통).
 
     `settings`를 주지 않으면 프로세스 설정(`get_settings()`)을 읽는다 — 호출부가 설정을 들고
     다니지 않아도 되게 하되, 테스트는 명시 주입으로 프로세스 상태와 무관하게 판정한다.

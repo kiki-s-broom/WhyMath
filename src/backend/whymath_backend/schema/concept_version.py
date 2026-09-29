@@ -42,6 +42,7 @@ from whymath_backend.schema.version_header import (
     VersionChange,
     VersionGovernance,
     VersionIntegrity,
+    VersionQA,
     VersionSource,
     VersionStatus,
 )
@@ -110,8 +111,9 @@ class ConceptVersion(BaseModel):
     원 계약과 동형).
 
     Lifecycle 불변식(PUBLISHED payload 불변·PUBLISHED→DRAFT 금지)은 **이 Pydantic
-    모델이 강제하지 않는다** — 단일 트랜잭션 내 상태 전이 검증은 DB 트리거(ORM 계층
-    아래)가 유일 권위다(`db/models/concept_version.py` 참조). Pydantic은 구조만 검증한다.
+    모델이 강제하지 않는다** — Pydantic은 구조만 검증한다. 허용 전이는 전이표
+    (`schema/version_lifecycle.py`)가, 전이 실행과 게이트 검증은 `l3/publish_gate.py`가,
+    PUBLISHED 불변성의 최후 방어는 DB 트리거(`db/models/concept_version.py`)가 맡는다(EOS-50).
     """
 
     model_config = ConfigDict(
@@ -148,6 +150,10 @@ class ConceptVersion(BaseModel):
     )
     integrity: VersionIntegrity = Field(
         default_factory=VersionIntegrity, description="무결성 검증 정보."
+    )
+    qa: VersionQA = Field(
+        default_factory=VersionQA,
+        description="게이트 통과 기록(§9 QA 연결 · EOS-50) — `l3/publish_gate.py`만 채운다.",
     )
     payload: ConceptVersionPayload = Field(..., description="이 버전 시점의 Concept 스냅숏.")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="레코드 생성 시각.")

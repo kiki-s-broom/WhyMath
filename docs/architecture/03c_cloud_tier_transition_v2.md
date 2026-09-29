@@ -207,6 +207,18 @@ API 키를 **명시적으로** 넘긴다. Anthropic SDK의 자격증명 해소 �
 
 ## 5. 단계 계획
 
+> **[착지 2026-09-29 · ARCH-64]** B2(기본값 → `openrouter`)와 B3(학생 대면 `app.py` 팩토리 경유)가
+> **함께** 착지했다 — 게이트 `G-cloud-mid-seat-cutover`는 2026-09-21 판정 ①(저작+학생 대면 동시)로
+> clear됐다. **B1은 착지하지 않았다**: 2026-09-28 Kiki 결정(ARCH-66 기간 처분)으로 `ARCH-63`을
+> 선행에서 뗐고, 이 기간의 좌석 사슬은 아래 표의 `openrouter → anthropic → LOCAL`이 아니라
+> **`openrouter` 1좌석**이다. 1차 좌석 실패는 오류로 올라가며(예외 note·`/status`의
+> `cloud_failover_seat=null`·회차 관측 `failover` 블록이 "2차 좌석 없음"을 말한다) 다른 좌석이나
+> LOCAL로 자동 재시도되지 않는다 — LOCAL 강등은 라우팅 시점(구독·예산 가드)에서만 일어난다. §3.3의
+> 작동 신호 4종 중 `seat_primary_success_rate`·`seat_failover_rate`는 그래서 **미산출(None)**이다.
+> 남은 간극(명시): 라우터의 사전 예산 판정(`guard_cloud`·`est_cost_krw`)은 좌석을 모르고 anthropic
+> 단가로 판정한다(`SERVING_CLOUD_SEAT` docstring) — 원가 *기록*은 좌석 단가로 바뀌었으나 *판정*은
+> 보수 쪽으로 과대다. CLOUD_HIGH는 이 좌석에서 `openrouter_model_high`(미확인 핀 §6-1)로 나간다.
+
 | Phase | 내용 | 판정 필요 | 선행 |
 |---|---|---|---|
 | **A** | 단가표 공급자 축 분리 + 좌석별 원가 기록 | 불요 | — |

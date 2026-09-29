@@ -421,6 +421,8 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "/admin/settings/versions",
         _PARTIAL,
         "src/backend/whymath_backend/db/models/concept_version.py",
+        # EOS-50: 전이표 + Publish Gate 서비스(운영 API는 아직 없음 — 판정 문서 §5).
+        "src/backend/whymath_backend/l3/publish_gate.py",
     ),
     _module(
         "deployment",

@@ -8,8 +8,9 @@ remediation 계열(`practice_current`)이고 `reason.type`이 `unmeasured`가 �
 개념 C(학생이 틀리는 개념 · 난이도 2.5~3.5)와 더 쉬운 개념 P(1.0~1.5)를 심는다. 오답 뒤 θ가
 바닥으로 내려가면 추천기는 |b−θ|가 가장 작은 문항, 즉 **P 문항**을 고른다 — 상태 머신을 읽지
 않던 EOS-24 이전의 동작이 바로 그것이었다(`diagnose · unmeasured`). 그러므로 오개념 오답 뒤
-추천 문항이 C 안에 있다는 것은 "상태 경로가 후보를 제한했다"의 증거이고, 같은 시딩에서 **일반
-오답**(대조군)은 P로 내려간다.
+추천 문항이 C 안에 있다는 것은 "상태 경로가 후보를 제한했다"의 증거다. **EOS-26 이후** 같은
+시딩의 **일반 오답**(대조군)도 C 안에 머문다 — R6 집행이 선수 없는 C를 같은 개념 연습으로
+보내기 때문이다(대조군 docstring 참조). 그래서 R3 테스트의 변별력은 근거·지시 단언이 댄다.
 
 **시딩 경계**: Week 1~3 게이트와 같다 — 학습자 상태는 한 줄도 직접 쓰지 않는다(전부 HTTP
 부수효과). 저작 콘텐츠만 ORM으로 심는다. 픽스처 조립기는 Week 2 하네스에서 빌린다(재구현 0).
@@ -41,6 +42,7 @@ from whymath_backend.l2.recommendation_evidence import (
     META_KEY_LEARNING_STATE_DIRECTIVE,
     META_KEY_POLICY_VERSION,
     POLICY_VERSION_CAT_STATE_REMEDIATION,
+    POLICY_VERSION_CAT_STATE_UNDIAGNOSED,
 )
 
 pytestmark = pytest.mark.integration
@@ -238,18 +240,20 @@ def test_misconception_wrong_answer_is_remediated_in_the_same_concept_then_relea
         content.teardown()
 
 
-def test_undiagnosed_wrong_answer_is_not_directed() -> None:
-    """대조군(Gate 2 V1) — 같은 시딩에서 **일반 오답**은 상태 경로를 타지 않는다.
+def test_undiagnosed_wrong_answer_without_a_prerequisite_practices_the_same_concept() -> None:
+    """대조군(Gate 2 V1) — **EOS-26 승격**: 같은 시딩에서 일반 오답(R6)은 이제 상태 경로를 탄다.
 
-    이 테스트가 위 테스트의 변별력이다: 오답 뒤 추천이 C 밖으로 내려가는 것이 기본 동작이므로,
-    오개념 오답에서 C 안에 머문 것은 상태 경로 때문이다.
+    이 배치의 C에는 선수 엣지가 없다(P는 더 쉽지만 C의 선수가 아니다). 그래서 R6 집행은 선수를
+    탐침하지 못하고 같은 개념 C 연습으로 간다 — R6 결정(`PRACTICE_SAME_CONCEPT`)의 문면이다
+    (`same_concept_probe_unsupported` · EOS-26 판정문 §3 ⓐ). 근거는 바꾸지 않는다: 이름표는 숙달
+    구간 경로가 붙이고(C 숙달 0.15 → 선수 구간이나 C에 선수·후행 엣지가 없어 정직 강등), 상태 머신이
+    한 일은 지시 결과와 정책 버전이 기록한다.
 
-    **정직한 공백 동결**: 일반 오답(R6) 직후의 `diagnose · unmeasured`는 이 태스크가 고치지 않았다.
-    Kiki가 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion`을 (가) 좁힌 기준으로 닫았다(2026-09-25 ·
-    EOS-139) — R6 직후 `diagnose`는 **선수 개념 진단**일 때만 보정이다. 그런데 추천기는 선수 그래프가
-    아니라 θ 근방 최근접으로 고르므로, 이 시딩의 P(더 쉬운 개념)로 가는 것은 선수 진단의 증거가 아니다.
-    그 공백은 3루프 하네스의 방해 개념 프로브가 재고, 서빙 변경은 `EOS-26`이 소유한다. 아래 단언이
-    깨지면 R6 경로가 바뀐 것이므로 `EOS-26` 기준으로 단언을 승격하라.
+    EOS-26 전에는 이 테스트가 `diagnose · unmeasured`(문항 = 더 쉬운 P)를 동결했다 — 추천기가 θ 근방
+    최근접으로 골랐기 때문이다. 이 테스트가 위 R3 테스트의 변별력을 대던 역할("일반 오답은 C 밖으로
+    내려간다")은 이제 R3 테스트 자신의 근거·지시 단언(`misconception_remediation` · `learning_state` ·
+    `applied` — R3 경로에서만 나온다)과 뮤테이션(개념 제한 제거 → P로 내려가 RED)이 맡는다. 선수
+    엣지가 있을 때의 탐침은 `test_eos26_r6_prerequisite_probe.py`가 잰다.
     """
     _require_pg()
     content = _Content(c_problems=3)
@@ -266,18 +270,20 @@ def test_undiagnosed_wrong_answer_is_not_directed() -> None:
             ), f"전제 붕괴 — 일반 오답인데 R6가 아니다(오개념 채널이 이 답에 반응했다): {state}"
 
             rec = _next_problem(client, auth)
-            assert rec["learning_state_directive"] is None, rec
-            assert rec["reason"]["basis"] != "learning_state", rec
-            assert rec["problem_id"] not in {str(p) for p in content.c_pids}, (
-                "일반 오답 뒤에도 C 안에 머물렀다 — 그러면 위 테스트의 'C 안' 단언이 상태 경로의 "
-                "증거가 되지 못한다(시딩 배치가 변별력을 잃었다)."
+            assert rec["learning_state_directive"] == "same_concept_probe_unsupported", rec
+            assert rec["problem_id"] in {str(p) for p in content.c_pids[1:]}, (
+                "선수 없는 개념의 일반 오답 뒤 추천이 C 밖으로 나갔다 — R6 문면(같은 개념 연습)이 "
+                f"집행되지 않았다: {rec}"
             )
-            assert rec["action"] == "diagnose", (
-                "일반 오답 직후 추천이 더 이상 diagnose가 아니다 — R6 경로가 바뀌었다(`EOS-26` 선수 "
-                "진단 배선으로 보인다). Kiki 기준(`G-eos24-loop1-undiagnosed-wrong-criterion` · 선수 "
-                "진단 + 진단 오답 시 선수 연습 하강)으로 이 단언을 승격하라."
-            )
-            _step("control", f"R6 → directive=None · action={rec['action']} · 문항∉C")
+            assert rec["target_concept"] == str(content.c_concept), rec
+            assert rec["action"] == "practice_current", rec
+            assert rec["reason"]["basis"] != "learning_state", rec  # R6는 근거를 바꾸지 않는다
+            assert rec["intent_resolution"] == "unsupported", rec  # C에 선수·후행 엣지가 없다
+            meta = asyncio.run(_treatment_meta(rec["problem_id"]))
+            assert meta is not None, "추천이 나갔는데 처치 기록이 없다"
+            assert meta[META_KEY_LEARNING_STATE_DIRECTIVE] == "same_concept_probe_unsupported", meta
+            assert meta[META_KEY_POLICY_VERSION] == POLICY_VERSION_CAT_STATE_UNDIAGNOSED, meta
+            _step("control", f"R6 → directive={rec['learning_state_directive']} · 문항∈C")
     finally:
         content.teardown()
 
@@ -361,7 +367,10 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
     """EOS-140/EOS-138 — C에서 관측된 옛 가설로 P에 오개념 교정을 고정하지 않는다(반례 S1).
 
     흐름: C 정답 → C 오개념 오답(스캔·매치 → tse 0) → C 정답(미스캔) → P 오답 → 추천.
-    EOS-138 이후 P 오답은 R3가 아니라 R6으로 가고, 추천에는 상태 머신 지시가 없다.
+    EOS-138 이후 P 오답은 R3가 아니라 R6으로 간다. EOS-26 이후 R6는 추천이 집행하는 지시라,
+    추천은 R6 지시를 따른다 — 이 픽스처의 P에는 선수 엣지가 없으므로 같은 개념 제한
+    (`same_concept_probe_unsupported`)이고 대상은 P다. 오개념 교정(R3) 지시·근거는 없다.
+    (EOS-26 전에는 "지시 없음"을 단언했다 — 그때는 R3만 지시였기 때문이다.)
     맨 앞의 정답은 경계가 **가장 늦은** 전이여야 걸러지게 만든다 — 그 정답의 전이가 옛 스캔보다
     앞에 있으므로, 경계를 가장 이른 전이로 잡는 뮤테이션(`max`→`min`)은 옛 가설을 통과시킨다.
     """
@@ -405,10 +414,15 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
             ], f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
 
             rec = _next_problem(client, auth)
-            assert rec["learning_state_directive"] is None, (
-                "R3가 없는데 추천이 상태 머신 지시를 읽었다 — 옛 가설이 교정 고정으로 샜다: "
-                f"{rec}"
+            # EOS-26 — R6 지시는 R6 계열이어야 한다. 옛 가설이 샜다면 R3 교정 지시(대상 C)가 나온다.
+            # 값은 상수를 import하지 않고 리터럴로 밟는다(상수 뮤테이션을 따라 움직이지 않게).
+            assert rec["learning_state_directive"] == "same_concept_probe_unsupported", (
+                "R6(원인 미상 오답) 뒤 추천이 R6 지시를 따르지 않았다 — 옛 가설이 교정 고정으로 "
+                f"샜거나 R6 집행이 빠졌다: {rec}"
             )
+            assert rec["target_concept"] == str(
+                content.p_concept
+            ), f"추천 대상이 P가 아니다 — C의 옛 가설이 대상을 끌어갔다: {rec}"
             assert rec["reason"]["basis"] != "learning_state", rec
             assert rec["reason"]["type"] != "misconception_remediation", rec
             _step(

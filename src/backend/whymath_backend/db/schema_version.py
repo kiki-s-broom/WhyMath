@@ -166,6 +166,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 감사(누가·누구에게·언제·만료)의 "만료·누가" 좌석. ops/operator_token_cli가 유일 생산자.
     "9d3e6b1f4a27",  # S4-11: hints 테이블(graded 힌트 카탈로그 — HintNode 연기 해제·level CHECK
     # 1~3로 Level 4 표현 불가·verified 게이팅). 생성 writer·게이트·coach 서빙 reader 동반 좌석.
+    "9d3e7b1c5a20",  # EOS-50: concept_version_status_enum 'IN_QA' + concept_version.qa(게이트
+    # 통과 기록 — §9 QA 연결). 쓰는 곳은 l3/publish_gate 한 곳(AST 동결).
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]
