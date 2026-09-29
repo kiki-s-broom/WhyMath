@@ -4,15 +4,22 @@
 정답으로 내면 다음 `GET /v1/me/next-problem`이 `theta=4.0`(SE 7.897)이고 추천은 **4.8**(은행 최고 난이도)
 이었다. 이어서 정답을 내면 4.4 → 3.9 순으로 **내려온다**(역사다리 — 판정문 §1-1). 판정
 (`docs/reviews/eos147_all_correct_theta_pin_judgment_2026-09-29.md`)은 추정기를 그대로 두고 추천의
-표적 θ만 분리한다: 맞힌 최고 난이도 + 1단계.
+표적 θ만 분리한다: 맞힌 최고 난이도 + 0.5 로짓(잠정 — 처음 1.0이었다가 독립 비판을 받고 내렸다).
 
 이 파일이 지키는 것:
 
-① **바뀌는 것** — 첫 정답 뒤 추천이 3.9(한 칸 위)이고, 정답을 이어 내면 3.9 → 4.8 → 4.4로 **오른 뒤**
-   꼭대기에서 내려온다. 응답이 `selection_theta`(0.9·1.9·2.8)와 `theta_boundary="upper"`로 그 사실을 말한다.
+① **바뀌는 것** — 첫 정답 뒤 추천이 3.4(반 칸 위)이고, 정답을 이어 내면 3.4 → 3.9 → 4.4 → 4.8로 **오른
+   뒤** 꼭대기 문항을 다 풀면 나머지(2.4)로 내려온다 — 가장 어려운 문항은 다섯 번째에 나간다(수정 전
+   2번째·1.0 단계 3번째). 응답이 `selection_theta`(0.4·0.9·1.4·1.9·2.3)와 `theta_boundary="upper"`로
+   그 사실을 말하고, 처치 기록에도 `theta_boundary`·`policy_version=cat_v4`가 남는다.
 ② **바뀌지 않는 것** — 응답의 `theta`(4.0)·`standard_error`(7.897)·`measurement_sufficient`, 능력 API
    (`/ability`·`/ability/history`)와 평가 캡처(ASM-03)의 판정 입력. 처치 기록의 `theta`.
-③ **혼합 이력은 추정기로 넘어간다** · **하한(전부 오답)은 범위 밖이라 종전 그대로** — 두 경계를 동결한다.
+③ **혼합 이력은 추정기로 넘어간다**(처치 기록에 경계 키 없음) · **하한(전부 오답)은 범위 밖이라 종전
+   그대로**(선택은 추정 θ = -4.0 · 처치 기록에는 경계 키 `lower`만) — 두 경계를 동결한다.
+
+**잠정 동작의 동결** — 정답 개수·도움 완료를 반영하지 않는 0.5 단계의 사다리다. 표적의 실측 보정과
+도움 받은 완료 신호의 반영은 `EOS-39`가 소유하므로, ① 여정의 리터럴은 그 태스크에서 의도적으로 바뀔 수
+있다. DB 없는 짝(사다리 순서 동결)은 `tests/backend/l2/test_eos147_selection_theta.py`의 `TestLadderSpeed`다.
 
 **요청 형태 2종**(`prioritize_weak_concepts` 전송·미전송 — 실제 모바일 앱은 미전송)으로 같은 여정을
 돈다. 한 형태에서만 서는 결과는 약점 가중의 우연이다(EOS-26 판정문 §1-2).
@@ -38,8 +45,10 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
+    META_KEY_POLICY_VERSION,
     META_KEY_SELECTION_THETA,
     META_KEY_THETA,
+    META_KEY_THETA_BOUNDARY,
 )
 
 pytestmark = pytest.mark.integration
@@ -82,6 +91,17 @@ _REQUEST_SHAPES: dict[str, bool] = {"weak-first": True, "app-default": False}
 _BANK: list[float] = [1.2, 1.8, 2.4, 2.9, 3.4, 3.9, 4.4, 4.8]
 _SE_ONE_CORRECT = 7.8966  # 수정 전 실측(b=-0.1 정답 1건 · θ=4.0에서의 SE) — 리터럴로 동결한다
 
+#: 첫 정답(라벨 2.9 · b=-0.1) 뒤 모두 정답으로 이어질 때의 여정 — `(추천 난이도 라벨, 그 회차의
+#: selection_theta)`. 유도: 표적 = min(4.0, max(0.0, 맞힌 최고 b + 0.5)), 추천 = 남은 문항 중 b가
+#: 표적에 가장 가까운 것(a=1이라 정보량 최대와 같다).
+_LADDER: list[tuple[float, float]] = [
+    (3.4, 0.4),  # 최고 b=-0.1 → 0.4 → b=0.4(라벨 3.4)가 P=0.5로 정보량 최대
+    (3.9, 0.9),  # 최고 b=0.4 → 0.9 → b=0.9(라벨 3.9)
+    (4.4, 1.4),  # 최고 b=0.9 → 1.4 → b=1.4(라벨 4.4)
+    (4.8, 1.9),  # 최고 b=1.4 → 1.9 → 가장 가까운 1.8(라벨 4.8) — 꼭대기, 2.9부터 다섯 번째
+    (2.4, 2.3),  # 최고 b=1.8 → 2.3 → 남은 b는 전부 낮다: 가장 가까운 -0.6(라벨 2.4)로 내려온다
+]
+
 
 def _next(client: Any, auth: dict[str, str], *, weak_first: bool) -> dict[str, Any]:
     suffix = "?prioritize_weak_concepts=true" if weak_first else ""
@@ -113,11 +133,16 @@ async def _treatment_meta(problem_id: str) -> dict[str, Any] | None:
 
 
 @pytest.mark.parametrize("weak_first", list(_REQUEST_SHAPES.values()), ids=list(_REQUEST_SHAPES))
-def test_first_correct_answers_climb_one_step_at_a_time(weak_first: bool) -> None:
-    """정답 3건 — 추천은 3.9 → 4.8 → 4.4(한 칸 위에서 시작해 오르고, 꼭대기 뒤에 내려온다).
+def test_correct_answers_climb_half_a_logit_at_a_time(weak_first: bool) -> None:
+    """정답 5건 — 추천은 3.4 → 3.9 → 4.4 → 4.8 → 2.4(반 칸 위에서 시작해 오르고, 꼭대기 뒤에 내려온다).
 
-    수정 전 같은 여정은 4.8 → 4.4 → 3.9였다. 응답의 `theta`·SE·중단 규칙은 세 번 모두 추정기의 값
-    그대로이고(첫 SE는 수정 전 실측 7.897과 같다), 달라진 것은 후보를 고른 θ(`selection_theta`)뿐이다.
+    수정 전 같은 여정은 4.8 → 4.4 → 3.9 → 3.4 → 2.4였다(첫 정답 뒤 곧장 꼭대기). 응답의 `theta`·SE·중단
+    규칙은 매번 추정기의 값 그대로이고(첫 SE는 수정 전 실측 7.897과 같다), 달라진 것은 후보를 고른
+    θ(`selection_theta`)뿐이다. 첫 회차에는 처치 기록도 함께 본다 — 경계 사실(`theta_boundary`)과
+    정책 식별자(`cat_v4`)가 서빙 경로에서 실제로 남는가.
+
+    **잠정 동작의 동결** — 정답 개수·도움 완료를 반영하지 않는 0.5 단계의 여정이다. 보정은 `EOS-39`가
+    소유하므로 이 리터럴은 그 태스크에서 의도적으로 바뀔 수 있다.
     """
     content, _journal = _P._begin("E147-ladder")
     try:
@@ -129,30 +154,25 @@ def test_first_correct_answers_climb_one_step_at_a_time(weak_first: bool) -> Non
             auth = _P._login(client)
 
             _answer(client, auth, pids[_BANK.index(2.9)], correct=True)
-            first = _next(client, auth, weak_first=weak_first)
-            assert first["theta"] == 4.0, first  # 추정 θ는 그대로 — 전부 정답이면 상한 클램프
-            assert first["theta_boundary"] == "upper", first
-            assert first["selection_theta"] == pytest.approx(0.9, abs=1e-9), first
-            assert first["problem_id"] != hardest, "첫 정답 뒤 은행 꼭대기로 뛰었다 — 수정 전 결함"
-            assert first["difficulty"] == 3.9, first  # 맞힌 2.9에서 한 칸 위
-            assert first["standard_error"] == pytest.approx(_SE_ONE_CORRECT, abs=1e-3), first
-            assert first["measurement_sufficient"] is False, first
-
-            meta = asyncio.run(_treatment_meta(first["problem_id"]))
-            assert meta is not None, "추천이 나갔는데 처치 기록이 없다"
-            assert meta[META_KEY_THETA] == 4.0, meta  # 기록 theta = 응답 theta(추정 θ)
-            assert meta[META_KEY_SELECTION_THETA] == pytest.approx(0.9, abs=1e-9), meta
-
-            _answer(client, auth, first["problem_id"], correct=True)
-            second = _next(client, auth, weak_first=weak_first)
-            assert second["theta"] == 4.0 and second["theta_boundary"] == "upper", second
-            assert second["selection_theta"] == pytest.approx(1.9, abs=1e-9), second
-            assert second["difficulty"] == 4.8, second  # 사다리가 꼭대기에 닿는다
-
-            _answer(client, auth, second["problem_id"], correct=True)
-            third = _next(client, auth, weak_first=weak_first)
-            assert third["selection_theta"] == pytest.approx(2.8, abs=1e-9), third
-            assert third["difficulty"] == 4.4, third  # 꼭대기 문항을 다 풀었으니 다음으로 어려운 것
+            for turn, (label, target) in enumerate(_LADDER, start=1):
+                rec = _next(client, auth, weak_first=weak_first)
+                # 추정 θ는 그대로 — 전부 정답이면 상한 클램프이고 경계 사실이 그것을 말한다.
+                assert rec["theta"] == 4.0 and rec["theta_boundary"] == "upper", (turn, rec)
+                assert rec["selection_theta"] == pytest.approx(target, abs=1e-9), (turn, rec)
+                assert rec["difficulty"] == label, (turn, rec)
+                assert rec["measurement_sufficient"] is False, (turn, rec)
+                if turn == 1:
+                    assert (
+                        rec["problem_id"] != hardest
+                    ), "첫 정답 뒤 은행 꼭대기로 뛰었다 — 수정 전 결함"
+                    assert rec["standard_error"] == pytest.approx(_SE_ONE_CORRECT, abs=1e-3), rec
+                    meta = asyncio.run(_treatment_meta(rec["problem_id"]))
+                    assert meta is not None, "추천이 나갔는데 처치 기록이 없다"
+                    assert meta[META_KEY_THETA] == 4.0, meta  # 기록 theta = 응답 theta(추정 θ)
+                    assert meta[META_KEY_SELECTION_THETA] == pytest.approx(0.4, abs=1e-9), meta
+                    assert meta[META_KEY_THETA_BOUNDARY] == "upper", meta  # 경계 사실이 남는다
+                    assert meta[META_KEY_POLICY_VERSION] == "cat_v4", meta  # 선택 규칙의 판
+                _answer(client, auth, rec["problem_id"], correct=True)
     finally:
         content.teardown()
 
@@ -177,6 +197,7 @@ def test_a_wrong_answer_hands_the_selection_back_to_the_estimator() -> None:
             meta = asyncio.run(_treatment_meta(rec["problem_id"]))
             assert meta is not None
             assert META_KEY_SELECTION_THETA not in meta, meta  # 다를 때만 남긴다
+            assert META_KEY_THETA_BOUNDARY not in meta, meta  # 경계가 아니면 키 자체가 없다
     finally:
         content.teardown()
 
@@ -199,6 +220,12 @@ def test_first_wrong_answer_is_reported_but_keeps_the_easiest_pick() -> None:
             assert rec["theta_boundary"] == "lower", rec
             assert rec["selection_theta"] == -4.0, rec
             assert rec["difficulty"] == 1.2, rec  # 가장 쉬운 문항
+            # 처치 기록 — 경계 사실만 남는다(선택 θ = 추정 θ = -4.0이라 selection_theta 키는 없다).
+            meta = asyncio.run(_treatment_meta(rec["problem_id"]))
+            assert meta is not None, "추천이 나갔는데 처치 기록이 없다"
+            assert meta[META_KEY_THETA] == -4.0, meta
+            assert meta[META_KEY_THETA_BOUNDARY] == "lower", meta
+            assert META_KEY_SELECTION_THETA not in meta, meta
     finally:
         content.teardown()
 

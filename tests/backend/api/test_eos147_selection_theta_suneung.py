@@ -10,6 +10,9 @@
 추정 θ 그대로임을 동결한다. 기본 CAT의 짝은 `tests/backend/l2/test_eos147_selection_theta.py`다.
 
 기대값은 리터럴이다(상수를 import해 기대값을 만들면 상수 뮤테이션을 따라 움직인다 — MISC-30).
+아래의 표적 0.9는 `_history()`가 **손으로 주입한 상태값**이지 규칙(맞힌 최고 난이도 + 0.5)이 낸 값이
+아니다 — 이 파일은 정책이 그 값을 어느 지점에 쓰는지만 재므로 단계 상수와 무관하다. 규칙 산출(단계·
+바닥·상한)은 `tests/backend/l2/test_eos147_selection_theta.py`가 지킨다.
 """
 
 from __future__ import annotations

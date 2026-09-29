@@ -44,10 +44,11 @@ EOS-124가 기본 CAT에서 고친 결함이 이 정책에도 있었다(2026-09-
     없다 — 숙달 0.55에서 오답 1개면 0.219(선수 복귀), 정답 1개면 0.862(전진)다. 응답 하나로 콘텐츠를
     옮기게 된다(`EOS-33`). 재선택의 재판정은 `EOS-35`가 소유한다.
 
-그래서 이 정책의 **선택은 바뀌지 않는다** — 같은 입력에서 같은 문항이 나가고, `policy_version`도
-`suneung_v1` 그대로다(REC-11: 후보 생성·선택 규칙의 식별자). 바뀌는 것은
-설명(reason·action·target)과,
-그 설명이 전달 문항으로 어떻게 해소됐는지를 말하는 `intent_resolution`이다.
+그래서 EOS-25가 바꾼 것은 설명(reason·action·target)과, 그 설명이 전달 문항으로 어떻게 해소됐는지를
+말하는 `intent_resolution`뿐이고 선택은 바뀌지 않았다(`policy_version`은 그때 `suneung_v1` 그대로).
+**EOS-147이 선택을 바꿨다**: 전부 정답 이력에서 후보를 고르는 표적 θ가 추정 θ(4.0 클램프)가 아니라
+`ability_for_selection`의 표적이라 그 이력의 선택이 달라진다 — 그래서 `suneung_v2`다(REC-11: 후보
+생성·선택 규칙의 식별자).
 """
 
 from __future__ import annotations

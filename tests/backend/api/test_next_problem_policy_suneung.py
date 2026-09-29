@@ -462,13 +462,14 @@ class TestFirstPassPathsAndDeclarations:
         assert e.reason_calls == [None]  # 없는 문항의 개념을 묻지 않는다
         _assert_aligned(outcome)
 
-    def test_selection_rule_identifier_is_unchanged(self) -> None:
-        """선택 규칙은 바뀌지 않았다 — 설명만 정렬했으므로 REC-11 식별자를 올리지 않는다.
+    def test_selection_rule_identifier_is_suneung_v2(self) -> None:
+        """REC-11 식별자는 선택 규칙의 판이다 — EOS-25는 설명만 정렬해 `suneung_v1` 그대로였고,
+        EOS-147이 전부 정답 이력의 표적 θ를 바꿔 `suneung_v2`로 올렸다.
 
-        콘텐츠 재선택을 켜는 변경(EOS-35)은 선택 규칙을 바꾸므로 그때 이 값을 올리고 이 단언을
-        함께 고친다(소급 평가가 두 규칙의 로그를 섞지 않게).
+        콘텐츠 재선택을 켜는 변경(EOS-35)이나 표적 규칙의 보정(EOS-39)은 선택 규칙을 다시 바꾸므로
+        그때 이 값을 올리고 이 단언을 함께 고친다(소급 평가가 두 규칙의 로그를 섞지 않게).
         """
-        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v1"
+        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v2"
 
 
 # ──────────────────────────────────────────────────────────────────────────

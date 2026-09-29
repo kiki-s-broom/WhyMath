@@ -6,8 +6,11 @@
 `l2/irt.py`(경계 판정·표적 규칙·상수) · `l2/next_problem_selection.py`(상태 객체·로더 — 특히
 **SE가 계속 추정 θ에서 계산되는가**) · `l2/recommendation_policy.py`·
 `api/_next_problem_policy.py`(두 정책의 θ 소비 **지점마다**) ·
-`l2/recommendation_evidence.py`(처치 기록 키) · `api/me.py`(응답 매핑 — 서빙 경로 표면).
-추정기 자신(`estimate_ability`)을 흔들면 동결 테스트가 RED가 되는지도 잰다(불변 열).
+`l2/recommendation_evidence.py`(처치 기록 키 `selection_theta`·`theta_boundary` · 정책 버전 식별자
+4종) · `api/me.py`(응답 매핑·처치 기록 전달 — 서빙 경로 표면). 추정기 자신(`estimate_ability`)을
+흔들면 동결 테스트가 RED가 되는지도 잰다(불변 열). 단계 상수는 0.5(잠정 — 처음 1.0이었다가 독립
+비판을 받고 내렸다)이고, 옛 값 1.0으로 되돌린 뮤테이션(`I03`)이 새 리터럴·사다리 동결 테스트에서
+RED가 되어야 한다.
 
 규율은 선례 `scripts/analysis/mutate_eos26_r6_guards.py`와 같다 — 주입 실재 단언(앵커 1건 ·
 치환 후 원본과 다름 · 쓴 내용 재확인) · 순수 Python 치환(셸 heredoc 주입 0) · 백업 **복사**
@@ -17,18 +20,18 @@ pytest 종료 코드 · 실행마다 대상 모듈의 바이트코드 캐시 삭
 마지막에 다시 단언한다.
 
 **같은 종류가 일부만 RED면 하네스를 의심한다** — 정책 지점별 뮤테이션(`P05`~`P10` ·
-`S05`~`S08`)은 같은 종류이므로 전건이 RED여야 한다. 하나라도 생존하면 그 지점을 재는 테스트가
-없다는 뜻이다.
+`S05`~`S08`) · 정책 버전 리터럴(`V01`~`V04`) · 처치 기록의 경계 키(`E05`~`E07`)는 각각 같은
+종류이므로 전건이 RED여야 한다. 하나라도 생존하면 그 지점을 재는 테스트가 없다는 뜻이다.
 
-표면이 둘이다:
+표면이 둘이다(뮤테이션 총 58종 — 단위 52종 + 서빙 경로 6종):
 
 - **단위**(기본): `tests/backend/l2/test_eos147_selection_theta.py` ·
   `tests/backend/api/test_eos147_selection_theta_suneung.py` — DB 없이 규칙·상태 객체·정책 소비
-  지점.
+  지점·사다리 순서·처치 기록 키·버전 리터럴.
 - **서빙 경로**(`--with-integration`): 실 PostgreSQL · HTTP 통합 테스트
   `tests/backend/api/test_eos147_all_correct_selection_theta.py`. 환경변수
   `WHYMATH_DATABASE_URL`(asyncpg URL · **이 브랜치의 head까지 마이그레이션된 DB**)이 필요하다.
-  `api/me.py` 응답 매핑처럼 단위가 못 보는 지점은 이 표면에서만 잡힌다.
+  `api/me.py` 응답 매핑·처치 기록 전달(`M01`~`M04`)처럼 단위가 못 보는 지점은 이 표면에서만 잡힌다.
 
 사용: `python3 scripts/analysis/mutate_eos147_selection_theta_guards.py
 [--with-integration] [--only 이름조각]`
@@ -81,7 +84,7 @@ class Mutation:
 
 
 # ── 앵커(원문 그대로 — 1건이어야 한다) ───────────────────────────────────────────────
-_STEP = "ALL_CORRECT_STEP_LOGIT = 1.0\n"
+_STEP = "ALL_CORRECT_STEP_LOGIT = 0.5\n"
 _FLOOR_CAP = "    return min(upper, max(cold_start, reach))\n"
 _REACH = "    reach = max(item.difficulty for item, _ in responses) + step\n"
 _COLD = "    cold_start = estimate_ability([])\n"
@@ -154,15 +157,24 @@ _SUN_SCORE = (
 )
 
 _EVD_GATE = "    if selection_theta is not None and selection_theta != theta:\n"
+_EVD_BOUNDARY = (
+    "    if theta_boundary is not None:\n"
+    "        meta[META_KEY_THETA_BOUNDARY] = theta_boundary\n"
+)
+_EVD_VER_CAT = 'POLICY_VERSION_CAT: str = "cat_v4"\n'
+_EVD_VER_SUNEUNG = 'POLICY_VERSION_SUNEUNG: str = "suneung_v2"\n'
+_EVD_VER_REMEDIATION = 'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"\n'
+_EVD_VER_UNDIAGNOSED = 'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"\n'
 _ME_SEL = (
     "        selection_theta=(\n"
     "            outcome.selection_theta"
     " if outcome.selection_theta is not None else outcome.theta\n"
     "        ),\n"
 )
-_ME_BOUNDARY = "        theta_boundary=outcome.theta_boundary,\n"
+_ME_BOUNDARY = "        ),\n        theta_boundary=outcome.theta_boundary,\n"
 _ME_LEDGER = (
     "            selection_theta=outcome.selection_theta,\n"
+    "            theta_boundary=outcome.theta_boundary,\n"
     "            pool_size=outcome.candidate_pool_size,\n"
 )
 
@@ -177,7 +189,7 @@ MUTATIONS: list[Mutation] = [
     # ── 축 1: 단계 상수 — 리터럴 기대값이 상수를 따라 움직이지 않는가 ─────────────────
     Mutation("I01-step-zero", IRT, _STEP, "ALL_CORRECT_STEP_LOGIT = 0.0\n", "단계 상수"),
     Mutation("I02-step-two", IRT, _STEP, "ALL_CORRECT_STEP_LOGIT = 2.0\n", "단계 상수"),
-    Mutation("I03-step-half", IRT, _STEP, "ALL_CORRECT_STEP_LOGIT = 0.5\n", "단계 상수"),
+    Mutation("I03-step-old-one", IRT, _STEP, "ALL_CORRECT_STEP_LOGIT = 1.0\n", "단계 상수(옛 값)"),
     # ── 축 2: 표적 규칙의 절 — 바닥·상한·최고 난이도·경계 게이트 ─────────────────────
     Mutation(
         "I04-no-cold-start-floor",
@@ -487,6 +499,56 @@ MUTATIONS: list[Mutation] = [
         'META_KEY_SELECTION_THETA: str = "sel_theta"\n',
         "소비처가 읽는 키 이름",
     ),
+    Mutation(
+        "E05-boundary-key-never-written",
+        EVIDENCE,
+        _EVD_BOUNDARY,
+        _swap(_EVD_BOUNDARY, "if theta_boundary is not None:", "if False:"),
+        "경계 키 기록",
+    ),
+    Mutation(
+        "E06-boundary-written-when-none",
+        EVIDENCE,
+        _EVD_BOUNDARY,
+        "    meta[META_KEY_THETA_BOUNDARY] = theta_boundary\n",
+        "경계 아니면 키 없음(null 기록 금지)",
+    ),
+    Mutation(
+        "E07-boundary-key-name-changed",
+        EVIDENCE,
+        'META_KEY_THETA_BOUNDARY: str = "theta_boundary"\n',
+        'META_KEY_THETA_BOUNDARY: str = "boundary"\n',
+        "소비처가 읽는 경계 키 이름",
+    ),
+    # ── 축 8-b: 정책 버전 식별자 4종(REC-11) — 같은 종류이므로 전건 RED여야 한다 ─────────────
+    Mutation(
+        "V01-cat-version-old",
+        EVIDENCE,
+        _EVD_VER_CAT,
+        'POLICY_VERSION_CAT: str = "cat_v2"\n',
+        "버전: 기본 CAT(옛 값)",
+    ),
+    Mutation(
+        "V02-suneung-version-old",
+        EVIDENCE,
+        _EVD_VER_SUNEUNG,
+        'POLICY_VERSION_SUNEUNG: str = "suneung_v1"\n',
+        "버전: 수능(옛 값)",
+    ),
+    Mutation(
+        "V03-remediation-variant-changed",
+        EVIDENCE,
+        _EVD_VER_REMEDIATION,
+        'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v2_state_remediation"\n',
+        "버전: R3 집행 변형(바뀌면 안 된다)",
+    ),
+    Mutation(
+        "V04-undiagnosed-variant-changed",
+        EVIDENCE,
+        _EVD_VER_UNDIAGNOSED,
+        'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v4_state_undiagnosed"\n',
+        "버전: R6 집행 변형(바뀌면 안 된다)",
+    ),
     # ── 축 9: 응답 매핑·기록 전달(서빙 경로) — 단위가 못 보는 지점 ─────────────────────
     Mutation(
         "M01-response-selection-is-estimate",
@@ -508,8 +570,18 @@ MUTATIONS: list[Mutation] = [
         "M03-ledger-selection-not-passed",
         ME,
         _ME_LEDGER,
+        "            theta_boundary=outcome.theta_boundary,\n"
         "            pool_size=outcome.candidate_pool_size,\n",
-        "처치 기록 전달",
+        "처치 기록 전달(선택 θ)",
+        True,
+    ),
+    Mutation(
+        "M04-ledger-boundary-not-passed",
+        ME,
+        _ME_LEDGER,
+        "            selection_theta=outcome.selection_theta,\n"
+        "            pool_size=outcome.candidate_pool_size,\n",
+        "처치 기록 전달(경계 사실)",
         True,
     ),
     # 서빙 경로 표면에서 다시 보는 핵심 두 건 — "학생 응답이 실제로 바뀌는가"

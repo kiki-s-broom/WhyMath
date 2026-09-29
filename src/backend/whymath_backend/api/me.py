@@ -1773,7 +1773,13 @@ _CI_Z_95 = 1.96  # 95% 신뢰구간 z값(표준정규 양측 0.025)
 class AbilityResponse(BaseModel):
     """`GET /v1/me/ability` 응답 — IRT 능력 추정(θ + 측정 정밀도)."""
 
-    theta: float = Field(description="IRT 능력 추정 θ(logit). 채점 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "IRT 능력 추정 θ(logit). 채점 응답 없으면 0. 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     response_count: int = Field(description="추정에 쓰인 채점(is_correct 있는) 풀이 수.")
     standard_error: float | None = Field(
         default=None,
@@ -1952,7 +1958,13 @@ class AbilityHistoryPoint(BaseModel):
     """`GET /v1/me/ability/history`의 한 시점 — k번째 채점 직후 누적 θ."""
 
     as_of: datetime = Field(description="이 지점에 반영된 마지막 채점 시각(created_at).")
-    theta: float = Field(description="이 시점까지 누적 응답으로 추정한 θ(logit).")
+    theta: float = Field(
+        description=(
+            "이 시점까지 누적 응답으로 추정한 θ(logit). 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     standard_error: float | None = Field(
         default=None, description="이 시점 θ의 표준오차. 측정 불가면 null."
     )
@@ -2613,18 +2625,21 @@ class NextProblemResponse(BaseModel):
     )
     selection_theta: float = Field(
         description=(
-            "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 맞힌 최고 "
-            "난이도 + 1단계(콜드스타트 이상 · 상한 이하)이고, 그 외에는 `theta`와 같다. `theta`와 "
-            "다르면 경계 규칙이 발동했다는 관측이다 — 항상 채워지므로 null을 `theta`와 같다고 "
-            "추측하지 않는다."
+            "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 "
+            "`min(4.0, max(0.0, 맞힌 최고 난이도 b + 0.5))`(잠정 — 판정문 §4-2·`EOS-39`가 보정 "
+            "소유)이고, 그 외에는 `theta`와 같다. `theta`와 다르면 경계 규칙이 발동했다는 "
+            "관측이다 — 항상 채워지므로 null을 `theta`와 같다고 추측하지 않는다."
         )
     )
     theta_boundary: Literal["upper", "lower"] | None = Field(
         default=None,
         description=(
-            "EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가. `upper`=전부 정답(`theta`=4.0은 "
-            "측정값이 아님 · `selection_theta`가 표적) · `lower`=전부 오답(관측만 — 선택은 "
-            "`theta` 그대로) · null=경계 아님."
+            "EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — **측정 한계 표지**다. `upper`=전부 "
+            "정답(`theta`=4.0은 측정값이 아니라 클램프 · `selection_theta`가 표적) · "
+            "`lower`=전부 오답(관측만 — 선택은 `theta` 그대로) · null=응답 이력이 경계가 "
+            "아님. null이라고 `theta`가 ±4.0이 아니라는 뜻은 아니다(혼합 이력에서 MLE가 범위를 "
+            "넘어 클램프된 경우도 null이다). 계측 신호이므로 학생 화면에 θ·능력치로 노출하지 "
+            "않는다(REC-10 ④)."
         ),
     )
     difficulty: float | None = Field(
@@ -2782,8 +2797,11 @@ async def recommend_next_problem(
     `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
     EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
     EOS-147 신규 2필드는 `selection_theta`(후보를 고르는 데 실제 쓴 θ)와 `theta_boundary`(추정 θ가
-    MLE 발산 경계인가)다 — 전부 정답 이력에서 `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지
-    않고, 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·`measurement_sufficient`는 불변).
+    MLE 발산 경계인가 — 측정 한계 표지이며 학생 화면에 노출하지 않는다)다 — 전부 정답 이력에서
+    `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지 않고(맞힌 최고 난이도 + 0.5 로짓 · 잠정 ·
+    `EOS-39`가 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
+    `measurement_sufficient`는 불변). 그 이력의 선택이 바뀌므로 `policy_version`은 `cat_v4`(수능
+    `suneung_v2`)다.
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
@@ -2827,6 +2845,7 @@ async def recommend_next_problem(
             problem_id=outcome.problem_id,
             theta=outcome.theta,
             selection_theta=outcome.selection_theta,
+            theta_boundary=outcome.theta_boundary,
             pool_size=outcome.candidate_pool_size,
             applied_weights=outcome.applied_weights,
             mode=mode,
