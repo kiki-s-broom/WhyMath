@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-148-r5-non-execution-premise-rejudge
+title: "EOS-24의 R5 비집행 근거(θ 하락 → 선수 하강)가 픽스처 의존으로 판명 — 탐침·연속 R6 뒤 R5에서 하강한 선수를 유지할지 재판정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-26-r6-diagnosis-prerequisite-directed
+requires_gates: []
+acceptance:
+  - "① 실측 사실 — EOS-24는 R5(반복 실패 → REMEDIATING · 설명·힌트)를 집행하지 않았다(판정문 §3). 근거는 \"3연속 오답 뒤 현재 개념에 가두면 θ 하락에 따른 선수 하강이 막힌다\"였고, 그 하강은 \"θ가 내려가면 추천기가 선수 문항을 고른다\"는 전제 위에 있었다. EOS-139·EOS-26 실측이 그 전제를 픽스처 의존으로 판명했다 — 추천기는 θ 근방 최근접을 고르며, 선수보다 쉬운 무관 개념이 있으면 그쪽으로 간다(EOS-26 판정문 §1-1).\n② 그래서 EOS-26 개입(첫 R6 선수 탐침 → 연속 두 번째 R6 같은 개념 연습)이 끝나는 셋째 연속 오답(R5)에서 추천은 기본 경로로 돌아가고, 실제 앱 요청 형태에서는 가장 쉬운 무관 개념으로 이탈할 수 있다(EOS-26 판정문 §0·§5 — 독립 비판 발견 4).\n③ 처분 판정 선행 — (가) R5를 집행한다: 직전 결정이 탐침·연속 R6면 마지막으로 다룬 개념(하강한 선수)을 유지하고 설명·힌트 행위와 합성 (나) 비집행 유지 + 근거를 새 사실로 다시 쓴다 (다) 기타. Persona B 여정(`test_e2e_persona_journeys.py` — 반복 실패 뒤 선수 하강 동결)과의 관계를 함께 판정한다. 결정 없이 구현하지 않는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_recommendation.py
+  - tests/backend/api/test_e2e_persona_journeys.py
+session: null
+notes: "출처: EOS-26 판정문 독립 교수학 비판 발견 4 부수(2026-09-26). 인접: EOS-145(R5 연속 범위 — 입력 축)와 다르다 — 이쪽은 추천이 R5를 집행하는가(출력 축)다. 분류 LOOP."
+updated: 2026-09-26

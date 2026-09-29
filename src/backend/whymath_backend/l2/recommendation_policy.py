@@ -73,6 +73,12 @@ load_attempt_history_state` docstring).
 개념으로 제한하고 학습 밴드로 고른다. 집행 조건·안전장치는 `l2.learning_state_recommendation`
 docstring이 정본이다. 지시가 없는 요청은 조회 0건이 추가되고 결과는 전환 전과 같다.
 
+**EOS-26 — R6(원인 미상 오답)도 집행한다.** 연속 오답의 첫 R6는 오답 개념의 직접 선수(숙달되지
+않은 것)로, 연속 두 번째는 방금 틀린 개념으로 후보를 **제한**한다. R3와 달리 근거는 바꾸지 않는다 —
+제한된 후보에서 같은 선택 연산을 하고 이름표는 EOS-124 갈래가 그대로 붙인다(전달 문항에 대해 그
+이름표가 참이기 때문이다). 단 R6 경로에서는 전진하지 않는다(상태 머신이 방금 오답을 관측했다).
+선수 읽기의 그래프 예산은 이 모듈이 걸어 주입한다(`_read_prerequisites`) — 예산 정의는 여기 하나다.
+
 ────────────────────────────────────────────────────────────────────────────
 개념 그래프 예산 — depth ≤ 2 · nodes ≤ 20 · visited · timeout
 ────────────────────────────────────────────────────────────────────────────
@@ -159,6 +165,7 @@ from whymath_backend.l2.recommendation_contract import (
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
     POLICY_VERSION_CAT_STATE_REMEDIATION,
+    POLICY_VERSION_CAT_STATE_UNDIAGNOSED,
 )
 from whymath_backend.l2.recommendation_reason import (
     collect_concept_reason,
@@ -306,6 +313,13 @@ class IntentResolution(str, Enum):
     UNSUPPORTED = "unsupported"
     """규칙은 관계 행위를 가리켰으나 **근거가 없다**(선수·후행 엣지 없음 · 선수 전부 미측정).
     반증과 구별한다. 앵커 개념 연습으로 정직 강등한다."""
+
+    STATE_WITHHELD = "state_withheld"
+    """규칙은 전진을 가리켰으나 **상태 머신 결정이 막았다**(EOS-26) — R6(원인 미상 오답) 집행
+    경로에서 앵커가 전진 구간(> 0.7)이면 전진하지 않고 앵커 개념 연습으로 정직 강등한다. 측정이
+    반증한 것(`REFUTED`)과 다르다: 오답은 이미 숙달에 반영됐고 반영된 숙달이 여전히 전진을
+    말한다 — 막은 주체는 측정이 아니라 R6 결정("같은 개념 연습")이다. 사전 숙달이 높은 학생은
+    오답 1회로 0.7 아래로 안 떨어져 여기에 닿는다(BKT 기본값 사전 0.95 → 오답 뒤 약 0.73)."""
 
     GRAPH_TIMEOUT = "graph_timeout"
     """그래프 조회가 시간 예산을 넘어 판정하지 못했다 — 정직 강등(예외 타입명 로그 동반)."""
@@ -585,7 +599,8 @@ class NextProblemOutcome(Recommendation):
     learning_state_directive: StateDirectiveOutcome | None = Field(
         default=None,
         description=(
-            "EOS-24 — 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과(`applied`=집행 · 그 외="
+            "EOS-24 — 학습 상태 머신이 이 추천을 지시했을 때 그 처리 결과(`applied`=R3 집행 · "
+            "EOS-26 `prerequisite_probe`·`same_concept_*`=R6를 후보 제한으로 집행 · 그 외="
             "집행하지 못한 사유). 상태 머신이 지시하지 않았으면 null. 수능 정책은 상태 머신을 "
             "읽지 않으므로 항상 null이다(판정문 §7-3)."
         ),
@@ -769,22 +784,34 @@ class CatRecommendationPolicy:
             theta=theta,
             attempted_ids=attempt_state.attempted_ids,
             excluded_ids=excluded_ids,
+            read_prerequisites=self._read_prerequisites,
         )
         applied_route: StateRoute | None = (
             state_route if state_route is not None and state_route.applied else None
         )
+        # EOS-26 — R6(원인 미상 오답)를 **후보 제한으로** 집행한 경로. 근거는 바꾸지 않는다: 제한된
+        # 후보(선수 탐침 또는 같은 개념)에서 같은 선택 연산을 하고, 이름표는 아래 EOS-124 갈래가
+        # 붙인다. 밴드는 경로에 따라 다르다(바로 아래).
+        undiagnosed_route: StateRoute | None = (
+            state_route if state_route is not None and state_route.undiagnosed_applied else None
+        )
+        # R3 교정과 R6 **연습** 경로(탐침 제외)는 요청 목적과 무관하게 학습 밴드로 고른다 — 오답
+        # 직후의 연습에 정보량 최대(정답 확률 ~50% 지향)를 쓰지 않는다(REC-04 · 판정문 §4). 탐침은
+        # 측정 자체라 요청 목적 그대로다.
         effective_context = (
             learning_context.model_copy(update={"purpose": "learning"})
             if applied_route is not None
+            or (undiagnosed_route is not None and undiagnosed_route.undiagnosed_practice)
             else learning_context
         )
 
         # REC-04: purpose=learning일 때만 False(문헌값·미보정 — S4-15 전까지).
         band_calibrated = False if effective_context.purpose == "learning" else None
 
+        restricted_route = applied_route if applied_route is not None else undiagnosed_route
         candidate_rows = (
-            list(applied_route.candidate_rows)
-            if applied_route is not None
+            list(restricted_route.candidate_rows)
+            if restricted_route is not None
             else await load_candidate_rows(
                 session,
                 theta,
@@ -809,6 +836,14 @@ class CatRecommendationPolicy:
         weak_signal = sum(1 for w in weights if w != 1.0) if weights is not None else 0
 
         best = select_weighted_item(theta, items, weights=weights)
+        # 집행된 추천만 다른 버전을 적는다 — 후보 생성 규칙이 다르므로(R3: 개념 제한 + 학습 밴드 ·
+        # R6: 선수 탐침/같은 개념 제한) 소급 평가가 규칙이 다른 로그를 섞지 않게 한다.
+        if applied_route is not None:
+            policy_version = POLICY_VERSION_CAT_STATE_REMEDIATION
+        elif undiagnosed_route is not None:
+            policy_version = POLICY_VERSION_CAT_STATE_UNDIAGNOSED
+        else:
+            policy_version = self.policy_version
         common: PolicyTelemetry = {
             "theta": theta,
             "standard_error": attempt_state.standard_error,
@@ -819,13 +854,7 @@ class CatRecommendationPolicy:
             "candidate_pool_size": candidate_pool_size,
             "weak_concept_signal_count": weak_signal,
             "band_calibrated": band_calibrated,
-            # 집행된 추천만 다른 버전을 적는다 — 후보 생성 규칙이 다르므로(개념 제한 + 학습 밴드)
-            # 소급 평가가 두 규칙의 로그를 섞지 않게 한다.
-            "policy_version": (
-                POLICY_VERSION_CAT_STATE_REMEDIATION
-                if applied_route is not None
-                else self.policy_version
-            ),
+            "policy_version": policy_version,
         }
         directive = state_route.outcome if state_route is not None else None
         if best is None:
@@ -878,13 +907,19 @@ class CatRecommendationPolicy:
             anchor_reason = await collect_recommendation_reason(
                 session, learner_id=user_id, problem_id=chosen_id
             )
-            intent = await resolve_policy_intent(
-                session,
-                anchor_reason=anchor_reason,
-                learner_state=learner_state,
-                learner_id=user_id,
-                budget=self._graph_budget,
-            )
+            if undiagnosed_route is not None and anchor_reason.type is ReasonType.NEXT_CONCEPT:
+                # EOS-26 — R6 경로에서는 전진하지 않는다. R6 결정("같은 개념 연습")이 전진을 막는다
+                # — 앵커 개념 연습으로 강등(`state_withheld`). 측정 반증(`refuted`)이 아니다:
+                # 오답은 이미 숙달에 반영됐고 반영된 숙달이 여전히 전진을 말한다.
+                intent = _demoted(anchor_reason, IntentResolution.STATE_WITHHELD)
+            else:
+                intent = await resolve_policy_intent(
+                    session,
+                    anchor_reason=anchor_reason,
+                    learner_state=learner_state,
+                    learner_id=user_id,
+                    budget=self._graph_budget,
+                )
             delivery = _Delivery(
                 problem_id=delivery.problem_id,
                 difficulty=delivery.difficulty,
@@ -896,7 +931,9 @@ class CatRecommendationPolicy:
                 aligned = await self._select_aligned(
                     intent.reselect_groups,
                     user_id=user_id,
-                    learning_context=learning_context,
+                    # 1차 선택과 같은 요청 상황(밴드 포함)으로 다시 고른다 — R6 연습 경로가 학습
+                    # 밴드를 강제했으면 재선택도 같은 밴드다. 지시가 없으면 원래 요청 그대로다.
+                    learning_context=effective_context,
                     theta=theta,
                     attempted_ids=attempt_state.attempted_ids,
                     excluded_ids=excluded_ids,
@@ -920,6 +957,24 @@ class CatRecommendationPolicy:
             learning_state_directive=directive,
             **common,
         )
+
+    async def _read_prerequisites(
+        self, concept_id: uuid.UUID, max_depth: int
+    ) -> list[PrerequisiteRow]:
+        """R6 선수 탐침의 선수 읽기 — 그래프 예산을 **여기서** 건다(EOS-26 `PrerequisiteReader`).
+
+        정책의 다른 그래프 읽기와 같은 세 장치다: 깊이는 요청과 예산 천장 중 작은 쪽, 시간은
+        `_within_budget`, 너비·visited는 `_apply_node_budget`. `learning_state_recommendation`이
+        이 함수를 주입받는 이유는 예산 정의를 두 곳으로 나누지 않기 위해서다(그 모듈이 예산을 다시
+        정의하면 천장 상수·뮤테이션 하네스가 가리키는 곳과 실제로 걸리는 곳이 갈라진다). 시간 초과는
+        `TimeoutError`로 그대로 올린다 — 판정(같은 개념 연습으로 강등)은 호출부가 한다.
+        """
+        depth = min(max_depth, self._graph_budget.max_depth)
+        rows = await _within_budget(
+            self._graph_budget,
+            lambda: fetch_prerequisites(self._session, concept_id, max_depth=depth),
+        )
+        return _apply_node_budget(rows, self._graph_budget)
 
     async def _select_aligned(
         self,

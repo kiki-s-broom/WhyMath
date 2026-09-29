@@ -1116,8 +1116,11 @@ class TestAppVersionGate:
 
 
 def test_create_app_defaults_are_real_implementations() -> None:
-    """기본 팩토리(주입 없음)는 CompositeProvider(Ollama+Anthropic, S5)
+    """기본 팩토리(주입 없음)는 CompositeProvider(Ollama+기본 클라우드 좌석, S5·ARCH-64)
     +RedisCache(S2)+LangfuseSink(S3)+CeleryJobQueue(S4)를 단다.
+
+    ARCH-64: 클라우드 좌석은 `build_cloud_provider()`가 정하고 기본은 OpenRouter다(종전
+    Anthropic 하드코딩 — 2026-09-21 Kiki 지시·게이트 G-cloud-mid-seat-cutover로 전환).
 
     S2에서 기본 캐시가 InMemoryCache → RedisCache로, S3에서 기본 트레이스가
     RecordingTraceSink → LangfuseSink로, S4에서 기본 큐가 CeleryJobQueue로, S5에서 기본
@@ -1128,18 +1131,19 @@ def test_create_app_defaults_are_real_implementations() -> None:
     """
     from whymath_backend.app import _CACHE_KEY, _PROVIDER_KEY, _QUEUE_KEY, _TRACE_KEY
     from whymath_backend.l3.cache import RedisCache as _RC  # noqa: N814
-    from whymath_backend.l3.providers.anthropic import AnthropicProvider as _AP  # noqa: N814
     from whymath_backend.l3.providers.composite import CompositeProvider as _CP  # noqa: N814
     from whymath_backend.l3.providers.ollama import OllamaProvider as _OP  # noqa: N814
+    from whymath_backend.l3.providers.openrouter import OpenRouterProvider as _ORP  # noqa: N814
     from whymath_backend.l3.queue import CeleryJobQueue as _CJQ  # noqa: N814
     from whymath_backend.l3.trace import LangfuseSink as _LFS  # noqa: N814
 
     app = create_app()
     composite = getattr(app.state, _PROVIDER_KEY)
     assert isinstance(composite, _CP)
-    # 기본 복합 provider는 로컬=Ollama, 클라우드=Anthropic을 단다(S5 디스패치).
+    # 기본 복합 provider는 로컬=Ollama, 클라우드=OpenRouter를 단다(S5 디스패치 · ARCH-64 팩토리).
     assert isinstance(composite._local, _OP)
-    assert isinstance(composite._cloud, _AP)
+    assert isinstance(composite._cloud, _ORP)
+    assert composite.cloud_seat == "openrouter"
     assert isinstance(getattr(app.state, _CACHE_KEY), _RC)
     assert isinstance(getattr(app.state, _TRACE_KEY), _LFS)
     assert isinstance(getattr(app.state, _QUEUE_KEY), _CJQ)

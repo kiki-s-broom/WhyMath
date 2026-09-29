@@ -451,6 +451,11 @@ Kiki 판단: *"우리는 일단 개발과정에 사용할건데 byok까지 할 �
 **판정: 개발 단계 저작 경로에 OpenRouter `deepseek/deepseek-v4.1-flash`(공급사 `deepinfra`
 고정)를 채택한다. 기본 라우팅(`claude-sonnet-4-6`) 변경은 하지 않는다.**
 
+> **⚠ 번복 표기 (2026-09-29 · ARCH-64)** — 이 판정 중 **"기본 라우팅 변경은 하지 않는다"(기본 핀
+> 불변) 부분은 번복됐다.** 채택 판정 자체(OpenRouter `deepseek/deepseek-v4.1-flash` · 공급사
+> `deepinfra` 고정)는 유효하며, 번복된 것은 "기본값을 옮기지 않는다"는 조항 하나다. 근거와 현행은
+> 아래 「기본 라우팅을 바꾸지 않는 이유」 뒤의 [번복] 블록. 원문은 판정 당시의 기록으로 지우지 않는다.
+
 판정 기준 4개 중 3개 충족, 1개 명시 보류:
 
 | 기준 | 결과 | 근거 |
@@ -463,6 +468,27 @@ Kiki 판단: *"우리는 일단 개발과정에 사용할건데 byok까지 할 �
 **기본 라우팅을 바꾸지 않는 이유**: 이 판정은 *선택지를 넓힌 것*이지 기본값을 옮긴 것이
 아니다(ARCH-49 acceptance ⑤ 유지 — 저비용 티어의 기본은 `CostTier.LOCAL`). 그리고 (d)가
 보류인 채로 기본 경로를 옮기면 가용성 미판정 구성이 곧 기본값이 된다.
+
+> **[번복 2026-09-29 · ARCH-64] 위 "기본 라우팅을 바꾸지 않는 이유" 조항은 번복됐다.**
+>
+> - **근거 ① Kiki 지시(2026-09-21)** — "학생 대면까지 한 번에" → "학생대면도 오픈라우터로 전환".
+>   전환의 목적지(저작 경로 + 학생 대면 서빙)를 Kiki가 두 번 확인해 확정했다.
+> - **근거 ② 게이트 `G-cloud-mid-seat-cutover` clear(2026-09-21)** — 판정 3택 중 ①(저작 + 학생 대면
+>   동시 컷오버). 같은 판정이 `ARCH-56`의 acceptance를 "차단 판정"에서 "운영 지표 기준선"으로
+>   재정의했다 — 이 조항의 이유였던 (d) 지연·가용성 보류는 더 이상 기본값 전환의 차단 사유가 아니다.
+> - **근거 ③ 선행 착지** — `ARCH-62`(단가표 좌석 축) done. 이게 없으면 MID 원가가 24.4배 과대
+>   계상돼 예산 가드가 불필요한 LOCAL 강등을 낸다(설계 `docs/architecture/03c_cloud_tier_transition_v2.md` §2).
+> - **가용성 처분(2026-09-28 Kiki 결정 · ARCH-66 기간)** — 이 조항이 막으려던 위험(공유 풀 429)의
+>   구조적 해소 수단은 `ARCH-63` 좌석 failover인데, 그 2차 좌석이 Anthropic이라 API 중단
+>   (`anthropic_api_enabled=False` · 2026-09-24~12-31) 동안은 붙일 수 없다. 그래서 이 기간에는
+>   **2차 좌석이 없다** — 1차 좌석(openrouter) 실패는 오류로 올라가고 다른 좌석·LOCAL로 자동
+>   재시도되지 않는다(LOCAL 강등은 라우팅 시점 구독·예산 가드에서만). 학생 참여가 12/31 이후라
+>   이 기간의 요구는 내부 테스트 수준이다. `ARCH-63`은 `G-arch66-anthropic-api-pause-review`
+>   재개 판정 뒤 추가된다.
+> - **현행(코드)** — `config.py` `cloud_provider` 기본값 `openrouter` · 학생 대면 `app.py`가
+>   `build_cloud_provider()` 경유 · 동결 테스트 `test_default_cloud_provider_is_openrouter` ·
+>   `test_student_facing_app_assembles_cloud_seat_through_the_factory` ·
+>   동작 계약 `tests/backend/l3/test_cloud_mid_seat_cutover.py`. 결정 로그 = `MEMORY.md` 2026-09-29 ARCH-64.
 
 #### 판정에서 뺀 축과 그 이유
 

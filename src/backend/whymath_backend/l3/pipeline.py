@@ -25,8 +25,9 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
-from whymath_backend.config import get_settings
+from whymath_backend.config import CloudSeat, get_settings
 from whymath_backend.l3.interfaces import (
     AsyncJobQueue,
     CacheBackend,
@@ -43,12 +44,41 @@ from whymath_backend.l3.models import (
 )
 from whymath_backend.l3.pregenerate.validator import SeedValidator, validate_response
 from whymath_backend.l3.router import (
+    SERVING_CLOUD_SEAT,
     Router,
     _as_cost_tier,
     actual_cost_krw,
     cache_key_for,
     langfuse_fields,
 )
+
+_NO_SEAT_SURFACE = object()
+"""provider가 좌석 표면(`cloud_seat`·`seat`)을 아예 노출하지 않음 — '미상(None)'과 구별하는 표지."""
+
+
+def served_cloud_seat(provider: LLMProvider) -> CloudSeat | None:
+    """이 provider로 클라우드 결정을 보내면 **어느 좌석이 받는가** — 원가 기록의 단가 좌석(ARCH-64).
+
+    학생 대면 서빙이 `build_cloud_provider()` 경유로 바뀌면서 좌석이 셀렉터를 따라 움직인다.
+    그런데 원가 기록이 종전처럼 좌석을 생략하면 `SERVING_CLOUD_SEAT`(anthropic) 단가로 적혀,
+    openrouter가 답한 호출이 **24.4배**로 기록된다(8.612원 vs 0.354원 — 03c §2.2). 그래서
+    설정이 아니라 **꽂힌 객체**에서 좌석을 읽는다:
+
+      ① `cloud_seat` 표면(`CompositeProvider`) — 꽂힌 클라우드 제공자의 선언. None이면 미상.
+      ② `seat` 표면(클라우드 제공자를 직접 넘긴 경우) — 그 제공자의 선언.
+      ③ 둘 다 없음(테스트 가짜·레거시 provider) — `SERVING_CLOUD_SEAT`. 좌석 표면이 없는
+         provider는 좌석 축 도입 전 계약으로 쓰이던 것이라 종전 의미를 보존한다. **운영 조립
+         (`app.py`)은 ①을 반드시 탄다** — `test_cloud_mid_seat_cutover.py`가 동결한다.
+
+    ①에서 None(미상)을 anthropic으로 접지 않는다 — 접으면 원가가 거짓이 된다. 호출부는 None을
+    `actual_cost_krw(seat=None)`에 넘겨 '미측정'으로 남긴다(CLAUDE.md 「모른다 ≠ 아니다」).
+    """
+    declared = getattr(provider, "cloud_seat", _NO_SEAT_SURFACE)
+    if declared is _NO_SEAT_SURFACE:
+        declared = getattr(provider, "seat", _NO_SEAT_SURFACE)
+    if declared is _NO_SEAT_SURFACE:
+        return SERVING_CLOUD_SEAT
+    return cast("CloudSeat | None", declared)
 
 
 class QualityQueueUnavailableError(RuntimeError):
@@ -332,12 +362,15 @@ async def generate(
     # 클라우드인데 토큰이 미상이면 None으로 남긴다('미상'과 '0원'을 구분 — 지어내지 않음).
     actual_krw: float | None
     is_cloud = _as_cost_tier(decision.cost_tier) is not CostTier.LOCAL
+    # ARCH-64 — 단가 좌석은 꽂힌 provider에서 읽는다(`served_cloud_seat` docstring). 같은 값을
+    # trace의 `cloud_seat`에도 실어 "어느 좌석이 답했나"가 호출 단위로 관측되게 한다.
+    served_seat = served_cloud_seat(provider) if is_cloud else None
     if usage is None:
         actual_krw = None
     elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
         actual_krw = None
     else:
-        actual_krw = actual_cost_krw(decision, usage)
+        actual_krw = actual_cost_krw(decision, usage, seat=served_seat)
     # 런타임 shadow 검증(비차단·opt-in) — 거짓 수치 관계 등 환각 신호를 관측에 남긴다.
     # 캐시 적재 *전에* 검증해야 skip_cache_on_signal이 적재 여부를 결정할 수 있다.
     signal = validate_response(validator, output) if validator is not None else None
@@ -359,6 +392,7 @@ async def generate(
             cost_krw=actual_krw,
             content_source="generate",  # 2층 캐시의 (3) — 실제 LLM 생성.
             training_allowed=training_allowed,
+            cloud_seat=served_seat,  # ARCH-64 — 클라우드 호출의 단가 좌석(LOCAL은 None)
         )
     )
     return GenerationResult(

@@ -435,11 +435,47 @@ def _read_claims(root: Path, base_sha: str) -> list[RemoteClaim]:
     return claims
 
 
+def preserved_root_entries(root: Path, base_sha: str, replaced: str) -> list[str]:
+    """base 커밋 루트 트리에서 `replaced` 디렉터리를 **뺀 나머지** 항목(mktree 입력 줄).
+
+    왜 필요한가 (HARN-111): claim 브랜치에는 이제 `claims/` 말고도 `reservations/`(번호
+    예약 — `number_guard`)가 산다. 종전 `_write_claims`는 루트 트리를 `claims/` 하나로
+    **새로 지었기 때문에**, claim 한 건을 쓰는 순간 같은 브랜치의 다른 디렉터리가 통째로
+    사라졌다 — 예약이 착수 한 번에 조용히 지워지는 구조다. 한 디렉터리를 쓰는 쪽은
+    자기 디렉터리만 갈아 끼우고 나머지는 base에서 그대로 옮긴다.
+
+    `replaced`와 **CR 정규화 후 같은 이름**도 뺀다 — 구버전 Windows 세션이 남긴
+    `claims\\r` 오염 디렉터리(HARN-36)를 옮겨 싣지 않아야 "다음 뮤테이션이 트리를 다시
+    쓰며 오염을 치유한다"는 계약이 유지된다. 개행이 섞인 이름은 mktree 줄 형식을 깨므로
+    옮기지 않는다(현행 쓰기 경로는 그런 이름을 만들지 않는다).
+
+    base를 읽지 못하면 **예외**다 — 빈 목록으로 접으면 그 쓰기가 남의 디렉터리를
+    지운다(측정 실패를 "옮길 것 없음"으로 위장하지 않는다).
+    """
+    if not base_sha:
+        return []
+    ls = _git(root, "ls-tree", "-z", base_sha, timeout=15)
+    if ls.returncode != 0:
+        raise RuntimeError(f"base 루트 트리 조회 실패: {(ls.stderr or '').strip()}")
+    kept: list[str] = []
+    for entry in (ls.stdout or "").split("\0"):
+        if not entry.strip():
+            continue
+        info, _, name = entry.partition("\t")
+        if name.replace("\r", "") == replaced or "\n" in name or "\r" in name:
+            continue
+        kept.append(f"{info}\t{name}\n")
+    return kept
+
+
 def _write_claims(root: Path, base_sha: str, claims: list[RemoteClaim], message: str) -> str:
     """claim 목록을 담은 커밋을 만들어 sha를 돌려준다 (push는 하지 않는다).
 
     트리는 `git mktree`로 직접 만든다 — **인덱스를 쓰지 않으므로** 사용자의 스테이징
     영역·작업 트리를 건드릴 수 없다(구조적 차단).
+
+    루트의 `claims/` 밖 항목(번호 예약 `reservations/` 등)은 base에서 그대로 옮긴다
+    (`preserved_root_entries` · HARN-111).
     """
     entries: list[str] = []
     for c in sorted(claims, key=lambda x: x.task_id):
@@ -449,13 +485,13 @@ def _write_claims(root: Path, base_sha: str, claims: list[RemoteClaim], message:
             raise RuntimeError(f"blob 생성 실패: {blob.stderr.strip()}")
         entries.append(f"100644 blob {blob.stdout.strip()}\t{c.task_id}.json")
 
+    root_entries = "".join(preserved_root_entries(root, base_sha, CLAIMS_DIR))
     if entries:
         sub = _git(root, "mktree", input_text="\n".join(entries) + "\n")
         if sub.returncode != 0:
             raise RuntimeError(f"claims 트리 생성 실패: {sub.stderr.strip()}")
-        root_entries = f"040000 tree {sub.stdout.strip()}\t{CLAIMS_DIR}\n"
-    else:
-        root_entries = ""  # claim 0건 = 빈 트리 (해제로 마지막 claim이 사라진 경우)
+        root_entries += f"040000 tree {sub.stdout.strip()}\t{CLAIMS_DIR}\n"
+    # claim 0건이면 claims/ 항목 없이 나머지(예약 등)만 남는다 — 전부 비면 빈 트리
 
     tree = _git(root, "mktree", input_text=root_entries)
     if tree.returncode != 0:

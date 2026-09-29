@@ -17,6 +17,10 @@ PK 판단(Principle 1: Entity ID ≠ Version ID):
   참조하지 않는다** — 태스크 acceptance ①이 명시한 방향이며 `curriculum_version.framework_id
   → curriculum_framework.framework_id`(둘 다 의미 문자열 PK)와 동형 선례다.
 
+전이 실행(EOS-50): 상태·거버넌스·게이트 기록을 쓰는 코드는 `l3/publish_gate.py` 한 곳이다 —
+전이표(`schema/version_lifecycle.py`)를 조회해 게이트를 통과한 전이만 반영한다. 이 ORM
+클래스를 import할 수 있는 운영 모듈도 그 파일로 제한된다(AST 동결).
+
 Lifecycle 불변식 시행(§7 — acceptance ②):
   PUBLISHED 행의 `payload`는 불변이고, PUBLISHED → DRAFT 전이는 금지된다. 이 두 규칙은
   ORM 계층이 아니라 **DB BEFORE UPDATE 트리거**(`concept_version_immutability_guard`,
@@ -52,7 +56,7 @@ from whymath_backend.schema.version_header import VersionStatus
 # (`version_id`·`previous_version_id`·`created_at`·`published_at`)은 각자 전용
 # SQLAlchemy 타입(Uuid·DateTime)이 네이티브로 바인딩하므로 영향 없음 — 이 JSONB
 # 대상 5개만 `mode="json"`으로 다시 덤프해 UUID/datetime을 JSON-안전 문자열로 만든다.
-_JSONB_FIELDS: tuple[str, ...] = ("change", "source", "governance", "integrity", "payload")
+_JSONB_FIELDS: tuple[str, ...] = ("change", "source", "governance", "integrity", "qa", "payload")
 
 
 class ConceptVersion(Base):
@@ -97,6 +101,10 @@ class ConceptVersion(Base):
     source: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
     governance: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
     integrity: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+    # 게이트 통과 기록(§9 QA 연결 · EOS-50) — `schema.version_header.VersionQA`의 model_dump().
+    # 쓰는 곳은 `l3/publish_gate.py` 한 곳뿐이다(AST 동결 — test_publish_gate_enforcement.py).
+    # 리비전 9d3e7b1c5a20이 추가(nullable·기존 행 NULL = "게이트 기록 없음").
+    qa: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
 
     # ===== payload — 이 버전 시점의 Concept 스냅숏(불변성 트리거 보호 대상) =====
     payload: Mapped[dict[str, object]] = mapped_column(JSONB(none_as_null=True), nullable=False)

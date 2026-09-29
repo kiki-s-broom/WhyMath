@@ -32,8 +32,9 @@ mode="sync"). 클라우드 결정은 항상 동기라 비동기 큐(Celery)를 �
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Final, cast, get_args
 
+from whymath_backend.config import CloudSeat
 from whymath_backend.l3.interfaces import LLMProvider
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision
 from whymath_backend.l3.provider_jurisdiction import (
@@ -55,6 +56,34 @@ DEFAULT_CLOUD_JURISDICTION = Jurisdiction.US
 """
 
 
+CLOUD_FAILOVER_SEAT: Final[None] = None
+"""2차 클라우드 좌석 — **없다** (2026-09-28 Kiki 결정 · ARCH-66 기간 처분).
+
+1차 좌석(기본 openrouter)이 실패해도 다른 클라우드 좌석으로 넘어가지 않는다. Anthropic 2차
+좌석 failover는 `ARCH-63`이 추가하며, 그 태스크는 게이트 `G-arch66-anthropic-api-pause-review`
+(Anthropic API 재개 판정)에 묶여 있다. 이 값을 문자열로 바꾸는 것은 failover 배선 없이
+"2차 좌석 있음"을 선언하는 위장이므로, 바꾸려면 ARCH-63이 실제 재시도 경로와 함께 바꾼다
+(`tests/backend/l3/test_cloud_mid_seat_cutover.py`가 None을 동결한다).
+"""
+
+
+def no_secondary_seat_note(primary_seat: CloudSeat | None) -> str:
+    """클라우드 좌석 실패 예외에 붙이는 정직한 설명 — "2차 좌석 없음"의 **단일 문구 좌석**.
+
+    두 가지를 함께 말한다. ⓐ 다른 클라우드 좌석으로 넘어가지 않았다(2차 좌석 없음) ⓑ LOCAL로도
+    자동 재시도되지 않았다 — 이 기간의 LOCAL 강등은 **라우팅 시점**(구독·예산 가드,
+    `l3.router.guard_cloud`)에서만 일어난다. ⓑ를 빼면 읽는 사람이 "LOCAL이 대신 받았겠지"로
+    오독한다(03c §3.2 설계도는 런타임 LOCAL 강등을 그렸지만 그 경로는 ARCH-63 몫이며 아직 없다).
+    """
+    seat = primary_seat if primary_seat is not None else "미선언(좌석 미상)"
+    return (
+        f"[클라우드 좌석] 1차 좌석 {seat} 호출 실패 — 2차 클라우드 좌석 없음(재시도 좌석 0개). "
+        "이 요청은 다른 클라우드 좌석으로도, LOCAL로도 자동 재시도되지 않았다(LOCAL 강등은 "
+        "라우팅 시점의 구독·예산 가드에서만 일어난다). Anthropic 2차 좌석 = ARCH-63, "
+        "G-arch66-anthropic-api-pause-review 재개 판정 뒤."
+    )
+
+
 class CompositeProvider:
     """로컬↔클라우드 디스패처 — interfaces.LLMProvider 충족.
 
@@ -73,6 +102,34 @@ class CompositeProvider:
     ) -> None:
         self._local = local
         self._cloud = cloud
+
+    # ── 좌석 관측 (ARCH-64) ─────────────────────────────────────────────
+    @property
+    def cloud_seat(self) -> CloudSeat | None:
+        """클라우드 슬롯에 **실제로 꽂힌** 좌석 이름 — 없거나 선언하지 않았으면 None(미상).
+
+        설정(`cloud_provider`)을 다시 읽지 않고 꽂힌 객체의 선언(`seat`)을 읽는다. 설정을 읽으면
+        "셀렉터는 openrouter인데 누군가 다른 제공자를 주입한" 조립에서 기록이 거짓이 된다 —
+        ARCH-58이 상환한 사고의 형태다. 미상은 anthropic으로 접지 않고 None으로 둔다
+        (호출부가 원가를 '미측정'으로 남긴다 — CLAUDE.md 「모른다 ≠ 아니다」).
+        """
+        if self._cloud is None:
+            return None
+        declared = getattr(self._cloud, "seat", None)
+        if declared is None:
+            return None
+        if declared not in get_args(CloudSeat):
+            # 오타·새 좌석을 기본 좌석으로 반올림하지 않는다(`cloud_jurisdiction`과 같은 규율).
+            raise TypeError(
+                f"클라우드 제공자의 seat 선언은 CloudSeat 값이어야 한다(받은 {declared!r}) — "
+                "config.CloudSeat에 좌석을 추가하고 단가표·팩토리를 함께 고쳐라."
+            )
+        return cast(CloudSeat, declared)
+
+    @property
+    def cloud_failover_seat(self) -> None:
+        """2차 클라우드 좌석 — 이 기간에는 항상 None(`CLOUD_FAILOVER_SEAT` 참조)."""
+        return CLOUD_FAILOVER_SEAT
 
     async def generate(
         self,
@@ -104,6 +161,10 @@ class CompositeProvider:
           options.seed·Anthropic 명확한 거부). 이 디스패처는 seed를 **삼키지 않는다** — 삼키면
           클라우드 경로에서 "요청했는데 조용히 무시됨"이 되어 거짓 재현 기록의 문이 열린다.
 
+        - 클라우드 위임이 **실패**하면 예외를 그대로 다시 던지되(타입·메시지 보존),
+          `no_secondary_seat_note()` 문구를 note로 덧붙인다 — 2차 클라우드 좌석이 없고 LOCAL로도
+          자동 재시도하지 않았다는 사실(ARCH-64 · 2026-09-28 Kiki 결정).
+
         반환은 위임받은 제공자의 `GenerationResult(text, usage)` *그대로*다(전파) — text는
         검증 전 원시 출력(각 제공자 docstring 경계 메모), usage는 하위 제공자가 포착한 실측.
         """
@@ -132,7 +193,20 @@ class CompositeProvider:
             forward["json_schema"] = json_schema
         if seed is not None:
             forward["seed"] = seed
-        return await target.generate(prompt, system, decision, **forward)
+        if cost is CostTier.LOCAL:
+            return await target.generate(prompt, system, decision, **forward)
+        try:
+            return await target.generate(prompt, system, decision, **forward)
+        except Exception as exc:
+            # 예외를 **바꾸지 않는다**(타입·메시지 보존 — 기존 호출부의 except·match 계약 무변경).
+            # 정직한 좌석 사실만 note로 덧붙여 다시 던진다: 2차 좌석이 없어 아무도 대신 받지
+            # 않았다는 것. 삼키거나 LOCAL로 조용히 내리지 않는다(CLAUDE.md 「침묵 실패 금지」).
+            try:
+                seat = self.cloud_seat
+            except TypeError:
+                seat = None  # 선언 오류가 원래 실패를 가리지 않게 — 좌석만 '미상'으로 적는다
+            exc.add_note(no_secondary_seat_note(seat))
+            raise
 
     # ── 관할 게이트 (ARCH-49) ────────────────────────────────────────────
     @staticmethod

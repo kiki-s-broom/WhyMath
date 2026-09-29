@@ -289,8 +289,16 @@ class TestModelNameForDecision:
         assert model_name_for_decision(decision) == "qwen2-math:1.5b"
 
     def test_cloud_decisions_read_settings_models(self) -> None:
-        """CLOUD_MID/HIGH는 Anthropic provider와 같은 설정 좌석을 읽는다(단일 근거)."""
-        settings = Settings(anthropic_model_mid="mid-model-x", anthropic_model_high="high-model-y")
+        """CLOUD_MID/HIGH는 Anthropic provider와 같은 설정 좌석을 읽는다(단일 근거).
+
+        좌석을 `anthropic`으로 **명시**한다 — ARCH-64 이후 기본 좌석은 openrouter라, 명시하지 않으면
+        이 테스트가 재는 축(anthropic 핀 오버라이드가 기록에 반영되는가)이 아니라 기본값 전환을 잰다.
+        """
+        settings = Settings(
+            cloud_provider="anthropic",
+            anthropic_model_mid="mid-model-x",
+            anthropic_model_high="high-model-y",
+        )
         mid = Router().route(
             _request(
                 task_type="prove",

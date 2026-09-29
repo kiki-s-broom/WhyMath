@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,11 +16,34 @@ requires_gates:
 acceptance:
   - "① cloud_provider 기본값 anthropic → openrouter 전환. ② ARCH-55 판정문의 \"기본 핀 불변\" 조항과 tests/backend/l3/test_cloud_provider_selector.py의 test_default_cloud_provider_is_anthropic 동결 문면을 **함께** 갱신한다 — 코드만 바꾸고 동결 문면을 두면 그 테스트가 이유를 잃은 채 실패하거나, 더 나쁘게는 갱신된 이유를 아무도 모른다. ③ 학생 대면 서빙(app.py)의 좌석 조립을 build_cloud_provider() 팩토리 경유로 전환하고 test_student_facing_app_does_not_use_the_selector를 그 근거로 갱신한다 — 무력화된 채 통과시키지 않는다(가드가 좌석 조립 위치를 계속 보게 한다). ④ 순서 준수 — ③은 ARCH-62·ARCH-63 착지 후 G-cloud-mid-seat-cutover clear 이후에만 한다. 반대 순서는 게이트 우회다(그 테스트 docstring이 명시). ⑤ 라이브 대조 1회 — 전환 후 저작 1회차와 학생 대면 1회차를 각각 돌려 cloud_seat 관측이 openrouter를 말하고, 기록 원가가 좌석 단가(약 0.354원)로 찍히며, seat_primary_success_rate가 산출되는지 확인한다. 실패 회차도 그대로 기록한다(폐기 금지). ⑥ MEMORY 결정 로그 기재 — 전환 근거(2026-09-21 Kiki 지시)·ARCH-55 판정 번복 사실·비용 영향·가용성 해소 수단(ARCH-63 failover). ⑦ CLAUDE.md 기술 스택 표의 클라우드 LLM 행을 실측 정합시킨다(현재 \"claude-sonnet-4-6(CLOUD_MID)·claude-opus-4-7(CLOUD_HIGH)만\" 표기)."
   - "[2026-09-28 Kiki 결정 · ARCH-66 기간 처분] Anthropic API 중단(~12/31) 기간에도 컷오버를 착수한다 — ARCH-63(Anthropic 2차 좌석 failover)은 게이트 G-arch66-anthropic-api-pause-review에 묶여 있으므로 선행에서 뗐다. 이 기간의 failover는 1차 좌석(openrouter) 실패 시 **기존 LOCAL 강등 경로만**이다(2차 anthropic 좌석 없음 — 그 사실을 오류 문구·관측 필드에 정직하게 남기고, '2차 좌석 있음'으로 위장하지 않는다). Anthropic 2차 좌석은 재개 판정 뒤 ARCH-63이 추가한다. 근거: G-cloud-mid-seat-cutover는 2026-09-21에 이미 clear(컷오버 승인 · 저작+학생 대면 동시)됐고, 학생 참여도 12/31 이후(ARCH-66 ⑥)라 이 기간의 안전장치 요구는 내부 테스트 수준이다. 종전 상태의 결함: 승인된 대체 좌석 작업이 보류된 작업 뒤에 잠겨, 중단 기간 내내 클라우드 결정이 나는 요청이 오류였다(MEMORY 2026-09-24 ARCH-66 '영향 정리')."
-artifacts: []
+  - "[처분 2026-09-29 · PR #1370] ①②③④⑥⑦ 이행. ⑤(라이브 대조)는 컨테이너에 OpenRouter 키가 없어 미수행 — ARCH-71-cutover-live-check-runbooks로 승계(학생 대면 런북 부재·`seat_primary_success_rate`는 ARCH-63 전까지 미산출). 2026-09-28 결정 항의 전제(\"기존 LOCAL 강등 경로\")가 코드에 없음을 실측 — ARCH-69로 등재했고, 이 기간 1차 좌석 실패는 예외가 그대로 올라간다는 사실을 오류 문구·`/status`·회차 관측에 정직하게 남겼다."
+artifacts:
+  - "PR #1370 (커밋 9f41df91) — 기본 좌석 openrouter·학생 대면 팩토리 경유·좌석 단가 원가·2차 좌석 없음 정직 표기. ⑤ 라이브 대조는 ARCH-71 승계, 런타임 LOCAL 강등 부재는 ARCH-69"
 paths:
-  - src/backend/whymath_backend/config.py
+  - CLAUDE.md
+  - MEMORY.md
+  - docs/architecture/03c_cloud_tier_transition_v2.md
+  - docs/ops/arch55_provider_battle_smoke_runbook.md
+  - src/backend/whymath_backend/api/_model_status.py
   - src/backend/whymath_backend/app.py
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/harness/anchor_round_ledger.py
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - src/backend/whymath_backend/l3/equivalent/llm_generator.py
+  - src/backend/whymath_backend/l3/multi_solution.py
+  - src/backend/whymath_backend/l3/pedagogy/analogy_generator.py
+  - src/backend/whymath_backend/l3/pipeline.py
+  - src/backend/whymath_backend/l3/providers/anthropic.py
+  - src/backend/whymath_backend/l3/providers/composite.py
+  - src/backend/whymath_backend/l3/providers/deepseek.py
+  - src/backend/whymath_backend/l3/providers/factory.py
+  - src/backend/whymath_backend/l3/providers/openrouter.py
+  - src/backend/whymath_backend/l3/router.py
   - tests/backend/l3/test_cloud_provider_selector.py
+  - tests/backend/l3/test_provenance_bridge.py
+  - tests/backend/l3/test_router.py
+  - tests/backend/test_app.py
+  - tests/backend/l3/test_cloud_mid_seat_cutover.py
 session: null
-notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 1절·5절. 판정 기준: main d10ba109.\n\n이 태스크에서 새로 짜는 클라우드 코드는 없다 — Kiki가 지정한 네 조건(OpenRouter·특정 공급사·US·fp8)이 config.py에 이미 구현·동결돼 있다(openrouter_model_mid=deepseek/deepseek-v4.1-flash · openrouter_allowed_providers=(deepinfra,) · provider.only + allow_fallbacks=false + data_collection=deny 3종 계약). 바꾸는 것은 기본값 한 줄이고, 그것이 ARCH-55 판정문이 못박은 값이라 코드 변경이 아니라 판정 번복이다.\n\n적용 범위는 저작 경로와 학생 대면 양쪽이다 — 2026-09-21 Kiki 2회 확인.\n\n[정정 2026-09-28] depends_on 제거 1건: 2026-09-28 Kiki 결정: Anthropic 중단 기간에도 컷오버 착수 허용 — 보류 태스크(ARCH-63)에 승인된 작업이 잠겨 있던 결함 해소"
-updated: 2026-09-28
+notes: "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 1절·5절. 판정 기준: main d10ba109.\n\n이 태스크에서 새로 짜는 클라우드 코드는 없다 — Kiki가 지정한 네 조건(OpenRouter·특정 공급사·US·fp8)이 config.py에 이미 구현·동결돼 있다(openrouter_model_mid=deepseek/deepseek-v4.1-flash · openrouter_allowed_providers=(deepinfra,) · provider.only + allow_fallbacks=false + data_collection=deny 3종 계약). 바꾸는 것은 기본값 한 줄이고, 그것이 ARCH-55 판정문이 못박은 값이라 코드 변경이 아니라 판정 번복이다.\n\n적용 범위는 저작 경로와 학생 대면 양쪽이다 — 2026-09-21 Kiki 2회 확인.\n\n[정정 2026-09-28] depends_on 제거 1건: 2026-09-28 Kiki 결정: Anthropic 중단 기간에도 컷오버 착수 허용 — 보류 태스크(ARCH-63)에 승인된 작업이 잠겨 있던 결함 해소\n\n[정정 2026-09-29] ⑤ 승계·LOCAL 강등 전제 부재 기록\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/app.py', 'tests/backend/l3/test_cloud_provider_selector.py'] → ['CLAUDE.md', 'MEMORY.md', 'docs/architecture/03c_cloud_tier_transition_v2.md', 'docs/ops/arch55_provider_battle_smoke_runbook.md', 'src/backend/whymath_backend/api/_model_status.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/harness/anchor_round_ledger.py', 'src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'src/backend/whymath_backend/l3/equivalent/llm_generator.py', 'src/backend/whymath_backend/l3/multi_solution.py', 'src/backend/whymath_backend/l3/pedagogy/analogy_generator.py', 'src/backend/whymath_backend/l3/pipeline.py', 'src/backend/whymath_backend/l3/providers/anthropic.py', 'src/backend/whymath_backend/l3/providers/composite.py', 'src/backend/whymath_backend/l3/providers/deepseek.py', 'src/backend/whymath_backend/l3/providers/factory.py', 'src/backend/whymath_backend/l3/providers/openrouter.py', 'src/backend/whymath_backend/l3/router.py', 'tests/backend/l3/test_cloud_provider_selector.py', 'tests/backend/l3/test_provenance_bridge.py', 'tests/backend/l3/test_router.py', 'tests/backend/test_app.py', 'tests/backend/l3/test_cloud_mid_seat_cutover.py']: 실제 변경 범위 반영(설정·서빙 앱·공급사·파이프라인·라우터·관측·문서)"
+updated: 2026-09-29
