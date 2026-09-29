@@ -31,7 +31,10 @@ from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
 _UID = uuid.uuid4()
 # 응답 시간 상한(초) — 재현표에서는 20초 timeout이었다. 앱 조립·직렬화까지 포함한 여유값.
-_PROMPT_S = 2.0
+# '멈춤 부류' 상한(초) — 재현표의 20초 timeout 부류만 가른다(정상 실측 최대 0.35초). 부하에 따라
+# 흔들리는 좁은 상한은 쓰지 않는다 — 계산 전 거부의 결정론적 증거는 단위 테스트
+# (`tests/backend/l3/test_safe_parse.py`의 `forbid_evaluation`)가 호출 사실로 본다.
+_PROMPT_S = 5.0
 # 부정적 강화 금지(CLAUDE.md) — 학생에게 닿을 수 있는 사유 문장에 들어가면 안 되는 표현.
 _NEGATIVE_WORDS = ("틀렸", "못 한", "못한다", "잘못")
 

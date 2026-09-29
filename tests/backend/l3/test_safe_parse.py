@@ -48,8 +48,9 @@ from whymath_backend.l3.symbolic_equivalence import (
 # 동치 권위·사전생성 검증기가 쓰는 변환(암묵곱·^) — 두 번째 파싱 모드.
 _T_IMPLICIT = standard_transformations + (implicit_multiplication, convert_xor)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-# 시간 예산(초) — 모듈 상수와 같은 값. 적대 입력 거부가 이 안에 끝나야 한다.
-_BUDGET_S = 0.2
+# 통합 경로의 '멈춤 부류' 상한(초) — 재현표의 20초 timeout 부류만 가른다(정상 실측 최대 0.35초).
+# 거부가 *계산 전에* 났다는 증거는 벽시계가 아니라 `forbid_evaluation`(호출 사실)이 본다.
+_HANG_CLASS_S = 5.0
 
 _X = sympy.Symbol("x")
 
@@ -260,26 +261,63 @@ _ADVERSARIAL: tuple[tuple[str, str], ...] = (
 )
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _warm_up() -> None:
-    """첫 호출의 지연 초기화(SymPy 내부)를 시간 측정에서 뺀다 — 정상 입력 1회."""
-    safe_sympify("x + 1")
-    safe_parse_expr("2x + 1", transformations=_T_IMPLICIT)
+class _EvaluationCalled(BaseException):
+    """계산하는 경로가 불렸다 — 호출부의 `except Exception`에 삼켜지지 않게 BaseException 하위다."""
+
+
+@pytest.fixture
+def forbid_evaluation(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """계산하는 파서 호출을 금지한다 — '거부가 계산 전에 났다'의 결정론적 증거.
+
+    종전에는 벽시계 상한(200ms)으로 봤는데, 판정이 기계 부하에 따라 달라졌다: 4프로세스 병렬
+    실행에서 `x^99+x+1`이 0.249초로 실패했다(거부 자체는 구조 단계에서 끝났는데도). 모듈 설계가
+    벽시계를 판정에 쓰지 않는 것과 같은 이유로, 테스트도 시간이 아니라 *호출 사실*로 본다.
+    구조 파싱(비활성 이름공간을 `global_dict`로 넘기는 호출)은 허용하고, 그 밖의 문자열 파싱이
+    불리면 즉시 실패한다 — 가드가 빠진 변형은 `9^9^9`를 계산하며 멈추는 대신 곧바로 RED가 된다.
+    """
+    calls: list[str] = []
+    real_parse_expr = safe_parse._sympy_parse_expr
+    real_sympify = safe_parse.sympy.sympify
+
+    def parse_expr_spy(text: str, *args: Any, **kwargs: Any) -> Any:
+        if "global_dict" not in kwargs:  # 구조 파싱만 global_dict(비활성 이름공간)를 넘긴다
+            calls.append(text)
+            raise _EvaluationCalled(text)
+        return real_parse_expr(text, *args, **kwargs)
+
+    def sympify_spy(value: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(value, str):
+            calls.append(value)
+            raise _EvaluationCalled(value)
+        return real_sympify(value, *args, **kwargs)
+
+    monkeypatch.setattr(safe_parse, "_sympy_parse_expr", parse_expr_spy)
+    monkeypatch.setattr(safe_parse.sympy, "sympify", sympify_spy)
+    return calls
+
+
+def _max_integer_bits(tree: Any) -> int:
+    """식 나무 안 정수·유리수(분자·분모)의 최대 비트 수 — 계산으로 생긴 큰 수가 있는지 본다."""
+    widest = 0
+    for node in sympy.preorder_traversal(tree):
+        if isinstance(node, sympy.Rational):
+            widest = max(widest, abs(int(node.p)).bit_length(), int(node.q).bit_length())
+    return widest
 
 
 @pytest.mark.parametrize(("text", "code"), _ADVERSARIAL, ids=[c for _, c in _ADVERSARIAL])
-def test_adversarial_input_is_rejected_within_budget(text: str, code: str) -> None:
-    """적대 입력 — 두 파싱 모드 모두 기대 사유로 거부되고, 각각 200ms 안에 끝난다."""
+def test_adversarial_input_is_rejected_before_evaluation(
+    text: str, code: str, forbid_evaluation: list[str]
+) -> None:
+    """적대 입력 — 두 파싱 모드 모두 기대 사유로 거부되고, 계산하는 파서는 한 번도 불리지 않는다."""
     for parse in (
         lambda: safe_sympify(text),
         lambda: safe_parse_expr(text, transformations=_T_IMPLICIT),
     ):
-        started = time.perf_counter()
         with pytest.raises(UnsafeExpressionError) as info:
             parse()
-        elapsed = time.perf_counter() - started
         assert info.value.code == code
-        assert elapsed < _BUDGET_S, f"거부에 {elapsed:.3f}s — 시간 예산 {_BUDGET_S}s 초과"
+    assert forbid_evaluation == []
 
 
 # 예산 사유(구조 검사가 거르는 것) — 문자열 검사(①②③)에서 걸리는 사유는 여기 해당하지 않는다.
@@ -310,13 +348,12 @@ def test_structural_stage_alone_rejects_budget_inputs(text: str, code: str) -> N
     거부는 반드시 계산 전에 나야 한다. 여기서 확인하는 것은 그 순서다.
     """
     transformations = standard_transformations + (convert_xor,)
-    started = time.perf_counter()
+    tree = safe_parse._structural_parse(text, transformations=transformations, local_dict=None)
+    # 계산 없음의 증거 — 나무에는 입력에 적힌 리터럴만 있다(`9^9^9`가 계산됐다면 수억 비트).
+    assert _max_integer_bits(tree) <= 64
     with pytest.raises(UnsafeExpressionError) as info:
-        safe_parse._check_tree(
-            safe_parse._structural_parse(text, transformations=transformations, local_dict=None)
-        )
+        safe_parse._check_tree(tree)
     assert info.value.code == code
-    assert time.perf_counter() - started < _BUDGET_S
 
 
 def test_rejection_is_a_sympify_error_without_student_text() -> None:
@@ -432,12 +469,17 @@ def test_book_example_power_of_power_is_rejected() -> None:
         ensure_within_budget(_X**9801)
 
 
-def test_substitution_is_checked_before_it_computes() -> None:
+def test_substitution_is_checked_before_it_computes(monkeypatch: pytest.MonkeyPatch) -> None:
     """대입 폭발 — `2^x`에 `x = 10^100`은 계산 없는 대입 미리보기에서 거부(재현표 항목)."""
-    started = time.perf_counter()
-    with pytest.raises(UnsafeExpressionError, match="exponent_too_large"):
-        safe_subs(2**_X, {_X: sympy.Integer(10) ** 100})
-    assert time.perf_counter() - started < _BUDGET_S
+
+    def subs_spy(self: Any, *args: Any, **kwargs: Any) -> Any:
+        raise _EvaluationCalled("subs")
+
+    # 계산하는 대입(`subs`)이 불리기 *전에* 거부돼야 한다 — 벽시계가 아니라 호출 사실로 본다.
+    with monkeypatch.context() as patch:
+        patch.setattr(sympy.Basic, "subs", subs_spy)
+        with pytest.raises(UnsafeExpressionError, match="exponent_too_large"):
+            safe_subs(2**_X, {_X: sympy.Integer(10) ** 100})
     assert safe_subs(2**_X, {_X: sympy.Integer(10)}) == 1024
     with pytest.raises(UnsafeExpressionError, match="factorial_too_large"):
         safe_subs(sympy.factorial(_X), {_X: sympy.Integer(10) ** 9})
@@ -534,7 +576,7 @@ def test_student_answer_paths_end_quickly_as_unverifiable(text: str, check_value
         outcome = path(text)
         elapsed = time.perf_counter() - started
         value = getattr(outcome, "value", outcome)
-        assert elapsed < 1.0, f"{name}: {elapsed:.2f}s — 20초 timeout 부류가 다시 열렸다"
+        assert elapsed < _HANG_CLASS_S, f"{name}: {elapsed:.2f}s — 20초 timeout 부류가 다시 열렸다"
         if check_value:
             assert value in unverifiable_like, f"{name}: {value!r}"
 
