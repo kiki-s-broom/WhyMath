@@ -65,6 +65,10 @@ from whymath_backend.l3.equivalent.orchestrator import (
     GenerationOutcome,
 )
 from whymath_backend.l3.providers.composite import CLOUD_FAILOVER_SEAT
+from whymath_backend.l3.providers.seat_failure import (
+    DEGRADE_REASONS,
+    LocalDegradeSnapshot,
+)
 
 __all__ = [
     "ACCEPTED_STATUSES",
@@ -1033,6 +1037,7 @@ def seat_operating_rates(
     *,
     selected_seat: str,
     seat_model_pins: tuple[str, ...],
+    local_degrade: LocalDegradeSnapshot | None = None,
 ) -> dict[str, Any]:
     """회차의 좌석 '작동한 비율' + 판정(순수·파일 I/O 0).
 
@@ -1053,6 +1058,10 @@ def seat_operating_rates(
         회차가 원래 LOCAL로 라우팅될 조건이었다면 정상이며, 그 판단은 읽는 사람 몫이다
         (도구는 사실만 적는다).
       - `mixed` — 일부만 선택 좌석. 클라우드·로컬 혼재 회차.
+
+    `local_degrade`(ARCH-69)는 이 회차를 돈 `CompositeProvider.local_degrade_snapshot()`의 사본이다.
+    주지 않으면(None) failover 블록의 `seat_local_degrade_rate`는 **미측정(None)**이다 — 저작·측정
+    조립은 런타임 강등이 장착되지 않아 넘길 계수가 애초에 없다.
     """
     pins = frozenset(seat_model_pins)
     on_seat = sum(count for model, count in tally.by_model if model in pins)
@@ -1095,29 +1104,75 @@ def seat_operating_rates(
             "'관측 실패'가 '선언값과 일치'로 위장되기 때문이다."
         ),
         "observation": _observation_block(tally),
-        "failover": _failover_block(),
+        "failover": _failover_block(local_degrade),
         "state": state,
     }
 
 
-def _failover_block() -> dict[str, Any]:
-    """좌석 failover 축 (ARCH-64) — 이 기간에는 **없다**는 사실을 회차 기록이 스스로 말하게 한다.
+def _failover_block(local_degrade: LocalDegradeSnapshot | None = None) -> dict[str, Any]:
+    """좌석 failover 축 (ARCH-64·ARCH-69) — **없는 것과 있는 것**을 회차 기록이 스스로 말하게 한다.
 
-    2026-09-28 Kiki 결정(ARCH-66 기간 처분): 1차 좌석(openrouter)이 실패해도 2차 클라우드 좌석이
-    없다. 그래서 `seat_primary_success_rate`·`seat_failover_rate`(03c §3.3 작동 신호)는 이
-    회차에서 **산출되지 않는다** — 값이 0이 아니라 None인 이유가 "failover가 한 번도 안 일어났다"가
-    아니라 "failover 경로 자체가 없다"임을 적는다. 둘을 0으로 채우면 없는 보호가 "작동했고
-    필요 없었다"로 읽힌다. 두 지표는 `ARCH-63`(G-arch66-anthropic-api-pause-review 재개 판정 뒤)이
-    per-seat 성공 계수와 함께 붙인다.
+    2026-09-28 Kiki 결정(ARCH-66 기간 처분): 1차 좌석(openrouter)이 실패해도 **2차 클라우드
+    좌석은 없다**. 그래서 `seat_primary_success_rate`·`seat_failover_rate`(03c §3.3 작동 신호)는
+    이 회차에서 **산출되지 않는다** — 값이 0이 아니라 None인 이유가 "failover가 한 번도 안
+    일어났다"가 아니라 "failover 경로 자체가 없다"임을 적는다. 둘을 0으로 채우면 없는 보호가
+    "작동했고 필요 없었다"로 읽힌다. 두 지표는 `ARCH-63`(G-arch66-anthropic-api-pause-review 재개
+    판정 뒤)이 per-seat 성공 계수와 함께 붙인다.
+
+    **`seat_local_degrade_rate`는 ARCH-69가 붙였다**(ARCH-63 ④와 같은 이름·정의 — 정의의 단일
+    좌석은 `l3.providers.seat_failure.seat_local_degrade_rate`이며 여기서 다시 계산하지 않고
+    스냅샷의 `rate`를 읽는다). 강등 경로를 탄 횟수 ÷ 클라우드 디스패치 횟수이고, **분모 0이면
+    None**, **강등 미장착 조립이어도 None**이다 — 0.0은 "시도했는데 강등이 0회였다"라는 다른
+    사실이라 쓰지 않는다.
+
+    `local_degrade`가 None이면 이 회차의 관측에는 강등 계수가 전달되지 않은 것이다(미측정).
+    저작·측정 조립의 `CompositeProvider`는 런타임 강등이 장착되지 않으므로(학생 대면 서빙만 —
+    `app.py`, AST로 동결) 정상이며, 서빙의 실값은 `/status`의 `cloud_local_degrade`가 말한다.
     """
+    if local_degrade is None:
+        degrade_block: dict[str, Any] = {
+            "armed": None,
+            "measured": False,
+            "cloud_attempts": None,
+            "local_degrades": None,
+            "local_degrade_failures": None,
+            "by_reason": None,
+        }
+        degrade_note = (
+            "이 회차 관측에는 LOCAL 강등 계수가 전달되지 않았다(미측정 — 0이 아니다). 저작·측정 "
+            "조립의 CompositeProvider는 런타임 LOCAL 강등이 장착되지 않아 1차 좌석 실패는 "
+            "LOCAL로도 재시도되지 않고 실패로 남는다. 강등은 학생 대면 서빙 조립에만 "
+            "있다(ARCH-69 · 서빙의 실값 = /status의 cloud_local_degrade)."
+        )
+    else:
+        degrade_block = {
+            "armed": local_degrade.armed,
+            "measured": True,
+            "cloud_attempts": local_degrade.cloud_attempts,
+            "local_degrades": local_degrade.local_degrades,
+            "local_degrade_failures": local_degrade.local_degrade_failures,
+            "by_reason": {
+                reason: (local_degrade.by_reason or {}).get(reason, 0) for reason in DEGRADE_REASONS
+            },
+        }
+        degrade_note = (
+            "이 회차의 조립은 런타임 LOCAL 강등이 장착돼 있었다 — seat_local_degrade_rate는 "
+            "분모(클라우드 디스패치)가 0이면 None이다."
+            if local_degrade.armed
+            else "이 회차의 조립은 런타임 LOCAL 강등이 장착돼 있지 않았다 — 1차 좌석 실패는 "
+            "LOCAL로도 재시도되지 않고 실패로 남는다(seat_local_degrade_rate는 강등할 수 없는 "
+            "구성이라 None)."
+        )
     return {
         "secondary_seat": CLOUD_FAILOVER_SEAT,
         "seat_primary_success_rate": None,
         "seat_failover_rate": None,
+        "seat_local_degrade_rate": (local_degrade.rate if local_degrade is not None else None),
+        "local_degrade": degrade_block,
         "note": (
             "2차 클라우드 좌석 없음(ARCH-66 기간 · 2026-09-28 Kiki 결정) — 1차 좌석 실패는 다른 "
-            "좌석·LOCAL로 자동 재시도되지 않고 실패로 남는다. seat_primary_success_rate·"
-            "seat_failover_rate는 미산출(0이 아니다) — ARCH-63이 추가한다."
+            "클라우드 좌석으로 넘어가지 않는다. seat_primary_success_rate·seat_failover_rate는 "
+            "미산출(0이 아니다) — ARCH-63이 추가한다. " + degrade_note
         ),
     }
 

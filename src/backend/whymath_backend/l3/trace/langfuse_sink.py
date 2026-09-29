@@ -47,6 +47,10 @@ _TAG_FIELDS: tuple[str, ...] = (
     "local_model",
     "cache_hit",
     "content_source",  # 공급 경로(dsl_render/prompt_cache/generate·03c §4) — 비용 축 필터.
+    # 런타임 LOCAL 강등 사유(ARCH-69) — 강등된 호출만 태그가 붙는다(값이 없으면 태그도 없어 정상
+    # 호출은 노이즈가 되지 않는다). `local_degraded`는 True/False가 항상 실려 태그로 쓰면 전
+    # 호출에 붙으므로 태그에서 뺐다(메타데이터에는 그대로 있다).
+    "degrade_reason",
 )
 
 # Langfuse 이벤트 이름 — L3 라우팅 결정 1건 = 이벤트 1건.

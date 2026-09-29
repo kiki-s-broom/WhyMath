@@ -203,6 +203,7 @@ from whymath_backend.l3.pregenerate.validator import (
 from whymath_backend.l3.providers.composite import CompositeProvider
 from whymath_backend.l3.providers.factory import build_cloud_provider
 from whymath_backend.l3.providers.ollama import OllamaProvider
+from whymath_backend.l3.providers.seat_failure import DEGRADE_REASONS
 from whymath_backend.l3.queue import CeleryJobQueue
 from whymath_backend.l3.trace import LangfuseSink
 from whymath_backend.l5.ocr.factory import build_ocr_components
@@ -298,6 +299,28 @@ class GenerateResponseBody(BaseModel):
             "문자열=거짓 수치 관계 등 사유. 상위 계층이 재생성·L4/L5 라우팅 결정에 활용."
         ),
     )
+    local_degraded: bool = Field(
+        default=False,
+        description=(
+            "True면 `decision`이 클라우드(CLOUD_*)여도 **응답은 LOCAL이 만들었다** — 1차 클라우드 "
+            "좌석이 429·5xx·타임아웃·미설정으로 실패해 런타임 강등이 일어났다(ARCH-69). "
+            "`decision.cost_tier`만 읽는 소비자가 클라우드 품질로 오독하지 않도록 명시한다. 강등 "
+            "응답도 `validation_signal` 등 다른 응답과 같은 검증·관측을 탄다."
+        ),
+    )
+    degraded_from_seat: str | None = Field(
+        default=None,
+        description=(
+            "강등 직전의 클라우드 1차 좌석(예 openrouter). 강등이 없거나 좌석 미상이면 None"
+        ),
+    )
+    degrade_reason: str | None = Field(
+        default=None,
+        description=(
+            "강등 사유 코드 — rate_limited/server_error/timeout/not_configured. "
+            "강등이 없으면 None"
+        ),
+    )
 
 
 class GenerateQueuedBody(BaseModel):
@@ -338,6 +361,38 @@ class ModelAvailabilityBody(BaseModel):
 
     model_id: str
     present: bool
+
+
+class LocalDegradeStatusBody(BaseModel):
+    """`/status`의 런타임 LOCAL 강등 블록(ARCH-69) — 장착 여부 + `seat_local_degrade_rate`.
+
+    값은 **이 프로세스**의 인프로세스 계수다(재시작하면 0 · 워커가 여럿이면 각자의 값). 누적 통계는
+    trace의 `local_degraded` 필드 집계가 맞다 — 외부 관측이 죽어도 이 신호는 남는다(이중 회계).
+    """
+
+    armed: bool = Field(
+        ...,
+        description=(
+            "이 서빙 조립에 런타임 LOCAL 강등이 장착돼 있는가. False면 나머지 값이 0이어도 "
+            "`seat_local_degrade_rate`는 None이다(강등할 수 없는 구성 ≠ 강등 0회)"
+        ),
+    )
+    cloud_attempts: int = Field(..., description="클라우드 좌석으로 디스패치한 횟수(분모)", ge=0)
+    local_degrades: int = Field(..., description="LOCAL 강등 경로를 탄 횟수(분자)", ge=0)
+    local_degrade_failures: int = Field(
+        ..., description="강등 경로를 탔으나 LOCAL도 실패해 원 클라우드 예외가 올라간 횟수", ge=0
+    )
+    by_reason: dict[str, int] = Field(
+        ..., description=f"사유 코드별 강등 횟수 — 키는 항상 {list(DEGRADE_REASONS)} 전체"
+    )
+    seat_local_degrade_rate: float | None = Field(
+        default=None,
+        description=(
+            "강등 경로를 탄 횟수 ÷ 클라우드 디스패치 횟수. **분모가 0이거나 강등 미장착이면 None** "
+            "(0.0이 아니다 — 시도가 없던 것과 시도했는데 강등이 0회였던 것은 다른 사실이다). "
+            "ARCH-63 ④와 같은 이름·정의를 공유한다"
+        ),
+    )
 
 
 class StatusBody(BaseModel):
@@ -382,9 +437,17 @@ class StatusBody(BaseModel):
     cloud_failover_seat: str | None = Field(
         default=None,
         description=(
-            "2차 클라우드 좌석(failover). 2026-12-31까지 없음=None — 1차 좌석 실패는 오류로 "
-            "올라가며 다른 좌석·LOCAL로 자동 재시도하지 않는다(2026-09-28 Kiki 결정 · "
-            "ARCH-63은 G-arch66-anthropic-api-pause-review 재개 판정 뒤)"
+            "2차 **클라우드** 좌석(failover). 2026-12-31까지 없음=None — 1차 좌석 실패가 다른 "
+            "클라우드 좌석으로 넘어가지 않는다(2026-09-28 Kiki 결정 · ARCH-63은 "
+            "G-arch66-anthropic-api-pause-review 재개 판정 뒤). LOCAL 강등은 별개 축이다 — "
+            "`cloud_local_degrade`(ARCH-69)가 장착 여부와 강등률을 말한다"
+        ),
+    )
+    cloud_local_degrade: LocalDegradeStatusBody | None = Field(
+        default=None,
+        description=(
+            "런타임 LOCAL 강등(ARCH-69)의 장착 여부와 작동 신호. None=이 provider가 강등 표면을 "
+            "노출하지 않음(미노출 — '강등 없음'이 아니다)"
         ),
     )
 
@@ -849,15 +912,22 @@ def create_app(
     # "학생대면도 오픈라우터로 전환" · 게이트 G-cloud-mid-seat-cutover clear) — 저작 경로와 같은
     # 셀렉터(`settings.cloud_provider`, 기본 openrouter)를 읽으므로 학생 대면과 저작이 한 좌석을
     # 쓴다. 종전의 `AnthropicProvider()` 하드코딩은 ARCH-66(Anthropic API 중단) 기간 내내
-    # 클라우드 결정을 전부 오류로 만들던 자리다. 2차 좌석은 없다 — 1차 좌석 실패는 오류로
-    # 올라가며 `CompositeProvider`가 그 사실을 예외 note로 붙인다(2026-09-28 Kiki 결정).
+    # 클라우드 결정을 전부 오류로 만들던 자리다. **2차 클라우드 좌석은 없다**(2026-09-28 Kiki 결정)
+    # — 대신 학생 대면은 실패가 화면의 오류가 되므로 **런타임 LOCAL 강등을 켠다**(ARCH-69
+    # `runtime_local_degrade=True`): 1차 좌석이 429·5xx·타임아웃·미설정으로 실패하면 LOCAL이 1회
+    # 대신 답하고, 그 사실은 응답·trace·Langfuse에 표기된다. 4xx(요청·인증 오류)는 강등하지 않고
+    # 예외가 올라간다. 이 인자는 저작·측정 경로에는 **없다**(그쪽은 명확한 실패가 옳다 — AST 동결).
     # 둘 다 지연이라 구성 시 라이브 Ollama·OpenRouter 키가 필요 없다.
     # (OPS-01) 변수로 잡아 두는 이유: 기본 readiness probes가 같은 provider의
     # check_status를 재사용한다(/status와 동일 표면 — 재발명 금지).
     resolved_provider: LLMProvider = (
         provider
         if provider is not None
-        else CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider(settings_for_app))
+        else CompositeProvider(
+            local=OllamaProvider(),
+            cloud=build_cloud_provider(settings_for_app),
+            runtime_local_degrade=True,
+        )
     )
     app.state.__setattr__(_PROVIDER_KEY, resolved_provider)
     # 기본 캐시는 RedisCache(지연 연결) — 구성 시 라이브 Redis 불필요(첫 접근 때 연결).
@@ -1155,6 +1225,18 @@ def create_app(
             cloud_error=snapshot.cloud_error,
             cloud_seat=snapshot.cloud_seat,
             cloud_failover_seat=snapshot.cloud_failover_seat,
+            cloud_local_degrade=(
+                LocalDegradeStatusBody(
+                    armed=snapshot.cloud_local_degrade.armed,
+                    cloud_attempts=snapshot.cloud_local_degrade.cloud_attempts,
+                    local_degrades=snapshot.cloud_local_degrade.local_degrades,
+                    local_degrade_failures=snapshot.cloud_local_degrade.local_degrade_failures,
+                    by_reason=dict(snapshot.cloud_local_degrade.by_reason or {}),
+                    seat_local_degrade_rate=snapshot.cloud_local_degrade.rate,
+                )
+                if snapshot.cloud_local_degrade is not None
+                else None
+            ),
         )
 
     @app.post("/v1/generate", tags=["l3"])
@@ -1239,6 +1321,14 @@ def create_app(
             cache_hit=result.cache_hit,
             decision=result.decision,
             validation_signal=result.validation_signal,
+            # 런타임 LOCAL 강등(ARCH-69) — 결정과 응답의 어긋남을 응답에서 지우지 않는다.
+            local_degraded=result.local_degrade is not None,
+            degraded_from_seat=(
+                result.local_degrade.from_seat if result.local_degrade is not None else None
+            ),
+            degrade_reason=(
+                result.local_degrade.reason if result.local_degrade is not None else None
+            ),
         )
         return JSONResponse(
             status_code=status.HTTP_200_OK,

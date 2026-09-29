@@ -23,7 +23,9 @@ ARCH-55 채택 판정문("이 판정은 선택지를 넓힌 것이지 기본값�
 
 **2차 좌석은 없다** (2026-09-28 Kiki 결정 · ARCH-66 기간). 이 팩토리는 좌석 **하나**를 만든다.
 Anthropic 2차 좌석 failover는 `ARCH-63`이 `G-arch66-anthropic-api-pause-review` 재개 판정 뒤
-추가한다 — 그 전까지 1차 좌석 실패는 `CompositeProvider`가 "2차 좌석 없음" note를 붙여 올린다.
+추가한다 — 그 전까지 1차 좌석 실패는 다른 클라우드 좌석으로 넘어가지 않는다. 학생 대면 조립은
+429·5xx·타임아웃·미설정 실패를 LOCAL로 1회 강등하고(ARCH-69 — `CompositeProvider`
+`runtime_local_degrade`), 그 밖의 실패는 "2차 좌석 없음" note를 붙여 올린다.
 
 **관할 게이트는 이 모듈이 아니라 `CompositeProvider`가 세운다**(기존 설계 유지). 팩토리가
 자기 자신을 검열하면 팩토리를 우회해 provider를 직접 쥐는 경로가 게이트까지 함께 우회한다 —
