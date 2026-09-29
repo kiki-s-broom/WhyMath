@@ -3415,6 +3415,18 @@
    "ref": "2026-09-29",
    "paths": [
     "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "EOS-146 2세션 중복 게이트 — 결정 게이트 부착·claim 반납을 ARCH-71 PR에 10시간 실어 둬 main엔 무주 todo로 보임",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
     "tests/harness/test_jit*.py"
    ],
    "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red(push 전 검출)",

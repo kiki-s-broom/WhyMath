@@ -423,18 +423,18 @@ gates:
       - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
     depends_on:
       - EOS-150
-  - id: G-eos146-app-wrong-answer-source-disposition
-    title: "앱 오답·포기 원천 처분 선택(EOS-146 ③ 가·나·다) — 코치 턴 오답을 응답 1건으로 적재 / 앱이 문항 단위 오답 제출(MOB-20 계약 재판정) / 앱에서는 상태 머신 집행 미사용(범위 명기)"
+  - id: G-eos146-disposition
+    title: "EOS-146 앱 오답·포기 이벤트 원천 처분 선택(가·나·다) — (가) 코치 턴의 오답 신호(검증 결과·오개념 매칭)를 응답 1건으로 적재하고 상태 머신 실행(코치 한 턴을 오답 1건으로 셀지 = 교수학 판정) / (나) 앱이 문항 단위 오답을 POST /v1/me/attempts로 제출하도록 계약 변경(MOB-20 계약상 금지 재판정) / (다) 앱에서는 상태 머신 집행(R3·R6)을 쓰지 않기로 하고 범위 명기(Phase 3 Release Gate A 영향)"
     kind: decision
     assignee: kiki
     status: pending
     requested: 2026-09-29
-    remind_after_days: 14
+    remind_after_days: 7
     evidence: null
     cleared_by: null
     notes: ""
     corrections: []
-    no_inputs_reason: "판정 근거는 이미 있다 — EOS-146 acceptance ①~③(코드 대조 2026-09-26)·EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §4(판정 수준 = API 계약 · 앱 도달 0 · 판정 기준 main a82f9449). 코치 대화의 한 턴을 오답 1건으로 셀지 자체가 교수학 판정이고, (나)는 MOB-20의 '계약상 금지' 결정을 뒤집으며, (다)는 G-p3-entry-gate2-pass를 어느 자로 볼지(판정문 §4-2)와 같은 결정이라 Kiki 몫이다"
+    no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §4·§5·§7 P-1(판정 기준 main a82f9449)과 EOS-146 acceptance ③. 코치 한 턴을 오답 1건으로 셀지는 교수학 판정이고 (나)는 앱 계약(MOB-20) 재판정이라 구현 세션이 대신 고르지 않는다. 2026-09-29 코드 재확인(main a28a8d08): EOS-134 착지로 코치 정답 완료는 advance_on_graded_attempt를 돌지만(api/coach.py:1416) 코치 경로에 오답·포기 적재는 0건이고 모바일 lib은 POST /v1/me/attempts를 호출하지 않는다 — R3·R6 앱 도달 0 유지(이 검색 방법 기준). 근거: 이 선행 조건이 acceptance 산문뿐이라 next가 EOS-146을 1순위 후보로 계속 내놓아 세션마다 같은 벽에 부딪혔다."
   - id: G-eos23-rejected-quad-sum-classification
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human
