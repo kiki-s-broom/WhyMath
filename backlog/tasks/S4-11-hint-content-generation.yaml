@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 5
 eos_priority: P0
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - "src/backend/whymath_backend/l3/**"
   - "src/backend/whymath_backend/db/models/**"
   - "src/backend/whymath_backend/api/**"
-session: null
+session: claude/ecstatic-feynman-bxxxvd
 notes: "docs/architecture/solution_module_gap_review.md §3 D3 — 외부 EOS 틀(기능 25) 대조(최대 실행 갭). HintNode Persistence 연기(MEMORY 2026-07-08 Phase 6b) 해제 조건 충족 슬라이스. 학생 대면 서빙 포함 → S3-01 의존 해제(2026-09-22) — 실학생 응답을 입력으로 쓰지 않으므로 12/31 내용 완성 우선 결정에 따라 순서 의존만 떼었다. 루프 검증 전 기능 확장 주의는 유지(S4-05 선례). 스캐폴딩 페이딩·개입 금지 타이머는 §4-①\n\n[정정 2026-09-01] eos_priority null → P0: 판정표 R/CU★ — 검증설계서 §8 집행 지점 명시 지목. EOS-80 일괄 백필\n\n[정정 2026-09-22] depends_on 제거 1건: 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다.\nnotes 치환 — 12/31 내부 콘텐츠 완성 우선 순서 결정(2026-09-22 Kiki 지시) — 파일럿(S3-01)이 내용 완성 이후로 이동했고, 본 태스크는 실학생 응답을 입력으로 소비하지 않는다(스테이지 순서로 상속된 의존). 실응답이 입력인 S4-15만 의존을 유지한다. 로드맵 docs/strategy/status_roadmap_2026-07.md S4절의 파일럿-우선 순서와 의도적으로 상이하며, 근거는 S4-01 실측 커버리지(대학 코드 참조 문항 0/2638·K-12 0문 4과목·초3~4 2.1%) — 이 상태로 파일럿을 돌리면 학생이 풀 문제가 없다."
-updated: 2026-09-22
+updated: 2026-09-29
