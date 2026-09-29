@@ -187,6 +187,18 @@
   },
   {
    "kind": "rule",
+   "ref": "R-067",
+   "paths": [
+    "docs/ops/**",
+    "scripts/ops/**",
+    "scripts/ops/check_runbook_self_containment.py",
+    "tests/infra/test_runbook_block_self_containment.py"
+   ],
+   "text": "실행 시스템 진입 경로 완전 명시 (2026-07-16 Kiki 지정)",
+   "weight": 100
+  },
+  {
+   "kind": "rule",
    "ref": "R-069b",
    "paths": [
     "docs/ops/g_skb01_concept_behavior_skills_populate_runbook.md"

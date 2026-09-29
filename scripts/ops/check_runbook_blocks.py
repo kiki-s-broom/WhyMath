@@ -137,7 +137,9 @@ _SECURE_STRING = re.compile(r"-AsSecureString\b", re.IGNORECASE)
 # 초판이 이것을 함께 넣었다가 `ip_separation_evidence_gate`·`g_skb01_resolution_remeasure`
 # 두 런북의 **정상 정지 장치**를 위반으로 잡았다(2026-09-22 실측) — 헌법이 처방한 형태를
 # 가드가 거부하면 사람은 가드를 끈다. 여기에 어휘를 더할 때는 "한 줄인가, 루프인가"를 먼저
-# 판정할 것.
+# 판정할 것. 단 그 권장은 **블록을 단독으로 붙여넣을 때만** 성립한다(CLAUDE.md v0.2.34 정정 —
+# 뒤 블록 첫 줄을 입력으로 삼킨다). 단독 붙여넣기 경고의 동반은 HARN-115 게이트
+# (`check_runbook_self_containment.py`)가 검사한다 — 이 스캐너는 계속 제외한다.
 _INTERACTIVE = re.compile(r"\breview_session\b", re.IGNORECASE)
 _LENGTH_CHECK = re.compile(r"\.Length\b|\bLength\b", re.IGNORECASE)
 
