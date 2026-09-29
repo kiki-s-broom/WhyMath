@@ -3144,6 +3144,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-22",
+   "paths": [
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**",
+    "tests/infra/test_ci_mirror.py"
+   ],
+   "text": "CI 미러가 선언 없는 스텝에도 pipefail을 걸어 거짓 실패 — stdout 미보존으로 원인 불명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
     "scripts/harness/backlog.py"
@@ -3387,6 +3398,16 @@
     "tests/infra/test_integration_marker_*.py"
    ],
    "text": "CI 통합 잡 재현 스크립트가 스텝 env를 빠뜨려 통합 461건 전부 skip·exit 0 — 판정 줄로 발견",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red(push 전 검출)",
    "weight": 1
   },
   {
