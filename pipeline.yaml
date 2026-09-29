@@ -185,9 +185,17 @@ nodes:
   #   집행 주체 = Phaiakes9 Windows 작업 스케줄러(CI 잡 없음 — workflows grep 'backup' 히트는 주석 ci.yml:1114,1152 뿐·E3)
   backup: { needs: [publish] }
 
+  # [부분·E2] 개념 버전 발행 게이트 (EOS-50) — 문항 `publish`와 **별개 노드**다(축 판정 docs/reviews/eos50_publish_gate_axis_judgment_2026-09-29.md)
+  #   전이표(데이터 선언) src/backend/whymath_backend/schema/version_lifecycle.py · 검증 파이프라인·전이 실행·Rollback l3/publish_gate.py
+  #   집행 동결(AST — concept_version·발행 포인터의 유일한 쓰기 자리) tests/backend/l3/test_publish_gate_enforcement.py
+  #   실 PG 왕복 tests/backend/l3/test_publish_gate_integration.py (CI backend-migrations 잡)
+  #   미구현: 이 게이트를 부르는 운영 API·CLI는 0건(44 §12 CMS 버전 API 미착수) — 지금 호출자는 테스트뿐이다
+  concept_version_publish: { needs: [concept_graph] }
+
   # [집행·E2] DB 무결성 게이트 7종(orphan concept/skill/problem·dangling curriculum·duplicate canonical·event schema·발행 포인터)
   #   ops/integrity_violations_gate.py:1-30 (OPS-55·EOS-07) · CI backend-migrations 잡 .github/workflows/ci.yml:660-661
-  integrity_gate: { needs: [publish] }
+  #   ⑦ 발행 포인터(concept.current_published_version_id) 검사는 concept_version_publish 가 쓰는 값을 사후 감사한다
+  integrity_gate: { needs: [publish, concept_version_publish] }
 
   # [집행·E2] 코치 응답 시드 사전적재(문항 은행이 아니라 L3 캐시 콘텐츠): JSONL 스펙→라우터 동일 키→SymPy 시드 검증→Redis
   #   src/backend/whymath_backend/l3/pregenerate/__main__.py:1-17 · prewarmer.py:1-14 · validator.py:1-10 · GenerationLog 사이드카(EOS-55)

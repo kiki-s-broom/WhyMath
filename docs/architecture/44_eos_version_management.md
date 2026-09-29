@@ -420,4 +420,10 @@ MVP 다음 단계에서 추가.
 3. **Concept Version**: `ConceptVersion` 테이블 및 `concept_id` 기반 버전 계약.
 4. **Release Snapshot**: `Release`, `ReleaseItem` 테이블 설계.
 5. **VersionContext**: 학습 이벤트에 고정되는 런타임 컨텍스트 모델.
-6. **Publish Gate**: Draft → Publish 검증 파이프라인.
+6. **Publish Gate**: Draft → Publish 검증 파이프라인. — [구현 2026-09-29 · EOS-50] 전이표
+   `schema/version_lifecycle.py`(데이터 선언 · `IN_QA` 상태 추가) · 검증 파이프라인·전이 실행·
+   Rollback `l3/publish_gate.py` · 게이트 기록 좌석 `concept_version.qa`(리비전 `9d3e7b1c5a20`).
+   기존 `review_status`·PB-03 노출 계약과는 **다른 축**이며 경계 5항은
+   `docs/reviews/eos50_publish_gate_axis_judgment_2026-09-29.md`. 현재 게이트 검사는 스키마·
+   content_hash·거버넌스·QA 기록 결속까지이고, §9의 Source·License·Math·Graph·AI Validation은
+   개념 payload에 볼 대상이 없어 포함하지 않았다(문항 버전 ARCH-31이 소비). 운영 API·CLI는 미구현.

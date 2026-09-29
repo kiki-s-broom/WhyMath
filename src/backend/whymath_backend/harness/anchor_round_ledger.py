@@ -64,6 +64,7 @@ from whymath_backend.l3.equivalent.orchestrator import (
     DuplicateOrigin,
     GenerationOutcome,
 )
+from whymath_backend.l3.providers.composite import CLOUD_FAILOVER_SEAT
 
 __all__ = [
     "ACCEPTED_STATUSES",
@@ -1094,7 +1095,30 @@ def seat_operating_rates(
             "'관측 실패'가 '선언값과 일치'로 위장되기 때문이다."
         ),
         "observation": _observation_block(tally),
+        "failover": _failover_block(),
         "state": state,
+    }
+
+
+def _failover_block() -> dict[str, Any]:
+    """좌석 failover 축 (ARCH-64) — 이 기간에는 **없다**는 사실을 회차 기록이 스스로 말하게 한다.
+
+    2026-09-28 Kiki 결정(ARCH-66 기간 처분): 1차 좌석(openrouter)이 실패해도 2차 클라우드 좌석이
+    없다. 그래서 `seat_primary_success_rate`·`seat_failover_rate`(03c §3.3 작동 신호)는 이
+    회차에서 **산출되지 않는다** — 값이 0이 아니라 None인 이유가 "failover가 한 번도 안 일어났다"가
+    아니라 "failover 경로 자체가 없다"임을 적는다. 둘을 0으로 채우면 없는 보호가 "작동했고
+    필요 없었다"로 읽힌다. 두 지표는 `ARCH-63`(G-arch66-anthropic-api-pause-review 재개 판정 뒤)이
+    per-seat 성공 계수와 함께 붙인다.
+    """
+    return {
+        "secondary_seat": CLOUD_FAILOVER_SEAT,
+        "seat_primary_success_rate": None,
+        "seat_failover_rate": None,
+        "note": (
+            "2차 클라우드 좌석 없음(ARCH-66 기간 · 2026-09-28 Kiki 결정) — 1차 좌석 실패는 다른 "
+            "좌석·LOCAL로 자동 재시도되지 않고 실패로 남는다. seat_primary_success_rate·"
+            "seat_failover_rate는 미산출(0이 아니다) — ARCH-63이 추가한다."
+        ),
     }
 
 
