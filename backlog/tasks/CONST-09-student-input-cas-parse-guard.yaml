@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - src/backend/whymath_backend/l3/equivalent/canonicalize.py
   - "tests/backend/l3/test_safe_parse*.py"
   - tests/infra/test_cas_parse_entrypoint_governance.py
-session: null
+session: claude/focused-ramanujan-2p5q8w
 notes: "출처 = docs/reviews/coding_diagnosis_baseline_2026-09-27.md BL-004(높음·E2). 의사결정 우선순위 1(학생 안전). CONST-08(파트 VII)의 R22-03 좌석과 증적을 공유한다.\n\n[정정 2026-09-27] acceptance 분할 등재 2/4\n\n[정정 2026-09-27] acceptance 분할 등재 3/4\n\n[정정 2026-09-27] acceptance 분할 등재 4/4"
-updated: 2026-09-27
+updated: 2026-09-29
