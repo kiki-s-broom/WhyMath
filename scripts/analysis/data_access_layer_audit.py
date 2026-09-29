@@ -267,6 +267,12 @@ BASELINE: dict[str, frozenset[str]] = {
             "l3/pedagogy/prescreen.py",
             "l3/pedagogy/review.py",
             "l3/pedagogy/slot_generator.py",
+            # EOS-50 — 개념 버전 Publish Gate. `concept_version` 행과 발행 포인터
+            # (`concept.current_published_version_id`)를 쓰는 **유일한** 자리로 설계됐다
+            # (AST 동결 test_publish_gate_enforcement.py). 전이 실행이 게이트 검증과 같은
+            # 트랜잭션·같은 행 잠금 안에 있어야 하므로 저장소 계층으로 분리하지 않았다 — 이
+            # 등재가 "이 파일은 DB를 직접 잡는다"의 서면 선언이다.
+            "l3/publish_gate.py",
             "l3/solution_path_store.py",
         }
     ),

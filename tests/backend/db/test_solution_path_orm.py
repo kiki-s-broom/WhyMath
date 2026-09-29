@@ -193,7 +193,9 @@ class TestMigrationFileChain:
         # 세션 부분 유니크 인덱스)을 얹어 head를 다시 이동.
         # ADMIN-15가 그 위에 8c19e8a611e4(privacy_audit.token_expires_at/issued_by — 운영자
         # 토큰 발급 감사)를 얹어 head를 다시 이동.
-        assert heads == {"8c19e8a611e4"}
+        # EOS-50이 그 위에 9d3e7b1c5a20(concept_version_status_enum 'IN_QA' +
+        # concept_version.qa 게이트 기록 좌석)을 얹어 head를 다시 이동.
+        assert heads == {"9d3e7b1c5a20"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""
