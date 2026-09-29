@@ -2562,9 +2562,11 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    ".claude/commands/drive.md",
     "scripts/harness/ci_job_coverage.py",
     "scripts/harness/ci_mirror.py",
-    "tests/harness/test_ci_job_coverage*.py"
+    "tests/harness/test_ci_job_coverage*.py",
+    "tests/infra/test_ci_job_coverage*.py"
    ],
    "text": "ci_job_coverage scope에 stdin 입력·출력 tail 절단 — 0건 판정을 읽지 못해 backend 잡 누락",
    "weight": 2
