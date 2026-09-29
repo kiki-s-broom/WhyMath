@@ -427,6 +427,56 @@ class TestHookReadsLedgersNotAFile:
         assert "[적시 규칙]" not in err
 
 
+# ── ⑥-c 대장 쓰기 뒤 재생성 단계가 없다 (HARN-179) ─────────────────────────
+
+
+class TestLedgerWritesNeedNoRebuild:
+    """쓰기 CLI 다음 편집이 곧바로 새 기록을 본다 — 사이에 사람이 돌릴 명령이 없다.
+
+    종전(커밋 인덱스)에는 `incident add` 뒤 `jit build`를 잊으면 CI `jit check`가 red였다
+    (계열 derived-index-not-rebuilt 3회 · 뒤 스텝 7건 미실행). 쓰기 CLI마다 재생성 배선을 다는
+    대신 읽는 쪽이 대장을 직접 보게 했으므로(HARN-130), 여기서는 그 결과를 쓰기 쪽에서 본다:
+    쓰고 → 다른 명령 없이 → 다음 편집. 훅이 저장된 파일을 읽게 되돌리면(뮤테이션 J01) RED다.
+    """
+
+    def test_incident_add_is_visible_to_the_next_edit(self, git_repo, monkeypatch, capsys) -> None:
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("방금 등재한 사고") == 0
+        code, err = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert code == 0
+        assert "방금 등재한 사고" in err
+        assert cli.main(["jit", "check"]) == 0
+
+    def test_task_path_amend_moves_the_injection_immediately(
+        self, git_repo, monkeypatch, capsys
+    ) -> None:
+        """태스크 쪽 쓰기도 같다 — 상환 태스크의 paths를 옮기면 주입도 그 자리로 옮겨 간다.
+
+        대조: 옛 경로에서는 사라진다. 옛 설계에서는 이 정정도 재생성을 요구했다(사고 대장이
+        아니라 태스크를 고쳐도 인덱스가 낡았다).
+        """
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("경로가 옮겨 갈 사고") == 0
+        assert (
+            cli.main(
+                [
+                    "amend",
+                    "HARN-901-fix",
+                    "--path",
+                    "src/y/**",
+                    "--drop-scope",
+                    "--reason",
+                    "픽스처 — 상환 범위 이동",
+                ]
+            )
+            == 0
+        )
+        _, err_new = _edit(root, "src/y/b.py", monkeypatch, capsys)
+        _, err_old = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert "경로가 옮겨 갈 사고" in err_new
+        assert "경로가 옮겨 갈 사고" not in err_old
+
+
 # ── ⑦ CLI ───────────────────────────────────────────────────────────────────
 
 
