@@ -160,6 +160,9 @@ BASELINE: dict[str, frozenset[str]] = {
             "harness/qa_pipeline.py",
             "harness/recommendation_outcome_report.py",
             "harness/standard_attainment_report.py",
+            # S4-01 슬라이스 2 — traversal 실부하 판정은 실 PG 전 앵커를 직접 재야 한다(측정 대상이
+            # 곧 서빙 탐색 함수의 세션 호출이다). 서빙 코드가 아니라 CI 게이트 도구다.
+            "harness/traversal_load_probe.py",
             "harness/wh1_evaluation.py",
         }
     ),

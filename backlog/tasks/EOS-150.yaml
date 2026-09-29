@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-150
+title: "QA 엔진 문항 좌석(judge_item)이 정답을 재검산하지 않는다 — 정답이 틀린 문항도 pass라 수학 오류(F1·F2)가 골든 평가에서 구조적 FN이 된다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 문항 좌석에 정답 재검산 성분 추가 — `harness/qa_pipeline.judge_item`이 `corpus_reverify._reverify_one`(S6 상시 재검산 — Tier1·근 선택·Tier2 단계·개념형)을 재구현 없이 부른다. 재검산 fail은 violation, skip(재료 없음·unverifiable)은 unjudgeable로 옮겨 pass로 접지 않는다. 이 성분이 ok가 아닌 문항은 pass가 될 수 없다(필수 성분)."
+  - "② 전수 대응 계약 갱신 — 재검산 성분은 집계 9축 밖(S6 검증 스택)이므로 `ITEM_LEVEL_AXES`·`CORPUS_LEVEL_ONLY_AXES`의 9축 전수 대응을 깨지 않는 별도 표기로 둔다. 계약 문서(golden_benchmark_contract.md)의 좌석 구성 서술과 판정기 식별(verdict_source)이 이 변경을 반영한다."
+  - "③ 변별력 — 정답만 틀린 문항(조건·산문·출처는 정상)이 fail로 판정됨을 반례 픽스처로 동결하고, 재검산 성분을 빼는 뮤테이션이 RED를 내는지 확인한다. 저장소 문제은행 전수에서 새 fail·판정 불가 건수를 실측해 적는다."
+  - "④ 첫 평가 선후 — 게이트 G-eos137-first-eval(EOS-137 ② 런북)이 이 태스크 이전에 실행되면 골든의 수학 결함을 좌석이 못 보는 상태로 원장 첫 행이 찍힌다. 게이트 입력 간선으로 이 태스크를 건다."
+artifacts:
+  - "PR #1367 — 문항 좌석 정답 재검산 필수 성분 · 판정 기준 main 559be84e · 문제은행 14,034건 판정 불변"
+  - "PR #1367 머지(main e68d9308) — 문항 좌석 정답 재검산 필수 성분 · 문제은행 14,034건 판정 불변 · 뮤테이션 3종 RED"
+paths:
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - src/backend/whymath_backend/harness/qa_item_verdicts.py
+  - "tests/backend/harness/test_qa_*.py"
+  - docs/standards/golden_benchmark_contract.md
+  - src/backend/whymath_backend/ops/qa_confusion_matrix.py
+  - docs/ops/eos137_first_eval_runbook.md
+session: null
+notes: "출처: 2026-09-28 EOS-137 병렬 중복 구현 대조(판정 기준 main 559be84e). main #1352의 judge_item은 조건 DSL·금칙어/PII·레코드 출처 3축만 보며 ItemJudgement.verdict는 위반·판정 불가가 없으면 pass다 — 정답 재검산이 없다. 닫힌 중복 PR #1364는 재검산을 필수 성분으로 뒀고, Kiki 결정(같은 날)으로 그 한 가지만 이식한다.\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_item_verdicts.py', 'tests/backend/harness/test_qa_*.py', 'docs/standards/golden_benchmark_contract.md'] → ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_item_verdicts.py', 'tests/backend/harness/test_qa_*.py', 'docs/standards/golden_benchmark_contract.md', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'docs/ops/eos137_first_eval_runbook.md']: 착지 범위 반영 — 판정기 설명(qa_confusion_matrix 헤더)·런북 기대 설명과 선행 조건\n\n[정정 2026-09-28] PR 증적 연결"
+updated: 2026-09-29
