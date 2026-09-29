@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -16,7 +16,8 @@ acceptance:
   - "② 코딩 헌법 R22-03(학생 입력 수식은 허용 문자 검사를 통과한 뒤에만 CAS로 파싱)의 집행 장치 = 단일 안전 파싱 진입점(허용 문자·길이·지수 크기 상한·evaluate=False·시간 예산)을 l3에 두고, 학생 입력이 닿는 경로가 전부 그 진입점을 경유하도록 AST 거버넌스 테스트로 동결한다(직접 sympify 호출 0건 또는 허용목록 사유 필수)."
   - "③ 변별력 — 가드 제거·우회 경로 추가 두 뮤테이션에서 RED, 정상 입력 GREEN(대조군). 성능 예산(예: 200ms) 초과 입력은 거부 응답(학생 문구는 부정적 강화 금지 규칙 준수)으로 끝난다."
   - "④ 완료 = tests/backend 배선 + 재현 기록 + CONST-07(R22-03 좌석)에 증적 연결. 의사결정 우선순위 1(학생 안전·웰빙) 항목이라 P1."
-artifacts: []
+artifacts:
+  - "PR #1380 (4d6bc51f — l3/safe_parse.py 단일 진입점 · 학생 입력 호출부 51곳 이전·허용목록 6 · 원격 코드 실행·9^9^9 정지 재현 후 차단 · 거버넌스 AST 테스트 · 뮤테이션 5종 전건 RED · 로컬 CI 미러 실행 스텝 전건 통과 + QA 파이프라인 게이트 직접 실행 통과)"
 paths:
   - src/backend/whymath_backend/l3/safe_parse.py
   - src/backend/whymath_backend/l3/verify_answer.py
@@ -38,6 +39,6 @@ paths:
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
   - scripts/analysis/eos_core_adapter_boundary_scan.py
   - scripts/analysis/eos_feature_inventory_v2.py
-session: claude/focused-ramanujan-2p5q8w
+session: null
 notes: "출처 = docs/reviews/coding_diagnosis_baseline_2026-09-27.md BL-004(높음·E2). 의사결정 우선순위 1(학생 안전). CONST-08(파트 VII)의 R22-03 좌석과 증적을 공유한다.\n\n[정정 2026-09-27] acceptance 분할 등재 2/4\n\n[정정 2026-09-27] acceptance 분할 등재 3/4\n\n[정정 2026-09-27] acceptance 분할 등재 4/4\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l3/safe_parse.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/l3/equivalent/canonicalize.py', 'tests/backend/l3/test_safe_parse*.py', 'tests/infra/test_cas_parse_entrypoint_governance.py'] → ['src/backend/whymath_backend/l3/safe_parse.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/l3/equivalent/canonicalize.py', 'tests/backend/l3/test_safe_parse*.py', 'tests/infra/test_cas_parse_entrypoint_governance.py', 'tests/backend/api/test_verify_unsafe_input.py', 'src/backend/whymath_backend/l3/symbolic_equivalence.py', 'src/backend/whymath_backend/l3/verify_answer_form.py', 'src/backend/whymath_backend/l3/dsl/compiler.py', 'src/backend/whymath_backend/l3/dsl/math_verifier.py', 'src/backend/whymath_backend/l3/dsl/variable_engine.py', 'src/backend/whymath_backend/l3/equivalent/counterexample_fuzz.py', 'src/backend/whymath_backend/l3/equivalent/llm_generator.py', 'src/backend/whymath_backend/l3/pregenerate/validator.py', 'src/backend/whymath_backend/l4/misconception/wrong_form_match.py', 'src/backend/whymath_backend/l5/ocr/verify.py', 'src/backend/whymath_backend/harness/tier1_rejection_classifier.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_core_adapter_boundary_scan.py', 'scripts/analysis/eos_feature_inventory_v2.py']: [실측 2026-09-29 · 판정 기준 main 120bd7c5 · acceptance ① 재현 기록] 경로 7종(verify_answer 답 값·조건 · verify_step · verify_final_answer · scan_attempt_answer(/v1/me/attempts 텍스트 채널) · form_verdict_for · OCR parse_check_latex), 입력마다 별도 프로세스·timeout -s KILL 20초. ⓐ DoS 재현됨: 9^9^9·9**9**9는 form_verdict를 뺀 6경로 전부 20초 timeout · LaTeX 9^{9^{9}}는 OCR 20초 timeout · (10^9)!는 5경로 timeout · (x+y+z+w+v)^60은 verify_step·최종답·scan_attempt timeout · 조건 y=2^x에 답 x=10^100은 timeout · x^99+x+1=0은 최종답·verify_step timeout · 2^1000000000은 6.6~11.9초. ⓑ 더 심각한 발견 — 원격 코드 실행: exec(chr(..)+..) 형태(영숫자·괄호·+만)의 학생 입력이 verify_answer·verify_step·최종답·scan_attempt·OCR 경로에서 실제로 실행됐다. SymPy 파서가 eval을 쓰고 전역 이름공간에 파이썬 내장 함수를 싣기 때문이다. 메인 세션이 origin/main 사본에서 독립 재현했다(무해 페이로드로 표시 파일 생성 확인 · 결과는 unverifiable로 조용히 끝나 화면상 무증상). 해당 API는 ConsentedUser 인증이 필요하다 — 로그인한 학생 계정이면 누구나 가능했다. ⓒ 수정 후: 위 입력 전부 0.1~12ms 안에 unverifiable·OCR ok=False·RAN_NO_CANDIDATE로 끝나고 코드 실행 0건. 예외 2건 — x^99+x+1=0의 최종답 판정은 incorrect(좌변 거부 후 기존 폴백이 우변 0을 기대값과 비교), x^20+x+1=0(차수 상한과 같음)은 하류 solve로 약 1.5초. [범위 정정] 학생 입력이 닿는 호출부 51곳을 안전 진입점으로 옮기며 선언 paths 밖 파일이 바뀌었다(dsl·pregenerate·symbolic_equivalence·verify_answer_form·equivalent/llm_generator·counterexample_fuzz·l4 wrong_form_match·l5 ocr/verify·harness tier1_rejection_classifier·ops declared_unwired_audit·분석 스크립트 2종·API 테스트). [오기 정정] acceptance ④의 'CONST-07(R22-03 좌석)'은 CONST-08이다 — R22-03은 파트 VII(22장) 소관이고 대조표 배정도 CONST-08이다."
 updated: 2026-09-29
