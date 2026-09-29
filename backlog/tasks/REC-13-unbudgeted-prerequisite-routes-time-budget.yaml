@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: REC-13-unbudgeted-prerequisite-routes-time-budget
+title: "예산 밖 선수 탐색 경로에 시간 예산 — /v1/me/weak-concepts/* 깊이 5·시간 제한 없음, 엣지 목록 행 상한 없음"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 예산 밖 선수 탐색에 시간 예산을 건다 — GET /v1/me/weak-concepts/{id}/prerequisites · /coaching · /learning-path 와 POST /v1/me/assessments/capture, 코치 세션의 선수 코칭 경로가 fetch_prerequisites를 시간 제한 없이 부른다(깊이 쿼리 파라미터 상한 MAX_PREREQUISITE_DEPTH=5 · 노드 상한 64는 SQL이 끝난 뒤 파이썬에서만 적용). 정책 경로와 같은 방식(_within_budget 또는 동등한 단일 지점)으로 시간 예산을 걸고, 초과 시 조용히 빈 결과를 내지 말고 강등 사유를 관측 가능하게 한다."
+  - "② GET /v1/concepts/{id}/edges 에 행 상한(또는 페이지네이션)을 둔다 — 현재 유일하게 LIMIT이 없는 엣지 엔드포인트다. 상한 초과는 로그를 남긴다(침묵 절단 금지)."
+  - "③ 집행 지점 검증 — S4-01 슬라이스 2의 판정 CLI(whymath_backend.harness.traversal_load_probe)의 라우트 형태를 '참조 기준 측정'에서 '서빙 예산 측정'으로 전환한다(TraversalShape.budgeted=True). 결함 주입: 느린 가짜 탐색으로 시간 예산 발동을 RED→강등 경로로 확인하고 정상 대조군 GREEN."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/api/concepts.py
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/l2/prerequisite_recommendation.py
+  - "tests/backend/**"
+session: null
+notes: "S4-01 슬라이스 2(traversal 실부하 측정, 2026-09-28) 중 전수 조사로 발견. 현재 규모(원자 2,683노드·2,210엣지)에서는 실측상 안전하다 — 깊이 5 선수 탐색 최대 55노드·원시 행 114, 동시 8요청 최대 약 0.19초, 동시 32요청 최대 약 0.5초로 정책 시간 예산 2.0초 안이다. 그러나 '실측상 안전'과 '예산이 걸려 있다'는 다른 주장이다 — 재귀 CTE가 UNION ALL이라 그래프가 조밀해지면 SQL이 깊이 5까지의 모든 경로를 만든 뒤에야 파이썬 상한이 적용되고, 느린 DB에서는 요청이 매달린다. 대학 과목 간 엣지 저작(S4-01 남은 범위 ⒜)·경계 엣지 병합(S4-60)이 그래프 밀도를 올리는 방향이라 등재한다."
+updated: 2026-09-28
