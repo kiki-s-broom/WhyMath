@@ -3273,8 +3273,13 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    ".claude/hooks/chat_block_guard.py",
+    ".claude/hooks/fence_guard.py",
     ".claude/hooks/git_revert_guard.py",
-    "tests/infra/test_git_revert_guard.py"
+    "tests/infra/test_chat_block_guard.py",
+    "tests/infra/test_fence_guard.py",
+    "tests/infra/test_git_revert_guard.py",
+    "tests/infra/test_hook_stdin_utf8.py"
    ],
    "text": "기존 git_revert_guard 가 태스크 등재 heredoc 본문의 설명 문구를 git 원복 명령으로 오판해 차단",
    "weight": 1
@@ -4026,8 +4031,13 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    ".claude/hooks/chat_block_guard.py",
+    ".claude/hooks/fence_guard.py",
     ".claude/hooks/git_revert_guard.py",
-    "tests/infra/test_git_revert_guard.py"
+    "tests/infra/test_chat_block_guard.py",
+    "tests/infra/test_fence_guard.py",
+    "tests/infra/test_git_revert_guard.py",
+    "tests/infra/test_hook_stdin_utf8.py"
    ],
    "text": "신설 헌법 가드가 cp949 콘솔에서 한글·— 섞인 명령을 통과(fail-open) — stdin 을 로캘 인코딩으로 해독",
    "weight": 0
