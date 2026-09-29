@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-29 (판정 · EOS-141): **Phase 2 Gate 2 3차 재판정 = PASS — 단 판정 수준은 API 계약(앱 도달 0)이다. 앱 도달을 자로 삼으면 FAIL(소유 `EOS-146`). 어느 자로 볼지와 게이트 `G-p3-entry-gate2-pass` clear는 Kiki 몫** (claude 판정 · 구현 세션과 분리 · production code 무변경) — 판정 기준 main `a82f9449`
+
+- **근거**: 10조건 전건 충족 · 상시 3루프 하네스 general·misconception 모두 LOOP1~3 PASS(9/25의 유일한 미충족이던 원인 미상 오답 Loop 1 보정이 `EOS-26`으로 섬) · 일회성 프로브 7변이 전건 PASS · SCENARIO-001~010 로컬 10/10 + 판정 기준 커밋의 CI 실행 2회(merge_group·push)에서 실제 실행 10 passed. 판정문 `docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md`(P3-00b 인수 점검 겸).
+- **KPI 5종(병기)**: `loop_kpi_gate` EXIT=1 — ⑤ Traceability FAIL 40/40은 판정 하네스가 `DELETE /v1/me`로 지운 학습자 잔여(삭제권 이행과 진짜 끊김을 구별 못 하는 설계 공백), ①②④는 하네스가 스스로 지운 데이터 위라 미측정. 네 판정(9/19·9/24·9/25·9/29) 모두 같은 형태.
+- **⑨ 집행**: `EOS-37-kpi5-erasure-traceability-disposition`(⑤ 삭제권 오염 처분 — PIPA 표면이라 처분 결정 선행) · `EOS-38-loop-kpi-judgment-sample-path`(①②④ 표본 경로 · 선행 EOS-37) 등재, `EOS-146`과 함께 `P3-17-week3-release-gate-judgment`의 선행으로 부착. 첫 등재 시도 `EOS-151`은 원격 claim 충돌로 CLI가 거부(HARN-111 가드 실작동).
+- **정정된 전제**: 9/25 §3-5의 "서빙 코드 변경 없이 기준만 바꾸면 된다"는 틀렸다 — ⓐ·ⓑ가 서는 것은 `EOS-26`의 서빙 변경 덕이다. `EOS-146` ②·EOS-26 판정문 §1-6의 "코치 완료는 상태 머신을 안 돈다"도 `EOS-134` 착지로 사실이 아니다(코치 완료는 `advance_on_graded_attempt(is_correct=True)` 호출) — 단 "R3·R6 앱 도달 0" 결론은 유지.
+
 ### 2026-09-29 (판정·착지 · S4-11): **HintNode 영속 연기(2026-07-08 Phase 6b)를 해제한다 — `hints` 테이블을 생성 writer·게이트 3종 검증·coach 서빙 reader 한 슬라이스로 세웠다. 힌트 본문은 검증된 풀이 단계에서 템플릿으로 만들고(LLM 호출 0), 새 힌트 유형 enum은 두지 않으며, Level 4는 Hint 밖 안전망으로 남긴다** (claude 판정·구현) — 판정 기준 main `120bd7c5`
 
 - **무엇**: 리비전 `9d3e6b1f4a27`. `l4/hint_content`(generator·gates·store·populate) — L1 개념 이름만 · L2 단계 흐름(위치·남은 단계, 계산 결과 없음) · L3 검증된 전이 1개 시연(마지막 단계는 L3 없음). `store.py`가 `hints`의 유일한 writer·reader다. 재생성에서 사라진 힌트는 지우지 않고 `verified=false`로 은퇴시킨다.
