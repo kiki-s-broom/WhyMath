@@ -109,7 +109,7 @@ class Hint(Base):
     reveals_partial_computation: Mapped[bool] = mapped_column(
         sa.Boolean, nullable=False, server_default=sa.false()
     )
-    # 노출한 개념 ID(UC 코드 공간 — concept_node.concept_id = concept.code). SEC-06 none_as_null.
+    # 노출한 개념 ID(원자 코드 공간 — atom_node.code · runtime truth). SEC-06 none_as_null.
     revealed_concept_ids: Mapped[list[str]] = mapped_column(
         JSONB(none_as_null=True), nullable=False, server_default=sa.text("'[]'::jsonb")
     )

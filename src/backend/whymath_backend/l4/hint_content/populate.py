@@ -122,6 +122,7 @@ class GenerationReport:
             "concepts_from_step": self.load.concepts_from_step,
             "concepts_from_problem": self.load.concepts_from_problem,
             "concepts_missing": self.load.concepts_missing,
+            "concept_codes_off_axis": self.load.concept_codes_off_axis,
             "generated": self.generated,
             "generated_by_level": {str(k): v for k, v in sorted(self.generated_by_level.items())},
             "verified": self.verified,

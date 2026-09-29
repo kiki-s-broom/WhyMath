@@ -306,15 +306,33 @@ class TestLoaderToServingOnRealPg:
                     ),
                     {"sp": path_id, "p": pid},
                 )
-                for order, (content, verified) in enumerate(
-                    zip(steps, (False, True, True), strict=True), start=1
+                # 원자 축 개념 1개(단계 2에 매칭) + 축 밖 코드(단계 3 — 구 437 UC 흉내).
+                atom_code = f"it-atom-{pid.hex[:12]}"
+                await session.execute(
+                    text(
+                        "INSERT INTO atom_node (code, name_ko, level, review_status)"
+                        " VALUES (:c, '인수분해', '세부개념', 'reviewed')"
+                    ),
+                    {"c": atom_code},
+                )
+                step_codes = (None, atom_code, f"legacy-uc-{pid.hex[:12]}")
+                for order, (content, verified, code) in enumerate(
+                    zip(steps, (False, True, True), step_codes, strict=True), start=1
                 ):
                     await session.execute(
                         text(
                             "INSERT INTO problem_step (problem_id, step_order, expected_answer,"
-                            " solution_path_id, sympy_verified) VALUES (:p, :o, :c, :sp, :v)"
+                            " solution_path_id, sympy_verified, concept_node_id)"
+                            " VALUES (:p, :o, :c, :sp, :v, :cn)"
                         ),
-                        {"p": pid, "o": order, "c": content, "sp": path_id, "v": verified},
+                        {
+                            "p": pid,
+                            "o": order,
+                            "c": content,
+                            "sp": path_id,
+                            "v": verified,
+                            "cn": code,
+                        },
                     )
                 inputs, report = await store.load_path_inputs(session)
                 mine = [p for p in inputs if p.solution_path_id == path_id]
@@ -323,11 +341,25 @@ class TestLoaderToServingOnRealPg:
                 assert path.step_contents == steps
                 assert path.step_verified == (False, True, True)
                 assert path.final_answer == "x = 2 또는 x = 3"
-                # 문항-개념 매핑을 심지 않았다 — 개념은 None(날조 금지) → L1은 만들어지지 않는다.
-                assert path.step_concepts == (None, None, None)
+                # 이름은 실 PG 원자 축(atom_node)에서 해석 — 축 밖 코드·미매핑은 None(날조 금지).
+                # 문항-개념 매핑(problem_concept)은 심지 않아 문제 대표 개념 폴백도 없다.
+                assert path.step_concepts[0] is None
+                assert path.step_concepts[1] is not None
+                assert (path.step_concepts[1].name, path.step_concepts[1].source) == (
+                    "인수분해",
+                    "step",
+                )
+                assert path.step_concepts[2] is None
+                assert report.concept_codes_off_axis >= 1
 
                 result = build_path_hints(path)
-                assert {h.level for h in result.hints} == {2, 3}
+                # 2단계는 개념이 있어 L1~L3, 3단계(마지막·축 밖)는 L2만.
+                assert sorted((h.solution_step_ref.step_order, h.level) for h in result.hints) == [
+                    (2, 1),
+                    (2, 2),
+                    (2, 3),
+                    (3, 2),
+                ]
                 counts = await store.write_hints(
                     session, list(result.hints), processed_path_ids=[path_id]
                 )

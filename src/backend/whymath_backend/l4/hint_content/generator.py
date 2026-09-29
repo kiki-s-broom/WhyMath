@@ -18,7 +18,8 @@ LLM 힌트는 §2-③ 위반". 이 모듈은 **LLM 호출 0**이다 — 본문�
 
 레벨별 노출(acceptance "L1=개념 이름만·L2=단계 흐름·L3=부분 시연"):
   - **L1** 개념 이름만 — 단계 구조·계산을 말하지 않는다. 개념이 없으면 만들지 않는다(날조 금지).
-    개념 출처 2종: ① 단계에 매칭된 개념(`problem_step.concept_node_id` — 사람 검수로 채워짐)
+    개념 출처 2종(이름은 둘 다 원자 백본 축에서 해석 — `store.load_path_inputs`):
+    ① 단계에 매칭된 개념(`problem_step.concept_node_id` — 사람 검수로 채워짐)
     ② 없으면 문제의 대표 개념(PRIMARY→TESTED). 출처에 따라 문장이 다르다("이번 단계에서는" vs
     "이 문제는 …이 중심") — 문제 단위 개념을 단계 개념처럼 말하지 않는다.
   - **L2** 단계 흐름 — 전체 단계 수·현재 위치·남은 단계를 말하되 **계산 결과는 싣지 않는다**.
@@ -85,7 +86,7 @@ SKIP_FINAL_STEP_PARTIAL = "final_step_partial"
 
 @dataclass(frozen=True)
 class ConceptRef:
-    """L1에 댈 개념 — ID(UC 코드 공간)·한국어 이름·출처(단계 매칭/문제 대표)."""
+    """L1에 댈 개념 — ID(원자 코드)·한국어 이름(원자 축 메타)·출처(단계 매칭/문제 대표)."""
 
     concept_id: str
     name: str

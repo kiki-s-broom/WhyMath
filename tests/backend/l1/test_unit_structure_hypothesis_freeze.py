@@ -15,7 +15,7 @@ red가 나면: 가설이 현실이 된 것이다(누군가 순서 컬럼·역할
 
 측정 5종(가설 명세 문서 §0과 1:1):
   M1  순서(ordering)-족 컬럼: 전 테이블에서 제안 이름(order_index 등) 0개 · ordering-족
-      전수는 런타임/콘텐츠 내부 순서 7개뿐(allowlist 등식) · 커리큘럼 구조 테이블 위 0개.
+      전수는 런타임/콘텐츠 내부 순서 8개뿐(allowlist 등식) · 커리큘럼 구조 테이블 위 0개.
   M2  계층(parent)-족 컬럼: 전수 9개 등식 동결 — 커리큘럼 축은 원자 백본 parent_code
       단일 원천(+ 그 UUID 프로젝션·교과서 Overlay 트리)뿐 · 1급 트리 테이블 부재.
   M3  Unit 간 의미 관계: 코퍼스 실적재 엣지의 관계 타입 = {prerequisite} 단일 ·
@@ -108,6 +108,11 @@ _RUNTIME_ORDERING_ALLOWLIST = frozenset(
         ("dialogue_turn", "turn_order"),  # 대화 턴 순서(런타임 세션)
         ("problem", "session_position"),  # 세션 내 권장 출제 순서(문제 배치·세션 스코프)
         ("problem_step", "step_order"),  # 문제 내부 풀이 step 순서(콘텐츠 내부 구조)
+        # S4-11(2026-09-29): 힌트가 *어느 풀이 단계의 것인지* 가리키는 참조 키 — 위
+        # `problem_step.step_order`와 같은 축의 사본(yaml `SolutionStepRef = 경로 ID + 단계 order`).
+        # 새 순서 축이 아니다: 값의 출처가 풀이 경로의 단계 order이고, 커리큘럼 형제(단원 간)
+        # 순서와 무관하며, 커리큘럼 구조 테이블이 아니다. 판정 근거는 명세 문서 §0 M1 각주.
+        ("hints", "step_order"),
         ("solution_paths", "concept_sequence"),  # 풀이 경로 개념 순서열(풀이 스코프)
         ("student_solution_step", "sequence_no"),  # 학생 풀이 step 순번(런타임 이벤트)
     }
@@ -239,7 +244,7 @@ def test_m1_no_proposed_ordering_column_anywhere() -> None:
 
 
 def test_m1_ordering_family_equals_runtime_allowlist() -> None:
-    """ordering-족 컬럼 전수는 런타임/콘텐츠 내부 순서 7개뿐이다(등식 — 신규는 red).
+    """ordering-족 컬럼 전수는 런타임/콘텐츠 내부 순서 8개뿐이다(등식 — 신규는 red).
 
     새 ordering-족 컬럼이 *어디에든* 생기면 이 등식이 깨진다. 커리큘럼 순서 컬럼이면 가설 1
     승격 절차를 밟고, 런타임 순번이면 allowlist에 스코프 주석과 함께 추가하라(명세 문서 §0).

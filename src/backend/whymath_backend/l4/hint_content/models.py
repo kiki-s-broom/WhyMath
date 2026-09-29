@@ -112,7 +112,7 @@ class HintReveals(BaseModel):
         default=False, description="일부 단계 실제 시연(L3 전형)."
     )
     revealed_concept_ids: tuple[str, ...] = Field(
-        default=(), description="노출한 개념 ID(UC 코드 공간 — concept_node.concept_id)."
+        default=(), description="노출한 개념 ID(원자 코드 공간 — atom_node.code)."
     )
     reveal_score: float = Field(ge=0.0, le=1.0, description="종합 노출 점수 0~1(파생값).")
 

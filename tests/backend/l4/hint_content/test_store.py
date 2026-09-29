@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -18,7 +19,6 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.concept import Concept
-from whymath_backend.db.models.concept_node import ConceptNode
 from whymath_backend.db.models.hint import Hint as HintORM
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l4.hint_content import store
@@ -240,7 +240,7 @@ class TestLoader:
     async def test_loads_inputs_and_accounts_every_skip(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        concept_uuid = uuid.uuid4()
+        concept_uuid, other_uuid = uuid.uuid4(), uuid.uuid4()
         headers = {
             "sp-ok": SimpleNamespace(problem_id=_PID),
             "sp-gap": SimpleNamespace(problem_id=_PID),
@@ -250,11 +250,18 @@ class TestLoader:
             "sp-ok": [
                 _step(1, _STEPS[0], verified=False),
                 _step(2, _STEPS[1], verified=True, concept="math.algebra.factoring"),
-                _step(3, _STEPS[2], verified=True),
+                # 원자 축 밖 코드(구 437 UC) — 이름을 쓰지 않고 문제 대표 개념으로 대신한다.
+                _step(3, _STEPS[2], verified=True, concept="LEGACY-UC-001"),
             ],
             "sp-gap": [_step(1, "a", verified=False), _step(3, "b", verified=True)],
             "sp-noanswer": [_step(1, "y", verified=False), _step(2, "z", verified=True)],
         }
+        # 원자 축 메타(atom_node) — 여기 없는 코드는 축 밖이다.
+        atom_axis = {
+            "math.algebra.factoring": SimpleNamespace(name_ko="인수분해"),
+            "math.algebra.poly": SimpleNamespace(name_ko="다항식"),
+        }
+        lookups: list[list[str]] = []
 
         async def _ids(_session: object) -> list[str]:
             return ["sp-gap", "sp-missing", "sp-noanswer", "sp-ok"]
@@ -266,19 +273,25 @@ class TestLoader:
             return steps[path_id]
 
         async def _primary(_session: object, problem_id: uuid.UUID) -> uuid.UUID | None:
-            return concept_uuid if problem_id == _PID else None
+            return concept_uuid if problem_id == _PID else other_uuid
+
+        async def _atom_meta(_session: object, codes: Sequence[str]) -> dict[str, Any]:
+            lookups.append(list(codes))
+            return {code: atom_axis[code] for code in codes if code in atom_axis}
 
         monkeypatch.setattr(store, "list_step_materialized_path_ids", _ids)
         monkeypatch.setattr(store, "get_solution_path", _header)
         monkeypatch.setattr(store, "get_solution_path_steps", _steps)
         monkeypatch.setattr(store, "get_primary_concept_id", _primary)
+        monkeypatch.setattr(store, "fetch_atom_axis_meta", _atom_meta)
         preload: dict[tuple[type, object], object] = {
             (Problem, _PID): SimpleNamespace(answer="x = 2, x = 3"),
             (Problem, _OTHER_PID): SimpleNamespace(answer=None),
-            (ConceptNode, "math.algebra.factoring"): SimpleNamespace(
-                concept_id="math.algebra.factoring", name_ko="인수분해"
+            # concept.name_ko는 읽지 않는다 — 이름은 원자 축에서만(구 437 병존 행 방어).
+            (Concept, concept_uuid): SimpleNamespace(
+                code="math.algebra.poly", name_ko="쓰면 안 됨"
             ),
-            (Concept, concept_uuid): SimpleNamespace(code="math.algebra.poly", name_ko="다항식"),
+            (Concept, other_uuid): SimpleNamespace(code="LEGACY-UC-999", name_ko="쓰면 안 됨"),
         }
         inputs, report = await store.load_path_inputs(_session(_GetSession(preload)))
 
@@ -291,7 +304,7 @@ class TestLoader:
         assert ok.step_contents == _STEPS
         assert ok.step_verified == (False, True, True)
         assert ok.final_answer == "x = 2, x = 3"
-        # 단계 매칭 개념이 우선, 없으면 문제 대표 개념(출처 표기 분리).
+        # 단계 코드가 원자 축에 있으면 그 이름, 없거나 축 밖이면 문제 대표 개념(출처 표기 분리).
         assert [c.source if c else None for c in ok.step_concepts] == [
             "problem_primary",
             "step",
@@ -299,8 +312,12 @@ class TestLoader:
         ]
         assert ok.step_concepts[1] == ConceptRef("math.algebra.factoring", "인수분해", "step")
         assert ok.step_concepts[0] == ConceptRef("math.algebra.poly", "다항식", "problem_primary")
-        # 문제 대표 개념도 없으면 None(날조 금지).
+        assert all(c is None or c.name != "쓰면 안 됨" for c in ok.step_concepts)
+        # 문제 대표 개념이 원자 축 밖이면 None(날조 금지) — 축 밖으로 계상된다.
         assert by_id["sp-noanswer"].step_concepts == (None, None)
         assert report.concepts_from_step == 1
         assert report.concepts_from_problem == 2
         assert report.concepts_missing == 2
+        assert report.concept_codes_off_axis == 2  # LEGACY-UC-001(단계) + LEGACY-UC-999(문제)
+        # 개념 이름 조회는 전부 원자 축 좌석을 거쳤다.
+        assert ["LEGACY-UC-001", "math.algebra.factoring"] in lookups
