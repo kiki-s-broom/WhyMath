@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - scripts/harness/backlog.py
   - scripts/harness/ci_mirror.py
-session: null
+session: claude/magical-maxwell-hja5kh-harn-173
 notes: "출처: EOS-24 PR #1316 harness-integrity red(E501 1건 · 커밋 9501795d로 수정). 분류 ci-local-repro-gap.\n\n[정정 2026-09-25] EOS-24 PR #1316 CI 도달 오독(같은 세션 2건째) — 대책 항목 추가\n\n[정정 2026-09-27] HARN-180이 미러 판정에 미실행 상태(종료 코드 3)를 추가해 이 태스크의 승격 판정 입력이 바뀌었다 — 판정하는 세션이 놓치지 않게 연동을 남긴다."
-updated: 2026-09-27
+updated: 2026-09-29
