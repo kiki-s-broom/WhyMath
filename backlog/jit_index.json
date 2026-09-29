@@ -3400,6 +3400,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    ".claude/commands/drive.md",
+    "scripts/harness/port_freshness.py",
+    "tests/harness/test_port_freshness.py"
+   ],
+   "text": "위임 워크트리 산출물(ARCH-71 런북)이 ARCH-69 이전 기준에서 쓰인 채 이식 — 서술한 좌석 실패 동작이 이미 거짓",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
