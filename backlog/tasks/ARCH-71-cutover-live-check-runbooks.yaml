@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - docs/ops/eos118_seat_signal_live_runbook.md
   - "docs/ops/arch71_*.md"
-session: null
+session: claude/ecstatic-feynman-bxxxvd
 notes: "출처: ARCH-64 ⑤ 미이행분 승계(2026-09-29). CLAUDE.md '회수·완료 시 미이행분은 승계 태스크로 분리' 규칙."
 updated: 2026-09-29
