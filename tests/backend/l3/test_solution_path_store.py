@@ -20,6 +20,7 @@ from whymath_backend.l3.solution_path_store import (
     get_solution_path,
     get_solution_path_steps,
     get_solution_paths,
+    list_step_materialized_path_ids,
 )
 
 
@@ -130,3 +131,31 @@ class TestGetSolutionPathSteps:
     async def test_empty_when_no_steps(self) -> None:
         out = await get_solution_path_steps(cast(AsyncSession, _FakeSession([])), "sp-1")
         assert out == []
+
+
+class _CapturingSession(_FakeSession):
+    """실행 문장을 컴파일해 남기는 가짜 — 조회 조건이 실재하는지 확인용."""
+
+    def __init__(self, items: list[Any]) -> None:
+        super().__init__(items)
+        self.sql: list[str] = []
+
+    async def execute(self, stmt: Any) -> _FakeResult:
+        self.sql.append(str(stmt.compile()))
+        return await super().execute(stmt)
+
+
+class TestListStepMaterializedPathIds:
+    """S4-11 — 힌트 생성 원천 열거(단계가 실체화된 경로만·NULL 방어·결정적 정렬)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_distinct_ordered_ids_and_drops_null(self) -> None:
+        session = _CapturingSession(["sp-a", None, "sp-b"])
+        out = await list_step_materialized_path_ids(cast(AsyncSession, session))
+        assert out == ["sp-a", "sp-b"]
+        sql = session.sql[0]
+        assert "DISTINCT" in sql
+        assert "problem_step.solution_path_id IS NOT NULL" in sql
+        # 내용 NULL 행만 가진 경로는 뺀다(get_solution_path_steps와 같은 서빙 가능 기준).
+        assert "problem_step.expected_answer IS NOT NULL" in sql
+        assert "ORDER BY problem_step.solution_path_id" in sql

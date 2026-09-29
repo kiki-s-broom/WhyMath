@@ -22,7 +22,11 @@
 #     Hint.level 3 (거의 정답)  ↔  답 미루기 3.부분 풀이 — 일부 단계 실제 시연
 #     (Hint 엔티티 없음)        ↔  답 미루기 4.전체 풀이 — 마지막 수단, 학습 곡선 분석과 함께만
 #
-# 상태: **명세 단계 — 좌석 미실체화**(ARCH-39 실측). graded 힌트는 Phase 1 성공 기준
+# 상태(2026-09-29 갱신): **좌석 실체화 — S4-11**. `hints` 테이블(`db/models/hint.py`)·
+#       Pydantic 정본(`l4/hint_content/models.py`)·오프라인 생성(`generator.py`·템플릿·LLM 0)·
+#       게이트 3종(`gates.py`)·coach 서빙 reader(`store.find_served_hint` ← `api/coach.py`).
+#       reveal_score는 서빙 턴의 `attempt_event`(힌트제공)에 실린다(아래 옛 상태 기록은 이력).
+# 옛 상태: **명세 단계 — 좌석 미실체화**(ARCH-39 실측). graded 힌트는 Phase 1 성공 기준
 #       (답 미루기 4단계 + 도달 깊이 2.5+)이며, 그 KPI는 **현재 본문 저장 없이도 측정된다**
 #       (`wh1_evaluation ⑧` = `attempt_event.hint_level` 평균·최대). 즉 아래 `reveal_score`는
 #       KPI 성립의 전제가 아니라 **정밀화**이며, 지금은 **미구현**이다.
@@ -42,7 +46,7 @@ layer: L4
 #   [정정 2026-09-07] 이 자리에 한때 "영구 부재 판정"이라고 적혔다. **틀렸다** — S4-11이
 #   acceptance로 "hints 테이블 실체화"를 약속하고 있다. 실측(힌트가 턴마다 동적 생성된다·
 #   KPI는 hint_level로 이미 측정된다)은 유효하지만, 그것으로 P0 태스크를 무효화할 수는 없다.
-storage: "계획 — `hints` 미실체화(2026-09-06 실측: ORM·마이그레이션 0건). 좌석 신설은 `S4-11-hint-content-generation`(P0)이 소유하며 선행 `S4-09`·`S3-01` 대기 중. 현재 힌트는 L4 코치가 턴마다 동적 생성하고, 사용 *기록*만 `hint_usage` 테이블에 남는다(본문 아님·hint_id는 FK 없는 느슨참조)."
+storage: "PostgreSQL 16 (hints) — S4-11 실체화(2026-09-29 · 마이그레이션 9d3e6b1f4a27). 이전 상태(2026-09-06 실측: ORM·마이그레이션 0건)는 위 주석 이력 참조. 사용 *기록*은 여전히 `hint_usage`(본문 아님·hint_id는 FK 없는 느슨참조 유지 — canonical_entity_model_v1.md §3-B 실체화 절)."
 primary_key: "hint_id (좌석 실체화 시 PK — 현재는 서빙 응답 내 식별자로만 유효)"
 phase_scope: "Phase 1 — 답 미루기 4단계 엔진, 평균 도달 깊이 2.5+ (KPI 측정은 hint_level 기반·본문 불요)"
 
@@ -115,6 +119,10 @@ fields:
     required: false
     description: 이 힌트를 생성한 LLM 티어 (L3 라우터 경유). 비용 추적용.
     enum: [LOCAL, MID, HIGH]
+    note: >-
+      S4-11 실체화에서 **컬럼을 두지 않았다** — 현 생성기는 템플릿(LLM 호출 0)이라 항상 null인
+      죽은 컬럼이 된다. 대신 `generator_version`(템플릿 판)을 기록한다. LLM 생성 경로가 생기면
+      라우터 결정과 함께 그때 더한다.
 
   verified:
     type: boolean
