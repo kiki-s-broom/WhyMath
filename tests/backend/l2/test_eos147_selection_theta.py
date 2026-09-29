@@ -787,7 +787,7 @@ class TestLadderSpeed:
         assert got.index(4.8) + 1 == 2
 
     async def test_one_logit_step_would_only_delay_the_top_by_one(self) -> None:
-        """폐기한 초안(1.0 단계) — 꼭대기가 3번째로 늦춰질 뿐이다(표적이 4.0에서 내려와 ±1칸)."""
+        """폐기한 초안(1.0 단계) — 가장 어려운 문항이 기준선(2번째)보다 한 칸 늦은 3번째일 뿐이다."""
         got = await _ladder(
             lambda responses, state: ability_for_selection(responses, state.theta, step=1.0)
         )
