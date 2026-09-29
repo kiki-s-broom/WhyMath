@@ -21,4 +21,4 @@ paths:
   - "tests/harness/test_jit*.py"
 session: null
 notes: "실측 2026-09-26(HARN-176 세션): incident add로 사고 1건을 기록한 뒤 CI 미러(ci_mirror.py)의 harness-integrity 잡이 '적시 주입 인덱스 대조' 스텝에서 'jit_index.json 이 대장과 어긋났다'로 실패했고, 뒤 스텝 7건(ADR 번호·claim 교차·고립 브랜치·EOS 리포트·ruff·black·하네스 테스트)이 미실행이었다. 같은 시점 origin/main worktree에서는 jit check가 통과(주입 후보 296건)해 원인이 사고 추가임을 대조로 확인했다. backlog.py jit build 재생성(+11줄·사고 1건) 후 통과. incident add 출력에는 재생성 안내가 없어, 사고를 기록하는 세션은 CI red로만 알게 된다."
-updated: 2026-09-26
+updated: 2026-09-29

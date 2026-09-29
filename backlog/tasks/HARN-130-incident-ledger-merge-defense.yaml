@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -24,6 +24,18 @@ paths:
   - scripts/harness/store.py
   - backlog/incidents.ndjson
   - tests/harness/test_incidents.py
-session: null
-notes: "근거: 2026-09-21 PR #1255 머지 큐 이탈 실측(`github-merge-queue[bot]` · reason=MERGE_CONFLICT). 판정 기준 main `27db64c4`. 충돌 재현·해소는 임시 워크트리에서 확인했고 합집합 681줄(676+3+2)에서 `backlog.py validate`·`audit-deps`·`incident report --json` 전건 exit 0이었다. 해소 자체는 그 PR 소유 세션에 맡겼다(2026-09-21 Kiki 판단) — 이 태스크는 재발 방지 축만 소유한다.\n\n선례: HARN-46(이벤트 대장 세션 샤딩 · done)이 같은 유형의 1회차이고 이것이 2회차다. 그때의 교훈(드라이버 의존이 아니라 충돌 불가능 구조로 이관)이 신설 대장에 승계되지 않은 것이 이번 원인이다 — 즉 개별 파일의 누락이 아니라 \"append-only 대장을 새로 만들 때 머지 방어를 함께 설계한다\"는 규약의 부재일 수 있다. 그 일반화가 필요한지는 이 태스크가 판단한다.\n\n소유 경계: HARN-118(사고 대장 구조화)은 done이라 여기에 부착할 수 없어 신규 등재한다(만료된 좌석에 매다는 대신 분리 — CLAUDE.md 중복 소유 회피)."
-updated: 2026-09-21
+  - "backlog/incidents/**"
+  - scripts/harness/backlog.py
+  - scripts/harness/jit_rules.py
+  - tests/harness/test_jit_rules.py
+  - backlog/jit_index.json
+  - ".gitignore"
+  - ".github/workflows/ci.yml"
+  - docs/standards/build_harness.md
+  - tests/harness/test_incident_ledger_sharding.py
+  - scripts/harness/verify_incident_shard_discrimination.py
+  - tests/harness/test_incident_shard_mutation_anchors.py
+  - MEMORY.md
+session: claude/fervent-goldberg-s8y8ws
+notes: "근거: 2026-09-21 PR #1255 머지 큐 이탈 실측(`github-merge-queue[bot]` · reason=MERGE_CONFLICT). 판정 기준 main `27db64c4`. 충돌 재현·해소는 임시 워크트리에서 확인했고 합집합 681줄(676+3+2)에서 `backlog.py validate`·`audit-deps`·`incident report --json` 전건 exit 0이었다. 해소 자체는 그 PR 소유 세션에 맡겼다(2026-09-21 Kiki 판단) — 이 태스크는 재발 방지 축만 소유한다.\n\n선례: HARN-46(이벤트 대장 세션 샤딩 · done)이 같은 유형의 1회차이고 이것이 2회차다. 그때의 교훈(드라이버 의존이 아니라 충돌 불가능 구조로 이관)이 신설 대장에 승계되지 않은 것이 이번 원인이다 — 즉 개별 파일의 누락이 아니라 \"append-only 대장을 새로 만들 때 머지 방어를 함께 설계한다\"는 규약의 부재일 수 있다. 그 일반화가 필요한지는 이 태스크가 판단한다.\n\n소유 경계: HARN-118(사고 대장 구조화)은 done이라 여기에 부착할 수 없어 신규 등재한다(만료된 좌석에 매다는 대신 분리 — CLAUDE.md 중복 소유 회피).\n\n[정정 2026-09-29] paths ['.gitattributes', 'scripts/harness/incidents.py', 'scripts/harness/store.py', 'backlog/incidents.ndjson', 'tests/harness/test_incidents.py'] → ['.gitattributes', 'scripts/harness/incidents.py', 'scripts/harness/store.py', 'backlog/incidents.ndjson', 'tests/harness/test_incidents.py', 'backlog/incidents/**', 'scripts/harness/backlog.py', 'scripts/harness/jit_rules.py', 'tests/harness/test_jit_rules.py', 'backlog/jit_index.json', '.gitignore', '.github/workflows/ci.yml', 'docs/standards/build_harness.md', 'tests/harness/test_incident_ledger_sharding.py', 'scripts/harness/verify_incident_shard_discrimination.py', 'tests/harness/test_incident_shard_mutation_anchors.py', 'MEMORY.md']: 착수 실측(판정 기준 main e68d9308): 사고 대장만 샤딩하면 acceptance 5의 두 브랜치 무충돌 머지가 성립하지 않는다 — 파생 인덱스 backlog/jit_index.json 이 사고 추가와 함께 바뀐다(main에서 이 파일을 바꾼 커밋 26건 중 25건이 사고 대장도 바꿨다). 인덱스 축을 같은 태스크에서 풀어야 5가 참이 되므로 그 파일들과 신규 테스트·뮤테이션 하네스를 범위에 넣는다"
+updated: 2026-09-29

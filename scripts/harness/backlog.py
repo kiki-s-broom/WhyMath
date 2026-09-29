@@ -3816,10 +3816,13 @@ def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
         print(f"❌ 사고 등재 거부 — {blocked}", file=sys.stderr)
         return 1
 
-    ledger.append(candidate)
-    ledger.sort(key=lambda i: i.date)
-    incidents_mod.save_incidents(root, ledger)
-    nth = incidents_mod.next_nth([i for i in ledger if i is not candidate], candidate)
+    # HARN-130 ③ — 공용 파일을 다시 쓰지 않고 이 세션(=브랜치)의 샤드에 1줄 append한다.
+    # 종전(대장 전체를 날짜순 재기록)은 모든 세션이 같은 파일 끝을 고쳐 머지 큐에서 충돌했다
+    # (2026-09-21 PR #1255). 회차는 날짜로 세므로 파일 순서를 맞출 필요가 없다.
+    shard = incidents_mod.append_incident(
+        root, store.session_shard_name(store.current_branch(root)), candidate
+    )
+    nth = incidents_mod.next_nth(ledger, candidate)
     store.append_event(
         root,
         "incident_add",
@@ -3832,7 +3835,7 @@ def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
     )
     where = "계열 미배정" if nth is None else f"계열 {candidate.series_id} {nth}회차"
     print(f"▶ 사고 등재 ({where}) — {candidate.date} [{candidate.cat}] {candidate.title}")
-    print(f"  대장: {incidents_mod.ledger_path(root).relative_to(root)} (총 {len(ledger)}건)")
+    print(f"  샤드: {shard.relative_to(root).as_posix()} (대장 전체 {len(ledger) + 1}건)")
     return 0
 
 
@@ -4015,59 +4018,79 @@ def _cmd_rules_render(root: Path, args: argparse.Namespace) -> int:
 def cmd_jit(root: Path, args: argparse.Namespace) -> int:
     action = args.jit_command
     if action in ("build", "check"):
-        return _cmd_jit_build(root, args, check=(action == "check"))
+        return _cmd_jit_check(root, legacy_build=(action == "build"))
     if action == "show":
         return _cmd_jit_show(root, args)
     return _fail(f"jit: 알 수 없는 하위 명령 '{action}'")
 
 
-def _build_jit_notes(root: Path) -> tuple[list[jit_rules.Note], list[str]]:
-    backlog, _ = _load(root)
+def _build_jit_notes(
+    root: Path, backlog: object | None = None
+) -> tuple[list[jit_rules.Note], list[str]]:
+    """대장 3종 → 적시 주입 후보. 편집 훅과 CLI가 이 한 함수를 쓴다 (HARN-130).
+
+    커밋된 인덱스 파일은 없다 — 대장이 바뀌면 다음 편집이 곧바로 새 후보를 본다.
+    `backlog`를 넘기면 다시 읽지 않는다(편집 훅은 조율 정책 검사와 대장을 공유한다).
+    """
+    if backlog is None:
+        backlog, _ = _load(root)
     rule_list, rule_errors = rules_mod.load_rules(root)
     incident_list, incident_errors = incidents_mod.load_incidents(root)
     errors = rule_errors + incident_errors
     return jit_rules.build_notes(backlog, rule_list, incident_list), errors
 
 
-def _cmd_jit_build(root: Path, args: argparse.Namespace, *, check: bool) -> int:
+def _cmd_jit_check(root: Path, *, legacy_build: bool) -> int:
+    """주입 후보가 대장에서 실제로 계산되는가 — 스키마 위반·0건이면 exit 1 (HARN-130).
+
+    종전 `check`는 커밋된 `backlog/jit_index.json`이 대장과 같은지 봤다. 그 파일이 머지
+    충돌과 재생성 망각 CI red(HARN-179)를 만들어 없앴으므로, 이제 볼 것은 '어긋났는가'가
+    아니라 '계산되는가'다. 0건은 통과가 아니다 — 대장이 비었거나 경로 해소가 전멸한 것이고,
+    그때 훅은 모든 편집에서 침묵해 "사고가 없다"와 구별되지 않는다(스캔 0건은 실패).
+    `build`는 옛 안내(사고 등재 뒤 `jit build`)를 따르는 세션을 위해 남긴 같은 검사다.
+    """
+    if legacy_build:
+        print(
+            "ℹ jit build는 더 이상 파일을 만들지 않는다 — 적시 주입 후보는 편집 시 대장에서 "
+            "계산한다(HARN-130). 사고를 등재한 뒤 따로 돌릴 것이 없다. 아래는 계산 검사다."
+        )
     notes, errors = _build_jit_notes(root)
     if errors:
         print(
-            f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr
+            f"❌ 대장 스키마 위반 {len(errors)}건 — 적시 주입 후보를 믿을 수 없다:",
+            file=sys.stderr,
         )
         for error in errors[:10]:
             print(f"  · {error}", file=sys.stderr)
         return 1
-    body = jit_rules.dump_index(notes)
-    target = jit_rules.index_path(root)
-    if check:
-        current = target.read_text(encoding="utf-8") if target.exists() else ""
-        if current != body:
-            print(
-                f"❌ {jit_rules.INDEX_NAME} 이 대장과 어긋났다 — "
-                f"`backlog.py jit build`로 재생성하라 (인덱스는 대장의 렌더 결과다)",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"✔ {jit_rules.INDEX_NAME} 가 대장과 일치 (주입 후보 {len(notes)}건)")
-        return 0
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body, encoding="utf-8")
+    if not notes:
+        print(
+            "❌ 적시 주입 후보 0건 — 경로가 해소되는 사고·규칙이 하나도 없다. 대장이 비었거나 "
+            "태스크 paths 해소가 전멸했다(0건은 '사고가 없다'가 아니라 '계산 실패'다)",
+            file=sys.stderr,
+        )
+        return 1
     rules_n = sum(1 for n in notes if n.kind == "rule")
     print(
-        f"▶ {jit_rules.INDEX_NAME} 재생성 — 주입 후보 {len(notes)}건 "
-        f"(규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+        f"✔ 적시 주입 후보 {len(notes)}건 계산됨 (규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+        " — 편집 시 대장에서 계산(커밋 인덱스 없음)"
     )
     return 0
 
 
 def _cmd_jit_show(root: Path, args: argparse.Namespace) -> int:
     """이 경로를 편집하면 무엇이 뜨는지 — 훅을 돌리지 않고 확인하는 경로."""
-    notes = jit_rules.load_index(root)
+    notes, errors = _build_jit_notes(root)
+    if errors:
+        print(
+            f"⚠ 대장 스키마 위반 {len(errors)}건 — 아래 결과는 읽힌 줄만으로 계산했다 "
+            "(`backlog.py jit check`로 확인)",
+            file=sys.stderr,
+        )
     if not notes:
         return _fail(
-            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 "
-            f"(0건은 침묵이 아니라 미구축이다)"
+            "적시 주입 후보가 0건이다 — 대장에서 경로가 해소되는 사고·규칙이 없다 "
+            "(0건은 침묵이 아니라 계산 실패다)"
         )
     matched = jit_rules.notes_for_path(notes, args.path)
     rendered = jit_rules.render_injection(matched, args.path)
@@ -4377,15 +4400,19 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     # HARN-121 ③ 적시 주입 — 이 경로에서 실제로 났던 사고·규칙만 최대 5줄.
     # 정책 검사보다 **먼저** 낸다: 정책 위반이 block이면 아래에서 exit 2로 끝나는데,
     # 그때 정작 도움이 되는 맥락을 못 보여주면 안 된다.
-    _inject_jit_notes(root, file_path)
+    # HARN-130: 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다. 대장은 한 번만
+    # 읽어 정책 검사에 넘긴다 — 그 검사가 원래 편집마다 대장을 통째로 읽고 있었다.
+    loaded = _inject_jit_notes(root, file_path)
     try:
-        return _check_edit_policy(root, file_path)
+        return _check_edit_policy(root, file_path, loaded)
     except Exception:  # 정책 검사 실패는 무조건 통과 (fail-open)
         return 0
 
 
-def _inject_jit_notes(root: Path, file_path: str) -> None:
+def _inject_jit_notes(root: Path, file_path: str) -> object | None:
     """편집 경로에 걸리는 사고·규칙을 stderr에 주입 — 0건이면 침묵 (HARN-121 ③).
+
+    반환: 읽은 태스크 대장(정책 검사가 다시 읽지 않도록) — 레포 밖·실패면 None.
 
     훅을 절대 볼모로 잡지 않는다: 어떤 실패도 exit code를 바꾸지 않는다. 다만 예외를
     **삼키지는 않는다** — 타입명을 남긴다(CLAUDE.md 침묵 실패 금지). 무타입 경고가
@@ -4393,22 +4420,28 @@ def _inject_jit_notes(root: Path, file_path: str) -> None:
     """
     try:
         if not file_path:
-            return
+            return None
         try:
             rel = str(Path(file_path).resolve().relative_to(root.resolve()))
         except ValueError:
-            return  # 레포 밖 — 관할 아님
+            return None  # 레포 밖 — 관할 아님
         rel = rel.replace("\\", "/")
-        notes = jit_rules.load_index(root)
+        backlog, _ = _load(root)
+        notes, _ = _build_jit_notes(root, backlog)
         rendered = jit_rules.render_injection(jit_rules.notes_for_path(notes, rel), rel)
         if rendered:
             print(rendered, file=sys.stderr)
+        return backlog
     except Exception as exc:  # noqa: BLE001 — 관측성 코드는 개발을 막지 않는다
         print(f"[적시 규칙] 주입 실패 — {type(exc).__name__} (편집은 계속된다)", file=sys.stderr)
+        return None
 
 
-def _check_edit_policy(root: Path, file_path: str) -> int:
-    """비-backlog 파일 편집의 조율 정책 검사 — check-edit ①②③."""
+def _check_edit_policy(root: Path, file_path: str, loaded: object | None = None) -> int:
+    """비-backlog 파일 편집의 조율 정책 검사 — check-edit ①②③.
+
+    `loaded`는 적시 주입이 이미 읽은 태스크 대장이다(없으면 여기서 읽는다).
+    """
     from models import CODE_DOMAIN_PREFIXES
 
     if not file_path:
@@ -4423,7 +4456,7 @@ def _check_edit_policy(root: Path, file_path: str) -> int:
     branch = store.current_branch(root)
     if branch in ("unknown", "main", ""):
         return 0
-    backlog, _ = _load(root)
+    backlog = loaded if loaded is not None else _load(root)[0]
     mine = [t for t in backlog.tasks.values() if t.status == "in_progress" and t.session == branch]
     violations: list[tuple[str, str, str]] = []  # (rule, mode, 메시지)
 
@@ -5314,10 +5347,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.set_defaults(func=cmd_rules)
 
-    p = sub.add_parser("jit", help="적시 규칙 주입 인덱스 — 편집 경로별 사고·규칙 (HARN-121 ③)")
+    p = sub.add_parser(
+        "jit", help="적시 규칙 주입 — 편집 경로별 사고·규칙 (HARN-121 ③ · 편집 시 계산 HARN-130)"
+    )
     jsub = p.add_subparsers(dest="jit_command", required=True)
-    jsub.add_parser("build", help="대장 3종 → backlog/jit_index.json 재생성")
-    jsub.add_parser("check", help="인덱스가 대장과 어긋났는지 검사 (exit 1)")
+    jsub.add_parser(
+        "build", help="(옛 명령) 파일을 만들지 않는다 — 편집 시 계산으로 바뀌었다 · check와 같다"
+    )
+    jsub.add_parser(
+        "check", help="대장에서 주입 후보가 계산되는지 검사 (스키마 위반·0건이면 exit 1)"
+    )
     jp = jsub.add_parser("show", help="이 경로를 편집하면 무엇이 뜨는지 미리보기")
     jp.add_argument("path", help="레포 상대 경로")
     p.set_defaults(func=cmd_jit)
