@@ -121,14 +121,18 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 #: `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
 #: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
-POLICY_VERSION_CAT: str = "cat_v2"
+#: `cat_v3`(EOS-33): 관계 행위에 **증거 요건**이 붙었다 — 전진은 앵커 개념의 채점 응답 3개 이상,
+#: 선수 복귀의 목표 P는 숙달이 BKT 사전값(0.3) 미만일 때만 콘텐츠를 옮긴다. 같은 학생·같은 1차
+#: 선택에서 `cat_v2`와 다른 문항이 나가므로(응답 1~2개의 전진 · 0.3~0.7 선수로의 복귀가 사라진다)
+#: 새 식별자를 쓴다. 해소 값에 `insufficient_evidence`가 추가됐다.
+POLICY_VERSION_CAT: str = "cat_v3"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v1"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
-지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-124 이후 `cat_v2`)을
+지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-33 이후 `cat_v3`)을
 따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 — EOS-124는 교정 경로를 바꾸지 않았으므로
 (집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다."""
 

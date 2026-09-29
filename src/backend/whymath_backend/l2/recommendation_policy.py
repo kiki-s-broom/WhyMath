@@ -42,6 +42,12 @@ EOS-19 시점의 v1은 문항을 IRT로 고른 *뒤* 그 문항의 개념 숙달
 소급 평가가 두 규칙을 섞지 않는다. θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은
 게이트·같은 가중·같은 선택기를 쓴다 — 달라지는 것은 후보 집합뿐이다).
 
+**EOS-33 (`cat_v3`)** — 관계 행위의 **증거 요건**이 붙었다. 전진은 앵커 개념의 채점 응답이 3개
+이상일 때만 콘텐츠를 옮기고(`IntentResolution.INSUFFICIENT_EVIDENCE`), 선수 복귀의 목표 P는 숙달이
+BKT 사전값(0.3) 미만일 때만 선다(`is_prerequisite_deficit`). 두 방향의 요건이 비대칭인 이유와
+기각된 대칭안의 실측은 판정문 `docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_
+2026-09-29.md`가 정본이다. 규칙이 바뀌었으므로 `policy_version`이 `cat_v3`로 올라간다.
+
 ────────────────────────────────────────────────────────────────────────────
 **추천 결과를 바꾸지 않는다** (EOS-19 acceptance ④ — 그 전환의 가장 중요한 제약)
 ────────────────────────────────────────────────────────────────────────────
@@ -147,6 +153,8 @@ from whymath_backend.l2.recommendation_contract import (
     action_for,
     check_intent_alignment,
     demote_to_current_concept,
+    has_advance_evidence,
+    is_prerequisite_deficit,
 )
 from whymath_backend.l2.recommendation_evidence import (
     POLICY_VERSION_CAT,
@@ -290,8 +298,10 @@ class IntentResolution(str, Enum):
     """관계 행위(선수 복귀·전진)를 전달 문항이 **실제로 싣는다** — 설명과 콘텐츠가 같은 개념."""
 
     REFUTED = "refuted"
-    """규칙은 관계 행위를 가리켰으나 **측정이 반증**했다(측정된 선수가 전부 숙달 · 후행이 전부
-    이미 숙달). 앵커 개념 연습으로 정직 강등한다."""
+    """규칙은 관계 행위를 가리켰으나 **측정이 지지하지 않는다**(측정된 선수 중 결손의 직접 증거 —
+    사전값 미만 — 가 없다 · 후행이 전부 이미 숙달). 앵커 개념 연습으로 정직 강등한다. EOS-33부터
+    엇갈린 증거의 선수(예: 0.50)도 여기 든다 — 종전(`cat_v2`)의 뜻은 "측정된 선수가 전부
+    0.7 이상"."""
 
     UNSUPPORTED = "unsupported"
     """규칙은 관계 행위를 가리켰으나 **근거가 없다**(선수·후행 엣지 없음 · 선수 전부 미측정).
@@ -311,6 +321,13 @@ class IntentResolution(str, Enum):
     있었을
     수 있지만 모드의 판정으로 가지 않았다. 한 값으로 접으면 "못 했다"와 "안 했다"가 같은 글자가
     된다."""
+
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    """규칙은 전진을 가리켰고 열린 후행도 있으나 **앵커 개념의 채점 응답이 하한 미만**이다
+    (EOS-33 · `ADVANCE_EVIDENCE_MIN_RESPONSES`). 1차 선택 문항을 내보내고 앵커 개념 연습으로 정직
+    강등한다. 반증(`REFUTED`)·근거 없음(`UNSUPPORTED`)과 다르다 — 측정은 있고 반대 증거도 없으며,
+    응답이 쌓이면 스스로 풀린다. 하한은 열린 후행을 **확인한 뒤에** 본다: 조회 전에 보면 원래 반증·
+    근거 없음이었을 경우까지 흡수해, 하한이 실제로 막은 이동의 수(작동 비율)가 부풀려진다."""
 
     NO_CANDIDATE = "no_candidate"
     """후보가 아예 없다 — 추천 자체가 없다(`problem_id=None`)."""
@@ -357,11 +374,12 @@ async def resolve_policy_intent(
     목표 개념으로 바꾼다. 관계 행위가 아니면(연습·진단·미매핑) 그래프를 읽지 않는다.
 
     **선수 구간(숙달 < 0.4)** — 세 갈래를 차례로 본다:
-      (가) 앵커의 측정된 선수 중 **아직 약한 것**(숙달 < `WEAK_CONCEPT_MASTERY_CEILING`)이 있다 →
-           가장 약한 것부터 재선택 목표로. EOS-124 (나)가 여기서 막힌다: 선수가 1.0으로 숙달됐으면
-           목표가 되지 않는다(종전 목표 판정 `resolve_target_concept` — EOS-25에서 제거 — 는 측정된
-           선수 중 *최저*를 골라, 전부
-           숙달이어도 그중 하나를 "막힌 선수"로 불렀다).
+      (가) 앵커의 측정된 선수 중 **결손의 직접 증거가 있는 것**(숙달 < BKT 사전값 0.3 —
+           `is_prerequisite_deficit` · EOS-33)이 있다 → 가장 약한 것부터 재선택 목표로. EOS-124
+           (나)가 여기서 막힌다: 선수가 1.0으로 숙달됐으면 목표가 되지 않는다(종전 목표 판정
+           `resolve_target_concept` — EOS-25에서 제거 — 는 측정된 선수 중 *최저*를 골라, 전부
+           숙달이어도 그중 하나를 "막힌 선수"로 불렀다). 경계가 0.7이었던 `cat_v2`는 정답 1회로
+           0.69가 된 선수를 약점으로 불러, 정답이 오히려 선수 복귀를 부르는 비단조였다.
       (나) 앵커 자신이 **막힌 후행**(숙달 < 0.4)의 직접 선수다 → 근거를 그 후행으로 옮기고, 목표는
            이미 전달될 앵커 문항이다(재선택 없음). "원래 개념이 막혀서 선수를 연습한다"는 설명이
            여기서 선다 — 1차 선택이 이미 선수 문항을 골랐을 때의 정확한 이유다.
@@ -370,7 +388,13 @@ async def resolve_policy_intent(
 
     **전진 구간(숙달 > 0.7)** — 앵커의 직접 후행 중 **아직 숙달되지 않은 것**(미측정 포함)을 한
     묶음으로 재선택 목표로. EOS-124 (가)가 여기서 막힌다: 숙달한 개념의 문항에 `advance_next`를
-    붙이는 대신 다음 개념 문항을 찾는다. 후행이 없거나 전부 숙달이면 정직 강등.
+    붙이는 대신 다음 개념 문항을 찾는다. 후행이 없거나 전부 숙달이면 정직 강등. 열린 후행이
+    있어도 앵커의 채점 응답이 `ADVANCE_EVIDENCE_MIN_RESPONSES`(3) 미만이면 옮기지 않는다
+    (`INSUFFICIENT_EVIDENCE` · EOS-33 — 응답 2개면 BKT 사전 설정만으로 0.7을 넘는다).
+
+    **하한은 전진에만 있다**(EOS-33): 선수 쪽은 앵커가 아니라 목표 P의 증거(사전값 미만)를
+    요구한다. 앵커에 하한을 걸면 선수 결손으로 막힌 학생의 하강이 응답 3개까지 늦어지고, 그 사이
+    쌓인 오답이 전진 쪽 오판을 오히려 늘린다(판정문 §3-3 표).
 
     **미측정 선수는 목표가 아니다**(종전 규율 유지): 측정 없는 선수를 "막혔다"고 부르면 근거
     없음이 근거로 위장된다. 미측정 선수를 *진단*하러 내려가는 것은 별도 교수학 판정이 필요한
@@ -421,7 +445,7 @@ async def _prerequisite_intent(
     learner_id: uuid.UUID,
     budget: ConceptGraphBudget,
 ) -> PolicyIntent:
-    """선수 구간 의도 — (가) 약한 선수로 내려가기 · (나) 막힌 후행의 선수로 설명 · (다) 강등."""
+    """선수 구간 의도 — (가) 결손 선수로 내려가기 · (나) 막힌 후행의 선수로 설명 · (다) 강등."""
     rows = _apply_node_budget(await _budgeted_prerequisites(session, anchor, budget), budget)
     measured = [
         (mastery, row)
@@ -429,7 +453,9 @@ async def _prerequisite_intent(
         if (mastery := _mastery_of(row.concept_code, learner_state)) is not None
     ]
     weak = sorted(
-        (pair for pair in measured if pair[0] < WEAK_CONCEPT_MASTERY_CEILING),
+        # EOS-33 — 목표 P는 결손의 직접 증거(사전값 미만)가 있을 때만. 앵커에는 하한을 걸지 않는다:
+        # 막힌 학생의 하강을 늦추지 않는 대신, 콘텐츠를 옮길 곳(P)의 증거를 요구한다.
+        (pair for pair in measured if is_prerequisite_deficit(pair[0])),
         # 가장 약한 선수가 최우선 — 동률이면 가까운 선수(depth 낮은 쪽)·그다음 id로 결정론 고정.
         key=lambda pair: (pair[0], pair[1].depth, str(pair[1].concept_id)),
     )
@@ -479,7 +505,12 @@ async def _advance_intent(
     learner_state: LearnerState,
     budget: ConceptGraphBudget,
 ) -> PolicyIntent:
-    """전진 구간 의도 — 아직 숙달되지 않은 직접 후행을 한 묶음으로 재선택 목표로."""
+    """전진 구간 의도 — 아직 숙달되지 않은 직접 후행을 한 묶음으로 재선택 목표로.
+
+    EOS-33 — 열린 후행이 **있을 때만** 앵커의 채점 응답 수를 본다(`has_advance_evidence`). 순서가
+    계약이다: 하한을 그래프 조회 앞에 두면 원래 반증·근거 없음이었을 경우까지 하한이 흡수해,
+    하한이 실제로 막은 이동의 수가 부풀려진다(`IntentResolution.INSUFFICIENT_EVIDENCE`).
+    """
     successors = await _within_budget(
         budget, lambda: load_direct_successors(session, anchor, max_nodes=budget.max_nodes)
     )
@@ -491,6 +522,10 @@ async def _advance_intent(
         or mastery <= WEAK_CONCEPT_MASTERY_CEILING
     )
     if open_successors:
+        if not has_advance_evidence(anchor_reason):
+            # 응답 1~2개의 0.7 초과는 BKT 사전 설정의 산물일 수 있다 — 콘텐츠를 옮기지 않고
+            # 1차 선택(앵커 개념)을 그대로 낸다. 응답이 쌓이면 스스로 풀린다(판정문 §3-2).
+            return _demoted(anchor_reason, IntentResolution.INSUFFICIENT_EVIDENCE)
         return PolicyIntent(
             reason=anchor_reason,
             resolution=IntentResolution.SERVED,
