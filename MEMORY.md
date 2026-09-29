@@ -11591,3 +11591,5 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미조사(추정 금지)**: 응답 학생 1명의 출처(시연·개발 계정 여부)는 조사하지 않았다. 운영 학생 데이터가 아직 사실상 없다는 것은 실측 표가 말하는 범위(80건·1명)까지만 주장한다.
 - **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
 - **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).
+
+- **정정(같은 날 후속)**: 위 '재측정 조건'의 "5건 이상 문항이 생기면"은 오기다. 5건은 b(1PL) 보정 바닥이고 변별도 a 채택은 응답 50건 이상+SE 0.3 이하(`l2/item_calibration.py`의 `_MIN_RESPONSES_FOR_DISCRIMINATION`·`_MAX_DISCRIMINATION_SE`)다. 재측정 조건 = `discrimination_calibrated`가 처음 1건 이상이 되는 것. 자동 알림은 `EOS-154-irt-a-first-adoption-signal`(선행 `PB-10` 스케줄 좌석)로 등재했다.
