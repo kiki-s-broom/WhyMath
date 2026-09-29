@@ -600,8 +600,9 @@ class TestPolicySeam:
 # ⑤ 무엇을 지시로 읽는가(R2 제외 — 국면·트리거 둘 다) ⑥ 판정 트리(연속 둘째 · 막힘 문턱 · 아는
 # 결손 · 미측정 선수 탐침 · 같은 개념 폴백)와 선택 축(직접 선수 · 미측정만 · 병합 정렬) ⑦ 정책
 # 이음매(후보 제한 · 연습 경로 학습 밴드 · 정책 버전 · 전진 보류 · 예산을 건 선수 읽기). 설계
-# 정본은 EOS-26 판정문 §2~§4. 경계는 상수를 import하지 않고 리터럴(막힘 0.39·0.40 · 선수 약점
-# 0.69·0.70)로 밟는다(MISC-30 자기참조 교훈 — 파일 머리 ②와 같은 규율).
+# 정본은 EOS-26 판정문 §2~§4. 경계는 상수를 import하지 않고 리터럴(막힘 0.39·0.40 · 선수 결손
+# 0.29·0.30 — EOS-151이 EOS-33 (가) 술어로 정합하기 전에는 0.69·0.70)로 밟는다(MISC-30 자기참조
+# 교훈 — 파일 머리 ②와 같은 규율).
 # ══════════════════════════════════════════════════════════════════════════
 R6 = TransitionTrigger.POLICY_PRACTICE_UNDIAGNOSED
 R2 = TransitionTrigger.POLICY_PRACTICE_LOW_CONFIDENCE
@@ -724,16 +725,19 @@ def anchor_mastery(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
 
 
 class TestPrerequisiteStatus:
-    """직접 선수의 측정 상태 — EOS-124 (가)와 같은 입력·같은 경계(< 0.7 약점). 리터럴로 밟는다."""
+    """직접 선수의 측정 상태 — EOS-124 (가)와 같은 입력·같은 술어(사전값 0.3 미만이면 결손 ·
+    EOS-151). 리터럴로 밟는다."""
 
     @pytest.mark.parametrize(
         ("code", "mastery", "status"),
         [
             ("UC-A", None, "unmeasured"),
             (None, None, "unmeasured"),  # 코드가 없으면 숙달을 찾을 수 없다 — 미측정
-            ("UC-A", 0.69, "weak"),
+            ("UC-A", 0.29, "weak"),
             ("UC-A", 0.15, "weak"),
-            ("UC-A", 0.70, "strong"),  # 경계 자체 — (가)도 0.70을 약점으로 보지 않는다
+            ("UC-A", 0.30, "strong"),  # 경계 자체 — (가)도 사전값 0.30을 결손으로 보지 않는다
+            # 옛 약점 구간(0.3~0.7)은 이제 "측정됐고 결손 아님"이다 — 경계를 0.7로 되돌리면 RED
+            ("UC-A", 0.69, "strong"),
             ("UC-A", 0.95, "strong"),
         ],
     )
@@ -919,11 +923,13 @@ class TestRouteUndiagnosedWrong:
             candidate_rows=((_SAME, 3.0, None),),
         )
 
-    @pytest.mark.parametrize("mastery", [0.70, 0.95])
+    @pytest.mark.parametrize("mastery", [0.30, 0.69, 0.95])
     async def test_measured_strong_prerequisites_are_refuted(
         self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
     ) -> None:
-        """숙달(≥ 0.7) 선수만 있으면 원인 후보가 선수에 없다 — 같은 개념(사유 refuted)."""
+        """측정됐고 결손이 아닌(사전값 0.3 이상) 선수만 있으면 원인 후보가 선수에 없다 — 같은
+        개념(사유 refuted). 0.30은 `<`를 `<=`로 바꾸는 뮤테이션을, 0.69는 경계를 0.7로 되돌리는
+        뮤테이션을 가른다(EOS-151)."""
         fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
         route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": mastery}), session, reader)
@@ -931,13 +937,15 @@ class TestRouteUndiagnosedWrong:
         assert route.outcome is lsr.StateDirectiveOutcome.SAME_CONCEPT_PROBE_REFUTED
         assert len(fake.statements) == 3  # 앵커 · 직전 결정 · 같은 개념 — 탐침 후보는 묻지 않는다
 
-    @pytest.mark.parametrize("mastery", [0.69, 0.15])
+    @pytest.mark.parametrize("mastery", [0.29, 0.15])
     async def test_measured_weak_prerequisite_is_a_known_deficit(
         self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
     ) -> None:
-        """이미 측정된 약점(< 0.7) — 진단하지 않고 오답 개념으로 제한한다(EOS-124 (가)가 잇는다).
+        """이미 측정된 결손(사전값 0.3 미만) — 진단하지 않고 오답 개념으로 제한한다(EOS-124 (가)가
+        잇는다 — 같은 술어라 반드시 이 선수를 찾는다).
 
-        0.69가 핵심 반례다(`<`를 `<=`로 바꾸거나 경계를 0.4로 옮기는 뮤테이션을 가른다).
+        0.29가 핵심 반례다(경계를 사전값 아래로 내리는 뮤테이션을 가른다 · `<`→`<=`와 0.7 복귀는 위
+        refuted의 0.30·0.69가 가른다).
         """
         fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A)])
@@ -956,9 +964,24 @@ class TestRouteUndiagnosedWrong:
         """아는 결손이 먼저다 — 미측정 선수가 함께 있어도 탐침하지 않는다(판정문 §3 ⓑ)."""
         _fake, session = _session([_PROBLEM], [], [(_SAME, 3.0, None)])
         reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
-        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": 0.3}), session, reader)
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": 0.15}), session, reader)
         assert route is not None
         assert route.outcome is lsr.StateDirectiveOutcome.KNOWN_PREREQUISITE_DEFICIT
+
+    @pytest.mark.parametrize("mastery", [0.30, 0.69])
+    async def test_mixed_evidence_prerequisite_does_not_block_probing(
+        self, anchored: list[uuid.UUID], anchor_mastery: list[Any], mastery: float
+    ) -> None:
+        """측정됐지만 결손이 아닌 선수(사전값 0.3~0.7 — 엇갈린 증거)는 아는 결손이 아니다 — 함께
+        있는 미측정 선수를 탐침한다(EOS-151 — 정합 전에는 0.3~0.7이 아는 결손으로 탐침을 막았다)."""
+        fake, session = _session([_PROBLEM], [], [(_PROBE_ITEM, 1.2, None, _PRE_B)])
+        reader = _Reader(rows=[_prereq("UC-PRE-A", _PRE_A), _prereq("UC-PRE-B", _PRE_B)])
+        route = await _route_r6(_undiagnosed(mastery={"UC-PRE-A": mastery}), session, reader)
+        assert route is not None
+        assert route.outcome is lsr.StateDirectiveOutcome.PREREQUISITE_PROBE
+        values = _param_values(fake.statements[2])
+        assert _PRE_B in values  # 미측정 선수만 탐침 후보다
+        assert _PRE_A not in values
 
     async def test_probe_pool_holds_only_unmeasured_prerequisites(
         self, anchored: list[uuid.UUID], anchor_mastery: list[Any]
@@ -1132,6 +1155,19 @@ def _probe_route() -> lsr.StateRoute:
         concept_id=_CONCEPT,
         candidate_rows=((_PROBE_ITEM, 1.2, None),),
     )
+
+
+class TestUndiagnosedPolicyVersion:
+    """R6 집행 추천의 정책 식별자 — 이름표·재선택이 기본 CAT 규칙을 따르므로 판 번호도 기본 CAT을
+    따른다(EOS-151 ② — 소급 평가가 두 규칙을 한 식별자로 섞지 않게)."""
+
+    def test_wire_value(self) -> None:
+        # 리터럴로 못 박는다 — 값을 옛 `cat_v2_state_undiagnosed`로 되돌리면 RED
+        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v3_state_undiagnosed"
+
+    def test_tracks_the_base_cat_version(self) -> None:
+        # 기본 CAT이 다음 판으로 올라가면 이 식별자도 함께 올라가야 한다 — 잊으면 여기서 RED
+        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == f"{POLICY_VERSION_CAT}_state_undiagnosed"
 
 
 class TestUndiagnosedPolicySeam:

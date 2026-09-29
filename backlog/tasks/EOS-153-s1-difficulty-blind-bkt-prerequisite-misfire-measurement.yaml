@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-153-s1-difficulty-blind-bkt-prerequisite-misfire-measurement
+title: "S-1 조합 위험 측정 — 오답 원천 개통 뒤 정보량 최대 출제 × 난이도를 모르는 BKT가 선수 복귀를 능력과 무관하게 발화하는 비율 (EOS-33 판정문 §8 S-1)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-146-app-wrong-answer-event-source
+  - EOS-151-r6-deficit-predicate-reconciliation
+requires_gates: []
+acceptance:
+  - "① 예측치 산출(선행 가능): 현재 규칙(cat_v3 · R6는 EOS-151 정합 뒤)을 합성 학생 모의로 돌려, 능력(θ) 구간별로 한 앵커 개념의 첫 6문항 안에 사후 숙달이 선수 구간(0.4 미만)에 드는 비율과, 그 뒤 선수 복귀(practice_prerequisite)·R6 아는 결손(known_prerequisite_deficit)·R6 선수 탐침(prerequisite_probe)이 발화하는 비율을 낸다. EOS-33 판정문 §8 S-1의 모형 예측(정답 약 50% 출제에서 능력 무관 75%)을 재현하거나 반박한다. 모의 결과는 운영 판정을 대신하지 않는다.\n② 운영 측정(EOS-146 이후): 오답이 적재되는 학생의 처치 기록(policy_version · intent_resolution · learning_state_directive)에서 ①과 같은 비율을 θ 구간별로 산출하는 읽기 전용 CLI. 능력 상위 구간(θ가 앵커 문항 b보다 1 이상 높은 학생)에서의 발화를 오발화 후보로 따로 센다.\n③ 판정 기준 사전 등록: 능력 상위 구간에서 6문항 안 선수 구간 진입 비율의 Wilson 단측 하한이 50%를 넘으면 난이도를 모르는 BKT의 오발화로 판정하고, 처치 판정(난이도 인지 숙달 갱신 · 선수 복귀 문턱 재판정 · 관계 행위 하한 조정 중 택일)을 연다. 측정 실패(DB 미도달 · 대상 기록 0건 · 표본 부족)는 exit 2 판정 불가로 가른다(0건을 통과로 위장하지 않는다).\n④ 결과를 EOS-33 판정문 부록에 판정 기준 커밋 해시와 함께 기록한다."
+artifacts: []
+paths:
+  - "scripts/analysis/eos153_*.py"
+  - "tests/backend/l2/test_eos153_*.py"
+  - docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md
+session: null
+notes: "출처: EOS-151 acceptance ④ — EOS-33 판정문(docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md) §8 S-1이 정합 태스크에 넘긴 조합 검토를 측정 태스크로 분리했다. 지금은 앱이 오답을 적재하지 않아(EOS-146) 선수 쪽이 학생에게 닿지 않으므로 운영 영향은 0이다 — 그래서 선행은 EOS-146(오답 원천)과 EOS-151(R6·(가) 술어 정합)이다. EOS-146 ④(R6 집행이 진단 CAT의 SE 수렴에 주는 영향)와는 다른 질문이다: 그쪽은 측정 효율, 이쪽은 선수 복귀 발화가 능력과 무관하게 일어나는가."
+updated: 2026-09-29

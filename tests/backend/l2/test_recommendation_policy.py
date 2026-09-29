@@ -962,11 +962,12 @@ class TestCatPolicyAlignedSelection:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 병합 순서 트립와이어 — 두 좌석이 결손 경계를 다르게 보는 순간 RED (EOS-33 × EOS-26)
+# 병합 순서 트립와이어 — 두 좌석이 결손 경계를 다르게 보는 순간 RED (EOS-33 × EOS-26 · EOS-151에서
+# skip 분기를 지워 상시 불변식으로 승격)
 # ──────────────────────────────────────────────────────────────────────────
 class TestParallelMergeTripwire:
     def test_r6_known_deficit_classifier_shares_the_deficit_predicate(self) -> None:
-        """EOS-26의 R6 선수 분류는 (가)와 **같은 술어**여야 한다 — 이 테스트 작성 시점 미머지(PR #1338).
+        """EOS-26의 R6 선수 분류는 (가)와 **같은 술어**여야 한다 — 상시 불변식(EOS-151에서 승격).
 
         EOS-26은 `_prerequisite_status`의 약점 판정을 "(가)와 같은 선 · 같은 입력 — 넘기면 그쪽이 반드시
         이 선수를 찾는다"로 정의했다. EOS-33이 (가)의 선을 0.7 → 사전값 0.3으로 옮겼으므로, 그 분류가
@@ -974,16 +975,15 @@ class TestParallelMergeTripwire:
         선수를 찾지 못한다 — 지시값과 전달 문항이 **조용히** 어긋난다. EOS-26의 테스트는 자기 함수를
         리터럴로 재므로 이 조합을 잡지 못한다.
 
-        분류기가 트리에 없으면 판정 대상이 없어 skip이다(**통과가 아니다**). 들어오면 두 좌석의 술어
-        일치를 단언한다 — 나중에 착지하는 PR의 머지 큐 빌드가 RED가 된다. 정합이 끝나면 skip 분기를
-        지워 상시 불변식으로 승격한다(정합 태스크 EOS-151).
+        처음에는 두 PR이 병렬이라 분류기가 없으면 skip하는 병합 순서 트립와이어였다 — EOS-26(#1338)이
+        먼저 착지하자 이 PR(#1377)의 병합 빌드에서 숙달 0.30에 RED를 냈고(설계대로), EOS-151이 분류기를
+        같은 술어로 바꾼 뒤 skip 분기를 지웠다. 이제 분류기가 사라지면 import가 실패해 RED다(모른다 ≠
+        통과). 클래스 이름은 판정문·대장이 이 이름으로 가리키므로 그대로 둔다.
         """
         from whymath_backend.l2 import learning_state_recommendation as lsr
 
-        classify = getattr(lsr, "_prerequisite_status", None)
-        status = getattr(lsr, "_PrerequisiteStatus", None)
-        if classify is None or status is None:
-            pytest.skip("EOS-26 R6 선수 분류 미착지 — 판정 대상 없음(통과가 아니다 · EOS-151)")
+        classify = lsr._prerequisite_status
+        status = lsr._PrerequisiteStatus
         for mastery in (0.0, 0.15, 0.29, 0.30, 0.50, 0.69, 0.70, 0.95):
             called_deficit = (
                 classify(_row(_PREREQ_A, "UC-TRIP"), _state({"UC-TRIP": mastery})) is status.WEAK

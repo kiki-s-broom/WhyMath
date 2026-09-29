@@ -66,11 +66,13 @@ R6의 결정은 "같은 개념 연습"(`PRACTICE_SAME_CONCEPT`)이다. Kiki 결�
   · **첫 오답인데 오답 개념 C가 막히지 않았다**(사후 숙달 ≥ 0.4) → 같은 개념. 숙달한 학생의 1회
     실수를 선수 결손으로 읽지 않는다. 막힘 판정은 계획서 §8의 선수 경계(0.4)와 같은 선이다.
   · **첫 오답 · C가 막혔다(< 0.4)** → C의 직접 선수를 본다:
-      - 이미 측정된 약점(< 0.7)이 있으면 **진단하지 않는다** — C로 제한해 EOS-124 (가)가 가장 약한
-        선수로 연습을 잇게 한다(아는 결손이 먼저다).
+      - 이미 측정된 결손(BKT 사전값 0.3 미만 · `is_prerequisite_deficit` — (가)와 같은 술어)이
+        있으면 **진단하지 않는다** — C로 제한해 EOS-124 (가)가 가장 약한 선수로 연습을 잇게
+        한다(아는 결손이 먼저다).
       - 아니면 **미측정** 직접 선수의 문항으로 제한한다(선수 탐침 1문항 — 진단은 모르는 것을 잰다).
         Kiki 기준 ⓐ가 여기서 선다. 한 선수는 한 번 재면 측정된 것이 되어 다시 탐침되지 않는다.
-      - 탐침할 것이 없으면(엣지 없음 · 전부 숙달 · 문항 없음 · 조회 시간 초과) 같은 개념이다.
+      - 탐침할 것이 없으면(엣지 없음 · 전부 측정됐고 결손 아님 · 문항 없음 · 조회 시간 초과) 같은
+        개념이다.
   · 같은 개념에도 문항이 없을 때만 기본 경로로 돌아간다.
   · R2(정답+미측정 확신)의 PRACTICING은 지시가 아니다 — 국면과 트리거를 둘 다 본다.
 
@@ -121,8 +123,8 @@ from whymath_backend.l2.next_problem_selection import (
 from whymath_backend.l2.prerequisite_recommendation import PrerequisiteRow
 from whymath_backend.l2.recommendation_contract import (
     PREREQUISITE_MASTERY_CEILING,
-    WEAK_CONCEPT_MASTERY_CEILING,
     RecommendationReason,
+    is_prerequisite_deficit,
     remediation_reason,
 )
 from whymath_backend.l2.remediation_policy import MISCONCEPTION_REMEDIATION_FLOOR
@@ -227,17 +229,17 @@ class StateDirectiveOutcome(str, Enum):
     공백) — 막힘을 세울 근거가 없어 같은 개념으로 제한했다(경고 로그 동반)."""
 
     KNOWN_PREREQUISITE_DEFICIT = "known_prerequisite_deficit"
-    """연속 첫 오답 · 오답 개념이 막혔다 · 직접 선수 중 이미 측정된 약점(< 0.7)이 있다 — 진단하지
-    않고 오답 개념으로 제한했다. 그 개념 앵커의 EOS-124 선수 구간 의도 (가)가 가장 약한 선수로
-    연습을 잇는다(`intent_resolution=served`로 관측된다)."""
+    """연속 첫 오답 · 오답 개념이 막혔다 · 직접 선수 중 이미 측정된 결손(사전값 0.3 미만)이 있다 —
+    진단하지 않고 오답 개념으로 제한했다. 그 개념 앵커의 EOS-124 선수 구간 의도 (가)가 가장 약한
+    선수로 연습을 잇는다(`intent_resolution=served`로 관측된다)."""
 
     SAME_CONCEPT_PROBE_UNSUPPORTED = "same_concept_probe_unsupported"
     """첫 오답 · 막힘인데 오답 개념에 선수 엣지가 없다 — 같은 개념으로 제한했다(그래프 커버리지
     공백일 수 있다)."""
 
     SAME_CONCEPT_PROBE_REFUTED = "same_concept_probe_refuted"
-    """첫 오답 · 막힘인데 직접 선수가 전부 이미 숙달(≥ 0.7)이다 — 원인 후보가 선수에 없다. 같은
-    개념으로 제한했다."""
+    """첫 오답 · 막힘인데 직접 선수가 전부 측정됐고 결손이 아니다(사전값 0.3 이상) — 원인 후보가
+    선수에 없다. 같은 개념으로 제한했다."""
 
     SAME_CONCEPT_PROBE_UNAVAILABLE = "same_concept_probe_unavailable"
     """첫 오답 · 막힘인데 미측정 직접 선수에 출제 가능한 미시도 문항이 없다 — 같은 개념으로
@@ -522,24 +524,28 @@ class _PrerequisiteStatus(str, Enum):
     """측정이 없다(코드 없음 포함) — **탐침(진단) 대상**이다. 진단은 모르는 것을 잰다."""
 
     WEAK = "weak"
-    """측정된 약점(< 0.7) — 이미 아는 결손이다. 진단하지 않고 연습으로 잇는다(EOS-124 (가)와 같은
-    선 · 같은 입력 — 그래서 넘기면 그쪽이 반드시 이 선수를 찾는다)."""
+    """측정된 결손(BKT 사전값 0.3 미만 · `is_prerequisite_deficit`) — 이미 아는 결손이다. 진단하지
+    않고 연습으로 잇는다(EOS-124 (가)와 같은 술어 · 같은 입력 — 그래서 넘기면 그쪽이 반드시 이
+    선수를 찾는다 · EOS-151)."""
 
     STRONG = "strong"
-    """측정된 숙달(≥ 0.7) — 원인 후보가 아니다."""
+    """측정됐고 결손이 아니다(사전값 이상) — 원인 후보가 아니다. 0.3~0.7은 숙달도 아니지만 결손의
+    직접 증거도 아니다(엇갈린 증거 · EOS-33 판정문 S-4). 이름은 EOS-26 착지 때(경계 0.7)
+    그대로다."""
 
 
 def _prerequisite_status(row: PrerequisiteRow, learner_state: LearnerState) -> _PrerequisiteStatus:
     """선수 1건의 측정 상태. 입력은 `learner_state.mastery`(개념코드 키) — EOS-124 선수 구간 의도
-    (가)와 같은 입력·같은 경계(`< WEAK_CONCEPT_MASTERY_CEILING`면 약점)다. 경계를 따로 두면 "아는
-    결손이 있다"고 넘겼는데 (가)가 그 선수를 찾지 못하는 틈이 생긴다.
+    (가)와 같은 입력·같은 술어(`is_prerequisite_deficit`면 결손)다. 경계를 따로 두면 "아는 결손이
+    있다"고 넘겼는데 (가)가 그 선수를 찾지 못하는 틈이 생긴다 — EOS-33이 (가)의 목표 경계를 0.7에서
+    사전값으로 옮겼으므로 여기도 같은 술어를 부른다(EOS-151 · 병합 순서 트립와이어가 일치를 동결).
 
     코드가 없거나 측정이 없으면 미측정이다(모른다 ≠ 숙달 · 모른다 ≠ 약점).
     """
     mastery = learner_state.mastery.get(row.concept_code) if row.concept_code is not None else None
     if mastery is None:
         return _PrerequisiteStatus.UNMEASURED
-    if mastery < WEAK_CONCEPT_MASTERY_CEILING:
+    if is_prerequisite_deficit(mastery):
         return _PrerequisiteStatus.WEAK
     return _PrerequisiteStatus.STRONG
 
