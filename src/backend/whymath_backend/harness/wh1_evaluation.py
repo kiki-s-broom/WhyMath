@@ -58,6 +58,9 @@ S3 세션 대리 지표 4종 추가(`status_roadmap_2026-07.md` §3): 기존 7�
                             아니라 도달 깊이*(평균·최대)로 집계. 게이밍(힌트 회피로 낮은 레벨
                             유지)은 R15(`help_reduction_validated`)가 이미 교차 방어 — note에
                             캐비엇·R15 참조를 정직 표기(단독 해석 금지).
+                            S4-11: 같은 힌트제공 행의 `reveal_score`(검수 graded 힌트가 *실제로
+                            서빙된* 턴만 기록)를 note에 병기 — 기록 비율·평균·깊이 환산(3×).
+                            value(평균 hint_level)는 불변(KPI 정의 불변·정밀화는 note).
   ⑨ BKT 숙달 증가율       — 🟢 MEASURED/NO_DATA: `ConceptMasteryHistory` (user,concept)별 첫→
                             마지막 mastery 차의 평균(증가 *방향·크기*). measured_at 간격으로
                             나눈 *시간 정규화 rate*는 아님(후속)·그룹당 최소 `_MIN_MASTERY_
@@ -113,6 +116,7 @@ from whymath_backend.l2.ability_estimation import resolve_item_difficulty_b
 from whymath_backend.l2.prerequisite_recommendation import (
     recommend_prerequisite_gaps_detailed,
 )
+from whymath_backend.l4.hint_content.models import reveal_depth_equivalent
 from whymath_backend.l4.lthc.adapt import _MASTERED_THRESHOLD
 from whymath_backend.l4.misconception.probes import compute_diagnostic_recall
 from whymath_backend.l4.turn_meta import REACHABLE_STRATEGIES
@@ -1023,7 +1027,7 @@ def _state_mismatch_from_counts(mismatched: int, total: int) -> Metric:
     )
 
 
-def _hint_depth_from_levels(hint_levels: list[int]) -> Metric:
+def _hint_depth_from_levels(hint_levels: list[int], reveal_scores: Sequence[float] = ()) -> Metric:
     """⑧ 답 미루기 도달 깊이 — 힌트제공 hint_level의 평균·최대를 Metric으로(순수·날조 0).
 
     입력 `hint_levels`는 ⑤와 *동일한* 힌트제공 이벤트 hint_level(1~4·graded 노출량) 목록이다
@@ -1038,6 +1042,12 @@ def _hint_depth_from_levels(hint_levels: list[int]) -> Metric:
     (좋음)* 또는 *힌트 회피(틀려도 낮은 레벨에 머묾·나쁨)* 둘 다일 수 있어 **단독 해석 금지**다.
     이 함정은 이미 R15 결합 판정(`help_reduction_validated`·도움↓×정답률×난이도 교차)이 방어하므로,
     ⑧은 R15와 *함께* 읽어야 한다 — note에 참조를 명시한다(⑧ 자체는 raw 깊이일 뿐).
+
+    S4-11 정밀화(`reveal_scores`): 같은 힌트제공 행에 실린 `reveal_score`(검수 graded 힌트가 실제로
+    서빙된 턴에만 있다) 목록이다. value는 **바꾸지 않는다**(KPI 정의 = 평균 hint_level 불변) —
+    note에 "기록 m/n건·평균·깊이 환산(3×점수, `l4.hint_content.models.reveal_depth_equivalent`)"을
+    병기한다. m=0이면 "기록 0건"을 그대로 적는다(작동한 비율 — 카탈로그 서빙이 한 번도 안 일어난
+    것을 숨기지 않는다). 기본 `()`면 구판 호출과 같은 값·같은 병기 문구(기록 0건)다.
     """
     n = len(hint_levels)
     if n == 0:
@@ -1051,6 +1061,15 @@ def _hint_depth_from_levels(hint_levels: list[int]) -> Metric:
         )
     mean_depth = sum(hint_levels) / n
     max_depth = max(hint_levels)
+    scored = len(reveal_scores)
+    if scored:
+        mean_reveal = sum(reveal_scores) / scored
+        reveal_note = (
+            f" · reveal_score 기록 {scored}/{n}건(검수 힌트 서빙 턴) 평균 {mean_reveal:.4f}·"
+            f"깊이 환산 {reveal_depth_equivalent(mean_reveal):.4f}"
+        )
+    else:
+        reveal_note = f" · reveal_score 기록 0/{n}건(검수 graded 힌트 서빙 없음 — 정적 템플릿만)"
     return Metric(
         value=mean_depth,
         status=MetricStatus.MEASURED,
@@ -1059,6 +1078,7 @@ def _hint_depth_from_levels(hint_levels: list[int]) -> Metric:
             "높을수록 깊은 힌트까지 감). **단독 해석 금지** — 낮은 깊이는 숙달 또는 *힌트 회피*"
             "(교정기 함정) 둘 다일 수 있어 R15(help_reduction_validated)와 함께 읽어야 함(⑧은 "
             "raw 깊이·게이밍 방어는 R15 몫)·세션별 분해는 후속(현재 user/시간창 집계)."
+            f"{reveal_note}"
         ),
     )
 
@@ -1491,6 +1511,8 @@ async def compute_wh1_surrogate_metrics(
                 AttemptEvent.event_data["hint_level"].as_integer(),
                 # PED-04 ⑭: 같은 행에 실린 D2 불일치 태그를 함께 뽑는다(신규 쿼리 0).
                 AttemptEvent.event_data["client_state_mismatch"].as_boolean(),
+                # S4-11: 같은 행의 reveal_score(검수 힌트 서빙 턴만 존재 — 신규 쿼리 0).
+                AttemptEvent.event_data["reveal_score"].as_float(),
             )
             .select_from(AttemptEvent)
             .where(*hint_conds)
@@ -1511,7 +1533,13 @@ async def compute_wh1_surrogate_metrics(
     # ⑤가 hint_level *기울기*(도움 감소 추세)를 본다면 ⑧은 *도달 깊이*(평균·최대)를 본다 —
     # 같은 시계열의 다른 집계(순수 함수 위임·표본은 sample_hint_events 공유). 게이밍(힌트 회피)
     # 방어는 R15(help_reduction_validated) 몫이라 ⑧은 단독 해석 금지(note 표기).
-    hint_depth = _hint_depth_from_levels(hint_levels)
+    # S4-11: reveal_score 열(3번째)이 없는 행 형태(구 픽스처)는 기록 없음으로 읽는다.
+    reveal_scores = [
+        float(row[2])
+        for row in hint_rows
+        if row[0] is not None and len(row) > 2 and row[2] is not None
+    ]
+    hint_depth = _hint_depth_from_levels(hint_levels, reveal_scores)
 
     # ── ⑮ 도움 요청 대 제공 비 (attempt_event event_type=힌트요청 개수·⑤와 동형 scope) ──
     # S3-16 소생 — 힌트요청(demand)이 휴면에서 생산자를 얻으며 연 형제 좌석. 분모(supply)는
