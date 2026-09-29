@@ -367,7 +367,10 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
     """EOS-140/EOS-138 — C에서 관측된 옛 가설로 P에 오개념 교정을 고정하지 않는다(반례 S1).
 
     흐름: C 정답 → C 오개념 오답(스캔·매치 → tse 0) → C 정답(미스캔) → P 오답 → 추천.
-    EOS-138 이후 P 오답은 R3가 아니라 R6으로 가고, 추천에는 상태 머신 지시가 없다.
+    EOS-138 이후 P 오답은 R3가 아니라 R6으로 간다. EOS-26 이후 R6는 추천이 집행하는 지시라,
+    추천은 R6 지시를 따른다 — 이 픽스처의 P에는 선수 엣지가 없으므로 같은 개념 제한
+    (`same_concept_probe_unsupported`)이고 대상은 P다. 오개념 교정(R3) 지시·근거는 없다.
+    (EOS-26 전에는 "지시 없음"을 단언했다 — 그때는 R3만 지시였기 때문이다.)
     맨 앞의 정답은 경계가 **가장 늦은** 전이여야 걸러지게 만든다 — 그 정답의 전이가 옛 스캔보다
     앞에 있으므로, 경계를 가장 이른 전이로 잡는 뮤테이션(`max`→`min`)은 옛 가설을 통과시킨다.
     """
@@ -411,10 +414,15 @@ def test_stale_hypothesis_does_not_pin_remediation_to_another_concept(
             ], f"전제 붕괴 — 옛 가설의 tse가 {expected_turns}여야 이 변이가 재려는 것을 잰다: {turns}"
 
             rec = _next_problem(client, auth)
-            assert rec["learning_state_directive"] is None, (
-                "R3가 없는데 추천이 상태 머신 지시를 읽었다 — 옛 가설이 교정 고정으로 샜다: "
-                f"{rec}"
+            # EOS-26 — R6 지시는 R6 계열이어야 한다. 옛 가설이 샜다면 R3 교정 지시(대상 C)가 나온다.
+            # 값은 상수를 import하지 않고 리터럴로 밟는다(상수 뮤테이션을 따라 움직이지 않게).
+            assert rec["learning_state_directive"] == "same_concept_probe_unsupported", (
+                "R6(원인 미상 오답) 뒤 추천이 R6 지시를 따르지 않았다 — 옛 가설이 교정 고정으로 "
+                f"샜거나 R6 집행이 빠졌다: {rec}"
             )
+            assert rec["target_concept"] == str(
+                content.p_concept
+            ), f"추천 대상이 P가 아니다 — C의 옛 가설이 대상을 끌어갔다: {rec}"
             assert rec["reason"]["basis"] != "learning_state", rec
             assert rec["reason"]["type"] != "misconception_remediation", rec
             _step(

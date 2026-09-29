@@ -3355,6 +3355,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "tests/backend/conftest.py",
+    "tests/data_pipeline/conftest.py",
+    "tests/infra/test_integration_marker_*.py"
+   ],
+   "text": "CI 통합 잡 재현 스크립트가 스텝 env를 빠뜨려 통합 461건 전부 skip·exit 0 — 판정 줄로 발견",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-07-19",
    "paths": [
     "src/backend/whymath_backend/l3/**"
