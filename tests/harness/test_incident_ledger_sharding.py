@@ -125,6 +125,39 @@ class TestUnionAttributeWiring:
         assert ["backlog/incidents/*.ndjson", "merge=union"] in lines
 
 
+# ── ①-b 일반화 — 새 append 대장은 머지 방어를 고른 뒤에만 착지한다 ──────────
+#
+# 이 태스크의 원인은 개별 파일의 누락이 아니라 교훈의 미승계였다 — HARN-46(이벤트 대장)이 배운
+# 샤딩이 HARN-118(사고 대장)에 넘어가지 않았다. 규칙 문장을 하나 더 쓰는 대신 전수 검사로 막는다:
+# `backlog/` 최상위의 NDJSON 대장은 아래 표에 결정이 적혀 있어야 한다. 표에 없는 이름이 생기면
+# RED — 세션 샤드 디렉터리로 두거나, 여러 세션이 동시에 쓰지 않는 근거를 적어 표에 올린다.
+_TOP_LEVEL_NDJSON_DECISIONS: dict[str, str] = {
+    "events.ndjson": "레거시(읽기 전용) — 신규 기록은 backlog/events/<세션>.ndjson (HARN-46)",
+    "incidents.ndjson": "레거시(읽기 전용) — 신규 등재는 backlog/incidents/<세션>.ndjson (HARN-130)",
+    "rules.ndjson": (
+        "드문 단독 쓰기 — 규칙 등재·정정은 CLAUDE.md 본문 변경과 함께 가고, 착지(2026-09-21 #1246) "
+        "후 이 파일을 바꾼 main 커밋은 1건(2026-09-29 실측)이다. 동시 편집이 잦아지면 샤딩을 재판정한다"
+    ),
+}
+
+
+def undecided_ledgers(names: set[str]) -> list[str]:
+    """최상위 NDJSON 이름 중 머지 방어 결정이 없는 것 — 순수 함수라 합성 목록으로 주입 가능."""
+    return sorted(n for n in names if n not in _TOP_LEVEL_NDJSON_DECISIONS)
+
+
+class TestNewLedgerMustChooseAMergeDefense:
+    def test_every_top_level_ndjson_ledger_has_a_decision(self) -> None:
+        names = {p.name for p in (REPO_ROOT / "backlog").glob("*.ndjson")}
+        assert names, "backlog/ 최상위 NDJSON을 하나도 못 찾았다 — 스캔 0건은 통과가 아니라 실패다"
+        assert undecided_ledgers(names) == []
+
+    def test_a_new_ledger_without_a_decision_is_named(self) -> None:
+        """반례 — 결정 없는 새 대장을 넣으면 그 이름이 나온다(대조군: 기존 셋은 안 나온다)."""
+        names = {*_TOP_LEVEL_NDJSON_DECISIONS, "new_ledger.ndjson"}
+        assert undecided_ledgers(names) == ["new_ledger.ndjson"]
+
+
 # ── ③ 쓰기 샤딩 ─────────────────────────────────────────────────────────────
 
 
