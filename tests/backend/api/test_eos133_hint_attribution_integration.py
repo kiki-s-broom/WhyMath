@@ -6,11 +6,14 @@
   ① 막힘 → 단계 2 힌트 → 정답 → 돌아보기 — `used_hint=True` · `hint_usage` 1행이 그 공급 행과
      시각·단계가 같다(식별자·열람시간은 NULL — 날조 금지). 삭제권이 그 행까지 지운다.
   ② 방향(단계 1)만 받고 정답 — `used_hint=False` · 0행(기본 공급은 힌트 사용이 아니다).
-  ③ 정답을 낸 **그 턴**에 단계 2가 공급됨 — `used_hint=False` · 0행. 그 공급은 답이 나온 뒤라
-     이 풀이에 쓰였을 수 없다(상한 = 정답 제출 턴 · 완료 시각이 아니다).
+  ③ 정답을 낸 **그 턴**의 결정 단계가 2로 올라도(좌절 토큰) — 그 턴은 돌아보기 진입으로 가로채여
+     공급 원장에 행이 남지 않는다(EOS-30). `used_hint=False` · 0행. 귀속 창의 상한(정답 제출 턴 ·
+     완료 시각이 아니다)은 이중 방어로 남았고, 그 경계 자체는 단위 테스트가 맡는다.
   ④ 첫 메시지에서 바로 정답 — `used_hint=False` · 0행(창이 빈다).
+  ⑤ 오답을 내고 재고 유도를 받은 턴(EOS-30) — 그 턴의 단계 2가 원장에 적히지 않고, 다음 턴 사다리는
+     **실제로 받은** 단계(1)에서 이어 오른다(받지 않은 2를 건너뛰어 3으로 도약하지 않는다).
 
-SCENARIO-005(시나리오 스위트)가 ①의 장면 단언을, 이 파일이 경계 셋(②③④)과 행 내용을 맡는다.
+SCENARIO-005(시나리오 스위트)가 ①의 장면 단언을, 이 파일이 경계(②③④)와 행 내용·사다리(⑤)를 맡는다.
 헬퍼는 시나리오 스위트를 경로 로딩으로 빌려 쓴다(그쪽은 다시 페르소나 하네스를 빌린다).
 """
 
@@ -24,6 +27,8 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+
+from whymath_backend.l4.completion import _REDIRECT_PROMPT, _REDIRECT_PROMPT_SPECIFIC
 
 pytestmark = pytest.mark.integration
 
@@ -70,6 +75,10 @@ _NEUTRAL = "x의 값을 구하려고 해요"
 _SOLVED_BUT_UNSURE = "잘 모르겠지만 이렇게 풀었어요"
 #: 돌아보기 응답 — 이 턴이 완료를 확정한다.
 _REFLECTION = "양변을 3으로 나누면 x만 남아서 그렇게 풀었어요"
+#: 오답 최종 단계 — 서버 verify가 incorrect로 판정해 재고 유도(REDIRECT)가 발화한다.
+_WRONG_STEPS = ["3*x = 174639", "x = 999"]
+#: 좌절 토큰만 담은 발화 — 직전 공급 단계에서 한 단계 올린다(`decide_hint_level` 규칙 3).
+_FRUSTRATED = "모르겠어요"
 
 
 def _open(client: Any, auth: dict[str, str], pid: uuid.UUID, text: str, **extra: Any) -> str:
@@ -197,20 +206,27 @@ def test_direction_only_is_not_hint_usage() -> None:
     _run_case("2", body)
 
 
-def test_supply_after_the_correct_submission_is_not_attributed() -> None:
+def test_handled_turn_supply_is_neither_recorded_nor_attributed() -> None:
     def body(client: Any, auth: dict[str, str], uid: uuid.UUID, pid: uuid.UUID, j: Any) -> None:
         did = _open(client, auth, pid, _NEUTRAL)
-        _submit_correct(client, auth, did, _SOLVED_BUT_UNSURE)
-        # 전제: 정답을 낸 바로 그 턴의 결정 단계가 2로 원장에 적혔다(답이 나온 *뒤*의 공급).
+        submitted = _submit_correct(client, auth, did, _SOLVED_BUT_UNSURE)
+        # 전제: 정답을 낸 바로 그 턴의 결정 단계는 2로 올랐다(좌절 토큰). EOS-30 이전에는 이 2가
+        # 원장에 적혔다(학생은 돌아보기 템플릿을 받았는데도) — 이 전제가 있어야 아래 [1]이 공허하지
+        # 않다(결정 단계가 처음부터 1이면 가로챈 턴의 행이 없어도 [1]이다).
+        assert submitted["decision"]["hint_level"] == 2, submitted["decision"]
         levels = _S._hint_levels(_S._trace(client, auth))
-        assert levels == [1, 2], levels
+        assert levels == [1], (
+            "가로챈 턴(돌아보기 진입)의 결정 단계가 공급 원장에 적혔다 — 학생이 받지 않은 단계가 "
+            f"'제공'으로 남는다: {levels}"
+        )
         attempt_id = _reflect(client, auth, did)
+        # 돌아보기 응답 턴(완료 인정)도 가로챈 턴이라 원장은 그대로다.
+        assert _S._hint_levels(_S._trace(client, auth)) == [1]
 
         used, rows = _attribution(uid, attempt_id)
-        j.record("③", "정답 턴의 단계 2 공급", used_hint=used, 행=len(rows), 공급=levels)
+        j.record("③", "가로챈 턴의 단계 2", used_hint=used, 행=len(rows), 공급=levels)
         assert used is False and rows == [], (
-            "정답을 낸 뒤에 공급된 힌트가 그 풀이에 귀속됐다 — 귀속 창의 상한이 정답 제출 턴이 "
-            f"아니다(used_hint={used} · 행={rows})."
+            "정답을 낸 턴의 가짜 공급이 그 풀이에 귀속됐다 — " f"used_hint={used} · 행={rows}"
         )
 
     _run_case("3", body)
@@ -238,3 +254,47 @@ def test_solution_in_the_first_message_is_not_hint_usage() -> None:
         assert used is False and rows == [], (used, rows)
 
     _run_case("4", body)
+
+
+def test_redirect_turn_records_no_supply_and_the_ladder_does_not_skip() -> None:
+    def body(client: Any, auth: dict[str, str], uid: uuid.UUID, pid: uuid.UUID, j: Any) -> None:
+        did = _open(client, auth, pid, _NEUTRAL)
+        assert _S._hint_levels(_S._trace(client, auth)) == [1], "중립 발화가 단계 1이 아니다"
+        redirected = _turn(
+            client,
+            auth,
+            did,
+            _FRUSTRATED,
+            solution_steps=_WRONG_STEPS,
+            solution_step_types=["계산"],
+        )
+        # 전제 ① 오답이라 재고 유도로 가로챘다(완료도 돌아보기도 아니다) ② 이 턴의 결정 단계는 2였다.
+        # 두 전제가 있어야 아래 단언이 공허하지 않다 — EOS-30 이전에는 이 2가 원장에 적혔다.
+        assert redirected["problem_complete"] is False, redirected
+        assert redirected["awaiting_reflection"] is False, redirected
+        assert redirected["decision"]["prompt"] in {_REDIRECT_PROMPT, _REDIRECT_PROMPT_SPECIFIC}
+        assert redirected["decision"]["hint_level"] == 2, redirected["decision"]
+        after_redirect = _S._hint_levels(_S._trace(client, auth))
+        assert after_redirect == [1], (
+            "재고 유도 턴의 결정 단계가 공급 원장에 적혔다 — "
+            f"학생은 힌트를 받지 않았다: {after_redirect}"
+        )
+
+        # 이어지는 턴 — 사다리는 학생이 **실제로 받은** 단계(1)에서 한 칸 오른 2다. 받지 않은 2를
+        # 건너뛰어 3(부분 풀이)으로 도약하면 "가장 빠른 단계에서 멈춤" 계약이 깨진다.
+        follow = _turn(client, auth, did, _FRUSTRATED)
+        levels = _S._hint_levels(_S._trace(client, auth))
+        j.record(
+            "⑤",
+            "재고 유도 뒤 사다리",
+            재고턴결정=redirected["decision"]["hint_level"],
+            다음턴결정=follow["decision"]["hint_level"],
+            공급=levels,
+        )
+        assert follow["decision"]["hint_level"] == 2, (
+            "사다리가 받지 않은 단계를 건너뛰어 올랐다 — 재고 유도 턴의 가짜 공급이 다음 턴 입력을 "
+            f"부풀렸다(다음 턴 단계={follow['decision']['hint_level']})."
+        )
+        assert levels == [1, 2], levels
+
+    _run_case("5", body)

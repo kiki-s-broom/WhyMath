@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-29 (판정 · EOS-141): **Phase 2 Gate 2 3차 재판정 = PASS — 단 판정 수준은 API 계약(앱 도달 0)이다. 앱 도달을 자로 삼으면 FAIL(소유 `EOS-146`). 어느 자로 볼지와 게이트 `G-p3-entry-gate2-pass` clear는 Kiki 몫** (claude 판정 · 구현 세션과 분리 · production code 무변경) — 판정 기준 main `a82f9449`
+
+- **근거**: 10조건 전건 충족 · 상시 3루프 하네스 general·misconception 모두 LOOP1~3 PASS(9/25의 유일한 미충족이던 원인 미상 오답 Loop 1 보정이 `EOS-26`으로 섬) · 일회성 프로브 7변이 전건 PASS · SCENARIO-001~010 로컬 10/10 + 판정 기준 커밋의 CI 실행 2회(merge_group·push)에서 실제 실행 10 passed. 판정문 `docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md`(P3-00b 인수 점검 겸).
+- **KPI 5종(병기)**: `loop_kpi_gate` EXIT=1 — ⑤ Traceability FAIL 40/40은 판정 하네스가 `DELETE /v1/me`로 지운 학습자 잔여(삭제권 이행과 진짜 끊김을 구별 못 하는 설계 공백), ①②④는 하네스가 스스로 지운 데이터 위라 미측정. 네 판정(9/19·9/24·9/25·9/29) 모두 같은 형태.
+- **⑨ 집행**: `EOS-37-kpi5-erasure-traceability-disposition`(⑤ 삭제권 오염 처분 — PIPA 표면이라 처분 결정 선행) · `EOS-38-loop-kpi-judgment-sample-path`(①②④ 표본 경로 · 선행 EOS-37) 등재, `EOS-146`과 함께 `P3-17-week3-release-gate-judgment`의 선행으로 부착. 첫 등재 시도 `EOS-151`은 원격 claim 충돌로 CLI가 거부(HARN-111 가드 실작동).
+- **정정된 전제**: 9/25 §3-5의 "서빙 코드 변경 없이 기준만 바꾸면 된다"는 틀렸다 — ⓐ·ⓑ가 서는 것은 `EOS-26`의 서빙 변경 덕이다. `EOS-146` ②·EOS-26 판정문 §1-6의 "코치 완료는 상태 머신을 안 돈다"도 `EOS-134` 착지로 사실이 아니다(코치 완료는 `advance_on_graded_attempt(is_correct=True)` 호출) — 단 "R3·R6 앱 도달 0" 결론은 유지.
+
 ### 2026-09-29 (판정·착지 · S4-11): **HintNode 영속 연기(2026-07-08 Phase 6b)를 해제한다 — `hints` 테이블을 생성 writer·게이트 3종 검증·coach 서빙 reader 한 슬라이스로 세웠다. 힌트 본문은 검증된 풀이 단계에서 템플릿으로 만들고(LLM 호출 0), 새 힌트 유형 enum은 두지 않으며, Level 4는 Hint 밖 안전망으로 남긴다** (claude 판정·구현) — 판정 기준 main `120bd7c5`
 
 - **무엇**: 리비전 `9d3e6b1f4a27`. `l4/hint_content`(generator·gates·store·populate) — L1 개념 이름만 · L2 단계 흐름(위치·남은 단계, 계산 결과 없음) · L3 검증된 전이 1개 시연(마지막 단계는 L3 없음). `store.py`가 `hints`의 유일한 writer·reader다. 재생성에서 사라진 힌트는 지우지 않고 `verified=false`로 은퇴시킨다.
@@ -11582,6 +11589,27 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **새로 찾은 것**: `start`가 같은 세션의 두 번째 in_progress claim을 쓰기 전에 거부하지 않는다(다른 쓰기 CLI는 쓰기 전 validate로 거부) → `HARN-197` 등재. `backlog/gates.yaml`은 09-21 이후 main 커밋 128건 중 37건이 건드리는 공용 단일 파일이지만 기록된 충돌이 0건이라 태스크로 올리지 않았다(관찰만).
 - **사고 대장**: 4건 — 새 샤드(`backlog/incidents/claude_fervent-goldberg-s8y8ws.ndjson`)로 첫 등재. `session-multi-claim` 1회차 · `harness-test-live-ledger-write` 16회차 · `nondiscriminating-check` 7회차(훅 주입 테스트의 `[적시 규칙]` 단언이 실패 문구와 공통 접두 — 8일 잠복) · `incident-ledger-merge-conflict` 2회차(#1355의 두 번 충돌 소급 등재).
 - **정직한 공백**: 옛 코드로 `jit_index.json`을 수정한 채 열린 PR은 이 변경을 머지할 때 modify/delete 충돌이 한 번 난다(파일 삭제로 해소 · `.gitignore`가 재유입 차단). main 브랜치에서의 편집만 훅이 약 2초 늘어난다. 누출 서명은 과소 집계 방향의 오판 가능성이 있다(착지일 이후·앞뒤 30초 고립·backlog.py 정확히 3건인 실제 편집).
+### 2026-09-29 — EOS-30: 완료 상태 머신이 가로챈 턴은 힌트 공급 원장에 행을 남기지 않는다 — 판정 기준 main `9308cf4c`
+
+- **판정(acceptance ①)**: 종전(가로챈 턴도 결정 단계를 '제공'으로 적음)을 **유지하지 않는다.** 완료 상태 머신이 발화를 가로챈 턴(`completion.handled` — 돌아보기 진입·계속·완료 인정·재고 유도)은 `힌트제공` 행을 남기지 않는다(`api/coach._log_hint_event(turn_handled=…)` · 두 호출부 `create_session`·`append_turns`).
+  - **근거 1 — 원장의 뜻**: 이 원장은 "AI가 *제공한* 노출량"이다. 가로챈 턴에서 학생이 받는 것은 결정론 템플릿이고, 템플릿으로 바뀌는 것은 `decision`의 prompt·socratic_category뿐이라 `hint_level`만 남아 적혔다. `hint_level`이 None이면 행을 만들지 않는 기존 "날조 회피"와 같은 결의 판정이다.
+  - **근거 2 — 학생에게 닿는 실측**: 수정 전 동작을 실 PG(16.13)에서 재현했다. 중립 발화 → 좌절 발화+오답 풀이(재고 유도) → 좌절 발화 순서에서 원장이 `[1, 2, 3]`이 되고 **다음 턴 단계가 3(부분 풀이)** 이었다. 학생은 단계 2를 한 번도 받지 못했다(2는 재고 유도 턴의 가짜 공급). 수정 후 원장 `[1, 2]`·다음 턴 단계 2. 원인은 `_prev_hint_level_for`가 원장의 마지막 행을 읽고 `decide_hint_level` 규칙 2·3이 `min(4, prev+1)`로 올리기 때문이다 — "가장 빠른 단계에서 멈춤"과 "막혔을 때 바로 정답 제공 금지"(CLAUDE.md 교수학)를 원장 오염이 우회하고 있었다.
+  - **근거 3 — 유지할 소비자가 없다**: 모바일은 `hint_level`·`reveals`를 파싱만 하고 화면에서 쓰지 않는다(검색 범위 `src/mobile/lib`).
+  - **기각한 대안**: ⓐ 행은 남기고 표식만 싣기 — `HintEventData.hint_level`이 필수이고 ⑤⑧⑮가 같은 행을 공급으로 세므로 소비자 4곳을 전부 고쳐야 한다. ⓑ 응답의 `decision.hint_level`을 바꾸기 — API 계약 변경이라 범위 밖.
+- **영향 전수(acceptance ②)** — 원장 소비자 전수(`힌트제공` 검색 기준):
+  - **다음 턴 사다리(`_prev_hint_level_for`)**: 가로챈 턴 뒤에도 학생이 *실제로 받은* 단계에서 이어 오른다(위 실측).
+  - **WH-1 ⑤ 도움 감소 곡선(OLS 기울기)·⑧ 도달 깊이(평균·최대)**: 가로챈 턴의 표본이 빠진다. 방향은 **구조상 추정**이다 — 문항 끝(정답 제출·돌아보기)의 기본 단계(신호 없으면 1) 표본이 사라져, 겉보기 '도움 감소'가 덜 좋게 나오고 평균 깊이는 오르는 쪽일 수 있다. **운영 데이터로 재측정하지 않았다.**
+  - **⑮ 도움 요청 대 제공 비**: 분모(공급)만 줄고 분자(`힌트요청`)는 그대로라, 가로챈 턴의 "요청했으나 제공되지 않음"이 비에 그대로 반영된다(전보다 정확).
+  - **⑭ 클라 상태 불일치율**: 같은 행이 `client_state_mismatch` 태그의 운반체라 가로챈 턴의 관측이 함께 사라진다 — ⑭은 이제 **코칭이 실제로 나간 턴만의 비율**이다. 모바일은 `prev_hint_level`을 보내지 않으므로(검색 범위 `src/mobile/lib`) 이 수정이 새 불일치를 만들지는 않는다.
+  - **EOS-133 힌트 귀속(`_attribute_hints`)**: 정답 이전의 재고 유도 턴 단계를 세던 과대 계상이 사라진다. 귀속 창 상한(정답 제출 턴)은 이중 방어로 유지했고 두 함수의 한계 문구·`docs/architecture/32_learning_history.md` §4-5를 정정했다.
+  - **과거 행**: 백필하지 않는다 — EOS-30 이전에 적힌 행은 그대로이고, 배포 전에 연 대화가 배포 뒤에 완료되면 옛 행이 창 안에 있을 수 있다.
+  - **병합 정합(S4-11 병합 시 확인)**: main의 `_served_hint_for`는 `completion_handled`면 조회 0으로 None을 돌려주므로 가로챈 턴에는 서빙 힌트가 없고 이 슬라이스로 행 자체도 없다. ⑧ note의 `reveal_score 기록 m/n건` 분모 n도 코칭이 실제로 나간 턴 기준이 되어 두 슬라이스가 같은 정의로 정렬된다(가로챈 턴이 n을 부풀려 m/n을 낮추지 않는다).
+  - **일별 학습 지표 롤업(`l2/learning_metrics_rollup.py`)**: `daily_learning_metrics.socratic_turns`는 그날의 `막힘`·`힌트요청`·`힌트제공` **이벤트 수**라 가로챈 턴의 공급 행이 빠진 만큼 준다(코치 완료 1건당 가로챈 턴 수 — 보통 2~3 — 만큼 · 다른 두 이벤트는 그대로). 값은 `GET /v1/me/learning-metrics`의 `total_socratic_turns`(기간 SUM)로 나가지만 모바일·웹 소비처는 검색 범위(`src/mobile`·`src/web`·`src/webapp`)에서 0건이다. 필드 설명의 '턴 수'는 원래도 이벤트 수와 달랐다(한 턴에 이벤트가 최대 3종). 과거 행은 백필하지 않는다.
+  - **학습 이벤트 트레이스(`l2/learning_event_trace.py`)**: `힌트제공`→`HINT_PROVIDED` 매핑은 그대로라 가로챈 턴은 더 이상 '힌트 제공' 트레이스를 만들지 않는다 — 그 이름의 뜻(AI가 힌트를 줬다)에 오히려 맞아진다.
+  - **전수 누락 정정(2026-09-29)**: 최초 전수가 위 L2 두 곳을 빠뜨렸다. main `0f05876b` 병합 뒤 `힌트제공`을 origin/main의 `src/backend` 전체에서 다시 검색(14개 파일)하고 원장 행을 실제로 읽는 곳을 하나씩 확인해 발견했다 — 나머지 파일은 정의·주석이거나 이미 열거한 소비처(사다리·WH-1·EOS-133)다. 코드 결론은 바뀌지 않는다.
+- **acceptance ③(테스트 갱신)**: EOS-133 통합 ③의 전제 단언(원장 `[1, 2]`)을 `[1]`로 바꾸고 이 턴의 결정 단계가 2였음을 전제로 함께 단언한다(단계가 처음부터 1이면 공허하므로). 통합 ⑤(재고 유도 뒤 사다리) 신규. SCENARIO-005에 "시간선의 공급은 ①뿐" 단언을 더했다(옛 동작이면 ②③ 턴의 행이 시간선에 남는다).
+- **검증**: 단위 hermetic 11건 신규(가로챈 4전이 + `create_session` 첫 턴 · 대조군 3 — 가로채지 않은 턴은 그대로 적재·게이트 off의 오답 턴도 적재·가로챈 턴의 검산결과는 유지 · 기록 함수 단위 2 · 호출부 전수 AST 가드) — 전제(재고 유도 발화·결정 단계 2)를 먼저 단언한다. 인접 스위트 포함 359 passed. 실 PG(로컬 16.13 + pgvector 0.6.0) 통합 7 passed. **뮤테이션 5종 5/5 RED · 원복 바이트 동일**: M1 조기 반환 제거 · M2 `create_session` 호출부 인자 누락 · M3 `append_turns` 호출부 인자 누락 · M4 항상 미적재(과잉 수정 — 통합 ①까지 RED) · M5 열쇠를 `attempt_id`로 바꿈(완료 턴만 스킵).
+- **정직한 공백**: ⓐ API 응답의 `decision.hint_level`·`reveals`는 가로챈 턴에도 계산된 단계를 그대로 낸다(화면 미사용 전제 — 검색 범위 `src/mobile/lib`). ⓑ 가로챈 턴은 여전히 Polya 단계 꼬리 길이(`turn_count`)에 들어가 5회+ 막힘 임계(규칙 1)에 기여한다 — 코드 읽기 기준의 관측이며 이번 범위 밖이라 판정하지 않았다. ⓒ ⑤⑧ 방향은 운영 데이터로 확인하지 않은 구조 추정이다. ⓓ ⑭ 표본 정의가 바뀌었다(위).
 ### 2026-09-29 (판정 집행 · ARCH-64): **CLOUD_MID 좌석 컷오버 — `cloud_provider` 기본값 anthropic → openrouter, 학생 대면 서빙도 팩토리 경유. ARCH-55 "기본 핀 불변" 조항 번복. 이 기간 2차 좌석 없음** (Kiki 지시·게이트 판정, claude 집행) — 판정 기준 main `120bd7c5`
 
 - **전환 근거**: 2026-09-21 Kiki 지시 — "학생 대면까지 한 번에" → "학생대면도 오픈라우터로 전환". 같은 날 게이트 `G-cloud-mid-seat-cutover`가 판정 ①(저작 + 학생 대면 동시 컷오버)로 clear됐다(`backlog/gates.yaml` · evidence 판정 기준 main `bcbbcd73`). 선행 `ARCH-62`(단가표 좌석 축)는 done이다. `ARCH-63`(Anthropic 2차 좌석 failover)은 2026-09-28 Kiki 결정으로 선행에서 뗐다(ARCH-66 기간 처분 — 아래).
@@ -11601,3 +11629,24 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미조사(추정 금지)**: 응답 학생 1명의 출처(시연·개발 계정 여부)는 조사하지 않았다. 운영 학생 데이터가 아직 사실상 없다는 것은 실측 표가 말하는 범위(80건·1명)까지만 주장한다.
 - **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
 - **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).
+
+### 2026-09-29 (정정·집행 · ARCH-69): **클라우드 1차 좌석 실패 시 런타임 LOCAL 강등 — 학생 대면 서빙 조립에 한해 신설. 위 ARCH-64 로그의 "LOCAL로 자동 재시도되지 않는다"는 이 착지부터 학생 대면 조립에서 거짓이다** (claude 구현) — 판정 기준: 브랜치 `claude/gallant-euler-blngpj` · ARCH-64 PR #1370(미머지)
+
+- **정정 대상(원문은 지우지 않는다 — 이 파일은 append 전용)**: 바로 위 2026-09-29 ARCH-64 로그의 세 문장이다. ⓐ "가용성 해소 수단" 항의 "실측 정정: 코드에는 '1차 좌석 실패 → LOCAL 자동 재시도' 경로가 **없다**" — ARCH-64 착지 시점에는 사실이었고 이제 학생 대면 조립에서는 아니다 ⓑ "OpenRouter 키 부재 시" 항의 "Anthropic·LOCAL 어느 쪽도 대신 받지 않는다" — **저작·측정 조립(강등 미장착)에서만** 유효하다. 학생 대면 조립은 LOCAL이 대신 답하되 `not_configured`로 표기한다 ⓒ "검증" 항의 "키 부재·429 실패의 무대체" — 같은 범위 한정. **불변**: 2차 **클라우드** 좌석은 여전히 없다(2026-09-28 Kiki 결정 · `CLOUD_FAILOVER_SEAT=None` · `/status cloud_failover_seat=null`) — 이번에 생긴 것은 다른 축(LOCAL 강등)이다.
+- **실측 발단**: ARCH-64 구현 중 코드에 없음을 확인했다 — 2026-09-28 Kiki 결정 ②("이 기간 failover는 LOCAL 강등만")와 ARCH-63 ①이 전제한 "기존 LOCAL 강등 경로"는 라우팅 시점(`guard_cloud`·`guard_data_export`)에만 있었고, 이미 클라우드로 나간 호출의 실패는 예외로 올라가 `/v1/generate`가 500이 됐다. 컷오버로 클라우드 결정 요청이 실제로 openrouter로 나가기 시작했으므로 그 상태를 오래 둘 수 없다.
+- **결정·구현**:
+  1. **트리거** — 429 · 5xx · 408 · 타임아웃(내장·`httpx.TimeoutException`·`anthropic.APITimeoutError`) · 미설정. **강등하지 않는 것(대조군)**: 4xx(400·401·402·403·404·409·422 등 요청·인증·잔액·모델 ID 오류 — 같은 실패가 반복될 뿐이고 LOCAL 응답이 원인을 가린다), 계약 오류(`images`·`json_schema` 미지원), 관할 게이트 차단(설정 오류), 연결 실패(`ConnectError` 등 — 사유 코드 밖).
+  2. **분류는 타입으로, 한 곳에서** — `l3/providers/seat_failure.py`(신규). 종전에 상태코드는 `RuntimeError("… HTTP 429 …")` 메시지 안에만 있었다. 전송기가 `SeatHttpError(status_code=…)`를 올리고(RuntimeError 하위·메시지 무변경 — 기존 `except`·문구 매칭 무영향), 세 프로바이더의 "미설정"이 `SeatNotConfiguredError`가 됐다. 분류기는 타입·구조 속성(`status_code`·`response.status_code`)만 읽고 메시지는 읽지 않는다 — 타입 없는 `RuntimeError("…429…")`는 강등하지 않는다(동결). 실물 httpx·anthropic SDK 예외 클래스와 실물 전송기(MockTransport)로도 판정을 재서, 시임 가짜만으로 정합을 선언하지 않았다.
+  3. **opt-in** — `CompositeProvider(runtime_local_degrade=False 기본)`. 켜는 곳은 학생 대면 `app.py` **하나**뿐이다(AST 동결). 저작 경로는 "명확한 실패"가 옳고(사람이 본다), 좌석 정확도를 재는 측정 하네스는 LOCAL 응답이 클라우드 좌석의 응답으로 기록되면 측정이 무효가 된다.
+  4. **강등 대상** — `router.local_degrade_decision`: MATH/MID·동기(CLOUD_* 결정은 sync라 비동기 전용 QUALITY 불가). CLOUD_HIGH도 같은 대상이다. LOCAL도 실패하면 **원래의 클라우드 예외**가 올라오고 LOCAL 실패 타입이 note에 남는다(원 예외의 `__context__`는 오염되지 않는다).
+- **검증 계약 불변(핵심)**: 강등은 `provider.generate` **안에서** 끝나므로 `pipeline.generate`의 shadow validator는 강등 응답에도 같은 코드로 적용된다. 같은 환각 텍스트(`3 > 5`)가 (a) 클라우드 정상 응답 (b) 강등된 LOCAL 응답으로 나올 때 검증기가 각 1회 불리고 같은 신호를 낸다(동결). 코드로 찾은 **유일한 우회 후보는 캐시**였다 — 강등 응답을 클라우드 키(`cloud_mid:-:-`)에 저장하면 다음 동일 요청이 LOCAL 텍스트를 클라우드 응답으로 적중시키고, 적중 경로는 검증기도 강등 표기도 싣지 못한다. 그래서 강등 응답은 캐시에 저장하지 않는다(동결).
+- **정직성**: 원가는 **실제로 답한 결정(LOCAL=0원)**으로 계상된다(종전 결정 기준이면 LOCAL 토큰에 클라우드 단가가 곱해진다). trace·Langfuse에 `local_degraded`(항상 실림 — 강등 없음도 False로 명시)·`degraded_from_seat`·`degrade_reason`(Langfuse 태그)·`degraded_to_local`·`degrade_cloud_attempt_ms`. `/v1/generate` 응답 `local_degraded`·`degraded_from_seat`·`degrade_reason`(`decision.cost_tier`만 읽는 소비자가 클라우드 품질로 오독하지 않게). `/status`의 `cloud_local_degrade` 블록. **작동 신호 `seat_local_degrade_rate`** = 강등 경로를 탄 횟수 ÷ 클라우드 디스패치 횟수 — **분모 0이거나 강등 미장착이면 None**(0.0이 아니다). ARCH-63 ④와 같은 이름·정의이며 정의 함수는 `seat_failure.seat_local_degrade_rate` 한 곳이다. 회차 관측 `failover` 블록이 이를 싣는다(계수를 받지 않은 회차는 미측정 None). `seat_primary_success_rate`·`seat_failover_rate`는 ARCH-63 몫이라 None 유지.
+- **바뀐 문구**: 예외 note(미장착·강등 대상 아님·LOCAL도 실패의 3상태) · `/status` 필드 설명 · OpenRouter 키 부재 원인 문구 · `config.py` 주석 · 회차 관측 `failover` 블록 · 03c 설계 §5 정정 · ARCH-55 판정 런북 정정 bullet · `CLAUDE.md` 스택 표 한 문장(v0.2.35 — 규칙 추가 아님). ARCH-64의 동결 테스트 중 "키 부재 → LOCAL이 안 받는다"는 저작 조립(강등 미장착)으로 옮겼다 — 앱 조립으로 재면 그 사실이 거짓이기 때문이다.
+- **변별력**: 신규 `tests/backend/l3/test_cloud_runtime_local_degrade.py` 93건(분류 표 · 강등 경로 · 4xx 대조군 · LOCAL 동시 실패 · 검증 동치 · 캐시 · 원가·trace · 신호 정의 · 앱 조립 끝단 · `/status`·`/v1/generate` · AST 집행 지점). **뮤테이션 16종 전건 RED**(강등 제거 · 4xx도 강등 · 강등 시 검증 우회 · 클라우드 단가 원가 · 사유 코드 누락 · 사유 하드코딩 · "2차 좌석 있음" 위장 · 강등 응답 캐시 저장 · 메시지 기반 분류 · 분모 0→0.0 · app 미장착 · LOCAL 실패가 원 예외를 덮음 · 분모 미계수 · 타임아웃 분류 제거 · 미설정 분류 제거 · LOCAL 실패 삼킴). 대조군 106 passed · 원복 sha256 일치 · 라이브 호출 0건.
+- **남은 것(정직)**
+  - **대기 시간**: 강등은 전송기의 자체 재시도(최대 3회·백오프·`Retry-After` 상한 20초)가 **끝난 뒤** 걸린다. 공유 풀이 막히면 학생이 (수십 초 + LOCAL 약 4초)를 기다릴 수 있다. 회로 차단기는 없다 — `degrade_cloud_attempt_ms`로 관측만 한다.
+  - **강등 패밀리 고정(MATH)**: CLOUD_* 결정은 task_type을 싣지 않아(불변식 4) NLP 계열이 CLOUD_MID로 오면 수학 모델로 강등된다(03a §0.2 실측 7b도 0%). 서빙에서는 `requires_reasoning`+premium만 승급해 드물지만 0은 아니다 — 패밀리 힌트를 결정에 싣는 것은 별도 설계 사안.
+  - **연결 실패(`ConnectError` 등)는 사유 코드 밖이라 강등하지 않는다** — 학생 대면에서는 여전히 500이다. 사유 코드를 늘릴지는 판정 사안.
+  - **강등률은 프로세스 인메모리**(재시작 0 · 워커별). 누적은 trace의 `local_degraded` 집계 몫.
+  - **소비자 중 `local_degrade`로 동작을 바꾸는 곳은 없다** — `/v1/generate`는 비학생 원시 출력 계약(게이트 ③ 봉인 D)이고, 표기만 한다.
+  - **라이브 미검증** — OpenRouter·Ollama 실호출 0건(ARCH-66 · 가짜 전송·가짜 LOCAL만).

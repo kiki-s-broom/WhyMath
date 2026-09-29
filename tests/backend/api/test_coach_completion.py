@@ -20,28 +20,33 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
+import whymath_backend.api.coach as coach_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.api._rate_limit import reset_store
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.models.activity import AttemptEvent as AttemptEventORM
 from whymath_backend.db.models.activity import ProblemAttempt as ProblemAttemptORM
 from whymath_backend.db.models.dialogue import Dialogue as DialogueORM
 from whymath_backend.db.models.problem import Problem as ProblemORM
 from whymath_backend.db.session import get_session
 from whymath_backend.l4.completion import _REDIRECT_PROMPT
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
-from whymath_backend.schema.enums import Persona
+from whymath_backend.schema.enums import EventType, Persona
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
 _UID = uuid.uuid4()
@@ -656,3 +661,204 @@ class TestAnswerFormWiring:
         )
         assert body["answer_form"] == "unverifiable"
         assert body["awaiting_reflection"] is True, "형태 판정 불가가 정답 흐름을 막았다"
+
+
+# ── EOS-30: 가로챈 턴의 힌트 공급 원장 ───────────────────────────────────────────────────────
+
+
+def _supply_events(captured: _CapturingSession) -> list[AttemptEventORM]:
+    """캡처 세션에 적재된 공급 원장 행(`힌트제공`)만 골라낸다."""
+    return [
+        o
+        for o in captured.added
+        if isinstance(o, AttemptEventORM) and o.event_type is EventType.힌트제공
+    ]
+
+
+class TestHandledTurnRecordsNoHintSupply:
+    """EOS-30 — 완료 상태머신이 발화를 가로챈 턴은 힌트 공급 원장(`힌트제공`)에 행을 남기지 않는다.
+
+    가로챈 턴(돌아보기 진입·돌아보기 계속·완료 인정·재고 유도)에서 학생이 받는 것은 결정론
+    템플릿이다. 템플릿으로 바뀌는 것은 `decision`의 prompt·socratic_category뿐이고 `hint_level`은
+    그대로 남기 때문에, 예전에는 학생이 받지 않은 단계가 원장에 '제공'으로 적혔다. 그 행은 다음 턴
+    사다리 입력(`_prev_hint_level_for`)·WH-1 지표 ⑤⑧⑮⑭·EOS-133 귀속이 전부 읽는다.
+
+    각 케이스는 **전제**를 먼저 단언한다 — 이 턴이 정말 가로챈 턴이고, 결정 단계가 원장에 적힐 만한
+    값(2)이었다. 그렇지 않으면 '0행' 단언이 공허하다(가로채이지 않은 턴이어도, 단계가 None이어도
+    0행이다). 대조군 둘은 반대 방향 회귀를 막는다: 가로채지 않은 턴은 그대로 적재되고(전부 안 적는
+    과잉 수정 방지), 게이트 off면 오답 제출 턴도 적재된다(규칙의 열쇠는 '오답 제출'이 아니라
+    '가로챔'이다).
+    """
+
+    #: 좌절 토큰("모르겠")을 담은 발화 — 첫 결정(직전 단계 없음 → 1)에서 결정 단계가 2로 오른다.
+    _FRUSTRATED = "모르겠어요"
+
+    @staticmethod
+    def _dialogue(
+        did: uuid.UUID, pid: uuid.UUID, *, total_turns: int, review_turns_remaining: int
+    ) -> DialogueORM:
+        return DialogueORM.from_schema(
+            DialogueSchema(
+                dialogue_id=did,
+                user_id=_UID,
+                problem_id=pid,
+                total_turns=total_turns,
+                student_turns=total_turns // 2,
+                assistant_turns=total_turns // 2,
+                review_turns_remaining=review_turns_remaining,
+            )
+        )
+
+    def _post_turn(
+        self,
+        student_input: str,
+        *,
+        steps: list[str] | None = None,
+        review_turns_remaining: int = 0,
+        total_turns: int = 0,
+        **extra: Any,
+    ) -> tuple[dict[str, Any], _CapturingSession]:
+        did, pid = uuid.uuid4(), uuid.uuid4()
+        dialogue = self._dialogue(
+            did, pid, total_turns=total_turns, review_turns_remaining=review_turns_remaining
+        )
+        client, captured = _session_client(
+            preload={(DialogueORM, did): dialogue, (ProblemORM, pid): _problem(answer="3")}
+        )
+        payload: dict[str, Any] = {"student_input": student_input, **extra}
+        if steps is not None:
+            payload["solution_steps"] = steps
+        resp = client.post(f"/v1/coach/sessions/{did}/turns", json=payload)
+        assert resp.status_code == 201, resp.text
+        body: dict[str, Any] = resp.json()
+        return body, captured
+
+    # ── 가로챈 4전이 — 전부 0행 ──────────────────────────────────────────────────
+
+    def test_redirect_turn_leaves_no_supply_row(self) -> None:
+        body, captured = self._post_turn(self._FRUSTRATED, steps=["x=99"])
+        # 전제: 재고 유도로 가로챘고, 가로채이지 않았다면 결정 단계 2가 원장에 적혔을 턴이다.
+        assert body["decision"]["prompt"] == _REDIRECT_PROMPT
+        assert body["decision"]["hint_level"] == 2
+        assert _supply_events(captured) == []
+
+    def test_review_entry_turn_leaves_no_supply_row(self) -> None:
+        body, captured = self._post_turn(self._FRUSTRATED, steps=["x=3"])
+        assert body["awaiting_reflection"] is True and body["problem_complete"] is False
+        assert body["decision"]["hint_level"] == 2
+        assert _supply_events(captured) == []
+
+    def test_review_continue_turn_leaves_no_supply_row(self) -> None:
+        # 돌아보기가 2턴 남은 대화 — 이 턴은 남은 수만 줄이고 다음 메타인지 발화를 낸다.
+        body, captured = self._post_turn(self._FRUSTRATED, review_turns_remaining=2, total_turns=2)
+        assert body["awaiting_reflection"] is True and body["problem_complete"] is False
+        assert body["decision"]["hint_level"] == 2
+        assert _supply_events(captured) == []
+
+    def test_completion_turn_leaves_no_supply_row(self) -> None:
+        body, captured = self._post_turn(self._FRUSTRATED, review_turns_remaining=1, total_turns=2)
+        assert body["problem_complete"] is True
+        assert body["decision"]["hint_level"] == 2
+        assert _supply_events(captured) == []
+
+    def test_first_turn_of_a_session_is_covered_too(self) -> None:
+        """두 번째 호출부(`create_session`) — 첫 메시지에서 바로 정답이면 돌아보기 진입이 그 턴이다."""
+        pid = uuid.uuid4()
+        client, captured = _session_client(preload={(ProblemORM, pid): _problem(answer="3")})
+        resp = client.post(
+            "/v1/coach/sessions",
+            json={
+                "student_input": self._FRUSTRATED,
+                "problem_id": str(pid),
+                "solution_steps": ["x=3"],
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["awaiting_reflection"] is True
+        assert body["decision"]["hint_level"] == 2
+        assert _supply_events(captured) == []
+
+    # ── 대조군 — 반대 방향 회귀(과잉 수정)를 막는다 ─────────────────────────────
+
+    def test_untouched_turn_still_records_its_supply(self) -> None:
+        """풀이를 내지 않은 턴은 완료 무관(NONE)이라 가로채이지 않는다 — 공급은 그대로 적재된다."""
+        body, captured = self._post_turn(self._FRUSTRATED)
+        events = _supply_events(captured)
+        assert len(events) == 1
+        assert events[0].event_data["hint_level"] == body["decision"]["hint_level"] == 2
+
+    def test_gate_off_wrong_answer_turn_still_records_its_supply(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """게이트 off면 오답을 내도 가로채이지 않는다 — 규칙의 열쇠는 '가로챔'이지 '오답 제출'이 아니다."""
+        monkeypatch.setenv("WHYMATH_L4_SOLUTION_COMPLETION_ENABLED", "false")
+        get_settings.cache_clear()
+        try:
+            body, captured = self._post_turn(self._FRUSTRATED, steps=["x=99"])
+            assert body["decision"]["prompt"] != _REDIRECT_PROMPT
+            assert len(_supply_events(captured)) == 1
+        finally:
+            get_settings.cache_clear()
+
+    def test_handled_turn_keeps_its_other_telemetry(self) -> None:
+        """가로챈 턴에서 지우는 것은 '공급' 행뿐이다 — 학생이 실제로 낸 풀이의 검산결과는 남는다."""
+        _, captured = self._post_turn(
+            self._FRUSTRATED, steps=["x=99"], student_solution="계산하면 2+3=6 이다"
+        )
+        verify = [
+            o
+            for o in captured.added
+            if isinstance(o, AttemptEventORM) and o.event_type is EventType.검산결과
+        ]
+        assert len(verify) == 1
+        assert _supply_events(captured) == []
+
+    # ── 기록 함수 단위 + 호출부 전수 가드 ───────────────────────────────────────
+
+    async def test_log_hint_event_skips_a_handled_turn(self) -> None:
+        sess = _CapturingSession()
+        await coach_module._log_hint_event(
+            cast(AsyncSession, sess),
+            user_id=_UID,
+            problem_id=None,
+            attempt_id=None,
+            hint_level=3,
+            turn_handled=True,
+        )
+        assert sess.added == []
+
+    async def test_log_hint_event_default_still_records(self) -> None:
+        """`turn_handled`를 생략한 호출은 종전과 같이 1행 적재한다(기존 호출의 동작 불변)."""
+        sess = _CapturingSession()
+        await coach_module._log_hint_event(
+            cast(AsyncSession, sess),
+            user_id=_UID,
+            problem_id=None,
+            attempt_id=None,
+            hint_level=3,
+        )
+        assert len(sess.added) == 1
+
+    def test_every_call_site_passes_the_completion_outcome(self) -> None:
+        """`coach.py`의 `_log_hint_event` 호출은 전부 `turn_handled=completion.handled`를 싣는다.
+
+        `turn_handled`의 기본값이 False(=적재)라, 새 호출부가 이 인자를 빠뜨리면 가로챈 턴의
+        가짜 공급이 조용히 되살아난다. 호출 이름이 바뀌어 스캔이 0건이 되면 이 가드가 공허하게
+        통과하므로 최소 2건(`create_session`·`append_turns`)을 함께 요구한다.
+        """
+        tree = ast.parse(inspect.getsource(coach_module))
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "_log_hint_event"
+        ]
+        assert len(calls) >= 2, f"_log_hint_event 호출 {len(calls)}건 — 가드가 공허하다."
+        for call in calls:
+            passed = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
+            assert passed.get("turn_handled") == "completion.handled", (
+                f"coach.py {call.lineno}행의 _log_hint_event 호출이 turn_handled="
+                f"completion.handled를 싣지 않는다(전달값: {passed.get('turn_handled')!r})."
+            )
