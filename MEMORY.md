@@ -11570,3 +11570,25 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미조사(추정 금지)**: 응답 학생 1명의 출처(시연·개발 계정 여부)는 조사하지 않았다. 운영 학생 데이터가 아직 사실상 없다는 것은 실측 표가 말하는 범위(80건·1명)까지만 주장한다.
 - **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
 - **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).
+
+### 2026-09-29 — HARN-173: `done`의 CI 미러 부재를 warn에서 block으로 승격 (PR 증적 경로 · unknown·fail만 · 미실행 제외 · `--no-mirror '<사유>'`) — 판정 기준 main `b2b0c1e6`
+
+**배경(실측)**: 2026-09-25 EOS-24(PR #1316) 세션이 CI 미러 도구가 있는데도 쓰지 않고 잡 스텝을 손으로 골라 재현해 `harness-integrity`의 `ruff check scripts tests/harness` 스텝을 빠뜨렸고 PR CI가 E501 1건으로 red가 됐다. `backlog.py done`의 미러 부재 경고(HARN-119 ② 1단계 warn)는 한 번 떴을 뿐 아무도 멈추지 않았다. 사고 대장 `ci-local-repro-gap` 4회차 — 1~3회차 대책은 **도구**를 고쳤고 이번은 도구가 있는데 **쓰지 않은** 축이다.
+
+**결정**
+1. **승격한다.** `backlog/policy.yaml`에 `ci_mirror_at_done: block`(값 `warn`|`block` · 키 없으면 `warn` · `off` 없음 — 끄는 값은 사유도 기록도 없는 탈출구). 기본을 warn으로 둔 이유: 미러 결과 파일이 없는 임시 저장소를 쓰는 기존 하네스 테스트와 정책 키가 없는 저장소가 전부 막히지 않게 한다 — 승격은 §3c대로 policy.yaml 1줄이다.
+2. **거부 상태 = `unknown`(결과 없음·다른 커밋·형식 깨짐·잡 0건)과 `fail`**(exit 1 · 대장 무변경). **`not_executed`(exit 3)는 warn 유지** — HARN-181(미러가 조건 스텝 평가) 착지 전까지 조건 스텝 잡은 항상 3이라 막으면 그 잡을 건드리는 모든 done이 막힌다. 통과로 접지도 않는다(종전 경고 + 이벤트 `not_executed`).
+3. **적용 범위** = 소유자 claude + PR 증적 경로(`--no-pr` 미지정). `--no-pr` 경로·사람 소유(`--as`) done은 미러 대상이 아니라 종전 그대로(정책·미러 조회도 하지 않는다).
+4. **예외 경로** `done --no-mirror '<사유>'` — 공백 사유는 상태·경로·정책과 무관하게 거부(무사유 면제 없음), 사유는 태스크 notes(`[미러 면제 날짜]`)와 이벤트(`no_mirror_reason`) 양쪽에 남는다.
+5. **조회 자체 실패**(ImportError·OSError·SubprocessError)는 경고 후 통과(fail-open)이되 이벤트에 `mirror_state: unavailable`로 **따로** 기록하고 집계에서 통과에 합산하지 않는다(측정 실패 ≠ 통과).
+6. **정책 값이 깨지면 엄격한 쪽** — policy.yaml 오류(미지 필드 오타·미등록 값·YAML 문법 오류)가 하나라도 있으면 값을 믿지 않고 block으로 취급하고 거부 문구에 이유를 적는다(오타가 조용히 warn으로 떨어지는 상시 fail-open 방지 · CLAUDE.md 제2조 잠정 해석 "더 엄격한 쪽").
+7. **측정** — `done` 이벤트에 `mirror_scope`·`mirror_gate_mode`·`mirror_state`·`mirror_commit`·`mirror_outcome`·`no_mirror_reason`·`ci_reach_*`를 남기고 `policy report`가 최근 N일 done을 상태별로 세는 절을 낸다. **CI 도달 잡(acceptance ⑤)**: PR 경로 done이 트렁크 대비 변경 파일의 `ci_job_coverage` 도달 잡을 stdout 한 줄로 안내하고 이벤트에 적는다(계산 실패는 done을 막지 않고 예외 타입명을 stderr에 남긴다).
+8. 구현 위치: 판정 로직은 신규 `scripts/harness/done_mirror_gate.py`, `cmd_done`에는 호출만(`backlog.py`가 동시 수정 최다 파일이라 배선 최소화). 종전 경고 헬퍼 `_warn_if_ci_mirror_missing`은 본문을 건드리지 않았다(infra 계약·뮤테이션 앵커 유지).
+
+**승격 절차와의 차이(정직)**: §3c의 "2주/30세션 관찰" 기준은 채우지 않았다 — 종전 경고는 stderr만 내고 `policy_warn`을 남기지 않아 warn 관측 데이터가 없다. 근거는 실측 사고 1건 + HARN-122 ②의 선례("원칙의 집행 지점은 정탐률과 무관하게 block + 예외 경로") + 예외 경로가 오탐 비용을 사유 1줄로 상한한다는 점이다. build_harness.md §8 금기 "측정(policy report) 없이 warn→block 승격"과 긴장하므로 승격 뒤 측정으로 재확인한다: 승격 2주 뒤 `policy report`에서 `--no-mirror` 사용률·`unknown` 재시도 분포를 본다. `policy_promote` 이벤트는 **발행하지 못했다** — `policy` 서브명령에 승격 경로가 없다(show·report뿐, 이벤트 손편집 금지). 승계 필요: `policy promote` 경로 신설(HARN-122 소관).
+
+**미이행 — acceptance ③ 푸시 축**: 이 게이트는 `done` 시점에만 선다. `/drive` 순서가 커밋→PR(푸시)→done이라 red 푸시 자체는 막지 못하고 **미검증 완료 선언**을 막는다. 푸시 지점(PreToolUse `git push`·PR 생성)에 "미러 결과 커밋 ≠ 푸시 대상 HEAD면 고지"를 거는 안은 오탐 비용이 크다(대장만 바꾸는 푸시·claim 푸시·재현 뒤 병합만 하는 푸시가 전부 걸린다). 이번에는 걸지 않았고 위 측정 필드가 그 판정의 근거를 만든다. 승계 필요: 푸시 시점 미러-HEAD 불일치 고지.
+
+**남은 것(정직)**: ① 거부된 done은 대장에 아무것도 쓰지 않는 계약이라 **거부 건수는 대장에 남지 않는다** — 통과한 done의 분포로만 사후 감시한다. ② CI 도달 잡은 done이 안내·기록할 뿐 PR 본문에 자동 첨부하지 않는다(PR 생성 프리플라이트는 별건). ③ 미러 조회 코드가 게이트와 종전 경고 헬퍼 두 곳에 있다 — 헬퍼 본문이 infra 계약 테스트·뮤테이션 앵커(`tests/infra/test_ci_mirror.py` M14)에 묶여 있어 손대지 않았고, 두 조회가 같은 사실을 보는지는 `test_lookup_agrees_with_the_legacy_warning`이 동결한다. ④ 착수 중 발견한 기존 결함: YAML 문법이 깨진 policy.yaml에서 `done`이 **대장 쓰기 이후** 원격 claim 해제(`_release_remote_claim`)가 정책을 따로 읽다 예외로 죽는다(이 게이트가 만든 것이 아니며 게이트는 그 경우 거부로 먼저 멈춘다 — 면제 경로는 여전히 이 크래시를 밟는다). 별건 등재 필요.
+
+**변별력**: `tests/harness/test_done_mirror_gate.py` 293건 — 상태 5 × 정책 2 × 경로 3의 30셀을 리터럴 표로 동결하고 CLI 종단으로 거부·통과·우회·면제·조회 실패·깨진 정책을 각각 밟는다. 뮤테이션 52종(판정 표 각 절·배선·정책 키·집계) 전건 RED·대조군 GREEN, CLI 종단 시험만으로도 대표 10종이 독립적으로 RED. 주입의 실재(`count==1`·`mutated != original`)와 원복 sha256을 순수 Python 하네스가 단언했다.

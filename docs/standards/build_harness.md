@@ -635,6 +635,63 @@ ref를 하나도 못 찾으면 `empty` = 판정 불가**다. 네트워크 실패
   과탐이 미탐보다 안전하다는 원칙. 원격 claim conflict는 단계적 도입의 예외로
   **즉시 차단**(신호가 확정적이므로).
 
+### 3c-1. `done` CI 미러 게이트 — 미러 부재를 block으로 승격한 판정 (HARN-173)
+
+**왜**: `backlog.py done`은 이번 커밋의 CI 미러 결과(`.claude/cache/ci_mirror.json`)가 없어도 경고만 했다
+(HARN-119 ② "1단계 warn"). 실측(2026-09-25 EOS-24 · PR #1316): 세션이 미러를 쓰지 않고 잡 스텝을 손으로
+골라 재현했고 `harness-integrity`의 `ruff check scripts tests/harness` 스텝을 빠뜨려 PR CI가 E501 1건으로
+red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않았다. 사고 대장 `ci-local-repro-gap` 4회차 —
+1~3회차 대책(HARN-129·HARN-172)은 **도구**를 고쳤고, 이번은 도구가 있는데 **쓰지 않은** 축이다.
+
+**판정**: 승격한다. `backlog/policy.yaml`의 `ci_mirror_at_done`(`warn`|`block`, 키가 없으면 `warn`)이 스위치이고
+이 저장소는 `block`을 선언한다. 판정은 `scripts/harness/done_mirror_gate.py`(순수 함수 + 조회)가 하고 `cmd_done`은
+호출만 한다 — `backlog.py`는 동시에 가장 많이 고쳐지는 파일이라 배선을 몇 줄로 묶었다.
+
+| 미러 상태 | 뜻 | `warn` | `block` |
+|---|---|---|---|
+| `pass` | 이번 HEAD의 결과가 전 잡 통과 | 통과(조용) | 통과(조용) |
+| `not_executed` | 식·조건 스텝이라 원리상 로컬에서 못 돈 검사가 남음(exit 3) | 경고 | **경고 유지 — 거부하지 않는다** |
+| `fail` | 미러가 실패로 끝남 | 경고 | **거부(exit 1 · 대장 무변경)** |
+| `unknown` | 결과 없음·다른 커밋·형식 깨짐·잡 0건 | 경고 | **거부(exit 1 · 대장 무변경)** |
+| `unavailable` | 조회 자체가 실패(미러 모듈 부재·git 없음) | 경고 | 경고 후 통과(fail-open) — **통과로 세지 않고 따로 기록** |
+
+- **적용 범위**: 소유자가 claude이고 PR 증적 경로(`--no-pr` 미지정)인 done만. `--no-pr {investigation|incomplete|ci-red|kiki-hold}`
+  경로와 사람 소유(`--as`) done은 미러 대상이 아니므로 종전 그대로다(경고조차 새로 만들지 않고 정책·미러 조회도 하지 않는다).
+- **미실행을 막지 않는 이유**: HARN-181(미러가 `if: needs.changes.outputs.*` 조건을 평가) 착지 전까지 조건 스텝을 가진 잡은
+  항상 exit 3이다. 3을 막으면 그 잡을 건드리는 모든 done이 막혀 사람이 게이트를 끈다. 다만 통과로 접지도 않는다 — 종전
+  경고("돌지 않은 검사")가 그대로 나고 이벤트에 `not_executed`로 남는다. HARN-181 착지 뒤 재판정 대상이다.
+- **예외 경로 — `done --no-mirror '<사유>'`**: 사유가 비었거나 공백뿐이면 거부한다(무사유 면제 없음 · 상태·경로·정책과 무관하게
+  거부). 사유는 태스크 notes(`[미러 면제 날짜] 사유`)와 이벤트 대장(`no_mirror_reason`) **양쪽**에 남는다 — 남지 않는 탈출구는
+  게이트를 끄는 것과 같다. 거부되지 않을 상태에 준 사유도 기록하되 우회로 세지 않는다(`mirror_outcome`).
+- **판정은 상태 전이 전에**: 거부하면 대장에 아무것도 쓰지 않는다(`--no-pr` 거부와 같은 순서). 거부 문구가 처방을 함께 낸다 —
+  `python3 scripts/harness/ci_mirror.py run [--prepend-path ...]`로 재현하거나, 환경 때문에 못 돌리면 `--no-mirror '<사유>'`.
+- **정책 값이 깨지면 엄격한 쪽**: `policy.yaml`에 오류가 하나라도 있으면(미지 필드 오타·미등록 값·YAML 문법 오류) 값을 믿지 않고
+  `block`으로 취급하고 이유를 거부 문구에 적는다. 오타가 조용히 `warn`으로 떨어지면 "승격했다고 믿는 정책이 실은 꺼진" 상시
+  fail-open이 된다. 출구는 있다 — 정책을 고치거나 `--no-mirror`.
+- **측정(사후 감시 근거)**: `done` 이벤트에 `mirror_scope`(`pr`|`no_pr`|`human`)와, PR 경로에는 `mirror_gate_mode`·`mirror_state`
+  (`pass|not_executed|fail|unknown|unavailable`)·`mirror_commit`·`mirror_outcome`(`pass|warn|bypass`), 사유가 있으면
+  `no_mirror_reason`을 적는다. `backlog.py policy report`가 최근 N일 done을 상태별로 세는 절을 낸다(`unavailable`은 통과에 합산하지
+  않는다). **한계**: 거부된 done은 대장에 아무것도 쓰지 않는 계약이라 **거부 건수는 대장에 남지 않는다** — 통과한 done의 분포
+  (`--no-mirror` 사용률·`unknown` 재시도 뒤 분포)로만 사후 감시한다.
+- **CI 도달 잡 안내(acceptance ⑤)**: PR 경로 done은 트렁크(`origin/main`) 대비 변경 파일이 닿는 잡을
+  `ci_job_coverage.scope`로 계산해 stdout 한 줄로 안내하고 이벤트에 `ci_reach_jobs`·`ci_reach_changed`를 적는다. 계산이 실패해도
+  done을 막지 않고 예외 타입명을 stderr에 낸다(`ci_reach_status: failed` · `ci_reach_error`). 워크플로 파일이 없는 저장소는
+  오류가 아니라 `no_workflow`다. PR 본문에 도달 잡 목록을 첨부하는 것은 사람 몫이다(자동 첨부 아님).
+- **승격 절차의 이행 범위(정직)**: §3c의 "2주/30세션 관찰" 기준은 **채우지 않았다** — 이 게이트의 종전 경고는 stderr만 냈고
+  `policy_warn` 이벤트를 남기지 않아 warn 관측 데이터가 없다. 승격의 근거는 ⓐ실측 사고 1건(위)과 ⓑHARN-122 ②의 선례
+  ("원칙의 집행 지점은 정탐률과 무관하게 block + 예외 경로" — `adhoc_edit`) ⓒ예외 경로가 오탐 비용을 사유 1줄로 상한하는 점이며,
+  측정은 승격 **뒤에** 위 필드로 시작한다. 절차 3요소 중 policy.yaml 1줄과 MEMORY 결정 로그는 이행했으나 **`policy_promote`
+  이벤트는 발행하지 못했다** — `policy` 서브명령에 승격 경로가 없다(show·report뿐이고 이벤트 손편집은 금지).
+  승계 필요: `policy promote` 경로 신설(HARN-122 소관).
+- **푸시 축(acceptance ③) — 미구현·판정만**: 이 게이트는 `done`(완료 선언) 시점에만 선다. `/drive` 순서가 커밋→PR(푸시)→done이라
+  **red 푸시 자체는 막지 못하고 미검증 완료 선언을 막는다.** 푸시 지점(PreToolUse `git push`·PR 생성)에 "미러 결과 커밋 ≠ 푸시
+  대상 HEAD면 고지"를 거는 안은 오탐 비용이 크다 — 대장만 바꾸는 푸시·claim 푸시·이미 재현한 뒤 병합만 하는 푸시가 전부 걸린다.
+  그래서 이번에는 걸지 않고, 위 측정 필드(`unknown` 분포·`--no-mirror` 사용률)가 그 판정의 근거를 만든다.
+  승계 필요: 푸시 시점 미러-HEAD 불일치 고지.
+- **변별력**: `tests/harness/test_done_mirror_gate.py` — 상태 5 × 정책 2 × 경로 3의 30셀을 리터럴 표로 동결하고(표를 다시 계산하지
+  않는다), CLI 종단으로 거부·통과·우회·면제·조회 실패·깨진 정책을 각각 밟는다. 판정 표의 각 절·배선·정책 키·집계에 뮤테이션 52종을
+  주입해 전건 RED(대조군 GREEN) — 주입의 실재(`count==1`·`mutated != original`)와 원복 sha256을 하네스가 단언했다.
+
 ## 3d. 의존 선언의 두 종류 — 하드 부착 vs 소프트 분류 (HARN-52 · HARN-53)
 
 `selector.py`는 **`depends_on`만** 본다. notes에 "선행: X 착지 후"라고 적어도 스케줄러는
@@ -1075,6 +1132,7 @@ python3 scripts/harness/backlog.py start <id> --ignore-remote-claim  # 이 태�
 python3 scripts/harness/backlog.py start <id> --no-remote            # 원격 보호 전체 생략(오프라인·긴급)
 python3 scripts/harness/backlog.py done <id> --artifact "<PR 번호를 담은 증적>"   # 증적·PR 참조 필수
 python3 scripts/harness/backlog.py done <id> --artifact "<커밋>" --no-pr ci-red   # 예외 4종만(HARN-23)
+python3 scripts/harness/backlog.py done <id> --artifact "<PR 증적>" --no-mirror "<사유>"   # CI 미러 게이트 예외(HARN-173 · §3c-1) — 사유가 notes·이벤트에 남는다·공백 사유는 거부
 python3 scripts/harness/backlog.py done <재판정 id> --artifact "#N" --verdict FAIL --evidence "<판정문 · 기준 커밋>" --attach <후속 재판정 id>
 python3 scripts/harness/backlog.py done <재판정 id> --artifact "#N" --verdict PASS --evidence "<판정문 · 기준 커밋>"
 python3 scripts/harness/backlog.py done <수정 id> --artifact "#N" --no-verdict "수정 태스크 — 재판정은 <id>가 한다"
@@ -1251,6 +1309,7 @@ exit code이므로 "출력 억제·잘라내기 판정 금지" 금기(CLAUDE.md 
 - ❌ **태스크 정정을 문서에만 착지시키고 acceptance에 반영하지 않기 (HARN-24)** — "문서가 소유자"라는 우회는 착수 세션이 그 문서를 읽을 때만 성립한다. 태스크 YAML은 *반드시* 읽히지만 참조 문서는 선택이다. 정정은 `amend`로 acceptance에 도달시킨다. (사고 경위: ADMIN-02의 범위 축소 정정이 `operations_platform_gap_review.md`에만 있고 acceptance에 없어, 그 정정을 조상으로 가진 세션이 stale acceptance ②를 그대로 집행해 `subscription_*` 3컬럼까지 드롭 — 커밋 b3a58b02)
 - ❌ 증적(artifact) 없는 done
 - ❌ **PR 참조 없는 done** — 산출물이 있으면 요청 없이 PR을 여는 것이 기본값이다(CLAUDE.md "완료·병합"). 증적에 `#12`·`.../pull/12`가 없으면 CLI가 exit 1로 거부하며, 예외는 `--no-pr {investigation|incomplete|ci-red|kiki-hold}`로만 통과한다(HARN-23). 스쿼시 머지 커밋의 `(#758)` 관례는 그대로 통과 — 기존 증적 표기를 바꿀 필요 없다
+- ❌ **CI 미러 재현 없는 PR 증적 done (HARN-173)** — `ci_mirror_at_done=block`(이 저장소)에서 claude 소유 PR 경로 done은 미러 결과가 없거나(다른 커밋 포함) 실패면 CLI가 exit 1로 거부하고 대장에 아무것도 쓰지 않는다. 미실행(exit 3)은 경고만 하며, 환경 때문에 재현할 수 없으면 `--no-mirror '<사유>'`(사유가 notes·이벤트에 남는다)로만 통과한다. 상세 = §3c-1
 - ❌ evidence 없는 게이트 clear
 - ❌ E축 게이트 우회 착수 (waive는 Kiki 전용 결정)
 - ❌ ROADMAP "현재 위치"를 backlog와 어긋나게 단독 편집
