@@ -1,1 +1,1 @@
-{"branch": "claude/exciting-wozniak-3mw0xw", "harness": "2.0", "task": "EOS-146-app-wrong-answer-event-source", "ts": "2026-09-29T22:28:46Z"}
+{"branch": "claude/exciting-wozniak-3mw0xw", "harness": "2.0", "kind": "block", "reason": "처분 판정(acceptance ③) 선행 — 결정 게이트 G-eos146-disposition(Kiki)로 대장에 집행. 판정 전에는 구현하지 않는다", "task": "EOS-146-app-wrong-answer-event-source", "ts": "2026-09-29T22:31:17Z"}
