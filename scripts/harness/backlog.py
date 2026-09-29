@@ -47,6 +47,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
+import event_leaks
 import incidents as incidents_mod
 import jit_rules
 import pathscope
@@ -4770,25 +4771,23 @@ def cmd_policy(root: Path, args: argparse.Namespace) -> int:
     # 비교하면 TypeError다. store.parse_event_ts가 레거시 줄에도 오프셋을 붙여 주므로
     # 양쪽 표기가 같은 축에서 비교된다.
     cutoff = datetime.now().astimezone() - timedelta(days=args.days)
+    # HARN-44: 엄격 strptime("%Y-%m-%dT%H:%M:%S") + except ValueError: continue 조합은
+    # 오프셋이 붙은 신규 줄을 **에러 없이 통째로 누락**시킨다(침묵 실패). 두 표기를
+    # 모두 읽는 공용 파서(`event_leaks.read_warn_events` → `store.parse_event_ts`)를 경유한다 —
+    # 레거시 줄의 오프셋은 가정값이라 정렬 위치가 부정확할 수 있고, 그 사실은 아래에서 말한다.
+    warns = event_leaks.read_warn_events(root)
+    # HARN-170 ⑤ — 테스트 누출 묶음은 대장에서 지우지 않고(append 전용) 집계에서만 뺀다.
+    # 판정은 기간 필터 **전** 전체에서 한다: 묶음이 기간 경계에서 잘리면 모양이 깨져 반쪽만 남는다.
+    leaked = event_leaks.leak_keys(record for record, _event, _known in warns)
     collected: list[tuple[datetime, dict, bool]] = []
-    for path in store.event_paths(root):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("action") != "policy_warn":
-                continue
-            # HARN-44: 엄격 strptime("%Y-%m-%dT%H:%M:%S") + except ValueError: continue 조합은
-            # 오프셋이 붙은 신규 줄을 **에러 없이 통째로 누락**시킨다(침묵 실패). 두 표기를
-            # 모두 읽는 공용 파서를 경유한다 — 레거시 줄의 오프셋은 가정값이라 정렬 위치가
-            # 부정확할 수 있고, 그 사실은 아래 렌더에서 별도로 말한다.
-            moment = store.parse_event_ts(event.get("ts"))
-            if moment is None:
-                continue
-            if moment.moment < cutoff:
-                continue
-            collected.append((moment.moment, event, moment.offset_known))
+    excluded = 0
+    for record, event, offset_known in warns:
+        if record.moment < cutoff:
+            continue
+        if record.key in leaked:
+            excluded += 1
+            continue
+        collected.append((record.moment, event, offset_known))
     collected.sort(key=lambda pair: pair[0])
     by_rule: dict[str, list[dict]] = {}
     total = 0
@@ -4799,6 +4798,11 @@ def cmd_policy(root: Path, args: argparse.Namespace) -> int:
             unknown_offset += 1
         by_rule.setdefault(str(event.get("rule", "?")), []).append(event)
     print(f"조율 정책 warn 리포트 — 최근 {args.days}일, 총 {total}건")
+    # 0건이어도 말한다 — 빼는 장치가 있다는 사실과 그 크기가 늘 보여야 뺄셈이 숨지 않는다.
+    print(
+        f"  테스트 누출 서명 {excluded}건 제외 (HARN-170 — 대장은 append 전용이라 지우지 않고 "
+        "집계에서만 뺀다 · 판별 규칙 scripts/harness/event_leaks.py)"
+    )
     if unknown_offset:
         # 추정 정렬을 실측 정렬인 척하지 않는다(HARN-44 ② — 레거시는 척도 불명).
         print(
