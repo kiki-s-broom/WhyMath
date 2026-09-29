@@ -48,10 +48,12 @@ R22-03: "학생 입력 수식은 허용 문자 검사를 통과한 뒤에만 CAS
 from __future__ import annotations
 
 import builtins
+import functools
 import keyword
 import logging
 import math
 import re
+import threading
 import time
 import types
 import unicodedata
@@ -61,6 +63,7 @@ from typing import Any
 
 import sympy
 from sympy.core.parameters import evaluate as _evaluate_context
+from sympy.core.parameters import global_parameters as _global_parameters
 from sympy.parsing.sympy_parser import convert_xor as _t_convert_xor
 from sympy.parsing.sympy_parser import (
     implicit_multiplication as _t_implicit_multiplication,
@@ -139,6 +142,25 @@ MAX_DERIVATIVE_ORDER = 10
 
 PARSE_TIME_BUDGET_S = 0.2
 """관측용 시간 예산(초). 넘으면 경고 로그만 남긴다 — 판정 불변(결정론 유지·모듈 docstring ⑧)."""
+
+PARSE_CACHE_SIZE = 32_768
+"""같은 문자열의 판정·결과를 기억하는 칸 수(LRU·진입점별).
+
+안전 파싱은 구조 파싱과 실제 파싱으로 두 번 읽어 원 `sympify`보다 약 2배 느리다(고유 입력
+1.4만 건 실측 합 13.3초 → 27.2초). 그런데 같은 문자열이 반복해서 들어온다 — 백엔드 테스트
+스위트 실측에서 문자열 `sympify` 52.6만 건이 고유 2.4만 건이었다(평균 21.6회 반복). 운영에서도
+문항의 조건·정답 문자열은 학생 시도마다 다시 파싱된다. 판정은 입력 문자열·옵션·SymPy 전역
+모드만의 함수라, 결과를 기억해도 판정이 바뀌지 않는다.
+
+크기는 **작으면 급격히 무너진다** — 코퍼스를 한 바퀴씩 도는 호출은 고유 문자열 수가 칸 수를
+넘는 순간 LRU가 매번 가장 오래된 칸(=다음에 쓸 칸)을 버려 적중률이 떨어진다. 워커별 호출 순서
+재생(2026-09-29) 적중률: 4,096칸 53.1%·90.5% → 16,384칸 95.7%·91.8% → 32,768칸 95.9%·91.8%.
+4,096칸으로는 CI backend 잡이 35분 시간 제한을 넘었다(PR #1380). 여유를 두어 32,768칸으로
+잡았다 — 고유 1.4만 칸을 채운 캐시의 추적 메모리가 5.6MB였으므로 가득 차도 진입점당 수십 MB
+수준이다.
+
+결과는 *불변* 값일 때만 기억한다(`_is_immutable_result`) — 리스트처럼 바뀔 수 있는 값은
+호출부가 고치면 캐시가 오염되므로 매번 새로 만든다."""
 
 # 과학표기 지수 한 개가 가질 수 있는 최대 크기의 로그2 — 이보다 큰 지수는 결과가 어떻든
 # 계산 자체가 천문학적이다(2^64 ≈ 1.8×10^19).
@@ -675,13 +697,79 @@ def ensure_within_budget(value: Any) -> Any:
     return result
 
 
-def safe_sympify(text: Any, *, convert_xor: bool = True, evaluate: bool = True) -> Any:
-    """`sympy.sympify(text, convert_xor=…, evaluate=…)`의 안전판 — 결과는 원 호출과 같다.
+# ── 판정 캐시 ─────────────────────────────────────────────────────────────────────
+# 캐시 칸의 값: ("ok", 결과) = 불변 결과 · ("rejected", 사유 코드) = 거부 판정 ·
+# ("passthrough", None) = 바뀔 수 있는 결과라 기억하지 않음(매번 새로 계산). 원 파서의 다른
+# 예외(문법 오류 등)는 기억하지 않는다 — `lru_cache`는 예외를 캐시하지 않고 그대로 올린다.
+_CacheEntry = tuple[str, Any]
+# 이번 호출이 캐시 칸을 *새로 계산*했는지(miss) 스레드별로 표시한다 — 새로 계산한 거부는 계산
+# 도중 `_reject`가 이미 로그를 남겼으므로, 되돌릴 때 한 번 더 남기지 않는다(거부 1회 = 로그 1줄).
+_cache_state = threading.local()
 
-    문자열이 아니면(SymPy 값·파이썬 수) `ensure_within_budget`과 같이 처리한다.
+# 불변 파이썬 값 — 파서가 SymPy 객체 대신 돌려줄 수 있는 결과(`x == y` → 파이썬 `bool`,
+# `1, 2` → 튜플). 이 값들은 호출부가 고칠 수 없어 공유해도 안전하다.
+_IMMUTABLE_SCALARS: tuple[type, ...] = (bool, int, float, complex, str, type(None))
+
+
+def _is_immutable_result(value: Any) -> bool:
+    """캐시에 넣어도 되는 결과인가 — 불변 SymPy 객체·불변 스칼라, 그리고 그것만 담은 튜플."""
+    if isinstance(value, (sympy.Basic, *_IMMUTABLE_SCALARS)):
+        return True
+    if isinstance(value, (tuple, frozenset)):
+        return all(_is_immutable_result(item) for item in value)
+    return False
+
+
+def _global_mode() -> tuple[bool, bool, bool]:
+    """결과를 바꾸는 SymPy 전역 모드 — `evaluate(False)`·`distribute(False)`·`exp_is_pow`.
+
+    같은 문자열도 이 모드가 다르면 다른 식이 된다(`x + x` → `2*x` 또는 `x + x`) — 캐시 키에 넣는다.
     """
-    if not isinstance(text, str):
-        return ensure_within_budget(text)
+    return (
+        bool(_global_parameters.evaluate),
+        bool(_global_parameters.distribute),
+        bool(_global_parameters.exp_is_pow),
+    )
+
+
+def _to_cache_entry(compute: Callable[[], Any]) -> _CacheEntry:
+    """계산 한 번을 캐시 칸으로 바꾼다 — 거부는 사유 코드로, 가변 결과는 통과 표시로.
+
+    '새로 계산함' 표시는 계산이 *끝난 뒤* 세운다 — 계산 안에서 다른 캐시 조회가 표시를
+    덮어써도 바깥 호출의 판정이 흔들리지 않는다.
+    """
+    try:
+        result = compute()
+    except UnsafeExpressionError as exc:
+        _cache_state.computed = True
+        return ("rejected", exc.code)
+    _cache_state.computed = True
+    if _is_immutable_result(result):
+        return ("ok", result)
+    return ("passthrough", None)
+
+
+def _lookup(cached: Callable[[], _CacheEntry]) -> tuple[_CacheEntry, bool]:
+    """캐시를 조회하고 (칸, 이번 호출이 새로 계산했는가)를 돌려준다."""
+    _cache_state.computed = False
+    entry = cached()
+    return entry, bool(getattr(_cache_state, "computed", False))
+
+
+def _from_cache_entry(entry: _CacheEntry, computed: bool, compute: Callable[[], Any]) -> Any:
+    """캐시 칸을 호출 결과로 되돌린다 — 거부는 매번 새 예외(캐시에서 꺼낸 거부는 로그도 새로)."""
+    kind, payload = entry
+    if kind == "ok":
+        return payload
+    if kind == "rejected":
+        if computed:
+            raise UnsafeExpressionError(str(payload))  # 계산 중 이미 로그를 남겼다
+        raise _reject(str(payload))
+    return compute()
+
+
+def _sympify_uncached(text: str, *, convert_xor: bool, evaluate: bool) -> Any:
+    """문자열 `sympify`의 안전 검사 본체(캐시 없음)."""
     started = time.perf_counter()
     _screen_text(text)
     transformations = _standard_transformations + ((_t_convert_xor,) if convert_xor else ())
@@ -690,6 +778,39 @@ def safe_sympify(text: Any, *, convert_xor: bool = True, evaluate: bool = True) 
     _check_tree(result)
     _timed("sympify", started)
     return result
+
+
+@functools.lru_cache(maxsize=PARSE_CACHE_SIZE)
+def _sympify_cached(
+    text: str, convert_xor: bool, evaluate: bool, global_mode: tuple[bool, bool, bool]
+) -> _CacheEntry:
+    """`global_mode`는 키 전용 — 호출 시점의 SymPy 전역 모드가 결과를 바꾸므로 구분한다."""
+    del global_mode  # 키로만 쓴다(값은 계산이 전역 상태에서 직접 읽는다)
+    return _to_cache_entry(
+        lambda: _sympify_uncached(text, convert_xor=convert_xor, evaluate=evaluate)
+    )
+
+
+def clear_parse_cache() -> None:
+    """판정 캐시를 비운다 — 상한·관측 설정을 바꿔 가며 검사하는 테스트용."""
+    _sympify_cached.cache_clear()
+    _parse_expr_cached.cache_clear()
+
+
+def safe_sympify(text: Any, *, convert_xor: bool = True, evaluate: bool = True) -> Any:
+    """`sympy.sympify(text, convert_xor=…, evaluate=…)`의 안전판 — 결과는 원 호출과 같다.
+
+    문자열이 아니면(SymPy 값·파이썬 수) `ensure_within_budget`과 같이 처리한다. 같은 문자열·
+    옵션·SymPy 전역 모드의 판정은 기억해 두고 다시 쓴다(`PARSE_CACHE_SIZE`).
+    """
+    if not isinstance(text, str):
+        return ensure_within_budget(text)
+    entry, computed = _lookup(lambda: _sympify_cached(text, convert_xor, evaluate, _global_mode()))
+    return _from_cache_entry(
+        entry,
+        computed,
+        lambda: _sympify_uncached(text, convert_xor=convert_xor, evaluate=evaluate),
+    )
 
 
 def safe_parse_expr(
@@ -702,11 +823,52 @@ def safe_parse_expr(
     """`parse_expr(text, local_dict=…, transformations=…, evaluate=…)`의 안전판.
 
     `local_dict`의 이름은 호출부가 명시한 값이라 식별자 허용목록 검사에서 통과시킨다(값 자체는
-    구조 검사가 본다 — 바인딩 값이 거대 정수면 거부된다).
+    구조 검사가 본다 — 바인딩 값이 거대 정수면 거부된다). `local_dict`가 없는 호출만 판정을
+    기억해 다시 쓴다 — 사전은 해시할 수 없고 내용이 호출마다 다를 수 있다.
     """
-    started = time.perf_counter()
     if not isinstance(text, str):
         raise _reject("not_text")
+    if local_dict is None:
+        entry, computed = _lookup(
+            lambda: _parse_expr_cached(text, transformations, evaluate, _global_mode())
+        )
+        return _from_cache_entry(
+            entry,
+            computed,
+            lambda: _parse_expr_uncached(
+                text, transformations=transformations, local_dict=None, evaluate=evaluate
+            ),
+        )
+    return _parse_expr_uncached(
+        text, transformations=transformations, local_dict=local_dict, evaluate=evaluate
+    )
+
+
+@functools.lru_cache(maxsize=PARSE_CACHE_SIZE)
+def _parse_expr_cached(
+    text: str,
+    transformations: tuple[Any, ...],
+    evaluate: bool,
+    global_mode: tuple[bool, bool, bool],
+) -> _CacheEntry:
+    """`local_dict` 없는 `parse_expr`의 판정 캐시 — `global_mode`는 키 전용."""
+    del global_mode  # 키로만 쓴다
+    return _to_cache_entry(
+        lambda: _parse_expr_uncached(
+            text, transformations=transformations, local_dict=None, evaluate=evaluate
+        )
+    )
+
+
+def _parse_expr_uncached(
+    text: str,
+    *,
+    transformations: tuple[Any, ...],
+    local_dict: Mapping[str, Any] | None,
+    evaluate: bool,
+) -> Any:
+    """`parse_expr`의 안전 검사 본체(캐시 없음)."""
+    started = time.perf_counter()
     _screen_text(text, local_names=tuple(local_dict or ()))
     _check_tree(_structural_parse(text, transformations=transformations, local_dict=local_dict))
     result = _sympy_parse_expr(

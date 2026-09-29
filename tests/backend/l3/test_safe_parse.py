@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -52,6 +52,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BUDGET_S = 0.2
 
 _X = sympy.Symbol("x")
+
+
+@pytest.fixture(autouse=True)
+def _fresh_parse_cache() -> Iterator[None]:
+    """테스트마다 판정 캐시를 비운다 — 관측 로그·설정을 바꾸는 테스트가 앞 테스트의 캐시 칸에
+    가려져 순서에 따라 결과가 달라지지 않게 한다(pytest-randomly 무작위 순서)."""
+    safe_parse.clear_parse_cache()
+    yield
+    safe_parse.clear_parse_cache()
 
 
 def _srepr_or_fail(fn: Callable[[], Any]) -> str:
@@ -534,3 +543,101 @@ def test_identity_status_folds_rejection_into_parse_error() -> None:
     """거부 → 동치 권위의 기존 parse_error 경로(학생 화면은 기존 parse_error 분기 문구)."""
     assert identity_status("9^9^9", "1") is IdentityVerdict.parse_error
     assert identity_status("2x+2", "2(x+1)") is IdentityVerdict.identity
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ④ 판정 캐시 — 같은 문자열을 다시 읽지 않되, 판정·안전은 바뀌지 않는다
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_cache_reuses_the_same_result() -> None:
+    """같은 문자열·옵션의 두 번째 호출은 캐시에서 같은 (불변) 객체를 돌려준다."""
+    first = safe_sympify("x**2 - 5*x + 6")
+    before = safe_parse._sympify_cached.cache_info().hits
+    second = safe_sympify("x**2 - 5*x + 6")
+    assert second is first
+    assert safe_parse._sympify_cached.cache_info().hits == before + 1
+
+
+def test_cached_rejection_still_rejects_and_logs_every_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """거부 판정도 기억하지만, 다시 들어오면 매번 거부 예외와 로그를 새로 낸다(침묵 금지)."""
+    with caplog.at_level(logging.INFO, logger="whymath.l3.safe_parse"):
+        for _ in range(2):
+            with pytest.raises(UnsafeExpressionError):
+                safe_sympify("9^9^9")
+    rejections = [r for r in caplog.records if "safe_parse 거부" in r.getMessage()]
+    assert len(rejections) == 2
+    assert safe_parse._sympify_cached.cache_info().hits >= 1
+
+
+def test_mutable_result_is_not_shared_through_the_cache() -> None:
+    """리스트처럼 바뀔 수 있는 결과는 기억하지 않는다 — 호출부가 고쳐도 다음 호출은 새 값이다."""
+    first = safe_sympify("[1, 2]")
+    assert isinstance(first, list)
+    first.append(3)
+    assert safe_sympify("[1, 2]") == [1, 2]
+
+
+def test_global_evaluate_mode_is_part_of_the_cache_key() -> None:
+    """전역 평가 모드가 다르면 다른 칸이다 — 평가된 결과가 비평가 문맥으로 새지 않는다."""
+    assert safe_sympify("x + x") == 2 * _X
+    with sympy.evaluate(False):
+        unevaluated = safe_sympify("x + x")
+    assert isinstance(unevaluated, sympy.Add)
+    assert unevaluated.args == (_X, _X)
+
+
+def test_global_distribute_mode_is_part_of_the_cache_key() -> None:
+    """`distribute(False)` 문맥도 다른 칸이다 — `2*(x+1)`이 전개된 채로 새지 않는다."""
+    from sympy.core.parameters import distribute
+
+    assert safe_sympify("2*(x + 1)") == 2 * _X + 2
+    with distribute(False):
+        kept = safe_sympify("2*(x + 1)")
+    assert isinstance(kept, sympy.Mul)
+    assert kept.args == (sympy.Integer(2), _X + 1)
+
+
+def test_immutable_python_results_are_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    """파서가 파이썬 불·튜플을 돌려줘도 불변이면 기억한다(`x == y` 같은 조건식이 반복된다).
+
+    `False`는 파이썬 단일 객체라 `is`로 가릴 수 없고, '매번 새로 계산' 표시 칸도 캐시 적중으로
+    세므로 적중 수로도 가릴 수 없다 — 실제 파싱 본체가 몇 번 불렸는지로 본다.
+    """
+    calls: list[str] = []
+    original = safe_parse._sympify_uncached
+
+    def counting(text: str, **kwargs: Any) -> Any:
+        calls.append(text)
+        return original(text, **kwargs)
+
+    monkeypatch.setattr(safe_parse, "_sympify_uncached", counting)
+    for _ in range(3):
+        assert safe_sympify("x == y") is False
+        assert safe_sympify("1, 2") == (1, 2)
+    assert calls == ["x == y", "1, 2"]
+
+
+def test_tuple_holding_a_mutable_value_is_not_shared() -> None:
+    """튜플이어도 안에 바뀔 수 있는 값이 있으면 기억하지 않는다 — 원소를 고쳐도 새 값이 나온다."""
+    first = safe_sympify("(1, [2])")
+    assert isinstance(first, tuple)
+    first[1].append(3)
+    assert safe_sympify("(1, [2])") == (1, [2])
+
+
+def test_parse_expr_with_local_dict_is_not_cached() -> None:
+    """`local_dict`가 있는 호출은 사전 내용이 결과를 바꾸므로 기억하지 않는다."""
+    one = safe_parse_expr("a + 0", transformations=_T_IMPLICIT, local_dict={"a": sympy.Integer(1)})
+    two = safe_parse_expr("a + 0", transformations=_T_IMPLICIT, local_dict={"a": sympy.Integer(2)})
+    assert (one, two) == (sympy.Integer(1), sympy.Integer(2))
+
+
+def test_parse_expr_without_local_dict_is_cached() -> None:
+    """`local_dict` 없는 `parse_expr`는 판정을 기억한다(스위트 호출의 대부분)."""
+    first = safe_parse_expr("2x + 1", transformations=_T_IMPLICIT)
+    before = safe_parse._parse_expr_cached.cache_info().hits
+    assert safe_parse_expr("2x + 1", transformations=_T_IMPLICIT) is first
+    assert safe_parse._parse_expr_cached.cache_info().hits == before + 1
