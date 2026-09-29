@@ -155,12 +155,19 @@ CLOUD_TOKEN_PRICE_USD_PER_1M: Final[dict[tuple[CostTier, CloudSeat], tuple[float
 """클라우드 (티어, 좌석) 토큰 가격(USD/1M, 입력·출력). est·actual 공통 단가 근거."""
 
 SERVING_CLOUD_SEAT: Final[CloudSeat] = "anthropic"
-"""**학생 대면 서빙**의 클라우드 좌석 — 항상 anthropic.
+"""좌석을 **말하지 않은** 호출부의 기본 좌석 — 역사적 값 anthropic (이름은 ARCH-62 당시 그대로).
 
-`settings.cloud_provider` 셀렉터를 읽지 *않는* 것이 의도다: 그 셀렉터는 **저작 경로 전용**
-이고(config `cloud_provider` 주석), 학생 대면을 옮기는 것은 코드 변경이 아니라
-`G-arch56-availability-trigger`의 Kiki 판정 사안이다. 여기서 셀렉터를 읽으면 저작 경로의
-좌석 변경이 학생 트래픽의 예산 판정까지 조용히 바꾼다.
+**ARCH-64 이후 이 상수는 "학생 대면 서빙 좌석"이 아니다.** 2026-09-21 Kiki 지시로 학생 대면
+서빙(`app.py`)도 `build_cloud_provider()` 경유가 됐고 기본 좌석은 `openrouter`다. 실제 서빙
+좌석은 꽂힌 provider의 선언(`CompositeProvider.cloud_seat`)이 말하며, 파이프라인 원가 기록은
+그것을 읽는다(`l3.pipeline.served_cloud_seat`). 이 상수가 아직 쓰이는 자리는 둘이다:
+
+  ① **좌석 표면이 없는 provider**(테스트 가짜·레거시)의 원가 기록 — 좌석 축 도입 전 계약.
+  ② **라우터의 사전 판정**(`guard_cloud` 예산 임계·`est_cost_krw`) — `Router.route()`는 요청만
+     받고 좌석을 모른다. 그래서 openrouter 좌석에서도 예산은 anthropic 단가로 판정된다: CLOUD_MID
+     1회 임계가 0.354원이 아니라 8.612원이라 **보수 쪽으로 과대**(불필요한 LOCAL 강등 가능)이고,
+     CLOUD_HIGH는 openrouter 단가가 미등재라 그 좌석 기준으로는 판정 자체가 불가하다. 라우터에
+     좌석을 넘기는 배선은 이 태스크 범위 밖이며 후속으로 분리한다(ARCH-64 보고 참조).
 
 저작 경로는 이 상수를 쓰지 않고 `providers.factory.cloud_provider_name()`이 돌려준 좌석을
 `seat=`로 **명시해서** 넘긴다.
@@ -243,7 +250,8 @@ def actual_cost_usd(
     - **좌석 또는 단가가 미상이면 `None`** — 0.0과 구별된다(ARCH-62 acceptance ③).
 
     `seat`의 세 상태가 각각 다른 사실을 말한다:
-      · 생략      — 학생 대면 서빙 좌석(`SERVING_CLOUD_SEAT` = anthropic). 기존 호출부의 뜻.
+      · 생략      — `SERVING_CLOUD_SEAT`(anthropic) — 좌석을 말하지 않은 호출부의 기본값.
+                    ARCH-64 이후 학생 대면 서빙 좌석이 아니다(서빙은 `served_cloud_seat`가 명시).
       · 명시       — 저작 경로 등 **실제 응답한 좌석**(`cloud_provider_name()` 값).
       · `None` 명시 — 좌석 미상. 읽을 단가가 없으므로 `None`을 돌려준다.
     """
@@ -523,6 +531,7 @@ def langfuse_fields(
     cost_krw: float | None = None,
     content_source: str | None = None,
     training_allowed: bool | None = None,
+    cloud_seat: str | None = None,
 ) -> dict[str, object]:
     """Langfuse 기록 필드 dict 생성 (03a §F.2 표).
 
@@ -538,6 +547,10 @@ def langfuse_fields(
 
     `training_allowed`는 AI 모델 학습/개선에 사용자 데이터를 사용할 수 있는지의 동의
     상태다(EOS §48). `None`이면 미측정. 관측용이며 provider 동작을 직접 제어하지 않는다.
+
+    `cloud_seat`(ARCH-64)는 클라우드 호출이 실제로 나간 좌석 이름(`openrouter` 등)이다 —
+    `cost_krw`가 어느 단가표로 계상됐는지를 같은 레코드가 말하게 한다. LOCAL·캐시 적중·미상은
+    None이다(좌석을 모르는 것을 기본 좌석으로 채우지 않는다).
     """
     cost = _as_cost_tier(decision.cost_tier)
     family = _as_model_family(decision.local_family)
@@ -581,6 +594,9 @@ def langfuse_fields(
         # 공급 경로(03c 2층 캐시) — prompt_cache/generate는 파이프라인이 cache_hit에서 유도하고,
         # dsl_render는 라우팅을 타지 않아 상위(l4 공급 경로)가 자기 이벤트로 기록한다.
         "content_source": content_source,
+        # 클라우드 좌석(ARCH-64) — cost_krw의 단가 좌석. 2차 좌석이 없으므로(ARCH-66 기간) 한 호출에
+        # 좌석은 하나뿐이다; failover가 붙으면(ARCH-63) 시도 좌석·응답 좌석을 따로 싣는다.
+        "cloud_seat": cloud_seat,
     }
 
 

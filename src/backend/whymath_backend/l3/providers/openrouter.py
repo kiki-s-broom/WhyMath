@@ -51,9 +51,9 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, ClassVar, Final
 
-from whymath_backend.config import Settings, get_settings
+from whymath_backend.config import CloudSeat, Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers._openai_compat import (
@@ -256,6 +256,11 @@ class OpenRouterProvider:
     이 제공자의 관할은 `jurisdiction` 프로퍼티가 노출하고 디스패처가 그것을 읽는다.
     """
 
+    # 이 제공자가 앉는 클라우드 좌석 이름(ARCH-64) — `CompositeProvider.cloud_seat`가 읽어
+    # 기록 원가를 **실제로 꽂힌 좌석**의 단가로 계상하게 한다. 값은 `build_cloud_provider()`가
+    # 이 클래스를 만드는 셀렉터 값과 같아야 한다(`test_cloud_mid_seat_cutover.py`가 대조한다).
+    seat: ClassVar[CloudSeat] = "openrouter"
+
     def __init__(
         self,
         *,
@@ -403,8 +408,8 @@ class OpenRouterProvider:
     async def check_status(self) -> OpenRouterStatus:
         """구성 점검(네트워크 없음) — 키·허용목록·유도된 관할을 보고한다.
 
-        허용목록이 비었거나 관할이 `UNKNOWN`이면 그 사실을 `error`에 담는다 — /status가
-        "설정은 됐는데 아무것도 못 보낸다"는 상태를 침묵하지 않게 한다.
+        허용목록이 비었거나 관할이 `UNKNOWN`이거나 키가 없으면 그 사실을 `error`에 담는다 —
+        /status가 "설정은 됐는데 아무것도 못 보낸다"는 상태를 침묵하지 않게 한다.
         """
         settings = self._resolved_settings
         allowed = tuple(settings.openrouter_allowed_providers)
@@ -416,6 +421,16 @@ class OpenRouterProvider:
             error = (
                 "허용 공급사의 관할을 확정할 수 없음(국적 미확인 slug 또는 관할 혼재) — "
                 "전건 차단 상태"
+            )
+        elif not self.configured:
+            # ARCH-64 — 이 좌석이 기본값이 되면서 "키 없음"은 학생 대면·저작 양쪽의 클라우드
+            # 결정이 전부 실패하는 상태가 됐다. `configured=False`만 두고 사유를 비우면 /status가
+            # 원인을 말하지 않는다. 그리고 **다른 좌석으로 대체되지 않는다**는 사실을 함께 적는다 —
+            # 운영자가 "anthropic이 대신 받겠지"라고 읽지 않게(2차 좌석 없음 · ARCH-66 기간).
+            error = (
+                "OpenRouter 키 미설정(WHYMATH_OPENROUTER_API_KEY 또는 OPENROUTER_API_KEY) — "
+                "클라우드 결정은 명확한 오류로 실패한다. 다른 클라우드 좌석으로 대체되지 않는다"
+                "(2차 좌석 없음 · ARCH-63은 G-arch66-anthropic-api-pause-review 재개 판정 뒤)"
             )
         return OpenRouterStatus(
             configured=self.configured,
