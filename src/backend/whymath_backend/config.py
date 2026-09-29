@@ -599,9 +599,12 @@ class Settings(BaseSettings):
     # **2차 클라우드 좌석은 없다(2026-09-28 Kiki 결정 · ARCH-66 기간).** 1차 좌석(openrouter)이
     # 실패하면 anthropic으로 넘어가지 않는다 — Anthropic API가 `anthropic_api_enabled=False`로
     # 중단 중이고, 2차 좌석 failover(`ARCH-63`)는 게이트 `G-arch66-anthropic-api-pause-review`
-    # 재개 판정 뒤에 붙는다. 이 기간의 LOCAL 강등은 **라우팅 시점**(구독·예산 가드)에서만
-    # 일어나며, 이미 클라우드로 디스패치된 호출의 실패는 LOCAL로 자동 재시도되지 않고 오류로
-    # 올라간다(`CompositeProvider`가 그 사실을 예외 note로 붙인다).
+    # 재개 판정 뒤에 붙는다. LOCAL 강등은 **두 시점**에 있다: 라우팅 시점(구독·예산 가드 —
+    # 결정이 이미 LOCAL)과, **학생 대면 서빙 조립에 한한 런타임 강등**(ARCH-69 —
+    # `CompositeProvider(runtime_local_degrade=True)`: 이미 클라우드로 나간 호출이 429·5xx·
+    # 타임아웃·미설정으로 실패하면 LOCAL이 1회 대신 답하고 응답·trace에 표기된다. 4xx는 강등
+    # 하지 않는다). 저작·측정 조립에는 런타임 강등이 없어 실패는 오류로 올라간다
+    # (`CompositeProvider`가 그 사실을 예외 note로 붙인다).
     cloud_provider: CloudSeat = Field(
         default="openrouter",
         description=(
@@ -610,7 +613,8 @@ class Settings(BaseSettings):
             "deepinfra 고정 · fp8 · US) / `anthropic`(claude-sonnet-4-6 · ARCH-66 기간에는 "
             "anthropic_api_enabled=False라 호출 불가) / `deepseek`(공식 API·CN 관할). 좌석 "
             "선택만이고 클라이언트 생성은 지연된다. 2차 클라우드 좌석(failover)은 없다 — "
-            "ARCH-63이 G-arch66-anthropic-api-pause-review 재개 판정 뒤 추가한다."
+            "ARCH-63이 G-arch66-anthropic-api-pause-review 재개 판정 뒤 추가한다. 학생 대면 "
+            "서빙은 1차 좌석 실패 시 LOCAL로 강등한다(ARCH-69)."
         ),
     )
 

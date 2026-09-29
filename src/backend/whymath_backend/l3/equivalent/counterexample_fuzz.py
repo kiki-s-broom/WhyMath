@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -26,9 +27,13 @@ from typing import Literal
 
 import sympy
 
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import _parse_condition
 
 __all__ = ["FuzzVerdict", "fuzz_answer"]
+
+# 침묵 실패 금지(CLAUDE.md) — 파싱 회피는 예외 타입명을 남긴다(값은 싣지 않는다).
+logger = logging.getLogger("whymath.l3.equivalent.counterexample_fuzz")
 
 # 기본 탐색 시행 수(§2 "≥10,000") — 구간을 이만큼 등분해 각 점에서 잔차를 평가한다.
 _DEFAULT_TRIALS = 10_000
@@ -57,9 +62,12 @@ class FuzzVerdict:
 def _to_float(value: str) -> float | None:
     """정답 문자열(정확값 'p + sqrt(q)' 포함)을 float으로 — 실패·비실수면 None."""
     try:
-        evaluated = sympy.sympify(value, convert_xor=True).evalf()
+        # CONST-09: 생성물 정답 문자열도 안전 진입점으로 파싱한다
+        # (거부는 SympifyError 하위라 아래 except가 받는다).
+        evaluated = safe_sympify(value).evalf()
         result = complex(evaluated)
-    except (sympy.SympifyError, TypeError, ValueError):
+    except (sympy.SympifyError, TypeError, ValueError) as exc:
+        logger.debug("counterexample_fuzz 정답 파싱 회피: %s", type(exc).__name__)
         return None
     if abs(result.imag) > 1e-9:
         return None  # 복소수 정답은 이 실수축 fuzzer의 범위 밖(정직)

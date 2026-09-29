@@ -14,9 +14,13 @@
 
 설계 원칙 (측정 도구 실패 경로 — CLAUDE.md 2026-08-22):
   · 스텝마다 즉시 flush — 중간에 멈춰도 거기까지의 증거가 남는다
-  · 실패 *원인*을 남긴다 — exit code만이 아니라 stderr 꼬리를 함께 기록
+  · 실패 *원인*을 남긴다 — exit code만이 아니라 stderr·stdout 꼬리를 함께 기록. GitHub 형식
+    오류(`::error::`)는 stdout으로 나오므로 stderr만 남기면 원인이 통째로 사라진다(HARN-162)
   · 모든 서브프로세스에 타임아웃 — 무한 대기로 측정 회차를 태우지 않는다
   · 지금 보는 것이 이번 실행인가 — 결과 JSON에 기준 커밋 해시를 박는다
+  · 스텝은 **GitHub가 그 스텝에 쓰는 셸**로 돌린다 — `shell:` 키가 없으면 `bash -e`(pipefail
+    없음), `shell: bash`면 `bash --noprofile --norc -eo pipefail`이다. 둘은 다르며 미러가 CI보다
+    엄격하면 거짓 실패가 난다(HARN-162 — 아래 `step_shell_argv`)
 
 범위:
   `uses:` 액션 스텝(체크아웃·setup-python 등)은 로컬에서 실행하지 않는다. "환경 전제"로
@@ -93,6 +97,8 @@ class StepResult:
     duration_s: float = 0.0
     reason: str = ""
     stderr_tail: str = ""
+    #: 실패 스텝만 채운다(통과 스텝의 stdout은 설치 로그 같은 소음이라 JSON만 부풀린다).
+    stdout_tail: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +108,7 @@ class StepResult:
             "duration_s": round(self.duration_s, 2),
             "reason": self.reason,
             "stderr_tail": self.stderr_tail[-800:],
+            "stdout_tail": self.stdout_tail[-800:],
         }
 
 
@@ -239,6 +246,49 @@ def step_env(
     return env
 
 
+#: `shell:` 키가 없는 스텝(리눅스)에 GitHub가 실제로 쓰는 호출 — `bash -e {0}`. **pipefail이 없다.**
+_SHELL_ARGV_UNSET = ["bash", "-e"]
+#: `shell: bash`를 **명시**했을 때의 호출. 이쪽만 pipefail이 켜진다.
+_SHELL_ARGV_BASH = ["bash", "--noprofile", "--norc", "-eo", "pipefail"]
+
+
+def _run_defaults(container: Any) -> dict[str, Any]:
+    """워크플로·잡의 `defaults.run` 매핑. 모양이 다르면 빈 매핑(호출측이 '선언 없음'으로 읽는다)."""
+    defaults = container.get("defaults") if isinstance(container, dict) else None
+    run = defaults.get("run") if isinstance(defaults, dict) else None
+    return run if isinstance(run, dict) else {}
+
+
+def step_shell_argv(
+    job: dict[str, Any], step: dict[str, Any], default_shell: Any = None
+) -> tuple[list[str] | None, str]:
+    """이 스텝에 GitHub가 쓰는 셸 호출 인자열. 재현하지 않는 셸이면 (None, 사유) (HARN-162).
+
+    우선순위는 GitHub와 같다: 스텝 `shell` > 잡 `defaults.run.shell` > 워크플로
+    `defaults.run.shell`(`default_shell`). 선언이 하나도 없으면 `bash -e`이고, 명시적
+    `shell: bash`만 `-o pipefail`이 붙는다 — 이 둘을 같은 것으로 다루면 미러가 CI보다 엄격해져
+    거짓 실패를 낸다(2026-09-22 실측: webapp 잡의 `leak=$(grep … | wc -l)`이 no-match에서 CI는
+    통과인데 미러는 pipefail 때문에 exit 1).
+
+    bash 두 형태 밖의 셸(`pwsh`·`python`·`sh`·사용자 정의 템플릿)은 (None, 사유)를 돌려준다.
+    모르는 셸을 bash로 돌리면 그 결과는 그 스텝의 것이 아니므로 실행하지 않고 사유를 남긴다 —
+    호출측이 미실행으로 센다. 선언 값의 판별은 `is None`이다(빈 문자열도 '선언'이다).
+    """
+    declared = step.get("shell")
+    if declared is None:
+        declared = _run_defaults(job).get("shell")
+    if declared is None:
+        declared = default_shell
+    if declared is None:
+        return list(_SHELL_ARGV_UNSET), ""
+    if declared == "bash":
+        return list(_SHELL_ARGV_BASH), ""
+    return None, (
+        f"미러가 재현하지 않는 셸(shell: {declared!r}) — "
+        f"다른 셸로 돌린 결과는 이 스텝의 것이 아니다"
+    )
+
+
 # ── 실행 ───────────────────────────────────────────────────────────────────
 def run_step(
     job: dict[str, Any],
@@ -247,12 +297,17 @@ def run_step(
     timeout: int,
     log_handle=None,
     prepend_path: list[str] | None = None,
+    default_shell: Any = None,
 ) -> StepResult:
-    """스텝 하나를 bash로 실행한다. 실패해도 원인이 남도록 stderr 꼬리를 보존한다."""
+    """스텝 하나를 GitHub와 같은 셸로 실행한다. 실패 원인이 남도록 stderr·stdout 꼬리를 보존한다."""
     name = str(step.get("name") or "(이름 없음)")
     runnable, reason = step_is_runnable(step)
     if not runnable:
         return StepResult(name=name, status=not_run_status(step), reason=reason)
+
+    shell_argv, shell_reason = step_shell_argv(job, step, default_shell)
+    if shell_argv is None:
+        return StepResult(name=name, status=NOT_EXECUTED, reason=shell_reason)
 
     cwd, wd_reason = step_working_directory(job, step, repo_root)
     if cwd is None:
@@ -263,10 +318,10 @@ def run_step(
     started = time.monotonic()
     try:
         proc = subprocess.run(
-            # GitHub Actions의 bash 기본과 정확히 맞춘다: `bash --noprofile --norc -eo pipefail`.
-            # `-u`를 더하면 CI보다 엄격해져 **거짓 실패**를 내고, 거짓 실패는 없는 회귀를
-            # 쫓게 만들어 통과보다 비싸다(2026-09-07 축).
-            ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", step["run"]],
+            # 셸 인자는 스텝의 `shell` 선언이 정한다(`step_shell_argv`) — 한 가지로 고정하지 않는다.
+            # CI보다 엄격한 플래그(`-u`, 선언 없는 스텝의 pipefail)는 **거짓 실패**를 내고, 거짓
+            # 실패는 없는 회귀를 쫓게 만들어 통과보다 비싸다(2026-09-07 축).
+            [*shell_argv, "-c", step["run"]],
             cwd=cwd,
             env=step_env(job, step, prepend_path),
             capture_output=True,
@@ -293,7 +348,9 @@ def run_step(
         status=PASSED if code == 0 else FAILED,
         exit_code=code,
         duration_s=duration,
-        stderr_tail=(stderr or stdout),
+        stderr_tail=stderr,
+        # `::error::` 같은 GitHub 형식 오류는 stdout으로 나온다 — stderr만 남기면 원인이 사라진다.
+        stdout_tail=stdout if code != 0 else "",
     )
     _flush_step(result, log_handle)
     return result
@@ -328,6 +385,10 @@ def run_job(
     if not steps:
         raise MirrorUsageError(f"잡 '{job_name}'의 스텝 파싱 0건 — 통과가 아니라 실패다")
 
+    # 워크플로 최상위 `defaults.run.shell`은 잡·스텝 선언이 없을 때의 기본이다. 지금 ci.yml에는
+    # 없지만, 생기면 조용히 무시된 채 다른 셸로 돌지 않게 여기서 읽어 넘긴다.
+    default_shell = _run_defaults(workflow).get("shell")
+
     result = JobResult(name=job_name)
     failed = False
     for step in steps:
@@ -340,7 +401,9 @@ def run_job(
                 )
             )
             continue
-        step_result = run_step(job, step, repo_root, timeout, log_handle, prepend_path)
+        step_result = run_step(
+            job, step, repo_root, timeout, log_handle, prepend_path, default_shell
+        )
         result.steps.append(step_result)
         if step_result.status == FAILED:
             failed = True
