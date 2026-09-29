@@ -153,3 +153,68 @@ class SimilarityIndex:
             for value, tid, top in scored[:limit]
             if value >= floor
         ]
+
+
+# ── 슬러그 대조 — 본문이 없는 원격 claim·예약용 (HARN-111 ⑦(가)) ────────────────
+#
+# 위 IDF 본문 대조는 **본문(제목·notes·acceptance)이 있어야** 성립한다. 그런데 원격 claim
+# 대장과 번호 예약에는 본문이 없고 **full ID(= 번호 + 슬러그)만** 있다. 2026-09-28
+# `HARN-183`↔`OPS-69` 이중 등재는 슬러그까지 같았는데(`harness-integrity-timeout-budget`)
+# 그 claim의 브랜치가 이 클론에 없어 본문 대조가 아예 성립하지 않았다.
+#
+# 왜 본문 점수에 claim ID를 섞지 않는가 (실측 2026-09-29 · 실코퍼스 891건): `HARN-183` 본문
+# vs `OPS-69` full ID 문자열의 IDF 점수는 **0.091**로 floor 0.13 아래였다 — 짧은 문서는
+# 정규화(기하평균)에서 불리하다. 같은 쌍의 **슬러그끼리 가중 자카드는 1.00**이다. 그래서
+# 슬러그는 슬러그끼리 따로 잰다.
+#
+# 임계 보정 (같은 실측 — 슬러그 코퍼스 882건 · 순서 없는 쌍 388,521개):
+#   가중 자카드 ≥ 0.5 → 쌍 57개(0.015%) · 1건 이상 걸리는 태스크 7.1%
+#   ≥ 0.4 → 쌍 103개 · 15.8% / ≥ 0.6 → 쌍 44개 · 4.4%
+# 대조군은 코퍼스 전체가 아니라 **로컬에 없는 원격 claim·예약**뿐이다(실측 당시 claim 16건 중
+# 로컬 부재 2건) — 그래서 0.5에서 add 한 번당 오탐 기대치는 1% 미만이다. 0.5를 넘는 쌍의
+# 상당수는 의도적 연작(`ARCH-0N-playbook-audit` 등)이며, 고지이지 차단이 아니므로 허용한다.
+SLUG_FLOOR = 0.5
+
+_SLUG_NUMBER = re.compile(r"^[A-Za-z][A-Za-z0-9]*-\d+-?")
+
+
+def slug_tokens(task_id: str) -> frozenset[str]:
+    """`HARN-183-harness-integrity-timeout-budget` → {harness, integrity, timeout, budget}.
+
+    번호 접두는 뗀다 — 번호는 번호 가드의 몫이고, 여기서 번호가 섞이면 같은 접두끼리
+    점수가 부풀려진다. 1글자 토큰은 버린다(`bucket-b`의 `b` 같은 연작 꼬리표).
+    """
+    slug = _SLUG_NUMBER.sub("", task_id)
+    return frozenset(t for t in slug.lower().split("-") if len(t) >= 2)
+
+
+class SlugIndex:
+    """슬러그 토큰 IDF — 가중 자카드로 두 full ID의 슬러그를 대조한다.
+
+    IDF를 쓰는 이유는 본문 대조와 같다: `harness`·`gate`·`contract` 같은 흔한 슬러그 단어만
+    겹친 쌍을 걸러야 한다. IDF는 호출자가 준 ID 목록(로컬 백로그 + 대조군) 자신에서 산출한다
+    — 네트워크·외부 모델 없음.
+    """
+
+    def __init__(self, task_ids: Iterable[str]) -> None:
+        token_sets = [slug_tokens(t) for t in task_ids]
+        self._n = max(len(token_sets), 1)
+        self._df: dict[str, int] = {}
+        for toks in token_sets:
+            for t in toks:
+                self._df[t] = self._df.get(t, 0) + 1
+
+    def _idf(self, term: str) -> float:
+        # +1: 모든 ID에 있는 단어도 가중 0이 되지 않게 — 슬러그는 짧아서 토큰 하나가
+        # 0이 되면 합집합이 비어 점수가 정의되지 않는 쌍이 생긴다.
+        return math.log((self._n + 1) / (1 + self._df.get(term, 0))) + 1.0
+
+    def score(self, a: str, b: str) -> tuple[float, tuple[str, ...]]:
+        """(가중 자카드, 공유 토큰). 슬러그가 없는 쪽이 있으면 0."""
+        ta, tb = slug_tokens(a), slug_tokens(b)
+        union = ta | tb
+        if not ta or not tb or not union:
+            return 0.0, ()
+        shared = ta & tb
+        value = sum(self._idf(t) for t in shared) / sum(self._idf(t) for t in union)
+        return value, tuple(sorted(shared, key=lambda t: (-self._idf(t), t)))
