@@ -3099,7 +3099,11 @@
    "kind": "incident",
    "ref": "2026-09-18",
    "paths": [
+    "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
+    "scripts/harness/number_guard.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/similar.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
@@ -3262,7 +3266,11 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
+    "scripts/harness/number_guard.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/similar.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
@@ -3283,7 +3291,11 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
+    "scripts/harness/number_guard.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/similar.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
@@ -3307,7 +3319,11 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
+    "scripts/harness/number_guard.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/similar.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
@@ -3977,7 +3993,11 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "docs/standards/build_harness.md",
     "scripts/harness/backlog.py",
+    "scripts/harness/number_guard.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/similar.py",
     "scripts/harness/store.py",
     "tests/harness/*.py"
    ],
@@ -4077,6 +4097,16 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(EOS-123 미러 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 10건 미실행(푸시 후·PR 전 검출)",
    "weight": 0
   }
  ]
