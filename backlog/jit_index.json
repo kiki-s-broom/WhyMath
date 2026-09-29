@@ -3128,6 +3128,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-22",
+   "paths": [
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**"
+   ],
+   "text": "CI 미러가 선언 없는 스텝에도 pipefail을 걸어 거짓 실패 — stdout 미보존으로 원인 불명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
     "scripts/harness/backlog.py"
