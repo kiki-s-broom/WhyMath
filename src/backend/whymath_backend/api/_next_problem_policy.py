@@ -134,7 +134,10 @@ class SuneungRecommendationPolicy:
         persona = self._persona
 
         attempt_state = await load_attempt_history_state(session, user_id)
-        theta = attempt_state.theta
+        # EOS-147 — 이 함수의 `theta`는 후보 선택에 쓰는 θ(`selection_theta`)다. 전부 정답 이력의
+        # 추정 θ는 MLE가 없는 상한 클램프(4.0)라 표적으로 쓰지 않는다. 기본 CAT 정책과 같은 상태
+        # 객체·같은 정의다(모드마다 표적 θ의 정의를 갈라 두지 않는다). 응답·SE에는 추정 θ가 나간다.
+        theta = attempt_state.selection_theta
 
         sibling_ids: set[uuid.UUID] = set()
         if self._sibling_filter is not None:
@@ -198,7 +201,9 @@ class SuneungRecommendationPolicy:
             theta, candidates, persona, extra_weights=extra_weights
         )
         common: PolicyTelemetry = {
-            "theta": theta,
+            "theta": attempt_state.theta,
+            "selection_theta": theta,
+            "theta_boundary": attempt_state.theta_boundary,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,

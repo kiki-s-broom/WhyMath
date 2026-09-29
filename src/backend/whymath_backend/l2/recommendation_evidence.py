@@ -93,6 +93,10 @@ EVENT_TYPE_RECOMMENDATION_TREATMENT: str = "recommendation_render"
 # `meta` JSONB 키 — 비민감 메타만(B1). 집계가 이 키로 되읽을 수 있게 상수로 동결한다.
 META_KEY_PROBLEM_ID: str = "problem_id"
 META_KEY_THETA: str = "theta"
+#: EOS-147 — 후보 점수(`candidates[]`)를 계산하는 데 쓴 θ. **추정 θ(`theta`)와 다를 때만** 남긴다
+#: (전부 정답 이력에서 추천이 추정 θ가 아니라 표적 θ로 고른다). 키가 없으면 선택 θ = `theta`다 —
+#: 이 식(`meta.get("selection_theta", meta["theta"])`)이 수정 전 기록까지 정확히 재현한다.
+META_KEY_SELECTION_THETA: str = "selection_theta"
 META_KEY_POOL_SIZE: str = "pool_size"
 META_KEY_APPLIED_WEIGHTS: str = "applied_weights"
 META_KEY_MODE: str = "mode"
@@ -162,6 +166,7 @@ async def record_recommendation_treatment(
     theta: float,
     pool_size: int,
     applied_weights: bool,
+    selection_theta: float | None = None,
     mode: str | None = None,
     gate_reason: str | None = None,
     candidates: list[tuple[uuid.UUID, float]] | None = None,
@@ -178,6 +183,11 @@ async def record_recommendation_treatment(
     `session.add`만 하고 commit하지 않는다(`pedagogy_evidence.py` 관례 — 커밋 경계는
     호출자 책임). 호출자는 `problem_id`가 null이 아닐 때만(추천이 실제로 나갔을 때만)
     이 함수를 불러야 한다 — 가짜 처치 금지.
+
+    `selection_theta`(EOS-147): 후보를 고르는 데 쓴 θ. `theta`(추정 θ)와 **다를 때만** meta에
+    `selection_theta` 키로 남긴다 — None이거나 `theta`와 같으면 키를 넣지 않는다("없음"과 "null로
+    기록됨"을 구분하는 기존 관례). 소급 평가는 `meta.get("selection_theta", meta["theta"])`로
+    후보 점수를 재현한다.
 
     `pool_size`: 선택 시점의 후보 풀 크기(θ 근방 SQL 선별 결과 건수). `applied_weights`:
     `prioritize_weak_concepts` 가중이 실제로 적용됐는지(약점 개념 가중 쿼리가 돌았는지).
@@ -217,6 +227,8 @@ async def record_recommendation_treatment(
         META_KEY_APPLIED_WEIGHTS: applied_weights,
     }
     # None인 선택 키는 아예 넣지 않는다 — "없음"과 "null로 기록됨"을 구분 가능하게.
+    if selection_theta is not None and selection_theta != theta:
+        meta[META_KEY_SELECTION_THETA] = selection_theta
     if mode is not None:
         meta[META_KEY_MODE] = mode
     if gate_reason is not None:
@@ -266,6 +278,7 @@ __all__ = [
     "META_KEY_POOL_SIZE",
     "META_KEY_PROBLEM_ID",
     "META_KEY_REASON",
+    "META_KEY_SELECTION_THETA",
     "META_KEY_THETA",
     "POLICY_VERSION_CAT",
     "POLICY_VERSION_CAT_STATE_REMEDIATION",

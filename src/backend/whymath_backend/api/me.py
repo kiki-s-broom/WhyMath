@@ -2603,7 +2603,30 @@ class NextProblemResponse(BaseModel):
         default=None,
         description="추천 문항 id. 후보(미응답·난이도 라벨 보유)가 없으면 null.",
     )
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 **측정값이 아니다**(`theta_boundary`가 그 사실을 "
+            "말한다). 출제 후보를 고르는 데 실제 쓴 θ는 `selection_theta`다(EOS-147 — 종전 설명은 "
+            "'추천에 쓰인'이었으나 전부 정답 이력에서 그렇지 않게 됐다)."
+        )
+    )
+    selection_theta: float = Field(
+        description=(
+            "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 맞힌 최고 "
+            "난이도 + 1단계(콜드스타트 이상 · 상한 이하)이고, 그 외에는 `theta`와 같다. `theta`와 "
+            "다르면 경계 규칙이 발동했다는 관측이다 — 항상 채워지므로 null을 `theta`와 같다고 "
+            "추측하지 않는다."
+        )
+    )
+    theta_boundary: Literal["upper", "lower"] | None = Field(
+        default=None,
+        description=(
+            "EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가. `upper`=전부 정답(`theta`=4.0은 "
+            "측정값이 아님 · `selection_theta`가 표적) · `lower`=전부 오답(관측만 — 선택은 "
+            "`theta` 그대로) · null=경계 아님."
+        ),
+    )
     difficulty: float | None = Field(
         default=None,
         description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null.",
@@ -2758,6 +2781,9 @@ async def recommend_next_problem(
     `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. EOS-19 신규 2필드는
     `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
     EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
+    EOS-147 신규 2필드는 `selection_theta`(후보를 고르는 데 실제 쓴 θ)와 `theta_boundary`(추정 θ가
+    MLE 발산 경계인가)다 — 전부 정답 이력에서 `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지
+    않고, 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·`measurement_sufficient`는 불변).
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
@@ -2800,6 +2826,7 @@ async def recommend_next_problem(
             session,
             problem_id=outcome.problem_id,
             theta=outcome.theta,
+            selection_theta=outcome.selection_theta,
             pool_size=outcome.candidate_pool_size,
             applied_weights=outcome.applied_weights,
             mode=mode,
@@ -2823,6 +2850,11 @@ async def recommend_next_problem(
     return NextProblemResponse(
         problem_id=outcome.problem_id,
         theta=outcome.theta,
+        # EOS-147: 두 정책은 항상 채운다. None은 이 필드를 모르는 생성자뿐이며 추정 θ와 같다.
+        selection_theta=(
+            outcome.selection_theta if outcome.selection_theta is not None else outcome.theta
+        ),
+        theta_boundary=outcome.theta_boundary,
         difficulty=outcome.difficulty,
         standard_error=outcome.standard_error,
         measurement_sufficient=outcome.measurement_sufficient,

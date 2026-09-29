@@ -73,6 +73,12 @@ docstring이 정본이다. 지시가 없는 요청은 조회 0건이 추가되�
 이름표가 참이기 때문이다). 단 R6 경로에서는 전진하지 않는다(상태 머신이 방금 오답을 관측했다).
 선수 읽기의 그래프 예산은 이 모듈이 걸어 주입한다(`_read_prerequisites`) — 예산 정의는 여기 하나다.
 
+**EOS-147 — 후보 선택에는 추정 θ가 아니라 *선택 θ*를 쓴다.** 전부 정답 이력에서 추정 θ는 MLE가
+존재하지 않아 상한(4.0)에 붙는 클램프인데, 그것을 표적으로 쓰면 첫 정답 뒤 은행의 가장 어려운
+문항으로 뛴다. `AttemptHistoryState.selection_theta`(전부 정답이면 맞힌 최고 난이도 + 1단계,
+그 외에는 추정 θ와 같다)로 고른다. 추정기·SE·중단 규칙은 그대로다(판정문
+`docs/reviews/eos147_*`).
+
 ────────────────────────────────────────────────────────────────────────────
 개념 그래프 예산 — depth ≤ 2 · nodes ≤ 20 · visited · timeout
 ────────────────────────────────────────────────────────────────────────────
@@ -115,6 +121,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.irt import (
     IrtItem,
+    ThetaBoundary,
     item_information,
     learning_band_weight,
     select_weighted_item,
@@ -529,7 +536,28 @@ class NextProblemOutcome(Recommendation):
     응답은 바이트 동일하다.
     """
 
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 측정값이 아니다(`theta_boundary`). 출제에 실제 쓴 "
+            "θ는 `selection_theta`다(EOS-147)."
+        )
+    )
+    selection_theta: float | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 후보를 고르는 데 **실제로 쓴** θ. 전부 정답 이력에서만 `theta`와 다르다"
+            "(맞힌 최고 난이도 + 1단계 · 판정문 §4). 두 정책은 항상 채운다. None은 이 필드를 "
+            "모르는 생성자(테스트 스텁 등)뿐이며 `theta`와 같다는 뜻이다."
+        ),
+    )
+    theta_boundary: ThetaBoundary | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 추정 θ가 MLE 발산 경계에 붙었는가: `upper`=전부 정답 · `lower`=전부 오답 · "
+            "None=경계 아님. `lower`는 관측만 하고 선택은 바꾸지 않는다(판정문 §4-4)."
+        ),
+    )
     difficulty: float | None = Field(
         default=None, description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null."
     )
@@ -628,6 +656,8 @@ class PolicyTelemetry(TypedDict):
     """
 
     theta: float
+    selection_theta: float
+    theta_boundary: ThetaBoundary | None
     standard_error: float | None
     measurement_sufficient: bool
     weight_axes_applied: list[str]
@@ -730,7 +760,11 @@ class CatRecommendationPolicy:
         user_id = uuid.UUID(learner_state.student_id)
 
         attempt_state = await load_attempt_history_state(session, user_id)
-        theta = attempt_state.theta
+        # EOS-147 — 이 함수의 `theta`는 **후보 선택에 쓰는 θ**(`selection_theta`)다. 추정 θ
+        # (`attempt_state.theta`)가 아니다: 전부 정답 이력에서 추정 θ는 MLE가 없어 상한(4.0)에
+        # 붙는 클램프이고, 그것을 표적으로 쓰면 은행 꼭대기로 뛴다. 두 값이 갈라지는 것은 그
+        # 이력뿐이며, 응답·SE·중단 규칙에는 계속 추정 θ가 나간다(아래 `common`).
+        theta = attempt_state.selection_theta
 
         # S4-14 — sibling_filter 지정 + 직전 오답 존재 시에만 형제 조회(쿼리 0회 증가 보존 원칙).
         sibling_ids: set[uuid.UUID] = set()
@@ -810,7 +844,9 @@ class CatRecommendationPolicy:
         else:
             policy_version = self.policy_version
         common: PolicyTelemetry = {
-            "theta": theta,
+            "theta": attempt_state.theta,
+            "selection_theta": theta,
+            "theta_boundary": attempt_state.theta_boundary,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,
