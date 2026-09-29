@@ -11589,6 +11589,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **새로 찾은 것**: `start`가 같은 세션의 두 번째 in_progress claim을 쓰기 전에 거부하지 않는다(다른 쓰기 CLI는 쓰기 전 validate로 거부) → `HARN-197` 등재. `backlog/gates.yaml`은 09-21 이후 main 커밋 128건 중 37건이 건드리는 공용 단일 파일이지만 기록된 충돌이 0건이라 태스크로 올리지 않았다(관찰만).
 - **사고 대장**: 4건 — 새 샤드(`backlog/incidents/claude_fervent-goldberg-s8y8ws.ndjson`)로 첫 등재. `session-multi-claim` 1회차 · `harness-test-live-ledger-write` 16회차 · `nondiscriminating-check` 7회차(훅 주입 테스트의 `[적시 규칙]` 단언이 실패 문구와 공통 접두 — 8일 잠복) · `incident-ledger-merge-conflict` 2회차(#1355의 두 번 충돌 소급 등재).
 - **정직한 공백**: 옛 코드로 `jit_index.json`을 수정한 채 열린 PR은 이 변경을 머지할 때 modify/delete 충돌이 한 번 난다(파일 삭제로 해소 · `.gitignore`가 재유입 차단). main 브랜치에서의 편집만 훅이 약 2초 늘어난다. 누출 서명은 과소 집계 방향의 오판 가능성이 있다(착지일 이후·앞뒤 30초 고립·backlog.py 정확히 3건인 실제 편집).
+### 2026-09-29 — CONST-09 착지: 학생 입력 CAS 파싱 단일 안전 진입점 — 서버 정지(9^9^9)보다 무거운 원격 코드 실행 결함을 함께 막았다 (판정 기준 main `120bd7c5`)
+
+- **발견(재현 기록)**: 진단 기준선 BL-004가 지목한 서버 정지는 재현됐다 — `9^9^9`는 학생 경로 7종 중 6종에서 20초 timeout, `(10^9)!`·`(x+y+z+w+v)^60`·조건 `y=2^x`에 답 `x=10^100`·`x^99+x+1=0`도 멈춤. 그보다 무거운 것은 **원격 코드 실행**이다: `sympify`·`parse_expr`·`parse_latex`는 내부적으로 `eval`을 쓰고 전역에 파이썬 내장 함수(`exec`·`chr`·`open`)를 싣는다. 영숫자·괄호·`+`만으로 된 `exec(chr(..)+..)` 입력이 `verify_answer`·`verify_step`·최종답·`scan_attempt_answer`·OCR 경로에서 실제로 실행됐다. 메인 세션이 origin/main 사본에서 독립 재현했다(무해 페이로드로 표시 파일 생성 · 판정은 `unverifiable`로 조용히 끝나 화면상 무증상).
+- **노출면**: 해당 API는 `ConsentedUser` 인증이 필요하다 — 로그인한 학생 계정이면 누구나 가능했다. 운영 배포 전·실학생 투입 전이라 실제 노출은 Kiki 시연 서버(LAN·데모 토큰) 가동 시간에 한정된다.
+- **해법**: `l3/safe_parse.py` 단일 진입점 — 길이 1000·허용 문자·**식별자 허용목록**(파서 이름공간에 묶인 이름은 허용 함수가 아니면 거부 · `_` 시작·키워드·NFKC 정규화 후 판정) → 내장 함수를 비운 이름공간에서 계산 없는 구조 파싱 → 결정론적 예산(리터럴 100자리·중첩 30·노드 2000·정수 10,000비트·다항 차수 20·전개 항 500·계승 1000 등) → 원 파서 호출 → 결과 재검사. 거부는 `SympifyError` 하위 예외라 기존 `unverifiable`/`parse_error` 경로로 끝난다(새 응답 필드·새 학생 문구 없음). 시간 예산은 결정론적 상한으로 강제하고 벽시계는 관측만 한다(`signal.alarm` 미사용 — 워커 스레드에서 동작하지 않는다).
+- **분류**: 비테스트 직접 호출 57건 = 안전 진입점 경유로 이전 51 + 허용목록 6(코드 상수·저작 코퍼스·오프라인 배치, 사유 필수). 우회는 AST 거버넌스 테스트가 막는다(호출·참조·별칭·import 전부 · stale 항목·0건 스캔 실패).
+- **회귀 근거**: 기존 스위트가 파서에 넣은 고유 입력 37,406건 중 37,400건이 원 파서와 동일 결과, 차이 6건은 전부 이상 입력(`③`·`1⁄2` 등). 저작 코퍼스 고유 식 12,475건은 거짓 거부 0.
+- **판단 지점**: 경계 스캔에서 `l3.safe_parse`를 ADAPTER가 아니라 MIXED로 배정했다(ADAPTER면 기존 sympy 의존이 CORE 도달로 약 20건 새로 드러나 기준선을 넘는다 — 새 의존이 아니다). **남은 한계**: `getattr(sympy, "sympify")` 같은 동적 접근과 다른 SymPy API에 문자열을 넘겨 내부 파싱되는 경우는 거버넌스가 보지 못한다 · 차수 상한과 같은 `x^20+x+1=0`은 하류 solve로 약 1.5초.
+- **사람 몫**: R22-03의 헌법 등록부 채택(`docs/constitution_proposals/rules_additions_v1.1.yaml` → `constitution/rules.yaml`)은 Kiki 판단 · 다음 시연 전에는 이 수정이 담긴 main으로 서버를 띄운다. 사고 대장 계열 `untrusted-input-cas-eval` 1회차.
 ### 2026-09-29 — EOS-30: 완료 상태 머신이 가로챈 턴은 힌트 공급 원장에 행을 남기지 않는다 — 판정 기준 main `9308cf4c`
 
 - **판정(acceptance ①)**: 종전(가로챈 턴도 결정 단계를 '제공'으로 적음)을 **유지하지 않는다.** 완료 상태 머신이 발화를 가로챈 턴(`completion.handled` — 돌아보기 진입·계속·완료 인정·재고 유도)은 `힌트제공` 행을 남기지 않는다(`api/coach._log_hint_event(turn_handled=…)` · 두 호출부 `create_session`·`append_turns`).
@@ -11650,3 +11659,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
   - **강등률은 프로세스 인메모리**(재시작 0 · 워커별). 누적은 trace의 `local_degraded` 집계 몫.
   - **소비자 중 `local_degrade`로 동작을 바꾸는 곳은 없다** — `/v1/generate`는 비학생 원시 출력 계약(게이트 ③ 봉인 D)이고, 표기만 한다.
   - **라이브 미검증** — OpenRouter·Ollama 실호출 0건(ARCH-66 · 가짜 전송·가짜 LOCAL만).
+
+### 2026-09-29 — EOS-129 ⑤ 게이트 3건 → 1건 일원화 확정 — 판정 기준 main `c13c04ed`
+
+- **실측(main 기준)**: EOS-129 관련 게이트는 `G-eos129-prod-response-distribution` 1건뿐이다(`backlog/gates.yaml` · cleared · PR #1371). 게이트 ID 중복은 `grep`+`uniq -d`로 0건 확인했고(`validate`는 중복을 못 잡는다 — HARN-192가 소유), EOS-129의 `requires_gates`도 이 1건만 가리킨다. 2026-09-28 항목이 "셋"이라 부른 것은 main 안의 중복이 아니라 브랜치·PR에 흩어진 정의였다.
+  - `G-eos129-prod-response-distribution` — #1352가 넣은 main의 정본. 이번에 닫혔다.
+  - `G-eos129-item-response-census` — #1346(닫힘·미머지)에만 있고 main에 없다. 자산은 브랜치 `claude/magical-maxwell-hja5kh-eos129`(head `c5983e59`)에 남아 있다.
+  - "#1358의 같은 ID 다른 정의" — 머지된 #1358의 `gates.yaml` 변경은 `G-eos23-rejected-quad-sum-classification` 추가뿐이라 main에는 그 변형이 없다. dry-run CLI 경로는 EOS-129 notes의 `[병합 정정 2026-09-28]`에 대체 측정 경로로 남아 있다.
+- **처분**: 정본은 `G-eos129-prod-response-distribution` 1건으로 확정한다. `G-eos129-item-response-census`는 되살리지 않는다 — ⑤의 물음(추정 가능 문항이 몇 건인가)이 이미 답을 얻었고(0건), 새 pending 게이트를 붙이면 답이 난 측정에 사람 게이트가 다시 생긴다. Kiki는 census 런북을 실행할 필요가 없다.
+- **census 자산은 회수하지 않는다 — 단, 대체가 완전하지 않다**(파일 목록·소스 대조로 확인한 범위 — 실행 대조는 하지 않았다):
+  - 대체됨: Rasch 45문항 하한 회귀(브랜치 `test_irt_rasch_information_bound.py` ↔ main `test_irt_discrimination_calibration.py`), 문항당 응답 수 분포(`response_count_distribution`), b 보정 가능 문항 수(`calibrated_b`).
+  - 대체 안 됨: **문항별 서로 다른 학생 수**를 세는 축. census는 학생 수로 세지만 main의 a 채택 기준은 문항당 응답 건수(`_MIN_RESPONSES_FOR_DISCRIMINATION = 50`)이고 학생 수 기준이 없다. 한 학생의 반복 응답으로도 건수는 채워질 수 있다 — 지금 운영 응답 학생이 1명이라 재측정 때 이 축이 실제로 문제가 될 수 있다. 판정 규칙은 건드리지 않았고, 필요해지면 별도 태스크로 등재한다.
+- **정정**: PR #1371이 EOS-129 acceptance에 적은 "100건 이상(a 추정 후보) 문항 0건"의 100은 main 코드의 기준이 아니다. 코드의 a 채택 최소 응답은 50건이다. 운영 응답이 문항당 최대 4건이라 결론(추정 가능 문항 0건)은 그대로다.
+- **브랜치 처분**: 삭제하지 않았다. 브랜치 정리는 stray-code 감사 배치가 소유하며, 이 항목의 "회수 불요"와 "대체 안 됨" 항이 그 판정의 근거다. 되살릴 필요가 생기면 `c5983e59`에서 `item_response_census.py`·`test_item_response_census.py`·`eos129_item_response_census_runbook.md` 3파일을 가져온다.
+- **사고 대장**: EOS-129 병렬 중복은 PR #1356이 이미 기록했다. 같은 사고를 다시 세지 않는다.
