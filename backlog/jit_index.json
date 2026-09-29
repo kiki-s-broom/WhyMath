@@ -4076,6 +4076,15 @@
    "paths": [
     "tests/harness/**"
    ],
+   "text": "tests/harness(CI 미러)가 claim 반납 뒤에도 세션 샤드에 가짜 path_overlap 3줄(backlog.py) 기록 — EOS-33 done 후 재현 중",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "tests/harness/**"
+   ],
    "text": "tests/harness(CI 미러)가 claim 세션 샤드에 가짜 policy_warn 7줄(backlog.py·README.md) 기록 — EOS-33 미러 중 · 커밋본 복원",
    "weight": 0
   }
