@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-144-r6-probe-next-action-residual-mismatch
+title: "R6 첫 오답 선수 탐침과 상태 머신 next_action(PRACTICE_SAME_CONCEPT)의 잔여 불일치 — 탐침 규칙을 V1_RULES로 올릴지 판정(EOS-26 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-26-r6-diagnosis-prerequisite-directed
+requires_gates: []
+acceptance:
+  - "① 실측 사실(EOS-26 착지 후) — 연속 오답의 첫 R6에서 시도 응답의 `learning_state.next_action`은 `PRACTICE_SAME_CONCEPT`인데 직후 `GET /v1/me/next-problem`은 선수 탐침(`action=diagnose` · `learning_state_directive=prerequisite_probe` · 문항 = 오답 개념의 직접 선수)을 낸다. 연속 두 번째 R6와 탐침 불가 폴백에서는 둘이 같은 말을 한다(EOS-26 판정문 §2-3). 게이트 `G-eos24-loop1-undiagnosed-wrong-criterion` evidence가 \"후속 태스크로 등재한다\"고 적은 부채(R6 next_action ↔ 추천 행위 불일치)의 잔여분이며, 그 부채는 대장에 없었다.\n② 처분 판정 선행 — (가) 탐침 규칙을 상태 머신으로 올린다(첫 원인 미상 오답의 `next_action`이 선수 진단을 말하게 · `target_concept_id`를 채우려면 그래프 조회가 필요하다 — R4 미배선과 같은 비용 문제) (나) 추천 쪽 규칙을 유지하고 `next_action`의 계약 의미를 \"상태 머신 권고 · 추천이 선수 탐침으로 구체화\"로 문서화 (다) 기타. 결정 없이 구현하지 않는다(EOS-24 판정문 §2 근거 1 — 결정자가 둘이면 학생은 모순을 받는다).\n③ 인접 경계 — `EOS-127`(R4 입력 미배선)이 배선되면 선수 결손을 상태 머신이 직접 결정하므로, 처분 전에 두 태스크의 acceptance를 대조한다."
+  - "④ (EOS-26 독립 비판 발견 5 · 2026-09-26) 탐침을 **맞힌** 분기에서도 R6 문면은 끝내 집행되지 않는다 — 최신 결정이 R2(정답)라 지시가 아니고(EOS-26 판정문 §3 ⓓ), 기본 경로는 개념을 보지 않아 오답 개념 C로 돌아가지 않는다. 처분 판정에 \"탐침 정답 뒤 C로 한 번 복귀(문면 재개)\"를 선택지로 포함한다(R2 일반 집행과는 다르다 — 직전 결정이 탐침을 낸 R6일 때만)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/learning_state_policy.py
+  - src/backend/whymath_backend/schema/learning_state.py
+  - src/backend/whymath_backend/l2/learning_state_recommendation.py
+session: null
+notes: "출처: EOS-26 판정문 docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md §2-3·§7-2. 모바일 NextProblemResponse는 action·reason·learning_state를 파싱하지 않으므로(게이트 evidence 실측) 학생 체감 차이는 지금 없다 — API 계약의 정합 문제다. 분류 LOOP.\n\n[정정 2026-09-26] EOS-26 독립 교수학 비판 발견 5 반영 — 탐침 정답 분기의 R6 문면 미집행을 같은 처분 판정에 포함"
+updated: 2026-09-26

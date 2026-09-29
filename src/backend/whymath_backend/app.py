@@ -200,8 +200,8 @@ from whymath_backend.l3.pregenerate.validator import (
     default_seed_validator,
     validate_response,
 )
-from whymath_backend.l3.providers.anthropic import AnthropicProvider
 from whymath_backend.l3.providers.composite import CompositeProvider
+from whymath_backend.l3.providers.factory import build_cloud_provider
 from whymath_backend.l3.providers.ollama import OllamaProvider
 from whymath_backend.l3.queue import CeleryJobQueue
 from whymath_backend.l3.trace import LangfuseSink
@@ -341,7 +341,7 @@ class ModelAvailabilityBody(BaseModel):
 
 
 class StatusBody(BaseModel):
-    """GET /status 응답 — Ollama(로컬) 레디니스 + 클라우드(Anthropic) 구성 보고.
+    """GET /status 응답 — Ollama(로컬) 레디니스 + 클라우드 좌석(기본 openrouter) 구성 보고.
 
     로컬 필드(ready/reachable/models/missing/error)는 S1 계약 그대로다. S5가 클라우드
     필드(cloud_*)를 *선택적으로* 덧붙인다 — 기본 None이라 기존 응답·테스트와 호환된다.
@@ -353,19 +353,38 @@ class StatusBody(BaseModel):
     models: list[ModelAvailabilityBody] = Field(..., description="라우팅 모델별 설치 여부")
     missing: list[str] = Field(..., description="미설치 모델 ID 목록")
     error: str | None = Field(default=None, description="도달 실패 시 사유(비크래시)")
-    # ── 클라우드(Anthropic, S5) — 선택적. None이면 클라우드 상태 미노출 ──
+    # ── 클라우드(S5 · 좌석은 ARCH-64부터 셀렉터 — 기본 openrouter) — 선택적. None=미노출 ──
     cloud_configured: bool | None = Field(
         default=None,
-        description="Anthropic 전송 가능 여부(키 설정 + ARCH-66 사용 허가). None=미노출",
+        description=(
+            "클라우드 좌석 전송 가능 여부(openrouter=키+허용 공급사 · anthropic=키+ARCH-66 "
+            "사용 허가). None=미노출"
+        ),
     )
     cloud_reachable: bool | None = Field(
-        default=None, description="Anthropic 도달·인증 확인(models.list). None=미노출"
+        default=None,
+        description=(
+            "클라우드 도달·인증 확인(anthropic만 보고 — openrouter는 의도적 미측정). "
+            "None=미노출 또는 미측정"
+        ),
     )
     cloud_error: str | None = Field(
         default=None,
         description=(
             "클라우드 도달/인증 실패 사유, 또는 키는 있으나 사용 중단 방침으로 막힌 사유"
             "(비크래시 · ARCH-68). None=미노출 또는 사유 없음"
+        ),
+    )
+    cloud_seat: str | None = Field(
+        default=None,
+        description="클라우드 슬롯에 실제로 꽂힌 좌석 이름(ARCH-64 — 기본 openrouter). None=미노출",
+    )
+    cloud_failover_seat: str | None = Field(
+        default=None,
+        description=(
+            "2차 클라우드 좌석(failover). 2026-12-31까지 없음=None — 1차 좌석 실패는 오류로 "
+            "올라가며 다른 좌석·LOCAL로 자동 재시도하지 않는다(2026-09-28 Kiki 결정 · "
+            "ARCH-63은 G-arch66-anthropic-api-pause-review 재개 판정 뒤)"
         ),
     )
 
@@ -825,14 +844,20 @@ def create_app(
             )
         return response
 
-    # 기본 provider는 CompositeProvider — cost_tier로 로컬(Ollama)↔클라우드(Anthropic)
-    # 디스패치(S5). 둘 다 지연이라 구성 시 라이브 Ollama·Anthropic 키가 필요 없다.
+    # 기본 provider는 CompositeProvider — cost_tier로 로컬(Ollama)↔클라우드 디스패치(S5).
+    # 클라우드 좌석은 **`build_cloud_provider()` 팩토리가 정한다**(ARCH-64 · 2026-09-21 Kiki 지시
+    # "학생대면도 오픈라우터로 전환" · 게이트 G-cloud-mid-seat-cutover clear) — 저작 경로와 같은
+    # 셀렉터(`settings.cloud_provider`, 기본 openrouter)를 읽으므로 학생 대면과 저작이 한 좌석을
+    # 쓴다. 종전의 `AnthropicProvider()` 하드코딩은 ARCH-66(Anthropic API 중단) 기간 내내
+    # 클라우드 결정을 전부 오류로 만들던 자리다. 2차 좌석은 없다 — 1차 좌석 실패는 오류로
+    # 올라가며 `CompositeProvider`가 그 사실을 예외 note로 붙인다(2026-09-28 Kiki 결정).
+    # 둘 다 지연이라 구성 시 라이브 Ollama·OpenRouter 키가 필요 없다.
     # (OPS-01) 변수로 잡아 두는 이유: 기본 readiness probes가 같은 provider의
     # check_status를 재사용한다(/status와 동일 표면 — 재발명 금지).
     resolved_provider: LLMProvider = (
         provider
         if provider is not None
-        else CompositeProvider(local=OllamaProvider(), cloud=AnthropicProvider())
+        else CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider(settings_for_app))
     )
     app.state.__setattr__(_PROVIDER_KEY, resolved_provider)
     # 기본 캐시는 RedisCache(지연 연결) — 구성 시 라이브 Redis 불필요(첫 접근 때 연결).
@@ -1103,7 +1128,7 @@ def create_app(
 
     @app.get("/status", tags=["ops"], response_model=StatusBody)
     async def get_status(request: Request) -> StatusBody:
-        """레디니스 — Ollama(로컬) 도달성·모델 매트릭스 + 클라우드(Anthropic) 구성 보고.
+        """레디니스 — Ollama(로컬) 도달성·모델 매트릭스 + 클라우드 좌석 구성 보고(ARCH-64).
 
         Ollama·클라우드가 죽어 있어도 500을 던지지 않는다 — 상태로 *보고*한다. 로컬
         도달성은 provider.check_status로, 클라우드 구성/도달성은 provider.check_cloud_status
@@ -1128,6 +1153,8 @@ def create_app(
             cloud_configured=snapshot.cloud_configured,
             cloud_reachable=snapshot.cloud_reachable,
             cloud_error=snapshot.cloud_error,
+            cloud_seat=snapshot.cloud_seat,
+            cloud_failover_seat=snapshot.cloud_failover_seat,
         )
 
     @app.post("/v1/generate", tags=["l3"])
