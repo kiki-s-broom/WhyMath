@@ -11640,3 +11640,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
   - **강등률은 프로세스 인메모리**(재시작 0 · 워커별). 누적은 trace의 `local_degraded` 집계 몫.
   - **소비자 중 `local_degrade`로 동작을 바꾸는 곳은 없다** — `/v1/generate`는 비학생 원시 출력 계약(게이트 ③ 봉인 D)이고, 표기만 한다.
   - **라이브 미검증** — OpenRouter·Ollama 실호출 0건(ARCH-66 · 가짜 전송·가짜 LOCAL만).
+
+### 2026-09-29 — EOS-129 ⑤ 게이트 3건 → 1건 일원화 확정 — 판정 기준 main `c13c04ed`
+
+- **실측(main 기준)**: EOS-129 관련 게이트는 `G-eos129-prod-response-distribution` 1건뿐이다(`backlog/gates.yaml` · cleared · PR #1371). 게이트 ID 중복은 `grep`+`uniq -d`로 0건 확인했고(`validate`는 중복을 못 잡는다 — HARN-192가 소유), EOS-129의 `requires_gates`도 이 1건만 가리킨다. 2026-09-28 항목이 "셋"이라 부른 것은 main 안의 중복이 아니라 브랜치·PR에 흩어진 정의였다.
+  - `G-eos129-prod-response-distribution` — #1352가 넣은 main의 정본. 이번에 닫혔다.
+  - `G-eos129-item-response-census` — #1346(닫힘·미머지)에만 있고 main에 없다. 자산은 브랜치 `claude/magical-maxwell-hja5kh-eos129`(head `c5983e59`)에 남아 있다.
+  - "#1358의 같은 ID 다른 정의" — 머지된 #1358의 `gates.yaml` 변경은 `G-eos23-rejected-quad-sum-classification` 추가뿐이라 main에는 그 변형이 없다. dry-run CLI 경로는 EOS-129 notes의 `[병합 정정 2026-09-28]`에 대체 측정 경로로 남아 있다.
+- **처분**: 정본은 `G-eos129-prod-response-distribution` 1건으로 확정한다. `G-eos129-item-response-census`는 되살리지 않는다 — ⑤의 물음(추정 가능 문항이 몇 건인가)이 이미 답을 얻었고(0건), 새 pending 게이트를 붙이면 답이 난 측정에 사람 게이트가 다시 생긴다. Kiki는 census 런북을 실행할 필요가 없다.
+- **census 자산은 회수하지 않는다 — 단, 대체가 완전하지 않다**(파일 목록·소스 대조로 확인한 범위 — 실행 대조는 하지 않았다):
+  - 대체됨: Rasch 45문항 하한 회귀(브랜치 `test_irt_rasch_information_bound.py` ↔ main `test_irt_discrimination_calibration.py`), 문항당 응답 수 분포(`response_count_distribution`), b 보정 가능 문항 수(`calibrated_b`).
+  - 대체 안 됨: **문항별 서로 다른 학생 수**를 세는 축. census는 학생 수로 세지만 main의 a 채택 기준은 문항당 응답 건수(`_MIN_RESPONSES_FOR_DISCRIMINATION = 50`)이고 학생 수 기준이 없다. 한 학생의 반복 응답으로도 건수는 채워질 수 있다 — 지금 운영 응답 학생이 1명이라 재측정 때 이 축이 실제로 문제가 될 수 있다. 판정 규칙은 건드리지 않았고, 필요해지면 별도 태스크로 등재한다.
+- **정정**: PR #1371이 EOS-129 acceptance에 적은 "100건 이상(a 추정 후보) 문항 0건"의 100은 main 코드의 기준이 아니다. 코드의 a 채택 최소 응답은 50건이다. 운영 응답이 문항당 최대 4건이라 결론(추정 가능 문항 0건)은 그대로다.
+- **브랜치 처분**: 삭제하지 않았다. 브랜치 정리는 stray-code 감사 배치가 소유하며, 이 항목의 "회수 불요"와 "대체 안 됨" 항이 그 판정의 근거다. 되살릴 필요가 생기면 `c5983e59`에서 `item_response_census.py`·`test_item_response_census.py`·`eos129_item_response_census_runbook.md` 3파일을 가져온다.
+- **사고 대장**: EOS-129 병렬 중복은 PR #1356이 이미 기록했다. 같은 사고를 다시 세지 않는다.
