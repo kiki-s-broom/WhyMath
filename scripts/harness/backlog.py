@@ -49,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dep_declaration
 import incidents as incidents_mod
 import jit_rules
+import number_guard
 import pathscope
 import remote_claims
 import report
@@ -2204,6 +2205,8 @@ def _taken_id_numbers(root: Path, backlog: object, policy: object) -> dict[str, 
     """이미 쓰인 `<PREFIX>-<번호>` → (점유 태스크의 full ID, 출처 라벨).
 
     **로컬 백로그 + 원격 claim 대장 + 원격 브랜치 backlog/tasks/ 파일명** 세 곳을 본다.
+    HARN-111부터 네 번째 출처 **원격 번호 예약**(push 전 번호 · `number_guard`)을 함께 보고,
+    파일명 스캔 직전에 원격 heads를 갱신한다(ⓓ — 이 클론에 ref가 없던 브랜치도 보이게).
     원격을 보는 것이 핵심이다 — ARCH-13·OPS-15 두 사고 모두 병렬 세션이 *서로의
     브랜치를 못 봐서* 같은 번호를 각각 등재한 것이라, 로컬만 검사하면 재발을 하나도
     막지 못한다(HARN-10).
@@ -2233,27 +2236,24 @@ def _taken_id_numbers(root: Path, backlog: object, policy: object) -> dict[str, 
         if number:
             taken.setdefault(number, (str(task_id), "로컬 백로그"))
     if getattr(policy, "remote_claims", False):
-        claims, _status = remote_claims.list_claims(root)
-        for claim in claims:
-            number = store.id_number_of(claim.task_id)
+        # HARN-111 — 원격 관측을 한 번에: ⓓ heads 갱신 → claim 대장(+번호 예약) → 파일명 스캔.
+        # 출처마다 상태를 따로 받아 못 본 출처를 말한다(종전엔 claim 조회 상태를 버려서
+        # 조회 실패가 '원격 claim 0건'으로 조용히 접혔다).
+        view = number_guard.observe(root, ttl_hours=getattr(policy, "claim_ttl_hours", 72))
+        for warning in view.warnings():
+            print(f"  ⚠ {warning}", file=sys.stderr)
+        occupants = [(c.task_id, "원격 claim") for c in view.claims]
+        occupants += [
+            (r.task_id or f"{r.number}-예약-레코드-파손", f"원격 번호 예약({r.branch or '?'})")
+            for r in view.reservations
+        ]
+        occupants += [
+            (f.task_id, f"원격 브랜치 backlog/tasks/({f.branch})") for f in view.task_files
+        ]
+        for owner, source in occupants:
+            number = store.id_number_of(owner)
             if number:
-                taken.setdefault(number, (claim.task_id, "원격 claim"))
-        task_files, files_status = remote_claims.scan_remote_task_files(root)
-        if files_status.startswith("error"):
-            # 침묵 금지(CLAUDE.md) — status 자체에 이미 예외 타입명이 담겨 있다
-            # (scan_remote_task_files 내부의 f"error:{type(exc).__name__}" 포장).
-            print(
-                f"  ⚠ 원격 브랜치 backlog/tasks/ 파일명 스캔 실패({files_status}) — "
-                "등재만 되고 아직 claim되지 않은 원격 번호는 놓칠 수 있다",
-                file=sys.stderr,
-            )
-        for task_file in task_files:
-            number = store.id_number_of(task_file.task_id)
-            if number:
-                taken.setdefault(
-                    number,
-                    (task_file.task_id, f"원격 브랜치 backlog/tasks/({task_file.branch})"),
-                )
+                taken.setdefault(number, (owner, source))
     return taken
 
 
@@ -2445,7 +2445,9 @@ def _format_age(seconds: float) -> str:
     return f"{hours}시간 {rem}분" if rem else f"{hours}시간"
 
 
-def _print_visibility_notice(root: Path, task_id: str, policy: object) -> None:
+def _print_visibility_notice(
+    root: Path, task_id: str, policy: object, *, reserved: bool = False
+) -> None:
     """등재 직후 **가드의 관측 사각**을 사람에게 고지한다 (HARN-43).
 
     **탐지가 아니라 고지다.** 미push 브랜치를 실제로 관측하는 수단은 없으므로(그
@@ -2468,17 +2470,29 @@ def _print_visibility_notice(root: Path, task_id: str, policy: object) -> None:
     branch = store.current_branch(root)
     pushed, _pushed_status = remote_claims.branch_has_remote_ref(root, branch)
     if pushed is False:
+        # 번호 예약(HARN-111 ⓐ)이 성공했으면 번호는 이미 보인다 — 안 보이는 것은 본문이다.
+        subject = (
+            "번호는 원격 예약으로 다른 세션의 add에 보이지만, 태스크 본문(제목·acceptance)은"
+            if reserved
+            else "이 번호는"
+        )
         lines.append(
-            f"이 번호는 **push 전까지 다른 세션에 보이지 않는다** — 현재 브랜치 "
+            f"{subject} **push 전까지 다른 세션에 보이지 않는다** — 현재 브랜치 "
             f"'{branch}'의 원격 ref가 이 클론에 없다(미push 추정)."
         )
 
-    age, _age_status = remote_claims.remote_refs_age_seconds(root)
-    if age is not None and age >= _STALE_REFS_SECONDS:
+    # HARN-111 ⑦(다) — 나이는 **전체 브랜치 fetch** 스탬프로 잰다. 종전 `remote_refs_age_seconds`
+    # 는 FETCH_HEAD를 봐서 번호 가드의 claim fetch가 매번 그것을 새로 쓰는 add 안에서는 구조적으로
+    # 0초였다. 이번 관측에서 갱신(ⓓ)이 성공했으면 스냅샷은 지금 것이므로 말할 것이 없다.
+    view = number_guard.current_view(root)
+    age, _age_status = number_guard.branch_snapshot_age(root)
+    refreshed = view is not None and view.heads_status == "ok"
+    if not refreshed and age is not None and age >= _STALE_REFS_SECONDS:
         lines.append(
-            f"번호 가드가 읽은 원격 스냅샷이 {_format_age(age)} 지났다 — 그 이후 원격에 "
-            "등재된 번호는 구조적으로 보지 못했다(`scan_remote_task_files`는 네트워크를 "
-            "타지 않는다). 최신 판정이 필요하면 `git fetch origin` 후 재확인."
+            f"번호 가드가 읽은 원격 스냅샷이 {_format_age(age)} 지났다(마지막 **전체 브랜치 "
+            "fetch** 기준 — claim·표적 fetch는 세지 않는다). 그 이후 원격에 등재된 번호는 "
+            "보지 못했다. 최신 판정이 필요하면 "
+            "`git fetch origin '+refs/heads/*:refs/remotes/origin/*'` 후 재확인."
         )
     if not lines:
         return
@@ -2556,11 +2570,18 @@ def _print_similar_notice(root: Path, backlog, task: Task, policy: object) -> No
                 origins[tid] = f"origin/{branch_of.get(tid, '?')}"
             if read_status != "ok":
                 remote_status = read_status
+        # HARN-111 ⑦(가)(나) — 본문이 어디에도 없는 원격 claim·번호 예약은 **슬러그**로 대조한다.
+        # 번호 가드가 방금 읽은 대장을 재사용하므로 추가 네트워크 0(HARN-183↔OPS-69 축).
+        slug_hits, slug_status = number_guard.slug_candidates(root, task.id, set(corpus))
+        if slug_status != "ok" and remote_status == "ok":
+            remote_status = f"claim 대장 {slug_status}"
+    else:
+        slug_hits = []
 
     index = similar.SimilarityIndex(corpus)
     found = index.candidates(
         similar.task_text(task.title, task.notes, task.acceptance), pool, origins=origins
-    )
+    ) + list(slug_hits)
     if not found and remote_status in ("ok", "disabled"):
         return  # 조용할 때는 조용하다
     if found:
@@ -2652,7 +2673,11 @@ def _id_number_conflict(
         policy, _ = store.load_policy(root)
         try:
             taken = _taken_id_numbers(root, backlog, policy)
-            remote_ok = True
+            # HARN-111 — 관측이 출처별 상태를 들고 오므로 '예외 없음'이 아니라 '다 봤는가'로 판정
+            view = (
+                number_guard.current_view(root) if getattr(policy, "remote_claims", False) else None
+            )
+            remote_ok = view is None or view.complete
         except Exception as exc:  # 원격 조회 실패는 등재를 막지 않는다 — 단 침묵 금지
             taken = _taken_id_numbers(root, backlog, None)
             remote_ok = False
@@ -2751,8 +2776,9 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
     err, remote_ok = _id_number_conflict(root, backlog, args.id)
     if err:
         return _fail(err)
-        if not remote_ok:
-            print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")
+    if not remote_ok:
+        # HARN-111 — 종전엔 이 안내가 `return` 뒤에 있어 **한 번도 실행될 수 없었다**.
+        print("  · 번호 충돌 검사: 원격을 다 보지 못한 부분 판정 — 머지 시 validate가 2선 방어한다")
     task = Task(
         id=args.id,
         title=args.title,
@@ -2844,6 +2870,13 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         # 대장은 무변경이어야 한다 — `save_task` 이전이라 디스크에 아무것도 쓰이지 않았고,
         # `backlog.tasks`는 이 프로세스의 메모리라 종료와 함께 사라진다(부분 쓰기 없음).
         return 1
+    # [HARN-111 ⓐ] 쓰기 직전에 번호를 원격에 예약한다(CAS) — push 전 사각(EOS-108 24초)을 닫는다.
+    # 경합에서 지면 번호 가드를 다시 돌려 **다음 빈 번호 제안이 담긴** 표준 거부로 끝낸다.
+    reservation = number_guard.reserve_for(root, task.id, policy, verb="add")
+    if reservation.status == "conflict":
+        del backlog.tasks[task.id]  # 자기 자신이 '로컬 점유'로 잡혀 재판정이 통과하지 않게
+        err, _ = _id_number_conflict(root, backlog, args.id)
+        return _fail(err or number_guard.describe_conflict(task.id, reservation))
     path = store.save_task(root, task)
     store.append_event(root, "add", task.id, eos_priority=task.eos_priority)
     print(f"＋ {task.id} 추가 → {path.relative_to(root)} [EOS {task.eos_priority}]")
@@ -2862,7 +2895,7 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         )
         print(f"  ⇄ One In → One Out: {swapped} P0 → P1 강등")
     # HARN-43 — 등재는 끝났고, 이제 가드가 *못 본* 범위를 말한다(차단 아님).
-    _print_visibility_notice(root, task.id, policy)
+    _print_visibility_notice(root, task.id, policy, reserved=reservation.status == "ok")
     # HARN-51 — 번호가 아니라 *의미*가 겹치는 태스크를 고지한다(차단 아님).
     _print_similar_notice(root, backlog, task, policy)
     return 0
@@ -3602,6 +3635,12 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
     err, remote_ok = _id_number_conflict(root, backlog, args.new_id, verb="rename")
     if err:
         return _fail(err)
+    # [HARN-111 ⓐ] 새 번호도 원격에 예약한다 — rename은 add와 같은 번호 배정 경로다.
+    policy, _ = store.load_policy(root)
+    reservation = number_guard.reserve_for(root, args.new_id, policy, verb="rename")
+    if reservation.status == "conflict":
+        err, _ = _id_number_conflict(root, backlog, args.new_id, verb="rename")
+        return _fail(err or number_guard.describe_conflict(args.new_id, reservation))
 
     old_path = store.backlog_dir(root) / "tasks" / f"{old.id}.yaml"
     prev_session, prev_status = old.session, old.status
@@ -3681,9 +3720,12 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
         f"  ⚠ 과거 이벤트 기록의 '{args.old_id}' 참조는 **옮기지 않았다**(append-only 대장 — "
         f"고쳐 쓰면 그때의 사실이 사라진다). `rename` 이벤트가 구↔신을 잇는다."
     )
+    old_number = store.id_number_of(args.old_id) or args.old_id
     print(
         f"  ⚠ 문서·커밋 메시지·PR 본문의 '{args.old_id}' 참조도 옮기지 않았다 — "
-        f"이 CLI 범위 밖이다. 필요하면 손으로 확인하라: git grep -n {args.old_id}"
+        f"이 CLI 범위 밖이다. 필요하면 손으로 확인하라: git grep -n {args.old_id} · "
+        f"맨 번호 참조는 git grep -nE '{old_number}([^0-9]|$)' "
+        "(분류·교차 참조 노트 관례 = build_harness.md §7b · HARN-111 ④)"
     )
     if not remote_ok:
         print("  · 번호 충돌 검사: 로컬만 통과 — 머지 시 validate가 2선 방어한다")

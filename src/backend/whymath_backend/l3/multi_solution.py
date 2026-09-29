@@ -1203,8 +1203,8 @@ async def _default_run(
             provider = DeterministicFakeProvider.for_seeds(seeds)
         else:
             # 표준 저작 구성 — 지연 연결이라 구성만으로 네트워크 0. 클라우드 좌석은
-            # `settings.cloud_provider`가 정한다(ARCH-57). **app.py와는 의도적으로
-            # 다르다** — 학생 대면 서빙은 셀렉터를 타지 않는다(ARCH-56 게이트 ⓐ).
+            # `settings.cloud_provider`가 정한다(ARCH-57). ARCH-64부터 학생 대면 서빙(app.py)도
+            # 같은 팩토리를 경유하므로 저작과 학생 대면이 한 좌석을 쓴다(기본 openrouter).
             from whymath_backend.l3.providers.composite import CompositeProvider
             from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider

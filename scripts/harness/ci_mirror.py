@@ -34,7 +34,8 @@
   통과한 검사를 같은 화면에 두면 사람이 통과로 읽는다(2026-09-27 EOS-26 실측: OPS-24 드리프트
   게이트 2개가 건너뛰어졌는데 최종 줄은 "✔ 전 잡 통과"였다).
 
-exit code: 0 전 스텝 통과 · 1 실패 스텝 존재 · 2 사용 오류(잡 이름 오타·파싱 0건)
+exit code: 0 전 스텝 통과 · 1 실패 스텝 존재 · 2 사용 오류(잡 이름 오타·파싱 0건
+  · 자동 선택의 판정 대상 변경 파일 0건 · `--stdin` 없는 파이프 입력 — HARN-172)
   · 3 실행한 스텝은 전부 통과했지만 미실행 검사 스텝 존재(HARN-180 — 통과가 아니다)
 """
 
@@ -631,7 +632,20 @@ def _resolve_jobs(args: argparse.Namespace, workflow: dict[str, Any], repo_root:
     """--job 지정이 없으면 HARN-109 열거기로 '봐야 하는 잡'을 계산한다."""
     if args.job:
         return list(args.job)
-    changed = coverage.changed_files_from_git(args.diff_base, repo_root)
+    # 판정 입력은 scope와 **같은 창구**로 정한다(HARN-172 ④) — 직접 git diff를 부르면 변경 0건이
+    # 상시 잡만 고른 "✔ 전 잡 통과"가 되고, 파이프 입력은 조용히 버려진다(2026-09-25 사고 형태).
+    info = coverage.resolve_changed_files(
+        changed_file=[],
+        use_stdin=args.stdin,
+        diff_base=args.diff_base,
+        repo_root=repo_root,
+        allow_empty=args.allow_empty,
+    )
+    for line in coverage.render_changed_input(info):
+        print(line)
+    # 최종 줄 뒤에 반복한다 — 결과를 tail로 잘라 읽어도 미커밋 누락이 보이게(cmd_run이 출력).
+    args.input_warning_tail = coverage.input_warning_tail(info)
+    changed = info.files
     scopes = coverage.classify_jobs(workflow, changed)
     required = coverage.jobs_to_cover(scopes)
     by_name = {s.name: s for s in scopes}
@@ -677,6 +691,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(render(results))
         print(f"결과 저장: {args.result} (commit {payload['commit'][:12]})")
         print(final_line(results))
+        if getattr(args, "input_warning_tail", None):
+            print(args.input_warning_tail)
     return int(payload["exit"])
 
 
@@ -707,6 +723,17 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser("run", help="잡 실행 (미지정 시 변경이 닿는 잡을 자동 계산)")
     pr.add_argument("--job", action="append", default=[], help="실행할 잡 이름(반복 지정)")
     pr.add_argument("--diff-base", default="origin/main")
+    # HARN-172 — 자동 잡 선택의 판정 입력 규칙은 ci_job_coverage scope와 같다.
+    pr.add_argument(
+        "--stdin",
+        action="store_true",
+        help="--job 미지정 시 표준 입력의 경로 목록으로 잡을 고른다(없으면 파이프 입력은 거부)",
+    )
+    pr.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="변경 파일 0건을 의도한 판정으로 허용(상시 잡만 실행) — 없으면 0건은 exit 2",
+    )
     pr.add_argument("--timeout", type=int, default=DEFAULT_STEP_TIMEOUT)
     pr.add_argument(
         "--prepend-path",
@@ -730,7 +757,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return int(args.func(args))
-    except MirrorUsageError as exc:
+    except (MirrorUsageError, coverage.InputRejectedError) as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
     except coverage.ScanEmptyError as exc:

@@ -12,6 +12,7 @@ alembic autogenerate(env.py의 `target_metadata = Base.metadata`)가 테이블�
   - 도메인4 Activity (§6.1): LearningSession·ProblemAttempt·AttemptEvent.
   - EOS-32 AnswerSubmission (attempt 내 다회 제출 시퀀스 정규화 — 32_learning_history §4).
   - EOS-45 HintUsage (힌트 횟수·레벨·열람시간 1급 데이터화 — used_hint 병행·32 §4).
+  - S4-11 Hint (graded 힌트 카탈로그 `hints` — HintNode 연기 해제·본문 좌석 단일).
   - EOS-46 StudentSolutionStep (학생 풀이 step 정규 기록 — ADR-002·WH-S SolutionNode와 무관).
   - 도메인5 Dialogue (§7.1): Dialogue·DialogueTurn.
   - 도메인6 Assessment (§8.1): Assessment·ConceptMasteryHistory.
@@ -100,6 +101,7 @@ from whymath_backend.db.models.formula_node import (
     FORMULA_REVIEW_STATUS_DEFAULT,
     FormulaNode,
 )
+from whymath_backend.db.models.hint import Hint
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
 from whymath_backend.db.models.learner_state import LearnerStateRecord
@@ -207,6 +209,8 @@ __all__ = [
     "AnswerSubmission",
     # EOS-45: HintUsage (힌트 횟수·레벨·열람시간 1급 데이터화 — used_hint 병행·hint_rate 원천)
     "HintUsage",
+    # S4-11: Hint (graded 힌트 카탈로그 — 생성 writer·게이트·coach 서빙 reader 동반 좌석)
+    "Hint",
     # EOS-46: StudentSolutionStep (학생 풀이 step 정규 기록 — ADR-002·WH-S SolutionNode와 무관)
     "StudentSolutionStep",
     # EOS-54: ReviewTimerEvent (HIT 검수 타이머 이벤트 — 검수자 텔레메트리·학생 축 없음)

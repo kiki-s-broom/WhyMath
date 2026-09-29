@@ -164,6 +164,10 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 부분 유니크 인덱스(uq_learning_session_open_per_user). 서버 30분 유휴 규칙 writer의 좌석.
     "8c19e8a611e4",  # ADMIN-15: privacy_audit.token_expires_at/issued_by — 운영자 토큰 발급
     # 감사(누가·누구에게·언제·만료)의 "만료·누가" 좌석. ops/operator_token_cli가 유일 생산자.
+    "9d3e6b1f4a27",  # S4-11: hints 테이블(graded 힌트 카탈로그 — HintNode 연기 해제·level CHECK
+    # 1~3로 Level 4 표현 불가·verified 게이팅). 생성 writer·게이트·coach 서빙 reader 동반 좌석.
+    "9d3e7b1c5a20",  # EOS-50: concept_version_status_enum 'IN_QA' + concept_version.qa(게이트
+    # 통과 기록 — §9 QA 연결). 쓰는 곳은 l3/publish_gate 한 곳(AST 동결).
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

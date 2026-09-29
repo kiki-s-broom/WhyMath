@@ -171,7 +171,7 @@ python3 scripts/harness/backlog.py audit-deps
 | 태스크 ID | 구분 | priority | eos_priority | stage |
 |---|---|---|---|---|
 | `EOS-128-phase3-plan-backlog-conversion` | 변환 태스크 자신(in_progress) | 2 | P1 | S3 |
-| `NOTNOW-01-digital-twin-advanced` | Not Now #1 | 5 | P3 | S5 |
+| `NOTNOW-01-digital-twin-advanced` | Not Now #1 — **2026-09-29 취소**(Kiki 결정 · 게이트 판정 ③폐기를 이 1건에 적용 · 게이트는 나머지 11종을 위해 pending 유지) | 5 | P3 | S5 |
 | `NOTNOW-02-virtual-learning-experiment` | Not Now #2 | 5 | P3 | S5 |
 | `NOTNOW-03-growth-path-long-term-prediction` | Not Now #3 | 5 | P3 | S5 |
 | `NOTNOW-04-auto-pedagogy-improvement` | Not Now #4 | 5 | P3 | S5 |

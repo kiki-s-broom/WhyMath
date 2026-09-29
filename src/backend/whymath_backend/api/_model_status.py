@@ -27,6 +27,7 @@ from fastapi import Request
 
 from whymath_backend.api._l3_state import get_provider
 from whymath_backend.l3.providers.ollama import OllamaStatus
+from whymath_backend.l3.providers.seat_failure import LocalDegradeSnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,16 @@ class ModelStatusSnapshot:
     cloud_configured: bool | None
     cloud_reachable: bool | None
     cloud_error: str | None
+    # ARCH-64 — 클라우드 슬롯에 실제로 꽂힌 좌석(`CompositeProvider.cloud_seat`). None=미노출·미상.
+    cloud_seat: str | None = None
+    # ARCH-64 — 2차 클라우드 좌석. 이 기간에는 **항상 None(없음)**이다(2026-09-28 Kiki 결정 ·
+    # ARCH-63은 G-arch66-anthropic-api-pause-review 재개 판정 뒤). 필드를 두는 이유는 "없음"을
+    # 운영자가 추측이 아니라 관측으로 읽게 하기 위해서다 — 필드가 없으면 anthropic이 대신
+    # 받는다고 읽을 여지가 남는다.
+    cloud_failover_seat: str | None = None
+    # ARCH-69 — 런타임 LOCAL 강등의 장착 여부와 **작동 신호**(`seat_local_degrade_rate`). None=이
+    # provider가 강등 표면을 노출하지 않음(가짜·강등 없는 구현) — "강등 없음"이 아니라 "모름"이다.
+    cloud_local_degrade: LocalDegradeSnapshot | None = None
 
 
 async def collect_model_status(request: Request) -> ModelStatusSnapshot:
@@ -56,6 +67,15 @@ async def collect_model_status(request: Request) -> ModelStatusSnapshot:
     cloud_configured: bool | None = None
     cloud_reachable: bool | None = None
     cloud_error: str | None = None
+    # 좌석 표면(ARCH-64)은 check_cloud_status와 독립이다 — 상태 점검이 없는 provider라도 좌석은
+    # 말할 수 있다. 선언 오류(TypeError)는 여기서 삼키지 않는다: 좌석 선언이 틀린 조립은 설정
+    # 오류이고 /status가 그것을 가리면 원가 기록 오류가 무증상이 된다.
+    cloud_seat = getattr(provider, "cloud_seat", None)
+    cloud_failover_seat = getattr(provider, "cloud_failover_seat", None)
+    # 강등 표면(ARCH-69) — 좌석 표면과 같은 규율이다: 노출하지 않는 provider는 None(미노출)이며
+    # 0으로 채우지 않는다. 스냅샷 타입이 아닌 값이 오면 미노출로 취급한다(가짜의 임의 속성 방어).
+    degrade_reader = getattr(provider, "local_degrade_snapshot", None)
+    degrade_snapshot = degrade_reader() if callable(degrade_reader) else None
     cloud_check = getattr(provider, "check_cloud_status", None)
     if cloud_check is not None:
         cloud_status = await cloud_check()
@@ -70,4 +90,9 @@ async def collect_model_status(request: Request) -> ModelStatusSnapshot:
         cloud_configured=cloud_configured,
         cloud_reachable=cloud_reachable,
         cloud_error=cloud_error,
+        cloud_seat=cloud_seat if isinstance(cloud_seat, str) else None,
+        cloud_failover_seat=(cloud_failover_seat if isinstance(cloud_failover_seat, str) else None),
+        cloud_local_degrade=(
+            degrade_snapshot if isinstance(degrade_snapshot, LocalDegradeSnapshot) else None
+        ),
     )

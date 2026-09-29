@@ -136,6 +136,8 @@ from whymath_backend.l4.completion import (
     decide_completion,
     review_turns_on_entry,
 )
+from whymath_backend.l4.hint_content.models import ServedHint
+from whymath_backend.l4.hint_content.store import find_served_hint, serving_step_order
 from whymath_backend.l4.hint_deferral import (
     counts_as_hint_usage,
     is_answer_demand,
@@ -514,6 +516,16 @@ _COMPLETED_ATTEMPT_ID_DESC = (
     "완료 시(problem_complete=True) 서버가 적재한 ProblemAttempt PK. 완료가 아니면 None. 클라가 "
     "필요 시 이 attempt를 참조할 수 있게 노출한다(적재 자체는 서버가 이미 수행·클라 재적재 불요)."
 )
+# S4-11 — coach 서빙 reader의 응답 좌석(세션 2응답 공통). stateless `CoachResponse`에는 싣지
+# 않는다 — DB가 없어 카탈로그를 읽을 수 없고, 넣으면 항상 null인 가짜 계기판이 된다.
+_SERVED_HINT_DESC = (
+    "이 턴의 hint_level(1~3)에 맞는 **검수 통과 graded 힌트** 1개(S4-11) — 학생이 아직 적지 않은 "
+    "첫 풀이 단계 이후의 가장 이른 단계 힌트다. 오프라인 생성 후 게이트 3종(레벨-노출 정합·정답 "
+    "누출·정서 톤)을 통과한 카탈로그 행만 나간다. null이면 이 턴에 줄 검수 힌트가 없다(카탈로그 "
+    "미생성·hint_level 4=전체 풀이는 Hint 밖 안전망·돌아보기/완료 턴·플래그 OFF). **학생 대면 "
+    "발화(`decision.prompt`)와 별개의 추가 신호**다 — 클라는 '지금 N단계 힌트' 라벨과 함께 카드로 "
+    "보여 줄 수 있고, 발화를 대체하지 않는다. 정답 값은 담기지 않는다(게이트 B)."
+)
 
 
 class SessionCreateResponse(CoachResponse):
@@ -549,6 +561,7 @@ class SessionCreateResponse(CoachResponse):
     answer_form: FormVerdict = Field(
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
     )
+    served_hint: ServedHint | None = Field(default=None, description=_SERVED_HINT_DESC)
 
 
 class TurnAppendResponse(CoachResponse):
@@ -587,6 +600,7 @@ class TurnAppendResponse(CoachResponse):
     answer_form: FormVerdict = Field(
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
     )
+    served_hint: ServedHint | None = Field(default=None, description=_SERVED_HINT_DESC)
 
 
 class SessionGetResponse(BaseModel):
@@ -1137,9 +1151,13 @@ async def _hint_attribution_window(
     """힌트 귀속 창 `[대화 시작, 정답을 처음 낸 학생 턴의 발화 시각)` — 모르면 None(EOS-133).
 
     상한이 완료 시각이 아니라 **정답 제출 턴**인 이유: 정답을 낸 턴과 돌아보기 턴에서도 핸들러는
-    그 턴의 결정 단계를 공급 원장(`힌트제공`)에 적는다(`_log_hint_event`는 완료 판정 *뒤*에
-    불린다). 그 행들은 학생이 답을 낸 *다음*에 나온 것이라 이 풀이에 쓰였을 수 없다 — 완료
+    (EOS-30 이전) 그 턴의 결정 단계를 공급 원장(`힌트제공`)에 적었다(`_log_hint_event`는 완료 판정
+    *뒤*에 불린다). 그 행들은 학생이 답을 낸 *다음*에 나온 것이라 이 풀이에 쓰였을 수 없다 — 완료
     시각까지 세면 스스로 푼 학생도 돌아보기 턴의 공급 때문에 '힌트 사용'이 된다.
+    **EOS-30 이후**에는 가로챈 턴이 공급 행을 남기지 않아(`_log_hint_event`의 `turn_handled`) 실제
+    흐름에서 이 상한이 걸러 낼 행이 없다. 그래도 상한은 **이중 방어로 유지한다**: 배포 전에 연
+    대화가 배포 뒤에 완료되면 옛 행(백필 없음)이 창 근처에 있을 수 있고, 상한 자체가 "정답 이후의
+    공급은 이 풀이의 것이 아니다"라는 독립된 보증이다.
 
     정답 제출 턴 찾기: 완료 턴의 학생 발화는 아직 적재 전이고, 이미 적재된 학생 턴 중 마지막
     (돌아보기 턴 수 − 1)개가 돌아보기 응답이다 — 턴 수는 상태 머신과 같은 정본
@@ -1201,9 +1219,11 @@ async def _attribute_hints(
       - None  — 창을 모르거나, 셀 행이 0개인데 단계를 못 읽은 공급 행이 섞였다(그 행이 2 이상
         이었을 수 있으므로 "안 썼다"로 확정하지 않는다).
 
-    **한계(명시)**: 공급 원장 기준이다. 완료 상태 머신이 발화를 가로챈 턴(재고 유도 등)에서도
-    핸들러는 그 턴의 결정 단계를 원장에 적으므로, 그 턴의 단계가 2 이상이면 학생이 실제로 받은
-    발화가 재고 템플릿이었어도 여기서 센다. 원장 쪽을 고치는 일은 이 함수의 범위 밖이다.
+    **한계(명시)**: 공급 원장 기준이다. 완료 상태 머신이 발화를 가로챈 턴(재고 유도 등)의 단계를
+    세던 과대 계상은 EOS-30이 원장 쪽에서 없앴다(가로챈 턴은 행을 남기지 않는다 —
+    `_log_hint_event`의 `turn_handled`). 남는 한계: EOS-30 **이전에 적힌 행은 백필하지 않았다**
+    (원장을 소급 수정하지 않는다) — 배포 전에 시작한 대화의 재고 유도 턴 행이 창 안에 있으면 여전히
+    센다.
     """
     if window is None:
         return _HINT_ATTRIBUTION_UNKNOWN
@@ -1881,6 +1901,8 @@ async def _log_hint_event(
     mode: str | None = None,
     persona: str | None = None,
     client_state_mismatch: bool = False,
+    turn_handled: bool = False,
+    served_hint: ServedHint | None = None,
 ) -> None:
     """AI가 제공한 힌트 노출량(hint_level)을 `attempt_event`(event_type=힌트제공)로 1행 적재.
 
@@ -1905,7 +1927,28 @@ async def _log_hint_event(
 
     **S3-03 mode 태깅**: `_log_verify_event`와 동형으로 `mode`·`persona`(선택)를 event_data에
     실어 ⑤(도움 감소)·⑧(도달 깊이)의 mode-scoped 집계를 가능하게 한다. None(기본)이면 미태깅.
+
+    **EOS-30 가로챈 턴**: `turn_handled=True`면 적재하지 않는다. 완료 상태 머신이 발화를 가로챈
+    턴(돌아보기 진입·계속·완료 인정·재고 유도)에서 학생이 받는 것은 결정론 템플릿이다 — 템플릿으로
+    바뀌는 것은 `decision`의 prompt·socratic_category뿐이고 `hint_level`은 남기 때문에, 예전에는
+    학생이 받지 않은 단계가 '제공'으로 적혔다. 그 행은 ① 다음 턴 사다리 입력(`_prev_hint_level_for`
+    → `decide_hint_level` 규칙 2·3의 `prev+1`)을 부풀려 받지 않은 단계를 건너뛰게 했고 ② WH-1 ⑤⑧
+    ⑮의 표본을 오염시켰으며 ③ EOS-133 힌트 귀속이 재고 유도 턴의 단계를 세게 만들었다. 이 원장의
+    의미는 "AI가 *제공한* 노출량"이므로 제공하지 않은 턴은 행이 없어야 한다(날조 회피 — `hint_level`
+    None과 같은 원칙). 호출부는 반드시 `turn_handled=completion.handled`를 싣는다(AST 가드 동결).
+
+    **정직한 한계**: 이 행은 지표 ⑭(클라 상태 불일치율)의 표본도 겸한다(`client_state_mismatch`
+    태그가 같은 행에 실린다). 그래서 가로챈 턴의 불일치 관측은 함께 사라진다 — ⑭은 이제 코칭이
+    실제로 나간 턴만의 비율이다. 태그만 실은 행을 남기는 길은 계약(`HintEventData.hint_level`
+    필수)을 바꿔야 하고 ⑤⑧⑮가 그 행을 다시 공급으로 세게 되어 택하지 않았다.
+
+    **S4-11 reveal_score**: 이 턴에 검수 힌트가 *실제로 서빙됐으면*(`served_hint`) 그 힌트의
+    `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
+    읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
+    서빙 reader가 이미 들고 온 값만 운반).
     """
+    if turn_handled:
+        return  # 가로챈 턴 — 학생은 힌트가 아니라 결정론 템플릿을 받았다(EOS-30).
     if hint_level is None:
         return  # 힌트 레벨 없음(이론적 경계) → 적재 안 함(날조 회피).
 
@@ -1921,9 +1964,54 @@ async def _log_hint_event(
             mode=mode,
             persona=persona,
             client_state_mismatch=client_state_mismatch,
+            reveal_score=served_hint.reveal_score if served_hint is not None else None,
+            hint_id=served_hint.hint_id if served_hint is not None else None,
         ),
     )
     session.add(event)  # commit은 핸들러가 — 같은 트랜잭션에 합류(별도 commit 금지).
+
+
+async def _served_hint_for(
+    session: AsyncSession,
+    *,
+    problem_id: uuid.UUID | None,
+    hint_level: int,
+    solution_steps: Sequence[str] | None,
+    completion_handled: bool,
+) -> ServedHint | None:
+    """S4-11 coach 서빙 reader — 이 턴 hint_level의 검수 통과 graded 힌트 1개(없으면 None).
+
+    연기 해제 전제 ③ serving의 집행 지점이다(`l4.hint_content.store.find_served_hint` 호출은
+    이 헬퍼뿐). 조회하지 않는 경우(쿼리 0):
+      - 플래그 `l4_hint_content_serving_enabled` OFF(킬 스위치)
+      - 문항 맥락 없음(problem_id None — 카탈로그는 문제 단위)
+      - 완료 상태머신이 발화를 가로챈 턴(돌아보기·인정·재고 — 정답에 도착한 학생에게 힌트 없음)
+    hint_level 4(전체 풀이)는 store가 조회 없이 None을 돌려준다(Hint 엔티티 밖 안전망).
+
+    단계 선택은 `serving_step_order`(제출한 풀이 단계 수 + 1 — 개수 기반 정렬의 정직한 한계는
+    store docstring). never-break: 조회 실패는 힌트 없이 진행하고 **예외 타입명**을 남긴다(침묵
+    실패 금지). 단 DB 오류로 트랜잭션이 중단되면 이후 적재·commit도 실패한다 — 그 축의 방어는
+    기동 시 스키마 버전 가드(`db/schema_version.py` — `hints` 리비전 미적용을 BEHIND로 거부)다.
+    """
+    if completion_handled or problem_id is None:
+        return None
+    if not get_settings().l4_hint_content_serving_enabled:
+        return None
+    try:
+        return await find_served_hint(
+            session,
+            problem_id=problem_id,
+            hint_level=hint_level,
+            from_step_order=serving_step_order(solution_steps),
+        )
+    except Exception as exc:  # never-break — 힌트 카탈로그 조회 실패가 코칭 턴을 깨지 않는다
+        logger.warning(
+            "served_hint 조회 실패 — 힌트 없이 진행 problem_id=%s hint_level=%s exc_type=%s",
+            problem_id,
+            hint_level,
+            type(exc).__name__,
+        )
+        return None
 
 
 async def _log_demand_event(
@@ -2855,6 +2943,17 @@ async def create_session(
     # S3-03: verify와 동일 mode·persona 태그를 실어 ⑤⑧ mode-scoped 집계를 가능하게 한다.
     # PED-04 D2: 클라 제출 상태와의 불일치 여부를 이 이벤트에 태그로 실어 *영속 좌석*을 만든다
     # (신규 EventType·컬럼 0 — JSONB 페이로드 확장). 로그만 두면 집계가 불가능하다.
+    # S4-11: 검수 graded 힌트 서빙 reader — 최종 결정(완료·WH-1 반영 후)의 hint_level로 찾고,
+    # 찾은 힌트의 reveal_score·hint_id를 같은 힌트제공 행에 싣는다(KPI 도달 깊이 정밀화).
+    served_hint = await _served_hint_for(
+        session,
+        problem_id=body.problem_id,
+        hint_level=decision.hint_level,
+        solution_steps=body.solution_steps,
+        completion_handled=completion.handled,
+    )
+    # EOS-30: 완료 상태머신이 발화를 가로챈 턴은 공급 행을 남기지 않는다 — 학생이 받은 것은 힌트가
+    # 아니라 결정론 템플릿이다(`decision.hint_level`은 템플릿으로 바뀌지 않고 남는 값일 뿐).
     await _log_hint_event(
         session,
         user_id=user.user_id,
@@ -2864,6 +2963,8 @@ async def create_session(
         mode=body.mode,
         persona=event_persona,
         client_state_mismatch=bool(mismatch_fields),
+        turn_handled=completion.handled,
+        served_hint=served_hint,
     )
     # PED-04 D1: 교수 결정 메타 조립 — 전부 위에서 *이미 계산된* 값이다(재계산 0).
     target_stage = (
@@ -2988,6 +3089,7 @@ async def create_session(
         awaiting_reflection=completion.awaiting_reflection,
         completed_attempt_id=completion.attempt_id,
         completion_evidence=completion.completion_evidence,
+        served_hint=served_hint,
     )
 
 
@@ -3242,6 +3344,15 @@ async def append_turns(
     # commit 없음). problem_id·attempt_id는 dialogue 출처(append는 dialogue 컨텍스트).
     # S3-03: verify와 동일 mode·persona 태그를 실어 후속 턴의 ⑤⑧ 집계도 mode-scoped 가능.
     # PED-04 D2: 클라 제출 상태 불일치 태그(영속 좌석·신규 EventType 0).
+    # S4-11: create_session과 동형 — 검수 graded 힌트 서빙 reader(문항은 dialogue 출처).
+    served_hint = await _served_hint_for(
+        session,
+        problem_id=dialogue.problem_id,
+        hint_level=decision.hint_level,
+        solution_steps=body.solution_steps,
+        completion_handled=completion.handled,
+    )
+    # EOS-30: create_session과 동형 — 가로챈 턴(돌아보기·인정·재고 유도)은 공급 행을 남기지 않는다.
     await _log_hint_event(
         session,
         user_id=user.user_id,
@@ -3251,6 +3362,8 @@ async def append_turns(
         mode=body.mode,
         persona=event_persona,
         client_state_mismatch=bool(mismatch_fields),
+        turn_handled=completion.handled,
+        served_hint=served_hint,
     )
     # PED-04 D1: 교수 결정 메타 — create_session과 동형. 목표 단계는 *서버 파생* 상태 기준이다
     # (클라 제출 기준이면 D2가 되찾은 진실원천이 다시 클라로 새어 나간다).
@@ -3390,6 +3503,7 @@ async def append_turns(
         awaiting_reflection=completion.awaiting_reflection,
         completed_attempt_id=completion.attempt_id,
         completion_evidence=completion.completion_evidence,
+        served_hint=served_hint,
     )
 
 

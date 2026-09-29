@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-40-three-loop-journey-request-shape
+title: "3루프 하네스 본 관통이 하네스 전용 요청 형태(prioritize_weak_concepts=true)로만 §18을 잰다 — 실제 앱 요청 형태로도 판정(EOS-26 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-26-r6-diagnosis-prerequisite-directed
+requires_gates: []
+acceptance:
+  - "① 실측 사실(EOS-26 · 2026-09-26) — 3루프 하네스 본 관통(`tests/backend/api/test_e2e_three_consecutive_loops.py::_run_journey`)은 모든 추천을 `prioritize_weak_concepts=true`로 요청한다(`test_e2e_persona_journeys.py::_next_problem`의 `weak_first` 기본값 True). 실제 모바일 앱은 이 파라미터를 보내지 않는다(`src/mobile/lib/features/problems/data/problems_api.dart::getNextProblem` 기본값 false · 유일한 호출부 `problem_screen.dart`가 인자 없이 `load()`). EOS-26은 진단 보정 프로브만 두 요청 형태로 강화했다 — 약점 가중(방금 틀린 개념 문항 1.85배)이 기준 ⓑ를 대신 세우고 있었기 때문이다(EOS-26 판정문 §1-2).\n② 목표 — 본 관통(Loop 1~3)을 두 요청 형태로 돌려 형태별 판정을 낸다. 실제 앱 형태에서 §18(무개입 연속 3루프)이 서는지 실측하고, 형태별로 다르면 동결표를 형태별로 나눈다(한 표로 두면 한쪽을 올리는 순간 다른 쪽이 거짓 해소가 된다 — EOS-24 동결표 분리 선례).\n③ 같은 공백이 페르소나 여정 하네스(`test_e2e_persona_journeys.py` — 기본 `weak_first=True`)에도 있는지 확인하고 이 태스크의 범위를 정한다."
+artifacts: []
+paths:
+  - tests/backend/api/test_e2e_three_consecutive_loops.py
+  - tests/backend/api/test_e2e_persona_journeys.py
+session: null
+notes: "출처: EOS-26 판정문 §1-2·§7-2 · 사고 대장 nondiscriminating-check 계열(요청 형태의 우연을 동작으로 오독). 상시 3루프 하네스 소유 좌석은 PED-36 ⑫다. 분류 LOOP."
+updated: 2026-09-26

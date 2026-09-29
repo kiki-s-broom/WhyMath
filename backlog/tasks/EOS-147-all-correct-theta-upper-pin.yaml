@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-147-all-correct-theta-upper-pin
+title: "정답만 있는 이력에서 추천 θ가 상한 4.0에 고정돼 가장 어려운 문항이 나간다 — 앱 학생은 영구(코치 정답 완료만 기록)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(2026-09-26 · 실 PG 컨테이너 재현) — 첫 응답이 정답뿐인 학습자는 다음 `GET /v1/me/next-problem`에서 `theta=4.0`을 받고, 추천이 은행의 가장 어려운 문항(재현 픽스처에서 난이도 4.8)으로 간다. 원인: `l2/irt.py::estimate_ability`는 전부 정답이면 MLE 발산을 상한(`_THETA_UPPER = 4.0`)으로 돌려주고, 후보 정렬(`candidate_pool_order_by`)이 |b−θ| 최근접이다. 오답이 하나라도 기록돼야 θ가 유한하게 내려온다.\n② 앱 학생에게는 영구적이다 — 앱의 응답 기록은 코치 정답 완료(`api/coach.py::_complete_problem` · `is_correct=True`)뿐이라 오답이 기록되지 않는다(EOS-146). 첫 완료 이후 모든 추천이 가장 어려운 남은 문항이 된다(코드 경로 · 앱 실측 아님). API 클라이언트도 초반 연속 정답 구간에서 같은 도약을 겪는다.\n③ 처분 판정 선행 — 초기 구간 추정(예: 사전분포를 둔 추정·단계 크기 제한)·상한 도달 시 선택 규칙 중 무엇을 쓸지 정한다. θ 추정기는 평가 캡처(ASM-03)와 공유되므로(`load_attempt_history_state` 단일 진실 원천) 두 소비처의 영향을 함께 판정한다. 결정 없이 추정기를 바꾸지 않는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/irt.py
+  - src/backend/whymath_backend/l2/next_problem_selection.py
+session: null
+notes: "출처: EOS-26 판정문 독립 교수학 비판의 범위 밖 부수 관측(2026-09-26) — 컨테이너 실 PG에서 재현(정답 1회 뒤 θ 0.0 → 4.0 · 추천 난이도 2.9 → 4.8). 대장·리뷰에서 같은 문제를 다루는 태스크를 찾지 못했다(이 검색 방법 기준). 분류 LOOP."
+updated: 2026-09-26

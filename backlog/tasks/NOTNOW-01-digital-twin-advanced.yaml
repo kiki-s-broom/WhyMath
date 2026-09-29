@@ -5,7 +5,7 @@ track: math-completion
 stage: S5
 subject: cross
 layer: ml-models
-status: todo
+status: cancelled
 priority: 5
 eos_priority: P3
 owner: claude
@@ -17,5 +17,5 @@ acceptance:
 artifacts: []
 paths: []
 session: null
-notes: "[Not Now List] Phase 3 실행계획(Math EOS 과목 완성 · 2026-10-26~11-22) 범위 규율이 12월 출시 이후로 보낸 12종 중 하나. v1.0 이후, 11월 착수 금지. 집행: 게이트 G-not-now-v1-release-recheck(kiki/decision · 재확인 지점 = v1.0 출시 이후 첫 계획 세션)이 pending인 동안 selector 후보에서 제외된다 — notes 산문은 selector가 읽지 않으므로 게이트로 집행한다. 이 태스크는 자리표시(placeholder)다: 실제 설계는 재개 판정 시점에 한다(Phase 2 계획서 300 §15가 같은 계열을 production code 동결로 지정했고 그 동결은 유지된다). 등재 경위: EOS-128(P3-00a) · 2026-09-20 · 판정 기준 main e91a75d3.\n\n중복 실측(등재 전): 역할 검색 digital.?twin|디지털 트윈 — 코드(src/backend·src/mobile·src/data-pipeline) 0파일 · 대장 736건 중 hit 2건(EOS-103·EOS-122)은 동결 준수 문구로만 언급 · git log --all --grep 0건.\n인접(다른 축 — 겹침 아님): EOS-10·EOS-103(LearnerState 단일 표면·영속 — 상태 모델이지 시뮬레이션 트윈이 아니다)."
-updated: 2026-09-20
+notes: "[Not Now List] Phase 3 실행계획(Math EOS 과목 완성 · 2026-10-26~11-22) 범위 규율이 12월 출시 이후로 보낸 12종 중 하나. v1.0 이후, 11월 착수 금지. 집행: 게이트 G-not-now-v1-release-recheck(kiki/decision · 재확인 지점 = v1.0 출시 이후 첫 계획 세션)이 pending인 동안 selector 후보에서 제외된다 — notes 산문은 selector가 읽지 않으므로 게이트로 집행한다. 이 태스크는 자리표시(placeholder)다: 실제 설계는 재개 판정 시점에 한다(Phase 2 계획서 300 §15가 같은 계열을 production code 동결로 지정했고 그 동결은 유지된다). 등재 경위: EOS-128(P3-00a) · 2026-09-20 · 판정 기준 main e91a75d3.\n\n중복 실측(등재 전): 역할 검색 digital.?twin|디지털 트윈 — 코드(src/backend·src/mobile·src/data-pipeline) 0파일 · 대장 736건 중 hit 2건(EOS-103·EOS-122)은 동결 준수 문구로만 언급 · git log --all --grep 0건.\n인접(다른 축 — 겹침 아님): EOS-10·EOS-103(LearnerState 단일 표면·영속 — 상태 모델이지 시뮬레이션 트윈이 아니다).\n\n[취소 2026-09-29] Kiki 결정(2026-09-29 세션 지시 '태스크 취소') — Not Now 자리표시 폐기. 게이트 G-not-now-v1-release-recheck 판정 3택 중 ③폐기를 이 태스크 1건에 한해 적용한다(게이트 자체는 나머지 Not Now 11종을 위해 pending 유지). 설계·코드 산출물 0건. 필요해지면 v1.0 운영 실측을 근거로 새 태스크로 재등재한다. 판정 기준 main 97e504aa"
+updated: 2026-09-29

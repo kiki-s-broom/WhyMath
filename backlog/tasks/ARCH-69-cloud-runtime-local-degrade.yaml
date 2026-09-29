@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-69-cloud-runtime-local-degrade
+title: "클라우드 1차 좌석 실패 시 런타임 LOCAL 강등 경로 부재 — 예외가 그대로 올라가 /v1/generate 500 (ARCH-64·ARCH-63이 전제한 '기존 LOCAL 강등'이 코드에 없음)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(판정 기준: 브랜치 claude/gallant-euler-blngpj · ARCH-64 PR #1370) — 클라우드 좌석으로 이미 나간 호출이 실패하면(429·5xx·타임아웃·키 부재) 예외가 그대로 올라가 `/v1/generate`는 500이 된다. LOCAL 강등은 **라우팅 시점**(`guard_cloud` 구독·예산 가드, 학생 기본 신호 free·0원)에만 있고 **런타임 실패 후 강등 경로는 코드에 없다**. 2026-09-28 Kiki 결정(ARCH-64 acceptance)과 ARCH-63 ①이 모두 \"기존 LOCAL 강등 경로\"를 전제했으나 그 경로는 존재하지 않았다.\n② 처분 — `CompositeProvider`(또는 라우터 층)에 1차 좌석 실패 시 LOCAL로 1회 강등하는 경로를 배선한다. 트리거는 ARCH-63 ③과 같게 429·5xx·타임아웃·미설정으로 한정하고 4xx(요청 오류)는 강등하지 않는다. 강등된 응답은 검증 계약(학생 제공 전 PRM/도구 검증)을 그대로 통과해야 한다 — 강등이 검증을 건너뛰는 경로가 되면 안 된다.\n③ 정직성 — 강등 사실을 응답·trace·Langfuse에 남긴다(`degraded_from_seat`·사유). 원가는 실제로 답한 좌석(LOCAL=0원)으로 기록한다. 작동 신호 `seat_local_degrade_rate`를 리포트가 산출한다(ARCH-63 ④와 같은 이름·정의를 공유 — 두 번째 정의 금지).\n④ 변별력 — 1차 좌석 429·키 부재 주입 시 LOCAL이 응답하고 강등률이 오른다, 4xx 주입 시 강등하지 않는다(대조군), 강등 제거 뮤테이션에서 RED.\n⑤ ARCH-63과의 관계 — 이 태스크는 Anthropic 게이트와 무관하게 지금 착수 가능한 축이다. ARCH-63이 재개되면 1차→2차 좌석→LOCAL 순서의 마지막 단계로 이 경로를 재사용한다(ARCH-63 ①의 \"기존 LOCAL 강등 경로\"가 가리킬 실체가 이것이다)."
+artifacts:
+  - "PR #1386 (커밋 c1144f07) — 타입 기반 실패 분류·app.py만 LOCAL 강등 장착(AST 동결)·강등 응답 캐시 미적재·강등 관측 필드. 연결 실패 미강등·강등 대기 시간은 후속 후보"
+paths:
+  - src/backend/whymath_backend/l3/providers/composite.py
+  - src/backend/whymath_backend/l3/router.py
+  - src/backend/whymath_backend/l3/pipeline.py
+  - tests/backend/l3/test_cloud_runtime_local_degrade.py
+session: null
+notes: "출처: ARCH-64 구현 중 실측(2026-09-29). 학생 참여는 12/31 이후(ARCH-66 ⑥)라 지금 학생 대면 영향은 없으나, 컷오버로 클라우드 결정 요청이 실제로 openrouter로 나가기 시작했으므로 실패 시 동작이 500인 상태를 오래 두면 안 된다."
+updated: 2026-09-29

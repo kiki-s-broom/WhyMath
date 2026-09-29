@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-70-seat-aware-precost-and-high-pin
+title: "라우터 사전 예산 판정이 좌석을 모름(anthropic 단가 고정) + CLOUD_HIGH openrouter 핀 미확인·단가 미등재 — ARCH-64 컷오버 후속"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - ARCH-64-cloud-mid-seat-cutover
+requires_gates: []
+acceptance:
+  - "① 실측 사실(ARCH-64 PR #1370) — 라우터의 사전 예산 판정(`guard_cloud`·`est_cost_krw`)은 좌석을 모르고 anthropic 단가로 판정한다. 기본 좌석이 openrouter(약 0.354원/호출 · anthropic 대비 1/24 수준)로 바뀐 뒤에는 과대 추정이라 예산 가드가 불필요하게 LOCAL로 강등할 수 있다(보수 방향 오차). 사후 원가 기록은 ARCH-64가 좌석 단가로 고쳤으므로 **사전 판정과 사후 기록의 단가 원천이 갈라진 상태**다.\n② 처분 — 사전 판정도 선택된 좌석(`cloud_provider` → 좌석 단가표 ARCH-62)의 단가를 쓰게 한다. 단가 원천은 사후 기록과 **같은 함수**여야 한다(두 번째 단가표 금지).\n③ CLOUD_HIGH 좌석 — 새 기본값에서 CLOUD_HIGH는 openrouter `deepseek/deepseek-v4-pro`로 나가는데, 이 핀은 실측 채택 근거가 없고 단가가 미등재라 기록 원가가 None이다. 핀의 채택 근거(모델 존재·공급사 고정·정밀도)를 확인해 등재하거나, 근거가 없으면 CLOUD_HIGH를 명시적으로 막는다(미확인 핀으로 조용히 호출하지 않는다 — CLAUDE.md 모델 포트폴리오 채택 조건 ②③).\n④ 변별력 — 좌석별 사전 추정이 좌석 단가와 일치함을 단언하고, 단가 원천을 anthropic 고정으로 되돌리는 뮤테이션에서 RED."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/router.py
+  - src/backend/whymath_backend/l3/cost_table.py
+  - src/backend/whymath_backend/config.py
+session: null
+notes: "출처: ARCH-64 구현 중 실측(2026-09-29). 보수 방향 오차라 학생 안전 영향은 없고 비용·강등률 축이다."
+updated: 2026-09-29
