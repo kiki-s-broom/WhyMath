@@ -238,8 +238,12 @@ def build(payload: dict, target: int, group_take: int, row_width: int) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--from", dest="src", help="이미 있는 페이로드 JSON (없으면 work_graph.py 실행)")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--from", dest="src", help="이미 있는 페이로드 JSON (없으면 work_graph.py 실행)"
+    )
     ap.add_argument("--target", type=int, default=28)
     ap.add_argument("--group-take", type=int, default=3)
     ap.add_argument("--row-width", type=int, default=3600)
