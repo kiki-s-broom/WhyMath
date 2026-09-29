@@ -4172,6 +4172,15 @@
    "kind": "incident",
    "ref": "2026-09-29",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄 기록(EOS-30 병합 재검증)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
     "scripts/harness/backlog.py",
     "tests/harness/test_jit*.py"
    ],
