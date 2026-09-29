@@ -189,7 +189,11 @@
    "kind": "rule",
    "ref": "R-067",
    "paths": [
+    ".github/workflows/ci.yml",
+    "CLAUDE.md",
+    "backlog/rules.ndjson",
     "docs/ops/**",
+    "docs/standards/rule_index.md",
     "scripts/ops/**",
     "scripts/ops/check_runbook_self_containment.py",
     "tests/infra/test_runbook_block_self_containment.py"
@@ -2603,6 +2607,16 @@
     "tests/infra/test_ci_job_timeout_headroom.py"
    ],
    "text": "harness-integrity 5분 상한 소진 — 테스트 증가로 머지 큐 PR 2건 연속 cancelled(상시 잡이라 전면 차단)",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "태스크 paths 정정(amend --path) 뒤 jit_index.json 미재생성 — 규칙 enforced_by 태스크의 경로가 인덱스 입력 · 검증 전 푸시로 PR CI red",
    "weight": 2
   },
   {
