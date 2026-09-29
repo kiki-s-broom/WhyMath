@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/l2/recommendation_contract.py
-session: null
+session: claude/harn-180-424n4m
 notes: "출처: EOS-25 판정 독립 비판 F2(차단)·놓친 것 4. 수능 모드는 이 결함 때문에 관계 재선택을 보류했다(mode_withheld). 기본 CAT에는 같은 입력 결함이 이미 서빙 경로에 있으므로 EOS-25 범위 밖의 별건이다."
-updated: 2026-09-28
+updated: 2026-09-29
