@@ -54,6 +54,7 @@ from whymath_backend.config import CloudSeat, Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision, Usage
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers._response_fields import read_response_model_id
+from whymath_backend.l3.providers.seat_failure import SeatNotConfiguredError
 from whymath_backend.l3.router import _as_cost_tier
 
 
@@ -361,10 +362,13 @@ class AnthropicProvider:
         # 문구는 Settings의 단일 좌석에서 읽는다(ARCH-68) — /status·live_preflight가 같은 문구를
         # 쓰므로, 여기서 따로 쓰면 원인 표기가 표면마다 갈라진다.
         policy_block = settings.anthropic_policy_block_reason
+        # 정책 차단(ARCH-66)과 키 부재는 둘 다 "이 좌석은 지금 쓸 수 없다"이며 같은 `미설정`
+        # 타입으로 올린다(ARCH-69 — RuntimeError 하위·문구 무변경). 강등 사유는 둘 다
+        # `not_configured`다.
         if policy_block is not None:
-            raise RuntimeError(f"{policy_block} — 클라우드 생성을 하지 않습니다.")
+            raise SeatNotConfiguredError(f"{policy_block} — 클라우드 생성을 하지 않습니다.")
         if not settings.anthropic_configured:
-            raise RuntimeError(
+            raise SeatNotConfiguredError(
                 "Anthropic API 키가 미설정이라 클라우드 생성을 할 수 없습니다 "
                 "(라우터가 CLOUD_* 결정을 내렸으나 WHYMATH_ANTHROPIC_API_KEY 없음). "
                 "키를 주입하거나, 클라우드 미사용 배포라면 "

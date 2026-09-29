@@ -13,11 +13,14 @@
   ② **기록 원가 = 좌석 단가** — 학생 대면 파이프라인이 원가를 anthropic 단가(8.612원/회 추정)가
      아니라 openrouter 단가로 계상하고, trace가 `cloud_seat=openrouter`를 싣는다(24.4배 과대
      계상 방지 — 03c §2.2).
-  ③ **OpenRouter 키 부재** — 조용히 anthropic으로 가지 않고, 침묵하지도 않는다: 생성은 명확한
-     RuntimeError, /status는 `cloud_configured=False` + 원인 문구.
-  ④ **2차 좌석 없음의 정직성** (2026-09-28 Kiki 결정) — 1차 좌석 실패는 다른 좌석·LOCAL로 자동
-     재시도되지 않고, 예외 note·/status·회차 관측이 전부 "없음"을 말한다. '2차 좌석 있음'으로
-     보이는 값이 생기면 red.
+  ③ **OpenRouter 키 부재** — 조용히 anthropic으로 가지 않고, 침묵하지도 않는다: **저작·측정 조립**
+     (런타임 LOCAL 강등 미장착)은 명확한 RuntimeError, /status는 `cloud_configured=False` + 원인 문구.
+     학생 대면 조립은 ARCH-69부터 LOCAL이 대신 답하되 `not_configured`로 표기한다
+     (`test_cloud_runtime_local_degrade.py`).
+  ④ **2차 좌석 없음의 정직성** (2026-09-28 Kiki 결정) — 1차 좌석 실패는 **다른 클라우드 좌석**으로
+     넘어가지 않고, 예외 note·/status·회차 관측이 전부 "2차 클라우드 좌석 없음"을 말한다. '2차 좌석
+     있음'으로 보이는 값이 생기면 red. LOCAL 강등은 별개 축이다(ARCH-69 — 강등 미장착 조립에서는
+     이 파일이 "LOCAL로도 안 갔다"를, 학생 대면 조립에서는 그 파일이 "LOCAL이 답했다"를 동결한다).
   ⑤ **좌석 선언 ↔ 팩토리 셀렉터 정합** — 제공자 클래스의 `seat` 선언이 그 클래스를 만드는
      셀렉터 값과 같다(원가 기록이 읽는 좌석과 실제 좌석이 갈라지지 않는다).
 """
@@ -113,12 +116,18 @@ def anthropic_never_called(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 @pytest.fixture
 def local_never_called(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """LOCAL(Ollama)이 대신 불리면 기록한다 — "1차 좌석 실패 → 자동 LOCAL 재시도"의 관측 지점."""
+    """LOCAL(Ollama)이 대신 불리면 기록한다 — "1차 좌석 실패 → 자동 LOCAL 재시도"의 관측 지점.
+
+    **강등 미장착 조립**(저작·측정 경로, `CompositeProvider` 기본값)에서만 쓴다. 학생 대면 조립은
+    ARCH-69부터 LOCAL 강등이 켜져 있어 이 관측 지점이 정상적으로 불린다.
+    """
     called: list[str] = []
 
     async def _record(self: OllamaProvider, *args: Any, **kwargs: Any) -> Any:
         called.append("local")
-        raise AssertionError("ARCH-64: 클라우드 실패가 LOCAL로 자동 재시도되면 안 된다")
+        raise AssertionError(
+            "ARCH-64: 강등 미장착 조립에서 클라우드 실패가 LOCAL로 재시도되면 안 된다"
+        )
 
     monkeypatch.setattr(OllamaProvider, "generate", _record)
     return called
@@ -270,25 +279,38 @@ async def test_missing_openrouter_key_fails_loudly_without_anthropic_or_local(
     anthropic_never_called: list[str],
     local_never_called: list[str],
 ) -> None:
-    """키 없음 → 명확한 RuntimeError + "2차 좌석 없음" note. Anthropic·LOCAL 어느 쪽도 대신 받지 않는다."""
-    provider = _app_provider()
+    """키 없음 → **저작 조립**(강등 미장착)은 명확한 RuntimeError + "2차 좌석 없음" note. Anthropic·LOCAL 어느 쪽도 대신 받지 않는다.
+
+    학생 대면 조립(`create_app()`)은 ARCH-69부터 LOCAL이 대신 답한다 — 그 대비는
+    `test_cloud_runtime_local_degrade.py::test_app_missing_openrouter_key_answers_from_local_marked_not_configured`.
+    이 테스트가 옮겨 간 이유: 종전에는 앱 조립으로 재서 "LOCAL이 안 받는다"를 동결했는데, 그 사실은
+    강등을 켠 조립에서 거짓이 됐다. 저작·측정 조립(강등 미장착)에서는 여전히 참이므로 실제 저작 조립으로 잰다.
+    """
+    from whymath_backend.l3.equivalent.llm_generator import LLMEquivalentProblemGenerator
+
+    provider = LLMEquivalentProblemGenerator(trace=RecordingTraceSink())._provider
+    assert isinstance(provider, CompositeProvider)
+    assert provider.local_degrade_armed is False  # 저작 조립은 강등이 없다
     assert (
         provider.cloud_seat == "openrouter"
     )  # 키가 없어도 좌석은 openrouter — anthropic으로 접지 않음
 
+    decision = RoutingDecision(
+        cost_tier=CostTier.CLOUD_MID,
+        local_family=None,
+        local_model=None,
+        mode="sync",
+        reason="arch64-missing-key",
+        est_latency_ms=3000,
+        est_cost_krw=0.0,
+        data_licenses=SELF_AUTHORED_CORPUS,
+    )
     with pytest.raises(RuntimeError, match="OpenRouter가 미설정") as excinfo:
-        await generate(
-            _student_cloud_mid_request(),
-            "학생 질문",
-            "시스템",
-            provider=provider,
-            cache=InMemoryCache(),
-            trace=RecordingTraceSink(),
-            cache_ttl_s=60,
-        )
+        await provider.generate("학생 질문", "시스템", decision)
     notes = getattr(excinfo.value, "__notes__", [])
     assert any("2차 클라우드 좌석 없음" in note for note in notes), notes
     assert any("openrouter" in note for note in notes), notes
+    assert any("장착되지 않아" in note for note in notes), notes
     assert anthropic_never_called == []
     assert local_never_called == []
 
@@ -333,7 +355,11 @@ async def test_primary_seat_failure_is_not_retried_anywhere(
     fake_http: type[_FakeHttpTransport],
     anthropic_never_called: list[str],
 ) -> None:
-    """1차 좌석 429 → 같은 예외(타입·메시지 보존)가 올라가고, 다른 좌석·LOCAL 호출은 0건."""
+    """1차 좌석 429 → **강등 미장착 조립**에서는 같은 예외(타입·메시지 보존)가 올라가고, 다른 좌석·LOCAL 호출은 0건.
+
+    조립은 `CompositeProvider(local, cloud)` 기본값(= 저작·측정 조립)이다. 학생 대면 조립은 같은 429에서
+    LOCAL이 대신 답한다 — `test_cloud_runtime_local_degrade.py`.
+    """
     original = RuntimeError("OpenAI 호환 호출 실패 HTTP 429: engine_overloaded (시도 3회)")
     fake_http.fail_with = original
     local = _CountingLocal()
@@ -371,12 +397,18 @@ def test_failover_seat_is_declared_absent() -> None:
 
 
 def test_no_secondary_seat_note_says_absence_and_no_local_retry() -> None:
-    """예외 note 문구 — "2차 좌석 없음"과 "LOCAL 자동 재시도 없음"을 둘 다 말한다."""
+    """예외 note 문구 — "2차 클라우드 좌석 없음"과 (강등 미장착 조립의) "LOCAL 재시도 없음"을 둘 다 말한다.
+
+    ARCH-69 이후 "LOCAL로 갔는가"는 조립마다 갈린다 — 이 기본 호출은 강등 미장착(저작·측정) 문구다. 세 상태
+    (미장착·강등 대상 아님·LOCAL도 실패)의 문구 대비는 `test_cloud_runtime_local_degrade.py`가 동결한다.
+    """
     note = no_secondary_seat_note("openrouter")
     assert "1차 좌석 openrouter" in note
     assert "2차 클라우드 좌석 없음" in note
     assert "재시도 좌석 0개" in note
-    assert "LOCAL로도 자동 재시도되지 않았다" in note
+    assert "LOCAL로도 재시도되지 않았다" in note
+    assert "장착되지 않아" in note
+    assert "ARCH-69" in note
     assert "ARCH-63" in note
     # 좌석을 모르면 anthropic으로 채우지 않는다.
     assert "anthropic" not in no_secondary_seat_note(None).split("—")[0]
@@ -399,6 +431,8 @@ def test_round_seat_observation_reports_no_failover_metrics() -> None:
     assert failover["secondary_seat"] is None
     assert failover["seat_primary_success_rate"] is None
     assert failover["seat_failover_rate"] is None
+    # ARCH-69 — 강등률은 강등 계수를 받았을 때만 산출된다(이 회차 관측은 받지 않았다 → 미측정).
+    assert failover["seat_local_degrade_rate"] is None
     assert "2차 클라우드 좌석 없음" in failover["note"]
 
 
