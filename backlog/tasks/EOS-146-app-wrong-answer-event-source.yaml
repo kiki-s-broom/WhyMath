@@ -10,14 +10,16 @@ priority: 2
 eos_priority: P1
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-eos146-disposition
 acceptance:
   - "① 실측 사실(2026-09-26 코드 대조) — 모바일 앱은 `POST /v1/me/attempts`를 부르지 않는다(`src/mobile/test/e2e_loop_flow_test.dart`가 호출 0회를 동결 · MOB-20 \"배선 아님 — 계약상 금지\"). 학습 상태 머신(`l2/learning_state_machine.py::advance_on_attempt`)의 호출부는 `api/me.py`의 응답 제출 경로 하나뿐이고, 코치 완료(`api/coach.py::_complete_problem`)는 `ProblemAttempt(is_correct=True)`만 적재하며 상태 머신을 돌리지 않는다. 앱의 오답·포기는 어디에도 적재되지 않는다. 그래서 앱 학생의 원장은 비어 있고, 추천이 상태 머신 결정을 집행하는 두 경로 — R3 오개념 교정(EOS-24)과 R6 원인 미상 오답(EOS-26) — 는 앱 학생에게 **0회** 돈다. 두 경로의 해소는 API 계약 수준(3루프 하네스·`POST /v1/me/attempts` 클라이언트)이다.\n② 경계 — `EOS-134`(todo)는 코치 **정답 완료**만 상태 머신에 태운다. 착지해도 R3·R6의 원천(오답)은 생기지 않는다. 이 태스크는 오답·포기 이벤트의 원천이다.\n③ 처분 판정 선행 — (가) 코치 턴의 오답 신호(검증 결과·오개념 매칭)를 응답 1건으로 적재하고 상태 머신을 돌린다 (나) 앱이 문항 단위 오답을 제출하도록 계약을 바꾼다(MOB-20의 \"계약상 금지\" 재판정) (다) 앱에서는 상태 머신 집행을 쓰지 않는다고 결정하고 게이트·판정문에 범위를 명기한다. 결정 없이 구현하지 않는다 — 코치 대화의 한 턴을 \"오답 1건\"으로 셀지 자체가 교수학 판정이다."
   - "④ (EOS-26 독립 비판 발견 10 · 2026-09-26 — 병기) 오답 원천이 생기면 R6 집행(EOS-26)이 진단 목적 CAT의 측정 효율에 주는 영향을 잰다. 오답 뒤 문항이 제한 후보(선수 탐침 · 같은 개념 연습 — 연습은 학습 밴드)로 바뀌어 정보량 최대 선택에서 벗어나므로 SE 수렴이 늦어질 수 있다 — ASM-03 capture가 `TARGET_SE`(0.3) 대신 `MAX_ADMINISTERED_ITEMS`(20문항) 상한으로 확정되는 비율이 지표다(`l2/next_problem_selection.py`). capture 관측에 R6 제한 문항 비율을 싣거나 배치 진단 구간에서 R6 제한을 끄는 조건을 이 태스크의 처분 판정과 함께 본다. 지금은 앱 도달 0이라 영향 0이다(EOS-26 판정문 §5)."
+  - "⑤ (2026-09-29 정정 — 게이트 부착) ③의 처분 판정 선행을 게이트 G-eos146-disposition(decision · Kiki)으로 대장에 집행했다 — 종전에는 산문뿐이라 next가 이 태스크를 1순위 후보로 내놓아 각 세션이 같은 벽에 부딪혔다. ②의 EOS-134(todo)는 낡았다: EOS-134는 done이고 코치 정답 완료는 advance_on_graded_attempt(api/coach.py:1416)를 돈다. 결론은 유지된다 — R3·R6의 원천인 오답·포기는 여전히 어디에도 적재되지 않는다(코치 경로에 is_correct=False·포기 적재 0건 · 모바일 lib에 POST /v1/me/attempts 호출 0건 · 2026-09-29 main a28a8d08 실측 · 이 검색 방법 기준). 게이트가 clear되면 선택한 (가)·(나)·(다)에 맞춰 acceptance를 다시 쓴다(구현 범위가 선택에 따라 백엔드 하나·앱 계약·문서뿐으로 갈린다)."
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/l2/learning_state_machine.py
 session: null
-notes: "출처: EOS-26 판정문 독립 교수학 비판 발견 1(2026-09-26) — 코드로 확인. 앱 오답·포기 → 상태 머신 원천을 다루는 태스크는 대장에 없었다(grep \"포기|abandon|오답 이벤트|is_correct=False\" backlog/tasks · 이 검색 방법 기준). 같은 원천 부재가 추천 θ도 흔든다 — EOS-147. 분류 LOOP.\n\n[정정 2026-09-26] EOS-26 독립 교수학 비판 발견 10 — R6 제한이 진단 CAT 측정 효율에 주는 영향을 원천 착지 시 재도록 병기"
-updated: 2026-09-26
+notes: "출처: EOS-26 판정문 독립 교수학 비판 발견 1(2026-09-26) — 코드로 확인. 앱 오답·포기 → 상태 머신 원천을 다루는 태스크는 대장에 없었다(grep \"포기|abandon|오답 이벤트|is_correct=False\" backlog/tasks · 이 검색 방법 기준). 같은 원천 부재가 추천 θ도 흔든다 — EOS-147. 분류 LOOP.\n\n[정정 2026-09-26] EOS-26 독립 교수학 비판 발견 10 — R6 제한이 진단 CAT 측정 효율에 주는 영향을 원천 착지 시 재도록 병기\n\n[정정 2026-09-29] 처분 판정 선행(acceptance ③)을 결정 게이트로 대장에 집행 + 낡은 전제(EOS-134 todo) 정정 — 산문뿐이라 next가 1순위로 계속 노출\n\n[차단 2026-09-29] 처분 판정(acceptance ③) 선행 — 결정 게이트 G-eos146-disposition(Kiki)로 대장에 집행. 판정 전에는 구현하지 않는다"
+updated: 2026-09-29
