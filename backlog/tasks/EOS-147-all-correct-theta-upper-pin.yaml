@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/irt.py
   - src/backend/whymath_backend/l2/next_problem_selection.py
-session: null
+session: claude/magical-maxwell-hja5kh-eos-147
 notes: "출처: EOS-26 판정문 독립 교수학 비판의 범위 밖 부수 관측(2026-09-26) — 컨테이너 실 PG에서 재현(정답 1회 뒤 θ 0.0 → 4.0 · 추천 난이도 2.9 → 4.8). 대장·리뷰에서 같은 문제를 다루는 태스크를 찾지 못했다(이 검색 방법 기준). 분류 LOOP."
-updated: 2026-09-26
+updated: 2026-09-29
