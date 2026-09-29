@@ -3,17 +3,20 @@
 판정문 `docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md`가
 인용하는 수치를 **실제 코드 경로로** 다시 낸다(재현용 · 결정론 · DB 불요).
 
-세 절:
-  ① 실측 고정 — `l2/bkt.py::update_mastery` 커널 값과, 적재 경로(`compute_mastery_record`:
+네 절(판정문 절 번호와 대응):
+  ① 실측 고정(§1) — `l2/bkt.py::update_mastery` 커널 값과, 적재 경로(`compute_mastery_record`:
      소수 둘째 자리 반올림·표본·신뢰도)로 콜드스타트부터 관계 구간이 처음 발화하는 응답 수.
-  ② 거짓 관계 행위 — BKT 생성 모형(추정기와 같은 모수)에서 숨은 상태 경로까지 정확 열거해,
-     발화 순간의 상태로 거짓 전진(L=0에서 전진)·숙달자 하강(L=1에서 선수 복귀)을 가른다.
-     하한을 방향별로 켜고 끈 네 조합을 비교한다.
-  ③ 수능 가중 편향 — 권위·시그니처가 비었을 때 수능 가중(1+난이도)이 고르는 문항의 정답
-     확률과, 그 정답률에서 같은 개념 응답이 선수 구간으로 떨어지는 비율(하한 전후).
+  ② 전진 하한(§3-2) — BKT 생성 모형(추정기와 같은 모수)에서 숨은 상태 경로까지 정확 열거해,
+     발화 순간(응답 직후)의 상태로 거짓 전진(L=0에서 전진)·숙달자 하강을 가른다. 전진 하한만
+     바꾼 행과, 독립 비판으로 폐기된 대칭 하한(선수 3·전진 3) 행을 함께 낸다.
+  ③ 결손 학생(§3-3) — 선수 결손 때문에 C를 배울 수 없는 학생(정답률 고정·학습 없음)에서
+     앵커 하한이 하강을 늦추고 거짓 전진을 늘리는지 잰다.
+  ④ 수능 가중 편향(§7) — 권위·시그니처가 비었을 때 수능 가중(1+난이도)이 고르는 문항의 정답
+     확률과 선수 구간 진입률. 희소 합성 풀(9문항)의 최악값이다 — 풀이 조밀하면 편향이 준다.
 
-한계(판정문 §8과 같다): 학생 모형은 BKT 자신의 가정(문항 무관 정답률·흡수 숙달·망각 0)이다.
-선수 개념 P는 모형에 없으므로 비숙달자의 선수 복귀가 옳았는지는 이 계산으로 말할 수 없다.
+한계(판정문 §3-2·§8): 학생 모형은 BKT 자신의 가정(문항 무관 정답률·흡수 숙달·망각 0)이다.
+모수가 맞는 BKT에서 사후 숙달은 충분통계라, 표본 하한의 가치는 모형 오지정에서 온다 — 이 계산은
+방향을 보일 뿐 크기를 보증하지 않는다. 선수 개념 P는 모형에 없다.
 """
 
 from __future__ import annotations
@@ -125,7 +128,7 @@ def _classified_rates(start_mastered: float, k_pre: int, k_adv: int, horizon: in
 
 
 def section_false_moves(horizon: int) -> None:
-    """② 방향별 하한 네 조합의 거짓 전진·정당 전진·숙달자 하강."""
+    """② 전진 하한만 바꿀 때(판정 §3-2) + 폐기된 대칭 하한 비교(§10 추적용)."""
     print(f"② 발화 순간 상태로 가른 관계 행위 확률(응답 {horizon}개 안 · 처음 발화만)")
     for label, start in (
         ("진짜 숙달자(L=1)", 1.0),
@@ -133,11 +136,41 @@ def section_false_moves(horizon: int) -> None:
         ("콜드스타트(사전 0.30)", _PARAMS.p_init),
     ):
         print(f"   {label}")
-        for k_pre, k_adv in ((1, 1), (1, 3), (3, 1), (3, 3)):
+        for k_pre, k_adv in ((1, 1), (1, 3), (1, 4), (1, 5), (3, 3)):
             r = _classified_rates(start, k_pre, k_adv, horizon)
+            tag = " (폐기안 · 대칭)" if k_pre > 1 else ""
             print(
                 f"     선수 하한 {k_pre} · 전진 하한 {k_adv}: 거짓 전진 {r['false_advance']:.3f} · "
-                f"정당 전진 {r['true_advance']:.3f} · 숙달자 하강 {r['master_demoted']:.3f}"
+                f"정당 전진 {r['true_advance']:.3f} · 숙달자 하강 {r['master_demoted']:.3f}{tag}"
+            )
+
+
+def section_blocked_students(horizon: int) -> None:
+    """③ 선수 결손으로 C를 배울 수 없는 학생(판정 §3-3) — 정답률 q 고정·학습 없음.
+
+    선수 복귀가 돕기로 한 집단이다. 앵커(C) 하한이 이 집단의 하강을 늦추는지 잰다.
+    """
+    print(f"③ 결손 학생(정답률 고정·학습 없음 · 응답 {horizon}개 안)")
+    for q in (0.2, 0.35):
+        for k_pre, k_adv, label in ((1, 1, "없음"), (3, 3, "선수 3·전진 3"), (1, 3, "전진만 3")):
+            advance = descent = wrongs_weighted = 0.0
+            for observations in itertools.product("CW", repeat=horizon):
+                probability = 1.0
+                for mark in observations:
+                    probability *= q if mark == "C" else 1.0 - q
+                fired = _first_fire(observations, k_pre, k_adv)
+                if fired is None:
+                    continue
+                band, index = fired
+                if band is ReasonType.NEXT_CONCEPT:
+                    advance += probability
+                else:
+                    descent += probability
+                    wrongs_weighted += probability * observations[: index + 1].count("W")
+            mean_wrongs = wrongs_weighted / descent if descent else float("nan")
+            print(
+                f"   q={q:.2f} 하한 {label}: 거짓 전진 {advance:.3f} · 하강 {descent:.3f} · "
+                f"하강 전 평균 오답 {mean_wrongs:.2f}회"
             )
 
 
@@ -159,7 +192,7 @@ def _band_entry(correct_rate: float, floor: int, horizon: int) -> tuple[float, f
 
 
 def section_suneung_bias(horizon: int) -> None:
-    """③ 수능 가중(1+난이도)이 고르는 문항의 정답 확률과 선수 구간 진입률."""
+    """④ 수능 가중(1+난이도)이 고르는 문항의 정답 확률과 선수 구간 진입률(희소 합성 풀 최악값)."""
     levels = [1.0 + 0.5 * i for i in range(9)]
     problems = [
         SimpleNamespace(exam_authority_weight=None, signature_patterns=[], difficulty_overall=d)
@@ -171,7 +204,7 @@ def section_suneung_bias(horizon: int) -> None:
         assert b is not None
         items.append(IrtItem(difficulty=b))
     weights = [suneung_item_weight(p) for p in problems]  # type: ignore[arg-type]
-    print("③ 수능 가중 편향(권위·시그니처 없음 · 난이도 1.0~5.0 각 1문항 · Rasch 폴백)")
+    print("④ 수능 가중 편향(권위·시그니처 없음 · 난이도 1.0~5.0 각 1문항 · Rasch 폴백 · 최악값)")
     for theta in (-1.0, 0.0, 1.0):
         default_index = select_weighted_item(theta, items)
         suneung_index = select_weighted_item(theta, items, weights=weights)
@@ -199,11 +232,15 @@ def section_suneung_bias(horizon: int) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--horizon", type=int, default=6, help="개념당 응답 수 상한(기본 6)")
+    parser.add_argument("--horizon", type=int, default=8, help="② ③의 개념당 응답 수 상한(기본 8)")
+    parser.add_argument(
+        "--bias-horizon", type=int, default=6, help="④ 선수 진입률의 응답 수 상한(기본 6)"
+    )
     args = parser.parse_args()
     section_measurements()
     section_false_moves(args.horizon)
-    section_suneung_bias(args.horizon)
+    section_blocked_students(args.horizon)
+    section_suneung_bias(args.bias_horizon)
     return 0
 
 
