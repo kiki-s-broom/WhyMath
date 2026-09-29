@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-197-amend-foreign-claim-blind
+id: HARN-199-amend-foreign-claim-blind
 title: "amend가 다른 세션이 claim 중인 태스크에도 경고 없이 쓴다 — 대장 정정 verb의 claim 조회 부재(근접 사고 1건 · 피해 0)"
 track: infra-debt
 stage: S3
@@ -21,5 +21,5 @@ paths:
   - scripts/harness/backlog.py
   - "tests/harness/**"
 session: null
-notes: "출처: 2026-09-29 ARCH-68(PR #1357) 머지 뒤, Kiki가 승인한 '추천대로 진행'(HARN-130·HARN-170 우선순위 상향)을 이 세션이 실행하다 발견. HARN-170 amend를 로컬 커밋으로 만든 뒤 다른 세션의 재claim(07:00:48Z)을 알게 되어 푸시하지 않고 폐기했다(패치는 세션 임시 보관). 폐기 근거: 목적(그 태스크가 다뤄지는 것)이 이미 달성됐고, 활동 중인 세션의 태스크 파일과 충돌할 위험만 남았다. 분류: 근접 사고 — 사고 대장에는 올리지 않았다(대장 끝 줄 추가가 머지 충돌 핫스팟이고 그 구조는 HARN-130이 소유). 사고 경위의 정본은 이 notes와 acceptance ①이다. 부수 관측: 이 세션의 amend는 claim이 걸린 태스크에도 종료 코드 0으로 성공했고 출력에도 단서가 없었다."
+notes: "출처: 2026-09-29 ARCH-68(PR #1357) 머지 뒤, Kiki가 승인한 '추천대로 진행'(HARN-130·HARN-170 우선순위 상향)을 이 세션이 실행하다 발견. HARN-170 amend를 로컬 커밋으로 만든 뒤 다른 세션의 재claim(07:00:48Z)을 알게 되어 푸시하지 않고 폐기했다(패치는 세션 임시 보관). 폐기 근거: 목적(그 태스크가 다뤄지는 것)이 이미 달성됐고, 활동 중인 세션의 태스크 파일과 충돌할 위험만 남았다. 분류: 근접 사고 — 사고 대장에는 올리지 않았다(대장 끝 줄 추가가 머지 충돌 핫스팟이고 그 구조는 HARN-130이 소유). 사고 경위의 정본은 이 notes와 acceptance ①이다. 부수 관측: 이 세션의 amend는 claim이 걸린 태스크에도 종료 코드 0으로 성공했고 출력에도 단서가 없었다.\n\n[개명 2026-09-29] HARN-197-amend-foreign-claim-blind → HARN-199-amend-foreign-claim-blind: 번호 경합 해소 — 다른 세션(fervent-goldberg-s8y8ws)이 HARN-197-start-refuses-second-claim을 같은 번호로 등재했다(이 세션 푸시 07:15Z, 그쪽 커밋 07:17Z · 서로의 push 전에 add가 번호를 배정한 HARN-111 형태의 경합). 그쪽 태스크는 사고 대장 fix_ref가 HARN-197을 가리켜 개명이 HARN-195(fix_ref가 개명을 따라가지 않는 결함)에 걸리므로, 대장 참조가 없는 이쪽이 양보한다. 198은 다른 세션이 다음 번호로 받기 쉬워 199로 옮긴다."
 updated: 2026-09-29
