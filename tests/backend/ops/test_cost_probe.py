@@ -33,10 +33,11 @@ from whymath_backend.schema.enums import LicenseType
 # 가짜 Settings·provider·스파이 sink — 라이브 없이 실 pipeline.generate를 태운다.
 # ──────────────────────────────────────────────────────────────────────────
 class _FakeSettings:
-    """Settings의 최소 표면 — run_probe가 읽는 anthropic_configured만."""
+    """Settings의 최소 표면 — run_probe가 읽는 anthropic_configured + 정책 차단 사유(ARCH-68)."""
 
-    def __init__(self, *, anthropic: bool) -> None:
+    def __init__(self, *, anthropic: bool, policy_block: str | None = None) -> None:
         self.anthropic_configured = anthropic
+        self.anthropic_policy_block_reason = policy_block
 
 
 class _FakeProvider:
@@ -432,6 +433,50 @@ def test_run_probe_local_only_when_anthropic_unset() -> None:
     # record된 필드에 실측 usage가 흘렀다(캐시 미스 생성 — 프롬프트 유일화 검증).
     assert all(r["cache_hit"] is False for r in spy.records)
     assert all(r["input_tokens"] == 10 for r in spy.records)
+    # ARCH-68 회귀 0 — 키 미설정 자동 제외는 사유를 붙이지 않는다(종전 출력 그대로).
+    assert report.cloud_excluded_reason is None
+    assert "제외 사유" not in cp.render_report(report)
+
+
+_POLICY = "POLICY-SENTINEL: Anthropic API 사용 중단 방침(ARCH-66)으로 차단됨"
+
+
+def test_run_probe_policy_block_records_exclusion_reason(tmp_path: Path) -> None:
+    """ARCH-68: 정책 차단으로 클라우드가 자동 제외되면 그 사유가 리포트·출력·JSON에 실린다.
+
+    `클라우드 archetype 포함: False`만으로는 키가 없어서인지·막혀서인지·--no-cloud인지 모른다.
+    """
+    provider = _FakeProvider()
+    spy = _SpySink()
+    report = asyncio.run(
+        cp.run_probe(
+            _FakeSettings(anthropic=False, policy_block=_POLICY),  # type: ignore[arg-type]
+            rounds=2,
+            deps_factory=lambda _s: _deps(provider, spy),
+        )
+    )
+    assert report.cloud_included is False
+    assert report.cloud_excluded_reason == _POLICY
+    assert f"클라우드 제외 사유: {_POLICY}" in cp.render_report(report)
+    out = tmp_path / "probe.json"
+    out.write_text(json.dumps(report.to_json(), ensure_ascii=False), encoding="utf-8")
+    assert json.loads(out.read_text(encoding="utf-8"))["cloud_excluded_reason"] == _POLICY
+
+
+def test_run_probe_no_cloud_flag_has_no_policy_reason() -> None:
+    """ARCH-68: --no-cloud(include_cloud=False)는 사람이 고른 제외라 정책 사유를 붙이지 않는다."""
+    provider = _FakeProvider()
+    spy = _SpySink()
+    report = asyncio.run(
+        cp.run_probe(
+            _FakeSettings(anthropic=False, policy_block=_POLICY),  # type: ignore[arg-type]
+            rounds=2,
+            include_cloud=False,
+            deps_factory=lambda _s: _deps(provider, spy),
+        )
+    )
+    assert report.cloud_included is False
+    assert report.cloud_excluded_reason is None
 
 
 def test_run_probe_cloud_mix_ratio_measured() -> None:

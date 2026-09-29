@@ -15,6 +15,7 @@ import os
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -82,12 +83,18 @@ async def _noop_skill_event(*_args: Any, **_kwargs: Any) -> None:
     return None
 
 
+async def _noop_state_machine(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
+    """EOS-134 상태 머신 공용 진입점 no-op — 거부 없음(이 파일의 관심은 암호화다)."""
+    return SimpleNamespace(rejected_transition=None)
+
+
 @pytest.fixture(autouse=True)
 def _stub_l2_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     """attempt 적재 자체만 보되, 숙달 전파 L2 헬퍼는 DB 무접근 no-op으로 대체."""
     monkeypatch.setattr(coach_module, "record_problem_attempt_mastery", _noop_mastery)
     monkeypatch.setattr(coach_module, "record_problem_attempt_skill_mastery", _noop_mastery)
     monkeypatch.setattr(coach_module, "record_attempt_skill_event", _noop_skill_event)
+    monkeypatch.setattr(coach_module, "advance_on_graded_attempt", _noop_state_machine)
 
 
 def test_plaintext_when_key_unset() -> None:

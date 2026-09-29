@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-189-reap-task-missing-masks-branch-gone
+title: "claims reap — 태스크 부재(task_missing)가 홀더 브랜치 소멸(branch_gone)을 가려 고아 claim이 자동 청소에서 영구히 빠진다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정 — 원격 claim `OPS-73-generated-inventory-conflict-blocks-ci`(홀더 `claude/status-38gu4d` · 2026-09-12T02:59:55Z 등록 · harness-claims 커밋 `d145632d`)는 같은 날 태스크가 `OPS-76-generated-inventory-conflict-blocks-ci`로 개명돼(OPS-76 notes [개명 2026-09-12] · HARN-100 개명 CLI 착지 #1148보다 앞선 수동 개명이라 claim이 따라오지 않았다) main에 그 ID가 없고, 홀더 브랜치도 원격에 없다. 그런데 `claims reap`은 이것을 `task_missing`으로만 분류한다 — `scripts/harness/remote_claims.py::stale_claims()`가 `task is None`이면 곧바로 `continue`해 홀더 브랜치 부재 판정(HARN-26)에 도달하지 않기 때문이다. `AUTO_REAP_REASONS`(task_done·branch_gone)는 task_missing을 의도적으로 제외하므로 `.github/workflows/harness-audit.yml`의 `claims reap --auto`가 main push·야간마다 돌아도 16일째 남아 있고, SessionStart 브리핑이 매 세션 \"착수 금지\"로 노출한다. stray-code 12회차(2026-09-18)·13회차(2026-09-28) 연속 관측. 재현: `python3 scripts/harness/backlog.py claims reap` 출력의 `(task_missing, claude/status-38gu4d)` 줄 + `git ls-remote --heads origin claude/status-38gu4d` 0건.\n② 판정 순서 정정 — 태스크 부재 claim에 대해서도 홀더 브랜치 부재(유예 경과)를 먼저 판정해 `branch_gone`으로 분류할지 결정하고, 채택/기각 근거를 docstring에 적는다. 근거 후보: 기존 테스트 `test_branch_gone_takes_precedence_over_ttl`이 \"순서가 뒤집히면 사유가 비확정 사유가 되어 자동 집행에서 빠진다 — 순서는 표시 문구가 아니라 집행 여부를 바꾼다\"고 고정했는데, 같은 논리가 task_missing에도 적용된다. 또 task_missing을 자동 청소에서 뺀 이유(다른 브랜치에서 등재된 태스크는 CI 러너에 구조적으로 missing)는 홀더 브랜치가 살아 있을 때의 논거다 — 홀더 브랜치가 유예(24h)를 넘겨 없으면 그 claim이 지키는 작업은 원격에 없다. 반례를 찾으면 테스트로 고정하고 기각한다.\n③ 변별력 — 픽스처 4종: ⓐ task 부재 + 브랜치 부재(유예 경과) → branch_gone(자동 청소 대상) ⓑ task 부재 + 브랜치 부재(유예 이내) → 삭제 금지 사유(`*_recent`) ⓒ task 부재 + 브랜치 실재 → task_missing 유지(대조군 — 이것이 없으면 \"태스크 부재는 전부 branch_gone\"이라는 과잉 수정이 통과한다) ⓓ `existing_branches=None`(조회 실패) → 현행 task_missing(브랜치 판정 보류). 판정 순서를 되돌리는 뮤테이션이 ⓐ에서 RED인지 확인하고, 주입 실재(mutated != original)·원복 바이트 동일을 단언한다.\n④ 집행 지점(정본화와 별항) — 착지 후 `harness-audit.yml` `claim-reap` 잡(`--auto`) 실행 로그에서 이 유형이 branch_gone으로 실제 청소되는지 확인한다. OPS-73 고아 claim이 그때까지 남아 있으면 그것이 라이브 표본이다(이미 치워졌으면 그 경위를 notes에 남기고 ③의 합성 표본으로 대체)."
+artifacts: []
+paths:
+  - scripts/harness/remote_claims.py
+  - tests/harness/test_remote_claims.py
+session: null
+notes: "발견 경위(2026-09-28 · stray-code 13회차 · docs/reviews/unmerged_branch_audit_2026-09-28.md): 12회차가 \"claim 대장 이상 — 존재하지 않는 브랜치를 가리키는 활성 claim\"으로 보고만 하고 원인을 밝히지 않았던 건이 13회차에도 그대로 남아 있었다. 원인 추적 결과 ⓐ 개명(OPS-73→OPS-76)이 claim을 옮기지 않았고 ⓑ 그렇게 생긴 고아를 자동 청소가 판정 순서 때문에 못 보는 두 결함의 합성이었다. ⓐ는 HARN-100 개명 CLI가 이후 개명분에 대해 막는다 — 이 태스크는 **이전되지 않은 잔재를 청소하는 축**만 소유한다.\n\n반복 관측(감사 2회 연속)이라 CLAUDE.md 「실수 관리」에 따라 관측 기록이 아니라 태스크로 등재한다.\n\n인접: HARN-26(branch_gone 기준 신설·done) · HARN-27(reap 집행 지점·done — AUTO_REAP_REASONS 동결 테스트가 있다) · HARN-21(task_missing 경합 유예·done) · HARN-100(개명 CLI·done).\n\n[개명 2026-09-28] HARN-186-reap-task-missing-masks-branch-gone → HARN-189-reap-task-missing-masks-branch-gone: 번호 충돌 해소 — push 전 사이 다른 세션 2곳(claude/ecstatic-feynman-bxxxvd · claude/magical-maxwell-hja5kh-gate-release-gap)이 HARN-186을 각자 등재했다(HARN-111 경합). 원격 전 브랜치·claim 대장 실측으로 189 비어 있음 확인"
+updated: 2026-09-28

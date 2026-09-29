@@ -21,7 +21,7 @@
   |-------------------------------|---------------------------------------------|------|
   | `is_correct`                  | 응답 제출 본문                              | 배선 |
   | `confidence`                  | `ProblemAttempt.confidence_self_reported`   | 배선 |
-  | `confirmed_misconception_ids` | `misconception_hypothesis`(is_active=true)  | 배선 |
+  | `confirmed_misconception_ids` | **이번 응답의 스캔 후보**(호출부가 넘긴다)   | 배선 |
   | `consecutive_failures`        | `problem_attempt` 최근 이력                 | 배선 |
   | `prerequisite_gap_concept_ids`| `l2.prerequisite_recommendation`            | **미배선** |
 
@@ -33,11 +33,30 @@
 "작동 신호 없는 알고리즘 부착 금지" — 어느 규칙이 실제로 돌았는지는 `PolicyDecision.rule_id`가
 응답에 실려 매 요청 관측된다).
 
+R3의 입력 = **이 응답에서** 강하게 확인된 오개념 (EOS-138 ②)
+---------------------------------------------------------------
+`confirmed_misconception_ids`는 규칙 R3(`R3-wrong-misconception`)의 유일한 입력이다. 종전에는
+이 조립기가 **학생 전체의 활성 가설**을 신뢰 하한 없이 읽었다. 그래서 다른 개념에서 생긴 옛
+가설 1건만 남아 있어도 이번 오답에 R3가 발화했고, `target_misconception_id`가 방금 틀린 개념과
+무관한 옛 가설을 가리켰다(EOS-24 판정문 §4 반례 S1).
+
+지금은 호출부(`api/me.py::submit_attempt`)가 **이번 응답의 스캔이 게이트 통과시킨 후보**만
+`(misconception_id, 갱신 후 가설 신뢰)` 쌍으로 넘기고, 이 조립기는 그중 신뢰가
+`MISCONCEPTION_REMEDIATION_FLOOR`(0.7)를 **초과**하는 것만 남긴다. 스캔이 돌지 않은 회차(답안
+없음·지문 없음·킬 스위치 OFF)에는 빈 값이 넘어오므로 R3는 발화하지 않는다. `turns_since_evidence
+= 0`으로 좁히는 방식은 쓰지 않는다 — tse는 *스캔한* 회차에만 움직여, 미스캔 회차에서는 옛
+가설의 0이 그대로 남는다(태스크 ⑥ 정정 · EOS-140 실측 반례). 판정 정본은
+`docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md`.
+
+쌍으로 받는 이유는 계층 경계다: 가설 타입(`MisconceptionHypothesis`)은 L4이고 L2는 L4를 import할
+수 없다(역방향 의존 금지). 원시 쌍이면 어느 쪽 타입도 끌어오지 않는다.
+
 오개념을 *미리* 넣지 않는다
 ---------------------------
 CLAUDE.md는 "오개념을 초기 context에 preload 금지 — reactive retrieval만"을 금기로 둔다.
-이 조립기는 **오답일 때만** 오개념을 조회한다(`is_correct=True`면 쿼리 자체를 돌리지 않는다).
-정답 맥락에 오개념 id를 실어 보내면 그것이 곧 preload이며, 하류 LLM 컨텍스트 오염의 입구다.
+이 조립기는 **오답일 때만** 오개념 id를 싣는다(`is_correct=True`면 넘겨받은 쌍이 있어도 빈
+튜플). 그리고 이제 이 조립기는 가설 테이블을 **아예 조회하지 않는다** — 넘겨받는 것은 이번
+응답이 방금 관측한 후보뿐이라, 과거 가설이 정책 입력으로 새어 들어올 경로 자체가 없다.
 """
 
 from __future__ import annotations
@@ -49,9 +68,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
-from whymath_backend.db.models.misconception_hypothesis import (
-    MisconceptionHypothesisRecord,
-)
+from whymath_backend.l2.remediation_policy import MISCONCEPTION_REMEDIATION_FLOOR
 from whymath_backend.schema.learning_state import AttemptEvidence
 
 __all__ = ["CONSECUTIVE_FAILURE_SCAN_LIMIT", "build_attempt_evidence"]
@@ -105,24 +122,35 @@ async def _count_consecutive_failures(
     return failures
 
 
-async def _active_misconception_ids(session: AsyncSession, user_id: uuid.UUID) -> tuple[str, ...]:
-    """활성 오개념 가설 id — confidence 내림차순.
+def _confirmed_misconception_ids(
+    this_attempt_misconceptions: Sequence[tuple[str, float]],
+) -> tuple[str, ...]:
+    """이번 응답의 (id, 신뢰) 쌍 → R3 입력 id — 하한 **초과**만·신뢰 내림차순·동률 id 오름차순.
 
-    `l2/learner_state.py::_get_active_misconception_ids`와 **같은 모양의 SELECT**다. 두
-    모듈이 각자 쓰는 이유는 계층 경계 때문이며(L2는 L4의 `hypothesis_store`를 import할 수
-    없다), 이 중복은 의도적이다 — 값이 아니라 쿼리 모양의 중복이고, 가설 테이블 자체가 단일
-    진실 원천으로 남는다.
+    경계는 "초과"다(0.7은 **제외**). `MISCONCEPTION_REMEDIATION_FLOOR`의 정의("이 값을 초과해야
+    교정으로 간다")와 추천 쪽 안전장치 ②(`learning_state_recommendation` — `<= 하한`이면 집행
+    안 함)가 같은 방향이다. 두 곳의 경계 방향이 어긋나면 상태 머신은 R3를 냈는데 추천은
+    거절하는 회차가 생긴다.
+
+    같은 id가 여러 번 오면 **가장 높은 신뢰 하나**로 합친다(중복 제거). 순서는 결정론이다 —
+    `target_misconception_id`가 첫 원소이므로, 동률에서 입력 순서를 따르면 같은 사실이 호출마다
+    다른 교정 대상을 낼 수 있다.
+
+    신뢰가 [0, 1] 밖이거나 NaN이면 **거부한다**. NaN은 모든 비교가 거짓이라 조용히 "하한 이하"로
+    떨어진다 — 망가진 입력이 "확인된 오개념 없음"으로 위장되면 안 된다(CLAUDE.md 침묵 실패 금지).
     """
-    stmt = (
-        select(MisconceptionHypothesisRecord.misconception_id)
-        .where(
-            MisconceptionHypothesisRecord.user_id == user_id,
-            MisconceptionHypothesisRecord.is_active.is_(True),
-        )
-        .order_by(desc(MisconceptionHypothesisRecord.confidence))
-    )
-    result = await session.execute(stmt)
-    return tuple(result.scalars().all())
+    best: dict[str, float] = {}
+    for misconception_id, confidence in this_attempt_misconceptions:
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError(
+                f"오개념 신뢰는 0~1이어야 합니다(id={misconception_id!r}, 받은 값: {confidence!r})."
+            )
+        if confidence <= MISCONCEPTION_REMEDIATION_FLOOR:
+            continue
+        if confidence > best.get(misconception_id, -1.0):
+            best[misconception_id] = confidence
+    ordered = sorted(best.items(), key=lambda item: (-item[1], item[0]))
+    return tuple(misconception_id for misconception_id, _ in ordered)
 
 
 async def build_attempt_evidence(
@@ -132,6 +160,7 @@ async def build_attempt_evidence(
     is_correct: bool,
     confidence: float | None = None,
     prerequisite_gap_concept_ids: Sequence[str] = (),
+    this_attempt_misconceptions: Sequence[tuple[str, float]] = (),
 ) -> AttemptEvidence:
     """응답 1건의 정책 증거를 조립한다.
 
@@ -140,10 +169,16 @@ async def build_attempt_evidence(
         confidence: 학생 자기보고 확신도 0~1. 미측정은 `None`(0.0으로 채우지 않는다).
         prerequisite_gap_concept_ids: 선수 개념 결손 id — **호출부가 넣어 준다**(모듈
             docstring "생산자 배선 현황" 참조). 비우면 R4가 매치되지 않는다.
+        this_attempt_misconceptions: **이번 응답의 스캔**이 게이트 통과시킨 후보의
+            `(misconception_id, 갱신 후 가설 신뢰)` 쌍. 스캔이 돌지 않았으면 비운다 — 그러면
+            R3가 매치되지 않는다(모듈 docstring "R3의 입력" 참조). 하한 필터·정렬·중복 제거는
+            이 조립기가 한다.
 
-    오답일 때만 오개념을 조회한다(reactive retrieval — CLAUDE.md 금기).
+    오답일 때만 오개념 id를 싣는다(reactive retrieval — CLAUDE.md 금기).
     """
-    misconception_ids = () if is_correct else await _active_misconception_ids(session, user_id)
+    misconception_ids = (
+        () if is_correct else _confirmed_misconception_ids(this_attempt_misconceptions)
+    )
     consecutive_failures = await _count_consecutive_failures(
         session, user_id, this_attempt_is_correct=is_correct
     )

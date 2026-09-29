@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-195-incident-fix-ref-rename-misroute
+title: "사고 줄 fix_ref가 태스크 개명을 따라가지 않는다 — JIT가 번호만으로 풀어 그 번호를 새로 쓴 무관한 태스크 경로에 사고를 주입(정정 경로 0)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(판정 기준 main `48138a88`) — 사고 줄 「EOS-137 게이트 부착 후 claim 반납 → 다른 세션이 13:46 재착수해 ①을 다시 구현(미푸시)」(#1365)의 `fix_ref`는 `HARN-186-unmerged-gate-attach-claim-release-gap`이다. 그 full ID는 대장 어디에도 없고(개명으로 `HARN-193-unmerged-gate-attach-claim-release-gap`이 됐다), `jit_rules.build_notes`는 `_TASK_REF_RE`로 번호 `HARN-186`만 뽑아 `HARN-186-job-log-truncation-warning-hook`의 paths(`.claude/hooks/job_log_truncation_guard.py` 등)에 이 사고를 주입한다. 이 오주입을 테스트로 재현해 고정한다(수정 전 동작 복원 시 RED)."
+  - "② 해석 규칙 — fix_ref에 full ID(번호+슬러그)가 적혀 있으면 full ID로 푼다. 대장에 그 full ID가 없으면 번호로 폴백하지 않고 '해석 불가'로 센다 — 슬러그가 다른 같은 번호의 태스크에 주입하지 않는다. 번호만 적힌 짧은 참조(`HARN-170` 등)는 종전대로 번호로 푼다(양방향 대조군)."
+  - "③ 개명 추적 — `backlog.py rename`이 옛 ID → 새 ID를 대장이 읽을 수 있는 형태(이벤트 또는 별칭 표)로 남기고, ②의 해석이 그것을 따라 새 ID로 푼다. 사고 대장은 append-only이므로 기존 줄을 고치지 않는다."
+  - "④ 무결성 신호 — `validate` 또는 `jit check`가 해석 불가 fix_ref(대장에 없고 개명 기록으로도 풀리지 않는 full ID)를 건수와 함께 낸다. 미머지 브랜치의 태스크를 가리키는 과도기 상태는 정상적으로 생기므로 실패가 아니라 경고로 둘지 판정하고 근거를 적는다."
+  - "⑤ 변별력 — ①~④ 절마다 그 절을 끊는 뮤테이션을 두고 전건 RED를 확인한다(주입 적용 단언 · 원복 바이트 동일)."
+artifacts: []
+paths:
+  - scripts/harness/jit_rules.py
+  - scripts/harness/incidents.py
+  - scripts/harness/backlog.py
+  - tests/harness/test_jit_rules.py
+  - tests/harness/test_rename_cli.py
+session: null
+notes: "출처: 2026-09-28 PR #1356에 main 48138a88을 병합하다 실측. 경위: 이 세션이 등재한 HARN-186-unmerged-gate-attach-claim-release-gap이 CONST-02(#1349)의 HARN-186과 번호가 겹쳐 HARN-193으로 개명했다(rename은 사고 줄 fix_ref를 되쓰지 않는다 — HARN-100 설계). 그 사이 #1365가 같은 결함을 HARN-191로 따로 등재했다가 취소하면서, 사고 줄 fix_ref와 취소 태스크 notes에 개명 전 ID를 적었다. notes는 amend --notes-replace로 정정했으나 사고 줄은 정정 CLI가 없다. 참고: rename은 이미 옛 ID와 새 ID를 잇는 rename 이벤트를 남긴다(개명 출력 문구 \"rename 이벤트가 구↔신을 잇는다\" — ③의 원천 후보). 관련: HARN-111(번호 예약 경합) · HARN-179(사고 쓰기 뒤 jit 재생성) · HARN-100(rename 경로 · done) · HARN-133(개명 뒤 짧은 번호 역참조 스캔 — 사고 대장 fix_ref와 JIT 해석은 범위 밖).\n\n[정정 2026-09-28] notes 치환 — 인접 태스크 HARN-133과의 경계 명시\n\n[정정 2026-09-28] notes 치환 — ③ 설계 원천 후보(rename 이벤트) 명시 — #1353 재개명 때 CLI 출력으로 확인"
+updated: 2026-09-28

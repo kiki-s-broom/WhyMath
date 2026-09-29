@@ -338,6 +338,45 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-09-28 (결정·정리 · Kiki 지시 "변경 계획에 걸림돌이 되는 절차들을 싹 정리" · HARN-77): **"12/31 내부 프로젝트 완성"을 정의하고(Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결), 이전 계획의 잔재 7건을 대장·문서·하네스에서 걷었다 — 셀렉터가 이제 12월 검증 등급을 첫 키로 쓰고 이월 등급(P2·P3)을 기본 숨긴다** (Kiki 결정 2건, claude 조사·집행) — 판정 기준 main `6c880b67`
+
+- **발단**: 게이트 `G-student-work-after-internal-completion` 점검 요청 → Kiki 지시 "12/31 내부완성으로 계획을 변경하기로 한 이상 이전 계획과의 차이가 없으면 변경 계획에 차질 … 걸림돌이 되는 절차들을 싹 정리".
+- **실측(정리 전)**: ① "내부 프로젝트 완성"의 정의 0건(내가 찾은 방법: docs·MEMORY·gates.yaml·README에서 `내부 (프로젝트 )?완성(의 정의|이란|=|:| 기준| 조건)` 검색) — EOS 선언 §0-2는 12/31을 AI 콘텐츠 전략 Go/No-Go 판정일로만 정의하는데, 그 "내부 완성 이후"를 전제한 대기 게이트가 5종(학생 재개·S3-02 재측정·Anthropic 재개·랜딩 변호사·Not Now) ② `next` 후보 195건 중 P2(판정 이후) 125·P3 5 = **67%가 2027 이월분**, 상위 10건에 P2 7건, 첫 P0 40위 — `selector.sort_key`에 `eos_priority`가 없었다(`HARN-77`이 09-07에 등재돼 있었으나 미착수) ③ `S3-01`이 12/31 이후로 연기됐는데 eos P0("없으면 12월 검증 불성립") ④ `ARCH-64`(09-21 Kiki 승인 컷오버)가 `ARCH-63`(ARCH-66 게이트에 보류)에 의존해 잠김 → 중단 기간 내내 클라우드 결정 요청이 오류 ⑤ `MGMT-01/02`(변호사·P1)가 게이트 없이 blocked 파킹 — 07-27 "출시 전 일괄" 결정의 만료 지점 부재 ⑥ `CUR-17/18`이 이월 판정인데 "unblock하면 next 최상위"라는 이유로 blocked 파킹(09-06) ⑦ 문면 잔재: 학생 게이트 제목의 "G4 조건 함께 판정"(EOS-135로 09-24 이미 결정) · Not Now 게이트의 "v1.0(12월 출시)"(§0-2와 모순) · `current_phase_checklist.md` "Phase 1(MVP) 진행 중"(08-30 MVP 종료 선언과 모순) · ROADMAP Phase 1 종료 게이트·status_roadmap S3/S5 탈출 게이트의 학생 조건에 연기 표시 없음.
+- **Kiki 결정 ①(내부 완성 정의)**: 권장안 채택 — ① Phase 3 Release Gate A~E PASS(`G-p3-w3-release-merged`) ② EOS G5 판정 완료 ③ 12월 검증 P0 전건 종결. 학생·변호사·Anthropic API 없이 성립하는 조건만. 집행 = `G-internal-completion-2026-12-31`(decision · 여는 작업 `P3-17` · 독촉 94일). §0-2의 판정은 ②로 흡수(개정 아님). 대안(G5만 · Kiki 별도 정의문)은 기각.
+- **Kiki 결정 ②(클라우드 좌석)**: 중단 기간에도 컷오버 착수 허용 — `ARCH-64`의 `ARCH-63` 의존 제거, 이 기간 failover는 LOCAL 강등만(acceptance에 명시 · "2차 좌석 있음"으로 위장 금지). ARCH-66 로그가 "Kiki 판단으로 남긴" 항목의 해소.
+- **집행(대장 · 전부 CLI · 손편집 0)**: `gates add` 2건(`G-internal-completion-2026-12-31` · `G-external-counsel-restart-after-internal-completion`(no-inputs · 독촉 95일 · MGMT-01/02 부착)) · `gates amend --title` 2건(학생·Not Now) + `--no-inputs` 1건 · `amend S3-01 --eos-priority P2` · `amend ARCH-64 --remove-depends ARCH-63 --acceptance` · `amend MGMT-01/02 --gate` · `unblock` 4건(MGMT-01·02·CUR-17·18). `validate`·`audit-deps` green.
+- **집행(코드 · HARN-77)**: `selector.sort_key` = (EOS 등급, stage, priority, −해금 수, id) — **등급이 stage보다 앞**인 이유: stage는 이전 계획(S0~S5 수학 완성)의 축이고 12/31 계획의 축은 12월 검증 관여도다. 미지정은 맨 뒤(모른다 ≠ 필수). `candidates(eos_hide=EOS_DEFERRED)`가 P2·P3를 `eos_deferred`로 제외(게이트·선행 등 다른 사유가 먼저) · `next --all-eos` · 숨긴 건수 0건 포함 항상 고지(`--json`은 stderr) · `start`는 경고만 · 정지 사유 `eos_deferred` 신설 · next/status/brief에 `[EOS 등급]` 표시 · board 라벨. 예산 게이트(`_active_p0`)는 건드리지 않았다(acceptance ⑥).
+- **변별력**: `TestEosPriorityOrdering.test_eos_grade_beats_stage_and_priority` 픽스처는 stage·priority가 등급과 반대 방향 — `eos_rank` 항을 빼면 2/5 RED 실측(원복 `cp` 바이트 동일 · 5/5 GREEN). 기존 `TestUnmergedDoneDetection` 픽스처의 P2를 P1로 바꿨다(숨김이 미머지 done 스캔보다 먼저라 P2 피검체는 스캔에 안 든다 — 그 스위트의 피검체는 등급이 아니다).
+- **측정(acceptance ③)**: 착지 전 `next --n 500 --json`(원격 claim·미머지 done 제외) 후보 195 = P0 2·P1 63·P2 125·P3 5, 상위 10 중 P2 7, 첫 P0 40위 → 착지 후(`--no-remote`) 후보 77 = P0 3·P1 74, 상위 10 = P0 3 + P1 7, 첫 P0 1위, 숨김 147건. 09-07 기준선(후보 125·P0 5·첫 P0 10위)과 방향 일치.
+- **정본 갱신**: `build_harness.md` v1.13(§3·§3a·§7) · EOS 선언 개정 이력 · ROADMAP 「현재 국면」+Phase 1 게이트+각주 · status_roadmap S3/S5 · current_phase_checklist 헤더. CLAUDE.md는 무변경(산문 등재 동결).
+- **남긴 것(정직한 공백)**: ⓐ 정의 ③(P0 전건 종결)은 기계 집행 없음 — 게이트 `--depends`는 `P3-17`만 걸었다(P0 집합은 유동) ⓑ P0인데 priority가 낮은 3건(`S4-11` 5·`ADMIN-07` 3·`EOS-50` 3)은 등급 첫 키로 이제 상위에 오르지만 priority 값 자체는 손대지 않았다(`amend --priority`는 Kiki 판단) ⓒ Phase 3 지시문 원문의 "Not Now(12월 출시 이후)" 문구는 Kiki 지시문이라 고치지 않았다 ⓓ `G-p3-entry-gate2-pass`(Phase 2 Gate 2 PASS)가 P3-01~17 14건을 잠그는 것은 품질 게이트라 유지 — 임계 경로는 `EOS-26-r6`(미머지 done · `claude/magical-maxwell-hja5kh`) → `EOS-141` 3차 재판정 → 게이트 → P3 ⓔ MGMT-01/02는 owner=kiki라 원래도 자동 후보가 아니었다 — 게이트 부착의 효과는 만료 지점의 기계 가시화다.
+
+### 2026-09-28 (판정·착지 · EOS-17): **채점 응답의 숙달 갱신은 빈 값을 null로 낸다 — 0.0으로 접으면 writer 결함이 "숙달 0"으로 위장된다. 추천 근거의 신뢰도 0.0은 의도된 표현으로 유지**
+
+- **실측 범위(판정 기준 main `ed3d14da`)**: 응답 경계에서 학습자 숙달의 None을 숫자로 접는 곳은 `api/me.py::submit_attempt`의 개념·스킬 숙달 갱신 2모델(`mastery` 0.0 · `sample_size` 0)뿐이었다. 백엔드 전역 `else 0`·`or 0`·`coalesce(…, 0)` 113건을 역할로 분류하면 나머지는 횟수(없음 = 0이 사실) · 내부 계산(정렬 키의 존재 비트 · 추정기 가산) · 학습자 측정이 아닌 영역(OCR 인식 신뢰도 · 하네스 집계) · 의도된 표현(추천 근거 `confidence`)이다. 읽기 표면(`/v1/me/mastery/current` · `bkt_mastery` · `irt_mastery_proxy` · 추천 근거 `mastery`)은 이미 null을 보존하고 있었다.
+- **판정**: 갱신 행은 추정기 계약상 값을 가지므로(`MasteryUpdate.mastery` 0~1 · 표본 1 이상 · 멱등 재조회·경합 승자 행도 같은 writer) 접기 가지는 오늘 발화하지 않는다. 그러나 "구조적으로 안 나온다"는 접을 이유가 아니라 **접어도 들키지 않는다**는 뜻일 뿐이다 — 발화하는 순간 클라이언트는 거짓 측정 "숙달 0"을 받는다. 그래서 스키마를 `float | None`·`int | None`으로 열고 빈 값은 null로 내며, 계약상 불가한 상태이므로 경고 로그로 드러낸다(값·식별자 미기록). 기각한 대안: 빈 행을 목록에서 빼기(갱신 0건과 값을 모르는 갱신 1건이 같은 모양 · 하네스 프로브가 목록 길이로 도달을 센다) · 500 실패(attempt는 이미 commit됐다 — 표현 문제로 제출을 실패처럼 보이게 하면 재시도가 중복 제출을 낳는다).
+- **클라이언트 영향 0**: 모바일은 `POST /v1/me/attempts`를 부르지 않고(코치 완료가 대신 적재) `mastery_updates`·`skill_mastery_updates`를 파싱하는 코드가 없다. 모바일이 읽는 숙달 필드는 이미 전부 `double?`다.
+- **유지한 접기**: 추천 근거 `confidence` 0.0 — 근거가 없으면 신뢰도 0이 뜻 그대로이고("중간값으로 채우면 모른다가 반쯤 안다로 읽힌다" · `l2/recommendation_contract.py`), 미측정 자체는 `type=UNMEASURED` · `basis` · `mastery=None`이 따로 말한다.
+- **동결**: `api/` 전수 AST 가드(`tests/backend/api/test_mastery_response_zero_fold_guard.py` — 숙달 이름 자리의 None→숫자 접기) + HTTP 수준 null/0.0 구별 테스트 + 경고 로그 테스트. 뮤테이션 15종 전건 검출.
+
+### 2026-09-28 (판정·착지 · EOS-134): **두 채점 경로(`/v1/me/attempts`·코치 완료)를 학습 상태 머신의 공용 진입점 하나로 묶는다 — 코치 완료는 확신도 미측정 정답이라 R2(같은 개념 연습)로 간다. 비대칭 재발은 AST 가드와 실 PG 동치 테스트가 막는다** (claude 판정·구현) — 판정 기준 main `919865d4` + `EOS-133`(PR #1351) 위에 쌓음
+
+- **발단**: SCENARIO-005 정직한 공백 ⓓ — 코치 대화로 문제를 완료해도 `/v1/me/learning-state`가 `NEW`·전이 0건이었다. `_complete_problem`은 attempt·숙달·이벤트를 적재하지만 상태 머신을 부르지 않았다.
+- **결정 1 — 공용 진입점 `advance_on_graded_attempt`(L2)**: 정책 증거 조립(`build_attempt_evidence`) + 주 진입점(`advance_on_attempt`)을 한 함수로 묶고, 두 서빙 경로가 이것만 부른다. 코치 경로에 같은 두 줄을 복사하는 대신 함수를 새로 둔 이유: 한 경로만 증거 축(선수 결손 id·개념 id)을 늘려도 다른 경로는 조용히 옛 증거로 남는다 — 이번 공백이 바로 "한 경로에만 있는" 형태였다. 집행: AST 가드(두 경로가 공용 진입점을 부르고, `api/` 어디서도 하위 두 함수를 부르거나 import하지 않는다) + 실 PG 동치 테스트(같은 신원을 삭제권으로 비워 가며 정답 2회를 두 경로로 흘려 전이 목록 완전 일치).
+- **결정 2 — 코치 완료의 정책 입력**: 정오답 = 서버 판정 정답, 확신도 = None(코치 요청에는 자기보고 확신도가 없고 OCR 인식 신뢰도만 있다). 정책은 미측정을 "높은 확신"으로 읽지 않으므로 R1(진급)이 아니라 R2(같은 개념 연습)다 — "정답률만으로 진급시키지 않는다"와 같은 방향. 새 학생은 `NEW → LEARNING → ASSESSING → PRACTICING`.
+- **결정 3 — 거부 표면**: 평가 진입이 거부되면(진단 중 학습자 등) 원장에 아무것도 남지 않는다. attempts 경로는 응답의 `rejected_transition`으로 드러내지만 코치 응답에는 그 칸이 없어, 응답 계약을 넓히지 않고 경고 로그(예외 타입명 포함)로 드러낸다. 완료 자체는 성공한다.
+- **정직한 공백**: 코치 완료는 항상 정답이라 오답 규칙(R3·R5·R6)은 이 경로로 발화하지 않는다 — 코치 경로의 오답은 재고 유도(REDIRECT)일 뿐 attempt를 남기지 않기 때문이다. 앱 학생의 오답 원천은 이 태스크 범위 밖이다.
+
+### 2026-09-28 (판정·착지 · EOS-133): **코치 완료 attempt에 힌트 사용을 귀속한다 — 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 공급만 센다. 귀속된 신호는 아직 숙달 갱신이 읽지 않는다(`bkt-v1` 유지 · 소비 배선 = `EOS-29`)** (claude 판정·구현) — 판정 기준 main `6b91d11e`
+
+- **발단**: SCENARIO-005(힌트 후 정답)의 정직한 공백 ⓐ — 코치 대화로 낸 정답 attempt의 `used_hint`가 NULL이고 `hint_usage` writer가 저장소 전체에 0건이었다(EOS-45는 스키마·ORM·privacy만 세웠다).
+- **결정 1 — '힌트 사용' = 공급 단계 2 이상**: 코치 경로에는 학생이 힌트를 "여는" 동작이 없고 모든 응답이 어떤 단계로든 비계된다. 단계 1(방향)은 막힘 신호가 없어도 매 턴 기본으로 나가므로 세면 모든 코치 완료가 '힌트 사용'이 되어 신호가 사라진다. 2 이상은 풀이의 단계 흐름이 드러난 공급이다. '초보' 라벨 학생은 기본 단계가 2로 올라가는데 받은 도움의 양이 같으므로 똑같이 센다. `runtime_selector.is_stuck`의 "2 이상 = 도움을 구했다"와 같은 경계다. 정본 = `l4/hint_deferral.HINT_USAGE_MIN_LEVEL`.
+- **결정 2 — 귀속 창의 상한은 정답 제출 턴이지 완료 시각이 아니다**: 정답 제출 턴과 돌아보기 턴에서도 핸들러는 그 턴의 결정 단계를 공급 원장에 적는다(`_log_hint_event`가 완료 판정 뒤에 불린다). 완료 시각까지 세면 정답 턴 발화에 좌절 토큰("모르겠")이 섞였을 때 스스로 푼 학생이 '힌트 사용'이 된다 — 통합 테스트 ③이 실 PG에서 재현한다. 정답 제출 턴은 적재된 학생 턴을 돌아보기 턴 수(`review_turns_on_entry` — 상태 머신과 같은 정본)만큼 거슬러 찾고, 상한 비교는 엄격(`<`)이다. 첫 메시지에서 바로 정답이면 창이 비어 `used_hint=False`.
+- **결정 3 — 3상태·같은 commit**: True(센 공급 1건+) · False(창을 알고 단계를 전부 읽었고 0건) · None(창을 모름, 또는 판독 불가 공급 행이 섞임). `hint_usage` 행은 attempt와 같은 commit으로 부모 행 flush 뒤 적재한다. `hint_id`·`view_duration_ms`는 NULL(식별자·열람 종료 신호가 없다 — 날조 금지).
+- **결정 4 (acceptance ②) — 숙달 갱신은 힌트를 아직 읽지 않는다**: 기본 추정기 `bkt-v1`은 힌트 축을 읽지 않고, 채점 증거에도 그 축이 없다. `simple-additive-v1`(힌트 이득 ×0.7)을 기본으로 올리는 것은 측정 없는 전환이라 하지 않았다. 소비 배선은 `EOS-29`가 소유하고, SCENARIO-005 ④ⓒ(완료 채점 증거에 `hint_used` 키 없음)가 그 착지를 알린다.
+- **32 §4 1번과의 관계**: 그 조항이 금지한 것은 *과거* 공급 이벤트의 *일괄 승격*(열람 여부를 모르는 공급을 열람으로 날조)이다. 코치 경로의 공급 단계는 그 턴 응답 발화를 빚는 값이라 학생이 읽는 본문에 실려 전달되므로, 전달이 성립하는 구간만 센다. 과거분 백필은 여전히 없다.
+- **부수 발견 — 가로챈 턴의 유령 공급(`EOS-30` 등재)**: 완료 상태 머신이 발화를 템플릿으로 바꾼 턴에서도 결정 단계가 원장에 '제공'으로 남는다(앱은 `hint_level`을 화면에 쓰지 않는다 — `src/mobile/lib` 검색 기준). WH-1 ⑤와, 창 안의 재고 유도 턴을 세는 귀속을 과대 계상할 수 있다.
+- **정직한 공백**: 같은 문항 대화를 동시에 두 개 열면 창이 겹쳐 다른 대화의 공급도 센다(공급 이벤트에 대화 id가 없다). `/v1/me/attempts`(클라 자가보고) 경로는 건드리지 않았다(처분 = `EOS-29` ①).
 ### 2026-09-28 (판정·착지 · EOS-132): **KPI ⑤의 LearnerState 홉은 추천 기록에 남긴 근거로 되짚는다 — Assessment 홉은 `assessment` 테이블이 아니라 근거 숙달 행이고, 근거 기록 이전의 추천은 소급 불가로 빼되 따로 센다** (claude 판정·구현) — 판정 기준 main `a0e60965`
 
 - **발단**: ⑤는 LearnerState 홉 원천(`user_state_snapshot`)이 writer 0건 빈 좌석이라 구조적 미측정이었고, 분자 쿼리는 소유자 없이 비어 있었다(2026-09-24 결정 4의 집행).
@@ -11371,6 +11410,64 @@ PR #846에 실재한다"가 #941 착지로 사실이 아니게 됐다. 소유가
 
 **착지 중 추가 판단(첫 미러 실행에서 발견)**: 자동 선택이 경로 필터 잡 `changes`를 "재현 가능"으로 골랐다(`ci_job_coverage`는 docker·서비스 컨테이너만 재현 불가로 본다). 그 잡의 filter 스텝은 `${{ github.event_name }}`을 써서 새 분류에서는 매번 미실행이므로, 그대로면 **모든 자동 미러 실행이 exit 3**이 되어 경고가 상시 소음이 된다. 그 잡이 하는 일(영역 플래그 계산)은 미러의 잡 선택이 같은 정본(그 잡의 filter 스텝)을 읽어 이미 대신하므로 사각지대가 아니다 — 자동 선택에서 사유를 출력하며 제외했다(`--job changes`로 직접 지정하면 돌리고 미실행을 보고). 재발 방지 동결: 문서만 바뀐 변경의 자동 선택 잡에 "원리상 못 도는 run 스텝" 0건(`test_always_on_jobs_have_no_structural_not_executed`) + 제외 절 제거 뮤테이션 M15 RED.
 
+## 2026-09-28: 미머지 브랜치 전수 감사 13회차 — 회수 0건 · 삭제 12차 배치 5건 · 감사 중 실시간 중복·오분류 발견 · 대책 태스크 3건
+
+**판정 기준: main `919865d4`**(이후 `ed3d14da` 머지 반영). 세션 시작 시 shallow였고 `git fetch --unshallow origin` + `--prune`
+재동기화로 전제를 복구한 뒤에만 판정했다(1,319커밋). 판정 정본 = `docs/reviews/unmerged_branch_audit_2026-09-28.md`.
+
+**모집단**: 원격 ref 39 = 감사 대상 20 + 제외 19(열린 PR 소유 15 · 원격 claim 활성 2 · `main`/`harness-claims` 2).
+유령 PR 0건(열린 PR 15건 head 전부 실재·SHA 일치). **판정 4분류**: ① 회수 **0** · ② 추적 중 **15**(좌석 상실 0) ·
+③ 삭제 가능 **5** · ④ 제외 19. 직전 배치(9·10·11차 + 수동 2) 잔존 **0/8**.
+
+**③ 삭제 12차 배치 5건**(`claude/*`, 전부 main이 더 새로운 판): `adoring-mccarthy-sle0uj`(a737df74 — strict 해제 커밋은
+#1161로 착지, 두 번째 커밋은 **Kiki 로컬 잔여분 보존 커밋**으로 내용은 MP-06이 회수한 뒤 main이 더 고침) ·
+`new-session-fy0wry`(3d534dcc — main 조상) · `new-session-jchdr8`(f34b7478 — #1215 머지 3분 뒤 커밋, main이 09-24 이관) ·
+`test-driven-development-03elxp`(49d9d76a — main 조상, MP-02 홀드 09-23 해제) · `relaxed-fermat-8dui3u`(03e45689 — MP-06
+done/#1249). 삭제 대상에만 있던 문구 2줄(EOS-128 forced release 이벤트 · EOS-117 증적 상세)은 판정 문서 §4에 원문 보존.
+
+**감사 중 발견 ① — EOS-129 연쇄 착수(이 감사는 소유하지 않음)**: 열린 PR #1346이 EOS-129를 부분 이행(⑤ 운영 DB 응답 분포
+실측 도구 + 게이트 `G-eos129-item-response-census`)하고 08:43Z에 "게이트 대기로 claim 해제(todo)"했는데, 11:25Z 다른 세션
+`focused-ramanujan-2p5q8w`가 main만 보고 착수해 **같은 측정의 두 번째 게이트** `G-eos129-prod-response-distribution`를
+4분 만에 신설했다(세 번째 세션도 12:11Z 착수). 이 감사도 사고 1건 + 대책 태스크(HARN-187)를 등재했으나, 푸시 전에 PR #1346의
+세션이 같은 사건을 3세션 실측으로 먼저 기록한 **PR #1356**(`HARN-193-unmerged-gate-attach-claim-release-gap` — PR 당시 `HARN-186`, 머지 `3dbe54d3` 때 개명 — + 사고 1건)을
+발견해 **이 브랜치의 사고 1줄은 빼고 HARN-187은 취소**했다(같은 사고의 이중 계수 방지). **Kiki는 두 런북을 모두 실행할
+필요가 없다.**
+
+**감사 중 발견 ② — 브리핑 "이미 포팅됨" 오분류 3회차(`HARN-190`)**: 세션 재개 브리핑이 `vafylb`를 "이미 포팅됨·결정 불요"로
+표시했다. 근거 `9905fdc4`(08-03 · #683)는 **그 브랜치 자신의 앞선 머지분**이고, 브랜치는 그 뒤 `f4c6f69c`(08-09)로 같은 파일
+(`harness/residue_gate_demotion_battle.py`)의 cp949 콘솔 출력 크래시를 고쳤는데 그 수정은 main에 없다(main판 출력·도움말
+16줄에 U+2014 · stdout 재구성 없음). `_find_ported_evidence()`가 근거 커밋이 건드린 **파일 경로**만 교집합으로 세 1/1 전건
+착지로 판정한다(메모리 재현). 실제 좌석은 `OPS-53`(todo)이며 **이 브랜치는 삭제하면 안 된다**. 40xspg(08-11)·7n9n72(08-30 →
+HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
+
+**두 회차 연속 원인 미상이던 claim 대장 이상의 원인 확정(`HARN-189`)**: `OPS-73-generated-inventory-conflict-blocks-ci` → 부재
+브랜치 `status-38gu4d` claim이 16일째 남은 것은 ⓐ 09-12 수동 개명(→`OPS-76`, done)이 claim을 옮기지 않았고 ⓑ
+`remote_claims.stale_claims()`가 태스크 부재(`task_missing`)를 먼저 판정해 홀더 브랜치 소멸(`branch_gone`) 판정에 도달하지
+않으며, 자동 청소는 task_missing을 의도적으로 제외하기 때문이다(메모리 재현 — 태스크 유무만 바꾸면 사유가 갈린다).
+
+**부수 발견(`HARN-188`)**: `.github/branch-protection-setup.md` §트러블슈팅 「판정기 파일이 없다」가 삭제 대상 `03elxp`를 체크아웃
+대상으로 지명한다. 판정기는 #981(09-05)로 main에 들어왔으므로 전제가 3주 전에 끝났고, 지금 따르면 09-07 트리의 옛 판정기
+(`bypass_actors`·`merge_queue` 축 이전)로 판정한다. 가드 테스트 단언이 `git checkout -B claude/`를 요구해 정정에 테스트 변경이
+따르므로 별도 태스크로 분리했다.
+
+**태스크 번호 경합(HARN-111 실례)**: 처음 받은 번호 185·186이 푸시 전 사이 다른 세션들에 **각각 2건씩** 등재돼 있었다
+(`add`가 "push 전까지 다른 세션에 보이지 않는다"고 고지한 창). 원격 전 브랜치·claim 대장에서 188~199가 비어 있음을 실측한 뒤
+`backlog.py rename`으로 185→188 · 186→189를 옮겼다.
+
+**감사 자신의 검증에서 난 사고 2건**: ⓐ `derived-index-not-rebuilt` 3회차 — 사고를 `incident add`로 쓴 뒤
+`backlog/jit_index.json`을 재생성하지 않아 푸시 전 로컬 CI 미러(`ci_mirror.py`)의 harness-integrity가 "적시 주입 인덱스
+대조"에서 exit 1(뒤 스텝 7건 미실행). origin/main 워크트리 대조로 원인을 확정하고 `jit build`로 재생성했다(대책 `HARN-179`
+기등재 — 미러를 안 돌렸으면 CI red였다) ⓑ `harness-test-live-ledger-write` 14회차 — 재검증 미러의 `tests/harness`가 이 세션
+샤드에 가짜 `policy_warn` 3줄을 썼다(커밋 전 제거). 대책 `HARN-170`은 09-24 이후 14회 기록됐는데 우선순위 3·EOS P2에 머물러
+있다. (두 회차는 main `559be84e` 병합 후 대장 기준 스냅샷 — 기록 당시 2회차·7회차였으나 같은 날 다른 세션들이 같은 두 계열을
+계속 기록해 병합마다 앞에 끼어들었다 — 병합 7회 동안 8→9→10→11→12→12→14. HARN-179·HARN-170 결함을 오늘만 여러 세션이 겪고 있다는 신호다.)
+
+**정직한 공백**: ② 추적 중 15건의 잔여 diff 전수 대조는 하지 않았다(8~10회차 승계 — 단 `vafylb`는 §5-1에서 좌석을 다시 봤다).
+스킬 §3의 main 언급 grep을 `.github`·`MEMORY.md`까지 넓혀 돌렸기 때문에 HARN-188을 찾았다 — 스킬 원문 범위
+(`backlog/tasks docs`)로는 보이지 않는다. claim 활성 2건(block 홀드, TTL 초과)은 판정 보류를 유지했다. 떠돌이 좌석 3건
+(HARN-121·SKB-03·SKB-04 — 작업은 머지됨)은 4분류 밖이라 관측만 남겼다.
+
+---
 ### 2026-09-28 — SEC-38 착지: 로그 마스킹 정규식을 `re.ASCII`로 — 한국어 문장 속 PII·시크릿이 평문으로 남던 사각 (판정 기준 main `919865d4`)
 
 **결함(실측)**: `ops/log_scrubber`의 패턴 7종(이메일·휴대전화·sk-/pk- 키·Bearer·JWT·`WHYMATH_*_KEY=`·학생 원문 필드명)이 전부 `\b` 경계를 썼는데, 파이썬 `re`는 기본값에서 한글을 단어 문자로 본다. 그래서 `010-1234-5678로`·`01012345678입니다`·`kid@test.com으로`·`키sk-ant-…`·`토큰eyJ…`·`설정WHYMATH_JWT_SECRET_KEY=…`처럼 **한글이 붙은 자리에서 경계가 성립하지 않아** `scrub_text`가 원문을 그대로 반환했다. 단독 번호·메일만 가려졌다. 기존 금칙어/PII 검출기 테스트는 `student.example@test.com 으로`처럼 띄어 써서 이 사각을 비껴가고 있었다. 발견 경위: EOS-137 서브에이전트가 금칙어 축 전화번호 사각을 보고 → 메인 세션이 같은 패턴이 로그 마스킹에 쓰임을 확인하고 이메일·시크릿·환경변수·필드명까지 확장 실측.

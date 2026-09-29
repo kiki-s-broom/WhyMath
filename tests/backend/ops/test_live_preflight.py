@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+
+from pydantic import SecretStr
 
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.data_export_policy import EXPORT_ALLOWED, EXPORT_PROHIBITED
@@ -32,11 +35,12 @@ from whymath_backend.ops import live_preflight as lp
 # 가짜 Settings·provider — 라이브 없이 코어를 태운다.
 # ──────────────────────────────────────────────────────────────────────────
 class _FakeSettings:
-    """Settings의 최소 표면만 흉내 — 두 판정 프로퍼티만 필요하다."""
+    """Settings의 최소 표면만 흉내 — 두 판정 프로퍼티 + 정책 차단 사유(ARCH-68)."""
 
-    def __init__(self, *, anthropic: bool, langfuse: bool) -> None:
+    def __init__(self, *, anthropic: bool, langfuse: bool, policy_block: str | None = None) -> None:
         self.anthropic_configured = anthropic
         self.langfuse_configured = langfuse
+        self.anthropic_policy_block_reason = policy_block
 
 
 class _FakeCloud:
@@ -99,9 +103,15 @@ def _local_factory(fake: _FakeOllama) -> lp.LocalProviderFactory:
     return lambda _settings: fake  # type: ignore[arg-type,return-value]
 
 
-def _settings(*, anthropic: bool, langfuse: bool) -> lp.Settings:
-    # _FakeSettings는 Settings의 두 프로퍼티만 노출 — run_preflight는 그 둘만 읽는다.
-    return _FakeSettings(anthropic=anthropic, langfuse=langfuse)  # type: ignore[return-value]
+def _settings(*, anthropic: bool, langfuse: bool, policy_block: str | None = None) -> lp.Settings:
+    # _FakeSettings는 run_preflight가 읽는 세 프로퍼티만 노출한다.
+    return _FakeSettings(  # type: ignore[return-value]
+        anthropic=anthropic, langfuse=langfuse, policy_block=policy_block
+    )
+
+
+_POLICY = "POLICY-SENTINEL: Anthropic API 사용 중단 방침(ARCH-66)으로 차단됨"
+"""정책 차단 사유 센티넬 — 표면이 이 문구를 *그대로* 싣는지 본다(문구 재작성 금지·ARCH-68)."""
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -270,6 +280,76 @@ async def test_smoke_skipped_when_anthropic_unconfigured() -> None:
     assert cloud.generate_calls == []  # 실 호출 없음
 
 
+async def test_key_missing_skip_output_is_unchanged() -> None:
+    """ARCH-68 회귀 0 — 키 미설정 경로의 skip 문구는 바이트 그대로, 정책 사유 필드는 None."""
+    cloud = _FakeCloud(configured=False, reachable=False)
+    report = await lp.run_preflight(
+        _settings(anthropic=False, langfuse=False),
+        smoke=True,
+        cloud_provider_factory=_cloud_factory(cloud),
+        local_provider_factory=_local_factory(_FakeOllama(reachable=True)),
+    )
+    assert report.smoke.skipped_reason == "anthropic 미설정(키 없음) — 스모크 skip"
+    assert report.cloud_policy_block is None
+    assert "정책 차단" not in lp._render_stdout(report)
+
+
+async def test_policy_block_skip_names_policy_not_missing_key() -> None:
+    """ARCH-68: 키는 있으나 정책 차단이면 skip 사유가 그 사유를 말하고 '키 없음'이라고 하지 않는다.
+
+    ARCH-66 사용 중단 기간의 기본 상황(키는 남아 있고 스위치만 꺼짐)이다. '키 없음'이라고
+    말하면 운영자가 이미 있는 키를 다시 넣는 헛수고로 간다. 정보이므로 종료 코드는 0이다.
+    """
+    cloud = _FakeCloud(configured=False, reachable=False)
+    report = await lp.run_preflight(
+        _settings(anthropic=False, langfuse=False, policy_block=_POLICY),
+        smoke=True,
+        cloud_provider_factory=_cloud_factory(cloud),
+        local_provider_factory=_local_factory(_FakeOllama(reachable=True)),
+    )
+    assert report.cloud_configured is False
+    assert report.cloud_policy_block == _POLICY
+    assert report.smoke.ran is False
+    assert report.smoke.skipped_reason == f"{_POLICY} — 스모크 skip"
+    assert "키 없음" not in report.smoke.skipped_reason
+    assert report.exit_code == 0
+    assert cloud.generate_calls == []  # 실 호출 없음
+    # 사람용 출력에도 원인이 보인다 — '아니오' 한 줄만 있으면 '키 없음'으로 읽힌다.
+    text = lp._render_stdout(report)
+    assert f"정책 차단: {_POLICY}" in text
+
+
+async def test_real_settings_policy_block_reaches_report() -> None:
+    """ARCH-68: 가짜가 아닌 실제 Settings(키 있음·스위치 꺼짐)로도 사유가 리포트까지 흐른다.
+
+    가짜 Settings만 쓰면 속성 이름이 어긋나도 모른다(가짜가 그 이름을 스스로 정하므로) — 실물로
+    배선을 한 번 확인한다. 키 값은 리포트·출력 어디에도 나오지 않는다.
+    """
+    settings = lp.Settings(
+        anthropic_api_key=SecretStr("sk-ant-preflight-secret"),
+        anthropic_api_enabled=False,
+        langfuse_public_key="",
+        langfuse_secret_key=SecretStr(""),
+    )
+    reason = settings.anthropic_policy_block_reason
+    assert reason is not None
+    cloud = _FakeCloud(configured=False, reachable=False)
+    report = await lp.run_preflight(
+        settings,
+        smoke=True,
+        cloud_provider_factory=_cloud_factory(cloud),
+        local_provider_factory=_local_factory(_FakeOllama(reachable=True)),
+    )
+    assert report.cloud_configured is False
+    assert report.cloud_policy_block == reason
+    assert report.smoke.skipped_reason == f"{reason} — 스모크 skip"
+    text = lp._render_stdout(report)
+    assert "sk-ant-preflight-secret" not in text
+    assert "sk-ant-preflight-secret" not in json.dumps(
+        dataclasses.asdict(report), ensure_ascii=False
+    )
+
+
 async def test_smoke_skipped_when_no_smoke_flag() -> None:
     """--no-smoke(smoke=False)면 설정돼 있어도 실 호출을 하지 않는다."""
     cloud = _FakeCloud(configured=True, reachable=True, result=GenerationResult(text="2"))
@@ -395,6 +475,19 @@ def test_json_report_roundtrip(tmp_path: Path) -> None:
     assert loaded["smoke"]["cost_krw"] == 1.155
     assert loaded["smoke"]["input_tokens"] == 100
     assert loaded["exit_code"] == 0
+    assert loaded["cloud_policy_block"] is None  # ARCH-68 — 막히지 않았으면 None
+
+
+def test_json_report_carries_policy_block(tmp_path: Path) -> None:
+    """ARCH-68: 정책 차단 사유는 JSON 리포트에도 실린다(사람용 출력만이 아니라)."""
+    report = dataclasses.replace(
+        _sample_report(), cloud_configured=False, cloud_policy_block=_POLICY
+    )
+    out = tmp_path / "preflight.json"
+    lp._write_json(report, out)
+    loaded = json.loads(out.read_text(encoding="utf-8"))
+    assert loaded["cloud_configured"] is False
+    assert loaded["cloud_policy_block"] == _POLICY
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -520,6 +613,34 @@ async def test_via_pipeline_local_fallback_when_anthropic_unset() -> None:
     assert spy.flush_count == 1
     assert smoke.langfuse_recorded is True
     assert smoke.pipeline_note is not None and "폴백" in smoke.pipeline_note
+    # ARCH-68 회귀 0 — 키 미설정 경로의 폴백 메모는 바이트 그대로.
+    assert smoke.pipeline_note == (
+        "LOCAL 폴백(anthropic 미설정) — 로컬 1콜, cost_tier=LOCAL·0원이라도 기록 증명 성립"
+    )
+    assert report.exit_code == 0
+
+
+async def test_via_pipeline_fallback_note_names_policy_block() -> None:
+    """ARCH-68: 정책 차단이면 LOCAL 폴백 메모가 '미설정' 대신 그 사유를 말한다(폴백 동작은 같다)."""
+    usage = Usage(input_tokens=20, output_tokens=10, latency_ms=900.0)
+    provider = _FakePipelineProvider(GenerationResult(text="2", usage=usage))
+    spy = _SpyInnerSink()
+    deps, _cache = _pipeline_deps(provider, spy)
+
+    report = await lp.run_preflight(
+        _settings(anthropic=False, langfuse=True, policy_block=_POLICY),
+        smoke=True,
+        via_pipeline=True,
+        cloud_provider_factory=_cloud_factory(_FakeCloud(configured=False, reachable=False)),
+        local_provider_factory=_local_factory(_FakeOllama(reachable=True)),
+        pipeline_deps_factory=lambda _s: deps,
+    )
+    smoke = report.smoke
+    assert smoke.routed_cost_tier == CostTier.LOCAL.value  # 폴백 동작은 그대로
+    assert smoke.pipeline_note is not None
+    assert _POLICY in smoke.pipeline_note
+    assert "anthropic 미설정" not in smoke.pipeline_note
+    assert report.cloud_policy_block == _POLICY
     assert report.exit_code == 0
 
 
