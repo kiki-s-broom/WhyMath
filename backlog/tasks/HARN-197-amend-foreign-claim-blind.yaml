@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-197-amend-foreign-claim-blind
+title: "amend가 다른 세션이 claim 중인 태스크에도 경고 없이 쓴다 — 대장 정정 verb의 claim 조회 부재(근접 사고 1건 · 피해 0)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 사실(판정 기준: main 97e504aa · 2026-09-29) — cmd_amend(scripts/harness/backlog.py)는 대상 태스크가 다른 세션의 원격 claim 아래에 있어도 경고 없이 쓴다. 근접 사고 1건(피해 0): 2026-09-29 07:00:48Z에 다른 세션이 HARN-170을 claim했는데, 이 세션이 07:04Z경 HARN-170에 amend(우선순위·등급 상향)를 경고 없이 성공시켰다. 커밋 직후 claim 기록을 다시 조회하다 발견해 푸시 전에 폐기했다 — 발견은 도구가 아니라 이 세션의 수동 재조회였다. 같은 파일을 두 세션이 고치면 나중에 병합하는 쪽이 충돌하고 머지 큐에서 MERGE_CONFLICT로 빠질 수 있다. 정적 스캔(claim 조회 어휘 참조 수, 거친 값): cmd_start 25 · cmd_gates 15 · cmd_cancel 7 · cmd_block 3 · cmd_amend 1(674줄). 정확한 판정은 구현자가 함수 단위로 다시 실측한다(이 스캔은 어휘 계수이지 호출 그래프가 아니다)."
+  - "② 처분 — amend가 대상 태스크의 다른 세션 claim을 발견하면 stderr에 경고(claim 보유 브랜치·시각 포함)와 이벤트 1줄을 남긴다. 거부하지는 않는 것을 기본으로 제안한다(대장 정정 경로 보존 — 차단 여부는 구현 시 Kiki 판정). claim을 조회하지 못한 경우(캐시 없음·오프라인)는 '없음'과 구분해 '확인 불가'로 알린다(모른다≠아니다 — 3상태)."
+  - "③ 범위 전수 — 같은 사각이 대상 태스크를 쓰는 다른 대장 verb(rename · gates 중 태스크를 바꾸는 하위 명령 등)에도 있는지 함수 단위로 확인하고, 없는 곳은 '없음'과 근거를, 있는 곳은 같은 경고를 붙인다. 확인하지 않은 verb는 목록으로 남긴다(안 본 것을 통과로 세지 않는다)."
+  - "④ 변별력 — 다른 세션 claim이 있는 태스크 · 자기 claim 태스크 · claim 없는 태스크 · claim 확인 불가의 4상태 각각에서 경고 유무를 단언하는 테스트를 tests/harness에 두고, claim 조회를 제거하는 뮤테이션이 RED가 됨을 확인한다(주입 실재 단언 포함). 경고가 나야 하는 것은 첫째(다른 세션 claim)와 넷째('확인 불가' 문구)뿐이다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: "출처: 2026-09-29 ARCH-68(PR #1357) 머지 뒤, Kiki가 승인한 '추천대로 진행'(HARN-130·HARN-170 우선순위 상향)을 이 세션이 실행하다 발견. HARN-170 amend를 로컬 커밋으로 만든 뒤 다른 세션의 재claim(07:00:48Z)을 알게 되어 푸시하지 않고 폐기했다(패치는 세션 임시 보관). 폐기 근거: 목적(그 태스크가 다뤄지는 것)이 이미 달성됐고, 활동 중인 세션의 태스크 파일과 충돌할 위험만 남았다. 분류: 근접 사고 — 사고 대장에는 올리지 않았다(대장 끝 줄 추가가 머지 충돌 핫스팟이고 그 구조는 HARN-130이 소유). 사고 경위의 정본은 이 notes와 acceptance ①이다. 부수 관측: 이 세션의 amend는 claim이 걸린 태스크에도 종료 코드 0으로 성공했고 출력에도 단서가 없었다."
+updated: 2026-09-29
