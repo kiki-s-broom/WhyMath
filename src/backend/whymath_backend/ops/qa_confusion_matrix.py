@@ -230,7 +230,8 @@ _FAIL_TOKENS = frozenset({"fail", "failed", "reject", "rejected", "block", "bloc
 
 _VERDICT_SOURCE_HEADERS: Mapping[str | None, str] = {
     VERDICT_SOURCE_QA_ENGINE: (
-        "`qa_engine` — QA 엔진 문항 단위 좌석(`harness/qa_pipeline.judge_item` · 문항 단위 3축). "
+        "`qa_engine` — QA 엔진 문항 단위 좌석(`harness/qa_pipeline.judge_item` · "
+        "정답 재검산 + 문항 단위 3축). "
         "이 FN율은 그 좌석의 FN율이다(9축 전체가 아니다)"
     ),
     VERDICT_SOURCE_GENERATION_GATE: (

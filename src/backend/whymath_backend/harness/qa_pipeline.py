@@ -82,13 +82,25 @@ import-linter 7계층 계약(`[tool.importlinter]`)은 `root_package = "whymath_
     코퍼스 디렉터리 단위라 문항 좌석 밖)
 
 나머지 6축은 문항을 판정하지 않는다 — `CORPUS_LEVEL_ONLY_AXES`가 축별 사유를 적는다(9축
-분할의 전수성은 테스트가 `AXIS_NAMES`·`build_report` 키와 대조해 동결한다). 즉 이 좌석이 내는
-pass는 "엔진의 문항 단위 3축이 이의 없음"이지 "9축 전부 통과"가 아니다 — 골든 대비 FN율은
-바로 그 좁은 표면의 FN율이다(정직한 범위).
+분할의 전수성은 테스트가 `AXIS_NAMES`·`build_report` 키와 대조해 동결한다).
+
+**정답 재검산 성분 (EOS-150)** — 위 3축 중 어느 것도 *답이 맞는가*를 보지 않는다. 그래서
+좌석은 9축 밖의 기계 검증 스택 하나를 더 부른다(`ITEM_VERIFICATION_AXES`):
+
+  - `answer_reverify` — `corpus_reverify._reverify_one`(S6 상시 재검산 — Tier1·근 선택·Tier2
+    단계·개념형 검증기. CI 야간 잡이 코퍼스 전수에 돌리는 바로 그 함수, 재구현 0). fail은
+    `violation`, skip(재료 없음·unverifiable)은 `unjudgeable`이다 — "오염 아님"이지 "정답 확인"이
+    아니므로 pass로 접지 않는다.
+
+이 성분은 **필수**다(`ITEM_REQUIRED_AXES`) — 정답 재검산이 `ok`가 아닌 문항은 pass가 될 수
+없다. 없으면 정답만 틀린 문항(조건·산문·출처는 정상)이 pass가 되어, 골든의 수학 결함(F1·F2)이
+엔진의 한계가 아니라 **좌석이 부르지 않은 검증기**의 몫으로 FN에 쌓인다. 즉 이 좌석이 내는
+pass는 "정답 재검산 통과 + 문항 단위 3축 이의 없음"이지 "9축 전부 통과"가 아니다 — 골든 대비
+FN율은 그 표면의 FN율이다(정직한 범위).
 
 판정 규칙: 어느 축이든 `violation`이면 **fail**(나머지 축이 판정 불가여도 결론은 선다) ·
-위반 없이 `unjudgeable`이 하나라도 있으면 **판정 불가(None)** — pass로 채우지 않는다
-(미측정 ≠ 통과) · 그 밖(`ok`·`not_applicable`만)이면 **pass**.
+위반 없이 `unjudgeable`이 하나라도 있거나 필수 성분이 `ok`가 아니면 **판정 불가(None)** —
+pass로 채우지 않는다(미측정 ≠ 통과) · 그 밖(`ok`·`not_applicable`만)이면 **pass**.
 
 각 축 실행은 개별 try/except로 격리된다 — 한 축의 예외가 나머지 축 실행을 막지 않고,
 그 축은 `{"measured": false, "status": "error", "detail": {"error_type": ...}}`로
@@ -131,6 +143,7 @@ from whymath_backend.harness import (
     banned_words_pii_eval,
     coach_prose_leak_eval,
     corpus_audit_eval,
+    corpus_reverify,
     crosslink_demotion_eval,
     defect_detection_eval,
 )
@@ -143,6 +156,10 @@ __all__ = [
     "CORPUS_LEVEL_ONLY_AXES",
     "ITEM_AXIS_SCOPE",
     "ITEM_LEVEL_AXES",
+    "ITEM_REQUIRED_AXES",
+    "ITEM_SEAT_AXES",
+    "ITEM_VERIFICATION_AXES",
+    "ITEM_VERIFICATION_SCOPE",
     "ItemAxisResult",
     "ItemJudgement",
     "build_report",
@@ -813,6 +830,27 @@ CORPUS_LEVEL_ONLY_AXES: Mapping[str, str] = {
 }
 """문항 단위 판정을 내지 않는 6축과 그 사유 — 좌석 3축 + 이 6축 = `AXIS_NAMES`(전수)."""
 
+ITEM_AXIS_ANSWER_REVERIFY = "answer_reverify"
+
+ITEM_VERIFICATION_AXES: tuple[str, ...] = (ITEM_AXIS_ANSWER_REVERIFY,)
+"""집계 9축 **밖**에서 좌석이 부르는 기계 검증 성분(EOS-150) — 9축 전수 분할과 섞지 않는다."""
+
+ITEM_VERIFICATION_SCOPE: Mapping[str, str] = {
+    ITEM_AXIS_ANSWER_REVERIFY: (
+        "정답 재검산(corpus_reverify._reverify_one — S6 상시 재검산: Tier1·근 선택·Tier2 단계·"
+        "개념형) — verify 재료가 없거나 판정 불가면 unjudgeable(통과 아님)"
+    ),
+}
+"""검증 성분이 **무엇까지만** 보는가 — fuzz(수치 반례)는 켜지 않는다(야간 CLI 기본값과 같다)."""
+
+ITEM_SEAT_AXES: tuple[str, ...] = ITEM_LEVEL_AXES + ITEM_VERIFICATION_AXES
+"""`judge_item`이 실제로 돌리는 성분 전부(판정 순서)."""
+
+ITEM_REQUIRED_AXES: tuple[str, ...] = (ITEM_AXIS_ANSWER_REVERIFY,)
+"""pass의 필요조건 — 이 성분이 `ok`가 아니면 판정 불가다.
+
+답을 확인하지 못한 문항은 통과가 아니다(미측정 ≠ 통과)."""
+
 ItemAxisStatus = Literal["ok", "violation", "not_applicable", "unjudgeable"]
 
 
@@ -839,8 +877,18 @@ class ItemJudgement:
         return tuple(name for name, r in self.axes.items() if r.status == "unjudgeable")
 
     @property
+    def missing_required_axes(self) -> tuple[str, ...]:
+        """필수 성분 중 `ok`가 아닌 것(부재 포함) — 비어 있지 않으면 pass가 될 수 없다."""
+        return tuple(
+            name
+            for name in ITEM_REQUIRED_AXES
+            if name not in self.axes or self.axes[name].status != "ok"
+        )
+
+    @property
     def verdict(self) -> Literal["pass", "fail"] | None:
-        """fail(위반 1축 이상) · None(위반 없이 판정 불가 1축 이상) · pass(그 밖).
+        """fail(위반 1축 이상) · None(위반 없이 판정 불가 1축 이상 또는 필수 성분 미확인) ·
+        pass(그 밖).
 
         None을 pass로 접지 않는다 — 판정하지 못한 문항을 통과로 세면 골든 대비 FN이 그만큼
         사라진다(골든의 존재 이유 훼손 · 계약 §6 "미평가를 pass로 간주 금지"와 같은 원칙).
@@ -848,6 +896,8 @@ class ItemJudgement:
         if self.failed_axes:
             return "fail"
         if self.unjudgeable_axes:
+            return None
+        if self.missing_required_axes:
             return None
         return "pass"
 
@@ -929,21 +979,41 @@ def _item_content_provenance(problem: Mapping[str, Any]) -> ItemAxisResult:
     return ItemAxisResult(status="ok")
 
 
+def _item_answer_reverify(problem: Mapping[str, Any]) -> ItemAxisResult:
+    """S6 재검산의 문항 적용 — `corpus_reverify._reverify_one`을 그대로 부르고 상태만 옮긴다.
+
+    pass→ok · fail→violation · skip→unjudgeable. skip은 "재검증 불가를 오염으로 오판하지
+    않는다"는 야간 게이트의 규약이지 정답 확인이 아니므로, 문항 판정에서는 판정 불가다.
+    """
+    try:
+        state, reason = corpus_reverify._reverify_one(dict(problem), use_fuzz=False)
+    except Exception as exc:  # noqa: BLE001 — 판정 불가로 격리하되 타입명 보존(침묵 실패 금지)
+        return ItemAxisResult(
+            status="unjudgeable", reason=f"{type(exc).__name__}: _reverify_one 예외"
+        )
+    if state == "pass":
+        return ItemAxisResult(status="ok")
+    if state == "fail":
+        return ItemAxisResult(status="violation", reason=f"answer_reverify: {reason}")
+    return ItemAxisResult(status="unjudgeable", reason=f"answer_reverify: {reason}")
+
+
 _ITEM_JUDGES: dict[str, Callable[[Mapping[str, Any]], ItemAxisResult]] = {
     ITEM_AXIS_EQUIVALENCE: _item_equivalence,
     ITEM_AXIS_BANNED_WORDS_PII: _item_banned_words_pii,
     ITEM_AXIS_CONTENT_PROVENANCE: _item_content_provenance,
+    ITEM_AXIS_ANSWER_REVERIFY: _item_answer_reverify,
 }
 
 
 def judge_item(problem: Mapping[str, Any]) -> ItemJudgement:
     """문항 1건(코퍼스 레코드 직렬화 = 검수 큐 `candidate_payload`와 같은 형태)을 판정한다.
 
-    문항 단위 3축(`ITEM_LEVEL_AXES`)을 전부 돌린다 — 한 축이 fail이어도 나머지를 멈추지
-    않는다(어느 축이 무엇을 봤는지가 리포트의 축별 분포로 남아야 한다). 판정 규칙은
-    `ItemJudgement.verdict`.
+    좌석 성분 전부(`ITEM_SEAT_AXES` — 문항 단위 3축 + 정답 재검산)를 돌린다 — 한 축이 fail이어도
+    나머지를 멈추지 않는다(어느 축이 무엇을 봤는지가 리포트의 축별 분포로 남아야 한다). 판정
+    규칙은 `ItemJudgement.verdict`.
     """
-    return ItemJudgement(axes={name: _ITEM_JUDGES[name](problem) for name in ITEM_LEVEL_AXES})
+    return ItemJudgement(axes={name: _ITEM_JUDGES[name](problem) for name in ITEM_SEAT_AXES})
 
 
 def main(argv: list[str] | None = None) -> int:

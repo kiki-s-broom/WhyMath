@@ -889,6 +889,11 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-421", "연령별 설명 공개 진입점(EOS-70 explain 위임 대상)", "Student", "Pedagogy", "P2",
        "C9 — EOS-98, 저장(영속화) 축은 미착수(EOS-70 explain 계약 확정 후 판단)",
        "l4.pedagogy.age_band_explanation"),
+    _e("WM-E-422", "graded 힌트 내용 생성·게이트 3종·hints 영속·coach 서빙 reader", "Student",
+       "Pedagogy", "P0",
+       "C7 힌트 3단계 — S4-11(HintNode 연기 해제·reveal_score KPI 정밀화)",
+       "l4.hint_content.models", "l4.hint_content.generator", "l4.hint_content.gates",
+       "l4.hint_content.store", "l4.hint_content.populate"),
     # ════════════════════ E — L5·L6 ════════════════════
     _e("WM-E-501", "OCR 파이프라인(검출→라우팅→인식→조립·검증)", "Student", "Math Engine", "P2",
        "PaddleOCR+Qwen3-VL — 라이브 정확도 미검증", "l5.ocr.assemble", "l5.ocr.detect",
@@ -959,7 +964,8 @@ CATALOG: tuple[Spec, ...] = (
        "db.models.curriculum_entry", "db.models.curriculum_framework",
        "db.models.curriculum_version", "db.models.dead_end_log", "db.models.device",
        "db.models.dialogue", "db.models.evidence_event", "db.models.evidence_link",
-       "db.models.formula_node", "db.models.hint_usage", "db.models.job_ownership",
+       "db.models.formula_node", "db.models.hint", "db.models.hint_usage",
+       "db.models.job_ownership",
        "db.models.learner_state", "db.models.learning_state_transition",
        "db.models.misconception_catalog", "db.models.misconception_crosslink",
        "db.models.misconception_embedding", "db.models.misconception_hypothesis",
@@ -1132,7 +1138,11 @@ CATALOG: tuple[Spec, ...] = (
        # OPS-68 — `*_report` 와일드카드에 안 걸리는 짝(표본 *생성*기라 이름이 _probe다).
        # 리포트가 볼 표본을 만드는 도구이므로 관측 가족에 함께 귀속한다.
        "harness.attempt_skill_reach_probe",
-       "harness.concept_assessment_index"),
+       "harness.concept_assessment_index",
+       # S4-01 슬라이스 2 — 개념 그래프 traversal 성능 예산 실부하 판정(실 PG 전수 측정).
+       # 리포트이자 게이트(exit 0/1/2)지만, 측정 대상이 *도달·커버리지*가 아니라 *탐색 부하*라
+       # QA 게이트 행(WM-O-912)이 아니라 관측 가족에 귀속한다 — 이름이 _probe인 짝(OPS-68 선례).
+       "harness.traversal_load_probe"),
     _o("WM-O-914", "데이터 무결성 게이트(orphan·dangling·duplicate 6종)", "Admin", "QA", "P0",
        "OPS-55 — 느슨참조 드리프트 감사(v_integrity_violations) · 주간 지표 #4 산출원",
        "ops.integrity_violations_gate"),
