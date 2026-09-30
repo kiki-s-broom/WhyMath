@@ -16,6 +16,13 @@
 > 제공자 예외를 기록하지 않아 그런 회차에서 **실패 원인이 한 글자도 남지 않았다**(검토자 재현:
 > 429 + Ollama 가동 회차의 JSON에 오류가 없다). 이 판은 프로브가 제공자 예외·강등 필드·강등
 > 계수를 싣고, 성공 기준·실패 대처·부록을 main 기준으로 다시 썼다.
+>
+> **ARCH-101 정정(2026-09-30)**: 학생 대면 trace 레코드(`router.langfuse_fields`)에 관측 모델
+> (`served_model`)과 이 호출의 재시도 수(`retries`)가 실리게 됐다. 그래서 0-3·0-5·4절의 `served`
+> 읽는 법·5절 끝·판정 후 처리·부록 ①을 고쳤다. 프로브는 `probe_rev`를 `arch101-served-in-trace`로
+> 올리고 trace의 두 값을 함께 싣는다. 검사 9개와 판정 규칙은 그대로다. 이 정정의 코드 사실은
+> `ebd7a159`에 ARCH-101 변경을 얹은 트리에서 읽었다(`ebd7a159`의 서빙 코드는 `a28a8d08`과 같다 —
+> `git diff --stat` 0건).
 
 ## 0. 먼저 알아 둘 사실 — 이 회차가 무엇을 재고 무엇을 재지 않는가
 
@@ -63,9 +70,14 @@
   (`router.langfuse_fields`)에만 싣는다. 운영 서버에서는 그 레코드가 `LangfuseSink`(외부 SaaS)로만
   나간다. 같은 레코드에 강등 5필드(`local_degraded`·`degraded_from_seat`·`degrade_reason`·
   `degraded_to_local`·`degrade_cloud_attempt_ms`)도 실린다.
-- 관측 모델(`Usage.served_model`)은 제공자가 응답에서 읽어 오지만 **학생 대면 경로의 어떤 기록에도
-  남지 않는다** — `langfuse_fields`가 그 필드를 싣지 않는다(코드 판독 · `a28a8d08`). 프로브가
-  trace 레코드에 그 키가 없다는 절반은 실측한다(`served.in_trace_record`). 저작 경로는 genlog에 남긴다.
+- 관측 모델(`Usage.served_model` — 제공자가 응답에서 읽은 모델명)과 이 호출의 재시도 수
+  (`Usage.retries`)도 **같은 trace 레코드에 실린다**(`served_model`·`retries` 키 · `ARCH-101`).
+  초판은 이 두 값이 학생 대면 경로의 어떤 기록에도 남지 않는다고 적었다(`a28a8d08` 코드 판독 · 당시
+  부록 ① 실측 `served.in_trace_record=false`). 두 값은 **텍스트를 만든 호출**의 것이다. 강등
+  회차면 대신 답한 LOCAL 모델 태그가 실리고 `retries`는 null이다 — Ollama는 우리 전송기를 타지 않아
+  재시도 계측이 없고, 실패한 클라우드 시도의 재시도는 이 키에 실리지 않는다. 운영 서버에서는 이 두
+  값도 Langfuse로만 나간다. 프로세스 안에서 이 값을 모으는 계수는 없다(강등 여부 자체는 `/status`의
+  `cloud_local_degrade`가 센다). 저작 경로는 genlog에 남긴다.
 
 ### 0-4. 1차 좌석이 실패하면 — ARCH-69 런타임 LOCAL 강등
 
@@ -86,10 +98,11 @@
 
 ### 0-5. 그래서 이 런북은 서버를 띄우지 않는다
 
-운영 서버(uvicorn)에 HTTP로 보내면 좌석·기록 원가는 Langfuse에서만, 관측 모델은 어디에서도 읽을 수
-없다. CLAUDE.md 「측정·게이트 도구가 판정치를 외부 관측 인프라에만 의존 금지」에 걸린다. 그래서
-이 런북은 **`create_app()`이 만든 앱 객체에 같은 프로세스 안에서 HTTP(ASGI) 요청을 보낸다.**
-좌석은 손대지 않고 앱이 조립한 기본값 그대로 쓴다.
+운영 서버(uvicorn)에 HTTP로 보내면 좌석·기록 원가·관측 모델은 Langfuse에서만 읽을 수 있다(관측
+모델은 `ARCH-101` 이후 — 그 전에는 어디에서도 읽을 수 없었다). CLAUDE.md 「측정·게이트 도구가
+판정치를 외부 관측 인프라에만 의존 금지」에 걸린다. 그래서 이 런북은 **`create_app()`이 만든
+앱 객체에 같은 프로세스 안에서 HTTP(ASGI) 요청을 보낸다.** 좌석은 손대지 않고 앱이 조립한
+기본값 그대로 쓴다.
 
 | 축 | 운영 서버 | 이 런북 |
 |---|---|---|
@@ -103,10 +116,14 @@
 | DB 세션 | 실제 | 대체 — 없음(성인·미상 사용자는 동의 판정에 DB를 읽지 않는다) |
 | 응답 캐시 | `RedisCache` | `InMemoryCache`(새 프로세스라 적중 0) |
 | trace | `LangfuseSink` | `RecordingTraceSink`(같은 레코드를 프로세스 안에서 읽는다 · Langfuse 전송 없음) |
-| 관측 모델·제공자 예외 | 기록 안 됨 | 제공자 `generate`의 반환값과 예외를 관찰 래퍼로 읽는다(예외는 기록한 뒤 **그대로 다시 던진다** — 동작 불변) |
+| 관측 모델·재시도 수 | trace 레코드 → Langfuse(`ARCH-101`) | 같은 trace 레코드를 프로세스 안에서 읽고, 제공자 `generate`의 반환값과 대조한다 |
+| 제공자 예외 | 기록 안 됨 | 제공자 `generate`의 예외를 관찰 래퍼로 읽는다(예외는 기록한 뒤 **그대로 다시 던진다** — 동작 불변) |
 
-대체한 네 축(인증·DB·캐시·trace 전송)은 ARCH-64·ARCH-69가 건드리지 않은 축이다. 운영 서버 경로
-자체의 라이브 확인은 이 회차의 범위가 아니다(5절 끝 "이 회차가 닫지 않는 것").
+대체한 네 축(인증·DB·캐시·trace 전송)은 ARCH-64·ARCH-69가 건드리지 않은 축이다. ARCH-101이 바꾼
+것은 trace 레코드의 *내용*이고, 두 싱크는 그 내용을 같은 `langfuse_fields`에서 받는다 —
+`LangfuseSink`는 키를 거르지 않고 전 필드를 이벤트 메타데이터로 보낸다
+(`tests/backend/l3/test_langfuse_fields_observation.py`). 운영 서버 경로 자체의 라이브 확인은 이
+회차의 범위가 아니다(5절 끝 "이 회차가 닫지 않는 것").
 
 ## 1. 과제 명칭
 
@@ -198,8 +215,15 @@ HTTP 200 뒤에 숨을 수 있으므로, 실패 회차에서도 **원인이 파�
   추정이고, 기록 원가는 이 회차의 실측 토큰으로 계산된다. 판정은 `recorded_matches`가
   `openrouter`인가로 한다.
 - `served.equals_pin`이 `false`면 실패가 아니라 **사람 판정 대상**이다(별칭→버전 해소인가, 진짜
-  폴백인가 — EOS-112가 기계 판정에서 뺀 축). `served.recorded_anywhere_on_this_path=false`는
-  코드 판독 기준(`a28a8d08`)이고, 그중 trace 레코드 절반은 `served.in_trace_record`가 실측한다.
+  폴백인가 — EOS-112가 기계 판정에서 뺀 축).
+- `served.in_trace_record`는 `true`가 정상이다 — `ARCH-101` 이후 trace 레코드에 `served_model` 키가
+  항상 실린다. `false`면 ARCH-101 이전 트리에서 돈 것이다. `served.trace_equals_provider`는 성공
+  회차에서 `true`가 정상이다 — 제공자가 응답에서 읽은 모델명이 trace 레코드에 그대로 실렸다는 뜻이다.
+  `false`면 세션에 알린다. 강등·예외 회차에서는 OpenRouter 응답이 없어 `null`이고, 그때
+  `trace.served_model`에 대신 답한 LOCAL 모델 태그가 있다.
+- `trace.retries`는 성공 회차에서 이 호출의 실제 재시도 수다(`0` = 한 번에 성공). 강등 회차에서는
+  `null`이다 — **0으로 접어 적지 않는다**(LOCAL은 재시도 계측이 없고, 실패한 클라우드 시도의 재시도는
+  여기 실리지 않는다).
 - `status_http.local_reachable`은 호출 **전**의 Ollama 도달 여부다 — 실패 회차가 어느 갈래로 갈지
   미리 말한다(0-4).
 - `provider_errors[].message` 끝의 `(시도 3회)`는 **설정된 최대 시도 횟수**다. 실제 전송 횟수가
@@ -213,7 +237,8 @@ HTTP 200 뒤에 숨을 수 있으므로, 실패 회차에서도 **원인이 파�
   과부하로 기대 범위이며 그 자체가 기록 대상이다. `server_error`(5xx)·`timeout`(408 또는 60초
   타임아웃)도 같다. `not_configured`는 [C-2] 재검사(`KEY_READY`)를 통과했다면 일어나면 안 되는
   값이다 — 세션에 알린다. 원 예외(타입·상태코드·공급사 응답 본문)는
-  `provider_errors`의 `openrouter` 항목에 있다.
+  `provider_errors`의 `openrouter` 항목에 있다. 대신 답한 LOCAL 모델 태그는 `trace.served_model`에
+  있다(`ARCH-101`).
 - `error` + `failure_path=degraded_local_failed` — 1차 좌석도, LOCAL(Ollama)도 실패했다.
   `provider_errors`에 두 항목이 있다. 이 머신에서 Ollama를 켜고 다시 하면 같은 1차 좌석 실패가
   `degraded_cause_recorded`로 바뀐다 — **Ollama를 켜서 결과를 바꾸는 것은 세션이 판정한 뒤에** 한다.
@@ -243,8 +268,8 @@ HTTP 200 뒤에 숨을 수 있으므로, 실패 회차에서도 **원인이 파�
   클론에는 아무것도 쓰지 않는다.
 
 **이 회차가 닫지 않는 것(명시)**: 운영 서버(uvicorn) 경로의 JWT·DB·Redis·Langfuse 전송은 재지
-않는다(0-5 표). 관측 모델이 학생 대면 기록에 남지 않는 것은 이 회차가 고칠 일이 아니라 기록할
-사실이다.
+않는다(0-5 표). 관측 모델·재시도 수가 trace 레코드에 실리는 것(`ARCH-101`)은 이 회차가 프로세스
+안에서 확인하지만, 그 레코드가 운영 Langfuse에 실제로 적재되는지는 재지 않는다.
 
 ## 6. 창 구분
 
@@ -392,7 +417,7 @@ import datetime, json, math, os, sys, uuid
 os.environ.pop("WHYMATH_CLOUD_PROVIDER", None)
 OUT = os.environ.get("ARCH71_PROBE_OUT")
 BASIS = "code reading at main a28a8d08"
-report = {"probe": "arch71-student-facing-cloud-mid", "probe_rev": "arch69-degrade-aware", "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "stage": "import"}
+report = {"probe": "arch71-student-facing-cloud-mid", "probe_rev": "arch101-served-in-trace", "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "stage": "import"}
 calls = {"openrouter": 0, "anthropic": 0, "deepseek": 0, "ollama": 0}
 usages = []
 failures = []
@@ -502,7 +527,7 @@ try:
     flush()
     record = trace.records[-1] if trace.records else {}
     report["trace_records"] = len(trace.records)
-    report["trace"] = {key: record.get(key, "absent") for key in ("cost_tier", "cloud_seat", "cost_krw", "input_tokens", "output_tokens", "latency_ms", "content_source", "cache_hit", "data_export_reason", "local_degraded", "degraded_from_seat", "degrade_reason", "degraded_to_local", "degrade_cloud_attempt_ms")}
+    report["trace"] = {key: record.get(key, "absent") for key in ("cost_tier", "cloud_seat", "cost_krw", "input_tokens", "output_tokens", "latency_ms", "content_source", "cache_hit", "data_export_reason", "local_degraded", "degraded_from_seat", "degrade_reason", "degraded_to_local", "degrade_cloud_attempt_ms", "served_model", "retries")}
     status_after = client.get("/status")
     after_degrade = status_after.json().get("cloud_local_degrade", "absent")
     report["status_after_http"] = {"code": status_after.status_code, "cloud_local_degrade": after_degrade}
@@ -523,7 +548,7 @@ try:
     report["price_check"] = price
     usage = usages[-1] if usages else None
     served = getattr(usage, "served_model", None)
-    report["served"] = {"served_model": served, "declared_pin": settings.openrouter_model_mid, "equals_pin": None if served is None else served == settings.openrouter_model_mid, "retries": getattr(usage, "retries", None), "in_trace_record": "served_model" in record, "recorded_anywhere_on_this_path": False, "recorded_anywhere_basis": BASIS + " - langfuse_fields has no served_model key; in_trace_record is the measured half"}
+    report["served"] = {"served_model": served, "declared_pin": settings.openrouter_model_mid, "equals_pin": None if served is None else served == settings.openrouter_model_mid, "retries": getattr(usage, "retries", None), "in_trace_record": "served_model" in record, "trace_equals_provider": None if served is None else record.get("served_model") == served, "trace_note": "ARCH-101 - langfuse_fields carries served_model and retries of the call that produced the text; under a LOCAL degrade the trace holds the LOCAL model and retries None"}
     report["stage"] = "done"
 except Exception as exc:
     report["error" if "error" not in report else "probe_error"] = dict(describe(exc), where="probe stage " + str(report.get("stage")))
@@ -595,7 +620,7 @@ $AppSeat = (& $Py -c "import os; os.environ.pop('WHYMATH_CLOUD_PROVIDER', None);
 $AnthropicOff = (& $Py -c "from whymath_backend.config import get_settings; print(get_settings().anthropic_api_enabled is False)")
 $Routes = (& $Py -c "from whymath_backend.l3.router import Router; from whymath_backend.l3.models import RoutingRequest; from whymath_backend.l3.escalation_defaults import default_student_escalation_signals as dflt; d=dflt(); base=dict(task_type='coach', difficulty='hard', requires_reasoning=True, sync=True, data_licenses=['INTERNAL_OWNED']); s=Router().route(RoutingRequest(student_subscription=d.student_subscription, budget_krw=d.budget_krw, **base)); p=Router().route(RoutingRequest(student_subscription='premium', budget_krw=1000.0, **base)); print(s.cost_tier, p.cost_tier, p.est_cost_krw)")
 $KeyReady = (& $Py -c "import asyncio; from whymath_backend.config import get_settings; from whymath_backend.l3.providers.openrouter import OpenRouterProvider; k=get_settings().openrouter_api_key.get_secret_value(); print(asyncio.run(OpenRouterProvider().check_status()).configured and len(k) >= 20 and chr(8230) not in k)")
-$ProbeLoaded = ([string]$ProbeCode).Contains("arch69-degrade-aware")
+$ProbeLoaded = ([string]$ProbeCode).Contains("arch101-served-in-trace")
 "RECHECK TREE_HAS_THIS_RUNBOOK=$HasRunbook FROM_TREE=$FromTree DEPS_OK=$Deps APP_SEAT=[$AppSeat] ANTHROPIC_OFF=$AnthropicOff ROUTES=[$Routes] KEY_READY=$KeyReady PROBE_LOADED=$ProbeLoaded"
 if ($HasRunbook -and $FromTree -and ($Deps -eq "True") -and ($AppSeat -eq "openrouter OpenRouterProvider None True") -and ($AnthropicOff -eq "True") -and ($Routes -like "local cloud_mid *") -and ($KeyReady -eq "True") -and $ProbeLoaded) { $OutDir = Join-Path $Tree ".arch71-out"; New-Item -ItemType Directory -Force -Path $OutDir | Out-Null; $ProbeFile = Join-Path $OutDir "student-facing-$Stamp.json"; $env:ARCH71_PROBE_OUT = $ProbeFile; $ProbeCode | & $Py -; "PROBE_EXIT=$LASTEXITCODE"; "PROBE_FILE=$ProbeFile"; "PROBE_FILE_EXISTS=$(Test-Path $ProbeFile)" } else { "WRITE_REFUSED=True — 호출 0건. TREE_HAS_THIS_RUNBOOK=$HasRunbook(True여야 함) FROM_TREE=$FromTree(True여야 함) DEPS_OK=$Deps(True여야 함) APP_SEAT=[$AppSeat](openrouter OpenRouterProvider None True여야 함) ANTHROPIC_OFF=$AnthropicOff(True여야 함 — ARCH-66) ROUTES=[$Routes](local cloud_mid로 시작해야 함) KEY_READY=$KeyReady(True여야 함 — [B]·[K]) PROBE_LOADED=$ProbeLoaded(True여야 함 — 이 판의 [C-1]을 먼저). [A]부터 다시 붙여넣고 그 출력을 회신해 주십시오." }
 ```
@@ -630,9 +655,11 @@ if ($HasRunbook -and $FromTree -and ($Deps -eq "True") -and ($AppSeat -eq "openr
   남는다 — 앞 파일을 지우지 않는다).
 - `served.equals_pin=false`면 `served_model`을 보고 별칭→버전 해소인지 진짜 폴백인지 사람이 판정해
   기록한다.
-- 관측 모델이 학생 대면 기록에 남지 않는다는 사실(0-3)은 이 회차의 결과와 무관하게 후속 등재
-  대상이다 — `ARCH-101`로 등재했다(2026-09-29). 그 태스크가 착지하면 `served.in_trace_record`가
-  True가 되고 0-3 문면을 정정해야 한다.
+- 관측 모델이 학생 대면 기록에 남지 않던 공백(초판 0-3)은 `ARCH-101`이 닫았다 — trace 레코드에
+  `served_model`·`retries`가 실린다. 이 회차의 `served.in_trace_record=true`와
+  `served.trace_equals_provider=true`(성공 회차)가 그 라이브 확인이다. 판정 칸에 `trace.served_model`·
+  `trace.retries`를 함께 적는다(`null`은 `null`로 적고 0으로 접지 않는다). `served.in_trace_record=false`가
+  나오면 ARCH-101 이전 트리에서 돈 것이다 — [A]의 worktree 줄과 함께 세션에 알린다.
 
 ## 부록 — 이 런북의 사전 검증 (컨테이너 · 판정 기준 main `a28a8d08`)
 
@@ -664,7 +691,8 @@ here-string 본문을 **이 파일에서 그대로 떼어내** 실행했다(ASCI
   openrouter 산식과 일치(anthropic 산식 0.8778원과 불일치) · `student_default_route.cost_tier=local` ·
   `dry_route.est_cost_krw=8.61168`(0-3의 간극) · 호출 전 `/status`의 강등 블록 `armed=true`·
   `cloud_attempts=0`·`seat_local_degrade_rate=null`, 호출 뒤 `cloud_attempts=1`·`local_degrades=0`·
-  `seat_local_degrade_rate=0.0` · `served.in_trace_record=false`.
+  `seat_local_degrade_rate=0.0` · `served.in_trace_record=false`(ARCH-101 이전 트리의 값 — 아래
+  "ARCH-101 재검증" 참조).
 - ②④⑤⑥ `failure_path=degraded_local_answered` · 응답 `local_degraded=true`·`degraded_from_seat=openrouter` ·
   trace `cloud_seat=null`·`cost_krw=0.0`·`degraded_to_local=math/mid`·`degrade_cloud_attempt_ms` 값 있음 ·
   호출 뒤 `/status`의 `local_degrades=1`·`by_reason`에서 해당 사유 1·`seat_local_degrade_rate=1.0` ·
@@ -683,6 +711,35 @@ here-string 본문을 **이 파일에서 그대로 떼어내** 실행했다(ASCI
   (`openrouter OpenRouterProvider None True`·`local cloud_mid 8.61168`·`True`)을 확인했다. 변별력:
   ARCH-69 이전 트리(`ab9f29f2`)에서는 `APP_SEAT`가 `AttributeError`로 비고,
   `WHYMATH_ANTHROPIC_API_ENABLED=true`면 `ANTHROPIC_OFF=False`, 키가 없으면 `KEY_READY=False`다.
+
+### ARCH-101 재검증 (2026-09-30 · 컨테이너)
+
+재현 방법은 위와 같다 — [C-1] here-string 본문을 런북 파일에서 **그대로 떼어** 실행했고,
+`httpx.AsyncClient.post` 하나만 가짜 OpenRouter 응답으로 바꿨다(200 응답 본문의 `model`은 선언
+핀과 일부러 다르게 `deepseek/deepseek-v4.1-flash-20260910`으로 뒀다). 강등 시나리오의 "Ollama
+가동"은 위와 같이 `OllamaProvider.generate` 대역이며, 그 대역은 `served_model="qwen2-math:7b"`를
+돌려준다. 트리는 둘이다: ARCH-101 이전 = `ebd7a159`의 `git worktree add --detach` 사본, 이후 =
+같은 커밋에 ARCH-101 변경을 얹은 작업 트리. 실행 코드의 출처는 프로브의 `source` 값으로 확인했다.
+두 트리 모두 추출한 본문은 182줄이다.
+
+| 프로브 판 | 트리 | 시나리오 | `verdict` / `PROBE_EXIT` | `served.in_trace_record` | `served.trace_equals_provider` | `trace.served_model` | `trace.retries` |
+|---|---|---|---|---|---|---|---|
+| 신판(`arch101-served-in-trace`) | ARCH-101 이후 | 정상 | `pass` / 0 | `true` | `true` | 응답의 `model` 그대로 | `0` |
+| 신판 | ARCH-101 이후 | 429 1회 뒤 200 | `pass` / 0 | `true` | `true` | 응답의 `model` 그대로 | `1` |
+| 신판 | ARCH-101 이후 | 429 + Ollama 가동 | `degraded_cause_recorded` / 2 | `true` | `null` | `qwen2-math:7b`(대신 답한 LOCAL) | `null` |
+| 신판 | ARCH-101 이전 | 정상 | `pass` / 0 | **`false`** | `false` | `absent` | `absent` |
+| 신판 | ARCH-101 이전 | 429 + Ollama 가동 | `degraded_cause_recorded` / 2 | **`false`** | `null` | `absent` | `absent` |
+| 구판(`arch69-degrade-aware`) | ARCH-101 이후 | 정상 | `pass` / 0 | **`true`** | (키 없음) | (목록에 없음) | (목록에 없음) |
+| 구판 | ARCH-101 이전 | 정상 | `pass` / 0 | `false` | (키 없음) | (목록에 없음) | (목록에 없음) |
+
+- 구판 프로브를 ARCH-101 이후 트리에서 돌리면 `in_trace_record`는 `true`가 되지만, 같은 블록의
+  `recorded_anywhere_on_this_path=false`와 근거 문구("langfuse_fields has no served_model key")가
+  **거짓이 된 채로** 증거 파일에 남는다. 그래서 신판은 그 두 키를 실측값 `trace_equals_provider`로
+  바꾸고 `probe_rev`를 올렸다 — [C-2]의 적재 확인(`PROBE_LOADED`)이 구판 적재 창을 거부한다.
+- 신판은 trace의 `served_model`·`retries`를 `trace` 블록에 함께 싣는다. 검사 9개·`verdict` 규칙은
+  바꾸지 않았다 — 위 표에서 트리가 바뀌어도 `verdict`가 같은 것이 그 확인이다(두 트리의 차이는
+  `served`·`trace` 블록에만 나타난다).
+- 정상 시나리오의 기록 원가는 두 트리에서 같다(`0.052976`원 · openrouter 산식 일치).
 
 ### 이 런북에 대한 CI 가드의 실제 적용 범위 (정직한 공백)
 

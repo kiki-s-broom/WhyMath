@@ -11664,6 +11664,11 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **브랜치 처분**: 삭제하지 않았다. 브랜치 정리는 stray-code 감사 배치가 소유하며, 이 항목의 "회수 불요"와 "대체 안 됨" 항이 그 판정의 근거다. 되살릴 필요가 생기면 `c5983e59`에서 `item_response_census.py`·`test_item_response_census.py`·`eos129_item_response_census_runbook.md` 3파일을 가져온다.
 - **사고 대장**: EOS-129 병렬 중복은 PR #1356이 이미 기록했다. 같은 사고를 다시 세지 않는다.
 
+### 2026-09-30 — ARCH-101: 학생 대면 trace 레코드에 관측 모델·재시도 수 적재 — 인프로세스 집계는 지금 두지 않는다(ARCH-63 착지 시 재판정) — 판정 기준 main `ebd7a159`
+- **무엇**: `router.langfuse_fields`가 `Usage.served_model`(응답이 실제로 어느 모델에서 왔나)과 `Usage.retries`(그 호출 1건의 실제 재시도 수)를 `usage`에서 그대로 옮긴다. 미측정은 None이고 0이나 선언 핀으로 접지 않는다. 두 값은 언제나 **텍스트를 만든 호출**의 것이다 — 런타임 LOCAL 강등(ARCH-69)이면 대신 답한 LOCAL 태그가 실리고 `retries`는 None이다(Ollama는 우리 전송기를 타지 않는다 · 실패한 클라우드 시도의 재시도는 싣지 않는다). 설계 문서 `03a_l3_router_design.md` §F.2 표에 두 행을 더했다.
+- **결정(acceptance ④ · 이중 회계)**: 운영에서 두 값은 Langfuse로만 나가지만 **인프로세스 계수는 지금 두지 않는다.** 근거 셋: ① 이중 회계 원칙의 대상은 *판정에 쓰이는 값*인데, 학생 대면 경로에서 이 두 값으로 판정하는 게이트가 지금 없다 — 유일한 소비자인 ARCH-71 프로브는 `RecordingTraceSink`로 같은 레코드를 프로세스 안에서 읽는다 ② 판정에 쓰이는 "누가 답했나"(강등 여부)는 이미 `LocalDegradeCounter`가 `/status`의 `cloud_local_degrade`로 센다 ③ `served_model`만의 고유 정보(선언 핀과 다른가)는 EOS-112가 기계 판정에서 뺀 사람 판정 축이다.
+- **재판정 조건**: ARCH-63(좌석 failover · 1차 좌석 성공률)이 착지하면 `retries`가 "1차 좌석 성공"의 판정 입력이 된다. 그때는 인프로세스 계수가 필요하고 자리는 `CompositeProvider`의 계수가 자연스럽다 — ARCH-63 acceptance에 이 항목을 덧붙였다.
+- **부수**: 교차검증·다중풀이 등 다른 L3 호출부의 레코드에도 두 키가 자동으로 실린다(해 없음 · 호출부별 테스트는 두지 않았다). ARCH-71 학생 대면 런북의 프로브는 `probe_rev=arch101-served-in-trace`로 올렸고, 변경 전·후 트리 대조로 `served.in_trace_record`가 false→true로 바뀌는 것을 확인했다(런북 부록 "ARCH-101 재검증").
 ### 2026-09-29 — HARN-206 작업 그래프 데스크톱 앱 착지 — HARN-182 페이로드를 그대로 그리는 독립 Windows 설치형(Electron) — 판정 기준 main `a28a8d08`
 
 - **요청**: Kiki가 참고 프로그램(EOS Work Graph v0.1.0 · Electron+React · NSIS · 설계안 동봉)을 보고 "참고삼아 더 나은 Windows 프로그램"을 요청. 기존 HARN-182는 브라우저 파일(`work/graph.html`)이라 설치형이 아니었다.

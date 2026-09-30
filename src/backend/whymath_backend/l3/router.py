@@ -623,6 +623,25 @@ def langfuse_fields(
     `degrade_reason` 세 키로 드러난다. 강등 호출 비율을 재는 쪽은 `local_degraded`가 항상
     실린다는 데 기댄다(강등 없음도 False로 명시 — 키 부재와 False를 구분해야 "이 기록은 강등
     축을 모른다"와 "강등이 없었다"가 갈린다).
+
+    `served_model`·`retries`(ARCH-101 — EOS-112의 학생 대면 축)는 `usage`에서 **그대로** 옮긴다.
+    `served_model`은 응답이 실제로 어느 모델에서 왔는가(provider 응답의 모델 식별자)이고,
+    `retries`는 그 호출 1건에서 실제로 일어난 재시도 수다. 미측정은 None이며 **0이나 설정값
+    (선언 핀)으로 접지 않는다** — 0으로 접으면 계측 없는 경로가 '재시도 0%'로, 설정값으로 접으면
+    선언값의 복사본이 '관측'으로 위장된다(`Usage` docstring). 두 값은 언제나 **`usage`를 낸 호출
+    = 텍스트를 만든 호출**을 말한다:
+
+    - 클라우드 정상 응답 — 공급사 응답의 `model`, 전송기 카운터의 이 호출 차분(0 = 계측했고
+      한 번에 성공).
+    - LOCAL 결정 — Ollama 응답의 `model`(데몬이 실제로 로드한 태그), `retries`는 None(Ollama는
+      우리 전송기를 타지 않아 재시도 카운터가 없다).
+    - 런타임 LOCAL 강등(ARCH-69) — `usage`는 **대신 답한 LOCAL 호출**의 것이라 `served_model`은
+      LOCAL 모델이고 `retries`는 None이다. 실패한 클라우드 시도의 재시도는 이 두 키에 실리지
+      않는다(그 시간은 `degrade_cloud_attempt_ms` 안에 있다). 그래서 강등 레코드는
+      `cost_tier`=cloud_*인데 `served_model`=LOCAL 태그다 — 그 어긋남이 "결정과 응답이 갈렸다"는
+      사실 자체다.
+    - usage 없음(캐시 적중·비동기 enqueue·usage 미노출 provider) — 둘 다 None. 캐시 적중의 원
+      생성자는 적재 시점의 미스 레코드에 남아 있다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     family = _as_model_family(decision.local_family)
@@ -648,6 +667,11 @@ def langfuse_fields(
         "input_tokens": usage.input_tokens if usage is not None else None,  # 실측 입력 토큰
         "output_tokens": usage.output_tokens if usage is not None else None,  # 실측 출력 토큰
         "latency_ms": usage.latency_ms if usage is not None else None,  # 실측 지연(ms)
+        # ── 관측(ARCH-101 — EOS-112 학생 대면 축) — "누가 실제로 답했나"·"몇 번 다시 걸었나" ──
+        # usage를 낸 호출의 값을 그대로 옮긴다(강등이면 LOCAL 호출). None을 0·설정값으로 접지
+        # 않는다 — 계측 없음이 '재시도 0'으로, 선언 핀이 '관측'으로 위장된다.
+        "served_model": usage.served_model if usage is not None else None,  # 응답의 모델 식별자
+        "retries": usage.retries if usage is not None else None,  # 이 호출의 실제 재시도 수
         "cost_krw": cost_krw,  # 실측 비용(원) — 로컬 0.0·클라우드 토큰 산정·미상 None
         "call_site": site.value if site is not None else None,  # 호출지점별 분포
         "cache_hit": cache_hit,  # 캐싱 적중률 KPI
