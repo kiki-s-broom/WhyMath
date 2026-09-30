@@ -822,11 +822,11 @@ gates:
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-30
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "2026-09-30 Kiki 판정. 후보 1 미적분Ⅰ '미분' 대단원 선택(고2 · 2028 수능 공통 · 성취기준 10코드). Q1 = 고3 수능 쪽 · Q2 = 성취기준당 대표 개념 1개(437 입도)로 분모 고정, 원자 리프 단위는 다음 단계로 미룸 · Q3 = 대단원 1개. 근거 문서 docs/reviews/p3_01_scope_candidates_2026-09-30.md 3장·4장 (판정 기준 main f0ca37bb · PR #1405)."
+    cleared_by: kiki
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
