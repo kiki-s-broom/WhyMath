@@ -2,6 +2,8 @@
 //
 // 네트워크·플랫폼 채널 없이: fake AuthApi + fake TokenStore를 provider override로 주입한다
 // (chat_controller_test 패턴). 토큰 발급·저장의 *배선*만 검증 — 수학·인증 결정은 서버.
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,7 @@ import 'package:korean_math_app/core/token_refresh_api.dart';
 import 'package:korean_math_app/core/token_store.dart';
 import 'package:korean_math_app/features/auth/application/auth_controller.dart';
 import 'package:korean_math_app/features/auth/data/auth_api.dart';
+import 'package:korean_math_app/features/chat/data/dialogue_store.dart';
 
 class _FakeAuthApi extends AuthApi {
   _FakeAuthApi({this.token, this.shouldThrow = false}) : super(Dio());
@@ -100,11 +103,48 @@ class _ThrowingTokenStore implements TokenStore {
   Future<void> clear() async {}
 }
 
+/// 인메모리 대화 세션 참조 저장소(MOB-11) — 로그아웃 정리 검증용.
+class _FakeDialogueStore implements DialogueStore {
+  _FakeDialogueStore([this.dialogueId]);
+
+  String? dialogueId;
+
+  @override
+  Future<String?> readDialogueId() async => dialogueId;
+
+  @override
+  Future<void> saveDialogueId(String value) async => dialogueId = value;
+
+  @override
+  Future<void> clearDialogueId() async => dialogueId = null;
+}
+
+/// 모든 요청에 401을 돌려주는 어댑터 — dioProvider의 세션 무효 배선(MOB-15)을 네트워크 없이 검증.
+class _UnauthorizedAdapter implements HttpClientAdapter {
+  int requests = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests++;
+    return ResponseBody.fromString('{}', 401, headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 ProviderContainer _container(
   AuthApi api,
   TokenStore store, {
   RefreshTokenStore? refreshStore,
   TokenRefreshApi? refreshApi,
+  DialogueStore? dialogueStore,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -113,6 +153,7 @@ ProviderContainer _container(
       // MOB-12: 리프레시 토큰 저장·서버 로그아웃 호출도 fake로 — 실 구현은 플랫폼 채널/HTTP다.
       refreshTokenStoreProvider.overrideWithValue(refreshStore ?? _FakeRefreshTokenStore()),
       tokenRefreshApiProvider.overrideWithValue(refreshApi ?? _FakeTokenRefreshApi()),
+      dialogueStoreProvider.overrideWithValue(dialogueStore ?? _FakeDialogueStore()),
     ],
   );
   addTearDown(container.dispose);
@@ -165,6 +206,41 @@ void main() {
     expect(store.cleared, isTrue);
     expect(refreshStore.cleared, isTrue);
     expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+  });
+
+  test('logout은 마지막 대화 세션 참조도 지운다(MOB-11 — 다음 학생이 물려받지 않게)', () async {
+    final dialogueStore = _FakeDialogueStore('prev-student-dialogue');
+    final container = _container(
+      _FakeAuthApi(token: 'tok'),
+      _FakeTokenStore()..saved = 'tok',
+      dialogueStore: dialogueStore,
+    );
+    await container.read(authControllerProvider.notifier).logout();
+    expect(dialogueStore.dialogueId, isNull);
+  });
+
+  test('dioProvider 배선(MOB-15): 갱신 불가 401이면 앱 전역 로그아웃으로 미인증이 된다', () async {
+    final store = _FakeTokenStore()..saved = 'expired';
+    final refreshStore = _FakeRefreshTokenStore(); // 리프레시 토큰 없음 → 갱신 불가(네트워크 미호출)
+    final dialogueStore = _FakeDialogueStore('d-1');
+    final container = _container(
+      _FakeAuthApi(token: 'tok'),
+      store,
+      refreshStore: refreshStore,
+      dialogueStore: dialogueStore,
+    );
+    await container.read(authControllerProvider.notifier).restore();
+    expect(container.read(authControllerProvider).isAuthenticated, isTrue);
+
+    final adapter = _UnauthorizedAdapter();
+    final dio = container.read(dioProvider)..httpClientAdapter = adapter;
+    await expectLater(dio.get<dynamic>('/v1/me/sessions'), throwsA(isA<DioException>()));
+
+    // 부분 정리(토큰만 삭제)가 아니라 로그아웃 전체 정리 — 앱 상태까지 미인증으로 맞는다.
+    expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+    expect(store.saved, isNull);
+    expect(dialogueStore.dialogueId, isNull);
+    expect(adapter.requests, 1, reason: '401→정리 경로가 요청을 재발사하면 안 된다(재귀·루프 없음)');
   });
 
   test('logout: 서버 호출 실패해도 로컬 정리·미인증은 반드시 수행된다', () async {

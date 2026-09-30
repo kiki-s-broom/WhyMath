@@ -179,7 +179,7 @@ class TestObserveCrosslinkShadow:
 # ② never-break(비차단) — resolve가 raise해도 본류 안 깸
 # ──────────────────────────────────────────────────────────────────────────
 class TestNeverBreak:
-    def test_resolver_raises_returns_none(self) -> None:
+    def test_resolver_raises_returns_none(self, caplog: pytest.LogCaptureFixture) -> None:
         """resolve(DB 미도달 등)가 raise → 예외 전파 0·반환 None(적재 본류 보호)."""
 
         class _BoomResolver:
@@ -187,7 +187,20 @@ class TestNeverBreak:
                 raise RuntimeError("DB 미도달")
 
         # raise를 삼키고 정상 반환(예외 전파 0)하면 통과 — 반환은 항상 None(비노출 불변).
-        observe_crosslink_shadow(_VALID_KEBAB, resolver=_BoomResolver())  # type: ignore[arg-type]
+        with caplog.at_level(logging.WARNING, logger="whymath.l4.misconception.crosslink_shadow"):
+            observe_crosslink_shadow(_VALID_KEBAB, resolver=_BoomResolver())  # type: ignore[arg-type]
+        # 침묵 실패 금지(CLAUDE.md) — 타입명은 남기고 예외 메시지·트레이스백은 남기지 않는다
+        # (예외 메시지는 학생 발화·답안을 담을 수 있다 — 미성년자 PII).
+        warnings = [
+            r
+            for r in caplog.records
+            if r.name == "whymath.l4.misconception.crosslink_shadow"
+            and r.levelno == logging.WARNING
+        ]
+        assert len(warnings) == 1
+        assert "RuntimeError" in warnings[0].getMessage()
+        assert "DB 미도달" not in warnings[0].getMessage()
+        assert warnings[0].exc_info is None
 
     def test_async_wrapper_never_breaks(self) -> None:
         """async 래퍼도 resolve raise를 삼킨다(to_thread 방어선)."""
