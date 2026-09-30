@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -27,6 +27,6 @@ paths:
   - src/mobile/lib/features/chat/presentation/chat_screen.dart
   - src/mobile/lib/features/chat/presentation/coach_signal_card.dart
   - "src/mobile/test/**"
-session: null
+session: claude/fervent-goldberg-s8y8ws
 notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §3-2·§5 R4 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 네 항목 모두 정적 분석만으로 낭비가 확정된 것만 골랐다(실측 계측 없이도 효과 판정 가능). 등급 P1 근거: 12월 내부 테스트 계정 표본 수집 중 학생앱 체감 품질을 높이지만 없어도 검증은 성립한다."
-updated: 2026-09-25
+updated: 2026-09-30
