@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-202-ci-mirror-step-time-regression
+title: "CI 미러가 스텝 소요 회귀를 못 본다 — 로컬 pytest 1,095→1,502초(+37%)를 통과로 표시했고 같은 커밋 CI backend 잡은 35분 상한에서 취소(PR #1380)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 진단 재현 — 미러가 스텝의 *성패*만 보고 *소요*는 보지 않아, 시간 회귀를 품은 변경을 통과로 보고한다는 것을 합성 이력으로 재현한다. 실측(2026-09-29 PR #1380 CONST-09): 로컬 미러 backend 잡 Pytest 스텝이 base 1,095초 → 변경 후 1,502초(+37%)였는데 `✔`로 표시됐고, 같은 커밋의 CI backend 잡은 35분 상한에 걸려 pytest 99% 지점에서 cancelled(`--dist loadfile`이라 무거운 파일 몇 개가 꼬리를 이뤘다).\n② 절대값이 아니라 기준선 대비로 판정한다 — 로컬 1,502초(25분)는 35분 상한 *안*이었다. 즉 \"로컬 소요 < timeout-minutes\"는 이번 사고를 통과시키는 검사다(반례를 픽스처로 동결). 미러는 스텝별 소요를 base 커밋(merge-base 또는 origin/main) 키로 로컬 이력에 기록하고, 같은 스텝의 이번 소요가 기준선 대비 일정 비율(초안 +20%) 이상이면 '시간 회귀' 상태로 낸다 — 통과(exit 0)가 아니다(HARN-180의 exit 3처럼 '통과 아님'으로 구분).\n③ 모른다 ≠ 아니다 — 기준선이 없으면(이력 0건·다른 머신·다른 워커 수) '기준선 없음'으로 드러내고 '회귀 없음'으로 접지 않는다. 최종 줄에 잡의 `timeout-minutes`(ci.yml에서 직접 읽음 — 하드코딩 금지)와 로컬 소요 비율도 함께 낸다.\n④ 변별력 — 합성 이력 픽스처로 회귀(RED)·대조군 무회귀(GREEN)·기준선 없음(별도 상태) 3상태, 그리고 ②의 '상한 안이지만 기준선 대비 회귀' 반례. 뮤테이션으로 각 절의 반례를 밟는다(비율 판정 제거·기준선 없음을 무회귀로 접기·timeout 하드코딩)."
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+  - "tests/harness/test_ci_mirror*.py"
+session: null
+notes: "발견 경위: 2026-09-29 PR #1380(CONST-09 학생 입력 CAS 안전 파싱)의 CI backend 잡이 35분 상한에 걸려 cancelled. 원인은 안전 파서가 문자열을 두 번 읽어(구조 파싱 + 실제 파싱) 파싱 1회당 약 2배가 된 것이고, 테스트 스위트가 같은 문자열을 반복 파싱해(문자열 sympify 52.6만 건 중 고유 2.4만 건) 그 비용이 누적됐다. 푸시 전 로컬 미러는 Pytest 스텝을 1,502초 걸려 통과로 표시했다 — 직전 base 실행은 1,095초였는데 미러는 그 비교를 하지 않는다. 즉시 조치는 PR #1380 안에서 판정 캐시 확대(4,096 → 32,768칸)로 했다. 이 태스크는 '미러가 시간 회귀를 못 본다'는 재발 축을 막는다. OPS-100(main CI 잡별 시간 여유 상시 감시)은 *머지 뒤* 누적 소진을 보는 사후 감시라 *푸시 전* 변경 단위 회귀는 다루지 않는다 — 축이 겹치지 않는다. 사고 대장 계열: ci-job-timeout-exhausted 2회차(1회차 OPS-69 harness-integrity)."
+updated: 2026-09-29

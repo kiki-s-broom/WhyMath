@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -445,6 +446,54 @@ class Usage:
     """
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 런타임 LOCAL 강등 (ARCH-69) — "클라우드로 나간 호출이 실패해 LOCAL이 대신 답했다"는 사실
+#
+# 라우팅 시점의 LOCAL 강등(`guard_cloud`·`guard_data_export`)은 *결정*이 이미 LOCAL이라 이 타입이
+# 필요 없다. 이 타입은 결정은 CLOUD_*였는데 **응답은 LOCAL이 했다**는, 결정과 응답이 어긋난 호출만
+# 나른다 — 그 어긋남이 응답·trace·Langfuse에서 사라지면 클라우드 품질로 답한 것처럼 읽힌다.
+# ──────────────────────────────────────────────────────────────────────────
+DegradeReason = Literal["rate_limited", "server_error", "timeout", "not_configured"]
+"""런타임 LOCAL 강등의 사유 코드 — 이 네 값뿐이다.
+
+분류의 단일 좌석은 `l3.providers.seat_failure.classify_seat_failure`다(타입·구조 속성으로 판정,
+메시지 문자열은 읽지 않는다). 4xx(요청·인증·계약 오류)는 사유가 **없다** — 강등하지 않고 원래
+예외가 올라간다(같은 실패가 반복될 뿐이고 LOCAL 응답이 원인을 가린다).
+"""
+
+
+@dataclass(slots=True, frozen=True)
+class LocalDegrade:
+    """클라우드 1차 좌석 실패 → LOCAL 강등이 **실제로 일어났고 LOCAL이 답했다**는 기록.
+
+    `GenerationResult.local_degrade`가 None이면 강등이 없었다는 뜻이다(정상 호출). 이 객체가
+    있으면 그 응답은 `decision.cost_tier`(라우터가 원한 클라우드)와 무관하게 **LOCAL이 만들었다** —
+    파이프라인은 원가를 LOCAL(0원)로 계상하고, 강등 응답을 클라우드 캐시 키에 저장하지 않으며,
+    trace·응답에 이 사실을 싣는다. 검증(shadow validator 등)은 이 객체의 유무와 무관하게
+    똑같이 적용된다 — 강등은 `provider.generate` **안에서** 일어나 파이프라인 위쪽은 그것을
+    구별하지 않기 때문이다(`test_cloud_runtime_local_degrade.py`가 동결한다).
+    """
+
+    reason: DegradeReason
+    """강등 사유 코드.
+
+    rate_limited(429) · server_error(5xx) · timeout(408·타임아웃) · not_configured(미설정).
+    """
+
+    from_seat: str | None
+    """강등 직전의 클라우드 1차 좌석 이름. **좌석 미상이면 None**(기본 좌석으로 접지 않는다)."""
+
+    cloud_error_type: str
+    """원 클라우드 예외의 타입명 — 시크릿·응답 본문을 싣지 않는다(침묵 실패 금지의 타입명 규칙)."""
+
+    served_decision: RoutingDecision
+    """실제로 답한 LOCAL 결정 — 원가(0원)·`served` 패밀리/크기 관측의 근거."""
+
+    cloud_attempt_ms: float | None = None
+    """실패한 클라우드 시도가 쓴 벽시계 시간(ms) — 학생이 기다린 시간은 LOCAL 지연이 아니라 이 값
+    + LOCAL 지연이다. 전송기의 재시도·백오프가 이 안에 들어 있다. 미계측이면 None."""
+
+
 @dataclass(slots=True, frozen=True)
 class GenerationResult:
     """`LLMProvider.generate`의 반환형 — 검증 전 원시 텍스트 + 실측 usage.
@@ -464,3 +513,11 @@ class GenerationResult:
 
     usage: Usage | None = None
     """실측 usage — provider가 노출하지 않으면 None(지어내지 않음)."""
+
+    local_degrade: LocalDegrade | None = None
+    """런타임 LOCAL 강등이 일어났으면 그 기록, 아니면 None(ARCH-69).
+
+    None이 "강등 없음"의 유일한 표현이다 — 강등 미장착 조립(저작·측정 경로)과 강등이 필요 없던
+    정상 호출이 같은 None으로 나온다. 둘을 가르는 것은 `CompositeProvider.local_degrade_snapshot()`
+    의 `armed`다. 이 필드가 있어도 `text`는 여전히 *검증 전 원시 출력*이다.
+    """

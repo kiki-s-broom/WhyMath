@@ -489,6 +489,12 @@ Kiki 판단: *"우리는 일단 개발과정에 사용할건데 byok까지 할 �
 >   `build_cloud_provider()` 경유 · 동결 테스트 `test_default_cloud_provider_is_openrouter` ·
 >   `test_student_facing_app_assembles_cloud_seat_through_the_factory` ·
 >   동작 계약 `tests/backend/l3/test_cloud_mid_seat_cutover.py`. 결정 로그 = `MEMORY.md` 2026-09-29 ARCH-64.
+> - **정정(2026-09-29 · ARCH-69)** — 위 "가용성 처분" 항의 "다른 좌석·LOCAL로 자동 재시도되지 않는다(LOCAL
+>   강등은 라우팅 시점 구독·예산 가드에서만)"는 학생 대면 서빙 조립에서 더는 참이 아니다. 2차 **클라우드**
+>   좌석이 없다는 결정은 그대로지만, 1차 좌석이 429·5xx·타임아웃·미설정으로 실패하면 학생 대면
+>   조립은 LOCAL로 1회 강등한다(응답·trace에 `degraded_from_seat`·사유 표기 · 4xx는 강등 안 함).
+>   저작·측정 조립(이 런북의 배틀 포함)은 강등이 없어 실패가 실패로 남는다 — 측정이 LOCAL 응답을 클라우드
+>   좌석의 응답으로 기록하지 않는다. 동작 계약 `tests/backend/l3/test_cloud_runtime_local_degrade.py`.
 
 #### 판정에서 뺀 축과 그 이유
 

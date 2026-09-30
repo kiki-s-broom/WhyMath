@@ -29,6 +29,7 @@ from whymath_backend.l3.data_export_policy import (
 from whymath_backend.l3.models import (
     CallSite,
     CostTier,
+    LocalDegrade,
     LocalModelTier,
     ModelFamily,
     RoutingDecision,
@@ -405,6 +406,59 @@ def cloud_cost(req: RoutingRequest, cost: CostTier, seat: CloudSeat = SERVING_CL
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# 런타임 LOCAL 강등의 대상 결정 (ARCH-69) — 실패한 클라우드 호출을 무엇이 대신 답하는가
+#
+# `guard_cloud`(위)는 **라우팅 시점**에 클라우드를 막는다. 이 함수는 그 반대 시점 — 이미 CLOUD_*로
+# 결정돼 디스패치된 호출이 실패한 **뒤** — 의 LOCAL 대상을 정한다. 둘은 같은 LOCAL이지만 다른
+# 사건이라(하나는 결정, 하나는 결정과 응답의 어긋남) 이름·기록·계수가 분리된다.
+# ──────────────────────────────────────────────────────────────────────────
+DEGRADE_LOCAL_FAMILY: Final[ModelFamily] = ModelFamily.MATH
+"""강등 대상 패밀리 — 라우터 축3의 안전 기본값과 같다(`Router._decide_family` 마지막 분기).
+
+**한계(명시)**: CLOUD_* 결정에는 task_type·call_site가 실려 있지 않아(`RoutingDecision`은 클라우드
+경로에서 축3을 비운다 — 불변식 4) 강등 시점에 NLP 계열(추출·정규화·매칭·분류)인지 알 수 없다.
+NLP를 수학 특화 모델로 돌리면 7b조차 0%였다(03a §0.2 실측). 현재 서빙에서 CLOUD_MID는
+`requires_reasoning` + premium 이상으로만 승급하므로(`business_cost_tier` 규칙 4) NLP 호출이
+여기로 오는 일은 드물지만 0은 아니다 — 패밀리 힌트를 결정에 싣는 것은 별도 설계 사안이다.
+"""
+
+DEGRADE_LOCAL_TIER: Final[LocalModelTier] = LocalModelTier.MID
+"""강등 대상 크기 — **동기로 부를 수 있는 가장 큰 로컬 모델**이다.
+
+CLOUD_* 결정은 항상 `mode="sync"`(03a §C.4)라 비동기 전용인 QUALITY(27b/MoE)는 쓸 수 없고,
+클라우드가 답했을 자리(어려운 진단·코칭)이므로 즉답용 FAST보다 MID(p50≈3.9초)가 맞다.
+"""
+
+
+def local_degrade_decision(decision: RoutingDecision) -> RoutingDecision:
+    """CLOUD_* 결정에서 런타임 강등 대상 LOCAL 결정을 만든다 — 비용·크기·패밀리는 위 두 상수.
+
+    LOCAL 결정을 넣으면 **오류**다 — 이미 LOCAL인 호출은 강등할 곳이 없고, 조용히 그대로 돌려주면
+    호출부의 "강등이 일어났다"는 판단이 거짓이 된다. 데이터 등급(`data_licenses`)·반출 판정 사유는
+    **승계**한다(LOCAL은 국내라 게이트가 막을 것이 없으므로 `data_export_blocked`는 False —
+    이 결정은 법적 게이트가 강등시킨 것이 아니라 가용성 실패가 강등시킨 것이다).
+    """
+    cost = _as_cost_tier(decision.cost_tier)
+    if cost is CostTier.LOCAL:
+        raise ValueError("이미 LOCAL인 결정은 런타임 강등 대상이 아니다(강등할 곳이 없다).")
+    return RoutingDecision(
+        cost_tier=CostTier.LOCAL,
+        local_family=DEGRADE_LOCAL_FAMILY,
+        local_model=DEGRADE_LOCAL_TIER,
+        mode="sync",
+        reason=(
+            f"local/{DEGRADE_LOCAL_FAMILY.value}/{DEGRADE_LOCAL_TIER.value} "
+            f"(runtime degrade from {cost.value})"
+        ),
+        est_latency_ms=local_latency(DEGRADE_LOCAL_TIER),
+        est_cost_krw=0.0,  # 로컬은 0원
+        data_export_blocked=False,
+        data_export_reason=decision.data_export_reason,
+        data_licenses=decision.data_licenses,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 구독·예산 가드 (03a §D.4 guard_cloud)
 # ──────────────────────────────────────────────────────────────────────────
 def guard_cloud(
@@ -519,6 +573,16 @@ def cache_key_for(
 # ──────────────────────────────────────────────────────────────────────────
 # Langfuse 태그 (03a §F.2 — dict만 생성, 실제 전송 X)
 # ──────────────────────────────────────────────────────────────────────────
+def _served_local_label(degrade: LocalDegrade) -> str:
+    """강등으로 답한 LOCAL 모델의 `패밀리/크기` 표기 — trace에서 "어느 로컬이 답했나"를 읽는다."""
+    served = degrade.served_decision
+    family = _as_model_family(served.local_family)
+    local = _as_local_tier(served.local_model)
+    family_id = family.value if family is not None else "-"
+    local_id = local.value if local is not None else "-"
+    return f"{family_id}/{local_id}"
+
+
 def langfuse_fields(
     decision: RoutingDecision,
     *,
@@ -532,6 +596,7 @@ def langfuse_fields(
     content_source: str | None = None,
     training_allowed: bool | None = None,
     cloud_seat: str | None = None,
+    local_degrade: LocalDegrade | None = None,
 ) -> dict[str, object]:
     """Langfuse 기록 필드 dict 생성 (03a §F.2 표).
 
@@ -551,6 +616,32 @@ def langfuse_fields(
     `cloud_seat`(ARCH-64)는 클라우드 호출이 실제로 나간 좌석 이름(`openrouter` 등)이다 —
     `cost_krw`가 어느 단가표로 계상됐는지를 같은 레코드가 말하게 한다. LOCAL·캐시 적중·미상은
     None이다(좌석을 모르는 것을 기본 좌석으로 채우지 않는다).
+
+    `local_degrade`(ARCH-69)는 클라우드로 결정됐으나 **LOCAL이 대신 답한** 호출의 기록이다. 그
+    호출은 `cost_tier`(라우터의 결정)가 클라우드 그대로고 `cost_krw`는 LOCAL(0원)이며
+    `cloud_seat`는 None이다 — 그 어긋남이 `local_degraded`·`degraded_from_seat`·
+    `degrade_reason` 세 키로 드러난다. 강등 호출 비율을 재는 쪽은 `local_degraded`가 항상
+    실린다는 데 기댄다(강등 없음도 False로 명시 — 키 부재와 False를 구분해야 "이 기록은 강등
+    축을 모른다"와 "강등이 없었다"가 갈린다).
+
+    `served_model`·`retries`(ARCH-101 — EOS-112의 학생 대면 축)는 `usage`에서 **그대로** 옮긴다.
+    `served_model`은 응답이 실제로 어느 모델에서 왔는가(provider 응답의 모델 식별자)이고,
+    `retries`는 그 호출 1건에서 실제로 일어난 재시도 수다. 미측정은 None이며 **0이나 설정값
+    (선언 핀)으로 접지 않는다** — 0으로 접으면 계측 없는 경로가 '재시도 0%'로, 설정값으로 접으면
+    선언값의 복사본이 '관측'으로 위장된다(`Usage` docstring). 두 값은 언제나 **`usage`를 낸 호출
+    = 텍스트를 만든 호출**을 말한다:
+
+    - 클라우드 정상 응답 — 공급사 응답의 `model`, 전송기 카운터의 이 호출 차분(0 = 계측했고
+      한 번에 성공).
+    - LOCAL 결정 — Ollama 응답의 `model`(데몬이 실제로 로드한 태그), `retries`는 None(Ollama는
+      우리 전송기를 타지 않아 재시도 카운터가 없다).
+    - 런타임 LOCAL 강등(ARCH-69) — `usage`는 **대신 답한 LOCAL 호출**의 것이라 `served_model`은
+      LOCAL 모델이고 `retries`는 None이다. 실패한 클라우드 시도의 재시도는 이 두 키에 실리지
+      않는다(그 시간은 `degrade_cloud_attempt_ms` 안에 있다). 그래서 강등 레코드는
+      `cost_tier`=cloud_*인데 `served_model`=LOCAL 태그다 — 그 어긋남이 "결정과 응답이 갈렸다"는
+      사실 자체다.
+    - usage 없음(캐시 적중·비동기 enqueue·usage 미노출 provider) — 둘 다 None. 캐시 적중의 원
+      생성자는 적재 시점의 미스 레코드에 남아 있다.
     """
     cost = _as_cost_tier(decision.cost_tier)
     family = _as_model_family(decision.local_family)
@@ -576,6 +667,11 @@ def langfuse_fields(
         "input_tokens": usage.input_tokens if usage is not None else None,  # 실측 입력 토큰
         "output_tokens": usage.output_tokens if usage is not None else None,  # 실측 출력 토큰
         "latency_ms": usage.latency_ms if usage is not None else None,  # 실측 지연(ms)
+        # ── 관측(ARCH-101 — EOS-112 학생 대면 축) — "누가 실제로 답했나"·"몇 번 다시 걸었나" ──
+        # usage를 낸 호출의 값을 그대로 옮긴다(강등이면 LOCAL 호출). None을 0·설정값으로 접지
+        # 않는다 — 계측 없음이 '재시도 0'으로, 선언 핀이 '관측'으로 위장된다.
+        "served_model": usage.served_model if usage is not None else None,  # 응답의 모델 식별자
+        "retries": usage.retries if usage is not None else None,  # 이 호출의 실제 재시도 수
         "cost_krw": cost_krw,  # 실측 비용(원) — 로컬 0.0·클라우드 토큰 산정·미상 None
         "call_site": site.value if site is not None else None,  # 호출지점별 분포
         "cache_hit": cache_hit,  # 캐싱 적중률 KPI
@@ -597,6 +693,17 @@ def langfuse_fields(
         # 클라우드 좌석(ARCH-64) — cost_krw의 단가 좌석. 2차 좌석이 없으므로(ARCH-66 기간) 한 호출에
         # 좌석은 하나뿐이다; failover가 붙으면(ARCH-63) 시도 좌석·응답 좌석을 따로 싣는다.
         "cloud_seat": cloud_seat,
+        # ── 런타임 LOCAL 강등(ARCH-69) — 결정(cost_tier)과 응답(누가 답했나)의 어긋남 ──
+        # 항상 싣는다: 강등 없음도 `False`로 적어야 이 기록이 강등 축을 아는 기록임이 드러난다.
+        "local_degraded": local_degrade is not None,
+        "degraded_from_seat": local_degrade.from_seat if local_degrade is not None else None,
+        "degrade_reason": local_degrade.reason if local_degrade is not None else None,
+        "degraded_to_local": (
+            _served_local_label(local_degrade) if local_degrade is not None else None
+        ),
+        "degrade_cloud_attempt_ms": (
+            local_degrade.cloud_attempt_ms if local_degrade is not None else None
+        ),
     }
 
 

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-37-kpi5-erasure-traceability-disposition
+title: "KPI ⑤ Traceability가 삭제권 이행(DELETE /v1/me)으로 세션 조인이 끊긴 추천을 끊김으로 계상한다 — 무관용 축이 학생 1명의 삭제에 FAIL"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates:
+  - G-eos37-erasure-kpi-disposition
+acceptance:
+  - "① 실측 사실(EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5 · 판정 기준 main a82f9449): 판정 하네스가 `DELETE /v1/me`로 지운 학습자의 추천 40건이 전건 `break_learner_unjoined`로 계상돼 `ops/loop_kpi_gate` ⑤ FAIL 40/40. 깨끗한 DB 보조 측정에서는 6/13이고 남긴 학습자의 추천 7건은 끊김 0건. 수집기 관측범위 문구 자신이 \"세션 기록 실패 placeholder와 구별할 수 없다\"고 적는다.\n② 처분 판정 선행 — (가) 삭제 원장(`privacy/erasure.py`)이 지운 세션 id를 남기고 수집기가 그것을 `excluded_erased`로 분모에서 빼 detail에 보고 (나) 삭제 시 그 세션의 추천 evidence_event를 함께 삭제하거나 익명 tombstone(PED-03 user_id 비보유 설계와의 정합 판정) (다) 현행 유지 — 판정 하네스 teardown 순서만 조정하고 운영 오염 수용. PIPA 삭제권 표면이므로 결정 전에는 구현하지 않는다.\n③ 모른다 ≠ 아니다 — 삭제 증거가 없는 끊김은 계속 끊김으로 센다.\n④ 변별력 두 방향 — 삭제 주입 → excluded(끊김 아님) · 세션 기록 실패 placeholder 주입 → 끊김 유지 · 대조군: 남긴 학습자의 추천은 `traced_full`.\n⑤ 선행으로 걸 태스크: P3-17-week3-release-gate-judgment (amend --depends로 집행)."
+  - "[추가 2026-09-30 · 판정 기준 main `85f934a4`] 소유 경계: (나)를 고르면 `evidence_event` 파기 배선(계정 삭제·개별 세션 삭제)은 SEC-40이 맡고 이 태스크는 KPI 수집기 쪽만 한다(중복 구현 방지). 판정 시 함께 볼 사실: 삭제 뒤 남는 `evidence_event`는 재연결 경로 2건(개별 세션 삭제의 증빙 로그 user_id+세션 ID · 계정 삭제의 HMAC 바인딩+잔존 user_id)의 대상이다. (가)는 지운 세션 ID를 더 남기므로 이 표면을 넓히고, (나)만 닫는다. (가)를 고르려면 변호사 회신(`docs/legal/pipa_data_matrix.md` §5)을 먼저 받는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/loop_kpi_gate.py
+  - src/backend/whymath_backend/privacy/erasure.py
+  - "tests/backend/ops/**"
+session: null
+notes: "EOS-141 Gate 2 3차 재판정(docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §7-1 P-2) acceptance ⑨에 따른 등재 — KPI ⑤ 측정 오염의 처분. PIPA 삭제권 표면이라 처분(가)(나)(다) 결정이 구현보다 먼저다.\n\n[정정 2026-09-29] acceptance ② 처분 판정 선행을 대장에 집행 — PIPA 삭제권 표면의 선택은 Kiki 결정이므로 결정 게이트를 붙여 selector가 결정 전 착수를 막게 한다(산문 선행만으로는 next가 이 태스크를 1순위로 올렸다)\n\n[정정 2026-09-30] evidence_event 파기 배선의 소유 경계와 재연결 경로 사실 병기 — 2026-09-30 Kiki 검토의견 승인"
+updated: 2026-09-30
