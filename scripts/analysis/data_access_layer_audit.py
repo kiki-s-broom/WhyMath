@@ -117,6 +117,12 @@ CLEAN_LAYERS: tuple[str, ...] = ("schema", "lang", "l5", "l6")
 BASELINE: dict[str, frozenset[str]] = {
     "api": frozenset(
         {
+            # EOS-146 — `api/me.py`의 오답 오개념 스캔이 **그대로 내려온 것**이다(신규 접근점
+            # 아님·같은 쿼리 2건: 문항의 distractor_map·question_text 조회). 코치 서버 판정 오답
+            # 적재가 같은 스캔을 같은 조건으로 돌려야 두 채점 경로가 같은 R3 입력을 내므로
+            # (EOS-134의 "같은 입력 → 같은 전이" 규율), 두 라우터가 서로를 import하지 않고 함께 쓰는
+            # 좌석으로 옮겼다. 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
+            "api/_attempt_misconception_scan.py",
             "api/_auth.py",
             "api/_concept_orchestration.py",
             # EOS-19 — `api/me.py`의 수능 분기가 정책 구현체로 이동한 것이다(신규 접근점
