@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:korean_math_app/app.dart';
+import 'package:korean_math_app/features/onboarding/data/onboarding_store.dart';
 import 'package:korean_math_app/features/onboarding/data/user_api.dart';
 import 'package:korean_math_app/features/problems/data/problem_models.dart';
 import 'package:korean_math_app/features/problems/data/problems_api.dart';
@@ -59,11 +60,23 @@ class _FakeUserApi extends UserApi {
   }
 }
 
-Widget _app() {
+/// 메모리 OnboardingStore — 완료 지점이 "봤음"을 영속하는지(MOB-11) 기록한다.
+class _FakeOnboardingStore implements OnboardingStore {
+  bool seen = false;
+
+  @override
+  Future<bool> hasSeenOnboarding() async => seen;
+
+  @override
+  Future<void> markOnboardingSeen() async => seen = true;
+}
+
+Widget _app({OnboardingStore? onboardingStore}) {
   return ProviderScope(
     overrides: [
       problemsApiProvider.overrideWithValue(_FakeProblemsApi()),
       userApiProvider.overrideWithValue(_FakeUserApi()),
+      onboardingStoreProvider.overrideWithValue(onboardingStore ?? _FakeOnboardingStore()),
     ],
     child: const WhyMathApp(),
   );
@@ -153,5 +166,30 @@ void main() {
     // 예외 없이 렌더되고 첫 페이지 콘텐츠가 존재한다(스크롤 안쪽).
     expect(tester.takeException(), isNull);
     expect(find.text('답이 아닌, 이유를 묻습니다'), findsOneWidget);
+  });
+
+  testWidgets('"건너뛰기" 완료 지점은 온보딩 "봤음"을 영속한다(MOB-11 — 다음 실행부터 재노출 안 함)', (tester) async {
+    final store = _FakeOnboardingStore();
+    await tester.pumpWidget(_app(onboardingStore: store));
+    await tester.pumpAndSettle();
+    expect(store.seen, isFalse);
+
+    await tester.tap(find.text('건너뛰기'));
+    await tester.pumpAndSettle();
+
+    expect(store.seen, isTrue);
+  });
+
+  testWidgets('"시작하기" 완료 지점도 온보딩 "봤음"을 영속한다(MOB-11)', (tester) async {
+    final store = _FakeOnboardingStore();
+    await tester.pumpWidget(_app(onboardingStore: store));
+    await tester.pumpAndSettle();
+    await _advanceToForm(tester);
+
+    await tester.tap(find.widgetWithText(FilledButton, '시작하기'));
+    await tester.pumpAndSettle();
+
+    expect(store.seen, isTrue);
+    expect(find.byType(ProblemScreen), findsOneWidget);
   });
 }

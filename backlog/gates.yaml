@@ -25,6 +25,18 @@ gates:
     cleared_by: null
     notes: ""
     corrections: []
+  - id: G-android-release-store-signing
+    title: "Android 스토어 배포 전 release 서명키 생성·keystore 배선 필수(현재 debug 키로 서명 중)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-30
+    remind_after_days: 30
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "keystore 생성·Play Console 서명키 등록은 Kiki 소유 비밀·계정 행위라 선행 태스크가 없다 — 코드 쪽 추적은 build.gradle 주석과 test/android_release_signing_gate_test.dart(MOB-18)"
   - id: G-arch38-verdict-recheck
     title: "ARCH-38 '혼입 유지' 판정의 재확인 (재확인 지점 = W8 종료 직후 2026-10-26) — 판정 근거 3종 중 정적으로 확정 불가한 ②③ 축을 사람이 확인한다. ②assessment JSONB 5필드에 *갱신* writer가 생겼는가(현행 write-once·하루 1행 idempotency) ③5필드를 값으로 읽어 판단에 쓰는 서빙 reader가 착지했는가(직렬화는 소비 아님·ASM-11 진행 여부). 근거 ①(W8 경로 접촉 0)은 사람이 볼 필요 없다 — tests/backend/db/test_assessment_result_verdict_premise.py가 자동으로 RED를 낸다. 판정 3택: ①판정 유지(트리거 미발동 — 기본값·ARCH-40을 재생성해 감시 지속) ②재판정 착수(canonical_entity_model_v1.md §5 절차) ③영구 확정으로 종결. 근거 = 정본 §3-C · MEMORY 2026-09-06 결정 로그 · PR #997. 등재 이유: Codex P2 지적 수용 — 재확인을 태스크로만 등재하면 selector가 즉시 착수 후보로 계산해(실측: 후보 124건에 포함) 트리거를 기다리지 않는다. G-state-machine-deferral-recheck 선례 동형"
     kind: decision

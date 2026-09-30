@@ -355,5 +355,8 @@ async def observe_wh1_harness_shadow(
             turn_index=turn_index,
             problem_id=problem_id,
         )
-    except Exception:  # noqa: BLE001 — 관측은 본류를 안 깬다(비차단 방어선·shadow.py:244 미러)
+    # 관측 방어선 — 관측은 본류를 안 깬다(비차단 방어선·shadow.py:244 미러)
+    except Exception as exc:  # noqa: BLE001
+        # 침묵 실패 금지 — 타입명만 남긴다(메시지·트레이스백은 학생 발화를 담을 수 있어 제외).
+        logger.warning("WH-1 하네스 shadow 관측 실패: %s", type(exc).__name__)
         return
