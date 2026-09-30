@@ -2405,8 +2405,12 @@
    "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
+    "MEMORY.md",
+    "docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md",
+    "scripts/analysis/mutate_gate_attach_guards.py",
     "scripts/harness/backlog.py",
     "scripts/harness/remote_claims.py",
+    "scripts/harness/report.py",
     "scripts/harness/selector.py",
     "tests/harness/test_*gate*claim*.py"
    ],
@@ -3414,8 +3418,12 @@
    "kind": "incident",
    "ref": "2026-09-29",
    "paths": [
+    "MEMORY.md",
+    "docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md",
+    "scripts/analysis/mutate_gate_attach_guards.py",
     "scripts/harness/backlog.py",
     "scripts/harness/remote_claims.py",
+    "scripts/harness/report.py",
     "scripts/harness/selector.py",
     "tests/harness/test_*gate*claim*.py"
    ],
