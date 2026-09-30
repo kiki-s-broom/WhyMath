@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -16,10 +16,13 @@ acceptance:
   - "② 변별력 양방향 — hermetic 대장 픽스처에서 사고 1건 add 직후 jit check가 exit 0임을 동결하고, 재생성 배선을 제거하는 뮤테이션을 주입하면 같은 테스트가 RED가 됨을 확인한다(주입 적용 단언 포함)"
   - "③ 경계 — 인덱스 형식·주입 로직·check-edit 훅은 HARN-121 소관이다. 이 태스크는 쓰기 경로에서 렌더 결과를 함께 갱신하는 배선만 한다"
   - "④ 태스크 대장 쓰기 경로 편입 (2026-09-29 실측으로 추가) — 인덱스는 사고·규칙 대장뿐 아니라 태스크의 paths에서도 파생된다(jit_rules._task_paths가 태스크 번호 프리픽스별 paths 합집합을 만든다). 그러므로 태스크의 paths를 바꾸는 쓰기(backlog.py amend --path · add --path · rename)도 쓰기 직후 인덱스를 재생성해야 한다. ①은 사고·규칙 대장만 명시해 이 경로가 범위 밖이었다. 실측: HARN-162 세션이 incident add 뒤 jit build로 인덱스를 맞추고 jit check exit 0을 확인했는데, 그 뒤 amend --path로 paths를 정정하자 인덱스가 다시 어긋났다 — 로컬 CI 미러의 harness-integrity가 jit check 스텝에서 exit 1로 잡았고 뒤 스텝 10건이 미실행이 됐다(push 전 검출). 변별력: 태스크 paths 변경 직후 jit check가 exit 0임을 동결하고, 재생성 배선을 제거하는 뮤테이션에서 RED가 됨을 확인한다(paths가 인덱스에 닿는 태스크를 픽스처로 써야 그 절을 밟는다 — 인덱스에 안 닿는 태스크의 paths 변경은 재생성 없이도 GREEN이라 검출 실패가 아니다)."
-artifacts: []
+  - "[정정 2026-09-29 — 기제 교체 · 분기 기준 main 120bd7c5] ①이 전제한 재생성 대상(커밋된 backlog/jit_index.json)이 HARN-130에서 없어졌다 — 사고를 등재한 PR끼리 그 파일에서 충돌했으므로 커밋을 중단하고 적시 주입 후보를 편집 시 대장에서 계산하게 했다. 그래서 ①의 문자 그대로(쓰기 직후 파일 재생성·실패 시 jit build 안내)는 이행할 대상이 없고, ①의 목적 두 가지는 구조적으로 성립한다: (가) 쓰기 뒤 주입이 낡지 않는다 — 읽는 쪽이 대장을 직접 본다 (나) 재생성을 잊어 CI가 red가 되는 경로가 없다 — CI jit check는 이제 커밋 파일 대조가 아니라 '대장에서 계산되는가'(0건·스키마 위반 red)를 보므로 사고 등재가 그 스텝을 red로 만들 수 없다. 옛 안내대로 jit build를 돌려도 파일을 만들지 않고 같은 검사만 한다. ② 변별력은 같은 의도로 재정의했다: tests/harness/test_jit_rules.py::TestLedgerWritesNeedNoRebuild — hermetic 저장소에서 incident add 직후 다른 명령 없이 다음 편집의 주입에 새 사고가 뜨고 jit check가 exit 0이며, 상환 태스크의 paths를 amend하면 주입이 새 경로로 옮겨 가고 옛 경로에서는 사라진다(대조). 훅이 저장된 파일을 읽게 되돌리는 뮤테이션 J01(scripts/harness/verify_incident_shard_discrimination.py)을 주입하면 두 테스트가 모두 RED다(실측: 대조 2 passed · 주입 2 failed · 주입 적용·원복 sha256 단언 통과). ③ 경계 — 훅의 데이터 원천 교체는 HARN-130이 paths 정정 기록과 함께 소유했고, 이 태스크가 더한 것은 쓰기 쪽 관점의 테스트뿐이다."
+  - "[추가 2026-09-29 — 규칙 축 · 판정 기준 이 PR head `2b2a4faf`] 규칙의 `enforced_by`가 가리키는 태스크의 paths도 주입 경로다(열린 PR #1377·#1382가 각각 ④로 따로 실측한 축). 편집 시 대장에서 계산하므로 그 태스크의 `amend --path`도 재생성 없이 다음 편집에 반영된다 — `tests/harness/test_jit_rules.py::TestLedgerWritesNeedNoRebuild::test_rule_enforcer_path_amend_moves_the_injection_immediately`가 동결(양성 대조: 옮기기 전 옛 경로에 뜬다). 변별력: 규칙만 첫 스냅숏을 쓰는 주입(M3)과 규칙이 태스크 참조를 풀지 않는 주입(M2)에서 이 테스트가 RED, 같은 M3에서 사고 축 테스트(`test_task_path_amend_moves_the_injection_immediately`)는 GREEN — 규칙 축은 이 테스트만 지킨다"
+artifacts:
+  - "PR #1375 — https://github.com/kiki-s-broom/WhyMath/pull/1375"
 paths:
   - scripts/harness/backlog.py
   - "tests/harness/test_jit*.py"
 session: null
-notes: "실측 2026-09-26(HARN-176 세션): incident add로 사고 1건을 기록한 뒤 CI 미러(ci_mirror.py)의 harness-integrity 잡이 '적시 주입 인덱스 대조' 스텝에서 'jit_index.json 이 대장과 어긋났다'로 실패했고, 뒤 스텝 7건(ADR 번호·claim 교차·고립 브랜치·EOS 리포트·ruff·black·하네스 테스트)이 미실행이었다. 같은 시점 origin/main worktree에서는 jit check가 통과(주입 후보 296건)해 원인이 사고 추가임을 대조로 확인했다. backlog.py jit build 재생성(+11줄·사고 1건) 후 통과. incident add 출력에는 재생성 안내가 없어, 사고를 기록하는 세션은 CI red로만 알게 된다.\n\n[정정 2026-09-29] acceptance ④ 추가: 태스크 paths 쓰기 경로(amend --path·add --path·rename)도 인덱스 재생성 범위 — HARN-162 세션에서 amend --path 뒤 인덱스 어긋남 실측"
+notes: "실측 2026-09-26(HARN-176 세션): incident add로 사고 1건을 기록한 뒤 CI 미러(ci_mirror.py)의 harness-integrity 잡이 '적시 주입 인덱스 대조' 스텝에서 'jit_index.json 이 대장과 어긋났다'로 실패했고, 뒤 스텝 7건(ADR 번호·claim 교차·고립 브랜치·EOS 리포트·ruff·black·하네스 테스트)이 미실행이었다. 같은 시점 origin/main worktree에서는 jit check가 통과(주입 후보 296건)해 원인이 사고 추가임을 대조로 확인했다. backlog.py jit build 재생성(+11줄·사고 1건) 후 통과. incident add 출력에는 재생성 안내가 없어, 사고를 기록하는 세션은 CI red로만 알게 된다.\n\n[정정 2026-09-29] acceptance ④ 추가: 태스크 paths 쓰기 경로(amend --path·add --path·rename)도 인덱스 재생성 범위 — HARN-162 세션에서 amend --path 뒤 인덱스 어긋남 실측\n\n[정정 2026-09-29] 기제 교체 — HARN-130이 커밋 인덱스를 없애 재생성 대상이 사라짐. 목적 충족 근거와 재정의한 변별력 기록\n\n[정정 2026-09-29] 규칙 enforced_by 태스크 paths 축 명시 — 열린 PR #1377·#1382가 같은 축을 ④로 등재 중이라, 완료 판정이 그 축까지 테스트로 덮는다는 근거를 대장에 남긴다"
 updated: 2026-09-29
