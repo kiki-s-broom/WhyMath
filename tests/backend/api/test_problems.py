@@ -15,6 +15,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +25,7 @@ from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
+from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.schema.enums import (
@@ -55,8 +57,15 @@ def _valid_schema() -> ProblemSchema:
     )
 
 
+#: LIC-09 — 생성물(자체생성) POST에 동반해야 하는 provenance 좌석의 최소 유효값.
+_VALID_PROVENANCE: dict[str, Any] = {
+    "generation_type": "FULLY_GENERATED",
+    "license": "WHYMATH_GENERATED",
+}
+
+
 def _valid_body() -> dict[str, Any]:
-    return _valid_schema().model_dump(mode="json")
+    return {**_valid_schema().model_dump(mode="json"), "provenance": dict(_VALID_PROVENANCE)}
 
 
 class _FakeScalars:
@@ -84,11 +93,15 @@ class FakeSession:
         get_map: dict[uuid.UUID, Problem] | None = None,
         list_rows: list[Problem] | None = None,
         commit_error: Exception | None = None,
+        flush_error: Exception | None = None,
     ) -> None:
         self._get_map = dict(get_map or {})
         self._list_rows = list(list_rows or [])
         self._commit_error = commit_error
+        self._flush_error = flush_error
         self.added: list[Any] = []
+        # LIC-09 — flush 시점에 이미 add된 객체 수(원장이 문항 flush *뒤*에 붙는지 판정용).
+        self.flushed_at: list[int] = []
         self.deleted: list[Any] = []
         self.committed = False
         self.rolled_back = False
@@ -100,6 +113,11 @@ class FakeSession:
         if self._commit_error is not None:
             raise self._commit_error
         self.committed = True
+
+    async def flush(self) -> None:
+        if self._flush_error is not None:
+            raise self._flush_error
+        self.flushed_at.append(len(self.added))
 
     async def rollback(self) -> None:
         self.rolled_back = True
@@ -159,8 +177,8 @@ class TestCreate:
         assert resp.status_code == 201, resp.text
         assert resp.json()["subject"] == "미적분"
         assert fake.committed is True
-        # SEC-29: Problem 본체 + 콘텐츠CUD 감사 행(PrivacyAudit) = 2건, 같은 트랜잭션.
-        assert len(fake.added) == 2
+        # SEC-29 + LIC-09: Problem 본체 + provenance 원장 + 콘텐츠CUD 감사 행 = 3건, 같은 트랜잭션.
+        assert len(fake.added) == 3
 
     def test_create_duplicate_returns_409(self) -> None:
         """external_id/slug UNIQUE 충돌(IntegrityError) → 롤백 후 409."""
@@ -177,6 +195,98 @@ class TestCreate:
         resp = _client(fake).post("/v1/problems", json={"source_type": "자체생성"})
         assert resp.status_code == 422
         assert fake.committed is False
+
+    def test_create_duplicate_on_flush_returns_409(self) -> None:
+        """LIC-09 — UNIQUE 충돌이 원장 부착 전 flush에서 터져도 409(500으로 새지 않는다)."""
+        err = IntegrityError("INSERT", {}, Exception("duplicate key value violates unique"))
+        fake = FakeSession(flush_error=err)
+        resp = _client(fake).post("/v1/problems", json=_valid_body())
+        assert resp.status_code == 409
+        assert fake.rolled_back is True
+        assert fake.committed is False
+        assert not any(isinstance(obj, ContentProvenanceORM) for obj in fake.added)
+
+
+class TestCreateProvenanceGate:
+    """LIC-09 — 생성물 POST는 provenance 관문을 경유하고 원장 행을 같은 트랜잭션에 남긴다."""
+
+    def test_generated_without_provenance_is_rejected_before_db(self) -> None:
+        """자체생성인데 provenance 좌석이 비면 422 — DB에 아무것도 add하지 않는다."""
+        fake = FakeSession()
+        resp = _client(fake).post("/v1/problems", json=_valid_schema().model_dump(mode="json"))
+        assert resp.status_code == 422, resp.text
+        assert "provenance 부재" in resp.json()["detail"]
+        assert fake.added == []
+        assert fake.committed is False
+
+    @pytest.mark.parametrize(
+        ("provenance", "reason"),
+        [
+            ({"license": "WHYMATH_GENERATED"}, "generation_type"),
+            ({"generation_type": "FULLY_GENERATED"}, "license"),
+            # 법적 불변식 (A) — ORIGINAL(원본 그대로) 차단은 관문이 schema를 경유해 강제한다.
+            ({"generation_type": "ORIGINAL", "license": "WHYMATH_GENERATED"}, "provenance 무효"),
+            # 법적 불변식 (B) — EBS_LICENSED 차단.
+            ({"generation_type": "FULLY_GENERATED", "license": "EBS_LICENSED"}, "provenance 무효"),
+        ],
+    )
+    def test_incomplete_or_illegal_provenance_is_rejected(
+        self, provenance: dict[str, Any], reason: str
+    ) -> None:
+        fake = FakeSession()
+        body = {**_valid_schema().model_dump(mode="json"), "provenance": provenance}
+        resp = _client(fake).post("/v1/problems", json=body)
+        assert resp.status_code == 422, resp.text
+        assert reason in resp.json()["detail"]
+        assert fake.added == []
+
+    def test_unknown_enum_value_is_rejected(self) -> None:
+        """미지 enum 값은 요청 모델 단계에서 422(원장에 집계 불가 문자열이 들어가지 않는다)."""
+        fake = FakeSession()
+        body = {
+            **_valid_schema().model_dump(mode="json"),
+            "provenance": {"generation_type": "MADE_UP", "license": "WHYMATH_GENERATED"},
+        }
+        resp = _client(fake).post("/v1/problems", json=body)
+        assert resp.status_code == 422
+        assert fake.added == []
+
+    def test_valid_provenance_writes_ledger_row_after_problem_flush(self) -> None:
+        """원장 행이 문항 id를 가리키고, 문항 flush *뒤*에 add된다(FK 순서)."""
+        fake = FakeSession()
+        body = _valid_body()
+        body["provenance"]["original_source"] = "평가원"
+        body["provenance"]["generation_type"] = "VARIANT_NUMBER"
+        resp = _client(fake).post("/v1/problems", json=body)
+        assert resp.status_code == 201, resp.text
+        problems = [obj for obj in fake.added if isinstance(obj, Problem)]
+        ledgers = [obj for obj in fake.added if isinstance(obj, ContentProvenanceORM)]
+        assert len(problems) == 1 and len(ledgers) == 1
+        ledger = ledgers[0]
+        assert ledger.problem_id == problems[0].problem_id
+        assert str(ledger.problem_id) == resp.json()["problem_id"]
+        assert ledger.generation_type == "VARIANT_NUMBER"
+        assert ledger.license == "WHYMATH_GENERATED"
+        assert ledger.original_source == "평가원"
+        # flush는 문항 1건만 add된 시점에 일어났고, 원장은 그 뒤에 붙었다.
+        assert fake.flushed_at == [1]
+        assert fake.added.index(ledger) > fake.added.index(problems[0])
+        # 응답(관리자 표면)은 schema.Problem이다 — 요청 전용 좌석이 새지 않는다.
+        assert "provenance" not in resp.json()
+
+    def test_metadata_only_source_needs_no_provenance(self) -> None:
+        """생성물이 아닌 출처(평가원 — 본문 미보유)는 원장 대상이 아니다: 좌석 없이 201."""
+        fake = FakeSession()
+        schema = ProblemSchema(
+            source_type=SourceType.평가원,
+            curriculum_version=Curriculum.REVISION_2015,
+            valid_from_year=2014,
+            subject=Subject.미적분,
+            unit_codes=["CAL-INT-DEF"],
+        )
+        resp = _client(fake).post("/v1/problems", json=schema.model_dump(mode="json"))
+        assert resp.status_code == 201, resp.text
+        assert not any(isinstance(obj, ContentProvenanceORM) for obj in fake.added)
 
 
 class TestRead:

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -20,7 +20,9 @@ acceptance:
   - "⑥ 알림 미사용 — MOB-08(#694)이 firebase 2종을 제거해 전제가 소멸했다(gap_review_r2 §3-③·§5-④). 푸시 기반 복귀 유도는 이 태스크 범위 밖"
   - "⑦ 변별력 — 재실행 시 온보딩이 실제로 건너뛰어지는지, 저장소를 비우면 다시 뜨는지 양방향 실측"
   - "⑧ 범위 밖 동결 — 경로 복원·마지막 목표 복원 화면(§5-③ 잔여)·알림·연속 학습 통계 화면"
-artifacts: []
+artifacts:
+  - "#1402"
+  - f36d9515
 paths:
   - src/mobile/lib/core/router.dart
   - "src/mobile/lib/features/onboarding/**"
@@ -28,4 +30,4 @@ paths:
   - "src/mobile/test/**"
 session: null
 notes: "docs/architecture/gamification_module_gap_review_r2.md §6 D7. 기능 79(Streak) 11개 세부 중 유일하게 채택된 축인데 현행이 역행한다 — 온보딩이 매 실행마다 뜨고(router.dart:96 + onboarding_screen.dart:12-14 자인) 마지막 대화 복원이 0이라(dialogueId 인메모리·coach_api.dart:82 호출처 0·lib/ 전체 '이어하기' 0건) 복귀 학생과 신규 학생이 동일 화면을 본다. D3가 02_student_ui_master_plan.md:93-94에 원칙 4('연속성은 압박이 아니라 복귀 지원')를 정본화했으나 streak·retention·재진입·대시보드 열린 태스크가 0건 — 정본은 있는데 추적이 없다. [r3 정정 2026-08-11 · gamification_module_gap_review_r3.md §4 D12·§정정 ②⑧] (가) 앵커 정정 — 원칙 4는 02_student_ui_master_plan.md:92-94가 아니라 :93-94(5원칙 전체는 :87-95). (나) 분모 정정 — '백로그 176건 전수'는 현재 255건(비-done 69건)이며, 재확인 결과 관련 열린 태스크가 이 태스크 1건뿐이라는 판정 자체는 유효. (다) 중복 착수 금지 — 이 태스크의 구현이 다른 세션 브랜치 claude/whymath-issues-review-k20m0w의 커밋 4cb8d9d3(2026-08-09, 16파일 +695/-32·테스트 4파일: onboarding_store.dart·onboarding_seen_controller.dart·dialogue_store.dart + 테스트)에 이미 존재하며 main 미병합이다(git merge-base --is-ancestor 4cb8d9d3 <main HEAD> → NO). 재구현하면 2026-07-27 OPS-07 735줄 폐기의 반복이다. (라) 만료·재확인 지점(CLAUDE.md '만료 없는 유예·제외 금지') — 그 브랜치가 병합되면 status를 done으로 정정하고, 병합 없이 2026-08-18까지 경과하면 회수 태스크를 등재한다.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-09-30

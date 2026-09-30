@@ -25,6 +25,18 @@ gates:
     cleared_by: null
     notes: ""
     corrections: []
+  - id: G-android-release-store-signing
+    title: "Android 스토어 배포 전 release 서명키 생성·keystore 배선 필수(현재 debug 키로 서명 중)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-30
+    remind_after_days: 30
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "keystore 생성·Play Console 서명키 등록은 Kiki 소유 비밀·계정 행위라 선행 태스크가 없다 — 코드 쪽 추적은 build.gradle 주석과 test/android_release_signing_gate_test.dart(MOB-18)"
   - id: G-arch38-verdict-recheck
     title: "ARCH-38 '혼입 유지' 판정의 재확인 (재확인 지점 = W8 종료 직후 2026-10-26) — 판정 근거 3종 중 정적으로 확정 불가한 ②③ 축을 사람이 확인한다. ②assessment JSONB 5필드에 *갱신* writer가 생겼는가(현행 write-once·하루 1행 idempotency) ③5필드를 값으로 읽어 판단에 쓰는 서빙 reader가 착지했는가(직렬화는 소비 아님·ASM-11 진행 여부). 근거 ①(W8 경로 접촉 0)은 사람이 볼 필요 없다 — tests/backend/db/test_assessment_result_verdict_premise.py가 자동으로 RED를 낸다. 판정 3택: ①판정 유지(트리거 미발동 — 기본값·ARCH-40을 재생성해 감시 지속) ②재판정 착수(canonical_entity_model_v1.md §5 절차) ③영구 확정으로 종결. 근거 = 정본 §3-C · MEMORY 2026-09-06 결정 로그 · PR #997. 등재 이유: Codex P2 지적 수용 — 재확인을 태스크로만 등재하면 selector가 즉시 착수 후보로 계산해(실측: 후보 124건에 포함) 트리거를 기다리지 않는다. G-state-machine-deferral-recheck 선례 동형"
     kind: decision
@@ -818,6 +830,18 @@ gates:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
     depends_on:
       - P3-17-week3-release-gate-judgment
+  - id: G-p301-scope-choice
+    title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-30
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
