@@ -280,6 +280,8 @@ def run_tests() -> tuple[int, str]:
         env=env,
         capture_output=True,
         text=True,
+        encoding="utf-8",  # HARN-19 — 로케일(cp949) 디코드 금지(pytest 출력에 한글이 섞인다)
+        errors="replace",
         timeout=600,
     )
     return proc.returncode, proc.stdout + proc.stderr
