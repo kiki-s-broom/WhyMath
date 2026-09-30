@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,7 +18,8 @@ acceptance:
   - "④ 버블 재빌드 범위 — `chat_screen.dart:832`의 `MediaQuery.of(context).size`가 키보드 애니메이션 프레임마다 버블을 다시 빌드시킨다(`coach_signal_card.dart:111` 동형). `MediaQuery.sizeOf`로 좁힌다. 위젯 테스트에서 키보드 inset 변화 시 버블 build 횟수가 늘지 않음을 단언한다 — 벽시계가 아니라 build 횟수라는 결정론적 대리지표로 판정한다."
   - "⑤ 범위 밖 동결 — 다음 문제 prefetch는 포함하지 않는다(`GET /v1/me/next-problem`이 호출마다 `record_recommendation_treatment`로 처치를 기록하므로 미리 부르면 학생이 보지 않은 추천이 처치로 남는다 — 조회와 기록의 분리가 먼저다). 단계 패널 prefetch는 SOL-02 교수학 계약으로 금지다(`step_panel_controller.dart:6-10`). `MathText` 파싱 캐시(`Math.tex` 파싱 시점 미확인)와 MathLive WebView 사전 워밍도 포함하지 않는다."
   - "⑥ 검증 — CI mobile 잡의 스텝 목록(`flutter analyze`·`flutter test`·커버리지 게이트)을 로컬에서 그대로 재현해 exit 0을 확인한다."
-artifacts: []
+artifacts:
+  - "PR #1409 — https://github.com/kiki-s-broom/WhyMath/pull/1409 (head ab7ff24c: 로컬 CI 미러 7잡 전건 exit 0 · 클라우드 CI 9잡 success·11잡 skipped · 뮤테이션 23종 전건 RED·생존 0 · mobile 527→577 passed·커버리지 84.3%)"
 paths:
   - src/mobile/lib/features/problems/application/diagnosis_controller.dart
   - src/mobile/lib/features/problems/application/diagnosis_state.dart
@@ -27,6 +28,6 @@ paths:
   - src/mobile/lib/features/chat/presentation/chat_screen.dart
   - src/mobile/lib/features/chat/presentation/coach_signal_card.dart
   - "src/mobile/test/**"
-session: claude/fervent-goldberg-s8y8ws
+session: null
 notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §3-2·§5 R4 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 네 항목 모두 정적 분석만으로 낭비가 확정된 것만 골랐다(실측 계측 없이도 효과 판정 가능). 등급 P1 근거: 12월 내부 테스트 계정 표본 수집 중 학생앱 체감 품질을 높이지만 없어도 검증은 성립한다."
 updated: 2026-09-30
