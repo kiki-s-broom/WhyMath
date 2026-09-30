@@ -20,7 +20,7 @@
 그 값을 받아 오개념으로 옮기는 순수 변환만 담당한다(DB·I/O 0).
 
 **단일 진실원천(ASM-06 승계 제약)**: 이 모듈은 *후보를 만들 뿐* 판정하지 않는다. 산출물은
-기존 오개념 좌석 — 채점 경로는 `_scan_attempt_misconceptions`의 후보 집합에 합류해
+기존 오개념 좌석 — 채점 경로는 `scan_attempt_misconceptions`의 후보 집합에 합류해
 `collect_assessment_evidence`·`apply_candidates`로, 코치 경로는 `_compute_matches` 결과와
 합류해 `curate_hypothesis`로 흐른다. **별도 판정 경로·별도 응답 필드를 신설하지 않는다**
 (이중 진실원천 금지). 그래서 이 모듈에는 영속·노출 코드가 한 줄도 없다.
