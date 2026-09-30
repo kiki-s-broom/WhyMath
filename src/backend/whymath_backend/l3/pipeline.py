@@ -407,6 +407,8 @@ async def generate(
             student_id_hash=student_id_hash,
             validation_signal=reason,
             # 실측(S1 게이트 ②) — provider가 포착한 usage + 토큰 산정 비용(est_*와 분리).
+            # 관측 모델·재시도 수(ARCH-101)도 이 usage에서 실린다 — 강등(ARCH-69)이면 usage가
+            # 대신 답한 LOCAL 호출의 것이라 `served_model`은 LOCAL 태그, `retries`는 None이다.
             usage=usage,
             cost_krw=actual_krw,
             content_source="generate",  # 2층 캐시의 (3) — 실제 LLM 생성.
