@@ -1701,11 +1701,11 @@ jobs:
       # 무배선이었다 — "일부만 배선됨"이 같은 디렉터리 안에서 한 번 더 재현된 형태다.
       # lint는 재귀라 `scripts` 하나로 harness까지 덮는다. 잔여 위반은 1파일뿐이었다
       # (`diagnose_atom_orphans.py` black — 이 PR에서 정리. OPS-12가 8파일을 이미 상환한 결과).
-      - name: Ruff (scripts + tests/harness)
-        run: python3 -m ruff check scripts tests/harness
+      - name: Ruff (scripts + tests/harness + tools)
+        run: python3 -m ruff check scripts tests/harness tools
 
-      - name: Black --check (scripts + tests/harness)
-        run: python3 -m black --check --line-length 100 scripts tests/harness
+      - name: Black --check (scripts + tests/harness + tools)
+        run: python3 -m black --check --line-length 100 scripts tests/harness tools
 
       - name: 하네스 테스트
         run: python3 -m pytest tests/harness -q
