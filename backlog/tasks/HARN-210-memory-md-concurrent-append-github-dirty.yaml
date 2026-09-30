@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-210-memory-md-concurrent-append-github-dirty
+title: "MEMORY.md 동시 append가 GitHub 서버 병합에서 충돌(dirty)로 보인다 — 결정 로그를 덧붙인 PR이 main 착지마다 충돌·CI 런 0건 (이벤트 HARN-46 · 사고 대장 HARN-130 동형 3회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 진단 고정(측정·재현) — 아래 수치를 이 태스크가 다시 잰 값으로 고정하고, 임시 저장소에서 '양쪽이 MEMORY.md 끝에 덧붙임 → 로컬 git은 union으로 합치고 GitHub 서버 병합은 충돌' 조건을 재현 가능한 픽스처로 만든다. 등재 시점 실측(판정 기준 main `fff5b74a`): ⓐ MEMORY.md 3,368,672바이트·11,689줄 ⓑ 최근 24시간 main 커밋 21건 중 10건·7일 101건 중 51건이 MEMORY.md를 건드렸다(약 절반) — 결정 로그를 덧붙인 PR은 평균 2~3시간마다 같은 파일 끝이 main과 겹친다 ⓒ 2026-09-30 이 세션에서 같은 원인으로 PR 1396이 2회·PR 1385가 1회 GitHub에서 dirty(충돌)로 보였고(각 PR 본문에 기록), dirty PR에는 GitHub가 CI 런을 만들지 않아 체크가 0건이었다(충돌을 푼 뒤에야 시작) ⓓ 로컬 git 병합은 충돌 0·양쪽 줄 전부 보존이었다(부모 대비 삭제 0줄). 못 본 것: 머지 큐가 MEMORY.md 동시 append로 실제 이탈시키는지 — HARN-130의 MERGE_CONFLICT 이탈 실측은 사고 대장 파일 사례이고 기제가 같다고 읽어서 추정할 뿐 MEMORY.md 경로로는 재현하지 않았다."
+  - "② 기존 방어의 한계 고정 — `.gitattributes`의 `MEMORY.md merge=union`은 로컬 git에서만 작동하고 GitHub 서버 병합(PR 병합 가능 판정·머지 큐)은 저장소 merge driver를 적용하지 않는다(`.gitattributes` 주석이 이미 적은 사실 — HARN-46·HARN-130도 같은 사실이 원인이었다). `.github/scripts/pr_auto_resync.sh`(HARN-85)는 BEHIND인 auto-merge PR만 update-branch(서버 병합)로 최신화하고 충돌(409)은 사람 몫이라 이 계열을 풀지 못한다. 위 두 줄은 스크립트 헤더와 주석을 읽어서 확인한 것이며, 주입 실측은 ①의 픽스처가 맡는다."
+  - "③ 설계 판정(구현 전 판정문 필수 — docs/reviews/) — 선택지 셋을 한 표에서 비교한다: (가) 결정 로그를 세션·일자 단위 조각 파일로 쪼갠다(이벤트 HARN-46·사고 대장 HARN-130과 같은 형태 — 서로 다른 세션은 서로 다른 파일에 쓰므로 충돌이 없다. MEMORY.md는 생성 인덱스 또는 읽기 전용이 된다) (나) 결정 로그 append를 PR이 아니라 머지 뒤 자동화가 맡는다 (다) 현상 유지 + 자동 재동기화가 로컬 git union 병합으로 충돌 PR을 해소한다(워크플로에서 git merge 후 push — 토큰이 만든 push는 워크플로를 재발화시키지 않는 제약(HARN-85)과 머지 큐 경로 미해소를 판정). 판정 근거에 반드시 넣을 것: ⓐ MEMORY.md를 직접 읽거나 검사하는 소비처 전수(등재 시점 git grep: scripts·tests·.claude·.github·tools 38개 파일 — 에이전트 지침·명령·훅·테스트) ⓑ 'MEMORY.md 끝에 결정 로그 append' 규범을 바꾸는 것은 CLAUDE.md 산문 동결(2026-09-20) 때문에 Kiki 판단이 필요하다 — 규범을 바꾸지 않아도 되는 안과 바꿔야 하는 안을 구분해 제시 ⓒ 과거 기록 3.4MB의 처분(이관 여부·읽기 전용화)."
+  - "④ 착지·집행(판정 뒤) — 선택안 구현 + 동결 테스트 + 배선 확인: 두 세션(브랜치)이 같은 창에서 결정 로그를 더해도 GitHub 서버 병합이 충돌하지 않음을 임시 저장소 픽스처로 재현한다(수정 전 RED → 수정 후 GREEN · 뮤테이션으로 각 절의 변별력 확인 — 'MEMORY.md를 건드리지 않는 PR'을 대조군으로 둬 전부 충돌로 계상하는 과잉 수정을 막는다). 머지 큐 경로에서 실제로 풀리는지는 실 PR 쌍으로 확인하거나, 확인하지 못했으면 '미확인'으로 적는다. 착지 뒤 지표(예: 사고 대장의 'MEMORY.md 기인 dirty' 신규 줄 수 · 머지 큐 MERGE_CONFLICT 이탈 중 MEMORY.md 기인 건수)를 정의해 7일 관측한다 — 정의할 수 없으면 acceptance를 채우지 못한 것이다."
+artifacts: []
+paths:
+  - ".gitattributes"
+  - ".github/scripts/pr_auto_resync.sh"
+  - ".github/workflows/pr-auto-resync.yml"
+  - docs/standards/parallel_sessions.md
+session: null
+notes: "출처: 2026-09-30 /drive 세션(claude/magical-maxwell-hja5kh-*) — PR 1396(EOS-147)·PR 1385(HARN-173)가 main의 MEMORY.md 추가와 겹쳐 GitHub에서 dirty로 보인 사례. 판정 기준 main `fff5b74a`. 계열: 이벤트 대장(HARN-46) → 사고 대장(HARN-130) → MEMORY.md(이 태스크)로 이어지는 '공용 append 파일 × GitHub 서버 병합' 3회차. 사고 대장 계열 키는 memory-md-append-github-dirty이며 HARN-46·HARN-130은 별도 키라 회차 계산에 합쳐지지 않는다(같은 기제라는 판단은 사람이 본다). 이 태스크는 설계 판정이 먼저다 — 조각 파일화는 MEMORY.md 소비처 38개와 CLAUDE.md 규범에 닿으므로 구현부터 시작하지 않는다. HARN-32의 완화책 후보에 'MEMORY.md 결정 로그를 세션·일자 단위 파일로 쪼개기'가 이미 적혀 있었으나 MEMORY.md 쪽을 맡은 태스크는 찾지 못했다(태스크 제목·본문 검색 기준)."
+updated: 2026-09-30
