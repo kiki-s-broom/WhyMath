@@ -4253,6 +4253,18 @@
    ],
    "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 10건 미실행(푸시 후·PR 전 검출)",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-30",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "done이 claim을 반납한 뒤 done 커밋 push 전 창 — EOS-147(PR #1396 열림)이 next 1순위로 노출(근접 사고 · 착수 전 검출)",
+   "weight": 0
   }
  ]
 }
