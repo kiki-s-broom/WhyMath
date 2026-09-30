@@ -143,6 +143,14 @@ function sanitizeOptions(o: unknown): Partial<WorkspaceOptions> | undefined {
   return out;
 }
 
+/** app.getPath가 던지면 undefined — 알려진 폴더를 풀지 못하면 Electron이 예외를 던진다(2026-09-30 Windows CI 실측:
+    USERPROFILE 아래 Desktop이 없으면 getPath("desktop") 예외 → 시작 실패 대화상자가 메인 프로세스를 막아 앱이 뜨지 않았다).
+    바탕화면은 저장소 후보 하나일 뿐이므로 못 구하면 그 후보만 빼고 계속한다. 사유는 stderr에 남긴다. */
+function tryGetPath(name: Parameters<typeof app.getPath>[0]): string | undefined {
+  try { return app.getPath(name); }
+  catch (e) { console.error(`[work-graph] ${name} 경로를 구하지 못해 후보에서 뺀다 ${(e as Error).name}: ${(e as Error).message}`); return undefined; }
+}
+
 /** 작업공간 준비.
     ① 환경변수 WORK_GRAPH_WORKSPACE가 있으면 그것을 등록한다(스모크·명시 지정).
     ② 없고 등록된 작업공간도 없으면(첫 실행) 알려진 자리에서 WhyMath 저장소를 찾아 등록한다 —
@@ -157,7 +165,7 @@ async function ensureWorkspace(): Promise<void> {
   if ((await settings.list()).length) return;
   discovery = await discoverWorkspace(workspaceCandidates({
     env: process.env, platform: process.platform, home: os.homedir(),
-    desktop: app.getPath("desktop"), appDir: app.getAppPath(),
+    desktop: tryGetPath("desktop"), appDir: app.getAppPath(),
   }));
   if (!discovery.found) return;
   const r = await settings.add({ path: discovery.found, requireHarness: true });

@@ -159,10 +159,14 @@ test("창 크기·위치를 기억한다 — 닫을 때 저장하고 다음 실�
   test.setTimeout(120_000);
   const tmp = mkdtempSync(path.join(os.tmpdir(), "wg-bounds-"));
   const env = { ...shortcutEnv(path.join(tmp, "ud"), tmp), WORK_GRAPH_WORKSPACE: WORKSPACE };
-  const want = { x: 60, y: 50, width: 1000, height: 700 };
   try {
     const first = await launch(ROOT, env, tmp);
     await first.firstWindow();
+    // 좌표는 실제 화면 작업 영역 안에서 정한다 — Windows CI 러너 화면은 1024×768이라 고정 좌표는 fitBounds가 당겨 온다(설계대로)
+    const want = await first.evaluate(({ screen }) => {
+      const a = screen.getPrimaryDisplay().workArea;
+      return { x: a.x + 30, y: a.y + 30, width: Math.min(920, a.width - 60), height: Math.min(620, a.height - 60) };
+    });
     await first.evaluate(({ BrowserWindow }, b) => { BrowserWindow.getAllWindows()[0].setBounds(b); }, want);
     await first.close();
     const saved = JSON.parse(readFileSync(path.join(tmp, "ud", "window.json"), "utf8"));
@@ -187,8 +191,10 @@ test("창 크기·위치를 기억한다 — 닫을 때 저장하고 다음 실�
 test("앱 데이터는 appData\\whymath-work-graph-desktop에 모인다 — 한글 제품명이 appData 루트로 새지 않는다", async () => {
   test.setTimeout(120_000);
   const tmp = mkdtempSync(path.join(os.tmpdir(), "wg-appdata-"));
-  const env = shortcutEnv("", tmp);
-  delete env.WORK_GRAPH_USER_DATA;
+  // 홈(USERPROFILE)은 바꾸지 않는다 — Windows는 appData를 %USERPROFILE% 아래 알려진 폴더로 풀므로, 임시 홈이면
+  // getPath("appData")가 예외를 던져 이 테스트가 보려는 것(실제 appData 아래 폴더 이름)을 볼 수 없다
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && k !== "WORK_GRAPH_USER_DATA") env[k] = v;
   env.XDG_CONFIG_HOME = path.join(tmp, ".config");   // 리눅스 appData — Windows는 알려진 폴더 API라 env로 못 바꾼다
   env.WORK_GRAPH_WORKSPACE = WORKSPACE;
   const app = await launch(ROOT, env, tmp);
