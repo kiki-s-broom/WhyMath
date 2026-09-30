@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,10 @@ paths:
   - scripts/harness/remote_claims.py
   - scripts/harness/selector.py
   - "tests/harness/test_*gate*claim*.py"
-session: null
-notes: "출처: 2026-09-28 /drive 3차 중 열린 PR 점검에서 PR #1352(EOS-129 ⑤)를 발견하고, 세 브랜치의 대장 이벤트로 전이 순서를 실측했다. 사고 대장 계열 `parallel-duplicate-implementation` 11회차. 축 구분 — HARN-91은 트렁크에 새로 실린 의존·게이트를, HARN-11은 미머지 done을, HARN-105는 사람 게이트의 중복 안내를 본다. 이 태스크는 미머지 브랜치의 게이트 부착과 claim 해제가 겹친 공백이다.\n\n[정정 2026-09-28] 추가 실측 — 세 번째 세션의 EOS-129 done(#1358)과 미머지 게이트 인용 형태 기록\n\n[정정 2026-09-28] 추가 실측 — EOS-137이 같은 공백으로 next 1순위 노출 중(표준 흐름이 만드는 공백)\n\n[개명 2026-09-28] HARN-186-unmerged-gate-attach-claim-release-gap → HARN-193-unmerged-gate-attach-claim-release-gap: 번호 충돌 정정 — main(#1349 CONST-02)이 HARN-186-job-log-truncation-warning-hook을 먼저 머지했다. 187~190(#1361)·191(#1353)·192(타 브랜치)는 미머지 브랜치가 쓰고 있어 원격 전 브랜치 기준 첫 빈 번호 193으로 옮긴다\n\n[정정 2026-09-28] 중복 등재 2건(HARN-191 main·HARN-187 #1361) 흡수 기록 + EOS-137 사고 기록은 #1365 줄로 일원화\n\n[정정 2026-09-29] 추가 실측 — EOS-146 2세션 중복 게이트(PR #1392 병합 충돌로 발견)"
-updated: 2026-09-29
+  - scripts/harness/report.py
+  - scripts/analysis/mutate_gate_attach_guards.py
+  - docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md
+  - MEMORY.md
+session: claude/hopeful-bell-nbyslb
+notes: "출처: 2026-09-28 /drive 3차 중 열린 PR 점검에서 PR #1352(EOS-129 ⑤)를 발견하고, 세 브랜치의 대장 이벤트로 전이 순서를 실측했다. 사고 대장 계열 `parallel-duplicate-implementation` 11회차. 축 구분 — HARN-91은 트렁크에 새로 실린 의존·게이트를, HARN-11은 미머지 done을, HARN-105는 사람 게이트의 중복 안내를 본다. 이 태스크는 미머지 브랜치의 게이트 부착과 claim 해제가 겹친 공백이다.\n\n[정정 2026-09-28] 추가 실측 — 세 번째 세션의 EOS-129 done(#1358)과 미머지 게이트 인용 형태 기록\n\n[정정 2026-09-28] 추가 실측 — EOS-137이 같은 공백으로 next 1순위 노출 중(표준 흐름이 만드는 공백)\n\n[개명 2026-09-28] HARN-186-unmerged-gate-attach-claim-release-gap → HARN-193-unmerged-gate-attach-claim-release-gap: 번호 충돌 정정 — main(#1349 CONST-02)이 HARN-186-job-log-truncation-warning-hook을 먼저 머지했다. 187~190(#1361)·191(#1353)·192(타 브랜치)는 미머지 브랜치가 쓰고 있어 원격 전 브랜치 기준 첫 빈 번호 193으로 옮긴다\n\n[정정 2026-09-28] 중복 등재 2건(HARN-191 main·HARN-187 #1361) 흡수 기록 + EOS-137 사고 기록은 #1365 줄로 일원화\n\n[정정 2026-09-29] 추가 실측 — EOS-146 2세션 중복 게이트(PR #1392 병합 충돌로 발견)\n\n[정정 2026-09-30] paths ['scripts/harness/backlog.py', 'scripts/harness/remote_claims.py', 'scripts/harness/selector.py', 'tests/harness/test_*gate*claim*.py'] → ['scripts/harness/backlog.py', 'scripts/harness/remote_claims.py', 'scripts/harness/selector.py', 'tests/harness/test_*gate*claim*.py', 'scripts/harness/report.py', 'scripts/analysis/mutate_gate_attach_guards.py', 'docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md', 'MEMORY.md']: 구현 중 실제로 건드린 파일을 paths에 반영(기존 4개 유지 + 추가 4개) — 브리핑 렌더·뮤테이션 하네스·판정 문서·MEMORY 결정 로그"
+updated: 2026-09-30

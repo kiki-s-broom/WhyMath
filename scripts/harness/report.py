@@ -393,6 +393,8 @@ def render_brief(
     pr_state_lookup_ok: bool = True,
     pr_state_lookup_error: str = "",
     done_excluded: dict[str, list[str]] | None = None,
+    gate_attach_excluded: dict[str, list[str]] | None = None,
+    gate_attach_status: str = "disabled",
     doc_series_candidates: list[tuple[str, tuple[str, ...], str]] | None = None,
     doc_series_status: str = "ok",
     ruleset_reminder: str | None = None,
@@ -422,6 +424,13 @@ def render_brief(
     머지 전인 태스크. `next`(HARN-11)와 동형으로 후보에서 제외해 브리핑이 이미 끝난
     일을 1순위로 추천하는 근접사고를 막는다. 순수 함수 — 원격 조회는 호출부(`cmd_brief`)
     책임이라 여기서는 이미 계산된 결과만 받는다(테스트 용이성·기존 시그니처 하위호환 유지).
+    gate_attach_excluded / gate_attach_status: task_id → `브랜치:게이트` 목록(HARN-193) —
+    미머지 브랜치가 게이트를 붙여 두고 원격 claim을 푼 태스크. done_excluded와 같은 이유로
+    후보에서 빼고, **왜 빠졌는지를 한 줄로 보인다**(사라진 후보를 세션이 다시 조사하지 않게).
+    status가 `ok`·`disabled`가 아니면(`truncated`·`offline`·`error:*`) "부착 없음"이 아니라
+    **판정 보류**로 표시한다 — 훅이 stderr를 버리므로(`2>/dev/null`) 스캔 실패는 이 함수가
+    반환하는 문자열 안에 있어야 실제로 보인다(stale_branch_status와 동형). 기본값
+    `disabled`는 하위호환(인자를 안 주는 기존 호출부는 출력이 그대로다).
     doc_series_candidates: (branch, files, last_commit_at_iso) 목록(HARN-14) — 나이 임계
     없이 트렁크에 없는 `docs/**/*_review.md`를 추가한 미머지 브랜치 전부. stale_branches와
     같은 결합도 원칙(원시 튜플만 받음). **훅이 stderr를 버리므로**(`.claude/settings.json`
@@ -574,6 +583,18 @@ def render_brief(
     ready, excluded = selector.candidates(backlog, remote_claimed=remote_claimed)
     if done_excluded:
         ready = [t for t in ready if t.id not in done_excluded]
+    if gate_attach_excluded:
+        ready = [t for t in ready if t.id not in gate_attach_excluded]
+        for task_id, attached in sorted(gate_attach_excluded.items()):
+            lines.append(
+                f"⛔ 후보 제외 {task_id} — 미머지 브랜치가 게이트를 붙여 뒀다: "
+                f"{', '.join(attached)}"
+            )
+    if gate_attach_status not in ("ok", "disabled"):
+        lines.append(
+            f"(미머지 게이트 부착 스캔 {gate_attach_status} — 게이트가 붙은 태스크가 후보에 "
+            f"섞였을 수 있음 · 판정 보류)"
+        )
     if ready:
         lines.append("다음 착수 후보:")
         for i, task in enumerate(ready[:3], start=1):

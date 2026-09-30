@@ -11663,3 +11663,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **정정**: PR #1371이 EOS-129 acceptance에 적은 "100건 이상(a 추정 후보) 문항 0건"의 100은 main 코드의 기준이 아니다. 코드의 a 채택 최소 응답은 50건이다. 운영 응답이 문항당 최대 4건이라 결론(추정 가능 문항 0건)은 그대로다.
 - **브랜치 처분**: 삭제하지 않았다. 브랜치 정리는 stray-code 감사 배치가 소유하며, 이 항목의 "회수 불요"와 "대체 안 됨" 항이 그 판정의 근거다. 되살릴 필요가 생기면 `c5983e59`에서 `item_response_census.py`·`test_item_response_census.py`·`eos129_item_response_census_runbook.md` 3파일을 가져온다.
 - **사고 대장**: EOS-129 병렬 중복은 PR #1356이 이미 기록했다. 같은 사고를 다시 세지 않는다.
+
+### 2026-09-30 — HARN-193 착지: 게이트를 붙이고 claim을 푼 태스크의 착수 공백 — 읽기측 스캔 채택 · 쓰기측 홀드 보류 — 판정 기준 main `ebd7a159`
+- **결함**: `start` → `gates add` → `amend --gate` → `unblock` 흐름에서 `unblock`이 원격 claim을 즉시 걷는데, 그 자리를 대신할 트렁크 사본의 `requires_gates`는 PR이 머지돼야 생긴다. 그 창에서 `next`·브리핑이 태스크를 게이트 없는 무주 todo로 1순위 추천했다(`EOS-129` 3세션 · `EOS-137` · `EOS-146`).
+- **결정(ⓑ 읽기측 채택 · ⓐ 쓰기측 홀드 보류)**: `remote_claims.scan_remote_gate_attachments` — 브랜치 사본의 `requires_gates`에서 트렁크·로컬 사본이 아는 게이트를 뺀 나머지를 "그 브랜치만 붙인" 게이트로 센다. 트렁크가 `cleared`·`waived`로 기록한 게이트는 제외하고, 트렁크에 정의가 없거나 `pending`이면 미통과로 센다. `next`(제외+이유) · `start`(거부+`--ignore-remote-claim` 우회+이벤트 `start_ignored_unmerged_gate_attach`) · `brief`(제외+이유를 stdout — 훅이 stderr를 버린다)에 배선했다.
+- **근거**: ① 이력 4건 전부 게이트를 담은 브랜치가 push된 뒤였다(태스크 원문·사고 대장 기록 기준) ② 쓰기측은 원격 claim 쓰기가 막힌 환경(HARN-07 이력)에서 무력하다 ③ 홀드는 수명(누가 언제 걷는가)을 새로 요구한다 — `unblock`은 todo 태스크에 경로가 없고 흡수된 HARN-191은 `claims reap`·브리핑에 해제 판정을 넣으려 했다. 읽기측은 상태가 없어 트렁크 착지 즉시 자동 해소된다.
+- **표시 정직성**: status `ok`·`truncated`·`no_refs`·`offline`·`error:<Type>`. shallow·단일 브랜치 클론은 트렁크 ref만 캐시하는데(실측 `--depth 1` 캐시=HEAD·main) 첫 구현이 다른 브랜치 0개를 훑고도 `ok`를 반환했다 — `no_refs`를 신설하고 직전에 fetch한 `start`는 `refs_fresh=True`로 구분한다.
+- **검증**: `tests/harness/test_gate_attach_claim_gap.py` 33건 · `scripts/analysis/mutate_gate_attach_guards.py` 28종 전건 RED·생존 0(앵커 1건·주입 실재·원복 바이트 동일·대조군 선행) · 실제 원격 42 ref에서 `EOS-129` 사고 상태 양성 검출 · 전체 950 태스크 5.15초 / 준비 후보 72건 0.80초.
+- **중간 실수(기록)**: ⓐ 첫 뮤테이션 실행에서 M27·M28 생존 — "브랜치 없는 저장소" 대조군이 `harness-claims` 부산물 브랜치 때문에 그 절에 닿지 않았다(픽스처가 남은 브랜치가 main뿐임을 스스로 단언하도록 수정) ⓑ M07을 "동치·생존 정상"으로 표기했으나 `no_refs` 추가 뒤 실제 뮤테이션이 되어 하네스가 지적했다 ⓒ `brief`가 shallow 클론에서도 사고를 잡는 이유를 stale-branch 스캔으로 **추정**해 적었으나 대조 실험(문서 시리즈 스캔을 끄면 캐시가 안 생긴다)으로 `scan_doc_series_duplicates`의 fetch로 정정했다.
+- **남은 것(정직)**: push 전 브랜치는 관측 불가 → `HARN-207`(P2 · 관측 기반 착수 · 재확인 2026-11-30 · 만료 시 cancel). 낡은 브랜치가 트렁크에서 떼어 낸 게이트를 들고 있으면 과잉 차단(우회 플래그로 넘김). 거부·제외는 이벤트를 남기지 않아 발화 횟수를 세지 않는다(작동 비율 미측정). 운영 데이터로 재지 않았다.
+- **정본**: `docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md`. 범위 밖: `EOS-129` 3중 착수 정리(#1346·#1352·#1358)는 Kiki 판단.
