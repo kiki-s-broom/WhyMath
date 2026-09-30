@@ -10,10 +10,14 @@
 
 from __future__ import annotations
 
+import logging
 import random
 from dataclasses import dataclass
 
 from whymath_backend.l3.dsl.models import ProblemTemplate, VariableSpec
+
+# 침묵 실패 금지(CLAUDE.md) — 제약 파싱 회피는 예외 타입명만 남긴다.
+logger = logging.getLogger("whymath.l3.dsl.variable_engine")
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,9 +109,11 @@ class VariableEngine:
             from sympy.parsing.sympy_parser import (
                 convert_xor,
                 implicit_multiplication,
-                parse_expr,
                 standard_transformations,
             )
+
+            # CONST-09(R22-03): 제약식은 `/v1/dsl/*`로 사용자가 보낼 수 있다 — 안전 진입점 경유.
+            from whymath_backend.l3.safe_parse import safe_parse_expr
         except ImportError as exc:
             raise RuntimeError("VariableEngine 제약 검증에는 sympy가 필요합니다.") from exc
 
@@ -129,8 +135,11 @@ class VariableEngine:
         for constraint in self._template.constraints:
             expr_text = constraint.expression
             try:
-                expr = parse_expr(expr_text, local_dict=local_dict, transformations=transformations)
-            except Exception:
+                expr = safe_parse_expr(
+                    expr_text, local_dict=local_dict, transformations=transformations
+                )
+            except Exception as exc:  # noqa: BLE001 — 파싱 실패·안전 파싱 거부는 제약 불충족
+                logger.debug("DSL 제약식 파싱 회피: %s", type(exc).__name__)
                 return False
 
             try:

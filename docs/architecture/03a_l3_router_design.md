@@ -479,6 +479,8 @@ def _cache_key(prompt, system, cost_tier, local_family, local_model):
 | `student_id_hash` | 해시 | 직접 ID 금지(기존 규칙 유지) |
 | `data_export_blocked`(신규·EOS-59) | bool | 데이터 등급 게이트가 *실제로* 클라우드를 막은 건수 — "작동한 비율"의 분자 |
 | `data_export_reason`(신규·EOS-59) | EXPORT_ALLOWED/PROHIBITED/UNVERIFIED 또는 null | 등급 판정 분포·발동률 분모. null=미판정(라우터 미경유)이며 '허용'이 아니다 |
+| `served_model`(신규·ARCH-101) | 응답의 모델 식별자 또는 null | "누가 실제로 답했나" — 텍스트를 만든 호출의 관측값(런타임 LOCAL 강등이면 LOCAL 태그). null=미관측이며 선언 핀으로 채우지 않는다 |
+| `retries`(신규·ARCH-101) | 이 호출의 실제 재시도 수 또는 null | 재시도로 가려진 실패 관측. 0=계측했고 한 번에 성공, null=계측 없음(Ollama·캐시 적중·강등 응답) — 둘을 접지 않는다 |
 
 ---
 

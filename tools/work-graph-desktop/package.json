@@ -1,0 +1,30 @@
+{
+  "name": "whymath-work-graph-desktop",
+  "productName": "WhyMath 작업 지도",
+  "version": "0.1.0",
+  "description": "WhyMath 작업 그래프 데스크톱 앱 — work_graph.py 페이로드를 그대로 그리는 Electron 껍데기 (HARN-206)",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "WhyMath",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "fixture": "python3 fixtures/make_fixture.py",
+    "test": "vitest run",
+    "e2e": "playwright test --project renderer",
+    "e2e:electron": "xvfb-run -a playwright test --project electron",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win nsis zip --publish never"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.18.0",
+    "electron": "38.2.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "^0.25.10",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

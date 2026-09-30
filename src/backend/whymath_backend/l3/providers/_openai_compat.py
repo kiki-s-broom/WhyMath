@@ -27,6 +27,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from whymath_backend.l3.models import Usage
 from whymath_backend.l3.providers._response_fields import read_response_model_id
+from whymath_backend.l3.providers.seat_failure import SeatHttpError
 
 __all__ = [
     "RETRYABLE_STATUS",
@@ -108,8 +109,9 @@ class HttpxChatTransport:
 
     비-2xx는 **삼키지 않는다**. `raise_for_status()`가 던지는 `httpx.HTTPStatusError`에는
     응답 본문이 없어 "왜 거절당했는지"가 사라지므로(공급사 필터 거부·모델 ID 오타·쿼터는
-    전부 4xx다), 본문을 붙인 `RuntimeError`로 바꿔 던진다 — CLAUDE.md 「측정·수집 도구를
-    성공 경로만 보고 설계 금지」 ②(실패 *원인*이 남는가).
+    전부 4xx다), 본문을 붙인 `SeatHttpError`(`RuntimeError` 하위·`status_code` 속성 보유 —
+    ARCH-69)로 바꿔 던진다 — CLAUDE.md 「측정·수집 도구를 성공 경로만 보고 설계 금지」
+    ②(실패 *원인*이 남는가).
 
     재시도 (2026-09-17 실측 대응)
     ---------------------------
@@ -168,6 +170,7 @@ class HttpxChatTransport:
                 "httpx가 설치되지 않아 OpenAI 호환 호출을 할 수 없습니다 " "(`pip install httpx`)."
             ) from exc
         last_error = ""
+        last_status = 0  # 아래 루프가 최소 1회 돌므로 raise 시점엔 항상 실제 상태코드로 덮여 있다
         for attempt in range(self._max_attempts):
             async with httpx.AsyncClient(timeout=timeout_s) as client:
                 response = await client.post(url, headers=dict(headers), json=dict(payload))
@@ -178,13 +181,17 @@ class HttpxChatTransport:
                 last_error = (
                     f"OpenAI 호환 호출 실패 HTTP {response.status_code}: {response.text[:2000]}"
                 )
+                last_status = response.status_code
                 retryable = response.status_code in RETRYABLE_STATUS
                 retry_after = _parse_retry_after(response.headers.get("retry-after"))
             if not retryable or attempt == self._max_attempts - 1:
                 break
             _RETRY_COUNT.set(_RETRY_COUNT.get() + 1)
             await self._sleep(self._backoff_s(attempt, retry_after))
-        raise RuntimeError(f"{last_error} (시도 {self._max_attempts}회)")
+        # ARCH-69 — 상태코드를 메시지가 아니라 **속성**으로 나른다(`SeatHttpError`는 RuntimeError
+        # 하위라 종전 `except RuntimeError`·문구 매칭은 그대로 성립한다). 런타임 LOCAL 강등의
+        # 분류(`seat_failure.classify_seat_failure`)가 이 속성을 읽는다 — 문구를 캐지 않는다.
+        raise SeatHttpError(f"{last_error} (시도 {self._max_attempts}회)", status_code=last_status)
 
 
 def _parse_retry_after(raw: str | None) -> float | None:

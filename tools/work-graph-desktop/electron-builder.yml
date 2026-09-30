@@ -1,0 +1,30 @@
+# electron-builder 설정 (HARN-206). 아이콘을 지정하지 않는다 — 리눅스에서 wine 없이 빌드하기 위해
+# Electron 기본 아이콘을 쓴다(아이콘 교체는 Windows에서 `win.icon`에 .ico를 지정하면 된다).
+# 코드서명 없음 — 인증서 미제공. SmartScreen 경고는 README에 명시한다.
+appId: kr.whymath.workgraph
+productName: WhyMath 작업 지도
+copyright: WhyMath
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - fixtures/sample.json
+  - package.json
+  - "!node_modules/**/*"
+asar: true
+win:
+  target:
+    - nsis
+    - zip
+  artifactName: "${name}-${version}-${os}-${arch}.${ext}"
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: WhyMath 작업 지도
+  artifactName: "${name}-${version}-setup.${ext}"
+publish: null

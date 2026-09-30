@@ -13,10 +13,12 @@ Principle 1(Entity ID ≠ Version ID): `entity_id`는 그 엔티티의 *의미 I
 `code` — `math.<area>.<slug>`)이고, `version_id`는 이 버전 레코드 자체의 UUID다. 하나의
 entity_id에 여러 version_id가 매달린다(§6.2 예시: "Problem PRB-001234 v7").
 
-Lifecycle(§7, 상태 6종): `DRAFT → IN_REVIEW → APPROVED → PUBLISHED → DEPRECATED → RETIRED`.
-**PUBLISHED → DRAFT는 금지**다(이미 발행된 버전은 수정 불가 — 수정하려면 clone해 새
-DRAFT vN+1을 만든다). 이 계약은 상태 값의 *어휘*만 정의한다 — 전이 규칙 자체의 강제는
-도메인별 ORM/DB 트리거 소관이다(예: `db/models/concept_version.py` + alembic 트리거).
+Lifecycle(§7 + EOS-50, 상태 7종): `DRAFT → IN_REVIEW → IN_QA → APPROVED → PUBLISHED →
+DEPRECATED → RETIRED`. **PUBLISHED → DRAFT는 금지**다(이미 발행된 버전은 수정 불가 — 수정하려면
+clone해 새 DRAFT vN+1을 만든다). 이 파일은 상태·전이·게이트의 *어휘*만 정의한다. **어떤 상태에서
+어떤 전이가 허용되는가는 `schema/version_lifecycle.py`의 전이표 한 장이 정본**이다(EOS-50 ⑨ —
+전이 규칙을 코드 분기에 흩지 않는다). 전이의 실행·게이트 검증은 `l3/publish_gate.py`가,
+PUBLISHED 불변성의 최후 방어는 DB 트리거(`db/models/concept_version.py` + alembic)가 맡는다.
 
 컨벤션(`schema/curriculum_version.py`·`schema/concept.py` 답습):
   - `ConfigDict(extra="forbid", use_enum_values=True, str_strip_whitespace=True)`.
@@ -42,23 +44,31 @@ from pydantic import BaseModel, ConfigDict, Field
 # Lifecycle 상태 (44_eos_version_management.md §7 — 6단계)
 # ──────────────────────────────────────────────────────────────────────────
 class VersionStatus(str, Enum):
-    """버전 생명주기 상태 — §7 상태 머신 6종.
+    """버전 생명주기 상태 — §7 상태 머신 6종 + EOS-50 `IN_QA` 1종 = 7종.
 
-    전이 규칙(§7 다이어그램): `DRAFT → IN_REVIEW → APPROVED → PUBLISHED → DEPRECATED →
-    RETIRED`(IN_REVIEW에서 반려되면 DRAFT로 되돌아갈 수 있음 — request changes). **단
-    PUBLISHED에 도달한 뒤로는 DRAFT로 돌아갈 수 없다** — "이미 Published 버전을 다시
-    수정 불가 상태로 되돌리지 않는다. 대신 Published 버전을 clone해 Draft vN+1을
-    만든다"(§7). 이 금지의 기계 시행은 도메인 ORM/DB 트리거 소관(예: `concept_version`
-    BEFORE UPDATE 트리거 — `db/models/concept_version.py` docstring 참조).
+    허용 전이는 여기 적지 않는다 — `schema/version_lifecycle.py`의 `LIFECYCLE_TRANSITIONS`가
+    유일한 정본이다(산문과 표가 둘 다 있으면 언젠가 갈라진다). 다만 두 불변식은 표와 무관하게
+    여기 적어 둔다: **PUBLISHED에 도달한 뒤로는 DRAFT로 돌아갈 수 없다**("Published 버전을
+    clone해 Draft vN+1을 만든다" — §7)이고, 이 금지와 PUBLISHED payload 불변은 DB 트리거도
+    독립적으로 막는다(`concept_version` BEFORE UPDATE 트리거 — `db/models/concept_version.py`).
 
-    값(영어) — `44_eos_version_management.md` §6.2 원문 그대로.
+    값(영어) — `44_eos_version_management.md` §6.2 원문 그대로(`IN_QA`만 EOS-50 추가).
     """
 
     DRAFT = "DRAFT"
     """초안 — 편집 중, 아직 검토에 제출되지 않음."""
 
     IN_REVIEW = "IN_REVIEW"
-    """검토 중 — 제출되어 리뷰어의 승인/반려를 기다림."""
+    """검토 중 — 제출되어 리뷰어의 검토 통과/반려를 기다림."""
+
+    IN_QA = "IN_QA"
+    """QA 중 — 사람 검토를 통과해 자동 검증(QA 게이트)과 승인을 기다림(EOS-50 · P3-11 ⑨).
+
+    §7 원 다이어그램에는 없던 상태다. P3-11이 요구한 "Review → QA → Approved" 순서와 §9의
+    "각 버전은 QA 결과를 연결한다"를 *상태*로 표현하려고 더했다 — QA를 승인 간선의 부수
+    효과로만 두면 "검토는 끝났고 QA 대기 중"이라는 사실이 어디에도 남지 않는다. PG enum
+    `concept_version_status_enum`에는 리비전 `9d3e7b1c5a20`이 `IN_REVIEW` 뒤에 추가한다.
+    """
 
     APPROVED = "APPROVED"
     """승인됨 — 검토를 통과했으나 아직 발행 전."""
@@ -155,6 +165,93 @@ class VersionIntegrity(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# 전이·게이트 어휘 (EOS-50) — 허용 조합은 `schema/version_lifecycle.py` 전이표가 정한다
+# ──────────────────────────────────────────────────────────────────────────
+class TransitionAction(str, Enum):
+    """전이 이름 — 무엇을 하려는가. 어느 상태에서 어디로 가는지는 전이표가 정한다.
+
+    `SUPERSEDE`·`ROLLBACK`·`RESTORE`는 **복합 연산 전용**이다(전이표의 `compound_only`).
+    `l3/publish_gate.apply_transition`에 직접 넣으면 거부된다 — 발행의 부수 효과(이전 발행본
+    대체)와 롤백(현재 발행본 내림 + 직전 발행본 복원)은 짝이 맞아야 하므로 반쪽만 실행할 수 없다.
+    """
+
+    SUBMIT = "submit"
+    REQUEST_CHANGES = "request_changes"
+    PASS_REVIEW = "pass_review"
+    FAIL_QA = "fail_qa"
+    APPROVE = "approve"
+    PUBLISH = "publish"
+    DEPRECATE = "deprecate"
+    RETIRE = "retire"
+    SUPERSEDE = "supersede"
+    ROLLBACK = "rollback"
+    RESTORE = "restore"
+
+
+class GateKind(str, Enum):
+    """게이트 종류 — 전이표의 한 간선에 붙어 그 전이를 검증 파이프라인에 강제 경유시킨다.
+
+    검사 항목의 정본은 `l3/publish_gate.py`의 `run_gate`다(여기는 이름만).
+    """
+
+    QA = "qa"
+    """승인 직전(IN_QA → APPROVED) — 스키마 유효·content_hash 산출·작성/검토자 완결."""
+
+    PUBLISH = "publish"
+    """발행 직전(APPROVED → PUBLISHED) — 해시 재계산 일치·작성/검토/승인자 완결·QA 기록 결속."""
+
+    RESTORE = "restore"
+    """롤백 복원 직전(DEPRECATED → PUBLISHED) — PUBLISH 검사 + 과거 발행 이력."""
+
+
+class GateRecord(BaseModel):
+    """게이트 통과 기록 1건 — 헌법 제5조 ③·R2-03(판정자·일시·근거·우회 여부).
+
+    통과한 게이트만 기록된다. 실패는 예외로 거부되고(전이 자체가 일어나지 않음) 로그에 남는다.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        use_enum_values=True,
+        str_strip_whitespace=True,
+    )
+
+    gate: GateKind = Field(..., description="게이트 종류.")
+    action: TransitionAction = Field(..., description="이 게이트가 붙은 전이.")
+    verdict: str = Field(default="PASSED", description="판정 — 기록되는 것은 통과뿐이다.")
+    judged_by: str = Field(..., min_length=1, description="판정자(전이를 요청한 행위자).")
+    judged_at: datetime = Field(..., description="판정 시각.")
+    checks: list[str] = Field(..., min_length=1, description="통과한 검사 이름(근거).")
+    content_hash: str = Field(..., min_length=1, description="판정 대상 payload의 해시(근거).")
+    validator_bundle_version: str = Field(..., min_length=1, description="검사 묶음 버전.")
+    qa_run_id: str = Field(..., min_length=1, description="이 판정 실행의 식별자.")
+    bypassed: bool = Field(
+        default=False,
+        description="우회 여부 — 현재 우회 경로가 없으므로 항상 False(제9조 ②).",
+    )
+
+
+class VersionQA(BaseModel):
+    """버전의 QA 연결 — §9 `qa_status`·`qa_run_id`·`validator_bundle_version` + 기록 이력.
+
+    앞의 셋은 **마지막 통과 게이트**의 요약이고, `records`는 추가만 되는 이력이다.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        use_enum_values=True,
+        str_strip_whitespace=True,
+    )
+
+    qa_status: str | None = Field(default=None, description="마지막 게이트 판정(PASSED).")
+    qa_run_id: str | None = Field(default=None, description="마지막 게이트 실행 식별자.")
+    validator_bundle_version: str | None = Field(
+        default=None, description="마지막 게이트의 검사 묶음 버전."
+    )
+    records: list[GateRecord] = Field(default_factory=list, description="게이트 통과 이력.")
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 공통 버전 헤더 (§6.2 원문 필드 목록)
 # ──────────────────────────────────────────────────────────────────────────
 class VersionHeader(BaseModel):
@@ -219,6 +316,10 @@ class VersionHeader(BaseModel):
         default_factory=VersionIntegrity,
         description="무결성 검증 정보.",
     )
+    qa: VersionQA = Field(
+        default_factory=VersionQA,
+        description="게이트(QA·발행·복원) 통과 기록 — §9 'QA 결과를 연결한다'(EOS-50).",
+    )
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="레코드 생성 시각.",
@@ -235,5 +336,9 @@ __all__ = [
     "VersionSource",
     "VersionGovernance",
     "VersionIntegrity",
+    "TransitionAction",
+    "GateKind",
+    "GateRecord",
+    "VersionQA",
     "VersionHeader",
 ]

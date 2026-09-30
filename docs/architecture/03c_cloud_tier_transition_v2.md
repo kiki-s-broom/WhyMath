@@ -134,7 +134,7 @@ CLAUDE.md 「작동 신호 없는 알고리즘 부착 금지」가 겨냥하는 
 학생 대면 CLOUD_MID 요청
   → openrouter(deepinfra/fp8) 시도
   → 429/5xx/타임아웃이면 → anthropic(claude-sonnet-4-6)로 1회 재시도
-  → 그것도 실패하면 → LOCAL 강등 (기존 경로)
+  → 그것도 실패하면 → LOCAL 강등 (ARCH-69가 만든 런타임 강등 경로 — 착지 2026-09-29)
   ※ 매 회차 seat_attempted · seat_served · failover_reason을 기록
 ```
 
@@ -206,6 +206,26 @@ API 키를 **명시적으로** 넘긴다. Anthropic SDK의 자격증명 해소 �
 (`G-opus5-billing-path-prod-recheck`).
 
 ## 5. 단계 계획
+
+> **[착지 2026-09-29 · ARCH-64]** B2(기본값 → `openrouter`)와 B3(학생 대면 `app.py` 팩토리 경유)가
+> **함께** 착지했다 — 게이트 `G-cloud-mid-seat-cutover`는 2026-09-21 판정 ①(저작+학생 대면 동시)로
+> clear됐다. **B1은 착지하지 않았다**: 2026-09-28 Kiki 결정(ARCH-66 기간 처분)으로 `ARCH-63`을
+> 선행에서 뗐고, 이 기간의 좌석 사슬은 아래 표의 `openrouter → anthropic → LOCAL`이 아니라
+> **`openrouter` → LOCAL**(2차 **클라우드** 좌석 없음)이다. 1차 좌석 실패는 다른 클라우드 좌석으로
+> 넘어가지 않는다(예외 note·`/status`의 `cloud_failover_seat=null`·회차 관측 `failover` 블록이
+> "2차 좌석 없음"을 말한다).
+>
+> **[정정 2026-09-29 · ARCH-69]** ARCH-64 착지 당시 이 자리는 "LOCAL로도 자동 재시도되지 않는다 —
+> LOCAL 강등은 라우팅 시점(구독·예산 가드)에서만"이었다. 그 서술은 거짓이 됐다: 런타임 강등 경로가
+> **학생 대면 서빙 조립에 한해** 생겼다 — 1차 좌석이 429·5xx·408/타임아웃·미설정으로 실패하면 LOCAL이
+> 1회 대신 답하고(`CompositeProvider(runtime_local_degrade=True)` — `app.py`만), 그 사실은 응답·
+> trace·Langfuse에 `degraded_from_seat`·사유 코드로 표기된다. 4xx(요청·인증 오류)는 강등하지 않고
+> 예외가 그대로 올라오며, 저작·측정 조립은 강등이 없어 실패가 실패로 남는다. §3.3의 작동 신호 4종
+> 중 `seat_local_degrade_rate`는 ARCH-69가 붙였고(분모 0이면 None) `seat_primary_success_rate`·
+> `seat_failover_rate`는 여전히 **미산출(None)**이다.
+> 남은 간극(명시): 라우터의 사전 예산 판정(`guard_cloud`·`est_cost_krw`)은 좌석을 모르고 anthropic
+> 단가로 판정한다(`SERVING_CLOUD_SEAT` docstring) — 원가 *기록*은 좌석 단가로 바뀌었으나 *판정*은
+> 보수 쪽으로 과대다. CLOUD_HIGH는 이 좌석에서 `openrouter_model_high`(미확인 핀 §6-1)로 나간다.
 
 | Phase | 내용 | 판정 필요 | 선행 |
 |---|---|---|---|

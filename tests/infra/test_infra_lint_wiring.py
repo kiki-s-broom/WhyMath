@@ -42,7 +42,9 @@ _CI_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 # (잡 이름, 그 잡이 lint해야 하는 대상 경로들) — 배선 추가 시 여기에 등재해 동결한다.
 _WIRINGS: list[tuple[str, tuple[str, ...]]] = [
     ("infra-contracts", ("tests/infra", "infra", "conftest.py")),  # OPS-11 · OPS-13
-    ("harness-integrity", ("scripts", "tests/harness")),  # OPS-12 · OPS-13(harness→scripts 확대)
+    # HARN-206(2026-09-29) — tools/ 확대: 데스크톱 앱의 픽스처 생성기(`tools/work-graph-desktop/
+    # fixtures/make_fixture.py`)가 어떤 lint에도 안 잡혀 `test_lint_coverage`가 red였다.
+    ("harness-integrity", ("scripts", "tests/harness", "tools")),  # OPS-12 · OPS-13 · HARN-206
     ("data-pipeline", ("tests/data_pipeline",)),  # OPS-14(OPS-13 허용목록 상환)
 ]
 _WIRING_IDS = [job for job, _ in _WIRINGS]
