@@ -401,6 +401,22 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_coach_wrong_submission_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-146 — 코치가 서버 검증으로 판정한 **명확한 오답**을 학습 원장에 적재할지"
+            "(정식기능·킬 스위치). True(기본)면 완료 상태머신이 재고 유도(REDIRECT)를 내는 턴 중 "
+            "같은 학생·같은 문항의 **최초 1건**만 ProblemAttempt(is_correct=False)로 적재하고 "
+            "`/v1/me/attempts`와 같은 후처리(답안 오개념 스캔·숙달 전파·스킬 이벤트·학습 상태 "
+            "머신)를 태운다 — 앱 학생의 오답이 R3·R5·R6에 닿는 유일한 경로다. 재제출 오답과 "
+            "판정 불가(unverifiable)는 세지 않는다. "
+            "`l4_solution_completion_enabled`가 상위 게이트다 — 그것이 False면 REDIRECT 자체가 "
+            "없으므로 이 플래그와 무관하게 적재가 없다. 이 플래그는 재고 유도 발화는 그대로 두고 "
+            "**적재만** 끄는 좁은 스위치다(끄면 종전 동작과 비트동일). "
+            "WHYMATH_L4_COACH_WRONG_SUBMISSION_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_hint_content_serving_enabled: bool = Field(
         default=True,
         description=(

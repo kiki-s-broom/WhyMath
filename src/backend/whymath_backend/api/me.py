@@ -44,8 +44,6 @@ from __future__ import annotations
 import logging
 import math
 import uuid
-from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal, TypeVar
 
@@ -63,6 +61,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._attempt_misconception_scan import (
+    scan_attempt_misconceptions,
+    this_attempt_misconceptions_from,
+)
 from whymath_backend.api._auth import ConsentedUser, CurrentUser, RequireContentAdmin
 from whymath_backend.api._crypto import (
     encrypt_dialogue_content,
@@ -211,7 +213,6 @@ from whymath_backend.l4.misconception.attempt_hypothesis_policy import (
     AttemptHypothesisAction,
     decide_attempt_hypothesis_action,
 )
-from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
@@ -244,8 +245,6 @@ from whymath_backend.schema.assessment import (
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
 from whymath_backend.schema.assessment_evidence import (
     AssessmentEvidence,
-    MisconceptionCandidate,
-    MisconceptionScan,
 )
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
@@ -732,139 +731,6 @@ async def list_my_privacy_audit(
 _STARTED_AT_SKEW_TOLERANCE = timedelta(minutes=5)
 
 
-@dataclass(frozen=True)
-class _AttemptMisconceptionScan:
-    """`_scan_attempt_misconceptions`의 결과 — 훑기 3상태 + 게이트 통과 후보.
-
-    능력 구현이 돌려주는 리치 타입을 Core 안에 들이지 않으려는 좌석이다. Core가 읽는 것은
-    `scan`·`candidates` 둘뿐이므로(능력 Protocol이 노출하는 것과 동일) 여기서 그 둘만 고정한다.
-    """
-
-    scan: MisconceptionScan
-    candidates: tuple[MisconceptionCandidate, ...]
-
-
-_NOT_SCANNED = _AttemptMisconceptionScan(scan=MisconceptionScan.NOT_RUN, candidates=())
-"""훑지 않음 — 답안·선지 인덱스 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**
-
-정답은 사유가 아니다 — 정답 회차도 오답과 같은 조건으로 훑는다(EOS-123)."""
-
-
-async def _scan_attempt_misconceptions(
-    session: AsyncSession,
-    detector: AttemptMisconceptionDetector,
-    *,
-    problem_id: uuid.UUID,
-    answer: str | None,
-    selected_choice_index: int | None,
-) -> _AttemptMisconceptionScan:
-    """채점 1건에서 오개념 후보를 훑는다 — 재료가 없으면 훑지 않았다고 말한다.
-
-    **독립된 두 채널**을 훑고 결과를 합친다. 둘은 재료도 실패 모드도 다르므로 서로의 실행
-    조건이 되지 않는다 — 한쪽이 못 돌아도 다른 쪽은 돈다:
-
-      ① **텍스트 채널**(EOS-104): 과목 어댑터가 문항 지문 + 제출 답안(자유 텍스트)을 이어
-         오류 서명을 읽는다. 지문이나 답안이 없으면 이 채널은 돌지 않는다.
-      ② **선지 채널**(ASM-06): 학생이 고른 보기 인덱스를 그 문항의 `distractor_map`에
-         대조해 역추적한다(`l4.misconception.distractor_link`). 답안 텍스트도 지문도 필요
-         없다 — 인덱스와 매핑만 있으면 된다. 그래서 "보기만 탭하고 아무것도 쓰지 않은"
-         제출에서 **유일하게** 도는 채널이다(종전엔 그런 제출이 통째로 not_run이었다).
-
-    훑지 않는 조건(두 채널 *모두* 미실행일 때만 `NOT_RUN`): 킬 스위치 OFF ·
-    (텍스트 채널) 답안 미제출·문항 지문 부재(또는 지문에서 식 추출 실패) · (선지 채널) 인덱스
-    미보고·선지 플래그 OFF·매핑 부재. 이들을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면
-    하류가 *미측정*을 *측정된 0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
-
-    **정답 회차도 같은 조건으로 훑는다(EOS-123).** 이 함수는 정오답을 받지 않는다. 종전에는
-    정답을 두 채널 모두에서 조기 반환했는데, 그러면 호출자가 정답 회차의 가설을 전혀 움직이지
-    못해 "다르게 틀리면 신뢰가 내려가고 맞히면 그대로"인 역방향 비대칭이 생겼다(페르소나 C
-    0.85 → 0.74 → 0.74). 정답 전용 조건을 따로 두지 않고 조기 반환만 걷은 이유는, 그래야 정답이
-    감쇠를 받는 조건과 오답이 감쇠를 받는 조건이 **이 함수 하나로 같게** 정해지기 때문이다 —
-    정답 쪽 조건이 넓으면 같은 문항에서 오답은 못 내리는데 정답만 내리는 거울상 비대칭이 된다.
-
-    정답 답안은 텍스트 채널의 ⓪ 거짓 등식 가드가 막아 후보가 없는 것이 정상이고(`RAN_NO_CANDIDATE`),
-    정답 선지 인덱스는 `distractor_map`(오답 선지만 담는다)에 없어 역시 후보가 없다. 정답으로
-    보고됐는데 후보가 나오면 그것은 보고와 서버 관측의 **충돌**이다. 훑기 결과를 가설에 어떻게
-    반영할지(충돌이면 보류)는 호출자가 `l4.misconception.attempt_hypothesis_policy`로 정한다 —
-    이 함수는 본 것을 그대로 보고할 뿐이다.
-    """
-    if not get_settings().l4_attempt_misconception_scan_enabled:
-        return _NOT_SCANNED
-
-    # ── 채널 ②(선지) — 텍스트보다 먼저. DB 1회(distractor_map 단일 컬럼)이고, 인덱스를
-    # 보고하지 않았으면 그 조회조차 하지 않는다(reactive retrieval — 카탈로그·다른 오개념을
-    # 미리 싣지 않는다·CLAUDE.md 협상 불가).
-    choice_candidates: tuple[MisconceptionCandidate, ...] = ()
-    choice_ran = False
-    if selected_choice_index is not None and get_settings().l4_distractor_link_enabled:
-        distractor_map = await session.scalar(
-            select(Problem.distractor_map).where(Problem.problem_id == problem_id)
-        )
-        # 매핑이 아예 없는 문항이면 이 채널은 *돌 재료가 없다* — 돌았는데 0건인 것과 구분해
-        # ran으로 세지 않는다(작동한 비율을 부풀리지 않는다).
-        if distractor_map:
-            choice_ran = True
-            choice_candidates = distractor_link_candidates(distractor_map, selected_choice_index)
-
-    # ── 채널 ①(텍스트) — 기존 EOS-104 경로. 조건·폴백·로그 전부 불변.
-    text_candidates: tuple[MisconceptionCandidate, ...] = ()
-    text_scan = MisconceptionScan.NOT_RUN
-    if answer is not None:
-        question_text = await session.scalar(
-            select(Problem.question_text).where(Problem.problem_id == problem_id)
-        )
-        if question_text:
-            # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를
-            # 이름으로 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
-            try:
-                result = detector.scan_attempt_answer(
-                    question_text=question_text, student_answer=answer
-                )
-            except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
-                # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로
-                # 여기서 터지면 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측
-                # 실패가 채점 실패를 만드는 셈. 그래서 삼키되, **예외 타입명을 반드시 남긴다**
-                # (CLAUDE.md 침묵 실패 금지 — 무타입 경고가 langfuse v2 쓰기 8일 무증상 전멸의
-                # 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
-                _logger.warning(
-                    "오개념 훑기 실패 — 채점은 계속한다(텍스트 채널 not_run). "
-                    "exc_type=%s problem_id=%s",
-                    type(exc).__name__,
-                    problem_id,
-                )
-            else:
-                text_scan = result.scan
-                text_candidates = tuple(result.candidates)
-
-    # ── 합류. 같은 오개념을 두 채널이 함께 지목하면 *더 높은 신뢰도 하나*만 남긴다 — 같은
-    # 사실의 사본 둘이 가설 저장소에서 서로를 덮어쓰는 순서 의존을 만들지 않기 위해서다.
-    merged = _merge_misconception_candidates(choice_candidates, text_candidates)
-    text_ran = text_scan is not MisconceptionScan.NOT_RUN
-    if not choice_ran and not text_ran:
-        return _NOT_SCANNED
-    scan = MisconceptionScan.RAN_WITH_CANDIDATES if merged else MisconceptionScan.RAN_NO_CANDIDATE
-    return _AttemptMisconceptionScan(scan=scan, candidates=merged)
-
-
-def _merge_misconception_candidates(
-    *channels: Sequence[MisconceptionCandidate],
-) -> tuple[MisconceptionCandidate, ...]:
-    """여러 채널의 오개념 후보를 id 기준으로 합친다 — 중복은 신뢰도 높은 쪽만, 순서는 결정론.
-
-    앞 채널의 등장 순서를 보존하고(첫 등장 위치 고정), 같은 id가 뒤에서 더 높은 신뢰도로
-    다시 나오면 *그 자리에서* 값만 교체한다. 정렬을 새로 하지 않는 이유는 각 채널이 이미
-    자기 기준으로 정렬돼 왔고, 여기서 재정렬하면 채널 간 신뢰도 척도가 서로 다른데도 한 줄로
-    비교하는 셈이 되기 때문이다(`semantic_similarity`와 `confidence`를 섞지 않는 것과 동형).
-    """
-    merged: dict[str, MisconceptionCandidate] = {}
-    for channel in channels:
-        for candidate in channel:
-            existing = merged.get(candidate.misconception_id)
-            if existing is None or candidate.confidence > existing.confidence:
-                merged[candidate.misconception_id] = candidate
-    return tuple(merged.values())
-
-
 class AttemptSubmitRequest(BaseModel):
     """본인 풀이 채점 결과 제출 — `POST /v1/me/attempts` 요청 본문.
 
@@ -1275,7 +1141,7 @@ async def submit_attempt(
     # 귀속(핵심): 후보의 재료가 **이 attempt에서만** 나오므로 attempt 귀속이 정의상 성립한다.
     # 대화 턴의 게이트 매칭을 옮겨 오지 않는 이유가 이것이다 — 그쪽은 *턴* 단위라 옮기면
     # "이 답안의 오개념 후보"가 거짓 주장이 된다(EOS-104 acceptance ③).
-    misconception_scan_result = await _scan_attempt_misconceptions(
+    misconception_scan_result = await scan_attempt_misconceptions(
         session,
         misconception_detector,
         problem_id=body.problem_id,
@@ -1345,13 +1211,8 @@ async def submit_attempt(
         # 오개념이 앞서 쌓였다면 이번 증거로 강화된 값이 교정 경로의 근거가 된다.
         # `apply_candidates`와 같은 조건(`gate_passed`)으로 거른다 — 저장소가 무시한 후보를 여기서
         # 되살리지 않는다(카탈로그 밖 id는 저장소가 이미 뺐으므로 갱신 세트에 나타나지 않는다).
-        scanned_ids = {
-            c.misconception_id for c in misconception_scan_result.candidates if c.gate_passed
-        }
-        this_attempt_misconceptions = tuple(
-            (h.misconception_id, h.confidence)
-            for h in active_hypotheses
-            if h.misconception_id in scanned_ids
+        this_attempt_misconceptions = this_attempt_misconceptions_from(
+            active_hypotheses, misconception_scan_result.candidates
         )
     elif hypothesis_action is AttemptHypothesisAction.DECAY_ONLY:
         # 반환값을 쓰지 않는다 — 정답 회차는 복습 코칭을 만들지 않는다(바로 위 APPLY 분기 주석).

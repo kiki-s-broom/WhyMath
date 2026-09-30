@@ -439,11 +439,11 @@ gates:
     title: "EOS-146 앱 오답·포기 이벤트 원천 처분 선택(가·나·다) — (가) 코치 턴의 오답 신호(검증 결과·오개념 매칭)를 응답 1건으로 적재하고 상태 머신 실행(코치 한 턴을 오답 1건으로 셀지 = 교수학 판정) / (나) 앱이 문항 단위 오답을 POST /v1/me/attempts로 제출하도록 계약 변경(MOB-20 계약상 금지 재판정) / (다) 앱에서는 상태 머신 집행(R3·R6)을 쓰지 않기로 하고 범위 명기(Phase 3 Release Gate A 영향)"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-29
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "세션 사용자 결정(2026-09-30 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): (가) 코치가 서버에서 판정한 명확한 오답(final_incorrect)을 같은 학생·같은 문제의 최초 1건만 ProblemAttempt(is_correct=False)로 적재하고 상태 머신을 돌린다. 재제출 오답·unverifiable은 세지 않고, 앱·/v1/me/attempts 계약은 바꾸지 않는다((나)·(다) 미채택). 포기는 이번 처분에서 제외하고 EOS-41-app-abandon-signal-source로 분리. 판정 기준 main 270968a2 — 코드 대조: 코치 REDIRECT 진입 시 적재 0건(api/coach.py::_resolve_completion), dialogue.attempt_id는 완료 표지라 오답 행을 링크하면 안 됨, 코치 경로 is_correct=False 적재 0건·모바일 POST /v1/me/attempts 호출 0건(이 검색 방법 기준). 근거 문서 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §4·§7 P-1. 후속: EOS-146 acceptance ⑥·⑦ 재작성 · 결정 로그 MEMORY.md 2026-09-30."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §4·§5·§7 P-1(판정 기준 main a82f9449)과 EOS-146 acceptance ③. 코치 한 턴을 오답 1건으로 셀지는 교수학 판정이고 (나)는 앱 계약(MOB-20) 재판정이라 구현 세션이 대신 고르지 않는다. 2026-09-29 코드 재확인(main a28a8d08): EOS-134 착지로 코치 정답 완료는 advance_on_graded_attempt를 돌지만(api/coach.py:1416) 코치 경로에 오답·포기 적재는 0건이고 모바일 lib은 POST /v1/me/attempts를 호출하지 않는다 — R3·R6 앱 도달 0 유지(이 검색 방법 기준). 근거: 이 선행 조건이 acceptance 산문뿐이라 next가 EOS-146을 1순위 후보로 계속 내놓아 세션마다 같은 벽에 부딪혔다."
