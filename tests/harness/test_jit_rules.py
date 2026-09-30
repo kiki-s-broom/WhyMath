@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -201,66 +202,84 @@ class TestRankingAndCap:
         assert "src/x/a.py" in text and "2건" in text
 
 
-# ── ④ 인덱스 직렬화 ─────────────────────────────────────────────────────────
+# ── ④ 커밋 인덱스 없음 (HARN-130) ───────────────────────────────────────────
 
 
-class TestIndex:
-    def test_dump_is_deterministic(self) -> None:
-        """같은 대장이면 같은 바이트 — 아니면 `jit check`가 상시 red가 된다."""
+class TestNoCommittedIndex:
+    """주입 후보는 편집 시 대장에서 계산한다 — 커밋 파생물이 다시 생기면 충돌·낡음이 돌아온다.
+
+    커밋하던 시절의 두 사고: 사고를 등재한 PR끼리 `backlog/jit_index.json`에서 충돌했고
+    (main에서 이 파일을 바꾼 커밋 26건 중 25건이 사고 대장도 바꿨다), 재생성을 잊으면 CI가
+    red였다(HARN-179). 아래 둘이 그 파일의 귀환을 막는다.
+    """
+
+    def test_index_file_is_not_tracked(self) -> None:
+        out = subprocess.run(
+            ["git", "ls-files", "--", "backlog/jit_index.json"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            encoding="utf-8",
+            check=True,
+        )
+        assert (
+            out.stdout.strip() == ""
+        ), "적시 주입 인덱스가 다시 커밋됐다 — 편집 시 계산이 정본이다"
+
+    def test_index_file_is_ignored(self) -> None:
+        """옛 코드의 `jit build`가 남긴 파일이 `git add -A`로 다시 들어가지 않는다.
+
+        `check-ignore`는 무시되면 0, 아니면 1, 오류면 128이다 — 0만 통과시킨다.
+        """
+        out = subprocess.run(["git", "check-ignore", "-q", "backlog/jit_index.json"], cwd=REPO_ROOT)
+        assert out.returncode == 0
+
+    def test_ci_runs_the_computation_check(self) -> None:
+        """집행 지점 — 커밋 인덱스가 사라진 뒤 '대장에서 계산되는가'를 CI가 실제로 본다.
+
+        `harness-integrity` 잡에 `backlog.py jit check` 스텝이 있고 fail-open이 아니어야 한다.
+        스텝이 빠지면 0건(경로 해소 전멸)이 어느 곳에서도 red가 되지 않는다.
+        """
+        import yaml
+
+        spec = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+        steps = [s for s in spec["jobs"]["harness-integrity"]["steps"] if isinstance(s, dict)]
+        hits = [
+            s for s in steps if "scripts/harness/backlog.py jit check" in str(s.get("run") or "")
+        ]
+        assert len(hits) == 1, "harness-integrity 잡에 jit check 스텝이 정확히 1개여야 한다"
+        assert str(hits[0].get("continue-on-error", "false")).lower() != "true"
+
+    def test_build_is_deterministic(self) -> None:
+        """같은 대장이면 같은 후보 — 편집마다 결과가 흔들리면 주입이 소음이 된다."""
         backlog = _backlog(FakeTask(id="HARN-99-fix", paths=["src/x/**"]))
         made = lambda: jit_rules.build_notes(  # noqa: E731
             backlog,
             [FakeRule(id="R-001", title="규칙", enforced_by=["HARN-99"])],
             [FakeIncident(date="2026-09-01", title="사고", fix_ref="HARN-99")],
         )
-        assert jit_rules.dump_index(made()) == jit_rules.dump_index(made())
-
-    def test_roundtrip(self, tmp_path: Path) -> None:
-        backlog = _backlog(FakeTask(id="HARN-99-fix", paths=["src/x/**"]))
-        notes = jit_rules.build_notes(
-            backlog, [], [FakeIncident(date="2026-09-01", title="사고", fix_ref="HARN-99")]
-        )
-        (tmp_path / "backlog").mkdir()
-        jit_rules.index_path(tmp_path).write_text(jit_rules.dump_index(notes), encoding="utf-8")
-        assert jit_rules.load_index(tmp_path) == notes
-
-    @pytest.mark.parametrize("body", ["{broken", "[]", '{"version": 1}', '{"notes": "nope"}'])
-    def test_corrupt_index_is_empty_not_an_exception(self, tmp_path: Path, body: str) -> None:
-        """훅이 읽는 파일이다 — 깨졌다고 편집을 막으면 안 된다."""
-        (tmp_path / "backlog").mkdir()
-        jit_rules.index_path(tmp_path).write_text(body, encoding="utf-8")
-        assert jit_rules.load_index(tmp_path) == []
-
-    def test_missing_index_is_empty(self, tmp_path: Path) -> None:
-        assert jit_rules.load_index(tmp_path) == []
+        assert made() == made()
 
 
 # ── ⑤ 저장소 현재 상태 ──────────────────────────────────────────────────────
 
 
+@pytest.fixture(scope="module")
+def live_notes() -> list[jit_rules.Note]:
+    """실제 대장에서 계산한 주입 후보 — 훅·CLI와 같은 함수(`_build_jit_notes`)를 쓴다."""
+    notes, errors = cli._build_jit_notes(REPO_ROOT)
+    assert errors == [], errors[:5]
+    return notes
+
+
 class TestLiveRepo:
-    def test_index_matches_the_ledgers(self) -> None:
-        """인덱스는 대장의 렌더 결과다 — 손편집·표류는 여기서 잡힌다."""
-        import incidents as incidents_mod
-        import rules as rules_mod
-        import store
+    def test_live_notes_are_not_empty(self, live_notes) -> None:
+        """스캔 0건은 실패다 — 빈 후보는 '사고가 없다'가 아니라 '계산 실패'다."""
+        assert len(live_notes) > 50
 
-        backlog, _ = store.load_backlog(REPO_ROOT)
-        rule_list, rule_errors = rules_mod.load_rules(REPO_ROOT)
-        incident_list, incident_errors = incidents_mod.load_incidents(REPO_ROOT)
-        assert rule_errors == [] and incident_errors == []
-        expected = jit_rules.dump_index(jit_rules.build_notes(backlog, rule_list, incident_list))
-        assert jit_rules.index_path(REPO_ROOT).read_text(encoding="utf-8") == expected
-
-    def test_index_is_not_empty(self) -> None:
-        """스캔 0건은 실패다 — 빈 인덱스는 '사고가 없다'가 아니라 '미구축'이다."""
-        assert len(jit_rules.load_index(REPO_ROOT)) > 50
-
-    def test_a_hot_path_injects_and_a_cold_one_is_silent(self) -> None:
+    def test_a_hot_path_injects_and_a_cold_one_is_silent(self, live_notes) -> None:
         """실제 대장에서의 변별력 — 합성 픽스처만으로는 실물에서 도는지 모른다."""
-        notes = jit_rules.load_index(REPO_ROOT)
-        assert jit_rules.notes_for_path(notes, "scripts/harness/backlog.py")
-        assert jit_rules.notes_for_path(notes, "README.md") == []
+        assert jit_rules.notes_for_path(live_notes, "scripts/harness/backlog.py")
+        assert jit_rules.notes_for_path(live_notes, "README.md") == []
 
 
 # ── ⑥ 훅 경로 ───────────────────────────────────────────────────────────────
@@ -278,40 +297,33 @@ class TestCheckEditHook:
     def test_hot_path_injects(self, monkeypatch, capsys) -> None:
         code, err = self._run(monkeypatch, capsys, "scripts/harness/backlog.py")
         assert code == 0
-        assert "[적시 규칙]" in err
+        # "[적시 규칙]"만 보면 실패 문구("[적시 규칙] 주입 실패 — …")도 통과한다 — 주입 본문을 본다.
+        assert "경로에서 실제로 났던 것" in err
+        assert "주입 실패" not in err
 
     def test_cold_path_is_silent(self, monkeypatch, capsys) -> None:
         code, err = self._run(monkeypatch, capsys, "README.md")
         assert code == 0
         assert "[적시 규칙]" not in err
 
-    def test_broken_index_never_blocks_the_edit(self, monkeypatch, capsys) -> None:
-        """fail-open — 관측성 코드가 개발을 볼모로 잡으면 사람이 훅을 끈다."""
-        path = jit_rules.index_path(REPO_ROOT)
-        original = path.read_bytes()
-        try:
-            path.write_text("{broken\n", encoding="utf-8")
-            code, err = self._run(monkeypatch, capsys, "scripts/harness/backlog.py")
-            assert code == 0
-            assert "[적시 규칙]" not in err  # 빈 인덱스 = 침묵 (예외가 아니다)
-        finally:
-            path.write_bytes(original)
-        assert path.read_bytes() == original
+    def test_injection_failure_never_blocks_and_names_the_exception_type(
+        self, monkeypatch, capsys
+    ) -> None:
+        """fail-open + 침묵 실패 금지 — 계산이 터져도 편집은 통과하고, 타입명은 남는다.
 
-    def test_injection_failure_names_the_exception_type(self, monkeypatch, capsys) -> None:
-        """침묵 실패 금지 — 무타입 경고가 langfuse 8일 무증상 전멸의 원인이었다."""
-        monkeypatch.chdir(REPO_ROOT)
+        종전 판은 실제 인덱스 파일을 깨뜨렸다가 복원했다(중단되면 실파일이 깨진 채 남는다 —
+        HARN-170 ③). 이제 파일이 없으므로 계산 함수 자체를 터뜨린다. 무타입 경고가 langfuse
+        쓰기 8일 무증상 전멸의 원인이었다.
+        """
 
-        def boom(_root: Path) -> list[jit_rules.Note]:
+        def boom(_root: Path, _backlog: object | None = None) -> tuple[list, list]:
             raise RuntimeError("터짐")
 
-        monkeypatch.setattr(jit_rules, "load_index", boom)
-        payload = json.dumps(
-            {"tool_input": {"file_path": str(REPO_ROOT / "scripts/harness/backlog.py")}}
-        )
-        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
-        assert cli.main(["check-edit"]) == 0
-        assert "RuntimeError" in capsys.readouterr().err
+        monkeypatch.setattr(cli, "_build_jit_notes", boom)
+        code, err = self._run(monkeypatch, capsys, "scripts/harness/backlog.py")
+        assert code == 0
+        assert "RuntimeError" in err
+        assert "경로에서 실제로 났던 것" not in err  # 실패가 주입처럼 보이지 않는다
 
     def test_outside_repo_path_is_ignored(self, monkeypatch, capsys, tmp_path: Path) -> None:
         monkeypatch.chdir(REPO_ROOT)
@@ -321,6 +333,193 @@ class TestCheckEditHook:
         assert "[적시 규칙]" not in capsys.readouterr().err
 
 
+# ── ⑥-b 훅은 저장 파일이 아니라 대장을 읽는다 (HARN-130 · hermetic) ─────────
+
+
+def _ledger_repo(git_repo: Path, monkeypatch) -> Path:
+    """시드 + 상환 태스크 1건(`src/x/**`)을 가진 임시 저장소 — main 브랜치라 정책 검사는 조기 반환."""
+    monkeypatch.chdir(git_repo)
+    assert cli.main(["seed"]) == 0
+    assert (
+        cli.main(
+            [
+                "add",
+                "--id",
+                "HARN-901-fix",
+                "--title",
+                "픽스처 상환 태스크",
+                "--track",
+                "math-completion",
+                "--stage",
+                "S2",
+                "--path",
+                "src/x/**",
+                "--eos-priority",
+                "P3",
+            ]
+        )
+        == 0
+    )
+    return git_repo
+
+
+def _edit(root: Path, rel: str, monkeypatch, capsys) -> tuple[int, str]:
+    capsys.readouterr()
+    payload = json.dumps({"tool_input": {"file_path": str(root / rel)}})
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    code = cli.main(["check-edit"])
+    return code, capsys.readouterr().err
+
+
+def _add_incident(title: str) -> int:
+    return cli.main(
+        [
+            "incident",
+            "add",
+            "--title",
+            title,
+            "--cat",
+            "G",
+            "--fix-form",
+            "task",
+            "--fix-ref",
+            "HARN-901",
+        ]
+    )
+
+
+class TestHookReadsLedgersNotAFile:
+    def test_a_leftover_index_file_is_not_read(self, git_repo, monkeypatch, capsys) -> None:
+        """옛 코드가 남긴 낡은 인덱스 파일이 있어도 훅은 대장에서 계산한다.
+
+        반례 픽스처: 파일에만 있는 사고(무게 최대)를 심는다. 훅이 파일을 읽으면 그 줄이 뜨고,
+        대장에서 계산하면 대장의 사고만 뜬다 — 두 경로가 서로 다른 글자를 내야 변별된다.
+        """
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("대장에 있는 사고") == 0
+        stale = {
+            "version": 1,
+            "max_notes": 5,
+            "notes": [
+                {
+                    "kind": "incident",
+                    "ref": "2020-01-01",
+                    "paths": ["src/x/**"],
+                    "text": "파일에만 있는 낡은 사고",
+                    "weight": 6,
+                }
+            ],
+        }
+        (root / "backlog" / "jit_index.json").write_text(
+            json.dumps(stale, ensure_ascii=False), encoding="utf-8"
+        )
+        code, err = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert code == 0
+        assert "대장에 있는 사고" in err
+        assert "파일에만 있는 낡은 사고" not in err
+
+    def test_cold_path_stays_silent_in_the_same_repo(self, git_repo, monkeypatch, capsys) -> None:
+        """대조군 — 위 주입이 '모든 편집에 뜬다'가 아님을 같은 저장소에서 보인다."""
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("대장에 있는 사고") == 0
+        code, err = _edit(root, "docs/elsewhere.md", monkeypatch, capsys)
+        assert code == 0
+        assert "[적시 규칙]" not in err
+
+
+# ── ⑥-c 대장 쓰기 뒤 재생성 단계가 없다 (HARN-179) ─────────────────────────
+
+
+class TestLedgerWritesNeedNoRebuild:
+    """쓰기 CLI 다음 편집이 곧바로 새 기록을 본다 — 사이에 사람이 돌릴 명령이 없다.
+
+    종전(커밋 인덱스)에는 `incident add` 뒤 `jit build`를 잊으면 CI `jit check`가 red였다
+    (계열 derived-index-not-rebuilt 3회 · 뒤 스텝 7건 미실행). 쓰기 CLI마다 재생성 배선을 다는
+    대신 읽는 쪽이 대장을 직접 보게 했으므로(HARN-130), 여기서는 그 결과를 쓰기 쪽에서 본다:
+    쓰고 → 다른 명령 없이 → 다음 편집. 훅이 저장된 파일을 읽게 되돌리면(뮤테이션 J01) RED다.
+    """
+
+    def test_incident_add_is_visible_to_the_next_edit(self, git_repo, monkeypatch, capsys) -> None:
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("방금 등재한 사고") == 0
+        code, err = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert code == 0
+        assert "방금 등재한 사고" in err
+        assert cli.main(["jit", "check"]) == 0
+
+    def test_task_path_amend_moves_the_injection_immediately(
+        self, git_repo, monkeypatch, capsys
+    ) -> None:
+        """태스크 쪽 쓰기도 같다 — 상환 태스크의 paths를 옮기면 주입도 그 자리로 옮겨 간다.
+
+        대조: 옛 경로에서는 사라진다. 옛 설계에서는 이 정정도 재생성을 요구했다(사고 대장이
+        아니라 태스크를 고쳐도 인덱스가 낡았다).
+        """
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("경로가 옮겨 갈 사고") == 0
+        assert (
+            cli.main(
+                [
+                    "amend",
+                    "HARN-901-fix",
+                    "--path",
+                    "src/y/**",
+                    "--drop-scope",
+                    "--reason",
+                    "픽스처 — 상환 범위 이동",
+                ]
+            )
+            == 0
+        )
+        _, err_new = _edit(root, "src/y/b.py", monkeypatch, capsys)
+        _, err_old = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert "경로가 옮겨 갈 사고" in err_new
+        assert "경로가 옮겨 갈 사고" not in err_old
+
+    def test_rule_enforcer_path_amend_moves_the_injection_immediately(
+        self, git_repo, monkeypatch, capsys
+    ) -> None:
+        """규칙 축도 같다 — `enforced_by`가 가리키는 태스크의 paths를 옮기면 규칙 주입도 따라간다.
+
+        사고의 상환 태스크(위 테스트)와 규칙의 집행 태스크는 같은 `_task_paths`를 거치지만
+        별개 입력이다. 옛 설계에서는 규칙 쪽 태스크 paths 정정도 재생성을 요구했다
+        (2026-09-29 두 세션이 HARN-179 ④로 따로 실측). 대조: 옮기기 전에는 옛 경로에 뜬다.
+        """
+        root = _ledger_repo(git_repo, monkeypatch)
+        title = "집행 태스크 경로를 따라 옮겨 가는 픽스처 규칙"
+        rule = {
+            "id": "R-901",
+            "slug": "fixture-rule",
+            "title": title,
+            "origin": "incident",
+            "status": "task",
+            "enforced_by": ["HARN-901"],
+        }
+        (root / "backlog" / "rules.ndjson").write_text(
+            json.dumps(rule, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        _, err_before = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert title in err_before  # 양성 대조 — 규칙이 집행 태스크 경로로 주입된다
+        assert (
+            cli.main(
+                [
+                    "amend",
+                    "HARN-901-fix",
+                    "--path",
+                    "src/y/**",
+                    "--drop-scope",
+                    "--reason",
+                    "픽스처 — 집행 범위 이동",
+                ]
+            )
+            == 0
+        )
+        _, err_new = _edit(root, "src/y/b.py", monkeypatch, capsys)
+        _, err_old = _edit(root, "src/x/a.py", monkeypatch, capsys)
+        assert title in err_new
+        assert title not in err_old
+
+
 # ── ⑦ CLI ───────────────────────────────────────────────────────────────────
 
 
@@ -328,19 +527,47 @@ class TestCli:
     def test_check_passes_on_the_live_repo(self, monkeypatch, capsys) -> None:
         monkeypatch.chdir(REPO_ROOT)
         assert cli.main(["jit", "check"]) == 0
-        assert "일치" in capsys.readouterr().out
+        assert "계산됨" in capsys.readouterr().out
 
-    def test_check_detects_a_stale_index(self, monkeypatch, capsys) -> None:
-        monkeypatch.chdir(REPO_ROOT)
-        path = jit_rules.index_path(REPO_ROOT)
-        original = path.read_bytes()
-        try:
-            path.write_text('{"version": 1, "max_notes": 5, "notes": []}\n', encoding="utf-8")
-            assert cli.main(["jit", "check"]) == 1
-            assert "어긋났다" in capsys.readouterr().err
-        finally:
-            path.write_bytes(original)
-        assert path.read_bytes() == original
+    def test_check_fails_on_zero_candidates(self, git_repo, monkeypatch, capsys) -> None:
+        """스캔 0건은 실패 — 경로가 풀리는 사고·규칙이 하나도 없으면 red(조용한 통과 금지).
+
+        CI의 `jit check` 스텝이 지키는 것이 이것이다. 커밋 인덱스가 사라진 뒤 이 스텝이
+        '파일이 없으니 볼 것 없음'으로 늘 초록이면 검사가 아니라 위장이다.
+        """
+        monkeypatch.chdir(git_repo)
+        assert cli.main(["seed"]) == 0
+        capsys.readouterr()
+        assert cli.main(["jit", "check"]) == 1
+        assert "0건" in capsys.readouterr().err
+
+    def test_check_passes_once_one_candidate_resolves(self, git_repo, monkeypatch, capsys) -> None:
+        """위 0건 RED의 대조군 — 같은 저장소에 경로가 풀리는 사고 1건을 넣으면 GREEN."""
+        _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("경로가 풀리는 사고") == 0
+        capsys.readouterr()
+        assert cli.main(["jit", "check"]) == 0
+        assert "1건 계산됨" in capsys.readouterr().out
+
+    def test_check_fails_on_a_corrupt_ledger_line(self, git_repo, monkeypatch, capsys) -> None:
+        """샤드의 깨진 줄도 잡는다 — 오류 위치가 어느 샤드인지 말한다."""
+        _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("정상 사고") == 0
+        shard = git_repo / "backlog" / "incidents" / "zz_broken.ndjson"
+        shard.write_text("{broken\n", encoding="utf-8")
+        capsys.readouterr()
+        assert cli.main(["jit", "check"]) == 1
+        err = capsys.readouterr().err
+        assert "JSONDecodeError" in err and "incidents/zz_broken.ndjson:1" in err
+
+    def test_legacy_build_writes_no_file(self, git_repo, monkeypatch, capsys) -> None:
+        """옛 안내(사고 등재 뒤 `jit build`)를 따라도 파일이 생기지 않고 같은 검사를 한다."""
+        root = _ledger_repo(git_repo, monkeypatch)
+        assert _add_incident("경로가 풀리는 사고") == 0
+        capsys.readouterr()
+        assert cli.main(["jit", "build"]) == 0
+        assert "파일을 만들지 않는다" in capsys.readouterr().out
+        assert not (root / "backlog" / "jit_index.json").exists()
 
     def test_show_previews_a_hot_path(self, monkeypatch, capsys) -> None:
         monkeypatch.chdir(REPO_ROOT)
