@@ -387,20 +387,23 @@ class TestCli:
         assert cli.main(["rules", "lint"]) == 0
         assert "green" in capsys.readouterr().out
 
-    def test_render_check_detects_a_hand_edited_doc(self, monkeypatch, tmp_path, capsys) -> None:
-        """문서는 렌더 결과다 — 손편집은 exit 1이어야 한다."""
-        monkeypatch.chdir(REPO_ROOT)
-        assert cli.main(["rules", "render", "--check"]) == 0
+    def test_render_check_detects_a_hand_edited_doc(self, monkeypatch, git_repo, capsys) -> None:
+        """문서는 렌더 결과다 — 손편집은 exit 1이어야 한다.
+
+        실제 문서를 덮어썼다 복원하던 방식은 중단되면 실파일이 깨진 채 남는다(HARN-170 ③과
+        같은 형태) — 대장과 문서를 임시 저장소로 복사해 거기서 손편집한다.
+        """
+        for rel in (f"backlog/{rules_mod.LEDGER_NAME}", rules_mod.INDEX_DOC):
+            target = git_repo / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((REPO_ROOT / rel).read_bytes())
+        monkeypatch.chdir(git_repo)
+        assert cli.main(["rules", "render", "--check"]) == 0  # 대조군 — 복사본은 일치한다
         capsys.readouterr()
-        doc = REPO_ROOT / rules_mod.INDEX_DOC
-        original = doc.read_bytes()
-        try:
-            doc.write_text(original.decode("utf-8") + "\n손편집한 줄\n", encoding="utf-8")
-            assert cli.main(["rules", "render", "--check"]) == 1
-            assert "어긋났다" in capsys.readouterr().err
-        finally:
-            doc.write_bytes(original)
-        assert doc.read_bytes() == original
+        doc = git_repo / rules_mod.INDEX_DOC
+        doc.write_text(doc.read_text(encoding="utf-8") + "\n손편집한 줄\n", encoding="utf-8")
+        assert cli.main(["rules", "render", "--check"]) == 1
+        assert "어긋났다" in capsys.readouterr().err
 
     def test_report_json_shape(self, monkeypatch, capsys) -> None:
         monkeypatch.chdir(REPO_ROOT)
