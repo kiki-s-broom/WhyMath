@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: HARN-200-push-time-mirror-head-notice
+id: HARN-209-push-time-mirror-head-notice
 title: "푸시·PR 생성 시점에 미러 결과 커밋이 푸시 대상 HEAD와 다르면 고지하고 PR 본문에 도달 잡을 싣는다 — done 게이트(HARN-173)가 못 막는 red 푸시 축"
 track: infra-debt
 stage: S3
@@ -25,5 +25,5 @@ paths:
   - scripts/harness/ci_mirror.py
   - "tests/harness/test_*push*mirror*.py"
 session: null
-notes: "출처: 2026-09-29 /drive 4차 — `HARN-173-done-mirror-absence-promotion` 구현에서 acceptance ③(푸시 축)을 의도적으로 제외하고 ⑤의 PR 본문 자동 첨부를 미이행으로 남겼다. 이 태스크가 그 승계다(미이행분은 승계 태스크로 분리 등재 — 회수 완료 선언 시 acceptance 전수 재대조 원칙). 관련: `HARN-173`(done 게이트·측정 필드)·`HARN-119`/`HARN-180`(미러 도구)·`HARN-181`(조건 스텝 평가 — 착지하면 `not_executed` 재판정)."
-updated: 2026-09-29
+notes: "출처: 2026-09-29 /drive 4차 — `HARN-173-done-mirror-absence-promotion` 구현에서 acceptance ③(푸시 축)을 의도적으로 제외하고 ⑤의 PR 본문 자동 첨부를 미이행으로 남겼다. 이 태스크가 그 승계다(미이행분은 승계 태스크로 분리 등재 — 회수 완료 선언 시 acceptance 전수 재대조 원칙). 관련: `HARN-173`(done 게이트·측정 필드)·`HARN-119`/`HARN-180`(미러 도구)·`HARN-181`(조건 스텝 평가 — 착지하면 `not_executed` 재판정).\n\n[개명 2026-09-30] HARN-200-push-time-mirror-head-notice → HARN-209-push-time-mirror-head-notice: 번호 HARN-200이 PR 1377 브랜치의 HARN-200-runbook-self-containment-waiver-cleanup과 겹친다(서로 다른 슬러그라 validate는 통과하지만 번호 참조가 결정 불가). 원격 예약 대장의 소유는 이 브랜치지만 그 브랜치는 같은 번호로 이미 파일을 가졌고 타 세션 브랜치는 고칠 수 없으므로, 머지 큐가 한쪽을 막기 전에 이쪽이 선제 개명한다."
+updated: 2026-09-30
