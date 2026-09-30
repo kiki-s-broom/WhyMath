@@ -2,6 +2,7 @@
 
 엔드포인트(prefix `/v1/problems`):
   - POST   /v1/problems          — 문제 생성(검증된 schema.Problem → ORM → commit). 201.
+                                   생성물이면 provenance 좌석 필수·원장 행 동반(LIC-09).
   - GET    /v1/problems/{id}     — 단건 조회(UUID). 없으면 404.
   - GET    /v1/problems          — 목록(최신순, limit/offset, subject 선택 필터).
 
@@ -46,7 +47,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,12 +61,21 @@ from whymath_backend.api._concurrency import (
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.config import get_settings
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
+from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.session import get_session
+from whymath_backend.l1.problem_bank.provenance_gate import (
+    ProvenanceInput,
+    ProvenanceMissingError,
+    require_provenance,
+)
 from whymath_backend.privacy.audit import record_content_mutation_audit
 from whymath_backend.schema.enums import (
+    GenerationType,
+    LicenseType,
     PrivacyAuditAction,
     PrivacyAuditResourceType,
     ReviewStatus,
+    SourceType,
     Subject,
     is_review_status_quarantined,
 )
@@ -150,6 +160,49 @@ def _reject_if_quarantined(orm: Problem, problem_id: uuid.UUID) -> None:
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# LIC-09 provenance 좌석 — 관리자 REST 생성의 요청 계약
+# ──────────────────────────────────────────────────────────────────────────
+# 코퍼스 적재 경로(LIC-03)는 저작 메타에서 provenance를 싣지만, 이 REST 표면은 요청 본문이
+# `schema.Problem` 그대로라 관문에 넘길 재료 자체가 없었다(= 생성물이 원장 없이 INSERT되던 구멍).
+# 요청 계약에 좌석을 두고, 판정은 **관문 하나**(`require_provenance`)에 맡긴다 — 여기서 필수성·
+# 법적 불변식을 재구현하면 코퍼스 경로와 기준이 갈라진다.
+
+
+class ProblemProvenanceIn(BaseModel):
+    """POST /v1/problems 의 provenance 3축 — `content_provenance` 원장 컬럼과 1:1.
+
+    필드는 전부 Optional로 둔다: *필수성*은 출처(`source_type`)에 따라 달라지고 그 판정은
+    관문이 내린다(생성물이면 generation_type·license 필수). enum 타입이라 미지 값은 여기서
+    422가 되고, 법적 불변식(ORIGINAL·EBS_LICENSED 차단 등)은 관문이 `schema.ContentProvenance`를
+    경유시켜 422로 거부한다.
+    """
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    generation_type: GenerationType | None = Field(
+        default=None, description="변형/생성 단계 — VARIANT_*/COMPOSED/FULLY_GENERATED"
+    )
+    license: LicenseType | None = Field(default=None, description="지배 라이선스")
+    original_source: SourceType | None = Field(
+        default=None, description="원본 출처(변형의 경우 — 메타 전용 출처 규칙 적용)"
+    )
+
+
+class ProblemCreateRequest(ProblemSchema):
+    """관리자 문제 생성 요청 — `schema.Problem` + provenance 좌석(LIC-09).
+
+    `source_type=자체생성`(생성물)이면 `provenance`가 **필수**다 — 없으면 422(A4 DoD
+    "provenance 없는 AI 생성물 INSERT 거부"의 REST 축). 메타 전용 출처는 원장 대상이 아니라
+    생략 가능하다(보내도 원장 행을 만들지 않는다 — 관문이 None을 돌려준다).
+    """
+
+    provenance: ProblemProvenanceIn | None = Field(
+        default=None,
+        description="출처 원장 재료 — source_type=자체생성이면 필수(없으면 422)",
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -157,7 +210,7 @@ def _reject_if_quarantined(orm: Problem, problem_id: uuid.UUID) -> None:
     summary="문제 생성",
 )
 async def create_problem(
-    body: ProblemSchema,
+    body: ProblemCreateRequest,
     session: SessionDep,
     response: Response,
     admin: RequireContentAdmin,
@@ -172,9 +225,47 @@ async def create_problem(
 
     SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
     (IntegrityError로 롤백되면 감사 행도 함께 롤백 — 실패한 시도는 감사하지 않는다).
+
+    LIC-09: 생성물(`source_type=자체생성`)은 `provenance_gate.require_provenance`를 경유한다 —
+    재료가 없거나 무효면 **DB를 건드리기 전에** 422. 통과하면 `content_provenance` 행을 문항·
+    감사 행과 **같은 트랜잭션**에 남긴다(문항만 커밋되고 원장이 빠진 상태가 곧 DoD 위반).
+    원장 FK(`content_provenance.problem_id → problem`)가 문항 행을 요구하므로 문항을 먼저
+    flush한 뒤 원장을 add한다 — ORM 간 relationship이 없어 unit-of-work의 INSERT 순서에
+    기대지 않는다.
     """
+    try:
+        gate_result = require_provenance(
+            slug=body.slug or str(body.problem_id),
+            source_type_value=body.source_type,
+            provenance=(
+                ProvenanceInput(
+                    generation_type=body.provenance.generation_type,
+                    license=body.provenance.license,
+                    original_source=body.provenance.original_source,
+                )
+                if body.provenance is not None
+                else None
+            ),
+            problem_id=body.problem_id,
+        )
+    except ProvenanceMissingError as exc:
+        # 침묵 실패 금지 — 관문 사유(어느 축이 비었는지·어느 불변식인지)를 그대로 싣는다.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
     orm = Problem.from_schema(body)
     session.add(orm)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 존재하는 external_id 또는 slug입니다.",
+        ) from exc
+    if gate_result is not None:
+        session.add(ContentProvenanceORM.from_schema(gate_result))
     settings = get_settings()
     record_content_mutation_audit(
         session,
@@ -398,8 +489,11 @@ async def delete_problem(
     request: Request,
     if_match: Annotated[str | None, Header()] = None,
 ) -> Response:
-    """문제 삭제 — 없으면 404. 풀이단계·관계·시도 등 참조가 있으면 FK 위반 → 409.
+    """문제 삭제 — 없으면 404. 풀이단계·관계·시도·출처 원장 등 참조가 있으면 FK 위반 → 409.
     `Role.CONTENT_ADMIN` 전용.
+
+    LIC-09: 생성물은 생성 시 `content_provenance` 행을 동반하므로 이 경로로는 409가 된다 —
+    감사 원장을 REST 삭제가 조용히 지우지 않는다(비노출은 격리 EOS-71이 비파괴 경로).
 
     cascade를 ORM에 두지 않았으므로 참조가 있으면 삭제를 거부한다(가짜 cascade 금지).
     `If-Match`를 보내면 그사이 변경된 리소스의 삭제를 412로 막는다(조건부 삭제 —
@@ -432,6 +526,9 @@ async def delete_problem(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="이 문제를 참조하는 단계·관계·시도가 있어 삭제할 수 없습니다.",
+            detail=(
+                "이 문제를 참조하는 단계·관계·시도·출처 원장이 있어 삭제할 수 없습니다. "
+                "노출만 끊으려면 격리(quarantined)를 사용하세요."
+            ),
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

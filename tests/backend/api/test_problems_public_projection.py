@@ -124,6 +124,9 @@ class FakeSession:
     async def commit(self) -> None:
         return None
 
+    async def flush(self) -> None:
+        return None
+
     async def refresh(self, obj: Any) -> None:
         return None
 
@@ -297,9 +300,12 @@ class TestPublicPayloadSeal:
 class TestAdminSurfaceKeepsFullSchema:
     def test_admin_post_response_contains_answer(self) -> None:
         """관리자_POST — 같은 데이터가 전체 스키마로 돌아온다(분리가 실제로 변별됨)."""
-        resp = _client(FakeSession()).post(
-            "/v1/problems", json=_full_schema().model_dump(mode="json")
-        )
+        # LIC-09 — 자체생성 POST는 provenance 좌석 동반 필수.
+        body = {
+            **_full_schema().model_dump(mode="json"),
+            "provenance": {"generation_type": "FULLY_GENERATED", "license": "WHYMATH_GENERATED"},
+        }
+        resp = _client(FakeSession()).post("/v1/problems", json=body)
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["answer"] == _ANSWER_SENTINEL
