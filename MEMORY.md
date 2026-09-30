@@ -11639,6 +11639,7 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **런북 사고 아님**: 첫 시도는 Docker Desktop 엔진 미기동(`dockerDesktopLinuxEngine` 파이프 없음)으로 세 명령이 전부 실패했고 쿼리는 하나도 실행되지 않았다. 런북이 예고한 실패 상태이며 엔진 기동 후 재실행으로 성립했다.
 - **게이트 정리**: `G-eos129-prod-response-distribution` cleared(clear 주체 claude · 증거에 판정 기준 해시 병기). #1346의 `G-eos129-item-response-census`와 #1358의 같은 ID 다른 정의는 이 브랜치에 없어 손대지 않았다(2026-09-28 항목의 "남은 판단(Kiki)"이 계속 소유).
 
+- **정정(같은 날 후속)**: 위 '재측정 조건'의 "5건 이상 문항이 생기면"은 오기다. 5건은 b(1PL) 보정 바닥이고 변별도 a 채택은 응답 50건 이상+SE 0.3 이하(`l2/item_calibration.py`의 `_MIN_RESPONSES_FOR_DISCRIMINATION`·`_MAX_DISCRIMINATION_SE`)다. 재측정 조건 = `discrimination_calibrated`가 처음 1건 이상이 되는 것. 자동 알림은 `EOS-154-irt-a-first-adoption-signal`(선행 `PB-10` 스케줄 좌석)로 등재했다.
 ### 2026-09-29 (정정·집행 · ARCH-69): **클라우드 1차 좌석 실패 시 런타임 LOCAL 강등 — 학생 대면 서빙 조립에 한해 신설. 위 ARCH-64 로그의 "LOCAL로 자동 재시도되지 않는다"는 이 착지부터 학생 대면 조립에서 거짓이다** (claude 구현) — 판정 기준: 브랜치 `claude/gallant-euler-blngpj` · ARCH-64 PR #1370(미머지)
 
 - **정정 대상(원문은 지우지 않는다 — 이 파일은 append 전용)**: 바로 위 2026-09-29 ARCH-64 로그의 세 문장이다. ⓐ "가용성 해소 수단" 항의 "실측 정정: 코드에는 '1차 좌석 실패 → LOCAL 자동 재시도' 경로가 **없다**" — ARCH-64 착지 시점에는 사실이었고 이제 학생 대면 조립에서는 아니다 ⓑ "OpenRouter 키 부재 시" 항의 "Anthropic·LOCAL 어느 쪽도 대신 받지 않는다" — **저작·측정 조립(강등 미장착)에서만** 유효하다. 학생 대면 조립은 LOCAL이 대신 답하되 `not_configured`로 표기한다 ⓒ "검증" 항의 "키 부재·429 실패의 무대체" — 같은 범위 한정. **불변**: 2차 **클라우드** 좌석은 여전히 없다(2026-09-28 Kiki 결정 · `CLOUD_FAILOVER_SEAT=None` · `/status cloud_failover_seat=null`) — 이번에 생긴 것은 다른 축(LOCAL 강등)이다.
