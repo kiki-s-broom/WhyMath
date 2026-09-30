@@ -120,11 +120,13 @@ class AuthController extends _$AuthController {
     }
     state = state.copyWith(isAuthenticated: false);
     // MOB-23: 토큰·대화 참조만 지우고 끝내면 이전 학생의 활성 문제·코치 대화(dialogueId·메시지 누적)가
-    // provider에 그대로 남는다(非autoDispose `activeProblemProvider`·앱 수명 내내 유지되는
-    // `ChatController` 상태) — 같은 기기로 다음 학생이 로그인하면 그 잔여가 그대로 보인다.
+    // provider에 그대로 남는다. `activeProblemProvider`는 非autoDispose라 앱 수명 내내 유지되고,
+    // `ChatController`는 autoDispose지만 학습 탭의 ChatScreen이 셸(`StatefulShellRoute.indexedStack`)에
+    // 마운트된 채 구독을 유지하며 로그아웃이 화면을 벗어나게 하는 redirect도 없어서 상태가 그대로 산다 —
+    // 같은 기기로 다음 학생이 로그인하면 그 잔여가 그대로 보인다.
     // `invalidate`로 두 provider를 최초 빌드 상태(활성 문제 없음·빈 대화)로 되돌려 학생 간 경계를 보장한다.
-    // 위 세 정리가 모두 끝난 뒤(= 로그아웃이 실제로 완료된 경우)에만 실행된다 — `tokenStore.clear()`가
-    // 던지면 학생은 로그인 상태로 남으므로 잔여를 지울 이유가 없다.
+    // 위 정리 뒤(= 로그아웃이 끝까지 진행된 경우)에만 실행된다 — 액세스 토큰 삭제(`tokenStore.clear()`)가
+    // 던져 로그아웃이 중단되면 학생은 로그인 상태로 남으므로 잔여를 지울 이유가 없다.
     ref.invalidate(activeProblemProvider);
     ref.invalidate(chatControllerProvider);
   }
