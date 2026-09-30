@@ -11716,3 +11716,23 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **위치·산출**: `tools/work-graph-desktop/`(TypeScript · esbuild · electron 38.2.1 · electron-builder 26.15.3) · 런북 `docs/ops/work_graph_desktop_runbook.md`. 리눅스 크로스 빌드 실측: NSIS 설치 EXE 87.0MB + 무설치 zip 121.9MB(코드서명 없음). 리눅스에서 NSIS를 만들려면 wine(64+32비트)+xvfb가 필요했고 i386 의존성 충돌(`libgd3`)은 amd64 판을 i386과 같은 버전으로 고정해 풀었다 — Windows(Kiki 머신)에서는 `npm.cmd run dist:win`만으로 된다.
 - **검증**: vitest 51 · 렌더러 Playwright 10 · Electron 스모크 1(xvfb · 실제 저장소 수집 · webPreferences contextIsolation/sandbox on) · 뮤테이션 3종(판정 덮어쓰기·불가 은폐·직접 쓰기) 전건 RED · 런북 가드 3종(check_runbook_blocks·check_ps_scripts·cp949_guard) exit 0.
 - **미검증(명시)**: Windows 실 설치·실행·제거·바로가기 — 런북 [1]~[7]로 Kiki에게 위임. gh 어댑터 라이브 경로(컨테이너에 gh 없음). 아이콘은 Electron 기본(Windows에서 `win.icon`으로 교체 가능).
+
+### 2026-09-30 (결정 · 게이트 `G-eos146-disposition` / EOS-146): **앱 오답은 코치가 서버에서 판정한 명확한 오답의 '문제당 최초 1건'만 원장에 적재해 상태 머신에 태운다 — (가) 채택, (나)·(다) 기각, '포기'는 분리** (세션 사용자 결정 · claude 기록·집행) — 판정 기준 main `270968a2`
+
+- **문제**: 앱 학생의 오답·포기가 서버 어디에도 적재되지 않아 R3(오개념 교정 · `EOS-24`)·R5·R6(원인 미상 오답 · `EOS-26`)이 앱 학생에게 0회 돈다(코치 경로 `is_correct=False` 적재 0건 · 모바일 `POST /v1/me/attempts` 호출 0건 — 이 검색 방법 기준). 정답 완료만 `EOS-134` 이후 `advance_on_graded_attempt`를 돈다.
+- **결정**: (가) 코치 서버 판정 `final_incorrect`(→ `REDIRECT`)를 같은 학생·같은 문제의 **최초 1건만** `ProblemAttempt(is_correct=False)` + 상태 머신으로 적재. 재제출 오답·unverifiable은 세지 않는다 — 틀린 뒤 스스로 고치는 Polya 정상 경로를 원장에서 벌점처럼 쌓지 않고, 모르는 것을 틀렸다고 접지 않는다.
+- **기각**: (나) 앱이 `/v1/me/attempts`로 자가보고 — 정오 판정이 클라로 넘어가 서버 권위·"수학 로직을 클라에 넣지 않는다"와 부딪히고 MOB-20이 금지한 이중 적재가 남는다. (다) 앱에서 R3·R6 미사용 — 앱 도달 0이 영구화되고 Release Gate A 범위가 줄어든다.
+- **구현 시 함정(코드로 확인)**: `dialogue.attempt_id`의 존재가 '완료됨' 표지(재완료 가드)라 오답 행을 링크하면 풀던 대화가 완료로 읽힌다. 오답 적재는 그 필드를 건드리지 않는다. 오답만 있는 문제가 `GET /me/next-problem` 미시도 필터(NOT IN)에서 제외되는지는 구현 세션이 실측해 판정한다.
+- **집행**: `EOS-146` acceptance ⑥·⑦ 재작성(앱 변경 0 · `/v1/me/attempts` 계약 변경 0 · 변별력 뮤테이션 포함). 구현은 이 결정으로 착수 가능해졌을 뿐 **미착수**다. '포기'(풀다 떠남)는 원천 신호가 코치·앱 어디에도 없어 `EOS-41-app-abandon-signal-source`(P2 · `EOS-146` 선행)로 분리 — 무엇을 포기로 볼지가 교수학 판정이라 착수 세션이 결정 게이트를 먼저 등재한다. R5 연속 오답 범위(개념 무관·시간 창 부재)는 `EOS-145` 소유로 이 결정이 바꾸지 않는다.
+- **게이트 처리**: `G-eos146-disposition` clear(주체 claude — 사용자 응답 중계 · 대장에 사실대로 기록). `G-p3-entry-gate2-pass`(판정문 §4-2 (A)/(B))는 이 결정이 닫지 않는다 — Kiki 몫으로 남는다. `EOS-146`은 여전히 `P3-17`의 선행이다.
+
+### 2026-09-30 (착지 · EOS-146): **코치 서버 판정 오답의 '문제당 최초 1건'을 원장에 적재하고 `/v1/me/attempts`와 같은 후처리를 태운다 — 앱 학생의 오답이 R3·R6에 처음 닿는다** (claude 구현) — 판정 기준: 브랜치 `claude/festive-clarke-msoutj`(PR #1397 · 미머지)
+
+- **무엇이 바뀌었나**: 코치 완료 상태머신이 재고 유도(`REDIRECT`)를 내는 턴에서 같은 학생·같은 문항의 **최초 1건만** `ProblemAttempt(is_correct=False)`로 적재하고, 답안 오개념 스캔 → 증거 → 가설 → 숙달(개념·스킬) → 스킬 이벤트 → 학습 상태 머신을 `/v1/me/attempts`의 오답 경로와 같은 순서·같은 함수로 태운다(`api/coach.py::_record_first_wrong_submission`). 앱·`/v1/me/attempts` 계약·모바일 코드는 바뀌지 않는다.
+- **실측(실 PG · 로컬 PostgreSQL 16 + pgvector)**: 같은 오답에 두 채점 경로가 **같은 전이 사슬**을 낸다 — 오개념이 걸리는 오답(`x^2+4`)은 NEW→LEARNING→ASSESSING→R3, 원인 미상 오답(`x+5`)은 R6. 재제출 오답은 행이 늘지 않고, 오답 뒤 스스로 고쳐 완료하면 오답 1건 + 정답 1건이 남으며 R6 → R2로 진행한다. 서버 검증기가 `unverifiable`로 판정하는 답(다항식 정답에 대한 `7`·`x=99`)은 적재 0이다.
+- **결정 (가) 이행 중 발견한 정정**: EOS-146 ⑥ ⓒ의 "그 턴에서 확인된 오개념 id를 R3 입력으로 넘긴다"는 EOS-138(대화 턴 매치는 "이 답안의 오개념"이 아니다)과 충돌해 채택하지 않았다. R3 입력은 **이번 답안의 스캔**에서만 만든다 — 그래서 `api/me.py`의 스캔 함수를 `api/_attempt_misconception_scan.py`로 **옮겨** 두 경로가 공유하고(동작 불변), R3 입력 도출(`this_attempt_misconceptions_from`)도 한 곳에 뒀다. 결정의 결과는 그대로다.
+- **부수 좌석**: 스킬 이벤트 `source` 셋째 라벨 `coach_wrong_submission`(폐쇄 3종 — 리포트의 종단 기록률 분모가 attempt 행 수라, 이벤트를 안 남기면 새 오답 행이 "writer 미도달"로 계상된다) · 킬 스위치 `l4_coach_wrong_submission_enabled`(기본 ON · 끄면 종전과 비트동일) · 코치 능력 묶음에 오개념 검출기 주입(`_SubjectCapabilityDeps` 4종).
+- **검증**: 단위 22 + 실 PG 통합 4 · 결함 주입 단위 17종 + 통합 6종(원래 결함 "REDIRECT에서 적재 안 함"을 되살리면 세 테스트가 깨진다) 전건 검출 · mypy --strict · lint-imports · 숙달 단일 쓰기 경로 스캔 · 선언≠배선 감사 통과.
+- **판정 기록**: 오답만 있는 문항은 `GET /me/next-problem` 미시도 필터에서 빠진다 — `/v1/me/attempts` 오답과 같은 동작이라 의도로 본다.
+- **교수학 상호작용(판정 대기 · CI가 잡음)**: 코치 오답이 적재되면 숙달이 낮아져 라벨이 `초보`가 되고, 힌트 규칙 5가 좌절 신호의 상승분에 한 칸을 더해 같은 대화의 다음 힌트가 1→3(부분 풀이)으로 오른다(공급 원장은 사실대로 `[1, 3]`). 기존 정책의 직접 결과지만 오답 한 건으로 두 칸 도약하는 것이 "가장 빠른 단계에서 멈춤"에 비추어 허용되는지는 교수학 판정이 필요하다 — 규칙은 바꾸지 않고 테스트로 고정했다(`EOS-146` acceptance ⑩ · 후보: 현행 유지 / `초보` 라벨 최소 표본 / 코치 오답 숙달 전파 유예).
+- **한계(명시)**: 같은 학생·문항 동시 요청이면 조회-삽입 경합으로 2행이 생길 수 있다(잠금·유니크 인덱스는 마이그레이션이라 미착수) · `used_hint`는 판정하지 않고 NULL · '포기'는 `EOS-41-app-abandon-signal-source`(P2) · 진단 CAT 측정 효율 영향("영향 0" 전제가 이 착지로 깨짐)은 `EOS-42-r6-cat-efficiency-measurement`(P2)로 승계 · EOS-63·SKB-01 런북의 기록률 표 설명은 새 셋째 행을 언급하지 않는다(해당 태스크 소유라 미수정).

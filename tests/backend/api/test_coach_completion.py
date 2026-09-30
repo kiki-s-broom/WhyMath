@@ -410,7 +410,14 @@ class TestAppendTurnsRedirectsOnIncorrect:
         assert body["awaiting_reflection"] is False
         assert body["completed_attempt_id"] is None
         assert body["decision"]["prompt"] == _REDIRECT_PROMPT
-        assert not any(isinstance(o, ProblemAttemptORM) for o in captured.added)
+        # EOS-146: 재고 유도 턴은 서버가 판정한 오답 1건을 원장에 적재한다 — 단 **완료가 아니다**.
+        # (종전 단언은 '오답이면 아무것도 적재하지 않는다'였다 — 앱 학생의 오답이 R3·R5·R6에
+        # 닿지 못한 원인이 바로 그것이다.) 적재된 행은 dialogue에 링크되지 않는다: 그 필드의
+        # 존재가 '완료됨' 표지라 링크하면 풀던 대화가 완료로 읽힌다.
+        wrong = [o for o in captured.added if isinstance(o, ProblemAttemptORM)]
+        assert len(wrong) == 1
+        assert wrong[0].is_correct is False
+        assert dialogue.attempt_id is None
 
     def test_incorrect_final_answer_variant_on_later_turn(self) -> None:
         # total_turns=2 — 이미 1교환 있음 → 이 append는 turn_index=2 → 구체 재고 발화로 변주.

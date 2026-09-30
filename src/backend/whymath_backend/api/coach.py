@@ -35,6 +35,10 @@ from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._attempt_misconception_scan import (
+    scan_attempt_misconceptions,
+    this_attempt_misconceptions_from,
+)
 from whymath_backend.api._auth import ConsentedUser
 from whymath_backend.api._concurrency import etag_for, matches_if_none_match
 from whymath_backend.api._crypto import (
@@ -68,6 +72,7 @@ from whymath_backend.api._segmentation_state import (
 )
 from whymath_backend.api._subject_capability_state import (
     get_answer_form_verifier,
+    get_attempt_misconception_detector,
     get_final_answer_verifier,
     get_step_chain_verifier,
 )
@@ -153,6 +158,10 @@ from whymath_backend.l4.misconception import (
     select_intervention,
     select_intervention_from_hypotheses,
 )
+from whymath_backend.l4.misconception.attempt_hypothesis_policy import (
+    AttemptHypothesisAction,
+    decide_attempt_hypothesis_action,
+)
 from whymath_backend.l4.misconception.catalog import CATALOG, CATALOG_BY_ID
 from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
 from whymath_backend.l4.misconception.evidence_store import (
@@ -160,7 +169,7 @@ from whymath_backend.l4.misconception.evidence_store import (
     log_evidence,
 )
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
-from whymath_backend.l4.misconception.hypothesis_store import curate_hypothesis
+from whymath_backend.l4.misconception.hypothesis_store import apply_candidates, curate_hypothesis
 from whymath_backend.l4.misconception.judge import JudgeProtocol, LLMJudge, judge_filter
 from whymath_backend.l4.misconception.judge_seam import L3JudgeSeam
 from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
@@ -198,6 +207,7 @@ from whymath_backend.schema.hint_usage import HintUsage as HintUsageSchema
 from whymath_backend.schema.pedagogy_pack import PedagogyPack
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
+    AttemptMisconceptionDetector,
     ChainVerificationCounts,
     FinalAnswerVerifier,
     StepChainVerifier,
@@ -865,7 +875,7 @@ JudgeSeamDeps = Annotated[_JudgeSeamDeps, Depends(_get_judge_seam_deps)]
 
 
 class _SubjectCapabilityDeps(NamedTuple):
-    """이 라우터가 쓰는 **과목 능력 3종** — app.state 등록분(EOS-89·COMP-01).
+    """이 라우터가 쓰는 **과목 능력 4종** — app.state 등록분(EOS-89·COMP-01·EOS-146).
 
     `_JudgeSeamDeps`와 같은 형태다(`request.app.state` 경유라 팩토리 클로저에 의존하지 않아
     TestClient에서도 안전). 다만 **폴백이 없다**: judge seam은 없으면 자기 기본값으로 도는
@@ -880,6 +890,10 @@ class _SubjectCapabilityDeps(NamedTuple):
 
     앞의 둘(완료 상태머신용)과 소비처가 다르지만 좌석을 나누지 않는 이유: 셋 다 *같은 등록
     (push) 규약*으로 app.state에서 오고, 좌석을 쪼개면 핸들러 시그니처가 능력 수만큼 늘어난다."""
+    attempt_misconception_detector: AttemptMisconceptionDetector
+    """오답 답안 → 오개념 후보 검출(EOS-104) — 서버 판정 오답 적재(EOS-146)가 `/v1/me/attempts`와
+    같은 훑기를 돌릴 때 쓴다. 같은 등록(push) 규약이고 폴백이 없다 — 등록 누락은
+    `AttributeError`로 터진다(`_subject_capability_state` 모듈 docstring)."""
 
 
 def _get_subject_capabilities(request: Request) -> _SubjectCapabilityDeps:
@@ -894,6 +908,7 @@ def _get_subject_capabilities(request: Request) -> _SubjectCapabilityDeps:
         final_answer=get_final_answer_verifier(request),
         answer_form=get_answer_form_verifier(request),
         step_chain=get_step_chain_verifier(request),
+        attempt_misconception_detector=get_attempt_misconception_detector(request),
     )
 
 
@@ -1428,6 +1443,175 @@ async def _complete_problem(
     return attempt.attempt_id, completion_evidence
 
 
+async def _record_first_wrong_submission(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    problem_id: uuid.UUID | None,
+    final_answer: str | None,
+    started_at: datetime | None,
+    detector: AttemptMisconceptionDetector,
+) -> uuid.UUID | None:
+    """서버가 판정한 명확한 오답의 **문제당 최초 1건**을 원장에 적재한다(EOS-146).
+
+    적재한 뒤 학습 상태 머신까지 태운다.
+
+    왜 필요한가: 앱 학생의 원장에는 코치 **정답 완료**만 남아 R3(오개념 교정)·R5(반복 실패)·
+    R6(원인 미상 오답)이 앱 학생에게 0회 돌았다. 오답 원천이 없었기 때문이다. 코치는 이미
+    서버 권위로 "명확한 오답"을 판정한다(`_final_answer_state` → `final_incorrect` → REDIRECT).
+    이 함수는 그 판정을 원장으로 옮긴다. 앱·`/v1/me/attempts` 계약은 바뀌지 않는다(정오 판정은
+    서버가 한다).
+
+    **계수 규칙**(결정 2026-09-30 · 게이트 `G-eos146-disposition` (가)): 같은 학생·같은 문항에
+    `is_correct=False` 행이 이미 있으면 적재하지 않는다. 틀린 뒤 스스로 고치는 것은 Polya의
+    정상 경로라, 재제출을 오답 행으로 쌓아 벌점처럼 만들지 않는다. 중간 코치 턴과
+    unverifiable(사변·파싱 불가 — 호출부가 correct·incorrect 둘 다 False로 넘긴다)은 애초에
+    이 함수에 오지 않는다.
+
+    **`dialogue.attempt_id`에 연결하지 않는다.** 그 필드의 존재가 '완료됨' 표지(재완료 가드)라
+    여기서 돌려주는 id를 링크하면 풀던 대화가 완료로 읽힌다. 반환값은 로그·테스트용이다.
+
+    후처리는 `/v1/me/attempts`의 오답 경로와 **같은 순서·같은 함수**다(EOS-134가 세운 대칭):
+    답안 훑기 → 증거 조립 → 가설 갱신 → 숙달 전파(개념·스킬) → 스킬 이벤트 → 상태 머신.
+    R3 입력은 **이번 답안의 스캔**에서만 온다(EOS-138 — 대화 턴의 오개념 매치는 "이 답안의
+    오개념"이 아니므로 쓰지 않는다). 확신도 입력은 코치 경로에 없어 None(미측정)이다.
+
+    실패 정책: attempt 적재(commit)까지는 예외를 전파한다(`_complete_problem`과 같다). 그 뒤
+    후처리는 관측이라 실패가 코치 응답을 깨뜨리지 않는다 — 삼키되 **예외 타입명**을 로그에
+    남긴다(침묵 실패 금지). 킬 스위치 `l4_coach_wrong_submission_enabled`가 꺼져 있으면
+    아무것도 하지 않는다.
+
+    남은 한계(명시): ① 같은 학생·문항 동시 요청이면 조회-삽입 경합으로 2행이 생길 수 있다
+    (잠금·유니크 인덱스는 마이그레이션이라 이 범위 밖). ② 힌트 귀속(`used_hint`)은 판정하지
+    않고 NULL로 둔다 — 귀속 창이 완료 턴 기준으로 정의돼 있어 이 시점에는 정의가 없다
+    (날조 금지).
+    """
+    if problem_id is None or not get_settings().l4_coach_wrong_submission_enabled:
+        return None
+    prior_wrong = (
+        await session.execute(
+            select(ProblemAttemptORM.attempt_id)
+            .where(
+                ProblemAttemptORM.user_id == user_id,
+                ProblemAttemptORM.problem_id == problem_id,
+                ProblemAttemptORM.is_correct.is_(False),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if prior_wrong is not None:
+        # "작동한 비율" — 적재한 것과 생략한 것을 둘 다 센다(한쪽이 0이면 규칙이 안 도는 것이다).
+        logger.info(
+            "코치 오답 제출: 이 학생·문항의 오답이 이미 원장에 있다 — 적재 생략 "
+            "outcome=skipped_duplicate problem_id=%s (EOS-146)",
+            problem_id,
+        )
+        return None
+
+    received_at = datetime.now(timezone.utc)
+    # SEC-31: `_complete_problem`·`submit_attempt`와 같은 봉투 암호화 — 세 적재 경로가 같은
+    # 보호를 받는다.
+    student_work_cipher = require_student_work_cipher(get_settings())
+    student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
+        student_work_cipher, final_answer
+    )
+    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    attempt = ProblemAttemptORM(
+        attempt_id=uuid.uuid4(),
+        user_id=user_id,
+        session_id=learning_session_id,
+        problem_id=problem_id,
+        is_correct=False,  # 서버 권위 판정(final incorrect) — 클라 보고 아님.
+        student_answer=student_answer_plain,
+        student_answer_encrypted=student_answer_encrypted,
+        student_answer_nonce=student_answer_nonce,
+        used_socratic=True,  # 코치 대화로 도달한 제출.
+        used_hint=None,  # 판정하지 않는다(위 한계 ②) — NULL=미판정이지 False가 아니다.
+        # PED-37: 발생 시작 시각은 넘어온 값 그대로 — 없으면 NULL(날조 금지). 대화 생성 턴에는
+        # dialogue가 아직 없어 None이다(보존 파기는 COALESCE(started_at, ingested_at)라 안전).
+        started_at=started_at,
+        ended_at=received_at,
+        ingested_at=received_at,
+    )
+    attempt_id = attempt.attempt_id
+    session.add(attempt)
+    await session.commit()  # attempt 우선 durable(`_complete_problem`·submit_attempt 패턴).
+
+    try:
+        # 후보의 재료가 **이 답안에서만** 나오므로 attempt 귀속이 정의상 성립한다(EOS-104).
+        scan = await scan_attempt_misconceptions(
+            session,
+            detector,
+            problem_id=problem_id,
+            answer=final_answer,
+            selected_choice_index=None,  # 코치 경로에는 보기 탭 인덱스가 없다.
+        )
+        evidence = await collect_assessment_evidence(
+            session,
+            learner_id=user_id,
+            problem_id=problem_id,
+            correct=False,
+            attempt_id=attempt_id,
+            observed_at=received_at,
+            possible_misconceptions=scan.candidates,
+            misconception_scan=scan.scan,
+        )
+        # 가설 반영은 L4 정책이 정한다(EOS-123). 오답에서는 APPLY(훑음) 아니면 NONE(훑지 않음)이다.
+        this_attempt_misconceptions: tuple[tuple[str, float], ...] = ()
+        if (
+            decide_attempt_hypothesis_action(is_correct=False, scan=scan.scan)
+            is AttemptHypothesisAction.APPLY
+        ):
+            active_hypotheses = await apply_candidates(session, user_id, scan.candidates)
+            await session.commit()
+            this_attempt_misconceptions = this_attempt_misconceptions_from(
+                active_hypotheses, scan.candidates
+            )
+        await record_problem_attempt_mastery(session, evidence=evidence)
+        skill_records = await record_problem_attempt_skill_mastery(session, evidence=evidence)
+        await record_attempt_skill_event(
+            session,
+            user_id=user_id,
+            attempt_id=attempt_id,
+            problem_id=problem_id,
+            is_correct=False,
+            skill_ids=[r.skill_id for r in skill_records],
+            source=AttemptSource.coach_wrong_submission,
+        )
+        transition = await advance_on_graded_attempt(
+            session,
+            user_id=user_id,
+            attempt_id=attempt_id,
+            is_correct=False,
+            confidence=None,
+            this_attempt_misconceptions=this_attempt_misconceptions,
+        )
+    except Exception as exc:  # noqa: BLE001 — 관측이 코치 응답을 깨뜨리지 않는다(아래 주석)
+        # **never-break**: attempt는 이미 commit됐다. 후처리는 관측이라 여기서 터져도 학생은
+        # 재고 유도 발화를 받아야 한다. 삼키되 예외 타입명을 반드시 남긴다(침묵 실패 금지).
+        logger.warning(
+            "코치 오답 제출: 후처리 실패 — attempt는 적재됨. exc_type=%s problem_id=%s (EOS-146)",
+            type(exc).__name__,
+            problem_id,
+        )
+        return attempt_id
+    if transition.rejected_transition is not None:
+        logger.warning(
+            "코치 오답 제출: 학습 상태 전이 거부 — %s (EOS-146 · attempt는 적재됨)",
+            transition.rejected_transition,
+        )
+    decision = transition.decision
+    logger.info(
+        "코치 오답 제출 적재 outcome=recorded scan=%s rule_id=%s to_state=%s "
+        "problem_id=%s (EOS-146)",
+        scan.scan.value,
+        decision.rule_id if decision is not None else None,
+        transition.final_state,
+        problem_id,
+    )
+    return attempt_id
+
+
 class _CompletionResult(NamedTuple):
     """`_resolve_completion` 반환 — 완료 상태머신 처리 결과(호출자가 발화·영속·응답에 반영).
 
@@ -1483,6 +1667,8 @@ async def _resolve_completion(
       3. `decide_completion`으로 5전이 결정.
       4. `NONE` → no-op(기존 발화 유지). 그 외 → 결정론 발화로 override(prompt·socratic_category).
       5. `COMPLETE` → `_complete_problem`으로 attempt 적재·숙달 전파(attempt_id 확보).
+      6. `REDIRECT` → `_record_first_wrong_submission`으로 문제당 최초 오답 1건 적재(EOS-146 ·
+         attempt_id는 돌려주지 않는다 — 완료 표지를 건드리지 않는다).
 
     PED-37 `attempt_started_at`: 적재할 attempt의 *발생* 시작 시각. `_complete_problem`이 자체로
     구할 수 없어(이 함수도 dialogue를 모른다) 호출자가 넘긴다 — append_turn은 `dialogue.started_at`,
@@ -1562,6 +1748,18 @@ async def _resolve_completion(
             final_answer=_last_solution_step(body),
             started_at=attempt_started_at,
             dialogue_id=dialogue_id,
+        )
+    elif cd.action is CompletionAction.REDIRECT:
+        # EOS-146: 서버가 명확한 오답으로 판정한 제출의 **문제당 최초 1건**을 원장에 적재한다 — 앱
+        # 학생의 오답이 R3·R5·R6에 닿는 유일한 경로다. `attempt_id`는 None으로 둔다: 이 결과의
+        # attempt_id가 dialogue에 링크되면(호출자가 그렇게 한다) 풀던 대화가 완료로 읽힌다.
+        await _record_first_wrong_submission(
+            session,
+            user_id=user_id,
+            problem_id=problem_id,
+            final_answer=_last_solution_step(body),
+            started_at=attempt_started_at,
+            detector=capabilities.attempt_misconception_detector,
         )
     return _CompletionResult(
         decision=new_decision,

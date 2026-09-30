@@ -845,13 +845,14 @@ CATALOG: tuple[Spec, ...] = (
        "Pedagogy", "P0",
        "B6·Gate2 ⑦ 오개념 기록 (오답 서명 채널 = EOS-104 · 킬스위치 "
        "l4_attempt_misconception_scan_enabled 기본 ON / 오답 선지 역추적 채널 = ASM-06 · "
-       "킬스위치 l4_distractor_link_enabled 기본 ON)",
+       "킬스위치 l4_distractor_link_enabled 기본 ON · 두 채점 경로(/v1/me/attempts·코치 서버 "
+       "판정 오답 EOS-146)가 같은 스캔 좌석 api._attempt_misconception_scan을 쓴다)",
        "l4.misconception.catalog", "l4.misconception.diagnose",
        "l4.misconception.combined", "l4.misconception.models", "l4.misconception.intervene",
        "l4.misconception.match_gate", "l4.misconception.distractor",
        "l4.misconception.distractor_link",
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
-       "l4.misconception.answer_signature"),
+       "l4.misconception.answer_signature", "api._attempt_misconception_scan"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",
