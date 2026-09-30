@@ -23,11 +23,16 @@ import sympy
 from sympy.parsing.sympy_parser import (
     convert_xor,
     implicit_multiplication,
-    parse_expr,
     standard_transformations,
 )
 
 from whymath_backend.l3.pregenerate.models import PregenItem, ValidationSignal
+
+# CONST-09(코딩 헌법 R22-03): 이 검증기는 *LLM 응답*을 파싱한다 — 런타임 생성물은 학생 발화를
+# 되풀이할 수 있으므로(`9^9^9 = 1`을 따라 쓰게 하면 그대로 계산된다) 신뢰 입력이 아니다. 또
+# `_parse_expr`는 해집합 경로(`solution_set`)를 통해 학생 최종답에도 쓰인다. 거부는 아래 보수
+# 회피(통과)로 접힌다.
+from whymath_backend.l3.safe_parse import safe_parse_expr, safe_sympify
 
 # 침묵실패 금지(CLAUDE.md) — 이 모듈의 보수 회피는 "통과(None)"로 귀결되므로 sympy 계통
 # 장애 시 산술 게이트가 무증상 전부-통과가 될 수 있다(langfuse 사고와 동형 위험). 예외
@@ -209,8 +214,8 @@ def _equality_is_false(lhs_s: str, rhs_s: str) -> str | None:
     *0이 아니라고 확정*할 때만 실패시킨다 — 자연어·심볼릭 표현을 잘못 탈락시키지 않게.
     """
     try:
-        lhs = sympy.sympify(lhs_s, convert_xor=True)
-        rhs = sympy.sympify(rhs_s, convert_xor=True)
+        lhs = safe_sympify(lhs_s)
+        rhs = safe_sympify(rhs_s)
         # 자유 변수(심볼릭)·비수치는 판정 불가 → 건너뜀(통과).
         if lhs.free_symbols or rhs.free_symbols:
             return None
@@ -276,8 +281,8 @@ def _inequality_is_false(lhs_s: str, rhs_s: str, op: str) -> str | None:
     SymPy가 관계를 `S.false`로 *확정*할 때만 실패.
     """
     try:
-        lhs = sympy.sympify(lhs_s, convert_xor=True)
-        rhs = sympy.sympify(rhs_s, convert_xor=True)
+        lhs = safe_sympify(lhs_s)
+        rhs = safe_sympify(rhs_s)
         if lhs.free_symbols or rhs.free_symbols:
             return None  # 심볼릭 → 판정 불가(통과)
         rel = _INEQ_FUNC[op](lhs, rhs)
@@ -342,8 +347,8 @@ def _not_equal_is_false(lhs_s: str, rhs_s: str) -> str | None:
     통과, SymPy가 차이를 *0이라고 확정*할 때만 실패.
     """
     try:
-        lhs = sympy.sympify(lhs_s, convert_xor=True)
-        rhs = sympy.sympify(rhs_s, convert_xor=True)
+        lhs = safe_sympify(lhs_s)
+        rhs = safe_sympify(rhs_s)
         if lhs.free_symbols or rhs.free_symbols:
             return None  # 심볼릭 → 판정 불가(통과)
         is_zero = sympy.simplify(lhs - rhs).is_zero
@@ -406,7 +411,7 @@ def _parse_expr(text: str) -> Any:
     반환은 SymPy 식(untyped → Any) 또는 None. 호출지가 None 검사 후 식 연산을 한다.
     """
     try:
-        return parse_expr(text, transformations=_PARSE_TRANSFORMS)
+        return safe_parse_expr(text, transformations=_PARSE_TRANSFORMS)
     except Exception as exc:  # noqa: BLE001 — 파싱 실패는 보수적으로 건너뜀(통과)
         logger.debug("pregenerate.validator 보수 회피(통과): %s", type(exc).__name__)
         return None

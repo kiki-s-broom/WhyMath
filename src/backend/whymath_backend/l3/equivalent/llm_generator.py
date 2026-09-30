@@ -104,7 +104,6 @@ from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from typing import Any
 
-import sympy
 from pydantic import ValidationError
 
 from whymath_backend.config import CloudSeat, Settings
@@ -131,6 +130,7 @@ from whymath_backend.l3.pregenerate.provenance_bridge import (
 )
 from whymath_backend.l3.prompt_assets import fill, prompt_text
 from whymath_backend.l3.router import Router, _as_cost_tier, actual_cost_krw, langfuse_fields
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import derive_selected_root
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -389,8 +389,8 @@ class LLMEquivalentProblemGenerator:
         """
         if provider is None:
             # 표준 저작 구성 — 지연 연결이라 구성만으로 네트워크 0. 클라우드 좌석은
-            # `settings.cloud_provider`가 정한다(ARCH-57). **app.py와는 의도적으로
-            # 다르다** — 학생 대면 서빙은 셀렉터를 타지 않는다(ARCH-56 게이트 ⓐ).
+            # `settings.cloud_provider`가 정한다(ARCH-57). ARCH-64부터 학생 대면 서빙(app.py)도
+            # 같은 팩토리를 경유하므로 저작과 학생 대면이 한 좌석을 쓴다(기본 openrouter).
             from whymath_backend.l3.providers.composite import CompositeProvider
             from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
@@ -1028,8 +1028,9 @@ class LLMEquivalentProblemGenerator:
             return answer, answer_map  # 유도 불가 — 게이트에 판정 위임(보수적).
         var, given = next(iter(answer_map.items()))
         try:
-            given_value = complex(sympy.sympify(given, convert_xor=True).evalf())
-            derived_value = complex(sympy.sympify(derived, convert_xor=True).evalf())
+            # CONST-09: LLM 답은 신뢰 입력이 아니다 — 안전 진입점으로 파싱한다(거부는 아래 except).
+            given_value = complex(safe_sympify(given).evalf())
+            derived_value = complex(safe_sympify(derived).evalf())
         except Exception:  # noqa: BLE001 — 답 파싱 불가는 정규화 포기(게이트 위임)
             return answer, answer_map
         # 부동소수 표기 차이만 흡수(상대 1e-6) — 반올림 소수(1.33)·틀린 근은 불일치로 거부.

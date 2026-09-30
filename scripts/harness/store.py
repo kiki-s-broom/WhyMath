@@ -222,6 +222,12 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
         for gdata in raw.get("gates") or []:
             gate = _coerce(Gate, gdata or {}, f"gates.yaml:{(gdata or {}).get('id', '?')}", errors)
             if gate:
+                # HARN-192 — 사전 대입은 같은 id의 뒤 정의가 앞 정의를 조용히 덮어쓴다.
+                # 병렬 브랜치가 같은 게이트 ID를 따로 추가하고 충돌을 '둘 다 유지'로 풀면
+                # 여기서만 잡힌다(태스크 ID 중복 검사와 대칭). 로드는 계속한다 — 이 오류가
+                # 다른 무결성 검사를 가리면 한 번에 하나씩만 고치게 된다.
+                if gate.id in backlog.gates:  # type: ignore[union-attr]
+                    errors.append(f"gates.yaml: 게이트 ID 중복 '{gate.id}'")  # type: ignore[union-attr]
                 backlog.gates[gate.id] = gate  # type: ignore[union-attr]
 
     tasks_dir = bdir / "tasks"

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,10 +16,12 @@ acceptance:
   - "② 회귀 테스트 — 같은 ID 블록 2개 픽스처는 RED(수정 전 코드에서 GREEN임을 먼저 확인해 결함 재현을 증명), 서로 다른 ID 2개 대조군은 GREEN. 뒤 정의가 이기는 조용한 덮어쓰기를 단언으로 드러낸다."
   - "③ 교차 브랜치 충돌 판정 — 두 미머지 브랜치가 같은 게이트 ID를 각자 추가하는 경로(`gates add`는 자기 대장만 본다)를 막을지 조사하고 결론을 적는다. HARN-111(태스크 번호 경합)의 게이트 축으로 흡수할지 여기서 집행할지 판정한다."
   - "④ 변별력 — ①의 검사를 제거하는 뮤테이션이 ②의 테스트를 RED로 만드는지 확인한다(주입 적용 단언 · 원복 바이트 동일)."
-artifacts: []
+  - "③ 판정 결과(2026-09-29 · 판정 기준: main c13c04ed + 이 브랜치의 ①②) — 교차 브랜치 게이트 ID 충돌은 여기서 원격 스캔으로 집행하지 않고, HARN-111로 흡수하지도 않는다.\n\nⓐ 실측: 격리 임시 git 저장소에서 두 경로를 재현했다. 같은 자리 삽입 뒤 '둘 다 유지'로 해소(git 충돌 있음), 다른 자리 삽입 뒤 깨끗한 병합(충돌 없음). 두 경로 모두 수정 전 validate는 exit 0(블록 5개가 '게이트 4건'으로 접혀 보고), ① 적용 뒤에는 exit 1 '게이트 ID 중복'이다. 병합 전 기준선은 수정 전·후 모두 exit 0이다(대조군). 시뮬레이션 첫 회차는 충돌 마커 줄만 지운 탓에 블록이 1개가 되어 의도한 상황을 만들지 못했고, 그 결과는 근거로 쓰지 않았다.\n\nⓑ 병합 시점 차단: ci.yml에 merge_group 트리거가 있고 harness-integrity 잡이 validate를 돌리므로 대기열의 병합 커밋에서 걸리는 것으로 읽힌다. 실제 대기열로는 검증하지 않았다 — 읽어서 그렇게 보인다는 범위다.\n\nⓒ 기전 차이: 태스크 번호는 CLI가 '다음 번호'를 제안해 두 세션이 같은 번호를 고르는 경합이 구조적이다(HARN-111). 게이트 ID는 gates add가 제안하지 않고 사람이 짓는다(검색 범위: backlog.py의 게이트 add 구현 읽기). 같은 ID 충돌은 같은 태스크를 두 세션이 잡았다는 신호이며, 이 사건(PR 1352·1358)의 뿌리는 HARN-193(게이트 부착 뒤 claim 반납 공백)이다.\n\nⓓ 비용: HARN-111의 원격 스캔은 브랜치별 backlog/tasks 파일명을 ls-tree로 나열한다. 게이트 ID는 gates.yaml 한 파일 안에 있어 브랜치마다 내용을 읽어 파싱해야 하고, 얻는 것은 병합 시점보다 조금 이른 검출뿐이다. HARN-111은 done이라 흡수 대상도 아니다.\n\n잔여 위험: push 전·PR 단계에서는 상대 브랜치의 같은 게이트 ID를 알 수 없다 — 중복 작업 낭비이며 main 무결성 위험은 아니다(그 축은 HARN-193 소관).\n\n부수 발견: 같은 시뮬레이션에서 한 블록 안 중복 키가 로더에서 조용히 덮어써짐을 실측했다 — 별개 결함이라 HARN-203으로 분리 등재했다."
+artifacts:
+  - "#1390"
 paths:
   - scripts/harness/store.py
   - "tests/harness/test_store*.py"
 session: null
-notes: "출처: 2026-09-28 PR #1352 머지 대기 중 실측(판정 기준 main e674f6d7).\n\n[실측] 격리 사본에서 gates.yaml의 G-eos129-prod-response-distribution 블록을 한 번 더 붙여 넣고 validate를 돌렸다 — '백로그 무결성 green · 게이트 87건' exit 0. 중복이 한 건으로 접혀 보고됐다.\n\n[계기] PR #1352(main 머지)와 PR #1358(미머지)이 같은 게이트 ID G-eos129-prod-response-distribution을 서로 다른 정의(title·depends_on)로 따로 추가했다. 두 PR이 같은 자리에 삽입해 git 충돌은 나지만, 충돌을 '둘 다 유지'로 풀면 validate가 통과시키고 뒤 정의가 이긴다. 병렬 중복의 원인 축은 HARN-186(미머지 · 게이트 부착 후 claim 반납 공백)이다. 같은 ⑤에 세 번째 게이트 G-eos129-item-response-census(PR #1346 · 미머지)도 있다 — 이름이 달라 이 검사로는 잡히지 않는 의미 중복이며 HARN-186·187 소관이다."
-updated: 2026-09-28
+notes: "출처: 2026-09-28 PR #1352 머지 대기 중 실측(판정 기준 main e674f6d7).\n\n[실측] 격리 사본에서 gates.yaml의 G-eos129-prod-response-distribution 블록을 한 번 더 붙여 넣고 validate를 돌렸다 — '백로그 무결성 green · 게이트 87건' exit 0. 중복이 한 건으로 접혀 보고됐다.\n\n[계기] PR #1352(main 머지)와 PR #1358(미머지)이 같은 게이트 ID G-eos129-prod-response-distribution을 서로 다른 정의(title·depends_on)로 따로 추가했다. 두 PR이 같은 자리에 삽입해 git 충돌은 나지만, 충돌을 '둘 다 유지'로 풀면 validate가 통과시키고 뒤 정의가 이긴다. 병렬 중복의 원인 축은 HARN-186(미머지 · 게이트 부착 후 claim 반납 공백)이다. 같은 ⑤에 세 번째 게이트 G-eos129-item-response-census(PR #1346 · 미머지)도 있다 — 이름이 달라 이 검사로는 잡히지 않는 의미 중복이며 HARN-186·187 소관이다.\n\n[정정 2026-09-29] ③ 교차 브랜치 판정 결과 기록 — 시뮬레이션 실측·흡수 여부 결론(HARN-192 acceptance ③ 이행)"
+updated: 2026-09-29

@@ -627,8 +627,9 @@ def test_scenario_005_correct_after_hint() -> None:
       ③ 돌아보기 응답 → 완료 · `problem_attempt` 1행(is_correct=True·used_socratic=True) ·
          숙달이 첫 측정으로 생긴다 · 힌트 이벤트가 그 문항에 묶여 시간선에 남는다.
       ④ⓐ 힌트 귀속(`EOS-133` 해소) — 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 그
-         attempt에 남는다(`used_hint=True` · `hint_usage` 단계 = ①의 공급). ②·③ 턴의 공급은
-         답이 나온 뒤라 세지 않는다.
+         attempt에 남는다(`used_hint=True` · `hint_usage` 단계 = ①의 공급). ②·③ 턴은 완료 상태
+         머신이 발화를 가로채(돌아보기·인정) 공급 원장에 행이 남지 않는다(`EOS-30`) — 시간선의
+         공급은 ①뿐이다.
       ④ⓑ 상태 머신(`EOS-134` 해소) — 코치 완료도 `/v1/me/attempts`와 같은 공용 진입점을 돌아
          `NEW → LEARNING → ASSESSING → PRACTICING`이 된다(R2 — 확신도 미측정 정답은 같은 개념 연습).
       ④ 정직한 공백 동결 1건(ⓒ `EOS-29`):
@@ -721,9 +722,16 @@ def test_scenario_005_correct_after_hint() -> None:
             assert hint_events and all(
                 e["problem_id"] == str(pid) for e in hint_events
             ), hint_events
+            # EOS-30: ②(정답 제출 → 돌아보기 진입)·③(돌아보기 응답 → 완료 인정) 턴은 완료 상태
+            # 머신이 발화를 가로챈 턴이라 학생은 힌트가 아니라 결정론 템플릿을 받았다. 그 턴의
+            # 결정 단계는 원장에 '제공'으로 적히지 않는다 — 시간선의 공급은 ①의 막힘 공급뿐이다.
+            assert _hint_levels(entries) == [hint], (
+                "가로챈 턴(돌아보기·인정)의 단계가 공급 원장에 적혔다 — 학생이 받지 않은 "
+                f"단계가 '제공'으로 남는다: {_hint_levels(entries)} (①의 공급 {hint})"
+            )
 
-            # ④ⓐ 힌트 귀속(EOS-133 해소) — ①의 막힘 공급 하나만 이 attempt에 남는다. ②(정답 제출)·
-            # ③(돌아보기) 턴의 공급은 답이 나온 뒤라 이 풀이에 쓰였을 수 없다(창 상한 = 정답 제출 턴).
+            # ④ⓐ 힌트 귀속(EOS-133 해소) — ①의 막힘 공급 하나만 이 attempt에 남는다. ②·③ 턴은
+            # 공급 행이 없어 셀 것이 없다(EOS-30) — 귀속 창 상한(정답 제출 턴)은 이중 방어로 남았다.
             hint_rows = _read_rows(
                 "SELECT hint_level FROM hint_usage WHERE attempt_id = :aid ORDER BY requested_at",
                 {"aid": attempt_id},

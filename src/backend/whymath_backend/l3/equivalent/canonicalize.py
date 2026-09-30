@@ -22,6 +22,11 @@ from collections.abc import Sequence
 import sympy
 from sympy.core.function import AppliedUndef
 
+# CONST-09(코딩 헌법 R22-03): 조건식은 LLM 생성물이라(Phaiakes9 실측 pseudo-DSL 회귀가 그 증거)
+# 신뢰 입력이 아니다 — 파싱은 안전 진입점을 거친다. 거부(`UnsafeExpressionError` ⊂
+# SympifyError)는 아래 기존 except가 "파싱 불가"/None으로 접는다.
+from whymath_backend.l3.safe_parse import safe_sympify
+
 __all__ = ["canonical_condition", "canonical_signature", "condition_dsl_violation"]
 
 # 관계 연산자(등호 외) — canonical_condition·condition_dsl_violation 공용 분리 규약.
@@ -63,8 +68,8 @@ def condition_dsl_violation(condition: str) -> str | None:
     op, lhs_text, rhs_text = _split_relation(text)
     del op  # 언어 폐쇄 검사는 연산자 무관(분리만 공용 규약 사용).
     try:
-        lhs = sympy.sympify(lhs_text, convert_xor=True)
-        rhs = sympy.sympify(rhs_text, convert_xor=True)
+        lhs = safe_sympify(lhs_text)
+        rhs = safe_sympify(rhs_text)
     except (sympy.SympifyError, TypeError, ValueError, SyntaxError, AttributeError):
         return "파싱 불가 — SymPy (부)등식이 아님(파이썬 문법·비수식 혼입)"
     if not isinstance(lhs, sympy.Expr) or not isinstance(rhs, sympy.Expr):
@@ -89,8 +94,8 @@ def canonical_condition(condition: str) -> str | None:
         return None
     op, lhs_text, rhs_text = _split_relation(text)
     try:
-        lhs = sympy.sympify(lhs_text, convert_xor=True)
-        rhs = sympy.sympify(rhs_text, convert_xor=True)
+        lhs = safe_sympify(lhs_text)
+        rhs = safe_sympify(rhs_text)
         residual = sympy.expand(lhs - rhs)
     except (sympy.SympifyError, TypeError, ValueError, SyntaxError, AttributeError):
         return None

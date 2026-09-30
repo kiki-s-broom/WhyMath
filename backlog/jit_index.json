@@ -464,6 +464,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "tests/backend/api/test_e2e_persona_journeys.py",
+    "tests/backend/api/test_e2e_three_consecutive_loops.py"
+   ],
+   "text": "EOS-139 폐루프(ⓑ) PASS가 방해 개념 부재와 하네스 전용 요청 형태의 우연 — 실제 앱 요청이면 붕괴",
+   "weight": 5
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-28",
    "paths": [
     "scripts/harness/backlog.py",
@@ -2574,9 +2584,11 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    ".claude/commands/drive.md",
     "scripts/harness/ci_job_coverage.py",
     "scripts/harness/ci_mirror.py",
-    "tests/harness/test_ci_job_coverage*.py"
+    "tests/harness/test_ci_job_coverage*.py",
+    "tests/infra/test_ci_job_coverage*.py"
    ],
    "text": "ci_job_coverage scope에 stdin 입력·출력 tail 절단 — 0건 판정을 읽지 못해 backend 잡 누락",
    "weight": 2
@@ -2603,6 +2615,16 @@
     "tests/infra/test_ci_job_timeout_headroom.py"
    ],
    "text": "harness-integrity 5분 상한 소진 — 테스트 증가로 머지 큐 PR 2건 연속 cancelled(상시 잡이라 전면 차단)",
+   "weight": 2
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/test_ci_mirror*.py"
+   ],
+   "text": "CONST-09 안전 파서가 파싱 비용 2배 — CI backend 잡 35분 상한 소진(pytest 99%에서 cancelled), 로컬 미러는 통과 표시",
    "weight": 2
   },
   {
@@ -3144,6 +3166,17 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-22",
+   "paths": [
+    "scripts/harness/ci_mirror.py",
+    "tests/harness/**",
+    "tests/infra/test_ci_mirror.py"
+   ],
+   "text": "CI 미러가 선언 없는 스텝에도 pipefail을 걸어 거짓 실패 — stdout 미보존으로 원인 불명",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-24",
    "paths": [
     "scripts/harness/backlog.py"
@@ -3185,9 +3218,16 @@
    "kind": "incident",
    "ref": "2026-09-25",
    "paths": [
+    "docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md",
+    "scripts/analysis/mutate_eos26_r6_guards.py",
+    "src/backend/whymath_backend/api/me.py",
     "src/backend/whymath_backend/l2/learning_state_recommendation.py",
+    "src/backend/whymath_backend/l2/recommendation_evidence.py",
+    "src/backend/whymath_backend/l2/recommendation_policy.py",
     "tests/backend/api/test_e2e_three_consecutive_loops.py",
-    "tests/backend/api/test_eos24_recommendation_follows_learning_state.py"
+    "tests/backend/api/test_eos24_recommendation_follows_learning_state.py",
+    "tests/backend/api/test_eos26_r6_prerequisite_probe.py",
+    "tests/backend/l2/test_learning_state_recommendation.py"
    ],
    "text": "픽스처가 선수를 유일한 쉬운 개념으로 심어 'R6 진단=선수 진단'을 동작으로 오독 — Kiki 결정 전제 오류",
    "weight": 1
@@ -3215,6 +3255,16 @@
   },
   {
    "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
+    "scripts/harness/mutate.py",
+    "tests/harness/test_mutate_harness.py"
+   ],
+   "text": "장기 검증(백엔드 잡 재현·커밋본 뮤테이션) 도중 작업 트리 수정 — 이 세션 2회 · 두 결과 폐기 후 재실행",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
    "ref": "2026-09-27",
    "paths": [
     "scripts/harness/backlog.py"
@@ -3226,9 +3276,28 @@
    "kind": "incident",
    "ref": "2026-09-27",
    "paths": [
+    "tests/harness/**"
+   ],
+   "text": "로컬 pytest tests/harness가 이 세션 이벤트 대장에 가짜 policy_warn 7줄 — CI 미러 중 2회 · 커밋 전 되돌림",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
     "scripts/harness/backlog.py"
    ],
    "text": "번호 확인용 backlog add 가 실제 태스크 CONST-01-x 생성 — rename 거부로 cancel 처리(2회차)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-27",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "사고 추가·경로 정정 뒤 jit_index.json 미재생성 — 로컬 CI 미러에서 harness-integrity red(push 전 발견)",
    "weight": 1
   },
   {
@@ -3346,9 +3415,53 @@
    "kind": "incident",
    "ref": "2026-09-29",
    "paths": [
+    "tests/backend/conftest.py",
+    "tests/data_pipeline/conftest.py",
+    "tests/infra/test_integration_marker_*.py"
+   ],
+   "text": "CI 통합 잡 재현 스크립트가 스텝 env를 빠뜨려 통합 461건 전부 skip·exit 0 — 판정 줄로 발견",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "scripts/harness/remote_claims.py",
+    "scripts/harness/selector.py",
+    "tests/harness/test_*gate*claim*.py"
+   ],
+   "text": "EOS-146 2세션 중복 게이트 — 결정 게이트 부착·claim 반납을 ARCH-71 PR에 10시간 실어 둬 main엔 무주 todo로 보임",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "scripts/harness/backlog.py",
+    "tests/harness/test_jit*.py"
+   ],
+   "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red(push 전 검출)",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
     "scripts/harness/backlog.py"
    ],
    "text": "start 출력을 | head -80으로 잘라 BrokenPipe 중단 — 경고 이벤트 82줄만 남고 claim 없음·사유 없는 exit 1",
+   "weight": 1
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    ".claude/commands/drive.md",
+    "scripts/harness/port_freshness.py",
+    "tests/harness/test_port_freshness.py"
+   ],
+   "text": "위임 워크트리 산출물(ARCH-71 런북)이 ARCH-69 이전 기준에서 쓰인 채 이식 — 서술한 좌석 실패 동작이 이미 거짓",
    "weight": 1
   },
   {
@@ -3898,6 +4011,16 @@
    "kind": "incident",
    "ref": "2026-09-26",
    "paths": [
+    "src/backend/whymath_backend/api/coach.py",
+    "src/backend/whymath_backend/l2/learning_state_machine.py"
+   ],
+   "text": "EOS-26 판정문 초안이 '실제 앱' 해소를 주장 — 앱은 오답을 상태 머신에 보내지 않아 R6 도달 0",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-26",
+   "paths": [
     ".claude/hooks/chat_block_guard.py",
     "scripts/ops/check_runbook_blocks.py",
     "tests/infra/**"
@@ -4109,6 +4232,28 @@
     "tests/harness/**"
    ],
    "text": "하네스 테스트가 claim 세션 이벤트 대장에 가짜 policy_warn 7줄 기록(EOS-123 미러 중 · 커밋 전 cp 백업 복원)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    "tests/harness/**"
+   ],
+   "text": "CI 미러 중 tests/harness가 세션 샤드에 가짜 path_overlap 3줄 기록(EOS-30 병합 재검증)",
+   "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-29",
+   "paths": [
+    ".gitattributes",
+    "backlog/incidents.ndjson",
+    "scripts/harness/incidents.py",
+    "scripts/harness/store.py",
+    "tests/harness/test_incidents.py"
+   ],
+   "text": "PR #1380 main 병합에서 사고 대장 충돌 — main이 날짜순 중간 삽입 6줄이라 끝 추가 합집합 단언 실패",
    "weight": 0
   },
   {
