@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - tests/backend/privacy/test_erasure_plan_completeness.py
   - src/backend/whymath_backend/privacy/erasure.py
-session: null
+session: claude/ecstatic-feynman-bxxxvd
 notes: "사실(판정 기준 main `85f934a4`): `evidence_event`에는 user 컬럼·user FK가 없고 `session_id`(FK 아님)로만 학생에 묶인다. 그래서 현행 완전성 스윕(FK 산출물 ∪ 계획 파생 이름 — SEC-35)에 걸리지 않고, `_ERASURE_PLAN`과 보존 파기 계획 모두 밖이다. 반면 `privacy/export.py`는 `learning_session` 조인으로 이 행을 학생 데이터로 반출한다(EOS-131 ⑤) — 열람권에는 포함되고 삭제권에서는 빠지는 모순. 학생 테이블 중 세션 축으로만 묶이는 것은 현재 `evidence_event` 1건(`review_timer_event`는 검수자 세션). SEC-35(`learner_id` 별칭 사각)와 같은 계열의 다른 형태다. 2026-09-30 Kiki 승인(검토의견 \"진행\") — 처분(삭제 배선)은 SEC-40이 소유한다."
 updated: 2026-09-30
