@@ -641,6 +641,19 @@ gates:
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
     corrections: []
+  - id: G-misc40-new-crosslink-signature
+    title: "신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-30
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - MISC-40-calculus-diff-kebab-seat
   - id: G-mp02-rerun-model-pilot
     title: "MP-02 재회차 (Phaiakes9) — 로컬 저작 모델 비교 파일럿(mid=qwen2.5:7b vs quality=qwen3:30b-a3b, 각 30건 · 문제 유형 3종 순환 · 카나리 끔) → 수용 건수가 많은 티어로 MP-02 2회차 n=60(카나리 기본값). 런북 = docs/reviews/mp02_rerun_runbook.md (착지 PR 머지 후 실행 — 런북 1단계 HAS_TIER_FLAG=True가 머지를 기계 확인). 회신 = 런북 8절 목록(5절·7절 출력 전문 필수). 배경: 1차 회차(run_id c0854e38…)는 30건 중 중복 20건이라 판정 분모 10 — 10/10 만점이어도 Wilson 하한 0.7871 < 0.90으로 통과가 수학적으로 불가능했다(25건 이상 전건 합격이어야 0.9023). 판정 규칙은 런북 5절에 실행 전 고정: accepted_stored가 많은 티어, 동률이면 mid. 전제: Ollama 가동 · qwen3:30b-a3b 설치(없으면 런북 2절에서 pull) · 비용 0원(로컬)."
     kind: human
