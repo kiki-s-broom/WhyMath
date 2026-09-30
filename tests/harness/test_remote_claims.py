@@ -6,11 +6,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 import remote_claims
 from models import Backlog, Task
 
@@ -2497,3 +2500,347 @@ class TestProxyBlockedAttribution:
         result, error = remote_claims._fetch_pr_labels(tmp_path, [675])
         assert result is None
         assert "SessionScopeBlocked" in error and "#675" in error
+
+
+# ── HARN-190 — 포팅 근거의 시간 축 ─────────────────────────────────────────
+_REMOTE_CLAIMS_SRC = Path(remote_claims.__file__)
+_MUTANT_SEQ = [0]
+
+
+def _load_mutant(tmp_path: Path, old: str, new: str):
+    """`remote_claims.py`를 깨뜨린 **사본**을 임시 경로에서 로드한다 — 원본 파일은 건드리지 않는다.
+
+    주입이 실제로 들어갔는지(치환 대상 1건·`mutated != original`)를 여기서 단언한다 — 조용히
+    실패한 주입은 정상 파일에 대해 테스트를 돌리고 "통과"가 "검출"처럼 보이게 만든다.
+    """
+    original = _REMOTE_CLAIMS_SRC.read_text(encoding="utf-8")
+    assert original.count(old) == 1, f"치환 대상이 1건이 아니다: {old[:60]!r}"
+    mutated = original.replace(old, new, 1)
+    assert mutated != original, "주입이 적용되지 않았다 — 하네스 결함"
+    _MUTANT_SEQ[0] += 1
+    name = f"remote_claims_mutant_{_MUTANT_SEQ[0]}"
+    target = tmp_path / f"{name}.py"
+    target.write_text(mutated, encoding="utf-8")
+    spec = importlib.util.spec_from_file_location(name, target)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    # exec 전에 등록해야 한다 — dataclass가 sys.modules[cls.__module__]를 조회한다.
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(name, None)
+    return module, original
+
+
+def _scan_entry(module, repo: Path, branch: str):
+    result = module.scan_stale_branches(repo, days_threshold=3)
+    return {s.branch: s for s in result.stale}[branch]
+
+
+def _assert_later_edit_is_not_landed(module, repo: Path, branch: str) -> None:
+    """ⓐ — 근거 커밋 뒤에 브랜치가 같은 파일을 다시 고쳤다: '결정 불요'가 아니고 단서가 남는다."""
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status != "ported", "근거 이후 브랜치가 다시 고쳤는데 '결정 불요'가 됐다"
+    assert entry.evidence == ""
+    assert entry.partial_port.startswith("0/1 파일"), entry.partial_port
+    assert "다시 고친 파일 1건" in entry.partial_port, entry.partial_port
+
+
+def _assert_only_the_edited_file_is_excluded(module, repo: Path, branch: str) -> None:
+    """ⓐ' — 파일 2개 중 다시 고친 1개만 제외된다(과잉 배제 방지): 1/2 착지·재수정 1건."""
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status != "ported"
+    assert entry.partial_port.startswith("1/2 파일"), entry.partial_port
+    assert "다시 고친 파일 1건" in entry.partial_port, entry.partial_port
+
+
+def _assert_evidence_after_last_edit_stays_ported(module, repo: Path, branch: str) -> None:
+    """ⓑ — 대조군: 근거 커밋이 브랜치의 마지막 수정보다 뒤면 전건 착지가 유지된다.
+
+    이 대조군이 없으면 "근거 커밋이 있으면 전부 부분 착지"라는 과잉 수정이 통과한다.
+    """
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status == "ported", f"정상 회수가 '결정 불요'에서 밀려났다: {entry}"
+    assert entry.partial_port == ""
+
+
+def _assert_equal_time_counts_as_edited(module, repo: Path, branch: str) -> None:
+    """ⓔ — 근거와 재수정이 같은 시각이면 재수정으로 본다(오탐이 미탐보다 위험하다)."""
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status != "ported", "같은 시각을 착지로 읽었다 — 안전한 쪽이 아니다"
+    assert entry.partial_port.startswith("0/1 파일"), entry.partial_port
+
+
+def _assert_re_recovery_after_edit_is_landed(module, repo: Path, branch: str) -> None:
+    """ⓕ — 재수정 뒤에 다시 회수한 두 번째 근거가 있으면 그 파일은 착지다(근거별 합집합)."""
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status == "ported", f"두 번째 회수가 시간 축에 막혔다: {entry}"
+    assert entry.evidence, "근거 커밋이 '결정 불요'의 이유로 노출돼야 한다"
+    assert entry.partial_port == "", entry.partial_port
+
+
+def _assert_touch_scan_failure_is_indeterminate(module, repo: Path, branch: str, patch) -> None:
+    """ⓓ — 재수정 시각 조회가 실패하면 판정 불가다: 통과가 아니고 예외 타입명이 남는다."""
+    real_git = module._git
+
+    def flaky_log(root, *argv, **kwargs):
+        # 시각 조회만 실패시킨다 — `trunk..ref` 범위를 인자로 받는 log 호출이다.
+        if argv[:1] == ("log",) and any(".." in str(part) for part in argv[1:3]):
+            raise TimeoutError("git log 타임아웃(합성)")
+        return real_git(root, *argv, **kwargs)
+
+    patch.setattr(module, "_git", flaky_log)
+    entry = _scan_entry(module, repo, branch)
+    assert entry.status != "ported", "시각 조회 실패가 '결정 불요'가 됐다"
+    assert entry.evidence == ""
+    assert "TimeoutError" in entry.port_scan_error, entry.port_scan_error
+
+
+class TestPortedEvidenceTimeAxis:
+    """HARN-190 — 근거 커밋이 옮긴 파일을 **그 뒤에 브랜치가 다시 고쳤다면** 착지로 세지 않는다.
+
+    실측(2026-09-28 vafylb): 근거 `9905fdc4`는 브랜치 자신의 앞선 머지분이었고 브랜치는 그 뒤
+    같은 파일을 다시 고쳤는데(cp949 출력 크래시 해소) 그 변경은 main에 없었다. 파일 경로
+    교집합만 세던 판정이 1/1 전건 착지로 읽어 "결정 불요"를 냈다 — 오분류 계열 3회차.
+    시각은 커밋마다 명시해 선후 관계를 통제한다(백데이트 헬퍼는 '일' 단위라 같은 시각을 못 만든다).
+    """
+
+    @staticmethod
+    def _run(repo: Path, *argv: str, env: dict[str, str] | None = None) -> None:
+        subprocess.run(["git", *argv], cwd=repo, check=True, capture_output=True, env=env)
+
+    @staticmethod
+    def _dated_env(when: datetime) -> dict[str, str]:
+        iso = when.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        return {**_os_environ(), "GIT_AUTHOR_DATE": iso, "GIT_COMMITTER_DATE": iso}
+
+    def _commit_at(self, repo: Path, files: dict[str, str], message: str, when: datetime) -> None:
+        for name, body in files.items():
+            path = repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(body, encoding="utf-8")
+            self._run(repo, "add", name)
+        self._run(repo, "commit", "-m", message, env=self._dated_env(when))
+
+    def _build(
+        self,
+        bare_remote,
+        suffix: str,
+        *,
+        files: tuple[str, ...] = ("src/alpha.py",),
+        evidence_days: float = 6,
+        pre_edit_days: float | None = None,
+        merge_days: float | None = None,
+        edit_days: float | None = None,
+        edit_files: tuple[str, ...] | None = None,
+        evidence2_days: float | None = None,
+        branch_files_only_docs: bool = False,
+    ) -> tuple[Path, str]:
+        """브랜치 1개와 그 근거 커밋(들)을 **지정한 시각**으로 만들고 관측용 클론을 돌려준다.
+
+        타임라인: 브랜치 시작(9일 전) → [근거 전 재수정] → main의 근거 커밋 → [main을 브랜치가
+        흡수 = 근거가 브랜치의 조상] → [근거 뒤 재수정] → [두 번째 근거].
+        근거 커밋은 브랜치와 **같은 본문**을 쓴다 — main을 브랜치에 병합할 때 충돌하지 않게.
+        """
+        _, clone = bare_remote
+        a = clone(f"a-{suffix}")
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+
+        def at(days: float) -> datetime:
+            return now - timedelta(days=days)
+
+        def body(name: str, version: int) -> str:
+            return f"{name} v{version}\n"
+
+        branch = f"claude/whymath-timeaxis-{suffix}"
+        self._run(a, "checkout", "main")
+        self._run(a, "checkout", "-b", branch)
+        start_files = ("docs/note.md",) if branch_files_only_docs else files
+        self._commit_at(a, {f: body(f, 1) for f in start_files}, f"{branch} 시작", at(9))
+        version = 1
+        if pre_edit_days is not None:
+            version = 2
+            self._commit_at(
+                a, {f: body(f, 2) for f in files}, f"{branch} 재수정(근거 전)", at(pre_edit_days)
+            )
+        self._run(a, "push", "-u", "origin", branch)
+
+        self._run(a, "checkout", "main")
+        self._commit_at(
+            a, {f: body(f, version) for f in files}, f"회수: {branch} 코드 이식", at(evidence_days)
+        )
+        self._run(a, "push", "origin", "main")
+
+        if merge_days is not None:
+            self._run(a, "checkout", branch)
+            self._run(
+                a,
+                "merge",
+                "main",
+                "-m",
+                f"main 병합 ({branch})",
+                env=self._dated_env(at(merge_days)),
+            )
+            self._run(a, "push", "origin", branch)
+        if edit_days is not None:
+            self._run(a, "checkout", branch)
+            targets = edit_files if edit_files is not None else files
+            self._commit_at(
+                a, {f: body(f, 3) for f in targets}, f"{branch} 근거 뒤 재수정", at(edit_days)
+            )
+            self._run(a, "push", "origin", branch)
+        if evidence2_days is not None:
+            self._run(a, "checkout", "main")
+            self._commit_at(
+                a,
+                {f: body(f, 3) for f in files},
+                f"2차 회수: {branch} 재수정분",
+                at(evidence2_days),
+            )
+            self._run(a, "push", "origin", "main")
+        return clone(f"b-{suffix}"), branch
+
+    # ── 계약 — 각 절이 없으면 통과하는 입력을 픽스처로 둔다 ──────────────────
+    def test_edit_after_evidence_is_not_landed(self, bare_remote):
+        """ⓐ 근거(6일 전) 뒤에 브랜치가 같은 파일을 다시 수정(4일 전) → 결정 불요가 아니다."""
+        repo, branch = self._build(bare_remote, "ea", edit_days=4)
+        _assert_later_edit_is_not_landed(remote_claims, repo, branch)
+
+    def test_vafylb_shape_evidence_in_branch_ancestry_then_edit(self, bare_remote):
+        """ⓐ'' 실측 재현 — 근거가 브랜치 **자신의 앞선 머지분**(조상)이고 그 뒤 브랜치가 다시 고쳤다."""
+        repo, branch = self._build(bare_remote, "va", merge_days=5, edit_days=4)
+        _assert_later_edit_is_not_landed(remote_claims, repo, branch)
+
+    def test_only_the_re_edited_file_is_excluded(self, bare_remote):
+        """ⓐ' 파일 2개 중 1개만 다시 고침 → 1/2 착지·재수정 1건(전부 제외하는 과잉 배제 방지)."""
+        repo, branch = self._build(
+            bare_remote,
+            "two",
+            files=("src/alpha.py", "src/beta.py"),
+            edit_days=4,
+            edit_files=("src/beta.py",),
+        )
+        _assert_only_the_edited_file_is_excluded(remote_claims, repo, branch)
+
+    def test_evidence_after_last_branch_edit_stays_ported(self, bare_remote):
+        """ⓑ 대조군 — 브랜치의 마지막 수정(7일 전)보다 근거(5일 전)가 뒤면 전건 착지 유지."""
+        repo, branch = self._build(bare_remote, "eb", pre_edit_days=7, evidence_days=5)
+        _assert_evidence_after_last_edit_stays_ported(remote_claims, repo, branch)
+
+    def test_ancestor_evidence_without_later_edit_stays_ported(self, bare_remote):
+        """ⓑ' 대조군 — 근거가 브랜치의 조상이어도 그 뒤 수정이 없으면 전건 착지 유지.
+
+        이 픽스처는 시간 축 코드에 **도달하지 않는다** — 브랜치가 트렁크를 병합한 순간 착지 파일이
+        브랜치 diff에서 빠져 `0/0` 조기 종료로 ported가 된다. 그래서 "브랜치 고유 커밋(`trunk..ref`)만
+        본다"는 선택은 이 테스트로 강제되지 않는다(근거가 조상이면서 파일이 분모에 남으려면 이후
+        재수정이 있어야 하고, 그 경우는 전체 이력을 봐도 같은 결론이다 — 실측상 동치). 이 테스트가
+        지키는 것은 '조상 근거 + 수정 없음이 부분 착지로 밀려나지 않는다'는 결과 자체다.
+        """
+        repo, branch = self._build(bare_remote, "an", merge_days=5)
+        _assert_evidence_after_last_edit_stays_ported(remote_claims, repo, branch)
+
+    def test_branch_without_code_files_keeps_current_behavior(self, bare_remote):
+        """ⓒ 코드 파일 0개 브랜치(0/0) → 현행 유지: 근거 코드 커밋이 있으면 ported."""
+        repo, branch = self._build(bare_remote, "dc", branch_files_only_docs=True)
+        entry = _scan_entry(remote_claims, repo, branch)
+        assert entry.status == "ported", entry
+
+    def test_equal_time_counts_as_edited(self, bare_remote):
+        """ⓔ 근거와 재수정이 같은 시각 → 재수정으로 본다(안전한 쪽)."""
+        repo, branch = self._build(bare_remote, "eq", evidence_days=6, edit_days=6)
+        _assert_equal_time_counts_as_edited(remote_claims, repo, branch)
+
+    def test_re_recovery_after_edit_is_landed(self, bare_remote):
+        """ⓕ 재수정(5일 전) 뒤에 다시 회수한 2차 근거(4일 전)가 있으면 그 파일은 착지다."""
+        repo, branch = self._build(bare_remote, "rr", edit_days=5, evidence2_days=4)
+        _assert_re_recovery_after_edit_is_landed(remote_claims, repo, branch)
+
+    def test_touch_scan_failure_is_indeterminate(self, bare_remote, monkeypatch):
+        """ⓓ 재수정 시각 조회 실패 → 판정 불가(통과 아님) + 예외 타입명."""
+        repo, branch = self._build(bare_remote, "tf", edit_days=4)
+        _assert_touch_scan_failure_is_indeterminate(remote_claims, repo, branch, monkeypatch)
+
+    # ── 뮤테이션 — 각 절을 깨뜨리면 그 절을 밟는 단언이 RED인가 ────────────
+    @pytest.mark.parametrize(
+        ("label", "old", "new", "kwargs", "assert_fn", "needs_patch"),
+        [
+            (
+                "M1-시간 축 조건 제거(원래 결함 형태)",
+                "            if commit_time is not None and last_touch.get(name, -1) < commit_time\n",
+                "            if commit_time is not None\n",
+                {"edit_days": 4},
+                _assert_later_edit_is_not_landed,
+                False,
+            ),
+            (
+                "M2-같은 시각을 착지로 읽음(< → <=)",
+                "last_touch.get(name, -1) < commit_time",
+                "last_touch.get(name, -1) <= commit_time",
+                {"evidence_days": 6, "edit_days": 6},
+                _assert_equal_time_counts_as_edited,
+                False,
+            ),
+            (
+                "M3-파일의 마지막 수정 대신 가장 오래된 수정을 씀(최신순 로그의 마지막 항목이 남음)",
+                "            if name and when > last.get(name, -1):\n",
+                "            if name:\n",
+                {"edit_days": 4},
+                _assert_later_edit_is_not_landed,
+                False,
+            ),
+            (
+                "M4-착지 0건일 때 흡수 흔적을 버림",
+                "return 0 < self.landed < self.total or (self.landed == 0 and self.superseded > 0)",
+                "return 0 < self.landed < self.total",
+                {"edit_days": 4},
+                _assert_later_edit_is_not_landed,
+                False,
+            ),
+            (
+                "M5-시각 조회 실패를 재수정 없음으로 삼킴",
+                '    if last_touch is None:\n        return PortEvidence("", 0, 0, scan_error=touch_error)\n',
+                "    if last_touch is None:\n        last_touch = {}\n",
+                {"edit_days": 4},
+                _assert_touch_scan_failure_is_indeterminate,
+                True,
+            ),
+            (
+                "M6-재수정 건수를 단서에 싣지 않음",
+                "superseded=len(superseded))",
+                "superseded=0)",
+                {
+                    "files": ("src/alpha.py", "src/beta.py"),
+                    "edit_days": 4,
+                    "edit_files": ("src/beta.py",),
+                },
+                _assert_only_the_edited_file_is_excluded,
+                False,
+            ),
+            (
+                "M7-근거별 착지 합집합을 첫 근거로 제한(2차 회수를 무시)",
+                "    for title, commit_time, overlap in contributions:\n        landed = {",
+                "    for title, commit_time, overlap in contributions[-1:]:\n        landed = {",
+                {"edit_days": 5, "evidence2_days": 4},
+                _assert_re_recovery_after_edit_is_landed,
+                False,
+            ),
+        ],
+        ids=["M1", "M2", "M3", "M4", "M5", "M6", "M7"],
+    )
+    def test_mutations_are_detected(
+        self, tmp_path, bare_remote, monkeypatch, label, old, new, kwargs, assert_fn, needs_patch
+    ):
+        """M1~M7: 시간 축의 한 절을 깨뜨린 사본은 그 절을 밟는 단언에서 RED, 원본은 GREEN.
+
+        같은 저장소 상태에 원본·변이 사본을 **각각** 대서 비교한다 — 변이 쪽이 통과하면 그 절을
+        밟지 못한 픽스처이거나 주입이 안 들어간 것이다(주입 실재는 `_load_mutant`가 단언).
+        """
+        mutant, original = _load_mutant(tmp_path, old, new)
+        repo, branch = self._build(bare_remote, "mu", **kwargs)
+        args = (repo, branch, monkeypatch) if needs_patch else (repo, branch)
+        with pytest.raises(AssertionError):
+            assert_fn(mutant, *args)
+        monkeypatch.undo()  # 변이 쪽에서 건 패치가 원본 검사에 새지 않게 한다
+        assert_fn(remote_claims, *args)
+        assert _REMOTE_CLAIMS_SRC.read_text(encoding="utf-8") == original, label

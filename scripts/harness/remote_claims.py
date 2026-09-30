@@ -2312,13 +2312,21 @@ class PortEvidence:
     landed: int
     total: int
     scan_error: str = ""
-    """분모(브랜치 코드 파일) 산출 실패 사유 — 있으면 **포팅 여부를 판정하지 못했다**."""
+    """분모(브랜치 코드 파일)·시각 산출 실패 사유 — 있으면 **포팅 여부를 판정하지 못했다**."""
+    superseded: int = 0
+    """근거 커밋이 옮겼으나 **그 뒤 브랜치가 다시 고쳐** 착지로 세지 않은 파일 수(HARN-190).
+
+    근거 커밋이 그 파일을 옮긴 것은 사실이지만 브랜치가 이후에 한 변경은 트렁크에 없다 —
+    그 파일을 착지로 세면 '결정 불요'가 되어 뒤의 변경이 삭제 배치에 실린다. 착지 0건이어도
+    이 값이 양수면 흡수 흔적은 있는 것이므로 `is_partial`이 참이다(흔적을 버리지 않는다)."""
 
     @property
     def is_full_port(self) -> bool:
         """브랜치 고유 코드가 전부 트렁크에 착지했는가 — 이때만 '결정 불요'다.
 
         분모 산출에 실패했으면(`scan_error`) 언제나 False다 — 판정 불가는 통과가 아니다.
+        재수정으로 제외된 파일(`superseded`)은 `landed`에 들지 않으므로 그 브랜치는 전건
+        착지가 될 수 없다.
         """
         if self.scan_error:
             return False
@@ -2326,7 +2334,9 @@ class PortEvidence:
 
     @property
     def is_partial(self) -> bool:
-        return bool(self.header) and 0 < self.landed < self.total
+        if not self.header or self.scan_error:
+            return False
+        return 0 < self.landed < self.total or (self.landed == 0 and self.superseded > 0)
 
 
 def _branch_code_files(root: Path, trunk_ref: str, ref: str) -> tuple[frozenset[str] | None, str]:
@@ -2354,6 +2364,48 @@ def _branch_code_files(root: Path, trunk_ref: str, ref: str) -> tuple[frozenset[
     return frozenset(f for f in files if f.split("/", 1)[0] not in _LEDGER_ONLY_TOPS), ""
 
 
+def _branch_last_touch_times(
+    root: Path, trunk_ref: str, ref: str
+) -> tuple[dict[str, int] | None, str]:
+    """브랜치 **고유 커밋**(`trunk..ref`)이 각 파일을 마지막으로 건드린 시각(초)과 실패 사유.
+
+    포팅 판정의 **시간 축**이다(HARN-190) — 근거 커밋이 어떤 파일을 옮겼더라도 그 뒤에 브랜치가
+    같은 파일을 다시 고쳤다면, 그 뒤의 변경은 트렁크에 없다. 트렁크에 이미 있는 커밋
+    (`trunk..ref`에서 빠지는 것 — 브랜치 자신의 앞선 머지분 포함)은 세지 않는다.
+
+    반환 `None`은 **판정 불가**이며 빈 딕셔너리와 다르다(`_branch_code_files`와 같은 규약 —
+    측정 실패를 "재수정 없음"으로 바꾸면 이 태스크가 막으려던 오탐이 그대로 열린다).
+    실패 사유에는 **예외 타입명**을 담는다(무타입 경고 금지 — CLAUDE.md 침묵 실패 금지).
+    """
+    try:
+        res = _git(
+            root,
+            "log",
+            f"{trunk_ref}..{ref}",
+            "--name-only",
+            f"--format={_EVIDENCE_RECORD_SEP}%ct",
+            timeout=60,
+        )
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        return None, f"{type(exc).__name__}: {exc}"
+    if res.returncode != 0:
+        detail = (res.stderr or "").strip().splitlines()
+        reason = detail[0] if detail else "no stderr"
+        return None, f"git log exit {res.returncode}: {reason[:120]}"
+    last: dict[str, int] = {}
+    for record in res.stdout.split(_EVIDENCE_RECORD_SEP):
+        stamp, _, blob = record.strip("\n").partition("\n")
+        try:
+            when = int(stamp.strip())
+        except ValueError:
+            continue  # 머리말이 없는 조각(맨 앞 빈 레코드) — 건너뛴다
+        for line in blob.splitlines():
+            name = line.strip()
+            if name and when > last.get(name, -1):
+                last[name] = when
+    return last, ""
+
+
 def _find_ported_evidence(
     root: Path, trunk_ref: str, branch: str, ref: str | None = None
 ) -> PortEvidence:
@@ -2366,7 +2418,7 @@ def _find_ported_evidence(
 
     ⚠ 여기서 가장 위험한 오류는 미탐이 아니라 **오탐**이다. 잘못된 "포팅됨" 강등은
     브리핑에서 "결정 불요"로 표시돼 실작업이 든 브랜치를 삭제 대상으로 만든다. 그래서
-    두 겹으로 막는다:
+    세 겹으로 막는다:
 
       ① needle 길이 하한(12자) — 옛 구현은 `-([a-z0-9]{6})$` 6자 접미사를 needle로
          썼는데, 이건 세션 해시뿐 아니라 평범한 영단어도 잡았다(`…-metrics-writer`의
@@ -2378,8 +2430,26 @@ def _find_ported_evidence(
          으로 뒤집던 사고를 막는다(2026-08-11 실측: 오탐 5건이 전부 이 형태였고,
          `claude/whymath-solution-review-40xspg`는 미회수 S4-09를 안은 채 "포팅됨"으로
          분류돼 있었다).
+      ③ 시간 축(HARN-190) — 근거 커밋이 어떤 파일을 옮겼어도 **그 뒤에 브랜치가 같은
+         파일을 다시 고쳤다면** 그 파일은 착지가 아니다(`_branch_last_touch_times`).
+         브랜치 고유 커밋(`trunk..ref`)의 마지막 수정 시각이 근거 커밋 시각과 같거나
+         늦으면 제외한다. 실측(2026-09-28 vafylb): 근거 `9905fdc4`는 브랜치 **자신의
+         앞선 머지분**이었고 브랜치는 그 뒤 같은 파일을 다시 고쳤는데(cp949 크래시
+         해소) 그 변경은 main에 없었다 — 파일 경로 교집합만 세던 판정은 1/1 전건
+         착지로 읽었다. 같은 오분류 계열 3회차다(40xspg 문서 커밋 · 7n9n72 다른 파일
+         커밋 · 이번 같은 파일의 이후 변경).
+
+         택일 근거 — 대안은 "브랜치 고유 줄이 트렁크에 전부 있는가"의 **내용 대조**였다.
+         버린 이유: 트렁크가 그 파일을 이후에 더 고쳤으면(정상적인 진화) 내용이 달라져
+         제대로 포팅된 브랜치가 영구히 '부분 착지'로 남고, 그러면 '결정 불요' 분류가
+         쓸모를 잃어 경고가 소음이 된다. 시간 축은 정확히 이번 사각(근거 이후의 브랜치
+         변경)만 겨냥하고 재현율을 유지한다. 대신 한계를 정직하게 둔다 — 아래.
 
     정직한 잔존 한계:
+      · 시간 축은 committer 시각이다. 포팅 뒤에 브랜치를 **리베이스·체리픽**했다면 커밋
+         시각이 갱신돼 파일이 재수정으로 읽힌다(부분 착지로 남음) — 미탐·안전 방향이다.
+         반대로 시계가 크게 틀어진 커밋은 잘못 착지로 읽힐 수 있으나 근거 커밋을 브리핑이
+         항상 함께 노출하므로 사람이 훑을 수 있다.
       · 순수 문서·백로그 PR로 정리된 브랜치는 미탐된다(→ unresolved로 남음). 과보고는
         사람이 훑으면 되고 과소보고는 사고가 되므로 **의도된 비대칭**이다.
       · trunk에 진짜 머지 커밋이 있으면 `--name-only`가 빈 목록을 내 원장 취급으로
@@ -2402,7 +2472,9 @@ def _find_ported_evidence(
             f"--grep={needle}",
             "--fixed-strings",
             "--name-only",
-            f"--format={_EVIDENCE_RECORD_SEP}%h%x09%s",
+            # `%ct`(committer 시각)를 맨 앞에 둔다 — 시간 축 판정용(HARN-190). 제목 문자열
+            # (`%h %s`)은 그대로라 기존 근거 표기가 바뀌지 않는다.
+            f"--format={_EVIDENCE_RECORD_SEP}%ct%x09%h%x09%s",
             "-n",
             "5",
             timeout=30,
@@ -2423,12 +2495,19 @@ def _find_ported_evidence(
     # 브랜치명을 인용한 커밋들을 **모아서** 본다 — 회수는 종종 여러 소형 PR로 나뉘고,
     # 커밋 하나가 파일 A를, 다른 하나가 파일 B를 옮긴다. 각각을 따로 재면 둘 다 부분
     # 착지로 보여 전건 회수된 브랜치가 계속 고립으로 남는다(codex P2).
-    contributions: list[tuple[str, frozenset[str]]] = []
+    # 각 항목 = (제목, 근거 커밋 시각, 근거 커밋이 옮긴 브랜치 코드 파일). 시각을 못 읽으면
+    # None — 시간 축을 증명할 수 없으므로 아래에서 착지로 세지 않는다.
+    contributions: list[tuple[str, int | None, frozenset[str]]] = []
     for record in found.stdout.split(_EVIDENCE_RECORD_SEP):
         header, _, files_blob = record.strip("\n").partition("\n")
         header = header.strip()
         if not header:
             continue
+        stamp, _, header = header.partition("\t")  # `%ct\t%h\t%s` — 맨 앞이 시각
+        try:
+            commit_time: int | None = int(stamp.strip())
+        except ValueError:
+            commit_time = None
         commit_files = {line.strip() for line in files_blob.splitlines() if line.strip()}
         tops = {f.split("/", 1)[0] for f in commit_files}
         if not tops - _LEDGER_ONLY_TOPS:
@@ -2438,18 +2517,40 @@ def _find_ported_evidence(
             # 브랜치에 고유 코드가 없다(순수 문서 브랜치) — 남길 코드가 없으면 고립될
             # 코드도 없으므로 교집합을 요구할 대상이 자체가 없다.
             return PortEvidence(title, 0, 0)
-        contributions.append((title, branch_files & frozenset(commit_files)))
+        contributions.append((title, commit_time, branch_files & frozenset(commit_files)))
 
-    landed_union: set[str] = set()
-    for _title, overlap in contributions:
-        landed_union |= overlap
-    if not landed_union:
+    overlap_union: set[str] = set()
+    for _title, _when, overlap in contributions:
+        overlap_union |= overlap
+    if not overlap_union:
         return empty
-    contributing = [title for title, overlap in contributions if overlap]
+
+    # 시간 축(HARN-190) — 근거 커밋이 파일을 옮겼더라도 **그 뒤에 브랜치가 같은 파일을 다시
+    # 고쳤다면** 그 파일은 착지가 아니다. 뒤의 변경은 트렁크에 없으므로 착지로 세면 '결정
+    # 불요'가 되어 그 변경이 삭제 배치에 실린다(2026-09-28 vafylb: 근거는 브랜치 자신의 앞선
+    # 머지분이었고 그 뒤 cp949 수정이 main에 없었다). 같은 시각이면 재수정으로 본다 —
+    # 오탐(잘못된 결정 불요)이 미탐보다 위험하다는 이 함수의 원칙을 그대로 따른다.
+    last_touch, touch_error = _branch_last_touch_times(root, trunk_ref, ref or "")
+    if last_touch is None:
+        return PortEvidence("", 0, 0, scan_error=touch_error)
+    landed_union: set[str] = set()
+    landed_titles: list[str] = []
+    for title, commit_time, overlap in contributions:
+        landed = {
+            name
+            for name in overlap
+            if commit_time is not None and last_touch.get(name, -1) < commit_time
+        }
+        if landed:
+            landed_union |= landed
+            landed_titles.append(title)
+    superseded = overlap_union - landed_union
+    # 착지 근거가 하나도 없어도(전부 재수정됨) 흡수 흔적은 있다 — 첫 근거를 단서로 싣는다.
+    contributing = landed_titles or [t for t, _w, overlap in contributions if overlap]
     header = contributing[0]
     if len(contributing) > 1:
         header = f"{header} (외 {len(contributing) - 1}건)"
-    return PortEvidence(header, len(landed_union), len(branch_files))
+    return PortEvidence(header, len(landed_union), len(branch_files), superseded=len(superseded))
 
 
 @dataclass
@@ -2630,6 +2731,10 @@ def scan_stale_branches(
                     # 흔적을 버리지도(사람이 다시 찾게 됨) 흡수로 단정하지도(고립이 숨음)
                     # 않고, 아래 정상 분류를 그대로 태우되 단서를 함께 싣는다(HARN-37 ②).
                     partial_port = f"{port.landed}/{port.total} 파일 · {port.header}"
+                    if port.superseded:
+                        # 근거 커밋이 옮긴 파일을 그 뒤 브랜치가 다시 고쳤다(HARN-190) — 그 재수정은
+                        # 트렁크에 없다. 착지로 세지 않았음을 단서가 스스로 밝힌다.
+                        partial_port += f" · 근거 이후 브랜치가 다시 고친 파일 {port.superseded}건"
                 if evidence:
                     status = "ported"
                 elif pr_heads is None:
