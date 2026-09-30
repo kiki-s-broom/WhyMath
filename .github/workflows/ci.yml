@@ -1567,9 +1567,11 @@ jobs:
           python3 scripts/harness/backlog.py rules lint
           python3 scripts/harness/backlog.py rules render --check
 
-      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
-      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
-      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+      # HARN-121 ③ · HARN-130 — 적시 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다.
+      # 종전의 커밋 인덱스(backlog/jit_index.json)는 사고를 등재한 PR끼리 충돌하고, 재생성을
+      # 잊으면 이 스텝이 red였다(HARN-179). 이제 이 스텝은 "대장에서 계산되는가"를 본다 —
+      # 대장 스키마 위반이나 후보 0건(경로 해소 전멸)이면 red다. 0건은 통과가 아니다.
+      - name: 적시 주입 계산 검사 (HARN-121 ③ · HARN-130)
         run: python3 scripts/harness/backlog.py jit check
 
       # CONST-02 — 코딩 헌법(constitution/) 위헌 심사 래칫. 왜 이 잡인가: 상시 실행(needs:

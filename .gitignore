@@ -219,6 +219,11 @@ data/audit/
 backlog/inventory/feature_inventory_v2.yaml
 backlog/inventory/feature_inventory_v2.csv
 
+# 적시 주입 인덱스 — 커밋하지 않는다 (HARN-130). 주입 후보는 편집 시 대장에서 계산한다.
+# 커밋하던 시절에는 사고를 등재한 PR끼리 이 파일에서 충돌했고, 재생성을 잊으면 CI가
+# red였다(HARN-179). 옛 코드의 `jit build`가 남긴 파일이 다시 들어가지 않게 막는다.
+backlog/jit_index.json
+
 # ARCH-57 저작 배치 산출(런북 docs/ops/arch57_authoring_openrouter_runbook.md)
 # — LLM 생성 문항 JSONL. 로컬 실행 결과이지 저장소 자산이 아니다.
 .arch57-out/
