@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "② 보강 직후 `evidence_event`가 RED로 잡히는 것을 실측하고, 이 태스크에서는 `_ERASURE_PLAN_EXEMPTIONS`에 **만료 있는 사유**로 임시 등재한다. 사유에 재연결 경로 2건과 처분 태스크 SEC-40 · 결정 게이트 `G-eos37-erasure-kpi-disposition`을 적고, SEC-40이 done이 된 뒤에도 이 항목이 남아 있으면 RED가 나는 만료 장치를 둔다(CLAUDE.md 「만료 없는 유예·제외 금지」)."
   - "③ 보존기간 파기(`privacy/retention.py`)에도 같은 사각이 있는지 판정하고 결과를 적는다 — 판정 기준 main `85f934a4`에서 `evidence_event`는 보존 파기 대상도 아니다(사실상 무기한 보존)."
   - "④ 뮤테이션: (C) 판정 제거 → `evidence_event` 미검출로 가드가 GREEN이 되는지 · 만료 장치 제거 → RED 소실 — 각각 RED를 확인한다."
-artifacts: []
+artifacts:
+  - "PR #1404 (https://github.com/kiki-s-broom/WhyMath/pull/1404) — 삭제권 완전성 가드 (C) 학생 세션 축 + evidence_event 만료 있는 임시 예외(해소 SEC-40) · 뮤테이션 18종 전건 기대대로 · 미러 6잡 exit 0 · 판정 기준 브랜치 HEAD 26c78bcd(main 6d891518 위)"
 paths:
   - tests/backend/privacy/test_erasure_plan_completeness.py
   - src/backend/whymath_backend/privacy/erasure.py
-session: claude/ecstatic-feynman-bxxxvd
+session: null
 notes: "사실(판정 기준 main `85f934a4`): `evidence_event`에는 user 컬럼·user FK가 없고 `session_id`(FK 아님)로만 학생에 묶인다. 그래서 현행 완전성 스윕(FK 산출물 ∪ 계획 파생 이름 — SEC-35)에 걸리지 않고, `_ERASURE_PLAN`과 보존 파기 계획 모두 밖이다. 반면 `privacy/export.py`는 `learning_session` 조인으로 이 행을 학생 데이터로 반출한다(EOS-131 ⑤) — 열람권에는 포함되고 삭제권에서는 빠지는 모순. 학생 테이블 중 세션 축으로만 묶이는 것은 현재 `evidence_event` 1건(`review_timer_event`는 검수자 세션). SEC-35(`learner_id` 별칭 사각)와 같은 계열의 다른 형태다. 2026-09-30 Kiki 승인(검토의견 \"진행\") — 처분(삭제 배선)은 SEC-40이 소유한다."
 updated: 2026-09-30
