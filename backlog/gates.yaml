@@ -465,11 +465,11 @@ gates:
     title: "KPI ⑤ 삭제권 잔여 처분 선택(가·나·다) — 삭제 원장 기반 excluded_erased / 삭제 시 추천 이벤트 삭제·익명 tombstone / 현행 유지(하네스 teardown만 조정)"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-29
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main f0ca37bb (P3-01 ①② #1405). 2026-09-30 Kiki 판정 (나) 채택 — 삭제권 이행 시 그 세션의 추천 evidence_event도 함께 삭제한다 (세션 https://claude.ai/code/session_01Nz9XkkccZCSsfTXGdnygQ6 · AskUserQuestion '(나) 삭제 시 추천 이벤트도 함께 삭제' 선택 · 에이전트 중계 기록). 근거 문서: docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5·§7-1 P-2 · EOS-37 acceptance ② 및 2026-09-30 소유 경계 추가분 · SEC-40 acceptance ①②③⑤ · docs/legal/pipa_data_matrix.md §5.\n[결정] (나) 채택. 계정 삭제(erase_user)와 개별 세션 삭제(DELETE /v1/me/sessions/{id})가 그 세션의 evidence_event 행을 같은 트랜잭션에서 삭제한다 — 재연결 경로 2건(개별 세션 삭제의 증빙 로그 user_id+세션 ID · 계정 삭제의 HMAC 바인딩+잔존 user_id)을 닫는 유일한 안이다. (가)(삭제 원장 + excluded_erased)와 (다)(현행 유지 + 하네스 teardown 조정)는 미채택.\n[소유] 파기 배선 = SEC-40(선행 SEC-39 done · 이 게이트가 clear되어 착수 해금). EOS-37은 KPI 수집기 쪽만 한다(EOS-37 acceptance 2026-09-30 소유 경계 그대로).\n[변호사 회신 불요] (나)는 삭제 범위를 넓히는 쪽이라 pipa_data_matrix §5의 '가명 처치 기록 잔존 적법성' 질문 회신 없이 진행 가능하다 — '가명 보존 적법'을 가정하지 않는다. 삭제 증빙 로그(deletion_audit)의 식별자 보존 연한은 이 결정 범위 밖이다(MGMT-02 회신 선행).\n[부수 영향 — 미측정 ≠ 통과] (나) 착지 후 삭제 뒤에는 추천 이벤트 자체가 없어지므로 판정 하네스의 KPI ⑤ 분모가 0이 되어 FAIL이 아니라 미측정으로 바뀔 수 있다. 그 미측정을 통과로 읽지 않는다 — 표본 산출 경로는 EOS-38 소유.\n[범위] 이 결정은 처분 방향만 정한다. 구현·검증은 SEC-40·EOS-37 소유."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5·§7-1 P-2(판정 기준 main a82f9449). 선택지는 EOS-37 acceptance ②. PIPA 삭제권 표면이라 기계가 대신 고르지 않는다(CLAUDE.md 법령 유래 절차 기계 대체 금지)"
