@@ -1567,9 +1567,11 @@ jobs:
           python3 scripts/harness/backlog.py rules lint
           python3 scripts/harness/backlog.py rules render --check
 
-      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
-      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
-      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+      # HARN-121 ③ · HARN-130 — 적시 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다.
+      # 종전의 커밋 인덱스(backlog/jit_index.json)는 사고를 등재한 PR끼리 충돌하고, 재생성을
+      # 잊으면 이 스텝이 red였다(HARN-179). 이제 이 스텝은 "대장에서 계산되는가"를 본다 —
+      # 대장 스키마 위반이나 후보 0건(경로 해소 전멸)이면 red다. 0건은 통과가 아니다.
+      - name: 적시 주입 계산 검사 (HARN-121 ③ · HARN-130)
         run: python3 scripts/harness/backlog.py jit check
 
       # CONST-02 — 코딩 헌법(constitution/) 위헌 심사 래칫. 왜 이 잡인가: 상시 실행(needs:
@@ -1701,11 +1703,11 @@ jobs:
       # 무배선이었다 — "일부만 배선됨"이 같은 디렉터리 안에서 한 번 더 재현된 형태다.
       # lint는 재귀라 `scripts` 하나로 harness까지 덮는다. 잔여 위반은 1파일뿐이었다
       # (`diagnose_atom_orphans.py` black — 이 PR에서 정리. OPS-12가 8파일을 이미 상환한 결과).
-      - name: Ruff (scripts + tests/harness)
-        run: python3 -m ruff check scripts tests/harness
+      - name: Ruff (scripts + tests/harness + tools)
+        run: python3 -m ruff check scripts tests/harness tools
 
-      - name: Black --check (scripts + tests/harness)
-        run: python3 -m black --check --line-length 100 scripts tests/harness
+      - name: Black --check (scripts + tests/harness + tools)
+        run: python3 -m black --check --line-length 100 scripts tests/harness tools
 
       - name: 하네스 테스트
         run: python3 -m pytest tests/harness -q

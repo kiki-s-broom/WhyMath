@@ -31,6 +31,13 @@
 사진**이다. `user_state_snapshot`의 writer 0 상태(배선 또는 폐기)는 `EOS-103`이 판정하지
 않았다 — 그 판정은 `EOS-10`이 소유한다.
 
+※ [갱신 2026-09-29] `S4-11`이 **Hint 좌석을 실체화**했다 — `hints` 테이블(graded 힌트 카탈로그)을
+Hint 좌석의 1번째 테이블로 세워 82→83 테이블로 늘었다. §3-B가 요구한 "명시적 결정"의 이행이며,
+좌석 부재 동결 상수(`ABSENT_ENTITIES`·`RESERVED_ABSENT_TABLE_NAMES`)의 `Hint` 항목을 **의도적으로
+걷어냈다**(좌석 부재 4종 → 3종). 컬럼 축 가드(`test_no_table_gains_a_hint_body_column`)는 남기되
+뜻을 '좌석 부재'에서 **'본문 좌석 단일'**로 바꿨다 — 힌트 본문은 `hints.content`에만 산다.
+연기 해제 근거(생성 writer·게이트 3종·coach 서빙 reader 동반)는 §3-B 말미 "실체화" 절 참조.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -44,7 +51,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 |---|---|---|
 | ① | 81테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
-| ③ | **좌석 부재 4종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `hints`는 물론 `hint_content` 같은 우회 이름으로 좌석을 등재해도 **RED** |
+| ③ | **좌석 부재 3종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `assessment_result`는 물론 우회 이름으로 좌석을 등재해도 **RED** (Hint는 S4-11이 실체화 — 본문 좌석 단일은 ③-c 컬럼 가드가 동결) |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
 
 ④는 "이름이 문서 어딘가에 있다"가 아니라 **어느 엔티티에 배정됐는지**를 본다. 토큰 존재만 보는
@@ -122,7 +129,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 10. **Hint** — 등급화된 **힌트**(1=가장 은근 ~ 3=거의 정답).
     - *이다*: "바로 정답 제공 금지 · 가능한 가장 빠른 단계에서 멈춤"의 데이터 표현.
     - *아니다*: 힌트를 **썼다는 기록**이 아니다(그것은 LearningEvent의 `hint_usage`).
-    - → **좌석 부재**(§3-B). 설계 정본은 있고 저장 좌석이 없다.
+    - → ~~좌석 부재~~ **`hints` 실체화**(§3-B, 2026-09-29 `S4-11`). 한 풀이 단계·한 레벨(1~3)의
+      본문·노출량·검수 상태. Level 4(전체 풀이)는 좌석 밖 안전망(CHECK로 표현 불가).
 
 11. **Content** — 개념·소단원에 붙는 **설명 자산**(은유·오개념 설명·정식정의·허용표현·암기카드).
     - *이다*: 학생에게 보여줄 수 있는 서술형 자산과 그 슬롯.
@@ -183,12 +191,12 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 ---
 
-## §2. 현행 82테이블 전수 귀속표
+## §2. 현행 83테이블 전수 귀속표
 
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 44테이블
+### §2-A. 좌석 배정 — 45테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -201,7 +209,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 7 | **Misconception** | `misconception_catalog` | 1 |
 | 8 | **Problem** | `problem` · `problem_step` | 2 |
 | 9 | **Solution** | `solution_paths` · `solution_nodes` · `verified_solutions` · `verified_lemmas` | 4 |
-| 10 | **Hint** | — **좌석 부재**(§3) | 0 |
+| 10 | **Hint** | `hints` | 1 |
 | 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
 | 12 | **Learner** | `user_profile` | 1 |
 | 13 | **LearnerState** | `user_state_snapshot` · `learner_state` · `learning_state_transition` | 3 |
@@ -212,7 +220,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 44**
+**좌석 합계 = 45**
 
 ### §2-B. 핵심 외 — 38테이블
 
@@ -261,7 +269,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 44 + 38 = **82** ✓(EOS-103 `learner_state` + EOS-105
+**핵심-외 합계 = 38** · 45 + 38 = **83** ✓(S4-11 `hints`를 Hint 좌석에 추가 — 2026-09-29.
+그 이전 44 + 38 = 82는 EOS-103 `learner_state` + EOS-105
 `learning_state_transition`을 LearnerState 좌석에 추가 — 둘은 서로 다른 브랜치에서 각각 +1로
 착지해 병합 시 43이 아니라 **44**가 된다. 이전 42 + 38 = 80은 EOS-49 `concept_version` 추가
 — 2026-09-14, 그 이전 41 + 38 = 79는 SEC-27 `job_ownership` 추가 — 2026-09-11)
@@ -354,6 +363,24 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 - **9월 조치**: `hint.schema.yaml`의 `storage` 선언을 실측에 맞게 정정(드리프트 §7-B 해소) ·
   좌석 신설 여부는 **판정하지 않고** `S4-11`에 넘긴다 · 예약 3종(테이블명·좌석 tuple·컬럼)은 유지.
+
+#### 실체화 (2026-09-29 · `S4-11`) — 위 실측 4건에 대한 답
+
+- **좌석**: `hints` 테이블(`db/models/hint.py` · 마이그레이션 `9d3e6b1f4a27`). 예약 2종(테이블명·
+  좌석 tuple)을 걷어냈고, 컬럼 축 가드는 **'본문 좌석 단일'**로 뜻을 바꿔 유지한다.
+- **실측 ① (런타임 힌트에 영속 정체성 없음)** → 서빙 경로를 저장하지 않고 **오프라인 생성**을 새로
+  세웠다(`l4/hint_content/generator.py` 템플릿·LLM 0 → `gates.py` 3종 → `store.py` 유일 writer).
+- **실측 ② (원천 지목 불일치 `HintSpec` vs `SolutionStep`)** → 둘 다 쓰지 않았다. acceptance가
+  지목한 **검증된 단계 본문**(`problem_step.expected_answer` + `sympy_verified`)을 원천으로 본문을
+  *새로* 조립한다 — `SolutionStep.hint`(빈 좌석)도, 검증 앵커 없는 `HintSpec`(DSL 저작)도 아니다.
+  `HintSpec`의 소비자 0건 상태는 그대로다(이 슬라이스의 범위 밖).
+- **실측 ③ (KPI는 좌석 없이 측정)** → 그대로 인정했다. `reveal_score`는 `attempt_event`(힌트제공)에
+  *검수 힌트가 실제로 서빙된 턴만* 실리고, `wh1_evaluation` ⑧은 value(평균 hint_level)를 바꾸지
+  않고 note에 기록 비율·평균·깊이 환산을 병기한다 — 전제가 아니라 정밀화.
+- **실측 ④ (`hint_usage.hint_id` writer 0)** → **FK로 조이지 않는다.** `hint_usage`는 학생 *열람*
+  사건이고 그 writer가 아직 hint_id를 채우지 않으므로, 지금 FK를 걸면 증거 없는 결정이다. 서빙된
+  hint_id는 `attempt_event`(힌트제공, supply) 페이로드에 먼저 실린다 — 열람(usage) 쪽 결선은 그
+  writer가 서는 태스크가 판정한다.
 
 ### §3-C. AssessmentResult — `assessment` 안에 혼입돼 있다 → **혼입 유지로 판정**(2026-09-06)
 

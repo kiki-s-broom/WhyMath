@@ -11,6 +11,8 @@
     `get_solution_path_steps`로 경로 헤더·단계를 읽는다. 단계 영속 좌석은 S4-09 결정대로
     `problem_step` additive 컬럼(`solution_path_id` FK)이라 단계 읽기도 본 store가 담당한다
     (경로 읽기 단일 표면 — 재구현 금지).
+  - L4 `hint_content/store`(S4-11 힌트 오프라인 생성 원천)가 `list_step_materialized_path_ids`
+    로 단계가 실체화된 경로를 열거하고, 위 두 함수로 헤더·단계를 읽는다(재구현 금지 — 같은 표면).
 
 저장소 패턴(`whs/solution_bank.py` 선례): AsyncSession 주입·순수 ORM/쿼리빌더·결정적 정렬.
 """
@@ -30,6 +32,7 @@ __all__ = [
     "get_solution_path",
     "get_solution_path_steps",
     "get_solution_paths",
+    "list_step_materialized_path_ids",
 ]
 
 
@@ -96,3 +99,23 @@ async def get_solution_path_steps(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_step_materialized_path_ids(session: AsyncSession) -> list[str]:
+    """단계가 `problem_step`에 실체화된 경로 id 전부 — 결정적 정렬(S4-11 힌트 생성 원천 열거).
+
+    문제당 대표 1경로만 단계가 실체화되므로(`whs/path_promotion.py` S4-10 재론) 이 목록은 곧
+    "단계 단위 산출물(힌트 등)을 만들 수 있는 경로"다. 헤더만 있는 추가 경로는 단계가 없어
+    포함되지 않는다. 내용 NULL 행만 가진 경로는 `get_solution_path_steps`와 같은 기준으로 뺀다.
+    """
+    stmt = (
+        select(ProblemStep.solution_path_id)
+        .where(
+            ProblemStep.solution_path_id.isnot(None),
+            ProblemStep.expected_answer.isnot(None),
+        )
+        .distinct()
+        .order_by(ProblemStep.solution_path_id)
+    )
+    result = await session.execute(stmt)
+    return [path_id for path_id in result.scalars().all() if path_id is not None]

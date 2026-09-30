@@ -401,6 +401,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_hint_content_serving_enabled: bool = Field(
+        default=True,
+        description=(
+            "S4-11 — 코치 세션(/v1/coach/sessions·turns)이 **검수 통과(verified) graded 힌트**를 "
+            "`hints` 카탈로그에서 찾아 응답의 `served_hint`로 실을지(정식기능·킬 스위치). "
+            "True(기본)면 결정된 hint_level이 1~3이고 문항 맥락이 있을 때, 학생이 아직 적지 않은 "
+            "첫 단계 이후의 가장 이른 검수 힌트 1개를 싣고 그 reveal_score·hint_id를 "
+            "`attempt_event`(힌트제공)에 함께 적재한다(KPI 도달 깊이 정밀화). 카탈로그가 비어 "
+            "있으면(오프라인 생성 `l4.hint_content.populate --apply` 미실행) 항상 null이다 — "
+            "데이터가 곧 두 번째 게이트다. 학생 대면 발화(`decision.prompt`)는 **바꾸지 않는다** "
+            "(추가 필드일 뿐 — WH-1 primary·정적 템플릿 경로 불변). Level 4(전체 풀이)는 Hint "
+            "엔티티 밖이라 조회하지 않는다. stateless /v1/coach는 DB가 없어 무관. False면 조회 0·"
+            "served_hint 항상 null·reveal_score 미적재(완전 되돌리기). "
+            "WHYMATH_L4_HINT_CONTENT_SERVING_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_theta_min_responses: int = Field(
         default=3,
         ge=0,
@@ -557,27 +574,47 @@ class Settings(BaseSettings):
         ),
     )
 
-    # ── 클라우드 슬롯 셀렉터 (ARCH-57 — ARCH-55 채택 판정의 집행 지점) ──
+    # ── 클라우드 슬롯 셀렉터 (ARCH-57 도입 · ARCH-64 기본값 전환) ──
     # `CompositeProvider`의 cloud 슬롯에 어떤 프로바이더가 앉는가. 종전에는 호출자가
     # `AnthropicProvider()`를 **하드코딩**해 8곳에 흩어져 있었고, 그래서 ARCH-55가 채택한
     # OpenRouter 경로를 프로브만 쓰고 실제 저작 작업은 쓸 수 없었다(채택은 났는데 집행이
     # 없는 상태 — CLAUDE.md 「정본화를 집행으로 착각한 완료 선언 금지」).
     #
-    # **기본값 `anthropic`은 불변이다.** ARCH-55 채택 판정문이 "선택지를 넓힌 것이지 기본값을
-    # 옮긴 것이 아니다"라고 명시했고, 판정 기준 (d) 지연·가용성이 `ARCH-56`으로 보류 중이라
-    # 미판정 구성이 기본값이 되면 안 된다. 이 기본값을 바꾸는 것은 코드 변경이 아니라 판정이다
+    # **기본값 = `openrouter` (ARCH-64 · 2026-09-21 Kiki 지시 · ARCH-55 "기본 핀 불변" 조항 번복).**
+    # ARCH-55 채택 판정문(2026-09-18)은 "선택지를 넓힌 것이지 기본값을 옮긴 것이 아니다"라며
+    # 기본값을 `anthropic`에 못박았다. 그 조항은 **번복됐다** — 2026-09-21 Kiki가 "학생 대면까지
+    # 한 번에" → "학생대면도 오픈라우터로 전환"으로 목적지를 확정했고, 게이트
+    # `G-cloud-mid-seat-cutover`가 같은 날 판정 ①(저작+학생 대면 동시 컷오버)로 clear됐다.
+    # 판정문 원문은 지우지 않고 번복 표기를 덧붙였다
+    # (`docs/ops/arch55_provider_battle_smoke_runbook.md` 「채택 판정」 절). 이 기본값을 다시
+    # 옮기는 것도 코드 변경이 아니라 판정이다
     # (`tests/backend/l3/test_cloud_provider_selector.py`가 계약으로 동결한다).
     #
-    # 적용 범위는 **저작 경로 한정**이다 — 학생 대면 서빙(`app.py`)은 이 셀렉터를 타지 않는다.
-    # 그쪽을 옮기는 것은 `G-arch56-availability-trigger`의 발동 조건 ⓐ(학생 대면 트래픽 투입
-    # 결정)를 실현시키는 행위라 Kiki 판정 사안이다.
+    # 적용 범위는 **저작 경로 + 학생 대면 서빙(`app.py`) 양쪽**이다 — 둘 다 `build_cloud_provider()`
+    # 한 팩토리로 좌석을 조립한다(ARCH-64 ③). 좌석마다 원가가 다르므로(CLOUD_MID 1회 추정
+    # anthropic 8.612원 vs openrouter 0.354원 — `l3.router.CLOUD_MIN_COST_KRW`) 기록 원가는
+    # **실제로 꽂힌 좌석**의 단가로 계상된다
+    # (provider의 `seat` 선언 → `CompositeProvider.cloud_seat`).
+    #
+    # **2차 클라우드 좌석은 없다(2026-09-28 Kiki 결정 · ARCH-66 기간).** 1차 좌석(openrouter)이
+    # 실패하면 anthropic으로 넘어가지 않는다 — Anthropic API가 `anthropic_api_enabled=False`로
+    # 중단 중이고, 2차 좌석 failover(`ARCH-63`)는 게이트 `G-arch66-anthropic-api-pause-review`
+    # 재개 판정 뒤에 붙는다. LOCAL 강등은 **두 시점**에 있다: 라우팅 시점(구독·예산 가드 —
+    # 결정이 이미 LOCAL)과, **학생 대면 서빙 조립에 한한 런타임 강등**(ARCH-69 —
+    # `CompositeProvider(runtime_local_degrade=True)`: 이미 클라우드로 나간 호출이 429·5xx·
+    # 타임아웃·미설정으로 실패하면 LOCAL이 1회 대신 답하고 응답·trace에 표기된다. 4xx는 강등
+    # 하지 않는다). 저작·측정 조립에는 런타임 강등이 없어 실패는 오류로 올라간다
+    # (`CompositeProvider`가 그 사실을 예외 note로 붙인다).
     cloud_provider: CloudSeat = Field(
-        default="anthropic",
+        default="openrouter",
         description=(
-            "저작 경로의 클라우드 슬롯 제공자. `anthropic`(기본·불변 핀 claude-sonnet-4-6) / "
-            "`openrouter`(ARCH-55 채택 — deepseek/deepseek-v4.1-flash·공급사 deepinfra 고정) / "
-            "`deepseek`(공식 API·CN 관할). 좌석 선택만이고 클라이언트 생성은 지연된다. "
-            "학생 대면 서빙은 이 값과 무관하게 항상 anthropic이다(ARCH-56 게이트)."
+            "클라우드 슬롯 제공자(저작 경로 + 학생 대면 서빙 공통 — 둘 다 build_cloud_provider "
+            "경유). `openrouter`(기본 · ARCH-64 전환 · deepseek/deepseek-v4.1-flash · 공급사 "
+            "deepinfra 고정 · fp8 · US) / `anthropic`(claude-sonnet-4-6 · ARCH-66 기간에는 "
+            "anthropic_api_enabled=False라 호출 불가) / `deepseek`(공식 API·CN 관할). 좌석 "
+            "선택만이고 클라이언트 생성은 지연된다. 2차 클라우드 좌석(failover)은 없다 — "
+            "ARCH-63이 G-arch66-anthropic-api-pause-review 재개 판정 뒤 추가한다. 학생 대면 "
+            "서빙은 1차 좌석 실패 시 LOCAL로 강등한다(ARCH-69)."
         ),
     )
 

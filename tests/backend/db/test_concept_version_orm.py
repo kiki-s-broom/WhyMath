@@ -100,12 +100,17 @@ def test_concept_version_unique_and_index() -> None:
 
 
 def test_concept_version_status_enum_values() -> None:
-    """status 컬럼의 PG enum이 6종 값을 갖고 기본값은 DRAFT."""
+    """status 컬럼의 PG enum이 7종 값을 갖고 기본값은 DRAFT.
+
+    EOS-49의 6종에 EOS-50이 `IN_QA`를 더했다(리비전 9d3e7b1c5a20 — P3-11 ⑨ "Review → QA →
+    Approved"). 어휘 확장이며 EOS-49의 불변식(PUBLISHED payload 불변·→DRAFT 금지)은 그대로다.
+    """
     col = OrmConceptVersion.__table__.c.status
     enums = col.type.enums  # type: ignore[attr-defined]
     assert set(enums) == {
         "DRAFT",
         "IN_REVIEW",
+        "IN_QA",
         "APPROVED",
         "PUBLISHED",
         "DEPRECATED",
@@ -115,8 +120,8 @@ def test_concept_version_status_enum_values() -> None:
 
 
 def test_concept_version_jsonb_columns_none_as_null() -> None:
-    """change/source/governance/integrity/payload 전부 JSONB(none_as_null=True) — SEC-06."""
-    for name in ("change", "source", "governance", "integrity", "payload"):
+    """change/source/governance/integrity/qa/payload 전부 JSONB(none_as_null=True) — SEC-06."""
+    for name in ("change", "source", "governance", "integrity", "qa", "payload"):
         col = OrmConceptVersion.__table__.c[name]
         assert col.type.none_as_null is True  # type: ignore[attr-defined]
     assert OrmConceptVersion.__table__.c.payload.nullable is False

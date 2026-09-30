@@ -4456,6 +4456,9 @@ class TestLogHintEvent:
             "persona": None,
             # PED-04 D2: 불일치 태그 — 기본 False(클라 상태 미제출·서버 파생과 일치).
             "client_state_mismatch": False,
+            # S4-11: served_hint 미지정 → 검수 힌트 미서빙 턴(None·0으로 날조 금지).
+            "reveal_score": None,
+            "hint_id": None,
         }
         assert event.user_id == self._UID
         assert event.problem_id == self._PID
@@ -4482,6 +4485,8 @@ class TestLogHintEvent:
             "mode": None,
             "persona": None,
             "client_state_mismatch": False,
+            "reveal_score": None,
+            "hint_id": None,
         }
 
 

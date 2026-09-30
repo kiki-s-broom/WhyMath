@@ -6,6 +6,8 @@
     backlog/tasks/<id>.yaml       태스크당 1파일 (병렬 세션 충돌 원천 차단)
     backlog/events/<actor>.ndjson append-only 상태변경 로그 — **세션(=브랜치)당 1샤드**
     backlog/events.ndjson         레거시 단일 대장 (읽기 전용 역사 — 신규 기록 없음)
+    backlog/incidents/<actor>.ndjson  사고 대장 — 같은 샤딩 (읽기·쓰기는 incidents.py · HARN-130)
+    backlog/incidents.ndjson      사고 대장 레거시(시드) — 읽기 전용 역사
 
 이벤트 샤딩(HARN-46, 2026-08-31): 원래는 events.ndjson 한 파일에 모든 세션이
 append했고 `.gitattributes merge=union`이 병렬 충돌을 흡수한다고 믿었다. 그러나
@@ -222,6 +224,12 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
         for gdata in raw.get("gates") or []:
             gate = _coerce(Gate, gdata or {}, f"gates.yaml:{(gdata or {}).get('id', '?')}", errors)
             if gate:
+                # HARN-192 — 사전 대입은 같은 id의 뒤 정의가 앞 정의를 조용히 덮어쓴다.
+                # 병렬 브랜치가 같은 게이트 ID를 따로 추가하고 충돌을 '둘 다 유지'로 풀면
+                # 여기서만 잡힌다(태스크 ID 중복 검사와 대칭). 로드는 계속한다 — 이 오류가
+                # 다른 무결성 검사를 가리면 한 번에 하나씩만 고치게 된다.
+                if gate.id in backlog.gates:  # type: ignore[union-attr]
+                    errors.append(f"gates.yaml: 게이트 ID 중복 '{gate.id}'")  # type: ignore[union-attr]
                 backlog.gates[gate.id] = gate  # type: ignore[union-attr]
 
     tasks_dir = bdir / "tasks"
@@ -337,6 +345,16 @@ def _event_shard_name(actor: str) -> str:
     return safe[:120] + ".ndjson"
 
 
+def session_shard_name(actor: str) -> str:
+    """세션(=브랜치) 샤드 파일명 — append-only 대장 전부가 같은 키로 나눈다.
+
+    이벤트 대장(HARN-46)과 사고 대장(HARN-130)이 **같은 함수**로 샤드 이름을 정한다.
+    대장마다 이름 규칙을 따로 두면 한 세션의 기록이 대장마다 다른 파일명으로 흩어지고,
+    경로 탈출 방어도 대장 수만큼 따로 유지해야 한다.
+    """
+    return _event_shard_name(actor)
+
+
 def event_paths(root: Path) -> list[Path]:
     """이벤트 대장 파일 전부 — 레거시 단일 대장 + 세션 샤드(이름 정렬).
 
@@ -410,7 +428,7 @@ def append_event(root: Path, action: str, subject_id: str, **extra: object) -> N
     공용 단일 파일이 main 착지마다 열린 PR을 dirty로 만들었다(PR #931 실측).
     """
     actor = current_branch(root)
-    path = backlog_dir(root) / "events" / _event_shard_name(actor)
+    path = backlog_dir(root) / "events" / session_shard_name(actor)
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {
         # HARN-44: **오프셋 포함** 표기(`...+09:00`/`...+00:00`). 종전 표기
