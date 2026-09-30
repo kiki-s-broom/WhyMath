@@ -1201,3 +1201,4 @@
 {"ts": "2026-09-30T07:03:48+00:00", "actor": "claude/ecstatic-feynman-bxxxvd", "action": "policy_warn", "id": "SEC-41", "rule": "path_overlap", "other": "SEC-40", "detail": "프리픽스 포함: tests/backend/privacy/test_retention*.py ⊇ tests/backend/privacy/test_erasure_relink*.py", "mode": "warn"}
 {"ts": "2026-09-30T07:03:52+00:00", "actor": "claude/ecstatic-feynman-bxxxvd", "action": "add", "id": "SEC-41", "eos_priority": "P1"}
 {"ts": "2026-09-30T07:20:30+00:00", "actor": "claude/ecstatic-feynman-bxxxvd", "action": "done", "id": "SEC-39", "artifacts": ["PR #1404 (https://github.com/kiki-s-broom/WhyMath/pull/1404) — 삭제권 완전성 가드 (C) 학생 세션 축 + evidence_event 만료 있는 임시 예외(해소 SEC-40) · 뮤테이션 18종 전건 기대대로 · 미러 6잡 exit 0 · 판정 기준 브랜치 HEAD 26c78bcd(main 6d891518 위)"]}
+{"ts": "2026-09-30T08:49:27+00:00", "actor": "claude/ecstatic-feynman-bxxxvd", "action": "start", "id": "P3-01-scope-freeze", "session": "claude/ecstatic-feynman-bxxxvd", "remote": "ok"}
