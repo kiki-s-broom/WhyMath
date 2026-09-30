@@ -115,6 +115,92 @@ class TestLoadErrors:
         assert any("미지 필드" in e for e in errors)
 
 
+def _gate(gate_id: str, title: str) -> Gate:
+    return Gate(
+        id=gate_id,
+        title=title,
+        requested="2026-07-01",
+        no_inputs_reason="테스트 픽스처 — 입력 태스크 없음(HARN-174)",
+    )
+
+
+class TestGateIdDuplicate:
+    """HARN-192 — gates.yaml에 같은 id 블록이 둘이면 뒤 정의가 앞 정의를 조용히 덮어썼다.
+
+    태스크 쪽은 '태스크 ID 중복'으로 잡는데 게이트 쪽은 사전 대입(`gates[id] = gate`)이라
+    validate가 exit 0으로 통과했다(2026-09-28 실측 — PR #1352·#1358이 같은 게이트 ID를
+    서로 다른 정의로 따로 추가했고, 충돌을 '둘 다 유지'로 풀면 통과했다).
+    """
+
+    def test_duplicate_gate_id_is_reported_at_load(self, tmp_path: Path):
+        """test_같은_게이트_ID_두_블록은_로드_오류"""
+        _write_minimal_backlog(
+            tmp_path,
+            [_task()],
+            gates=[
+                _gate("G-lock", "앞 정의"),
+                _gate("G-dup", "먼저 온 정의"),
+                _gate("G-dup", "나중에 온 정의"),
+            ],
+        )
+        backlog, errors = store.load_backlog(tmp_path)
+        dup_errors = [e for e in errors if "게이트 ID 중복" in e]
+        assert len(dup_errors) == 1
+        assert "G-dup" in dup_errors[0]
+        # 오류를 내더라도 로드는 계속된다(뒤 정의가 이긴다) — 다른 무결성 검사를 막지 않는다
+        assert backlog.gates["G-dup"].title == "나중에 온 정의"
+
+    def test_duplicate_gate_id_makes_validate_red(self, tmp_path: Path):
+        """test_게이트_ID_중복은_validate_오류로_승격"""
+        _write_minimal_backlog(
+            tmp_path,
+            [_task()],
+            gates=[_gate("G-lock", "잠금"), _gate("G-dup", "가"), _gate("G-dup", "나")],
+        )
+        backlog, schema_errors = store.load_backlog(tmp_path)
+        errors = store.validate_backlog(backlog, schema_errors)
+        assert any("게이트 ID 중복" in e and "G-dup" in e for e in errors)
+
+    def test_distinct_gate_ids_are_green(self, tmp_path: Path):
+        """test_서로_다른_게이트_ID_두_개는_대조군_green — 과잉 검출(전부 실패) 방지"""
+        _write_minimal_backlog(
+            tmp_path,
+            [_task()],
+            gates=[_gate("G-lock", "잠금"), _gate("G-one", "하나"), _gate("G-two", "둘")],
+        )
+        backlog, schema_errors = store.load_backlog(tmp_path)
+        assert not [e for e in schema_errors if "게이트 ID 중복" in e]
+        assert store.validate_backlog(backlog, schema_errors) == []
+
+    def test_three_blocks_of_same_id_reports_each_extra_once(self, tmp_path: Path):
+        """test_같은_ID_세_블록은_초과분_2건을_각각_보고"""
+        _write_minimal_backlog(
+            tmp_path,
+            [_task()],
+            gates=[
+                _gate("G-lock", "잠금"),
+                _gate("G-dup", "1"),
+                _gate("G-dup", "2"),
+                _gate("G-dup", "3"),
+            ],
+        )
+        _, errors = store.load_backlog(tmp_path)
+        assert len([e for e in errors if "게이트 ID 중복" in e]) == 2
+
+    def test_cli_validate_exits_1_on_duplicate_gate_id(self, git_repo: Path, monkeypatch, capsys):
+        """test_validate_CLI는_게이트_ID_중복에서_exit_1 — acceptance ①의 종단 확인"""
+        import backlog as cli
+
+        monkeypatch.chdir(git_repo)
+        _write_minimal_backlog(
+            git_repo,
+            [_task()],
+            gates=[_gate("G-lock", "잠금"), _gate("G-dup", "가"), _gate("G-dup", "나")],
+        )
+        assert cli.main(["validate", "--quiet"]) == 1
+        assert "게이트 ID 중복" in capsys.readouterr().err
+
+
 class TestValidateBacklog:
     def test_valid_backlog_is_green(self, tmp_path: Path):
         """test_정상_백로그는_green"""

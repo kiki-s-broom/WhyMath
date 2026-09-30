@@ -237,3 +237,7 @@ backlog/jit_index.json
 
 # EOS-02 프롬프트 캐시 라이브 계측 회차 산출(docs/ops/eos02_prompt_cache_live_runbook.md)
 .eos02-out/
+
+# ARCH-71 학생 대면 CLOUD_MID 라이브 회차 산출(docs/ops/arch71_student_facing_cloud_mid_live_runbook.md)
+# — 프로브 결과 JSON. 로컬 실행 결과이지 저장소 자산이 아니다.
+.arch71-out/

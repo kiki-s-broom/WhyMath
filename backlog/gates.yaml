@@ -64,6 +64,19 @@ gates:
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '방침 만료 지점(2026-12-31 내부 완성) — Kiki 방침 재판정이며 먼저 끝나야 할 태스크가 없다. 묶인 라이브 측정 축은 이 게이트를 기다리는 쪽이다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
     no_inputs_reason: "방침 만료 지점(2026-12-31 내부 완성) — Kiki 방침 재판정이며 먼저 끝나야 할 태스크가 없다. 묶인 라이브 측정 축은 이 게이트를 기다리는 쪽이다"
+  - id: G-arch71-cutover-live-run
+    title: "ARCH-64 컷오버 라이브 대조 1회차(ARCH-71 acceptance ③) — Kiki 머신에서 저작 런북(docs/ops/eos118_seat_signal_live_runbook.md [A]~[C])과 학생 대면 런북(docs/ops/arch71_student_facing_cloud_mid_live_runbook.md)을 각 1회 실행한다. 확인: cloud_seat=openrouter · 관측 모델 · 기록 원가(좌석 단가 약 0.354원) · 학생 대면은 verdict(pass / degraded_cause_recorded / 그 밖)와 강등 원인(local_degraded·degrade_reason·provider_errors). 실패·강등 회차도 폐기하지 않고 기록한다. seat_primary_success_rate는 ARCH-63 전까지 None(미산출)이 정상이며 0으로 적지 않는다. 강등·429가 잦으면 G-cloud-mid-seat-cutover 판정 한계대로 openrouter_allowed_providers 이중화를 재질의한다. clear 증적 = 두 런북의 결과 JSON 판정 줄 + 판정 기준 커밋."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-09-29
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - ARCH-71-cutover-live-check-runbooks
   - id: G-attempt-retention-purge-backfill-decision
     title: "Kiki 결정: ProblemAttempt PII 보존기한 파기 대상 소급 확인 — started_at 상시 NULL 버그로 지금까지 파기 0건 (원 PED-16이 7n9n72에 고립·main ID 충돌로 유실 → 2026-09-07 감사가 게이트로 재등재). 배경: privacy/retention.py:80이 ProblemAttempt 파기 기준 컬럼으로 started_at을 쓰는데 두 writer(api/coach.py·api/me.py) 어디서도 채우지 않아 상시 NULL — 근본수정은 PED-37(회수 태스크)이 소유하며 착지 후 신규 행부터 정상. 결정 3항(claude가 판단할 사안 아님 — 법령 유래 절차의 기계 대체 금지): (a) 이 컨테이너·개발 환경·Phaiakes9 prod DB(whymath-pg 5433)에 실제 학생 개인정보가 쌓인 적이 있는가(2026-09-03 복구 리허설 실측 problem_attempt 0행·user_profile 1행이면 실무 영향 0 가능성 높음) (b) 있다면 기존 NULL 행의 소급 파기 기준을 무엇으로 볼 것인가(ended_at 대체 등) (c) 소급 파기 스크립트가 필요하면 별도 태스크로 claude에게 위임. clear evidence에 (a)의 실측 행수와 (b)(c)의 결정을 적는다"
     kind: decision
@@ -410,6 +423,18 @@ gates:
       - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
     depends_on:
       - EOS-150
+  - id: G-eos146-disposition
+    title: "EOS-146 앱 오답·포기 이벤트 원천 처분 선택(가·나·다) — (가) 코치 턴의 오답 신호(검증 결과·오개념 매칭)를 응답 1건으로 적재하고 상태 머신 실행(코치 한 턴을 오답 1건으로 셀지 = 교수학 판정) / (나) 앱이 문항 단위 오답을 POST /v1/me/attempts로 제출하도록 계약 변경(MOB-20 계약상 금지 재판정) / (다) 앱에서는 상태 머신 집행(R3·R6)을 쓰지 않기로 하고 범위 명기(Phase 3 Release Gate A 영향)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-09-29
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §4·§5·§7 P-1(판정 기준 main a82f9449)과 EOS-146 acceptance ③. 코치 한 턴을 오답 1건으로 셀지는 교수학 판정이고 (나)는 앱 계약(MOB-20) 재판정이라 구현 세션이 대신 고르지 않는다. 2026-09-29 코드 재확인(main a28a8d08): EOS-134 착지로 코치 정답 완료는 advance_on_graded_attempt를 돌지만(api/coach.py:1416) 코치 경로에 오답·포기 적재는 0건이고 모바일 lib은 POST /v1/me/attempts를 호출하지 않는다 — R3·R6 앱 도달 0 유지(이 검색 방법 기준). 근거: 이 선행 조건이 acceptance 산문뿐이라 next가 EOS-146을 1순위 후보로 계속 내놓아 세션마다 같은 벽에 부딪혔다."
   - id: G-eos23-rejected-quad-sum-classification
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human
