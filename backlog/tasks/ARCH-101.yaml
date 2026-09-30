@@ -22,6 +22,7 @@ paths:
   - src/backend/whymath_backend/l3/pipeline.py
   - "tests/backend/l3/test_langfuse_fields*.py"
   - docs/ops/arch71_student_facing_cloud_mid_live_runbook.md
+  - docs/architecture/03a_l3_router_design.md
 session: claude/ecstatic-feynman-bxxxvd
-notes: "ARCH-71 학생 대면 런북(`docs/ops/arch71_student_facing_cloud_mid_live_runbook.md`)이 \"후속 등재 대상(세션 몫)\"으로 적은 항목. 근거: 런북 §0-3 코드 판독 + 부록 ① 실측 `served.in_trace_record=false`. `src/backend/whymath_backend/l3/router.py`의 `langfuse_fields` 키 목록에 `served_model`·`retries`가 없다(2026-09-29 브랜치 HEAD 판독). 저작 경로는 EOS-112가 genlog에 남기므로 '누가 실제로 답했나'를 사후에 알 수 없는 것은 학생 대면 경로뿐이다 — EOS-112의 학생 대면 축. ARCH-69 강등이 붙은 뒤로는 \"좌석은 openrouter인데 실제 답은 LOCAL\"인 회차가 생기므로 이 필드의 필요가 커졌다."
+notes: "ARCH-71 학생 대면 런북(`docs/ops/arch71_student_facing_cloud_mid_live_runbook.md`)이 \"후속 등재 대상(세션 몫)\"으로 적은 항목. 근거: 런북 §0-3 코드 판독 + 부록 ① 실측 `served.in_trace_record=false`. `src/backend/whymath_backend/l3/router.py`의 `langfuse_fields` 키 목록에 `served_model`·`retries`가 없다(2026-09-29 브랜치 HEAD 판독). 저작 경로는 EOS-112가 genlog에 남기므로 '누가 실제로 답했나'를 사후에 알 수 없는 것은 학생 대면 경로뿐이다 — EOS-112의 학생 대면 축. ARCH-69 강등이 붙은 뒤로는 \"좌석은 openrouter인데 실제 답은 LOCAL\"인 회차가 생기므로 이 필드의 필요가 커졌다.\n\n[정정 2026-09-30] paths ['src/backend/whymath_backend/l3/router.py', 'src/backend/whymath_backend/l3/pipeline.py', 'tests/backend/l3/test_langfuse_fields*.py', 'docs/ops/arch71_student_facing_cloud_mid_live_runbook.md'] → ['src/backend/whymath_backend/l3/router.py', 'src/backend/whymath_backend/l3/pipeline.py', 'tests/backend/l3/test_langfuse_fields*.py', 'docs/ops/arch71_student_facing_cloud_mid_live_runbook.md', 'docs/architecture/03a_l3_router_design.md']: 구현 범위 정정 — 03a §F.2 필드 표도 갱신 대상(편집 훅 scope_drift 경고)"
 updated: 2026-09-30
