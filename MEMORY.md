@@ -11672,3 +11672,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **위치·산출**: `tools/work-graph-desktop/`(TypeScript · esbuild · electron 38.2.1 · electron-builder 26.15.3) · 런북 `docs/ops/work_graph_desktop_runbook.md`. 리눅스 크로스 빌드 실측: NSIS 설치 EXE 87.0MB + 무설치 zip 121.9MB(코드서명 없음). 리눅스에서 NSIS를 만들려면 wine(64+32비트)+xvfb가 필요했고 i386 의존성 충돌(`libgd3`)은 amd64 판을 i386과 같은 버전으로 고정해 풀었다 — Windows(Kiki 머신)에서는 `npm.cmd run dist:win`만으로 된다.
 - **검증**: vitest 51 · 렌더러 Playwright 10 · Electron 스모크 1(xvfb · 실제 저장소 수집 · webPreferences contextIsolation/sandbox on) · 뮤테이션 3종(판정 덮어쓰기·불가 은폐·직접 쓰기) 전건 RED · 런북 가드 3종(check_runbook_blocks·check_ps_scripts·cp949_guard) exit 0.
 - **미검증(명시)**: Windows 실 설치·실행·제거·바로가기 — 런북 [1]~[7]로 Kiki에게 위임. gh 어댑터 라이브 경로(컨테이너에 gh 없음). 아이콘은 Electron 기본(Windows에서 `win.icon`으로 교체 가능).
+
+### 2026-09-30 (결정 · 게이트 `G-eos146-disposition` / EOS-146): **앱 오답은 코치가 서버에서 판정한 명확한 오답의 '문제당 최초 1건'만 원장에 적재해 상태 머신에 태운다 — (가) 채택, (나)·(다) 기각, '포기'는 분리** (세션 사용자 결정 · claude 기록·집행) — 판정 기준 main `270968a2`
+
+- **문제**: 앱 학생의 오답·포기가 서버 어디에도 적재되지 않아 R3(오개념 교정 · `EOS-24`)·R5·R6(원인 미상 오답 · `EOS-26`)이 앱 학생에게 0회 돈다(코치 경로 `is_correct=False` 적재 0건 · 모바일 `POST /v1/me/attempts` 호출 0건 — 이 검색 방법 기준). 정답 완료만 `EOS-134` 이후 `advance_on_graded_attempt`를 돈다.
+- **결정**: (가) 코치 서버 판정 `final_incorrect`(→ `REDIRECT`)를 같은 학생·같은 문제의 **최초 1건만** `ProblemAttempt(is_correct=False)` + 상태 머신으로 적재. 재제출 오답·unverifiable은 세지 않는다 — 틀린 뒤 스스로 고치는 Polya 정상 경로를 원장에서 벌점처럼 쌓지 않고, 모르는 것을 틀렸다고 접지 않는다.
+- **기각**: (나) 앱이 `/v1/me/attempts`로 자가보고 — 정오 판정이 클라로 넘어가 서버 권위·"수학 로직을 클라에 넣지 않는다"와 부딪히고 MOB-20이 금지한 이중 적재가 남는다. (다) 앱에서 R3·R6 미사용 — 앱 도달 0이 영구화되고 Release Gate A 범위가 줄어든다.
+- **구현 시 함정(코드로 확인)**: `dialogue.attempt_id`의 존재가 '완료됨' 표지(재완료 가드)라 오답 행을 링크하면 풀던 대화가 완료로 읽힌다. 오답 적재는 그 필드를 건드리지 않는다. 오답만 있는 문제가 `GET /me/next-problem` 미시도 필터(NOT IN)에서 제외되는지는 구현 세션이 실측해 판정한다.
+- **집행**: `EOS-146` acceptance ⑥·⑦ 재작성(앱 변경 0 · `/v1/me/attempts` 계약 변경 0 · 변별력 뮤테이션 포함). 구현은 이 결정으로 착수 가능해졌을 뿐 **미착수**다. '포기'(풀다 떠남)는 원천 신호가 코치·앱 어디에도 없어 `EOS-41-app-abandon-signal-source`(P2 · `EOS-146` 선행)로 분리 — 무엇을 포기로 볼지가 교수학 판정이라 착수 세션이 결정 게이트를 먼저 등재한다. R5 연속 오답 범위(개념 무관·시간 창 부재)는 `EOS-145` 소유로 이 결정이 바꾸지 않는다.
+- **게이트 처리**: `G-eos146-disposition` clear(주체 claude — 사용자 응답 중계 · 대장에 사실대로 기록). `G-p3-entry-gate2-pass`(판정문 §4-2 (A)/(B))는 이 결정이 닫지 않는다 — Kiki 몫으로 남는다. `EOS-146`은 여전히 `P3-17`의 선행이다.
