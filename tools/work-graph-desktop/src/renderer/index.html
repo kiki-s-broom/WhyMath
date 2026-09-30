@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhyMath 작업 지도</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <nav class="rail" id="rail" aria-label="작업공간·보기">
+    <div class="brand">
+      <h1>WhyMath 작업 지도</h1>
+      <span class="mode" id="mode"></span>
+    </div>
+    <h2>작업공간</h2>
+    <div class="ws-list" id="ws-list"></div>
+    <button class="rail-btn add" id="ws-add" type="button">＋ 작업공간 추가</button>
+    <h2>보기</h2>
+    <div class="views" id="views" role="tablist">
+      <button class="rail-btn" type="button" data-view="map" role="tab">전체 지도</button>
+      <button class="rail-btn" type="button" data-view="ready" role="tab">지금 처리할 일</button>
+      <button class="rail-btn" type="button" data-view="human" role="tab">사람 작업</button>
+      <button class="rail-btn" type="button" data-view="branch" role="tab">미머지 작업</button>
+      <button class="rail-btn" type="button" data-view="list" role="tab">목록 보기</button>
+    </div>
+    <div class="rail-foot">
+      <button class="rail-btn" id="ws-settings" type="button">연결 및 설정</button>
+    </div>
+  </nav>
+  <div class="body">
+    <header class="top">
+      <div class="cards" id="cards" role="toolbar" aria-label="집계 — 누르면 걸러 본다"></div>
+      <div class="status">
+        <span class="snap" id="snap-line" aria-live="polite">스냅샷 없음</span>
+        <button class="btn primary" id="refresh" type="button">새로고침</button>
+      </div>
+    </header>
+    <div class="attention" id="attention" hidden></div>
+    <div class="tools">
+      <input type="search" id="q" placeholder="ID·제목 검색 ( / )" aria-label="창 검색">
+      <select id="fstage" aria-label="스테이지"></select>
+      <select id="flayer" aria-label="레이어"></select>
+      <select id="ftrack" aria-label="트랙"></select>
+      <select id="fkind" aria-label="종류">
+        <option value="">종류 전체</option>
+        <option value="task">작업</option>
+        <option value="gate">게이트</option>
+        <option value="branch">브랜치</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="hits" id="hits"></span>
+      <button class="btn icon" id="zoom-out" type="button" title="축소 (-)">−</button>
+      <button class="btn icon" id="zoom-in" type="button" title="확대 (+)">+</button>
+      <button class="btn" id="fit" type="button" title="전체 맞춤 (0)">전체 맞춤</button>
+      <button class="btn" id="reset-pos" type="button" title="끌어 옮긴 창 위치를 처음으로">배치 초기화</button>
+    </div>
+    <div class="main">
+      <main class="stage" id="stage" role="region" aria-label="작업 캔버스 — 끌어서 이동, 휠로 확대 축소">
+        <div class="world" id="world"></div>
+        <div class="notice" id="notice"></div>
+        <div class="zoomrd" id="zoomrd"></div>
+        <details class="legend" id="legend" open><summary>범례</summary>
+          <span><i class="c-ready"></i>시작 가능</span>
+          <span><i class="c-in_progress"></i>진행 중·검토</span>
+          <span><i class="c-waiting"></i>대기</span>
+          <span><i class="c-blocked"></i>차단</span>
+          <span><i class="c-human"></i>사람 작업·게이트</span>
+          <span><i class="c-gate_verdict"></i>판정 결과 미기록</span>
+          <span><i class="c-branch"></i>미머지 브랜치</span>
+          <span style="color:var(--muted)">왼쪽 → 오른쪽 = 먼저 → 나중</span>
+        </details>
+        <canvas class="mini" id="mini" aria-label="미니맵 — 눌러서 이동"></canvas>
+        <div class="empty" id="empty" hidden></div>
+      </main>
+      <section class="table" id="table" hidden aria-label="목록 보기"></section>
+      <aside class="detail" id="detail" aria-label="선택한 창 상세" aria-live="polite"></aside>
+    </div>
+  </div>
+  <div class="modal" id="modal" hidden></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -95,6 +95,12 @@ _EXEMPT = {
     # acceptance ⑥에서 정본 명령을 브리핑 §8로 넘겼고, acceptance는 append 전용이라
     # ④의 옛 문면을 고칠 수 없다(그 사실이 ⑥에 적혀 있다).
     "backlog/tasks/MGMT-06-export-prediction-disclosure-counsel.yaml": "백로그 acceptance 본문(복붙 런북 아님·정본은 브리핑 §8)",
+    # HARN-206(2026-09-29) — 데스크톱 앱 테스트 픽스처. `work_graph.py --json` 페이로드를 그대로
+    # 잘라 만든 **기계 산출물**이고(생성기 `make_fixture.py`), 명령은 board.py와 같은 규칙
+    # (`gate_clear_command` — 담당자가 claude가 아니면 `--as`)로 이미 조립돼 있다. 사람이
+    # 복붙하는 문서가 아니라 화면 계약 테스트의 입력이다.
+    "tools/work-graph-desktop/fixtures/sample.json": "앱 화면 계약 픽스처(work_graph.py 산출물 축소본·복붙 문서 아님)",
+    "tools/work-graph-desktop/fixtures/sample_ok.json": "앱 화면 계약 픽스처(scans ok 변형·복붙 문서 아님)",
 }
 # CLAUDE.md는 여기 없다: 구체 게이트 ID 명령이 0건이라(자리표시자 서술뿐) 면제할 대상 자체가
 # 없다. 처음엔 넣었다가 `test_exemptions_are_real_and_named`가 유령 면제로 잡아냈다 —
