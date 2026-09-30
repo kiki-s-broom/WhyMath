@@ -12,7 +12,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/api_client.dart';
 import '../../../core/env.dart';
 import '../../../core/token_store.dart';
+import '../../chat/application/chat_controller.dart';
 import '../../chat/data/dialogue_store.dart';
+import '../../problems/application/active_problem.dart';
 import '../data/auth_api.dart';
 import 'auth_state.dart';
 
@@ -117,5 +119,13 @@ class AuthController extends _$AuthController {
       debugPrint('대화 세션 참조 삭제 실패(${e.runtimeType}).');
     }
     state = state.copyWith(isAuthenticated: false);
+    // MOB-23: 토큰·대화 참조만 지우고 끝내면 이전 학생의 활성 문제·코치 대화(dialogueId·메시지 누적)가
+    // provider에 그대로 남는다(非autoDispose `activeProblemProvider`·앱 수명 내내 유지되는
+    // `ChatController` 상태) — 같은 기기로 다음 학생이 로그인하면 그 잔여가 그대로 보인다.
+    // `invalidate`로 두 provider를 최초 빌드 상태(활성 문제 없음·빈 대화)로 되돌려 학생 간 경계를 보장한다.
+    // 위 세 정리가 모두 끝난 뒤(= 로그아웃이 실제로 완료된 경우)에만 실행된다 — `tokenStore.clear()`가
+    // 던지면 학생은 로그인 상태로 남으므로 잔여를 지울 이유가 없다.
+    ref.invalidate(activeProblemProvider);
+    ref.invalidate(chatControllerProvider);
   }
 }

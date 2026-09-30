@@ -140,6 +140,82 @@ void main() {
     expect(find.text('채팅 화면'), findsOneWidget);
   });
 
+  testWidgets(
+      '이미 활성 문제(A)가 있어도 "풀이 시작"은 새 문제(B)로 전환한다(stale A 없음·MOB-23)',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        problemsApiProvider.overrideWithValue(
+          _FakeProblemsApi(
+            next: const NextProblemResponse(problemId: 'p2'),
+            problem: const Problem(
+              problemId: 'p2',
+              sourceType: '자체생성',
+              subject: '수학I',
+              unitCodes: <String>['ALG'],
+              questionText: '문제 B',
+            ),
+          ),
+        ),
+        // 이미 문제 A로 풀이 중이던 상태를 재현한다(예: 문제 화면에 다시 진입하기 전).
+        activeProblemProvider.overrideWith(
+          (ref) => const Problem(
+            problemId: 'p1',
+            sourceType: '자체생성',
+            subject: '수학I',
+            unitCodes: <String>['ALG'],
+            questionText: '문제 A',
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.problemPath,
+      routes: [
+        GoRoute(
+          path: AppRoutes.problemPath,
+          builder: (_, __) => const ProblemScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.chatPath,
+          builder: (_, __) => const Scaffold(body: Text('채팅 화면')),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 진입 시점엔 여전히 A(직전 문제)가 활성이다.
+    expect(container.read(activeProblemProvider)?.problemId, 'p1');
+
+    // 전환 도중 실제로 null을 거치는지(리셋 후 재세팅) 상태 변화 시퀀스를 직접 기록한다 —
+    // A→B 직접 덮어쓰기(수정 전 코드)만으로도 최종값은 이미 B라 최종값 단언만으론 레드를
+    // 재현하지 못한다. 이 리스너가 그 차이를 드러낸다.
+    final transitions = <Problem?>[];
+    final subscription = container.listen<Problem?>(
+      activeProblemProvider,
+      (previous, next) => transitions.add(next),
+      fireImmediately: false,
+    );
+    addTearDown(subscription.close);
+
+    await tester.tap(find.widgetWithText(FilledButton, '풀이 시작'));
+    await tester.pumpAndSettle();
+
+    // 새로 시작한 B로 전환되고, A의 흔적이 남지 않는다(결함 신고 등의 오귀속 방지).
+    expect(container.read(activeProblemProvider)?.problemId, 'p2');
+    expect(container.read(activeProblemProvider)?.problemId, isNot('p1'));
+    // 리셋 후 재세팅 — 전환 도중 null을 반드시 거친다(직접 덮어쓰기였다면 이 이벤트가 없다).
+    expect(transitions, contains(isNull));
+  });
+
   testWidgets('안전: 문제 화면에 정답 문자열이 렌더되지 않는다', (tester) async {
     // Problem 모델은 answer를 담지 않으므로 화면이 정답을 그릴 방법이 없다(구조적 차단 확인).
     final api = _FakeProblemsApi(

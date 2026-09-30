@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: mobile
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/mobile/test/auth_controller_test.dart
   - src/mobile/test/chat_screen_test.dart
   - src/mobile/test/problem_screen_test.dart
-session: null
+session: claude/fervent-goldberg-s8y8ws
 notes: "[분리 경위] S3-24 버킷B 회수(이 세션) 도중 발견. 섀도 브랜치에서 problem_screen.dart·problem_screen_test.dart·chat_screen_test.dart를 MOB-12가 *먼저* 건드리고 그 위에 S3-24 항목들이 쌓여 있어, 브랜치 팁을 그대로 취하면 S3-24와 무관한 MOB-12가 조용히 섞여 들어온다. 실제로 한 번 섞였고(게다가 auth_controller 쪽 절반은 안 따라와 불완전 이식 상태였다), main 버전에서 다시 시작해 S3-24 커밋만 재적용하는 방식으로 전량 제외했다. 제외 확인은 특정 마커 3종(problem_screen의 state = null / chat_screen_test의 _FakeDefectReportApi / problem_screen_test의 stale 이전 문제)이 0건임으로 실측했다.\n[중복 소유 주의] 같은 브랜치의 비보안 회수는 MOB-18-issues-review-nonsecurity-recovery도 소유한다. 다만 MOB-18은 claim이 release됐고(3d570b8c) 소유 브랜치 claude/whymath-system-review-n75r24는 원격에 없으며 부분 회수(PB-04·#1031)만 머지된 stale in_progress다 — 착수 전 MOB-18과의 경계를 먼저 확정할 것."
-updated: 2026-09-21
+updated: 2026-09-30
