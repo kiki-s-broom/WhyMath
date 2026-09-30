@@ -49,6 +49,11 @@ ORM/쿼리빌더만(`delete(Model).where(...)` — 원시 SQL 0·CLAUDE.md). `di
 이를 강제한다. 협업(다자 소유) 스키마의 파기 규칙은
 `docs/architecture/collaboration_landing_design.md` §3(5분류·3배관 처리표·변호사 검토 대상)이
 정본이다.
+
+알려진 미삭제(SEC-39, 2026-09-30 — 정직 표기): `evidence_event`(교수법 처치·결과 기록)는 학생
+데이터이지만 이 모듈이 **아직 지우지 않는다**. 삭제 배선은 SEC-40(결정 게이트
+`G-eos37-erasure-kpi-disposition` 대기)이 소유하고, 그 전까지 허용목록에 *만료 있는 임시 예외*로
+등재돼 있다 — 사유(재연결 경로 2건)는 `_ERASURE_PLAN_EXEMPTIONS["evidence_event"]`가 정본이다.
 """
 
 from __future__ import annotations
@@ -152,16 +157,25 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
 # 잡는다 — 기존 test_erasure.py:94 `test_covers_all_planned_tables`(계획→실행, planned <= order)의
 # *역방향*(실행→계획, 소유 테이블 중 계획 누락 검출)이다.
 #
-# 소유 판정(SEC-35, 2026-09-18): **`user_profile.user_id` FK 보유(컬럼명 무관) ∪ `_ERASURE_PLAN`이
-# 쓰는 컬럼명 보유**의 합집합이다. 종전에는 컬럼명 3종(user_id·student_id·target_user_id) 고정
-# 열거 하나였고, 그래서 `learner_state`(소유 컬럼 `learner_id`)가 스윕에 한 번도 들어오지
-# 않았다 — 가드는 초록인데 테이블은 계획 밖이었다. 판정 로직·남는 사각은 그 테스트 파일의
-# `_owner_tables` 위 주석이 정본이다.
+# 소유 판정: **(A) `user_profile.user_id` FK 보유(컬럼명 무관) ∪ (B) `_ERASURE_PLAN`이 쓰는
+# 컬럼명 보유 ∪ (C) 학생 세션 축(`learning_session.session_id`를 가리키는 FK 또는 느슨참조)**의
+# 합집합이다. (A)·(B)는 SEC-35(2026-09-18)가 만들었다 — 종전에는 컬럼명 3종(user_id·student_id·
+# target_user_id) 고정 열거 하나였고, 그래서 `learner_state`(소유 컬럼 `learner_id`)가 스윕에 한
+# 번도 들어오지 않았다. (C)는 SEC-39(2026-09-30)가 더했다 — user 축 없이 `session_id`로만 학생에
+# 묶이는 `evidence_event`가 (A)·(B) 어디에도 안 걸려 삭제권 가드의 사각에 있었다. 판정 로직·
+# 포함/제외 기준·남는 사각은 그 테스트 파일의 `_owner_tables` 위 주석이 정본이다.
 #
-# 분류 근거: `docs/architecture/collaboration_landing_design.md` §2.2(소유 축 5분류) — 여기 등재된
-# 모든 테이블은 **E형(감사)** 또는 `user_profile`(별도 명시 삭제) 둘 중 하나다. 미래 협업 스키마가
-# 만드는 B형(학생 기여+타인 컨테이너)·C형(교차 사용자 집계)·D형(조직 소유) 테이블도 같은 방식으로
-# 이 상수에 사유와 함께 등재하거나, `_ERASURE_PLAN`에 편입해야 한다(같은 문서 §3 다자 소유 규칙).
+# 분류 근거: `docs/architecture/collaboration_landing_design.md` §2.2(소유 축 5분류). 여기 등재된
+# 테이블은 두 종류다:
+#   · **영구 예외** — **E형(감사)** 또는 `user_profile`(별도 명시 삭제). 만료가 없고, 그 집합은
+#     테스트의 `PERMANENT_ERASURE_EXEMPTIONS`가 고정한다(영구 예외를 늘리는 것은 의식적 결정).
+#   · **임시 예외** — 처분이 다른 태스크·결정 대기라 *아직* 계획 밖인 학생 데이터. 반드시 아래
+#     `_ERASURE_PLAN_EXEMPTION_EXPIRY`에 해소 태스크를 함께 등재하며, 그 태스크가 종결되고도
+#     항목이 남아 있으면 테스트가 RED를 낸다(CLAUDE.md 「만료 없는 유예·제외 금지」). 현재
+#     `evidence_event` 1건(SEC-40).
+# 미래 협업 스키마가 만드는 B형(학생 기여+타인 컨테이너)·C형(교차 사용자 집계)·D형(조직 소유)
+# 테이블도 같은 방식으로 이 상수에 사유와 함께 등재하거나, `_ERASURE_PLAN`에 편입해야 한다
+# (같은 문서 §3 다자 소유 규칙).
 _ERASURE_PLAN_EXEMPTIONS: dict[str, str] = {
     "user_profile": (
         "user_id가 PK 자체 — `_ERASURE_PLAN` 튜플이 아니라 `erase_user()`가 자식 삭제 전부가 "
@@ -179,6 +193,33 @@ _ERASURE_PLAN_EXEMPTIONS: dict[str, str] = {
         "`PrivacyAudit`) — user_id·target_user_id 둘 다 FK가 아닌 plain UUID. deletion_audit와 "
         "동일 근거로 계정 삭제 후에도 잔존해야 감사 목적을 달성한다. 협업 5분류(E형 감사)와 동형."
     ),
+    # SEC-39 — **임시 예외(만료 있음)**. 아래 `_ERASURE_PLAN_EXEMPTION_EXPIRY`가 해소 태스크를
+    # 구조 필드로 들고 있고, SEC-40이 종결되고도 이 항목이 남으면 완전성 테스트가 RED를 낸다.
+    "evidence_event": (
+        "임시 예외 — 만료 있음(해소 태스크 SEC-40 · 결정 게이트 G-eos37-erasure-kpi-disposition). "
+        "교수법 처치·결과 기록(`db/models/evidence_event.py` · 하이퍼테이블)은 user 컬럼도 user "
+        "FK도 없이 `session_id`(FK 아닌 느슨참조)로만 학생에 묶여, 소유 판정 (C) 학생 세션 축"
+        "(SEC-39)이 생기기 전까지 완전성 가드의 사각이었다. 반면 반출(`privacy/export.py` "
+        "EOS-131 ⑤)은 `learning_session` 조인으로 이 행을 학생 데이터로 내준다 — 열람권엔 있고 "
+        "삭제권엔 없는 비대칭이 이 예외의 실체다. 삭제 배선은 SEC-40이 소유하며, KPI 측정용 보존 "
+        "여부를 가르는 결정 게이트를 기다린다. 그 전까지 행이 남아 재연결 경로 2건이 열려 있다: "
+        "ⓐ 개별 세션 삭제(`api/me.py` `_delete_owned_resource`)는 `learning_session`만 지우고 "
+        "`deletion_audit`에 (user_id, resource_id=세션 ID)를 남기므로 그 세션 ID로 이 행을 다시 "
+        "찾는다 ⓑ 계정 삭제(`erase_user`)는 이 행을 지우지 않고 `deletion_audit`에 user_id를 "
+        "남기므로, `meta.user_binding`(HMAC(jwt 비밀키, 도메인:session_id:user_id) · "
+        "`l2/pedagogy_evidence.session_user_binding`)을 잔존 user_id로 재계산해 이 학생의 세션을 "
+        "다시 찾는다(비밀키를 가진 운영 주체 한정 — 적법성은 변호사 판단). 정당한 영구 사유가 "
+        "아니라 처분 대기이므로 만료 없는 등재 금지."
+    ),
+}
+
+# SEC-39 — 허용목록 항목 중 **임시 예외**의 해소 태스크(테이블명 → 백로그 태스크 ID).
+# 사유 문자열 속 태스크 ID는 기계가 대조할 수 없으므로 구조 필드로 따로 둔다(`ops/provenance_audit`
+# `GrandfatherEntry` · ARCH-25 그랜드파더 만료 계약 선례). 완전성 테스트가 `backlog/tasks/*.yaml`의
+# `status`를 읽어, 태스크가 없거나 done·cancelled인데 항목이 남아 있으면 RED를 낸다(자동 해제
+# 아님 — 걷는 것은 처분을 구현하는 사람이다). 이 맵에 없는 허용목록 항목은 영구 예외여야 한다.
+_ERASURE_PLAN_EXEMPTION_EXPIRY: dict[str, str] = {
+    "evidence_event": "SEC-40",
 }
 
 
