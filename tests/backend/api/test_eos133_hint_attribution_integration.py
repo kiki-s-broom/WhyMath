@@ -19,6 +19,7 @@ SCENARIO-005(시나리오 스위트)가 ①의 장면 단언을, 이 파일이 �
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import pathlib
 import sys
@@ -39,8 +40,16 @@ _SUITE_PATH = (
 )
 #: 빌려 쓰는 헬퍼 계약 — 하나라도 사라지면 수집 단계에서 이름을 지목하며 깨진다.
 _HELPERS = (
+    "Curriculum",
+    "Problem",
+    "ProblemSchema",
+    "ReviewStatus",
+    "SourceType",
+    "Subject",
+    "_COMPLETION_ANSWER",
     "_CORRECT_STEPS",
     "_STUCK",
+    "_add_all",
     "_answered_problem",
     "_begin",
     "_client",
@@ -149,11 +158,45 @@ def _supply(uid: uuid.UUID, pid: uuid.UUID) -> list[tuple[Any, ...]]:
     )
 
 
-def _run_case(tag: str, body: Any) -> None:
+def _unmapped_problem(content: Any, tag: str) -> uuid.UUID:
+    """개념에 매핑하지 않은 문항(저작 콘텐츠) — 오답이 숙달을 움직이지 못한다.
+
+    코치 오답이 원장에 적재되면(EOS-146) 숙달이 낮아져 힌트 사다리의 **숙달 라벨 축**(규칙 5)이 켜진다.
+    이 파일의 ⑤는 그 축이 아니라 "재고 유도 턴이 가짜 공급 행을 남기지 않는다"를 본다 — 두 축을 섞지
+    않으려고 숙달이 측정되지 않는 문항으로 격리한다. 숙달 축 자체는 아래 ⑥이 따로 고정한다.
+    """
+    pid = uuid.uuid4()
+    asyncio.run(
+        _S._add_all(
+            _S.Problem.from_schema(
+                _S.ProblemSchema(
+                    problem_id=pid,
+                    source_type=_S.SourceType.자체생성,
+                    review_status=_S.ReviewStatus.approved,
+                    curriculum_version=_S.Curriculum.REVISION_2022,
+                    valid_from_year=2022,
+                    subject=_S.Subject.공통,
+                    unit_codes=[f"U-{content.sfx}{tag}"],
+                    difficulty_overall=3.0,
+                    question_text=f"3x = 174639 일 때 x의 값을 구하시오. ({tag})",
+                    answer=_S._COMPLETION_ANSWER,
+                )
+            )
+        )
+    )
+    content.problem_ids.append(pid)
+    return pid
+
+
+def _run_case(tag: str, body: Any, *, concept_mapped: bool = True) -> None:
     content, journal = _S._begin(f"EOS-133-{tag}")
     try:
         cid, _code = _S._seed_concept(content, f"h{tag}", "일차방정식의 풀이")
-        pid = _S._answered_problem(content, cid, f"h{tag}", 3.0)
+        pid = (
+            _S._answered_problem(content, cid, f"h{tag}", 3.0)
+            if concept_mapped
+            else _unmapped_problem(content, f"h{tag}")
+        )
         with _S._client() as client:
             _S._erase_learner(client)  # 지난 회차 잔여 제거(멱등)
             auth = _S._login(client)
@@ -297,4 +340,48 @@ def test_redirect_turn_records_no_supply_and_the_ladder_does_not_skip() -> None:
         )
         assert levels == [1, 2], levels
 
-    _run_case("5", body)
+    # 숙달이 측정되지 않는 문항 — EOS-146 이후 코치 오답이 숙달을 움직이므로(아래 ⑥) 그 축을 끈다.
+    _run_case("5", body, concept_mapped=False)
+
+
+def test_first_wrong_answer_lowers_mastery_so_the_next_hint_rises_an_extra_step() -> None:
+    """⑥ (EOS-146) 오답 한 건이 적재되면 같은 대화의 다음 힌트가 숙달 라벨 규칙으로 한 칸 더 오른다.
+
+    ⑤와 같은 장면이지만 문항이 개념에 매핑돼 있다. 코치가 서버 판정 오답을 원장에 적재하면 숙달이
+    낮아져(BKT 0.4 미만) 라벨이 `초보`가 되고, 힌트 단계 규칙 5(`decide_hint_level` — `초보`이면
+    `min(4, base+1)`)가 좌절 신호의 상승분(1→2)에 한 칸을 더한다: 1→3. **가짜 공급이 아니다** — 3은
+    학생에게 실제로 공급된 단계라 원장(`[1, 3]`)이 그대로 말한다. 재고 유도 턴의 단계 2는 여전히 원장에
+    적히지 않는다.
+
+    이 테스트는 그 상호작용을 **고정**한다 — 옳다고 선언하는 것이 아니다. 오답 한 건으로 `초보`가 되어
+    부분 풀이(3)가 두 칸 도약하는 것이 교수학적으로 허용되는지는 판정 대기다(EOS-146 acceptance ⑩).
+    그 판정이 바뀌면 이 테스트가 먼저 깨져 결정이 눈에 보이게 한다.
+    """
+
+    def body(client: Any, auth: dict[str, str], uid: uuid.UUID, pid: uuid.UUID, j: Any) -> None:
+        did = _open(client, auth, pid, _NEUTRAL)
+        assert _S._hint_levels(_S._trace(client, auth)) == [1]
+        redirected = _turn(
+            client,
+            auth,
+            did,
+            _FRUSTRATED,
+            solution_steps=_WRONG_STEPS,
+            solution_step_types=["계산"],
+        )
+        assert redirected["decision"]["prompt"] in {_REDIRECT_PROMPT, _REDIRECT_PROMPT_SPECIFIC}
+        # 재고 유도 턴의 결정 단계는 여전히 원장에 적히지 않는다(EOS-30 불변).
+        assert _S._hint_levels(_S._trace(client, auth)) == [1]
+
+        follow = _turn(client, auth, did, _FRUSTRATED)
+        levels = _S._hint_levels(_S._trace(client, auth))
+        j.record(
+            "⑥",
+            "오답 뒤 사다리(숙달 라벨)",
+            다음턴결정=follow["decision"]["hint_level"],
+            공급=levels,
+        )
+        assert follow["decision"]["hint_level"] == 3, follow["decision"]
+        assert levels == [1, 3], levels
+
+    _run_case("6", body)
