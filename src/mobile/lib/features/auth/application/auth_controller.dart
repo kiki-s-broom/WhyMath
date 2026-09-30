@@ -12,6 +12,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/api_client.dart';
 import '../../../core/env.dart';
 import '../../../core/token_store.dart';
+import '../../chat/data/dialogue_store.dart';
 import '../data/auth_api.dart';
 import 'auth_state.dart';
 
@@ -107,6 +108,13 @@ class AuthController extends _$AuthController {
       await refreshStore.clearRefreshToken();
     } on Object catch (e) {
       debugPrint('리프레시 토큰 삭제 실패(${e.runtimeType}).');
+    }
+    // MOB-11: 마지막 대화 세션 참조도 지운다 — 같은 기기에서 다음 학생이 로그인했을 때 이전
+    // 학생의 세션 UUID로 복원을 시도하지 않게(서버 소유권 검증이 404로 막지만 참조 자체를 남기지 않는다).
+    try {
+      await ref.read(dialogueStoreProvider).clearDialogueId();
+    } on Object catch (e) {
+      debugPrint('대화 세션 참조 삭제 실패(${e.runtimeType}).');
     }
     state = state.copyWith(isAuthenticated: false);
   }
