@@ -11672,3 +11672,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **위치·산출**: `tools/work-graph-desktop/`(TypeScript · esbuild · electron 38.2.1 · electron-builder 26.15.3) · 런북 `docs/ops/work_graph_desktop_runbook.md`. 리눅스 크로스 빌드 실측: NSIS 설치 EXE 87.0MB + 무설치 zip 121.9MB(코드서명 없음). 리눅스에서 NSIS를 만들려면 wine(64+32비트)+xvfb가 필요했고 i386 의존성 충돌(`libgd3`)은 amd64 판을 i386과 같은 버전으로 고정해 풀었다 — Windows(Kiki 머신)에서는 `npm.cmd run dist:win`만으로 된다.
 - **검증**: vitest 51 · 렌더러 Playwright 10 · Electron 스모크 1(xvfb · 실제 저장소 수집 · webPreferences contextIsolation/sandbox on) · 뮤테이션 3종(판정 덮어쓰기·불가 은폐·직접 쓰기) 전건 RED · 런북 가드 3종(check_runbook_blocks·check_ps_scripts·cp949_guard) exit 0.
 - **미검증(명시)**: Windows 실 설치·실행·제거·바로가기 — 런북 [1]~[7]로 Kiki에게 위임. gh 어댑터 라이브 경로(컨테이너에 gh 없음). 아이콘은 Electron 기본(Windows에서 `win.icon`으로 교체 가능).
+
+
+### 2026-09-30 — HARN-208 작업 그래프 데스크톱 앱을 Windows 프로그램 실행 형식으로 — 두 번 클릭·저장소 자동 연결·실물 Windows CI — 판정 기준 main `270968a2`
+
+- **요청**: Kiki "앱의 실행을 윈도우 프로그램 실행 형식으로 다시 만들어줘". HARN-206 앱은 `npm start`(개발 모드)나 로컬 `npm run dist:win`으로만 켤 수 있어 Node·PowerShell이 필요했고, 설치본을 바로가기로 켜면 작업 폴더가 저장소가 아니어서 작업공간을 손으로 등록해야 했다.
+- **결정 5건**: ① 산출 3종 — NSIS 설치 EXE(바탕화면·시작 메뉴 바로가기 · 설치 끝에 실행) + 무설치 단일 EXE(portable) + zip, 아이콘은 표준 라이브러리 생성기(`scripts/make_icon.py`)가 만든 다중 해상도 .ico를 rcedit로 EXE에 심는다. ② 첫 실행 저장소 자동 찾기 — 무설치 EXE 위치 → 앱 위치의 조상 4단계 → 실제 바탕화면\__AI\WhyMath → 홈 순. 못 찾으면 대화상자를 자동으로 띄우지 않고 찾아본 자리·사유를 보이는 첫 화면 + 버튼 한 번(저장소가 아니면 거부·저장 0). ③ 파이썬은 `--version`이 아니라 `import yaml`로 찔러 **하네스를 돌릴 수 있는** 첫 인터프리터를 고른다(저장소 `.venv` → `src\backend\.venv` → PATH 순 — Kiki 머신의 conda base + .venv 공존 대응). ④ 단일 인스턴스 · 창 자리 기억(화면 밖이면 버림). ⑤ 데이터 폴더를 `%APPDATA%\whymath-work-graph-desktop`으로 고정.
+- **발견(사고 1회차 `runbook-path-unverified-against-code`)**: 제품명이 한글이라 Electron 기본 userData가 로캘에 따라 갈렸다(실측 · 리눅스 C.UTF-8 → `.config/WhyMath 작업 지도` · 로캘 없음·미설치 → appData 루트 그대로). HARN-206 런북의 스냅샷 검사 블록이 가리킨 `%APPDATA%\whymath-work-graph-desktop`은 어느 쪽과도 맞지 않아, 수집이 성공해도 「스냅샷 없음」으로 판정했을 것이다. 런북 실행 전에 발견해 피해 0. 대책 = ⑤ + 회귀 e2e.
+- **실물 Windows 판정 좌석**: `.github/workflows/work-graph-desktop.yml` — linux 잡(vitest·렌더러·Electron xvfb)과 windows 잡(같은 테스트 → 패키징 → **패키징된 EXE를 Playwright로 띄워** 저장소 수집 → 아티팩트 업로드). 컨테이너는 Windows EXE를 실행할 수 없으므로 실행 판정은 이 잡과 Kiki 런북이 한다. 필수 체크 아님(앱 경로 변경 시에만).
+- **검증(컨테이너)**: vitest 70 · 렌더러 Playwright 11 · Electron 6 passed + 1 skipped(패키징 EXE — 리눅스 패키징본으로 따로 돌려 1 passed) · 뮤테이션 11종 전건 RED · 교차 빌드 산출 3종의 아이콘 7크기·제품명 리소스 바이트 확인 · Authenticode 없음(인증서 미제공) · 런북 가드 3종 exit 0.
+- **미검증(명시)**: 설치 마법사·바로가기·SmartScreen·실제 바탕화면 자동 찾기는 Kiki 런북 [A]~[D]. 코드서명 인증서 없음.

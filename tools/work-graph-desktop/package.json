@@ -16,7 +16,8 @@
     "e2e": "playwright test --project renderer",
     "e2e:electron": "xvfb-run -a playwright test --project electron",
     "start": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win nsis zip --publish never"
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "icon": "python3 scripts/make_icon.py"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

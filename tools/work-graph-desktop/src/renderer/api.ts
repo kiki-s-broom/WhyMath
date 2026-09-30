@@ -19,7 +19,7 @@ export function fixtureNames(): string[] {
 }
 
 /** 픽스처 API — 메모리 저장. `?fixture=<이름>`으로 페이로드를 고른다. */
-export function fixtureApi(name: string, opts: { stale?: boolean; collectedAt?: string } = {}): WorkGraphApi {
+export function fixtureApi(name: string, opts: { stale?: boolean; collectedAt?: string; noWorkspace?: boolean } = {}): WorkGraphApi {
   const payload = FIXTURES[name] ?? FIXTURES.sample;
   const ws: Workspace = {
     id: "ws_fixture00000", name: `픽스처 ${name in FIXTURES ? name : "sample"}`, root: "(fixture)",
@@ -42,7 +42,7 @@ export function fixtureApi(name: string, opts: { stale?: boolean; collectedAt?: 
   });
   return {
     mode: () => "fixture",
-    listWorkspaces: async () => [ws],
+    listWorkspaces: async () => (opts.noWorkspace ? [] : [ws]),
     pickFolder: async () => null,
     addWorkspace: async () => ({ ok: false, reason: "픽스처 모드 — 작업공간을 추가할 수 없다(Electron에서만)" }),
     updateWorkspace: async () => ws,
@@ -58,11 +58,16 @@ export function fixtureApi(name: string, opts: { stale?: boolean; collectedAt?: 
     resetLayout: async (id) => { layouts.delete(id); },
     openExternal: async () => false,
     openTaskFile: async () => ({ ok: false, reason: "픽스처 모드 — 파일을 열 수 없다" }),
+    // `?first=1` — 첫 실행 화면 계약용: 작업공간 0개 + 자동 찾기 실패 보고
+    discovery: async () => (opts.noWorkspace ? { found: null, tried: [
+      { path: "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath", reason: "폴더가 없다: C:\\Users\\kiki\\Desktop\\__AI\\WhyMath" },
+      { path: "C:\\Users\\kiki\\WhyMath", reason: "폴더가 없다: C:\\Users\\kiki\\WhyMath" },
+    ] } : null),
   };
 }
 
 export function chooseApi(): WorkGraphApi {
   if (window.workGraph) return window.workGraph;
   const q = new URLSearchParams(location.search);
-  return fixtureApi(q.get("fixture") ?? "sample", { stale: q.get("stale") === "1" });
+  return fixtureApi(q.get("fixture") ?? "sample", { stale: q.get("stale") === "1", noWorkspace: q.get("first") === "1" });
 }

@@ -4253,6 +4253,17 @@
    ],
    "text": "amend --path 뒤 jit_index.json 미재생성 — 로컬 CI 미러 harness-integrity red·뒤 스텝 10건 미실행(푸시 후·PR 전 검출)",
    "weight": 0
+  },
+  {
+   "kind": "incident",
+   "ref": "2026-09-30",
+   "paths": [
+    ".github/workflows/work-graph-desktop.yml",
+    "docs/ops/work_graph_desktop_runbook.md",
+    "tools/work-graph-desktop/**"
+   ],
+   "text": "데스크톱 앱 런북이 코드가 만들지 않는 데이터 폴더를 안내 — 수집 성공도 스냅샷 없음으로 판정했을 것",
+   "weight": 0
   }
  ]
 }

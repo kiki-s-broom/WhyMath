@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-208-work-graph-desktop-windows-launch
+title: "작업 그래프 데스크톱 앱의 Windows 프로그램 실행 형식 — 두 번 클릭 실행(바로가기·portable)·작업공간 자동 연결·아이콘·단일 인스턴스·실물 Windows CI 빌드"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-206-work-graph-desktop-app
+requires_gates: []
+acceptance:
+  - "① 두 번 클릭 실행 — 설치 EXE가 바탕화면·시작 메뉴 바로가기를 만들고 설치 직후 앱을 연다. 무설치 단일 실행 파일(portable EXE)도 함께 낸다. 실행에 PowerShell·Node·npm이 필요 없다.\n② 작업공간 자동 연결 — 바로가기로 켜면 작업 폴더(cwd)가 저장소가 아니므로, 첫 실행에서 저장된 작업공간 → 알려진 경로(Kiki 고정 경로 C:\\Users\\kiki\\Desktop\\__AI\\WhyMath) 순으로 저장소를 찾고, 없으면 폴더 선택 대화상자를 연다. 고른 폴더가 WhyMath 저장소가 아니면(scripts/harness/work_graph.py 부재) 거부하고 사유를 보인다.\n③ 프로그램 모양 — 앱 아이콘(.ico 다중 해상도) · 단일 인스턴스(두 번째 실행은 기존 창을 앞으로) · 창 크기·위치 기억.\n④ 실제 Windows 검증 — GitHub Actions windows-latest에서 빌드·단위 테스트·Electron 기동 스모크를 돌리고 설치 EXE·portable EXE를 아티팩트로 올린다(수동 실행 + 앱 경로 변경 시). 컨테이너 교차 빌드와 별개로 실물 Windows 판정을 확보한다.\n⑤ 검증 — 작업공간 탐색 순서·저장소 판정·설정 저장은 vitest, 첫 실행 흐름(자동 연결 · 선택 대화상자 · 거부)은 Electron 스모크로 동결하고 뮤테이션에서 RED를 확인한다."
+  - "정정(2026-09-30 · 구현 판정): ②의 \"없으면 폴더 선택 대화상자를 연다\"는 대화상자를 자동으로 띄우지 않고 첫 화면 안내 카드(찾아본 자리·사유 목록 + 「WhyMath 폴더 선택…」 버튼 한 번)로 연다. 이유 — 앱이 뜨자마자 설명 없이 대화상자가 먼저 뜨면 무엇을 고르라는지 모른다. 부수 착지: 데이터 폴더를 %APPDATA%\\whymath-work-graph-desktop으로 고정(제품명이 한글이라 Electron 기본 userData가 로캘에 따라 appData\\WhyMath 작업 지도 또는 appData 루트로 갈렸고, HARN-206 런북의 스냅샷 검사 블록이 가리킨 경로와 어느 쪽도 일치하지 않았다 — 회귀 테스트 e2e 「앱 데이터는 appData\\whymath-work-graph-desktop에 모인다」)."
+artifacts: []
+paths:
+  - "tools/work-graph-desktop/**"
+  - docs/ops/work_graph_desktop_runbook.md
+  - ".github/workflows/work-graph-desktop.yml"
+session: claude/focused-ramanujan-2p5q8w
+notes: "Kiki 요청(2026-09-30): 앱 실행을 Windows 프로그램 실행 형식으로. HARN-206은 개발 모드(npm start)나 로컬 빌드(npm run dist:win)로만 켤 수 있어 Node·PowerShell이 필요했다.\n\n[정정 2026-09-30] 구현 판정에 따른 ② 방식 정정과 데이터 폴더 부수 착지 기록"
+updated: 2026-09-30
