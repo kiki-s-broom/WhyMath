@@ -160,6 +160,9 @@ BASELINE: dict[str, frozenset[str]] = {
             "harness/qa_pipeline.py",
             "harness/recommendation_outcome_report.py",
             "harness/standard_attainment_report.py",
+            # S4-01 슬라이스 2 — traversal 실부하 판정은 실 PG 전 앵커를 직접 재야 한다(측정 대상이
+            # 곧 서빙 탐색 함수의 세션 호출이다). 서빙 코드가 아니라 CI 게이트 도구다.
+            "harness/traversal_load_probe.py",
             "harness/wh1_evaluation.py",
         }
     ),
@@ -267,11 +270,23 @@ BASELINE: dict[str, frozenset[str]] = {
             "l3/pedagogy/prescreen.py",
             "l3/pedagogy/review.py",
             "l3/pedagogy/slot_generator.py",
+            # EOS-50 — 개념 버전 Publish Gate. `concept_version` 행과 발행 포인터
+            # (`concept.current_published_version_id`)를 쓰는 **유일한** 자리로 설계됐다
+            # (AST 동결 test_publish_gate_enforcement.py). 전이 실행이 게이트 검증과 같은
+            # 트랜잭션·같은 행 잠금 안에 있어야 하므로 저장소 계층으로 분리하지 않았다 — 이
+            # 등재가 "이 파일은 DB를 직접 잡는다"의 서면 선언이다.
+            "l3/publish_gate.py",
             "l3/solution_path_store.py",
         }
     ),
     "l4": frozenset(
         {
+            # S4-11 — `hints` 테이블(이 PR이 신설)의 **유일 writer·reader**다. 재사용할 기존
+            # 조회 함수가 없는 신규 테이블이라 새 접근점이 맞다(EOS-103 learner_state_store와
+            # 같은 처분 ② 경로). 경로·단계 읽기는 기존 `l3/solution_path_store.py`(baseline)를
+            # 다운콜해 재구현하지 않고, 오프라인 CLI(`populate.py`)는 세션 호출 없이 이 모듈만
+            # 부른다 — baseline 한 줄이 느는 대신 그 테이블의 접근점은 1개로 고정된다.
+            "l4/hint_content/store.py",
             "l4/misconception/evidence_store.py",
             "l4/misconception/hypothesis_store.py",
             "l4/misconception/semantic/pgvector_index.py",

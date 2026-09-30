@@ -9,12 +9,16 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from whymath_backend.l3.dsl.models import ProblemDSL
 from whymath_backend.l3.dsl.validators import BaseDSLValidator, ValidationResult
 from whymath_backend.l3.dsl.variable_engine import VariableBinding
 from whymath_backend.l3.pregenerate.models import ValidationSignal
+
+# 침묵 실패 금지(CLAUDE.md) — 파싱 회피는 예외 타입명만 남긴다.
+logger = logging.getLogger("whymath.l3.dsl.math_verifier")
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,9 +58,12 @@ def _parse_expression(text: str, local_dict: dict[str, object]) -> object | None
         from sympy.parsing.sympy_parser import (
             convert_xor,
             implicit_multiplication,
-            parse_expr,
             standard_transformations,
         )
+
+        # CONST-09(R22-03): DSL은 `/v1/dsl/validate`·`/compile`로 *인증된 모든 사용자*가 보낼 수
+        # 있다 — 식 문자열은 신뢰 입력이 아니므로 안전 진입점을 거친다(지연 import 유지).
+        from whymath_backend.l3.safe_parse import safe_parse_expr
     except ImportError:
         return None
 
@@ -65,9 +72,12 @@ def _parse_expression(text: str, local_dict: dict[str, object]) -> object | None
         implicit_multiplication,
     )
     try:
-        result: object = parse_expr(text, local_dict=local_dict, transformations=transformations)
+        result: object = safe_parse_expr(
+            text, local_dict=local_dict, transformations=transformations
+        )
         return result
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — 파싱 실패·거부는 None(보수)
+        logger.debug("DSL 식 파싱 회피: %s", type(exc).__name__)
         return None
 
 

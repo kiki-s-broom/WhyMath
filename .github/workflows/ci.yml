@@ -688,6 +688,27 @@ jobs:
         # `tests/infra/test_gate_harness_marker_reach_wiring.py`가 기계로 막는다.
         run: pytest -m integration --ignore=../../tests/backend/l3
 
+      # ── S4-01 슬라이스 2 — 개념 그래프 traversal 성능 예산 **실부하** 판정 ──────────────
+      # 예산 가드(깊이 2·노드 20·시간 2.0초)는 코드로 있었지만 전 그래프 규모에서 버티는지는
+      # 측정된 적이 없었다. 원자 백본 전량을 실 PG에 적재하고 전 앵커 × 탐색 형태 3종 × 동시성
+      # 1·8로 전수 측정해, 시간 예산 초과 0 · 결과 집합이 graph.json 구조 계산과 앵커마다 일치할
+      # 때만 exit 0이다(측정 불성립 = exit 2 — 적재 누락·코퍼스 드리프트가 통과로 위장되지 않는다).
+      # 위 통합 테스트가 남긴 행이 있으면 모집단이 코퍼스와 달라지므로(드리프트 → exit 2) DB를
+      # base→head로 다시 만든 뒤 적재한다. 적재·판정은 저장소 루트 상대경로(data/corpus/…)를
+      # 쓰므로 루트에서 돈다. 배선 실재성 = tests/infra/test_traversal_load_probe_wiring.py.
+      - name: DB 재생성 (traversal 실부하 측정 전 — 통합 테스트 잔여 행 제거)
+        run: |
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+
+      - name: 원자 백본 적재 (traversal 실부하 측정 입력)
+        working-directory: .
+        run: python -m whymath_backend.l1.atom_graph.populate --graph data/corpus/atom_graph_v1/graph.json
+
+      - name: 게이트 — traversal 성능 예산 실부하 (S4-01 · 전 앵커 전수)
+        working-directory: .
+        run: python -m whymath_backend.harness.traversal_load_probe --graph data/corpus/atom_graph_v1/graph.json --concurrency 1,8
+
   # ─────────────────────────────────────────────────────────────────
   # data-pipeline 실 PG 적재 통합테스트 (슬99) — NCIC load_to_postgres 경로
   # 기본 data-pipeline 잡은 [dev]만 설치(sqlalchemy 없음)·PG 서비스 없으므로
@@ -1546,9 +1567,11 @@ jobs:
           python3 scripts/harness/backlog.py rules lint
           python3 scripts/harness/backlog.py rules render --check
 
-      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
-      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
-      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+      # HARN-121 ③ · HARN-130 — 적시 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다.
+      # 종전의 커밋 인덱스(backlog/jit_index.json)는 사고를 등재한 PR끼리 충돌하고, 재생성을
+      # 잊으면 이 스텝이 red였다(HARN-179). 이제 이 스텝은 "대장에서 계산되는가"를 본다 —
+      # 대장 스키마 위반이나 후보 0건(경로 해소 전멸)이면 red다. 0건은 통과가 아니다.
+      - name: 적시 주입 계산 검사 (HARN-121 ③ · HARN-130)
         run: python3 scripts/harness/backlog.py jit check
 
       # CONST-02 — 코딩 헌법(constitution/) 위헌 심사 래칫. 왜 이 잡인가: 상시 실행(needs:
@@ -1680,11 +1703,11 @@ jobs:
       # 무배선이었다 — "일부만 배선됨"이 같은 디렉터리 안에서 한 번 더 재현된 형태다.
       # lint는 재귀라 `scripts` 하나로 harness까지 덮는다. 잔여 위반은 1파일뿐이었다
       # (`diagnose_atom_orphans.py` black — 이 PR에서 정리. OPS-12가 8파일을 이미 상환한 결과).
-      - name: Ruff (scripts + tests/harness)
-        run: python3 -m ruff check scripts tests/harness
+      - name: Ruff (scripts + tests/harness + tools)
+        run: python3 -m ruff check scripts tests/harness tools
 
-      - name: Black --check (scripts + tests/harness)
-        run: python3 -m black --check --line-length 100 scripts tests/harness
+      - name: Black --check (scripts + tests/harness + tools)
+        run: python3 -m black --check --line-length 100 scripts tests/harness tools
 
       - name: 하네스 테스트
         run: python3 -m pytest tests/harness -q

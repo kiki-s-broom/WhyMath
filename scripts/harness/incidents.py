@@ -22,10 +22,23 @@
 3. **손편집 금지** — 스키마 검사는 `validate`가 하고, 등재는 CLI가 한다. 대장을
    직접 고치는 경로는 이 저장소에서 이미 사고를 냈다(YAML 손편집·백틱 소실).
 
-저장 형식: `backlog/incidents.ndjson` (한 줄 = 사고 1건).
-YAML이 아니라 NDJSON인 이유는 셋이다 — ① 676행 매핑을 YAML로 두면 인용 규칙
+저장 형식: 한 줄 = 사고 1건인 NDJSON 파일 여러 개 (HARN-130).
+  · `backlog/incidents/<세션>.ndjson` — 신규 등재가 가는 곳. **세션(=브랜치)당 1샤드**
+  · `backlog/incidents.ndjson`        — 레거시(시드 676건 + 샤딩 이전 등재). 읽기 전용 역사
+읽기는 둘을 합친다(`ledger_paths` — 레거시 → 샤드 이름순 → 줄 순). 어느 한쪽만 읽으면
+과거가 사라지거나 오늘 쓴 줄이 사라진다.
+
+YAML이 아니라 NDJSON인 이유는 둘이다 — ① 676행 매핑을 YAML로 두면 인용 규칙
 (백틱·콜론·따옴표)이 사고 표면이 된다(2026-09-08 백틱 치환 소실이 정확히 그 부류다)
-② 한 줄 = 한 레코드라 append가 충돌을 안 만든다 ③ 시드 원천이 이미 JSON Lines다.
+② 시드 원천이 이미 JSON Lines다.
+
+왜 샤드인가 (정정): 종전 판은 "한 줄 = 한 레코드라 append가 충돌을 안 만든다"를 세 번째
+이유로 적었는데 **사실이 아니었다**. 두 브랜치가 같은 파일 끝에 각각 한 줄을 붙이면 git은
+같은 위치의 서로 다른 삽입으로 보고 충돌을 낸다 — 2026-09-21 PR #1255가 머지 큐에서
+`MERGE_CONFLICT`로 이탈했고 충돌 파일이 정확히 이 대장이었다. `.gitattributes`의
+`merge=union`은 로컬 git만 돕는다(GitHub 서버는 저장소 merge driver를 적용하지 않는다 —
+HARN-46 이벤트 대장이 같은 이유로 먼저 샤딩됐다). 그래서 서로 다른 세션이 서로 다른
+파일에 쓰게 해 충돌을 '해소 가능'이 아니라 '발생 불가능'으로 만든다.
 
 의존성: 표준 라이브러리만. `scripts/harness/`의 다른 모듈과 같은 계약이다
 (루트에 파이썬 프로젝트가 없어 어떤 환경에서도 `python3` 단독 임포트 가능해야 한다).
@@ -88,7 +101,8 @@ WHO_CAUGHT: tuple[str, ...] = ("self", "kiki", "bot", "ci", "luck", "unknown")
 SERIES_ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-LEDGER_NAME = "incidents.ndjson"
+LEDGER_NAME = "incidents.ndjson"  # 레거시(시드) 단일 대장 — 읽기 전용 역사
+SHARD_DIR_NAME = "incidents"  # 세션(=브랜치)당 1샤드 — `backlog/incidents/<세션>.ndjson`
 
 # 시드 회차 문자열 → 계열 슬러그. **키워드 표이지 추론이 아니다** — 각 항목은
 # 시드의 `series` 원문에 실제로 등장하는 부분 문자열이며, 원문은 `series_raw`에
@@ -216,20 +230,50 @@ def to_line(incident: Incident) -> str:
 
 
 def ledger_path(root: Path) -> Path:
+    """레거시(시드) 대장 — 읽기 전용 역사. 신규 등재는 `shard_path`로 간다(HARN-130)."""
     return root / "backlog" / LEDGER_NAME
 
 
-def load_incidents(root: Path) -> tuple[list[Incident], list[str]]:
-    """대장 읽기 — (레코드, 스키마 오류). 파일 부재는 빈 대장(오류 아님)."""
-    path = ledger_path(root)
-    if not path.exists():
-        return [], []
+def shard_dir(root: Path) -> Path:
+    return root / "backlog" / SHARD_DIR_NAME
+
+
+def shard_path(root: Path, shard_name: str) -> Path:
+    """세션 샤드 경로. `shard_name`은 호출측이 `store.session_shard_name(브랜치)`로 만든다.
+
+    이 모듈은 git을 모른다(표준 라이브러리만 — 모듈 docstring). 그래서 브랜치 조회와
+    파일명 정규화는 이벤트 대장과 같은 함수를 쓰는 호출측의 몫이고, 여기서는 그 이름이
+    디렉터리를 벗어나지 않는지만 한 번 더 막는다.
+    """
+    if not shard_name or Path(shard_name).name != shard_name or shard_name.startswith("."):
+        raise ValueError(f"샤드 이름이 파일명 하나가 아니다: {shard_name!r}")
+    return shard_dir(root) / shard_name
+
+
+def ledger_paths(root: Path) -> list[Path]:
+    """사고 대장 파일 전부 — 레거시 → 세션 샤드(이름순). 이 순서가 곧 읽기 순서다.
+
+    읽기 순서는 `compute_nth`의 같은 날짜 동률 깨기에 쓰인다(날짜가 먼저다). 샤드 사이의
+    순서는 이름순이라 결정적이지만 '먼저 일어났다'는 뜻은 아니다 — 대장에 시각 필드가 없어
+    같은 날 두 세션이 같은 계열을 등재하면 어느 쪽이 먼저였는지는 모른다(모른다 ≠ 아니다).
+    """
+    paths: list[Path] = []
+    legacy = ledger_path(root)
+    if legacy.exists():
+        paths.append(legacy)
+    shards = shard_dir(root)
+    if shards.is_dir():
+        paths.extend(sorted(shards.glob("*.ndjson")))
+    return paths
+
+
+def _read_ledger_file(path: Path, where_prefix: str) -> tuple[list[Incident], list[str]]:
     incidents: list[Incident] = []
     errors: list[str] = []
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not raw.strip():
             continue
-        where = f"{LEDGER_NAME}:{lineno}"
+        where = f"{where_prefix}:{lineno}"
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
@@ -248,7 +292,38 @@ def load_incidents(root: Path) -> tuple[list[Incident], list[str]]:
     return incidents, errors
 
 
+def load_incidents(root: Path) -> tuple[list[Incident], list[str]]:
+    """대장 읽기 — 레거시 + 세션 샤드 전부의 (레코드, 스키마 오류). 파일 부재는 빈 대장.
+
+    오류 위치는 `backlog/` 기준 상대 경로로 적는다(`incidents.ndjson:3` ·
+    `incidents/<세션>.ndjson:2`) — 샤드가 여럿이면 줄 번호만으로는 어느 파일인지 모른다.
+    """
+    incidents: list[Incident] = []
+    errors: list[str] = []
+    backlog_root = root / "backlog"
+    for path in ledger_paths(root):
+        where_prefix = path.relative_to(backlog_root).as_posix()
+        found, found_errors = _read_ledger_file(path, where_prefix)
+        incidents.extend(found)
+        errors.extend(found_errors)
+    return incidents, errors
+
+
+def append_incident(root: Path, shard_name: str, incident: Incident) -> Path:
+    """신규 등재 — 세션 샤드 끝에 1줄 append (HARN-130 ③). 공용 파일은 건드리지 않는다.
+
+    종전 등재는 대장 전체를 날짜순으로 다시 써서 공용 파일 하나를 모든 세션이 고쳤다.
+    회차(`compute_nth`)는 파일 순서가 아니라 날짜로 세므로 다시 쓸 이유가 없다.
+    """
+    path = shard_path(root, shard_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(to_line(incident) + "\n")
+    return path
+
+
 def save_incidents(root: Path, incidents: list[Incident]) -> Path:
+    """레거시(시드) 대장 통째 쓰기 — `incident seed` 전용. 신규 등재는 `append_incident`."""
     path = ledger_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     body = "".join(to_line(i) + "\n" for i in incidents)
@@ -260,10 +335,11 @@ def save_incidents(root: Path, incidents: list[Incident]) -> Path:
 
 
 def compute_nth(incidents: list[Incident]) -> list[int | None]:
-    """각 레코드의 회차 — 같은 `series_id` 안에서 (date, 파일 위치) 순 1-기반 서수.
+    """각 레코드의 회차 — 같은 `series_id` 안에서 (date, 읽기 순서) 순 1-기반 서수.
 
     `series_id`가 비면 `None`(미배정 = 모른다). 파일 순서에 의존하지 않도록 날짜로
-    정렬하므로, 과거 사고를 뒤늦게 append해도 회차가 올바르게 재계산된다.
+    정렬하므로, 과거 사고를 뒤늦게 append해도 회차가 올바르게 재계산된다. 읽기 순서는
+    같은 날짜의 동률만 깬다(`ledger_paths` — 레거시 → 샤드 이름순 → 줄 순).
     """
     order: dict[str, list[int]] = {}
     for index, incident in enumerate(incidents):

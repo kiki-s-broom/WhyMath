@@ -153,6 +153,26 @@ class HintEventData(_EventPayload):
             "기본 False라 기존 이벤트·픽스처와 호환."
         ),
     )
+    reveal_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "S4-11: 이 턴에 **검수 통과 graded 힌트가 실제로 서빙됐을 때** 그 힌트의 노출 점수"
+            "(0~1·`l4.hint_content.models.compute_reveal_score` 정의). KPI '답 미루기 도달 깊이 "
+            "2.5+'의 정밀화 신호(깊이 환산 = 3×점수) — `hint_level`은 *결정된* 단계, 이 값은 "
+            "*전달된* 노출이다. None=이 턴에 카탈로그 힌트 미서빙(정적 템플릿만 — 문제 특화 노출이 "
+            "없으므로 0으로 날조하지 않는다) 또는 구판 이벤트."
+        ),
+    )
+    hint_id: str | None = Field(
+        default=None,
+        max_length=200,
+        description=(
+            "S4-11: 서빙된 카탈로그 힌트 ID(`hints.hint_id` — 결정론 생성 자리 키). "
+            "None=미서빙. 식별자일 뿐 본문이 아니다(본문은 이벤트에 싣지 않는다)."
+        ),
+    )
 
 
 class DemandEventData(_EventPayload):

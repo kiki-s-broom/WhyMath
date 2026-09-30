@@ -54,6 +54,29 @@ python3 scripts/harness/backlog.py start <id>
 llm-architect / pedagogy-designer). 위임 프롬프트에 반드시 포함:
 acceptance 전 항목 · 7계층 경계 · CLAUDE.md 금기 · 한국어 주석 규칙.
 
+**3a. 위임 산출물 이식 — 기준 신선도 판정 (HARN-205)**
+서브에이전트가 격리 워크트리에서 만든 산출물을 이 브랜치로 옮길 때(`git diff <위임 기준>..<위임 HEAD> | git apply`
+등), "옮긴 파일이 바이트 동일한가"만 보면 **산출물이 서술하는 코드가 그 사이 main에서 바뀐 것**을 못 본다.
+2026-09-29 ARCH-71 런북이 `ab9f29f2`에서 쓰여 "1차 좌석 실패 → 5xx"라고 서술했는데, 이식 시점 브랜치에는
+이미 ARCH-69(LOCAL 강등 200)가 들어와 있었다(사고 계열 `delegated-output-stale-base`). 위임 기준은 서브에이전트
+워크트리가 분기한 커밋이다 — 위임할 때 기록해 두고, 모르면 `git -C <워크트리> merge-base HEAD origin/main`.
+이식한 산출물(문서·런북·코드 모두)에 대해 **두 번** 돌린다:
+```bash
+# ① 이식 직후 — git apply만 하고 커밋하기 전 (대상 = 브랜치 HEAD, 기본값)
+python3 scripts/harness/port_freshness.py --delegate-base <위임기준커밋> <산출물경로...>
+# ② PR 직전 — 이식 뒤 main이 더 움직였을 수 있다 (대상 = origin/main)
+git fetch origin main
+python3 scripts/harness/port_freshness.py --delegate-base <위임기준커밋> --target origin/main <산출물경로...>
+```
+- `0` 신선 · `1` 산출물이 참조하는 경로가 위임 기준 이후 대상에서 바뀌었다(교집합·모름·산출물 자체 변경) —
+  출력된 **커밋의 변경을 산출물의 서술과 대조**하고 거짓이 된 서술을 고친 뒤에 커밋·PR한다. 도구는 이름만
+  보므로 "대조했더니 서술은 여전히 참"이면 그 근거를 PR 본문에 적는다 · `2` 판정 불가(인자·커밋 없음·
+  **참조 0건**·대상에 이식 자신이 들어 있음) — 통과가 아니다
+- ①을 이식 커밋 **뒤에** 돌리면 기준→HEAD 변경에 이식 자신이 섞여 `2`로 멈춘다. 이미 커밋했다면
+  `--target <이식 직전 커밋>`을 준다
+- "모름"은 `router.py`처럼 파일명만 적혀 여러 경로로 풀리고 그중 바뀐 것이 있는 참조다 — 0으로 접지 않고
+  `1`에 포함된다. 산출물이 전체 경로를 적게 고치면 사라진다
+
 **4. 검증** — 무엇을 돌릴지 사람이 고르지 않는다 (HARN-109·HARN-119)
 ```bash
 python3 scripts/harness/ci_mirror.py run          # 변경이 닿는 잡을 자동 계산해 그대로 실행
@@ -69,6 +92,10 @@ python3 scripts/harness/ci_mirror.py run          # 변경이 닿는 잡을 자�
   최종 줄의 미실행 목록을 읽어 그 명령을 직접 돌리거나, PR 본문에 "CI가 판정"으로 명기한다.
   액션 스텝(`uses:`)은 "환경 전제"로 따로 세며 3을 만들지 않는다. 경로 필터 잡(`changes`)은
   미러의 잡 선택이 같은 정본을 읽어 대신하므로 자동 선택에서 사유와 함께 빠진다
+- 자동 선택의 판정 입력은 `git diff <diff-base>...HEAD` — **커밋된 변경뿐**이다(HARN-172).
+  변경 파일 0건이면 상시 잡만 돌려 통과로 보고하지 않고 `2`로 멈추며, 미커밋 변경이 판정에서
+  빠졌으면 머리말과 마지막 줄에 건수를 경고한다. 커밋한 뒤 다시 돌리거나(`done`의 미러 신선도
+  검사도 커밋 기준이다) 목록을 `--stdin`으로 넘긴다. 의도한 0건이면 `--allow-empty`
 - 범위를 직접 지정해야 하면 `--job <이름>`(반복 지정). 무엇이 있는지는
   `python3 scripts/harness/ci_job_coverage.py scope`가 답한다
 - acceptance 전 항목 자기평가 (하나라도 미충족 = 미완)

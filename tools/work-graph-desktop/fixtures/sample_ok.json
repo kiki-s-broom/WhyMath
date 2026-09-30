@@ -1,0 +1,3071 @@
+{
+ "generated": "2026-09-29",
+ "base": "a28a8d08",
+ "current_stage": "S1",
+ "open_tasks": 33,
+ "open_gates": 6,
+ "branch_total": 1,
+ "edge_total": 26,
+ "counts": {
+  "ready": 4,
+  "in_progress": 3,
+  "waiting": 16,
+  "blocked": 3,
+  "human": 7,
+  "gate_turn": 5,
+  "gate_verdict": 1,
+  "gate_wait": 0,
+  "branch": 1
+ },
+ "flow_count": 6,
+ "flow_node_total": 28,
+ "independent_total": 12,
+ "canvas": {
+  "w": 3364,
+  "h": 2554,
+  "win_w": 300,
+  "win_h": 176
+ },
+ "ready_order": [
+  "t:ARCH-71-cutover-live-check-runbooks",
+  "t:CONST-10-git-revert-guard-stdin-locale-decode",
+  "t:EOS-147-all-correct-theta-upper-pin",
+  "t:HARN-80-direct-commit-landing-done-path"
+ ],
+ "stages": [
+  "S0",
+  "S1",
+  "S2",
+  "S3",
+  "S4",
+  "S5",
+  "E1",
+  "E2",
+  "E3",
+  "E4",
+  "E5",
+  "E6"
+ ],
+ "scans": {
+  "remote_done": {
+   "status": "ok",
+   "count": 0
+  },
+  "remote_claim": {
+   "status": "ok",
+   "count": 0
+  },
+  "stale_branches": {
+   "status": "ok",
+   "count": 0
+  }
+ },
+ "errors": [],
+ "frames": [
+  {
+   "kind": "flow",
+   "hub": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+   "size": 9,
+   "edge_count": 12,
+   "depth": 3,
+   "counts": {
+    "gate_verdict": 1,
+    "gate_turn": 1,
+    "waiting": 6,
+    "branch": 1
+   },
+   "keys": [
+    "g:G-const-a0002-adoption",
+    "g:G-const-sources-registry-adopt",
+    "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+    "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+    "t:CONST-05-coding-constitution-part3-change-safety",
+    "t:CONST-06-coding-constitution-part4-verification-independence",
+    "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+    "t:CONST-08-coding-constitution-part7-edu-app",
+    "b:claude/sample-branch"
+   ],
+   "id": "flow-3",
+   "index": 3,
+   "x": 0,
+   "y": 0,
+   "w": 1164,
+   "h": 1300
+  },
+  {
+   "kind": "flow",
+   "hub": "g:G-arch66-anthropic-api-pause-review",
+   "title": "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.",
+   "size": 4,
+   "edge_count": 3,
+   "depth": 2,
+   "counts": {
+    "gate_turn": 2,
+    "waiting": 2
+   },
+   "keys": [
+    "g:G-arch66-anthropic-api-pause-review",
+    "g:G-opus5-billing-path-prod-recheck",
+    "t:ARCH-50-cloud-high-model-pin-reevaluation",
+    "t:ARCH-63-cloud-seat-failover"
+   ],
+   "id": "flow-4",
+   "index": 4,
+   "x": 1236,
+   "y": 0,
+   "w": 760,
+   "h": 462
+  },
+  {
+   "kind": "flow",
+   "hub": "g:G-external-counsel-restart-after-internal-completion",
+   "title": "외부 의존 작업 재개 판정 (2026-07-27 Kiki 결정의 만료 지점 · 12/31 내부 프로젝트 완성 이후) — 변호사 회신·외부인 리뷰 등 외부 의존 작업은 '미완성 제품의 병목이 되는 것 반대'(2026-07-27 Kiki)로 제품 출시(공개 β) 준비 단계에서 일괄 처리한다. 그 준비 단계의 시작점 = 내부 완성 판정(G-internal-completion-2026-12-31) 이후이며, 이 게이트가 그 만료·재확인 지점이다(만료 없는 유예 금지). 부착 = MGMT-01(법정대리인 실 본인확인 · 변호사 자문 선행)·MGMT-02(이용약관·개인정보처리방침 문안 · 변호사 검토). 종전에는 두 태스크가 게이트 없이 blocked로 파킹돼 있어 기계가 만료 지점을 몰랐다 — 2026-09-28 정리로 게이트 부착 + todo 복귀(후보 제외는 게이트가 집행). 같은 부류의 기존 게이트는 각자 만료 지점을 가지므로 흡수하지 않는다: G-web01-landing-legal-review(랜딩 변호사 검토 · 독촉 2027-01-05) · G-export-prediction-disclosure(열람권 예측치 법률 검토 · MGMT-06). 판정 3택: ①재개(변호사 자문 착수 — MGMT-02 → MGMT-01 → MGMT-03 순) ②연장(새 기한으로 재생성) ③범위 조정. 근거 = MEMORY 2026-07-27 결정 로그 · 2026-09-28 결정 로그.",
+   "size": 4,
+   "edge_count": 3,
+   "depth": 3,
+   "counts": {
+    "gate_turn": 1,
+    "human": 3
+   },
+   "keys": [
+    "g:G-external-counsel-restart-after-internal-completion",
+    "t:MGMT-01-guardian-real-verification",
+    "t:MGMT-02-terms-privacy-policy-counsel",
+    "t:MGMT-03-age-collection-prodsignal-policy"
+   ],
+   "id": "flow-5",
+   "index": 5,
+   "x": 2068,
+   "y": 0,
+   "w": 1164,
+   "h": 462
+  },
+  {
+   "kind": "flow",
+   "hub": "t:KG-02-concept-content-review-promotion",
+   "title": "이론 콘텐츠 검수 승격 — concept_content 846(K-12 437+대학 409) ai_estimated→reviewed 배치 (AI 자기승인 금지)",
+   "size": 4,
+   "edge_count": 3,
+   "depth": 3,
+   "counts": {
+    "gate_turn": 1,
+    "waiting": 3
+   },
+   "keys": [
+    "g:G-kg02-review-promotion-llm-session",
+    "t:KG-02-concept-content-review-promotion",
+    "t:KG-05-university-content-mechanical-pattern-fix",
+    "t:KG-06-concept-content-depth-enrichment"
+   ],
+   "id": "flow-6",
+   "index": 6,
+   "x": 0,
+   "y": 1372,
+   "w": 1164,
+   "h": 462
+  },
+  {
+   "kind": "flow",
+   "hub": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+   "title": "Phaiakes9 침해 대응 — 채굴 예약 작업(GoogleUpdateTask 위장) 발견, 자격증명 전량 로테이션·노출 판정·오진 기록 정정",
+   "size": 4,
+   "edge_count": 3,
+   "depth": 3,
+   "counts": {
+    "waiting": 3,
+    "human": 1
+   },
+   "keys": [
+    "t:OPS-75-amd395-post-incident-full-rebenchmark",
+    "t:OPS-98-coach-turn-tool-call-latency-distribution",
+    "t:PED-38-wh1-fast-path-simple-turn-bypass",
+    "t:SEC-34-phaiakes9-cryptominer-incident-response"
+   ],
+   "id": "flow-7",
+   "index": 7,
+   "x": 1236,
+   "y": 1372,
+   "w": 1164,
+   "h": 462
+  },
+  {
+   "kind": "flow",
+   "hub": "t:CUR-07-achievement-standard-schema-extension",
+   "title": "AchievementStandard 스키마 확장 — 평가준거 코드·성취수준 등급 커버리지 반영 (CUR-03/CUR-05 약속 이행)",
+   "size": 3,
+   "edge_count": 2,
+   "depth": 3,
+   "counts": {
+    "waiting": 2,
+    "ready": 1
+   },
+   "keys": [
+    "t:CUR-07-achievement-standard-schema-extension",
+    "t:CUR-13-learning-outcome-fields-extension",
+    "t:HARN-80-direct-commit-landing-done-path"
+   ],
+   "id": "flow-8",
+   "index": 8,
+   "x": 0,
+   "y": 1906,
+   "w": 1164,
+   "h": 260
+  },
+  {
+   "kind": "group",
+   "group": "in_progress",
+   "title": "진행 중",
+   "hint": "지금 누군가 작업 중이거나 검토를 기다린다",
+   "keys": [
+    "t:NLP-05-shadow-grading-input-supply",
+    "t:SKB-03-atom-node-projection-cli-and-prod-populate",
+    "t:SKB-04-concept-content-k12-prod-populate"
+   ],
+   "id": "group-in_progress",
+   "x": 1236,
+   "y": 1906,
+   "w": 1008,
+   "h": 268,
+   "size": 3
+  },
+  {
+   "kind": "group",
+   "group": "ready",
+   "title": "지금 시작 가능",
+   "hint": "선행·게이트가 없다 — 순서 상관없이 바로 착수할 수 있다",
+   "keys": [
+    "t:ARCH-71-cutover-live-check-runbooks",
+    "t:CONST-10-git-revert-guard-stdin-locale-decode",
+    "t:EOS-147-all-correct-theta-upper-pin"
+   ],
+   "id": "group-ready",
+   "x": 2316,
+   "y": 1906,
+   "w": 1008,
+   "h": 268,
+   "size": 3
+  },
+  {
+   "kind": "group",
+   "group": "human",
+   "title": "사람 작업",
+   "hint": "Kiki 소유 태스크와 아무 작업도 걸려 있지 않은 게이트 — 사람이 움직이거나 판정 기록을 기다린다(창의 상태 표시가 어느 쪽인지 말한다)",
+   "keys": [
+    "t:MOB-21-onboarding-grade-schooltype-input",
+    "t:REC-07-grading-authority-transfer-decision",
+    "t:PED-31-eos-pedagogy-strategy-library-gap-design"
+   ],
+   "id": "group-human",
+   "x": 0,
+   "y": 2246,
+   "w": 1008,
+   "h": 268,
+   "size": 3
+  },
+  {
+   "kind": "group",
+   "group": "blocked",
+   "title": "차단",
+   "hint": "사유가 붙어 멈춰 있다",
+   "keys": [
+    "t:ARCH-11-subgraph-depth-guard",
+    "t:HARN-114-chat-fence-guard-stop-hook",
+    "t:HARN-82-required-checks-premise-drift"
+   ],
+   "id": "group-blocked",
+   "x": 1080,
+   "y": 2246,
+   "w": 1008,
+   "h": 268,
+   "size": 3
+  }
+ ],
+ "edges": [
+  {
+   "src": "g:G-const-a0002-adoption",
+   "dst": "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     447
+    ],
+    [
+     432,
+     375
+    ],
+    [
+     732,
+     375
+    ],
+    [
+     836,
+     144
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-const-a0002-adoption",
+   "dst": "t:CONST-05-coding-constitution-part3-change-safety",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     447
+    ],
+    [
+     432,
+     411
+    ],
+    [
+     732,
+     411
+    ],
+    [
+     836,
+     346
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-const-a0002-adoption",
+   "dst": "t:CONST-06-coding-constitution-part4-verification-independence",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     447
+    ],
+    [
+     432,
+     447
+    ],
+    [
+     732,
+     447
+    ],
+    [
+     836,
+     548
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-const-a0002-adoption",
+   "dst": "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     447
+    ],
+    [
+     432,
+     685
+    ],
+    [
+     732,
+     685
+    ],
+    [
+     836,
+     750
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-const-a0002-adoption",
+   "dst": "t:CONST-08-coding-constitution-part7-edu-app",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     447
+    ],
+    [
+     432,
+     721
+    ],
+    [
+     732,
+     721
+    ],
+    [
+     836,
+     952
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-const-sources-registry-adopt",
+   "dst": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     649
+    ],
+    [
+     432,
+     566
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "dst": "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     566
+    ],
+    [
+     836,
+     144
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "dst": "t:CONST-05-coding-constitution-part3-change-safety",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     566
+    ],
+    [
+     836,
+     346
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "dst": "t:CONST-06-coding-constitution-part4-verification-independence",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     566
+    ],
+    [
+     836,
+     548
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "dst": "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     566
+    ],
+    [
+     836,
+     750
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "dst": "t:CONST-08-coding-constitution-part7-edu-app",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     566
+    ],
+    [
+     836,
+     952
+    ]
+   ],
+   "frame": "flow-3"
+  },
+  {
+   "src": "g:G-arch66-anthropic-api-pause-review",
+   "dst": "t:ARCH-50-cloud-high-model-pin-reevaluation",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     1564,
+     144
+    ],
+    [
+     1668,
+     346
+    ]
+   ],
+   "frame": "flow-4"
+  },
+  {
+   "src": "g:G-arch66-anthropic-api-pause-review",
+   "dst": "t:ARCH-63-cloud-seat-failover",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     1564,
+     144
+    ],
+    [
+     1668,
+     144
+    ]
+   ],
+   "frame": "flow-4"
+  },
+  {
+   "src": "g:G-opus5-billing-path-prod-recheck",
+   "dst": "t:ARCH-50-cloud-high-model-pin-reevaluation",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     1564,
+     346
+    ],
+    [
+     1668,
+     346
+    ]
+   ],
+   "frame": "flow-4"
+  },
+  {
+   "src": "g:G-external-counsel-restart-after-internal-completion",
+   "dst": "t:MGMT-01-guardian-real-verification",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     2396,
+     245
+    ],
+    [
+     2500,
+     144
+    ]
+   ],
+   "frame": "flow-5"
+  },
+  {
+   "src": "g:G-external-counsel-restart-after-internal-completion",
+   "dst": "t:MGMT-02-terms-privacy-policy-counsel",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     2396,
+     245
+    ],
+    [
+     2500,
+     346
+    ]
+   ],
+   "frame": "flow-5"
+  },
+  {
+   "src": "t:MGMT-02-terms-privacy-policy-counsel",
+   "dst": "t:MGMT-03-age-collection-prodsignal-policy",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     2800,
+     346
+    ],
+    [
+     2904,
+     245
+    ]
+   ],
+   "frame": "flow-5"
+  },
+  {
+   "src": "g:G-kg02-review-promotion-llm-session",
+   "dst": "t:KG-02-concept-content-review-promotion",
+   "kind": "requires_gates",
+   "back": false,
+   "points": [
+    [
+     328,
+     1617
+    ],
+    [
+     432,
+     1617
+    ]
+   ],
+   "frame": "flow-6"
+  },
+  {
+   "src": "t:KG-02-concept-content-review-promotion",
+   "dst": "t:KG-05-university-content-mechanical-pattern-fix",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     1617
+    ],
+    [
+     836,
+     1516
+    ]
+   ],
+   "frame": "flow-6"
+  },
+  {
+   "src": "t:KG-02-concept-content-review-promotion",
+   "dst": "t:KG-06-concept-content-depth-enrichment",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     1617
+    ],
+    [
+     836,
+     1718
+    ]
+   ],
+   "frame": "flow-6"
+  },
+  {
+   "src": "t:OPS-98-coach-turn-tool-call-latency-distribution",
+   "dst": "t:PED-38-wh1-fast-path-simple-turn-bypass",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     1968,
+     1718
+    ],
+    [
+     2072,
+     1617
+    ]
+   ],
+   "frame": "flow-7"
+  },
+  {
+   "src": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+   "dst": "t:OPS-75-amd395-post-incident-full-rebenchmark",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     1564,
+     1617
+    ],
+    [
+     1668,
+     1516
+    ]
+   ],
+   "frame": "flow-7"
+  },
+  {
+   "src": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+   "dst": "t:OPS-98-coach-turn-tool-call-latency-distribution",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     1564,
+     1617
+    ],
+    [
+     1668,
+     1718
+    ]
+   ],
+   "frame": "flow-7"
+  },
+  {
+   "src": "t:CUR-07-achievement-standard-schema-extension",
+   "dst": "t:CUR-13-learning-outcome-fields-extension",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     732,
+     2050
+    ],
+    [
+     836,
+     2050
+    ]
+   ],
+   "frame": "flow-8"
+  },
+  {
+   "src": "t:HARN-80-direct-commit-landing-done-path",
+   "dst": "t:CUR-07-achievement-standard-schema-extension",
+   "kind": "depends_on",
+   "back": false,
+   "points": [
+    [
+     328,
+     2050
+    ],
+    [
+     432,
+     2050
+    ]
+   ],
+   "frame": "flow-8"
+  },
+  {
+   "src": "b:claude/sample-branch",
+   "dst": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "kind": "done_on_branch",
+   "back": false,
+   "points": [
+    [
+     328,
+     1156
+    ],
+    [
+     432,
+     566
+    ]
+   ],
+   "frame": "flow-3"
+  }
+ ],
+ "nodes": {
+  "t:PED-31-eos-pedagogy-strategy-library-gap-design": {
+   "key": "t:PED-31-eos-pedagogy-strategy-library-gap-design",
+   "kind": "task",
+   "id": "PED-31-eos-pedagogy-strategy-library-gap-design",
+   "preds": [],
+   "succs": [],
+   "short": "PED-31",
+   "title": "EOS pedagogical strategy library gap design 14/15/16/17 boundaries",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "Write docs/architecture/04f_pedagogy_module_boundaries.md with gap analysis vs current L4 imple…",
+    "Define WhyMath seats for explanation selection, hint strategy, remediation strategy modules"
+   ],
+   "acceptance": [
+    "Write docs/architecture/04f_pedagogy_module_boundaries.md with gap analysis vs current L4 implementation",
+    "Define WhyMath seats for explanation selection, hint strategy, remediation strategy modules",
+    "Quantify gaps in l4/pedagogy: StrategyDecision, ExecutionPlan, Outcome, PedagogicalAction, StrategyStep",
+    "Link PED-31 in ROADMAP.md Phase 1-2 L4 pedagogy engine milestones",
+    "Decompose follow-up tasks PED-32 execution plan model and PED-33 event-system wiring in notes"
+   ],
+   "notes": "Gap design task: reconcile external 14 pedagogical strategy review with WhyMath current PedagogyStrategy enum, YAML catalog, runtime_selector. Identify missing StrategyDecision/ExecutionPlan/Outcome entities, PedagogicalAction atomic layer, StrategyStep, ApplicabilityRule, Pedagogy Graph, State Machine, Fading policy, Event System integration, and conditional effectiveness model. Document 15/16/17 module boundaries.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 680,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-human",
+   "flow": null
+  },
+  "t:CONST-10-git-revert-guard-stdin-locale-decode": {
+   "key": "t:CONST-10-git-revert-guard-stdin-locale-decode",
+   "kind": "task",
+   "id": "CONST-10-git-revert-guard-stdin-locale-decode",
+   "preds": [],
+   "succs": [],
+   "short": "CONST-10",
+   "title": "기존 훅의 stdin 로캘 해독 fail-open 정정 — git_revert_guard.py 가 cp949 콘솔에서 한글 명령을 통과시킨다 (CONST-02 이식 중 발견)",
+   "state": "ready",
+   "label": "시작 가능",
+   "reason": "",
+   "detail": "",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① .claude/hooks/git_revert_guard.py 의 입력 해독을 sys.stdin(로캘 인코딩) 대신 sys.stdin.buffer 바이트 + UTF-8 …",
+    "② 회귀 테스트 — PYTHONIOENCODING=cp949 환경에서 한글과 '—'(UTF-8 E2 80 94)가 섞인 파괴적 git 원복 명령(이 가드가 막는 형태)이 …"
+   ],
+   "acceptance": [
+    "① .claude/hooks/git_revert_guard.py 의 입력 해독을 sys.stdin(로캘 인코딩) 대신 sys.stdin.buffer 바이트 + UTF-8 명시 해독으로 바꾼다 — guard_constitution.py(CONST-02)와 같은 방식.",
+    "② 회귀 테스트 — PYTHONIOENCODING=cp949 환경에서 한글과 '—'(UTF-8 E2 80 94)가 섞인 파괴적 git 원복 명령(이 가드가 막는 형태)이 차단(exit 2)되고, 같은 문자를 담은 읽기 전용 명령은 통과(exit 0)하는 양방향 픽스처. 수정 전 코드로 되돌리면 RED가 나는지 뮤테이션으로 확인한다(원복은 cp 백업).",
+    "③ 저장소의 다른 훅 입력 경로(.claude/hooks/*.py 와 scripts/harness/backlog.py 의 check-edit·check-stop)에 같은 형태(json.load(sys.stdin))가 남아 있는지 전수 스캔하고, 남아 있으면 같은 PR에서 고치거나 승계 태스크로 분리한다."
+   ],
+   "notes": "CONST-02 이식 중 발견(2026-09-28). guard_constitution.py 가 json.load(sys.stdin) 으로 훅 입력을 읽어, 한국어 Windows(cp949) 콘솔에서 한글과 '—'가 섞인 명령이 UnicodeDecodeError → except ValueError → '입력 파싱 실패 — 통과'(fail-open)로 샜다(PYTHONIOENCODING=cp949 재현). 같은 형태가 git_revert_guard.py 의 main 입력 해독에 있다 — 이 가드가 막는 것은 미커밋 작업분을 지우는 git 원복(CLAUDE.md 뮤테이션 원복 금지 규칙의 집행 장치)이라, Windows 세션에서 그 보호가 조용히 꺼질 수 있다. 참고: 같은 세션에서 이 가드가 태스크 등재 heredoc 본문의 설명 문구를 명령으로 오판해 막은 일도 있었다(heredoc 본문을 데이터로 분리하지 않음) — 판정 범위 개선 여부는 이 태스크에서 함께 검토한다.",
+   "cmd": "python3 scripts/harness/backlog.py start CONST-10-git-revert-guard-stdin-locale-decode",
+   "x": 2670,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-ready",
+   "flow": null
+  },
+  "t:KG-06-concept-content-depth-enrichment": {
+   "key": "t:KG-06-concept-content-depth-enrichment",
+   "kind": "task",
+   "id": "KG-06-concept-content-depth-enrichment",
+   "preds": [
+    {
+     "key": "t:KG-02-concept-content-review-promotion",
+     "id": "KG-02-concept-content-review-promotion",
+     "kind": "task",
+     "title": "이론 콘텐츠 검수 승격 — concept_content 846(K-12 437+대학 409) ai_estimated→reviewed 배치 (AI 자기승인 금지)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "KG-06",
+   "title": "이론 콘텐츠 깊이 보강 스코핑 — explanation 평균 25자 구조화 확장 + K-12 플래시카드 76% 공백 + en/ja 로케일 0건",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "KG-02-concept-content-review-promotion",
+   "stage": "S5",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 4,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [
+    "KG-06-concept-content-depth-enrichment",
+    "KG-02-concept-content-review-promotion",
+    "G-kg02-review-promotion-llm-session"
+   ],
+   "excerpt": [
+    "① 현재 깊이 실측 고정: explanation 30자 미만 273/437(62%), 평균 25자, K-12 플래시카드 보유 24%(105/437)·8개 과목 0장, en…",
+    "② 확장 목표 구조 확정: 직관→정의→예시→오개념 연결(pedagogy_packs CONCEPT 팩의 required_slots와 정합) + 학교급별 문체 프로파일(l4/…"
+   ],
+   "acceptance": [
+    "① 현재 깊이 실측 고정: explanation 30자 미만 273/437(62%), 평균 25자, K-12 플래시카드 보유 24%(105/437)·8개 과목 0장, en/ja 로케일 0/437(빈 골격)",
+    "② 확장 목표 구조 확정: 직관→정의→예시→오개념 연결(pedagogy_packs CONCEPT 팩의 required_slots와 정합) + 학교급별 문체 프로파일(l4/speech/profiles.py와 모순 금지)",
+    "③ 생성 경로 결정: data-pipeline 재생성 vs 검수 워크플로(KG-02) 내 수기 보강 — 검수 없는 대량 재생성은 KG-02 blocked 사유와 같은 구조라 선행 해소 필요",
+    "④ 로케일(en/ja)은 Phase 5 글로벌 전까지 의도적 공백인지 Kiki 판단 필요 — 사람 게이트 후보",
+    "⑤ 범위 밖: 실제 대량 재생성 실행(이 태스크는 스코핑까지 — 실행은 승인된 설계로 별도 등재)"
+   ],
+   "notes": "2026-08-13 감사 발견. '이유를 묻는 수학' 정체성 대비 이론이 한 줄 요약 수준. KG-02(검수) blocked 해소가 전제 — 물량 846건이라 생성 품질 게이트 없는 양산은 재발 경로.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 836,
+   "y": 1630,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-6",
+   "flow": 6
+  },
+  "g:G-const-sources-registry-adopt": {
+   "key": "g:G-const-sources-registry-adopt",
+   "kind": "gate",
+   "id": "G-const-sources-registry-adopt",
+   "preds": [
+    {
+     "key": "t:CONST-02-coding-constitution-transplant-stage1-2",
+     "id": "CONST-02-coding-constitution-transplant-stage1-2",
+     "kind": "task",
+     "title": "코딩 헌법(구조 결함 표준북·헌법 v1.0/v1.1 꾸러미) 이식 1~2단계 — 설치·보호 훅·위헌 심사 래칫 CI·진단 도구·이식 정본 문서 (Kiki 지시 2026-09-26)",
+     "status": "done",
+     "open": false,
+     "edge": "게이트를 여는 작업"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-const-sources-registry-adopt",
+   "title": "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시.",
+   "state": "gate_turn",
+   "label": "사람 차례",
+   "reason": "담당 kiki의 행동을 기다린다",
+   "detail": "",
+   "gate_kind": "human",
+   "assignee": "kiki",
+   "requested": "2026-09-27",
+   "days": 2,
+   "overdue": false,
+   "unlocks": 6,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-const-sources-registry-adopt --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 28,
+   "y": 561,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:SKB-03-atom-node-projection-cli-and-prod-populate": {
+   "key": "t:SKB-03-atom-node-projection-cli-and-prod-populate",
+   "kind": "task",
+   "id": "SKB-03-atom-node-projection-cli-and-prod-populate",
+   "preds": [
+    {
+     "key": "g:G-skb03-atom-node-populate",
+     "id": "G-skb03-atom-node-populate",
+     "kind": "gate",
+     "title": "SKB-03 atom_node 메타 프로젝션 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(atom_graph.populate 재실행, PR 병합 후). 배경: atom_node_projection.py가 멱등 upsert 구현을 갖고도 어느 CLI에서도 호출되지 않아 prod에 한 번도 적재된 적이 없었다(2026-09-14 실측: 크로스워크 이전이 \"atom_node 대상 행 부재 1311건\" 보고). SKB-03이 atom_graph/populate.py에 그 적재를 배선했고(CLI 기본 ON·--skip-atom-node로 opt-out) 이 게이트는 그 CLI를 prod에서 1회 실행한다. 부수 효과 주의: 같은 CLI가 concept·concept_edge·시각화 Overlay 2종도 함께 멱등 재적재한다(신규 행 생성이 아니라 upsert 갱신) — 그것이 원래 이 CLI의 본업이고 atom_node는 여섯 번째 스텝으로 얹혔다. 실행 전 BEFORE 카운트, 실행 후 AFTER 카운트를 읽어 적재 성립을 확인하며, acceptance ①이 요구하는 \"테이블 전량 공백인지 일부 code 부재인지\"의 실측도 이 게이트의 BEFORE 단계에서 함께 확정한다. 런북: docs/ops/skb03_atom_node_populate_runbook.md",
+     "status": "cleared",
+     "open": false,
+     "edge": "필요 게이트"
+    }
+   ],
+   "succs": [],
+   "short": "SKB-03",
+   "title": "atom_node prod 미적재 + 적재 CLI 부재 — L2 약개념 추천 메타 enrich가 조용히 0건",
+   "state": "review",
+   "label": "검토 대기",
+   "reason": "검토 대기",
+   "detail": "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). 그 게이트의 목표(concept.behavior_skills)는 달성됐고(AFTER_NONEMPTY=1198) 이 태스크는 같은 실행이 드러낸 별개 공백이다. SKB-01 notes의 \"atom_node.beh…",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "claude/quirky-cori-x91nld",
+   "updated": "2026-09-15",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main …",
+    "②-정정(2026-09-14 착수 실측): \"적재 CLI 진입점이 없다\"는 진단은 증상은 맞았으나 위치가 달랐다. 정확히는 \"이미 있는 CLI가 형제 projection을…"
+   ],
+   "acceptance": [
+    "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main b810388b) 중 concept_atom_crosswalk.populate가 \"atom_node 대상 행 부재 1311건 (예: 10공수1-01-01-1, 10공수1-01-01-2, 10공수1-01-01-3)\"을 보고했다 — atom_node.behavior_skills 갱신 0건. 같은 실행에서 concept 축은 1311/1311 전건 매칭됐으므로 code 키 자체는 정상이고 atom_node 테이블에 그 행들이 없다는 뜻이다. 착수 시 atom_node 전체 행수를 직접 실측해 \"1311개 code 부재\"인지 \"테이블 전량 공백\"인지 범위를 확정한다(이 등재 시점에는 전자만 확인됨).\n② 적재 경로 부재 확정: l1/atom_graph/atom_node_projection.py는 atom_node 멱등 upsert 구현을 갖고 있으나 CLI 진입점이 없다(__main__ 블록 0건·argparse 0건 — main b810388b 실측). 즉 prod에 적재할 실행 경로 자체가 없다. l1/atom_graph/populate.py는 concept/concept_edge 적재기라 atom_node를 건드리지 않는다(docstring 명시). 해법은 SKB-01과 동형: 적재 CLI를 신설하고 게이트로 prod 1회 실행을 위임한다.\n③ 소비처 영향 명시: atom_node는 L2 weak_concept_recommendation(약개념 추천 메타 enrich·S0-4d)이 소비한다 — 비어 있으면 그 경로가 \"메타 누락\"이 아니라 \"원자 축 밖\"으로 읽어 조용히 enrich 0건이 된다(모듈 docstring 24행). 작동한 비율 원칙에 따라 적재 후 enrich 성립 비율을 리포트로 확인할 수 있어야 한다.\n④ prod 적재는 human gate로 위임(prod DB 쓰기라 세션 직접 실행 불가) — 게이트 등재는 CLI 신설 PR 병합 후.",
+    "②-정정(2026-09-14 착수 실측): \"적재 CLI 진입점이 없다\"는 진단은 증상은 맞았으나 위치가 달랐다. 정확히는 \"이미 있는 CLI가 형제 projection을 빠뜨렸다\"다 — 이 저장소의 관례는 <dir>/populate.py가 형제 *_node_projection.py를 부르는 것이고(skill_graph/populate.py 24행·problem_type_graph/populate.py 24행·concept_content 전부 그렇다) atom_graph/populate.py만 atom_node_projection import가 0건이었다. 그 CLI는 concept/concept_edge/시각화 Overlay 2종을 적재하는 멀쩡한 진입점이었다. 따라서 해법은 새 CLI 신설이 아니라 기존 CLI에 여섯 번째 적재 스텝 배선이며, 같은 파일의 VIZ-01 D1 선례(opt-in Overlay)를 그대로 답습했다. 다만 Overlay와 달리 경로 인자가 없어(같은 graph.json) opt-in 스위치가 None 경로가 아니라 불린 populate_node_meta다 — 기본 False가 기존 hermetic 단위테스트(tmp_path 그래프·PG 불요)의 계약을 보존하고, CLI(_main)는 기본 ON으로 호출하며 --skip-atom-node로 opt-out한다. 이 정정은 SKB-01의 ③-보정2와 같은 형태다(진단은 정확, 정정 위치가 달랐다).\n③-충족확인(2026-09-14): 이 항이 요구한 \"작동한 비율\" 신호는 이미 배선돼 있었다 — l2/weak_concept_recommendation.py가 off_atom_axis를 계수해 WeakConceptResult로 반환한다(216·223·247행·ARCH-13 표면화). 새로 만들 필요가 없으므로 이 태스크의 실제 스코프는 CLI 배선 하나로 줄었다. 다만 그 계수가 적재 후 실제로 줄어드는지는 학습자 진단 데이터가 있는 요청을 호출해야 알 수 있어 이 태스크 범위 밖이다(런북 §8에 고지).\n①-부분충족(2026-09-14): 기대 적재 건수를 코퍼스에서 직접 셌다 — data/corpus/atom_graph_v1/graph.json의 concepts 2,683건(세부개념 1,823 + 단원 217 + 소단원 643), name/level 결손으로 skip될 노드 0건. concept 테이블 2,683행과 정확히 일치한다. 이 과정에서 atom_node_projection.py docstring의 \"원자 1,837 + 단원 217 + 소단원 643 = 2,697\"이 낡은 값임이 드러나 3곳을 실측값으로 정정했다. 다만 이 항이 요구한 \"prod atom_node 전체 행수\"(전량 공백인지 1,311 code만 부재인지)는 prod DB 읽기라 세션이 못 한다 — 게이트 런북 [B]단계의 BEFORE_TOTAL이 그 답을 낸다.\n④-집행(2026-09-14): prod 적재 게이트 G-skb03-atom-node-populate 등재 + 런북 docs/ops/skb03_atom_node_populate_runbook.md 작성. 런북은 SKB-01 런북 §9의 교훈(자동 가드 없음·블록 간 사람 판정·체크아웃 대신 동등성 판정)을 처음부터 적용했다. 이 게이트가 clear되고 AFTER_TOTAL=2683이 확인되기 전까지 이 태스크는 미완이다.\n⑤-후속발견(2026-09-14): atom_node 행이 생긴 뒤 concept_atom_crosswalk.populate를 한 번 더 돌려야 atom_node.behavior_skills가 채워진다(2026-09-14 실행은 대상 행 부재로 0건이었다). 그 재실행은 이 게이트 범위 밖이며 런북 §8에 고지했다 — AFTER_WITH_SKILLS=0이 정상임을 함께 명시해 오판을 막았다."
+   ],
+   "notes": "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). 그 게이트의 목표(concept.behavior_skills)는 달성됐고(AFTER_NONEMPTY=1198) 이 태스크는 같은 실행이 드러낸 별개 공백이다. SKB-01 notes의 \"atom_node.behavior_skills는 이미 크로스워크로 정상 채워져 있으므로(S0-2)\"라는 전제가 prod에서 성립하지 않음을 이 실측이 뒤집었다 — S0-2는 UPDATE 코드를 만들었을 뿐 대상 행을 적재하지 않는다.\n\n[정정 2026-09-14] 착수 실측으로 진단 위치 정정(CLI 부재 -> 기존 CLI가 형제 projection 누락) + acceptance③ 기배선 확인 + 기대 건수 2683 실측 + prod 적재 게이트/런북 집행\n\n[정정 2026-09-15] CLI 배선 PR #1163 main 병합(6d34e607) — 코드 축 완료, prod 적재 게이트 G-skb03-atom-node-populate 대기로 태스크는 미완 유지",
+   "cmd": "",
+   "x": 1590,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-in_progress",
+   "flow": null
+  },
+  "t:CONST-05-coding-constitution-part3-change-safety": {
+   "key": "t:CONST-05-coding-constitution-part3-change-safety",
+   "kind": "task",
+   "id": "CONST-05-coding-constitution-part3-change-safety",
+   "preds": [
+    {
+     "key": "g:G-const-a0002-adoption",
+     "id": "G-const-a0002-adoption",
+     "kind": "gate",
+     "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CONST-05",
+   "title": "코딩 헌법 이식 3단계 — 파트 III(9~11장) — 커밋 규율·마이그레이션·래칫 집행 장치 착지 (규칙 8건)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 0,
+   "wait_chain": [
+    "CONST-05-coding-constitution-part3-change-safety",
+    "G-const-a0002-adoption (외 1)"
+   ],
+   "excerpt": [
+    "① 대상 규칙 8건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'none…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 8건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'none': 3, 'partial': 5}): R9-01(none·st3·S) → scripts/ops/check_commit_msg.py / R9-02(partial·st3·S) → scripts/ops/check_commit_msg.py / R9-03(none·st4·S) → scripts/ops/check_commit_msg.py / R10-01(partial·st3·S) → scripts/ops/check_migrations.py / R10-02(none·st4·M) → scripts/ops/check_migrations.py / R10-03(partial·st4·M) → scripts/backup/migrate_whymath_pg.ps1 / R11-01(partial·st3·M) → scripts/ops/lint_ratchet.py / R11-02(partial·st3·S) → scripts/ops/lint_ratchet.py",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다.",
+    "⑥ (CONST-02 대조표 비평가 처분 #7 승계) DB 제약 규칙(R2-01 등)의 check 경로를 꾸러미 제안(db/constraints/*.sql)이 아니라 이 저장소 관례(alembic 리비전 + tests/backend/db 계약 테스트)로 재지정하는 개정 초안을 docs/constitution_proposals/ 에 둔다. 제약이 운영 DB에 실제로 걸려 있는지는 저장소만으로 판정할 수 없으므로 scripts/ops/probe_prod_schema_revision.sql 을 Kiki 머신에서 실행하는 사람 게이트(6항목 브리핑 동봉)로 분리한다."
+   ],
+   "notes": "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계",
+   "cmd": "",
+   "x": 836,
+   "y": 258,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:ARCH-50-cloud-high-model-pin-reevaluation": {
+   "key": "t:ARCH-50-cloud-high-model-pin-reevaluation",
+   "kind": "task",
+   "id": "ARCH-50-cloud-high-model-pin-reevaluation",
+   "preds": [
+    {
+     "key": "g:G-arch66-anthropic-api-pause-review",
+     "id": "G-arch66-anthropic-api-pause-review",
+     "kind": "gate",
+     "title": "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "g:G-opus5-billing-path-prod-recheck",
+     "id": "G-opus5-billing-path-prod-recheck",
+     "kind": "gate",
+     "title": "Opus 5 과금 경로의 프로덕션 재확인 지점 — 개발 단계 한정 승인의 만료 지점. 2026-09-21 Kiki 판단으로 개발 단계에서는 Claude Max 요금제 구독 경유로 Opus 5를 쓰기로 했다(이전 세션에서 사용 가능 검토 완료). 이 승인은 개발 단계 한정이므로 만료·재확인 지점을 동반한다(CLAUDE.md 「만료 없는 유예·제외 금지」). 재확인 시점 = 프로덕션 배포 판정 시 또는 학생 대면 트래픽이 개발용 좌석을 넘어설 때 중 먼저 오는 쪽. 확인할 것: ①구독 경유 호출이 프로덕션 트래픽 규모·약관에서 유효한가 ②유효하지 않으면 API 키 과금으로 전환할 때의 비용 영향(Opus 5 $5/$25 · 가정토큰 74/358 기준 1회 14.353원) ③auth_source 관측이 실제로 어느 경로를 쓰고 있는지 말하고 있는가(조용한 폴백이 없는가). 판정 3택: ①개발단계 승인 유지(재확인 게이트 재생성) ②API 키 과금으로 전환 ③좌석 자체 재설계. 근거 = docs/architecture/03c_cloud_tier_transition_v2.md 4.3~4.4절 · ARCH-50 acceptance ⑨",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:ARCH-62-cloud-cost-table-seat-axis",
+     "id": "ARCH-62-cloud-cost-table-seat-axis",
+     "kind": "task",
+     "title": "클라우드 단가표 좌석 축 분리 — 티어만으로 키가 잡혀 MID 좌석 이동 시 24.4배 과대 계상",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "ARCH-50",
+   "title": "CLOUD_HIGH 모델 핀 재평가 — 목표 Opus 5(2026-09-21 Kiki 지시·Fable 5.1 대체) + 구독 자격증명 사슬 복원",
+   "state": "waiting",
+   "label": "사람 게이트 대기",
+   "reason": "사람 게이트 대기",
+   "detail": "G-opus5-billing-path-prod-recheck, G-arch66-anthropic-api-pause-review",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-24",
+   "unlocks": 0,
+   "wait_chain": [
+    "ARCH-50-cloud-high-model-pin-reevaluation",
+    "G-arch66-anthropic-api-pause-review (외 1)"
+   ],
+   "excerpt": [
+    "①단가표·한도표 동시 갱신 — `l3/router.py`의 `CLOUD_TOKEN_PRICE_USD_PER_1M`에 새 핀의 실단가를 넣고, `DAILY_LIMIT_KRW…",
+    "[목표 핀 변경 2026-09-21] Kiki 지시로 CLOUD_HIGH 목표가 Fable 5.1 → **Opus 5**로 바뀐다. 위 ①~④는 Fable 5.1 전제로 …"
+   ],
+   "acceptance": [
+    "①단가표·한도표 동시 갱신 — `l3/router.py`의 `CLOUD_TOKEN_PRICE_USD_PER_1M`에 새 핀의 실단가를 넣고, `DAILY_LIMIT_KRW`(free 100·basic 500·premium 2000·gifted 5000)가 여전히 의도한 콜 수를 허용하는지 재계산한다. Fable 5.1은 10/50 USD per 1M로 현행 Opus 4.7(5/25)의 정확히 2배이므로, 실측 p50 토큰(입력 74·출력 358)으로 콜당 14.4원에서 28.7원이 되고 premium 한도가 139콜에서 69콜로 반감한다. 단가만 바꾸고 한도표를 두면 상위 티어가 조용히 절반이 된다.\n②API 표면 차이의 실측 대조 — Fable 5.1은 Opus 계열과 요청 표면이 다르다(사고는 항상 켜짐이라 `thinking` 생략 또는 adaptive만 허용·`budget_tokens`는 400·강제 `tool_choice` any/tool은 400·assistant prefill 400·`output_config.effort`로 깊이 제어·거부 stop_reason 처리와 server-side fallback 권장). `l3/providers/anthropic.py`가 현재 보내는 인자 집합이 새 핀에서 유효한지 실물 SDK 표면으로 확인한다 — 시임 테스트만으로 정합 선언 금지(CLAUDE.md).\n③검증 계약 불변 확인 — 모델이 바뀌어도 SymPy 단일 권위·학생 제공 전 검증·Langfuse 추적·미성년자 데이터 정책·저작권 레일은 유지된다. 교체 후 해당 게이트들이 여전히 green인지 확인한다.\n④MEMORY 결정 로그 기재 — 교체 근거·비용 영향·한도표 재계산 결과.",
+    "[목표 핀 변경 2026-09-21] Kiki 지시로 CLOUD_HIGH 목표가 Fable 5.1 → **Opus 5**로 바뀐다. 위 ①~④는 Fable 5.1 전제로 쓰였으므로 아래가 우선한다. ⑤ 정확한 모델 id는 `claude-opus-5`이며 **날짜 접미사를 붙이지 않는다**(컨텍스트 1M). ⑥ 단가는 $5/$25로 현행 핀 `claude-opus-4-7`과 **동일**하다 — 따라서 ①의 단가표 값 변경과 `DAILY_LIMIT_KRW` 재계산은 **불요**다(Fable 5.1의 2배 단가를 전제한 ① 본문은 이 핀에 적용되지 않는다). ⑦ 단, 동작이 다르다 — Opus 5는 thinking이 **기본 ON(adaptive)**이라 `thinking` 생략 시에도 사고가 돌고, 4.7(생략 시 사고 없음) 대비 출력 토큰이 늘 수 있다. 그러므로 `_EST_ASSUMED_OUTPUT_TOKENS=358`(4.7 기준 2026-07-14 실측 p50·n=32)은 교체 후 `ops.cost_report`의 suggested_est_*로 재대입한다. ⑧ `budget_tokens`는 Opus 5에서 제거돼 400을 내므로 현행 프로바이더가 그것을 보내지 않는지 실물 SDK 표면으로 확인한다(②의 실측 대조 요구를 Opus 5 축으로 승계). ⑨ **자격증명 사슬 복원** — `l3/providers/anthropic.py`가 `AsyncAnthropic(api_key=...)`로 키를 명시 주입해 SDK의 해소 사슬(ANTHROPIC_API_KEY → ANTHROPIC_AUTH_TOKEN → OAuth 프로파일 → WIF)을 통째로 가린다. 개발 단계에서 Claude Max 구독 경유로 Opus 5를 쓰려면 키가 비었을 때 인자를 **생략**해 SDK가 사슬을 타게 해야 한다. 조용한 폴백 금지 — 어느 경로로 인증됐는지 /status와 회차 리포트가 auth_source(api_key|auth_token|oauth_profile|none)로 말한다. 변별력: 키만 있는 환경·토큰만 있는 환경·둘 다 없는 환경 세 가지가 서로 다른 값을 내야 하며 셋 전부에서 테스트한다. ⑩ 단가표 구조 변경은 이 태스크가 아니라 ARCH-62(좌석 축 분리)가 소유한다 — 중복 구현 금지.",
+    "[ARCH-66 보류 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다(Claude는 Claude Max 구독 개발 도구로만). 이 태스크는 Anthropic 좌석의 런타임 호출을 전제하므로 재판정 게이트 G-arch66-anthropic-api-pause-review에 묶는다. 특히 구독 OAuth 자격증명을 백엔드 런타임에 쓰는 설계(03c 4.3)는 2026-05-20 결정(소비자 구독 = 개인 사용 한정·제품 서빙 불가)과 충돌 소지가 있어 그 게이트에서 함께 판정한다."
+   ],
+   "notes": "착수 배경: 2026-09-16 Kiki 요청(\"high = Fable 5.1\"). 현행 CLOUD_HIGH 핀은 claude-opus-4-7이다(config.py anthropic_model_high). 교체 자체는 env 오버라이드로도 가능하나 단가표·한도표가 코드 상수라 함께 움직여야 하고, Fable 계열은 요청 표면이 Opus와 달라 프로바이더 인자 집합 재확인이 필요하다. 형제 태스크 ARCH-49(DeepSeek)와 달리 이쪽은 같은 Anthropic 관할이라 국외 이전 축의 변화가 없다 — 법적 선결 조건이 붙지 않는 이유다.\n\n[정정 2026-09-21] title 'CLOUD_HIGH 모델 핀 재평가 — Fable 5.1 교체 시 단가표·일일 한도표·프로바이더 인자 표면 동시 갱신' → 'CLOUD_HIGH 모델 핀 재평가 — 목표 Opus 5(2026-09-21 Kiki 지시·Fable 5.1 대체) + 구독 자격증명 사슬 복원': 2026-09-21 Kiki 지시로 CLOUD_HIGH 목표 핀이 Fable 5.1에서 Opus 5로 바뀜 + 구독 과금 경로가 현행 api_key 명시 주입에 막혀 자격증명 사슬 축이 추가됨. 설계 근거 = docs/architecture/03c_cloud_tier_transition_v2.md 4절. 신규 태스크 대신 amend를 쓴 이유 = 이 태스크가 이미 CLOUD_HIGH 핀을 소유하고 있어 신규 등재는 EOS-120형 중복 소유가 된다\n\n[정정 2026-09-21] 개발 단계 구독 경유 승인의 만료·재확인 지점 부착 (CLAUDE.md 만료 없는 유예 금지) — 설계 4.4절\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침",
+   "cmd": "",
+   "x": 1668,
+   "y": 258,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-4",
+   "flow": 4
+  },
+  "t:ARCH-71-cutover-live-check-runbooks": {
+   "key": "t:ARCH-71-cutover-live-check-runbooks",
+   "kind": "task",
+   "id": "ARCH-71-cutover-live-check-runbooks",
+   "preds": [
+    {
+     "key": "t:ARCH-64-cloud-mid-seat-cutover",
+     "id": "ARCH-64-cloud-mid-seat-cutover",
+     "kind": "task",
+     "title": "CLOUD_MID 좌석 컷오버 — cloud_provider 기본값 openrouter 전환 + 학생 대면 서빙 노출 (ARCH-55 판정 번복)",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "ARCH-71",
+   "title": "ARCH-64 컷오버 라이브 대조 승계 — 저작·학생 대면 1회차 런북 작성(학생 대면 런북 부재) + Kiki 실행 게이트",
+   "state": "ready",
+   "label": "시작 가능",
+   "reason": "",
+   "detail": "",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-29",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① ARCH-64 acceptance ⑤(라이브 대조 1회)의 승계 — ARCH-64는 컨테이너에 OpenRouter 키가 없어 라이브 대조를 수행하지 못했다. 저작 1회…"
+   ],
+   "acceptance": [
+    "① ARCH-64 acceptance ⑤(라이브 대조 1회)의 승계 — ARCH-64는 컨테이너에 OpenRouter 키가 없어 라이브 대조를 수행하지 못했다. 저작 1회차와 학생 대면 1회차를 각각 돌려 `cloud_seat=openrouter`·관측 모델·기록 원가(좌석 단가 약 0.354원)를 확인한다. 실패 회차도 폐기하지 않고 기록한다.\n② 런북 — 저작 경로는 기존 `docs/ops/eos118_seat_signal_live_runbook.md` [C]를 쓰되, 그 문면의 \"대조군 = 기본 좌석(anthropic)\" 전제를 기본값 전환·ARCH-66 차단에 맞게 갱신한다. 학생 대면 경로는 기존 런북이 없다 — `/v1/generate`에 CLOUD_MID로 라우팅되는 본문(premium·requires_reasoning·예산·반출 가능 등급)을 보내는 런북을 새로 쓴다(실제 학생 엔드포인트는 free·0원 기본이라 LOCAL로만 간다는 사실을 런북에 명시). 두 런북 모두 CLAUDE.md Kiki 머신 안내 규칙(6항목 브리핑·자리표시자 0·쓰기 블록 자가 거부·`python -m`)을 따른다.\n③ 실행은 Kiki 머신에서만 가능하므로 게이트로 넘긴다(착수 세션이 게이트를 등재). `seat_primary_success_rate`는 ARCH-63 전까지 코드에 없으므로 이 회차에서는 None(미산출)이 정상이며 그 사실을 판정에 적는다(0으로 접지 않는다)."
+   ],
+   "notes": "출처: ARCH-64 ⑤ 미이행분 승계(2026-09-29). CLAUDE.md '회수·완료 시 미이행분은 승계 태스크로 분리' 규칙.",
+   "cmd": "python3 scripts/harness/backlog.py start ARCH-71-cutover-live-check-runbooks",
+   "x": 2344,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-ready",
+   "flow": null
+  },
+  "t:HARN-114-chat-fence-guard-stop-hook": {
+   "key": "t:HARN-114-chat-fence-guard-stop-hook",
+   "kind": "task",
+   "id": "HARN-114-chat-fence-guard-stop-hook",
+   "preds": [],
+   "succs": [],
+   "short": "HARN-114",
+   "title": "채팅 출력 펜스 규칙의 기계 집행 — Stop 훅이 transcript를 읽어 탐지·재작성 요구·측정 (텍스트 규칙 3회 실패 후 코드 착지)",
+   "state": "blocked",
+   "label": "차단",
+   "reason": "차단",
+   "detail": "[차단 2026-09-19] 2주 측정 창 대기 — 작업이 아니라 경과 대기다. 3겹 방어 코드·배선은 main 978d7505(PR #1208)에 착지했고, acceptance ⑧의 완료 기준이 \"설치 후 2주간 retry:false 위반 0건\"이라 그 전에는 done으로 칠 수 없다. 만료(2026-10-02경) 시점 할 일 둘: ① .claude/logs/fence_violations…",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 1,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-19",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 1겹 규칙 문장 전환(금지형 → 대체형) — CLAUDE.md의 채팅 펜스 규칙을 \"쓰지 마라\"에서 \"대신 이렇게 하라\"로 고친다. 세 번의 실패 지점마다 대체 형식을…"
+   ],
+   "acceptance": [
+    "① 1겹 규칙 문장 전환(금지형 → 대체형) — CLAUDE.md의 채팅 펜스 규칙을 \"쓰지 마라\"에서 \"대신 이렇게 하라\"로 고친다. 세 번의 실패 지점마다 대체 형식을 하나씩 지정한다: 커밋 해시·식별자는 **인라인 백틱**, 명령 실행 결과는 **요약 문장 + 인용문**, 구조체(JSON 등)는 **필드명: 값 산문 나열**. 관찰 근거: 3회 전부 \"결과가 이렇게 보입니다\"를 보여주려는 순간이었고, 금지만 있으면 그 순간 쓸 대안이 없어 습관(펜스)으로 돌아간다.\n② 규칙 본문의 틀린 전제 정정 — \"채팅 축은 이 규칙이 유일한 방어선\"은 **사실이 아니다**. Stop 훅이 `transcript_path`로 그 세션의 대화 기록을 읽을 수 있고, 이 저장소는 이미 Stop 훅(`backlog.py check-stop`)을 운영 중이다. 그 문장을 지우고 기계 집행 소유자를 이 태스크로 적는다.\n③ 2겹 UserPromptSubmit 상기 — 대화가 길어질수록 CLAUDE.md의 영향력이 약해진다(3회차 전부 장시간 세션의 후반이었다). `UserPromptSubmit` 훅이 매 턴 대체 형식 한 줄을 주입한다.\n④ 3겹 Stop 훅 탐지 — 마지막 답변에서 위반 펜스를 찾아 exit 2로 종료를 막고 재작성을 요구하며, `.claude/logs/fence_violations.jsonl`에 건수를 남긴다(측정 지표). `stop_hook_active`로 무한 반복을 막는다.\n⑤ **탐지 기준은 \"펜스 유무\"가 아니라 \"실행 의도 태그\"다**(세션이 제안 설계에서 정정한 축) — 규칙 본문이 \"펜스는 실행용 *전용*\"이라고 하므로 실행 블록은 **허용 대상**이다. `^```` 전건을 잡으면 Kiki께 드리는 런북 실행 블록이 전부 막혀 핵심 워크플로가 깨진다. 허용 = 실행 언어 태그(powershell·bash·sh·cmd 등)가 붙은 펜스. 위반 = 태그 없는 펜스 + 비실행 태그(json·text·yaml 등). 3회 위반 전부 태그 없는 펜스였다.\n⑥ 변별력 — 설치 후 **일부러 위반 펜스를 한 번 써서 훅이 실제로 잡는지** 확인한다(transcript 구조는 Claude Code 버전에 따라 바뀔 수 있으므로 형태 가정을 실측으로 검증한다). 대조군: 실행 태그 펜스가 **통과**하는지도 같은 방식으로 확인한다 — 대조군이 없으면 \"전건 차단\"이라는 과잉 수정이 통과한다. 훅이 transcript를 못 읽는 경우 **작업을 막지 않고 통과**시킨다(관측 실패가 작업 실패가 되면 안 된다).\n⑦ 오탐 탈출구 — Kiki가 명시적으로 코드를 요청한 턴은 통과시킨다(사용자 메시지의 마커 검사). 탈출구 사용은 로그에 남긴다 — 남지 않는 탈출구는 게이트를 끄는 것과 같다.\n⑧ 완료 기준(측정) — 설치 후 **2주간 `fence_violations.jsonl`의 `retry:false` 위반 0건**. retry:true(재작성으로 교정된 건)는 위반으로 세지 않되 별도 집계해 \"탐지기가 실제로 일하고 있다\"의 증거로 쓴다. 2주 동안 retry 기록이 0건이면 그것은 \"위반이 없었다\"가 아니라 **\"탐지기가 안 돌고 있다\"일 수 있으므로**, ⑥의 주입 확인을 만료 시점에 한 번 더 한다.\n⑨ 한계 명시 — 이것은 예방이 아니라 **탐지 + 강제 재작성 + 기록**이다. 이미 화면에 나간 답변은 지울 수 없어 위반 답이 한 번 보인 뒤 수정본이 이어진다. 예방은 ①②가, 안전망은 ③④가 맡는 구조임을 규칙 본문에 적는다."
+   ],
+   "notes": "사고 경위: CLAUDE.md 「실행용 블록과 증거 블록의 분리」(2026-08-31 신설 · 2026-09-10 v0.2.20 확장)가 **3회 뚫렸다**. 1회차 HARN-38(증거 인용이 복사-실행돼 CommandNotFound 2건) · 2회차 OPS-72(커밋 해시+메시지 줄과 명령+결과 주석을 펜스에 담아 ParserError 1건 + fatal 2건) · 3회차 2026-09-18 이 세션(저작 요약 예상 JSON을 펜스에 담아 ParserError). 셋 다 읽기 전용이라 피해 0이지만 파괴적 명령이었다면 달랐다.\\n\\n세션이 처음에 '채팅 축은 코드가 닿지 않으니 태스크 등재는 알리바이'라고 판단했는데 **그 전제가 틀렸다** — Kiki 지적으로 정정. Stop 훅은 transcript_path로 대화 기록을 읽을 수 있고, 이 저장소는 이미 Stop 훅(backlog.py check-stop)·SessionStart·PostToolUse를 운영 중이다(실측). 즉 측정 가능한 게이트를 만들 수 있으므로 CLAUDE.md '동일 유형 텍스트 규칙 2회 실패 후 코드 착지' 선례가 그대로 적용된다.\\n\\n세션이 제안 설계에서 정정한 축(acceptance ⑤): 탐지 기준을 '펜스 유무'로 잡으면 Kiki께 드리는 런북 실행 블록이 전부 막힌다 — 규칙 본문이 '펜스는 실행용 전용'이라 실행 블록은 허용 대상이다. 실행 언어 태그 유무로 갈라야 하며, 3회 위반은 전부 태그 없는 펜스였다.\\n\\n실패 지점의 공통 형태(세션 관찰): 세 번 다 '결과가 이렇게 보입니다'를 보여주려던 순간이다. 그래서 금지형이 아니라 대체형 규칙이 필요하다.\n\n[차단 2026-09-19] 2주 측정 창 대기 — 작업이 아니라 경과 대기다. 3겹 방어 코드·배선은 main 978d7505(PR #1208)에 착지했고, acceptance ⑧의 완료 기준이 \"설치 후 2주간 retry:false 위반 0건\"이라 그 전에는 done으로 칠 수 없다. 만료(2026-10-02경) 시점 할 일 둘: ① .claude/logs/fence_violations.jsonl에서 retry:false 건수 확인 ② 탐지기 생존 주입 확인(무태그 펜스 transcript로 exit 2가 나는지) — 2주간 기록 0건은 \"위반이 없었다\"일 수도 \"탐지기가 안 돈다\"일 수도 있어 ①만으로는 변별력이 없다. --handover인 이유: 2주 홀드는 stale claim이 되고, 만료 시점 측정은 어느 세션이든 할 수 있다.",
+   "cmd": "",
+   "x": 1434,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-blocked",
+   "flow": null
+  },
+  "g:G-kg02-review-promotion-llm-session": {
+   "key": "g:G-kg02-review-promotion-llm-session",
+   "kind": "gate",
+   "id": "G-kg02-review-promotion-llm-session",
+   "preds": [
+    {
+     "key": "t:CONT-05-concept-content-supply-review-gate",
+     "id": "CONT-05-concept-content-supply-review-gate",
+     "kind": "task",
+     "title": "학생 학습 공급(/study)이 개념 콘텐츠의 검수 상태를 보지 않는다 — ai_estimated 은유·오개념·설명이 reviewed와 똑같이 공급된다(검수 게이트 판정·집행)",
+     "status": "done",
+     "open": false,
+     "edge": "게이트를 여는 작업"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:KG-02-concept-content-review-promotion",
+     "id": "KG-02-concept-content-review-promotion",
+     "kind": "task",
+     "title": "이론 콘텐츠 검수 승격 — concept_content 846(K-12 437+대학 409) ai_estimated→reviewed 배치 (AI 자기승인 금지)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-kg02-review-promotion-llm-session",
+   "title": "KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md",
+   "state": "gate_turn",
+   "label": "사람 차례",
+   "reason": "담당 kiki의 행동을 기다린다",
+   "detail": "",
+   "gate_kind": "human",
+   "assignee": "kiki",
+   "requested": "2026-09-21",
+   "days": 8,
+   "overdue": false,
+   "unlocks": 3,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-kg02-review-promotion-llm-session --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 28,
+   "y": 1529,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-6",
+   "flow": 6
+  },
+  "t:OPS-75-amd395-post-incident-full-rebenchmark": {
+   "key": "t:OPS-75-amd395-post-incident-full-rebenchmark",
+   "kind": "task",
+   "id": "OPS-75-amd395-post-incident-full-rebenchmark",
+   "preds": [
+    {
+     "key": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+     "id": "SEC-34-phaiakes9-cryptominer-incident-response",
+     "kind": "task",
+     "title": "Phaiakes9 침해 대응 — 채굴 예약 작업(GoogleUpdateTask 위장) 발견, 자격증명 전량 로테이션·노출 판정·오진 기록 정정",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "OPS-75",
+   "title": "AMD395 로컬 LLM 성능 전면 재측정 — 채굴 감염기간(추정 3주) 오염 가능 벤치마크 전건 재실측",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "SEC-34-phaiakes9-cryptominer-incident-response",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-12",
+   "unlocks": 0,
+   "wait_chain": [
+    "OPS-75-amd395-post-incident-full-rebenchmark",
+    "SEC-34-phaiakes9-cryptominer-incident-response"
+   ],
+   "excerpt": [
+    "SEC-34가 완결(백신 전체 검사·보안 예외 원복·자동시작 잔존물 전수·자격증명 로테이션)된 뒤에만 착수 — 감염 잔존 상태에서 재측정하면 같은 오염이 재현된다",
+    "tune_and_bench.ps1 -Presets baseline,rocm,vulkan,resident,power140(별도 실행 2회) 전건 재실행 — clean 상태의…"
+   ],
+   "acceptance": [
+    "SEC-34가 완결(백신 전체 검사·보안 예외 원복·자동시작 잔존물 전수·자격증명 로테이션)된 뒤에만 착수 — 감염 잔존 상태에서 재측정하면 같은 오염이 재현된다",
+    "tune_and_bench.ps1 -Presets baseline,rocm,vulkan,resident,power140(별도 실행 2회) 전건 재실행 — clean 상태의 새 evidence_*.txt·bench_*.csv 생성",
+    "★확정 결론 7항 각각을 새 실측과 대조 — 20% 규칙(§ '하지 말 것')으로 유의미한 차이만 결론 갱신, 나머지는 '재검증 완료·불변'으로 표기 전환",
+    "OPS-49(QUALITY 티어 MoE 채택 결정)의 전제인 왕복 지연 12.4s→2.3s가 clean 상태에서도 유지되는지 재확인 — 무너지면 라우터 LOCAL_LATENCY_MS[QUALITY] 재조정 태스크로 별도 등재",
+    "게이트 G-amd395-perf-baseline의 evidence를 감염기간 데이터 인용에서 clean 재측정 데이터 인용으로 교체(gates.yaml amend)",
+    "docs/ops/amd395_local_llm_performance.md·.claude/commands/llm-perf-doctor.md의 OPS-74 정정 박스('잠정치로 읽는다')를 재측정 완료 문구로 갱신"
+   ],
+   "notes": "OPS-74가 남긴 후속 — 문서 §5 09-10 정정 박스의 '이 문서의 성능 수치들도 감염 기간과 겹치는 구간은 재측정 대상이다'라는 산문 선언을 대장에 집행한다(CLAUDE.md '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지' 준수). Kiki 머신(Phaiakes9) 실물 실행이 필수라 세션이 대신 측정할 수 없다 — 착수 시 6항목 브리핑·자가검증 동봉 런북을 세션이 새로 작성해 제공한다(기존 §1 브리핑 재사용 가능, 단 '침해 정리 후 첫 측정'이라는 전제를 §1에 추가). depends_on을 SEC-34 전체로 걸었다 — SEC-34 acceptance 중 미완인 자격증명 로테이션·백신 전체 검사·보안 예외 원복이 남아 있는 한(2026-09-10 notes 최신 상태 기준) 이 태스크는 audit-deps상 착수 후보가 되지 않는다(HARN-52).",
+   "cmd": "",
+   "x": 1668,
+   "y": 1428,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-7",
+   "flow": 7
+  },
+  "g:G-const-a0002-adoption": {
+   "key": "g:G-const-a0002-adoption",
+   "kind": "gate",
+   "id": "G-const-a0002-adoption",
+   "preds": [
+    {
+     "key": "t:CONST-02-coding-constitution-transplant-stage1-2",
+     "id": "CONST-02-coding-constitution-transplant-stage1-2",
+     "kind": "task",
+     "title": "코딩 헌법(구조 결함 표준북·헌법 v1.0/v1.1 꾸러미) 이식 1~2단계 — 설치·보호 훅·위헌 심사 래칫 CI·진단 도구·이식 정본 문서 (Kiki 지시 2026-09-26)",
+     "status": "done",
+     "open": false,
+     "edge": "게이트를 여는 작업"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+     "id": "CONST-04-coding-constitution-part2-boundary-contract-secrets",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 II(5~8장·28장) — 경계·계약·상태·비밀값 집행 장치 착지 (규칙 15건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-05-coding-constitution-part3-change-safety",
+     "id": "CONST-05-coding-constitution-part3-change-safety",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 III(9~11장) — 커밋 규율·마이그레이션·래칫 집행 장치 착지 (규칙 8건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-06-coding-constitution-part4-verification-independence",
+     "id": "CONST-06-coding-constitution-part4-verification-independence",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 IV(12~14장) — 테스트 구조·검증 독립·정적 분석 집행 장치 착지 (규칙 9건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+     "id": "CONST-07-coding-constitution-part5-6-ops-ai-collab",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 V·VI(15~19장) — 관측·백업·회고·AI 작업 단위·사람 검토 집행 장치 착지 (규칙 15건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-08-coding-constitution-part7-edu-app",
+     "id": "CONST-08-coding-constitution-part7-edu-app",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 VII(20~29장) — 교육앱 특화 집행 장치 착지 (규칙 34건)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-const-a0002-adoption",
+   "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+   "state": "gate_verdict",
+   "label": "판정 결과 미기록",
+   "reason": "판정 결과 미기록 — 입력은 전부 끝났는데 그 상태의 FAIL/PASS 기록이 없다(done 인계 --verdict 또는 gates amend --verdict)",
+   "detail": "",
+   "gate_kind": "decision",
+   "assignee": "kiki",
+   "requested": "2026-09-27",
+   "days": 2,
+   "overdue": false,
+   "unlocks": 5,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-const-a0002-adoption --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 28,
+   "y": 359,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:OPS-98-coach-turn-tool-call-latency-distribution": {
+   "key": "t:OPS-98-coach-turn-tool-call-latency-distribution",
+   "kind": "task",
+   "id": "OPS-98-coach-turn-tool-call-latency-distribution",
+   "preds": [
+    {
+     "key": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+     "id": "SEC-34-phaiakes9-cryptominer-incident-response",
+     "kind": "task",
+     "title": "Phaiakes9 침해 대응 — 채굴 예약 작업(GoogleUpdateTask 위장) 발견, 자격증명 전량 로테이션·노출 판정·오진 기록 정정",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:PED-38-wh1-fast-path-simple-turn-bypass",
+     "id": "PED-38-wh1-fast-path-simple-turn-bypass",
+     "kind": "task",
+     "title": "WH-1 fast path(04a §5.3) 배선 — 풀이 없는 단순 턴은 도구 루프를 건너뛰고 즉답(기본 OFF · 애매하면 풀 루프)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "OPS-98",
+   "title": "코치 턴 도구 호출 수·지연 분포 실측 + 예산 정합 — 타임아웃 15초·도구 16회가 SLO T1 p95 5초·PRD 3초의 3~5배이고 분포를 잰 적이 없다",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "SEC-34-phaiakes9-cryptominer-incident-response",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-25",
+   "unlocks": 1,
+   "wait_chain": [
+    "OPS-98-coach-turn-tool-call-latency-distribution",
+    "SEC-34-phaiakes9-cryptominer-incident-response"
+   ],
+   "excerpt": [
+    "① 실측 전제(판정 기준 main `63451153`): 세션 턴(`POST /v1/coach/sessions/{dialogue_id}/turns`)은 `wh1_prima…",
+    "② 측정 — 고정 시나리오 턴(최소 30턴)을 로컬 LLM으로 돌려 턴별 도구 호출 수와 턴 지연을 기록한다. **단순 턴**(인사·\"네\"·격려 요청·진행 확인 등 풀이 …"
+   ],
+   "acceptance": [
+    "① 실측 전제(판정 기준 main `63451153`): 세션 턴(`POST /v1/coach/sessions/{dialogue_id}/turns`)은 `wh1_primary_enabled` 기본 True로 WH-1 도구 루프를 탄다. 도구 1회가 LLM 1회(`harness/wh1_llm_policy.py` `LLMTutorPolicy.next_action`)이고 최대 `max_tool_calls=16`회 직렬이며, 한 턴 전체가 `wh1_primary_timeout_seconds=15.0`으로 감싸진다. 목표는 SLO S5 T1 p95 ≤ 5s(`docs/standards/incident_response_slo.md`)와 PRD 「Socratic 응답 < 3초」다. 한 턴이 도구를 실제로 몇 번 부르는지는 분포가 없다.",
+    "② 측정 — 고정 시나리오 턴(최소 30턴)을 로컬 LLM으로 돌려 턴별 도구 호출 수와 턴 지연을 기록한다. **단순 턴**(인사·\"네\"·격려 요청·진행 확인 등 풀이 제출 없음)과 **풀이 턴**을 나눠 각각 분포(중앙값·p75·p95)를 낸다. 타임아웃으로 결정론 폴백된 턴 비율도 함께 낸다 — 폴백은 지연을 잘라 낮은 수치로 위장하기 때문이다. 측정은 감염이 정리된 머신에서만 하고 감염 기간 수치는 인용하지 않는다(`SEC-34`).",
+    "③ 판정 제시 — 결과로 세 선택지를 Kiki께 제시한다: (가) 기본값(`wh1_primary_timeout_seconds`·`max_tool_calls`)을 SLO에 맞춰 낮춤 (나) SLO T1을 실측에 맞춰 정정 (다) fast path(`04a` §5.3)로 단순 턴 분리. 각 선택지의 교수학적 비용(폴백 증가 = 덜 개인화된 코칭)을 함께 적는다. 결정은 MEMORY 결정 로그에 남긴다.",
+    "④ 기본값 동결 — 결정된 `wh1_primary_timeout_seconds`·`wh1_prose_timeout_seconds`·`max_tool_calls` 기본값을 테스트로 동결한다(판정 기준 시점에 두 타임아웃 기본값을 참조하는 테스트 0건). 값을 바꾸는 뮤테이션에서 RED를 확인한다.",
+    "⑤ 수집 도구 설계 — 수집 스크립트는 턴마다 즉시 기록하고(중단돼도 증거 보존), 실패 원인(예외 타입명·타임아웃 사실)을 남기며, 실행 식별자로 이번 실행분만 집계한다(CLAUDE.md 「측정·수집 도구를 성공 경로만 보고 설계 금지」). 외부 프로세스 호출에는 전부 타임아웃을 건다."
+   ],
+   "notes": "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ①③④ (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. depends_on `SEC-34` 근거: 측정 머신(Phaiakes9)이 깨끗해야 지연 수치가 유효하다. `OPS-75`(감염 기간 벤치마크 전면 재실측, P2)는 이 태스크의 조건이 아니다 — 범위가 달라 병행할 수 있다. 등급 P1 근거: 12월 내부 테스트 계정 표본 수집에서 코치 대기 시간이 체감 품질을 크게 좌우하지만, 없어도 검증 자체는 성립한다. Kiki 머신 실행이 필요하며 런북은 6항목 브리핑 규칙을 따른다.",
+   "cmd": "",
+   "x": 1668,
+   "y": 1630,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-7",
+   "flow": 7
+  },
+  "t:CUR-07-achievement-standard-schema-extension": {
+   "key": "t:CUR-07-achievement-standard-schema-extension",
+   "kind": "task",
+   "id": "CUR-07-achievement-standard-schema-extension",
+   "preds": [
+    {
+     "key": "t:CUR-05-achievement-criteria-corpus-recovery",
+     "id": "CUR-05-achievement-criteria-corpus-recovery",
+     "kind": "task",
+     "title": "성취수준·평가기준 코퍼스 미착륙 회수 — CUR-03 done인데 main에 산출물 0",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:HARN-80-direct-commit-landing-done-path",
+     "id": "HARN-80-direct-commit-landing-done-path",
+     "kind": "task",
+     "title": "직접 커밋으로 main에 착지한 태스크의 done 경로 부재 — --no-pr 4종 어디에도 없고 잘못된 사유로 통과시키면 거부 우회 (CUR-07 실사례: 구현은 main 7b4fb546에 있는데 대장은 todo·HARN-34 노트는 '고립')",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:CUR-13-learning-outcome-fields-extension",
+     "id": "CUR-13-learning-outcome-fields-extension",
+     "kind": "task",
+     "title": "AchievementStandard Learning Outcome/Competency 필드 확장",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "CUR-07",
+   "title": "AchievementStandard 스키마 확장 — 평가준거 코드·성취수준 등급 커버리지 반영 (CUR-03/CUR-05 약속 이행)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "HARN-80-direct-commit-landing-done-path",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 3,
+   "owner": "claude",
+   "session": "claude/remaining-track-34zvse",
+   "updated": "2026-09-07",
+   "unlocks": 1,
+   "wait_chain": [
+    "CUR-07-achievement-standard-schema-extension",
+    "HARN-80-direct-commit-landing-done-path"
+   ],
+   "excerpt": [
+    "achievement_criteria_v1(CUR-05 회수 완료·13세트·459건 성취기준→평가준거코드·54건 단원→성취수준등급) 구조를 실측 근거로 Achievemen…",
+    "마이그레이션 작성 — Alembic 리비전 신설(schema_version.py KNOWN_REVISIONS 동결 갱신 포함). 기존 achievement_standard…"
+   ],
+   "acceptance": [
+    "achievement_criteria_v1(CUR-05 회수 완료·13세트·459건 성취기준→평가준거코드·54건 단원→성취수준등급) 구조를 실측 근거로 AchievementStandard(db/models/achievement_standard.py) 확장 설계 — 현재 스키마엔 평가준거 코드·등급(A~E/A~C) 커버리지 필드가 없음(실측 확인). 신규 컬럼 또는 연관 테이블 중 정합 판단(코퍼스가 성취기준 1건당 평가준거 코드 다건·등급 다건이라 1:N — 배열 컬럼 vs 별도 테이블 트레이드오프 기록)",
+    "마이그레이션 작성 — Alembic 리비전 신설(schema_version.py KNOWN_REVISIONS 동결 갱신 포함). 기존 achievement_standard 행(이미 적재된 정본 성취기준)과 충돌 0(additive)",
+    "적재기 — l1/standards/standard_loader.py 또는 신규 모듈이 achievement_criteria_v1을 읽어 신규 필드를 채운다. norm_id↔achievement_criteria.json의 standard_code 매칭 축 확인(교육과정 개정별 코드 표기 차이 — 데이터 카드 §5 명시 위험) 필요, 매칭 실패 건은 조용히 스킵하지 않고 정직 계상",
+    "범위 밖: 성취수준 데이터의 런타임/학생 대면 노출(별도 판단 — 게임화·등급 노출 정책과 얽힐 수 있어 ASM-02 선례 검토 필요) · 본문 서술 반입(라이선스 미확인 상태 무변경)",
+    "[정정 2026-09-07 stray-code 8회차] **재구현 금지** — 이 태스크의 산출물 12파일은 main 7b4fb546(2026-08-25 · 'Closes CUR-07' · 직접 커밋·PR 없음)에 이미 착지했다(브랜치 34zvse 판과 achievement_level_unit.py·l1/standards/criteria_loader.py·test_criteria_loader.py·test_achievement_level_unit_orm.py 바이트 동일, 나머지는 main 후행 우세). acceptance ③(매칭 실패 정직 계상)은 main criteria_loader.py CriteriaMatchResult.unmatched로 충족. 남은 것은 대장 done 전이뿐인데 `done --artifact 7b4fb546`은 PR 증적 게이트가 exit 1로 거부 — HARN-80(--no-pr direct-commit 경로)이 착지하면 그 경로로 전이하고 HARN-34 notes의 '34zvse 고립' 기술을 정정한다. 전이 전 34zvse 삭제 금지"
+   ],
+   "notes": "CUR-03(2026-08-08) acceptance④가 약속했으나 등재되지 않았던 후속 — CUR-05(성취수준 코퍼스 회수, 2026-08-11)의 acceptance③이 이 등재를 done 선행 조건으로 강제해 지금 등재한다(docs/architecture/curriculum_module_gap_review_r2.md §3 D5). 데이터가 스키마보다 먼저 착지한다는 CUR-03 원설계를 승계 — achievement_criteria_v1이 먼저 main에 있어야 이 스키마 설계가 실측 근거를 갖는다. [2026-08-30 HARN-34 고립 참조] 구현이 claude/remaining-track-34zvse(7fb78470)에 고립(done 표기·CUR-08 회수가 이 항목은 미이식). 착수 시 파일 단위 회수 우선\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/B4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5): 구현이 이미 main 7b4fb546(08-25 직접 커밋)에 착지했는데 대장이 todo·HARN-34 노트가 '고립'이라 착수 세션이 재구현할 위험 — 재구현 금지 표기. done 전이는 PR 증적 게이트가 거부(실측)해 HARN-80 경로로\n\n[정정 2026-09-07] Codex P1(PR #1027) 동형: 잔여 작업(done 전이)이 'HARN-80 착지 후'라는 산문 선행 — depends_on으로 집행(HARN-11 필터가 가리는 것과 별개로 대장 선언을 정합하게)",
+   "cmd": "",
+   "x": 432,
+   "y": 1962,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-8",
+   "flow": 8
+  },
+  "t:CONST-08-coding-constitution-part7-edu-app": {
+   "key": "t:CONST-08-coding-constitution-part7-edu-app",
+   "kind": "task",
+   "id": "CONST-08-coding-constitution-part7-edu-app",
+   "preds": [
+    {
+     "key": "g:G-const-a0002-adoption",
+     "id": "G-const-a0002-adoption",
+     "kind": "gate",
+     "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CONST-08",
+   "title": "코딩 헌법 이식 3단계 — 파트 VII(20~29장) — 교육앱 특화 집행 장치 착지 (규칙 34건)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-29",
+   "unlocks": 0,
+   "wait_chain": [
+    "CONST-08-coding-constitution-part7-edu-app",
+    "G-const-a0002-adoption (외 1)"
+   ],
+   "excerpt": [
+    "① 대상 규칙 34건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'cod…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 34건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'code_exists': 1, 'partial': 24, 'none': 9}): R20-01(code_exists·st1·S) → tests/data_pipeline/atom_graph/test_atom_corpus_governance.py / R20-02(partial·st2·S) → tests/data_pipeline/atom_graph/test_atom_corpus_governance.py / R20-03(partial·st3·M) → src/data-pipeline/data_pipeline/atom_graph/validate.py / R20-04(none·st3·S) → src/data-pipeline/data_pipeline/graph_analytics/analytics.py / R20-05(partial·st3·M) → tests/infra/test_graph_id_history_governance.py / R21-01(partial·st2·M) → src/backend/whymath_backend/harness/content_lint.py / R21-02(none·st5·L) → tests/backend/db/test_attempt_version_pinning.py / R21-03(none·st5·L) → src/backend/whymath_backend/ops/content_release_manifest.py / R21-04(partial·st2·S) → scripts/ops/cp949_guard.py / R22-01(partial·st3·M) → tests/backend/l1/problem_bank/test_single_correct_choice.py / R22-02(partial·st3·M) → src/mobile/test/corpus_katex_parse_test.dart / R22-03(partial·st3·S) → tests/backend/l3/test_safe_parse.py / R23-01(none·st5·M) → tests/backend/db/test_responses_append_only.py / R23-02(partial·st3·M) → tests/backend/l2/test_mastery_model_version.py / R23-03(partial·st3·S) → tests/backend/l2/test_bkt.py / R23-04(none·st6·M) → src/backend/whymath_backend/harness/mastery_replay_compare.py / R24-01(partial·st6·M) → src/backend/whymath_backend/ops/item_stats_report.py / R24-02(partial·st6·M) → src/backend/whymath_backend/ops/item_stats_report.py / R24-03(partial·st3·S) → tests/backend/schema/test_difficulty_source.py / R25-01(partial·st3·M) → tests/backend/harness/test_wh1_primary.py + tests/backend/harness/test / R25-02(partial·st4·L) → src/backend/whymath_backend/harness/tutor_eval.py / R25-03(none·st3·M) → src/backend/whymath_backend/l4/crisis_guard.py / R25-04(partial·st3·M) → src/backend/whymath_backend/harness/prompt_asset_audit.py / R26-01(partial·st3·M) → tests/backend/privacy/test_pii_field_inventory.py / R26-02(partial·st3·M) → src/backend/whymath_backend/l3/pii_scrubber.py / R26-03(partial·st3·S) → src/mobile/test/governance/sdk_allowlist_governance_test.dart / R26-04(partial·st3·M) → tests/backend/api/test_consent_gate_route_coverage.py / R27-01(partial·st3·S) → src/backend/whymath_backend/ops/provenance_audit.py / R27-02(partial·st4·M) → src/backend/whymath_backend/harness/golden_promotion_gate.py / R27-03(none·st3·S) → scripts/ops/check_asset_licenses.py / R29-01(partial·st5·M) → src/mobile/integration_test/perf_budget_test.dart / R29-02(none·st3·M) → src/mobile/lib/features/chat/data/answer_draft_store.dart + src/mobile / R29-03(partial·st3·M) → src/backend/whymath_backend/harness/content_a11y_lint.py / R29-04(none·st5·M) → scripts/perf/loadtest_classroom.py",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다.",
+    "⑥ (CONST-02 대조표 비평가 처분 #6 승계) 모바일(Flutter) 축 재판정 — 조사 때 모바일 열이 0건이었다. R4-02·R14-03·R29-02의 check 경로(app/lib/…)를 저장소 배치(src/mobile/lib · src/mobile/analysis_options.yaml)로 정정하는 개정 초안을 두고, ci.yml mobile 잡 스텝과 src/mobile/test/governance/*_test.dart 거버넌스 테스트에 매핑해 없음/부분을 다시 판정한다. mobile 잡이 path-filter로 PR마다 돌지 않는다는 점을 연결 판정에 반영한다."
+   ],
+   "notes": "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계\n\n[정정 2026-09-29] CONST-09 acceptance ④(R22-03 좌석에 증적 연결) 집행 — R22-03은 파트 VII(22장)이라 CONST-08 소관. 규칙 자체의 헌법 등록부 채택(rules_additions_v1.1 → constitution/rules.yaml)은 사람 몫이며 이 증적과 별개다.",
+   "cmd": "",
+   "x": 836,
+   "y": 864,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:SEC-34-phaiakes9-cryptominer-incident-response": {
+   "key": "t:SEC-34-phaiakes9-cryptominer-incident-response",
+   "kind": "task",
+   "id": "SEC-34-phaiakes9-cryptominer-incident-response",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:OPS-75-amd395-post-incident-full-rebenchmark",
+     "id": "OPS-75-amd395-post-incident-full-rebenchmark",
+     "kind": "task",
+     "title": "AMD395 로컬 LLM 성능 전면 재측정 — 채굴 감염기간(추정 3주) 오염 가능 벤치마크 전건 재실측",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:OPS-98-coach-turn-tool-call-latency-distribution",
+     "id": "OPS-98-coach-turn-tool-call-latency-distribution",
+     "kind": "task",
+     "title": "코치 턴 도구 호출 수·지연 분포 실측 + 예산 정합 — 타임아웃 15초·도구 16회가 SLO T1 p95 5초·PRD 3초의 3~5배이고 분포를 잰 적이 없다",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "SEC-34",
+   "title": "Phaiakes9 침해 대응 — 채굴 예약 작업(GoogleUpdateTask 위장) 발견, 자격증명 전량 로테이션·노출 판정·오진 기록 정정",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 1,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-24",
+   "unlocks": 3,
+   "wait_chain": [],
+   "excerpt": [
+    "① 침해 범위 실측 — Phaiakes9에서 무엇이 실행됐고 무엇에 접근할 수 있었는지 확정한다. 관측된 사실(2026-09-10 Kiki): `GoogleUpdateTa…",
+    "② 자격증명 전량 로테이션 — 이 머신에 존재했거나 입력된 시크릿을 **전부 무효화·재발급**한다. 채굴 드로퍼는 자격증명 탈취 모듈을 동반하는 경우가 흔하므로, 유출 증…"
+   ],
+   "acceptance": [
+    "① 침해 범위 실측 — Phaiakes9에서 무엇이 실행됐고 무엇에 접근할 수 있었는지 확정한다. 관측된 사실(2026-09-10 Kiki): `GoogleUpdateTaskSYSTEM`·`GoogleUpdateTask` 예약 작업이 ⓐ보안 검사 예외 추가 ⓑ외부 스크립트 다운로드·실행 ⓒ채굴 의심 파일 실행을 수행했고, 종료 후 공유 커밋 약 152.8 GiB가 회수됐다. 확인할 것: 예약 작업의 등록 시각(최초 감염 시점 추정) · 다운로드 URL·드롭 경로 · 자동시작 잔존물(Run 키·서비스·WMI 구독) · Defender 제외 목록 원복 여부. 이름이 SYSTEM 권한 작업이므로 **관리자 권한 침해로 간주**한다.",
+    "② 자격증명 전량 로테이션 — 이 머신에 존재했거나 입력된 시크릿을 **전부 무효화·재발급**한다. 채굴 드로퍼는 자격증명 탈취 모듈을 동반하는 경우가 흔하므로, 유출 증거가 없어도 노출로 간주한다(부분 성공을 전체 정상으로 해석하지 않기). 최소 목록: GitHub PAT(`PR_AUTO_RESYNC_TOKEN` — 저장소 시크릿 재등록 포함) · GitHub 계정 세션·SSH 키 · `DEPLOY_SSH_KEY/HOST/USER/KNOWN_HOSTS/PATH` · `WHYMATH_JWT_SECRET_KEY` · Anthropic/Langfuse 등 `.env`의 API 키 · 로컬 DB 접속정보. 각 항목의 재발급 완료를 체크리스트로 남긴다.",
+    "③ 학생 데이터 노출 판정 — prod DB(docker `whymath-pg`)에 미성년자 개인정보가 있었는지 실측으로 확정한다. **현재까지의 실측은 유리하다**: 2026-09-07 `problem_attempt` 총 0행(게이트 `G-attempt-retention-purge-backfill-decision` evidence) · 2026-09-10 `attempt_event`/`attempt` 관련 리포트도 `attempts_total=0 · events_total=0`. 이 두 실측이 침해 기간을 덮는지 시점 대조하고, 덮으면 \"학생 PII 노출 0건\"을 근거와 함께 기록한다. 덮지 않으면 그 구간을 별도로 조회한다. 법령 유래 통지 의무 판단은 기계가 대체하지 않는다 — 노출이 확인되면 변호사 검토 경로로 넘긴다.",
+    "④ 오진 기록 정정 — 이 사고는 성능 문서에 **원인 미규명**으로 등재돼 있었다. `docs/ops/amd395_local_llm_performance.md`의 2026-08-22 \"커밋 235GB의 정체 — 무엇이 점유하는지 모른다\"와 2026-09-10 \"약 302 GB가 어느 회계에도 잡히지 않는다 … 재부팅\"이 그것이며, 같은 내용이 `.claude/commands/llm-perf-doctor.md` 카탈로그에도 있다. 원인이 밝혀졌으므로 두 곳을 정정하고 **배제 4단은 방법으로 유지하되 종착점을 \"재부팅\"에서 \"예약 작업·자동시작 항목 점검\"으로 바꾼다** — 재부팅은 증상만 지우고 감염은 남긴다(실제로 08-22 이후 3주 가까이 그렇게 살았을 가능성이 있다).",
+    "⑤ 재발 탐지 — 같은 형태가 다시 생겼을 때 사람이 알아채는 경로를 만든다. 최소안: 커밋 여유가 임계 아래로 내려가면 경고하는 점검을 기존 `scripts/ops/collect_gpu_evidence.ps1`에 붙이고, 프로세스 private 총합과 커밋 점유의 **격차**를 함께 출력한다(이번 사고의 지문이 정확히 그 격차였다 — 커밋 326 GB vs 프로세스 19.4 GB). 이 태스크는 탐지 배선까지가 범위이고, 안티바이러스 정책·재설치 판단은 Kiki 결정이다.",
+    "⑥ **봉쇄 실측 기록 (2026-09-10 · 이 태스크 등재 직후 확보)** — ①의 \"확인할 것\" 중 일부가 이미 답변됐다. 이 항이 그 시점의 정본이다.\n\n[사용자 확인] 채굴을 설치·허용한 적이 없다고 확인했고, 확인된 채굴 프로세스 종료를 승인했다.\n\n[16:41 KST · 프로세스 종료] 현재 계정 권한으로 채굴 부모·자식 프로세스를 종료하자 공유 커밋이 **156.699 → 3.854 GiB**로 줄어 **152.845 GiB가 회수**됐다. 이후 5분간 31개 표본에서 약 3.83 GiB로 안정했고 마지막 조회에 알려진 채굴 부모·자식은 없었다. 즉 미설명 공유 커밋의 대부분이 이 무단 채굴 계통에 귀속된다는 **강한 인과 증거**다(회수량이 격차와 자릿수로 일치).\n\n[16:41 시점 잔여] 자동실행 작업 2개 비활성화가 Windows 접근 거부로 **실패**해 재실행 경로가 남아 있었다 — 그 시점 판정은 \"완전 제거 아님\"이었다.\n\n[17:50 KST · 자동실행 차단] 관리자 승인 토큰으로 두 작업을 비활성화했다. 정확한 경로는 `\\Microsoft\\Windows\\Google\\GoogleUpdateTaskSYSTEM`과 `\\Microsoft\\Windows\\Google\\GoogleUpdateTask`이며 둘 다 `Enabled=false · State=Disabled`. 변경 전 경로·이름·실행 파일·명령 인수가 보존 증거와 일치함을 확인했고 원문 XML을 백업했다. 독립 검증 스크립트가 변경 전 FAIL → 변경 후 PASS로 갈랐다(변별력 확인). 17:50 스냅샷: 공유 커밋 3.87550 GiB · 전체 커밋 25.51697 GiB · 채굴 명령 지표 일치 프로세스 0건.\n\n[여전히 미완 — 이것을 부재 판정으로 쓰지 않는다] 백신 검사 · 확인된 악성 파일의 선별 격리 · **채굴이 추가한 보안 검사 예외의 원복** · 추가 침해 조사. 특히 보안 예외를 되돌리지 않으면 재감염이 쉽다. 프로세스 조회 0건은 \"시스템 전체 악성코드 부재\"가 아니다.\n\n[따라서 ②(자격증명 로테이션)가 지금 최우선이다] 머신의 실행은 멈췄지만, 감염 기간 중 유출됐을 수 있는 토큰·키는 **머신 밖에서도 계속 유효**하다. 봉쇄와 로테이션은 별개의 축이며 봉쇄 완료가 로테이션을 대체하지 않는다.",
+    "⑦ **선별 격리 완료 — 13개 파일 (2026-09-10 · 검증 스크립트 실측)**\n\n[격리 대상 13종 · 위장 수법이 그대로 드러난다]\n· `C:\\Windows\\svchost.exe` — **정품은 System32에 있다.** Windows 루트의 svchost는 존재해선 안 되는 파일이다\n· `C:\\ProgramData\\KB5019959.exe` — Windows 업데이트 KB 번호로 위장\n· `C:\\ProgramData\\Google\\7z.exe` + `.png.001` — 7-Zip과 **PNG로 위장한 분할 아카이브**\n· `C:\\ProgramData\\Google\\InstallUtil.png.001/.002` — .NET LOLBIN(InstallUtil)을 PNG 확장자로 은닉\n· `C:\\ProgramData\\Google\\MEDIA.png.001/.002`\n· `C:\\ProgramData\\Google\\Locales\\{MA,RO,UN,WI,XM}.pak` — Chrome 로케일 파일로 위장한 분할 조각 5개\n즉 **분할 아카이브를 7z로 풀어 LOLBIN으로 실행**하는 구조이며, 정품 Chrome Remote Desktop·Docs와 **같은 폴더**에 숨어 예약 작업 경로(`\\Microsoft\\Windows\\Google\\`)가 그럴듯해 보이게 만들었다.\n\n[검증 스크립트가 실제로 갈라 주는 것 — 변별력 있음] ⓐ13개 원본 경로가 **실행 위치에서 사라졌는가**(남아 있으면 FAIL·exit 1) ⓑ격리 매니페스트 항목이 정확히 13건이고 각 항목의 `Source`가 예상 목록에 속하는가 ⓒ격리본의 **SHA-256이 매니페스트와 일치**하는가(무결성·복구 가능성) ⓓ각 격리본에 Everyone(S-1-1-0) 대상 **ExecuteFile Deny ACE**가 있는가(재실행 차단) ⓔ정품 경로 6종(System32의 svchost·cmd·powershell 32/64비트·Chrome Remote Desktop·Docs)이 **보존**됐는가(과잉 삭제 검출). 삭제가 아니라 **복구 가능한 격리**라 오탐이었을 때 되돌릴 수 있다.\n\n[이 스크립트가 증명하지 않는 것 — 부재 판정으로 쓰지 않는다] ⓐ**알려진 13경로만** 본다. 전수 검사가 아니다 ⓑ채굴이 추가한 **보안 검사 예외의 원복 여부는 검사하지 않는다** — 예외가 남아 있으면 재감염 경로가 열려 있다 ⓒ자동실행 잔존물 중 **예약 작업 2개 외의 축**(Run 키·서비스·WMI 구독·시작 폴더)은 범위 밖 ⓓ이 13개가 악성의 **전부**임을 뜻하지 않는다.\n\n[따라서 남은 순서] ①보안 예외 원복 ②백신 전체 검사 ③자동실행 잔존물 전수 ④그리고 **②(자격증명 로테이션)은 이 셋과 무관하게 지금 진행한다** — 머신을 아무리 깨끗하게 만들어도 이미 나간 토큰은 머신 밖에서 계속 유효하다.",
+    "⑧ **격리 스크립트 리뷰 (2026-09-10 · 코드 정독) — 설계는 견고하다. 다만 백신 스캔이 탐지 전용이다.**\n\n[이 저장소의 기준으로 잘 만들어진 점] ⓐ`-Apply`에 관리자 권한을 요구하고 없으면 이동 0건으로 거부 ⓑ부모 경로 4곳과 격리 루트의 **reparse point(심볼릭 링크·정션) 검사** — 경로 리디렉션 공격 차단 ⓒ정규화 경로를 **대소문자 구분 비교**(`-cne`)해 단축명·케이스 트릭 거부 ⓓ보존된 증거 JSON과 **SHA-256·길이 양쪽 대조**, 어긋나면 \"증거 수집 이후 변경됨\"으로 거부 ⓔ**예약 작업 2개가 Disabled인지 먼저 확인한 뒤에만** 파일을 옮긴다(지속성 차단이 격리보다 앞 — 순서가 옳다) ⓕ이동 직전 재해시(TOCTOU 축소)·이동 후 재해시·원본 부재까지 3중 확인 ⓖ**단계마다 즉시 JSON 저장**이라 중간에 실패해도 증거가 남는다(CLAUDE.md \"실패해도 증거가 남는가\") ⓗ독립 검증기를 **System32 절대경로 powershell.exe**로 호출해 PATH 하이재킹을 피하고 종료 코드를 확인 ⓘ MSERT 실행 전 **Authenticode 서명 Valid + 서명자 Microsoft Corporation** 확인 ⓙ격리 사유를 \"확인된 악성 자동실행 체인이 직접 참조\"(4건)와 \"연관 배포 번들 자료 · 예방적 격리이며 백신 판정이 아님\"(9건)으로 **나눠 기록** — 확정과 예방을 섞지 않았다.\n\n[짚을 것 — MSERT 인자] `-ArgumentList @('/F','/N','/Q')`에서 **`/N`은 탐지 전용(detect only)**이다(제가 아는 한). 즉 이 스캔은 **아무것도 치료·제거하지 않는다** — 결과는 `C:\\Windows\\debug\\msert.log`에 기록될 뿐이다. 보수적 선택으로서는 타당하나, \"백신 검사 완료\"를 **치료 완료로 읽으면 안 된다**. 로그를 읽어 탐지 목록을 확인하고, 치료가 필요하면 별도 판단으로 실행한다.\n\n[여전히 미해결 — 이 스크립트들의 범위 밖] ⓐ**채굴이 추가한 보안 검사 예외의 원복** — 어떤 스크립트도 손대지 않는다. 남아 있으면 재감염 경로가 열려 있다 ⓑ**자격증명 로테이션**(②) — 머신 정화와 무관하게 이미 나간 토큰은 밖에서 계속 유효하다 ⓒ예약 작업 2개 외의 지속성(Run 키·서비스·WMI 구독·시작 폴더) 전수 ⓓ최초 감염 경로·시점.",
+    "⑨ **자동실행 전수 스캔 결과 (2026-09-10) — 채굴 계열 0건 · 미상 1건은 오탐 판명**\n\n[스캔] `Get-ScheduledTask`에서 Disabled가 아닌 작업 중 실행 인자에 powershell·curl·wget·bitsadmin·mshta·rundll32·http가 걸리는 것을 전수 조회. 12건 매치.\n\n[결과 ①] `\\Microsoft\\Windows\\Google\\` 아래 작업이 **한 건도 나오지 않았다**. 필터가 Disabled를 제외하므로, 17:50 비활성화가 실제로 유효함을 **독립 경로로 재확인**한 것이다(비활성화를 수행한 스크립트가 아니라 다른 조회가 확인했다는 점이 중요하다).\n\n[결과 ②] Windows 기본 작업 9건(PcaPatchDbTask·StartupAppTask·CleanupTemporaryState·Autochk\\Proxy·capabilityaccessmanager·PCRPF·StateRepository·Sysmain·Windows Filtering Platform)은 전부 `%windir%\\system32\\rundll32.exe` + System32 정품 DLL — 정상. 대조점: 채굴은 `C:\\Windows\\svchost.exe`를 썼는데 정품 svchost는 System32에 있다.\n\n[결과 ③ — 오탐 1건] `WhyMath_Daily_Backup`이 저장소 이력에 없는 스크립트를 숨김 실행(`-WindowStyle Hidden`)해 의심 대상이었다. **오탐으로 판정**했다. 근거 5종: ⓐ파일 헤더가 우리 백업 스크립트(git 번들 → pg_dump → age 암호화 → 회전, 한국어 주석) ⓑ위험 지표 전수 스캔 0건(DownloadString·FromBase64String·Add-MpPreference·ExclusionPath·URL 전부 부재) ⓒ폴더가 2026-07-05자 옛 저장소 클론(CLAUDE.md·MEMORY.md·.claude/agents 포함) ⓓ같은 폴더에 `_cleanup_nested_clone.bat`(2026-09-06 22:53) — 그날 클론 정리 흔적 ⓔ작업 실행 결과가 계속 1(실패)로 조용히 성공해 온 흔적이 없다. 즉 9/6 저녁 옛 클론에서 만든 뒤 정본 저장소로 옮기며 남은 잔재다.\n\n[조치] 그 작업은 제거했다(`Unregister-ScheduledTask` → 잔여 0건). 매일 03:00에 실패를 반복하던 상태였고, 이름 때문에 \"매일 백업이 돈다\"는 착각을 유발했다 — CLAUDE.md \"상시 실패하는 보호를 보호로 신뢰 금지\"가 겨냥하는 상태. 옛 클론 폴더 자체는 남겨 뒀다(정본 착각 위험은 별건).\n\n[오탐도 기록하는 이유] 다음 세션이 같은 이름을 보고 처음부터 다시 조사하지 않게 하기 위해서다. 부재·무해 판정도 근거와 함께 남아야 재사용된다.",
+    "⑩ **채굴의 실제 운영 피해 — 백업 1회 유실이 확인됐고, 원인 귀속이 변별력 있게 성립했다 (2026-09-10)**\n\n[관측] 정상 백업 작업 `WhyMath-DB-Backup`이 09-10 10:16:53 실행에서 **exit 1**로 실패했고, 백업 디렉터리에 **9/10자 파일이 없었다**(9/7·9/8·9/9는 각각 04:00에 576,864 bytes로 정상 생성). 세 작업의 LastRunTime이 정확히 같은 초인 것은 04:00·09:00 예정분이 PC 기동 시 `StartWhenAvailable`로 함께 발화한 것이다.\n\n[가설] 10:16은 채굴이 공유 커밋 152 GiB를 쥐고 있던 시각이다(정리는 16:41). 백업은 pg_dump + Docker + age 암호화를 연달아 돌리므로 커밋 여유 2 GB에서는 실패한다.\n\n[검증 — 변별력 있음] 채굴 정리 후 **같은 명령을 같은 환경에서** 재실행: 2회 연속 **exit 0**. `whymath_20260910_233826.dump.age`(784,205 bytes)·`whymath_20260910_233930.dump.age` 생성, age 암호화 성공(평문 삭제 확인), 오프사이트 복사까지 완료. 실패와 성공 사이의 **유일한 차이가 메모리 회복**이므로 원인 귀속이 성립한다.\n\n[의미] 지금까지의 증거는 전부 *메모리 수치*였다. 이것은 채굴이 **실제로 운영 산출물을 망가뜨렸다**는 첫 독립 증거다 — 그리고 그 피해가 하필 **백업**이었다. 신선도 검사(`-MaxAgeHours 48`)가 하루치 실패를 설계상 허용하므로 경고도 뜨지 않았다: 이틀 연속 실패했다면 그때 잡혔겠지만, 그 사이 복구 지점이 하루 비어 있었다.\n\n[덤프 크기 증가는 정상] 576,864 → 784,205 bytes(+36%)는 감염과 무관하다. 같은 날 `G-eos63` 프로브가 prod DB에 ATTEMPTS=20·EVENTS=20을 기록했고(게이트 evidence: WINDOW 2026-09-10T03:33:12Z), 그 20행이 증가분과 정합한다. 이 행들은 런북이 지정한 **고정 합성 사용자** 소유이며 실제 학생 데이터가 아니다 — ③(학생 데이터 노출 판정)의 \"실 학생 PII 0건\"은 유지되되, 이제 DB가 완전히 비어 있지는 않다는 점을 시점과 함께 적는다.\n\n[따라서 ①에 추가] 침해 범위 실측에 **백업 무결성·연속성** 축을 포함한다. 이번엔 1회 유실로 끝났고 기존 백업의 변조 흔적은 관측되지 않았으나(9/7~9/9 파일 크기·시각 정상), 감염 기간 전체에 대해 같은 유형의 조용한 실패가 더 있었는지는 미확인이다.",
+    "[교차참조 2026-09-12] acceptance ④가 요구한 문서 정정 중 세션이 실행 가능한 순수 텍스트 정정(docs/ops/amd395_local_llm_performance.md·.claude/commands/llm-perf-doctor.md의 '미규명'·'재시작이 답' 오진 표시)은 OPS-74로 분리해 완료했다(PR #1137) — SEC-34 owner:kiki 때문에 세션이 --as kiki로 본 태스크를 직접 착수하지 않고 스코프를 나눴다. 감염기간과 겹치는 성능 수치의 전면 재측정은 OPS-75(depends_on SEC-34)로 등재했다 — SEC-34의 나머지 acceptance(②자격증명 로테이션·백신 전체 검사·보안 예외 원복 등)가 완결돼야 OPS-75가 착수 후보가 된다.",
+    "[ARCH-66 2026-09-24] Anthropic API 사용 중단(2026-12-31까지) — 로테이션 대상 중 Anthropic 키는 사용하지 않는 기간이므로 로테이션 대신 폐기(console에서 revoke)를 검토한다. 쓰지 않는 유효 키는 유출 시 과금 위험만 남긴다."
+   ],
+   "notes": "발견 경위(2026-09-10): MP-02 첫 회차가 ROCm 4.07 GiB 할당 실패로 10/10 생성 실패했다. `/llm-perf-doctor` 카탈로그의 1순위 처방(고아 프로세스 정리)이 듣지 않아 배제를 4단으로 진행했고 — 고아 0건 · 컨텍스트 정상 · Pool Nonpaged 1.97 GB · WSL 종료 시 +1.9 GB뿐 — 커밋 326.4 GB인데 프로세스 366개 private 합이 19.4 GB라는 **격차**만 남았다. 그 시점 판정은 \"원인 미규명 · 재부팅\"이었고 실제로 재부팅으로 256.7 GB가 회복됐다.\n\n그러나 재부팅은 대증이었다. Kiki가 이어서 예약 작업을 점검해 `GoogleUpdateTaskSYSTEM`·`GoogleUpdateTask`가 보안 검사 예외 추가 · 외부 스크립트 다운로드·실행 · 채굴 의심 파일 실행을 하고 있었음을 확인했고, 종료 후 공유 커밋 약 152.8 GiB를 회수했다. **즉 성능 미스터리의 정체는 침해였다.**\n\n[왜 오래 안 보였나] 이 형태는 성능 문제로 위장된다 — 프로세스 목록에도 커널 풀에도 안 잡히고(공유 커밋), 증상은 \"메모리 부족\"이라는 엉뚱한 얼굴로 나오며, 재부팅하면 일시적으로 정상으로 돌아간다. 2026-08-22 기록의 \"커밋 235GB의 정체를 모른다\"가 같은 지문이었을 가능성이 높다 — 그렇다면 약 3주간 감염 상태로 운영된 셈이다.\n\n[우선순위 근거] CLAUDE.md 의사결정 우선순위상 ①학생 안전·웰빙 ②법적·윤리 준수가 성능·개발속도보다 앞선다. 이 태스크는 자격증명 로테이션과 학생 데이터 노출 판정을 먼저 두고, 탐지 배선을 마지막에 둔다.\n\n[정정 2026-09-10] 봉쇄 실측 확보 — 프로세스 종료 152.845 GiB 회수·자동실행 2개 비활성화 검증 완료, 잔여(백신·격리·보안예외 원복·로테이션) 명시\n\n[정정 2026-09-10] 선별 격리 13종 완료·검증 스크립트 실측 반영 — 위장 경로 구조와 검증 한계 명시\n\n[정정 2026-09-10] 격리 스크립트 코드 리뷰 — 설계 강점 10건 확인, MSERT 탐지 전용 인자 지적, 범위 밖 4건 명시\n\n[정정 2026-09-10] 자동실행 전수 스캔 결과(채굴 0건·오탐 1건 판명·제거) + 백업 1회 유실의 원인 귀속(재실행 2회 exit 0으로 변별)\n\n[정정 2026-09-12] OPS-74/OPS-75 신설 교차참조 — ④의 문서정정 스코프 분리 완료 기록\n\n[정정 2026-09-24] ARCH-66: 미사용 키 폐기 검토",
+   "cmd": "",
+   "x": 1264,
+   "y": 1529,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-7",
+   "flow": 7
+  },
+  "g:G-arch66-anthropic-api-pause-review": {
+   "key": "g:G-arch66-anthropic-api-pause-review",
+   "kind": "gate",
+   "id": "G-arch66-anthropic-api-pause-review",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:ARCH-50-cloud-high-model-pin-reevaluation",
+     "id": "ARCH-50-cloud-high-model-pin-reevaluation",
+     "kind": "task",
+     "title": "CLOUD_HIGH 모델 핀 재평가 — 목표 Opus 5(2026-09-21 Kiki 지시·Fable 5.1 대체) + 구독 자격증명 사슬 복원",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:ARCH-63-cloud-seat-failover",
+     "id": "ARCH-63-cloud-seat-failover",
+     "kind": "task",
+     "title": "클라우드 좌석 failover — OpenRouter 1차 실패 시 anthropic 2차·그다음 LOCAL (학생 대면 전환의 안전 장치)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-arch66-anthropic-api-pause-review",
+   "title": "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.",
+   "state": "gate_turn",
+   "label": "사람 차례",
+   "reason": "담당 kiki의 행동을 기다린다",
+   "detail": "",
+   "gate_kind": "decision",
+   "assignee": "kiki",
+   "requested": "2026-09-24",
+   "days": 5,
+   "overdue": false,
+   "unlocks": 2,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-arch66-anthropic-api-pause-review --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 1264,
+   "y": 56,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-4",
+   "flow": 4
+  },
+  "t:EOS-147-all-correct-theta-upper-pin": {
+   "key": "t:EOS-147-all-correct-theta-upper-pin",
+   "kind": "task",
+   "id": "EOS-147-all-correct-theta-upper-pin",
+   "preds": [],
+   "succs": [],
+   "short": "EOS-147",
+   "title": "정답만 있는 이력에서 추천 θ가 상한 4.0에 고정돼 가장 어려운 문항이 나간다 — 앱 학생은 영구(코치 정답 완료만 기록)",
+   "state": "ready",
+   "label": "시작 가능",
+   "reason": "",
+   "detail": "",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-26",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 실측 사실(2026-09-26 · 실 PG 컨테이너 재현) — 첫 응답이 정답뿐인 학습자는 다음 `GET /v1/me/next-problem`에서 `theta=4.0`…"
+   ],
+   "acceptance": [
+    "① 실측 사실(2026-09-26 · 실 PG 컨테이너 재현) — 첫 응답이 정답뿐인 학습자는 다음 `GET /v1/me/next-problem`에서 `theta=4.0`을 받고, 추천이 은행의 가장 어려운 문항(재현 픽스처에서 난이도 4.8)으로 간다. 원인: `l2/irt.py::estimate_ability`는 전부 정답이면 MLE 발산을 상한(`_THETA_UPPER = 4.0`)으로 돌려주고, 후보 정렬(`candidate_pool_order_by`)이 |b−θ| 최근접이다. 오답이 하나라도 기록돼야 θ가 유한하게 내려온다.\n② 앱 학생에게는 영구적이다 — 앱의 응답 기록은 코치 정답 완료(`api/coach.py::_complete_problem` · `is_correct=True`)뿐이라 오답이 기록되지 않는다(EOS-146). 첫 완료 이후 모든 추천이 가장 어려운 남은 문항이 된다(코드 경로 · 앱 실측 아님). API 클라이언트도 초반 연속 정답 구간에서 같은 도약을 겪는다.\n③ 처분 판정 선행 — 초기 구간 추정(예: 사전분포를 둔 추정·단계 크기 제한)·상한 도달 시 선택 규칙 중 무엇을 쓸지 정한다. θ 추정기는 평가 캡처(ASM-03)와 공유되므로(`load_attempt_history_state` 단일 진실 원천) 두 소비처의 영향을 함께 판정한다. 결정 없이 추정기를 바꾸지 않는다."
+   ],
+   "notes": "출처: EOS-26 판정문 독립 교수학 비판의 범위 밖 부수 관측(2026-09-26) — 컨테이너 실 PG에서 재현(정답 1회 뒤 θ 0.0 → 4.0 · 추천 난이도 2.9 → 4.8). 대장·리뷰에서 같은 문제를 다루는 태스크를 찾지 못했다(이 검색 방법 기준). 분류 LOOP.",
+   "cmd": "python3 scripts/harness/backlog.py start EOS-147-all-correct-theta-upper-pin",
+   "x": 2996,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-ready",
+   "flow": null
+  },
+  "g:G-opus5-billing-path-prod-recheck": {
+   "key": "g:G-opus5-billing-path-prod-recheck",
+   "kind": "gate",
+   "id": "G-opus5-billing-path-prod-recheck",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:ARCH-50-cloud-high-model-pin-reevaluation",
+     "id": "ARCH-50-cloud-high-model-pin-reevaluation",
+     "kind": "task",
+     "title": "CLOUD_HIGH 모델 핀 재평가 — 목표 Opus 5(2026-09-21 Kiki 지시·Fable 5.1 대체) + 구독 자격증명 사슬 복원",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-opus5-billing-path-prod-recheck",
+   "title": "Opus 5 과금 경로의 프로덕션 재확인 지점 — 개발 단계 한정 승인의 만료 지점. 2026-09-21 Kiki 판단으로 개발 단계에서는 Claude Max 요금제 구독 경유로 Opus 5를 쓰기로 했다(이전 세션에서 사용 가능 검토 완료). 이 승인은 개발 단계 한정이므로 만료·재확인 지점을 동반한다(CLAUDE.md 「만료 없는 유예·제외 금지」). 재확인 시점 = 프로덕션 배포 판정 시 또는 학생 대면 트래픽이 개발용 좌석을 넘어설 때 중 먼저 오는 쪽. 확인할 것: ①구독 경유 호출이 프로덕션 트래픽 규모·약관에서 유효한가 ②유효하지 않으면 API 키 과금으로 전환할 때의 비용 영향(Opus 5 $5/$25 · 가정토큰 74/358 기준 1회 14.353원) ③auth_source 관측이 실제로 어느 경로를 쓰고 있는지 말하고 있는가(조용한 폴백이 없는가). 판정 3택: ①개발단계 승인 유지(재확인 게이트 재생성) ②API 키 과금으로 전환 ③좌석 자체 재설계. 근거 = docs/architecture/03c_cloud_tier_transition_v2.md 4.3~4.4절 · ARCH-50 acceptance ⑨",
+   "state": "gate_turn",
+   "label": "사람 차례",
+   "reason": "담당 kiki의 행동을 기다린다",
+   "detail": "",
+   "gate_kind": "decision",
+   "assignee": "kiki",
+   "requested": "2026-09-21",
+   "days": 8,
+   "overdue": false,
+   "unlocks": 1,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-opus5-billing-path-prod-recheck --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 1264,
+   "y": 258,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-4",
+   "flow": 4
+  },
+  "t:MGMT-02-terms-privacy-policy-counsel": {
+   "key": "t:MGMT-02-terms-privacy-policy-counsel",
+   "kind": "task",
+   "id": "MGMT-02-terms-privacy-policy-counsel",
+   "preds": [
+    {
+     "key": "g:G-external-counsel-restart-after-internal-completion",
+     "id": "G-external-counsel-restart-after-internal-completion",
+     "kind": "gate",
+     "title": "외부 의존 작업 재개 판정 (2026-07-27 Kiki 결정의 만료 지점 · 12/31 내부 프로젝트 완성 이후) — 변호사 회신·외부인 리뷰 등 외부 의존 작업은 '미완성 제품의 병목이 되는 것 반대'(2026-07-27 Kiki)로 제품 출시(공개 β) 준비 단계에서 일괄 처리한다. 그 준비 단계의 시작점 = 내부 완성 판정(G-internal-completion-2026-12-31) 이후이며, 이 게이트가 그 만료·재확인 지점이다(만료 없는 유예 금지). 부착 = MGMT-01(법정대리인 실 본인확인 · 변호사 자문 선행)·MGMT-02(이용약관·개인정보처리방침 문안 · 변호사 검토). 종전에는 두 태스크가 게이트 없이 blocked로 파킹돼 있어 기계가 만료 지점을 몰랐다 — 2026-09-28 정리로 게이트 부착 + todo 복귀(후보 제외는 게이트가 집행). 같은 부류의 기존 게이트는 각자 만료 지점을 가지므로 흡수하지 않는다: G-web01-landing-legal-review(랜딩 변호사 검토 · 독촉 2027-01-05) · G-export-prediction-disclosure(열람권 예측치 법률 검토 · MGMT-06). 판정 3택: ①재개(변호사 자문 착수 — MGMT-02 → MGMT-01 → MGMT-03 순) ②연장(새 기한으로 재생성) ③범위 조정. 근거 = MEMORY 2026-07-27 결정 로그 · 2026-09-28 결정 로그.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:MGMT-03-age-collection-prodsignal-policy",
+     "id": "MGMT-03-age-collection-prodsignal-policy",
+     "kind": "task",
+     "title": "연령 강제 수집 정책 + is_production_like 다신호화 — PIPA 미성년 게이트 실집행·안전장치 결박 해소 (법률·정책 결정 · k20m0w 등재 유실 재등재)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "MGMT-02",
+   "title": "이용약관·개인정보처리방침 문안 확정 (변호사 검토) — 동의 버전 원장의 선결",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "docs",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 1,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 1,
+   "wait_chain": [
+    "MGMT-02-terms-privacy-policy-counsel",
+    "G-external-counsel-restart-after-internal-completion"
+   ],
+   "excerpt": [
+    "이용약관·개인정보처리방침 문안 확정 — 법률 판단이라 기계 대체 불가(CLAUDE.md '법령 유래 절차의 기계 대체 금지')",
+    "동의 scope 범위 확정(학습데이터 활용·마케팅·AI 활용을 별도 동의로 받을지·문구) — enums.py:1122-1126의 '변호사 자문으로 범위·문구가 확정된 뒤 …"
+   ],
+   "acceptance": [
+    "이용약관·개인정보처리방침 문안 확정 — 법률 판단이라 기계 대체 불가(CLAUDE.md '법령 유래 절차의 기계 대체 금지')",
+    "동의 scope 범위 확정(학습데이터 활용·마케팅·AI 활용을 별도 동의로 받을지·문구) — enums.py:1122-1126의 '변호사 자문으로 범위·문구가 확정된 뒤 추가' 이행",
+    "미성년 동의 철회 절차의 법적 요건 확인(현재 필드만 실재·경로 미완)"
+   ],
+   "notes": "공개 β 준비 착수 전까지 보류 — 변호사 회신 등 외부 작업이 미완성 제품의 병목이 되지 않게(2026-07-27 Kiki 지시·MGMT-01 동형). unblock 트리거 = 공개 β 준비 착수. 사실관계 교차기록(MOB-08·2026-08-03): firebase_messaging·firebase_core(푸시) 제거로 현재 모바일 앱에는 네트워크·데이터수집 표면을 가진 제3자 SDK가 남아 있지 않다 — 앱이 통신하는 대상은 자체 백엔드와 이미 별도로 고지된 OAuth 로그인 제공자뿐이다.\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 약관·처리방침 문안은 동의 버전 원장이 요구하는 항목 — 등급은 중요도이지 착수 가능성이 아니며 변호사 검토 대기 상태다. EOS-80 일괄 백필\n\n[정정 2026-09-28] 2026-09-28 정리 — 2026-07-27 '외부 작업 출시 전 일괄' 결정의 만료 지점을 게이트로 집행(종전: 게이트 없는 blocked 파킹)",
+   "cmd": "",
+   "x": 2500,
+   "y": 258,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-5",
+   "flow": 5
+  },
+  "t:MOB-21-onboarding-grade-schooltype-input": {
+   "key": "t:MOB-21-onboarding-grade-schooltype-input",
+   "kind": "task",
+   "id": "MOB-21-onboarding-grade-schooltype-input",
+   "preds": [
+    {
+     "key": "t:EOS-82-profile-grade-schooltype-writer",
+     "id": "EOS-82-profile-grade-schooltype-writer",
+     "kind": "task",
+     "title": "학년·학교유형 자가입력 경로 부재 — 소비자 4곳이 영구 None으로 무효화 (G1)",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "MOB-21",
+   "title": "온보딩에 학년·학교유형 입력 추가 — EOS-82가 연 API의 클라이언트 측 소비",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "mobile",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-03",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 온보딩 목표 입력 페이지에 학년(10~14 드롭다운)·학교유형(SchoolType 12종 드롭다운) 2필드를 추가하고 기존 PATCH /v1/users/me 전송 본문…",
+    "② 변별력 — 값을 고르지 않으면 본문에 키가 실리지 않고(서버 None 유지), 고르면 실린다는 것을 controller 단위 테스트로 동결한다. 항상 실리거나 항상 안…"
+   ],
+   "acceptance": [
+    "① 온보딩 목표 입력 페이지에 학년(10~14 드롭다운)·학교유형(SchoolType 12종 드롭다운) 2필드를 추가하고 기존 PATCH /v1/users/me 전송 본문에 합류시킨다. 자유 입력 금지(드롭다운만 — 3분 무마찰 원칙). 두 필드 모두 선택이며 비워도 진행된다(기존 온보딩 계약 유지)",
+    "② 변별력 — 값을 고르지 않으면 본문에 키가 실리지 않고(서버 None 유지), 고르면 실린다는 것을 controller 단위 테스트로 동결한다. 항상 실리거나 항상 안 실리면 검사가 아니다",
+    "③ 검증 — flutter analyze·flutter test 통과. 이 저장소 CI의 mobile 잡이 실제로 실행하는 명령 그대로 돌린다"
+   ],
+   "notes": "선행 EOS-82가 백엔드 화이트리스트를 열었다(PATCH /v1/users/me에 grade·school_type 수용 + 테스트 8건 동결). 그러나 앱 온보딩은 목표 등급·점수·시험일·출생연도 4종만 모으므로 **학생이 값을 넣을 화면이 여전히 없다** — API만 열려 있고 소비자 4곳은 계속 None을 받는다. 이 태스크가 착지해야 G1이 실제로 닫힌다. 등재 사유(범위 분리): 세션 환경에 Flutter SDK가 없어 analyze·test로 검증할 수 없었다 — 검증 못 하는 변경을 같은 PR에 실으면 CI red 위험(CLAUDE.md 완료·병합 예외 ③). 참조: docs/reviews/eos_one_subject_completion_review_2026-09-03.md §2.4.",
+   "cmd": "",
+   "x": 28,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-human",
+   "flow": null
+  },
+  "g:G-external-counsel-restart-after-internal-completion": {
+   "key": "g:G-external-counsel-restart-after-internal-completion",
+   "kind": "gate",
+   "id": "G-external-counsel-restart-after-internal-completion",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:MGMT-01-guardian-real-verification",
+     "id": "MGMT-01-guardian-real-verification",
+     "kind": "task",
+     "title": "법정대리인 실 본인확인 설계·도입 — StubGuardianVerifier 대체 (변호사 자문 선행)",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:MGMT-02-terms-privacy-policy-counsel",
+     "id": "MGMT-02-terms-privacy-policy-counsel",
+     "kind": "task",
+     "title": "이용약관·개인정보처리방침 문안 확정 (변호사 검토) — 동의 버전 원장의 선결",
+     "status": "todo",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "short": "G-external-counsel-restart-after-internal-completion",
+   "title": "외부 의존 작업 재개 판정 (2026-07-27 Kiki 결정의 만료 지점 · 12/31 내부 프로젝트 완성 이후) — 변호사 회신·외부인 리뷰 등 외부 의존 작업은 '미완성 제품의 병목이 되는 것 반대'(2026-07-27 Kiki)로 제품 출시(공개 β) 준비 단계에서 일괄 처리한다. 그 준비 단계의 시작점 = 내부 완성 판정(G-internal-completion-2026-12-31) 이후이며, 이 게이트가 그 만료·재확인 지점이다(만료 없는 유예 금지). 부착 = MGMT-01(법정대리인 실 본인확인 · 변호사 자문 선행)·MGMT-02(이용약관·개인정보처리방침 문안 · 변호사 검토). 종전에는 두 태스크가 게이트 없이 blocked로 파킹돼 있어 기계가 만료 지점을 몰랐다 — 2026-09-28 정리로 게이트 부착 + todo 복귀(후보 제외는 게이트가 집행). 같은 부류의 기존 게이트는 각자 만료 지점을 가지므로 흡수하지 않는다: G-web01-landing-legal-review(랜딩 변호사 검토 · 독촉 2027-01-05) · G-export-prediction-disclosure(열람권 예측치 법률 검토 · MGMT-06). 판정 3택: ①재개(변호사 자문 착수 — MGMT-02 → MGMT-01 → MGMT-03 순) ②연장(새 기한으로 재생성) ③범위 조정. 근거 = MEMORY 2026-07-27 결정 로그 · 2026-09-28 결정 로그.",
+   "state": "gate_turn",
+   "label": "사람 차례",
+   "reason": "담당 kiki의 행동을 기다린다",
+   "detail": "",
+   "gate_kind": "decision",
+   "assignee": "kiki",
+   "requested": "2026-09-28",
+   "days": 1,
+   "overdue": false,
+   "unlocks": 3,
+   "wait_chain": [],
+   "excerpt": [],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "python3 scripts/harness/backlog.py gates clear G-external-counsel-restart-after-internal-completion --as kiki --evidence \"<근거: PR 번호 또는 커밋 해시>\"",
+   "x": 2096,
+   "y": 157,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-5",
+   "flow": 5
+  },
+  "t:CONST-03-coding-constitution-stage3-part1-enforcement": {
+   "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+   "kind": "task",
+   "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "preds": [
+    {
+     "key": "g:G-const-sources-registry-adopt",
+     "id": "G-const-sources-registry-adopt",
+     "kind": "gate",
+     "title": "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-02-coding-constitution-transplant-stage1-2",
+     "id": "CONST-02-coding-constitution-transplant-stage1-2",
+     "kind": "task",
+     "title": "코딩 헌법(구조 결함 표준북·헌법 v1.0/v1.1 꾸러미) 이식 1~2단계 — 설치·보호 훅·위헌 심사 래칫 CI·진단 도구·이식 정본 문서 (Kiki 지시 2026-09-26)",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "b:claude/sample-branch",
+     "id": "claude/sample-branch",
+     "kind": "branch",
+     "title": "완료분 CONST-03 — 트렁크에 아직 합쳐지지 않았다",
+     "status": "unmerged",
+     "open": true,
+     "edge": "이 브랜치에 완료분이 있다(미머지)"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+     "id": "CONST-04-coding-constitution-part2-boundary-contract-secrets",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 II(5~8장·28장) — 경계·계약·상태·비밀값 집행 장치 착지 (규칙 15건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:CONST-05-coding-constitution-part3-change-safety",
+     "id": "CONST-05-coding-constitution-part3-change-safety",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 III(9~11장) — 커밋 규율·마이그레이션·래칫 집행 장치 착지 (규칙 8건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:CONST-06-coding-constitution-part4-verification-independence",
+     "id": "CONST-06-coding-constitution-part4-verification-independence",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 IV(12~14장) — 테스트 구조·검증 독립·정적 분석 집행 장치 착지 (규칙 9건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+     "id": "CONST-07-coding-constitution-part5-6-ops-ai-collab",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 V·VI(15~19장) — 관측·백업·회고·AI 작업 단위·사람 검토 집행 장치 착지 (규칙 15건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:CONST-08-coding-constitution-part7-edu-app",
+     "id": "CONST-08-coding-constitution-part7-edu-app",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 VII(20~29장) — 교육앱 특화 집행 장치 착지 (규칙 34건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "CONST-03",
+   "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+   "state": "waiting",
+   "label": "사람 게이트 대기",
+   "reason": "사람 게이트 대기",
+   "detail": "G-const-sources-registry-adopt",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 5,
+   "wait_chain": [
+    "CONST-03-coding-constitution-stage3-part1-enforcement",
+    "G-const-sources-registry-adopt"
+   ],
+   "excerpt": [
+    "① 대상 규칙 10건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'par…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 10건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'partial': 9, 'none': 1}): R0-02(partial·st3·S) → scripts/constitution/check_amendment.py / R1-01(partial·st3·M) → pipeline.yaml / R1-02(partial·st3·S) → scripts/constitution/pipeline_check.py / R1-03(partial·st3·M) → pipeline.yaml / R2-02(partial·st3·M) → tests/backend/harness/test_review_gate_independence.py / R2-03(partial·st3·M) → tests/backend/schema/test_gate_record_schema.py / R2-04(partial·st3·S) → src/backend/whymath_backend/ops/hit_cu_metrics.py / R3-01(partial·st3·M) → tests/infra/test_batch_idempotency_coverage.py / R4-02(none·st3·M) → scripts/ops/check_generated_schemas.py / R4-03(partial·st2·S) → tests/infra/test_docs_numbers.py",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다.",
+    "⑥ (CONST-02 대조표 비평가 처분 #2·#3·#4 승계) audit.py 판정 논리를 이 저장소 구조에 맞게 고친다 — ⓐ 배선 판정을 전역 STAGE가 아니라 규칙 자신의 stage 기준으로 ⓑ 워크플로 텍스트 부분 문자열 일치(주석·무관 워크플로도 연결로 셈) 대신 잡 스텝의 run 명령 단위 대조 ⓒ 파일 단위 pytest run(35건)이 디렉터리 단위 CI 잡에서 구조적 미연결이 되지 않는 판정 방식 ⓓ 저장소 루트 cwd·180초 타임아웃·shell=True 실행의 규칙별 설정 ⓔ L4 비대칭(파일 없음 차단·미배선 침묵·실패 경고) 정리. 근거 = docs/standards/coding_constitution_transplant.md §4. 이것이 끝나야 R4-01(래칫이 CI에서 audit.py를 실제로 돌리는데도 3단계에서 미연결로 보임)이 정당하게 해소된다 — 문자열을 맞추려는 주석·형식 스텝 추가는 금지(검사기를 속이는 것).",
+    "⑦ (처분 #2 승계) Claude Code 밖 경로의 헌법 보호 — 가드 훅은 AI 세션의 명령만 본다. 사람 push·GitHub 웹 편집·다른 AI 도구 경로는 브랜치 룰셋 또는 CODEOWNERS(constitution/** 필수 리뷰어 = Kiki)로 막는다. 룰셋·CODEOWNERS 변경은 되돌리기 어려운 저장소 설정이므로 Kiki 게이트로 분리하고, 가용성(조직 소유·플랜)을 먼저 실측한다(CLAUDE.md 설정 부재를 설정 가능으로 단정 금지)."
+   ],
+   "notes": "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계",
+   "cmd": "",
+   "x": 432,
+   "y": 478,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:ARCH-63-cloud-seat-failover": {
+   "key": "t:ARCH-63-cloud-seat-failover",
+   "kind": "task",
+   "id": "ARCH-63-cloud-seat-failover",
+   "preds": [
+    {
+     "key": "g:G-arch66-anthropic-api-pause-review",
+     "id": "G-arch66-anthropic-api-pause-review",
+     "kind": "gate",
+     "title": "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:ARCH-62-cloud-cost-table-seat-axis",
+     "id": "ARCH-62-cloud-cost-table-seat-axis",
+     "kind": "task",
+     "title": "클라우드 단가표 좌석 축 분리 — 티어만으로 키가 잡혀 MID 좌석 이동 시 24.4배 과대 계상",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "ARCH-63",
+   "title": "클라우드 좌석 failover — OpenRouter 1차 실패 시 anthropic 2차·그다음 LOCAL (학생 대면 전환의 안전 장치)",
+   "state": "waiting",
+   "label": "사람 게이트 대기",
+   "reason": "사람 게이트 대기",
+   "detail": "G-arch66-anthropic-api-pause-review",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-29",
+   "unlocks": 0,
+   "wait_chain": [
+    "ARCH-63-cloud-seat-failover",
+    "G-arch66-anthropic-api-pause-review"
+   ],
+   "excerpt": [
+    "① 좌석 failover 경로 배선 — CLOUD_MID 요청이 1차 좌석(openrouter/deepinfra) 실패 시 2차 좌석(anthropic)으로 1회 재시도하…",
+    "[ARCH-66 보류 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다(Claude는 Claude Max 구독 개발 도…"
+   ],
+   "acceptance": [
+    "① 좌석 failover 경로 배선 — CLOUD_MID 요청이 1차 좌석(openrouter/deepinfra) 실패 시 2차 좌석(anthropic)으로 1회 재시도하고, 그것도 실패하면 기존 LOCAL 강등 경로를 탄다. ② OpenRouter의 `allow_fallbacks=false`는 **그대로 유지**한다 — 이 태스크가 만드는 것은 OpenRouter 내부 폴백이 아니라 우리 라우터 층의 명시적 좌석 전환이다. 둘은 다른 것이며, 전자를 켜면 정밀도(fp8/fp4/unknown)가 섞여 품질 비교가 무효가 된다(ARCH-55 채택 계약). ③ failover 트리거는 429·5xx·타임아웃으로 한정한다 — 4xx(인증·잘못된 요청)는 재시도하지 않는다(같은 실패가 반복될 뿐이고 원인을 가린다). ④ 작동 신호 4종을 리포트가 낸다(CLAUDE.md 「작동한 비율」): seat_primary_success_rate · seat_failover_rate(+사유 분포 429/5xx/timeout) · seat_local_degrade_rate · seat_not_measured. 좌석 미상을 0으로 접지 않는다. ⑤ 변별력 — 1차 좌석이 429를 내도록 주입하면 2차 좌석이 응답하고 seat_failover_rate가 오른다. 주입 없이는 seat_primary_success_rate가 1.0이고 failover 0이다. 두 상태가 서로 다른 값을 내는 것까지 확인한다. ⑥ 뮤테이션 — failover 분기를 제거하면 ⑤의 주입 테스트가 RED. 4xx 재시도 금지 절을 제거하면 인증 실패 주입 테스트가 RED. 두 절 각각에 그 절이 없으면 통과하는 입력을 픽스처로 둔다.",
+    "[ARCH-66 보류 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다(Claude는 Claude Max 구독 개발 도구로만). 이 태스크는 Anthropic 좌석의 런타임 호출을 전제하므로 재판정 게이트 G-arch66-anthropic-api-pause-review에 묶는다. 특히 구독 OAuth 자격증명을 백엔드 런타임에 쓰는 설계(03c 4.3)는 2026-05-20 결정(소비자 구독 = 개인 사용 한정·제품 서빙 불가)과 충돌 소지가 있어 그 게이트에서 함께 판정한다.",
+    "[정정 2026-09-29 · ARCH-64 실측] ①의 \"기존 LOCAL 강등 경로\"는 코드에 없었다 — LOCAL 강등은 라우팅 시점에만 있고 클라우드 호출 실패 후 강등은 없다. 그 경로는 ARCH-69-cloud-runtime-local-degrade가 만든다. 이 태스크가 재개되면 1차 → 2차 좌석 → ARCH-69의 LOCAL 강등 순서로 잇고, `seat_local_degrade_rate`는 ARCH-69와 같은 정의를 공유한다."
+   ],
+   "notes": "근거 = docs/architecture/03c_cloud_tier_transition_v2.md 3절. 판정 기준: main d10ba109.\n\n이 태스크가 학생 대면 전환(ARCH-64)의 안전 장치다. 실측된 공유 풀 대기열 실패율이 2026-09-17~18 4회차에서 30%→15%→0%로 흔들렸고(limit_source=upstream_provider_shared_pool·is_byok=false) p95 지연이 212초까지 갔다. 저작 경로에서는 명확한 실패가 옳은 선택이지만(사람이 본다) 학생 대면에서는 그 실패가 학생 화면의 오류가 된다.\n\nfailover가 성립하면 가용성 축은 '차단 판정의 입력'이 아니라 '운영 지표'가 된다 — ARCH-56의 acceptance 재정의가 그 위에 선다(Kiki 판정 사안).\n\n주의: seat_failover_rate가 상시 높으면 그것은 보호가 작동 중이라는 뜻이 아니라 1차 좌석이 부적합하다는 신호다. 그때 openrouter_allowed_providers에 정밀도가 같은 곳(baseten — PROVIDER_* 표 등재·Region US·baseten/fp8)을 추가해 이중화한다. 정밀도가 다른 곳을 넣는 것은 이중화가 아니라 오염이다.\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침\n\n[정정 2026-09-29] ARCH-64 실측: 전제한 LOCAL 강등 경로 부재 → ARCH-69 연결",
+   "cmd": "",
+   "x": 1668,
+   "y": 56,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-4",
+   "flow": 4
+  },
+  "t:MGMT-01-guardian-real-verification": {
+   "key": "t:MGMT-01-guardian-real-verification",
+   "kind": "task",
+   "id": "MGMT-01-guardian-real-verification",
+   "preds": [
+    {
+     "key": "g:G-external-counsel-restart-after-internal-completion",
+     "id": "G-external-counsel-restart-after-internal-completion",
+     "kind": "gate",
+     "title": "외부 의존 작업 재개 판정 (2026-07-27 Kiki 결정의 만료 지점 · 12/31 내부 프로젝트 완성 이후) — 변호사 회신·외부인 리뷰 등 외부 의존 작업은 '미완성 제품의 병목이 되는 것 반대'(2026-07-27 Kiki)로 제품 출시(공개 β) 준비 단계에서 일괄 처리한다. 그 준비 단계의 시작점 = 내부 완성 판정(G-internal-completion-2026-12-31) 이후이며, 이 게이트가 그 만료·재확인 지점이다(만료 없는 유예 금지). 부착 = MGMT-01(법정대리인 실 본인확인 · 변호사 자문 선행)·MGMT-02(이용약관·개인정보처리방침 문안 · 변호사 검토). 종전에는 두 태스크가 게이트 없이 blocked로 파킹돼 있어 기계가 만료 지점을 몰랐다 — 2026-09-28 정리로 게이트 부착 + todo 복귀(후보 제외는 게이트가 집행). 같은 부류의 기존 게이트는 각자 만료 지점을 가지므로 흡수하지 않는다: G-web01-landing-legal-review(랜딩 변호사 검토 · 독촉 2027-01-05) · G-export-prediction-disclosure(열람권 예측치 법률 검토 · MGMT-06). 판정 3택: ①재개(변호사 자문 착수 — MGMT-02 → MGMT-01 → MGMT-03 순) ②연장(새 기한으로 재생성) ③범위 조정. 근거 = MEMORY 2026-07-27 결정 로그 · 2026-09-28 결정 로그.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    }
+   ],
+   "succs": [],
+   "short": "MGMT-01",
+   "title": "법정대리인 실 본인확인 설계·도입 — StubGuardianVerifier 대체 (변호사 자문 선행)",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 1,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 0,
+   "wait_chain": [
+    "MGMT-01-guardian-real-verification",
+    "G-external-counsel-restart-after-internal-completion"
+   ],
+   "excerpt": [
+    "실 본인확인 방식(휴대폰 본인인증 등) 법적 적정성 변호사 자문 — 법령 유래 사람 의사표시",
+    "자문 결과 기반 verification_method 실구현으로 StubGuardianVerifier 대체 (consent_grant.py)"
+   ],
+   "acceptance": [
+    "실 본인확인 방식(휴대폰 본인인증 등) 법적 적정성 변호사 자문 — 법령 유래 사람 의사표시",
+    "자문 결과 기반 verification_method 실구현으로 StubGuardianVerifier 대체 (consent_grant.py)",
+    "PII 최소수집·해시 저장 원칙 유지 (guardian_email_hash 평문 금지)"
+   ],
+   "notes": "제품 출시(공개 β) 전으로 일괄 연기 — 2026-07-27 Kiki 지시: 변호사 회신·외부인 리뷰 등 외부 작업이 미완성 제품의 병목이 되는 것 반대. 자문 준비물(docs/legal/guardian_verification_counsel_brief.md)은 완비 — 출시 준비 단계에서 그대로 사용. unblock 트리거 = 공개 β 준비 착수\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 학생 표본 수집의 법적 전제(법정대리인 동의) — 등급≠착수, 변호사 자문에 막혀 있음. EOS-80 일괄 백필\n\n[정정 2026-09-28] 2026-09-28 정리 — 2026-07-27 '외부 작업 출시 전 일괄' 결정의 만료 지점을 게이트로 집행(종전: 게이트 없는 blocked 파킹)",
+   "cmd": "",
+   "x": 2500,
+   "y": 56,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-5",
+   "flow": 5
+  },
+  "t:NLP-05-shadow-grading-input-supply": {
+   "key": "t:NLP-05-shadow-grading-input-supply",
+   "kind": "task",
+   "id": "NLP-05-shadow-grading-input-supply",
+   "preds": [
+    {
+     "key": "t:REC-09-r2-isolated-implementation-recovery",
+     "id": "REC-09-r2-isolated-implementation-recovery",
+     "kind": "task",
+     "title": "r2 완료분 회수 — REC-05(채점 커버리지 관측)·REC-08(Wilson 게이트+CI 배선) 구현 2커밋이 main 미도달(미병합 고립)",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "NLP-05",
+   "title": "채점 shadow 입력 공급 — derive_verify_inputs가 읽는 formal이 코퍼스 0/2,647(구조적 0% 커버리지)",
+   "state": "review",
+   "label": "검토 대기",
+   "reason": "검토 대기",
+   "detail": "docs/architecture/nlp_module_gap_review_r2.md §8.2(Δ2·판정 뒤집기). r2 본문 §2 D2 잔여 ②는 '얼마나 좁은지는 리포트를 돌려야 알 수 있다'고 적었으나 코퍼스 grep으로 즉답되고 답은 0이다 — derive_verify_inputs(:93)가 읽는 Condition.formal은 코퍼스 7뱅크 2,647건 전부에 없고 저장소 전체에 wr…",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 1,
+   "owner": "claude",
+   "session": "main",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 선행 확인(REC-09 승계): REC-05 고립본이 같은 사실에 독립 도달했다 — attempt_grading_shadow_report.py 638줄본이 '코퍼스 2…",
+    "② 현행 실측 고정: conditions_parsed[*].formal 보유 0건·Condition(formal=) writer 0건, 그리고 코퍼스 verify 블록(a…"
+   ],
+   "acceptance": [
+    "① 선행 확인(REC-09 승계): REC-05 고립본이 같은 사실에 독립 도달했다 — attempt_grading_shadow_report.py 638줄본이 '코퍼스 2,647문항 중 0건만 통과(조건 보유 30건 전부 formal 결측)'를 이미 적었고 classify_gradability 4버킷·verifiable_zero_reason을 구현했다. REC-09 회수 착륙을 먼저 확인하고, 그 산출물을 **재구현하지 않는다**(승계). 회수본과 이 태스크의 실제 델타를 착수 첫 단계에서 확정한다",
+    "② 현행 실측 고정: conditions_parsed[*].formal 보유 0건·Condition(formal=) writer 0건, 그리고 코퍼스 verify 블록(answer_map+conditions) 보유 2,647/2,647=100%를 재확인한다(주장 확인 또는 반증 — 반증되면 범위 재조정)",
+    "③ 입력 공급(정본화·이 태스크의 고유 기여): REC-05가 보지 않은 축을 연다 — 그 리포트는 DB Problem 필드(choices·answer·question_format·answer_format·derive_verify_inputs)만 읽고 코퍼스 verify 블록 참조가 0건이다. 이미 100% 존재하는 verify 블록을 공급원으로 쓴다(whs/corpus_replay.py:104 선례·신규 채점기 0·신규 스키마 0). DB 컬럼 부활 안은 대안으로 검토만 하고 선택 근거를 notes에 남긴다",
+    "④ 집행 지점(별항): 그 입력으로 verify_answer가 실제로 호출되는 코드 경로를 명시하고, 파생 성공 건수가 0이 아님을 실데이터로 보인다 — '정본화'만으로 완료 처리하지 않는다(2026-08-04 금기). REC-05의 상한 리포트에서 C버킷(또는 신설 verify_block_derivable 버킷)이 0에서 올라가는 것이 성공 신호다",
+    "⑤ 탈락 사유 계수(REC-05 위에 얹기): REC-05의 verifiable_zero_reason 2분('attempt 0행' ↔ '코퍼스 formal 결측')을 승계하고, verify 블록 축의 탈락 사유(no_verify_block·parse_error·multi_symbol·no_student_answer)를 그 위에 더한다. 기존 2분을 재구현하거나 대체하지 않는다",
+    "⑥ 교수학 계약 승계: unverifiable을 오답으로 강등하지 않는다. 리포트는 '검산 가능 표본 N건 중 M건'으로 표시(분모 없는 0 금지). 범위 밖 명시 — BKT 입력 권위 이관 아님(관측만·NLP-02 계약 불변을 테스트로 재동결)",
+    "⑦ 변별력: formal/verify 재료를 의도적으로 비운 문항을 주입해 해당 사유 카운터가 실제로 오르는지 실측 → 복원해 정상 실측. 성공/실패 양쪽에서 같은 값을 내면 이 설계 자체가 실패다"
+   ],
+   "notes": "docs/architecture/nlp_module_gap_review_r2.md §8.2(Δ2·판정 뒤집기). r2 본문 §2 D2 잔여 ②는 '얼마나 좁은지는 리포트를 돌려야 알 수 있다'고 적었으나 코퍼스 grep으로 즉답되고 답은 0이다 — derive_verify_inputs(:93)가 읽는 Condition.formal은 코퍼스 7뱅크 2,647건 전부에 없고 저장소 전체에 writer가 0건이라 파생이 영구히 None이다. 정작 필요한 answer_map+conditions는 코퍼스 verify 블록에 100% 있는데 l1/problem_bank/populate.py:296이 pop하고 :214가 '적재는 slug·problem·concept_tags·relations만 소비'라 자인한다. 파급: r2 §3 D6이 사전 등재한 이관 임계 '검산 가능 200건 이상'이 OPS-19(러너) 착륙 후에도 영구 미달 → v1 §5-② 채점 권위 이관 유보가 해제도 영구화도 불가(CLAUDE.md '만료 없는 유예·제외 금지'). 착수 순서: 이 태스크가 OPS-19보다 먼저다 — 돌릴 것이 없는 러너를 먼저 배선하면 '돌렸는데 0'이라는 가장 나쁜 화면이 된다. CLAUDE.md '작동 신호 없는 알고리즘 부착 금지 — 작동한 비율' 정면 해당. 겹침 경고 조사(2026-08-11): overlap이 S4-16(in_progress·claude/whymath-ai-content-design-vafylb)과 1건 경고했으나 프리픽스 artifact다 — S4-16의 paths가 harness/** 광역이고, 그 브랜치의 실제 harness 변경은 residue_gate_demotion_battle.py 1파일뿐이라 attempt_grading_shadow_report.py와 실충돌 0. 다만 claim이 8일 경과(policy claim_ttl_hours=72 초과)이므로 착수 시 재확인한다. 인접 대조(2026-08-11 병합 시점·r2 §8.11-①): REC-05(추천 r2 §2 G1)가 같은 사실에 독립 도달했다 — 고립본 attempt_grading_shadow_report.py 638줄(main 412줄+226)이 '코퍼스 2,647문항 중 0건만 통과(조건 보유 30건 전부 formal 결측)'를 그대로 적었다. 수치가 정확히 일치하므로 Δ2는 교차 검증된 사실이며, 이 문서 §8.2의 '최대 발견'은 최초 발견이 아니라 고립돼 안 보였을 뿐이다. 처방은 다르다 — REC-05는 0을 정직하게 만들고(4버킷 상한 리포트+verifiable_zero_reason) 이 태스크는 0을 0이 아니게 만든다(코퍼스 verify 블록 공급). REC-05는 verify 블록 참조가 0건(전수 grep 확인)이라 겹치지 않는다. 다만 같은 파일을 고치므로 REC-09(회수)에 depends — 회수 전 착수하면 226줄을 모르는 채 같은 파일을 고쳐 두 번째 고립을 만든다.\n\n[정정 2026-09-01] eos_priority null → P1: 자동검증률 KPI — formal 커버리지 0% 해소. EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 1264,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-in_progress",
+   "flow": null
+  },
+  "t:ARCH-11-subgraph-depth-guard": {
+   "key": "t:ARCH-11-subgraph-depth-guard",
+   "kind": "task",
+   "id": "ARCH-11-subgraph-depth-guard",
+   "preds": [
+    {
+     "key": "t:S1-11-coach-harness-converge",
+     "id": "S1-11-coach-harness-converge",
+     "kind": "task",
+     "title": "상환 #3 완전 — coach→하네스 단일 수렴",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "ARCH-11",
+   "title": "Minimal Subgraph depth≤2 가드 — WH-1 traversal 소비처 착륙 시 동반 도입 (유예 B 추적)",
+   "state": "blocked",
+   "label": "차단",
+   "reason": "차단",
+   "detail": "트리거 미발동(2026-07-20 실측): S1-11 머지는 WH-1 발화 flip만 착륙·그래프 traversal 미도입 — query_curriculum/read_student_state는 wh1_loop._exec에서 기록만 하는 stub, wh1_llm_policy._build_prompt는 flat(TurnState 요약), 유일 엣지순회 prerequisite_recommenda…",
+   "stage": "S1",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "l2/reasoning_subgraph.py seam에 depth≤2·visited set·timeout·token budget guard 도입 + 테스트 동결"
+   ],
+   "acceptance": [
+    "l2/reasoning_subgraph.py seam에 depth≤2·visited set·timeout·token budget guard 도입 + 테스트 동결"
+   ],
+   "notes": "트리거 미발동(2026-07-20 실측): S1-11 머지는 WH-1 발화 flip만 착륙·그래프 traversal 미도입 — query_curriculum/read_student_state는 wh1_loop._exec에서 기록만 하는 stub, wh1_llm_policy._build_prompt는 flat(TurnState 요약), 유일 엣지순회 prerequisite_recommendation은 LLM 미주입(제외 축). 지금 l2/reasoning_subgraph.py 생성=소비처 0 추상(CLAUDE.md 금기)·test_llm_subgraph_budget_invariant가 graph→LLM 빌더 없음 동결. 실제 트리거=query_curriculum이 L1+L2 실제 순회·프롬프트 주입하는 슬라이스 착륙. depends_on(S1-11)은 프록시라 조기 발동 — 해당 슬라이스 착륙 시 unblock.\n\n[복구 불가 — 2026-08-10 확인] 이 태스크는 main 트렁크 히스토리상 최초 커밋(squash 병합)부터 이미 status: blocked·notes=차단사유 상태로 존재한다 — 즉 'add로 등재'와 '동일 세션 내 block 호출로 notes 덮어쓰기'가 같은 squash 커밋 안에서 함께 일어나, 원 설계 근거(발견 경위 등)가 main에 한 번도 커밋되지 않았다. git log --all(원격 브랜치 포함)로 조회했으나 main 조상 경로상 더 이른 버전이 없어 복구 불가 — 대체된 원문은 유실됨(날조하지 않음).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/플레이북 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 1108,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-blocked",
+   "flow": null
+  },
+  "t:HARN-80-direct-commit-landing-done-path": {
+   "key": "t:HARN-80-direct-commit-landing-done-path",
+   "kind": "task",
+   "id": "HARN-80-direct-commit-landing-done-path",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:CUR-07-achievement-standard-schema-extension",
+     "id": "CUR-07-achievement-standard-schema-extension",
+     "kind": "task",
+     "title": "AchievementStandard 스키마 확장 — 평가준거 코드·성취수준 등급 커버리지 반영 (CUR-03/CUR-05 약속 이행)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "HARN-80",
+   "title": "직접 커밋으로 main에 착지한 태스크의 done 경로 부재 — --no-pr 4종 어디에도 없고 잘못된 사유로 통과시키면 거부 우회 (CUR-07 실사례: 구현은 main 7b4fb546에 있는데 대장은 todo·HARN-34 노트는 '고립')",
+   "state": "ready",
+   "label": "시작 가능",
+   "reason": "",
+   "detail": "",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-07",
+   "unlocks": 2,
+   "wait_chain": [],
+   "excerpt": [
+    "① 재현 고정(2026-09-07 main b75f495d): CUR-07-achievement-standard-schema-extension 산출물 12파일이 main …",
+    "② 경로 신설: --no-pr direct-commit <sha> — 기계 변별력 필수: 그 sha가 `git merge-base --is-ancestor <sha> or…"
+   ],
+   "acceptance": [
+    "① 재현 고정(2026-09-07 main b75f495d): CUR-07-achievement-standard-schema-extension 산출물 12파일이 main 7b4fb546(2026-08-25 · doldori7 · first-parent 직접 커밋 · 'Closes CUR-07' · PR 참조 없음)에 착지 — 브랜치 34zvse 판과 4파일 바이트 동일·6파일 main 후행 우세·acceptance ③ 충족(criteria_loader CriteriaMatchResult.unmatched). 그런데 main YAML은 status todo·artifacts []·session 34zvse(죽은 claim)이고 HARN-34 notes(08-30)는 '34zvse에 고립·미이식'으로 사실과 어긋난다. `backlog.py done CUR-07 --artifact 7b4fb546`은 PR 증적 게이트가 exit 1로 거부(실측) — --no-pr {investigation|incomplete|ci-red|kiki-hold} 어느 것도 '직접 커밋 착지'가 아니다",
+    "② 경로 신설: --no-pr direct-commit <sha> — 기계 변별력 필수: 그 sha가 `git merge-base --is-ancestor <sha> origin/main`으로 trunk 조상임을 CLI가 실측한 뒤에만 통과(조상이 아니면 exit 1 · git 실패·shallow는 측정 실패로 exit 3 — 0건 통과로 위장 금지). 사유·sha는 notes와 이벤트 양쪽에 남는다 — 남지 않는 탈출구는 게이트를 끄는 것과 같다(HARN-68 --no-base 선례 동형)",
+    "③ 변별력 양방향: main 조상 sha로는 done 성공, 비조상 sha(브랜치 전용 커밋)로는 거부, 기존 --no-pr 4종의 동작 불변 — 뮤테이션(조상 검사 제거)이 RED를 내는지 실측 후 통과 선언",
+    "④ 집행: CUR-07을 이 경로로 done 전이하고(증적 7b4fb546·session 해제) HARN-34 notes의 '34zvse 고립' 기술을 amend로 정정한다. 그 뒤 34zvse는 코드 잔여 0(§5 실측)이므로 삭제 배치 후보 — 전이 전 삭제 금지",
+    "⑤ 범위 밖: 직접 커밋 자체의 허용 여부(브랜치 보호 룰셋·OPS-08 소관) · HARN-57(done 후 artifacts 정정·PR #1021)과 중복 착수 금지 — 그쪽은 done *이후* 보정, 이쪽은 done *진입* 경로"
+   ],
+   "notes": "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5·§7 (stray-code 8회차 — 34zvse 커버리지 정독). CLAUDE.md '거부의 우회 금지' 처리 순서 ③(CLI 경로 자체가 없는 설계 공백이면 태스크로 등재 — HARN-06 선례). 8회차 세션은 done을 시도해 거부를 실측했고 우회하지 않았다. 코드·데이터 유실 0 — 대장(상태·증적·이벤트) 축만 공백.",
+   "cmd": "python3 scripts/harness/backlog.py start HARN-80-direct-commit-landing-done-path",
+   "x": 28,
+   "y": 1962,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-8",
+   "flow": 8
+  },
+  "t:KG-05-university-content-mechanical-pattern-fix": {
+   "key": "t:KG-05-university-content-mechanical-pattern-fix",
+   "kind": "task",
+   "id": "KG-05-university-content-mechanical-pattern-fix",
+   "preds": [
+    {
+     "key": "t:KG-02-concept-content-review-promotion",
+     "id": "KG-02-concept-content-review-promotion",
+     "kind": "task",
+     "title": "이론 콘텐츠 검수 승격 — concept_content 846(K-12 437+대학 409) ai_estimated→reviewed 배치 (AI 자기승인 금지)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "KG-05",
+   "title": "대학 콘텐츠 기계적 생성 패턴 손질 — mnemonic '주의: <오개념 원문>' 409건 + 화살표 체인 explanation + review_status 스키마 드리프트",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "KG-02-concept-content-review-promotion",
+   "stage": "S4",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [
+    "KG-05-university-content-mechanical-pattern-fix",
+    "KG-02-concept-content-review-promotion",
+    "G-kg02-review-promotion-llm-session"
+   ],
+   "excerpt": [
+    "① flashcard mnemonic 409/409가 '주의: ' + 오개념 원문의 기계 복사임을 전수 실측 확인 후 처분 결정 — 틀린 문장을 암기카드에 반복 노출하는 …",
+    "② explanation이 409/409 'A → B → C' 토픽 체인(설명 아닌 로드맵)임을 실측 고정하고, 재서술 방침을 결정 — 전량 재생성이면 생성 파이프라인 경…"
+   ],
+   "acceptance": [
+    "① flashcard mnemonic 409/409가 '주의: ' + 오개념 원문의 기계 복사임을 전수 실측 확인 후 처분 결정 — 틀린 문장을 암기카드에 반복 노출하는 설계는 교수학 위해(2026-08-13 감사). 제거·재작성·null화 중 근거 있는 처분을 택하고 판단 근거를 기록",
+    "② explanation이 409/409 'A → B → C' 토픽 체인(설명 아닌 로드맵)임을 실측 고정하고, 재서술 방침을 결정 — 전량 재생성이면 생성 파이프라인 경로를, 보류면 KG-02 검수 워크플로에 편입을 명시",
+    "③ 스키마 드리프트 해소: 대학 content.json에 review_status·standard_codes 필드 부재 — K-12와 동일 축을 갖추거나, 의도적 차이면 스키마·로더·문서에 자인 주석 (KG-02의 reviewed_only 소비 경로와 모순되지 않아야 함)",
+    "④ _provenance.json 갱신 + 변경 전후 샘플 10건 수기 검산(수학 정확성은 현재 양호하므로 훼손 금지)",
+    "⑤ 범위 밖: K-12 코퍼스(QUAL-06 소관), 카드 difficulty_tier 문자열 타입 정정(별도 관찰 필요 시 신규 등재)"
+   ],
+   "notes": "2026-08-13 감사 발견. 대학 콘텐츠 수학 정확성은 샘플 검산 통과(선형 ODE·제2동형정리·오일러 φ·블랙-숄즈 전부 정확) — 문제는 표현의 기계성뿐. KG-02(blocked) 해소 전 대량 재서술은 검수 없는 승격 위험이 있어 depends 처리.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 836,
+   "y": 1428,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-6",
+   "flow": 6
+  },
+  "t:SKB-04-concept-content-k12-prod-populate": {
+   "key": "t:SKB-04-concept-content-k12-prod-populate",
+   "kind": "task",
+   "id": "SKB-04-concept-content-k12-prod-populate",
+   "preds": [
+    {
+     "key": "g:G-skb04-concept-content-populate",
+     "id": "G-skb04-concept-content-populate",
+     "kind": "gate",
+     "title": "SKB-04 concept_content prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(concept_content.populate 1회 실행). 배경: 이 CLI는 완비돼 있으나 prod에서 한 번도 실행되지 않았다(2026-09-14 실측: 크로스워크 이전이 \"concept_content K-12 대상 행 부재 437건\" 보고). 2026-09-15 착수 검증에서 코드 공백이 아님을 확정했다 — 코퍼스 실재(K-12 437건·대학 409건)·CLI 진입점 실재(main(argv)->int·__main__)·크로스워크가 부재로 지목한 code 3건이 코퍼스에 전건 포함(10기수1-01-01/-02/-03)·concept_content는 FK가 없고 code가 PK라 선행 적재 불요. 즉 실행만 하면 해소된다. 기대 적재: K-12 437 + 대학 409 = 846건. 런북: docs/ops/skb04_concept_content_populate_runbook.md. SKB-03 게이트(G-skb03-atom-node-populate)와 같은 창에서 연달아 실행 가능하며 순서 의존은 없다(두 테이블은 서로 참조하지 않는다).",
+     "status": "cleared",
+     "open": false,
+     "edge": "필요 게이트"
+    }
+   ],
+   "succs": [],
+   "short": "SKB-04",
+   "title": "concept_content K-12 437행 prod 미적재 — L4 콘텐츠 공급·연령대 설명·concepts API가 조용히 빈 결과",
+   "state": "in_progress",
+   "label": "진행 중",
+   "reason": "",
+   "detail": "",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "claude/quirky-cori-x91nld",
+   "updated": "2026-09-15",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main …",
+    "②-확정(2026-09-15 착수 검증): 1차 가설 \"코드 공백이 아니라 prod에서 한 번도 실행되지 않았다\"가 맞다. 실측 4건 — ⓐ CLI 진입점 실재(l1/co…"
+   ],
+   "acceptance": [
+    "① 실측 확정: 2026-09-14 G-skb01-concept-behavior-skills-populate 실행(Kiki·Phaiakes9 whymath-pg·main b810388b) 중 concept_atom_crosswalk.populate가 \"concept_content K-12 대상 행 부재 437건 (예: 10기수1-01-01, 10기수1-01-02, 10기수1-01-03)\"을 보고했다 — concept_content.atom_codes 갱신 0건(대상 437건 전건 부재·대학 행 무변경). 착수 시 concept_content 전체 행수를 직접 실측해 \"K-12 437행 부재\"인지 \"테이블 전량 공백\"인지 범위를 확정한다(이 등재 시점에는 전자만 확인됨 — 대학 행의 존재 여부는 미측정).\n② SKB-03과 다른 점 명시: 이쪽은 적재 CLI가 이미 있다 — l1/concept_content/populate.py에 main(argv)->int와 __main__ 진입점 실재(main b810388b 실측 37행·88행). 즉 코드 공백이 아니라 \"prod에서 한 번도 실행되지 않았다\"가 1차 가설이다. 착수 시 그 가설을 먼저 검증한다(실행했는데 실패한 흔적이 있는지·코퍼스 커버리지가 K-12를 포함하는지).\n③ 소비처 영향 명시: concept_content는 L4 content_supply.py·l4/pedagogy/age_band_explanation.py·api/concepts.py가 소비한다 — 비어 있으면 그 경로들이 조용히 빈 콘텐츠를 낸다. 작동한 비율 원칙에 따라 적재 후 공급 성립 비율을 확인할 수 있어야 한다.\n④ prod 적재는 human gate로 위임(prod DB 쓰기라 세션 직접 실행 불가). ②의 가설이 맞으면 이 태스크의 산출물은 코드가 아니라 검증된 실행 런북 + 게이트다.",
+    "②-확정(2026-09-15 착수 검증): 1차 가설 \"코드 공백이 아니라 prod에서 한 번도 실행되지 않았다\"가 맞다. 실측 4건 — ⓐ CLI 진입점 실재(l1/concept_content/populate.py의 main(argv)->int 37행·__main__ 88행, argparse·파일 부재 return 2·stdout 보고까지 완비) ⓑ 코퍼스 실재(data/corpus/concept_content_v1/content.json의 content 배열 437건 + concept_content_university_v1 409건 = 846건) ⓒ 키 공간 일치 — 크로스워크가 \"대상 행 부재\"로 지목한 code 3건(10기수1-01-01·-02·-03)이 K-12 코퍼스에 전건 포함되고 437 code 전건 유일 ⓓ 선행 적재 불요 — concept_content는 FK가 없고 code가 PK다(db/models/concept_content.py 67행, 주석에 \"FK는 두지 않는다\" 명시). 따라서 이 태스크의 산출물은 코드가 아니라 검증된 런북 + 게이트다(acceptance ④의 예고대로 성립).\n③-충족확인(2026-09-15): 이 항이 요구한 \"작동한 비율\" 신호는 이미 배선돼 있었다 — l4/content_supply.py가 dsl_render_rate를 점추정과 Wilson 하한으로 함께 노출하고 어댑터별로 분해하며(118~121행), 렌더가 아닌 경로로 간 이유를 fallback_reason·gate_reason_code로 남긴다(97·105·106행). SKB-03의 off_atom_axis와 같은 형태다. 다만 그 비율이 적재 후 실제로 올라가는지는 학생 요청을 흘려야 알 수 있어 이 태스크 범위 밖이다(런북 §8 고지).\n①-부분충족·표현정정(2026-09-15): 기대 적재 건수를 코퍼스에서 직접 셌다(K-12 437·대학 409·총 846). 다만 prod의 concept_content 전체 행수는 prod DB 읽기라 세션이 못 한다 — 런북 [B]단계의 BEFORE_TOTAL/BEFORE_K12/BEFORE_UNIV가 그 답을 내며, 특히 대학 409행의 존재 여부는 한 번도 확인된 적이 없다(크로스워크는 K-12 축만 건드렸다). 아울러 등재 시 제목·acceptance의 \"조용히 빈 결과\" 표현을 정정한다 — 실측 결과 소비처 2곳의 행동이 다르다: content_supply.py는 행이 없으면 로그 없이 None을 반환하지만(256행) age_band_explanation.py는 경고 로그를 남기고 None을 반환한다(79행). \"조용히\"는 전자 축에만 정확하다.\n④-집행(2026-09-15): prod 적재 게이트 G-skb04-concept-content-populate 등재 + 런북 docs/ops/skb04_concept_content_populate_runbook.md 작성. 런북은 SKB-01 런북 §9의 교훈(최상위 elseif/else 금지·침묵 가드 금지·블록 간 사람 판정·체크아웃 대신 동등성 판정)을 적용했고, SKB-03 게이트와 같은 창에서 순서 무관하게 연달아 실행 가능함을 명시했다(두 테이블은 서로 참조하지 않는다). 이 게이트가 clear되고 AFTER_TOTAL=846이 확인되기 전까지 이 태스크는 미완이다.\n⑤-후속발견(2026-09-15): SKB-03과 공통 후속이 있다 — 두 적재로 행이 생긴 뒤 concept_atom_crosswalk.populate를 한 번 더 돌리면 atom_node.behavior_skills와 concept_content.atom_codes가 함께 채워진다(2026-09-14 실행은 양쪽 모두 대상 행 부재로 0건이었다). 두 게이트를 모두 실행한 뒤 크로스워크 재실행 1회로 두 축이 동시 해소되므로, 그 재실행은 별도 게이트로 묶는 것이 왕복을 줄인다. 런북 §8에 상호 참조를 남겼다."
+   ],
+   "notes": "출처: 2026-09-14 게이트 G-skb01-concept-behavior-skills-populate 실행 중 부수 관측(세션 claude/quirky-cori-x91nld). SKB-03(atom_node 미적재)과 같은 실행에서 함께 드러난 별개 공백이며, SKB-03은 적재 CLI 자체가 없는 반면 이쪽은 CLI가 있어 해법 축이 다르다 — 그래서 분리 등재한다.\n\n[정정 2026-09-15] 착수 검증으로 가설② 확정(코드 공백 아님·실측 4건) + acceptance③ 기배선 확인 + 기대 건수 846 실측 + '조용히' 표현 정정 + 게이트/런북 집행",
+   "cmd": "",
+   "x": 1916,
+   "y": 1970,
+   "w": 300,
+   "h": 176,
+   "frame": "group-in_progress",
+   "flow": null
+  },
+  "t:CONST-06-coding-constitution-part4-verification-independence": {
+   "key": "t:CONST-06-coding-constitution-part4-verification-independence",
+   "kind": "task",
+   "id": "CONST-06-coding-constitution-part4-verification-independence",
+   "preds": [
+    {
+     "key": "g:G-const-a0002-adoption",
+     "id": "G-const-a0002-adoption",
+     "kind": "gate",
+     "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CONST-06",
+   "title": "코딩 헌법 이식 3단계 — 파트 IV(12~14장) — 테스트 구조·검증 독립·정적 분석 집행 장치 착지 (규칙 9건)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-27",
+   "unlocks": 0,
+   "wait_chain": [
+    "CONST-06-coding-constitution-part4-verification-independence",
+    "G-const-a0002-adoption (외 1)"
+   ],
+   "excerpt": [
+    "① 대상 규칙 9건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'part…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 9건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'partial': 6, 'none': 3}): R12-01(partial·st3·M) → conftest.py / R12-02(none·st3·S) → scripts/harness/check_fix_has_test.py + tests/harness/test_check_fix_h / R12-03(partial·st4·M) → scripts/ops/check_test_budget.py + tests/infra/test_check_test_budget. / R13-01(partial·st1·S) → tests/backend/l3/test_cross_verify.py / R13-02(partial·st3·M) → tests/backend/l3/test_verifier_diversity.py / R13-03(none·st5·M) → scripts/ops/check_layer_agreement.py + tests/infra/test_check_layer_ag / R14-01(partial·st1·S) → tests/infra/test_lint_coverage.py / R14-02(partial·st3·M) → src/backend/requirements-dev.lock + src/data-pipeline/requirements-dev / R14-03(none·st2·S) → .github/workflows/ci.yml",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다."
+   ],
+   "notes": "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5",
+   "cmd": "",
+   "x": 836,
+   "y": 460,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:CONST-04-coding-constitution-part2-boundary-contract-secrets": {
+   "key": "t:CONST-04-coding-constitution-part2-boundary-contract-secrets",
+   "kind": "task",
+   "id": "CONST-04-coding-constitution-part2-boundary-contract-secrets",
+   "preds": [
+    {
+     "key": "g:G-const-a0002-adoption",
+     "id": "G-const-a0002-adoption",
+     "kind": "gate",
+     "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CONST-04",
+   "title": "코딩 헌법 이식 3단계 — 파트 II(5~8장·28장) — 경계·계약·상태·비밀값 집행 장치 착지 (규칙 15건)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 0,
+   "wait_chain": [
+    "CONST-04-coding-constitution-part2-boundary-contract-secrets",
+    "G-const-a0002-adoption (외 1)"
+   ],
+   "excerpt": [
+    "① 대상 규칙 15건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'cod…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 15건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'code_exists': 3, 'partial': 10, 'none': 1, 'not_applicable': 1}): R5-01(code_exists·st1·S) → src/backend/pyproject.toml [tool.importlinter] / R5-02(partial·st2·M) → src/backend/pyproject.toml [tool.importlinter] — forbidden 계약 'AI SDK· / R6-01(partial·st3·M) → tests/infra/test_ai_output_boundary_parsing.py / R6-02(partial·st3·M) → tests/backend/db/test_schema_compat_real_samples.py / R6-03(partial·st3·M) → tests/backend/schema/test_schema_version_field_governance.py / R7-01(partial·st4·M) → tests/backend/db/test_no_state_flag_columns.py / R7-02(partial·st4·M) → src/backend/alembic/versions/<date>_problem_review_status_transition_t / R8-01(partial·st3·M) → scripts/ops/check_committed_secrets.py / R8-02(none·st4·M) → scripts/ops/scan_app_bundle.py / R8-03(partial·st3·M) → src/backend/whymath_backend/ops/required_settings.py + tests/backend/t / R8-04(partial·st1·S) → docs/ops/backup_key_custody.md / R28-01(not_applicable·st3·S) → tests/infra/test_subject_package_independence.py / R28-02(code_exists·st1·S) → tests/backend/schema/test_subject_adapter.py + tests/backend/schema/te / R28-03(code_exists·st1·S) → tests/backend/schema/test_subject_adapter_physics_stub.py / R28-04(partial·st2·M) → tests/backend/schema/test_subject_adapter_core_gates.py",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다.",
+    "⑥ (CONST-02 대조표 비평가 처분 #11 승계) pipeline.yaml 범위 — 현재 28노드는 콘텐츠 파이프라인만 담아 개인정보(privacy)·학습자 상태(BKT·learner_state)·임베딩(pgvector) 축 규칙이 매달릴 노드가 없다. 이 파트의 경계·계약 규칙에 필요한 노드를 추가할지 결정하고, 추가하면 pipeline_check(--require·--direct-upstream-of) 통과와 tests/infra 동결을 함께 한다."
+   ],
+   "notes": "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계",
+   "cmd": "",
+   "x": 836,
+   "y": 56,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:REC-07-grading-authority-transfer-decision": {
+   "key": "t:REC-07-grading-authority-transfer-decision",
+   "kind": "task",
+   "id": "REC-07-grading-authority-transfer-decision",
+   "preds": [
+    {
+     "key": "t:REC-05-grading-coverage-ceiling",
+     "id": "REC-05-grading-coverage-ceiling",
+     "kind": "task",
+     "title": "채점 가능성 상한 관측 — shadow 파생 경로 커버리지 0/2,647 실측 + 선택형 61.1% 미배선 가시화",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:REC-08-selective-grading-demotion-gate",
+     "id": "REC-08-selective-grading-demotion-gate",
+     "kind": "task",
+     "title": "선택형·단답 서버 채점 결함 주입 강등전 — Wilson 게이트로 REC-07 결정 입력 확정(옵션 C)",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "REC-07",
+   "title": "채점 권위 이관 결정 — 선택형 서버 채점 채택 여부(사람 결정·REC-08 게이트 입력·옵션 C)",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① REC-08 강등전의 PASS/FAIL + 결함 검출률 Wilson 95% 하한·무결함 오검출 Wilson 95% 상한을 근거로 선택형(A 버킷) 서버 채점 권위 채택…",
+    "② 채택 시 클라 계약 변경 범위를 명시한다 — 앱은 student_answer만 전송하고 is_correct를 전송하지 않는다(현재 앱은 정답을 구조적으로 모른다: pr…"
+   ],
+   "acceptance": [
+    "① REC-08 강등전의 PASS/FAIL + 결함 검출률 Wilson 95% 하한·무결함 오검출 Wilson 95% 상한을 근거로 선택형(A 버킷) 서버 채점 권위 채택 여부를 결정한다(2026-08-09 Kiki 옵션 C 선택 — REC-05의 정적 커버리지 수치만으로 즉결하지 않는다). claude가 대신 판정하지 않는다 — 학습자 모델 전체(BKT·θ·추천)의 입력을 바꾸는 결정이다",
+    "② 채택 시 클라 계약 변경 범위를 명시한다 — 앱은 student_answer만 전송하고 is_correct를 전송하지 않는다(현재 앱은 정답을 구조적으로 모른다: problems_api.dart:40-41이 answer 키 미선언·verify_api.dart:23 '정답을 알지 못하는 검증')",
+    "③ 단답 수치(B 버킷 1,031건) 정규화 규칙 채택 여부를 별도로 판정한다 — REC-08이 같은 강등전에서 B버킷도 함께 측정하므로 그 결과를 근거로 쓴다. 표기 변형(분수·소수·근호)의 동치 판정 권위는 SymPy(l3)이며 새 축을 만들지 않는다. REC-05는 A/B 버킷 모집단 산정(1,616건/1,031건)의 입력으로 계속 쓰인다",
+    "④ ARCH-12(QuizMode 클라 채점=데모 예외)와의 정합을 명시한다 — 예외가 유지되는지 흡수되는지",
+    "⑤ 미채택도 결정이다 — 미채택 시 근거와 재검토 트리거를 남긴다(발화 조건 형식). 결정 전까지 REC-01 §5-①·②(클라 attempt 배선·개인화 기본 on)는 계속 잠금 상태임을 확인한다"
+   ],
+   "notes": "docs/architecture/ai_recommendation_module_gap_review_2.md §2 G1 후속. 1차 문서 §5-①은 '클라 attempt 배선'의 발화 조건을 'NLP-02 관측이 착지해 서버가 채점 권위를 가질 수 있음이 확인됐을 때'로 두었는데, NLP-02는 done이나 그 관측 경로의 파생 가능 문항이 0건이라(REC-05 실측) 조건이 구조적으로 충족될 수 없다. 사람 결정 태스크는 ASM-02(등급 노출 정책)·CUR-03(성취수준 반입) 선례를 따른다 — 자동 착수 후보에 오르지 않으며 Kiki가 start/done --as kiki로 직접 기입한다(HARN-06). 2026-08-09: claude가 제시한 4개 옵션(A 전면 이관·B 선택형만 우선·C 측정 게이트 후 이관·D 미채택) 중 Kiki가 C를 선택 — REC-08(결함 주입 강등전) 등재로 반영. MEMORY.md 2026-08-09 결정 로그 참조.\n\n[정정 2026-09-01] eos_priority null → P1: REC-08 게이트 입력(사람 결정). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 354,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-human",
+   "flow": null
+  },
+  "t:CUR-13-learning-outcome-fields-extension": {
+   "key": "t:CUR-13-learning-outcome-fields-extension",
+   "kind": "task",
+   "id": "CUR-13-learning-outcome-fields-extension",
+   "preds": [
+    {
+     "key": "t:CUR-07-achievement-standard-schema-extension",
+     "id": "CUR-07-achievement-standard-schema-extension",
+     "kind": "task",
+     "title": "AchievementStandard 스키마 확장 — 평가준거 코드·성취수준 등급 커버리지 반영 (CUR-03/CUR-05 약속 이행)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CUR-13",
+   "title": "AchievementStandard Learning Outcome/Competency 필드 확장",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CUR-07-achievement-standard-schema-extension",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-01",
+   "unlocks": 0,
+   "wait_chain": [
+    "CUR-13-learning-outcome-fields-extension",
+    "CUR-07-achievement-standard-schema-extension",
+    "HARN-80-direct-commit-landing-done-path"
+   ],
+   "excerpt": [
+    "① AchievementStandard에 cognitive_level·mastery_definition·observable·assessmentable·knowledge_t…"
+   ],
+   "acceptance": [
+    "① AchievementStandard에 cognitive_level·mastery_definition·observable·assessmentable·knowledge_type nullable 컬럼 추가. ② schema/Pydantic/ORM/마이그레이션 동시 갱신. ③ achievement_criteria_v1 코퍼스에서 채울 수 있는 필드가 있는지 실측 후 로더 확장 여부 판단. ④ Alembic additive 마이그레이션 왕복 green. ⑤ 범위 밖: 별도 LearningOutcome/Competency 테이블 분리는 Phase 2."
+   ],
+   "notes": "EOS Curriculum Semantic Backbone ADR Phase 1 실행 항목 4. 별도 엔티티 분리는 NCIC 기반 MVP에 과해, AchievementStandard 확장으로 충분함.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필",
+   "cmd": "",
+   "x": 836,
+   "y": 1962,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-8",
+   "flow": 8
+  },
+  "t:KG-02-concept-content-review-promotion": {
+   "key": "t:KG-02-concept-content-review-promotion",
+   "kind": "task",
+   "id": "KG-02-concept-content-review-promotion",
+   "preds": [
+    {
+     "key": "g:G-kg02-review-promotion-llm-session",
+     "id": "G-kg02-review-promotion-llm-session",
+     "kind": "gate",
+     "title": "KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:ARCH-62-cloud-cost-table-seat-axis",
+     "id": "ARCH-62-cloud-cost-table-seat-axis",
+     "kind": "task",
+     "title": "클라우드 단가표 좌석 축 분리 — 티어만으로 키가 잡혀 MID 좌석 이동 시 24.4배 과대 계상",
+     "status": "done",
+     "open": false,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [
+    {
+     "key": "t:KG-05-university-content-mechanical-pattern-fix",
+     "id": "KG-05-university-content-mechanical-pattern-fix",
+     "kind": "task",
+     "title": "대학 콘텐츠 기계적 생성 패턴 손질 — mnemonic '주의: <오개념 원문>' 409건 + 화살표 체인 explanation + review_status 스키마 드리프트",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    },
+    {
+     "key": "t:KG-06-concept-content-depth-enrichment",
+     "id": "KG-06-concept-content-depth-enrichment",
+     "kind": "task",
+     "title": "이론 콘텐츠 깊이 보강 스코핑 — explanation 평균 25자 구조화 확장 + K-12 플래시카드 76% 공백 + en/ja 로케일 0건",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "short": "KG-02",
+   "title": "이론 콘텐츠 검수 승격 — concept_content 846(K-12 437+대학 409) ai_estimated→reviewed 배치 (AI 자기승인 금지)",
+   "state": "waiting",
+   "label": "사람 게이트 대기",
+   "reason": "사람 게이트 대기",
+   "detail": "G-kg02-review-promotion-llm-session",
+   "stage": "S4",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 4,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-25",
+   "unlocks": 2,
+   "wait_chain": [
+    "KG-02-concept-content-review-promotion",
+    "G-kg02-review-promotion-llm-session"
+   ],
+   "excerpt": [
+    "① 표본 검수 배치: concept_content_v1 437건 + concept_content_university_v1 409건 = 846건을 S2-05 ①~⑥ 판정 축…",
+    "② AI 자기승인 금지(knowledge_module_gap_review.md §2-③ 협상 불가) — 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 …"
+   ],
+   "acceptance": [
+    "① 표본 검수 배치: concept_content_v1 437건 + concept_content_university_v1 409건 = 846건을 S2-05 ①~⑥ 판정 축·Wilson min-n 샘플링(superhuman_verification_standard.md 게이트 CLI 관례)으로 검수한다",
+    "② AI 자기승인 금지(knowledge_module_gap_review.md §2-③ 협상 불가) — 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만. 문항 선례(2026-07-10 AI 검수 전환 결정·S4-16 강등전)와 동형, 실 LLM 필요 시 Kiki 머신 동반",
+    "③ PASS 스코프만 review_status를 결정론 각인(사람 인상 입력 경로 0 — PB-03 축② 선례)하고, 승격 후 /concepts/search reviewed_only=true 재측정 N>0으로 KG-01 ③ 관측 축이 실제로 소비됨을 확인한다",
+    "④ 미통과분은 ai_estimated 유지 + 결함 목록 산출(침묵 승격 금지). 변별력: 결함 주입 표본(오류 정의 삽입)이 검수 배치에서 실제 FAIL로 나오는지 실측한다",
+    "⑤ 대학 409의 층위 불일치 해소 — 코퍼스에는 review_status 필드 자체가 없는데 l1/concept_content/projection.py가 K-12·대학 구분 없이 ai_estimated 상수를 각인한다. 승격 판정이 대학 행에도 실제로 적용되는지(또는 명시적으로 제외되는지) 코드 경로에서 확인한다",
+    "⑥ [2026-09-21 추가] 승격 권위 게이트 집행 — acceptance ②(AI 자기승인 금지)를 산문이 아니라 코드가 검사한다. l1/concept_content/review_gate.py가 승인 행의 서명(reviewed_by가 등재 검수자 allowlist + reviewed_at ISO 8601)을 검사하고, 위반이 1건이라도 있으면 배치 전체를 거부한다(fail-closed·부분 적용 금지). CERTIFIED_MACHINE_REVIEWERS는 강등전(S4-16) 미통과 상태를 반영해 빈 튜플로 동결하며 거버넌스 테스트가 그 공백을 지킨다. 변별력 = 뮤테이션 9종(allowlist 무력화·서명 검사 제거·시각 검사 제거·게이트 전체 무력화·승인 어휘 오타·미인증 기계 판정자 등재·공백 정규화 제거·fail-closed 제거·CLI 거부 제거) 전건 RED. 한계 명시: 이 게이트가 막는 것은 망각과 자기승인이지 위조가 아니다(세션이 reviewed_by에 사람 이름을 적는 것은 로컬 CLI 계층에서 막을 수 없다 — backlog.py done의 PR 증적 검사와 동형 한계).",
+    "⑦ [정정 2026-09-25 · 판정 기준 main 3a7a7315] ③의 관측 표면을 바로잡는다 — 승격 확인은 /v1/concepts/content?reviewed_only=true 가 승격 건수만큼 늘어나는지로 한다. ③이 지목한 /concepts/search reviewed_only=true 는 atom_node(전 행 ai_estimated 상수)를 읽어 이 승격으로는 계속 0이다(콘텐츠 846 code 중 검색 색인에 있는 것 0건). 실측: 로컬 PG16+pgvector에 코퍼스 846행·원자 2,683행을 적재하고 실제 승격 CLI로 2건(N1·AALG1-U1-S1)을 올렸더니 content 0→2, search 0→0이었고, 양성 대조로 원자 1건을 reviewed로 바꾸면 search가 1건을 돌려줬다. /concepts/search 축을 움직이는 것은 원자(atom_node) 승격이며 이 태스크의 범위가 아니다. 운영 주의: 승격은 코퍼스 JSON 커밋까지가 한 동작이다 — DB만 바꾸면 다음 적재가 코퍼스 값(ai_estimated)으로 되돌린다(같은 실측에서 재적재가 앞 회차의 승격 2건을 되돌린 것을 관측). 학생 영향: 학생 /study 공급은 현재 review_status를 읽지 않으므로 승격이 학생 화면을 바꾸는지는 CONT-05 판정에 달려 있다."
+   ],
+   "notes": "정본: docs/architecture/subject_content_coverage_gap_review.md §3 D2(스코프 확대 근거는 §8-③). 검수 축이 세 태스크(S3-26 ③ 축 도입·S2-05 문항 30문·KG-01 관측)에 걸쳐 각자 done인데 사이의 승격 실행이 무주공산. [2026-08-11 회수·스코프 확대] 초판 notes는 'K-12 437 우선 — 대학 409는 review_status 필드 부재라 별도 판단'이었으나, 실측상 projection.py:196이 두 축을 구분 없이 ai_estimated로 각인하므로 reviewed_only=true 소비 경로에서 구분되지 않는다 → 대상을 846으로 확대(신규 태스크 신설이 아니라 기존 acceptance 정밀화).\n\n[차단 2026-08-11] 회수 시 브랜치 최종 상태(c17b7f1d) 승계 — 핵심 전제 2건이 구조적으로 미성립: ①acceptance①의 실 검수는 LLM provider 호출이 필수인데 원격 세션에 backend용 provider 미배선(ANTHROPIC_API_KEY/OPENAI_API_KEY/OLLAMA_* 전부 부재) ②acceptance②가 재사용을 명시한 결함주입 강등전 인프라(agreement_gate*.py)를 S4-16(claude/whymath-ai-content-design-vafylb)이 동일 사유로 점유 중 — 2026-08-11 재확인 결과 S4-16은 여전히 in_progress. 재개 조건: S4-16 완료(범용 강등전 게이트 패턴 확정) 또는 Kiki 머신 실 LLM 세션. 회수 시 스코프를 437→846(대학 409 포함)으로 확대했으므로 재개 시 projection.py 층위 불일치(acceptance⑤)도 함께 판정한다.\n\n[2026-08-23 상태 정정] 2026-08-16 done 표기는 조기 종결. 실제 acceptance 충족 증거 부족(검수 배치 미실행, LLM provider 미배선, S4-16 강등전 인프라 점유 지속). status를 blocked로 되돌림. progress 0%.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/내용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-21] 차단 사유를 대장이 집행하게 — 재개 조건(S4-16 완료 또는 Kiki 머신 실 LLM 세션)이 2026-08-11부터 notes 산문에만 있어 /gates 화면에 보이지 않았고 만료·재확인 지점도 없었다. 2026-09-21 실측으로 전제 2건이 여전히 성립함을 확인(provider 부재·S4-16 자신도 blocked)하고 human 게이트로 등재해 부착한다.\n\n[정정 2026-09-21] [정정 2026-09-21 · 실측 재판정] 41일 전 notes의 전제 2건이 코드 변화로 낡았다. 실측: ①acceptance ⑤가 말한 \"대학 코퍼스에는 review_status 필드 자체가 없다\"는 더 이상 사실이 아니다 — concept_content_v1 437건·concept_content_university_v1 409건 **전건이 review_status 필드를 보유**(값은 모두 ai…",
+   "cmd": "",
+   "x": 432,
+   "y": 1529,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-6",
+   "flow": 6
+  },
+  "t:HARN-82-required-checks-premise-drift": {
+   "key": "t:HARN-82-required-checks-premise-drift",
+   "kind": "task",
+   "id": "HARN-82-required-checks-premise-drift",
+   "preds": [],
+   "succs": [],
+   "short": "HARN-82",
+   "title": "머지 판정 도구의 필수 체크 전제가 실측과 어긋난다 — docstring '6종·6.5분·느린 잡 제외' vs 현재 규칙 16종(느린 잡 포함)",
+   "state": "blocked",
+   "label": "차단",
+   "reason": "차단",
+   "detail": "[차단 2026-09-07] acceptance ① 실측이 이 세션에서 결론 불가 — 소스 둘이 서로 반대를 가리킨다(2026-09-07T23:56Z 조회). [실측] ⓐ룰셋 /rules/branches/main·/rulesets/16623542(전문·admin 뷰) 양쪽 모두 required_status_checks 규칙 **자체가 없다**(규칙 = deletion·non_fast_for…",
+   "stage": "S3",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-07",
+   "unlocks": 0,
+   "wait_chain": [],
+   "excerpt": [
+    "① 실측 재확인 — GET /repos/doldori7/WhyMath/rules/branches/main 으로 required_status_checks 전건을 다시 조회해…",
+    "② docstring 정정 — pr_merge_readiness.py 모듈 docstring의 '필수 체크 6종(중앙값 6.5분)뿐' 과 '최장 잡 backend — li…"
+   ],
+   "acceptance": [
+    "① 실측 재확인 — GET /repos/doldori7/WhyMath/rules/branches/main 으로 required_status_checks 전건을 다시 조회해 목록·건수를 조회 시각과 함께 기록한다. 2026-09-07 실측값은 16종이며 'backend — lint·type·test'가 포함돼 있다",
+    "② docstring 정정 — pr_merge_readiness.py 모듈 docstring의 '필수 체크 6종(중앙값 6.5분)뿐' 과 '최장 잡 backend — lint·type·test(~30분)는 필수 목록에 없다' 두 문장을 실측값으로 교체한다. 도구 *코드*는 규칙을 라이브 조회하므로 동작 자체는 정상이다 — 고칠 대상은 전략을 오도하는 산문이지 로직이 아니다",
+    "③ 완화 전략 재판정 — 느린 잡이 필수에 포함되면 '필수만 기다리면 6.5분'이라는 완화가 성립하지 않는다. 필수 16종의 실측 소요(중앙값)를 다시 재어 대기 시간과 base 전진 확률을 재산출하고, 완화가 여전히 유효한지 판정한다. 무효라면 그 사실을 docstring에 명시해 다음 세션이 없는 최적화를 믿지 않게 한다",
+    "④ 변별력 — 도구가 필수 목록을 하드코딩이 아니라 라이브 조회한다는 것을 결함 주입으로 확인한다(규칙 응답을 6종으로 축소 주입 → 판정 문구·exit code가 실제로 달라지는가). 주입 전후 바이트 동일 원복을 단언한다",
+    "⑤ 정직한 공백 — 6종에서 16종으로 늘어난 시점과 사유는 ruleset 이력 조회 권한이 없어 규명하지 못했다. 규명 수단을 찾지 못하면 '조회 방법 없음'이라고 범위를 밝혀 적는다(추론으로 채우지 않는다)"
+   ],
+   "notes": "발견 경위(2026-09-07): 세션이 PR #1025를 머지하려다 REST 405 'Repository rule violations found / 16 of 16 required status checks are expected'를 2회 맞았다. 원인 규명 과정에서 pr_merge_readiness.py를 읽었는데, 그 docstring은 '필수 체크 6종(중앙값 6.5분)뿐이고 최장 잡 backend — lint·type·test(~30분)는 필수 목록에 없다'고 적고 있었다. 그런데 같은 도구를 실행해 규칙을 라이브 조회하니 16종이었고 그 느린 잡이 필수에 들어 있었다. 405 에러 문구의 '16'과도 일치한다.\\n\\n왜 중요한가: 그 docstring은 단순 설명이 아니라 이 저장소의 머지 전략 근거다 — '필수만 기다리면 6.5분이라 base 전진 확률 16%, 전체를 기다리면 28.6분이라 70%'라는 계산이 완화 방안 전체를 떠받친다. 느린 잡이 필수가 된 순간 그 계산의 분자가 바뀌므로, 전략을 읽고 따르는 세션은 있지도 않은 최적화를 믿게 된다. 도구 코드는 라이브 조회라 정상 동작하므로 이것은 무증상이다 — 판정은 맞고 산문만 틀렸다.\\n\\n인접: HARN-32가 그 전제를 세운 태스크이고, 머지 큐 도입(HARN-56)이 착지하면 이 축의 실효성 자체가 달라진다. 다만 이 태스크는 그 둘과 독립적으로 성립한다 — 산문이 실측과 어긋난 것을 고치는 일이라 다른 태스크의 결과를 기다리지 않는다.\n\n[차단 2026-09-07] acceptance ① 실측이 이 세션에서 결론 불가 — 소스 둘이 서로 반대를 가리킨다(2026-09-07T23:56Z 조회). [실측] ⓐ룰셋 /rules/branches/main·/rulesets/16623542(전문·admin 뷰) 양쪽 모두 required_status_checks 규칙 **자체가 없다**(규칙 = deletion·non_fast_forward·pull_request·required_linear_history). 그 룰셋의 updated_at은 2026-09-07T21:25:48Z로 오늘 갱신됐다 ⓑ레거시 /branches/main/protection은 **HTTP 403 'Resource not accessible by integration'** — 읽을 수 없다(없는 것이 아니라 못 보는 것) ⓒ그런데 PR #1053의 mergeable_state는 여전히 **behind**이고, behind는 strict 요구가 살아 있을 때 나오는 상태다 ⓓpr_merge_readiness.py를 실 PR에 돌리면 '필수 체크 0건 — 규칙 미조회/권한 부족(측정 실패)' exit 1. [왜 멈추는가] 태스크 전제는 '16종'인데 룰셋은 0종, 동작 신호는 반대, 이를 가를 레거시 소스는 403이다. 이 상태에서 docstring을 '0종'으로 고치면 근거가 한쪽 소스뿐이고 동작 신호가 반대인 **틀린 정정**을 박는 것이 된다 — 이 태스크가 고치려는 결함(전제와 실측의 어긋남)을 그대로 재생산한다. [해소 조건] 둘 중 하나. ①레거시 브랜치 보호를 읽을 수 있는 권한(admin)으로 1회 조회해 required check 유무·strict 여부를 확정…",
+   "cmd": "",
+   "x": 1760,
+   "y": 2310,
+   "w": 300,
+   "h": 176,
+   "frame": "group-blocked",
+   "flow": null
+  },
+  "t:CONST-07-coding-constitution-part5-6-ops-ai-collab": {
+   "key": "t:CONST-07-coding-constitution-part5-6-ops-ai-collab",
+   "kind": "task",
+   "id": "CONST-07-coding-constitution-part5-6-ops-ai-collab",
+   "preds": [
+    {
+     "key": "g:G-const-a0002-adoption",
+     "id": "G-const-a0002-adoption",
+     "kind": "gate",
+     "title": "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능.",
+     "status": "pending",
+     "open": true,
+     "edge": "필요 게이트"
+    },
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "CONST-07",
+   "title": "코딩 헌법 이식 3단계 — 파트 V·VI(15~19장) — 관측·백업·회고·AI 작업 단위·사람 검토 집행 장치 착지 (규칙 15건)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "CONST-03-coding-constitution-stage3-part1-enforcement",
+   "stage": "S4",
+   "layer": "infra",
+   "track": "infra-debt",
+   "subject": "cross",
+   "priority": 3,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-28",
+   "unlocks": 0,
+   "wait_chain": [
+    "CONST-07-coding-constitution-part5-6-ops-ai-collab",
+    "G-const-a0002-adoption (외 1)"
+   ],
+   "excerpt": [
+    "① 대상 규칙 15건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'par…",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존…"
+   ],
+   "acceptance": [
+    "① 대상 규칙 15건(2026-09-27 대조표 docs/reviews/coding_constitution_crosswalk_2026-09-27.md 기준 상태 {'partial': 13, 'none': 2}): R15-01(partial·st3·M) → src/backend/pyproject.toml / R15-02(partial·st4·M) → tests/backend/harness/test_batch_summary_contract.py / R15-03(partial·st3·S) → tests/backend/ops/test_log_scrubber_wiring.py / R16-01(partial·st4·S) → scripts/backup/backup_status.py / R16-02(partial·st4·S) → scripts/backup/backup_status.py / R16-03(partial·st4·S) → scripts/backup/backup_status.py / R17-01(partial·st3·M) → scripts/harness/rules.py / R17-02(partial·st4·S) → scripts/harness/backlog.py / R18-01(partial·st3·S) → scripts/harness/backlog.py / R18-02(partial·st3·S) → backlog/policy.yaml / R18-03(none·st4·M) → scripts/harness/models.py / R18-04(partial·st4·S) → scripts/harness/change_size_check.py / R19-01(none·st4·S) → src/backend/whymath_backend/harness/review_session.py / R19-02(partial·st4·M) → src/backend/whymath_backend/harness/review_session.py / R19-03(partial·st4·S) → src/backend/whymath_backend/ops/review_health.py",
+    "② 규칙마다 집행 장치 실물(테스트·CI 스텝·훅·DB 제약)을 이 저장소 구조로 만들고, 정본화(파일 존재)와 집행 지점(CI 잡·훅 배선)을 별항으로 증적한다 — 기존 장치가 있으면 재사용하고 새로 만들지 않는다(대조표 repo_enforcement 열).",
+    "③ 변별력 — 규칙마다 위반 상태를 주입해 RED, 정상 상태 GREEN을 확인하고(주입 적용·원복 바이트 동일 단언), 주입 목록을 PR 본문에 남긴다.",
+    "④ constitution/rules.yaml의 check·run 경로 정정은 AI가 직접 쓰지 않는다(제9조·제11조) — docs/constitution_proposals/ 에 개정 초안(A000N)과 정정 yaml을 두고 Kiki가 채택·반영한다. 채택 전에는 audit.py --stage N 미리보기로 '이 파트 규칙 전건 통과'를 세션이 실측해 게이트 evidence로 남긴다.",
+    "⑤ 완료 판정 = 해당 파트 규칙 전건이 audit.py --stage <규칙 stage> 실행에서 통과(exit 0) + tests/infra 배선 동결 + PR 머지. 규칙 stage가 5·6인 항목(DB 제약·실사용 데이터)은 이 태스크 범위 밖으로 표시하고 승계 태스크 ID를 notes에 적는다.",
+    "⑥ (CONST-02 대조표 비평가 처분 #8·#11 승계) ⓐ 판정 장소 축 — 백업(R16 계열)처럼 실물이 Kiki 머신에만 있는 규칙은 CI에서 영구 '집행 장치 없음' 또는 거짓 통과가 된다. 규칙에 판정 장소(ci / kiki-machine)를 구분하는 방법을 개정 초안으로 제안하고, 머신 로컬 규칙은 점검 스크립트 출력을 Kiki가 첨부하는 사람 게이트로 판정한다. 진단 D-07의 어긋남 3점(스케줄 04:00 vs 진술 03:00 · 보존 14일 vs 30개 · git bundle 부재)은 Get-ScheduledTask 실측 후 정정한다. ⓑ pipeline.yaml 범위 — 현재 28노드는 콘텐츠 파이프라인만 담는다. 관측(Langfuse)·LLM 라우팅 노드 추가 여부를 결정하고, 추가하면 pipeline_check 통과와 테스트 동결을 함께 한다."
+   ],
+   "notes": "A0002 채택(G-const-a0002-adoption) 결과에 따라 대상 규칙이 줄 수 있다 — 채택 판정문의 삭제 목록을 반영해 ①을 amend한다. 파트 순서 권고(부록 C): II → III → IV → VII → V·VI.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계",
+   "cmd": "",
+   "x": 836,
+   "y": 662,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3
+  },
+  "t:PED-38-wh1-fast-path-simple-turn-bypass": {
+   "key": "t:PED-38-wh1-fast-path-simple-turn-bypass",
+   "kind": "task",
+   "id": "PED-38-wh1-fast-path-simple-turn-bypass",
+   "preds": [
+    {
+     "key": "t:OPS-98-coach-turn-tool-call-latency-distribution",
+     "id": "OPS-98-coach-turn-tool-call-latency-distribution",
+     "kind": "task",
+     "title": "코치 턴 도구 호출 수·지연 분포 실측 + 예산 정합 — 타임아웃 15초·도구 16회가 SLO T1 p95 5초·PRD 3초의 3~5배이고 분포를 잰 적이 없다",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "PED-38",
+   "title": "WH-1 fast path(04a §5.3) 배선 — 풀이 없는 단순 턴은 도구 루프를 건너뛰고 즉답(기본 OFF · 애매하면 풀 루프)",
+   "state": "waiting",
+   "label": "선행 태스크 대기",
+   "reason": "선행 태스크 대기",
+   "detail": "OPS-98-coach-turn-tool-call-latency-distribution",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "math-completion",
+   "subject": "math",
+   "priority": 2,
+   "owner": "claude",
+   "session": "",
+   "updated": "2026-09-25",
+   "unlocks": 0,
+   "wait_chain": [
+    "PED-38-wh1-fast-path-simple-turn-bypass",
+    "OPS-98-coach-turn-tool-call-latency-distribution",
+    "SEC-34-phaiakes9-cryptominer-incident-response"
+   ],
+   "excerpt": [
+    "① 착수 판정 — 선행 실측 태스크(depends_on)의 ② 분포에서 단순 턴의 풀 루프 비용이 유의한지 먼저 판정한다. 유의하지 않거나 그 태스크 ③에서 Kiki가 (…",
+    "② 배선 — 설계 정본은 `docs/architecture/04a_wh1_tutoring_harness.md` §5.3이고, 코드상 자리는 `harness/wh1_prim…"
+   ],
+   "acceptance": [
+    "① 착수 판정 — 선행 실측 태스크(depends_on)의 ② 분포에서 단순 턴의 풀 루프 비용이 유의한지 먼저 판정한다. 유의하지 않거나 그 태스크 ③에서 Kiki가 (다)를 고르지 않았으면, 코드를 바꾸지 않고 판정 근거와 기준 커밋을 적어 cancel한다(추측 최적화 금지 — `EOS-114` 선례).",
+    "② 배선 — 설계 정본은 `docs/architecture/04a_wh1_tutoring_harness.md` §5.3이고, 코드상 자리는 `harness/wh1_primary.py:39`의 \"범위 밖(후속): fast path\" 주석이다. 턴 사전 분류기를 두고 단순 턴만 도구 루프 없이 결정론 즉답 경로로 보낸다. 기본 OFF 플래그로 넣고 킬스위치 환경변수를 둔다 — 기존 `config.py` `*_enabled` 규약을 확장하며 신규 플래그 프레임워크는 만들지 않는다.",
+    "③ 안전 방향(fail-closed) — 분류가 애매하면 **풀 루프**로 보낸다. 풀이 턴을 단순 턴으로 오분류하면 검증(verify 의무·정답 억제 백스톱·톤필터)을 건너뛸 위험이 있으므로, 즉답 경로도 L4 톤필터를 거치고 수식·숫자·정답 판정을 담지 않는다. 풀이 제출이 포함된 턴은 분류기와 무관하게 풀 루프로 간다는 불변식을 테스트로 고정한다.",
+    "④ 측정 — 라벨이 붙은 턴 표본으로 분류기 오분류율을 두 방향으로 낸다: 풀이 턴→단순(위험 방향)과 단순→풀이(비용 방향). 위험 방향은 Wilson 상한으로 보고하고 그 상한이 허용치를 넘으면 기본값을 켜지 않는다. 플래그 ON/OFF에서 단순 턴 지연이 실제로 달라지는지 대조한다(양쪽에서 같은 값이면 플래그가 분기하지 않는 것이다).",
+    "⑤ 범위 밖 — 기본값 전환(GA flip)은 포함하지 않는다. 측정과 실기기 확인을 거친 별도 커밋으로 한다(S1-11 선례)."
+   ],
+   "notes": "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ② (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. 설계가 `04a` §5.3과 `wh1_primary.py` docstring에만 있고 담당 태스크가 없었다(`backlog/tasks/`에서 `fast.path`·`fast_path` 검색 0건 — main `d5438782` 기준). depends_on 실측 태스크 근거: 단순 턴 비용이 유의할 때만 착수한다. 등급 P1 근거: 코치 턴이 학생 대기의 지배 구간이다.",
+   "cmd": "",
+   "x": 2072,
+   "y": 1529,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-7",
+   "flow": 7
+  },
+  "t:MGMT-03-age-collection-prodsignal-policy": {
+   "key": "t:MGMT-03-age-collection-prodsignal-policy",
+   "kind": "task",
+   "id": "MGMT-03-age-collection-prodsignal-policy",
+   "preds": [
+    {
+     "key": "t:MGMT-02-terms-privacy-policy-counsel",
+     "id": "MGMT-02-terms-privacy-policy-counsel",
+     "kind": "task",
+     "title": "이용약관·개인정보처리방침 문안 확정 (변호사 검토) — 동의 버전 원장의 선결",
+     "status": "todo",
+     "open": true,
+     "edge": "선행 태스크"
+    }
+   ],
+   "succs": [],
+   "short": "MGMT-03",
+   "title": "연령 강제 수집 정책 + is_production_like 다신호화 — PIPA 미성년 게이트 실집행·안전장치 결박 해소 (법률·정책 결정 · k20m0w 등재 유실 재등재)",
+   "state": "human",
+   "label": "사람 소유 · kiki",
+   "reason": "사람 소유",
+   "detail": "kiki",
+   "stage": "S3",
+   "layer": "backend",
+   "track": "infra-debt",
+   "subject": "math",
+   "priority": 1,
+   "owner": "kiki",
+   "session": "",
+   "updated": "2026-09-07",
+   "unlocks": 0,
+   "wait_chain": [
+    "MGMT-03-age-collection-prodsignal-policy",
+    "MGMT-02-terms-privacy-policy-counsel",
+    "G-external-counsel-restart-after-internal-completion"
+   ],
+   "excerpt": [
+    "① 고립 실측 고정(2026-09-07 main b75f495d): 원 MGMT-03은 origin/claude/whymath-issues-review-k20m0w(233…",
+    "② 결정A(연령 수집): 실 OAuth(카카오/네이버)가 birth_year 미전달(원 실측 oauth_providers.py:85,147)이라 신규 가입자 전원 is_m…"
+   ],
+   "acceptance": [
+    "① 고립 실측 고정(2026-09-07 main b75f495d): 원 MGMT-03은 origin/claude/whymath-issues-review-k20m0w(2330a095)에만 존재(정본 docs/reviews/functional_security_audit_2026-08-08.md H4·M7). main 백로그 MGMT-03 0건·git grep MGMT-03 0건·동등 태스크 0건(유사 언급은 docs/legal/guardian_verification_counsel_brief.md의 birth_year 필수화 여부 1줄뿐). 좌석 MOB-18·SEC-24·SEC-30·PB-14·HARN-25·S3-24 어느 acceptance에도 없었다",
+    "② 결정A(연령 수집): 실 OAuth(카카오/네이버)가 birth_year 미전달(원 실측 oauth_providers.py:85,147)이라 신규 가입자 전원 is_minor=None → 동의 게이트(_auth.py:88)가 '알려진 미성년'만 차단. 가입 시 birth_year 필수화 여부·카카오/네이버 birthday 스코프 파싱 도입 여부를 변호사 자문으로 결정(현재 '모르면 모른다'는 의도된 정책 경계·MGMT-02 의존). 착수 시 줄 번호는 현행 main에서 재실측",
+    "③ 결정/수정B(prod 신호): config.py is_production_like가 OAuth 구성 단일 신호로 대화암호화 fail-closed·PII IP salt·데모 provider 차단 3중을 동시 판정. OAuth 외 로그인(device/email) 추가 시 미성년이 is_minor=None으로 진입하며 안전장치가 함께 꺼지는 침묵 실패 위험 — prod 판별을 명시 env 축으로 다신호화(안전장치별 독립 fail-closed) 검토. B는 법률 판단이 아닌 공학 변경이라 변호사 회신 없이도 분리 착수 가능(분리 시 별도 등재)",
+    "④ 집행 게이트: 실 OAuth 로그인 배선 시점에 birth_year 수집·is_minor 파생이 라이브 미성년 보호를 실제 집행하는지 결함주입으로 확인(선언≠집행). 법령 유래 절차(변호사 판단)의 기계 대체 금지"
+   ],
+   "notes": "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5 (stray-code 8회차 — k20m0w 커버리지 정독 risk=high). 원 등재 2026-08-08(k20m0w) 정본 = functional_security_audit_2026-08-08.md H4(HIGH·PARTIAL)·M7(MEDIUM·PARTIAL). 법률·정책 결정(변호사)이라 owner=kiki·MGMT-02 의존 — MGMT-01/02와 같은 '공개 β 준비 착수' 계열이나, 실 OAuth 배선 시 즉시 라이브 노출되므로 그 시점이 재확인 지점. 완화: 현 실 로그인 클라 스텁·데모는 birth_year 전달. 보안·법령 관련 고립분 → priority 1(stray-code 규칙). 원 브랜치 k20m0w는 MOB-18 회수 완료 전 삭제 금지.",
+   "cmd": "",
+   "x": 2904,
+   "y": 157,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-5",
+   "flow": 5
+  },
+  "b:claude/sample-branch": {
+   "key": "b:claude/sample-branch",
+   "kind": "branch",
+   "id": "claude/sample-branch",
+   "preds": [],
+   "succs": [
+    {
+     "key": "t:CONST-03-coding-constitution-stage3-part1-enforcement",
+     "id": "CONST-03-coding-constitution-stage3-part1-enforcement",
+     "kind": "task",
+     "title": "코딩 헌법 이식 3단계 — 파트 I(1~4장)+R0 — 3단계 집행 장치 + Stop 훅 위헌 심사(4단계 준비) 집행 장치 착지 (규칙 10건)",
+     "status": "todo",
+     "open": true,
+     "edge": "이 브랜치에 완료분이 있다(미머지)"
+    }
+   ],
+   "short": "sample-branch",
+   "title": "완료분 CONST-03 — 트렁크에 아직 합쳐지지 않았다",
+   "state": "branch",
+   "label": "미머지 브랜치",
+   "reason": "합성 픽스처 — 원격 조회 없이 만든 브랜치 창",
+   "detail": "",
+   "verdict": "unscanned",
+   "done_tasks": [
+    "CONST-03-coding-constitution-stage3-part1-enforcement"
+   ],
+   "claimed_tasks": [],
+   "foreign_tasks": [],
+   "ahead": 3,
+   "age_days": 2.5,
+   "last_commit_at": "2026-09-27T09:00:00+00:00",
+   "disposal_labels": [],
+   "unlocks": 1,
+   "wait_chain": [],
+   "excerpt": [
+    "완료분: CONST-03"
+   ],
+   "acceptance": [],
+   "notes": "",
+   "cmd": "git fetch origin claude/sample-branch && git log --oneline origin/main..origin/claude/sample-branch",
+   "x": 28,
+   "y": 1068,
+   "w": 300,
+   "h": 176,
+   "frame": "flow-3",
+   "flow": 3,
+   "synthetic": true
+  }
+ },
+ "fixture": {
+  "source": "scripts/harness/work_graph.py --json --no-remote",
+  "rule": "fixtures/make_fixture.py — 모듈 docstring의 축소 규칙 1~7",
+  "target": 28,
+  "group_take": 3
+ }
+}

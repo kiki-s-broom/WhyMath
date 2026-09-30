@@ -962,12 +962,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # OCR 다중 페이지 변형(구 유예) — 2026-08-10 OPS-25로 해제. 이 항목의 사유 자체가
         # "감사기가 상수 경유 호출을 못 잡는 알려진 정밀도 한계"라고 자인하고 있었다. 유예로
         # 덮는 대신 탐지기를 고쳤으므로(`_constant_indirect_calls`) 이제 reached다.
-        # 검증 원시 도구 — verify-step은 verify-solution이 내부에서 연쇄 적용하는 하위 빌딩
-        # 블록(api/verify.py 모듈 docstring)이고, 학생 앱은 조립된 verify-solution만 부른다.
-        "POST /v1/verify-step": (
-            "by-design:api/verify.py — verify-step은 verify-solution이 연쇄 적용하는 하위 도구 "
-            "표면(모듈 docstring). 학생 경로는 조립된 POST /v1/verify-solution만 쓴다(reached)"
-        ),
+        # 검증 원시 도구 `POST /v1/verify-step`(구 by-design 유예) — 2026-09-29 CONST-09로 해제.
+        # `tests/backend/api/test_verify_unsafe_input.py`가 이 라우트에 `9^9^9` 류를 HTTP로 보내
+        # 안전 진입점(R22-03) 뒤의 '판정 불가' 경로를 관통하므로 이제 reached다(감사기가 stale
+        # 유예로 잡았다). 정직 표기: 학생 앱은 여전히 조립된 verify-solution만 부른다 — 이것은
+        # 도달 증명이지 학생 화면 배선이 아니다.
         # 콘텐츠 접근 권한 판정 표면 — MVP에서 클라이언트 직접 호출 경로가 아직 확정되지 않았고
         # L1 rights gateway는 내부/후속 화면(L5/L6)에서 소비할 것으로 설계되어 있어, 현재 단계에서
         # 도달 항목이 0건인 것이 의도다. 학생 앱이 직접 부르게 되면 reached로 전환한다.

@@ -39,9 +39,9 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Final
+from typing import Any, ClassVar, Final
 
-from whymath_backend.config import Settings, get_settings
+from whymath_backend.config import CloudSeat, Settings, get_settings
 from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision
 from whymath_backend.l3.provider_jurisdiction import Jurisdiction
 from whymath_backend.l3.providers._openai_compat import (
@@ -52,6 +52,7 @@ from whymath_backend.l3.providers._openai_compat import (
     retries_in_current_call,
     retries_since,
 )
+from whymath_backend.l3.providers.seat_failure import SeatNotConfiguredError
 from whymath_backend.l3.router import _as_cost_tier
 
 __all__ = [
@@ -118,6 +119,11 @@ class DeepSeekProvider:
     `CompositeProvider`가 디스패치 직전에 한다(openrouter.py와 같은 이유 — provider가
     자기를 검열하면 직접 호출 우회 경로가 생긴다). 이 제공자는 자기 관할만 선언한다.
     """
+
+    # 이 제공자가 앉는 클라우드 좌석 이름(ARCH-64) — `CompositeProvider.cloud_seat`가 읽어
+    # 기록 원가를 **실제로 꽂힌 좌석**의 단가로 계상하게 한다. 값은 `build_cloud_provider()`가
+    # 이 클래스를 만드는 셀렉터 값과 같아야 한다(`test_cloud_mid_seat_cutover.py`가 대조한다).
+    seat: ClassVar[CloudSeat] = "deepseek"
 
     def __init__(
         self,
@@ -198,7 +204,7 @@ class DeepSeekProvider:
         settings = self._resolved_settings
         model_id = self._resolve_model(cost, settings)
         if not self.configured:
-            raise RuntimeError(
+            raise SeatNotConfiguredError(  # 타입화(ARCH-69) — RuntimeError 하위·문구 무변경
                 "DeepSeek API 키가 미설정이라 생성을 할 수 없습니다 "
                 "(WHYMATH_DEEPSEEK_API_KEY 또는 DEEPSEEK_API_KEY)."
             )
