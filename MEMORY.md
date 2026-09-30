@@ -11663,3 +11663,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **정정**: PR #1371이 EOS-129 acceptance에 적은 "100건 이상(a 추정 후보) 문항 0건"의 100은 main 코드의 기준이 아니다. 코드의 a 채택 최소 응답은 50건이다. 운영 응답이 문항당 최대 4건이라 결론(추정 가능 문항 0건)은 그대로다.
 - **브랜치 처분**: 삭제하지 않았다. 브랜치 정리는 stray-code 감사 배치가 소유하며, 이 항목의 "회수 불요"와 "대체 안 됨" 항이 그 판정의 근거다. 되살릴 필요가 생기면 `c5983e59`에서 `item_response_census.py`·`test_item_response_census.py`·`eos129_item_response_census_runbook.md` 3파일을 가져온다.
 - **사고 대장**: EOS-129 병렬 중복은 PR #1356이 이미 기록했다. 같은 사고를 다시 세지 않는다.
+
+### 2026-09-29 — HARN-206 작업 그래프 데스크톱 앱 착지 — HARN-182 페이로드를 그대로 그리는 독립 Windows 설치형(Electron) — 판정 기준 main `a28a8d08`
+
+- **요청**: Kiki가 참고 프로그램(EOS Work Graph v0.1.0 · Electron+React · NSIS · 설계안 동봉)을 보고 "참고삼아 더 나은 Windows 프로그램"을 요청. 기존 HARN-182는 브라우저 파일(`work/graph.html`)이라 설치형이 아니었다.
+- **결정 3건**: ① 판정 무복제 — 앱은 `scripts/harness/work_graph.py --json` 페이로드를 데이터 계약으로 삼아 창·연결선·집계를 그대로 그린다(앱 안에서 selector/store 판정 재구현 금지 · e2e가 창 수=nodes·연결선=edges·창 상태=페이로드 state를 동결). ② 쓰기는 단일 창구 — 착수·게이트 해소·완료는 `backlog.py` CLI를 셸 없이 spawn하고 결과를 그대로 보여 준다(거버넌스 테스트가 `backlog/` 쓰기 0건을 소스 스캔으로 동결). ③ 판정 불가 무은폐 — 원격 조회 3종 skipped/error·python/git/gh 부재·24h 초과 스냅샷·validate 경고는 사유가 붙은 '확인 필요' 카드로 나온다.
+- **참고 설계안 대비 개선**: React 미사용(번들 742KB) · 실시간 아님을 상태 줄에 상시 표시(스냅샷 시각·출처별 ok/skipped) · 다중 작업공간 · 집계 카드 클릭=필터 · 선행/후속 사슬 강조 · 목록 보기(키보드) · 상세 패널에 원본 링크(태스크 YAML·PR)와 동작 버튼. Codex 동기화 같은 미연결 출처는 아예 두지 않았다.
+- **위치·산출**: `tools/work-graph-desktop/`(TypeScript · esbuild · electron 38.2.1 · electron-builder 26.15.3) · 런북 `docs/ops/work_graph_desktop_runbook.md`. 리눅스 크로스 빌드 실측: NSIS 설치 EXE 87.0MB + 무설치 zip 121.9MB(코드서명 없음). 리눅스에서 NSIS를 만들려면 wine(64+32비트)+xvfb가 필요했고 i386 의존성 충돌(`libgd3`)은 amd64 판을 i386과 같은 버전으로 고정해 풀었다 — Windows(Kiki 머신)에서는 `npm.cmd run dist:win`만으로 된다.
+- **검증**: vitest 51 · 렌더러 Playwright 10 · Electron 스모크 1(xvfb · 실제 저장소 수집 · webPreferences contextIsolation/sandbox on) · 뮤테이션 3종(판정 덮어쓰기·불가 은폐·직접 쓰기) 전건 RED · 런북 가드 3종(check_runbook_blocks·check_ps_scripts·cp949_guard) exit 0.
+- **미검증(명시)**: Windows 실 설치·실행·제거·바로가기 — 런북 [1]~[7]로 Kiki에게 위임. gh 어댑터 라이브 경로(컨테이너에 gh 없음). 아이콘은 Electron 기본(Windows에서 `win.icon`으로 교체 가능).
