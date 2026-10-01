@@ -176,6 +176,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _onSend() async {
+    // 응답 대기 중이면 보내지 않고 입력을 그대로 둔다(MOB-24 ③). 전송 잠금(sendEnabled)은 다음 프레임에야
+    // 반영되고 키보드 '보내기'(Enter)도 이 경로로 오므로, 그림자 상태가 아니라 *살아 있는* 상태를 직접
+    // 확인한다. 컨트롤러도 재진입을 막지만 그 앞에서 입력창을 비워 버리면 학생이 대기 중에 써 둔 글이
+    // 사라진다.
+    if (ref.read(chatControllerProvider).isSending) {
+      return;
+    }
     final text = _inputController.text;
     if (text.trim().isEmpty) {
       return;
@@ -281,6 +288,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       },
     );
 
+    // 메시지 목록은 LayoutBuilder *밖*에서 한 번만 만든다(MOB-24 ④).
+    //
+    // 키보드가 올라오면 Scaffold가 body 높이를 프레임마다 줄이고, LayoutBuilder는 그때마다 builder를
+    // 다시 돌린다. 목록(ListView.builder)을 builder 안에서 만들면 매번 새 위젯·새 delegate가 되고,
+    // SliverChildBuilderDelegate.shouldRebuild는 항상 true라서 화면에 보이는 버블이 전부 강제
+    // 재빌드된다 — **키보드 프레임마다** 일어나는 재빌드의 실제 원인이 이것이다(실측: 버블 6개·키보드 5프레임에
+    // _MessageBubble 재빌드 30회 — 버블의 MediaQuery 구독을 `sizeOf`로 좁혀도 30회 그대로였다. Scaffold가
+    // body 하위 MediaQuery에서 키보드 viewInsets를 제거하므로 `MediaQuery.of`는 이 원인이 아니었다).
+    // builder가 돌 때마다 *같은 인스턴스*를 넘기면 Element가 `widget == newWidget`으로 보고 하위 트리를
+    // 건너뛴다(대화 상태가 바뀔 때만 새 인스턴스가 된다).
+    final Widget messageList = _MessageList(messages: state.messages);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('WhyMath'),
@@ -336,16 +355,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               // 풀이 중인 문제를 채팅 위에 상시 노출(접기 가능) — 실기기 시연 피드백:
               // "문제가 한 화면에 같이 안 나옴". 학생이 문제를 다시 보러 화면을 떠나지 않게 한다.
               _ActiveProblemBanner(maxHeight: bannerMaxHeight),
-              Expanded(
-                child: state.messages.isEmpty
-                    ? const _EmptyHint()
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        itemCount: state.messages.length,
-                        itemBuilder: (context, index) =>
-                            _MessageBubble(message: state.messages[index]),
-                      ),
-              ),
+              Expanded(child: messageList),
               // 코치 응답 대기 중 선형 인디케이터(은근한 로딩·도파민 카운트다운 아님).
               if (state.isSending) const LinearProgressIndicator(minHeight: 2),
               // 객관식 선택지 세로 번호 목록(S3-12→S3-17 — 섀도 브랜치 회수) — 활성 문항이
@@ -380,11 +390,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               _InputBar(
                 controller: _inputController,
                 stepsEditorKey: _stepsEditorKey,
+                // 입력(글쓰기·모드 전환·단계 편집)과 전송(보내기·키보드 '보내기'·풀이 제출)을 따로
+                // 잠근다(MOB-24 ③). 예전에는 응답 대기 동안 입력창 *자체*가 잠기고 키보드도 내려가,
+                // 코치가 답하는 내내 다음 생각을 적어 둘 수 없었다. 이제 대기 중에도 글은 쓰고, 막는 것은
+                // 전송 동작뿐이다(컨트롤러도 `isSending` 가드로 재진입을 막지만, 잠금이 없으면 입력창만
+                // 비워지고 전송이 무시돼 써 둔 글이 사라진다).
+                //
                 // 완료는 *종단 상태*다 — 여기서 한 턴을 더 보내면 서버가 already_completed로
                 // no-op 처리해 problem_complete=false를 돌려주고(coach.py:2630·l4/completion.py),
                 // 그러면 유일한 '다음 문항으로'가 사라진 채 끝난 세션에 묶인다. 그래서 완료 중에는
-                // 턴을 만드는 입력을 막는다(진행 경로는 '다음 문항으로' 하나만 남긴다).
-                enabled: !state.isSending && !completion.problemComplete,
+                // 턴을 만드는 입력을 막는다(진행 경로는 '다음 문항으로' 하나만 남긴다) — 입력도 전송도.
+                inputEnabled: !completion.problemComplete,
+                sendEnabled: !state.isSending && !completion.problemComplete,
                 mode: _mode,
                 stepAreaMaxHeight: stepAreaMaxHeight,
                 onSend: _onSend,
@@ -781,6 +798,29 @@ class _ChoiceRow extends StatelessWidget {
   }
 }
 
+/// 대화 목록 — 메시지가 없으면 안내를, 있으면 버블 리스트를 그린다(MOB-24 ④).
+///
+/// [ChatScreen.build]가 LayoutBuilder *밖*에서 한 인스턴스만 만들어 넘긴다(그 이유는 그곳 주석).
+/// 이 위젯이 목록 구성(빈 안내↔ListView)의 단일 지점이라 호출부는 인스턴스만 다룬다.
+class _MessageList extends StatelessWidget {
+  const _MessageList({required this.messages});
+
+  /// 화면에 그릴 대화(오래된 → 최신).
+  final List<ChatMessage> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    if (messages.isEmpty) {
+      return const _EmptyHint();
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemCount: messages.length,
+      itemBuilder: (context, index) => _MessageBubble(message: messages[index]),
+    );
+  }
+}
+
 /// 메시지가 없을 때 보여줄 안내 — 답을 재촉하지 않는 톤.
 class _EmptyHint extends StatelessWidget {
   const _EmptyHint();
@@ -829,7 +869,11 @@ class _MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md14, vertical: AppSpacing.sm10),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          // 폭만 필요하므로 `sizeOf`로 size 변화에만 구독한다(MOB-24 ④). `MediaQuery.of`는 MediaQuery 전체를
+          // 구독해서, 하단 시스템 인셋(홈 인디케이터·제스처 바)이 있는 폰에서는 키보드가 오르내리는 첫·끝
+          // 프레임(body MediaQuery의 padding.bottom이 바뀌는 프레임)마다 모든 버블이 다시 빌드된다(실측 참조:
+          // test/chat_bubble_rebuild_test.dart).
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         decoration: BoxDecoration(
           color: bubbleColor,
@@ -914,7 +958,8 @@ class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
     required this.stepsEditorKey,
-    required this.enabled,
+    required this.inputEnabled,
+    required this.sendEnabled,
     required this.mode,
     required this.stepAreaMaxHeight,
     required this.onSend,
@@ -929,7 +974,12 @@ class _InputBar extends StatelessWidget {
   /// 풀이 단계 편집기 상태 핸들 — MathLive 입력을 단계 필드에 채우는 데 쓴다(MOB-07).
   final GlobalKey<_SolutionStepsEditorState> stepsEditorKey;
 
-  final bool enabled;
+  /// 입력 표면(글쓰기·모드 전환·수식 입력 진입·단계 추가/삭제) 활성 여부 — 응답 대기 중에도 true다(MOB-24 ③).
+  /// 끝난 문항(완료)에서만 false.
+  final bool inputEnabled;
+
+  /// 전송 동작(보내기 버튼·키보드 '보내기'·풀이 제출) 활성 여부 — 응답 대기·완료 중엔 false(중복 전송 방지).
+  final bool sendEnabled;
   final _InputMode mode;
 
   /// 풀이 단계 영역 최대 높이 — 화면(LayoutBuilder)이 키보드로 줄어든 body 가용
@@ -966,7 +1016,7 @@ class _InputBar extends StatelessWidget {
                         : Icons.format_list_numbered,
                   ),
                   tooltip: isSolution ? '대화로 전환' : '풀이 단계로 전환',
-                  onPressed: enabled ? onToggleMode : null,
+                  onPressed: inputEnabled ? onToggleMode : null,
                 ),
                 Text(
                   isSolution ? '풀이 단계' : '대화',
@@ -979,7 +1029,7 @@ class _InputBar extends StatelessWidget {
                   TextButton.icon(
                     icon: const Icon(Icons.functions, size: 18),
                     label: const Text('수식으로 입력'),
-                    onPressed: enabled ? onMathInput : null,
+                    onPressed: inputEnabled ? onMathInput : null,
                   ),
                 ],
               ],
@@ -990,7 +1040,8 @@ class _InputBar extends StatelessWidget {
               // GlobalKey로 MathLive 입력을 이 편집기 필드에 채운다(MOB-07).
               _SolutionStepsEditor(
                 key: stepsEditorKey,
-                enabled: enabled,
+                inputEnabled: inputEnabled,
+                sendEnabled: sendEnabled,
                 stepAreaMaxHeight: stepAreaMaxHeight,
                 onSubmit: onSendSolution,
               )
@@ -1000,11 +1051,21 @@ class _InputBar extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       controller: controller,
-                      enabled: enabled,
+                      // 응답 대기 중에도 글은 쓸 수 있다 — 잠그는 것은 전송뿐이다(MOB-24 ③).
+                      enabled: inputEnabled,
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: enabled ? (_) => onSend() : null,
+                      // 키보드 '보내기'(Enter)도 전송 동작이다 — 대기 중이면 아무것도 보내지 않고 글도 지우지
+                      // 않는다(onSend가 살아 있는 상태를 한 번 더 확인한다).
+                      onSubmitted: (_) {
+                        if (sendEnabled) {
+                          onSend();
+                        }
+                      },
+                      // 전송이 막힌 동안엔 '보내기' 키가 포커스를 내려놓지 않게 한다 — 기본 동작은 키보드를
+                      // 내리는데, 학생은 다음 생각을 이어 쓰는 중이다. 전송이 열려 있을 땐 null(기본 동작 유지).
+                      onEditingComplete: sendEnabled ? null : () {},
                       decoration: const InputDecoration(
                         hintText: '생각을 적어 보세요',
                         border: OutlineInputBorder(),
@@ -1016,7 +1077,7 @@ class _InputBar extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.send),
                     tooltip: '보내기',
-                    onPressed: enabled ? onSend : null,
+                    onPressed: sendEnabled ? onSend : null,
                   ),
                 ],
               ),
@@ -1040,13 +1101,18 @@ class _InputBar extends StatelessWidget {
 class _SolutionStepsEditor extends StatefulWidget {
   const _SolutionStepsEditor({
     super.key,
-    required this.enabled,
+    required this.inputEnabled,
+    required this.sendEnabled,
     required this.stepAreaMaxHeight,
     required this.onSubmit,
   });
 
-  /// 입력·버튼 활성 여부(전송 중엔 비활성 — 기존 입력 행과 동일 규칙).
-  final bool enabled;
+  /// 단계 필드·"단계 추가"·"단계 삭제" 활성 여부 — 응답 대기 중에도 true다(MOB-24 ③).
+  /// 코치를 기다리는 동안 다음 단계를 미리 적어 둘 수 있게 한다. 끝난 문항(완료)에서만 false.
+  final bool inputEnabled;
+
+  /// "N단계 제출" 활성 여부 — 응답 대기·완료 중엔 false(중복 전송 방지). 비어 있으면 별개로 비활성이다.
+  final bool sendEnabled;
 
   /// 단계 필드 리스트 영역 최대 높이 — 넉넉하면 절대 상한(162px·행 3개 분량), 키보드로
   /// 좁아지면 body 가용 높이 비율로 줄어든 값이 내려온다(MOB-02). 초과분은 내부 스크롤.
@@ -1272,13 +1338,13 @@ class _SolutionStepsEditorState extends State<_SolutionStepsEditor> {
             TextButton.icon(
               icon: const Icon(Icons.add, size: 18),
               label: const Text('단계 추가'),
-              onPressed: widget.enabled ? () => _addStep(focus: true) : null,
+              onPressed: widget.inputEnabled ? () => _addStep(focus: true) : null,
             ),
             const Spacer(),
             // "N단계 제출" — 제출 미리보기(몇 단계가 실제 전송되는지 상시 표시).
             // 비어있으면 보낼 게 없으므로 비활성(1단계 제출은 허용 — 백엔드 안전 처리).
             FilledButton(
-              onPressed: (widget.enabled && _filledCount > 0) ? _submit : null,
+              onPressed: (widget.sendEnabled && _filledCount > 0) ? _submit : null,
               child: Text(
                 _filledCount > 0 ? '$_filledCount단계 제출' : '풀이 제출',
               ),
@@ -1316,7 +1382,7 @@ class _SolutionStepsEditorState extends State<_SolutionStepsEditor> {
                 child: TextField(
                   controller: _controllers[index],
                   focusNode: _focusNodes[index],
-                  enabled: widget.enabled,
+                  enabled: widget.inputEnabled,
                   maxLines: 1,
                   // Enter=다음 단계(마지막이면 추가) — 줄바꿈이 아니라 단계 이동이 자연 흐름.
                   textInputAction: TextInputAction.next,
@@ -1333,7 +1399,7 @@ class _SolutionStepsEditorState extends State<_SolutionStepsEditor> {
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline, size: 20),
                 tooltip: '단계 삭제',
-                onPressed: (widget.enabled && _controllers.length > 1)
+                onPressed: (widget.inputEnabled && _controllers.length > 1)
                     ? () => _removeStep(index)
                     : null,
               ),

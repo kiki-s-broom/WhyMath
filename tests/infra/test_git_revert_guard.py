@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -350,3 +351,113 @@ class TestEscapeHatchIsRecorded:
         ]
         assert rows and rows[-1]["escaped"] is True
         assert rows[-1]["blocked"] is False
+
+
+# ===========================================================================
+# CONST-10 — 훅 입력 해독은 로캘과 무관해야 한다 (UTF-8 원문 · cp949 콘솔)
+# ===========================================================================
+
+_IO_ENCODINGS = ["utf-8", "cp949"]
+
+# '—'(UTF-8 E2 80 94)는 cp949 트레일 바이트 범위(0x41-0x5A·0x61-0x7A·0x81-0xFE) 밖의 0x80을
+# 가져 cp949 텍스트 모드로 읽으면 **결정적으로** UnicodeDecodeError 가 난다.
+_KO_TAIL = "# 정리 — 한글 설명"
+
+
+def _run_raw(raw: bytes, cwd: Path, *, io_encoding: str) -> subprocess.CompletedProcess[bytes]:
+    """훅 입력을 **바이트 그대로** 넣고 stdin/stderr 로캘만 `io_encoding` 으로 바꿔 돌린다."""
+    return subprocess.run(
+        [sys.executable, str(_GUARD)],
+        input=raw,
+        capture_output=True,
+        cwd=str(cwd),
+        timeout=60,
+        env={**os.environ, "PYTHONIOENCODING": io_encoding},
+    )
+
+
+def _run_utf8(command: str, cwd: Path, *, io_encoding: str) -> subprocess.CompletedProcess[bytes]:
+    """UTF-8 **원문**(`ensure_ascii=False`)을 넣는다 — Claude Code 가 실제로 보내는 형태다.
+
+    위 `_run` 은 `json.dumps` 기본값(`ensure_ascii=True`)이라 한글·'—' 가 전부 `\\uXXXX` 로
+    이스케이프된 순수 ASCII 를 넣는다. 그러면 stdin 을 로캘 인코딩으로 읽는 결함이 있어도
+    통과한다 — 2026-09-29 실측: 수정 전 코드가 이 파일의 기존 테스트 전부를 통과했다.
+    """
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+        "cwd": str(cwd),
+        "session_id": "test",
+    }
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    return _run_raw(raw, cwd, io_encoding=io_encoding)
+
+
+def _stderr(proc: subprocess.CompletedProcess[bytes], io_encoding: str) -> str:
+    return proc.stderr.decode(io_encoding, errors="replace")
+
+
+class TestHookInputIsDecodedAsUtf8:
+    """CONST-10 — UTF-8 JSON 을 로캘 인코딩으로 읽으면 한국어 Windows 에서 이 가드가 꺼진다.
+
+    수정 전에는 `json.load(sys.stdin)` 이 cp949 로 해독하다 `UnicodeDecodeError` →
+    `except ValueError` → "입력 파싱 실패 — 통과" 였다: **한글 설명이 든 파괴적 원복 명령이
+    그대로 통과했다.** 양방향을 함께 잰다 — 막아야 할 것은 막고, 조용해야 할 것은 조용하다.
+    """
+
+    @pytest.mark.parametrize("io_encoding", _IO_ENCODINGS)
+    def test_destructive_command_with_korean_and_dash_is_blocked(
+        self, repo: Path, io_encoding: str
+    ) -> None:
+        _dirty(repo)
+        proc = _run_utf8(
+            f"git checkout -- backlog/events.ndjson  {_KO_TAIL}", repo, io_encoding=io_encoding
+        )
+        assert proc.returncode == 2, (
+            f"[{io_encoding}] 한글·'—'가 든 파괴적 원복이 통과했다(fail-open): "
+            f"{_stderr(proc, io_encoding)[:200]}"
+        )
+        assert "미커밋 변경" in _stderr(proc, io_encoding)
+
+    @pytest.mark.parametrize("io_encoding", _IO_ENCODINGS)
+    def test_read_only_command_with_korean_and_dash_passes_without_parse_failure(
+        self, repo: Path, io_encoding: str
+    ) -> None:
+        """**통과의 사유를 본다** — exit 0 만으로는 '옳게 통과'와 '해독 실패로 통과'를 못 가른다.
+
+        수정 전 cp949 에서도 exit 0 이었지만 stderr 에 "입력 파싱 실패" 가 있었다. 이 단언이
+        없으면 해독 실패로 꺼진 가드가 '조용히 통과'로 위장된다(변별력 없는 검증 스텝).
+        """
+        proc = _run_utf8(f"git status  {_KO_TAIL}", repo, io_encoding=io_encoding)
+        assert proc.returncode == 0
+        assert "입력 파싱 실패" not in _stderr(proc, io_encoding), "입력을 해독하지 못하고 통과했다"
+        assert proc.stderr == b"", "정상 통과는 침묵이어야 한다"
+
+    @pytest.mark.parametrize("io_encoding", _IO_ENCODINGS)
+    def test_destructive_command_on_clean_tree_stays_silent(
+        self, repo: Path, io_encoding: str
+    ) -> None:
+        """**대조군** — 한글이 있다고 전건 차단하지 않는다(잃을 것이 없으면 침묵)."""
+        proc = _run_utf8(
+            f"git checkout -- backlog/events.ndjson  {_KO_TAIL}", repo, io_encoding=io_encoding
+        )
+        assert proc.returncode == 0
+        assert proc.stderr == b""
+
+    def test_invalid_utf8_bytes_do_not_disable_the_guard(self, repo: Path) -> None:
+        """깨진 바이트가 섞여도 가드가 꺼지지 않는다 — `errors="replace"` 의 이유.
+
+        엄격 해독(`strict`)이면 잘못된 UTF-8 1바이트가 `UnicodeDecodeError` → 통과(fail-open)라,
+        입력이 깨진 순간 가드가 통째로 꺼진다. 대체 문자로 읽으면 명령의 나머지는 판정된다.
+        """
+        _dirty(repo)
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git checkout -- backlog/events.ndjson  # BAD"},
+            "cwd": str(repo),
+            "session_id": "test",
+        }
+        raw = json.dumps(payload).encode("utf-8").replace(b"BAD", b"\xff\xfe")
+        assert b"\xff\xfe" in raw, "주입이 적용되지 않았다"
+        proc = _run_raw(raw, repo, io_encoding="utf-8")
+        assert proc.returncode == 2, _stderr(proc, "utf-8")[:200]

@@ -86,7 +86,7 @@ import os
 import re
 import subprocess
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1417,6 +1417,168 @@ def scan_remote_done(
             branch = ref[len(REMOTE_REF_PREFIX) :] if ref.startswith(REMOTE_REF_PREFIX) else ref
             found.setdefault(task_id, []).append(DoneElsewhere(task_id, ref, branch))
         return found, "ok"
+    except subprocess.TimeoutExpired:
+        return {}, "offline"
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
+        return {}, f"error:{type(exc).__name__}"
+
+
+# ── 미머지 브랜치의 게이트 부착 스캔 (HARN-193) ───────────────────────────────
+#
+# 착수 차단은 세 겹이다 — ⑴ 원격 claim(harness-claims) ⑵ 트렁크 사본의 requires_gates·
+# depends_on(HARN-91) ⑶ 미머지 done(HARN-11 `scan_remote_done`). 게이트를 붙이는 표준
+# 흐름은 `start` → `gates add` → `amend --gate` → `unblock`인데, `unblock`은 ⑴을 즉시
+# 걷고 그 자리를 대신할 ⑵는 **브랜치에만** 있어 PR이 머지되기 전까지 어느 세션에도 보이지
+# 않는다. 보호를 교대하는 순간에 공백이 생기고, 그 창에서 같은 태스크가 연쇄 착수된다
+# (실측 2026-09-28: `EOS-129`가 하루에 세 세션에서 착수돼 PR 셋이 열렸다).
+#
+# `scan_remote_done`이 "브랜치가 끝냈는가"를 본다면 이 스캔은 "브랜치가 **게이트를 붙였는가**"를
+# 본다. 같은 `cat-file --batch` 한 번으로 (트렁크 + 브랜치) × 태스크 사본을 읽고 requires_gates
+# 차집합을 취한다 — 조회는 브랜치 수가 아니라 프로세스 1회다.
+
+
+@dataclass(frozen=True)
+class GateAttachedElsewhere:
+    """미머지 브랜치가 이 태스크에 붙여 둔, 트렁크에서 아직 통과되지 않은 게이트 1건.
+
+    `trunk_gate_state`: 트렁크 gates.yaml에서의 status. ""는 **트렁크에 그 게이트 정의가
+        없다**는 뜻이다(게이트 자체가 그 브랜치에서 신설됨 — 이번 사고의 전형)이며 미통과로 센다.
+    `branch_gate_state`: 그 브랜치 사본 gates.yaml에서의 status. **표시용이며 판정에 쓰지
+        않는다** — 미머지 브랜치에서 clear됐다는 것은 트렁크에서 clear됐다는 뜻이 아니다
+        (CLAUDE.md '미머지 존재를 충족으로 단정 금지').
+    """
+
+    task_id: str
+    gate_id: str
+    ref: str
+    branch: str
+    trunk_gate_state: str
+    branch_gate_state: str
+
+
+def scan_remote_gate_attachments(
+    root: Path,
+    tasks: Mapping[str, Sequence[str]],
+    *,
+    fetch: bool = False,
+    refs_fresh: bool = False,
+    exclude_branches: Sequence[str] = (),
+    max_refs: int = SCAN_MAX_REFS,
+) -> tuple[dict[str, list[GateAttachedElsewhere]], str]:
+    """미머지 브랜치가 태스크에 붙인 게이트를 찾는다 → {task_id: [GateAttachedElsewhere]}.
+
+    `tasks`는 `{task_id: 로컬 사본의 requires_gates}`다. **차집합의 기준선은 둘이다** — 트렁크
+    사본과 로컬 사본. 브랜치 사본의 requires_gates에서 그 둘에 이미 있는 게이트를 뺀 나머지가
+    "그 브랜치만 붙인" 게이트다. 로컬에 이미 있는 게이트는 `selector.classify_todo`가 판정하고
+    (중복 판정 금지), 트렁크에 이미 있는 게이트는 트렁크 백로그가 직접 보여 준다.
+
+    그 나머지 중 **트렁크 gates.yaml이 cleared/waived로 기록한 것은 제외**한다(이미 풀린
+    게이트를 붙여 둔 낡은 브랜치가 착수를 영구 차단하면 안 된다 — 과잉 차단 대조군).
+    트렁크에 정의가 없거나 pending이면 미통과로 센다: 신규 항목의 부재는 안전 방향이 아니다
+    (`scan_trunk_task_drift`와 같은 규약).
+
+    제외 규칙: 트렁크 ref, `exclude_branches`(호출한 세션 자신의 브랜치 — 내 로컬 사본이 그
+    push본보다 최신이다). `fetch=False`(기본)는 **이미 있는 remote-tracking ref만** 보며
+    네트워크 0이다 — `next`·`brief`용. `start`는 `scan_remote_done(fetch=True)`가 직전에 ref를
+    최신화하므로 그 뒤에 `fetch=False, refs_fresh=True`로 부르면 추가 왕복이 없다.
+
+    `refs_fresh`: 호출자가 직전에 fetch로 ref를 최신화했다는 선언이다. 이것이 없고 `fetch`도
+    아니면 **다른 브랜치 ref가 0개일 때 `no_refs`를 돌려준다** — shallow·단일 브랜치 클론은
+    트렁크 ref만 캐시하므로(2026-09-30 실측: `--depth 1` 클론의 캐시는 HEAD·main뿐) 그 상태의
+    "0개를 훑었다"는 '부착 없음'이 아니라 '안 봤다'다.
+
+    반환 status: `ok` · `truncated`(브랜치 수가 상한을 넘어 일부만 봤다 — 발견분은 유효하고
+    **빈 결과만** 판정 불가) · `no_refs`(캐시에 다른 브랜치가 없어 못 봤다 — 판정 불가) ·
+    `offline` · `error:<Type>`. `ok`가 아니면 빈 결과를 '게이트 부착 없음'으로 읽어서는
+    안 된다(측정 실패와 통과는 같은 색이면 안 된다).
+
+    알려진 한계(정직 기술): ① push되지 않은 브랜치는 관측할 수 없다(HARN-43 고지 축) ② 낡은
+    브랜치가 트렁크에서 **떼어 낸**(amend --remove-gate) 게이트를 아직 들고 있으면 그 게이트가
+    트렁크에서 pending인 동안 과잉 차단한다 — 메시지가 브랜치를 지목하고
+    `--ignore-remote-claim`으로 넘길 수 있다.
+    """
+    if not tasks:
+        return {}, "ok"
+    if not has_remote(root):
+        return {}, "offline"
+    try:
+        if fetch:
+            fetched = _git(
+                root,
+                "fetch",
+                "--quiet",
+                "--prune",
+                "origin",
+                "+refs/heads/*:refs/remotes/origin/*",
+                timeout=SCAN_FETCH_TIMEOUT,
+            )
+            if fetched.returncode != 0:
+                return {}, _classify_failure(fetched.stderr)
+        listing = _git(root, "for-each-ref", "--format=%(refname)", "refs/remotes/origin")
+        if listing.returncode != 0:
+            return {}, _classify_failure(listing.stderr)
+        trunk_ref, _ = _resolve_trunk_ref(root)
+        skip_refs = {trunk_ref, *(REMOTE_REF_PREFIX + b for b in exclude_branches)}
+        wanted = [
+            r.strip()
+            for r in listing.stdout.splitlines()
+            if r.strip() and not r.strip().endswith("/HEAD") and r.strip() not in skip_refs
+        ]
+        if not wanted and not (fetch or refs_fresh):
+            # 다른 브랜치를 하나도 못 봤다 — 스캔 0건은 통과가 아니라 판정 불가다.
+            return {}, "no_refs"
+        refs = wanted[:max_refs]
+        truncated = len(wanted) > len(refs)
+        task_ids = list(tasks)
+
+        # 트렁크 사본(기준선)을 앞에 두고 그 뒤에 (ref, task) 전 조합 — 프로세스 1회.
+        pairs = [(trunk_ref, tid) for tid in task_ids] + [
+            (ref, tid) for ref in refs for tid in task_ids
+        ]
+        request = "".join(f"{ref}:backlog/tasks/{tid}.yaml\n" for ref, tid in pairs)
+        batch = _git(root, "cat-file", "--batch", input_text=request, timeout=SCAN_FETCH_TIMEOUT)
+        if batch.returncode != 0:
+            return {}, _classify_failure(batch.stderr)
+        blobs = list(_iter_batch_blobs(batch.stdout))
+        if len(blobs) != len(pairs):
+            # zip(strict=False)로 덮으면 정렬이 어긋난 결과가 엉뚱한 브랜치에 붙는다
+            # (`_iter_batch_blobs` docstring의 2026-07-29 사고). 어긋남은 판정 불가다.
+            return {}, "error:BatchMisaligned"
+
+        base = len(task_ids)
+        trunk_gates = {
+            tid: set(_top_level_list_field(blob, "requires_gates")) if blob is not None else set()
+            for tid, blob in zip(task_ids, blobs[:base], strict=True)
+        }
+        trunk_state: dict[str, str] = {}
+        branch_state: dict[tuple[str, str], str] = {}
+        found: dict[str, list[GateAttachedElsewhere]] = {}
+        for (ref, tid), blob in zip(pairs[base:], blobs[base:], strict=True):
+            if blob is None:
+                continue  # 그 브랜치에 그 파일이 없다(태스크 신설 이전 시점)
+            known = trunk_gates[tid] | set(tasks[tid])
+            branch = ref[len(REMOTE_REF_PREFIX) :] if ref.startswith(REMOTE_REF_PREFIX) else ref
+            for gate_id in _top_level_list_field(blob, "requires_gates"):
+                if gate_id in known:
+                    continue
+                if gate_id not in trunk_state:
+                    trunk_state[gate_id] = _trunk_gate_status(root, trunk_ref, gate_id)
+                if trunk_state[gate_id] in ("cleared", "waived"):
+                    continue
+                if (ref, gate_id) not in branch_state:
+                    branch_state[(ref, gate_id)] = _trunk_gate_status(root, ref, gate_id)
+                found.setdefault(tid, []).append(
+                    GateAttachedElsewhere(
+                        task_id=tid,
+                        gate_id=gate_id,
+                        ref=ref,
+                        branch=branch,
+                        trunk_gate_state=trunk_state[gate_id],
+                        branch_gate_state=branch_state[(ref, gate_id)],
+                    )
+                )
+        return found, "truncated" if truncated else "ok"
     except subprocess.TimeoutExpired:
         return {}, "offline"
     except Exception as exc:  # pragma: no cover - 환경 의존
