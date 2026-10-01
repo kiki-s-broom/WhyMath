@@ -865,7 +865,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"
     depends_on:
       - P3-18-calculus-verifiability-probe
   - id: G-path04-learning-path-xlsx
