@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - "docs/reviews/p3_18_*.md"
   - tests/backend/harness/test_p3_18_calculus_verifiability_probe.py
   - "tests/backend/harness/fixtures/p3_18_*"
-session: null
+session: claude/gallant-euler-blngpj
 notes: "출처: 2026-09-30 Kiki 승인 등록(P3-01 대표 과정 선택 후속 — 후보 1 미적분Ⅰ '미분'). p3_01_scope_candidates_2026-09-30.md §3.2가 후보 1의 '가장 큰 위험'으로 적은 '단원별 SymPy 검증 경로 가용성은 측정하지 않았다'를 측정으로 바꾸는 태스크다.\n근거 조사(2026-09-30 · 정적 읽기 — 이 세션 python에 sympy가 없어 실행하지 못했다. 추측 포함): 7개 개념 중 -02-03·-02-04·-02-10은 기존 Derivative 패턴 검증으로 가능(3개 뱅크 800건이 같은 방식), -02-05는 답이 식이면 표본 검증이라 증명이 아님, -02-06·-02-09는 수치형만 일부 가능(평균값 정리 검증기 0건 · real_root_count는 자유변수 1개 다항식만), -02-08(그래프 개형)은 검증기와 문항이 모두 0건(requires_graph_sketch True 0건)이라 불가로 보임. 즉 위험은 문서가 우려한 것보다 좁고 확실히 막힌 것은 1개다. 이 분류는 실행으로 확정되기 전까지 가설이다.\nP3-01 ③(9항 범위 명세 동결)이 이 결과를 입력으로 받도록 P3-01 depends_on에 이 태스크를 건다 — 결과에 따라 핵심 개념 목록이 바뀔 수 있다."
-updated: 2026-09-30
+updated: 2026-10-01
