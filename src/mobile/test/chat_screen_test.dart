@@ -11,6 +11,7 @@ import 'package:korean_math_app/features/chat/data/coach_models.dart';
 import 'package:korean_math_app/features/chat/presentation/chat_screen.dart';
 import 'package:korean_math_app/features/problems/application/active_problem.dart';
 import 'package:korean_math_app/features/problems/data/problem_models.dart';
+import 'package:korean_math_app/features/reports/data/defect_report_api.dart';
 
 /// 미리 짠 응답을 돌려주는 fake(또는 throw) — 위젯 테스트용.
 ///
@@ -60,6 +61,23 @@ class _FakeCoachApi extends CoachApi {
       response: response!,
       wh1TurnIndex: 2,
     );
+  }
+}
+
+/// 호출을 기록만 하는 fake — 실제 네트워크 없이 신고 시점의 problemId를 검증한다(MOB-23).
+class _FakeDefectReportApi extends DefectReportApi {
+  _FakeDefectReportApi() : super(Dio());
+
+  int callCount = 0;
+  String? lastProblemId;
+
+  @override
+  Future<void> reportDefect({
+    required DefectReportCategory category,
+    String? problemId,
+  }) async {
+    callCount++;
+    lastProblemId = problemId;
   }
 }
 
@@ -432,6 +450,58 @@ void main() {
   testWidgets('활성 문제가 없으면 배너가 그려지지 않는다', (tester) async {
     await tester.pumpWidget(_wrap(_FakeCoachApi(response: _response())));
     expect(find.textContaining('풀이 중인 문제'), findsNothing);
+  });
+
+  testWidgets(
+      '문제 전환 후 결함 신고는 새 문제로 접수된다(stale 이전 문제 problem_id 없음·MOB-23)',
+      (tester) async {
+    // 소비 측 종단 가드: 문제 A로 풀이하다 문제 B로 전환한 뒤 신고하면, 화면이
+    // activeProblemProvider를 watch해 재렌더되므로 신고 시점의 최신 값(B)이 실려야 한다.
+    // 전환 자체(null 경유 리셋)는 problem_screen_test가 검증하고, 이 테스트는 그 전환을 화면이
+    // 실제로 따라가는지(watch → 재렌더 → 신고 payload)만 본다.
+    final reportApi = _FakeDefectReportApi();
+    final container = ProviderContainer(
+      overrides: [
+        coachApiProvider.overrideWithValue(_FakeCoachApi(response: _response())),
+        defectReportApiProvider.overrideWithValue(reportApi),
+        activeProblemProvider.overrideWith(
+          (ref) => const Problem(
+            problemId: 'p-old',
+            sourceType: '자체생성',
+            subject: '공통',
+            questionText: '이전 문제',
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ChatScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 문제 전환(problem_screen.onStart와 동형 — null을 거쳐 새 문제로 재세팅)을 재현한다.
+    container.read(activeProblemProvider.notifier).state = null;
+    container.read(activeProblemProvider.notifier).state = const Problem(
+      problemId: 'p-new',
+      sourceType: '자체생성',
+      subject: '공통',
+      questionText: '새 문제',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.flag_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '신고하기'));
+    await tester.pumpAndSettle();
+
+    expect(reportApi.callCount, 1);
+    expect(reportApi.lastProblemId, 'p-new');
+    expect(reportApi.lastProblemId, isNot('p-old'));
   });
 
   // ── S3-12→S3-17 객관식 선택지 세로 번호 목록 ─────────────────────────────

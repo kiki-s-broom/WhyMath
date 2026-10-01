@@ -82,6 +82,10 @@ class _ProblemScreenState extends ConsumerState<ProblemScreen> {
       problem: state.problem!,
       onStart: () {
         // 활성 문제를 세팅해 코치 세션이 problem_id에 묶이게 한다(Slice 2 소비).
+        // MOB-23: 직전 문제(A)가 남아 있는 채로 새 문제(B)를 곧장 덮어쓰면 "이전 문제는 항상 null을
+        // 거쳐야 끝난다"는 전환 계약이 코드에 드러나지 않는다 — null을 한 번 거쳐 리셋한 뒤 재세팅한다
+        // (결함 신고 등 activeProblemProvider를 참조하는 화면이 A의 흔적을 볼 수 없게).
+        ref.read(activeProblemProvider.notifier).state = null;
         ref.read(activeProblemProvider.notifier).state = state.problem;
         context.go(AppRoutes.chatPath);
       },

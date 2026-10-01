@@ -27,7 +27,15 @@ dependencies = [
     # openai OpenAI().embeddings.create / ollama AsyncClient.generate·list)을 2026-07-21 실물 설치로
     # 실측 검증한 메이저까지만 허용(anthropic 0.117·openai 2.46·ollama 0.6에서 표면 확인). 무상한
     # pin이 v2/v4 혼재를 낳았던 langfuse 교훈(아래)과 동일 규칙 — 차기 메이저는 표면 재검증 후 승격.
-    "anthropic>=0.40.0,<1",
+    # anthropic 하한(OPS-87) — 위 상한 규칙의 반대편이다: 우리가 messages.create에 싣는 최상위 인자 9종이
+    # *전부 존재하는 최초 버전*이 하한이다. 2026-10-01 실물 설치 후 inspect.signature 실측(0.40.0~0.90.0
+    # 67개 버전·AsyncMessages.create): thinking 0.47.0 · output_config 0.77.0 · cache_control 0.83.0부터
+    # 존재하고 나머지 6종은 전 구간에 있다. 예전 하한 0.40.0은 cache_control이 없는 59개 버전(측정 구간의
+    # 88%)을 허용했다. 이 SDK의 messages.create에는 **kwargs가 없어(측정 67개 버전·설치본 0.125.0 전건)
+    # 없는 인자를 싣는 순간 TypeError로 호출이 즉사한다 — 조용히 무시되지는 않는다. 그러나 저작 배치는
+    # 호출 실패를 generation_failed로 집계해 회차가 정상 종료하므로 사람에게는 "측정 0건"으로만 보인다
+    # (무증상에 가깝다). 집행: tests/backend/l3/test_anthropic_sdk_surface.py(실물 시그니처 + 하한 대조).
+    "anthropic>=0.83.0,<1",
     "openai>=1.50.0,<3",
     "ollama>=0.4.0,<1",
     # 벡터 DB(pgvector·Postgres 통합) — 마이그레이션·ORM이 top-level import라 메인 의존성 유지.
