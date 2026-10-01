@@ -66,6 +66,9 @@ class AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // 요청마다 부르지만 플랫폼 채널 왕복은 첫 1회뿐이다 — `SecureTokenStore`가 액세스 토큰을 메모리에 캐시하고
+    // (MOB-24 ②), 로그인·갱신 회전 저장·로그아웃/401 정리가 모두 그 저장소를 지나 캐시가 무효화된다. 이
+    // 인터셉터가 토큰을 따로 들고 있지 않는 것도 같은 이유다 — 저장소 밖에 사본을 두면 그 무효화를 못 본다.
     final token = await _store.readAccessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';

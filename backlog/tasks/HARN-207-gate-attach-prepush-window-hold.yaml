@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-207-gate-attach-prepush-window-hold
+title: "게이트 부착~push 사이 창의 쓰기측 보호 — 미push 브랜치의 게이트 부착은 읽기측 스캔(HARN-193)이 못 본다 (관측 기반 착수 · 2026-11-30 재확인)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 착수 조건(관측 기반 · 무기한 유예 아님): HARN-193의 읽기측 스캔 착지 이후, 사고 대장(`backlog/incidents.ndjson`)의 계열 `parallel-duplicate-implementation`에 원인이 **push 전 게이트 부착**(게이트를 붙이고 claim을 푼 세션의 브랜치가 아직 원격에 없어 스캔이 못 본 창)인 사고가 1건이라도 등재되면 착수한다. 관측이 없으면 착수하지 않는다 — 판정문 §2가 밝힌 쓰기측 홀드의 비용(홀드 수명 관리)을 치를 근거가 없기 때문이다."
+  - "② 재확인 지점(만료): 2026-11-30까지 ①의 관측이 0건이면 이 태스크를 cancel하고 사유를 남긴다(쓰기측 홀드 영구 미채택 확정). 관측이 있으면 ③으로 진행한다. 이 날짜를 넘긴 채 todo로 남아 있으면 그 자체가 결함이다(만료 없는 유예 금지)."
+  - "③ 설계 선행 요건: 판정문 `docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md` §2·§6이 적은 홀드 수명 문제를 먼저 풀어야 한다 — `unblock`은 blocked/in_progress→todo 전이용이라 이미 todo인 게이트 대기 태스크에는 홀드를 걷는 경로가 없고, HARN-191(흡수·cancelled)은 그 해제 판정을 `claims reap`·브리핑에 새로 넣으려 했다. 해제 주체·조건·테스트(착지 후 해제, 양방향 변별력)가 설계에 없으면 착수하지 않는다. 읽기측 스캔이 이미 트렁크 착지 즉시 자동 해소되므로, 쓰기측은 push 전 창만 메워야 하고 그 이상을 하면 중복이다."
+  - "④ 작동 비율 측정: 읽기측 스캔의 거부·제외가 실제로 몇 번 발화했는지 세는 방법을 정한다. 현재 거부(`start` exit 1)와 제외(`next`·`brief`)는 이벤트를 남기지 않는다 — 거부 때마다 이벤트를 쓰면 실패한 착수가 작업 트리를 더럽히기 때문이다. 우회(`start_ignored_unmerged_gate_attach`)만 이벤트로 남는다. 발화 건수가 없으면 이 스캔이 일하고 있는지와 일하지 않는지가 같은 화면이다(CLAUDE.md '작동한 비율' 원칙)."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+session: null
+notes: "출처: HARN-193 설계 판정(2026-09-30) — 후보 ⓐ(쓰기측 홀드)를 채택하지 않은 잔여 위험을 추적한다. 판정문 §2. 읽기측 스캔이 못 보는 창 = 게이트를 붙이고 claim을 푼 세션의 브랜치가 원격에 push되기 전. 이력 4건(EOS-129 3세션·EOS-137·EOS-146)은 전부 브랜치가 push된 뒤였다. 관련: HARN-191(흡수·cancelled, 같은 쓰기측 홀드안), HARN-43(미push 브랜치 비가시성 고지), HARN-134(차단 홀드 kind:block)."
+updated: 2026-09-30

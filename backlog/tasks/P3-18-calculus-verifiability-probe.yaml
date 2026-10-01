@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-18-calculus-verifiability-probe
+title: "P3-18 — 대표 과정(미적분Ⅰ 미분) 신규 저작 개념 7개의 SymPy 검증 가능성 프로브 — 정답 통과·오답 주입 실패를 exit code로 판정(P3-01 ③ 동결 입력)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 프로브 14행 작성: 대표 과정(미적분Ⅰ '미분') 문항 0건 핵심 개념 7개([12미적Ⅰ-02-03]·-02-04·-02-05·-02-06·-02-08·-02-09·-02-10) 각각에 정답 행 1개와 오답 주입 행 1개(정답 값만 틀리게 바꾼 행)를 만든다. 개념별로 실제 저작 형태를 쓴다: 도함수 값·곱의 미분·접선 방정식·평균값 정리의 c값·극값 개수·방정식 실근 개수·속도/가속도.\n② 판정은 exit code로 낸다: 정답 파일이 기존 재검증 경로(harness.corpus_reverify 또는 문항 수용 게이트)에서 exit 0이고 skip 0이며, 오답 파일이 exit 1이고 실패 수가 오답 행 수와 같아야 '가능'. 한쪽만 만족하면 '일부 가능', 정답 행이 skip(unverifiable)이면 '불가'. exit 0만으로 '검증됨'이라 하지 않는다 — corpus_reverify는 unverifiable을 skip으로 넘기고 fail일 때만 exit 1을 낸다.\n③ 변별력: 오답 주입 행이 실제로 실패하는지 확인한다. 정답 행과 오답 행이 둘 다 통과하는 프로브는 위장이므로 무효 처리하고 원인을 적는다.\n④ 결과를 docs/reviews/p3_18_*.md에 개념 7개 표(가능/일부/불가 + 근거 exit code)로 남긴다. 실행하지 못한 항목은 실행하지 못했다고 쓴다(환경에 sympy가 필요하다 — python -m pip install -e src/backend 후 실행).\n⑤ 불가·일부 개념이 나오면 세션이 분모를 조정하지 않는다: 처분안(가: 핵심 개념에서 제외하고 사유 기록 / 나: 파생 판정(극값 개수 등)으로 대체 / 다: 인간 폴백)을 Kiki 결정 게이트로 올린다. P3-01 ③은 그 결과를 입력으로 받는다.\n⑥ 완료 판정 — 결과 문서와 프로브 행이 main에 있고 ②의 exit code가 문서에 기록됨."
+artifacts: []
+paths:
+  - "docs/reviews/p3_18_*.md"
+  - tests/backend/harness/test_p3_18_calculus_verifiability_probe.py
+  - "tests/backend/harness/fixtures/p3_18_*"
+session: null
+notes: "출처: 2026-09-30 Kiki 승인 등록(P3-01 대표 과정 선택 후속 — 후보 1 미적분Ⅰ '미분'). p3_01_scope_candidates_2026-09-30.md §3.2가 후보 1의 '가장 큰 위험'으로 적은 '단원별 SymPy 검증 경로 가용성은 측정하지 않았다'를 측정으로 바꾸는 태스크다.\n근거 조사(2026-09-30 · 정적 읽기 — 이 세션 python에 sympy가 없어 실행하지 못했다. 추측 포함): 7개 개념 중 -02-03·-02-04·-02-10은 기존 Derivative 패턴 검증으로 가능(3개 뱅크 800건이 같은 방식), -02-05는 답이 식이면 표본 검증이라 증명이 아님, -02-06·-02-09는 수치형만 일부 가능(평균값 정리 검증기 0건 · real_root_count는 자유변수 1개 다항식만), -02-08(그래프 개형)은 검증기와 문항이 모두 0건(requires_graph_sketch True 0건)이라 불가로 보임. 즉 위험은 문서가 우려한 것보다 좁고 확실히 막힌 것은 1개다. 이 분류는 실행으로 확정되기 전까지 가설이다.\nP3-01 ③(9항 범위 명세 동결)이 이 결과를 입력으로 받도록 P3-01 depends_on에 이 태스크를 건다 — 결과에 따라 핵심 개념 목록이 바뀔 수 있다."
+updated: 2026-09-30

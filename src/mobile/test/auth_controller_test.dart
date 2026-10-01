@@ -12,7 +12,12 @@ import 'package:korean_math_app/core/token_refresh_api.dart';
 import 'package:korean_math_app/core/token_store.dart';
 import 'package:korean_math_app/features/auth/application/auth_controller.dart';
 import 'package:korean_math_app/features/auth/data/auth_api.dart';
+import 'package:korean_math_app/features/chat/application/chat_controller.dart';
+import 'package:korean_math_app/features/chat/data/coach_api.dart';
+import 'package:korean_math_app/features/chat/data/coach_models.dart';
 import 'package:korean_math_app/features/chat/data/dialogue_store.dart';
+import 'package:korean_math_app/features/problems/application/active_problem.dart';
+import 'package:korean_math_app/features/problems/data/problem_models.dart';
 
 class _FakeAuthApi extends AuthApi {
   _FakeAuthApi({this.token, this.shouldThrow = false}) : super(Dio());
@@ -119,6 +124,35 @@ class _FakeDialogueStore implements DialogueStore {
   Future<void> clearDialogueId() async => dialogueId = null;
 }
 
+/// 세션 잔여 재현용 fake(MOB-23) — 코치 응답 1개를 그대로 돌려준다(chat_controller_test 패턴 축약).
+class _FakeCoachApi extends CoachApi {
+  _FakeCoachApi() : super(Dio());
+
+  @override
+  Future<CoachTurnResult> createSession(
+    CoachRequest request, {
+    String? problemId,
+  }) async {
+    return CoachTurnResult(
+      dialogueId: 'prev-student-dialogue',
+      response: CoachResponse(
+        decision: PedagogyDecision(
+          polyaStageToAdvance: 'stay',
+          prompt: '이전 학생 발화에 대한 응답(테스트)',
+          system: '시스템(테스트)',
+          socraticCategory: '',
+        ),
+      ),
+      wh1TurnIndex: 1,
+    );
+  }
+
+  @override
+  Future<CoachTurnResult> addTurn(String dialogueId, CoachRequest request) {
+    throw UnimplementedError('이 테스트는 첫 턴만 쓴다');
+  }
+}
+
 /// 모든 요청에 401을 돌려주는 어댑터 — dioProvider의 세션 무효 배선(MOB-15)을 네트워크 없이 검증.
 class _UnauthorizedAdapter implements HttpClientAdapter {
   int requests = 0;
@@ -145,6 +179,7 @@ ProviderContainer _container(
   RefreshTokenStore? refreshStore,
   TokenRefreshApi? refreshApi,
   DialogueStore? dialogueStore,
+  CoachApi? coachApi,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -154,6 +189,8 @@ ProviderContainer _container(
       refreshTokenStoreProvider.overrideWithValue(refreshStore ?? _FakeRefreshTokenStore()),
       tokenRefreshApiProvider.overrideWithValue(refreshApi ?? _FakeTokenRefreshApi()),
       dialogueStoreProvider.overrideWithValue(dialogueStore ?? _FakeDialogueStore()),
+      // MOB-23: 이전 학생의 코치 대화 잔여를 재현하는 테스트만 주입한다(기본은 실 구현 — 미사용).
+      if (coachApi != null) coachApiProvider.overrideWithValue(coachApi),
     ],
   );
   addTearDown(container.dispose);
@@ -217,6 +254,41 @@ void main() {
     );
     await container.read(authControllerProvider.notifier).logout();
     expect(dialogueStore.dialogueId, isNull);
+  });
+
+  test(
+      'logout → activeProblemProvider·코치 대화(dialogueId·메시지)도 함께 초기화된다'
+      '(다음 학생에게 잔여 노출 방지·MOB-23)', () async {
+    final container = _container(
+      _FakeAuthApi(token: 'tok'),
+      _FakeTokenStore()..saved = 'tok',
+      coachApi: _FakeCoachApi(),
+    );
+
+    // 이전 학생이 풀던 문제가 남아 있는 상태를 재현한다. `overrideWith`로 초기값을 고정하면
+    // `invalidate`가 그 고정값으로 되돌아가 버려 리셋을 검증할 수 없으므로(실제 프로덕션
+    // 빌더는 `(ref) => null`), 실제 빌더를 그대로 두고 세팅만 직접 한다(problem_screen.onStart와
+    // 동형 — `.notifier.state =`).
+    container.read(activeProblemProvider.notifier).state = const Problem(
+      problemId: 'p-prev-student',
+      sourceType: '자체생성',
+      subject: '공통',
+      unitCodes: <String>['ALG'],
+    );
+
+    // 이전 학생의 코치 대화 잔여(dialogueId·메시지)를 재현한다.
+    await container.read(chatControllerProvider.notifier).send('이전 학생 발화');
+    expect(container.read(chatControllerProvider).dialogueId, isNotNull);
+    expect(container.read(chatControllerProvider).messages, isNotEmpty);
+    expect(container.read(activeProblemProvider), isNotNull);
+
+    await container.read(authControllerProvider.notifier).logout();
+
+    // 다음 학생이 같은 기기로 로그인해도 이전 학생의 문제·대화가 보이지 않아야 한다.
+    expect(container.read(activeProblemProvider), isNull);
+    final chatState = container.read(chatControllerProvider);
+    expect(chatState.dialogueId, isNull);
+    expect(chatState.messages, isEmpty);
   });
 
   test('dioProvider 배선(MOB-15): 갱신 불가 401이면 앱 전역 로그아웃으로 미인증이 된다', () async {

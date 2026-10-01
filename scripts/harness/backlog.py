@@ -520,6 +520,17 @@ def _overlap_block_map(root: Path, backlog, policy) -> dict[str, list[str]] | No
     return result or None
 
 
+def _gate_attach_summary(attached: list[remote_claims.GateAttachedElsewhere]) -> str:
+    """미머지 게이트 부착 발견분을 `브랜치 (게이트, ...); ...` 한 줄로 만든다 (HARN-193)"""
+    by_branch: dict[str, list[str]] = {}
+    for found in attached:
+        by_branch.setdefault(found.branch, []).append(found.gate_id)
+    return "; ".join(
+        f"{branch} ({', '.join(dict.fromkeys(gates))})"
+        for branch, gates in sorted(by_branch.items())
+    )
+
+
 def cmd_next(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     policy, _ = store.load_policy(root)
@@ -560,6 +571,29 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
                 f"⚠ 미머지 done 탐지 불가({done_status}) — 완료분이 섞였을 수 있음",
                 file=sys.stderr,
             )
+        # 미머지 게이트 부착 제외 (HARN-193) — 타 세션이 게이트를 붙이고 claim을 푼 태스크는
+        # 트렁크에서 게이트 없는 무주 todo로 보인다(그 부착은 PR이 머지돼야 트렁크에 실린다).
+        # done 스캔과 같은 이유로 fetch 없이 캐시된 ref만 본다(네트워크 0) — 확정 지점은 start다.
+        if ready:
+            gate_map, gate_status = remote_claims.scan_remote_gate_attachments(
+                root,
+                {t.id: t.requires_gates for t in ready},
+                exclude_branches=[store.current_branch(root)],
+            )
+            for task_id, attached in sorted(gate_map.items()):
+                print(
+                    f"⚠ 후보 제외 {task_id} — 미머지 브랜치가 게이트를 붙여 뒀다: "
+                    f"{_gate_attach_summary(attached)}",
+                    file=sys.stderr,
+                )
+            ready = [t for t in ready if t.id not in gate_map]
+            if gate_status != "ok":
+                # 빈 결과를 '부착 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 미머지 게이트 부착 탐지 불가({gate_status}) — 다른 브랜치가 게이트를 "
+                    f"붙여 둔 태스크가 후보에 섞였을 수 있음",
+                    file=sys.stderr,
+                )
     # 취소된 선행에 차단된 todo (HARN-67 ②) — 후보 0건 여부·--json 여부와 무관하게 **매번**
     # 경고한다. 차단 자체는 옳을 수 있으나(결정 불가 → 차단 유지) 조용한 차단만은 금지다:
     # 선행을 cancel한 세션은 후속이 사라진 것을 못 보고, 다음 세션은 "왜 안 나오지"를 다시
@@ -718,6 +752,13 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                 f"⚠ 미머지 done 탐지 불가({done_status}) — 타 세션 완료분을 못 봤을 수 있음",
                 file=sys.stderr,
             )
+            # 게이트 부착 스캔은 같은 fetch에 편승하므로 fetch가 실패했으면 같이 못 본 것이다.
+            # 위 경고에 묻지 않고 따로 낸다 — 무엇을 못 봤는지가 화면에 남아야 한다 (HARN-193 ⑤).
+            print(
+                f"⚠ 미머지 게이트 부착 탐지 불가({done_status}) — 타 세션이 이 태스크에 게이트를 "
+                f"붙여 뒀는지 못 봤을 수 있음",
+                file=sys.stderr,
+            )
 
         # [프리플라이트 0.5] 트렁크 의존·게이트 시차 (HARN-91) — classify_todo는 로컬
         # 백로그 사본만 보므로, 내 마지막 fetch 뒤 트렁크에 새로 착지한 의존·게이트(조건이
@@ -760,6 +801,58 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                 print(
                     f"⚠ 트렁크 의존·게이트 시차 탐지 불가({drift_result.status}) — "
                     f"트렁크에 새로 착지한 조건을 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+
+        # [프리플라이트 0.75] 미머지 브랜치의 게이트 부착 (HARN-193) — 트렁크 시차(0.5)의 반대
+        # 방향이다. 0.5는 *트렁크가* 조건을 강화한 경우를 보고, 이 검사는 *미머지 브랜치가*
+        # 강화한 경우를 본다. 게이트를 붙이고 `unblock`한 세션은 원격 claim을 걷고, 그 부착은
+        # PR이 머지되기 전까지 트렁크 어디에도 없어 다른 세션에게 이 태스크는 무주 todo다.
+        # 위 done 스캔이 fetch=True로 ref를 최신화했으므로 같은 fetch에 편승한다(추가 왕복 0).
+        if done_status == "ok":
+            gate_map, gate_status = remote_claims.scan_remote_gate_attachments(
+                root,
+                {task.id: task.requires_gates},
+                refs_fresh=True,  # 위 done 스캔의 fetch=True가 방금 ref를 최신화했다
+                exclude_branches=[session],
+            )
+            attached = gate_map.get(task.id, [])
+            if attached:
+                lines = [
+                    f"  - {a.gate_id} (트렁크: {a.trunk_gate_state or '정의 없음'} · "
+                    f"그 브랜치: {a.branch_gate_state or '정의 안 읽힘'}) ← {a.branch}"
+                    for a in attached
+                ]
+                first_branch = attached[0].branch
+                message = (
+                    f"{task.id} 착수 거부 — 미머지 브랜치가 이 태스크에 **게이트를 붙여 뒀다**"
+                    f"(HARN-193):\n"
+                    + "\n".join(lines)
+                    + "\n  그 부착은 PR이 머지돼야 트렁크에 실린다 — 그 전까지 트렁크 백로그는\n"
+                    "  이 태스크를 게이트 없는 무주 todo로 보여 준다. 착수하면 결정·측정 선행을\n"
+                    "  건너뛴 이중 구현이 된다.\n"
+                    f"  확인: git show origin/{first_branch}:backlog/tasks/{task.id}.yaml\n"
+                    f"  그 브랜치의 세션과 조율하거나, 폐기된 브랜치라면: --ignore-remote-claim"
+                )
+                if getattr(args, "ignore_remote_claim", False):
+                    print(
+                        f"⚠ 미머지 게이트 부착 무시하고 진행 — 결정·측정 선행을 건너뛴 이중 구현 "
+                        f"위험을 감수합니다: {_gate_attach_summary(attached)}",
+                        file=sys.stderr,
+                    )
+                    store.append_event(
+                        root,
+                        "start_ignored_unmerged_gate_attach",
+                        task.id,
+                        attached=[f"{a.branch}:{a.gate_id}" for a in attached],
+                    )
+                else:
+                    return _fail(message)
+            elif gate_status != "ok":
+                # 빈 결과를 '부착 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 미머지 게이트 부착 탐지 불가({gate_status}) — 타 세션이 이 태스크에 "
+                    f"게이트를 붙여 뒀는지 못 봤을 수 있음",
                     file=sys.stderr,
                 )
 
@@ -4316,6 +4409,31 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
+    # 미머지 게이트 부착 제외 (HARN-193) — 게이트를 붙이고 claim을 푼 태스크가 브리핑의 "다음
+    # 착수 후보"로 노출되는 것이 이 결함이 실제로 연쇄 착수를 낳은 경로다(EOS-137·EOS-146 실측).
+    # 같은 이유로 next의 필터를 브리핑에도 배선한다. **실패는 stdout에 싣는다** — 훅이 stderr를
+    # 버리므로(`2>/dev/null`) render_brief가 반환하는 문자열 안에 있어야 세션이 실제로 본다.
+    gate_attach_excluded: dict[str, list[str]] = {}
+    gate_attach_status = "disabled"
+    try:
+        if policy.remote_claims:
+            ready, _ = selector.candidates(backlog, remote_claimed=remote_claimed)
+            ready = [t for t in ready if t.id not in done_excluded]
+            gate_attach_status = "ok"
+            if ready:
+                gate_map, gate_attach_status = remote_claims.scan_remote_gate_attachments(
+                    root,
+                    {t.id: t.requires_gates for t in ready},
+                    exclude_branches=[store.current_branch(root)],
+                )
+                gate_attach_excluded = {
+                    tid: [f"{a.branch}:{a.gate_id}" for a in attached]
+                    for tid, attached in gate_map.items()
+                }
+    except Exception as exc:  # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지)
+        gate_attach_excluded = {}
+        gate_attach_status = f"error:{type(exc).__name__}"
+
     # 브랜치 보호 라이브 확인 리마인드 (HARN-63 ④ 집행 지점) — 문서·ci.yml 대조는 둘 다
     # 저장소 *안*이라 라이브 설정이 비어도 전부 초록으로 통과한다(3회차 사고의 구조적 원인).
     # 조회는 사람만 할 수 있으므로(관리자 토큰), 기계는 "얼마나 오래 확인하지 않았는가"를 센다.
@@ -4338,6 +4456,8 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             pr_state_lookup_ok=pr_state_lookup_ok,
             pr_state_lookup_error=pr_state_lookup_error,
             done_excluded=done_excluded,
+            gate_attach_excluded=gate_attach_excluded,
+            gate_attach_status=gate_attach_status,
             doc_series_candidates=doc_series_candidates,
             doc_series_status=doc_series_status,
             ruleset_reminder=ruleset_reminder,

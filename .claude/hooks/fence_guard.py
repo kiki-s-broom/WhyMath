@@ -131,8 +131,11 @@ def _log(payload: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    # 훅 입력은 UTF-8 JSON 이다 — sys.stdin(로캘 인코딩 · 한국어 Windows = cp949)으로 읽으면
+    # '—' 등에서 UnicodeDecodeError → 아래 except → 통과(fail-open)로 이 훅이 조용히 꺼진다
+    # (CONST-10). 바이트로 읽어 UTF-8 로 직접 해독한다.
     try:
-        data = json.load(sys.stdin)
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
     except (json.JSONDecodeError, ValueError) as exc:
         print(f"[fence_guard] 입력 파싱 실패({type(exc).__name__}) — 통과", file=sys.stderr)
         return 0
