@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,10 +15,17 @@ acceptance:
   - "① .claude/hooks/git_revert_guard.py 의 입력 해독을 sys.stdin(로캘 인코딩) 대신 sys.stdin.buffer 바이트 + UTF-8 명시 해독으로 바꾼다 — guard_constitution.py(CONST-02)와 같은 방식."
   - "② 회귀 테스트 — PYTHONIOENCODING=cp949 환경에서 한글과 '—'(UTF-8 E2 80 94)가 섞인 파괴적 git 원복 명령(이 가드가 막는 형태)이 차단(exit 2)되고, 같은 문자를 담은 읽기 전용 명령은 통과(exit 0)하는 양방향 픽스처. 수정 전 코드로 되돌리면 RED가 나는지 뮤테이션으로 확인한다(원복은 cp 백업)."
   - "③ 저장소의 다른 훅 입력 경로(.claude/hooks/*.py 와 scripts/harness/backlog.py 의 check-edit·check-stop)에 같은 형태(json.load(sys.stdin))가 남아 있는지 전수 스캔하고, 남아 있으면 같은 PR에서 고치거나 승계 태스크로 분리한다."
-artifacts: []
+  - "[이행 기록 2026-09-29] ① `.claude/hooks/git_revert_guard.py`가 훅 입력을 `json.loads(sys.stdin.buffer.read().decode(\"utf-8\", errors=\"replace\"))`로 읽는다(`guard_constitution.py`와 같은 방식). 재현: `PYTHONIOENCODING=cp949`에 UTF-8 원문 페이로드를 넣으면 수정 전 exit 0(한글·'—'가 든 `git checkout -- <더러운 경로>` 통과), 수정 후 exit 2. ② `tests/infra/test_git_revert_guard.py`의 `TestHookInputIsDecodedAsUtf8` — utf-8·cp949 두 로캘 × (한글·'—'가 든 파괴적 원복 차단 · 읽기 전용 명령의 침묵(통과 사유에 \"입력 파싱 실패\"가 없음을 단언) · 깨끗한 트리 대조군) + 깨진 UTF-8 바이트가 섞여도 가드가 꺼지지 않는 1건. 기존 테스트가 이 결함을 못 본 이유는 `json.dumps` 기본값(`ensure_ascii=True`)이 한글·'—'를 `\\uXXXX`로 바꿔 순수 ASCII를 넣었기 때문이다 — 새 테스트는 UTF-8 원문 바이트를 넣는다. ③ 전수 스캔(AST · `sys.stdin`을 `.buffer` 없이 쓰는 곳): 같은 결함이 `.claude/hooks/fence_guard.py`·`chat_block_guard.py`에도 있어 같은 PR에서 고쳤고(각 cp949 회귀 테스트), `scripts/harness/backlog.py`의 check-edit·check-stop과 `scripts/constitution/audit.py --hook`은 승계 태스크 `HARN-196-hook-stdin-utf8-backlog-cli-audit`으로 분리했다. 가드: `tests/infra/test_hook_stdin_utf8.py` — 등록된 훅 ∪ `.claude/hooks/*.py` 전수 AST 스캔, 열외(`backlog.py` → HARN-196)는 고쳐지면 테스트가 실패해 스스로 만료된다. 뮤테이션 13종(훅 3종 되돌림 · `errors` 엄격화 · 검사기 절 제거 8종 · 열외 자기 만료 1종) 전건 RED · 생존 0 · 원복은 백업 복사 + sha256 동일."
+artifacts:
+  - "PR #1374 https://github.com/kiki-s-broom/WhyMath/pull/1374 — 훅 3종 stdin UTF-8 해독 정정 + 회귀 테스트 36건 + 전수 AST 가드, 뮤테이션 13종 전건 RED, ci_mirror 5잡 exit 0(Python 3.12)"
 paths:
   - ".claude/hooks/git_revert_guard.py"
   - tests/infra/test_git_revert_guard.py
+  - ".claude/hooks/fence_guard.py"
+  - ".claude/hooks/chat_block_guard.py"
+  - tests/infra/test_fence_guard.py
+  - tests/infra/test_chat_block_guard.py
+  - tests/infra/test_hook_stdin_utf8.py
 session: null
-notes: "CONST-02 이식 중 발견(2026-09-28). guard_constitution.py 가 json.load(sys.stdin) 으로 훅 입력을 읽어, 한국어 Windows(cp949) 콘솔에서 한글과 '—'가 섞인 명령이 UnicodeDecodeError → except ValueError → '입력 파싱 실패 — 통과'(fail-open)로 샜다(PYTHONIOENCODING=cp949 재현). 같은 형태가 git_revert_guard.py 의 main 입력 해독에 있다 — 이 가드가 막는 것은 미커밋 작업분을 지우는 git 원복(CLAUDE.md 뮤테이션 원복 금지 규칙의 집행 장치)이라, Windows 세션에서 그 보호가 조용히 꺼질 수 있다. 참고: 같은 세션에서 이 가드가 태스크 등재 heredoc 본문의 설명 문구를 명령으로 오판해 막은 일도 있었다(heredoc 본문을 데이터로 분리하지 않음) — 판정 범위 개선 여부는 이 태스크에서 함께 검토한다."
-updated: 2026-09-28
+notes: "CONST-02 이식 중 발견(2026-09-28). guard_constitution.py 가 json.load(sys.stdin) 으로 훅 입력을 읽어, 한국어 Windows(cp949) 콘솔에서 한글과 '—'가 섞인 명령이 UnicodeDecodeError → except ValueError → '입력 파싱 실패 — 통과'(fail-open)로 샜다(PYTHONIOENCODING=cp949 재현). 같은 형태가 git_revert_guard.py 의 main 입력 해독에 있다 — 이 가드가 막는 것은 미커밋 작업분을 지우는 git 원복(CLAUDE.md 뮤테이션 원복 금지 규칙의 집행 장치)이라, Windows 세션에서 그 보호가 조용히 꺼질 수 있다. 참고: 같은 세션에서 이 가드가 태스크 등재 heredoc 본문의 설명 문구를 명령으로 오판해 막은 일도 있었다(heredoc 본문을 데이터로 분리하지 않음) — 판정 범위 개선 여부는 이 태스크에서 함께 검토한다.\n\n[정정 2026-09-29] paths ['.claude/hooks/git_revert_guard.py', 'tests/infra/test_git_revert_guard.py'] → ['.claude/hooks/git_revert_guard.py', 'tests/infra/test_git_revert_guard.py', '.claude/hooks/fence_guard.py', '.claude/hooks/chat_block_guard.py', 'tests/infra/test_fence_guard.py', 'tests/infra/test_chat_block_guard.py', 'tests/infra/test_hook_stdin_utf8.py']: 이행 기록 + 실제로 건드린 파일 범위 정정(훅 3종 · 회귀 테스트 · 전수 가드)"
+updated: 2026-09-29

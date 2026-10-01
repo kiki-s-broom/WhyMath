@@ -261,7 +261,7 @@ class AttemptedEventData(_EventPayload):
     12월 데이터의 소급 불가 축이 자유형에 섞인다. 이 페이로드는 그 컬럼을 *읽을 때 필요한
     맥락*(어느 채점 경로에서·어떤 판정으로 나온 기록인가)만 계약한다.
 
-    `source`는 두 채점 경로를 가르는 폐쇄 라벨(`AttemptSource`)이다 — 한쪽 경로에만 writer가
+    `source`는 채점 경로를 가르는 폐쇄 라벨(`AttemptSource` 3종)이다 — 한쪽 경로에만 writer가
     배선되면 기록률 리포트가 경로별 분모로 그것을 즉시 드러낸다(한 경로 누락이 전체 평균에
     희석돼 보이지 않는 것을 막는다). `is_correct`는 채점 결과 불리언(비식별 — 학생 답안 원문은
     싣지 않는다·S4-19 관측 레코드 규약 동형).
@@ -273,7 +273,8 @@ class AttemptedEventData(_EventPayload):
     source: str = Field(
         ...,
         description="채점 경로 라벨(AttemptSource 값: attempt_submit=자가보고 v1 · "
-        "coach_completion=코치 서버검증). 경로별 기록률 분모.",
+        "coach_completion=코치 서버검증 완료 · coach_wrong_submission=코치 서버 판정 오답 "
+        "최초 제출). 경로별 기록률 분모.",
     )
 
 

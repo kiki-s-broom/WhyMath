@@ -193,8 +193,12 @@ _ADVICE = (
 
 
 def main() -> int:
+    # 훅 입력은 UTF-8 JSON 이다. sys.stdin 은 로캘 인코딩(한국어 Windows = cp949)으로 해독하므로
+    # 한글·'—' 가 섞인 명령에서 UnicodeDecodeError → 아래 except → **통과(fail-open)** 가 됐다:
+    # 이 가드는 한글 설명이 든 파괴적 원복 명령을 막지 못했다(CONST-10 · 2026-09-28 cp949 재현).
+    # 바이트로 읽어 UTF-8 로 직접 해독한다(guard_constitution.py 와 같은 방식).
     try:
-        data = json.load(sys.stdin)
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
     except (json.JSONDecodeError, ValueError) as exc:
         print(f"[git_revert_guard] 입력 파싱 실패({type(exc).__name__}) — 통과", file=sys.stderr)
         return 0

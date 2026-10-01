@@ -15,6 +15,7 @@ acceptance:
   - "답입력·시각화조작 2종 EventType은 S3-16/슬96-J에서 build_event_data 생산자가 배선됐으나(attempt_event에 실제로 적재됨), 그 값을 읽는 소비자가 0건이다. 각 신호를 실제로 소비하는 지표/리포트/API 좌석을 최소 1곳 배선한다 — 예: 답입력(server_latency_ms 분포 리포트), 시각화조작(visualization_reach_report 소비 축 추가). ※막힘은 범위 제외(2026-08-10 R3 실측 정정 — COLLAB-03의 l2/learning_metrics_rollup._SOCRATIC_EVENT_TYPES가 이미 .in_()으로 소비 중, visualization_module_gap_review.md §8.2. 중복 배선 금지)"
   - "새 EventType enum 신설 0(기존 2종의 소비자만 배선) — 학생 대면 응답 페이로드 무변경 회귀"
   - "완료 후 OPS-22 declared_unwired_audit 재실행 시 이 2종이 reached로 전환됨을 확인하고 대장의 답입력·시각화조작 pending-task 항목 제거(방치 시 expired-waiver가 잡는다). 막힘 항목은 제거가 아니라 pending-task:OPS-25-audit-membership-consumption-detection으로 재지정(OPS-25가 선행 착륙해 이미 처리했다면 불요) — 소비자는 실재하나 탐지기가 멤버십 소비를 못 보는 한 유예 근거가 필요하다"
+  - "[회수 참조 2026-09-30 · MOB-18에서 인계] 고립 브랜치 origin/claude/whymath-issues-review-k20m0w의 커밋 10ef8e7c(S4-22 첫 구현·wh1_evaluation 소비 좌석 ⑰⑱⑲·12파일 +649/-45)가 이 태스크의 선행 구현이다. MOB-18은 이것을 이식하지 않았다 — 그 커밋은 막힘을 포함한 3종을 소비하는데 이 태스크는 2026-08-10 R3로 막힘을 범위에서 뺐고, 대상 파일(wh1_evaluation.py·me.py·growth_evidence_exposure.py)이 분기 이후 main에서 40커밋 바뀌었다. 착수 세션은 git show 10ef8e7c를 설계 참고로 읽고 현 main 위에 답입력·시각화조작 2종만 재구현한다. k20m0w는 이 태스크 완료 전 삭제 금지"
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/wh1_evaluation.py
@@ -22,5 +23,5 @@ paths:
   - src/backend/whymath_backend/api/me.py
   - src/backend/whymath_backend/api/coach.py
 session: null
-notes: "OPS-22(선언≠배선 일반 탐지기) 구현 중 실측 발견 — S3-16이 3종의 생산자만 소생시키고(관측 신호로 적재) 소비자는 범위 밖으로 남겼다(S3-16 acceptance ②는 힌트요청/힌트제공만 지표 ⑫로 소비). 반복 실수(생산 좌석 완비 + 소비 미배선) 패턴의 축소판 인스턴스 — 즉시 해소보다 추적이 우선이라 유예(pending-task) 대상으로 등재. [2026-08-10 R3 범위 정정] 막힘은 이 태스크 등재(08-07)와 같은 시기 착륙한 COLLAB-03(#752)이 l2/learning_metrics_rollup.py:124-126,563에서 frozenset+.in_() 멤버십 필터로 이미 소비(소크라테스 상호작용 집계) — OPS-22 탐지기가 ast.Compare만 봐서(declared_unwired_audit.py:358-376) 대장에 producer-only로 남아 있었을 뿐이다. 본 태스크는 답입력·시각화조작 2종만 배선한다(중복 배선 방지·S3-25 범위 축소 선례). 탐지기 보강·막힘 유예 정리는 OPS-25 소관. 근거: visualization_module_gap_review.md §8.2.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "OPS-22(선언≠배선 일반 탐지기) 구현 중 실측 발견 — S3-16이 3종의 생산자만 소생시키고(관측 신호로 적재) 소비자는 범위 밖으로 남겼다(S3-16 acceptance ②는 힌트요청/힌트제공만 지표 ⑫로 소비). 반복 실수(생산 좌석 완비 + 소비 미배선) 패턴의 축소판 인스턴스 — 즉시 해소보다 추적이 우선이라 유예(pending-task) 대상으로 등재. [2026-08-10 R3 범위 정정] 막힘은 이 태스크 등재(08-07)와 같은 시기 착륙한 COLLAB-03(#752)이 l2/learning_metrics_rollup.py:124-126,563에서 frozenset+.in_() 멤버십 필터로 이미 소비(소크라테스 상호작용 집계) — OPS-22 탐지기가 ast.Compare만 봐서(declared_unwired_audit.py:358-376) 대장에 producer-only로 남아 있었을 뿐이다. 본 태스크는 답입력·시각화조작 2종만 배선한다(중복 배선 방지·S3-25 범위 축소 선례). 탐지기 보강·막힘 유예 정리는 OPS-25 소관. 근거: visualization_module_gap_review.md §8.2.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-30] MOB-18 회수 범위에서 S4-22 구현 커밋 인계(범위 재정의·main 드리프트로 이식 부적합)"
+updated: 2026-09-30

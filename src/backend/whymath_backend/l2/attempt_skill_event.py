@@ -44,7 +44,7 @@ _logger = logging.getLogger("whymath.l2.attempt_skill_event")
 
 
 class AttemptSource(str, Enum):
-    """채점 경로 라벨(폐쇄 2종) — `문제시도` 이벤트 `event_data.source`.
+    """채점 경로 라벨(폐쇄 3종) — `문제시도` 이벤트 `event_data.source`.
 
     한 경로에만 writer가 배선되는 회귀를 기록률 리포트가 *경로별 분모*로 잡아내기 위한 축이다
     (전체 평균 하나면 한쪽 경로 전멸이 절반의 감소로 희석돼 보인다).
@@ -55,6 +55,13 @@ class AttemptSource(str, Enum):
 
     coach_completion = "coach_completion"
     """코치 대화 완료 확정 — 서버가 `verify_final_answer`로 판정한 경로(api/coach.py)."""
+
+    coach_wrong_submission = "coach_wrong_submission"
+    """코치 대화의 서버 판정 오답 최초 제출(EOS-146) — 완료가 아니다(api/coach.py).
+
+    `coach_completion`과 갈라 둔 이유: 그 라벨은 "완료 확정 경로"의 분모라 오답 제출이 섞이면
+    경로별 기록률이 의미를 잃는다. 이 라벨의 `is_correct`는 항상 False다.
+    """
 
 
 async def record_attempt_skill_event(

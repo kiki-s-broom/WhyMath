@@ -9,8 +9,9 @@
 //
 // 정직(범위): 세션 복원(OAuth-c2b)으로 *복원된 인증* 세션은 가드가 채팅으로 보낸다. 단 실 로그인은
 // code 획득 webview(c3) 전엔 작동하지 않으므로 가드는 미인증을 강제하지 않는다 — 미인증은 여전히
-// 온보딩→채팅 흐름을 그대로 탄다(앱 유지). 미인증→로그인 강제·로그아웃 반영·세션 만료·온보딩 1회-
-// 노출 영속(shared_preferences)·딥링크는 *후속 슬라이스*다.
+// 온보딩→채팅 흐름을 그대로 탄다(앱 유지). 온보딩을 이미 마친 기기는 같은 가드가 채팅으로 보낸다
+// (`onboardingSeenControllerProvider`·복귀 지원 최소 착지 MOB-11). 미인증→로그인 강제·로그아웃
+// 반영·딥링크는 *후속 슬라이스*다.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,6 +23,7 @@ import '../features/chat/presentation/mathlive_input_screen.dart';
 import '../features/explore/presentation/explore_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/ocr/presentation/ocr_capture_screen.dart';
+import '../features/onboarding/application/onboarding_seen_controller.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/problems/presentation/problem_screen.dart';
 import '../features/profile/presentation/me_screen.dart';
@@ -94,23 +96,30 @@ abstract final class AppRoutes {
 
 /// 앱 전역 [GoRouter] provider.
 ///
-/// `initialLocation`은 온보딩 — 첫 진입에서 메타인지 접근을 먼저 안내한다. 라우터 인스턴스는
-/// 앱 수명 동안 1개만 유지되도록 plain [Provider]로 둔다(코드 생성 의존 없이 기존 provider
-/// 패턴과 일치). `redirect`는 *복원된 인증* 세션만 채팅으로 보내는 비파괴 가드(c2b)다 —
-/// 미인증 강제 redirect·온보딩 영속 redirect는 후속 슬라이스다(기본 흐름은 온보딩→채팅 유지).
+/// `initialLocation`은 항상 온보딩 경로 상수다 — 실제 첫 화면(온보딩을 볼지·바로 채팅으로
+/// 갈지)은 `redirect`가 결정한다(아래). 라우터 인스턴스는 앱 수명 동안 1개만 유지되도록 plain
+/// [Provider]로 둔다(코드 생성 의존 없이 기존 provider 패턴과 일치). `redirect`는 *복원된 인증*
+/// 세션과 *온보딩을 이미 마친* 기기를 채팅으로 보내는 비파괴 가드다(c2b + MOB-11) — 미인증 강제
+/// redirect는 후속 슬라이스다(기본 흐름은 온보딩→채팅 유지).
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.onboardingPath,
-    // 비파괴 가드(OAuth-c2b): *복원된 인증* 세션이 온보딩/로그인에 있으면 채팅으로 보낸다.
+    // 비파괴 가드: ① OAuth-c2b — *복원된 인증* 세션이 온보딩/로그인에 있으면 채팅으로 보낸다.
+    // ② MOB-11 — 온보딩을 이미 마친 기기(`onboardingSeenControllerProvider`)가 온보딩에 있으면
+    // 채팅으로 보낸다(복귀 학생이 매번 온보딩부터 다시 보지 않게 — "돌아오기 쉽다"). 로그인 경로는
+    // ②의 대상이 아니다(온보딩만 봤다고 로그인 화면을 막지 않는다).
     // 미인증은 강제 redirect하지 않는다 — 로그인은 실 webview(c3) 전엔 작동하지 않으므로
     // 미인증→로그인 강제는 앱을 막는다(미인증은 현 온보딩→채팅 흐름 유지). redirect는 완전
-    // 동기라 context를 쓰지 않는다. refreshListenable 생략(c2b): 복원은 runApp 전 완료되고
+    // 동기라 context를 쓰지 않는다. refreshListenable 생략(c2b): 두 상태 모두 복원은 runApp 전 완료되고
     // 로그인은 명시적 네비게이션이라 런타임 재평가가 불필요하다 — 로그아웃·강제 가드는 c3.
     redirect: (context, state) {
       final authenticated = ref.read(authControllerProvider).isAuthenticated;
+      final onboardingSeen = ref.read(onboardingSeenControllerProvider);
       final location = state.matchedLocation;
-      if (authenticated &&
-          (location == AppRoutes.onboardingPath || location == AppRoutes.loginPath)) {
+      if (location == AppRoutes.onboardingPath && (authenticated || onboardingSeen)) {
+        return AppRoutes.chatPath;
+      }
+      if (authenticated && location == AppRoutes.loginPath) {
         return AppRoutes.chatPath;
       }
       return null;
