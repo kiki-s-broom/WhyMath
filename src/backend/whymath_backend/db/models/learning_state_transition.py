@@ -95,7 +95,8 @@ class LearningStateTransition(Base):
         nullable=True,
         doc=(
             "이 전이를 유발한 `problem_attempt` 행. FK를 걸지 않는 이유는 concept_id와 같다 "
-            "— 보존기한 파기로 attempt가 지워져도 전이 이력은 남는다."
+            "— 보존기한 파기로 attempt가 지워져도 전이 이력은 남는다(전이 행 자신도 `occurred_at` "
+            "기준 같은 창이 지나면 `privacy/retention.py`가 파기한다 · SEC-41)."
         ),
     )
     occurred_at: Mapped[datetime] = mapped_column(
