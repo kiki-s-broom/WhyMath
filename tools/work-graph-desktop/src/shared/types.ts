@@ -233,7 +233,13 @@ export interface AddWorkspaceInput {
   path?: string;
   name?: string;
   options?: Partial<WorkspaceOptions>;
+  /** true면 WhyMath 저장소(scripts/harness/work_graph.py 있음)만 받는다 — 첫 실행 안내 화면용 (HARN-208) */
+  requireHarness?: boolean;
 }
+
+/** 첫 실행 저장소 자동 찾기 결과 (HARN-208) — 찾은 곳, 또는 찾아본 자리와 각각의 사유 */
+export interface DiscoveryAttempt { path: string; reason: string }
+export interface DiscoveryReport { found: string | null; tried: DiscoveryAttempt[] }
 
 export interface WorkGraphApi {
   listWorkspaces(): Promise<Workspace[]>;
@@ -249,6 +255,8 @@ export interface WorkGraphApi {
   resetLayout(id: string): Promise<void>;
   openExternal(url: string): Promise<boolean>;
   openTaskFile(id: string, nodeKey: string): Promise<{ ok: boolean; reason?: string; path?: string }>;
+  /** 첫 실행 자동 찾기 결과 — 찾기를 하지 않았으면(이미 작업공간이 있었음) null (HARN-208) */
+  discovery(): Promise<DiscoveryReport | null>;
   /** 실행 환경 — 픽스처 모드인지(Electron 없이 브라우저에서 열렸는지) */
   mode(): "electron" | "fixture";
 }

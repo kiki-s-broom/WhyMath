@@ -189,6 +189,15 @@ svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .zoomrd{position:absolute;right:12px;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:11.5px;color:var(--muted);z-index:2;font-variant-numeric:tabular-nums}
 .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:40px;text-align:center;font-size:14px;color:var(--muted);z-index:3;white-space:pre-wrap;line-height:1.7}
 .empty b{color:var(--ink)}
+/* 첫 실행 화면 (HARN-208) — .empty 위에 올라가는 안내 카드 */
+.welcome{max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px 28px;text-align:left;white-space:normal;color:var(--ink)}
+.welcome b{font-size:17px;display:block;margin-bottom:8px}
+.welcome p{margin:0 0 14px;color:var(--muted)}
+.welcome .btn{font-size:14px;padding:8px 16px}
+.welcome .err{margin-top:10px;color:var(--block);font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.welcome details{margin-top:14px;font-size:12.5px;color:var(--muted)}
+.welcome ul{margin:8px 0 0;padding-left:18px}
+.welcome li{margin:3px 0;overflow-wrap:anywhere}
 
 /* ── 목록 보기(표) ── */
 .table{flex:1;min-width:0;overflow:auto;background:var(--panel)}

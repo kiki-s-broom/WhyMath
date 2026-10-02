@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-02 (착지 · DP-03): **분석 envelope의 재전송 멱등키 `event_uuid`를 `attempt_event`에 영속화했다 — 시각 컬럼은 새로 만들지 않고 기존 `event_at`(수신)·`event_time`(발생)을 쓴다. hypertable에서는 이 멱등 계약이 성립하지 않으므로 마이그레이션이 fail-closed로 중단한다** (claude 판정·구현)
+
+- **무엇**: 리비전 `a3f7c9d1e5b2`(down `9d3e7b1c5a20`). `event_uuid UUID NULL`(server_default 없음·백필 금지 — 기존 행에 uuid를 채우면 producer가 만든 적 없는 키를 날조한다) + 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`). 복합 PK `(event_id, event_at)`·BIGSERIAL 내부 키 불변. writer 좌석 = `l2.attempt_skill_event.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`·키 없으면 ValueError).
+- **시각 컬럼 비신설(실측 근거)**: envelope `received_at` = `attempt_event.event_at`(전 writer가 서버 now·파티션 키), `occurred_at` = `event_time`(EOS-48). 새 컬럼은 같은 사실의 중복 좌석이라 정본이 갈린다.
+- **hypertable 비호환(ADR-001 추기)**: hypertable UNIQUE는 파티션 키 `event_at`을 포함해야 하는데 재전송은 `event_at`이 매번 달라 `(event_uuid, event_at)`로는 못 막는다. 운영 DB는 일반 PG16이라 지금은 무충돌이고, hypertable이면 마이그레이션이 예외로 중단한다 — 조용히 약화하면 '멱등 보호 있음'으로 위장된다.
+- **미결(의도적)**: 기존 writer(`api/interactions.py`·`l2/attempt_skill_event.py`·`api/coach.py`)는 아직 `event_uuid`를 넘기지 않는다 — 모바일 producer·envelope→ORM 결선은 후속(S3-16 writer 확장과 같은 좌석을 건드리므로 이 태스크는 공통 영속 계약만 확정). 따라서 현재 운영 경로에서 재전송 방어가 *작동한 비율*은 0이다.
+
 ### 2026-09-29 (판정 · EOS-141): **Phase 2 Gate 2 3차 재판정 = PASS — 단 판정 수준은 API 계약(앱 도달 0)이다. 앱 도달을 자로 삼으면 FAIL(소유 `EOS-146`). 어느 자로 볼지와 게이트 `G-p3-entry-gate2-pass` clear는 Kiki 몫** (claude 판정 · 구현 세션과 분리 · production code 무변경) — 판정 기준 main `a82f9449`
 
 - **근거**: 10조건 전건 충족 · 상시 3루프 하네스 general·misconception 모두 LOOP1~3 PASS(9/25의 유일한 미충족이던 원인 미상 오답 Loop 1 보정이 `EOS-26`으로 섬) · 일회성 프로브 7변이 전건 PASS · SCENARIO-001~010 로컬 10/10 + 판정 기준 커밋의 CI 실행 2회(merge_group·push)에서 실제 실행 10 passed. 판정문 `docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md`(P3-00b 인수 점검 겸).
@@ -11705,6 +11712,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: vitest 51 · 렌더러 Playwright 10 · Electron 스모크 1(xvfb · 실제 저장소 수집 · webPreferences contextIsolation/sandbox on) · 뮤테이션 3종(판정 덮어쓰기·불가 은폐·직접 쓰기) 전건 RED · 런북 가드 3종(check_runbook_blocks·check_ps_scripts·cp949_guard) exit 0.
 - **미검증(명시)**: Windows 실 설치·실행·제거·바로가기 — 런북 [1]~[7]로 Kiki에게 위임. gh 어댑터 라이브 경로(컨테이너에 gh 없음). 아이콘은 Electron 기본(Windows에서 `win.icon`으로 교체 가능).
 
+
+### 2026-09-30 — HARN-208 작업 그래프 데스크톱 앱을 Windows 프로그램 실행 형식으로 — 두 번 클릭·저장소 자동 연결·실물 Windows CI — 판정 기준 main `270968a2`
+
+- **요청**: Kiki "앱의 실행을 윈도우 프로그램 실행 형식으로 다시 만들어줘". HARN-206 앱은 `npm start`(개발 모드)나 로컬 `npm run dist:win`으로만 켤 수 있어 Node·PowerShell이 필요했고, 설치본을 바로가기로 켜면 작업 폴더가 저장소가 아니어서 작업공간을 손으로 등록해야 했다.
+- **결정 5건**: ① 산출 3종 — NSIS 설치 EXE(바탕화면·시작 메뉴 바로가기 · 설치 끝에 실행) + 무설치 단일 EXE(portable) + zip, 아이콘은 표준 라이브러리 생성기(`scripts/make_icon.py`)가 만든 다중 해상도 .ico를 rcedit로 EXE에 심는다. ② 첫 실행 저장소 자동 찾기 — 무설치 EXE 위치 → 앱 위치의 조상 4단계 → 실제 바탕화면\__AI\WhyMath → 홈 순. 못 찾으면 대화상자를 자동으로 띄우지 않고 찾아본 자리·사유를 보이는 첫 화면 + 버튼 한 번(저장소가 아니면 거부·저장 0). ③ 파이썬은 `--version`이 아니라 `import yaml`로 찔러 **하네스를 돌릴 수 있는** 첫 인터프리터를 고른다(저장소 `.venv` → `src\backend\.venv` → PATH 순 — Kiki 머신의 conda base + .venv 공존 대응). ④ 단일 인스턴스 · 창 자리 기억(화면 밖이면 버림). ⑤ 데이터 폴더를 `%APPDATA%\whymath-work-graph-desktop`으로 고정.
+- **발견(사고 1회차 `runbook-path-unverified-against-code`)**: 제품명이 한글이라 Electron 기본 userData가 로캘에 따라 갈렸다(실측 · 리눅스 C.UTF-8 → `.config/WhyMath 작업 지도` · 로캘 없음·미설치 → appData 루트 그대로). HARN-206 런북의 스냅샷 검사 블록이 가리킨 `%APPDATA%\whymath-work-graph-desktop`은 어느 쪽과도 맞지 않아, 수집이 성공해도 「스냅샷 없음」으로 판정했을 것이다. 런북 실행 전에 발견해 피해 0. 대책 = ⑤ + 회귀 e2e.
+- **실물 Windows 판정 좌석**: `.github/workflows/work-graph-desktop.yml` — linux 잡(vitest·렌더러·Electron xvfb)과 windows 잡(같은 테스트 → 패키징 → **패키징된 EXE를 Playwright로 띄워** 저장소 수집 → 아티팩트 업로드). 컨테이너는 Windows EXE를 실행할 수 없으므로 실행 판정은 이 잡과 Kiki 런북이 한다. 필수 체크 아님(앱 경로 변경 시에만).
+- **검증(컨테이너)**: vitest 70 · 렌더러 Playwright 11 · Electron 6 passed + 1 skipped(패키징 EXE — 리눅스 패키징본으로 따로 돌려 1 passed) · 뮤테이션 11종 전건 RED · 교차 빌드 산출 3종의 아이콘 7크기·제품명 리소스 바이트 확인 · Authenticode 없음(인증서 미제공) · 런북 가드 3종 exit 0.
+- **미검증(명시)**: 설치 마법사·바로가기·SmartScreen·실제 바탕화면 자동 찾기는 Kiki 런북 [A]~[D]. 코드서명 인증서 없음.
 ### 2026-09-30 (결정 · 게이트 `G-eos146-disposition` / EOS-146): **앱 오답은 코치가 서버에서 판정한 명확한 오답의 '문제당 최초 1건'만 원장에 적재해 상태 머신에 태운다 — (가) 채택, (나)·(다) 기각, '포기'는 분리** (세션 사용자 결정 · claude 기록·집행) — 판정 기준 main `270968a2`
 
 - **문제**: 앱 학생의 오답·포기가 서버 어디에도 적재되지 않아 R3(오개념 교정 · `EOS-24`)·R5·R6(원인 미상 오답 · `EOS-26`)이 앱 학생에게 0회 돈다(코치 경로 `is_correct=False` 적재 0건 · 모바일 `POST /v1/me/attempts` 호출 0건 — 이 검색 방법 기준). 정답 완료만 `EOS-134` 이후 `advance_on_graded_attempt`를 돈다.
@@ -11734,3 +11750,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **추적 15건 승계**: head 불변 15/15 · 좌석 상실 0(k20m0w의 MOB-18·MOB-11·MOB-23은 done, 나머지 좌석 유지).
 - **세션 실수 1건**: 번호 탐색용으로 돌린 `backlog.py add --id SEC-99`가 실제 등재라 원격 번호 예약 `SEC-99`가 남았다(로컬 파일은 제거). 해제 하위 명령이 보이지 않아 미해제 — 번호 후보 확인은 `git ls-tree` 읽기 전용으로 한다.
 - **한계**: 삭제 대상 이벤트 샤드 원문을 판정 문서에 보존하지 못했다(읽기 명령이 권한 거부됨 — head SHA로만 복구).
+### 2026-10-01 — EOS-31 착지: 수능 적격 게이트가 출제 범위(2028학년도 = 2022 개정 대수·미적분Ⅰ·확률과 통계)를 선결 조건으로 본다 — 승인 2,480 → 1,046건 · 정책 `suneung_v2` (claude 구현) — 판정 기준: 브랜치 `claude/brave-turing-bpytzd`(분기 main `0f74a7bc` · 미머지)
+- **결함**: `persona_fit`이 난이도 구간 하나만의 함수라 라벨 있는 승인 문항 **2,480건 전부**가 페르소나 A 수능 적격이었다(초·중 전용 888건 포함 — 실 PG에 저장소 코퍼스를 적재해 실측. 독립 비판의 1,122건은 코퍼스 파일 기준이고 서빙은 `atom_node.standard_codes` 조인을 읽어 888건이다). 집계 명령 = `scripts/analysis/suneung_scope_census.py`.
+- **결정**: 범위를 신호(OR)가 아니라 **선결 조건(AND)**으로 게이트 ②-c에 둔다. 성취기준 접두어(`[12대수…]`·`[12미적…]`·`[12확통…]`) + 교육과정 개정 일치로 판정(같은 접두어가 2015·2022 개정에 모두 있다). 세 값(`in_scope`·`out_of_scope`·`unknown`) — 코드를 모르면 통과시키지 않는다. `persona_fit` 규칙은 **바꾸지 않았다**(6개 모드가 공유하는 신호). 정의 정본 = `l6/suneung/scope.py`, SQL 사전필터(`suneung_scope_clause`)가 같은 접두어 상수를 읽는다 — 실 코퍼스 14,034건에서 SQL=파이썬=3,781건 일치.
+- **같은 변경으로 막은 조용한 회귀**: `GET /v1/gating/suneung`는 성취기준 코드 주입이 없는 의존성을 써서 이 게이트가 들어오면 운영에서 항상 빈 결과가 된다 — 수능 전용 의존성(`SuneungCandidatesDep`)으로 바꿨다.
+- **정책 버전 `suneung_v1` → `suneung_v2`**: 같은 입력에서 다른 문항이 나갈 수 있다(EOS-25는 설명만 바꿔 올리지 않았다). 재선택 보류(`mode_withheld`)의 근거 ①이 바뀐 사실은 `EOS-35`의 입력이다 — 선수 개념 문항이 범위 밖이면 `target_unavailable` 강등이 잦아질 것(EOS-25 초안의 예측이 이제 사실).
+- **검증**: 결함 주입 16종 전건 RED(`scripts/analysis/mutate_eos31_suneung_scope_guards.py` · 단위 12 + 실 PG 4) · 실 PG 통합 신규 2건(조합 매트릭스 3자 일치 · 후보 풀 소멸 방지와 사전필터를 끈 대조군) · 기존 수능 통합 6건 수정 전/후 동일 6 통과. 기존 통합 3개 파일은 문항이 개념 연결 없이 심겨 범위를 알 수 없었다 — 범위 안 연결을 추가했고, "임계 미달 제외" 대조 테스트는 범위 밖이어도 통과해 변별력을 잃으므로 범위 안으로 고쳐야만 의미가 선다.
+- **사고(대장 등재)**: ① 뮤테이션 하네스가 백업 파일명을 파일명만으로 만들어 동명 파일(`l6/suneung/gating.py`·`api/gating.py`) 백업이 서로 덮였고 원복 검증도 백업끼리 비교해 통과 — 실제로 `api/gating.py`가 덮였다(실행 전 사본으로 복구). 백업명 유일화 + 시작 시점 메모리 바이트와의 비교로 정정(`nondiscriminating-check` 11회차) ② 자동 줄바꿈 스크립트가 주석 뒤 코드 줄까지 합쳐 구문을 깼다 — ruff가 즉시 검출·수동 복구(`autoedit-adjacent-line-merge` 1회차). `git stash` 시도는 가드 훅이 막았다(미커밋 작업 무증상 소실 방지 — 우회하지 않았다).
+- **한계·판단 대기**: ⓐ **공통수학(`[10공수…]`·`[10기수…]`) 522건 제외는 Kiki 확인 필요** — 태스크 문면대로 선수 영역으로 보았고 외부 1차 자료(교육부 고시)로는 확인하지 못했다. 넣으려면 접두어 한 줄(게이트·SQL이 같은 상수를 따른다) ⓑ **운영 DB 집계 미실시**(일회용 DB의 숫자) ⓒ 코퍼스 파일 코드와 서빙 조인 코드가 달라 어느 쪽이 정본인지 미판정 ⓓ 승인 문항에 기출 `exam_type` 0건·시그니처 30건이라 범위 통과분의 수능 적격은 거의 `persona_fit`(난이도 구간) 의존 — "범위 밖을 거른다"이지 "수능다움을 가린다"가 아니다 ⓔ 2027학년도(2015 개정) 규칙 없음(코드 0건). 학생 앱은 `mode=suneung`을 호출하지 않아 오늘 닿는 학생은 없다. 판정문 = `docs/reviews/eos31_suneung_scope_judgment_2026-10-01.md`.
+
+### 2026-10-02 — EOS-31 정정: 접두어 `12미적`이 진로 선택 미적분Ⅱ까지 통과시키고 있었다 — `12미적Ⅰ`로 좁힘 · 적격 1,046 → 974건 · 공통수학은 평가원 안내상 "간접 포함"으로 판정 재검토 필요 — 판정 기준: 브랜치 `claude/brave-turing-bpytzd`(미머지)
+- **결함(내가 만든 것)**: 2022 개정에서 미적분Ⅱ(`[12미적Ⅱ-…]`)는 진로 선택이라 2028 수능 범위 밖인데, 범위 접두어를 `12미적`으로 둬 승인 **72건이 적격으로 통과**했다. 조합 매트릭스에 미적분Ⅱ·2015식 숫자형(`[12미적01-…]`) 형태가 없어 결함 주입 16종도 못 잡았다. Kiki가 보내준 연구보고서 20~21쪽(표 Ⅱ-1-1·Ⅱ-1-2 과목 구조)을 코퍼스 코드와 대조하다 발견했다.
+- **정정**: 접두어 `12미적Ⅰ`, 매트릭스에 두 형태 추가(15종), 뮤테이션 S06(접두어 확대) 추가(17종). 수치: 승인 적격 974건 · 범위 밖 1,506건(초·중 888 · 공통·기본수학 522 · 진로·융합 선택 96) · SQL=파이썬 3,444건 일치. 앞 로그의 1,046건·3,781건은 이 정정으로 대체된다.
+- **공통수학**: 평가원 안내로 보도된 문구는 "직접 범위 3과목 + 공통수학1·2 간접 포함"(2차 자료 2건 · 원문 미확인). 초판의 "선수 영역이라 제외"는 너무 엄격했을 수 있다. 직접/간접 2단 범위 안을 권고 — 결정은 Kiki.

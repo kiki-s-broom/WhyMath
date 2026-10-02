@@ -195,3 +195,20 @@ test("브랜치 창·게이트 창의 상세와 동작 버튼 — 실행 결과�
   await expect(page.locator("#detail")).toContainText("확인 명령 (읽기 전용)");
   await expect(page.locator("#detail")).toContainText("PR 사실 (gh)");
 });
+
+test("첫 실행 화면(HARN-208) — 작업공간 0개 · 자동 찾기 실패면 찾아본 자리와 사유를 그대로 보인다", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${PAGE}?fixture=sample&first=1`);
+  const welcome = page.getByTestId("welcome");
+  await expect(welcome).toBeVisible();
+  await expect(welcome).toContainText("WhyMath 저장소를 연결하세요");
+  await expect(welcome).toContainText("2곳에서 찾아봤지만");
+  await page.locator("#empty details summary").click();
+  await expect(page.getByTestId("welcome-tried").locator("li")).toHaveCount(2);
+  await expect(page.getByTestId("welcome-tried")).toContainText("폴더가 없다");
+  // 픽스처 모드는 폴더를 연결할 수 없다 — 누를 수 없는 버튼을 보이지 않는다
+  await expect(page.getByTestId("welcome-pick")).toHaveCount(0);
+  await expect(page.locator(".win")).toHaveCount(0);
+  expect(errors, "페이지 오류 0건").toEqual([]);
+});

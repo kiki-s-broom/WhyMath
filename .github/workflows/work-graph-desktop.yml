@@ -1,0 +1,123 @@
+# 작업 그래프 데스크톱 앱 (HARN-206 · HARN-208) — tools/work-graph-desktop.
+#
+# 두 잡:
+#   linux   — 단위 테스트(vitest) · 렌더러 화면 계약(Chromium) · 실제 Electron 앱 흐름(xvfb).
+#   windows — 실물 Windows에서 같은 단위·Electron 테스트 → 설치 EXE·무설치 EXE·zip 패키징 →
+#             **패키징된 EXE 자체를 띄워** 저장소를 수집하는지 확인 → 산출물을 아티팩트로 올린다.
+#             컨테이너의 교차 빌드(wine)는 Windows에서 실행해 볼 수 없으므로, 실행 판정은 이 잡이 한다.
+#
+# 필수 체크가 아니다(앱 경로가 바뀔 때만 돈다) — merge_group 트리거를 두지 않는다.
+# 코드서명 없음(인증서 미제공). 산출물은 저장소 Actions 실행 화면의 Artifacts에서 받는다.
+name: work-graph-desktop
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/work-graph-desktop/**"
+      - ".github/workflows/work-graph-desktop.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/work-graph-desktop/**"
+      - ".github/workflows/work-graph-desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: work-graph-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: tools/work-graph-desktop
+
+jobs:
+  linux:
+    name: work-graph-desktop — linux (vitest·렌더러·Electron)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 하네스 의존성(PyYAML) — work_graph.py 실행용
+        run: python -m pip install pyyaml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/work-graph-desktop/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 단위 테스트 (vitest)
+        run: npm test
+      - name: 번들 빌드
+        run: npm run build
+      - name: Playwright Chromium 설치 (렌더러 화면 계약용)
+        run: npx playwright install --with-deps chromium
+      - name: 렌더러 화면 계약 (Chromium · 픽스처)
+        run: npx playwright test --project renderer
+      - name: 실제 Electron 앱 흐름 (xvfb)
+        run: xvfb-run -a npx playwright test --project electron
+
+  windows:
+    name: work-graph-desktop — windows (테스트·패키징·EXE 기동)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 하네스 의존성(PyYAML) — work_graph.py 실행용
+        run: python -m pip install pyyaml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/work-graph-desktop/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 단위 테스트 (vitest)
+        run: npm test
+      - name: 번들 빌드
+        run: npm run build
+      - name: 실제 Electron 앱 흐름 (개발 모드)
+        run: npx playwright test --project electron
+      - name: 패키징 — 설치 EXE · 무설치 EXE · zip
+        run: npx electron-builder --win --publish never
+      - name: 산출물 확인
+        shell: pwsh
+        run: |
+          $want = @(
+            "release/whymath-work-graph-desktop-0.1.0-setup.exe",
+            "release/whymath-work-graph-desktop-0.1.0-portable.exe",
+            "release/whymath-work-graph-desktop-0.1.0-win-x64.zip",
+            "release/win-unpacked/WhyMathWorkGraph.exe"
+          )
+          $missing = $want | Where-Object { -not (Test-Path $_) }
+          if ($missing) { Write-Error "산출물 없음: $($missing -join ', ')"; exit 1 }
+          Get-Item $want | Format-Table Name, Length
+      - name: 패키징된 EXE 기동 → 저장소 수집
+        shell: pwsh
+        run: |
+          $env:WG_PACKAGED_EXE = (Resolve-Path "release/win-unpacked/WhyMathWorkGraph.exe").Path
+          npx playwright test --project electron -g "패키징된 EXE"
+          exit $LASTEXITCODE
+      - name: 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-graph-desktop-windows
+          path: |
+            tools/work-graph-desktop/release/*.exe
+            tools/work-graph-desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 30
