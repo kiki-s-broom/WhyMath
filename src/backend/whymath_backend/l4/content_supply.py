@@ -44,6 +44,24 @@ REND-01(렌더 어댑터)과 PED-02(교수법 선택·게이트)를 잇는 마�
 판정을 맡기면 강등된 행이 TTL 동안 계속 공급된다. 그래서 캐시 적중도 PK 조회 1회를 치른다 — 학생
 안전(#1)이 비용(#6)보다 위다.
 판정문 = `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md`.
+
+────────────────────────────────────────────────────────────────────────────
+크로스워크 역조회 — PK 미스 시 `atom_codes`를 따라간다 (CONT-06 ⓐ · 2026-10-02)
+────────────────────────────────────────────────────────────────────────────
+학습목표의 `concept_nodes[0]`은 원자 코드다. K-12 콘텐츠의 PK는 구 437 개념코드라 원자 코드와
+겹치지 않으므로, PK 조회만으로는 K-12 콘텐츠 437행이 `/study`에 구조적으로 닿지 않았다. 그래서
+PK가 비면 `concept_content.atom_codes`(크로스워크 전이)에 그 원자를 포함하는 K-12 행을 찾는다.
+  - **PK 우선**: PK 적중이면 역조회를 하지 않는다(대학 소단원 코드는 PK로 이미 닿는다).
+  - **게이트 불변**: 역조회로 고른 행도 같은 검수 게이트를 지난다 — 행 → 게이트 → 캐시 순서 그대로.
+  - **대표 선택(1:N)**: 후보는 `code` 오름차순이고, **검수 통과 행을 먼저** 고른다(없으면 첫 행을
+    UNREVIEWED 보고용으로만 쓴다). 크로스워크의 `primary_atom_code`·`confidence`는 DB에 없다
+    (`atom_codes`만 이전됨) — 런타임에 코퍼스 파일을 읽어 오지 않으려는 의도적 선택이다. 실측
+    (2026-10-02): 원자 1,311종 중 34종만 후보가 2~3행이고, 그 경우에도 결과·로그에 후보 전체와
+    선택 코드가 남는다.
+  - **한계(명시)**: 크로스워크 437행은 전건 `ai_estimated`(confidence 0.54~0.75)다. 콘텐츠 행의
+    `reviewed`는 *콘텐츠*를 사람이 검수했다는 뜻이지 *그 원자와의 연결*을 보증하지 않는다. 이 경로는
+    검수 통과 행만 공급하고 연결 방식을 `lookup_via="crosswalk"`로 응답·로그·집계에 드러낼 뿐,
+    연결의 정확성은 검수자가 `atom_codes`를 함께 보는 것에 의존한다(판정문 §4).
 """
 
 from __future__ import annotations
@@ -57,7 +75,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.config import get_settings
 from whymath_backend.harness.wilson import wilson_lower_bound
-from whymath_backend.l1.concept_content import get_concept_content
+from whymath_backend.l1.concept_content import find_k12_contents_by_atom, get_concept_content
 from whymath_backend.l1.concept_content.review_gate import is_supply_eligible
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
@@ -104,6 +122,13 @@ REASON_NO_ADAPTER = "NO_ADAPTER"
 REASON_RENDER_UNVERIFIED = "RENDER_UNVERIFIED"
 """렌더는 됐으나 검증 신호가 떠서 학생에게 노출할 수 없다."""
 
+# 콘텐츠 행을 어떻게 찾았는가 — 역조회가 *실제로 일한* 비율을 집계가 말하게 한다(작동한 비율 원칙).
+LOOKUP_PK = "pk"
+"""요청 code가 `concept_content` PK와 일치했다(대학 소단원 코드 등)."""
+
+LOOKUP_CROSSWALK = "crosswalk"
+"""PK는 비었고 `atom_codes` 역조회로 K-12 행을 찾았다(CONT-06)."""
+
 
 @dataclass(frozen=True, slots=True)
 class SupplyResult:
@@ -120,6 +145,12 @@ class SupplyResult:
     text: str | None = None
     gate_reason_code: str | None = None
     fallback_reason: str | None = None
+    content_code: str | None = None
+    """서빙한 `concept_content` 행의 code. 역조회면 요청 code(원자)와 다르다. 행이 없으면 None."""
+    lookup_via: str | None = None
+    """콘텐츠 행을 찾은 경로(`LOOKUP_PK`·`LOOKUP_CROSSWALK`). 행 후보가 하나도 없었으면 None."""
+    lookup_candidates: tuple[str, ...] = ()
+    """역조회 후보 code 전체(오름차순). PK 적중이면 빈 튜플 — 대표 선택의 근거를 남긴다."""
 
     @property
     def is_free(self) -> bool:
@@ -148,12 +179,16 @@ class SupplyTally:
     by_fallback_reason: dict[str, int] = field(default_factory=dict)
     """폴백 사유(`REASON_*`) → 건수. 렌더가 아니었던 *이유*의 분포."""
 
+    by_lookup_via: dict[str, int] = field(default_factory=dict)
+    """콘텐츠 행 조회 경로(`LOOKUP_*`) → 건수. 크로스워크 역조회가 일한 횟수(CONT-06)."""
+
     def record(
         self,
         source: ContentSource,
         *,
         strategy: str | None = None,
         fallback_reason: str | None = None,
+        lookup_via: str | None = None,
     ) -> None:
         """공급 1건 집계 — 경로는 항상, 전략·폴백 사유는 알려진 경우에만 분해에 더한다.
 
@@ -169,6 +204,8 @@ class SupplyTally:
             self.by_fallback_reason[fallback_reason] = (
                 self.by_fallback_reason.get(fallback_reason, 0) + 1
             )
+        if lookup_via is not None:
+            self.by_lookup_via[lookup_via] = self.by_lookup_via.get(lookup_via, 0) + 1
 
     @property
     def total(self) -> int:
@@ -214,6 +251,7 @@ class SupplyTally:
                 k: self.strategy_render_rate(k) for k in sorted(self.by_strategy)
             },
             "by_fallback_reason": dict(sorted(self.by_fallback_reason.items())),
+            "by_lookup_via": dict(sorted(self.by_lookup_via.items())),
         }
 
 
@@ -239,26 +277,51 @@ def reset_process_tally() -> None:
     _PROCESS_TALLY.counts.clear()
     _PROCESS_TALLY.by_strategy.clear()
     _PROCESS_TALLY.by_fallback_reason.clear()
+    _PROCESS_TALLY.by_lookup_via.clear()
 
 
-async def resolve_concept_dsl(
+@dataclass(frozen=True, slots=True)
+class ContentResolution:
+    """콘텐츠 해석 결과 — DSL(또는 사유)과 *어느 행을 어떻게 골랐는가*.
+
+    `resolve_concept_dsl`의 `(DSL, 사유)` 계약에는 "어느 행으로 서빙했는가"가 없다. 역조회
+    (CONT-06)는 요청 code와 서빙 행 code가 달라지는 첫 경로라, 그 근거(경로·후보·선택)를
+    반환값으로 내보낸다.
+    """
+
+    dsl: ConceptDSL | None
+    reason: str | None
+    content_code: str | None = None
+    lookup_via: str | None = None
+    candidates: tuple[str, ...] = ()
+
+
+async def resolve_concept_content(
     code: str,
     *,
     session: AsyncSession,
     cache: CacheBackend,
     ttl_s: int = DSL_CACHE_TTL_S,
-) -> tuple[ConceptDSL | None, str | None]:
-    """개념 DSL 해석 + **검수 게이트** — 공급 가능하면 `(DSL, None)`, 아니면 `(None, 사유)`.
+) -> ContentResolution:
+    """개념 DSL 해석 + **검수 게이트** + 크로스워크 역조회 — 근거까지 담은 정본 해석 함수.
 
-    순서가 계약이다(CONT-05 ③):
-      ① DB에서 행을 읽는다 — 없으면 `(None, REASON_NO_DSL)`.
-      ② 검수 게이트 — 공급 가능 상태(`is_supply_eligible`)가 아니면 `(None, REASON_UNREVIEWED)`.
-      ③ 그다음에야 캐시를 본다 — 적중이면 캐시 DSL, 미스면 행을 투영해 적재한다.
+    순서가 계약이다(CONT-05 ③ · CONT-06):
+      ① PK로 행을 읽는다. 비었으면 K-12 `atom_codes` 역조회로 후보를 모은다 — 후보도 없으면
+         `(None, REASON_NO_DSL)`.
+      ② 행을 하나 고른다(PK 적중이면 그 행 · 역조회면 *검수 통과 행 우선*, `code` 오름차순).
+      ③ 검수 게이트 — 공급 가능 상태(`is_supply_eligible`)가 아니면 `(None, REASON_UNREVIEWED)`.
+         PK 경로와 역조회 경로가 **같은 한 곳**을 지난다(경로별로 게이트를 복제하지 않는다).
+      ④ 그다음에야 캐시를 본다 — 키는 *서빙 행의 code*다(요청 원자 code가 아니다). 같은 행을 여러
+         원자가 공유하므로 원자별로 캐시를 쪼개면 같은 본문이 중복 적재되고, 행 단위로 강등될 때
+         원자마다 낡은 항목이 따로 남는다.
 
-    ②를 ③ 뒤로 옮기면(= 미스일 때만 검사) 강등된 행의 DSL이 TTL(24h) 동안 계속 공급된다. 그래서
-    캐시 적중도 ①의 PK 조회를 치른다 — 캐시가 아끼는 것은 투영·평가 재료 주입이지 게이트 판정이
-    아니다. 차단된 행은 캐시에 적재하지 않는다(적재해도 ②가 먼저 막지만, 검수 전 본문을 캐시에 남길
-    이유가 없다).
+    ③을 ④ 뒤로 옮기면(= 미스일 때만 검사) 강등된 행의 DSL이 TTL(24h) 동안 계속 공급된다. 그래서
+    캐시 적중도 ①의 조회를 치른다 — 캐시가 아끼는 것은 투영·평가 재료 주입이지 게이트 판정이
+    아니다. 차단된 행은 캐시에 적재하지 않는다.
+
+    역조회 후보가 있는데 하나도 검수를 통과하지 못하면 `REASON_UNREVIEWED`다(`NO_DSL`이 아니다) —
+    "연결된 콘텐츠는 있으나 검수 전"과 "연결된 콘텐츠 자체가 없음"은 승격 대상 유무가 다르므로
+    따로 센다.
 
     캐시(`CacheBackend`)는 **str 전용**이라 pydantic `model_dump_json()`으로 직렬화한다. 역직렬화가
     실패하면(계약 변경·손상) **미스로 취급**해 행에서 다시 만든다 — 낡은 형태를 억지로 쓰는 조용한
@@ -271,22 +334,55 @@ async def resolve_concept_dsl(
     렌더 불가로 남는다(주입은 이미 있는 값을 덮지 않으므로 적중 경로에서도 안전하다).
     """
     row = await get_concept_content(session, code)
+    via = LOOKUP_PK
+    candidates: tuple[str, ...] = ()
     if row is None:
-        return None, REASON_NO_DSL
-    if not is_supply_eligible(row.review_status):
-        return None, REASON_UNREVIEWED
+        found = await find_k12_contents_by_atom(session, code)
+        if not found:
+            return ContentResolution(None, REASON_NO_DSL)
+        via = LOOKUP_CROSSWALK
+        candidates = tuple(r.code for r in found)
+        # 대표 선택 — 검수 통과 행 우선, 없으면 첫 행(아래 게이트가 막고 UNREVIEWED로 보고한다).
+        row = next((r for r in found if is_supply_eligible(r.review_status)), found[0])
+        logger.info(
+            "콘텐츠 크로스워크 역조회 — atom=%s selected=%s candidates=%s review_status=%s",
+            code,
+            row.code,
+            ",".join(candidates),
+            row.review_status,
+        )
 
-    key = f"{DSL_CACHE_PREFIX}{code}"
+    if not is_supply_eligible(row.review_status):
+        return ContentResolution(None, REASON_UNREVIEWED, row.code, via, candidates)
+
+    key = f"{DSL_CACHE_PREFIX}{row.code}"
     cached = await cache.get(key)
     if cached is not None:
         try:
-            return attach_assessment(ConceptDSL.model_validate_json(cached)), None
+            dsl = attach_assessment(ConceptDSL.model_validate_json(cached))
+            return ContentResolution(dsl, None, row.code, via, candidates)
         except ValidationError:
             pass  # 계약 변경 등 — 미스 취급 후 아래에서 재생성.
 
-    dsl = attach_assessment(from_concept_content(row))
-    await cache.set(key, dsl.model_dump_json(), ttl_s)
-    return dsl, None
+    built = attach_assessment(from_concept_content(row))
+    await cache.set(key, built.model_dump_json(), ttl_s)
+    return ContentResolution(built, None, row.code, via, candidates)
+
+
+async def resolve_concept_dsl(
+    code: str,
+    *,
+    session: AsyncSession,
+    cache: CacheBackend,
+    ttl_s: int = DSL_CACHE_TTL_S,
+) -> tuple[ConceptDSL | None, str | None]:
+    """개념 DSL 해석 — 공급 가능하면 `(DSL, None)`, 아니면 `(None, 사유)`.
+
+    `resolve_concept_content`의 얇은 래퍼다(기존 `(DSL, 사유)` 계약 유지). 게이트·역조회 순서는
+    그쪽이 정본이며 이 래퍼는 판정을 복제하지 않는다.
+    """
+    resolution = await resolve_concept_content(code, session=session, cache=cache, ttl_s=ttl_s)
+    return resolution.dsl, resolution.reason
 
 
 async def get_concept_dsl(
@@ -372,10 +468,11 @@ async def supply(
     strategy = gate_result.strategy
     render_ctx = ctx if ctx is not None else RenderContext()
 
-    dsl, dsl_reason = await resolve_concept_dsl(code, session=session, cache=cache)
+    resolution = await resolve_concept_content(code, session=session, cache=cache)
+    dsl = resolution.dsl
     if dsl is None:
         # 행 없음(NO_DSL)·검수 전(UNREVIEWED) — 처리는 같고(렌더 없이 폴백·404) 사유만 다르다.
-        reason: str | None = dsl_reason
+        reason: str | None = resolution.reason
         unit: RenderedUnit | None = None
     else:
         unit, reason = _render_or_reason(
@@ -392,11 +489,16 @@ async def supply(
             strategy=strategy,
             rendered=unit,
             gate_reason_code=gate_result.reason_code,
+            content_code=resolution.content_code,
+            lookup_via=resolution.lookup_via,
+            lookup_candidates=resolution.candidates,
         )
         if trace is not None:
-            trace.record(_render_trace_fields(code, strategy))
+            trace.record(_render_trace_fields(code, strategy, resolution))
         if tally is not None:
-            tally.record(result.content_source, strategy=strategy.value)
+            tally.record(
+                result.content_source, strategy=strategy.value, lookup_via=resolution.lookup_via
+            )
         return result
 
     # ── 생성 폴백 ────────────────────────────────────────────────
@@ -406,9 +508,17 @@ async def supply(
             strategy=strategy,
             gate_reason_code=gate_result.reason_code,
             fallback_reason=reason,
+            content_code=resolution.content_code,
+            lookup_via=resolution.lookup_via,
+            lookup_candidates=resolution.candidates,
         )
         if tally is not None:
-            tally.record(result.content_source, strategy=strategy.value, fallback_reason=reason)
+            tally.record(
+                result.content_source,
+                strategy=strategy.value,
+                fallback_reason=reason,
+                lookup_via=resolution.lookup_via,
+            )
         return result
 
     # 전략 카드 계층(PED-23 회수 — 04e §3.2): decide()가 고른(게이트 통과 후) 전략의 카탈로그
@@ -448,13 +558,23 @@ async def supply(
         text=generated.text,
         gate_reason_code=gate_result.reason_code,
         fallback_reason=reason,
+        content_code=resolution.content_code,
+        lookup_via=resolution.lookup_via,
+        lookup_candidates=resolution.candidates,
     )
     if tally is not None:
-        tally.record(source, strategy=strategy.value, fallback_reason=reason)
+        tally.record(
+            source,
+            strategy=strategy.value,
+            fallback_reason=reason,
+            lookup_via=resolution.lookup_via,
+        )
     return result
 
 
-def _render_trace_fields(code: str, strategy: PedagogyStrategy) -> dict[str, object]:
+def _render_trace_fields(
+    code: str, strategy: PedagogyStrategy, resolution: ContentResolution
+) -> dict[str, object]:
     """렌더 경로 관측 이벤트 — 라우팅 결정이 없는 경로라 `langfuse_fields`를 쓰지 않는다.
 
     렌더는 LLM을 타지 않으므로 `RoutingDecision`이 존재하지 않는다. 그래서 `cost_tier` 등 라우팅
@@ -464,6 +584,9 @@ def _render_trace_fields(code: str, strategy: PedagogyStrategy) -> dict[str, obj
         "content_source": "dsl_render",
         "cost_krw": 0.0,  # 결정론 렌더 — LLM 호출 0.
         "dsl_code": code,
+        # 역조회면 요청 code(원자)와 서빙 행 code가 다르다 — 둘 다 남겨 선택 근거를 추적한다.
+        "content_code": resolution.content_code,
+        "lookup_via": resolution.lookup_via,
         "pedagogy_strategy": strategy.value,
     }
 
@@ -471,17 +594,21 @@ def _render_trace_fields(code: str, strategy: PedagogyStrategy) -> dict[str, obj
 __all__ = [
     "DSL_CACHE_PREFIX",
     "DSL_CACHE_TTL_S",
+    "LOOKUP_CROSSWALK",
+    "LOOKUP_PK",
     "REASON_CANNOT_RENDER",
     "REASON_NO_ADAPTER",
     "REASON_NO_DSL",
     "REASON_RENDER_UNVERIFIED",
     "REASON_UNREVIEWED",
+    "ContentResolution",
     "ContentSource",
     "SupplyResult",
     "SupplyTally",
     "get_concept_dsl",
     "get_process_tally",
     "reset_process_tally",
+    "resolve_concept_content",
     "resolve_concept_dsl",
     "supply",
 ]
