@@ -1,0 +1,21 @@
+# A0004 초안 — 원본 등록부(sources)에 추가할 3건 (채택 전)
+#
+# 이 파일은 `constitution/rules.yaml` 의 `sources:` 절 **끝에 덧붙일 항목**만 담는다(규칙·단계·조문은 없다).
+# A0003(원본 등록부 9건 정정)이 먼저 채택돼 있어야 한다 — 채택 후 등록부는 9건 + 3건 = 12건이 된다.
+# 항목 형식은 A0003 의 정정안(rules_v1.0.1_sources_fixed.yaml)과 같다.
+# 단원·소단원 위계는 여기에 없다 — 정본이 아직 선언되지 않았다(A0004 「결정 대기」 · 태스크 CONST-11).
+
+  - name: 프로젝트 규칙 (개발 헌법 본문)
+    path: CLAUDE.md
+    version: "규칙 본문의 정본. 집행 메타(상태·집행 지점)는 backlog/rules.ndjson 이 규칙 제목 문자열로 대응하며 scripts/harness/rules.py 린트가 어긋남을 red 로 만든다. 코딩 헌법(constitution/rules.yaml)의 규칙과는 다른 집합이다"
+    derived: [backlog/rules.ndjson, docs/standards/rule_index.md]
+
+  - name: LLM 모델 핀 (로컬 Ollama)
+    path: src/backend/whymath_backend/l3/router.py
+    version: "LOCAL_MODEL_MATRIX(MATH·GENERAL·VISION × FAST·MID) + QUALITY_MODEL_ID. 설계 근거 문서 docs/architecture/03a_l3_router_design.md 는 해설이지 값의 정본이 아니다"
+    derived: [CLAUDE.md 기술 스택 표 '로컬 LLM' 행, .claude/agents/llm-architect.md A.0 매트릭스]
+
+  - name: LLM 모델 핀 (클라우드)
+    path: src/backend/whymath_backend/config.py
+    version: "cloud_provider 셀렉터 + openrouter_model_mid/high · anthropic_model_mid/high 기본값. 단가는 l3/router.py 의 비용표가 따로 가진다(모델 ID 와 단가는 다른 종류의 값)"
+    derived: [CLAUDE.md 기술 스택 표 '클라우드 LLM' 행, tests/backend/test_config.py 기본값 고정]
