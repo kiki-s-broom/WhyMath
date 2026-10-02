@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,12 +16,13 @@ acceptance:
   - Problem.source_type/source_detail → source_id FK 이관 계획
   - Alembic 마이그레이션 추가
   - 기존 _provenance.json sidecar와의 관계 문서화
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1428 · 판정 기준 cc32e4dc · 직렬 전체 스위트 15674 passed · source_entity 재사용 결정(새 테이블 미신설)·source_id FK 좌석·문서 arch32_source_entity_migration.md"
 paths:
   - src/backend/whymath_backend/schema/problem.py
   - src/backend/whymath_backend/db/models/problem.py
   - src/backend/whymath_backend/schema/enums.py
   - src/backend/whymath_backend/ops/provenance_audit.py
-session: claude/happy-turing-ustq5u
+session: null
 notes: "011_1 EOS Identity 수용 결정 후속. 첨부 설계안의 Source 객체 + Provenance Chain을 MVP 범위 내에서 출발.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
 updated: 2026-10-02
