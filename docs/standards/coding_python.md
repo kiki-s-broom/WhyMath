@@ -4,7 +4,11 @@
 - Python 3.12+
 - 패키지 관리: `uv` (pip 대체)
 - 가상환경: `uv venv`
-- 의존성: `pyproject.toml`
+- 의존성: `pyproject.toml` — **모든 선언에 상한을 건다**(OPS-94). 상한은 "그 시점 설치·최신 중 큰 쪽의
+  다음 메이저 미만"(0.x는 `<1`)으로 걸고, 올릴 때는 두 pyproject와 워크플로 직설치에서 **같은 패키지의
+  상한을 함께** 올린다. 무상한 선언·상한 불일치·만료된 예외는 CI가 막는다 —
+  `scripts/ops/check_dependency_upper_bounds.py`(`infra-contracts` 잡). 예외는
+  `scripts/ops/dependency_upper_bound_allowlist.toml`에 사유·만료일(366일 이내)과 함께만 둔다.
 
 ## 포맷·린터
 - 포맷: `black`

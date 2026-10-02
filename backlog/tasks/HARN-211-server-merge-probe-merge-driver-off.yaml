@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-211-server-merge-probe-merge-driver-off
+title: "서버 병합 모사 프로브 상시화 — merge 드라이버를 끈 3-way 병합으로 머지 큐 MERGE_CONFLICT를 enqueue 전에 예측 (로컬 병합 시험의 변별력 결함)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 프로브 CLI 신설 — `scripts/harness/server_merge_probe.py <병합 대상 ref> [--ours <ref>]`: 임시 worktree(detached)에서 `.gitattributes`의 `merge=` 선언 줄을 제거한 뒤(제거한 줄 수를 단언 — 0건이면 로컬 병합과 같아 변별력이 없으므로 측정 실패) 3-way 병합을 시도하고 충돌 파일 목록을 낸다. 종료 코드: 0 충돌 없음 · 1 충돌(파일 목록 출력) · 2 측정 실패. 대상이 이미 ours의 조상이면(`git merge-base --is-ancestor`) 병합이 항상 \"Already up to date\"라 아무것도 예측하지 못하므로 통과가 아니라 exit 2로 멈춘다 — 이 사고의 정정 직후 실제로 그 위장 통과가 한 번 났다(프로브가 exit 0·충돌 0건을 출력했는데 HEAD가 이미 origin/main을 포함하고 있었다)."
+  - "② 변별력 동결 — `tests/harness/test_server_merge_probe.py`, 임시 저장소 픽스처로: ⓐ 양쪽이 같은 자리에 덧붙임 + `merge=union` 선언 → 로컬 `git merge`는 충돌 0이고 프로브는 충돌 1건(두 값이 갈리는 것이 이 도구의 존재 이유) ⓑ 떨어진 자리 동시 삽입 → 프로브 통과(대조군 — 전부 충돌로 계상하는 과잉 검출 방지) ⓒ `merge=` 선언이 없는 저장소 → 측정 실패 ⓓ 대상이 조상인 경우 → 측정 실패. 뮤테이션(선언 줄 제거 생략 · 조상 검사 제거 · 충돌 목록 무시 · 양성/음성 판정 뒤집기)으로 각 절의 변별력을 확인하고, 픽스처가 그 절을 실제로 밟는지(절을 지우면 어느 입력이 통과하는가)를 절마다 적는다."
+  - "③ 집행 지점(정본화와 별항) — 프로브를 실제로 부르는 곳을 정한다: `.claude/commands/drive.md` 5.5(PR 생성) 직후와 \"pr\" 흐름의 enqueue 직전, 그리고 `backlog.py done`의 PR 증적 안내 중 하나 이상이 최신 main에 대한 프로브 실행을 요구하게 한다. 배선 동결 테스트가 그 문서·코드가 프로브를 가리키는지(그리고 CI 잡이 그 테스트를 돌리는지) 확인한다. 프로브가 저장소에 있어도 아무도 부르지 않으면 이 사고는 되풀이된다."
+  - "④ 한계를 도구 출력에 병기 — 머지 큐 그룹의 실제 병합 기준은 enqueue 시점이 아니라 그룹 형성 시점의 tip이라, 프로브는 '지금의 main'과의 충돌만 예측한다. 큐에서 앞서 착지할 PR이 같은 자리를 건드리면 못 본다. 이 한계는 프로브 출력 마지막 줄에도 적는다(통과를 '큐에서도 안전'으로 읽지 않게). 구조 대책은 HARN-210(MEMORY.md 동시 append — PR 1406 계류)이 맡고, 이 태스크는 enqueue 전 사전 검출이다. 두 태스크의 범위가 겹치는지(프로브가 HARN-210 착지 뒤에도 필요한 범위)는 HARN-210 ③ 설계 판정 때 함께 본다."
+  - "⑤ 근거 사고(2026-10-02 PR #1419): 머지 큐가 MERGE_CONFLICT로 이탈시켰다(15:01Z, github-merge-queue[bot]). 로컬 병합 시험은 \"Merge made by the 'ort' strategy\"로 충돌 0이었고 merge 드라이버를 끈 서버 방식 모사는 MEMORY.md 1건이었다. 원인: main이 base(28c12104)의 11743행 뒤에 9줄, 이 브랜치가 같은 자리에 27줄을 동시에 덧붙였다. 해소는 내 항목 3건을 상단 결정 로그의 비경합 지점으로 옮겨 main 대비 순수 단일 삽입(+28줄)으로 만든 것이고, 해소 전후로 프로브 결과가 충돌 1건에서 0건으로 갈렸다(양성 대조군: 같은 자리 삽입 시 충돌 / 음성 대조군: 최상단·EOF·멀리 떨어진 중간 삽입은 통과). 이 실측은 HARN-210 ①이 '못 본 것'으로 적은 \"머지 큐가 MEMORY.md 동시 append로 실제 이탈시키는지\"의 첫 증거다."
+artifacts: []
+paths:
+  - scripts/harness/server_merge_probe.py
+  - tests/harness/test_server_merge_probe.py
+  - ".claude/commands/drive.md"
+  - docs/standards/build_harness.md
+session: null
+notes: "출처: 2026-10-02 /drive 세션(claude/fervent-goldberg-s8y8ws) — PR #1419 머지 큐 이탈. 사고 계열은 nondiscriminating-check(변별력 없는 검증) 12회차이며 같은 사고가 memory-md-append-github-dirty 계열의 첫 실측 이탈이기도 하다(관련 태스크 HARN-210 — PR 1406에서 계류 중이라 이 대장에는 아직 없다). 시제품 두 개를 세션 스크래치에서 만들어 썼다: 서버 방식 병합 모사(드라이버 선언 줄을 지운 임시 커밋 위에서 병합)와 동시 삽입 시나리오 4종(최상단·EOF·같은 자리 양성 대조군·멀리 떨어진 중간). 구현은 그 방식을 정식 모듈과 테스트로 옮기는 일이다. 구조 대책(MEMORY.md 조각 파일화 등)은 이 태스크의 범위가 아니다."
+updated: 2026-10-02

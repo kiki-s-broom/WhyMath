@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: 하네스 의존성(PyYAML) — work_graph.py 실행용
-        run: python -m pip install pyyaml
+        run: python -m pip install "pyyaml>=6.0.1,<7"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -76,7 +76,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: 하네스 의존성(PyYAML) — work_graph.py 실행용
-        run: python -m pip install pyyaml
+        run: python -m pip install "pyyaml>=6.0.1,<7"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

@@ -5,24 +5,24 @@ description = "WhyMath 백엔드"
 requires-python = ">=3.12"
 dependencies = [
     # 웹 프레임워크
-    "fastapi[standard]>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.9.0",
-    "pydantic-settings>=2.5.0",
+    "fastapi[standard]>=0.115.0,<1",
+    "uvicorn[standard]>=0.32.0,<1",
+    "pydantic>=2.9.0,<3",
+    "pydantic-settings>=2.5.0,<3",
     # 데이터베이스
     "sqlalchemy[asyncio]>=2.0.35,<2.1",  # OPS-91: 2.1.0에서 mypy --strict 34건 실패(2026-09-25) — 이행 전 상한
-    "asyncpg>=0.30.0",
+    "asyncpg>=0.30.0,<1",
     # psycopg(sync) — 슬105 PgVectorIndex 전용(벡터 store 좌석에 한정된 sync 드라이버).
     # 앱 본체는 async(asyncpg)이고, 이 sync 드라이버는 VectorIndex Protocol이 sync라 *영속
     # 벡터 인덱스 좌석에만* 도입한다. import는 PgVectorIndex 내부 lazy — 기본(memory) 경로는
     # psycopg 불요. async 앱 엔진은 무변경 (MEMORY 2026-06-10 슬105 결정 로그).
-    "psycopg[binary]>=3.1",
-    "alembic>=1.13.3",
+    "psycopg[binary]>=3.1,<4",
+    "alembic>=1.13.3,<2",
     # 캐시·큐
-    "redis[hiredis]>=5.1.0",
-    "celery>=5.4.0",
+    "redis[hiredis]>=5.1.0,<9",
+    "celery>=5.4.0,<6",
     # 외부 통신
-    "httpx>=0.27.2",
+    "httpx>=0.27.2,<1",
     # LLM — 상한: 우리가 실제 호출하는 표면(anthropic AsyncAnthropic.messages.create·models.list /
     # openai OpenAI().embeddings.create / ollama AsyncClient.generate·list)을 2026-07-21 실물 설치로
     # 실측 검증한 메이저까지만 허용(anthropic 0.117·openai 2.46·ollama 0.6에서 표면 확인). 무상한
@@ -39,30 +39,30 @@ dependencies = [
     "openai>=1.50.0,<3",
     "ollama>=0.4.0,<1",
     # 벡터 DB(pgvector·Postgres 통합) — 마이그레이션·ORM이 top-level import라 메인 의존성 유지.
-    "pgvector>=0.3.0",
+    "pgvector>=0.3.0,<1",
     # 임베딩(sentence-transformers·bge-m3→torch 수 GB)은 [embedding] extra로 분리(슬110 #6) —
     # 기본(memory·게이트 off) 경로는 lazy import라 미사용. provider.py가 함수내 lazy import하고
     # mypy는 ignore_missing_imports=true라, extra 미설치 환경에서도 collection·hermetic·mypy green.
     # 인증·보안 — passlib[bcrypt]는 2026-07-30 SEC-07 D1로 제거(비밀번호 인증 미채택·
     # SSO 전용이라 src/ 실사용 0건 — account_security_gap_review.md §2-③).
-    "python-jose[cryptography]>=3.3.0",
+    "python-jose[cryptography]>=3.3.0,<4",
     # 관측성 — 상한 <5: 쓰기/읽기 표면을 v2.60·v3.15·v4.14에서 실측 검증(2026-07-16,
     # sink record는 create_event/event 적응·cost_report는 fetch_observations/api 적응).
     # 미검증 차기 메이저의 무단 유입을 차단한다(무상한 pin이 v2/v4 혼재를 낳았던 교훈).
     "langfuse>=2.50.0,<5",
-    "opentelemetry-api>=1.27.0",
-    "opentelemetry-sdk>=1.27.0",
-    "structlog>=24.4.0",
+    "opentelemetry-api>=1.27.0,<2",
+    "opentelemetry-sdk>=1.27.0,<2",
+    "structlog>=24.4.0,<27",
     # 데이터
-    "pandas>=2.2.3",
-    "polars>=1.10.0",
-    "great-expectations>=1.0.0",
+    "pandas>=2.2.3,<4",
+    "polars>=1.10.0,<2",
+    "great-expectations>=1.0.0,<2",
     # YAML — 교수법 팩 시더(l1/pedagogy)가 packs YAML을 파싱한다. data-pipeline 핀(pyyaml>=6.0.1)과
     # 동일 floor. `yaml.safe_load`만 쓴다(임의 객체 역직렬화 금지·안전 로더).
-    "pyyaml>=6.0.1",
+    "pyyaml>=6.0.1,<7",
     # PDF·OCR·시각화
-    "pdfplumber>=0.11.4",
-    "sympy>=1.13.3",
+    "pdfplumber>=0.11.4,<1",
+    "sympy>=1.13.3,<2",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +70,7 @@ dependencies = [
 # 측정에 필요. 기본 배포·hermetic CI는 불요(lazy import·FakeEmbeddingProvider). 설치:
 # `pip install -e ".[dev,embedding]"`. (OpenAI 임베딩은 openai 메인 의존성으로 별도.)
 embedding = [
-    "sentence-transformers>=3.1.0",
+    "sentence-transformers>=3.1.0,<7",
 ]
 # L5 OCR(Phase A) — 손글씨 풀이 인식 경량 백엔드. rapidocr(검출·한글 텍스트)·rapid_latex_ocr
 # (수식→LaTeX)는 ONNX 런타임 기반(torch 불요). pillow·numpy는 이미지 디코드/크롭(파이프라인
@@ -78,24 +78,24 @@ embedding = [
 # lazy import라 미설치 환경에서도 collection·import·mypy(ignore_missing_imports) green. 설치:
 # `pip install -e ".[dev,ocr]"`. 미설치 시 부품은 명확한 RuntimeError(조용한 폴백 없음).
 ocr = [
-    "rapidocr-onnxruntime>=1.3.0",
-    "rapid-latex-ocr>=0.0.9",
-    "pillow>=10.0.0",
-    "numpy>=1.26.0",
+    "rapidocr-onnxruntime>=1.3.0,<2",
+    "rapid-latex-ocr>=0.0.9,<1",
+    "pillow>=10.0.0,<13",
+    "numpy>=1.26.0,<3",
 ]
 # L5 OCR(Phase B) — MFD(수식 영역 검출). rapid-layout는 RapidAI의 레이아웃 분석으로
 # **Apache-2.0**·순수 ONNXRuntime(torch/ultralytics 불요)다. PP 계열 모델만 쓴다 —
 # ultralytics 기반(yolov8*/doclayout*)은 AGPL-3.0이라 코드에서 거부한다(결정 우선순위 #2).
 # lazy import라 미설치 CI에서도 green. 설치: `pip install -e ".[dev,ocr,ocr-layout]"`.
 ocr-layout = [
-    "rapid-layout>=1.2.0",
+    "rapid-layout>=1.2.0,<2",
 ]
 # L5 OCR(Phase C) — 무거운 백엔드(torch 수 GB). TexTeller·Qwen3-VL(transformers). Phase A/B
 # 미사용(스텁 좌석)이라 분리한다. 실제 모델 배선은 후속 슬라이스. ultralytics(AGPL)는
 # 제외한다 — MFD는 rapid-layout(Apache-2.0)으로 대체했다(우선순위 #2 법적 준수).
 ocr-heavy = [
-    "transformers>=4.40.0",
-    "torch>=2.0.0",
+    "transformers>=4.40.0,<6",
+    "torch>=2.0.0,<3",
 ]
 dev = [
     # 상한 핀 — data-pipeline에서 검증된 상한을 동일 적용 (2026-05-14).
@@ -123,7 +123,7 @@ dev = [
     # 바꾼다 — 718건의 혼란 대신 원인을 지목하는 UsageError 하나. 이 주석은 *왜 그 가드가 있는지*의
     # 근거이며, 가드를 지우려면 이 문단도 함께 지워야 한다(둘 중 하나만 남으면 다음 사람이 또 밟는다).
     "pytest-asyncio>=0.24.0,<2",
-    "pytest-cov>=5.0.0",
+    "pytest-cov>=5.0.0,<8",
     # pytest-randomly — 매 실행 테스트 순서를 섞어 *순서 의존*을 조기·반복 노출한다(OPS-09).
     # OPS-07 가드가 `db.session` 전역 오염의 *원인을 지목*한다면, 이쪽은 종류를 가리지 않고
     # 순서 의존의 *존재를 발견*한다 — 둘은 대체가 아니라 상보다. 도입 근거는 추정이 아니라
@@ -159,7 +159,7 @@ dev = [
     "import-linter>=2.0,<3",
     # PyYAML 타입 스텁 — l1/pedagogy 시더가 pyyaml을 쓰므로 mypy --strict용 스텁 동반
     # (data-pipeline dev 핀과 동일: types-PyYAML>=6.0.12).
-    "types-PyYAML>=6.0.12",
+    "types-PyYAML>=6.0.12,<7",
     # 메모(M1.2): 기존 dev 핀에 있던 `mocktail>=1.0.0`은 *배포된 버전이 없어*
     # (PyPI 최신 0.0.4) `pip install -e .[dev]`를 실패시켜 CI를 깨뜨린다. M1.2
     # 라우터 단위테스트는 외부 모킹 라이브러리가 필요 없으므로(순수 결정 로직 +
@@ -169,7 +169,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.25.0"]
+requires = ["hatchling>=1.25.0,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

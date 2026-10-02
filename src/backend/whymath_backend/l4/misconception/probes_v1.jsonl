@@ -167,3 +167,6 @@
 {"statement": "동전과 주사위를 같이 던지는 경우의 수를 셀 때 그냥 두 경우의 수를 더해버렸어", "expected_id": "addition-multiplication-rule-confused", "near_id": null, "kind": "paraphrase", "note": "MISC-21 A3 좌석 — signals 미공출현(합의 법칙·곱의 법칙 회피)"}
 {"statement": "동시에 일어나는 두 사건의 경우의 수는 각각의 경우의 수를 곱해서 구한다", "expected_id": null, "near_id": "addition-multiplication-rule-confused", "kind": "correct-near", "note": "MISC-21 A3 좌석 — 올바른 곱사건 판단(법칙 명칭 미포함)"}
 {"statement": "합의 법칙과 곱의 법칙을 구분해서 써야 한다", "expected_id": null, "near_id": "addition-multiplication-rule-confused", "kind": "correct-near", "note": "PR #1068 Codex P1 회귀 — 법칙 명칭 공출현 + 반박 조건(구분) 대조"}
+{"statement": "x의 세제곱을 미분할 때 지수 3을 앞으로 내리는 걸 빠뜨리고 그냥 x의 제곱이라고 적었어", "expected_id": "power-rule-step-omitted", "near_id": null, "kind": "paraphrase", "note": "MISC-40 #68 — 첫째 형태(계수 누락)·signals 미공출현((x³)′·= x² 회피·말로 풀어 씀)"}
+{"statement": "x의 세제곱을 미분하면서 3은 앞으로 내렸는데 지수는 줄이지 않고 3x의 세제곱으로 두었어", "expected_id": "power-rule-step-omitted", "near_id": null, "kind": "paraphrase", "note": "MISC-40 #68 — 둘째 형태(지수 감소 누락)·signals 미공출현(말로 풀어 씀)"}
+{"statement": "x의 세제곱을 미분하면 지수 3이 앞으로 내려와 계수가 되고 지수는 1 줄어 3x의 제곱이 된다", "expected_id": null, "near_id": "power-rule-step-omitted", "kind": "correct-near", "note": "MISC-40 #68 — 올바른 거듭제곱 미분(내림·감소 둘 다 수행·(x³)′·= x² 미포함)"}

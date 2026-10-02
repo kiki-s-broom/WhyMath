@@ -22,10 +22,11 @@ from whymath_backend.l4.misconception.match_gate import _DEFAULT_CONFIDENCE_FLOO
 class TestCatalogShape:
     def test_thirty_two_entries_doc_explicit_only(self) -> None:
         # doc 명시·상세화: 대수 37 + 기하 8 + 확률통계 7 + 함수 3
-        #                 + 미적분 7 + 수열 2 + 삼각함수 2 + 벡터 1 = 67
+        #                 + 미적분 8 + 수열 2 + 삼각함수 2 + 벡터 1 = 68
         #                 (Phase 1 30 + S2-p 2 + 극값 MC 2 + 843 트랜치1~4 각 6 + 트랜치5 6
-        #                  + MISC-21 3(앵커 A1·A2·A3 좌석 보강 — doc #65-67))
-        assert len(CATALOG) == 67
+        #                  + MISC-21 3(앵커 A1·A2·A3 좌석 보강 — doc #65-67)
+        #                  + MISC-40 1(미분 대단원 좌석 판정 — 미적분 doc #68))
+        assert len(CATALOG) == 68
 
     def test_all_ids_unique(self) -> None:
         ids = [m.id for m in CATALOG]
@@ -154,6 +155,118 @@ class TestMisc21AnchorSeatIds:
         """A5(고1 이차함수 최대·최소) 후보 M-id는 omission형이라 의도적 미승격 — 회귀 가드."""
         for mid in ("domain-restricted-vertex-only", "quadratic-max-min-endpoint-ignored"):
             assert mid not in CATALOG_BY_ID
+
+
+class TestMisc40PowerRuleSeat:
+    """MISC-40(2026-10-02) — 미적분Ⅰ '미분' 대단원 좌석 판정으로 신설된 1종(doc #68·M0671)."""
+
+    _ID = "power-rule-step-omitted"
+
+    def test_entry_shape(self) -> None:
+        m = CATALOG_BY_ID[self._ID]
+        assert m.domain == "미적분"
+        # 신호는 **한 덩어리**다 — `("(x³)′", "= x²")` 두 토막 AND로 쪼개면 `= x²`가 흔한 토막이라 올바른
+        # 풀이에도 발화한다(아래 test_correct_solutions_mentioning_both_fragments_stay_below_gate).
+        assert m.signals == ("(x³)′ = x²",)
+        # 정규식 채널은 일부러 두지 않았다 — 정규식 보유 항목은 동결 집합이고 새 채널은 측정 통과를
+        # 함께 요구한다(TestRegexSignals). 이 항목의 본 용도는 객관식 distractor 역추적 좌석이다.
+        assert m.regex_signals == ()
+
+    def test_appended_after_existing_calculus_entries(self) -> None:
+        # 순서 안정성 — 신규 항목은 도메인 기존 항목 *뒤*에 붙인다(진단 동률 정렬 회귀 가드).
+        calculus = [m.id for m in CATALOG if m.domain == "미적분"]
+        assert calculus[0] == "chain-rule-inner-derivative-omitted"
+        assert calculus[-1] == self._ID
+        assert len(calculus) == 8
+
+    def test_counterexample_numbers_are_correct(self) -> None:
+        # 반례의 수치(12·4·24)는 손으로 쓴 값이다 — SymPy로 실제 값을 확인해 문자열과 대조한다.
+        import sympy as sp
+
+        x = sp.symbols("x")
+        assert sp.diff(x**3, x).subs(x, 2) == 12  # 정답 3x² 의 x=2 값
+        assert (x**2).subs(x, 2) == 4  # 첫째 틀린 형태(계수 누락)
+        assert (3 * x**3).subs(x, 2) == 24  # 둘째 틀린 형태(지수 감소 누락)
+        counterexample = CATALOG_BY_ID[self._ID].counterexample
+        for value in ("12", "4", "24"):
+            assert value in counterexample, value
+
+    def test_counterexample_does_not_reveal_the_answer(self) -> None:
+        # 반례 문자열은 개입 발화 템플릿(`intervene._assemble_counterexample`)에 그대로 들어가 학생에게
+        # 닿을 수 있다 — 정답식·규칙 문장을 적으면 답 미루기를 어긴다(독립 비판 F7). 값 비교만 남긴다.
+        counterexample = CATALOG_BY_ID[self._ID].counterexample
+        assert "정답" not in counterexample
+        assert "3x²" not in counterexample  # 정답식(숫자·x² 값 비교에 쓰인 `3x³`과 구별)
+        assert "내려오" not in counterexample and "줄어야" not in counterexample  # 규칙 문장
+
+    def test_wrong_form_fires_and_correct_forms_stay_below_gate(self) -> None:
+        # 틀린 첫째 형태는 표기 변이(위첨자·^·^{})와 무관하게 게이트 이상으로 발화한다.
+        wrong = ("(x³)′ = x²", "f(x)=x^3일 때 (x^3)′=x^2 이다", "(x^{3})′ = x^{2}")
+        # 정답 형태·정답 해설은 자기 오개념으로 게이트(0.65) 이상 발화하면 안 된다 — 정답에 틀렸다고 말하는
+        # 오류가 놓치는 오류보다 해롭다(결정 우선순위 #1).
+        correct = (
+            "(x³)′ = 3x²",
+            "(x^3)′=3x^2",
+            "(x^{3})′ = 3x^{2}",
+            "x의 세제곱을 미분하면 지수 3이 앞으로 내려와 3x의 제곱이 된다",
+        )
+
+        def conf(text: str) -> float:
+            hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+            return 0.0 if hit is None else hit.confidence
+
+        for text in wrong:
+            assert conf(text) >= _DEFAULT_CONFIDENCE_FLOOR, text
+        for text in correct:
+            assert conf(text) < _DEFAULT_CONFIDENCE_FLOOR, text
+
+    def test_explicit_correction_of_the_wrong_form_is_not_diagnosed(self) -> None:
+        # 학생이 틀린 형태를 인용해 *부정*하면 확신 진단이 나가지 않는다(정정 억제 축이 이 항목에도 닿는다).
+        text = "(x³)′ = x² 라는 풀이는 틀렸다"
+        hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+        assert hit is None or hit.confidence < _DEFAULT_CONFIDENCE_FLOOR
+
+    def test_correct_solutions_mentioning_both_fragments_stay_below_gate(self) -> None:
+        # 실측 회귀(2026-10-02) — 신호가 `(x³)′`·`= x²` 두 토막 AND였을 때 아래 *올바른* 풀이 중 앞의 셋이
+        # conf 1.0으로 발화했다(`= x²`는 `f(x) = x²`·`x³ = x²·x`처럼 올바른 풀이에도 흔한 토막이라 같은 글
+        # 어딘가에 따로 있기만 해도 맞았다). 정답에 틀렸다고 말하는 오류가 놓치는 오류보다 해롭다
+        # (결정 우선순위 #1). 한 덩어리 신호는 좌변 *바로 뒤*의 `= x²`만 잡으므로 전부 게이트 미만이다.
+        correct_solutions = (
+            "x³ = x²·x 이므로 (x³)′ = (x²·x)′ = 2x·x + x²·1 = 3x²",  # 곱의 미분으로 유도
+            "f(x) = x² 이고 g(x) = x³ 일 때 (x³)′ = 3x² 이다",  # 무관한 `f(x) = x²` 병기
+            "y = x² 의 그래프에서 (x³)′ = 3x² 이므로 기울기는 12",  # 무관한 `y = x²` 병기
+            "(x³)′ + (x²)′ = 3x² + 2x",
+            "(x²)′ = 2x, (x³)′ = 3x²",
+            "x² = 4 이고 (x³)′ = 3x² 이다",
+        )
+        for text in correct_solutions:
+            hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+            assert hit is None or hit.confidence < _DEFAULT_CONFIDENCE_FLOOR, text
+
+    def test_wrong_form_inside_a_sentence_still_fires(self) -> None:
+        # 한 덩어리로 좁힌 대가가 재현율 손실이 아님을 확인 — 문장 속에 박힌 틀린 형태는 여전히 잡힌다.
+        text = "f(x)=x³ 이므로 f′(x) = (x³)′ = x² 이다"
+        hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+        assert hit is not None and hit.confidence >= _DEFAULT_CONFIDENCE_FLOOR
+
+    def test_known_limits_are_documented_not_hidden(self) -> None:
+        # 한계(§5.3·문서 #68에 명시)를 *단언으로* 고정한다.
+        # ① 미검출 — 둘째 형태(3x³)·아스키 아포스트로피는 못 잡는다.
+        for text in ("(x³)′ = 3x³", "(x³)' = x²"):
+            hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+            assert hit is None or hit.confidence < _DEFAULT_CONFIDENCE_FLOOR, text
+        # ② 오탐 — 계수를 뒤에 쓴 *올바른* `(x³)′ = x²·3`은 접두가 같아 발화한다(희귀 표기·측정 전까지 한계).
+        # 이 단언이 적색이 되면 누군가 이 오탐을 고친 것이니 문서 #68의 한계 ②와 카탈로그 주석을 함께 갱신하라.
+        text = "(x³)′ = x²·3 이다"
+        hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+        assert hit is not None and hit.confidence >= _DEFAULT_CONFIDENCE_FLOOR
+        # ③ 오탐 — 틀린 형태를 대조 표지("가 아니라")로 인용한 올바른 풀이도 발화한다. 종결형 정정 어휘
+        # (틀렸다·아니다)가 아니면 억제되지 않는 것은 substring 매처 **공통** 한계다(`diagnose.py`
+        # `_CORRECTION_NEAR_SIGNAL` 주석 — "A가 아니라 B다"는 부정이 아니라 주장의 흔한 형식이라 일부러 안 막는다).
+        # 이 단언이 적색이 되면 공통 한계가 풀린 것이니 문서 #68의 한계 ③과 판정 문서 §8을 함께 갱신하라.
+        text = "(x³)′ = x² 가 아니라 (x³)′ = 3x² 이다"
+        hit = next((d for d in diagnose(text, top_k=8) if d.misconception.id == self._ID), None)
+        assert hit is not None and hit.confidence >= _DEFAULT_CONFIDENCE_FLOOR
 
 
 class TestSuneungCanonicalIds:
@@ -316,8 +429,8 @@ class TestCanonicalWrongForm:
 class TestCorrectForm:
     """선택 필드 `correct_form` — identity-shaped 오개념의 정정 형태(정밀 −1 반박 신호·tier).
 
-    부여 8종(distribution·a⁰·log·곱미분·sin 합분배 + 슬: 신호 정밀화로 gate-safe화된 square-root·
-    fraction-cancellation·chain-rule). 핵심 불변식: 정정 형태가 *자기 오개념*으로 신뢰 게이트(0.65)
+    부여 9종(distribution·a⁰·log·곱미분·sin 합분배 + 슬: 신호 정밀화로 gate-safe화된 square-root·
+    fraction-cancellation·chain-rule + MISC-40 power-rule-step-omitted). 핵심 불변식: 정정 형태가 *자기 오개념*으로 신뢰 게이트(0.65)
     이상 confident 오진단되면 안 된다 — `signals`가 *틀린 RHS*를 포함해 정정 형태(올바른 RHS)와
     구분되는 오개념만 부여(LHS-only 느슨 신호는 신호 정밀화로 먼저 좁힌다).
     """
@@ -332,6 +445,8 @@ class TestCorrectForm:
         "square-root-positivity",
         "fraction-cancellation",
         "chain-rule-inner-derivative-omitted",
+        # MISC-40: 연쇄법칙과 같은 설계(좌변만 공유·틀린 RHS 미포함)로 gate-safe.
+        "power-rule-step-omitted",
     }
 
     def test_field_optional_and_typed(self) -> None:
