@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - tests/harness/test_cli.py
   - backlog/tasks/CUR-07-achievement-standard-schema-extension.yaml
   - backlog/tasks/HARN-34-lost-bookkeeping-gate-recovery.yaml
-session: null
+session: claude/charming-albattani-c5004d
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5·§7 (stray-code 8회차 — 34zvse 커버리지 정독). CLAUDE.md '거부의 우회 금지' 처리 순서 ③(CLI 경로 자체가 없는 설계 공백이면 태스크로 등재 — HARN-06 선례). 8회차 세션은 done을 시도해 거부를 실측했고 우회하지 않았다. 코드·데이터 유실 0 — 대장(상태·증적·이벤트) 축만 공백."
-updated: 2026-09-07
+updated: 2026-10-01
