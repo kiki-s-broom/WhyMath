@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - src/backend/whymath_backend/app.py
   - "tests/backend/ops/**"
   - docs/standards/incident_response_slo.md
-session: null
+session: claude/awesome-bohr-cxff43
 notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §5 R1 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 등급 P1 근거: 12월 검증은 이것 없이도 성립하지만(우회 가능), 경로별 지연이 없으면 코치 턴(T1)이 느린지 판정할 수단이 없다. 연결(의존 관계 아님): `OPS-30`은 알림 채널·외부 프로브를, `EOS-114`는 next-problem 쿼리 비용을 다룬다 — 이 태스크의 경로별 지연은 `EOS-114`의 판정 재료로 쓰일 수 있다."
-updated: 2026-09-25
+updated: 2026-10-02
