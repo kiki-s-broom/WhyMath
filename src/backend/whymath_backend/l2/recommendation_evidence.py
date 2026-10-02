@@ -141,10 +141,10 @@ POLICY_VERSION_CAT: str = "cat_v4"
 POLICY_VERSION_SUNEUNG: str = "suneung_v3"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
 
-`suneung_v3`(EOS-147): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 전부 정답 이력에서 후보를 고르는
-θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의 표적이다. 그 외 이력의 선택은 `suneung_v2`와
-같지만 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다. `suneung_v2`는 EOS-31이
-먼저 썼다(두 변경이 한 번호를 쓰면 소급 평가가 서로 다른 규칙을 섞는다).
+`suneung_v3`(EOS-147): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 전부 정답 이력에서 후보를
+고르는 θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의 표적이다. 그 외 이력의 선택은
+`suneung_v2`와 같지만 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다.
+`suneung_v2`는 EOS-31이 먼저 썼다(두 변경이 한 번호를 쓰면 소급 평가가 서로 다른 규칙을 섞는다).
 
 `suneung_v2`(EOS-31): 수능 적격 게이트와 SQL 사전필터에 **출제 범위**(목표 학년도 수능의 성취기준
 범위 — `l6/suneung/scope.py`)가 선결 조건으로 들어갔다. `suneung_v1`은 난이도 라벨만 있으면 초·중
