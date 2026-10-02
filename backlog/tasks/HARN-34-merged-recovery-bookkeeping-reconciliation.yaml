@@ -7,6 +7,7 @@ subject: cross
 layer: infra
 status: done
 priority: 1
+eos_priority: null
 owner: claude
 depends_on: []
 requires_gates: []
@@ -16,11 +17,12 @@ acceptance:
   - "③ 고립 구현 참조 병기: main todo 태스크 yaml notes에 참조 브랜치 head를 기록해 중복 구현을 차단 — MISC-01·MISC-03·PB-02(6dszy0 67881979: 테스트 5파일 main 부재 실측)·CUR-07(34zvse 7fb78470)·S3-28(e98dw4 f8c0e3b6)·PB-08(6eejrv 2f428729 — 단 redaction 접근은 #802 close로 폐기, 검수 축 테스트만 참고)"
   - "④ OPS-41 notes 현행화: a3ysut·8ap436 원 브랜치 소멸(backup/*-pre-rebase만 잔존·head 갱신), p1hubt 소멸+학습경로 r3 doc 착지 확인, 게임화 r3 doc 착지 확인 — 잔여 대상을 a3ysut(backup)·t608mk·azdnov 3건으로 재열거"
   - "⑤ 집행 지점: backlog.py validate exit 0 + 게이트는 /gates 점검 화면에 실제 노출 확인(정본화≠집행 규칙)"
+  - "2026-10-02 정정: acceptance ③이 적은 CUR-07(34zvse 7fb78470)의 '고립' 기술은 사실과 다르다. CUR-07 산출물은 main 7b4fb546(2026-08-25 직접 커밋)에 이미 있고, 34zvse 판 9개 산출물 대조 결과 4개 바이트 동일·5개는 main이 앞선 상태(브랜치에만 있는 줄은 주석·docstring·필드 설명 문구와 리비전 목록 서식뿐, 동등 테스트는 main에 존재)다. CUR-07은 HARN-80 경로(--no-pr direct-commit)로 done 전이했다. 따라서 34zvse는 CUR-07에 관한 한 회수할 코드가 남지 않았다."
 artifacts:
   - "PR #900 (https://github.com/doldori7/WhyMath/pull/900) — ①G-export-prediction-disclosure 게이트 재등재(원 요청일 08-11 보존) ②ASM-12/#822·MISC-04/#821·CUR-16/#892·S4-10/#898 done 정정(이행 실측 병기)·SEC-28 유실 차단 note ③고립 참조 7건 병기 ④OPS-41 현행화 ⑤validate green·게이트 대장 노출 확인"
 paths:
   - backlog/gates.yaml
   - "backlog/tasks/**"
 session: null
-notes: "출처: docs/reviews/unmerged_branch_audit_2026-08-29.md. 회수 완료 전 참조 원 브랜치(ph1ad7·eos-curriculum-semantic-backbone-adr) 삭제 금지. '회수 시 acceptance 전수 재대조 생략 금지'(2026-08-10) 실사례 — #821/#822가 코드만 착지하고 부기·게이트를 유실"
-updated: 2026-08-30
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-08-29.md. 회수 완료 전 참조 원 브랜치(ph1ad7·eos-curriculum-semantic-backbone-adr) 삭제 금지. '회수 시 acceptance 전수 재대조 생략 금지'(2026-08-10) 실사례 — #821/#822가 코드만 착지하고 부기·게이트를 유실\n\n[정정 2026-10-02] HARN-80 ④ — CUR-07 고립 기술 정정(폐기 표시). 근거는 acceptance 말미에 기록"
+updated: 2026-10-02
