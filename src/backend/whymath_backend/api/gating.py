@@ -289,6 +289,21 @@ async def _inject_curriculum_required_depth(
             problem.curriculum_required_depth = max(depths, key=lambda d: _DEPTH_ORDER[d])
 
 
+async def _inject_achievement_codes(session: AsyncSession, candidates: list[ProblemSchema]) -> None:
+    """후보 문항에 *성취기준 코드*(비영속 필드)를 원자 축 조인으로 주입한다(in-place).
+
+    학교진도(`_fetch_candidates_with_standards`)와 수능(`_fetch_candidates_with_codes` — EOS-31)이
+    같은 조인을 쓴다 — 같은 L5 레이어에서 같은 조인을 두 번 쓰지 않는다(단일 진실 원천). 코드가
+    없는 문항은 키 부재로 빈 리스트가 유지된다(학교진도는 단원·persona_fit 폴백, 수능 게이트는
+    `UNKNOWN`으로 거절).
+    """
+    codes = await _fetch_achievement_codes(session, [p.problem_id for p in candidates])
+    for problem in candidates:
+        if problem.problem_id in codes:
+            # sorted로 결정적 순서(집합→리스트). 키 부재 문항은 기본 빈 리스트 유지.
+            problem.achievement_standard_codes = sorted(codes[problem.problem_id])
+
+
 async def _fetch_candidates_with_standards(session: SessionDep) -> list[ProblemSchema]:
     """학교진도 후보를 읽고 *성취기준 코드*·*교육과정 요구 깊이*(비영속 필드)를 주입해 돌려준다.
 
@@ -301,8 +316,9 @@ async def _fetch_candidates_with_standards(session: SessionDep) -> list[ProblemS
          `ProblemSchema.curriculum_required_depth`에 채운다(자동 커리큘럼 정렬 깊이 축). curriculum_
          entry 미적재·깊이 미큐레이션이면 None으로 남아 L6 깊이정렬이 무신호 폴백(데이터0 안전).
 
-    school-progress 게이팅 핸들러 전용 의존성이라 retake·suneung·thinking은 이 조인 비용을 지지
-    않는다(그들은 `CandidatesDep` 유지).
+    school-progress 게이팅 핸들러 전용 의존성이라 retake·thinking은 이 조인 비용을 지지 않는다
+    (그들은 `CandidatesDep` 유지). 수능은 깊이 주입 없이 코드만 필요해
+    `_fetch_candidates_with_codes`를 쓴다(EOS-31).
 
     Args:
       session: 요청 수명 AsyncSession(`get_session` 주입).
@@ -311,11 +327,7 @@ async def _fetch_candidates_with_standards(session: SessionDep) -> list[ProblemS
       성취기준 코드·교육과정 요구 깊이가 주입된 후보 `schema.Problem` 리스트(게이팅 입력).
     """
     candidates = await _fetch_candidates(session)
-    codes = await _fetch_achievement_codes(session, [p.problem_id for p in candidates])
-    for problem in candidates:
-        if problem.problem_id in codes:
-            # sorted로 결정적 순서(집합→리스트). 키 부재 문항은 기본 빈 리스트 유지.
-            problem.achievement_standard_codes = sorted(codes[problem.problem_id])
+    await _inject_achievement_codes(session, candidates)
     # 자동 커리큘럼 정렬 깊이 축 주입(curriculum_entry resolver·in-place·데이터0 시 None 폴백).
     await _inject_curriculum_required_depth(session, candidates)
     return candidates
@@ -324,6 +336,21 @@ async def _fetch_candidates_with_standards(session: SessionDep) -> list[ProblemS
 SchoolProgressCandidatesDep = Annotated[
     list[ProblemSchema], Depends(_fetch_candidates_with_standards)
 ]
+
+
+async def _fetch_candidates_with_codes(session: SessionDep) -> list[ProblemSchema]:
+    """수능 후보를 읽고 *성취기준 코드*(비영속 필드)만 주입한다 — 출제 범위 게이트(EOS-31)의 입력.
+
+    수능 게이트 ②-c는 코드가 없으면 `UNKNOWN`으로 거절한다(fail-closed). 그래서
+    `CandidatesDep`(코드 미주입)를 그대로 쓰면 이 엔드포인트가 **항상 빈 결과**를 낸다 — 조용한
+    회귀다. 교육과정 요구 깊이(sync 엔진 좌석)는 수능이 쓰지 않으므로 주입하지 않는다.
+    """
+    candidates = await _fetch_candidates(session)
+    await _inject_achievement_codes(session, candidates)
+    return candidates
+
+
+SuneungCandidatesDep = Annotated[list[ProblemSchema], Depends(_fetch_candidates_with_codes)]
 
 
 def _to_public(items: list[ProblemSchema]) -> list[PublicProblem]:
@@ -366,7 +393,7 @@ async def gating_retake(
 )
 async def gating_suneung(
     request: Request,
-    candidates: CandidatesDep,
+    candidates: SuneungCandidatesDep,
     persona: Annotated[
         Persona, Query(description="노출 대상 페르소나. 수능은 A·B·C 대상")
     ] = Persona.A_일반고고3,

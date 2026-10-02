@@ -374,7 +374,9 @@ class TestSeatExistsInAllThreePlaces:
         # [2026-09-29 S4-11] head가 9d3e6b1f4a27(hints 테이블)로, 이어서 [EOS-50] 9d3e7b1c5a20
         # (concept_version_status_enum 'IN_QA' + concept_version.qa 게이트 기록 좌석)으로
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
-        assert EXPECTED_ALEMBIC_HEAD == "9d3e7b1c5a20"
+        # [2026-10-02 DP-03] head가 a3f7c9d1e5b2(attempt_event.event_uuid 멱등키)로 전진 —
+        # 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "a3f7c9d1e5b2"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

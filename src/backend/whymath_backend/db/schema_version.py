@@ -168,6 +168,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 1~3로 Level 4 표현 불가·verified 게이팅). 생성 writer·게이트·coach 서빙 reader 동반 좌석.
     "9d3e7b1c5a20",  # EOS-50: concept_version_status_enum 'IN_QA' + concept_version.qa(게이트
     # 통과 기록 — §9 QA 연결). 쓰는 곳은 l3/publish_gate 한 곳(AST 동결).
+    "a3f7c9d1e5b2",  # DP-03: attempt_event.event_uuid(재전송 멱등키) + 부분 UNIQUE 인덱스
+    # (NULL=멱등키 미부여·백필 금지). hypertable이면 마이그레이션이 중단한다(ADR-001).
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

@@ -52,17 +52,30 @@ function fakeExec(table: (cmd: string, args: string[]) => Partial<ExecResult> | 
 }
 
 describe("python 탐색", () => {
-  it("후보 순서: 지정 → python3 → python → (win32) py -3", () => {
-    expect(pythonCandidates("C:/x/python.exe", "win32").map((c) => [c.cmd, ...c.prefix].join(" ")))
-      .toEqual(["C:/x/python.exe", "python3", "python", "py -3"]);
+  it("후보 순서: 지정 → 저장소 .venv → src/backend/.venv → python3 → python → (win32) py -3", () => {
+    expect(pythonCandidates("C:/x/python.exe", "win32", "C:\\repo").map((c) => [c.cmd, ...c.prefix].join(" ")))
+      .toEqual(["C:/x/python.exe", "C:\\repo\\.venv\\Scripts\\python.exe", "C:\\repo\\src\\backend\\.venv\\Scripts\\python.exe",
+        "python3", "python", "py -3"]);
+    expect(pythonCandidates(undefined, "linux", "/repo").map((c) => c.cmd))
+      .toEqual(["/repo/.venv/bin/python", "/repo/src/backend/.venv/bin/python", "python3", "python"]);
     expect(pythonCandidates(undefined, "linux").map((c) => c.cmd)).toEqual(["python3", "python"]);
   });
-  it("처음 되는 후보를 고르고, 없으면 시도 목록을 돌려준다", async () => {
-    const ex = fakeExec((cmd) => (cmd === "python" ? { stdout: "Python 3.12" } : undefined));
-    const r = await findPython(ex, tmp, undefined, "win32");
-    expect(r.found?.cmd).toBe("python"); expect(r.tried).toEqual(["python3", "python"]);
-    const none = await findPython(fakeExec(() => undefined), tmp, undefined, "win32");
-    expect(none.found).toBeNull(); expect(none.tried).toEqual(["python3", "python", "py -3"]);
+  it("--version이 아니라 yaml 임포트로 찌른다 — 하네스를 돌릴 수 있는 인터프리터만 고른다", async () => {
+    const ex = fakeExec((cmd) => (cmd === "python" ? { stdout: "" } : undefined));
+    await findPython(ex, "/repo", undefined, "linux");
+    expect(ex.calls.every((c) => c[1] === "-c" && c[2] === "import yaml")).toBe(true);
+  });
+  it("처음 되는 후보를 고르고, 없으면 시도 목록을 돌려준다 · 있지만 못 돌린 것은 사유를 붙인다", async () => {
+    const venv = "/repo/.venv/bin/python";
+    // 저장소 .venv는 실행되지만 yaml이 없다(exit 1) → 건너뛰고 python을 고른다
+    const ex = fakeExec((cmd) => (cmd === "python" ? { stdout: "" }
+      : cmd === venv ? { status: "error", code: 1, reason: "ExitError: 1" } : undefined));
+    const r = await findPython(ex, "/repo", undefined, "linux");
+    expect(r.found?.cmd).toBe("python");
+    expect(r.tried).toEqual([`${venv}(실행됐지만 yaml 임포트 실패)`, "/repo/src/backend/.venv/bin/python", "python3", "python"]);
+    const none = await findPython(fakeExec(() => undefined), "C:\\repo", undefined, "win32");
+    expect(none.found).toBeNull();
+    expect(none.tried.slice(-3)).toEqual(["python3", "python", "py -3"]);
   });
 });
 
@@ -73,24 +86,24 @@ describe("harnessAdapter", () => {
     expect(r.payload).toBeNull(); expect(r.result.status).toBe("missing_tool"); expect(r.result.reason).toMatch(/python3, python/);
   });
   it("정상 → 페이로드 그대로 + --no-remote 전달 + stderr는 warnings", async () => {
-    const ex = fakeExec((cmd, args) => args[0] === "--version" ? {} : { stdout: JSON.stringify(payload), stderr: "경고 1\n경고 2\n" });
+    const ex = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { stdout: JSON.stringify(payload), stderr: "경고 1\n경고 2\n" });
     const r = await collectHarness(tmp, opts, ex, "linux");
     expect(r.result.status).toBe("ok"); expect(r.payload).toEqual(payload);
     expect(r.result.warnings).toEqual(["경고 1", "경고 2"]);
     expect(ex.calls.at(-1)).toEqual(["python3", "scripts/harness/work_graph.py", "--json", "--no-remote"]);
-    const ex2 = fakeExec((cmd, args) => args[0] === "--version" ? {} : { stdout: JSON.stringify(payload) });
+    const ex2 = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { stdout: JSON.stringify(payload) });
     await collectHarness(tmp, { ...opts, remote: true }, ex2, "linux");
     expect(ex2.calls.at(-1)).toEqual(["python3", "scripts/harness/work_graph.py", "--json"]);
   });
   it("타임아웃·오류·깨진 JSON은 각각 status로 남는다", async () => {
-    const to = fakeExec((cmd, args) => args[0] === "--version" ? {} : { status: "timeout", code: null, reason: "TimeoutError: 120000ms" });
+    const to = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { status: "timeout", code: null, reason: "TimeoutError: 120000ms" });
     expect((await collectHarness(tmp, opts, to, "linux")).result).toMatchObject({ status: "timeout", reason: /TimeoutError/ });
-    const er = fakeExec((cmd, args) => args[0] === "--version" ? {} : { status: "error", code: 1, stderr: "Traceback", reason: "ExitError: python3 종료 코드 1" });
+    const er = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { status: "error", code: 1, stderr: "Traceback", reason: "ExitError: python3 종료 코드 1" });
     const e = await collectHarness(tmp, opts, er, "linux");
     expect(e.result.status).toBe("error"); expect(e.result.warnings).toEqual(["Traceback"]); expect(e.payload).toBeNull();
-    const bad = fakeExec((cmd, args) => args[0] === "--version" ? {} : { stdout: "not json" });
+    const bad = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { stdout: "not json" });
     expect((await collectHarness(tmp, opts, bad, "linux")).result).toMatchObject({ status: "error", reason: /SyntaxError/ });
-    const schema = fakeExec((cmd, args) => args[0] === "--version" ? {} : { stdout: "{}" });
+    const schema = fakeExec((cmd, args) => args[0] === "-c" ? (cmd === "python3" ? {} : undefined) : { stdout: "{}" });
     expect((await collectHarness(tmp, opts, schema, "linux")).result).toMatchObject({ status: "error", reason: /SchemaError/ });
   });
 });

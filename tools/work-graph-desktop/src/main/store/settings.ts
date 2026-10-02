@@ -67,6 +67,9 @@ export class SettingsStore {
     const root = path.resolve(input.path);
     const detected = await detectKind(root);
     if (detected.kind === null) return { ok: false, reason: detected.reason };
+    if (input.requireHarness && detected.kind !== "harness") {
+      return { ok: false, reason: `WhyMath 저장소가 아니다 — ${root}에 scripts/harness/work_graph.py가 없다` };
+    }
     const settings = await this.load();
     const existing = settings.workspaces.find((w) => path.resolve(w.root) === root);
     if (existing) return { ok: true, workspace: existing };
