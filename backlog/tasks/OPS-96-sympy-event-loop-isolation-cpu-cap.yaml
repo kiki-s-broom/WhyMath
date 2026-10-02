@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - src/backend/whymath_backend/l3/verify_step.py
   - src/backend/whymath_backend/api/coach.py
   - "tests/backend/api/test_verify*.py"
-session: null
+session: claude/blissful-lovelace-ubp9tw
 notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §5 R6 (PR #1311). 2026-09-25 Kiki 지정 — 12/31 내부 완성 기간 최소 묶음(R1·R4·R6) 중 1건. 성능보다 가용성·검증 권위 축의 결함이다. 등급 P1 근거: 12월 검증은 성립하지만, 내부 테스트 중 병리적 입력 1건이 서버 전체를 멈출 수 있다."
-updated: 2026-09-25
+updated: 2026-10-02

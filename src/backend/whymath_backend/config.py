@@ -417,6 +417,48 @@ class Settings(BaseSettings):
         ),
     )
 
+    sympy_isolation_enabled: bool = Field(
+        default=True,
+        description=(
+            "OPS-96 — 학생 대면 경로의 SymPy 검증(`/v1/verify-step`·`verify-solution`·"
+            "`verify-answer`·코치 턴의 최종답 판정)을 **별도 프로세스 워커**에서 시간 상한과 함께 "
+            "돌릴지. True(기본)면 느린 식 1건이 그 워커의 모든 학생 요청을 멈추지 않고(이벤트 루프 "
+            "격리), 상한을 넘기면 계산을 끊고 **판정 불가(unverifiable)** 로 응답한다(통과·오답 "
+            "아님). False면 종전처럼 핸들러 안에서 동기 실행(상한 없음·완전 되돌리기). "
+            "WHYMATH_SYMPY_ISOLATION_ENABLED=false로 끈다."
+        ),
+    )
+    sympy_isolation_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description=(
+            "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
+            "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
+            "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
+            "입력이 판정 불가로 떨어질 수 있으니 `sympy_isolation_budget_exceeded` 로그 비율을 "
+            "보고 조정한다."
+        ),
+    )
+    sympy_isolation_preload_modules: list[str] = Field(
+        default_factory=lambda: ["sympy"],
+        description=(
+            "OPS-96 — SymPy 워커 프로세스가 `ready` 이전에 미리 import할 모듈. 비우면 첫 호출이 "
+            "import 비용(≈1초)을 치른다(그 시간은 계산 상한 밖이라 판정 불가로 새지는 않지만 첫 "
+            "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
+        ),
+    )
+    sympy_isolation_max_workers: int = Field(
+        default=2,
+        ge=1,
+        le=16,
+        description=(
+            "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
+            "상태로 상주한다(메모리 약 100~150MB/개 — 서버 워커 수 × 이 값 만큼 프로세스가 뜬다). "
+            "모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 판정 불가로 떨어진다."
+        ),
+    )
+
     l4_hint_content_serving_enabled: bool = Field(
         default=True,
         description=(
