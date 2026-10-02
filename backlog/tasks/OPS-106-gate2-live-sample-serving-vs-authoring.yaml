@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-106-gate2-live-sample-serving-vs-authoring
+title: "게이트② 라이브 표본 실측 — WH-1 primary 계상·LangfuseSink 실전송·저작 분리 라이브 확인 (OPS-84 ③ 승계)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-84-authoring-path-pipeline-wiring-and-live-cost-sample
+  - OPS-105-pipeline-trace-call-site-and-surface-axis
+requires_gates: []
+acceptance:
+  - "① 게이트② 라이브 표본 실측(OPS-84 ③ 승계) — Phaiakes9에서 WH-1 primary 트래픽을 흘린 뒤 ops/cost_report가 그 호출을 학생 대면 표본으로 계상하는지 확인한다. 프로덕션 LangfuseSink로 이벤트가 실제 전송되는지(주입 TraceSink 아님)를 확인하는 것이 핵심이다.\n② 인프로세스 이중 회계(ops/cost_probe 로컬 비율)와 대조해 측정 실패가 0건 통과로 위장되지 않는지 본다.\n③ 저작 rephrase CLI(--limit 소량)를 같은 창에서 흘려 traffic_surface=authoring 이벤트가 cost_report에서 표본 제외 건수로만 나타나는지 확인한다(OPS-84가 hermetic으로 동결한 분리를 라이브로 확인).\n④ Kiki 실행 런북은 실행 전 저장소 코드 경로 실측으로 검증한다(CLAUDE.md 검증 없는 실행 안내 금지) — 이 태스크가 런북을 쓰고 사람 게이트를 등재한다."
+artifacts: []
+paths:
+  - "docs/ops/**"
+session: null
+notes: "OPS-84 ③(라이브 표본)은 트래픽이 필요해 클라우드 세션에서 실행 불가 — 승계 분리. OPS-105 선행: call_site/표면 축 없이는 WH-1 primary 호출을 표본에서 식별할 수 없다(조용한 0건 통과 위험)."
+updated: 2026-10-02
