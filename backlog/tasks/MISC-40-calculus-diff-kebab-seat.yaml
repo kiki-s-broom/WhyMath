@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -22,6 +22,13 @@ paths:
   - tests/backend/l4/test_misconception_catalog.py
   - tests/backend/l4/test_crosslink_review.py
   - tests/backend/l4/test_crosslink_triage.py
-session: null
-notes: "출처: 2026-09-30 Kiki 승인 등록(P3-01 대표 과정 선택 후속). 병목 정정: 처음에는 Kiki 검수가 병목이라 보았으나 조사 결과 병목은 kebab 신설(세션 작업 · 테스트 회귀 연쇄)이고 서명은 트랜치 단위로 한 번에 끝나는 규모다(과거 하루 6~11건 선례 — 1건당 소요는 실측 없음).\n근거 조사(2026-09-30 · 정적 읽기): 검수 큐 docs/data/misconception_crosslink_review_queue.json 114행 전행 pending 봉인, 승인분 data/corpus/misconception_crosslinks_v1/crosslinks.json 64행. 승인 계약의 kebab_id는 CATALOG_BY_ID에 있어야 하므로 신설이 검수보다 먼저다. 7개 개념의 M-id 서술이 대부분 omission형이라 7건 전부가 kebab이 되지 않을 수 있다(조사 담당의 판단·추측). M-id 코퍼스 자체가 AI생성-검수필요라 Kiki가 이중으로 봐야 한다.\n신규 crosslink 서명 게이트를 P3-03 requires_gates에 부착해, 서명 없이 콘텐츠 채우기가 착수되는 경로를 selector가 막는다."
-updated: 2026-09-30
+  - tests/backend/harness/test_crosslink_demotion_eval.py
+  - tests/backend/harness/test_wh1_evaluation.py
+  - tests/backend/l4/misconception/test_answer_signature.py
+  - tests/backend/l4/test_misconception_judge_integration.py
+  - tests/backend/l4/test_misconception_probes.py
+  - tests/backend/l4/test_misconception_semantic_eval.py
+  - tests/backend/l4/test_misconception_semantic_eval_integration.py
+session: claude/fervent-goldberg-s8y8ws
+notes: "출처: 2026-09-30 Kiki 승인 등록(P3-01 대표 과정 선택 후속). 병목 정정: 처음에는 Kiki 검수가 병목이라 보았으나 조사 결과 병목은 kebab 신설(세션 작업 · 테스트 회귀 연쇄)이고 서명은 트랜치 단위로 한 번에 끝나는 규모다(과거 하루 6~11건 선례 — 1건당 소요는 실측 없음).\n근거 조사(2026-09-30 · 정적 읽기): 검수 큐 docs/data/misconception_crosslink_review_queue.json 114행 전행 pending 봉인, 승인분 data/corpus/misconception_crosslinks_v1/crosslinks.json 64행. 승인 계약의 kebab_id는 CATALOG_BY_ID에 있어야 하므로 신설이 검수보다 먼저다. 7개 개념의 M-id 서술이 대부분 omission형이라 7건 전부가 kebab이 되지 않을 수 있다(조사 담당의 판단·추측). M-id 코퍼스 자체가 AI생성-검수필요라 Kiki가 이중으로 봐야 한다.\n신규 crosslink 서명 게이트를 P3-03 requires_gates에 부착해, 서명 없이 콘텐츠 채우기가 착수되는 경로를 selector가 막는다.\n\n[정정 2026-10-02] paths ['src/backend/whymath_backend/l4/misconception/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'docs/reviews/misc_40_*.md', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py'] → ['src/backend/whymath_backend/l4/misconception/**', 'docs/prompts/misconception_diagnosis.md', 'docs/data/misconception_crosslink_review_queue.json', 'docs/reviews/misc_40_*.md', 'tests/backend/l4/test_misconception_catalog.py', 'tests/backend/l4/test_crosslink_review.py', 'tests/backend/l4/test_crosslink_triage.py', 'tests/backend/harness/test_crosslink_demotion_eval.py', 'tests/backend/harness/test_wh1_evaluation.py', 'tests/backend/l4/misconception/test_answer_signature.py', 'tests/backend/l4/test_misconception_judge_integration.py', 'tests/backend/l4/test_misconception_probes.py', 'tests/backend/l4/test_misconception_semantic_eval.py', 'tests/backend/l4/test_misconception_semantic_eval_integration.py']: 카탈로그 68종 신설에 따른 개수 동결 테스트 연쇄 갱신 7개 파일을 paths에 더했다(기존 7개는 전부 유지 — MISC-21 선례: 착수 시 paths가 테스트 3개만 적었다)"
+updated: 2026-10-02

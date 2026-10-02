@@ -293,15 +293,15 @@ class TestFormatReport:
 class TestProbeSetStructure:
     def test_loads_98_probes(self) -> None:
         probes = _load_real_probes()
-        # 150 + 843 트랜치5 12(recall 6·FP 6) + MISC-21 7(recall 3·FP 4 — #1068 P1)
-        assert len(probes) == 169
+        # 150 + 843 트랜치5 12(recall 6·FP 6) + MISC-21 7(recall 3·FP 4 — #1068 P1) + MISC-40 3(recall 2·FP 1)
+        assert len(probes) == 172
 
     def test_recall_and_fp_split(self) -> None:
         probes = _load_real_probes()
         recall = [p for p in probes if p.is_recall_probe]
         fp = [p for p in probes if p.is_fp_probe]
-        assert len(recall) == 98  # 89 + 843 트랜치5 recall 6 + MISC-21 recall 3
-        assert len(fp) == 71  # 61 + 843 트랜치5 FP 6 + MISC-21 FP 4(#1068 P1 회귀 1건 포함)
+        assert len(recall) == 100  # 89 + 843 트랜치5 recall 6 + MISC-21 recall 3 + MISC-40 recall 2
+        assert len(fp) == 72  # 61 + 843 트랜치5 FP 6 + MISC-21 FP 4(#1068 P1 회귀 1건 포함) + MISC-40 FP 1
         # 상호배타·완전분할(recall ⊕ fp = 전체).
         assert len(recall) + len(fp) == len(probes)
 
@@ -357,7 +357,7 @@ class TestRunProbesWiring:
         assert len(outcomes) == len(probes)
         report = evaluate(outcomes)
         # 구조 단언만(품질 hard-fail 아님): 비율은 [0,1] 또는 None.
-        assert report.total == 169
+        assert report.total == 172
         for value in (report.recall, report.false_positive_rate):
             assert value is None or 0.0 <= value <= 1.0
         # outcome의 semantic_ids/substring_ids는 카탈로그 id이거나 빈 튜플.
@@ -630,7 +630,7 @@ class TestRunProbesWithJudgeWiring:
         )
         assert len(outcomes) == len(probes)
         report = evaluate(outcomes)
-        assert report.total == 169
+        assert report.total == 172
         # 전부 유지(불확실)이므로 judge 후 지표 = 의미 지표(거른 게 없음).
         assert report.judge_false_positives == report.semantic_false_positives
         assert report.judge_caught_recall == report.caught_recall
@@ -732,9 +732,9 @@ class TestRunJsonOutput:
             )
         assert code == 0
         payload = json.loads(capsys.readouterr().out)
-        assert payload["summary"]["total"] == 169
+        assert payload["summary"]["total"] == 172
         assert payload["summary"]["judge_applied"] is False
-        assert len(payload["probes"]) == 169
+        assert len(payload["probes"]) == 172
 
     def test_run_json_with_judge_includes_decisions(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -798,8 +798,8 @@ class TestRunJsonOutput:
         assert code == 0
         assert "summary" not in capsys.readouterr().out  # 본문은 파일로, stdout엔 없음
         payload = json.loads(out_file.read_text(encoding="utf-8"))
-        assert payload["summary"]["total"] == 169
-        assert len(payload["probes"]) == 169
+        assert payload["summary"]["total"] == 172
+        assert len(payload["probes"]) == 172
 
 
 # ══════════════════════════════════════════════════════════════════════════

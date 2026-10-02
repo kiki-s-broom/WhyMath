@@ -374,11 +374,18 @@ _MISC21_DIRECT: dict[str, set[tuple[str, float]]] = {
     "addition-multiplication-rule-confused": {("M0599", 0.9)},
 }
 
+# MISC-40 — 미적분Ⅰ '미분' 대단원 좌석 판정으로 신설된 1종(같은 화이트리스트 계약·전행 pending·미서명).
+# 나머지 6개 개념 중 M0672는 기존 부분매핑 pending 행이 좌석 후보(신설 없음)이고, M0673·M0674·M0676·
+# M0677·M0678은 의도적 미승격이라 여기 없다(아래 판정 동결 테스트 참조).
+_MISC40_DIRECT: dict[str, set[tuple[str, float]]] = {
+    "power-rule-step-omitted": {("M0671", 0.85)},
+}
+
 
 def test_real_queue_direct_top_confidences_match_draft(
     real_rows: list[dict[str, Any]],
 ) -> None:
-    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 — 그 외 차단.
+    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 ∪ MISC-40 — 그 외 차단.
     expected: dict[str, set[tuple[str, float]]] = {
         k: set(_DRAFT_DIRECT_TOPS.get(k, set()))
         | set(_REVIEWED_DIRECT_ALTS.get(k, set()))
@@ -390,6 +397,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE4_DIRECT.get(k, set()))
         | set(_TRANCHE5_DIRECT.get(k, set()))
         | set(_MISC21_DIRECT.get(k, set()))
+        | set(_MISC40_DIRECT.get(k, set()))
         for k in set(_DRAFT_DIRECT_TOPS)
         | set(_REVIEWED_DIRECT_ALTS)
         | set(_S2P_DIRECT)
@@ -400,6 +408,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE4_DIRECT)
         | set(_TRANCHE5_DIRECT)
         | set(_MISC21_DIRECT)
+        | set(_MISC40_DIRECT)
     }
     actual: dict[str, set[tuple[str, float]]] = {}
     for row in real_rows:
@@ -439,3 +448,86 @@ def test_real_queue_explicit_alt_confidences_match_draft(
 def test_real_queue_promotes_nothing_as_is(real_queue: dict[str, Any]) -> None:
     # 전행 pending인 실 큐는 승격 0건 — 검수 없이 어떤 행도 로더 형식으로 새지 않는다.
     assert promote_approved(real_queue) == {"crosslinks": []}
+
+
+# ── MISC-40(2026-10-02) — 미적분Ⅰ '미분' 대단원 문항 0건 개념 7개의 좌석 판정 동결 ─────────────────
+# 판정 근거·사유·재검토 조건: docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md.
+# 이 절의 단언은 **판정이 데이터와 어긋나지 않게** 묶는다. 어느 하나가 적색이면 판정 문서를 먼저
+# 갱신하라 — 예컨대 미승격 5건 중 하나에 좌석(큐 행·승인 행)이 생겼다면 그것은 판정 변경이다.
+# (Kiki 서명으로 큐 행이 approved가 되는 순간 `test_real_queue_all_pending_unsigned`와 함께 이 절도
+# 서명 PR이 갱신한다 — 기존 크로스워크 봉인 테스트와 같은 운용이다.)
+_MISC40_DOC = _ROOT / "docs" / "reviews" / "misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md"
+_CROSSLINKS_PATH = _ROOT / "data" / "corpus" / "misconception_crosslinks_v1" / "crosslinks.json"
+
+#: 판정 대상 개념 → 그 개념에 걸린 M-id. "개념당 M-id가 정확히 1개"가 판정의 전제다.
+_MISC40_CONCEPT_MIDS: dict[str, str] = {
+    "[12미적Ⅰ-02-03]": "M0671",
+    "[12미적Ⅰ-02-04]": "M0672",
+    "[12미적Ⅰ-02-05]": "M0673",
+    "[12미적Ⅰ-02-06]": "M0674",
+    "[12미적Ⅰ-02-08]": "M0676",
+    "[12미적Ⅰ-02-09]": "M0677",
+    "[12미적Ⅰ-02-10]": "M0678",
+}
+#: 의도적 미승격 — omission형(또는 문항 맥락 종속)이라 kebab도 큐 행도 만들지 않았다.
+_MISC40_NOT_PROMOTED = ("M0673", "M0674", "M0676", "M0677", "M0678")
+#: 서명 게이트(G-misc40-new-crosslink-signature)에 올린 5행 = MISC-21 잔여 3 + MISC-40 신설 1 + 기존 부분매핑 1.
+_MISC40_SIGNATURE_PAIRS: tuple[tuple[str, str], ...] = (
+    ("bigger-denominator-bigger-fraction", "M0462"),
+    ("ratio-order-swapped", "M0515"),
+    ("addition-multiplication-rule-confused", "M0599"),
+    ("power-rule-step-omitted", "M0671"),
+    ("product-rule-naive", "M0672"),
+)
+
+
+def test_misc40_each_concept_has_exactly_one_mid_in_corpus() -> None:
+    # 판정의 전제 — 7개 개념 각각에 걸린 M-id가 정확히 1개다(코퍼스가 바뀌면 판정을 다시 센다).
+    corpus = json.loads(_CORPUS_PATH.read_text(encoding="utf-8"))
+    for code, mid in _MISC40_CONCEPT_MIDS.items():
+        found = sorted(m["mis_id"] for m in corpus["misconceptions"] if m.get("standard_code") == code)
+        assert found == [mid], (code, found)
+
+
+def test_misc40_not_promoted_mids_have_no_crosswalk_seat(real_rows: list[dict[str, Any]]) -> None:
+    # 의도적 미승격 5건 — 승인 크로스워크에도 검수 큐에도 행이 없어야 한다(판정 회귀 가드).
+    approved = json.loads(_CROSSLINKS_PATH.read_text(encoding="utf-8"))["crosslinks"]
+    approved_mids = {r["mis_id"] for r in approved}
+    queued_mids = {r["mis_id"] for r in real_rows}
+    for mid in _MISC40_NOT_PROMOTED:
+        assert mid not in approved_mids, mid
+        assert mid not in queued_mids, mid
+
+
+def test_misc40_new_kebab_has_single_pending_direct_row(real_rows: list[dict[str, Any]]) -> None:
+    rows = [r for r in real_rows if r["kebab_id"] == "power-rule-step-omitted"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert (row["mis_id"], row["link_type"], row["confidence"]) == ("M0671", "직접매핑", 0.85)
+    assert row["status"] == "pending"
+    assert row["reviewer"] is None and row["reviewed_on"] is None
+    assert "power-rule-step-omitted" in CATALOG_BY_ID  # 큐 행이 가리키는 kebab이 실재한다
+
+
+def test_misc40_m0672_seat_is_the_existing_pending_partial_row(real_rows: list[dict[str, Any]]) -> None:
+    # M0672는 신설 없이 기존 kebab(product-rule-naive)의 *이미 있던* 부분매핑 pending 행이 좌석 후보다.
+    # 행을 새로 만들거나 바꾸지 않았다는 것을 값으로 못 박는다(확정은 Kiki 검수).
+    rows = [r for r in real_rows if r["mis_id"] == "M0672"]
+    assert [(r["kebab_id"], r["link_type"], r["confidence"], r["status"]) for r in rows] == [
+        ("product-rule-naive", "부분매핑", None, "pending")
+    ]
+
+
+def test_misc40_signature_table_in_judgment_doc_matches_queue(real_rows: list[dict[str, Any]]) -> None:
+    # 서명 대상 5행은 ① 큐에 실재하고 ② 판정 문서 **§6 절의** 표 행(`|`로 시작하는 줄)에 kebab·M-id가
+    # 함께 적혀 있다. 절을 §6으로 좁히는 이유: 문서 앞쪽 §1 판정표도 같은 두 문자열을 한 행에 담고 있어,
+    # 문서 전체에서 찾으면 §6의 서명 대상 행이 지워져도 통과한다(행 삭제 시뮬레이션으로 확인한 사각).
+    text = _MISC40_DOC.read_text(encoding="utf-8")
+    sections = [sec for sec in text.split("\n## ") if sec.startswith("§6.")]
+    assert len(sections) == 1, "판정 문서에 '## §6.' 절이 정확히 하나여야 한다"
+    table_lines = [ln for ln in sections[0].splitlines() if ln.startswith("|")]
+    assert table_lines, "스캔 0건 — §6 절에 표 행이 없다(공허 통과 방지)"
+    queue_pairs = {(r["kebab_id"], r["mis_id"]) for r in real_rows}
+    for kebab, mid in _MISC40_SIGNATURE_PAIRS:
+        assert (kebab, mid) in queue_pairs, (kebab, mid)
+        assert any(kebab in ln and mid in ln for ln in table_lines), (kebab, mid)
