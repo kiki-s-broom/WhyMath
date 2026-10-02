@@ -346,6 +346,11 @@
 - **정정**: `evidence_event.retention_until`은 "retention.py 소관"이 아니라 읽는 코드도 채우는 writer도 없는 예약 컬럼이다(writer 3곳 실측 · `EvidenceEventStore.log` 호출처 0건). 모델 docstring을 정정하고, 누가 채우기 시작하면 RED가 되는 핀을 뒀다. 부수로 `review_timer_event` docstring의 삭제권 스윕 축 서술에 (C) 제외 사실을 보강했다.
 - **후속**: `SEC-25-writer0-account-history-retention-disposition`(writer 0인 `user_track_history`·`user_persona_history`) 등재 · `user_state_snapshot`은 기존 `ARCH-51`에 묶음 · `SEC-40`(삭제권 배선)과는 파일이 겹치지 않는다.
 - **검증**: 뮤테이션 20건(M1~M12) 전건 검출 · 주입 미적용 0 · 바이트 동일 복원. M6a는 내 기대 목록이 틀렸을 뿐(만료 등재 제거는 순회 대상이 사라져 `live_resolution_task`가 못 잡는 게 맞다) 다른 두 테스트가 RED. 대표 사례: 소유 판정이 빈 집합이 되면 실제 완전성 테스트는 **조용히 통과**하고 `…is_not_vacuous`만 RED(M12).
+### 2026-10-02 (착지 · OPS-84): **저작 rephrase를 `l3.pipeline` 경유로 전환하되 응답 캐시는 끈다 — 그리고 저작 trace에 `traffic_surface="authoring"` 표지를 실어 게이트② 표본(학생 대면 루프당 비용)에서 분리한다** (claude 판정·구현)
+
+- **결선**: `QuestionRephraser`가 `Router().route()` 결과를 손으로 재조립(`_decide_routing`)해 `provider.generate`를 직접 부르던 우회를 `pipeline.generate(prefer_local_family=GENERAL, temperature=)`로 바꿨다. 이벤트 루프는 인스턴스가 소유한다(호출부 3종이 전부 동기 CLI라 실행 중 루프가 없다). 뮤테이션 10종 중 9종 RED — 생존 1종(표지 래퍼의 `flush` 미위임)은 아무도 부르지 않는 죽은 코드로 판명돼 제거했다.
+- **캐시 판정(실측)**: 끈다. ⓐ 온도 스윕은 같은 rephraser로 같은 앞 N건을 반복해 회차 간 폭으로 유의성을 판정하는데, 캐시를 켜면 repeats=5에서 호출이 25회→5회로 줄고 폭이 0으로 붕괴한다(대조군 테스트로 동결) ⓑ `data/corpus/*/problems.jsonl` 37개 파일의 봉인 대상 발문 3,159건 중 파일 내 중복 398건(12.6%)이 전부 같은 재서술을 받는다. 회차 축을 키에 넣는 안은 프롬프트 정본을 바꿔 실측 수율(v3·0.7)을 무효화하므로 기각.
+- **새로 드러난 위험과 대응**: 저작 호출을 Langfuse로 보내면 `ops/cost_report`가 호출 지점 구분 없이 게이트② 표본으로 집계해 로컬 비율·토큰 p50이 위장된다. 표지 + 리포트 분리(`authoring_excluded_count`·notes 공개)로 막았다. 파이프라인이 trace에 `call_site`를 싣지 않는 일반 결함은 `OPS-105`, 라이브 표본 실측(OPS-84 ③)은 `OPS-106`, 남은 저작 경로 우회 6자리(acceptance의 "마지막 1건"은 사실이 아니었다)는 `OPS-107`로 분리했다.
 
 ### 2026-10-02 (착지 · DP-03): **분석 envelope의 재전송 멱등키 `event_uuid`를 `attempt_event`에 영속화했다 — 시각 컬럼은 새로 만들지 않고 기존 `event_at`(수신)·`event_time`(발생)을 쓴다. hypertable에서는 이 멱등 계약이 성립하지 않으므로 마이그레이션이 fail-closed로 중단한다** (claude 판정·구현)
 
@@ -11750,6 +11755,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **교수학 상호작용(판정 대기 · CI가 잡음)**: 코치 오답이 적재되면 숙달이 낮아져 라벨이 `초보`가 되고, 힌트 규칙 5가 좌절 신호의 상승분에 한 칸을 더해 같은 대화의 다음 힌트가 1→3(부분 풀이)으로 오른다(공급 원장은 사실대로 `[1, 3]`). 기존 정책의 직접 결과지만 오답 한 건으로 두 칸 도약하는 것이 "가장 빠른 단계에서 멈춤"에 비추어 허용되는지는 교수학 판정이 필요하다 — 규칙은 바꾸지 않고 테스트로 고정했다(`EOS-146` acceptance ⑩ · 후보: 현행 유지 / `초보` 라벨 최소 표본 / 코치 오답 숙달 전파 유예).
 - **한계(명시)**: 같은 학생·문항 동시 요청이면 조회-삽입 경합으로 2행이 생길 수 있다(잠금·유니크 인덱스는 마이그레이션이라 미착수) · `used_hint`는 판정하지 않고 NULL · '포기'는 `EOS-41-app-abandon-signal-source`(P2) · 진단 CAT 측정 효율 영향("영향 0" 전제가 이 착지로 깨짐)은 `EOS-42-r6-cat-efficiency-measurement`(P2)로 승계 · EOS-63·SKB-01 런북의 기록률 표 설명은 새 셋째 행을 언급하지 않는다(해당 태스크 소유라 미수정).
 
+## 2026-10-02: 미머지 브랜치 전수 감사 14회차 — 미추적 고립 1건(법령 · SEC-42 priority 1) · 삭제 13차 배치 3건 · 추적 15건 승계
+
+판정 기준 main `f99d1dc1`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-02.md`(Kiki "떠돌이 코드 정리"). 원격 ref 45 → 감사 대상 19(PR 소유 21 · claim 활성 2 · 머지 큐 임시 1 제외).
+
+- **회수 1건**: `claude/intelligent-noether-tbj2jf`(`c671a313`)가 게이트 `G-eos37-erasure-kpi-disposition`(PIPA 삭제권 처분)을 Kiki 판정 (나)로 clear했는데 main은 pending이라 SEC-40이 착수 못 한다. 회수 태스크 **SEC-42**(priority 1). 에이전트 중계 기록이라 이식 전 Kiki 재확인을 acceptance ③에 둔다. 이 브랜치는 이식 완료 전 삭제 금지.
+- **삭제 13차 배치 3건**: `hja5kh-eos129`(PR #1346 닫힘 · #1389가 census 자산 비회수를 명문화) · `hja5kh-s4-11`(#1372로 먼저 완료) · `gk8vkz`(EOS-141 claim 해제 기록뿐). 12차 5건은 잔존 0/5.
+- **추적 15건 승계**: head 불변 15/15 · 좌석 상실 0(k20m0w의 MOB-18·MOB-11·MOB-23은 done, 나머지 좌석 유지).
+- **세션 실수 1건**: 번호 탐색용으로 돌린 `backlog.py add --id SEC-99`가 실제 등재라 원격 번호 예약 `SEC-99`가 남았다(로컬 파일은 제거). 해제 하위 명령이 보이지 않아 미해제 — 번호 후보 확인은 `git ls-tree` 읽기 전용으로 한다.
+- **한계**: 삭제 대상 이벤트 샤드 원문을 판정 문서에 보존하지 못했다(읽기 명령이 권한 거부됨 — head SHA로만 복구).
 ### 2026-10-01 — EOS-31 착지: 수능 적격 게이트가 출제 범위(2028학년도 = 2022 개정 대수·미적분Ⅰ·확률과 통계)를 선결 조건으로 본다 — 승인 2,480 → 1,046건 · 정책 `suneung_v2` (claude 구현) — 판정 기준: 브랜치 `claude/brave-turing-bpytzd`(분기 main `0f74a7bc` · 미머지)
 - **결함**: `persona_fit`이 난이도 구간 하나만의 함수라 라벨 있는 승인 문항 **2,480건 전부**가 페르소나 A 수능 적격이었다(초·중 전용 888건 포함 — 실 PG에 저장소 코퍼스를 적재해 실측. 독립 비판의 1,122건은 코퍼스 파일 기준이고 서빙은 `atom_node.standard_codes` 조인을 읽어 888건이다). 집계 명령 = `scripts/analysis/suneung_scope_census.py`.
 - **결정**: 범위를 신호(OR)가 아니라 **선결 조건(AND)**으로 게이트 ②-c에 둔다. 성취기준 접두어(`[12대수…]`·`[12미적…]`·`[12확통…]`) + 교육과정 개정 일치로 판정(같은 접두어가 2015·2022 개정에 모두 있다). 세 값(`in_scope`·`out_of_scope`·`unknown`) — 코드를 모르면 통과시키지 않는다. `persona_fit` 규칙은 **바꾸지 않았다**(6개 모드가 공유하는 신호). 정의 정본 = `l6/suneung/scope.py`, SQL 사전필터(`suneung_scope_clause`)가 같은 접두어 상수를 읽는다 — 실 코퍼스 14,034건에서 SQL=파이썬=3,781건 일치.

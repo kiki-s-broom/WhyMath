@@ -11,6 +11,8 @@ eos_priority: P1
 owner: claude
 depends_on:
   - P3-02-coverage-instruments
+  - P3-19-mvt-interval-membership-check
+  - P3-21-derived-shape-probe-monotonic-extremum
 requires_gates:
   - G-p3-entry-gate2-pass
   - G-misc40-new-crosslink-signature
@@ -19,5 +21,5 @@ acceptance:
 artifacts: []
 paths: []
 session: null
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [03]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] CUR-06(todo)은 학교급 경계 연결을 **관측**한다(20/2210 = 0.9%·고→대 0) — 채우기는 아니다. ARCH-17(done·DAG)·EOS-100(done)이 구조를 가지나 대표 과정 단위 충족은 0건. 신규. Hint 저장 좌석은 ARCH-39 가 '선언 정본 ↔ 저장 실측 불일치 유일 엔티티'로 지목했으므로 ②의 Hint 연결은 그 좌석 해소가 선행일 수 있다.\n\n[정정 2026-09-30] 신규 crosslink 서명 없이 콘텐츠 채우기가 착수되는 경로를 selector가 막는다"
-updated: 2026-09-30
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [03]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] CUR-06(todo)은 학교급 경계 연결을 **관측**한다(20/2210 = 0.9%·고→대 0) — 채우기는 아니다. ARCH-17(done·DAG)·EOS-100(done)이 구조를 가지나 대표 과정 단위 충족은 0건. 신규. Hint 저장 좌석은 ARCH-39 가 '선언 정본 ↔ 저장 실측 불일치 유일 엔티티'로 지목했으므로 ②의 Hint 연결은 그 좌석 해소가 선행일 수 있다.\n\n[정정 2026-09-30] 신규 crosslink 서명 없이 콘텐츠 채우기가 착수되는 경로를 selector가 막는다\n\n[정정 2026-10-02] 게이트 G-p318-calc-02-08-disposition Kiki 결정 2026-10-02 — 02-06 을 일부 가능으로 분류. 구간 밖 근이 정답으로 통과하는 상태에서 02-06 문항을 채우지 않도록 대장에 집행\n\n[정정 2026-10-02] 게이트 G-p318-calc-02-08-disposition Kiki 결정 2026-10-02 — 02-08 을 파생 판정(나)으로 대체. 파생 판정 3종 중 극값 개수만 실측돼 있어 나머지 측정이 문항화의 근거"
+updated: 2026-10-02

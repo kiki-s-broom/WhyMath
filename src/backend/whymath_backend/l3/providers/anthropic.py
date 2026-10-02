@@ -72,13 +72,17 @@ class _Messages(Protocol):
         *,
         model: str,
         max_tokens: int,
-        system: str,
+        system: str | list[dict[str, Any]],
         messages: list[dict[str, str]],
         **kwargs: Any,
     ) -> Any:
         """메시지 생성 (anthropic messages.create API의 부분집합).
 
-        `**kwargs`는 선택적 튜닝 인자(output_config·thinking·cache_control)를 *설정된
+        `system`은 문자열(캐싱 OFF·기본) 또는 텍스트 블록 리스트(캐싱 ON — OPS-89: system 블록
+        끝에 명시 `cache_control` 브레이크포인트)다. 실물 SDK 시그니처도 `Union[str,
+        Iterable[TextBlockParam]]`이다.
+
+        `**kwargs`는 선택적 튜닝 인자(output_config·thinking·temperature·top_p)를 *설정된
         경우에만* 전달하기 위함이다 — None을 넘기지 않고 키 자체를 생략한다(SDK NotGiven
         규약 충돌 회피).
         """
@@ -141,6 +145,31 @@ def resolve_cloud_model(cost_tier: object, settings: Settings) -> str:
         f"resolve_cloud_model은 클라우드 티어에만 적용된다(받은 {cost.value}). "
         "LOCAL은 router.resolve_model 담당이다(03a §A.0)."
     )
+
+
+def _system_param(system: str, *, caching: bool) -> str | list[dict[str, Any]]:
+    """`messages.create(system=)`에 실을 값 — 캐싱 ON이면 system 블록 끝에 명시 브레이크포인트.
+
+    **왜 최상위 `cache_control`(자동 캐싱)이 아닌가 (OPS-89)**: 자동 캐싱은 브레이크포인트를
+    *마지막 캐시 가능 블록*에 놓는다. 요청은 `tools → system → messages` 순으로 렌더되므로 그
+    자리는 매 호출 달라지는 user 프롬프트의 끝이다. 안정 system 프리픽스 + 가변 user 꼬리 형태
+    (`cross_verify._run_perspective`·`multi_solution.generate_candidates`)에서는 다시 읽히지 않을
+    바이트에 쓰기 할증(1.25배)만 내고 적중은 0이다. 그래서 브레이크포인트를 **system 블록 끝**
+    (공유 프리픽스의 마지막 바이트)에 명시한다 — user 메시지에는 표시를 달지 않는다(가변 꼬리는
+    브레이크포인트 뒤라 할증을 내지 않는다).
+
+    캐싱 OFF(기본)면 현행 그대로 system *문자열*을 돌려준다(키·블록 변화 0 — 기본값 회귀 0).
+
+    **빈 system은 브레이크포인트를 생략한다**: 빈(또는 공백뿐인) 텍스트 블록은 Messages API가
+    거부할 수 있다(알려진 API 동작에 따른 *보수적 회피* — 실물 SDK는 이 값을 검증하지 않고
+    이 환경에서는 라이브 호출이 막혀(ARCH-66) 실제 400 여부는 **라이브 미검증**이다). 그래서
+    빈 문자열은 종전대로 문자열 그대로 보낸다. 이때 요청에는 브레이크포인트가 아예 없어 캐싱이
+    일어나지 않는다 — 공유 프리픽스(system)가 없으니 캐시할 대상도 없고, user에 표시를 다는
+    것은 이 함수가 막으려는 바로 그 배치다.
+    """
+    if not caching or not system.strip():
+        return system
+    return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
 
 def _extract_text(message: Any) -> str:
@@ -471,13 +500,13 @@ class AnthropicProvider:
         settings = self._resolved_settings
         model_id = resolve_cloud_model(cost, settings)
         # 선택적 튜닝 인자 — *설정된 경우에만* 키를 싣는다(기본 전부 OFF=현 동작, 03a §H#4).
+        # (프롬프트 캐싱은 여기 최상위 키가 아니라 system 블록 끝 브레이크포인트다 — 아래
+        #  `_system_param`·OPS-89. 최상위 자동 캐싱은 가변 user 꼬리에 브레이크포인트를 놓는다.)
         extra: dict[str, Any] = {}
         if settings.anthropic_effort:
             extra["output_config"] = {"effort": settings.anthropic_effort}
         if settings.anthropic_thinking:
             extra["thinking"] = {"type": "adaptive"}
-        if settings.anthropic_prompt_caching:
-            extra["cache_control"] = {"type": "ephemeral"}
         # S2-g 생성 다양성 — 온도 지정 시에만 싣는다(기본 미지정=현 동작). Opus 4.7은 temperature를
         # 거부하므로 CLOUD_HIGH 호출부는 지정하지 않는다(위 docstring ⚠️).
         if temperature is not None:
@@ -488,12 +517,14 @@ class AnthropicProvider:
         if top_p is not None:
             extra["top_p"] = top_p
 
+        system_param = _system_param(system, caching=settings.anthropic_prompt_caching)
+
         # 지연 실측 — 호출을 monotonic으로 감싼다(추정 est_latency_ms와 구분되는 actual).
         start = time.monotonic()
         response = await self._get_client().messages.create(
             model=model_id,
             max_tokens=settings.anthropic_max_tokens,
-            system=system,
+            system=system_param,
             messages=[{"role": "user", "content": prompt}],
             **extra,
         )

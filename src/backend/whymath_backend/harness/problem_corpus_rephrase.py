@@ -165,12 +165,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    report = run_corpus_rephrase(
-        in_path=args.in_path,
-        out_path=args.out_path,
-        rephraser=QuestionRephraser(temperature=args.temperature),
-        limit=args.limit,
-    )
+    rephraser = QuestionRephraser(temperature=args.temperature)
+    try:
+        report = run_corpus_rephrase(
+            in_path=args.in_path,
+            out_path=args.out_path,
+            rephraser=rephraser,
+            limit=args.limit,
+        )
+    finally:
+        # 짧게 끝나는 CLI — 저작 호출의 Langfuse `l3_routing` 배치를 종료 전에 확정(OPS-84).
+        rephraser.flush()
     json.dump(report.to_json(), sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
     return 0
