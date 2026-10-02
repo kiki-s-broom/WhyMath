@@ -88,6 +88,8 @@ class CrossBandValidationReport:
     proposal_count: int = 0
     existing_edge_count: int = 0
     issues: list[ValidationIssue] = field(default_factory=list)
+    #: 요약 첫머리 표기 — 같은 리포트 형태를 쓰는 다른 제안 검증기(대학 과목간 등)가 덮어쓴다.
+    label: str = "경계 엣지 제안 검증"
 
     @property
     def errors(self) -> list[ValidationIssue]:
@@ -119,7 +121,7 @@ class CrossBandValidationReport:
         """사람 가독 요약(PASS/FAIL = error 없음/있음)."""
         verdict = "PASS" if self.success else "FAIL"
         return (
-            f"경계 엣지 제안 검증[{verdict}]: 제안 {self.proposal_count}건, "
+            f"{self.label}[{verdict}]: 제안 {self.proposal_count}건, "
             f"기존 엣지 {self.existing_edge_count}건, "
             f"error {len(self.errors)}개, warning {len(self.warnings)}개"
         )

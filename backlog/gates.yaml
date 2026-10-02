@@ -1051,6 +1051,18 @@ gates:
       - "[2026-09-25] depends_on +S3-51-free-use-remeasurement-observability — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 재측정 도구(회차 구간 필터·판정 모집단 분모·등호 전이 축)를 만든 작업이 S3-51이다(done) — 재개 판정의 선택지 ①이 그 도구를 쓴다"
       - "[2026-09-27] depends_on -S3-51-free-use-remeasurement-observability · no_inputs_reason: None → '시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다' — HARN-177 ② 표시 정직성 착지 후 실측 정정 — 이 게이트의 입력 S3-51은 재측정 도구를 만든 작업(done)이지 판정 태스크가 아니다. 재개 판정(3택)은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 하는 시점 판정이라 여는 작업이 대장에 없다. HARN-174 v2-9 백필이 도구 제작을 입력으로 걸었는데, HARN-177 이후 '입력 전부 done · 판정 기록 없음'은 판정 결과 미기록으로 표시되므로 사실(시점 트리거·사람 직접 판정)에 맞게 입력 없음 사유로 옮긴다. 도구 준비 완료 사실은 title에 그대로 있다(S3-51 · PR #1273). 판정 기준 main 8138f19a"
     no_inputs_reason: "시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다"
+  - id: G-s401-inter-course-edge-review
+    title: "S4-01 대학 과목간 선수 엣지 137건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/inter_course_edges_university_v1.json 과 표 문서 docs/data/inter_course_edges_university_v1.md §7 의 137행(from 선수 과목 원자 · to 후속 과목 원자 · 근거)을 보고 승인/반려/보류로 판정한다. 과목 쌍(문서 표의 묶음, 66쌍·쌍당 최대 4건) 단위로 판정해도 된다. 기계로 검증된 것(양끝 실재·대학 과목 간·세부개념 수준·중복 없음·쌍당 상한·병합 시 DAG 비순환·과목 계열 정합)은 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 개념이 저 개념의 선수인가\"라는 교수학적 판단이다. 이 제안은 슬라이스 1(고→대 24건, G-s401-uni-boundary-edge-review)과 함께일 때만 효과가 있다 — 측정: 정본 0/512 → 슬라이스1 198/512 → 슬라이스1+본 제안 466/512(91.0%). 부분 승인이 정상이다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-01
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "사람 검수(교수학적 타당성 판단) — 제안 파일은 이 태스크(S4-01 슬라이스 3) PR 로 main 에 들어온다. 제안 생산자 S4-01 은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다"
   - id: G-s401-uni-boundary-edge-review
     title: "S4-01 고→대 경계 엣지 24건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/cross_band_edges_university_v1.json 과 표 문서 docs/data/cross_band_edges_university_v1.md 의 24행(from 고등 원자 · to 대학 세부개념 · 근거)을 보고 각 행을 승인/반려/보류로 판정한다. 기계로 검증된 것(양끝 실재·방향 고등→대학·세부개념 수준·중복 없음·병합 시 DAG 비순환·과목 계열 정합)은 이미 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 고등 개념이 저 대학 개념의 선수인가\"라는 교수학적 판단이다. 선례 = 2026-07-28 중복 원자 병합 14건(검수 16 중 2건은 사이클 충돌로 실행 보류). 승인분만 병합하며 부분 승인이 정상이다."
     kind: human
