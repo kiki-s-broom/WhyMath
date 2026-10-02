@@ -1,0 +1,34 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-23-matrix-ops-pilot-corpus
+title: "고등 2x2 행렬 연산 파일럿 코퍼스 (W2) — 신규 결정론 생성기 + 행렬 0커버 4코드 해소"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-63-elementary-addsub-pilot-corpus
+requires_gates: []
+acceptance:
+  - "고등 축 0커버 211개 중 행렬 영역 4코드(10공수1-04-01/02, 10기수1-04-01/02) 전량 0.0%임을 실측 확인"
+  - "신규 MatrixOpsSkeletonGenerator([10공수1-04-02] 행렬의 연산·덧셈/뺄셈/스칼라배/곱셈 4변형) — 기존 좌석·게이트 무변경 재사용"
+  - "Tier1이 행렬값 조건(Matrix(...)=Matrix(...))에는 unverifiable을 내는 것을 실측 확인 — 결과 행렬의 성분 1개를 스칼라 조건으로 검증하는 안전 설계로 우회(신규 검증기 발명 0)"
+  - "elementary_addsub와 동일하게 run_equivalent_generation을 signature_index=None으로 직접 호출(답값 기반 구조dedup 오탐 회피 — 동일 처방 2회차 재사용 확인)"
+  - "problem_bank_matrix_ops_v0 코퍼스 생성 — 전건 Tier1 게이트 통과·is_published=False"
+  - "coverage 리포트 재실행으로 실제 이동 확인(고등학교 커버율·행렬 영역 0커버 코드 감소)"
+  - "단위테스트(생성기·배치) green, ruff·black·mypy --strict clean"
+artifacts:
+  - a6265ebb
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/matrix_ops_skeleton_generator.py
+  - src/backend/whymath_backend/harness/matrix_ops_batch.py
+  - tests/backend/l3/equivalent/test_matrix_ops_skeleton_generator.py
+  - tests/backend/harness/test_matrix_ops_batch.py
+  - data/corpus/problem_bank_matrix_ops_v0/problems.jsonl
+session: null
+notes: "학년축 최단경로 계획 §3 W2 두 번째 슬라이스(고등 0% 도메인). S4-22(초등 덧셈뺄셈)와 동일 패턴 — signature_index 답값기반 오탐 처방까지 그대로 재사용해 재발명 0으로 확인. 남은 고등 0% 도메인(집합과 명제·통계·적분법·이차곡선 등)·중등 증분·대학 축은 후속 슬라이스.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-23-matrix-ops-pilot-corpus 재등재. 원 증적 ['a6265ebb']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

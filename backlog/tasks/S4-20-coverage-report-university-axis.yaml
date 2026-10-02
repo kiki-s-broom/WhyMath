@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-20-coverage-report-university-axis
+title: "커버리지 리포트 대학 축 추가 (W1) — standards_university_v1 분모 편입 + school_type 대학교 행"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-62-grade-axis-overlay-wiring
+requires_gates: []
+acceptance:
+  - "problem_bank_coverage.py가 대학 성취기준(standards_university_v1/standards.json, 409건)을 선택적 축으로 적재 — problem_types 축과 동일하게 soft-fail(로드 실패해도 exit 2 아님·경고만)"
+  - "coverage_by_school_type 테이블에 '대학교' 행이 자연스럽게 추가됨(기존 초/중/고 행·분모·형식 무변경 — 회귀 0)"
+  - "대학 자체 커버리지 절(target_codes_total·covered_codes·zero_coverage_codes·과목별 분해)이 K-12 §1과 동일한 정직회계 원칙(분모 0 시 None·0커버 목록 truncation 고지)으로 리포트에 신설"
+  - "기존 K-12 §1 헤드라인(revision·target_codes_total·covered_codes 등)은 바이트 단위 회귀 0 — 대학 데이터는 별도 축으로 가산, 기존 분모에 합산되지 않음"
+  - "단위테스트·CLI 테스트 green, JSON 산출물에 university 블록 신설"
+  - "[회수 원천·재구현 금지 — PB-14 ⑤] trjg5x 커밋 1325fae1: harness/problem_bank_coverage.py --university-standards·§1.5·JSON university 블록(167줄)+tests/backend/harness/test_problem_bank_coverage.py(187줄). docs/data/problem_bank_coverage_4axis.{json,md}는 생성기 회수 후 재생성(유일성 낮음). `git show 1325fae1`로 이식한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_bank_coverage.py
+  - tests/backend/harness/test_problem_bank_coverage.py
+session: null
+notes: "학년축 최단경로 계획(docs/strategy/grade_axis_mvp_shortest_path_v1.md) §3 W1. S4-19(W0) 완료 이후 진행. 실측: standards_university_v1/standards.json의 curriculum_revision은 고정값 '대학'(K-12 '2022 개정'과 다른 축·자체작성이라 국가교육과정 개정 체계 밖). school_type 전량 '대학교' 단일값. build_report의 기존 revision(단일 문자열) 분모 계약은 그대로 두고 university_catalog를 완전히 별도 optional 축으로 가산 — problem_types(S3-27) 축 설계 선례를 그대로 따른다(신규 패턴 0).\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-20-coverage-report-university-axis 재등재. 원 증적 ['1325fae1']. 산출물이 main에 없어 todo — 아래 회수 원천을 재구현하지 말고 커밋에서 이식한다."
+updated: 2026-10-02

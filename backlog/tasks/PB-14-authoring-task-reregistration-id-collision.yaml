@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ acceptance:
 artifacts: []
 paths:
   - "backlog/tasks/**"
-session: null
+session: claude/pensive-babbage-ijn58w
 notes: "출처: G-authoring-expansion-merge-decision(2026-08-31 Kiki '회수' 결정) + PB-06 정정 기록. PB-13(코퍼스 이식)을 depends_on으로 선언했다 — ③의 본문 대조가 이식 결과에 의존하므로 권고가 아니라 의존이다(2026-08-31 PR #939 Codex P2 수용: notes의 권고만으로는 스케줄러가 PB-14를 먼저 노출·착수시켜 완료된 코퍼스 태스크를 허위 잔여로 재등재할 수 있다). 회수 완료 전 원 브랜치 삭제 금지.\n\n[정정 2026-09-01] eos_priority null → P1: 회수 축 — 저작 태스크 32건 재등재. EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) trjg5x 커버리지 정독 risk=high: PB-13 ②가 '소관 분리'로 제외한 18파일(S4-19 학년축 7파일+테스트 5·S4-20 대학 커버리지 축 2+리포트 2·PATH-03 3·상위 설계 문서 2)을 받은 태스크가 main에 없다. ③이 S4-19·S4-20을 todo로 재등재하게 돼 있어 대장은 닫히지만 코드는 재구현 전제이고, PB-13 done(PR #975 머지) 시점에 '회수 완료 전 삭제 금지' 조건이 소멸해 고아가 된다(vafylb·7n9n72 동형). 7회차(PR #1020) 무접촉"
-updated: 2026-09-07
+updated: 2026-10-02
