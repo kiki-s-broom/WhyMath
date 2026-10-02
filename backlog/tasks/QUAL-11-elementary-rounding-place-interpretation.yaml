@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 실측 사실(판정 기준 main 9a19ec0c · 2026-09-25 전체 시스템 재검토 §3-5): data/corpus/problem_bank_elementary_rounding_v0/problems.jsonl 600문을 전수 재계산했다. 발문은 전부 \"N을 X의 자리에서 반올림/올림/버림하면\"인데, 정답은 600/600이 \"X의 자리까지 나타냄\" 해석으로 계산돼 있다. 한국 초등 교과 관례(\"X의 자리에서\" 어림 → X 자리 숫자를 보고 그 윗자리까지 나타냄)와 비교하면 불일치 537 · 일치 63이다. 답이 입력값과 같은 문항이 15건이다(예: \"81880을 십의 자리에서 반올림/올림/버림\" → 정답 셋 다 81880, 관례상 81900/81900/81800). SymPy 검증은 생성기가 만든 조건식만 확인하므로 발문과 정답의 해석 불일치를 잡지 못한다. 600문 전부 review_status 없음 · is_published=False라 학생 노출은 0이다.\n② 처분: 생성기(harness/elementary_rounding_batch.py 계열)를 발문 해석에 맞게 고치거나, 발문을 \"X의 자리까지 나타내시오\"로 바꿔 정답 해석에 맞춘다. 어느 쪽인지는 교수학 확인(교과서 표현 관례) 후 정하고 근거를 notes에 남긴다. 답이 입력값과 같아지는 입력(어림 자리 아래가 전부 0)은 생성 단계에서 거른다.\n③ 회귀 동결: 코퍼스 전수를 독립 계산식(관례 해석)과 대조하는 테스트를 둔다. 불일치 0 · 답=입력값 0을 단언하고, 생성기 해석을 되돌리는 뮤테이션이 RED인지 확인한다.\n④ 일반화 판정: 같은 부류(발문 문장과 조건식의 의미 불일치)가 다른 템플릿 코퍼스에도 있을 수 있다. 발문↔조건 의미 검사기를 신설할지는 판정만 하고 이 태스크에서 구현하지 않는다(필요하면 별도 등재)."
+  - "[처분 결과 2026-10-02] ②③ 이행·④ 판정. ② 처분=발문 교정안 채택: 교과서 정식 표현 \"~하여 X의 자리까지 나타내면\"이 기존 정답 계산(배율=자리값)과 정확히 같은 해석이라 정답 600개는 불변이고 발문만 바뀐다(생성기 해석을 \"X의 자리에서\"=윗자리까지로 고치는 안은 정답 전수 교체+교과서 표현 혼용 위험이라 미채택). 답=입력값 입력(value % factor == 0)은 생성 풀에서 제외. 코퍼스를 CLI로 재생성해 600/600 적재·게이트 거부 0. 교수학 확인은 교과서 정식 표현 관례에 근거한 것이며 사람 교수학자 검수는 아니다(코퍼스는 여전히 is_published=False·검수 0건). ③ 회귀 동결=tests/backend/harness/test_elementary_rounding_corpus_convention.py(Decimal.quantize 독립 계산·코퍼스 600/600+생성기 풀 300x3 전수·불일치 0·답=입력값 0). 뮤테이션 4종(옛 표현 복귀·배율 10배·필터 제거·코퍼스 오염) 전건 RED, 원복 바이트 동일 확인. ④ 일반화 판정=신설 필요(권고). 근거: 결정론 템플릿 생성기가 36개 배치·40개 스켈레톤 생성기·코퍼스 37종으로 실재하고, 이 사고 구조(검증이 생성기가 만든 조건식만 보고 발문 문장과의 의미 일치는 안 본다)는 어림에 국한되지 않는 구조적 사각이다. 이 태스크에서는 구현하지 않으며 별도 등재가 필요하다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/elementary_rounding_batch.py
   - "data/corpus/problem_bank_elementary_rounding_v0/**"
-session: null
-notes: "출처: 전체 시스템 재검토 docs/reviews/system_full_review_2026-09-25.md §3-5·§4 A2 (판정 기준 main 9a19ec0c). 600문 전수 재계산 수치는 이 태스크 등재 세션이 직접 산출했다. 학생 노출 0(비노출)이라 즉시 피해는 없으나 '검증 통과 = 정답'이 아닌 사례라 검증 사각 축의 근거가 된다."
-updated: 2026-09-25
+session: claude/friendly-pascal-mnmypk
+notes: "출처: 전체 시스템 재검토 docs/reviews/system_full_review_2026-09-25.md §3-5·§4 A2 (판정 기준 main 9a19ec0c). 600문 전수 재계산 수치는 이 태스크 등재 세션이 직접 산출했다. 학생 노출 0(비노출)이라 즉시 피해는 없으나 '검증 통과 = 정답'이 아닌 사례라 검증 사각 축의 근거가 된다.\n\n[정정 2026-10-02] QUAL-11 처분 결과·일반화 판정 기록"
+updated: 2026-10-02
