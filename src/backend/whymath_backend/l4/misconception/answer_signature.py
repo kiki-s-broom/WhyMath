@@ -28,8 +28,8 @@ M-id로의 변환은 crosswalk(`docs/standards/crosswalk_gate_contract.md` · �
 - **재료가 없으면 훑지 않는다.** 답안이 없거나·문항에서 식을 못 뽑으면
   `MisconceptionScan.NOT_RUN`이다. 0건을 "오개념이 없었다"로 읽히게 하지 않는다. 정답은
   재료 부족이 아니다 — 채점 경로는 정답 답안도 넘긴다(EOS-123 · 아래 `scan_attempt_answer`).
-- **탐지 대상은 `canonical_wrong_form`을 가진 오개념뿐**이다(현재 카탈로그 67종 중 2종).
-  나머지 65종은 이 채널로 *잡히지 않으며*, 그 사실을 `scanned_forms`가 자기 기술한다 —
+- **탐지 대상은 `canonical_wrong_form`을 가진 오개념뿐**이다(현재 카탈로그 68종 중 2종).
+  나머지 66종은 이 채널로 *잡히지 않으며*, 그 사실을 `scanned_forms`가 자기 기술한다 —
   "훑었는데 없었다"의 범위를 응답이 스스로 말하게 한다(작동한 비율 원칙).
 - **문항 식 추출은 휴리스틱**이다. 그래서 구조 정합이 SymPy로 *증명*되어도 confidence를 1.0이
   아니라 `_STRUCTURAL_MATCH_CONFIDENCE`로 둔다(아래 상수 주석).
