@@ -2662,7 +2662,7 @@ async def recommend_next_problem(
     `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지 않고(맞힌 최고 난이도 + 0.5 로짓 · 잠정 ·
     `EOS-39`가 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
     `measurement_sufficient`는 불변). 그 이력의 선택이 바뀌므로 `policy_version`은 `cat_v4`(수능
-    `suneung_v2`)다.
+    `suneung_v3`)다.
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.

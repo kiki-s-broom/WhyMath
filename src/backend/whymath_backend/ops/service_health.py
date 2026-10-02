@@ -64,6 +64,10 @@ COMPONENT_LLM_ROUTER = "llm_router"
 ALERT_METRIC_ERROR_RATE = "error_rate"
 ALERT_METRIC_LATENCY_P95 = "latency_p95_ms"
 
+# 라우트 매칭 실패 요청(404·라우터 도달 전 거절)이 모이는 단일 버킷 이름 — 원시 경로 문자열을
+# 키로 쓰면 크롤러가 만든 임의 경로가 키를 무한히 늘린다(카디널리티 폭발·OPS-95).
+ROUTE_UNMATCHED = "(unmatched)"
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # 컴포넌트 딥체크 — 각 체크는 절대 예외를 던지지 않는다(비크래시 보고).
@@ -261,6 +265,23 @@ def default_readiness_probes(
 # 인프로세스 요청 계측 — 이중 회계의 프로세스 안쪽 축(SaaS 독립).
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True, slots=True)
+class RouteLatency:
+    """라우트 템플릿 1개의 최근 창 지연·에러율 — S5(경로별 SLO)의 측정 원천(OPS-95).
+
+    `route`는 원시 경로가 아니라 FastAPI 라우트 템플릿(`/v1/coach/sessions/{dialogue_id}/turns`)
+    이다. 표본이 있는 라우트만 만들어지므로 count>=1이고 백분위는 항상 값이 있다(표본 0은
+    스냅샷에 아예 없다 — '미측정'을 0.0으로 위장하지 않는다).
+    """
+
+    route: str
+    count: int
+    error_rate: float
+    p50_latency_ms: float
+    p75_latency_ms: float
+    p95_latency_ms: float
+
+
+@dataclass(frozen=True, slots=True)
 class MetricsSnapshot:
     """계측 스냅샷(불변) — /health/ready 노출·알림 평가의 입력.
 
@@ -275,6 +296,18 @@ class MetricsSnapshot:
     window_p95_latency_ms: float | None
     latency_sum_ms: float
     latency_max_ms: float | None
+    # 라우트별 최근 창(OPS-95) — 라우트 이름순. 기본값을 둬 기존 생성처(테스트 포함)를 깨지 않는다.
+    routes: tuple[RouteLatency, ...] = ()
+
+
+def _percentile(ordered: Sequence[float], q: float) -> float:
+    """오름차순 표본의 nearest-rank 백분위(q∈(0,1]). 빈 입력은 호출자가 먼저 걸러야 한다.
+
+    전역 p95와 라우트별 백분위가 같은 식을 쓰도록 한 곳에 둔다 — 식이 둘로 갈라지면 같은
+    표본이 두 표면에서 다른 p95를 낸다.
+    """
+    index = max(0, math.ceil(len(ordered) * q) - 1)
+    return ordered[index]
 
 
 class ServiceMetrics:
@@ -300,9 +333,18 @@ class ServiceMetrics:
         self._latency_max_ms: float | None = None  # 요청 0건이면 최대 지연은 '없음'(0 아님)
         # (지연 ms, 5xx 여부) 최근 창 — maxlen이 가장 오래된 표본을 자동 축출한다.
         self._window: deque[tuple[float, bool]] = deque(maxlen=window_size)
+        self._window_size = window_size
+        # 라우트 템플릿 → 그 라우트의 최근 창(OPS-95). 키는 라우트 표의 템플릿 + 미매칭 버킷뿐이라
+        # 유한하다(원시 경로를 키로 쓰지 않는 것이 카디널리티 방어선).
+        self._route_windows: dict[str, deque[tuple[float, bool]]] = {}
 
-    def record(self, latency_ms: float, status_code: int) -> None:
+    def record(self, latency_ms: float, status_code: int, route: str | None = None) -> None:
         """요청 1건 기록 — 지연(ms)·상태코드. 5xx(>=500)만 오류로 회계한다.
+
+        `route`(OPS-95)는 라우트 *템플릿*이다. 주면 전역 창에 더해 그 라우트의 창에도 기록하고,
+        None이면 전역만 기록한다(라우트를 모르는 기존 호출자 호환 — 미들웨어는 미매칭 요청에
+        `ROUTE_UNMATCHED`를 명시해 넘긴다). 요청 경로의 비용은 deque append 상수 시간이다 —
+        정렬은 `snapshot()`(조회 시점)에서만 한다.
 
         4xx는 오류율에 넣지 않는다 — 클라이언트 귀책(잘못된 입력·미인증)은 서비스 가동
         판정과 무관하고, 넣으면 크롤러·오타 트래픽이 가짜 알림을 낸다.
@@ -316,6 +358,12 @@ class ServiceMetrics:
             latency_ms if self._latency_max_ms is None else max(self._latency_max_ms, latency_ms)
         )
         self._window.append((latency_ms, is_5xx))
+        if route is not None:
+            route_window = self._route_windows.get(route)
+            if route_window is None:
+                route_window = deque(maxlen=self._window_size)
+                self._route_windows[route] = route_window
+            route_window.append((latency_ms, is_5xx))
 
     def uptime_seconds(self) -> float:
         """프로세스(계측 시작) 이후 경과 초 — 가동(uptime) 보고의 원천."""
@@ -331,12 +379,35 @@ class ServiceMetrics:
         """최근 창 p95 지연(ms). 창 표본 0이면 None('미측정'·0.0과 구분)."""
         if not self._window:
             return None
-        ordered = sorted(latency for latency, _ in self._window)
-        index = max(0, math.ceil(len(ordered) * 0.95) - 1)
-        return ordered[index]
+        return _percentile(sorted(latency for latency, _ in self._window), 0.95)
 
-    def snapshot(self) -> MetricsSnapshot:
-        """현재 계측의 불변 스냅샷 — 노출·알림 평가는 이 스냅샷 기준(평가 중 변형 방지)."""
+    def route_latencies(self) -> tuple[RouteLatency, ...]:
+        """라우트별 최근 창 지연·에러율 — 라우트 이름순(결정적 출력). 표본 없는 라우트는 없다."""
+        rows: list[RouteLatency] = []
+        for route in sorted(self._route_windows):
+            window = self._route_windows[route]
+            if not window:
+                continue
+            ordered = sorted(latency for latency, _ in window)
+            rows.append(
+                RouteLatency(
+                    route=route,
+                    count=len(window),
+                    error_rate=sum(1 for _, is_5xx in window if is_5xx) / len(window),
+                    p50_latency_ms=_percentile(ordered, 0.50),
+                    p75_latency_ms=_percentile(ordered, 0.75),
+                    p95_latency_ms=_percentile(ordered, 0.95),
+                )
+            )
+        return tuple(rows)
+
+    def snapshot(self, *, include_routes: bool = True) -> MetricsSnapshot:
+        """현재 계측의 불변 스냅샷 — 노출·알림 평가는 이 스냅샷 기준(평가 중 변형 방지).
+
+        `include_routes=False`는 요청마다 알림을 평가하는 경로용이다 — 라우트별 백분위는 정렬이
+        필요해 요청 경로에서 계산하면 안 된다(OPS-95: 정렬은 조회 시점에만). 알림 판정(S1·S2)은
+        전역 지표만 쓰므로 결과가 같다.
+        """
         return MetricsSnapshot(
             uptime_seconds=self.uptime_seconds(),
             total_requests=self._total_requests,
@@ -346,6 +417,7 @@ class ServiceMetrics:
             window_p95_latency_ms=self.window_p95_latency_ms(),
             latency_sum_ms=self._latency_sum_ms,
             latency_max_ms=self._latency_max_ms,
+            routes=self.route_latencies() if include_routes else (),
         )
 
 

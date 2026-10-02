@@ -27,20 +27,36 @@ FIRST_VERSION 표의 출처
 경우 없음. 최초 실재 버전: thinking 0.47.0 · output_config 0.77.0 · cache_control 0.83.0, 나머지 6종은
 측정 구간 전체(0.40.0 이전은 미측정 — 우리 하한이 0.40.0 밑으로 내려갈 일은 없다).
 설치본(0.125.0)은 ②가 매 실행마다 직접 확인한다.
+
+OPS-89 변경 — 프롬프트 캐싱의 *위치*가 최상위 `cache_control`에서 **system 블록 끝 브레이크포인트**로
+옮겨졌다. 그래서 (1) 최상위 인자 집합에서 `cache_control`이 빠졌고(아래 FIRST_VERSION·TUNING_KEYS에서
+제외, 되돌리면 RED인 음성 대조군 추가) (2) 새로 싣는 것은 `system=[{"type":"text","text":…,
+"cache_control":{"type":"ephemeral"}}]`라서, 이 파일 뒤쪽 `TestSystemBlockSurface`가 그 표면을 *실물 SDK*에
+대고 확인한다 — ⓐ `create(system=)`이 텍스트 블록 리스트를 받는 시그니처 ⓑ `TextBlockParam`에
+`cache_control` 필드 실재 ⓒ 우리가 실제로 싣는 블록의 모든 키가 그 TypedDict에 있음 ⓓ 하한 대조
+(SYSTEM_BLOCK_FIRST_VERSION: 2026-10-02 실물 설치 실측 — 0.40.0에는 없고 0.41.0부터 있음) ⓔ 실물
+`AsyncAnthropic`을 네트워크 없는 `httpx.MockTransport`에 물려 *실제 직렬화된 요청 본문*에 최상위
+`cache_control`이 없고 system 블록에 있음을 확인(라이브 호출 아님 — ARCH-66).
 """
 
 from __future__ import annotations
 
+import collections.abc
 import importlib.metadata
 import inspect
+import json
 import re
 import tomllib
+import typing
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
+from anthropic import AsyncAnthropic
 from anthropic.resources.messages import AsyncMessages
+from anthropic.types import CacheControlEphemeralParam, TextBlockParam
 
 from whymath_backend.config import Settings
 from whymath_backend.l3.models import CostTier, RoutingDecision
@@ -58,11 +74,18 @@ FIRST_VERSION: dict[str, Version] = {
     "top_p": (0, 40, 0),
     "thinking": (0, 47, 0),
     "output_config": (0, 77, 0),
-    "cache_control": (0, 83, 0),
+    # 최상위 `cache_control`(0.83.0)은 OPS-89로 더 이상 싣지 않아 표에서 뺐다 — 캐싱은 system 블록 안에 있다.
+    # 되돌리면 test_top_level_cache_control_is_not_sent·test_every_sent_key_has_a_recorded_first_version이 RED.
 }
 
-# 이 태스크가 지목한 세 키 — 유도 결과에 이 셋이 없으면 노브를 못 켠 것이라 검사가 공허하다(양성 대조군).
-TUNING_KEYS = frozenset({"cache_control", "output_config", "thinking"})
+# system 텍스트 블록(`TextBlockParam`)의 `cache_control` 필드가 처음 존재한 anthropic 버전.
+# 2026-10-02 실물 설치 실측(`pip install --no-deps --target`별 버전 → `typing.get_type_hints(TextBlockParam)`):
+# 0.40.0 없음 · 0.41.0~0.45.0(0.43.1 포함)·0.50.0~0.80.0(5 간격 표본)·0.83.0·0.125.0 있음.
+# 표본 구간에서 한 번 생긴 필드가 뒤 버전에서 사라진 경우는 없었다(전수는 아님).
+SYSTEM_BLOCK_FIRST_VERSION: dict[str, Version] = {"cache_control": (0, 41, 0)}
+
+# 이 태스크가 지목한 두 키 — 유도 결과에 이 둘이 없으면 노브를 못 켠 것이라 검사가 공허하다(양성 대조군).
+TUNING_KEYS = frozenset({"output_config", "thinking"})
 
 _PYPROJECT = Path(__file__).resolve().parents[3] / "src" / "backend" / "pyproject.toml"
 
@@ -139,6 +162,9 @@ def _cloud_decision() -> RoutingDecision:
 async def sent_top_level_keys() -> set[str]:
     """모든 선택 노브를 켠 호출들이 `messages.create`에 실제로 싣는 최상위 인자 이름의 합집합.
 
+    prompt_caching도 켠다 — OPS-89 이후 그 효과는 최상위 키가 아니라 system 블록 안에 나타나므로
+    합집합에 `cache_control`이 *없어야* 한다(음성 대조군은 아래 테스트).
+
     temperature와 top_p는 API가 동시 지정을 400으로 거부해(provider가 사전 차단) 두 호출로 나눈다.
     """
     settings = Settings(
@@ -175,23 +201,24 @@ class TestJudgementFunctions:
         assert missing_keys(["a", "b", "c"], ["a", "c"]) == []
 
     def test_floor_below_first_version_names_the_key(self) -> None:
-        """하한 0.82.0은 cache_control(0.83.0)을 허용하지 못한다 — 옛 하한 0.40.0은 셋 다 지목된다."""
+        """하한 0.76.0은 output_config(0.77.0)를 허용하지 못한다 — 옛 하한 0.40.0은 둘 다 지목된다."""
         keys = set(FIRST_VERSION)
-        assert floor_violations((0, 82, 0), keys, FIRST_VERSION) == {"cache_control": (0, 83, 0)}
+        assert floor_violations((0, 76, 0), keys, FIRST_VERSION) == {"output_config": (0, 77, 0)}
         assert floor_violations((0, 40, 0), keys, FIRST_VERSION) == {
-            "cache_control": (0, 83, 0),
             "output_config": (0, 77, 0),
             "thinking": (0, 47, 0),
         }
 
     def test_floor_at_or_above_every_first_version_is_clean(self) -> None:
-        assert floor_violations((0, 83, 0), set(FIRST_VERSION), FIRST_VERSION) == {}
+        assert floor_violations((0, 77, 0), set(FIRST_VERSION), FIRST_VERSION) == {}
         assert floor_violations((0, 90, 0), set(FIRST_VERSION), FIRST_VERSION) == {}
 
     def test_unrecorded_key_is_named(self) -> None:
         """코드가 새 키를 싣기 시작했는데 표에 없으면 판정 불능이라 이름으로 지목한다."""
         assert unrecorded_keys(["model", "service_tier"], FIRST_VERSION) == ["service_tier"]
-        assert unrecorded_keys(["model", "cache_control"], FIRST_VERSION) == []
+        assert unrecorded_keys(["model", "thinking"], FIRST_VERSION) == []
+        # OPS-89: 최상위 cache_control은 더 이상 표에 없다 — 코드가 다시 싣기 시작하면 지목된다.
+        assert unrecorded_keys(["model", "cache_control"], FIRST_VERSION) == ["cache_control"]
 
     def test_parse_floor_reads_the_lower_bound(self) -> None:
         assert parse_floor("anthropic>=0.83.0,<1") == (0, 83, 0)
@@ -208,11 +235,19 @@ class TestJudgementFunctions:
 # ──────────────────────────────────────────────────────────────────────────
 class TestSentKeysAgainstRealSdk:
     async def test_derivation_exercises_the_tuning_knobs(self) -> None:
-        """양성 대조군 — 유도가 세 튜닝 키를 실제로 잡았다(노브가 안 켜졌으면 아래 검사가 공허해진다)."""
+        """양성 대조군 — 유도가 두 튜닝 키를 실제로 잡았다(노브가 안 켜졌으면 아래 검사가 공허해진다)."""
         sent = await sent_top_level_keys()
         not_sent = sorted(TUNING_KEYS - sent)
         assert not not_sent, f"노브를 켰는데 최상위 인자로 안 실린 키: {not_sent}"
         assert {"model", "max_tokens", "system", "messages", "temperature", "top_p"} <= sent
+
+    async def test_top_level_cache_control_is_not_sent(self) -> None:
+        """음성 대조군(OPS-89) — 캐싱을 켜도 최상위 `cache_control`(자동 캐싱)은 싣지 않는다.
+
+        자동 캐싱은 마지막 캐시 가능 블록(가변 user 프롬프트) 뒤에 브레이크포인트를 놓아 공유 system
+        프리픽스가 적중하지 못한다. 이 키가 다시 나타나면 그 배치로 되돌아간 것이다.
+        """
+        assert "cache_control" not in await sent_top_level_keys()
 
     async def test_every_sent_key_has_a_recorded_first_version(self) -> None:
         """코드가 싣는 모든 키의 최초 실재 버전이 표에 있다 — 새 키는 실측해서 표에 넣어야 하한 판정이 선다."""
@@ -258,7 +293,7 @@ class TestSentKeysAgainstRealSdk:
 # ──────────────────────────────────────────────────────────────────────────
 class TestDeclaredFloor:
     async def test_declared_floor_covers_every_key_we_send(self) -> None:
-        """하한 버전에도 우리가 싣는 모든 인자가 존재한다 — 옛 하한 0.40.0이면 세 키가 지목돼 RED였다."""
+        """하한 버전에도 우리가 싣는 모든 인자가 존재한다 — 옛 하한 0.40.0이면 두 키가 지목돼 RED였다."""
         sent = await sent_top_level_keys()
         requirement = declared_requirement()
         floor = parse_floor(requirement)
@@ -273,3 +308,135 @@ class TestDeclaredFloor:
     def test_declared_requirement_keeps_an_upper_bound(self) -> None:
         """OPS-87 범위 밖 동결 확인 — 이 태스크는 하한만 바꾼다(상한 <1은 그대로)."""
         assert "<1" in declared_requirement().replace(" ", "")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-89 · system 블록 표면 — `system=[{"type":"text","text":…,"cache_control":…}]`가 실물 SDK에 있는가
+# ──────────────────────────────────────────────────────────────────────────
+async def sent_system_blocks() -> list[dict[str, Any]]:
+    """캐싱 ON 호출이 `messages.create(system=)`에 실제로 싣는 블록 리스트(코드 경로에서 유도)."""
+    client = _CaptureClient()
+    provider = AnthropicProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=Settings(anthropic_prompt_caching=True),
+    )
+    await provider.generate("p", "공유 system", _cloud_decision())
+    system = client.messages.calls[0]["system"]
+    assert isinstance(system, list), f"캐싱 ON인데 system이 블록 리스트가 아니다: {system!r}"
+    return [dict(block) for block in system]
+
+
+def _typed_dict_keys(td: Any) -> set[str]:
+    """TypedDict의 선언 키(상속 포함) — 실물 SDK의 타입 표면."""
+    return set(typing.get_type_hints(td, include_extras=True))
+
+
+class TestSystemBlockSurface:
+    def test_create_system_accepts_a_list_of_text_blocks(self) -> None:
+        """실물 `AsyncMessages.create`의 `system` 시그니처가 `Iterable[TextBlockParam]`을 받는다."""
+        system_hint = typing.get_type_hints(AsyncMessages.create)["system"]
+        members = typing.get_args(system_hint)
+        iterable_args = [
+            typing.get_args(m) for m in members if typing.get_origin(m) is collections.abc.Iterable
+        ]
+        assert str in members, f"system이 문자열을 못 받는다(현행 OFF 경로 깨짐): {system_hint}"
+        assert (TextBlockParam,) in iterable_args, (
+            f"설치된 SDK의 create(system=)이 Iterable[TextBlockParam]을 받지 않는다: {system_hint}. "
+            "OPS-89의 system 블록 브레이크포인트가 전송될 수 없다 — pin 하한·코드를 재검토하라."
+        )
+
+    def test_text_block_param_has_cache_control_field(self) -> None:
+        """실물 `TextBlockParam`에 text·type·cache_control 필드가 있다."""
+        keys = _typed_dict_keys(TextBlockParam)
+        assert {"text", "type", "cache_control"} <= keys, sorted(keys)
+        assert "type" in _typed_dict_keys(CacheControlEphemeralParam)
+
+    async def test_every_key_we_send_in_system_block_exists_in_the_sdk_types(self) -> None:
+        """우리가 실제로 싣는 system 블록·cache_control의 모든 키가 실물 SDK TypedDict에 있다."""
+        blocks = await sent_system_blocks()
+        assert blocks, "system 블록이 비었다 — 검사가 공허하다"
+        block_keys = _typed_dict_keys(TextBlockParam)
+        cc_keys = _typed_dict_keys(CacheControlEphemeralParam)
+        required = set(TextBlockParam.__required_keys__)
+        for block in blocks:
+            unknown = set(block) - block_keys
+            assert not unknown, f"SDK에 없는 system 블록 키: {unknown}"
+            assert required <= set(block), f"필수 키 누락: {required - set(block)}"
+            unknown_cc = set(block["cache_control"]) - cc_keys
+            assert not unknown_cc, f"SDK에 없는 cache_control 키: {unknown_cc}"
+
+    async def test_every_system_block_key_has_a_recorded_first_version(self) -> None:
+        """블록의 선택 키(cache_control)는 최초 실재 버전이 기록돼 있어야 하한 판정이 선다."""
+        optional = {k for b in await sent_system_blocks() for k in b} - {"type", "text"}
+        assert optional == set(SYSTEM_BLOCK_FIRST_VERSION), (
+            f"system 블록이 싣는 선택 키 {sorted(optional)}와 기록된 "
+            f"{sorted(SYSTEM_BLOCK_FIRST_VERSION)}가 다르다 — 새 키는 PyPI 구버전을 실물 설치해 "
+            "TypedDict로 최초 버전을 재서 표에 넣어라."
+        )
+
+    async def test_declared_floor_covers_system_block_keys(self) -> None:
+        """pyproject 하한이 system 블록 `cache_control`의 최초 실재 버전(0.41.0) 이상이다."""
+        floor = parse_floor(declared_requirement())
+        sent = {k for b in await sent_system_blocks() for k in b}
+        violations = floor_violations(floor, sent, SYSTEM_BLOCK_FIRST_VERSION)
+        assert (
+            not violations
+        ), f"하한 {_fmt(floor)}이 system 블록 키의 최초 버전보다 낮다: {violations}"
+
+    async def test_real_sdk_serializes_breakpoint_on_system_block_only(self) -> None:
+        """실물 `AsyncAnthropic`이 직렬화한 *요청 본문*에서 브레이크포인트가 system 블록에만 있다.
+
+        네트워크 없음 — `httpx.MockTransport`가 요청을 캡처하고 최소 유효 응답을 돌려준다(라이브 호출
+        아님·ARCH-66 준수). 시임(가짜 create)이 아니라 SDK의 실제 직렬화 경로를 통과한다는 점이 요지다.
+        응답 usage의 캐시 필드가 `_extract_usage`까지 흘러 `Usage`로 올라오는지도 함께 본다.
+        """
+        captured: list[dict[str, Any]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(json.loads(request.content))
+            return httpx.Response(
+                200,
+                json={
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-6",
+                    "content": [{"type": "text", "text": "ok"}],
+                    "stop_reason": "end_turn",
+                    "stop_sequence": None,
+                    "usage": {
+                        "input_tokens": 5,
+                        "output_tokens": 2,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 123,
+                    },
+                },
+            )
+
+        real_client = AsyncAnthropic(
+            api_key="test-key-not-a-secret",
+            http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+            max_retries=0,
+        )
+        provider = AnthropicProvider(
+            client=real_client,  # type: ignore[arg-type]
+            settings=Settings(anthropic_prompt_caching=True),
+        )
+
+        out = await provider.generate("가변 user 꼬리", "공유 system 프리픽스", _cloud_decision())
+
+        assert len(captured) == 1
+        body = captured[0]
+        assert (
+            "cache_control" not in body
+        ), "최상위 cache_control이 직렬화됐다 — 자동 캐싱 배치로 회귀"
+        assert body["system"] == [
+            {
+                "type": "text",
+                "text": "공유 system 프리픽스",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        assert body["messages"] == [{"role": "user", "content": "가변 user 꼬리"}]
+        assert out.usage is not None
+        assert out.usage.cache_read_input_tokens == 123

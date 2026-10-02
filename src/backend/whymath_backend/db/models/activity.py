@@ -392,6 +392,22 @@ class AttemptEvent(Base):
     # server_default를 달면 기존 행 전체가 "해소 0건"으로 백필되는 날조라 달지 않는다.
     skill_ids: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text), nullable=True)
 
+    # ===== 재전송 멱등키 (DP-03) =====
+    # producer 생성 키(AnalyticsEventEnvelope.event_uuid). 내부 키 event_id(BIGSERIAL)는 DB가
+    # 할당하므로 모바일 재전송을 식별할 수 없다. nullable·server_default 없음 — NULL=멱등키 미부여
+    # (구판 writer·기존 행). 백필(gen_random_uuid)은 producer가 만든 적 없는 키를 날조한다.
+    # 유일성은 아래 부분 UNIQUE 인덱스가 DB 차원에서 강제한다(동시 재전송 경합에서 한 건만 생존).
+    event_uuid: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
+
+    __table_args__ = (
+        sa.Index(
+            "uq_attempt_event_event_uuid",
+            "event_uuid",
+            unique=True,
+            postgresql_where=sa.text("event_uuid IS NOT NULL"),
+        ),
+    )
+
     @classmethod
     def from_schema(cls, schema: SchemaAttemptEvent) -> AttemptEvent:
         """검증된 `schema.AttemptEvent` → 영속 ORM(schema↔db seam).

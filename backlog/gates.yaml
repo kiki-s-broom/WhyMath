@@ -374,6 +374,7 @@ gates:
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +OPS-89-cache-breakpoint-placement-shared-prefix — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 게이트 제목의 발동 조건이 'OPS-89가 main에 착지한 때'다 — 산문에만 있던 발동 조건을 입력 간선으로 옮긴다"
+      - "[2026-10-02] verdict PASS · inputs: OPS-89-cache-breakpoint-placement-shared-prefix · evidence: 판정 기준 커밋 4d8262545(PR 1425·미머지 — 머지 전에는 발동 조건 충족으로 읽지 말 것). PASS의 뜻은 브레이크포인트 이동 코드와 모사·SDK 표면 검증이 완성돼 재판정 입력이 갖춰졌다는 것이지 기본값 전환 근거가 갖춰졌다는 뜻이 아님: 실제 API cache_read 라이브 증거는 없고(ARCH-66·G-arch66 전까지 미수행), cross_verify 경로는 system이 최소 캐시 토큰 미만이라 위치를 고쳐도 캐시 무효(OPS-104 소유). 따라서 ①기본값 True 전환은 라이브 실측 전 근거 부족. 결정은 게이트 담당자 몫. 판정문 docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md — done OPS-89-cache-breakpoint-placement-shared-prefix 인계"
     depends_on:
       - OPS-89-cache-breakpoint-placement-shared-prefix
   - id: G-eos02-prompt-cache-live-run
@@ -855,6 +856,20 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
+  - id: G-p318-calc-02-08-disposition
+    title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-01
+    remind_after_days: 3
+    evidence: "세션 사용자 결정(2026-10-02 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): [12미적Ⅰ-02-08] 그래프 개형 = 처분 (나) 파생 판정으로 대체 — 극값 개수·증감 구간·극값의 x좌표/값으로 문항화하고 분모 7은 유지하며 시각 선택형 개형 문항은 두지 않는다. 단서 3건: [12미적Ⅰ-02-06]·[12미적Ⅰ-02-09]는 일부 가능으로 보고 보완 태스크 P3-19(구간 소속 검산)·P3-20(매개변수형 검증 필요성 판정)을 등재, [12미적Ⅰ-02-05]는 가능을 유지하고 표본 검증 단서만 기록. (나)가 근거한 실측은 극값 개수뿐이어서 증감 구간·극값 좌표 프로브 P3-21을 등재했고, P3-03에 P3-19·P3-21을 의존으로 부착했다(P3-20은 필요성 판정 뒤). 판정 근거: docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md §2·§4·§5 · 판정 기준 main 53718366 · PR #1414."
+    cleared_by: claude
+    notes: ""
+    corrections:
+      - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"
+    depends_on:
+      - P3-18-calculus-verifiability-probe
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
@@ -1037,6 +1052,18 @@ gates:
       - "[2026-09-25] depends_on +S3-51-free-use-remeasurement-observability — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 재측정 도구(회차 구간 필터·판정 모집단 분모·등호 전이 축)를 만든 작업이 S3-51이다(done) — 재개 판정의 선택지 ①이 그 도구를 쓴다"
       - "[2026-09-27] depends_on -S3-51-free-use-remeasurement-observability · no_inputs_reason: None → '시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다' — HARN-177 ② 표시 정직성 착지 후 실측 정정 — 이 게이트의 입력 S3-51은 재측정 도구를 만든 작업(done)이지 판정 태스크가 아니다. 재개 판정(3택)은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 하는 시점 판정이라 여는 작업이 대장에 없다. HARN-174 v2-9 백필이 도구 제작을 입력으로 걸었는데, HARN-177 이후 '입력 전부 done · 판정 기록 없음'은 판정 결과 미기록으로 표시되므로 사실(시점 트리거·사람 직접 판정)에 맞게 입력 없음 사유로 옮긴다. 도구 준비 완료 사실은 title에 그대로 있다(S3-51 · PR #1273). 판정 기준 main 8138f19a"
     no_inputs_reason: "시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다"
+  - id: G-s401-inter-course-edge-review
+    title: "S4-01 대학 과목간 선수 엣지 137건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/inter_course_edges_university_v1.json 과 표 문서 docs/data/inter_course_edges_university_v1.md §7 의 137행(from 선수 과목 원자 · to 후속 과목 원자 · 근거)을 보고 승인/반려/보류로 판정한다. 과목 쌍(문서 표의 묶음, 66쌍·쌍당 최대 4건) 단위로 판정해도 된다. 기계로 검증된 것(양끝 실재·대학 과목 간·세부개념 수준·중복 없음·쌍당 상한·병합 시 DAG 비순환·과목 계열 정합)은 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 개념이 저 개념의 선수인가\"라는 교수학적 판단이다. 이 제안은 슬라이스 1(고→대 24건, G-s401-uni-boundary-edge-review)과 함께일 때만 효과가 있다 — 측정: 정본 0/512 → 슬라이스1 198/512 → 슬라이스1+본 제안 466/512(91.0%). 부분 승인이 정상이다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-01
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "사람 검수(교수학적 타당성 판단) — 제안 파일은 이 태스크(S4-01 슬라이스 3) PR 로 main 에 들어온다. 제안 생산자 S4-01 은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다"
   - id: G-s401-uni-boundary-edge-review
     title: "S4-01 고→대 경계 엣지 24건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/cross_band_edges_university_v1.json 과 표 문서 docs/data/cross_band_edges_university_v1.md 의 24행(from 고등 원자 · to 대학 세부개념 · 근거)을 보고 각 행을 승인/반려/보류로 판정한다. 기계로 검증된 것(양끝 실재·방향 고등→대학·세부개념 수준·중복 없음·병합 시 DAG 비순환·과목 계열 정합)은 이미 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 고등 개념이 저 대학 개념의 선수인가\"라는 교수학적 판단이다. 선례 = 2026-07-28 중복 원자 병합 14건(검수 16 중 2건은 사이클 충돌로 실행 보류). 승인분만 병합하며 부분 승인이 정상이다."
     kind: human

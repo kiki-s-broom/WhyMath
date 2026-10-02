@@ -828,7 +828,7 @@ class TestPolicyVersionLiterals:
         경로 규칙(후보 제한·이름표)이 같고 두 경로는 오답이 있는 이력에서만 발동한다.
         """
         assert POLICY_VERSION_CAT == "cat_v4"
-        assert POLICY_VERSION_SUNEUNG == "suneung_v2"
+        assert POLICY_VERSION_SUNEUNG == "suneung_v3"
         assert POLICY_VERSION_CAT_STATE_REMEDIATION == "cat_v1_state_remediation"
         assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v2_state_undiagnosed"
 

@@ -215,7 +215,7 @@ class TestCandidatesAndPolicyVersion:
             occurred_at=_AT,
         )
         assert row.meta is not None
-        assert row.meta[META_KEY_POLICY_VERSION] == "suneung_v2"
+        assert row.meta[META_KEY_POLICY_VERSION] == "suneung_v3"
         # candidates는 생략됐으므로 policy_version만 실린다(둘은 독립 선택 인자).
         assert META_KEY_CANDIDATES not in row.meta
 

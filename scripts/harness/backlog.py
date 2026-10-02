@@ -7,7 +7,7 @@
     python3 scripts/harness/backlog.py start <id> [--session <branch>]
                                                  [--no-remote | --ignore-remote-claim]
     python3 scripts/harness/backlog.py done <id> --artifact <PR/커밋> [--artifact ...]
-                                                 [--no-pr <예외사유>]
+                                                 [--no-pr <예외사유> [--direct-commit-sha <해시>]]
     python3 scripts/harness/backlog.py block <id> --reason <사유>
     python3 scripts/harness/backlog.py unblock <id>
     python3 scripts/harness/backlog.py review <id>                (in_progress → review)
@@ -335,7 +335,62 @@ NO_PR_REASONS: tuple[str, ...] = (
     "incomplete",  # 미완 또는 사람 게이트 대기 — 아직 열 PR이 아님
     "ci-red",  # CI 적색 — 먼저 고친다
     "kiki-hold",  # Kiki의 명시적 보류 지시
+    "direct-commit",  # PR 없이 trunk에 직접 착지 — --direct-commit-sha가 trunk 조상이어야 함
 )
+
+# `--no-pr direct-commit`의 기계 변별력 (HARN-80). 앞 4종은 "PR을 *안 열었다*"는 자기 신고라
+# 검증할 방법이 없지만, 이 사유는 "이미 main에 *착지했다*"는 주장이라 git으로 실측할 수 있다.
+# 실측 없이 받으면 이 사유는 4종 위에 얹은 다섯 번째 자유 서술일 뿐이다.
+DIRECT_COMMIT_REASON = "direct-commit"
+DIRECT_COMMIT_TRUNK_REF = "origin/main"
+_COMMIT_SHA_RE = re.compile(r"[0-9a-fA-F]{7,40}")
+
+# 3상태 — 접지 않는다(모른다 ≠ 아니다). unmeasurable을 not_ancestor로 접으면 shallow 클론에서
+# 정상 착지분이 오거부되고, ancestor로 접으면 측정 실패가 통과로 위장된다.
+_LANDING_ANCESTOR = "ancestor"
+_LANDING_NOT_ANCESTOR = "not_ancestor"
+_LANDING_UNMEASURABLE = "unmeasurable"
+
+
+def _probe_trunk_landing(root: Path, sha: str) -> tuple[str, str]:
+    """`sha`가 `origin/main`의 조상인지 실측 — (상태, 전체 해시 또는 사유) (HARN-80).
+
+    판정은 `git merge-base --is-ancestor` 하나다. shallow 클론은 조상 관계를 *부분 이력*으로
+    계산하므로 "조상 아님"이 거짓일 수 있다 — 그래서 shallow는 거부(not_ancestor)가 아니라
+    **측정 불가**로 가른다. git 실패·타임아웃·디코드 실패도 같다: 어느 쪽도 통과가 되지 않는다.
+    """
+    try:
+        shallow = remote_claims._git(root, "rev-parse", "--is-shallow-repository", timeout=15)
+        if shallow.returncode != 0:
+            return (
+                _LANDING_UNMEASURABLE,
+                f"git rev-parse --is-shallow-repository rc={shallow.returncode}",
+            )
+        if (shallow.stdout or "").strip() == "true":
+            return _LANDING_UNMEASURABLE, "shallow 클론 — `git fetch --unshallow origin` 후 재실행"
+        trunk = remote_claims._git(
+            root, "rev-parse", "--verify", "--quiet", f"{DIRECT_COMMIT_TRUNK_REF}^{{commit}}"
+        )
+        if trunk.returncode != 0:
+            return _LANDING_UNMEASURABLE, (
+                f"{DIRECT_COMMIT_TRUNK_REF} 를 읽을 수 없다 — `git fetch origin main` 후 재실행"
+            )
+        commit = remote_claims._git(root, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}")
+        full = (commit.stdout or "").strip()
+        if commit.returncode != 0 or not full:
+            return _LANDING_UNMEASURABLE, (
+                f"커밋 {sha} 를 이 클론에서 찾을 수 없다 — fetch 누락이거나 존재하지 않는 해시"
+            )
+        verdict = remote_claims._git(
+            root, "merge-base", "--is-ancestor", full, trunk.stdout.strip()
+        )
+    except (OSError, subprocess.SubprocessError, remote_claims.GitOutputDecodeError) as exc:
+        return _LANDING_UNMEASURABLE, f"exception:{type(exc).__name__}"
+    if verdict.returncode == 0:
+        return _LANDING_ANCESTOR, full
+    if verdict.returncode == 1:
+        return _LANDING_NOT_ANCESTOR, full
+    return _LANDING_UNMEASURABLE, f"git merge-base --is-ancestor rc={verdict.returncode}"
 
 
 def _reason_created_declarations(
@@ -1363,8 +1418,42 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             f"PR을 열었다면 그 번호를 증적에 담고, 예외라면 사유를 명시하세요: "
             f"--no-pr {{{'|'.join(NO_PR_REASONS)}}} "
             f"(investigation=산출물 없는 조사·계획 / incomplete=미완·게이트 대기 / "
-            f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시)"
+            f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시 / "
+            f"direct-commit=PR 없이 main에 직접 착지 — --direct-commit-sha <해시> 필수, "
+            f"origin/main 조상임을 실측)"
         )
+    # 직접 커밋 착지 검증 (HARN-80) — `--no-pr direct-commit`은 "이미 main에 들어갔다"는 주장이라
+    # 신고를 믿지 않고 git으로 실측한다. 판정만 하고 거부면 아무것도 쓰지 않는다(상태 전이 앞).
+    # exit 1 = 주장이 거짓(조상 아님·인자 오류) / exit 3 = 측정 실패(shallow·git 오류) —
+    # 측정 실패를 0건 통과로 위장하지 않는다.
+    direct_sha = getattr(args, "direct_commit_sha", None)
+    landed_full: str | None = None
+    if direct_sha is not None and no_pr_reason != DIRECT_COMMIT_REASON:
+        return _fail(
+            f"{task.id}: --direct-commit-sha 는 --no-pr {DIRECT_COMMIT_REASON} 와 함께만 쓴다"
+        )
+    if no_pr_reason == DIRECT_COMMIT_REASON:
+        if direct_sha is None or not _COMMIT_SHA_RE.fullmatch(direct_sha):
+            return _fail(
+                f"{task.id}: --no-pr {DIRECT_COMMIT_REASON} 는 "
+                f"--direct-commit-sha <커밋 해시 7~40자 16진> "
+                f"가 필요하다(받은 값: {direct_sha!r})"
+            )
+        landing, detail = _probe_trunk_landing(root, direct_sha)
+        if landing == _LANDING_UNMEASURABLE:
+            print(
+                f"✘ {task.id}: 착지 여부를 측정하지 못했다 — {detail}. 통과시키지 않는다(exit 3).",
+                file=sys.stderr,
+            )
+            return 3
+        if landing == _LANDING_NOT_ANCESTOR:
+            return _fail(
+                f"{task.id}: {detail[:12]} 는 {DIRECT_COMMIT_TRUNK_REF} 의 조상이 아니다 — "
+                f"trunk에 착지하지 않은 커밋(브랜치 전용)이다. "
+                f"PR을 열어 머지한 뒤 PR 참조 증적으로 "
+                f"done 하라"
+            )
+        landed_full = detail
     # CI 미러 프리플라이트 (HARN-119 ②) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
     # 1단계는 warn이다(측정 없는 도입 없음 — block 승격은 HARN-122 절차). 거부하지 않는
     # 이유는 이 게이트가 막는 것이 *망각*이지 *위조*가 아니기 때문이다. 다만 침묵하지는
@@ -1396,7 +1485,13 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             )
     task.artifacts = list(dict.fromkeys(task.artifacts + args.artifact))
     task.session = None
-    if no_pr_reason is not None:
+    if landed_full is not None:
+        # 직접 커밋 착지는 '보류'가 아니라 '착지 완료'다 — `PR 보류` 태그를 쓰면 HARN-57의 사후
+        # 해소 로직이 미해소 보류로 오인한다. 별도 태그로 갈라 notes에 해시와 함께 남긴다.
+        task.notes = _append_note(
+            task.notes, f"{DIRECT_COMMIT_REASON} {landed_full} (trunk 조상 실측)", "직접 커밋 착지"
+        )
+    elif no_pr_reason is not None:
         # PR 없이 종결한 사실을 태스크에 남긴다 — 나중에 "왜 이건 PR이 없지"를
         # 브랜치 고고학으로 되짚지 않아도 되게(미병합 고립 4회차의 실제 비용).
         task.notes = _append_note(task.notes, no_pr_reason, "PR 보류")
@@ -1407,6 +1502,8 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
         done_extra["as_owner"] = as_owner
     if no_pr_reason is not None:
         done_extra["no_pr_reason"] = no_pr_reason
+    if landed_full is not None:
+        done_extra["direct_commit_sha"] = landed_full
     store.append_event(root, "done", task.id, **done_extra)
     if handoff is not None:
         _write_gate_handoff(root, backlog, task, handoff)
@@ -5098,7 +5195,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="no_pr",
         default=None,
         choices=list(NO_PR_REASONS),
-        help="PR 없이 완료하는 예외 사유 (HARN-23 — 예외 4종만 허용)",
+        help="PR 없이 완료하는 예외 사유 (HARN-23 — 예외 4종 + direct-commit(HARN-80))",
+    )
+    p.add_argument(
+        "--direct-commit-sha",
+        dest="direct_commit_sha",
+        default=None,
+        metavar="SHA",
+        help="--no-pr direct-commit 의 착지 커밋 — origin/main 조상임을 CLI가 git으로 실측한다. "
+        "조상이 아니면 exit 1, shallow·git 오류로 측정 불가면 exit 3 (HARN-80)",
     )
     # ── 게이트 판정 인계 (HARN-177 ①) — pending decision 게이트의 입력 태스크에만 뜻이 있다 ──
     p.add_argument(

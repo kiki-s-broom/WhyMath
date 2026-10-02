@@ -138,10 +138,19 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
 POLICY_VERSION_CAT: str = "cat_v4"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
-#: `suneung_v2`(EOS-147): 수능 모드도 같은 표적 θ를 쓴다(EOS-25는 선택을 바꾸지 않아
-#: `suneung_v1`이었다).
-POLICY_VERSION_SUNEUNG: str = "suneung_v2"
-"""수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`."""
+POLICY_VERSION_SUNEUNG: str = "suneung_v3"
+"""수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
+
+`suneung_v3`(EOS-147): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 전부 정답 이력에서 후보를 고르는
+θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의 표적이다. 그 외 이력의 선택은 `suneung_v2`와
+같지만 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다. `suneung_v2`는 EOS-31이
+먼저 썼다(두 변경이 한 번호를 쓰면 소급 평가가 서로 다른 규칙을 섞는다).
+
+`suneung_v2`(EOS-31): 수능 적격 게이트와 SQL 사전필터에 **출제 범위**(목표 학년도 수능의 성취기준
+범위 — `l6/suneung/scope.py`)가 선결 조건으로 들어갔다. `suneung_v1`은 난이도 라벨만 있으면 초·중
+성취기준 전용 문항도 적격이었으므로 후보 집합이 다르다 — 두 판의 로그를 섞어 평가하면 서로 다른
+후보 규칙이 한 정책으로 읽힌다. 설명(reason·action·target)만 바꾼 EOS-25는 이 값을 올리지
+않았다(그 변경은 선택 규칙이 아니었다)."""
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.

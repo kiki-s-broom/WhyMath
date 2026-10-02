@@ -73,6 +73,8 @@ def _problem(**over: object) -> Problem:
         "valid_from_year": 2022,
         "subject": Subject.미적분,
         "unit_codes": ["CAL-INT-DEF"],
+        # EOS-31 — 수능 출제 범위 축(범위 안 코드). 주입이 없으면 게이트가 `UNKNOWN`으로 거절한다.
+        "achievement_standard_codes": ["[12대수01-01]"],
         "question_format": QuestionFormat.재수전용형,
         "bloom_level": BloomLevel.CREATE,
         "difficulty_overall": 5.0,

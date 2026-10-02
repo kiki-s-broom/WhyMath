@@ -162,7 +162,7 @@ _EVD_BOUNDARY = (
     "        meta[META_KEY_THETA_BOUNDARY] = theta_boundary\n"
 )
 _EVD_VER_CAT = 'POLICY_VERSION_CAT: str = "cat_v4"\n'
-_EVD_VER_SUNEUNG = 'POLICY_VERSION_SUNEUNG: str = "suneung_v2"\n'
+_EVD_VER_SUNEUNG = 'POLICY_VERSION_SUNEUNG: str = "suneung_v3"\n'
 _EVD_VER_REMEDIATION = 'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"\n'
 _EVD_VER_UNDIAGNOSED = 'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"\n'
 _ME_SEL = (

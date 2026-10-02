@@ -448,7 +448,7 @@ class TestOutcomeEnforcesAlignment:
             "problem_id": None,
             "reason": no_candidate_reason(),
             "theta": 0.0,
-            "policy_version": "suneung_v2",
+            "policy_version": "suneung_v3",
         }
         if not omit:
             base["intent_resolution"] = None

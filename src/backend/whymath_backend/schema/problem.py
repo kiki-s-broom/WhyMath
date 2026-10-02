@@ -468,6 +468,13 @@ class PublicProblem(BaseModel):
         default=None,
         description="출처 구조 메타 {publisher, year, edition, page} 등(본문 X)",
     )
+    source_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "주 출처 엔티티 FK(`source_entity.source_id`) — ARCH-32 점진 이관 좌석. "
+            "None=미이관(백필 금지). source_type은 저작권 불변식의 근거라 이관 중 유지한다."
+        ),
+    )
 
     # ===== 시험 컨텍스트 =====
     exam_type: ExamType | None = Field(

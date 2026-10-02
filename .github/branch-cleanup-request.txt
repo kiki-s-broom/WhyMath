@@ -296,3 +296,27 @@ claude/new-session-fy0wry
 claude/new-session-jchdr8
 claude/test-driven-development-03elxp
 claude/relaxed-fermat-8dui3u
+
+# ── 2026-10-02 13차 배치 (3건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-02.md §3-③ ──
+# 직전 배치 집행 확인(2026-10-02 ls-remote 실측): 12차 5건(adoring-mccarthy-sle0uj · new-session-fy0wry ·
+#   new-session-jchdr8 · test-driven-development-03elxp · relaxed-fermat-8dui3u) 전건 **잔존 0/5**.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   magical-maxwell-hja5kh-eos129 = c5983e59
+#     근거: PR #1346 닫힘(미머지 · 2026-09-28). main 결정 로그(#1389 · 0f97ed64)가 "G-eos129-item-response-census는
+#     되살리지 않고 census 자산은 회수하지 않는다"고 명문화했다. 잔여 diff 10파일은 전부 그 도구의 부속이다 —
+#     census 모듈·테스트·런북 · 공용 로더 load_graded_responses(census의 read_only 옵션 전용 · main 심볼 0건) ·
+#     인벤토리 귀속 · 주석 정정(main이 EOS-129 ③ 착지 #1358로 같은 주석을 더 새로 고쳤다). Rasch 45문항 하한
+#     동결은 main test_irt_discrimination_calibration.py가 이미 갖는다. 이벤트 샤드 16줄은 판정 문서 §4 참조.
+#   magical-maxwell-hja5kh-s4-11 = 9adc142e
+#     근거: 브랜치 자신이 "타 세션이 #1372로 먼저 완료·머지해 이 브랜치는 폐기"를 기록했다. main의 S4-11은 done.
+#     고유 내용 = 착수·반납 이벤트 샤드(98줄)와 태스크 YAML 6줄 변경뿐.
+#   optimistic-bell-gk8vkz = 8fe81e89
+#     근거: EOS-141 "착수 후 미완 종료 — claim 해제 기록(판정 산출물 없음)" 1커밋. main의 EOS-141은 done(#1387).
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 12차 승계 전건 유지 + 신규:
+#   intelligent-noether-tbj2jf(SEC-42 — G-eos37 게이트 clear 회수 · 이식 완료 전 삭제 금지 · head c671a313)
+#   기존 15건 승계: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 34zvse · 5t5lmv · iws58k ·
+#   t608mk/azdnov · 6eejrv · e98dw4 · q8tvcx · 29ac1b · vafylb(OPS-53 — 브리핑 "이미 포팅됨"은 오분류, HARN-190)
+# ⚠ gh-readonly-queue/main/pr-1417-* 는 머지 큐 임시 브랜치(자동 소멸)이며 허용 패턴 밖이라 이 목록에 넣지 않는다.
+claude/magical-maxwell-hja5kh-eos129
+claude/magical-maxwell-hja5kh-s4-11
+claude/optimistic-bell-gk8vkz

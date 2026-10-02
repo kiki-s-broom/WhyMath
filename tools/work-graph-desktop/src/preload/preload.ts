@@ -17,6 +17,7 @@ const api: WorkGraphApi = {
   resetLayout: (id: string) => ipcRenderer.invoke("layout:reset", id),
   openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url),
   openTaskFile: (id: string, nodeKey: string) => ipcRenderer.invoke("shell:openTaskFile", id, nodeKey),
+  discovery: () => ipcRenderer.invoke("ws:discovery"),
   mode: () => "electron",
 };
 

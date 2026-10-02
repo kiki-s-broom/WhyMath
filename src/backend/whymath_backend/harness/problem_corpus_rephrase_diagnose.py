@@ -292,13 +292,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.offset < 0:
         parser.error("--offset은 0 이상이어야 합니다.")
     limit = args.limit if args.limit and args.limit > 0 else None
-    report = run_rephrase_diagnose(
-        in_path=args.in_path,
-        rephraser=QuestionRephraser(temperature=args.temperature),
-        temperature=args.temperature,
-        limit=limit,
-        offset=args.offset,
-    )
+    rephraser = QuestionRephraser(temperature=args.temperature)
+    try:
+        report = run_rephrase_diagnose(
+            in_path=args.in_path,
+            rephraser=rephraser,
+            temperature=args.temperature,
+            limit=limit,
+            offset=args.offset,
+        )
+    finally:
+        # 짧게 끝나는 CLI — 저작 호출의 Langfuse `l3_routing` 배치를 종료 전에 확정(OPS-84).
+        rephraser.flush()
     if args.dump_path is not None:
         written = _write_failures(args.dump_path, report.failures)
         sys.stderr.write(f"실패 {written}건 dump → {args.dump_path}\n")
