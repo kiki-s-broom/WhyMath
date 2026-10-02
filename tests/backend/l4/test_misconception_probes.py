@@ -72,8 +72,10 @@ class TestPackageDataLoading:
                 recall += 1
             else:
                 fp += 1
-        assert recall == 100  # recall 프로브 수(843 트랜치5 +6 + MISC-21 +3 + MISC-40 +2)
-        assert fp == 72  # FP 프로브(843 트랜치5 +6 + MISC-21 +4 — #1068 P1 회귀 1건 포함 + MISC-40 +1)
+        # recall 프로브 수(843 트랜치5 +6 + MISC-21 +3 + MISC-40 +2)
+        assert recall == 100
+        # FP 프로브(843 트랜치5 +6 + MISC-21 +4 — #1068 P1 회귀 1건 포함 + MISC-40 +1)
+        assert fp == 72
 
     def test_all_expected_ids_in_catalog(self) -> None:
         # recall 프로브의 expected_id는 모두 카탈로그 id(매처가 잡을 수 있는 라벨).

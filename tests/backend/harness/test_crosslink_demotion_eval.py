@@ -40,7 +40,8 @@ class TestSummarize:
 
     def test_coverage_accounting_uses_real_catalog(self) -> None:
         report = ev.summarize([], _KEBAB_STANDARDS, _MID_STANDARDS)
-        assert report.kebabs_total == 68  # 실 카탈로그 68종(843 트랜치1~5 + MISC-21 3 + MISC-40 1 포함)
+        # 실 카탈로그 68종(843 트랜치1~5 + MISC-21 3 + MISC-40 1 포함)
+        assert report.kebabs_total == 68
         assert report.kebabs_decidable == 2  # 신호 부여한 2 kebab
 
 

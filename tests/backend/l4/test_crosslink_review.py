@@ -485,7 +485,9 @@ def test_misc40_each_concept_has_exactly_one_mid_in_corpus() -> None:
     # 판정의 전제 — 7개 개념 각각에 걸린 M-id가 정확히 1개다(코퍼스가 바뀌면 판정을 다시 센다).
     corpus = json.loads(_CORPUS_PATH.read_text(encoding="utf-8"))
     for code, mid in _MISC40_CONCEPT_MIDS.items():
-        found = sorted(m["mis_id"] for m in corpus["misconceptions"] if m.get("standard_code") == code)
+        found = sorted(
+            m["mis_id"] for m in corpus["misconceptions"] if m.get("standard_code") == code
+        )
         assert found == [mid], (code, found)
 
 
@@ -509,7 +511,9 @@ def test_misc40_new_kebab_has_single_pending_direct_row(real_rows: list[dict[str
     assert "power-rule-step-omitted" in CATALOG_BY_ID  # 큐 행이 가리키는 kebab이 실재한다
 
 
-def test_misc40_m0672_seat_is_the_existing_pending_partial_row(real_rows: list[dict[str, Any]]) -> None:
+def test_misc40_m0672_seat_is_the_existing_pending_partial_row(
+    real_rows: list[dict[str, Any]],
+) -> None:
     # M0672는 신설 없이 기존 kebab(product-rule-naive)의 *이미 있던* 부분매핑 pending 행이 좌석 후보다.
     # 행을 새로 만들거나 바꾸지 않았다는 것을 값으로 못 박는다(확정은 Kiki 검수).
     rows = [r for r in real_rows if r["mis_id"] == "M0672"]
@@ -518,7 +522,9 @@ def test_misc40_m0672_seat_is_the_existing_pending_partial_row(real_rows: list[d
     ]
 
 
-def test_misc40_signature_table_in_judgment_doc_matches_queue(real_rows: list[dict[str, Any]]) -> None:
+def test_misc40_signature_table_in_judgment_doc_matches_queue(
+    real_rows: list[dict[str, Any]],
+) -> None:
     # 서명 대상 5행은 ① 큐에 실재하고 ② 판정 문서 **§6 절의** 표 행(`|`로 시작하는 줄)에 kebab·M-id가
     # 함께 적혀 있다. 절을 §6으로 좁히는 이유: 문서 앞쪽 §1 판정표도 같은 두 문자열을 한 행에 담고 있어,
     # 문서 전체에서 찾으면 §6의 서명 대상 행이 지워져도 통과한다(행 삭제 시뮬레이션으로 확인한 사각).

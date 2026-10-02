@@ -300,8 +300,10 @@ class TestProbeSetStructure:
         probes = _load_real_probes()
         recall = [p for p in probes if p.is_recall_probe]
         fp = [p for p in probes if p.is_fp_probe]
-        assert len(recall) == 100  # 89 + 843 트랜치5 recall 6 + MISC-21 recall 3 + MISC-40 recall 2
-        assert len(fp) == 72  # 61 + 843 트랜치5 FP 6 + MISC-21 FP 4(#1068 P1 회귀 1건 포함) + MISC-40 FP 1
+        # 89 + 843 트랜치5 recall 6 + MISC-21 recall 3 + MISC-40 recall 2
+        assert len(recall) == 100
+        # 61 + 843 트랜치5 FP 6 + MISC-21 FP 4(#1068 P1 회귀 1건 포함) + MISC-40 FP 1
+        assert len(fp) == 72
         # 상호배타·완전분할(recall ⊕ fp = 전체).
         assert len(recall) + len(fp) == len(probes)
 
