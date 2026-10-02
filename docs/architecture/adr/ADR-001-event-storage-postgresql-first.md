@@ -74,3 +74,9 @@ P1 이벤트 writer와 세션/퍼널 집계가 실제 트래픽에서 동작한 
 ## 추기 (2026-08-31 — EOS-48)
 
 EOS-48이 `attempt_event`에 nullable `event_time`(클라이언트 신고 발생 시각) 컬럼을 추가했다(마이그레이션 `c9bc2555282e`). 본 ADR의 hypertable 전환 조건·절차와의 충돌 여부를 재확인한 결과 **무충돌**이다: ① 파티션 키(`event_at`)·복합 PK 불변 — `create_hypertable` 전환 절차는 컬럼 목록과 무관하게 동작한다 ② 컬럼은 NULL 지배적(신고 이벤트만 값)이라 압축·chunk 부담 미미 ③ `event_at`의 실측 의미(전 writer가 서버 now — 수신 시각)를 재정의하지 않고 발생 시각을 별도 컬럼으로 분리했으므로, 전환 시 파티션 의미도 그대로다. 귀속 계약(발생 우선·시계 왜곡 시 수신 폴백)은 `l2.learning_metrics_rollup.effective_event_moment`가 정본이다.
+
+## 추기 (2026-10-02 — DP-03)
+
+DP-03이 `attempt_event`에 nullable `event_uuid`(producer 재전송 멱등키)와 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`)를 추가했다(마이그레이션 `a3f7c9d1e5b2`). 기존 BIGSERIAL `event_id`·복합 PK `(event_id, event_at)`는 불변이다. envelope의 두 시각은 새 컬럼 없이 기존 좌석을 쓴다: `received_at` = `event_at`(서버 수신·파티션 키), `occurred_at` = `event_time`(EOS-48).
+
+**위 "TimescaleDB 전환 필수 작업 4(unique constraint/파티션 키 호환성)"가 이 인덱스로 구체화됐다 — 비호환이다.** hypertable의 UNIQUE 인덱스는 파티션 키 `event_at`을 포함해야 하는데, 재전송은 서버 수신 시각(`event_at`)이 매번 달라 `(event_uuid, event_at)` UNIQUE로는 재전송을 막지 못한다. 그래서 마이그레이션은 `attempt_event`가 hypertable이면 **예외로 중단**한다(조용히 복합 키로 약화하면 "멱등 보호 있음"으로 위장되기 때문). 전환 ADR은 멱등키 전용 비-hypertable 테이블 등 별도 좌석을 설계해야 하며, 그 전까지 재전송 방어의 정본은 이 인덱스 + `db.models.activity.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`)다.

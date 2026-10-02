@@ -46,6 +46,8 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
@@ -392,6 +394,22 @@ class AttemptEvent(Base):
     # server_default를 달면 기존 행 전체가 "해소 0건"으로 백필되는 날조라 달지 않는다.
     skill_ids: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text), nullable=True)
 
+    # ===== 재전송 멱등키 (DP-03) =====
+    # producer 생성 키(AnalyticsEventEnvelope.event_uuid). 내부 키 event_id(BIGSERIAL)는 DB가
+    # 할당하므로 모바일 재전송을 식별할 수 없다. nullable·server_default 없음 — NULL=멱등키 미부여
+    # (구판 writer·기존 행). 백필(gen_random_uuid)은 producer가 만든 적 없는 키를 날조한다.
+    # 유일성은 아래 부분 UNIQUE 인덱스가 DB 차원에서 강제한다(동시 재전송 경합에서 한 건만 생존).
+    event_uuid: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
+
+    __table_args__ = (
+        sa.Index(
+            "uq_attempt_event_event_uuid",
+            "event_uuid",
+            unique=True,
+            postgresql_where=sa.text("event_uuid IS NOT NULL"),
+        ),
+    )
+
     @classmethod
     def from_schema(cls, schema: SchemaAttemptEvent) -> AttemptEvent:
         """검증된 `schema.AttemptEvent` → 영속 ORM(schema↔db seam).
@@ -411,4 +429,34 @@ class AttemptEvent(Base):
         return SchemaAttemptEvent.model_validate(data)
 
 
-__all__ = ["LearningSession", "ProblemAttempt", "AttemptEvent"]
+async def insert_attempt_event_once(session: AsyncSession, event: AttemptEvent) -> bool:
+    """`event_uuid`가 있는 이벤트를 **멱등하게** 삽입한다 — 새로 반영됐으면 True, 재전송이면 False.
+
+    `INSERT ... ON CONFLICT (event_uuid) WHERE event_uuid IS NOT NULL DO NOTHING`이라 사전 조회
+    없이도 동시 재전송 경합에서 정확히 한 건만 남는다(check-then-act 경합 없음). `event_uuid`가
+    None이면 멱등 대상이 아니므로 ValueError — 키 없는 이벤트를 이 경로로 보내 "멱등 보호 있음"
+    으로 오인하는 것을 막는다(키 없는 기존 writer는 `session.add`를 그대로 쓴다).
+
+    commit은 호출자 소유다(`get_session`은 자동 commit하지 않는다).
+    """
+    if event.event_uuid is None:
+        raise ValueError("event_uuid가 없는 이벤트는 멱등 삽입 대상이 아니다")
+    values = {
+        col.key: getattr(event, col.key)
+        for col in sa.inspect(AttemptEvent).mapper.column_attrs
+        if getattr(event, col.key) is not None
+    }
+    stmt = (
+        pg_insert(AttemptEvent)
+        .values(**values)
+        .on_conflict_do_nothing(
+            index_elements=[AttemptEvent.event_uuid],
+            index_where=sa.text("event_uuid IS NOT NULL"),
+        )
+        .returning(AttemptEvent.event_id)
+    )
+    inserted = (await session.execute(stmt)).scalar_one_or_none()
+    return inserted is not None
+
+
+__all__ = ["LearningSession", "ProblemAttempt", "AttemptEvent", "insert_attempt_event_once"]
