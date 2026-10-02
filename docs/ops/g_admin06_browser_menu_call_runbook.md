@@ -73,12 +73,14 @@ git fetch origin main
 $Wt = Join-Path $env:TEMP "whymath-g-admin06"
 if (Test-Path $Wt) { git worktree remove --force $Wt; "OLD_WORKTREE_REMOVED=True" }
 git worktree add --detach $Wt origin/main
-"WORKTREE_HEAD=" + (git -C $Wt log -1 --oneline)
-"NODE_FOUND=" + [bool](Get-Command node -ErrorAction SilentlyContinue)
-"NPM_CMD_FOUND=" + [bool](Get-Command npm.cmd -ErrorAction SilentlyContinue)
+$Expected = (git rev-parse origin/main)
+$Head = (git -C $Wt rev-parse HEAD)
+"EXPECTED=$Expected"
+"WORKTREE_HEAD_FULL=$Head"
+if ($Head -eq $Expected) { "WORKTREE_HEAD=" + (git -C $Wt log -1 --oneline); "NODE_FOUND=" + [bool](Get-Command node -ErrorAction SilentlyContinue); "NPM_CMD_FOUND=" + [bool](Get-Command npm.cmd -ErrorAction SilentlyContinue) } else { "REFUSED — HEAD=$Head 기대=$Expected. worktree 생성 실패 또는 다른 커밋 — 이후 블록을 실행하지 말 것" }
 ```
 
-판정: `NODE_FOUND=True`와 `NPM_CMD_FOUND=True`가 둘 다 나와야 블록 2로 간다. `False`면 Node.js 22 LTS를 설치하고 **새 창**에서 블록 1부터 다시 한다. `WORKTREE_HEAD=`의 해시가 이번 실행의 기준 커밋이므로 회신에 포함한다.
+판정: `WORKTREE_HEAD_FULL`과 `EXPECTED`가 같고 `NODE_FOUND=True`·`NPM_CMD_FOUND=True`가 나와야 블록 2로 간다. `REFUSED` 줄이 보이면 worktree가 만들어지지 않았거나 main이 아닌 커밋을 가리키는 것이므로 **이후 블록을 실행하지 않고** 그 줄을 회신한다(폴더가 남아 있어 `git worktree add`가 실패한 경우가 흔하다 — 같은 블록을 새 창에서 다시 실행하면 이 블록 앞부분이 옛 폴더를 지운다). `NODE_FOUND=False`면 Node.js 22 LTS를 설치하고 **새 창**에서 블록 1부터 다시 한다. `WORKTREE_HEAD=`의 해시가 이번 실행의 기준 커밋이므로 회신에 포함한다.
 
 ### 블록 2 — 창① [빌드]: admin 타깃 빌드
 
