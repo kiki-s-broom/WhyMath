@@ -4,6 +4,7 @@
 > 대상 게이트: `G-admin06-browser-menu-call` (ADMIN-06 acceptance ②의 사람 축 · ADMIN-07 착수 선결)
 > A 단계는 **읽기 전용**이다(DB 쓰기·대장 조작·배포 없음). B 단계는 `whymath-pg`에 백업 후 스키마 업그레이드 1회와 토큰 발급 감사 1행을 쓴다(§5 B2·B3 — 둘 다 자가거부 가드 안).
 > 개정: 2026-09-25 §5 B 단계 채움(ADMIN-15 착지 · 판정 기준: 브랜치 `claude/optimistic-euler-wckia8`, main `f138f894` 병합본)
+> 개정: 2026-10-02 (판정 기준: main `dc44512b`) — ①§0에 **한 번에 끝내는 권장 경로** 추가(A를 따로 돌리지 않는다) ②B2의 스키마 업그레이드가 ADMIN-15 컬럼 2개만이 아니라 **그 뒤에 쌓인 마이그레이션 전부**를 적용함을 정정하고, 기대 상태를 해시 고정(`8c19e8a611e4`)이 아니라 `(head)` 표지로 판정하도록 변경(마이그레이션이 자주 쌓여 해시는 곧 낡는다 — 이 런북 작성 후 1주 안에 head가 `8c19e8a611e4`에서 `a3f7c9d1e5b2`까지 3번 이동했다) ③브라우저 확인에 **B-2(비허용 origin)** 추가
 
 ## 0. 먼저 알아 둘 것 — 이 게이트는 두 단계로 나뉜다
 
@@ -17,6 +18,16 @@
 B가 불가한 이유: `GET /v1/admin/menu`는 **데모 계정이 아닌** 실 신원 토큰을 요구한다(`api/admin_menu.py` — 데모 계정 403). 저장소에서 액세스 토큰을 발급하는 경로는 OAuth 콜백(`api/auth.py`)과 데모 로그인 둘뿐이고, Kiki의 content_admin 계정(`account_bootstrap_cli`로 생성 — 게이트 `G-operator-seat-first-grant` 증적)에는 OAuth 로그인 이력이 없다. 이 공백은 태스크 **`ADMIN-15-operator-access-token-issuance`**가 운영자 토큰 발급 CLI로 메웠다(§5).
 
 **A 단계만으로 게이트를 닫지 않는다.** A의 결과는 게이트 notes에 부분 증적으로 남기고, B까지 끝난 뒤 clear한다.
+
+### 권장 경로 — 한 번에 끝내기 (2026-10-02 개정)
+
+A와 B를 따로 두 번 돌리지 않는다. **§5(B 단계)를 한 번 실행하면서 브라우저 확인만 두 번**(B-1 허용 origin·B-2 비허용 origin) 하면 게이트 제목의 두 요구가 한 번에 증명된다.
+
+- B-1(허용 origin + 실 토큰 → 200 + 메뉴 렌더)이 A-1(가짜 토큰 → 401)의 상위 증적이다. 허용 origin에서 실 토큰 응답이 화면에 그려졌다면 브라우저가 서버 응답을 받았다는 뜻이다.
+- B-2는 **같은 정적 서버를 `localhost` 주소로** 연다. 브라우저의 사전 허가 질의(프리플라이트)는 인증보다 먼저 CORS 미들웨어가 처리하므로 토큰이 진짜여도 비허용 origin은 같게 차단된다. 이 설명은 코드를 읽은 추론이고, A 단계 컨테이너 실측(가짜 토큰·Chromium)이 같은 결과를 냈다. B-2가 그 추론을 실 환경에서 직접 확인한다.
+- A 단계(§2~§4)는 **DB·Docker 없이 CORS 축만 먼저** 보고 싶을 때의 대체 경로로 남긴다. 게이트 clear에는 쓰지 못한다.
+
+블록 실행 순서(총 25~35분, 대부분 `npm ci` 대기): 창① §2 블록 1 → 블록 2 → §5 B1 → (B1이 `AT_HEAD_BEFORE=False`일 때만) B2 → 창② B3 → 창③ 블록 4 → 창① §4 블록 5 → 브라우저 B-1 → B-2 → 창① §6 정리.
 
 ### A 단계가 변별력이 있는 이유 (2026-09-25 컨테이너 실측)
 
@@ -174,10 +185,15 @@ A-2에서 페이지 자체가 안 열리면(연결 거부), `localhost`가 IPv6�
 
 ## 5. B 단계 — 200 + 내비 렌더 (`ADMIN-15` 착지 후 실행 가능)
 
-A 단계와 **따로** 실행한다(A의 블록 6이 worktree를 지웠으므로 준비부터 다시 한다). 새로 필요한 것은 세 가지다.
+§0의 권장 경로대로 A 단계를 건너뛰고 이 §5를 바로 실행한다(A를 이미 돌려 정리까지 마쳤다면 worktree가 지워졌으므로 준비부터 다시 한다). A와 다른 점이 세 가지 있다.
 
 - **운영자 토큰** — `ops/operator_token_cli.py`(ADMIN-15)가 content_admin 계정에 단기 토큰(기본 30분·상한 60분)을 발급하고, 발급마다 `privacy_audit`에 `operator_token_issued` 1행(누가·누구에게·언제·만료)을 남긴다. 데모 계정·content_admin이 아닌 계정·없는 계정은 exit 1로 거부한다.
 - **스키마 업그레이드** — 위 감사 행이 쓰는 컬럼 2개(`token_expires_at`·`issued_by`)가 마이그레이션 `8c19e8a611e4`로 추가됐다. `whymath-pg`에 적용돼 있지 않으면 CLI가 빠진 컬럼 이름을 적고 exit 1로 거부한다. 그래서 블록 B2가 **백업 후 `alembic upgrade head`**를 한다(이 런북에서 유일한 DB 쓰기).
+  - **`upgrade head`는 ADMIN-15 컬럼 2개만이 아니라 아직 적용 안 된 마이그레이션 전부를 적용한다.** 개정 시점(main `dc44512b`)에 `8c19e8a611e4` 뒤로 3건이 더 있다: `9d3e6b1f4a27`(`hints` 테이블 신설) · `9d3e7b1c5a20`(`concept_version`에 `IN_QA` 상태값과 `qa` 컬럼 추가) · `a3f7c9d1e5b2`(`attempt_event.event_uuid` 컬럼과 부분 유니크 인덱스 추가). 세 파일의 설명(docstring)이 모두 기존 행·기존 컬럼을 바꾸지 않는 추가형이라고 밝힌다. DB가 이미 head면 아무것도 하지 않는다(B1의 `AT_HEAD_BEFORE=True`면 B2를 건너뛴다).
+  - 전체가 **트랜잭션 1개**로 묶여 도중에 하나라도 실패하면 전부 롤백된다(`alembic/env.py`가 `begin_transaction()`을 한 번만 열고 `transaction_per_migration`을 켜지 않는다 — 코드를 읽은 판단이며 실행해 본 것은 아니다). 그 위에 B2가 실행 전 백업을 따로 뜬다.
+  - `a3f7c9d1e5b2`는 `attempt_event`가 TimescaleDB hypertable이면 예외로 **중단**하도록 만들어졌다. `whymath-pg`는 일반 PostgreSQL 16(pgvector 이미지)이라 해당하지 않지만, 만약 이 예외가 나면 출력 전문을 회신한다(위 트랜잭션 때문에 DB는 바뀌지 않았다).
+  - **head까지 올리는 이유**: 개발 DB가 main의 head를 따라가는 것이 이 저장소의 일반 상태이고, 중간 리비전에 멈춰 두면 다른 세션의 코드와 어긋난다. ADMIN-15에 필요한 것만 원하면 B2의 `alembic upgrade head`를 `alembic upgrade 8c19e8a611e4`로 바꾸고, 그 경우 판정의 `AT_HEAD_AFTER`는 `False`가 정상이다.
+  - **기대 상태를 해시로 고정하지 않는다.** head는 자주 이동하므로 B1·B2는 `alembic current` 출력 끝에 `(head)`가 붙는지로 판정한다.
 - **같은 JWT 시크릿** — 토큰은 창②의 서버와 같은 `WHYMATH_JWT_SECRET_KEY`로 서명돼야 한다. 그래서 토큰 발급을 **창② 안에서** 서버 기동 직전에 하고, 토큰은 화면에 찍지 않고 **클립보드**로만 넘긴다.
 
 > 실측(2026-09-25 컨테이너, 로컬 PG16): `account_bootstrap_cli create` → `role_grant_cli grant … content_admin` → `operator_token_cli issue … --ttl-minutes 30` exit 0 → 그 토큰으로 `GET /v1/admin/menu` **HTTP 200**, 섹션이 채워진 응답 · `--ttl-minutes 90`은 exit 2로 거부. 통합 테스트 `tests/backend/ops/test_operator_token_cli_integration.py` 5건(메뉴 200 + sections 비어 있지 않음 · 무토큰 401 대조 · 감사 1행 · 거부 3종 감사 0)이 같은 흐름을 동결한다.
@@ -200,19 +216,21 @@ $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath
 "HAS_TOKEN_CLI=" + (Test-Path (Join-Path $Wt "src\backend\whymath_backend\ops\operator_token_cli.py"))
 "PG_RUNNING=" + [bool](docker ps --filter "name=^whymath-pg$" --format "{{.Names}}")
 cd (Join-Path $Wt "src\backend")
-& $Py -m alembic current
+$CurOut = (& $Py -m alembic current 2>&1) -join "`n"
 "CURRENT_EXIT=$LASTEXITCODE"
+$CurOut
+"AT_HEAD_BEFORE=" + ($CurOut -match '\(head\)')
 & $Py -m alembic heads
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Admins = @(docker exec whymath-pg psql -U whymath -d whymath -tAc "select user_id from user_profile where role::text='content_admin'" | Where-Object { $_ -match '^[0-9a-f-]{36}$' })
 "CONTENT_ADMIN_COUNT=" + $Admins.Count
 ```
 
-판정: `HAS_TOKEN_CLI=True`·`PG_RUNNING=True`·`CURRENT_EXIT=0`·`CONTENT_ADMIN_COUNT=1`. `alembic heads`는 `8c19e8a611e4 (head)`(또는 그 이후)를 낸다. `alembic current`가 이미 같은 값이면 B2를 건너뛰어도 된다. content_admin 계정은 **정확히 1개**여야 한다(B3가 그 1개를 자동으로 고른다 — 0개나 2개 이상이면 B3가 거부한다). 계정 조회는 읽기 전용 `select` 한 줄이다.
+판정: `HAS_TOKEN_CLI=True`·`PG_RUNNING=True`·`CURRENT_EXIT=0`·`CONTENT_ADMIN_COUNT=1`. `alembic heads`가 낸 해시는 이 파일 개정 시점에 `a3f7c9d1e5b2`이지만 **고정 기대값이 아니다**(이후 마이그레이션이 쌓이면 달라진다). `AT_HEAD_BEFORE=True`(`alembic current` 출력 끝에 `(head)`)면 DB가 이미 최신이므로 B2를 건너뛴다. `False`면 B2로 간다 — `alembic current`가 아무것도 안 내는 빈 DB도 `False`다. content_admin 계정은 **정확히 1개**여야 한다(B3가 그 1개를 자동으로 고른다 — 0개나 2개 이상이면 B3가 거부한다). 계정 조회는 읽기 전용 `select` 한 줄이다.
 
 ### B2 — 창① [백업 + 스키마 업그레이드 — 쓰기]
 
-B1의 판정값을 눈으로 확인한 다음에 붙여넣는다. 이 블록은 조건(worktree 코드·컨테이너 가동·CLI 실재)을 **스스로 다시 검사해** 하나라도 어긋나면 아무것도 쓰지 않는다. 백업이 실패하면 업그레이드도 하지 않는다. 백업 파일은 저장소 밖 `C:\Users\kiki\whymath_backups`에 남는다(PowerShell `>`로 받으면 바이너리 덤프가 깨지므로 컨테이너 안에서 파일로 만든 뒤 `docker cp`로 꺼낸다).
+B1이 `AT_HEAD_BEFORE=True`였다면 **이 블록을 건너뛴다**(백업도 필요 없다). `False`였을 때만 B1의 판정값을 눈으로 확인한 다음에 붙여넣는다. 이 블록은 조건(worktree 코드·컨테이너 가동·CLI 실재)을 **스스로 다시 검사해** 하나라도 어긋나면 아무것도 쓰지 않는다. 백업이 실패하면 업그레이드도 하지 않는다. 백업 파일은 저장소 밖 `C:\Users\kiki\whymath_backups`에 남는다(PowerShell `>`로 받으면 바이너리 덤프가 깨지므로 컨테이너 안에서 파일로 만든 뒤 `docker cp`로 꺼낸다).
 
 ```powershell
 # [창① B2 백업 + alembic upgrade head — 쓰기] Windows PowerShell — Phaiakes9
@@ -229,10 +247,10 @@ New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 $Dump = "whymath_before_admin15_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".dump"
 "FROM_WORKTREE=$FromWt"
 "PG_RUNNING=$PgUp"
-if ($FromWt -and $PgUp) { docker exec whymath-pg pg_dump -U whymath -Fc -f "/tmp/$Dump" whymath; $DumpExit = $LASTEXITCODE; docker cp "whymath-pg:/tmp/$Dump" (Join-Path $BackupDir $Dump); $CpExit = $LASTEXITCODE; $DumpSize = if (Test-Path (Join-Path $BackupDir $Dump)) { (Get-Item (Join-Path $BackupDir $Dump)).Length } else { 0 }; "DUMP_EXIT=$DumpExit"; "CP_EXIT=$CpExit"; "DUMP_BYTES=$DumpSize"; if (($DumpExit -eq 0) -and ($CpExit -eq 0) -and ($DumpSize -gt 0)) { cd (Join-Path $Wt "src\backend"); & $Py -m alembic upgrade head; "UPGRADE_EXIT=$LASTEXITCODE"; & $Py -m alembic current; cd C:\Users\kiki\Desktop\__AI\WhyMath } else { "UPGRADE_REFUSED=True — 백업 실패(DUMP_EXIT·CP_EXIT·DUMP_BYTES 확인). DB는 바뀌지 않았다" } } else { "WRITE_REFUSED=True — FROM_WORKTREE=$FromWt PG_RUNNING=$PgUp. False인 쪽을 해결한 뒤 B1부터 다시" }
+if ($FromWt -and $PgUp) { docker exec whymath-pg pg_dump -U whymath -Fc -f "/tmp/$Dump" whymath; $DumpExit = $LASTEXITCODE; docker cp "whymath-pg:/tmp/$Dump" (Join-Path $BackupDir $Dump); $CpExit = $LASTEXITCODE; $DumpSize = if (Test-Path (Join-Path $BackupDir $Dump)) { (Get-Item (Join-Path $BackupDir $Dump)).Length } else { 0 }; "DUMP_EXIT=$DumpExit"; "CP_EXIT=$CpExit"; "DUMP_BYTES=$DumpSize"; if (($DumpExit -eq 0) -and ($CpExit -eq 0) -and ($DumpSize -gt 0)) { cd (Join-Path $Wt "src\backend"); & $Py -m alembic upgrade head; "UPGRADE_EXIT=$LASTEXITCODE"; $CurOut = (& $Py -m alembic current 2>&1) -join "`n"; $CurOut; "AT_HEAD_AFTER=" + ($CurOut -match '\(head\)'); cd C:\Users\kiki\Desktop\__AI\WhyMath } else { "UPGRADE_REFUSED=True — 백업 실패(DUMP_EXIT·CP_EXIT·DUMP_BYTES 확인). DB는 바뀌지 않았다" } } else { "WRITE_REFUSED=True — FROM_WORKTREE=$FromWt PG_RUNNING=$PgUp. False인 쪽을 해결한 뒤 B1부터 다시" }
 ```
 
-판정: `DUMP_EXIT=0`·`CP_EXIT=0`·`DUMP_BYTES`가 0보다 큼 → `UPGRADE_EXIT=0` → 마지막 `alembic current`가 `8c19e8a611e4 (head)`(또는 그 이후). 거부 줄(`WRITE_REFUSED`·`UPGRADE_REFUSED`)이 보이면 DB는 바뀌지 않은 것이다.
+판정: `DUMP_EXIT=0`·`CP_EXIT=0`·`DUMP_BYTES`가 0보다 큼 → `UPGRADE_EXIT=0` → `AT_HEAD_AFTER=True`(마지막 `alembic current` 출력 끝에 `(head)`). 업그레이드가 도중에 실패하면 `UPGRADE_EXIT`가 0이 아니고 `AT_HEAD_AFTER=False`이며, 트랜잭션 1개라 DB는 바뀌지 않은 채로 남는다(백업 파일은 그래도 남는다). 거부 줄(`WRITE_REFUSED`·`UPGRADE_REFUSED`)이 보이면 DB는 바뀌지 않은 것이다.
 
 ### B3 — 창② [토큰 발급 + 백엔드 — 점유]
 
@@ -263,6 +281,10 @@ if ($FromWt -and (-not $PortBusy) -and ($Admins.Count -eq 1)) { $Issued = (& $Py
 
 ### B4 — 창③ [정적 서버]: §3의 블록 4를 그대로 실행
 
+### B5 — 창① [자가검증]: §4의 블록 5를 그대로 실행
+
+`PREFLIGHT_ALLOWED=200`·`PREFLIGHT_DENIED=400`·`STATIC_ADMIN=200`이 나온 다음에 브라우저로 간다. 이 값이 B-2(비허용 origin)의 기계 증적이 된다.
+
 ### 브라우저 B-1 — 허용 origin + 실 토큰
 
 1. Chrome에서 `http://127.0.0.1:3001/admin/` 을 연다(A 단계에서 연 탭이면 로그아웃 후 새로고침).
@@ -272,12 +294,24 @@ if ($FromWt -and (-not $PortBusy) -and ($Admins.Count -eq 1)) { $Issued = (& $Py
 
 실패 시 대처: 「이 계정으로는 콘솔을 열 수 없습니다 (403)」이면 토큰 대상이 데모 계정이다(발급 CLI가 먼저 거부했어야 하므로 B3 출력 전문을 회신) · 「토큰이 유효하지 않습니다 (401)」이면 토큰과 서버의 시크릿이 다르거나 만료다(B3를 새 창에서 다시).
 
+### 브라우저 B-2 — 비허용 origin (B-1과 같은 서버·같은 토큰)
+
+1. 같은 브라우저의 **새 탭**에서 `http://localhost:3001/admin/` 을 연다(같은 파일을 다른 주소로 여는 것이다 — `127.0.0.1`과 `localhost`는 브라우저에게 서로 다른 origin이다).
+2. 「운영자 인증」 칸에 **Ctrl+V**(B-1에서 쓴 토큰)를 붙이고 「콘솔 열기」. 클립보드가 이미 다른 내용으로 바뀌었다면 `not-a-real-token`을 넣어도 된다 — 차단은 토큰과 무관하며, A 단계 컨테이너 실측이 이 조합(가짜 토큰·비허용 origin)이었다.
+3. **기대**: 본문 제목 「**백엔드에 닿지 못했습니다**」, 설명에 `실패 종류: TypeError`. B-1에서는 메뉴가 그려졌던 같은 토큰이 여기서는 화면에 아무것도 못 그린다 — 이 대조가 "차단하는 쪽이 CORS다"의 증거다.
+4. F12 → Console 탭에 `has been blocked by CORS policy` 문구가 보인다.
+
+`localhost` 주소 자체가 안 열리면(연결 거부) IPv6로만 해석되는 환경이다. 이때는 B5의 `PREFLIGHT_DENIED=400`을 비허용 축 증적으로 쓰고 회신에 그렇게 적는다.
+
 ### B 단계 회신할 내용
 
-- B1의 `HAS_TOKEN_CLI`·`PG_RUNNING`·`CURRENT_EXIT`·`CONTENT_ADMIN_COUNT` 줄과 `alembic current` 출력
-- B2의 `DUMP_EXIT`·`CP_EXIT`·`DUMP_BYTES`·`UPGRADE_EXIT` 줄과 마지막 `alembic current` 출력(건너뛰었으면 그 사실)
+- B0: 블록 1의 `WORKTREE_HEAD=` 줄(게이트 판정 기준 커밋이 된다)과 블록 2의 `BUILD_EXIT=`·`OUT_ADMIN=` 줄
+- B1의 `HAS_TOKEN_CLI`·`PG_RUNNING`·`CURRENT_EXIT`·`AT_HEAD_BEFORE`·`CONTENT_ADMIN_COUNT` 줄과 `alembic current` 출력
+- B2의 `DUMP_EXIT`·`CP_EXIT`·`DUMP_BYTES`·`UPGRADE_EXIT`·`AT_HEAD_AFTER` 줄과 마지막 `alembic current` 출력(건너뛰었으면 그 사실)
 - B3의 `CONTENT_ADMIN_COUNT`·`ISSUE_EXIT`·`TOKEN_LENGTH`·`EXPIRES_AT` 줄(**토큰 값은 보내지 않는다**)
+- B5의 세 줄(`PREFLIGHT_ALLOWED`·`PREFLIGHT_DENIED`·`STATIC_ADMIN`)
 - B-1 화면의 왼쪽 메뉴 섹션 이름들과 Network `menu` 상태 코드(가능하면 스크린샷)
+- B-2 화면에 뜬 제목 한 줄(가능하면 스크린샷)
 
 세션이 A·B 결과를 증적으로 게이트를 clear한다. 정리는 §6과 같다(백업 파일은 남겨 둔다).
 
@@ -302,3 +336,5 @@ git worktree prune
 
 - 이 런북의 PowerShell 블록은 **Windows에서 실행 검증되지 않았다.** 같은 절차의 Linux 등가물(admin 빌드 → uvicorn → 정적 서버 → Chromium 두 origin)을 컨테이너에서 실측했고, worktree 코드가 PYTHONPATH로 editable 설치를 이기는 것도 컨테이너에서 확인했다. PowerShell 고유 부분(`npm.cmd`·`Get-NetTCPConnection`·`curl.exe`)은 표준 동작 기준이며, 각 블록에 판정 줄을 넣어 어긋나면 그 자리에서 보이게 했다.
 - A 단계는 **CORS 축만** 증명한다. 셸이 실 토큰으로 내비를 그리는지는 B 단계가 증명한다.
+- **2026-10-02 개정분은 재실측하지 못했다.** 이번 개정은 문서·PowerShell 블록의 수정이고, 컨테이너가 Python 3.11이라(백엔드 요구 `>=3.12`) 백엔드를 띄워 B 흐름을 다시 돌릴 수 없었다. 대신 ①`backend-migrations` CI 잡이 매 PR마다 head까지 `alembic upgrade head`와 `downgrade base` 왕복을 돌리고(`.github/workflows/ci.yml`) ②ADMIN-15 통합 테스트가 같은 잡에서 수집된다. 2026-09-25의 컨테이너 실측(§5)은 마이그레이션 3건이 쌓이기 전 시점이다.
+- B1·B2에 새로 넣은 `(& $Py -m alembic current 2>&1) -join "`n"`과 `-match '\(head\)'`는 Windows PowerShell에서 실행 검증되지 않았다. 어긋나면 `AT_HEAD_*`가 `False`로 나올 수 있다(이 두 줄 자체는 DB를 쓰지 않는다 — `AT_HEAD_AFTER`는 업그레이드가 끝난 뒤의 표시일 뿐이다). 그 경우 출력된 `alembic current` 전문을 회신하면 눈으로 판정한다.
