@@ -262,9 +262,11 @@ async def post_study_unit(
     # 어댑터별 비율을 함께 실어, 특정 교수법만 학생에게 도달하지 못하는 상태(전건 404)가 전체
     # 평균에 묻히지 않게 한다. 학생 원문·식별자는 싣지 않는다(개념 code·전략·경로만).
     logger.info(
-        "study supply — concept=%s strategy=%s source=%s fallback=%s "
+        "study supply — concept=%s content=%s via=%s strategy=%s source=%s fallback=%s "
         "dsl_render_rate=%s strategy_render_rate=%s",
         concept_code,
+        result.content_code,
+        result.lookup_via,
         result.strategy.value,
         result.content_source,
         result.fallback_reason,

@@ -23,11 +23,14 @@ from whymath_backend.l3.render.adapter import RenderContext
 from whymath_backend.l3.render.dsl import ConceptDSL
 from whymath_backend.l4.content_supply import (
     DSL_CACHE_PREFIX,
+    LOOKUP_CROSSWALK,
+    LOOKUP_PK,
     REASON_CANNOT_RENDER,
     REASON_NO_DSL,
     REASON_UNREVIEWED,
     SupplyTally,
     get_concept_dsl,
+    resolve_concept_content,
     resolve_concept_dsl,
     supply,
 )
@@ -57,18 +60,55 @@ class _FakeRow:
     # 렌더·폴백·집계 테스트는 검수 통과 행을 전제한다(CONT-05 공급 게이트 통과). 게이트 자체는
     # `TestSupplyReviewGate`가 `ai_estimated`를 명시해 검사한다 — 실 코퍼스 846행은 전부 ai_estimated다.
     review_status: str = "reviewed"
+    # 역조회(CONT-06)는 K-12 행만 본다 — 대학 행은 code가 이미 원자 소단원이라 PK로 닿는다.
+    scope: str = "K-12"
+
+
+class _FakeScalars:
+    def __init__(self, rows: list[_FakeRow]) -> None:
+        self._rows = rows
+
+    def all(self) -> list[_FakeRow]:
+        return list(self._rows)
+
+
+class _FakeResult:
+    def __init__(self, rows: list[_FakeRow]) -> None:
+        self._rows = rows
+
+    def scalars(self) -> _FakeScalars:
+        return _FakeScalars(self._rows)
 
 
 class _FakeSession:
-    """`session.get(Model, pk)`만 흉내내는 대역 — 실 DB 없이 공급 경로를 검사한다."""
+    """`session.get(Model, pk)` + 역조회용 `session.execute(select)` 대역 — 실 DB 없이 공급 경로를 검사한다.
+
+    `execute`는 stmt를 **해석**해 흉내낸다(전건 반환 위장 금지): 바인딩 값 중에 행의 `atom_codes`에
+    들어 있는 것이 있고 scope가 K-12인 행만 돌려주며, stmt에 ORDER BY가 있을 때만 code 오름차순으로
+    정렬한다 — 쿼리에서 정렬이나 scope 조건이 빠지면 이 대역도 그대로 어긋난다.
+    """
 
     def __init__(self, rows: dict[str, _FakeRow] | None = None) -> None:
         self._rows = rows or {}
         self.get_calls = 0
+        self.execute_calls = 0
 
     async def get(self, _model: object, pk: str) -> _FakeRow | None:
         self.get_calls += 1
         return self._rows.get(pk)
+
+    async def execute(self, stmt: Any) -> _FakeResult:
+        self.execute_calls += 1
+        params = set(stmt.compile().params.values())
+        sql = str(stmt)
+        rows = [
+            r
+            for r in self._rows.values()
+            if ("scope" not in sql or r.scope in params) and params & set(r.atom_codes)
+        ]
+        if "ORDER BY" in sql:
+            rows.sort(key=lambda r: r.code)
+        return _FakeResult(rows)
 
 
 class _FakeCache:
@@ -294,6 +334,195 @@ class TestSupplyReviewGate:
 
         assert await run("reviewed") == "dsl_render"
         assert await run("ai_estimated") == REASON_UNREVIEWED
+
+
+# ── 크로스워크 역조회(CONT-06) ────────────────────────────────────
+
+_ATOM = "10공수1-02-06-2"  # 파일럿 소단원의 세부개념 원자 — 콘텐츠 PK(구 437 코드)와 겹치지 않는다.
+
+
+def _k12_row(code: str, *, status: str = "reviewed", atoms: tuple[str, ...] = (_ATOM,)) -> _FakeRow:
+    return _FakeRow(code=code, name=f"{code} 콘텐츠", atom_codes=list(atoms), review_status=status)
+
+
+class TestCrosswalkReverseLookup:
+    """CONT-06 ⓐ — PK 미스 시 `atom_codes`를 따라간다. 게이트·캐시 순서는 PK 경로와 같다.
+
+    acceptance ④의 3상태: 역조회 전 NO_DSL → 역조회 후 해석(검수 통과) → ai_estimated면 UNREVIEWED.
+    """
+
+    @pytest.mark.asyncio
+    async def test_three_states_for_one_pilot_atom(self) -> None:
+        # ① 연결된 K-12 행이 없다 → NO_DSL (역조회 이전 상태와 같다)
+        none_res = await resolve_concept_content(_ATOM, session=_FakeSession(), cache=_FakeCache())
+        assert (none_res.dsl, none_res.reason) == (None, REASON_NO_DSL)
+        assert none_res.lookup_via is None
+
+        # ② 연결된 행이 reviewed → 그 행의 DSL로 해석된다(요청 code는 원자, 서빙 code는 콘텐츠 행).
+        ok = await resolve_concept_content(
+            _ATOM, session=_FakeSession({"HK11": _k12_row("HK11")}), cache=_FakeCache()
+        )
+        assert ok.reason is None and ok.dsl is not None
+        assert ok.dsl.code == "HK11"
+        assert (ok.content_code, ok.lookup_via, ok.candidates) == (
+            "HK11",
+            LOOKUP_CROSSWALK,
+            ("HK11",),
+        )
+
+        # ③ 같은 연결이 ai_estimated → UNREVIEWED (NO_DSL이 아니다 — 승격하면 열리는 상태다)
+        blocked = await resolve_concept_content(
+            _ATOM,
+            session=_FakeSession({"HK11": _k12_row("HK11", status="ai_estimated")}),
+            cache=_FakeCache(),
+        )
+        assert (blocked.dsl, blocked.reason) == (None, REASON_UNREVIEWED)
+        assert blocked.content_code == "HK11" and blocked.lookup_via == LOOKUP_CROSSWALK
+
+    @pytest.mark.asyncio
+    async def test_pk_hit_wins_and_skips_reverse_lookup(self) -> None:
+        # PK 우선 — 대학 소단원 코드처럼 PK로 닿으면 역조회를 하지 않는다(쿼리 0회).
+        session = _FakeSession(
+            {
+                "UNI1": _FakeRow(code="UNI1", scope="대학"),
+                "HK11": _k12_row("HK11", atoms=("UNI1",)),  # 같은 문자열을 atom으로 가진 다른 행
+            }
+        )
+        res = await resolve_concept_content("UNI1", session=session, cache=_FakeCache())
+
+        assert res.content_code == "UNI1" and res.lookup_via == LOOKUP_PK
+        assert session.execute_calls == 0
+
+    @pytest.mark.asyncio
+    async def test_university_rows_are_not_reverse_matched(self) -> None:
+        # 대학 행은 역조회 대상이 아니다 — atom_codes가 우연히 맞아도 scope가 걸러낸다.
+        session = _FakeSession({"U1": _FakeRow(code="U1", scope="대학", atom_codes=[_ATOM])})
+        res = await resolve_concept_content(_ATOM, session=session, cache=_FakeCache())
+
+        assert (res.dsl, res.reason) == (None, REASON_NO_DSL)
+
+    @pytest.mark.asyncio
+    async def test_reviewed_candidate_is_preferred_over_lower_code_unreviewed(self) -> None:
+        # 대표 선택 — 코드 순서가 앞서도 검수 전 행이 검수 통과 행을 가리지 못한다.
+        session = _FakeSession(
+            {
+                "HK11": _k12_row("HK11", status="reviewed"),
+                "10기수1-02-05": _k12_row("10기수1-02-05", status="ai_estimated"),
+            }
+        )
+        res = await resolve_concept_content(_ATOM, session=session, cache=_FakeCache())
+
+        assert res.content_code == "HK11"
+        assert res.candidates == ("10기수1-02-05", "HK11")  # 후보 전체가 오름차순으로 남는다.
+
+    @pytest.mark.asyncio
+    async def test_ties_resolve_to_lowest_code_deterministically(self) -> None:
+        # 둘 다 reviewed면 code 오름차순 첫 행 — 삽입 순서(DB 반환 순서)에 기대지 않는다.
+        rows = {
+            "HK11": _k12_row("HK11"),
+            "10기수1-02-05": _k12_row("10기수1-02-05"),
+        }
+        res = await resolve_concept_content(_ATOM, session=_FakeSession(rows), cache=_FakeCache())
+        assert res.content_code == "10기수1-02-05"
+
+    @pytest.mark.asyncio
+    async def test_all_candidates_unreviewed_reports_unreviewed_not_no_dsl(self) -> None:
+        session = _FakeSession(
+            {
+                "HK11": _k12_row("HK11", status="ai_estimated"),
+                "10기수1-02-05": _k12_row("10기수1-02-05", status="rejected"),
+            }
+        )
+        res = await resolve_concept_content(_ATOM, session=session, cache=_FakeCache())
+
+        assert (res.dsl, res.reason) == (None, REASON_UNREVIEWED)
+        assert res.candidates == ("10기수1-02-05", "HK11")
+
+    @pytest.mark.asyncio
+    async def test_cache_is_keyed_by_serving_row_and_demotion_is_immediate(self) -> None:
+        # 캐시 키는 서빙 행 code — 요청 원자로 쪼개지 않는다. 그리고 역조회 경로도 캐시 적중이 게이트를
+        # 우회하지 못한다(강등 즉시 거부) — CONT-05 ③이 역조회로 새지 않는다는 동결.
+        row = _k12_row("HK11")
+        session, cache = _FakeSession({"HK11": row}), _FakeCache()
+        assert (await resolve_concept_content(_ATOM, session=session, cache=cache)).dsl is not None
+        assert f"{DSL_CACHE_PREFIX}HK11" in cache.store
+        assert f"{DSL_CACHE_PREFIX}{_ATOM}" not in cache.store
+
+        row.review_status = "ai_estimated"
+        res = await resolve_concept_content(_ATOM, session=session, cache=cache)
+        assert (res.dsl, res.reason) == (None, REASON_UNREVIEWED)
+
+    @pytest.mark.asyncio
+    async def test_two_atoms_share_one_cache_entry(self) -> None:
+        row = _k12_row("HK11", atoms=(_ATOM, "10공수1-02-06-3"))
+        session, cache = _FakeSession({"HK11": row}), _FakeCache()
+        await resolve_concept_content(_ATOM, session=session, cache=cache)
+        await resolve_concept_content("10공수1-02-06-3", session=session, cache=cache)
+
+        assert list(cache.store) == [f"{DSL_CACHE_PREFIX}HK11"]
+
+    @pytest.mark.asyncio
+    async def test_supply_serves_via_crosswalk_and_reports_lookup(self) -> None:
+        # 서빙 경로 — SupplyResult·집계·trace에 역조회가 보인다(작동한 비율 원칙).
+        tally, trace = SupplyTally(), _RecordingTrace()
+        result = await supply(
+            code=_ATOM,
+            signals=StudentSignals(),
+            session=_FakeSession({"HK11": _k12_row("HK11")}),
+            cache=_FakeCache(),
+            trace=trace,
+            tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+        )
+
+        assert result.content_source == "dsl_render" and result.rendered is not None
+        assert (result.content_code, result.lookup_via) == ("HK11", LOOKUP_CROSSWALK)
+        assert result.lookup_candidates == ("HK11",)
+        assert tally.by_lookup_via == {LOOKUP_CROSSWALK: 1}
+        assert tally.to_json()["by_lookup_via"] == {LOOKUP_CROSSWALK: 1}
+        assert trace.records[0]["dsl_code"] == _ATOM
+        assert trace.records[0]["content_code"] == "HK11"
+
+    @pytest.mark.asyncio
+    async def test_supply_unreviewed_via_crosswalk_renders_nothing(self) -> None:
+        # 검수 전 연결 — 렌더 0 · 사유 UNREVIEWED · 그래도 역조회가 일했음은 집계에 남는다.
+        tally = SupplyTally()
+        result = await supply(
+            code=_ATOM,
+            signals=StudentSignals(),
+            session=_FakeSession({"HK11": _k12_row("HK11", status="ai_estimated")}),
+            cache=_FakeCache(),
+            tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+        )
+
+        assert result.rendered is None and result.fallback_reason == REASON_UNREVIEWED
+        assert tally.by_lookup_via == {LOOKUP_CROSSWALK: 1}
+        assert "dsl_render" not in tally.counts
+
+    def test_query_shape_is_scoped_ordered_and_array_membership(self) -> None:
+        # 쿼리 형태 동결 — 대역이 아니라 실제로 생성되는 PG SQL을 본다: K-12 한정·배열 포함·code 정렬.
+        from sqlalchemy.dialects import postgresql
+
+        from whymath_backend.l1.concept_content.resolve import find_k12_contents_by_atom
+
+        captured: list[Any] = []
+
+        class _Capture:
+            async def execute(self, stmt: Any) -> _FakeResult:
+                captured.append(stmt)
+                return _FakeResult([])
+
+        import asyncio
+
+        asyncio.run(find_k12_contents_by_atom(_Capture(), _ATOM))  # type: ignore[arg-type]
+        sql = str(captured[0].compile(dialect=postgresql.dialect()))
+
+        assert "concept_content.scope =" in sql
+        assert "= ANY (concept_content.atom_codes)" in sql
+        assert "ORDER BY concept_content.code" in sql
 
 
 # ── 공급 분기 ─────────────────────────────────────────────────────

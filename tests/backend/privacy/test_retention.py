@@ -15,24 +15,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.privacy.retention import (
+    _PURGED_ELSEWHERE,
     _RETENTION_PLAN,
+    _RETENTION_PLAN_EXEMPTIONS,
     _effective_timestamp,
     purge_expired_records,
     retention_cutoff,
 )
 
-# 계정/인증/동의/가설 테이블은 보존 의미가 달라 *제외*돼야 한다(회귀 가드).
-_EXCLUDED_TABLES = {
-    "user_profile",
-    "device_credential",
-    "refresh_token_session",
-    "parental_consent",
-    "user_track_history",
-    "user_persona_history",
-    "user_state_snapshot",
-    "misconception_hypothesis",
-    "evidence_links",  # purge_expired(retention_until)가 별도 처리
-}
+# 타임스탬프 창 파기 계획 *밖*이어야 하는 소유 테이블 — **항목별 사유가 붙은** 목록(SEC-41 ③).
+# 종전 판은 사유 없이 이름 9개만 나열한 집합이라 "왜 안 지우는가"가 코드 어디에도 없었다(무사유
+# 제외 금지). 사유의 정본은 `privacy/retention.py`의 `_RETENTION_PLAN_EXEMPTIONS`(의도적 제외)와
+# `_PURGED_ELSEWHERE`(다른 경로가 파기 — evidence_links)다. 같은 사유를 여기 또 적으면 두 곳이
+# 어긋나므로 정본을 그대로 쓴다 — 사유가 비면 아래 `test_excluded_tables_all_carry_a_reason`이 RED.
+_EXCLUDED_TABLES: dict[str, str] = {**_RETENTION_PLAN_EXEMPTIONS, **_PURGED_ELSEWHERE}
 
 
 class _FakeResult:
@@ -66,7 +62,7 @@ class TestRetentionCutoff:
 
 class TestPurgeExpiredRecords:
     def test_deletes_all_plan_tables_child_first(self) -> None:
-        """플랜 9테이블을 child→parent 순서로 삭제·테이블별 행수 반환."""
+        """플랜 전 테이블을 child→parent 순서로 삭제·테이블별 행수 반환."""
         session = _FakeSession(rowcount=2)
         counts = asyncio.run(
             purge_expired_records(cast(AsyncSession, session), as_of=date(2026, 6, 18), years=3)
@@ -81,7 +77,20 @@ class TestPurgeExpiredRecords:
     def test_excludes_account_and_evidence_tables(self) -> None:
         """계정/인증/동의/가설·evidence_links는 *파기 대상 아님*(보존 의미 상이·중복 0)."""
         planned = {m.__tablename__ for m, _ in _RETENTION_PLAN}
-        assert planned.isdisjoint(_EXCLUDED_TABLES)
+        overlap = planned & set(_EXCLUDED_TABLES)
+        assert overlap == set(), (
+            f"계획과 제외 목록에 모두 있는 테이블: {sorted(overlap)} — 계획에 편입했으면 제외 항목을 "
+            "걷어라(중복 등재는 어느 쪽이 사실인지 흐린다)."
+        )
+
+    def test_excluded_tables_all_carry_a_reason(self) -> None:
+        """SEC-41 ③ — 제외 목록의 모든 항목에 사유가 있다(무사유 제외 금지). 공백뿐인 사유도 거부."""
+        assert _EXCLUDED_TABLES, "제외 목록이 비었다 — 감사 테이블 등 최소 항목이 있어야 한다."
+        for table, reason in _EXCLUDED_TABLES.items():
+            assert reason.strip(), f"{table}의 제외 사유가 비어 있다(무사유 제외 금지)."
+            assert (
+                len(reason.strip()) >= 20
+            ), f"{table}의 제외 사유가 지나치게 짧다(형식적 사유 의심)."
 
     def test_zero_rowcount_reported(self) -> None:
         """만료분 0건 → 테이블별 0(에러 아님·정상)."""

@@ -17,9 +17,34 @@
   3. **위생 재검사** — rephrase가 새로 도입한 거짓 수치 등식('3×4=11' 등)을 위생 validator
      (`default_seed_validator`)로 다시 거른다(acceptance._evaluate_hygiene와 같은 검증기).
 
-라우터 경유(CLAUDE.md "LLM 호출은 항상 라우터 경유"): `Router().route()`로 결정하고
-`provider.generate(...)`로 위임한다. 저작 패밀리 GENERAL(qwen2.5) — rephrase는 수학 풀이가
-아니라 instruction-following(문장 다양화)이라 MATH(qwen2-math)보다 GENERAL이 낫다(S2-h 논거 동형).
+라우터 경유(CLAUDE.md "LLM 호출은 항상 라우터 경유"): **`l3.pipeline.generate` 경유**다(OPS-84) —
+라우터 결정·관측(`l3_routing` trace)·실측 원가 계상이 전부 파이프라인 한 자리에서 일어난다. 종전엔
+`Router().route()` 결과를 이 모듈이 손으로 재조립(`_decide_routing`)해 `provider.generate(...)`를
+직접 불렀으므로 라우터는 경유했으나 **관측이 0건**이었다(OPS-36이 학생 대면 축에서 해소한 것과 같은
+우회의 저작 경로판). 저작 패밀리 GENERAL(qwen2.5) — rephrase는 수학 풀이가 아니라
+instruction-following(문장 다양화)이라 MATH(qwen2-math)보다 GENERAL이 낫다(S2-h 논거 동형) — 이
+선호는 이제 `pipeline.generate(prefer_local_family=)`가 표현한다(재조립 코드 미러 제거).
+
+이벤트 루프 소유권(OPS-84 ① 판정): **이 인스턴스가 소유한다.** 호출부는 전부 동기 CLI 루프
+(`harness/problem_corpus_rephrase`·`_diagnose`·`_sweep` — 실행 중인 루프가 없는 문맥)이고,
+`pipeline.generate`는 루프에 묶인 상태가 없는 순수 코루틴이다. 루프에 묶인 것은 provider의 비동기
+커넥션 풀뿐이라, 인스턴스 전용 지속 루프(`_ensure_loop`)에서 파이프라인 코루틴을 돌리면 커넥션
+재사용이 종전과 같다. 실행 중인 루프 안에서 부르면(비동기 문맥 오용) `run_until_complete`가
+RuntimeError를 내고, 그것은 PROVIDER_ERROR로 fail-closed된다(원문 유지 — 조용한 크래시 없음).
+비동기 문맥(WH-1 프로즈)은 이 클래스를 쓰지 않고 `harness/wh1_llm_seam`을 쓴다.
+
+캐시 판정(OPS-84 ② — 실측 근거): **이 경로는 응답 캐시를 끈다**(`_NoStoreCache`). 파이프라인의
+캐시 키는 `(prompt, system, 결정 3축)`이라 온도도 회차도 포함하지 않는다. 그런데 ⓐ 온도 스윕
+(`problem_corpus_rephrase_sweep`)은 같은 rephraser로 같은 앞 N건을 `repeats`회 반복해 회차 간
+min~max 폭으로 유의성을 판정한다 — 캐시를 켜면 2회차부터 전건 적중해 폭이 0으로 붕괴하고,
+LLM 호출이 N×repeats가 아니라 N회로 줄어 **측정이 위장된다**(`test_rephrase_pipeline_wiring`의
+스윕 실측이 동결: repeats=5에서 호출 5배 차·폭 0) ⓑ 코퍼스 자체에도 같은 파일 안 중복 발문이
+있다 — 2026-10-02 실측 `data/corpus/*/problems.jsonl` 37개 파일, 방정식 봉인 대상 3,159건 중
+파일 내 중복 398건(12.6%). 캐시를 켜면 이들이 **전부 같은 재서술**을 받아, 다양화가 목적인
+경로에서 중복을 그대로 보존한다. 회차 축을 키에 넣는 안은 프롬프트 정본(`docs/prompts/
+l3_rephrase.md`)을 바꿔야 해 실측된 수율(v3·0.7)을 무효화하므로 기각했다. 끄는 비용은 0이다 —
+저작은 오프라인 배치라 같은 입력을 재호출할 이유가 위 두 경우뿐이고, 둘 다 재호출이 *목적*이다.
+관측은 캐시와 무관하게 매 호출 기록된다(`content_source="generate"`·`cache_hit=False`).
 
 hermetic: provider 주입 좌석(테스트=FakeProvider). 이 환경엔 LLM이 없어 라이브 호출을 하지
 않는다 — 실 다양화는 Phaiakes9에서 실 provider 주입으로 구동한다(llm_generator 라이브 핸드오프
@@ -44,20 +69,21 @@ from whymath_backend.l3.equivalent.rephrase_hygiene import (
     question_hygiene_violations,
 )
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
-from whymath_backend.l3.interfaces import LLMProvider
-from whymath_backend.l3.models import ModelFamily, RoutingDecision, RoutingRequest
+from whymath_backend.l3.interfaces import LLMProvider, RecordingTraceSink, TraceSink
+from whymath_backend.l3.models import ModelFamily, RoutingRequest
+from whymath_backend.l3.pipeline import generate as l3_generate
 from whymath_backend.l3.pregenerate.validator import (
     SeedValidator,
     default_seed_validator,
     validate_response,
 )
 from whymath_backend.l3.prompt_assets import fill, prompt_text
-from whymath_backend.l3.router import Router
 
 # 학생 요청 라우팅 신호 기본값 — 6개 호출부 공용 단일 좌석(OPS-18, `api/visualization.py` 미러).
 _STUDENT_ESCALATION_DEFAULTS = default_student_escalation_signals()
 
 __all__ = [
+    "AUTHORING_TRAFFIC_SURFACE",
     "QuestionRephraser",
     "RephraseOutcome",
     "classify_invariance_failure",
@@ -218,12 +244,61 @@ def verify_numeric_invariance(
     return rephrased_text.strip()
 
 
+class _NoStoreCache:
+    """적중도 적재도 하지 않는 `CacheBackend` — 저작 rephrase 전용(OPS-84 ② 판정).
+
+    왜 끄는가는 모듈 docstring 「캐시 판정」에 실측과 함께 있다(스윕 반복 위장·코퍼스 중복 12.6%).
+    캐시 *백엔드*를 바꾸는 것이 아니라 이 경로가 캐시를 **쓰지 않는다**는 선언이다 — 학생 대면·
+    앱 전역 캐시(RedisCache)는 무관하다.
+    """
+
+    async def get(self, key: str) -> str | None:
+        """항상 미스 — 같은 프롬프트라도 매번 새로 생성한다(다양화가 목적)."""
+        return None
+
+    async def set(self, key: str, value: str, ttl_seconds: int) -> None:
+        """적재하지 않는다 — 다음 동일 프롬프트가 이 결과를 재사용하지 않게."""
+        return None
+
+
+AUTHORING_TRAFFIC_SURFACE = "authoring"
+"""저작 경로 trace 표지 — `traffic_surface` 필드 값(OPS-84 ③).
+
+`ops/cost_report`의 게이트②는 **학생 대면 루프당 비용**을 잰다. 저작 rephrase는 오프라인 배치라
+한 번에 수백~수천 건(LOCAL·0원)을 같은 `l3_routing` 스트림에 낸다 — 표지 없이 섞이면 로컬 비율이
+부풀고 토큰 p50이 저작 쪽으로 끌려가 게이트 판정이 **위장된다**. 그래서 저작 trace에 이 표지를 싣고,
+리포트는 이 표지가 붙은 이벤트를 게이트② 표본에서 빼고 건수만 따로 보고한다. 표지가 없는 이벤트는
+종전대로 서빙 표본이다(구 이벤트 하위호환).
+"""
+
+
+class _AuthoringTraceSink:
+    """기록 dict에 `traffic_surface="authoring"`을 덧붙여 안쪽 싱크로 넘기는 래퍼.
+
+    호출마다 만드는 얇은 어댑터라 `flush`를 두지 않는다 — flush는 `QuestionRephraser.flush`가
+    안쪽 싱크에 직접 건다. 원 dict는 얕은 복사 후 확장한다(호출자 dict 불변).
+    """
+
+    def __init__(self, inner: TraceSink) -> None:
+        self.inner = inner
+
+    def record(self, fields: dict[str, object]) -> None:
+        """표지를 덧붙여 기록한다."""
+        self.inner.record({**fields, "traffic_surface": AUTHORING_TRAFFIC_SURFACE})
+
+
 class QuestionRephraser:
-    """발문 다양화기 — provider 주입·라우터 경유·수치 불변 검증(fail-closed).
+    """발문 다양화기 — provider 주입·파이프라인 경유·수치 불변 검증(fail-closed).
 
     `provider`(LLMProvider)를 주입한다(테스트=FakeProvider·라이브=CompositeProvider). None이면
     표준 CompositeProvider를 지연 구성하나, 이 환경엔 LLM이 없어 라이브 호출을 하지 않는다(실
     구동은 Phaiakes9). `rephrase`는 항상 유효한 발문을 돌려준다(검증 실패 시 원문 — fail-closed).
+
+    `trace`(TraceSink): 주입하면 그것에 기록한다. 미주입이면 **provider 미주입(라이브 지연 구성)
+    일 때만** `LangfuseSink`를 지연 구성해 실제 Langfuse로 보낸다 — 라이브 저작 호출이 관측에서
+    빠지지 않게. provider만 주입한 경우(테스트)는 `RecordingTraceSink`로 폴백해 네트워크·키
+    의존이 생기지 않는다. 짧게 끝나는 CLI는 끝에 `flush()`를 불러 배치 유실을 막는다.
+    어느 싱크든 기록에는 `traffic_surface="authoring"` 표지가 붙는다(`AUTHORING_TRAFFIC_SURFACE`).
     """
 
     def __init__(
@@ -237,8 +312,10 @@ class QuestionRephraser:
         authoring_family: ModelFamily | None = ModelFamily.GENERAL,
         subscription: str = _STUDENT_ESCALATION_DEFAULTS.student_subscription,
         validator: SeedValidator | None = None,
+        trace: TraceSink | None = None,
     ) -> None:
         self._provider = provider
+        self._trace = trace
         self._temperature = temperature
         self._authoring_family = authoring_family
         self._subscription = subscription
@@ -260,7 +337,10 @@ class QuestionRephraser:
         try:
             raw = self._invoke(question_text, equation)
         except Exception as error:  # noqa: BLE001 — provider 장애는 조용한 크래시 금지·원문 폴백
-            _logger.warning("발문 rephrase provider 예외 — 원문 유지: %s", error)
+            # 예외 타입명을 남긴다(CLAUDE.md 침묵 실패 금지 — 무타입 경고 금지).
+            _logger.warning(
+                "발문 rephrase provider 예외(%s) — 원문 유지: %s", type(error).__name__, error
+            )
             return RephraseOutcome(
                 question_text, False, f"provider 예외: {error}", REASON_PROVIDER_ERROR
             )
@@ -285,21 +365,29 @@ class QuestionRephraser:
             )
         return RephraseOutcome(verified, True, None)
 
-    # ── LLM 호출(라우터 경유·GENERAL 저작 패밀리·지속 이벤트 루프) ────────
+    # ── LLM 호출(파이프라인 경유·GENERAL 저작 패밀리·지속 이벤트 루프) ────────
     def _invoke(self, question_text: str, equation: str) -> str:
+        """`l3.pipeline.generate` 경유 1회 — 라우터 결정·관측 기록이 전부 파이프라인에서.
+
+        패밀리 선호는 `prefer_local_family`로, 온도는 `temperature`로 넘긴다. 캐시는
+        `_NoStoreCache`(모듈 docstring 「캐시 판정」). 반환 텍스트는 검증 전 원시 출력이며,
+        `rephrase`가 결정론 봉인으로 판정한다.
+        """
         provider = self._resolve_provider()
-        decision = self._decide_routing()
         prompt = _build_prompt(question_text, equation)
-        # provider 반환은 GenerationResult(text, usage) — rephrase는 텍스트만 소비.
-        generated = self._ensure_loop().run_until_complete(
-            provider.generate(
+        result = self._ensure_loop().run_until_complete(
+            l3_generate(
+                self._routing_request(),
                 prompt,
                 _system_prompt(),
-                decision,
+                provider=provider,
+                cache=_NoStoreCache(),
+                trace=_AuthoringTraceSink(self._resolve_trace()),
+                prefer_local_family=self._authoring_family,
                 temperature=self._temperature,
             )
         )
-        return generated.text
+        return result.text
 
     def _resolve_provider(self) -> LLMProvider:
         if self._provider is None:
@@ -308,19 +396,38 @@ class QuestionRephraser:
             from whymath_backend.l3.providers.factory import build_cloud_provider
             from whymath_backend.l3.providers.ollama import OllamaProvider
 
+            if self._trace is None:
+                # 라이브 지연 구성 경로 — 관측도 실제 Langfuse로(미설정이면 LangfuseSink가 no-op).
+                from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
+
+                self._trace = LangfuseSink()
             self._provider = CompositeProvider(local=OllamaProvider(), cloud=build_cloud_provider())
         return self._provider
 
-    def _decide_routing(self) -> RoutingDecision:
-        """라우터 결정 + 저작 패밀리 선호(GENERAL) — llm_generator._decide_routing 축소 미러.
+    def _resolve_trace(self) -> TraceSink:
+        if self._trace is None:
+            # provider만 주입된 경로(테스트) — 네트워크·키 의존 없는 기록 싱크.
+            self._trace = RecordingTraceSink()
+        return self._trace
+
+    def flush(self) -> None:
+        """관측 싱크가 `flush`를 노출하면 즉시 전송을 확정한다(짧게 끝나는 CLI용·never-break).
+
+        `LangfuseSink.flush`는 미설정·오류를 스스로 삼킨다. 노출하지 않는 싱크(Recording)는 no-op.
+        """
+        flush = getattr(self._trace, "flush", None)
+        if callable(flush):
+            flush()
+
+    def _routing_request(self) -> RoutingRequest:
+        """저작 rephrase의 라우팅 신호 — 결정은 파이프라인이 `Router().route()`로 내린다.
 
         rephrase는 다단계 추론이 아니라 문장 다양화(instruction-following)라 requires_reasoning=
-        False·난이도 easy로 라우팅한다(로컬 FAST 즉답·저비용). 로컬 FAST/MID 결정의 패밀리 축만
-        GENERAL로 갈아탄다(라우터의 비용·크기·모드는 존중).
+        False·난이도 easy로 라우팅한다(로컬 FAST 즉답·저비용). 패밀리 축은 파이프라인의
+        `prefer_local_family`가 LOCAL FAST/MID 결정에서만 GENERAL로 갈아탄다(비용·크기·모드와
+        데이터 등급 판정은 라우터 것 그대로 — `pipeline._apply_family_preference`).
         """
-        from whymath_backend.l3.models import CostTier, LocalModelTier
-
-        request = RoutingRequest(
+        return RoutingRequest(
             task_type="generate",
             difficulty="easy",
             requires_reasoning=False,
@@ -330,30 +437,6 @@ class QuestionRephraser:
             # 등급: 다양화 대상은 *자체 저작 동등문제*의 발문이다(평가원·EBS·교과서 본문은
             # 애초에 코퍼스에 없다 — 저작권 레일). 자체 저작이라 반출 가능(EOS-59).
             data_licenses=SELF_AUTHORED_CORPUS,
-        )
-        decision = Router().route(request)
-        if self._authoring_family is None:
-            return decision
-        is_local = decision.cost_tier == CostTier.LOCAL.value
-        family_applicable = is_local and decision.local_model in (
-            LocalModelTier.FAST.value,
-            LocalModelTier.MID.value,
-        )
-        if not family_applicable or decision.local_family == self._authoring_family.value:
-            return decision
-        return RoutingDecision(
-            cost_tier=decision.cost_tier,
-            local_family=self._authoring_family,
-            local_model=decision.local_model,
-            mode=decision.mode,
-            reason=f"{decision.reason} → rephrase:{self._authoring_family.value}",
-            est_latency_ms=decision.est_latency_ms,
-            est_cost_krw=decision.est_cost_krw,
-            # 데이터 등급 게이트의 판정·발동 신호는 *승계*한다 — 여기서는 패밀리 축만
-            # 갈아탈 뿐 법적 판정을 다시 하지 않는다. 안 실어 보내면 원본 결정이 게이트에
-            # 막혔다는 사실이 관측에서 조용히 사라진다(발동률 과소집계·EOS-59 ②).
-            data_export_blocked=decision.data_export_blocked,
-            data_export_reason=decision.data_export_reason,
         )
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:

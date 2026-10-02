@@ -39,11 +39,13 @@ describe("runAction", () => {
     const calls: { cmd: string; args: string[]; cwd: string }[] = [];
     const exec: Exec = async (cmd, args, o) => {
       calls.push({ cmd, args, cwd: o.cwd });
-      if (args[0] === "--version") return { status: "ok", code: 0, stdout: "Python 3.12", stderr: "" };
+      // 탐침(yaml 임포트)은 python3만 통과 — 저장소 가상환경 후보는 없는 것으로 본다
+      if (args[0] === "-c") return cmd === "python3" ? { status: "ok", code: 0, stdout: "", stderr: "" }
+        : { status: "missing_tool", code: null, stdout: "", stderr: "", reason: "Error: spawn ENOENT" };
       return { status: "error", code: 1, stdout: "대장 거부", stderr: "exit 1", reason: "ExitError: python3 종료 코드 1" };
     };
     const r = await runAction(req("gates_clear", { id: "G-1", evidence: "PR #9 $(echo x) `id`", assignee: "kiki" }), "/repo", { remote: false, github: false }, exec, "linux");
-    expect(calls[1]).toEqual({ cmd: "python3", args: [CLI, "gates", "clear", "G-1", "--as", "kiki", "--evidence", "PR #9 $(echo x) `id`"], cwd: "/repo" });
+    expect(calls.at(-1)).toEqual({ cmd: "python3", args: [CLI, "gates", "clear", "G-1", "--as", "kiki", "--evidence", "PR #9 $(echo x) `id`"], cwd: "/repo" });
     expect(r).toEqual({ ok: false, exitCode: 1, stdout: "대장 거부", stderr: "exit 1", command: ["python3", CLI, "gates", "clear", "G-1", "--as", "kiki", "--evidence", "PR #9 $(echo x) `id`"], reason: "ExitError: python3 종료 코드 1" });
   });
   it("파이썬 없음 → 실행하지 않고 사유", async () => {

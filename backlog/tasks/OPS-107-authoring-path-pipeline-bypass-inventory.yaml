@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-107-authoring-path-pipeline-bypass-inventory
+title: "저작·배치 경로 파이프라인 우회 잔여 전수 — provider.generate 직접 호출 6자리 판정 (OPS-84 '마지막 1건' 정정)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-84-authoring-path-pipeline-wiring-and-live-cost-sample
+requires_gates: []
+acceptance:
+  - "① 저작·배치 경로 중 l3.pipeline을 우회하고 provider.generate를 직접 부르는 자리를 전수 열거한다 — 2026-10-02 OPS-84 조사 시점 실측 후보: l3/equivalent/llm_generator.py·l3/cross_verify.py·l3/multi_solution.py·l3/pedagogy/explanation_generator.py·l3/pregenerate/prewarmer.py·harness/concept_content_review_batch.py(측정 전용 하네스 battle·probe류는 별도 판정).\n② 각 자리를 파이프라인 경유로 전환할지·의도적 제외할지 판정한다(캐시 의미는 OPS-84 ② 판정 형식을 따른다 — 다양성 목적 경로는 캐시를 끄고 근거를 실측으로 남긴다). 전환 자리는 traffic_surface=authoring 표지를 싣는다.\n③ OPS-84 acceptance ①의 '마지막 우회 1건' 서술은 사실이 아니었다 — 이 태스크가 그 정정의 소유자다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/**"
+session: null
+notes: OPS-84 조사 중 grep 실측으로 발견.
+updated: 2026-10-02

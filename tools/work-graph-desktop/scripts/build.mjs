@@ -22,6 +22,8 @@ function copyStatic() {
   mkdirSync(join(root, "dist/renderer"), { recursive: true });
   cpSync(join(root, "src/renderer/index.html"), join(root, "dist/renderer/index.html"));
   cpSync(join(root, "src/renderer/style.css"), join(root, "dist/renderer/style.css"));
+  // 개발 모드 창 아이콘 (HARN-208) — 설치본은 EXE에 심긴 assets/icon.ico를 쓴다
+  cpSync(join(root, "assets/icon.png"), join(root, "dist/icon.png"));
 }
 
 copyStatic();

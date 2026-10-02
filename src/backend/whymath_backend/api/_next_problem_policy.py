@@ -44,19 +44,33 @@ EOS-124가 기본 CAT에서 고친 결함이 이 정책에도 있었다(2026-09-
     없다 — 숙달 0.55에서 오답 1개면 0.219(선수 복귀), 정답 1개면 0.862(전진)다. 응답 하나로 콘텐츠를
     옮기게 된다(`EOS-33`). 재선택의 재판정은 `EOS-35`가 소유한다.
 
-그래서 이 정책의 **선택은 바뀌지 않는다** — 같은 입력에서 같은 문항이 나가고, `policy_version`도
-`suneung_v1` 그대로다(REC-11: 후보 생성·선택 규칙의 식별자). 바뀌는 것은
-설명(reason·action·target)과,
-그 설명이 전달 문항으로 어떻게 해소됐는지를 말하는 `intent_resolution`이다.
+그래서 EOS-25는 **선택을 바꾸지 않았다** — 같은 입력에서 같은 문항이 나갔고 `policy_version`도
+그대로였다 (REC-11: 후보 생성·선택 규칙의 식별자). 바뀐 것은 설명(reason·action·target)과, 그
+설명이 전달 문항으로 어떻게 해소됐는지를 말하는 `intent_resolution`이다.
+
+────────────────────────────────────────────────────────────────────────────
+EOS-31 — 수능 게이트가 출제 범위를 본다 (`suneung_v1` → `suneung_v2`)
+────────────────────────────────────────────────────────────────────────────
+위 ①(게이트가 학년·범위를 보지 않는다)을 닫았다. 이번에는 **선택이 바뀐다** — 후보 집합이 다르므로
+`policy_version`을 `suneung_v2`로 올렸다. 출제 범위(목표 학년도 수능의 성취기준 접두어 집합)는 L6
+`scope.py` 하나가 정본이고, 게이트 ②-c(파이썬)와 이 모듈의 SQL 사전필터(`suneung_scope_clause`)가
+같은 접두어 상수를 읽는다. 사전필터가 범위를 모르면 후보 풀 `LIMIT`가 θ 근방 순으로 자르는 사이
+범위 밖 문항이 풀을 채우고 게이트가 그것들을 전부 탈락시켜, 범위 안 문항이 있는데도 후보가
+사라진다. EOS-25가 보류한 재선택(`mode_withheld`)의 재판정은 `EOS-35`가 소유한다 — 이 변경은 그
+전제 ①이 바뀐 사실을 만들 뿐 재선택을 켜지 않는다(숙달 구간 입력의 신뢰 하한 `EOS-33`이 별건으로
+남아 있다).
 """
 
 from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, and_, exists, func, literal, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api.gating import _fetch_achievement_codes as fetch_achievement_codes
+from whymath_backend.db.models.atom_node import AtomNode
+from whymath_backend.db.models.concept import Concept, ProblemConcept
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l2.ability_estimation import resolve_item_difficulty_b
 from whymath_backend.l2.irt import IrtItem, item_information, learning_band_weight
@@ -93,6 +107,7 @@ from whymath_backend.l2.recommendation_reason import collect_recommendation_reas
 from whymath_backend.l6.suneung import (
     SUNEUNG_DEFAULT_MIN_FIT,
     SUNEUNG_EXAM_TYPES,
+    SUNEUNG_SCOPE,
     is_suneung_eligible,
     recommend_suneung_index,
     suneung_item_weight,
@@ -100,7 +115,45 @@ from whymath_backend.l6.suneung import (
 from whymath_backend.schema.enums import Persona
 from whymath_backend.schema.problem import METADATA_ONLY_SOURCES
 
-__all__ = ["SuneungRecommendationPolicy"]
+__all__ = ["SuneungRecommendationPolicy", "suneung_scope_clause"]
+
+
+def suneung_scope_clause() -> ColumnElement[bool]:
+    """수능 출제 범위 SQL 절 — 게이트 ②-c(`l6.suneung.scope.suneung_scope_verdict`)의 SQL 사본.
+
+    **같은 정의를 쓴다**(EOS-31 ④): 교육과정 개정이 목표 학년도의 것이고, 문항이 잇는 원자 개념의
+    `atom_node.standard_codes` 중 `SUNEUNG_SCOPE.code_startswith_patterns()`로 시작하는 코드가
+    **하나라도** 있다. 접두어 상수는 L6 모듈 하나이고 이 함수는 그것을 읽기만 한다 — 한쪽만 고치면
+    사전필터가 막은 문항을 게이트가 통과시키거나 그 반대가 되므로 같은 입력 전수에서 두 판정이
+    일치하는지를 실 PG 통합 테스트가 본다(`test_eos31_suneung_scope_integration.py`). 성취기준
+    코드를 모르는 문항 (`UNKNOWN`)은 이 절에서도 빠진다(조인 행이 없으므로).
+
+    `unnest`는 문항→개념→원자 조인에 이어 LATERAL로 펼친다 — 후보 풀 `LIMIT`가 θ 근방 순으로
+    자르기 전에 범위 밖 문항이 풀을 채워 게이트가 전부 탈락시키는 일(후보 소멸)을 막는다.
+    """
+    codes = func.unnest(AtomNode.standard_codes).table_valued("scope_code").render_derived()
+    codes_lateral = codes.lateral("scope_codes")
+    code_column = codes_lateral.c.scope_code
+    return and_(
+        Problem.curriculum_version == SUNEUNG_SCOPE.curriculum.value,
+        exists(
+            select(literal(1))
+            .select_from(ProblemConcept)
+            .join(Concept, ProblemConcept.concept_id == Concept.concept_id)
+            .join(AtomNode, AtomNode.code == Concept.code)
+            .join(codes_lateral, true())
+            .where(
+                ProblemConcept.problem_id == Problem.problem_id,
+                or_(
+                    *(
+                        code_column.startswith(pattern, autoescape=True)
+                        for pattern in SUNEUNG_SCOPE.code_startswith_patterns()
+                    )
+                ),
+            )
+            .correlate(Problem)
+        ),
+    )
 
 
 class SuneungRecommendationPolicy:
@@ -148,6 +201,8 @@ class SuneungRecommendationPolicy:
         stmt = select(Problem).where(
             Problem.difficulty_overall.isnot(None),
             Problem.source_type.notin_([s.value for s in METADATA_ONLY_SOURCES]),
+            # EOS-31 — 출제 범위는 신호(OR)가 아니라 선결 조건(AND)이다. 게이트 ②-c와 같은 정의.
+            suneung_scope_clause(),
             or_(
                 Problem.exam_type.in_([e.value for e in SUNEUNG_EXAM_TYPES]),
                 func.cardinality(Problem.signature_patterns) > 0,
@@ -161,6 +216,17 @@ class SuneungRecommendationPolicy:
         stmt = stmt.order_by(*candidate_pool_order_by(theta)).limit(CANDIDATE_POOL_SIZE)
         candidates = [row.to_schema() for row in (await session.execute(stmt)).scalars().all()]
         candidate_pool_size = len(candidates)
+        # EOS-31 — 게이트 ②-c가 보는 성취기준 코드(비영속 필드)를 L5가 주입한다. 주입이 빠지면
+        # 모든 후보가 `UNKNOWN`으로 거절돼 후보가 소멸한다(fail-closed) — "없음"이 "적격"으로
+        # 새지 않는다.
+        codes_by_problem = await fetch_achievement_codes(
+            session, [p.problem_id for p in candidates]
+        )
+        for candidate in candidates:
+            if candidate.problem_id in codes_by_problem:
+                candidate.achievement_standard_codes = sorted(
+                    codes_by_problem[candidate.problem_id]
+                )
 
         # 약점 가중은 기본 CAT과 *같은 헬퍼*를 공유 — extra_weights로 곱 결합.
         extra_weights: list[float] | None = None

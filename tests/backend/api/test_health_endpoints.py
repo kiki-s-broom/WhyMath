@@ -14,6 +14,7 @@ create_app() 팩토리에 가짜(provider·cache·trace·queue + metrics·readin
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -36,6 +37,7 @@ from whymath_backend.ops.service_health import (
     COMPONENT_REDIS,
     ComponentCheck,
     ReadinessProbes,
+    RouteLatency,
     ServiceMetrics,
     check_database,
 )
@@ -305,7 +307,7 @@ class TestMetricsMiddleware:
             pass
 
         class _BrokenMetrics(ServiceMetrics):
-            def record(self, latency_ms: float, status_code: int) -> None:
+            def record(self, latency_ms: float, status_code: int, route: str | None = None) -> None:
                 raise _InstrumentBoomError("계측 폭발(주입)")
 
         app, _ = _build_app(metrics=_BrokenMetrics())
@@ -314,3 +316,111 @@ class TestMetricsMiddleware:
             resp = client.get("/v1/jobs/j1")
         assert resp.status_code == 200  # 계측 실패가 요청을 깨지 않는다
         assert "_InstrumentBoomError" in caplog.text  # 예외 타입명 로그(침묵 실패 금지)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-95 — 라우트 템플릿 계측(S5)·Server-Timing 헤더.
+# ──────────────────────────────────────────────────────────────────────────
+class TestRouteTemplateMetrics:
+    def test_requests_are_keyed_by_route_template_not_raw_path(self) -> None:
+        """서로 다른 job_id 두 요청이 *한 템플릿 버킷*으로 모인다(카디널리티 방어)."""
+        app, metrics = _build_app()
+        client = TestClient(app)
+        assert client.get("/v1/jobs/j1").status_code == 200
+        assert client.get("/v1/jobs/j2").status_code == 200
+        rows = {row.route: row for row in metrics.snapshot().routes}
+        assert set(rows) == {"/v1/jobs/{job_id}"}
+        assert rows["/v1/jobs/{job_id}"].count == 2
+
+    def test_unmatched_requests_share_one_bucket(self) -> None:
+        """없는 경로 N개가 키 N개가 되지 않고 `(unmatched)` 1개로 모인다."""
+        app, metrics = _build_app()
+        client = TestClient(app)
+        for i in range(5):
+            assert client.get(f"/no-such-route-{i}").status_code == 404
+        rows = {row.route: row for row in metrics.snapshot().routes}
+        assert set(rows) == {"(unmatched)"}
+        assert rows["(unmatched)"].count == 5
+
+    def test_unhandled_exception_is_recorded_under_its_route(self) -> None:
+        """핸들러 폭발(500)도 그 라우트 템플릿에 회계된다 — 에러율이 라우트로 귀속된다."""
+        app, metrics = _build_app()
+
+        @app.get("/boom/{item_id}")
+        async def boom(item_id: str) -> None:  # pragma: no cover — 예외 경로 자체가 목적
+            raise _BoomError("핸들러 폭발(주입)")
+
+        TestClient(app, raise_server_exceptions=False).get("/boom/7")
+        rows = {row.route: row for row in metrics.snapshot().routes}
+        assert rows["/boom/{item_id}"].error_rate == 1.0
+
+    def test_ready_body_exposes_routes_and_null_when_unmeasured(self) -> None:
+        """`/health/ready` metrics.routes — 표본 없으면 빈 목록(미측정), 있으면 템플릿별 백분위."""
+        app, _ = _build_app()
+        client = TestClient(app)
+        assert client.get("/health/ready").json()["metrics"]["routes"] == []
+        client.get("/v1/jobs/j1")
+        (row,) = client.get("/health/ready").json()["metrics"]["routes"]
+        assert row["route"] == "/v1/jobs/{job_id}"
+        assert row["count"] == 1
+        assert set(row) >= {"p50_latency_ms", "p75_latency_ms", "p95_latency_ms", "error_rate"}
+
+    def test_alert_evaluation_unchanged_by_route_dimension(self) -> None:
+        """전역 알림 판정(S1)은 라우트 차원 추가 뒤에도 그대로 — 표본이 라우트 없이 들어와도 breach."""
+        metrics = ServiceMetrics()
+        for _ in range(10):
+            metrics.record(50.0, 500)  # route 미지정(전역만)
+        app, _ = _build_app(metrics=metrics)
+        body = TestClient(app).get("/health/ready").json()
+        assert any(a["metric"] == "error_rate" for a in body["alerts"])
+        assert body["metrics"]["routes"] == []
+
+
+class TestRoutePercentilesComputedOnReadOnly:
+    def test_requests_do_not_compute_route_percentiles_but_ready_does(self) -> None:
+        """라우트별 백분위(정렬)는 조회 시점에만 — 요청 경로에서는 한 번도 계산되지 않는다(OPS-95 ⑤)."""
+        calls = 0
+
+        class _Counting(ServiceMetrics):
+            def route_latencies(self) -> tuple[RouteLatency, ...]:
+                nonlocal calls
+                calls += 1
+                return super().route_latencies()
+
+        app, _ = _build_app(metrics=_Counting())
+        client = TestClient(app)
+        for _ in range(5):
+            client.get("/v1/jobs/j1")
+        assert calls == 0, "요청 경로에서 라우트 백분위를 계산했다(정렬 비용이 요청마다 든다)"
+        client.get("/health/ready")
+        assert calls == 1
+
+
+class TestServerTimingHeader:
+    def test_normal_response_carries_server_timing(self) -> None:
+        """일반 응답에 `Server-Timing: app;dur=<ms>` — 시간 값만, 다른 정보 없음."""
+        app, _ = _build_app()
+        resp = TestClient(app).get("/v1/jobs/j1")
+        header = resp.headers["Server-Timing"]
+        assert re.fullmatch(r"app;dur=\d+(\.\d+)?", header), header
+
+    def test_header_leaks_no_identifier_or_path(self) -> None:
+        """헤더에 사용자 식별자·경로·요청 값이 없다(미성년자 데이터 정책)."""
+        app, _ = _build_app()
+        resp = TestClient(app).get("/v1/jobs/secret-job-id-123")
+        header = resp.headers["Server-Timing"]
+        assert "secret-job-id-123" not in header
+        assert str(_FAKE_METRICS_USER.user_id) not in header
+        assert "/v1" not in header
+
+    def test_probe_paths_do_not_get_the_header(self) -> None:
+        """프로브 경로는 계측 제외 규칙을 따른다 — 헤더도 없다."""
+        app, _ = _build_app()
+        client = TestClient(app)
+        for path in ("/health", "/health/live", "/health/ready", "/status"):
+            assert "Server-Timing" not in client.get(path).headers, path
+
+    def test_unmatched_404_also_gets_the_header(self) -> None:
+        """라우트 미매칭 응답도 서버가 처리한 응답이므로 헤더가 있다."""
+        app, _ = _build_app()
+        assert "Server-Timing" in TestClient(app).get("/no-such-route").headers

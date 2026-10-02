@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-25-writer0-account-history-retention-disposition
+title: "writer 0 계정 이력 2테이블(user_track_history·user_persona_history)이 보존 파기 계획 밖 — writer 도입 전 처분 판정"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 재확인 — `user_track_history`(`UserTrackHistory`)·`user_persona_history`(`UserPersonaHistory`)의 writer가 판정 시점에도 0건인지 다시 센다. 2026-10-02 SEC-41 실측은 `schema/` 변환 seam 외에 모델을 참조하는 쓰기 경로가 없었다(\"내가 찾은 방법으로 0건\" — 범위: `src/backend/whymath_backend` 전수 grep, 모델·erasure·export·retention 제외). 부재 판정은 시점에 종속되므로 근거 커밋 해시를 함께 적는다."
+  - "② 처분 — writer가 여전히 0건이면 좌석 폐기 또는 보류를 판정한다(`ARCH-51`의 `user_state_snapshot` 처분이 선례). writer가 생겼거나 생길 예정이면 `privacy/retention.py`의 `_RETENTION_PLAN`에 편입(기준 컬럼 `changed_at`·`detected_at`)하거나 사유 있는 영구 제외로 확정한다. 보존 연한이 법령 판단이면 연한을 코드가 정하지 않고 MGMT-02 회신 대기로 명시한다(CLAUDE.md 「법령 유래 절차의 기계 대체 금지」)."
+  - "③ 해소 시 `privacy/retention.py`의 `_RETENTION_PLAN_EXEMPTIONS`와 `_RETENTION_PLAN_EXEMPTION_EXPIRY`에서 두 테이블 항목을 걷는다. 걷지 않은 채 이 태스크가 done·cancelled가 되면 SEC-41이 신설한 만료 가드(`tests/backend/privacy/test_retention_plan_completeness.py`)가 RED를 낸다 — 처분을 구현하는 사람이 항목을 걷는 것이 해소의 정의다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/privacy/retention.py
+  - "tests/backend/privacy/test_retention*.py"
+session: null
+notes: "SEC-41 파생(2026-10-02 · 판정 기준 main `a05eb49a`). SEC-41이 보존 파기 완전성 가드를 신설하며 기존 사유 없던 제외 목록에 사유를 붙이는 과정에서, 이 두 테이블은 \"설계상 영구 제외\"가 아니라 \"writer 0이라 보존할 행이 아직 없다\"가 유일한 정직한 사유임을 확인했다. 그 사유는 writer가 생기는 순간 거짓이 되는데 이를 알려 주는 장치가 없어, 임시 제외로 등재하고 이 태스크를 해소 태스크로 묶었다. `user_state_snapshot`은 같은 상태이지만 소유 태스크 `ARCH-51`이 이미 있어 그쪽에 묶었다."
+updated: 2026-10-02

@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from whymath_backend.api._next_problem_policy import SuneungRecommendationPolicy
 from whymath_backend.config import Settings
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
+from whymath_backend.db.models.atom_node import ATOM_REVIEW_STATUS_AI_ESTIMATED, AtomNode
 from whymath_backend.db.models.concept import Concept, ConceptEdge, ProblemConcept
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l2.learner_state import get_state
@@ -132,6 +133,22 @@ def _mastery(uid: uuid.UUID, cid: uuid.UUID, value: float) -> ConceptMasteryHist
     )
 
 
+def _atom_for(concept: Concept) -> AtomNode:
+    """개념과 같은 `code`의 원자 노드 — 수능 출제 범위 안 성취기준 코드(2022 개정 대수)를 단다.
+
+    수능 정책(EOS-31)은 문항→개념→`atom_node.standard_codes`로 범위를 판정한다. 개념만 심으면 코드가
+    없어 모든 문항이 `UNKNOWN`으로 후보에서 빠진다 — 이 파일의 시나리오는 *범위 안* 세계에서
+    재선택 보류를 재는 것이라 범위 안 코드를 단다(범위 판정 자체는 `test_eos31_*`가 전담).
+    """
+    return AtomNode(
+        code=concept.code,
+        name_ko=concept.name_ko,
+        level="세부개념",
+        standard_codes=["[12대수01-01]"],
+        review_status=ATOM_REVIEW_STATUS_AI_ESTIMATED,
+    )
+
+
 async def _seed(rows: list[object]) -> None:
     engine = create_async_engine(_settings().database_url)
     try:
@@ -139,6 +156,9 @@ async def _seed(rows: list[object]) -> None:
             for row in rows:
                 session.add(row)
                 await session.flush()  # FK 순서를 목록 순서 그대로 지킨다
+                if isinstance(row, Concept):
+                    session.add(_atom_for(row))
+                    await session.flush()
             await session.commit()
     finally:
         await engine.dispose()
@@ -167,6 +187,14 @@ async def _cleanup(
                 text(
                     "DELETE FROM concept_edge WHERE from_concept_id = ANY(:ids) "
                     "OR to_concept_id = ANY(:ids)"
+                ),
+                {"ids": cids},
+            )
+            # 원자 노드는 개념과 같은 code로만 이어진다(FK 없음) — 개념을 지우기 *전에* code를 찾아 지운다.
+            await conn.execute(
+                text(
+                    "DELETE FROM atom_node WHERE code IN "
+                    "(SELECT code FROM concept WHERE concept_id = ANY(:ids))"
                 ),
                 {"ids": cids},
             )
@@ -229,7 +257,7 @@ def test_suneung_advance_is_withheld_even_when_the_next_concept_has_a_problem_on
         assert outcome.reason.concept_id == c_anchor
         assert outcome.reason.mastery == 0.98
         assert outcome.intent_resolution is IntentResolution.MODE_WITHHELD
-        assert outcome.policy_version == "suneung_v1"
+        assert outcome.policy_version == "suneung_v2"
     finally:
         asyncio.run(_cleanup([p_anchor, p_next], [c_anchor, c_next], [uid]))
 
