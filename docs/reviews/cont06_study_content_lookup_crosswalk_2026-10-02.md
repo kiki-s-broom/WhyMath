@@ -133,11 +133,27 @@ acceptance ②가 요구한 "검수 전 매핑으로 콘텐츠를 고르는 것"
 
 - **운영 DB** — `concept_content.atom_codes`가 운영에 실제로 채워졌는지(크로스워크 전이 적재 여부)는 세션이
   읽을 수 없다. 코퍼스·코드 기준이다. 비어 있으면 역조회는 NO_DSL로 정직하게 떨어진다(해롭지 않다).
-- **전체 백엔드 스위트** — 관련 영역(`l1`·`l3`·`l4`·`api` 공급 경로 사용 파일)만 돌렸다. 전체는 아래 §7 참조.
+- **통합 테스트(실 PG)** — 기본 skip(`WHYMATH_RUN_INTEGRATION`)이라 돌리지 않았다. 역조회 SQL은 PG 방언 컴파일로 형태만
+  동결했고(§4.1) 실제 DB 실행은 CI·운영 적재 환경 몫이다.
 
 ## 7. 전체 스위트
 
-(작성 시점에 아직 실행 전 — 실행 후 이 절에 종료 코드와 건수를 기록한다.)
+CI `backend` 잡의 pytest 인자 그대로(`-m "not corpus_authoring" -n auto --dist loadfile --cov=whymath_backend
+--cov-fail-under=70`) 커밋 `77962918`에서 실행했다. 실행 중에는 작업 트리를 바꾸지 않았다.
+
+| 검사 | 결과 |
+|---|---|
+| 전체 백엔드 pytest | **15,682 passed · 506 skipped · 1 xfailed** · exit 0 · 집계 커버리지 90.65% |
+| 계층별 커버리지 게이트 | exit 0 — api 96.7 · l1 88.5 · l2 96.4 · l3 94.6 · l4 96.3 (전 계층 floor 충족) |
+| `tests/infra`(`infra-contracts` 잡) | 2,256 passed · exit 0 |
+| `tests/harness`(`harness-integrity` 잡) | 1,588 passed · exit 0 |
+| 헌법 위헌 심사 래칫(제10조) | **exit 0** · 차단 7건 ≤ 기준선 7건 |
+| `backlog.py validate`·`audit-deps`·`rules lint`·`jit check` | 전건 exit 0 |
+| `check_runbook_blocks`·`cp949_guard`·`check_conflict_markers`·`mastery_write_path_scan`·`declared_unwired_audit` | 전건 exit 0 |
+
+CI의 다른 잡(`mobile`·`web`·`webapp`·`data-pipeline*`·`docker-build`·`backend-migrations`·`corpus-authoring`)은 이 변경이
+닿지 않는다고 판단해 돌리지 않았다 — 변경은 `src/backend` 파이썬 3파일·테스트·문서·대장뿐이고 마이그레이션·모바일·웹을
+건드리지 않는다(DB 스키마 불변 — 인덱스·컬럼 추가 0).
 
 ---
 
