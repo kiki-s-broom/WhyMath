@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,12 +17,13 @@ acceptance:
   - "③ `tests/backend/privacy/test_retention.py`의 `_EXCLUDED_TABLES`에 항목별 사유를 붙인다 — 현재 사유 없는 제외 목록이다(무사유 예외 금지)."
   - "④ `evidence_event`의 `retention_until` 컬럼은 모델 docstring이 \"privacy/retention.py 소관\"이라 적지만 읽는 파기 경로가 없고 writer도 값을 채우지 않는다 — 배선할지, 컬럼 서술을 정정할지 판정한다(SEC-40의 삭제권 배선과 겹치면 그쪽과 조율)."
   - "⑤ 뮤테이션: 스윕에서 한 축 제거 → 누락 미검출 · 제외 목록 사유 비움 → RED — 각각 확인한다."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1430 (#1430) · 판정 기준 main a05eb49a · 커밋 1be6f6a6 · 전체 스위트 15694 passed exit 0"
 paths:
   - "tests/backend/privacy/test_retention*.py"
   - src/backend/whymath_backend/privacy/retention.py
   - src/backend/whymath_backend/db/models/review_timer_event.py
   - tests/backend/db/test_review_timer_event_orm.py
-session: claude/affectionate-wozniak-xz224q
+session: null
 notes: "SEC-39 acceptance ③ 판정에서 나온 후속(2026-09-30 · 판정 기준 SEC-39 로컬 커밋 `5953635f`): 역할 기준 4곳(`_RETENTION_PLAN` 사용 테스트 8파일 · `metadata.tables` 전수 테스트 · `retention_until` 사용처 · ops/scripts의 retention 참조)을 뒤져 보존 파기 쪽 메타데이터 전수 스윕 0건 — 이 검색 범위에서 보존 파기 완전성 가드는 없다. 삭제권 가드가 SEC-35·SEC-39로 두 번 사각을 닫은 것과 달리 보존 파기 쪽은 가드 자체가 없어, 새 학생 테이블이 파기 계획에 들어갔는지 기계가 묻지 않는다. 부수(정정 필요): `db/models/review_timer_event.py`와 `tests/backend/db/test_review_timer_event_orm.py`의 docstring이 삭제권 스윕 축을 (A)∪(B)로만 적는다 — 결론(검수자 테이블은 소유 아님)은 맞지만 (C) 제외 사실(`NON_STUDENT_SESSION_COLUMNS`)이 빠졌다."
 updated: 2026-10-02
