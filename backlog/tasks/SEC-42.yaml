@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-42
+title: "G-eos37 삭제권 처분 (나) 채택 게이트 clear 회수 — 고립 브랜치 tbj2jf의 Kiki 판정이 main에 없어 SEC-40이 막혀 있다"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/intelligent-noether-tbj2jf head c671a313(2026-09-30 · ahead 1 · diff 2파일: backlog/gates.yaml · backlog/events/claude_intelligent-noether-tbj2jf.ndjson). 내용 = 게이트 G-eos37-erasure-kpi-disposition을 cleared로 닫은 Kiki 판정 (나) 채택(삭제 시 그 세션의 추천 evidence_event를 같은 트랜잭션에서 함께 삭제). 판정 기준 main f99d1dc1(2026-10-02): 같은 게이트가 main에서는 status pending·cleared_by null이라 SEC-40(requires_gates에 이 게이트)·EOS-37이 착수 불가로 막혀 있다. 재현: git diff origin/main...origin/claude/intelligent-noether-tbj2jf -- backlog/gates.yaml\n② 이식 방식 = 파일 단위 — 브랜치는 main보다 12커밋 낡았으므로 통째 머지 금지. backlog.py gates clear 경로로 main에서 재실행하거나(대장 손편집 금지), 브랜치의 evidence 원문을 그대로 --evidence에 쓴다. 판정 근거 문구(판정 기준 f0ca37bb · 세션 링크 · 가·나·다 결정문 · 소유 경계 · 부수 영향)를 한 글자도 줄이지 않는다. 백틱이 든 산문은 인용 heredoc 파일 경유로 넘기고 쓴 뒤 읽어 대조한다.\n③ 법령 유래 판정의 출처 재확인 — 이 clear는 에이전트가 AskUserQuestion으로 Kiki 선택을 중계한 기록이다(cleared_by claude). PIPA 삭제권 처분이라 기계 대체 금지 대상이므로, 이식 전에 Kiki에게 (나) 채택이 맞는지 1줄 확인을 받고 그 확인을 gates clear의 evidence에 덧붙인다. 확인이 오기 전에는 이식하지 않는다.\n④ 집행 지점(정본화와 별항) — 이식 후 backlog.py next --n 500 --json에서 SEC-40이 착수 후보로 해금되는지(전건 조회 — 상위 N건 절단으로 부재 판정 금지)와 EOS-37이 여전히 게이트 외 선행(SEC-40 소유 경계)으로만 막히는지 확인한다. 게이트 clear가 SEC-40 해금으로 실제 이어지는지가 이 태스크의 완료 기준이다.\n⑤ 이식 완료 후 원 브랜치 삭제는 이 태스크 PR 머지 뒤 다음 삭제 배치에서 한다."
+artifacts: []
+paths:
+  - backlog/gates.yaml
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-02.md §3-①(stray-code 14회차). 우선순위 1 = PIPA 삭제권 표면(의사결정 우선순위 2번 · 협상 불가). 회수 완료 전 원 브랜치 claude/intelligent-noether-tbj2jf 삭제 금지(head c671a313). 원 번호 재사용 없음 — 브랜치에는 태스크 파일이 없고 게이트 clear 1건뿐이다. 이 게이트가 main에서 pending인 채로 SEC-40을 막고 있어, 삭제권 이행 뒤 evidence_event 잔존(재연결 경로 2건) 차단이 판정이 끝났는데도 착수되지 못한다."
+updated: 2026-10-02
