@@ -374,6 +374,7 @@ gates:
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +OPS-89-cache-breakpoint-placement-shared-prefix — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 게이트 제목의 발동 조건이 'OPS-89가 main에 착지한 때'다 — 산문에만 있던 발동 조건을 입력 간선으로 옮긴다"
+      - "[2026-10-02] verdict PASS · inputs: OPS-89-cache-breakpoint-placement-shared-prefix · evidence: 판정 기준 커밋 4d8262545(PR 1425·미머지 — 머지 전에는 발동 조건 충족으로 읽지 말 것). PASS의 뜻은 브레이크포인트 이동 코드와 모사·SDK 표면 검증이 완성돼 재판정 입력이 갖춰졌다는 것이지 기본값 전환 근거가 갖춰졌다는 뜻이 아님: 실제 API cache_read 라이브 증거는 없고(ARCH-66·G-arch66 전까지 미수행), cross_verify 경로는 system이 최소 캐시 토큰 미만이라 위치를 고쳐도 캐시 무효(OPS-104 소유). 따라서 ①기본값 True 전환은 라이브 실측 전 근거 부족. 결정은 게이트 담당자 몫. 판정문 docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md — done OPS-89-cache-breakpoint-placement-shared-prefix 인계"
     depends_on:
       - OPS-89-cache-breakpoint-placement-shared-prefix
   - id: G-eos02-prompt-cache-live-run
