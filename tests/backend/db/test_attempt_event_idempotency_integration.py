@@ -168,7 +168,7 @@ class TestRetransmitAppliedOnce:
     async def test_sequential_resend_with_different_event_at_is_dropped(self) -> None:
         from sqlalchemy import text
 
-        from whymath_backend.db.models.activity import insert_attempt_event_once
+        from whymath_backend.l2.attempt_skill_event import insert_attempt_event_once
 
         async def scenario(maker, keys):  # type: ignore[no-untyped-def]
             key = uuid.uuid4()
@@ -194,7 +194,7 @@ class TestRetransmitAppliedOnce:
     async def test_concurrent_resend_lands_exactly_once(self) -> None:
         from sqlalchemy import text
 
-        from whymath_backend.db.models.activity import insert_attempt_event_once
+        from whymath_backend.l2.attempt_skill_event import insert_attempt_event_once
 
         async def scenario(maker, keys):  # type: ignore[no-untyped-def]
             key = uuid.uuid4()
@@ -222,7 +222,7 @@ class TestRetransmitAppliedOnce:
         """대조군 — 인덱스가 모든 삽입을 막는 것이 아니다(다른 uuid·NULL 키는 각자 반영)."""
         from sqlalchemy import text
 
-        from whymath_backend.db.models.activity import insert_attempt_event_once
+        from whymath_backend.l2.attempt_skill_event import insert_attempt_event_once
 
         async def scenario(maker, keys):  # type: ignore[no-untyped-def]
             a, b = uuid.uuid4(), uuid.uuid4()
@@ -258,7 +258,7 @@ class TestRetransmitAppliedOnce:
         await self._run(scenario)
 
     async def test_helper_rejects_event_without_key(self) -> None:
-        from whymath_backend.db.models.activity import insert_attempt_event_once
+        from whymath_backend.l2.attempt_skill_event import insert_attempt_event_once
 
         with pytest.raises(ValueError, match="event_uuid"):
             await insert_attempt_event_once(None, _event(None))  # type: ignore[arg-type]

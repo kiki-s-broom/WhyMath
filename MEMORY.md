@@ -340,7 +340,7 @@
 
 ### 2026-10-02 (착지 · DP-03): **분석 envelope의 재전송 멱등키 `event_uuid`를 `attempt_event`에 영속화했다 — 시각 컬럼은 새로 만들지 않고 기존 `event_at`(수신)·`event_time`(발생)을 쓴다. hypertable에서는 이 멱등 계약이 성립하지 않으므로 마이그레이션이 fail-closed로 중단한다** (claude 판정·구현)
 
-- **무엇**: 리비전 `a3f7c9d1e5b2`(down `9d3e7b1c5a20`). `event_uuid UUID NULL`(server_default 없음·백필 금지 — 기존 행에 uuid를 채우면 producer가 만든 적 없는 키를 날조한다) + 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`). 복합 PK `(event_id, event_at)`·BIGSERIAL 내부 키 불변. writer 좌석 = `db.models.activity.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`·키 없으면 ValueError).
+- **무엇**: 리비전 `a3f7c9d1e5b2`(down `9d3e7b1c5a20`). `event_uuid UUID NULL`(server_default 없음·백필 금지 — 기존 행에 uuid를 채우면 producer가 만든 적 없는 키를 날조한다) + 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`). 복합 PK `(event_id, event_at)`·BIGSERIAL 내부 키 불변. writer 좌석 = `l2.attempt_skill_event.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`·키 없으면 ValueError).
 - **시각 컬럼 비신설(실측 근거)**: envelope `received_at` = `attempt_event.event_at`(전 writer가 서버 now·파티션 키), `occurred_at` = `event_time`(EOS-48). 새 컬럼은 같은 사실의 중복 좌석이라 정본이 갈린다.
 - **hypertable 비호환(ADR-001 추기)**: hypertable UNIQUE는 파티션 키 `event_at`을 포함해야 하는데 재전송은 `event_at`이 매번 달라 `(event_uuid, event_at)`로는 못 막는다. 운영 DB는 일반 PG16이라 지금은 무충돌이고, hypertable이면 마이그레이션이 예외로 중단한다 — 조용히 약화하면 '멱등 보호 있음'으로 위장된다.
 - **미결(의도적)**: 기존 writer(`api/interactions.py`·`l2/attempt_skill_event.py`·`api/coach.py`)는 아직 `event_uuid`를 넘기지 않는다 — 모바일 producer·envelope→ORM 결선은 후속(S3-16 writer 확장과 같은 좌석을 건드리므로 이 태스크는 공통 영속 계약만 확정). 따라서 현재 운영 경로에서 재전송 방어가 *작동한 비율*은 0이다.
