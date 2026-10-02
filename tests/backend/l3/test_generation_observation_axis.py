@@ -376,7 +376,9 @@ class TestSeatExistsInAllThreePlaces:
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-02 DP-03] head가 a3f7c9d1e5b2(attempt_event.event_uuid 멱등키)로 전진 —
         # 위와 같은 이유로 리터럴만 현행화한다.
-        assert EXPECTED_ALEMBIC_HEAD == "a3f7c9d1e5b2"
+        # [2026-10-02 ARCH-32] head가 b4d8e2a6c0f3(problem.source_id — source_entity FK 좌석)로
+        # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "b4d8e2a6c0f3"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:
