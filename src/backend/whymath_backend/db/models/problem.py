@@ -97,6 +97,12 @@ class Problem(Base):
         nullable=False,
     )
     source_detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    # ARCH-32: 주 출처 엔티티 FK(source_entity, LIC-01). nullable — NULL=미이관(백필 금지).
+    # source_type/source_detail은 이관 기간 중 유지(저작권 불변식·소비처 다수). 상세=
+    # docs/architecture/arch32_source_entity_migration.md.
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid, sa.ForeignKey("source_entity.source_id")
+    )
 
     # ===== 시험 컨텍스트 =====
     exam_type: Mapped[ExamType | None] = mapped_column(_pg_enum(ExamType, "exam_type_enum"))
@@ -287,6 +293,7 @@ class Problem(Base):
         sa.Index("idx_problem_subject_unit", "subject", "unit_codes"),
         sa.Index("idx_problem_signature", "signature_patterns", postgresql_using="gin"),
         sa.Index("idx_problem_difficulty", "difficulty_overall"),
+        sa.Index("idx_problem_source_id", "source_id"),
         sa.Index("idx_problem_persona_fit", "persona_fit", postgresql_using="gin"),
         sa.Index("idx_problem_curriculum", "curriculum_version", "valid_from_year"),
         sa.Index("idx_problem_tags", "tags", postgresql_using="gin"),
