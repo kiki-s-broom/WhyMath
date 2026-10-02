@@ -855,6 +855,20 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
+  - id: G-p318-calc-02-08-disposition
+    title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-01
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"
+    depends_on:
+      - P3-18-calculus-verifiability-probe
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
