@@ -914,7 +914,7 @@ CATALOG: tuple[Spec, ...] = (
        "l6.thinking.gating"),
     _e("WM-E-602", "수능 모드 게이팅·적응 추천(게이팅×IRT CAT)", "Student", "Recommendation", "P1",
        "next-problem이 소비 — 공용 게이팅 헬퍼 포함", "l6.suneung.gating",
-       "l6.suneung.recommendation", "l6._shared"),
+       "l6.suneung.recommendation", "l6.suneung.scope", "l6._shared"),
     _e("WM-E-603", "평가 청사진 테스트셋 조립", "Student", "Assessment", "P0",
        "ASM-04 — assemble 표면의 엔진", "l6.blueprint.assembly"),
     # ════════════════════ E — WH-S·WH-1 하네스(런타임) ════════════════════

@@ -72,6 +72,32 @@ async def _pg_reachable() -> bool:
         await engine.dispose()
 
 
+def _in_scope_link(pid: uuid.UUID, tag: str) -> tuple[Concept, AtomNode, ProblemConcept]:
+    """문항을 수능 출제 범위 안(2022 개정 대수)으로 만드는 연결 행 3개 — 개념·원자 노드·문항↔개념(EOS-31).
+
+    수능 정책은 문항→개념→`atom_node.standard_codes`로 범위를 판정하므로, 개념 연결이 없는 문항은 범위를
+    알 수 없어(`UNKNOWN`) 후보에서 빠진다. persona_fit·시그니처 같은 *신호* 축을 재는 테스트는 문항을
+    범위 안으로 두고 신호만 바꿔야 변별력이 선다 — 범위 밖이어도 "제외됨"이 나오는 테스트는 신호의
+    유무를 증명하지 못한다. 정리는 각 테스트가 `UC.eos31.<tag>` 코드로 직접 한다.
+    """
+    cid = uuid.uuid4()
+    code = f"UC.eos31.{tag}"
+    concept = Concept.from_schema(
+        ConceptSchema(concept_id=cid, code=code, name_ko=code, level=ConceptLevel.세부개념)
+    )
+    atom = AtomNode(
+        code=code,
+        name_ko=code,
+        level="세부개념",
+        standard_codes=["[12대수01-01]"],
+        review_status="ai_estimated",
+    )
+    link = ProblemConcept.from_schema(
+        ProblemConceptSchema(problem_id=pid, concept_id=cid, role=ConceptRole.PRIMARY)
+    )
+    return concept, atom, link
+
+
 async def _add_all(*objs: object) -> None:
     engine = create_async_engine(_settings().database_url)
     try:
@@ -1003,12 +1029,22 @@ def test_me_next_problem_suneung_persona_fit_only_candidate_on_live_pg() -> None
     async def _setup() -> None:
         await _add_all(_user(uid))
         await _add_all(_persona_fit_only_problem())
+        await _add_all(*_in_scope_link(pid, suffix))  # EOS-31 — 범위 안으로 둔다(신호만 변인)
 
     async def _cleanup() -> None:
         engine = create_async_engine(_settings().database_url)
         try:
             async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM problem_concept WHERE problem_id=:p"), {"p": str(pid)}
+                )
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                await conn.execute(
+                    text("DELETE FROM atom_node WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
+                await conn.execute(
+                    text("DELETE FROM concept WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
                 # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
                 await conn.execute(
                     text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
@@ -1071,12 +1107,22 @@ def test_me_next_problem_suneung_persona_fit_below_threshold_excluded_on_live_pg
     async def _setup() -> None:
         await _add_all(_user(uid))
         await _add_all(_low_fit_problem())
+        await _add_all(*_in_scope_link(pid, suffix))  # EOS-31 — 범위 안으로 둔다(신호만 변인)
 
     async def _cleanup() -> None:
         engine = create_async_engine(_settings().database_url)
         try:
             async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM problem_concept WHERE problem_id=:p"), {"p": str(pid)}
+                )
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                await conn.execute(
+                    text("DELETE FROM atom_node WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
+                await conn.execute(
+                    text("DELETE FROM concept WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
                 # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
                 await conn.execute(
                     text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}

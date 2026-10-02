@@ -38,9 +38,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.consent import current_year_kst, derive_is_minor
+from whymath_backend.db.models.atom_node import AtomNode
+from whymath_backend.db.models.concept import Concept, ProblemConcept
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.user import UserProfile
+from whymath_backend.schema.concept import Concept as ConceptSchema
+from whymath_backend.schema.concept import ProblemConcept as ProblemConceptSchema
 from whymath_backend.schema.enums import (
+    ConceptLevel,
+    ConceptRole,
     Curriculum,
     Persona,
     ReviewStatus,
@@ -147,6 +153,30 @@ def _suneung_problem(pid: uuid.UUID, suffix: str) -> Problem:
     )
 
 
+def _in_scope_link(pid: uuid.UUID, suffix: str) -> tuple[Concept, AtomNode, ProblemConcept]:
+    """수능 문항을 출제 범위 안(2022 개정 대수)으로 만드는 연결 행 — 개념·원자 노드·문항↔개념(EOS-31).
+
+    수능 정책은 문항→개념→`atom_node.standard_codes`로 범위를 판정한다. 연결이 없으면 `UNKNOWN`이라
+    이 루프의 "수능 다음문항"이 후보를 못 찾는다. 일반 문항(대조군)에는 달지 않는다.
+    """
+    cid = uuid.uuid4()
+    code = f"UC.eos31.e2e.{suffix}"
+    concept = Concept.from_schema(
+        ConceptSchema(concept_id=cid, code=code, name_ko=code, level=ConceptLevel.세부개념)
+    )
+    atom = AtomNode(
+        code=code,
+        name_ko=code,
+        level="세부개념",
+        standard_codes=["[12대수01-01]"],
+        review_status="ai_estimated",
+    )
+    link = ProblemConcept.from_schema(
+        ProblemConceptSchema(problem_id=pid, concept_id=cid, role=ConceptRole.PRIMARY)
+    )
+    return concept, atom, link
+
+
 def _plain_problem(pid: uuid.UUID, suffix: str) -> Problem:
     """일반(비수능) 자체생성 문항 — mode 미지정 세션의 검산 이벤트 원천(mode 필터 대조군)."""
     return Problem.from_schema(
@@ -170,6 +200,7 @@ async def _cleanup(
     *,
     problem_ids: list[uuid.UUID],
     dialogue_ids: list[uuid.UUID],
+    suffix: str,
 ) -> None:
     """FK 안전 순서 정리 — 자식부터 부모로."""
     engine = create_async_engine(_settings().database_url)
@@ -194,7 +225,18 @@ async def _cleanup(
                 {"ids": dids},
             )
             await conn.execute(
+                text("DELETE FROM problem_concept WHERE problem_id = ANY(:ids)"), {"ids": pids}
+            )
+            await conn.execute(
                 text("DELETE FROM problem WHERE problem_id = ANY(:ids)"), {"ids": pids}
+            )
+            # EOS-31 — 범위 연결용 원자 노드·개념(`UC.eos31.e2e.<suffix>`) — 문항 삭제 뒤에 지운다.
+            await conn.execute(
+                text("DELETE FROM atom_node WHERE code = :c"),
+                {"c": f"UC.eos31.e2e.{suffix}"},
+            )
+            await conn.execute(
+                text("DELETE FROM concept WHERE code = :c"), {"c": f"UC.eos31.e2e.{suffix}"}
             )
             # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
             await conn.execute(
@@ -233,6 +275,7 @@ def test_suneung_loop_onboarding_to_measurement_on_live_pg() -> None:
         # ── 시딩: 성인 유저 + 수능 적격 문항 + 일반 문항(mode 필터 대조군) ──────────────
         asyncio.run(_add_adult_user(uid, birth_year=birth_year))
         asyncio.run(_add_all(_suneung_problem(suneung_pid, sfx)))
+        asyncio.run(_add_all(*_in_scope_link(suneung_pid, sfx)))  # EOS-31 — 범위 안
         asyncio.run(_add_all(_plain_problem(plain_pid, sfx)))
 
         token = create_access_token(uid, settings=_settings())
@@ -364,5 +407,6 @@ def test_suneung_loop_onboarding_to_measurement_on_live_pg() -> None:
                 uid,
                 problem_ids=[suneung_pid, plain_pid],
                 dialogue_ids=dialogue_ids,
+                suffix=sfx,
             )
         )

@@ -8,6 +8,7 @@
   - `Problem.persona_fit: dict[Persona, float]` (페르소나별 적합도 0~1),
   - `Problem.difficulty_overall` (종합 난이도 보조 축),
   - `Problem.source_type` (저작권 노출 게이트 — 평가원/EBS/교과서 본문 미보유 차단).
+  - `Problem.achievement_standard_codes` (비영속·L5 주입 — 출제 범위 게이트 `scope.py`. EOS-31).
 
 대상: 정시(수능) 응시 페르소나 A·B·C만. D(학종·수시)·E(영재)는 이 모드 범위 밖.
 
@@ -39,15 +40,31 @@ from whymath_backend.l6.suneung.recommendation import (
     recommend_suneung_index,
     suneung_item_weight,
 )
+from whymath_backend.l6.suneung.scope import (
+    SUNEUNG_SCOPE,
+    SUNEUNG_SCOPES,
+    SUNEUNG_TARGET_EXAM_YEAR,
+    ScopeVerdict,
+    SuneungScope,
+    code_in_scope,
+    suneung_scope_verdict,
+)
 
 __all__ = [
     "METADATA_ONLY_SOURCES",
     "SUNEUNG_DEFAULT_MIN_FIT",
     "SUNEUNG_EXAM_TYPES",
     "SUNEUNG_PERSONAS",
+    "SUNEUNG_SCOPE",
+    "SUNEUNG_SCOPES",
+    "SUNEUNG_TARGET_EXAM_YEAR",
+    "ScopeVerdict",
+    "SuneungScope",
+    "code_in_scope",
     "is_suneung_eligible",
     "recommend_suneung_index",
     "select_suneung_items",
     "suneung_item_weight",
     "suneung_priority",
+    "suneung_scope_verdict",
 ]

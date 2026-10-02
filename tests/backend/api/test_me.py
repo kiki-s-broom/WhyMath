@@ -3189,6 +3189,24 @@ class _OrmProblemRow:
         return self._problem
 
 
+#: EOS-31 — 수능 출제 범위 안의 성취기준 고시 코드(2022 개정 대수). 이 파일의 수능 시나리오는 *신호*
+#: (시그니처·기출·적합도)와 CAT을 재는 것이라 후보를 모두 범위 안으로 둔다 — 범위 판정 자체는
+#: `tests/backend/l6/suneung/test_scope.py`·`test_eos31_*`가 전담한다.
+_SUNEUNG_IN_SCOPE_CODE = "[12대수01-01]"
+
+
+def _suneung_pool(*problems: SchemaProblem) -> list[_AQResult]:
+    """수능 후보 풀이 소비하는 큐 결과 2건 — ①후보 ORM 행 ②성취기준 원자 축 조인 행(EOS-31).
+
+    정책은 후보 조회 직후 `(problem_id, standard_codes 배열)` 조인으로 비영속 필드를 주입한다. 그
+    조회가 큐의 다음 칸이므로 후보 행 바로 뒤에 둔다 — 순서가 어긋나면 뒤따르는 근거 조회가 한 칸씩 밀린다.
+    """
+    return [
+        _AQResult([_OrmProblemRow(p) for p in problems]),
+        _AQResult([(p.problem_id, [_SUNEUNG_IN_SCOPE_CODE]) for p in problems]),
+    ]
+
+
 class TestNextProblemSuneungMode:
     """S2-06: ?mode=suneung — 수능 게이팅(진실 게이트) × IRT CAT 결합 분기.
 
@@ -3215,7 +3233,7 @@ class TestNextProblemSuneungMode:
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES],
         )
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+            [_AQResult([]), *_suneung_pool(problem)] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
@@ -3256,7 +3274,7 @@ class TestNextProblemSuneungMode:
         """REC-03 — 수능 모드 추천도 처치로 기록되며 meta.mode="suneung"이 남는다."""
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+            [_AQResult([]), *_suneung_pool(problem)] + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
@@ -3267,7 +3285,7 @@ class TestNextProblemSuneungMode:
         assert session.commits == 1
 
     def test_recommendation_records_candidates_and_policy_version_suneung(self) -> None:
-        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v1이 실린다.
+        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v2이 실린다.
 
         적격(시그니처 보유)·부적격(수능 신호 전무) 후보를 함께 넣어 candidates[]가 부적격을
         빼고 적격만 담는지(진실 게이트 재적용)까지 함께 확인한다.
@@ -3275,8 +3293,7 @@ class TestNextProblemSuneungMode:
         eligible = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         ineligible = _suneung_problem()  # 수능 신호 전무 → is_suneung_eligible=False
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(eligible), _OrmProblemRow(ineligible)])]
-            + _reason_results()
+            [_AQResult([]), *_suneung_pool(eligible, ineligible)] + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
@@ -3298,8 +3315,7 @@ class TestNextProblemSuneungMode:
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES], irt_difficulty_b=band_b
         )
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(mid), _OrmProblemRow(banded)])]
-            + _reason_results()
+            [_AQResult([]), *_suneung_pool(mid, banded)] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung&purpose=learning").json()
@@ -3310,7 +3326,7 @@ class TestNextProblemSuneungMode:
         """적격 0 → problem_id null(기본 CAT과 동일한 null 응답 계약)."""
         # 수능 신호 전무(기출 아님·시그니처 없음·적합도 없음) → 진실 게이트에서 탈락.
         no_signal = _suneung_problem()
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(no_signal)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(no_signal)])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body == {
@@ -3344,7 +3360,7 @@ class TestNextProblemSuneungMode:
         수능 모드 핵심 저작권 계약 — 평가원 기출 본문 절대 노출 불가(자체생성 동등문제만).
         """
         blocked = _suneung_problem(source_type=SourceType.평가원, exam_type=ExamType.수능)
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(blocked)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(blocked)])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body["problem_id"] is None
@@ -3352,7 +3368,7 @@ class TestNextProblemSuneungMode:
     def test_persona_d_blocks_all(self) -> None:
         """persona=D_학종고2(비응시) → 적격 후보가 있어도 전부 차단 → null."""
         eligible = _suneung_problem(exam_type=ExamType.수능)
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(eligible)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(eligible)])
         client = _attempts_client(session)
         body = client.get(
             "/v1/me/next-problem", params={"mode": "suneung", "persona": "D_학종고2"}
@@ -3370,7 +3386,7 @@ class TestNextProblemSuneungMode:
         session = _next_problem_session(
             [
                 _AQResult([]),  # 채점 이력 없음 → θ=0
-                _AQResult([_OrmProblemRow(strong), _OrmProblemRow(weak)]),  # 동률 후보
+                *_suneung_pool(strong, weak),  # 동률 후보
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),  # 숙달: 강·약
                 _AQResult([(strong.problem_id, c_strong), (weak.problem_id, c_weak)]),  # 개념 매핑
             ]
@@ -3513,7 +3529,7 @@ class TestNextProblemReason:
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         cid = uuid.uuid4()
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            [_AQResult([]), *_suneung_pool(problem)]
             + _reason_results_measured(cid, _MasteryRow(0.2, 0.75))
         )
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
@@ -3586,7 +3602,7 @@ class TestNextProblemReason:
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         cid = uuid.uuid4()
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            [_AQResult([]), *_suneung_pool(problem)]
             + _reason_results_measured(cid, _MasteryRow(0.9, 0.6))
         )
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
