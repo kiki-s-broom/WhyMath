@@ -3,7 +3,7 @@
    집계 = counts). 앱이 스스로 계산하는 것은 '확인 필요' 사유 개수뿐이다. 쓰기는 preload API의 runAction
    (backlog.py CLI)으로만 나가고 결과(exit code·stdout·stderr)는 그대로 보여 준다. */
 import type {
-  ActionKind, ActionResult, GraphNode, Layout, NodeLink, Snapshot, SourceResult, WorkGraphApi, Workspace,
+  ActionKind, ActionResult, DiscoveryReport, GraphNode, Layout, NodeLink, Snapshot, SourceResult, WorkGraphApi, Workspace,
 } from "../shared/types";
 import { chooseApi } from "./api";
 import { esc, GraphCanvas, KIND_LABEL, type View } from "./canvas";
@@ -88,12 +88,14 @@ interface State {
   attentionOpen: boolean;
   busy: boolean;
   lastResult: { key: string; result: ActionResult } | null;
+  /** 첫 실행 저장소 자동 찾기 결과 (HARN-208) — 찾기를 안 했으면 null */
+  discovery: DiscoveryReport | null;
 }
 
 const st: State = {
   api: chooseApi(), workspaces: [], ws: null, snap: null, layout: { positions: {}, view: null, notes: {} },
   view: "map", groups: new Set(), query: "", stage: "", layer: "", track: "", kind: "",
-  selected: null, attentionOpen: false, busy: false, lastResult: null,
+  selected: null, attentionOpen: false, busy: false, lastResult: null, discovery: null,
 };
 
 const canvas = new GraphCanvas($("stage"), $("world"), $<HTMLCanvasElement>("mini"), $("zoomrd"), {
@@ -501,13 +503,45 @@ function showEmpty(text: string | null): void {
   el.innerHTML = text ? text.split("\n").map((l, i) => i === 0 ? `<b>${esc(l)}</b>` : esc(l)).join("<br>") : "";
 }
 
+/** 첫 화면 (HARN-208) — 작업공간이 하나도 없을 때. 자동 찾기가 실패했으면 찾아본 자리와 사유를 그대로 보이고,
+    'WhyMath 폴더 선택' 한 번으로 연결한다. WhyMath 저장소가 아닌 폴더는 거부하고 사유를 보인다. */
+function showWelcome(): void {
+  const el = $("empty");
+  const electron = st.api.mode() === "electron";
+  const tried = st.discovery?.tried ?? [];
+  el.hidden = false;
+  el.innerHTML = `<div class="welcome" data-testid="welcome">
+    <b>WhyMath 저장소를 연결하세요</b>
+    <p>${st.discovery ? `처음 실행이라 저장소 폴더를 ${tried.length}곳에서 찾아봤지만 찾지 못했습니다.` : "등록된 작업공간이 없습니다."}
+    <br>WhyMath 폴더(안에 <code>scripts\\harness\\work_graph.py</code>가 있는 폴더)를 한 번 골라 주세요. 다음부터는 바로 열립니다.</p>
+    ${electron ? '<button class="btn primary" type="button" id="welcome-pick" data-testid="welcome-pick">WhyMath 폴더 선택…</button>'
+      : "<p>픽스처 모드 — 여기서는 폴더를 연결할 수 없습니다(설치한 앱에서만).</p>"}
+    <div class="err" id="welcome-err" data-testid="welcome-err"></div>
+    ${tried.length ? `<details><summary>찾아본 자리 ${tried.length}곳</summary><ul data-testid="welcome-tried">${
+      tried.map((t) => `<li><code>${esc(t.path)}</code> — ${esc(t.reason)}</li>`).join("")}</ul></details>` : ""}
+  </div>`;
+  const pick = el.querySelector("#welcome-pick") as HTMLElement | null;
+  if (!pick) return;
+  pick.onclick = async () => {
+    const err = el.querySelector("#welcome-err") as HTMLElement;
+    err.textContent = "";
+    const p = await st.api.pickFolder();
+    if (!p) return;   // 대화상자를 닫았다 — 아무것도 바꾸지 않는다
+    const r = await st.api.addWorkspace({ path: p, requireHarness: true });
+    if (!r.ok) { err.textContent = r.reason; return; }
+    st.workspaces = await st.api.listWorkspaces();
+    await selectWorkspace(r.workspace.id);
+    if (!st.snap) void refreshNow();   // 연결 직후 한 번 수집한다 — 빈 화면에서 새로고침을 찾게 하지 않는다
+  };
+}
+
 function applySnapshot(): void {
   const p = st.snap?.payload ?? null;
   canvas.setData(p, st.layout.positions, st.layout.notes);
   renderRail(); renderTools(); renderStatus(); renderAttention(); renderCards(); renderDetail();
   applyFilter();
   if (st.view === "list") renderTable();
-  if (!st.ws) showEmpty("작업공간이 없다\n왼쪽 레일의 '작업공간 추가'로 저장소 폴더를 등록하라");
+  if (!st.ws) showWelcome();
   else if (!st.snap) showEmpty(`저장된 스냅샷이 없다\n오른쪽 위 '새로고침'을 누르면 ${st.ws.root}에서 work_graph.py를 실행해 수집한다`);
   else if (!p) showEmpty(`이 스냅샷에는 그래프가 없다\n${SOURCE_NAME.harness} ${st.snap.sources.harness.status} — ${st.snap.sources.harness.reason ?? ""}`);
   else showEmpty(null);
@@ -598,6 +632,7 @@ function bind(): void {
 async function boot(): Promise<void> {
   bind();
   st.workspaces = await st.api.listWorkspaces();
+  try { st.discovery = await st.api.discovery(); } catch { st.discovery = null; }
   let remembered: string | null = null;
   try { remembered = localStorage.getItem("wg:ws"); } catch { /* 무시 */ }
   const first = st.workspaces.find((w) => w.id === remembered) ?? st.workspaces[0] ?? null;

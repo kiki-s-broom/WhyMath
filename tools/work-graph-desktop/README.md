@@ -1,4 +1,9 @@
-# WhyMath 작업 지도 — 작업 그래프 데스크톱 앱 (HARN-206)
+# WhyMath 작업 지도 — 작업 그래프 데스크톱 앱 (HARN-206 · HARN-208)
+
+> **켜는 법(HARN-208)** — 설치 파일 `whymath-work-graph-desktop-<버전>-setup.exe`를 두 번 클릭해 설치하면 바탕화면·시작 메뉴에
+> `WhyMath 작업 지도` 아이콘이 생기고, 그 뒤로는 아이콘을 두 번 클릭해 연다(PowerShell·Node 불요). 설치 없이 쓰려면
+> `…-portable.exe`를 두 번 클릭한다. 첫 실행에 앱이 `<바탕화면>\__AI\WhyMath`를 스스로 찾아 연결하고, 못 찾으면 첫 화면에서
+> 폴더를 한 번 고르게 한다. 설치·확인 절차 = `docs/ops/work_graph_desktop_runbook.md`.
 
 `scripts/harness/work_graph.py --json`이 낸 작업 흐름 그래프(HARN-182)를 **독립 Windows 설치형 앱**으로
 보여 주는 Electron 껍데기다. 브라우저 파일(`work/graph.html`)과 달리 여러 작업공간을 등록해 두고,
@@ -57,26 +62,34 @@ npm run typecheck        # tsc(main/preload) + tsc(renderer)
 npm run test             # vitest (tests/unit)
 npm run e2e              # Playwright renderer 프로젝트 (Chromium · 픽스처 · file://)
 npm run e2e:electron     # xvfb-run 으로 실제 앱 스모크 (WORK_GRAPH_WORKSPACE 기본값 = 저장소 루트)
-npm run start            # 개발 실행 (electron .)
-npm run dist:win         # electron-builder --win nsis zip --publish never → release/
+npm run start            # 개발 실행 (electron .) — 앱 위치의 조상에서 저장소를 찾으므로 환경변수 불요
+npm run dist:win         # electron-builder --win → release/ (설치 EXE · 무설치 EXE · zip — 아이콘 편집에 wine 필요)
+npm run icon             # scripts/make_icon.py → assets/icon.ico(16~256)·icon.png(512) 재생성 (표준 라이브러리만)
 npm run fixture          # 저장소 루트의 work_graph.py를 실행해 fixtures/sample*.json 재생성
 ```
 
 Playwright 브라우저는 환경변수 `PLAYWRIGHT_BROWSERS_PATH`의 기설치본(이 컨테이너는 `/opt/pw-browsers`,
 `@playwright/test@1.56.1`과 짝)을 쓴다 — `npx playwright install`을 돌리지 않는다.
 
-## 빌드 산출물 (리눅스 컨테이너 실측 2026-09-29)
+## Windows 프로그램 실행 형식 (HARN-208)
 
-`npm run dist:win`을 이 컨테이너(Linux · wine 없음)에서 실행한 결과는 `docs/ops/work_graph_desktop_runbook.md`
-「검증」 절에 실측값(파일명·크기·exit code)이 있다. 요약:
+| 항목 | 동작 | 집행 |
+|---|---|---|
+| 두 번 클릭 실행 | NSIS 설치 EXE가 바탕화면·시작 메뉴 바로가기를 만들고 설치 끝에 앱을 연다 · 무설치 단일 EXE(portable) · zip | `electron-builder.yml` · CI windows 잡 산출물 확인 |
+| 저장소 자동 연결 | 첫 실행(작업공간 0개)에 무설치 EXE 위치 → 앱 위치의 조상(4단계) → `<실제 바탕화면>\__AI\WhyMath` → `<홈>\Desktop\__AI\WhyMath` → `<홈>\WhyMath` 순으로 `scripts/harness/work_graph.py`가 있는 폴더를 찾는다. 못 찾으면 첫 화면이 찾아본 자리와 사유를 보이고 「WhyMath 폴더 선택…」 한 번으로 연결(저장소가 아니면 거부). | `src/main/discover.ts` · `tests/unit/launch.test.ts` · e2e 「바로가기 실행」·「저장소를 못 찾으면」 |
+| 파이썬 선택 | 지정 → 저장소 `.venv` → `src\backend\.venv` → python3 → python → py -3 중 **`import yaml`이 되는** 첫 인터프리터(PATH의 첫 파이썬이 다른 환경일 수 있어서) | `src/main/adapters/python.ts` · `tests/unit/adapters.test.ts` |
+| 프로그램 모양 | 아이콘(다중 해상도 .ico) · 단일 인스턴스(두 번째 실행은 기존 창을 앞으로) · 창 크기·위치 기억(화면 밖이면 버림) | `assets/` · `src/main/store/windowState.ts` · e2e 「두 번째 실행」·「창 크기·위치」 |
+| 데이터 폴더 | `%APPDATA%\whymath-work-graph-desktop` 고정(제품명이 한글이라 Electron 기본값이 로캘에 따라 갈리므로) | `src/main/main.ts` `USER_DATA_DIR` · e2e 「앱 데이터는…」 |
 
-- `release/whymath-work-graph-desktop-0.1.0-win-x64.zip` — 무설치 zip (`win-unpacked/` 통째).
-- `release/whymath-work-graph-desktop-0.1.0-setup.exe` — NSIS 설치 파일(oneClick=false · perMachine=false · 설치 폴더 변경 허용).
-  electron-builder 26은 리눅스에서도 NSIS를 빌드한다(내장 makensis). 실패하면 런북에 원인을 적었다.
-- **아이콘은 Electron 기본 아이콘**이다. 리눅스에서 wine 없이 빌드하려고 `win.icon`을 비워 두었다 —
-  Windows에서 빌드할 때 `electron-builder.yml`의 `win.icon: build/icon.ico`를 추가하면 된다.
-- **코드서명 없음** — 인증서가 없다. 설치 파일 실행 시 SmartScreen 경고가 나오면 「추가 정보 → 실행」으로 진행한다.
-- Windows에서 실제 설치·실행·제거는 이 컨테이너에서 확인할 수 없다 → **미검증**. Kiki 런북으로 넘긴다.
+산출물(리눅스 교차 빌드 실측 2026-09-30 — 크기·아이콘 확인은 런북 「검증」 절):
+
+- `release/whymath-work-graph-desktop-0.1.0-setup.exe` — NSIS 설치(현재 사용자 · 설치 폴더 변경 허용 · 바탕화면·시작 메뉴 바로가기 · 설치 끝에 실행).
+- `release/whymath-work-graph-desktop-0.1.0-portable.exe` — 무설치 단일 EXE(켤 때마다 임시 폴더에 풀어 3~5초 늦게 뜬다).
+- `release/whymath-work-graph-desktop-0.1.0-win-x64.zip` — `win-unpacked/` 통째(실행 파일 `WhyMathWorkGraph.exe`).
+- 아이콘·버전 정보는 rcedit가 EXE에 심는다(`signAndEditExecutable: true` — 리눅스에서는 wine 9.0이 필요).
+- **코드서명 없음** — 인증서가 없다. 첫 실행 SmartScreen 경고는 「추가 정보 → 실행」.
+- 실물 Windows 판정은 CI `.github/workflows/work-graph-desktop.yml`의 windows 잡(같은 테스트 + 패키징된 EXE를 띄워 저장소 수집)과
+  Kiki 런북이 한다. 이 컨테이너(Linux)는 Windows EXE를 실행할 수 없다.
 
 ## 보안
 
@@ -96,4 +109,4 @@ Electron 없이 화면을 볼 수 있다(픽스처 모드 — 명령 실행 없�
 
 - 원격 조회를 켜면(`remote: true`) `work_graph.py`가 GitHub·원격 브랜치를 읽으므로 네트워크와 시간이 든다(타임아웃 120초).
 - `gates amend --verdict`(판정 결과 기록)는 앱이 대신 실행하지 않는다 — 상세 패널이 명령을 안내만 한다.
-- Windows 실 설치·실행·제거는 미검증(런북 §검증 참조).
+- 설치 마법사·바로가기·SmartScreen·실제 바탕화면 자동 찾기는 Kiki 런북이 판정한다(CI는 패키징된 EXE 기동·수집까지).
