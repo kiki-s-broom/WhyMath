@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/rephrase.py
   - "tests/backend/l3/**"
-session: null
+session: claude/trusting-davinci-fhx3jd
 notes: "OPS-36 승계 태스크(CLAUDE.md '회수로 done 선언 시 acceptance 전수 재대조 — 미이행분은 승계 태스크로 분리 등재' 규칙 적용). OPS-36은 학생 대면 축을 PR #1207(main df374448)로 착지시키고 done 처리하되, acceptance ①의 괄호 항목(rephrase.py)과 ②(라이브 표본 실측)는 이 태스크가 가져간다. 분리 사유: rephrase.py는 동기·자체 이벤트루프 저작 경로라 학생 대면 축과 이벤트루프 소유권·캐시 의미 판정이 다르고, 라이브 표본은 트래픽이 필요해 코드 슬라이스와 성격이 다르다. 등재 경위: OPS-36을 review로 두면 backlog.py next 후보(132건)에 나오지 않아 잔여 범위가 아무에게도 안 보이는 상태가 된다 — 실측 확인함. 이 저장소가 4회 겪은 '완료작업 고립'과 같은 형태라 done + 승계 분리로 해소한다."
-updated: 2026-09-19
+updated: 2026-10-02

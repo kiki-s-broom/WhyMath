@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-02 (착지 · OPS-84): **저작 rephrase를 `l3.pipeline` 경유로 전환하되 응답 캐시는 끈다 — 그리고 저작 trace에 `traffic_surface="authoring"` 표지를 실어 게이트② 표본(학생 대면 루프당 비용)에서 분리한다** (claude 판정·구현)
+
+- **결선**: `QuestionRephraser`가 `Router().route()` 결과를 손으로 재조립(`_decide_routing`)해 `provider.generate`를 직접 부르던 우회를 `pipeline.generate(prefer_local_family=GENERAL, temperature=)`로 바꿨다. 이벤트 루프는 인스턴스가 소유한다(호출부 3종이 전부 동기 CLI라 실행 중 루프가 없다). 뮤테이션 10종 중 9종 RED — 생존 1종(표지 래퍼의 `flush` 미위임)은 아무도 부르지 않는 죽은 코드로 판명돼 제거했다.
+- **캐시 판정(실측)**: 끈다. ⓐ 온도 스윕은 같은 rephraser로 같은 앞 N건을 반복해 회차 간 폭으로 유의성을 판정하는데, 캐시를 켜면 repeats=5에서 호출이 25회→5회로 줄고 폭이 0으로 붕괴한다(대조군 테스트로 동결) ⓑ `data/corpus/*/problems.jsonl` 37개 파일의 봉인 대상 발문 3,159건 중 파일 내 중복 398건(12.6%)이 전부 같은 재서술을 받는다. 회차 축을 키에 넣는 안은 프롬프트 정본을 바꿔 실측 수율(v3·0.7)을 무효화하므로 기각.
+- **새로 드러난 위험과 대응**: 저작 호출을 Langfuse로 보내면 `ops/cost_report`가 호출 지점 구분 없이 게이트② 표본으로 집계해 로컬 비율·토큰 p50이 위장된다. 표지 + 리포트 분리(`authoring_excluded_count`·notes 공개)로 막았다. 파이프라인이 trace에 `call_site`를 싣지 않는 일반 결함은 `OPS-105`, 라이브 표본 실측(OPS-84 ③)은 `OPS-106`, 남은 저작 경로 우회 6자리(acceptance의 "마지막 1건"은 사실이 아니었다)는 `OPS-107`로 분리했다.
+
 ### 2026-10-02 (착지 · DP-03): **분석 envelope의 재전송 멱등키 `event_uuid`를 `attempt_event`에 영속화했다 — 시각 컬럼은 새로 만들지 않고 기존 `event_at`(수신)·`event_time`(발생)을 쓴다. hypertable에서는 이 멱등 계약이 성립하지 않으므로 마이그레이션이 fail-closed로 중단한다** (claude 판정·구현)
 
 - **무엇**: 리비전 `a3f7c9d1e5b2`(down `9d3e7b1c5a20`). `event_uuid UUID NULL`(server_default 없음·백필 금지 — 기존 행에 uuid를 채우면 producer가 만든 적 없는 키를 날조한다) + 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`). 복합 PK `(event_id, event_at)`·BIGSERIAL 내부 키 불변. writer 좌석 = `l2.attempt_skill_event.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`·키 없으면 ValueError).
