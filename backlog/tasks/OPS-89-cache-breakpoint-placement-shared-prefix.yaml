@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
   - "[ARCH-66 2026-09-24] Kiki 결정으로 2026-12-31까지 Anthropic API를 쓰지 않는다. 이 태스크의 Anthropic 라이브 호출 축(실측·재측정·대조군)은 재판정 게이트 G-arch66-anthropic-api-pause-review 전까지 수행하지 않는다. 코드·오프라인 축은 진행할 수 있으며, 그 경우 라이브 축은 미수행으로 명시한다(미측정을 통과로 계상 금지)."
 artifacts: []
 paths: []
-session: null
+session: claude/gallant-euler-blngpj
 notes: "발견 경위: 2026-09-21 게이트 G-eos02-prompt-cache-live-run 라이브 회차 판정 중. 판정문 docs/ops/eos02_prompt_cache_live_verdict.md 4 절이 근거다. 라이브 회차 자체는 적중률 89.9%로 성공했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. EOS-02 acceptance 3 이 전역 기본값 전환을 보류한 직접 사유다.\n\n[정정 2026-09-24] ARCH-66: Anthropic API 사용 중단 방침"
-updated: 2026-09-24
+updated: 2026-10-02

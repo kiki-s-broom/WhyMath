@@ -584,7 +584,9 @@ class Settings(BaseSettings):
     anthropic_prompt_caching: bool = Field(
         default=False,
         description=(
-            "True면 messages.create에 top-level cache_control(ephemeral) 적용(prefix 캐시). "
+            "True면 system 프롬프트 블록 끝에 cache_control(ephemeral) 브레이크포인트 적용"
+            "(prefix 캐시 — OPS-89: 최상위 자동 캐싱은 가변 user 꼬리에 놓여 적중 0이라 "
+            "system 끝으로 옮겼다). "
             "기본 False(현 동작 유지) — 적중은 라이브 키로만 검증 가능하고 system 프롬프트가 "
             "L4/L5 미확정이라 효과 잠정. 짧은 프리픽스는 최소 토큰 미만이라 무효(silent no-op)."
         ),
