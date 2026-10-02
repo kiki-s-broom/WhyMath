@@ -1,0 +1,20 @@
+{
+  "pool": "whymath-original",
+  "source_file": "scope_spec.yaml",
+  "upstream_source": null,
+  "source_citation": "Phase 3 대표 과정 범위 명세: 와이매스 자체작성(P3-01 동결본). 성취기준 코드는 교육부 고시 제2022-33호 [수학과 교육과정]의 성취기준 *식별자*이며 성취기준 본문은 미포함 — 본문은 data/corpus/standards_v1(공공누리 제1유형)에 있고 이 파일은 그 코드를 참조만 한다. Concept ID·원자 코드·스킬·M-id·문제유형도 와이매스 자체 코퍼스의 ID를 참조만 하며 본문을 담지 않는다.",
+  "license_notice": "와이매스 자체 저작물. 참조하는 성취기준 코드 체계의 출처 표시는 standards_v1 사이드카의 공공누리 제1유형 고지를 승계한다.",
+  "counts": {
+    "curriculum_nodes": 10,
+    "concepts": 10,
+    "core_concepts": 10,
+    "skills": 8,
+    "core_misconceptions": 12,
+    "required_problem_types": 5,
+    "total_min_distinct_problems": 60
+  },
+  "frozen_by_gate": "G-p301-scope-choice",
+  "integrity_gate": "tests/backend/l1/test_phase3_scope_spec.py — 참조 실재(성취기준·Concept·원자·스킬·M-id·문제유형) + 빈 목록·산술 불일치 판정",
+  "provenance_note": "P3-01 acceptance ③ — 후보 문서(docs/reviews/p3_01_scope_candidates_2026-09-30.md) 실측과 Kiki 선택(2026-09-30)·P3-18 처분(2026-10-02)을 데이터로 옮긴 것이다. 핵심 오개념 선정 규칙과 필수 문제유형은 세션 제안이며 파일 머리말에 명시했다.",
+  "determinism": "결정론 — 손 편집 소스(생성 파이프라인 없음). 무결성은 CI 게이트가 판정한다."
+}
