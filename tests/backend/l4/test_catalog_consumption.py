@@ -480,6 +480,18 @@ class _FakeSession:
     async def get(self, _model: object, pk: str) -> _FakeRow | None:
         return self._rows.get(pk)
 
+    async def execute(self, _stmt: object) -> _NoRows:
+        # 크로스워크 역조회(CONT-06) — PK 미스 때 호출된다. 이 대역에는 원자 연결 행이 없다.
+        return _NoRows()
+
+
+class _NoRows:
+    def scalars(self) -> _NoRows:
+        return self
+
+    def all(self) -> list[_FakeRow]:
+        return []
+
 
 class _FakeCache:
     def __init__(self) -> None:

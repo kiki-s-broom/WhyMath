@@ -176,6 +176,13 @@ class CostReport:
     notes: list[str] = field(default_factory=list)
     """집계 한계·주의(표본 부족·미분류 tier 등)를 사람이 읽도록 남긴다."""
 
+    authoring_excluded_count: int = 0
+    """게이트② 표본에서 뺀 저작 경로 이벤트 수(`traffic_surface="authoring"`·OPS-84 ③).
+
+    저작 rephrase는 오프라인 배치(LOCAL·0원 대량)라 학생 대면 루프당 비용 표본에 섞이면 로컬 비율과
+    토큰 p50이 위장된다. 이 수는 빼되 **숨기지 않는다** — 0이 아니면 notes에도 적힌다. 기본값은
+    직접 조립자(`harness/pilot_kpi_baseline`) 하위호환용(위 `content_source_counts`와 같은 이유)."""
+
     @property
     def data_export_block_rate(self) -> float | None:
         """데이터 등급 게이트 발동률 = 차단/판정 이벤트 (EOS-59 ② "작동한 비율").
@@ -246,6 +253,16 @@ def aggregate_l3_events(events: list[dict[str, object]]) -> CostReport:
     비율을, cache_hit로 적중률을 낸다. 토큰 p50는 router._EST_ASSUMED_* 튜닝 제안으로 낸다.
     """
     notes: list[str] = []
+
+    # 저작 경로 분리(OPS-84 ③) — 게이트②는 학생 대면 루프당 비용이다. 저작 표지가 붙은 이벤트는
+    # 표본에서 빼고 건수만 보고한다(표지 없는 구 이벤트는 서빙 표본으로 남는다 — 하위호환).
+    authoring_excluded = sum(1 for ev in events if ev.get("traffic_surface") == "authoring")
+    if authoring_excluded:
+        events = [ev for ev in events if ev.get("traffic_surface") != "authoring"]
+        notes.append(
+            f"저작 경로 이벤트 {authoring_excluded}건은 게이트② 표본에서 제외"
+            "(traffic_surface=authoring — 오프라인 배치가 루프당 비용을 위장하지 않게)."
+        )
 
     input_vals: list[float] = []
     output_vals: list[float] = []
@@ -392,6 +409,7 @@ def aggregate_l3_events(events: list[dict[str, object]]) -> CostReport:
         suggested_est_output_tokens=sug_out,
         notes=notes,
         tier_stats=tier_stats,
+        authoring_excluded_count=authoring_excluded,
     )
 
 

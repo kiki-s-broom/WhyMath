@@ -507,3 +507,44 @@ def test_render_shows_block_rate_when_measured() -> None:
     text = cr._render_stdout(cr.aggregate_l3_events(events))
     assert "차단 발동: 1건 / 판정 이벤트 2건" in text
     assert "발동률 50.0%" in text
+
+
+# ── 저작 경로 분리(OPS-84 ③) ─────────────────────────────────────────────
+
+
+def test_authoring_events_are_excluded_from_gate2_sample_but_counted() -> None:
+    """저작 표지 이벤트는 게이트② 표본에서 빠지고, 뺀 건수는 숨기지 않는다.
+
+    대조: 서빙 이벤트는 클라우드 1건뿐(로컬 비율 0.0). 저작 로컬 이벤트 3건이 섞이면 로컬
+    비율이 0.75로 **위장**된다 — 분리 후에도 0.0이어야 한다.
+    """
+    serving: dict[str, object] = {
+        "cost_tier": "cloud_mid",
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cost_krw": 0.42,
+    }
+    authoring = [
+        {
+            "cost_tier": "local",
+            "input_tokens": 400,
+            "output_tokens": 300,
+            "cost_krw": 0.0,
+            "traffic_surface": "authoring",
+        }
+        for _ in range(3)
+    ]
+    report = cr.aggregate_l3_events([serving, *authoring])
+    assert report.event_count == 1
+    assert report.local_ratio == 0.0
+    assert report.input_tokens.p50 == 100
+    assert report.authoring_excluded_count == 3
+    assert any("저작 경로 이벤트 3건" in note for note in report.notes)
+
+
+def test_events_without_surface_tag_stay_in_the_serving_sample() -> None:
+    """표지 없는 구 이벤트는 종전대로 서빙 표본이다(하위호환) — 분리 0건이면 note도 없다."""
+    report = cr.aggregate_l3_events(_sample_events())
+    assert report.event_count == 5
+    assert report.authoring_excluded_count == 0
+    assert not any("저작 경로" in note for note in report.notes)

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONT-08-crosswalk-lookup-review-input-mapping-visibility
+title: "크로스워크 역조회로 공급되는 콘텐츠의 검수 입력에 연결 원자·매핑 신뢰도가 없다 — reviewed 가 '이 원자에 대한 콘텐츠로 맞다'를 보증하지 못한다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - CONT-06-study-content-lookup-crosswalk-unused
+requires_gates: []
+acceptance:
+  - "① 배경(CONT-06 판정문 §4): 크로스워크 역조회가 착지하면 K-12 콘텐츠 행의 reviewed 가 곧 \"그 행에 연결된 원자들\"의 학생 공급을 연다. 그런데 크로스워크 437행은 전건 ai_estimated(confidence 0.54~0.75)이고 콘텐츠 검수 배치(harness/concept_content_review_batch.py)의 검수 입력에는 연결 원자(atom_codes)·매핑 confidence가 없다 — 검수자는 콘텐츠만 보고 reviewed를 찍으므로 \"콘텐츠가 맞다\"가 \"그 원자에 대한 콘텐츠로 맞다\"로 읽히는 구멍이 생긴다.\n② 판정 택1: ⓐ 검수 입력(배치 프롬프트·사람 검수 시트)에 atom_codes 와 해당 원자 명칭·크로스워크 confidence/primary 여부를 함께 싣고, 검수 라벨에 \"연결 승인\" 여부를 별도로 받는다 ⓑ 역조회 경로에 한해 별도 연결 검수 상태를 도입해 reviewed 와 AND 로 요구한다 ⓒ 위험 수용 — 근거와 함께 명문화.\n③ 어느 쪽이든 변별력: 연결이 틀린 콘텐츠 행(주입)이 검수 입력에서 보이는지/공급 게이트에서 막히는지 테스트로 확인하고 뮤테이션 RED 를 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/concept_content_review_batch.py
+  - "tests/backend/harness/test_concept_content_review_batch*.py"
+session: null
+notes: "출처: CONT-06 판정문 docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md §4·§7. 선행: CONT-06 착지(역조회). G-kg02 승격 회차 전에 판정되어야 한다 — 승격이 학생 공급을 여는 문이므로."
+updated: 2026-10-02

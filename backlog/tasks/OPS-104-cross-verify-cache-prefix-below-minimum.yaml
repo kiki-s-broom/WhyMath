@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-104-cross-verify-cache-prefix-below-minimum
+title: "cross_verify 경로 system 프리픽스가 최소 캐시 토큰 미만 — 캐싱 ON이어도 조용히 무효, 끌지 키울지 판정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-89-cache-breakpoint-placement-shared-prefix
+requires_gates: []
+acceptance:
+  - "① 실측 확인: cross_verify 경로의 system(관점 12종, 272~520자)이 모델 최소 캐시 프리픽스(Sonnet 4.6=1024, Opus 4.7=2048 토큰) 미만이라 OPS-89 위치 수정 뒤에도 캐시가 조용히 무효임을 라이브 count_tokens 없이 확정할 수 있는 범위(바이트 상한)와 라이브 확인이 필요한 범위로 나눠 기록한다.\n② 판정: 이 경로에서 anthropic_prompt_caching 을 켜는 것이 이득이 없다면(쓰기 할증도 적중도 없음) 경로별로 캐싱을 끄거나 공유 프리픽스를 최소 이상으로 키울지 결정한다 — 키우는 안은 프롬프트 의미를 바꾸므로 교수학·검증 계약(SymPy 단일 권위·PRM)과 충돌하지 않는지 확인한다.\n③ 근거 없는 추측 금지: 라이브 호출이 필요한 부분은 G-arch66-anthropic-api-pause-review 전까지 미수행으로 명시한다."
+artifacts: []
+paths:
+  - "docs/reviews/ops104_*.md"
+  - src/backend/whymath_backend/l3/cross_verify.py
+session: null
+notes: "출처: OPS-89 보고(2026-10-02) 중요 발견 — cross_verify 경로는 브레이크포인트 위치를 고쳐도 system만으로 어떤 모델 최소치에도 못 미쳐 캐시가 조용히 무효다(테스트 test_below_minimum_prefix_is_a_silent_noop_even_with_correct_placement). 쓰기 할증은 사라지지만 적중도 생기지 않는다. OPS-89는 위치 수정까지만 소유하고 이 판단(끄기 vs 프리픽스 키우기)은 범위 밖이라 분리 등재한다. 판정 문서 = docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md."
+updated: 2026-10-02
