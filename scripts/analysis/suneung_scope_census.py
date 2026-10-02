@@ -75,7 +75,7 @@ def _reason_out(problem: ProblemSchema) -> str:
         return "초·중 전용"
     if levels & set(_COMMON_BASIC):
         return "공통·기본수학 포함(범위 안 코드 없음)"
-    return "기하·진로선택 포함(범위 안 코드 없음)"
+    return "진로·융합 선택(기하·미적분Ⅱ 등) 포함(범위 안 코드 없음)"
 
 
 async def _run(url: str) -> int:

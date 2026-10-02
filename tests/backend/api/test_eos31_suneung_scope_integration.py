@@ -227,11 +227,13 @@ def test_sql_clause_and_python_verdict_select_the_same_problems_on_live_pg() -> 
     _require_pg()
     seed = _Seed()
     c_dae = seed.concept_with_codes("dae", ["[12대수01-01]"])
-    c_mi = seed.concept_with_codes("mi", ["[12미적02-03]"])
+    c_mi = seed.concept_with_codes("mi", ["[12미적Ⅰ-02-03]"])
     c_hwak = seed.concept_with_codes("hwak", ["[12확통01-02]"])
     c_mid = seed.concept_with_codes("mid", ["[9수02-01]"])
     c_common = seed.concept_with_codes("common", ["[10공수1-01-01]"])
     c_geo = seed.concept_with_codes("geo", ["[12기하02-05]"])
+    c_mi2 = seed.concept_with_codes("mi2", ["[12미적Ⅱ-01-01]"])  # 진로 선택 — 범위 밖
+    c_mi_old = seed.concept_with_codes("mi-old", ["[12미적01-01]"])  # 2015식 숫자형 — 범위 밖
     c_bridge = seed.concept_with_codes("bridge", ["[9수02-01]", "[12대수01-01]"])
     c_empty = seed.concept_with_codes("empty", [])  # 원자 노드는 있으나 성취기준 코드가 비었다
     c_truncated = seed.concept_with_codes("trunc", ["[12대"])  # 접두어가 잘렸다
@@ -248,11 +250,13 @@ def test_sql_clause_and_python_verdict_select_the_same_problems_on_live_pg() -> 
         "중학교": seed.problem([c_mid]),
         "공통수학": seed.problem([c_common]),
         "기하": seed.problem([c_geo]),
+        "미적분Ⅱ(진로 선택)": seed.problem([c_mi2]),
+        "미적분 2015식 숫자형": seed.problem([c_mi_old]),
         "코드 없는 원자": seed.problem([c_empty]),
         "개념 연결 없음": seed.problem([]),
         "접두어 잘림": seed.problem([c_truncated]),
         "접두어가 중간에": seed.problem([c_midstring]),
-        "같은 접두어·다른 개정": seed.problem([c_mi], curriculum=Curriculum.REVISION_2015),
+        "같은 접두어·다른 개정": seed.problem([c_dae], curriculum=Curriculum.REVISION_2015),
     }
     try:
         asyncio.run(seed.apply())

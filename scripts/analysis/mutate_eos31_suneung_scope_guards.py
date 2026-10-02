@@ -137,11 +137,22 @@ MUTATIONS: list[Mutation] = [
         SCOPE,
         (
             (
-                '    code_prefixes=("12대수", "12미적", "12확통"),',
-                '    code_prefixes=("12대수", "12미적", "12확통", "9수"),',
+                '    code_prefixes=("12대수", "12미적Ⅰ", "12확통"),',
+                '    code_prefixes=("12대수", "12미적Ⅰ", "12확통", "9수"),',
             ),
         ),
         "범위 확대(초·중 유입)",
+    ),
+    Mutation(
+        "S06-calculus-prefix-lets-calculus2-in",
+        SCOPE,
+        (
+            (
+                '    code_prefixes=("12대수", "12미적Ⅰ", "12확통"),',
+                '    code_prefixes=("12대수", "12미적", "12확통"),',
+            ),
+        ),
+        "진로 선택 과목(미적분Ⅱ) 유입",
     ),
     # ── 축 B: 게이트 ②-c ───────────────────────────────────────────────────────
     Mutation(

@@ -51,15 +51,15 @@ class TestDefinition:
     def test_target_year_scope_matches_the_judgment(self) -> None:
         """2028학년도 = 2022 개정 대수·미적분Ⅰ·확률과 통계 — 이 판정이 바뀌면 판정문을 먼저 고친다."""
         assert SUNEUNG_SCOPE.curriculum is Curriculum.REVISION_2022
-        assert set(SUNEUNG_SCOPE.code_prefixes) == {"12대수", "12미적", "12확통"}
+        assert set(SUNEUNG_SCOPE.code_prefixes) == {"12대수", "12미적Ⅰ", "12확통"}
 
     def test_patterns_include_the_opening_bracket(self) -> None:
         """대괄호까지 포함해 비교한다 — 접두어가 코드 중간에 우연히 닿지 않게."""
-        assert SUNEUNG_SCOPE.code_startswith_patterns() == ("[12대수", "[12미적", "[12확통")
+        assert SUNEUNG_SCOPE.code_startswith_patterns() == ("[12대수", "[12미적Ⅰ", "[12확통")
 
 
 class TestCodeInScope:
-    @pytest.mark.parametrize("code", ["[12대수01-01]", "[12미적02-03]", "[12확통01-02]"])
+    @pytest.mark.parametrize("code", ["[12대수01-01]", "[12미적Ⅰ-02-03]", "[12확통01-02]"])
     def test_in_scope_codes(self, code: str) -> None:
         assert code_in_scope(code) is True
 
@@ -71,7 +71,9 @@ class TestCodeInScope:
             "[9수02-01]",  # 중학교
             "[10공수1-01-01]",  # 공통수학 — 선수 영역이지 출제 범위가 아니다
             "[10기수1-02-02]",  # 기본수학
-            "[12기하02-05]",  # 기하 — 2028 수능 범위가 아니다
+            "[12기하02-05]",  # 기하 — 진로 선택, 2028 수능 범위가 아니다
+            "[12미적Ⅱ-01-01]",  # 미적분Ⅱ — 진로 선택. 접두어 `12미적`만 쓰면 새는 형태(EOS-31 실측 72건)
+            "[12미적01-01]",  # 2015 개정 숫자형 미적분 — 2022 범위의 미적분Ⅰ과 다른 코드다
             "[12직수01-01]",  # 직무수학(진로선택)
             "[12수문01-01]",  # 수학과 문화
             "[12인수01-01]",  # 인공지능 수학
@@ -113,9 +115,9 @@ class TestVerdict:
         assert suneung_scope_verdict(problem) is ScopeVerdict.UNKNOWN
 
     def test_same_prefix_in_another_curriculum_is_out_of_scope(self) -> None:
-        """`[12미적…]`은 2015·2022 양쪽에 있고 다른 내용을 가리킨다 — 개정이 다르면 범위 밖이다."""
-        inside = _problem(["[12미적01-01]"], curriculum_version=Curriculum.REVISION_2022)
-        outside = _problem(["[12미적01-01]"], curriculum_version=Curriculum.REVISION_2015)
+        """같은 접두어가 개정마다 다른 내용을 가리킬 수 있다 — 개정이 다르면 범위 밖이다."""
+        inside = _problem(["[12대수01-01]"], curriculum_version=Curriculum.REVISION_2022)
+        outside = _problem(["[12대수01-01]"], curriculum_version=Curriculum.REVISION_2015)
         assert suneung_scope_verdict(inside) is ScopeVerdict.IN_SCOPE
         assert suneung_scope_verdict(outside) is ScopeVerdict.OUT_OF_SCOPE
 
