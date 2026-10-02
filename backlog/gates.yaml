@@ -859,11 +859,11 @@ gates:
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-01
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "세션 사용자 결정(2026-10-02 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): [12미적Ⅰ-02-08] 그래프 개형 = 처분 (나) 파생 판정으로 대체 — 극값 개수·증감 구간·극값의 x좌표/값으로 문항화하고 분모 7은 유지하며 시각 선택형 개형 문항은 두지 않는다. 단서 3건: [12미적Ⅰ-02-06]·[12미적Ⅰ-02-09]는 일부 가능으로 보고 보완 태스크 P3-19(구간 소속 검산)·P3-20(매개변수형 검증 필요성 판정)을 등재, [12미적Ⅰ-02-05]는 가능을 유지하고 표본 검증 단서만 기록. (나)가 근거한 실측은 극값 개수뿐이어서 증감 구간·극값 좌표 프로브 P3-21을 등재했고, P3-03에 P3-19·P3-21을 의존으로 부착했다(P3-20은 필요성 판정 뒤). 판정 근거: docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md §2·§4·§5 · 판정 기준 main 53718366 · PR #1414."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"
