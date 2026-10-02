@@ -421,3 +421,9 @@ class AttemptEvent(BaseModel):
         "None=미기록(구판 이벤트·writer 미도달·다른 event_type)·[]=해소 실행했으나 매핑 0건 — "
         "둘을 구분한다(S3-07 None≠0 규약·'작동한 비율' 측정의 데이터 전제).",
     )
+    event_uuid: uuid.UUID | None = Field(
+        default=None,
+        description="DP-03: producer 생성 재전송 멱등키(AnalyticsEventEnvelope.event_uuid의 "
+        "영속 좌석). 내부 키 event_id(BIGSERIAL)와 별개 — 같은 event_uuid의 재전송은 DB UNIQUE가 "
+        "한 번만 반영한다. None=멱등키 미부여(구판 writer·기존 행 — 백필 금지: 날조).",
+    )
