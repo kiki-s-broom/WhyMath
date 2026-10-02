@@ -53,7 +53,7 @@ _DEFAULT_SPEC = Path("data/corpus/phase3_scope_v1/scope_spec.yaml")
 
 SPEC_VERSION = 1
 
-#: P3-18 SymPy 검증 가능성 판정 어휘 — 오타를 통과시키면 어떤 개념이 부분 가능인지 조용히 틀어진다.
+#: P3-18 검증 가능성 판정 어휘 — 오타를 통과시키면 어떤 개념이 부분 가능인지 조용히 틀어진다.
 KNOWN_PROBE_VERDICTS: frozenset[str] = frozenset(
     {"possible", "partial", "replaced_by_derived", "not_probed"}
 )
