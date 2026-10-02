@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - src/backend/whymath_backend/l6/suneung/gating.py
   - src/backend/whymath_backend/l1/problem_bank/persona_fit_rules.py
   - src/backend/whymath_backend/api/_next_problem_policy.py
-session: null
+session: claude/brave-turing-bpytzd
 notes: "출처: EOS-25 판정(docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md) 중 pedagogy-designer 독립 비판 F1·놓친 것 1·2. EOS-25는 이 결함 때문에 수능 모드의 관계 재선택을 보류했다(mode_withheld) — \"수능 모드 안에서 다시 고른다\"가 이 게이트로는 성립하지 않기 때문이다. 그 재선택의 재판정 태스크가 이 태스크에 의존한다."
-updated: 2026-09-28
+updated: 2026-10-01

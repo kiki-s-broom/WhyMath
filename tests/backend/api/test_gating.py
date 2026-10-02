@@ -291,11 +291,23 @@ class TestRetake:
 # ──────────────────────────────────────────────────────────────────────
 # GET /v1/gating/suneung
 # ──────────────────────────────────────────────────────────────────────
+_IN_SCOPE_CODE = "[12대수01-01]"  # 2028 수능 출제 범위 안(2022 개정 대수) — EOS-31
+_OUT_OF_SCOPE_CODE = "[9수02-01]"  # 중학교 — 수능 출제 범위 밖
+
+
+def _codes(*items: Problem, code: str = _IN_SCOPE_CODE) -> list[tuple[uuid.UUID, list[str]]]:
+    """수능 게이트 ②-c 입력 — 성취기준 원자 축 조인 행(`(problem_id, standard_codes 배열)`).
+
+    ORM `Problem`은 `achievement_standard_codes`(비영속)를 담지 못하므로 라우터가 조인으로 주입한다.
+    """
+    return [(item.problem_id, [code]) for item in items]
+
+
 class TestSuneung:
     def test_persona_a_sees_exam_signal_item(self) -> None:
         """persona=A(기본) → 정시 신호(exam_type=수능) 자체생성 문항이 노출된다."""
         item = _problem(slug="suneung-exam", exam_type=ExamType.수능)
-        resp = _client([item]).get("/v1/gating/suneung")  # persona 기본 A
+        resp = _client([item], _codes(item)).get("/v1/gating/suneung")  # persona 기본 A
         assert resp.status_code == 200, resp.text
         assert _slugs(resp.json()) == ["suneung-exam"]
 
@@ -305,7 +317,9 @@ class TestSuneung:
             slug="sig",
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES],
         )
-        resp = _client([item]).get("/v1/gating/suneung", params={"persona": "A_일반고고3"})
+        resp = _client([item], _codes(item)).get(
+            "/v1/gating/suneung", params={"persona": "A_일반고고3"}
+        )
         assert resp.status_code == 200
         assert _slugs(resp.json()) == ["sig"]
 
@@ -318,7 +332,7 @@ class TestSuneung:
             source_type=SourceType.평가원,
             exam_type=ExamType.수능,
         )
-        resp = _client([blocked, ok]).get("/v1/gating/suneung")
+        resp = _client([blocked, ok], _codes(blocked, ok)).get("/v1/gating/suneung")
         assert resp.status_code == 200
         payload = resp.json()
         assert _slugs(payload) == ["own"]
@@ -329,9 +343,34 @@ class TestSuneung:
         suneung = _problem(slug="suneung", exam_type=ExamType.수능, exam_authority_weight=1.0)
         hakpyeong = _problem(slug="hakpyeong", exam_type=ExamType.학평, exam_authority_weight=0.5)
         # 입력은 역순으로 줘서 정렬이 실제로 일어나는지 본다.
-        resp = _client([hakpyeong, suneung]).get("/v1/gating/suneung")
+        resp = _client([hakpyeong, suneung], _codes(hakpyeong, suneung)).get("/v1/gating/suneung")
         assert resp.status_code == 200
         assert _slugs(resp.json()) == ["suneung", "hakpyeong"]
+
+    def test_out_of_scope_item_is_excluded_even_with_exam_signal(self) -> None:
+        """EOS-31 — 출제 범위 밖(중학교 코드) 문항은 기출 신호가 있어도 노출되지 않는다.
+
+        범위는 신호(OR)가 아니라 선결 조건(AND)이다. 같은 요청에 범위 안 문항을 함께 둬 "범위 문항만
+        남는다"가 변별되게 한다(전부 걸러진 빈 응답과 구분).
+        """
+        inside = _problem(slug="inside", exam_type=ExamType.수능)
+        outside = _problem(slug="outside", exam_type=ExamType.수능)
+        rows = _codes(inside) + _codes(outside, code=_OUT_OF_SCOPE_CODE)
+        resp = _client([outside, inside], rows).get("/v1/gating/suneung")
+        assert resp.status_code == 200, resp.text
+        assert _slugs(resp.json()) == ["inside"]
+
+    def test_item_without_standard_codes_is_excluded_not_passed(self) -> None:
+        """EOS-31 — 성취기준 코드를 모르는 문항(조인 행 없음)은 통과하지 않는다(fail-closed).
+
+        주입이 빠진 `CandidatesDep`를 그대로 썼다면 이 엔드포인트가 *항상 빈 결과*를 냈을 것이다 —
+        범위 안 문항이 함께 나가는 것으로 "주입 경로가 실제로 일한다"까지 같이 본다.
+        """
+        known = _problem(slug="known", exam_type=ExamType.수능)
+        unknown = _problem(slug="unknown", exam_type=ExamType.수능)
+        resp = _client([unknown, known], _codes(known)).get("/v1/gating/suneung")
+        assert resp.status_code == 200, resp.text
+        assert _slugs(resp.json()) == ["known"]
 
     def test_non_target_persona_d_returns_empty(self) -> None:
         """D(학종·수시)는 정시 모드 비대상 → 게이팅이 거른다(빈 배열)."""

@@ -38,6 +38,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from whymath_backend.api import _next_problem_policy as suneung_module
 from whymath_backend.api._next_problem_policy import SuneungRecommendationPolicy
@@ -61,7 +62,7 @@ from whymath_backend.l2.recommendation_policy import (
     IntentResolution,
     NextProblemOutcome,
 )
-from whymath_backend.l6.suneung import is_suneung_eligible
+from whymath_backend.l6.suneung import SUNEUNG_SCOPE, is_suneung_eligible
 from whymath_backend.schema.enums import (
     Curriculum,
     Persona,
@@ -104,6 +105,8 @@ def _problem(**over: Any) -> SchemaProblem:
         "valid_from_year": 2022,
         "subject": Subject.공통,
         "unit_codes": ["U-EOS25"],
+        # EOS-31 — 수능 출제 범위 안 성취기준 코드(2022 개정 대수). 정책이 조인으로 주입하는 비영속 필드다.
+        "achievement_standard_codes": ["[12대수01-01]"],
         "difficulty_overall": 3.0,
         "signature_patterns": [SignaturePattern.COMPOUND_CHOICES],
     }
@@ -152,9 +155,12 @@ class _PoolSession:
     def __init__(self, pool: list[SchemaProblem]) -> None:
         self._pool = pool
         self.execute_calls = 0
+        self.pool_stmt: Any = None  # EOS-31 — 후보 풀 SQL(범위 절 존재 단언용)
 
     async def execute(self, _stmt: Any) -> _Result:
         self.execute_calls += 1
+        if self.pool_stmt is None:
+            self.pool_stmt = _stmt
         if self.execute_calls > 1:
             raise AssertionError(
                 "1차 후보 풀 외의 직접 조회 — 수능 모드는 콘텐츠를 다시 고르지 않는다(EOS-25)"
@@ -219,11 +225,18 @@ class _Env:
         return self.concept_reasons[concept_id]
 
 
+async def _no_injection(_s: object, _problem_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    return {}
+
+
 @pytest.fixture
 def env(monkeypatch: pytest.MonkeyPatch) -> Any:
     def _install(**kw: Any) -> _Env:
         e = _Env(**kw)
         monkeypatch.setattr(suneung_module, "load_attempt_history_state", e.history)
+        # EOS-31 — 성취기준 코드 조인도 이름 교체로 대역한다(풀 조회 "한 번" 규약을 지키려고).
+        # 빌더가 이미 코드를 갖고 있으므로 주입은 빈 결과다. 주입 자체는 PG 통합 테스트가 본다.
+        monkeypatch.setattr(suneung_module, "fetch_achievement_codes", _no_injection)
         monkeypatch.setattr(suneung_module, "collect_recommendation_reason", e.reason)
         monkeypatch.setattr(policy_module, "fetch_prerequisites", e.fetch_prerequisites)
         monkeypatch.setattr(policy_module, "load_direct_successors", e.load_direct_successors)
@@ -462,38 +475,124 @@ class TestFirstPassPathsAndDeclarations:
         assert e.reason_calls == [None]  # 없는 문항의 개념을 묻지 않는다
         _assert_aligned(outcome)
 
-    def test_selection_rule_identifier_is_unchanged(self) -> None:
-        """선택 규칙은 바뀌지 않았다 — 설명만 정렬했으므로 REC-11 식별자를 올리지 않는다.
+    def test_selection_rule_identifier_reflects_the_scope_gate(self) -> None:
+        """후보 규칙이 바뀌었다 — EOS-31이 출제 범위를 선결 조건으로 넣었으므로 REC-11 식별자를 올렸다.
 
-        콘텐츠 재선택을 켜는 변경(EOS-35)은 선택 규칙을 바꾸므로 그때 이 값을 올리고 이 단언을
-        함께 고친다(소급 평가가 두 규칙의 로그를 섞지 않게).
+        EOS-25는 설명만 정렬해 이 값을 올리지 않았다. 이번에는 같은 입력에서 **다른 문항이 나갈 수
+        있다**(초·중 전용 문항이 후보에서 빠진다) — 소급 평가가 `suneung_v1`과 `suneung_v2` 로그를
+        한 정책으로 섞지 않게 하는 값이다. 재선택을 켜는 변경(EOS-35)은 다시 올린다.
         """
-        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v1"
+        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v2"
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ④ 판정 전제의 동결 — 이 사실이 바뀌면 재선택 보류를 다시 판정한다
+# ④ 판정 전제의 동결 — EOS-25의 재선택 보류 근거 ①(게이트가 범위를 못 본다)이 닫혔다
 # ──────────────────────────────────────────────────────────────────────────
 class TestJudgmentPremiseFreeze:
-    """EOS-25가 재선택을 보류한 첫 번째 근거를 **사실로** 동결한다(현행 결함 동결 · EOS-124 ⑤ 선례).
+    """EOS-25가 재선택을 보류한 첫 번째 근거를 **사실로** 동결했던 자리 — EOS-31이 그 사실을 뒤집었다.
 
-    근거 = "수능 게이트가 학년·출제범위를 보지 않는다"(독립 비판 F1). 그 사실은 `persona_fit`이 난이도
-    구간 하나만의 함수라는 데서 나온다. 초안은 이 사실을 게이트의 **조건 목록**만 보고 놓쳤다 — 게이트가
-    존재한다는 것을 게이트가 작동한다는 것으로 읽었다(사고 대장 기록). 그래서 조건 목록이 아니라 **실제
-    규칙 함수를 통과시킨 결과**로 동결한다. `EOS-31`이 게이트에 학년·범위를 넣으면 이 테스트가 실패한다.
-    그때 재선택 보류의 근거 ①이 바뀐 것이므로 `EOS-35`(재선택 재판정)의 트리거를 확인하고 이 동결을
-    올바른 값 단언으로 바꾼다.
+    근거 = "수능 게이트가 학년·출제범위를 보지 않는다"(독립 비판 F1). 그 결함은 `persona_fit`이 난이도
+    구간 하나만의 함수라는 데서 나왔고, **그 사실은 그대로다**(아래 첫 테스트가 계속 동결한다 — 적합도 규칙을
+    바꾸면 다른 5개 모드가 함께 움직여 EOS-31은 건드리지 않았다). 바뀐 것은 게이트가 범위를 **별도 선결
+    조건**으로 본다는 점이다. 그래서 조건 목록이 아니라 **실제 규칙 함수를 통과시킨 결과**로, 그리고
+    대조군(범위 안 같은 문항)과 **쌍으로** 동결한다 — 범위 밖만 단언하면 "전부 거절하는 게이트"도 통과한다.
+
+    EOS-35(재선택 재판정)는 이 근거 ①이 바뀐 사실을 트리거로 받는다. 근거 ②(숙달 구간 입력의 신뢰 하한 —
+    EOS-33)는 이 변경과 무관하게 남아 있다.
     """
 
     @pytest.mark.parametrize("difficulty", [1.0, 2.5, 3.2, 3.7, 4.5])
-    def test_every_labeled_problem_passes_the_suneung_gate_for_persona_a(
-        self, difficulty: float
-    ) -> None:
-        # 기출 유형도 시그니처도 없는 문항 — 수능 신호는 적합도 규칙이 매긴 persona_fit 하나뿐이다.
+    def test_persona_fit_alone_is_still_scope_blind(self, difficulty: float) -> None:
+        # 기출 유형도 시그니처도 없는 문항 — 적합도 규칙이 매긴 값만 본다. 난이도 라벨이 있으면 A는 늘 0.70+다.
         bare = _problem(signature_patterns=[], difficulty_overall=difficulty)
         fit, _rationale = derive_persona_fit(bare)
-        scored = bare.model_copy(update={"persona_fit": fit})
-        assert is_suneung_eligible(scored, Persona.A_일반고고3) is True, (
-            "수능 게이트가 이제 라벨 있는 문항을 거른다 — EOS-31 착지로 보인다. EOS-25의 재선택 보류 "
-            "근거 ①이 바뀌었으니 EOS-35(재선택 재판정)의 트리거를 확인하고 이 동결을 갱신하라."
+        assert fit[Persona.A_일반고고3.value] >= 0.5, (
+            "persona_fit이 이제 난이도 구간 밖 신호를 본다 — 적합도 규칙이 바뀌었다. 6개 모드의 임계 계약을 "
+            "다시 보고, 수능 게이트 ②-c가 여전히 별도 선결 조건으로 필요한지 판정하라."
         )
+
+    @pytest.mark.parametrize("difficulty", [1.0, 2.5, 3.2, 3.7, 4.5])
+    def test_labeled_problem_is_eligible_only_inside_the_scope(self, difficulty: float) -> None:
+        bare = _problem(signature_patterns=[], difficulty_overall=difficulty)
+        fit, _rationale = derive_persona_fit(bare)
+        inside = bare.model_copy(update={"persona_fit": fit})
+        outside = inside.model_copy(update={"achievement_standard_codes": ["[9수02-01]"]})
+        unknown = inside.model_copy(update={"achievement_standard_codes": []})
+        assert is_suneung_eligible(inside, Persona.A_일반고고3) is True  # 대조군: 범위 안
+        assert (
+            is_suneung_eligible(outside, Persona.A_일반고고3) is False
+        ), "중학교 성취기준 전용 문항이 수능 적격으로 새고 있다 — 게이트 ②-c(출제 범위)가 무력하다(EOS-31)."
+        assert is_suneung_eligible(unknown, Persona.A_일반고고3) is False  # 모른다 ≠ 적격
+
+
+_DIRECT_REASON = build_reason(
+    concept_id=_ANCHOR, mastery=0.55, confidence=0.5
+)  # 학습 구간 → direct
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑤ EOS-31 — 출제 범위: 성취기준 코드 주입과 SQL 사전필터
+# ──────────────────────────────────────────────────────────────────────────
+class TestScopeInjectionAndPrefilter:
+    """정책이 후보에 성취기준 코드를 **주입**하고, 후보 풀 SQL에 같은 범위 절을 **싣는가**.
+
+    게이트 판정 자체는 `tests/backend/l6/suneung/`가 본다. 여기서 보는 것은 L5 배선이다 — 주입이 빠지면
+    모든 후보가 `UNKNOWN`으로 거절돼 후보가 소멸한다(fail-closed). 그래서 "주입이 일한다"는 *쌍*으로
+    증명한다: 같은 후보가 범위 안 코드를 받으면 나가고, 못 받거나 범위 밖 코드를 받으면 안 나간다.
+    SQL↔파이썬 일치와 후보 풀 소멸 방지는 실 PG 통합 테스트(`test_eos31_suneung_scope_integration.py`)가 본다.
+    """
+
+    @staticmethod
+    def _install_injection(
+        monkeypatch: pytest.MonkeyPatch, codes: dict[uuid.UUID, set[str]]
+    ) -> None:
+        async def _fetch(_s: object, _ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+            return codes
+
+        monkeypatch.setattr(suneung_module, "fetch_achievement_codes", _fetch)
+
+    async def test_injected_in_scope_code_makes_the_item_servable(
+        self, env: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        env(anchor_reason=_DIRECT_REASON)
+        bare = _problem(achievement_standard_codes=[])  # 풀에서 막 읽은 상태 — 코드 비영속
+        self._install_injection(monkeypatch, {bare.problem_id: {"[12대수01-01]"}})
+        outcome, _session = await _run([bare])
+        assert outcome.problem_id == bare.problem_id
+
+    async def test_injected_out_of_scope_code_removes_the_item(
+        self, env: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        env(anchor_reason=no_candidate_reason())
+        bare = _problem(achievement_standard_codes=[])
+        self._install_injection(monkeypatch, {bare.problem_id: {"[9수02-01]"}})
+        outcome, _session = await _run([bare])
+        assert outcome.problem_id is None
+        assert outcome.candidate_zero_reason == "all_candidates_gated_ineligible"
+
+    async def test_missing_injection_removes_the_item_instead_of_passing_it(
+        self, env: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """조인 행이 없으면(코드를 모른다) 통과가 아니라 후보 소멸이다 — fail-closed가 서빙 경로에서도 선다."""
+        env(anchor_reason=no_candidate_reason())
+        bare = _problem(achievement_standard_codes=[])
+        self._install_injection(monkeypatch, {})
+        outcome, _session = await _run([bare])
+        assert outcome.problem_id is None
+        assert outcome.candidate_zero_reason == "all_candidates_gated_ineligible"
+
+    async def test_pool_sql_carries_the_scope_clause_from_the_shared_definition(
+        self, env: Any
+    ) -> None:
+        """후보 풀 SQL이 교육과정 개정·범위 접두어를 **같은 상수에서** 읽어 싣는다(④ 같은 정의)."""
+        env(anchor_reason=_DIRECT_REASON)
+        _outcome, session = await _run([_problem()])
+        sql = str(
+            session.pool_stmt.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "unnest(atom_node.standard_codes)" in sql
+        assert f"problem.curriculum_version = '{SUNEUNG_SCOPE.curriculum.value}'" in sql
+        for pattern in SUNEUNG_SCOPE.code_startswith_patterns():
+            assert pattern in sql, f"범위 접두어 {pattern!r}가 사전필터 SQL에 없다"
