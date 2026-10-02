@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-22-coverage-hint-source-wiring
+title: "P3-22 — Coverage 계측기의 힌트 연결 입력 배선 (P3-04 의 hint_strategy 좌석 확정 후 · unmeasured 해소)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-02-coverage-instruments
+  - P3-04-problem-metadata-and-slots
+requires_gates: []
+acceptance:
+  - "① P3-04 가 정한 hint_strategy 저장 좌석을 읽어 Coverage 계측기의 힌트 입력(CoverageCorpus.hint_problem_ids)을 채운다. 좌석이 없는 동안은 None(측정 불가)을 유지한다 — 빈 집합으로 채우면 '측정했는데 없다'로 위장된다.\n② 힌트 연결이 linked/missing 으로 측정되고, 좌석에서 힌트를 지우는 주입에 Concept Completeness 가 실제로 떨어진다(정상 입력의 초록은 증거가 아니다).\n③ tests/backend/l1/test_phase3_coverage.py 의 test_hint_is_reported_unmeasured_while_the_seat_is_absent 를 좌석 배선에 맞게 갱신한다 — 좌석이 생겼는데 이 단언이 남아 있으면 배선 누락을 드러내도록 일부러 둔 테스트다.\n④ 실제 코퍼스의 힌트 연결 수치(기준선)를 CLI 출력으로 보고한다. 힌트 본문의 학생 공급 게이트(검수 상태)는 이 태스크의 범위가 아니다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/standards/phase3_coverage.py
+  - tests/backend/l1/test_phase3_coverage.py
+session: null
+notes: "출처: P3-02 구현 중 발견(2026-10-02). 힌트 저장 좌석은 ARCH-39 가 '영구 부재'로 판정했고(재확인 트리거 있음), 지시문 [07] 의 Problem 필수 7필드 중 hint strategy 의 좌석은 P3-04 가 정한다. 그래서 P3-02 의 Concept Completeness 는 힌트 연결을 unmeasured 로 보고하며, unmeasured 는 충족이 아니라 Completeness 가 좌석 전에는 충족될 수 없다. 이 태스크는 좌석이 정해진 뒤 계측기에 그 입력을 배선하는 좌석이다. 등재는 착수가 아니다."
+updated: 2026-10-02
