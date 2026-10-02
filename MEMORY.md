@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
+
+- **무엇**: `tests/backend/privacy/test_retention_plan_completeness.py` 신설 — 삭제권 가드(`test_erasure_plan_completeness`)의 소유 판정 (A)∪(B)∪(C)를 경로 로드로 재사용(판정 복제 0 · 삭제권 쪽 파일 무수정)해, 소유 테이블이 ① `_RETENTION_PLAN` ② `_PURGED_ELSEWHERE` ③ `_RETENTION_PLAN_EXEMPTIONS` 어디에도 없으면 RED. 삭제권의 만료 계약(SEC-39)도 재사용 — 임시 제외 9건이 해소 태스크(`MGMT-02`·`ARCH-51`·`SEC-25`)를 구조 필드로 가진다.
+- **실측(판정 기준 main `a05eb49a`)**: 소유 28테이블 · 계획 14 · 계획 밖 15건 중 11건은 사유 있는 제외, **4건이 무사유**였다. 처분: 편입 3건 = `evidence_event`(`time`) · `learning_state_transition`(`occurred_at`) · `job_ownership`(`created_at`) — 셋 다 NOT NULL이라 NULL-미파기 잔존이 없고 새 연한 숫자를 정하지 않는다. 제외 1건 = `learner_state`(학생당 1행 현재값 — `updated_at`은 활동 시각이 아니라 변경 시각이라 기준으로 쓰면 활동 중인 학생의 행이 지워진다).
+- **판단이 갈린 지점(Kiki 확인 필요)**: ⓐ `evidence_event` 편입은 미결정 게이트 `G-eos37-erasure-kpi-disposition`과 별개 축(창 만료 삭제 vs 요청 시 삭제)이라 보고 진행했으나 그 선택 결과와의 정합은 **확인하지 못했다** — 되돌리기는 계획 1줄. ⓑ `learning_state_transition` 편입으로 비활동 3년+ 학생의 현재 상태가 `NEW`로 돌아간다(원장 최신 행이 정본). ⓒ 기존 제외 8건에 사유를 붙이며 법령 판단 대기 6건(감사 2·동의·계정 현재값 3)을 MGMT-02에 묶었다 — 법적 결론이 아니라 "연한 미확정" 상태 표기다.
+- **정정**: `evidence_event.retention_until`은 "retention.py 소관"이 아니라 읽는 코드도 채우는 writer도 없는 예약 컬럼이다(writer 3곳 실측 · `EvidenceEventStore.log` 호출처 0건). 모델 docstring을 정정하고, 누가 채우기 시작하면 RED가 되는 핀을 뒀다. 부수로 `review_timer_event` docstring의 삭제권 스윕 축 서술에 (C) 제외 사실을 보강했다.
+- **후속**: `SEC-25-writer0-account-history-retention-disposition`(writer 0인 `user_track_history`·`user_persona_history`) 등재 · `user_state_snapshot`은 기존 `ARCH-51`에 묶음 · `SEC-40`(삭제권 배선)과는 파일이 겹치지 않는다.
+- **검증**: 뮤테이션 20건(M1~M12) 전건 검출 · 주입 미적용 0 · 바이트 동일 복원. M6a는 내 기대 목록이 틀렸을 뿐(만료 등재 제거는 순회 대상이 사라져 `live_resolution_task`가 못 잡는 게 맞다) 다른 두 테스트가 RED. 대표 사례: 소유 판정이 빈 집합이 되면 실제 완전성 테스트는 **조용히 통과**하고 `…is_not_vacuous`만 RED(M12).
+
 ### 2026-10-02 (착지 · DP-03): **분석 envelope의 재전송 멱등키 `event_uuid`를 `attempt_event`에 영속화했다 — 시각 컬럼은 새로 만들지 않고 기존 `event_at`(수신)·`event_time`(발생)을 쓴다. hypertable에서는 이 멱등 계약이 성립하지 않으므로 마이그레이션이 fail-closed로 중단한다** (claude 판정·구현)
 
 - **무엇**: 리비전 `a3f7c9d1e5b2`(down `9d3e7b1c5a20`). `event_uuid UUID NULL`(server_default 없음·백필 금지 — 기존 행에 uuid를 채우면 producer가 만든 적 없는 키를 날조한다) + 부분 UNIQUE 인덱스 `uq_attempt_event_event_uuid`(`WHERE event_uuid IS NOT NULL`). 복합 PK `(event_id, event_at)`·BIGSERIAL 내부 키 불변. writer 좌석 = `l2.attempt_skill_event.insert_attempt_event_once`(`ON CONFLICT DO NOTHING`·키 없으면 ValueError).

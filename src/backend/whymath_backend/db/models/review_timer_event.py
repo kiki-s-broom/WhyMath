@@ -18,9 +18,16 @@ KPI)의 측정 방법 "검수 타이머 이벤트(시작·종료·중단) 전수
     스키마가 측정 실패를 제조한다. `GenerationLog.problem_id`(같은 생산 계측 로그 계열)와
     동형: nullable·ondelete 지정 없음(NO ACTION).
   - `reviewer_id` TEXT NOT NULL — 검수 *행위자* 핸들. **학생 소유 축 아님**: privacy 스윕
-    (`test_erasure_plan_completeness` — SEC-35 이후 FK 산출물 ∪ 계획 파생 이름)에 걸리지 않음을
-    실측 확인(green)했다. 이 테이블은 `user_profile.user_id` FK가 없고 `_ERASURE_PLAN`이 쓰는
-    컬럼명도 갖지 않는다. 그 파일 주석이 created_by·approved_by류를 "콘텐츠
+    (`test_erasure_plan_completeness` — (A) FK 산출물 ∪ (B) 계획 파생 이름 ∪ (C) 학생 세션 축)이
+    이 테이블을 소유로 잡지 않음을 실측 확인(green)했다. (A)·(B)는 이 테이블에 `user_profile.
+    user_id` FK도 `_ERASURE_PLAN`이 쓰는 컬럼명도 없어 *구조적으로* 안 걸린다. **(C)는 다르다** —
+    `review_session_id`가 (C)의 이름 절(`*_session_id`)에 *걸린다*. 그런데 이 컬럼은 검수자 세션
+    (sitting) 상관 id이지 학생 학습 세션이 아니라서, 그 파일의 `NON_STUDENT_SESSION_COLUMNS`
+    (`("review_timer_event", "review_session_id")`)에 사유와 함께 *제외*돼 있다. 즉 초록은 "안
+    걸려서"가 아니라 "걸렸으나 사유 있게 제외돼서"다 — 그 제외가 사라지면 이 테이블이 삭제권
+    스윕에서 RED가 된다(`test_non_student_session_columns_are_excluded_and_the_exclusion_is_
+    load_bearing`가 동결). 보존 파기 완전성 가드(SEC-41)는 같은 소유 판정을 재사용하므로 같은
+    결론이다. 그 파일 주석이 created_by·approved_by류를 "콘텐츠
     저작/검수 행위자"로 명시 분류한다. 따라서 erasure/retention/export 3종 배선 **불요** —
     학생 축 컬럼 부재는 `test_review_timer_event_orm.py`가 RPT-01(`test_defect_report_no_
     user_id.py`) 선례로 동결한다.
