@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - backlog/gates.yaml
-session: null
+session: claude/gallant-euler-blngpj
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-02.md §3-①(stray-code 14회차). 우선순위 1 = PIPA 삭제권 표면(의사결정 우선순위 2번 · 협상 불가). 회수 완료 전 원 브랜치 claude/intelligent-noether-tbj2jf 삭제 금지(head c671a313). 원 번호 재사용 없음 — 브랜치에는 태스크 파일이 없고 게이트 clear 1건뿐이다. 이 게이트가 main에서 pending인 채로 SEC-40을 막고 있어, 삭제권 이행 뒤 evidence_event 잔존(재연결 경로 2건) 차단이 판정이 끝났는데도 착수되지 못한다."
 updated: 2026-10-02
