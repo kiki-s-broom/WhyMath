@@ -271,7 +271,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e ".[dev]"
           # ARCH-21: QA 파이프라인 오케스트레이터(whymath_backend.harness.qa_pipeline)를 이
           # 잡에서 돌리려면 backend 패키지가 필요하다(backend 잡이 역방향으로 이미
@@ -365,7 +365,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트(tests/backend/l1/test_five_node_connectivity_governance.py)가
           # data_pipeline(L1)을 import한다 → 백엔드 잡에도 설치(수집 ImportError 방지).
@@ -633,7 +633,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           # 슬112(비용): [embedding](sentence-transformers→torch 수 GB)은 CI에서 설치하지
           # 않는다 — 라이브 bge-m3 통합은 CI에서 *항상 skip*(HF 미도달·Phaiakes9 전용)이라
           # torch 설치가 분당 과금만 태웠다. 슬110의 find_spec 사전체크가 미설치를 깨끗이
@@ -762,7 +762,7 @@ jobs:
 
       - name: Install dependencies (editable + dev + postgres extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e ".[dev,postgres]"
 
       - name: Pytest (NCIC 적재 통합테스트 — 실 PG)
@@ -828,7 +828,7 @@ jobs:
 
       - name: Install dependencies (editable + dev + neo4j extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e ".[dev,neo4j]"
 
       - name: Pytest (개념그래프 적재 통합테스트 — 실 Neo4j)
@@ -954,7 +954,7 @@ jobs:
       # data_pipeline을 import하지 않는다). 무거운 backend 전체 대신 이 최소 설치만 한다.
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e ".[dev]"
 
       # 실제 src/mobile/lib·src/backend/whymath_backend/api를 스캔하는 회귀 스모크를 실행한다.
@@ -1161,9 +1161,15 @@ jobs:
       # (상한을 걸어 메이저 변경 시 재검증을 강제).
       # sqlalchemy 상한은 두 pyproject와 같아야 한다(OPS-91 핀·OPS-92 동결 —
       # tests/infra/test_sqlalchemy_upper_bound.py가 전 지점 동일 상한을 검사한다).
+      # pytest·pytest-asyncio·pytest-randomly·pyyaml도 pyproject와 **같은 상한**을 건다(OPS-94).
+      # 무상한 직설치는 PyPI 최신이 그대로 깔리는 구조라, pyproject가 `pytest-randomly<4`로
+      # 묶는 동안 이 잡은 5.0.0 위에서 돌고 있었다(2026-10-02 PR #1419 CI 로그 실측:
+      # `Successfully installed … pytest-randomly-5.0.0` — SQLAlchemy 사고와 같은 모양의 검증
+      # 표면 불일치). 전 지점의 상한 존재·일치는 아래 게이트 스텝이 요구한다.
       - name: Install deps (실측 최소 7종 — 백엔드 전체 설치 불요)
         run: |
-          pip install pytest pytest-asyncio pytest-randomly pyyaml "sqlalchemy>=2.0,<2.1" \
+          pip install "pytest>=8.3.3,<10" "pytest-asyncio>=0.24.0,<2" \
+                      "pytest-randomly>=3.15,<4" "pyyaml>=6.0.1,<7" "sqlalchemy>=2.0,<2.1" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
 
       # OPS-11 — `tests/infra`를 lint/format하는 잡이 **하나도 없었다**. backend 잡은
@@ -1198,6 +1204,15 @@ jobs:
       # 9종이 봉인한다(위 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
       - name: 게이트 — 숙달 단일 쓰기 경로 (EOS-108)
         run: python3 scripts/analysis/mastery_write_path_scan.py
+
+      # OPS-94 — 무상한 의존 pin 차단. 이 잡에 붙이는 이유: 검사기가 pyproject·워크플로를
+      # *텍스트로* 읽고(PyYAML·packaging — 위 Install deps가 이미 깐다) 백엔드 설치가 불요하며,
+      # 이 잡은 `needs: changes` 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — backend 잡은
+      # data-pipeline 전용 PR에서 안 돌 수 있고, 무상한 직설치는 정확히 워크플로만 바뀐 PR에서
+      # 생긴다. 변별력은 `tests/infra/test_dependency_upper_bounds.py`의 결함 주입이 봉인한다
+      # (아래 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 무상한 의존 pin 차단 (OPS-94)
+        run: python3 scripts/ops/check_dependency_upper_bounds.py
 
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q
@@ -1536,9 +1551,11 @@ jobs:
       # ruff·black(OPS-12) — 아래 lint 스텝용 검증 도구. 버전 핀은 backend `dev` extra와
       # 같은 정책(상한을 걸어 메이저 변경 시 재검증 강제). 하네스 *런타임*은 여전히
       # stdlib+PyYAML만이다(설계 불변식) — 나머지는 전부 검증 도구.
+      # pyyaml·pytest·pytest-randomly 상한도 pyproject와 같다(OPS-94 — 무상한 직설치는
+      # PyPI 최신이 그대로 깔려 pyproject가 묶은 메이저와 갈라진다).
       - name: Install deps (하네스 런타임은 stdlib+PyYAML — 나머지는 검증 도구)
         run: |
-          pip install pyyaml pytest pytest-randomly \
+          pip install "pyyaml>=6.0.1,<7" "pytest>=8.3.3,<10" "pytest-randomly>=3.15,<4" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
           # CUR-09 후속: EOS 단원 구조 관측 리포트가 whymath_backend.harness를 import하므로
           # backend 패키지를 editable 설치한다(dev extra 불요 — CLI는 stdlib+PyYAML만 쓴다).
@@ -1751,7 +1768,7 @@ jobs:
       # PyYAML 등 전부 base dependencies). lint·mypy·pytest는 별도 backend 잡이 이미 검증한다.
       - name: Install dependencies (editable, base only)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           pip install -e .
 
       - name: 게이트 — 선언≠배선 4축 정적 감사 (declared_unwired_audit)
@@ -1825,7 +1842,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           python -m pip install -e ../data-pipeline
 
@@ -1872,7 +1889,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 백엔드 잡에도 설치.
           python -m pip install -e ../data-pipeline
@@ -1983,7 +2000,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 백엔드 잡에도 설치.
           python -m pip install -e ../data-pipeline

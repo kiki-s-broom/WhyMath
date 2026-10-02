@@ -1,0 +1,259 @@
+# Phase 3 대표 과정 범위 명세 v1 — P3-01 동결본 (미적분Ⅰ '미분' 대단원)
+#
+# 지위
+# ----
+# Phase 3 모든 Coverage 계측(P3-02)의 **분모**다. 이 파일이 "무엇을 완성할 것인가"를 고정하고,
+# 이후 변경은 PR + 변경 사유 기록으로만 한다(P3-01 acceptance ④). 개념·문제·오개념 본문은
+# 담지 않는다 — 기존 자산의 ID만 가리킨다(새 ID 체계를 만들지 않는다).
+#
+# 동결 근거
+# ---------
+#   · 선택 게이트: G-p301-scope-choice (2026-09-30 Kiki 판정 — 후보 1 · Q1 고3 수능 ·
+#     Q2 437 입도 · Q3 대단원 1개)
+#   · 후보 비교·실측: docs/reviews/p3_01_scope_candidates_2026-09-30.md
+#   · 검증 가능성 처분: G-p318-calc-02-08-disposition (2026-10-02 Kiki 결정 — 02-08 은
+#     파생 판정 문항으로 대체, 02-06·02-09 는 일부 가능). 근거 docs/reviews/
+#     p3_18_calculus_verifiability_probe_result_2026-10-01.md
+#   · 항목 정의·임계값 원문: docs/strategy/phase3_math_eos_completion_instruction_set.md
+#     [03]·[04]·[07]·[08]·[09]
+#
+# 단방향 관례 (CLAUDE.md "YAML=소스 · DB=산출물")
+# ----------------------------------------------
+# 이 파일이 소스다. 로더(l1.standards.phase3_scope)·측정 CLI·리포트는 전부 이 파일을
+# **읽기만** 한다. DB에서 범위를 되읽어 이 파일을 갱신하지 않는다.
+#
+# 무결성 게이트
+# -------------
+# 모든 참조(성취기준 코드·Concept ID·원자 코드·스킬·M-id·문제유형)가 아래 sources 의 코퍼스에
+# 실재하는지, 빈 목록이 없는지, 목록끼리 어긋나지 않는지를 로더가 검사한다
+# (tests/backend/l1/test_phase3_scope_spec.py — CI 매 PR).
+#
+# 판단이 들어간 두 곳 (Kiki 확인 대상 — PR 본문에도 적었다)
+# --------------------------------------------------------
+#   ① core_misconceptions 의 선정 규칙(selection_rule) — 규칙은 기계적이지만 "문항에 이미 닿은
+#      것을 우선한다"는 선택 자체는 세션의 제안이다.
+#   ② required_problem_types — 현재 범위 문항이 쓰는 유형 5종이다. 신규 개념의 문항 형태가
+#      이 5종으로 표현된다는 것은 세션의 추정이며 P3-04·P3-05 에서 확인한다.
+
+spec_version: 1
+spec_id: phase3-scope-v1
+frozen_at: "2026-10-02"
+frozen_by_gate: G-p301-scope-choice
+disposition_gate: G-p318-calc-02-08-disposition
+design_doc: docs/reviews/p3_01_scope_candidates_2026-09-30.md
+disposition_doc: docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md
+
+choice_record:
+  decided_at: "2026-09-30"
+  decided_by: kiki
+  q1_market_vs_density: "고3 수능 쪽(후보 1 — 2028 수능 공통 범위, 페르소나 A)"
+  q2_concept_granularity: "성취기준당 대표 개념 1개(437 입도) — 원자 리프 단위는 다음 단계로 미룬다"
+  q3_scope_breadth: "대단원 1개 — 과목 전체로 넓히지 않는다"
+
+# 로더가 참조 실재를 검사할 코퍼스 경로(레포 루트 기준). 테스트가 임시 코퍼스로 바꿔 끼울 수 있게
+# 데이터로 둔다(anchors.yaml 의 standards_sources 와 같은 관용). 성취기준 개정 필터는
+# course.curriculum_revision 하나만 쓴다(진실 원천을 둘로 두지 않는다).
+sources:
+  standards: data/corpus/standards_v1/standards.json
+  concept_ids: data/corpus/concept_graph_v1/ids.yaml
+  crosswalk: data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl
+  atoms: data/corpus/atom_graph_v1/graph.json
+  skills: data/corpus/skill_graph_v1/skills.jsonl
+  misconceptions: data/corpus/misconceptions_v1/misconceptions.json
+  problem_types: data/corpus/problem_type_graph_v1/problem_types.jsonl
+
+# ── 항 1. 과정 1개 ─────────────────────────────────────────────────────────
+course:
+  id: calculus1-differentiation
+  name_ko: "미적분Ⅰ — 미분"
+  subject_code: "12미적Ⅰ"
+  domain: "미분"
+  curriculum_revision: "2022 개정"
+
+# ── 항 2. 대상 학년·과목·단원 범위 ─────────────────────────────────────────
+scope:
+  grade: "고2"
+  school_level: "고등학교"
+  subject_code: "12미적Ⅰ"
+  subject_name_ko: "미적분Ⅰ"
+  domain: "미분"
+  # 이 대단원 밖(극한·연속, 적분)은 채우지 않는다 — "김에 같이" 금지.
+  excluded_domains: ["함수의 극한과 연속", "적분"]
+
+# ── 항 3. Curriculum Node 목록 (성취기준 코드 = 교육과정 Overlay 의 노드) ───
+curriculum_nodes:
+  - {code: "[12미적Ⅰ-02-01]", sub_domain: "미분계수"}
+  - {code: "[12미적Ⅰ-02-02]", sub_domain: "미분가능성과 연속성"}
+  - {code: "[12미적Ⅰ-02-03]", sub_domain: "함수 y=xⁿ의 도함수"}
+  - {code: "[12미적Ⅰ-02-04]", sub_domain: "다항함수의 도함수"}
+  - {code: "[12미적Ⅰ-02-05]", sub_domain: "접선의 방정식"}
+  - {code: "[12미적Ⅰ-02-06]", sub_domain: "평균값 정리"}
+  - {code: "[12미적Ⅰ-02-07]", sub_domain: "함수의 증가·감소, 극대·극소"}
+  - {code: "[12미적Ⅰ-02-08]", sub_domain: "함수의 그래프의 개형"}
+  - {code: "[12미적Ⅰ-02-09]", sub_domain: "방정식과 부등식에의 활용"}
+  - {code: "[12미적Ⅰ-02-10]", sub_domain: "속도와 가속도"}
+
+# ── 항 4. Concept 목록 (437 입도 — 성취기준당 대표 개념 1개) ────────────────
+# concept_id  = 구 437 개념의 canonical_id(concept_graph_v1/ids.yaml · 크로스워크 정본)
+# source_id   = 같은 개념의 src_id(문항 `concepts[].concept_src_id`·M-id `concept_src_id` 의 조인 키)
+# primary_atom_code = 크로스워크가 지정한 primary 원자(런타임 문항 연결이 닿는 원자)
+# core        = 핵심 여부. 이 대단원은 10개 전부 핵심이다(후보 문서 §3.2 — 핵심 6~12 범위).
+# probe_verdict = P3-18 SymPy 검증 가능성 판정(possible | partial | replaced_by_derived |
+#                 not_probed). not_probed 는 프로브 대상이 아니었다는 뜻(이미 문항이 있는 개념).
+concepts:
+  - code: "[12미적Ⅰ-02-01]"
+    concept_id: math.calculus.mibungyesu
+    source_id: "H:12미적Ⅰ02-01"
+    primary_atom_code: "12미적Ⅰ-02-01-2"
+    core: true
+    probe_verdict: not_probed
+  - code: "[12미적Ⅰ-02-02]"
+    concept_id: math.calculus.mibunganeungseonggwa-yeonsokseong
+    source_id: "H:12미적Ⅰ02-02"
+    primary_atom_code: "12미적Ⅰ-02-02-1"
+    core: true
+    probe_verdict: not_probed
+  - code: "[12미적Ⅰ-02-03]"
+    concept_id: math.calculus.hamsu-y-x-nui-dohamsu
+    source_id: "H:12미적Ⅰ02-03"
+    primary_atom_code: "12미적Ⅰ-02-03-1"
+    core: true
+    probe_verdict: possible
+  - code: "[12미적Ⅰ-02-04]"
+    concept_id: math.calculus.mibunbeopgwa-dahanghamsuui-dohamsu
+    source_id: "H:12미적Ⅰ02-04"
+    primary_atom_code: "12미적Ⅰ-02-04-1"
+    core: true
+    probe_verdict: possible
+  - code: "[12미적Ⅰ-02-05]"
+    concept_id: math.calculus.jeopseonui-bangjeongsik
+    source_id: "H:12미적Ⅰ02-05"
+    primary_atom_code: "12미적Ⅰ-02-05-1"
+    core: true
+    probe_verdict: possible
+    probe_note: "가능 유지(Kiki 2026-10-02). 표본 검증이다 — 접선 조건을 '접점에서 이중근' 항등식으로 써야 한다."
+  - code: "[12미적Ⅰ-02-06]"
+    concept_id: math.calculus.pyeonggyungaps-jeongri
+    source_id: "H:12미적Ⅰ02-06"
+    primary_atom_code: "12미적Ⅰ-02-06-1"
+    core: true
+    probe_verdict: partial
+    probe_note: "일부 가능(Kiki 2026-10-02). c값 검산이 구간 소속을 보지 않아 구간 밖 근이 정답으로 통과한다."
+  - code: "[12미적Ⅰ-02-07]"
+    concept_id: math.calculus.hamsuui-jeungga-gamsowa-geukdae-geukso
+    source_id: "H:12미적Ⅰ02-07"
+    primary_atom_code: "12미적Ⅰ-02-07-1"
+    core: true
+    probe_verdict: not_probed
+  - code: "[12미적Ⅰ-02-08]"
+    concept_id: math.calculus.hamsuui-geuraepeu-gaehyeong
+    source_id: "H:12미적Ⅰ02-08"
+    primary_atom_code: "12미적Ⅰ-02-08-1"
+    core: true
+    probe_verdict: replaced_by_derived
+    probe_note: "처분 (나)(Kiki 2026-10-02). 개형 그림 문항은 두지 않고 파생 판정(극값 개수·증감 구간·극값의 x좌표/값)으로 문항화한다. 분모에서는 빠지지 않는다."
+  - code: "[12미적Ⅰ-02-09]"
+    concept_id: math.calculus.bangjeongsik-budeungsikeui-hwalyong
+    source_id: "H:12미적Ⅰ02-09"
+    primary_atom_code: "12미적Ⅰ-02-09-1"
+    core: true
+    probe_verdict: partial
+    probe_note: "일부 가능(Kiki 2026-10-02). 수치형 실근 개수만 검증된다 — 매개변수(k) 범위형은 검증기가 없다."
+  - code: "[12미적Ⅰ-02-10]"
+    concept_id: math.calculus.sokdowa-gasokdo
+    source_id: "H:12미적Ⅰ02-10"
+    primary_atom_code: "12미적Ⅰ-02-10-1"
+    core: true
+    probe_verdict: possible
+
+# ── 항 5. Skill 목록 ───────────────────────────────────────────────────────
+# 위 개념 10개의 원자 30개가 가진 behavior_skills 의 합집합(skill_graph_v1 27종 중 8종).
+# 로더는 ① 8종이 스킬 코퍼스에 실재하는지 ② 개념마다 이 목록과 겹치는 스킬이 1개 이상인지를 본다.
+skills:
+  - skill.case-analysis
+  - skill.deductive-reasoning
+  - skill.equation-rearrangement
+  - skill.graph-reading
+  - skill.graph-sketching
+  - skill.pattern-generalization
+  - skill.polynomial-arithmetic
+  - skill.word-problem-modeling
+
+# ── 항 6. 핵심 오개념 목록 (M-id) ──────────────────────────────────────────
+# selection_rule — 기계적 규칙(세션 제안, Kiki 확인 대상):
+#   (1) 그 개념의 성취기준에 귀속된 M-id(ATOM 유래 제외) 중, 이미 문항의 오답 보기(distractor)에
+#       L4 kebab 크로스링크를 거쳐 닿는 것을 우선한다.
+#   (2) 그런 M-id 가 없는 개념은 귀속 M-id 전부를 핵심으로 한다(이 대단원에서는 개념당 1개).
+# 귀속 M-id 총 46개 중 12개가 핵심이다. 나머지(02-01 의 33개 등)는 DB 에 남지만 분모에 넣지 않는다.
+# 이후 P3-06 이 핵심 오개념마다 signature·픽스처를 확보한다. 오개념 kebab 신설·크로스링크 서명
+# (G-misc40-new-crosslink-signature)의 결과로 목록이 바뀌면 PR 로 변경한다.
+core_misconceptions:
+  selection_rule: "개념에 귀속된 M-id 중 문항 오답 보기에 이미 연결된 것 우선, 없으면 귀속 M-id 전부"
+  items:
+    - {mis_id: M0075, concept_code: "[12미적Ⅰ-02-01]"}
+    - {mis_id: M0080, concept_code: "[12미적Ⅰ-02-01]"}
+    - {mis_id: M0670, concept_code: "[12미적Ⅰ-02-02]"}
+    - {mis_id: M0671, concept_code: "[12미적Ⅰ-02-03]"}
+    - {mis_id: M0672, concept_code: "[12미적Ⅰ-02-04]"}
+    - {mis_id: M0673, concept_code: "[12미적Ⅰ-02-05]"}
+    - {mis_id: M0674, concept_code: "[12미적Ⅰ-02-06]"}
+    - {mis_id: M0864, concept_code: "[12미적Ⅰ-02-07]"}
+    - {mis_id: M0865, concept_code: "[12미적Ⅰ-02-07]"}
+    - {mis_id: M0676, concept_code: "[12미적Ⅰ-02-08]"}
+    - {mis_id: M0677, concept_code: "[12미적Ⅰ-02-09]"}
+    - {mis_id: M0678, concept_code: "[12미적Ⅰ-02-10]"}
+
+# ── 항 7. 필수 Problem Type 목록 ────────────────────────────────────────────
+# 현재 범위 문항 413건이 쓰는 문제유형 5종(problem_type_graph_v1 17종 중). 신규 개념의 문항 형태가
+# 이 5종으로 표현된다는 것은 세션의 추정이다 — P3-04·P3-05 에서 확인하고, 모자라면 PR 로 추가한다.
+required_problem_types:
+  basis: "범위 문항 413건이 이미 쓰는 유형(optimize-extremum 237 · solve-for-unknown 80 · evaluate-expression 48 · count-solutions 24 · verify-claim 24)"
+  items:
+    - ptype.evaluate-expression
+    - ptype.solve-for-unknown
+    - ptype.optimize-extremum
+    - ptype.count-solutions
+    - ptype.verify-claim
+
+# ── 항 8. 문제 수량 목표 ───────────────────────────────────────────────────
+# 6슬롯 원문(지시문 [07] P3-04 ②): 대표 / 기본 / 응용 / 오개념 유발 / 진단 / 숙련도 확인.
+# 합계 = 핵심 개념 수 × 슬롯 수 × 슬롯당 최소 고유 문항 수 (로더가 산술을 대조한다).
+quantity_targets:
+  slots:
+    - {id: representative, name_ko: "대표"}
+    - {id: basic, name_ko: "기본"}
+    - {id: applied, name_ko: "응용"}
+    - {id: misconception_trigger, name_ko: "오개념 유발"}
+    - {id: diagnostic, name_ko: "진단"}
+    - {id: mastery_check, name_ko: "숙련도 확인"}
+  min_distinct_problems_per_slot: 1
+  total_min_distinct_problems: 60
+  distinct_basis: "문면 골격(숫자를 #로 접은 문면)의 고유 수 — 후보 문서 §2.1 의 실측 기준. P3-05 가 근사 중복 기준을 정하면 그 정의로 교체한다(PR)."
+  counting_rules:
+    - "오개념 유발 슬롯의 문제는 연결된 misconception signature 가 있을 때만 센다(지시문 [08] ③)."
+    - "새 문제의 정답은 SymPy 로 검증된 것만 연결 완료로 센다(지시문 [08] ⑤)."
+
+# ── 항 9. 콘텐츠 completeness 기준 ─────────────────────────────────────────
+# 지시문 [04](P3-02)·[07](P3-04)이 정의한 목표 수치와 연결 종류를 그대로 옮긴 입력이다.
+# '완전 연결'의 측정 정의는 P3-02 가 코드 한 곳에 둔다 — 이 절은 측정 정의가 아니다.
+completeness:
+  targets:
+    content_coverage_rate: {value: 0.95}
+    curriculum_coverage: {value: 0.98}
+    concept_completeness: {value: 0.95}
+    problem_coverage_by_skill: {value: 0.95}
+    graph_connectivity_coverage:
+      value: null
+      reason: "지시문 원문에 목표 수치가 없다 — P3-02 가 기준선을 실측한 뒤 제안한다."
+  concept_required_links: [prerequisite, misconception, solution, hint, pedagogy]
+  graph_path: [concept, skill, problem, misconception, pedagogy]
+  curriculum_path: [curriculum, concept, skill, problem]
+  problem_required_fields:
+    - difficulty
+    - skill
+    - concept
+    - solution
+    - answer
+    - misconception_signature
+    - hint_strategy
+  empty_denominator: fail

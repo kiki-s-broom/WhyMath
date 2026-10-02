@@ -643,7 +643,7 @@ gates:
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
     corrections: []
   - id: G-misc40-new-crosslink-signature
-    title: "신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다"
+    title: "신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition"
     kind: human
     assignee: kiki
     status: pending
@@ -652,7 +652,23 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-02] title: '신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다' → '신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition' — MISC-40이 서명 대상 표(5행)와 근거를 판정 문서 §6에 냈다 — 제목이 가리키던 산출물의 위치·행 수를 명시하고, 서명 시점(PR 머지 후)과 별건 결정 게이트를 병기"
+    depends_on:
+      - MISC-40-calculus-diff-kebab-seat
+  - id: G-misc40-unseated-concepts-disposition
+    title: "MISC-40 판정 기준 승인 + 좌석 없는 5개 개념 처분 — (1) 판정 기준 Q2~Q4(완결된 주장의 문항 무관성·기존 kebab 겹침·주 진술)를 승인할지: 카탈로그 원칙 문구에 없는 이 판정의 추가 기준이다. (2) [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 안 A: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 안 B: M-id를 positive-signal형으로 재저작(M0674·M0678 둘째 문장이 후보) / 안 C: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정 / 안 D: 약한 공출현 신호 kebab(#33·#34 선례) / 안 E: 보류(P3-02와 G-p318-calc-02-08-disposition 결과 이후). 세션 의견은 E. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §3·§7"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-02
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-10-02] title: 'MISC-40 좌석 없는 5개 개념 처분 — [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 positive-signal 기준 미충족으로 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 가: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 나: 5개 M-id를 positive-signal형으로 재저작 / 다: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정. -02-08은 G-p318-calc-02-08-disposition 결과를 본 뒤 정하는 편이 낭비가 적다. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §7' → 'MISC-40 판정 기준 승인 + 좌석 없는 5개 개념 처분 — (1) 판정 기준 Q2~Q4(완결된 주장의 문항 무관성·기존 kebab 겹침·주 진술)를 승인할지: 카탈로그 원칙 문구에 없는 이 판정의 추가 기준이다. (2) [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 안 A: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 안 B: M-id를 positive-signal형으로 재저작(M0674·M0678 둘째 문장이 후보) / 안 C: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정 / 안 D: 약한 공출현 신호 kebab(#33·#34 선례) / 안 E: 보류(P3-02와 G-p318-calc-02-08-disposition 결과 이후). 세션 의견은 E. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §3·§7' — 독립 비판(F3·F6) 반영 — 결정 대상에 판정 기준 Q2~Q4 승인을 더하고 선택지에 안 D(약한 공출현 신호 kebab)·안 E(보류)를 추가"
+      - "[2026-10-02] verdict PASS · inputs: MISC-40-calculus-diff-kebab-seat · evidence: 판정문 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §7(선택지 안 A~E · 세션 의견 E) · 판정 기준 커밋 9e9d6dd9(PR #1419 · main b08a94ae 위). PASS의 뜻은 결정 입력(판정 기준 Q2~Q4의 승인 대상과 좌석 0이 남는 5개 개념의 선택지·영향 범위)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫 — done MISC-40-calculus-diff-kebab-seat 인계 — done MISC-40-calculus-diff-kebab-seat 인계"
     depends_on:
       - MISC-40-calculus-diff-kebab-seat
   - id: G-mp02-rerun-model-pilot
