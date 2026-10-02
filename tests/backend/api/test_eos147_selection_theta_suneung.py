@@ -72,6 +72,10 @@ def _problem(difficulty: float) -> SchemaProblem:
         valid_from_year=2022,
         subject=Subject.공통,
         unit_codes=["U-EOS147"],
+        # EOS-31 — 수능 출제 범위 안 성취기준 코드(2022 개정 대수). 게이트 ②-c가 범위를
+        # 선결 조건으로 보므로 코드가 없으면 후보가 전부 UNKNOWN으로 거절된다. 정책이
+        # 조인으로 주입하는 비영속 필드다.
+        achievement_standard_codes=["[12대수01-01]"],
         difficulty_overall=difficulty,
         signature_patterns=[SignaturePattern.COMPOUND_CHOICES],
     )
@@ -107,6 +111,15 @@ class _PoolSession:
         self.calls += 1
         assert self.calls == 1, "1차 후보 풀 외의 직접 조회 — 수능 모드는 재선택하지 않는다"
         return _Result([_OrmRow(p) for p in self._pool])
+
+
+async def _no_injection(_s: object, _problem_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    """성취기준 코드 조인 대역 — 빌더가 이미 코드를 갖고 있어 주입은 빈 결과다(EOS-31).
+
+    조인은 두 번째 직접 조회라 `_PoolSession`의 "풀 한 번" 규약을 깬다. 주입 자체는 실 PG 통합
+    테스트가 본다 — 이 파일은 θ 소비 지점만 잰다.
+    """
+    return {}
 
 
 class _Spy:
@@ -146,6 +159,8 @@ def _install(
         return real_band(theta, item, **kw)
 
     monkeypatch.setattr(suneung_module, "load_attempt_history_state", _history)
+    # EOS-31 — 코드 조인도 이름 교체로 대역한다(풀 조회 "한 번" 규약을 지키려고).
+    monkeypatch.setattr(suneung_module, "fetch_achievement_codes", _no_injection)
     monkeypatch.setattr(suneung_module, "collect_recommendation_reason", _reason)
     monkeypatch.setattr(suneung_module, "candidate_pool_order_by", _order)
     monkeypatch.setattr(suneung_module, "recommend_suneung_index", _index)
