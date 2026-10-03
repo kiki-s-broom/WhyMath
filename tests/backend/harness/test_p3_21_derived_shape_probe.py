@@ -230,7 +230,9 @@ class TestJudgeReuseGuards:
         # 재구현 금지(acceptance ③) — 같은 객체여야 한다.
         assert judge_concept.__module__ == "_p3_18_probe_for_p3_21"
 
-    def test_sham_is_detected_when_wrong_row_is_replaced_by_correct_row(self, tmp_path: Path) -> None:
+    def test_sham_is_detected_when_wrong_row_is_replaced_by_correct_row(
+        self, tmp_path: Path
+    ) -> None:
         # 뮤테이션 — 오답 행을 정답 행으로 바꾸면 모든 형태가 위장이 되어야 한다(판정이 변별한다는 증거).
         correct = _by_form(_read_rows(_CORRECT))
         for form in ("A1", "B1", "C1"):
