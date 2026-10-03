@@ -601,7 +601,8 @@ CATALOG: tuple[Spec, ...] = (
        "l2.mastery_contract", "l2.mastery_estimators", "l2.mastery_tracking",
        "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
-       "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
+       "Gate2 ②·⑨ — CAT 기반 · EOS-125 채점 경계 θ 스냅샷 자동 적재", "l2.irt",
+       "l2.ability_estimation", "l2.ability_tracking", "l2.ability_snapshot_capture"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items", status="Batch"),
     # EOS-103: 영속 축(l2.learner_state_store)을 **같은 기능번호**에 귀속시킨다 — §15가
