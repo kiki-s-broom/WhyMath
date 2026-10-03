@@ -21,11 +21,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from whymath_backend.config import Settings
 from whymath_backend.ops import loop_kpi_gate as gate
+from whymath_backend.privacy import erasure
 
 pytestmark = pytest.mark.integration
 
@@ -661,6 +663,228 @@ class TestTraceabilityOnTheLiveSchema:
         # 정리 후 — 이 창에 남은 것이 없다(잔존 0).
         after = await gate.collect_traceability(db, window)
         assert dict(after.detail or {})["recommendations_in_window"] == 0
+
+
+class TestTraceabilityAcrossErasure:
+    """KPI⑤ × 삭제권 — 학습자 1명의 삭제가 무관용 축을 FAIL시키지 않는가(EOS-37·처분 (나)).
+
+    EOS-141 판정(main `a82f9449`)에서 판정 하네스가 `DELETE /v1/me`로 지운 학습자의 추천 40건이
+    전건 `break_learner_unjoined`로 계상돼 ⑤가 40/40 FAIL이었다. 처분 (나)(Kiki 2026-09-30)에 따라
+    삭제는 그 세션의 추천 기록을 함께 지운다(SEC-40). 이 파일은 그 **결과를 수집기 쪽에서** 고정한다.
+
+    심는 것(과거 시각대 전용 관측창): 남긴 학습자 K의 추천(전 홉 이어짐) · 지울 학습자 E의 추천(전
+    홉 이어짐) · 세션 기록 실패 placeholder(세션 행 없음). 실제 삭제 경로 `erasure.erase_user`로 E를
+    지운 뒤 같은 창을 다시 잰다. 실행 전·후를 한 테스트에서 재는 이유: 사전에 E의 추천이 **실제로
+    잡히고 끊김 없이 이어진다**는 사실이 없으면 "삭제 뒤 안 보인다"가 위장일 수 있다.
+    """
+
+    async def test_erasure_removes_the_learner_from_the_axis_without_hiding_real_breaks(
+        self, db_session: AsyncSession
+    ) -> None:
+        db = db_session
+        earliest = (
+            await db.execute(
+                text(
+                    "SELECT min(time) FROM evidence_event WHERE event_type = 'recommendation_render'"
+                    " AND meta ? 'learner_state_basis'"
+                )
+            )
+        ).scalar_one()
+        floor = datetime(2002, 1, 1, tzinfo=UTC)
+        t0 = (min(floor, earliest) - timedelta(days=1) if earliest is not None else floor).replace(
+            microsecond=0
+        )
+        window = gate.ObservationWindow(start=t0, end=t0 + timedelta(minutes=30))
+        # 지울 학습자의 추천만 담는 좁은 창 — 삭제로 관측창이 비면 미측정이어야 한다.
+        only_erased = gate.ObservationWindow(
+            start=t0 + timedelta(minutes=2, seconds=30), end=t0 + timedelta(minutes=3, seconds=30)
+        )
+
+        keep_uid, gone_uid = uuid.uuid4(), uuid.uuid4()
+        keep_sid, gone_sid, placeholder_sid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        pid = uuid.uuid4()
+        objective = f"kpi5-erase-{_RUN_TAG}"
+        ktype = await _knowledge_type(db)
+        measured = t0 + timedelta(minutes=1, microseconds=654321)
+
+        learners: dict[uuid.UUID, dict[str, uuid.UUID]] = {
+            keep_uid: {"sid": keep_sid, "aid": uuid.uuid4(), "c": uuid.uuid4()},
+            gone_uid: {"sid": gone_sid, "aid": uuid.uuid4(), "c": uuid.uuid4()},
+        }
+        for ids in learners.values():
+            ids["snap"], ids["hyp"] = uuid.uuid4(), uuid.uuid4()
+
+        def basis(ids: dict[str, uuid.UUID]) -> str:
+            return json.dumps(
+                {
+                    "learner_state_basis": {
+                        "schema": 1,
+                        "assembled_at": (t0 + timedelta(minutes=2)).isoformat(),
+                        "mastery": {
+                            "concept_id": str(ids["c"]),
+                            "measured_at": measured.isoformat(),
+                        },
+                        "ability_snapshot": {"snapshot_id": str(ids["snap"])},
+                        "misconception_hypothesis_ids": [str(ids["hyp"])],
+                    },
+                    "reason": {},
+                }
+            )
+
+        # (분, 세션 ID, meta) — K=2분 · E=3분(좁은 창 안) · placeholder=4분.
+        plan = [
+            (2, keep_sid, basis(learners[keep_uid])),
+            (3, gone_sid, basis(learners[gone_uid])),
+            (4, placeholder_sid, basis(learners[keep_uid])),
+        ]
+        settings = Settings(jwt_secret_key=SecretStr("integration-jwt-secret-0123456789abcdef"))
+        try:
+            await db.execute(
+                text(
+                    "INSERT INTO problem (problem_id, source_type, curriculum_version,"
+                    " valid_from_year, subject, unit_codes) VALUES (:p,"
+                    " CAST(:st AS source_type_enum), CAST(:cv AS curriculum_enum), 2015,"
+                    " CAST(:sj AS subject_enum), '{}')"
+                ),
+                {
+                    "p": pid,
+                    "st": await self._enum_label(db, "source_type_enum"),
+                    "cv": await self._enum_label(db, "curriculum_enum"),
+                    "sj": await self._enum_label(db, "subject_enum"),
+                },
+            )
+            for uid, ids in learners.items():
+                await db.execute(
+                    text(
+                        "INSERT INTO user_profile (user_id, persona_primary)"
+                        " VALUES (:u, 'A_일반고고3')"
+                    ),
+                    {"u": uid},
+                )
+                await db.execute(
+                    text(
+                        "INSERT INTO learning_session (session_id, user_id, started_at,"
+                        " last_activity_at) VALUES (:s, :u, :t, :t)"
+                    ),
+                    {"s": ids["sid"], "u": uid, "t": t0},
+                )
+                await db.execute(
+                    text(
+                        "INSERT INTO problem_attempt (attempt_id, user_id, session_id, problem_id,"
+                        " is_correct, ingested_at) VALUES (:a, :u, :s, :p, false, :t)"
+                    ),
+                    {"a": ids["aid"], "u": uid, "s": ids["sid"], "p": pid, "t": measured},
+                )
+                await db.execute(
+                    text(
+                        "INSERT INTO concept_mastery_history (user_id, concept_id, measured_at,"
+                        " mastery, attempt_id) VALUES (:u, :c, :m, 0.30, :a)"
+                    ),
+                    {"u": uid, "c": ids["c"], "m": measured, "a": ids["aid"]},
+                )
+                await db.execute(
+                    text(
+                        "INSERT INTO ability_snapshot (snapshot_id, user_id, theta,"
+                        " response_count, measured_at) VALUES (:sn, :u, 0.1, 1, :m)"
+                    ),
+                    {"sn": ids["snap"], "u": uid, "m": measured},
+                )
+                await db.execute(
+                    text(
+                        "INSERT INTO misconception_hypothesis (id, user_id, misconception_id,"
+                        " confidence) VALUES (:h, :u, :mid, 0.40)"
+                    ),
+                    {"h": ids["hyp"], "u": uid, "mid": f"M-{_RUN_TAG}"},
+                )
+            for minute, session_id, meta in plan:
+                await db.execute(
+                    text(
+                        "INSERT INTO evidence_event (time, session_id, objective_id, k_type,"
+                        " event_type, meta) VALUES (:t, :s, :o, CAST(:k AS knowledge_type),"
+                        " 'recommendation_render', CAST(:m AS jsonb))"
+                    ),
+                    {
+                        "t": t0 + timedelta(minutes=minute),
+                        "s": session_id,
+                        "o": objective,
+                        "k": ktype,
+                        "m": meta,
+                    },
+                )
+            await db.commit()
+
+            # ── 사전: 세 추천이 모두 잡히고, E의 추천은 전 홉이 이어진다(위장 아님의 전제).
+            before = await gate.collect_traceability(db, window)
+            detail_before = dict(before.detail or {})
+            assert detail_before["recommendations_in_window"] == 3
+            assert detail_before["traced_full"] == 2  # K · E
+            assert detail_before["break_learner_unjoined"] == 1  # placeholder
+            assert (before.numerator, before.denominator) == (1, 3)
+            solo_before = await gate.collect_traceability(db, only_erased)
+            assert (solo_before.numerator, solo_before.denominator) == (0, 1)
+
+            # ── 실제 삭제 경로로 E를 지운다(운영 `DELETE /v1/me`의 본체).
+            await erasure.erase_user(db, user_id=gone_uid, settings=settings)
+            await db.commit()
+            gone_rows = (
+                await db.execute(
+                    text("SELECT count(*) FROM evidence_event WHERE session_id = :s"),
+                    {"s": gone_sid},
+                )
+            ).scalar_one()
+            assert gone_rows == 0, "전제 — SEC-40이 삭제된 학습자의 추천 기록을 함께 지운다"
+
+            # ── 사후: E는 분자에도 분모에도 없다(끊김으로 계상되지 않는다) …
+            after = await gate.collect_traceability(db, window)
+            detail_after = dict(after.detail or {})
+            assert detail_after["recommendations_in_window"] == 2
+            assert detail_after["break_learner_unjoined"] == 1  # … 세션 기록 실패는 그대로 끊김
+            assert detail_after["traced_full"] == 1  # … 남긴 학습자 K는 그대로 전 홉 이어짐
+            assert (after.numerator, after.denominator) == (1, 2)
+
+            # ── 삭제로 관측창이 비면 통과가 아니라 미측정이다(표본 경로는 EOS-38 소유).
+            solo_after = await gate.collect_traceability(db, only_erased)
+            assert solo_after.denominator == 0
+            report = gate.evaluate(
+                {solo_after.kpi: solo_after}, window=only_erased, run_id="it-erased"
+            )
+            outcome = next(o for o in report.outcomes if o.kpi is gate.LoopKpi.TRACEABILITY)
+            assert outcome.verdict is gate.KpiVerdict.unmeasured
+            assert report.exit_code == 2  # 통과(0)로 읽히지 않는다
+        finally:
+            await db.rollback()
+            await db.execute(
+                text("DELETE FROM evidence_event WHERE objective_id = :o"), {"o": objective}
+            )
+            for uid in learners:
+                for table in (
+                    "concept_mastery_history",
+                    "ability_snapshot",
+                    "misconception_hypothesis",
+                    "problem_attempt",
+                    "learning_session",
+                    "deletion_audit",
+                ):
+                    await db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": uid})
+                await db.execute(text("DELETE FROM user_profile WHERE user_id = :u"), {"u": uid})
+            await db.execute(text("DELETE FROM problem WHERE problem_id = :p"), {"p": pid})
+            await db.commit()
+
+        residue = await gate.collect_traceability(db, window)
+        assert dict(residue.detail or {})["recommendations_in_window"] == 0
+
+    async def _enum_label(self, db: AsyncSession, typname: str) -> str:
+        return str(
+            (
+                await db.execute(
+                    text(
+                        "SELECT min(e.enumlabel) FROM pg_enum e JOIN pg_type t"
+                        " ON t.oid = e.enumtypid WHERE t.typname = :t"
+                    ),
+                    {"t": typname},
+                )
+            ).scalar_one()
+        )
 
 
 class TestSchemaSmoke:
