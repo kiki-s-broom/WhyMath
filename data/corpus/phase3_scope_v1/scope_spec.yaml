@@ -138,7 +138,7 @@ concepts:
     primary_atom_code: "12미적Ⅰ-02-06-1"
     core: true
     probe_verdict: partial
-    probe_note: "일부 가능(Kiki 2026-10-02). c값 검산이 구간 소속을 보지 않아 구간 밖 근이 정답으로 통과한다."
+    probe_note: "일부 가능(Kiki 2026-10-02). c값 검산이 구간 소속을 보지 않아 구간 밖 근이 정답으로 통과한다. 구간 소속 검산 추가는 P3-19 가 소유한다."
   - code: "[12미적Ⅰ-02-07]"
     concept_id: math.calculus.hamsuui-jeungga-gamsowa-geukdae-geukso
     source_id: "H:12미적Ⅰ02-07"
@@ -151,14 +151,14 @@ concepts:
     primary_atom_code: "12미적Ⅰ-02-08-1"
     core: true
     probe_verdict: replaced_by_derived
-    probe_note: "처분 (나)(Kiki 2026-10-02). 개형 그림 문항은 두지 않고 파생 판정(극값 개수·증감 구간·극값의 x좌표/값)으로 문항화한다. 분모에서는 빠지지 않는다."
+    probe_note: "처분 (나)(Kiki 2026-10-02). 개형 그림 문항은 두지 않고 파생 판정(극값 개수·증감 구간·극값의 x좌표/값)으로 문항화한다. 분모에서는 빠지지 않는다. 단, 실측된 것은 극값 개수뿐이다 — 증감 구간·극값의 x좌표/값은 아직 프로브하지 않았으며 P3-21 이 측정한다(불가가 나오면 문항화 형태를 다시 정한다)."
   - code: "[12미적Ⅰ-02-09]"
     concept_id: math.calculus.bangjeongsik-budeungsikeui-hwalyong
     source_id: "H:12미적Ⅰ02-09"
     primary_atom_code: "12미적Ⅰ-02-09-1"
     core: true
     probe_verdict: partial
-    probe_note: "일부 가능(Kiki 2026-10-02). 수치형 실근 개수만 검증된다 — 매개변수(k) 범위형은 검증기가 없다."
+    probe_note: "일부 가능(Kiki 2026-10-02). 수치형 실근 개수만 검증된다 — 매개변수(k) 범위형은 검증기가 없다. 범위형 문항이 실제로 필요한지는 P3-20 이 먼저 판정한다."
   - code: "[12미적Ⅰ-02-10]"
     concept_id: math.calculus.sokdowa-gasokdo
     source_id: "H:12미적Ⅰ02-10"
