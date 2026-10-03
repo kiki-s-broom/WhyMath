@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-174-review-timer-fingerprint-db-seat
+title: "review_timer_event에 content_fingerprint DB 컬럼 좌석 신설 — EOS-27 지문이 JSONL 매체에서만 운반되는 한계 해소"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-27-review-content-fingerprint
+requires_gates: []
+acceptance:
+  - "review_timer_event 테이블에 content_fingerprint 컬럼 좌석을 신설한다(alembic 리비전 + prod 스키마 프로브 등재 + 기능 인벤토리 귀속). 현재 ORM.from_schema는 지문이 실린 이벤트를 ValueError로 거부한다(EOS-27이 조용한 소실 대신 택한 임시 조치). 완료 시 그 거부를 제거하고 왕복(from_schema/to_schema)이 지문을 보존함을 테스트로 동결한다. 신규 컬럼은 nullable·server_default 없음(백필로 지문을 날조하지 않는다)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/db/models/review_timer_event.py
+session: null
+notes: "출처: EOS-27 계약 문서 docs/standards/review_status_stamping_contract.md 9.5 첫 항목. 지문은 현재 JSONL 매체(검수 CLI, 각인 도구, 승격 게이트)에서만 운반된다. infra-contracts 잡(인벤토리 전수 귀속, 스키마 프로브)이 닿는 변경이라 착수 시 그 잡의 스텝을 로컬에서 맞출 것."
+updated: 2026-10-03

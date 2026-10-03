@@ -157,6 +157,19 @@ class TestSchemaOrmRoundTrip:
         restored = orm.to_schema()
         assert restored == original
 
+    def test_from_schema_refuses_a_fingerprint_instead_of_silently_dropping_it(self) -> None:
+        """EOS-27 — DB에는 지문 컬럼 좌석이 없다. mapper 필터가 조용히 버리면 '저장했다'고 믿는 소비자가
+        생기므로 크게 거부한다(지문은 JSONL 매체에서만 운반된다 — 좌석 신설은 후속 태스크)."""
+        schema = SchemaReviewTimerEvent(
+            review_session_id=uuid.uuid4(),
+            cu_slug="cu-x",
+            reviewer_id="kiki",
+            event_type="started",
+            content_fingerprint="sha256:" + "a" * 64,
+        )
+        with pytest.raises(ValueError, match="content_fingerprint"):
+            ReviewTimerEvent.from_schema(schema)
+
     def test_from_schema_omits_none_recorded_at(self) -> None:
         """recorded_at=None(기본)은 속성 미설정 — server_default 적용(EOS-45 동형)."""
         schema = SchemaReviewTimerEvent(
