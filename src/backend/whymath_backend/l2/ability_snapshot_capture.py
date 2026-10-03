@@ -66,7 +66,7 @@ class AbilityCaptureOutcome(enum.StrEnum):
 
 
 async def _count_graded_attempts(session: AsyncSession, user_id: uuid.UUID) -> int:
-    """채점된 시도 수 — `estimate_global_ability`의 응답 후보(`is_correct IS NOT NULL`)와 같은 기준."""
+    """채점된 시도 수 — 추정의 응답 후보와 같은 기준(`is_correct IS NOT NULL`)."""
     stmt = select(func.count()).where(
         ProblemAttempt.user_id == user_id,
         ProblemAttempt.is_correct.isnot(None),
