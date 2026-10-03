@@ -1100,7 +1100,10 @@ CATALOG: tuple[Spec, ...] = (
        "harness.concept_content_review_batch", "harness.concept_content_audit",
        # MP-05 — 회차 앞머리 카나리 구간을 검수 큐 JSONL로 잘라내는 CLI. 검수 워크플로의
        # *입력 생산자*라 여기 귀속한다(산출을 먹는 쪽이 harness.review_session이다).
-       "harness.canary_slice"),
+       "harness.canary_slice",
+       # CONT-08 — 검수 입력(배치 프롬프트)·승격 게이트(apply)가 같은 연결 원자를 보게 하는
+       # 읽기 전용 컨텍스트 공급자. 검수 워크플로의 *입력 공급자*라 여기 귀속한다.
+       "harness.concept_content_link_context"),
     _o("WM-O-911", "골든 벤치마크 승격·경로 게이트·앵커 회차 대장", "Admin", "QA", "P0",
        "EOS-60/64 — 판정기의 FN율", "harness.golden_benchmark",
        "harness.golden_promotion_gate", "harness.anchor_round_ledger",
