@@ -346,6 +346,14 @@
 - **판정 3 — EOS-50 `content_hash`와 함수 공유 안 함**: 레시피만 같고 입력(개념 버전 payload vs 문항 레코드)이 다르다.
 - **한계**: 지문은 JSONL 매체에서만 운반(DB 좌석은 `EOS-174`로 분리 — ORM은 조용히 버리지 않고 ValueError) · 변조 방지가 아니라 변경 탐지(이벤트 파일까지 함께 고치면 못 본다) · 큐 모드 지문은 `candidate_payload` 기준. 정본 = `docs/standards/review_status_stamping_contract.md` 9절.
 - **검증**: 뮤테이션 15건 전건 RED(주입 적용·원복 바이트 동일 단언) · 실 파이프라인 E2E(승인→각인→손편집→차단, 편집→각인 거부, 재검수로 해소) · ruff·black·mypy --strict·lint-imports·헌법 래칫·`tests/infra` 2386·`tests/harness` 1588 통과. 백엔드 전체 스위트는 CI가 최종 판정.
+### 2026-10-03 (판정·착지 · EOS-127): **상태 머신 R4(선수결손)는 배선하지 않고 삭제한다 — 비용은 문제가 아니었다(`max_depth=1` 선수 조회 p50 2.3ms · 생산자 전체 p95 7~128ms). 배제 사유는 중복과 가로채기다: 선수 하강은 이미 R6 → 다음 문항 선택(EOS-26·124)이 요청 시점에 실 PG 검증된 채 수행하고, 그 경로는 R3·R6 결정만 읽으므로 R4가 발화하면 R6 하강을 막는다. R4a 예외도 소멸. 원장 enum 라벨 `POLICY_PREREQUISITE_GAP`만 은퇴 표기로 남긴다** (claude 판정·구현) — 판정 기준 main `381ec106`
+
+- **판정문**: `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md` (실측 표·변경 표·뮤테이션·남은 구멍 5건).
+- **EOS-105의 "무겁다"는 추정이었고 틀렸다**: 실 PG 600개념·학습자 시도 50/500/5,000건에서 CTE `max_depth=1` p50 2.2~2.4ms, 생산자 전체 p50 5.8/11.1/62.7ms · p95 7.1/13.7/127.8ms. 시간은 CTE가 아니라 학습자 전체 이력을 읽는 `compute_concept_diagnoses`에 비례한다.
+- **지운 것**: 규칙 `R4-prerequisite-gap` · `AttemptEvidence.prerequisite_gap_concept_ids` · 조립기 인자 · `NextActionKind.GO_TO_PREREQUISITE_CONCEPT` · 전이표 `ASSESSING → LEARNING`. **남긴 것**: PG enum 라벨 `POLICY_PREREQUISITE_GAP`(추가 전용 원장 — 지우면 타입 재생성 마이그레이션 + 값이 적힌 행이 있다면 읽기 `LookupError`) → `RETIRED_POLICY_TRIGGERS` 은퇴 표기 + "트리거 전수 = 규칙 트리거 ∪ 은퇴" 동결.
+- **검증**: 단위 285 passed · 실 PG 통합 38 passed(skip 0) · 새 동결 테스트 4종 뮤테이션 4/4 RED(주입마다 의도한 테스트 1건만 실패 · 원복 sha256 동일). `SCENARIO-003 ③`은 "R4 미발화 동결"에서 "R6이고 하강은 추천이 한다"로 승격.
+- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행 0건은 추론이지 실측이 아니다(Kiki가 prod에서 읽기 전용 1줄로 확인 가능 — PR 본문). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
+- **교훈(사고 아님)**: 비용 벤치가 같은 DB에 심은 문항 1,800건이 `next-problem` 전역 풀을 오염시켜 통합 5건이 거짓 실패했다 → DB를 새로 만들어 제거 실험으로 확인. 통합 테스트 기본 skip을 통과로 읽을 뻔한 것(69 skipped)은 즉시 플래그를 켜 재실행해 막았다.
 
 ### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
 

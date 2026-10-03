@@ -12,13 +12,13 @@
 #   level     : 목표 통제 강도 (L1~L5)
 #   check     : 집행 장치 파일 경로 (저장소 최상위 기준). 이 파일이 없으면 '집행 장치 없음'
 #   run       : 검사 실행 명령. 성공 = 종료 코드 0. L5 규칙은 위헌 심사 때 실제로 실행됨
-#   stage     : 이식 단계 (1~5). 해당 단계 전까지는 '집행 장치 없음'이 정상
+#   stage     : 이식 단계 (1~6). 해당 단계 전까지는 '집행 장치 없음'이 정상
 #   precedent : (선택) 이 규칙을 만든 판례 번호
 #
 # ⚠ check·run의 경로는 '제안 경로'다. 실제 저장소 구조에 맞게 사람이 조정한다.
 # ─────────────────────────────────────────────────────────────
 
-version: "1.0"
+version: "1.0.1"
 
 rules:
 
@@ -169,6 +169,829 @@ rules:
     run: pytest -q tests/test_docs_numbers.py
     stage: 3
 
+
+  # ── 파트 II ──
+  - id: R5-01
+    article: "제7조의2"
+    chapter: 5
+    axis: "경계"
+    statement: "모듈 의존 방향은 api → infra → subject_* → eos_core 이며 역방향 import를 금지한다"
+    level: L5
+    check: ".importlinter"
+    run: "lint-imports"
+    stage: 3
+    precedent: null
+  - id: R5-02
+    article: "제7조의2"
+    chapter: 5
+    axis: "경계"
+    statement: "eos_core는 DB 드라이버·AI SDK를 직접 import하지 않는다"
+    level: L5
+    check: ".importlinter"
+    run: "lint-imports"
+    stage: 3
+    precedent: null
+  - id: R6-01
+    article: "제7조의2"
+    chapter: 6
+    axis: "진실"
+    statement: "AI 출력과 외부 입력은 경계에서 스키마로 파싱하며, 실패하면 재시도 후 격리한다"
+    level: L5
+    check: "tests/constitution/test_ai_output_parsing.py"
+    run: "pytest -q tests/constitution/test_ai_output_parsing.py"
+    stage: 3
+    precedent: null
+  - id: R6-02
+    article: "제7조의2"
+    chapter: 6
+    axis: "변경"
+    statement: "스키마 변경은 과거 실제 데이터 표본으로 호환성 테스트를 통과해야 한다"
+    level: L5
+    check: "tests/constitution/test_schema_compat.py"
+    run: "pytest -q tests/constitution/test_schema_compat.py"
+    stage: 3
+    precedent: null
+  - id: R6-03
+    article: "제7조의2"
+    chapter: 6
+    axis: "진실"
+    statement: "경계를 넘는 모든 데이터 스키마에는 schema_version 필드가 있다"
+    level: L5
+    check: "scripts/constitution/check_schema_version.py"
+    run: "python scripts/constitution/check_schema_version.py"
+    stage: 3
+    precedent: null
+  - id: R7-01
+    article: "제7조의2"
+    chapter: 7
+    axis: "진실"
+    statement: "문항 상태는 status 한 컬럼으로만 표현하며 상태를 뜻하는 불리언 플래그 컬럼을 두지 않는다"
+    level: L5
+    check: "tests/constitution/test_no_state_flags.py"
+    run: "pytest -q tests/constitution/test_no_state_flags.py"
+    stage: 5
+    precedent: null
+  - id: R7-02
+    article: "제7조의2"
+    chapter: 7
+    axis: "흐름"
+    statement: "상태 전이는 전이표(item_transitions)에 있는 것만 DB가 허용한다"
+    level: L5
+    check: "db/constraints/item_transition_trigger.sql"
+    run: "pytest -q tests/constitution/test_item_transitions.py"
+    stage: 5
+    precedent: null
+  - id: R8-01
+    article: "제7조의2"
+    chapter: 8
+    axis: "경계"
+    statement: "비밀값(API 키·비밀번호·암호화 키)은 저장소에 커밋될 수 없다"
+    level: L5
+    check: ".pre-commit-config.yaml"
+    run: "pre-commit run gitleaks --all-files"
+    stage: 3
+    precedent: null
+  - id: R8-02
+    article: "제8조"
+    chapter: 8
+    axis: "경계"
+    statement: "앱 빌드 산출물에 서버용 비밀 키 패턴이 없어야 한다"
+    level: L5
+    check: "scripts/constitution/scan_app_bundle.py"
+    run: "python scripts/constitution/scan_app_bundle.py"
+    stage: 4
+    precedent: null
+  - id: R8-03
+    article: "제7조의2"
+    chapter: 8
+    axis: "회복"
+    statement: "서버는 필수 설정이 빠지면 시작하지 않고 즉시 종료한다"
+    level: L5
+    check: "tests/constitution/test_settings_failfast.py"
+    run: "pytest -q tests/constitution/test_settings_failfast.py"
+    stage: 3
+    precedent: null
+  - id: R8-04
+    article: "제7조의5"
+    chapter: 8
+    axis: "회복"
+    statement: "백업 암호화 비밀키는 백업과 다른 곳 2곳 이상에 보관하고 위치를 기록한다"
+    level: L2
+    check: "docs/ops/KEYS.md"
+    stage: 1
+    precedent: null
+
+  # ── 파트 III ──
+  - id: R9-01
+    article: "제7조의3"
+    chapter: 9
+    axis: "변경"
+    statement: "커밋 메시지는 Conventional Commits 형식(content 타입 포함)을 따른다"
+    level: L5
+    check: "scripts/constitution/check_commit_msg.py"
+    run: "python scripts/constitution/check_commit_msg.py --last"
+    stage: 3
+    precedent: null
+  - id: R9-02
+    article: "제7조의3"
+    chapter: 9
+    axis: "변경"
+    statement: "한 커밋의 변경 파일이 25개를 넘으면 경고한다"
+    level: L4
+    check: "scripts/constitution/check_commit_msg.py"
+    run: "python scripts/constitution/check_commit_msg.py --last --size"
+    stage: 3
+    precedent: null
+  - id: R9-03
+    article: "제7조의3"
+    chapter: 9
+    axis: "변경"
+    statement: "코드 변경과 콘텐츠 변경을 한 커밋에 섞으면 경고한다"
+    level: L4
+    check: "scripts/constitution/check_commit_msg.py"
+    run: "python scripts/constitution/check_commit_msg.py --last --mixed"
+    stage: 3
+    precedent: null
+  - id: R10-01
+    article: "제7조의3"
+    chapter: 10
+    axis: "변경"
+    statement: "DB 스키마는 migrations/ 파일로만 바꾸며, 적용된 마이그레이션 파일은 수정하지 않는다"
+    level: L5
+    check: "scripts/constitution/check_migrations.py"
+    run: "python scripts/constitution/check_migrations.py"
+    stage: 3
+    precedent: null
+  - id: R10-02
+    article: "제7조의3"
+    chapter: 10
+    axis: "변경"
+    statement: "DROP·RENAME이 든 마이그레이션은 contract 표식과 선행 expand 번호가 있어야 한다"
+    level: L5
+    check: "scripts/constitution/check_migrations.py"
+    run: "python scripts/constitution/check_migrations.py"
+    stage: 3
+    precedent: null
+  - id: R10-03
+    article: "제7조의5"
+    chapter: 10
+    axis: "회복"
+    statement: "마이그레이션은 자동 백업을 만들고 확인한 뒤에만 적용된다"
+    level: L5
+    check: "scripts/db/migrate.py"
+    run: "pytest -q tests/constitution/test_migrate_backup_first.py"
+    stage: 5
+    precedent: null
+  - id: R11-01
+    article: "제7조의3"
+    chapter: 11
+    axis: "변경"
+    statement: "린트 위반 수는 파일별 기준선보다 늘어날 수 없다 (래칫)"
+    level: L5
+    check: "scripts/constitution/ratchet.py"
+    run: "python scripts/constitution/ratchet.py"
+    stage: 3
+    precedent: null
+  - id: R11-02
+    article: "제11조"
+    chapter: 11
+    axis: "변경"
+    statement: "기준선은 줄어드는 방향으로만 갱신되며, 늘리려면 개정 기록이 필요하다"
+    level: L5
+    check: "scripts/constitution/ratchet.py"
+    run: "python scripts/constitution/ratchet.py --verify-monotonic"
+    stage: 3
+    precedent: null
+
+  # ── 파트 IV ──
+  - id: R12-01
+    article: "제7조의4"
+    chapter: 12
+    axis: "확신"
+    statement: "단위 테스트는 네트워크에 접속하지 않는다"
+    level: L5
+    check: "tests/conftest.py"
+    run: "pytest -q -m unit --disable-socket"
+    stage: 3
+    precedent: null
+  - id: R12-02
+    article: "제7조의4"
+    chapter: 12
+    axis: "확신"
+    statement: "fix: 커밋에는 재현 테스트 변경이 함께 있어야 한다"
+    level: L4
+    check: "scripts/constitution/check_commit_msg.py"
+    run: "python scripts/constitution/check_commit_msg.py --last --fix-has-test"
+    stage: 3
+    precedent: null
+  - id: R12-03
+    article: "제7조의4"
+    chapter: 12
+    axis: "확신"
+    statement: "단위 테스트 전체 실행 시간은 60초 이내여야 한다"
+    level: L4
+    check: "scripts/constitution/test_budget.py"
+    run: "python scripts/constitution/test_budget.py"
+    stage: 4
+    precedent: null
+  - id: R13-01
+    article: "제7조의4"
+    chapter: 13
+    axis: "확신"
+    statement: "정답 재도출 검증은 생성 단계의 정답을 입력으로 받지 않는다 (블라인드)"
+    level: L5
+    check: "tests/constitution/test_derive_verify_blind.py"
+    run: "pytest -q tests/constitution/test_derive_verify_blind.py"
+    stage: 3
+    precedent: null
+  - id: R13-02
+    article: "제7조의4"
+    chapter: 13
+    axis: "확신"
+    statement: "재도출 검증은 생성과 다른 방법(CAS) 또는 다른 모델 계열을 쓴다"
+    level: L5
+    check: "tests/constitution/test_verifier_diversity.py"
+    run: "pytest -q tests/constitution/test_verifier_diversity.py"
+    stage: 3
+    precedent: null
+  - id: R13-03
+    article: "제7조의4"
+    chapter: 13
+    axis: "확신"
+    statement: "검증 층 간 일치율이 4주 연속 100%이면 경고한다 (복사 의심)"
+    level: L4
+    check: "scripts/constitution/layer_agreement.py"
+    run: "python scripts/constitution/layer_agreement.py"
+    stage: 6
+    precedent: null
+  - id: R14-01
+    article: "제7조의4"
+    chapter: 14
+    axis: "확신"
+    statement: "저장소의 모든 .py 파일은 린트 검사 범위 안에 있어야 한다"
+    level: L5
+    check: "scripts/constitution/lint_scope.py"
+    run: "python scripts/constitution/lint_scope.py"
+    stage: 3
+    precedent: null
+  - id: R14-02
+    article: "제7조의4"
+    chapter: 14
+    axis: "확신"
+    statement: "검사 도구(ruff·mypy·pytest 등) 버전은 잠금 파일로 고정한다"
+    level: L5
+    check: "requirements-dev.lock"
+    run: "python scripts/constitution/check_tool_pins.py"
+    stage: 3
+    precedent: null
+  - id: R14-03
+    article: "제7조의4"
+    chapter: 14
+    axis: "확신"
+    statement: "Dart 분석은 info 수준까지 실패로 처리한다"
+    level: L5
+    check: "app/analysis_options.yaml"
+    run: "flutter analyze --fatal-infos"
+    stage: 3
+    precedent: null
+
+  # ── 파트 V ──
+  - id: R15-01
+    article: "제7조의5"
+    chapter: 15
+    axis: "회복"
+    statement: "백엔드 코드는 print() 대신 구조화 로그를 쓴다"
+    level: L5
+    check: "pyproject.toml"
+    run: "ruff check --select T20 backend"
+    stage: 3
+    precedent: null
+  - id: R15-02
+    article: "제7조의5"
+    chapter: 15
+    axis: "회복"
+    statement: "모든 배치는 run_id와 created·skip·failed 요약을 구조화 로그로 남긴다"
+    level: L4
+    check: "tests/constitution/test_batch_summary_log.py"
+    run: "pytest -q tests/constitution/test_batch_summary_log.py"
+    stage: 4
+    precedent: null
+  - id: R15-03
+    article: "제8조"
+    chapter: 15
+    axis: "경계"
+    statement: "로그에 개인정보가 평문으로 남지 않는다"
+    level: L5
+    check: "tests/constitution/test_log_pii_mask.py"
+    run: "pytest -q tests/constitution/test_log_pii_mask.py"
+    stage: 3
+    precedent: null
+  - id: R16-01
+    article: "제7조의5"
+    chapter: 16
+    axis: "회복"
+    statement: "백업 파일은 age 암호화 헤더와 최소 크기 검사를 통과해야 한다"
+    level: L5
+    check: "scripts/constitution/check_backups.py"
+    run: "python scripts/constitution/check_backups.py"
+    stage: 4
+    precedent: null
+  - id: R16-02
+    article: "제7조의5"
+    chapter: 16
+    axis: "회복"
+    statement: "마지막 복원 훈련이 35일 이상 지나면 경고한다"
+    level: L4
+    check: "scripts/constitution/check_backups.py"
+    run: "python scripts/constitution/check_backups.py --drill-age"
+    stage: 4
+    precedent: null
+  - id: R16-03
+    article: "제7조의5"
+    chapter: 16
+    axis: "회복"
+    statement: "최근 48시간 백업 사본이 서로 다른 위치 2곳 이상에 있어야 한다"
+    level: L4
+    check: "scripts/constitution/check_backups.py"
+    run: "python scripts/constitution/check_backups.py --copies"
+    stage: 4
+    precedent: null
+  - id: R17-01
+    article: "제11조"
+    chapter: 17
+    axis: "회복"
+    statement: "모든 판례의 '이제 무엇이 막는가'에는 규칙 ID가 하나 이상 있다"
+    level: L5
+    check: "scripts/constitution/check_precedents.py"
+    run: "python scripts/constitution/check_precedents.py"
+    stage: 3
+    precedent: null
+  - id: R17-02
+    article: "제11조"
+    chapter: 17
+    axis: "회복"
+    statement: "게이트 우회(bypass) 기록마다 판례가 있다"
+    level: L4
+    check: "scripts/constitution/check_precedents.py"
+    run: "python scripts/constitution/check_precedents.py --bypass"
+    stage: 5
+    precedent: null
+
+  # ── 파트 VI ──
+  - id: R18-01
+    article: "제9조"
+    chapter: 18
+    axis: "흐름"
+    statement: "task/ 브랜치에는 목표·범위·완료 조건을 적은 TASK.md가 있다"
+    level: L4
+    check: "scripts/constitution/check_task_card.py"
+    run: "python scripts/constitution/check_task_card.py"
+    stage: 4
+    precedent: null
+  - id: R18-02
+    article: "제9조"
+    chapter: 18
+    axis: "경계"
+    statement: "AI는 TASK.md의 수정 허용 범위 밖 파일을 편집할 수 없다"
+    level: L5
+    check: ".claude/hooks/guard_scope.py"
+    run: "python scripts/constitution/selftest_scope_guard.py"
+    stage: 4
+    precedent: null
+  - id: R18-03
+    article: "제9조"
+    chapter: 18
+    axis: "확신"
+    statement: "테스트 잠금이 선언된 작업에서 AI는 tests/를 수정할 수 없다"
+    level: L5
+    check: ".claude/hooks/guard_scope.py"
+    run: "python scripts/constitution/selftest_scope_guard.py"
+    stage: 4
+    precedent: null
+  - id: R18-04
+    article: "제9조"
+    chapter: 18
+    axis: "변경"
+    statement: "작업 1건의 변경이 400줄 또는 파일 10개를 넘으면 경고한다"
+    level: L4
+    check: "scripts/constitution/check_task_card.py"
+    run: "python scripts/constitution/check_task_card.py --size"
+    stage: 4
+    precedent: null
+  - id: R19-01
+    article: "제9조"
+    chapter: 19
+    axis: "확신"
+    statement: "검토 도구는 사람이 판정을 입력하기 전에 AI 참고 판정을 보여주지 않는다"
+    level: L5
+    check: "tests/constitution/test_review_blind.py"
+    run: "pytest -q tests/constitution/test_review_blind.py"
+    stage: 4
+    precedent: null
+  - id: R19-02
+    article: "제9조"
+    chapter: 19
+    axis: "확신"
+    statement: "검토 세션에는 정답을 아는 보정 문항이 10% 이상 섞인다"
+    level: L5
+    check: "tests/constitution/test_gold_injection.py"
+    run: "pytest -q tests/constitution/test_gold_injection.py"
+    stage: 4
+    precedent: null
+  - id: R19-03
+    article: "제9조"
+    chapter: 19
+    axis: "확신"
+    statement: "보정 문항 정답률 80% 미만인 세션의 판정은 재검토 대상으로 표시된다"
+    level: L4
+    check: "scripts/constitution/review_health.py"
+    run: "python scripts/constitution/review_health.py --gold"
+    stage: 4
+    precedent: null
+
+  # ── 파트 VII ──
+  - id: R20-01
+    article: "제8조의2"
+    chapter: 20
+    axis: "흐름"
+    statement: "개념 그래프에는 선수 관계 순환이 없다"
+    level: L5
+    check: "scripts/constitution/concept_graph_check.py"
+    run: "python scripts/constitution/concept_graph_check.py"
+    stage: 3
+    precedent: null
+  - id: R20-02
+    article: "제8조의2"
+    chapter: 20
+    axis: "진실"
+    statement: "모든 개념 노드는 원본 목록에 실재하는 성취기준 1개 이상에 연결된다 (보조 노드는 표식)"
+    level: L5
+    check: "scripts/constitution/concept_graph_check.py"
+    run: "python scripts/constitution/concept_graph_check.py"
+    stage: 3
+    precedent: null
+  - id: R20-03
+    article: "제8조의2"
+    chapter: 20
+    axis: "진실"
+    statement: "선수 노드의 학년은 대상 노드보다 높을 수 없다 (허용목록 예외)"
+    level: L5
+    check: "scripts/constitution/concept_graph_check.py"
+    run: "python scripts/constitution/concept_graph_check.py"
+    stage: 3
+    precedent: null
+  - id: R20-04
+    article: "제8조의2"
+    chapter: 20
+    axis: "진실"
+    statement: "추이적으로 중복된 선수 간선은 경고한다"
+    level: L4
+    check: "scripts/constitution/concept_graph_check.py"
+    run: "python scripts/constitution/concept_graph_check.py --redundant"
+    stage: 3
+    precedent: null
+  - id: R20-05
+    article: "제8조의2"
+    chapter: 20
+    axis: "변경"
+    statement: "한 번 발급된 노드 ID는 삭제·재사용하지 않고 deprecated로만 표시한다"
+    level: L5
+    check: "scripts/constitution/concept_graph_check.py"
+    run: "python scripts/constitution/concept_graph_check.py --id-history"
+    stage: 3
+    precedent: null
+  - id: R21-01
+    article: "제8조의2"
+    chapter: 21
+    axis: "확신"
+    statement: "콘텐츠 파일은 스키마·필수 필드·LaTeX 괄호 린트를 통과한다"
+    level: L5
+    check: "scripts/constitution/content_lint.py"
+    run: "python scripts/constitution/content_lint.py"
+    stage: 3
+    precedent: null
+  - id: R21-02
+    article: "제8조의2"
+    chapter: 21
+    axis: "진실"
+    statement: "학습자 응답은 (item_id, revision)을 함께 기록한다"
+    level: L5
+    check: "tests/constitution/test_response_revision.py"
+    run: "pytest -q tests/constitution/test_response_revision.py"
+    stage: 5
+    precedent: null
+  - id: R21-03
+    article: "제8조의2"
+    chapter: 21
+    axis: "변경"
+    statement: "콘텐츠 릴리스는 매니페스트(버전·해시)로 원자적으로 배포·롤백된다"
+    level: L4
+    check: "scripts/content/release.py"
+    run: "python scripts/content/release.py --verify"
+    stage: 5
+    precedent: null
+  - id: R21-04
+    article: "제8조"
+    chapter: 21
+    axis: "진실"
+    statement: "콘텐츠 문자열(특히 수식)에 제어 문자가 있으면 실패한다 (YAML 이스케이프 손상 탐지)"
+    level: L5
+    check: "scripts/constitution/content_lint.py"
+    run: "python scripts/constitution/content_lint.py --control-chars"
+    stage: 3
+    precedent: null
+  - id: R22-01
+    article: "제8조"
+    chapter: 22
+    axis: "확신"
+    statement: "CAS로 검증 가능한 문항은 정답 선지가 정확히 1개임을 확인한다"
+    level: L5
+    check: "tests/constitution/test_single_correct.py"
+    run: "pytest -q tests/constitution/test_single_correct.py"
+    stage: 3
+    precedent: null
+  - id: R22-02
+    article: "제8조"
+    chapter: 22
+    axis: "확신"
+    statement: "모든 수식은 KaTeX 파싱을 통과한다"
+    level: L5
+    check: "scripts/constitution/katex_check.js"
+    run: "node scripts/constitution/katex_check.js content"
+    stage: 3
+    precedent: null
+  - id: R22-03
+    article: "제8조"
+    chapter: 22
+    axis: "경계"
+    statement: "학생 입력 수식은 허용 문자 검사를 통과한 뒤에만 CAS로 파싱한다"
+    level: L5
+    check: "tests/constitution/test_safe_parse.py"
+    run: "pytest -q tests/constitution/test_safe_parse.py"
+    stage: 3
+    precedent: null
+  - id: R23-01
+    article: "제8조의2"
+    chapter: 23
+    axis: "진실"
+    statement: "응답 이벤트 테이블은 추가만 가능하다 (UPDATE·DELETE 차단)"
+    level: L5
+    check: "db/constraints/responses_append_only.sql"
+    run: "pytest -q tests/constitution/test_responses_append_only.py"
+    stage: 5
+    precedent: null
+  - id: R23-02
+    article: "제8조의2"
+    chapter: 23
+    axis: "진실"
+    statement: "모든 숙달 판정 기록에는 model_version이 있다"
+    level: L5
+    check: "tests/constitution/test_mastery_version.py"
+    run: "pytest -q tests/constitution/test_mastery_version.py"
+    stage: 5
+    precedent: null
+  - id: R23-03
+    article: "제8조의2"
+    chapter: 23
+    axis: "확신"
+    statement: "BKT 파라미터는 퇴화 방지 범위(추측 ≤ 0.3, 실수 ≤ 0.1)를 지킨다"
+    level: L5
+    check: "tests/constitution/test_bkt_params.py"
+    run: "pytest -q tests/constitution/test_bkt_params.py"
+    stage: 3
+    precedent: null
+  - id: R23-04
+    article: "제8조의2"
+    chapter: 23
+    axis: "변경"
+    statement: "모델·파라미터 변경은 과거 응답 재생 비교 보고서가 있어야 배포된다"
+    level: L5
+    check: "scripts/constitution/replay_compare.py"
+    run: "python scripts/constitution/replay_compare.py --check-latest"
+    stage: 6
+    precedent: null
+  - id: R24-01
+    article: "제8조의2"
+    chapter: 24
+    axis: "확신"
+    statement: "문항 통계(정답률·변별도·선지 선택률)를 주 1회 계산한다"
+    level: L4
+    check: "scripts/analytics/item_stats.py"
+    run: "python scripts/analytics/item_stats.py --freshness"
+    stage: 6
+    precedent: null
+  - id: R24-02
+    article: "제8조"
+    chapter: 24
+    axis: "확신"
+    statement: "응답 30건 이상에서 변별도가 -0.1 미만인 문항은 자동 격리된다"
+    level: L5
+    check: "scripts/analytics/item_stats.py"
+    run: "python scripts/analytics/item_stats.py --quarantine-check"
+    stage: 6
+    precedent: null
+  - id: R24-03
+    article: "제8조의2"
+    chapter: 24
+    axis: "진실"
+    statement: "문항 난이도에는 출처(ai_estimate / empirical)가 표기된다"
+    level: L5
+    check: "tests/constitution/test_difficulty_source.py"
+    run: "pytest -q tests/constitution/test_difficulty_source.py"
+    stage: 3
+    precedent: null
+  - id: R25-01
+    article: "제8조"
+    chapter: 25
+    axis: "확신"
+    statement: "튜터 응답은 출력 가드를 통과해야 학생에게 전달된다"
+    level: L5
+    check: "tests/constitution/test_tutor_guard.py"
+    run: "pytest -q tests/constitution/test_tutor_guard.py"
+    stage: 4
+    precedent: null
+  - id: R25-02
+    article: "제8조"
+    chapter: 25
+    axis: "확신"
+    statement: "프롬프트·모델 변경 시 튜터 평가셋 통과율이 기준선 이상이어야 한다"
+    level: L5
+    check: "scripts/constitution/tutor_eval.py"
+    run: "python scripts/constitution/tutor_eval.py --ratchet"
+    stage: 4
+    precedent: null
+  - id: R25-03
+    article: "제8조"
+    chapter: 25
+    axis: "경계"
+    statement: "위기 신호가 담긴 입력에는 정해진 안전 응답과 도움 경로가 반환된다"
+    level: L5
+    check: "tests/constitution/test_crisis_path.py"
+    run: "pytest -q tests/constitution/test_crisis_path.py"
+    stage: 4
+    precedent: null
+  - id: R25-04
+    article: "제9조"
+    chapter: 25
+    axis: "진실"
+    statement: "프롬프트는 prompts/ 파일로 버전 관리하며 코드 안 문자열로 두지 않는다"
+    level: L4
+    check: "scripts/constitution/check_prompts.py"
+    run: "python scripts/constitution/check_prompts.py"
+    stage: 3
+    precedent: null
+  - id: R26-01
+    article: "제8조"
+    chapter: 26
+    axis: "경계"
+    statement: "개인정보 인벤토리에 없는 개인정보 필드는 저장할 수 없다"
+    level: L5
+    check: "scripts/constitution/check_pii_inventory.py"
+    run: "python scripts/constitution/check_pii_inventory.py"
+    stage: 4
+    precedent: null
+  - id: R26-02
+    article: "제8조"
+    chapter: 26
+    axis: "경계"
+    statement: "외부 AI API로 가는 요청은 개인정보 차단기를 통과한다"
+    level: L5
+    check: "tests/constitution/test_pii_scrubber.py"
+    run: "pytest -q tests/constitution/test_pii_scrubber.py"
+    stage: 3
+    precedent: null
+  - id: R26-03
+    article: "제8조"
+    chapter: 26
+    axis: "경계"
+    statement: "앱의 제3자 SDK는 허용목록에 있는 것만 쓴다"
+    level: L5
+    check: "scripts/constitution/check_sdk_allowlist.py"
+    run: "python scripts/constitution/check_sdk_allowlist.py"
+    stage: 4
+    precedent: null
+  - id: R26-04
+    article: "제8조"
+    chapter: 26
+    axis: "경계"
+    statement: "만 14세 미만 계정은 법정대리인 동의 확인 전까지 개인정보 처리 기능이 잠긴다"
+    level: L5
+    check: "tests/e2e/test_under14_consent.py"
+    run: "pytest -q tests/e2e/test_under14_consent.py"
+    stage: 5
+    precedent: null
+  - id: R27-01
+    article: "제8조"
+    chapter: 27
+    axis: "진실"
+    statement: "모든 문항은 출처 필드(유형·근거·생성 모델·라이선스)를 가진다"
+    level: L5
+    check: "tests/constitution/test_provenance_fields.py"
+    run: "pytest -q tests/constitution/test_provenance_fields.py"
+    stage: 3
+    precedent: null
+  - id: R27-02
+    article: "제8조"
+    chapter: 27
+    axis: "흐름"
+    statement: "유사도 검사 기록이 없는 문항은 게시할 수 없다"
+    level: L5
+    check: "tests/constitution/test_similarity_gate.py"
+    run: "pytest -q tests/constitution/test_similarity_gate.py"
+    stage: 5
+    precedent: null
+  - id: R27-03
+    article: "제8조"
+    chapter: 27
+    axis: "진실"
+    statement: "이미지·폰트 등 에셋은 라이선스 목록에 등록되어야 한다"
+    level: L5
+    check: "scripts/constitution/check_asset_licenses.py"
+    run: "python scripts/constitution/check_asset_licenses.py"
+    stage: 3
+    precedent: null
+  - id: R28-01
+    article: "제7조의2"
+    chapter: 28
+    axis: "경계"
+    statement: "과목 패키지끼리는 서로 import하지 않는다"
+    level: L5
+    check: ".importlinter"
+    run: "lint-imports"
+    stage: 3
+    precedent: null
+  - id: R28-02
+    article: "제7조의2"
+    chapter: 28
+    axis: "경계"
+    statement: "모든 과목 어댑터는 코어가 소유한 계약 테스트를 통과한다"
+    level: L5
+    check: "tests/contract/test_subject_contract.py"
+    run: "pytest -q tests/contract"
+    stage: 3
+    precedent: null
+  - id: R28-03
+    article: "제7조의2"
+    chapter: 28
+    axis: "경계"
+    statement: "허수아비 과목 어댑터가 계약 테스트를 통과해 코어의 과목 독립성을 증명한다"
+    level: L5
+    check: "tests/contract/test_subject_contract.py"
+    run: "pytest -q tests/contract -k dummy"
+    stage: 3
+    precedent: null
+  - id: R28-04
+    article: "제5조"
+    chapter: 28
+    axis: "흐름"
+    statement: "과목 어댑터는 코어 필수 게이트를 제거할 수 없다"
+    level: L5
+    check: "tests/contract/test_subject_contract.py"
+    run: "pytest -q tests/contract -k core_gates"
+    stage: 3
+    precedent: null
+  - id: R29-01
+    article: "제8조의2"
+    chapter: 29
+    axis: "확신"
+    statement: "기준 기기에서 첫 화면 3초·반응 0.1초 성능 예산을 측정한다"
+    level: L4
+    check: "scripts/perf/budget_check.py"
+    run: "python scripts/perf/budget_check.py"
+    stage: 5
+    precedent: null
+  - id: R29-02
+    article: "제8조"
+    chapter: 29
+    axis: "회복"
+    statement: "네트워크가 끊겨도 작성 중인 답안이 보존된다"
+    level: L5
+    check: "app/integration_test/offline_draft_test.dart"
+    run: "flutter test integration_test/offline_draft_test.dart"
+    stage: 5
+    precedent: null
+  - id: R29-03
+    article: "제8조의2"
+    chapter: 29
+    axis: "진실"
+    statement: "모든 수식 콘텐츠에는 읽기 텍스트가 있다"
+    level: L5
+    check: "scripts/constitution/content_lint.py"
+    run: "python scripts/constitution/content_lint.py --a11y"
+    stage: 3
+    precedent: null
+  - id: R29-04
+    article: "제8조의2"
+    chapter: 29
+    axis: "확신"
+    statement: "교실 35명 동시 접속 부하 시험을 공개 전과 주요 변경 후 실행한다"
+    level: L4
+    check: "loadtest/classroom.py"
+    run: "python scripts/perf/loadtest_freshness.py"
+    stage: 5
+    precedent: null
+
+
 # ─────────────────────────────────────────────────────────────
 # 원본 등록부 (헌법 제7조) — 여기 없는 원본은 인정하지 않는다
 #   external: true  → 저장소 밖 원본 (존재 검사 생략, 판·버전 표기 필수)
@@ -176,42 +999,56 @@ rules:
 # ⚠ path는 제안 경로. 실제 위치로 바꾼 뒤 위헌 심사를 돌리면 누락이 드러난다.
 # ─────────────────────────────────────────────────────────────
 sources:
+  # ── v1.0.1 정정 (개정 초안 A0003 · CONST-02 · 판정 기준: 조사 main b8af6f26) ──
+  # 제안 경로 6/9가 이 저장소에 없어 위헌 심사 R4-01이 차단 7건을 냈다. 아래는 1차 조사가 코드의
+  # 실제 소비 경로(grep)로 찾고 독립 검증이 재확인한 정본 위치다. 근거 = docs/constitution_proposals/
+  # A0003_sources_registry_draft.md 와 docs/reviews/coding_constitution_crosswalk_2026-09-27.md §2.
   - name: 성취기준
-    external: true
-    path: "교육부 고시 2022 개정 수학과 교육과정 원문"
-    version: "고시 번호·판 확인 후 기입"
-    derived: [성취기준 추출 엑셀, curriculum_standards 테이블]
+    path: data/corpus/standards_v1/standards.json
+    version: "교육부 고시 제2022-33호(2022 개정 435건) + 제2015-74호(2015 개정 460건) · 코퍼스 원본 sha256 4e21d6d4424c… (2026-06-20)"
+    derived: [PG achievement_standard, PG concept_standard_link, PG curriculum_entry KR 셀, 커버리지 리포트 분모]
 
   - name: 개념 그래프 (노드·선수 관계)
-    path: content/concept_graph.yaml
-    derived: [PostgreSQL concept_nodes 적재본]
+    path: data/corpus/atom_graph_v1/graph.json
+    version: "atom_graph_v1 — 원자 백본 2,683노드·2,210엣지 (legacy 437개념 concept_graph_v1 은 감사 전용 스냅샷)"
+    derived: [PG concept·concept_edge, PG atom_node, PG atom_embedding, 시각화 Overlay]
 
   - name: 오개념 DB·오답 op-code
-    path: content/misconceptions.yaml
-    derived: [PostgreSQL misconceptions 적재본, 앱 번들]
+    path: data/corpus/misconceptions_v1/misconceptions.json
+    version: "M-id 카탈로그 843건 · kebab 탐지 카탈로그 67종(정본 docs/prompts/misconception_diagnosis.md) · op-code 10종(l4/misconception/distractor.py)"
+    derived: [PG misconception_catalog, Problem.distractor_map, 크로스링크 게이트 적재본]
 
   - name: 수능 시그니처 패턴
-    path: content/csat_patterns.yaml
-    derived: [PostgreSQL csat_patterns 적재본]
+    path: src/backend/whymath_backend/schema/enums.py
+    version: "SignaturePattern 10종 폐쇄 enum (설계 정본 schemas/v1.0/schema_v1.0.md §14.3 · 태깅 규칙 3종 signature_tagger.py)"
+    derived: [Problem.signature_patterns 배열, 코퍼스 signature_patterns 태그, L6 suneung 게이팅]
 
   - name: 문항 데이터 구조
-    path: schemas/item.schema.json
-    derived: [backend/models/item.py, app/lib/models/item.dart]
+    path: src/backend/whymath_backend/schema/problem.py
+    version: "Problem.schema_version whymath-problem 1.1.0 (설계 정본 schemas/v1.0/schema_v1.0.md §3.1)"
+    derived: [PG problem·problem_step·problem_relation (ORM), Dart problem_models.dart, API 응답 모델]
 
   - name: 파이프라인 실행 순서
     path: pipeline.yaml
-    derived: [README의 순서 설명]
+    derived: [런북·docstring의 적재 순서 설명(파생 — pipeline.yaml 이 정본)]
 
   - name: 저작권 허용 기준
-    path: docs/copyright/MathScope_저작권_종합가이드_v2.0.md
-    derived: [게시 게이트 허용 등급 목록]
+    path: docs/data/licensing_safety.md
+    version: "매트릭스 정본 (원문 docs/legal/copyright_guide_v2.md v2.0 2026-05-27 · 값 정본 docs/legal/copyright_gradient.md §4.2)"
+    derived: [ContentPool enum, METADATA_ONLY_SOURCES 검증자, 약관 스냅샷 TIER1_SOURCES, CI policy-guard]
 
   - name: EOS 기능 목록
-    path: docs/planning/WhyMath_EOS_2026_12월출시_기능재배치.xlsx
-    derived: [TODO 문서, 이슈]
+    path: scripts/analysis/eos_feature_inventory_v2.py
+    version: "기계 도출 장부 v2 (162행 · 2026-09-03) — 외부 xlsx(52·120·382 항목)와의 개수 정합은 판정 대상 아님"
+    derived: [backlog/inventory/feature_inventory_v2.yaml (비커밋 산출), backlog 태스크]
 
   - name: 학습자 응답·지식 추적 상태
     external: true
-    path: "PostgreSQL (nucbox-evo-x2 Docker 컨테이너)"
-    version: "운영 DB — 파일로 복사해 수정 후 되돌려 넣기 금지"
-    derived: [분석용 내보내기]
+    path: "PostgreSQL 운영 DB whymath-pg (Phaiakes9 Docker · 호스트 5433)"
+    version: "코드 기대 스키마 alembic head 8c19e8a611e4 · 운영 DB 스탬프 d6e7f8a9b0c1 (probe_prod_schema_revision.sql 로 확정)"
+    derived: [분석용 내보내기, 일일 학습 지표 롤업]
+
+  # ── Kiki 판단 요청(채택 시 위 목록에 추가) — 정본이 두 곳 이상인 데이터 종류 3건 ──
+  # ① 규칙 등록부: CLAUDE.md 원문 · backlog/rules.ndjson(데이터) · docs/standards/rule_index.md(렌더) · 이 파일
+  # ② LLM 모델 핀: src/backend/whymath_backend/l3/router.py LOCAL_MODEL_MATRIX · config.py · CLAUDE.md 스택 표
+  # ③ 단원·소단원 위계: atom_graph_v1(단원 217·소단원 643) · achievement_criteria_v1 · units_v1 · textbook_unit

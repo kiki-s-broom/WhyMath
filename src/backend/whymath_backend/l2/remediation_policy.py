@@ -5,10 +5,11 @@
 
 **경로 표는 여기 없다 — EOS-138 ③ 판정 요지 (3줄)**
   1. 오답 직후 "무엇을 먼저 보정하나"의 정본은 상태 머신 하나다(`l2/learning_state_policy.V1_RULES`
-     — R5 반복 실패 > R3 오개념 > R4 선수 결손).
+     — R5 반복 실패 > R3 오개념. 선수 결손 규칙 R4는 EOS-127에서 삭제됐다).
   2. 이 모듈에 있던 두 번째 순서 선언(`select_route` · RT1 선수 > RT2 오개념)은 소비처 0건이었고
      순서가 반대였다 — 정렬하지 않고 **삭제**했다(진실 원천 둘 = 유지보수 지옥).
-  3. R4가 R3를 이기는 예외(측정된 선수 결손 ∧ 교정 저항)는 R4 생산자 배선과 함께 `EOS-127`로 넘겼다.
+  3. R4가 R3를 이기는 예외(R4a: 측정된 선수 결손 ∧ 교정 저항)는 R4와 함께 소멸했다(EOS-127 —
+     R4를 삭제하는 처분이라 예외도 넣지 않는다). 선수 하강은 다음 문항 선택이 맡는다.
   판정문: `docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md`.
   재등장 방지: `tests/backend/l2/test_remediation_policy.py::TestNoRouteVocabulary`.
 
@@ -130,8 +131,9 @@ class EscalationRung(str, Enum):
     PREREQUISITE_CONCEPT = "prerequisite_concept"
     """4회 이상 — 현재 개념을 붙잡고 있는 것을 멈추고 선수 개념으로 되돌아간다.
 
-    이 등급은 반복 오류 사다리의 강도 표기이지 경로 순서가 아니다. 선수 경로 전환은 상태 머신
-    R4(와 EOS-127의 R4a 예외)가 소유한다(EOS-138 ③ 판정 §2).
+    이 등급은 반복 오류 사다리의 강도 표기이지 경로 순서가 아니다. 선수 쪽 하강은 상태 머신
+    전이가 아니라 다음 문항 선택(R6 선수 탐침 · `l2/learning_state_recommendation`)이 소유한다
+    (EOS-127 — 종전에 이 자리를 가리키던 R4는 삭제됐다).
     """
 
 
