@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/backend/whymath_backend/ops/loop_kpi_gate.py
   - src/backend/whymath_backend/privacy/erasure.py
   - "tests/backend/ops/**"
-session: null
+session: claude/laughing-cerf-l9nqgq
 notes: "EOS-141 Gate 2 3차 재판정(docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §7-1 P-2) acceptance ⑨에 따른 등재 — KPI ⑤ 측정 오염의 처분. PIPA 삭제권 표면이라 처분(가)(나)(다) 결정이 구현보다 먼저다.\n\n[정정 2026-09-29] acceptance ② 처분 판정 선행을 대장에 집행 — PIPA 삭제권 표면의 선택은 Kiki 결정이므로 결정 게이트를 붙여 selector가 결정 전 착수를 막게 한다(산문 선행만으로는 next가 이 태스크를 1순위로 올렸다)\n\n[정정 2026-09-30] evidence_event 파기 배선의 소유 경계와 재연결 경로 사실 병기 — 2026-09-30 Kiki 검토의견 승인"
-updated: 2026-09-30
+updated: 2026-10-03
