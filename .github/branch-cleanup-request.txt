@@ -320,3 +320,21 @@ claude/relaxed-fermat-8dui3u
 claude/magical-maxwell-hja5kh-eos129
 claude/magical-maxwell-hja5kh-s4-11
 claude/optimistic-bell-gk8vkz
+
+# ── 2026-10-03 14차 배치 (2건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-03.md §3-③ ──
+# 직전 배치 집행 확인(2026-10-03 ls-remote 실측): 13차 3건(magical-maxwell-hja5kh-eos129 ·
+#   magical-maxwell-hja5kh-s4-11 · optimistic-bell-gk8vkz) 전건 **잔존 0/3**.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   intelligent-noether-tbj2jf = c671a313
+#     근거: 회수 태스크 SEC-42가 PR #1433(2de73590)으로 done. 브랜치의 유일한 변경(G-eos37 게이트 pending→cleared
+#     6줄 + 이벤트 샤드 1줄)은 main 게이트 evidence(1,478자)가 브랜치 evidence 원문(1,160자)을 그대로 포함하는 것으로
+#     실측 확인됐다. SEC-40(#1439)이 그 해금으로 착지했다. 이벤트 샤드 원문은 이 SHA로만 복구된다.
+#   dreamy-carson-7x90dj = 3b45cd97
+#     근거: 커밋 1개·파일 1개(이벤트 샤드 25줄 전부 QUAL-11 착수 거부 policy_warn/path_overlap). QUAL-11은
+#     friendly-pascal-mnmypk가 claim 중이다. 코드·문서·태스크 변경 0건.
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 13차 승계 + 신규:
+#   remaining-track-34zvse(HARN-212 — 좌석 CUR-04·05·07·08·HARN-80이 전부 done이 된 뒤 MEMORY 결정 로그 2건만 잔여 ·
+#   회수 완료 전 삭제 금지 · head 7fb78470) · 나머지 14건 승계: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w ·
+#   gdmwhk/uqyg79 · 5t5lmv · iws58k · t608mk/azdnov · 6eejrv · e98dw4 · q8tvcx · 29ac1b · vafylb(OPS-53)
+claude/intelligent-noether-tbj2jf
+claude/dreamy-carson-7x90dj
