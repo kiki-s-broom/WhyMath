@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - "docs/reviews/ops104_*.md"
   - src/backend/whymath_backend/l3/cross_verify.py
-session: null
+session: claude/practical-maxwell-kuwl7x
 notes: "출처: OPS-89 보고(2026-10-02) 중요 발견 — cross_verify 경로는 브레이크포인트 위치를 고쳐도 system만으로 어떤 모델 최소치에도 못 미쳐 캐시가 조용히 무효다(테스트 test_below_minimum_prefix_is_a_silent_noop_even_with_correct_placement). 쓰기 할증은 사라지지만 적중도 생기지 않는다. OPS-89는 위치 수정까지만 소유하고 이 판단(끄기 vs 프리픽스 키우기)은 범위 밖이라 분리 등재한다. 판정 문서 = docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md."
-updated: 2026-10-02
+updated: 2026-10-03

@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-108-cross-verify-cloud-seat-local-decision-rejected
+title: "CrossVerifier에 클라우드 provider를 직결하면 LOCAL 라우팅 결정을 거부해 전 관점 provider_error — residue_gate_demotion_battle --cloud 측정 경로 확인"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현·범위 확정: 클라우드 provider(Anthropic·OpenRouter·DeepSeek 각각)를 직결한 CrossVerifier.verify()가 LOCAL 라우팅 결정을 받아 전 관점 provider_error가 되는지를 가짜 클라이언트로 좌석별 실행해 확정한다(OPS-104 보고는 Anthropic 좌석+가짜 클라이언트만 실행했고 OpenRouter는 코드 읽기만 했다). 실제 residue_gate_demotion_battle --cloud 진입점이 같은 조립을 쓰는지도 실행으로 확인한다.\n② 사실이면 수정: --cloud 측정 조립이 클라우드 결정을 만들어 주도록 고치되, 측정 구성=배포 구성 원칙(UnionCrossVerifier docstring)과 충돌하지 않는지 확인한다 — 배포 라우팅은 LOCAL이므로 클라우드 좌석 측정이 인증이 되려면 배포 라우팅도 같은 좌석이어야 한다는 --cloud help 문구의 전제를 함께 판정한다.\n③ 회귀 테스트: 클라우드 provider 직결 CrossVerifier가 provider_error가 아닌 실제 generate 호출에 도달함을 좌석별로 고정한다(기존 test_residue_gate_demotion_battle.py의 --cloud 테스트는 상호배타·설정 기록만 본다).\n④ 라이브 호출은 G-arch66-anthropic-api-pause-review 전까지 하지 않는다 — 가짜 클라이언트 범위만 수행하고 라이브 미수행을 명시한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/residue_gate_demotion_battle.py
+  - tests/backend/harness/test_residue_gate_demotion_battle.py
+session: null
+notes: "출처: OPS-104 판정 문서 §4.1(docs/reviews/ops104_cross_verify_cache_prefix_2026-10-03.md). 확인된 범위 = Anthropic 좌석+가짜 messages.create에서 3관점 전부 provider_error. 미확인 = 실제 --cloud CLI 실행·OpenRouter/DeepSeek 좌석 실행. 가능성 보고이며 확정 결함이 아니다 — 착수 시 ①에서 먼저 확정한다."
+updated: 2026-10-03
