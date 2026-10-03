@@ -2661,6 +2661,9 @@ class TestNextProblem:
         assert body == {
             "problem_id": None,
             "theta": 0.0,
+            # EOS-147: 가산 2필드 — 이력이 없으면 경계가 아니라 선택 θ는 추정 θ와 같다.
+            "selection_theta": 0.0,
+            "theta_boundary": None,
             "difficulty": None,
             "standard_error": None,
             "measurement_sufficient": False,
@@ -3241,6 +3244,8 @@ class TestNextProblemSuneungMode:
         assert set(body) == {
             "problem_id",
             "theta",
+            "selection_theta",  # EOS-147: 후보를 고르는 데 실제 쓴 θ(가산 — 항상 채워진다)
+            "theta_boundary",  # EOS-147: 추정 θ가 MLE 발산 경계인가(가산 — null=경계 아님)
             "difficulty",
             "standard_error",
             "measurement_sufficient",
@@ -3285,7 +3290,7 @@ class TestNextProblemSuneungMode:
         assert session.commits == 1
 
     def test_recommendation_records_candidates_and_policy_version_suneung(self) -> None:
-        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v2이 실린다.
+        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v3가 실린다.
 
         적격(시그니처 보유)·부적격(수능 신호 전무) 후보를 함께 넣어 candidates[]가 부적격을
         빼고 적격만 담는지(진실 게이트 재적용)까지 함께 확인한다.
@@ -3332,6 +3337,9 @@ class TestNextProblemSuneungMode:
         assert body == {
             "problem_id": None,
             "theta": 0.0,
+            # EOS-147: 가산 2필드 — 이력이 없으면 경계가 아니라 선택 θ는 추정 θ와 같다.
+            "selection_theta": 0.0,
+            "theta_boundary": None,
             "difficulty": None,
             "standard_error": None,
             "measurement_sufficient": False,

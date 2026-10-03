@@ -83,6 +83,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.evidence_event import EvidenceEvent
+from whymath_backend.l2.irt import ThetaBoundary
 from whymath_backend.l2.learner_state import LearnerStateBasis
 from whymath_backend.l2.recommendation_contract import RecommendationReason
 from whymath_backend.schema.enums import KnowledgeType
@@ -93,6 +94,15 @@ EVENT_TYPE_RECOMMENDATION_TREATMENT: str = "recommendation_render"
 # `meta` JSONB 키 — 비민감 메타만(B1). 집계가 이 키로 되읽을 수 있게 상수로 동결한다.
 META_KEY_PROBLEM_ID: str = "problem_id"
 META_KEY_THETA: str = "theta"
+#: EOS-147 — 후보 점수(`candidates[]`)를 계산하는 데 쓴 θ. **추정 θ(`theta`)와 다를 때만** 남긴다
+#: (전부 정답 이력에서 추천이 추정 θ가 아니라 표적 θ로 고른다). 키가 없으면 선택 θ = `theta`다 —
+#: 이 식(`meta.get("selection_theta", meta["theta"])`)이 수정 전 기록까지 정확히 재현한다.
+META_KEY_SELECTION_THETA: str = "selection_theta"
+#: EOS-147 — 추정 θ가 MLE 발산 경계인가(`upper`=전부 정답·`lower`=전부 오답). 경계가 아니면(None)
+#: 키를 넣지 않는다 — '없음'과 'null로 기록됨'을 구분. 발동률(전체 처치 중 이 키가 있는 비율·값별
+#: 분포)을 소급 측정하는 재료다. 키가 없다고 θ가 ±4.0이 아니라는 뜻은 아니다(혼합 이력에서 MLE가
+#: 범위를 넘어 클램프된 경우도 없다).
+META_KEY_THETA_BOUNDARY: str = "theta_boundary"
 META_KEY_POOL_SIZE: str = "pool_size"
 META_KEY_APPLIED_WEIGHTS: str = "applied_weights"
 META_KEY_MODE: str = "mode"
@@ -118,13 +128,23 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
-#: `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
+#: `cat_v4`(EOS-147): 전부 정답 이력에서 후보를 고르는 표적 θ가 추정 θ(4.0 클램프)가 아니라
+#: `ability_for_selection`의 표적이 된다(첫 정답 뒤 은행 꼭대기로 뛰지 않는다). 그 외 이력의 선택은
+#: `cat_v2`와 같지만, 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다.
+#: `cat_v3`은 병렬 태스크 EOS-33이 쓰는 번호라 건너뛴다 — 두 알고리즘이 같은 식별자를 쓰면
+#: 소급 평가가 섞인다.
+#: 이전 `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
 #: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
-POLICY_VERSION_CAT: str = "cat_v2"
+POLICY_VERSION_CAT: str = "cat_v4"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
-POLICY_VERSION_SUNEUNG: str = "suneung_v2"
+POLICY_VERSION_SUNEUNG: str = "suneung_v3"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
+
+`suneung_v3`(EOS-147): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 전부 정답 이력에서 후보를
+고르는 θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의 표적이다. 그 외 이력의 선택은
+`suneung_v2`와 같지만 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다.
+`suneung_v2`는 EOS-31이 먼저 썼다(두 변경이 한 번호를 쓰면 소급 평가가 서로 다른 규칙을 섞는다).
 
 `suneung_v2`(EOS-31): 수능 적격 게이트와 SQL 사전필터에 **출제 범위**(목표 학년도 수능의 성취기준
 범위 — `l6/suneung/scope.py`)가 선결 조건으로 들어갔다. `suneung_v1`은 난이도 라벨만 있으면 초·중
@@ -134,16 +154,26 @@ POLICY_VERSION_SUNEUNG: str = "suneung_v2"
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
-지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — EOS-124 이후 `cat_v2`)을
-따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 — EOS-124는 교정 경로를 바꾸지 않았으므로
-(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다."""
+지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — 현행 `cat_v4`, EOS-124가
+`cat_v2`로·EOS-147이 `cat_v4`로 올렸다)을 따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 —
+EOS-124는 교정 경로를 바꾸지 않았으므로(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다.
+
+EOS-147은 이 값을 바꾸지 않는다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
+이력에서만 발동한다. 예외: 난이도 라벨이 없는 문항의 오답은 IRT 응답에 들어 있지 않아 이력이
+'전부 정답'으로 판정될 수 있다 — 그 코너에서는 후보 풀 조회 θ가 선택 θ로 바뀐다(처치 기록의
+`selection_theta` 키가 그 표지다)."""
 POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"
 """EOS-26 — 상태 머신 R6(원인 미상 오답)를 집행한 추천: 후보를 오답 개념의 직접 선수(연속 첫
 오답 — 선수 탐침) 또는 방금 틀린 개념(연속 두 번째 · 탐침 불가 폴백)으로 **제한**한다. 후보 생성
 규칙이 기본 CAT과 다르므로 따로 적는다. 이름표·재선택은 기본 CAT의 `cat_v2`(EOS-124) 규칙 그대로라
 `v2`다 — R3 교정 경로(`cat_v1_state_remediation`)와 달리 근거를 바꾸지 않는다. 제한하지 못한
 R6(`anchor_unresolved`·`no_candidate_in_concept`)는 기본 CAT 규칙을 따르므로
-`POLICY_VERSION_CAT`이다."""
+`POLICY_VERSION_CAT`이다.
+
+EOS-147은 이 값을 바꾸지 않는다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
+이력에서만 발동한다. 예외: 난이도 라벨이 없는 문항의 오답은 IRT 응답에 들어 있지 않아 이력이
+'전부 정답'으로 판정될 수 있다 — 그 코너에서는 후보 풀 조회 θ가 선택 θ로 바뀐다(처치 기록의
+`selection_theta` 키가 그 표지다)."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -168,6 +198,8 @@ async def record_recommendation_treatment(
     theta: float,
     pool_size: int,
     applied_weights: bool,
+    selection_theta: float | None = None,
+    theta_boundary: ThetaBoundary | None = None,
     mode: str | None = None,
     gate_reason: str | None = None,
     candidates: list[tuple[uuid.UUID, float]] | None = None,
@@ -184,6 +216,17 @@ async def record_recommendation_treatment(
     `session.add`만 하고 commit하지 않는다(`pedagogy_evidence.py` 관례 — 커밋 경계는
     호출자 책임). 호출자는 `problem_id`가 null이 아닐 때만(추천이 실제로 나갔을 때만)
     이 함수를 불러야 한다 — 가짜 처치 금지.
+
+    `selection_theta`(EOS-147): 후보를 고르는 데 쓴 θ. `theta`(추정 θ)와 **다를 때만** meta에
+    `selection_theta` 키로 남긴다 — None이거나 `theta`와 같으면 키를 넣지 않는다("없음"과 "null로
+    기록됨"을 구분하는 기존 관례). 소급 평가는 `meta.get("selection_theta", meta["theta"])`로
+    후보 점수를 재현한다.
+
+    `theta_boundary`(EOS-147): 추정 θ가 MLE 발산 경계인가 — `upper`(전부 정답)·`lower`(전부 오답)
+    문자열을 그대로 `theta_boundary` 키로 남긴다. None(경계 아님)이면 키를 넣지 않는다. 이 키는
+    `selection_theta` 키와 독립이다 — `lower`는 선택 θ가 추정 θ와 같아 `selection_theta` 키 없이
+    이 키만 남고, 표적이 상한에 막힌 `upper`도 마찬가지다. 키가 있는 처치의 비율·값별 분포가 경계
+    규칙의 발동률이다(소급 측정 재료).
 
     `pool_size`: 선택 시점의 후보 풀 크기(θ 근방 SQL 선별 결과 건수). `applied_weights`:
     `prioritize_weak_concepts` 가중이 실제로 적용됐는지(약점 개념 가중 쿼리가 돌았는지).
@@ -223,6 +266,10 @@ async def record_recommendation_treatment(
         META_KEY_APPLIED_WEIGHTS: applied_weights,
     }
     # None인 선택 키는 아예 넣지 않는다 — "없음"과 "null로 기록됨"을 구분 가능하게.
+    if selection_theta is not None and selection_theta != theta:
+        meta[META_KEY_SELECTION_THETA] = selection_theta
+    if theta_boundary is not None:
+        meta[META_KEY_THETA_BOUNDARY] = theta_boundary
     if mode is not None:
         meta[META_KEY_MODE] = mode
     if gate_reason is not None:
@@ -272,7 +319,9 @@ __all__ = [
     "META_KEY_POOL_SIZE",
     "META_KEY_PROBLEM_ID",
     "META_KEY_REASON",
+    "META_KEY_SELECTION_THETA",
     "META_KEY_THETA",
+    "META_KEY_THETA_BOUNDARY",
     "POLICY_VERSION_CAT",
     "POLICY_VERSION_CAT_STATE_REMEDIATION",
     "POLICY_VERSION_CAT_STATE_UNDIAGNOSED",
