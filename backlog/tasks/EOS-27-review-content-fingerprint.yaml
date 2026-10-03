@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,7 +17,8 @@ acceptance:
   - "② 각인 집행 — 사람 판정 각인 도구(review_status_verdict_bridge)가 최신 종결 판정의 지문과 코퍼스 현재 내용의 지문을 대조해, 다르면 각인하지 않고 별도 버킷(검수 후 내용 변경)으로 보고한다. 지문 없는 판정의 처리(보류 vs 현행 유지)를 판정 문서로 남기고 테스트로 동결한다."
   - "③ 게이트 집행 — 골든 승격 게이트가 승격 제안의 현재 내용 지문과 최신 사람 판정 지문을 대조한다(불일치 = 경로 밖·별도 사유). 음성 대조: 승인 → 내용 손편집 → 승격 제안이 차단된다(실 파이프라인 관통 E2E)."
   - "④ 손질 승인 해금 판정 — 검수 도구가 손질 후 내용의 지문까지 기록할 수 있으면 approved_with_edit를 재검수 없이 각인할 수 있는지 판정한다(현행 EOS-136은 재검수 필수로 보류). 판정 결과와 근거를 docs/standards/review_status_stamping_contract.md에 반영한다."
-artifacts: []
+artifacts:
+  - "PR #1445 (https://github.com/kiki-s-broom/WhyMath/pull/1445) — 검수 내용 지문: 스키마 정본·검수 CLI 기록·각인 도구 대조·게이트 ②단 대조·계약 문서 §9 판정(지문 없음=보류·손질 승인 해금 안 함). 후속 EOS-174"
 paths:
   - src/backend/whymath_backend/harness/review_session.py
   - src/backend/whymath_backend/schema/review_timer.py
@@ -25,6 +26,6 @@ paths:
   - src/backend/whymath_backend/harness/golden_promotion_gate.py
   - "tests/backend/harness/test_review_*.py"
   - tests/backend/harness/test_golden_promotion_gate.py
-session: claude/vigilant-brahmagupta-63qb9l
+session: null
 notes: "출처: EOS-136(사람 판정 → 회차 코퍼스 review_status 각인) 계약 문서 docs/standards/review_status_stamping_contract.md §8 한계. 판정 기준 main 0e7b4f6b. 현행 게이트 ③단은 review_status 값(감사값 = 코퍼스값)만 대조하므로 문항 내용 편집은 보지 않는다. 승격 경로가 아직 실승격 0건이라(MP-03 0/15) 학생 노출 사고는 없으나, 승격이 시작되면 사람 승인 이후의 내용 변경이 재검수 없이 노출되는 경로가 된다. EOS-50(Publish Gate)의 content_hash는 게시 전이 검증 축이라 검수 시점 지문과 다르다 — 착수 시 EOS-50과의 관계를 먼저 판정한다(같은 지문 함수를 쓸 수 있으면 재사용)."
 updated: 2026-10-03
