@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -20,11 +20,12 @@ acceptance:
   - "④ SEC-39의 임시 허용목록 항목(`evidence_event`)을 제거한다(SEC-39의 만료 장치가 이것을 강제한다)."
   - "⑤ 선행: 결정 게이트 `G-eos37-erasure-kpi-disposition`. (나)를 고르면 이 태스크가 파기 배선을 소유하고 EOS-37은 KPI 수집기 쪽만 한다. (가)를 고르면 `evidence_event` 보존이 전제되므로 이 태스크는 변호사 회신(`docs/legal/pipa_data_matrix.md` §5 질문 2건) 전까지 구현하지 않는다."
   - "⑥ 삭제 증빙 로그(`deletion_audit`)의 user_id·resource_id 보존 연한은 이 태스크가 정하지 않는다 — MGMT-02 변호사 회신이 선행한다(`privacy/retention.py` ADMIN-03 문단)."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1439 (커밋 dbe0e7a7d) — evidence_event 파기 배선(계정·세션 삭제), 재연결 0건 통합 동결, SEC-39 허용목록 제거"
 paths:
   - src/backend/whymath_backend/privacy/erasure.py
   - src/backend/whymath_backend/api/me.py
   - "tests/backend/privacy/test_erasure_relink*.py"
 session: null
 notes: "재연결 경로(판정 기준 main `85f934a4` 코드 판독): ⓐ 개별 세션 삭제 — `_delete_owned_resource`가 `learning_session`만 지우고 `deletion_audit`에 (user_id=소유자, resource_id=세션 ID)를 남긴다. 그 세션 ID의 `evidence_event` 행은 남으므로 증빙 로그와 맞대면 곧바로 그 학생의 처치 기록을 다시 찾는다. ⓑ 계정 삭제 — `erase_user`가 `evidence_event`를 지우지 않고 `deletion_audit`에 user_id를 남긴다. `evidence_event.meta.user_binding`은 HMAC(jwt 비밀키, 도메인:session_id:user_id)라, 비밀키를 가진 운영 주체는 잔존 user_id로 전 행의 바인딩을 계산해 그 학생의 세션을 다시 찾을 수 있다(외부인은 비밀키가 없어 불가 — 그래서 적법성은 변호사 판단). 우선순위: CLAUDE.md 의사결정 2번(법적 준수)이 KPI 측정보다 앞선다. 2026-09-30 Kiki 승인(검토의견 \"진행\")."
-updated: 2026-09-30
+updated: 2026-10-03
