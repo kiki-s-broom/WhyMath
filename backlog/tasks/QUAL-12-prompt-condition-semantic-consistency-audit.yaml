@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-12-prompt-condition-semantic-consistency-audit
+title: "템플릿 코퍼스 발문↔조건 의미 일치 전수 점검·검사기 설계 판정 — QUAL-11 사고 구조(SymPy 통과·발문 해석 불일치)의 일반화"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 선행: 결정론 템플릿 코퍼스 37종(l3/equivalent 스켈레톤 생성기 40개·harness 배치 36개) 중 발문 문장에 의미가 걸린 유형(자릿수 지시어·방향어·단위·포함/제외 표현 등)을 전수 열거하고, 각 유형의 발문 해석과 정답 계산 해석을 독립 계산으로 대조한 불일치 건수를 낸다. 대상은 QUAL-11이 어림 코퍼스에서 확인한 사고 구조 — 검증이 생성기가 만든 조건식만 보고 발문 문장과의 의미 일치는 보지 않는다 — 와 같은 부류다. 판정 기준 main 해시를 리포트 상단에 박는다.\n② 설계 판정: 발문↔조건 의미 검사기를 (a) 코퍼스별 독립 계산 회귀 테스트(QUAL-11 방식)의 템플릿화로 갈지, (b) 수용 게이트(acceptance)에 발문 파싱 대조 단계를 넣을지, (c) 둘 다 불필요한지 근거와 함께 정한다. 게이트 편입이면 PB 수용 게이트 호출처에 실제로 경유하는지(정본화와 집행 지점 별항)를 acceptance에 분리해 적는다.\n③ ①에서 불일치가 나온 코퍼스는 이 태스크에서 고치지 않고 코퍼스별 처분 태스크로 분리 등재한다(QUAL-02·QUAL-07 선례). 모두 is_published 여부와 학생 노출 건수를 함께 적는다.\n④ 검사기를 구현하면 결함 주입(발문 해석을 되돌리는 뮤테이션)으로 RED를 확인하고, 스캔 0건·파싱 실패는 실패로 처리해 공허 통과를 막는다."
+artifacts: []
+paths:
+  - "docs/reviews/**"
+  - "tests/backend/harness/**"
+  - "src/backend/whymath_backend/l3/equivalent/acceptance*.py"
+session: null
+notes: "출처: QUAL-11 acceptance 4항(일반화 판정) — 판정 결과 신설 필요. 근거: 어림 코퍼스에서 발문 X의 자리에서와 정답 X의 자리까지 해석 불일치 600문 중 537문이 SymPy 검증을 그대로 통과했다. 이 태스크는 설계 판정과 실측 전수가 본체이고 구현은 판정 결과에 따른다. 어림 외 코퍼스의 불일치는 아직 미측정이다(없다는 뜻이 아니다)."
+updated: 2026-10-03
