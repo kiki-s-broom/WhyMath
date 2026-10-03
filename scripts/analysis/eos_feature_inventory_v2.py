@@ -545,7 +545,7 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-105", "교육과정 프레임워크 로더·해석", "Platform", "Curriculum", "P0",
        "B1 — CUR-10", "l1.curriculum.curriculum_loader", "l1.curriculum.curriculum_resolve",
        "l1.curriculum.populate"),
-    _e("WM-E-106", "성취기준·평가기준 적재·정렬 질의·앵커 레지스트리·Phase 3 범위 명세·Coverage 계측기",
+    _e("WM-E-106", "성취기준·평가기준 적재·정렬 질의·앵커 레지스트리·Phase 3 범위 명세·계측기",
        "Platform", "Curriculum", "P0", "B1·F1 앵커 성취기준 코드셋",
        "l1.standards.alignment_query", "l1.standards.anchor_registry",
        "l1.standards.criteria_loader", "l1.standards.learning_map",

@@ -137,11 +137,11 @@ class TestControl:
         report = pc.evaluate(spec, index, world)
         assert report.chain_funnel == {"skill": n, "problem": n, "misconception": n, "pedagogy": n}
 
-    def test_denominators_come_from_the_frozen_spec(self, spec, index, world) -> None:
+    def test_populations_come_from_the_frozen_spec(self, spec, index, world) -> None:
         report = pc.evaluate(spec, index, world)
-        assert report.metric("content_coverage_rate").denominator == len(spec.core_concepts)
-        assert report.metric("concept_completeness").denominator == len(spec.core_concepts)
-        assert report.metric("curriculum_coverage").denominator == len(spec.nodes)
+        assert report.metric("content_coverage_rate").population == len(spec.core_concepts)
+        assert report.metric("concept_completeness").population == len(spec.core_concepts)
+        assert report.metric("curriculum_coverage").population == len(spec.nodes)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ class TestVerdict:
         _, broken = _drop_problem(spec, index, world)
         report = pc.evaluate(spec, index, broken)
         content = report.metric("content_coverage_rate")
-        assert (content.numerator, content.denominator) == (9, 10)
+        assert (content.met_count, content.population) == (9, 10)
         assert content.met is False
         assert report.exit_code == 1
         assert any("Content Coverage Rate" in f for f in report.failures)
@@ -360,7 +360,7 @@ class TestVerdict:
         report = pc.evaluate(empty, index, world)
         for key in ("content_coverage_rate", "concept_completeness", "graph_connectivity_coverage"):
             metric = report.metric(key)
-            assert metric.denominator == 0
+            assert metric.population == 0
             assert metric.value is None
         assert report.exit_code == 1
         assert any("분모가 0" in f for f in report.failures)
@@ -369,7 +369,7 @@ class TestVerdict:
     def test_zero_curriculum_nodes_is_failure_not_pass(self, spec, index, world) -> None:
         report = pc.evaluate(replace(spec, nodes=()), index, world)
         curriculum = report.metric("curriculum_coverage")
-        assert curriculum.denominator == 0 and curriculum.value is None
+        assert curriculum.population == 0 and curriculum.value is None
         assert report.exit_code == 1
         assert any("Curriculum Coverage" in f and "분모가 0" in f for f in report.failures)
 
@@ -468,7 +468,7 @@ class TestCompletenessIsNotFieldFilling:
         """측정 불가는 충족이 아니다 — 다른 4개가 전부 linked 여도 완전하지 않다."""
         report = pc.evaluate(spec, index, _inject(world, hint_problem_ids=None))
         n = len(spec.core_concepts)
-        assert report.metric("concept_completeness").numerator == 0
+        assert report.metric("concept_completeness").met_count == 0
         assert report.link_counts["hint"] == {"linked": 0, "missing": 0, "unmeasured": n}
         assert report.completeness_measurable == (n, n)  # 측정 가능한 연결만 보면 완전(참고 수치)
         assert any("hint" in w and "측정 불가" in w for w in report.warnings)
@@ -534,7 +534,7 @@ class TestConnectivityIsOnePath:
         report = pc.evaluate(spec, index, split)
         n = len(spec.core_concepts)
         # 개념 k: 스킬 문항(extra)은 있고, 오개념 닿는 문항(0)은 있지만 같은 문항이 아니다.
-        assert report.metric("graph_connectivity_coverage").numerator == n - 1
+        assert report.metric("graph_connectivity_coverage").met_count == n - 1
         assert report.chain_funnel["problem"] == n
         assert report.chain_funnel["misconception"] == n - 1
 
@@ -575,7 +575,7 @@ class TestConnectivityIsOnePath:
         crosslinks["syn-kebab-0"] = frozenset({other})
         report = pc.evaluate(spec, index, _inject(world, crosslinks=crosslinks))
         n = len(spec.core_concepts)
-        assert report.metric("graph_connectivity_coverage").numerator == n - 1
+        assert report.metric("graph_connectivity_coverage").met_count == n - 1
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -636,7 +636,7 @@ class TestDefinitionsBite:
     def test_skills_outside_the_spec_do_not_link(self, spec, index, world) -> None:
         narrowed = replace(spec, skills=("skill.not-in-any-atom",))
         report = pc.evaluate(narrowed, index, world)
-        assert report.metric("content_coverage_rate").numerator == 0
+        assert report.metric("content_coverage_rate").met_count == 0
         assert report.chain_funnel["skill"] == 0
 
     def test_atoms_outside_the_leaf_backbone_are_ignored(self, spec, index, world) -> None:
@@ -704,7 +704,7 @@ class TestDefinitionsBite:
             spec, concepts=tuple(replace(c, core=False) if c == k else c for c in spec.concepts)
         )
         report = pc.evaluate(demoted, index, world)
-        assert report.metric("content_coverage_rate").denominator == len(spec.core_concepts) - 1
+        assert report.metric("content_coverage_rate").population == len(spec.core_concepts) - 1
         assert report.metric("curriculum_coverage").value == 1.0
 
     def test_problem_skills_are_the_union_over_type_codes(self, spec, index, world) -> None:
@@ -724,7 +724,7 @@ class TestDefinitionsBite:
         problems = list(world.problems)
         problems[0] = replace(problems[0], problem_type_codes=("ptype.never-defined",))
         report = pc.evaluate(spec, index, _inject(world, problems=tuple(problems)))
-        assert report.metric("content_coverage_rate").numerator == len(spec.core_concepts) - 1
+        assert report.metric("content_coverage_rate").met_count == len(spec.core_concepts) - 1
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -777,7 +777,7 @@ class TestProblemRow:
         problems = list(world.problems)
         problems[0] = replace(problems[0], review_status=None)
         report = pc.evaluate(spec, index, _inject(world, problems=tuple(problems)))
-        assert report.metric("content_coverage_rate").numerator == len(spec.core_concepts) - 1
+        assert report.metric("content_coverage_rate").met_count == len(spec.core_concepts) - 1
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -992,7 +992,7 @@ class TestRealCorpus:
         # 연결 여부만 세는 두 지표는 미충족 수가 분모 - 분자와 정확히 같다.
         for key in ("content_coverage_rate", "curriculum_coverage"):
             metric = real_report.metric(key)
-            assert len(metric.unmet) == metric.denominator - metric.numerator, key
+            assert len(metric.unmet) == metric.population - metric.met_count, key
         f = real_report.chain_funnel
         assert f["skill"] >= f["problem"] >= f["misconception"] >= f["pedagogy"]
 
@@ -1050,7 +1050,7 @@ class TestCli:
         keys = [m["key"] for m in doc["metrics"]]
         assert keys == list(_KEYS[:4])
         content = next(m for m in doc["metrics"] if m["key"] == "content_coverage_rate")
-        assert (content["numerator"], content["denominator"]) == (9, 10)
+        assert (content["met_count"], content["population"]) == (9, 10)
         assert content["unmet"][0]["subject"] == _first(spec).code
         assert content["unmet"][0]["missing"]
         assert doc["supply_coverage"]["target"] is None
@@ -1059,7 +1059,7 @@ class TestCli:
         assert pc.main(["--spec", str(tmp_path / "missing.yaml")]) == 2
         assert "적재 실패" in capsys.readouterr().err
 
-    def test_exit_2_and_refusal_when_the_denominator_is_polluted(self, tmp_path, capsys) -> None:
+    def test_exit_2_and_refusal_when_the_population_is_polluted(self, tmp_path, capsys) -> None:
         """분모(명세)가 코퍼스와 어긋난 채로 잰 수치는 의미가 없다 — 측정을 거부한다."""
         doc = json.loads(json.dumps(yaml.safe_load(ps.default_spec_path().read_text("utf-8"))))
         doc["concepts"][0]["concept_id"] = "math.calculus.does-not-exist-injected"
@@ -1074,7 +1074,7 @@ class TestCli:
         assert code in (0, 1)
         doc = json.loads(capsys.readouterr().out)
         assert doc["exit_code"] == code
-        assert [m["denominator"] for m in doc["metrics"]] == [10, 10, 10, 10]
+        assert [m["population"] for m in doc["metrics"]] == [10, 10, 10, 10]
 
     def test_corpus_load_failure_is_exit_2_not_a_zero_pass(self, monkeypatch, capsys) -> None:
         def boom(spec: ps.ScopeSpec) -> pc.CoverageCorpus:

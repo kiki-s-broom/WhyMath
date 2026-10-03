@@ -545,8 +545,8 @@ class MetricResult:
 
     key: str
     name_ko: str
-    numerator: int
-    denominator: int
+    met_count: int
+    population: int
     value: float | None
     target: float | None
     met: bool | None
@@ -587,8 +587,8 @@ class CoverageReport:
         raise KeyError(key)
 
 
-def _ratio(numerator: int, denominator: int) -> float | None:
-    return numerator / denominator if denominator > 0 else None
+def _ratio(met_count: int, population: int) -> float | None:
+    return met_count / population if population > 0 else None
 
 
 def _judge(value: float | None, target: float | None) -> bool | None:
@@ -634,8 +634,8 @@ def _content_coverage(
     main = MetricResult(
         key="content_coverage_rate",
         name_ko="Content Coverage Rate",
-        numerator=len(linked),
-        denominator=len(facts),
+        met_count=len(linked),
+        population=len(facts),
         value=value,
         target=target,
         met=_judge(value, target),
@@ -656,8 +656,8 @@ def _content_coverage(
     supply = MetricResult(
         key="supply_coverage",
         name_ko="공급 가능 커버리지",
-        numerator=len(supplyable),
-        denominator=len(facts),
+        met_count=len(supplyable),
+        population=len(facts),
         value=_ratio(len(supplyable), len(facts)),
         target=None,
         met=None,
@@ -694,8 +694,8 @@ def _curriculum_coverage(spec: ScopeSpec, all_facts: tuple[ConceptFacts, ...]) -
     return MetricResult(
         key="curriculum_coverage",
         name_ko="Curriculum Coverage",
-        numerator=connected,
-        denominator=len(spec.nodes),
+        met_count=connected,
+        population=len(spec.nodes),
         value=value,
         target=target,
         met=_judge(value, target),
@@ -795,8 +795,8 @@ def _completeness(
     result = MetricResult(
         key="concept_completeness",
         name_ko="Concept Completeness",
-        numerator=complete,
-        denominator=len(facts),
+        met_count=complete,
+        population=len(facts),
         value=value,
         target=target,
         met=_judge(value, target),
@@ -846,8 +846,8 @@ def _connectivity(
     result = MetricResult(
         key="graph_connectivity_coverage",
         name_ko="Graph Connectivity Coverage",
-        numerator=full,
-        denominator=len(facts),
+        met_count=full,
+        population=len(facts),
         value=value,
         target=target,
         met=_judge(value, target),
@@ -901,21 +901,21 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
 
     failures: list[str] = []
     for m in metrics:
-        if m.denominator == 0:
+        if m.population == 0:
             failures.append(f"{m.name_ko}: 분모가 0 이다 — 측정 불가(통과가 아니다)")
         elif m.gated and m.met is False:
             assert m.value is not None and m.target is not None
             failures.append(
                 f"{m.name_ko}: {m.value:.1%} < 목표 {m.target:.1%} "
-                f"({m.numerator}/{m.denominator}, 미충족 {len(m.unmet)}건)"
+                f"({m.met_count}/{m.population}, 미충족 {len(m.unmet)}건)"
             )
 
     warnings: list[str] = []
-    if supply.numerator < content.numerator:
+    if supply.met_count < content.met_count:
         warnings.append(
-            f"연결은 {content.numerator}/{content.denominator} 이지만 학생 공급 가능은 "
-            f"{supply.numerator}/{supply.denominator} 이다 — 검수 승격(G-kg02) 전 개념 "
-            f"{content.numerator - supply.numerator}개는 연결돼 있어도 학생에게 공급되지 않는다"
+            f"연결은 {content.met_count}/{content.population} 이지만 학생 공급 가능은 "
+            f"{supply.met_count}/{supply.population} 이다 — 검수 승격(G-kg02) 전 개념 "
+            f"{content.met_count - supply.met_count}개는 연결돼 있어도 학생에게 공급되지 않는다"
         )
     unmeasured = [name for name, c in link_counts.items() if c["unmeasured"] > 0]
     if unmeasured:
@@ -946,8 +946,8 @@ def _metric_json(m: MetricResult) -> dict[str, Any]:
     return {
         "key": m.key,
         "name": m.name_ko,
-        "numerator": m.numerator,
-        "denominator": m.denominator,
+        "met_count": m.met_count,
+        "population": m.population,
         "value": m.value,
         "target": m.target,
         "met": m.met,
@@ -969,7 +969,7 @@ def to_json(report: CoverageReport) -> dict[str, Any]:
         "chain_funnel": dict(report.chain_funnel),
         "completeness_measurable": {
             "complete": report.completeness_measurable[0],
-            "denominator": report.completeness_measurable[1],
+            "population": report.completeness_measurable[1],
         },
         "problems_scanned": report.problems_scanned,
         "warnings": list(report.warnings),
@@ -994,7 +994,7 @@ def render(report: CoverageReport) -> str:
         target = "—" if m.target is None else f"≥{m.target:.0%}"
         verdict = "목표 없음" if m.met is None else ("충족" if m.met else "미달")
         lines.append(
-            f"{m.name_ko:<28}  {m.numerator}/{m.denominator} = {_pct(m.value):<10}  "
+            f"{m.name_ko:<28}  {m.met_count}/{m.population} = {_pct(m.value):<10}  "
             f"{target:<8}  {verdict}"
         )
     lines += ["", "연결별 충족 수 (핵심 개념 기준)"]
