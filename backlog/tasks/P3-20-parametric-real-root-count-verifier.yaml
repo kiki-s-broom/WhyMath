@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,8 +13,9 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 대상 — [12미적Ⅰ-02-09] 방정식·부등식 활용 중 매개변수(k) 범위형 문항. 근거는 P3-18 결과 문서 §4-④(보강 진단: real_root_count 가 단일 변수만 받아 unverifiable · skip). 수치형(예: x³−3x−2=0 의 서로 다른 실근 개수)은 P3-18 에서 이미 '가능'이므로 이 태스크의 범위가 아니다.\n② 필요성 판정이 먼저다 — 핵심 개념 채우기 계획에서 매개변수 범위형이 실제로 몇 건 필요한지 센다. 0건이거나 수치형으로 충분하면 구현 없이 '불요'로 닫고 근거를 남긴다(과공학 방지).\n③ 필요하다고 판정되면 — 매개변수 k 를 받아 '실근 개수가 n 이 되는 k 의 범위'를 SymPy 로 정답 검산하는 검증 경로를 추가한다. 정답 파일 exit 0 · skip 0, 오답(범위 경계의 포함·제외를 뒤바꾼 것 등) exit 1 로 변별한다.\n④ 미검증인 동안의 제약 — 검증 경로가 생기기 전에는 매개변수 범위형 문항을 코퍼스에 넣지 않는다(skip 은 통과가 아니다). 이 제약을 핵심 개념 채우기 태스크의 입력 목록에 문장으로 명시한다.\n⑤ 코퍼스 채우기 태스크에 이 태스크를 걸지는 않는다. ②에서 수치형만으로 핵심 개념 Coverage 를 채울 수 없다고 판정되면 그때 amend --depends 로 대장에 부착한다.\n⑥ 확인 범위 — 백엔드 소스·테스트를 건드리면 전체 스위트와 CI 잡 전체 기준으로 확인한다."
-artifacts: []
+artifacts:
+  - "PR #1449 (kiki-s-broom/WhyMath#1449) — docs/reviews/p3_20_parametric_range_necessity_judgment_2026-10-03.md · tests/backend/harness/test_p3_20_equation_inequality_slot_capacity.py(9건)·fixtures/p3_20_{correct,wrong}.jsonl. 판정: 불요(조건부) — 수치형 6슬롯 전건 가능·구현 안 함. 판정 기준: main 381ec106 위 브랜치 기준(미머지). 뮤테이션 7종 전건 RED(등가 뮤턴트 2종 교체 후), ci_mirror 7잡 통과·미실행 0. P3-03 acceptance 에 미검증 제약 부착(amend)"
 paths: []
-session: claude/eloquent-bohr-1da6mq
+session: null
 notes: "출처: P3-18 결과 문서 §2·§4-④ + 게이트 G-p318-calc-02-08-disposition 의 Kiki 결정(2026-10-02, AskUserQuestion 응답을 세션이 중계). [12미적Ⅰ-02-09] 를 '일부 가능'(수치형만 가능)으로 분류한 결과의 보완 태스크다. 판정 기준: main 53718366. 수치형만으로 충분하면 구현 없이 닫을 수 있도록 acceptance ②를 먼저 둔다."
 updated: 2026-10-03
