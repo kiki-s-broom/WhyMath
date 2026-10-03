@@ -232,11 +232,11 @@ gates:
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-27
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 8a0e4678 (PR #1444 squash 머지, 2026-10-03 14:06Z). Kiki가 Phaiakes9에서 런북 과제 A를 직접 실행 — 채택 도우미 A0003 --stage 2 --apply: RULES_COUNT=14 · SOURCES_COUNT=9 · STAGE_NOW=2 · ADOPT_RESULT=applied · APPLY_OK=True. 위헌 심사 audit.py(단계 2): 심사 항목 23개 · 차단 사유 0건 · R0-01 통과 · 원본 등록부 9건 전부 통과(AUDIT_OK=True). 래칫 --update-baseline: 단계 1→2 · 차단 7→0건(BASELINE_OK=True) · 래칫 판정 단계 2 차단 0건 ≤ 기준선 0건(RATCHET_OK=True). 커밋 f8c25a68 변경 4파일(constitution/STAGE · constitution/rules.yaml · constitution/amendments/A0003_원본등록부정정.md · metrics/coding_constitution_audit_baseline.json) 원격 파일 목록 일치 확인. CI 머지 큐 통과 후 main 반영. 첫 시도에서 동의를 소문자로 입력해 반영 블록이 CONSENT=False로 거부(constitution/ 불변 확인)된 뒤 대문자 ADOPT로 재실행. 사람 서명 완료분 반영이며 새 서명 아님. 후속: A0004(원본 등록부 3건 추가)는 채택 도우미 미지원이라 별도 — docs/constitution_proposals/A0004_sources_registry_additions_draft.md."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
