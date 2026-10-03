@@ -190,16 +190,39 @@ FIXTURES: list[tuple[str, str, dict[str, str], int]] = [
 ]
 
 
-def run_fixture(tool: str, tool_input: dict[str, str]) -> int:
-    """가드를 훅처럼 실행해 종료 코드를 돌려준다."""
+#: 차단 안내문에 반드시 실려야 하는 표지 — 조문 인용과 차단 사유 줄 (CONST-12 ③)
+ADVICE_MARKS = ("제9조", "차단 사유")
+
+
+def judge_fixture(expected: int, code: int, stderr: str) -> str | None:
+    """픽스처 1건의 판정. 일치하면 None, 아니면 불일치 설명.
+
+    종료 코드만 보면 안내문이 비거나 깨져도 초록이다 — 차단은 사람(과 에이전트)이 읽을 안내문까지가
+    기능이므로, 차단 픽스처는 stderr 에 조문 인용과 차단 사유가 실렸는지도 단언한다.
+    """
+    if code != expected:
+        return f"기대 {expected} · 실제 {code}"
+    if expected == BLOCK:
+        missing = [m for m in ADVICE_MARKS if m not in stderr]
+        if missing:
+            return f"차단했지만 안내문에 {missing} 이(가) 없다(stderr {len(stderr)}자)"
+    return None
+
+
+def run_fixture(tool: str, tool_input: dict[str, str]) -> tuple[int, str]:
+    """가드를 훅처럼 실행해 (종료 코드, stderr 안내문)을 돌려준다.
+
+    출력은 바이트로 받아 **메인 스레드에서** UTF-8 로 엄격 해독한다. subprocess 에 text=True 를
+    맡기면 해독이 reader 스레드 안에서 일어나, 실패가 스레드 트레이스로만 찍히고 출력은 조용히
+    사라진다(2026-10-03 Kiki 머신: 차단 픽스처 28건마다 UnicodeDecodeError 가 찍혔는데 판정은
+    초록이었다). 해독 실패는 호출자(main)가 불일치로 계상한다.
+    """
     filled = {k: v.replace("{root}", str(ROOT)) for k, v in tool_input.items()}
     payload = json.dumps({"tool_name": tool, "tool_input": filled, "cwd": str(ROOT)})
     proc = subprocess.run(
         [sys.executable, str(GUARD)],
-        input=payload,
+        input=payload.encode("utf-8"),
         capture_output=True,
-        text=True,
-        encoding="utf-8",
         # 환경은 상속한다 — Windows 는 SYSTEMROOT 가 없으면 파이썬이 시작조차 못 한다(초판은 PATH 만
         # 남겨 비웠는데, 그러면 Kiki 머신의 위헌 심사 R0-01 이 전건 불일치로 red 가 된다).
         env={
@@ -210,7 +233,7 @@ def run_fixture(tool: str, tool_input: dict[str, str]) -> int:
         },
         timeout=30,
     )
-    return proc.returncode
+    return proc.returncode, proc.stderr.decode("utf-8")
 
 
 def main() -> int:
@@ -224,9 +247,17 @@ def main() -> int:
         return 2
     mismatches = []
     for desc, tool, tool_input, expected in FIXTURES:
-        got = run_fixture(tool, tool_input)
-        if got != expected:
-            mismatches.append(f"{desc}: 기대 {expected} · 실제 {got} · {tool} {tool_input}")
+        try:
+            code, stderr = run_fixture(tool, tool_input)
+        except UnicodeDecodeError as exc:  # 가드가 UTF-8 이 아닌 바이트를 냈다 — 삼키지 않는다
+            mismatches.append(
+                f"{desc}: 가드 stderr 해독 실패({type(exc).__name__} · 위치 {exc.start}) "
+                f"· {tool} {tool_input}"
+            )
+            continue
+        problem = judge_fixture(expected, code, stderr)
+        if problem is not None:
+            mismatches.append(f"{desc}: {problem} · {tool} {tool_input}")
     blocks = sum(1 for f in FIXTURES if f[3] == BLOCK)
     print(
         f"가드 자가시험: 픽스처 {len(FIXTURES)}건"
