@@ -18,6 +18,12 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/loop_kpi_gate.py
   - "tests/backend/ops/**"
+  - src/backend/whymath_backend/ops/loop_kpi_sample_load.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/data_access_layer_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md
+  - docs/standards/loop_kpi_contract.md
 session: claude/gracious-clarke-9hdhez
-notes: "EOS-141 Gate 2 3차 재판정(docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §7-1 P-3) acceptance ⑨에 따른 등재 — 루프 KPI ①②④ 판정 표본 경로. 선행 EOS-37(⑤ 삭제권 오염 처분)."
+notes: "EOS-141 Gate 2 3차 재판정(docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §7-1 P-3) acceptance ⑨에 따른 등재 — 루프 KPI ①②④ 판정 표본 경로. 선행 EOS-37(⑤ 삭제권 오염 처분).\n\n[정정 2026-10-03] paths ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**'] → ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**', 'src/backend/whymath_backend/ops/loop_kpi_sample_load.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/data_access_layer_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md', 'docs/standards/loop_kpi_contract.md']: 신규 모듈의 CI 계약 대장 3곳 등재·문서 산출물이 닿는 파일을 범위에 편입"
 updated: 2026-10-03
