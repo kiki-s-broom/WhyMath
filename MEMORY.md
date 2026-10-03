@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-03 (판정·착지 · EOS-127): **상태 머신 R4(선수결손)는 배선하지 않고 삭제한다 — 비용은 문제가 아니었다(`max_depth=1` 선수 조회 p50 2.3ms · 생산자 전체 p95 7~128ms). 배제 사유는 중복과 가로채기다: 선수 하강은 이미 R6 → 다음 문항 선택(EOS-26·124)이 요청 시점에 실 PG 검증된 채 수행하고, 그 경로는 R3·R6 결정만 읽으므로 R4가 발화하면 R6 하강을 막는다. R4a 예외도 소멸. 원장 enum 라벨 `POLICY_PREREQUISITE_GAP`만 은퇴 표기로 남긴다** (claude 판정·구현) — 판정 기준 main `381ec106`
+
+- **판정문**: `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md` (실측 표·변경 표·뮤테이션·남은 구멍 5건).
+- **EOS-105의 "무겁다"는 추정이었고 틀렸다**: 실 PG 600개념·학습자 시도 50/500/5,000건에서 CTE `max_depth=1` p50 2.2~2.4ms, 생산자 전체 p50 5.8/11.1/62.7ms · p95 7.1/13.7/127.8ms. 시간은 CTE가 아니라 학습자 전체 이력을 읽는 `compute_concept_diagnoses`에 비례한다.
+- **지운 것**: 규칙 `R4-prerequisite-gap` · `AttemptEvidence.prerequisite_gap_concept_ids` · 조립기 인자 · `NextActionKind.GO_TO_PREREQUISITE_CONCEPT` · 전이표 `ASSESSING → LEARNING`. **남긴 것**: PG enum 라벨 `POLICY_PREREQUISITE_GAP`(추가 전용 원장 — 지우면 타입 재생성 마이그레이션 + 값이 적힌 행이 있다면 읽기 `LookupError`) → `RETIRED_POLICY_TRIGGERS` 은퇴 표기 + "트리거 전수 = 규칙 트리거 ∪ 은퇴" 동결.
+- **검증**: 단위 285 passed · 실 PG 통합 38 passed(skip 0) · 새 동결 테스트 4종 뮤테이션 4/4 RED(주입마다 의도한 테스트 1건만 실패 · 원복 sha256 동일). `SCENARIO-003 ③`은 "R4 미발화 동결"에서 "R6이고 하강은 추천이 한다"로 승격.
+- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행 0건은 추론이지 실측이 아니다(Kiki가 prod에서 읽기 전용 1줄로 확인 가능 — PR 본문). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
+- **교훈(사고 아님)**: 비용 벤치가 같은 DB에 심은 문항 1,800건이 `next-problem` 전역 풀을 오염시켜 통합 5건이 거짓 실패했다 → DB를 새로 만들어 제거 실험으로 확인. 통합 테스트 기본 skip을 통과로 읽을 뻔한 것(69 skipped)은 즉시 플래그를 켜 재실행해 막았다.
+
 ### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
 
 - **무엇**: `tests/backend/privacy/test_retention_plan_completeness.py` 신설 — 삭제권 가드(`test_erasure_plan_completeness`)의 소유 판정 (A)∪(B)∪(C)를 경로 로드로 재사용(판정 복제 0 · 삭제권 쪽 파일 무수정)해, 소유 테이블이 ① `_RETENTION_PLAN` ② `_PURGED_ELSEWHERE` ③ `_RETENTION_PLAN_EXEMPTIONS` 어디에도 없으면 RED. 삭제권의 만료 계약(SEC-39)도 재사용 — 임시 제외 9건이 해소 태스크(`MGMT-02`·`ARCH-51`·`SEC-25`)를 구조 필드로 가진다.
