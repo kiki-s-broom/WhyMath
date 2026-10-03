@@ -64,6 +64,16 @@ UI로 하려던 강제("타이머·반려코드 없이 판정 제출 자체를 �
 validator). 이 CLI는 그 계약이 사람 입력 경로까지 이어지게 한다 — 반려를 고르면 F1~F8 선택을
 받을 때까지 진행하지 않으며, 자유 텍스트 메모는 코드를 *대체*하지 않고 보조할 뿐이다.
 
+## 검수 내용 지문 (EOS-27)
+
+항목마다 **검수자에게 보인 레코드의 지문**
+(`schema/review_timer.review_content_fingerprint`)을 만들어
+`started`·`finished` 이벤트와 판정 행에 싣는다. 승인 뒤 누군가 문항 내용을 손으로 고치면 각인 도구
+(`review_status_verdict_bridge`)와 승격 게이트(`golden_promotion_gate`)가 이 지문을 코퍼스 현재
+내용의 지문과 대조해 잡는다. 본문이 없는 항목(`payload is None`)은 인증할 내용이 없으므로 지문을
+**만들지 않는다**(None = 모름) — 빈 본문의 지문을 만들면 "본 것이 없는 판정"이
+"내용 일치"처럼 보인다.
+
 ## 측정 도구 실패 경로 설계 (2026-08-22 규칙)
 
   - **항목마다 즉시 flush** — 이벤트도 판정도 항목 단위로 append→flush→close 한다. 검수
@@ -118,6 +128,7 @@ from whymath_backend.schema.enums import GenerationFailureCode
 from whymath_backend.schema.review_timer import (
     VERDICT_APPROVED_WITH_EDIT,
     ReviewTimerEventType,
+    review_content_fingerprint,
     review_status_for_verdict,
 )
 
@@ -288,6 +299,7 @@ def append_verdict_jsonl(
     review_session_id: uuid.UUID,
     failure_code: GenerationFailureCode | None,
     failure_note: str | None,
+    content_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """판정 1건을 JSONL에 **즉시** append한다(호출마다 open→기록→flush→close).
 
@@ -311,6 +323,7 @@ def append_verdict_jsonl(
         "review_session_id": str(review_session_id),
         "failure_code": failure_code.value if failure_code is not None else None,
         "failure_note": failure_note,
+        "content_fingerprint": content_fingerprint,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -473,11 +486,14 @@ def run_review_session(
     total = len(pending)
 
     for index, item in enumerate(pending, start=1):
+        # 검수자에게 보일 레코드의 지문 — 본문이 없으면 인증할 내용도 없다(None = 모름·EOS-27).
+        fingerprint = review_content_fingerprint(item.payload) if item.payload is not None else None
         started = append_event_jsonl(
             events_path,
             start_review(
                 cu_slug=item.slug,
                 reviewer_id=reviewer_id,
+                content_fingerprint=fingerprint,
                 occurred_at=now_utc(),
             ),
         )
@@ -513,6 +529,7 @@ def run_review_session(
                     elapsed_ms=elapsed_ms,
                     failure_code=failure_code,
                     failure_note=note,
+                    content_fingerprint=fingerprint,
                     occurred_at=now_utc(),
                 ),
             )
@@ -525,6 +542,7 @@ def run_review_session(
                 review_session_id=started.review_session_id,
                 failure_code=failure_code,
                 failure_note=note,
+                content_fingerprint=fingerprint,
             )
             if action == "approved":
                 approved += 1

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -25,6 +25,6 @@ paths:
   - src/backend/whymath_backend/harness/golden_promotion_gate.py
   - "tests/backend/harness/test_review_*.py"
   - tests/backend/harness/test_golden_promotion_gate.py
-session: null
+session: claude/vigilant-brahmagupta-63qb9l
 notes: "출처: EOS-136(사람 판정 → 회차 코퍼스 review_status 각인) 계약 문서 docs/standards/review_status_stamping_contract.md §8 한계. 판정 기준 main 0e7b4f6b. 현행 게이트 ③단은 review_status 값(감사값 = 코퍼스값)만 대조하므로 문항 내용 편집은 보지 않는다. 승격 경로가 아직 실승격 0건이라(MP-03 0/15) 학생 노출 사고는 없으나, 승격이 시작되면 사람 승인 이후의 내용 변경이 재검수 없이 노출되는 경로가 된다. EOS-50(Publish Gate)의 content_hash는 게시 전이 검증 축이라 검수 시점 지문과 다르다 — 착수 시 EOS-50과의 관계를 먼저 판정한다(같은 지문 함수를 쓸 수 있으면 재사용)."
-updated: 2026-09-27
+updated: 2026-10-03

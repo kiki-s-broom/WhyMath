@@ -1,7 +1,8 @@
 # review_status 각인 계약 — 두 도구의 적용 대상 · 충돌 규칙 · 승격 게이트 ④단 분모 (EOS-136)
 
-> **판정 기준**: main `0e7b4f6b`. 코퍼스 수치는 그 커밋의 `data/corpus/problem_bank_*/problems.jsonl`
+> **판정 기준**: main `0e7b4f6b`(§1~§8 · EOS-136). 코퍼스 수치는 그 커밋의 `data/corpus/problem_bank_*/problems.jsonl`
 > 전수 실측이고, Wilson 수치는 저장소 `harness/wilson.wilson_upper_bound`(단측 · 신뢰 0.95) 실측이다.
+> §9(EOS-27 · 검수 후 내용 지문)의 판정 기준은 main `381ec106`이다.
 >
 > 이 문서는 문항 코퍼스의 `review_status`를 **쓰는** 도구들의 계약 정본이다. 코드 쪽 정본은
 > `harness/review_status_domains.py`(적용 대상)와 `harness/golden_promotion_gate.py`(판정 해석 ·
@@ -18,6 +19,7 @@
 | 각인값 | `approved` → approved · `rejected` → rejected · `approved_with_edit` → **각인 보류**(손질 전 내용이라 재검수 필요)(§4). |
 | ④단 분모 | **생성 배치 품질**로 판정한다 — 분모는 검수 배치 전체, 분자는 판정 이력의 반려·손질 승인(§5). |
 | CI 드리프트 가드 | `--all --check`는 고정 7종만 보며, 회차 코퍼스가 그 목록에 들어오면 exit 2로 빨개진다(§6). |
+| 검수 후 내용 편집 | 검수 이벤트가 **검수자가 본 레코드의 지문**을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다. 다르거나 **지문이 없으면** 각인·승격하지 않는다(§9). |
 
 ---
 
@@ -97,6 +99,8 @@
 | `rejected` | rejected | `human_verdict_rejected` |
 | `approved_with_edit` | **보류** | `human_verdict_needs_edit` |
 
+- **각인 전 지문 대조**(EOS-27): 위 표의 각인값이 있는 판정(approved·rejected)은 검수 이벤트의 내용 지문이
+  코퍼스 현재 레코드의 지문과 같을 때만 각인한다(§9). 손질 승인은 각인값이 없어 대조 대상이 아니다.
 - **판정 해석은 한 함수다** — `golden_promotion_gate.read_human_verdict_ledger`(파일 순서상 마지막
   종결이 최신 판정 · started/aborted는 판정 아님). 게이트 ②④단, 제안 파생(`golden_inputs`), 각인
   도구가 모두 이것으로 읽는다.
@@ -190,17 +194,22 @@ MP-03 1차 시도(§8.2)는 검수 15건 전부를 제안했으므로 제안 분
 | 코퍼스 단위 백필의 거부(단일 · `--all`) | `problem_corpus_review_status_backfill.main` | `test_review_status_domains.py` · `test_eos_anchor_e2e_a4.py::…::test_corpus_level_backfill_refuses_pipeline_output` |
 | 사람 판정 각인 · 불가침 · 세탁 금지 · 쓰기 순서 | `review_status_verdict_bridge.run_bridge` | `test_review_status_verdict_bridge.py` |
 | 판정 해석 단일 권위 · 손질 승인 ②단 차단 | `golden_promotion_gate.read_human_verdict_ledger` · `certifies_current_content` | `test_golden_promotion_gate.py` |
+| 검수 지문 정규화(단일 정본) · 3상태 대조 | `schema/review_timer.review_content_fingerprint` · `review_fingerprint_state` | `test_review_timer.py::TestFingerprintNormalization` · `TestFingerprintState` |
+| 검수 CLI가 지문을 기록한다 | `review_session.run_review_session` | `test_review_session.py::TestContentFingerprintIsRecorded` |
+| 각인 전 지문 대조 · 내용 변경·지문 없음 버킷 | `review_status_verdict_bridge.plan_stamps` | `test_review_status_verdict_bridge.py::TestContentFingerprint` |
+| 승격 게이트 ②단 지문 대조 | `golden_promotion_gate.evaluate_promotion` · `main` | `test_golden_promotion_gate.py::TestContentFingerprintStage` · `TestContentFingerprintCli` |
 | ④단 분모 = 검수 배치 · 분자 = 이력 | `golden_promotion_gate.PromotionGateReport` | `test_golden_promotion_gate.py::TestReviewBatchDenominator` |
 | 판정 파일 ≠ 감사로그 | `golden_promotion_gate._load_backfill_audit` | `test_review_status_verdict_bridge.py::TestReviewVerdictFileIsNotTheAudit` |
-| 실 파이프라인 관통(축적 → 검수 → 각인 → 게이트) · 음성 대조 | 위 전부 | `test_eos_anchor_e2e_a4.py::TestGoldenPromotionGateOnPipelineOutput` |
+| 실 파이프라인 관통(축적 → 검수 → 각인 → 게이트) · 음성 대조(승인 → 내용 손편집 → 차단 포함) | 위 전부 | `test_eos_anchor_e2e_a4.py::TestGoldenPromotionGateOnPipelineOutput` |
 
 ---
 
 ## 8. 한계 (명시)
 
-- **검수 후 내용 편집은 탐지하지 못한다.** 검수 이벤트에는 검수자가 본 내용의 지문이 없다. 사람이
-  승인한 뒤 누군가 문항 *내용*을 손으로 고치면 각인 도구는 그대로 approved를 찍고, 게이트는 값
-  (`review_status`)만 대조하므로 통과시킨다. 추적 태스크: `EOS-27-review-content-fingerprint`.
+- ~~**검수 후 내용 편집은 탐지하지 못한다.**~~ → **해소(EOS-27 · §9).** 판정 기준 `0e7b4f6b`의 서술은
+  "검수 이벤트에 검수자가 본 내용의 지문이 없어, 승인 뒤 문항 내용을 손으로 고쳐도 각인 도구는 approved를
+  찍고 게이트는 값(`review_status`)만 대조해 통과시킨다"였다. 지금은 두 도구가 지문을 대조한다.
+  **남은 한계**는 §9.5.
 - **코퍼스 단위 백필의 감사로그는 실행마다 덮어쓴다(append가 아니다).** 고정 코퍼스에 레코드를 더하고
   다시 돌리면 이전 각인 기록이 감사 파일에서 사라진다(git 이력에는 남는다). 그 감사로그로 게이트를
   돌리면 이전 레코드가 `review_status_not_backfilled`로 보인다. 실측(판정 기준 커밋의 코드): 3건 각인 →
@@ -209,3 +218,85 @@ MP-03 1차 시도(§8.2)는 검수 15건 전부를 제안했으므로 제안 분
 - **배치는 운영자가 넘긴 기록이다.** 여러 회차의 기록을 함께 넘기면 합친 배치로 잰다(§5.4).
 - **골든 벤치는 CU별 최신 판정 1건만 쓴다**(`docs/standards/golden_benchmark_contract.md` — EOS-60).
   정답지 라벨은 QA 엔진이 볼 내용의 라벨이라 목적이 다르며, 이 계약의 ④단 이력 규칙과 섞지 않는다.
+
+---
+
+## 9. 검수 후 내용 편집 — 내용 지문 (EOS-27)
+
+> **판정 기준**: main `381ec106`. §8이 인정한 사각("승인 뒤 문항 내용을 손으로 고쳐도 탐지하지 못한다")을 닫는다.
+
+### 9.1 무엇이 비어 있었나
+
+게이트 ②단은 최신 사람 판정이 `approved`인지만, ③단은 `review_status` **값**(감사 각인값 = 코퍼스 값)만
+봤다. 둘 다 문항 *내용*은 보지 않는다. 그래서 승인·각인을 정상으로 마친 문항의 정답·해설·조건을 누군가
+손으로 고쳐도 사람 판정·감사로그·코퍼스 값이 전부 그대로여서 게이트가 통과시켰다. 승격이 시작되면
+(MP-03 판정 시점 실승격 0건) 사람 승인 이후의 변경이 재검수 없이 학생에게 나가는 경로다.
+
+### 9.2 지문 — 무엇을 해시하는가
+
+정본은 `schema/review_timer.review_content_fingerprint` **한 함수**다(검수 CLI = 기록, 각인 도구·게이트 = 대조).
+
+| 규칙 | 내용 | 근거 |
+|---|---|---|
+| 대상 | 검수자에게 보인 레코드 전체(코퍼스 모드는 행 자신, 큐 모드는 `candidate_payload`) | 검수 화면은 본문 10개 축만 렌더하고 나머지는 키 이름만 고지한다. 렌더 축만 해시하면 *안 보인 필드*(힌트·검산 조건)의 사후 편집이 조용히 통과한다 — 테스트 `미렌더_힌트` 행이 고정 |
+| 제외 | 최상위 `review_status` · `review_score` · `quarantine_reason` · `quarantined_at` · `updated_at` | 검수 **뒤에** 정당한 도구(각인·격리)가 쓰는 운영 메타. `review_status`를 넣으면 각인 직후 전건이 "내용 변경"으로 보인다. 집합은 좁게 동결(`test_excluded_set_is_exactly_the_documented_one`) — 넓히면 그만큼 구멍이다 |
+| 정규화 | 최상위 `None` 값 키를 뺀다(키 없음 ≡ null) · 키 정렬 · `ensure_ascii=False` · 최소 구분자 | 직렬화 순서·널 표기에 의한 거짓 "변경" 방지. 빈 문자열·빈 목록·중첩 `None`은 **내용**이다 |
+| 표기 | `sha256:` + 소문자 hex 64자 | `l3/publish_gate`의 `content_hash`와 같은 표기 |
+| 직렬화 불가 값 | `TypeError`(`str()`로 접지 않는다) | 접으면 서로 다른 객체가 같은 지문을 낼 수 있다 |
+
+**EOS-50(`content_hash`)과의 관계 판정**: 같은 *레시피*(키 정렬 JSON → sha256)이되 **다른 물건의 해시**다.
+`compute_content_hash`는 개념 버전 payload(`ConceptVersionPayload`)의 게시 전이 검증(재계산 == 승인 시점
+각인값)이고, 이쪽은 문항(CU) 코퍼스 레코드의 *검수 시점* 지문이다. 입력 모델이 달라 함수를 공유하지 않는다
+(공유하면 개념 payload 스키마 변경이 문항 지문을 흔든다). 표기 접두만 맞췄다.
+
+### 9.3 3상태 대조 — 모름은 일치가 아니다
+
+`review_fingerprint_state(검수 시점 지문, 현재 지문)` → `match` · `changed` · `unknown`(어느 한쪽이라도 없음).
+
+| 상태 | 각인 도구 (`review_status_verdict_bridge`) | 승격 게이트 (②단) |
+|---|---|---|
+| `match` | 기존 규칙대로 각인 | 통과(③단 이하로 진행) |
+| `changed` | **각인 거부** → `content_changed` (exit 1). 코퍼스에 노출 통과값이 이미 있으면 `exposure_risk` — 같은 값이 이미 찍혀 있어도(`already_stamped`가 될 레코드) 내용 변경이 먼저다 | `review_content_changed` |
+| `unknown` | 빈 칸이면 **각인 보류** → `fingerprint_unverifiable` (exit 1). 이미 채워진 레코드는 쓸 것이 없으므로 기존 버킷을 따른다 | `review_fingerprint_unverifiable` |
+
+게이트 사유 순서: 코퍼스 부재 → 판정 없음 → 반려 → 손질 승인 → **내용 변경 → 지문 없음** → 각인 기록 없음 →
+감사/코퍼스 불일치 → 각인값 비승인. 지문 단이 ③단(값 대조) 앞에 있는 이유: 내용이 바뀐 건은 값 대조가 전부
+초록이어도 막혀야 한다 — 그것이 사각이었다(`test_fingerprint_stage_precedes_the_audit_stages`가 고정).
+
+### 9.4 판정 두 건
+
+**(a) 지문 없는 판정의 처리 — '보류'(현행 유지 아님).** 선택지는 두 개였다. *현행 유지*(지문이 없으면 옛 방식대로
+각인·승격)는 "모름"을 "일치"로 읽는 것이라 이 필드가 막으려는 사각을 **옛 이벤트 전체에 대해 영구히 연다**
+— 지문이 없는 승인은 정의상 편집 여부를 알 수 없다. *보류*는 옛 이벤트의 승인을 재검수로 갱신해야 한다는
+비용이 든다. 비용이 작다고 판단했다: ① 판정 시점 실승격 0건이라 막힐 승격이 없고 ② 재검수는 항목 표시 + 키 1회
+이며 ③ 재검수 종결이 새 지문을 싣는 정본 해소 경로다(`test_rereview_with_a_fingerprint_unblocks_the_held_record`).
+만료 없는 유예(그랜드파더)를 만들지 않는다 — 우회 플래그도 없다(`--force` 류 부재 테스트 유지).
+영향: 이 변경 이전에 만든 검수 이벤트(예: MP-03 15건)는 전부 `fingerprint_unverifiable`이며 재검수 전까지
+각인·승격되지 않는다.
+
+**(b) 손질 승인(`approved_with_edit`) 해금 — 해금하지 않는다(재검수 유지).** 질문은 "검수 도구가 손질 후 내용의
+지문까지 기록할 수 있으면 재검수 없이 각인할 수 있는가"였다. 판정:
+
+1. **지금 도구는 손질 후 내용을 보지도 저장하지도 않는다.** `e`는 "손질하면 쓸 수 있다"는 표시일 뿐이고 편집
+   기능이 없다. 이벤트가 싣는 지문은 검수자가 *본*(= 손질 전) 내용의 지문이다. 이 값은 "코퍼스가 아직
+   손질 전 내용인가"를 알려 줄 뿐, 손질 후 내용의 승인 근거가 아니다.
+2. 지문이 `changed`로 바뀐 손질 승인 레코드는 "누군가 코퍼스를 고쳤다"까지만 안다. **그 최종 텍스트를 사람이
+   본 기록이 없다** — 이것은 재검수가 만드는 증거(최종 내용의 지문을 단 새 승인)와 같은 물건을 다른 근거로
+   대체하려는 시도다. 무검증 승인 경로를 새로 여는 것이므로 채택하지 않는다.
+3. 그래서 각인 도구는 손질 승인을 지문과 무관하게 `held_edit_pending`으로 둔다(내용이 바뀌었어도 — 테스트
+   `test_edit_pending_verdict_is_still_just_held`).
+4. **해금의 조건(미래 판정용)**: 검수 도구가 *도구 안에서* 손질을 받고 손질 **후** 내용의 지문을 별도 필드로
+   싣고, 그 내용을 사람이 확인하는 단계가 있을 때만 재판정할 수 있다. 그것은 사실상 "재검수가 도구 안에서
+   일어난다"이므로 지금의 "손질 → 재검수(approved)" 경로와 증거 수준이 같다 — 얻는 것은 왕복 절감뿐이다.
+
+### 9.5 남은 한계 (명시)
+
+- **지문은 JSONL 매체에서만 운반된다.** `review_timer_event`(DB)에는 지문 컬럼 좌석이 없다.
+  `ORM.from_schema`는 지문이 실린 이벤트를 **조용히 버리지 않고 `ValueError`로 거부**한다(침묵 실패 금지).
+  DB 영속 좌석(마이그레이션 + 프로브 + 인벤토리 귀속)은 후속 태스크다.
+- **지문은 변조 방지가 아니라 변경 탐지다.** 누군가 코퍼스와 검수 이벤트 JSONL을 **둘 다** 고치면(이벤트의 지문까지
+  다시 계산해 넣으면) 이 장치는 못 본다. 이 한계는 이벤트 파일을 쓰는 경로가 검수 CLI 하나라는 운영 전제와
+  `append` 전용 관례에 기대며, 서명·해시 체인은 이 태스크의 범위 밖이다.
+- **큐 모드 검수의 지문은 `candidate_payload` 기준이다.** 큐 후보는 수용 전 비수용 후보라 코퍼스에 없고(§2·게이트
+  ① 서로소), 수용 뒤 코퍼스 레코드와 직렬화가 다르면 `changed`로 보수적으로 막힌다 — 재검수가 해소한다.
+- **여러 회차 이벤트를 합칠 때** 파일 순서상 마지막 종결의 지문이 쓰인다(판정 해석 규칙과 같다).

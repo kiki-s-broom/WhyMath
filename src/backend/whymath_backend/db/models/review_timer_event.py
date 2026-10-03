@@ -118,6 +118,15 @@ class ReviewTimerEvent(Base):
         할당은 NULL INSERT가 되어 NOT NULL 위반이고, 속성 미설정이어야 `server_default now()`
         가 적용된다(EOS-45 `requested_at` 동형).
         """
+        if schema.content_fingerprint is not None:
+            # EOS-27: 지문은 JSONL 매체(검수 CLI → 각인 도구 → 승격 게이트)에서만 운반된다 — DB 컬럼
+            # 좌석이 없다. 아래 mapped_keys 필터가 조용히 버리면 "지문을 저장했다고 믿는" 소비자가
+            # 생긴다(침묵 실패). 좌석 신설(마이그레이션 + 프로브)은 후속 태스크이므로
+            # 그때까지 크게 거부한다.
+            raise ValueError(
+                "content_fingerprint는 review_timer_event에 컬럼 좌석이 없다 — 영속하면 지문이 "
+                "조용히 소실된다(EOS-27: JSONL 매체 한정)"
+            )
         data = schema.model_dump()
         mapped_keys = {col.key for col in sa.inspect(cls).mapper.column_attrs}
         kwargs = {k: v for k, v in data.items() if k in mapped_keys}

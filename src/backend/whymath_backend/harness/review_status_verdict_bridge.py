@@ -36,6 +36,27 @@
                             술어는 게이트와 공유하는 `certifies_current_content`다. 해금 경로 =
                             손질 반영 → 재검수(`approved`) — 재검수 종결이 최신 판정이 된다.
 
+검수 후 내용 편집 — 지문 대조 (EOS-27)
+--------------------------------------
+검수 이벤트는 검수자가 본 레코드의 지문(`content_fingerprint` — `schema/review_timer.
+review_content_fingerprint`)을 싣는다. 승인·반려를 각인하기 **전에** 그 지문을 코퍼스 현재 레코드의
+지문과 대조한다(`review_fingerprint_state` — 3상태). 대조 대상은 각인할 값이 있는 판정(approved·
+rejected)뿐이다 — 손질 승인은 어차피 보류다.
+
+  - ``match``   → 아래 불가침 규칙대로 진행.
+  - ``changed`` → 각인하지 않고 ``content_changed``로 보고(exit 1). 승인 뒤에 내용이 바뀌었다 —
+                  사람이 본 내용이 아니다. 코퍼스에 이미 노출 통과값이 있으면 ``exposure_risk``다
+                  (승인 후 편집된 문항이 노출 가능 상태). 이미 같은 값이 찍혀 있어도
+                  (``already_stamped``가 될 레코드) 내용이 바뀌었으면 ``content_changed``다 —
+                  지문이 달라진 사실이 먼저다.
+  - ``unknown`` → 이벤트에 지문이 없다(옛 이벤트·본문을 못 본 항목). 빈 칸이면 각인하지 않고
+                  ``fingerprint_unverifiable``로 보류한다(exit 1) — **모름은 일치가 아니다**.
+                  해금 경로 = 재검수(새 이벤트가 지문을 싣는다). 이미 채워진 레코드는 쓸 것이
+                  없으므로 기존 버킷(``already_stamped``·``conflict``)을 그대로 따른다.
+  지문 없는 판정의 처리를 '현행 유지(각인)'가 아니라 '보류'로 둔 근거와 영향 범위는
+  `docs/standards/review_status_stamping_contract.md` §9 · 동결 테스트
+  `test_review_status_verdict_bridge.py::TestContentFingerprint`.
+
 불가침 규칙 — 이미 채워진 값은 덮어쓰지 않는다
 --------------------------------------------
 `review_status`가 **이미 채워진** 레코드는 어떤 값이든 원문 줄 그대로 둔다(코퍼스 단위 백필의
@@ -112,12 +133,18 @@ from whymath_backend.harness.golden_promotion_gate import (
 )
 from whymath_backend.harness.review_status_domains import verdict_bridge_refusal
 from whymath_backend.schema.enums import ReviewStatus, is_review_status_cleared
-from whymath_backend.schema.review_timer import ReviewTimerEvent, review_status_for_verdict
+from whymath_backend.schema.review_timer import (
+    ReviewTimerEvent,
+    review_content_fingerprint,
+    review_fingerprint_state,
+    review_status_for_verdict,
+)
 
 __all__ = [
     "STAMP_SOURCE",
     "BridgePlan",
     "BridgeReport",
+    "ContentChange",
     "Conflict",
     "default_stamp_audit_path",
     "main",
@@ -185,6 +212,30 @@ class Conflict:
 
 
 @dataclass(frozen=True, slots=True)
+class ContentChange:
+    """검수 뒤 내용이 바뀐 레코드 — 판정의 지문이 코퍼스 현재 지문과 다르다. 각인하지 않는다."""
+
+    slug: str
+    current: str | None
+    """코퍼스에 있는 review_status(빈 칸이면 None)."""
+    human_verdict: str
+    reviewed_fingerprint: str
+    current_fingerprint: str
+    exposure_risk: bool
+    """채워진 값이 노출 통과값이다 — 사람이 본 적 없는 내용이 노출 가능 상태(격리 절차 대상)."""
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "current": self.current,
+            "human_verdict": self.human_verdict,
+            "reviewed_fingerprint": self.reviewed_fingerprint,
+            "current_fingerprint": self.current_fingerprint,
+            "exposure_risk": self.exposure_risk,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class BridgePlan:
     """각인 계획(순수 계산 결과) — 무엇을 쓰고 무엇을 왜 안 쓰는지 전부 나른다."""
 
@@ -199,6 +250,10 @@ class BridgePlan:
     already_stamped: list[str] = field(default_factory=list)
     held_edit_pending: list[str] = field(default_factory=list)
     conflicts: list[Conflict] = field(default_factory=list)
+    content_changed: list[ContentChange] = field(default_factory=list)
+    """검수 뒤 내용이 바뀐 레코드(EOS-27) — 각인하지 않았다."""
+    fingerprint_unverifiable: list[str] = field(default_factory=list)
+    """이벤트에 지문이 없어 각인하지 않고 보류한 빈 칸 레코드(EOS-27) — 재검수가 해금한다."""
     no_verdict: int = 0
     """판정 없는 코퍼스 레코드 수 — 건드리지 않았다."""
     verdict_not_in_corpus: list[str] = field(default_factory=list)
@@ -210,12 +265,14 @@ class BridgePlan:
 
     @property
     def matched(self) -> int:
-        """코퍼스 레코드 중 사람 판정이 대응하는 수 — 네 버킷의 합."""
+        """코퍼스 레코드 중 사람 판정이 대응하는 수 — 여섯 버킷의 합."""
         return (
             self.stamped
             + len(self.already_stamped)
             + len(self.held_edit_pending)
             + len(self.conflicts)
+            + len(self.content_changed)
+            + len(self.fingerprint_unverifiable)
         )
 
     def stamped_by_status(self) -> dict[str, int]:
@@ -263,6 +320,7 @@ def _audit_row(
         "event_id": str(event.event_id),
         "review_session_id": str(event.review_session_id),
         "reviewer_id": event.reviewer_id,
+        "content_fingerprint": event.content_fingerprint,
         "reviewed_at": _iso(event.occurred_at),
         "recorded_at": _iso(event.recorded_at),
         "stamped_at": stamped_at.isoformat(),
@@ -331,6 +389,8 @@ def plan_stamps(
     already: list[str] = []
     held: list[str] = []
     conflicts: list[Conflict] = []
+    changed: list[ContentChange] = []
+    unverifiable: list[str] = []
     no_verdict = 0
     corpus_slugs = {row.slug for row in rows}
 
@@ -342,6 +402,31 @@ def plan_stamps(
             continue
         verdict = str(event.verdict)
         target = stamp_target(verdict)
+        if target is not None:
+            # EOS-27 — 각인할 값이 있는 판정은 먼저 "검수자가 본 내용이 지금 그대로인가"를 가른다.
+            # 불가침 규칙(채워진 값 보존)보다 앞선다: 내용이 바뀐 레코드는 이미 같은 값이 찍혀
+            # 있어도 `already_stamped`("할 일 없음")로 접을 수 없다 — 그것이 정확히 사각이었다.
+            current_fp = review_content_fingerprint(row.data)
+            fp_state = review_fingerprint_state(event.content_fingerprint, current_fp)
+            if fp_state == "changed":
+                assert event.content_fingerprint is not None  # changed는 양쪽 지문이 있을 때만
+                out_lines.append(row.text)
+                changed.append(
+                    ContentChange(
+                        slug=row.slug,
+                        current=row.current,
+                        human_verdict=verdict,
+                        reviewed_fingerprint=event.content_fingerprint,
+                        current_fingerprint=current_fp,
+                        exposure_risk=row.current is not None
+                        and is_review_status_cleared(row.current),
+                    )
+                )
+                continue
+            if fp_state == "unknown" and row.current is None:
+                out_lines.append(row.text)
+                unverifiable.append(row.slug)
+                continue
         bucket = _bucket(row.current, target)
         if bucket == "stamp":
             assert target is not None  # _bucket이 target 없는 빈 칸을 stamp로 내지 않는다
@@ -385,6 +470,8 @@ def plan_stamps(
         already_stamped=already,
         held_edit_pending=held,
         conflicts=conflicts,
+        content_changed=changed,
+        fingerprint_unverifiable=unverifiable,
         no_verdict=no_verdict,
         verdict_not_in_corpus=[slug for slug in latest if slug not in corpus_slugs],
     )
@@ -409,7 +496,12 @@ class BridgeReport:
     def exit_code(self) -> int:
         if self.error is not None or self.plan is None:
             return _EXIT_INPUT_ERROR
-        if self.plan.conflicts or self.plan.matched == 0:
+        if (
+            self.plan.conflicts
+            or self.plan.content_changed
+            or self.plan.fingerprint_unverifiable
+            or self.plan.matched == 0
+        ):
             return _EXIT_ATTENTION
         return _EXIT_OK
 
@@ -437,7 +529,10 @@ class BridgeReport:
                     "already_stamped": plan.already_stamped,
                     "held_edit_pending": plan.held_edit_pending,
                     "conflicts": [conflict.to_json() for conflict in plan.conflicts],
-                    "exposure_risk": sum(1 for c in plan.conflicts if c.exposure_risk),
+                    "exposure_risk": sum(1 for c in plan.conflicts if c.exposure_risk)
+                    + sum(1 for c in plan.content_changed if c.exposure_risk),
+                    "content_changed": [change.to_json() for change in plan.content_changed],
+                    "fingerprint_unverifiable": plan.fingerprint_unverifiable,
                     "no_verdict": plan.no_verdict,
                     "verdict_not_in_corpus": plan.verdict_not_in_corpus,
                 }
@@ -554,6 +649,9 @@ def _summary_line(report: BridgeReport) -> str:
         f"[각인 {mode}] 각인 {plan.stamped}건({by_status}) · 이미 같은 값 "
         f"{len(plan.already_stamped)} · 손질 승인 보류 {len(plan.held_edit_pending)} · 충돌 "
         f"{len(plan.conflicts)}(노출 위험 {sum(1 for c in plan.conflicts if c.exposure_risk)}) · "
+        f"검수 후 내용 변경 {len(plan.content_changed)}"
+        f"(노출 위험 {sum(1 for c in plan.content_changed if c.exposure_risk)}) · "
+        f"지문 없어 보류 {len(plan.fingerprint_unverifiable)} · "
         f"판정 없음 {plan.no_verdict} · 코퍼스 밖 판정 {len(plan.verdict_not_in_corpus)} "
         f"(exit {report.exit_code})"
     )
@@ -617,6 +715,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             sys.stderr.write(
                 f"[충돌] {conflict.slug}: 코퍼스 {conflict.current} ≠ 최신 사람 판정 "
                 f"{conflict.human_verdict}(각인값 {conflict.target}) — 덮어쓰지 않았다{note}\n"
+            )
+        for change in plan.content_changed:
+            note = (
+                " — 노출 위험: 격리 계약(docs/standards/problem_quarantine_contract.md) 절차 대상"
+                if change.exposure_risk
+                else ""
+            )
+            sys.stderr.write(
+                f"[검수 후 내용 변경] {change.slug}: 사람 판정 {change.human_verdict}가 본 내용과 "
+                f"코퍼스 현재 내용의 지문이 다르다 — 각인하지 않았다(재검수 필요){note}\n"
+            )
+        if plan.fingerprint_unverifiable:
+            sys.stderr.write(
+                f"[지문 없음] {len(plan.fingerprint_unverifiable)}건 — 검수 이벤트에 내용 지문이 "
+                "없어 '본 내용이 지금 그대로인가'를 확인할 수 없다. 각인하지 않고 보류했다"
+                "(모름은 일치가 아니다) — 재검수(review_session)가 지문 있는 판정을 새로 남긴다.\n"
             )
         if plan.matched == 0:
             sys.stderr.write(
