@@ -35,6 +35,7 @@ from whymath_backend.harness.golden_inputs import (
 )
 from whymath_backend.harness.golden_promotion_gate import main as gate_main
 from whymath_backend.l1.standards.anchor_registry import load_anchor_registry
+from whymath_backend.schema.review_timer import review_content_fingerprint
 
 _REGISTRY = load_anchor_registry()
 
@@ -185,9 +186,17 @@ class TestProposal:
         events = _standard_events(tmp_path)
         proposal = tmp_path / "proposal.txt"
         _, summary = _run(["proposal", "--events", str(events), "--out", str(proposal)], capsys)
-        corpus = _write_jsonl(
-            tmp_path / "acc.jsonl", [{"slug": s, "review_status": None} for s in ("wm-a", "wm-c")]
-        )
+        corpus_rows = [{"slug": s, "review_status": None} for s in ("wm-a", "wm-c")]
+        corpus = _write_jsonl(tmp_path / "acc.jsonl", corpus_rows)
+        # EOS-27 — 승인 판정은 검수 CLI처럼 '본 레코드의 지문'을 싣는다. 지문이 없으면 게이트가 ③단 전에
+        # `review_fingerprint_unverifiable`로 막아 이 테스트가 보려는 ③단 분포가 가려진다.
+        lines = []
+        for line in events.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if row["cu_slug"] == "wm-a" and row["event_type"] == "finished":
+                row["content_fingerprint"] = review_content_fingerprint(corpus_rows[0])
+            lines.append(json.dumps(row, ensure_ascii=False))
+        events.write_text("\n".join(lines) + "\n", encoding="utf-8")
         queue = _write_jsonl(tmp_path / "acc.review.jsonl", [])
         audit = _write_jsonl(tmp_path / "audit.jsonl", [])
         report = tmp_path / "gate.json"
