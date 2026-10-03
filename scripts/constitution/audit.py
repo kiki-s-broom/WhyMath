@@ -312,7 +312,10 @@ def main() -> int:
     if ARGS.hook and not sys.stdin.isatty():
         # Stop 훅 무한 반복 방지: 이미 훅 때문에 작업을 이어가는 중이면 이번엔 통과시킴
         try:
-            if json.load(sys.stdin).get("stop_hook_active"):
+            # 훅 입력은 UTF-8 JSON — 로캘(cp949) 해독을 피해 바이트로 읽는다
+            if json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace")).get(
+                "stop_hook_active"
+            ):
                 return 0
         except (json.JSONDecodeError, ValueError):
             pass

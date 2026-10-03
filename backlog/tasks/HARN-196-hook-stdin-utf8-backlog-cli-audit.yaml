@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -27,6 +27,6 @@ paths:
   - tests/harness/test_jit_rules.py
   - tests/harness/test_stop_hook_integrity_gate.py
   - tests/infra/test_hook_stdin_utf8.py
-session: null
+session: claude/pensive-hamilton-yar1i2
 notes: "출처: 2026-09-29 CONST-10 착수 중 acceptance ③ 전수 스캔. `.claude/hooks/`의 세 훅(`git_revert_guard` · `fence_guard` · `chat_block_guard`)은 CONST-10이 같은 PR에서 고쳤다 — 같은 폴더·같은 한 줄 수정이고 셋 다 등록된 훅에서 조용히 통과(fail-open)했기 때문이다. 이 태스크로 분리한 이유는 세 가지다. 첫째, `backlog.py`는 이 저장소에서 가장 많은 세션이 동시에 고치는 파일이고 이 두 명령은 테스트 대역이 10곳 걸려 있어 CONST-10의 범위를 훅 세 개 밖으로 넓히면 충돌 표면이 커진다. 둘째, 실패 양상이 다르다 — 앞의 셋은 통과였지만 여기는 예외로 훅이 죽는 미작동이라 즉시 위험도가 낮다(exit 1은 비차단 오류). 셋째, `audit.py`는 CONST-02가 이식한 파일이고 `--hook` 모드는 아직 등록되지 않았다. 관련: HARN-19(서브프로세스 출력 인코딩) · OPS-78(저장소 파일 바이트 무결성)."
-updated: 2026-09-29
+updated: 2026-10-03

@@ -39,9 +39,11 @@ _TASKS_DIR = _REPO_ROOT / "backlog" / "tasks"
 #: 아직 고치지 않은 훅 진입점 → 그것을 소유한 태스크(full id). 이 표가 비면 CONST-10 의 목표가 끝난 것이다.
 #: `backlog.py` 는 check-edit·check-stop 이 stdin 을 읽는데, 이 두 명령을 부르는 테스트 대역
 #: (`io.StringIO` — `.buffer` 없음)가 5개 파일 10곳이라 CONST-10 범위 밖으로 분리했다.
-_OPEN_SITES: dict[str, str] = {
-    "scripts/harness/backlog.py": "HARN-196-hook-stdin-utf8-backlog-cli-audit",
-}
+_OPEN_SITES: dict[str, str] = {}
+
+#: `settings.json` 에 등록되진 않았지만 훅 입력(stdin JSON)을 읽는 진입점 — 등록 시점에 검사를 한 번도
+#: 안 받은 채 켜지지 않도록 지금부터 스캔한다(HARN-196). `audit.py --hook` 은 Stop 훅용 모드다.
+_UNREGISTERED_HOOK_ENTRYPOINTS = ("scripts/constitution/audit.py",)
 
 #: `sys.stdin.<attr>` 중 **해독을 하지 않는** 사용 — 바이트 계층 · 대화형 판정 · 기술자 번호.
 _NON_DECODING_ATTRS = frozenset({"buffer", "isatty", "fileno"})
@@ -94,9 +96,11 @@ def registered_hook_scripts(root: Path = _REPO_ROOT) -> list[str]:
 
 
 def scanned_scripts(root: Path = _REPO_ROOT) -> list[str]:
-    """스캔 대상 = 등록된 훅 ∪ `.claude/hooks/*.py` — 등록을 빠뜨린 훅 스크립트도 본다."""
+    """스캔 대상 = 등록된 훅 ∪ `.claude/hooks/*.py` ∪ 미등록 훅 모드 진입점 — 등록을 빠뜨린 것도 본다."""
     on_disk = {p.relative_to(root).as_posix() for p in (root / ".claude" / "hooks").glob("*.py")}
-    return sorted(on_disk | set(registered_hook_scripts(root)))
+    return sorted(
+        on_disk | set(registered_hook_scripts(root)) | set(_UNREGISTERED_HOOK_ENTRYPOINTS)
+    )
 
 
 def _violations(rel: str) -> list[int]:
@@ -114,6 +118,9 @@ def test_scan_is_not_vacuous() -> None:
     for name in ("git_revert_guard", "fence_guard", "chat_block_guard", "guard_constitution"):
         assert f".claude/hooks/{name}.py" in scanned, f"{name} 이 스캔에서 빠졌다"
     assert "scripts/harness/backlog.py" in scanned, "settings.json 등록 훅(backlog.py)이 빠졌다"
+    assert (
+        "scripts/constitution/audit.py" in scanned
+    ), "미등록 훅 모드 진입점(audit.py --hook)이 빠졌다 — 등록 시점에 무검사로 켜진다(HARN-196)"
 
 
 def test_registered_hook_scripts_exist() -> None:
