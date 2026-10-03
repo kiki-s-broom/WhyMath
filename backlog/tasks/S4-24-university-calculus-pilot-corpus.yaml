@@ -1,0 +1,34 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-24-university-calculus-pilot-corpus
+title: "대학 미적분학 곱의 미분법 파일럿 코퍼스 (W2) — 대학 축 0% 최초 착점"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-23-matrix-ops-pilot-corpus
+requires_gates: []
+acceptance:
+  - "대학 축 문제은행 0% 전량임을 재확인(W1 리포트) — 신규 CalculusProductRuleSkeletonGenerator([CALC1-02-02] 곱의 미분법)로 최초 착점"
+  - "Tier1이 미분 조건을 처리하려면 Derivative(...).doit()로 명시 평가해야 함을 실측 확인(doit 없이는 unverifiable) — 정확한 사용법을 회귀 테스트로 동결"
+  - "대학 개념(원자 백본 CALC1-P06)이 구 437 legacy concept_graph_v1 공간에 없어 ConceptTag.concept_src_id 크로스워크 경로로 태깅 불가함을 실측 확인 — concept_tags=()로 정직 표시, 가짜 orphan-skip 태그 주입 금지. 원자 네이티브 태깅 경로 신설은 범위 밖(후속 U-계열 태스크)"
+  - "elementary/matrix와 동일하게 operation/변형 필터를 갖춘 생성기로 처음부터 설계(밴드 중복 방출 버그 재발 방지)"
+  - "problem_bank_university_calc1_v0 코퍼스 생성 — 전건 Tier1 게이트 통과·is_published=False"
+  - "coverage 리포트 재실행으로 대학 축 실제 이동 확인(0/409 → 최소 1코드 커버)"
+  - "단위테스트(생성기·배치) green, ruff·black·mypy --strict clean"
+artifacts:
+  - 17f2a53a
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/calculus_product_rule_skeleton_generator.py
+  - src/backend/whymath_backend/harness/university_calc1_batch.py
+  - tests/backend/l3/equivalent/test_calculus_product_rule_skeleton_generator.py
+  - tests/backend/harness/test_university_calc1_batch.py
+  - data/corpus/problem_bank_university_calc1_v0/problems.jsonl
+session: null
+notes: "학년축 최단경로 계획 §3 W2 세 번째 슬라이스 — 4축 중 마지막 미착수축(대학) 최초 착점. elementary(S4-22)·matrix(S4-23)의 operation 필터 패턴 재사용. 신규 발견: 대학 콘텐츠는 원자 백본에만 있고 구 437 concept_graph_v1에는 없어 기존 개념 태깅 경로가 닿지 않는다(U2/U3와 별개 문제 — U2/U3는 성취기준↔원자 링크, 이건 problem_concept 태깅 크로스워크). concept_tags=() 정직 표시로 진행하고 원자 네이티브 태깅은 후속.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-24-university-calculus-pilot-corpus 재등재. 원 증적 ['17f2a53a']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02
