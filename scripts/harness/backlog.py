@@ -8,6 +8,7 @@
                                                  [--no-remote | --ignore-remote-claim]
     python3 scripts/harness/backlog.py done <id> --artifact <PR/커밋> [--artifact ...]
                                                  [--no-pr <예외사유> [--direct-commit-sha <해시>]]
+                                                 [--no-mirror <사유>]
     python3 scripts/harness/backlog.py block <id> --reason <사유>
     python3 scripts/harness/backlog.py unblock <id>
     python3 scripts/harness/backlog.py review <id>                (in_progress → review)
@@ -47,6 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
+import done_mirror_gate
 import event_leaks
 import incidents as incidents_mod
 import jit_rules
@@ -1454,15 +1456,39 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
                 f"done 하라"
             )
         landed_full = detail
-    # CI 미러 프리플라이트 (HARN-119 ②) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
-    # 1단계는 warn이다(측정 없는 도입 없음 — block 승격은 HARN-122 절차). 거부하지 않는
-    # 이유는 이 게이트가 막는 것이 *망각*이지 *위조*가 아니기 때문이다. 다만 침묵하지는
-    # 않는다 — 아무 말 없이 통과시키면 "검증했다"와 "검증 안 했다"가 같은 화면이 된다.
-    _warn_if_ci_mirror_missing(root)
 
     error = _transition(task, "done")
     if error:
         return _fail(error)
+    # CI 미러 게이트 (HARN-119 ② → HARN-173) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
+    # 판정은 done_mirror_gate가 한다: policy `ci_mirror_at_done=block`이면 PR 증적 경로의 claude
+    # 소유 done에서 미러 unknown·fail을 거부하고(미실행은 warn 유지), `--no-mirror '<사유>'`는
+    # 사유를 notes·이벤트에 남기며 통과한다. 상태 전이 전에 판정하므로 거부하면 대장에 아무것도
+    # 쓰지 않는다. 거부하지 않는 경로에서도 침묵하지 않는다 — 종전 경고(아래 헬퍼)가 그대로 난다.
+    mirror_scope = done_mirror_gate.scope_of(task.owner, no_pr_reason)
+    mirror_decision = done_mirror_gate.judge(
+        root,
+        owner=task.owner,
+        no_pr_reason=no_pr_reason,
+        no_mirror_reason=getattr(args, "no_mirror", None),
+    )
+    if mirror_decision.rejected:
+        return _fail(f"{task.id}: {mirror_decision.reject_message}")
+    for notice in mirror_decision.notices:
+        print(notice, file=sys.stderr)
+    if mirror_decision.warn_legacy:
+        _warn_if_ci_mirror_missing(root)
+    # CI 도달 잡 안내 (HARN-173 ⑤) — 변경 파일이 닿는 잡을 한 줄로. 계산 실패는 done을 막지 않는다.
+    ci_reach = (
+        done_mirror_gate.ci_reach(root) if mirror_scope == done_mirror_gate.SCOPE_PR else None
+    )
+    if ci_reach is not None:
+        reach_line = ci_reach.stdout_line()
+        if reach_line:
+            print(reach_line)
+        reach_warning = ci_reach.warning_line()
+        if reach_warning:
+            print(reach_warning, file=sys.stderr)
     prev_session = task.session
     task.status = "done"
     # ── 게이트 판정 인계 (HARN-177 ①) — 판정만 한다. 거부면 아무것도 쓰지 않는다(위 status
@@ -1495,6 +1521,10 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
         # PR 없이 종결한 사실을 태스크에 남긴다 — 나중에 "왜 이건 PR이 없지"를
         # 브랜치 고고학으로 되짚지 않아도 되게(미병합 고립 4회차의 실제 비용).
         task.notes = _append_note(task.notes, no_pr_reason, "PR 보류")
+    if mirror_decision.note is not None:
+        # `--no-mirror` 사유도 notes에 남긴다(HARN-173) — 이벤트만 있으면 태스크를 읽는 사람이
+        # 왜 미러 없이 닫혔는지 대장 고고학으로 되짚어야 한다. 원 notes는 덮어쓰지 않는다(HARN-20).
+        task.notes = _append_note(task.notes, mirror_decision.note, "미러 면제")
     task.updated = _today()
     store.save_task(root, task)
     done_extra: dict[str, object] = {"artifacts": args.artifact}
@@ -1504,6 +1534,10 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
         done_extra["no_pr_reason"] = no_pr_reason
     if landed_full is not None:
         done_extra["direct_commit_sha"] = landed_full
+    # 미러 판정 상태·우회 사유·CI 도달 잡을 남긴다(HARN-173 ④) — 승격 판정의 사후 감시 근거.
+    done_extra.update(mirror_decision.event_fields)
+    if ci_reach is not None:
+        done_extra.update(ci_reach.event_fields)
     store.append_event(root, "done", task.id, **done_extra)
     if handoff is not None:
         _write_gate_handoff(root, backlog, task, handoff)
@@ -1536,8 +1570,11 @@ def _warn_if_ci_mirror_missing(root: Path) -> None:
 
     미실행(HARN-180)은 실패와 다르게 안내한다 — 다시 돌려도 같은 스텝은 또 돌지 않으므로
     "재현 후 다시 부르라"는 처방이 맞지 않는다. 그래도 통과로 접지는 않는다: 2026-09-27
-    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다. 1단계 warn은 그대로다(승격은
-    HARN-173 소관).
+    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다.
+
+    이 헬퍼는 **경고만** 한다. 거부 판정(HARN-173 — policy `ci_mirror_at_done=block`에서 PR 증적
+    경로의 미러 unknown·fail 거부)은 `done_mirror_gate.judge`가 하고, 거부하지 않는 경로에서
+    이 경고가 종전대로 난다.
     """
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -5056,6 +5093,11 @@ def cmd_policy(root: Path, args: argparse.Namespace) -> int:
         if not offset_known:
             unknown_offset += 1
         by_rule.setdefault(str(event.get("rule", "?")), []).append(event)
+    # done CI 미러 게이트의 사후 감시 절 (HARN-173 ④) — 통과한 done의 미러 상태·우회 분포.
+    # warn 리포트와 별개의 축이라 제목 앞에 따로 낸다(아래 "(경고 없음)" 줄과 섞이지 않게).
+    for mirror_line in done_mirror_gate.render_report(root, args.days):
+        print(mirror_line)
+    print()
     print(f"조율 정책 warn 리포트 — 최근 {args.days}일, 총 {total}건")
     # 0건이어도 말한다 — 빼는 장치가 있다는 사실과 그 크기가 늘 보여야 뺄셈이 숨지 않는다.
     print(
@@ -5204,6 +5246,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SHA",
         help="--no-pr direct-commit 의 착지 커밋 — origin/main 조상임을 CLI가 git으로 실측한다. "
         "조상이 아니면 exit 1, shallow·git 오류로 측정 불가면 exit 3 (HARN-80)",
+    )
+    p.add_argument(
+        "--no-mirror",
+        dest="no_mirror",
+        default=None,
+        metavar="<사유>",
+        help="CI 미러 게이트 예외 사유 (HARN-173) — policy ci_mirror_at_done=block에서 미러 결과가 "
+        "없거나 실패여도 통과하는 유일한 경로. 공백뿐인 사유는 거부하며 notes·이벤트에 남는다",
     )
     # ── 게이트 판정 인계 (HARN-177 ①) — pending decision 게이트의 입력 태스크에만 뜻이 있다 ──
     p.add_argument(

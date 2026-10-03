@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-201-broken-policy-yaml-crashes-done-after-write
+title: "YAML 문법이 깨진 policy.yaml에서 done이 대장을 쓴 뒤 정책 재읽기 예외로 죽는다 — 게이트를 타지 않는 면제 경로(--no-pr·사람 소유)가 밟는다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-29 · 판정 기준 `HARN-173-done-mirror-absence-promotion` 구현 중 발견 · 코드를 읽어서 그렇게 보인다): `store.load_policy`는 `_load_yaml`(`yaml.safe_load`)을 예외 처리 없이 부른다. YAML 문법이 깨진 `backlog/policy.yaml`이면 `yaml.YAMLError`가 그대로 전파된다. `cmd_done`은 대장을 쓴 **뒤에** `_release_remote_claim`에서 정책을 따로 다시 읽으므로, 그 예외로 `done`이 이미 `save_task`·`append_event`를 마친 상태에서 죽는다(exit 비정상 · claim 미해제). PR 증적 경로는 `done_mirror_gate`가 쓰기 전에 거부로 멈춰 이 경로를 밟지 않지만, `--no-pr` 경로와 사람 소유 done은 게이트가 정책을 읽지 않아 그대로 밟는다. 이 세션에서는 재현하지 않았다 — ②의 첫 단계가 재현이다."
+  - "② 고침: 먼저 hermetic 저장소에서 깨진 YAML `policy.yaml`로 `done --no-pr investigation`이 대장을 쓴 뒤 예외로 죽는 것을 재현해 RED로 고정한다. 그다음 판정한다 — ⓐ `load_policy`가 문법 오류를 오류 목록으로 돌려주고(파일 부재와 구별) 호출자가 그것을 다룬다 ⓑ 정책 조회를 대장 쓰기 **앞으로** 옮겨 실패하면 아무것도 쓰기 전에 거부한다 ⓒ 둘 다. 판정 기준: `start`·`unblock`·`block` 등 같은 헬퍼를 부르는 다른 명령이 같은 순서(쓰기 뒤 재읽기)를 밟는지 전수 확인하고, 밟으면 같은 PR에서 함께 고친다. 정책이 깨졌을 때 \"엄격한 쪽\"(HARN-173 게이트가 택한 방향)과 이 경로의 방향이 어긋나지 않게 한다."
+  - "③ 변별력: 깨진 YAML 픽스처에서 수정 전 exit 비정상·대장 변경(쓰기 뒤 크래시), 수정 뒤 거부이고 대장 바이트가 그대로다. 대조군 — 멀쩡한 정책은 종전대로 통과, 파일이 없는 저장소는 기본값(오류 아님)으로 통과. 정책 재읽기를 대장 쓰기 앞뒤로 옮기는 뮤테이션과 예외 처리를 지우는 뮤테이션이 각각 RED여야 하고, 주입 적용과 바이트 동일 원복을 단언한다."
+artifacts: []
+paths:
+  - scripts/harness/store.py
+  - scripts/harness/backlog.py
+  - "tests/harness/test_*policy*yaml*.py"
+session: null
+notes: "출처: 2026-09-29 /drive 4차 — `HARN-173-done-mirror-absence-promotion`을 구현한 서브에이전트가 보고한 기존 결함이다(게이트가 만든 결함이 아니다). 재현 전이라 위험 크기는 미확정 — 깨진 policy.yaml이 커밋될 가능성 자체는 `validate`·CI가 막는다. 그래도 크래시가 대장 쓰기 뒤라 반쯤 쓰인 상태가 남는 점이 이 저장소의 \"쓰기 전에 판정\" 원칙과 어긋난다."
+updated: 2026-09-29
