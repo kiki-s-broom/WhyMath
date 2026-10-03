@@ -345,16 +345,14 @@ class TestRealProbeThroughCorpusReverify:
 class TestSupplementDiagnostics:
     def test_each_supplement_row_behaves_as_recorded(self) -> None:
         rows = _read_rows(_SUPPLEMENT)
-        assert len(rows) == 6
+        assert len(rows) == 7
         for row in rows:
             report = cr.reverify_corpus([row], use_fuzz=False)
             state = "pass" if report.passed else "fail" if report.failed else "skip"
             assert state == row["probe_expected_state"], (row["slug"], row["probe_why"])
 
-    def test_interval_leak_makes_a_wrong_c_value_pass_hence_sham_for_that_form(
-        self, tmp_path: Path
-    ) -> None:
-        # 02-06: 구간 밖 근(-√3)을 오답으로 내도 통과한다 → 정답 통과와 짝지으면 위장이다.
+    def test_interval_membership_makes_02_06_possible_not_sham(self, tmp_path: Path) -> None:
+        # P3-19 수정 뒤: 구간 밖 근(-√3)은 fail이라 정답 통과와 짝지어도 위장이 아니다.
         supplement = {str(r["slug"]): r for r in _read_rows(_SUPPLEMENT)}
         leak = supplement["p3-18-supplement-06-interval-leak"]
         correct_06 = _by_concept(_read_rows(_CORRECT))["[12미적Ⅰ-02-06]"]
@@ -362,7 +360,56 @@ class TestSupplementDiagnostics:
             _outcome_of_row(correct_06, tmp_path, "c06"),
             _outcome_of_row(leak, tmp_path, "leak06"),
         )
-        assert verdict is Verdict.SHAM
+        assert verdict is Verdict.POSSIBLE
+
+    def test_two_roots_one_inside_pairs_pass_and_fail(self) -> None:
+        # 방정식 3c²=9 의 근이 ±√3 둘이고 (0,3) 안은 √3 하나 — 정답 pass·구간 밖 근 fail.
+        rows = {str(r["slug"]): r for r in _read_rows(_SUPPLEMENT)}
+        ok = cr.reverify_corpus([rows["p3-18-supplement-06-interval-ok"]], use_fuzz=False)
+        bad = cr.reverify_corpus([rows["p3-18-supplement-06-interval-leak"]], use_fuzz=False)
+        assert (ok.passed, ok.failed, ok.skipped) == (1, 0, 0)
+        assert (bad.passed, bad.failed, bad.skipped) == (0, 1, 0)
+
+    def test_equation_only_condition_still_leaks_so_interval_clauses_are_load_bearing(
+        self,
+    ) -> None:
+        # 뮤테이션: 구간 조건 절을 지우면(방정식만 남기면) 오답이 다시 통과한다 — 절이 실제 보호.
+        leak = {str(r["slug"]): r for r in _read_rows(_SUPPLEMENT)}[
+            "p3-18-supplement-06-interval-leak"
+        ]
+        conditions = leak["verify"]["conditions"]
+        assert isinstance(conditions, list) and len(conditions) == 5
+        mutated = json.loads(json.dumps(leak))
+        mutated["verify"]["conditions"] = conditions[0]  # 방정식 절만 남김
+        assert mutated["verify"]["conditions"] != conditions  # 주입이 실제로 적용됐다
+        report = cr.reverify_corpus([mutated], use_fuzz=False)
+        assert (report.passed, report.failed) == (1, 0)
+
+    def test_open_interval_endpoint_is_a_fail_not_a_skip(self) -> None:
+        # 끝점이 방정식의 근이어도 열린구간 (0,3) 밖이라 fail이다. 엄격 부등식(c < 3)만 쓰면
+        # 끝점에서 '경계 모호'로 skip이 되므로 >=·!= 쌍으로 쓴다.
+        for endpoint in ("0", "3"):
+            record: dict[str, object] = {
+                "slug": f"endpoint-{endpoint}",
+                "answer": endpoint,
+                "verify": {
+                    "conditions": ["c*(c - 3) = 0", "c >= 0", "c <= 3", "c != 0", "c != 3"],
+                    "answer_map": {"c": endpoint},
+                },
+            }
+            report = cr.reverify_corpus([record], use_fuzz=True)
+            assert (report.passed, report.failed, report.skipped) == (0, 1, 0), endpoint
+
+    def test_malformed_condition_list_is_skipped_not_passed(self) -> None:
+        # 빈 목록·비문자열 원소는 형식 부적합 skip — 통과로 위장하지 않는다.
+        for bad in ([], ["c = 1", 2]):
+            record: dict[str, object] = {
+                "slug": "malformed",
+                "answer": "1",
+                "verify": {"conditions": bad, "answer_map": {"c": "1"}},
+            }
+            report = cr.reverify_corpus([record], use_fuzz=False)
+            assert (report.passed, report.failed, report.skipped) == (0, 0, 1)
 
     def test_derived_extremum_form_is_possible_for_graph_concept(self, tmp_path: Path) -> None:
         # 처분안 '나'(파생 판정으로 대체)의 근거: -02-08을 극값 개수로 바꾸면 기존 검증기로 가능.
