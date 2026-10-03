@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ acceptance:
 artifacts: []
 paths:
   - ".github/pull_request_template.md"
-session: null
+session: claude/eloquent-bohr-1da6mq
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B6 · §5 B급 미등재 후보 8. 갭리뷰의 유예 사유(분류 체계 선행)는 2026-09-15 재대조 시점에 EOS-68·HARN-55 done으로 소멸했다 — 유예가 산문에만 있었기 때문에 그 소멸을 아무도 검사하지 않았다(CLAUDE.md '만료 없는 유예·제외 금지'의 전형). Gate D 집행 등재. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(PR 템플릿·pull_request_template·Release Classification·Contract impact) → 히트 2건(OPS-10·OPS-73) 모두 다른 절 소유·이 3블록 미포함."
-updated: 2026-09-15
+updated: 2026-10-03
