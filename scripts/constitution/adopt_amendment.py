@@ -18,6 +18,8 @@ AI 세션이 찾은 정정·개정은 `docs/constitution_proposals/` 에 초안�
   python scripts/constitution/adopt_amendment.py A0003 --stage 2 --apply    # 반영
   python scripts/constitution/adopt_amendment.py A0002                      # 미리보기
   python scripts/constitution/adopt_amendment.py A0002 --apply              # 반영
+  python scripts/constitution/adopt_amendment.py A0004                      # 미리보기 (A0003 선행)
+  python scripts/constitution/adopt_amendment.py A0004 --apply              # 반영
 
 `--apply` 는 AI 세션(환경변수 CLAUDECODE 가 있는 셸)에서 실행하면 거부한다(exit 3) — 헌법
 제9조의 이중 방어다. 미리보기는 읽기 전용이라 누구나 돌릴 수 있다.
@@ -61,7 +63,11 @@ A0002_CONSTITUTION = PROPOSALS / "CONSTITUTION_v1.1_A0002_proposed.md"
 A0002_ADDITIONS = PROPOSALS / "rules_additions_v1.1.yaml"
 A0002_DRAFT = PROPOSALS / "A0002_parts_II-VII_rules_draft.md"
 A0002_TARGET = "A0002_파트II-VII규칙.md"
+A0004_ADDITIONS = PROPOSALS / "rules_v1.0.2_sources_additions.yaml"
+A0004_DRAFT = PROPOSALS / "A0004_sources_registry_additions_draft.md"
+A0004_TARGET = "A0004_원본등록부3건추가.md"
 
+SOURCE_ITEM = re.compile(r"^  - name:", re.M)
 TOP_KEY = re.compile(r"^[A-Za-z_][\w-]*:")
 STATUS_LINE = re.compile(r"^- 상태: \*\*초안[^\n]*$", re.M)
 
@@ -206,12 +212,98 @@ def plan_a0002(adopter: str, today: str) -> dict[Path, str]:
     }
 
 
+# ─────────────────────────── A0004 ───────────────────────────
+def _exists(path: Path) -> bool:
+    """Path.exists() 는 권한 거부(EACCES)를 False 로 돌려주지 않고 예외로 올린다 — 거부로 바꾼다."""
+    try:
+        return path.exists()
+    except OSError as exc:
+        raise RefusalError(f"경로 접근 불가({type(exc).__name__}): {path}") from exc
+
+
+def plan_a0004(adopter: str, today: str) -> dict[Path, str]:
+    """A0004(원본 등록부 3건 추가)의 쓰기 계획. 규칙·단계·조문은 불변이고 sources 끝에 덧붙인다.
+
+    A0003 위에 얹는 개정이라 A0003 채택을 전제로 확인한다(CONST-12 ⑩).
+    """
+    if already_adopted("A0004"):
+        raise RefusalError(f"A0004 이미 채택됨: {already_adopted('A0004')[0].name}")
+    if not already_adopted("A0003"):
+        raise RefusalError(
+            "A0003 미채택 — A0004 는 A0003 위에 얹는 개정이다. 먼저 A0003 을 채택한다"
+        )
+    current_text = read(RULES)
+    current = parse(current_text, "constitution/rules.yaml")
+    split_sources(current_text)  # sources 가 파일 마지막 절인지 확인(덧붙임의 전제)
+
+    additions_text = read(A0004_ADDITIONS).replace("\r\n", "\n")
+    first_item = SOURCE_ITEM.search(additions_text)
+    if first_item is None:
+        raise RefusalError("추가분에서 '  - name:' 항목을 찾지 못함 — 추가분 형식이 바뀌었다")
+    body = additions_text[first_item.start() :].rstrip("\n") + "\n"  # 머리 주석(초안 안내)은 뗀다
+    try:
+        entries = yaml.safe_load(body)
+    except yaml.YAMLError as exc:
+        raise RefusalError(f"추가분 YAML 형식 오류: {type(exc).__name__}") from exc
+    if (
+        not isinstance(entries, list)
+        or not entries
+        or not all(isinstance(e, dict) and e.get("name") and e.get("path") for e in entries)
+    ):
+        raise RefusalError("추가분 항목 형식 오류 — 모든 항목에 name·path 가 있어야 한다")
+
+    names = [e["name"] for e in entries]
+    have = list(current.get("sources") or [])
+    taken = {s.get("name") for s in have}
+    dup = sorted((set(names) & taken) | {n for n in names if names.count(n) > 1})
+    if dup:
+        raise RefusalError(f"이미 등록됐거나 추가분 안에서 겹치는 원본 이름: {dup}")
+    for e in entries:  # 존재하지 않는 경로를 등록하면 위헌 심사 R4-01 이 새 차단 사유를 낸다
+        if not e.get("external") and not _exists(ROOT / e["path"]):
+            raise RefusalError(f"등록할 원본 경로가 저장소에 없다: {e['path']}")
+
+    new_text = current_text.rstrip("\n") + "\n\n" + body
+    merged = parse(new_text, "반영 결과")
+    if merged["rules"] != current["rules"]:
+        raise RefusalError("반영 결과의 규칙 목록이 현재와 다르다 — 쓰지 않음")
+    if merged.get("sources") != have + entries:
+        raise RefusalError("반영 결과의 원본 등록부가 '현재 + 추가분'과 다르다 — 쓰지 않음")
+    if set(merged) != set(current) or any(
+        merged[k] != v for k, v in current.items() if k != "sources"
+    ):
+        raise RefusalError("sources 외 항목(version·stage 설명 등)이 바뀌었다 — 쓰지 않음")
+
+    extra = [f"- 함께 반영: 원본 등록부 {len(have)}건 → {len(have) + len(entries)}건"]
+    return {
+        RULES: new_text,
+        AMENDMENTS / A0004_TARGET: stamp(read(A0004_DRAFT), adopter, today, extra),
+    }
+
+
+def _decode(raw: bytes, label: str) -> str:
+    """자식 출력을 UTF-8 로 명시 해독한다. 실패는 삼키지 않고 거부로 올린다 (CONST-12).
+
+    text=True·encoding 을 subprocess 에 맡기면 해독이 reader 스레드 안에서 일어나, 실패가 스레드
+    트레이스로만 찍히고 출력은 조용히 사라진다 — 호출자는 빈 문자열을 정상으로 읽는다.
+    """
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise RefusalError(
+            f"{label} 해독 실패({type(exc).__name__}) — 자식 출력이 UTF-8 이 아니다"
+        ) from exc
+
+
 def run_merge(apply: bool) -> subprocess.CompletedProcess[str]:
     cmd = [sys.executable, str(MERGE_RULES), str(A0002_ADDITIONS)]
     if apply:
         cmd += ["--apply", "--bump-stage-note"]
-    return subprocess.run(
-        cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=120
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, timeout=120)
+    return subprocess.CompletedProcess(
+        proc.args,
+        proc.returncode,
+        _decode(proc.stdout, "규칙 병합 stdout"),
+        _decode(proc.stderr, "규칙 병합 stderr"),
     )
 
 
@@ -230,7 +322,7 @@ def main() -> int:
         except (AttributeError, ValueError):
             pass
     ap = argparse.ArgumentParser(description="헌법 개정 채택 도우미(사람 전용)")
-    ap.add_argument("amendment", choices=["A0003", "A0002"])
+    ap.add_argument("amendment", choices=["A0003", "A0002", "A0004"])
     ap.add_argument("--stage", type=int, choices=range(2, 7), help="A0003과 함께 올릴 단계")
     ap.add_argument("--apply", action="store_true", help="실제 반영(없으면 미리보기)")
     ap.add_argument("--adopter", default="Kiki", help="개정자 이름(기본 Kiki)")
@@ -244,7 +336,7 @@ def main() -> int:
         )
         print("ADOPT_RESULT=refused_ai_session")
         return 3
-    if args.amendment == "A0002" and args.stage is not None:
+    if args.amendment != "A0003" and args.stage is not None:
         print("⛔ --stage 는 A0003 과 함께만 쓴다", file=sys.stderr)
         return 2
 
@@ -252,6 +344,8 @@ def main() -> int:
     try:
         if args.amendment == "A0003":
             plan = plan_a0003(args.stage, args.adopter, today)
+        elif args.amendment == "A0004":
+            plan = plan_a0004(args.adopter, today)
         else:
             plan = plan_a0002(args.adopter, today)
             preview = run_merge(apply=False)
@@ -267,13 +361,22 @@ def main() -> int:
 
     print(f"{args.amendment} 채택 계획 ({'반영' if args.apply else '미리보기'}):")
     show(plan)
+    if args.amendment == "A0004":  # 등록부가 몇 건에서 몇 건이 되는지 눈으로 확인(CONST-12 ⑩)
+        before = len(parse(read(RULES), "constitution/rules.yaml").get("sources") or [])
+        after = len(parse(plan[RULES], "반영 결과").get("sources") or [])
+        print(f"SOURCES_PLAN={before}->{after}")
     if not args.apply:
         print("ADOPT_RESULT=preview")
         print("반영하려면 같은 명령에 --apply 를 붙인다.")
         return 0
 
     if args.amendment == "A0002":
-        merged = run_merge(apply=True)
+        try:
+            merged = run_merge(apply=True)
+        except RefusalError as exc:  # 해독 실패도 쓰지 않고 멈춘다(헌법 본문 쓰기 전)
+            print(f"⛔ 규칙 병합 출력을 읽지 못함 — 헌법 본문은 쓰지 않음: {exc}", file=sys.stderr)
+            print("ADOPT_RESULT=refused")
+            return 1
         print(merged.stdout.strip())
         if merged.returncode != 0:
             print(f"⛔ 규칙 병합 실패 — 헌법 본문은 쓰지 않음: {merged.stderr}", file=sys.stderr)

@@ -515,7 +515,22 @@ def _log(record: dict[str, Any]) -> None:
         print(f"[guard_constitution] 로그 기록 실패({type(exc).__name__})", file=sys.stderr)
 
 
+def _utf8_stderr() -> None:
+    """차단 안내문(한글·⛔)을 파이프에서도 UTF-8 로 낸다 (CONST-12).
+
+    파이프·리다이렉트에서 sys.stderr 는 로캘 인코딩(한국어 Windows = cp949)을 쓴다 — 콘솔은
+    별도 경로라 멀쩡해 보여서 결함이 가려진다. cp949 에는 ⛔ 가 없어 리터럴 글자로 깨지고, 한글은
+    cp949 2바이트로 나가 UTF-8 로 읽는 쪽(자가시험·훅 소비자)이 해독에 실패한다. 종료 코드(2)는
+    그대로라 차단은 유지되지만 안내문이 소실·모지바케가 된다(2026-10-03 Kiki 머신 실측: 위치 7·0xc4).
+    """
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # 재구성 불가한 스트림은 그대로 둔다(안내문 출력은 계속)
+        pass
+
+
 def main() -> int:
+    _utf8_stderr()
     # 훅 입력은 UTF-8 JSON 이다. sys.stdin 은 로캘 인코딩(한국어 Windows = cp949)으로 해독하므로
     # 한글·'—' 가 섞인 명령에서 UnicodeDecodeError → 아래 except → **통과(fail-open)** 가 됐다
     # (2026-09-28 PYTHONIOENCODING=cp949 재현). 바이트로 읽어 UTF-8 로 직접 해독한다.
