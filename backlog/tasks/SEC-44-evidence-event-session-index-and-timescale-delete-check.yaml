@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-44-evidence-event-session-index-and-timescale-delete-check
+title: evidence_event session_id 인덱스 부재 EXPLAIN 실측과 TimescaleDB 하이퍼테이블·압축 청크 DELETE 실환경 검증
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - SEC-40
+requires_gates: []
+acceptance:
+  - "① evidence_event 에는 session_id 인덱스가 없다(PK (event_id, time) 과 idx_ev_obj_time 뿐). SEC-40 의 세션 ID IN 삭제와 meta.user_binding 일치 조회가 전 청크 순차 스캔임을 EXPLAIN 으로 실측하고, 인덱스 추가 여부와 형태(하이퍼테이블 인덱스)를 판정한다. 인덱스 추가는 alembic 마이그레이션이라 신규 리비전 등재 절차(EOS 인벤토리·prod 스키마 프로브)를 밟는다.\n② TimescaleDB 하이퍼테이블에서 evidence_event 의 DELETE 와 압축 청크 동작을 실환경(TimescaleDB 가 있는 PG)에서 검증한다. 이 컨테이너 PG 에는 TimescaleDB 가 없어 SEC-40 의 통합 테스트는 일반 테이블에서만 돌았다 — 압축·보존 정책은 alembic 에 0건이지만 운영 DB 사실은 미확인이다.\n③ 검증하지 못한 부분은 통과로 계상하지 않는다. 운영 DB 접근이 필요하면 Kiki 행동 게이트로 올린다."
+artifacts: []
+paths:
+  - "docs/reviews/sec44_*.md"
+session: null
+notes: "출처: SEC-40 보고(2026-10-03) 남은 불확실성 3·4. 바인딩 갈래는 바인딩 보유 행 전체를 읽어 파이썬에서 재계산하므로 규모에 선형이다. 키 회전 뒤 옛 키 바인딩 행을 못 찾는 한계는 별건(SEC-40 docstring 정직 표기)."
+updated: 2026-10-03

@@ -62,6 +62,7 @@ from whymath_backend.privacy.erasure import (
     _ERASURE_PLAN,
     _ERASURE_PLAN_EXEMPTION_EXPIRY,
     _ERASURE_PLAN_EXEMPTIONS,
+    _SESSION_AXIS_MODELS,
 )
 
 # ===========================================================================
@@ -159,8 +160,18 @@ NON_STUDENT_SESSION_COLUMNS: dict[tuple[str, str], str] = {
 
 
 def owner_column_names() -> frozenset[str]:
-    """(B) 스윕이 볼 컬럼명 — `_ERASURE_PLAN`이 실제로 쓰는 이름 + EXTRA(파생·하드코딩 아님)."""
-    return frozenset(column for _, column in _ERASURE_PLAN) | OWNER_COLUMN_NAMES_EXTRA
+    """(B) 스윕이 볼 컬럼명 — `_ERASURE_PLAN`이 쓰는 **user 축** 이름 + EXTRA(파생·하드코딩 아님).
+
+    SEC-40: 세션 축 계획 항목(`_SESSION_AXIS_MODELS` — `evidence_event.session_id`)은 뺀다. (B)는
+    *user* 축 스윕이고 세션 축은 (C)가 맡는다 — 세션 컬럼명이 (B)로 새어 들어오면 `session_id`를
+    가진 모든 테이블이 (B)로도 걸려, (C)를 지워도 가드가 초록인 상태(= (C)가 하는 일이 사라진
+    상태)가 된다. SEC-39의 사각 핀(`test_evidence_event_is_caught_only_by_student_session_axis`·
+    `test_session_name_clause_catches_loose_reference_that_user_axes_miss`)이 이 분리를 동결한다.
+    """
+    return (
+        frozenset(column for model, column in _ERASURE_PLAN if model not in _SESSION_AXIS_MODELS)
+        | OWNER_COLUMN_NAMES_EXTRA
+    )
 
 
 def is_session_reference_name(name: str) -> bool:
@@ -450,8 +461,15 @@ def test_owner_column_names_are_derived_from_plan_not_hardcoded() -> None:
     종전 구조는 이 파일의 리터럴을 사람이 기억해 갱신해야 했고, 그 기억이 실패한 결과가 SEC-35다.
     """
     names = owner_column_names()
-    plan_columns = {column for _, column in _ERASURE_PLAN}
+    plan_columns = {column for model, column in _ERASURE_PLAN if model not in _SESSION_AXIS_MODELS}
     assert plan_columns <= names, "계획이 쓰는 컬럼명이 스윕 대상에서 빠졌다."
+    # SEC-40: 세션 축 계획 항목(evidence_event.session_id)은 (B)에 *들어오지 않는다* — (B)는 user
+    # 축 스윕이고 세션 축은 (C)의 몫이다. 새어 들어오면 (C)를 지워도 가드가 초록이 된다.
+    session_axis_columns = {
+        column for model, column in _ERASURE_PLAN if model in _SESSION_AXIS_MODELS
+    }
+    assert session_axis_columns, "세션 축 계획 항목이 0건이다 — 이 분리 단언이 공허해졌다."
+    assert not (session_axis_columns - plan_columns) & names, "세션 축 컬럼명이 (B)로 새어 들었다."
     # SEC-35가 편입한 별칭이 파생으로 따라왔는지 — 하드코딩이면 이 단언이 의미를 잃는다.
     assert "learner_id" in names, (
         "learner_id가 스윕 이름 집합에 없다 — _ERASURE_PLAN 파생이 끊겼거나 "

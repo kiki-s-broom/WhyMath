@@ -50,21 +50,40 @@ ORM/쿼리빌더만(`delete(Model).where(...)` — 원시 SQL 0·CLAUDE.md). `di
 `docs/architecture/collaboration_landing_design.md` §3(5분류·3배관 처리표·변호사 검토 대상)이
 정본이다.
 
-알려진 미삭제(SEC-39, 2026-09-30 — 정직 표기): `evidence_event`(교수법 처치·결과 기록)는 학생
-데이터이지만 이 모듈이 **아직 지우지 않는다**. 삭제 배선은 SEC-40(결정 게이트
-`G-eos37-erasure-kpi-disposition` 대기)이 소유하고, 그 전까지 허용목록에 *만료 있는 임시 예외*로
-등재돼 있다 — 사유(재연결 경로 2건)는 `_ERASURE_PLAN_EXEMPTIONS["evidence_event"]`가 정본이다.
+`evidence_event` 삭제 배선(SEC-40, 2026-10-03): 교수법 처치·추천 기록(`evidence_event`)은 user
+컬럼도 user FK도 없이 `session_id`(느슨참조)로만 학생에 묶인다. SEC-39가 이 테이블을 완전성 가드의
+사각에서 찾아 임시 예외로 올렸고, 결정 게이트 `G-eos37-erasure-kpi-disposition`이 "삭제권 이행 시
+그 세션의 `evidence_event`도 함께 지운다"로 처분을 정해(KPI 보존보다 법적 준수가 앞선다 — CLAUDE.md
+의사결정 우선순위 2번) 이 모듈이 배선을 소유한다. 지우는 행은 **두 갈래의 세션 ID 합집합**이다:
+  ⓐ 이 학생의 `learning_session.session_id` — 추천 처치 행(`recommendation_render`)이 실 학습 세션을
+     가리킨다. 세션 행이 먼저 지워지면 이 연결 근거가 사라지므로 **세션 삭제 전에** 목록을 모은다.
+  ⓑ `meta.user_binding` HMAC 바인딩이 이 학생과 일치하는 행의 `session_id` — 교수법 처치
+     (`pedagogy_render`)는 `learning_session`이 아닌 임의 UUID를 쓰므로 ⓐ로는 못 잡는다. 이
+     바인딩은 `HMAC(jwt 비밀키, 도메인:session_id:user_id)`라 잔존 user_id(`deletion_audit`)로
+     전 행의 바인딩을 재계산하면 그 학생의 세션을 다시 찾을 수 있다 — 그 재연결 경로를 닫으려면
+     같은 계산으로 일치하는 행을 지워야 한다. 결과 행(`pedagogy_outcome`)은 `meta`가 없지만
+     처치와 같은 `session_id`를 쓰므로 합집합으로 함께 지워진다.
+  정직한 한계(조용히 넘기지 않는다): ① 바인딩 일치는 **현재 jwt 비밀키**로만 계산된다 — 키가 회전된
+  뒤에는 옛 키로 만든 바인딩을 재계산할 수 없어 ⓑ 갈래가 그 행을 못 찾는다(그 행은 키를 가진 누구도
+  더는 재연결할 수 없다는 점에서 위험이 줄지만, 지워졌다는 뜻은 아니다). ② 세션 기록 실패 경로의
+  placeholder 행(`recommendation_evidence`가 발급한 결합 불가 UUID)은 어떤 학생에도 이어 붙일 키가
+  없어 지울 근거 자체가 없다. ③ ⓑ는 `evidence_event`의 바인딩 보유 행 전체를 읽어 재계산하므로
+  행이 많아지면 비용이 선형으로 는다(삭제권 요청은 드물어 현재는 수용 — 규모가 커지면 후속).
+  삭제 보존 연한을 가정하지 않는다: 삭제 증빙(`deletion_audit`)의 보존 연한은 이 모듈이 정하지
+  않는다(MGMT-02 변호사 회신 선행 — `privacy/retention.py`).
 """
 
 from __future__ import annotations
 
+import hmac
 import uuid
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import CursorResult, delete
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.config import Settings
 from whymath_backend.db.base import Base
 from whymath_backend.db.models.activity import AttemptEvent, LearningSession, ProblemAttempt
 from whymath_backend.db.models.answer_submission import AnswerSubmission
@@ -77,6 +96,7 @@ from whymath_backend.db.models.assessment import (
 from whymath_backend.db.models.audit import DeletionAudit
 from whymath_backend.db.models.device import DeviceCredential
 from whymath_backend.db.models.dialogue import Dialogue
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.evidence_link import EvidenceLink
 from whymath_backend.db.models.hint_usage import HintUsage
 from whymath_backend.db.models.job_ownership import JobOwnership
@@ -95,6 +115,7 @@ from whymath_backend.db.models.user import (
     UserStateSnapshot,
     UserTrackHistory,
 )
+from whymath_backend.l2.pedagogy_evidence import META_KEY_USER_BINDING, session_user_binding
 from whymath_backend.schema.enums import AuditResourceType
 
 __all__ = [
@@ -118,6 +139,10 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
     # EOS-46: 학생 풀이 step — 같은 계열(attempt CASCADE 자식·자식 우선·ADR-002).
     (StudentSolutionStep, "user_id"),
     (ProblemAttempt, "user_id"),  # learning_session보다 먼저(session→attempt CASCADE 역순 방지)
+    # SEC-40: 교수법 처치·추천 기록 — **소유 컬럼이 user가 아니라 세션**이다(`session_id` 느슨참조·
+    # 하이퍼테이블). 그래서 아래 루프가 `== user_id`로 지우지 않고 `_SESSION_AXIS_MODELS` 분기로
+    # `erase_user`가 **세션 삭제 전에** 모아 둔 세션 ID 합집합으로 지운다(모듈 docstring 참조).
+    (EvidenceEvent, "session_id"),
     (LearningSession, "user_id"),
     (AttemptEvent, "user_id"),  # 느슨참조·hypertable(고아 방지)
     (Assessment, "user_id"),
@@ -150,6 +175,15 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
     (LearnerStateRecord, "learner_id"),
 )
 
+# 소유 컬럼이 user가 아니라 **세션**인 계획 항목 — `erase_user`가 `== user_id`가 아니라 세션 ID
+# 집합(`_collect_student_session_ids`)으로 지운다. 이 집합에 없는 모델에 세션 컬럼을 넘기면
+# `session_id == user_id`라는 무의미한 조건이 되어 조용히 0행을 지우므로, 새 세션 축 테이블은
+# 반드시 여기에도 올려야 한다(`tests/backend/privacy/test_erasure_relink*.py`가 동결).
+_SESSION_AXIS_MODELS: frozenset[type[Base]] = frozenset({EvidenceEvent})
+
+# 한 DELETE 문에 실을 세션 ID 수 상한 — asyncpg 바인드 파라미터 한도(32767)를 넘지 않게 나눈다.
+_SESSION_ID_CHUNK = 5000
+
 # COLLAB-02 방향 역전 — 소유 축을 가졌지만 *정당하게* `_ERASURE_PLAN` 밖에 있어야 하는
 # 테이블의 사유 명시 허용목록. 무사유 예외는 금지(CLAUDE.md).
 # `tests/backend/privacy/test_erasure_plan_completeness.py`가 `Base.metadata.tables` 전수에서
@@ -171,8 +205,8 @@ _ERASURE_PLAN: tuple[tuple[type[Base], str], ...] = (
 #     테스트의 `PERMANENT_ERASURE_EXEMPTIONS`가 고정한다(영구 예외를 늘리는 것은 의식적 결정).
 #   · **임시 예외** — 처분이 다른 태스크·결정 대기라 *아직* 계획 밖인 학생 데이터. 반드시 아래
 #     `_ERASURE_PLAN_EXEMPTION_EXPIRY`에 해소 태스크를 함께 등재하며, 그 태스크가 종결되고도
-#     항목이 남아 있으면 테스트가 RED를 낸다(CLAUDE.md 「만료 없는 유예·제외 금지」). 현재
-#     `evidence_event` 1건(SEC-40).
+#     항목이 남아 있으면 테스트가 RED를 낸다(CLAUDE.md 「만료 없는 유예·제외 금지」). 현재 0건
+#     (`evidence_event`는 SEC-40이 `_ERASURE_PLAN`으로 편입해 걷었다).
 # 미래 협업 스키마가 만드는 B형(학생 기여+타인 컨테이너)·C형(교차 사용자 집계)·D형(조직 소유)
 # 테이블도 같은 방식으로 이 상수에 사유와 함께 등재하거나, `_ERASURE_PLAN`에 편입해야 한다
 # (같은 문서 §3 다자 소유 규칙).
@@ -193,24 +227,6 @@ _ERASURE_PLAN_EXEMPTIONS: dict[str, str] = {
         "`PrivacyAudit`) — user_id·target_user_id 둘 다 FK가 아닌 plain UUID. deletion_audit와 "
         "동일 근거로 계정 삭제 후에도 잔존해야 감사 목적을 달성한다. 협업 5분류(E형 감사)와 동형."
     ),
-    # SEC-39 — **임시 예외(만료 있음)**. 아래 `_ERASURE_PLAN_EXEMPTION_EXPIRY`가 해소 태스크를
-    # 구조 필드로 들고 있고, SEC-40이 종결되고도 이 항목이 남으면 완전성 테스트가 RED를 낸다.
-    "evidence_event": (
-        "임시 예외 — 만료 있음(해소 태스크 SEC-40 · 결정 게이트 G-eos37-erasure-kpi-disposition). "
-        "교수법 처치·결과 기록(`db/models/evidence_event.py` · 하이퍼테이블)은 user 컬럼도 user "
-        "FK도 없이 `session_id`(FK 아닌 느슨참조)로만 학생에 묶여, 소유 판정 (C) 학생 세션 축"
-        "(SEC-39)이 생기기 전까지 완전성 가드의 사각이었다. 반면 반출(`privacy/export.py` "
-        "EOS-131 ⑤)은 `learning_session` 조인으로 이 행을 학생 데이터로 내준다 — 열람권엔 있고 "
-        "삭제권엔 없는 비대칭이 이 예외의 실체다. 삭제 배선은 SEC-40이 소유하며, KPI 측정용 보존 "
-        "여부를 가르는 결정 게이트를 기다린다. 그 전까지 행이 남아 재연결 경로 2건이 열려 있다: "
-        "ⓐ 개별 세션 삭제(`api/me.py` `_delete_owned_resource`)는 `learning_session`만 지우고 "
-        "`deletion_audit`에 (user_id, resource_id=세션 ID)를 남기므로 그 세션 ID로 이 행을 다시 "
-        "찾는다 ⓑ 계정 삭제(`erase_user`)는 이 행을 지우지 않고 `deletion_audit`에 user_id를 "
-        "남기므로, `meta.user_binding`(HMAC(jwt 비밀키, 도메인:session_id:user_id) · "
-        "`l2/pedagogy_evidence.session_user_binding`)을 잔존 user_id로 재계산해 이 학생의 세션을 "
-        "다시 찾는다(비밀키를 가진 운영 주체 한정 — 적법성은 변호사 판단). 정당한 영구 사유가 "
-        "아니라 처분 대기이므로 만료 없는 등재 금지."
-    ),
 }
 
 # SEC-39 — 허용목록 항목 중 **임시 예외**의 해소 태스크(테이블명 → 백로그 태스크 ID).
@@ -218,9 +234,11 @@ _ERASURE_PLAN_EXEMPTIONS: dict[str, str] = {
 # `GrandfatherEntry` · ARCH-25 그랜드파더 만료 계약 선례). 완전성 테스트가 `backlog/tasks/*.yaml`의
 # `status`를 읽어, 태스크가 없거나 done·cancelled인데 항목이 남아 있으면 RED를 낸다(자동 해제
 # 아님 — 걷는 것은 처분을 구현하는 사람이다). 이 맵에 없는 허용목록 항목은 영구 예외여야 한다.
-_ERASURE_PLAN_EXEMPTION_EXPIRY: dict[str, str] = {
-    "evidence_event": "SEC-40",
-}
+#
+# 현재 임시 예외는 **0건**이다 — `evidence_event`(SEC-39 등재 · 해소 태스크 SEC-40)가
+# `_ERASURE_PLAN`으로 편입되며 이 맵에서 걷혔다. 새 임시 예외가 생기면 여기에 해소 태스크와
+# 함께 등재한다.
+_ERASURE_PLAN_EXEMPTION_EXPIRY: dict[str, str] = {}
 
 
 class ExternalErasureTarget(BaseModel):
@@ -322,7 +340,73 @@ class ErasureReport(BaseModel):
     )
 
 
-async def erase_user(session: AsyncSession, *, user_id: uuid.UUID) -> ErasureReport:
+async def _bound_session_ids(
+    session: AsyncSession, *, user_id: uuid.UUID, settings: Settings
+) -> set[uuid.UUID]:
+    """`meta.user_binding` HMAC이 이 학생과 일치하는 `evidence_event`의 세션 ID(SEC-40 ⓑ).
+
+    바인딩은 `HMAC(jwt 비밀키, 도메인:session_id:user_id)`다 — 행마다 자신의 `session_id`로
+    `session_user_binding`을 다시 계산해 저장된 값과 상수시간 비교한다(운영 주체가 잔존 user_id로
+    할 수 있는 재연결과 **같은 계산**을 지우는 쪽이 먼저 한다). 바인딩 보유 행만 읽는다 —
+    바인딩이 없는 행(추천 기록·결과 행)은 다른 갈래(학습 세션 ID·같은 session_id)로 지워진다.
+    """
+    binding_col = EvidenceEvent.meta[META_KEY_USER_BINDING].astext
+    result = await session.execute(
+        select(EvidenceEvent.session_id, binding_col).where(binding_col.is_not(None)).distinct()
+    )
+    matched: set[uuid.UUID] = set()
+    for session_id, stored in result.all():
+        expected = session_user_binding(session_id, user_id, settings=settings)
+        if hmac.compare_digest(str(stored), expected):
+            matched.add(session_id)
+    return matched
+
+
+async def _collect_student_session_ids(
+    session: AsyncSession, *, user_id: uuid.UUID, settings: Settings
+) -> list[uuid.UUID]:
+    """이 학생의 세션 축 ID 합집합 — ⓐ 학습 세션 PK ∪ ⓑ 바인딩 일치 세션(모듈 docstring).
+
+    **세션 행을 지우기 전에** 호출해야 한다 — `learning_session`이 먼저 지워지면 ⓐ의 근거가 사라진다
+    (그 순서는 `erase_user`가 지키고, 순서를 뒤집으면 재연결 테스트가 RED다).
+    """
+    owned = (
+        (
+            await session.execute(
+                select(LearningSession.session_id).where(LearningSession.user_id == user_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    ids = set(owned) | await _bound_session_ids(session, user_id=user_id, settings=settings)
+    return sorted(ids, key=str)  # 결정적 순서(청크 경계 재현성)
+
+
+async def _delete_by_session_ids(
+    session: AsyncSession, model: type[Base], column: str, session_ids: list[uuid.UUID]
+) -> int:
+    """세션 ID 집합으로 세션 축 테이블을 지운다 — 청크 단위 DELETE, 같은 트랜잭션(commit은 호출자).
+
+    집합이 비어도 DELETE를 **한 번은** 실행한다(빈 IN → 0행): 계획의 모든 테이블이 실제 삭제 문을
+    거친다는 계약(`test_covers_all_planned_tables`)을 유지하고, 호출 누락을 0행 성공으로 위장하지
+    않는다. 실패는 삼키지 않는다(예외는 그대로 올라가 호출자 트랜잭션이 롤백된다).
+    """
+    col = getattr(model, column)
+    chunks = [
+        session_ids[k : k + _SESSION_ID_CHUNK]
+        for k in range(0, len(session_ids), _SESSION_ID_CHUNK)
+    ] or [[]]
+    total = 0
+    for chunk in chunks:
+        result = await session.execute(delete(model).where(col.in_(chunk)))
+        total += cast("CursorResult[Any]", result).rowcount or 0
+    return total
+
+
+async def erase_user(
+    session: AsyncSession, *, user_id: uuid.UUID, settings: Settings
+) -> ErasureReport:
     """사용자의 *모든* 학생-연결 데이터를 단일 트랜잭션으로 영구 삭제(개인정보 삭제권·R11).
 
     `_ERASURE_PLAN` 순서로 각 테이블을 `delete(...).where(user컬럼 == user_id)`로 지우고(자식→부모),
@@ -330,11 +414,24 @@ async def erase_user(session: AsyncSession, *, user_id: uuid.UUID) -> ErasureRep
     `dialogue_turn`은 `dialogue` 삭제에 DB CASCADE로 함께 제거된다(user 컬럼 없음). **commit은
     호출자**(flush로 같은 트랜잭션 가시화) — 어느 단계 실패도 전부 롤백돼 *부분 삭제가 없다*.
 
+    SEC-40: 세션 축 테이블(`evidence_event`)은 user 컬럼이 없어 **세션 ID 합집합**으로 지운다 —
+    그 목록은 `learning_session`을 지우기 *전에* 모은다(순서가 곧 정확성이다). 바인딩(HMAC) 일치
+    행을 찾으려면 jwt 비밀키가 필요해 `settings`를 필수로 받는다(기본값으로 감추지 않는다 —
+    비밀키 없이 호출하면 그 갈래가 조용히 빠지므로 호출 시점에 시그니처가 막는다).
+
     멱등성: 이미 없는 사용자면 모든 삭제가 0행이고 `user_profile_deleted=0`(에러 없이 무해 종료).
     감사 행은 user_profile이 실재했든 아니든 적재된다(삭제 *시도* 증빙). 순수 ORM/쿼리빌더만.
     """
+    # 세션 행·바인딩 근거가 살아 있을 때 세션 축 ID를 모은다(아래 루프의 learning_session 삭제 전).
+    session_ids = await _collect_student_session_ids(session, user_id=user_id, settings=settings)
+
     counts: dict[str, int] = {}
     for model, column in _ERASURE_PLAN:
+        if model in _SESSION_AXIS_MODELS:
+            counts[model.__tablename__] = await _delete_by_session_ids(
+                session, model, column, session_ids
+            )
+            continue
         result = await session.execute(delete(model).where(getattr(model, column) == user_id))
         counts[model.__tablename__] = cast("CursorResult[Any]", result).rowcount or 0
 

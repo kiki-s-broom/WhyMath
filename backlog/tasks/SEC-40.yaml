@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -25,6 +25,6 @@ paths:
   - src/backend/whymath_backend/privacy/erasure.py
   - src/backend/whymath_backend/api/me.py
   - "tests/backend/privacy/test_erasure_relink*.py"
-session: null
+session: claude/gallant-euler-blngpj
 notes: "재연결 경로(판정 기준 main `85f934a4` 코드 판독): ⓐ 개별 세션 삭제 — `_delete_owned_resource`가 `learning_session`만 지우고 `deletion_audit`에 (user_id=소유자, resource_id=세션 ID)를 남긴다. 그 세션 ID의 `evidence_event` 행은 남으므로 증빙 로그와 맞대면 곧바로 그 학생의 처치 기록을 다시 찾는다. ⓑ 계정 삭제 — `erase_user`가 `evidence_event`를 지우지 않고 `deletion_audit`에 user_id를 남긴다. `evidence_event.meta.user_binding`은 HMAC(jwt 비밀키, 도메인:session_id:user_id)라, 비밀키를 가진 운영 주체는 잔존 user_id로 전 행의 바인딩을 계산해 그 학생의 세션을 다시 찾을 수 있다(외부인은 비밀키가 없어 불가 — 그래서 적법성은 변호사 판단). 우선순위: CLAUDE.md 의사결정 2번(법적 준수)이 KPI 측정보다 앞선다. 2026-09-30 Kiki 승인(검토의견 \"진행\")."
-updated: 2026-09-30
+updated: 2026-10-03

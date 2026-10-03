@@ -134,7 +134,7 @@ def test_erase_user_succeeds_with_learner_state_row() -> None:
             await _seed_user_with_learner_state(sm, uid)
 
             async with sm() as session:
-                report = await erase_user(session, user_id=uid)
+                report = await erase_user(session, user_id=uid, settings=_settings())
                 await session.commit()  # commit은 호출자
                 # 보고에 *학습자 상태가 명시적으로 계상*되어야 한다 — CASCADE 부수효과로
                 # 사라진 것과 계획이 지운 것을 보고가 구분하지 못하면 감사 가치가 없다.
