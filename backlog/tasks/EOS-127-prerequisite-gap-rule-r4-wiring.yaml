@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/backend/whymath_backend/l2/learning_state_evidence.py
   - src/backend/whymath_backend/l2/learning_state_policy.py
   - src/backend/whymath_backend/api/me.py
-session: null
+session: claude/friendly-darwin-9fqq5z
 notes: "출처: 계획서 300 Phase 2 §11 집행 지시문 P-15 실행 중 실측 확인. 판정 기준 main 433ec9ea. EOS-105(done)가 acceptance 안에 \"명시한 한계 ②\"로 자인했으나 승계 태스크가 없었다 — CLAUDE.md \"회수로 태스크 done 선언 시 acceptance 전수 재대조\" 규칙이 겨냥하는 형태(약속한 것이 다 있는가)의 인접 사례이며, 여기서는 *한계로 선언한 것에 소유자가 없는* 축이다. P-15 ④ 범위 규율에 따라 등재만 하고 P-15 PR에서는 고치지 않았다. 분류 LOOP.\n\n[개명 2026-09-19] EOS-124-prerequisite-gap-rule-r4-wiring → EOS-127-prerequisite-gap-rule-r4-wiring: 번호 충돌 — main이 PR #1227에서 EOS-124(next-problem 정책·선택 축 불일치)를 먼저 착지시켰다. 미머지인 이쪽을 개명(HARN-100)\n\n[정정 2026-09-19] PR #1228 축소 — 하네스 경로 정정 + main EOS-124와의 경계 명시\n\n[정정 2026-09-28] EOS-138 판정 §5 R4a 예외를 R4 생산자 배선의 착지 조건으로 이관"
-updated: 2026-09-28
+updated: 2026-10-03
