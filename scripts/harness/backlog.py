@@ -552,6 +552,62 @@ def _remote_claim_map(root: Path, policy, skip: bool = False) -> tuple[dict[str,
     return {c.task_id: (c.branch or "?") for c in claims}, "ok"
 
 
+def _foreign_claim_state(root: Path, task_id: str) -> tuple[str, dict[str, str]]:
+    """대상 태스크의 원격 claim 상태 4상태 (HARN-199) — (상태, 근거).
+
+    - `foreign`: 다른 세션(브랜치)이 이 태스크를 claim 중이다 — 근거 = holder·ts·kind.
+    - `own`    : 이 세션(현재 브랜치)의 claim이다.
+    - `none`   : 조회에 성공했고 claim이 없다(**조회 성공일 때만** 이 상태다).
+    - `unknown`: 조회하지 못했다(비활성·offline·error·메타 파손) — 근거 = reason.
+    '모른다 ≠ 아니다': 조회 실패를 `none`으로 접으면 인프라 장애가 "경고 없음"으로 위장된다.
+    라이브 조회(`list_claims`)만 쓴다 — 낡은 캐시는 07:02 사고처럼 알려진 claim을 모를 수 있다.
+    """
+    policy, _ = store.load_policy(root)
+    if not policy.remote_claims:
+        return "unknown", {"reason": "disabled"}
+    claims, status = remote_claims.list_claims(root)
+    if status != "ok":
+        return "unknown", {"reason": status}
+    mine = store.current_branch(root)
+    holders = [c for c in claims if c.task_id == task_id]
+    if not holders:
+        return "none", {}
+    for c in holders:
+        if not c.branch:
+            # 메타(브랜치) 파손 — 누구의 것인지 모른다. 'own'으로 접으면 타 세션 claim을 놓친다.
+            return "unknown", {"reason": "claim 메타에 브랜치 없음"}
+    for c in holders:
+        if c.branch != mine:
+            return "foreign", {"holder": c.branch, "ts": c.ts or "?", "kind": c.kind}
+    return "own", {}
+
+
+def _warn_foreign_claim(root: Path, task_id: str, verb: str) -> dict[str, object] | None:
+    """타 세션 claim이 있거나 확인 불가면 stderr에 경고하고 이벤트 필드를 돌려준다 (HARN-199).
+
+    **거부하지 않는다** — 대장 정정 경로를 보존한다(차단 여부는 Kiki 판정). 경고는 `foreign`과
+    `unknown`에서만 나고 `own`·`none`은 침묵한다. 반환값은 해당 verb의 이벤트에 얹을 필드다.
+    """
+    state, info = _foreign_claim_state(root, task_id)
+    if state == "foreign":
+        print(
+            f"⚠ {task_id}: 다른 세션이 claim 중 — 보유 브랜치 {info['holder']} "
+            f"(claim {info['ts']}, kind={info['kind']}). {verb}는 계속 진행하지만, 같은 파일을 두 "
+            "세션이 고치면 나중에 병합하는 쪽이 충돌한다.",
+            file=sys.stderr,
+        )
+        return {"foreign_claim": {"state": "foreign", **info}}
+    if state == "unknown":
+        print(
+            f"⚠ {task_id}: 원격 claim 확인 불가({info['reason']}) — "
+            "'다른 세션 claim 없음'이 아니다. "
+            f"다른 세션이 잡고 있을 수 있다. {verb}는 계속 진행한다.",
+            file=sys.stderr,
+        )
+        return {"foreign_claim": {"state": "unknown", **info}}
+    return None
+
+
 def _overlap_block_map(root: Path, backlog, policy) -> dict[str, list[str]] | None:
     """block 모드일 때만 — todo 태스크별 in-flight 겹침 근거 (selector 제외용)."""
     if policy.path_overlap != "block":
@@ -1649,8 +1705,10 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
         return _fail(error)
     task.status = "review"
     task.updated = _today()
+    # HARN-199 — review도 대상 태스크 파일을 쓴다. 다른 세션 claim이면 알린다(거부하지 않는다).
+    foreign_claim = _warn_foreign_claim(root, task.id, "review 전이")
     store.save_task(root, task)
-    store.append_event(root, "review", task.id)
+    store.append_event(root, "review", task.id, **(foreign_claim or {}))
     print(f"👀 {task.id} 검토 대기 (세션: {task.session or '?'})")
     return 0
 
@@ -3610,8 +3668,12 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
     if _fail_on_reason_feedback(backlog, task.id, feedback_mask, hint=feedback_hint):
         return 1
 
+    # HARN-199 — 대상 태스크를 다른 세션이 claim 중이면 쓰기 전에 알린다(거부하지 않는다).
+    foreign_claim = _warn_foreign_claim(root, task.id, "정정")
     store.save_task(root, task)
     event_extra: dict[str, object] = {"reason": args.reason, "changed": changed}
+    if foreign_claim:
+        event_extra.update(foreign_claim)
     if track_before is not None:
         # track 축은 field/before/after도 함께 남긴다 — HARN-49가 쓰던 형태를 깨지 않는다.
         event_extra.update(field="track", before=track_before, after=args.track)
