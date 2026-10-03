@@ -18,7 +18,7 @@
 # ⚠ check·run의 경로는 '제안 경로'다. 실제 저장소 구조에 맞게 사람이 조정한다.
 # ─────────────────────────────────────────────────────────────
 
-version: "1.0"
+version: "1.0.1"
 
 rules:
 
@@ -176,42 +176,56 @@ rules:
 # ⚠ path는 제안 경로. 실제 위치로 바꾼 뒤 위헌 심사를 돌리면 누락이 드러난다.
 # ─────────────────────────────────────────────────────────────
 sources:
+  # ── v1.0.1 정정 (개정 초안 A0003 · CONST-02 · 판정 기준: 조사 main b8af6f26) ──
+  # 제안 경로 6/9가 이 저장소에 없어 위헌 심사 R4-01이 차단 7건을 냈다. 아래는 1차 조사가 코드의
+  # 실제 소비 경로(grep)로 찾고 독립 검증이 재확인한 정본 위치다. 근거 = docs/constitution_proposals/
+  # A0003_sources_registry_draft.md 와 docs/reviews/coding_constitution_crosswalk_2026-09-27.md §2.
   - name: 성취기준
-    external: true
-    path: "교육부 고시 2022 개정 수학과 교육과정 원문"
-    version: "고시 번호·판 확인 후 기입"
-    derived: [성취기준 추출 엑셀, curriculum_standards 테이블]
+    path: data/corpus/standards_v1/standards.json
+    version: "교육부 고시 제2022-33호(2022 개정 435건) + 제2015-74호(2015 개정 460건) · 코퍼스 원본 sha256 4e21d6d4424c… (2026-06-20)"
+    derived: [PG achievement_standard, PG concept_standard_link, PG curriculum_entry KR 셀, 커버리지 리포트 분모]
 
   - name: 개념 그래프 (노드·선수 관계)
-    path: content/concept_graph.yaml
-    derived: [PostgreSQL concept_nodes 적재본]
+    path: data/corpus/atom_graph_v1/graph.json
+    version: "atom_graph_v1 — 원자 백본 2,683노드·2,210엣지 (legacy 437개념 concept_graph_v1 은 감사 전용 스냅샷)"
+    derived: [PG concept·concept_edge, PG atom_node, PG atom_embedding, 시각화 Overlay]
 
   - name: 오개념 DB·오답 op-code
-    path: content/misconceptions.yaml
-    derived: [PostgreSQL misconceptions 적재본, 앱 번들]
+    path: data/corpus/misconceptions_v1/misconceptions.json
+    version: "M-id 카탈로그 843건 · kebab 탐지 카탈로그 67종(정본 docs/prompts/misconception_diagnosis.md) · op-code 10종(l4/misconception/distractor.py)"
+    derived: [PG misconception_catalog, Problem.distractor_map, 크로스링크 게이트 적재본]
 
   - name: 수능 시그니처 패턴
-    path: content/csat_patterns.yaml
-    derived: [PostgreSQL csat_patterns 적재본]
+    path: src/backend/whymath_backend/schema/enums.py
+    version: "SignaturePattern 10종 폐쇄 enum (설계 정본 schemas/v1.0/schema_v1.0.md §14.3 · 태깅 규칙 3종 signature_tagger.py)"
+    derived: [Problem.signature_patterns 배열, 코퍼스 signature_patterns 태그, L6 suneung 게이팅]
 
   - name: 문항 데이터 구조
-    path: schemas/item.schema.json
-    derived: [backend/models/item.py, app/lib/models/item.dart]
+    path: src/backend/whymath_backend/schema/problem.py
+    version: "Problem.schema_version whymath-problem 1.1.0 (설계 정본 schemas/v1.0/schema_v1.0.md §3.1)"
+    derived: [PG problem·problem_step·problem_relation (ORM), Dart problem_models.dart, API 응답 모델]
 
   - name: 파이프라인 실행 순서
     path: pipeline.yaml
-    derived: [README의 순서 설명]
+    derived: [런북·docstring의 적재 순서 설명(파생 — pipeline.yaml 이 정본)]
 
   - name: 저작권 허용 기준
-    path: docs/copyright/MathScope_저작권_종합가이드_v2.0.md
-    derived: [게시 게이트 허용 등급 목록]
+    path: docs/data/licensing_safety.md
+    version: "매트릭스 정본 (원문 docs/legal/copyright_guide_v2.md v2.0 2026-05-27 · 값 정본 docs/legal/copyright_gradient.md §4.2)"
+    derived: [ContentPool enum, METADATA_ONLY_SOURCES 검증자, 약관 스냅샷 TIER1_SOURCES, CI policy-guard]
 
   - name: EOS 기능 목록
-    path: docs/planning/WhyMath_EOS_2026_12월출시_기능재배치.xlsx
-    derived: [TODO 문서, 이슈]
+    path: scripts/analysis/eos_feature_inventory_v2.py
+    version: "기계 도출 장부 v2 (162행 · 2026-09-03) — 외부 xlsx(52·120·382 항목)와의 개수 정합은 판정 대상 아님"
+    derived: [backlog/inventory/feature_inventory_v2.yaml (비커밋 산출), backlog 태스크]
 
   - name: 학습자 응답·지식 추적 상태
     external: true
-    path: "PostgreSQL (nucbox-evo-x2 Docker 컨테이너)"
-    version: "운영 DB — 파일로 복사해 수정 후 되돌려 넣기 금지"
-    derived: [분석용 내보내기]
+    path: "PostgreSQL 운영 DB whymath-pg (Phaiakes9 Docker · 호스트 5433)"
+    version: "코드 기대 스키마 alembic head 8c19e8a611e4 · 운영 DB 스탬프 d6e7f8a9b0c1 (probe_prod_schema_revision.sql 로 확정)"
+    derived: [분석용 내보내기, 일일 학습 지표 롤업]
+
+  # ── Kiki 판단 요청(채택 시 위 목록에 추가) — 정본이 두 곳 이상인 데이터 종류 3건 ──
+  # ① 규칙 등록부: CLAUDE.md 원문 · backlog/rules.ndjson(데이터) · docs/standards/rule_index.md(렌더) · 이 파일
+  # ② LLM 모델 핀: src/backend/whymath_backend/l3/router.py LOCAL_MODEL_MATRIX · config.py · CLAUDE.md 스택 표
+  # ③ 단원·소단원 위계: atom_graph_v1(단원 217·소단원 643) · achievement_criteria_v1 · units_v1 · textbook_unit
