@@ -223,6 +223,16 @@ def _attempt(
     return body
 
 
+def _general_ability(client: Any, auth: dict[str, str]) -> float | None:
+    """`GET /v1/me/learner-state`의 전과목 θ — 상태 합성 표면이 말하는 값(EOS-125 관측 지점).
+
+    이 표면은 `ability_snapshot` 최신 행을 읽는다. 채점 루프가 그 행을 적재하지 않으면 값은 항상
+    None이라 같은 순간 `/next-problem`(즉석 추정)과 다른 말을 한다 — 그 결함을 지키는 자리다.
+    """
+    value = _get(client, auth, "/v1/me/learner-state")["general_ability"]
+    return None if value is None else float(value)
+
+
 def _mastery_of(client: Any, auth: dict[str, str], cid: uuid.UUID) -> float | None:
     """개념 숙달 현재값 — 미측정이면 None(0.0과 구별한다)."""
     for row in _get(client, auth, "/v1/me/mastery/current"):
@@ -543,6 +553,13 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             assert baseline is not None, "정답 1건 뒤에도 숙달이 미측정이면 전파가 끊긴 것이다."
 
+            # ②-b θ 적재 경계(`EOS-125`) — 세션을 닫거나 수동 캡처를 한 적이 없는 루프 학습자도 첫
+            #      채점 직후 상태 합성 표면에 θ가 실린다. 종전에는 이 값이 항상 null이었다.
+            assert _general_ability(client, auth) is not None, (
+                "채점 루프만 돈 학습자의 learner-state.general_ability가 null이다 — "
+                "채점 경계의 θ 스냅샷 적재(`l2.ability_snapshot_capture`)가 끊겼다(`EOS-125` 재발)."
+            )
+
             # ③ 대부분 정답 — 3문항 중 2정답 1오답(“대부분”이지 전부가 아니다).
             _attempt(client, auth, cur_pids[1], correct=True, answer="정답2")
             wrong = _attempt(client, auth, cur_pids[2], correct=False, answer="오답")
@@ -617,6 +634,13 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             #    *선택*임을 이미 판정했으므로, 여기서 보는 것은 고갈 경로에서도 목적지가 같은가다
             #    (다음 개념이 미측정이면 진단 문항으로 나간다 — 행위는 diagnose, target은 다음 개념).
             _attempt(client, auth, cur_pids[5], correct=True, answer="정답5")
+            # ⑥-b 적재는 매 채점이 아니라 stride 경계다(`EOS-125`) — 6건 채점에서 곡선은 2점
+            #      (첫 채점 1건 · 마지막 스냅샷 이후 5건 쌓인 6번째)이다. 6점이면 중복 적재다.
+            curve = _get(client, auth, "/v1/me/ability/snapshots")
+            assert [pt["response_count"] for pt in curve] == [1, 6], (
+                f"전과목 θ 곡선의 응답 수가 {[pt['response_count'] for pt in curve]}다 — "
+                "[1, 6]이 아니면 stride 판정이 깨졌다(매 채점 적재 또는 적재 누락)."
+            )
             drained = _next_problem(client, auth)
             journal.record(
                 "⑥다음concept도달",

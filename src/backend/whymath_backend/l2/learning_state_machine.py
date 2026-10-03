@@ -57,6 +57,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.learning_state_transition import LearningStateTransition
+from whymath_backend.l2.ability_snapshot_capture import capture_global_ability_if_due
 from whymath_backend.l2.learning_state_evidence import build_attempt_evidence
 from whymath_backend.l2.learning_state_policy import LearningStatePolicy, default_policy
 from whymath_backend.schema.learning_state import (
@@ -423,13 +424,18 @@ async def advance_on_graded_attempt(
         confidence=confidence,
         this_attempt_misconceptions=this_attempt_misconceptions,
     )
-    return await advance_on_attempt(
+    result = await advance_on_attempt(
         session,
         user_id=user_id,
         evidence=policy_evidence,
         attempt_id=attempt_id,
         policy=policy,
     )
+    # EOS-125: 채점 경로가 셋(`/v1/me/attempts`·코치 완료·코치 최초 오답)이라 θ 스냅샷 적재도 이
+    # 공용 진입점 한 곳에 둔다 — 경로마다 따로 부르면 한쪽만 빠지는 비대칭이 재발한다(EOS-134
+    # 와 같은 교훈). never-break·stride 판정은 그 모듈이 맡고, 결과는 상태 전이에 영향이 없다.
+    await capture_global_ability_if_due(session, user_id)
+    return result
 
 
 @dataclass(frozen=True)
