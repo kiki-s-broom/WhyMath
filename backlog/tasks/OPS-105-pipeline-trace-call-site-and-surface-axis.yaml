@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/pipeline.py
   - src/backend/whymath_backend/ops/cost_report.py
-session: null
+session: claude/sweet-hypatia-f402tv
 notes: "OPS-84 조사 중 발견. OPS-84는 저작 경로에 한정한 표지(traffic_surface=authoring)와 cost_report 분리만 착지시켰다."
-updated: 2026-10-02
+updated: 2026-10-03
