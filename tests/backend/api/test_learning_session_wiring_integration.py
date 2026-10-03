@@ -164,7 +164,9 @@ def test_serving_paths_open_one_session_and_join_recommendations() -> None:
                 " AND event_type = 'recommendation_render'",
                 {"s": sid},
             )
-            assert remaining == [(0,)], "삭제권 이행 뒤에도 그 세션의 추천 기록이 남아 재연결 경로가 열려 있다"
+            assert remaining == [
+                (0,)
+            ], "삭제권 이행 뒤에도 그 세션의 추천 기록이 남아 재연결 경로가 열려 있다"
             rejoined = _rows(
                 "SELECT count(*) FROM evidence_event e"
                 " JOIN learning_session s ON s.session_id = e.session_id WHERE s.user_id = :u",
