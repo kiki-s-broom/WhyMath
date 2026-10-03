@@ -20,6 +20,7 @@ from pathlib import Path
 
 import incidents as inc
 import pytest
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -401,13 +402,12 @@ class TestIncidentCli:
         self, seeded_repo: Path, capsys, monkeypatch
     ) -> None:
         """훅과 CLI가 같은 함수를 쓰는지 — 한쪽만 보면 배선이 반쪽이다."""
-        import io
 
         path = inc.ledger_path(seeded_repo)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('{"date": "2026-09-01", "cat": "Z", "title": "x"}\n', encoding="utf-8")
         payload = json.dumps({"tool_input": {"file_path": str(path)}})
-        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        set_hook_stdin(monkeypatch, payload)
         assert cli.main(["check-edit"]) == 2
 
     def test_seed_refuses_to_overwrite_without_force(self, seeded_repo: Path, capsys) -> None:
