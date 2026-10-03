@@ -309,6 +309,10 @@ BASELINE: dict[str, frozenset[str]] = {
             # EOS-15 — 루프 KPI 5종 수집기. 관측 CLI라 DB 직접 조회가 본질이며(관측 대상이
             # 실 운영 데이터다), `recommendation_reach_report`·`service_health`와 같은 부류다.
             "ops/loop_kpi_gate.py",
+            # EOS-38 — 판정 표본 산출 CLI. 앱의 엔진이 아니라 **별도 전용 DB URL**(`_kpi_sample`)에
+            # 직접 연결해 콘텐츠를 시딩하고 부하 결과를 센다 — 가드가 DB 이름·비합성 학습자를 본 뒤에야
+            # 연결하는 것이 본질이라 Repository 계층을 경유할 수 없다(경유하면 가드 이전에 앱 엔진이 열린다).
+            "ops/loop_kpi_sample_load.py",
             # ADMIN-15 — 운영자 토큰 발급 CLI. 대상 계정(역할·데모 여부) 조회 + 감사 행 적재를
             # 한 트랜잭션으로 하는 ops CLI라 role_grant_cli·account_bootstrap_cli와 같은 부류다.
             "ops/operator_token_cli.py",
