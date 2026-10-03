@@ -553,11 +553,12 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             assert baseline is not None, "정답 1건 뒤에도 숙달이 미측정이면 전파가 끊긴 것이다."
 
-            # ②-b θ 적재 경계(`EOS-125`) — 세션을 닫거나 수동 캡처를 한 적이 없는 루프 학습자도 첫
-            #      채점 직후 상태 합성 표면에 θ가 실린다. 종전에는 이 값이 항상 null이었다.
-            assert _general_ability(client, auth) is not None, (
-                "채점 루프만 돈 학습자의 learner-state.general_ability가 null이다 — "
-                "채점 경계의 θ 스냅샷 적재(`l2.ability_snapshot_capture`)가 끊겼다(`EOS-125` 재발)."
+            # ②-b θ 적재 경계(`EOS-125`) — 응답 1건짜리 θ는 신뢰 하한 미달이라 적재하지 않는다.
+            #      코치의 전과목 θ 폴백이 게이팅 없이 그 값을 읽어 힌트 사다리를 바꾸기 때문이다
+            #      (EOS-133 통합테스트가 잡은 실측 회귀). null은 결함이 아니라 "아직 측정 불가"다.
+            assert _general_ability(client, auth) is None, (
+                "응답 1건에서 general_ability가 적재됐다 — 신뢰 하한(`l4_theta_min_responses`) "
+                "미달 θ가 코치 전과목 폴백에 노출된다."
             )
 
             # ③ 대부분 정답 — 3문항 중 2정답 1오답(“대부분”이지 전부가 아니다).
@@ -569,6 +570,13 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             _attempt(client, auth, cur_pids[3], correct=True, answer="정답3")
             last = _attempt(client, auth, cur_pids[4], correct=True, answer="정답4")
+            # ③-b θ 적재 경계(`EOS-125`) — 세션을 닫거나 수동 캡처를 한 적이 없는 루프 학습자도 신뢰
+            #      하한을 넘으면 상태 합성 표면에 θ가 실린다. 종전에는 이 값이 항상 null이었다.
+            assert _general_ability(client, auth) is not None, (
+                "채점 5건을 푼 루프 학습자의 learner-state.general_ability가 null이다 — "
+                "채점 경계의 θ 스냅샷 적재(`l2.ability_snapshot_capture`)가 끊겼거나 신뢰 하한을 "
+                "영영 못 넘는다(`EOS-125` 재발)."
+            )
             mid = _mastery_of(client, auth, c_cur)
             journal.record("③대부분정답", "5회 중 4정답 1오답", 숙달=mid, 상태=_state_of(last))
 
@@ -634,12 +642,14 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             #    *선택*임을 이미 판정했으므로, 여기서 보는 것은 고갈 경로에서도 목적지가 같은가다
             #    (다음 개념이 미측정이면 진단 문항으로 나간다 — 행위는 diagnose, target은 다음 개념).
             _attempt(client, auth, cur_pids[5], correct=True, answer="정답5")
-            # ⑥-b 적재는 매 채점이 아니라 stride 경계다(`EOS-125`) — 6건 채점에서 곡선은 2점
-            #      (첫 채점 1건 · 마지막 스냅샷 이후 5건 쌓인 6번째)이다. 6점이면 중복 적재다.
+            # ⑥-b 적재는 매 채점이 아니라 신뢰 하한 도달 시점 + stride 경계다(`EOS-125`) — 6건
+            #      채점에서 곡선은 하한(3건)을 처음 넘은 시점의 1점뿐이다(다음 점은 그로부터 5건 뒤).
+            #      점이 더 있으면 중복 적재, 없으면 적재 누락이다.
             curve = _get(client, auth, "/v1/me/ability/snapshots")
-            assert [pt["response_count"] for pt in curve] == [1, 6], (
-                f"전과목 θ 곡선의 응답 수가 {[pt['response_count'] for pt in curve]}다 — "
-                "[1, 6]이 아니면 stride 판정이 깨졌다(매 채점 적재 또는 적재 누락)."
+            counts = [pt["response_count"] for pt in curve]
+            assert len(counts) == 1 and counts[0] >= 3, (
+                f"전과목 θ 곡선의 응답 수가 {counts}다 — 신뢰 하한 도달 시점 1점이 아니면 "
+                "적재 판정이 깨졌다(매 채점 적재 또는 적재 누락)."
             )
             drained = _next_problem(client, auth)
             journal.record(

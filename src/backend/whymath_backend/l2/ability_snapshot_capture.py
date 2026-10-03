@@ -11,12 +11,25 @@
 스냅샷에서 왔는지(`TraceBasis.ability_snapshot_id` — EOS-132 추적 고리)를 잃는다. (다) 현행 유지는
 결함을 문서화할 뿐 고치지 않는다.
 
+신뢰도 하한 — 불신뢰 θ는 적재하지 않는다(실측 사고: 첫 채점 직후 응답 1건짜리 θ를 적재했더니
+코치의 전과목 θ 폴백이 그것을 그대로 읽어 힌트 사다리 결정이 바뀌었다 —
+`test_eos133_hint_attribution_integration`). 코치의 개념 θ는 `_theta_reading_reliable`로 거르지만
+**전과목 폴백(`api/coach._server_theta_for`)은 게이팅이 없다**. 그러므로 적재 쪽이 하한을 둔다:
+응답 수 `l4_theta_min_responses` 이상 **그리고** SE가 측정 가능(정보 0이 아님 — 전부 정답/오답이면
+θ가 ±극단에 붙고 SE는 None). 그 전의 학습자는 θ가 null로 남고 `origins`가 `no_data`로 정직하게
+말한다 — "아직 측정 불가"는 결함이 아니다.
+왜 `l4_theta_max_se`(기본 1.0)까지 걸지 않는가(실측): 기본 상한은 6건을 풀어도 못 넘는다(SE 1.13) —
+코치의 *개념* θ에는 맞는 엄격함이나 여기에 걸면 짧게 푸는 학습자는 영영 θ를 못 얻는다. 기존
+세션 종료 적재는 응답 1건짜리도 무게이트로 적재해 왔으므로 이쪽이 더 엄격한 하한이다.
+부수 효과(명시): 하한을 넘은 학습자부터는 코치가 전과목 θ 교차검증 코칭을 받는다 — 종전에는
+루프 학습자에게 그 입력이 영영 없었다.
+
 중복·비용 판정 — 매 채점마다 쓰지 않는다:
-- 스냅샷 없음 → 첫 채점 직후 1건(콜드스타트 해소. 응답 1건짜리 θ는 SE·응답수가 함께 실려
-  coach 노이즈 가드가 거른다).
-- 스냅샷 있음 → 마지막 스냅샷 이후 채점이 `CAPTURE_STRIDE`건 이상 쌓였을 때만 1건.
-- 판정에는 `COUNT` 1회만 쓰고, 전체 이력을 읽는 추정(`estimate_global_ability`)은 적재가 확정된
-  뒤에만 돈다 — 한 학습자의 채점당 추가 비용은 가벼운 조회 2회다.
+- 스냅샷 없음 → 신뢰 하한을 처음 넘는 채점 직후 1건.
+- 스냅샷 있음 → 마지막 스냅샷 이후 채점이 `CAPTURE_STRIDE`건 이상 쌓였을 때만 1건(이때도 하한을 다시
+  확인한다 — 전부 정답이면 θ가 극단이고 SE가 None이라 기존 θ를 극단값으로 덮을 수 있다).
+- 판정에는 `COUNT` 1회만 쓰고, 전체 이력을 읽는 추정(`estimate_global_ability`)은 채점 수가 하한에
+  닿은 뒤에만 돈다 — 한 학습자의 채점당 추가 비용은 가벼운 조회 2회다.
 
 범위(명시): **전과목 θ(concept_id NULL)만** 적재한다. 개념별 θ(`/ability/by-concept` 곡선)는
 세션 종료·수동 캡처가 계속 맡는다 — 이 모듈은 *적재 경계*만 다루며 IRT 추정기·θ 척도는 건드리지
@@ -35,6 +48,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.config import get_settings
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.assessment import AbilitySnapshot
 from whymath_backend.l2.ability_estimation import estimate_global_ability
@@ -61,6 +75,9 @@ class AbilityCaptureOutcome(enum.StrEnum):
     NO_RESPONSES = "no_responses"
     """θ 추정에 쓸 응답이 없다(난이도 b를 못 정하는 문항뿐) — 빈 θ는 적재하지 않는다."""
 
+    UNRELIABLE = "unreliable"
+    """응답 수 하한 미달이거나 SE가 측정 불가라 적재하지 않았다(정상 — 코치 전과목 폴백 보호)."""
+
     FAILED = "failed"
     """적재 중 예외 — 경고를 남기고 삼켰다(채점 응답은 정상)."""
 
@@ -83,13 +100,18 @@ async def capture_global_ability_if_due(
     (최신 전과목 스냅샷·채점 수) 후 적재가 필요할 때만 추정과 쓰기가 일어난다.
     """
     try:
+        settings = get_settings()
         latest = await get_current_ability(session, user_id)  # concept_id None=전과목
         graded = await _count_graded_attempts(session, user_id)
+        if latest is None and graded < settings.l4_theta_min_responses:
+            return AbilityCaptureOutcome.UNRELIABLE  # 무거운 추정도 돌리지 않는다
         if latest is not None and graded - latest.response_count < CAPTURE_STRIDE:
             return AbilityCaptureOutcome.NOT_DUE
         theta, se, count = await estimate_global_ability(session, user_id)
         if count == 0:
             return AbilityCaptureOutcome.NO_RESPONSES
+        if count < settings.l4_theta_min_responses or se is None:
+            return AbilityCaptureOutcome.UNRELIABLE
         session.add(
             AbilitySnapshot.from_schema(
                 AbilitySnapshotSchema(
