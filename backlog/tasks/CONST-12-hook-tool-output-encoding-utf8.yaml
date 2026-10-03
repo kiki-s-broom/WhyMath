@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-12-hook-tool-output-encoding-utf8
+title: "헌법 가드·자가시험·채택 도우미의 Windows cp949↔UTF-8 출력 해독 불일치 3곳 정정 + 회귀 동결 (과제 C 실측 · PR #1447 본문 결함)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 실측 고정(정본화): Windows(cp949 로캘)에서 헌법 도구의 서브프로세스·표준 출력 해독이 어긋난 3곳을 재현 증거와 함께 표로 못박는다 — (a) .claude/hooks/guard_constitution.py 가 차단 안내문을 stderr 로 낼 때 인코딩을 지정하지 않아 파이프에서 cp949 로 나간다 (b) scripts/constitution/selftest_guard.py run_fixture 가 capture_output + encoding utf-8 로 읽어 차단 픽스처 28건마다 reader 스레드가 UnicodeDecodeError 를 낸다(2026-10-03 Kiki 머신 실측: 트레이스 28건 = 차단 기대 픽스처 28건) (c) scripts/constitution/adopt_amendment.py run_merge 가 merge_rules.py 출력을 UTF-8 로 읽는데 그 도구는 cp949 로 낸다(PR #1447 본문 실측: 첫 미리보기 UnicodeDecodeError, PYTHONUTF8=1 우회).\n② 집행 지점 1 — 출력 측: 가드와 merge_rules.py 가 진입점에서 stdout/stderr 를 UTF-8 로 재구성한다(OPS-53 ⑤ 와 같은 방향 — windows_utf8_setup.md 의 'CP949 를 애플리케이션 내부에서 지원하려 하지 말 것'). 정본화(①)와 별항이며, 이 항이 끝나야 읽는 쪽 수정이 의미를 갖는다.\n③ 집행 지점 2 — 읽는 쪽: selftest_guard 와 adopt_amendment run_merge 가 자식 출력을 UTF-8 로 명시 해독하되 해독 실패를 삼키지 않는다. 특히 자가시험은 판정을 종료 코드에만 걸고 안내문 본문을 보지 않으므로, 차단 픽스처마다 stderr 에 헌법 조문 안내문(제9조)이 비어 있지 않게 실렸는지 단언을 추가한다.\n④ 변별력(파이프 축): 콘솔이 아니라 파이프·리다이렉트에서 검증한다. 로케일 cp949 를 강제한 서브프로세스(PYTHONUTF8 해제·PYTHONIOENCODING=cp949)로 수정 전 UnicodeDecodeError 가 재현되고 수정 후 사라짐을 양방향 실측한다. 가드 안내문을 일부러 비우거나 인코딩을 되돌리는 뮤테이션을 주입해 새 단언이 RED 임을 확인하고 원복한다(cp 백업으로 원복 — git checkout 금지).\n⑤ 회귀 테스트: 위 3곳 모두 tests/infra 또는 tests/harness 에 동결한다(현재 selftest_guard·merge_rules 에는 테스트가 없다). CI 잡에서 실제로 도는지 배선을 확인한다.\n⑥ 범위 결정(Kiki 판정 대기): A0004(원본 등록부 3건 추가)를 채택 도우미가 반영하도록 adopt_amendment.py 에 plan_a0004 를 추가하는 일을 이 태스크에 포함할지, 별도 태스크로 분리할지 — 같은 파일을 만지므로 포함을 권고하나 분리 가능하다. 어느 쪽이든 constitution/ 는 쓰지 않는다(제9조).\n⑦ 범위 밖: constitution/ 직접 수정, 규칙 R0-01 의 의미 변경, OPS-53 의 harness·ops CLI 전수 감사(별건), HARN-196 의 stdin 해독 정정(별건)."
+artifacts: []
+paths:
+  - ".claude/hooks/guard_constitution.py"
+  - scripts/constitution/selftest_guard.py
+  - scripts/constitution/adopt_amendment.py
+  - scripts/constitution/merge_rules.py
+  - tests/infra/test_hook_tool_output_utf8.py
+session: null
+notes: "2026-10-03 코딩 헌법 이식 과제 C(가드 Windows 실동작 확인) 실행 중 발견. 판정은 통과(SELFTEST_EXIT=0·HOOK_BLOCK_EXIT=2·HOOK_ALLOW_EXIT=0)이며 이 결함은 판정을 훼손하지 않는다 — 자가시험이 종료 코드만 쓰기 때문이다. 같은 날 같은 계열(Windows cp949 와 UTF-8 해독 불일치)이 3곳에서 나와 계열 단위로 등재한다. 기존 CONST-10·HARN-196 은 stdin 입력 해독만, OPS-53 은 harness·ops CLI 출력 크래시만 다루며 .claude/hooks 와 scripts/constitution 은 범위 밖이다(2026-10-03 대장 실측: selftest_guard·merge_rules 를 언급하는 태스크는 CONST-02 뿐). 실행 Kiki 머신 증거: C 출력의 PYTHON3_PATH 는 AppData 의 실제 python3.exe.\n\n[정정 2026-10-03] paths ['.claude/hooks/guard_constitution.py', 'scripts/constitution/selftest_guard.py', 'scripts/constitution/adopt_amendment.py', 'scripts/constitution/merge_rules.py', 'tests/infra/**'] → ['.claude/hooks/guard_constitution.py', 'scripts/constitution/selftest_guard.py', 'scripts/constitution/adopt_amendment.py', 'scripts/constitution/merge_rules.py', 'tests/infra/test_hook_tool_output_utf8.py']: 범위 재설정 — 실제로 만질 4개 파일과 신규 회귀 테스트 1개만 지정\npaths 제거 1건: ['tests/infra/**']"
+updated: 2026-10-03
