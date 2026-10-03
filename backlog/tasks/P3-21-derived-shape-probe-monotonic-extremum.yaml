@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,8 +13,9 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 배경 — [12미적Ⅰ-02-08] 그래프 개형은 처분 (나)로 '파생 판정 문항'(극값 개수 · 증감 구간 · 극값의 x좌표/값)으로 대체됐다(게이트 G-p318-calc-02-08-disposition · Kiki 결정 2026-10-02). P3-18 이 실측한 파생 판정은 극값 개수뿐이다(보강 진단 ③b·③c: 정답 통과 · 오답 실패). 증감 구간 · 극값 x좌표 · 극값의 값은 프로브하지 않았다 — 처분 (나)의 나머지 근거가 미측정이다.\n② 파생 판정 3종(증감 구간 / 극값 x좌표 / 극값의 값) 각각에 정답 1 + 오답 1 쌍 프로브를 P3-18 과 같은 형식의 fixture 로 만들고, 종류마다 corpus_reverify 의 exit code · 통과/실패/skip 수로 판정한다(가능 / 불가 / 위장).\n③ 판정 규칙은 tests/backend/harness/test_p3_18_calculus_verifiability_probe.py 의 judge_concept 를 재사용한다(재구현 금지). 오답은 '값만 틀리게'뿐 아니라 부호·경계 포함 여부를 뒤바꾼 형태를 종류마다 하나 이상 둔다.\n④ 불가 또는 위장이 나온 형태는 02-08 문항화에서 제외할 후보로 결과 문서에 올리고 결정 게이트로 올린다. 세션이 임의로 문항 형태나 분모를 바꾸지 않는다.\n⑤ 결과 문서에 판정 기준 main 해시를 상단에 박는다. 프로브가 main 에 없는 상태의 수치는 '브랜치 기준'으로 구분해 적는다.\n⑥ 확인 범위 — 테스트·fixture 만 추가하고 검증기 코드를 고치지 않는다. 고칠 결함이 나오면 별도 태스크로 등재한다."
-artifacts: []
+artifacts:
+  - "PR #1449 (kiki-s-broom/WhyMath#1449) — tests/backend/harness/test_p3_21_derived_shape_probe.py(17건)·fixtures/p3_21_{correct,wrong}.jsonl(13형태)·docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md. 판정 기준: main 381ec106 위 브랜치 기준(미머지). 13형태 = 가능 7·일부 1·불가 1·위장 2·정답 오거부 2, 뮤테이션 7종 전건 RED, ci_mirror backend 22스텝 통과(미러 결과는 스크래치 경로에 저장). 제외 후보 6형태는 게이트 G-p321-derived-form-disposition 으로 상정"
 paths: []
-session: claude/eloquent-bohr-1da6mq
+session: null
 notes: "출처: P3-18 결과 문서 §5 처분안 (나)의 단점란(\"증감 구간·극값 좌표는 이번에 프로브하지 않았다\") + 게이트 G-p318-calc-02-08-disposition 의 Kiki 결정(2026-10-02, AskUserQuestion 응답을 세션이 중계). 처분이 산문의 미측정 가정에 머물지 않도록 태스크로 추적한다. 판정 기준: main 53718366. 코퍼스 채우기 태스크에는 amend --depends 로 대장에 부착한다."
 updated: 2026-10-03

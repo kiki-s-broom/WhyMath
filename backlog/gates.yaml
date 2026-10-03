@@ -898,7 +898,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-03] verdict PASS · inputs: P3-21-derived-shape-probe-monotonic-extremum · evidence: 판정문 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4 · 판정 기준 main 381ec106 위 PR #1449(미머지·브랜치 기준). PASS의 뜻은 결정 입력이 완성돼 Kiki의 처분(가/나/다)이 가능해졌다는 것: 13형태 중 가능 7·일부 가능 1·불가 1·위장 2·정답 오거부 2, 제외 후보 6형태 명시. 어느 안을 택할지는 게이트 담당자 몫. — done P3-21-derived-shape-probe-monotonic-extremum 인계"
     depends_on:
       - P3-21-derived-shape-probe-monotonic-extremum
   - id: G-path04-learning-path-xlsx
