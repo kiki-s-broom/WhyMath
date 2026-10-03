@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/harness/concept_content_review_batch.py
   - "tests/backend/harness/test_concept_content_review_batch*.py"
-session: null
+session: claude/laughing-cerf-l9nqgq
 notes: "출처: CONT-06 판정문 docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md §4·§7. 선행: CONT-06 착지(역조회). G-kg02 승격 회차 전에 판정되어야 한다 — 승격이 학생 공급을 여는 문이므로."
-updated: 2026-10-02
+updated: 2026-10-03

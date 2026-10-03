@@ -33,7 +33,8 @@ import json
 import math
 import random
 import sys
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,11 @@ from whymath_backend.db.models.concept_content import (
     CONTENT_REVIEW_STATUS_AI_ESTIMATED,
     CONTENT_SCOPE_K12,
     CONTENT_SCOPE_UNIVERSITY,
+)
+from whymath_backend.harness.concept_content_link_context import (
+    ContentLink,
+    format_link_for_review,
+    load_content_links,
 )
 from whymath_backend.harness.wilson import wilson_upper_bound
 from whymath_backend.l1.concept_content.projection import (
@@ -243,13 +249,51 @@ def _control_records() -> list[ConceptContentRecord]:
     ]
 
 
+# 연결 프로브 코드 접두사 — `__INJECT`·`__CONTROL`과 **겹치지 않게** 둔다(그 접두사는 콘텐츠 축의
+# 주입·대조군 판정(`missed_injected`·`false_positive_controls`)이 쓰므로, 겹치면 콘텐츠는 멀쩡한
+# 연결 프로브가 콘텐츠 결함 누락으로 잘못 계상된다).
+_LINK_BAD_PREFIX = "__LINK_BAD__"
+_LINK_GOOD_PREFIX = "__LINK_GOOD__"
+
+
+def _link_probes() -> list[tuple[ConceptContentRecord, ContentLink, str]]:
+    """연결 축 변별력 프로브 — (레코드, 연결, 종류). 콘텐츠는 **멀쩡하고 연결만** 다르다.
+
+    CONT-08: 검수 입력에 연결 원자를 싣는 것만으로는 rubric이 연결을 실제로 보는지 알 수 없다.
+    같은 깨끗한 본문(`_control_records()[0]`, 나눗셈의 나머지)에 ⓐ엉뚱한 원자(극한)를 붙인 `bad`는
+    `link_ok=false`여야 하고, ⓑ맞는 원자(나눗셈)를 붙인 `good`은 `link_ok=true`여야 한다.
+    둘 다 콘텐츠 축으로는 통과해야 한다(그래서 `__INJECT`·`__CONTROL` 접두사를 쓰지 않는다).
+    """
+    base = _control_records()[0]
+    bad = replace(base, code=f"{_LINK_BAD_PREFIX}WRONG_ATOM__", name="연결 프로브: 엉뚱한 원자")
+    good = replace(base, code=f"{_LINK_GOOD_PREFIX}RIGHT_ATOM__", name="연결 프로브: 맞는 원자")
+    wrong = ContentLink(
+        atom_codes=("__PROBE_ATOM_LIMIT__",),
+        atom_names={"__PROBE_ATOM_LIMIT__": "함수의 극한값 계산(좌극한·우극한)"},
+        primary_atom_code="__PROBE_ATOM_LIMIT__",
+        confidence=0.62,
+        match_method="standard_code+name",
+        mapping_review_status="ai_estimated",
+    )
+    right = ContentLink(
+        atom_codes=("__PROBE_ATOM_DIVISION__",),
+        atom_names={"__PROBE_ATOM_DIVISION__": "나눗셈의 나머지(나머지는 나누는 수보다 작다)"},
+        primary_atom_code="__PROBE_ATOM_DIVISION__",
+        confidence=0.62,
+        match_method="standard_code+name",
+        mapping_review_status="ai_estimated",
+    )
+    return [(bad, wrong, "bad"), (good, right, "good")]
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # LLM rubric
 # ──────────────────────────────────────────────────────────────────────────
 _RUBRIC_SYSTEM = """당신은 WhyMath(와이매스) 개념 콘텐츠 검수자입니다.
 다음 JSON 형식으로만 응답하세요:
 
-{"passed": true/false, "defects": ["결함1", "결함2", ...], "reason": "종합 평가 한 문장"}
+{"passed": true/false, "defects": ["결함1", "결함2", ...], "reason": "종합 평가 한 문장",
+ "link_ok": true/false}
 
 아래 개념 콘텐츠를 검수 기준에 따라 평가하세요.
 defect는 구체적이고 짧게 쓰세요.
@@ -262,12 +306,18 @@ passed는 true일 때 defects는 빈 배열 []이어야 합니다.
 4. 잔류 표기: explanation에 '2022 개정', 페이지 번호, '(N) 절제목' 등 크롤링 잔류가 없어야 한다.
 5. 필수 필드 결측: 은유·오개념·정식정의·허용표현·설명 중 하나라도 None/빈 값이면 결함이다.
 6. 전후 일관성: flashcards(있을 경우)가 은유/오개념/정의와 모순되면 안 된다.
+
+연결 적합성(link_ok) — 프롬프트에 "연결 원자:" 줄이 있을 때만 평가한다(없으면 link_ok를 생략):
+이 콘텐츠가 그 연결 원자들이 다루는 내용에 대한 것인가? 개념명·본문이 연결 원자와 다른 주제이거나
+연결 원자 일부만 다루면 link_ok=false다. 연결은 크로스워크가 기계로 추정한 것이라
+그럴듯하다는 이유로 승인하지 마라. link_ok는 passed와 별개다 — 콘텐츠 자체가 맞아도 연결이
+틀리면 link_ok=false이고, passed는 위 1~6만으로 정한다.
 """
 
 
-def _build_prompt(record: ConceptContentRecord) -> str:
-    """개념 레코드 → rubric 프롬프트."""
-    return (
+def _build_prompt(record: ConceptContentRecord, link: ContentLink | None = None) -> str:
+    """개념 레코드 → rubric 프롬프트. 연결(`link`)이 있으면 연결 원자·신뢰도 줄을 붙인다."""
+    base = (
         f"code: {record.code}\n"
         f"scope: {record.scope}\n"
         f"과목: {record.subject}\n"
@@ -280,6 +330,9 @@ def _build_prompt(record: ConceptContentRecord) -> str:
         f"설명(explanation): {record.explanation or '(없음)'}\n"
         f"암기카드 수: {len(record.flashcards)}\n"
     )
+    if link is None:
+        return base
+    return base + f"연결 원자: {format_link_for_review(link)}\n"
 
 
 _JSON_SCHEMA: dict[str, Any] = {
@@ -288,6 +341,7 @@ _JSON_SCHEMA: dict[str, Any] = {
         "passed": {"type": "boolean"},
         "defects": {"type": "array", "items": {"type": "string"}},
         "reason": {"type": "string"},
+        "link_ok": {"type": "boolean"},
     },
     "required": ["passed", "defects", "reason"],
 }
@@ -310,6 +364,16 @@ class Assessment:
     model: str
     latency_ms: float
     timestamp: str
+    link_atoms: tuple[str, ...] = ()
+    """검수 입력에 실린 연결 원자 코드 — 없으면 빈 튜플(대학 행·연결 없는 행)."""
+    link_confidence: float | None = None
+    link_answered: bool | None = None
+    """연결이 주어졌을 때 LLM이 `link_ok`를 **명시적으로** 답했는가(연결 없으면 None)."""
+    link_approved: bool | None = None
+    """연결이 주어졌을 때 LLM이 `link_ok=true`라고 **명시**했는가. 답이 없으면 False다 —
+    모른다 ≠ 맞다(연결 없으면 None). 콘텐츠 `passed`와 별개 축이다."""
+    link_probe: str | None = None
+    """연결 변별력 프로브 종류("bad"/"good") — 일반 표본은 None."""
 
     def to_jsonl(self) -> dict[str, Any]:
         return {
@@ -326,6 +390,11 @@ class Assessment:
             "model": self.model,
             "latency_ms": self.latency_ms,
             "timestamp": self.timestamp,
+            "link_atoms": list(self.link_atoms),
+            "link_confidence": self.link_confidence,
+            "link_answered": self.link_answered,
+            "link_approved": self.link_approved,
+            "link_probe": self.link_probe,
         }
 
 
@@ -337,8 +406,10 @@ async def _assess_one(
     injected: bool = False,
     control: bool = False,
     sampled: bool = True,
+    link: ContentLink | None = None,
+    link_probe: str | None = None,
 ) -> Assessment:
-    """단일 레코드에 대해 LLM rubric을 평가한다."""
+    """단일 레코드에 대해 LLM rubric을 평가한다. `link`가 있으면 연결 적합성(link_ok)도 받는다."""
     from whymath_backend.l3.models import CostTier, LocalModelTier, RoutingDecision
 
     decision = RoutingDecision(
@@ -371,7 +442,7 @@ async def _assess_one(
 
     start = datetime.now(timezone.utc)
     result = await provider.generate(
-        prompt=_build_prompt(record),
+        prompt=_build_prompt(record, link),
         system=_RUBRIC_SYSTEM,
         decision=decision,
         json_schema=_JSON_SCHEMA,
@@ -383,6 +454,7 @@ async def _assess_one(
     # `missed_injected`(주입을 놓친 수)가 구조적으로 항상 0이 되어 변별력 검사가
     # 위장이 된다 — LLM이 주입 결함을 통째로 놓쳐도 같은 숫자가 나온다.
     # 참값은 `expected_pass`가 따로 들고, 판정은 둘을 비교해서 한다.
+    link_ok = parsed.get("link_ok")
     return Assessment(
         code=record.code,
         scope=record.scope,
@@ -397,6 +469,12 @@ async def _assess_one(
         model=decision.local_model or "quality",
         latency_ms=latency_ms,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        link_atoms=link.atom_codes if link is not None else (),
+        link_confidence=link.confidence if link is not None else None,
+        link_answered=(isinstance(link_ok, bool) if link is not None else None),
+        # 연결이 주어졌는데 답이 없거나 true가 아니면 승인이 아니다(모른다 ≠ 맞다).
+        link_approved=(link_ok is True if link is not None else None),
+        link_probe=link_probe,
     )
 
 
@@ -418,12 +496,14 @@ def _parse_llm_response(text: str, code: str) -> dict[str, Any]:
             "passed": False,
             "defects": [f"llm_response_parse_error: {exc}"],
             "reason": "LLM 응답이 JSON이 아님",
+            "link_ok": None,
         }
     if not isinstance(data, dict):
         return {
             "passed": False,
             "defects": ["llm_response_not_object"],
             "reason": "LLM 응답이 JSON object가 아님",
+            "link_ok": None,
         }
     passed = bool(data.get("passed", False))
     defects = data.get("defects", [])
@@ -435,7 +515,14 @@ def _parse_llm_response(text: str, code: str) -> dict[str, Any]:
     # passed=true인데 defects가 비어있지 않으면 불일치 — 보수적으로 실패 처리
     if passed and defects:
         passed = False
-    return {"passed": passed, "defects": defects, "reason": reason}
+    # link_ok는 **불리언일 때만** 받는다 — 문자열 "true"·숫자 1 같은 값은 답이 없는 것으로 본다.
+    link_ok = data.get("link_ok")
+    return {
+        "passed": passed,
+        "defects": defects,
+        "reason": reason,
+        "link_ok": link_ok if isinstance(link_ok, bool) else None,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -454,6 +541,7 @@ class BatchReport:
     control_count: int = 0
     discrimination_measured: bool = True
     """LLM이 실제로 돌았는가. dry-run은 False — 그때의 변별력 수치는 측정이 아니다."""
+    link_probe_count: int = 0
 
     def sampled_assessments(self) -> list[Assessment]:
         return [a for a in self.assessed if a.sampled and not a.injected and not a.control]
@@ -463,6 +551,37 @@ class BatchReport:
 
     def control_assessments(self) -> list[Assessment]:
         return [a for a in self.assessed if a.control]
+
+    def link_probe_assessments(self) -> list[Assessment]:
+        return [a for a in self.assessed if a.link_probe is not None]
+
+    @property
+    def missed_link_bad(self) -> int:
+        """엉뚱한 원자에 연결된 프로브를 **승인한** 수 (연결 축 false negative)."""
+        return sum(
+            1
+            for a in self.link_probe_assessments()
+            if a.link_probe == "bad" and a.link_approved is not False
+        )
+
+    @property
+    def false_positive_link_good(self) -> int:
+        """맞는 원자에 연결된 프로브를 **승인하지 못한** 수 (연결 축 false positive·rubric 과민)."""
+        return sum(
+            1
+            for a in self.link_probe_assessments()
+            if a.link_probe == "good" and a.link_approved is not True
+        )
+
+    @property
+    def link_unapproved_sampled(self) -> int:
+        """표본 중 연결이 주어졌는데 LLM이 연결을 승인하지 않은 수 — 사람 검수가 먼저 볼 후보."""
+        return sum(1 for a in self.sampled_assessments() if a.link_approved is False)
+
+    @property
+    def link_sampled(self) -> int:
+        """표본 중 연결이 주어진(=K-12 연결 있는) 건수."""
+        return sum(1 for a in self.sampled_assessments() if a.link_approved is not None)
 
     @property
     def defective_sampled(self) -> int:
@@ -497,6 +616,11 @@ class BatchReport:
             "missed_injected": self.missed_injected,
             "false_positive_controls": self.false_positive_controls,
             "defect_rate_upper": self.defect_rate_upper(),
+            "link_probe_count": self.link_probe_count,
+            "missed_link_bad": self.missed_link_bad,
+            "false_positive_link_good": self.false_positive_link_good,
+            "link_sampled": self.link_sampled,
+            "link_unapproved_sampled": self.link_unapproved_sampled,
             "assessed_count": len(self.assessed),
         }
 
@@ -515,8 +639,17 @@ class BatchReport:
             f"오검출된 대조군(false positive): {self.false_positive_controls}"
             f" / {self.control_count}",
         ]
+        lines.append(
+            f"연결 적합성 표본: {self.link_sampled}건 중 미승인 {self.link_unapproved_sampled}건"
+            " — 미승인·무응답은 사람이 연결을 먼저 본다(reviewed는 연결을 보증하지 않는다)"
+        )
+        lines.append(
+            f"연결 프로브: 엉뚱한 원자 승인(false negative) {self.missed_link_bad}"
+            f" · 맞는 원자 미승인(false positive) {self.false_positive_link_good}"
+            f" / {self.link_probe_count}건"
+        )
         if not self.discrimination_measured:
-            lines.append("  → dry-run: LLM을 부르지 않았으므로 위 두 줄은 측정값이 아니다")
+            lines.append("  → dry-run: LLM을 부르지 않았으므로 위 변별력 줄은 측정값이 아니다")
         if self.missed_injected > 0:
             lines.append("  → rubric 변별력 부족: 주입한 결함을 LLM이 모두 잡지 못함")
         if self.false_positive_controls > 0:
@@ -562,10 +695,12 @@ class _FakeProvider:
         from whymath_backend.l3.models import GenerationResult, Usage
 
         code = ""
+        has_link = False
         for line in prompt.splitlines():
             if line.startswith("code:"):
                 code = line.split(":", 1)[1].strip()
-                break
+            elif line.startswith("연결 원자:"):
+                has_link = True
         if "__INJECT" in code:
             passed = False
             defects = ["injected_defect_detected"]
@@ -574,7 +709,10 @@ class _FakeProvider:
             passed = True
             defects = []
             reason = "fake provider: 통과"
-        payload = {"passed": passed, "defects": defects, "reason": reason}
+        payload: dict[str, Any] = {"passed": passed, "defects": defects, "reason": reason}
+        if has_link:
+            # 연결이 주어졌을 때만 답한다 — 엉뚱한 원자 프로브는 거절하고 나머지는 승인한다.
+            payload["link_ok"] = not code.startswith(_LINK_BAD_PREFIX)
         text = json.dumps(payload, ensure_ascii=False)
         return GenerationResult(
             text=text,
@@ -593,8 +731,14 @@ async def run_batch_review(
     output_path: Path | None,
     dry_run: bool,
     fake_llm: bool,
+    links: Mapping[str, ContentLink] | None = None,
 ) -> BatchReport:
-    """배치 검수 실행(비동기)."""
+    """배치 검수 실행(비동기). `links`(콘텐츠 code → 연결)가 None이면 코퍼스 기본 경로에서 읽는다.
+
+    연결을 읽지 못하면 **실패한다**(`FileNotFoundError`/`ValueError` → CLI exit 2) — 조용히
+    빈 연결로 돌리면 검수 입력에서 연결이 사라진 채 통과처럼 보인다(CONT-08).
+    """
+    content_links: Mapping[str, ContentLink] = load_content_links() if links is None else links
     records = load_all_records(k12_path, university_path)
     total = len(records)
     sample_size = min(total, min_n_for_zero_defects(threshold, confidence))
@@ -606,7 +750,9 @@ async def run_batch_review(
 
     # 주입 결함(통과하면 안 됨)과 깨끗한 대조군(통과해야 함)은 표본 집합에 넣지 않고
     # 별도 평가한다 — 전자는 false negative를, 후자는 false positive를 측정한다.
-    to_assess = list(sampled) + list(injected) + list(controls)
+    probes = _link_probes()
+    probe_links = {r.code: (link, kind) for r, link, kind in probes}
+    to_assess = list(sampled) + list(injected) + list(controls) + [r for r, _, _ in probes]
 
     provider: Any
     if dry_run:
@@ -634,6 +780,9 @@ async def run_batch_review(
                 model="dry-run",
                 latency_ms=0.0,
                 timestamp=datetime.now(timezone.utc).isoformat(),
+                link_probe=probe_links[r.code][1] if r.code in probe_links else None,
+                # dry-run은 LLM을 안 부르므로 프로브는 참값을 채운다(변별력은 미측정 표기).
+                link_approved=(probe_links[r.code][1] == "good" if r.code in probe_links else None),
             )
             for r in to_assess
         ]
@@ -652,6 +801,8 @@ async def run_batch_review(
                 injected=r.code.startswith("__INJECT"),
                 control=r.code.startswith("__CONTROL"),
                 sampled=r.code in sampled_codes,
+                link=probe_links[r.code][0] if r.code in probe_links else content_links.get(r.code),
+                link_probe=probe_links[r.code][1] if r.code in probe_links else None,
             )
             assessments.append(a)
 
@@ -664,6 +815,7 @@ async def run_batch_review(
         confidence=confidence,
         control_count=len(controls),
         discrimination_measured=not dry_run,
+        link_probe_count=len(probes),
     )
 
     if output_path is not None:
@@ -743,6 +895,21 @@ def main(argv: list[str] | None = None) -> int:
             f" {report.false_positive_controls}/{report.control_count}건을"
             " 결함으로 판정 — rubric 과민(false positive)."
             " 표본 결함율은 콘텐츠 품질이 아니라 rubric 판정을 재고 있을 수 있다.",
+            file=sys.stderr,
+        )
+        return _EXIT_GATE_FAIL
+    if report.missed_link_bad > 0:
+        print(
+            f"게이트 실패: 엉뚱한 원자에 연결된 프로브 {report.missed_link_bad}/"
+            f"{report.link_probe_count}건을 승인 — 연결 적합성 rubric 변별력 부족"
+            "(false negative). 이 상태로는 연결 승인 신호를 믿을 수 없다.",
+            file=sys.stderr,
+        )
+        return _EXIT_GATE_FAIL
+    if report.false_positive_link_good > 0:
+        print(
+            f"게이트 실패: 맞는 원자에 연결된 프로브 {report.false_positive_link_good}/"
+            f"{report.link_probe_count}건을 승인하지 못함 — 연결 rubric 과민(false positive)",
             file=sys.stderr,
         )
         return _EXIT_GATE_FAIL
