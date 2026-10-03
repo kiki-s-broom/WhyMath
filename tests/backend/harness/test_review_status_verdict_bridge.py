@@ -40,6 +40,7 @@ from whymath_backend.harness.review_timer import (
     start_review,
 )
 from whymath_backend.schema.enums import GenerationFailureCode
+from whymath_backend.schema.review_timer import review_content_fingerprint
 
 _T0 = datetime(2026, 9, 27, 1, 0, tzinfo=UTC)
 _FIXED_NOW = datetime(2026, 9, 27, 3, 0, tzinfo=UTC)
@@ -72,14 +73,34 @@ def _round_corpus(tmp_path: Path, rows: list[dict[str, Any]], *, ledger: bool = 
     return corpus
 
 
+#: 지문 인자 기본값 센티널 — "인자를 안 줌"(= `_record(slug)`의 지문을 싣는다)과 "None을 명시"
+#: (= 지문 없는 옛 이벤트 모사)를 구분한다. `review_status`는 지문에서 빠지므로(EOS-27) 같은 slug의
+#: 레코드는 각인 전후·채워진 값과 무관하게 같은 지문을 낸다.
+_DEFAULT_FP: Any = object()
+
+
 def _review(
-    events: Path, slug: str, verdict: str, *, minute: int, reviewer: str = "kiki"
+    events: Path,
+    slug: str,
+    verdict: str,
+    *,
+    minute: int,
+    reviewer: str = "kiki",
+    fingerprint: Any = _DEFAULT_FP,
 ) -> uuid.UUID:
-    """검수 1건(착수 → 종결)을 실제 writer로 적는다. 반려는 F2를 붙인다(스키마 강제)."""
+    """검수 1건(착수 → 종결)을 실제 writer로 적는다. 반려는 F2를 붙인다(스키마 강제).
+
+    기본은 검수 CLI처럼 `_record(slug)`의 지문을 싣는다(EOS-27). `fingerprint=None`은 지문이 없는
+    옛 이벤트, 문자열은 "검수자가 본 내용이 코퍼스와 다르다"를 모사한다.
+    """
+    fp = review_content_fingerprint(_record(slug)) if fingerprint is _DEFAULT_FP else fingerprint
     started = append_event_jsonl(
         events,
         start_review(
-            cu_slug=slug, reviewer_id=reviewer, occurred_at=_T0 + timedelta(minutes=minute)
+            cu_slug=slug,
+            reviewer_id=reviewer,
+            content_fingerprint=fp,
+            occurred_at=_T0 + timedelta(minutes=minute),
         ),
     )
     code = GenerationFailureCode("F2") if verdict == "rejected" else None
@@ -92,6 +113,7 @@ def _review(
             verdict=verdict,  # type: ignore[arg-type]
             elapsed_ms=90_000,
             failure_code=code,
+            content_fingerprint=fp,
             occurred_at=_T0 + timedelta(minutes=minute, seconds=90),
         ),
     )
@@ -705,3 +727,210 @@ class TestReport:
 
         assert result.exit_code == 0 and result.written is True
         assert _lines(_audit(corpus))[0]["stamped_at"] == _FIXED_NOW.isoformat()
+
+
+def _edit_content(corpus: Path, slug: str, **changes: Any) -> None:
+    """승인 뒤 손편집 흉내 — 한 레코드의 내용 키만 바꾼다(줄 수 보존 단언 — 제자리 편집 절단 방지)."""
+    lines = corpus.read_text(encoding="utf-8").splitlines()
+    rewritten = []
+    for line in lines:
+        row = json.loads(line)
+        if row["slug"] == slug:
+            row.update(changes)
+            line = json.dumps(row, ensure_ascii=False)
+        rewritten.append(line)
+    assert len(rewritten) == len(lines)
+    corpus.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+
+
+class TestContentFingerprint:
+    """[EOS-27 ②] 각인 전에 '검수자가 본 내용이 지금 그대로인가'를 가른다 — 음성·양성 대조 쌍.
+
+    모든 테스트는 같은 회차에 **손대지 않은 대조군 레코드**(`wm-ok`)를 함께 둔다: 대조군이 각인되면
+    도구가 무차별 거부가 아님이 보이고, 대상 레코드가 각인되지 않으면 변별이 보인다.
+    """
+
+    def test_content_edited_after_review_is_not_stamped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        corpus = _round_corpus(tmp_path, [_record("wm-ok"), _record("wm-edit")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-ok", "approved", minute=1)
+        _review(events, "wm-edit", "approved", minute=2)
+        _edit_content(corpus, "wm-edit", answer="2")  # 승인 뒤 정답을 손으로 바꿨다
+
+        code, report, err = _run(corpus, events, capsys)
+
+        assert code == 1  # 주의 필요(충돌과 같은 부류)
+        assert report["stamped_slugs"] == ["wm-ok"]  # 대조군은 각인
+        status = {row["slug"]: row.get("review_status") for row in _lines(corpus)}
+        assert status == {"wm-ok": "approved", "wm-edit": None}  # 대상은 빈 칸 그대로
+        (change,) = report["content_changed"]
+        assert change["slug"] == "wm-edit" and change["human_verdict"] == "approved"
+        assert change["reviewed_fingerprint"] != change["current_fingerprint"]
+        assert change["exposure_risk"] is False  # 아직 노출값이 아니다
+        assert [row["slug"] for row in _lines(_audit(corpus))] == ["wm-ok"]  # 감사 행도 없다
+        assert "검수 후 내용 변경 1" in err and "wm-edit" in err
+
+    def test_rejection_of_changed_content_is_also_not_stamped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """반려도 '본 내용'에 대한 판정이다 — 내용이 바뀌었으면 새 내용은 반려된 적이 없다."""
+        corpus = _round_corpus(tmp_path, [_record("wm-ok"), _record("wm-rej")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-ok", "approved", minute=1)
+        _review(events, "wm-rej", "rejected", minute=2)
+        _edit_content(corpus, "wm-rej", answer="2")
+
+        code, report, _err = _run(corpus, events, capsys)
+
+        assert code == 1
+        assert report["stamped_slugs"] == ["wm-ok"]
+        assert [c["slug"] for c in report["content_changed"]] == ["wm-rej"]
+        assert {row["slug"]: row.get("review_status") for row in _lines(corpus)}["wm-rej"] is None
+
+    def test_edit_after_stamping_is_reported_even_though_value_already_matches(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """EOS-136 §8의 사각 그 자체 — 각인 뒤 내용 편집. 값(approved)은 그대로라 예전엔
+        `already_stamped`("할 일 없음")로 접혔다. 지금은 노출 위험 있는 내용 변경으로 보고한다."""
+        corpus = _round_corpus(tmp_path, [_record("wm-ok"), _record("wm-late")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-ok", "approved", minute=1)
+        _review(events, "wm-late", "approved", minute=2)
+        code, _report, _err = _run(corpus, events, capsys)
+        assert code == 0
+        _edit_content(corpus, "wm-late", answer_explanation="해설을 몰래 고쳤다")
+
+        code, report, _err = _run(corpus, events, capsys)
+
+        assert code == 1
+        assert report["already_stamped"] == ["wm-ok"]  # 대조군은 여전히 '할 일 없음'
+        (change,) = report["content_changed"]
+        assert change["slug"] == "wm-late"
+        assert change["current"] == "approved" and change["exposure_risk"] is True
+        assert report["exposure_risk"] == 1
+        # 도구는 코퍼스도 감사도 더 쓰지 않았다 — 격리는 사람 절차다.
+        assert [row["slug"] for row in _lines(_audit(corpus))] == ["wm-ok", "wm-late"]
+
+    def test_stamping_itself_does_not_look_like_a_content_change(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """각인이 쓰는 `review_status`는 지문에서 빠진다 — 아니면 각인 직후 전건이 '변경'으로 보인다."""
+        corpus = _round_corpus(tmp_path, [_record("wm-a")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-a", "approved", minute=1)
+        assert _run(corpus, events, capsys)[0] == 0
+        assert _lines(corpus)[0]["review_status"] == "approved"
+
+        code, report, _err = _run(corpus, events, capsys)  # 2회차
+        assert code == 0 and report["content_changed"] == []
+        assert report["already_stamped"] == ["wm-a"]
+
+    def test_event_without_fingerprint_is_held_not_stamped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """'모름'은 '일치'가 아니다 — 지문 없는 옛 이벤트의 승인을 각인하면 사각이 그대로 열려 있다."""
+        corpus = _round_corpus(tmp_path, [_record("wm-ok"), _record("wm-legacy")])
+        original_legacy = [row for row in _lines(corpus) if row["slug"] == "wm-legacy"]
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-ok", "approved", minute=1)
+        _review(events, "wm-legacy", "approved", minute=2, fingerprint=None)
+
+        code, report, err = _run(corpus, events, capsys)
+
+        assert code == 1
+        assert report["stamped_slugs"] == ["wm-ok"]
+        assert report["fingerprint_unverifiable"] == ["wm-legacy"]
+        assert [row for row in _lines(corpus) if row["slug"] == "wm-legacy"] == original_legacy
+        assert "wm-legacy" not in {row["slug"] for row in _lines(_audit(corpus))}
+        assert "지문 없어 보류 1" in err
+
+    def test_rereview_with_a_fingerprint_unblocks_the_held_record(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """해금 경로 = 재검수. 파일 순서상 마지막 종결이 최신 판정이라 새 이벤트가 이긴다."""
+        corpus = _round_corpus(tmp_path, [_record("wm-legacy")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-legacy", "approved", minute=1, fingerprint=None)
+        assert _run(corpus, events, capsys)[1]["fingerprint_unverifiable"] == ["wm-legacy"]
+
+        _review(events, "wm-legacy", "approved", minute=5)  # 지문을 싣는 재검수
+
+        code, report, _err = _run(corpus, events, capsys)
+        assert code == 0 and report["stamped_slugs"] == ["wm-legacy"]
+
+    def test_rereview_after_an_edit_unblocks_the_changed_record(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """내용 변경도 같은 경로로 해소된다 — 고쳐진 지금 내용을 사람이 다시 보고 승인하면 통과."""
+        corpus = _round_corpus(tmp_path, [_record("wm-edit")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-edit", "approved", minute=1)
+        _edit_content(corpus, "wm-edit", answer="2")
+        assert _run(corpus, events, capsys)[0] == 1
+
+        edited_fp = review_content_fingerprint({**_record("wm-edit"), "answer": "2"})
+        _review(events, "wm-edit", "approved", minute=5, fingerprint=edited_fp)
+
+        code, report, _err = _run(corpus, events, capsys)
+        assert code == 0 and report["stamped_slugs"] == ["wm-edit"]
+
+    def test_filled_record_with_unknown_fingerprint_keeps_the_existing_buckets(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """이미 채워진 레코드는 쓸 것이 없다 — 지문 없음이 새 버킷을 만들지 않고 기존 규칙(불가침)을 따른다."""
+        corpus = _round_corpus(
+            tmp_path, [_record("wm-same", "approved"), _record("wm-diff", "pending")]
+        )
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-same", "approved", minute=1, fingerprint=None)
+        _review(events, "wm-diff", "approved", minute=2, fingerprint=None)
+
+        code, report, _err = _run(corpus, events, capsys)
+
+        assert report["already_stamped"] == ["wm-same"]
+        assert [c["slug"] for c in report["conflicts"]] == ["wm-diff"]
+        assert report["fingerprint_unverifiable"] == [] and report["content_changed"] == []
+        assert code == 1  # 충돌이 있으므로(기존 규칙 그대로)
+
+    def test_edit_pending_verdict_is_still_just_held(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """손질 승인은 각인할 값이 없어 지문 대조 대상이 아니다 — 내용이 바뀌어도 '보류'로 남는다
+        (EOS-27 ④ 판정: 손질 승인은 지문이 있어도 재검수 없이 해금되지 않는다)."""
+        corpus = _round_corpus(tmp_path, [_record("wm-e")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-e", "approved_with_edit", minute=1)
+        _edit_content(corpus, "wm-e", answer="손질 반영")  # 손질을 코퍼스에 반영했다
+
+        code, report, _err = _run(corpus, events, capsys)
+
+        assert code == 0
+        assert report["held_edit_pending"] == ["wm-e"]
+        assert report["content_changed"] == [] and report["stamped"] == 0
+
+    def test_audit_row_carries_the_reviewed_fingerprint(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        corpus = _round_corpus(tmp_path, [_record("wm-a")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-a", "approved", minute=1)
+        _run(corpus, events, capsys)
+        (row,) = _lines(_audit(corpus))
+        assert row["content_fingerprint"] == review_content_fingerprint(_record("wm-a"))
+
+    def test_dry_run_reports_content_change_and_writes_nothing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        corpus = _round_corpus(tmp_path, [_record("wm-edit")])
+        events = tmp_path / "events.jsonl"
+        _review(events, "wm-edit", "approved", minute=1)
+        _edit_content(corpus, "wm-edit", answer="2")
+        before = corpus.read_bytes()
+
+        code, report, _err = _run(corpus, events, capsys, "--dry-run")
+
+        assert code == 1 and report["dry_run"] is True and report["written"] is False
+        assert [c["slug"] for c in report["content_changed"]] == ["wm-edit"]
+        assert corpus.read_bytes() == before and not _audit(corpus).exists()

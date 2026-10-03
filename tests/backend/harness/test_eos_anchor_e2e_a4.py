@@ -910,6 +910,24 @@ class TestGoldenPromotionGateOnPipelineOutput:
         assert len(rewritten) == len(lines)  # 줄 수 보존(제자리 편집 절단 방지)
         corpus.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
 
+    @staticmethod
+    def _edit_content(corpus: Path, slug: str, **changes: Any) -> None:
+        """승인 뒤 손편집 흉내 — 한 레코드의 **내용** 키를 바꾼다(review_status는 건드리지 않는다).
+
+        EOS-136 §8이 인정한 사각 그 자체다: 값(`review_status`)·감사로그는 그대로인 채 문항
+        내용만 달라진다. 줄 수 보존 단언은 제자리 편집 절단 방지(파일이 잘리면 다른 가드를 오염).
+        """
+        lines = corpus.read_text(encoding="utf-8").splitlines()
+        rewritten = []
+        for line in lines:
+            row = json.loads(line)
+            if row["slug"] == slug:
+                row.update(changes)
+                line = json.dumps(row, ensure_ascii=False)
+            rewritten.append(line)
+        assert len(rewritten) == len(lines)
+        corpus.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+
     def test_corpus_and_review_queue_slugs_are_disjoint(
         self,
         tmp_path: Path,
@@ -1114,3 +1132,98 @@ class TestGoldenPromotionGateOnPipelineOutput:
         assert "회차 코퍼스" in err and "review_status_verdict_bridge" in err
         assert out.read_bytes() == before
         assert not audit.exists()
+
+    # ── EOS-27 ③ 음성 대조 — 승인 → 내용 손편집 → 승격 제안 차단(실 파이프라인 관통) ──────────
+    def test_content_edit_after_stamping_blocks_promotion(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """승인·각인까지 정상으로 마친 문항의 **정답을 손으로 고치면** 게이트가 막는다.
+
+        EOS-136 이후에도 이 상태는 통과했다 — `review_status`는 approved, 감사 각인값도 approved,
+        사람 판정도 approved라 ②·③단이 전부 초록이었고 게이트는 *값*만 봤다. 같은 회차의 손대지
+        않은 문항이 통과하는 것(양성 대조)과 함께 본다.
+        """
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        intact, edited = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["exit_code"] == 0 and stamp["stamped_by_status"] == {"approved": 2}
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert code == 0 and payload["off_path"] == 0  # 편집 전에는 둘 다 경로 내
+
+        self._edit_content(out, edited, answer="999")  # 각인 뒤 정답 변조
+
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert code == 1
+        assert self._reasons(payload) == {intact: None, edited: "review_content_changed"}
+        assert payload["fingerprint_checked"] is True
+
+    def test_content_edit_before_stamping_is_not_stamped_and_stays_blocked(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """검수 뒤·각인 전에 내용이 바뀌면 각인 도구가 **각인을 거부**하고 게이트도 막는다.
+
+        두 번째 방어선 — 게이트만 있으면 각인된 값이 코퍼스에 남아 있다. 각인 도구가 먼저 거부하면
+        승인 뒤 편집된 문항에는 애초에 approved가 찍히지 않는다.
+        """
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        intact, edited = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        self._edit_content(out, edited, answer_explanation="검수 뒤에 고친 해설")
+
+        stamp = self._stamp(out, events, capsys)
+        assert stamp["exit_code"] == 1
+        assert stamp["stamped_slugs"] == [intact]
+        assert [c["slug"] for c in stamp["content_changed"]] == [edited]
+        rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line]
+        assert {row["slug"]: row.get("review_status") for row in rows} == {
+            intact: "approved",
+            edited: None,
+        }
+
+        _code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert self._reasons(payload) == {intact: None, edited: "review_content_changed"}
+
+    def test_rereview_of_the_edited_content_restores_the_path(
+        self,
+        tmp_path: Path,
+        a4_seed: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """해소 경로 = 지금 내용의 재검수. 새 종결 판정이 새 지문을 싣고, 각인·게이트가 통과한다.
+
+        '막기만 하고 풀 길이 없는' 게이트는 사람이 게이트를 끄게 만든다 — 해소 경로까지 실 도구로
+        관통해 본다. as-found 결함으로 세지 않는 점(편집은 검수 결함이 아니다)도 함께 고정한다.
+        """
+        out, corpus_slugs, _queue = self._pipeline_outputs(tmp_path, a4_seed, monkeypatch, capsys)
+        _intact, edited = corpus_slugs
+        events = self._review(tmp_path, out, [self._KEY_APPROVE, self._KEY_APPROVE])
+        self._stamp(out, events, capsys)
+        self._edit_content(out, edited, answer="999")
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert code == 1 and self._reasons(payload)[edited] == "review_content_changed"
+
+        # 고쳐진 지금 내용을 사람이 다시 보고 승인한다 — 실 검수 도구가 현재 코퍼스 행으로 지문을 만든다.
+        self._review(tmp_path, out, [self._KEY_APPROVE], only=[edited])
+        code, payload, _stdout = self._gate(
+            tmp_path, out, events, corpus_slugs, capsys, "--max-defect-rate", "0.99"
+        )
+        assert payload["off_path"] == 0 and code == 0
+        assert payload["defects"] == 0  # 재승인은 결함 이력이 아니다(approved → approved)
