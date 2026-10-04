@@ -192,6 +192,7 @@ from whymath_backend.l3.interfaces import (
     CacheBackend,
     LLMProvider,
     TraceSink,
+    TrafficSurface,
 )
 from whymath_backend.l3.models import RoutingDecision, RoutingRequest
 from whymath_backend.l3.pipeline import QualityQueueUnavailableError
@@ -970,7 +971,13 @@ def create_app(
     # 기본 캐시는 RedisCache(지연 연결) — 구성 시 라이브 Redis 불필요(첫 접근 때 연결).
     app.state.__setattr__(_CACHE_KEY, cache if cache is not None else RedisCache())
     # 기본 트레이스는 LangfuseSink(지연·자기비활성) — 키 미설정 시 영구 no-op(S3).
-    app.state.__setattr__(_TRACE_KEY, trace if trace is not None else LangfuseSink())
+    # 이 싱크는 학생 대면 요청 경로의 것이라 기본 표면이 서빙이다(OPS-105 — 게이트② 표본의 대상).
+    # 저작·프로브는 자기 래퍼가 먼저 표지를 싣고, 먼저 실린 표지가 이긴다(`with_traffic_surface`).
+    # 주입된 싱크는 호출자가 표면을 책임진다(테스트 대역 등).
+    app.state.__setattr__(
+        _TRACE_KEY,
+        trace if trace is not None else LangfuseSink(traffic_surface=TrafficSurface.SERVING),
+    )
     # 기본 큐는 CeleryJobQueue(지연 연결) — 구성 시 broker 불필요(첫 디스패치 때 연결, S4).
     app.state.__setattr__(_QUEUE_KEY, queue if queue is not None else CeleryJobQueue())
     # ── 과목 능력 등록(push) — 계획서 100 §3.8 / EOS-89 ─────────────────────

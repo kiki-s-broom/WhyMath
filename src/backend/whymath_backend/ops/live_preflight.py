@@ -74,7 +74,7 @@ from typing import Protocol
 from whymath_backend.config import Settings
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.data_grade_defaults import SYNTHETIC_PROBE
-from whymath_backend.l3.interfaces import CacheBackend, InMemoryCache, LLMProvider
+from whymath_backend.l3.interfaces import CacheBackend, InMemoryCache, LLMProvider, TrafficSurface
 from whymath_backend.l3.models import (
     CostTier,
     GenerationResult,
@@ -348,7 +348,11 @@ def _default_pipeline_deps(settings: Settings) -> PipelineDeps:
         local=OllamaProvider(settings=settings),
         cloud=AnthropicProvider(settings=settings),
     )
-    trace = _CapturingTraceSink(LangfuseSink(settings=settings))
+    # 프리플라이트는 계측을 위해 일부러 낸 호출이다 — 표면 probe(OPS-105). 갈무리는 파이프라인이
+    # 기록한 그대로(표지 이전)를 보관하고 표지는 안쪽 싱크가 Langfuse로 보내기 직전에 싣는다.
+    trace = _CapturingTraceSink(
+        LangfuseSink(settings=settings, traffic_surface=TrafficSurface.PROBE)
+    )
     return PipelineDeps(
         provider=provider,
         cache=InMemoryCache(),

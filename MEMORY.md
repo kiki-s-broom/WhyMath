@@ -347,6 +347,14 @@
 - **환경 교훈(사고 아님)**: 세션 재개 중 로컬 PG가 내려가 통합 테스트가 `미도달 skip`으로 초록처럼 보였다 → skip 건수를 읽고 재기동 후 재실행. 신규 모듈은 CI 계약 3곳(선언≠배선·데이터 접근 baseline·인벤토리 귀속)에 반응해 등재했다.
 - **정직 표기**: 합성 부하는 실사용 검증이 아니다(ARCH-66 ⑥). `backend-migrations` 잡에서의 통합 테스트 실행은 이 세션에서 확인하지 못했다(로컬 PG 16으로만 재현).
 
+### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
+
+- **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.
+- **판정 1 — 지문 없는 판정은 보류**: 현행 유지(각인)는 모름을 일치로 읽어 옛 이벤트 전체에 사각을 영구히 연다. 비용은 옛 이벤트(MP-03 15건 등)의 재검수뿐이고 실승격이 0건이라 막힐 승격이 없다. 그랜드파더·우회 플래그 없음.
+- **판정 2 — 손질 승인 해금 안 함**: 현 도구는 손질 후 내용을 보지도 저장하지도 않고, 이벤트 지문은 손질 전 내용의 것이다. 최종 텍스트를 사람이 본 기록이 없는 승인 경로를 새로 열지 않는다.
+- **판정 3 — EOS-50 `content_hash`와 함수 공유 안 함**: 레시피만 같고 입력(개념 버전 payload vs 문항 레코드)이 다르다.
+- **한계**: 지문은 JSONL 매체에서만 운반(DB 좌석은 `EOS-174`로 분리 — ORM은 조용히 버리지 않고 ValueError) · 변조 방지가 아니라 변경 탐지(이벤트 파일까지 함께 고치면 못 본다) · 큐 모드 지문은 `candidate_payload` 기준. 정본 = `docs/standards/review_status_stamping_contract.md` 9절.
+- **검증**: 뮤테이션 15건 전건 RED(주입 적용·원복 바이트 동일 단언) · 실 파이프라인 E2E(승인→각인→손편집→차단, 편집→각인 거부, 재검수로 해소) · ruff·black·mypy --strict·lint-imports·헌법 래칫·`tests/infra` 2386·`tests/harness` 1588 통과. 백엔드 전체 스위트는 CI가 최종 판정.
 ### 2026-10-03 (판정·착지 · EOS-127): **상태 머신 R4(선수결손)는 배선하지 않고 삭제한다 — 비용은 문제가 아니었다(`max_depth=1` 선수 조회 p50 2.3ms · 생산자 전체 p95 7~128ms). 배제 사유는 중복과 가로채기다: 선수 하강은 이미 R6 → 다음 문항 선택(EOS-26·124)이 요청 시점에 실 PG 검증된 채 수행하고, 그 경로는 R3·R6 결정만 읽으므로 R4가 발화하면 R6 하강을 막는다. R4a 예외도 소멸. 원장 enum 라벨 `POLICY_PREREQUISITE_GAP`만 은퇴 표기로 남긴다** (claude 판정·구현) — 판정 기준 main `381ec106`
 
 - **판정문**: `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md` (실측 표·변경 표·뮤테이션·남은 구멍 5건).

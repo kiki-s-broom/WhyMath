@@ -20,7 +20,6 @@ acceptance ② 전체 실행 전후 대조는 conftest ②(`real_ledger_unchange
 from __future__ import annotations
 
 import ast
-import io
 import json
 from pathlib import Path
 
@@ -28,6 +27,7 @@ import _ledger_guard
 import pytest
 import remote_claims
 import store
+from _hook_stdin import set_hook_stdin
 from models import Backlog, Policy, Task
 
 import backlog as cli
@@ -73,7 +73,7 @@ def _probe(
 
     before = _events_snapshot()
     payload = json.dumps({"tool_input": {"file_path": str(REPO_ROOT / rel)}})
-    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    set_hook_stdin(monkeypatch, payload)
     try:
         code = cli.main(["check-edit"])
     finally:

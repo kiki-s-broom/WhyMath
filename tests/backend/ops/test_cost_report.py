@@ -548,3 +548,168 @@ def test_events_without_surface_tag_stay_in_the_serving_sample() -> None:
     assert report.event_count == 5
     assert report.authoring_excluded_count == 0
     assert not any("저작 경로" in note for note in report.notes)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-105 ③ — 표면(서빙·저작·프로브) 표지로 게이트② 표본을 거른다
+# ──────────────────────────────────────────────────────────────────────────
+def _surface_event(surface: object | None, **over: object) -> dict[str, object]:
+    """표면 표지만 다른 대표 이벤트 — 표지가 None 이면 키 자체를 넣지 않는다(미표기)."""
+    event: dict[str, object] = {
+        "cost_tier": "local",
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cost_krw": 0.0,
+    }
+    if surface is not None:
+        event["traffic_surface"] = surface
+    event.update(over)
+    return event
+
+
+def test_probe_events_are_excluded_from_gate2_sample_but_counted() -> None:
+    """프로브는 계측을 위해 일부러 낸 호출이다 — 저작과 같은 이유로 표본에서 빠지고 건수는 남는다."""
+    serving = _surface_event("serving", cost_tier="cloud_mid", cost_krw=0.42)
+    probes = [_surface_event("probe") for _ in range(4)]
+    report = cr.aggregate_l3_events([serving, *probes])
+    assert report.event_count == 1
+    assert report.local_ratio == 0.0  # 프로브 로컬 4건이 섞였다면 0.8 로 위장된다
+    assert report.probe_excluded_count == 4
+    assert any("프로브 이벤트 4건" in note for note in report.notes)
+
+
+def test_serving_events_stay_in_the_sample_and_are_counted() -> None:
+    report = cr.aggregate_l3_events([_surface_event("serving") for _ in range(3)])
+    assert report.event_count == 3
+    assert report.surface_counts["serving"] == 3
+    assert report.unlabeled_count == 0
+    assert report.surface_labeled_rate == 1.0
+    assert not any("표지 없는" in note for note in report.notes)
+
+
+def test_unlabeled_events_stay_by_default_and_are_reported_not_hidden() -> None:
+    """미표기 기본 처리 = 하위호환(서빙 표본에 남김) — 단 수와 표지 적용률을 숨기지 않는다."""
+    report = cr.aggregate_l3_events(_sample_events())
+    assert report.event_count == 5  # 표본에 남는다
+    assert report.unlabeled_count == 5
+    assert report.unlabeled_excluded is False
+    assert report.surface_labeled_rate == 0.0  # 표지가 하나도 작동하지 않았다
+    assert any("표지 없는 이벤트 5건" in n and "표지 적용률 0.0%" in n for n in report.notes)
+
+
+def test_unlabeled_note_says_absence_of_a_tag_does_not_mean_serving() -> None:
+    report = cr.aggregate_l3_events(_sample_events())
+    note = next(n for n in report.notes if "표지 없는 이벤트" in n)
+    assert "표지 없음이" in note and "서빙" in note
+
+
+def test_labeled_rate_is_the_share_of_events_that_carry_a_tag() -> None:
+    events = [_surface_event("serving"), _surface_event("probe"), _surface_event(None)] * 2
+    report = cr.aggregate_l3_events(events)
+    assert report.surface_counts == {"serving": 2, "authoring": 0, "probe": 2, "unlabeled": 2}
+    assert report.surface_labeled_rate == pytest.approx(4 / 6)
+    assert report.event_count == 4  # 서빙 2 + 미표기 2(프로브 2는 제외)
+
+
+def test_strict_surface_separates_unlabeled_as_unknown() -> None:
+    events = [_surface_event("serving"), _surface_event(None), _surface_event(None)]
+    report = cr.aggregate_l3_events(events, strict_surface=True)
+    assert report.event_count == 1  # 서빙으로 확인된 것만
+    assert report.unlabeled_count == 2
+    assert report.unlabeled_excluded is True
+    assert any("미상으로 분리" in n and "strict_surface" in n for n in report.notes)
+
+
+def test_strict_surface_still_excludes_authoring_and_probe() -> None:
+    events = [_surface_event("serving"), _surface_event("authoring"), _surface_event("probe")]
+    report = cr.aggregate_l3_events(events, strict_surface=True)
+    assert report.event_count == 1
+    assert report.authoring_excluded_count == 1
+    assert report.probe_excluded_count == 1
+    assert report.unlabeled_excluded is False  # 미표기가 없으면 '미표기를 뺐다'고 말하지 않는다
+
+
+@pytest.mark.parametrize("odd", ["servng", "SERVING", "", 7, ["serving"]])
+def test_out_of_vocabulary_surface_value_is_unlabeled_never_serving(odd: object) -> None:
+    """오타·대문자·비문자열은 서빙으로 읽지 않는다 — 미표기와 같은 집합에 두고 값을 남긴다."""
+    report = cr.aggregate_l3_events([_surface_event("serving"), _surface_event(odd)])
+    assert report.surface_counts["serving"] == 1
+    assert report.surface_counts["unlabeled"] == 1
+    assert report.unlabeled_count == 1
+    assert any("어휘 밖 표지 값" in n for n in report.notes)
+
+
+def test_out_of_vocabulary_value_is_dropped_in_strict_mode() -> None:
+    report = cr.aggregate_l3_events([_surface_event("servng")], strict_surface=True)
+    assert report.event_count == 0
+    assert report.unlabeled_count == 1
+
+
+def test_empty_input_has_no_labeled_rate() -> None:
+    """이벤트 0건이면 적용률은 None 이다 — 0% 가 아니라 '측정할 것이 없다'."""
+    report = cr.aggregate_l3_events([])
+    assert report.surface_labeled_rate is None
+    assert report.notes == []
+
+
+def test_directly_assembled_report_without_the_surface_axis_has_no_rate() -> None:
+    """표면 축을 모르는 직접 조립자(빈 surface_counts)는 적용률이 None 이다(하위호환)."""
+    import dataclasses
+
+    report = dataclasses.replace(cr.aggregate_l3_events(_sample_events()), surface_counts={})
+    assert report.surface_labeled_rate is None
+
+
+def test_surface_counts_cover_the_whole_input_including_excluded_events() -> None:
+    events = [_surface_event(s) for s in ("serving", "authoring", "authoring", "probe", None)]
+    report = cr.aggregate_l3_events(events)
+    assert sum(report.surface_counts.values()) == len(events)
+    assert report.event_count == 2  # 서빙 1 + 미표기 1
+
+
+def test_render_shows_the_surface_section_and_the_sample_policy() -> None:
+    report = cr.aggregate_l3_events([_surface_event("serving"), _surface_event(None)])
+    out = cr._render_stdout(report)
+    assert "[트래픽 표면" in out
+    assert "표지 적용률 50.0%" in out
+    assert "서빙 + 미표기(하위호환)" in out
+    strict = cr._render_stdout(
+        cr.aggregate_l3_events(
+            [_surface_event("serving"), _surface_event(None)], strict_surface=True
+        )
+    )
+    assert "서빙만(미표기는 미상으로 제외)" in strict
+
+
+def test_cli_passes_strict_surface_through(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    events = [_surface_event("serving"), _surface_event(None)]
+    monkeypatch.setattr(cr, "fetch_l3_events", lambda **_: events)
+    assert cr.main(["--strict-surface"]) == 0
+    assert "서빙만(미표기는 미상으로 제외)" in capsys.readouterr().out
+    assert cr.main([]) == 0
+    assert "서빙 + 미표기(하위호환)" in capsys.readouterr().out
+
+
+def test_producer_and_consumer_share_one_vocabulary() -> None:
+    """실제 싱크가 낳은 이벤트를 리포트가 그대로 읽는다 — 한쪽 어휘만 바뀌면 여기서 갈라진다."""
+    from whymath_backend.l3.interfaces import TrafficSurface
+    from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
+
+    class _Client:
+        def __init__(self) -> None:
+            self.metadata: list[dict[str, object]] = []
+
+        def create_event(
+            self, *, name: str, metadata: dict[str, object] | None = None, **_: Any
+        ) -> Any:
+            self.metadata.append(dict(metadata or {}))
+            return object()
+
+    client = _Client()
+    base = {"cost_tier": "local", "input_tokens": 10, "output_tokens": 5}
+    for surface in TrafficSurface:
+        LangfuseSink(client=client, traffic_surface=surface).record(dict(base))  # type: ignore[arg-type]
+    LangfuseSink(client=client).record(dict(base))  # 표지를 싣지 않는 경로 = 미표기
+    report = cr.aggregate_l3_events(client.metadata)
+    assert report.surface_counts == {"serving": 1, "authoring": 1, "probe": 1, "unlabeled": 1}
+    assert report.event_count == 2  # 서빙 + 미표기

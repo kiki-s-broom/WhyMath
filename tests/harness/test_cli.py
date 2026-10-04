@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import store
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -656,7 +656,7 @@ class TestCheckStop:
         return task_id
 
     def _invoke(self, monkeypatch, stdin_payload: dict) -> int:
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(stdin_payload)))
+        set_hook_stdin(monkeypatch, json.dumps(stdin_payload))
         return cli.main(["check-stop"])
 
     def test_reentry_passes_immediately(self, seeded_repo: Path, monkeypatch, capsys):
@@ -700,7 +700,7 @@ class TestCheckStop:
 class TestCheckEdit:
     def _invoke(self, monkeypatch, file_path: str) -> int:
         payload = {"tool_input": {"file_path": file_path}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         return cli.main(["check-edit"])
 
     def test_non_backlog_file_ignored(self, seeded_repo: Path, monkeypatch):
@@ -1534,7 +1534,7 @@ class TestCheckEditPolicy:
 
     def _invoke(self, monkeypatch, file_path: str) -> int:
         payload = {"tool_input": {"file_path": file_path}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         return cli.main(["check-edit"])
 
     def _on_branch(self, repo: Path, name: str) -> None:
@@ -1758,7 +1758,7 @@ class TestCrossSessionOverlap:
         capsys.readouterr()
         # B가 A의 선언 범위(src/backend/**) 안 파일 편집 → path_overlap 경고
         payload = {"tool_input": {"file_path": str(repo_b / "src/backend/api/x.py")}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         assert cli.main(["check-edit"]) == 0  # warn 모드
         err = capsys.readouterr().err
         assert "path_overlap" in err

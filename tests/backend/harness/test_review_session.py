@@ -26,6 +26,7 @@ from whymath_backend.harness.review_session import (
     run_review_session,
 )
 from whymath_backend.ops import hit_cu_metrics
+from whymath_backend.schema.review_timer import review_content_fingerprint
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> Path:
@@ -405,3 +406,66 @@ class TestItemBodyIsRendered:
         items, _ = load_review_items(path)
         _, rendered = _run(tmp_path, items, "a\n")
         assert tail in rendered
+
+
+class TestContentFingerprintIsRecorded:
+    """[EOS-27 ①] 검수 CLI가 '검수자에게 보인 레코드'의 지문을 started·finished·판정 행에 싣는다."""
+
+    _PAYLOAD = {"slug": "cu-fp", "question_text": "x^2 = 4 의 양의 근", "answer": "2"}
+
+    def test_events_and_verdict_row_carry_the_fingerprint_of_the_shown_payload(
+        self, tmp_path: Path
+    ) -> None:
+        item = ReviewItem(slug="cu-fp", payload=self._PAYLOAD)
+        _run(tmp_path, [item], "a\n")
+        expected = review_content_fingerprint(self._PAYLOAD)
+        events = _read_jsonl(tmp_path / "events.jsonl")
+        assert [e["event_type"] for e in events] == ["started", "finished"]
+        assert [e["content_fingerprint"] for e in events] == [expected, expected]
+        (verdict_row,) = _read_jsonl(tmp_path / "verdicts.jsonl")
+        assert verdict_row["content_fingerprint"] == expected
+
+    def test_fingerprint_is_the_one_the_bridge_and_gate_recompute(self, tmp_path: Path) -> None:
+        """기록 쪽과 대조 쪽이 같은 함수라는 증거 — 코퍼스 행을 읽어 만든 지문과 일치한다."""
+        corpus = _write_jsonl(tmp_path / "corpus.jsonl", [self._PAYLOAD])
+        items, errors = load_review_items(corpus)
+        assert errors == []
+        _run(tmp_path, items, "a\n")
+        finished = [
+            e for e in _read_jsonl(tmp_path / "events.jsonl") if e["event_type"] == "finished"
+        ]
+        assert finished[0]["content_fingerprint"] == review_content_fingerprint(
+            json.loads(corpus.read_text(encoding="utf-8").splitlines()[0])
+        )
+
+    def test_different_content_gets_a_different_fingerprint(self, tmp_path: Path) -> None:
+        a = ReviewItem(slug="cu-a", payload={"slug": "cu-a", "answer": "2"})
+        b = ReviewItem(slug="cu-b", payload={"slug": "cu-b", "answer": "3"})
+        _run(tmp_path, [a, b], "a\na\n")
+        finished = [
+            e for e in _read_jsonl(tmp_path / "events.jsonl") if e["event_type"] == "finished"
+        ]
+        assert finished[0]["content_fingerprint"] != finished[1]["content_fingerprint"]
+
+    def test_item_without_a_body_records_unknown_not_a_fingerprint_of_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        """본문을 못 보여준 항목의 판정은 내용을 인증하지 않는다 — 빈 본문의 지문을 만들면 '일치'로 오독."""
+        item = ReviewItem(slug="cu-nobody", payload=None, payload_absent_reason="생성 실패 후보")
+        _run(tmp_path, [item], "s\n")  # 본문 없이는 보류가 정직한 판정
+        _run(
+            tmp_path,
+            [ReviewItem(slug="cu-nobody2", payload=None, payload_absent_reason="x")],
+            "a\n",
+        )
+        events = _read_jsonl(tmp_path / "events.jsonl")
+        assert events and all("content_fingerprint" in e for e in events)
+        assert all(e["content_fingerprint"] is None for e in events)
+
+    def test_aborted_event_carries_no_fingerprint(self, tmp_path: Path) -> None:
+        item = ReviewItem(slug="cu-fp", payload=self._PAYLOAD)
+        _run(tmp_path, [item], "s\n")
+        events = _read_jsonl(tmp_path / "events.jsonl")
+        assert [e["event_type"] for e in events] == ["started", "aborted"]
+        assert events[0]["content_fingerprint"] is not None
+        assert events[1]["content_fingerprint"] is None

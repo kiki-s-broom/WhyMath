@@ -20,9 +20,11 @@ slug별로 옮기는 `harness/review_status_verdict_bridge`, 고정 코퍼스 7�
 감사 라벨 표본으로 코퍼스 전체를 판정하는 `harness/problem_corpus_review_status_backfill`이다.
 이 게이트는 어느 도구의 감사로그든 같은 형식(`slug`·`review_status`)으로 읽는다.
 
-경로 밖 승격의 구체형 7종을 각각 다른 사유로 거부한다(뭉뚱그린 "거부" 금지 — 조치가 다르다):
+경로 밖 승격의 구체형 9종을 각각 다른 사유로 거부한다(뭉뚱그린 "거부" 금지 — 조치가 다르다):
 `not_in_corpus` · `no_human_verdict` · `human_verdict_rejected` ·
 `human_verdict_needs_edit`(사람이 "손질하면 쓸 수 있다"로 판정 — 지금 내용은 승인되지 않았다) ·
+`review_content_changed`(사람 판정 뒤 코퍼스 내용이 바뀌었다 — 검수 지문 ≠ 현재 지문, EOS-27) ·
+`review_fingerprint_unverifiable`(판정 이벤트에 내용 지문이 없다 — 모름은 일치가 아니다, EOS-27) ·
 `review_status_not_backfilled`(각인 감사로그에 각인 기록 없음 = 손각인 의심) ·
 `review_status_audit_mismatch`(감사로그 각인값 ≠ 코퍼스 현재값 = 각인 후 손편집 의심) ·
 `review_status_not_approved`(감사로그·코퍼스가 일치하되 값이 approved가 아님).
@@ -39,6 +41,22 @@ review_status_for_verdict`가 이 판정을 `approved`로 옮기는 것은 *손�
 승격 경로는 "손질 반영 → 재검수(`approved`)"다(재검수의 종결이 최신 판정이 된다).
 판정 술어는 `certifies_current_content` 하나이며 각인 도구가 같은 술어를 import해 쓴다(게이트와
 각인 도구가 한 판정을 다르게 읽지 않게).
+
+왜 ②단이 "판정 실재"에서 멈추지 않고 내용 지문까지 보는가 (EOS-27)
+-----------------------------------------------------------------
+②단은 최신 사람 판정이 `approved`인지만 봤고, ③단은 `review_status` **값**(감사값 = 코퍼스값)만
+대조했다. 둘 다 문항 *내용*은 보지 않는다 — 사람이 승인한 뒤 누군가 문항을 손으로 고치면(정답·해설·
+조건) 승인·각인·감사로그가 전부 그대로여서 게이트가 통과시킨다. 검수 이벤트가 검수자가 본 레코드의
+지문(`content_fingerprint`)을 싣게 되었으므로(`review_session`), 게이트는 승인 판정의 지문과 코퍼스
+현재 레코드의 지문(`schema/review_timer.review_content_fingerprint`)을 대조한다:
+
+  · 다르다            → `review_content_changed` (승인이 인증한 내용이 아니다 — 조치: 재검수)
+  · 이벤트에 지문 없음 → `review_fingerprint_unverifiable` (옛 이벤트 · 모름 ≠ 일치 — 조치: 재검수)
+  · 같다              → 통과 (③단 이하로 진행)
+
+대조는 `evaluate_promotion(review_fingerprints=, corpus_fingerprints=)`를 **둘 다** 넘길 때 켜진다
+(순수 함수라 파일을 못 읽는다). 생략하면 `fingerprint_checked=False`로 리포트에 *미수행*을 자백한다
+— CLI는 항상 넘기며 인자로 끌 수 없다. 반려·손질 승인은 이미 ②단에서 막히므로 지문을 보지 않는다.
 
 왜 ①단이 "검수 큐 등재"가 아니라 "코퍼스 실재"인가 (2026-09-01 codex P1 실측)
 --------------------------------------------------------------------------
@@ -153,7 +171,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -162,7 +180,12 @@ from whymath_backend.harness.needs_review_worklist import load_review_queue_json
 from whymath_backend.harness.review_timer import load_events_jsonl
 from whymath_backend.harness.wilson import wilson_upper_bound
 from whymath_backend.schema.enums import is_review_status_cleared
-from whymath_backend.schema.review_timer import VERDICT_APPROVED_WITH_EDIT, ReviewTimerEvent
+from whymath_backend.schema.review_timer import (
+    VERDICT_APPROVED_WITH_EDIT,
+    ReviewTimerEvent,
+    review_content_fingerprint,
+    review_fingerprint_state,
+)
 
 __all__ = [
     "AS_FOUND_DEFECT_VERDICTS",
@@ -194,7 +217,8 @@ HUMAN_REVIEW_NOTICE = (
 # ④단의 "검수 배치 전체"는 EOS-136 판정(분모가 제안이면 통과 경로의 결함 수가 항상 0이다).
 PROMOTION_PATH_STAGES = (
     "① 코퍼스 실재(축적 CLI가 수용·저장한 후보 — 검수 큐 등재가 아니다)",
-    "② 사람 검수 판정(ReviewTimerEvent finished + verdict=approved — 손질 승인은 재검수 대상)",
+    "② 사람 검수 판정(ReviewTimerEvent finished + verdict=approved — 손질 승인은 재검수 대상 · "
+    "판정이 본 내용 지문 = 코퍼스 현재 내용 지문)",
     "③ review_status 각인(각인 도구 감사로그 각인값 = 코퍼스 값 = approved)",
     "④ Wilson 결함율 상한 게이트(검수 배치 전체 — 판정 이력의 반려·손질 승인 = as-found 결함)",
 )
@@ -216,6 +240,9 @@ _REVIEW_VERDICT_ROW_KEY = "verdict"
 # approved_with_edit는 ②단을 통과하지 못하는가"). 각인 도구(`review_status_verdict_bridge`)도
 # 이 값만 approved로 각인한다.
 _AS_IS_APPROVAL = "approved"
+
+# 지문 대조를 건너뛴 리포트가 싣는 자백 문구 — 테스트가 '미수행' 포함 여부로 대조한다.
+_FINGERPRINT_UNCHECKED_TEXT = "미수행 — 승인 뒤 내용 편집은 확인되지 않았다"
 
 #: ④단 분자 — as-found 결함 판정. 반려는 정의상 결함이고, 손질 승인은 *손질 전* 내용이 결함이었다는
 #: 뜻이다(골든 계약 `edit_aware_verdict` → defective와 같은 규칙 — 같은 사실을 두 곳이 다르게 세지
@@ -274,7 +301,17 @@ class SlugVerdict:
     """①단 — 코퍼스 JSONL에 이 slug 레코드가 실재하는가(승격 후보의 전제)."""
 
     blocked_reason: str | None
-    """차단 사유(경로 밖 7종 중 하나). None이면 경로 내."""
+    """차단 사유(경로 밖 9종 중 하나). None이면 경로 내."""
+
+    review_fingerprint: str | None = None
+    """②단 — 최신 사람 판정이 본 내용의 지문(EOS-27). None = 이벤트에 지문 없음(모름)."""
+
+    corpus_fingerprint: str | None = None
+    """②단 — 코퍼스 현재 레코드의 지문(레코드 부재면 None)."""
+
+    fingerprint_state: str = "not_checked"
+    """`match`·`changed`·`unknown`(`review_fingerprint_state`) 또는 `not_checked`(대조 미수행 —
+    `evaluate_promotion`에 지문 맵을 넘기지 않았다). 통과가 아니라 *미수행*임을 값으로 자백한다."""
 
     @property
     def on_path(self) -> bool:
@@ -290,6 +327,9 @@ class SlugVerdict:
             "backfill_review_status": self.backfill_review_status,
             "in_corpus": self.in_corpus,
             "corpus_review_status": self.corpus_review_status,
+            "review_fingerprint": self.review_fingerprint,
+            "corpus_fingerprint": self.corpus_fingerprint,
+            "fingerprint_state": self.fingerprint_state,
             "on_path": self.on_path,
             "blocked_reason": self.blocked_reason,
         }
@@ -322,6 +362,10 @@ class PromotionGateReport:
     제안만 세면 반려분이 ②단에서 먼저 빠져 통과 경로의 결함 수가 항상 0이 된다(EOS-136 판정 —
     모듈 docstring ④단 절).
     """
+
+    fingerprint_checked: bool = False
+    """②단 내용 지문 대조를 *수행했는가*(EOS-27). False면 이 리포트의 통과는 '승인 뒤 내용 편집'을
+    보지 않은 통과다 — CLI는 항상 True로 호출한다."""
 
     batch_defective: frozenset[str] = frozenset()
     """④단 분자 — 검수 배치 중 종결 판정 **이력**에 as-found 결함(반려·손질 승인)이 있는 slug.
@@ -411,6 +455,7 @@ class PromotionGateReport:
             "proposed": len(self.verdicts),
             "on_path": len(self.verdicts) - len(self.off_path),
             "off_path": len(self.off_path),
+            "fingerprint_checked": self.fingerprint_checked,
             "previously_queued": len(self.previously_queued),
             "input_damaged": self.input_damaged,
             # ④단 분모·분자 — 검수 배치 기준(EOS-136). `defect_scope`가 그 사실을 산출물에 싣는다.
@@ -442,6 +487,8 @@ def evaluate_promotion(
     confidence: float = _DEFAULT_CONFIDENCE,
     load_errors: Sequence[str] = (),
     as_found_defective: Collection[str] | None = None,
+    review_fingerprints: Mapping[str, str | None] | None = None,
+    corpus_fingerprints: Mapping[str, str] | None = None,
 ) -> PromotionGateReport:
     """승격 제안을 정본 경로 4단에 대조한다(순수 — 파일 I/O 0·쓰기 0).
 
@@ -463,10 +510,23 @@ def evaluate_promotion(
     (`read_human_verdict_ledger`가 만든다). 생략하면 최신 판정값에서만 유도한다(이력을 모르는
     호출자용 — 그 경우 손질 후 재승인은 결함으로 세지 못하므로 CLI는 항상 이력을 넘긴다).
 
+    `review_fingerprints`·`corpus_fingerprints`(EOS-27)는 **둘 다** 넘길 때만 ②단 내용 지문 대조가
+    켜진다: {slug: 최신 사람 판정이 본 내용의 지문(None = 이벤트에 지문 없음)} ·
+    {slug: 코퍼스 현재 레코드의 지문}. 하나만 넘기면 `ValueError`다(반쪽 대조는
+    '대조했다'로 위장된다).
+    둘 다 생략하면 대조를 건너뛰고 리포트가 `fingerprint_checked=False`로 그 사실을 싣는다.
+
     차단 사유는 **첫 번째로 막힌 단**을 낸다(뭉뚱그리지 않는다 — 조치가 단마다 다르다):
     코퍼스에 없다 → 사람 판정이 없다 → 사람이 반려했다 → 사람이 손질을 요구했다 →
-    각인을 안 거쳤다 → 감사값과 코퍼스값이 어긋난다 → 각인값이 approved가 아니다.
+    판정 뒤 내용이 바뀌었다 → 판정에 내용 지문이 없다 → 각인을 안 거쳤다 → 감사값과 코퍼스값이
+    어긋난다 → 각인값이 approved가 아니다.
     """
+    if (review_fingerprints is None) != (corpus_fingerprints is None):
+        raise ValueError(
+            "review_fingerprints와 corpus_fingerprints는 함께 넘겨야 한다 — 한쪽만 있으면 "
+            "내용 지문 대조는 수행될 수 없는데 수행된 것처럼 보인다(EOS-27)"
+        )
+    fingerprint_checked = review_fingerprints is not None
     verdicts: list[SlugVerdict] = []
     for slug in proposed_slugs:
         in_queue = slug in queue_slugs  # 정보 전용(차단 조건 아님)
@@ -477,6 +537,11 @@ def evaluate_promotion(
         stamped = audit_status is not None and is_review_status_cleared(audit_status)
         in_corpus = slug in corpus_review_status
         status = corpus_review_status.get(slug)
+        review_fp = review_fingerprints.get(slug) if review_fingerprints is not None else None
+        corpus_fp = corpus_fingerprints.get(slug) if corpus_fingerprints is not None else None
+        fp_state = (
+            review_fingerprint_state(review_fp, corpus_fp) if fingerprint_checked else "not_checked"
+        )
 
         reason: str | None
         if not in_corpus:
@@ -491,6 +556,16 @@ def evaluate_promotion(
             # 저장하지 않는다). 조치: 손질을 코퍼스에 반영하고 재검수(approved)를 받는다.
             # 각인 도구도 같은 술어로 이 판정을 각인하지 않는다(모듈 docstring — EOS-136).
             reason = "human_verdict_needs_edit"
+        elif fp_state == "changed":
+            # EOS-27 — 사람은 이 내용을 승인한 적이 없다. 승인 뒤 누군가 문항을 고쳤다(정답·해설·
+            # 조건). 값(review_status)·감사로그는 멀쩡하므로 아래 ③단은 이것을 못 본다.
+            # 조치: 지금 내용을 재검수(approved)한다 — 그 종결이 새 지문을 싣는다.
+            reason = "review_content_changed"
+        elif fp_state == "unknown":
+            # EOS-27 — 판정 이벤트에 지문이 없다(옛 이벤트·본문 미표시). 모름은 일치가 아니다.
+            # 조치: 재검수. (코퍼스 레코드가 없으면 위 ①단이 이미 막았으므로 여기 오는 unknown은
+            # 항상 '이벤트 쪽 지문 없음'이다.)
+            reason = "review_fingerprint_unverifiable"
         elif audit_status is None:
             # 코퍼스 값은 approved인데 각인 감사로그에 기록이 없다 = 각인 도구를 안 거친
             # 각인(손편집 의심). 값만 보고 통과시키면 "경로 밖 승격"의 가장 쉬운 형태가 열린다.
@@ -518,6 +593,9 @@ def evaluate_promotion(
                 corpus_review_status=status,
                 in_corpus=in_corpus,
                 blocked_reason=reason,
+                review_fingerprint=review_fp,
+                corpus_fingerprint=corpus_fp,
+                fingerprint_state=fp_state,
             )
         )
     defective = (
@@ -534,6 +612,7 @@ def evaluate_promotion(
         load_errors=list(load_errors),
         batch_verdicts=dict(human_verdicts),
         batch_defective=defective,
+        fingerprint_checked=fingerprint_checked,
     )
 
 
@@ -563,6 +642,8 @@ def render_gate_report(report: PromotionGateReport) -> str:
             # 큐 이력은 **정보**로만 싣는다(차단 조건 아님) — 승격 후보가 한때 반려·검수필요
             # 큐에 올랐다는 사실은 검수자에게 의미가 있어 버리지 않는다.
             f"- 참고(차단 아님): 한때 검수 큐에 오른 제안 {len(report.previously_queued)}건",
+            f"- 내용 지문 대조(EOS-27): "
+            f"{'수행' if report.fingerprint_checked else _FINGERPRINT_UNCHECKED_TEXT}",
             f"- 판정: {'승격 허용' if report.approved else '승격 거부'}",
             "",
         ]
@@ -650,7 +731,16 @@ def _load_backfill_audit(path: Path) -> tuple[dict[str, str], list[str]]:
 
 
 def _load_corpus_review_status(path: Path) -> tuple[dict[str, str | None], list[str]]:
-    """코퍼스 JSONL → {slug: review_status}. 생 dict로 읽는다(Problem 검증 우회).
+    """코퍼스 JSONL → ({slug: review_status}, 실패 사유). `_load_corpus_records`의 상태 투영."""
+    statuses, _fingerprints, errors = _load_corpus_records(path)
+    return statuses, errors
+
+
+def _load_corpus_records(
+    path: Path,
+) -> tuple[dict[str, str | None], dict[str, str], list[str]]:
+    """코퍼스 JSONL → ({slug: review_status}, {slug: 내용 지문}, 실패 사유). 생 dict로 읽는다
+    (Problem 검증 우회). 지문은 EOS-27 — `review_content_fingerprint` 단일 정본으로 만든다.
 
     `load_problem_bank_records`를 쓰지 않는 이유: 이 게이트가 봐야 하는 것은 두 키(`slug`·
     `review_status`)뿐인데, 전체 레코드 검증에 걸려 `ProblemCorpusError`가 나면 *게이트가
@@ -658,6 +748,7 @@ def _load_corpus_review_status(path: Path) -> tuple[dict[str, str | None], list[
     관대해져도 판정 기준은 느슨해지지 않는다.
     """
     statuses: dict[str, str | None] = {}
+    fingerprints: dict[str, str] = {}
     errors: list[str] = []
     with path.open("r", encoding="utf-8") as handle:
         for line_no, line in enumerate(handle, start=1):
@@ -675,7 +766,8 @@ def _load_corpus_review_status(path: Path) -> tuple[dict[str, str | None], list[
             if isinstance(slug, str) and slug:
                 raw = parsed.get("review_status")
                 statuses[slug] = raw if isinstance(raw, str) else None
-    return statuses, errors
+                fingerprints[slug] = review_content_fingerprint(parsed)
+    return statuses, fingerprints, errors
 
 
 @dataclass(frozen=True, slots=True)
@@ -831,8 +923,9 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
         backfilled.update(audit_status)  # 마지막 감사 파일의 각인이 이긴다(재실행 갱신)
         load_errors.extend(audit_errors)
 
-    corpus_status, corpus_errors = _load_corpus_review_status(args.corpus)
+    corpus_status, corpus_fingerprints, corpus_errors = _load_corpus_records(args.corpus)
     load_errors.extend(corpus_errors)
+    review_fingerprints = {slug: event.content_fingerprint for slug, event in ledger.latest.items()}
 
     report = evaluate_promotion(
         proposed,
@@ -844,6 +937,8 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901 — 입력 검
         confidence=args.confidence,
         load_errors=load_errors,
         as_found_defective=ledger.as_found_defective,
+        review_fingerprints=review_fingerprints,
+        corpus_fingerprints=corpus_fingerprints,
     )
     _say(render_gate_report(report))
     if args.json_out is not None:
