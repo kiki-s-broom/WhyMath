@@ -171,6 +171,18 @@ class TestControlGroup:
         assert sessions == learners
 
 
+class TestSyntheticContentGoesThroughTheProvenanceGate:
+    def test_every_synthetic_problem_has_a_ledger_row(self, sample_db: str) -> None:
+        """LIC-03 — 생성물(`자체생성`) 문항은 원장 없이 들어가지 않는다. 합성 문항도 예외가 아니다."""
+        (problems,) = _sql("SELECT count(*) FROM problem")[0]
+        (ledgered,) = _sql(
+            "SELECT count(DISTINCT problem_id) FROM content_provenance"
+            " WHERE problem_id IN (SELECT problem_id FROM problem)"
+        )[0]
+        assert problems > 0
+        assert ledgered == problems
+
+
 class TestViolationInjectionFlipsEachKpi:
     def test_kpi1_a_session_that_never_reaches_a_recommendation_flips_to_fail(
         self, sample_db: str, tmp_path: Path

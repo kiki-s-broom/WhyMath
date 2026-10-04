@@ -64,7 +64,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from pydantic import SecretStr
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -197,12 +197,16 @@ async def _seed_content(
     """저작 콘텐츠(개념·문항·매핑)를 결정론 id로 멱등 시딩한다 — 학습자 상태는 쓰지 않는다."""
     from whymath_backend.db.models.concept import Concept, ProblemConcept
     from whymath_backend.db.models.problem import Problem
+    from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
+    from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceInput, require_provenance
     from whymath_backend.schema.concept import Concept as ConceptSchema
     from whymath_backend.schema.concept import ProblemConcept as ProblemConceptSchema
     from whymath_backend.schema.enums import (
         ConceptLevel,
         ConceptRole,
         Curriculum,
+        GenerationType,
+        LicenseType,
         ReviewStatus,
         SourceType,
         Subject,
@@ -231,22 +235,39 @@ async def _seed_content(
                 for k in range(_PROBLEMS_PER_CONCEPT):
                     pid = _content_id("problem", f"{c}-{k}")
                     problem_concept.append((pid, cid))
-                    await session.merge(
-                        Problem.from_schema(
-                            ProblemSchema(
-                                problem_id=pid,
-                                source_type=SourceType.자체생성,
-                                review_status=ReviewStatus.approved,
-                                curriculum_version=Curriculum.REVISION_2022,
-                                valid_from_year=2022,
-                                subject=Subject.공통,
-                                unit_codes=[f"U-kpisample-{c}-{k}"],
-                                # 난이도를 서로 다르게 — 추천이 θ 근방 최근접을 고른다.
-                                difficulty_overall=2.0 + c * 1.5 + k * 0.7,
-                                answer="kpi-sample-synthetic-answer",
-                            )
-                        )
+                    problem_schema = ProblemSchema(
+                        problem_id=pid,
+                        source_type=SourceType.자체생성,
+                        review_status=ReviewStatus.approved,
+                        curriculum_version=Curriculum.REVISION_2022,
+                        valid_from_year=2022,
+                        subject=Subject.공통,
+                        unit_codes=[f"U-kpisample-{c}-{k}"],
+                        # 난이도를 서로 다르게 — 추천이 θ 근방 최근접을 고른다.
+                        difficulty_overall=2.0 + c * 1.5 + k * 0.7,
+                        answer="kpi-sample-synthetic-answer",
                     )
+                    await session.merge(Problem.from_schema(problem_schema))
+                    # LIC-03 단일 관문 — 생성물(`자체생성`) 문항은 출처 원장 없이 들어가지 않는다.
+                    # 관문이 검증한 `ContentProvenance`를 같은 세션에서 멱등으로 남긴다.
+                    gated = require_provenance(
+                        slug=f"kpi-sample-{c}-{k}",
+                        source_type_value=problem_schema.source_type,
+                        provenance=ProvenanceInput(
+                            generation_type=GenerationType.FULLY_GENERATED.value,
+                            license=LicenseType.WHYMATH_GENERATED.value,
+                        ),
+                        problem_id=pid,
+                    )
+                    if gated is not None:
+                        already = await session.scalar(
+                            select(ContentProvenanceORM.provenance_id)
+                            .where(ContentProvenanceORM.problem_id == pid)
+                            .limit(1)
+                        )
+                        if already is None:
+                            await session.flush()  # 문항 행이 먼저 있어야 원장 FK가 성립한다.
+                            await session.merge(ContentProvenanceORM.from_schema(gated))
                     await session.merge(
                         ProblemConcept.from_schema(
                             ProblemConceptSchema(
