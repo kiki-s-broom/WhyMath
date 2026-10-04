@@ -536,7 +536,11 @@ CATALOG: tuple[Spec, ...] = (
        "api._concept_orchestration", pipelines=("concept_graph",), duplicate_of="WM-E-101"),
     _e("WM-E-103", "개념↔원자 크로스워크 이전", "Platform", "Knowledge Graph", "P1",
        "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk.populate",
-       "l1.concept_atom_crosswalk.transfer", pipelines=("concept_atom_crosswalk",)),
+       "l1.concept_atom_crosswalk.transfer",
+       # CONT-08 — 콘텐츠 code → 연결 원자 읽기 전용 로더(검수 입력·승격 게이트가 공급 경로와
+       # 같은 연결을 본다). 이전(transfer)과 같은 도출 규칙·같은 다리를 쓰는 형제 모듈이다.
+       "l1.concept_atom_crosswalk.content_link",
+       pipelines=("concept_atom_crosswalk",)),
     _e("WM-E-104", "개념 콘텐츠 4종 적재·해석", "Platform", "Content", "P0",
        "Gate2 ⑤ — 정의·비유·예시·직관", "l1.concept_content.populate",
        "l1.concept_content.projection", "l1.concept_content.resolve",

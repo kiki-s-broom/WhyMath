@@ -25,6 +25,11 @@
 콘텐츠 `code`로 크로스워크를 바로 찾으면 0건이라 "연결 없음"으로 읽힌다. 새 모듈은 공급 경로의 도출 규칙을 그대로
 재사용하고, 테스트가 두 결과의 일치를 단언한다(`test_atom_codes_equal_the_supply_path_derivation`).
 
+**로더를 `l1/concept_atom_crosswalk/`에 둔 이유**: 처음엔 `harness/`에 뒀는데 CI의 구 437 소비 가드
+(`test_legacy_snapshot_governance` — 구 437 `graph.json`을 읽는 모듈은 화이트리스트 안에만)가 걸렸다.
+가드를 확장하는 대신 이미 화이트리스트인 크로스워크 패키지로 옮겼다 — 도출 규칙(`transfer`)과 같은 자리라
+응집도도 좋고, 가드는 그대로다. 새 모듈은 EOS 기능 인벤토리(`WM-E-103`·`WM-O-910`)에도 귀속했다.
+
 ## 2. 택1 판정
 
 - **ⓐ(입력 확장 + 연결 승인 라벨 분리) — 채택.** 연결 원자·신뢰도를 검수자(LLM·사람)에게 보이고, 승인을
@@ -39,7 +44,7 @@
 
 | 규칙 | 내용 |
 |---|---|
-| 연결 출처 | `harness/concept_content_link_context.py` — 공급 경로와 같은 도출. 조인 실패(`concept_id` 부재·한 행에 크로스워크 중복)는 `ValueError`, 파일 부재는 `FileNotFoundError`. 빈 결과로 대체하지 않는다 |
+| 연결 출처 | `l1/concept_atom_crosswalk/content_link.py` — 공급 경로와 같은 도출(`harness/concept_content_link_context.py`는 표시용 창구). 조인 실패(`concept_id` 부재·한 행에 크로스워크 중복)는 `ValueError`, 파일 부재는 `FileNotFoundError`. 빈 결과로 대체하지 않는다 |
 | 검수 입력 | 프롬프트에 `연결 원자: 코드(명칭)[대표] … — 크로스워크 ai_estimated(기계 추정·미검수, confidence=…)` 한 줄. 연결이 없으면(대학·unmapped) 줄 자체가 없다 |
 | 응답 축 | rubric `link_ok`(불리언) — `passed`와 별개. 콘텐츠가 맞아도 연결이 틀리면 `link_ok=false` |
 | 모른다 ≠ 맞다 | 연결을 줬는데 `link_ok`를 안 답하거나 불리언이 아니면 **승인이 아니다**(`link_approved=False`, `link_answered=False`로 구별해 기록) |
