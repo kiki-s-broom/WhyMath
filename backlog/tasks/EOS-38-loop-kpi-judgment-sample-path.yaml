@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 실측 사실(EOS-141 판정문 §5 · main a82f9449): 공식 실측의 `loop_kpi_gate` ①②④는 분모 0으로 미측정. 학습자 1명을 남긴 보조 측정에서 ①은 1/1이지만 Wilson 하한 0.27로 FAIL, ②는 0/12이지만 Wilson 상한 0.18로 FAIL. 통과에 필요한 최소 표본은 ① 전건 성공 세션 52건 · ② 무위반 스캔 268행(`harness/wilson` · CONFIDENCE 0.95). 9/19·9/24·9/25·9/29 네 판정 모두 같은 형태였다.\n② 목표: 판정 시점에 ①②④가 측정되는 경로를 정한다(하나를 고르고 근거를 남긴다) — (가) ARCH-66 ⑥의 테스트 계정 세션을 관측창에 쌓는다 (나) 결정론 합성 부하(하네스 여정 N회 · 삭제하지 않음)를 전용 DB에 쌓고 그 위에서 CLI를 돈다 (다) 판정 규칙에 \"표본 부족 FAIL은 미측정과 같게 계상\"을 명시한다. 합성 부하는 실사용 검증으로 계상하지 않는다(P3-13 ARCH-66 ⑥ 단서와 같다).\n③ 변별력: 위반 주입(끊긴 세션 · 불일치 행 · 운영자 감사 행)이 각 KPI를 FAIL로 바꾸는지 확인하고, 정상 표본 대조군은 PASS.\n④ 선행: KPI ⑤ 삭제권 오염 처분 태스크가 먼저다 — ⑤ 오염이 제거되지 않으면 이 경로의 ⑤도 FAIL로 오염된다.\n⑤ 선행으로 걸 태스크: P3-17-week3-release-gate-judgment (amend --depends로 집행). P3-14-phase3-metrics-cli의 Learning Loop Success가 ①을 재사용하면 거기에도 건다(재사용 여부 미확인)."
-artifacts: []
+artifacts:
+  - "PR #1458 (kiki-s-broom/WhyMath) · docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md · src/backend/whymath_backend/ops/loop_kpi_sample_load.py"
 paths:
   - src/backend/whymath_backend/ops/loop_kpi_gate.py
   - "tests/backend/ops/**"
@@ -25,6 +26,6 @@ paths:
   - docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md
   - docs/standards/loop_kpi_contract.md
   - tests/backend/db/test_problem_write_provenance_single_gate.py
-session: claude/gracious-clarke-9hdhez
+session: null
 notes: "EOS-141 Gate 2 3차 재판정(docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §7-1 P-3) acceptance ⑨에 따른 등재 — 루프 KPI ①②④ 판정 표본 경로. 선행 EOS-37(⑤ 삭제권 오염 처분).\n\n[정정 2026-10-03] paths ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**'] → ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**', 'src/backend/whymath_backend/ops/loop_kpi_sample_load.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/data_access_layer_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md', 'docs/standards/loop_kpi_contract.md']: 신규 모듈의 CI 계약 대장 3곳 등재·문서 산출물이 닿는 파일을 범위에 편입\n\n[정정 2026-10-04] paths ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**', 'src/backend/whymath_backend/ops/loop_kpi_sample_load.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/data_access_layer_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md', 'docs/standards/loop_kpi_contract.md'] → ['src/backend/whymath_backend/ops/loop_kpi_gate.py', 'tests/backend/ops/**', 'src/backend/whymath_backend/ops/loop_kpi_sample_load.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/data_access_layer_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md', 'docs/standards/loop_kpi_contract.md', 'tests/backend/db/test_problem_write_provenance_single_gate.py']: LIC-03 단일 관문 테스트 허용 목록 등재가 닿는 파일 편입"
 updated: 2026-10-04
