@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-03 (판정·착지 · EOS-38): **루프 KPI ①②④ 판정 표본은 (나) 결정론 합성 부하를 `_kpi_sample` 전용 DB에 쌓아 만든다 — (가) 사람이 쌓는 테스트 계정은 52·268을 보장 못 하고, (다) 표본 부족 FAIL을 미측정으로 부르는 것은 4회 공전의 원인을 못 바꾼다. 판정 CLI에 `--sample-basis synthetic` 표지를 달아 실사용 검증으로 계상하지 않는다** (claude 판정·구현) — 판정 기준 main `5e9ce568`
+
+- **판정문**: `docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md` (후보 비교·실측·변별력·뮤테이션 7종·한계).
+- **실측**: 학습자 60명 부하 15초 → 5종 PASS exit 0(① 60/60 하한 0.9569 · ② 0/542 · ④ 0/180). 최소 표본은 코드가 계산(52·268).
+- **발견**: ②의 분모는 학습자 행이 아니라 콘텐츠·`attempt_event` 행이다. 이 규모에서 ② 위반 1건은 판정을 못 뒤집고 2건부터 FAIL(설계 의도 — 테스트가 양방향 동결).
+- **뮤테이션 M4 생존**: 삭제 금지 탐지기가 정확한 이름만 봐서 `_exec_delete` 변형을 놓쳤다 → 부분 일치로 확장 후 RED. 주입 없이 선언했다면 구멍이 남았을 자리다.
+- **환경 교훈(사고 아님)**: 세션 재개 중 로컬 PG가 내려가 통합 테스트가 `미도달 skip`으로 초록처럼 보였다 → skip 건수를 읽고 재기동 후 재실행. 신규 모듈은 CI 계약 3곳(선언≠배선·데이터 접근 baseline·인벤토리 귀속)에 반응해 등재했다.
+- **정직 표기**: 합성 부하는 실사용 검증이 아니다(ARCH-66 ⑥). `backend-migrations` 잡에서의 통합 테스트 실행은 이 세션에서 확인하지 못했다(로컬 PG 16으로만 재현).
+
 ### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
 
 - **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.
