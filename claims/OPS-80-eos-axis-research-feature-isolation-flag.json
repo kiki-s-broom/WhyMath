@@ -1,1 +1,1 @@
-{"branch": "claude/gracious-clarke-9hdhez", "harness": "2.0", "task": "OPS-80-eos-axis-research-feature-isolation-flag", "ts": "2026-10-05T19:54:52Z"}
+{"branch": "claude/gracious-clarke-9hdhez", "harness": "2.0", "kind": "block", "reason": "acceptance ⑤: E축·연구성 기능의 범위 확정이 선행 판단(Kiki)이다 — 확정 전 플래그 선제 추가 금지. 범위 후보 목록 제시 후 판정 필요", "task": "OPS-80-eos-axis-research-feature-isolation-flag", "ts": "2026-10-05T19:55:09Z"}
