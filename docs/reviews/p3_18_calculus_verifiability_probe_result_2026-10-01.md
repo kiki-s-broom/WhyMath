@@ -96,6 +96,15 @@
 
 ## 7. 산출물
 
-- `tests/backend/harness/fixtures/p3_18_correct.jsonl`(정답 7행) · `p3_18_wrong.jsonl`(오답 7행) · `p3_18_supplement.jsonl`(보강 진단 6행, 판정 불산입)
+- `tests/backend/harness/fixtures/p3_18_correct.jsonl`(정답 7행) · `p3_18_wrong.jsonl`(오답 7행) · `p3_18_supplement.jsonl`(보강 진단 7행, 판정 불산입 — P3-19에서 `interval-ok` 1행 추가)
 - `tests/backend/harness/test_p3_18_calculus_verifiability_probe.py` — 판정 순수 함수 + 프로브 실측 동결
 - 문항은 전부 자체 제작 수치다(교과서·기출 본문 복제 없음, license `WHYMATH_GENERATED`).
+
+## 8. 정정 — `[12미적Ⅰ-02-06]` 구간 소속 판정 (P3-19, 2026-10-03)
+
+§2 표·§4-②의 "구간 밖 근이 통과한다"는 **P3-19 이전 상태**의 기록이다(당시 값은 위 표에 그대로 둔다). P3-19가 `corpus_reverify`의 `verify.conditions`를 문자열 1개 또는 연립(문자열 목록·AND)으로 받게 해, 평균값 정리 문항이 `f'(c)=평균변화율` 방정식과 함께 c가 열린구간 (a,b) 안이라는 조건을 같이 검산한다. 새 필드는 없다 — 검증기(`verify_answer`)와 적재기(`populate.ProblemVerifyMeta`)가 이미 목록을 받았고 `corpus_reverify`만 문자열로 제한돼 있었다.
+
+- 열린구간은 `c >= a`·`c <= b`·`c != a`·`c != b` 네 절로 쓴다. 엄격 부등식(`c > a`)은 끝점에서 '경계 모호'로 **skip**이 되어 끝점 오답이 fail이 되지 못하기 때문이다.
+- 실측: 같은 보강 행(f=x³, [0,3], c=−√3)이 `corpus_reverify`에서 통과 1 → **실패 1**(exit 1)로 바뀌었다. 정답 행(f=x²+2x, [1,3], c=2)은 통과 1·skip 0을 유지하고, 근이 ±√3 둘이고 하나만 구간 안인 정답·오답 쌍(`interval-ok` √3 pass · `interval-leak` −√3 fail)이 추가됐다. 02-06 판정은 위장 후보에서 **가능**(무단서)으로 올라간다.
+- 한계: fuzzer(`fuzz_answer`)는 단변수 등식 1개만 다루므로 연립 조건 문항은 fuzz 대상에서 빠진다(오염으로 보지 않고 건너뛴다). 처분 기록: 이 정정은 P3-19 PR(이 문서를 바꾸는 PR)이 만든다.
+

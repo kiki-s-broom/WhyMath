@@ -19,7 +19,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from pathlib import Path
@@ -27,6 +26,7 @@ from pathlib import Path
 import pytest
 import selector
 import store
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -1227,7 +1227,7 @@ class TestPathsCorrectionEndsScopeDrift:
         JSON 파싱부터다. 내부 함수만 부르면 배선이 끊겨도 테스트는 초록이다.
         """
         payload = {"tool_input": {"file_path": file_path}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         return cli.main(["check-edit"])
 
     def _on_branch(self, repo: Path, name: str) -> None:

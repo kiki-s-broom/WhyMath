@@ -33,9 +33,11 @@ from pathlib import Path
 
 import pytest
 
+from whymath_backend.app import RouteLatencyBody
 from whymath_backend.config import Settings
 from whymath_backend.l3.router import SLA_GATE_MS
 from whymath_backend.ops.declared_unwired_audit import route_paths
+from whymath_backend.ops.service_health import ServiceMetrics
 
 # 레포 루트 — tests/backend/ops/<이 파일> 기준 3단계 위.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -289,3 +291,96 @@ def test_unknown_path_does_not_match_route_table() -> None:
     assert _route_matches("/health/ready", known)
     # 템플릿 라우트의 구체 인스턴스는 인정한다(거짓 실패 방지).
     assert _route_matches("/v1/problems/12345", known)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ④ OPS-95 — S5(경로별 SLO)의 "측정 가능" 주장 ↔ 코드의 라우트 차원 실재 대조.
+# ──────────────────────────────────────────────────────────────────────────
+_S5_ROW = re.compile(r"^\| \*\*S5\*\* \|.*$", re.MULTILINE)
+_S5_FIELDS = ("p50_latency_ms", "p75_latency_ms", "p95_latency_ms", "error_rate", "count")
+
+
+def _s5_doc_violations(doc_text: str) -> list[str]:
+    """S5 행이 '측정 가능'을 주장하는데 그 수단이 코드에 없거나, 반대로 미측정이라 적었는가."""
+    match = _S5_ROW.search(doc_text)
+    if match is None:
+        return ["S5 행(| **S5** | ...)이 §1-2 표에 없다 — 경로별 SLO 상태가 문서에서 사라졌다."]
+    row = match.group(0)
+    problems: list[str] = []
+    if "미측정" in row or "❌" in row:
+        problems.append("S5 행이 미측정으로 적혀 있다 — 라우트 차원이 코드에 있으므로 거짓이다.")
+    if "✅" not in row or "측정 가능" not in row:
+        problems.append("S5 행에 '✅ 측정 가능' 표기가 없다.")
+    if "metrics.routes" not in row:
+        problems.append("S5 행이 측정 수단(`metrics.routes`)을 가리키지 않는다.")
+    for field in _S5_FIELDS:
+        if field in row and field not in RouteLatencyBody.model_fields:
+            problems.append(f"S5 행이 `{field}`를 안내하나 응답 스키마(RouteLatencyBody)에 없다.")
+    return problems
+
+
+def _route_dimension_violations(metrics_cls: type[ServiceMetrics]) -> list[str]:
+    """계측 클래스가 라우트 차원을 *실제로* 갖는지 행동으로 판정한다(소스 문자열 검사 아님).
+
+    느린 라우트와 빠른 라우트를 기록해 ①두 라우트가 별개 행으로 나오는가 ②각자의 p95가 섞이지
+    않았는가 ③미매칭 버킷이 별개로 남는가를 본다. 위반 목록이 비면 차원이 있다.
+    """
+    metrics = metrics_cls()
+    slow, fast, unmatched = "/slow/{x}", "/fast/{x}", "(unmatched)"
+    for _ in range(20):
+        metrics.record(4000.0, 200, slow)
+        metrics.record(20.0, 200, fast)
+        metrics.record(5.0, 404, unmatched)
+    rows = {row.route: row for row in metrics.snapshot().routes}
+    problems: list[str] = []
+    for name in (slow, fast, unmatched):
+        if name not in rows:
+            problems.append(f"라우트 행 '{name}'이 스냅샷에 없다 — 라우트 차원이 없거나 병합됐다.")
+    if problems:
+        return problems
+    if rows[slow].p95_latency_ms != 4000.0 or rows[fast].p95_latency_ms != 20.0:
+        problems.append("라우트별 p95가 섞였다 — 두 라우트의 지연이 한 버킷으로 계상됐다.")
+    return problems
+
+
+def test_s5_doc_claim_matches_code_dimension() -> None:
+    """문서의 S5 '측정 가능'은 코드에 라우트 차원이 실재할 때만 참이다 — 양쪽 모두 위반 0."""
+    assert _s5_doc_violations(_doc_text()) == []
+    assert _route_dimension_violations(ServiceMetrics) == []
+
+
+def test_s5_doc_reverted_to_unmeasured_is_detected() -> None:
+    """S5를 '미측정 목표'로 되돌린 문서는 위반으로 잡힌다(문서쪽 변별력)."""
+    original = _doc_text()
+    mutated = original.replace("✅ **측정 가능**(달성 여부는", "❌ **미측정 목표**(달성 여부는", 1)
+    assert mutated != original, "주입이 적용되지 않았다 — 치환 대상 문면이 바뀌었다"
+    assert _s5_doc_violations(mutated), "미측정으로 되돌렸는데 검출되지 않았다(변별력 없음)"
+
+
+def test_s5_missing_row_is_not_silently_passed() -> None:
+    """S5 행이 통째로 사라져도 '위반 0'으로 통과하면 안 된다."""
+    mutated = _S5_ROW.sub("", _doc_text())
+    assert mutated != _doc_text()
+    assert _s5_doc_violations(mutated)
+
+
+def test_mutant_dropping_route_dimension_is_detected() -> None:
+    """뮤테이션 A: `route` 인자를 무시하는(=차원 제거) 계측은 RED."""
+
+    class _DropsRoute(ServiceMetrics):
+        def record(self, latency_ms: float, status_code: int, route: str | None = None) -> None:
+            super().record(latency_ms, status_code)  # route를 버린다
+
+    assert _DropsRoute.record is not ServiceMetrics.record  # 주입이 실제로 적용됐다
+    assert _route_dimension_violations(_DropsRoute), "차원 제거를 검출하지 못했다"
+
+
+def test_mutant_merging_routes_into_one_bucket_is_detected() -> None:
+    """뮤테이션 B: 모든 라우트를 한 버킷에 섞는 계측은 RED."""
+
+    class _MergesRoutes(ServiceMetrics):
+        def record(self, latency_ms: float, status_code: int, route: str | None = None) -> None:
+            super().record(latency_ms, status_code, "(all)")  # 전부 한 키로
+
+    assert _MergesRoutes.record is not ServiceMetrics.record
+    assert _route_dimension_violations(_MergesRoutes), "버킷 병합을 검출하지 못했다"

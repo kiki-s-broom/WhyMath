@@ -16,13 +16,13 @@
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from pathlib import Path
 
 import pytest
 import store
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -69,7 +69,7 @@ def _add(task_id: str) -> int:
 
 
 def _check_stop(monkeypatch, payload: dict | None = None) -> int:
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload or {})))
+    set_hook_stdin(monkeypatch, json.dumps(payload or {}))
     return cli.main(["check-stop"])
 
 

@@ -69,7 +69,7 @@ writer 0건 빈 좌석이라 ⑤가 구조적 미측정이었다. 이제 `/v1/me
 
 | 홉 | 조인 키 | 끊김 코드(`detail.break_*`) |
 |---|---|---|
-| ① 추천 → 학습자 | `evidence_event.session_id → learning_session.user_id` | `learner_unjoined` — 세션 기록 실패 placeholder·삭제권으로 지워진 세션(둘은 구별 불가) |
+| ① 추천 → 학습자 | `evidence_event.session_id → learning_session.user_id` | `learner_unjoined` — 세션 기록 실패 placeholder·SEC-40 착지 이전에 삭제돼 남은 잔여. 삭제권 이행은 이제 그 세션의 추천 기록을 함께 지우므로(처분 (나)·EOS-37) 삭제 자체는 이 끊김을 만들지 않는다 |
 | ② → LearnerState | `meta.learner_state_basis`(키 부재 · 형식 불량 · 가리키는 θ 스냅샷/가설 행이 없거나 다른 학생 것) | `basis_missing` · `basis_malformed` · `basis_row_missing` |
 | ③ → Assessment | 근거 숙달 행 `(학습자, concept_id, measured_at)` — µs까지 정확히 일치 | `assessment_missing` |
 | ④ → Attempt | 그 행의 `concept_mastery_history.attempt_id → problem_attempt`(같은 학생) | `attempt_missing` |

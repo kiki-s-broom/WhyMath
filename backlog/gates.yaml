@@ -192,13 +192,14 @@ gates:
     title: "헌법 개정안 A0002(제7조의2~5·제8조의2 신설 + 규칙 81건 R5~R29) 채택 판정 — 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md)는 81건 중 partial 59 · none 18 · code_exists 3 · N/A 1(R28-01: 과목 패키지가 아직 1개)로 실측했고, 부록 C 권고대로 파트 단위(II→III→IV→VII 콘텐츠→V·VI)로 켠다. 판정 3택: ① 81건 전건 채택(단계 도달 전까지 '예정') ② 일부 삭제 후 채택(뺀 규칙과 사유를 A0002 본문에 기록) ③ 보류. 채택 시 절차 = 런북 과제 B(merge_rules.py — 파일 끝 직접 붙여넣기 금지·sources로 흡수됨). 채택돼야 CONST-04~08(파트별 집행 장치)이 착수 가능."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-27
     remind_after_days: 21
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 116060df (PR #1447 squash 머지, 2026-10-03 15:50Z). 판정 ① 81건 전건 채택(삭제 규칙 없음 · 단계 도달 전까지 신규 규칙은 예정 표기). Kiki가 Phaiakes9에서 런북 과제 B를 직접 실행 — 채택 도우미 A0002 --apply(직접 입력한 동의 ADOPT 경유): RULES_COUNT=95 · SOURCES_COUNT=9 · STAGE_NOW=2 · AMENDMENTS=A0001,A0002,A0003 · ADOPT_RESULT=applied · APPLY_OK=True. 위헌 심사 audit.py(단계 2): 심사 항목 104개 · 차단 사유 0건 · AUDIT_OK=True. 래칫 audit_ratchet.py: 단계 2 · 차단 0건 이하 기준선 0건 · RATCHET_OK=True. 단계 3 미리보기(--no-run --stage 3): 차단 51건(STAGE3_PREVIEW_EXIT=1, 다음 단계 할 일 목록이며 CONST-03~08이 소유). 커밋 3c316812 push 성공(COMMIT_EXIT=0 · PUSH_EXIT=0). 세션이 main에서 실측: 규칙 95건 · STAGE 2 · 개정 기록 3개. CI: 머지 전 PR 체크 성공 7·실패 0(건너뜀 13은 경로 필터)과 머지 큐 CI 통과 후 머지, 헌법 래칫은 harness-integrity 잡에서 실행. 한계: 증적의 도우미 출력값은 Kiki가 채팅으로 전달한 것이며 이 세션이 그 머신에서 재실행하지 않았다. 조문 문안의 내용 타당성은 세션이 판정하지 않았다(판정은 Kiki). 도우미 run_merge()의 cp949 출력 해독 결함은 PYTHONUTF8=1 우회로 통과했고 근본 수정은 별건 후속."
+    cleared_by: claude
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-03] verdict PASS · inputs: CONST-02-coding-constitution-transplant-stage1-2 · evidence: 판정 기준: main 116060df (PR #1447 squash 머지, 2026-10-03 15:50Z). 판정 ① 81건 전건 채택(삭제 규칙 없음 · 단계 도달 전까지 신규 규칙은 예정 표기). Kiki가 Phaiakes9에서 런북 과제 B를 직접 실행 — 채택 도우미 A0002 --apply(직접 입력한 동의 ADOPT 경유): RULES_COUNT=95 · SOURCES_COUNT=9 · STAGE_NOW=2 · AMENDMENTS=A0001,A0002,A0003 · ADOPT_RESULT=applied · APPLY_OK=True. 위헌 심사 audit.py(단계 2): 심사 항목 104개 · 차단 사유 0건 · AUDIT_OK=True. 래칫 audit_ratchet.py: 단계 2 · 차단 0건 이하 기준선 0건 · RATCHET_OK=True. 단계 3 미리보기(--no-run --stage 3): 차단 51건(STAGE3_PREVIEW_EXIT=1, 다음 단계 할 일 목록이며 CONST-03~08이 소유). 커밋 3c316812 push 성공(COMMIT_EXIT=0 · PUSH_EXIT=0). 세션이 main에서 실측: 규칙 95건 · STAGE 2 · 개정 기록 3개. CI: 머지 전 PR 체크 성공 7·실패 0(건너뜀 13은 경로 필터)과 머지 큐 CI 통과 후 머지, 헌법 래칫은 harness-integrity 잡에서 실행. 한계: 증적의 도우미 출력값은 Kiki가 채팅으로 전달한 것이며 이 세션이 그 머신에서 재실행하지 않았다. 조문 문안의 내용 타당성은 세션이 판정하지 않았다(판정은 Kiki). 도우미 run_merge()의 cp949 출력 해독 결함은 PYTHONUTF8=1 우회로 통과했고 근본 수정은 별건 후속. — PR 1447 머지로 A0002 채택 판정 ① 확정 — 판정 결과(PASS) 미기록 경고 해소"
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
   - id: G-const-diagnosis-s00-s10-run
@@ -232,11 +233,11 @@ gates:
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-27
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 8a0e4678 (PR #1444 squash 머지, 2026-10-03 14:06Z). Kiki가 Phaiakes9에서 런북 과제 A를 직접 실행 — 채택 도우미 A0003 --stage 2 --apply: RULES_COUNT=14 · SOURCES_COUNT=9 · STAGE_NOW=2 · ADOPT_RESULT=applied · APPLY_OK=True. 위헌 심사 audit.py(단계 2): 심사 항목 23개 · 차단 사유 0건 · R0-01 통과 · 원본 등록부 9건 전부 통과(AUDIT_OK=True). 래칫 --update-baseline: 단계 1→2 · 차단 7→0건(BASELINE_OK=True) · 래칫 판정 단계 2 차단 0건 ≤ 기준선 0건(RATCHET_OK=True). 커밋 f8c25a68 변경 4파일(constitution/STAGE · constitution/rules.yaml · constitution/amendments/A0003_원본등록부정정.md · metrics/coding_constitution_audit_baseline.json) 원격 파일 목록 일치 확인. CI 머지 큐 통과 후 main 반영. 첫 시도에서 동의를 소문자로 입력해 반영 블록이 CONSENT=False로 거부(constitution/ 불변 확인)된 뒤 대문자 ADOPT로 재실행. 사람 서명 완료분 반영이며 새 서명 아님. 후속: A0004(원본 등록부 3건 추가)는 채택 도우미 미지원이라 별도 — docs/constitution_proposals/A0004_sources_registry_additions_draft.md."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -363,7 +364,7 @@ gates:
     notes: ""
     corrections: []
   - id: G-eos02-default-flip-recheck
-    title: "EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형."
+    title: "[2026-10-03 Kiki 판정 ②보류 유지 — 기본값은 False 그대로 · 재판정 시점 = API 재개 판정 G-arch66-anthropic-api-pause-review 이후 · 그때 OPS-104 처리와 라이브 cache_read 실측을 선행한다] EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형."
     kind: decision
     assignee: kiki
     status: pending
@@ -374,8 +375,12 @@ gates:
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +OPS-89-cache-breakpoint-placement-shared-prefix — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 게이트 제목의 발동 조건이 'OPS-89가 main에 착지한 때'다 — 산문에만 있던 발동 조건을 입력 간선으로 옮긴다"
+      - "[2026-10-02] verdict PASS · inputs: OPS-89-cache-breakpoint-placement-shared-prefix · evidence: 판정 기준 커밋 4d8262545(PR 1425·미머지 — 머지 전에는 발동 조건 충족으로 읽지 말 것). PASS의 뜻은 브레이크포인트 이동 코드와 모사·SDK 표면 검증이 완성돼 재판정 입력이 갖춰졌다는 것이지 기본값 전환 근거가 갖춰졌다는 뜻이 아님: 실제 API cache_read 라이브 증거는 없고(ARCH-66·G-arch66 전까지 미수행), cross_verify 경로는 system이 최소 캐시 토큰 미만이라 위치를 고쳐도 캐시 무효(OPS-104 소유). 따라서 ①기본값 True 전환은 라이브 실측 전 근거 부족. 결정은 게이트 담당자 몫. 판정문 docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md — done OPS-89-cache-breakpoint-placement-shared-prefix 인계"
+      - "[2026-10-02] depends_on +OPS-104-cross-verify-cache-prefix-below-minimum — 개발기간(2026-09-24~2026-12-31) N/A 처리 — Kiki 결정(2026-10-02). 개발은 Claude Max 구독으로 진행하고 백엔드 Anthropic API 좌석은 꺼져 있다(ARCH-66). 구독 세션(Claude Code)의 캐싱은 자동이라 우리가 cache_control 위치·기본값을 제어할 수 없어, 이 게이트가 묻는 anthropic_prompt_caching 전역 기본값 전환의 대응물이 구독 쪽에 없다. 따라서 기본값 전환 재판정은 API 재개 판정(G-arch66-anthropic-api-pause-review) 이후로 미룬다. 그 전까지 라이브 cache_read 증거는 수행 불가이고 cross_verify 경로 프리픽스 미달(OPS-104)도 미해소다. 결정은 여전히 Kiki 몫이며 이 amend는 판정이 아니다. 근거: MEMORY 2026-09-24 ARCH-66 경계 절, docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md"
+      - "[2026-10-03] title: 'EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형.' → '[2026-10-03 Kiki 판정 ②보류 유지 — 기본값은 False 그대로 · 재판정 시점 = API 재개 판정 G-arch66-anthropic-api-pause-review 이후 · 그때 OPS-104 처리와 라이브 cache_read 실측을 선행한다] EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형.' — Kiki가 선택지 2(보류 유지)로 판정했다(2026-10-03 세션 대화). 근거: 실 API cache_read 라이브 증거를 ARCH-66 방침(2026-12-31까지 Anthropic API 미사용)상 지금 얻을 수 없고, OPS-104(cross_verify 프리픽스 최소 캐시 토큰 미달)가 미해소다. 게이트는 pending으로 유지하며 입력(OPS-89·OPS-104)은 그대로 둔다. 판정 기준 main 12242694."
     depends_on:
       - OPS-89-cache-breakpoint-placement-shared-prefix
+      - OPS-104-cross-verify-cache-prefix-below-minimum
   - id: G-eos02-prompt-cache-live-run
     title: "EOS-02 라이브 회차 — Phaiakes9 실 Anthropic 키 + 캐시 플래그 ON + --subscription premium --budget-krw 병기로 accumulate n>=10 실행, 리포트 prompt_cache 블록(state·hit_rate·calls_with_cache_telemetry) 회신"
     kind: human
@@ -477,11 +482,11 @@ gates:
     title: "KPI ⑤ 삭제권 잔여 처분 선택(가·나·다) — 삭제 원장 기반 excluded_erased / 삭제 시 추천 이벤트 삭제·익명 tombstone / 현행 유지(하네스 teardown만 조정)"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-29
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main f0ca37bb (P3-01 ①② #1405). 2026-09-30 Kiki 판정 (나) 채택 — 삭제권 이행 시 그 세션의 추천 evidence_event도 함께 삭제한다 (세션 https://claude.ai/code/session_01Nz9XkkccZCSsfTXGdnygQ6 · AskUserQuestion '(나) 삭제 시 추천 이벤트도 함께 삭제' 선택 · 에이전트 중계 기록). 근거 문서: docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5·§7-1 P-2 · EOS-37 acceptance ② 및 2026-09-30 소유 경계 추가분 · SEC-40 acceptance ①②③⑤ · docs/legal/pipa_data_matrix.md §5.\n[결정] (나) 채택. 계정 삭제(erase_user)와 개별 세션 삭제(DELETE /v1/me/sessions/{id})가 그 세션의 evidence_event 행을 같은 트랜잭션에서 삭제한다 — 재연결 경로 2건(개별 세션 삭제의 증빙 로그 user_id+세션 ID · 계정 삭제의 HMAC 바인딩+잔존 user_id)을 닫는 유일한 안이다. (가)(삭제 원장 + excluded_erased)와 (다)(현행 유지 + 하네스 teardown 조정)는 미채택.\n[소유] 파기 배선 = SEC-40(선행 SEC-39 done · 이 게이트가 clear되어 착수 해금). EOS-37은 KPI 수집기 쪽만 한다(EOS-37 acceptance 2026-09-30 소유 경계 그대로).\n[변호사 회신 불요] (나)는 삭제 범위를 넓히는 쪽이라 pipa_data_matrix §5의 '가명 처치 기록 잔존 적법성' 질문 회신 없이 진행 가능하다 — '가명 보존 적법'을 가정하지 않는다. 삭제 증빙 로그(deletion_audit)의 식별자 보존 연한은 이 결정 범위 밖이다(MGMT-02 회신 선행).\n[부수 영향 — 미측정 ≠ 통과] (나) 착지 후 삭제 뒤에는 추천 이벤트 자체가 없어지므로 판정 하네스의 KPI ⑤ 분모가 0이 되어 FAIL이 아니라 미측정으로 바뀔 수 있다. 그 미측정을 통과로 읽지 않는다 — 표본 산출 경로는 EOS-38 소유.\n[범위] 이 결정은 처분 방향만 정한다. 구현·검증은 SEC-40·EOS-37 소유.\n[이식 재확인 2026-10-02 · SEC-42] 판정 기준 main a907f0bf5. 위 판정은 고립 브랜치 origin/claude/intelligent-noether-tbj2jf head c671a313 에서 clear된 기록을 main으로 회수한 것이다. 이식 직전 Kiki가 이 세션에서 AskUserQuestion으로 '(나) 채택이 맞다, 이식 진행'을 직접 선택해 확인했다(세션 https://claude.ai/code/session_01DX6mZTLbJsRqrfmsXfCg48 · 에이전트 중계 기록). 판정 근거 원문은 한 글자도 줄이지 않았다."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 이미 있다 — EOS-141 판정문 docs/reviews/eos_phase2_gate2_rejudgment_2026-09-29.md §5·§7-1 P-2(판정 기준 main a82f9449). 선택지는 EOS-37 acceptance ②. PIPA 삭제권 표면이라 기계가 대신 고르지 않는다(CLAUDE.md 법령 유래 절차 기계 대체 금지)"
@@ -642,7 +647,7 @@ gates:
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
     corrections: []
   - id: G-misc40-new-crosslink-signature
-    title: "신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다"
+    title: "신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition"
     kind: human
     assignee: kiki
     status: pending
@@ -651,7 +656,23 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-02] title: '신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다' → '신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition' — MISC-40이 서명 대상 표(5행)와 근거를 판정 문서 §6에 냈다 — 제목이 가리키던 산출물의 위치·행 수를 명시하고, 서명 시점(PR 머지 후)과 별건 결정 게이트를 병기"
+    depends_on:
+      - MISC-40-calculus-diff-kebab-seat
+  - id: G-misc40-unseated-concepts-disposition
+    title: "MISC-40 판정 기준 승인 + 좌석 없는 5개 개념 처분 — (1) 판정 기준 Q2~Q4(완결된 주장의 문항 무관성·기존 kebab 겹침·주 진술)를 승인할지: 카탈로그 원칙 문구에 없는 이 판정의 추가 기준이다. (2) [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 안 A: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 안 B: M-id를 positive-signal형으로 재저작(M0674·M0678 둘째 문장이 후보) / 안 C: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정 / 안 D: 약한 공출현 신호 kebab(#33·#34 선례) / 안 E: 보류(P3-02와 G-p318-calc-02-08-disposition 결과 이후). 세션 의견은 E. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §3·§7"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-02
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-10-02] title: 'MISC-40 좌석 없는 5개 개념 처분 — [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 positive-signal 기준 미충족으로 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 가: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 나: 5개 M-id를 positive-signal형으로 재저작 / 다: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정. -02-08은 G-p318-calc-02-08-disposition 결과를 본 뒤 정하는 편이 낭비가 적다. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §7' → 'MISC-40 판정 기준 승인 + 좌석 없는 5개 개념 처분 — (1) 판정 기준 Q2~Q4(완결된 주장의 문항 무관성·기존 kebab 겹침·주 진술)를 승인할지: 카탈로그 원칙 문구에 없는 이 판정의 추가 기준이다. (2) [12미적Ⅰ-02-05·06·08·09·10]의 M-id(M0673·M0674·M0676·M0677·M0678)는 의도적 미승격이라 서명 뒤에도 좌석 0이고 앵커 A6의 좌석은 2로 그대로다. 안 A: 객관식 선지 역추적 전용 kebab 허용(카탈로그 signals≥1 불변식 완화 — 1순위 M0674) / 안 B: M-id를 positive-signal형으로 재저작(M0674·M0678 둘째 문장이 후보) / 안 C: 좌석 0을 수용하고 P3-02의 Misconception 충족 정의에서 M-id 수준을 인정 / 안 D: 약한 공출현 신호 kebab(#33·#34 선례) / 안 E: 보류(P3-02와 G-p318-calc-02-08-disposition 결과 이후). 세션 의견은 E. 근거 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §3·§7' — 독립 비판(F3·F6) 반영 — 결정 대상에 판정 기준 Q2~Q4 승인을 더하고 선택지에 안 D(약한 공출현 신호 kebab)·안 E(보류)를 추가"
+      - "[2026-10-02] verdict PASS · inputs: MISC-40-calculus-diff-kebab-seat · evidence: 판정문 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §7(선택지 안 A~E · 세션 의견 E) · 판정 기준 커밋 9e9d6dd9(PR #1419 · main b08a94ae 위). PASS의 뜻은 결정 입력(판정 기준 Q2~Q4의 승인 대상과 좌석 0이 남는 5개 개념의 선택지·영향 범위)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫 — done MISC-40-calculus-diff-kebab-seat 인계 — done MISC-40-calculus-diff-kebab-seat 인계"
     depends_on:
       - MISC-40-calculus-diff-kebab-seat
   - id: G-mp02-rerun-model-pilot
@@ -859,11 +880,11 @@ gates:
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-01
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "세션 사용자 결정(2026-10-02 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): [12미적Ⅰ-02-08] 그래프 개형 = 처분 (나) 파생 판정으로 대체 — 극값 개수·증감 구간·극값의 x좌표/값으로 문항화하고 분모 7은 유지하며 시각 선택형 개형 문항은 두지 않는다. 단서 3건: [12미적Ⅰ-02-06]·[12미적Ⅰ-02-09]는 일부 가능으로 보고 보완 태스크 P3-19(구간 소속 검산)·P3-20(매개변수형 검증 필요성 판정)을 등재, [12미적Ⅰ-02-05]는 가능을 유지하고 표본 검증 단서만 기록. (나)가 근거한 실측은 극값 개수뿐이어서 증감 구간·극값 좌표 프로브 P3-21을 등재했고, P3-03에 P3-19·P3-21을 의존으로 부착했다(P3-20은 필요성 판정 뒤). 판정 근거: docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md §2·§4·§5 · 판정 기준 main 53718366 · PR #1414."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"

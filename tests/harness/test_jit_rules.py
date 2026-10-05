@@ -13,7 +13,6 @@ acceptance ③이 요구하는 변별력은 한 문장이다: **"대장에 경�
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -21,6 +20,7 @@ from pathlib import Path
 
 import jit_rules
 import pytest
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -290,7 +290,7 @@ class TestCheckEditHook:
     def _run(monkeypatch, capsys, rel: str) -> tuple[int, str]:
         monkeypatch.chdir(REPO_ROOT)
         payload = json.dumps({"tool_input": {"file_path": str(REPO_ROOT / rel)}})
-        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        set_hook_stdin(monkeypatch, payload)
         code = cli.main(["check-edit"])
         return code, capsys.readouterr().err
 
@@ -328,7 +328,7 @@ class TestCheckEditHook:
     def test_outside_repo_path_is_ignored(self, monkeypatch, capsys, tmp_path: Path) -> None:
         monkeypatch.chdir(REPO_ROOT)
         payload = json.dumps({"tool_input": {"file_path": str(tmp_path / "elsewhere.py")}})
-        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        set_hook_stdin(monkeypatch, payload)
         assert cli.main(["check-edit"]) == 0
         assert "[적시 규칙]" not in capsys.readouterr().err
 
@@ -366,7 +366,7 @@ def _ledger_repo(git_repo: Path, monkeypatch) -> Path:
 def _edit(root: Path, rel: str, monkeypatch, capsys) -> tuple[int, str]:
     capsys.readouterr()
     payload = json.dumps({"tool_input": {"file_path": str(root / rel)}})
-    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    set_hook_stdin(monkeypatch, payload)
     code = cli.main(["check-edit"])
     return code, capsys.readouterr().err
 

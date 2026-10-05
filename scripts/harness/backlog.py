@@ -4528,6 +4528,16 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_hook_stdin() -> str:
+    """훅 입력(UTF-8 JSON)을 읽는다 — 바이트로 읽어 UTF-8 로 직접 해독한다 (HARN-196).
+
+    `sys.stdin.read()` 는 프로세스 로캘 인코딩(한국어 Windows = cp949)으로 해독한다. Claude Code 는
+    UTF-8 로 보내므로 한글·'—' 가 섞이면 `UnicodeDecodeError` 가 나 훅이 트레이스백으로 죽는다.
+    `errors="replace"` 는 깨진 바이트가 있어도 `stop_hook_active` 같은 ASCII 키를 살리기 위함이다.
+    """
+    return sys.stdin.buffer.read().decode("utf-8", errors="replace")
+
+
 def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
     """Stop 훅 — 진행 중 태스크가 있는데 상태 갱신 없이 세션이 끝나면 차단(exit 2).
 
@@ -4535,7 +4545,7 @@ def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
     판정이 불확실한 모든 경우는 통과(exit 0) — 훅이 개발을 볼모로 잡으면 안 된다.
     """
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(_read_hook_stdin() or "{}")
     except json.JSONDecodeError:
         payload = {}
     if payload.get("stop_hook_active"):
@@ -4640,7 +4650,7 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     판정 불확실·예외는 전부 통과(exit 0) — 훅이 개발을 볼모로 잡으면 안 된다.
     """
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(_read_hook_stdin() or "{}")
     except json.JSONDecodeError:
         return 0
     file_path = str((payload.get("tool_input") or {}).get("file_path", ""))

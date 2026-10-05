@@ -130,7 +130,7 @@ def test_question_without_extractable_expression_is_not_run() -> None:
 def test_scanned_forms_discloses_channel_reach() -> None:
     """이 채널의 **사정거리**가 결과에 함께 실린다(작동한 비율 원칙).
 
-    0건을 "카탈로그 67종 전체에 없었다"로 읽으면 거짓이다 — 이 채널은
+    0건을 "카탈로그 68종 전체에 없었다"로 읽으면 거짓이다 — 이 채널은
     `canonical_wrong_form`을 가진 오개념만 본다.
     """
     from whymath_backend.l4.misconception.catalog import CATALOG

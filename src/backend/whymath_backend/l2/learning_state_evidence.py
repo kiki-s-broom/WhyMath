@@ -14,8 +14,8 @@
 
 생산자 배선 현황 (정본화 ≠ 집행 — 실측을 숨기지 않는다)
 --------------------------------------------------------
-`AttemptEvidence`의 5필드 중 이 조립기가 **실제로 채우는 것**과 **아직 호출부가 넣어 줘야
-하는 것**을 구분해 적는다. "필드가 있다"와 "그 필드에 값이 들어온다"는 다르다.
+`AttemptEvidence`의 4필드는 전부 이 조립기(또는 호출부가 넘기는 값)로 **실제로 채워진다**.
+"필드가 있다"와 "그 필드에 값이 들어온다"는 다르므로 생산자를 적어 둔다.
 
   | 필드                          | v1 생산자                                   | 상태 |
   |-------------------------------|---------------------------------------------|------|
@@ -23,15 +23,13 @@
   | `confidence`                  | `ProblemAttempt.confidence_self_reported`   | 배선 |
   | `confirmed_misconception_ids` | **이번 응답의 스캔 후보**(호출부가 넘긴다)   | 배선 |
   | `consecutive_failures`        | `problem_attempt` 최근 이력                 | 배선 |
-  | `prerequisite_gap_concept_ids`| `l2.prerequisite_recommendation`            | **미배선** |
 
-`prerequisite_gap_concept_ids`를 이 조립기가 스스로 채우지 않는 이유는 비용이다 —
-`recommend_prerequisite_gaps`는 개념 그래프 재귀 CTE 순회라 응답 제출마다 돌리기에 무겁다.
-그래서 **인자로 받는다**: 배치·비동기 경로가 계산해 넣어 주면 R4가 그 즉시 작동하고, 이
-모듈과 정책은 한 줄도 바뀌지 않는다. 지금 그 생산자를 배선하지 않았다는 사실 자체를 여기
-적어 두는 것이 "규칙은 있는데 영원히 안 도는" 상태를 숨기지 않는 방법이다(CLAUDE.md
-"작동 신호 없는 알고리즘 부착 금지" — 어느 규칙이 실제로 돌았는지는 `PolicyDecision.rule_id`가
-응답에 실려 매 요청 관측된다).
+선수 개념 결손은 증거 필드가 **아니다** (EOS-127). 과거에는 `prerequisite_gap_concept_ids`
+필드가 열려 있었으나 생산자가 서빙 경로에 한 번도 배선되지 않았고(`recommend_prerequisite_gaps`가
+재귀 CTE라 무겁다는 추정 — 실측하니 `max_depth=1`은 p50 2.3ms였다), 배선하면 같은 판단을
+다음 문항 선택(R6 선수 탐침)과 이중으로 하게 돼 필드·규칙(R4)·간선을 함께 삭제했다. 판정·실측:
+`docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md`. 어느 규칙이 실제로 돌았는지는
+`PolicyDecision.rule_id`가 응답에 실려 매 요청 관측된다(CLAUDE.md "작동한 비율" 원칙).
 
 R3의 입력 = **이 응답에서** 강하게 확인된 오개념 (EOS-138 ②)
 ---------------------------------------------------------------
@@ -159,7 +157,6 @@ async def build_attempt_evidence(
     user_id: uuid.UUID,
     is_correct: bool,
     confidence: float | None = None,
-    prerequisite_gap_concept_ids: Sequence[str] = (),
     this_attempt_misconceptions: Sequence[tuple[str, float]] = (),
 ) -> AttemptEvidence:
     """응답 1건의 정책 증거를 조립한다.
@@ -167,8 +164,6 @@ async def build_attempt_evidence(
     Args:
         is_correct: 이번 응답의 정오답.
         confidence: 학생 자기보고 확신도 0~1. 미측정은 `None`(0.0으로 채우지 않는다).
-        prerequisite_gap_concept_ids: 선수 개념 결손 id — **호출부가 넣어 준다**(모듈
-            docstring "생산자 배선 현황" 참조). 비우면 R4가 매치되지 않는다.
         this_attempt_misconceptions: **이번 응답의 스캔**이 게이트 통과시킨 후보의
             `(misconception_id, 갱신 후 가설 신뢰)` 쌍. 스캔이 돌지 않았으면 비운다 — 그러면
             R3가 매치되지 않는다(모듈 docstring "R3의 입력" 참조). 하한 필터·정렬·중복 제거는
@@ -186,6 +181,5 @@ async def build_attempt_evidence(
         is_correct=is_correct,
         confidence=confidence,
         confirmed_misconception_ids=misconception_ids,
-        prerequisite_gap_concept_ids=tuple(prerequisite_gap_concept_ids),
         consecutive_failures=consecutive_failures,
     )

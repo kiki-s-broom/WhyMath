@@ -58,7 +58,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._attempt_misconception_scan import (
@@ -104,6 +104,7 @@ from whymath_backend.db.models.assessment import (
 from whymath_backend.db.models.audit import DeletionAudit, PrivacyAudit
 from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.dialogue import Dialogue
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.problem import Problem
 
 # COLLAB-03: 학습시간 통계 좌석의 공급원(l2.learning_metrics_rollup이 적재).
@@ -422,13 +423,25 @@ async def _delete_owned_resource(
 ) -> None:
     """본인 소유 리소스 영구 삭제(GDPR) — 204. slice 51/52/53 동형. slice 56: 직속 자식은
     ON DELETE CASCADE로 자동 제거(session→attempt·dialogue→turn)·dialogue.attempt_id는
-    SET NULL. attempt_event(loose ref·FK 아님)는 고아 잔존(설계 한계).
+    SET NULL. attempt_event(loose ref·FK 아님)는 고아 잔존(설계 한계 — SEC-40이 처분을 판정:
+    **유지**. 근거·후속은 `docs/reviews/sec40_evidence_event_erasure_wiring_2026-10-03.md` §4).
+
+    SEC-40: `LearningSession` 삭제는 그 세션의 `evidence_event`(느슨참조·FK 아님 → CASCADE가 못
+    지운다)를 **같은 트랜잭션**으로 함께 지운다. 안 지우면 `deletion_audit`의
+    (user_id, resource_id=세션 ID)와 그 행의 `session_id`를 맞대어 삭제한 세션의 처치 기록을 다시
+    찾을 수 있다(재연결 경로 ⓐ). 증빙 행 삭제가 실패하면 예외가 그대로 올라가 세션 삭제도 커밋되지
+    않는다(부분 삭제 없음). 분기 조건이 `model is LearningSession`이라 이 헬퍼를 쓰는 새 호출자도
+    기본으로 따라온다(호출자가 플래그를 기억해야 하는 구조를 피한다).
 
     slice 57: 삭제와 *동일 트랜잭션*으로 DeletionAudit 1행 적재(GDPR 삭제 증빙·부모만 기록·
     콘텐츠 미저장). user_id=소유자·resource_type/resource_id=대상. 같은 commit이라 삭제↔감사
     원자적(부분 실패 없음).
     """
     row = await _get_owned_or_404(session, model, pk, owner_id, not_found_detail)
+    if model is LearningSession:
+        # SEC-40: 세션 행을 지우기 *전에* 그 세션 ID의 증빙 행을 지운다(소유 확인 뒤 — 타인 세션
+        # ID로 남의 증빙을 지우는 경로가 없다). 같은 트랜잭션이라 아래 commit이 둘을 함께 확정한다.
+        await session.execute(delete(EvidenceEvent).where(EvidenceEvent.session_id == pk))
     await session.delete(row)
     session.add(
         DeletionAudit(
@@ -1273,9 +1286,11 @@ async def submit_attempt(
     # 스캔 후보의 가설 신뢰이기 때문이다(`this_attempt_misconceptions` · EOS-138 ②). 조립기는 가설
     # 테이블을 다시 읽지 않는다: 학생 전체 활성 가설을 읽던 종전 방식이 옛 가설로 R3를 발화시켰다.
     #
-    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
-    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
-    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 선수 결손 규칙(R4)은 없다(EOS-127): 이 경로는 선수 결손 증거를 만들지 않는다. 선수 하강은
+    # 상태 머신 전이가 아니라 다음 문항 선택이 요청 시점에 한다(R6 선수 탐침 ·
+    # `l2/learning_state_recommendation`). 제출마다 선수 생산자를 돌리면 같은 판단을 이중으로 하고
+    # R6 하강을 가로챈다 — 판정·실측:
+    # `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md`.
     # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 쓰고 있다. 상태 머신이
     # 읽는 정책 입력(`AttemptEvidence`)은 공용 진입점 안에서 조립되어 이 함수에 이름이 없다.
     transition = await advance_on_graded_attempt(
@@ -3462,6 +3477,7 @@ async def erase_my_account(
     body: AccountErasureRequest,
     user: CurrentUser,
     session: SessionDep,
+    settings: SettingsDep,
 ) -> AccountErasureResponse:
     """삭제권(R11) — 본인 계정의 *모든* 학생-연결 데이터를 단일 트랜잭션으로 영구 삭제.
 
@@ -3486,7 +3502,8 @@ async def erase_my_account(
         )
     # 삭제 후 user 객체 만료(expire_on_commit)에 대비해 user_id를 먼저 포획.
     user_id = user.user_id
-    report = await erase_user(session, user_id=user_id)
+    # SEC-40: 세션 축 증빙 행의 HMAC 바인딩 일치 삭제에 jwt 비밀키가 필요해 settings를 넘긴다.
+    report = await erase_user(session, user_id=user_id, settings=settings)
     await session.commit()
     # ops 가시화 — RDB 밖 store(Redis·Langfuse)는 이 TX가 못 지운다(report.pending_external).
     # 누락을 조용히 넘기지 않도록 알림(store명·user_id만·키 패턴 미로깅) — 별도 삭제 필요.

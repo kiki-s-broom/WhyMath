@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable
-from typing import Final
+from typing import Final, Literal
 
 from whymath_backend.config import CloudSeat
 from whymath_backend.l3.data_export_policy import (
@@ -178,6 +178,43 @@ USD_TO_KRW: Final[float] = 1540.0
 """환율(원/USD) — 2026-06-23 기준. 라이브 보정 대상."""
 
 # ──────────────────────────────────────────────────────────────────────────
+# 프롬프트 캐시 과금 배수 (OPS-88) — **anthropic 좌석 한정**, 입력 단가에 곱한다.
+#
+# Anthropic은 캐시로 읽힌 프리픽스를 `input_tokens`에서 *빼고* `cache_read_input_tokens`에,
+# 캐시에 쓴 프리픽스를 `cache_creation_input_tokens`에 따로 센다(`l3.models.Usage` 주석).
+# 프롬프트 총 토큰이 `input + cache_read + cache_creation`이라는 뜻이고, 종전 산식은
+# `input_tokens`에만 입력 단가를 곱해 읽기(0.1배)·쓰기(1.25배) 비용이 통째로 빠져 있었다.
+#
+# 근거 — 2026-09-21 EOS-02 라이브 회차 실측(`docs/ops/eos02_prompt_cache_live_verdict.md` §3-1):
+# 보고 cost_usd_total $0.03987 vs 실제 추정 $0.05549(28.1% 과소). 그 차이 $0.01562는 정확히
+# `21,789 tok × 0.1 + 2,421 tok × 1.25`에 Sonnet 입력 단가 $3/1M을 곱한 값($0.0156155)이다 —
+# 두 배수(0.1·1.25)가 실측 갭을 재현한다(회귀 테스트가 이 산수를 고정). 1시간 TTL 쓰기(2배)는
+# 그 실측에 쓰이지 않은 공개 가격표 값이라 **미검증**이다(표현만 해 두고 호출부가 고르지 않으면
+# 쓰이지 않는다).
+# ──────────────────────────────────────────────────────────────────────────
+CacheTtl = Literal["5m", "1h"]
+"""캐시 TTL — 쓰기 할증 배수가 TTL에 따라 갈린다. 현행 호출은 기본 5분이다."""
+
+CACHE_READ_PRICE_MULTIPLIER: Final[float] = 0.1
+"""캐시 *읽기*(적중) 과금 배수 — 입력 단가의 0.1배. EOS-02 실측 갭으로 교차검증됨."""
+
+CACHE_WRITE_PRICE_MULTIPLIER: Final[dict[CacheTtl, float]] = {"5m": 1.25, "1h": 2.0}
+"""캐시 *쓰기* 과금 배수 — 5분 TTL 1.25배(EOS-02 실측 갭으로 교차검증) · 1시간 TTL 2배(미검증)."""
+
+DEFAULT_CACHE_TTL: Final[CacheTtl] = "5m"
+"""호출부가 TTL을 말하지 않았을 때의 쓰기 배수 축 — 현행 provider는 기본(5분) 캐싱만 쓴다."""
+
+_ADDITIVE_CACHE_ACCOUNTING_SEATS: Final[frozenset[CloudSeat]] = frozenset({"anthropic"})
+"""캐시 토큰을 `input_tokens` **밖**에서 따로 세는(합산 관계) 좌석 — 이 좌석만 위 배수를 더한다.
+
+다른 좌석의 캐시 회계는 의미가 다르다: DeepSeek의 `prompt_cache_hit_tokens`는 `prompt_tokens`를
+**쪼갠 것**이라 `hit + miss == prompt_tokens`이고 `Usage.input_tokens`에 이미 hit이 들어 있다
+(`providers/_openai_compat.extract_usage` 주석 — "합산 금지 축"). 그 좌석에 anthropic식 가산을 하면
+캐시 적중분이 **이중 계상**된다. 그래서 여기에 없는 좌석은 `input_tokens × 입력 단가`를 그대로 쓰고
+캐시 할인은 반영하지 않는다(단가표에 그 좌석의 캐시 단가 근거가 없다 — 보수적 과대 계상).
+"""
+
+# ──────────────────────────────────────────────────────────────────────────
 # est(사전 추정) 가정 토큰 상수 — route() 시점엔 실제 토큰이 미상이므로, 사전
 # 추정(est_cost_krw·guard_cloud 예산 판정)은 *대표 호출 토큰 수*를 가정해야 한다.
 #
@@ -240,11 +277,20 @@ def actual_cost_usd(
     usage: Usage,
     *,
     seat: CloudSeat | None = SERVING_CLOUD_SEAT,
+    cache_ttl: CacheTtl = DEFAULT_CACHE_TTL,
 ) -> float | None:
     """실측 토큰 → 호출 비용(USD) 순수 함수 (S1 게이트 ② 비용 실측).
 
     - LOCAL(Phaiakes9) → 0.0 (토큰 무관·0원 확정. 좌석과 무관하다).
     - CLOUD_* → (입력토큰×입력단가 + 출력토큰×출력단가)/1M — **좌석별 단가**를 쓴다.
+    - **anthropic 좌석은 캐시 토큰을 입력 단가의 배수로 더한다**(OPS-88): 입력 과금 토큰 =
+      `input + cache_read × 0.1 + cache_creation × 1.25`(5분 TTL — `cache_ttl="1h"`면 2배).
+      Anthropic의 `input_tokens`는 캐시 미적중 잔량뿐이라 이 항이 없으면 캐시를 켠 회차가 실제보다
+      적게 계상된다(EOS-02 라이브 28.1% 과소). 다른 좌석은 캐시 토큰이 `input_tokens`에 이미 들어
+      있어 가산하지 않는다(`_ADDITIVE_CACHE_ACCOUNTING_SEATS` 주석).
+    - **캐시 두 필드가 `None`이면 그 항을 산입하지 않는다** — 구버전 SDK·미노출이라 *못 읽은* 것이지
+      "캐시가 없었다"는 실측이 아니다(미측정 ≠ 0). 이때 값은 캐시 항이 빠진 **하한**이며 `Usage`
+      자체는 바꾸지 않는다(0으로 접어 채우지 않는다 — 접는 순간 미관측이 0 실측으로 위장된다).
     - CLOUD_*인데 토큰이 미상(None)이면 0.0을 돌려주지만, 이는 '0원 확정'이 아니라
       '산정 불가'다 — 호출부(파이프라인)는 usage 토큰이 None이면 cost를 **None으로
       기록**해 미상과 0원을 구분한다(값을 지어내지 않음, CLAUDE.md).
@@ -265,7 +311,17 @@ def actual_cost_usd(
     if price is None:
         return None  # 좌석 미상 또는 단가 미등재 — 0원으로 접지 않는다
     price_in, price_out = price
-    return (usage.input_tokens * price_in + usage.output_tokens * price_out) / 1_000_000
+    billed_input = float(usage.input_tokens)
+    if seat in _ADDITIVE_CACHE_ACCOUNTING_SEATS:
+        # 캐시 읽기·쓰기는 input_tokens 밖에서 따로 센 항이라 단가 배수를 곱해 더한다.
+        # None(미관측)은 그 항을 건너뛴다 — 0을 대입해 "관측했더니 0"으로 바꾸지 않는다.
+        cache_read = usage.cache_read_input_tokens
+        cache_write = usage.cache_creation_input_tokens
+        if cache_read is not None:
+            billed_input += cache_read * CACHE_READ_PRICE_MULTIPLIER
+        if cache_write is not None:
+            billed_input += cache_write * CACHE_WRITE_PRICE_MULTIPLIER[cache_ttl]
+    return (billed_input * price_in + usage.output_tokens * price_out) / 1_000_000
 
 
 def actual_cost_krw(
@@ -273,14 +329,16 @@ def actual_cost_krw(
     usage: Usage,
     *,
     seat: CloudSeat | None = SERVING_CLOUD_SEAT,
+    cache_ttl: CacheTtl = DEFAULT_CACHE_TTL,
 ) -> float | None:
     """실측 토큰 → 호출 비용(원) 순수 함수 — actual_cost_usd × 환율 (S1 게이트 ②).
 
     추정 `est_cost_krw`(라우터 결정 시점·대표 토큰 가정)와 *명시적으로 분리*된 실측이다.
     LOCAL=0.0. 토큰 미상 시 0.0 — '미상' 표시는 호출부가 usage 토큰 None으로 판단한다.
     좌석·단가 미상이면 `None`(미측정) — 환율을 곱할 값 자체가 없다.
+    캐시 과금(anthropic 좌석의 읽기 0.1배·쓰기 1.25배)은 `actual_cost_usd`가 이미 반영한다.
     """
-    usd = actual_cost_usd(decision, usage, seat=seat)
+    usd = actual_cost_usd(decision, usage, seat=seat, cache_ttl=cache_ttl)
     if usd is None:
         return None
     return usd * USD_TO_KRW

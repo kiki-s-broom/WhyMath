@@ -1,22 +1,19 @@
 {
-  "stage": 1,
-  "blocking": 7,
-  "items": [
-    "원본:EOS 기능 목록",
-    "원본:개념 그래프 (노드·선수 관계)",
-    "원본:문항 데이터 구조",
-    "원본:성취기준",
-    "원본:수능 시그니처 패턴",
-    "원본:오개념 DB·오답 op-code",
-    "원본:저작권 허용 기준"
-  ],
-  "judged_at": "HEAD 586351bf · 2026-09-28",
+  "stage": 2,
+  "blocking": 0,
+  "items": [],
+  "judged_at": "HEAD 381ec106 · 2026-10-03",
   "note": "코딩 헌법 위헌 심사 래칫 기준선(CONST-02). 감소 방향으로만 갱신된다 — scripts/constitution/audit_ratchet.py --update-baseline. 0으로 만드는 일은 게이트 G-const-sources-registry-adopt 가 소유한다.",
   "history": [
     {
       "blocking": 7,
       "judged_at": "HEAD 586351bf · 2026-09-28",
       "reason": "최초 생성(--init)"
+    },
+    {
+      "blocking": 0,
+      "judged_at": "HEAD 381ec106 · 2026-10-03",
+      "reason": "단계 이동 1→2 (새 차단 없음) · 하향: 해소 ['원본:EOS 기능 목록', '원본:개념 그래프 (노드·선수 관계)', '원본:문항 데이터 구조', '원본:성취기준', '원본:수능 시그니처 패턴', '원본:오개념 DB·오답 op-code', '원본:저작권 허용 기준']"
     }
   ]
 }

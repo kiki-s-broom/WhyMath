@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-19-mvt-interval-membership-check
+title: "P3-19 — 평균값 정리 c값 검산에 구간 소속 판정 추가 — 구간 밖 근이 정답으로 통과하는 결함 (P3-18 02-06 단서 보완)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 동결 — 보강 진단 fixture(tests/backend/harness/fixtures/p3_18_supplement.jsonl 의 평균값 정리 행: f=x³ · 구간 [0,3] 에서 구간 밖 근 −√3 을 오답으로 제출)가 지금 corpus_reverify exit 0 · 통과 1 로 **오답이 통과**한다. 이 사실을 수정 전에 RED 테스트로 먼저 동결한다(오답이 통과한다는 단언을 코드로 남긴다).\n② 수정 — 평균값 정리 c값 문항의 검산이 f'(c)=평균변화율 방정식뿐 아니라 c 가 열린구간 (a,b) 안에 있는지도 판정하도록 고친다. 구간 조건을 문항 재료에서 받아야 해서 새 필드가 필요하면 최소한만 추가하고 기존 코퍼스·검증기 호출은 깨지 않는다.\n③ 변별력 — 수정 뒤 같은 fixture 행이 exit 1(실패 1)이고, P3-18 정답 행(f=x²+2x · [1,3] · c=2)은 exit 0 · skip 0 을 유지한다. 방정식의 근이 둘이고 하나만 구간 안에 있는 형태로 정답·오답 쌍을 하나 더 둔다. 구간 조건 절을 지우는 뮤테이션이 RED 가 되는지 확인한다(주입이 실제로 적용됐는지 mutated != original 단언 포함).\n④ 처분 기록 — [12미적Ⅰ-02-06] 은 이 태스크가 done 이 될 때까지 '일부 가능'이다(게이트 G-p318-calc-02-08-disposition 의 Kiki 결정 2026-10-02). done 뒤 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md 에 어느 PR 로 '가능'이 됐는지 정정 줄을 남긴다.\n⑤ 확인 범위 — 백엔드 소스·테스트를 건드리므로 전체 스위트와 CI 잡 전체 기준으로 확인한다. 부분 스위트 통과를 회귀 없음의 근거로 보고하지 않는다."
+artifacts:
+  - "PR kiki-s-broom/WhyMath#1442 · 9360d995 · 프로브 24 passed · 전체 스위트 15784 passed(수집오류 8파일은 data_pipeline 미설치→설치 후 127 passed) · ruff/black/mypy --strict/lint-imports exit 0 · 코퍼스 재검증 421 통과"
+paths: []
+session: null
+notes: "출처: P3-18 결과 문서(docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md §4-②) + 게이트 G-p318-calc-02-08-disposition 의 Kiki 결정(2026-10-02, AskUserQuestion 응답을 세션이 중계). [12미적Ⅰ-02-06] 을 '일부 가능'으로 분류한 결과의 보완 태스크다. 판정 기준: main 53718366. 구간 밖 근이 정답으로 통과하는 상태에서 02-06 문항을 코퍼스에 세우면 틀린 정답이 검증을 통과할 수 있으므로, 코퍼스 채우기 쪽 태스크에 이 태스크를 의존으로 부착한다(대장 amend 로 집행 — 이 문구는 선언이 아니다)."
+updated: 2026-10-03

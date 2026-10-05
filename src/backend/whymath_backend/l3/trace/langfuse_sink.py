@@ -34,6 +34,7 @@ import logging
 from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.l3.interfaces import TrafficSurface, with_traffic_surface
 
 logger = logging.getLogger("whymath.l3.trace")
 
@@ -51,6 +52,9 @@ _TAG_FIELDS: tuple[str, ...] = (
     # 호출은 노이즈가 되지 않는다). `local_degraded`는 True/False가 항상 실려 태그로 쓰면 전
     # 호출에 붙으므로 태그에서 뺐다(메타데이터에는 그대로 있다).
     "degrade_reason",
+    # 표면 표지(OPS-105) — 서빙/저작/프로브를 Langfuse UI에서 바로 거른다. 표지가 없는 이벤트는
+    # 태그도 없어(None 제외 규칙) '미표기'가 별도 집합으로 남는다.
+    "traffic_surface",
 )
 
 # Langfuse 이벤트 이름 — L3 라우팅 결정 1건 = 이벤트 1건.
@@ -159,10 +163,19 @@ class LangfuseSink:
         *,
         client: _LangfuseClient | None = None,
         settings: Settings | None = None,
+        traffic_surface: TrafficSurface | None = None,
     ) -> None:
         # 주입된 클라이언트가 있으면 그것을 쓰고, 없으면 설정 완비 시 첫 사용에 지연 생성.
         self._client = client
         self._settings = settings
+        # 이 싱크가 낳는 기록의 기본 표면(OPS-105). None(기본)이면 표지를 싣지 않는다 — 기존
+        # 호출부는 비트동일. 기록 dict에 이미 표지가 있으면 그것이 이긴다(`with_traffic_surface`).
+        self._traffic_surface = traffic_surface
+
+    @property
+    def traffic_surface(self) -> TrafficSurface | None:
+        """이 싱크가 기록에 기본으로 싣는 표면(없으면 None)."""
+        return self._traffic_surface
 
     @property
     def _resolved_settings(self) -> Settings:
@@ -210,6 +223,8 @@ class LangfuseSink:
         client = self._get_client()
         if client is None:
             return  # 미설정 → no-op (네트워크·클라이언트 없음)
+        if self._traffic_surface is not None:
+            fields = with_traffic_surface(fields, self._traffic_surface)
         try:
             # SDK 버전 적응 쓰기(2026-07-16 실측): v3/v4=create_event, v2=event.
             # v2(2.60.10)에는 create_event가 없어 종전 고정 호출은 매 record가

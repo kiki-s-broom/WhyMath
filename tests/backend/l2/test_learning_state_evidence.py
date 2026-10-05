@@ -257,21 +257,18 @@ async def test_unmeasured_confidence_stays_none_instead_of_becoming_zero() -> No
     assert evidence.confidence is None
 
 
-@pytest.mark.asyncio
-async def test_prerequisite_gaps_come_from_the_caller_not_from_this_module() -> None:
-    """선수결손은 호출부가 넣어 준다 — 조립기는 그것을 계산하지 않는다(생산자 미배선 명시).
+def test_prerequisite_gap_is_not_an_evidence_field_anymore() -> None:
+    """선수 결손은 정책 증거가 아니다 — 필드도 조립기 인자도 없다(EOS-127 (나) 처분).
 
-    기본값이 비어 있다는 사실 자체가 계약이다. 비어 있으면 R4가 매치되지 않는다는 것을
-    이 테스트가 못 박아, "규칙은 있는데 영원히 안 도는" 상태를 숨기지 않는다.
+    종전에는 `prerequisite_gap_concept_ids`가 열려 있었으나 서빙 경로가 한 번도 채우지 않아 R4가
+    발화하지 않았다. "선언만 있고 집행이 없는" 입구를 다시 열면 같은 상태가 재발하므로, 필드와
+    인자의 **부재**를 동결한다. 선수 하강은 다음 문항 선택(R6 경로)이 맡는다.
     """
-    session, _ = _session()
-    default_evidence = await build_attempt_evidence(session, user_id=_UID, is_correct=False)
-    assert default_evidence.prerequisite_gap_concept_ids == ()
+    import inspect
 
-    injected = await build_attempt_evidence(
-        session,
-        user_id=_UID,
-        is_correct=False,
-        prerequisite_gap_concept_ids=["C-prereq-01"],
+    from whymath_backend.schema.learning_state import AttemptEvidence
+
+    assert "prerequisite_gap_concept_ids" not in AttemptEvidence.model_fields
+    assert (
+        "prerequisite_gap_concept_ids" not in inspect.signature(build_attempt_evidence).parameters
     )
-    assert injected.prerequisite_gap_concept_ids == ("C-prereq-01",)

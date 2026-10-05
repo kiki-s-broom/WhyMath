@@ -192,6 +192,7 @@ from whymath_backend.l3.interfaces import (
     CacheBackend,
     LLMProvider,
     TraceSink,
+    TrafficSurface,
 )
 from whymath_backend.l3.models import RoutingDecision, RoutingRequest
 from whymath_backend.l3.pipeline import QualityQueueUnavailableError
@@ -209,10 +210,12 @@ from whymath_backend.l3.trace import LangfuseSink
 from whymath_backend.l5.ocr.factory import build_ocr_components
 from whymath_backend.ops.log_scrubber import install_log_scrubber
 from whymath_backend.ops.service_health import (
+    ROUTE_UNMATCHED,
     AlertLogNotifier,
     ComponentCheck,
     MetricsSnapshot,
     ReadinessProbes,
+    RouteLatency,
     ServiceMetrics,
     default_readiness_probes,
     evaluate_alerts,
@@ -232,6 +235,10 @@ _READY_PROBES_KEY = "readiness_probes"
 # 프로브 폴링이 표본을 지배하고, 특히 DB 다운 시 /health/ready 503 폭주가 5xx 에러율을
 # *자기증폭*시킨다(관측이 관측을 오염). 학생·API 트래픽만 계측한다.
 _OPS_PROBE_PATHS = frozenset({"/health", "/health/live", "/health/ready", "/status"})
+# OPS-95: 서버 처리 시간 응답 헤더(W3C Server-Timing). 값은 `app;dur=<ms>` 하나뿐이다 — 사용자
+# 식별자·요청 내용·내부 처리 세부는 싣지 않는다(미성년자 데이터 정책). 프로브 경로는 위
+# 상수의 제외 규칙을 그대로 따른다(계측과 같은 경계).
+_SERVER_TIMING_HEADER = "Server-Timing"
 
 # OPS-17: 클라 최소 버전 게이트 — 헤더 이름 + '미상(unknown)' 경량 카운터의 app.state 키.
 # 신규 미들웨어를 만들지 않고 기존 `_service_metrics_middleware`(OPS-01) 좌석에 얹는다(아래
@@ -471,6 +478,20 @@ class ComponentCheckBody(BaseModel):
     )
 
 
+class RouteLatencyBody(BaseModel):
+    """/health/ready 라우트별 최근 창 지연·에러율(OPS-95·SLO S5) — 표본이 있는 라우트만 나온다."""
+
+    route: str = Field(
+        ...,
+        description="FastAPI 라우트 템플릿(원시 경로 아님). 매칭 실패는 '(unmatched)' 1개 버킷",
+    )
+    count: int = Field(..., description="그 라우트 최근 창 표본 수")
+    error_rate: float = Field(..., description="그 라우트 최근 창 5xx 비율")
+    p50_latency_ms: float = Field(..., description="최근 창 p50 지연(ms)")
+    p75_latency_ms: float = Field(..., description="최근 창 p75 지연(ms)")
+    p95_latency_ms: float = Field(..., description="최근 창 p95 지연(ms)")
+
+
 class MetricsSummaryBody(BaseModel):
     """/health/ready 인프로세스 계측 요약 — None 필드는 '미측정'(0과 구분·날조 금지)."""
 
@@ -486,6 +507,10 @@ class MetricsSummaryBody(BaseModel):
     )
     latency_sum_ms: float = Field(..., description="누적 지연 합계(ms)")
     latency_max_ms: float | None = Field(..., description="누적 최대 지연(ms). None=요청 0건")
+    routes: list[RouteLatencyBody] = Field(
+        default_factory=list,
+        description="라우트 템플릿별 최근 창 지연(OPS-95). 표본 없는 라우트는 목록에 없다(미측정)",
+    )
 
 
 class AlertBody(BaseModel):
@@ -679,6 +704,18 @@ def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
     )
 
 
+def _route_latency_body(row: RouteLatency) -> RouteLatencyBody:
+    """RouteLatency(도메인) → RouteLatencyBody(HTTP 스키마) 변환(OPS-95)."""
+    return RouteLatencyBody(
+        route=row.route,
+        count=row.count,
+        error_rate=row.error_rate,
+        p50_latency_ms=row.p50_latency_ms,
+        p75_latency_ms=row.p75_latency_ms,
+        p95_latency_ms=row.p95_latency_ms,
+    )
+
+
 def _metrics_body(snapshot: MetricsSnapshot) -> MetricsSummaryBody:
     """MetricsSnapshot(도메인) → MetricsSummaryBody(HTTP 스키마) 변환."""
     return MetricsSummaryBody(
@@ -690,6 +727,7 @@ def _metrics_body(snapshot: MetricsSnapshot) -> MetricsSummaryBody:
         window_p95_latency_ms=snapshot.window_p95_latency_ms,
         latency_sum_ms=snapshot.latency_sum_ms,
         latency_max_ms=snapshot.latency_max_ms,
+        routes=[_route_latency_body(row) for row in snapshot.routes],
     )
 
 
@@ -933,7 +971,13 @@ def create_app(
     # 기본 캐시는 RedisCache(지연 연결) — 구성 시 라이브 Redis 불필요(첫 접근 때 연결).
     app.state.__setattr__(_CACHE_KEY, cache if cache is not None else RedisCache())
     # 기본 트레이스는 LangfuseSink(지연·자기비활성) — 키 미설정 시 영구 no-op(S3).
-    app.state.__setattr__(_TRACE_KEY, trace if trace is not None else LangfuseSink())
+    # 이 싱크는 학생 대면 요청 경로의 것이라 기본 표면이 서빙이다(OPS-105 — 게이트② 표본의 대상).
+    # 저작·프로브는 자기 래퍼가 먼저 표지를 싣고, 먼저 실린 표지가 이긴다(`with_traffic_surface`).
+    # 주입된 싱크는 호출자가 표면을 책임진다(테스트 대역 등).
+    app.state.__setattr__(
+        _TRACE_KEY,
+        trace if trace is not None else LangfuseSink(traffic_surface=TrafficSurface.SERVING),
+    )
     # 기본 큐는 CeleryJobQueue(지연 연결) — 구성 시 broker 불필요(첫 디스패치 때 연결, S4).
     app.state.__setattr__(_QUEUE_KEY, queue if queue is not None else CeleryJobQueue())
     # ── 과목 능력 등록(push) — 계획서 100 §3.8 / EOS-89 ─────────────────────
@@ -1024,7 +1068,17 @@ def create_app(
     # (재시작 시 리셋 — 인프로세스 계측이라 영속 저장 0·growth_evidence와 동형 전제).
     set_l6_mode_reach_counters(app, L6ModeReachCounters())
 
-    def _observe_request(elapsed_ms: float, status_code: int) -> None:
+    def _route_template(request: Request) -> str:
+        """요청이 매칭된 라우트의 *템플릿*(OPS-95) — 매칭 실패는 `ROUTE_UNMATCHED` 단일 버킷.
+
+        `scope["route"]`는 라우터가 매칭한 뒤에야 채워지므로 `call_next` 이후에 읽는다. 원시
+        `request.url.path`를 쓰면 `/v1/problems/123`·`/v1/problems/124`가 각각 키가 돼 카디널리티가
+        폭발한다. 템플릿을 못 읽는 모든 경우(route 없음·path 속성 없음)는 미매칭으로 모은다.
+        """
+        template = getattr(request.scope.get("route"), "path", None)
+        return template if isinstance(template, str) and template else ROUTE_UNMATCHED
+
+    def _observe_request(elapsed_ms: float, status_code: int, route: str) -> None:
         """요청 1건 계측 + 알림 평가 — 계측 실패가 요청을 절대 깨지 않는다.
 
         침묵 실패 금지(CLAUDE.md): 계측은 best-effort라 예외를 삼키되 **무타입 경고
@@ -1032,11 +1086,12 @@ def create_app(
         교훈). 시크릿·필드값은 로그에 싣지 않는다.
         """
         try:
-            resolved_metrics.record(elapsed_ms, status_code)
+            resolved_metrics.record(elapsed_ms, status_code, route)
             observed_settings = get_settings()
             alert_notifier.notify(
                 evaluate_alerts(
-                    resolved_metrics.snapshot(),
+                    # 라우트별 백분위는 정렬이 필요해 요청 경로에서 계산하지 않는다(OPS-95 ⑤).
+                    resolved_metrics.snapshot(include_routes=False),
                     error_rate_threshold=observed_settings.ops_error_rate_alert_threshold,
                     latency_p95_threshold_ms=observed_settings.ops_latency_p95_alert_ms,
                 )
@@ -1079,6 +1134,9 @@ def create_app(
           파싱 불가한 버전 문자열(형식 위반)도 침묵 실패 없이 동일하게 "미상"으로 계상한다.
         - 핸들러의 미처리 예외는 5xx(500)로 회계한 뒤 **그대로 재던진다** — 계측은
           예외를 삼키지 않는다(바깥 ServerErrorMiddleware가 500 응답으로 변환).
+        - **OPS-95**: 라우트 *템플릿* 단위로도 기록하고(`_route_template`), 응답에 `Server-Timing:
+          app;dur=<ms>`를 싣는다. 미처리 예외·426 차단 응답에는 헤더가 없다(응답 객체가 없거나
+          핸들러가 돌지 않아 서버 처리 시간이 아니다).
         - 계측 자체의 실패는 `_observe_request`가 흡수한다(요청 무영향·예외 타입명 로그).
         """
         if request.url.path in _OPS_PROBE_PATHS:
@@ -1113,9 +1171,12 @@ def create_app(
         try:
             response = await call_next(request)
         except Exception:
-            _observe_request((time.monotonic() - started) * 1000.0, 500)
+            _observe_request((time.monotonic() - started) * 1000.0, 500, _route_template(request))
             raise
-        _observe_request((time.monotonic() - started) * 1000.0, response.status_code)
+        elapsed_ms = (time.monotonic() - started) * 1000.0
+        _observe_request(elapsed_ms, response.status_code, _route_template(request))
+        # OPS-95: 클라이언트가 체감 시간에서 서버 구간을 분리할 수 있게 한다(시간 값만 싣는다).
+        response.headers[_SERVER_TIMING_HEADER] = f"app;dur={elapsed_ms:.1f}"
         return response
 
     @app.get("/health", tags=["ops"])
