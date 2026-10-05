@@ -338,6 +338,17 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-05 (런북 착지 · OPS-106): **게이트② 라이브 표본 실측 런북을 코드 경로 실측으로 설계했다 — 실행은 Kiki 게이트(`G-ops106-gate2-live-sample`)이며 수치는 아직 없다. 설계 중 드러난 함정 4건과 도구 결함 1건을 기록한다** (claude 판정·구현) — 판정 기준 main `198bba76`
+
+- **런북**: `docs/ops/ops106_gate2_live_sample_runbook.md`. 서빙(①)·이중 회계(②)·저작 분리(③)를 한 창에서 잰다. 실행 순서는 ②→③→①(Langfuse 수집 지연으로 늦게 온 서빙 이벤트가 저작 판정 창을 오염시키지 못하게 서빙을 마지막에).
+- **함정 1 — `cost_probe`·`live_preflight`는 서빙 표본을 못 만든다**: 둘 다 `traffic_surface=probe`로 기록되고 `cost_report`가 표본에서 뺀다. WH-1 primary 표본은 서버(uvicorn)로 가는 HTTP 합성 코치 트래픽으로만 만들 수 있고, `cost_probe`는 인프로세스 대조(성공 수 N = Langfuse `probe` 증가분) 전용이다. 근거: `pipeline.generate`는 캐시 적중 포함 호출 성공 1건당 이벤트 1건을 기록하고 provider 예외일 때만 기록하지 않는다.
+- **함정 2 — 합성 트래픽의 primary 도달**: `problem_id`가 없으면 `_final_answer_state`가 `(None, not_required)` → `decide_completion` ⑤ `NONE` → `handled=False`라 primary LLM이 호출된다. 반대로 실제 학생 턴은 정답/오답 판정 시 돌아보기·재고 템플릿이 가로채 LLM을 건너뛰므로, 이 실측은 배선 확인이지 학생 분포 대표성이 아니다.
+- **함정 3 — rephrase 입력 코퍼스**: `problem_bank_*` 31개 중 대부분이 `extract_equation` 0건(실물 함수로 측정)이라 아무 파일이나 넘기면 저작 호출 0건 → "분리 실패" 오진. `problem_bank_discrete_ev_v0`(200/200 추출 가능)를 쓰고 런북 §1이 앞 5건을 직접 재서 `CORPUS_OK`로 게이트한다.
+- **함정 4 — `cost_report`는 키가 없거나 Langfuse가 죽어도 exit 0에 전부 0**(실측). 그 "0건 통과 위장"을 이중 회계 판정(`SILENT_ZERO`)이 가른다.
+- **도구 결함(`OPS-111`)**: `wh1_shadow_probe` 자동 토큰 발급이 SEC-08 이후 필수인 CSRF `state` 없이 콜백을 호출한다 — 서버 스키마 `OAuthCallbackRequest`로 직접 재현(state missing). 기존 테스트는 `MockTransport`가 콜백을 항상 200으로 돌려 가렸다(시임 테스트만으로 외부 계약 정합 선언 금지 계열). 런북 §6은 토큰을 직접 발급해 `--token`으로 우회한다.
+- **검증**: 판정 스니펫 3종의 25개 분기를 합성 입력으로 전수 확인(분기마다 그 분기에서만 나오는 입력)하고, 실제 `aggregate_l3_events` 산출 JSON으로 형태 가정을 확인했으며, PowerShell 7.4.6 파서로 8개 블록 구문 오류 0건(일부러 깨뜨린 3종은 오류 검출)·문서에서 추출한 판정 문자열을 PowerShell 경유로 실행해 `MATCH`/`SILENT_ZERO` 구분을 확인했다. **Windows PowerShell 5.1 실행·라이브 Langfuse·Ollama는 이 환경에서 검증하지 못했다.**
+- **한계(명시)**: 서빙에는 LLM 호출 단위 인프로세스 카운터가 없어 §6은 "1건 이상 도착"까지만 증명한다. 결과 수치는 Kiki 실행 후 이 로그에 추가한다.
+
 ### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
 
 - **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.

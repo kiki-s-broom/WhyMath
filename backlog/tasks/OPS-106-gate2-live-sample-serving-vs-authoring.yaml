@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ acceptance:
 artifacts: []
 paths:
   - "docs/ops/**"
-session: null
+session: claude/amazing-wright-yioenm
 notes: "OPS-84 ③(라이브 표본)은 트래픽이 필요해 클라우드 세션에서 실행 불가 — 승계 분리. OPS-105 선행: call_site/표면 축 없이는 WH-1 primary 호출을 표본에서 식별할 수 없다(조용한 0건 통과 위험)."
-updated: 2026-10-02
+updated: 2026-10-05
