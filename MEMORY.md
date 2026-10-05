@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-05 (판정 · G-misc40-new-crosslink-signature): **서명 대상 5행 중 승인 3(M0462·M0599·M0672 부분매핑 유지) · 보류 2(M0515·M0671) — 같은 날 먼저 머지된 5행 전건 승인(#1454)을 이 판정으로 대체한다** (Kiki 판정·claude 반영) — 판정 기준 main `d0ba970c`
+
+- **판정자·방법**: Kiki가 서명 창(Artifact)에서 행별로 고른 결과를 채팅에 붙여넣었다(검수자 `kiki`·날짜 2026-10-05). claude는 판정을 옮기기만 했고 승인 여부를 정하지 않았다. 세션이 검수 큐 복사본에 서명을 기입해 `promote_approved`로 3행을 산출했다(원본 큐는 전행 pending 봉인 유지).
+- **충돌과 해소**: main에는 같은 날 07:26(UTC)에 머지된 #1454가 5행을 전부 승인(M0671 승인·M0672 직접매핑 0.85 승격, 서명일 2026-10-03)으로 이미 반영했다. 서명 창 판정과 달라 Kiki에게 어느 쪽이 최종인지 물었고 **서명 창 판정이 최종**이라는 답을 받았다. 코퍼스를 69→67건으로 정정했다(M0515·M0671 행 제거 · M0672는 부분매핑·신뢰도 미기재로 환원 · M0462·M0599는 서명일 2026-10-05로 재서명).
+- **결과**: 승인 코퍼스 67건(직접 66·부분 1). 앵커 좌석은 A1=1·A3=1이 되고 A2는 0으로 남는다. 승인 코퍼스에 처음 부분매핑 행이 들어와 `test_load_gate_passes`의 "전 행 직접매핑" 가정을 직접매핑 하한 + 부분매핑 한 행 허용으로 정확히 고쳤다.
+- **보류 2행 추적**: 기한 없는 보류를 막으려고 게이트 `G-misc40-deferred-two-rows-redecision`(7일 독촉)을 등재했다. M0671은 성취기준 `[12미적Ⅰ-02-03]` 원문 확인이 선행 조건이다.
+- **검증**: 표적 테스트 193 passed · ruff/black exit 0 · `provenance_audit`·`explicit_correction_gap_eval`·`misconception_false_positive_eval` exit 0 · 코퍼스 주입 4종(보류행 적재 2·M0672 직접 승격·M0462 삭제) 전건 RED·원복 바이트 동일.
+- **남은 사람 몫**: 라이브 DB 적재(`promote --load`)는 prod DB가 있는 Kiki 머신에서, 게이트 `G-misc40-new-crosslink-signature` clear는 Kiki가 한다.
+
 ### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
 
 - **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.

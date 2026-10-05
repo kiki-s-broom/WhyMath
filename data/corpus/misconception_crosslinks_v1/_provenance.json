@@ -5,9 +5,10 @@
   "origin": "docs/data/misconception_crosslink_review_queue.json (검수 큐·전행 pending) 의 승인분",
   "review_method": "human sign-off (AI 자기승인 금지·Gate Contract crosswalk_gate_contract.md)",
   "counts": {
-    "crosslinks": 69,
+    "crosslinks": 67,
     "link_types": {
-      "직접매핑": 69
+      "직접매핑": 66,
+      "부분매핑": 1
     }
   },
   "signatures": [
@@ -527,45 +528,29 @@
       "kebab_id": "product-rule-naive",
       "mis_id": "M0672",
       "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
-      "confidence": 0.85,
-      "note_stamp": "검수:kiki 2026-10-03"
+      "reviewed_on": "2026-10-05",
+      "confidence": null,
+      "note_stamp": "검수:kiki 2026-10-05"
     },
     {
       "kebab_id": "bigger-denominator-bigger-fraction",
       "mis_id": "M0462",
       "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
+      "reviewed_on": "2026-10-05",
       "confidence": 0.9,
-      "note_stamp": "검수:kiki 2026-10-03"
-    },
-    {
-      "kebab_id": "ratio-order-swapped",
-      "mis_id": "M0515",
-      "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
-      "confidence": 0.85,
-      "note_stamp": "검수:kiki 2026-10-03"
+      "note_stamp": "검수:kiki 2026-10-05"
     },
     {
       "kebab_id": "addition-multiplication-rule-confused",
       "mis_id": "M0599",
       "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
+      "reviewed_on": "2026-10-05",
       "confidence": 0.9,
-      "note_stamp": "검수:kiki 2026-10-03"
-    },
-    {
-      "kebab_id": "power-rule-step-omitted",
-      "mis_id": "M0671",
-      "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
-      "confidence": 0.85,
-      "note_stamp": "검수:kiki 2026-10-03"
+      "note_stamp": "검수:kiki 2026-10-05"
     }
   ],
   "generation": "promote_approved(review_queue 승인본) 산출 — method=manual·검수 서명 stamp 부착(load 게이트 통과분).",
   "license_notice": "와이매스 자체 저작 매핑(kebab 카탈로그 × M-id 코퍼스 대응·검수 판단). 성취기준 코드는 구조 메타(공공·사실).",
   "cascade_warning": "Phase 5(M#### 코퍼스 폐기) 시 misconception_crosslink FK가 ondelete=CASCADE라 M-id 삭제 전 이 검수 행을 반드시 이전할 것(조용한 전멸 방지 — MEMORY 2026-07-08).",
-  "source_of_truth": "MEMORY.md 2026-07-08 극값 2 + 2026-07-10 트리아지 corroborated A그룹 11 + B그룹 8 + fraction-cancellation M0118(직접·conf≥0.8) 승인·이후 corroborated 종료. · 2026-10-03 G-misc40-new-crosslink-signature 5행(M0462·M0515·M0599·M0671·M0672 — Kiki가 대화에서 행별 승인 결정·검수자명 kiki 지정, 세션이 promote_approved로 산출. 게이트 clear는 Kiki 몫)."
+  "source_of_truth": "MEMORY.md 2026-07-08 극값 2 + 2026-07-10 트리아지 corroborated A그룹 11 + B그룹 8 + fraction-cancellation M0118(직접·conf≥0.8) 승인·이후 corroborated 종료. · 2026-10-05 G-misc40-new-crosslink-signature 서명 5행 중 승인 3행(M0462·M0599 직접매핑 · M0672 부분매핑 유지) — Kiki가 서명 창에서 행별 판정(M0515·M0671은 보류라 미적재), 검수자명 kiki, 세션이 promote_approved로 산출. 같은 날 먼저 머지된 5행 전건 승인 반영(#1454)은 이 판정으로 대체됐다. 게이트 clear는 Kiki 몫."
 }
