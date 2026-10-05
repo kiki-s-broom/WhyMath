@@ -158,6 +158,18 @@ def _mutate(path: Path, old: str, new: str) -> None:
     path.write_text(mutated, encoding="utf-8")
 
 
+def _wire_ci(root: Path, command: str) -> None:
+    """합성 저장소의 CI 가 이 명령을 실제로 실행하게 한다(제10조 ① '연결' — 파일 존재만으로는 부족)."""
+    workflows = root / ".github" / "workflows"
+    workflows.mkdir(parents=True, exist_ok=True)
+    (workflows / "ci.yml").write_text(
+        yaml.safe_dump(
+            {"name": "ci", "jobs": {"j": {"runs-on": "ubuntu-latest", "steps": [{"run": command}]}}}
+        ),
+        encoding="utf-8",
+    )
+
+
 def _touch(root: Path, rel: str) -> None:
     target = root / rel
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -240,8 +252,13 @@ def test_stage_raise_moves_baseline_only_without_new_blocking(sandbox: Path) -> 
     refused = _run(sandbox, "--update-baseline")
     assert refused.returncode == 1 and "RT-01" in refused.stderr
     assert baseline.read_bytes() == before
-    # ② 집행 장치를 두면 새 차단 없음 → 기준선이 2단계로 이동하고 기록이 남는다
+    # ② 집행 장치 파일만 있고 CI 가 실행하지 않으면(미연결 — CONST-03 P1 이후 판정) 여전히 새 차단
     _touch(sandbox, "hook/guard.py")
+    unwired = _run(sandbox, "--update-baseline")
+    assert unwired.returncode == 1 and "RT-01" in unwired.stderr, unwired.stderr
+    assert baseline.read_bytes() == before
+    # ③ CI 가 그 검사를 실제로 실행하면 새 차단 없음 → 기준선이 2단계로 이동하고 기록이 남는다
+    _wire_ci(sandbox, "python hook/guard.py")
     moved = _run(sandbox, "--update-baseline")
     assert moved.returncode == 0, moved.stdout + moved.stderr
     after = json.loads(baseline.read_text(encoding="utf-8"))

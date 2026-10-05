@@ -380,6 +380,29 @@ def render_status_json(backlog: Backlog, errors: list[str], today: date) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
+def impl_signal_line(
+    impl_new: int | None, impl_changed: int | None, impl_scan_error: str = ""
+) -> str:
+    """브랜치의 구현 신호 한 줄(HARN-31) — 없으면 빈 문자열(미측정·대상 밖).
+
+    3상태를 **서로 다른 문장**으로 말한다. 0과 판정 불가를 같은 화면으로 내면 측정 실패가
+    "구현 없음"으로 위장된다(CLAUDE.md 3상태 원칙):
+      · 양수 — done 표기가 있든 없든 구현 파일이 있다. 내용을 열어 보라는 행동을 명시한다.
+      · 0 — 문서·원장 위주. 읽을 구현이 없다는 *긍정* 정보이므로 숨기지 않고 보인다.
+      · 사유 있음 — 판정 불가. 삭제 전 수동 확인을 요구한다.
+    """
+    if impl_new is None or impl_changed is None:
+        if impl_scan_error:
+            return f"      ↳ 구현 신호 판정 불가: {impl_scan_error} — 삭제 전 수동 확인 필요"
+        return ""
+    if impl_new + impl_changed > 0:
+        return (
+            f"      ↳ 🧩 구현 신호: 신규 {impl_new}파일 · 수정 {impl_changed}파일 "
+            "(태스크 done 표기와 무관 — 내용을 열어 확인)"
+        )
+    return "      ↳ 구현 신호 없음 (문서·원장 위주)"
+
+
 def render_brief(
     backlog: Backlog,
     errors: list[str],
@@ -402,7 +425,10 @@ def render_brief(
     """SessionStart 훅용 — 컨텍스트에 주입되는 최소 브리핑.
 
     remote_claimed: task_id → 원격 claim 브랜치 (refs/claims/* 조회 결과, best-effort).
-    stale_branches: (branch, age_days, ahead, status, evidence[, partial_port[, port_scan_error]])
+    stale_branches: (branch, age_days, ahead, status, evidence[, partial_port[, port_scan_error
+        [, impl_new[, impl_changed[, impl_scan_error]]]]]) — 마지막 3개(HARN-31)는 done 표기와
+        무관한 구현 신호다(신규/수정 구현 파일 수·측정 불가 사유). `None`은 미측정 또는
+        판정 불가라 `0`과 다르다 — 0이면 "구현 신호 없음", 사유가 있으면 "판정 불가"로 말한다.
         목록
         (HARN-13 + 2026-08-05
     3분류 확장 · HARN-78 5분류) — 원시 튜플로 받아 이 모듈이 `remote_claims`를 직접
@@ -474,12 +500,20 @@ def render_brief(
     # 참고로 낮춰, 매 세션 Kiki가 훑어야 하는 줄 수를 실제 조치 대상으로 좁힌다.
     if stale_branches:
         normalized = []
+        impl_lines: dict[str, str] = {}  # 브랜치 → 구현 신호 줄(HARN-31)
         for entry in stale_branches:
             branch_name, age_days_val, ahead_val = entry[0], entry[1], entry[2]
             status_val, evidence_val = entry[3:5] if len(entry) >= 5 else ("unresolved", "")
             # 6번째 원소(부분 착지 단서)는 선택 — 구 호출부 5튜플 호환(HARN-37).
             partial_val = entry[5] if len(entry) >= 6 else ""
             scan_err_val = entry[6] if len(entry) >= 7 else ""
+            impl_line = impl_signal_line(
+                entry[7] if len(entry) >= 8 else None,
+                entry[8] if len(entry) >= 9 else None,
+                entry[9] if len(entry) >= 10 else "",
+            )
+            if impl_line:
+                impl_lines[branch_name] = impl_line
             normalized.append(
                 (
                     branch_name,
@@ -517,6 +551,8 @@ def render_brief(
                     # 흡수 흔적은 있으나 전건은 아니다 — 사람이 같은 조사를 다시 하지
                     # 않게 단서를 잇고, 동시에 '결정 불요'로 숨기지도 않는다(HARN-37).
                     lines.append(f"      ↳ 부분 착지: {partial} — 잔여분 확인 필요")
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         # PR 닫힘(미머지, HARN-78) — PR이 있었다는 사실이 처분 완료를 뜻하지 않는다.
         # isolated와 같은 행동 요구(재작업 또는 폐기 판단)이므로 같은 위계로 강조한다.
         if pr_closed:
@@ -526,6 +562,8 @@ def render_brief(
                     f"  · {stale_branch} — {evidence} · 최종 커밋 {age_days:.0f}일 전 · "
                     f"trunk 대비 {ahead}커밋 앞섬"
                 )
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         # PR 대기 — 작업은 GitHub에 보인다. 열림이 GitHub API로 확인됐으면(pr_state_
         # lookup_ok) Kiki에게 "결정하라"고 다시 묻지 않고 PR 번호를 건넨다. 확인이
         # 안 됐으면(토큰 없음 등) "열림"이라고 단정하지 않고 직접 확인하라고 말한다
@@ -553,6 +591,8 @@ def render_brief(
                     f"  · {stale_branch} — 최종 커밋 {age_days:.0f}일 전 · "
                     f"trunk 대비 {ahead}커밋 앞섬"
                 )
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         if ported:
             lines.append(f"(참고) 이미 포팅됨 — 원본 정리만 필요, 결정 불요 — {len(ported)}건:")
             for stale_branch, _age_days, _ahead, _status, evidence, _partial, _err in ported:

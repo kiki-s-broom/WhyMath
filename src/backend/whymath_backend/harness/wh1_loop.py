@@ -35,7 +35,8 @@ log_evidence`·BKT 커밋 결선은 후속). 그래서 본 골격은 *순수·DB
 도구 8종(§3) ↔ 본 하네스 처리(순수):
   1 read_student_state: 정책 공급(노드 컨텍스트) — 기록(L2 BKT 조인은 영속 좌석 후속).
   2 verify_step       : 하네스가 `verify_solution`(L3·순수 SymPy) 실행 → 3-state.
-  3 match_misconception: 하네스가 `diagnose`(L4·substring 순수) 실행 → 후보.
+  3 match_misconception: 하네스가 `diagnose`(L4·substring 순수) 실행 → §3.3 품질 게이트
+    (`apply_match_quality_gate`·top-1<floor면 후보 비움·MISC-18) → 후보.
   4 curate_hypothesis : 하네스가 순수 `curate`(감쇠·강화·반박·최대5) 실행 — 반박은 *in-memory
     증거 원장 순지지도<0*에서(net_support 동형). 작업 메모리 갱신.
   5 query_curriculum  : 정책 공급(노드·관계) — 기록(L1+L2 조인은 영속 좌석 후속).
@@ -69,6 +70,7 @@ from whymath_backend.l4.misconception.crosslink_shadow import observe_crosslink_
 from whymath_backend.l4.misconception.diagnose import diagnose
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis, curate
 from whymath_backend.l4.misconception.intervene import select_intervention_from_hypotheses
+from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
 from whymath_backend.l4.misconception.models import MisconceptionMatch
 from whymath_backend.l4.misconception.probe_selection import (
     _EXPLORE_PERIOD,
@@ -231,6 +233,18 @@ class ToolResult(BaseModel):
             "verify_step 실행 결과에만 채워지고 다른 도구는 None이다. 값은 개수뿐 — 학생 "
             "원문·식은 담지 않는다(shadow 관측 레코드의 비식별 계약 유지). 관측 전용이며 "
             "하네스 판정(3-state·불변식)에는 쓰이지 않는다."
+        ),
+    )
+    match_gate_counts: dict[str, int] | None = Field(
+        default=None,
+        description=(
+            "match_misconception 실행의 *품질 게이트 작동량*(MISC-18) — `raw`(게이트 전 후보 수)·"
+            "`kept`(게이트 통과 후보 수)·`no_confident_match`(top-1<floor로 후보를 비웠으면 1)·"
+            "`attribution_unclear`(통과한 top-1의 귀속 불명이면 1). match_misconception 결과에만 "
+            "채워지고 다른 도구는 None이다. `raw - kept`가 게이트가 *실제로 걸러낸* 약한 매치 수 "
+            '— 게이트가 일했는지는 이 분포로만 안다(CLAUDE.md "작동 신호 없는 알고리즘 부착 '
+            '금지"). 값은 개수뿐이라 학생 원문·후보 id를 담지 않는다(비식별). 관측 전용 — 하네스 '
+            "판정에는 쓰이지 않는다."
         ),
     )
 
@@ -467,9 +481,24 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
 
     if isinstance(action, MatchMisconceptionAction):
         # diagnose(순수·substring) → 후보. 매칭은 *내부 동작*(학생 비노출·§3.4-3).
-        state.last_matches = diagnose(action.student_text)
+        raw_matches = diagnose(action.student_text)
+        # §3.3 품질 게이트(MISC-18) — 코치 경로(`api/coach.py` `_compute_matches`)와 *같은* 계약
+        # 모듈을 부른다(floor 0.65는 `match_gate.py` 한 곳이 소유·여기에 상수 복제 0). 이 경로는
+        # 게이트 없이 도는 주경로였다 — top-1 신뢰도<floor인 약한 매치(0.33·0.5)로도 가설을 세워
+        # 개입 발화까지 갔다. `ocr_confidence`를 넘기지 않는다(None): 하네스는 OCR 신뢰도를 갖고
+        # 있지 않으므로 게이트 ②는 dormant이고 없는 신호를 날조하지 않는다.
+        gate = apply_match_quality_gate(raw_matches)
+        state.last_matches = gate.matches
         return ToolResult(
-            kind=action.kind, ok=True, detail=f"오개념 후보 {len(state.last_matches)}건(내부)."
+            kind=action.kind,
+            ok=True,
+            detail=f"오개념 후보 {len(state.last_matches)}건(내부).",
+            match_gate_counts={
+                "raw": len(raw_matches),
+                "kept": len(gate.matches),
+                "no_confident_match": int(gate.no_confident_match),
+                "attribution_unclear": int(gate.attribution_unclear),
+            },
         )
 
     if isinstance(action, CurateHypothesisAction):

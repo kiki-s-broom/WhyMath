@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,11 +15,12 @@ acceptance:
   - "① 본문 대조(선행) — origin/claude/whymath-service-operations-review-5t5lmv(head 7052c34a)의 r2 문서·검증 실행 함정 2건 등재분이 main 현행과 여전히 정합인지 읽고 판정한다(추측 채택 금지). 코드 2파일(api/speech.py·schema/speech.py) 변경의 채택 여부 포함"
   - "② 채택분 파일 단위 이식 + 문서는 docs/reviews 착지. 기각분은 기각 사유를 이 태스크 notes에 기록"
   - "⑤ [고립 참조 정정 2026-09-07 stray-code 8회차 — head dd3e9475 기준 acceptance 밖 잔여 승격] (a) OPS-35 클라 버전 게이트 관측(브랜치 done 7df9ff8d·PR 없음·main OPS-35는 별건 → CLI 재등재): backend app.py 426 차단의 요청 회계 편입·_observe_version_state 3상태 카운터·/health/ready client_version(92줄) + config.py min_app_version '상향 트리거' 블록(~5줄만 — 나머지 AES/texteller 줄은 SEC-28·PED-23 후행 reflow라 이식 금지) + tests/backend/test_app.py TestAppVersionObservability 3건 + mobile core/update_required.dart(426 단일 좌석)·test/update_required_test.dart + 컨트롤러 7건의 426 소비 줄만(account_security·auth·chat 4줄·ocr·onboarding·diagnosis·me_tab 5줄 — me_tab ~17줄·chat 6줄은 MOB-17/#863·MOB-20/#979 후행판이 main 우세·이식 금지) + incident_response_slo.md §1-4 client_version 행. main grep client_version/blocked_total/update_required 0건. (b) A11Y-02 접근성 커버리지 드리프트 가드(브랜치 done a7a9e9ec·PR 없음·main 번호 미사용 → CLI 재등재): src/mobile/test/accessibility_coverage_governance_test.dart(160)·accessibility_test.dart 3축(ChatScreen·ProblemScreen·DefectReport, 155)·06_design_system.md §7 — main 0건. (c) OPS-34 제거된 의존↔정본 동기 게이트 설계 YAML(todo·main OPS-34는 별건 → CLI 재등재·동등 테스트 main 0건). (d) r2 §4 정정 유실 6문서 — 05_interaction.md:48·system_deep_dive.md:101/103·visualization_module_gap_review.md:143(제목줄·R4·§8은 main 우세·이식 금지)·ui/01:105·ui/02:39,46·service_ops_mgmt_gap_review_2026-07.md:43 — main이 여전히 'flutter_tts 합성'·'44dp'로 stale. (e) CLAUDE.md 규칙 1줄 '문서 §정정의 소유자 위임을 집행으로 착각 금지(2026-08-11·반복 실수 11회차)' main 0건(버전줄·스택표 6줄은 main 우세) + MEMORY 결정 로그 3건(08-11 서비스 운영 r2·OPS-35·A11Y-02, 30줄). (f) events.ndjson 44줄은 이식 금지(번호 충돌 — CLI가 새 이벤트 생성). 회수 완료 전 5t5lmv 삭제 금지"
-artifacts: []
+artifacts:
+  - "PR kiki-s-broom/WhyMath#1466 · 98936207 · 정정 7파일+v1 배너+06 TTS 행 이식 · r2 문서 docs/reviews 착지 · 기각 3건(사유 notes) · 승계 등재 OPS-112·A11Y-02·OPS-113(구현은 Flutter 부재로 미이식) · ci_mirror 6잡 전 exit 0(미실행 0) · validate 989건 green"
 paths:
   - "docs/reviews/**"
   - src/backend/whymath_backend/api/speech.py
   - src/backend/whymath_backend/schema/speech.py
 session: null
-notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A5. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 risk=high: acceptance ①②가 head 7052c34a 기준이라 그 뒤 4커밋(7df9ff8d OPS-35 구현·91c0f527·a7a9e9ec A11Y-02 구현·dd3e9475)의 산출물 29항목이 무소유 — HARN-35 notes는 'OPS-40 소유'로 미뤄 상호 미소유. 별항으로 승격"
-updated: 2026-09-07
+notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A5. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 risk=high: acceptance ①②가 head 7052c34a 기준이라 그 뒤 4커밋(7df9ff8d OPS-35 구현·91c0f527·a7a9e9ec A11Y-02 구현·dd3e9475)의 산출물 29항목이 무소유 — HARN-35 notes는 'OPS-40 소유'로 미뤄 상호 미소유. 별항으로 승격\n\n[처분 2026-10-05 OPS-40 회수 — 판정 기준 main d0ba970c] ① 본문 대조: r2 문서 핵심 판정(D1~D5 done·G1~G3 열림)은 현행과 일치, 낡은 것은 MGMT-02 상태·백로그 수·화면 수·소유 태스크 번호·줄 번호 인용. docs/reviews/service_operations_gap_review_r2.md로 착지(맨 위 회수 블록에 번호 매핑·현행 델타·처분표). ② 이식: api/speech.py·schema/speech.py·05_interaction·system_deep_dive·visualization_module_gap_review·ui/01·ui/02 정정, v1 배너+신고 API 경로 오기, 06_design_system §7 TTS 행. 기각 3건과 사유: (가) service_ops_mgmt_gap_review_2026-07.md:43 정정 — '학생 경로 LOCAL 고정' 전제가 ARCH-64(학생 대면 서빙도 클라우드 좌석)로 낡음 (나) CLAUDE.md 스택 표 정정 — main 우세(ARCH-64 전면 재작성, 줄 :86) (다) CLAUDE.md 프로세스 금기 1건 신설(⑤e) — 2026-09-20 새 산문 규칙 등재 동결과 충돌(집행은 OPS-113 코드로). ⑤ 분리: (a) OPS-35 구현 -> OPS-112-client-version-gate-observability (b) A11Y-02 구현 -> A11Y-02-accessibility-coverage-drift-gate (c) OPS-34 설계 -> OPS-113-removed-dependency-canon-sync-gate — 번호 충돌(main의 OPS-34·OPS-35는 별건)이라 새 번호, Flutter 부재로 모바일 구현은 이식하지 않음. (d) 정정 6문서 중 5개 이식, 나머지 service_ops_mgmt는 위 기각. (e) MEMORY 결정 로그는 OPS-40 회수 1건으로 새로 기록(고립 브랜치의 OPS-35·A11Y-02 완료 서술은 구현이 main에 없어 이식 금지). (f) events.ndjson 이식 안 함. 회수 완료 전 5t5lmv 삭제 금지 — OPS-112·A11Y-02의 참조 구현(7df9ff8d·a7a9e9ec)이 그 브랜치에 있다.\n\n[정정 2026-10-05] notes 치환 — OPS-40 회수 처분 기록(기각 사유·승계 태스크 번호·삭제 금지 조건)"
+updated: 2026-10-05

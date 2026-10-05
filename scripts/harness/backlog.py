@@ -4384,7 +4384,7 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     # 장기 미머지 브랜치 경고 (HARN-13 + 2026-08-05 3분류 확장) — SessionStart 1회 비용,
     # 정보성(브리핑을 막지 않음). active_branches는 이미 계산해둔 remote_claimed의 브랜치
     # 집합을 재사용한다 — 새 원격 조회 없이 "타 세션 진행중"을 판별하기 위함.
-    stale_branches: list[tuple[str, float, int, str, str]] = []
+    stale_branches: list[tuple] = []  # report.render_brief 계약 — 길이 5~10 튜플
     stale_branch_status = "ok"
     stale_branch_message = ""
     pr_state_lookup_ok = True
@@ -4408,6 +4408,9 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
                         s.evidence,
                         s.partial_port,
                         s.port_scan_error,
+                        s.impl_new,
+                        s.impl_changed,
+                        s.impl_scan_error,
                     )
                     for s in scan.stale
                 ]
@@ -4872,6 +4875,13 @@ def cmd_claims(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_impl_signal(item: remote_claims.StaleBranch) -> None:
+    """`branches` 출력에 구현 신호(HARN-31)를 덧붙인다 — 문구는 브리핑과 같은 함수를 쓴다."""
+    line = report.impl_signal_line(item.impl_new, item.impl_changed, item.impl_scan_error)
+    if line:
+        print(line)
+
+
 def cmd_branches(root: Path, args: argparse.Namespace) -> int:
     """장기 미머지 브랜치를 고립/PR제출로 갈라 보고한다 (HARN-47).
 
@@ -4960,8 +4970,10 @@ def cmd_branches(root: Path, args: argparse.Namespace) -> int:
         )
     for item in isolated:
         print(f"  [고립] {item.branch} — {item.age_days:.0f}일 전 · trunk 대비 {item.ahead}커밋")
+        _print_impl_signal(item)
     for item in pr_closed:
         print(f"  [PR-닫힘] {item.branch} — {item.evidence} · {item.age_days:.0f}일 전")
+        _print_impl_signal(item)
     for item in pr_filed:
         label_note = ""
         if item.disposal_labels:
