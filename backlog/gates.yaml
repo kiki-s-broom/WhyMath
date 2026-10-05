@@ -430,11 +430,11 @@ gates:
     title: "EOS-137 ② QA 엔진 첫 평가 실행 — 문항별 판정 어댑터를 MP-03 골든 v1(rotation 0)과 검수 큐에 돌려 혼동행렬·평가 원장 첫 행을 남긴다(런북 docs/ops/eos137_first_eval_runbook.md · EOS-137 PR main 머지 후에만 실행 가능 · 출력 전체를 세션에 전달하면 세션이 수치를 MEMORY에 기록하고 EOS-137을 닫는다)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 실행 출력 회신(2026-10-05 · Phaiakes9 · 런북 docs/ops/eos137_first_eval_runbook.md §1~§4 전 단계 성공 기준 통과). 판정 기준 main b165e53b(워크트리 HEAD 일치, 코드 출처 WhyMath-eos137 확인, 선행 EOS-150은 e68d9308로 main 머지). 골든 v1 rotation 0 digest 55105757519f 15건(MP-03 기록과 일치) · 어댑터 ADAPTER_EXIT=0 입력 15 판정 15 PASS 15 FAIL 0 판정불가 0 · 혼동행렬 CM_EXIT=0 TP 0 FN 2 FP 0 TN 13 커버리지 15/15 Wilson 하한 0.847 재현율 하한 0.0 FN율 상한 1.0 오경보 상한 0.172 FN 결함코드 F7 2건 · 평가 원장 1행 기록(LEDGER_ROWS_AFTER=1 · engine_revision b165e53b · verdict_source qa_engine). 산출물은 Kiki 머신 mp02-out/eos137 및 mp03/golden_benchmark_v1/eval_ledger.jsonl(코퍼스 데이터라 미커밋)."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
