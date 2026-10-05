@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -29,6 +29,6 @@ paths:
   - "tests/backend/**"
   - "scripts/harness/**"
   - "tests/harness/**"
-session: null
+session: claude/laughing-cerf-l9nqgq
 notes: "원 등재 OPS-24(vafylb b1218739에만 잔존·CLAUDE.md 사고 경위 속 별건 OPS-24와 번호 재사용 충돌) — HARN-35 재등재. S4-16 강등전 CLI의 Phaiakes9 라이브 크래시 실측(em dash U+2014·cp949 부재). 2026-07-17 logconfig 사고와 같은 cp949 계열 2회차 — 등재 의무 건\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/계측 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-01] 2026-09-01 실측 사고 편입 + HARN-58 통합. 같은 유형 3회차 — 2026-07-17 logconfig(외부 도구의 읽기 인코딩), HARN-19(우리가 파싱하는 출력), 이번은 **우리가 내는 출력**. 앞 둘은 규칙·코드로 막았으나 출력측 축이 비어 있었다. 우회 수단(PYTHONUTF8 환경변수)은 사람이 매 창에서 기억해야 하므로 항구 대책이 아니다\n\n[정정 2026-09-01] PR #970 codex P2 수용 — acceptance만 넓히고 paths를 못 넓힌 공백을 명시. 정정 경로 부재가 원인이라 HARN-59로 분리 등재했고, 그때까지의 상태를 여기 적어 둔다(침묵 금지)\n\n[정정 2026-09-07] paths ['src/backend/whymath_backend/harness/**', 'src/backend/whymath_backend/ops/**', 'tests/backend/**'] → ['src/backend/whymath_backend/harness/**', 'src/backend/whymath_backend/ops/**', 'tests/backend/**', 'scripts/harness/**', 'tests/harness/**']: acceptance 4가 넓힌 범위를 paths에 반영 — 대장 CLI가 대상에 들어왔는데 범위 선언이 따라가지 못했다\n\n[정정 2026-09-14] 같은 cp949 계열 4회차가 별도 축으로 실측·처리됐다. 이 태스크와 범위가 다름을 명시하지 않으면 착수 세션이 중복 처리하거나 반대로 덮였다고 오인한다.\n\n[정정 2026-09-21] MP-02 라이브 회차에서 4회차 발현 — 측정 산출물 절단 + exit code 의미 붕괴라는 새 피해 형태"
-updated: 2026-09-21
+updated: 2026-10-05
