@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-62-grade-axis-overlay-wiring
+title: "학년축 오버레이 배선 W0 — 대학 커리큘럼 셀 유도 + Polya 학년 register + 구조분기 금지 거버넌스"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "atom_graph_v1 대학 원자(school_level=대학) grade_band(1~4학년)를 KR curriculum_entry 셀로 직접 유도하는 load_kr_curriculum_entries_for_university_atoms 추가 — canonical 개념그래프·크로스워크 둘 다 대학 원자 0건 매핑이라 이 경로 없이는 대학 축 required_depth 신호가 영원히 도달 못 함(2026-08-05 실측)"
+  - "PolyaCoach.decide(grade=...)가 base_system 정체성 문구의 학년 register(초등학생/중학생/고등학생/대학생)를 결정 — grade=None 폴백은 기존 '중·고등학생' 문구와 바이트 동일(회귀 0)"
+  - "L2/L3/L4에 school_level·grade_band·grade_band_hint 비교 분기(==/!=) 없음을 소스 스캔으로 동결하는 거버넌스 테스트 추가(dict 기반 오버레이 룩업은 허용)"
+  - "관련 단위테스트 전부 green(신규 대학 원자 유도·grade register·거버넌스 3종)"
+  - "[회수 원천·재구현 금지 — PB-14 ⑤] trjg5x 커밋 40597d5c: l1/curriculum/curriculum_loader.py load_kr_curriculum_entries_for_university_atoms(115줄)·l4/polya/prompts.py _GRADE_BAND_RANGES/_grade_register/base_system_for_grade(grade=None 시 _BASE_SYSTEM 바이트 동일)·engine.py decide(grade=) 15줄·__init__ re-export 2줄 + 테스트 5파일(test_grade_axis_governance 95·test_curriculum_entry_loader 139·test_polya_prompts 71·test_polya_engine 43·test_pedagogy_pack_assembler 9). main 부재 실측(grep 0). `git show 40597d5c`로 이식하고 main 현행에 맞춰 정합한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/curriculum/curriculum_loader.py
+  - "src/backend/whymath_backend/l4/polya/**"
+  - src/backend/whymath_backend/config.py
+  - tests/backend/l1/test_curriculum_entry_loader.py
+  - tests/backend/l1/test_grade_axis_governance.py
+  - tests/backend/l4/test_polya_engine.py
+  - tests/backend/l4/test_polya_prompts.py
+  - tests/backend/l4/test_pedagogy_pack_assembler.py
+session: null
+notes: "학년축 최단경로 계획(docs/strategy/grade_axis_mvp_shortest_path_v1.md) §3 W0. Kiki 채택 승인(2026-08-05) 이후 진행 — S4-01의 depends_on(S3-01 파일럿) 직렬 병목을 끊고 4축 확장을 병렬화하는 첫 패키지. path_overlap 인지: l4/** 가 S3-24-shadow-recovery-bucket-b(claude/s3-02-live-remeasurement-tlthrr)와 광역 glob으로 겹치나, S3-24의 실제 9개 하위항목은 전부 모바일+answer-verification(l4/reflection 추정)이라 l4/polya/*를 직접 건드리지 않음(2026-08-05 확인) — 실충돌 아님으로 판단하고 진행.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-19-grade-axis-overlay-wiring 재등재. 원 증적 ['40597d5c']. 산출물이 main에 없어 todo — 아래 회수 원천을 재구현하지 말고 커밋에서 이식한다."
+updated: 2026-10-02

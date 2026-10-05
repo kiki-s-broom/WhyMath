@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-37-gcd-lcm-corpus
+title: "초등 최대공약수·최소공배수 파일럿 코퍼스 (W2 Phase2 #3)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-36-elementary-rounding-corpus
+requires_gates: []
+acceptance:
+  - "[6수01-04](최대공약수·개념 B1)·[6수01-05](최소공배수·개념 B2) 0커버 해소 — kind(gcd/lcm) 필터 2밴드"
+  - "SymPy gcd()/lcm() 함수 기반 Tier1 검증 실측 확인"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - df171e80
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/elementary_gcd_lcm_skeleton_generator.py
+  - src/backend/whymath_backend/harness/elementary_gcd_lcm_batch.py
+  - tests/backend/l3/equivalent/test_elementary_gcd_lcm_skeleton_generator.py
+  - tests/backend/harness/test_elementary_gcd_lcm_batch.py
+  - data/corpus/problem_bank_elementary_gcd_lcm_v0/problems.jsonl
+session: null
+notes: "W2 Phase2 웨이브1 항목3/5.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-37-gcd-lcm-corpus 재등재. 원 증적 ['df171e80']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02
