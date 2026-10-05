@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -29,6 +29,6 @@ paths:
   - scripts/analysis/eos_feature_inventory_v2.py
   - docs/standards/golden_benchmark_contract.md
   - docs/ops/eos137_first_eval_runbook.md
-session: null
+session: claude/busy-lamport-h2t1p2
 notes: "출처: MP-03 착수 분석 2026-09-25(판정 기준 main f5db0e68) — golden_benchmark는 정답지를 동결할 뿐 append 원장이 없고, 저장소의 유일한 append 원장(qa_confusion_matrix의 평가 원장)은 --predictions를 요구하는데 그것을 만드는 도구가 저장소에 0건이다(qa_verdict 키는 그 모듈·테스트·계약 문서에만 나온다). 그래서 MP-03 ④의 첫 레코드는 동결 지문(버전·회전·동결 시각·digest·라벨 분포)으로 한정되고 QA 엔진 FN율은 측정 불가로 남는다. EOS-60(done)이 골든·혼동행렬 계산기를 만들었으나 입력 생산자는 범위 밖이었던 것으로 읽힌다(읽어서 그렇게 보인다 — EOS-60 acceptance 전수 대조는 이 태스크 착수 시 수행).\n\n[정정 2026-09-28] paths ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py'] → ['src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/harness/qa_*verdict*.py', 'src/backend/whymath_backend/ops/qa_confusion_matrix.py', 'tests/backend/harness/test_qa_*.py', 'tests/backend/ops/test_qa_confusion_matrix.py', 'src/backend/whymath_backend/harness/golden_benchmark.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/standards/golden_benchmark_contract.md', 'docs/ops/eos137_first_eval_runbook.md']: 착지 범위 반영 — 원장 스키마가 golden_benchmark.py에 있어 판정기 종류·스냅샷 필드를 거기 추가, 새 CLI의 by-design 선언(declared_unwired_audit.py)과 인벤토리 귀속(eos_feature_inventory_v2.py), ③④ 판정 문서(golden_benchmark_contract.md), ② 런북\n\n[정정 2026-09-28] acceptance ②(첫 평가)는 Kiki 머신 데이터로만 실행 가능 — ①③④와 런북은 이번 회차에 착지하고, ②의 실행·수치 기록은 게이트 해소 후 같은 태스크에서 닫는다"
-updated: 2026-09-28
+updated: 2026-10-05
