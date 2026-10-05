@@ -215,6 +215,11 @@ BASELINE: dict[str, frozenset[str]] = {
     "l2": frozenset(
         {
             "l2/ability_estimation.py",
+            # EOS-125: 채점 경계의 전과목 θ 스냅샷 자동 적재 — `ability_snapshot`에 *쓰는* 채점
+            # 경로 함수가 0건이었다(적재는 수동 캡처·세션 종료뿐). 쓰기 대상은 기존 테이블이고
+            # 읽기는 `ability_tracking`·`ability_estimation`을 그대로 재사용한다 — 이 모듈이 더하는
+            # 접근은 채점 수 COUNT 1건과 스냅샷 INSERT 1건이다.
+            "l2/ability_snapshot_capture.py",
             "l2/ability_tracking.py",
             "l2/attempt_skill_event.py",
             "l2/concept_diagnosis.py",
