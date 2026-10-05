@@ -1,10 +1,14 @@
 """Schema 수식 음성화(Math-to-Speech) 선언적 명세 모델 (Pydantic) — 음성 슬라이스 S1.
 
 설계 정본: `docs/architecture/05_interaction.md` §5 접근성("TTS 통합")·슬89 "표현≠의미".
-"읽어주기"의 어려운 본질은 오디오 합성(클라 `flutter_tts`)이 아니라 **LaTeX/수식구조 →
+"읽어주기"의 어려운 본질은 오디오 합성(클라 측)이 아니라 **LaTeX/수식구조 →
 모호성 없는·학년 적합 한국어 낭독 문자열 변환**이다. 이 변환은 수학 의미 분해가 필요한
 코어 로직이므로 L1–L4(독립 수학 코어)가 담당하고, 오디오 합성만 클라(L5)가 한다. 즉
 `SpeechSpec`은 `Visualization`·`LearningScene`의 직계 형제 — "음성 = 코어 구조의 한 렌더 타깃".
+
+주의: **클라 합성 경로는 현재 존재하지 않는다**(2026-08-11 실측) — `flutter_tts`가 Gradle
+비호환으로 `src/mobile/pubspec.yaml`에서 제거됐다. 이 스키마는 서버 축 계약일 뿐이며,
+소비처 재도입은 실기기 호환 재검증이 선행한다.
 
 7계층 경계: 이 파일은 *데이터 계약*만 정의한다(레이어 import 0 — `visualization.py`·
 `learning_scene` 스키마가 L레이어를 import하지 않는 선례). 변환 엔진은 L3(`l3/speech.py`),
@@ -148,7 +152,7 @@ def _collapse_ws(s: str) -> str:
 class SpeechSpec(BaseModel):
     """단일 수식의 선언적 낭독 명세 — `Visualization`·`LearningScene`의 직계 형제.
 
-    `plain_text`는 SSML 미지원 환경(`flutter_tts` 기본)을 위한 폴백 낭독 문자열, `tokens`는
+    `plain_text`는 SSML 미지원 합성 엔진을 위한 폴백 낭독 문자열, `tokens`는
     운율(멈춤·강조)을 담은 토큰열, `ssml`은 (지원 엔진용) 조립 SSML이다. `unresolved_symbols`는
     사전에 없던 기호를 *조용히 넘기지 않고* 정직하게 노출하는 관측 필드(CLAUDE.md "환각 발견 시
     조용히 넘어가지 말고 로그").
@@ -168,7 +172,7 @@ class SpeechSpec(BaseModel):
     speech_id: uuid.UUID = Field(default_factory=uuid4, description="낭독 명세 PK (UUID)")
     source_latex: str = Field(..., description="원본 LaTeX — 추적성·캐시 키")
     grade_band: SpeechGradeBand = Field(..., description="어느 학년 프로파일로 읽었는가")
-    plain_text: str = Field(..., description="SSML 없는 폴백 낭독 문자열(flutter_tts 기본)")
+    plain_text: str = Field(..., description="SSML 없는 폴백 낭독 문자열(비SSML 엔진용)")
     tokens: list[SpeechToken] = Field(
         default_factory=list, description="운율(멈춤·강조) 포함 토큰열(SSML 합성용)"
     )

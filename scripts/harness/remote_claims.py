@@ -1951,6 +1951,25 @@ class StaleBranch:
     ①이 "8일간 갱신 0"을 이 근사로 실측했다). 빈 튜플은 "라벨 없음"과 "조회 안 함/실패"
     양쪽을 뜻할 수 있으므로, 후자는 `StaleBranchScanResult.pr_label_lookup_ok`로 가른다.
     """
+    impl_new: int | None = None
+    """(HARN-31) 이 브랜치가 트렁크 대비 **새로 추가한** 구현 파일 수(원장·문서 최상위 제외).
+
+    **3상태**다 — 양수(구현 있음)·`0`(구현 신호 없음: 문서·원장 위주)·`None`(**미측정 또는
+    판정 불가**). `None`을 `0`으로 읽으면 안 된다: 측정 실패가 "구현 없음"으로 위장된다.
+    측정 실패 사유는 `impl_scan_error`가 따로 말한다. 측정 대상은 `isolated`·`unresolved`·
+    `pr_closed`뿐이다(그 외 분류는 이미 처분 경로가 있어 `None`으로 남는다).
+
+    존재 이유(2026-08-11 gdmwhk 실측): 태스크를 done으로 닫지 않은 채 구현 22파일을 쌓아 둔
+    브랜치는 "브랜치 done vs main done" 대조(`scan_remote_done`·stray-code ②)에 **0건**이다.
+    그 대조는 done 표기를 전제하므로 표기가 없는 구현은 구조적으로 못 본다.
+    """
+    impl_changed: int | None = None
+    """(HARN-31) 트렁크 대비 **기존 파일을 고친** 구현 파일 수 — 3상태는 `impl_new`와 같다.
+
+    신규만 세면 기존 모듈을 고쳐 끝낸 작업(예: `api/speech.py` 변경만 있는 브랜치)이 신호 0으로
+    숨는다 — 과소보고 금지(#785 판정)이므로 수정분도 센다. 삭제(D)는 세지 않는다."""
+    impl_scan_error: str = ""
+    """(HARN-31) 구현 신호 측정 **불가** 사유(예외 타입명 포함) — 있으면 `impl_*`는 `None`."""
 
 
 # 근거 needle 길이 하한 — 짧은 문자열은 우연 매칭 생성기다.
@@ -1960,6 +1979,9 @@ _MIN_EVIDENCE_NEEDLE = 12
 _LEDGER_ONLY_TOPS = frozenset(
     {"MEMORY.md", "backlog", "docs", ".github", "ROADMAP.md", "README.md", "CLAUDE.md"}
 )
+
+# 구현 신호(HARN-31) 측정 대상 분류 — 사람이 회수/삭제를 판단해야 하는 축만.
+_IMPL_SIGNAL_STATUSES = frozenset({"isolated", "unresolved", "pr_closed"})
 
 # git log 레코드 구분자(RS) — 커밋 제목에 개행이 없다는 가정에 의존하지 않기 위함.
 _EVIDENCE_RECORD_SEP = "\x1e"
@@ -2362,6 +2384,46 @@ def _branch_code_files(root: Path, trunk_ref: str, ref: str) -> tuple[frozenset[
         return None, f"git diff exit {res.returncode}: {reason[:120]}"
     files = {line.strip() for line in res.stdout.splitlines() if line.strip()}
     return frozenset(f for f in files if f.split("/", 1)[0] not in _LEDGER_ONLY_TOPS), ""
+
+
+def _branch_impl_signal(root: Path, trunk_ref: str, ref: str) -> tuple[tuple[int, int] | None, str]:
+    """(신규, 수정) 구현 파일 수 + 실패 사유 — 브랜치의 **done 표기와 무관한** 구현 신호(HARN-31).
+
+    `_branch_code_files`와 같은 분모 정의(원장·문서 최상위 `_LEDGER_ONLY_TOPS` 제외)를 쓴다 —
+    "원장 전용 변경은 구현이 아니다"의 판정을 두 곳에서 따로 갖지 않는다. stray-code의
+    `^(src|tests|data|scripts)/` 4개 최상위보다 **넓다**(그 외 최상위도 센다): 과보고는 사람이
+    훑으면 되고 과소보고는 고립이 되므로 의도된 비대칭이다.
+
+    신규(A)와 수정(M·R·C·T)을 나눠 센다. 신규만 세면 기존 모듈을 고쳐 끝낸 브랜치가 0으로
+    숨는다. 삭제(D)는 세지 않는다 — 삭제는 "남아 있는 구현"이 아니다.
+
+    반환 `None`은 **판정 불가**이며 `(0, 0)`과 다르다(`_branch_code_files`와 같은 규약 —
+    git이 잠깐 실패한 것을 "구현 없음"으로 읽으면 측정 실패가 통과로 위장된다).
+    실패 사유에는 **예외 타입명**을 담는다(무타입 경고 금지 — CLAUDE.md 침묵 실패 금지).
+    """
+    try:
+        res = _git(root, "diff", "--name-status", f"{trunk_ref}...{ref}", timeout=30)
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        return None, f"{type(exc).__name__}: {exc}"
+    if res.returncode != 0:
+        detail = (res.stderr or "").strip().splitlines()
+        reason = detail[0] if detail else "no stderr"
+        return None, f"git diff exit {res.returncode}: {reason[:120]}"
+    added = changed = 0
+    for line in res.stdout.splitlines():
+        fields = line.rstrip("\n").split("\t")
+        # `--name-status`: `A\t경로` · `M\t경로` · `R087\t옛\t새`(이름 변경은 마지막이 현재 경로)
+        if len(fields) < 2 or not fields[0]:
+            continue
+        path = fields[-1].strip()
+        if not path or path.split("/", 1)[0] in _LEDGER_ONLY_TOPS:
+            continue
+        kind = fields[0][0]
+        if kind == "A":
+            added += 1
+        elif kind in "MRCT":
+            changed += 1
+    return (added, changed), ""
 
 
 def _branch_last_touch_times(
@@ -2825,6 +2887,20 @@ def scan_stale_branches(
                     disposal = tuple(n for n in names if n in DISPOSAL_LABELS)
                     if disposal:
                         stale[idx] = replace(stale[idx], disposal_labels=disposal)
+
+        # (HARN-31) 4차 — 구현 신호. **최종 분류 기준**으로 측정한다(위 정밀화가 pr_filed를
+        # pr_closed로 바꾼 뒤여야 대상이 맞다). 대상은 사람이 "회수/삭제"를 판단해야 하는 축뿐 —
+        # active(타 세션 진행)·ported(이미 흡수)·pr_filed(PR이 소유)는 처분 경로가 있어 건너뛴다.
+        # 브랜치당 git diff 1회라 비용은 대상 수에 선형이며(실측 ~30건) fetch·API는 추가하지 않는다.
+        for idx, item in enumerate(stale):
+            if item.status not in _IMPL_SIGNAL_STATUSES:
+                continue
+            signal, signal_err = _branch_impl_signal(root, trunk_ref, item.ref)
+            if signal is None:
+                # 측정 불가 — impl_*는 None 그대로 두고 사유만 싣는다(모른다 ≠ 구현 없음).
+                stale[idx] = replace(item, impl_scan_error=signal_err)
+            else:
+                stale[idx] = replace(item, impl_new=signal[0], impl_changed=signal[1])
 
         return StaleBranchScanResult(
             "ok",
