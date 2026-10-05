@@ -2067,6 +2067,10 @@ def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
         print(gate.notes or "(이상 상태 — waived인데 notes 없음)")
     else:
         print("evidence: 없음(아직 결정 전)")
+    # 열린 채 누적된 판정 근거·부분 답변 (HARN-39 ④) — clear 판단자가 못 읽으면 추론으로 닫는다
+    if gate.status != "waived" and gate.notes.strip():
+        print("notes (전문):")
+        print(gate.notes)
     # 여는 작업과 대기 경로 (HARN-174 v2-5) — pending이면 무엇이 끝나야 판정할 수 있는지까지
     print(report.gate_inputs_text(backlog, gate))
     if gate.status == "pending":
@@ -2222,6 +2226,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     no_inputs = (no_inputs_arg or "").strip() or None
     verdict = getattr(args, "verdict", None)
     named_owners = list(dict.fromkeys(getattr(args, "verdict_owners", None) or []))
+    note_arg = getattr(args, "gate_note", None)
+    note = (note_arg or "").strip() or None
     # --evidence 단독 호출은 "정정할 것이 없다"보다 **먼저** 판정한다 — 순서가 반대면 이 절은
     # 도달 불가능한 코드가 된다(HARN-174 구현 중 실측: 강화한 단언이 잡았다).
     if args.evidence and verdict is None:
@@ -2238,11 +2244,14 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         and not remove_deps
         and no_inputs_arg is None
         and verdict is None
+        and note_arg is None
     ):
         return _fail(
             f"{gate_id}: 정정할 것이 없다 — --title / --remind-after-days / --depends / "
-            "--remove-depends / --no-inputs / --verdict 중 하나 이상 필요"
+            "--remove-depends / --no-inputs / --verdict / --note 중 하나 이상 필요"
         )
+    if note_arg is not None and note is None:
+        return _fail(f"{gate_id}: --note 내용이 비어 있다 — 빈 근거는 기록하지 않는다")
     if no_inputs_arg is not None and no_inputs is None:
         return _fail(f"{gate_id}: --no-inputs 사유가 비어 있다 — 무사유 면제는 없다")
     both = sorted(set(add_deps) & set(remove_deps))
@@ -2300,6 +2309,11 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         except _VerdictRejectedError as exc:
             return _fail(str(exc))
 
+    # 판정 근거·부분 답변 누적 (HARN-39 ④) — status 를 건드리지 않으므로 clear/waive 와 달리
+    # 게이트가 열린 채 근거만 쌓인다. 원 notes 는 지우지 않고 append 한다(HARN-20).
+    if note is not None:
+        changes.append(f"notes +{len(note)}자")
+
     if not changes:
         return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")
 
@@ -2309,6 +2323,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         gate.title = new_title
     if new_remind is not None:
         gate.remind_after_days = new_remind
+    if note is not None:
+        gate.notes = _append_note(gate.notes, note, "판정 근거")
 
     errors = store.validate_backlog(backlog)
     own_errors = [e for e in errors if gate_id in e]
@@ -2323,6 +2339,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         event_extra.update(depends_on=list(gate.depends_on), no_inputs_reason=gate.no_inputs_reason)
     if verdict is not None:
         event_extra.update(verdict=verdict, evidence=args.evidence, owners=named_owners)
+    if note is not None:
+        event_extra.update(note=note)
     store.append_event(
         root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes), **event_extra
     )
@@ -5472,6 +5490,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "gates amend --verdict FAIL: 이미 이 게이트의 열린 상류에 있는 미종결 소유 태스크를 "
             "지목 (반복 지정 · HARN-177 ⑥ — 열린 경로에 없으면 거부)"
+        ),
+    )
+    p.add_argument(
+        "--note",
+        dest="gate_note",
+        default=None,
+        metavar="내용",
+        help=(
+            "gates amend: 게이트를 닫지 않고 판정 근거·부분 답변을 notes 에 누적 (append-only · "
+            'HARN-39). 백틱이 든 산문은 인용 heredoc 으로 파일에 쓴 뒤 "$(cat 파일)"로 넘긴다'
         ),
     )
     p.add_argument(
