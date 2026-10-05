@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-155-qa-engine-golden-rotation1-defect-sample
+title: "QA 엔진 첫 평가가 결함 2건(F7)뿐이라 재현율을 못 잰다 — F1·F2 포함 rotation 1 독립 표본 골든과 두 번째 평가점"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-137-qa-per-item-verdict-adapter
+requires_gates: []
+acceptance:
+  - "① 결함 표본 확대 — 골든 v1은 결함 2건(F7만)이라 재현율 구간이 [0.0, 1.0]이고 F1·F2 수학 오류가 0건이다. rotation 1 독립 표본(--exclude-golden으로 v1 slug 제외)에 F1·F2·F3·F4를 포함한 결함을 충분히 넣어(Wilson 하한이 의미를 갖는 규모) 새 골든을 동결한다. ② 두 번째 점 — 새 골든을 EOS-137이 만든 어댑터로 판정해 원장에 rotation 1 행을 남긴다(v1은 재채점 금지). EOS-150 정답 재검산 성분이 F1·F2를 실제로 걸러내는지 숫자로 확인한다. ③ F7 좌석 판정 — 엔진에 문장 수준 성분이 없다는 것이 측정됐으므로, 성분을 추가할지 인간 폴백 구간으로 남길지 판정문을 남긴다(측정 없는 기계 게이트의 인간 검수 대체 선언 금지)."
+artifacts: []
+paths:
+  - docs/standards/golden_benchmark_contract.md
+  - src/backend/whymath_backend/harness/golden_benchmark.py
+session: null
+notes: "출처: EOS-137 ② 첫 평가(2026-10-05 · 판정 기준 main b165e53b) — TP 0 FN 2 FP 0 TN 13 · 결함 코드 F7 2건 · 재현율 하한 0.0. 골든 v1 결함 표본이 2건이라 어떤 결론도 못 낸다는 점과 EOS-150 성분이 F1·F2를 못 만난 점이 이 태스크의 이유다. 골든 동결·검수는 사람 게이트가 걸릴 수 있어 착수 시 MP-03 절차를 따른다."
+updated: 2026-10-05
