@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-60-harness-gate-flag-consumption-judgement
+title: "WH-1 하네스가 품질 게이트 플래그(attribution_unclear·low_quality)에 반응하지 않는다 — 코치는 +1/−1 증거를 보류하는데 하네스 log_evidence는 모른다(판정 필요)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - MISC-18-match-gate-single-enforcement
+requires_gates: []
+acceptance:
+  - "① 실측 — 하네스 경로(`harness/wh1_loop.py` `log_evidence`)가 귀속 불명(`attribution_unclear`)·미확인 전사(`low_quality`)로 표시될 매치의 오개념 id를 +1 지지 증거로 적재할 수 있는지 소스와 재현 입력으로 확인한다. 코치 경로(`api/coach.py` 증거 적재부 — MISC-17/MISC-28)는 두 경우 +1도 −1도 만들지 않는다. 가능하다면 어느 입력에서 일어나는지를 숫자로 남긴다.\n② 판정 — 같은 보류를 하네스에 둘지(`match_gate_counts`의 `attribution_unclear`를 `log_evidence` 게이트로 연결) 정책(LLM) 책임으로 남길지를 근거와 함께 결정 기록한다. 판정 없이 구현부터 하지 않는다.\n③ 판정이 '둔다'이면 집행과 주입 RED(보류를 제거하면 RED)를 함께 넣는다. 집행 지점은 정본화와 별항으로 적는다.\n④ 범위 밖 동결 — floor 0.65·`intervene.py` 0.5 임계·judge 필터 기본값은 건드리지 않는다(MISC-18 ⑤와 동일)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_loop.py
+session: null
+notes: "MISC-18(PR 머지 후)의 정직한 잔여 1번 — docs/reviews/misc_18_match_gate_single_enforcement_2026-10-05.md §6. MISC-18은 floor(게이트①)만 결선했고 하네스는 attribution_unclear·no_confident_match를 ToolResult.match_gate_counts에 기록만 한다. 코치 경로와의 불일치가 실제 오적재로 이어지는지는 미확인이므로 ①이 실측이다(부재/존재 단정 금지)."
+updated: 2026-10-05
