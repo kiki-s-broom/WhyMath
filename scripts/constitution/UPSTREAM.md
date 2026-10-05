@@ -19,7 +19,7 @@
 | `rules_additions_v1.1.yaml` | v1.1 갱신 꾸러미 · `WhyMath_constitution_v1.1_update/rules_additions_v1.1.yaml` | `a506d734e22f255400e3a0e18ec9e0d4d684f6d75fb973aa13eee5b131bcbeb6` |
 | `A0002 초안` | v1.1 갱신 꾸러미 · `WhyMath_constitution_v1.1_update/A0002_파트II-VII규칙_초안.md` | `dc36c9c8e6c59b5f026b479881ef0c4d7f571edc504466dcc9fa268c3059e242` |
 
-## 로컬 패치 목록 (코드에는 `# whymath 패치(CONST-02):` 주석으로 표시)
+## 로컬 패치 목록 (코드에는 `# whymath 패치(CONST-02):`·`(CONST-03):` 주석으로 표시)
 
 | 파일 | 패치 | 왜 |
 |---|---|---|
@@ -29,6 +29,12 @@
 | `audit.py` | ⓓ `--json FILE` 결과 출력 | 래칫이 한국어 표를 긁지 않고 읽는다(출력 문구가 바뀌어도 판정이 안 깨진다) |
 | `audit.py` | ⓔ 심사 불가는 모드와 무관하게 exit 2 | 원본은 일반 모드에서 1로 끝나 '위반'과 '심사 불가'가 같은 코드였다 |
 | `audit.py` | 예외 메시지에 타입명 병기 | CLAUDE.md '침묵 실패 금지' — 예외 타입명을 남긴다 |
+| `audit.py` | ⓕ(CONST-03) 연결 판정을 워크플로 YAML 의 `run` **명령 단위**로 — 주석·echo·step name·heredoc·look-alike 경로는 연결이 아니다 | 원본은 워크플로 전체 텍스트의 부분 문자열 일치라 주석 속 문자열도 '연결'로 셌다 |
+| `audit.py` | ⓖ(CONST-03) 연결 판정을 전역 STAGE 가 아니라 **규칙 자신의 단계**부터 · L4 도 L5 와 같게 | 원본은 STAGE≥3 에서만, L5 만 미연결을 봤다(2단계 규칙·L4 는 침묵 통과) |
+| `audit.py` | ⓗ(CONST-03) 파일 단위 pytest 규칙은 CI 가 그 파일을 품은 디렉터리를 필터 없이 돌면 연결 — `-k`/`-m`/`--deselect`/`--ignore`/노드 ID 로 일부만 도는 스텝은 연결이 아니다 | 원본은 파일 단위 run 35건이 디렉터리 단위 CI 에서 구조적 미연결이었다 |
+| `audit.py` | ⓘ(CONST-03) 규칙별 실행 설정 `timeout_sec`(1~1800)·`cwd`(저장소 안)·`shell`(true 일 때만 셸) + `python`/`python3`/`pytest` 는 지금 파이썬으로 고정 + 셸 연산자는 `shell: true` 없이 실행 거부 | 원본은 루트 cwd·180초·셸 문자열 고정이라 백엔드 테스트·윈도우 실행기를 못 다뤘다 · 형식 오류는 심사 불가(exit 2) |
+| `audit.py` | ⓙ(CONST-03) R4-01 은 CI 가 `audit.py` 를 직접 또는 한 단계 래퍼(래칫)의 서브프로세스로 실행하면 연결 — 래퍼 판정은 AST(대입·호출 인자의 문자열 + `import subprocess`)이며 docstring·주석은 세지 않는다 | 래칫이 CI 에서 `audit.py` 를 실제로 돌리는데도 '미연결'이던 것의 정당한 해소(문자열 맞추기 금지) |
+| `audit.py` | ⓚ(CONST-03) 워크플로·pre-commit 에서 명령을 하나도 못 읽으면(스캔 0건) 미연결 · 못 읽은 파일·줄은 detail 에 남김 | '0건 통과' 위장 금지 · 침묵 실패 금지 |
 | `pipeline_check.py` | `--direct-upstream-of TARGET:NODE` | 원본 `--upstream-of`는 추이적이라 우회 간선이 있어도 통과했다(주입 실측) |
 | `pipeline_check.py` | 노드 0개·설정 오류는 exit 2 | '0건 통과' 위장 금지 |
 | `merge_rules.py` | 줄 단위 `rules:` 탐색 · `--bump-stage-note` · 경로 안내 | 원본은 CRLF·뒤 공백에서 IndexError, 머리말 단계 표기는 손편집을 요구했다 |

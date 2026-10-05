@@ -874,6 +874,12 @@ _MANUAL_COMPARISON_TOOL = (
     "by-design:후보 모델 결선용 수동 비교 도구 — 상시 게이트가 아니라 승격 판정 시점에 사람이 "
     "돌린다"
 )
+_JUDGMENT_SAMPLE_LOADER = (
+    "by-design:판정 표본 산출 CLI(EOS-38) — `_kpi_sample` 전용 DB에 결정론 합성 학습자를 쌓는 "
+    "쓰기 도구라 판정 세션이 손으로 돌린다. 전용 DB 가드(이름·비합성 학습자 0건)가 실DB 실행을 "
+    "거부하므로 CI 상시 실행은 오히려 계약 밖이다. 변별력 검증은 통합 테스트가 전용 DB를 직접 "
+    "만들어 같은 CLI를 서브프로세스로 돌리는 경로가 맡는다"
+)
 _CORPUS_AUTHORING_WRITER = (
     "by-design:코퍼스 저작 도구(리포 데이터 기록기) — 사람이 새 코퍼스를 만들 때 출처·라이선스를 "
     "입력해 사이드카를 쓴다. 입력(pool·서지 문구)이 사람의 법적 판단이라 자동화 대상이 아니고, "
@@ -1346,6 +1352,9 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 계약을 만족하는 파일을 만들어 주는 도구가 저장소에 0개였던 부재를 메운다 — 저자가 손으로
         # 돌리는 쓰기 도구이므로 CI 상시 실행 대상이 아니다(사유 상수 참조).
         "ops.corpus_provenance_sidecar": _CORPUS_AUTHORING_WRITER,
+        # EOS-38(2026-10-03): 루프 KPI ①②④ 판정 표본 — 판정 하네스가 스스로 지운 데이터 위에서
+        # Gate 2 판정이 4회 공전한 것에 대한 (나) 결정론 합성 부하 경로. 사유 상수 참조.
+        "ops.loop_kpi_sample_load": _JUDGMENT_SAMPLE_LOADER,
         "harness.agreement_gate_cli": _MANUAL_COMPARISON_TOOL,
         # OPS-48(완료) — QUALITY 티어 dense↔MoE 정확도 축 강등전. Phaiakes9 실측 완료,
         # 결과는 data/audit/ops-48-moe-accuracy-battle-*.jsonl. 승격 판정 시점의 수동 도구.

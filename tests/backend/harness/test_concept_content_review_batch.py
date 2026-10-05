@@ -384,9 +384,18 @@ class TestRenderSeparatesDirections:
 class _VerdictProvider:
     """지정한 판정을 그대로 돌려주는 스텁 — rubric 자체가 아니라 *기록 경로*를 시험한다."""
 
-    def __init__(self, *, passed_for_inject: bool, passed_for_control: bool) -> None:
+    def __init__(
+        self,
+        *,
+        passed_for_inject: bool,
+        passed_for_control: bool,
+        link_mode: str = "correct",
+    ) -> None:
         self._inject = passed_for_inject
         self._control = passed_for_control
+        # 연결 적합성(link_ok) 응답 방식 — correct: 엉뚱한 원자만 거절 · approve_all: 전부 승인 ·
+        # reject_all: 전부 거절 · silent: 답하지 않음. 연결 줄이 없는 프롬프트에는 어느 모드든 생략.
+        self._link_mode = link_mode
 
     async def generate(self, prompt: str, system: str, decision: object, **kw: object) -> object:
         from whymath_backend.l3.models import GenerationResult, Usage
@@ -402,12 +411,20 @@ class _VerdictProvider:
             passed = self._control
         else:
             passed = True
-        body = (
-            '{"passed": true, "defects": [], "reason": "ok"}'
-            if passed
-            else '{"passed": false, "defects": ["d"], "reason": "ng"}'
+        payload: dict[str, object] = {
+            "passed": passed,
+            "defects": [] if passed else ["d"],
+            "reason": "ok" if passed else "ng",
+        }
+        if "연결 원자:" in prompt and self._link_mode != "silent":
+            if self._link_mode == "correct":
+                payload["link_ok"] = not code.startswith("__LINK_BAD__")
+            else:
+                payload["link_ok"] = self._link_mode == "approve_all"
+        return GenerationResult(
+            text=json.dumps(payload, ensure_ascii=False),
+            usage=Usage(input_tokens=1, output_tokens=1),
         )
-        return GenerationResult(text=body, usage=Usage(input_tokens=1, output_tokens=1))
 
 
 class TestAssessOneRecordsLlmVerdict:

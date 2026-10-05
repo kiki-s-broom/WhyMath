@@ -182,6 +182,8 @@ class TestNoRawLeak:
         # prose_rephrased/prose_reason_code(S4-04)도 비식별 bool·코드 라벨뿐(발화 원문 없음).
         # n_equation_transitions/n_mixed_form_transitions(S3-51)도 비식별 *정수* 개수뿐 —
         # 어느 경로로 판정했는지의 횟수이지 식·원문이 아니다(형태 라벨은 폐쇄 3종 enum).
+        # n_match_raw/n_match_kept(MISC-18)도 비식별 *정수* 개수뿐 — 품질 게이트 전·후 후보 수
+        # 이지 후보 id·학생 원문이 아니다(어느 오개념인지는 이 필드에 없다).
         parsed = json.loads(raw)
         assert set(parsed.keys()) <= {
             "status",
@@ -192,6 +194,8 @@ class TestNoRawLeak:
             "n_unverifiable",
             "n_equation_transitions",
             "n_mixed_form_transitions",
+            "n_match_raw",
+            "n_match_kept",
             "tool_calls",
             "hypothesis_count",
             "dialogue_id",

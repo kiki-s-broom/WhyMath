@@ -536,7 +536,11 @@ CATALOG: tuple[Spec, ...] = (
        "api._concept_orchestration", pipelines=("concept_graph",), duplicate_of="WM-E-101"),
     _e("WM-E-103", "개념↔원자 크로스워크 이전", "Platform", "Knowledge Graph", "P1",
        "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk.populate",
-       "l1.concept_atom_crosswalk.transfer", pipelines=("concept_atom_crosswalk",)),
+       "l1.concept_atom_crosswalk.transfer",
+       # CONT-08 — 콘텐츠 code → 연결 원자 읽기 전용 로더(검수 입력·승격 게이트가 공급 경로와
+       # 같은 연결을 본다). 이전(transfer)과 같은 도출 규칙·같은 다리를 쓰는 형제 모듈이다.
+       "l1.concept_atom_crosswalk.content_link",
+       pipelines=("concept_atom_crosswalk",)),
     _e("WM-E-104", "개념 콘텐츠 4종 적재·해석", "Platform", "Content", "P0",
        "Gate2 ⑤ — 정의·비유·예시·직관", "l1.concept_content.populate",
        "l1.concept_content.projection", "l1.concept_content.resolve",
@@ -601,7 +605,8 @@ CATALOG: tuple[Spec, ...] = (
        "l2.mastery_contract", "l2.mastery_estimators", "l2.mastery_tracking",
        "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
-       "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
+       "Gate2 ②·⑨ — CAT 기반 · EOS-125 채점 경계 θ 스냅샷 자동 적재", "l2.irt",
+       "l2.ability_estimation", "l2.ability_tracking", "l2.ability_snapshot_capture"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items", status="Batch"),
     # EOS-103: 영속 축(l2.learner_state_store)을 **같은 기능번호**에 귀속시킨다 — §15가
@@ -1100,7 +1105,10 @@ CATALOG: tuple[Spec, ...] = (
        "harness.concept_content_review_batch", "harness.concept_content_audit",
        # MP-05 — 회차 앞머리 카나리 구간을 검수 큐 JSONL로 잘라내는 CLI. 검수 워크플로의
        # *입력 생산자*라 여기 귀속한다(산출을 먹는 쪽이 harness.review_session이다).
-       "harness.canary_slice"),
+       "harness.canary_slice",
+       # CONT-08 — 검수 입력(배치 프롬프트)·승격 게이트(apply)가 같은 연결 원자를 보게 하는
+       # 읽기 전용 컨텍스트 공급자. 검수 워크플로의 *입력 공급자*라 여기 귀속한다.
+       "harness.concept_content_link_context"),
     _o("WM-O-911", "골든 벤치마크 승격·경로 게이트·앵커 회차 대장", "Admin", "QA", "P0",
        "EOS-60/64 — 판정기의 FN율", "harness.golden_benchmark",
        "harness.golden_promotion_gate", "harness.anchor_round_ledger",
@@ -1161,7 +1169,7 @@ CATALOG: tuple[Spec, ...] = (
     # 보여 "KPI 17종"이라는 착시가 생긴다 — 정본 경계는 docs/standards/loop_kpi_contract.md.
     _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
        "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
-       "ops.loop_kpi_gate"),
+       "ops.loop_kpi_gate", "ops.loop_kpi_sample_load"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),
