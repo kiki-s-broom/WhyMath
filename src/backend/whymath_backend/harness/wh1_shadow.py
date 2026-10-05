@@ -107,8 +107,8 @@ class Wh1HarnessShadowObservation(BaseModel):
     """이 턴 match_misconception의 **게이트 전** 후보 수 합(MISC-18·비식별 정수). **None=구판
     레코드**(게이트 결선 이전 emit)로 "후보 0건"(=0)과 구분한다 — 신판 emit은 항상 기록한다(match
     미호출 턴도 0). `n_match_raw - n_match_kept`가 품질 게이트(top-1<floor면 후보 비움)가 이 턴에
-    *실제로 걸러낸* 약한 매치 수이며, 게이트가 실사용에서 일했는지는 이 분포로만 알 수 있다(CLAUDE.md
-    '작동한 비율' 원칙). 후보 id·학생 원문은 담지 않는다."""
+    *실제로 걸러낸* 약한 매치 수이며, 게이트가 실사용에서 일했는지는 이 분포로만 알 수 있다
+    (CLAUDE.md '작동한 비율' 원칙). 후보 id·학생 원문은 담지 않는다."""
 
     n_match_kept: int | None = None
     """이 턴 match_misconception의 **게이트 통과** 후보 수 합(MISC-18). None=구판 레코드."""

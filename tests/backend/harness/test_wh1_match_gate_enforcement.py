@@ -145,9 +145,7 @@ def _gate_callers() -> set[str]:
 
 
 def _ungated_raw_consumers() -> set[str]:
-    return {
-        rel for rel, scan in _scan_package().items() if scan.raw_calls and not scan.gate_calls
-    }
+    return {rel for rel, scan in _scan_package().items() if scan.raw_calls and not scan.gate_calls}
 
 
 class TestScanIsNotVacuous:
@@ -176,9 +174,9 @@ class TestGateCallersAreFrozen:
         """호출이 *지정 함수 안*에 있다 — 부분 이동(헬퍼에만 남기고 주경로에서 뺌) 차단."""
         for rel, function in SERVING_GATE_FUNCTIONS.items():
             enclosing = {fn for _, fn in _scan_package()[rel].gate_calls}
-            assert function in enclosing, (
-                f"{rel}: 게이트 호출이 {function}() 안에 없다(현재 위치: {sorted(enclosing)})"
-            )
+            assert (
+                function in enclosing
+            ), f"{rel}: 게이트 호출이 {function}() 안에 없다(현재 위치: {sorted(enclosing)})"
 
     def test_gate_caller_registry_is_closed(self) -> None:
         """게이트 호출자 집합 == 등록부. 신규 호출 경로도 삭제된 경로도 red다."""
@@ -188,9 +186,9 @@ class TestGateCallersAreFrozen:
             f"등록 안 된 게이트 호출자: {sorted(found - registered)} — 역할(serving/channel/"
             "measurement)을 판정해 GATE_CALLERS에 적는다"
         )
-        assert registered - found == set(), (
-            f"등록부에는 있으나 더는 게이트를 안 부르는 모듈: {sorted(registered - found)}"
-        )
+        assert (
+            registered - found == set()
+        ), f"등록부에는 있으나 더는 게이트를 안 부르는 모듈: {sorted(registered - found)}"
 
 
 class TestUngatedRawConsumersAreFrozen:
@@ -202,9 +200,9 @@ class TestUngatedRawConsumersAreFrozen:
         """
         found = _ungated_raw_consumers()
         registered = set(UNGATED_RAW_CONSUMERS)
-        assert found - registered == set(), (
-            f"게이트 없는 새 원시 매처 소비자: {sorted(found - registered)}"
-        )
+        assert (
+            found - registered == set()
+        ), f"게이트 없는 새 원시 매처 소비자: {sorted(found - registered)}"
         assert registered - found == set(), (
             f"등록부에는 있으나 더는 게이트 없는 원시 소비자가 아닌 모듈: "
             f"{sorted(registered - found)}"

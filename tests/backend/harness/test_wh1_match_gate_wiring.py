@@ -196,7 +196,9 @@ class TestShadowRecordCarriesGateCounts:
     """
 
     @staticmethod
-    def _record(outcome: TurnOutcome, caplog: pytest.LogCaptureFixture) -> Wh1HarnessShadowObservation:
+    def _record(
+        outcome: TurnOutcome, caplog: pytest.LogCaptureFixture
+    ) -> Wh1HarnessShadowObservation:
         record_logger = wh1_shadow.record_logger.name
         with caplog.at_level(logging.INFO, logger=record_logger):
             emit_wh1_observation(outcome)
@@ -213,12 +215,16 @@ class TestShadowRecordCarriesGateCounts:
         assert obs.n_match_kept == 0
         assert obs.n_match_raw is not None and obs.n_match_raw > 0
 
-    def test_strong_match_keeps_everything_in_record(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_strong_match_keeps_everything_in_record(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         obs = self._record(_turn(_STRONG_TEXT), caplog)
 
         assert obs.n_match_raw == obs.n_match_kept == len(diagnose(_STRONG_TEXT))
 
-    def test_turn_without_match_records_zero_not_none(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_turn_without_match_records_zero_not_none(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """신판 emit은 match 미호출 턴도 0을 기록한다 — None(구판)과 0(신판·후보 없음)을 구분."""
         policy = ScriptedTutorPolicy([EndTurnAction(action_type="격려", utterance="잘하고 있어.")])
         outcome = asyncio.run(run_tutoring_turn(policy=policy))
@@ -244,19 +250,34 @@ class TestShadowRecordCarriesGateCounts:
                 kind="match_misconception",
                 ok=True,
                 detail="오개념 후보 0건(내부).",
-                match_gate_counts={"raw": 3, "kept": 1, "no_confident_match": 0, "attribution_unclear": 0},
+                match_gate_counts={
+                    "raw": 3,
+                    "kept": 1,
+                    "no_confident_match": 0,
+                    "attribution_unclear": 0,
+                },
             ),
             ToolResult(
                 kind="match_misconception",
                 ok=True,
                 detail="오개념 후보 0건(내부).",
-                match_gate_counts={"raw": 2, "kept": 0, "no_confident_match": 1, "attribution_unclear": 0},
+                match_gate_counts={
+                    "raw": 2,
+                    "kept": 0,
+                    "no_confident_match": 1,
+                    "attribution_unclear": 0,
+                },
             ),
             ToolResult(  # 거부된 실행은 판정이 아니다.
                 kind="match_misconception",
                 ok=False,
                 detail="거부.",
-                match_gate_counts={"raw": 99, "kept": 99, "no_confident_match": 0, "attribution_unclear": 0},
+                match_gate_counts={
+                    "raw": 99,
+                    "kept": 99,
+                    "no_confident_match": 0,
+                    "attribution_unclear": 0,
+                },
             ),
             ToolResult(kind="match_misconception", ok=True, detail="구판 결과(필드 None)."),
             ToolResult(kind="end_turn", ok=True, detail="학생 발화 산출(격려)."),
@@ -264,7 +285,12 @@ class TestShadowRecordCarriesGateCounts:
                 kind="curate_hypothesis",
                 ok=True,
                 detail="활성 가설 0건(내부).",
-                match_gate_counts={"raw": 7, "kept": 7, "no_confident_match": 0, "attribution_unclear": 0},
+                match_gate_counts={
+                    "raw": 7,
+                    "kept": 7,
+                    "no_confident_match": 0,
+                    "attribution_unclear": 0,
+                },
             ),
         ]
 
