@@ -169,11 +169,69 @@ def dump_tracks(stage_order: list[str], tracks: list[Track]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _load_yaml(path: Path) -> dict:
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+def _duplicate_key_loader() -> type:
+    """한 매핑 안의 중복 키를 기록하는 SafeLoader 서브클래스를 만든다(HARN-203).
+
+    `yaml.safe_load`는 같은 매핑에 같은 키가 둘이면 **뒤 값이 이기고 오류를 내지 않는다**
+    (2026-09-29 실측 — title이 둘인 게이트 블록이 뒤 값 하나로 로드됐다). 블록 단위 ID 중복은
+    HARN-192가 잡지만 *블록 안의* 키 중복은 그 검사에 보이지 않는다 — 앞 값이 말없이 사라진다.
+
+    클래스를 모듈 최상위가 아니라 호출 시점에 만드는 이유: PyYAML이 없는 환경(`yaml is None`)에서도
+    이 모듈 import가 깨지지 않아야 한다(위 폴백). 병합 키(`<<`)는 *의도된* 덮어쓰기라 검사에서 뺀다.
+    """
+    assert yaml is not None
+
+    class _Loader(yaml.SafeLoader):  # type: ignore[misc,name-defined]
+        duplicates: list[tuple[str, int, int]]
+
+    def construct_mapping(loader: _Loader, node: object, deep: bool = False) -> object:
+        seen: dict[object, int] = {}
+        for key_node, _ in node.value:  # type: ignore[attr-defined]
+            if key_node.tag == _MERGE_TAG:
+                continue
+            # 생성 실패(미지 태그 등)는 삼키지 않는다 — 어차피 아래 PyYAML 본 구성이 같은 오류를 낸다.
+            # 병합 키(`<<`)는 생성기가 없어 여기서 예외가 나므로 위 면제 절이 실제로 필요하다.
+            key = loader.construct_object(key_node, deep=True)
+            try:
+                hash(key)
+            except TypeError:  # 해시 불가 키는 PyYAML 자신이 오류를 낸다 — 여기서 대신 판정하지 않는다
+                continue
+            line = key_node.start_mark.line + 1
+            if key in seen:
+                loader.duplicates.append((str(key), seen[key], line))
+            else:
+                seen[key] = line
+        return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)  # type: ignore[arg-type]
+
+    _Loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_mapping)
+    return _Loader
+
+
+def _load_yaml(path: Path, errors: list[str] | None = None) -> dict:
+    """대장 YAML 로드. `errors`를 주면 한 매핑 안의 중복 키를 거기에 올린다(HARN-203).
+
+    중복이 있어도 로드는 계속한다(뒤 값이 이긴다) — 이 오류가 다른 무결성 검사를 가리면 한 번에
+    하나씩만 고치게 된다(HARN-192와 같은 관례). 호출자가 `errors`를 넘기지 않으면 종전 동작이다.
+    """
     if yaml is None:  # pragma: no cover - 환경 의존
         raise RuntimeError(YAML_MISSING_MSG)
+    loader_cls = _duplicate_key_loader()
     with path.open(encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
+        loader = loader_cls(fh)
+        loader.duplicates = []
+        try:
+            data = loader.get_single_data()
+        finally:
+            loader.dispose()
+    if errors is not None:
+        for key, first_line, line in loader.duplicates:
+            errors.append(
+                f"{path.name}: 같은 매핑 안에서 키 '{key}'가 중복됐다 "
+                f"(줄 {first_line}·{line}) — 앞 값이 조용히 사라진다(HARN-203)"
+            )
     return data or {}
 
 
@@ -209,7 +267,7 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
 
     tracks_path = bdir / "tracks.yaml"
     if tracks_path.exists():
-        raw = _load_yaml(tracks_path)
+        raw = _load_yaml(tracks_path, errors)
         backlog.stage_order = list(raw.get("stage_order") or [])
         for tid, tdata in (raw.get("tracks") or {}).items():
             track = _coerce(Track, {"id": tid, **(tdata or {})}, f"tracks.yaml:{tid}", errors)
@@ -220,7 +278,7 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
 
     gates_path = bdir / "gates.yaml"
     if gates_path.exists():
-        raw = _load_yaml(gates_path)
+        raw = _load_yaml(gates_path, errors)
         for gdata in raw.get("gates") or []:
             gate = _coerce(Gate, gdata or {}, f"gates.yaml:{(gdata or {}).get('id', '?')}", errors)
             if gate:
@@ -235,7 +293,7 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
     tasks_dir = bdir / "tasks"
     if tasks_dir.is_dir():
         for path in sorted(tasks_dir.glob("*.yaml")):
-            raw = _load_yaml(path)
+            raw = _load_yaml(path, errors)
             task = _coerce(Task, raw, path.name, errors)
             if task is None:
                 continue
@@ -293,7 +351,7 @@ def load_policy(root: Path) -> tuple[Policy, list[str]]:
     path = backlog_dir(root) / "policy.yaml"
     if not path.exists():
         return Policy(), errors
-    raw = _load_yaml(path)
+    raw = _load_yaml(path, errors)  # HARN-203: policy.yaml도 같은 대장 계열 — 중복 키 검출 대상
     policy = _coerce(Policy, raw, "policy.yaml", errors)
     if policy is None:
         return Policy(), errors
