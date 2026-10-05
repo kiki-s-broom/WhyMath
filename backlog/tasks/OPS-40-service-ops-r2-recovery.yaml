@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - "docs/reviews/**"
   - src/backend/whymath_backend/api/speech.py
   - src/backend/whymath_backend/schema/speech.py
-session: null
+session: claude/laughing-cerf-l9nqgq
 notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A5. 회수 완료 전 원 브랜치 삭제 금지\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독 risk=high: acceptance ①②가 head 7052c34a 기준이라 그 뒤 4커밋(7df9ff8d OPS-35 구현·91c0f527·a7a9e9ec A11Y-02 구현·dd3e9475)의 산출물 29항목이 무소유 — HARN-35 notes는 'OPS-40 소유'로 미뤄 상호 미소유. 별항으로 승격"
-updated: 2026-09-07
+updated: 2026-10-05
