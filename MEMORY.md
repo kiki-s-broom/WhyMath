@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-05 (판정 · G-misc40-new-crosslink-signature): **서명 대상 5행 중 승인 4(M0462·M0515·M0599 직접매핑 · M0672 부분매핑 유지) · 보류 1(M0671) — 같은 날 먼저 머지된 5행 전건 승인(#1454)을 이 판정으로 대체한다** (Kiki 판정·claude 반영) — 판정 기준 main `590a0759`
+
+- **판정자·방법**: Kiki가 행별 판정을 확정했다(#1·#2·#3 승인 · #4 보류 · #5 부분매핑 그대로 승인). 서명 기입은 Kiki 머신에서 Kiki가 직접 입력한 검수자명 `kiki`·날짜 2026-10-05로 실행됐다(검수 큐 복사본 서명 → `promote --out` 승인 4건 확인 → `promote --load` 4건 멱등 upsert, 종료 코드 0). claude는 서명을 기입하지 않았고 실행 블록과 저장소 반영만 맡았다. 원본 큐는 전행 pending 봉인을 유지한다.
+- **충돌과 해소**: main에는 #1454가 5행 전건 승인(M0671 승인·M0672 직접 0.85, 서명일 2026-10-03)을 이미 반영했고, 미머지 브랜치 `claude/crosslink-signature-mm6kie`(`873e6c34`)는 별도 판정(승인 3 · 보류 M0515·M0671, 67건)을 담고 있었다. 세 판정이 서로 달라 Kiki에게 어느 쪽이 최종인지 물었고 **M0515 승인 유지(이 판정)가 최종**이라는 답을 받았다. 그 브랜치의 M0515 보류는 폐기 대상이며 그 브랜치가 등재한 게이트 `G-misc40-deferred-two-rows-redecision`은 이 판정과 맞지 않는다(보류는 M0671 하나뿐).
+- **결과**: 승인 코퍼스 69→68건(직접 67·부분 1). M0671 행을 제거하고 M0672를 부분매핑·신뢰도 미기재로 환원했으며 승인 4행의 서명일을 2026-10-05로 정정했다. 앵커 좌석은 A1·A2·A3가 각 1로 유지되고 A6은 2 그대로다. 승인 코퍼스에 처음 부분매핑 행이 들어가 `test_load_gate_passes`의 "전 행 직접매핑" 가정을 직접매핑 하한 + 부분매핑 한 행 허용으로 정확히 고쳤고, 보류행 비적재 가드를 신설했다.
+- **보류 1행 추적**: 게이트 `G-misc40-deferred-m0671-redecision`(7일 독촉)을 등재했다. M0671은 성취기준 `[12미적Ⅰ-02-03]` 원문 확인이 선행 조건이다.
+- **검증**: 크로스워크 관련 backend 테스트 258 passed · 15 skipped(DB 통합 테스트 기본 skip) · 코퍼스 주입 4종(M0671 적재·M0672 직접 승격·M0515 삭제·서명일 되돌림) 전건 RED·원복 바이트 동일.
+- **남은 사람 몫**: 게이트 `G-misc40-new-crosslink-signature` clear는 이 PR 머지 후 Kiki가 한다. 라이브 DB에는 이 판정의 4행이 이미 적재돼 있다.
+
 ### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
 
 - **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.
