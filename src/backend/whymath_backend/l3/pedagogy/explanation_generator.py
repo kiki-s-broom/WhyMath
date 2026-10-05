@@ -32,7 +32,7 @@ from typing import Any, Final
 
 from whymath_backend.config import Settings
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
-from whymath_backend.l3.interfaces import LLMProvider, TraceSink
+from whymath_backend.l3.interfaces import AuthoringTraceSink, LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CostTier,
     LocalModelTier,
@@ -244,7 +244,7 @@ class ExplanationGenerator:
         else:
             actual_krw = actual_cost_krw(decision, usage)
         try:
-            self._trace.record(
+            AuthoringTraceSink(self._trace).record(
                 langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw)
             )
         except Exception as exc:  # noqa: BLE001 — 관측 장애가 저작 배치를 깨면 안 됨

@@ -69,7 +69,13 @@ from whymath_backend.l3.equivalent.rephrase_hygiene import (
     question_hygiene_violations,
 )
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
-from whymath_backend.l3.interfaces import LLMProvider, RecordingTraceSink, TraceSink
+from whymath_backend.l3.interfaces import (
+    AUTHORING_TRAFFIC_SURFACE,
+    AuthoringTraceSink,
+    LLMProvider,
+    RecordingTraceSink,
+    TraceSink,
+)
 from whymath_backend.l3.models import ModelFamily, RoutingRequest
 from whymath_backend.l3.pipeline import generate as l3_generate
 from whymath_backend.l3.pregenerate.validator import (
@@ -261,32 +267,6 @@ class _NoStoreCache:
         return None
 
 
-AUTHORING_TRAFFIC_SURFACE = "authoring"
-"""저작 경로 trace 표지 — `traffic_surface` 필드 값(OPS-84 ③).
-
-`ops/cost_report`의 게이트②는 **학생 대면 루프당 비용**을 잰다. 저작 rephrase는 오프라인 배치라
-한 번에 수백~수천 건(LOCAL·0원)을 같은 `l3_routing` 스트림에 낸다 — 표지 없이 섞이면 로컬 비율이
-부풀고 토큰 p50이 저작 쪽으로 끌려가 게이트 판정이 **위장된다**. 그래서 저작 trace에 이 표지를 싣고,
-리포트는 이 표지가 붙은 이벤트를 게이트② 표본에서 빼고 건수만 따로 보고한다. 표지가 없는 이벤트는
-종전대로 서빙 표본이다(구 이벤트 하위호환).
-"""
-
-
-class _AuthoringTraceSink:
-    """기록 dict에 `traffic_surface="authoring"`을 덧붙여 안쪽 싱크로 넘기는 래퍼.
-
-    호출마다 만드는 얇은 어댑터라 `flush`를 두지 않는다 — flush는 `QuestionRephraser.flush`가
-    안쪽 싱크에 직접 건다. 원 dict는 얕은 복사 후 확장한다(호출자 dict 불변).
-    """
-
-    def __init__(self, inner: TraceSink) -> None:
-        self.inner = inner
-
-    def record(self, fields: dict[str, object]) -> None:
-        """표지를 덧붙여 기록한다."""
-        self.inner.record({**fields, "traffic_surface": AUTHORING_TRAFFIC_SURFACE})
-
-
 class QuestionRephraser:
     """발문 다양화기 — provider 주입·파이프라인 경유·수치 불변 검증(fail-closed).
 
@@ -382,7 +362,7 @@ class QuestionRephraser:
                 _system_prompt(),
                 provider=provider,
                 cache=_NoStoreCache(),
-                trace=_AuthoringTraceSink(self._resolve_trace()),
+                trace=AuthoringTraceSink(self._resolve_trace()),
                 prefer_local_family=self._authoring_family,
                 temperature=self._temperature,
             )

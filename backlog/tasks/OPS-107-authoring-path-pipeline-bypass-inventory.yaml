@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/**"
-session: null
+session: claude/eloquent-bohr-1da6mq
 notes: OPS-84 조사 중 grep 실측으로 발견.
-updated: 2026-10-02
+updated: 2026-10-05

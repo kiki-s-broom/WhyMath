@@ -161,3 +161,30 @@ class RecordingTraceSink:
     def record(self, fields: dict[str, object]) -> None:
         """태그 dict를 보관."""
         self.records.append(fields)
+
+
+AUTHORING_TRAFFIC_SURFACE = "authoring"
+"""저작 경로 trace 표지 — `traffic_surface` 필드 값(OPS-84 ③ · OPS-107에서 공용화).
+
+`ops/cost_report`의 게이트②는 **학생 대면 루프당 비용**을 잰다. 저작 배치(동등문제·다중 풀이·설명·
+비유 생성, 교차검증, 발문 rephrase)는 오프라인으로 한 번에 수백~수천 건(LOCAL·0원)을 같은
+`l3_routing` 스트림에 낸다 — 표지 없이 섞이면 로컬 비율이 부풀고 토큰 p50이 저작 쪽으로
+끌려가 게이트 판정이 **위장된다**. 그래서 저작 trace에 이 표지를 싣고, 리포트는 표지가 붙은
+이벤트를 게이트② 표본에서 빼고 건수만 따로 보고한다. 표지가 없는 이벤트는 종전대로 서빙
+표본이다(구 이벤트 하위호환 — 그래서 표지를 *빠뜨린* 저작 경로는 조용히 서빙 표본을 오염시킨다).
+"""
+
+
+class AuthoringTraceSink:
+    """기록 dict에 `traffic_surface="authoring"`을 덧붙여 안쪽 싱크로 넘기는 래퍼 — TraceSink 충족.
+
+    호출마다 만드는 얇은 어댑터라 `flush`를 두지 않는다 — flush는 소유자가 안쪽 싱크에 직접 건다.
+    원 dict는 얕은 복사 후 확장한다(호출자 dict 불변).
+    """
+
+    def __init__(self, inner: TraceSink) -> None:
+        self.inner = inner
+
+    def record(self, fields: dict[str, object]) -> None:
+        """표지를 덧붙여 기록한다."""
+        self.inner.record({**fields, "traffic_surface": AUTHORING_TRAFFIC_SURFACE})

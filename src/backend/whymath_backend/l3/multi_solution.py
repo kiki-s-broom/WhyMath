@@ -104,7 +104,7 @@ from whymath_backend.db.models.verified_solution import (
 )
 from whymath_backend.db.session import get_sessionmaker
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
-from whymath_backend.l3.interfaces import LLMProvider, TraceSink
+from whymath_backend.l3.interfaces import AuthoringTraceSink, LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CostTier,
     GenerationResult,
@@ -781,7 +781,9 @@ def _record_trace(trace: TraceSink, decision: RoutingDecision, usage: Usage | No
     else:
         actual_krw = actual_cost_krw(decision, usage)
     try:
-        trace.record(langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw))
+        AuthoringTraceSink(trace).record(
+            langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw)
+        )
     except Exception as exc:  # noqa: BLE001 — 관측 장애가 생성 배치를 깨면 안 됨
         # 침묵실패 금지 — 예외 *타입명*만 경고(필드·키 값 미출력·langfuse_sink 방침 동형).
         _LOGGER.warning("다중 풀이 생성 관측 기록 실패(%s) — 무시하고 계속", type(exc).__name__)
