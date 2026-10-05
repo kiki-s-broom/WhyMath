@@ -49,6 +49,9 @@ _ALLOWED_WRITERS: dict[Path, bool] = {
     # LIC-09 — 관리자 REST POST. 요청 계약에 provenance 좌석(`ProblemCreateRequest.provenance`)을
     # 신설하고 관문을 경유시켜 면제를 거뒀다(구 면제는 LIC-09 승계로 스스로 만료하는 형태였다).
     Path("src/backend/whymath_backend/api/problems.py"): True,
+    # EOS-38 — 루프 KPI 판정 표본 산출 CLI. 전용 DB(`_kpi_sample`)에 합성 문항을 시딩하되 관문을
+    # 경유해 `content_provenance` 원장 행을 함께 남긴다(면제 아님 — 관문 import 강제).
+    Path("src/backend/whymath_backend/ops/loop_kpi_sample_load.py"): True,
 }
 
 # 면제 writer → 승계 태스크 ID. 위 False 항목과 키가 일치해야 한다(아래 테스트가 대조).

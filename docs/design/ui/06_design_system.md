@@ -92,9 +92,13 @@
 | 탭 영역 | 48dp 이상 | 🟡 M3 기본 컴포넌트 충족 + explore/home/me guideline 검증(배율 1.0×/1.3×/2.0×, A11Y-01). chat 문제 배너 탭에 라벨·button 시맨틱(MOB-13) + 최소 48dp 보장(MOB-14·`maxHeight` clamp로 MOB-02 상한 불침범) |
 | Semantics 라벨 | 아이콘 버튼·탭 목적지 라벨 | 🟡 아이콘 버튼 `tooltip`·셸 탭 label·OCR 영역 카드·chat 배너(MOB-13) 라벨 보유. `SceneRenderer`의 시각화 placeholder(`_VisualizationSeed`)도 단일 `Semantics` 라벨 부착(A11Y-01). 전면 감사는 후속 |
 | 색만으로 정보 전달 금지 | 굵기·아이콘·문구 병행 | 🟢 `CoachEmphasisText`(굵기)·신호는 아이콘+문구·정오 채색 전무 |
-| TTS | `SpeechSpec` 소비(클라 합성) | 🔴 후속 |
+| TTS | `SpeechSpec` 소비(클라 합성) | 🔴 후속 — **"곧"이 아니라 트리거 대기**. 서버 축은 완비(`POST /v1/speech/latex`)이나 클라 합성 의존이 없다(`flutter_tts` Gradle 비호환 실측으로 제거). 발화 조건 = ⓐ 실기기 Gradle 호환을 재검증한 대체 의존 확보 **또는** ⓑ 시각·청각 약자 학생의 파일럿 참여 **또는** ⓒ 교육기관 납품 결정 (`service_operations_gap_review.md` §5-④) |
 
-→ **후속**: chat·ocr *전체 화면 상태*(활성 문제·메시지·인식 후 cue) 대비·배율 검증(컨트롤러 override 하네스)·Semantics 라벨 전면 감사·TTS(`SpeechSpec`).
+→ **후속(각 항목은 소유 태스크 또는 발화 트리거를 가진다 — 소유 없는 "후속"은 영구 미상환이 된다)**:
+- chat·problem *전체 화면 상태*(활성 문제·메시지) 대비·배율 검증 + **커버리지 드리프트 가드**(새 화면이 게이트 밖으로 조용히 늘지 않게) → **`A11Y-02`** 소유(2026-10-05 OPS-40 회수 등재 — 고립 브랜치 `5t5lmv`의 설계 승계).
+- ocr *인식 후 cue* 상태 검증 → `A11Y-02` 범위 밖. 트리거 = OCR 실기기 경로가 파일럿에서 실사용될 때.
+- Semantics 라벨 **전면** 감사 → 트리거 대기(현재는 아이콘 버튼·탭·배너·시각화 placeholder만 보유). 전면 감사는 화면 집합이 안정된 뒤가 옳다.
+- TTS(`SpeechSpec`) → 위 표 TTS 행의 ⓐⓑⓒ 트리거 참조.
 
 ---
 
