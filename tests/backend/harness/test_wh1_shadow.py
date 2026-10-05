@@ -184,6 +184,7 @@ class TestNoRawLeak:
         # 어느 경로로 판정했는지의 횟수이지 식·원문이 아니다(형태 라벨은 폐쇄 3종 enum).
         # n_match_raw/n_match_kept(MISC-18)도 비식별 *정수* 개수뿐 — 품질 게이트 전·후 후보 수
         # 이지 후보 id·학생 원문이 아니다(어느 오개념인지는 이 필드에 없다).
+        # n_match_attribution_unclear(MISC-60)도 비식별 *정수* — 귀속 불명으로 보류한 match 실행 수.
         parsed = json.loads(raw)
         assert set(parsed.keys()) <= {
             "status",
@@ -196,6 +197,7 @@ class TestNoRawLeak:
             "n_mixed_form_transitions",
             "n_match_raw",
             "n_match_kept",
+            "n_match_attribution_unclear",
             "tool_calls",
             "hypothesis_count",
             "dialogue_id",

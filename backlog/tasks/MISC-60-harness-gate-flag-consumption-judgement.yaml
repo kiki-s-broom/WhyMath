@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,12 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/wh1_loop.py
-session: null
-notes: "MISC-18(PR 머지 후)의 정직한 잔여 1번 — docs/reviews/misc_18_match_gate_single_enforcement_2026-10-05.md §6. MISC-18은 floor(게이트①)만 결선했고 하네스는 attribution_unclear·no_confident_match를 ToolResult.match_gate_counts에 기록만 한다. 코치 경로와의 불일치가 실제 오적재로 이어지는지는 미확인이므로 ①이 실측이다(부재/존재 단정 금지)."
+  - src/backend/whymath_backend/harness/wh1_shadow.py
+  - src/backend/whymath_backend/l4/misconception/match_gate.py
+  - src/backend/whymath_backend/api/coach.py
+  - "tests/backend/harness/test_wh1_*.py"
+  - tests/backend/api/test_coach_wh1_convergence_governance.py
+  - docs/reviews/misc_60_harness_withheld_verdict_2026-10-05.md
+session: claude/sweet-hypatia-f402tv
+notes: "MISC-18(PR 머지 후)의 정직한 잔여 1번 — docs/reviews/misc_18_match_gate_single_enforcement_2026-10-05.md §6. MISC-18은 floor(게이트①)만 결선했고 하네스는 attribution_unclear·no_confident_match를 ToolResult.match_gate_counts에 기록만 한다. 코치 경로와의 불일치가 실제 오적재로 이어지는지는 미확인이므로 ①이 실측이다(부재/존재 단정 금지).\n\n[정정 2026-10-05] paths ['src/backend/whymath_backend/harness/wh1_loop.py'] → ['src/backend/whymath_backend/harness/wh1_loop.py', 'src/backend/whymath_backend/harness/wh1_shadow.py', 'src/backend/whymath_backend/l4/misconception/match_gate.py', 'src/backend/whymath_backend/api/coach.py', 'tests/backend/harness/test_wh1_*.py', 'tests/backend/api/test_coach_wh1_convergence_governance.py', 'docs/reviews/misc_60_harness_withheld_verdict_2026-10-05.md']: 판정이 '둔다'로 확정돼 실제 변경 범위가 넓어졌다 — 보류 판정 술어를 계약 모듈에 두고(match_gate.py) 코치가 위임하며(coach.py) shadow 관측 레코드에 발동 횟수를 연결하고(wh1_shadow.py) 코치-하네스 동일성 동결 테스트와 판정 기록 문서를 더한다(기존 wh1_loop.py·테스트 글롭 유지)"
 updated: 2026-10-05
