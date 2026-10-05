@@ -605,7 +605,8 @@ CATALOG: tuple[Spec, ...] = (
        "l2.mastery_contract", "l2.mastery_estimators", "l2.mastery_tracking",
        "l2.skill_mastery_tracking"),
     _e("WM-E-202", "IRT 문항·능력 동시 추정·θ 시계열", "Student", "Learning Model", "P0",
-       "Gate2 ②·⑨ — CAT 기반", "l2.irt", "l2.ability_estimation", "l2.ability_tracking"),
+       "Gate2 ②·⑨ — CAT 기반 · EOS-125 채점 경계 θ 스냅샷 자동 적재", "l2.irt",
+       "l2.ability_estimation", "l2.ability_tracking", "l2.ability_snapshot_capture"),
     _e("WM-E-203", "문항 난이도 JMLE 보정 배치", "Admin", "Assessment", "P1",
        "D3 난이도 타당도 KPI 재료", "l2.item_calibration", "l2.calibrate_items", status="Batch"),
     # EOS-103: 영속 축(l2.learner_state_store)을 **같은 기능번호**에 귀속시킨다 — §15가
@@ -1168,7 +1169,7 @@ CATALOG: tuple[Spec, ...] = (
     # 보여 "KPI 17종"이라는 착시가 생긴다 — 정본 경계는 docs/standards/loop_kpi_contract.md.
     _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
        "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
-       "ops.loop_kpi_gate"),
+       "ops.loop_kpi_gate", "ops.loop_kpi_sample_load"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),

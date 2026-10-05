@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-03 (판정·착지 · EOS-38): **루프 KPI ①②④ 판정 표본은 (나) 결정론 합성 부하를 `_kpi_sample` 전용 DB에 쌓아 만든다 — (가) 사람이 쌓는 테스트 계정은 52·268을 보장 못 하고, (다) 표본 부족 FAIL을 미측정으로 부르는 것은 4회 공전의 원인을 못 바꾼다. 판정 CLI에 `--sample-basis synthetic` 표지를 달아 실사용 검증으로 계상하지 않는다** (claude 판정·구현) — 판정 기준 main `5e9ce568`
+
+- **판정문**: `docs/reviews/eos_38_loop_kpi_sample_path_2026-10-03.md` (후보 비교·실측·변별력·뮤테이션 7종·한계).
+- **실측**: 학습자 60명 부하 15초 → 5종 PASS exit 0(① 60/60 하한 0.9569 · ② 0/542 · ④ 0/180). 최소 표본은 코드가 계산(52·268).
+- **발견**: ②의 분모는 학습자 행이 아니라 콘텐츠·`attempt_event` 행이다. 이 규모에서 ② 위반 1건은 판정을 못 뒤집고 2건부터 FAIL(설계 의도 — 테스트가 양방향 동결).
+- **뮤테이션 M4 생존**: 삭제 금지 탐지기가 정확한 이름만 봐서 `_exec_delete` 변형을 놓쳤다 → 부분 일치로 확장 후 RED. 주입 없이 선언했다면 구멍이 남았을 자리다.
+- **환경 교훈(사고 아님)**: 세션 재개 중 로컬 PG가 내려가 통합 테스트가 `미도달 skip`으로 초록처럼 보였다 → skip 건수를 읽고 재기동 후 재실행. 신규 모듈은 CI 계약 3곳(선언≠배선·데이터 접근 baseline·인벤토리 귀속)에 반응해 등재했다.
+- **정직 표기**: 합성 부하는 실사용 검증이 아니다(ARCH-66 ⑥). `backend-migrations` 잡에서의 통합 테스트 실행은 이 세션에서 확인하지 못했다(로컬 PG 16으로만 재현).
+
 ### 2026-10-03 (착지 · EOS-27): **검수 이벤트가 검수자가 본 레코드의 내용 지문을 싣고, 각인 도구와 승격 게이트가 코퍼스 현재 지문과 대조한다 — 지문 없는 판정은 '모름'이라 보류하고, 손질 승인은 해금하지 않는다** — 판정 기준 main `381ec106`
 
 - **무엇**: `schema/review_timer.review_content_fingerprint`(정규화 단일 정본) · `review_fingerprint_state`(match/changed/unknown 3상태) · 이벤트 선택 필드 `content_fingerprint`(started·finished만, aborted 금지). 검수 CLI가 기록하고, `review_status_verdict_bridge`가 각인 전에(`content_changed`·`fingerprint_unverifiable` 버킷, exit 1), `golden_promotion_gate`가 ②단에서(`review_content_changed`·`review_fingerprint_unverifiable`) 대조한다. EOS-136 계약 8절의 '검수 후 내용 편집 미탐지' 한계 해소.
@@ -11835,3 +11844,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **원장**: 평가 원장 1행 기록(engine_revision `b165e53b` · verdict_source `qa_engine`). 같은 골든은 다른 리비전으로 다시 잴 수 없다(재채점 금지 · 계약 §4). 이후 표류 점은 계약 §9의 회전별 독립 표본(rotation ≥ 1)에 찍는다. 산출물은 Kiki 머신 `mp02-out\eos137\`·`mp03\golden_benchmark_v1\eval_ledger.jsonl`(코퍼스 데이터라 저장소 미커밋).
 - **acceptance 전수 재대조(EOS-137)**: ①어댑터(`harness/qa_item_verdicts.py` · main) ②첫 평가(이 항목) ③표류 시계열 판정(계약 §9 · `TestDriftTimeSeriesDesign`) ④대용 입력 명기(`verdict_source` 폐쇄 어휘) — 4항 전부 이행, 미이행 0.
 - **후속**: 위 ①·② 두 한계는 태스크 `EOS-155-qa-engine-golden-rotation1-defect-sample`로 등재(F1·F2 포함 결함 표본 확대 + rotation 1 독립 표본으로 두 번째 점).
+## 2026-10-03 EOS-125 — 루프 학습자 `general_ability` null 처분: (가) 채점 경계 자동 적재 채택
+- **결함**: `GET /v1/me/learner-state`의 `general_ability`는 `ability_snapshot` 최신 행을 읽는데, 그 행은 수동 캡처·세션 종료로만 생겨 채점 루프만 도는 학습자는 항상 null이었다(`/next-problem`은 같은 순간 θ를 즉석 추정해 싣는다).
+- **처분 (가)**: 채점 공용 진입점 `advance_on_graded_attempt`(3개 채점 경로 공유) 끝에서 `l2/ability_snapshot_capture.capture_global_ability_if_due`를 부른다. 적재 시점 = 스냅샷이 없을 때(첫 채점) 또는 마지막 스냅샷 이후 채점 5건 이상(`CAPTURE_STRIDE`). 전과목 θ만 적재하고 개념별 θ는 세션 종료·수동 캡처가 계속 맡는다(L2에서 L5 코드 호출 불가). 실패는 예외 타입명만 로그에 남기고 삼킨다(채점 응답 무영향).
+- **(나)·(다) 미채택 사유**: (나) 읽기측을 즉석 추정으로 바꾸면 θ가 어느 스냅샷에서 왔는지(`TraceBasis.ability_snapshot_id`, EOS-132 추적 고리)를 잃는다. (다) 현행 유지는 결함을 문서화할 뿐이다.
+- **관측 지점**: `tests/backend/api/test_e2e_persona_journeys.py` 페르소나 A에 ②-b(첫 채점 뒤 `general_ability` not null)·⑥-b(6건 채점 뒤 전과목 곡선 응답 수 `[1, 6]`) 신설. 실 PG에서 통과, 적재 호출을 제거하면 ②-b가 RED(뮤테이션 확인·원복 확인).
+- **한계(명시)**: stride 5는 판단값이며 실측 근거가 아니다. 곡선의 점 밀도가 부족하거나 넘치면 `CAPTURE_STRIDE` 한 상수로 조정한다. 판정 기준 main `a05eb49a`.
+### 2026-10-05 — OPS-40 회수: 고립 브랜치 `5t5lmv`(서비스 운영 r2) — 정정 7파일 이식 · r2 문서 `docs/reviews` 착지 · 구현 3건은 새 번호로 승계 · 기각 3건
+- **결정**: 고립 브랜치 `origin/claude/whymath-service-operations-review-5t5lmv`(head `dd3e9475`)의 산출물을 **통째로 이식하지 않고 main 현행과 대조해 채택·기각**했다(읽기 전용 에이전트 3개 + 이 세션 직접 재확인). 정본 = `docs/reviews/service_operations_gap_review_r2.md`(맨 위 회수 블록 ①~③에 번호 매핑·현행 델타·처분표).
+- **판정**: r2의 핵심 판정은 2개월 뒤에도 성립한다 — D1~D5 전건 done, G1~G3는 **main에서 여전히 열려 있다**(426이 요청 회계 이전에 early-return·미상 카운터 프로덕션 리더 0·클라 426 분기 1곳·a11y 게이트 5개로 고정·chat/problem/신고 다이얼로그 게이트 밖·드리프트 가드 0). 낡은 것은 `MGMT-02` 상태(`blocked`→`todo`+게이트)·백로그 수(258→986)·화면 수(16→17)·소유 태스크 번호·줄 번호 인용 약 14건.
+- **이식(7+3 파일)**: `api/speech.py`·`schema/speech.py`·`05_interaction.md`·`system_deep_dive.md`·`visualization_module_gap_review.md`·`ui/01`·`ui/02`의 `flutter_tts`·44dp 정정(패치 충돌 0), v1 문서 배너 + 신고 API 경로 오기 정정(`/v1/defect-reports`→`/v1/reports/defects`), `06_design_system.md` §7 TTS 행 발화 트리거.
+- **기각 3건**: ① `service_ops_mgmt_gap_review_2026-07.md:43`의 "학생 경로 LOCAL 고정 → 비용 사고 위험 0" — **전제가 낡았다**(ARCH-64로 학생 대면 서빙도 클라우드 좌석). ② `CLAUDE.md` 스택 표 정정 — main 우세(ARCH-64 전면 재작성). ③ `CLAUDE.md` 프로세스 금기 1건 신설 — **2026-09-20 새 산문 규칙 등재 동결과 충돌**, 집행은 코드(`OPS-113`)로. 규칙 문구를 원하면 Kiki의 동결 예외 판정 사안.
+- **승계 등재(번호 충돌 때문에 새 번호)**: `OPS-112-client-version-gate-observability`(고립 브랜치의 `OPS-35`) · `OPS-113-removed-dependency-canon-sync-gate`(`OPS-34`) · `A11Y-02-accessibility-coverage-drift-gate`(번호 그대로). 구현(백엔드 `app.py`·`config.py`·모바일 컨트롤러 7곳·a11y 테스트 2파일)은 Flutter가 없는 환경이라 **이식하지 않았다** — 참조 구현 커밋 `7df9ff8d`·`a7a9e9ec`는 고립 브랜치에 남는다. **회수 완료 전 `5t5lmv` 삭제 금지.**
+- **이식 금지로 남긴 것**: `events.ndjson` 44줄(번호 충돌) · 고립 브랜치 `MEMORY.md`의 OPS-35·A11Y-02 "완료" 서술(그 구현이 main에 없어 거짓이 된다).
+- **교훈(코드로 집행되는 쪽)**: "정정 위임이 acceptance·paths로 안 내려가면 8일간 미집행"이라는 r2의 G1은 2개월 뒤에도 같은 형태로 관측됐다 — 이번 회수 자체가 그 증거(정정 7곳이 main에 두 달간 stale). 재유입 방지는 산문이 아니라 `OPS-113`의 게이트 몫이다.
