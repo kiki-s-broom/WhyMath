@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - "docs/architecture/**"
   - "docs/reviews/**"
-session: null
+session: claude/nice-carson-itm4bw
 notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §2-A7. [2026-08-30 HARN-34 현행화] 원 브랜치 a3ysut·8ap436·p1hubt 소멸. 착지 확인: 게임화 r3·학습경로 r3 doc은 main 실재 — 잔여 대상 3건으로 축소: ①ai_content r3 = claude/backup/ai-content-a3ysut-pre-rebase(b271671b) ②데이터플랫폼 r2 + OPS-35/36/37·QUAL-05 등재분 = t608mk(d876b523·OPS-36은 main 동번호 별건과 충돌 — CLI 재배정) ③헌법 통합감사·재채번 판정 + HARN-22 등재분 = azdnov(c335a787·HARN-22도 main 동번호 별건과 충돌). acceptance ③의 8ap436 MOB-17 축은 backup(ce93aaad)에서 확인\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/회수 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-07] stray-code 8회차(2026-09-07 r2 §5) 커버리지 정독: acceptance ①~③이 '문서'만 다뤄, notes에만 적힌 태스크 YAML 재등재 5건·MEMORY 결정 로그 2블록이 done 시 고아가 되는 구조(vafylb·7n9n72 동형). 별항으로 승격한다. 7회차(PR #1020)는 이 좌석을 손대지 않아 충돌 없음"
-updated: 2026-09-07
+updated: 2026-10-05
