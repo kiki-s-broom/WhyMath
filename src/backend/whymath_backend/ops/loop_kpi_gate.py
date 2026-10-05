@@ -317,8 +317,11 @@ _COVERAGE_NOTE_INTEGRITY = (
 
 _COVERAGE_NOTE_TRACEABILITY = (
     "근거 기록 개시 전의 추천은 LearnerState 근거가 없어 소급 역추적이 불가능하다 — 분모에서 빼고 "
-    "excluded_pre_basis로 센다. 삭제권 이행으로 세션 행이 지워진 추천은 학습자 결합이 끊겨 "
-    "break_learner_unjoined로 잡힌다(세션 기록 실패 placeholder와 구별할 수 없다)."
+    "excluded_pre_basis로 센다. 삭제권 이행(계정·개별 세션 삭제)은 그 세션의 추천 기록도 같은 "
+    "트랜잭션에서 지우므로(SEC-40·처분 (나)) 삭제된 학습자의 추천은 분자에도 분모에도 나타나지 "
+    "않는다 — 삭제로 관측창이 비면 분모 0 → 미측정이다. 학습자 결합이 끊긴 추천"
+    "(break_learner_unjoined)은 세션 기록 실패 placeholder이거나 SEC-40 착지 이전에 삭제돼 남은 "
+    "잔여이며, 삭제 증거가 없으므로 끊김으로 센다(모른다 ≠ 아니다)."
 )
 
 LOOP_KPI_SPECS: Final[tuple[LoopKpiSpec, ...]] = (
@@ -988,7 +991,8 @@ class TraceBreak(str, Enum):
 
     LEARNER_UNJOINED = "learner_unjoined"
     """① `evidence_event.session_id → learning_session` 조인 실패(세션 기록 실패 placeholder ·
-    삭제권으로 지워진 세션 — 둘을 구별할 수 없다)."""
+    SEC-40 착지 이전에 삭제돼 남은 잔여). 삭제권 이행은 이제 추천 기록을 함께 지우므로 삭제가
+    이 끊김을 만들지 않는다 — 삭제 증거 없이 끊긴 추천은 계속 끊김으로 센다."""
 
     BASIS_MISSING = "basis_missing"
     """② 근거 기록 개시 **이후**인데 `learner_state_basis` 키가 없다 — 모른다(끊김)."""

@@ -55,7 +55,7 @@ from typing import Literal
 from whymath_backend.config import Settings
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
-from whymath_backend.l3.interfaces import AuthoringTraceSink, LLMProvider, TraceSink
+from whymath_backend.l3.interfaces import LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CallSite,
     CostTier,
@@ -767,7 +767,7 @@ class CrossVerifier:
         else:
             cost_krw = actual_cost_krw(decision, usage)
         try:
-            AuthoringTraceSink(self._trace).record(
+            self._trace.record(
                 langfuse_fields(
                     decision,
                     cache_hit=False,

@@ -77,7 +77,7 @@ from whymath_backend.harness.wilson import wilson_lower_bound
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.data_export_policy import guard_data_export
 from whymath_backend.l3.data_grade_defaults import SYNTHETIC_PROBE
-from whymath_backend.l3.interfaces import CacheBackend, InMemoryCache, LLMProvider
+from whymath_backend.l3.interfaces import CacheBackend, InMemoryCache, LLMProvider, TrafficSurface
 from whymath_backend.l3.models import CostTier, RoutingRequest
 from whymath_backend.l3.providers.anthropic import AnthropicProvider
 from whymath_backend.l3.providers.composite import CompositeProvider
@@ -508,7 +508,8 @@ def _default_probe_deps(settings: Settings) -> ProbeDeps:
     return ProbeDeps(
         provider=provider,
         cache=InMemoryCache(),
-        trace=LangfuseSink(settings=settings),
+        # 비용 프로브는 계측을 위해 일부러 낸 호출이다 — 표면 probe(OPS-105·게이트② 표본에서 제외).
+        trace=LangfuseSink(settings=settings, traffic_surface=TrafficSurface.PROBE),
         generate=pipeline.generate,
     )
 

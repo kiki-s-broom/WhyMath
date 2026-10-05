@@ -21,9 +21,11 @@ skill_node)만 ORM으로 심는다. 읽기 전용 SELECT는 공개 표면이 그
 
 **정직한 공백 동결** — 현행 코드로 성립하지 않는 마디는 `skip`으로 위장하지 않는다. *현행 동작*을
 단언하고, 고쳐지면 그 단언이 실패하며 메시지가 소유 태스크를 가리킨다.
-  - SCENARIO-003 ⓐ `EOS-127` — 상태 머신 R4(선수결손)는 서빙 경로에서 발화하지 않는다.
   - SCENARIO-005 ⓒ 귀속된 힌트를 숙달 갱신이 읽지 않는다(완료 채점 증거에 `hint_used` 축이 없다) —
     `EOS-29-assessment-evidence-hint-axis-producer`.
+  - (해소) SCENARIO-003 ⓐ `EOS-127` — 상태 머신 R4(선수결손)가 서빙 경로에서 발화하지 않던 공백.
+    **R4를 삭제**하는 처분으로 해소했다(선수 하강은 다음 문항 선택의 R6 경로가 이미 수행한다 —
+    ②가 그 증거). 단언은 "선수 결손 상태의 오답은 R6이고 선수 하강은 추천이 한다"로 승격했다.
   - (해소) SCENARIO-005 ⓐ 힌트 귀속 — `EOS-133`이 코치 완료 경로에 `hint_usage`의 첫 writer를
     세워, 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 `used_hint=True`·`hint_usage`로
     남는다는 정상 동작 단언으로 승격했다.
@@ -483,8 +485,9 @@ def test_scenario_003_prerequisite_gap() -> None:
       ① 원래 개념 오답만 있을 때: 선수 후보는 보이지만 `weak_only` 결손 목록엔 없다(미측정).
       ② 선수 개념 오답 1건 → 결손으로 분류 · 추천 `action=practice_prerequisite`·
          `target_concept=선수` · 고른 문항이 선수 개념 문항.
-      ③ 정직한 공백 동결(`EOS-127`) — 같은 상황에서 상태 머신 규칙 R4(선수결손)는 발화하지
-         않는다(`prerequisite_gap_concept_ids` 생산자 미배선). 정책 결정은 R6(원인 미상 오답)이다.
+      ③ 선수 하강의 소유자(`EOS-127` 처분) — 같은 상황의 상태 머신 결정은 R6(원인 미상 오답)이며
+         선수 쪽 하강은 상태 전이가 아니라 ②의 다음 문항 선택이 한다. R4(선수결손 규칙)는
+         삭제됐으므로 이 오답이 어떤 선수 지목 결정(`target_concept_id`)도 만들지 않는다.
     """
     content, journal = _begin("SCENARIO-003")
     try:
@@ -523,25 +526,26 @@ def test_scenario_003_prerequisite_gap() -> None:
             assert rec["target_concept"] == str(c_pre), rec
             assert rec["problem_id"] in {str(p) for p in pre_pids}, rec
 
-            # ③ 정직한 공백 동결 (EOS-127) — 결손이 확정된 상태의 원래 개념 오답.
-            #    연속 오답 임계(R5)가 R4보다 앞서므로, 정답 1건으로 연속을 끊은 뒤에 본다 —
-            #    끊지 않으면 3연속 오답이 R5로 가서 "R4가 없어서 R6"과 구별되지 않는다.
+            # ③ 선수 하강의 소유자 (EOS-127) — 결손이 확정된 상태의 원래 개념 오답.
+            #    연속 오답 임계(R5)가 R3·R6보다 앞서므로, 정답 1건으로 연속을 끊은 뒤에 본다 —
+            #    끊지 않으면 3연속 오답이 R5로 가서 "R6이라서 선수를 지목하지 않는다"와 구별되지 않는다.
             _attempt(client, auth, main_pids[1], correct=True, answer="정답")
             body = _attempt(
                 client, auth, main_pids[2], correct=False, answer=_UNMATCHED_WRONG_ANSWER
             )
             ls_block = body["learning_state"]
             journal.record(
-                "③R4미발화",
-                "EOS-127 정직한 공백",
+                "③상태머신결정",
+                "EOS-127 — R4 삭제·선수 하강은 추천(②)이 소유",
                 rule=ls_block["rule_id"],
                 next_action=ls_block["next_action"],
                 target=ls_block["target_concept_id"],
             )
             assert ls_block["rule_id"] == "R6-wrong-undiagnosed", (
-                f"선수 결손 상태의 오답에 규칙 {ls_block['rule_id']}가 발화했다 — `EOS-127`(R4 "
-                "생산자 배선)이 해소된 것으로 보인다. 이 단언을 R4·GO_TO_PREREQUISITE_CONCEPT·"
-                "target=선수 단언으로 승격하고 EOS-127을 닫아라."
+                f"선수 결손 상태의 오답에 규칙 {ls_block['rule_id']}가 발화했다 — `EOS-127`이 R4를 "
+                "삭제하며 선수 하강을 다음 문항 선택(R6 경로)에 맡겼다. 상태 머신이 선수를 지목하는 "
+                "규칙을 되살렸다면 R6 하강(②)을 가로채지 않는지 먼저 판정문을 읽어라: "
+                "docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md."
             )
             assert ls_block["target_concept_id"] is None, ls_block
         journal.dump()

@@ -95,10 +95,23 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
     verify = record.get("verify")
     if not isinstance(verify, dict):
         return "skip", "verify 재료 없음"
-    conditions = verify.get("conditions")
+    raw_conditions = verify.get("conditions")
     answer_map = verify.get("answer_map")
     selection = verify.get("answer_selection")
-    if not isinstance(conditions, str) or not isinstance(answer_map, dict):
+    # conditions는 문자열 1개 또는 연립(문자열 목록·AND). 목록은 평균값 정리의 c가 열린구간 안인지
+    # 처럼 방정식 밖의 소속 조건을 함께 검산할 때 쓴다(ProblemVerifyMeta도 같은 형태를 받는다).
+    conditions: str | list[str]
+    if isinstance(raw_conditions, str):
+        conditions = raw_conditions
+    elif (
+        isinstance(raw_conditions, list)
+        and raw_conditions
+        and all(isinstance(c, str) for c in raw_conditions)
+    ):
+        conditions = [str(c) for c in raw_conditions]
+    else:
+        return "skip", "conditions/answer_map 형식 부적합"
+    if not isinstance(answer_map, dict):
         return "skip", "conditions/answer_map 형식 부적합"
     amap = {str(k): str(v) for k, v in answer_map.items()}
 
@@ -154,7 +167,8 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
             )
 
     # 수치 반례 fuzz(옵션) — fail만 오염으로 본다.
-    if use_fuzz:
+    # fuzzer는 단변수 등식 1개만 다룬다 — 연립(목록) 조건은 범위 밖이라 건너뛴다.
+    if use_fuzz and isinstance(conditions, str):
         fuzz = fuzz_answer(conditions, amap, selection if isinstance(selection, str) else None)
         if fuzz.state == "fail":
             return "fail", f"수치 반례: {fuzz.reason}"

@@ -70,11 +70,11 @@ from whymath_backend.l3.equivalent.rephrase_hygiene import (
 )
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
 from whymath_backend.l3.interfaces import (
-    AUTHORING_TRAFFIC_SURFACE,
-    AuthoringTraceSink,
     LLMProvider,
     RecordingTraceSink,
+    SurfaceTaggingTraceSink,
     TraceSink,
+    TrafficSurface,
 )
 from whymath_backend.l3.models import ModelFamily, RoutingRequest
 from whymath_backend.l3.pipeline import generate as l3_generate
@@ -267,6 +267,16 @@ class _NoStoreCache:
         return None
 
 
+AUTHORING_TRAFFIC_SURFACE = TrafficSurface.AUTHORING.value
+"""저작 경로 trace 표지 — `traffic_surface` 필드 값(OPS-84 ③ · OPS-105가 `TrafficSurface`로 일반화).
+
+어휘와 근거의 정본은 `l3.interfaces.TrafficSurface`다 — 이 상수는 종전 호출부·테스트의 이름을 지키는
+별칭이다. 저작 rephrase는 오프라인 배치라 한 번에 수백~수천 건(LOCAL·0원)을 같은 `l3_routing`
+스트림에 낸다. 표지 없이 섞이면 학생 대면 루프당 비용(게이트②)의 로컬 비율이 부풀고 토큰 p50이
+저작 쪽으로 끌려가 판정이 **위장된다**.
+"""
+
+
 class QuestionRephraser:
     """발문 다양화기 — provider 주입·파이프라인 경유·수치 불변 검증(fail-closed).
 
@@ -362,7 +372,7 @@ class QuestionRephraser:
                 _system_prompt(),
                 provider=provider,
                 cache=_NoStoreCache(),
-                trace=AuthoringTraceSink(self._resolve_trace()),
+                trace=SurfaceTaggingTraceSink(self._resolve_trace(), TrafficSurface.AUTHORING),
                 prefer_local_family=self._authoring_family,
                 temperature=self._temperature,
             )

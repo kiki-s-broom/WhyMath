@@ -4,16 +4,12 @@
 `review_status='reviewed'`인 code만 코퍼스 JSON과 `concept_content` 테이블에 반영한다.
 다른 상태(rejected, ai_estimated 등)는 코퍼스/DB를 건드리지 않는다(fail-closed).
 
-**승인 행은 검수 게이트를 통과해야 한다** — `l1.concept_content.review_gate`가 승격 권위를
-검사한다(`reviewed_by`가 등재 검수자 + `reviewed_at` ISO 8601). `review_status='reviewed'`는
-학생 공급 게이트 기준이라(집행 지점 `l4/content_supply.py::resolve_concept_dsl` — CONT-05 ⓐ)
-서명 없는 승격은 미검증 AI 콘텐츠의 학생 공급이 된다. 위반이 1건이라도 있으면 **전체를 거부**한다
-(부분 적용 금지). 검색 표면(`l1/*/retrieval.py`)은 이 테이블이 아니라 `concept_node`·`atom_node`의
-검수 상태를 읽으므로 이 승격에 반응하지 않는다(2026-09-25 주입 실측 — 종전 판의 주장 정정).
-
-승격은 **코퍼스 커밋까지가 한 동작**이다 — `ConceptContentStore.upsert`가 코퍼스의 `review_status`를
-그대로 쓰므로, DB만 바꾸면 다음 적재가 되돌린다(같은 실측 §3.4). 이 CLI가 코퍼스 JSON과 DB를 함께
-바꾸는 이유이며, 바뀐 코퍼스는 PR로 커밋해야 남는다.
+**연결 승인(CONT-08)** — K-12 콘텐츠 행은 크로스워크가 기계로 추정한 원자(`atom_codes`)에
+연결돼 있고, 역조회(CONT-06)가 착지한 뒤 그 행의 `reviewed`는 연결된 모든 원자의 학생 공급을
+연다. `reviewed`는 "콘텐츠가 맞다"를 말할 뿐 "이 원자에 대한 콘텐츠로 맞다"를 보증하지 않는다.
+그래서 연결 원자가 있는 행의 승인 라벨은 `link_approved: true`(검수자가 연결 원자·신뢰도를 보고
+연결이 맞다고 따로 확인)를 **명시**해야 한다. 없거나 true가 아니면 위반이며 전체를 거부한다
+(모른다 ≠ 맞다). 대학 행은 연결이 없어 해당 없음.
 
 사용:
     python -m whymath_backend.harness.concept_content_review_apply \
@@ -24,6 +20,7 @@
     {
       "code": "N1",
       "review_status": "reviewed",
+      "link_approved": true,
       "reviewed_by": "kiki",
       "reviewed_at": "2026-08-16T00:00:00Z"
     }
@@ -45,10 +42,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from whymath_backend.harness.concept_content_link_context import ContentLink, load_content_links
 from whymath_backend.l1.concept_content.projection import ConceptContentStore
 from whymath_backend.l1.concept_content.review_gate import promotion_violations
 
@@ -69,6 +68,8 @@ class LabelRow:
     review_status: str
     reviewed_by: str | None
     reviewed_at: str | None
+    link_approved: bool | None = None
+    """검수자가 연결 원자·신뢰도를 보고 연결이 맞다고 **따로** 확인했는가(CONT-08). 불리언만."""
 
 
 @dataclass(slots=True)
@@ -144,12 +145,16 @@ def load_labels(path: Path) -> list[LabelRow]:
             reviewed_by = reviewed_by if isinstance(reviewed_by, str) else None
             reviewed_at = obj.get("reviewed_at")
             reviewed_at = reviewed_at if isinstance(reviewed_at, str) else None
+            # 불리언만 받는다 — 문자열 "true"·숫자 1 같은 값은 승인이 아니다(모른다 ≠ 맞다).
+            link_approved = obj.get("link_approved")
+            link_approved = link_approved if isinstance(link_approved, bool) else None
             rows.append(
                 LabelRow(
                     code=str(obj.get("code", "")),
                     review_status=str(obj.get("review_status", "")),
                     reviewed_by=reviewed_by,
                     reviewed_at=reviewed_at,
+                    link_approved=link_approved,
                 )
             )
     return rows
@@ -184,8 +189,9 @@ def apply_labels(
     university_path: Path,
     store: ConceptContentStore | None = None,
     dry_run: bool = False,
+    links: Mapping[str, ContentLink] | None = None,
 ) -> ApplyReport:
-    """라벨을 코퍼스 JSON + DB에 적용한다."""
+    """라벨을 코퍼스 JSON + DB에 적용한다. `links`(code → 연결)가 None이면 코퍼스에서 읽는다."""
     approved = [row for row in labels if row.review_status == "reviewed"]
     approved_codes = [row.code for row in approved]
     approved_set = set(approved_codes)
@@ -214,6 +220,22 @@ def apply_labels(
                 row_label=f"[행 {index}] ",
             )
         )
+
+    # 연결 승인 게이트(CONT-08) — 연결 원자가 있는 K-12 행은 `link_approved: true`를 명시해야 한다.
+    # 승인 행이 없으면 연결을 읽지 않는다. 읽는데 실패하면 예외로 올린다(조용히 빈 연결로 대체하면
+    # "연결 없음"으로 읽혀 이 게이트가 통째로 풀린다).
+    if approved:
+        content_links = load_content_links() if links is None else links
+        for index, row in enumerate(approved):
+            link = content_links.get(row.code)
+            if link is not None and row.link_approved is not True:
+                report.gate_violations.append(
+                    f"[행 {index}] {row.code}: 연결 원자 {len(link.atom_codes)}개"
+                    f"(크로스워크 {link.mapping_review_status}·기계 추정)가 있는데"
+                    " 연결 승인(link_approved=true)이 없다"
+                    " — reviewed는 '이 원자에 대한 콘텐츠로 맞다'를 보증하지 않는다"
+                )
+
     if report.gate_violations:
         return report
 
@@ -276,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
             university_path=university,
             dry_run=args.dry_run,
         )
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:  # JSONDecodeError·연결 조인 실패(ValueError) 포함
         print(f"코퍼스 갱신 오류: {exc}", file=sys.stderr)
         return _EXIT_INPUT_ERROR
 
@@ -291,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     if report.gate_violations:
         print(
             f"검수 게이트 거부: {len(report.gate_violations)}건 — 승격하지 않았습니다"
-            " (AI 자기승인 금지·서명 필수).",
+            " (AI 자기승인 금지·서명 필수·연결 승인 필수).",
             file=sys.stderr,
         )
         return _EXIT_LABEL_ERROR

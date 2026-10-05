@@ -1286,9 +1286,11 @@ async def submit_attempt(
     # 스캔 후보의 가설 신뢰이기 때문이다(`this_attempt_misconceptions` · EOS-138 ②). 조립기는 가설
     # 테이블을 다시 읽지 않는다: 학생 전체 활성 가설을 읽던 종전 방식이 옛 가설로 R3를 발화시켰다.
     #
-    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
-    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
-    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 선수 결손 규칙(R4)은 없다(EOS-127): 이 경로는 선수 결손 증거를 만들지 않는다. 선수 하강은
+    # 상태 머신 전이가 아니라 다음 문항 선택이 요청 시점에 한다(R6 선수 탐침 ·
+    # `l2/learning_state_recommendation`). 제출마다 선수 생산자를 돌리면 같은 판단을 이중으로 하고
+    # R6 하강을 가로챈다 — 판정·실측:
+    # `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md`.
     # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 쓰고 있다. 상태 머신이
     # 읽는 정책 입력(`AttemptEvidence`)은 공용 진입점 안에서 조립되어 이 함수에 이름이 없다.
     transition = await advance_on_graded_attempt(

@@ -9,7 +9,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Protocol, runtime_checkable
+from enum import Enum
+from typing import Final, Protocol, runtime_checkable
 
 from whymath_backend.l3.models import GenerationResult, RoutingDecision
 
@@ -113,6 +114,87 @@ class TraceSink(Protocol):
         ...
 
 
+class TrafficSurface(str, Enum):
+    """trace 표면 표지 — 이 호출이 **누구를 위한 트래픽인가**(OPS-84 ③ → OPS-105 일반화).
+
+    `ops/cost_report`의 게이트②는 **학생 대면 루프당 비용**을 잰다. 같은 `l3_routing` 스트림에
+    서빙·저작·프로브 호출이 함께 흐르므로 표면이 구분되지 않으면 로컬 비율과 토큰 분포가 위장된다.
+
+    **왜 CallSite 로는 안 되는가**: `CallSite`는 *호출지점*(개념 추출·자기검증 등)의 분류다. 같은
+    호출지점을 서빙·저작·프로브가 똑같이 쓰므로 호출지점에서 표면을 유도할 수 없다 — 표면은 호출이
+    *어디서 시작됐는가*의 사실이라 호출 경로가 직접 싣는다.
+
+    **왜 별도 불리언이 아니라 닫힌 어휘 한 필드인가**: 표면은 서로 배타적이고(한 호출은 한 표면)
+    값이 늘 수 있다. `is_authoring`·`is_probe`로 쪼개면 둘 다 True/둘 다 False 같은 불가능한
+    상태가 생기고, 소비측(`cost_report`)이 불리언마다 분기를 늘려야 한다.
+
+    표지가 **없는** 이벤트는 위 셋의 어느 것도 아니다 — `cost_report`가 미표기로 따로 세고 비율을
+    보고한다(`TRAFFIC_SURFACE_FIELD`가 비어 있는 것과 `serving`은 다르다).
+
+    표지를 싣는 지점(= 표면을 *아는* 지점): 서빙 = `app.create_app`의 기본 `LangfuseSink` ·
+    저작 = `QuestionRephraser`의 래퍼 · 프로브 = `live_preflight`·`cost_probe`의 기본 싱크.
+    **싣지 않는 지점(의도적 미표기)**: 비동기 큐 워커(`l3/queue/tasks.py`)와 자체 `LangfuseSink`를
+    만드는 오프라인 생성기들(`cross_verify`·`multi_solution`·`pedagogy/*`·`llm_generator`)
+    — 표면을 추측해 채우면 틀린 표지가 '관측'으로 위장되므로 비워 두고 미표기 비율로 드러낸다.
+    """
+
+    SERVING = "serving"
+    """학생 대면 — 게이트② 표본의 대상."""
+
+    AUTHORING = "authoring"
+    """저작 — 오프라인 배치(대량·LOCAL·0원)라 학생 대면 비용 표본에 섞이면 안 된다."""
+
+    PROBE = "probe"
+    """프로브 — 프리플라이트·비용 측정 같은 계측 트래픽. 측정을 위해 일부러 낸 호출이다."""
+
+
+TRAFFIC_SURFACE_FIELD: Final = "traffic_surface"
+"""기록 dict 안의 표면 표지 키."""
+
+
+def with_traffic_surface(
+    fields: Mapping[str, object], surface: TrafficSurface
+) -> dict[str, object]:
+    """기록 dict 복사본에 표면 표지를 싣는다 — **먼저 실린 표지가 이긴다**(원 dict 불변).
+
+    표지가 이미 있으면 덮지 않는다. 트래픽의 **출처에 가까운 쪽이 더 구체적**이기 때문이다 —
+    저작 래퍼가 단 `authoring`을, 바깥 기본 싱크(서빙)가 `serving`으로 덮어쓰면 오프라인 배치가
+    학생 대면 표본으로 되돌아온다. 래퍼가 겹쳐도(저작 → 서빙 기본 싱크) 먼저 실린 표지가 남는다.
+    """
+    if TRAFFIC_SURFACE_FIELD in fields:
+        return dict(fields)
+    return {**fields, TRAFFIC_SURFACE_FIELD: surface.value}
+
+
+class SurfaceTaggingTraceSink:
+    """안쪽 싱크로 넘기기 전에 `traffic_surface` 표지를 싣는 얇은 래퍼 — TraceSink 충족.
+
+    호출 경로가 싱크를 **직접 만들지 못할 때**(주입된 싱크를 감싸야 하는 저작·프로브) 쓴다. 싱크를
+    스스로 만드는 자리는 `LangfuseSink(traffic_surface=...)`가 같은 규칙을 쓴다.
+    `flush`는 안쪽 싱크가 노출할 때만 위임한다(없으면 no-op — 짧게 끝나는 CLI가 래퍼에도 안전하게
+    부를 수 있게).
+    """
+
+    def __init__(self, inner: TraceSink, surface: TrafficSurface) -> None:
+        self._inner = inner
+        self._surface = surface
+
+    @property
+    def surface(self) -> TrafficSurface:
+        """이 래퍼가 싣는 표면."""
+        return self._surface
+
+    def record(self, fields: dict[str, object]) -> None:
+        """표지를 싣고(먼저 실린 표지 우선) 안쪽 싱크에 기록한다."""
+        self._inner.record(with_traffic_surface(fields, self._surface))
+
+    def flush(self) -> None:
+        """안쪽 싱크가 `flush`를 노출하면 위임한다."""
+        flush = getattr(self._inner, "flush", None)
+        if callable(flush):
+            flush()
+
+
 @runtime_checkable
 class AsyncJobQueue(Protocol):
     """비동기 작업 큐 경계 (QUALITY 27b 비동기 전용 경로, 03a §D.3).
@@ -161,30 +243,3 @@ class RecordingTraceSink:
     def record(self, fields: dict[str, object]) -> None:
         """태그 dict를 보관."""
         self.records.append(fields)
-
-
-AUTHORING_TRAFFIC_SURFACE = "authoring"
-"""저작 경로 trace 표지 — `traffic_surface` 필드 값(OPS-84 ③ · OPS-107에서 공용화).
-
-`ops/cost_report`의 게이트②는 **학생 대면 루프당 비용**을 잰다. 저작 배치(동등문제·다중 풀이·설명·
-비유 생성, 교차검증, 발문 rephrase)는 오프라인으로 한 번에 수백~수천 건(LOCAL·0원)을 같은
-`l3_routing` 스트림에 낸다 — 표지 없이 섞이면 로컬 비율이 부풀고 토큰 p50이 저작 쪽으로
-끌려가 게이트 판정이 **위장된다**. 그래서 저작 trace에 이 표지를 싣고, 리포트는 표지가 붙은
-이벤트를 게이트② 표본에서 빼고 건수만 따로 보고한다. 표지가 없는 이벤트는 종전대로 서빙
-표본이다(구 이벤트 하위호환 — 그래서 표지를 *빠뜨린* 저작 경로는 조용히 서빙 표본을 오염시킨다).
-"""
-
-
-class AuthoringTraceSink:
-    """기록 dict에 `traffic_surface="authoring"`을 덧붙여 안쪽 싱크로 넘기는 래퍼 — TraceSink 충족.
-
-    호출마다 만드는 얇은 어댑터라 `flush`를 두지 않는다 — flush는 소유자가 안쪽 싱크에 직접 건다.
-    원 dict는 얕은 복사 후 확장한다(호출자 dict 불변).
-    """
-
-    def __init__(self, inner: TraceSink) -> None:
-        self.inner = inner
-
-    def record(self, fields: dict[str, object]) -> None:
-        """표지를 덧붙여 기록한다."""
-        self.inner.record({**fields, "traffic_surface": AUTHORING_TRAFFIC_SURFACE})

@@ -114,7 +114,7 @@ from whymath_backend.l3.equivalent.canonicalize import condition_dsl_violation
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
 from whymath_backend.l3.generation_seed import SeedSource, seed_for_decision
-from whymath_backend.l3.interfaces import AuthoringTraceSink, LLMProvider, TraceSink
+from whymath_backend.l3.interfaces import LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CostTier,
     GenerationResult,
@@ -619,7 +619,7 @@ class LLMEquivalentProblemGenerator:
         else:
             actual_krw = actual_cost_krw(decision, usage, seat=self._authoring_seat())
         try:
-            AuthoringTraceSink(self._trace).record(
+            self._trace.record(
                 langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw)
             )
         except Exception as exc:  # noqa: BLE001 — 관측 장애가 저작 배치를 깨면 안 됨
