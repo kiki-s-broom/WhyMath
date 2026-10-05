@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 검출 — 대장 YAML 로더가 같은 매핑 안에서 같은 키를 두 번 만나면 오류로 올린다. 오류에는 파일명과 중복된 키 이름이 들어간다. 대상은 backlog/tasks·gates.yaml·tracks.yaml 로드 경로(store._load_yaml)이며, 정책·인시던트 등 다른 로더까지 넓힐지는 착수 시 판정해 적는다. 현재 yaml.safe_load는 뒤 값이 이기고 오류가 없다(2026-09-29 실측: title이 둘인 게이트 블록이 뒤 값 하나로 로드됨).\n② 회귀 테스트 — 중복 키 픽스처는 RED(수정 전 코드에서 GREEN임을 먼저 확인해 결함 재현을 증명), 키가 서로 다른 대조군은 GREEN. HARN-192의 블록 단위 ID 중복 테스트(TestGateIdDuplicate)와 같은 관례를 따른다.\n③ 기존 대장 전건 실측 — 검사를 켜기 전에 실제 backlog/ 전체(태스크 900건대·게이트·트랙)에 중복 키가 0건인지 먼저 센다. 0건이 아니면 검사를 켜는 순간 main이 red가 되므로 정정 경로를 함께 정한다.\n④ 변별력 — ①의 검사를 제거·약화하는 뮤테이션이 ②의 테스트를 RED로 만드는지 확인한다(주입 적용 단언 · 원복 바이트 동일)."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1460 (커밋 2be55fac3) — 대장 YAML 중복 키 검출(파일명·키·줄), 실제 대장 988파일 0건, 뮤테이션 7종 전건 RED"
 paths:
   - scripts/harness/store.py
   - "tests/harness/test_store*.py"
-session: claude/gallant-euler-blngpj
+session: null
 notes: "출처: 2026-09-29 HARN-192(게이트 ID 중복) ③ 교차 브랜치 시뮬레이션 중 부수 발견. 임시 git 저장소에서 두 브랜치가 gates.yaml의 같은 자리에 같은 게이트를 삽입하게 하고 충돌 마커 줄만 지워 병합했더니, 블록이 2개가 아니라 1개였고 validate가 green이었다(게이트 4건). git이 공통 줄을 합치고 title 줄만 충돌로 남기므로 마커만 지우면 title 키가 둘인 블록이 된다.\n\n[실측] 위 병합 파일을 직접 열어 확인하지는 않았다(블록 수 1·validate green으로부터의 추론). 로더 동작은 별도로 실측했다: store._load_yaml이 title이 둘인 gates 블록을 읽으면 결과가 {'gates': [{'id': 'G-x', 'title': '뒤 제목'}]}이다. 오류·경고 없이 뒤 값이 이긴다. 즉 병합 충돌을 줄 단위로 서둘러 풀면 앞 정의가 조용히 사라진다.\n\n[경계] HARN-192는 같은 id의 블록 단위 중복(사전 대입 덮어쓰기)만 다룬다. 이 태스크는 그보다 아래 층, 한 블록 안의 키 중복이다. 두 결함은 원인이 다르고 한쪽 수정이 다른 쪽을 막지 못한다(시뮬레이션에서 HARN-192 수정 후 하네스도 이 케이스는 green이었다).\n\n[범위 명시] 정책·인시던트 등 대장 밖 YAML 로더가 같은 취약점을 갖는지는 확인하지 않았다 — acceptance ①이 착수 시 판정하도록 남겼다."
 updated: 2026-10-05
