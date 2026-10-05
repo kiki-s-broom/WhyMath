@@ -894,11 +894,11 @@ gates:
     title: "P3-21 처분 결정 — [12미적Ⅰ-02-08] 파생 판정 문항의 허용 형태. 프로브 13형태: 가능 7·일부 가능 1·불가 1·위장 2·정답 오거부 2. 제외 후보 6형태 = 증감 구간을 구간 기호로 답하기(불가) / 경계 포함 여부(일부 가능·오답이 skip) / 구간을 함수식 단독 조건으로 표현(정답 오거부) / 극대극소를 selection 없이 묻기(위장) / 극값 점 (x,f(x)) 묻기(위장) / 극값의 값만 답(x 없이·정답 오거부). 가: 6형태 제외하고 경계점·소속 정수·극값 x좌표·x 고정 극값 대리 형태만 문항화(분모 7 유지·증감 구간 전체 맞힘은 기계 보증 불가를 명시) / 나: 위장 2형태는 selection·x 고정 저작 규칙을 필수화해 유지하고 나머지 4형태만 제외 / 다: 형태 제외 없이 인간 폴백(검수 권위 서열상 측정 전 대체 선언 불가). 세션 의견은 나. 근거 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-03
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "세션 사용자 결정(2026-10-05 · AskUserQuestion 응답 '네, 이 결정(나)이 맞습니다'를 세션이 중계 기입 — clear 주체 claude): [12미적Ⅰ-02-08] 파생 판정 문항 = 안 나 — 위장 2형태(B3 극대·극소를 selection 없이 묻기 · C3 극값 점 (x,f(x)) 묻기)는 저작 규칙을 필수화해 유지(B3 answer_selection 필수 · C3 극값 x좌표를 문항에 고정)하고, 4형태(A4 증감 구간 구간 기호 답 · A3 경계 포함 여부 · A5 구간을 함수식 단독 조건으로 표현 · C4 극값의 값만 답)는 제외한다. 분모 7 유지. 저작 규칙으로 올릴 단서: B2 의 selection 은 작성자 사전 계산 의존 · C2 는 x 가 묶여 있는 동안만 가능. 결정 원문은 PR #1449 댓글 https://github.com/kiki-s-broom/WhyMath/pull/1449#issuecomment-5996261730 (Claude 세션이 남긴 댓글이라 진위는 사용자 확인으로 갈음). 판정 기준: PR #1449 head 86c0c3f1(미머지 — 병합 후 main 해시는 머지 뒤 별도 확인) · 근거 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-10-03] verdict PASS · inputs: P3-21-derived-shape-probe-monotonic-extremum · evidence: 판정문 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4 · 판정 기준 main 381ec106 위 PR #1449(미머지·브랜치 기준). PASS의 뜻은 결정 입력이 완성돼 Kiki의 처분(가/나/다)이 가능해졌다는 것: 13형태 중 가능 7·일부 가능 1·불가 1·위장 2·정답 오거부 2, 제외 후보 6형태 명시. 어느 안을 택할지는 게이트 담당자 몫. — done P3-21-derived-shape-probe-monotonic-extremum 인계"
