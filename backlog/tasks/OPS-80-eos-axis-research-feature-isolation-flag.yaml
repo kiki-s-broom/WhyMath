@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: blocked
 priority: 3
 eos_priority: P1
 owner: claude
@@ -22,5 +22,5 @@ paths:
   - src/backend/whymath_backend/config.py
   - "tests/backend/**"
 session: null
-notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B2 · §5 B급 미등재 후보 2. 2026-09-15 재대조(판정 기준 main 4b33d243)에서 이 후보가 **소유자 0건**으로 남아 있음을 확인해 등재한다 — CLAUDE.md Gate D(소유자 없는 알려진 결함을 만들지 않는다)·'만료 없는 유예·제외 금지' 집행. 갭리뷰 §5는 B급 8건을 \"Kiki 판정 대기\"로 산문에만 남겼고, eos_phase0_gate_a_e_judgment_2026-09-06.md §6이 \"그 8건을 재대조하지 않았다\"고 공백을 명시했다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(기능 플래그·default OFF·미완 기능 격리·experimental) → 무관 1건(HARN-55)만."
-updated: 2026-09-15
+notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B2 · §5 B급 미등재 후보 2. 2026-09-15 재대조(판정 기준 main 4b33d243)에서 이 후보가 **소유자 0건**으로 남아 있음을 확인해 등재한다 — CLAUDE.md Gate D(소유자 없는 알려진 결함을 만들지 않는다)·'만료 없는 유예·제외 금지' 집행. 갭리뷰 §5는 B급 8건을 \"Kiki 판정 대기\"로 산문에만 남겼고, eos_phase0_gate_a_e_judgment_2026-09-06.md §6이 \"그 8건을 재대조하지 않았다\"고 공백을 명시했다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(기능 플래그·default OFF·미완 기능 격리·experimental) → 무관 1건(HARN-55)만.\n\n[차단 2026-10-05] acceptance ⑤: E축·연구성 기능의 범위 확정이 선행 판단(Kiki)이다 — 확정 전 플래그 선제 추가 금지. 범위 후보 목록 제시 후 판정 필요"
+updated: 2026-10-05
