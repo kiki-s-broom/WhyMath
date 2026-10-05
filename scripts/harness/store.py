@@ -192,12 +192,12 @@ def _duplicate_key_loader() -> type:
         for key_node, _ in node.value:  # type: ignore[attr-defined]
             if key_node.tag == _MERGE_TAG:
                 continue
-            # 생성 실패(미지 태그 등)는 삼키지 않는다 — 어차피 아래 PyYAML 본 구성이 같은 오류를 낸다.
+            # 생성 실패(미지 태그 등)는 삼키지 않는다 — 아래 PyYAML 본 구성이 같은 오류를 낸다.
             # 병합 키(`<<`)는 생성기가 없어 여기서 예외가 나므로 위 면제 절이 실제로 필요하다.
             key = loader.construct_object(key_node, deep=True)
             try:
                 hash(key)
-            except TypeError:  # 해시 불가 키는 PyYAML 자신이 오류를 낸다 — 여기서 대신 판정하지 않는다
+            except TypeError:  # 해시 불가 키는 PyYAML 본 구성이 오류를 낸다 — 대신 판정 안 함
                 continue
             line = key_node.start_mark.line + 1
             if key in seen:

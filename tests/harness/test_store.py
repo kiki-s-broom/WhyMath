@@ -325,7 +325,9 @@ class TestYamlDuplicateKey:
         text = path.read_text(encoding="utf-8")
         marker = "    title: 잠금 게이트\n"
         assert text.count(marker) == 1, text  # 주입 대상 실재 단언
-        path.write_text(text.replace(marker, marker + "    title: 뒤에 온 제목\n"), encoding="utf-8")
+        path.write_text(
+            text.replace(marker, marker + "    title: 뒤에 온 제목\n"), encoding="utf-8"
+        )
         backlog, errors = store.load_backlog(tmp_path)
         dup = [e for e in errors if self._MARK in e]
         assert len(dup) == 1, errors
