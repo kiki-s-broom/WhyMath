@@ -18,6 +18,94 @@ claude
 > /implement L1-data-foundation  # L1 데이터 기반 구현 착수
 ```
 
+## 로컬 부트스트랩 — 새 기기에서 서비스 띄우기
+
+> 임의의 새 기기·새 세션 기준이다(Kiki 머신 전용 데모 런북 `docs/ops/**`와 별개). 전제: **Python 3.12** · **Docker**(또는 pgvector가 들어 있는 PostgreSQL 16). 명령은 저장소 루트에서 시작한다. 각 단계의 `자가검증`은 **그 단계 산출물 자체**를 본다 — 실패하면 다음 단계로 가지 않는다.
+
+**1. 파이썬 환경과 의존성**
+
+```bash
+python3.12 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade "pip<27"
+python -m pip install -e "src/backend[dev]"
+python -m pip install -e src/data-pipeline
+```
+
+자가검증 — 두 패키지가 같은 인터프리터에서 import 된다.
+
+```bash
+python -c "import whymath_backend, data_pipeline"
+```
+
+**2. 데이터베이스 (pgvector 포함 PostgreSQL 16)** — 호스트 포트는 `5433`을 쓴다(5432는 다른 프로젝트가 쓰는 경우가 많다).
+
+```bash
+docker run -d --name whymath-pg -p 5433:5432 \
+  -e POSTGRES_USER=whymath -e POSTGRES_DB=whymath \
+  -e POSTGRES_HOST_AUTH_METHOD=trust pgvector/pgvector:pg16
+export WHYMATH_DATABASE_URL=postgresql+asyncpg://whymath@127.0.0.1:5433/whymath
+```
+
+자가검증 — DB가 실제로 쿼리에 답한다(컨테이너가 떴다는 사실만으로는 부족하다).
+
+```bash
+docker exec whymath-pg psql -U whymath -d whymath -tAc "SELECT 1"
+```
+
+**3. 마이그레이션**
+
+```bash
+cd src/backend
+python -m alembic upgrade head
+```
+
+자가검증 — 현재 리비전이 head 이다.
+
+```bash
+python -m alembic current | grep -q "(head)"
+```
+
+**4. 서버 기동** (같은 셸 · `src/backend`에서)
+
+```bash
+nohup python -m uvicorn whymath_backend.app:create_app --factory --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+SERVER_PID=$!
+sleep 8
+```
+
+자가검증 — **내가 띄운 프로세스**가 살아 있고 기동을 끝냈다. `/health/live`가 200이어도 이것을 대신하지 못한다: 포트를 먼저 잡고 있던 다른 프로세스(이전 서버·좀비)가 응답했을 수 있고, 그 사이 새 서버는 `address already in use`로 죽어 있을 수 있다.
+
+```bash
+kill -0 "$SERVER_PID" && grep -q "Application startup complete" uvicorn.log
+```
+
+스모크 — DB 연결까지 포함한 준비 상태(위 자가검증이 통과한 뒤에만 의미가 있다).
+
+```bash
+curl -fsS http://127.0.0.1:8000/health/ready | python -c "import sys, json; sys.exit(0 if json.load(sys.stdin)['components']['database']['reachable'] else 1)"
+```
+
+> `redis`·`llm_router`가 `reachable: false`로 보이는 것은 정상이다(필수 구성요소가 아니다 — `required: false`).
+
+**5. 테스트 확인** (저장소 루트에서)
+
+```bash
+cd ../..
+python -m pytest -c src/backend/pyproject.toml --rootdir=src/backend tests/backend/test_config.py tests/backend/test_app.py
+```
+
+테스트 경로를 그냥 넘기면 pytest 가 설정 파일을 못 읽어 **가드가 막는다**(`-c`·`--rootdir` 가 그 이유다). 판정은 종료 코드로 한다 — 출력을 `-q`·`| tail`로 줄이지 않는다.
+
+**6. 정리**
+
+```bash
+kill "$SERVER_PID"
+docker stop whymath-pg
+```
+
+> 이 절의 경로·명령이 저장소에 실재하는지는 `tests/infra/test_readme_bootstrap.py`가 대조한다. 스택을 바꾸면 이 절도 함께 고친다.
+
 ## 프로젝트 정체성
 
 **한 줄 요약**: 성취기준 정밀 매핑 + 메타인지·사고력 코칭 + 단계별 진단 + 로컬 LLM 비용 구조 = 한국 사교육 시장의 *비어 있는 자리*에 자리 잡는 앱.
