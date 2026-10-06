@@ -216,8 +216,9 @@ function parseConflict(raw: unknown): Extract<ReviewTransitionResult, { kind: "c
   if (!isRecord(raw) || !isRecord(raw.detail)) return null;
   const { code, message, current_status: currentStatus } = raw.detail;
   if (code !== "stale_status" && code !== "illegal_transition") return null;
-  if (!isStr(message) || !isStr(currentStatus)) return null;
-  return { kind: "conflict", code, message, currentStatus };
+  // 검수 상태가 미지정(null)인 문항은 서버가 current_status를 null로 보낸다 — 충돌로 읽되 "unset"으로 표기.
+  if (!isStr(message) || !(isStr(currentStatus) || currentStatus === null)) return null;
+  return { kind: "conflict", code, message, currentStatus: currentStatus ?? "unset" };
 }
 
 /** 403·422의 사유 문자열. FastAPI 422는 detail이 배열일 수 있어 문자열이 아니면 빈 값. */
