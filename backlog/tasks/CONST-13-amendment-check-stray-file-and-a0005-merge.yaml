@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: math
 layer: infra
-status: in_progress
+status: blocked
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - scripts/constitution/check_amendment.py
   - tests/infra/test_coding_constitution_amendment_check.py
   - docs/constitution_proposals/
-session: claude/dreamy-albattani-a99dad
-notes: "CONST-03 추가 검토(2026-10-06)에서 파생. CONST-03 은 병렬 세션이 claim 중이라 같은 태스크에 손대지 않고 후속으로 분리한다.\n\n[정정 2026-10-06] depends_on 제거 1건: 오등재 의존 정정 — 병렬 세션이 소유한 태스크와 분리한 작업이라 의존을 두지 않는다"
+session: null
+notes: "CONST-03 추가 검토(2026-10-06)에서 파생. CONST-03 은 병렬 세션이 claim 중이라 같은 태스크에 손대지 않고 후속으로 분리한다.\n\n[정정 2026-10-06] depends_on 제거 1건: 오등재 의존 정정 — 병렬 세션이 소유한 태스크와 분리한 작업이라 의존을 두지 않는다\n\n[차단 2026-10-06] 세션 1태스크 규칙 임시 해소 — CONST-03 은 병렬 세션이 소유한 점유가 남아 있어 PR 오픈 뒤 done 하려고 보류한다"
 updated: 2026-10-06
