@@ -970,7 +970,7 @@ def _misconception_frames() -> list[Frame]:
         Frame("mc-y-intercept-of-tangent", _grid("p3-tan:m3", pool, pts), m3),
         Frame("mc-tangent-line-value", _grid("p3-tan:m4", pool, pts, (-2, 0, 3, 4)), m4),
         Frame("mc-find-point-on-parabola", _grid("p3-tan:m5", (2, 3, 4, 5, 6, 7, 8)), m5),
-        Frame("mc-find-point-on-cubic", _grid("p3-tan:m6", (2, 3, 4, 5, 6, 8, 27)), m6),
+        Frame("mc-find-point-on-cubic", _grid("p3-tan:m6", (3, 4, 5, 6, 7, 9, 10)), m6),
     ]
 
 
@@ -1105,7 +1105,7 @@ def _diagnostic_frames() -> list[Frame]:
             _grid("p3-tan:d5", (1, 2, -1, 3, -2), (-3, -2, -1, 1, 2, 3, 4)),
             d5,
         ),
-        Frame("diag-slope-at-origin-of-power", _grid("p3-tan:d6", (2, 3, 4, 5, 6, 7, 8)), d6),
+        Frame("diag-slope-at-origin-of-power", _grid("p3-tan:d6", (2, 3, 4, 5, 8, 9, 10)), d6),
     ]
 
 

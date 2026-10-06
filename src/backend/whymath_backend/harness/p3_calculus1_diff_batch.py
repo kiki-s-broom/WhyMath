@@ -43,6 +43,15 @@ from whymath_backend.harness.problem_corpus_batch import (
     JsonlCorpusSink,
 )
 from whymath_backend.l3.equivalent.orchestrator import run_equivalent_generation
+from whymath_backend.l3.equivalent.p3_diff_equation_application_skeleton_generator import (
+    P3DiffEquationApplicationGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator import (
+    P3DiffGraphShapeGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
+    P3DiffMeanValueTheoremGenerator,
+)
 from whymath_backend.l3.equivalent.p3_diff_polynomial_rules_skeleton_generator import (
     P3DiffPolynomialRulesGenerator,
 )
@@ -54,6 +63,12 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     SLOT_NAMES_KO,
     P3DiffSlotGenerator,
     skeleton_of,
+)
+from whymath_backend.l3.equivalent.p3_diff_tangent_line_skeleton_generator import (
+    P3DiffTangentLineGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator import (
+    P3DiffVelocityAccelerationGenerator,
 )
 from whymath_backend.l3.verification_tier import VerificationTier
 
@@ -71,6 +86,11 @@ CORPUS_DIR_NAME: Final = "problem_bank_p3_calculus1_diff_v0"
 GENERATORS: Final[tuple[type[P3DiffSlotGenerator], ...]] = (
     P3DiffPowerDerivativeGenerator,
     P3DiffPolynomialRulesGenerator,
+    P3DiffTangentLineGenerator,
+    P3DiffMeanValueTheoremGenerator,
+    P3DiffGraphShapeGenerator,
+    P3DiffEquationApplicationGenerator,
+    P3DiffVelocityAccelerationGenerator,
 )
 
 #: 사이드카 `generated` — 은행이 처음 만들어진 날. 의도적 내용 변경이 아니면 바꾸지 않는다
