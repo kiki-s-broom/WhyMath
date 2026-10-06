@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,12 @@ requires_gates: []
 acceptance:
   - "게이트 G-p321-derived-form-disposition(Kiki 결정 2026-10-05 · 안 나)이 [12미적Ⅰ-02-08] 파생 판정 문항의 위장 2형태를 저작 규칙 필수로 유지하기로 했다. 그 규칙이 산문으로만 있으면 어긴 문항이 코퍼스에 들어가도 막는 곳이 없다 — 집행을 만든다. ① 규칙 B3: 극대·극소를 묻는 극값 x좌표 문항은 verify 에 answer_selection(smallest/largest)이 반드시 있다(없으면 극소점을 극대점이라 답해도 통과 — 프로브 위장). ② 규칙 C3: 극값의 값·점을 묻는 문항은 극값 x좌표를 검산 조건에 고정한다(answer_map 에 x 포함 — 없으면 정답도 fail·곡선 위 임의 점은 통과). ③ 제외 4형태 차단: 구간 기호로 답하는 증감 구간·경계 포함 여부·함수식 단독 조건 표현·x 없는 극값의 값은 02-08 문항으로 허용하지 않는다. ④ 집행 지점은 코퍼스 적재 전 린트 또는 저작 수용 게이트 중 기존 경로를 먼저 찾아 거기에 붙인다(신규 모듈은 EOS 인벤토리 귀속 대상이니 최소화). ⑤ 변별력 — 규칙을 어긴 문항(selection 없는 극대 x좌표·x 없는 극값의 값 등)이 RED, 지킨 문항이 GREEN 임을 양방향 테스트와 뮤테이션으로 확인한다. ⑥ 단서 반영: B2 의 selection 은 작성자 사전 계산에 의존하고 C2 는 x 가 묶여 있는 동안만 가능하다는 점을 규칙 문서에 명시한다. 근거 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4 · 게이트 증적 PR #1449 댓글 issuecomment-5996261730"
 artifacts: []
-paths: []
-session: null
-notes: ""
-updated: 2026-10-05
+paths:
+  - src/backend/whymath_backend/l1/problem_bank/derived_form_rules.py
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - tests/backend/l1/test_derived_form_rules.py
+  - docs/standards/derived_judgment_authoring_rules.md
+  - scripts/analysis/eos_feature_inventory_v2.py
+session: claude/gracious-clarke-9hdhez
+notes: "[정정 2026-10-06] paths [] → ['src/backend/whymath_backend/l1/problem_bank/derived_form_rules.py', 'src/backend/whymath_backend/l1/problem_bank/populate.py', 'tests/backend/l1/test_derived_form_rules.py', 'docs/standards/derived_judgment_authoring_rules.md', 'scripts/analysis/eos_feature_inventory_v2.py']: 집행 지점·산출물 파일을 범위에 선언(착수 시 paths 미선언)"
+updated: 2026-10-06
