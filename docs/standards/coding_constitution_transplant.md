@@ -131,6 +131,12 @@ AI가 `constitution/`을 고치려 하면 가드가 막고, 그 거부는 **우�
 
 **P1 이 보지 못하는 것 (정직 고지)**: 스텝의 `if:` 조건·잡의 `needs`/경로 필터로 실제로는 안 도는 경우 · 셸 변수·`$(...)` 치환 · 파이썬 스크립트가 내부에서 다른 도구를 부르는 경우(래퍼 한 단계 외). 보지 못한 것은 '연결'로 세지 않는다.
 
+**CONST-03 P2 — 작은 규칙 4건 (2026-10-05 · 판정 기준: `claude/dreamy-albattani-a99dad` 브랜치)**
+- **R0-02** — `scripts/constitution/check_amendment.py` 신설 + CI harness-integrity 스텝(등록 run 문자열과 글자까지 동일). 실제 헌법 이력 3커밋(`09501c5f`·`8a0e4678`·`116060df`)을 대조군으로 재생해 **전건 exit 0**(정상 개정을 막지 않음)을 확인했다. 뮤테이션 14종 전건 RED(처음 1종 생존 — 분기 뒤 main 이 앞서간 픽스처 부재 — 을 테스트 추가로 닫음).
+- **R1-02** — 새 도구 없이 CI 스텝만 추가(`pipeline_check.py --downstream standards`, 등록 명령 그대로). P1 이 '거짓 통과'로 드러낸 미연결을 해소한다.
+- **R4-03** — `tests/infra/test_docs_numbers.py` 신설: 원자 백본 노드·엣지(2,683·2,210 → CLAUDE.md·00_overview.md)·M-id(843 → 04·04c). 스캔 0건은 실패. 뮤테이션 7종 RED. **시그니처 패턴 수는 대조하지 못한다** — 저장소에 셀 원본이 없다('55+108'은 ROADMAP 설계 수치). **rules.yaml 은 이 파일을 `tests/test_docs_numbers.py`(`pytest -q …`)로 등록**해 두어 단계 3 심사는 계속 '집행 장치 없음'이다 — 경로 정정은 P4 개정 초안의 몫이다.
+- **R2-04** — `scripts/constitution/review_health.py` 신설(판정 논리 + 테스트 18건·뮤테이션 15종 RED). **한계**: 실제 검토 이벤트는 Kiki 머신에만 있어 CI 가 실데이터를 판정할 수 없다. 규칙의 단계도 rules.yaml 4 ↔ 대조표 3 으로 갈린다 — P4 에서 결정한다. 맨몸 run 은 `--events` 없이 exit 2(측정 불가)라 단계 4 에서 그대로 '실행 실패'로 판정된다는 점도 P4 에서 풀어야 한다(규칙에 `run` 인자·판정 장소 축 필요).
+
 **헌법 본문의 오기 (Kiki 판단 — 다음 개정 때 함께 정정 권장)**
 - `CONSTITUTION.md` 머리말 "AI는 읽기만 할 수 있다 (제8조)" — AI 권한 한계는 **제9조**다.
 - 표준북 부록 C 본문 "3단계의 44개 규칙" — 같은 파일의 표와 `rules_additions_v1.1.yaml` 실측은 **45건**이다.
