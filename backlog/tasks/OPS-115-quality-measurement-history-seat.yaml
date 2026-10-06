@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-115-quality-measurement-history-seat
+title: "품질·운영 측정의 이력 좌석 0 — 리포트가 러너와 함께 소멸하고 추세를 볼 수 없다(OPS-30 ④ 배제 전제 소멸)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① qa_report.json 생존 — ci.yml:193이 --json으로 리포트를 만들지만 그 잡에 upload-artifact 스텝이 없어 러너와 함께 소멸한다(전체 워크플로 upload-artifact 2건은 coverage 전용). 기존 upload-artifact 패턴(ci.yml:171·315)을 재사용해 최소 1홉을 잇는다. ci.yml:190 주석의 '리포트는 그대로 남는다'가 사실이 되게 한다.\n② 추세 좌석 1개 — 품질/운영 지표의 시계열 저장이 DB 41종 전수에서 0건이다(timeseries 3종은 학습 분석이지 품질 아님). 저장 평면은 PostgreSQL+TimescaleDB로 한다 — ClickHouse는 2026-08-11 미도입 확정(행동 로그 정본 = PG 단일 평면). 최소 1지표부터 시작하고 스키마 확장은 후속.\n③ OPS-30 경계 명시 — OPS-30 acceptance ④가 '지표 영속화(ClickHouse 적재)'를 범위 밖 동결했는데, ClickHouse 미도입 확정으로 그 배제가 지목한 기전이 사라졌다. 이 태스크가 영속화 축의 소유자가 됨을 두 태스크 notes에 교차 기록해 '만료 없는 유예'로 남지 않게 한다.\n④ 범위 밖 동결 — 실시간 대시보드·Grafana/Prometheus(app.py:716이 과공학으로 배제)·알림 발송 채널(OPS-30 ① 소유)·외부 업타임 프로브(OPS-30 ② 소유)는 포함하지 않는다. 이 태스크는 '측정 결과가 시간을 건너 살아남는가' 한 홉만 닫는다."
+artifacts: []
+paths:
+  - ".github/workflows/ci.yml"
+  - "src/backend/whymath_backend/ops/**"
+  - "tests/infra/**"
+session: null
+notes: "2026-08-11 data_platform_eos_frame_gap_review_2026-08-11.md D3. 품질 모니터링의 세 홉(알림→사람·이력→저장소·스케줄→실행) 중 '이력→저장소'만 소유자가 없었다. 실측: qa_report.json upload-artifact 0건, 품질 지표 추세 테이블 0건(DB 41종 전수). 품질 모니터링의 정의상 이력이 없으면 추세(품질 저하)를 볼 수 없고 매 실행이 단발 스냅샷이 된다. OPS-30 ④가 이 축을 'ClickHouse 적재'라는 이유로 배제했으나 2026-08-11 Kiki 결정으로 ClickHouse 미도입이 확정돼 배제의 전제가 소멸. [OPS-41 회수] 원 번호 OPS-36(t608mk) → main에 동번호 별건(OPS-36-wh1-llm-observability-cache-wiring, done)이 있어 CLI 재발급 OPS-115."
+updated: 2026-10-05

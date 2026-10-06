@@ -131,6 +131,32 @@ AI가 `constitution/`을 고치려 하면 가드가 막고, 그 거부는 **우�
 
 **P1 이 보지 못하는 것 (정직 고지)**: 스텝의 `if:` 조건·잡의 `needs`/경로 필터로 실제로는 안 도는 경우 · 셸 변수·`$(...)` 치환 · 파이썬 스크립트가 내부에서 다른 도구를 부르는 경우(래퍼 한 단계 외). 보지 못한 것은 '연결'로 세지 않는다.
 
+**CONST-03 P2 — 작은 규칙 4건 (2026-10-05 · 판정 기준: `claude/dreamy-albattani-a99dad` 브랜치)**
+- **R0-02** — `scripts/constitution/check_amendment.py` 신설 + CI harness-integrity 스텝(등록 run 문자열과 글자까지 동일). 실제 헌법 이력 3커밋(`09501c5f`·`8a0e4678`·`116060df`)을 대조군으로 재생해 **전건 exit 0**(정상 개정을 막지 않음)을 확인했다. 뮤테이션 14종 전건 RED(처음 1종 생존 — 분기 뒤 main 이 앞서간 픽스처 부재 — 을 테스트 추가로 닫음).
+- **R1-02** — 새 도구 없이 CI 스텝만 추가(`pipeline_check.py --downstream standards`, 등록 명령 그대로). P1 이 '거짓 통과'로 드러낸 미연결을 해소한다.
+- **R4-03** — `tests/infra/test_docs_numbers.py` 신설: 원자 백본 노드·엣지(2,683·2,210 → CLAUDE.md·00_overview.md)·M-id(843 → 04·04c). 스캔 0건은 실패. 뮤테이션 7종 RED. **시그니처 패턴 수는 대조하지 못한다** — 저장소에 셀 원본이 없다('55+108'은 ROADMAP 설계 수치). **rules.yaml 은 이 파일을 `tests/test_docs_numbers.py`(`pytest -q …`)로 등록**해 두어 단계 3 심사는 계속 '집행 장치 없음'이다 — 경로 정정은 P4 개정 초안의 몫이다.
+- **R2-04** — `scripts/constitution/review_health.py` 신설(판정 논리 + 테스트 18건·뮤테이션 15종 RED). **한계**: 실제 검토 이벤트는 Kiki 머신에만 있어 CI 가 실데이터를 판정할 수 없다. 규칙의 단계도 rules.yaml 4 ↔ 대조표 3 으로 갈린다 — P4 에서 결정한다. 맨몸 run 은 `--events` 없이 exit 2(측정 불가)라 단계 4 에서 그대로 '실행 실패'로 판정된다는 점도 P4 에서 풀어야 한다(규칙에 `run` 인자·판정 장소 축 필요).
+
+**CONST-03 P3 — 중간 규칙 (2026-10-06 · 판정 기준: `claude/dreamy-albattani-a99dad` 브랜치, P2 머지 `a5a30dea` 위)**
+
+단계 3 미리보기 차단 50 → 47(`audit.py --stage 3` 실행 포함 모드에서도 R1-01·R1-03·R2-02·R2-03·R3-01 통과).
+
+- **R1-01·R1-03** — 새 장치 없음. P1 이 CI 스텝을 YAML 명령 단위로 읽게 된 뒤 기존 `콘텐츠 파이프라인 그래프 검사` 스텝이 두 규칙의 등록 명령을 포함하는 것으로 판정돼 이미 '통과'다(CONST-02 착지분).
+- **R2-03** — `tests/constitution/test_gate_schema.py`(18건). 대상은 `GateRecord`(버전 전이 게이트 기록)뿐이다: 4요건 필드 존재·생략 거부·실제 `plan_transition` 경로가 *채워서* 내는가. 필드 하나씩 뺀 모델로 검사 함수의 변별을 확인한다. `bypassed`는 어떤 경로에서도 True 가 되지 않아(제9조 ②) 필드의 존재만 지키고 우회 시의 기록은 못 본다. **`ReviewTimerEvent`(우회 필드 없음)·`ReviewQueueEntry`(판정자 없음)는 대상에서 뺐다 — '게이트 기록'에 포함할지는 Kiki 판단이다.**
+- **R2-02** — `tests/constitution/test_gate_independence.py`(8건). 코드 경로 불변식: `rejected_duplicate` 후보가 `needs_review`·`rejected_gate` 와 같은 길(큐 → 검수 항목 → 검수 세션 → finished)로 판정을 받는다 · 큐 입구가 status 로 거르지 않는다 · 상태 어휘 동기(`GenerationOutcome.status` ↔ `_STATUS_PRIORITY` ↔ `ACCEPTED_STATUSES`) · 보류([s])는 종결이 아니라 재개 때 다시 제시된다. **못 막는 것: 판정되지 않고 남은 보류분의 상한** — 판례 P0001 이 정확히 이 경로였다(중복 9건을 보류해 6/15만 판정). 보류 허용 여부와 '모든 후보'의 범위(라이브 큐만인가, 결정론 배치 산출물도 포함인가)는 Kiki 정책 결정이다.
+- **R3-01** — `tests/test_idempotency.py`(11건). 배치를 돌리지 않고 **'두 번 실행 테스트가 있는가'를 AST 로 전수 강제**한다: `harness/*_batch.py` 36개마다 `tests/backend/harness/test_<이름>.py` 가 있고, 한 테스트 함수가 배치 진입점(`main`·`run_*`)을 두 번 이상 부르며 `==` 단언을 갖는다(테스트 *이름*은 보지 않는다). 실측으로 36개 중 **35개가 이미 충족, 1개(`concept_content_review_batch`)가 위반**이었다 — 그 배치는 행마다 `datetime.now()`를 찍어 바이트 동일이 성립하지 않아 시계 필드(timestamp·latency_ms)를 뺀 재실행 동일성 테스트를 새로 써서 닫았다(면제 아님·`EXEMPT` 0건, 면제는 만료일을 강제). **범위 밖**: `scripts/*.py` 적재·백필 CLI 8개 · `problem_corpus_accumulate`(라이브 LLM append — 설계상 두 번 돌리면 행이 늘어난다) · populate 계열 17개 — '배치 스크립트'의 정의를 넓힐지는 Kiki 정책 결정이다.
+- **R4-02 — 이번 PR 에서 하지 않았다(결정 대기)**: 규칙 전제("Python·Dart 데이터 모델은 `schemas/` 의 JSON Schema 에서 자동 생성")가 이 저장소와 다르다. `schemas/v1.1/*.yaml` 은 있으나 Python 모델(`schema/problem.py` 등)은 손으로 쓴 Pydantic 이고 생성 도구(`datamodel-codegen` 등)·`scripts/check_generated.sh` 는 없다. 통과시키려면 (가) 생성기를 도입하거나 (나) 규칙 문구를 '스키마 YAML ↔ 모델 필드 일치 검사'로 바꿔야 한다 — 헌법 개정(Kiki 채택)이 필요하다.
+
+배선: R2-02·R2-03 은 `ci.yml` backend 잡의 `헌법 집행 테스트` 스텝(루트에서 `pytest -q tests/constitution` — `tests/constitution` 은 backend testpaths 밖이라 전체 Pytest 스텝이 보지 못한다), R3-01 은 infra-contracts 잡의 `배치 두 번 실행 테스트 전수` 스텝(백엔드 import 0). 새 디렉터리는 해당 잡의 ruff·black 대상에도 추가했다. 뮤테이션 11종(소스 변형: 게이트 기록 필드 삭제·기본값 반전·판정자 상수화·큐 입구 중복 제외·우선순위 표 삭제·보류를 종결로 계상 등) 전건 RED, R3-01 은 가짜 트리에 위반 5종(테스트 없음·한 번만 실행·비교 단언 없음·이름만 결정론·진입점 아닌 함수)을 주입해 전건 검출했다.
+
+**CONST-03 P4 — 정정 초안·단계 3 준비 판정·헌법 밖 보호(⑦) (2026-10-06 · 판정 기준: main `3d2b95e3`)**
+
+- **정정 초안**: `docs/constitution_proposals/A0005_part1_corrections_draft.md` + 패치 `rules_A0005_part1_corrections.patch`(R4-03 경로 · R2-04 단계·실행 · 머리말 `timeout_sec`/`cwd`/`shell` 설명 3줄). 패치는 현재 `rules.yaml` 에 `patch -p1 --dry-run` 으로 깨끗이 적용된다. 적용 사본에서 `audit.py --stage 3`: 차단 47 → 46, **파트 I(0~4장)에서 남는 것은 R4-02 한 건**이고 나머지 45건은 5~29장(CONST-04~08).
+- **단계 3 상향 판정**: 파트 I 은 R4-02 만 남기고 준비됐으나 `STAGE` 는 전역이라 지금 3 으로 올리면 파트 II~VII 단계 3 규칙 45건이 한꺼번에 판정돼 래칫이 red 가 된다 → **상향은 CONST-04~08 착지 뒤**. 이 PR 은 `STAGE` 를 건드리지 않는다(AI 는 `constitution/` 을 편집할 수 없다).
+- **R4-02**: 전제 불일치를 실측으로 확인했다 — `schemas/v1.1/*.yaml` 은 JSON Schema 가 아니라 `fields:` 구조이고 머리말이 스스로 '구본 명세(비정본)·미구현·필드 체계 상이'라고 선언한다. 3택(A 방향 뒤집기 권고 · B 생성기 도입 비권고 · C 철회/이월)은 초안에 있고 게이트 `G-const-r4-02-decision` 이 Kiki 판정을 기다린다.
+- **헌법 밖 경로 보호(⑦) — 가용성 실측 (CLAUDE.md '설정 부재≠설정 가능' 절차)**: 저장소 `kiki-s-broom/WhyMath` 는 **Organization 소유·public**(`GET /repos`), 기본 브랜치 룰셋(`16623542`)은 `pull_request`(필수 승인 0명 · `require_code_owner_review: false`)·`deletion`·`non_fast_forward`·`merge_queue`·필수 체크를 가진다. `.github/CODEOWNERS` 는 있으나 **모든 경로의 소유자가 `@doldori7` 하나**이고, PR 작성자도 같은 계정이다(이 세션의 PR 작성자 표기가 `doldori7`). 따라서 ①**코드 오너 리뷰 필수**는 GitHub 가 작성자 본인 승인을 인정하지 않으므로 켜는 순간 **모든 PR 이 막힌다**(사람과 AI 세션이 같은 신원). ②룰셋의 **우회 주체는 역할·팀·앱**이라 같은 신원을 가른 사용자 단위 예외를 만들 수 없다. 조직 플랜은 이 세션의 프록시가 `orgs/` 경로를 막아 **확인하지 못했다(제공 여부 미확인)** — 플랜에 달린 룰셋 기능(경로 제한 푸시 룰 등)은 판정하지 않았다.
+  - 남는 현실적 후보: (가) 현상 유지 — 가드 훅(`.claude/hooks/guard_constitution.py`)과 R0-02(`check_amendment.py`: 개정 기록 동반)가 *절차*를 막는다. 한계: 신원이 같아 "사람이 아니라 AI 가 고쳤다"를 GitHub 쪽에서 구별하지 못한다. (나) **서명 검증 CI 스텝** — `constitution/` 을 바꾸는 커밋은 Kiki 만 가진 서명 키(공개키는 저장소에 커밋)로 서명됐을 때만 통과. AI 세션은 키가 없어 서명할 수 없다. 비용: Kiki 머신의 서명 설정과 CI 검증 스텝이 필요하고 서명 없는 합법적 개정 경로(웹 UI 편집 등)가 막힌다. (다) 별도 계정·봇을 만들어 작성자를 분리한 뒤 코드 오너 리뷰 필수 — 신원 체계 변경이라 비용이 크다. 선택은 Kiki 몫이고 게이트 `G-const-protection-outside-claude` 에 올렸다.
+
 **헌법 본문의 오기 (Kiki 판단 — 다음 개정 때 함께 정정 권장)**
 - `CONSTITUTION.md` 머리말 "AI는 읽기만 할 수 있다 (제8조)" — AI 권한 한계는 **제9조**다.
 - 표준북 부록 C 본문 "3단계의 44개 규칙" — 같은 파일의 표와 `rules_additions_v1.1.yaml` 실측은 **45건**이다.

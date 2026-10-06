@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-198-done-claim-release-before-record-visible
+title: "done이 원격 claim을 놓고 done 기록이 원격에 오르기까지 46분 — 머지 큐 대기 중인 PR의 태스크가 무주 todo로 보여 재착수된다(S4-11 중복 구현)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-29 · 판정 기준 main `c08c58c4`): `S4-11-hint-content-generation`이 두 세션에서 착수돼 같은 슬라이스가 두 번 구현됐다. 시각은 UTC다. `claude/ecstatic-feynman-bxxxvd`는 start 04:17:49 · PR #1372 머지 큐 진입 · `done` 이벤트 07:24:36(원격 claim 즉시 해제) · done 기록 커밋 `ee4ae446`은 08:10:31이며 그 브랜치에만 있다. `claude/magical-maxwell-hja5kh-s4-11`은 start 07:29:15(원격 claim `ok` · `scan_remote_done(fetch=True)`가 done을 못 봄) 뒤 서브에이전트가 같은 슬라이스를 구현했다(추적 파일 24개 +554/-147 · 신규 19개 · 약 1시간 반). 다른 목적의 점검(#1338 안전망)에서 main에 #1372가 들어온 것을 우연히 보고 09:09에 중단·폐기했다. 착수 시점 main(`97e504aa`)의 S4-11은 `todo`였고 PR #1372는 머지 큐에서 CI를 도는 중이었다. 발견 경로가 검증이 아니라 우연이라는 점이 핵심이다."
+  - "② 원인 축(코드를 읽어서 그렇게 보인다 · 재현 전): 착수 차단 세 겹 — ⑴ 원격 claim ⑵ 트렁크의 requires_gates·depends_on ⑶ 미머지 done(`remote_claims.scan_remote_done`은 `status: done`만 본다) — 이 이 타임라인에서 전부 비었다. ⑴ `done`이 claim을 즉시 걷는다(07:24:36). ⑵ 게이트·의존은 애초에 없었다. ⑶ done 상태를 담은 대장 변경은 finisher의 작업 트리에만 있었고, 그 브랜치의 원격 사본은 `in_progress`였다. 즉 ⑶은 done 기록이 원격에 오르는 순간에야 켜지는데, `done`(claim 해제)과 그 순간 사이가 46분이고 머지 큐 대기가 그 위에 겹친다. 보이지 않은 신호가 둘이다: 형제 브랜치 사본의 `in_progress`(다른 세션이 잡고 있다는 뜻), 그리고 그 태스크 ID를 제목에 담은 열린 PR."
+  - "③ 설계 판정(구현 시작 전 판정문 1건): 후보를 비용과 함께 판정한다. ⓐ 쓰기측 — `done`이 원격 claim 해제를 done 대장 변경이 원격 브랜치에 오른 것을 확인한 뒤로 미룬다(push까지 `done`의 일부로 묶거나, 해제를 청소 경로의 `task_done` 사유에 맡긴다). ⓑ 읽기측 — `start`·`next`가 다른 원격 브랜치에서 같은 태스크가 `in_progress`·`review`·`done`이면서 트렁크에 없고 브랜치 팁이 정책 TTL 이내인 경우를 '형제 진행 중'으로 판정해 착수 후보에서 빼고 `start`를 거부한다(우회는 `--ignore-remote-claim`뿐이며 이벤트가 남는다). ⓒ 둘 다. 판정 근거에 반드시 넣는다: 쓰기측이 무력한 환경(refs/claims push가 프록시에서 상시 실패하던 HARN-07 이력)과 읽기측의 오탐 비용(방치된 옛 브랜치의 `in_progress` 사본이 정당한 착수를 막는다 — 팁 나이와 PR 열림 여부로 어디까지 거를 수 있는가). `HARN-193-unmerged-gate-attach-claim-release-gap` ③(게이트 부착 뒤 claim 반납 공백)이 같은 원격 브랜치 스캔을 쓰므로 두 설계를 대조하고 한 스캔으로 합칠 수 있는지 판정에 적는다."
+  - "④ 변별력: 픽스처는 위 타임라인의 재현이다 — 원격 브랜치 사본이 `in_progress`이고 claim 대장은 비었고 트렁크는 `todo`인 상태에서 `start`가 exit 1이고 대장이 그대로이며 그 브랜치명을 낸다. 대조군 셋을 함께 둔다: 팁이 TTL을 넘긴 방치 브랜치(거부하지 않는다) · 트렁크에 이미 실린 태스크(형제 사본을 무시한다) · 형제 사본이 `todo`인 브랜치(거부하지 않는다). 스캔 자신의 실패(fetch 실패·브랜치 0건)를 '형제 없음'으로 통과시키지 않고 경고를 낸다(측정 실패는 통과가 아니다). 판정 절을 하나씩 제거하는 뮤테이션마다 RED여야 하고, 주입 적용과 바이트 동일 원복을 단언한다."
+  - "⑤ 집행 지점(정본화와 별항): 새 스캔이 `cmd_start`와 `cmd_next`의 실제 호출 경로에서 불리는지를 배선 테스트로 동결한다. 함수가 존재한다는 것과 서빙 경로가 그것을 부른다는 것은 다르다."
+artifacts:
+  - "PR #1490 — https://github.com/kiki-s-broom/WhyMath/pull/1490 (판정 기준 main 6d631adb6 + 브랜치 병합 커밋 62a263530, ci_mirror 전 잡 통과)"
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/remote_claims.py
+  - scripts/harness/selector.py
+  - "tests/harness/test_*sibling*claim*.py"
+session: null
+notes: "출처: 2026-09-29 /drive 4차 — S4-11을 착수해 서브에이전트에 위임한 뒤 #1338 안전망 점검 중 main에서 #1372를 발견했다. 사고 대장 계열 `parallel-duplicate-implementation` 등재 시점에는 13회차였고 main 병합 뒤 같은 계열의 다른 세션 1줄이 먼저 들어와 대장 기준 14회차(2회차 이상이라 코드·태스크 대책이 필수). 축 구분 — `HARN-193-unmerged-gate-attach-claim-release-gap`은 게이트 부착 뒤 `unblock`이 claim을 걷는 공백이고, HARN-11은 원격에 오른 미머지 done을 본다. 이 태스크는 `done`이 claim을 걷는 시점과 done 기록이 원격에 오르는 시점 사이의 공백, 그리고 형제 브랜치의 `in_progress` 사본이라는 읽기 신호를 다룬다. 피해: 서브에이전트 구현 약 1시간 반 폐기(추적 24 파일·신규 19 파일 · 백업은 세션 로컬). 중복 착수 자체는 이 세션이 착수 전에 열린 PR을 조회했다면 피할 수 있었으나 그 조회는 절차에 없고, 절차에 없는 확인을 사람 규율에 맡기지 않도록 코드로 등재한다.\n\n[정정 2026-09-29] notes 치환 — 사고 대장 계열 회차 정정 — 등재 결과 13회차(notes에 12회차로 적었음)\n\n[정정 2026-09-30] notes 치환 — main 병합으로 사고 계열 회차가 13에서 14로 밀렸다(다른 세션이 먼저 1줄 추가) — 파생 회차를 사실에 맞춘다"
+updated: 2026-10-06

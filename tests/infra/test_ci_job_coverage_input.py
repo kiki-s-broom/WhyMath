@@ -147,6 +147,9 @@ def _toolset(tmp_path: Path, coverage_src: str | None = None, mirror_src: str | 
     mir = tools / "ci_mirror.py"
     cov.write_text(coverage_src or _COVERAGE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     mir.write_text(mirror_src or _MIRROR_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # 두 도구의 `__main__` 블록이 같은 디렉터리의 _stdio를 임포트한다(OPS-53)
+    stdio = _MIRROR_PATH.parent / "_stdio.py"
+    (tools / "_stdio.py").write_text(stdio.read_text(encoding="utf-8"), encoding="utf-8")
     return cov, mir
 
 

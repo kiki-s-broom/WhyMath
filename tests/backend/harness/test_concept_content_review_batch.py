@@ -134,6 +134,29 @@ class TestBatchReviewFakeLLM:
         assert any(json.loads(line).get("injected") for line in lines)
         assert any(json.loads(line).get("passed") for line in lines)
 
+    def test_rerun_with_same_seed_gives_same_rows_modulo_clock_fields(self, tmp_path: Path) -> None:
+        """R3-01 — 같은 인자로 두 번 돌리면 결과가 같다(시계 필드 timestamp·latency_ms만 제외).
+
+        이 배치는 행마다 `datetime.now()`를 찍으므로 바이트 동일은 성립하지 않는다 — 그래서
+        '결과'를 시계가 아닌 내용으로 정의한다. 시계 외 필드가 하나라도 갈리면(난수·순서·집합 반복
+        순서 의존) 재실행 불안정이다.
+        """
+        argv = ["--fake-llm", "--seed", "123", "--threshold", "0.10", "--out"]
+        outs = [tmp_path / "a.jsonl", tmp_path / "b.jsonl"]
+        assert main([*argv, str(outs[0])]) == 0
+        assert main([*argv, str(outs[1])]) == 0
+
+        def stable_rows(path: Path) -> list[dict[str, object]]:
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            for row in rows:
+                row.pop("timestamp", None)
+                row.pop("latency_ms", None)
+            return rows
+
+        first, second = (stable_rows(o) for o in outs)
+        assert len(first) > 0
+        assert first == second
+
     def test_fake_llm_gate_fails_when_threshold_too_low(self, tmp_path: Path) -> None:
         out = tmp_path / "audit.jsonl"
         # threshold 0.0001 → 모든 결함을 초과로 판정, exit 1

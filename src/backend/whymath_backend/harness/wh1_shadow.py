@@ -113,6 +113,13 @@ class Wh1HarnessShadowObservation(BaseModel):
     n_match_kept: int | None = None
     """이 턴 match_misconception의 **게이트 통과** 후보 수 합(MISC-18). None=구판 레코드."""
 
+    n_match_attribution_unclear: int | None = None
+    """이 턴 match_misconception 중 top-1이 **귀속 불명**이라 확신 진단을 보류한 실행 수(MISC-60·
+    비식별 정수). 하네스는 OCR 신뢰도를 갖지 않아 게이트②가 dormant이므로 보류 = 귀속 불명이다.
+    **None=구판 레코드**(보류 이전 emit)로 "보류 0회"(=0)와 구분한다 — 신판 emit은 항상 기록한다.
+    이 값이 0보다 큰 턴은 `curate_hypothesis`가 감쇠만 했고 `log_evidence`가 거부된 턴이다 — 보류가
+    실사용에서 얼마나 자주 발동하는지는 이 분포로만 알 수 있다(CLAUDE.md '작동한 비율' 원칙)."""
+
     tool_calls: int
     """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일)."""
 
@@ -237,6 +244,24 @@ def _count_match_gate(trace: Sequence[ToolResult]) -> tuple[int, int]:
     return raw, kept
 
 
+def _count_match_attribution_unclear(trace: Sequence[ToolResult]) -> int:
+    """트레이스의 match_misconception 중 귀속 불명(보류)이었던 실행 수의 합(MISC-60).
+
+    `_count_match_gate`의 자매 함수다 — 하네스가 트레이스에 실어 둔 `match_gate_counts`의
+    `attribution_unclear`를 **합산만** 한다(판정 재구현 0). 거부된 match(`ok=False`)·구판 결과
+    (None)·match가 아닌 도구 결과는 0으로 합산된다. 산출은 비식별 정수 1개뿐이다.
+    """
+    total = 0
+    for result in trace:
+        if result.kind != "match_misconception" or not result.ok:
+            continue
+        counts = result.match_gate_counts
+        if counts is None:
+            continue
+        total += counts.get("attribution_unclear", 0)
+    return total
+
+
 def emit_wh1_observation(
     outcome: TurnOutcome,
     *,
@@ -265,9 +290,11 @@ def emit_wh1_observation(
     n_equation, n_mixed = _count_verify_forms(outcome.trace)
     # 매치 품질 게이트 작동량(MISC-18) — 게이트가 이 턴에 걸러낸 약한 매치가 몇 건인지(raw−kept).
     n_match_raw, n_match_kept = _count_match_gate(outcome.trace)
+    # 확신 진단 보류 발동 수(MISC-60) — 이 턴에 귀속 불명으로 가설·증거를 보류한 match 실행 수.
+    n_match_unclear = _count_match_attribution_unclear(outcome.trace)
     logger.info(
         "WH-1 하네스 %s — status=%s action_type=%s verify=%s "
-        "transitions(c/i/u)=%d/%d/%d match(raw/kept)=%d/%d "
+        "transitions(c/i/u)=%d/%d/%d match(raw/kept/unclear)=%d/%d/%d "
         "(tool_calls=%d hypotheses=%d tone_rewritten=%s)",
         "primary" if primary else "shadow(비노출)",
         outcome.status,
@@ -278,6 +305,7 @@ def emit_wh1_observation(
         n_unverifiable,
         n_match_raw,
         n_match_kept,
+        n_match_unclear,
         outcome.tool_calls,
         len(outcome.hypotheses),
         tone_rewritten,
@@ -294,6 +322,7 @@ def emit_wh1_observation(
             n_mixed_form_transitions=n_mixed,
             n_match_raw=n_match_raw,
             n_match_kept=n_match_kept,
+            n_match_attribution_unclear=n_match_unclear,
             tool_calls=outcome.tool_calls,
             hypothesis_count=len(outcome.hypotheses),
             dialogue_id=dialogue_id,

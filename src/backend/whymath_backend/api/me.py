@@ -1649,7 +1649,13 @@ _CI_Z_95 = 1.96  # 95% 신뢰구간 z값(표준정규 양측 0.025)
 class AbilityResponse(BaseModel):
     """`GET /v1/me/ability` 응답 — IRT 능력 추정(θ + 측정 정밀도)."""
 
-    theta: float = Field(description="IRT 능력 추정 θ(logit). 채점 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "IRT 능력 추정 θ(logit). 채점 응답 없으면 0. 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     response_count: int = Field(description="추정에 쓰인 채점(is_correct 있는) 풀이 수.")
     standard_error: float | None = Field(
         default=None,
@@ -1828,7 +1834,13 @@ class AbilityHistoryPoint(BaseModel):
     """`GET /v1/me/ability/history`의 한 시점 — k번째 채점 직후 누적 θ."""
 
     as_of: datetime = Field(description="이 지점에 반영된 마지막 채점 시각(created_at).")
-    theta: float = Field(description="이 시점까지 누적 응답으로 추정한 θ(logit).")
+    theta: float = Field(
+        description=(
+            "이 시점까지 누적 응답으로 추정한 θ(logit). 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     standard_error: float | None = Field(
         default=None, description="이 시점 θ의 표준오차. 측정 불가면 null."
     )
@@ -2479,7 +2491,33 @@ class NextProblemResponse(BaseModel):
         default=None,
         description="추천 문항 id. 후보(미응답·난이도 라벨 보유)가 없으면 null.",
     )
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 **측정값이 아니다**(`theta_boundary`가 그 사실을 "
+            "말한다). 출제 후보를 고르는 데 실제 쓴 θ는 `selection_theta`다(EOS-147 — 종전 설명은 "
+            "'추천에 쓰인'이었으나 전부 정답 이력에서 그렇지 않게 됐다)."
+        )
+    )
+    selection_theta: float = Field(
+        description=(
+            "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 "
+            "`min(4.0, max(0.0, 맞힌 최고 난이도 b + 0.5))`(잠정 — 판정문 §4-2·`EOS-39`가 보정 "
+            "소유)이고, 그 외에는 `theta`와 같다. `theta`와 다르면 경계 규칙이 발동했다는 "
+            "관측이다 — 항상 채워지므로 null을 `theta`와 같다고 추측하지 않는다."
+        )
+    )
+    theta_boundary: Literal["upper", "lower"] | None = Field(
+        default=None,
+        description=(
+            "EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — **측정 한계 표지**다. `upper`=전부 "
+            "정답(`theta`=4.0은 측정값이 아니라 클램프 · `selection_theta`가 표적) · "
+            "`lower`=전부 오답(관측만 — 선택은 `theta` 그대로) · null=응답 이력이 경계가 "
+            "아님. null이라고 `theta`가 ±4.0이 아니라는 뜻은 아니다(혼합 이력에서 MLE가 범위를 "
+            "넘어 클램프된 경우도 null이다). 계측 신호이므로 학생 화면에 θ·능력치로 노출하지 "
+            "않는다(REC-10 ④)."
+        ),
+    )
     difficulty: float | None = Field(
         default=None,
         description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null.",
@@ -2634,6 +2672,12 @@ async def recommend_next_problem(
     `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. EOS-19 신규 2필드는
     `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
     EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
+    EOS-147 신규 2필드는 `selection_theta`(후보를 고르는 데 실제 쓴 θ)와 `theta_boundary`(추정 θ가
+    MLE 발산 경계인가 — 측정 한계 표지이며 학생 화면에 노출하지 않는다)다 — 전부 정답 이력에서
+    `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지 않고(맞힌 최고 난이도 + 0.5 로짓 · 잠정 ·
+    `EOS-39`가 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
+    `measurement_sufficient`는 불변). 그 이력의 선택이 바뀌므로 `policy_version`은 `cat_v4`(수능
+    `suneung_v3`)다.
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
@@ -2676,6 +2720,8 @@ async def recommend_next_problem(
             session,
             problem_id=outcome.problem_id,
             theta=outcome.theta,
+            selection_theta=outcome.selection_theta,
+            theta_boundary=outcome.theta_boundary,
             pool_size=outcome.candidate_pool_size,
             applied_weights=outcome.applied_weights,
             mode=mode,
@@ -2699,6 +2745,11 @@ async def recommend_next_problem(
     return NextProblemResponse(
         problem_id=outcome.problem_id,
         theta=outcome.theta,
+        # EOS-147: 두 정책은 항상 채운다. None은 이 필드를 모르는 생성자뿐이며 추정 θ와 같다.
+        selection_theta=(
+            outcome.selection_theta if outcome.selection_theta is not None else outcome.theta
+        ),
+        theta_boundary=outcome.theta_boundary,
         difficulty=outcome.difficulty,
         standard_error=outcome.standard_error,
         measurement_sufficient=outcome.measurement_sufficient,
@@ -3696,8 +3747,10 @@ class GrowthEvidenceBrierView(BaseModel):
 class GrowthEvidenceResponse(BaseModel):
     """`GET /v1/me/growth-evidence` 응답 — 성장 증거 학생 안전 노출(노출 계약 경유 유일 표면).
 
-    `SurrogateMetrics`의 `STUDENT_VISIBLE` 9지표(`calibration_brier` 제외) + Brier 서술
-    1종만 필드로 존재한다. **내부 전용 2종(② 진단정확도·④ 턴당 토큰 — 시스템 품질/비용
+    `SurrogateMetrics`의 `STUDENT_VISIBLE`·`PROVISIONAL` 10지표(`calibration_brier` 제외) +
+    Brier 서술 1종만 필드로 존재한다(계약 표와의 양방향 일치는
+    `tests/backend/api/test_exposure_contract_serving_crosswalk.py`가 기계로 강제한다 — PED-28).
+    **내부 전용 5종(② 진단정확도·④ 턴당 토큰·⑫⑬⑭ 튜터 행태·동기화 — 시스템 품질/비용
     지표)은 이 스키마 어디에도 필드가 없다** — `INTERNAL_ONLY` 계층이라 런타임에 걸러지는
     것이 아니라 애초에 필드 자체가 없다(구조적 배제 — 필터는 꺼질 수 있으나 부재는 꺼질
     수 없다는 태스크 설계 원칙). R15 결합 판정 원본(교정기 함정 verdict 포함)도 이 스키마에
@@ -3733,6 +3786,11 @@ class GrowthEvidenceResponse(BaseModel):
     mastery_gain_rate: GrowthEvidenceMetricView = Field(description="⑨ BKT 숙달 증가율.")
     misconception_resolution_rate: GrowthEvidenceMetricView = Field(description="⑩ 오개념 해소율.")
     self_solve_rate: GrowthEvidenceMetricView = Field(description="⑪ 스스로 풀이 도달율.")
+    # ⑯ 결손 복구 리드타임(PED-13) — 계약이 STUDENT_VISIBLE로 판정했는데 이 스키마에 자리가 없던
+    # 드리프트를 PED-28이 상환했다(자기 대비 축 — 또래·평균 대비 파생은 계약이 의도적으로 부재).
+    gap_recovery_leadtime_days: GrowthEvidenceMetricView = Field(
+        description="⑯ 결손 복구 리드타임(경과 일수, 자기 대비)."
+    )
     # ② 진단정확도·④ 턴당 토큰 — INTERNAL_ONLY 2종은 여기 필드가 없다(구조적 배제. 값을
     # 넣고 걸러내는 게 아니라 애초에 자리 자체를 만들지 않는다).
 
@@ -3867,6 +3925,9 @@ async def get_my_growth_evidence(
         ),
         self_solve_rate=_render_growth_evidence_metric(
             metrics, "self_solve_rate", exposure_by_field
+        ),
+        gap_recovery_leadtime_days=_render_growth_evidence_metric(
+            metrics, "gap_recovery_leadtime_days", exposure_by_field
         ),
         calibration_brier=GrowthEvidenceBrierView(
             narrative=narrate_calibration_brier(metrics.calibration_brier.value)

@@ -25,11 +25,39 @@ theta·DB Schema)·BKT와 교차검증.
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 _THETA_LOWER = -4.0  # logit 척도 실질 하한(P≈0.018 @ a=1,b=0)
 _THETA_UPPER = 4.0  # 상한(P≈0.982)
+
+#: MLE가 존재하지 않는(발산) 이력의 종류 — `upper`=전부 정답 · `lower`=전부 오답(EOS-147).
+ThetaBoundary = Literal["upper", "lower"]
+
+# EOS-147 — 전부 정답 이력에서 **추천이 쓰는 표적 θ**에 얹는 단계(logit). 판정 정본은
+# `docs/reviews/eos147_all_correct_theta_pin_judgment_2026-09-29.md` §4-2.
+#
+# 왜 필요한가: 전부 정답이면 MLE가 존재하지 않아 `estimate_ability`가 상한(4.0)을 돌려주는데, 그것은
+# 측정값이 아니라 클램프다. 추천이 그 값을 표적으로 쓰면 첫 정답 뒤 은행의 가장 어려운 문항으로
+# 뛴다(실 PG 실측: 2.9 정답 → 4.8). 추정기를 고치면 문항 보정·코치 노이즈 가드·SE가 함께 흔들려
+# (판정문 §3) 추정기는 그대로 두고 **표적만** 분리한다.
+#
+# 왜 0.5인가 — **측정한 값이 아니라 설계 논리와 시뮬레이션이다(잠정)**. 처음 1.0으로 잡았다가 독립
+# 비판(판정문 §10)을 받고 내렸다:
+#  - 난이도 척도: `difficulty_to_logit`이 전문가 라벨 1~5를 b -2~+2로 옮기므로 1.0 = 라벨 1단계,
+#    0.5 = 반 단계. "방금 맞힌 최고 난이도에서 반 칸 위".
+#  - 정보 효율: 표적이 능력에서 s만큼 어긋나면 문항당 정보량은 P(1−P)이고 최대 0.25 대비
+#    s=0.5 → 94% · s=1.0 → 79% · s=2.0 → 42%.
+#  - 사다리 속도(2026-09-29 재현 — 통합 테스트 픽스처 8문항, 라벨 1.2~4.8): 정답이 이어질 때 가장
+#    어려운 문항이 나가는 순번은 현행(상한 고정) 2번째 · 1.0 단계 3번째 · 0.5 단계 5번째다. 1.0은
+#    현행보다 한 칸 늦출 뿐이라 초안의 "정답 4건에 꼭대기" 근거가 틀렸고, 0.5가 사다리를 실제로
+#    세운다.
+#  - 아직 모르는 것: ① 정답 개수 n을 반영하지 않는다(가상 MAP 추정기 — 사전 N(0,1) — 대비 표적이
+#    −1.7~+1.4 로짓 어긋난다) ② 앱 학생의 "정답"은 코치 완료 기록이라 도움을 받은 완료를 포함한다 —
+#    독립 성공이 아니다. 그 신호를 표적에 반영하고 이 값을 실측으로 보정하는 일은 `EOS-39`가
+#    소유한다.
+ALL_CORRECT_STEP_LOGIT = 0.5
 
 
 class IrtItem(BaseModel):
@@ -96,6 +124,54 @@ def estimate_ability(
         if abs(step) < tol:
             break
     return theta
+
+
+def ability_boundary(responses: list[tuple[IrtItem, bool]]) -> ThetaBoundary | None:
+    """이 이력에서 MLE가 **존재하지 않는가** — `estimate_ability`의 경계값 특례와 같은 조건.
+
+    응답이 있고 전부 정답이면 `upper`·전부 오답이면 `lower`·그 외(빈 응답 포함)는 None. 판정을
+    θ의 **값**(`θ >= 4.0`)이 아니라 **응답**에서 한다: 오답이 섞여 MLE가 범위 밖으로 나가
+    클램프된 이력은 식별 불가가 아니라 "범위 밖의 진짜 추정"이라 경계가 아니다.
+    `estimate_ability`와 이 함수가 갈라지지 않는 것은 단위 테스트(경계 판정 ⇔ 추정기 출력)가
+    동결한다.
+    """
+    if not responses:
+        return None
+    if all(correct for _, correct in responses):
+        return "upper"
+    if not any(correct for _, correct in responses):
+        return "lower"
+    return None
+
+
+def ability_for_selection(
+    responses: list[tuple[IrtItem, bool]],
+    estimated_theta: float,
+    *,
+    step: float = ALL_CORRECT_STEP_LOGIT,
+    upper: float = _THETA_UPPER,
+) -> float:
+    """추천이 후보를 고를 때 쓰는 **표적 θ** — 전부 정답 이력에서만 추정 θ와 다르다(EOS-147).
+
+    전부 정답이면 `min(upper, max(콜드스타트 θ, 맞힌 최고 난이도 b + step))`이다.
+      - 콜드스타트 바닥(`estimate_ability([])`에서 유도): 첫 정답이 표적을 시작점 아래로 내리지
+        않는다(단조성 — 아주 쉬운 문항만 맞혀도 표적은 시작점이다).
+      - 맞힌 최고 난이도: 정답이 늘 때 표적이 **단조 비감소**다. 표적은 MLE 경계(`upper`) 이하라
+        현행(상한 고정)보다 **높지 않다** — 어려운 쪽으로 더 나가지 않는다는 순서 사실이며, 그것이
+        더 나은 추천이라는 주장이 아니다(판정문 §4-1·§4-2).
+      - **정답 개수(n)와 정답의 독립성은 반영하지 않는다**(잠정): 같은 최고 난이도면 정답이 1건이든
+        20건이든 표적이 같고, 도움을 받은 완료(앱 코치 완료 기록)도 정답으로 센다. 가상 MAP 추정기
+        대비 표적이 −1.7 ~ +1.4 로짓 어긋난다(판정문 §4-2). 보정은 `EOS-39`가 소유한다.
+    그 외 이력(전부 오답 포함 — 하한 대칭은 이번 범위 밖, 판정문 §4-4)은 `estimated_theta` 그대로다.
+
+    **추정기를 바꾸지 않는다.** 이 값은 SE·`measurement_sufficient`·능력 API·문항 보정의 입력이
+    아니다 — 그 소비처는 계속 `estimate_ability`의 출력을 읽는다(판정문 §2).
+    """
+    if ability_boundary(responses) != "upper":
+        return estimated_theta
+    cold_start = estimate_ability([])
+    reach = max(item.difficulty for item, _ in responses) + step
+    return min(upper, max(cold_start, reach))
 
 
 def estimate_difficulty(
@@ -471,11 +547,15 @@ def estimate_item_parameters(
 
 
 __all__ = [
+    "ALL_CORRECT_STEP_LOGIT",
     "IrtItem",
     "ItemFit",
     "LEARNING_BAND_HIGH",
     "LEARNING_BAND_LOW",
     "LEARNING_BAND_OUT_OF_RANGE_WEIGHT",
+    "ThetaBoundary",
+    "ability_boundary",
+    "ability_for_selection",
     "ability_standard_error",
     "estimate_ability",
     "estimate_difficulty",

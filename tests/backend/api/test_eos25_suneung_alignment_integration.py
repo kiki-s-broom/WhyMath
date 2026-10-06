@@ -257,7 +257,7 @@ def test_suneung_advance_is_withheld_even_when_the_next_concept_has_a_problem_on
         assert outcome.reason.concept_id == c_anchor
         assert outcome.reason.mastery == 0.98
         assert outcome.intent_resolution is IntentResolution.MODE_WITHHELD
-        assert outcome.policy_version == "suneung_v2"
+        assert outcome.policy_version == "suneung_v3"
     finally:
         asyncio.run(_cleanup([p_anchor, p_next], [c_anchor, c_next], [uid]))
 

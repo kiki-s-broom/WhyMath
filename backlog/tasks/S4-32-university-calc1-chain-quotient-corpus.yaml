@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-32-university-calc1-chain-quotient-corpus
+title: "대학 CALC1 몫의 미분법·연쇄법칙 파일럿 코퍼스 (W2 Phase1 #6)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-31-vector-operations-corpus
+requires_gates: []
+acceptance:
+  - "[CALC1-02-03](몫의 미분법) 0커버 해소 — g(k)=±1 되도록 구성해 정수 답 보장하는 생성기"
+  - "[CALC1-02-04](연쇄법칙) 0커버 해소 — (ax+b)^n 합성함수 생성기"
+  - "calculus_product_rule_skeleton_generator 관례 계승: Tier1 Derivative(...).doit() 검증·concept_tags=()(대학 원자 태깅 공백 정직 표시)·run_equivalent_generation(signature_index=None)"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - e4959b3c
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/calculus_chain_quotient_rule_skeleton_generator.py
+  - src/backend/whymath_backend/harness/university_calc1_chain_quotient_batch.py
+  - tests/backend/l3/equivalent/test_calculus_chain_quotient_rule_skeleton_generator.py
+  - tests/backend/harness/test_university_calc1_chain_quotient_batch.py
+  - data/corpus/problem_bank_university_calc1_chain_quotient_v0/problems.jsonl
+session: null
+notes: "w2_content_factory_completion_plan_v1.md §6 Phase 1 우선순위 6위. calculus_product_rule_skeleton_generator 형제 확장.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-32-university-calc1-chain-quotient-corpus 재등재. 원 증적 ['e4959b3c']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

@@ -19,8 +19,9 @@ exit code:
 경계 메모:
   - LLM 응답은 검증 전 원시 출력이며, 이 도구는 *감사 신호*만 만든다. 학생 노출은 후속
     사람 승인(`concept_content_review_apply`) 후 `review_status='reviewed'`로 갱신해야 한다.
-  - LLM 호출은 `l3/providers/ollama.OllamaProvider`를 경유한다(라우터 결정 bypass — 배치
-    품질 검수는 동기 SLA가 없으므로 QUALITY 27b를 직접 지정). Ollama 미도달 시 2를 반환.
+  - LLM 호출은 `l3/providers/ollama.OllamaProvider`를 경유하며 **`Router`를 거치지 않는다 —
+    의도다**(OPS-110 판정: `_assess_one` docstring). `RoutingDecision`은 `--model` 티어에서
+    손으로 만들고 항상 LOCAL·비용 0이다. Ollama 미도달 시 2를 반환.
   - "값을 지어내지 않음" 원칙: LLM 응답 파싱 실패 시 해당 레코드는 defect로 기록하고 사유를
     남긴다. missing count를 0으로 조용히 대체하지 않는다.
 """
@@ -71,7 +72,7 @@ _DEFAULT_CONFIDENCE = 0.95
 
 # LLM 품질 티어 → (패밀리, 크기) 매핑. QUALITY=27b, MID GENERAL=7b 일반·한국어, MID MATH=7b 수학.
 _MODEL_TIER_MAP: dict[str, tuple[str | None, str]] = {
-    "quality": (None, "quality"),  # qwen3.5:27b, 패밀리 무관
+    "quality": (None, "quality"),  # QUALITY 핀(l3/router.py QUALITY_MODEL_ID), 패밀리 무관
     "general:mid": ("general", "mid"),  # qwen2.5:7b
     "math:mid": ("math", "mid"),  # qwen2-math:7b
 }
@@ -409,7 +410,26 @@ async def _assess_one(
     link: ContentLink | None = None,
     link_probe: str | None = None,
 ) -> Assessment:
-    """단일 레코드에 대해 LLM rubric을 평가한다. `link`가 있으면 연결 적합성(link_ok)도 받는다."""
+    """단일 레코드에 대해 LLM rubric을 평가한다. `link`가 있으면 연결 적합성(link_ok)도 받는다.
+
+    **`Router`를 거치지 않고 `RoutingDecision`을 직접 만드는 것은 의도다 (OPS-110 판정).**
+    CLAUDE.md "LLM 호출은 항상 라우터 경유"의 취지는 ①클라우드 전에 로컬을 먼저 따지는 비용
+    통제 ②학생 대면 호출의 한 경로 관측이다. 이 도구는 둘 다 해당하지 않고, 라우터를 끼우면
+    측정이 깨진다:
+
+    - **고정 모델의 판정력을 잰다.** 이 배치의 결과(주입 결함 검출률·표본 결함율의 Wilson
+      상한)는 `--model`로 지정한 *한 모델*에 대한 수치다. `Router.route()`는 요청별
+      task_type·난이도·구독·예산으로 모델을 고르므로(03a §C) 표본마다 모델이 달라질 수 있고,
+      그러면 감사 리포트의 수치가 *섞인 모집단*의 것이 되어 어느 모델의 판정인지 말할 수 없다.
+    - **비용 통제 대상이 아니다.** 아래 `_MODEL_TIER_MAP`은 전부 로컬 티어이고
+      `_build_provider`는 `OllamaProvider`만 만든다. 클라우드로 새지 않음은
+      `test_concept_content_review_batch_router_intent.py`가 동결한다.
+    - **학생 대면이 아니다.** 산출물은 사람 승인 전 기계 선별 신호일 뿐이다.
+
+    같은 부류(provider 직접 호출 측정 하네스)는 `test_authoring_traffic_surface_inventory.py`가
+    `measurement-harness`로 분류해 전수 동결한다. 한계(정직하게): 이 호출은 Langfuse에 남지
+    않는다 — 대신 JSONL 감사 리포트가 레코드별 모델·지연·판정을 남긴다.
+    """
     from whymath_backend.l3.models import CostTier, LocalModelTier, RoutingDecision
 
     decision = RoutingDecision(

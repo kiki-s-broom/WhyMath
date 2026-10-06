@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-45-calculus1-integral-corpus
+title: "고등 미적분Ⅰ 적분(부정적분·정적분·넓이·속도와거리) 파일럿 코퍼스 (W2 Phase4 #1)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "[12미적Ⅰ-03-02]/[12미적Ⅰ-03-04]/[12미적Ⅰ-03-05]/[12미적Ⅰ-03-06] 0커버 해소 — kind 필터 4밴드 결정론 생성기 신설·전량 게이트 통과"
+artifacts:
+  - 01c454ac
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/calculus1_integral_skeleton_generator.py
+  - src/backend/whymath_backend/harness/calculus1_integral_batch.py
+  - "data/corpus/problem_bank_calculus1_integral_v0/**"
+  - tests/backend/l3/equivalent/test_calculus1_integral_skeleton_generator.py
+  - tests/backend/harness/test_calculus1_integral_batch.py
+session: null
+notes: "w2_content_factory_completion_plan_v1.md 재확인 — 적분 영역 0/6(전량 0커버), wave 3 최우선. Tier1 SymPy Integral((x,a,b)) 정적분 신규 검증 경로 실측 확인(스파이크: 정적분·부정적분(F(0)=k 트릭)·삼각/지수 전부 pass). concept_src_id: H:12미적Ⅰ03-02/04/05/06 — concept graph 실존 확인. 넓이/속도 kind는 v1 단순화로 b=0·a,c≥1 강제(항상 양수 구간 보장·부호분석 불요).\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-45-calculus1-integral-corpus 재등재. 원 증적 ['01c454ac']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

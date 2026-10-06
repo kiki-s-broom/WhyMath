@@ -978,12 +978,17 @@ def test_scenario_008_move_to_next_concept() -> None:
         c_cur, _ = _seed_concept(content, "s8cur", "일차식의 전개")
         c_next, _ = _seed_concept(content, "s8next", "이차식의 전개")
         asyncio.run(_add_all(_prereq_edge(c_cur, c_next)))
-        # 남겨 둘 현재 개념 문항(cur_pids[5])을 **가장 어렵게** 둔다. 전부 맞힌 학생의 θ는 척도
-        # 상단에 붙으므로 θ 근방 1차 선택은 가장 어려운 문항 — 즉 **현재 개념** 문항을 집는다.
-        # 그런데도 ③에서 다음 개념 문항이 나오면, 이동을 만든 것은 난이도 배치가 아니라 정책의
-        # 정렬 재선택이다(EOS-124). 다음 개념 문항을 더 어렵게 두면 1차 선택이 먼저 그쪽을 집어
-        # 이 변별력이 사라진다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서 ②·③ 판정 불가).
-        cur_pids = _seed_problems(content, c_cur, "s8c", [2.0, 2.4, 2.8, 3.2, 3.6, 5.0])
+        # 남겨 둘 현재 개념 문항(cur_pids[5])을 **1차 선택의 표적 θ에 가장 가깝게** 둔다(EOS-147).
+        # 전부 맞힌 학생의 추정 θ는 상한 4.0에 붙는 클램프라 추천은 그 값을 표적으로 쓰지 않고 맞힌 최고
+        # 난이도 b + 0.5를 쓴다: 위 다섯 문항의 최고 b는 0.6(라벨 3.6)이므로 표적은 1.1이다. 현재 개념
+        # 문항을 b=1.1(라벨 4.1)에 두면 다음 개념 문항(b=0.0·0.4)보다 표적에 가까워 θ 근방 1차 선택은
+        # **현재 개념** 문항을 집는다(EOS-147 이전에는 표적이 4.0이라 '가장 어려운 문항' — 라벨 5.0 — 이
+        # 그 자리였다). 그런데도 ③에서 다음 개념 문항이 나오면, 이동을 만든 것은 난이도 배치가 아니라
+        # 정책의 정렬 재선택이다(EOS-124). 다음 개념 문항이 표적에 더 가까우면 1차 선택이 먼저 그쪽을
+        # 집어 이 변별력이 사라진다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서 ②·③ 판정 불가 ·
+        # 2026-09-29 실측: 표적이 1.1이 된 뒤 현재 개념 문항이 라벨 5.0이면 — 표적과의 거리 0.9 > 다음
+        # 개념 b=0.4와의 거리 0.7 — 1차 선택이 다음 개념 문항이 되어 `action=diagnose`로 나간다).
+        cur_pids = _seed_problems(content, c_cur, "s8c", [2.0, 2.4, 2.8, 3.2, 3.6, 4.1])
         next_pids = _seed_problems(content, c_next, "s8n", [3.0, 3.4])
         cur_set = {str(p) for p in cur_pids}
 
@@ -1026,6 +1031,14 @@ def test_scenario_008_move_to_next_concept() -> None:
                 action=advanced["action"],
                 target=("현재" if advanced["target_concept"] == str(c_cur) else "다음"),
                 문항=("현재" if advanced["problem_id"] in cur_set else "다음"),
+            )
+            # 전제 확인(EOS-147) — 1차 선택이 남긴 현재 개념 문항(b=4.1−3.0=1.1)을 집는 배치인가. 응답의
+            # 선택 θ가 그 문항에 다음 개념 문항(b=0.0·0.4)보다 가까워야 ③이 재선택의 변별력을 가진다.
+            # 이 전제가 깨지면 아래 판정이 `diagnose ≠ advance_next` 같은 먼 증상으로 나오므로 먼저 말한다.
+            picked_at = advanced["selection_theta"]
+            assert abs(1.1 - picked_at) < min(abs(0.0 - picked_at), abs(0.4 - picked_at)), (
+                "1차 선택이 남긴 현재 개념 문항을 집는 배치가 아니다 — 선택 θ가 다음 개념 문항에 더 "
+                f"가깝다(픽스처를 표적 θ 규칙에 맞춰 다시 배치하라): {advanced}"
             )
             assert advanced["action"] == "advance_next", advanced
 

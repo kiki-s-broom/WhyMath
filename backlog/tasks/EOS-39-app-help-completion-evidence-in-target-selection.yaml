@@ -1,0 +1,33 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-39-app-help-completion-evidence-in-target-selection
+title: "추천 표적이 코치 도움 완료를 어떻게 세는가 — 앱 학생의 개루프(정답 완료만 기록)와 꼭대기 이후 하강 채널 판정 (EOS-147 이월)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-147-all-correct-theta-upper-pin
+requires_gates: []
+acceptance:
+  - "① 실측 고정(2026-09-29 · 판정 기준 `EOS-147-all-correct-theta-upper-pin` 판정문 `docs/reviews/eos147_all_correct_theta_pin_judgment_2026-09-29.md` §10 · 독립 교수학 비판이 시뮬레이션하고 이 세션이 그 스크립트를 재실행해 같은 수치를 얻었다): 앱 학생의 추천열은 **학생 행동과 무관한 개루프**다. 앱이 `is_correct=True`만 기록하므로(EOS-146) 서로 다른 학생 행동 3종(항상 독립 성공·항상 도움 필요·무작위)의 30문항 추천열이 바이트 동일했다. EOS-147의 선택 θ는 API 클라이언트의 초기 연속 정답 도약(첫 정답 뒤 난이도 4.8 · 3.9)은 완화하지만, 앱 학생에게는 수정 전 열에 칸을 끼울 뿐이다(8문항 픽스처 단계 0.5: 수정 전 `2.9 → 4.8 → 4.4 → …` 이 `2.9 → 3.4 → 3.9 → 4.4 → 4.8 → 2.4 → …`) — 5번째 추천부터는 수정 전과 같은 \"남은 가장 어려운 문항\" 하강열이다. 합성 학생 모델(가정: 독립 성공확률 σ(θ_true−b)·아니면 코치 도움 완료·앱은 둘 다 정답으로 기록 · 방향의 증거이며 운영 수치가 아니다)에서 첫 30개 추천의 독립 성공확률 평균은 θ_true=−1/0/+1에서 수정 전 0.061/0.147/0.312 → 단계 0.5 수정 뒤 0.068/0.160/0.330에 그쳤고 P<0.25 문항 비율은 0.97/0.90/0.00이었다. 즉 EOS-147 제목의 \"앱 학생은 영구\"는 이 태스크 없이는 해소되지 않는다."
+  - "② 소유 공백(대장 전수 검색 — 이 검색 방법 기준): `api/coach.py::_complete_problem`은 `is_correct=True`를 무조건 적재하고 `used_hint`(3상태 — 힌트 2단계 이상이 첫 정답 턴 전에 공급되면 True)는 `EOS-133-coach-hint-usage-attribution`(done)이 귀속시켰다. 그러나 `l2/next_problem_selection.py::load_attempt_history_state`의 응답 조회는 `used_hint`를 읽지 않아, 도움 완료가 독립 성공과 똑같이 추천 표적을 올린다(양의 되먹임). 대장에서 `used_hint`를 다루는 태스크는 `EOS-133`(done)·`EOS-29-assessment-evidence-hint-axis-producer`(숙달 추정기의 힌트 축 — 추천 표적이 아니다)·`EOS-45`뿐이고, 추천 표적에서의 소비는 소유자가 없다. `EOS-146-app-wrong-answer-event-source`는 오답·포기 이벤트의 원천만 소유한다."
+  - "③ 처분 판정(교수학 독립 비판 1회를 받는다 — 판정문이 먼저이고 코드는 그다음이다): 후보를 실제로 돌려 센다. ⓐ 선택용 응답에서 도움 완료를 **오답으로 센다**(기존 `estimate_ability`를 그대로 재사용하고 혼합 이력이면 MLE가 유한해진다 — 독립 비판의 합성 모델에서 θ_true=−1/0/+1의 라벨이 30번째 추천에서 1.98/2.99/3.97로 수렴하고 독립 성공확률 평균이 0.50 근방, P<0.25 문항 비율이 0.05였다. BKT에서 힌트 요청을 오류로 세는 관례가 있다는 것은 독립 비판의 배경지식이고 문헌 확인은 하지 않았다) ⓑ 최고 난이도 앵커에서 도움 완료만 **제외**한다(하강 채널이 없어 꼭대기 고정이 남는다 — 같은 합성 모델에서 θ_true=0의 라벨이 10번째 4.83·30번째 4.77) ⓒ 꼭대기에 닿은 뒤 표적을 더 어려운 문항이 아니라 LTHC 확장 경로(일반화·역명제·변형)와 Polya 4단계 검토로 바꾼다 ⓓ 이월. 반드시 정한다: `used_hint=None`(미상)을 어느 쪽으로 세는가(모른다는 아니다와 같지 않다) · 도움 완료를 \"실패\"로 부르는 것이 학생 대면 표현·게임화 금기와 충돌하지 않게 계측 전용으로 남기는가 · EOS-133 귀속의 오귀속률. 판정 근거에는 앱 사각도 넣는다: 화면의 \"건너뛰기\"(`problem_screen.dart`)는 attempt를 기록하지 않아 미시도 최고난도 문항이 다음 호출에 다시 나온다(결정론 argmax — 코드를 읽은 결과이고 실기기 실측이 아니다)."
+  - "④ 상수 `ALL_CORRECT_STEP_LOGIT`(EOS-147 시점 0.5)의 실측 보정: 그 값은 측정이 아니라 설계 논리(의사결정 우선순위 — 측정이 없으면 학생 웰빙을 우선해 덜 가파른 쪽)다. 운영 응답·이탈 데이터가 생기면 S4-15류 실측으로 정한다. 데이터가 없으면 없다고 판정문에 적는다."
+  - "⑤ 집행 지점(정본화와 별항)과 변별력: 판정이 정한 규칙이 `load_attempt_history_state` → 두 정책(`CatRecommendationPolicy`·`SuneungRecommendationPolicy`)을 실제로 지나는지 배선 테스트로 동결한다. 실 PG HTTP 통합에서 \"도움 완료 이력\"과 \"독립 성공 이력\"의 추천열이 갈라지는 픽스처를 두고(수정 전에는 같다), 규칙을 끄는 뮤테이션이 RED여야 한다. 정책 버전 문자열(`cat_v3`·`suneung_v2` 이후)을 올려 소급 평가가 두 규칙을 섞지 않게 한다."
+  - "⑥ 측정 재료·리포트 편입(EOS-147 연동 2026-09-29): 처치 기록의 `selection_theta`(선택 θ가 추정 θ와 다를 때만)·`theta_boundary`(경계일 때만) 키로 경계 규칙의 **발동률**(전체 `recommendation_render` 처치 중 `selection_theta` 키가 있는 비율)과 `theta_boundary` 값별 분포를 산출해 추천 도달 리포트(`ops/recommendation_reach_report.py`)에 축으로 싣는다 — CLAUDE.md \"작동한 비율\" 원칙(응답과 처치 기록은 요청 단위로 말하지만 집계 리포트는 아직 말하지 않는다). 분모(처치 0건)는 None으로 표기하고 0/0을 0.0으로 지어내지 않는다(그 모듈의 기존 규율). ④의 실측 보정은 이 발동률과 앱 학생 완료 수 분포를 재료로 삼는다. 정정: ⑤의 정책 버전 표기 `cat_v3`은 EOS-147의 실제 판 `cat_v4`(병렬 태스크 EOS-33이 `cat_v3`을 쓰므로 건너뜀)로 읽는다 — 이 태스크가 규칙을 바꾸면 그 판보다 위의 새 번호를 쓴다."
+  - "⑦ 하한(전부 오답 → 추정 θ −4.0) 재판정 — EOS-146 착지로 트리거됨(2026-09-30 · 판정 기준 main `b6a41dee`): PR 1397이 코치 서버가 판정한 명확한 오답의 '문제당 최초 1건'을 학습 원장에 적재하고 그 스위치 `l4_coach_wrong_submission_enabled`의 기본값이 True라서, 앱 학생의 이력에 오답이 처음 들어간다. 전부 오답인 이력은 `estimate_ability`가 하한 −4.0으로 클램프하고(측정값이 아니라 경계 — EOS-147이 상한에서 잡은 것과 대칭) 추천 표적이 그 값을 그대로 쓴다. 이 태스크가 소유하는 사유: EOS-146 acceptance의 'EOS-147 연동' 항이 이 재판정을 EOS-146에 붙였으나 그 항은 EOS-147 브랜치에만 있어 PR 1397 구현이 볼 수 없었고 EOS-146은 done이 됐다 — 미이행분을 여기로 승계한다. 판정 전에 먼저 재현해 센다(전부 오답 이력 → 추천 표적·난이도 열, 경계 표지 `theta_boundary`가 하한으로 기록되는지). 결함 단정이 아니라 재판정이다 — 쉬운 문항으로 내려가는 것이 교수학적으로 옳을 수도 있다."
+  - "[2026-10-02 정정 — 정책 번호 기준] ⑤의 \"정책 버전 문자열(`cat_v3`·`suneung_v2` 이후)\"은 병합 뒤 현행 값 기준으로 읽는다: 기본 CAT은 `cat_v4`(`cat_v3`은 EOS-33이 예약한 번호) · 수능은 `suneung_v3`(`suneung_v2`는 EOS-31, `suneung_v3`은 EOS-147)이다. 이 태스크가 선택 규칙을 바꾸면 번호를 이 문서에서 가져오지 말고 착수 시점 main의 `POLICY_VERSION_CAT`·`POLICY_VERSION_SUNEUNG`을 읽어 그 다음 번호를 쓴다 — 같은 번호를 두 변경이 쓰면 소급 평가가 섞이는 충돌이 이미 한 번 났다(EOS-147 대 EOS-31)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/next_problem_selection.py
+  - src/backend/whymath_backend/l2/irt.py
+  - src/backend/whymath_backend/l2/recommendation_policy.py
+  - src/backend/whymath_backend/api/_next_problem_policy.py
+  - src/backend/whymath_backend/ops/recommendation_reach_report.py
+session: null
+notes: "출처: 2026-09-29 /drive 4차 — `EOS-147-all-correct-theta-upper-pin`의 독립 교수학 비판이 acceptance ③의 \"상한 도달 시 선택 규칙\"이 판정문에서 꼭대기 이후를 다루지 않았음을 지적했고(처분 기록은 차단급), 이 태스크가 그 이월 처분의 소유자다. EOS-147은 API 클라이언트의 초기 연속 정답 도약(acceptance ①)을 해소하고 앱 학생 영구성(②)은 칸 삽입으로 부분 완화하는 데 그친다 — 해소는 이 태스크가 정하는 하강 채널에 달렸다. 관련: `EOS-146`(오답 원천 — 착지하면 하한 비대칭 재판정)·`EOS-133`(used_hint 귀속)·`EOS-29`(숙달 추정기의 힌트 축).\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py']: EOS-147 구현 결과 반영 — 경계 규칙 발동률의 도달 리포트 편입 소유 + 정책 버전 표기 정정(cat_v3은 병렬 태스크 번호)\n\n[정정 2026-09-30] EOS-146 착지(PR 1397)로 하한 비대칭 재판정이 트리거됨 — EOS-146 done 때 재대조에서 빠진 EOS-147 연동 항의 소유를 승계\n\n[정정 2026-10-02] 병합 뒤 정책 번호 현행 값 기준(cat_v4·suneung_v3)으로 acceptance 5의 번호 서술을 정정 병기"
+updated: 2026-10-02

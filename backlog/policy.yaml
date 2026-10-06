@@ -7,3 +7,6 @@ adhoc_edit: warn
 claim_ttl_hours: 72
 claim_branch_grace_hours: 24
 remote_claims: true
+# done의 CI 미러 부재 처분 (HARN-173) — block = PR 증적 경로 claude done에서 미러 unknown·fail 거부.
+# 미실행은 warn 유지 · 예외는 done --no-mirror '<사유>'(notes·이벤트에 기록). 승격 근거 = MEMORY.md.
+ci_mirror_at_done: block

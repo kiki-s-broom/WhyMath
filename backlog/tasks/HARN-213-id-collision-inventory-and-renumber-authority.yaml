@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-213-id-collision-inventory-and-renumber-authority
+title: "이중 배정 조회 계기판 부재 + live 충돌 16건 미등재 — 재채번 판정 권한의 승계 좌석"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 조회 계기판 신설: 현재 무엇이 이중 배정 상태인지 묻는 CLI 표면을 만든다(예: backlog.py collisions). HARN-15(#763)가 만든 것은 cmd_add 시점 예방뿐이고, validate는 로컬 백로그만 보므로 '지금 충돌 목록'을 물을 수단이 없다 — 2026-08-11 실측 16건은 수동 ls-tree 루프로만 발견됐다. scan_remote_task_files()(remote_claims.py)를 재사용하고 fetch=False·fail-open 시맨틱을 유지한다.\n② live 16건 생사 추적: PED-04~08·PED-13·PED-15·PED-16·OPS-20·OPS-21·OPS-24·OPS-25·MOB-14·S4-19·S4-22·VIZ-04 (8개 브랜치: uqyg79·enfkqt·7n9n72·vafylb·q8tvcx·k20m0w·trjg5x·e98dw4). 각 건의 상태(live/브랜치소멸/포팅흡수)를 계기판 출력으로 재확인하고, 브랜치 정리·머지로 소멸한 건은 자동으로 목록에서 빠지는지 확인한다(수기 목록 동결 금지).\n③ 재채번 판정 권한 승계 명시: HARN-15 acceptance ④의 'Kiki 전권'이 HARN-15 done 이후 어떤 열린 태스크에도 승계되지 않은 상태였다(2026-08-11 실측). 이 태스크가 그 좌석이며, 개별 충돌의 재채번 실행은 여전히 Kiki 판정임을 acceptance에 보존한다 — 기계는 목록·근거만 제시한다.\n④ grandfather 장부와의 정합: store._GRANDFATHERED_ID_NUMBERS(ARCH-13·OPS-15)가 현재 '재채번 포기 확정'의 유일한 명시 장부다. 계기판은 면제분을 숨기지 말고 '면제(사유)'로 함께 표시한다 — 침묵 실패 금지. S3-26/27/28 moot 판정(2026-08-11 Kiki)도 같은 장부에 실을지 결정한다.\n⑤ 범위 밖: 미머지 브랜치 12건의 처분 판정(브랜치 triage 소관) · 문서 축약 번호 참조 150곳+의 일괄 정정 · 개별 재채번 실행."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/store.py
+  - scripts/harness/remote_claims.py
+  - "tests/harness/**"
+session: null
+notes: "등재 경위: 2026-08-11 Kiki 재채번 판정(판정 C). HARN-15 acceptance ④가 열거한 OPS-17/18은 상대 브랜치 소멸로 moot 처리됐고 HARN-15는 done이 됐는데, 그 과정에서 '재채번 판정은 Kiki 전권'이라는 유보가 산문(MEMORY:384·통합점검 보고서 §7)에만 남고 열린 태스크로 승계되지 않았다 — 유보가 고아 상태. 동시에 2026-08-11 원격 38브랜치 전수 실측에서 신규 이중 배정 16건이 발견됐다(구 13건은 대부분 브랜치 정리로 소멸 — 부채가 줄어든 게 아니라 회전했다). 근본 결함은 '충돌을 조회할 계기판이 없어 수동 스캔으로만 발견된다'는 것이며, 이는 CLAUDE.md '측정 없는 게이트' 계열이다. [OPS-41 회수] 원 번호 HARN-22(azdnov) → main에 동번호 별건(HARN-22-id-number-suggestion-race)이 있어 CLI 재발급 HARN-213. 본 태스크는 재채번 판정 권한의 승계 좌석이다."
+updated: 2026-10-05

@@ -567,6 +567,7 @@ CATALOG: tuple[Spec, ...] = (
        "l1.pedagogy.populate", "l1.pedagogy.unit_compiler"),
     _e("WM-E-109", "문제은행 적재·임베딩·시그니처·페르소나 적합·정답분포", "Platform", "Content",
        "P0", "B7 코퍼스 2,647문", "l1.problem_bank.answer_distribution",
+       "l1.problem_bank.derived_form_rules",
        "l1.problem_bank.embedding", "l1.problem_bank.persona_fit_rules",
        "l1.problem_bank.populate", "l1.problem_bank.probe_candidates",
        "l1.problem_bank.provenance_gate", "l1.problem_bank.signature_tagger"),
@@ -1032,7 +1033,9 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-903", "서비스 헬스 딥체크·프리플라이트·DB 도달성 진단·로그 스크러버", "Admin",
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
-       "ops.db_host_reachability", status="Production"),
+       "ops.db_host_reachability",
+       # OPS-53: 패키지 임포트 시 CLI stdout/stderr을 UTF-8로 맞추는 헬퍼 — 운영 CLI의 출력 안전.
+       "_stdio", status="Production"),
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
        "P0",
        "단위비용 KPI(≤250원) 판독기 · ARCH-49 프로바이더 경로 실측(라우터 경유·ARCH-55 입력)",
