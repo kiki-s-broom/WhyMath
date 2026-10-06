@@ -2502,7 +2502,7 @@ class NextProblemResponse(BaseModel):
     selection_theta: float = Field(
         description=(
             "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 "
-            "`min(4.0, max(0.0, 맞힌 최고 난이도 b + 0.5))`(잠정 — 판정문 §4-2·`EOS-39`가 보정 "
+            "`min(4.0, max(0.0, 맞힌 최고 난이도 b + 0.5))`(잠정 — 판정문 §4-2·`EOS-176`이 보정 "
             "소유)이고, 그 외에는 `theta`와 같다. `theta`와 다르면 경계 규칙이 발동했다는 "
             "관측이다 — 항상 채워지므로 null을 `theta`와 같다고 추측하지 않는다."
         )
@@ -2675,9 +2675,10 @@ async def recommend_next_problem(
     EOS-147 신규 2필드는 `selection_theta`(후보를 고르는 데 실제 쓴 θ)와 `theta_boundary`(추정 θ가
     MLE 발산 경계인가 — 측정 한계 표지이며 학생 화면에 노출하지 않는다)다 — 전부 정답 이력에서
     `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지 않고(맞힌 최고 난이도 + 0.5 로짓 · 잠정 ·
-    `EOS-39`가 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
+    `EOS-176`이 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
     `measurement_sufficient`는 불변). 그 이력의 선택이 바뀌므로 `policy_version`은 `cat_v4`(수능
-    `suneung_v3`)다.
+    `suneung_v3`)였고, EOS-39가 코치 도움 완료를 선택 θ의 입력에서 실패로 접으면서 `cat_v5`(수능
+    `suneung_v4`)로 올렸다 — 응답 필드는 그대로이고 접힌 문항 수·미상 수는 처치 기록에만 남는다.
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
@@ -2722,6 +2723,8 @@ async def recommend_next_problem(
             theta=outcome.theta,
             selection_theta=outcome.selection_theta,
             theta_boundary=outcome.theta_boundary,
+            selection_help_count=outcome.selection_help_count,
+            selection_hint_unknown_count=outcome.selection_hint_unknown_count,
             pool_size=outcome.candidate_pool_size,
             applied_weights=outcome.applied_weights,
             mode=mode,

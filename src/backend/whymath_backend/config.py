@@ -417,6 +417,24 @@ class Settings(BaseSettings):
         ),
     )
 
+    l2_selection_help_fold_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-39 — 추천이 후보를 고르는 **표적 θ**를 만들 때 코치가 도움(힌트 단계 2 이상)을 "
+            "공급한 문항(`problem_attempt.used_hint=True`)을 **실패 응답 1건으로 접을지**"
+            "(정식기능·킬 스위치). True(기본)면 도움 완료가 독립 성공처럼 표적을 올리지 않는다 — "
+            "앱 학생의 추천열이 학생 행동에 반응한다(판정문 "
+            "`docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`). "
+            "**추정 θ·SE·능력 API·숙달은 어느 쪽이든 불변**이다(표적에만 쓴다). 이 규칙은 "
+            "`used_hint` 라벨의 정확도에 기대는데 그 정확도가 운영에서 미측정이고(라벨은 학생이 "
+            "요청한 것이 아니라 코치가 공급한 단계다 — 숙달 라벨 '초보'도 단계를 올린다), 라벨 "
+            "규칙 자체가 판정 대기(EOS-146 acceptance ⑩)라서 끌 수 있게 둔다: 발동률"
+            "(`selection_help_count`)이 비정상적으로 높거나 강한 학생에게 과하게 쉬운 문항이 "
+            "나가면 끈다. 끄면 종전 동작과 비트동일하다(도움 완료도 정답). "
+            "WHYMATH_L2_SELECTION_HELP_FOLD_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_hint_content_serving_enabled: bool = Field(
         default=True,
         description=(

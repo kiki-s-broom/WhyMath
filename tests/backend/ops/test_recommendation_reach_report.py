@@ -2,7 +2,7 @@
 
 집계 코어(`build_report`)는 순수 함수라 픽스처로 경계까지 전수 단언하고,
 `fetch_reach_counts`는 큐 기반 가짜 세션(FakeSession — test_me.py `_QueueSession` 관례
-답습)으로 실 DB 없이 쿼리 6회의 매핑을 검증한다. 실 JOIN·DISTINCT·필터·JSONB `has_key`의
+답습)으로 실 DB 없이 쿼리 11회의 매핑을 검증한다(EOS-39가 선택 θ 규칙 발동률 5개를 더했다). 실 JOIN·DISTINCT·필터·JSONB `has_key`의
 SQL 정확성은 FakeSession이 stmt를 무시하므로 검증하지 않는다(test_me.py 동일 관례 —
 통합테스트 영역).
 
@@ -32,11 +32,12 @@ class _FakeScalarResult:
 
 
 class _QueueSession:
-    """`fetch_reach_counts`의 execute 6회(①attempt ②eligible ③pair ④pool ⑤treatment
-    ⑥with_policy_metadata)를 큐로 반환."""
+    """`fetch_reach_counts`의 execute 11회(①attempt ②eligible ③pair ④pool ⑤treatment
+    ⑥with_policy_metadata ⑦selection_theta키 ⑧boundary=upper ⑨boundary=lower ⑩help키
+    ⑪hint_unknown키)를 큐로 반환. 뒤 5개를 생략하면 0으로 채운다(EOS-39 이전 호출 호환)."""
 
     def __init__(self, values: list[int]) -> None:
-        self._values = values
+        self._values = values + [0] * (11 - len(values))
         self._calls = 0
 
     async def execute(self, _stmt: object) -> _FakeScalarResult:
@@ -52,6 +53,11 @@ def _counts(
     pool: int = 0,
     treatment: int = 0,
     with_policy: int = 0,
+    selection_theta_key: int = 0,
+    boundary_upper: int = 0,
+    boundary_lower: int = 0,
+    help_key: int = 0,
+    hint_unknown_key: int = 0,
 ) -> rr.ReachCounts:
     return rr.ReachCounts(
         problem_attempt_total=attempt,
@@ -60,16 +66,54 @@ def _counts(
         candidate_pool_structural_cap=pool,
         recommendation_treatment_total=treatment,
         recommendation_treatment_with_policy_metadata_total=with_policy,
+        selection_theta_key_total=selection_theta_key,
+        theta_boundary_upper_total=boundary_upper,
+        theta_boundary_lower_total=boundary_lower,
+        selection_help_key_total=help_key,
+        selection_hint_unknown_key_total=hint_unknown_key,
     )
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # fetch_reach_counts — 쿼리 6회 → ReachCounts 매핑(순서 계약).
 # ──────────────────────────────────────────────────────────────────────────
-async def test_fetch_reach_counts_maps_six_queries_in_order() -> None:
-    session = _QueueSession([5, 3, 2, 120, 40, 25])
+async def test_fetch_reach_counts_maps_eleven_queries_in_order() -> None:
+    session = _QueueSession([5, 3, 2, 120, 40, 25, 11, 7, 2, 9, 4])
     counts = await rr.fetch_reach_counts(session)  # type: ignore[arg-type]
-    assert counts == _counts(attempt=5, eligible=3, pair=2, pool=120, treatment=40, with_policy=25)
+    assert counts == _counts(
+        attempt=5,
+        eligible=3,
+        pair=2,
+        pool=120,
+        treatment=40,
+        with_policy=25,
+        selection_theta_key=11,
+        boundary_upper=7,
+        boundary_lower=2,
+        help_key=9,
+        hint_unknown_key=4,
+    )
+
+
+async def test_every_query_is_consumed_and_the_order_is_a_contract() -> None:
+    """큐를 서로 다른 소수로 채워 **어느 쿼리가 어느 필드로 가는지**를 고정한다 — 순서가 바뀌면 RED."""
+    values = [101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151]
+    session = _QueueSession(values)
+    counts = await rr.fetch_reach_counts(session)  # type: ignore[arg-type]
+    assert session._calls == 11  # 쿼리를 하나 빠뜨리거나 더하면 RED
+    assert [
+        counts.problem_attempt_total,
+        counts.theta_eligible_response_total,
+        counts.weak_concept_signal_pair_total,
+        counts.candidate_pool_structural_cap,
+        counts.recommendation_treatment_total,
+        counts.recommendation_treatment_with_policy_metadata_total,
+        counts.selection_theta_key_total,
+        counts.theta_boundary_upper_total,
+        counts.theta_boundary_lower_total,
+        counts.selection_help_key_total,
+        counts.selection_hint_unknown_key_total,
+    ] == values
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -264,3 +308,63 @@ def test_main_runtime_error_reports_exception_type_name(monkeypatch: Any, capsys
     assert exit_code == 2
     err = capsys.readouterr().err
     assert "_BoomError" in err
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-39 — 선택 θ 규칙 발동률("작동한 비율"): 순수 집계·렌더·JSON.
+# ──────────────────────────────────────────────────────────────────────────
+def test_selection_rule_rates_are_none_without_a_denominator() -> None:
+    """처치 기록 0건이면 전 축 비율이 None이다 — 0/0을 0.0으로 지어내지 않는다."""
+    report = rr.build_report(_counts())
+    assert report.selection_theta_key_rate is None
+    assert report.theta_boundary_upper_rate is None
+    assert report.theta_boundary_lower_rate is None
+    assert report.selection_help_key_rate is None
+    assert report.selection_hint_unknown_key_rate is None
+    rendered = rr.render_report(report)
+    assert "## 6. 선택 θ 규칙 발동률" in rendered
+    assert f"발동률 전 축: {rr.NOT_REACHED}" in rendered
+
+
+def test_selection_rule_rates_use_the_treatment_total_as_the_denominator() -> None:
+    report = rr.build_report(
+        _counts(
+            treatment=40,
+            with_policy=40,
+            selection_theta_key=10,
+            boundary_upper=8,
+            boundary_lower=2,
+            help_key=5,
+            hint_unknown_key=20,
+        )
+    )
+    assert report.selection_theta_key_rate == 0.25
+    assert report.theta_boundary_upper_rate == 0.2
+    assert report.theta_boundary_lower_rate == 0.05
+    assert report.selection_help_key_rate == 0.125
+    assert report.selection_hint_unknown_key_rate == 0.5
+
+
+def test_selection_rule_axes_are_rendered_with_counts_and_percentages() -> None:
+    rendered = rr.render_report(
+        rr.build_report(_counts(treatment=40, selection_theta_key=10, help_key=5))
+    )
+    assert "`selection_theta` 키(선택 θ ≠ 추정 θ): **10** (25.0%)" in rendered
+    assert "`selection_help_count` 키(코치 도움 완료를 실패로 접음): **5** (12.5%)" in rendered
+    # 값이 0인 축도 '0건'으로 보인다(0.0%) — 분모가 있으므로 지어낸 값이 아니다.
+    assert "`theta_boundary=lower`(전부 오답): **0** (0.0%)" in rendered
+    # 킬 스위치 기간과 구분되지 않는다는 한계가 리포트 자체에 적혀 있다.
+    assert "l2_selection_help_fold_enabled" in rendered
+
+
+def test_selection_rule_json_structure_and_none_rates() -> None:
+    payload = rr.report_to_json(rr.build_report(_counts(treatment=4, help_key=1)))
+    rules = payload["selection_theta_rules"]
+    assert rules["treatment_total"] == 4
+    assert rules["selection_help_key"] == {"total": 1, "rate": 0.25}
+    assert rules["selection_theta_key"] == {"total": 0, "rate": 0.0}
+    none_payload = rr.report_to_json(rr.build_report(_counts()))
+    assert none_payload["selection_theta_rules"]["selection_help_key"] == {
+        "total": 0,
+        "rate": None,
+    }

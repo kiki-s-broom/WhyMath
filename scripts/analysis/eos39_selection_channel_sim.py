@@ -30,7 +30,9 @@
                 1건**이다(실패를 두 번 세지 않으면서 도움 완료를 독립 성공으로 세지 않는다).
                 도움 없이 오답 뒤 스스로 고친 문항은 종전대로 오답+정답 한 쌍이다. 하한은 그대로.
 - `a2_sym`    : `a2` + 선택용 응답이 전부 오답일 때 하한 고정 대신 실패한 최저 난이도에서 한
-                단계만 내린다(전부 정답 쪽 사다리와 대칭).
+                단계만 내린다(전부 정답 쪽 사다리와 대칭) — **실제 오답만 있는 이력도 바꾼다.**
+- `a2_narrow` : **채택안**. `a2` + 하한 사다리를 **도움 접기가 만든** 전부 실패에만 적용한다 —
+                원래 이력이 전부 오답이면(R3·R6의 기준선이 기대는 하한 −4.0) 건드리지 않는다.
 - `b`         : ⓑ 최고 난이도 앵커에서 도움 완료만 **제외**(전부 정답 이력에서만).
 
 사용: `python3 scripts/analysis/eos39_selection_channel_sim.py [--seeds N] [--rows N]`
@@ -146,6 +148,14 @@ def policy_a2_sym(rows: list[Row]) -> float:
     return ability_for_selection(resp, estimate_ability(resp))
 
 
+def policy_a2_narrow(rows: list[Row]) -> float:
+    resp = _collapsed_responses(rows)
+    original = _responses(rows)
+    if ability_boundary(resp) == "lower" and ability_boundary(original) != "lower":
+        return _lower_ladder(resp)
+    return ability_for_selection(resp, estimate_ability(resp))
+
+
 def policy_b(rows: list[Row]) -> float:
     resp = _responses(rows)
     est = estimate_ability(resp)
@@ -163,6 +173,7 @@ POLICIES: dict[str, Policy] = {
     "a1": policy_a1,
     "a2": policy_a2,
     "a2_sym": policy_a2_sym,
+    "a2_narrow": policy_a2_narrow,
     "b": policy_b,
 }
 
@@ -176,6 +187,9 @@ class Scenario:
     complete_after_fail: float = (
         1.0  # 독립 성공이 아닐 때 도움으로 **완료**할 확률(아니면 오답 행만)
     )
+    #: 독립 성공인데 코치 정책(숙달 라벨 '초보'·5회+ 막힘)이 단계 2+를 공급해 라벨이 참이 될 확률.
+    #: EOS-133 귀속은 "코치가 공급했는가"이지 "학생이 요청했는가"가 아니다(판정문 §9 #1).
+    scaffold_on_success: float = 0.0
 
 
 SCENARIOS = (
@@ -185,6 +199,8 @@ SCENARIOS = (
     Scenario("오답 뒤 절반만 완료(나머지는 오답 행만)", q_wrong=1.0, complete_after_fail=0.5),
     Scenario("절반 + 라벨 30% 미상", q_wrong=0.5, none_rate=0.3),
     Scenario("절반 + 라벨 20% 오귀속", q_wrong=0.5, mislabel=0.2),
+    Scenario("구조적 오귀속: 독립 성공의 30%가 도움 라벨", q_wrong=0.5, scaffold_on_success=0.3),
+    Scenario("구조적 오귀속: 독립 성공의 60%가 도움 라벨", q_wrong=0.5, scaffold_on_success=0.6),
 )
 
 
@@ -222,6 +238,7 @@ def simulate(
     u_none = [rng.random() for _ in range(n_rows)]
     u_mis = [rng.random() for _ in range(n_rows)]
     u_done = [rng.random() for _ in range(n_rows)]
+    u_scaffold = [rng.random() for _ in range(n_rows)]
     remaining = list(range(NUM_ITEMS))
     rows: list[Row] = []
     ps: list[float] = []
@@ -241,6 +258,8 @@ def simulate(
         label: bool | None
         if u_none[t] < scenario.none_rate:
             label = None
+        elif independent and u_scaffold[t] < scenario.scaffold_on_success:
+            label = True  # 구조적 오귀속 — 독립 성공인데 코치가 도움 단계를 공급했다
         else:
             truth = not independent
             label = (not truth) if u_mis[t] < scenario.mislabel else truth
@@ -276,7 +295,7 @@ def run(seeds: int, n_rows: int) -> None:
     for scenario in SCENARIOS:
         print(
             f"## {scenario.name} (q_wrong={scenario.q_wrong} · 미상={scenario.none_rate} "
-            f"· 오귀속={scenario.mislabel})"
+            f"· 오귀속={scenario.mislabel} · 구조적={scenario.scaffold_on_success})"
         )
         print(
             "| 규칙 | θ_true | P̄ | P<0.25 | P>0.90 | 라벨@10 | 라벨@끝 "

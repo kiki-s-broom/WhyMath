@@ -103,6 +103,15 @@ META_KEY_SELECTION_THETA: str = "selection_theta"
 #: 분포)을 소급 측정하는 재료다. 키가 없다고 θ가 ±4.0이 아니라는 뜻은 아니다(혼합 이력에서 MLE가
 #: 범위를 넘어 클램프된 경우도 없다).
 META_KEY_THETA_BOUNDARY: str = "theta_boundary"
+#: EOS-39 — 코치가 도움(힌트 단계 2 이상)을 공급해 완료한 문항이라 선택용 응답에서 **실패 1건으로
+#: 접힌 문항 수**. 0이면 키를 넣지 않는다 — 그래서 "키가 있는 처치 / 전체 처치"가 도움 채널의 발동률
+#: 이다(CLAUDE.md "작동한 비율"). 값은 라벨이 코치 정책(숙달 라벨 '초보'·5회+ 막힘)에도 의존하므로
+#: 학생이 도움을 요청한 횟수가 아니다(판정문 §2-2).
+META_KEY_SELECTION_HELP_COUNT: str = "selection_help_count"
+#: EOS-39 — 정답으로 센 완료 행 중 힌트 귀속(`used_hint`)이 미상(NULL)이라 도움 채널이 판정하지
+#: 못한 수. 0이면 키를 넣지 않는다. 미상은 구조적이라(귀속 창을 모름·EOS-133 이전 행·API 클라이언트)
+#: 이 비율이 높으면 도움 채널의 효과가 줄어든다(판정문 §4-1 — 정답으로 세는 대가).
+META_KEY_SELECTION_HINT_UNKNOWN_COUNT: str = "selection_hint_unknown_count"
 META_KEY_POOL_SIZE: str = "pool_size"
 META_KEY_APPLIED_WEIGHTS: str = "applied_weights"
 META_KEY_MODE: str = "mode"
@@ -128,6 +137,13 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
+#: `cat_v5`(EOS-39): 후보를 고르는 표적 θ를 만들 때 코치가 도움(힌트 단계 2 이상)을 공급해 완료한
+#: 문항을 **실패 응답 1건으로 접는다**(`l2.irt.selection_evidence` — 판정문
+#: `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`). 도움 완료가 있는
+#: 이력의 선택이 바뀌므로 올린다 — `cat_v4` 로그와 섞으면 두 규칙이 한 정책으로 읽힌다. 킬 스위치
+#: (`l2_selection_help_fold_enabled`)가 꺼진 동안의 기록도 이 번호를 단다 — 끈 사실은 처치 기록의
+#: `selection_help_count` 키 부재와 구분되지 않으므로 소급 평가는 **배포 기간**과 함께 읽어야 한다.
+#: `cat_v4`(EOS-147)는 위 규칙이 없는 판이다.
 #: `cat_v4`(EOS-147): 전부 정답 이력에서 후보를 고르는 표적 θ가 추정 θ(4.0 클램프)가 아니라
 #: `ability_for_selection`의 표적이 된다(첫 정답 뒤 은행 꼭대기로 뛰지 않는다). 그 외 이력의 선택은
 #: `cat_v2`와 같지만, 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다.
@@ -136,10 +152,14 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 #: 이전 `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
 #: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
-POLICY_VERSION_CAT: str = "cat_v4"
+POLICY_VERSION_CAT: str = "cat_v5"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
-POLICY_VERSION_SUNEUNG: str = "suneung_v3"
+POLICY_VERSION_SUNEUNG: str = "suneung_v4"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
+
+`suneung_v4`(EOS-39): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 도움을 쓴 문항을 실패 응답 1건으로
+접은 선택용 응답이다(`cat_v5`와 같은 상태 객체 — 모드마다 θ 정의를 갈라 두지 않는다). 도움 완료가
+있는 이력의 선택이 바뀌므로 올린다. `suneung_v3`은 그 규칙이 없는 판이다.
 
 `suneung_v3`(EOS-147): 수능 모드도 기본 CAT과 같은 표적 θ를 쓴다 — 전부 정답 이력에서 후보를
 고르는 θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의 표적이다. 그 외 이력의 선택은
@@ -151,29 +171,34 @@ POLICY_VERSION_SUNEUNG: str = "suneung_v3"
 성취기준 전용 문항도 적격이었으므로 후보 집합이 다르다 — 두 판의 로그를 섞어 평가하면 서로 다른
 후보 규칙이 한 정책으로 읽힌다. 설명(reason·action·target)만 바꾼 EOS-25는 이 값을 올리지
 않았다(그 변경은 선택 규칙이 아니었다)."""
-POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"
+POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v2_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
 지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — 현행 `cat_v4`, EOS-124가
 `cat_v2`로·EOS-147이 `cat_v4`로 올렸다)을 따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 —
 EOS-124는 교정 경로를 바꾸지 않았으므로(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다.
 
-EOS-147은 이 값을 바꾸지 않는다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
-이력에서만 발동한다. 예외: 난이도 라벨이 없는 문항의 오답은 IRT 응답에 들어 있지 않아 이력이
-'전부 정답'으로 판정될 수 있다 — 그 코너에서는 후보 풀 조회 θ가 선택 θ로 바뀐다(처치 기록의
-`selection_theta` 키가 그 표지다)."""
-POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"
+EOS-147은 이 값을 바꾸지 않았다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
+이력에서만 발동한다는 근거였다. **EOS-39가 `cat_v1_state_remediation`에서 올렸다**: 도움 접기는 오답
+행이 있는 이력에서도 선택 θ를 바꾸고(오답 + 도움 완료 문항을 실패 1건으로 접는다), R3의 학습 밴드
+가중(`recommendation_policy._combine_axes`의 `learning_band_weight(theta, item)`)이 그
+선택 θ를 읽는다 — EOS-147의 근거("오답 이력에서는 경계 규칙이 서지 않는다")가 더는 성립하지
+않는다. 경로 규칙(후보 제한·이름표)은 그대로이고 바뀐 것은 정렬·밴드의 θ다. (EOS-147이 적은 난이도
+라벨 없는 문항의 오답 코너는 이제 그 코너만의 예외가 아니다.) 하한(−4.0) 대칭은 이 판에서도 R3에
+대해 바꾸지 않았다 — 이월(판정문 §4-4).
+`cat_v1_state_remediation`은 도움 접기 이전 판이다."""
+POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v3_state_undiagnosed"
 """EOS-26 — 상태 머신 R6(원인 미상 오답)를 집행한 추천: 후보를 오답 개념의 직접 선수(연속 첫
 오답 — 선수 탐침) 또는 방금 틀린 개념(연속 두 번째 · 탐침 불가 폴백)으로 **제한**한다. 후보 생성
 규칙이 기본 CAT과 다르므로 따로 적는다. 이름표·재선택은 기본 CAT의 `cat_v2`(EOS-124) 규칙 그대로라
-`v2`다 — R3 교정 경로(`cat_v1_state_remediation`)와 달리 근거를 바꾸지 않는다. 제한하지 못한
-R6(`anchor_unresolved`·`no_candidate_in_concept`)는 기본 CAT 규칙을 따르므로
-`POLICY_VERSION_CAT`이다.
+`v2`였다 — R3 교정 경로와 달리 근거를 바꾸지 않았다. 제한하지 못한 R6(`anchor_unresolved`·
+`no_candidate_in_concept`)는 기본 CAT 규칙을 따르므로 `POLICY_VERSION_CAT`이다.
 
-EOS-147은 이 값을 바꾸지 않는다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
-이력에서만 발동한다. 예외: 난이도 라벨이 없는 문항의 오답은 IRT 응답에 들어 있지 않아 이력이
-'전부 정답'으로 판정될 수 있다 — 그 코너에서는 후보 풀 조회 θ가 선택 θ로 바뀐다(처치 기록의
-`selection_theta` 키가 그 표지다)."""
+EOS-147은 이 값을 바꾸지 않았다(오답 이력에서는 경계 규칙이 서지 않는다는 근거). **EOS-39가
+`cat_v2_state_undiagnosed`에서 `cat_v3_state_undiagnosed`로 올렸다**: 도움 접기가 오답 행이 있는
+이력의 선택 θ를 바꾸고 R6 제한 후보의 정렬이 그 θ를 읽는다 — 이유는 R3 판과 같다
+(`POLICY_VERSION_CAT_STATE_REMEDIATION` docstring). `cat_v2_state_undiagnosed`는 도움 접기
+이전 판이다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수
@@ -200,6 +225,8 @@ async def record_recommendation_treatment(
     applied_weights: bool,
     selection_theta: float | None = None,
     theta_boundary: ThetaBoundary | None = None,
+    selection_help_count: int = 0,
+    selection_hint_unknown_count: int = 0,
     mode: str | None = None,
     gate_reason: str | None = None,
     candidates: list[tuple[uuid.UUID, float]] | None = None,
@@ -227,6 +254,11 @@ async def record_recommendation_treatment(
     `selection_theta` 키와 독립이다 — `lower`는 선택 θ가 추정 θ와 같아 `selection_theta` 키 없이
     이 키만 남고, 표적이 상한에 막힌 `upper`도 마찬가지다. 키가 있는 처치의 비율·값별 분포가 경계
     규칙의 발동률이다(소급 측정 재료).
+
+    `selection_help_count`·`selection_hint_unknown_count`(EOS-39): 도움 접기가 이 이력에 닿은 정도 —
+    코치가 도움을 공급해 완료한 문항이라 선택용 응답에서 실패로 접힌 문항 수 · 정답으로 센 완료 중
+    힌트 귀속이 미상인 수. **0이면 키를 넣지 않는다**("없음"과 "0으로 기록됨"을 구분하는 기존 관례
+    — 키가 있는 처치의 비율이 곧 발동률이다). 음수는 호출 오류라 받지 않는다.
 
     `pool_size`: 선택 시점의 후보 풀 크기(θ 근방 SQL 선별 결과 건수). `applied_weights`:
     `prioritize_weak_concepts` 가중이 실제로 적용됐는지(약점 개념 가중 쿼리가 돌았는지).
@@ -270,6 +302,12 @@ async def record_recommendation_treatment(
         meta[META_KEY_SELECTION_THETA] = selection_theta
     if theta_boundary is not None:
         meta[META_KEY_THETA_BOUNDARY] = theta_boundary
+    if selection_help_count < 0 or selection_hint_unknown_count < 0:
+        raise ValueError("selection_help_count·selection_hint_unknown_count는 음수일 수 없다")
+    if selection_help_count > 0:
+        meta[META_KEY_SELECTION_HELP_COUNT] = selection_help_count
+    if selection_hint_unknown_count > 0:
+        meta[META_KEY_SELECTION_HINT_UNKNOWN_COUNT] = selection_hint_unknown_count
     if mode is not None:
         meta[META_KEY_MODE] = mode
     if gate_reason is not None:
@@ -319,6 +357,8 @@ __all__ = [
     "META_KEY_POOL_SIZE",
     "META_KEY_PROBLEM_ID",
     "META_KEY_REASON",
+    "META_KEY_SELECTION_HELP_COUNT",
+    "META_KEY_SELECTION_HINT_UNKNOWN_COUNT",
     "META_KEY_SELECTION_THETA",
     "META_KEY_THETA",
     "META_KEY_THETA_BOUNDARY",
