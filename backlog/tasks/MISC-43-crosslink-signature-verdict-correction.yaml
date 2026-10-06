@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-43-crosslink-signature-verdict-correction
+title: "G-misc40 서명 판정 정정 — Kiki 2026-10-06 판정(4번 M0671 보류·5번 M0672 부분매핑 유지)에 맞춰 PR 1454가 반영한 승인 코퍼스 69행을 67행으로 정정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 승인 코퍼스(crosslinks.json·_provenance.json)에서 M0671(power-rule-step-omitted) 행과 M0672(product-rule-naive 직접매핑 0.85) 행을 제거하고 건수·서명 대장을 69에서 67로 정정한다. M0462·M0515·M0599 3행은 유지한다. ② 5번은 부분매핑 유지 승인이며 부분매핑은 적재 대상이 아니므로 결정을 판정 문서 §6에 기록하고 코퍼스에 싣지 않는다. ③ test_approved_crosslinks_corpus·test_anchor_seat_gap 기대값을 정정하고 뮤테이션으로 RED를 확인한다. ④ 게이트 clear와 라이브 DB 적재는 Kiki 몫이다."
+artifacts: []
+paths:
+  - "data/corpus/misconception_crosslinks_v1/**"
+  - tests/backend/l1/test_approved_crosslinks_corpus.py
+  - tests/backend/l4/test_anchor_seat_gap.py
+  - "docs/reviews/misc_40_*.md"
+session: claude/sleepy-feynman-skndtr
+notes: "[트리거 면제] 서명 정정 데이터 작업이며 트리거 검출 대상이 아님"
+updated: 2026-10-06

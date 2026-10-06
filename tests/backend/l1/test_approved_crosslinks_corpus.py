@@ -4,7 +4,7 @@
 직접 승인한 매핑**을 promote 산출(로더 형식)해 커밋한 것이다(사람 사인오프·AI 자기승인 아님).
 2026-07-08 극값 2(M0864·M0865)·2026-07-10 트리아지 A 11 + B 8 + frac 1·2026-07-12 미매핑 Tier C
 Tier C 10 + period + root-loss + 843 트랜치1~5 각 6(신규 탐지 kebab·계산형)을 승인해
-**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-03 MISC-21·MISC-40 서명 5건이 더해져 **69건**이다. 이 테스트는 hermetic(DB 0)으로 봉인한다:
+**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-03 MISC-21 서명 3건이 더해져 **67건**이다(MISC-40의 M0671·M0672는 2026-10-06 Kiki 정정 판정으로 제외 — 아래 `_MISC40_HELD`). 이 테스트는 hermetic(DB 0)으로 봉인한다:
 ① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈843 코퍼스(참조 무결성)
 ③ `select_canonical`이 각 kebab에 canonical M-id를 실제로 돌려줌(단절 해소·843→34 도달).
 """
@@ -112,20 +112,24 @@ def _corpus_mis_ids() -> set[str]:
     return {m["mis_id"] for m in items if isinstance(m, dict) and "mis_id" in m}
 
 
-# 2026-10-03 게이트 G-misc40-new-crosslink-signature — Kiki가 행별로 승인한 5건(MISC-21 잔여 3 +
-# MISC-40 신설 1 + 기존 부분매핑 1을 직접 0.85로 승격). 위 `_EXPECTED`(kebab당 1건)와 달리
-# `product-rule-naive`는 M0075(0.97)에 더해 M0672(0.85)가 붙어 kebab당 2건이 되므로 쌍 집합으로 따로 동결한다.
+# 2026-10-03 게이트 G-misc40-new-crosslink-signature — Kiki가 승인한 MISC-21 잔여 3건.
+# (MISC-40 서명 대상 5행 중 M0671·M0672는 2026-10-06 Kiki 정정 판정으로 승인 코퍼스에서 제외했다.)
 _MISC40_SIGNED: dict[tuple[str, str], float] = {
     ("bigger-denominator-bigger-fraction", "M0462"): 0.9,
     ("ratio-order-swapped", "M0515"): 0.85,
     ("addition-multiplication-rule-confused", "M0599"): 0.9,
-    ("power-rule-step-omitted", "M0671"): 0.85,
-    ("product-rule-naive", "M0672"): 0.85,
+}
+
+# 2026-10-06 Kiki 판정: 4번 M0671 보류(성취기준 원문 확인 전) · 5번 M0672 부분매핑 유지 —
+# 부분매핑은 적재 대상이 아니므로 둘 다 승인 코퍼스에 있으면 안 된다.
+_MISC40_HELD: set[tuple[str, str]] = {
+    ("power-rule-step-omitted", "M0671"),
+    ("product-rule-naive", "M0672"),
 }
 
 
 def test_exact_approved_pairs() -> None:
-    # 승인 69건 = 기존 64건(kebab→M-id 동결) + 2026-10-03 서명 5건 — 드리프트 시 즉시 실패.
+    # 승인 67건 = 기존 64건(kebab→M-id 동결) + 2026-10-03 서명 3건 — 드리프트 시 즉시 실패.
     rows = _load_rows()
     pairs = {(r.kebab_id, r.mis_id) for r in rows}
     assert len(rows) == len(pairs), "중복 행 금지"
@@ -133,27 +137,29 @@ def test_exact_approved_pairs() -> None:
 
 
 def test_misc40_signed_rows_carry_kiki_stamp_and_confidence() -> None:
-    # 서명 5건의 신뢰도·서명 stamp를 값으로 못 박는다(승격 신뢰도 0.85 등 판정 결과 동결).
+    # 서명 3건의 신뢰도·서명 stamp를 값으로 못 박는다.
     by_pair = {(r.kebab_id, r.mis_id): r for r in _load_rows()}
     for pair, conf in _MISC40_SIGNED.items():
         row = by_pair[pair]
         assert row.confidence == conf, pair
         assert row.link_type == "직접매핑", pair
         assert row.note is not None and row.note.endswith("검수:kiki 2026-10-03"), pair
-    # M0671은 성취기준 원문 OCR 정합이 미확인인 채 서명됐다 — 그 사실이 note에서 지워지면 안 된다.
-    ocr_note = by_pair[("power-rule-step-omitted", "M0671")].note
-    assert ocr_note is not None and "원문 OCR 정합은 미확인" in ocr_note
 
 
-def test_product_rule_naive_canonical_stays_m0075_after_m0672_promotion() -> None:
-    # M0672(0.85)가 직접으로 붙어도 canonical은 strict 최대 신뢰도 M0075(0.97)로 유지된다 —
-    # 동률이 아니므로 ambiguous도 아니다(M0672는 보조 직접 링크).
+def test_misc40_held_rows_are_not_in_approved_corpus() -> None:
+    # 보류(M0671)·부분매핑 유지(M0672)는 코퍼스에 없어야 한다 — 되살아나면 Kiki 판정 위반.
+    pairs = {(r.kebab_id, r.mis_id) for r in _load_rows()}
+    assert not (pairs & _MISC40_HELD)
+
+
+def test_product_rule_naive_canonical_is_sole_m0075() -> None:
+    # M0672가 빠진 상태에서 product-rule-naive의 직접 링크는 M0075(0.97) 하나이고 canonical도 그것이다.
     links = [
         ResolvedLink(mis_id=r.mis_id, link_type=r.link_type, confidence=r.confidence)
         for r in _load_rows()
         if r.kebab_id == "product-rule-naive"
     ]
-    assert sorted(link.mis_id for link in links) == ["M0075", "M0672"]
+    assert [link.mis_id for link in links] == ["M0075"]
     sel = select_canonical(links)
     assert (sel.canonical_mis_id, sel.ambiguous, sel.reason) == ("M0075", False, "ok")
 

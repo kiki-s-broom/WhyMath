@@ -513,14 +513,6 @@
    "note": "검수:Kiki 2026-07-12"
   },
   {
-   "kebab_id": "product-rule-naive",
-   "mis_id": "M0672",
-   "link_type": "직접매핑",
-   "confidence": 0.85,
-   "method": "manual",
-   "note": "검수:kiki 2026-10-03"
-  },
-  {
    "kebab_id": "bigger-denominator-bigger-fraction",
    "mis_id": "M0462",
    "link_type": "직접매핑",
@@ -543,14 +535,6 @@
    "confidence": 0.9,
    "method": "manual",
    "note": "검수:kiki 2026-10-03"
-  },
-  {
-   "kebab_id": "power-rule-step-omitted",
-   "mis_id": "M0671",
-   "link_type": "직접매핑",
-   "confidence": 0.85,
-   "method": "manual",
-   "note": "성취기준 원문 OCR 정합은 미확인(correction_point의 'xn'·'의도함수' 흔적 — 연결 근거인 canonical/student_wrong_thinking은 정상) · 검수:kiki 2026-10-03"
   }
  ]
 }
