@@ -52,6 +52,15 @@
    키가 없는 것은 "규칙이 안 돌았다"일 수도, 킬 스위치(`l2_selection_help_fold_enabled`)가 꺼졌던
    기간일 수도 있다 — 두 상태는 이 키만으로 구분되지 않으므로 배포·스위치 기간과 함께 읽는다.
 
+7. **코치 단계 공급 구성**(EOS-178) — EOS-39 선택 θ 접기의 입력인 `used_hint`가 읽는 공급 원장
+   (`attempt_event` `힌트제공`)에서, 단계 2 이상 공급이 **학생 신호**로 올랐는가 **라벨만으로**
+   올랐는가를 센다. 원장 행의 `base_level`(능력 라벨 없이 계산한 단계 — `hint_level`과 나란히
+   적힌다)이 2 미만이면 라벨만으로 올라간 공급이다. 같은 (학생·문항) 안에 학생 신호 공급이 하나도
+   없으면 그 라벨은 학생 행동으로 **확인되지 않았다**. 구판 행(`base_level` 없음)은 분류할 수 없어
+   분모에서 따로 센다(0으로 접지 않는다). 이 축은 구판 규칙(EOS-133: 최종 단계 2 이상은 전부
+   도움)이 독립 성공을 얼마나 도움으로 오귀속했을지의 **상한 신호**이고, 킬 스위치
+   `l4_hint_attribution_label_free_enabled`를 끌지 판단하는 근거다.
+
 집계 코어(`build_report`)는 순수 함수(원시 카운트 → 리포트)라 hermetic 테스트로 전량
 검증 가능하다. DB 접속(`fetch_reach_counts`)만 async I/O 경계다.
 
@@ -75,10 +84,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from whymath_backend.db.models.activity import ProblemAttempt
+from whymath_backend.db.models.activity import AttemptEvent, ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
 from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.problem import Problem
@@ -92,6 +101,7 @@ from whymath_backend.l2.recommendation_evidence import (
     META_KEY_SELECTION_THETA,
     META_KEY_THETA_BOUNDARY,
 )
+from whymath_backend.schema.enums import EventType
 
 __all__ = [
     "NOT_REACHED",
@@ -153,6 +163,19 @@ class ReachCounts:
     selection_help_key_total: int = 0
     #: 처치 중 `selection_hint_unknown_count` 키가 있는 건수(힌트 귀속 미상이 섞였다).
     selection_hint_unknown_key_total: int = 0
+    #: EOS-178 — 공급 원장(`힌트제공`) 행 중 단계 2 이상(도움 후보)인 건수.
+    coach_supply_help_row_total: int = 0
+    #: 위 중 `base_level`이 실린 행(라벨 없는 단계로 분류 가능한 신판 행).
+    coach_supply_classified_row_total: int = 0
+    #: 분류된 행 중 `base_level < 2` — 학생 신호 없이 **라벨만으로** 올라간 공급.
+    coach_supply_label_only_row_total: int = 0
+    #: 라벨-단독 행 중 검수 힌트가 실제로 실린(`hint_id`) 행.
+    coach_supply_label_only_served_row_total: int = 0
+    #: 라벨-단독 행이 하나라도 있는 (학생·문항) 쌍 수.
+    coach_label_only_pair_total: int = 0
+    #: 그 쌍 중 학생 신호 공급(`base_level >= 2`)이 하나도 없는 쌍 — 라벨이 학생 행동으로
+    #: 확인되지 않았다.
+    coach_label_only_unsignaled_pair_total: int = 0
 
 
 async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
@@ -163,7 +186,9 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
     전체 행 수 ② θ 추정 유효 응답 ③ 개인화(BKT) 유니크 (user, concept) 쌍 ④ 후보 풀 구조적
     상한 ⑤ REC-11 candidates·policy_version 기록률(분모) ⑥ 그 분자 ⑦ `selection_theta` 키
     ⑧ `theta_boundary=upper` ⑨ `theta_boundary=lower` ⑩ `selection_help_count` 키
-    ⑪ `selection_hint_unknown_count` 키(EOS-39 — 전부 `recommendation_render` 처치 안에서).
+    ⑪ `selection_hint_unknown_count` 키(EOS-39 — 전부 `recommendation_render` 처치 안에서)
+    ⑫ 공급 원장 단계 2+ 행 ⑬ 그중 `base_level` 있는 행 ⑭ 그중 `base_level<2`(라벨-단독) ⑮ 그중
+    `hint_id` 있는 행 ⑯ 라벨-단독 행이 있는 (학생·문항) 쌍 ⑰ 그중 학생 신호 공급이 없는 쌍(EOS-178).
     """
     attempt_total = int(
         (await session.execute(select(func.count()).select_from(ProblemAttempt))).scalar_one()
@@ -238,6 +263,52 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         EvidenceEvent.meta.has_key(META_KEY_SELECTION_HINT_UNKNOWN_COUNT)
     )
 
+    # EOS-178 — 공급 원장의 단계 공급 구성. `hint_level`·`base_level`은 JSONB 정수 키다
+    # (`->>` 캐스팅 — 키가 없거나 JSON null이면 SQL NULL이라 비교가 거짓이 된다 = 구판 행이
+    # 분류에서 빠지는 방식).
+    supply_level = AttemptEvent.event_data["hint_level"].as_integer()
+    supply_base = AttemptEvent.event_data["base_level"].as_integer()
+    supply_served = AttemptEvent.event_data["hint_id"].as_string()
+    supply_stmt = (
+        select(func.count())
+        .select_from(AttemptEvent)
+        .where(AttemptEvent.event_type == EventType.힌트제공, supply_level >= 2)
+    )
+
+    async def _count_supply(*conditions: Any) -> int:
+        return int((await session.execute(supply_stmt.where(*conditions))).scalar_one())
+
+    supply_help_total = await _count_supply()
+    supply_classified_total = await _count_supply(supply_base.isnot(None))
+    supply_label_only_total = await _count_supply(supply_base < 2)
+    # `hint_id`가 비어 있지 않은 문자열일 때만 검수 힌트가 실린 것이다 — 키가 없거나 JSON null이면
+    # `->>`가 SQL NULL이고 `NULL != ''`도 NULL이라 이 조건 하나로 함께 빠진다.
+    supply_label_only_served_total = await _count_supply(supply_base < 2, supply_served != "")
+    # (학생·문항) 쌍 — 라벨-단독 행이 있는 쌍과, 그중 학생 신호 행이 없는 쌍. `bool_or`는 NULL을
+    # 무시하므로 구판 행뿐인 쌍은 둘 다 NULL이고 `is_(True)` 필터에서 빠진다.
+    pair_stats = (
+        select(
+            AttemptEvent.user_id,
+            AttemptEvent.problem_id,
+            func.bool_or(and_(supply_level >= 2, supply_base < 2)).label("has_label_only"),
+            func.bool_or(supply_base >= 2).label("has_signal"),
+        )
+        .where(AttemptEvent.event_type == EventType.힌트제공)
+        .group_by(AttemptEvent.user_id, AttemptEvent.problem_id)
+        .subquery()
+    )
+    label_only_pair_stmt = (
+        select(func.count()).select_from(pair_stats).where(pair_stats.c.has_label_only.is_(True))
+    )
+    label_only_pair_total = int((await session.execute(label_only_pair_stmt)).scalar_one())
+    # 라벨-단독 행이 있는 쌍은 `base_level`이 실린 행을 반드시 가지므로 `has_signal`이 NULL일 수
+    # 없다(`bool_or`는 그 행들의 참·거짓을 본다) — `is_(False)`만으로 "신호 없음"이 선다.
+    label_only_unsignaled_pair_total = int(
+        (
+            await session.execute(label_only_pair_stmt.where(pair_stats.c.has_signal.is_(False)))
+        ).scalar_one()
+    )
+
     return ReachCounts(
         problem_attempt_total=attempt_total,
         theta_eligible_response_total=eligible_total,
@@ -250,6 +321,12 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         theta_boundary_lower_total=boundary_lower_total,
         selection_help_key_total=help_key_total,
         selection_hint_unknown_key_total=hint_unknown_key_total,
+        coach_supply_help_row_total=supply_help_total,
+        coach_supply_classified_row_total=supply_classified_total,
+        coach_supply_label_only_row_total=supply_label_only_total,
+        coach_supply_label_only_served_row_total=supply_label_only_served_total,
+        coach_label_only_pair_total=label_only_pair_total,
+        coach_label_only_unsignaled_pair_total=label_only_unsignaled_pair_total,
     )
 
 
@@ -282,6 +359,17 @@ class ReachReport:
     selection_help_key_rate: float | None
     selection_hint_unknown_key_total: int
     selection_hint_unknown_key_rate: float | None
+    #: EOS-178 — 코치 단계 공급 구성. 분모가 0이면 비율은 None(0과 구별).
+    coach_supply_help_row_total: int
+    coach_supply_classified_row_total: int
+    coach_supply_classified_rate: float | None
+    coach_supply_label_only_row_total: int
+    coach_supply_label_only_rate: float | None
+    coach_supply_label_only_served_row_total: int
+    coach_supply_label_only_served_rate: float | None
+    coach_label_only_pair_total: int
+    coach_label_only_unsignaled_pair_total: int
+    coach_label_only_unsignaled_rate: float | None
 
 
 def _rate(numerator: int, denominator: int) -> float | None:
@@ -335,6 +423,25 @@ def build_report(counts: ReachCounts) -> ReachReport:
         selection_hint_unknown_key_total=counts.selection_hint_unknown_key_total,
         selection_hint_unknown_key_rate=_rate(
             counts.selection_hint_unknown_key_total, counts.recommendation_treatment_total
+        ),
+        coach_supply_help_row_total=counts.coach_supply_help_row_total,
+        coach_supply_classified_row_total=counts.coach_supply_classified_row_total,
+        coach_supply_classified_rate=_rate(
+            counts.coach_supply_classified_row_total, counts.coach_supply_help_row_total
+        ),
+        coach_supply_label_only_row_total=counts.coach_supply_label_only_row_total,
+        coach_supply_label_only_rate=_rate(
+            counts.coach_supply_label_only_row_total, counts.coach_supply_classified_row_total
+        ),
+        coach_supply_label_only_served_row_total=counts.coach_supply_label_only_served_row_total,
+        coach_supply_label_only_served_rate=_rate(
+            counts.coach_supply_label_only_served_row_total,
+            counts.coach_supply_label_only_row_total,
+        ),
+        coach_label_only_pair_total=counts.coach_label_only_pair_total,
+        coach_label_only_unsignaled_pair_total=counts.coach_label_only_unsignaled_pair_total,
+        coach_label_only_unsignaled_rate=_rate(
+            counts.coach_label_only_unsignaled_pair_total, counts.coach_label_only_pair_total
         ),
     )
 
@@ -451,6 +558,43 @@ def render_report(report: ReachReport) -> str:
             "  - 키가 없는 처치는 '규칙이 안 돌았다'이거나 킬 스위치"
             "(`l2_selection_help_fold_enabled`)가 꺼진 기간이다 — 배포·스위치 기간과 함께 읽는다."
         )
+    lines += [
+        "",
+        "## 7. 코치 단계 공급 구성 (EOS-178 — 라벨만으로 올라간 단계가 얼마인가)",
+        "",
+        f"- 공급 원장 단계 2+ 행(도움 후보): **{report.coach_supply_help_row_total}**",
+    ]
+    if report.coach_supply_help_row_total == 0:
+        lines.append(f"- 구성 전 축: {NOT_REACHED}(단계 2+ 공급 행 0건 — 분모 없음)")
+    else:
+        classified = _fmt_axis(
+            report.coach_supply_classified_row_total, report.coach_supply_classified_rate
+        )
+        label_only = _fmt_axis(
+            report.coach_supply_label_only_row_total, report.coach_supply_label_only_rate
+        )
+        served = _fmt_axis(
+            report.coach_supply_label_only_served_row_total,
+            report.coach_supply_label_only_served_rate,
+        )
+        unsignaled = _fmt_axis(
+            report.coach_label_only_unsignaled_pair_total, report.coach_label_only_unsignaled_rate
+        )
+        lines += [
+            f"- `base_level`이 실려 분류 가능한 행: {classified}"
+            " — 나머지는 구판 행(분류 불가·종전 규칙으로 센다)",
+            f"- 그중 **라벨만으로 올라간** 행(`base_level<2`): {label_only}",
+            f"- 라벨-단독 행 중 검수 힌트가 실제로 실린 행: {served}"
+            " — 이 행은 라벨이 올렸어도 도움으로 센다",
+            f"- 라벨-단독 행이 있는 (학생·문항) 쌍: **{report.coach_label_only_pair_total}**, "
+            f"그중 학생 신호 공급이 하나도 없는 쌍: {unsignaled}",
+            "  - 신호 없는 쌍의 비율이 높으면 라벨('초보')이 학생 행동으로 확인되지 않는다는 "
+            "뜻이다 — 구판 규칙이었다면 그 쌍의 독립 완료가 도움으로 접혔을 것이다"
+            "(상한 신호·확정 오귀속 수 아님).",
+            "  - 라벨-단독 행 비율이 높은데 신호 없는 쌍 비율이 낮으면 라벨이 정확하다는 쪽의 "
+            "증거다 — 킬 스위치(`l4_hint_attribution_label_free_enabled`)를 끄고 구판 규칙으로 "
+            "돌아갈지 판단한다.",
+        ]
     lines.append("")
     return "\n".join(lines)
 
@@ -499,6 +643,26 @@ def report_to_json(report: ReachReport) -> dict[str, Any]:
             "selection_hint_unknown_key": {
                 "total": report.selection_hint_unknown_key_total,
                 "rate": report.selection_hint_unknown_key_rate,
+            },
+        },
+        "coach_hint_supply": {
+            "help_row_total": report.coach_supply_help_row_total,
+            "classified": {
+                "total": report.coach_supply_classified_row_total,
+                "rate": report.coach_supply_classified_rate,
+            },
+            "label_only": {
+                "total": report.coach_supply_label_only_row_total,
+                "rate": report.coach_supply_label_only_rate,
+            },
+            "label_only_served": {
+                "total": report.coach_supply_label_only_served_row_total,
+                "rate": report.coach_supply_label_only_served_rate,
+            },
+            "label_only_pair": {
+                "total": report.coach_label_only_pair_total,
+                "unsignaled_total": report.coach_label_only_unsignaled_pair_total,
+                "unsignaled_rate": report.coach_label_only_unsignaled_rate,
             },
         },
     }

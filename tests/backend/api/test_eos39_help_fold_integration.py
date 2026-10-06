@@ -13,8 +13,9 @@
    추천 도달 리포트의 실 JSONB 쿼리(`has_key`·`->>`)가 그 키를 센다.
 ④ **`used_hint` 라벨 프로브**(비판 #1) — 코치 흐름 몇 개에서 라벨이 실제로 어떻게 붙는가. 이것은
    **현상의 고정이지 옳다는 선언이 아니다**: 라벨은 학생이 도움을 요청했는가가 아니라 코치가 단계 2
-   이상을 공급했는가이고, 오답이 숙달 라벨 '초보'를 만들면 코치가 단계를 올린다(EOS-146 acceptance ⑩ —
-   판정 대기). 그 판정이 바뀌면 이 프로브가 먼저 깨져 도움 접기의 입력이 달라졌음을 눈에 보이게 한다.
+   이상을 공급했는가이고, 오답이 숙달 라벨 '초보'를 만들면 코치가 단계를 올린다. EOS-178이 그 둘을
+   갈랐다 — **라벨만으로 올라간 단계는 원장에 남지만 도움으로 세지 않는다**(p2가 `False`로 바뀐 이유).
+   귀속 규칙이 또 바뀌면 이 프로브가 먼저 깨져 도움 접기의 입력이 달라졌음을 눈에 보이게 한다.
 
 헬퍼는 EOS-133 통합 테스트(→ 시나리오 스위트 → 페르소나 하네스)를 경로 로딩으로 빌려 쓴다.
 """
@@ -398,17 +399,19 @@ def test_probe_wrong_then_immediate_correct_is_not_labeled_help() -> None:
     assert levels == [1], levels
 
 
-def test_probe_wrong_then_a_neutral_chat_turn_then_correct_is_labeled_help() -> None:
-    """오답 → 중립 대화 한 턴 → 정답: 학생이 아무것도 요청하지 않았는데 `used_hint=True`가 된다.
+def test_probe_wrong_then_a_neutral_chat_turn_then_correct_is_not_labeled_help() -> None:
+    """오답 → 중립 대화 한 턴 → 정답: 학생이 아무것도 요청하지 않았으므로 `used_hint=False`다(EOS-178).
 
     오답 한 건이 숙달 라벨 '초보'를 만들고, 규칙 5(`decide_hint_level`)가 기본 단계 1을 2로 올린다 —
-    **코치 정책이 만든 도움 라벨**이다. 도움 접기는 이것을 실패로 센다(판정문 §2-2 — 구조적 오귀속 위험의
-    실제 사례). 이 라벨 규칙(EOS-146 acceptance ⑩)이 판정 대기 중이다.
+    원장의 최종 단계는 여전히 2다(코치의 단계 결정은 바뀌지 않았다). 그러나 라벨 없이 계산한 단계
+    (`base_level`)가 1이고 검수 힌트도 실리지 않아 귀속이 그 공급을 세지 않는다. EOS-178 이전에는 이
+    장면이 `used_hint=True`였고 도움 접기가 그것을 실패로 셌다(판정문 §2-2 — 구조적 오귀속 위험의 실제
+    사례). 세부(원장 필드·킬 스위치·다음 추천)는 `test_eos178_label_free_attribution_integration.py`.
     """
     _case("p2", _probe("오답→중립 대화→정답", ["x의 값을 다시 구해볼게요"]))
     used, levels = _PROBE_RESULTS["오답→중립 대화→정답"]
-    assert used is True, (used, levels)
-    assert levels and levels[-1] >= 2, levels  # 마지막 공급이 도움 단계(2 이상)다
+    assert used is False, (used, levels)
+    assert levels == [1, 2], levels  # 단계 결정은 그대로 — 귀속만 달라졌다
 
 
 def test_probe_wrong_then_frustrated_then_correct_is_labeled_help() -> None:

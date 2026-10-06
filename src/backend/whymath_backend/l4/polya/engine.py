@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from whymath_backend.config import get_settings
-from whymath_backend.l4.hint_deferral import REVEALS, decide_hint_level
+from whymath_backend.l4.hint_deferral import REVEALS, decide_base_hint_level, decide_hint_level
 from whymath_backend.l4.lthc.models import MasteryLevel
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.models import (
@@ -99,6 +99,12 @@ class PolyaCoach:
             prev_hint_level=state.prev_hint_level,
             mastery_level=mastery_level,
         )
+        # EOS-178: 같은 입력에서 라벨 없이 계산한 단계 — 공급 원장이 최종 단계와 나란히 적는다.
+        base_hint_level = decide_base_hint_level(
+            student_input=student_input,
+            turn_count=state.turn_count,
+            prev_hint_level=state.prev_hint_level,
+        )
         # 교수법 팩 4계층 조립(옵트인 + 플래그 게이트) — pack 주입 ∧ 플래그 ON일 때만. 그 외에는
         # base_system(sp.system) 무변경으로 기존 발문 경로와 비트동일(OFF/무팩 회귀 0 계약).
         system = sp.system
@@ -119,6 +125,8 @@ class PolyaCoach:
             system=system,
             suggested_actions=list(_STAGE_ACTIONS[target_stage]),
             reveals=REVEALS[hint_level],
+            base_hint_level=base_hint_level,
+            applied_mastery_level=mastery_level,
         )
 
     async def coach(
