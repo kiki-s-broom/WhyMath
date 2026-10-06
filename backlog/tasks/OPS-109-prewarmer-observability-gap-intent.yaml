@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "l3/pregenerate/prewarmer.py 는 provider 를 직접 부르면서 l3_routing 이벤트를 내지 않는다(pregenerate 패키지에 TraceSink 사용 0건·비용은 provenance_bridge 가 별도 기록). 사전생성 호출이 Langfuse·게이트② 관측에 남지 않는 것이 의도인지 확인하고, 의도면 그 근거를 모듈 docstring 에 적고, 아니면 저작 표지(AuthoringTraceSink)를 단 trace 를 연결한다. 근거 docs/reviews/ops_107_authoring_bypass_inventory_2026-10-05.md §4-3"
-artifacts: []
+artifacts:
+  - "PR #1481 (https://github.com/kiki-s-broom/WhyMath/pull/1481) — 판정 공백·prewarmer 저작 표지 trace 연결+생성 로그 원가 좌석 정정, 판정문 docs/reviews/ops_109_prewarmer_observability_2026-10-06.md, 테스트 21건·뮤테이션 19/19 검출, 후속 OPS-116"
 paths:
   - "src/backend/whymath_backend/l3/pregenerate/**"
+  - tests/backend/l3/test_prewarmer_trace.py
+  - docs/reviews/ops_109_prewarmer_observability_2026-10-06.md
 session: null
-notes: ""
-updated: 2026-10-05
+notes: "[정정 2026-10-06] paths ['src/backend/whymath_backend/l3/pregenerate/**'] → ['src/backend/whymath_backend/l3/pregenerate/**', 'tests/backend/l3/test_prewarmer_trace.py', 'docs/reviews/ops_109_prewarmer_observability_2026-10-06.md']: 구현 산출물(신규 테스트·판정 문서)이 작업 범위에 들어와 겹침 검사 대상으로 등재 — 기존 glob은 유지(amend --path는 목록 전체를 교체한다)"
+updated: 2026-10-06
