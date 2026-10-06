@@ -32,12 +32,13 @@ class _FakeScalarResult:
 
 
 class _QueueSession:
-    """`fetch_reach_counts`의 execute 11회(①attempt ②eligible ③pair ④pool ⑤treatment
+    """`fetch_reach_counts`의 execute 17회(①attempt ②eligible ③pair ④pool ⑤treatment
     ⑥with_policy_metadata ⑦selection_theta키 ⑧boundary=upper ⑨boundary=lower ⑩help키
-    ⑪hint_unknown키)를 큐로 반환. 뒤 5개를 생략하면 0으로 채운다(EOS-39 이전 호출 호환)."""
+    ⑪hint_unknown키 ⑫공급 2+ ⑬분류 가능 ⑭라벨-단독 ⑮라벨-단독 서빙 ⑯라벨-단독 쌍 ⑰신호 없는 쌍)를
+    큐로 반환. 뒤쪽을 생략하면 0으로 채운다(EOS-39·EOS-178 이전 호출 호환)."""
 
     def __init__(self, values: list[int]) -> None:
-        self._values = values + [0] * (11 - len(values))
+        self._values = values + [0] * (17 - len(values))
         self._calls = 0
 
     async def execute(self, _stmt: object) -> _FakeScalarResult:
@@ -58,6 +59,12 @@ def _counts(
     boundary_lower: int = 0,
     help_key: int = 0,
     hint_unknown_key: int = 0,
+    supply_help: int = 0,
+    supply_classified: int = 0,
+    supply_label_only: int = 0,
+    supply_label_only_served: int = 0,
+    label_only_pair: int = 0,
+    label_only_unsignaled_pair: int = 0,
 ) -> rr.ReachCounts:
     return rr.ReachCounts(
         problem_attempt_total=attempt,
@@ -71,14 +78,20 @@ def _counts(
         theta_boundary_lower_total=boundary_lower,
         selection_help_key_total=help_key,
         selection_hint_unknown_key_total=hint_unknown_key,
+        coach_supply_help_row_total=supply_help,
+        coach_supply_classified_row_total=supply_classified,
+        coach_supply_label_only_row_total=supply_label_only,
+        coach_supply_label_only_served_row_total=supply_label_only_served,
+        coach_label_only_pair_total=label_only_pair,
+        coach_label_only_unsignaled_pair_total=label_only_unsignaled_pair,
     )
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # fetch_reach_counts — 쿼리 6회 → ReachCounts 매핑(순서 계약).
 # ──────────────────────────────────────────────────────────────────────────
-async def test_fetch_reach_counts_maps_eleven_queries_in_order() -> None:
-    session = _QueueSession([5, 3, 2, 120, 40, 25, 11, 7, 2, 9, 4])
+async def test_fetch_reach_counts_maps_seventeen_queries_in_order() -> None:
+    session = _QueueSession([5, 3, 2, 120, 40, 25, 11, 7, 2, 9, 4, 60, 50, 20, 6, 15, 12])
     counts = await rr.fetch_reach_counts(session)  # type: ignore[arg-type]
     assert counts == _counts(
         attempt=5,
@@ -92,15 +105,21 @@ async def test_fetch_reach_counts_maps_eleven_queries_in_order() -> None:
         boundary_lower=2,
         help_key=9,
         hint_unknown_key=4,
+        supply_help=60,
+        supply_classified=50,
+        supply_label_only=20,
+        supply_label_only_served=6,
+        label_only_pair=15,
+        label_only_unsignaled_pair=12,
     )
 
 
 async def test_every_query_is_consumed_and_the_order_is_a_contract() -> None:
     """큐를 서로 다른 소수로 채워 **어느 쿼리가 어느 필드로 가는지**를 고정한다 — 순서가 바뀌면 RED."""
-    values = [101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151]
+    values = [101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181]
     session = _QueueSession(values)
     counts = await rr.fetch_reach_counts(session)  # type: ignore[arg-type]
-    assert session._calls == 11  # 쿼리를 하나 빠뜨리거나 더하면 RED
+    assert session._calls == 17  # 쿼리를 하나 빠뜨리거나 더하면 RED
     assert [
         counts.problem_attempt_total,
         counts.theta_eligible_response_total,
@@ -113,6 +132,12 @@ async def test_every_query_is_consumed_and_the_order_is_a_contract() -> None:
         counts.theta_boundary_lower_total,
         counts.selection_help_key_total,
         counts.selection_hint_unknown_key_total,
+        counts.coach_supply_help_row_total,
+        counts.coach_supply_classified_row_total,
+        counts.coach_supply_label_only_row_total,
+        counts.coach_supply_label_only_served_row_total,
+        counts.coach_label_only_pair_total,
+        counts.coach_label_only_unsignaled_pair_total,
     ] == values
 
 
@@ -367,4 +392,74 @@ def test_selection_rule_json_structure_and_none_rates() -> None:
     assert none_payload["selection_theta_rules"]["selection_help_key"] == {
         "total": 0,
         "rate": None,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-178 — 코치 단계 공급 구성(§7): 순수 집계·렌더·JSON. 실 JSONB·bool_or SQL은 통합 테스트가 본다.
+# ──────────────────────────────────────────────────────────────────────────
+def test_supply_composition_rates_are_none_without_a_denominator() -> None:
+    """단계 2+ 공급 행이 0건이면 전 비율이 None이고 '미도달'로 적힌다 — 0.0으로 위장하지 않는다."""
+    report = rr.build_report(_counts())
+    assert report.coach_supply_classified_rate is None
+    assert report.coach_supply_label_only_rate is None
+    assert report.coach_supply_label_only_served_rate is None
+    assert report.coach_label_only_unsignaled_rate is None
+    rendered = rr.render_report(report)
+    assert "## 7. 코치 단계 공급 구성" in rendered
+    assert f"구성 전 축: {rr.NOT_REACHED}" in rendered
+
+
+def test_supply_composition_rates_use_literal_denominators() -> None:
+    """분모가 축마다 다르다 — 분류율은 단계 2+ 행, 라벨-단독율은 분류된 행, 서빙율은 라벨-단독 행,
+    미확인율은 라벨-단독 쌍. 소수로 채워 어느 분모를 쓰는지 리터럴로 고정한다."""
+    report = rr.build_report(
+        _counts(
+            supply_help=80,
+            supply_classified=40,
+            supply_label_only=10,
+            supply_label_only_served=2,
+            label_only_pair=8,
+            label_only_unsignaled_pair=6,
+        )
+    )
+    assert report.coach_supply_classified_rate == 0.5
+    assert report.coach_supply_label_only_rate == 0.25
+    assert report.coach_supply_label_only_served_rate == 0.2
+    assert report.coach_label_only_unsignaled_rate == 0.75
+
+
+def test_supply_composition_partial_denominators_stay_none() -> None:
+    """구판 행뿐이면(분류된 행 0건) 라벨-단독율은 None이다 — '라벨-단독이 0%'로 읽히면 안 된다."""
+    report = rr.build_report(_counts(supply_help=30, supply_classified=0))
+    assert report.coach_supply_classified_rate == 0.0
+    assert report.coach_supply_label_only_rate is None
+    assert report.coach_supply_label_only_served_rate is None
+    assert report.coach_label_only_unsignaled_rate is None
+
+
+def test_supply_composition_render_and_json() -> None:
+    report = rr.build_report(
+        _counts(
+            supply_help=80,
+            supply_classified=40,
+            supply_label_only=10,
+            supply_label_only_served=2,
+            label_only_pair=8,
+            label_only_unsignaled_pair=6,
+        )
+    )
+    rendered = rr.render_report(report)
+    assert "단계 2+ 행(도움 후보): **80**" in rendered
+    assert "분류 가능한 행: **40** (50.0%)" in rendered
+    assert "라벨만으로 올라간** 행(`base_level<2`): **10** (25.0%)" in rendered
+    assert "학생 신호 공급이 하나도 없는 쌍: **6** (75.0%)" in rendered
+    assert "l4_hint_attribution_label_free_enabled" in rendered
+    payload: dict[str, Any] = rr.report_to_json(report)
+    assert payload["coach_hint_supply"] == {
+        "help_row_total": 80,
+        "classified": {"total": 40, "rate": 0.5},
+        "label_only": {"total": 10, "rate": 0.25},
+        "label_only_served": {"total": 2, "rate": 0.2},
+        "label_only_pair": {"total": 8, "unsignaled_total": 6, "unsignaled_rate": 0.75},
     }

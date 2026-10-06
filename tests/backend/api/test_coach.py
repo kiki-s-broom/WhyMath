@@ -4459,6 +4459,9 @@ class TestLogHintEvent:
             # S4-11: served_hint 미지정 → 검수 힌트 미서빙 턴(None·0으로 날조 금지).
             "reveal_score": None,
             "hint_id": None,
+            # EOS-178: 호출부가 라벨 없는 단계·적용된 라벨을 넘기지 않으면 구판 행과 같다(None).
+            "base_level": None,
+            "ability_level": None,
         }
         assert event.user_id == self._UID
         assert event.problem_id == self._PID
@@ -4487,6 +4490,8 @@ class TestLogHintEvent:
             "client_state_mismatch": False,
             "reveal_score": None,
             "hint_id": None,
+            "base_level": None,
+            "ability_level": None,
         }
 
 

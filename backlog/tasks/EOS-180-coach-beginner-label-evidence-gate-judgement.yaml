@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-180-coach-beginner-label-evidence-gate-judgement
+title: "'초보' 라벨의 증거 하한·수축 판정 — 다른 라벨 소비처(Polya 전이·LTHC·진단 화면)와 WH-1 ⑤⑧ KPI 연속성을 함께 본다 (EOS-178 후속 · 판정 대기)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-178-coach-hint-level-beginner-label-judgement
+  - EOS-179-coach-label-predictive-validity-reader
+requires_gates: []
+acceptance:
+  - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md` §3·§9): EOS-178은 라벨 자체를 바꾸지 않았다. 후보 (나θ: 증거 3건 미만이면 BKT를 빼고 θ만)는 이력이 쌓인 학생이 새 개념에서 오답 한 건을 냈을 때 '숙달'을 만들어 사다리를 풀고 EOS-39의 '너무 어려움' 노출을 늘린다(T6·독립 비판 #1·#4) — 반려. 후보 (나': 증거 3건 미만이면 라벨 없음)는 라벨 가용성을 잃고(K=20이면 문항 시작의 89%가 무라벨 — 독립 비판 #1) 연속 수축(confidence=n/(n+5))은 첫 오답 직후 '초보'를 99% '발전 중'으로 만든다(#3). 어느 쪽이든 교수학 판단이며 지표로 고를 수 없다."
+  - "② 선행 측정: (a) 운영의 학생당 개념 수 K(문항-개념 분포 — 은행 14,034문항이 닿는 개념 104개) (b) 오답 뒤 이탈률(`EOS-41`) (c) EOS-178이 적재하기 시작한 원장 `ability_level`·`base_level`과 `EOS-179`의 라벨 예측 타당도 리더 값. 이 셋이 없으면 임계 수치를 정하지 않는다(독립 비판 #7·#12). `ConceptMasteryHistory.sample_size`는 NULL 허용이고(구판 이력 — NULL을 0으로 읽으면 구판 전체가 무라벨이 된다) 오답은 PRIMARY에만, 정답은 PRIMARY+TESTED에 +1이라 '관측 3건'은 약 1.5문항이다(#9) — 증거 수의 정의부터 정한다."
+  - "③ 같은 판정에서 소비처 전수를 본다: 같은 노이즈 라벨이 학생 대면 화면에 남는다 — `/v1/me/diagnosis/concepts`의 `mastery_level`(`api/me.py` 1977행 부근) · `study.py` 188행 부근 · `_concept_orchestration.py` 87행 부근(None이면 '초보' 폴백). 코치 라벨만 바꾸면 같은 학생이 한 화면에서는 초보, 코치에서는 라벨 없음이 된다. WH-1 ⑤⑧(`harness/wh1_evaluation.py`)은 최종 단계를 세므로 라벨 규칙이 바뀌면 KPI 분포가 불연속이다 — 원장에 정책 버전 태그를 둘지 포함한다. Polya 전이(`l4/polya/transitions.py` — '초보'는 UNDERSTAND 재진술 +5자·PLAN 최소 길이, '숙달'은 EXECUTE 다중줄 면제)와 LTHC 적응도 같은 근거로 영향이 판정 대상이다. 명시 `mastery_level`(stateless `/v1/coach`·세션 요청 본문)은 증거 수가 없어 대상이 아니다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/l4/lthc/adapt.py
+session: null
+notes: "출처: EOS-178 판정문 §3·§5·§8 / 독립 비판 #1~#4·#9~#11 (2026-10-06). 등급 P2 근거: 합성 학생의 방향 증거만 있고 운영 응답·K·이탈률이 선행이라 12월 검증 이후 항목이다. 선행 EOS-178이 원장 계측(`base_level`·`ability_level`)과 귀속 분리를 먼저 착지시킨다.\n\n[트리거 면제] EOS-178 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
+updated: 2026-10-06

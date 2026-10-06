@@ -236,6 +236,9 @@ def test_hint_shape() -> None:
         # S4-11: 검수 힌트 미서빙 턴은 reveal_score·hint_id가 None(0으로 날조 금지).
         "reveal_score": None,
         "hint_id": None,
+        # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
+        "base_level": None,
+        "ability_level": None,
     }
 
 
@@ -249,6 +252,9 @@ def test_hint_mode_persona_tag() -> None:
         "client_state_mismatch": False,
         "reveal_score": None,
         "hint_id": None,
+        # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
+        "base_level": None,
+        "ability_level": None,
     }
 
 
@@ -262,6 +268,9 @@ def test_hint_client_state_mismatch_tag() -> None:
         "client_state_mismatch": True,
         "reveal_score": None,
         "hint_id": None,
+        # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
+        "base_level": None,
+        "ability_level": None,
     }
 
 

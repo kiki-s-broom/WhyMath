@@ -144,7 +144,7 @@ from whymath_backend.l4.completion import (
 from whymath_backend.l4.hint_content.models import ServedHint
 from whymath_backend.l4.hint_content.store import find_served_hint, serving_step_order
 from whymath_backend.l4.hint_deferral import (
-    counts_as_hint_usage,
+    counts_as_help_supply,
     is_answer_demand,
     is_stuck_turn_count,
 )
@@ -1216,6 +1216,28 @@ def _supplied_hint_level(payload: object) -> int | None:
     return level
 
 
+def _supplied_base_level(payload: object) -> int | None:
+    """`힌트제공` 페이로드의 라벨 없는 단계(`base_level` 1~4, EOS-178) — 없거나 못 읽으면 None.
+
+    None은 "구판 행이거나 값이 깨졌다"이며 `counts_as_help_supply`가 종전 규칙으로 센다
+    (모른다 ≠ 아니다).
+    """
+    if not isinstance(payload, dict):
+        return None
+    level = payload.get("base_level")
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 4:
+        return None
+    return level
+
+
+def _served_hint_marked(payload: object) -> bool:
+    """그 턴에 검수 힌트가 실제로 실렸는가 — `hint_id`가 비어 있지 않은 문자열이면 참(EOS-178)."""
+    if not isinstance(payload, dict):
+        return False
+    hint_id = payload.get("hint_id")
+    return isinstance(hint_id, str) and bool(hint_id)
+
+
 async def _attribute_hints(
     session: AsyncSession,
     *,
@@ -1225,8 +1247,12 @@ async def _attribute_hints(
 ) -> _HintAttribution:
     """귀속 창 안의 공급 원장(`힌트제공`)에서 '힌트 사용'으로 셀 행을 고른다(EOS-133).
 
-    센다 = 단계가 `counts_as_hint_usage`(2 이상)인 공급이다. 1(방향)은 막힘 신호가 없어도 매 턴
-    나가는 기본 단계라 세지 않는다 — 근거는 정본(`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다.
+    센다 = 단계가 2 이상이고 `counts_as_help_supply`가 도움으로 보는 공급이다. 1(방향)은 막힘
+    신호가 없어도 매 턴 나가는 기본 단계라 세지 않는다 — 근거는 정본
+    (`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다. **EOS-178**: 숙달 라벨 '초보'만으로 올라간 2
+    (학생 신호 없음·검수 힌트 미실림)는 세지 않는다 — 원장의 `base_level`(라벨 없이 계산한 단계)이
+    그것을 가른다. 구판 행(`base_level` 없음)은 종전대로 센다. 킬 스위치
+    `l4_hint_attribution_label_free_enabled`를 끄면 EOS-133 규칙 그대로다.
 
     `used_hint` 3상태(CLAUDE.md "모른다 ≠ 아니다"):
       - True  — 셀 행이 1개 이상.
@@ -1258,11 +1284,18 @@ async def _attribute_hints(
     ).all()
     hints: list[tuple[datetime, int]] = []
     unreadable = 0
+    # EOS-178: 라벨 없는 단계를 읽을지 — 끄면 모든 행의 base를 None(구판)으로 보아
+    # EOS-133 규칙 그대로다.
+    label_free = get_settings().l4_hint_attribution_label_free_enabled
     for event_at, payload in rows:
         level = _supplied_hint_level(payload)
         if level is None:
             unreadable += 1
-        elif counts_as_hint_usage(level):
+        elif counts_as_help_supply(
+            hint_level=level,
+            base_level=_supplied_base_level(payload) if label_free else None,
+            served=_served_hint_marked(payload),
+        ):
             hints.append((event_at, level))
     if unreadable:
         # 값은 싣지 않는다(학습 행동 데이터) — 건수와 결과 판정만 남겨 원장 결함을 추적한다.
@@ -2101,6 +2134,8 @@ async def _log_hint_event(
     client_state_mismatch: bool = False,
     turn_handled: bool = False,
     served_hint: ServedHint | None = None,
+    base_hint_level: int | None = None,
+    ability_level: str | None = None,
 ) -> None:
     """AI가 제공한 힌트 노출량(hint_level)을 `attempt_event`(event_type=힌트제공)로 1행 적재.
 
@@ -2144,6 +2179,13 @@ async def _log_hint_event(
     `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
     읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
     서빙 reader가 이미 들고 온 값만 운반).
+
+    **EOS-178 base_level·ability_level**: 결정이 이미 들고 있는 값(`decision.base_hint_level`·
+    `decision.applied_mastery_level`)을 같은 행에 싣는다(재계산 0). `base_level`은 라벨 없이
+    계산한 단계라 `hint_level > base_level`이면 라벨이 올린 턴이고, 힌트 귀속(`_attribute_hints`)이
+    그것으로 "학생 신호가 올린 공급"과 "라벨만 올린 공급"을 가른다. `ability_level`은 그 순간의
+    라벨이며 사후 백필이 불가능해 지금부터 쌓는다(읽는 쪽 = 후속 태스크). 둘 다 None이면
+    구판 행과 같다.
     """
     if turn_handled:
         return  # 가로챈 턴 — 학생은 힌트가 아니라 결정론 템플릿을 받았다(EOS-30).
@@ -2164,6 +2206,8 @@ async def _log_hint_event(
             client_state_mismatch=client_state_mismatch,
             reveal_score=served_hint.reveal_score if served_hint is not None else None,
             hint_id=served_hint.hint_id if served_hint is not None else None,
+            base_level=base_hint_level,
+            ability_level=ability_level,
         ),
     )
     session.add(event)  # commit은 핸들러가 — 같은 트랜잭션에 합류(별도 commit 금지).
@@ -3163,6 +3207,8 @@ async def create_session(
         client_state_mismatch=bool(mismatch_fields),
         turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
     )
     # PED-04 D1: 교수 결정 메타 조립 — 전부 위에서 *이미 계산된* 값이다(재계산 0).
     target_stage = (
@@ -3562,6 +3608,8 @@ async def append_turns(
         client_state_mismatch=bool(mismatch_fields),
         turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
     )
     # PED-04 D1: 교수 결정 메타 — create_session과 동형. 목표 단계는 *서버 파생* 상태 기준이다
     # (클라 제출 기준이면 D2가 되찾은 진실원천이 다시 클라로 새어 나간다).

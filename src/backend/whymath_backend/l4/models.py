@@ -154,6 +154,25 @@ class PedagogyDecision(BaseModel):
             "세션당 평균 노출량 KPI 입력."
         ),
     )
+    # EOS-178 — 공급 원장(`힌트제공`)에 싣는 *내부 계측*이라 응답 본문에는 나가지 않는다
+    # (`exclude=True` — 직렬화·OpenAPI 응답 스키마에서 빠진다. `model_copy(update=)`는 보존한다).
+    base_hint_level: Literal[1, 2, 3, 4] | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "능력 라벨 없이 계산한 단계(`hint_deferral.decide_base_hint_level`). `hint_level`과 "
+            "비교하면 그 턴의 단계가 학생 신호 때문인지 라벨 때문인지 가른다. None=엔진을 거치지 "
+            "않은 결정(직접 구성)."
+        ),
+    )
+    applied_mastery_level: str | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "이 결정에 적용된 능력 라벨('초보'|'발전 중'|'숙달'). None=라벨 없이 결정됨(숙달도 "
+            "미관측·stateless). 라벨 정확도 계측의 입력 — 응답 본문에는 나가지 않는다."
+        ),
+    )
 
 
 class ToneReport(BaseModel):
