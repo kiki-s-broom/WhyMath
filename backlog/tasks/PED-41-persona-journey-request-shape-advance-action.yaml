@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ acceptance:
 artifacts: []
 paths:
   - tests/backend/api/test_e2e_persona_journeys.py
-session: null
+session: claude/vibrant-pascal-9ebi61
 notes: "출처: PED-40 ③ 확인 결과. 3루프 본 관통은 두 요청 형태 모두 §18이 선다(PED-40 에서 형태별 동결). 이 태스크는 그 확인에서 드러난 페르소나 하네스 쪽 공백이다. 분류 LOOP."
-updated: 2026-10-03
+updated: 2026-10-06
