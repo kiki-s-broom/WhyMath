@@ -804,11 +804,16 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.conceptual_count_mc_generator",
        "l3.equivalent.misconception_eval_mc_generator",
        # P3-03 — Phase 3 미적분Ⅰ 미분 대단원 개념별 결정론 생성기(승인 문항 0건이던 개념 채움).
-       # 생성기 2종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
+       # 생성기 7종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
        # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
        "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
        "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
-       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator"),
+       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator",
+       "l3.equivalent.p3_diff_tangent_line_skeleton_generator",
+       "l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator",
+       "l3.equivalent.p3_diff_graph_shape_skeleton_generator",
+       "l3.equivalent.p3_diff_equation_application_skeleton_generator",
+       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",

@@ -15,6 +15,16 @@
 ⑥ 객관식 불변식(선지 4개·표기 상이·정답 위치와 오답 귀속 위치가 다름).
 ⑦ 필수 문제유형 5종 안에서만 쓴다 · review_status 키를 쓰지 않는다 · 신규 유니코드 글리프 0.
 ⑧ 슬롯 불변식 위반(균일하지 않은 오개념 집합 등)은 빌드 시점에 ValueError로 멈춘다.
+
+개념별 면제(`_EXEMPT`)
+---------------------
+이 파일의 일부 검사는 *수치 평가형*(미분계수 값·단일 미지수·kebab 크로스링크 도달)을 전제로 쓰여 있어,
+개념형·선택형·M-id 직접 연결 개념(02-05·06·08·09·10)이 구조상 만족하지 못하는 항목이 있다. 검사를
+약화·삭제하지 않고 **면제를 명시 데이터(`_EXEMPT`)로** 둔다 — 면제된 개념도 면제 대상이 *아닌* 문항·
+단언은 전부 그대로 검사받고, 각 면제는 ①왜 면제인지(근거) ②같은 불변식의 일반화판을 구현한 전용 테스트
+(파일·함수명 — `test_exemptions_point_at_real_dedicated_tests`가 실재를 확인) ③면제가 여전히 필요한지
+확인하는 *stale 가드*(면제 대상이 사라지거나 해소되면 red → 면제 삭제 신호)를 갖는다. 면제 키는
+`test_exemption_keys_only_name_registered_concepts`가 등록부의 실재 개념만 가리키는지 잡는다.
 """
 
 from __future__ import annotations
@@ -23,6 +33,7 @@ import json
 import re
 import typing
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
@@ -37,6 +48,15 @@ from whymath_backend.l3.equivalent import p3_diff_skeleton_base as base
 from whymath_backend.l3.equivalent.acceptance import evaluate_equivalent_candidate
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.orchestrator import run_equivalent_generation
+from whymath_backend.l3.equivalent.p3_diff_equation_application_skeleton_generator import (
+    P3DiffEquationApplicationGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator import (
+    P3DiffGraphShapeGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
+    P3DiffMeanValueTheoremGenerator,
+)
 from whymath_backend.l3.equivalent.p3_diff_polynomial_rules_skeleton_generator import (
     P3DiffPolynomialRulesGenerator,
 )
@@ -48,6 +68,12 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     DiffItem,
     P3DiffSlotGenerator,
     skeleton_of,
+)
+from whymath_backend.l3.equivalent.p3_diff_tangent_line_skeleton_generator import (
+    P3DiffTangentLineGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator import (
+    P3DiffVelocityAccelerationGenerator,
 )
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.validate import validate_distractor_map
@@ -62,6 +88,126 @@ _CORPUS_ROOT = Path(__file__).resolve().parents[4] / "data" / "corpus"
 _GLYPHS = ("²", "³", "Σ", "α", "β", "√", "′")
 
 _ALL = pytest.mark.parametrize("generator_cls", GENERATORS, ids=lambda g: g.standard_code)
+
+# ──────────────────────────────────────────────────────────────────────────
+# 개념별 면제 — 명시 데이터(근거·전용 테스트 포인터). 모듈 docstring 참조.
+# ──────────────────────────────────────────────────────────────────────────
+_C05 = "[12미적Ⅰ-02-05]"
+_C06 = "[12미적Ⅰ-02-06]"
+_C08 = "[12미적Ⅰ-02-08]"
+_C09 = "[12미적Ⅰ-02-09]"
+_C10 = "[12미적Ⅰ-02-10]"
+_F_TANGENT_VELOCITY = "test_p3_diff_tangent_velocity_generators.py"
+_F_MVT_EQUATION = "test_p3_diff_mvt_equation_generators.py"
+_F_GRAPH_SHAPE = "test_p3_diff_graph_shape_generator.py"
+
+
+@dataclass(frozen=True)
+class _Exempt:
+    """면제 1건 — 근거(왜)와 같은 불변식을 구현한 전용 테스트 포인터(파일, 함수명)."""
+
+    reason: str
+    dedicated: tuple[tuple[str, str], ...]
+
+
+_EXEMPT: dict[str, dict[str, _Exempt]] = {
+    # 정답을 틀리게 주입(answer_map +1)해 게이트가 거부하는지 보는 변별력 검사 — 개념형 게이트 재료
+    # (answer_kind·answer_aggregate·answer_selection)를 가진 후보는 이 파일의 주입 방식이 재료를 전달하지
+    # 않아 *재료 누락 거부/통과*를 재게 된다. 그 후보만 건너뛴다(나머지 후보는 전건 거부를 그대로 요구).
+    "gate_wrong_answer": {
+        _C06: _Exempt(
+            "02-06 개수·집계형 후보는 answer_map이 비어 주입 대상 키가 없다(개념형 검증기가 답을 판정).",
+            ((_F_MVT_EQUATION, "test_gate_rejects_a_wrong_answer_for_every_item"),),
+        ),
+        _C08: _Exempt(
+            "02-08 근 선택(answer_selection) 후보는 selection 없이 주입하면 '근 미확정'으로 강등될 뿐 "
+            "Tier1 오답 거부와 구분되지 않는다 — 전용 테스트가 selection을 함께 넘겨 전건 거부를 요구한다.",
+            ((_F_GRAPH_SHAPE, "test_gate_rejects_a_wrong_answer_for_every_item"),),
+        ),
+        _C09: _Exempt(
+            "02-09 개수형(answer_kind)·합/곱(answer_aggregate)·근 선택 후보는 answer_map이 비거나 "
+            "재료가 필요하다 — 전용 테스트가 재료를 함께 넘겨 전건 거부를 요구한다.",
+            ((_F_MVT_EQUATION, "test_gate_rejects_a_wrong_answer_for_every_item"),),
+        ),
+    },
+    # 극한 정의 재검산 하한(≥15건) — 02-06·08·09는 `Derivative(식, x).subs(x, 점) = y` 형태 문항이 거의
+    # 없는 개념형·판정형 개념이다(하한 15는 수치 평가형 개념의 척도). 매칭된 문항의 정답 검산은 그대로 한다.
+    "limit_definition_floor": {
+        _C06: _Exempt(
+            "02-06은 평균값 정리의 c값·구간 판정형이라 단일 미분계수 평가형이 2건뿐이다.",
+            ((_F_MVT_EQUATION, "test_answers_match_an_independent_recomputation_from_the_conditions"),),
+        ),
+        _C08: _Exempt(
+            "02-08은 극값 판정·그래프 개형형이라 단일 미분계수 평가형이 없다(f'의 근과 부호로 판정).",
+            ((_F_GRAPH_SHAPE, "test_x_coordinate_answers_match_value_based_classification"),),
+        ),
+        _C09: _Exempt(
+            "02-09는 방정식·부등식 활용형(개수·합·근 선택)이라 단일 미분계수 평가형이 없다.",
+            ((_F_MVT_EQUATION, "test_answers_match_an_independent_recomputation_from_the_conditions"),),
+        ),
+    },
+    # 섀도 채점 단일 미지수 계약 — (a) 02-06·09 개수·집계형은 문자열 조건에 자유기호 x가 있지만 답은
+    # 근의 *개수·합·곱*이라 answer_map이 비어 있고, (b) 02-08은 문자열 목록 조건 `(y = 식, f' = 0)`이
+    # 부등식 보호 없이 (x, y) 두 키를 쓴다(극값의 좌표·함숫값). 둘 다 코퍼스 로더가 읽지 않는 형태라
+    # `test_multi_symbol_population_is_frozen`(섀도 모집단 동결)에는 들어가지 않는다 — 그 동결은 무약화.
+    "single_unknown": {
+        _C06: _Exempt(
+            "개수·집계형 문항(answer_map 비어 있음)은 미지수가 답이 아니다.",
+            ((_F_MVT_EQUATION, "test_no_function_valued_answers_and_single_unknown_contract"),),
+        ),
+        _C08: _Exempt(
+            "극값 좌표·함숫값 문항은 (x, y) 두 값을 한 목록 조건으로 묶는다(P3-24 적재 파서가 집행).",
+            ((_F_GRAPH_SHAPE, "test_every_row_passes_the_p324_enforcement_parser"),),
+        ),
+        _C09: _Exempt(
+            "개수형 문항(answer_map 비어 있음)은 미지수가 답이 아니다.",
+            ((_F_MVT_EQUATION, "test_no_function_valued_answers_and_single_unknown_contract"),),
+        ),
+    },
+    # 핵심 오개념(M-id)이 크로스링크로 닿는지 — 02-05·08·10의 핵심 M0673·M0676·M0678은 MISC-40이 의도적으로
+    # 미승격한 omission형·문맥 종속형이라 크로스링크 kebab이 없다. 오개념 유발 슬롯은 기존 kebab에 연결된다
+    # (이 파일의 나머지 단언 — 카탈로그 실재·distractor_map 무결성 — 은 그대로).
+    "core_crosslink_reach": {
+        _C05: _Exempt(
+            "핵심 M0673 미승격(MISC-40) — 기존 kebab power-rule-step-omitted(→ M0671)에 연결.",
+            ((_F_TANGENT_VELOCITY, "test_core_misconception_is_reachable_through_crosslinks"),),
+        ),
+        _C08: _Exempt(
+            "핵심 M0676 미승격(MISC-40) — critical-point-implies-extremum(→ M0080)에 연결.",
+            ((_F_GRAPH_SHAPE, "test_misconception_chain_gap_is_documented_not_hidden"),),
+        ),
+        _C10: _Exempt(
+            "핵심 M0678 미승격(MISC-40) — power-rule-step-omitted(→ M0671)에 연결.",
+            ((_F_TANGENT_VELOCITY, "test_core_misconception_is_reachable_through_crosslinks"),),
+        ),
+    },
+    # kebab 좌석 부재 — 02-06·09는 핵심 오개념(M0674·M0677)이 L4 카탈로그에 kebab 좌석이 없어 distractor_map에
+    # M-id를 직접 쓴다. 참조 무결성 검증자(`validate_distractor_map`)는 M-id를 위반으로 읽는다. **이 충돌은
+    # 맞추지 않고 면제 + 좌석 신호(stale 가드: 좌석이 생기면 red)로 둔다** — 억지로 kebab을 지어내면 새 id를
+    # 만드는 제약(MISC-40)을 어긴다.
+    "kebab_seat_absent": {
+        _C06: _Exempt(
+            "핵심 M0674에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
+            ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
+        ),
+        _C09: _Exempt(
+            "핵심 M0677에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
+            ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
+        ),
+    },
+}
+
+
+def _is_exempt(test_key: str, generator_cls: type[P3DiffSlotGenerator]) -> bool:
+    return generator_cls.standard_code in _EXEMPT[test_key]
+
+
+def _gate_extras(obj: object) -> bool:
+    """개념형 게이트 재료(kind·aggregate·selection)를 하나라도 갖는가."""
+    return any(
+        getattr(obj, name, None) is not None
+        for name in ("answer_kind", "answer_aggregate", "answer_selection")
+    )
 
 
 def _all_items(generator_cls: type[P3DiffSlotGenerator]) -> list[DiffItem]:
@@ -134,12 +280,19 @@ def test_gate_rejects_a_wrong_answer_for_every_item(
     generator_cls: type[P3DiffSlotGenerator],
 ) -> None:
     """**변별력 실측(RED)** — 검산 재료의 답을 틀리게 만들면 전 문항이 Tier1에서 거부된다."""
+    exempt = _is_exempt("gate_wrong_answer", generator_cls)
     rejected = 0
     total = 0
+    skipped = 0
     for slot in SLOT_IDS:
         spec = generator_cls.spec_for(slot)
         for candidate in _candidates(generator_cls, slot):
+            if exempt and (_gate_extras(candidate) or not candidate.answer_map):
+                skipped += 1  # 면제: 개념형 게이트 재료 후보 — 전용 테스트가 같은 불변식을 건다
+                continue
             total += 1
+            # 면제 개념이 아니면 재료 후보·빈 answer_map이 하나도 없어야 한다(면제 누수 방지)
+            assert exempt or (not _gate_extras(candidate) and candidate.answer_map)
             key = sorted(candidate.answer_map)[-1]  # 마지막 키 = 최종 답(보조 변수는 앞)
             broken_map = dict(candidate.answer_map)
             broken_map[key] = f"({broken_map[key]}) + 1"
@@ -154,6 +307,8 @@ def test_gate_rejects_a_wrong_answer_for_every_item(
                 rejected += 1
     assert total > 0
     assert rejected == total, f"{total - rejected}건이 틀린 답을 통과시켰다"
+    if exempt:  # stale 가드 — 면제 대상 후보가 사라졌으면 면제를 지운다
+        assert skipped > 0, "면제(gate_wrong_answer)가 더는 필요 없다 — _EXEMPT에서 삭제"
 
 
 _SINGLE_DERIV = re.compile(
@@ -173,7 +328,14 @@ def test_value_answers_match_the_limit_definition(generator_cls: type[P3DiffSlot
             continue
         var = sympy.Symbol(match["var"])
         h = sympy.Symbol("h")
-        expr = sympy.sympify(match["expr"])
+        expr_parsed = sympy.sympify(match["expr"])
+        if isinstance(expr_parsed, tuple) or item.conditions.count("Derivative(") != 1:
+            # 이계도함수(`Derivative(f, t, t)`)·속도+가속도 합 같은 *복합* 형태는 이 검사의 단일 1계
+            # 미분계수 정규식이 의도한 대상이 아니다(과거엔 여기서 AttributeError로 터졌다). 그 형태의
+            # 극한 정의 재검산은 전용 테스트 `_limit_check`(test_p3_diff_tangent_velocity_generators.py
+            # `test_value_answers_match_the_limit_definition`)가 맡는다.
+            continue
+        expr = expr_parsed
         point = int(match["pt"])
         by_definition = sympy.limit((expr.subs(var, point + h) - expr.subs(var, point)) / h, h, 0)
         claimed = dict(item.answer_map)["y"]
@@ -181,7 +343,11 @@ def test_value_answers_match_the_limit_definition(generator_cls: type[P3DiffSlot
         # 표기된 정답도 같은 값이어야 한다(단답형·객관식 공통).
         assert sympy.simplify(sympy.sympify(item.answer_text) - by_definition) == 0
         checked += 1
-    assert checked >= 15, f"극한 정의로 재검산한 문항이 너무 적다: {checked}"
+    if _is_exempt("limit_definition_floor", generator_cls):
+        # 면제: 하한(≥15)만 — 매칭된 문항의 정답 재검산은 위에서 그대로 했다. stale 가드: 하한 미달일 때만 면제.
+        assert checked < 15, "면제(limit_definition_floor)가 더는 필요 없다 — _EXEMPT에서 삭제"
+    else:
+        assert checked >= 15, f"극한 정의로 재검산한 문항이 너무 적다: {checked}"
 
 
 @_ALL
@@ -211,8 +377,13 @@ def test_conditions_obey_the_single_unknown_contract_of_shadow_grading(
     `test_multi_symbol_population_is_frozen`이 red가 된다). 연립 목록 조건은 코퍼스 로더가
     읽지 않으므로(해를 부등식으로 유일하게 가르는 문항) 여기서는 *부등식 보호가 붙은 목록*만 허용한다.
     """
+    exempt = _is_exempt("single_unknown", generator_cls)
     str_checked = 0
+    skipped = 0
     for item in _all_items(generator_cls):
+        if exempt and _outside_single_unknown_form(item):
+            skipped += 1  # 면제: 개수·집계형(빈 answer_map) · 부등식 보호 없는 좌표 목록 조건
+            continue
         if isinstance(item.conditions, str):
             parsed = shadow._parse_for_derivation(item.conditions)
             assert parsed is not None, item.conditions
@@ -227,7 +398,19 @@ def test_conditions_obey_the_single_unknown_contract_of_shadow_grading(
                 item.conditions,
             )
             assert len(item.answer_map) == 1
-    assert str_checked >= 0.7 * len(_all_items(generator_cls))
+    if exempt:
+        # 면제 개념은 비율 하한 대신 "검사한 것 + 면제한 것 = 전부"로 닫고, stale 가드로 면제 필요를 확인한다.
+        assert skipped > 0, "면제(single_unknown)가 더는 필요 없다 — _EXEMPT에서 삭제"
+    else:
+        assert skipped == 0
+        assert str_checked >= 0.7 * len(_all_items(generator_cls))
+
+
+def _outside_single_unknown_form(item: DiffItem) -> bool:
+    """면제 대상 형태 — (a) 문자열 조건인데 answer_map이 빔(개수·집계형), (b) 부등식 보호 없는 목록 조건."""
+    if isinstance(item.conditions, str):
+        return not item.answer_map
+    return not any(re.search(r"[<>!]=?", c) for c in item.conditions[1:])
 
 
 @_ALL
@@ -244,14 +427,25 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
             encoding="utf-8"
         )
     )["crosslinks"]
+    reach_exempt = _is_exempt("core_crosslink_reach", generator_cls)
+    seat_absent = _is_exempt("kebab_seat_absent", generator_cls)
     reached: set[str] = set()
+    linked_mc: set[str] = set()
     for slot in SLOT_IDS:
         linked = generator_cls.target_misconception_ids(slot)
         if slot != "misconception_trigger":
             assert linked == frozenset(), f"{slot}: 오개념 유발이 아닌 슬롯에 오개념이 연결됨"
             continue
         assert linked, "오개념 유발 슬롯에 연결된 오개념이 없다 — 센 문항이 0이다"
+        linked_mc |= set(linked)
         for kebab in linked:
+            if seat_absent:
+                # 면제: kebab 좌석 없이 핵심 M-id를 직접 연결한다. 좌석이 생기면(카탈로그에 등장) red.
+                assert kebab in core, f"좌석 없는 연결은 핵심 M-id여야 한다: {kebab}"
+                assert kebab not in CATALOG_BY_ID, (
+                    f"kebab 좌석이 생겼다 — 생성기를 kebab 연결로 옮기고 면제 삭제: {kebab}"
+                )
+                continue
             assert kebab in CATALOG_BY_ID, f"카탈로그에 없는 kebab: {kebab}"
             reached |= {
                 row["mis_id"]
@@ -260,8 +454,20 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
             }
         for candidate in _candidates(generator_cls, slot):
             assert candidate.problem.distractor_map, "오개념 유발 문항에 distractor_map이 없다"
-            assert validate_distractor_map(candidate.problem.distractor_map) == []
-    assert core <= reached, f"핵심 오개념 {core}이 크로스링크로 닿지 않는다: {reached}"
+            violations = validate_distractor_map(candidate.problem.distractor_map)
+            if seat_absent:
+                # L4 검증자가 M-id 직접 연결을 위반으로 읽는다 — 충돌을 *숨기지 않고* 신호로 고정한다.
+                # 검증자가 M-id를 받아들이게 바뀌면(또는 좌석이 생기면) 이 단언이 red가 된다.
+                assert violations, "validate_distractor_map이 M-id를 더는 위반으로 읽지 않는다"
+            else:
+                assert violations == []
+    if seat_absent:
+        assert core <= linked_mc, f"핵심 M-id {core}가 직접 연결되지 않았다: {linked_mc}"
+    elif reach_exempt:
+        # stale 가드 — 크로스링크가 승격돼 핵심 오개념에 닿으면 면제를 지운다.
+        assert not core <= reached, f"핵심 {core}이 크로스링크로 닿는다 — _EXEMPT에서 삭제"
+    else:
+        assert core <= reached, f"핵심 오개념 {core}이 크로스링크로 닿지 않는다: {reached}"
 
 
 @_ALL
@@ -426,17 +632,57 @@ def test_overlap_audit_can_instantiate_every_slot(generator_cls: type[P3DiffSlot
     assert typing.get_args(base.SlotId) == SLOT_IDS
 
 
-def test_registry_holds_both_first_concepts_in_order() -> None:
-    """등록부에 02-03·02-04 생성기가 이 순서로 있다.
+def test_registry_holds_the_seven_concepts_in_order() -> None:
+    """등록부에 02-03·04·05·06·08·09·10 생성기가 이 순서로 있다.
 
     각 생성기 *모듈명*을 이 테스트가 직접 import하는 것은 `tests/infra/test_path_scoped_counting_guard`
     (생성기 모듈마다 그 이름을 참조하는 테스트가 있어야 한다)를 위한 명시 참조이기도 하다 — 등록부 순회
     테스트만으로는 새 모듈명이 어느 테스트에도 안 나온다. **새 개념을 등록부에 더하면 여기에도 한 줄을
     더한다.**
     """
-    assert GENERATORS[:2] == (P3DiffPowerDerivativeGenerator, P3DiffPolynomialRulesGenerator)
-    assert [g.standard_code for g in GENERATORS[:2]] == ["[12미적Ⅰ-02-03]", "[12미적Ⅰ-02-04]"]
+    assert GENERATORS == (
+        P3DiffPowerDerivativeGenerator,
+        P3DiffPolynomialRulesGenerator,
+        P3DiffTangentLineGenerator,
+        P3DiffMeanValueTheoremGenerator,
+        P3DiffGraphShapeGenerator,
+        P3DiffEquationApplicationGenerator,
+        P3DiffVelocityAccelerationGenerator,
+    )
+    assert [g.standard_code for g in GENERATORS] == [
+        "[12미적Ⅰ-02-03]",
+        "[12미적Ⅰ-02-04]",
+        _C05,
+        _C06,
+        _C08,
+        _C09,
+        _C10,
+    ]
     assert len({g.standard_code for g in GENERATORS}) == len(GENERATORS)  # 개념당 생성기 1개
+
+
+def test_exemption_keys_only_name_registered_concepts() -> None:
+    """면제 키가 등록부의 실재 개념만 가리킨다 — 오타·삭제된 개념으로 면제가 새지 않는다."""
+    registered = {g.standard_code for g in GENERATORS}
+    for test_key, table in _EXEMPT.items():
+        assert table, f"빈 면제 표: {test_key}"
+        assert set(table) <= registered, (test_key, set(table) - registered)
+
+
+def test_exemptions_point_at_real_dedicated_tests() -> None:
+    """모든 면제가 가리키는 전용 테스트(파일·함수)가 실재한다 — 면제의 근거가 허공이 아니다."""
+    here = Path(__file__).resolve().parent
+    for test_key, table in _EXEMPT.items():
+        for code, exempt in table.items():
+            assert exempt.reason.strip() and exempt.dedicated, (test_key, code)
+            for filename, func in exempt.dedicated:
+                source = (here / filename).read_text(encoding="utf-8")
+                assert re.search(rf"^def {re.escape(func)}\(", source, re.MULTILINE), (
+                    test_key,
+                    code,
+                    filename,
+                    func,
+                )
 
 
 def test_slot_ids_match_the_frozen_scope_spec() -> None:
