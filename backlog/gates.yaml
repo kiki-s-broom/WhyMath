@@ -80,11 +80,11 @@ gates:
     title: "ARCH-64 컷오버 라이브 대조 1회차(ARCH-71 acceptance ③) — Kiki 머신에서 저작 런북(docs/ops/eos118_seat_signal_live_runbook.md [A]~[C])과 학생 대면 런북(docs/ops/arch71_student_facing_cloud_mid_live_runbook.md)을 각 1회 실행한다. 확인: cloud_seat=openrouter · 관측 모델 · 기록 원가(좌석 단가 약 0.354원) · 학생 대면은 verdict(pass / degraded_cause_recorded / 그 밖)와 강등 원인(local_degraded·degrade_reason·provider_errors). 실패·강등 회차도 폐기하지 않고 기록한다. seat_primary_success_rate는 ARCH-63 전까지 None(미산출)이 정상이며 0으로 적지 않는다. 강등·429가 잦으면 G-cloud-mid-seat-cutover 판정 한계대로 openrouter_allowed_providers 이중화를 재질의한다. clear 증적 = 두 런북의 결과 JSON 판정 줄 + 판정 기준 커밋."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-29
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: Kiki 머신 Phaiakes9 실행 코드 = main c2a63692 (OPS-53, #1475) worktree. 2026-10-06 Kiki 직접 실행·결과 출력 전달.\n[저작 1회차 — eos118 런북 A~C] SEAT_OK=True · CHECK_EXIT=0 · CONFIGURED=True · KEY_LENGTH=73 · BATCH_EXIT=0. 다섯 축 전건 성립: selected_seat=openrouter(state=all_on_selected_seat) · comparable=5 matched=5 differs=0 · price_seat_counts openrouter=5 anthropic=0 neither=0 unmeasured=0 · retries_measured=5(retries_total=0) · secondary_seat/seat_primary_success_rate/seat_failover_rate 모두 null. 관측 모델 deepseek/deepseek-v4.1-flash 5건(선언=관측). 기록 원가 5건 합계 US$0.00415(약 6.39원, 건당 1.22~1.33원 — 실측 입력 2473토큰 기준이며 가정 토큰 추정 0.354원과 다른 것은 정상). seat_primary_success_rate=None(미산출 · ARCH-63 전 정상)을 0으로 적지 않음.\n[학생 대면 1회차 — arch71 런북 A~C-2] SETUP_OK=True · CONFIGURED=True · PROBE_EXIT=0 · verdict=pass · all_pass=true · failure_path=none · provider_errors=[] · local_degraded=false(seat_local_degrade_rate=0.0 실측) · trace cloud_seat=openrouter · served_model=deepseek/deepseek-v4.1-flash(pin과 동일 · trace=provider) · retries=0 · 기록 원가 0.131824원(입력 80·출력 116토큰, recorded_matches=openrouter, anthropic 단가였다면 3.0492원) · anthropic/deepseek/ollama 호출 0건. 결과 JSON = Kiki 머신 WhyMath-arch71/.arch71-out/student-facing-20261006-122234.json.\n관찰(실패 아님): 이번 2회차는 두 회차 모두 강등·429 0건이라 openrouter_allowed_providers 이중화 재질의 조건(강등·429 빈발)에는 해당하지 않음. 단 표본은 저작 5건·학생 1건뿐이라 강등률의 대표값이 아니다."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -662,11 +662,11 @@ gates:
     title: "신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-30
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 9a80f4623aeb00e13a91ca25eb8467d6d8f6e6ae (PR #1471 · 승인 코퍼스 69→68). Kiki 서명(검수자 kiki · 2026-10-05): 승인 M0462·M0515·M0599(직접매핑)·M0672(부분매핑 유지) / 보류 M0671(성취기준 원문 확인 선행 · 추적 게이트 G-misc40-deferred-m0671-redecision). 라이브 DB 실측(Kiki 머신 prod whymath-pg 읽기 전용 조회, 2026-10-06): 승인 4행 적재·stamp 검수:kiki 2026-10-05·M0671_ROWS=0. 위임: Kiki가 pr 지시로 clear 기록을 세션에 위임."
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-10-02] title: '신규 crosslink 서명 — 미분 단원 신설 kebab의 kebab↔M-id 검수 큐 행 승인/반려/보류 + MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599). 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다). MISC-40이 서명 대상 표와 근거 리포트를 낸 뒤 Kiki가 트랜치 단위로 한 번에 판정한다' → '신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition' — MISC-40이 서명 대상 표(5행)와 근거를 판정 문서 §6에 냈다 — 제목이 가리키던 산출물의 위치·행 수를 명시하고, 서명 시점(PR 머지 후)과 별건 결정 게이트를 병기"
