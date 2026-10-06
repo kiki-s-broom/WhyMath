@@ -3696,8 +3696,10 @@ class GrowthEvidenceBrierView(BaseModel):
 class GrowthEvidenceResponse(BaseModel):
     """`GET /v1/me/growth-evidence` 응답 — 성장 증거 학생 안전 노출(노출 계약 경유 유일 표면).
 
-    `SurrogateMetrics`의 `STUDENT_VISIBLE` 9지표(`calibration_brier` 제외) + Brier 서술
-    1종만 필드로 존재한다. **내부 전용 2종(② 진단정확도·④ 턴당 토큰 — 시스템 품질/비용
+    `SurrogateMetrics`의 `STUDENT_VISIBLE`·`PROVISIONAL` 10지표(`calibration_brier` 제외) +
+    Brier 서술 1종만 필드로 존재한다(계약 표와의 양방향 일치는
+    `tests/backend/api/test_exposure_contract_serving_crosswalk.py`가 기계로 강제한다 — PED-28).
+    **내부 전용 5종(② 진단정확도·④ 턴당 토큰·⑫⑬⑭ 튜터 행태·동기화 — 시스템 품질/비용
     지표)은 이 스키마 어디에도 필드가 없다** — `INTERNAL_ONLY` 계층이라 런타임에 걸러지는
     것이 아니라 애초에 필드 자체가 없다(구조적 배제 — 필터는 꺼질 수 있으나 부재는 꺼질
     수 없다는 태스크 설계 원칙). R15 결합 판정 원본(교정기 함정 verdict 포함)도 이 스키마에
@@ -3733,6 +3735,11 @@ class GrowthEvidenceResponse(BaseModel):
     mastery_gain_rate: GrowthEvidenceMetricView = Field(description="⑨ BKT 숙달 증가율.")
     misconception_resolution_rate: GrowthEvidenceMetricView = Field(description="⑩ 오개념 해소율.")
     self_solve_rate: GrowthEvidenceMetricView = Field(description="⑪ 스스로 풀이 도달율.")
+    # ⑯ 결손 복구 리드타임(PED-13) — 계약이 STUDENT_VISIBLE로 판정했는데 이 스키마에 자리가 없던
+    # 드리프트를 PED-28이 상환했다(자기 대비 축 — 또래·평균 대비 파생은 계약이 의도적으로 부재).
+    gap_recovery_leadtime_days: GrowthEvidenceMetricView = Field(
+        description="⑯ 결손 복구 리드타임(경과 일수, 자기 대비)."
+    )
     # ② 진단정확도·④ 턴당 토큰 — INTERNAL_ONLY 2종은 여기 필드가 없다(구조적 배제. 값을
     # 넣고 걸러내는 게 아니라 애초에 자리 자체를 만들지 않는다).
 
@@ -3867,6 +3874,9 @@ async def get_my_growth_evidence(
         ),
         self_solve_rate=_render_growth_evidence_metric(
             metrics, "self_solve_rate", exposure_by_field
+        ),
+        gap_recovery_leadtime_days=_render_growth_evidence_metric(
+            metrics, "gap_recovery_leadtime_days", exposure_by_field
         ),
         calibration_brier=GrowthEvidenceBrierView(
             narrative=narrate_calibration_brier(metrics.calibration_brier.value)

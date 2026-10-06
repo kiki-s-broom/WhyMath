@@ -11858,3 +11858,10 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **승계 등재(번호 충돌 때문에 새 번호)**: `OPS-112-client-version-gate-observability`(고립 브랜치의 `OPS-35`) · `OPS-113-removed-dependency-canon-sync-gate`(`OPS-34`) · `A11Y-02-accessibility-coverage-drift-gate`(번호 그대로). 구현(백엔드 `app.py`·`config.py`·모바일 컨트롤러 7곳·a11y 테스트 2파일)은 Flutter가 없는 환경이라 **이식하지 않았다** — 참조 구현 커밋 `7df9ff8d`·`a7a9e9ec`는 고립 브랜치에 남는다. **회수 완료 전 `5t5lmv` 삭제 금지.**
 - **이식 금지로 남긴 것**: `events.ndjson` 44줄(번호 충돌) · 고립 브랜치 `MEMORY.md`의 OPS-35·A11Y-02 "완료" 서술(그 구현이 main에 없어 거짓이 된다).
 - **교훈(코드로 집행되는 쪽)**: "정정 위임이 acceptance·paths로 안 내려가면 8일간 미집행"이라는 r2의 G1은 2개월 뒤에도 같은 형태로 관측됐다 — 이번 회수 자체가 그 증거(정정 7곳이 main에 두 달간 stale). 재유입 방지는 산문이 아니라 `OPS-113`의 게이트 몫이다.
+
+## 2026-10-06 PED-28 — 노출 계약↔서빙 스키마 양방향 대조 게이트 + 드리프트 2건 상환
+- **게이트(선행)**: `tests/backend/api/test_exposure_contract_serving_crosswalk.py` — 계약 표(`_STATIC_TIER`)·서빙 스키마(`GrowthEvidenceResponse`)·원천 지표(`SurrogateMetrics`의 `Metric` 필드)를 세 방향으로 대조한다(① 계약이 서빙하라 한 지표가 스키마에 있는가 ② 스키마 필드가 계약에 등재됐고 INTERNAL_ONLY가 아닌가 ③ 원천 지표가 전부 계약에 등재됐는가). 상환 전 첫 실행이 정확히 4건에서 RED였다(⑯ `gap_recovery_leadtime_days` 스키마 누락 + ⑫⑬⑭ 미등재) — 게이트가 처음부터 녹색이 아니었다는 것이 변별력의 첫 증거.
+- **동어반복 제거**: `test_me_growth_evidence.py`의 `_DECLARED_FIELDS`가 `set(GrowthEvidenceResponse.model_fields)`(검증 대상 자신)에서 파생되던 것을 계약 표 파생(봉투 필드 명시 목록 + 비 INTERNAL_ONLY 지표)으로 교체.
+- **상환**: ⑯을 응답 스키마·조립에 추가(자기 대비 축, 계약이 이미 STUDENT_VISIBLE 판정). ⑫ 발문 전략 다양성·⑬ 연속 반복률·⑭ 클라 상태 불일치율은 계약 표에 **INTERNAL_ONLY로 명시 등재** — 튜터 행태·동기화 신호라 학생 개인 지표가 아니고, 게이트를 녹색으로 만들려고 노출 쪽으로 밀지 않았다(acceptance ⑤). 재검토 발화조건 = 보호자·교사 대시보드가 튜터 행태 지표를 요구할 때(그때도 PED 판정 경유).
+- **변별력**: 실제 파일에 주입 5종(표에서 ⑯ 삭제·표에서 ⑫ 삭제·스키마에서 ⑯ 삭제·계약 밖 필드 추가·⑯을 INTERNAL_ONLY로) 전건 의도한 방향 코드로 RED, 주입 적용·바이트 동일 원복을 하네스가 단언. 같은 대조 함수에 합성 드리프트를 넣는 단위 변별 테스트 6건 상시 동행.
+- **한계(명시)**: 모바일은 ⑯을 렌더하지 않는다(범위 밖 — JSON 파싱은 모르는 키를 무시해 안전). 동어반복 제거본 자체(`_DECLARED_FIELDS`)에는 별도 주입을 하지 않았다 — 새 게이트가 같은 방향을 덮는다. 계층 판정 3종은 판단값이다.

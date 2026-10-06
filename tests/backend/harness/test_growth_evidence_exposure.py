@@ -99,10 +99,11 @@ def test_gaming_suspect_label_not_exposed_as_a_field() -> None:
     assert field_names == {"field", "tier", "exposable_now", "suppressed_reason"}
 
 
-def test_all_thirteen_fields_classified() -> None:
-    """13지표 전부가 판정에 나타난다(누락 0).
+def test_all_sixteen_fields_classified() -> None:
+    """16지표 전부가 판정에 나타난다(누락 0).
 
-    원 설계 11종 + 병합 편입 `help_demand_supply_ratio` + `gap_recovery_leadtime_days`(⑯·PED-13).
+    원 설계 11종 + 병합 편입 `help_demand_supply_ratio` + `gap_recovery_leadtime_days`(⑯·PED-13)
+    + PED-04 교수 결정 로그 3종(⑫⑬⑭ — PED-28이 INTERNAL_ONLY로 등재. 종전엔 판정 대상 밖이었다).
     """
     result = classify_metric_exposure(_metrics(R15Verdict.GENUINE_IMPROVEMENT))
     assert set(result) == {
@@ -119,7 +120,19 @@ def test_all_thirteen_fields_classified() -> None:
         "misconception_resolution_rate",
         "self_solve_rate",
         "gap_recovery_leadtime_days",
+        "strategy_diversity",
+        "strategy_repeat_rate",
+        "client_state_mismatch_rate",
     }
+
+
+def test_pedagogy_decision_log_metrics_are_internal_only() -> None:
+    """⑫⑬⑭는 튜터 행태·동기화 신호라 학생·보호자에 노출하지 않는다(PED-28 ⑤ — 자동 노출 금지)."""
+    result = classify_metric_exposure(_metrics(R15Verdict.GENUINE_IMPROVEMENT))
+    for field in ("strategy_diversity", "strategy_repeat_rate", "client_state_mismatch_rate"):
+        assert result[field].tier is ExposureTier.INTERNAL_ONLY
+        assert result[field].exposable_now is False
+        assert result[field].suppressed_reason is not None
 
 
 def test_narrate_calibration_brier_never_returns_raw_number() -> None:

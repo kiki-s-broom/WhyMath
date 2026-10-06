@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -25,6 +25,6 @@ paths:
   - src/backend/whymath_backend/harness/growth_evidence_exposure.py
   - src/backend/whymath_backend/api/me.py
   - "tests/backend/api/test_me_growth_evidence*.py"
-session: null
+session: claude/vibrant-pascal-9ebi61
 notes: "docs/architecture/gamification_module_gap_review_r3.md §2 G3 · §4 D9. 계약 표(_STATIC_TIER, growth_evidence_exposure.py:65-83)와 서빙 스키마(GrowthEvidenceResponse, api/me.py:3170-3219)가 양방향으로 어긋나 있다 — (가) 계약이 STUDENT_VISIBLE로 판정한 gap_recovery_leadtime_days(⑯·PED-13, :78)가 응답 스키마에 필드 부재(api/me.py 히트 0), (나) SurrogateMetrics의 3종이 _STATIC_TIER 미등재라 판정 대상 밖인데 /harness-metrics로는 나간다. 거버넌스가 못 잡은 이유는 기대값이 검증 대상에서 파생되는 동어반복(test_me_growth_evidence.py:52) — 성공/실패 양쪽에서 같은 값을 내는 검사다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/학생안전 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-06
