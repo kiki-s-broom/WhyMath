@@ -110,6 +110,7 @@ from whymath_backend.l1.concept_atom_crosswalk.transfer import (
 
 # 슬3 sync 엔진 빌더 재사용(신규 seam 0) — standards/atom_graph와 동일 좌석. (intra-L1 import)
 from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
+from whymath_backend.l1.problem_bank.derived_form_rules import derived_form_violations
 from whymath_backend.l1.problem_bank.provenance_gate import (
     ProvenanceInput,
     require_provenance,
@@ -357,6 +358,23 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
         _relation_tag_from_dict(r, slug=slug) for r in relations_raw if isinstance(r, dict)
     )
     verify_meta = _verify_meta_from_raw(verify_raw, slug=slug)
+    # ── ④-a 파생 판정 저작 형태 규칙(P3-24) — [12미적Ⅰ-02-08] 문항의 위장·제외 형태를
+    #    *파싱에서* 거부한다. 적재 루프가 아니라 여기서 막는 이유는 아래 provenance 관문과
+    #    같다(부분 적재 방지·DB 왕복 앞). 02-08 문항이 아니면 빈 리스트라 영향이 없다.
+    form_violations = derived_form_violations(
+        standard_codes=list(problem.achievement_standard_codes or []),
+        question_text=problem.question_text or "",
+        answer=problem.answer,
+        conditions=verify_meta.conditions,
+        answer_map=verify_meta.answer_map,
+        answer_selection=verify_meta.answer_selection,
+    )
+    if form_violations:
+        raise ProblemCorpusError(
+            "02-08 파생 판정 저작 규칙 위반(P3-24 · 게이트 G-p321-derived-form-disposition): "
+            + " / ".join(str(v) for v in form_violations)
+            + f" — slug={slug}"
+        )
     provenance_meta = ProblemProvenanceMeta(
         generation_type=str(generation_type) if generation_type is not None else "",
         license=str(license_value),

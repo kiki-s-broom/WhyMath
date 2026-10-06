@@ -84,6 +84,7 @@ OPS-84 ①은 `rephrase.py`를 "라우터 결과를 손으로 재조립해 provi
 
 1. **스캔 범위의 한계**: 수신자 이름이 `provider`·`self._provider`인 호출만 셌다. 이름이 다른 호출(`generator.generate`·`engine.generate`·`deps.generate`·`cloud.generate`·`model.generate`·`client.generate`·`resolved.generate`·`llm.generate`·`self._seam.generate`)은 **이 스캔의 바깥**이다. 그중 학생 대면 좌석 쪽(`l4/misconception/judge.py`·`l4/polya/engine.py`·`harness/wh1_*`)은 OPS-36이 소유한다고 알고 있으나, 이 세션은 각각이 파이프라인을 경유하는지 **열어서 확인하지 않았다**.
 2. **`harness/concept_content_review_batch.py`는 `Router`를 거치지 않고 `RoutingDecision`을 손으로 조립한다**(`_assess_one`). CLAUDE.md의 "LLM 호출은 항상 라우터 경유" 원칙과 맞는지는 CLI가 모델 티어를 인자로 고정하는 평가 하네스라는 점에서 의도일 수 있으나 확인하지 못했다 → `OPS-110`.
+   - **해소 (OPS-110 · 2026-10-06)**: **의도다 — Router 경유로 바꾸지 않는다.** 이 배치는 `--model`이 지정한 *한 모델*의 판정력(주입 결함 검출률·Wilson 상한)을 재므로, 표본마다 모델을 고를 수 있는 `Router.route()`를 끼우면 수치가 섞인 모집단의 것이 된다. 비용 통제·학생 대면 관측이라는 원칙의 취지에도 해당하지 않는다(티어 표 전부 로컬, provider는 `OllamaProvider`만). 근거는 `_assess_one` docstring이 소유하고, 클라우드로 새지 않는 경계는 `tests/backend/harness/test_concept_content_review_batch_router_intent.py`(뮤테이션 7종 전건 RED)가 동결한다. 분류(`measurement-harness`)는 그대로 유지. 정직한 한계: 이 호출은 Langfuse에 남지 않는다(JSONL 감사 리포트가 레코드별 모델·지연·판정을 대신 남긴다).
 3. **`prewarmer`는 `l3_routing` 이벤트를 내지 않는다** — pregenerate 패키지에 `TraceSink` 사용이 0건임을 코드로 확인했다. 비용은 `provenance_bridge`가 별도로 기록한다. 사전생성 호출이 Langfuse에 남지 않는 것이 의도인지는 확인하지 못했다 → `OPS-109`.
 
 문서 속 계획은 백로그를 대신하지 못하므로 2·3은 태스크로 추적한다.
