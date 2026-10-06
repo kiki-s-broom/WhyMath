@@ -567,6 +567,7 @@ CATALOG: tuple[Spec, ...] = (
        "l1.pedagogy.populate", "l1.pedagogy.unit_compiler"),
     _e("WM-E-109", "문제은행 적재·임베딩·시그니처·페르소나 적합·정답분포", "Platform", "Content",
        "P0", "B7 코퍼스 2,647문", "l1.problem_bank.answer_distribution",
+       "l1.problem_bank.derived_form_rules",
        "l1.problem_bank.embedding", "l1.problem_bank.persona_fit_rules",
        "l1.problem_bank.populate", "l1.problem_bank.probe_candidates",
        "l1.problem_bank.provenance_gate", "l1.problem_bank.signature_tagger"),
