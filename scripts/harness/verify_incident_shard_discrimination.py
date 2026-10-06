@@ -190,4 +190,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    import _stdio  # 스크립트 실행이면 이 디렉터리가 sys.path[0]이다 (OPS-53)
+
+    _stdio.ensure_utf8_stdio()
     sys.exit(main())
