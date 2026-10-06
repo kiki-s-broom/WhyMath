@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - "tests/golden/**"
   - "tests/backend/harness/test_golden_*.py"
   - "src/backend/whymath_backend/harness/golden_*.py"
-session: null
+session: claude/stoic-hawking-vzumx5
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B5 · §5 B급 미등재 후보 4. 갭리뷰는 \"EOS-64(nightly 골든·todo)가 인접 소유\"라고 적었으나, 2026-09-15 재대조 시점에 EOS-64는 done이고 그 acceptance 4항(nightly 배선·작동 비율·승격 경로·무진전 알람) 어디에도 자산 디렉터리 분리가 없다. 즉 인접 소유자가 완료되면서 이 축의 소유자가 소멸했다 — 완료된 태스크는 소유할 수 없다(2026-09-06 판정 규칙). Gate D 집행 등재. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(tests/golden·골든 자산·골든 데이터셋·Golden Dataset) → 0건."
-updated: 2026-09-15
+updated: 2026-10-06
