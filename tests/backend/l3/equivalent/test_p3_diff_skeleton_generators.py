@@ -135,7 +135,12 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
     "limit_definition_floor": {
         _C06: _Exempt(
             "02-06은 평균값 정리의 c값·구간 판정형이라 단일 미분계수 평가형이 2건뿐이다.",
-            ((_F_MVT_EQUATION, "test_answers_match_an_independent_recomputation_from_the_conditions"),),
+            (
+                (
+                    _F_MVT_EQUATION,
+                    "test_answers_match_an_independent_recomputation_from_the_conditions",
+                ),
+            ),
         ),
         _C08: _Exempt(
             "02-08은 극값 판정·그래프 개형형이라 단일 미분계수 평가형이 없다(f'의 근과 부호로 판정).",
@@ -143,7 +148,12 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
         ),
         _C09: _Exempt(
             "02-09는 방정식·부등식 활용형(개수·합·근 선택)이라 단일 미분계수 평가형이 없다.",
-            ((_F_MVT_EQUATION, "test_answers_match_an_independent_recomputation_from_the_conditions"),),
+            (
+                (
+                    _F_MVT_EQUATION,
+                    "test_answers_match_an_independent_recomputation_from_the_conditions",
+                ),
+            ),
         ),
     },
     # 섀도 채점 단일 미지수 계약 — (a) 02-06·09 개수·집계형은 문자열 조건에 자유기호 x가 있지만 답은
@@ -442,9 +452,9 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
             if seat_absent:
                 # 면제: kebab 좌석 없이 핵심 M-id를 직접 연결한다. 좌석이 생기면(카탈로그에 등장) red.
                 assert kebab in core, f"좌석 없는 연결은 핵심 M-id여야 한다: {kebab}"
-                assert kebab not in CATALOG_BY_ID, (
-                    f"kebab 좌석이 생겼다 — 생성기를 kebab 연결로 옮기고 면제 삭제: {kebab}"
-                )
+                assert (
+                    kebab not in CATALOG_BY_ID
+                ), f"kebab 좌석이 생겼다 — 생성기를 kebab 연결로 옮기고 면제 삭제: {kebab}"
                 continue
             assert kebab in CATALOG_BY_ID, f"카탈로그에 없는 kebab: {kebab}"
             reached |= {

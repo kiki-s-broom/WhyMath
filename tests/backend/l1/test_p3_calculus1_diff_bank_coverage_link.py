@@ -6,11 +6,12 @@
 핵심 축 — "approved만 빠진 상태"의 증명
 ---------------------------------------
 이 은행은 `review_status` 키를 쓰지 않으므로 계측기(`phase3_coverage`)는 이 문항을 적격으로 세지
-않는다(승인은 감사 표본 경로의 몫). 그러나 **승인만 되면** 두 개념이 충족으로 세어져야 의미가 있다.
+않는다(승인은 감사 표본 경로의 몫). 그러나 **승인만 되면** 일곱 개념(02-03·04·05·06·08·09·10)이
+충족으로 세어져야 의미가 있다.
 이를 실측하려고 임시 저장소 루트(코퍼스 디렉터리는 심볼릭 링크, 이 은행만 변형 복사본)를 만들어
 
-  · 키 제거본(`review_status` 없음) → 02-03·02-04 미충족 (현행 상태의 재현)
-  · 전건 `approved` 본            → 02-03·02-04 '스킬 연결된 적격 문항' 충족
+  · 키 제거본(`review_status` 없음) → 일곱 개념 미충족 (현행 상태의 재현)
+  · 전건 `approved` 본            → 일곱 개념 '스킬 연결된 적격 문항' 충족
 
 을 둘 다 단언한다 — 한쪽만 보면 "항상 충족"이나 "항상 미충족"인 계측기와 구별되지 않는다.
 레포 파일은 바꾸지 않는다(변형은 전부 tmp). 이 테스트가 *레포 파일의 승인 여부*에 의존하지 않도록
@@ -37,8 +38,31 @@ from whymath_backend.ops import provenance_audit as pa
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CORPUS = _REPO_ROOT / "data" / "corpus"
 _BANK = _CORPUS / CORPUS_DIR_NAME
-_CODES = ("[12미적Ⅰ-02-03]", "[12미적Ⅰ-02-04]")
-_KEBAB_OF = {"[12미적Ⅰ-02-03]": "power-rule-step-omitted", "[12미적Ⅰ-02-04]": "product-rule-naive"}
+_CODES = (
+    "[12미적Ⅰ-02-03]",
+    "[12미적Ⅰ-02-04]",
+    "[12미적Ⅰ-02-05]",
+    "[12미적Ⅰ-02-06]",
+    "[12미적Ⅰ-02-08]",
+    "[12미적Ⅰ-02-09]",
+    "[12미적Ⅰ-02-10]",
+)
+#: 오개념 유발 슬롯의 오답 귀속 id. 02-06·02-09는 핵심 오개념(M0674·M0677)에 kebab 좌석이 없어 M-id를
+#: 그대로 쓴다(전용 테스트 `test_kebab_seat_absence_is_a_tripwire`가 좌석 출현을 신호한다).
+_KEBAB_OF = {
+    "[12미적Ⅰ-02-03]": "power-rule-step-omitted",
+    "[12미적Ⅰ-02-04]": "product-rule-naive",
+    "[12미적Ⅰ-02-05]": "power-rule-step-omitted",
+    "[12미적Ⅰ-02-06]": "M0674",
+    "[12미적Ⅰ-02-08]": "critical-point-implies-extremum",
+    "[12미적Ⅰ-02-09]": "M0677",
+    "[12미적Ⅰ-02-10]": "power-rule-step-omitted",
+}
+#: 승인돼도 *핵심 오개념 사슬*이 0인 개념 — 핵심 M-id(M0673·M0676·M0678)가 크로스링크로 닿지 않거나
+#: (MISC-40 미승격) 02-06은 distractor가 계측기의 사슬 정의에 안 걸린다. stale 가드: 사슬이 생기면 red.
+_CHAIN_UNREACHED = frozenset(
+    {"[12미적Ⅰ-02-05]", "[12미적Ⅰ-02-06]", "[12미적Ⅰ-02-08]", "[12미적Ⅰ-02-10]"}
+)
 
 
 def _rows() -> list[dict[str, object]]:
@@ -122,7 +146,7 @@ def _facts_for(root: Path) -> dict[str, pc.ConceptFacts]:
 
 
 @pytest.mark.skipif(not _CORPUS.is_dir(), reason="data/corpus 부재")
-def test_only_approval_is_missing_for_the_two_concepts(tmp_path: Path) -> None:
+def test_only_approval_is_missing_for_the_seven_concepts(tmp_path: Path) -> None:
     unreviewed = _facts_for(_tmp_root(tmp_path, approved=False))
     approved = _facts_for(_tmp_root(tmp_path, approved=True))
     for code in _CODES:
@@ -132,7 +156,12 @@ def test_only_approval_is_missing_for_the_two_concepts(tmp_path: Path) -> None:
         # 승인만 되면 — 스킬 연결 문항이 생기고(개념 스킬 ∩ 문항 유형 스킬) 핵심 오개념까지 닿는다.
         assert approved[code].eligible, code
         assert approved[code].skill_linked, f"{code}: 승인돼도 스킬 연결 0 — 문제유형→스킬 단절"
-        assert approved[code].chain_problems, f"{code}: 핵심 오개념 사슬 0"
+        if code in _CHAIN_UNREACHED:
+            assert not approved[
+                code
+            ].chain_problems, f"{code}: 사슬이 생겼다 — _CHAIN_UNREACHED 삭제"
+        else:
+            assert approved[code].chain_problems, f"{code}: 핵심 오개념 사슬 0"
         assert approved[code].core_misconceptions  # 명세 핵심 오개념이 코퍼스에 실재
         assert approved[code].content_present  # 개념 콘텐츠 행 존재(완전 연결 조건 1)
         assert pc._is_fully_linked(approved[code])
@@ -140,8 +169,8 @@ def test_only_approval_is_missing_for_the_two_concepts(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not _CORPUS.is_dir(), reason="data/corpus 부재")
-def test_content_coverage_rises_by_exactly_the_two_concepts_when_approved(tmp_path: Path) -> None:
-    """지표 단위 대조 — 승인 본은 키 제거 본보다 Content Coverage 충족 개념이 정확히 2개 많다."""
+def test_content_coverage_rises_by_exactly_the_seven_concepts_when_approved(tmp_path: Path) -> None:
+    """지표 단위 대조 — 승인 본은 키 제거 본보다 Content Coverage 충족 개념이 정확히 7개 많다."""
     spec = load_scope_spec(default_spec_path())
     index = load_reference_index(spec)
     met = {}

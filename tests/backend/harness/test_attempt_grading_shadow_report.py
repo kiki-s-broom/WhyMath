@@ -880,7 +880,12 @@ class TestCorpusVerifyBlockSupply:
         문자열 조건만 읽는 계약상 블록에서 빠진다 — 그래서 증분이 144가 아니라 127이다.
         """
         blocks = _load_corpus_verify_blocks()
-        assert len(blocks) == 13647
+        # 13,647 → 13,841(+194): P3-03이 02-05·06·08·09·10 생성기 5종 360건을 더했다. 360건 중 166건은
+        # 블록에서 빠진다 — (a) 검산 조건이 *연립 목록*(부등식 보호·02-06 c값 구간 경계·02-08 극값 좌표)인
+        # 109건은 이 로더가 문자열 조건만 읽는 계약상, (b) answer_map이 빈 개수·집계형(02-06 11건·02-09
+        # 46건 = 57건)은 미지수가 답이 아니라 블록이 성립하지 않아서다(109 + 57 = 166). 그래서 증분이
+        # 360이 아니라 194다.
+        assert len(blocks) == 13841
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1112,8 +1117,11 @@ class TestCorpusCeilingReportDiscriminates:
                 )
 
         report = build_gradability_ceiling_report(problems)
-        assert report.total_problems == 14178  # 14,034 + P3-03 미분 은행 144
+        assert report.total_problems == 14538  # 14,034 + P3-03 미분 은행 504(144 + 360)
         assert report.bucket_counts["condition_formal_derivable"] > 0
         # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
         # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).
-        assert report.bucket_counts["condition_formal_derivable"] == 12373
+        # 12,373 → 12,535(+162): 02-05·06·08·09·10 생성기 5종 360건 중 객관식 60건은 selectable로,
+        # 비객관식 300건 중 문자열 검산 조건과 비지 않은 answer_map을 함께 가진 162건이 이 버킷으로 들어왔다
+        # (연립 목록 조건·개수/집계형(answer_map 빔)은 이 버킷이 아니다).
+        assert report.bucket_counts["condition_formal_derivable"] == 12535

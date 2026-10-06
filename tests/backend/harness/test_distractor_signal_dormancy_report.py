@@ -155,12 +155,14 @@ class TestCurrentRealityFrozen:
                     with_choices += has_c
                     with_dmap += has_d
                     both += has_c and has_d
-        # 2,638 + PB-13 회수 11,446 (r2의 2,647 대비 -9 = QUAL-02(#777) 은퇴 9건) + P3-03 미분 은행 144
-        assert total == 14178
-        # r2의 1,616 대비 -4(은퇴 9건 중 객관식 4건) + P3-03 객관식 24건(전부 distractor_map 보유)
-        assert with_choices == 1636
-        assert with_dmap == 1636
-        assert both == 1636  # choices↔distractor_map 동일 집합(불일치 0건)
+        # 2,638 + PB-13 회수 11,446 (r2의 2,647 대비 -9 = QUAL-02(#777) 은퇴 9건) + P3-03 미분 은행 504
+        # (144건 + 02-05·06·08·09·10 생성기 5종 360건)
+        assert total == 14538
+        # r2의 1,616 대비 -4(은퇴 9건 중 객관식 4건) + P3-03 객관식 84건(전부 distractor_map 보유 —
+        # 개념 7종 × 오개념 유발 슬롯 12건)
+        assert with_choices == 1696
+        assert with_dmap == 1696
+        assert both == 1696  # choices↔distractor_map 동일 집합(불일치 0건)
         note = dsdr._CORPUS_REMEASUREMENT_2026_08_11
         assert "2,638" in note
         assert "1,612" in note

@@ -864,7 +864,9 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> No
 
     # 14,034 → 14,178 · 37 → 38종: P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다
     # (실중복 0쌍 유지 — 아래 T2 단언이 그 증거다).
-    assert report.total_problems == 14178
+    # 14,178 → 14,538: P3-03이 02-05·06·08·09·10 생성기 5종(개념당 72건 = 360건)을 같은 은행에 더했다
+    # (코퍼스 수는 38종 그대로 — 은행 1개에 개념이 늘었다. 실중복 0쌍 유지는 아래 T2 단언이 증거).
+    assert report.total_problems == 14538
     assert len(report.corpora) == 38
 
     # T1 — 해소됨.
