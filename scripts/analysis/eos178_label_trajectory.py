@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""EOS-178 — '초보' 라벨이 힌트 단계·`used_hint`를 어떻게 움직이는가: 실제 함수로 재는 재현 스크립트.
+"""EOS-178 — '초보' 라벨이 힌트 단계·`used_hint`를 어떻게 움직이는가: 재현 스크립트.
 
-판정문(`docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md`)의 수치를 만든다. 합성 학생의
-확률은 가정이라 **방향의 증거**이지 운영 수치가 아니다(운영 응답이 없다). 라벨·단계 규칙 자체는
-저장소의 실제 함수를 그대로 부른다(`update_mastery` · `estimate_ability` · `_ability_level` ·
-`decide_hint_level`) — 이 스크립트가 규칙을 복제하지 않는다. 예외는 **후보 변형**(`variant_level`)
-뿐이며, 그것이 실제 `decide_hint_level`과 `current` 변형에서 전 격자 일치하는지를 먼저 단언한다
-(복제가 어긋나면 비교가 무의미하다).
+판정문(`docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md`)의 수치를 만든다.
+합성 학생의 확률은 가정이라 **방향의 증거**이지 운영 수치가 아니다(운영 응답이 없다).
+라벨·단계 규칙 자체는 저장소의 실제 함수를 그대로 부른다(`update_mastery` ·
+`estimate_ability` · `_ability_level` · `decide_hint_level`) — 이 스크립트가 규칙을 복제하지
+않는다. 예외는 **후보 변형**(`variant_level`)뿐이며, 그것이 실제 `decide_hint_level`과
+`current` 변형에서 전 격자 일치하는지를 먼저 단언한다(복제가 어긋나면 비교가 무의미하다).
 
 사용: `python3 scripts/analysis/eos178_label_trajectory.py`
 종료 코드 0 = 충실도 단언 통과 + 표 출력 · 1 = 충실도 불일치.
