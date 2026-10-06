@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -28,6 +28,6 @@ paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/api/_next_problem_policy.py
   - src/backend/whymath_backend/ops/recommendation_reach_report.py
-session: null
+session: claude/sweet-hypatia-f402tv
 notes: "출처: 2026-09-29 /drive 4차 — `EOS-147-all-correct-theta-upper-pin`의 독립 교수학 비판이 acceptance ③의 \"상한 도달 시 선택 규칙\"이 판정문에서 꼭대기 이후를 다루지 않았음을 지적했고(처분 기록은 차단급), 이 태스크가 그 이월 처분의 소유자다. EOS-147은 API 클라이언트의 초기 연속 정답 도약(acceptance ①)을 해소하고 앱 학생 영구성(②)은 칸 삽입으로 부분 완화하는 데 그친다 — 해소는 이 태스크가 정하는 하강 채널에 달렸다. 관련: `EOS-146`(오답 원천 — 착지하면 하한 비대칭 재판정)·`EOS-133`(used_hint 귀속)·`EOS-29`(숙달 추정기의 힌트 축).\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py']: EOS-147 구현 결과 반영 — 경계 규칙 발동률의 도달 리포트 편입 소유 + 정책 버전 표기 정정(cat_v3은 병렬 태스크 번호)\n\n[정정 2026-09-30] EOS-146 착지(PR 1397)로 하한 비대칭 재판정이 트리거됨 — EOS-146 done 때 재대조에서 빠진 EOS-147 연동 항의 소유를 승계\n\n[정정 2026-10-02] 병합 뒤 정책 번호 현행 값 기준(cat_v4·suneung_v3)으로 acceptance 5의 번호 서술을 정정 병기"
-updated: 2026-10-02
+updated: 2026-10-06
