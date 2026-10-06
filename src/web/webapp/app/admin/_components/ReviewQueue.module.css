@@ -1,0 +1,339 @@
+/*
+ * 검수 큐 화면 스타일 — admin.module.css·globals.css와 **같은 토큰**만 쓴다(색을 새로 정의하지
+ * 않는다 → 다크/라이트 전환과 대비비 실측이 한 벌로 유지된다). 포커스 윤곽은 지우지 않는다.
+ */
+
+.root {
+  display: block;
+  max-width: none;
+}
+
+.title {
+  margin: 0 0 0.9rem;
+  font-size: 1.5rem;
+}
+
+.muted {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--wm-ink-soft);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── 탭 ─────────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.tab {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 999px;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* 선택 표시는 색만이 아니라 굵기·테두리로도 전한다(색 단독 전달 금지) */
+.tab[aria-pressed="true"] {
+  border: 2px solid var(--wm-accent);
+  font-weight: 700;
+  color: var(--wm-accent);
+}
+
+.tab:focus-visible,
+.rowButton:focus-visible,
+.actionButton:focus-visible,
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.textarea:focus-visible {
+  outline: 3px solid var(--wm-accent);
+  outline-offset: 2px;
+}
+
+/* ── 알림 ───────────────────────────────────────────────────────────── */
+
+.live {
+  min-height: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.infoNotice {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--wm-line);
+  border-left: 4px solid var(--wm-accent);
+  border-radius: var(--wm-radius);
+  background: var(--wm-surface);
+  font-size: 0.92rem;
+}
+
+.failure {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--wm-line);
+  border-left: 4px solid var(--wm-accent-ink);
+  border-radius: var(--wm-radius);
+  background: var(--wm-surface);
+}
+
+.failureTitle {
+  margin: 0 0 0.3rem;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.failureText {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+}
+
+.emptyBox {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed var(--wm-line);
+  border-radius: var(--wm-radius);
+  font-size: 0.92rem;
+  color: var(--wm-ink-soft);
+}
+
+/* ── 2열 배치 (좁으면 세로) ─────────────────────────────────────────── */
+
+.columns {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.listPane {
+  flex: 1 1 28rem;
+  min-width: 0;
+}
+
+.detailPane {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+/* ── 표 ─────────────────────────────────────────────────────────────── */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.table th,
+.table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--wm-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table thead th {
+  color: var(--wm-ink-soft);
+  font-weight: 600;
+}
+
+.idCell {
+  font-weight: 400;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowSelected {
+  background: var(--wm-surface);
+}
+
+.rowButton {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 6px;
+  background: var(--wm-paper);
+  color: var(--wm-accent);
+  font: inherit;
+  font-family: ui-monospace, monospace;
+  cursor: pointer;
+}
+
+.rowButton[aria-current="true"] {
+  border: 2px solid var(--wm-accent);
+  font-weight: 700;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+  font-size: 0.88rem;
+}
+
+/* ── 상세 ───────────────────────────────────────────────────────────── */
+
+.detail {
+  border: 1px solid var(--wm-line);
+  border-radius: var(--wm-radius);
+  padding: 1rem;
+  background: var(--wm-surface);
+}
+
+.detailTitle {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 0.9rem;
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+}
+
+.meta dt {
+  color: var(--wm-ink-soft);
+}
+
+.meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.block {
+  margin: 0 0 1rem;
+}
+
+.blockTitle {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+/* 본문은 텍스트로만 — 줄바꿈 보존, HTML 해석 없음 */
+.text {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 8px;
+  background: var(--wm-paper);
+  font: inherit;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.choices {
+  margin: 0;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* ── 버튼·입력 ──────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.actionButton,
+.secondaryButton {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 999px;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.actionButton[aria-pressed="true"] {
+  border: 2px solid var(--wm-accent);
+  font-weight: 700;
+}
+
+.primaryButton {
+  padding: 0.4rem 1.1rem;
+  border: 1px solid var(--wm-accent);
+  border-radius: 999px;
+  background: var(--wm-accent);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.actionButton:disabled,
+.secondaryButton:disabled,
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirm {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid var(--wm-accent);
+  border-radius: var(--wm-radius);
+  background: var(--wm-paper);
+}
+
+.confirmText {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.86rem;
+}
+
+.textarea {
+  width: 100%;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--wm-line);
+  border-radius: 8px;
+  background: var(--wm-paper);
+  color: var(--wm-ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .primaryButton {
+    color: var(--wm-paper);
+  }
+}
