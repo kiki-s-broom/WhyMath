@@ -769,7 +769,7 @@ def _wrong_slopes(f: Poly, a: int) -> tuple[int, int]:
     """항별 거듭제곱 미분에서 (계수 누락, 지수 감소 누락)이 만드는 *틀린* 기울기."""
     coeff_omitted = sum(c * a ** (e - 1) for e, c in f if e >= 1)
     exponent_kept = sum(c * e * a**e for e, c in f if e >= 1)
-    return coeff_omitted, coeff_omitted
+    return coeff_omitted, exponent_kept
 
 
 def _mc_item(

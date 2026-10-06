@@ -611,7 +611,7 @@ def _applied_frames() -> list[Frame]:
                 f"x가 0 이상의 실수일 때, 부등식 {render_poly(p.poly)} <= 0을 만족시키는 x의 "
                 "값을 구하시오."
             ),
-            cond=(f"{poly_to_sympy_str(p.poly)} <= 0", "x >= 0"),
+            cond=(f"{poly_to_sympy_str(p.poly)} >= 0", "x >= 0"),
             value=a,
             explanation=(
                 f"인수분해하면 {_factored_text(p)} <= 0이다. x가 0 이상이면 남은 인수가 양수이므로 "
@@ -1113,7 +1113,7 @@ def _mastery_frames() -> list[Frame]:
             frame_id="mastery-equality-in-domain",
             text=(
                 f"x >= 0에서 부등식 {render_poly(p.poly)} >= 0이 성립함을 보이려 한다. "
-                "x >= 0 범위에서 등호가 성립하는 x의 값을 구하시오."
+                "이때 x >= 0에서 등호가 성립하는 x의 값을 구하시오."
             ),
             cond=(_eq_cond(p.poly, 0), "x >= 0"),
             value=a,

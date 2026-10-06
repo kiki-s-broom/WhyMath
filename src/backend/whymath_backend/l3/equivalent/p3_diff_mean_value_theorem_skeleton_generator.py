@@ -562,7 +562,31 @@ def _basic_frames() -> list[Frame]:
         )
         return item
 
+    def b7(p: tuple[object, ...]) -> DiffItem | None:
+        c, off = _case_of(p[0]), int(str(p[1]))
+        poly, slope = _slope_equation(c, off)
+        n = _count_roots(poly)
+        return KindedDiffItem(
+            slot="basic",
+            frame_id="basic-count-points-with-given-slope",
+            question_text=(
+                f"곡선 y = {_fx(c)} 위의 점 중에서 접선의 기울기가 {slope}인 점의 개수를 "
+                "구하시오."
+            ),
+            answer_text=str(n),
+            explanation=(
+                f"접선의 기울기가 {slope}인 점의 x좌표는 {render_poly(poly)} = 0의 실근이다. "
+                f"서로 다른 실근은 {n}개이다."
+            ),
+            conditions=f"{poly_to_sympy_str(poly)} = 0",
+            answer_map=(),
+            problem_type_code=_COUNT,
+            answer_format=AnswerFormat.자연수,
+            answer_kind="real_root_count",
+        )
+
     return [
+        Frame("basic-count-points-with-given-slope", _slope_params("p3-mvt:b7"), b7),
         Frame("basic-average-rate", _frames_params("p3-mvt:b1", _quad_cases()), b1),
         Frame(
             "basic-difference-equals-derivative-times-length",
@@ -693,6 +717,31 @@ def _applied_frames() -> list[Frame]:
             "applied", "applied-find-chord-endpoint", c.f, c, unknown="b", fixed_is_left=True
         )
 
+    def a6(p: tuple[object, ...]) -> DiffItem | None:
+        c, off = _case_of(p[0]), int(str(p[1]))
+        poly, slope = _slope_equation(c, off)
+        n = _count_roots(poly)
+        icpt = ((c.a * 3 + c.b * 5) % 7) - 3
+        return KindedDiffItem(
+            slot="applied",
+            frame_id="applied-count-tangents-parallel-to-line",
+            question_text=(
+                f"곡선 y = {_fx(c)} 위의 점 중에서 접선이 직선 y = {slope}x "
+                f"{'+' if icpt >= 0 else '-'} {abs(icpt)}{wa_gwa(str(abs(icpt)))} 평행한 점의 "
+                "개수를 구하시오."
+            ),
+            answer_text=str(n),
+            explanation=(
+                f"접선의 기울기가 {slope}이어야 하므로 {render_poly(poly)} = 0의 서로 다른 "
+                f"실근 {n}개가 접점의 x좌표이다."
+            ),
+            conditions=f"{poly_to_sympy_str(poly)} = 0",
+            answer_map=(),
+            problem_type_code=_COUNT,
+            answer_format=AnswerFormat.자연수,
+            answer_kind="real_root_count",
+        )
+
     return [
         Frame("applied-find-k-from-c", tuple(_k_params("p3-mvt:a1")), a1),
         Frame("applied-tangent-parallel-to-line", _frames_params("p3-mvt:a2", _cubic_cases()), a2),
@@ -703,6 +752,7 @@ def _applied_frames() -> list[Frame]:
         ),
         Frame("applied-find-left-endpoint", _frames_params("p3-mvt:a4", _quad_cases()), a4),
         Frame("applied-find-chord-endpoint", _frames_params("p3-mvt:a5", _quad_cases()), a5),
+        Frame("applied-count-tangents-parallel-to-line", _slope_params("p3-mvt:a6"), a6),
     ]
 
 
@@ -932,6 +982,27 @@ def _misconception_frames() -> list[Frame]:
 # ──────────────────────────────────────────────────────────────────────────
 # 진단(diagnostic) — 풀이의 한 단계씩을 따로 확인한다
 # ──────────────────────────────────────────────────────────────────────────
+def _count_roots(poly: Poly) -> int:
+    """서로 다른 실근 수 — 검산기와 독립인 경로(제곱 없는 부분의 Sturm 개수)."""
+    return int(sympy.Poly(poly_to_sympy(poly), _X).sqf_part().count_roots())
+
+
+def _slope_equation(case: _Case, offset: int) -> tuple[Poly, int]:
+    """f'(x) - (평균변화율 + offset)을 다항식으로 — 접선의 기울기가 그 값인 점의 x좌표 방정식."""
+    base_eq, m = _fprime_eq_rate_poly(case)
+    slope = int(m) + offset
+    d = dict(derivative_of(case.f))
+    d[0] = d.get(0, 0) - slope
+    return tuple(sorted(((e, c) for e, c in d.items() if c), reverse=True)), slope
+
+
+def _slope_params(seed: str) -> tuple[tuple[object, ...], ...]:
+    """(사례, 기울기 변위) 격자 — 변위가 달라 실근이 0·1·2개로 갈리게 한다."""
+    pool = _cubic_cases()[:60]
+    combos = tuple((case, off) for case in pool for off in (-9, -5, -2, 2, 5, 9, 14, 20))
+    return tuple(seeded_order(seed, combos))
+
+
 def _fprime_eq_rate_poly(case: _Case) -> tuple[Poly, Fraction]:
     """f'(x) - (평균변화율)을 다항식으로(평균변화율은 정수 — 정수 계수 다항식의 차분몫)."""
     m = Fraction(eval_at(case.f, case.b) - eval_at(case.f, case.a), case.b - case.a)

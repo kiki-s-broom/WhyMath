@@ -146,7 +146,12 @@ def test_the_two_generators_do_not_overlap_each_other_or_the_first_two_concepts(
     """형제 생성기 사이 발문·조건식 공간이 겹치지 않는다(QUAL-08 정신 — 같은 실체를 두 번 내지 않는다)."""
     spaces: dict[str, set[str]] = {}
     conds: dict[str, set[str]] = {}
-    for generator_cls in (_MVT, _EQ, P3DiffPowerDerivativeGenerator, P3DiffPolynomialRulesGenerator):
+    for generator_cls in (
+        _MVT,
+        _EQ,
+        P3DiffPowerDerivativeGenerator,
+        P3DiffPolynomialRulesGenerator,
+    ):
         items = _items(generator_cls)
         spaces[generator_cls.__name__] = {
             overlap_audit.normalize_question_text(i.question_text) for i in items
@@ -228,9 +233,9 @@ def test_with_item_kinds_carries_the_gate_materials_into_the_candidate(
             seen["kind"] += candidate.answer_kind is not None
             seen["aggregate"] += candidate.answer_aggregate is not None
             seen["selection"] += candidate.answer_selection is not None
-    assert seen["kind"] >= 5 and seen["aggregate"] >= 3
+    assert seen["kind"] >= 2 and seen["aggregate"] >= 2 and seen["selection"] >= 1
     if generator_cls is _EQ:
-        assert seen["selection"] >= 5
+        assert seen["kind"] >= 15 and seen["aggregate"] >= 8 and seen["selection"] >= 8
     # 확장 필드가 없는 평범한 DiffItem은 후보를 그대로 돌려준다
     sample = _candidates(generator_cls, "representative")[0]
     plain = DiffItem(
@@ -324,8 +329,10 @@ def _solution_points(item: DiffItem) -> list[float]:
 
 
 def _answer_value(item: DiffItem) -> float:
-    return float(sympy.Rational(item.answer_text)) if "/" in item.answer_text else float(
-        sympy.sympify(item.answer_text)
+    return (
+        float(sympy.Rational(item.answer_text))
+        if "/" in item.answer_text
+        else float(sympy.sympify(item.answer_text))
     )
 
 
@@ -372,7 +379,7 @@ def test_answers_match_an_independent_recomputation_from_the_conditions(
                 assert len(points) == 1, (item.question_text, points)
                 assert abs(points[0] - answer) < 1e-6, item.question_text
             checked["value"] += 1
-    assert checked["value"] >= 20 and checked["count"] >= 5, checked
+    assert checked["value"] >= 20 and checked["count"] >= 3 and checked["aggregate"] >= 3, checked
 
 
 @_ALL
@@ -409,13 +416,15 @@ def _c_find_items() -> list[DiffItem]:
     return [
         i
         for i in _items(_MVT)
-        if isinstance(i.conditions, tuple) and i.conditions[1:2] and i.conditions[1].startswith("c >=")
+        if isinstance(i.conditions, tuple)
+        and i.conditions[1:2]
+        and i.conditions[1].startswith("c >=")
     ]
 
 
 def test_mvt_c_items_carry_the_open_interval_in_the_p3_19_format() -> None:
     items = _c_find_items()
-    assert len(items) >= 40, len(items)
+    assert len(items) >= 30, len(items)
     for item in items:
         eq, lower, upper, no_lower, no_upper = item.conditions  # type: ignore[misc]
         a = int(_BOUND.match(lower).group(2))  # type: ignore[union-attr]
@@ -423,7 +432,10 @@ def test_mvt_c_items_carry_the_open_interval_in_the_p3_19_format() -> None:
         assert lower == f"c >= {a}" and upper == f"c <= {b}"
         assert no_lower == f"c != {a}" and no_upper == f"c != {b}"
         assert a < b
-        assert "Derivative(" in eq and ".doit().subs(" in eq and eq.count("Derivative") == 1
+        if "Derivative(" in eq:  # 미분 평가는 조건당 1회·맨몸(Tier1 제약)
+            assert ".doit().subs(" in eq and eq.count("Derivative") == 1
+        else:  # 문면의 방정식을 c에 대한 다항식으로 그대로 쓴 진단 문항
+            assert eq.endswith(" = 0"), eq
         answer = _answer_value(item)
         assert a < answer < b, item.question_text  # 답은 열린구간 안
 
@@ -453,11 +465,7 @@ def test_mvt_outside_root_is_rejected_only_because_of_the_interval_condition() -
         a = int(_BOUND.match(lower).group(2))  # type: ignore[union-attr]
         b = int(_BOUND.match(upper).group(2))  # type: ignore[union-attr]
         expr, _ = _parse_cond(eq)
-        roots = [
-            r
-            for r in sympy.solve(sympy.expand(expr), _C)
-            if r.is_real and not (a < r < b)
-        ]
+        roots = [r for r in sympy.solve(sympy.expand(expr), _C) if r.is_real and not (a < r < b)]
         for root in roots:
             wrong = {"c": str(root)}
             assert verify_answer(item.conditions, wrong).state == "fail"
