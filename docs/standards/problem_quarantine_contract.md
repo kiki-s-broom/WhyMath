@@ -103,6 +103,23 @@ NULL인 행에서 비교 결과가 NULL이 되고 WHERE가 그것을 참으로 �
 **격리 설정** — 관리자 표면(`PATCH /v1/problems/{id}`, `RequireContentAdmin`)으로 세 필드를 함께 쓴다.
 전용 엔드포인트를 따로 두지 않는다(§7).
 
+> **추가 기록 (ADMIN-07 · 2026-10) — 검증된 전용 경로**: 검수 큐 화면용으로
+> `POST /v1/admin/review-queue/items/{problem_id}/transitions`(`RequireReviewAdmin` = CONTENT_ADMIN
+> 전용·데모 403)가 생겼다. 본문 `{action, expected_status, reason}`의 `action`은
+> approve/reject/quarantine/release 4종이며 **허용 전이표**(`schema/review_transition.py` —
+> approve: pending→approved · reject: pending→rejected · quarantine: approved→quarantined ·
+> release: quarantined→approved, 그 외 전부 불허, 상태 미설정(`None`)은 어떤 액션도 불허)를 서버가
+> 집행한다. 한 트랜잭션에서 행 잠금(`SELECT … FOR UPDATE`) → `expected_status` 불일치 시 409
+> `stale_status` → 전이표 위반 시 409 `illegal_transition` → 갱신 → `privacy_audit` 1행(`action` =
+> 전이 액션 값) → commit 1회이며, 감사 쓰기가 실패하면 상태 변경도 롤백된다. `quarantine`은 `reason`
+> (공백 제외 1자 이상)을 필수로 요구하고 `quarantine_reason`·`quarantined_at`을 **상태와 함께** 쓴다
+> (§3 이행을 서버가 강제). `release`는 `approved`로 되돌리되 사유·시각을 지우지 않는다(아래 해제 2항과
+> 일치). 감사 행에는 사유를 싣지 않는다(PII 불변식 — 사유의 좌석은 `quarantine_reason`).
+> 이 기록은 위 PATCH 결정을 **뒤집지 않는다** — 아래 PATCH 경로는 그대로 유효하다.
+> **한계(사실대로)**: `PATCH /v1/problems/{id}`는 전이 검증이 없고(예: `rejected`→`approved`,
+> 사유 없는 격리가 통과한다) 이번 변경으로 막지 않았다. 그러므로 전이 계약은 **전용 경로를 쓰는 운영
+> 흐름**에 대해서만 성립하며, PATCH로의 우회는 남아 있다(범위 밖 — §7 참조).
+
 ```
 PATCH /v1/problems/{problem_id}
 { "review_status": "quarantined",
@@ -136,7 +153,9 @@ PATCH /v1/problems/{problem_id}
 - **`pending`·`NULL` 문항을 공개 GET에서 배제할지** — 이건 격리 축이 아니라 *공개 카탈로그 정책*
   (SEC-07 D1)의 변경이다. 회귀 범위가 크고 Kiki 결정 사항이라 이 태스크에서 손대지 않았다(§4 참조).
 - **격리 전용 엔드포인트**(`POST /v1/problems/{id}/quarantine`) — 관리자 PATCH로 충분하고, 표면을 늘리면
-  인가·ETag·감사 로그 계약을 한 벌 더 유지해야 한다.
+  인가·ETag·감사 로그 계약을 한 벌 더 유지해야 한다. *(ADMIN-07 추가 기록: 검수 큐용 전이 라우트가
+  `POST /v1/admin/review-queue/items/{id}/transitions`로 별도 착지했다 — §5 참조. 이 항의 판단 자체는
+  `/v1/problems` 하위 표면에 대한 것이라 유지된다. PATCH의 전이 검증 부재는 여전히 범위 밖이다.)*
 - **세 필드 동시 기록의 스키마 강제**(`review_status == quarantined ⇒ reason·at NOT NULL`) — 교정
   불변식으로 올리면 기존 행·마이그레이션 경로와 충돌한다. 현재는 이 문서의 절차 의무이고, 강제가
   필요해지면 별도 태스크로 등재한다.

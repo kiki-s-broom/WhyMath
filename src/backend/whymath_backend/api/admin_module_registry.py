@@ -185,6 +185,7 @@ def _module(
     )
 
 
+_LIVE = AdminModuleStatus.LIVE
 _PARTIAL = AdminModuleStatus.PARTIAL
 _PLANNED = AdminModuleStatus.PLANNED
 
@@ -197,7 +198,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         AdminSection.REVIEW,
         "검수 큐",
         "/admin/review",
-        _PARTIAL,
+        _LIVE,
         "src/backend/whymath_backend/harness/needs_review_worklist.py",
         "src/backend/whymath_backend/harness/review_session.py",
         "src/backend/whymath_backend/harness/review_timer.py",

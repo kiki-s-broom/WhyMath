@@ -11978,3 +11978,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **초기 오판(정정 기록)**: 첫 취소를 보고 "이 PR이 traversal을 건드리지 않으니 무관해 보인다"고 판단하고 `rerun_failed_jobs`를 한 번 썼다. 재실행은 통과해 큐에 들어갔지만 큐 실행에서 같은 지점에서 다시 끊겼다 — 시간 한계는 재실행으로 풀리는 종류가 아니라 **PR의 변경 크기에 걸린 결정적 한계**였다. "취소된 스텝이 25초 만에 끝났으니 짧은 게이트의 문제"라는 읽기가 틀렸고, 판정 근거는 스텝 시각이 아니라 **잡 시작부터의 경과 시간**이었다.
 - **조치**: `.github/workflows/ci.yml`의 `backend-migrations` 잡 `timeout-minutes`를 12→15로 올리고 사유를 주석에 남겼다(여유 ~3분). 상한을 넘는 폭주는 여전히 이 값이 잡는다. `tests/infra` 2534건 통과(이 값을 못 박은 계약 테스트는 없다).
 - **한계(명시)**: 여유를 늘린 것이지 소요를 줄인 것이 아니다 — 통합 pytest 스텝이 ~10분이라 테스트가 더 늘면 같은 일이 재발한다. 소요 추이 관측·분할은 별건이며 이 기록으로 추적한다(재발 대책 태스크 `OPS-117-backend-migrations-job-duration-headroom` 등재).
+
+### 2026-10-06 — ADMIN-07 검수 큐 UI + 검증된 상태 전이 BFF (Phase B 진입점)
+- **대상 엔티티**: `Problem.review_status`(pending/approved/rejected/quarantined). JSONL `needs_review_worklist` 축은 harness 어댑터 잔여 누출 래칫 때문에 이번 범위에서 제외(후속).
+- **전이표**(`schema/review_transition.py`, 불변): approve pending→approved · reject pending→rejected · quarantine approved→quarantined(사유 필수·≤2000자) · release quarantined→approved. `None`(미지정)은 어떤 액션도 허용하지 않는다("모른다 ≠ pending").
+- **집행**: `POST /v1/admin/review-queue/items/{id}/transitions` — `SELECT … FOR UPDATE`, `expected_status` 불일치 409 `stale_status`, 불허 전이 409 `illegal_transition`, 성공 전이마다 `privacy_audit` 1행을 같은 트랜잭션에 기록(`PrivacyAuditAction` approve/reject/quarantine/release, 마이그레이션 불필요). 실패 시 감사 0행, 감사 실패 시 상태 변경 롤백. CONTENT_ADMIN만 허용(그 외 403).
+- **웹**: `app/admin/review/page.admin.tsx`(+`_components/ReviewQueue*`) — 버튼은 서버가 준 `allowed_actions`만 노출, 판정은 서버. 프런트 직접 DB 접근 0. `review_queue` 모듈 PARTIAL→LIVE(계약 ⑧ 검사가 처음으로 공허하지 않게 됨).
+- **정직한 공백(후속 필요)**: ①기존 `PATCH /v1/problems/{id}`는 전이 검증 없이 review_status를 바꿀 수 있다(격리 계약 §7: 전용 엔드포인트 없음 결정 유지) — 전이 계약·감사 1행은 새 POST 경로에만 성립 ②`privacy_audit` 불변성은 관례일 뿐 DB 트리거 없음 ③reject 실패코드·HIT 타이머 강제 미포함 ④CI webapp 잡에 `out/admin/review/index.html` 존재 검사 추가 제안(.github 미수정) ⑤`security_privacy.md` 감사 action 열거 미갱신.
+- **정합 보정**: 백엔드는 미지정 문항의 409에 `current_status: null`을 보내는데 웹 파서가 문자열만 받아 `malformed`로 오분류 → null을 "unset"으로 읽도록 수정.
+- **검증 메모**: 백엔드 에이전트 뮤테이션 13종 전건 RED(rollback 제거 1건은 hermetic만 검출 — 세션 close가 롤백하므로 실 PG로는 불가). 웹 거버넌스 주입 5종 RED·브라우저 DOM 단언 22건 PASS.
