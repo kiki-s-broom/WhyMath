@@ -50,6 +50,8 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     product_to_sympy_str,
     render_poly,
     render_product,
+    with_eun_neun,
+    with_i_ga,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -183,7 +185,10 @@ def _read_item(
         frame_id=frame_id,
         question_text=text,
         answer_text=str(value),
-        explanation=f"{note} {shown}의 도함수는 {render_poly(d, var)}이므로 {what}은 {value}이다.",
+        explanation=(
+            f"{note} {shown}의 도함수는 {render_poly(d, var)}이므로 "
+            f"{with_eun_neun(what)} {value}이다."
+        ),
         conditions=f"Derivative({sym}, {var}).doit().subs({var}, {point}) = y",
         answer_map=(("y", str(value)),),
         problem_type_code=_EVAL,
@@ -485,7 +490,9 @@ def _applied_frames() -> list[Frame]:
         f: Poly = ((3, lead), (2, a), (1, c))
         b = eval_at(derivative_of(f), pt)  # 데이터는 SymPy로 구한다
         sign = "+" if c > 0 else "-"
-        text_f = f"{render_poly(((3, lead),))} + ax^2 {sign} {abs(c)}x"
+        # 일차항 계수 ±1은 '1x'가 아니라 'x'로 쓴다(계수 1 생략 — 감사 결함 교정).
+        x_term = "x" if abs(c) == 1 else f"{abs(c)}x"
+        text_f = f"{render_poly(((3, lead),))} + ax^2 {sign} {x_term}"
         return DiffItem(
             slot="applied",
             frame_id="applied-find-coefficient-from-value",
@@ -494,8 +501,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수는 {3 * lead}x^2 + 2ax {sign} {abs(c)}이므로 x가 {pt}일 때의 값이 {b}가 "
-                f"되는 a는 {a}이다."
+                f"도함수는 {3 * lead}x^2 + 2ax {sign} {abs(c)}이므로 x가 {pt}일 때의 값이 "
+                f"{with_i_ga(b)} 되는 a는 {a}이다."
             ),
             conditions=f"{_deriv_sym(f'{lead}*x**3 + a*x**2 + ({c})*x', str(pt))} = {b}",
             answer_map=(("a", str(a)),),
@@ -558,7 +565,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"곱의 미분법에 따라 f'(1)은 2a + {b + 3}이므로 이 값이 {c}가 되는 a는 {a}이다."
+                f"곱의 미분법에 따라 f'(1)은 2a + {b + 3}이므로 이 값이 "
+                f"{with_i_ga(c)} 되는 a는 {a}이다."
             ),
             conditions=f"{_deriv_sym(f'(x + a)*(x**2 + {b})', '1')} = {c}",
             answer_map=(("a", str(a)),),
@@ -574,12 +582,12 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-cubic-derivative-value-to-point",
             question_text=(
-                f"함수 f(x) = {render_poly(f)}에 대하여 f'(a)의 값이 {b}가 되도록 하는 "
+                f"함수 f(x) = {render_poly(f)}에 대하여 f'(a)의 값이 {with_i_ga(b)} 되도록 하는 "
                 "양수 a의 값을 구하시오."
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수는 {render_poly(derivative_of(f))}이므로 이 값이 {b}가 되는 "
+                f"도함수는 {render_poly(derivative_of(f))}이므로 이 값이 {with_i_ga(b)} 되는 "
                 f"양수 a는 {a}이다."
             ),
             conditions=(f"{_deriv_sym(poly_to_sympy_str(f), 'a')} = {b}", "a > 0"),
@@ -600,7 +608,9 @@ def _applied_frames() -> list[Frame]:
                 "상수 a의 값을 구하시오."
             ),
             answer_text=str(a),
-            explanation=(f"곱의 미분법에 따라 f'(0)은 {c}a이므로 이 값이 {d}가 되는 a는 {a}이다."),
+            explanation=(
+                f"곱의 미분법에 따라 f'(0)은 {c}a이므로 이 값이 {with_i_ga(d)} 되는 a는 {a}이다."
+            ),
             conditions=f"{_deriv_sym(f'(a*x + {b})*(x**2 + {c})', '0')} = {d}",
             answer_map=(("a", str(a)),),
             problem_type_code=_SOLVE,
@@ -678,7 +688,7 @@ def _mc_value(
         answer_text=answer,
         explanation=(
             f"곱의 미분법에 따라 도함수는 {render_poly(derivative_of(prod), var)}이므로 "
-            f"{var}가 {a}일 때의 값은 {correct}이다."
+            f"{with_i_ga(var)} {a}일 때의 값은 {correct}이다."
         ),
         conditions=f"Derivative({sym}, {var}).doit().subs({var}, {a}) = y",
         answer_map=(("y", str(correct)),),
@@ -1008,8 +1018,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"곱의 미분법에 따라 f'(1)은 2a + {2 * s + 4}이므로 이 값이 {value}가 되는 "
-                f"a는 {a}이다."
+                f"곱의 미분법에 따라 f'(1)은 2a + {2 * s + 4}이므로 이 값이 "
+                f"{with_i_ga(value)} 되는 a는 {a}이다."
             ),
             conditions=f"{_deriv_sym(f'(x**2 + {s})*(x**2 + a)', '1')} = {value}",
             answer_map=(("a", str(a)),),

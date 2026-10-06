@@ -404,8 +404,8 @@ def _interval_item(
         answer_map=(("x", str(n)),),
         ptype=_SOLVE,
         explanation=(
-            f"{_explain(fn)} f'(x) {relation} 0인 구간, 곧 {word}하는 구간에 속하는 정수는 "
-            f"{n}뿐이다."
+            f"{_explain(fn)} f'(x) {relation} 0이 되는 x의 범위는 {word}하는 구간의 양 끝을 "
+            f"뺀 안쪽이고, 그 범위에 속하는 정수는 {n}뿐이다."
         ),
     )
 
@@ -592,7 +592,8 @@ def _rep_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "rep-decreasing-integer",
-            "함수 f(x) = {f}{ga} 감소하는 구간에 속하는 정수는 하나뿐이다. 그 정수를 구하시오.",
+            "함수 f(x) = {f}에 대하여 f'(x) < 0을 만족시키는 정수 x는 하나뿐이다. "
+            "그 정수를 구하시오.",
             "p3-shape:rep6",
             slot=slot,
             direction="neg",
@@ -629,7 +630,8 @@ def _basic_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "basic-increasing-integer",
-            "함수 f(x) = {f}{ga} 증가하는 구간에 속하는 정수는 하나뿐이다. 그 정수를 구하시오.",
+            "함수 f(x) = {f}에 대하여 f'(x) > 0을 만족시키는 정수 x는 하나뿐이다. "
+            "그 정수를 구하시오.",
             "p3-shape:bas4",
             slot=slot,
             direction="pos",
@@ -1017,7 +1019,8 @@ def _diagnostic_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "diag-decreasing-integer-curve",
-            "곡선 y = {f}{ga} 감소하는 구간에 속하는 정수는 하나뿐이다. 그 정수를 구하시오.",
+            "함수 f(x) = {f}의 도함수를 f'(x)라 할 때, f'(x) < 0을 만족시키는 정수 x는 "
+            "하나뿐이다. 그 정수를 구하시오.",
             "p3-shape:dia6",
             slot=slot,
             direction="neg",

@@ -63,7 +63,11 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     eval_at,
     poly_to_sympy,
     poly_to_sympy_str,
+    render_affine,
     render_poly,
+    with_eul_reul,
+    with_i_ga,
+    with_wa_gwa,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -74,7 +78,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, eun_neun, wa_gwa
+from whymath_backend.lang.josa import eul_reul, eun_neun
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = [
@@ -292,8 +296,13 @@ def _c_item(
     ptype: str = _SOLVE,
     choices: tuple[str, ...] | None = None,
     distractors: tuple[tuple[int, str], ...] = (),
+    fn: str = "f",
 ) -> DiffItem | None:
-    """평균값 정리의 c를 묻는 문항 — 검산 재료는 방정식 1개 + 열린구간 경계 4개."""
+    """평균값 정리의 c를 묻는 문항 — 검산 재료는 방정식 1개 + 열린구간 경계 4개.
+
+    `fn`은 해설이 쓰는 함수 기호다 — 발문이 위치를 x(t)·s(t)로 소개한 시간 문항에서 해설이 발문에
+    없는 f를 꺼내지 않게 한다(감사 결함 교정: 발문에 정의 없이 f 등장).
+    """
     solved = _solve_c(case, var)
     if solved is None:
         return None
@@ -315,9 +324,9 @@ def _c_item(
         question_text=text,
         answer_text=answer,
         explanation=(
-            f"f'({var}) = {render_poly(derivative_of(case.f, var), var)}이고 "
+            f"{fn}'({var}) = {render_poly(derivative_of(case.f, var), var)}이고 "
             f"구간 [{case.a}, {case.b}]에서의 평균변화율은 {frac_text(m)}이다. "
-            f"f'(c) = {frac_text(m)}{eul_reul(frac_text(m))} 풀어 열린구간 "
+            f"{fn}'(c) = {frac_text(m)}{eul_reul(frac_text(m))} 풀어 열린구간 "
             f"({case.a}, {case.b})에 속하는 근을 찾으면 c = {frac_text(c)}이다.{other_note}"
         ),
         conditions=(equation, *_bounds(case.a, case.b)),
@@ -340,6 +349,11 @@ def _frames_params(seed: str, pool: tuple[_Case, ...]) -> tuple[tuple[object, ..
 
 def _fx(case: _Case) -> str:
     return render_poly(case.f)
+
+
+def _from_time_zero(pool: tuple[_Case, ...]) -> tuple[_Case, ...]:
+    """시간 맥락 문항용 풀 — 구간의 시작 시각이 0 이상인 사례만(출발 전 음수 시각 금지)."""
+    return tuple(case for case in pool if case.a >= 0)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -379,9 +393,10 @@ def _rep_frames() -> list[Frame]:
             slot="representative",
             frame_id="rep-tangent-parallel-to-chord",
             text=(
-                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), B({c.b}, {fb})에 대하여, "
-                f"열린구간 ({c.a}, {c.b})에서 곡선 위의 점 P(c, f(c))에서의 접선이 직선 AB와 "
-                "평행하다. c의 값을 구하시오."
+                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 두 점 A({c.a}, {fa}), "
+                f"{with_i_ga(f'B({c.b}, {fb})')} 있다. 열린구간 ({c.a}, {c.b})에서 곡선 위의 점 "
+                "P(c, f(c))에서의 "
+                "접선이 직선 AB와 평행할 때, c의 값을 구하시오."
             ),
             case=c,
         )
@@ -520,7 +535,8 @@ def _basic_frames() -> list[Frame]:
             slot="basic",
             frame_id="basic-chord-slope",
             text=(
-                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), B({c.b}, {fb})를 지나는 직선의 "
+                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), "
+                f"{with_eul_reul(f'B({c.b}, {fb})')} 지나는 직선의 "
                 "기울기를 구하시오."
             ),
             value=m,
@@ -559,6 +575,7 @@ def _basic_frames() -> list[Frame]:
             ),
             case=c,
             var="t",
+            fn="x",
         )
         return item
 
@@ -566,17 +583,23 @@ def _basic_frames() -> list[Frame]:
         c, off = _case_of(p[0]), int(str(p[1]))
         poly, slope = _slope_equation(c, off)
         n = _count_roots(poly)
+        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
+        # 기울기를 직선 AB(평균변화율)와 견주어 말한다 — 평균값 정리의 '평균변화율 ↔ 접선 기울기'
+        # 비교 맥락을 발문에 드러내 문항이 실제로 묻는 개념과 태그를 맞춘다(감사 bad_tag 교정).
+        compare = "큰" if off > 0 else "작은"
         return KindedDiffItem(
             slot="basic",
             frame_id="basic-count-points-with-given-slope",
             question_text=(
-                f"곡선 y = {_fx(c)} 위의 점 중에서 접선의 기울기가 {slope}인 점의 개수를 "
-                "구하시오."
+                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 두 점 A({c.a}, {fa}), "
+                f"{with_i_ga(f'B({c.b}, {fb})')} 있다. 이 곡선 위의 점 중에서 접선의 기울기가 "
+                f"직선 AB의 기울기보다 {abs(off)}만큼 {compare} 점의 개수를 구하시오."
             ),
             answer_text=str(n),
             explanation=(
-                f"접선의 기울기가 {slope}인 점의 x좌표는 {render_poly(poly)} = 0의 실근이다. "
-                f"서로 다른 실근은 {n}개이다."
+                f"직선 AB의 기울기는 구간 [{c.a}, {c.b}]에서의 평균변화율 {slope - off}이므로 "
+                f"접선의 기울기는 {slope}이다. 이를 만족하는 점의 x좌표는 "
+                f"{render_poly(poly)} = 0의 실근이고, 서로 다른 실근은 {n}개이다."
             ),
             conditions=f"{poly_to_sympy_str(poly)} = 0",
             answer_map=(),
@@ -596,7 +619,11 @@ def _basic_frames() -> list[Frame]:
         Frame("basic-rolle-theorem", _frames_params("p3-mvt:b3", _rolle_cases()), b3),
         Frame("basic-chord-slope", _frames_params("p3-mvt:b4", _cubic_cases()), b4),
         Frame("basic-function-value-difference", _frames_params("p3-mvt:b5", _cubic_cases()), b5),
-        Frame("basic-time-average-velocity", _frames_params("p3-mvt:b6", _quad_cases()), b6),
+        Frame(
+            "basic-time-average-velocity",
+            _frames_params("p3-mvt:b6", _from_time_zero(_quad_cases())),
+            b6,
+        ),
     ]
 
 
@@ -647,7 +674,8 @@ def _k_item(slot: str, frame_id: str, text_of: object, p: tuple[object, ...]) ->
         question_text=text_of(a, b, cs),
         answer_text=str(k),
         explanation=(
-            f"f'(x) = 3x^2 + 2kx이고 평균변화율은 {a * a + a * b + b * b} + {a + b}k이다. "
+            f"f'(x) = 3x^2 + 2kx이고 평균변화율은 "
+            f"{render_affine(a * a + a * b + b * b, a + b, 'k')}이다. "
             f"f'({cs}) = (평균변화율)에서 k = {k}이다."
         ),
         conditions=condition,
@@ -680,9 +708,10 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-tangent-parallel-to-line",
             text=(
-                f"곡선 y = {_fx(c)} 위의 점 P(c, f(c)) ({c.a} < c < {c.b})에서의 접선이 직선 "
+                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 점 P(c, f(c)) "
+                f"({c.a} < c < {c.b})에서의 접선이 직선 "
                 f"y = {frac_text(m)}x {'+' if n >= 0 else '-'} {abs(n)}"
-                f"{wa_gwa(str(abs(n)))} 평행할 때, c의 값을 구하시오."
+                f"{with_wa_gwa(abs(n))} 평행할 때, c의 값을 구하시오."
             ),
             case=c,
             rhs=frac_text(m),
@@ -701,6 +730,7 @@ def _applied_frames() -> list[Frame]:
             ),
             case=c,
             var="t",
+            fn="s",
         )
 
     def a4(p: tuple[object, ...]) -> DiffItem | None:
@@ -717,47 +747,41 @@ def _applied_frames() -> list[Frame]:
             "applied", "applied-find-chord-endpoint", c.f, c, unknown="b", fixed_is_left=True
         )
 
-    def a6(p: tuple[object, ...]) -> DiffItem | None:
-        c, off = _case_of(p[0]), int(str(p[1]))
-        poly, slope = _slope_equation(c, off)
-        n = _count_roots(poly)
-        icpt = ((c.a * 3 + c.b * 5) % 7) - 3
-        return KindedDiffItem(
-            slot="applied",
-            frame_id="applied-count-tangents-parallel-to-line",
-            question_text=(
-                f"곡선 y = {_fx(c)} 위의 점 중에서 접선이 직선 y = {slope}x "
-                f"{'+' if icpt >= 0 else '-'} {abs(icpt)}{wa_gwa(str(abs(icpt)))} 평행한 점의 "
-                "개수를 구하시오."
-            ),
-            answer_text=str(n),
-            explanation=(
-                f"접선의 기울기가 {slope}이어야 하므로 {render_poly(poly)} = 0의 서로 다른 "
-                f"실근 {n}개가 접점의 x좌표이다."
-            ),
-            conditions=f"{poly_to_sympy_str(poly)} = 0",
-            answer_map=(),
-            problem_type_code=_COUNT,
-            answer_format=AnswerFormat.자연수,
-            answer_kind="real_root_count",
-        )
-
     return [
         Frame("applied-find-k-from-c", tuple(_k_params("p3-mvt:a1")), a1),
         Frame("applied-tangent-parallel-to-line", _frames_params("p3-mvt:a2", _cubic_cases()), a2),
         Frame(
             "applied-car-instantaneous-equals-average",
-            _frames_params("p3-mvt:a3", _cubic_cases()),
+            _frames_params("p3-mvt:a3", _from_time_zero(_cubic_cases())),
             a3,
         ),
         Frame("applied-find-left-endpoint", _frames_params("p3-mvt:a4", _quad_cases()), a4),
         Frame("applied-find-chord-endpoint", _frames_params("p3-mvt:a5", _quad_cases()), a5),
-        Frame("applied-count-tangents-parallel-to-line", _slope_params("p3-mvt:a6"), a6),
     ]
 
 
 def _k_params(seed: str) -> list[tuple[object, ...]]:
     return [tuple(case) for case in seeded_order(seed, _k_cases())]
+
+
+def _endpoint_explanation(a: int, b: int, cs: str, *, unknown: str, fixed_is_left: bool) -> str:
+    """끝점 미지수 해설 — 답을 먼저 대입해 놓지 않고 미지수 식에서 풀이 순서대로 푼다.
+
+    c는 구간의 중점이므로 (두 끝점의 합)/2 = c이고, 합 = 2c는 주어진 c에서 곧바로 나온다.
+    """
+    total = a + b  # 2c — 두 끝점의 합(주어진 c에서 나오는 값)
+    if fixed_is_left:  # 왼쪽 끝점 a가 고정, 오른쪽 b가 미지수
+        head = f"({a} + {unknown})/2"
+        step = f"{a} + {unknown} = {total}"
+    else:  # 오른쪽 끝점 b가 고정, 왼쪽 a가 미지수
+        sign = "+" if b >= 0 else "-"
+        head = f"({unknown} {sign} {abs(b)})/2"
+        step = f"{unknown} {sign} {abs(b)} = {total}"
+    answer = b if fixed_is_left else a
+    return (
+        f"이차함수에서 평균값 정리의 c는 구간의 중점이므로 {head} = {cs}이다. "
+        f"양변에 2를 곱하면 {step}이므로 {unknown} = {answer}이다."
+    )
 
 
 def _endpoint_item(
@@ -822,10 +846,7 @@ def _endpoint_item(
         frame_id=frame_id,
         question_text=text,
         answer_text=str(answer),
-        explanation=(
-            f"이차함수에서 평균값 정리의 c는 구간의 중점이므로 ({a} + {b})/2 = {cs}이다. "
-            f"고정된 끝점 {given}{wa_gwa(str(given))} c = {cs}에서 {unknown} = {answer}이다."
-        ),
+        explanation=_endpoint_explanation(a, b, cs, unknown=unknown, fixed_is_left=fixed_is_left),
         conditions=(f"{deriv} = {rate}", side),
         answer_map=((unknown, str(answer)),),
         problem_type_code=_SOLVE,
@@ -851,6 +872,7 @@ def _mc_c_item(
     case: _Case,
     var: str = "x",
     fillers_seed: str,
+    fn: str = "f",
 ) -> DiffItem | None:
     """c를 묻는 객관식 — 롤의 정리와 혼동한 값(M0674)을 오답 선지에 둔다."""
     solved = _solve_c(case, var)
@@ -896,6 +918,7 @@ def _mc_c_item(
         var=var,
         choices=choices,
         distractors=distractors,
+        fn=fn,
     )
     if base is None:
         return None
@@ -939,6 +962,7 @@ def _misconception_frames() -> list[Frame]:
             ),
             case=c,
             var="t",
+            fn="x",
             fillers_seed=f"mc-t:{c.a}:{c.b}:{ft}",
         )
 
@@ -948,8 +972,8 @@ def _misconception_frames() -> list[Frame]:
         return _mc_c_item(
             frame_id="mc-tangent-parallel-find-c",
             text=(
-                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), B({c.b}, {fb}) 사이의 곡선 위에서 "
-                "직선 AB와 평행한 접선을 갖는 점의 x좌표는?"
+                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 두 점 A({c.a}, {fa}), "
+                f"B({c.b}, {fb}) 사이의 곡선 위에서 직선 AB와 평행한 접선을 갖는 점의 x좌표는?"
             ),
             case=c,
             fillers_seed=f"mc-p:{c.a}:{c.b}:{_fx(c)}",
@@ -969,11 +993,12 @@ def _misconception_frames() -> list[Frame]:
         )
 
     quad = tuple(c for c in _quad_cases() if _rolle_wrong_values(c))
+    quad_time = _from_time_zero(quad)
     cubic = tuple(c for c in _cubic_cases() if _rolle_wrong_values(c))
     return [
         Frame("mc-quadratic-find-c", _frames_params("p3-mvt:m1", quad), m1),
         Frame("mc-cubic-find-c", _frames_params("p3-mvt:m2", cubic), m2),
-        Frame("mc-time-find-c", _frames_params("p3-mvt:m3", quad), m3),
+        Frame("mc-time-find-c", _frames_params("p3-mvt:m3", quad_time), m3),
         Frame("mc-tangent-parallel-find-c", _frames_params("p3-mvt:m4", cubic), m4),
         Frame("mc-student-solution-check", _frames_params("p3-mvt:m5", quad), m5),
     ]
@@ -1014,28 +1039,6 @@ def _fprime_eq_rate_poly(case: _Case) -> tuple[Poly, Fraction]:
 
 
 def _diagnostic_frames() -> list[Frame]:
-    def d1(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        point = (c.a + c.b) % 5 - 2
-        value = eval_at(derivative_of(c.f), point)
-        return DiffItem(
-            slot="diagnostic",
-            frame_id="diag-derivative-value",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 x = {point}에서의 미분계수 f'({point})의 값을 "
-                "구하시오."
-            ),
-            answer_text=str(value),
-            explanation=(
-                f"도함수는 {render_poly(derivative_of(c.f))}이므로 x가 {point}일 때의 값은 "
-                f"{value}이다."
-            ),
-            conditions=f"Derivative({poly_to_sympy_str(c.f)}, x).doit().subs(x, {point}) = y",
-            answer_map=(("y", str(value)),),
-            problem_type_code=_EVAL,
-            answer_format=answer_format_of(value),
-        )
-
     def d2(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         eq, m = _fprime_eq_rate_poly(c)
@@ -1048,13 +1051,15 @@ def _diagnostic_frames() -> list[Frame]:
             slot="diagnostic",
             frame_id="diag-sum-of-candidate-roots",
             question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 방정식 f'(x) = {frac_text(m)}의 모든 근의 합을 "
-                "구하시오. (단, 중근은 중복하여 센다.)"
+                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
+                "같은 미분계수를 갖는 실수 x(구간 밖의 값도 포함)의 합을 구하시오. "
+                "(단, 중근은 중복하여 센다.)"
             ),
             answer_text=frac_text(value),
             explanation=(
-                f"f'(x)의 값이 {frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 근의 합은 "
-                f"{frac_text(value)}이다."
+                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
+                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 "
+                f"근의 합은 {frac_text(value)}이다."
             ),
             conditions=f"{poly_to_sympy_str(eq)} = 0",
             answer_map=(),
@@ -1074,35 +1079,20 @@ def _diagnostic_frames() -> list[Frame]:
             slot="diagnostic",
             frame_id="diag-larger-candidate",
             question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 방정식 f'(x) = {frac_text(m)}의 두 실근 중 "
-                "큰 근을 구하시오."
+                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
+                "같은 미분계수를 갖는 실수 x는 두 개이다. 이 중 큰 값을 구하시오."
             ),
             answer_text=frac_text(big),
             explanation=(
-                f"{render_poly(eq)} = 0의 두 근은 {frac_text(both[0])}, "
-                f"{frac_text(both[1])}이다."
+                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
+                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 그 두 근은 "
+                f"{frac_text(both[0])}, {frac_text(both[1])}이다."
             ),
             conditions=f"{poly_to_sympy_str(eq)} = 0",
             answer_map=(("x", frac_text(big)),),
             problem_type_code=_SOLVE,
             answer_format=answer_format_of(big),
             answer_selection="largest",
-        )
-
-    def d4(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        eq, _m = _fprime_eq_rate_poly(c)
-        # 구간 안의 근을 고르는 단계만 따로 묻는다(구간 소속 판정).
-        return _c_item(
-            slot="diagnostic",
-            frame_id="diag-pick-root-inside-interval",
-            text=(
-                f"방정식 {render_poly(eq)} = 0의 두 근 중 열린구간 ({c.a}, {c.b})에 속하는 근을 "
-                "구하시오."
-            ),
-            case=c,
-            # 문면의 방정식을 그대로 검산 재료로 쓴다(미지수는 구간 소속 판정과 같은 c).
-            equation_override=f"{poly_to_sympy_str(eq, 'c')} = 0",
         )
 
     def d5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1157,11 +1147,15 @@ def _diagnostic_frames() -> list[Frame]:
             slot="diagnostic",
             frame_id="diag-count-candidates",
             question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 방정식 f'(x) = {frac_text(m)}을 만족시키는 "
-                "서로 다른 실수 x의 개수를 구하시오."
+                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
+                "같은 미분계수를 갖는 서로 다른 실수 x의 개수를 구하시오."
             ),
             answer_text=str(distinct),
-            explanation=f"{render_poly(eq)} = 0의 서로 다른 실근은 {distinct}개이다.",
+            explanation=(
+                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
+                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 서로 다른 실근은 "
+                f"{distinct}개이다."
+            ),
             conditions=f"{poly_to_sympy_str(eq)} = 0",
             answer_map=(),
             problem_type_code=_COUNT,
@@ -1170,10 +1164,8 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     return [
-        Frame("diag-derivative-value", _frames_params("p3-mvt:d1", _cubic_cases()), d1),
         Frame("diag-sum-of-candidate-roots", _frames_params("p3-mvt:d2", _cubic_cases()), d2),
         Frame("diag-larger-candidate", _frames_params("p3-mvt:d3", _cubic_cases()), d3),
-        Frame("diag-pick-root-inside-interval", _frames_params("p3-mvt:d4", _cubic_cases()), d4),
         Frame("diag-value-of-derivative-at-c", _frames_params("p3-mvt:d5", _cubic_cases()), d5),
         Frame("diag-rolle-premise-find-k", _frames_params("p3-mvt:d6", _rolle_cases()), d6),
         Frame("diag-count-candidates", _frames_params("p3-mvt:d7", _cubic_cases()), d7),
@@ -1201,8 +1193,9 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=frac_text(out),
             explanation=(
-                f"{render_poly(eq)} = 0의 두 근은 {frac_text(c.c)}과 {frac_text(out)}이고 "
-                f"{frac_text(c.c)}만 열린구간 안에 있다. 구간 밖의 근은 {frac_text(out)}이다."
+                f"{render_poly(eq)} = 0의 두 근은 {with_wa_gwa(frac_text(c.c))} "
+                f"{frac_text(out)}이고 {frac_text(c.c)}만 열린구간 안에 있다. "
+                f"구간 밖의 근은 {frac_text(out)}이다."
             ),
             conditions=(f"{poly_to_sympy_str(eq)} = 0", side),
             answer_map=(("x", frac_text(out)),),
@@ -1252,9 +1245,9 @@ def _mastery_frames() -> list[Frame]:
             "mastery_check",
             "mastery-find-k-tangent-parallel",
             lambda a, b, cs: (
-                f"곡선 y = x^3 + kx^2 위의 두 점 (a, f(a)), (b, f(b))에서 a = {a}, b = {b}이다. "
-                f"이 두 점을 잇는 직선과 평행한 접선의 접점의 x좌표가 {cs}일 때, 상수 k의 값을 "
-                "구하시오."
+                f"함수 f(x) = x^3 + kx^2에 대하여 곡선 y = f(x) 위의 두 점 (a, f(a)), "
+                f"(b, f(b))에서 a = {a}, b = {b}이다. 이 두 점을 잇는 직선과 평행한 접선의 "
+                f"접점의 x좌표가 {cs}일 때, 상수 k의 값을 구하시오."
             ),
             p,
         )

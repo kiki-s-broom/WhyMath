@@ -16,21 +16,30 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
 
 import sympy
 
+from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga, wa_gwa
+
 __all__ = [
     "Poly",
+    "anchor_curve_function",
     "derivative_of",
     "eval_at",
     "poly_from_sympy",
     "poly_to_sympy",
     "poly_to_sympy_str",
     "product_to_sympy_str",
+    "render_affine",
     "render_poly",
     "render_product",
     "sympy_str_of",
+    "with_eul_reul",
+    "with_eun_neun",
+    "with_i_ga",
+    "with_wa_gwa",
 ]
 
 #: 다항식 — ((지수, 계수), ...) 지수 내림차순·계수 0 제외.
@@ -71,6 +80,22 @@ def render_poly(poly: Poly, var: str = "x") -> str:
         else:
             parts.append(f"{'-' if coef < 0 else '+'} {body}")
     return " ".join(parts)
+
+
+def render_affine(const: int, coef: int, var: str) -> str:
+    """상수항 먼저 쓰는 일차식 표기('9 - 3k'·'3 + k'·'-k'·'5') — 계수 ±1 생략·0 항 제거·`+ -` 금지.
+
+    `render_poly`는 차수 내림차순('-3k + 9')이라 해설의 '평균변화율은 9 - 3k' 같은 상수항 우선
+    서술에 못 쓴다. 문자열을 손으로 이어 붙이면 '3 + 1k'·'1 + 0k'·'9 + -3k'가 나오므로(P3-03 감사
+    결함) 그 부류를 이 헬퍼 하나로 막는다.
+    """
+    if coef == 0:
+        return str(const)
+    magnitude = abs(coef)
+    term = var if magnitude == 1 else f"{magnitude}{var}"
+    if const == 0:
+        return f"-{term}" if coef < 0 else term
+    return f"{const} {'-' if coef < 0 else '+'} {term}"
 
 
 def poly_to_sympy_str(poly: Poly, var: str = "x") -> str:
@@ -136,3 +161,56 @@ def product_to_sympy_str(factors: Sequence[Poly], var: str = "x") -> str:
 def sympy_str_of(poly: Poly, var: str = "x") -> str:
     """`answer_map` 값 표기 — `poly_to_sympy_str`의 별칭(의도 명시용)."""
     return poly_to_sympy_str(poly, var)
+
+
+# ── 조사 부착 헬퍼 ────────────────────────────────────────────────────────
+# 발문·해설 템플릿에 값·낱말을 끼우고 그 뒤에 조사를 붙일 때 *조사를 하드코딩하지 않는다*
+# (P3-03 감사 결함 교정 — "계수은"·"108가"·"-6와" 류). 받침 판별은 `lang.josa`(수는 한자어 읽기·
+# 변수는 라틴 문자 읽기·수식 꼬리는 마지막 읽기 음절)가 단일 진실 원천이다.
+
+
+def with_i_ga(value: object) -> str:
+    """값 뒤에 주격 조사(이/가)를 붙인 문자열 — 예 `with_i_ga(108)` = '108이'."""
+    token = str(value)
+    return f"{token}{i_ga(token)}"
+
+
+def with_eun_neun(value: object) -> str:
+    """값 뒤에 보조사(은/는)를 붙인 문자열 — 예 `with_eun_neun('계수')` = '계수는'."""
+    token = str(value)
+    return f"{token}{eun_neun(token)}"
+
+
+def with_eul_reul(value: object) -> str:
+    """값 뒤에 목적격 조사(을/를)를 붙인 문자열 — 예 `with_eul_reul(9)` = '9를'."""
+    token = str(value)
+    return f"{token}{eul_reul(token)}"
+
+
+def with_wa_gwa(value: object) -> str:
+    """값 뒤에 접속 조사(와/과)를 붙인 문자열 — 예 `with_wa_gwa(-6)` = '-6과'."""
+    token = str(value)
+    return f"{token}{wa_gwa(token)}"
+
+
+_FN_USE_RE = {name: re.compile(rf"(?<![A-Za-z0-9_']){name}\s*[(']") for name in "fgh"}
+
+
+def _defines_function(question_text: str, name: str) -> bool:
+    """발문이 함수 기호 `name`을 소개했는가 — `name(x)`·`name(t)`·'함수 name'이 있으면 True."""
+    pattern = rf"(?<![A-Za-z0-9_']){name}\((?:x|t)\)|함수 {name}(?![A-Za-z])"
+    return re.search(pattern, question_text) is not None
+
+
+def anchor_curve_function(question_text: str, explanation: str, *, name: str = "f") -> str:
+    """해설이 발문에 없는 함수 기호(f')를 꺼내면 곡선 식을 `y = f(x)`로 놓는다고 먼저 밝힌다.
+
+    '곡선 y = x^2 + 1 위의 …' 처럼 곡선을 y = …로만 준 발문의 해설이 갑자기 f'(1)을 쓰면 f가
+    정의되지 않은 채 등장한다(P3-03 감사 결함). 발문이 f를 소개했거나 해설이 f를 쓰지 않으면 해설을
+    그대로 둔다.
+    """
+    if _FN_USE_RE[name].search(explanation) is None:
+        return explanation
+    if _defines_function(question_text, name):
+        return explanation
+    return f"곡선의 식을 y = {name}(x)로 놓으면 {explanation}"

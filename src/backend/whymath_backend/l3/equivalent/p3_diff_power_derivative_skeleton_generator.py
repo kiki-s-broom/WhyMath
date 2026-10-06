@@ -6,7 +6,9 @@ kebab `power-rule-step-omitted`(지수를 앞으로 내리는 일과 1 줄이는
 
 범위(이 개념에 한정)
 --------------------
-`x^n`(n은 양의 정수)과 상수함수의 도함수·미분계수만 다룬다. **실수배·합·곱의 미분법은 다루지
+`x^n`(n은 양의 정수)의 도함수·미분계수만 다룬다. 상수함수 문항(`f(x) = 3`의 `f'(2)`)은 소영역
+`함수 y=xⁿ의 도함수`가 묻지 않는 선수 지식이라 뺐다(감사 bad_tag 교정 — PRIMARY 태그를 선수
+진단 문항에 두지 않는다). **실수배·합·곱의 미분법은 다루지
 않는다** — 그것은 `[12미적Ⅰ-02-04]`의 몫이다("김에 같이" 금지). 그래서 계수가 붙은 `cx^n`
 문항은 이 파일에 없다(오개념 유발 슬롯의 *구하는 미지수*도 `x^n`의 지수·위치에 한정).
 
@@ -59,6 +61,9 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     derivative_of,
     eval_at,
     render_poly,
+    with_eul_reul,
+    with_eun_neun,
+    with_i_ga,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -132,9 +137,9 @@ def _deriv_form_item(
         question_text=text,
         answer_text=str(value),
         explanation=(
-            f"거듭제곱의 미분법에 따라 지수 {n}을 앞으로 내리고 지수를 1 줄이면 "
+            f"거듭제곱의 미분법에 따라 지수 {with_eul_reul(n)} 앞으로 내리고 지수를 1 줄이면 "
             f"{render_poly(_mono(n), var)}의 도함수는 {render_poly(d, var)}이므로 "
-            f"{note}은 {value}이다."
+            f"{with_eun_neun(note)} {value}이다."
         ),
         conditions=condition,
         answer_map=((ask, str(value)),),
@@ -317,26 +322,12 @@ def _basic_frames() -> list[Frame]:
             answer_format=_fmt(diff),
         )
 
-    def b6(p: tuple[object, ...]) -> DiffItem | None:
-        c, a = int(str(p[0])), int(str(p[1]))
-        return DiffItem(
-            slot="basic",
-            frame_id="basic-constant-function",
-            question_text=f"f(x) = {c}일 때, f'({a})의 값을 구하시오.",
-            answer_text="0",
-            explanation=f"상수함수의 도함수는 항상 0이므로 f'({a})의 값은 0이다.",
-            conditions=f"Derivative({c}, x).doit().subs(x, {a}) = y",
-            answer_map=(("y", "0"),),
-            problem_type_code=_EVAL,
-            answer_format=AnswerFormat.실수,
-        )
-
     def b7(p: tuple[object, ...]) -> DiffItem | None:
         n, a = int(str(p[0])), int(str(p[1]))
         return _value_item(
             slot="basic",
             frame_id="basic-substitute-into-derivative",
-            text=f"함수 f(x) = x^{n}의 도함수 f'(x)에 x = {a}를 대입한 값을 구하시오.",
+            text=f"함수 f(x) = x^{n}의 도함수 f'(x)에 x = {with_eul_reul(a)} 대입한 값을 구하시오.",
             n=n,
             point=a,
         )
@@ -355,7 +346,6 @@ def _basic_frames() -> list[Frame]:
             _grid("p3-power:b5", (2, 3, 4), (3, 4, 5), (1, 2, 3, 4)),
             b5,
         ),
-        Frame("basic-constant-function", _grid("p3-power:b6", (3, 5, 7, 9), (1, 2, 3)), b6),
         Frame(
             "basic-substitute-into-derivative", _grid("p3-power:b7", _N_VALUE_RANGE, _POINTS), b7
         ),
@@ -382,7 +372,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(n),
             explanation=(
-                f"f'(x)는 n x^(n-1)이므로 x가 {a}일 때의 값이 {b}가 되는 자연수 n은 {n}이다."
+                f"f'(x)는 n x^(n-1)이므로 x가 {a}일 때의 값이 "
+                f"{with_i_ga(b)} 되는 자연수 n은 {n}이다."
             ),
             conditions=f"{_deriv_value_sym('n', str(a))} = {b}",
             answer_map=(("n", str(n)),),
@@ -397,12 +388,12 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-find-positive-point",
             question_text=(
-                f"함수 f(x) = x^{n}에 대하여 f'(a) = {b}{eul_reul(str(b))} 만족시키는 "
+                f"함수 f(x) = x^{n}에 대하여 f'(a) = {with_eul_reul(b)} 만족시키는 "
                 "양수 a의 값을 구하시오."
             ),
             answer_text=str(a),
             explanation=(
-                f"f'(x)는 {render_poly(derivative_of(_mono(n)))}이므로 이 값이 {b}가 되는 "
+                f"f'(x)는 {render_poly(derivative_of(_mono(n)))}이므로 이 값이 {with_i_ga(b)} 되는 "
                 f"양수 a는 {a}이다."
             ),
             conditions=(_deriv_value_sym(str(n), "a") + f" = {b}", "a > 0"),
@@ -462,7 +453,7 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"f'(1)은 {n}이고 f'(a)는 {n}a^{n - 1}이므로 a^{n - 1}이 {k}가 되는 "
+                f"f'(1)은 {n}이고 f'(a)는 {n}a^{n - 1}이므로 a^{n - 1}이 {with_i_ga(k)} 되는 "
                 f"양수 a는 {a}이다."
             ),
             # f'(1)의 값은 SymPy로 구해(`eval_at`) 조건식에 상수로 대입한다(미지수 1개 제약).
@@ -567,10 +558,10 @@ def _mc_solve_cubic(a0: int) -> DiffItem | None:
         slot="misconception_trigger",
         frame_id="mc-solve-cubic",
         question_text=(
-            f"함수 f(x) = x^3에 대하여 f'(a) = {b}{eul_reul(str(b))} 만족시키는 양수 a의 값은?"
+            f"함수 f(x) = x^3에 대하여 f'(a) = {with_eul_reul(b)} 만족시키는 양수 a의 값은?"
         ),
         answer_text=answer,
-        explanation=(f"x^3의 도함수는 3x^2이므로 3a^2이 {b}가 되는 양수 a는 {a0}이다."),
+        explanation=(f"x^3의 도함수는 3x^2이므로 3a^2이 {with_i_ga(b)} 되는 양수 a는 {a0}이다."),
         conditions=(_deriv_value_sym("3", "a") + f" = {b}", "a > 0"),
         answer_map=(("a", str(a0)),),
         problem_type_code=_SOLVE,
@@ -600,11 +591,9 @@ def _mc_solve_square(s: int) -> DiffItem | None:
     return DiffItem(
         slot="misconception_trigger",
         frame_id="mc-solve-square",
-        question_text=(
-            f"함수 f(x) = x^2에 대하여 f'(a) = {b}{eul_reul(str(b))} 만족시키는 a의 값은?"
-        ),
+        question_text=(f"함수 f(x) = x^2에 대하여 f'(a) = {with_eul_reul(b)} 만족시키는 a의 값은?"),
         answer_text=answer,
-        explanation=f"x^2의 도함수는 2x이므로 2a가 {b}가 되는 a는 {a0}이다.",
+        explanation=f"x^2의 도함수는 2x이므로 2a가 {with_i_ga(b)} 되는 a는 {a0}이다.",
         conditions=_deriv_value_sym("2", "a") + f" = {b}",
         answer_map=(("a", str(a0)),),
         problem_type_code=_SOLVE,
@@ -641,7 +630,7 @@ def _misconception_frames() -> list[Frame]:
         n, a = int(str(p[0])), int(str(p[1]))
         return _mc_value_item(
             "mc-substitute-into-derivative",
-            f"함수 f(x) = x^{n}의 도함수 f'(x)에 x = {a}를 대입한 값으로 옳은 것은?",
+            f"함수 f(x) = x^{n}의 도함수 f'(x)에 x = {with_eul_reul(a)} 대입한 값으로 옳은 것은?",
             n,
             a,
         )
@@ -683,7 +672,8 @@ def _diagnostic_frames() -> list[Frame]:
             question_text=f"함수 f(x) = x^{n}에 대하여 방정식 f'(x) = 0의 실근을 구하시오.",
             answer_text="0",
             explanation=(
-                f"도함수 {render_poly(derivative_of(_mono(n)))}이 0이 되는 실수 x는 0뿐이다."
+                f"도함수 {with_i_ga(render_poly(derivative_of(_mono(n))))} 0이 되는 "
+                "실수 x는 0뿐이다."
             ),
             conditions=f"Derivative(x**{n}, x).doit() = 0",
             answer_map=(("x", "0"),),
@@ -823,7 +813,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(n),
             explanation=(
-                f"f'(2)와 f(2)의 비는 n의 절반이므로 그 비가 {k}가 되는 자연수 n은 {n}이다."
+                f"f'(2)와 f(2)의 비는 n의 절반이므로 그 비가 "
+                f"{with_i_ga(k)} 되는 자연수 n은 {n}이다."
             ),
             conditions=f"{_deriv_value_sym('n', '2')} = {k}*2**n",
             answer_map=(("n", str(n)),),

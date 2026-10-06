@@ -6,6 +6,8 @@ t에 대한 다항함수일 때 속도 v(t) = x'(t), 가속도 a(t) = v'(t) = x'
 
 범위(이 개념에 한정): 다항 위치함수의 속도·가속도·방향 전환. **적분으로 위치·이동거리를 구하는
 일은 다루지 않는다**(속도→위치는 적분 단원). 평균속도는 두 시각의 위치 차로 묻는 단순 계산만 둔다.
+순수 '위치의 변화량'(함숫값의 차) 문항은 미분이 필요 없어 속도·가속도 개념이 아니므로 뺐다(감사
+bad_tag 교정 — 문항이 실제로 묻는 개념과 PRIMARY 태그를 일치시킨다).
 함수식(속도 함수)을 답으로 하는 문항은 만들지 않는다 — 채점 계약상 스칼라 단일 미지수만이라 속도·
 가속도의 *값*·시각·상수로 묻는다.
 
@@ -17,7 +19,7 @@ t에 대한 다항함수일 때 속도 v(t) = x'(t), 가속도 a(t) = v'(t) = x'
     *합쳐 한 번에* 미분한다(미분 평가가 든 변을 다른 연산과 섞지 못하는 Tier1 제약 — 2026-10-06
     형제 생성기 실측).
   · 속도의 부호가 중요한 문항은 `Abs(...)`(속력)를 그대로 쓴다.
-  · 평균속도·위치 변화량처럼 미분이 없는 문항은 위치 다항식에 시각을 *문자열로 대입*한
+  · 평균속도처럼 미분이 없는 문항은 위치 다항식에 시각을 *문자열로 대입*한
     산술식으로 검산한다(생성기의 정수 계산과 독립인 SymPy 평가 경로).
   · 미분 결과를 거쳐 *두 번째 값*을 묻는 문항(방향 전환 시각의 위치 등)은 첫 미지수(시각)를
     생성기가 SymPy로 푼 값으로 조건에 대입한다(`_unique_root`가 유일해를 확인).
@@ -54,6 +56,8 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_to_sympy,
     poly_to_sympy_str,
     render_poly,
+    with_i_ga,
+    with_wa_gwa,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -380,7 +384,7 @@ def _rep_frames() -> list[Frame]:
             ),
             answer=p0,
             explanation=(
-                f"속도 v(t)는 위치를 미분한 값이므로 t = {t}에서의 값이 {v}{i_ga(str(v))} "
+                f"속도 v(t)는 위치를 미분한 값이므로 t = {t}에서의 값이 {with_i_ga(v)} "
                 f"되도록 p를 정하면 p는 {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, t).doit().subs(t, {t}) = {v}",
@@ -398,11 +402,11 @@ def _rep_frames() -> list[Frame]:
             slot=slot,
             frame_id="rep-time-when-velocity-given",
             text=(
-                f"{_intro(f)} 점 P의 속도가 {v0}{i_ga(str(v0))} 되는 시각 t (t > 0)를 " "구하시오."
+                f"{_intro(f)} 점 P의 속도가 {with_i_ga(v0)} 되는 시각 t (t > 0)의 값을 구하시오."
             ),
             answer=r,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 이 값이 {v0}{i_ga(str(v0))} 되는 "
+                f"v(t) = {render_poly(_vel(f), _V)}이고 이 값이 {with_i_ga(v0)} 되는 "
                 f"양수 t는 {r}이다."
             ),
             conditions=(f"{_dv(f, 's')} = {v0}", "s > 0"),
@@ -418,7 +422,8 @@ def _rep_frames() -> list[Frame]:
             value=total,
             explanation=(
                 f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"t = {t}에서 속도 {_v_at(f, t)}와 가속도 {_a_at(f, t)}의 합은 {total}이다."
+                f"t = {t}에서 속도 {with_wa_gwa(_v_at(f, t))} 가속도 {_a_at(f, t)}의 합은 "
+                f"{total}이다."
             ),
             # 속도+가속도 = (x + x')'이므로 한 번의 미분 평가로 검산한다.
             conditions=(
@@ -520,23 +525,6 @@ def _basic_frames() -> list[Frame]:
             t,
         )
 
-    def b4(p: tuple[object, ...]) -> DiffItem | None:
-        f, t0, t1 = _as_poly(p[0]), _as_int(p[1]), _as_int(p[2])
-        if t0 >= t1:
-            return None
-        diff = _x_at(f, t1) - _x_at(f, t0)
-        return _value_item(
-            slot=slot,
-            frame_id="basic-displacement-over-interval",
-            text=f"{_intro(f)} t = {t0}에서 t = {t1}까지 점 P의 위치의 변화량을 구하시오.",
-            value=diff,
-            explanation=(
-                f"t = {t1}일 때의 위치 {_x_at(f, t1)}에서 t = {t0}일 때의 위치 {_x_at(f, t0)}"
-                f"{eul_reul(str(_x_at(f, t0)))} 빼면 {diff}이다."
-            ),
-            conditions=f"{_at(f, t1)} - {_at(f, t0)} = y",
-        )
-
     def b5(p: tuple[object, ...]) -> DiffItem | None:
         f, t = _as_poly(p[0]), _as_int(p[1])
         v = _v_at(f, t)
@@ -570,11 +558,6 @@ def _basic_frames() -> list[Frame]:
         Frame("basic-average-velocity", _grid("p3-vel:b1", quads[::5], (0, 1, 2), (3, 4, 5)), b1),
         Frame("basic-acceleration-of-cubic", _grid("p3-vel:b2", cubics[1::17], _TIMES0), b2),
         Frame("basic-velocity-of-quadratic", _grid("p3-vel:b3", quads[1::5], _TIMES0), b3),
-        Frame(
-            "basic-displacement-over-interval",
-            _grid("p3-vel:b4", cubics[4::19], (0, 1, 2), (3, 4, 5)),
-            b4,
-        ),
         Frame("basic-speed-at-time", _grid("p3-vel:b5", cubics[6::23], _TIMES), b5),
         Frame("basic-velocity-of-cubic", _grid("p3-vel:b6", cubics[8::29], _TIMES0), b6),
     ]
@@ -879,10 +862,10 @@ def _misconception_frames() -> list[Frame]:
             frame_id="mc-time-for-velocity-quadratic",
             question_text=(
                 f"수직선 위를 움직이는 점 P의 시각 t (t > 0)에서의 위치가 x = t^2일 때, "
-                f"점 P의 속도가 {b}{i_ga(str(b))} 되는 시각 t는?"
+                f"점 P의 속도가 {with_i_ga(b)} 되는 시각 t는?"
             ),
             answer_text=answer,
-            explanation=f"v(t) = 2t이므로 2t가 {b}{i_ga(str(b))} 되는 시각은 {t0}이다.",
+            explanation=f"v(t) = 2t이므로 2t가 {with_i_ga(b)} 되는 시각은 {t0}이다.",
             conditions=f"Derivative(t**2, t).doit().subs(t, s) = {b}",
             answer_map=(("s", str(t0)),),
             problem_type_code=_SOLVE,
@@ -915,10 +898,10 @@ def _misconception_frames() -> list[Frame]:
             frame_id="mc-time-for-velocity-cubic",
             question_text=(
                 f"수직선 위를 움직이는 점 P의 시각 t (t > 0)에서의 위치가 x = t^3일 때, "
-                f"점 P의 속도가 {b}{i_ga(str(b))} 되는 시각 t는?"
+                f"점 P의 속도가 {with_i_ga(b)} 되는 시각 t는?"
             ),
             answer_text=answer,
-            explanation=(f"v(t) = 3t^2이므로 3t^2이 {b}{i_ga(str(b))} 되는 양수 t는 {t0}이다."),
+            explanation=(f"v(t) = 3t^2이므로 3t^2이 {with_i_ga(b)} 되는 양수 t는 {t0}이다."),
             conditions=(f"Derivative(t**3, t).doit().subs(t, s) = {b}", "s > 0"),
             answer_map=(("s", str(t0)),),
             problem_type_code=_SOLVE,
@@ -1083,7 +1066,7 @@ def _mastery_frames() -> list[Frame]:
             answer=found,
             explanation=(
                 f"평균속도는 {avg}이고 v(t) = {render_poly(_vel(f), _V)}"
-                f"{i_ga(render_poly(_vel(f), _V))} {avg}{i_ga(str(avg))} "
+                f"{i_ga(render_poly(_vel(f), _V))} {with_i_ga(avg)} "
                 f"되는 시각은 {found}이다."
             ),
             conditions=(f"{_dv(f, 's')} = {avg}", f"s > {t0}", f"s < {t1}"),
@@ -1141,7 +1124,7 @@ def _mastery_frames() -> list[Frame]:
             frame_id="mastery-equal-velocity-two-points",
             text=(
                 f"수직선 위를 움직이는 두 점 P, Q의 시각 t에서의 위치가 각각 x = {_rt(f)}, "
-                f"x = {_rt(g)}이다. 두 점의 속도가 같아지는 시각 t (t > 0)를 구하시오."
+                f"x = {_rt(g)}이다. 두 점의 속도가 같아지는 시각 t (t > 0)의 값을 구하시오."
             ),
             answer=r,
             explanation=(

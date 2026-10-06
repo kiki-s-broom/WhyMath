@@ -57,6 +57,8 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_to_sympy,
     poly_to_sympy_str,
     render_poly,
+    with_eul_reul,
+    with_i_ga,
 )
 from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
     KindedDiffItem,
@@ -73,7 +75,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga, wa_gwa
+from whymath_backend.lang.josa import eun_neun, i_ga, wa_gwa
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffEquationApplicationGenerator"]
@@ -126,6 +128,11 @@ def _make(lead: int, roots: Sequence[int], quad: tuple[int, int] | None = None) 
 def _n_distinct(poly: Poly) -> int:
     """서로 다른 실근 수 — 검산기와 독립인 경로(제곱 없는 부분의 Sturm 개수)."""
     return int(sympy.Poly(poly_to_sympy(poly), _X).sqf_part().count_roots())
+
+
+def _no_nonpositive_real_root(poly: Poly) -> bool:
+    """실근이 모두 양수인가(0 이하의 실근 0개) — 시간 t의 맥락에서 정의역과 충돌하지 않는지 본다."""
+    return int(sympy.Poly(poly_to_sympy(poly), _X).sqf_part().count_roots(sup=0)) == 0
 
 
 @lru_cache(maxsize=None)
@@ -412,7 +419,7 @@ def _rep_frames() -> list[Frame]:
             slot="representative",
             frame_id="rep-curve-meets-horizontal-line",
             text=(
-                f"곡선 y = {render_poly(g)}{wa_gwa(render_poly(g))} 직선 y = {k}{i_ga(str(k))} "
+                f"곡선 y = {render_poly(g)}{wa_gwa(render_poly(g))} 직선 y = {with_i_ga(k)} "
                 "만나는 서로 다른 점의 개수를 구하시오."
             ),
             cond=f"{poly_to_sympy_str(g)} = {k}",
@@ -626,6 +633,10 @@ def _applied_frames() -> list[Frame]:
         if split is None:
             return None
         g, k = split
+        # 시간 t는 0 이상이고 높이는 양수여야 한다 — 높이 k가 양수이고 방정식의 실근이 전부
+        # 양수일 때만 쓴다(그래야 '서로 다른 실수 t'의 개수가 정의역 t >= 0과 충돌하지 않는다).
+        if k <= 0 or not _no_nonpositive_real_root(p.poly):
+            return None
         return _count_item(
             slot="applied",
             frame_id="applied-height-reaches-level",
@@ -636,7 +647,7 @@ def _applied_frames() -> list[Frame]:
             cond=f"{poly_to_sympy_str(g, 't')} = {k}",
             poly=p.poly,
             explanation=(
-                f"{render_poly(g, 't')} = {k}{eul_reul(str(k))} 정리하면 "
+                f"{render_poly(g, 't')} = {with_eul_reul(k)} 정리하면 "
                 f"{_factored_text(p, 't')} = 0이므로 "
                 f"서로 다른 실근은 {_n_distinct(p.poly)}개이다."
             ),
@@ -835,7 +846,7 @@ def _misconception_frames() -> list[Frame]:
             cond=f"{poly_to_sympy_str(g)} = {k}",
             p=p,
             seed=f"mc3:{p.poly}",
-            note=f"f(x) = {k}를 정리하면 {_factored_text(p)} = 0이다.",
+            note=f"f(x) = {with_eul_reul(k)} 정리하면 {_factored_text(p)} = 0이다.",
         )
 
     def m4(q: tuple[object, ...]) -> DiffItem | None:
@@ -985,7 +996,10 @@ def _diagnostic_frames() -> list[Frame]:
             ),
             cond=f"{poly_to_sympy_str(poly)} <= 0",
             value=a,
-            explanation=f"좌변은 (x - {a})의 제곱이므로 0 이하가 되려면 x가 {a}이어야 한다.",
+            explanation=(
+                f"좌변은 ({render_poly(((1, 1), (0, -a)))})의 제곱이므로 0 이하가 되려면 "
+                f"x가 {a}이어야 한다."
+            ),
             selection=None,
         )
 

@@ -53,6 +53,8 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_to_sympy,
     poly_to_sympy_str,
     render_poly,
+    with_eul_reul,
+    with_i_ga,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -344,8 +346,8 @@ def _rep_frames() -> list[Frame]:
             ),
             answer_text=str(p0),
             explanation=(
-                f"접선의 기울기는 미분계수이므로 도함수에 x = {a}{eul_reul(str(a))} 대입한 값이 "
-                f"{m}{i_ga(str(m))} 되도록 "
+                f"접선의 기울기는 미분계수이므로 도함수에 x = {with_eul_reul(a)} 대입한 값이 "
+                f"{with_i_ga(m)} 되도록 "
                 f"p를 정하면 p는 {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, x).doit().subs(x, {a}) = {m}",
@@ -371,7 +373,7 @@ def _rep_frames() -> list[Frame]:
             ),
             answer_text=str(a0),
             explanation=(
-                f"도함수 {render_poly(derivative_of(f))}에서 x가 a일 때의 값이 {m}이 되는 "
+                f"도함수 {render_poly(derivative_of(f))}에서 x가 a일 때의 값이 {with_i_ga(m)} 되는 "
                 f"양수 a는 {a0}이다."
             ),
             conditions=(f"{_d(f, 'a')} = {m}", "a > 0"),
@@ -577,7 +579,8 @@ def _applied_frames() -> list[Frame]:
             slot=slot,
             frame_id="applied-parallel-to-line",
             question_text=(
-                f"곡선 y = {render_poly(f)} 위의 점 (a, f(a))에서의 접선이 직선 "
+                f"함수 f(x) = {render_poly(f)}에 대하여 곡선 y = f(x) "
+                f"위의 점 (a, f(a))에서의 접선이 직선 "
                 f"y = {render_poly(((1, m), (0, n)))}에 평행할 때, 양수 a의 값을 구하시오."
             ),
             answer_text=str(a0),
@@ -606,13 +609,14 @@ def _applied_frames() -> list[Frame]:
             slot=slot,
             frame_id="applied-perpendicular-to-line",
             question_text=(
-                f"곡선 y = {render_poly(f)} 위의 점 (a, f(a))에서의 접선이 직선 "
+                f"함수 f(x) = {render_poly(f)}에 대하여 곡선 y = f(x) "
+                f"위의 점 (a, f(a))에서의 접선이 직선 "
                 f"x + {s}y = {s + 1}에 수직일 때, 양수 a의 값을 구하시오."
             ),
             answer_text=str(a0),
             explanation=(
                 f"직선 x + {s}y = {s + 1}의 기울기는 -1/{s}이고 수직인 직선의 기울기는 그 "
-                f"음의 역수 {s}이다. f'(a)의 값이 {s}{i_ga(str(s))} 되는 양수 a는 {a0}이다."
+                f"음의 역수 {s}이다. f'(a)의 값이 {with_i_ga(s)} 되는 양수 a는 {a0}이다."
             ),
             conditions=(f"{_d(f, 'a')} = {s}", "a > 0"),
             answer_map=(("a", str(a0)),),
@@ -639,7 +643,8 @@ def _applied_frames() -> list[Frame]:
             slot=slot,
             frame_id="applied-tangent-passes-through-point",
             question_text=(
-                f"곡선 y = {render_poly(f)} 위의 점 (a, f(a))에서의 접선이 점 {point}"
+                f"함수 f(x) = {render_poly(f)}에 대하여 곡선 y = f(x) "
+                f"위의 점 (a, f(a))에서의 접선이 점 {point}"
                 f"{eul_reul(point)} "
                 "지날 때, 양수 a의 값을 구하시오."
             ),
@@ -687,7 +692,8 @@ def _applied_frames() -> list[Frame]:
             slot=slot,
             frame_id="applied-tangent-through-origin",
             question_text=(
-                f"곡선 y = {render_poly(f)} 위의 점 (a, f(a))에서의 접선이 원점을 지날 때, "
+                f"함수 f(x) = {render_poly(f)}에 대하여 곡선 y = f(x) "
+                f"위의 점 (a, f(a))에서의 접선이 원점을 지날 때, "
                 "양수 a의 값을 구하시오."
             ),
             answer_text=str(s),
@@ -719,12 +725,12 @@ def _applied_frames() -> list[Frame]:
             frame_id="applied-parallel-tangent-at-other-point",
             question_text=(
                 f"곡선 y = {render_poly(f)} 위의 x좌표가 {a}인 점에서의 접선과 평행한 접선을 "
-                f"갖는 또 다른 점의 x좌표 b (b는 {a}{i_ga(str(a))} 아니다)의 값을 구하시오."
+                f"갖는 또 다른 점의 x좌표 b (b는 {with_i_ga(a)} 아니다)의 값을 구하시오."
             ),
             answer_text=str(b),
             explanation=(
                 f"평행하면 기울기가 같으므로 f'(b)의 값은 f'({a}){wa_gwa(fa_text)} 같은 {m}이다. "
-                f"도함수 {render_poly(derivative_of(f))}에서 {a}{i_ga(str(a))} 아닌 근은 {b}이다."
+                f"도함수 {render_poly(derivative_of(f))}에서 {with_i_ga(a)} 아닌 근은 {b}이다."
             ),
             conditions=(f"{_d(f, 'b')} = {m}", f"b != {a}"),
             answer_map=(("b", str(b)),),
@@ -911,7 +917,7 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"x^2의 도함수는 2x이므로 2a{i_ga('2a')} {b}{i_ga(str(b))} 되는 a는 " f"{a0}이다."
+                f"x^2의 도함수는 2x이므로 2a{i_ga('2a')} {with_i_ga(b)} 되는 a는 " f"{a0}이다."
             ),
             conditions=f"Derivative(x**2, x).doit().subs(x, a) = {b}",
             answer_map=(("a", str(a0)),),
@@ -949,7 +955,7 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"x^3의 도함수는 3x^2이므로 3a^2{i_ga('3a^2')} {b}{i_ga(str(b))} 되는 양수 a는 "
+                f"x^3의 도함수는 3x^2이므로 3a^2{i_ga('3a^2')} {with_i_ga(b)} 되는 양수 a는 "
                 f"{a0}이다."
             ),
             conditions=(f"Derivative(x**3, x).doit().subs(x, a) = {b}", "a > 0"),
@@ -1248,7 +1254,7 @@ def _mastery_frames() -> list[Frame]:
             answer_text=str(p0),
             explanation=(
                 f"접점 ({a}, f({a}))에서의 접선의 y절편은 f({a}) - {a}*f'({a})이고 "
-                f"이것이 {n}{i_ga(str(n))} "
+                f"이것이 {with_i_ga(n)} "
                 f"되도록 p를 정하면 p는 {p0}이다."
             ),
             conditions=f"{cond} = {n}",

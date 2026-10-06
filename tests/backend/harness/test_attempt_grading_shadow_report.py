@@ -885,7 +885,10 @@ class TestCorpusVerifyBlockSupply:
         # 109건은 이 로더가 문자열 조건만 읽는 계약상, (b) answer_map이 빈 개수·집계형(02-06 11건·02-09
         # 46건 = 57건)은 미지수가 답이 아니라 블록이 성립하지 않아서다(109 + 57 = 166). 그래서 증분이
         # 360이 아니라 194다.
-        assert len(blocks) == 13841
+        # 13,841 → 13,842(+1): P3-03 감사 결함 교정(문면·태그 정합)이 02-06의 개수형(answer_map 빔)
+        # 틀 2개(진단 `미분계수 값`·응용 `기울기 개수`)를 값형 진단 틀로 바꿔 answer_map을 가진 문항이
+        # 1건 늘었다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
+        assert len(blocks) == 13842
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1124,4 +1127,5 @@ class TestCorpusCeilingReportDiscriminates:
         # 12,373 → 12,535(+162): 02-05·06·08·09·10 생성기 5종 360건 중 객관식 60건은 selectable로,
         # 비객관식 300건 중 문자열 검산 조건과 비지 않은 answer_map을 함께 가진 162건이 이 버킷으로 들어왔다
         # (연립 목록 조건·개수/집계형(answer_map 빔)은 이 버킷이 아니다).
-        assert report.bucket_counts["condition_formal_derivable"] == 12535
+        # 12,535 → 12,536(+1): 위 블록 +1과 같은 사유(P3-03 감사 결함 교정 — 개수형 틀이 값형으로).
+        assert report.bucket_counts["condition_formal_derivable"] == 12536

@@ -158,7 +158,9 @@ def _is_param_item(row: dict[str, object]) -> bool:
 
 
 def _is_interval_item(row: dict[str, object]) -> bool:
-    return "정수는 하나뿐" in str(row["question_text"])
+    # 발문은 개폐가 모호한 '증가/감소하는 구간에 속하는 정수' 대신 `f'(x) < 0`(> 0)을 만족시키는
+    # 정수로 쓴다(감사 결함 교정 — 구간 개폐 해석에 따라 정답이 달라지던 문항).
+    return "정수 x는 하나뿐" in str(row["question_text"])
 
 
 def _x_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -386,7 +388,7 @@ def test_interval_items_have_exactly_one_integer_in_the_stated_region(
         if not _is_interval_item(row):
             continue
         text = str(row["question_text"])
-        wanted = 1 if "증가하는 구간" in text else -1
+        wanted = 1 if "f'(x) > 0" in text else -1
         deriv = sympy.diff(_function_of(row), _X)
         inside = [n for n in range(-80, 81) if int(sympy.sign(deriv.subs(_X, n))) == wanted]
         assert inside == [int(str(row["answer"]))], (text, inside)

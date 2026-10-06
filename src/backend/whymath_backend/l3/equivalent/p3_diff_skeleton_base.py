@@ -44,6 +44,7 @@ from typing import ClassVar, Final, Literal
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.p3_diff_expr import anchor_curve_function
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -379,7 +380,7 @@ class P3DiffSlotGenerator:
             question_text=item.question_text,
             choices=list(item.choices) if item.choices else None,
             answer=item.answer_text,
-            answer_explanation=item.explanation,
+            answer_explanation=anchor_curve_function(item.question_text, item.explanation),
             distractor_map=distractor_map,
             problem_type_codes=[item.problem_type_code],
             tags=[f"{SLOT_TAG_PREFIX}{item.slot}"],
