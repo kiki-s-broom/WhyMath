@@ -103,11 +103,11 @@ Python 3.10을 쓰면 `tomli`·`typing-extensions`도 필요하다(`python_versi
 
 ```bash
 # 저장소 루트에서 — infra-contracts 잡
-python3 -m black --check --line-length 100 tests/infra infra conftest.py > /tmp/oracle_infra.log 2>&1; echo "INFRA_EXIT=$?"
+python3 -m black --check --line-length 100 tests/infra infra conftest.py tests/test_idempotency.py > /tmp/oracle_infra.log 2>&1; echo "INFRA_EXIT=$?"
 # 저장소 루트에서 — harness-integrity 잡
 python3 -m black --check --line-length 100 scripts tests/harness tools > /tmp/oracle_harness.log 2>&1; echo "HARNESS_EXIT=$?"
 # src/backend 에서 — backend 잡
-cd src/backend && python3 -m black --check --line-length 100 . ../../tests/backend > /tmp/oracle_backend.log 2>&1; echo "BACKEND_EXIT=$?"; cd ../..
+cd src/backend && python3 -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution > /tmp/oracle_backend.log 2>&1; echo "BACKEND_EXIT=$?"; cd ../..
 # src/data-pipeline 에서 — data-pipeline 잡
 cd src/data-pipeline && python3 -m black --check --line-length 100 . ../../tests/data_pipeline > /tmp/oracle_dp.log 2>&1; echo "DP_EXIT=$?"; cd ../..
 ```
