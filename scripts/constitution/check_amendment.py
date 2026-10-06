@@ -136,11 +136,7 @@ def new_record_problems(repo: Path, fork: str, head: str, added: list[Change]) -
     for change in added:
         name = change.path[len(AMENDMENTS_DIR) :]
         match = RECORD_NAME.fullmatch(name)
-        if match is None:
-            problems.append(
-                f"{change.path}: 이름이 A####_*.md 형식이 아님 — 개정 기록으로 세지 않는다"
-            )
-            continue
+        assert match is not None  # 호출자(check)가 이름이 맞는 기록만 넘긴다
         number = match.group(1)
         if number in taken:
             problems.append(f"{change.path}: 번호 A{number} 가 이미 있다(기존 기록과 번호 충돌)")
@@ -167,29 +163,35 @@ def new_record_problems(repo: Path, fork: str, head: str, added: list[Change]) -
 def check(repo: Path, base: str, head: str) -> tuple[int, str]:
     fork, found = changes_since_fork(repo, base, head)
     targets = [c for c in found if is_amendment_target(c)]
-    added = [
-        c
-        for c in found
-        if c.status == "A" and c.path.startswith(AMENDMENTS_DIR) and c.path.count("/") >= 2
-    ]
+    added = [c for c in found if c.status == "A" and c.path.startswith(AMENDMENTS_DIR)]
+    # 이름이 A####_*.md 인 것만 '개정 기록'이다. README.md·.gitkeep 같은 *다른 파일*은 기록이
+    # 아니므로 무시한다 — 정상 기록과 같이 들어왔다고 PR 전체를 막으면 오류 문구("기록으로 세지
+    # 않는다")와 동작이 어긋난다. 기록이 하나도 없으면 아래에서 무시한 파일을 병기해 막는다.
+    records = [c for c in added if RECORD_NAME.fullmatch(c.path[len(AMENDMENTS_DIR) :])]
+    strays = [c for c in added if c not in records]
     scope = f"공통 조상 {fork[:8]} → {head} · 변경 {len(found)}건"
     if not targets:
-        extra = f" · 새 개정 기록 {len(added)}건" if added else ""
+        extra = f" · 새 개정 기록 {len(records)}건" if records else ""
         return 0, f"✅ 개정 대상 변경 없음({scope}{extra})"
-    problems = new_record_problems(repo, fork, head, added)
     listing = ", ".join(f"{c.status}:{c.path}" for c in targets[:5]) + (
         f" 외 {len(targets) - 5}건" if len(targets) > 5 else ""
     )
-    if not added:
+    if not records:
+        ignored = ""
+        if strays:
+            names = ", ".join(c.path[len(AMENDMENTS_DIR) :] for c in strays)
+            ignored = f"\n   (이름이 A####_*.md 형식이 아니라 기록으로 세지 않은 파일: {names})"
         return 1, (
             f"⛔ 헌법이 바뀌었는데 새 개정 기록이 없다({scope}). 개정 대상: {listing}\n"
             f"   제11조 ②: {AMENDMENTS_DIR} 에 A####_*.md 로 "
             "개정 번호·사유·영향 범위·날짜를 남긴다.\n"
             "   (헌법 개정은 사람만 한다 — AI 세션이 이 상태를 만들었다면 가드 훅을 우회한 것이다.)"
+            f"{ignored}"
         )
+    problems = new_record_problems(repo, fork, head, records)
     if problems:
         return 1, "⛔ 새 개정 기록이 요건을 못 채운다:\n" + "\n".join(f"   · {p}" for p in problems)
-    names = ", ".join(c.path[len(AMENDMENTS_DIR) :] for c in added)
+    names = ", ".join(c.path[len(AMENDMENTS_DIR) :] for c in records)
     return 0, f"✅ 헌법 변경({len(targets)}건)에 새 개정 기록이 동반됨: {names} ({scope})"
 
 

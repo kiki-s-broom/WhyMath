@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-13-amendment-check-stray-file-and-a0005-merge
+title: "코딩 헌법 R0-02 개정 기록 검사의 비기록 파일 오거부 수정 + 개정 A0005 단일화(파트 I 정정 + R4-02 문구)"
+track: infra-debt
+stage: S4
+subject: math
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① R0-02 판정 결함 수정 — `scripts/constitution/check_amendment.py` 가 개정 기록이 정상으로 있는데도 `constitution/amendments/` 에 기록이 아닌 파일(README.md 등)을 함께 추가하면 PR 전체를 막는다(2026-10-06 추가 검토에서 임시 저장소로 재현 · 오류 문구는 '개정 기록으로 세지 않는다'인데 동작은 거부). 기록이 아닌 파일은 무시하고 유효한 기록이 1건 이상 있는지만 보도록 고치고, 기록이 하나도 없을 때의 메시지에는 무시한 파일을 병기한다. 뮤테이션으로 변별을 확인한다.\n② 개정 A0005 단일화 — CONST-03 P4 의 A0005(파트 I 정정)와 병렬 세션 PR 1493 의 R4-02 문구 개정 초안(같은 번호 A0005)을 한 건으로 합친다: 정정 패치에 R4-02 블록(statement·check·run 3줄)을 흡수하고 초안의 R4-02 절을 Kiki 결정(나안: 스키마 YAML↔모델 필드 일치 검사)으로 갱신한다. 합친 패치가 현재 rules.yaml 에 dry-run 으로 적용되고 적용 사본에서 audit.py --stage 3 의 파트 I(0~4장) 차단이 0건임을 모의 실측한다. 집행 테스트(tests/constitution/test_schema_model_sync.py)는 PR 1493 소유 — 이 태스크는 만들지 않는다.\n③ 범위 밖 — rules.yaml·constitution/ 편집(Kiki 채택), STAGE 상향, 어긋남 5건 처분(별도 태스크)."
+artifacts: []
+paths:
+  - scripts/constitution/check_amendment.py
+  - tests/infra/test_coding_constitution_amendment_check.py
+  - docs/constitution_proposals/
+session: claude/dreamy-albattani-a99dad
+notes: "CONST-03 추가 검토(2026-10-06)에서 파생. CONST-03 은 병렬 세션이 claim 중이라 같은 태스크에 손대지 않고 후속으로 분리한다.\n\n[정정 2026-10-06] depends_on 제거 1건: 오등재 의존 정정 — 병렬 세션이 소유한 태스크와 분리한 작업이라 의존을 두지 않는다"
+updated: 2026-10-06
