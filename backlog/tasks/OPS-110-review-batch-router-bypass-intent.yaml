@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/concept_content_review_batch.py
-session: null
+session: claude/laughing-cerf-l9nqgq
 notes: ""
-updated: 2026-10-05
+updated: 2026-10-06
