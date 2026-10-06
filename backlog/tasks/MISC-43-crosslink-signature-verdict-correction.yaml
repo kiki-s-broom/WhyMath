@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,12 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 승인 코퍼스(crosslinks.json·_provenance.json)에서 M0671(power-rule-step-omitted) 행과 M0672(product-rule-naive 직접매핑 0.85) 행을 제거하고 건수·서명 대장을 69에서 67로 정정한다. M0462·M0515·M0599 3행은 유지한다. ② 5번은 부분매핑 유지 승인이며 부분매핑은 적재 대상이 아니므로 결정을 판정 문서 §6에 기록하고 코퍼스에 싣지 않는다. ③ test_approved_crosslinks_corpus·test_anchor_seat_gap 기대값을 정정하고 뮤테이션으로 RED를 확인한다. ④ 게이트 clear와 라이브 DB 적재는 Kiki 몫이다."
-artifacts: []
+artifacts:
+  - "철회 종결 · 판정 기준 main 73b01147 · 승인 코퍼스 68행(M0672 부분매핑 유지)은 main #1471·#1483과 동일 · PR #1487은 닫음 · 라이브 DB 승인 4행과 일치"
 paths:
   - "data/corpus/misconception_crosslinks_v1/**"
   - tests/backend/l1/test_approved_crosslinks_corpus.py
   - tests/backend/l4/test_anchor_seat_gap.py
   - "docs/reviews/misc_40_*.md"
-session: claude/sleepy-feynman-skndtr
-notes: "[트리거 면제] 서명 정정 데이터 작업이며 트리거 검출 대상이 아님"
+session: null
+notes: "[트리거 면제] 서명 정정 데이터 작업이며 트리거 검출 대상이 아님\n\n[PR 보류 2026-10-06] investigation\n\n[미러 면제 2026-10-06] 코드·데이터·테스트 변경 0 — 2026-10-06 Kiki가 M0672 제거를 철회해 코퍼스·테스트·문서를 main(68행)과 같게 되돌렸고 남은 차이는 대장 2파일뿐이라 재현할 변경이 없다"
 updated: 2026-10-06
