@@ -10,6 +10,27 @@ prompt, system, decision)`을 그대로 재사용 → 사전적재한 키는 런
 경계 메모: 본 슬라이스는 *시드 품질 위생*까지만 강제한다(BasicSeedValidator). 학생
 직접 노출 경계는 L4/L5 환각 방어가 책임진다(CLAUDE.md "LLM 응답을 검증 없이 학생에게
 제공 금지" — 사전적재된 응답도 런타임에서 환각 방어를 통과해야 학생에게 닿는다).
+
+관측(OPS-109): provider를 *직접* 부르는 이 모듈은 파이프라인을 거치지 않으므로(그것이 이
+모듈의 정의 — 파이프라인을 거치면 캐시 적중 때 생성이 일어나지 않는다) 파이프라인이 해 주는
+`l3_routing` trace 기록도 받지 못한다. **그 부재는 설계가 아니라 공백이었다** — 어디에도 의도라는
+기록이 없고, 같은 저작 계열인 `llm_generator`가 같은 공백을 "추적 0이던 공백 보정(2026-07-21
+정합성 검토)"으로 이미 메웠으며, 프로젝트 규칙이 "모든 LLM 호출 → Langfuse 추적"이다. 그래서
+provider 생성 1건마다 라우팅·실측(토큰·지연·원가)을 trace sink에 남긴다.
+  - **저작 표지**(`TrafficSurface.AUTHORING`)를 단다. 추측이 아니라 사실이다: 이 클래스를 만드는
+    프로덕션 호출부는 배치 CLI(`__main__.py`) 하나뿐이고(소스 스캔 테스트가 동결 — 서빙 경로가
+    생기면 red), 모듈 정의가 빌드타임 사전생성이다. 표지가 없으면 이 비용이 게이트② 서빙 표본의
+    '미표기'로 섞인다(`ops/cost_report`).
+  - **원가 좌석은 꽂힌 provider에서 읽는다**(`served_cloud_seat` — ARCH-64). 좌석을 생략하면
+    `SERVING_CLOUD_SEAT`(anthropic) 단가로 적혀 openrouter 호출이 22.5배(CLOUD_MID 실측)로
+    기록되고, 단가 미등재 좌석(CLOUD_HIGH)은 '미측정'이어야 할 값이 지어낸 금액이 된다. 생성
+    로그(`GenerationLog.cost_usd`)와 trace(`cost_krw`)가 같은 좌석을 읽어 서로 다른 원가를 말하지
+    않는다.
+  - 기록 시점은 **provider 응답을 받은 직후·검증 전**이다 — 응답이 오면 비용이 발생했으므로 이후
+    검증 성패와 무관하게 남긴다(`llm_generator` 동형). provider가 예외를 던진 항목·인제스트·스킵은
+    생성 호출이 없었으므로 기록하지 않는다.
+  - 생성 로그(provenance 채널·재현 좌표)와 Langfuse trace(운영 관측 채널)는 **다른 채널**이다 —
+    하나가 다른 하나를 대신하지 않는다.
 """
 
 from __future__ import annotations
@@ -17,9 +38,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 
+from whymath_backend.config import CloudSeat
 from whymath_backend.l3.generation_seed import SeedSource, seed_for_decision
-from whymath_backend.l3.interfaces import CacheBackend, LLMProvider
-from whymath_backend.l3.models import RoutingDecision, Usage
+from whymath_backend.l3.interfaces import (
+    CacheBackend,
+    LLMProvider,
+    SurfaceTaggingTraceSink,
+    TraceSink,
+    TrafficSurface,
+)
+from whymath_backend.l3.models import CostTier, RoutingDecision, Usage
 from whymath_backend.l3.pregenerate.models import (
     PregenItem,
     PrewarmItemResult,
@@ -32,7 +60,13 @@ from whymath_backend.l3.pregenerate.provenance_bridge import (
     model_name_for_decision,
 )
 from whymath_backend.l3.pregenerate.validator import SeedValidator
-from whymath_backend.l3.router import Router, cache_key_for
+from whymath_backend.l3.router import (
+    Router,
+    _as_cost_tier,
+    actual_cost_krw,
+    cache_key_for,
+    langfuse_fields,
+)
 from whymath_backend.schema.provenance import GenerationLog
 
 logger = logging.getLogger("whymath.l3.pregenerate.prewarmer")
@@ -64,6 +98,12 @@ class CachePrewarmer:
     "적재가 기본"이어야 한다(genlog 싱크 경로 자체는 CLI가 항상 배선하는 것과 동형). 시드가
     실제로 실리는 경로는 LOCAL뿐이고(클라우드는 구조적 불가) 그 판정은 `seed_for_decision`
     단일 좌석이 한다. 재현 프로브·테스트는 고정 시드 공급자를 주입해 같은 좌표를 되먹인다.
+
+    `trace`(OPS-109): provider 생성 1건마다 라우팅·실측을 기록할 관측 싱크. None(기본)이면
+    `LangfuseSink`를 기본 구성한다(키 미설정=no-op·네트워크 0 — `llm_generator` 동형) — 끄는
+    옵션을 두지 않는다("모든 LLM 호출 → Langfuse 추적"). 주입된 싱크도 **저작 표지로 감싼다**
+    (`SurfaceTaggingTraceSink` — 먼저 실린 표지가 이기므로 이미 표지가 있는 레코드는 그대로다).
+    배치 종료 시 `flush_trace()`로 전송을 확정할 것(Langfuse는 배치 전송).
     """
 
     def __init__(
@@ -75,6 +115,7 @@ class CachePrewarmer:
         router: Router | None = None,
         generation_log_sink: GenerationLogSink | None = None,
         seed_source: SeedSource | None = None,
+        trace: TraceSink | None = None,
     ) -> None:
         self._provider = provider
         self._cache = cache
@@ -82,6 +123,13 @@ class CachePrewarmer:
         self._router = router if router is not None else Router()
         self._generation_log_sink = generation_log_sink
         self._seed_source = seed_source
+        if trace is None:
+            # 관측 기본 배선 — 지연 import·키 미설정=no-op(네트워크 0)·`llm_generator`와 동형.
+            from whymath_backend.l3.trace.langfuse_sink import LangfuseSink
+
+            trace = LangfuseSink()
+        # 이 모듈의 provider 호출은 전부 빌드타임 저작이다 — 표지는 사실이다(모듈 docstring).
+        self._trace: TraceSink = SurfaceTaggingTraceSink(trace, TrafficSurface.AUTHORING)
 
     async def prewarm(
         self,
@@ -143,7 +191,7 @@ class CachePrewarmer:
                 result,
                 problem_id=None,
                 model_name=model_name_for_decision(decision),
-                cost_usd=actual_cost_usd_or_none(decision, result.usage),
+                cost_usd=actual_cost_usd_or_none(decision, result.usage, seat=self._served_seat()),
                 seed=result.seed,
                 input_snapshot=input_snapshot_for_prewarm(item),
             )
@@ -224,6 +272,8 @@ class CachePrewarmer:
                 )
             response = generated.text
             usage = generated.usage
+            # 응답이 왔다 = 비용이 발생했다 — 이후 검증 성패와 무관하게 관측을 먼저 남긴다.
+            self._record_trace(decision, usage)
 
         # 검증 게이트 — 통과한 시드만 캐시에 적재(품질 위생).
         failure_reason = self._validator.validate(item, response)
@@ -249,3 +299,61 @@ class CachePrewarmer:
             )
 
         return PrewarmItemResult(cache_key=key, status="written", usage=usage, seed=seed)
+
+    # ── 관측(OPS-109 — 사전적재 호출도 Langfuse에 남긴다) ──
+    def _served_seat(self) -> CloudSeat | None:
+        """클라우드 결정이 실제로 가는 좌석 — 원가 기록의 단가 좌석(ARCH-64·꽂힌 provider 기준).
+
+        `pipeline.served_cloud_seat`가 단일 원천이다. 함수 안에서 import하는 이유: `pipeline`이
+        `pregenerate.validator`를 import하므로(`pregenerate/__init__`가 이 모듈을 먼저 로드) 모듈
+        최상단 import는 순환이다. 미상(None)은 anthropic으로 접지 않는다 — 호출부가 '미측정'으로
+        남긴다(CLAUDE.md "모른다 ≠ 아니다").
+        """
+        from whymath_backend.l3.pipeline import served_cloud_seat
+
+        return served_cloud_seat(self._provider)
+
+    def _record_trace(self, decision: RoutingDecision, usage: Usage | None) -> None:
+        """생성 1건의 라우팅·실측(usage·원가)을 sink에 기록 — never-break(배치 비차단).
+
+        원가 회계는 `pipeline.generate`·`llm_generator`와 동형: usage 없음(미계측)·클라우드인데 토큰
+        미상이면 None('미상'과 0원 구분 — 지어내지 않음), 그 외 토큰 산정(LOCAL 0원 확정). 좌석은
+        꽂힌 provider에서 읽고(`_served_seat`) 같은 값을 `cloud_seat`에 실어 "어느 단가표로
+        계상했나"를 같은 레코드가 말하게 한다. student_id_hash는 없다(빌드타임 — 학생 무관).
+        """
+        is_cloud = _as_cost_tier(decision.cost_tier) is not CostTier.LOCAL
+        seat = self._served_seat() if is_cloud else None
+        actual_krw: float | None
+        if usage is None:
+            actual_krw = None
+        elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
+            actual_krw = None
+        else:
+            actual_krw = actual_cost_krw(decision, usage, seat=seat)
+        try:
+            self._trace.record(
+                langfuse_fields(
+                    decision,
+                    cache_hit=False,
+                    usage=usage,
+                    cost_krw=actual_krw,
+                    cloud_seat=seat,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — 관측 장애가 사전적재 배치를 깨면 안 됨
+            # 침묵 실패 금지 — 예외 *타입명*만 경고(필드·키 값 미출력, langfuse_sink 방침 동형).
+            logger.warning("사전적재 관측 기록 실패(%s) — 무시하고 계속", type(exc).__name__)
+
+    def flush_trace(self) -> None:
+        """배치 종료 시 관측 전송 확정 — LangfuseSink는 배치 전송이라 CLI가 flush로 확정한다.
+
+        TraceSink 계약은 record만 요구하므로 flush 없는 sink(테스트 대역)는 조용히 통과한다
+        (`SurfaceTaggingTraceSink`가 안쪽 sink의 flush로 위임). flush 오류도 삼키되 타입명은 남긴다.
+        """
+        flush = getattr(self._trace, "flush", None)
+        if not callable(flush):
+            return
+        try:
+            flush()
+        except Exception as exc:  # noqa: BLE001 — 관측 전송 장애가 배치 결과를 깨면 안 됨
+            logger.warning("사전적재 관측 flush 실패(%s) — 무시", type(exc).__name__)

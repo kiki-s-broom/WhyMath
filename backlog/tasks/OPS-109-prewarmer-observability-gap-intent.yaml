@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,8 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/pregenerate/**"
-session: null
-notes: ""
-updated: 2026-10-05
+  - tests/backend/l3/test_prewarmer_trace.py
+  - docs/reviews/ops_109_prewarmer_observability_2026-10-06.md
+session: claude/sweet-hypatia-f402tv
+notes: "[정정 2026-10-06] paths ['src/backend/whymath_backend/l3/pregenerate/**'] → ['src/backend/whymath_backend/l3/pregenerate/**', 'tests/backend/l3/test_prewarmer_trace.py', 'docs/reviews/ops_109_prewarmer_observability_2026-10-06.md']: 구현 산출물(신규 테스트·판정 문서)이 작업 범위에 들어와 겹침 검사 대상으로 등재 — 기존 glob은 유지(amend --path는 목록 전체를 교체한다)"
+updated: 2026-10-06

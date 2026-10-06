@@ -124,7 +124,12 @@ async def _run(
         validator=validator,
         generation_log_sink=_sink,
     )
-    report = await prewarmer.prewarm(items, ttl_seconds=ttl_seconds, overwrite=overwrite)
+    try:
+        report = await prewarmer.prewarm(items, ttl_seconds=ttl_seconds, overwrite=overwrite)
+    finally:
+        # Langfuse는 배치 전송이라 짧게 끝나는 CLI는 flush로 전송을 확정해야 한다(OPS-109).
+        # 라우터 오류 등으로 prewarm이 예외로 끝나도 그때까지 쌓인 관측은 남긴다.
+        prewarmer.flush_trace()
     print(format_report(report))
     return 0 if report.errored == 0 else 1
 
