@@ -646,6 +646,18 @@ gates:
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
     corrections: []
+  - id: G-misc40-deferred-m0671-redecision
+    title: "MISC-40 서명 보류 1행 재판정 - 2026-10-05 서명에서 보류한 power-rule-step-omitted ↔ M0671(성취기준 [12미적Ⅰ-02-03] 원문 확인이 선행 조건인 행. 코퍼스 correction_point에 원문 OCR 흔적이 있다)을 승인/반려로 확정한다. 이 행은 검수 큐에 pending으로 남아 있고 승인 코퍼스·DB에는 없다(좌석 0). 보류가 기한 없이 방치되지 않도록 7일 독촉을 건다. 판정 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md 6절 4번 행."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-05
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: 입력 태스크 없음 - M0671은 사람이 성취기준 원문을 직접 확인해야 하는 사람 판단이다
   - id: G-misc40-new-crosslink-signature
     title: "신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition"
     kind: human
