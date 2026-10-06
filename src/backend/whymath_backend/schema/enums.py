@@ -1649,7 +1649,7 @@ class PrivacyAuditResourceType(str, Enum):
 
 
 class PrivacyAuditAction(str, Enum):
-    """`privacy_audit.action` — `event_kind=content_mutation` 전용 동작 폐쇄 택소노미(SEC-29 · ADMIN-07).
+    """`privacy_audit.action` — `event_kind=content_mutation` 전용 동작 택소노미(SEC-29·ADMIN-07)
 
     **7값**: CRUD 3값(create/update/delete — SEC-29)에 검수 상태 전이 4값(approve/reject/
     quarantine/release — ADMIN-07 `POST /v1/admin/review-queue/items/{id}/transitions`)을
@@ -1658,9 +1658,9 @@ class PrivacyAuditAction(str, Enum):
 
     `resource_type`+`resource_id`가 *무엇을*, 이 값이 *무엇을 했는지*를 특정한다. 자유텍스트
     `reason`을 두지 않는 대신(`PrivacyAudit` 모델 docstring 참조) 이 값만으로 "무슨 동작이
-    있었는지" 사실을 충분히 감사한다 — 상세 diff·사유는 이 테이블의 책임이 아니다(1차 기록은 애플리케이션
-    로그·PG 자체의 데이터, 이 행은 "그 시각 그 사건이 있었다"는 2차 감사 신호 — `record_role_
-    change_audit` docstring과 동일 철학).
+    있었는지" 사실을 충분히 감사한다 — 상세 diff·사유는 이 테이블의 책임이 아니다(1차 기록은
+    애플리케이션 로그·PG 자체의 데이터, 이 행은
+    "그 시각 그 사건이 있었다"는 2차 감사 신호 — `record_role_change_audit` docstring과 동일 철학).
     """
 
     create = "create"

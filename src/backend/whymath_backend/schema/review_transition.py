@@ -37,7 +37,7 @@ class ReviewTransitionAction(StrEnum):
     release = "release"
 
 
-class IllegalReviewTransition(ValueError):
+class IllegalReviewTransition(ValueError):  # noqa: N818 — 계약상 이름(Error 접미사 없음)
     """전이표에 없는 `(현재 상태, 액션)` 조합."""
 
     def __init__(self, current: ReviewStatus | None, action: ReviewTransitionAction) -> None:

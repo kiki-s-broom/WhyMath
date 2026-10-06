@@ -174,7 +174,7 @@ def test_models_endpoint_reports_status_without_raising() -> None:
 
 
 def test_admin_surface_is_read_only() -> None:
-    """Phase A는 read-only — 비-GET 0건 **이면서** 라우트가 실재함을 함께 단언한다."""
+    """쓰기 표면 동결 — 허용 쓰기는 검수 전이 POST 1종뿐이고 라우트가 실재함을 함께 단언한다."""
     from whymath_backend.ops.declared_unwired_audit import walk_routes
 
     app = create_app()
@@ -185,7 +185,11 @@ def test_admin_surface_is_read_only() -> None:
     ]
     assert len(admin_routes) >= 5, f"admin 표면이 {len(admin_routes)}건 — 분모가 사라졌다"
     writes = [(m, p) for m, p in admin_routes if set(m) - {"GET", "HEAD", "OPTIONS"}]
-    assert writes == [], f"Phase A에 쓰기 라우트가 생겼다: {writes}"
+    # ADMIN-07 Phase B: 쓰기는 검수 상태 전이 1종뿐이다 — 다른 쓰기가 늘면 이 목록을 의식적으로
+    # 고쳐야 한다(조용한 표면 확장 방지). 라우트 자체의 계약은 test_admin_review_transitions*.py.
+    assert writes == [
+        (["POST"], "/v1/admin/review-queue/items/{problem_id}/transitions")
+    ], f"허용된 쓰기 1종 외의 쓰기 라우트: {writes}"
 
 
 def test_every_admin_route_uses_registry_derived_guard() -> None:

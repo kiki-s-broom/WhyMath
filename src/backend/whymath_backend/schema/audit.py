@@ -112,7 +112,7 @@ class PrivacyAudit(BaseModel):
     )
     action: PrivacyAuditAction | None = Field(
         default=None,
-        description="event_kind=content_mutation일 때만 — 동작(create/update/delete + 검수 전이 approve/reject/quarantine/release)",
+        description="event_kind=content_mutation일 때만 — 동작(CRUD 3값 + 검수 전이 4값)",
     )
     token_expires_at: datetime | None = Field(
         default=None,

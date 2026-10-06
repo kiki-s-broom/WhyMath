@@ -8,7 +8,7 @@
  * 바꾸는 것뿐이다. 어떤 버튼을 보일지는 서버가 준 `allowed_actions`가 정하고, 현재 상태가
  * 낡았는지는 서버가 `expected_status`로 판정한다(409).
  *
- * 구조: `fetch(`는 아래 `request()` **한 곳**뿐이다. 목록·상세·전이가 모두 이 함수를 지나므로
+ * 구조: 네트워크 호출(fetch)은 아래 `request()` **한 곳**뿐이다. 목록·상세·전이가 모두 이 함수를 지나므로
  * 토큰 부착·타임아웃·자격증명 모드·예외 타입명 기록이 세 호출에서 갈라질 수 없다
  * (`tests/infra/test_webapp_admin_review_governance.py`가 동결).
  *
