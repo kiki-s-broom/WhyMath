@@ -464,6 +464,26 @@ class TestScanFailureIsNotPass:
         assert real is not broken
 
 
+class TestOverlapWithCasFallback:
+    def test_new_scan_refuses_first_when_cas_also_fails(self, bare_remote, monkeypatch, capsys):
+        """CAS_실패와_형제_사본이_겹치면_앞단(HARN-198)이_먼저_거부하고_claim을_남기지_않는다"""
+        w = _world(bare_remote, monkeypatch)
+        w.landed_trunk(TASK)
+        w.finisher_in_the_gap()
+        mine = w.newcomer()
+        monkeypatch.setattr(
+            remote_claims,
+            "claim",
+            lambda *a, **k: remote_claims.ClaimResult("error", message="forced"),
+        )
+        capsys.readouterr()
+        assert cli.main(["start", TASK]) == 1
+        err = capsys.readouterr().err
+        assert "HARN-198" in err and "claude/finisher" in err
+        backlog, _ = store.load_backlog(mine)
+        assert backlog.tasks[TASK].status == "todo"
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # 집행 지점 — 함수가 존재한다는 것과 서빙 경로가 그것을 부른다는 것은 다르다
 # ═════════════════════════════════════════════════════════════════════════
