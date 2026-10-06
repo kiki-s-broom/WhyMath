@@ -151,7 +151,7 @@ jobs:
           # 의 검사 ⑤⑧이 읽는 입력이다(§2 관계표·§3 귀속표를 파싱해 상수와 1:1 대조). 필터 밖이면
           # 그 문서만 고치는 PR에서 backend 잡이 SKIP돼 **관계표를 조용히 고쳐도 검사 ⑧이 실행되지
           # 않는다**. 위 AST 가드가 그 테스트의 FROZEN_INPUT_PATHS를 읽어 이 편입을 강제한다.
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|tests/constitution/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
             be=true
           fi
           if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|\.github/workflows/ci\.yml$)'; then
