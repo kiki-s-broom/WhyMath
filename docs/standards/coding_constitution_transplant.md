@@ -149,6 +149,14 @@ AI가 `constitution/`을 고치려 하면 가드가 막고, 그 거부는 **우�
 
 배선: R2-02·R2-03 은 `ci.yml` backend 잡의 `헌법 집행 테스트` 스텝(루트에서 `pytest -q tests/constitution` — `tests/constitution` 은 backend testpaths 밖이라 전체 Pytest 스텝이 보지 못한다), R3-01 은 infra-contracts 잡의 `배치 두 번 실행 테스트 전수` 스텝(백엔드 import 0). 새 디렉터리는 해당 잡의 ruff·black 대상에도 추가했다. 뮤테이션 11종(소스 변형: 게이트 기록 필드 삭제·기본값 반전·판정자 상수화·큐 입구 중복 제외·우선순위 표 삭제·보류를 종결로 계상 등) 전건 RED, R3-01 은 가짜 트리에 위반 5종(테스트 없음·한 번만 실행·비교 단언 없음·이름만 결정론·진입점 아닌 함수)을 주입해 전건 검출했다.
 
+**CONST-03 P4 — 정정 초안·단계 3 준비 판정·헌법 밖 보호(⑦) (2026-10-06 · 판정 기준: main `3d2b95e3`)**
+
+- **정정 초안**: `docs/constitution_proposals/A0005_part1_corrections_draft.md` + 패치 `rules_A0005_part1_corrections.patch`(R4-03 경로 · R2-04 단계·실행 · 머리말 `timeout_sec`/`cwd`/`shell` 설명 3줄). 패치는 현재 `rules.yaml` 에 `patch -p1 --dry-run` 으로 깨끗이 적용된다. 적용 사본에서 `audit.py --stage 3`: 차단 47 → 46, **파트 I(0~4장)에서 남는 것은 R4-02 한 건**이고 나머지 45건은 5~29장(CONST-04~08).
+- **단계 3 상향 판정**: 파트 I 은 R4-02 만 남기고 준비됐으나 `STAGE` 는 전역이라 지금 3 으로 올리면 파트 II~VII 단계 3 규칙 45건이 한꺼번에 판정돼 래칫이 red 가 된다 → **상향은 CONST-04~08 착지 뒤**. 이 PR 은 `STAGE` 를 건드리지 않는다(AI 는 `constitution/` 을 편집할 수 없다).
+- **R4-02**: 전제 불일치를 실측으로 확인했다 — `schemas/v1.1/*.yaml` 은 JSON Schema 가 아니라 `fields:` 구조이고 머리말이 스스로 '구본 명세(비정본)·미구현·필드 체계 상이'라고 선언한다. 3택(A 방향 뒤집기 권고 · B 생성기 도입 비권고 · C 철회/이월)은 초안에 있고 게이트 `G-const-r4-02-decision` 이 Kiki 판정을 기다린다.
+- **헌법 밖 경로 보호(⑦) — 가용성 실측 (CLAUDE.md '설정 부재≠설정 가능' 절차)**: 저장소 `kiki-s-broom/WhyMath` 는 **Organization 소유·public**(`GET /repos`), 기본 브랜치 룰셋(`16623542`)은 `pull_request`(필수 승인 0명 · `require_code_owner_review: false`)·`deletion`·`non_fast_forward`·`merge_queue`·필수 체크를 가진다. `.github/CODEOWNERS` 는 있으나 **모든 경로의 소유자가 `@doldori7` 하나**이고, PR 작성자도 같은 계정이다(이 세션의 PR 작성자 표기가 `doldori7`). 따라서 ①**코드 오너 리뷰 필수**는 GitHub 가 작성자 본인 승인을 인정하지 않으므로 켜는 순간 **모든 PR 이 막힌다**(사람과 AI 세션이 같은 신원). ②룰셋의 **우회 주체는 역할·팀·앱**이라 같은 신원을 가른 사용자 단위 예외를 만들 수 없다. 조직 플랜은 이 세션의 프록시가 `orgs/` 경로를 막아 **확인하지 못했다(제공 여부 미확인)** — 플랜에 달린 룰셋 기능(경로 제한 푸시 룰 등)은 판정하지 않았다.
+  - 남는 현실적 후보: (가) 현상 유지 — 가드 훅(`.claude/hooks/guard_constitution.py`)과 R0-02(`check_amendment.py`: 개정 기록 동반)가 *절차*를 막는다. 한계: 신원이 같아 "사람이 아니라 AI 가 고쳤다"를 GitHub 쪽에서 구별하지 못한다. (나) **서명 검증 CI 스텝** — `constitution/` 을 바꾸는 커밋은 Kiki 만 가진 서명 키(공개키는 저장소에 커밋)로 서명됐을 때만 통과. AI 세션은 키가 없어 서명할 수 없다. 비용: Kiki 머신의 서명 설정과 CI 검증 스텝이 필요하고 서명 없는 합법적 개정 경로(웹 UI 편집 등)가 막힌다. (다) 별도 계정·봇을 만들어 작성자를 분리한 뒤 코드 오너 리뷰 필수 — 신원 체계 변경이라 비용이 크다. 선택은 Kiki 몫이고 게이트 `G-const-protection-outside-claude` 에 올렸다.
+
 **헌법 본문의 오기 (Kiki 판단 — 다음 개정 때 함께 정정 권장)**
 - `CONSTITUTION.md` 머리말 "AI는 읽기만 할 수 있다 (제8조)" — AI 권한 한계는 **제9조**다.
 - 표준북 부록 C 본문 "3단계의 44개 규칙" — 같은 파일의 표와 `rules_additions_v1.1.yaml` 실측은 **45건**이다.
