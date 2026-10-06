@@ -1,0 +1,11 @@
+# A0005 정정분 — constitution/rules.yaml 의 R4-02 블록만 아래로 교체한다(Kiki 직접 반영 · 제9조).
+# 바뀌는 것: statement · check · run 3줄. id·article·chapter·axis·level·stage 는 불변.
+  - id: R4-02
+    article: 제7조
+    chapter: 4
+    axis: 진실
+    statement: 스키마 명세 YAML(schemas/)의 모든 필드는 대응 데이터 모델에 존재해야 하며, 어긋남은 만료일과 함께 동결하고 늘리지 않는다
+    level: L5
+    check: tests/constitution/test_schema_model_sync.py
+    run: pytest -q tests/constitution/test_schema_model_sync.py
+    stage: 3
