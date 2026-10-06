@@ -591,7 +591,12 @@ jobs:
   backend-migrations:
     name: backend — 마이그레이션·통합 (실 PG)
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # 12→15분(2026-10-06 PED-41 PR 실측): 통합 pytest 스텝 하나가 ~10분이고 잡 전체가 ~11.4분이라
+    # 상한 12분과의 여유가 37초였다(직전 성공 큐 실행 pr-1385: 11분 23초). 그 여유가 소진되자 같은
+    # 마지막 스텝(traversal 실부하 게이트)이 PR 실행·큐 실행 모두에서 시작 ~25초 만에 `cancelled`
+    # (= 잡 시간 초과)로 끊겨 큐에서 CI_FAILURE로 빠졌다. 테스트가 늘 때마다 같은 일이 반복되므로
+    # 상한을 올려 여유를 ~3분으로 둔다. 상한을 넘는 폭주는 여전히 이 값이 잡는다.
+    timeout-minutes: 15
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
