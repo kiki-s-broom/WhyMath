@@ -38,9 +38,10 @@ EOS-19 시점의 v1은 문항을 IRT로 고른 *뒤* 그 문항의 개념 숙달
     근거 개념 ≠ 목표. 해소 결과는 `IntentResolution`으로 응답·처치 기록 양쪽에 남는다.
 
 그래서 v1의 아래 제약("추천 결과를 바꾸지 않는다")은 **EOS-19 전환에 한정된 것**이고, EOS-124는
-선수·전진 구간에서 선택을 *의도적으로* 바꾼다. 바뀐 알고리즘은 `policy_version=cat_v2`로 구분돼
-소급 평가가 두 규칙을 섞지 않는다. θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은
-게이트·같은 가중·같은 선택기를 쓴다 — 달라지는 것은 후보 집합뿐이다).
+선수·전진 구간에서 선택을 *의도적으로* 바꾼다. 바뀐 알고리즘은 그 시점에 `policy_version=cat_v2`로
+구분됐다(EOS-147이 이후 `cat_v4`로 올렸다 — 아래 EOS-147 절). 소급 평가가 두 규칙을 섞지 않는다.
+θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은 게이트·같은 가중·같은 선택기를 쓴다 —
+달라지는 것은 후보 집합뿐이다).
 
 ────────────────────────────────────────────────────────────────────────────
 **추천 결과를 바꾸지 않는다** (EOS-19 acceptance ④ — 그 전환의 가장 중요한 제약)
@@ -72,6 +73,17 @@ docstring이 정본이다. 지시가 없는 요청은 조회 0건이 추가되�
 제한된 후보에서 같은 선택 연산을 하고 이름표는 EOS-124 갈래가 그대로 붙인다(전달 문항에 대해 그
 이름표가 참이기 때문이다). 단 R6 경로에서는 전진하지 않는다(상태 머신이 방금 오답을 관측했다).
 선수 읽기의 그래프 예산은 이 모듈이 걸어 주입한다(`_read_prerequisites`) — 예산 정의는 여기 하나다.
+
+**EOS-147 — 후보 선택에는 추정 θ가 아니라 *선택 θ*를 쓴다.** 전부 정답 이력에서 추정 θ는 MLE가
+존재하지 않아 상한(4.0)에 붙는 클램프인데, 그것을 표적으로 쓰면 첫 정답 뒤 은행의 가장 어려운
+문항으로 뛴다. `AttemptHistoryState.selection_theta`(전부 정답이면 맞힌 최고 난이도 + 0.5 로짓 —
+잠정값·`EOS-39`가 보정을 소유, 그 외에는 추정 θ와 같다)로 고른다. 추정기·SE·중단 규칙은 그대로다.
+이 변경은 전부 정답 이력의 선택을 바꾸므로 `policy_version`을 `cat_v4`(수능 `suneung_v3`)로
+올렸다(REC-11). 상태 머신 집행 변형(`cat_v1_state_remediation`·`cat_v2_state_undiagnosed`)의
+문자열은 그대로다 — 경로 규칙(후보 제한·이름표)이 같고 오답이 있는 이력에서만 발동한다(예외:
+난이도 라벨이 없는 문항의 오답은 IRT 응답에 없어 이력이 '전부 정답'으로 판정될 수 있다 — 그
+코너의 후보 풀 조회 θ는 선택 θ이고, 처치 기록의 `selection_theta` 키가 그 표지다). 판정문
+`docs/reviews/eos147_*`.
 
 ────────────────────────────────────────────────────────────────────────────
 개념 그래프 예산 — depth ≤ 2 · nodes ≤ 20 · visited · timeout
@@ -115,6 +127,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.irt import (
     IrtItem,
+    ThetaBoundary,
     item_information,
     learning_band_weight,
     select_weighted_item,
@@ -529,7 +542,28 @@ class NextProblemOutcome(Recommendation):
     응답은 바이트 동일하다.
     """
 
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 측정값이 아니다(`theta_boundary`). 출제에 실제 쓴 "
+            "θ는 `selection_theta`다(EOS-147)."
+        )
+    )
+    selection_theta: float | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 후보를 고르는 데 **실제로 쓴** θ. 전부 정답 이력에서만 `theta`와 다르다"
+            "(맞힌 최고 난이도 + 0.5 로짓 · 잠정 · 판정문 §4-2). 두 정책은 항상 채운다. "
+            "None은 이 필드를 모르는 생성자(테스트 스텁 등)뿐이며 `theta`와 같다는 뜻이다."
+        ),
+    )
+    theta_boundary: ThetaBoundary | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 추정 θ가 MLE 발산 경계에 붙었는가: `upper`=전부 정답 · `lower`=전부 오답 · "
+            "None=경계 아님. `lower`는 관측만 하고 선택은 바꾸지 않는다(판정문 §4-4)."
+        ),
+    )
     difficulty: float | None = Field(
         default=None, description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null."
     )
@@ -628,6 +662,8 @@ class PolicyTelemetry(TypedDict):
     """
 
     theta: float
+    selection_theta: float
+    theta_boundary: ThetaBoundary | None
     standard_error: float | None
     measurement_sufficient: bool
     weight_axes_applied: list[str]
@@ -730,7 +766,11 @@ class CatRecommendationPolicy:
         user_id = uuid.UUID(learner_state.student_id)
 
         attempt_state = await load_attempt_history_state(session, user_id)
-        theta = attempt_state.theta
+        # EOS-147 — 이 함수의 `theta`는 **후보 선택에 쓰는 θ**(`selection_theta`)다. 추정 θ
+        # (`attempt_state.theta`)가 아니다: 전부 정답 이력에서 추정 θ는 MLE가 없어 상한(4.0)에
+        # 붙는 클램프이고, 그것을 표적으로 쓰면 은행 꼭대기로 뛴다. 두 값이 갈라지는 것은 그
+        # 이력뿐이며, 응답·SE·중단 규칙에는 계속 추정 θ가 나간다(아래 `common`).
+        theta = attempt_state.selection_theta
 
         # S4-14 — sibling_filter 지정 + 직전 오답 존재 시에만 형제 조회(쿼리 0회 증가 보존 원칙).
         sibling_ids: set[uuid.UUID] = set()
@@ -810,7 +850,9 @@ class CatRecommendationPolicy:
         else:
             policy_version = self.policy_version
         common: PolicyTelemetry = {
-            "theta": theta,
+            "theta": attempt_state.theta,
+            "selection_theta": theta,
+            "theta_boundary": attempt_state.theta_boundary,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,

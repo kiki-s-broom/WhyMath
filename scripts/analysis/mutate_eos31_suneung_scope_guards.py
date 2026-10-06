@@ -262,7 +262,7 @@ MUTATIONS: list[Mutation] = [
         EVIDENCE,
         (
             (
-                'POLICY_VERSION_SUNEUNG: str = "suneung_v2"',
+                'POLICY_VERSION_SUNEUNG: str = "suneung_v3"',
                 'POLICY_VERSION_SUNEUNG: str = "suneung_v1"',
             ),
         ),
