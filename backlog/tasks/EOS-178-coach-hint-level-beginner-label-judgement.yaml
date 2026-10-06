@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l4/hint_deferral.py
   - src/backend/whymath_backend/api/coach.py
-session: null
+session: claude/sweet-hypatia-f402tv
 notes: "출처: EOS-39 판정문 §2-2·§8 / 독립 비판 #1(차단) (2026-10-06). 등급 P1 근거: EOS-39 도움 접기의 입력 신호(used_hint)의 의미를 정하는 판정이며 앱 학생의 추천 표적에 직접 영향한다. 정본 소유 공백이던 EOS-146 acceptance ⑩의 승계처다.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
 updated: 2026-10-06
