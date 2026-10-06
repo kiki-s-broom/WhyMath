@@ -5,9 +5,9 @@
   "origin": "docs/data/misconception_crosslink_review_queue.json (검수 큐·전행 pending) 의 승인분",
   "review_method": "human sign-off (AI 자기승인 금지·Gate Contract crosswalk_gate_contract.md)",
   "counts": {
-    "crosslinks": 69,
+    "crosslinks": 68,
     "link_types": {
-      "직접매핑": 69
+      "직접매핑": 68
     }
   },
   "signatures": [
@@ -548,24 +548,16 @@
       "note_stamp": "검수:kiki 2026-10-03"
     },
     {
-      "kebab_id": "addition-multiplication-rule-confused",
-      "mis_id": "M0599",
-      "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
-      "confidence": 0.9,
-      "note_stamp": "검수:kiki 2026-10-03"
-    },
-    {
       "kebab_id": "power-rule-step-omitted",
       "mis_id": "M0671",
       "reviewer": "kiki",
-      "reviewed_on": "2026-10-03",
+      "reviewed_on": "2026-10-06",
       "confidence": 0.85,
-      "note_stamp": "검수:kiki 2026-10-03"
+      "note_stamp": "검수:kiki 2026-10-06"
     }
   ],
   "generation": "promote_approved(review_queue 승인본) 산출 — method=manual·검수 서명 stamp 부착(load 게이트 통과분).",
   "license_notice": "와이매스 자체 저작 매핑(kebab 카탈로그 × M-id 코퍼스 대응·검수 판단). 성취기준 코드는 구조 메타(공공·사실).",
   "cascade_warning": "Phase 5(M#### 코퍼스 폐기) 시 misconception_crosslink FK가 ondelete=CASCADE라 M-id 삭제 전 이 검수 행을 반드시 이전할 것(조용한 전멸 방지 — MEMORY 2026-07-08).",
-  "source_of_truth": "MEMORY.md 2026-07-08 극값 2 + 2026-07-10 트리아지 corroborated A그룹 11 + B그룹 8 + fraction-cancellation M0118(직접·conf≥0.8) 승인·이후 corroborated 종료. · 2026-10-03 G-misc40-new-crosslink-signature 5행(M0462·M0515·M0599·M0671·M0672 — Kiki가 대화에서 행별 승인 결정·검수자명 kiki 지정, 세션이 promote_approved로 산출. 게이트 clear는 Kiki 몫)."
+  "source_of_truth": "MEMORY.md 2026-07-08 극값 2 + 2026-07-10 트리아지 corroborated A그룹 11 + B그룹 8 + fraction-cancellation M0118(직접·conf≥0.8) 승인·이후 corroborated 종료. · 2026-10-03 G-misc40-new-crosslink-signature 5행(M0462·M0515·M0599·M0671·M0672 — Kiki가 대화에서 행별 승인 결정·검수자명 kiki 지정, 세션이 promote_approved로 산출) 반영 뒤, 2026-10-06 Kiki 재판정: M0599(addition-multiplication-rule-confused)는 보류로 되돌려 승인 코퍼스에서 제거(큐 행은 pending 유지), M0671은 성취기준 원문 확인함으로 note·서명일 정정. 게이트 clear는 Kiki 몫."
 }

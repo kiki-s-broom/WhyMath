@@ -4,7 +4,7 @@
 직접 승인한 매핑**을 promote 산출(로더 형식)해 커밋한 것이다(사람 사인오프·AI 자기승인 아님).
 2026-07-08 극값 2(M0864·M0865)·2026-07-10 트리아지 A 11 + B 8 + frac 1·2026-07-12 미매핑 Tier C
 Tier C 10 + period + root-loss + 843 트랜치1~5 각 6(신규 탐지 kebab·계산형)을 승인해
-**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-03 MISC-21·MISC-40 서명 5건이 더해져 **69건**이다. 이 테스트는 hermetic(DB 0)으로 봉인한다:
+**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-03 MISC-21·MISC-40 서명 5건이 더해졌다가 2026-10-06 M0599 보류 환원으로 **68건**이다. 이 테스트는 hermetic(DB 0)으로 봉인한다:
 ① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈843 코퍼스(참조 무결성)
 ③ `select_canonical`이 각 kebab에 canonical M-id를 실제로 돌려줌(단절 해소·843→34 도달).
 """
@@ -112,20 +112,20 @@ def _corpus_mis_ids() -> set[str]:
     return {m["mis_id"] for m in items if isinstance(m, dict) and "mis_id" in m}
 
 
-# 2026-10-03 게이트 G-misc40-new-crosslink-signature — Kiki가 행별로 승인한 5건(MISC-21 잔여 3 +
+# 2026-10-03 게이트 G-misc40-new-crosslink-signature — Kiki가 행별로 승인한 4건(MISC-21 잔여 2 +
 # MISC-40 신설 1 + 기존 부분매핑 1을 직접 0.85로 승격). 위 `_EXPECTED`(kebab당 1건)와 달리
+# M0599는 2026-10-06 보류로 되돌려 제외했다(`test_misc40_deferred_m0599_is_not_in_corpus`).
 # `product-rule-naive`는 M0075(0.97)에 더해 M0672(0.85)가 붙어 kebab당 2건이 되므로 쌍 집합으로 따로 동결한다.
 _MISC40_SIGNED: dict[tuple[str, str], float] = {
     ("bigger-denominator-bigger-fraction", "M0462"): 0.9,
     ("ratio-order-swapped", "M0515"): 0.85,
-    ("addition-multiplication-rule-confused", "M0599"): 0.9,
     ("power-rule-step-omitted", "M0671"): 0.85,
     ("product-rule-naive", "M0672"): 0.85,
 }
 
 
 def test_exact_approved_pairs() -> None:
-    # 승인 69건 = 기존 64건(kebab→M-id 동결) + 2026-10-03 서명 5건 — 드리프트 시 즉시 실패.
+    # 승인 68건 = 기존 64건(kebab→M-id 동결) + 2026-10-03·06 서명 4건 — 드리프트 시 즉시 실패.
     rows = _load_rows()
     pairs = {(r.kebab_id, r.mis_id) for r in rows}
     assert len(rows) == len(pairs), "중복 행 금지"
@@ -139,10 +139,17 @@ def test_misc40_signed_rows_carry_kiki_stamp_and_confidence() -> None:
         row = by_pair[pair]
         assert row.confidence == conf, pair
         assert row.link_type == "직접매핑", pair
-        assert row.note is not None and row.note.endswith("검수:kiki 2026-10-03"), pair
-    # M0671은 성취기준 원문 OCR 정합이 미확인인 채 서명됐다 — 그 사실이 note에서 지워지면 안 된다.
+        # M0671은 2026-10-06 원문 확인 후 재서명했다 — 나머지 3건은 2026-10-03 서명 그대로다.
+        stamp = "검수:kiki 2026-10-06" if pair[1] == "M0671" else "검수:kiki 2026-10-03"
+        assert row.note is not None and row.note.endswith(stamp), pair
+    # M0671은 성취기준 원문을 확인했다 — 그 사실이 note에서 지워지면 안 된다(미확인 표기로 되돌아가도 안 된다).
     ocr_note = by_pair[("power-rule-step-omitted", "M0671")].note
-    assert ocr_note is not None and "원문 OCR 정합은 미확인" in ocr_note
+    assert ocr_note is not None and "원문 확인함" in ocr_note and "미확인" not in ocr_note
+
+
+def test_misc40_deferred_m0599_is_not_in_corpus() -> None:
+    # 2026-10-06 Kiki 재판정 — M0599는 보류다. 보류 행이 승인 코퍼스에 남으면 서명 없이 노출된다.
+    assert not any(r.mis_id == "M0599" for r in _load_rows())
 
 
 def test_product_rule_naive_canonical_stays_m0075_after_m0672_promotion() -> None:
