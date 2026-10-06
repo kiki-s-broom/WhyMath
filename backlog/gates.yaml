@@ -4,11 +4,11 @@ gates:
     title: "백오피스 셸 실 브라우저 menu 호출 확인 — 허용 origin에서 200+내비 렌더 / 비허용 origin에서 차단 (ADMIN-06 acceptance ②의 사람 축)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 9a80f4623aeb (Kiki Phaiakes9 실행 2026-10-06, 런북 docs/ops/g_admin06_browser_menu_call_runbook.md 권장 경로 §5). 허용 origin http://127.0.0.1:3001/admin/ + 실 토큰(content_admin, ADMIN-15 operator_token_cli 발급·30분)에서 왼쪽 메뉴 7개 섹션(검수 큐·운영 대시보드·콘텐츠·LLM·프롬프트·비용·품질·사용자·프라이버시·데이터셋) 렌더(스크린샷) · 발급 직후 서버 확인 MENU_WITH_TOKEN=200 · PREFLIGHT_ALLOWED=200. 비허용 origin http://localhost:3001/admin/ 에서 같은 토큰으로 화면 제목 백엔드에 닿지 못했습니다(실패 종류 TypeError) = 브라우저 차단 · PREFLIGHT_DENIED=400 · STATIC_ADMIN=200. 빌드 BUILD_EXIT=0 OUT_ADMIN=True. 스키마는 5a7c31d9e0b4에서 b4d8e2a6c0f3(head)로 9건 업그레이드(백업 1119782바이트, UPGRADE_EXIT=0). 한계: 비허용 origin 화면의 콘솔 blocked by CORS policy 문구는 미확인(차단 주체는 PREFLIGHT_DENIED=400이 서버 쪽 증적). Network 탭 menu Status 숫자 스크린샷은 없고 MENU_WITH_TOKEN=200으로 대체. 첫 시도의 401 두 번은 서버 결함이 아니라 클립보드에 토큰 대신 주소가 들어 있던 입력 오류(ADMIN_ACTIVE_DELETED=t|f, 재발급 후 200). 런북의 마이그레이션 개수 서술(3건)은 이 DB 기준 9건으로 정정 필요."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-25] depends_on +ADMIN-06-admin-web-shell — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 확인 대상인 백오피스 셸을 만든 작업이 ADMIN-06이다(done) — 셸이 있어야 실 브라우저 menu 호출을 확인할 수 있다"

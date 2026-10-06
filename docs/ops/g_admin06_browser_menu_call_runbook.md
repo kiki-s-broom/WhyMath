@@ -6,6 +6,8 @@
 > 개정: 2026-09-25 §5 B 단계 채움(ADMIN-15 착지 · 판정 기준: 브랜치 `claude/optimistic-euler-wckia8`, main `f138f894` 병합본)
 > 개정: 2026-10-02 (판정 기준: main `dc44512b`) — ①§0에 **한 번에 끝내는 권장 경로** 추가(A를 따로 돌리지 않는다) ②B2의 스키마 업그레이드가 ADMIN-15 컬럼 2개만이 아니라 **그 뒤에 쌓인 마이그레이션 전부**를 적용함을 정정하고, 기대 상태를 해시 고정(`8c19e8a611e4`)이 아니라 `(head)` 표지로 판정하도록 변경(마이그레이션이 자주 쌓여 해시는 곧 낡는다 — 이 런북 작성 후 1주 안에 head가 `8c19e8a611e4`에서 `a3f7c9d1e5b2`까지 3번 이동했다) ③브라우저 확인에 **B-2(비허용 origin)** 추가 ④**실행 순서 결함 수정** — B3가 토큰을 클립보드에 넣은 뒤 B4·B5 블록을 복사하면 클립보드가 덮어써져 B-1의 Ctrl+V에 토큰이 안 붙었다. B4(정적 서버)를 B3 앞으로, B5(자가검증)를 브라우저 확인 뒤로 옮김
 
+> 개정: 2026-10-06 (판정 기준: main `9a80f462` · Kiki 실행으로 게이트 clear) — ①B2의 업그레이드 폭 실측(9건) 병기 ②**§5 B3 뒤에 "발급 직후 서버 확인 1회" 단계가 빠져 있던 결함**: 토큰이 클립보드에서 주소로 바뀐 채 붙여넣어져 401이 두 번 났고, 서버 결함과 입력 오류가 같은 화면(401)을 내 구분되지 않았다. 해결은 토큰 발급 직후 같은 셸에서 `curl.exe`로 `GET /v1/admin/menu`를 1회 호출해 `200`이면 클립보드에 넣는 것이었다(발급 CLI 설명서가 이미 권하던 확인). B3 블록 자체의 개정은 후속 — 아래 §5 B3는 이 단계가 없는 원형이다 ③포트 3001이 이미 점유돼 있던 경우(이전 시도의 정적 서버 잔재)는 `CMDLINE`이 이 런북의 `http.server 3001 … whymath-g-admin06`와 일치하면 끄지 말고 그대로 쓴다
+
 ## 0. 먼저 알아 둘 것 — 이 게이트는 두 단계로 나뉜다
 
 게이트 제목은 두 가지를 확인하라고 요구한다.
@@ -193,7 +195,7 @@ A-2에서 페이지 자체가 안 열리면(연결 거부), `localhost`가 IPv6�
 
 - **운영자 토큰** — `ops/operator_token_cli.py`(ADMIN-15)가 content_admin 계정에 단기 토큰(기본 30분·상한 60분)을 발급하고, 발급마다 `privacy_audit`에 `operator_token_issued` 1행(누가·누구에게·언제·만료)을 남긴다. 데모 계정·content_admin이 아닌 계정·없는 계정은 exit 1로 거부한다.
 - **스키마 업그레이드** — 위 감사 행이 쓰는 컬럼 2개(`token_expires_at`·`issued_by`)가 마이그레이션 `8c19e8a611e4`로 추가됐다. `whymath-pg`에 적용돼 있지 않으면 CLI가 빠진 컬럼 이름을 적고 exit 1로 거부한다. 그래서 블록 B2가 **백업 후 `alembic upgrade head`**를 한다(이 런북에서 유일한 DB 쓰기).
-  - **`upgrade head`는 ADMIN-15 컬럼 2개만이 아니라 아직 적용 안 된 마이그레이션 전부를 적용한다.** 개정 시점(main `dc44512b`)에 `8c19e8a611e4` 뒤로 3건이 더 있다: `9d3e6b1f4a27`(`hints` 테이블 신설) · `9d3e7b1c5a20`(`concept_version`에 `IN_QA` 상태값과 `qa` 컬럼 추가) · `a3f7c9d1e5b2`(`attempt_event.event_uuid` 컬럼과 부분 유니크 인덱스 추가). 세 파일의 설명(docstring)이 모두 기존 행·기존 컬럼을 바꾸지 않는 추가형이라고 밝힌다. DB가 이미 head면 아무것도 하지 않는다(B1의 `AT_HEAD_BEFORE=True`면 B2를 건너뛴다).
+  - **`upgrade head`는 ADMIN-15 컬럼 2개만이 아니라 아직 적용 안 된 마이그레이션 전부를 적용한다.** (2026-10-06 실행 실측: Kiki의 `whymath-pg`가 `5a7c31d9e0b4`에 있어 `b4d8e2a6c0f3`까지 **9건**이 한 번에 적용됐다 — 아래 "3건"은 DB가 `8c19e8a611e4`까지 와 있다는 가정의 서술이며 개발 DB의 실제 위치는 그보다 한참 뒤처져 있을 수 있다. 9건 모두 nullable 컬럼·인덱스·테이블 추가형이었고 `UPGRADE_EXIT=0`.) 개정 시점(main `dc44512b`)에 `8c19e8a611e4` 뒤로 3건이 더 있다: `9d3e6b1f4a27`(`hints` 테이블 신설) · `9d3e7b1c5a20`(`concept_version`에 `IN_QA` 상태값과 `qa` 컬럼 추가) · `a3f7c9d1e5b2`(`attempt_event.event_uuid` 컬럼과 부분 유니크 인덱스 추가). 세 파일의 설명(docstring)이 모두 기존 행·기존 컬럼을 바꾸지 않는 추가형이라고 밝힌다. DB가 이미 head면 아무것도 하지 않는다(B1의 `AT_HEAD_BEFORE=True`면 B2를 건너뛴다).
   - 전체가 **트랜잭션 1개**로 묶여 도중에 하나라도 실패하면 전부 롤백된다(`alembic/env.py`가 `begin_transaction()`을 한 번만 열고 `transaction_per_migration`을 켜지 않는다 — 코드를 읽은 판단이며 실행해 본 것은 아니다). 그 위에 B2가 실행 전 백업을 따로 뜬다.
   - `a3f7c9d1e5b2`는 `attempt_event`가 TimescaleDB hypertable이면 예외로 **중단**하도록 만들어졌다. `whymath-pg`는 일반 PostgreSQL 16(pgvector 이미지)이라 해당하지 않지만, 만약 이 예외가 나면 출력 전문을 회신한다(위 트랜잭션 때문에 DB는 바뀌지 않았다).
   - **head까지 올리는 이유**: 개발 DB가 main의 head를 따라가는 것이 이 저장소의 일반 상태이고, 중간 리비전에 멈춰 두면 다른 세션의 코드와 어긋난다. ADMIN-15에 필요한 것만 원하면 B2의 `alembic upgrade head`를 `alembic upgrade 8c19e8a611e4`로 바꾸고, 그 경우 판정의 `AT_HEAD_AFTER`는 `False`가 정상이다.
