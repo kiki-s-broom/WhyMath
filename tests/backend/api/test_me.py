@@ -2733,7 +2733,7 @@ class TestNextProblem:
         cand = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(uuid.uuid4(), True, None, None, None)]),  # b 소스 없음 → 제외
+                _AQResult([(uuid.uuid4(), True, None, None, None, None)]),  # b 소스 없음 → 제외
                 _AQResult([(cand, 3.0, None)]),
             ]
             + _reason_results()
@@ -2746,7 +2746,10 @@ class TestNextProblem:
     def test_high_theta_picks_harder(self) -> None:
         """전부 정답 → θ 상한(4.0). 난이도 3·5 후보 중 b=2(난이도 5)가 정보량 최대."""
         pid_mid, pid_hard = uuid.uuid4(), uuid.uuid4()
-        attempts = [(uuid.uuid4(), True, 5.0, None, None), (uuid.uuid4(), True, 4.0, None, None)]
+        attempts = [
+            (uuid.uuid4(), True, 5.0, None, None, None),
+            (uuid.uuid4(), True, 4.0, None, None, None),
+        ]
         session = _next_problem_session(
             [
                 _AQResult(attempts),
@@ -2765,7 +2768,7 @@ class TestNextProblem:
 
     def test_measurement_sufficient_when_many_responses(self) -> None:
         """난이도3(b=0) 46건 절반 정답 → θ=0·SE=2/√46≈0.295 ≤ 0.3 → 중단 권고."""
-        attempts = [(uuid.uuid4(), i % 2 == 0, 3.0, None, None) for i in range(46)]
+        attempts = [(uuid.uuid4(), i % 2 == 0, 3.0, None, None, None) for i in range(46)]
         cand = uuid.uuid4()
         session = _next_problem_session(
             [_AQResult(attempts), _AQResult([(cand, 3.0, None)])] + _reason_results()
@@ -2992,7 +2995,7 @@ class TestNextProblem:
         pid_sibling, pid_other = uuid.uuid4(), uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),  # ① 오답 이력(θ 추정 겸용)
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),  # ① 오답 이력(θ 추정 겸용)
                 _AQResult([pid_wrong]),  # ② 직전 오답 문항 id
                 _AQResult([(pid_wrong, pid_sibling)]),  # ③ 형제(parent=오답, related=형제)
                 _AQResult(  # ④ 후보(동일 난이도)
@@ -3015,7 +3018,7 @@ class TestNextProblem:
         c_weak = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),
                 _AQResult([pid_wrong]),
                 _AQResult([(pid_wrong, pid_sibling_weak)]),
                 _AQResult([(pid_plain, 3.0, None), (pid_sibling_weak, 3.0, None)]),
@@ -3037,7 +3040,7 @@ class TestNextProblem:
         pid_sibling = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),
                 _AQResult([pid_wrong]),
                 _AQResult([(pid_wrong, pid_sibling)]),
                 _AQResult([(pid_sibling, 3.0, None)]),
@@ -3154,7 +3157,7 @@ class TestCandidatePoolOrdering:
         assert before_id == str(pid_a)
 
         # ② attempt 1건 주입(pid_a 채점) — NOT IN이 SQL에 실리고, 반환 문항이 바뀐다
-        after_id, after_sql = _call([(pid_a, True, 3.0, None, None)], [(pid_b, 3.0, None)])
+        after_id, after_sql = _call([(pid_a, True, 3.0, None, None, None)], [(pid_b, 3.0, None)])
         assert "problem_id NOT IN" in after_sql
         assert after_id == str(pid_b)
         assert after_id != before_id
@@ -3290,7 +3293,7 @@ class TestNextProblemSuneungMode:
         assert session.commits == 1
 
     def test_recommendation_records_candidates_and_policy_version_suneung(self) -> None:
-        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v3가 실린다.
+        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v4가 실린다.
 
         적격(시그니처 보유)·부적격(수능 신호 전무) 후보를 함께 넣어 candidates[]가 부적격을
         빼고 적격만 담는지(진실 게이트 재적용)까지 함께 확인한다.

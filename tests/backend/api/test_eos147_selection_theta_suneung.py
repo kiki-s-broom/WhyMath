@@ -176,7 +176,7 @@ def _history(**over: Any) -> AttemptHistoryState:
         "measurement_sufficient": False,
         "administered_count": 1,
         "theta_boundary": "upper",
-        "boundary_selection_theta": 0.9,
+        "selection_theta_override": 0.9,
     }
     base.update(over)
     return AttemptHistoryState(**base)
@@ -234,7 +234,7 @@ class TestSuneungPolicyConsumesSelectionTheta:
         """경계가 아니면 전 지점이 추정 θ — 규칙이 발동하지 않은 요청은 종전과 같다."""
         spy = _install(
             monkeypatch,
-            _history(theta=0.7, theta_boundary=None, boundary_selection_theta=None),
+            _history(theta=0.7, theta_boundary=None, selection_theta_override=None),
         )
         outcome = await _run(
             [_problem(3.9), _problem(4.8)], LearningContext(mode="suneung", purpose="learning")
@@ -249,7 +249,7 @@ class TestSuneungPolicyConsumesSelectionTheta:
         """하한 비대칭 동결 — 전부 오답이면 경계 사실만 싣고 표적은 -4.0 그대로(범위 밖)."""
         spy = _install(
             monkeypatch,
-            _history(theta=-4.0, theta_boundary="lower", boundary_selection_theta=None),
+            _history(theta=-4.0, theta_boundary="lower", selection_theta_override=None),
         )
         outcome = await _run([_problem(3.9), _problem(4.8)], LearningContext(mode="suneung"))
         assert spy.order_theta == [-4.0] and spy.index_theta == [-4.0]
@@ -268,3 +268,22 @@ class TestSuneungPolicyConsumesSelectionTheta:
         assert outcome.theta == 4.0
         assert outcome.selection_theta == pytest.approx(0.9, abs=_ABS)
         assert outcome.theta_boundary == "upper"
+
+    async def test_help_fold_counts_flow_into_the_outcome(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """EOS-39 — 도움 접기·미상 계측이 수능 정책 결과까지 흐른다(처치 기록의 재료)."""
+        _install(monkeypatch, _history(selection_help_count=2, selection_hint_unknown_count=3))
+        outcome = await _run([_problem(3.9), _problem(4.8)], LearningContext(mode="suneung"))
+        assert outcome.selection_help_count == 2
+        assert outcome.selection_hint_unknown_count == 3
+
+    async def test_help_fold_counts_default_to_zero_and_survive_no_candidate(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _install(monkeypatch, _history())
+        outcome = await _run([_problem(3.9)], LearningContext(mode="suneung"))
+        assert (outcome.selection_help_count, outcome.selection_hint_unknown_count) == (0, 0)
+        _install(monkeypatch, _history(selection_help_count=1))
+        empty = await _run([], LearningContext(mode="suneung"))
+        assert empty.problem_id is None and empty.selection_help_count == 1

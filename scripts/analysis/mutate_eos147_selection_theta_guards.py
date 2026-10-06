@@ -87,7 +87,9 @@ class Mutation:
 _STEP = "ALL_CORRECT_STEP_LOGIT = 0.5\n"
 _FLOOR_CAP = "    return min(upper, max(cold_start, reach))\n"
 _REACH = "    reach = max(item.difficulty for item, _ in responses) + step\n"
-_COLD = "    cold_start = estimate_ability([])\n"
+#: EOS-39가 `ability_for_help_folded_selection`에 같은 줄(들여쓰기만 깊게)을 두었으므로 앞 줄까지
+#: 묶어 `ability_for_selection`의 것만 가리키게 한다 — 부분 문자열 일치가 두 건이 되는 것을 막는다.
+_COLD = "        return estimated_theta\n    cold_start = estimate_ability([])\n"
 _GATE = '    if ability_boundary(responses) != "upper":\n        return estimated_theta\n'
 _ALL = (
     "    if not responses:\n        return None\n"
@@ -106,15 +108,15 @@ _EST_UPPER = (
 
 _PROP = (
     "        return (\n"
-    "            self.theta if self.boundary_selection_theta is None"
-    " else self.boundary_selection_theta\n"
+    "            self.theta if self.selection_theta_override is None"
+    " else self.selection_theta_override\n"
     "        )\n"
 )
 _LOAD_SEL = "    selection_theta = ability_for_selection(responses, theta)\n"
 _LOAD_SE = "    se = ability_standard_error(theta, administered_items)\n"
 _LOAD_BOUNDARY = "        theta_boundary=ability_boundary(responses),\n"
 _LOAD_OVERRIDE = (
-    "        boundary_selection_theta=selection_theta if selection_theta != theta else None,\n"
+    "        selection_theta_override=selection_theta if selection_theta != theta else None,\n"
 )
 _LOAD_THETA = "    theta = estimate_ability(responses)\n"
 
@@ -161,10 +163,10 @@ _EVD_BOUNDARY = (
     "    if theta_boundary is not None:\n"
     "        meta[META_KEY_THETA_BOUNDARY] = theta_boundary\n"
 )
-_EVD_VER_CAT = 'POLICY_VERSION_CAT: str = "cat_v4"\n'
-_EVD_VER_SUNEUNG = 'POLICY_VERSION_SUNEUNG: str = "suneung_v3"\n'
-_EVD_VER_REMEDIATION = 'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v1_state_remediation"\n'
-_EVD_VER_UNDIAGNOSED = 'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v2_state_undiagnosed"\n'
+_EVD_VER_CAT = 'POLICY_VERSION_CAT: str = "cat_v5"\n'
+_EVD_VER_SUNEUNG = 'POLICY_VERSION_SUNEUNG: str = "suneung_v4"\n'
+_EVD_VER_REMEDIATION = 'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v2_state_remediation"\n'
+_EVD_VER_UNDIAGNOSED = 'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v3_state_undiagnosed"\n'
 _ME_SEL = (
     "        selection_theta=(\n"
     "            outcome.selection_theta"
@@ -175,7 +177,6 @@ _ME_BOUNDARY = "        ),\n        theta_boundary=outcome.theta_boundary,\n"
 _ME_LEDGER = (
     "            selection_theta=outcome.selection_theta,\n"
     "            theta_boundary=outcome.theta_boundary,\n"
-    "            pool_size=outcome.candidate_pool_size,\n"
 )
 
 
@@ -234,7 +235,7 @@ MUTATIONS: list[Mutation] = [
         "I10-cold-start-hardcoded",
         IRT,
         _COLD,
-        "    cold_start = 0.5\n",
+        "        return estimated_theta\n    cold_start = 0.5\n",
         "바닥의 유도",
     ),
     # ── 축 3: 경계 판정 ───────────────────────────────────────────────────────────
@@ -293,7 +294,7 @@ MUTATIONS: list[Mutation] = [
         "N02-selection-property-truthiness",
         NPS,
         _PROP,
-        "        return self.boundary_selection_theta or self.theta\n",
+        "        return self.selection_theta_override or self.theta\n",
         "0.0 덮어쓰기 값",
     ),
     Mutation(
@@ -328,7 +329,7 @@ MUTATIONS: list[Mutation] = [
         "N07-override-always-carried",
         NPS,
         _LOAD_OVERRIDE,
-        "        boundary_selection_theta=selection_theta,\n",
+        "        selection_theta_override=selection_theta,\n",
         "덮어쓰기는 다를 때만",
     ),
     # ── 축 6: 기본 CAT 정책의 θ 소비 지점 — 같은 종류이므로 전건 RED여야 한다 ─────────────
@@ -539,15 +540,15 @@ MUTATIONS: list[Mutation] = [
         "V03-remediation-variant-changed",
         EVIDENCE,
         _EVD_VER_REMEDIATION,
-        'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v2_state_remediation"\n',
-        "버전: R3 집행 변형(바뀌면 안 된다)",
+        'POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v9_state_remediation"\n',
+        "버전: R3 집행 변형(현행 값 고정 — EOS-39가 cat_v2로 올렸다)",
     ),
     Mutation(
         "V04-undiagnosed-variant-changed",
         EVIDENCE,
         _EVD_VER_UNDIAGNOSED,
-        'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v4_state_undiagnosed"\n',
-        "버전: R6 집행 변형(바뀌면 안 된다)",
+        'POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v9_state_undiagnosed"\n',
+        "버전: R6 집행 변형(현행 값 고정 — EOS-39가 cat_v3으로 올렸다)",
     ),
     # ── 축 9: 응답 매핑·기록 전달(서빙 경로) — 단위가 못 보는 지점 ─────────────────────
     Mutation(
@@ -562,7 +563,7 @@ MUTATIONS: list[Mutation] = [
         "M02-response-boundary-dropped",
         ME,
         _ME_BOUNDARY,
-        "        theta_boundary=None,\n",
+        "        ),\n        theta_boundary=None,\n",
         "응답 theta_boundary",
         True,
     ),
@@ -570,8 +571,7 @@ MUTATIONS: list[Mutation] = [
         "M03-ledger-selection-not-passed",
         ME,
         _ME_LEDGER,
-        "            theta_boundary=outcome.theta_boundary,\n"
-        "            pool_size=outcome.candidate_pool_size,\n",
+        "            theta_boundary=outcome.theta_boundary,\n",
         "처치 기록 전달(선택 θ)",
         True,
     ),
@@ -579,8 +579,7 @@ MUTATIONS: list[Mutation] = [
         "M04-ledger-boundary-not-passed",
         ME,
         _ME_LEDGER,
-        "            selection_theta=outcome.selection_theta,\n"
-        "            pool_size=outcome.candidate_pool_size,\n",
+        "            selection_theta=outcome.selection_theta,\n",
         "처치 기록 전달(경계 사실)",
         True,
     ),
@@ -674,6 +673,7 @@ def apply_mutation(m: Mutation) -> None:
     m.path.write_text(mutated, encoding="utf-8")
     if m.path.read_text(encoding="utf-8") != mutated:
         raise AssertionError(f"{m.name}: 쓴 내용이 다시 읽히지 않는다")
+    compile(mutated, str(m.path), "exec")  # 구문을 깨는 주입은 '검출'이 아니라 하네스 결함이다
 
 
 def main() -> int:

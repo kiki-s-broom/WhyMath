@@ -170,8 +170,9 @@ class TestAbilityForSelection:
     def test_does_not_depend_on_how_many_were_solved(self) -> None:
         """정답 개수(n)를 쓰지 않는다 — 같은 최고 난이도면 1개든 10개든 같은 표적(판정문 §9-2).
 
-        **잠정 동작의 동결** — 정답 개수·도움 완료를 반영하지 않는다. 보정은 `EOS-39`가 소유하므로
-        이 테스트는 그 태스크에서 의도적으로 바뀔 수 있다.
+        **잠정 동작의 동결** — 정답 개수를 반영하지 않는다(도움 완료는 앞단 `selection_evidence`가
+        접는다 — EOS-39). 보정은 `EOS-176`이 소유하므로 이 테스트는 그 태스크에서 의도적으로
+        바뀔 수 있다.
         """
         # 유도: 맞힌 최고 b = -0.1 → -0.1 + 0.5 = 0.4 (1건이든 10건이든 같다).
         assert ability_for_selection(_all_correct(-0.1), 4.0) == pytest.approx(0.4, abs=_ABS)
@@ -268,16 +269,16 @@ class TestAttemptHistoryStateSelectionTheta:
         state = _state(theta=1.25)
         assert state.selection_theta == 1.25
         assert state.theta_boundary is None
-        assert state.boundary_selection_theta is None
+        assert state.selection_theta_override is None
 
     def test_override_wins_for_selection_only(self) -> None:
-        state = _state(theta=4.0, theta_boundary="upper", boundary_selection_theta=0.9)
+        state = _state(theta=4.0, theta_boundary="upper", selection_theta_override=0.9)
         assert state.selection_theta == 0.9
         assert state.theta == 4.0  # 추정 θ는 그대로
 
     def test_a_zero_override_is_not_mistaken_for_missing(self) -> None:
         """0.0은 유효한 선택 θ다(콜드스타트 바닥) — `if override`(truthiness)로 읽으면 사라진다."""
-        state = _state(theta=4.0, theta_boundary="upper", boundary_selection_theta=0.0)
+        state = _state(theta=4.0, theta_boundary="upper", selection_theta_override=0.0)
         assert state.selection_theta == 0.0
 
 
@@ -298,10 +299,13 @@ class _HistorySession:
 
 
 def _row(
-    correct: bool | None, difficulty: float | None, irt_b: float | None = None
-) -> tuple[uuid.UUID, bool | None, float | None, float | None, float | None]:
-    """`(problem_id, is_correct, difficulty_overall, irt_difficulty_b, irt_a)`."""
-    return (uuid.uuid4(), correct, difficulty, irt_b, None)
+    correct: bool | None,
+    difficulty: float | None,
+    irt_b: float | None = None,
+    used_hint: bool | None = None,
+) -> tuple[uuid.UUID, bool | None, float | None, float | None, float | None, bool | None]:
+    """`(problem_id, is_correct, difficulty_overall, irt_difficulty_b, irt_a, used_hint)`."""
+    return (uuid.uuid4(), correct, difficulty, irt_b, None, used_hint)
 
 
 async def _load(rows: list[Any]) -> AttemptHistoryState:
@@ -347,7 +351,7 @@ class TestLoadAttemptHistoryState:
         state = await _load([_row(True, 3.0, irt_b=3.8)])
         assert state.theta_boundary == "upper"
         assert state.selection_theta == 4.0
-        assert state.boundary_selection_theta is None
+        assert state.selection_theta_override is None
 
     async def test_mixed_history_is_untouched(self) -> None:
         """혼합 이력 — 추정 θ(MLE)가 그대로 선택 θ이고 경계가 아니다."""
@@ -355,7 +359,7 @@ class TestLoadAttemptHistoryState:
         assert state.theta == pytest.approx(0.25, abs=1e-9)  # 정답 b=0 · 오답 b=0.5의 MLE
         assert state.selection_theta == state.theta
         assert state.theta_boundary is None
-        assert state.boundary_selection_theta is None
+        assert state.selection_theta_override is None
 
     async def test_all_wrong_is_reported_but_not_acted_on(self) -> None:
         """하한 — 경계 사실은 보고하되 선택은 추정 θ(-4.0) 그대로다(범위 밖 · 비대칭 동결)."""
@@ -363,7 +367,7 @@ class TestLoadAttemptHistoryState:
         assert state.theta == -4.0
         assert state.theta_boundary == "lower"
         assert state.selection_theta == -4.0
-        assert state.boundary_selection_theta is None
+        assert state.selection_theta_override is None
 
     async def test_no_history_is_cold_start(self) -> None:
         state = await _load([])
@@ -505,9 +509,9 @@ _POOL: list[tuple[uuid.UUID, float, float | None]] = [
     (_B, 4.8, None),
     (_C, 2.0, None),
 ]
-#: 주입한 상태 — `boundary_selection_theta=0.9`는 **손으로 넣은 값**이지 규칙이 낸 값이 아니다. 정책
+#: 주입한 상태 — `selection_theta_override=0.9`는 **손으로 넣은 값**이지 규칙이 낸 값이 아니다. 정책
 #: 소비 지점 테스트가 단계 상수를 따라 움직이지 않도록 규칙 산출(②③)과 분리했다.
-_BOUNDARY = dict(theta=4.0, theta_boundary="upper", boundary_selection_theta=0.9)
+_BOUNDARY = dict(theta=4.0, theta_boundary="upper", selection_theta_override=0.9)
 
 
 async def _run(
@@ -634,6 +638,29 @@ class TestCatPolicyConsumesSelectionTheta:
         assert outcome.theta == 4.0
         assert outcome.selection_theta == pytest.approx(0.9, abs=_ABS)
         assert outcome.theta_boundary == "upper"
+
+    async def test_help_fold_counts_flow_into_the_outcome(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """EOS-39 — 도움 접기·미상 계측이 정책 결과까지 흐른다(처치 기록의 재료)."""
+        _install(
+            monkeypatch,
+            history=_state(selection_help_count=2, selection_hint_unknown_count=3),
+            pool=_POOL,
+        )
+        outcome: NextProblemOutcome = await _run()
+        assert outcome.selection_help_count == 2
+        assert outcome.selection_hint_unknown_count == 3
+
+    async def test_help_fold_counts_default_to_zero_and_survive_no_candidate(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _install(monkeypatch, history=_state(), pool=_POOL)
+        outcome = await _run()
+        assert (outcome.selection_help_count, outcome.selection_hint_unknown_count) == (0, 0)
+        _install(monkeypatch, history=_state(selection_help_count=1), pool=[])
+        empty = await _run()
+        assert empty.problem_id is None and empty.selection_help_count == 1
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -772,9 +799,9 @@ class TestLadderSpeed:
     1.0 단계 3번째, 0.5 단계 5번째다. 1.0은 현행보다 한 칸 늦출 뿐이라 0.5로 내렸다. 이 클래스는 그
     숫자가 다시 거짓이 되지 않게 지킨다(단계 상수를 바꾸는 뮤테이션 I01·I02·I03이 여기서도 잡힌다).
 
-    **잠정 동작의 동결** — 정답 개수·도움 완료를 반영하지 않는 0.5 단계의 사다리다. 표적의 실측
-    보정과 도움 받은 완료 신호의 반영은 `EOS-39`가 소유하므로, 이 클래스는 그 태스크에서 의도적으로
-    바뀔 수 있다.
+    **잠정 동작의 동결** — 정답 개수를 반영하지 않는 0.5 단계의 사다리다(도움 받은 완료 신호는
+    EOS-39가 앞단에서 접는다 — 이 클래스의 이력은 독립 성공이다). 표적의 실측 보정은 `EOS-176`이
+    소유하므로, 이 클래스는 그 태스크에서 의도적으로 바뀔 수 있다.
     """
 
     async def test_baseline_jumps_to_the_top_at_the_second_recommendation(self) -> None:
@@ -824,13 +851,14 @@ class TestPolicyVersionLiterals:
     def test_versions_are_pinned_as_literals(self) -> None:
         """선택 규칙이 바뀌면 식별자를 올린다(REC-11) — EOS-147이 기본 CAT·수능의 선택을 바꿨다.
 
-        상수를 읽어 기대값을 만들지 않고 리터럴로 묻는다. 상태 머신 집행 변형 둘은 **그대로**다:
-        경로 규칙(후보 제한·이름표)이 같고 두 경로는 오답이 있는 이력에서만 발동한다.
+        상수를 읽어 기대값을 만들지 않고 리터럴로 묻는다. **EOS-39가 네 개를 모두 올렸다**: 도움
+        완료 접기는 오답 행이 있는 이력의 선택 θ도 바꾸고 R3·R6의 정렬·밴드가 그 θ를 읽는다(EOS-147이
+        R3·R6를 올리지 않은 근거 "오답 이력에서는 경계 규칙이 서지 않는다"가 더는 성립하지 않는다).
         """
-        assert POLICY_VERSION_CAT == "cat_v4"
-        assert POLICY_VERSION_SUNEUNG == "suneung_v3"
-        assert POLICY_VERSION_CAT_STATE_REMEDIATION == "cat_v1_state_remediation"
-        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v2_state_undiagnosed"
+        assert POLICY_VERSION_CAT == "cat_v5"
+        assert POLICY_VERSION_SUNEUNG == "suneung_v4"
+        assert POLICY_VERSION_CAT_STATE_REMEDIATION == "cat_v2_state_remediation"
+        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v3_state_undiagnosed"
 
     def test_the_four_identifiers_are_distinct(self) -> None:
         """둘이 같은 글자가 되면 소급 평가가 서로 다른 규칙의 로그를 한 정책으로 읽는다."""

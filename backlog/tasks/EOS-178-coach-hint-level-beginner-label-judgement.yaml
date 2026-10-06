@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-178-coach-hint-level-beginner-label-judgement
+title: "오답 한 건이 숙달 라벨 '초보'를 만들어 코치가 힌트 단계를 올린다 — 그 라벨이 만드는 used_hint=True의 판정 (EOS-146 acceptance ⑩ 승계 · EOS-39 입력)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-39-app-help-completion-evidence-in-target-selection
+requires_gates: []
+acceptance:
+  - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md` §2-2): EOS-146 acceptance ⑩이 \"오답 한 건으로 두 칸 도약하는 것이 교수학적으로 허용되는지는 판정 대기\"라고 적었으나 그 판정은 `done`인 EOS-146 안에 남아 **살아 있는 소유자가 없다.** `used_hint=True`는 학생의 도움 요청이 아니라 \"코치가 단계 2 이상을 공급했다\"이며 `decide_hint_level` 규칙 5(숙달 라벨 '초보' → 기본 단계 1이 2로)가 학생이 아무것도 요청하지 않아도 단계 2를 공급한다. EOS-146 이후 오답 한 건이 BKT를 0.4 미만으로 내려 '초보'를 만들므로 실 PG 통합(`test_eos39_help_fold_integration.py` 프로브: 오답 → 중립 한 턴 → 정답 = `used_hint=True`·공급 `[1,2]`)이 그 현상을 고정한다."
+  - "② 판정: '초보' 라벨에 최소 표본 수를 둘지, 오답 직후 자동 단계 상승을 막을지, 현행을 유지할지를 정한다. 이 판정이 바뀌면 EOS-39 도움 접기의 입력(`used_hint` 라벨)이 바뀐다 — 통합 테스트 프로브 3건이 먼저 깨져 눈에 보이게 한다(현상의 고정이지 옳다는 선언이 아니다). 판정 입력으로 EOS-39 계측(리포트 도움 접기 발동률·미상 비율)의 운영 값이 있으면 쓴다."
+  - "③ 라벨 정확도의 운영 실측 소유: 독립 성공이 코치 정책 때문에 도움 라벨을 받는 비율(구조적 오귀속 — EOS-39 판정 §4-2에서 합성으로 θ=+1 학생 서빙의 \"너무 쉬움\"(독립 성공확률 > 0.90)이 30% 오귀속에서 0.10 · 60%에서 0.64로 늘어남을 보임)을 운영 응답에서 재는 방법을 정한다. 이 비율이 높으면 EOS-39 킬 스위치 `l2_selection_help_fold_enabled`를 끄는 근거가 된다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/hint_deferral.py
+  - src/backend/whymath_backend/api/coach.py
+session: null
+notes: "출처: EOS-39 판정문 §2-2·§8 / 독립 비판 #1(차단) (2026-10-06). 등급 P1 근거: EOS-39 도움 접기의 입력 신호(used_hint)의 의미를 정하는 판정이며 앱 학생의 추천 표적에 직접 영향한다. 정본 소유 공백이던 EOS-146 acceptance ⑩의 승계처다.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
+updated: 2026-10-06

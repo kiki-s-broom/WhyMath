@@ -272,9 +272,12 @@ class _HistorySession:
         return _Result(self._rows)
 
 
-def _rows(irt_a: float | None) -> list[tuple[uuid.UUID, bool, float, float | None, float | None]]:
-    """난이도 2~4 교대·정오답 교대 30건 — (problem_id, is_correct, difficulty, irt_b, irt_a)."""
-    return [(uuid.uuid4(), k % 3 != 0, 2.0 + (k % 3), None, irt_a) for k in range(30)]
+def _rows(
+    irt_a: float | None,
+) -> list[tuple[uuid.UUID, bool, float, float | None, float | None, bool | None]]:
+    """난이도 2~4 교대·정오답 교대 30건 — (problem_id, is_correct, difficulty, irt_b, irt_a,
+    used_hint). 힌트 귀속은 전부 미상(None) — 이 테스트는 변별도 a만 잰다."""
+    return [(uuid.uuid4(), k % 3 != 0, 2.0 + (k % 3), None, irt_a, None) for k in range(30)]
 
 
 class TestLoadAttemptHistoryDiscrimination:
@@ -284,7 +287,7 @@ class TestLoadAttemptHistoryDiscrimination:
         state = await load_attempt_history_state(
             cast(AsyncSession, _HistorySession(rows)), uuid.uuid4()
         )
-        legacy = [(IrtItem(difficulty=difficulty_to_logit(d)), c) for _p, c, d, _b, _a in rows]
+        legacy = [(IrtItem(difficulty=difficulty_to_logit(d)), c) for _p, c, d, _b, _a, _h in rows]
         theta = estimate_ability(legacy)
         assert state.theta == theta
         assert state.standard_error == ability_standard_error(theta, [i for i, _ in legacy])

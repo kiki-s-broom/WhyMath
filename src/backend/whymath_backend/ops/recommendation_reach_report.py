@@ -44,7 +44,15 @@
    처치 전체 중 `meta`에 `candidates`·`policy_version`이 둘 다 실린 건수의 비율("작동한
    비율" — CLAUDE.md 원칙). 분모(처치 전체)가 0이면 비율은 **None**(0/0을 지어내지 않는다).
 
-집계 코어(`build_report`)는 순수 함수(원시 카운트 6개 → 리포트)라 hermetic 테스트로 전량
+6. **선택 θ 규칙 발동률**(EOS-147·EOS-39) — 같은 처치 기록에서 "추천이 추정 θ가 아니라 규칙이 만든
+   표적 θ로 골랐는가"를 센다. `selection_theta` 키(선택 θ ≠ 추정 θ — 전부 정답 상한 사다리·도움
+   접기)·`theta_boundary`(`upper`·`lower`)·`selection_help_count`(코치 도움 완료를 실패로 접은
+   문항이 있는 처치)·`selection_hint_unknown_count`(힌트 귀속 미상이 섞인 처치)의 **비율**이다
+   ("작동한 비율" — 200 응답은 규칙이 일했다는 증거가 아니다). 분모(처치 0건)는 None이다.
+   키가 없는 것은 "규칙이 안 돌았다"일 수도, 킬 스위치(`l2_selection_help_fold_enabled`)가 꺼졌던
+   기간일 수도 있다 — 두 상태는 이 키만으로 구분되지 않으므로 배포·스위치 기간과 함께 읽는다.
+
+집계 코어(`build_report`)는 순수 함수(원시 카운트 → 리포트)라 hermetic 테스트로 전량
 검증 가능하다. DB 접속(`fetch_reach_counts`)만 async I/O 경계다.
 
 실행
@@ -79,6 +87,10 @@ from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
     META_KEY_CANDIDATES,
     META_KEY_POLICY_VERSION,
+    META_KEY_SELECTION_HELP_COUNT,
+    META_KEY_SELECTION_HINT_UNKNOWN_COUNT,
+    META_KEY_SELECTION_THETA,
+    META_KEY_THETA_BOUNDARY,
 )
 
 __all__ = [
@@ -115,11 +127,16 @@ REQUEST_COUNTER_STATUS = (
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# DB 접속 경계 — 실제 쿼리 6회(전부 SQLAlchemy Core, 원시 SQL 0).
+# DB 접속 경계 — 실제 쿼리 11회(전부 SQLAlchemy Core, 원시 SQL 0).
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(slots=True, frozen=True)
 class ReachCounts:
-    """DB에서 실측한 원시 카운트 6종 — `build_report`(순수)의 유일한 입력."""
+    """DB에서 실측한 원시 카운트 11종 — `build_report`(순수)의 유일한 입력.
+
+    뒤의 5종(EOS-39 — 선택 θ 규칙 발동률)은 기본값 0이다: 이 필드 이전 생성자 호출처(테스트 등)와의
+    호환용이고, 값 0은 "분자가 0"일 뿐 "분모 없음"이 아니다(분모는
+    `recommendation_treatment_total`).
+    """
 
     problem_attempt_total: int
     theta_eligible_response_total: int
@@ -127,15 +144,26 @@ class ReachCounts:
     candidate_pool_structural_cap: int
     recommendation_treatment_total: int
     recommendation_treatment_with_policy_metadata_total: int
+    #: 처치 중 `selection_theta` 키가 있는 건수(선택 θ ≠ 추정 θ — 상한 사다리·도움 접기).
+    selection_theta_key_total: int = 0
+    #: 처치 중 `theta_boundary == "upper"`(전부 정답)·`"lower"`(전부 오답)인 건수.
+    theta_boundary_upper_total: int = 0
+    theta_boundary_lower_total: int = 0
+    #: 처치 중 `selection_help_count` 키가 있는 건수(코치 도움 완료를 실패로 접은 문항이 있었다).
+    selection_help_key_total: int = 0
+    #: 처치 중 `selection_hint_unknown_count` 키가 있는 건수(힌트 귀속 미상이 섞였다).
+    selection_hint_unknown_key_total: int = 0
 
 
 async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
-    """6개 실측 카운트를 쿼리 6회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
+    """11개 실측 카운트를 쿼리 11회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
 
-    각 쿼리의 의미는 모듈 docstring "실제로 DB에서 직접 측정하는 5축" 참조.
+    각 쿼리의 의미는 모듈 docstring "실제로 DB에서 직접 측정하는 축" 참조.
     쿼리 순서는 테스트(큐 기반 가짜 세션)와 계약이므로 바꾸지 않는다: ① problem_attempt
     전체 행 수 ② θ 추정 유효 응답 ③ 개인화(BKT) 유니크 (user, concept) 쌍 ④ 후보 풀 구조적
-    상한 ⑤ REC-11 candidates·policy_version 기록률(분자·분모).
+    상한 ⑤ REC-11 candidates·policy_version 기록률(분모) ⑥ 그 분자 ⑦ `selection_theta` 키
+    ⑧ `theta_boundary=upper` ⑨ `theta_boundary=lower` ⑩ `selection_help_count` 키
+    ⑪ `selection_hint_unknown_count` 키(EOS-39 — 전부 `recommendation_render` 처치 안에서).
     """
     attempt_total = int(
         (await session.execute(select(func.count()).select_from(ProblemAttempt))).scalar_one()
@@ -192,6 +220,24 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         (await session.execute(with_policy_metadata_stmt)).scalar_one()
     )
 
+    # EOS-39 — 선택 θ 규칙 발동률(같은 처치 모집단 안에서 키·값이 있는 건수). JSONB 키 존재는
+    # `has_key`, 값 비교는 `->>` 연산자(Core `op`)다 — 원시 SQL 0.
+    async def _count_treatments(*conditions: Any) -> int:
+        return int((await session.execute(treatment_total_stmt.where(*conditions))).scalar_one())
+
+    selection_theta_key_total = await _count_treatments(
+        EvidenceEvent.meta.has_key(META_KEY_SELECTION_THETA)
+    )
+    boundary_text = EvidenceEvent.meta.op("->>")(META_KEY_THETA_BOUNDARY)
+    boundary_upper_total = await _count_treatments(boundary_text == "upper")
+    boundary_lower_total = await _count_treatments(boundary_text == "lower")
+    help_key_total = await _count_treatments(
+        EvidenceEvent.meta.has_key(META_KEY_SELECTION_HELP_COUNT)
+    )
+    hint_unknown_key_total = await _count_treatments(
+        EvidenceEvent.meta.has_key(META_KEY_SELECTION_HINT_UNKNOWN_COUNT)
+    )
+
     return ReachCounts(
         problem_attempt_total=attempt_total,
         theta_eligible_response_total=eligible_total,
@@ -199,6 +245,11 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         candidate_pool_structural_cap=pool_cap,
         recommendation_treatment_total=treatment_total,
         recommendation_treatment_with_policy_metadata_total=with_policy_metadata_total,
+        selection_theta_key_total=selection_theta_key_total,
+        theta_boundary_upper_total=boundary_upper_total,
+        theta_boundary_lower_total=boundary_lower_total,
+        selection_help_key_total=help_key_total,
+        selection_hint_unknown_key_total=hint_unknown_key_total,
     )
 
 
@@ -220,10 +271,26 @@ class ReachReport:
     recommendation_treatment_total: int
     recommendation_treatment_with_policy_metadata_total: int
     recommendation_treatment_policy_metadata_rate: float | None
+    #: EOS-39 — 선택 θ 규칙 발동률. 분모는 `recommendation_treatment_total`이고 0이면 비율은 None.
+    selection_theta_key_total: int
+    selection_theta_key_rate: float | None
+    theta_boundary_upper_total: int
+    theta_boundary_upper_rate: float | None
+    theta_boundary_lower_total: int
+    theta_boundary_lower_rate: float | None
+    selection_help_key_total: int
+    selection_help_key_rate: float | None
+    selection_hint_unknown_key_total: int
+    selection_hint_unknown_key_rate: float | None
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    """분모 없는 비율은 None — 0/0을 0.0으로 지어내지 않는다(이 모듈의 None-vs-0 회계 원칙)."""
+    return None if denominator == 0 else numerator / denominator
 
 
 def build_report(counts: ReachCounts) -> ReachReport:
-    """원시 카운트 5개 → `ReachReport`(순수·부작용 0). `reached`는 count>0(분모 없는 0 방지).
+    """원시 카운트 → `ReachReport`(순수·부작용 0). `reached`는 count>0(분모 없는 0 방지).
 
     `recommendation_treatment_policy_metadata_rate`(REC-11 "작동한 비율")는 분모
     (`recommendation_treatment_total`)가 0이면 **None**이다 — 0/0을 0.0으로 지어내지
@@ -249,6 +316,26 @@ def build_report(counts: ReachCounts) -> ReachReport:
             counts.recommendation_treatment_with_policy_metadata_total
         ),
         recommendation_treatment_policy_metadata_rate=rate,
+        selection_theta_key_total=counts.selection_theta_key_total,
+        selection_theta_key_rate=_rate(
+            counts.selection_theta_key_total, counts.recommendation_treatment_total
+        ),
+        theta_boundary_upper_total=counts.theta_boundary_upper_total,
+        theta_boundary_upper_rate=_rate(
+            counts.theta_boundary_upper_total, counts.recommendation_treatment_total
+        ),
+        theta_boundary_lower_total=counts.theta_boundary_lower_total,
+        theta_boundary_lower_rate=_rate(
+            counts.theta_boundary_lower_total, counts.recommendation_treatment_total
+        ),
+        selection_help_key_total=counts.selection_help_key_total,
+        selection_help_key_rate=_rate(
+            counts.selection_help_key_total, counts.recommendation_treatment_total
+        ),
+        selection_hint_unknown_key_total=counts.selection_hint_unknown_key_total,
+        selection_hint_unknown_key_rate=_rate(
+            counts.selection_hint_unknown_key_total, counts.recommendation_treatment_total
+        ),
     )
 
 
@@ -257,6 +344,11 @@ def build_report(counts: ReachCounts) -> ReachReport:
 # ──────────────────────────────────────────────────────────────────────────
 def _status_label(reached: bool) -> str:
     return _MEASURED if reached else NOT_REACHED
+
+
+def _fmt_axis(total: int, rate: float | None) -> str:
+    """`건수 (비율)` — 분모 없는 비율(None)은 '미도달'로 적는다(0.0%로 위장하지 않는다)."""
+    return f"**{total}**" if rate is None else f"**{total}** ({rate:.1%})"
 
 
 def render_report(report: ReachReport) -> str:
@@ -318,6 +410,47 @@ def render_report(report: ReachReport) -> str:
                 "  - 1.0 미만이면 REC-11 이전(구버전 배선)에 기록된 처치가 섞여 있다는 뜻이다 "
                 "— 결함이 아니라 배선 시점 이전 데이터의 정직한 흔적."
             )
+    lines += [
+        "",
+        "## 6. 선택 θ 규칙 발동률 (EOS-147·EOS-39 — '작동한 비율')",
+        "",
+        f"- 분모(처치 기록 전체): **{report.recommendation_treatment_total}**",
+    ]
+    if report.recommendation_treatment_total == 0:
+        lines.append(f"- 발동률 전 축: {NOT_REACHED}(처치 기록 0건 — 분모 없음)")
+    else:
+        axes = (
+            (
+                "`selection_theta` 키(선택 θ ≠ 추정 θ)",
+                report.selection_theta_key_total,
+                report.selection_theta_key_rate,
+            ),
+            (
+                "`theta_boundary=upper`(전부 정답)",
+                report.theta_boundary_upper_total,
+                report.theta_boundary_upper_rate,
+            ),
+            (
+                "`theta_boundary=lower`(전부 오답)",
+                report.theta_boundary_lower_total,
+                report.theta_boundary_lower_rate,
+            ),
+            (
+                "`selection_help_count` 키(코치 도움 완료를 실패로 접음)",
+                report.selection_help_key_total,
+                report.selection_help_key_rate,
+            ),
+            (
+                "`selection_hint_unknown_count` 키(힌트 귀속 미상 섞임)",
+                report.selection_hint_unknown_key_total,
+                report.selection_hint_unknown_key_rate,
+            ),
+        )
+        lines += [f"- {label}: {_fmt_axis(total, rate)}" for label, total, rate in axes]
+        lines.append(
+            "  - 키가 없는 처치는 '규칙이 안 돌았다'이거나 킬 스위치"
+            "(`l2_selection_help_fold_enabled`)가 꺼진 기간이다 — 배포·스위치 기간과 함께 읽는다."
+        )
     lines.append("")
     return "\n".join(lines)
 
@@ -344,6 +477,29 @@ def report_to_json(report: ReachReport) -> dict[str, Any]:
             "total": report.recommendation_treatment_total,
             "with_policy_metadata": report.recommendation_treatment_with_policy_metadata_total,
             "rate": report.recommendation_treatment_policy_metadata_rate,
+        },
+        "selection_theta_rules": {
+            "treatment_total": report.recommendation_treatment_total,
+            "selection_theta_key": {
+                "total": report.selection_theta_key_total,
+                "rate": report.selection_theta_key_rate,
+            },
+            "theta_boundary_upper": {
+                "total": report.theta_boundary_upper_total,
+                "rate": report.theta_boundary_upper_rate,
+            },
+            "theta_boundary_lower": {
+                "total": report.theta_boundary_lower_total,
+                "rate": report.theta_boundary_lower_rate,
+            },
+            "selection_help_key": {
+                "total": report.selection_help_key_total,
+                "rate": report.selection_help_key_rate,
+            },
+            "selection_hint_unknown_key": {
+                "total": report.selection_hint_unknown_key_total,
+                "rate": report.selection_hint_unknown_key_rate,
+            },
         },
     }
 

@@ -25,7 +25,9 @@ theta·DB Schema)·BKT와 교차검증.
 from __future__ import annotations
 
 import math
-from typing import Literal
+from collections.abc import Hashable, Sequence
+from dataclasses import dataclass
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -55,8 +57,9 @@ ThetaBoundary = Literal["upper", "lower"]
 #    세운다.
 #  - 아직 모르는 것: ① 정답 개수 n을 반영하지 않는다(가상 MAP 추정기 — 사전 N(0,1) — 대비 표적이
 #    −1.7~+1.4 로짓 어긋난다) ② 앱 학생의 "정답"은 코치 완료 기록이라 도움을 받은 완료를 포함한다 —
-#    독립 성공이 아니다. 그 신호를 표적에 반영하고 이 값을 실측으로 보정하는 일은 `EOS-39`가
-#    소유한다.
+#    독립 성공이 아니다. 그 신호의 표적 반영은 EOS-39가 했다(`selection_evidence` — 코치가 단계 2
+#    이상을 공급한 문항을 실패 1건으로 접는다). 이 값(0.5)의 실측 보정은 운영 값이 쌓인 뒤
+#    `EOS-176`이 소유한다.
 ALL_CORRECT_STEP_LOGIT = 0.5
 
 
@@ -161,7 +164,7 @@ def ability_for_selection(
         더 나은 추천이라는 주장이 아니다(판정문 §4-1·§4-2).
       - **정답 개수(n)와 정답의 독립성은 반영하지 않는다**(잠정): 같은 최고 난이도면 정답이 1건이든
         20건이든 표적이 같고, 도움을 받은 완료(앱 코치 완료 기록)도 정답으로 센다. 가상 MAP 추정기
-        대비 표적이 −1.7 ~ +1.4 로짓 어긋난다(판정문 §4-2). 보정은 `EOS-39`가 소유한다.
+        대비 표적이 −1.7 ~ +1.4 로짓 어긋난다(판정문 §4-2). 보정은 `EOS-176`이 소유한다.
     그 외 이력(전부 오답 포함 — 하한 대칭은 이번 범위 밖, 판정문 §4-4)은 `estimated_theta` 그대로다.
 
     **추정기를 바꾸지 않는다.** 이 값은 SE·`measurement_sufficient`·능력 API·문항 보정의 입력이
@@ -172,6 +175,95 @@ def ability_for_selection(
     cold_start = estimate_ability([])
     reach = max(item.difficulty for item, _ in responses) + step
     return min(upper, max(cold_start, reach))
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionAttempt:
+    """선택용 응답을 만들 채점 행 하나(EOS-39) — 문항 식별자·문항 모수·정오·힌트 귀속(3상태).
+
+    `used_hint`는 `problem_attempt.used_hint`다 — **학생이 요청했는가가 아니라 코치가 단계 2 이상을
+    공급했는가**다(숙달 라벨 '초보'·5회+ 막힘도 단계를 올린다 — 판정문 §2-2).
+    """
+
+    problem_key: Hashable
+    item: IrtItem
+    is_correct: bool
+    used_hint: bool | None
+
+
+class SelectionEvidence(NamedTuple):
+    """`selection_evidence`의 결과 — 선택용 응답과 그 규칙이 이 이력에 얼마나 닿았는가."""
+
+    responses: list[tuple[IrtItem, bool]]
+    #: 도움 완료라서 실패 1건으로 접힌 **문항** 수 — 0이면 이 규칙이 이 이력에 닿지 않았다
+    #: ("작동한 비율" 원칙 — 200 응답은 규칙이 일했다는 증거가 아니다).
+    help_failure_count: int
+    #: 정답으로 센 완료 행 중 힌트 귀속이 미상(NULL)이라 판정하지 못한 수 — "모른다 ≠ 아니다".
+    hint_unknown_count: int
+
+
+def selection_evidence(attempts: Sequence[SelectionAttempt]) -> SelectionEvidence:
+    """추천 **표적**을 위한 응답 — 도움을 쓴 문항을 실패 1건으로 센다(EOS-39 · 판정문 §0).
+
+    **문항 단위로 접는다**: 한 문항에 도움 완료 행(`used_hint is True`인 정답)이 하나라도 있으면
+    그 문항은 실패 **1건**이다 — 그 문항에 오답 행이 있었든 없었든 실패는 한 번만 센다(재제출
+    오답을 벌점처럼 쌓지 않는다는 게이트 `G-eos146-disposition` (가)와 같은 결). 행 단위로 뒤집으면
+    오답 뒤 도움 완료 흐름(오답 행 + 도움 완료 행)에서 효과가 0이다(판정문 §3 `a1`).
+    도움 신호가 없는 문항은 행을 **있는 그대로** 둔다: 도움 없이 오답 뒤 스스로 고친 문항은
+    오답+정답 한 쌍(반반 맞힌 문항 — 종전과 같다 · 가치 판단 — 판정문 §4-5)이고, 힌트 귀속이
+    미상(`None`)인 정답은 정답이다(NULL을 실패로 세면 EOS-133 이전 이력과 API 클라이언트의
+    이력이 전부 실패가 된다 — "모른다 ≠ 아니다").
+
+    **추정 θ·SE·능력 API·숙달은 이 응답을 읽지 않는다** — 그 소비처는 계속 도움 완료도 정답으로 센
+    `estimate_ability` 입력을 읽는다(판정문 §2). 이 함수의 출력은 추천이 후보를 고르는 표적에만
+    쓰인다. 같은 문항의 행은 첫 등장 순서로 묶는다(순서는 MLE·경계 판정에 영향이 없다).
+    """
+    order: list[Hashable] = []
+    by_problem: dict[Hashable, list[SelectionAttempt]] = {}
+    for attempt in attempts:
+        if attempt.problem_key not in by_problem:
+            order.append(attempt.problem_key)
+            by_problem[attempt.problem_key] = []
+        by_problem[attempt.problem_key].append(attempt)
+    responses: list[tuple[IrtItem, bool]] = []
+    help_failures = 0
+    hint_unknown = 0
+    for key in order:
+        rows = by_problem[key]
+        if any(row.is_correct and row.used_hint is True for row in rows):
+            responses.append((rows[0].item, False))
+            help_failures += 1
+            continue
+        for row in rows:
+            responses.append((row.item, row.is_correct))
+            if row.is_correct and row.used_hint is None:
+                hint_unknown += 1
+    return SelectionEvidence(responses, help_failures, hint_unknown)
+
+
+def ability_for_help_folded_selection(
+    folded: list[tuple[IrtItem, bool]],
+    *,
+    step: float = ALL_CORRECT_STEP_LOGIT,
+    lower: float = _THETA_LOWER,
+) -> float:
+    """도움 접기(`selection_evidence`)가 **실제로 일어난** 이력의 표적 θ(EOS-39).
+
+    접힌 응답은 정답이 하나 이상 접혀 실패가 됐으므로 **전부 정답일 수 없다**(상한 사다리가 설 일
+    없음). 두 경우다.
+      - 혼합이면 MLE(`estimate_ability`) — 도움 완료가 독립 성공처럼 표적을 올리지 않는다.
+      - **전부 실패**이면 하한(−4.0) 고정이 아니라 사다리 `max(lower, min(콜드스타트 θ, 실패한
+        최저 난이도 b − step))`다. 첫 완료가 도움 완료인 학생을 은행의 가장 쉬운 문항(다른 개념일 수
+        있다)으로 보내지 않는다 — −4.0은 측정값이 아니라 탐색 범위의 끝이다. "한 단계 아래"는
+        콜드스타트(0.0) **위로 올라가지 않는다**(실패 난이도가 높으면 0.0이다).
+    **실제 오답만 있는 이력(도움 접기가 없었다)은 이 함수의 대상이 아니다** — 그 하한(−4.0)은
+    R3·R6의 선택 θ이기도 해서 이번에 바꾸지 않는다(판정문 §4-4 — 이월).
+    """
+    if ability_boundary(folded) == "lower":
+        cold_start = estimate_ability([])
+        reach = min(item.difficulty for item, _ in folded) - step
+        return max(lower, min(cold_start, reach))
+    return estimate_ability(folded)
 
 
 def estimate_difficulty(
@@ -553,8 +645,11 @@ __all__ = [
     "LEARNING_BAND_HIGH",
     "LEARNING_BAND_LOW",
     "LEARNING_BAND_OUT_OF_RANGE_WEIGHT",
+    "SelectionAttempt",
+    "SelectionEvidence",
     "ThetaBoundary",
     "ability_boundary",
+    "ability_for_help_folded_selection",
     "ability_for_selection",
     "ability_standard_error",
     "estimate_ability",
@@ -566,6 +661,7 @@ __all__ = [
     "probability_correct",
     "select_next_item",
     "select_weighted_item",
+    "selection_evidence",
     "theta_to_mastery_proxy",
     "total_information",
 ]
