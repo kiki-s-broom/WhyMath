@@ -80,11 +80,11 @@ gates:
     title: "ARCH-64 컷오버 라이브 대조 1회차(ARCH-71 acceptance ③) — Kiki 머신에서 저작 런북(docs/ops/eos118_seat_signal_live_runbook.md [A]~[C])과 학생 대면 런북(docs/ops/arch71_student_facing_cloud_mid_live_runbook.md)을 각 1회 실행한다. 확인: cloud_seat=openrouter · 관측 모델 · 기록 원가(좌석 단가 약 0.354원) · 학생 대면은 verdict(pass / degraded_cause_recorded / 그 밖)와 강등 원인(local_degraded·degrade_reason·provider_errors). 실패·강등 회차도 폐기하지 않고 기록한다. seat_primary_success_rate는 ARCH-63 전까지 None(미산출)이 정상이며 0으로 적지 않는다. 강등·429가 잦으면 G-cloud-mid-seat-cutover 판정 한계대로 openrouter_allowed_providers 이중화를 재질의한다. clear 증적 = 두 런북의 결과 JSON 판정 줄 + 판정 기준 커밋."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-29
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: Kiki 머신 Phaiakes9 실행 코드 = main c2a63692 (OPS-53, #1475) worktree. 2026-10-06 Kiki 직접 실행·결과 출력 전달.\n[저작 1회차 — eos118 런북 A~C] SEAT_OK=True · CHECK_EXIT=0 · CONFIGURED=True · KEY_LENGTH=73 · BATCH_EXIT=0. 다섯 축 전건 성립: selected_seat=openrouter(state=all_on_selected_seat) · comparable=5 matched=5 differs=0 · price_seat_counts openrouter=5 anthropic=0 neither=0 unmeasured=0 · retries_measured=5(retries_total=0) · secondary_seat/seat_primary_success_rate/seat_failover_rate 모두 null. 관측 모델 deepseek/deepseek-v4.1-flash 5건(선언=관측). 기록 원가 5건 합계 US$0.00415(약 6.39원, 건당 1.22~1.33원 — 실측 입력 2473토큰 기준이며 가정 토큰 추정 0.354원과 다른 것은 정상). seat_primary_success_rate=None(미산출 · ARCH-63 전 정상)을 0으로 적지 않음.\n[학생 대면 1회차 — arch71 런북 A~C-2] SETUP_OK=True · CONFIGURED=True · PROBE_EXIT=0 · verdict=pass · all_pass=true · failure_path=none · provider_errors=[] · local_degraded=false(seat_local_degrade_rate=0.0 실측) · trace cloud_seat=openrouter · served_model=deepseek/deepseek-v4.1-flash(pin과 동일 · trace=provider) · retries=0 · 기록 원가 0.131824원(입력 80·출력 116토큰, recorded_matches=openrouter, anthropic 단가였다면 3.0492원) · anthropic/deepseek/ollama 호출 0건. 결과 JSON = Kiki 머신 WhyMath-arch71/.arch71-out/student-facing-20261006-122234.json.\n관찰(실패 아님): 이번 2회차는 두 회차 모두 강등·429 0건이라 openrouter_allowed_providers 이중화 재질의 조건(강등·429 빈발)에는 해당하지 않음. 단 표본은 저작 5건·학생 1건뿐이라 강등률의 대표값이 아니다."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
