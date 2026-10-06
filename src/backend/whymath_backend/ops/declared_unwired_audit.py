@@ -1024,6 +1024,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.elementary_rounding_batch": _BATCH_GENERATOR,
         "harness.elementary_volume_measure_batch": _BATCH_GENERATOR,
         "harness.highschool_quotient_rule_batch": _BATCH_GENERATOR,
+        "harness.p3_calculus1_diff_batch": _BATCH_GENERATOR,
         "harness.linear_inequality_system_batch": _BATCH_GENERATOR,
         "harness.matrix_ops_batch": _BATCH_GENERATOR,
         "harness.measurement_unit_conversion_batch": _BATCH_GENERATOR,

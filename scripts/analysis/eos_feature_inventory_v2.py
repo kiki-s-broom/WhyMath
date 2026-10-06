@@ -761,7 +761,7 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.canonicalize", "l3.equivalent.rephrase", "l3.equivalent.rephrase_hygiene",
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
        "l3.equivalent.defect_seeder"),
-    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대)", "Admin", "Math Engine", "P0",
+    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기", "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
        "l3.equivalent.calculus1_integral_skeleton_generator",
        "l3.equivalent.calculus2_trig_integral_skeleton_generator",
@@ -802,7 +802,13 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.trig_skeleton_generator",
        "l3.equivalent.vector_operations_skeleton_generator",
        "l3.equivalent.conceptual_count_mc_generator",
-       "l3.equivalent.misconception_eval_mc_generator"),
+       "l3.equivalent.misconception_eval_mc_generator",
+       # P3-03 — Phase 3 미적분Ⅰ 미분 대단원 개념별 결정론 생성기(승인 문항 0건이던 개념 채움).
+       # 생성기 2종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
+       # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
+       "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
+       "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
+       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -1099,6 +1105,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.root_aggregate_batch", "harness.sample_mean_distribution_batch",
        "harness.sequence_sigma_batch", "harness.university_calc1_batch",
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
+       "harness.p3_calculus1_diff_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",

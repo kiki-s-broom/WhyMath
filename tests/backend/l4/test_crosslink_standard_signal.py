@@ -61,7 +61,10 @@ class TestDeriveKebabStandards:
         derived = derive_kebab_standards(_all_problem_records())  # type: ignore[arg-type]
         assert "not-a-built-kebab-sentinel" not in derived
         # 탐지 카탈로그 58 완주 — 유도 집합은 태깅된 kebab만(정직한 경계).
-        assert len(derived) <= 64
+        # 64 → 65: P3-03 미분 문항 은행(`problem_bank_p3_calculus1_diff_v0`)이 MISC-40 신설 kebab
+        # `power-rule-step-omitted`를 오답 귀인으로 처음 쓰기 시작했다(문항 코퍼스에 등장).
+        assert len(derived) <= 65
+        assert derived["power-rule-step-omitted"] == frozenset({"[12미적Ⅰ-02-03]"})
 
     def test_problem_counts_evidence(self) -> None:
         # 증거량(문항 수) — well-evidenced kebab은 하한 20 이상. root-loss는 증거 보강(24문항

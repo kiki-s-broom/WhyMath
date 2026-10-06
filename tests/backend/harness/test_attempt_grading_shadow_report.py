@@ -871,13 +871,16 @@ class TestCorpusVerifyBlockSupply:
     """`derive_verify_inputs`가 `Problem.conditions_parsed` 외에 코퍼스 verify 블록을 공급원으로 쓴다."""
 
     def test_loads_real_corpus_verify_blocks(self) -> None:
-        """코퍼스 로더가 13,570개의 유효한 verify 블록을 읽는다.
+        """코퍼스 로더가 13,647개의 유효한 verify 블록을 읽는다.
 
         2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
         30종의 문항수와 **정확히 일치**한다(우연한 드리프트가 아니라 회수의 산술 결과).
+        13,520 → 13,647(+127): P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다. 144건 중
+        17건은 검산 조건이 *연립 목록*(부등식 `a > 0`으로 해를 유일하게 가르는 문항)이라 이 로더가
+        문자열 조건만 읽는 계약상 블록에서 빠진다 — 그래서 증분이 144가 아니라 127이다.
         """
         blocks = _load_corpus_verify_blocks()
-        assert len(blocks) == 13520
+        assert len(blocks) == 13647
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1109,6 +1112,8 @@ class TestCorpusCeilingReportDiscriminates:
                 )
 
         report = build_gradability_ceiling_report(problems)
-        assert report.total_problems == 14034
+        assert report.total_problems == 14178  # 14,034 + P3-03 미분 은행 144
         assert report.bucket_counts["condition_formal_derivable"] > 0
-        assert report.bucket_counts["condition_formal_derivable"] == 12268
+        # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
+        # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).
+        assert report.bucket_counts["condition_formal_derivable"] == 12373
