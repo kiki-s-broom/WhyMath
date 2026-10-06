@@ -202,6 +202,18 @@ gates:
       - "[2026-10-03] verdict PASS · inputs: CONST-02-coding-constitution-transplant-stage1-2 · evidence: 판정 기준: main 116060df (PR #1447 squash 머지, 2026-10-03 15:50Z). 판정 ① 81건 전건 채택(삭제 규칙 없음 · 단계 도달 전까지 신규 규칙은 예정 표기). Kiki가 Phaiakes9에서 런북 과제 B를 직접 실행 — 채택 도우미 A0002 --apply(직접 입력한 동의 ADOPT 경유): RULES_COUNT=95 · SOURCES_COUNT=9 · STAGE_NOW=2 · AMENDMENTS=A0001,A0002,A0003 · ADOPT_RESULT=applied · APPLY_OK=True. 위헌 심사 audit.py(단계 2): 심사 항목 104개 · 차단 사유 0건 · AUDIT_OK=True. 래칫 audit_ratchet.py: 단계 2 · 차단 0건 이하 기준선 0건 · RATCHET_OK=True. 단계 3 미리보기(--no-run --stage 3): 차단 51건(STAGE3_PREVIEW_EXIT=1, 다음 단계 할 일 목록이며 CONST-03~08이 소유). 커밋 3c316812 push 성공(COMMIT_EXIT=0 · PUSH_EXIT=0). 세션이 main에서 실측: 규칙 95건 · STAGE 2 · 개정 기록 3개. CI: 머지 전 PR 체크 성공 7·실패 0(건너뜀 13은 경로 필터)과 머지 큐 CI 통과 후 머지, 헌법 래칫은 harness-integrity 잡에서 실행. 한계: 증적의 도우미 출력값은 Kiki가 채팅으로 전달한 것이며 이 세션이 그 머신에서 재실행하지 않았다. 조문 문안의 내용 타당성은 세션이 판정하지 않았다(판정은 Kiki). 도우미 run_merge()의 cp949 출력 해독 결함은 PYTHONUTF8=1 우회로 통과했고 근본 수정은 별건 후속. — PR 1447 머지로 A0002 채택 판정 ① 확정 — 판정 결과(PASS) 미기록 경고 해소"
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-a0005-part1-corrections
+    title: "헌법 개정 A0005 채택 판정 — 파트 I 집행 장치 정합 정정(R4-03 경로 `tests/infra/test_docs_numbers.py` · R2-04 단계 4→3·실행 `pytest -q tests/infra/test_review_health.py` · 머리말 필드 3종 설명). 초안 docs/constitution_proposals/A0005_part1_corrections_draft.md · 패치 rules_A0005_part1_corrections.patch(현재 rules.yaml 에 patch -p1 dry-run 통과). 채택 절차: 패치 적용 + constitution/amendments/A0005_*.md 기록(없으면 R0-02 가 CI 에서 막는다). 판정 기준: main 3d2b95e3 이후 CONST-03 P4 PR. R2-04 의 한계(CI 는 판정 논리만, 실데이터는 Kiki 머신)를 읽고 stage 3 정정이 맞는지도 판정한다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-06
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-diagnosis-s00-s10-run
     title: "260927 EOS 통합정밀진단 S00~S10을 Kiki 머신에서 실행해 이식 완성 결과를 독립 검증한다(공통규칙: 읽기 전용·증거 등급·단계마다 새 세션·S09는 다른 모델). 이 저장소에 이식된 헌법·집행 장치가 진단의 기준(기준/헌법·기준_코딩규칙)에 비춰 어디까지 충족되는지 S02·S07이 판정하고, S08이 'Phase 2 완료' 주장을 Gate 2 증거로 대조한다(저장소 기록: 계획서 300 Gate 2 판정 3회 FAIL — 9/19·9/24·9/25, 미충족 1축). 세션 측 사전 검증(기계 축)은 docs/standards/coding_constitution_transplant.md §5 프로토콜대로 CI가 상시 수행한다. evidence = 결과/S10_통합진단서.md 경로 + 기준 커밋 해시 + 차단·높음 건수."
     kind: human
@@ -229,6 +241,30 @@ gates:
       - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-const-protection-outside-claude
+    title: "헌법 밖 경로 보호(⑦) 방식 결정 — 조직 소유 public 저장소지만 CODEOWNERS 소유자가 전 경로 @doldori7 하나이고 PR 작성자도 같은 계정이라 코드 오너 리뷰 필수는 모든 PR 을 막는다(사람·AI 세션이 같은 신원). 후보: (가) 현상 유지(가드 훅 + R0-02) / (나) 서명 검증 CI 스텝(Kiki 서명 키로 서명된 커밋만 constitution/ 변경 통과) / (다) 별도 계정·봇으로 작성자 분리. 조직 플랜은 세션 프록시가 막아 제공 여부 미확인 — 플랜 의존 기능은 판정하지 않았다. 근거는 docs/standards/coding_constitution_transplant.md 의 CONST-03 P4 절."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-06
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
+  - id: G-const-r4-02-decision
+    title: "R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-06
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-sources-registry-adopt
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
     kind: human
