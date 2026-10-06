@@ -3,7 +3,7 @@
 acceptance ① 재현: 커밋된 실 코퍼스(앵커 레지스트리·misconceptions_v1·crosslinks.json)로
 "A1=0·A2=0·A3=0·A4=3·A5=0·A6=2 좌석(M-id는 A1=4·A2=2·A3=4·A4=8·A5=2·A6=8)"을 서명 전까지 재현했고,
 2026-10-05 게이트 `G-misc40-new-crosslink-signature` 서명으로 A1·A2·A3 좌석이 각각 0→1이 되었다
-(M0462·M0515·M0599 승인). A5=0·A6=2는 그대로다(M0671·M0672는 A6 앵커의 M-id 집합 밖이고 승인 코퍼스에도 없다 — 판정 문서 §6·§7).
+(M0462·M0515·M0599 승인). A5=0·A6=2는 그대로다(M0671·M0672는 A6 앵커의 M-id 집합 밖 — 판정 문서 §7).
 
 변별력(핵심 요구): `TestSeatVsNoSeatDiscrimination`은 좌석이 있는 상태와 없는 상태를 합성
 데이터로 직접 만들어 `compute_seat_gap`이 실제로 다른 값을 내는지 확인한다 — 항상 같은 값을

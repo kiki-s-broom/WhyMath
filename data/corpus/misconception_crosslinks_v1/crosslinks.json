@@ -513,6 +513,14 @@
    "note": "검수:Kiki 2026-07-12"
   },
   {
+   "kebab_id": "product-rule-naive",
+   "mis_id": "M0672",
+   "link_type": "부분매핑",
+   "confidence": null,
+   "method": "manual",
+   "note": "검수:kiki 2026-10-05"
+  },
+  {
    "kebab_id": "bigger-denominator-bigger-fraction",
    "mis_id": "M0462",
    "link_type": "직접매핑",
