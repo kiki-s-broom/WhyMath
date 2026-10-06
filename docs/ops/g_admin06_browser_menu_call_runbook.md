@@ -195,7 +195,10 @@ A-2에서 페이지 자체가 안 열리면(연결 거부), `localhost`가 IPv6�
 
 - **운영자 토큰** — `ops/operator_token_cli.py`(ADMIN-15)가 content_admin 계정에 단기 토큰(기본 30분·상한 60분)을 발급하고, 발급마다 `privacy_audit`에 `operator_token_issued` 1행(누가·누구에게·언제·만료)을 남긴다. 데모 계정·content_admin이 아닌 계정·없는 계정은 exit 1로 거부한다.
 - **스키마 업그레이드** — 위 감사 행이 쓰는 컬럼 2개(`token_expires_at`·`issued_by`)가 마이그레이션 `8c19e8a611e4`로 추가됐다. `whymath-pg`에 적용돼 있지 않으면 CLI가 빠진 컬럼 이름을 적고 exit 1로 거부한다. 그래서 블록 B2가 **백업 후 `alembic upgrade head`**를 한다(이 런북에서 유일한 DB 쓰기).
-  - **`upgrade head`는 ADMIN-15 컬럼 2개만이 아니라 아직 적용 안 된 마이그레이션 전부를 적용한다.** (2026-10-06 실행 실측: Kiki의 `whymath-pg`가 `5a7c31d9e0b4`에 있어 `b4d8e2a6c0f3`까지 **9건**이 한 번에 적용됐다 — 아래 "3건"은 DB가 `8c19e8a611e4`까지 와 있다는 가정의 서술이며 개발 DB의 실제 위치는 그보다 한참 뒤처져 있을 수 있다. 9건 모두 nullable 컬럼·인덱스·테이블 추가형이었고 `UPGRADE_EXIT=0`.) 개정 시점(main `dc44512b`)에 `8c19e8a611e4` 뒤로 3건이 더 있다: `9d3e6b1f4a27`(`hints` 테이블 신설) · `9d3e7b1c5a20`(`concept_version`에 `IN_QA` 상태값과 `qa` 컬럼 추가) · `a3f7c9d1e5b2`(`attempt_event.event_uuid` 컬럼과 부분 유니크 인덱스 추가). 세 파일의 설명(docstring)이 모두 기존 행·기존 컬럼을 바꾸지 않는 추가형이라고 밝힌다. DB가 이미 head면 아무것도 하지 않는다(B1의 `AT_HEAD_BEFORE=True`면 B2를 건너뛴다).
+  - **`upgrade head`는 ADMIN-15 컬럼 2개만이 아니라 아직 적용 안 된 마이그레이션 전부를 적용한다.** 적용 건수는 DB가 어느 리비전에 있느냐에 따라 달라진다.
+    - **실측(2026-10-06, Kiki `whymath-pg`)**: DB가 `5a7c31d9e0b4`에 있어 `b4d8e2a6c0f3`(head)까지 **9건**이 한 번에 적용됐다. 9건 모두 nullable 컬럼·인덱스·테이블 추가형이었고 `UPGRADE_EXIT=0`.
+    - **이미 `8c19e8a611e4`까지 와 있는 DB**라면 개정 시점(main `dc44512b`) 기준 그 뒤 3건만 적용된다: `9d3e6b1f4a27`(`hints` 테이블 신설) · `9d3e7b1c5a20`(`concept_version`에 `IN_QA` 상태값과 `qa` 컬럼 추가) · `a3f7c9d1e5b2`(`attempt_event.event_uuid` 컬럼과 부분 유니크 인덱스 추가). 세 파일의 설명(docstring)이 모두 기존 행·기존 컬럼을 바꾸지 않는 추가형이라고 밝힌다.
+    - DB가 이미 head면 아무것도 하지 않는다(B1의 `AT_HEAD_BEFORE=True`면 B2를 건너뛴다).
   - 전체가 **트랜잭션 1개**로 묶여 도중에 하나라도 실패하면 전부 롤백된다(`alembic/env.py`가 `begin_transaction()`을 한 번만 열고 `transaction_per_migration`을 켜지 않는다 — 코드를 읽은 판단이며 실행해 본 것은 아니다). 그 위에 B2가 실행 전 백업을 따로 뜬다.
   - `a3f7c9d1e5b2`는 `attempt_event`가 TimescaleDB hypertable이면 예외로 **중단**하도록 만들어졌다. `whymath-pg`는 일반 PostgreSQL 16(pgvector 이미지)이라 해당하지 않지만, 만약 이 예외가 나면 출력 전문을 회신한다(위 트랜잭션 때문에 DB는 바뀌지 않았다).
   - **head까지 올리는 이유**: 개발 DB가 main의 head를 따라가는 것이 이 저장소의 일반 상태이고, 중간 리비전에 멈춰 두면 다른 세션의 코드와 어긋난다. ADMIN-15에 필요한 것만 원하면 B2의 `alembic upgrade head`를 `alembic upgrade 8c19e8a611e4`로 바꾸고, 그 경우 판정의 `AT_HEAD_AFTER`는 `False`가 정상이다.
