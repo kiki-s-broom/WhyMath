@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "harness/concept_content_review_batch.py 의 _assess_one 이 Router 를 거치지 않고 RoutingDecision 을 손으로 조립한다(CLI 모델 티어 인자로 고정). CLAUDE.md 'LLM 호출은 항상 라우터 경유' 원칙과 맞는지 의도 여부를 확인하고 결론을 남긴다. 의도된 측정 하네스면 근거를 docstring 에 적고 전수 동결 목록(tests/backend/l3/test_authoring_traffic_surface_inventory.py)의 분류를 유지, 아니면 Router 경유로 바꾼다. 근거 docs/reviews/ops_107_authoring_bypass_inventory_2026-10-05.md §4-2"
-artifacts: []
+artifacts:
+  - "PR #1485 (https://github.com/kiki-s-broom/WhyMath/pull/1485) · 판정 기준 320d1b72 · 의도 판정(고정 모델 측정)·클라우드 비누출 계약 테스트 10건·뮤테이션 7/7 RED · ci_mirror 실행 스텝 전건 통과(exit 3: 코퍼스 조건 게이트 1건 미평가)"
 paths:
   - src/backend/whymath_backend/harness/concept_content_review_batch.py
-session: claude/laughing-cerf-l9nqgq
+session: null
 notes: ""
 updated: 2026-10-06
