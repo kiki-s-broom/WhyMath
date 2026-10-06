@@ -418,6 +418,8 @@ def render_brief(
     done_excluded: dict[str, list[str]] | None = None,
     gate_attach_excluded: dict[str, list[str]] | None = None,
     gate_attach_status: str = "disabled",
+    sibling_excluded: dict[str, list[str]] | None = None,
+    sibling_status: str = "disabled",
     doc_series_candidates: list[tuple[str, tuple[str, ...], str]] | None = None,
     doc_series_status: str = "ok",
     ruleset_reminder: str | None = None,
@@ -457,6 +459,11 @@ def render_brief(
     **판정 보류**로 표시한다 — 훅이 stderr를 버리므로(`2>/dev/null`) 스캔 실패는 이 함수가
     반환하는 문자열 안에 있어야 실제로 보인다(stale_branch_status와 동형). 기본값
     `disabled`는 하위호환(인자를 안 주는 기존 호출부는 출력이 그대로다).
+    sibling_excluded / sibling_status: task_id → `브랜치(상태)` 목록(HARN-198) — 미머지 브랜치가
+    in_progress·review로 들고 있는 태스크. 끝낸 세션의 done이 원격 claim을 걷고 done 기록은
+    아직 push 전인 창에서 트렁크는 이 태스크를 무주 todo로 보여 준다. gate_attach_*와 같은
+    규약이다 — 후보에서 빼고 이유를 한 줄로 보이며, status가 `ok`·`truncated`·`disabled`가
+    아니면 "형제 없음"이 아니라 **판정 보류**로 표시한다(훅이 stderr를 버리므로 반환 문자열 안에).
     doc_series_candidates: (branch, files, last_commit_at_iso) 목록(HARN-14) — 나이 임계
     없이 트렁크에 없는 `docs/**/*_review.md`를 추가한 미머지 브랜치 전부. stale_branches와
     같은 결합도 원칙(원시 튜플만 받음). **훅이 stderr를 버리므로**(`.claude/settings.json`
@@ -633,6 +640,18 @@ def render_brief(
     if gate_attach_status not in ("ok", "disabled"):
         lines.append(
             f"(미머지 게이트 부착 스캔 {gate_attach_status} — 게이트가 붙은 태스크가 후보에 "
+            f"섞였을 수 있음 · 판정 보류)"
+        )
+    if sibling_excluded:
+        ready = [t for t in ready if t.id not in sibling_excluded]
+        for task_id, holders in sorted(sibling_excluded.items()):
+            lines.append(
+                f"⛔ 후보 제외 {task_id} — 미머지 브랜치가 진행 중으로 들고 있다: "
+                f"{', '.join(holders)}"
+            )
+    if sibling_status not in ("ok", "truncated", "disabled"):
+        lines.append(
+            f"(형제 브랜치 진행 중 스캔 {sibling_status} — 다른 세션이 들고 있는 태스크가 후보에 "
             f"섞였을 수 있음 · 판정 보류)"
         )
     if ready:

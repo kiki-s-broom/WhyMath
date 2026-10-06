@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -23,6 +23,6 @@ paths:
   - scripts/harness/remote_claims.py
   - scripts/harness/selector.py
   - "tests/harness/test_*sibling*claim*.py"
-session: null
+session: claude/gallant-euler-blngpj
 notes: "출처: 2026-09-29 /drive 4차 — S4-11을 착수해 서브에이전트에 위임한 뒤 #1338 안전망 점검 중 main에서 #1372를 발견했다. 사고 대장 계열 `parallel-duplicate-implementation` 등재 시점에는 13회차였고 main 병합 뒤 같은 계열의 다른 세션 1줄이 먼저 들어와 대장 기준 14회차(2회차 이상이라 코드·태스크 대책이 필수). 축 구분 — `HARN-193-unmerged-gate-attach-claim-release-gap`은 게이트 부착 뒤 `unblock`이 claim을 걷는 공백이고, HARN-11은 원격에 오른 미머지 done을 본다. 이 태스크는 `done`이 claim을 걷는 시점과 done 기록이 원격에 오르는 시점 사이의 공백, 그리고 형제 브랜치의 `in_progress` 사본이라는 읽기 신호를 다룬다. 피해: 서브에이전트 구현 약 1시간 반 폐기(추적 24 파일·신규 19 파일 · 백업은 세션 로컬). 중복 착수 자체는 이 세션이 착수 전에 열린 PR을 조회했다면 피할 수 있었으나 그 조회는 절차에 없고, 절차에 없는 확인을 사람 규율에 맡기지 않도록 코드로 등재한다.\n\n[정정 2026-09-29] notes 치환 — 사고 대장 계열 회차 정정 — 등재 결과 13회차(notes에 12회차로 적었음)\n\n[정정 2026-09-30] notes 치환 — main 병합으로 사고 계열 회차가 13에서 14로 밀렸다(다른 세션이 먼저 1줄 추가) — 파생 회차를 사실에 맞춘다"
-updated: 2026-09-30
+updated: 2026-10-06
