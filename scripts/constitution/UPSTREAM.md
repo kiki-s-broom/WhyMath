@@ -49,6 +49,8 @@
 | `diag/` | 260927 EOS 통합정밀진단 묶음의 진단 도구 벤더링(`diag/UPSTREAM.md`) |
 | `run_baseline.py` | 진단 도구 일괄 실행 러너(출력은 gitignore된 `work/diag/`) |
 | `adopt_amendment.py` | **사람 전용** 개정 채택 도우미 — A0003(원본 등록부 절만 교체·규칙 불변 단언·단계 1칸 상향)·A0002(조문 삽입 제안본·규칙 병합). UTF-8(BOM 없음)·LF로만 쓰고, AI 세션에서는 `--apply` 거부(exit 3) |
+| `check_amendment.py` | 규칙 R0-02(제11조 ②)의 run — 공통 조상 기준으로 `constitution/` 변경에 새 개정 기록(`amendments/A####_*.md` 추가·번호 유일·제목 일치·날짜·200자↑)이 동반됐는지. 번호 단조 증가·특정 제목은 요구하지 않는다(A0003이 A0002보다 먼저 채택됨). exit 0/1/2 · CI harness-integrity 잡 (CONST-03) |
+| `review_health.py` | 규칙 R2-04(제9조·P0001)의 run — 검수 타이머 이벤트 JSONL(EOS-54)에서 세션별 소요 시간 중앙값<10초·반려율 0% 경고. 표본 5건 미만은 '판정 보류'. CI 에는 실데이터가 없어 판정 논리만 테스트로 동결(`--events` 필요, 없으면 exit 2) (CONST-03) |
 
 ## Kiki가 새 꾸러미를 주면 — 재동기화 절차
 

@@ -430,11 +430,11 @@ gates:
     title: "EOS-137 ② QA 엔진 첫 평가 실행 — 문항별 판정 어댑터를 MP-03 골든 v1(rotation 0)과 검수 큐에 돌려 혼동행렬·평가 원장 첫 행을 남긴다(런북 docs/ops/eos137_first_eval_runbook.md · EOS-137 PR main 머지 후에만 실행 가능 · 출력 전체를 세션에 전달하면 세션이 수치를 MEMORY에 기록하고 EOS-137을 닫는다)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 실행 출력 회신(2026-10-05 · Phaiakes9 · 런북 docs/ops/eos137_first_eval_runbook.md §1~§4 전 단계 성공 기준 통과). 판정 기준 main b165e53b(워크트리 HEAD 일치, 코드 출처 WhyMath-eos137 확인, 선행 EOS-150은 e68d9308로 main 머지). 골든 v1 rotation 0 digest 55105757519f 15건(MP-03 기록과 일치) · 어댑터 ADAPTER_EXIT=0 입력 15 판정 15 PASS 15 FAIL 0 판정불가 0 · 혼동행렬 CM_EXIT=0 TP 0 FN 2 FP 0 TN 13 커버리지 15/15 Wilson 하한 0.847 재현율 하한 0.0 FN율 상한 1.0 오경보 상한 0.172 FN 결함코드 F7 2건 · 평가 원장 1행 기록(LEDGER_ROWS_AFTER=1 · engine_revision b165e53b · verdict_source qa_engine). 산출물은 Kiki 머신 mp02-out/eos137 및 mp03/golden_benchmark_v1/eval_ledger.jsonl(코퍼스 데이터라 미커밋)."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-28] depends_on +EOS-150 · no_inputs_reason: '골든 v1·검수 큐가 Kiki 머신에만 있는 데이터 — 클라우드 세션은 실행할 수 없다' → None (입력 부착으로 해제) — 문항 좌석이 정답을 재검산하지 않는 상태로 첫 평가를 돌리면 골든의 수학 결함이 구조적 FN으로 원장 첫 행에 찍힌다 — EOS-150 착지 후 실행"
@@ -646,6 +646,18 @@ gates:
     cleared_by: kiki
     notes: "[판정기준 없음 2026-09-12] 대화에서 내린 교수학 판정 — 커밋과 무관한 결정"
     corrections: []
+  - id: G-misc40-deferred-m0671-redecision
+    title: "MISC-40 서명 보류 1행 재판정 - 2026-10-05 서명에서 보류한 power-rule-step-omitted ↔ M0671(성취기준 [12미적Ⅰ-02-03] 원문 확인이 선행 조건인 행. 코퍼스 correction_point에 원문 OCR 흔적이 있다)을 승인/반려로 확정한다. 이 행은 검수 큐에 pending으로 남아 있고 승인 코퍼스·DB에는 없다(좌석 0). 보류가 기한 없이 방치되지 않도록 7일 독촉을 건다. 판정 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md 6절 4번 행."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-05
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: 입력 태스크 없음 - M0671은 사람이 성취기준 원문을 직접 확인해야 하는 사람 판단이다
   - id: G-misc40-new-crosslink-signature
     title: "신규 crosslink 서명 — 서명 대상 5행의 kebab↔M-id 검수 큐 행 승인/반려/보류: MISC-21이 남긴 서명 전 3행(M0462·M0515·M0599) + MISC-40 신설 1행(power-rule-step-omitted ↔ M0671) + 큐에 이미 있던 부분매핑 1행(product-rule-naive ↔ M0672). 서명 대상 표와 행별 근거 = docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §6. 서명은 사람 전용(승인 게이트 계약 — 서명 위조는 도구가 못 잡는다)이며 MISC-40 PR이 머지돼 큐에 신설 행이 들어간 뒤에 한다. Kiki가 트랜치 단위로 한 번에 판정한다. 별건(서명 뒤에도 좌석 0인 5개 개념의 처분)은 게이트 G-misc40-unseated-concepts-disposition"
     kind: human
@@ -890,6 +902,20 @@ gates:
       - "[2026-10-01] verdict PASS · inputs: P3-18-calculus-verifiability-probe · evidence: 판정 기준 커밋 6edcbc9f5(PR 1414·미머지). PASS의 뜻은 7개 전부 검증 가능이 아니라 프로브 입력이 완성돼 Kiki 처분(가/나/다) 결정이 가능해졌다는 것: 가능 6·불가 1(-02-08)·위장 0. 처분 선택은 게이트 담당자 몫 — done P3-18-calculus-verifiability-probe 인계"
     depends_on:
       - P3-18-calculus-verifiability-probe
+  - id: G-p321-derived-form-disposition
+    title: "P3-21 처분 결정 — [12미적Ⅰ-02-08] 파생 판정 문항의 허용 형태. 프로브 13형태: 가능 7·일부 가능 1·불가 1·위장 2·정답 오거부 2. 제외 후보 6형태 = 증감 구간을 구간 기호로 답하기(불가) / 경계 포함 여부(일부 가능·오답이 skip) / 구간을 함수식 단독 조건으로 표현(정답 오거부) / 극대극소를 selection 없이 묻기(위장) / 극값 점 (x,f(x)) 묻기(위장) / 극값의 값만 답(x 없이·정답 오거부). 가: 6형태 제외하고 경계점·소속 정수·극값 x좌표·x 고정 극값 대리 형태만 문항화(분모 7 유지·증감 구간 전체 맞힘은 기계 보증 불가를 명시) / 나: 위장 2형태는 selection·x 고정 저작 규칙을 필수화해 유지하고 나머지 4형태만 제외 / 다: 형태 제외 없이 인간 폴백(검수 권위 서열상 측정 전 대체 선언 불가). 세션 의견은 나. 근거 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-03
+    remind_after_days: null
+    evidence: "세션 사용자 결정(2026-10-05 · AskUserQuestion 응답 '네, 이 결정(나)이 맞습니다'를 세션이 중계 기입 — clear 주체 claude): [12미적Ⅰ-02-08] 파생 판정 문항 = 안 나 — 위장 2형태(B3 극대·극소를 selection 없이 묻기 · C3 극값 점 (x,f(x)) 묻기)는 저작 규칙을 필수화해 유지(B3 answer_selection 필수 · C3 극값 x좌표를 문항에 고정)하고, 4형태(A4 증감 구간 구간 기호 답 · A3 경계 포함 여부 · A5 구간을 함수식 단독 조건으로 표현 · C4 극값의 값만 답)는 제외한다. 분모 7 유지. 저작 규칙으로 올릴 단서: B2 의 selection 은 작성자 사전 계산 의존 · C2 는 x 가 묶여 있는 동안만 가능. 결정 원문은 PR #1449 댓글 https://github.com/kiki-s-broom/WhyMath/pull/1449#issuecomment-5996261730 (Claude 세션이 남긴 댓글이라 진위는 사용자 확인으로 갈음). 판정 기준: PR #1449 head 86c0c3f1(미머지 — 병합 후 main 해시는 머지 뒤 별도 확인) · 근거 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4."
+    cleared_by: claude
+    notes: ""
+    corrections:
+      - "[2026-10-03] verdict PASS · inputs: P3-21-derived-shape-probe-monotonic-extremum · evidence: 판정문 docs/reviews/p3_21_derived_shape_probe_result_2026-10-03.md §2·§4 · 판정 기준 main 381ec106 위 PR #1449(미머지·브랜치 기준). PASS의 뜻은 결정 입력이 완성돼 Kiki의 처분(가/나/다)이 가능해졌다는 것: 13형태 중 가능 7·일부 가능 1·불가 1·위장 2·정답 오거부 2, 제외 후보 6형태 명시. 어느 안을 택할지는 게이트 담당자 몫. — done P3-21-derived-shape-probe-monotonic-extremum 인계"
+    depends_on:
+      - P3-21-derived-shape-probe-monotonic-extremum
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human

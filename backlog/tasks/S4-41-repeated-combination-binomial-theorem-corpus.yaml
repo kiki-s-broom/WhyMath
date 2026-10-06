@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-41-repeated-combination-binomial-theorem-corpus
+title: "고등 중복조합·이항정리 계수 파일럿 코퍼스 (W2 Phase3 #2)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "[12확통01-02]/[12확통01-03] 0커버 해소 — 2변형 결정론 생성기 신설·전량 게이트 통과"
+artifacts:
+  - a177b981
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/combination_binomial_skeleton_generator.py
+  - src/backend/whymath_backend/harness/combination_binomial_batch.py
+  - "data/corpus/problem_bank_combination_binomial_v0/**"
+  - tests/backend/l3/equivalent/test_combination_binomial_skeleton_generator.py
+  - tests/backend/harness/test_combination_binomial_batch.py
+session: null
+notes: "w2_content_factory_completion_plan_v1.md B급 §6 항목7(경우의 수) — permutation_combination_skeleton_generator(S4-33) 형제·후속 명시 범위(원순열·중복순열·조합·이항정리) 중 중복조합·이항정리 착수. concept_src_id: H:12확통01-02(중복조합)·H:12확통01-03(이항정리) — concept graph 실존 확인. factorial 기반 Tier1(순열 생성기 선례 재사용).\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-41-repeated-combination-binomial-theorem-corpus 재등재. 원 증적 ['a177b981']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

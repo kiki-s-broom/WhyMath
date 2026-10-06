@@ -518,7 +518,7 @@
    "link_type": "직접매핑",
    "confidence": 0.9,
    "method": "manual",
-   "note": "검수:kiki 2026-10-03"
+   "note": "검수:kiki 2026-10-05"
   },
   {
    "kebab_id": "ratio-order-swapped",
@@ -526,7 +526,7 @@
    "link_type": "직접매핑",
    "confidence": 0.85,
    "method": "manual",
-   "note": "검수:kiki 2026-10-03"
+   "note": "검수:kiki 2026-10-05"
   },
   {
    "kebab_id": "addition-multiplication-rule-confused",
@@ -534,7 +534,7 @@
    "link_type": "직접매핑",
    "confidence": 0.9,
    "method": "manual",
-   "note": "검수:kiki 2026-10-03"
+   "note": "검수:kiki 2026-10-05"
   }
  ]
 }

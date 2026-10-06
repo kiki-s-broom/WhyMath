@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: docs
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,10 +18,11 @@ acceptance:
   - "④ 판정은 exit code로 — README에 적는 검사 명령은 `-q`·`| tail`로 출력을 죽이지 않는다(2026-08-09 black 사고). 실행기는 `python -m pip`·`python -m pytest` 형태로 인터프리터를 고정한다(2026-07-27 다중 환경 사고)."
   - "⑤ 회귀 동결 — 문서만 고치면 다음 스택 변경에서 그대로 stale이 된다. README가 지시하는 경로·파일·명령이 저장소에 실재하는지 기계가 대조하게 한다(`tests/infra` 계열). 변별력은 문서의 명령 1건을 존재하지 않는 경로로 바꿔 RED가 나는지로 실측하고, 원복은 `cp` 백업으로만 한다(2026-08-10 `git checkout` 사고 규칙)."
   - "⑥ 범위 경계 — Kiki 머신 전용 런북(`docs/ops/**`·`scripts/demo/run_demo.ps1`)과 축이 다르다. 이쪽은 **임의의 새 기기·새 세션** 기준이며, Kiki 머신 고정 경로·PowerShell 전제를 README 본문에 넣지 않는다."
-artifacts: []
+artifacts:
+  - "PR #1474 (kiki-s-broom/WhyMath) · README.md 로컬 부트스트랩 절 · tests/infra/test_readme_bootstrap.py"
 paths:
   - README.md
   - "tests/infra/test_readme_bootstrap*.py"
 session: null
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B4 · §5 B급 미등재 후보 3. 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재 — Gate D(소유자 없는 알려진 결함 금지) 집행. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(README·로컬 환경·부트스트랩·개발 환경·quickstart) → 히트 11건 전건 오탐(다른 축에서 README를 언급할 뿐 이 절을 소유하지 않는다)."
-updated: 2026-09-15
+updated: 2026-10-05

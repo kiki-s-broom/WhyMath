@@ -1623,6 +1623,20 @@ jobs:
       - name: 헌법 보호 가드 자가시험 (CONST-02 — 헌법 제9조·R0-01)
         run: python scripts/constitution/selftest_guard.py
 
+      # CONST-03 — 헌법 제11조 ②·R0-02: constitution/ 이 바뀌었으면 같은 변경에 새 개정 기록
+      # (amendments/A####_*.md 추가)이 있어야 한다. 기준은 origin/main 과의 **공통 조상**이라
+      # main 이 분기 뒤 앞서가도 그 변경을 이 브랜치 탓으로 돌리지 않는다. 이 잡의
+      # fetch-depth: 0 이 base ref 를 보장하고, 못 찾으면 exit 2(측정 불가 — 통과로 위장 안 함).
+      # run 문자열은 rules.yaml R0-02 등록 명령과 글자까지 같아야 연결 판정이 같은 것을 가리킨다.
+      - name: 헌법 개정 기록 동반 검사 (CONST-03 — 헌법 제11조·R0-02)
+        run: python scripts/constitution/check_amendment.py
+
+      # CONST-03 — 헌법 제4조·R1-02: "노드를 바꿨을 때 다시 돌릴 하류를 명령 한 줄로 구한다"는
+      # 약속이 실제로 동작하는지(그래프가 읽히고 노드가 실재하는지) 상시 실행한다. 노드 이름은
+      # rules.yaml R1-02 등록 명령(standards)과 같아야 한다.
+      - name: 파이프라인 하류 조회 (CONST-03 — 헌법 제4조·R1-02)
+        run: python scripts/constitution/pipeline_check.py --downstream standards
+
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
       # 번호를 알려주지 못한다. 2026-09-05에 그 방식으로 ADR-003을 고른 세션이 같은 날

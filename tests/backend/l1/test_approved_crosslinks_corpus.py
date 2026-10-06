@@ -4,7 +4,7 @@
 직접 승인한 매핑**을 promote 산출(로더 형식)해 커밋한 것이다(사람 사인오프·AI 자기승인 아님).
 2026-07-08 극값 2(M0864·M0865)·2026-07-10 트리아지 A 11 + B 8 + frac 1·2026-07-12 미매핑 Tier C
 Tier C 10 + period + root-loss + 843 트랜치1~5 각 6(신규 탐지 kebab·계산형)을 승인해
-**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-03 MISC-21 서명 3건이 더해져 **67건**이다(MISC-40의 M0671·M0672는 2026-10-06 Kiki 정정 판정으로 제외 — 아래 `_MISC40_HELD`). 이 테스트는 hermetic(DB 0)으로 봉인한다:
+**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-05 게이트 `G-misc40-new-crosslink-signature` 서명으로 승인 3건(M0462·M0515·M0599)이 더해져 **67건**이다(보류 M0671·부분매핑 유지 M0672는 미적재 — 2026-10-06 Kiki 확정). 이 테스트는 hermetic(DB 0)으로 봉인한다:
 ① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈843 코퍼스(참조 무결성)
 ③ `select_canonical`이 각 kebab에 canonical M-id를 실제로 돌려줌(단절 해소·843→34 도달).
 """
@@ -112,24 +112,22 @@ def _corpus_mis_ids() -> set[str]:
     return {m["mis_id"] for m in items if isinstance(m, dict) and "mis_id" in m}
 
 
-# 2026-10-03 게이트 G-misc40-new-crosslink-signature — Kiki가 승인한 MISC-21 잔여 3건.
-# (MISC-40 서명 대상 5행 중 M0671·M0672는 2026-10-06 Kiki 정정 판정으로 승인 코퍼스에서 제외했다.)
-_MISC40_SIGNED: dict[tuple[str, str], float] = {
-    ("bigger-denominator-bigger-fraction", "M0462"): 0.9,
-    ("ratio-order-swapped", "M0515"): 0.85,
-    ("addition-multiplication-rule-confused", "M0599"): 0.9,
+# 2026-10-05 게이트 G-misc40-new-crosslink-signature — Kiki가 5행을 판정했다: 승인 3(M0462·M0515·M0599 직접매핑) +
+# 보류 1(M0671 — 성취기준 원문 확인 선행) + 부분매핑 유지 1(M0672 — 부분매핑은 적재 대상이 아니라 코퍼스에 싣지 않는다,
+# 2026-10-06 Kiki 확정). 값 = (link_type, confidence).
+_MISC40_SIGNED: dict[tuple[str, str], tuple[str, float | None]] = {
+    ("bigger-denominator-bigger-fraction", "M0462"): ("직접매핑", 0.9),
+    ("ratio-order-swapped", "M0515"): ("직접매핑", 0.85),
+    ("addition-multiplication-rule-confused", "M0599"): ("직접매핑", 0.9),
 }
-
-# 2026-10-06 Kiki 판정: 4번 M0671 보류(성취기준 원문 확인 전) · 5번 M0672 부분매핑 유지 —
-# 부분매핑은 적재 대상이 아니므로 둘 다 승인 코퍼스에 있으면 안 된다.
-_MISC40_HELD: set[tuple[str, str]] = {
-    ("power-rule-step-omitted", "M0671"),
-    ("product-rule-naive", "M0672"),
-}
+# 보류·부분매핑 유지라 코퍼스에 있으면 안 되는 쌍 — 서명 없는 적재나 판정 되돌림을 막는다.
+_MISC40_EXCLUDED: frozenset[tuple[str, str]] = frozenset(
+    {("power-rule-step-omitted", "M0671"), ("product-rule-naive", "M0672")}
+)
 
 
 def test_exact_approved_pairs() -> None:
-    # 승인 67건 = 기존 64건(kebab→M-id 동결) + 2026-10-03 서명 3건 — 드리프트 시 즉시 실패.
+    # 승인 67건 = 기존 64건(kebab→M-id 동결) + 2026-10-05 서명 승인 3건 — 드리프트 시 즉시 실패.
     rows = _load_rows()
     pairs = {(r.kebab_id, r.mis_id) for r in rows}
     assert len(rows) == len(pairs), "중복 행 금지"
@@ -137,23 +135,23 @@ def test_exact_approved_pairs() -> None:
 
 
 def test_misc40_signed_rows_carry_kiki_stamp_and_confidence() -> None:
-    # 서명 3건의 신뢰도·서명 stamp를 값으로 못 박는다.
+    # 서명 3건의 유형·신뢰도·서명 stamp를 값으로 못 박는다.
     by_pair = {(r.kebab_id, r.mis_id): r for r in _load_rows()}
-    for pair, conf in _MISC40_SIGNED.items():
+    for pair, (link_type, conf) in _MISC40_SIGNED.items():
         row = by_pair[pair]
         assert row.confidence == conf, pair
-        assert row.link_type == "직접매핑", pair
-        assert row.note is not None and row.note.endswith("검수:kiki 2026-10-03"), pair
+        assert row.link_type == link_type, pair
+        assert row.note is not None and row.note.endswith("검수:kiki 2026-10-05"), pair
 
 
-def test_misc40_held_rows_are_not_in_approved_corpus() -> None:
-    # 보류(M0671)·부분매핑 유지(M0672)는 코퍼스에 없어야 한다 — 되살아나면 Kiki 판정 위반.
+def test_misc40_excluded_rows_are_not_in_the_approved_corpus() -> None:
+    # M0671(보류)·M0672(부분매핑 유지)는 승인 코퍼스에 있으면 안 된다 — 있으면 즉시 실패.
     pairs = {(r.kebab_id, r.mis_id) for r in _load_rows()}
-    assert not (pairs & _MISC40_HELD)
+    assert pairs.isdisjoint(_MISC40_EXCLUDED)
 
 
 def test_product_rule_naive_canonical_is_sole_m0075() -> None:
-    # M0672가 빠진 상태에서 product-rule-naive의 직접 링크는 M0075(0.97) 하나이고 canonical도 그것이다.
+    # M0672가 빠져 product-rule-naive의 링크는 직접매핑 M0075(0.97) 하나이고 canonical도 그것이다.
     links = [
         ResolvedLink(mis_id=r.mis_id, link_type=r.link_type, confidence=r.confidence)
         for r in _load_rows()
@@ -171,10 +169,11 @@ def test_load_gate_passes() -> None:
     for r in rows:
         assert r.method == LOADABLE_METHOD
         assert is_signed(r.note)
+        # 이 코퍼스는 직접매핑만 싣는다(부분매핑은 적재 대상이 아니다 — M0672 제외, 2026-10-06 Kiki 확정).
+        assert r.link_type == "직접매핑", (r.kebab_id, r.mis_id)
         assert (
             r.confidence is not None and r.confidence >= 0.6
         )  # 직접매핑 승격 게이트 하한(DIRECT_MIN_CONFIDENCE)
-        assert r.link_type == "직접매핑"
 
 
 def test_referential_integrity() -> None:

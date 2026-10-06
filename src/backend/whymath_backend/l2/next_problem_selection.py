@@ -40,7 +40,14 @@ from whymath_backend.l2.ability_estimation import (
     resolve_item_difficulty_b,
     resolve_item_discrimination_a,
 )
-from whymath_backend.l2.irt import IrtItem, ability_standard_error, estimate_ability
+from whymath_backend.l2.irt import (
+    IrtItem,
+    ThetaBoundary,
+    ability_boundary,
+    ability_for_selection,
+    ability_standard_error,
+    estimate_ability,
+)
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole, EdgeType, ReviewStatus
 from whymath_backend.schema.problem import METADATA_ONLY_SOURCES
 
@@ -309,6 +316,24 @@ class AttemptHistoryState:
     #: "작동한 비율" 원칙 — a 보정이 이 학생의 θ·SE에 얼마나 닿았는지를 소비측이 알 수 있게 한다.
     #: 기본값 0은 a 소비 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
     discrimination_applied_count: int = 0
+    #: EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — 전부 정답 `upper` · 전부 오답 `lower` · 그 외
+    #: None. 기본값 None은 이 필드 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
+    theta_boundary: ThetaBoundary | None = None
+    #: EOS-147: 경계 규칙이 낸 **선택용** θ — `upper`에서 값이 추정 θ와 다를 때만 채운다(None이면
+    #: 선택 θ = 추정 θ). 직접 읽지 말고 `selection_theta` 속성을 쓴다.
+    boundary_selection_theta: float | None = None
+
+    @property
+    def selection_theta(self) -> float:
+        """추천이 후보를 고를 때 쓰는 θ(EOS-147) — 전부 정답 이력에서만 `theta`와 다르다.
+
+        `theta`(추정 θ)는 SE·`measurement_sufficient`·평가 캡처가 읽는 값이고 이 속성과 **다른
+        소비처**를 가진다. 둘을 하나로 접으면 전부 정답 이력에서 클램프(4.0)가 출제 표적이 되거나,
+        표적을 위해 추정기를 바꾸게 된다(판정문 §3).
+        """
+        return (
+            self.theta if self.boundary_selection_theta is None else self.boundary_selection_theta
+        )
 
     @property
     def item_cap_reached(self) -> bool:
@@ -368,6 +393,9 @@ async def load_attempt_history_state(
                 discrimination_applied += 1
             responses.append((IrtItem(difficulty=b, discrimination=a), bool(is_correct)))
     theta = estimate_ability(responses)
+    # EOS-147: 추정 θ는 그대로 두고, 전부 정답 이력에서만 **표적 θ**를 따로 낸다. SE·중단 규칙은
+    # 아래에서 계속 추정 θ로 계산한다(표적 θ로 SE를 재면 MLE가 없는 이력이 정밀해 보인다).
+    selection_theta = ability_for_selection(responses, theta)
     attempted_ids = {row[0] for row in attempt_rows}
     # slice 15: 응답한 문항(administered) 기준 측정 정밀도 — CAT 중단 규칙 신호.
     administered_items = [item for item, _ in responses]
@@ -381,6 +409,8 @@ async def load_attempt_history_state(
         measurement_sufficient=measurement_sufficient,
         administered_count=len(administered_items),
         discrimination_applied_count=discrimination_applied,
+        theta_boundary=ability_boundary(responses),
+        boundary_selection_theta=selection_theta if selection_theta != theta else None,
     )
 
 

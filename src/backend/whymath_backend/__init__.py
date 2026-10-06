@@ -7,3 +7,8 @@
 """
 
 __version__ = "0.1.0"
+
+# CLI 출력 인코딩 — `python -m whymath_backend.<모듈>`이 cp949 파이프에서 죽지 않게 (OPS-53).
+from whymath_backend._stdio import ensure_utf8_stdio  # noqa: E402
+
+ensure_utf8_stdio()

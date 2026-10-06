@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-63-elementary-addsub-pilot-corpus
+title: "초등 두 자리 수 덧셈뺄셈 파일럿 코퍼스 (W2) — 신규 결정론 생성기 + 400문 v0 적재"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "기존 12개 스켈레톤 생성기가 전부 고등 개념(실측 확인)이라 초등 축에 재사용 가능 생성기가 없었음을 확인 — 신규 ElementaryAddSubSkeletonGenerator가 그 공백을 메움(EquivalentProblemGenerator 좌석·evaluate_equivalent_candidate 게이트 재사용, 신규 게이트 발명 0)"
+  - "Tier1(l3/verify_answer)이 방정식 sympify 기반 범용 검산기라 산술 조건도 무변경 재사용됨을 실측 확인(도메인 전용 검증기 신설 불요)"
+  - "run_batch의 signature_index(S2-l 구조 dedup)가 산술 도메인에서 답값 기반 오탐(다른 (a,b) 조합·같은 결과값을 판박이로 오판)을 일으킴을 실측 발견 — run_equivalent_generation을 signature_index=None으로 직접 호출해 우회(finite_probability_batch 선례와 동형 처방)"
+  - "problem_bank_elementary_v0(400문·덧셈/뺄셈 2밴드) 코퍼스 생성 — 전건 Tier1 게이트 통과·is_published=False(AI 검수 게이트는 이 환경 밖 Kiki 머신 소관)"
+  - "coverage 리포트 재실행으로 실제 이동 확인(초등학교 7.4%→8.3%, [2수01-06] 커버 전환)"
+  - "단위테스트(생성기·배치) green, ruff·black·mypy --strict clean"
+artifacts:
+  - 6a93537c
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/elementary_addsub_skeleton_generator.py
+  - src/backend/whymath_backend/harness/elementary_addsub_batch.py
+  - tests/backend/l3/equivalent/test_elementary_addsub_skeleton_generator.py
+  - tests/backend/harness/test_elementary_addsub_batch.py
+  - data/corpus/problem_bank_elementary_v0/problems.jsonl
+session: null
+notes: "학년축 최단경로 계획(docs/strategy/grade_axis_mvp_shortest_path_v1.md) §3 W2 첫 슬라이스(임계경로). W2 전체(4축 콘텐츠 공장)는 단일 세션 범위를 넘는 대작업이라, 최대 공백축(초등 4.1%·0커버 116건)에서 신규 생성기 1종을 실증하는 것으로 범위를 좁혔다. 대학·고등 0커버 축·중등 증분은 후속 슬라이스(같은 패턴 반복 — 새 생성기 + 새 batch 스크립트). AI 검수 Wilson 게이트는 실 LLM 필요 — 원격 세션 환경 밖(Kiki 머신)이라 이 슬라이스는 v0(is_published=False)로 멈춘다.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-22-elementary-addsub-pilot-corpus 재등재. 원 증적 ['6a93537c']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측). 학년축 W0 항목(미완·todo)은 depends_on에 싣지 않았다 — 이 태스크의 산출물(코퍼스)은 이미 main에 있어 실제 의존은 해소 상태(허위 잔여 방지·원 의존은 매핑표 문서에 기록)."
+updated: 2026-10-02

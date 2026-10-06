@@ -70,7 +70,10 @@ from whymath_backend.l4.misconception.crosslink_shadow import observe_crosslink_
 from whymath_backend.l4.misconception.diagnose import diagnose
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis, curate
 from whymath_backend.l4.misconception.intervene import select_intervention_from_hypotheses
-from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
+from whymath_backend.l4.misconception.match_gate import (
+    apply_match_quality_gate,
+    is_verdict_withheld,
+)
 from whymath_backend.l4.misconception.models import MisconceptionMatch
 from whymath_backend.l4.misconception.probe_selection import (
     _EXPLORE_PERIOD,
@@ -278,6 +281,14 @@ class TurnState:
     hypotheses: list[MisconceptionHypothesis]
     evidence: list[EvidenceEdge] = field(default_factory=list)
     last_matches: list[MisconceptionMatch] = field(default_factory=list)
+    match_withheld: bool = False
+    """직전 match_misconception이 **확신 진단 보류** 대상이었는가(MISC-60 — 귀속 불명·미확인 전사).
+
+    True면 후보(`last_matches`)는 정책에 보이되 학습자 모델 쪽 두 도구가 막힌다:
+    `curate_hypothesis`는 빈 매칭으로 돈다(감쇠만 — 코치 `persisted_matches=[]`와 동형)·
+    `log_evidence`는 +1/−1 모두 거부한다. 판정은 `match_gate.is_verdict_withheld`가 소유한다
+    (코치와 같은 함수 객체). 마지막 match 실행 기준이며(`last_matches`와 같은 수명), match
+    이전엔 False다."""
     last_probe: ProbeSelection | None = None
     verify_called: bool = False
     last_verdict: Literal["correct", "incorrect", "unverifiable"] | None = None
@@ -489,6 +500,12 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
         # 있지 않으므로 게이트 ②는 dormant이고 없는 신호를 날조하지 않는다.
         gate = apply_match_quality_gate(raw_matches)
         state.last_matches = gate.matches
+        # 확신 진단 보류(MISC-60) — 귀속 불명(게이트③)·미확인 전사(게이트②, 하네스는 OCR 신뢰도가
+        # 없어 dormant)면 후보는 유지하되 학습자 모델 쪽(curate·log_evidence)에는 넣지 않는다.
+        # 코치가 `persisted_matches=[]`로 하는 처분과 같다 — 판정 함수도 같은 객체를 쓴다.
+        state.match_withheld = is_verdict_withheld(
+            low_quality=gate.low_quality, attribution_unclear=gate.attribution_unclear
+        )
         return ToolResult(
             kind=action.kind,
             ok=True,
@@ -505,7 +522,9 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
         # 순수 curate — 감쇠·강화·임계 가지치기·반박(in-memory net_support<0)·최대5(재구현 0).
         state.hypotheses = curate(
             state.hypotheses,
-            state.last_matches,
+            # 보류 턴(귀속 불명·미확인 전사)은 빈 매칭 = 감쇠만 — 확정 진단이 아닌 후보로 가설을
+            # 세우거나 강화하지 않는다(코치 `_apply_hypotheses(persisted_matches=[])` 동형·MISC-60).
+            [] if state.match_withheld else state.last_matches,
             turns_elapsed=action.turns_elapsed,
             refuted=_refuted_mids(state),
         )
@@ -571,6 +590,16 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
                 kind=action.kind,
                 ok=False,
                 detail=f"log_evidence 거부 — 극성 위반({action.polarity}).",
+            )
+        # 보류 턴(MISC-60) — 귀속 불명·미확인 전사는 +1 지지도 −1 반박도 만들지 않는다. 코치는 이
+        # 턴에 두 증거 생산을 모두 건너뛴다(`모른다`가 `아니다`로 뒤집히면 안 된다). 정책(LLM)은
+        # 요약에서 매치 id만 보고 보류 플래그를 못 보므로, 이 거부는 정책 선의가 아니라 하네스가
+        # 직접 강제한다(§3.4 불변식 계열).
+        if state.match_withheld:
+            return ToolResult(
+                kind=action.kind,
+                ok=False,
+                detail="log_evidence 거부 — 귀속 불명·미확인 전사 매치라 증거 보류(MISC-60).",
             )
         # crosswalk shadow(비노출·비차단) — 게이트 통과한 kebab-id의 M-id 매핑 coverage를
         # 로그로만 관측(state·ToolResult 불변). off(기본)면 조회 0이라 "순수·DB 무접근" 유지 —

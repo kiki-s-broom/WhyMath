@@ -59,6 +59,14 @@ EOS-31 — 수능 게이트가 출제 범위를 본다 (`suneung_v1` → `suneun
 사라진다. EOS-25가 보류한 재선택(`mode_withheld`)의 재판정은 `EOS-35`가 소유한다 — 이 변경은 그
 전제 ①이 바뀐 사실을 만들 뿐 재선택을 켜지 않는다(숙달 구간 입력의 신뢰 하한 `EOS-33`이 별건으로
 남아 있다).
+
+────────────────────────────────────────────────────────────────────────────
+EOS-147 — 전부 정답 이력의 표적 θ를 추정 θ에서 분리한다 (`suneung_v2` → `suneung_v3`)
+────────────────────────────────────────────────────────────────────────────
+전부 정답 이력에서 후보를 고르는 표적 θ가 추정 θ(4.0 클램프)가 아니라 `ability_for_selection`의
+표적이라 그 이력의 **선택이 바뀐다** — 그래서 `policy_version`을 `suneung_v3`로 올렸다(REC-11: 후보
+생성·선택 규칙의 식별자). `suneung_v2`는 EOS-31의 출제 범위 규칙이 먼저 썼으므로 두 변경이 한
+번호를 쓰지 않는다. 그 외 이력의 선택은 `suneung_v2`와 같다.
 """
 
 from __future__ import annotations
@@ -187,7 +195,10 @@ class SuneungRecommendationPolicy:
         persona = self._persona
 
         attempt_state = await load_attempt_history_state(session, user_id)
-        theta = attempt_state.theta
+        # EOS-147 — 이 함수의 `theta`는 후보 선택에 쓰는 θ(`selection_theta`)다. 전부 정답 이력의
+        # 추정 θ는 MLE가 없는 상한 클램프(4.0)라 표적으로 쓰지 않는다. 기본 CAT 정책과 같은 상태
+        # 객체·같은 정의다(모드마다 표적 θ의 정의를 갈라 두지 않는다). 응답·SE에는 추정 θ가 나간다.
+        theta = attempt_state.selection_theta
 
         sibling_ids: set[uuid.UUID] = set()
         if self._sibling_filter is not None:
@@ -264,7 +275,9 @@ class SuneungRecommendationPolicy:
             theta, candidates, persona, extra_weights=extra_weights
         )
         common: PolicyTelemetry = {
-            "theta": theta,
+            "theta": attempt_state.theta,
+            "selection_theta": theta,
+            "theta_boundary": attempt_state.theta_boundary,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,

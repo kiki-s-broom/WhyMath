@@ -13,10 +13,19 @@
 - **하지 않는다**: 실제 PR 본문이 채워졌는지는 보지 않는다(이 저장소 CI는 PR 본문을 읽지
   않는다). 즉 이것은 게이트가 아니라 **프롬프트의 무결성 동결**이다 — 그 이상으로 주장하면
   "측정 없는 기계 게이트를 검수 대체로 선언"하는 것이 된다(CLAUDE.md).
+
+**HARN-104 — 분류 3줄(Release Classification·Layer·Contract impact)의 채움 강제 판정**
+- 판정: **이번에는 강제하지 않는다.** 기존 4절도 CI가 본문을 읽지 않으므로 같은 한계를 공유하며,
+  본문 검사 워크플로를 새로 만드는 것은 근거(빈 칸이 실제로 얼마나 나오는지)가 없는 추측 구현이다.
+- 이 테스트가 동결하는 것은 *칸의 존재와 값 어휘*뿐이다 — 어휘는 대장 정본(`selector._EOS_RANK`)
+  및 7계층과 어긋나지 않는지만 본다. 채워졌는지는 보지 않는다.
+- 재개 조건: 머지된 PR 본문 표본에서 이 3줄이 비어 있는 비율이 측정으로 높게 나오면 본문 검사를
+  별도 태스크로 등재한다(지금은 측정 전이라 등재하지 않는다).
 """
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -35,6 +44,11 @@ _REQUIRED_SECTIONS: dict[str, str] = {
 # 긴 템플릿은 아무도 채우지 않는다 — 실효성 자체가 길이에 달려 있어 상한을 계약으로 건다.
 _MAX_LINES = 60
 _MAX_SECTIONS = 5
+
+# HARN-104 — 분류 3줄. 대장에 실재하는 값 어휘를 쓰므로(자유 서술이 아니다) 라벨과 어휘를 함께 동결한다.
+_CLASSIFICATION_LABELS = ("Release Classification", "Layer", "Contract impact")
+_LAYER_CODES = tuple(f"L{n}" for n in range(1, 8))  # 7계층 L1~L7
+_SELECTOR = _REPO_ROOT / "scripts" / "harness" / "selector.py"
 
 
 def _template_text() -> str:
@@ -90,6 +104,75 @@ def test_pr_template_forbids_blank_discriminability_answer() -> None:
         "변별력 칸에 '해당 없음이면 그 이유를 쓰라'는 지시가 없다 — 빈칸으로 통과하는 칸은 "
         "곧 사라진다."
     )
+
+
+def _eos_priority_vocabulary() -> tuple[str, ...]:
+    """대장 정본의 eos_priority 어휘 — `selector._EOS_RANK` 의 키. import 하지 않고 AST 로 읽는다."""
+    tree = ast.parse(_SELECTOR.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        target = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target, value = node.target.id, node.value
+        elif isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            target, value = node.targets[0].id, node.value
+        if target == "_EOS_RANK" and isinstance(value, ast.Dict):
+            keys = [k.value for k in value.keys if isinstance(k, ast.Constant)]
+            if keys:
+                return tuple(str(k) for k in keys)
+    raise AssertionError("selector._EOS_RANK 를 못 찾았다 — 정본 어휘가 사라졌거나 이동했다.")
+
+
+def _classification_block(text: str) -> str:
+    """분류 3줄 구간 — 첫 절 머리에서 다음 `## ` 절 직전까지(3줄의 라벨이 모두 이 안에 있어야 한다)."""
+    start = text.find("## ")
+    assert start >= 0, "템플릿에 절이 없다."
+    nxt = text.find("\n## ", start + 3)
+    return text[start : nxt if nxt >= 0 else len(text)]
+
+
+def test_pr_template_has_the_three_eos_classification_lines() -> None:
+    """계약 ⑤ (HARN-104) — Release Classification·Layer·Contract impact 3줄이 첫 절 안에 살아 있다.
+
+    새 `##` 절이 아니라 첫 절 안의 3줄이다 — 절 수 상한(계약 ③)을 건드리지 않고 길이 예산을 지킨다.
+    """
+    block = _classification_block(_template_text())
+    missing = [label for label in _CLASSIFICATION_LABELS if f"**{label}**" not in block]
+    assert not missing, f"PR 템플릿 첫 절에서 사라진 분류 줄: {missing}"
+
+
+def test_classification_vocabulary_matches_the_ledger() -> None:
+    """계약 ⑥ (HARN-104) — 칸의 값 어휘가 대장 정본(eos_priority)·7계층과 같다.
+
+    어휘가 대장과 어긋나면 사람이 존재하지 않는 등급을 적게 된다(빈 칸보다 나쁜 칸).
+    """
+    block = _classification_block(_template_text())
+    vocab = _eos_priority_vocabulary()
+    assert vocab == ("P0", "P1", "P2", "P3"), f"대장 eos_priority 어휘가 바뀌었다: {vocab}"
+    absent = [v for v in (*vocab, *_LAYER_CODES) if v not in block]
+    assert not absent, f"분류 칸에 안내되지 않은 값: {absent}"
+
+
+def test_gutted_classification_is_detected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """변별력 봉인 (HARN-104) — 분류 3줄이 없는 템플릿·어휘가 빠진 템플릿이 실제로 검출되는가."""
+    text = _template_text()
+    gutted = tmp_path / "pull_request_template.md"
+    monkeypatch.setattr(__name__ + "._TEMPLATE", gutted, raising=True)
+
+    # 라벨 하나 삭제 → ⑤ 검출
+    gutted.write_text(text.replace("**Layer**", "Layer"), encoding="utf-8")
+    with pytest.raises(AssertionError, match="사라진 분류 줄"):
+        test_pr_template_has_the_three_eos_classification_lines()
+
+    # 계층 어휘 L7 삭제 → ⑥ 검출
+    assert "L7" in text
+    gutted.write_text(text.replace("L7", "L_"), encoding="utf-8")
+    with pytest.raises(AssertionError, match="안내되지 않은 값"):
+        test_classification_vocabulary_matches_the_ledger()
+
+    # 등급 어휘 P3 삭제 → ⑥ 검출
+    gutted.write_text(text.replace("P3", "P_"), encoding="utf-8")
+    with pytest.raises(AssertionError, match="안내되지 않은 값"):
+        test_classification_vocabulary_matches_the_ledger()
 
 
 def test_missing_template_fails_loudly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
