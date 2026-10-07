@@ -763,7 +763,10 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.skeleton_generator", "l3.equivalent.difficulty",
        "l3.equivalent.canonicalize", "l3.equivalent.rephrase", "l3.equivalent.rephrase_hygiene",
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
-       "l3.equivalent.defect_seeder"),
+       "l3.equivalent.defect_seeder",
+       # P3-03 감사자 자격 측정 — 은행 전용 결함 주입기(defect_seeder와 같은 강등전 원리·이 은행의
+       # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
+       "l3.equivalent.p3_diff_defect_seeder"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
@@ -813,6 +816,9 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
        # 3차 감사 처분 — '선수 계산 우회로' 판정기(생성기 빌드가 문항마다 부르는 fail-loud 게이트).
        "l3.equivalent.p3_diff_shortcut_guard",
+       # 1·2차 감사 문면 결함 스캐너 — 테스트 안에 있던 판정 함수를 감사자 자격 측정의 기계 게이트가
+       # 쓰도록 승격(규칙 불변·대조군은 test_p3_diff_text_defects가 그대로 봉인).
+       "l3.equivalent.p3_diff_text_scanner",
        # 풀이 단계(`verify.solution_steps`) 결정론 도출 — 도함수 출발식부터 SymPy 계산(Tier2 계약).
        "l3.equivalent.p3_diff_solution_steps",
        "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
@@ -1151,6 +1157,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.banned_words_pii_eval", "harness.coach_prose_leak_eval",
        "harness.corpus_audit_eval", "harness.crosslink_demotion_eval",
        "harness.defect_detection_eval", "harness.explanation_f7_eval",
+       # P3-03 — 미분 은행 감사자 자격 측정(결함 주입 강등전 · 기계 ∪ LLM 이중 판정 · S5 보정 상한).
+       "harness.p3_audit_qualification",
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",

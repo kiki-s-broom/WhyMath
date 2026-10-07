@@ -153,6 +153,22 @@ T09-no-application·T10-linear-position. 4회차 감사 대상 원문 `round4/au
   (`corpus_audit_eval.AuditLabel` 형식, 240행)로 옮기고, 표본 id 집합과 1:1인지·은행 지문이 같은지 대조한 뒤
   `KNOWN_CORPORA`·`AUDIT_LABEL_MAP`에 편입한다. as-found 선언은 사람 검수의 첫 판정 그대로를 쓴다.
 
+## 감사자 자격 측정 — 결함 주입 강등전 (2026-10-08)
+
+사람 검수 철회의 대체 경로다. 상세(시험지 구성·GT 확정·판정자 요건·S5 보정 근거·한계)는
+`qualification/README.md`가 정본이다. 요지만 적는다.
+
+- **합격 기준(Kiki 결정 2026-10-08 — 코드 상수 `harness/p3_audit_qualification.py`가 단일 원천)**: 결함 120 + 정상 120
+  시험지(seed `20261008`)에서 감사 프로토콜(기계 게이트 전부 ∪ LLM 이중 판정, 한 명이라도 결함이면 결함)의
+  전체 검출률 Wilson 95% 단측 하한 ≥ 0.90 · 종류별 검출률 점추정 ≥ 0.80 · 정상 오경보율 Wilson 95% 단측 상한 ≤ 0.10.
+- **합격 뒤 S5**: 프로토콜로 504건을 감사해 관측 결함 k → 보정 상한 = Wilson 상한(k, 504) ÷ 검출률 Wilson 하한
+  ≤ 0.02이면 승인 근거(합성 신뢰도 ≥ 90% — 두 단측 95% 경계의 Bonferroni).
+- **시험지**: `qualification/blind_240.jsonl`(커밋) · 정답지는 감사 종료까지 저장소 밖 · 정답지 sha256 사전 등록
+  `qualification/answer_key.sha256` = `f8ab0a965fbf375d732d749ca370b81c8b9c9db89f36f85a2a34554706dee7bc`.
+- **기계 단독 측정(프로토콜 판정 아님)**: 검출 53/120(하한 0.369) · 오경보 0/120(상한 0.022) — 불합격.
+  기계가 잡은 53건은 전부 GT 규칙과 같은 규칙의 게이트가 있는 변이에서 나왔고, 그 밖 65건은 0/65다
+  (`qualification/README.md` "순환" 절). LLM 이중 판정은 아직 없다.
+
 ## 알려진 기록 결함
 
 - 2회차 02-10 감사자의 구조화 응답이 `placeholder`로 유실됐다. 라벨 파일(`round2/H_12___02_10.jsonl`)의
@@ -169,3 +185,5 @@ T09-no-application·T10-linear-position. 4회차 감사 대상 원문 `round4/au
   고정 입력이다 — 은행을 재생성해도 이 파일은 바꾸지 않는다
 - `round4/audited_bank.jsonl` — 4회차 감사 대상 은행(`e110735e`) 원문 스냅샷(504행 · 같은 필드·같은 직렬화)
 - `round4/disposition.json` — 4회차 결함 레코드 115건의 처분표(교정 기록 — as-found 판정은 고치지 않는다)
+- `qualification/` — 감사자 자격 측정(결함 주입 강등전): 시험지 `blind_240.jsonl`·정답지 지문 `answer_key.sha256`·
+  `manifest.json`·기계 라벨 `machine_labels.jsonl`·절차 정본 `README.md`
