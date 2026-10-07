@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: blocked
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,5 +20,5 @@ paths:
   - "src/data-pipeline/data_pipeline/misconception/**"
   - "docs/reviews/m0599_*.md"
 session: null
-notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다.\n\n[정정 2026-10-07] acceptance ① 원천 대조는 Kiki 머신의 원천 파일이 있어야 한다 — 진단 스크립트·런북을 착지시키고 실행 게이트로 대기"
+notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다.\n\n[차단 2026-10-07] 완료 조건 ①의 입력인 원천 JSON(fac16e6f…, sha256 fcf6d333…187e)이 저장소·이력·컨테이너 어디에도 없다(Kiki 머신 보관본, 2026-10-07 실측: find·git log -S 모두 파일 0건). ②·③은 ①의 판정(가설 ① 원천 공백 / 가설 ② 추출 누락)에 달려 있어 세션이 대신 못 한다 — 추측 저작은 '원 출처 근거' 조건 위반. 해소: Kiki가 원천 JSON을 세션에 제공(경로 또는 첨부)한 뒤 unblock.\n\n[진행 2026-10-07] 위 해소 조건(원천 JSON 제공)을 Kiki 머신에서의 1회 실행으로 대체하는 진단 도구(scripts/ops/misc61_source_key_probe.py)와 런북(docs/ops/misc61_source_probe_runbook.md)을 착지시키고 실행 게이트 G-misc61-source-probe-run을 부착했다. 결과 JSON을 받으면 ①의 판정을 기록하고 게이트를 닫은 뒤 unblock한다(원격 차단 홀드가 걸려 있어 status는 blocked를 유지한다)."
 updated: 2026-10-07

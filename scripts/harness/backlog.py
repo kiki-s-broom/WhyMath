@@ -768,6 +768,13 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
                     f"태스크가 후보에 섞였을 수 있음",
                     file=sys.stderr,
                 )
+        # 낡은 로컬 대장 고지 (HARN-54) — 트렁크에서 이미 done/cancelled인 태스크가 후보에 섞였는가.
+        # 위 세 스캔은 트렁크를 보지 않는다(`scan_remote_done`은 트렁크 ref를 의도적으로 제외한다).
+        # **제외하지 않고 고지만 한다** — 로컬에 정당한 후속 작업이 있을 수 있다. ref는 캐시만.
+        if ready:
+            _print_trunk_terminal_notice(
+                root, remote_claims.scan_trunk_terminal(root, [t.id for t in ready])
+            )
     # 취소된 선행에 차단된 todo (HARN-67 ②) — 후보 0건 여부·--json 여부와 무관하게 **매번**
     # 경고한다. 차단 자체는 옳을 수 있으나(결정 불가 → 차단 유지) 조용한 차단만은 금지다:
     # 선행을 cancel한 세션은 후속이 사라진 것을 못 보고, 다음 세션은 "왜 안 나오지"를 다시
@@ -830,6 +837,93 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
     print(hidden_notice)
     _print_gate_waits(backlog, excluded)
     return 0
+
+
+def _trunk_display(ref: str) -> str:
+    """`refs/remotes/origin/main` → `origin/main` (사람이 읽는 표기)."""
+    return ref.removeprefix("refs/remotes/")
+
+
+def _trunk_snapshot_age_line(root: Path) -> str | None:
+    """원격 스냅샷이 낡았으면 그 사실 한 줄, 아니면 None (HARN-54 ③).
+
+    `main에 없음`과 `main을 최근에 못 봤음`은 다른 진술이다 — 낡은 스냅샷으로 '트렁크에서 끝난
+    것 없음'을 말하면 거짓 안심이 된다. 나이는 **전체 브랜치 fetch 스탬프**로 잰다:
+    `remote_refs_age_seconds`는 FETCH_HEAD를 보는데, 이 CLI의 claim 조회(`list_claims`)가
+    매번 그것을 새로 써서 `next` 안에서는 구조적으로 0초에 가깝다(HARN-111 ⑦(다) 실측 — 거짓
+    안심). 판정 불가(스탬프 없음 등)는 침묵한다 — 추측을 출력하지 않는다.
+    """
+    age, _status = number_guard.branch_snapshot_age(root)
+    if age is None or age < _STALE_REFS_SECONDS:
+        return None
+    return (
+        f"⚠ origin 스냅샷이 {_format_age(age)} 지났다(마지막 전체 브랜치 fetch 기준) — "
+        f"트렁크 대조는 그 시점 기준이다. 최근에 끝난 태스크는 못 봤을 수 있다 · "
+        f"갱신: git fetch origin main"
+    )
+
+
+def _print_trunk_terminal_notice(root: Path, result: "remote_claims.TrunkTerminalResult") -> None:
+    """`next` — 후보 중 트렁크에서 이미 종결된 태스크를 고지한다 (HARN-54). 차단·제외 없음."""
+    for tid, hit in sorted(result.found.items()):
+        print(
+            f"⚠ 낡은 로컬 대장 {tid} — {_trunk_display(hit.trunk_ref)}에서는 "
+            f"이미 {hit.trunk_status} (로컬: todo). 후보에는 남기지만 착수하면 "
+            f"중복 구현일 수 있다 · 정정: git fetch origin main && git merge --ff-only origin/main",
+            file=sys.stderr,
+        )
+    if result.status != "ok":
+        # 판정 불가를 '트렁크에서 끝난 것 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — 이미 main에서 끝난 태스크가 "
+            f"후보에 섞였을 수 있음",
+            file=sys.stderr,
+        )
+        return
+    stale = _trunk_snapshot_age_line(root)
+    if stale:
+        print(stale, file=sys.stderr)
+
+
+def _print_trunk_terminal_start(
+    root: Path, task: Task, result: "remote_claims.TrunkTerminalResult | None"
+) -> None:
+    """`start` — 착수 대상이 트렁크에서 이미 종결됐으면 **마지막 출력**으로 눈에 띄게 고지한다.
+
+    사고 당시 경고가 path_overlap 4줄에 묻혀 착수가 그대로 진행됐다(HARN-54 ②) — 그래서
+    착수 확정 출력 *뒤*, 명령의 마지막에 온다. 차단하지 않는다(정당한 후속 작업 가능).
+    `result`가 None이면 대조를 시도하지 않은 경로(원격 claim 비활성·`--no-remote`)다 — 침묵.
+    """
+    if result is None:
+        return
+    hit = result.found.get(task.id)
+    if hit is not None:
+        bar = "!" * 64
+        print(
+            f"\n{bar}\n"
+            f"⚠ {task.id}는 {_trunk_display(hit.trunk_ref)}에서 이미 **{hit.trunk_status}**다 — "
+            f"이 클론의 대장이 낡았다(로컬: todo).\n"
+            f"  착수하면 중복 구현이 될 수 있다. 확인: git show {_trunk_display(hit.trunk_ref)}:"
+            f"backlog/tasks/{task.id}.yaml\n"
+            f"  대장 최신화: git fetch origin main && git merge --ff-only origin/main\n"
+            f"  (정당한 후속 작업이면 그대로 진행해도 된다 — 이 고지는 차단하지 않는다)\n"
+            f"{bar}",
+            file=sys.stderr,
+        )
+        store.append_event(
+            root,
+            "start_trunk_terminal_notice",
+            task.id,
+            trunk_status=hit.trunk_status,
+            trunk_ref=hit.trunk_ref,
+        )
+        return
+    if result.status != "ok":
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — {task.id}가 main에서 이미 끝났는지 "
+            f"못 봤다",
+            file=sys.stderr,
+        )
 
 
 def _print_gate_waits(backlog: object, excluded: list) -> None:
@@ -897,6 +991,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
     # 원격 claim 스냅샷 — 다른 세션의 in-flight는 로컬 backlog 사본에 안 보이므로
     # (claim은 각 브랜치의 worktree에만 기록) 원격 ref로만 교차 세션 겹침을 알 수 있다
     remote_claimed, _ = _remote_claim_map(root, policy, skip=getattr(args, "no_remote", False))
+    # 트렁크 종결 대조 결과 (HARN-54) — None = 대조를 시도하지 않은 경로(침묵), 마지막에 고지한다.
+    trunk_terminal: remote_claims.TrunkTerminalResult | None = None
 
     # [프리플라이트 0] 미머지 done — 타 세션이 이미 끝냈으나 머지 전인 태스크 (HARN-11).
     # claim 대장은 done 시 release돼 비어 있고 트렁크 사본은 아직 todo라, 다른 어떤
@@ -977,6 +1073,17 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                     f"트렁크에 새로 착지한 조건을 못 봤을 수 있음",
                     file=sys.stderr,
                 )
+
+        # [프리플라이트 0.6] 트렁크에서 이미 종결된 태스크 (HARN-54) — 0.5는 트렁크의 *조건 강화*만,
+        # 위 done 스캔은 *트렁크 밖* 브랜치만 본다. 낡은 로컬 대장이 main에서 이미 done인 태스크를
+        # todo로 보여 주는 창은 둘 다 못 본다. 위 fetch=True가 ref를 방금 최신화했으므로 편승한다.
+        # fetch가 실패했으면(done_status != ok) 그 사유를 그대로 싣는다 — 못 본 것을 '없음'으로 접지
+        # 않는다.
+        trunk_terminal = (
+            remote_claims.scan_trunk_terminal(root, [task.id])
+            if done_status == "ok"
+            else remote_claims.TrunkTerminalResult(done_status)
+        )
 
         # [프리플라이트 0.75] 미머지 브랜치의 게이트 부착 (HARN-193) — 트렁크 시차(0.5)의 반대
         # 방향이다. 0.5는 *트렁크가* 조건을 강화한 경우를 보고, 이 검사는 *미머지 브랜치가*
@@ -1222,6 +1329,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
         )
     for warning in task.layer_drift_warnings():
         print(f"  ⚠ {warning}", file=sys.stderr)
+    # 마지막 출력 — 앞의 겹침 경고들에 묻히지 않게 한다 (HARN-54 ②)
+    _print_trunk_terminal_start(root, task, trunk_terminal)
     return 0
 
 
