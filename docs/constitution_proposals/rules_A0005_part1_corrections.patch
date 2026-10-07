@@ -22,6 +22,20 @@
      precedent: P0001
  
    # ── 3장 멱등성 (헌법 제6조) ────────────────────────────
+@@ -153,10 +157,10 @@
+     article: 제7조
+     chapter: 4
+     axis: 진실
+-    statement: Python·Dart 데이터 모델은 schemas/ 의 JSON Schema에서 자동 생성되며, 재생성 결과가 커밋된 것과 같아야 한다
++    statement: 스키마 명세 YAML(schemas/)의 모든 필드는 대응 데이터 모델에 존재해야 하며, 어긋남은 만료일과 함께 동결하고 늘리지 않는다
+     level: L5
+-    check: scripts/check_generated.sh
+-    run: bash scripts/check_generated.sh
++    check: tests/constitution/test_schema_model_sync.py
++    run: pytest -q tests/constitution/test_schema_model_sync.py
+     stage: 3
+ 
+   - id: R4-03
 @@ -165,8 +169,8 @@
      axis: 진실
      statement: 문서에 적힌 핵심 숫자(개념 노드 수·오개념 수·시그니처 패턴 수)는 원본에서 센 실제 값과 같아야 한다
