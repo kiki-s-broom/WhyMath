@@ -980,12 +980,12 @@ gates:
     title: "P3-03 미분 문항 은행 사람 표본 검수 240건 — 검수 페이지 https://claude.ai/artifact/GHRd2VNjVpTjqDa5j5iGD3 에서 사전 등록 순서대로 240건 전부 통과/결함 판정(결함은 종류+근거 메모). 승인 기준 n=240·Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하. 표본 등록 docs/data/p3_calculus1_diff_audit/human_review/sample_240.json(은행 sha256 cc7e953974185ac4…, 시드 20261007). 표본 크기는 시작 전에 고정 — 중간에 멈추거나 늘리지 않는다. 검수가 끝나면 세션이 판정을 감사 라벨 파일로 옮겨 KNOWN_CORPORA·AUDIT_LABEL_MAP 편입과 approved 각인을 진행한다. 결함 2건 이상이면 승인되지 않으며 교정 후 처리는 그때 다시 정한다. 근거 docs/data/p3_calculus1_diff_audit/README.md(LLM 감사 4회 불합격 → Kiki 결정 2026-10-07 사람 검수 전환)"
     kind: human
     assignee: kiki
-    status: pending
+    status: waived
     requested: 2026-10-07
     remind_after_days: 7
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "철회 — 검증 권위 서열 위반(Kiki 지적 2026-10-08). 사람 표본 240건 판정을 은행 504건 승인의 유일 근거로 삼는 설계는 초인간 검증 기준 v1(docs/standards/superhuman_verification_standard.md §0)의 '인간 검수는 오류율 미측정 검출기 하나 — 최종 권위 아님 · 인간 폴백은 측정 미달·undecidable 구간만'에 어긋난다. 대체 경로 = 결함 주입 강등전(§3)으로 감사자·기계 게이트의 검출률·오경보율을 먼저 측정하고, 측정을 통과한 감사자 판정만 S5 근거로 쓰며, 사람은 판정 불가 잔여만 본다(P3-03 안에서 수행). 검수는 시작 전에 철회되어 사람 판정 0건."
     corrections: []
     no_inputs_reason: "표본·검수 페이지가 이미 준비돼 있다(표본 등록 커밋 이후 즉시 수행 가능) — 여는 작업 없음"
   - id: G-p318-calc-02-08-disposition
