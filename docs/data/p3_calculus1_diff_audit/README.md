@@ -129,6 +129,22 @@ T09-no-application·T10-linear-position. 4회차 감사 대상 원문 `round4/au
 이 판정기가 보증하지 않는 것(4회차 규칙 추가분): T09-no-application·T05·T10은 발문 *어휘*를 읽는다 — 같은
 수학을 다른 어휘로 쓰면 놓친다. T08-given-critical-points는 발문에 보이는 다항식의 유리수 임계점만 본다.
 
+## 사람 검수(나) — 사전 등록
+
+4회차 불합격 뒤 Kiki 결정(2026-10-07)으로 LLM 감사 반복을 멈추고 사람 표본 검수로 전환했다. 검수 전에 4회차 결함을
+교정했고(`round4/disposition.json`), 은행에 구조화 풀이 단계(`verify.solution_steps`)를 넣었다.
+
+- **표본 등록**: `human_review/sample_240.json` — 은행 sha256 `cc7e953974185ac4…`(커밋 `ba57809a`), 시드 `20261007`.
+  개념(7)×슬롯(6) 42층에서 층마다 12건 중 5건, 무작위 30개 층에서 1건 더 = 240건. 검토 순서도 같은 시드로 고정.
+  **은행이 이 지문에서 바뀌면 이 표본은 무효이며 다시 뽑는다.**
+- **표본 크기는 검수 시작 전에 고정**(240건). 결함을 보고 중간에 멈추거나 늘리면 편향이 생긴다.
+- **판정 기준**: n = 240, Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하 통과(0건 0.0111 · 1건 0.0185 · 2건 0.0249).
+- **도구**: Kiki 소유의 비공개 검수 페이지. 판정은 페이지 저장소 `verdicts` 컬렉션(문항 id = 문서 id)에 저장되며
+  쓰기는 소유자만 가능하다. 결함 수와 통과 여부는 240건을 모두 마친 뒤에만 페이지에 보인다.
+- **라벨 변환**: 검수가 끝나면 세션이 저장소를 읽어 `docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl`
+  (`corpus_audit_eval.AuditLabel` 형식, 240행)로 옮기고, 표본 id 집합과 1:1인지·은행 지문이 같은지 대조한 뒤
+  `KNOWN_CORPORA`·`AUDIT_LABEL_MAP`에 편입한다. as-found 선언은 사람 검수의 첫 판정 그대로를 쓴다.
+
 ## 알려진 기록 결함
 
 - 2회차 02-10 감사자의 구조화 응답이 `placeholder`로 유실됐다. 라벨 파일(`round2/H_12___02_10.jsonl`)의
@@ -140,6 +156,7 @@ T09-no-application·T10-linear-position. 4회차 감사 대상 원문 `round4/au
 - `round1/H_12___02_*.jsonl`, `round2/H_12___02_*.jsonl` — 개념별 라벨(`problem_id`·`verdict`·`defect_class`)
 - `round3/R*/H_12___02_*.jsonl`, `round4/R*/H_12___02_*.jsonl` — 판정자별 라벨
 - `round*/defects.json` — 결함 상세(근거·확신도)
+- `human_review/sample_240.json` — 사람 검수 표본 사전 등록(은행 지문·시드·고정 순서)
 - `round3/audited_bank.jsonl` — 3회차 감사 대상 은행 원문 스냅샷(504행 · 판정기 입력 필드만). 판정기 재현율 측정의
   고정 입력이다 — 은행을 재생성해도 이 파일은 바꾸지 않는다
 - `round4/audited_bank.jsonl` — 4회차 감사 대상 은행(`e110735e`) 원문 스냅샷(504행 · 같은 필드·같은 직렬화)
