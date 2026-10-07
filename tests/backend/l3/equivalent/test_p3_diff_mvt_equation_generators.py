@@ -74,7 +74,11 @@ _ALL = pytest.mark.parametrize("generator_cls", _GENS, ids=lambda g: g.standard_
 
 _MIN_SKELETONS = 30
 _MIN_FRAMES = 30
-_GLYPHS = ("²", "³", "Σ", "α", "β", "√", "′", "≠", "≤", "≥")
+# 4차 감사(2026-10-07) 표기 교정: 학생 대면 '√'·'≤'·'≥'는 *허용*한다 — 승인 은행 4종이 쓰는 표기이고
+# 표기 커버리지 게이트(`l3/notation_coverage`) 베이스라인에 이미 있는 글리프라 신규 누락이 아니다.
+# 대신 그 자리를 차지하던 코드 표기('<='·'>='·'sqrt('·'*')를 금지한다(`_CODE_NOTATION`).
+_GLYPHS = ("²", "³", "Σ", "α", "β", "′", "≠")
+_CODE_NOTATION = re.compile(r"<=|>=|sqrt\(|\*")
 _X = sympy.Symbol("x")
 _C = sympy.Symbol("c")
 
@@ -851,6 +855,7 @@ def test_no_new_unicode_glyphs_or_latex_markup(generator_cls: type[P3DiffSlotGen
             *(item.choices or ()),
         ):
             assert not any(g in field for g in _GLYPHS), field
+            assert not _CODE_NOTATION.search(field), field
             assert "$" not in field and "\\" not in field, field
         assert item.answer_format in set(AnswerFormat)
 

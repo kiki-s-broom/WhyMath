@@ -60,7 +60,6 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_sum,
     render_surd,
     with_eul_reul,
-    with_eun_neun,
     with_i_ga,
     with_wa_gwa,
 )
@@ -74,7 +73,6 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import euro_ro
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffVelocityAccelerationGenerator"]
@@ -946,7 +944,7 @@ def _misconception_frames() -> list[Frame]:
         wrong_coeff = sympy.sqrt(b)  # v = t^2으로 쓴 학생이 얻는 시각
         entries = [
             ChoiceEntry(str(t0), is_correct=True, sort_key=float(t0)),
-            # 학생 표기(렌더 계약) — '5*sqrt(3)'이 아니라 '5sqrt(3)'(3차 감사 bad_wording).
+            # 학생 표기 — '5√3'(4차 감사 bad_wording: 3차의 '5sqrt(3)'도 코드 표기로 판정됐다).
             ChoiceEntry(render_surd(wrong_coeff), _KEBAB, sort_key=float(wrong_coeff)),
         ]
         cube_root = round(t0 ** (2 / 3))
@@ -1006,40 +1004,9 @@ def _misconception_frames() -> list[Frame]:
 def _diagnostic_frames() -> list[Frame]:
     slot = "diagnostic"
 
-    def d1(p: tuple[object, ...]) -> DiffItem | None:
-        c, t = _as_int(p[0]), _as_int(p[1])
-        f: Poly = ((0, c),)
-        return _value_item(
-            slot=slot,
-            frame_id="diag-velocity-of-fixed-position",
-            text=(
-                f"수직선 위의 점 P의 시각 t에서의 위치가 x = {c}{euro_ro(str(c))} 일정할 때, "
-                f"t = {t}에서의 점 P의 속도를 구하시오."
-            ),
-            value=0,
-            explanation=(
-                f"위치 {with_eun_neun(f'x = {c}')} 시각 t에 대한 상수함수이므로 v(t) = 0이다. "
-                f"따라서 t = {t}에서의 속도는 0이다."
-            ),
-            conditions=f"{_dv(f, str(t))} = y",
-        )
-
-    def d2(p: tuple[object, ...]) -> DiffItem | None:
-        m, n, t = _as_int(p[0]), _as_int(p[1]), _as_int(p[2])
-        f = _poly({1: m, 0: n})
-        return _value_item(
-            slot=slot,
-            frame_id="diag-acceleration-of-uniform-motion",
-            text=f"{_intro(f)} t = {t}에서의 점 P의 가속도를 구하시오.",
-            value=0,
-            explanation=(
-                f"v(t) = {m}{euro_ro(str(m))} 속도가 일정하므로 a(t) = 0이다. 따라서 t = {t}에서의 "
-                "가속도는 "
-                "0이다."
-            ),
-            conditions=f"{_da(f, str(t))} = y",
-        )
-
+    # 4차 감사(2026-10-07) bad_tag 처분 — 위치가 상수(x = 7로 일정)·일차(x = 2t + 1)인 틀 3종
+    # (정지점의 속도·등속 운동의 속도·가속도)을 삭제했다. 정지면 속도 0, 등속이면 가속도 0·속도는
+    # 일차함수의 기울기라는 상식으로 풀린다(판정기 T10-linear-position이 재발을 막는다).
     def d3(p: tuple[object, ...]) -> DiffItem | None:
         f = _as_poly(p[0])
         if not any(e == 1 for e, _ in f):
@@ -1052,15 +1019,24 @@ def _diagnostic_frames() -> list[Frame]:
             0,
         )
 
-    def d4(p: tuple[object, ...]) -> DiffItem | None:
-        m, n, t = _as_int(p[0]), _as_int(p[1]), _as_int(p[2])
-        f = _poly({1: m, 0: n})
-        return _velocity_item(
-            slot,
-            "diag-velocity-of-uniform-motion",
-            f"{_intro(f)} t = {t}에서의 점 P의 속도를 구하시오.",
-            f,
-            t,
+    def d10(p: tuple[object, ...]) -> DiffItem | None:
+        # 이차 위치의 가속도 — 시각과 무관한 상수 2A다. 속도 v(t)(시각에 따라 변함)나 위치와
+        # 혼동하면 시각 T에 따라 다른 값이 나와 변별된다(등속 운동의 '가속도 0'과 달리 상식으로
+        # 정해지지 않는다).
+        f, t = _as_poly(p[0]), _as_int(p[1])
+        if dict(f).get(1, 0) == 0:
+            return None
+        a = _a_at(f, t)
+        return _value_item(
+            slot=slot,
+            frame_id="diag-acceleration-of-quadratic-position",
+            text=f"{_intro(f)} t = {t}에서의 점 P의 가속도를 구하시오.",
+            value=a,
+            explanation=(
+                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이다. "
+                f"가속도는 시각과 관계없이 항상 {a}이다. 따라서 t = {t}에서의 가속도는 {a}이다."
+            ),
+            conditions=f"{_da(f, str(t))} = y",
         )
 
     def d5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1092,21 +1068,11 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     return [
-        Frame(
-            "diag-velocity-of-fixed-position",
-            _grid("p3-vel:d1", (-3, -1, 2, 4, 7), (0, 1, 2, 3, 5)),
-            d1,
-        ),
-        Frame(
-            "diag-acceleration-of-uniform-motion",
-            _grid("p3-vel:d2", (-4, -3, -2, 1, 2, 3, 5), (-2, 0, 1, 3), (0, 1, 2, 4)),
-            d2,
-        ),
         Frame("diag-velocity-at-start", _grid("p3-vel:d3", _quad_pool()[::7]), d3),
         Frame(
-            "diag-velocity-of-uniform-motion",
-            _grid("p3-vel:d4", (-4, -3, -2, 1, 2, 3, 5, 6), (-1, 0, 2, 4), (1, 2, 3, 5)),
-            d4,
+            "diag-acceleration-of-quadratic-position",
+            _grid("p3-vel:d10", _quad_pool()[2::9], _TIMES),
+            d10,
         ),
         Frame(
             "diag-acceleration-of-power-position",

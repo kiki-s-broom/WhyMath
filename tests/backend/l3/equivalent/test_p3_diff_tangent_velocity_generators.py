@@ -445,9 +445,18 @@ def test_only_required_problem_types_and_no_review_status(
             assert dumped.get("review_status") is None
 
 
+#: 승인 은행 표기 글리프(4차 감사 표기 교정) — 이 셋 밖의 비ASCII·비한글 문자는 금지.
+_ALLOWED_GLYPHS = frozenset("√≤≥")
+
+
 @_ALL
 def test_text_is_ascii_plus_hangul_only(generator_cls: type[P3DiffSlotGenerator]) -> None:
-    """신규 유니코드 글리프 0 — 한글 음절과 ASCII만 쓴다(위첨자·≠·±·√ 등 금지)."""
+    """신규 유니코드 글리프 0 — 한글 음절·ASCII와 승인 은행 표기 글리프 '√'·'≤'·'≥'만 쓴다.
+
+    4차 감사(2026-10-07) 표기 교정 — 코드 표기 '8sqrt(3)'·'<='를 '8√3'·'≤'로 바꿨다. 세 글리프는 승인
+    은행 4종이 쓰고 표기 커버리지 베이스라인에 있다. 위첨자·≠·± 등 그 밖의 글리프는 여전히 금지하고,
+    코드 표기('<='·'>='·'sqrt('·'*')는 따로 금지한다.
+    """
     for item in _all_items(generator_cls):
         for field in (
             item.question_text,
@@ -455,8 +464,11 @@ def test_text_is_ascii_plus_hangul_only(generator_cls: type[P3DiffSlotGenerator]
             item.answer_text,
             *(item.choices or ()),
         ):
-            offenders = {c for c in field if not (c.isascii() or "가" <= c <= "힣")}
+            offenders = {
+                c for c in field if not (c.isascii() or "가" <= c <= "힣" or c in _ALLOWED_GLYPHS)
+            }
             assert not offenders, (offenders, field)
+            assert not re.search(r"<=|>=|sqrt\(|\*", field), field
             assert "$" not in field and "\\" not in field, field
 
 

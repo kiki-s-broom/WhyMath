@@ -565,7 +565,7 @@ def _mc_solve_cubic(a0: int) -> DiffItem | None:
     wrong_coeff = sympy.sqrt(b)  # (x^3)'를 x^2로 쓴 학생이 얻는 a
     entries = [
         ChoiceEntry(str(a0), is_correct=True, sort_key=float(a0)),
-        # 학생 표기(렌더 계약) — '8*sqrt(3)'이 아니라 '8sqrt(3)'(3차 감사 bad_wording).
+        # 학생 표기 — '8√3'(4차 감사 bad_wording: 3차의 '8sqrt(3)'도 코드 표기로 판정됐다).
         ChoiceEntry(render_surd(wrong_coeff), _KEBAB, sort_key=float(wrong_coeff)),
     ]
     cube_root = round(a0 ** (2 / 3))
@@ -690,23 +690,9 @@ def _misconception_frames() -> list[Frame]:
 # 진단(diagnostic) — 지수·계수·차수·특수한 값을 한 가지씩 확인
 # ──────────────────────────────────────────────────────────────────────────
 def _diagnostic_frames() -> list[Frame]:
-    def d1(p: tuple[object, ...]) -> DiffItem | None:
-        n = int(str(p[0]))
-        return DiffItem(
-            slot="diagnostic",
-            frame_id="diag-root-of-derivative",
-            question_text=f"함수 f(x) = x^{n}에 대하여 방정식 f'(x) = 0의 실근을 구하시오.",
-            answer_text="0",
-            explanation=(
-                f"도함수 {with_i_ga(render_poly(derivative_of(_mono(n))))} 0이 되는 "
-                "실수 x는 0뿐이다."
-            ),
-            conditions=f"Derivative(x**{n}, x).doit() = 0",
-            answer_map=(("x", "0"),),
-            problem_type_code=_SOLVE,
-            answer_format=_fmt(0),
-        )
-
+    # 4차 감사(2026-10-07) bad_tag 처분 — 'x^n의 도함수에 x = 0을 대입한 값'·'방정식 f'(x) = 0의
+    # 실근' 두 틀을 삭제했다. 정답이 0이고 원함수에 대입해도, 지수를 안 줄이거나 계수를 빠뜨려도
+    # 0이라 거듭제곱 미분법을 변별하지 못한다(우회로 판정기 T-zero-monomial이 재발을 막는다).
     def d2(p: tuple[object, ...]) -> DiffItem | None:
         a = int(str(p[0]))
         return DiffItem(
@@ -741,27 +727,35 @@ def _diagnostic_frames() -> list[Frame]:
             point=-1,
         )
 
-    def d5(p: tuple[object, ...]) -> DiffItem | None:
+    def d6(p: tuple[object, ...]) -> DiffItem | None:
+        # 4차 감사 처분으로 지운 두 틀의 자리 — 같은 '지수·계수' 진단을 *변별력 있게* 묻는다.
+        # f'(2) = n·2^(n - 1)은 f(2) = 2^n의 n/2배다. 지수를 안 줄이면 n배, 계수를 빠뜨리면 1/2배가
+        # 나와 오답 경로마다 답이 다르다(0 불변이던 종전 틀과 반대).
         n = int(str(p[0]))
-        return _value_item(
+        d_val, f_val = _dval(n, 2), 2**n
+        ratio = sympy.Rational(d_val, f_val)
+        return DiffItem(
             slot="diagnostic",
-            frame_id="diag-derivative-at-zero",
-            text=f"함수 f(x) = x^{n}의 도함수 f'(x)에 x = 0을 대입한 값을 구하시오.",
-            n=n,
-            point=0,
+            frame_id="diag-derivative-to-function-ratio",
+            question_text=(
+                f"함수 f(x) = x^{n}에 대하여 f'(2)의 값은 f(2)의 값의 몇 배인지 구하시오."
+            ),
+            answer_text=str(ratio),
+            explanation=(
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이므로 f'(2)의 값은 "
+                f"{n}(2^{n - 1}) = {d_val}이고, f(2)의 값은 2^{n} = {with_i_ga(f_val)}다. "
+                f"따라서 {d_val} = k({f_val})에서 k = {ratio}이다."
+            ),
+            conditions=f"{_deriv_value_sym(str(n), '2')} = k*2**{n}",
+            answer_map=(("k", str(ratio)),),
+            problem_type_code=_EVAL,
+            answer_format=_fmt(ratio),
         )
 
     def order(frame_id: str) -> tuple[tuple[object, ...], ...]:
         return tuple((n,) for n in seeded_order(f"p3-power:{frame_id}", _N_RANGE))
 
     return [
-        # 지수 2..4만 — 고중복도 근(x = 0, 중복도 n-1)은 수치 반례 fuzz가 근으로 인정하지
-        # 못하는 오탐을 낸다(`corpus_reverify --fuzz` 2026-10-06 실측: n=6·7). 그 범위를 피한다.
-        Frame(
-            "diag-root-of-derivative",
-            tuple((n,) for n in seeded_order("p3-power:d1", (2, 3, 4))),
-            d1,
-        ),
         Frame(
             "diag-derivative-of-identity-function",
             tuple((a,) for a in seeded_order("p3-power:d2", (-5, -4, -3, -2, -1, 1, 2, 3, 4, 5))),
@@ -769,7 +763,12 @@ def _diagnostic_frames() -> list[Frame]:
         ),
         Frame("diag-derivative-at-one", order("d3"), d3),
         Frame("diag-derivative-at-minus-one", order("d4"), d4),
-        Frame("diag-derivative-at-zero", order("d5"), d5),
+        # 지수 3 이상 — n = 2이면 2^(n - 1) = 2^1 표기가 생기고(지수 1 표기 결함 부류) 비율이 1이다.
+        Frame(
+            "diag-derivative-to-function-ratio",
+            tuple((n,) for n in seeded_order("p3-power:d6", tuple(range(3, 10)))),
+            d6,
+        ),
     ]
 
 

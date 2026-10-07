@@ -16,13 +16,22 @@
 JSONL 레코드(`probe_from_record`)에도 그대로 적용해 감사 회차의 교정 전 은행에서 재현율을 잴
 수 있게 한다.
 
+독립 감사 4회차(`round4/defects.json`·합집합 88·둘 다 27)는 이 판정기를 통과한 은행에서 다시
+결함을 찾았다 — ① 학생 대면 텍스트의 코드식 부등호 '<='·'>='와 근호 'sqrt(' ② 극값 위치를 둘
+이상 주는 02-08 문항(대입·대소 비교) ③ 복이차 사차식(완전제곱) ④ 포물선 꼭짓점의 수평 접선·직선의
+접선(02-05) ⑤ 위치가 일차 이하인 운동의 속도·가속도(02-10) ⑥ x^n의 도함수를 0에서 보는 문항(오답
+경로도 전부 0) ⑦ 방정식·부등식 맥락이 없는 02-09 최솟값 ⑧ 발문에 없는 '두 점'·'접점'을 쓰는 해설.
+4회차 규칙(아래 [4회차])이 그 부류를 생성 시점에 막는다.
+
 규칙(위반 id — 사유는 `ShortcutViolation.reason`)
 --------------------------------------------
 [공통 · 표기]
-  W-notation         학생 대면 문면(발문·선지·해설)에 SymPy 표기('*'·'Derivative(' 등)가
-                     있다. 렌더 계약(`docs/architecture/notation_contract.md` §6·
-                     `math_notation.dart`)은 'sqrt(3)'을 √3으로 조판하지만 '*'는
-                     가운뎃점(·)으로 남기므로, 8√3은 '8sqrt(3)'으로 쓴다.
+  W-notation         학생 대면 문면(발문·선지·해설·정답)에 SymPy 표기('*'·'Derivative(' 등)가
+                     있다.
+  W-ascii-inequality [4회차] 학생 대면 문면에 코드식 부등호 '<='·'>='가 있다 — 승인 은행 4종은
+                     '≤'·'≥'만 쓴다(Flutter 렌더는 '<='를 그대로 두 글자로 낸다).
+  W-sqrt-call        [4회차] 학생 대면 문면에 함수 호출꼴 근호 'sqrt('가 있다 — 승인 은행 관례는
+                     '8√3'이다(3회차 교정이 고른 '8sqrt(3)'은 감사자 둘이 모두 코드 표기로 봤다).
   W-point-x          '곡선 … 위의 x = 1에서의'처럼 점을 x값으로만 부른다('x좌표가 1인 점').
   W-trivial-ineq     '(-1 < 0 < 2)'처럼 상수만으로 된 자명한 부등식이 괄호로 붙어 있다
                      (템플릿 흔적).
@@ -39,6 +48,8 @@ JSONL 레코드(`probe_from_record`)에도 그대로 적용해 감사 회차의 
   E-symbol-intro     해설이 발문에 없는 기호(f'(c)의 c)를 소개 없이 쓴다.
   E-tautology        'q = 3에서 q = 3이다' 같은 순환 서술.
   E-term             '기울기 0인 일차함수'(상수함수를 일차함수라 부름).
+  E-object-intro     [4회차] 해설이 발문에 없는 도형 대상('두 점을 잇는 직선'·'접점'·'접선')을
+                     소개 없이 쓴다(발문에 점·곡선·직선·그래프가 하나도 없다).
 [개념 · 우회로(bad_tag)]
   T05-quadratic-tangency  (02-05) 접할 조건·곡선 밖의 점에서 그은 접선을 묻는데 곡선이
                           이차 이하라 판별식만으로 풀린다(곡선 차수 ≥ 3이어야 한다).
@@ -60,6 +71,24 @@ JSONL 레코드(`probe_from_record`)에도 그대로 적용해 감사 회차의 
   T09-pinned-minimizer    (02-09) 최솟값을 묻는데 발문이 최솟값을 갖는 x를 알려 주거나 그 x가
                           0이다(상수항이 곧 답 — 대입만).
   T10-average-only        (02-10) 평균속도만 묻는다(위치 대입·차분몫 — 미분 불요).
+  T-zero-monomial         [4회차] (전 개념) 발문의 함수가 단항식 c·x^n(n ≥ 2)인데 x = 0(원점)에서의
+                          미분계수나 방정식 f'(x) = 0의 근을 묻는다 — 정답도, 원함수 대입도,
+                          거듭제곱 미분법의 어떤 오답 경로도 0이라 변별이 없다.
+  T05-vertex-tangent      [4회차] (02-05) 곡선이 이차 이하인데 꼭짓점·x축에 평행한 접선·기울기 0을
+                          묻는다 — 꼭짓점 공식 -b/(2a)·완전제곱으로 풀린다.
+  T05-line-tangent        [4회차] (02-05) 직선 위의 점에서의 접선을 묻는다 — 직선의 기울기를 읽기만
+                          하면 된다.
+  T08-given-critical-points
+                          [4회차] (02-08) 발문이 극값을 갖는 x 위치를 둘 이상 준다 — 대입하고 대소를
+                          비교하면 극댓값·극솟값이 정해진다(삼차·사차에서 '큰 값이 극댓값'이 늘
+                          맞는다). 부호가 바뀌지 않는 임계점이 섞여 *극값인지* 가려야 하는 경우는
+                          세지 않는다(극값 위치는 둘 미만이 된다).
+  T08-biquadratic         [4회차] (02-08) 발문의 사차식이 x = h에 대해 대칭(복이차)이라
+                          (x - h)^2 = u로 두면 완전제곱만으로 극값의 위치·값이 나온다.
+  T09-no-application      [4회차] (02-09) 발문에 방정식·부등식·교점·위치 관계 맥락이 없다 — 최댓값·
+                          최솟값 기술(02-07/02-08 영역)만으로 풀리는 문항이다.
+  T10-linear-position     [4회차] (02-10) 위치가 일차 이하(x = 7·x = 2t + 1)인데 속도·가속도를
+                          묻는다 — 정지·등속이라는 상식(일차함수의 기울기)으로 풀린다.
 
 정직 범위(이 판정기가 보증하지 **않는** 것)
 -------------------------------------------
@@ -87,6 +116,7 @@ import sympy
 from whymath_backend.l3.safe_parse import safe_sympify
 
 __all__ = [
+    "ROUND4_RULE_IDS",
     "RULE_IDS",
     "ShortcutProbe",
     "ShortcutViolation",
@@ -123,7 +153,23 @@ RULE_IDS: Final[tuple[str, ...]] = (
     "T09-low-degree",
     "T09-pinned-minimizer",
     "T10-average-only",
+    # ── 4회차(2026-10-07) 결함 부류 — `ROUND4_RULE_IDS` ──
+    "W-ascii-inequality",
+    "W-sqrt-call",
+    "E-object-intro",
+    "T-zero-monomial",
+    "T05-vertex-tangent",
+    "T05-line-tangent",
+    "T08-given-critical-points",
+    "T08-biquadratic",
+    "T09-no-application",
+    "T10-linear-position",
 )
+
+#: 4회차 감사(합집합 88·둘 다 27)를 계기로 더한 규칙 — 3회차 재현율·과잉 거부 동결 테스트는 이
+#: 규칙들을 빼고 본다(3회차 판정자는 '<=' 등을 결함으로 보지 않았다 — 같은 원문에 대한 기준이
+#: 회차마다 다르므로, 회차별 측정은 그 회차의 규칙 집합으로 한다).
+ROUND4_RULE_IDS: Final[frozenset[str]] = frozenset(RULE_IDS[RULE_IDS.index("W-ascii-inequality") :])
 
 _C05: Final = "[12미적Ⅰ-02-05]"
 _C06: Final = "[12미적Ⅰ-02-06]"
@@ -305,11 +351,19 @@ def _has_repeated_factor(expr: sympy.Expr, var: sympy.Symbol) -> bool:
 # ──────────────────────────────────────────────────────────────────────────
 # [공통 · 표기]
 # ──────────────────────────────────────────────────────────────────────────
-#: 학생 문면에 새어 나온 SymPy 함수명(근호 'sqrt('는 렌더 계약상 학생 표기라 제외).
+#: 학생 문면에 새어 나온 SymPy 함수명(근호 'sqrt('는 4회차 규칙 W-sqrt-call이 따로 본다).
 _SYMPY_FUNCTION = re.compile(r"\b(?:Derivative|Abs|Rational|Integer|Symbol|Poly|Eq)\(")
+#: [4회차] 코드식 부등호 — 학생 표기는 '≤'·'≥'(승인 은행 관례). '=>'·'=<'는 쓰지 않으므로
+#: 보지 않는다.
+_W_ASCII_INEQ = re.compile(r"<=|>=")
+#: [4회차] 함수 호출꼴 근호 — 학생 표기는 '√3'·'8√3'.
+_W_SQRT_CALL = re.compile(r"sqrt\(")
 _W_POINT_X = re.compile(r"위의 [xt] = -?\d+(?:/\d+)?에서")
 _NUM = r"-?\d+(?:/\d+)?"
-_W_TRIVIAL_INEQ = re.compile(rf"\(\s*{_NUM}\s*<=?\s*{_NUM}\s*<=?\s*{_NUM}\s*\)")
+#: 부등호는 코드식('<=')과 학생 표기('≤') 둘 다 읽는다 — 표기를 바꿔도 자명 부등식 검출이 꺼지지
+#: 않게(4회차 표기 교정이 이 규칙을 무력화하지 않게) 한다.
+_LE = r"(?:<=?|≤)"
+_W_TRIVIAL_INEQ = re.compile(rf"\(\s*{_NUM}\s*{_LE}\s*{_NUM}\s*{_LE}\s*{_NUM}\s*\)")
 _W_ZERO_HOUR = re.compile(r"(?<!\d)0\s*시간\s*(?:부터|후|동안)|후\s+0\s*시간")
 _W_EXTREMUM_JOSA = re.compile(r"의 극(?:값|댓값|솟값)을 갖는|점이 [xt] = ")
 
@@ -318,14 +372,30 @@ def _notation_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     out: list[ShortcutViolation] = []
     fields = [("발문", probe.question_text), ("해설", probe.explanation)]
     fields += [(f"선지 {i + 1}", c) for i, c in enumerate(probe.choices)]
+    fields += [("정답", probe.answer)]
     for name, text in fields:
         if "*" in text or _SYMPY_FUNCTION.search(text):
             out.append(
                 ShortcutViolation(
                     "W-notation",
                     f"{name} {text!r}에 SymPy 표기('*'·'Derivative(' 등)가 학생에게 노출된다 — "
-                    "곱은 이어 쓴다(렌더 계약: 'sqrt(3)'은 √3으로, '*'는 가운뎃점으로 조판되므로 "
-                    "8√3은 '8sqrt(3)'으로 쓴다).",
+                    "곱은 이어 쓴다('3x^2'·'8√3').",
+                )
+            )
+        if _W_ASCII_INEQ.search(text):
+            out.append(
+                ShortcutViolation(
+                    "W-ascii-inequality",
+                    f"{name} {text!r}에 코드식 부등호('<='·'>=')가 있다 — 학생 표기 "
+                    "'≤'·'≥'로 쓴다.",
+                )
+            )
+        if _W_SQRT_CALL.search(text):
+            out.append(
+                ShortcutViolation(
+                    "W-sqrt-call",
+                    f"{name} {text!r}에 함수 호출꼴 근호 'sqrt('가 있다 — 학생 표기 '√'로 쓴다"
+                    "('8sqrt(3)' → '8√3').",
                 )
             )
     q = probe.question_text
@@ -481,6 +551,9 @@ _TAUTOLOGY = re.compile(
     r"(?<![A-Za-z0-9])([a-z])\s*=\s*(-?\d+(?:/\d+)?)에서\s*\1\s*=\s*\2(?![\d/])"
 )
 _TERM_LINEAR = re.compile(r"기울기(?:가)?\s*((?:-?\d+)(?:\s*,\s*-?\d+)*)\s*인\s*일차함수")
+#: [4회차] 해설이 꺼내는 도형 대상 — 발문(`_Q_OBJECT`)에 그 대상을 소개하는 말이 하나도 없으면 결함.
+_E_OBJECT = re.compile(r"두 점을 잇는|접점|접선")
+_Q_OBJECT = re.compile(r"점|접|곡선|직선|그래프")
 
 
 def _explanation_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
@@ -546,6 +619,15 @@ def _explanation_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
             out.append(
                 ShortcutViolation("E-term", "기울기가 0인 함수는 상수함수이지 일차함수가 아니다.")
             )
+    named = _E_OBJECT.search(e)
+    if named is not None and not _Q_OBJECT.search(q):
+        out.append(
+            ShortcutViolation(
+                "E-object-intro",
+                f"해설이 발문에 없는 대상 '{named.group(0)}'을(를) 소개 없이 쓴다 — 발문에 점·곡선·"
+                "직선·그래프가 없으면 '구간에서의 평균변화율'·'f'(c)'처럼 발문의 말로 쓴다.",
+            )
+        )
     return out
 
 
@@ -571,17 +653,78 @@ def _curve_degrees(q: str) -> list[int]:
     return degrees
 
 
+#: [4회차] 수평 접선을 묻는 표현 — 포물선이면 꼭짓점 공식으로 바로 풀린다.
+_HORIZONTAL = re.compile(r"꼭짓점|x축에 평행|수평|기울기가 0(?:일|인)")
+#: [4회차] 직선 위의 점에서의 접선 — '직선 y = 2x - 5 위의 점 (2, -1)에서의 접선'.
+_LINE_POINT = re.compile(r"직선 y = [^가-힣]+ 위의")
+
+
 def _tangent_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     q = probe.question_text
-    if not _TANGENCY.search(q):
-        return []
+    out: list[ShortcutViolation] = []
     degrees = _curve_degrees(q)
-    if degrees and max(degrees) <= 2:
-        return [
+    if _TANGENCY.search(q) and degrees and max(degrees) <= 2:
+        out.append(
             ShortcutViolation(
                 "T05-quadratic-tangency",
                 "접할 조건을 묻는데 곡선이 이차 이하라 연립 이차방정식의 판별식만으로 풀린다 — "
                 "곡선 차수가 3 이상이거나 접점의 미분계수가 풀이에 필수여야 한다.",
+            )
+        )
+    if degrees and max(degrees) <= 2 and _HORIZONTAL.search(q):
+        out.append(
+            ShortcutViolation(
+                "T05-vertex-tangent",
+                "곡선이 이차 이하인데 꼭짓점·x축에 평행한 접선(기울기 0)을 묻는다 — 포물선의 수평 "
+                "접선은 꼭짓점에만 생기므로 -b/(2a)·완전제곱으로 미분 없이 풀린다.",
+            )
+        )
+    if "접선" in q and _LINE_POINT.search(q):
+        out.append(
+            ShortcutViolation(
+                "T05-line-tangent",
+                "직선 위의 점에서의 접선을 묻는다 — 직선의 접선은 그 직선 자신이라 기울기를 읽기만 "
+                "하면 되고, 미분계수 개념이 없는 학생도 맞힌다.",
+            )
+        )
+    return out
+
+
+#: [4회차] x = 0에서의 값을 묻는 표현 — 대입('10을 대입'은 아니다)·미분계수 f'(0)·원점·
+#: 'x좌표가 0인'.
+#: 'x = 0'은 x 위치 고정 읽기(`_PIN_X` — 분수까지 수 하나를 통째로 읽는다)를 그대로 쓴다.
+_ZERO_PHRASE = re.compile(r"(?<!\d)0을 대입|[a-z]'\(0\)|원점|x좌표가 0인")
+#: [4회차] 방정식 f'(x) = 0의 근을 묻는 표현.
+_DERIV_ROOT = re.compile(r"[a-z]'\(x\) = 0의 (?:실근|근|해)")
+
+
+def _is_power_monomial(expr: sympy.Expr, var: sympy.Symbol) -> bool:
+    """x에 대해 항이 하나뿐이고 차수가 2 이상인가(c·x^n).
+
+    계수 c는 문자여도 된다 — kx^2도 x = 0에서의 미분계수가 0이다.
+    """
+    try:
+        poly = sympy.Poly(expr, var)
+    except sympy.PolynomialError:
+        return False
+    return len(poly.terms()) == 1 and poly.degree() >= 2
+
+
+def _zero_monomial_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """단항식 c·x^n의 x = 0(또는 f'(x) = 0의 근) — 정답·원함수 대입·오답 경로가 모두 0이다."""
+    q = probe.question_text
+    x = sympy.Symbol("x")
+    if not any(_is_power_monomial(p, x) for p in visible_polynomials(q)):
+        return []
+    pinned = {sympy.Rational(v) for v in _PIN_X.findall(q)}  # `_PIN_X`는 02-08 절에 정의(같은 경계)
+    at_zero = _ZERO_PHRASE.search(q) is not None or 0 in pinned
+    if at_zero or _DERIV_ROOT.search(q):
+        return [
+            ShortcutViolation(
+                "T-zero-monomial",
+                "단항식 c·x^n(n ≥ 2)의 x = 0에서의 미분계수(또는 f'(x) = 0의 근)를 묻는다 — "
+                "정답이 0이고 원함수에 대입해도, 지수를 안 줄이거나 계수를 빠뜨려도 0이라 거듭제곱 "
+                "미분법을 변별하지 못한다.",
             )
         ]
     return []
@@ -663,8 +806,62 @@ def _mvt_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return []
 
 
-_DERIV_INEQ = re.compile(r"(?<![A-Za-z])[a-z]'\((?:x|t)\)\s*(?:<|>|<=|>=)\s")
+#: 도함수 부등식 — 코드식('<=')과 학생 표기('≤') 둘 다 읽는다(표기 교정이 규칙을 끄지 않게).
+_DERIV_INEQ = re.compile(r"(?<![A-Za-z])[a-z]'\((?:x|t)\)\s*(?:<|>|<=|>=|≤|≥)\s")
 _PINNED_KIND = re.compile(r"(?<![A-Za-z])x = -?\d+에서(?:의)? 극(?:댓|솟)값")
+#: [4회차] 발문이 고정한 x 위치 — 'x = -1과 x = 3'·'x = 1/2'.
+_PIN_X = re.compile(r"(?<![A-Za-z])x = (-?\d+(?:/\d+)?)")
+
+
+def _sign_change_roots(expr: sympy.Expr, var: sympy.Symbol) -> set[sympy.Rational]:
+    """f'의 유리수 근 중 좌우에서 부호가 바뀌는 근(= 극값을 갖는 x) — 판정 정의의 단일 원천."""
+    deriv = sympy.expand(sympy.diff(expr, var))
+    if deriv.free_symbols != {var}:
+        return set()
+    roots = sorted(
+        r for r in sympy.roots(sympy.Poly(deriv, var)) if r.is_rational  # 정수·분수 근만
+    )
+    if not roots:
+        return set()
+    middles = [(a + b) / 2 for a, b in zip(roots, roots[1:], strict=False)]
+    probes = [roots[0] - 1, *middles, roots[-1] + 1]
+    signs = [sympy.sign(deriv.subs(var, p)) for p in probes]
+    return {r for i, r in enumerate(roots) if signs[i] * signs[i + 1] < 0}
+
+
+def _graph_shape_round4_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[4회차] 02-08 — 극값 위치를 둘 이상 준 문항·복이차 사차식."""
+    q = probe.question_text
+    x = sympy.Symbol("x")
+    pins = {sympy.Rational(v) for v in _PIN_X.findall(q)}
+    out: list[ShortcutViolation] = []
+    given = False
+    biquadratic = False
+    for poly in visible_polynomials(q):
+        if x not in poly.free_symbols:
+            continue
+        if len(pins & _sign_change_roots(poly, x)) >= 2:
+            given = True
+        if poly.free_symbols == {x} and is_shifted_biquadratic(poly, x):
+            biquadratic = True
+    if given:
+        out.append(
+            ShortcutViolation(
+                "T08-given-critical-points",
+                "발문이 극값을 갖는 x 위치를 둘 이상 준다 — 그 위치에 대입해 대소를 비교하면 "
+                "극댓값·극솟값이 정해져(삼차·사차에서 '큰 값이 극댓값') 도함수와 부호 판정이 필요 "
+                "없다. 임계점은 학생이 f'(x) = 0을 풀어 찾게 한다.",
+            )
+        )
+    if biquadratic:
+        out.append(
+            ShortcutViolation(
+                "T08-biquadratic",
+                "발문의 사차식이 x = h에 대해 대칭(복이차)이라 (x - h)^2 = u로 두면 완전제곱만으로 "
+                "극값의 위치·값이 나온다 — 비대칭 사차식을 쓴다.",
+            )
+        )
+    return out
 
 
 def _graph_shape_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
@@ -763,23 +960,65 @@ def _equation_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+#: [4회차] 02-09의 '활용' 맥락 — 방정식·부등식·교점·위치 관계 중 하나는 발문에 있어야 한다.
+_APPLICATION = re.compile(
+    r"방정식|부등식|실근|만나|교점|위쪽|아래쪽|보이려|성립|보다 크|보다 작|오른쪽|왼쪽"
+    r"|시각의 개수|x축"
+)
+
+
+def _application_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    if _APPLICATION.search(probe.question_text):
+        return []
+    return [
+        ShortcutViolation(
+            "T09-no-application",
+            "발문에 방정식·부등식·교점·위치 관계 맥락이 없는 최댓값·최솟값 문항이다 — "
+            "02-09(방정식과 부등식에의 활용)의 인지 행동 없이 극값 비교(02-07/02-08 영역)만으로 "
+            "풀린다.",
+        )
+    ]
+
+
+#: [4회차] 운동 문항의 위치 함수 — '위치가 x = 7로'·'위치가 x = -3t + 2일 때'·'위치가 x(t) = …'.
+_POSITION = re.compile(r"위치가 (?:x|x\(t\)) = (?P<rhs>[^가-힣,]+)")
+
+
 def _velocity_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     q = probe.question_text
     instant = re.sub(r"평균\s*속도", "", q)
+    out: list[ShortcutViolation] = []
     if re.search(r"평균\s*속도", q) and not re.search(r"속도|속력|멈추|정지|방향", instant):
-        return [
+        out.append(
             ShortcutViolation(
                 "T10-average-only",
                 "평균속도만 묻는다 — 위치에 두 시각을 대입한 차분몫이라 미분(순간속도)이 필요 "
                 "없다.",
             )
-        ]
-    return []
+        )
+    t = sympy.Symbol("t")
+    if re.search(r"속도|속력", instant):
+        for m in _POSITION.finditer(q):
+            expr = _parse_student(_clean_rhs(m.group("rhs"), "t"))
+            if expr is None:
+                continue
+            degree = int(sympy.degree(expr, t)) if t in expr.free_symbols else 0
+            if degree <= 1:
+                out.append(
+                    ShortcutViolation(
+                        "T10-linear-position",
+                        f"위치 {m.group('rhs').strip()!r}가 t의 일차 이하인데 속도·가속도를 "
+                        "묻는다 — "
+                        "정지(속도 0)·등속(가속도 0)·일차함수의 기울기라는 선수 지식으로 풀린다.",
+                    )
+                )
+                break
+    return out
 
 
 def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """문항 1건의 우회로·해설·표기 위반 목록 — 빈 리스트면 통과."""
-    out = _notation_rules(probe) + _explanation_rules(probe)
+    out = _notation_rules(probe) + _explanation_rules(probe) + _zero_monomial_rule(probe)
     code = probe.standard_code
     if code == _C05:
         out += _tangent_rules(probe)
@@ -788,9 +1027,9 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
     if code == _C06:
         out += _mvt_rules(probe)
     if code == _C08:
-        out += _graph_shape_rules(probe)
+        out += _graph_shape_rules(probe) + _graph_shape_round4_rules(probe)
     if code == _C09:
-        out += _equation_rules(probe)
+        out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
     return out

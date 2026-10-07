@@ -460,6 +460,10 @@ def _rep_frames() -> list[Frame]:
     def r6(p: tuple[object, ...]) -> DiffItem | None:
         f, a0 = _as_poly(p[0]), _as_int(p[1])
         m = eval_at(derivative_of(f), a0)
+        if m == 0:
+            # 4차 감사 bad_tag — 포물선에서 기울기 0인 접점은 꼭짓점이라 -b/(2a)로 풀린다
+            # (판정기 T05-vertex-tangent).
+            return None
         t = sympy.Symbol("t")
         d_expr = sympy.diff(poly_to_sympy(f), _X).subs(_X, t) - m
         found = _pick(_solve_real(d_expr, t), lambda r: r > 0)
@@ -1100,7 +1104,7 @@ def _misconception_frames() -> list[Frame]:
         wrong_coeff = sympy.sqrt(b)  # (x^3)'를 x^2로 쓴 학생이 얻는 a
         entries = [
             ChoiceEntry(str(a0), is_correct=True, sort_key=float(a0)),
-            # 학생 표기(렌더 계약) — '9*sqrt(3)'이 아니라 '9sqrt(3)'(3차 감사 bad_wording).
+            # 학생 표기 — '9√3'(4차 감사 bad_wording: 3차의 '9sqrt(3)'도 코드 표기로 판정됐다).
             ChoiceEntry(render_surd(wrong_coeff), _KEBAB, sort_key=float(wrong_coeff)),
         ]
         cube_root = round(a0 ** (2 / 3))
@@ -1153,69 +1157,14 @@ def _misconception_frames() -> list[Frame]:
 # 진단(diagnostic) — 접선의 기울기 = 미분계수라는 핵심 사실을 한 가지씩 확인
 # ──────────────────────────────────────────────────────────────────────────
 def _diagnostic_frames() -> list[Frame]:
+    """진단 슬롯 — 4차 감사(2026-10-07) bad_tag 처분으로 틀 5종 중 4종을 바꿨다.
+
+    삭제: 포물선 꼭짓점에서의 접선의 기울기·포물선의 x축에 평행한 접선(꼭짓점 공식 -b/(2a)로 풀림 —
+    판정기 T05-vertex-tangent) · 직선(상수함수 포함) 위의 점에서의 접선의 기울기(직선의 기울기를
+    읽기만 하면 됨 — T05-line-tangent) · y = x^n의 원점에서의 접선의 기울기(정답·원함수 대입·오답
+    경로가 모두 0 — T-zero-monomial). 대신 *미분계수와 함숫값을 구별해야* 답이 정해지는 틀을 둔다.
+    """
     slot = "diagnostic"
-
-    def d1(p: tuple[object, ...]) -> DiffItem | None:
-        lead, half = _as_int(p[0]), _as_int(p[1])
-        b = -2 * lead * half
-        f = _poly({2: lead, 1: b, 0: 3})
-        top = 3 - lead * half * half
-        vertex_form = (
-            f"{'' if lead == 1 else ('-' if lead == -1 else lead)}({_lin_text(half)})^2"
-            f" {_signed(top)}"
-            if top
-            else f"{'' if lead == 1 else ('-' if lead == -1 else lead)}({_lin_text(half)})^2"
-        )
-        fp = derivative_of(f)
-        return DiffItem(
-            slot=slot,
-            frame_id="diag-slope-at-vertex",
-            question_text=(f"곡선 y = {render_poly(f)}의 꼭짓점에서의 접선의 기울기를 구하시오."),
-            answer_text="0",
-            # 3차 감사 bad_explanation — 도함수 식과 대입 과정을 보인다(종전: 결론만).
-            explanation=(
-                f"y = {vertex_form}이므로 꼭짓점의 x좌표는 {half}이다. 도함수는 "
-                f"y' = {render_poly(fp)}이므로 x = {half}에서의 미분계수는 "
-                f"{_eval_text(fp, half)} = 0이고, 접선의 기울기는 0이다."
-            ),
-            conditions=f"{_d(f, str(half))} = y",
-            answer_map=(("y", "0"),),
-            problem_type_code=_EVAL,
-            answer_format=_fmt(0),
-        )
-
-    def d2(p: tuple[object, ...]) -> DiffItem | None:
-        m, n, a = _as_int(p[0]), _as_int(p[1]), _as_int(p[2])
-        f = _poly({1: m, 0: n})
-        return _slope_item(
-            slot=slot,
-            frame_id="diag-slope-of-line",
-            text=(
-                f"직선 y = {render_poly(f)} 위의 점 ({a}, {eval_at(f, a)})에서의 접선의 "
-                "기울기를 구하시오."
-            ),
-            f=f,
-            a=a,
-        )
-
-    def d3(p: tuple[object, ...]) -> DiffItem | None:
-        c, a = _as_int(p[0]), _as_int(p[1])
-        f: Poly = ((0, c),)
-        return DiffItem(
-            slot=slot,
-            frame_id="diag-slope-of-constant-curve",
-            question_text=(f"직선 y = {c} 위의 점 ({a}, {c})에서의 접선의 기울기를 구하시오."),
-            answer_text="0",
-            explanation=(
-                f"{with_eun_neun(f'y = {c}')} 상수함수이고 상수함수의 도함수는 0이므로 접선의 "
-                "기울기는 0이다. "
-                "(직선 위의 점에서의 접선은 그 직선 자신이다.)"
-            ),
-            conditions=f"{_d(f, str(a))} = y",
-            answer_map=(("y", "0"),),
-            problem_type_code=_EVAL,
-            answer_format=_fmt(0),
-        )
 
     def d4(p: tuple[object, ...]) -> DiffItem | None:
         f = _as_poly(p[0])
@@ -1232,69 +1181,108 @@ def _diagnostic_frames() -> list[Frame]:
             a=0,
         )
 
-    def d5(p: tuple[object, ...]) -> DiffItem | None:
-        lead, half = _as_int(p[0]), _as_int(p[1])
-        b = -2 * lead * half
-        f = _poly({2: lead, 1: b})
+    def d7(p: tuple[object, ...]) -> DiffItem | None:
+        # x축과 만나는 점(y = 0)에서의 기울기 — '그 점의 y좌표(0)'와 '접선의 기울기'를 혼동하면
+        # 0을 답한다. 삼차 곡선이라 이중근(판별식) 우회로도 없다.
+        lead, p_root, q_root, r_root = (_as_int(v) for v in p)
+        if not p_root < q_root < r_root:
+            return None
+        expr = sympy.expand(lead * (_X - p_root) * (_X - q_root) * (_X - r_root))
+        f = poly_from_sympy(expr)
+        if max(abs(c) for _, c in f) > 40:
+            return None
+        m = eval_at(derivative_of(f), r_root)
+        factored = render_factored(f)
         return DiffItem(
             slot=slot,
-            frame_id="diag-horizontal-tangent-point",
+            frame_id="diag-slope-at-largest-x-intercept",
             question_text=(
-                f"곡선 y = {render_poly(f)} 위의 점 중 접선이 x축에 평행한 점의 x좌표를 "
-                "구하시오."
+                f"곡선 y = {render_poly(f)}{i_ga(render_poly(f))} x축과 만나는 점 중 x좌표가 "
+                "가장 큰 점에서의 접선의 기울기를 구하시오."
             ),
-            answer_text=str(half),
+            answer_text=str(m),
             explanation=(
-                f"접선이 x축에 평행하면 기울기가 0이므로 f'(x) = {render_poly(derivative_of(f))}"
-                f" = 0에서 x는 {half}이다."
+                f"y = {factored}이므로 곡선이 x축과 만나는 점의 x좌표는 {p_root}, {q_root}, "
+                f"{r_root}이고 가장 큰 값은 {r_root}이다. 이 점의 y좌표는 0이지만 접선의 기울기는 "
+                f"미분계수이다. 도함수는 y' = {render_poly(derivative_of(f))}이므로 "
+                f"x = {r_root}에서의 기울기는 {m}이다."
             ),
-            conditions=f"{_d(f, 'a')} = 0",
-            answer_map=(("a", str(half)),),
-            problem_type_code=_SOLVE,
-            answer_format=_fmt(half),
+            conditions=f"{_d(f, str(r_root))} = y",
+            answer_map=(("y", str(m)),),
+            problem_type_code=_EVAL,
+            answer_format=_fmt(m),
         )
 
-    def d6(p: tuple[object, ...]) -> DiffItem | None:
-        n = _as_int(p[0])
-        f: Poly = ((n, 1),)
+    def d8(p: tuple[object, ...]) -> DiffItem | None:
+        # 기울기가 m인 접선이 하나뿐인 삼차 곡선 — f'(x) - m = 3·lead(x - r)^2(이중근)이라 접점이
+        # 하나다. 포물선의 '수평 접선 = 꼭짓점'(-b/(2a)) 같은 우회로가 없고, 근이 하나라 검산 조건이
+        # 문자열 하나로 성립한다(섀도 채점 단일 미지수 계약).
+        lead, r, m, d = (_as_int(v) for v in p)
+        f = _poly({3: lead, 2: -3 * lead * r, 1: 3 * lead * r * r + m, 0: d})
+        if max(abs(c) for _, c in f) > 40 or len(f) < 3:
+            return None
+        fp = derivative_of(f)
+        moved = _minus_const(fp, m)
         return DiffItem(
             slot=slot,
-            frame_id="diag-slope-at-origin-of-power",
-            question_text=f"곡선 y = x^{n} 위의 원점에서의 접선의 기울기를 구하시오.",
-            answer_text="0",
-            explanation=(
-                f"도함수 {render_poly(derivative_of(f))}에 x = 0을 대입하면 0이므로 접선의 "
-                "기울기는 0이다."
+            frame_id="diag-unique-tangent-slope-point",
+            question_text=(
+                f"곡선 y = {render_poly(f)} 위의 점 중 접선의 기울기가 {with_i_ga(m)} 되는 점은 "
+                "하나뿐이다. 그 점의 x좌표를 구하시오."
             ),
-            conditions=f"{_d(f, '0')} = y",
-            answer_map=(("y", "0"),),
-            problem_type_code=_EVAL,
-            answer_format=_fmt(0),
+            answer_text=str(r),
+            explanation=(
+                f"접선의 기울기는 미분계수이다. 도함수는 y' = {render_poly(fp)}이므로 "
+                f"{render_poly(fp)} = {m}, 즉 {render_factored(moved)} = 0이다. 이 방정식의 근은 "
+                f"x = {r} 하나뿐이므로 구하는 x좌표는 {r}이다."
+            ),
+            conditions=f"{_d(f, 'a')} = {m}",
+            answer_map=(("a", str(r)),),
+            problem_type_code=_SOLVE,
+            answer_format=_fmt(r),
+        )
+
+    def d9(p: tuple[object, ...]) -> DiffItem | None:
+        # y = x^n 위의 점 (-1, (-1)^n)에서의 접선의 y절편 — 기울기 n(-1)^(n - 1)을 거쳐야 한다.
+        # 함숫값과 혼동하거나 지수 홀짝의 부호를 놓치면 다른 값이 나온다(원점이던 종전 틀은 모든
+        # 경로가 0이었다). 같은 점의 *기울기*는 02-03 진단 f'(-1)과 검산 실체가 겹쳐(배치 교차
+        # 중복 제거) 기울기 대신 y절편을 묻는다.
+        n = _as_int(p[0])
+        f: Poly = ((n, 1),)
+        m, fa, k = _tangent(f, -1)
+        # 검산은 형제 틀(basic-y-intercept-of-cubic-tangent)과 같은 산술 재확인 — Tier1은
+        # Derivative(...)와 산술을 섞은 관계를 파싱하지 않는다(unverifiable).
+        return _echo_item(
+            slot=slot,
+            frame_id="diag-tangent-intercept-of-power-at-minus-one",
+            text=f"곡선 y = x^{n} 위의 점 (-1, {fa})에서의 접선의 y절편을 구하시오.",
+            value=k,
+            explanation=(
+                f"접선의 기울기는 접점에서의 미분계수이다. 도함수는 y' = "
+                f"{render_poly(derivative_of(f))}이므로 x = -1에서의 기울기는 {m}이다. 접선은 "
+                f"{_pt_slope(m, -1, fa)}이고, x = 0을 대입하면 y절편은 {k}이다."
+            ),
+            expr=f"({fa}) - (-1)*({m})",
+            ptype=_EVAL,
         )
 
     return [
-        Frame(
-            "diag-slope-at-vertex",
-            _grid("p3-tan:d1", (1, 2, -1, 3, -2), (-3, -2, -1, 1, 2, 3, 4)),
-            d1,
-        ),
-        Frame(
-            "diag-slope-of-line",
-            _grid("p3-tan:d2", (-4, -3, -2, -1, 1, 2, 3, 4), (-5, -2, 0, 1, 3, 6), (-1, 0, 1, 2)),
-            d2,
-        ),
-        Frame(
-            "diag-slope-of-constant-curve",
-            _grid("p3-tan:d3", (-4, -2, 1, 3, 5, 7), (-2, -1, 0, 1, 2, 3)),
-            d3,
-        ),
         Frame("diag-slope-at-y-axis", _grid("p3-tan:d4", _mixed_pool()[::3]), d4),
         Frame(
-            "diag-horizontal-tangent-point",
-            _grid("p3-tan:d5", (1, 2, -1, 3, -2), (-3, -2, -1, 1, 2, 3, 4)),
-            d5,
+            "diag-slope-at-largest-x-intercept",
+            _grid("p3-tan:d7", (1, -1, 2), (-3, -2, -1), (0, 1), (2, 3, 4)),
+            d7,
         ),
-        Frame("diag-slope-at-origin-of-power", _grid("p3-tan:d6", (2, 3, 4, 5, 8, 9, 10)), d6),
+        Frame(
+            "diag-unique-tangent-slope-point",
+            _grid("p3-tan:d8", (1, 2, -1), (-2, -1, 1, 2, 3), (-6, -3, 2, 4, 5), (-4, -1, 2, 5)),
+            d8,
+        ),
+        Frame(
+            "diag-tangent-intercept-of-power-at-minus-one",
+            _grid("p3-tan:d9", (2, 3, 4, 5, 6, 7, 8)),
+            d9,
+        ),
     ]
 
 

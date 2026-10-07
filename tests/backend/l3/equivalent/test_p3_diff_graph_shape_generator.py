@@ -54,7 +54,11 @@ pytestmark = pytest.mark.corpus_authoring
 
 _GEN = P3DiffGraphShapeGenerator
 _CORPUS_ROOT = Path(__file__).resolve().parents[4] / "data" / "corpus"
-_GLYPHS = ("²", "³", "Σ", "α", "β", "√", "′")
+# 4차 감사(2026-10-07) 표기 교정: 학생 대면 '√'·'≤'·'≥'는 *허용*한다 — 승인 은행 4종이 쓰는 표기이고
+# 표기 커버리지 게이트(`l3/notation_coverage`) 베이스라인에 이미 있는 글리프라 신규 누락이 아니다.
+# 대신 그 자리를 차지하던 코드 표기('<='·'>='·'sqrt('·'*')를 금지한다(`_CODE_NOTATION`).
+_GLYPHS = ("²", "³", "Σ", "α", "β", "′")
+_CODE_NOTATION = re.compile(r"<=|>=|sqrt\(|\*")
 _X = sympy.Symbol("x")
 _DELTA = Fraction(
     1, 4
@@ -156,9 +160,11 @@ def _is_value_item(row: dict[str, object]) -> bool:
 
 
 def _is_param_item(row: dict[str, object]) -> bool:
+    """미지 상수를 *답하는* 문항 — 4차 감사 재설계의 값형(미지 계수 a·k를 거쳐 극값을 답한다)은
+    answer_map에 보조 미지수를 싣지만 답은 y라 값형(`_is_value_item`)으로 센다."""
     amap = _verify(row)["answer_map"]
     assert isinstance(amap, dict)
-    return any(k not in ("x", "y") for k in amap)
+    return "y" not in amap and any(k not in ("x", "y") for k in amap)
 
 
 def _is_interval_item(row: dict[str, object]) -> bool:
@@ -227,6 +233,7 @@ def test_texts_are_clean_korean_without_leftover_placeholders_or_glyphs() -> Non
             assert "{" not in field and "}" not in field, field
             assert "  " not in field, field
             assert not any(g in field for g in _GLYPHS), field
+            assert not _CODE_NOTATION.search(field), field
             assert "$" not in field and "\\" not in field, field
         assert item.answer_format in set(AnswerFormat)
         assert item.answer_format != AnswerFormat.식
@@ -357,46 +364,80 @@ def test_x_coordinate_answers_match_value_based_classification(
     assert checked >= 36
 
 
+def _all_critical_kinds(expr: sympy.Expr) -> dict[int, str]:
+    """f'(x) = 0의 정수 근 전부와 그 성격(함숫값 비교 — 도함수 부호 분석과 독립)."""
+    return {r: _value_kind(expr, r) for r in _critical_points(expr)}
+
+
 def test_value_items_pin_x_and_match_the_value_at_a_verified_extremum(
     bank: tuple[Path, list[dict[str, object]]],
 ) -> None:
-    checked = 0
+    """값형 — 4차 감사(2026-10-07) 설계를 동결한다.
+
+    3차 은행은 '임계점을 둘 이상 고정하고 종류만 판정'하게 했는데, 감사자가 그 형태를 다시 bad_tag로
+    봤다 — 고정된 위치에 대입해 대소를 비교하면 '큰 값이 극댓값'으로 끝난다(삼차·사차에서 늘 맞는다).
+    그래서 이제 동결하는 것은 반대 방향이다: 고정된 위치 가운데 *극값인* 점은 많아야 하나이고, 나머지는
+    ⓐ 미지 계수형 — 고정점 하나(f'(p) = 0이 미지 계수를 유일하게 정한다)와 *고정되지 않은* 다른
+       극값을 답한다(학생이 도함수로 직접 찾는다), 또는
+    ⓑ 평평한 임계점형 — 고정점에 극값이 아닌 임계점이 섞여 *극값인지* 판정해야 한다.
+    """
+    checked = unknown_coef = flat_mixed = 0
     for row in _rows(bank):
         if not _is_value_item(row):
             continue
         text = str(row["question_text"])
-        expr = _function_of(row)
+        verify = _verify(row)
+        amap = verify["answer_map"]
+        assert isinstance(amap, dict)
+        expr = _function_of(row)  # 미지 계수는 정답 값으로 치환됨
         pins = sorted({int(m["r"]) for m in _PINS.finditer(text)})
-        # 판정형 동결 — 고정이 하나뿐인 값형('x = 1에서 극솟값을 갖는다. 그 극솟값은?')은 대입만으로
-        # 풀려 02-08 태그가 거짓이었다(2차 감사 bad_tag 14건). 임계점을 둘 이상 고정해 판정을 남긴다.
-        assert len(pins) >= 2, f"고정이 하나뿐인 대입형 값 문항: {text}"
-        kinds = {p: _value_kind(expr, p) for p in pins}
-        values = {p: int(expr.subs(_X, p)) for p in pins}
+        assert pins, f"규칙 C3 — 본문에 x 고정이 없다: {text}"
+        kinds = _all_critical_kinds(expr)
+        # 고정점은 전부 임계점이다('x = p에서 극값을 갖는다'·'f'(x) = 0의 근은 x = p'가 참이다).
+        assert all(p in kinds for p in pins), (text, pins, kinds)
+        extremum_pins = [p for p in pins if kinds[p] != "flat"]
+        assert len(extremum_pins) <= 1, f"극값 위치를 둘 이상 준다(대입·대소 비교 우회로): {text}"
+        r = int(amap["x"])
+        unknowns = sorted(k for k in amap if k not in ("x", "y"))
+        if unknowns:
+            # ⓐ 미지 계수형 — 고정 하나 · 그 고정점의 f'(p) = 0이 미지 계수를 유일하게 정한다 · 답은 다른 점.
+            assert len(pins) == 1 and len(unknowns) == 1, (text, pins, unknowns)
+            (name,) = unknowns
+            cond = verify["conditions"]
+            assert isinstance(cond, list) and len(cond) == 2
+            raw = sympy.sympify(cond[0].removeprefix("y = "))
+            coef = sympy.Symbol(name)
+            assert raw.free_symbols == {_X, coef}, (text, raw)
+            solved = sympy.solve(sympy.diff(raw, _X).subs(_X, pins[0]), coef)
+            assert solved == [sympy.Integer(int(str(amap[name])))], (text, solved)
+            assert r != pins[0], f"답한 극값이 고정점이다(다른 임계점을 찾을 필요가 없다): {text}"
+            unknown_coef += 1
+        else:
+            # ⓑ 평평한 임계점형 — 고정점에 극값이 아닌 임계점이 섞여 있다.
+            assert any(kinds[p] == "flat" for p in pins), (text, kinds)
+            flat_mixed += 1
         wanted = "max" if "극댓값" in text else ("min" if "극솟값" in text else None)
-        cands = [p for p in pins if (kinds[p] == wanted if wanted else kinds[p] != "flat")]
+        cands = [c for c, k in kinds.items() if (k == wanted if wanted else k != "flat")]
         assert cands, text
+        values = {c: int(expr.subs(_X, c)) for c in cands}
         if "작은 값" in text or "큰 값" in text:
             assert len(cands) >= 2, text
             pick = min if "작은 값" in text else max
-            value = pick(values[c] for c in cands)
+            value = pick(values.values())
         else:
-            assert len({values[c] for c in cands}) == 1, (text, cands)  # 유일(또는 대칭 동값)
-            value = values[cands[0]]
-        # 판정이 실제로 필요하다 — 고정된 점 중 원하는 종류가 *아닌* 점이 있다.
-        assert any(p not in cands for p in pins), f"고정점이 전부 같은 종류(판정 불필요): {text}"
-        verify = _verify(row)
-        amap = verify["answer_map"]
-        assert isinstance(amap, dict) and set(amap) == {"x", "y"}
-        r = int(amap["x"])
+            assert len(set(values.values())) == 1, (text, cands)  # 유일(또는 대칭 동값)
+            value = next(iter(values.values()))
         assert r in cands and values[r] == value and amap["y"] == str(value), text
         assert int(str(row["answer"])) == value
-        # 검산 조건이 x = r의 임계점 성격까지 본다(두 번째 조건 f'(x) = 0).
+        # 검산 조건이 x = r의 임계점 성격까지 본다(두 번째 조건 f'(x) = 0 — 미지 계수 치환 후).
         cond = verify["conditions"]
         assert isinstance(cond, list) and len(cond) == 2
-        deriv_at_r = sympy.sympify(cond[1].split(" = ")[0]).subs(_X, r)
+        params = {sympy.Symbol(k): sympy.Integer(int(str(amap[k]))) for k in unknowns}
+        deriv_at_r = sympy.sympify(cond[1].split(" = ")[0]).subs(params).doit().subs(_X, r)
         assert deriv_at_r == 0
         checked += 1
     assert checked >= 12
+    assert unknown_coef >= 8 and flat_mixed >= 1, (unknown_coef, flat_mixed)
 
 
 def test_interval_items_have_exactly_one_integer_in_the_stated_region(
@@ -445,12 +486,16 @@ def test_parameter_items_have_a_unique_solution_and_a_matching_extremum(
         pins = sorted({int(m["r"]) for m in _PINS.finditer(text)})
         assert pins, text
         want = "max" if word["word"] == "극댓값" else "min"
-        # 고정 하나(계수 a·b를 f'(r) = 0으로 정하는 형태)면 그 점, 판정형(상수 k — 임계점 둘을 고정)이면
-        # 고정점 중 *물은 종류인* 유일한 점이 r이다.
-        matching = [p for p in pins if _value_kind(expr, p) == want]
-        r = pins[0] if len(pins) == 1 else matching[0]
-        if len(pins) > 1:
-            assert len(matching) == 1, (text, pins, matching)
+        kinds = _all_critical_kinds(expr)
+        # 4차 감사 동결 — 고정점은 임계점이고, 그중 극값인 점은 많아야 하나다(임계점 둘을 다 주던 종전
+        # '판정형 k'는 대입·대소 비교로 풀렸다). r은 *물은 종류*의 유일한 임계점이다 — 고정점일 수도
+        # (계수 a·b를 f'(r) = 0으로 정하는 형태), 고정되지 않은 다른 임계점일 수도(4차 재설계 — x = p에서
+        # 극값을 가질 때 *다른 쪽* 극값이 v) 있다.
+        assert all(p in kinds for p in pins), (text, pins, kinds)
+        assert len([p for p in pins if kinds[p] != "flat"]) <= 1, text
+        matching = [c for c, k in kinds.items() if k == want]
+        assert len(matching) == 1, (text, kinds)
+        r = matching[0]
         assert int(str(amap["x"])) == r, text
         kind = _value_kind(expr, r)
         assert kind == ("max" if word["word"] == "극댓값" else "min"), text

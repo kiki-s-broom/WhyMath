@@ -12,6 +12,14 @@
    규칙(E)이다(우회로 규칙 T는 ok 문항을 하나도 거부하지 않는다). 집합이 바뀌면 RED — 조용히 늘거나
    줄지 않게 한다.
 ④ 규칙마다 결함 문면(RED)과 교정 문면(GREEN) 대조군이 있고, 생성기 빌드가 위반 문항에서 멈춘다.
+⑤ **4회차 재현율**(2026-10-07) — 4회차 감사 대상 은행 원문(`round4/audited_bank.jsonl`, 커밋 e110735e 시점
+   as-found)에서 결함 문항 합집합 88건(둘 다 27건)을 대응 규칙군이 전부 잡고, 두 판정자 모두 ok로 본 416건 중
+   거부는 고정된 2건뿐이다. 4회차 규칙을 빼면 88건 중 0건을 잡는다(그 은행은 3회차 규칙으로 빌드됐다 — 새
+   규칙이 실제로 일했다는 변별 증거).
+
+회차별 측정은 그 회차까지의 규칙 집합으로 한다: 3회차 동결(②·③)은 4회차 규칙(`ROUND4_RULE_IDS`)을 빼고
+보고, 4회차 규칙이 3회차 ok 문항을 몇 건 거부하는지는 따로 동결한다(같은 원문에 대한 판정 기준이 회차마다
+달랐다 — 3회차 판정자는 '<='를 결함으로 보지 않았고 4회차 판정자는 봤다).
 """
 
 from __future__ import annotations
@@ -28,6 +36,7 @@ from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator
     KindedDiffItem,
 )
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ROUND4_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     probe_from_record,
@@ -43,6 +52,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
 _ROOT = Path(__file__).resolve().parents[4]
 _BANK_DIR = _ROOT / "data" / "corpus" / "problem_bank_p3_calculus1_diff_v0"
 _ROUND3 = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "round3"
+_ROUND4 = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "round4"
 _FAMILY = {"bad_tag": "T", "bad_explanation": "E", "bad_wording": "W"}
 
 #: 둘 다 ok인 382건 중 판정기가 거부하는 문항(id 앞 8자리) — 전부 '해설 규칙'(E)이다.
@@ -68,12 +78,28 @@ _KNOWN_OK_REJECTED: frozenset[str] = frozenset(
 )
 
 
+#: 4회차 — 둘 다 ok인 416건 중 판정기가 거부하는 문항(id 앞 8자리). 둘 다 02-05 '곡선 y = x^n 위의 원점에서의
+#: 접선의 기울기'다(T-zero-monomial). 판정자들은 ok로 봤지만, 같은 0 불변(정답·원함수 대입·거듭제곱 미분법의
+#: 오답 경로가 모두 0) 때문에 02-03의 'x = 0 대입'형을 두 판정자 모두 bad_tag로 봤으므로 같은 규칙을 건다.
+_KNOWN_OK_REJECTED_R4: frozenset[str] = frozenset({"83e19c19", "bb1345b5"})
+
+#: 3회차 ok 382건 중 *4회차 규칙만으로* 거부되는 문항 수 — 회차 사이 판정 기준 차이의 크기(숨기지 않는다).
+#: 대부분 3회차·4회차 은행에 그대로 남아 4회차 판정자가 결함으로 본 형태다('<='·'sqrt('·임계점 둘 고정·
+#: 복이차·직선의 접선·등속 운동 등). 늘거나 줄면 RED.
+_R4_RULES_ON_R3_OK = 53
+
+
 def _jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
 def _rules(record: dict[str, object]) -> set[str]:
     return {v.rule for v in shortcut_violations(probe_from_record(record))}
+
+
+def _rules_pre4(record: dict[str, object]) -> set[str]:
+    """3회차까지의 규칙만 — 3회차 동결은 그 회차의 규칙 집합으로 본다."""
+    return _rules(record) - ROUND4_RULE_IDS
 
 
 @pytest.fixture(scope="module")
@@ -92,6 +118,27 @@ def defects() -> list[dict[str, str]]:
 def verdicts() -> dict[str, list[str]]:
     out: dict[str, list[str]] = defaultdict(list)
     for path in sorted(_ROUND3.glob("R*/*.jsonl")):
+        for row in _jsonl(path):
+            out[str(row["problem_id"])].append(str(row["verdict"]))
+    return out
+
+
+@pytest.fixture(scope="module")
+def audited4() -> dict[str, dict[str, object]]:
+    return {str(r["problem_id"]): r for r in _jsonl(_ROUND4 / "audited_bank.jsonl")}
+
+
+@pytest.fixture(scope="module")
+def defects4() -> list[dict[str, str]]:
+    raw = json.loads((_ROUND4 / "defects.json").read_text(encoding="utf-8"))
+    assert isinstance(raw, list)
+    return raw
+
+
+@pytest.fixture(scope="module")
+def verdicts4() -> dict[str, list[str]]:
+    out: dict[str, list[str]] = defaultdict(list)
+    for path in sorted(_ROUND4.glob("R*/*.jsonl")):
         for row in _jsonl(path):
             out[str(row["problem_id"])].append(str(row["verdict"]))
     return out
@@ -132,7 +179,7 @@ def test_round3_defects_are_caught_by_the_matching_rule_family(
         cls: sorted(
             pid[:8]
             for pid in ids
-            if not any(rule.startswith(_FAMILY[cls]) for rule in _rules(audited[pid]))
+            if not any(rule.startswith(_FAMILY[cls]) for rule in _rules_pre4(audited[pid]))
         )
         for cls, ids in by_class.items()
     }
@@ -145,10 +192,13 @@ def test_round3_ok_over_rejection_is_the_frozen_known_set(
 ) -> None:
     both_ok = [pid for pid, v in verdicts.items() if v == ["ok", "ok"]]
     assert len(both_ok) == 382
-    rejected = {pid[:8]: _rules(audited[pid]) for pid in both_ok if _rules(audited[pid])}
+    rejected = {pid[:8]: _rules_pre4(audited[pid]) for pid in both_ok if _rules_pre4(audited[pid])}
     assert set(rejected) == _KNOWN_OK_REJECTED
     # 우회로 규칙(T)과 표기 규칙(W)은 ok 문항을 하나도 거부하지 않는다 — 과잉 거부는 해설 규칙뿐.
     assert all(rule.startswith("E-") for rules in rejected.values() for rule in rules)
+    # 4회차 규칙은 3회차 판정자가 ok로 본 문항을 따로 거부한다 — 회차 사이 기준 차이(동결 값).
+    by_round4 = [pid for pid in both_ok if _rules(audited[pid]) & ROUND4_RULE_IDS]
+    assert len(by_round4) == _R4_RULES_ON_R3_OK
 
 
 def test_round3_split_items_are_all_rejected(
@@ -157,7 +207,75 @@ def test_round3_split_items_are_all_rejected(
     """판정자 한 명만 결함으로 본 25건도 전부 잡는다(불확실 판정도 놓치지 않는다)."""
     split = [pid for pid, v in verdicts.items() if sorted(v) == ["defect", "ok"]]
     assert len(split) == 25
-    assert [pid[:8] for pid in split if not _rules(audited[pid])] == []
+    assert [pid[:8] for pid in split if not _rules_pre4(audited[pid])] == []
+
+
+# ── ⑤ 4회차 재현율·과잉 거부 ──────────────────────────────────────────────────
+def test_audited_bank_fixture_is_the_round4_audit_target(
+    audited4: dict[str, dict[str, object]], verdicts4: dict[str, list[str]]
+) -> None:
+    """원문 스냅샷이 4회차 라벨과 같은 504건을 덮는다(문항마다 판정자 2명)."""
+    assert len(audited4) == 504
+    assert set(verdicts4) == set(audited4)
+    assert all(len(v) == 2 for v in verdicts4.values())
+
+
+def test_round4_defects_are_caught_by_the_matching_rule_family(
+    audited4: dict[str, dict[str, object]],
+    defects4: list[dict[str, str]],
+    verdicts4: dict[str, list[str]],
+) -> None:
+    by_class: dict[str, set[str]] = defaultdict(set)
+    for d in defects4:
+        by_class[d["defect_class"]].add(d["problem_id"])
+    assert {k: len(v) for k, v in by_class.items()} == {
+        "bad_wording": 39,
+        "bad_explanation": 3,
+        "bad_tag": 46,
+    }
+    union = {pid for pid, v in verdicts4.items() if "defect" in v}
+    both = {pid for pid, v in verdicts4.items() if v == ["defect", "defect"]}
+    assert set().union(*by_class.values()) == union and len(union) == 88 and len(both) == 27
+    missed = {
+        cls: sorted(
+            pid[:8]
+            for pid in ids
+            if not any(rule.startswith(_FAMILY[cls]) for rule in _rules(audited4[pid]))
+        )
+        for cls, ids in by_class.items()
+    }
+    assert missed == {"bad_wording": [], "bad_explanation": [], "bad_tag": []}
+
+
+def test_round4_defects_need_the_round4_rules(
+    audited4: dict[str, dict[str, object]], verdicts4: dict[str, list[str]]
+) -> None:
+    """변별 — 4회차 은행은 3회차 규칙으로 빌드됐으므로 3회차 규칙만으로는 결함 88건 중 0건을 잡는다.
+
+    4회차 규칙이 재현율 88/88을 *실제로* 만든다는 증거다(규칙을 지우면 이 은행의 결함은 다시 통과한다).
+    """
+    union = [pid for pid, v in verdicts4.items() if "defect" in v]
+    assert [pid[:8] for pid in union if _rules_pre4(audited4[pid])] == []
+    assert all(_rules(audited4[pid]) & ROUND4_RULE_IDS for pid in union)
+
+
+def test_round4_ok_over_rejection_is_the_frozen_known_set(
+    audited4: dict[str, dict[str, object]], verdicts4: dict[str, list[str]]
+) -> None:
+    both_ok = [pid for pid, v in verdicts4.items() if v == ["ok", "ok"]]
+    assert len(both_ok) == 416
+    rejected = {pid[:8]: _rules(audited4[pid]) for pid in both_ok if _rules(audited4[pid])}
+    assert set(rejected) == _KNOWN_OK_REJECTED_R4
+    assert all(rules == {"T-zero-monomial"} for rules in rejected.values()), rejected
+
+
+def test_round4_split_items_are_all_rejected(
+    audited4: dict[str, dict[str, object]], verdicts4: dict[str, list[str]]
+) -> None:
+    """판정자 한 명만 결함으로 본 61건도 전부 잡는다(4회차는 일치도 κ 0.412 — 분할이 많았다)."""
+    split = [pid for pid, v in verdicts4.items() if sorted(v) == ["defect", "ok"]]
+    assert len(split) == 61
+    assert [pid[:8] for pid in split if not _rules(audited4[pid])] == []
 
 
 # ── ④ 규칙별 대조군 ───────────────────────────────────────────────────────
@@ -402,15 +520,208 @@ _RED: list[tuple[str, ShortcutProbe]] = [
             conditions=("t = y",),
         ),
     ),
+    # 학생 표기로 쓴 부등호도 자명 부등식·도함수 부등식으로 읽는다(표기 교정이 규칙을 끄지 않게).
+    ("W-trivial-ineq", _probe("접점의 x좌표가 0 (0 ≤ 1 < 3)일 때, 상수 k의 값을 구하시오.")),
+    (
+        "T08-derivative-inequality",
+        _probe(
+            "함수 f(x) = x^3 - 3x에 대하여 f'(x) ≤ 0을 만족시키는 정수 x의 개수",
+            _DERIV_OK,
+            code=_C08,
+        ),
+    ),
+    (
+        "T08-derivative-inequality",
+        _probe(
+            "함수 f(x) = x^3 - 3x에 대하여 f'(x) ≥ 0을 만족시키는 x의 범위", _DERIV_OK, code=_C08
+        ),
+    ),
+    # ── 4회차 규칙(4회차 감사 원문 형태) ─────────────────────────────────────────
+    (
+        "W-ascii-inequality",
+        _probe(
+            "함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) <= 4이다. f(2) = 6일 때, f(4)의 값이 될 "
+            "수 있는 가장 큰 값을 구하시오.",
+            code=_C06,
+        ),
+    ),
+    ("W-ascii-inequality", _probe("상수 k의 값을 구하시오.", "f(x)는 x >= 1에서 증가한다.")),
+    ("W-sqrt-call", _probe("f'(a) = 192인 양수 a의 값은?", choices=("4", "8", "8sqrt(3)", "64"))),
+    # 정답 필드만 코드 표기인 경우(선지·발문·해설은 깨끗) — 정답도 학생 대면 문면이다.
+    ("W-sqrt-call", _probe("f'(a) = 12인 양수 a의 값을 구하시오.", answer="2sqrt(3)")),
+    (
+        "E-object-intro",
+        _probe(
+            "함수 f(x) = x^3 + kx^2에 대하여 닫힌구간 [-1, 3]에서 평균값 정리를 만족시키는 c의 값이 "
+            "1/3일 때, 상수 k의 값을 구하시오.",
+            "f'(x) = 3x^2 + 2kx이다. 두 점을 잇는 직선의 기울기는 7 + 2k이다. k = -5이다.",
+            code=_C06,
+        ),
+    ),
+    (
+        "E-object-intro",
+        _probe(
+            "닫힌구간 [0, 2]에서 평균값 정리를 만족시키는 c의 값을 구하시오.",
+            "f'(x) = 2x이다. 접점 x = c에서 f'(c) = 2이다.",
+            code=_C06,
+        ),
+    ),
+    (
+        "E-object-intro",
+        _probe(
+            "닫힌구간 [0, 2]에서 평균값 정리를 만족시키는 c의 값을 구하시오.",
+            "f'(x) = 2x이다. 접선의 기울기 f'(c)가 2이다.",
+            code=_C06,
+        ),
+    ),
+    # T-zero-monomial — x = 0을 가리키는 표현마다(대입·f'(0)·원점·x = 0·x좌표 0) 하나씩, 그리고 f'(x) = 0의 근.
+    ("T-zero-monomial", _probe("함수 f(x) = x^6의 도함수 f'(x)에 0을 대입한 값을 구하시오.")),
+    ("T-zero-monomial", _probe("함수 f(x) = x^4에 대하여 f'(0)의 값을 구하시오.")),
+    (
+        "T-zero-monomial",
+        _probe("곡선 y = x^5 위의 원점에서의 접선의 기울기를 구하시오.", code=_C05),
+    ),
+    ("T-zero-monomial", _probe("곡선 y = 2x^3의 접선 중 x = 0에서의 접선의 기울기를 구하시오.")),
+    (
+        "T-zero-monomial",
+        _probe("곡선 y = 2x^4 위의 x좌표가 0인 점에서의 접선의 기울기를 구하시오."),
+    ),
+    ("T-zero-monomial", _probe("함수 f(x) = x^3에 대하여 방정식 f'(x) = 0의 실근을 구하시오.")),
+    ("T-zero-monomial", _probe("함수 f(x) = x^4에 대하여 방정식 f'(x) = 0의 근을 구하시오.")),
+    ("T-zero-monomial", _probe("함수 f(x) = 3x^2에 대하여 방정식 f'(x) = 0의 해를 구하시오.")),
+    # 계수가 문자여도 단항식이면 0에서의 미분계수는 0이다(kx^2 — 계수와 무관하게 변별이 없다).
+    (
+        "T-zero-monomial",
+        _probe("함수 f(x) = kx^2에 대하여 f'(0)의 값을 구하시오.", "f'(x) = 2kx이다."),
+    ),
+    # T05-vertex-tangent — 수평 접선 표현마다 하나씩(꼭짓점·x축에 평행·기울기 0·수평).
+    (
+        "T05-vertex-tangent",
+        _probe("곡선 y = -x^2 + 2x + 3의 꼭짓점에서의 접선의 기울기를 구하시오.", code=_C05),
+    ),
+    (
+        "T05-vertex-tangent",
+        _probe(
+            "곡선 y = 3x^2 + 12x 위의 점 중 접선이 x축에 평행한 점의 x좌표를 구하시오.", code=_C05
+        ),
+    ),
+    (
+        "T05-vertex-tangent",
+        _probe(
+            "곡선 y = -x^2 + 2x + 3 위의 x좌표가 a인 점에서의 접선의 기울기가 0일 때, 양수 a의 값을 "
+            "구하시오.",
+            code=_C05,
+        ),
+    ),
+    (
+        "T05-vertex-tangent",
+        _probe("곡선 y = x^2 - 4x 위의 점 중 접선이 수평인 점의 x좌표", code=_C05),
+    ),
+    (
+        "T05-vertex-tangent",
+        _probe("곡선 y = 2x^2 + 8x + 1 위의 점 중 접선의 기울기가 0인 점의 x좌표", code=_C05),
+    ),
+    (
+        "T05-line-tangent",
+        _probe("직선 y = 2x - 5 위의 점 (2, -1)에서의 접선의 기울기를 구하시오.", code=_C05),
+    ),
+    (
+        "T05-line-tangent",
+        _probe("직선 y = 7 위의 점 (-1, 7)에서의 접선의 기울기를 구하시오.", code=_C05),
+    ),
+    (
+        "T08-given-critical-points",
+        _probe(
+            "함수 f(x) = 2x^3 - 3x^2 - 1은 x = 0과 x = 1에서 극값을 갖는다. 이 중 극솟값을 구하시오.",
+            _DERIV_OK,
+            code=_C08,
+        ),
+    ),
+    # 미지 상수 k는 도함수에서 사라진다 — 임계점 판정은 k와 무관하게 선다.
+    (
+        "T08-given-critical-points",
+        _probe(
+            "함수 f(x) = x^3 - 3x^2 - 9x + k는 x = -1과 x = 3에서 극값을 갖는다. 극댓값이 7일 때, "
+            "상수 k의 값을 구하시오.",
+            _DERIV_OK,
+            code=_C08,
+        ),
+    ),
+    (
+        "T08-biquadratic",
+        _probe(
+            "사차함수 f(x) = x^4 - 8x^2 - 2가 극소가 되는 x좌표 중 큰 값을 구하시오.",
+            _DERIV_OK,
+            code=_C08,
+        ),
+    ),
+    # x = 1에 대해 대칭인 사차식((x - 1)^4 - 2(x - 1)^2 - 0)을 전개한 꼴 — 평행이동한 복이차식.
+    (
+        "T08-biquadratic",
+        _probe(
+            "사차함수 f(x) = x^4 - 4x^3 + 4x^2 - 1이 극소가 되는 x좌표 중 큰 값을 구하시오.",
+            _DERIV_OK,
+            code=_C08,
+        ),
+    ),
+    (
+        "T09-no-application",
+        _probe(
+            "사차함수 f(x) = 3x^4 + 96x + 147의 최솟값을 구하시오.",
+            _DERIV_OK,
+            code=_C09,
+            answer="3",
+            conditions=("Derivative(3*x**4 + 96*x + 147, x).doit() = 0", "y = 3*x**4 + 96*x + 147"),
+            answer_map=(("x", "-2"), ("y", "3")),
+        ),
+    ),
+    (
+        "T10-linear-position",
+        _probe(
+            "수직선 위의 점 P의 시각 t에서의 위치가 x = 7로 일정할 때, t = 1에서의 점 P의 속도를 "
+            "구하시오.",
+            "v(t) = 0이다.",
+            code=_C10,
+        ),
+    ),
+    (
+        "T10-linear-position",
+        _probe(
+            "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = -3t + 2일 때, t = 2에서의 점 P의 "
+            "속도를 구하시오.",
+            "v(t) = -3이다.",
+            code=_C10,
+        ),
+    ),
+    (
+        "T10-linear-position",
+        _probe(
+            "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = 5t - 1일 때, t = 3에서의 점 P의 "
+            "속력을 구하시오.",
+            "v(t) = 5이다.",
+            code=_C10,
+        ),
+    ),
+    (
+        "T10-linear-position",
+        _probe(
+            "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x(t) = 2t + 1일 때, t = 2에서의 점 P의 "
+            "가속도를 구하시오.",
+            "v(t) = 2이고 a(t) = 0이다.",
+            code=_C10,
+        ),
+    ),
 ]
 
 #: 교정 문면(재설계 은행이 내는 형태) — 어떤 규칙에도 걸리지 않는다.
 _GREEN: list[ShortcutProbe] = [
-    _probe("f'(a) = 192인 양수 a의 값은?", choices=("4", "8", "8sqrt(3)", "64")),
+    # 4회차 표기 교정 — 근호는 '8√3'(3회차 교정의 '8sqrt(3)'은 4회차에서 코드 표기로 판정됐다).
+    _probe("f'(a) = 192인 양수 a의 값은?", choices=("4", "8", "8√3", "64")),
+    # 해설 규칙(E-derivative) 교정형 — 4회차에 꼭짓점 문면 자체가 우회로(T05-vertex-tangent)로 판정돼
+    # 같은 곡선의 꼭짓점이 아닌 점으로 바꿨다(해설에 도함수 식과 대입 과정을 보이는 형태는 그대로).
     _probe(
-        "곡선 y = -2x^2 - 12x + 3의 꼭짓점에서의 접선의 기울기를 구하시오.",
-        "y = -2(x + 3)^2 + 21이므로 꼭짓점의 x좌표는 -3이다. 도함수는 y' = -4x - 12이므로 "
-        "x = -3에서의 미분계수는 -4(-3) - 12 = 0이다.",
+        "곡선 y = -2x^2 - 12x + 3 위의 x좌표가 1인 점에서의 접선의 기울기를 구하시오.",
+        "도함수는 y' = -4x - 12이므로 x = 1에서의 미분계수는 -4(1) - 12 = -16이다.",
         code=_C05,
     ),
     _probe(
@@ -466,7 +777,7 @@ _GREEN: list[ShortcutProbe] = [
         kind="real_root_count",
     ),
     _probe(
-        "x >= 0일 때 부등식 x^3 > 3x - 3이 성립함을 보이려 한다. x >= 0에서 두 변의 차 "
+        "x ≥ 0일 때 부등식 x^3 > 3x - 3이 성립함을 보이려 한다. x ≥ 0에서 두 변의 차 "
         "x^3 - (3x - 3)의 최솟값을 구하시오.",
         "두 변의 차를 f(x) = x^3 - 3x + 3이라 하자. f'(x) = 3x^2 - 3 = 3(x + 1)(x - 1)이다.",
         code=_C09,
@@ -497,6 +808,120 @@ _GREEN: list[ShortcutProbe] = [
         "두 끝값은 각각 f(x)가 상수함수일 때와 기울기가 6인 일차함수일 때 나온다.",
         code=_C06,
     ),
+    # ── 4회차 규칙의 경계 대조군(각 규칙의 *면제 절*이 없으면 걸리는 문면) ─────────────────
+    _probe(
+        "함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) ≤ 4이다. f(2) = 6일 때, f(4)의 값이 될 수 "
+        "있는 가장 큰 값을 구하시오.",
+        "평균값 정리에 의해 f(4) - f(2) = 2f'(c)인 c가 있고 f'(c) ≤ 4이므로 f(4) ≤ 14이다.",
+        code=_C06,
+    ),
+    # E-object-intro — 해설의 대상을 발문이 소개한 경우(점·접·곡선·직선·그래프 표현마다 하나).
+    _probe(
+        "곡선 y = f(x) 위의 두 점 A, B를 잇는 직선에 평행한 접선",
+        "두 점을 잇는 직선의 기울기",
+        code=_C06,
+    ),
+    _probe("점 A의 x좌표 c를 구하시오.", "f'(x) = 2x이다. 접점의 x좌표는 c이다.", code=_C06),
+    _probe("x축에 접하는 c의 값을 구하시오.", "f'(x) = 2x이다. 접점의 x좌표는 c이다.", code=_C06),
+    _probe(
+        "곡선 y = x^2에 대하여 c의 값을 구하시오.",
+        "f'(x) = 2x이다. 접선의 기울기는 2c이다.",
+        code=_C06,
+    ),
+    _probe(
+        "직선 y = 3x와 평행한 c의 값을 구하시오.",
+        "f'(x) = 2x이다. 접선의 기울기는 3이다.",
+        code=_C06,
+    ),
+    _probe(
+        "함수의 그래프에서 c의 값을 구하시오.", "f'(x) = 2x이다. 접선의 기울기는 2c이다.", code=_C06
+    ),
+    # 지운 해설 표현을 평균변화율·f'(c)로 바꾼 교정형(발문에 점이 없다).
+    _probe(
+        "함수 f(x) = x^3 + kx^2에 대하여 닫힌구간 [-1, 3]에서 평균값 정리를 만족시키는 c의 값이 "
+        "1/3일 때, 상수 k의 값을 구하시오.",
+        "f'(x) = 3x^2 + 2kx이다. 구간 [-1, 3]에서의 평균변화율은 7 + 2k이다. 평균값 정리에 따라 "
+        "f'(c)가 이 평균변화율과 같고 c의 값이 1/3이므로 3(1/3)^2 + 2(1/3)k = 7 + 2k이다. "
+        "따라서 k = -5이다.",
+        code=_C06,
+    ),
+    # T-zero-monomial — 단항식이지만 0이 아닌 점·0이지만 단항식이 아닌 함수·일차 단항식.
+    _probe("곡선 y = x^5 위의 점 (-1, -1)에서의 접선의 y절편을 구하시오.", code=_C05),
+    _probe("함수 f(x) = x^3 + 2x에 대하여 f'(0)의 값을 구하시오."),
+    _probe("함수 f(x) = 3x에 대하여 f'(0)의 값을 구하시오.", "f'(x) = 3이다."),
+    _probe("함수 f(x) = x^3의 도함수 f'(x)에 10을 대입한 값을 구하시오.", "f'(x) = 3x^2이다."),
+    # T05-line-tangent — '직선 y = … 위의'가 있어도 접선을 묻지 않으면 걸지 않는다.
+    _probe("직선 y = 2x + 1 위의 점 (1, 3)의 y좌표와 x좌표의 차를 구하시오.", code=_C05),
+    # T05-vertex-tangent — 삼차 곡선의 수평 접선은 꼭짓점 공식으로 풀리지 않는다.
+    _probe(
+        "곡선 y = -x^3 + 12x + 2 위의 점 중 접선이 x축에 평행하고 x좌표가 양수인 점의 x좌표를 "
+        "구하시오.",
+        "도함수는 y' = -3x^2 + 12 = -3(x + 2)(x - 2)이다.",
+        code=_C05,
+    ),
+    # T08-given-critical-points — 임계점 하나 고정 + 미지 계수(재설계형), 평평한 임계점이 섞인 고정.
+    _probe(
+        "함수 f(x) = x^3 + ax^2 - 9x + 2가 x = -1에서 극값을 가질 때, f(x)의 극솟값을 구하시오. "
+        "(단, a는 상수이다.)",
+        "f'(x) = 3x^2 + 2ax - 9이다. f'(-1)의 값은 -6 - 2a이므로 a = -3이다.",
+        code=_C08,
+        answer="-25",
+        answer_map=(("x", "3"), ("a", "-3"), ("y", "-25")),
+    ),
+    _probe(
+        "사차함수 f(x) = x^4 - 4x^3 + 1에 대하여 방정식 f'(x) = 0의 실근은 x = 0과 x = 3이다. "
+        "f(x)의 극값을 구하시오.",
+        "f'(x) = 4x^3 - 12x^2 = 4x^2(x - 3)이다.",
+        code=_C08,
+    ),
+    # 'x = 수'가 문자 뒤에 붙은 곳('3ax = 1')은 x 위치 고정이 아니다(T08 고정 읽기의 경계).
+    _probe(
+        "함수 f(x) = x^3 - 3x에 대하여 3ax = 1과 3ax = -1을 만족시키는 a의 값을 구하시오.",
+        _DERIV_OK,
+        code=_C08,
+    ),
+    # f'의 근이 실수가 아니면(3x^2 + 6) 극값 위치가 없다 — 판정기가 허근을 극값으로 세지 않는다.
+    _probe(
+        "함수 f(x) = x^3 + 6x에 대하여 x = 1과 x = 2에서의 함숫값의 차를 구하시오.",
+        "f'(x) = 3x^2 + 6이다.",
+        code=_C08,
+    ),
+    # T08-biquadratic — 비대칭 사차식·미지 계수가 든 사차식(대칭 판정 불가 — 건너뛴다).
+    _probe(
+        "사차함수 f(x) = x^4 - 14x^2 + 24x - 2가 극소가 되는 x좌표 중 큰 값을 구하시오.",
+        _DERIV_OK,
+        code=_C08,
+    ),
+    _probe(
+        "사차함수 f(x) = x^4 + ax^3 + b가 x = 3에서 극솟값 -29를 가질 때, 상수 b의 값을 구하시오. "
+        "(단, a, b는 상수이다.)",
+        "f'(x) = 4x^3 + 3ax^2이다. 108 + 27a = 0이고 81 + 27a + b = -29이다.",
+        code=_C08,
+        answer="-2",
+        answer_map=(("x", "3"), ("b", "-2"), ("a", "-4")),
+    ),
+    # T09-no-application — 같은 최솟값을 그래프와 x축의 위치 관계로 묻는 교정형.
+    _probe(
+        "사차함수 y = 3x^4 + 96x + 147의 그래프가 x축과 만나지 않음을 보이려 한다. 이 함수의 "
+        "최솟값을 구하시오.",
+        "f(x) = 3x^4 + 96x + 147이라 하자. f'(x) = 12x^3 + 96이다.",
+        code=_C09,
+        answer="3",
+        conditions=("Derivative(3*x**4 + 96*x + 147, x).doit() = 0", "y = 3*x**4 + 96*x + 147"),
+        answer_map=(("x", "-2"), ("y", "3")),
+    ),
+    # T10-linear-position — 이차 위치의 가속도(차수 절), 일차 위치지만 속도를 묻지 않는 문면(속도 절).
+    _probe(
+        "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = t^2 - 4t + 3일 때, t = 2에서의 점 P의 "
+        "가속도를 구하시오.",
+        "v(t) = 2t - 4이고 a(t) = 2이다.",
+        code=_C10,
+    ),
+    _probe(
+        "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = 2t + 1일 때, t = 3에서의 점 P의 위치를 "
+        "구하시오.",
+        code=_C10,
+    ),
 ]
 
 
@@ -509,6 +934,35 @@ def test_rule_flags_the_audited_defect_form(rule: str, probe: ShortcutProbe) -> 
 @pytest.mark.parametrize("probe", _GREEN, ids=[f"green-{i}" for i in range(len(_GREEN))])
 def test_corrected_forms_pass_every_rule(probe: ShortcutProbe) -> None:
     assert [str(v) for v in shortcut_violations(probe)] == []
+
+
+#: 02-09 '활용' 맥락 어휘 — 판정기 정규식과 *독립된* 목록(정규식에서 어휘 하나를 지우면 아래 테스트가 RED).
+_APPLICATION_WORDS = (
+    "방정식",
+    "부등식",
+    "실근",
+    "만나",
+    "교점",
+    "위쪽",
+    "아래쪽",
+    "보이려",
+    "성립",
+    "보다 크",
+    "보다 작",
+    "오른쪽",
+    "왼쪽",
+    "시각의 개수",
+    "x축",
+)
+
+
+@pytest.mark.parametrize("word", _APPLICATION_WORDS)
+def test_each_application_word_alone_exempts_a_09_minimum_item(word: str) -> None:
+    """어휘 하나만 있는 02-09 문면은 T09-no-application을 통과하고, 어휘가 없으면 걸린다."""
+    with_word = _probe(f"{word} 맥락의 최솟값을 구하시오.", code=_C09)
+    without = _probe("함수의 최솟값을 구하시오.", code=_C09)
+    assert "T09-no-application" not in {v.rule for v in shortcut_violations(with_word)}
+    assert "T09-no-application" in {v.rule for v in shortcut_violations(without)}
 
 
 def test_every_rule_has_a_red_control() -> None:

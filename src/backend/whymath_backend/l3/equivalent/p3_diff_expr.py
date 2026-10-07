@@ -9,8 +9,9 @@
   다시 `Poly`로 풀어 사람이 읽는 표기로 되돌린다(손으로 짠 미분 공식을 정답 경로에 두지 않는다).
   생성기가 독립적으로 *다른 경로*(예: 거듭제곱 공식 n·x^(n-1))를 한 번 더 계산해 대조하는 것은
   각 생성기·테스트의 몫이다.
-· 표기는 ASCII 전용이다(`x^4`·`*` 없음) — 신규 유니코드 글리프(²·³)는 위생·글리프 가드가 막는다
-  (2026-08-07 conic_section_focus 사고 선례).
+· 표기는 ASCII가 기본이다(`x^4`·`*` 없음) — 신규 유니코드 글리프(²·³)는 위생·글리프 가드가 막는다
+  (2026-08-07 conic_section_focus 사고 선례). 예외는 승인 은행이 이미 쓰는 세 글리프
+  '√'·'≤'·'≥'뿐이다(4차 감사 교정 — 표기 커버리지 베이스라인 등재 글리프라 신규 누락이 아니다).
 · 다항식은 `((지수, 계수), ...)` 지수 내림차순 정수 계수 튜플이다. 계수 0 항은 담지 않는다.
 """
 
@@ -155,15 +156,27 @@ def eval_at(poly: Poly, point: int, var: str = "x") -> int:
 
 
 def render_surd(value: sympy.Expr) -> str:
-    """학생 대면 근호 표기 — `8*sqrt(3)` → '8sqrt(3)'(곱셈 기호 '*'를 노출하지 않는다).
+    """학생 대면 근호 표기 — `8*sqrt(3)` → '8√3'·`sqrt(5)` → '√5'·정수는 그대로.
 
-    렌더 계약(`docs/architecture/notation_contract.md` §6·`math_notation.dart` `toRenderLatex`)은
-    'sqrt(X)'를 √X로 조판하지만 '*'는 가운뎃점(·)으로 남긴다. 발문·해설이 '3x^2'처럼 곱을 이어
-    쓰므로 선지도 같은 규약을 따른다(3차 감사 결함: 선지 '8*sqrt(3)'). 유니코드 '√'는 P3 은행의
-    ASCII 전용 규약(글리프 가드) 때문에 쓰지 않는다.
+    4차 감사(2026-10-07) 교정: 3차 교정이 고른 '8sqrt(3)'(함수 호출꼴)은 감사자 둘이 모두 학생에게
+    노출된 코드 표기로 판정했다. 승인 은행 4종의 관례는 유니코드 '√'다(2026-10 실측 93건 — 표기
+    커버리지 게이트 `l3/notation_coverage`의 베이스라인에 이미 있는 글리프라 신규 누락이 아니다).
+    Flutter 렌더(`math_notation.dart`)는 '√'를 비-ASCII 프로즈 글리프로 그대로 그린다.
+
+    지원 범위는 `c·√r`(c 정수, r 제곱 인수 없는 양의 정수) 꼴뿐이다 — 그 밖의 값(분수 계수·
+    합)이 들어오면 조용히 이상한 표기를 내지 않고 ValueError로 멈춘다.
     """
-    text: str = str(sympy.sstr(value))
-    return text.replace("*", "")
+    expr = sympy.nsimplify(value)
+    if expr.is_Integer:
+        return str(expr)
+    coeff, rest = expr.as_coeff_Mul()
+    if not (coeff.is_Integer and rest.is_Pow and rest.exp == sympy.Rational(1, 2)):
+        raise ValueError(f"c·√r 꼴이 아닌 근호 값: {value}")
+    radicand = rest.base
+    if not (radicand.is_Integer and radicand > 1):
+        raise ValueError(f"근호 안이 1보다 큰 정수가 아니다: {value}")
+    head = "" if coeff == 1 else ("-" if coeff == -1 else str(coeff))
+    return f"{head}√{radicand}"
 
 
 def render_product(factors: Sequence[Poly], var: str = "x") -> str:

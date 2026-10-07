@@ -675,40 +675,40 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
     )
     if side == "upper":
         text = (
-            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) <= {hi}이다. f({a}) = {pv}일 때, "
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) ≤ {hi}이다. f({a}) = {pv}일 때, "
             f"f({b})의 값이 될 수 있는 가장 큰 값을 구하시오."
         )
         value = top
         line = render_poly(((1, hi), (0, pv - hi * a)))
         body = (
-            f"f'(c) <= {hi}이므로 {render_difference(f'f({b})', pv)} <= {hi * width}, 즉 "
-            f"f({b}) <= {top}이다. "
+            f"f'(c) ≤ {hi}이므로 {render_difference(f'f({b})', pv)} ≤ {hi * width}, 즉 "
+            f"f({b}) ≤ {top}이다. "
             f"f(x) = {line}이면 등호가 성립하므로 가장 큰 값은 {top}이다."
         )
         cond = f"{pv} + ({hi})*(({b}) - ({a})) = y"
     elif side == "lower":
         text = (
-            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) >= {lo}이다. f({a}) = {pv}일 때, "
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) ≥ {lo}이다. f({a}) = {pv}일 때, "
             f"f({b})의 값이 될 수 있는 가장 작은 값을 구하시오."
         )
         value = bottom
         line = render_poly(((1, lo), (0, pv - lo * a)))
         body = (
-            f"f'(c) >= {lo}이므로 {render_difference(f'f({b})', pv)} >= {lo * width}, 즉 "
-            f"f({b}) >= {bottom}이다. "
+            f"f'(c) ≥ {lo}이므로 {render_difference(f'f({b})', pv)} ≥ {lo * width}, 즉 "
+            f"f({b}) ≥ {bottom}이다. "
             f"f(x) = {line}이면 등호가 성립하므로 가장 작은 값은 {bottom}이다."
         )
         cond = f"{pv} + ({lo})*(({b}) - ({a})) = y"
     else:
         text = (
-            f"함수 f(x)는 모든 실수 x에서 미분가능하고 {lo} <= f'(x) <= {hi}이다. f({a}) = {pv}일 "
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 {lo} ≤ f'(x) ≤ {hi}이다. f({a}) = {pv}일 "
             f"때, f({b})의 값이 될 수 있는 가장 큰 값과 가장 작은 값의 합을 구하시오."
         )
         value = top + bottom
         body = (
-            f"{lo} <= f'(c) <= {hi}이므로 {lo * width} <= {render_difference(f'f({b})', pv)} <= "
+            f"{lo} ≤ f'(c) ≤ {hi}이므로 {lo * width} ≤ {render_difference(f'f({b})', pv)} ≤ "
             f"{hi * width}, 즉 "
-            f"{bottom} <= f({b}) <= {top}이다. 두 끝값은 각각 f(x)가 {_extreme_line(lo)}일 때와 "
+            f"{bottom} ≤ f({b}) ≤ {top}이다. 두 끝값은 각각 f(x)가 {_extreme_line(lo)}일 때와 "
             f"{_extreme_line(hi)}일 때 실제로 나오므로 구하는 합은 {top} + "
             f"{_paren_if_neg(bottom)} = {value}이다."
         )
@@ -878,13 +878,42 @@ def _tangent_k_text(c: Fraction) -> str:
     return f"3({cs})^2 + 2({cs})k"
 
 
-def _k_item(slot: str, frame_id: str, text_of: object, p: tuple[object, ...]) -> DiffItem | None:
+def _k_item(
+    slot: str,
+    frame_id: str,
+    text_of: object,
+    p: tuple[object, ...],
+    *,
+    points_in_question: bool,
+) -> DiffItem | None:
+    """평균값 정리의 c로 미지수 k를 구하는 문항.
+
+    `points_in_question`이 False면(발문이 구간만 주고 점·접선을 말하지 않는다) 해설도 '두 점을 잇는
+    직선'·'접점' 대신 발문의 말(구간에서의 평균변화율·f'(c))로 쓴다 — 4차 감사 bad_explanation
+    (소개 없이 '두 점'·'접점'이 등장 · 판정기 E-object-intro).
+    """
     k, a, b, c = int(str(p[0])), int(str(p[1])), int(str(p[2])), p[3]
     assert isinstance(c, Fraction)
     if not _unique_k(k, a, b, c):
         return None
     assert callable(text_of)
     cs = frac_text(c)
+    rate = render_affine(a * a + a * b + b * b, a + b, "k")
+    if points_in_question:
+        explanation = (
+            f"f'(x) = 3x^2 + 2kx이다. 두 점을 잇는 직선의 기울기는 구간 [{a}, {b}]에서의 "
+            f"평균변화율이므로 (f({b}) - f({a}))/({_minus(b, a)}) = {rate}이다. "
+            f"접점 x = {cs}에서의 접선의 기울기는 f'({cs}) = {_tangent_k_text(c)}이고 "
+            "이 값이 평균변화율과 같아야 하므로 "
+            f"{_tangent_k_text(c)} = {rate}에서 k = {k}이다."
+        )
+    else:
+        explanation = (
+            f"f'(x) = 3x^2 + 2kx이다. 구간 [{a}, {b}]에서의 평균변화율은 "
+            f"(f({b}) - f({a}))/({_minus(b, a)}) = {rate}이다. 평균값 정리에 따라 f'(c)가 이 "
+            f"평균변화율과 같고 c의 값이 {cs}이므로 f'({cs}) = {_tangent_k_text(c)}에서 "
+            f"{_tangent_k_text(c)} = {rate}이다. 따라서 k = {k}이다."
+        )
     condition = (
         f"Derivative(x**3 + k*x**2, x).doit().subs(x, {cs}) = "
         f"(({b})**3 + k*({b})**2 - (({a})**3 + k*({a})**2))/(({b}) - ({a}))"
@@ -894,14 +923,7 @@ def _k_item(slot: str, frame_id: str, text_of: object, p: tuple[object, ...]) ->
         frame_id=frame_id,
         question_text=text_of(a, b, cs),
         answer_text=str(k),
-        explanation=(
-            f"f'(x) = 3x^2 + 2kx이다. 두 점을 잇는 직선의 기울기는 구간 [{a}, {b}]에서의 "
-            f"평균변화율이므로 (f({b}) - f({a}))/({_minus(b, a)}) = "
-            f"{render_affine(a * a + a * b + b * b, a + b, 'k')}이다. 접점 x = {cs}에서의 접선의 "
-            f"기울기는 f'({cs}) = {_tangent_k_text(c)}이고 이 값이 평균변화율과 같아야 하므로 "
-            f"{_tangent_k_text(c)} = {render_affine(a * a + a * b + b * b, a + b, 'k')}에서 "
-            f"k = {k}이다."
-        ),
+        explanation=explanation,
         conditions=condition,
         answer_map=(("k", str(k)),),
         problem_type_code=_SOLVE,
@@ -919,6 +941,7 @@ def _applied_frames() -> list[Frame]:
                 f"만족시키는 c의 값이 {cs}일 때, 상수 k의 값을 구하시오."
             ),
             p,
+            points_in_question=False,
         )
 
     def a2(p: tuple[object, ...]) -> DiffItem | None:
@@ -1472,6 +1495,7 @@ def _mastery_frames() -> list[Frame]:
                 f"{cs}일 때, 상수 k의 값을 구하시오."
             ),
             p,
+            points_in_question=True,
         )
 
     def k5(p: tuple[object, ...]) -> DiffItem | None:

@@ -639,7 +639,7 @@ def _min_body(
             head + f"이차식 {quad}의 판별식은 {a * a} - {4 * a * a} = {-3 * a * a} < 0이므로 "
             f"{with_eun_neun(quad)} 항상 양수이다. 그러므로 방정식 {name}'(x) = 0의 실근은 "
             f"{a} 하나뿐이고, {name}'(x)의 부호는 {lin}의 부호와 같다. "
-            f"따라서 {name}(x)는 x <= {a}에서 감소하고 x >= {a}에서 증가하여, x가 {a}일 때 최솟값 "
+            f"따라서 {name}(x)는 x ≤ {a}에서 감소하고 x ≥ {a}에서 증가하여, x가 {a}일 때 최솟값 "
             f"{with_eul_reul(case.value)} 갖는다."
         )
     roots = ", ".join(f"{var} = {c}" for c in crit)
@@ -658,7 +658,7 @@ def _min_body(
             + f"방정식 {name}'({var}) = 0의 근은 {roots}이고, {name}({var})는 {signs}한다. "
             + tail
         )
-    dom = f"{var} > 0" if strict else f"{var} >= 0"
+    dom = f"{var} > 0" if strict else f"{var} ≥ 0"
     outside = [c for c in crit if c <= lower]
     note = ""
     if outside:
@@ -783,14 +783,14 @@ def _rep_frames() -> list[Frame]:
             slot="representative",
             frame_id="rep-difference-minimum-nonnegative",
             text=(
-                f"x >= 0일 때 부등식 {gt} > {with_i_ga(ht)} 성립함을 보이려 한다. x >= 0에서 "
+                f"x ≥ 0일 때 부등식 {gt} > {with_i_ga(ht)} 성립함을 보이려 한다. x ≥ 0에서 "
                 f"두 변의 차 {_sides_text(g, h)}의 최솟값을 구하시오."
             ),
             case=case,
             explanation=(
                 f"두 변의 차를 f(x) = {with_ira(render_poly(case.poly))} 하자. "
                 + _min_body(case, lower=0)
-                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x >= 0에서 부등식이 성립한다."
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x ≥ 0에서 부등식이 성립한다."
             ),
             domain="x >= 0",
         )
@@ -922,9 +922,19 @@ def _basic_frames() -> list[Frame]:
         return _min_item(
             slot="basic",
             frame_id="basic-cubic-minimum-on-nonnegative-domain",
-            text=f"x >= 0에서 함수 f(x) = {render_poly(case.poly)}의 최솟값을 구하시오.",
+            # 4차 감사 bad_tag(불확실) 처분 — 방정식·부등식 맥락 없는 순수 최솟값은 02-07/02-08
+            # 기술만으로 풀린다(판정기 T09-no-application). 최솟값(> 0)으로 '실근 없음'을 보이는
+            # 방정식 활용으로 묻는다.
+            text=(
+                f"함수 f(x) = {render_poly(case.poly)}에 대하여 x ≥ 0에서 방정식 f(x) = 0이 실근을 "
+                "갖지 않음을 보이려 한다. x ≥ 0에서 f(x)의 최솟값을 구하시오."
+            ),
             case=case,
-            explanation=_min_body(case, lower=0),
+            explanation=(
+                _min_body(case, lower=0)
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x ≥ 0에서 f(x) > 0이고, 방정식 "
+                "f(x) = 0은 x ≥ 0에서 실근을 갖지 않는다."
+            ),
             domain="x >= 0",
         )
 
@@ -981,7 +991,7 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-moving-point-position-count",
             text=(
-                "수직선 위를 움직이는 점 P의 시각 t (t >= 0)에서의 위치가 "
+                "수직선 위를 움직이는 점 P의 시각 t (t ≥ 0)에서의 위치가 "
                 f"x(t) = {render_poly(level.poly, 't')}이다. 점 P의 위치가 {with_i_ga(level.k)} "
                 "되는 서로 다른 시각의 개수를 구하시오."
             ),
@@ -1030,14 +1040,14 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-two-functions-gap-minimum",
             text=(
-                f"두 함수 f(x) = {render_poly(g)}, g(x) = {render_poly(h)}에 대하여 x >= 0에서 "
-                "f(x) > g(x)임을 보이려 한다. x >= 0에서 f(x) - g(x)의 최솟값을 구하시오."
+                f"두 함수 f(x) = {render_poly(g)}, g(x) = {render_poly(h)}에 대하여 x ≥ 0에서 "
+                "f(x) > g(x)임을 보이려 한다. x ≥ 0에서 f(x) - g(x)의 최솟값을 구하시오."
             ),
             case=case,
             explanation=(
                 f"h(x) = f(x) - g(x) = {with_ira(render_poly(case.poly))} 하자. "
                 + _min_body(case, name="h", lower=0)
-                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x >= 0에서 f(x) > g(x)이다."
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x ≥ 0에서 f(x) > g(x)이다."
             ),
             domain="x >= 0",
         )
@@ -1075,17 +1085,17 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-two-moving-points-gap",
             text=(
-                "수직선 위를 움직이는 두 점 P, Q의 시각 t (t >= 0)에서의 위치가 각각 "
-                f"p(t) = {render_poly(g, 't')}, q(t) = {render_poly(h, 't')}이다. t >= 0에서 점 "
+                "수직선 위를 움직이는 두 점 P, Q의 시각 t (t ≥ 0)에서의 위치가 각각 "
+                f"p(t) = {render_poly(g, 't')}, q(t) = {render_poly(h, 't')}이다. t ≥ 0에서 점 "
                 "P는 "
-                "항상 점 Q보다 오른쪽에 있음을 보이려 한다. t >= 0에서 p(t) - q(t)의 최솟값을 "
+                "항상 점 Q보다 오른쪽에 있음을 보이려 한다. t ≥ 0에서 p(t) - q(t)의 최솟값을 "
                 "구하시오."
             ),
             case=case,
             explanation=(
                 f"h(t) = p(t) - q(t) = {with_ira(render_poly(case.poly, 't'))} 하자. "
                 + _min_body(case, name="h", lower=0, var="t")
-                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 t >= 0에서 p(t) > q(t), 즉 점 P는 "
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 t ≥ 0에서 p(t) > q(t), 즉 점 P는 "
                 "항상 점 Q보다 오른쪽에 있다."
             ),
             domain="t >= 0",
@@ -1303,14 +1313,14 @@ def _diagnostic_frames() -> list[Frame]:
             slot="diagnostic",
             frame_id="diag-cubic-positive-on-domain",
             text=(
-                f"함수 f(x) = {render_poly(case.poly)}에 대하여 x >= 0에서 f(x) > 0임을 보이려 "
+                f"함수 f(x) = {render_poly(case.poly)}에 대하여 x ≥ 0에서 f(x) > 0임을 보이려 "
                 "한다. "
-                "x >= 0에서 f(x)의 최솟값을 구하시오."
+                "x ≥ 0에서 f(x)의 최솟값을 구하시오."
             ),
             case=case,
             explanation=(
                 _min_body(case, lower=0)
-                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x >= 0에서 f(x) > 0이다."
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 x ≥ 0에서 f(x) > 0이다."
             ),
             domain="x >= 0",
         )
@@ -1320,9 +1330,17 @@ def _diagnostic_frames() -> list[Frame]:
         return _min_item(
             slot="diagnostic",
             frame_id="diag-quartic-single-critical-minimum",
-            text=f"사차함수 f(x) = {render_poly(case.poly)}의 최솟값을 구하시오.",
+            # 4차 감사 처분 — 그래프와 x축의 위치 관계(교점 없음)를 보이는 활용으로 묻는다.
+            text=(
+                f"사차함수 y = {render_poly(case.poly)}의 그래프가 x축과 만나지 않음을 "
+                "보이려 한다. 이 함수의 최솟값을 구하시오."
+            ),
             case=case,
-            explanation=_min_body(case),
+            explanation=(
+                f"f(x) = {with_ira(render_poly(case.poly))} 하자. "
+                + _min_body(case)
+                + f" 최솟값 {with_i_ga(case.value)} 양수이므로 그래프는 x축과 만나지 않는다."
+            ),
             domain=None,
         )
 
@@ -1331,12 +1349,18 @@ def _diagnostic_frames() -> list[Frame]:
         return _min_item(
             slot="diagnostic",
             frame_id="diag-compare-two-local-minima",
+            # 4차 감사 bad_tag(불확실) 처분 — '두 극솟값 중 작은 값'만 묻던 문면에 방정식 맥락을
+            # 준다.
             text=(
-                f"사차함수 f(x) = {render_poly(case.poly)}의 두 극솟값 중 작은 값이 f(x)의 "
-                "최솟값이다. 이 최솟값을 구하시오."
+                f"사차함수 f(x) = {render_poly(case.poly)}에 대하여 방정식 f(x) = 0이 실근을 갖지 "
+                "않음을 보이려 한다. f(x)의 두 극솟값 중 작은 값을 구하시오."
             ),
             case=case,
-            explanation=_min_body(case),
+            explanation=(
+                _min_body(case)
+                + " 이 값이 양수이므로 모든 실수 x에 대하여 f(x) > 0이고, 방정식 f(x) = 0은 "
+                "실근을 갖지 않는다."
+            ),
             domain=None,
         )
 
