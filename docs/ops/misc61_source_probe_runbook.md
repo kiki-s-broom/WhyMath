@@ -53,6 +53,7 @@ if ($Src) { "원천 확인 — 블록 3으로 진행" } else { "SOURCE_NOT_FOUND
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창 — 작업 디렉터리를 임시 폴더로 옮긴다(스크립트가 상대 경로로 코퍼스를 읽는다)
 Set-Location $Wt
+$env:PYTHONUTF8="1"
 $CanRun = [bool]$Src -and $ProbeExists
 if ($CanRun) { $Report = python $Probe --source $Src --out (Join-Path $Wt "probe_report.json"); $Code = $LASTEXITCODE; $Report | Set-Clipboard; "PROBE_EXIT=$Code"; "REPORT_LINES=" + @($Report).Count; "CLIPBOARD_COPIED=True" } else { "PROBE_REFUSED — 블록 1·2의 판정값이 비었다: Src=$Src ProbeExists=$ProbeExists" }
 ```
