@@ -353,9 +353,45 @@ def _synthetic_ledger() -> tuple[list[AttemptEvent], list[uuid.UUID], dict[str, 
     return rows, users, inject
 
 
+def _noise_ledger() -> tuple[list[AttemptEvent], list[uuid.UUID]]:
+    """다른 테스트가 공유 DB에 남긴 잔여 행을 흉내 내는 쌍 3개 — **baseline이 0이 아닌 상태**를 만든다.
+
+    CI의 통합 잡은 한 DB를 스위트 전체가 공유하므로 이 테스트의 baseline은 0이 아니다(실측: 라벨 없는 쌍
+    2개가 이미 있었다). 빈 DB에서만 통과하는 테스트는 baseline을 잘못 잡아도 초록이라 그 결함을 못 본다
+    (PR #1503의 첫 CI가 바로 그것이었다 — 하한을 건 읽기를 하한 없는 baseline과 비교). 그래서 잔여 행을
+    이 테스트가 직접 심어 어떤 DB에서도 같은 조건을 밟는다.
+
+    N1·N2 라벨 없는 쌍(하한 아래에서는 나오지 않는다) · N3 서버 라벨 n=50 쌍(하한 10을 **통과**한다 —
+    하한을 건 baseline에도 들어 있다).
+    """
+    users = [uuid.uuid4() for _ in range(3)]
+    t0 = datetime(2026, 10, 7, 8, 0, 0, tzinfo=timezone.utc)
+    rows = [
+        _E._ledger_row(users[0], uuid.uuid4(), t0, hint_level=2, base_level=1),
+        _E._ledger_row(
+            users[1], uuid.uuid4(), t0 + timedelta(seconds=1), hint_level=1, base_level=1
+        ),
+        _E._ledger_row(
+            users[2],
+            uuid.uuid4(),
+            t0 + timedelta(seconds=2),
+            hint_level=1,
+            base_level=1,
+            ability_level="숙달",
+            label_source="server_bkt",
+            label_evidence_n=50,
+        ),
+    ]
+    return rows, users
+
+
 def test_the_validity_reader_in_real_jsonb_and_window_functions() -> None:
     rows, users, inject = _synthetic_ledger()
+    noise, noise_users = _noise_ledger()
+    clean = asyncio.run(_read())
+    asyncio.run(_E._insert(noise))  # baseline을 0이 아니게 만든다 — 아래 모든 증분은 이 위에서 센다
     before = asyncio.run(_read())
+    before_floored = asyncio.run(_read(min_evidence_n=10))
     asyncio.run(_E._insert(rows))
     try:
         after = asyncio.run(_read())
@@ -375,8 +411,12 @@ def test_the_validity_reader_in_real_jsonb_and_window_functions() -> None:
         )
         injected = asyncio.run(_read())
     finally:
-        asyncio.run(_E._purge(users))
+        asyncio.run(_E._purge(users + noise_users))
     restored = asyncio.run(_read())
+
+    # 노이즈가 실제로 baseline을 0이 아니게 만들었다(이 전제가 깨지면 아래 증분 단언은 빈 DB 테스트로 후퇴한다).
+    assert before.unlabeled_pair_total - clean.unlabeled_pair_total == 2, before
+    assert _cell_delta(clean, before) == {("숙달", "server_bkt"): (1, 0)}, before
 
     delta = _cell_delta(before, after)
     assert delta == {
@@ -393,9 +433,14 @@ def test_the_validity_reader_in_real_jsonb_and_window_functions() -> None:
 
     # 증거 수 하한(10): 첫 행의 label_evidence_n ≥ 10인 쌍만 — 숙달 n=40인 P3뿐이다(P8의 시각 첫 행은
     # n=5라 빠진다 — 늦은 행의 n=40으로 판정하면 틀린다). 모름(NULL)·낮은 n·라벨 없음 쌍은 전부 빠진다.
-    assert _cell_delta(before, floored) == {("숙달", "server_bkt"): (1, 0)}, floored
-    assert floored.unlabeled_pair_total - before.unlabeled_pair_total == 0, floored
-    assert floored.unclassified_pair_total - before.unclassified_pair_total == 0, floored
+    # **하한을 건 읽기는 하한을 건 baseline과 비교한다** — 하한 없는 baseline과 비교하면 필터에 걸러진
+    # 잔여 행(라벨 없는 쌍)이 음수 증분으로 나타난다.
+    assert _cell_delta(before_floored, floored) == {("숙달", "server_bkt"): (1, 0)}, floored
+    assert floored.unlabeled_pair_total - before_floored.unlabeled_pair_total == 0, floored
+    assert floored.unclassified_pair_total - before_floored.unclassified_pair_total == 0, floored
+    assert (
+        before_floored.unlabeled_pair_total == 0
+    ), before_floored  # 하한은 라벨 없는 잔여 쌍을 걸러 낸다
 
     # 주입 결과: P1이 신호 없음 → 신호 있음으로 — (초보,bkt)의 신호 쌍이 정확히 +1, 쌍 수는 그대로다.
     flipped = _cell_delta(before, injected)
@@ -407,10 +452,10 @@ def test_the_validity_reader_in_real_jsonb_and_window_functions() -> None:
     }, flipped
     assert after.unlabeled_pair_total == injected.unlabeled_pair_total  # 다른 분류는 안 건드린다
 
-    # 되돌림 — 합성 행을 지우면 증분이 0이다(센 것이 우리가 심은 행임을 확인).
-    assert restored.cells == before.cells
-    assert restored.unlabeled_pair_total == before.unlabeled_pair_total
-    assert restored.unclassified_pair_total == before.unclassified_pair_total
+    # 되돌림 — 합성 행과 노이즈를 지우면 처음 상태다(센 것이 우리가 심은 행임을 확인).
+    assert restored.cells == clean.cells
+    assert restored.unlabeled_pair_total == clean.unlabeled_pair_total
+    assert restored.unclassified_pair_total == clean.unclassified_pair_total
 
 
 def test_the_full_report_carries_the_validity_axis_end_to_end() -> None:
