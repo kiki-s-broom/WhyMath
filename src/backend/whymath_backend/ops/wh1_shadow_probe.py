@@ -276,9 +276,7 @@ def issue_demo_token(client: httpx.Client) -> str:
             "(scripts/demo/run_demo.ps1)을 확인하세요."
         ) from exc
     if state_resp.status_code != 200:
-        raise ProbeAuthError(
-            f"데모 state 발급 실패(HTTP {state_resp.status_code}) — {guidance}"
-        )
+        raise ProbeAuthError(f"데모 state 발급 실패(HTTP {state_resp.status_code}) — {guidance}")
     state = state_resp.json().get("state")
     if not isinstance(state, str) or not state:
         raise ProbeAuthError("데모 state 응답에 state가 없음 — 서버 버전을 확인하세요.")
