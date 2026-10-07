@@ -61,6 +61,20 @@
    도움)이 독립 성공을 얼마나 도움으로 오귀속했을지의 **상한 신호**이고, 킬 스위치
    `l4_hint_attribution_label_free_enabled`를 끌지 판단하는 근거다.
 
+8. **코치 라벨의 예측 타당도**(EOS-179) — §7이 *구성*을 센다면 이 축은 라벨('초보'|'발전 중'|
+   '숙달')이 학생 신호를 **맞히는가**를 잰다. 단위는 (학생·문항) 쌍이다: 그 문항의 *첫* 공급 행이
+   단 라벨(`ability_level`)을 층으로, 같은 쌍의 공급 행 중 `base_level >= 2`(학생 신호)가 하나라도
+   있었는지를 결과로 센다(창 함수 `row_number() over (partition by user_id, problem_id order by
+   event_at)`). '초보'의 정밀도(= '초보' 쌍 중 신호가 나온 비율)·재현율(= 신호가 나온 쌍 중
+   첫 라벨이 '초보'였던 비율)과, 변별 여부를 가리는 대조(= '초보'가 아닌 라벨의 신호율)를
+   **건수와 함께 Wilson 단측 95% 경계로** 낸다 — 점추정만 내면 30쌍 표본의 1%대 비율을
+   가리지 못한다(0/30의 단측 상한이 8.3%). 분모가 0이면 비율은 None이고(0과 구별)
+   **판정·임계는 이 리포트가 내지 않는다**(합성 표본으로 임계를 정하지 않는다 — 임계 판정은
+   후속 EOS-180). 라벨 출처(`label_source`)로 '서버 파생' 보기를 따로 낸다 — 클라가 정한
+   라벨의 정확도는 서버 라벨의 정확도가 아니다. `--min-label-evidence-n K`는 첫 행의 라벨이
+   서버 개념 숙달도 관측 K건 이상에서 나온 쌍만 본다(K의 값은 운영 데이터를 보며 고른다 —
+   이 리포트가 정하지 않는다).
+
 집계 코어(`build_report`)는 순수 함수(원시 카운트 → 리포트)라 hermetic 테스트로 전량
 검증 가능하다. DB 접속(`fetch_reach_counts`)만 async I/O 경계다.
 
@@ -92,6 +106,7 @@ from whymath_backend.db.models.assessment import ConceptMasteryHistory
 from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
+from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.l2.recommendation_evidence import (
     EVENT_TYPE_RECOMMENDATION_TREATMENT,
     META_KEY_CANDIDATES,
@@ -106,9 +121,13 @@ from whymath_backend.schema.enums import EventType
 __all__ = [
     "NOT_REACHED",
     "REQUEST_COUNTER_STATUS",
+    "LabelValidityRow",
+    "LabelValidityView",
     "ReachCounts",
     "ReachReport",
+    "WilsonRate",
     "build_report",
+    "fetch_label_validity",
     "fetch_reach_counts",
     "main",
     "render_report",
@@ -176,10 +195,21 @@ class ReachCounts:
     #: 그 쌍 중 학생 신호 공급(`base_level >= 2`)이 하나도 없는 쌍 — 라벨이 학생 행동으로
     #: 확인되지 않았다.
     coach_label_only_unsignaled_pair_total: int = 0
+    #: EOS-179 — 라벨 예측 타당도의 (라벨, 출처, 쌍 수, 신호 쌍 수) 칸. 쌍 = 문항의 첫 공급 행이
+    #: 라벨을 가졌고 같은 쌍의 모든 공급 행에 `base_level`이 실려 신호 판정이 가능한 쌍.
+    coach_label_validity_cells: tuple[tuple[str, str | None, int, int], ...] = ()
+    #: 첫 공급 행에 라벨(`ability_level`)이 없는 쌍 수 — 타당도 표에서 제외된다.
+    coach_label_unlabeled_pair_total: int = 0
+    #: 라벨은 있으나 `base_level`이 없는 행이 섞여 신호 판정이 불가능한 쌍 수 — 제외된다.
+    coach_label_unclassified_pair_total: int = 0
+    #: 이 읽기가 적용한 증거 수 하한(`--min-label-evidence-n`). None=걸지 않음.
+    coach_label_min_evidence_n: int | None = None
 
 
-async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
-    """11개 실측 카운트를 쿼리 11회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
+async def fetch_reach_counts(
+    session: AsyncSession, *, min_label_evidence_n: int | None = None
+) -> ReachCounts:
+    """실측 카운트를 쿼리 18회로 산출한다(전부 SQLAlchemy Core — 원시 SQL 0).
 
     각 쿼리의 의미는 모듈 docstring "실제로 DB에서 직접 측정하는 축" 참조.
     쿼리 순서는 테스트(큐 기반 가짜 세션)와 계약이므로 바꾸지 않는다: ① problem_attempt
@@ -188,7 +218,9 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
     ⑧ `theta_boundary=upper` ⑨ `theta_boundary=lower` ⑩ `selection_help_count` 키
     ⑪ `selection_hint_unknown_count` 키(EOS-39 — 전부 `recommendation_render` 처치 안에서)
     ⑫ 공급 원장 단계 2+ 행 ⑬ 그중 `base_level` 있는 행 ⑭ 그중 `base_level<2`(라벨-단독) ⑮ 그중
-    `hint_id` 있는 행 ⑯ 라벨-단독 행이 있는 (학생·문항) 쌍 ⑰ 그중 학생 신호 공급이 없는 쌍(EOS-178).
+    `hint_id` 있는 행 ⑯ 라벨-단독 행이 있는 (학생·문항) 쌍 ⑰ 그중 학생 신호 공급이 없는 쌍(EOS-178)
+    ⑱ 라벨 예측 타당도 — 첫 공급 행 라벨 × 출처별 (학생·문항) 쌍과 신호 쌍(EOS-179 · 행 단위가
+    아니라 `fetch_label_validity`가 한 쿼리로 읽는다).
     """
     attempt_total = int(
         (await session.execute(select(func.count()).select_from(ProblemAttempt))).scalar_one()
@@ -309,6 +341,8 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         ).scalar_one()
     )
 
+    validity = await fetch_label_validity(session, min_evidence_n=min_label_evidence_n)
+
     return ReachCounts(
         problem_attempt_total=attempt_total,
         theta_eligible_response_total=eligible_total,
@@ -327,6 +361,89 @@ async def fetch_reach_counts(session: AsyncSession) -> ReachCounts:
         coach_supply_label_only_served_row_total=supply_label_only_served_total,
         coach_label_only_pair_total=label_only_pair_total,
         coach_label_only_unsignaled_pair_total=label_only_unsignaled_pair_total,
+        coach_label_validity_cells=validity.cells,
+        coach_label_unlabeled_pair_total=validity.unlabeled_pair_total,
+        coach_label_unclassified_pair_total=validity.unclassified_pair_total,
+        coach_label_min_evidence_n=min_label_evidence_n,
+    )
+
+
+@dataclass(slots=True, frozen=True)
+class _LabelValidityRead:
+    """`fetch_label_validity`의 반환 — 칸·제외 쌍 수(`ReachCounts`에 그대로 옮겨 싣는다)."""
+
+    cells: tuple[tuple[str, str | None, int, int], ...]
+    unlabeled_pair_total: int
+    unclassified_pair_total: int
+
+
+async def fetch_label_validity(
+    session: AsyncSession, *, min_evidence_n: int | None = None
+) -> _LabelValidityRead:
+    """코치 라벨의 예측 타당도 원자료(EOS-179 · 쿼리 1회 · 조회 전용).
+
+    (학생·문항) 쌍마다 **첫 공급 행**(`event_at` 오름차순 1번)의 라벨(`ability_level`)·출처
+    (`label_source`)를 읽고, 같은 쌍의 모든 공급 행에서 학생 신호(`base_level >= 2`)가 하나라도
+    있었는지(`bool_or`)와 모든 행에 `base_level`이 실렸는지(`bool_and`)를 창 함수로 함께 계산한 뒤,
+    (라벨·출처·분류 가능 여부)로 묶어 쌍 수와 신호 쌍 수를 센다.
+
+    - 첫 행에 라벨이 없으면(`ability_level`이 NULL·빈 문자열) **라벨 없음**으로 따로 센다 — 두 번째
+      행의 라벨로 건너뛰지 않는다: 라벨은 그 문항의 *첫 노출 시점*의 예측이어야 하고, 이후 행의
+      라벨은 학생이 푼 뒤의 숙달도라 이미 결과의 영향을 받았다.
+    - 같은 쌍에 `base_level` 없는 행이 하나라도 섞이면(구판 행·롤백) 신호 없음을 확신할 수 없어
+      **분류 불가**로 따로 센다 — 신호 없음(False)으로 접지 않는다(`bool_or`는 NULL을 무시하므로
+      그대로 두면 구판 행이 섞인 쌍이 "신호 없음"으로 읽힌다).
+    - `min_evidence_n`이 주어지면 첫 행의 `label_evidence_n >= K`인 쌍만 센다(NULL=모름은 빠진다).
+      K의 값은 이 함수가 정하지 않는다.
+
+    같은 쌍의 같은 `event_at`을 가진 행은 순차 턴에서 생길 수 없어 동순위 처리를 따로 두지 않는다.
+    """
+    part = (AttemptEvent.user_id, AttemptEvent.problem_id)
+    level = AttemptEvent.event_data["ability_level"].as_string()
+    base = AttemptEvent.event_data["base_level"].as_integer()
+    ranked = (
+        select(
+            # 빈 문자열은 라벨 없음과 같게 본다(`hint_id`의 `!= ''` 관례와 동형).
+            func.nullif(level, "").label("label"),
+            AttemptEvent.event_data["label_source"].as_string().label("source"),
+            AttemptEvent.event_data["label_evidence_n"].as_integer().label("evidence_n"),
+            func.bool_or(base >= 2).over(partition_by=part).label("has_signal"),
+            func.bool_and(base.isnot(None)).over(partition_by=part).label("all_classified"),
+            func.row_number()
+            .over(partition_by=part, order_by=AttemptEvent.event_at.asc())
+            .label("rn"),
+        )
+        .where(AttemptEvent.event_type == EventType.힌트제공)
+        .subquery()
+    )
+    stmt = (
+        select(
+            ranked.c.label,
+            ranked.c.source,
+            ranked.c.all_classified,
+            func.count().label("pairs"),
+            func.count().filter(ranked.c.has_signal.is_(True)).label("signal_pairs"),
+        )
+        .where(ranked.c.rn == 1)
+        .group_by(ranked.c.label, ranked.c.source, ranked.c.all_classified)
+    )
+    if min_evidence_n is not None:
+        stmt = stmt.where(ranked.c.evidence_n >= min_evidence_n)
+
+    cells: list[tuple[str, str | None, int, int]] = []
+    unlabeled = 0
+    unclassified = 0
+    for label, source, all_classified, pairs, signal_pairs in (await session.execute(stmt)).all():
+        if label is None:
+            unlabeled += int(pairs)
+        elif all_classified is not True:
+            unclassified += int(pairs)
+        else:
+            cells.append((str(label), source, int(pairs), int(signal_pairs)))
+    return _LabelValidityRead(
+        cells=tuple(sorted(cells, key=lambda c: (c[0], c[1] or ""))),
+        unlabeled_pair_total=unlabeled,
+        unclassified_pair_total=unclassified,
     )
 
 
@@ -370,6 +487,99 @@ class ReachReport:
     coach_label_only_pair_total: int
     coach_label_only_unsignaled_pair_total: int
     coach_label_only_unsignaled_rate: float | None
+    #: EOS-179 — 코치 라벨의 예측 타당도. `all`은 모든 출처, `server`는 서버가 만든 라벨(출처가
+    #: `server_bkt`·`server_theta`)만. 판정·임계는 싣지 않는다(후속 EOS-180).
+    coach_label_validity_all: LabelValidityView
+    coach_label_validity_server: LabelValidityView
+    coach_label_unlabeled_pair_total: int
+    coach_label_unclassified_pair_total: int
+    #: 라벨·신호 판정이 모두 있으나 출처가 적히지 않은 쌍(EOS-179 이전 행) — `all`에만 들어간다.
+    coach_label_source_unknown_pair_total: int
+    coach_label_min_evidence_n: int | None
+
+
+# 타당도 표의 고정 라벨 순서 — 원장에 없는 라벨도 0쌍 행으로 보인다("없다"와 "안 봤다"를 가른다).
+NOVICE_LABEL = "초보"
+_LABEL_ORDER = ("초보", "발전 중", "숙달")
+#: 서버가 라벨을 만든 출처 — 클라가 직접 보낸('explicit')·클라 제출 bkt('client_bkt') 라벨은
+#: 서버 라벨의 정확도가 아니라 앱이 정한 값의 정확도라 이 보기에서 뺀다.
+_SERVER_LABEL_SOURCES = frozenset({"server_bkt", "server_theta"})
+
+
+@dataclass(slots=True, frozen=True)
+class WilsonRate:
+    """분자·분모·비율과 Wilson 단측 95% 경계 — 분모가 0이면 비율·경계는 전부 None(0과 구별)."""
+
+    numerator: int
+    denominator: int
+    rate: float | None
+    lower95: float | None
+    upper95: float | None
+
+
+def _wilson_rate(numerator: int, denominator: int) -> WilsonRate:
+    if denominator == 0:
+        return WilsonRate(numerator, 0, None, None, None)
+    return WilsonRate(
+        numerator,
+        denominator,
+        numerator / denominator,
+        wilson_lower_bound(numerator, denominator),
+        wilson_upper_bound(numerator, denominator),
+    )
+
+
+@dataclass(slots=True, frozen=True)
+class LabelValidityRow:
+    """한 라벨의 칸 — `signal`의 분모는 그 라벨이 첫 공급 행에 달린 쌍, 분자는 신호가 나온 쌍."""
+
+    label: str
+    signal: WilsonRate
+
+
+@dataclass(slots=True, frozen=True)
+class LabelValidityView:
+    """한 보기(모든 출처 / 서버 출처)의 라벨별 신호율과 '초보'의 정밀도·재현율·대조."""
+
+    pair_total: int
+    signal_pair_total: int
+    rows: tuple[LabelValidityRow, ...]
+    #: '초보' 정밀도 — 첫 라벨이 '초보'인 쌍 중 신호가 나온 비율.
+    novice_precision: WilsonRate
+    #: '초보' 재현율 — 신호가 나온 쌍 중 첫 라벨이 '초보'였던 비율.
+    novice_recall: WilsonRate
+    #: 대조 — '초보'가 아닌 라벨의 신호율. 라벨과 무관하게 같다면 라벨은 신호를 변별하지 못한다.
+    other_signal_rate: WilsonRate
+
+
+def _label_validity_view(
+    cells: tuple[tuple[str, str | None, int, int], ...], sources: frozenset[str] | None
+) -> LabelValidityView:
+    """칸들을 라벨별로 합산해 한 보기를 만든다(`sources`가 None이면 전 출처·아니면 그 출처만)."""
+    pairs: dict[str, int] = {}
+    signals: dict[str, int] = {}
+    for label, source, cell_pairs, cell_signals in cells:
+        if sources is not None and source not in sources:
+            continue
+        pairs[label] = pairs.get(label, 0) + cell_pairs
+        signals[label] = signals.get(label, 0) + cell_signals
+    # 고정 순서 + 원장에만 있는 낯선 라벨(정렬) — 조용히 버리면 분모가 어긋난다.
+    labels = list(_LABEL_ORDER) + sorted(k for k in pairs if k not in _LABEL_ORDER)
+    rows = tuple(
+        LabelValidityRow(k, _wilson_rate(signals.get(k, 0), pairs.get(k, 0))) for k in labels
+    )
+    pair_total = sum(pairs.values())
+    signal_total = sum(signals.values())
+    novice_pairs = pairs.get(NOVICE_LABEL, 0)
+    novice_signals = signals.get(NOVICE_LABEL, 0)
+    return LabelValidityView(
+        pair_total=pair_total,
+        signal_pair_total=signal_total,
+        rows=rows,
+        novice_precision=_wilson_rate(novice_signals, novice_pairs),
+        novice_recall=_wilson_rate(novice_signals, signal_total),
+        other_signal_rate=_wilson_rate(signal_total - novice_signals, pair_total - novice_pairs),
+    )
 
 
 def _rate(numerator: int, denominator: int) -> float | None:
@@ -443,6 +653,16 @@ def build_report(counts: ReachCounts) -> ReachReport:
         coach_label_only_unsignaled_rate=_rate(
             counts.coach_label_only_unsignaled_pair_total, counts.coach_label_only_pair_total
         ),
+        coach_label_validity_all=_label_validity_view(counts.coach_label_validity_cells, None),
+        coach_label_validity_server=_label_validity_view(
+            counts.coach_label_validity_cells, _SERVER_LABEL_SOURCES
+        ),
+        coach_label_unlabeled_pair_total=counts.coach_label_unlabeled_pair_total,
+        coach_label_unclassified_pair_total=counts.coach_label_unclassified_pair_total,
+        coach_label_source_unknown_pair_total=sum(
+            c[2] for c in counts.coach_label_validity_cells if c[1] is None
+        ),
+        coach_label_min_evidence_n=counts.coach_label_min_evidence_n,
     )
 
 
@@ -595,8 +815,96 @@ def render_report(report: ReachReport) -> str:
             "증거다 — 킬 스위치(`l4_hint_attribution_label_free_enabled`)를 끄고 구판 규칙으로 "
             "돌아갈지 판단한다.",
         ]
+    lines += _render_label_validity(report)
     lines.append("")
     return "\n".join(lines)
+
+
+def _fmt_wilson(r: WilsonRate) -> str:
+    """`분자/분모 = 비율 (Wilson 단측 95% 하한·상한)` — 분모 0이면 '미도달'(0.0%로 위장 금지)."""
+    if r.rate is None or r.lower95 is None or r.upper95 is None:
+        return f"{NOT_REACHED}(분모 0)"
+    return (
+        f"**{r.numerator}/{r.denominator}** = {r.rate:.1%} "
+        f"(Wilson 단측 95% 하한 {r.lower95:.1%} · 상한 {r.upper95:.1%})"
+    )
+
+
+def _render_label_validity_view(title: str, view: LabelValidityView) -> list[str]:
+    lines = [
+        f"- **{title}** — (학생·문항) 쌍 **{view.pair_total}**, "
+        f"그중 신호 쌍 **{view.signal_pair_total}**"
+    ]
+    if view.pair_total == 0:
+        lines.append(
+            f"  - 타당도 전 축: {NOT_REACHED}(라벨·신호 판정이 모두 있는 쌍 0건 — 분모 없음)"
+        )
+        return lines
+    lines += [f"  - 첫 라벨 `{row.label}` → 신호율 {_fmt_wilson(row.signal)}" for row in view.rows]
+    lines += [
+        f"  - '초보' 정밀도(첫 라벨이 '초보'인 쌍 중 신호): {_fmt_wilson(view.novice_precision)}",
+        f"  - '초보' 재현율(신호가 난 쌍 중 첫 라벨이 '초보'): {_fmt_wilson(view.novice_recall)}",
+        f"  - 대조 — '초보' 아닌 라벨의 신호율: {_fmt_wilson(view.other_signal_rate)}",
+    ]
+    return lines
+
+
+def _render_label_validity(report: ReachReport) -> list[str]:
+    lines = [
+        "",
+        "## 8. 코치 라벨의 예측 타당도 (EOS-179 — '초보'가 학생 신호를 맞히는가)",
+        "",
+        "- 단위: (학생·문항) 쌍. 문항의 **첫** 공급 행에 달린 라벨별로, 같은 쌍의 공급 행 중 "
+        "학생 신호(`base_level>=2`)가 하나라도 있었는지를 센다. 임계·판정은 이 리포트가 내지 "
+        "않는다(건수와 Wilson 경계만 — 임계 판정은 후속 EOS-180).",
+    ]
+    if report.coach_label_min_evidence_n is not None:
+        lines.append(
+            "- 증거 수 하한 적용: 첫 라벨이 서버 개념 숙달도 관측 "
+            f"**{report.coach_label_min_evidence_n}건 이상**에서 나온 쌍만 본다"
+            "(증거 수를 모르는 쌍은 빠진다)."
+        )
+    lines += [
+        "- 표에서 **제외**된 쌍 — 첫 공급 행에 라벨 없음: "
+        f"**{report.coach_label_unlabeled_pair_total}** · 신호 판정 불가"
+        f"(`base_level` 없는 구판 행이 섞임): **{report.coach_label_unclassified_pair_total}**",
+    ]
+    lines += _render_label_validity_view("모든 출처", report.coach_label_validity_all)
+    if report.coach_label_source_unknown_pair_total:
+        lines.append(
+            f"  - 이 중 라벨 출처가 적히지 않은 쌍(EOS-179 이전 행): "
+            f"**{report.coach_label_source_unknown_pair_total}** — 아래 서버 보기에서는 빠진다."
+        )
+    lines += _render_label_validity_view(
+        "서버가 만든 라벨만(`server_bkt`·`server_theta`)", report.coach_label_validity_server
+    )
+    lines += [
+        "  - 읽는 법: '초보'의 신호율이 다른 라벨보다 **뚜렷이 높아야** 라벨이 도움 필요를 "
+        "변별한다. 라벨과 무관하게 비슷하면 라벨은 신호를 예측하지 못한다 — 하한·상한이 겹치는 "
+        "구간은 표본이 그 차이를 가리지 못한다는 뜻이다.",
+    ]
+    return lines
+
+
+def _wilson_json(r: WilsonRate) -> dict[str, Any]:
+    return {
+        "numerator": r.numerator,
+        "denominator": r.denominator,
+        "rate": r.rate,
+        "lower95": r.lower95,
+        "upper95": r.upper95,
+    }
+
+
+def _validity_view_json(view: LabelValidityView) -> dict[str, Any]:
+    return {
+        "pair_total": view.pair_total,
+        "signal_pair_total": view.signal_pair_total,
+        "by_label": {row.label: _wilson_json(row.signal) for row in view.rows},
+        "novice_precision": _wilson_json(view.novice_precision),
+        "novice_recall": _wilson_json(view.novice_recall),
+        "other_signal_rate": _wilson_json(view.other_signal_rate),
+    }
 
 
 def report_to_json(report: ReachReport) -> dict[str, Any]:
@@ -665,6 +973,14 @@ def report_to_json(report: ReachReport) -> dict[str, Any]:
                 "unsignaled_rate": report.coach_label_only_unsignaled_rate,
             },
         },
+        "coach_label_validity": {
+            "min_evidence_n": report.coach_label_min_evidence_n,
+            "unlabeled_pair_total": report.coach_label_unlabeled_pair_total,
+            "unclassified_pair_total": report.coach_label_unclassified_pair_total,
+            "source_unknown_pair_total": report.coach_label_source_unknown_pair_total,
+            "all": _validity_view_json(report.coach_label_validity_all),
+            "server": _validity_view_json(report.coach_label_validity_server),
+        },
     }
 
 
@@ -675,12 +991,12 @@ def dump_json(report: ReachReport) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 # CLI (얇은 껍데기 — DB 세션 열고 닫기·입출력만, 집계는 위 순수 코어)
 # ──────────────────────────────────────────────────────────────────────────
-async def _run() -> ReachReport:
-    """세션을 열어 5축을 실측하고 리포트를 조립한다(조회 전용·쓰기 0). 종료 시 엔진 정리."""
+async def _run(min_label_evidence_n: int | None = None) -> ReachReport:
+    """세션을 열어 실측하고 리포트를 조립한다(조회 전용·쓰기 0). 종료 시 엔진 정리."""
     sessionmaker = get_sessionmaker()
     try:
         async with sessionmaker() as session:
-            counts = await fetch_reach_counts(session)
+            counts = await fetch_reach_counts(session, min_label_evidence_n=min_label_evidence_n)
     finally:
         await dispose_engine()
     return build_report(counts)
@@ -705,10 +1021,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--json", dest="json_path", type=Path, default=None, help="JSON 산출물 경로(선택)"
     )
+    parser.add_argument(
+        "--min-label-evidence-n",
+        dest="min_label_evidence_n",
+        type=int,
+        default=None,
+        help=(
+            "§8 라벨 예측 타당도를 첫 라벨이 서버 개념 숙달도 관측 K건 이상에서 나온 쌍으로 한정"
+            "(선택 — K는 운영 데이터를 보고 고른다·미지정이면 한정 없음)"
+        ),
+    )
     args = parser.parse_args(argv)
+    if args.min_label_evidence_n is not None and args.min_label_evidence_n < 0:
+        parser.error("--min-label-evidence-n은 0 이상이어야 한다")
 
     try:
-        report = asyncio.run(_run())
+        report = asyncio.run(_run(args.min_label_evidence_n))
     except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지: 실행 오류를 타입명과 함께 보고
         print(
             f"실행 오류 — 추천 도달 리포트 생성 실패({type(exc).__name__}): {exc}",

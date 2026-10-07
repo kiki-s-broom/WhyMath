@@ -173,6 +173,27 @@ class PedagogyDecision(BaseModel):
             "미관측·stateless). 라벨 정확도 계측의 입력 — 응답 본문에는 나가지 않는다."
         ),
     )
+    label_source: str | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "적용된 능력 라벨이 *어디서 왔는지*(EOS-179): 'explicit'(클라가 `mastery_level`을 직접 "
+            "보냄)·'server_bkt'(서버 L2 개념 숙달도가 들어감)·'server_theta'(서버 θ만)·"
+            "'client_bkt'(클라 제출 bkt가 들어감 — 서버가 검증하지 못한 입력). None=라벨 없음 또는 "
+            "엔진을 거치지 않은 결정. 라벨 정확도 해석의 층화 축이며 응답 본문에는 나가지 않는다."
+        ),
+    )
+    label_evidence_n: int | None = Field(
+        default=None,
+        exclude=True,
+        ge=0,
+        description=(
+            "라벨을 만든 서버 개념 숙달도의 관측 수(`concept_mastery_history.sample_size`). "
+            "None=**모름**(서버 숙달도가 라벨에 안 들어갔거나 sample_size가 기록되지 않음) — 0이 "
+            "아니다. 관측 1~2건짜리 라벨과 수십 건짜리 라벨을 같은 정확도로 세지 않기 위한 "
+            "입력이며 응답 본문에는 나가지 않는다."
+        ),
+    )
 
 
 class ToneReport(BaseModel):
