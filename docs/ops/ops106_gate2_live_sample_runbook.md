@@ -236,11 +236,10 @@ if ($PreOk -and $CorpusOk -and $Snap1Ready) { cmd /c "$PyExe -m whymath_backend.
 `serving` 표지를 붙여 Langfuse에 보냅니다. 서버가 별개 프로세스이므로 Langfuse에 `serving`이 늘었다면 그것을 보낼 수
 있었던 것은 기본 싱크뿐입니다.
 
-**토큰은 이 블록이 직접 발급해 `--token`으로 넘깁니다.** `wh1_shadow_probe`의 자동 발급은 `state` 없이
-`/v1/auth/demo/callback`을 호출하는데, 그 콜백은 SEC-08 이후 `state`가 **필수**라 그대로 쓰면 HTTP 422로
-첫 단계에서 죽습니다(서버 스키마 `OAuthCallbackRequest`로 직접 재현 확인 · 도구 수정은 별도 태스크).
-`run_demo.ps1`과 같은 순서(`GET …/demo/state` → `POST …/demo/callback`)를 따릅니다. 토큰 값은 출력하지 않고
-길이만 검사합니다(`TOKEN_ISSUED_LENGTH_OK`).
+**토큰은 프로브가 직접 발급합니다(`--token` 미지정).** `wh1_shadow_probe`는 `run_demo.ps1`과 같은 순서
+(`GET …/demo/state` → `POST …/demo/callback`)로 `state`를 먼저 받아 콜백 바디에 싣습니다(OPS-111 — 종전에는
+`state` 없이 호출해 SEC-08 이후 HTTP 422로 첫 단계에서 죽었고, 이 블록이 토큰을 대신 발급하는 우회를 썼다).
+발급 실패는 `serve.err`에 `프로브 실패(ProbeAuthError): …`로 남고 `SHADOW_PROBE_EXIT=2`가 됩니다.
 
 서버 로그의 `"primary":true` 줄 수(`P`)는 **서버가 primary 경로를 실제로 탔다는 인프로세스 증거**입니다. 턴 단위
 기록이라 LLM 호출 수와 1:1이 아니므로(턴마다 정책·프로즈 호출이 0~여러 건) **등식이 아니라 "P가 1 이상인가"만**
@@ -251,11 +250,7 @@ if ($PreOk -and $CorpusOk -and $Snap1Ready) { cmd /c "$PyExe -m whymath_backend.
 cd C:\Users\kiki\Desktop\__AI\WhyMath\src\backend
 $Snap2Ready = (Test-Path "$Out\snap_2.json")
 $P = 0
-$Token = ""
-if ($PreOk -and $Snap2Ready) { try { $St = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/v1/auth/demo/state").state; $TokBody = @{ code = "demo"; redirect_uri = "https://demo/cb"; state = $St } | ConvertTo-Json -Compress; $Token = (Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/v1/auth/demo/callback" -ContentType "application/json" -Body $TokBody).access_token } catch { "TOKEN_ISSUE_FAILED " + $_.Exception.GetType().Name } }
-$TokenOk = (($Token -is [string]) -and ($Token.Length -gt 20))
-"TOKEN_ISSUED_LENGTH_OK=$TokenOk"
-if ($PreOk -and $Snap2Ready -and $TokenOk) { cmd /c "$PyExe -m whymath_backend.ops.wh1_shadow_probe --base-url http://127.0.0.1:8000 --token $Token --rounds 1 > $Out\serve.out 2> $Out\serve.err"; "SHADOW_PROBE_EXIT=$LASTEXITCODE"; Get-Content "$Out\serve.out" -Encoding UTF8 -TotalCount 30; Get-Content "$Out\serve.err" -Encoding UTF8 -TotalCount 10 -ErrorAction SilentlyContinue; if (Test-Path $RecLog) { $P = @(Select-String -Path $RecLog -Pattern '"primary":true').Count }; "PRIMARY_RECORDS_P=$P"; for ($t = 1; $t -le 4; $t++) { cmd /c "$PyExe -m whymath_backend.ops.cost_report --days 1 --json $Out\snap_3.json > $Out\snap_3.out 2> $Out\snap_3.err"; $ServOut = @(& $PyExe -c $JServ "$Out\snap_2.json" "$Out\snap_3.json" $P); "POLL $t / 4"; $ServOut; if ($ServOut -contains "SERVING_SAMPLE COUNTED") { break }; Start-Sleep -Seconds 30 } } else { "REFUSED=True — PRE_OK=$PreOk SNAP_2_READY=$Snap2Ready TOKEN_OK=$TokenOk. §1·§5를 먼저 통과해야 하고, 토큰이 안 나왔으면 서버(창 ①)가 살아 있는지 확인해야 합니다. 서버에 합성 트래픽을 보내지 않았습니다." }
+if ($PreOk -and $Snap2Ready) { cmd /c "$PyExe -m whymath_backend.ops.wh1_shadow_probe --base-url http://127.0.0.1:8000 --rounds 1 > $Out\serve.out 2> $Out\serve.err"; "SHADOW_PROBE_EXIT=$LASTEXITCODE"; Get-Content "$Out\serve.out" -Encoding UTF8 -TotalCount 30; Get-Content "$Out\serve.err" -Encoding UTF8 -TotalCount 10 -ErrorAction SilentlyContinue; if (Test-Path $RecLog) { $P = @(Select-String -Path $RecLog -Pattern '"primary":true').Count }; "PRIMARY_RECORDS_P=$P"; for ($t = 1; $t -le 4; $t++) { cmd /c "$PyExe -m whymath_backend.ops.cost_report --days 1 --json $Out\snap_3.json > $Out\snap_3.out 2> $Out\snap_3.err"; $ServOut = @(& $PyExe -c $JServ "$Out\snap_2.json" "$Out\snap_3.json" $P); "POLL $t / 4"; $ServOut; if ($ServOut -contains "SERVING_SAMPLE COUNTED") { break }; Start-Sleep -Seconds 30 } } else { "REFUSED=True — PRE_OK=$PreOk SNAP_2_READY=$Snap2Ready. §1·§5를 먼저 통과해야 합니다. 서버에 합성 트래픽을 보내지 않았습니다." }
 ```
 
 **판정**: `SERVING_SAMPLE COUNTED`. `SHADOW_PROBE_EXIT=2`는 일부 제출이 HTTP 오류(401·429 등)로 실패했다는 뜻입니다 —
