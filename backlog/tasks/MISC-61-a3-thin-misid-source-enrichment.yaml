@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: blocked
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,5 +19,5 @@ paths:
   - "src/data-pipeline/data_pipeline/misconception/**"
   - "docs/reviews/m0599_*.md"
 session: null
-notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다."
+notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다.\n\n[차단 2026-10-07] 완료 조건 ①의 입력인 원천 JSON(fac16e6f…, sha256 fcf6d333…187e)이 저장소·이력·컨테이너 어디에도 없다(Kiki 머신 보관본, 2026-10-07 실측: find·git log -S 모두 파일 0건). ②·③은 ①의 판정(가설 ① 원천 공백 / 가설 ② 추출 누락)에 달려 있어 세션이 대신 못 한다 — 추측 저작은 '원 출처 근거' 조건 위반. 해소: Kiki가 원천 JSON을 세션에 제공(경로 또는 첨부)한 뒤 unblock."
 updated: 2026-10-07
