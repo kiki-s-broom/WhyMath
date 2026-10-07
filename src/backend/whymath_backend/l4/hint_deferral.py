@@ -55,8 +55,14 @@ REVEALS: dict[HintLevel, str] = {
 #: 학습 기록에서 **힌트 사용**으로 세는 최소 단계(EOS-133). 1(방향)은 "주목할 대상"만 가리키는
 #: 단계이고, 막힘 신호가 없으면 매 턴 기본으로 나간다(`decide_hint_level` 4번 규칙 "그 외 → 1").
 #: 그것까지 세면 코치 대화로 푼 모든 풀이가 '힌트 사용'이 되어 신호가 사라진다. 2 이상은 풀이의
-#: *단계 흐름*이 드러난 공급이다(`REVEALS[2]`) — 좌절·답 요구·5회+ 막힘으로 올라갔든 '초보' 라벨로
-#: 세분화됐든(5번 규칙이 기본 1을 2로 올린다) 학생이 받은 도움의 양은 같다.
+#: *단계 흐름*이 드러난 공급이다(`REVEALS[2]`).
+#: **EOS-178 정정**: 종전 문구는 "좌절·답 요구·5회+ 막힘으로 올라갔든 '초보' 라벨로 세분화됐든
+#: (5번 규칙이 기본 1을 2로 올린다) 학생이 받은 도움의 양은 같다"였다. 그 단정은 단계가 학생에게
+#: *전달된다*는 전제에 기댄다 — 그런데 학생 대면 발화(`decision.prompt`)는 단계와 무관한 Polya
+#: 단계 프롬프트이고 검수 힌트(`served_hint`)는 카탈로그가 있을 때만 응답에 실린다. 그래서
+#: **라벨만으로 올라간 단계는 학생 신호가 없고 전달된 내용도 없는 내부 수치일 수 있다** —
+#: `counts_as_help_supply`가 그 공급을 도움으로 세는 조건을 가른다
+#: (판정 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md`).
 #: `l4/pedagogy/runtime_selector.StudentSignals.is_stuck`이 "2 이상 = 도움을 구했다"로 읽는
 #: 경계와도 같다. 공급 원장(`attempt_event`의 힌트제공)에는 1을 포함한 전 단계가 그대로 남는다.
 HINT_USAGE_MIN_LEVEL: Final[int] = 2
@@ -65,6 +71,33 @@ HINT_USAGE_MIN_LEVEL: Final[int] = 2
 def counts_as_hint_usage(hint_level: int) -> bool:
     """이 단계의 공급 힌트를 학습 기록의 '힌트 사용'으로 세는가 — 2(단계 흐름) 이상만(EOS-133)."""
     return hint_level >= HINT_USAGE_MIN_LEVEL
+
+
+def counts_as_help_supply(*, hint_level: int, base_level: int | None, served: bool) -> bool:
+    """공급 원장 행 1개를 '도움 공급'으로 세는가 — 라벨만으로 올라간 단계를 가른다(EOS-178).
+
+    `hint_level`은 그 턴에 *결정된* 최종 단계, `base_level`은 같은 입력에서 능력 라벨 없이
+    계산한 단계(`decide_base_hint_level`), `served`는 그 턴에 검수 힌트가 *실제로 실렸는가*다.
+
+    진리표(전건 단위 테스트가 리터럴로 고정):
+      - 최종 단계가 2 미만 → 아니오(방향만 — EOS-133 기준 그대로. '숙달' 완화로 내려간 공급도 여기).
+      - `base_level` 모름(None — 구판 행·읽을 수 없는 값) → **예**. 라벨의 영향을 가를 수 없으므로
+        종전 규칙(EOS-133)대로 센다(모른다 ≠ 아니다 — "라벨 때문이 아니다"로 확정하지 않는다).
+      - `base_level` ≥ 2 → 예. 학생 신호(답 요구·좌절·5회+ 막힘)가 올린 공급이다.
+      - `base_level` < 2 ∧ 최종 ≥ 2 → **라벨만으로 올라간 공급**. 검수 힌트가 실제로 실렸을 때만 예
+        (내용이 응답에 담겨 나간 도움). 신호도 전달도 없으면 아니오.
+
+    `base_level ≥ 2 ⟺ 그 턴에 학생 신호`다(`decide_base_hint_level`의 성질: 신호 턴은 `min(4,
+    prev+1) ≥ 2` 또는 `max(prev, 3)`, 신호 없는 턴은 1) — 그래서 이 판정은 `prev`의 경로 의존과
+    무관하다.
+    """
+    if not counts_as_hint_usage(hint_level):
+        return False
+    if base_level is None:
+        return True
+    if counts_as_hint_usage(base_level):
+        return True
+    return served
 
 
 # 좌절 신호 — `docs/prompts/socratic_template.md` 시나리오 4(`affect=frustrated`).
@@ -168,6 +201,28 @@ def decide_hint_level(
         base = max(base, 3)
 
     return cast(HintLevel, base)
+
+
+def decide_base_hint_level(
+    *,
+    student_input: str,
+    turn_count: int,
+    prev_hint_level: int | None,
+) -> HintLevel:
+    """능력 라벨 없이 계산한 단계(EOS-178) — `decide_hint_level(mastery_level=None)`과 같다.
+
+    새 규칙이 아니라 *같은 함수의 라벨 없는 호출*이다(진실원천 하나 — 규칙 1~4·6을 복제하지 않는다).
+    공급 원장에 최종 단계와 나란히 적혀, 그 턴의 단계가 학생 신호 때문인지 라벨 때문인지를
+    가른다(`counts_as_help_supply`). `prev_hint_level`은 최종 단계 계산과 같은 값을 쓴다 — 직전 턴이
+    라벨로 올라 있었다면 신호 턴의 기본 단계(`prev+1`)에 그 한 칸이 이월되지만, 판정에 쓰는 것은
+    2 이상인가뿐이고 신호 턴의 기본 단계는 어느 `prev`에서도 2 이상이다.
+    """
+    return decide_hint_level(
+        student_input=student_input,
+        turn_count=turn_count,
+        prev_hint_level=prev_hint_level,
+        mastery_level=None,
+    )
 
 
 def is_answer_demand(student_input: str) -> bool:

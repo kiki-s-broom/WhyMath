@@ -102,6 +102,7 @@ from whymath_backend.l2 import (
     AbilityReading,
     get_current_ability,
     get_current_mastery,
+    get_current_mastery_sample_size,
     get_current_theta,
     get_primary_concept_id,
     theta_to_mastery_proxy,
@@ -144,7 +145,7 @@ from whymath_backend.l4.completion import (
 from whymath_backend.l4.hint_content.models import ServedHint
 from whymath_backend.l4.hint_content.store import find_served_hint, serving_step_order
 from whymath_backend.l4.hint_deferral import (
-    counts_as_hint_usage,
+    counts_as_help_supply,
     is_answer_demand,
     is_stuck_turn_count,
 )
@@ -643,6 +644,36 @@ def _ability_level(bkt_mastery: float | None, theta: float | None) -> MasteryLev
     return mastery_to_level(sum(parts) / len(parts))
 
 
+def _label_provenance(
+    *,
+    level: MasteryLevel | None,
+    explicit_level: MasteryLevel | None,
+    server_mastery: float | None,
+    client_bkt: float | None,
+    server_evidence_n: int | None,
+) -> tuple[str | None, int | None]:
+    """적용된 능력 라벨의 (출처, 증거 수) — 원장 계측용(EOS-179·재계산 0·비노출).
+
+    출처는 *라벨이 실제로 만들어진 입력*으로 정한다(`_build_response_payload`의 분기와 같은
+    우선순위): 명시 `mastery_level` → 'explicit', 서버 개념 숙달도가 들어갔다 → 'server_bkt',
+    그 밖에 클라 제출 bkt가 들어갔다 → 'client_bkt'(서버가 검증하지 못한 입력), 둘 다 없고
+    라벨이 있다면 서버 θ뿐이다 → 'server_theta'. 라벨이 없으면 (None, None).
+
+    증거 수는 **서버 개념 숙달도가 라벨에 들어간 경우에만** 의미가 있다 — 명시 라벨·클라 bkt·θ
+    단독은 `concept_mastery_history.sample_size`가 그 라벨의 증거가 아니므로 None(모름)이다.
+    `server_evidence_n`이 None이면(sample_size 미기록) 그대로 None — 0으로 접지 않는다.
+    """
+    if level is None:
+        return None, None
+    if explicit_level is not None:
+        return "explicit", None
+    if server_mastery is not None:
+        return "server_bkt", server_evidence_n
+    if client_bkt is not None:
+        return "client_bkt", None
+    return "server_theta", None
+
+
 class _StepVerificationCarry(NamedTuple):
     """S4-19: *게이트 이전* 단계 검증 결과의 적재 전용 운반 컨테이너(노출 아님).
 
@@ -671,6 +702,7 @@ def _build_response_payload(
     expected_answer: str | None = None,
     server_mastery: float | None = None,
     server_theta: float | None = None,
+    server_mastery_evidence: int | None = None,
     matches: list[MisconceptionMatch] | None = None,
     misconception_hypotheses: list[MisconceptionHypothesis] | None = None,
     pack: PedagogyPack | None = None,
@@ -752,6 +784,19 @@ def _build_response_payload(
         recent_categories=recent_categories,
         grade=grade,
         standard_code=standard_code,
+    )
+    # EOS-179: 라벨의 출처·증거 수를 결정에 실어 원장 적재(`_log_hint_event`)까지 운반한다 — 이미
+    # 위에서 고른 입력(명시 라벨·서버/클라 bkt·θ)의 *분기를 읽을 뿐* 라벨을 다시 계산하지 않는다
+    # (재계산 0). 응답 본문에는 나가지 않는다(`exclude=True`).
+    label_source, label_evidence_n = _label_provenance(
+        level=level,
+        explicit_level=body.mastery_level,
+        server_mastery=server_mastery,
+        client_bkt=body.bkt_mastery,
+        server_evidence_n=server_mastery_evidence,
+    )
+    decision = decision.model_copy(
+        update={"label_source": label_source, "label_evidence_n": label_evidence_n}
     )
     # slice 106: 주입된 결합 matches 우선·미주입(sync 직접호출·게이트 off 경로)이면 substring
     # diagnose 폴백(현행 비트동일). combine_diagnoses가 substr 우선이라 resolved[0]은 substr가
@@ -1216,6 +1261,28 @@ def _supplied_hint_level(payload: object) -> int | None:
     return level
 
 
+def _supplied_base_level(payload: object) -> int | None:
+    """`힌트제공` 페이로드의 라벨 없는 단계(`base_level` 1~4, EOS-178) — 없거나 못 읽으면 None.
+
+    None은 "구판 행이거나 값이 깨졌다"이며 `counts_as_help_supply`가 종전 규칙으로 센다
+    (모른다 ≠ 아니다).
+    """
+    if not isinstance(payload, dict):
+        return None
+    level = payload.get("base_level")
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 4:
+        return None
+    return level
+
+
+def _served_hint_marked(payload: object) -> bool:
+    """그 턴에 검수 힌트가 실제로 실렸는가 — `hint_id`가 비어 있지 않은 문자열이면 참(EOS-178)."""
+    if not isinstance(payload, dict):
+        return False
+    hint_id = payload.get("hint_id")
+    return isinstance(hint_id, str) and bool(hint_id)
+
+
 async def _attribute_hints(
     session: AsyncSession,
     *,
@@ -1225,8 +1292,12 @@ async def _attribute_hints(
 ) -> _HintAttribution:
     """귀속 창 안의 공급 원장(`힌트제공`)에서 '힌트 사용'으로 셀 행을 고른다(EOS-133).
 
-    센다 = 단계가 `counts_as_hint_usage`(2 이상)인 공급이다. 1(방향)은 막힘 신호가 없어도 매 턴
-    나가는 기본 단계라 세지 않는다 — 근거는 정본(`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다.
+    센다 = 단계가 2 이상이고 `counts_as_help_supply`가 도움으로 보는 공급이다. 1(방향)은 막힘
+    신호가 없어도 매 턴 나가는 기본 단계라 세지 않는다 — 근거는 정본
+    (`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다. **EOS-178**: 숙달 라벨 '초보'만으로 올라간 2
+    (학생 신호 없음·검수 힌트 미실림)는 세지 않는다 — 원장의 `base_level`(라벨 없이 계산한 단계)이
+    그것을 가른다. 구판 행(`base_level` 없음)은 종전대로 센다. 킬 스위치
+    `l4_hint_attribution_label_free_enabled`를 끄면 EOS-133 규칙 그대로다.
 
     `used_hint` 3상태(CLAUDE.md "모른다 ≠ 아니다"):
       - True  — 셀 행이 1개 이상.
@@ -1258,11 +1329,18 @@ async def _attribute_hints(
     ).all()
     hints: list[tuple[datetime, int]] = []
     unreadable = 0
+    # EOS-178: 라벨 없는 단계를 읽을지 — 끄면 모든 행의 base를 None(구판)으로 보아
+    # EOS-133 규칙 그대로다.
+    label_free = get_settings().l4_hint_attribution_label_free_enabled
     for event_at, payload in rows:
         level = _supplied_hint_level(payload)
         if level is None:
             unreadable += 1
-        elif counts_as_hint_usage(level):
+        elif counts_as_help_supply(
+            hint_level=level,
+            base_level=_supplied_base_level(payload) if label_free else None,
+            served=_served_hint_marked(payload),
+        ):
             hints.append((event_at, level))
     if unreadable:
         # 값은 싣지 않는다(학습 행동 데이터) — 건수와 결과 판정만 남겨 원장 결함을 추적한다.
@@ -1791,6 +1869,33 @@ async def _server_mastery_for(
     return await get_current_mastery(session, user_id, concept_id)
 
 
+async def _server_mastery_evidence_for(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    problem_id: uuid.UUID | None,
+    *,
+    server_mastery: float | None,
+    explicit_level: str | None,
+) -> int | None:
+    """서버 개념 숙달도가 라벨에 들어간 턴의 **증거 수**(관측 수) — 원장 계측 전용(EOS-179·비노출).
+
+    `_server_mastery_for`와 같은 개념(`get_primary_concept_id`)의 같은 최신 측정 행에서
+    `sample_size`를 읽는다. 서버 숙달도가 없거나(`server_mastery is None`) 명시 `mastery_level`이
+    라벨을 이긴 턴(`explicit_level`)은 증거 수가 그 라벨의 증거가 아니므로 조회하지 않는다 —
+    그래서 이 추가 조회(개념 해석 + 최신 행, 인덱스 단건 2회)는 **서버 숙달도가 실제로 쓰인 턴에만**
+    든다. 반환 None은 "모름"(개념 미해석·sample_size 미기록)이다 — 0이 아니다.
+
+    `_server_mastery_for`의 반환형(float)은 바꾸지 않는다 — 기존 테스트·호출부가 그 float 계약에
+    기댄다. 증거 수를 같은 호출로 묶는 대신 이 조회를 따로 두는 것이 변경 면적이 가장 작다.
+    """
+    if server_mastery is None or explicit_level is not None or problem_id is None:
+        return None
+    concept_id = await get_primary_concept_id(session, problem_id)
+    if concept_id is None:
+        return None
+    return await get_current_mastery_sample_size(session, user_id, concept_id)
+
+
 async def _pack_for(session: AsyncSession, problem_id: uuid.UUID | None) -> PedagogyPack | None:
     """문항 PRIMARY 개념 → k_type → 교수법 팩 해석 — coach 세션/턴 GA 배선(PED-01 후속).
 
@@ -2101,6 +2206,10 @@ async def _log_hint_event(
     client_state_mismatch: bool = False,
     turn_handled: bool = False,
     served_hint: ServedHint | None = None,
+    base_hint_level: int | None = None,
+    ability_level: str | None = None,
+    label_source: str | None = None,
+    label_evidence_n: int | None = None,
 ) -> None:
     """AI가 제공한 힌트 노출량(hint_level)을 `attempt_event`(event_type=힌트제공)로 1행 적재.
 
@@ -2144,6 +2253,18 @@ async def _log_hint_event(
     `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
     읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
     서빙 reader가 이미 들고 온 값만 운반).
+
+    **EOS-178 base_level·ability_level**: 결정이 이미 들고 있는 값(`decision.base_hint_level`·
+    `decision.applied_mastery_level`)을 같은 행에 싣는다(재계산 0). `base_level`은 라벨 없이
+    계산한 단계라 `hint_level > base_level`이면 라벨이 올린 턴이고, 힌트 귀속(`_attribute_hints`)이
+    그것으로 "학생 신호가 올린 공급"과 "라벨만 올린 공급"을 가른다. `ability_level`은 그 순간의
+    라벨이며 사후 백필이 불가능해 지금부터 쌓는다(읽는 쪽 = 후속 태스크). 둘 다 None이면
+    구판 행과 같다.
+
+    **EOS-179 label_source·label_evidence_n**: 라벨의 출처('explicit'·'server_bkt'·
+    'server_theta'·'client_bkt')와 그 라벨을 만든 서버 개념 숙달도의 관측 수를 같은 행에 싣는다
+    (결정이 이미 들고 있는 값 — 재계산 0). 증거 수 None은 "모름"이다(0 아님). 라벨 정확도를
+    출처·증거 수로 층화해 읽기 위한 입력이며 사후 백필이 불가능하다.
     """
     if turn_handled:
         return  # 가로챈 턴 — 학생은 힌트가 아니라 결정론 템플릿을 받았다(EOS-30).
@@ -2164,6 +2285,10 @@ async def _log_hint_event(
             client_state_mismatch=client_state_mismatch,
             reveal_score=served_hint.reveal_score if served_hint is not None else None,
             hint_id=served_hint.hint_id if served_hint is not None else None,
+            base_level=base_hint_level,
+            ability_level=ability_level,
+            label_source=label_source,
+            label_evidence_n=label_evidence_n,
         ),
     )
     session.add(event)  # commit은 핸들러가 — 같은 트랜잭션에 합류(별도 commit 금지).
@@ -2901,6 +3026,14 @@ async def create_session(
     expected_answer = await _expected_answer_for(session, body.problem_id)
     # slice 70: 서버 L2 저장소의 실제 숙달도를 조회해 클라 bkt 대체(게이트 ON·비노출).
     server_mastery = await _server_mastery_for(session, user.user_id, body.problem_id)
+    # EOS-179: 라벨 증거 수(원장 계측) — 서버 숙달도가 쓰인 턴에만 조회(비노출).
+    server_mastery_evidence = await _server_mastery_evidence_for(
+        session,
+        user.user_id,
+        body.problem_id,
+        server_mastery=server_mastery,
+        explicit_level=body.mastery_level,
+    )
     # slice 73·74: 서버 L2의 실제 θ도 조회 — BKT↔θ 교차검증(게이트 ON·θ 수치 비노출). slice 74:
     # 문항 개념의 *개념별* θ 우선·없으면 전과목 폴백(_server_theta_for 내부).
     server_theta = await _server_theta_for(session, user.user_id, body.problem_id)
@@ -3033,6 +3166,7 @@ async def create_session(
             expected_answer=expected_answer,
             server_mastery=server_mastery,
             server_theta=server_theta,
+            server_mastery_evidence=server_mastery_evidence,
             matches=outcome.matches,
             misconception_hypotheses=active_hypotheses,
             pack=pack,
@@ -3163,6 +3297,10 @@ async def create_session(
         client_state_mismatch=bool(mismatch_fields),
         turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
+        label_source=decision.label_source,
+        label_evidence_n=decision.label_evidence_n,
     )
     # PED-04 D1: 교수 결정 메타 조립 — 전부 위에서 *이미 계산된* 값이다(재계산 0).
     target_stage = (
@@ -3349,6 +3487,14 @@ async def append_turns(
     expected_answer = await _expected_answer_for(session, dialogue.problem_id)
     # slice 70: 멀티턴도 서버 L2 숙달도 조회(dialogue.problem_id·user 출처)·클라 bkt 대체.
     server_mastery = await _server_mastery_for(session, user.user_id, dialogue.problem_id)
+    # EOS-179: create_session과 동형 — 라벨 증거 수(원장 계측·비노출).
+    server_mastery_evidence = await _server_mastery_evidence_for(
+        session,
+        user.user_id,
+        dialogue.problem_id,
+        server_mastery=server_mastery,
+        explicit_level=body.mastery_level,
+    )
     # slice 73·74: 멀티턴도 서버 L2 θ 조회 — BKT↔θ 교차검증(θ 수치 비노출). slice 74: 개념별 θ
     # 우선(dialogue.problem_id)·없으면 전과목 폴백.
     server_theta = await _server_theta_for(session, user.user_id, dialogue.problem_id)
@@ -3445,6 +3591,7 @@ async def append_turns(
             expected_answer=expected_answer,
             server_mastery=server_mastery,
             server_theta=server_theta,
+            server_mastery_evidence=server_mastery_evidence,
             matches=outcome.matches,
             misconception_hypotheses=active_hypotheses,
             pack=pack,
@@ -3562,6 +3709,10 @@ async def append_turns(
         client_state_mismatch=bool(mismatch_fields),
         turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
+        label_source=decision.label_source,
+        label_evidence_n=decision.label_evidence_n,
     )
     # PED-04 D1: 교수 결정 메타 — create_session과 동형. 목표 단계는 *서버 파생* 상태 기준이다
     # (클라 제출 기준이면 D2가 되찾은 진실원천이 다시 클라로 새어 나간다).

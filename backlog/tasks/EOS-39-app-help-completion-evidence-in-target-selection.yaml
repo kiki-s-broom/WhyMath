@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,13 +21,26 @@ acceptance:
   - "⑥ 측정 재료·리포트 편입(EOS-147 연동 2026-09-29): 처치 기록의 `selection_theta`(선택 θ가 추정 θ와 다를 때만)·`theta_boundary`(경계일 때만) 키로 경계 규칙의 **발동률**(전체 `recommendation_render` 처치 중 `selection_theta` 키가 있는 비율)과 `theta_boundary` 값별 분포를 산출해 추천 도달 리포트(`ops/recommendation_reach_report.py`)에 축으로 싣는다 — CLAUDE.md \"작동한 비율\" 원칙(응답과 처치 기록은 요청 단위로 말하지만 집계 리포트는 아직 말하지 않는다). 분모(처치 0건)는 None으로 표기하고 0/0을 0.0으로 지어내지 않는다(그 모듈의 기존 규율). ④의 실측 보정은 이 발동률과 앱 학생 완료 수 분포를 재료로 삼는다. 정정: ⑤의 정책 버전 표기 `cat_v3`은 EOS-147의 실제 판 `cat_v4`(병렬 태스크 EOS-33이 `cat_v3`을 쓰므로 건너뜀)로 읽는다 — 이 태스크가 규칙을 바꾸면 그 판보다 위의 새 번호를 쓴다."
   - "⑦ 하한(전부 오답 → 추정 θ −4.0) 재판정 — EOS-146 착지로 트리거됨(2026-09-30 · 판정 기준 main `b6a41dee`): PR 1397이 코치 서버가 판정한 명확한 오답의 '문제당 최초 1건'을 학습 원장에 적재하고 그 스위치 `l4_coach_wrong_submission_enabled`의 기본값이 True라서, 앱 학생의 이력에 오답이 처음 들어간다. 전부 오답인 이력은 `estimate_ability`가 하한 −4.0으로 클램프하고(측정값이 아니라 경계 — EOS-147이 상한에서 잡은 것과 대칭) 추천 표적이 그 값을 그대로 쓴다. 이 태스크가 소유하는 사유: EOS-146 acceptance의 'EOS-147 연동' 항이 이 재판정을 EOS-146에 붙였으나 그 항은 EOS-147 브랜치에만 있어 PR 1397 구현이 볼 수 없었고 EOS-146은 done이 됐다 — 미이행분을 여기로 승계한다. 판정 전에 먼저 재현해 센다(전부 오답 이력 → 추천 표적·난이도 열, 경계 표지 `theta_boundary`가 하한으로 기록되는지). 결함 단정이 아니라 재판정이다 — 쉬운 문항으로 내려가는 것이 교수학적으로 옳을 수도 있다."
   - "[2026-10-02 정정 — 정책 번호 기준] ⑤의 \"정책 버전 문자열(`cat_v3`·`suneung_v2` 이후)\"은 병합 뒤 현행 값 기준으로 읽는다: 기본 CAT은 `cat_v4`(`cat_v3`은 EOS-33이 예약한 번호) · 수능은 `suneung_v3`(`suneung_v2`는 EOS-31, `suneung_v3`은 EOS-147)이다. 이 태스크가 선택 규칙을 바꾸면 번호를 이 문서에서 가져오지 말고 착수 시점 main의 `POLICY_VERSION_CAT`·`POLICY_VERSION_SUNEUNG`을 읽어 그 다음 번호를 쓴다 — 같은 번호를 두 변경이 쓰면 소급 평가가 섞이는 충돌이 이미 한 번 났다(EOS-147 대 EOS-31)."
-artifacts: []
+  - "[2026-10-06 처분 결과 — 항별 이행·이월 대조 · 판정문 `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`] ①실측 고정=이행(EOS-146 이후 개루프가 부분적으로만 닫혔음을 재측정해 정정 — §1). ②소유 공백=이행(로더가 `used_hint`를 읽지 않던 것을 6열 조회로 읽는다 — 단위가 쿼리 문장의 컬럼을 직접 단언). ③처분 판정=이행(후보 6종 실측 + 교수학 독립 비판 1회 · 차단 2건을 판정문에서 먼저 고친 뒤 구현 — 처분표 §9). ④상수 0.5 보정=**의도적 이월**(운영 응답·이탈 데이터 없음 · 값 불변 — `EOS-176-selection-theta-after-the-top-and-target-probability`). ⑤집행 지점=이행(`selection_evidence`→로더→두 정책→처치 기록 결선을 단위·실 PG HTTP 통합으로 동결 · 도움 완료/독립 성공의 추천열이 갈라지는 픽스처 · 정책 버전 4종 · 결함 주입 하네스). ⑥측정 재료·리포트=이행(처치 기록 `selection_help_count`·`selection_hint_unknown_count` + 도달 리포트 §6 \"선택 θ 규칙 발동률\"이 선택 θ 키·경계 값별·도움 접기·미상 비율을 싣는다). ⑦하한 재판정=**부분 이행**(도움 접기가 만든 전부 실패에만 사다리 `max(-4.0, min(0.0, 실패한 최저 b - 0.5))` · 실제 오답만 있는 이력의 −4.0은 R3·R6 학습 밴드 가중이 선택 θ를 읽어 유지 — 남은 반쪽은 `EOS-175-selection-theta-real-wrong-lower-bound-r3-r6`). 이월 소유: 꼭대기 이후·목표 정답확률=`EOS-176` · WH-1 ⑤ 도움 감소 곡선=`EOS-177` · EOS-146 ⑩ 숙달 라벨 '초보'·라벨 정확도 실측=`EOS-178`."
+artifacts:
+  - "PR #1491 https://github.com/kiki-s-broom/WhyMath/pull/1491 — 문항 단위 도움 접기(selection_evidence)·하한 사다리·킬 스위치·정책 버전 4종·발동률 계측 · CI 미러 6잡 통과(커밋 598c860b) · 후속 EOS-175~178"
 paths:
   - src/backend/whymath_backend/l2/next_problem_selection.py
   - src/backend/whymath_backend/l2/irt.py
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/api/_next_problem_policy.py
   - src/backend/whymath_backend/ops/recommendation_reach_report.py
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/api/me.py
+  - src/backend/whymath_backend/l2/recommendation_evidence.py
+  - tests/backend/l2/test_eos39_help_fold_selection.py
+  - tests/backend/api/test_eos39_help_fold_integration.py
+  - tests/backend/ops/test_recommendation_reach_report.py
+  - scripts/analysis/mutate_eos39_help_fold_guards.py
+  - scripts/analysis/mutate_eos147_selection_theta_guards.py
+  - scripts/analysis/mutate_eos31_suneung_scope_guards.py
+  - scripts/analysis/eos39_selection_channel_sim.py
+  - docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md
 session: null
-notes: "출처: 2026-09-29 /drive 4차 — `EOS-147-all-correct-theta-upper-pin`의 독립 교수학 비판이 acceptance ③의 \"상한 도달 시 선택 규칙\"이 판정문에서 꼭대기 이후를 다루지 않았음을 지적했고(처분 기록은 차단급), 이 태스크가 그 이월 처분의 소유자다. EOS-147은 API 클라이언트의 초기 연속 정답 도약(acceptance ①)을 해소하고 앱 학생 영구성(②)은 칸 삽입으로 부분 완화하는 데 그친다 — 해소는 이 태스크가 정하는 하강 채널에 달렸다. 관련: `EOS-146`(오답 원천 — 착지하면 하한 비대칭 재판정)·`EOS-133`(used_hint 귀속)·`EOS-29`(숙달 추정기의 힌트 축).\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py']: EOS-147 구현 결과 반영 — 경계 규칙 발동률의 도달 리포트 편입 소유 + 정책 버전 표기 정정(cat_v3은 병렬 태스크 번호)\n\n[정정 2026-09-30] EOS-146 착지(PR 1397)로 하한 비대칭 재판정이 트리거됨 — EOS-146 done 때 재대조에서 빠진 EOS-147 연동 항의 소유를 승계\n\n[정정 2026-10-02] 병합 뒤 정책 번호 현행 값 기준(cat_v4·suneung_v3)으로 acceptance 5의 번호 서술을 정정 병기"
-updated: 2026-10-02
+notes: "출처: 2026-09-29 /drive 4차 — `EOS-147-all-correct-theta-upper-pin`의 독립 교수학 비판이 acceptance ③의 \"상한 도달 시 선택 규칙\"이 판정문에서 꼭대기 이후를 다루지 않았음을 지적했고(처분 기록은 차단급), 이 태스크가 그 이월 처분의 소유자다. EOS-147은 API 클라이언트의 초기 연속 정답 도약(acceptance ①)을 해소하고 앱 학생 영구성(②)은 칸 삽입으로 부분 완화하는 데 그친다 — 해소는 이 태스크가 정하는 하강 채널에 달렸다. 관련: `EOS-146`(오답 원천 — 착지하면 하한 비대칭 재판정)·`EOS-133`(used_hint 귀속)·`EOS-29`(숙달 추정기의 힌트 축).\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py']: EOS-147 구현 결과 반영 — 경계 규칙 발동률의 도달 리포트 편입 소유 + 정책 버전 표기 정정(cat_v3은 병렬 태스크 번호)\n\n[정정 2026-09-30] EOS-146 착지(PR 1397)로 하한 비대칭 재판정이 트리거됨 — EOS-146 done 때 재대조에서 빠진 EOS-147 연동 항의 소유를 승계\n\n[정정 2026-10-02] 병합 뒤 정책 번호 현행 값 기준(cat_v4·suneung_v3)으로 acceptance 5의 번호 서술을 정정 병기\n\n[정정 2026-10-06] paths ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py'] → ['src/backend/whymath_backend/l2/next_problem_selection.py', 'src/backend/whymath_backend/l2/irt.py', 'src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/api/_next_problem_policy.py', 'src/backend/whymath_backend/ops/recommendation_reach_report.py', 'src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/me.py', 'src/backend/whymath_backend/l2/recommendation_evidence.py', 'tests/backend/l2/test_eos39_help_fold_selection.py', 'tests/backend/api/test_eos39_help_fold_integration.py', 'tests/backend/ops/test_recommendation_reach_report.py', 'scripts/analysis/mutate_eos39_help_fold_guards.py', 'scripts/analysis/mutate_eos147_selection_theta_guards.py', 'scripts/analysis/mutate_eos31_suneung_scope_guards.py', 'scripts/analysis/eos39_selection_channel_sim.py', 'docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md']: 구현 착지 전 경로 범위 확장(기존 5건 유지 + 신규 11건) + 항별 이행·이월 대조 기록"
+updated: 2026-10-06

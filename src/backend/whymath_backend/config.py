@@ -417,6 +417,41 @@ class Settings(BaseSettings):
         ),
     )
 
+    l2_selection_help_fold_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-39 — 추천이 후보를 고르는 **표적 θ**를 만들 때 코치가 도움(힌트 단계 2 이상)을 "
+            "공급한 문항(`problem_attempt.used_hint=True`)을 **실패 응답 1건으로 접을지**"
+            "(정식기능·킬 스위치). True(기본)면 도움 완료가 독립 성공처럼 표적을 올리지 않는다 — "
+            "앱 학생의 추천열이 학생 행동에 반응한다(판정문 "
+            "`docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`). "
+            "**추정 θ·SE·능력 API·숙달은 어느 쪽이든 불변**이다(표적에만 쓴다). 이 규칙은 "
+            "`used_hint` 라벨의 정확도에 기대는데 그 정확도가 운영에서 미측정이고(라벨은 학생이 "
+            "요청한 것이 아니라 코치가 공급한 단계다 — 숙달 라벨 '초보'도 단계를 올린다), 라벨 "
+            "규칙 자체가 판정 대기(EOS-146 acceptance ⑩)라서 끌 수 있게 둔다: 발동률"
+            "(`selection_help_count`)이 비정상적으로 높거나 강한 학생에게 과하게 쉬운 문항이 "
+            "나가면 끈다. 끄면 종전 동작과 비트동일하다(도움 완료도 정답). "
+            "WHYMATH_L2_SELECTION_HELP_FOLD_ENABLED=false로 끈다."
+        ),
+    )
+
+    l4_hint_attribution_label_free_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-178 — 코치 대화의 힌트 귀속(`used_hint`)이 **라벨만으로 올라간 단계**"
+            "(숙달 라벨 '초보'가 학생 신호 없이 1→2로 올린 공급)를 도움으로 세지 않을지"
+            "(정식기능·킬 스위치). True(기본)면 공급 원장 행의 `base_level`(라벨 없이 계산한 "
+            "단계)이 2 미만이고 검수 힌트도 실리지 않은 공급은 세지 않는다 — 학생 신호"
+            "(답 요구·좌절·5회+ 막힘)가 올렸거나 힌트 내용이 실제로 나간 공급만 도움이다"
+            "(판정문 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md`). "
+            "구판 행(`base_level` 없음)은 종전대로 센다. False면 EOS-133 규칙(최종 단계 2 "
+            "이상은 전부 도움)으로 완전히 되돌아간다 — 이 규칙의 입력이 EOS-39 선택 θ "
+            "접기이므로, 운영에서 약한 학생의 도움 완료가 독립 성공으로 과다 계상되면"
+            "(라벨-단독 비율·신호 미확인 비율 — 도달 리포트 §7) 끈다. "
+            "WHYMATH_L4_HINT_ATTRIBUTION_LABEL_FREE_ENABLED=false로 끈다."
+        ),
+    )
+
     l4_hint_content_serving_enabled: bool = Field(
         default=True,
         description=(

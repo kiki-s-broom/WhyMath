@@ -434,11 +434,14 @@ CATALOG: tuple[Spec, ...] = (
        "모듈 목록)",
        "admin_menu", "GET /menu"),
     _s("WM-S-055", "관리 콘솔 운영 조회(모델·비용·검수 큐·사용자)", "Admin", "Operations", "P1",
-       "ADMIN-05 · 04 §2 원칙2 Admin BFF — Phase A read-only. 가드는 레지스트리 파생"
+       "ADMIN-05 · 04 §2 원칙2 Admin BFF — Phase A read-only + ADMIN-07 검수 큐 항목·전이(쓰기 "
+       "1종). 가드는 레지스트리 파생"
        "(require_module_roles)이라 메뉴와 어긋날 수 없고, 데모 계정은 역할과 무관하게 403. "
        "집계·마스킹은 BFF에서 끝내 원자료를 프런트로 내보내지 않는다",
        "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
-       "GET /users/{user_id}"),
+       "GET /users/{user_id}", "GET /review-queue/items",
+       "GET /review-queue/items/{problem_id}",
+       "POST /review-queue/items/{problem_id}/transitions"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -978,7 +981,8 @@ CATALOG: tuple[Spec, ...] = (
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
        "schema.parental_consent", "schema.pedagogy_pack", "schema.pedagogy_strategy",
-       "schema.problem", "schema.provenance", "schema.review_timer", "schema.rights",
+       "schema.problem", "schema.provenance", "schema.review_timer",
+       "schema.review_transition", "schema.rights",
        "schema.speech", "schema.standard", "schema.student_solution_step",
        "schema.textbook_mapping", "schema.timeseries", "schema.unit_dsl", "schema.user",
        "schema.verification_capabilities", "schema.version_header",

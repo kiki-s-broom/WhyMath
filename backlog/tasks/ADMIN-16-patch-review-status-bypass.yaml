@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-16-patch-review-status-bypass
+title: "PATCH /v1/problems/{id}의 review_status 전이 검증 우회 차단 + 감사 1행"
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - ADMIN-07-review-ui
+requires_gates: []
+acceptance:
+  - "ADMIN-07이 만든 전이표(schema/review_transition.py)와 감사 1행은 새 POST transitions 경로에만 성립한다. 기존 PATCH /v1/problems/{id}는 review_status를 전이 검증 없이 바꿀 수 있다(rejected→approved, 사유 없는 quarantined). 집행: ①PATCH가 review_status를 바꾸려 하면 전이표를 경유하거나 거부하고 감사 1행을 남긴다 ②우회 경로 주입 테스트로 RED 확인. 부수: privacy_audit DB 불변 트리거 여부 판정, reject 실패코드·HIT 타이머 강제, 감사 action 열거 문서 동기화."
+artifacts: []
+paths: []
+session: null
+notes: "ADMIN-07 PR 1494 정직한 공백 1~3,6."
+updated: 2026-10-06

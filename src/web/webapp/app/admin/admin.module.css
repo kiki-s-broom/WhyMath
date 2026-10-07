@@ -73,7 +73,8 @@
 .main {
   flex: 1 1 24rem;
   padding: 1.5rem 1.25rem 3rem;
-  max-width: var(--wm-measure);
+  /* 모듈 화면(표·2열)이 들어가므로 넓게 두고, 읽기 폭 제한은 글 중심인 홈에만 건다 */
+  max-width: 80rem;
 }
 
 /* ── 좌측 내비 ───────────────────────────────────────────────────────── */
@@ -218,6 +219,7 @@
 
 .home {
   display: block;
+  max-width: var(--wm-measure);
 }
 
 .homeTitle {

@@ -170,6 +170,37 @@ def test_placeholder_records_fail(repo: Path, name: str, text: str, needle: str)
     assert needle in res.stderr
 
 
+def test_non_record_file_beside_a_valid_record_is_ignored(repo: Path) -> None:
+    """README.md 같은 기록 아닌 파일이 같이 들어와도 정상 기록이 있으면 통과한다."""
+    _write(repo, "constitution/rules.yaml", "rules: [a]\n")
+    _write(repo, "constitution/amendments/A0004_t.md", VALID_RECORD)
+    _write(repo, "constitution/amendments/README.md", "설명\n")
+    _commit(repo)
+    res = _run(repo)
+    assert res.returncode == 0, res.stderr
+    assert "A0004_t.md" in res.stdout and "README.md" not in res.stdout
+
+
+def test_only_non_record_files_fail_and_name_what_was_ignored(repo: Path) -> None:
+    _write(repo, "constitution/rules.yaml", "rules: [a]\n")
+    _write(repo, "constitution/amendments/README.md", "설명\n")
+    _commit(repo)
+    res = _run(repo)
+    assert res.returncode == 1
+    assert "개정 기록이 없다" in res.stderr and "README.md" in res.stderr
+
+
+def test_invalid_record_beside_ignored_file_is_still_validated(repo: Path) -> None:
+    """무시는 이름이 안 맞는 파일에만 — 이름이 맞는 기록은 빈 껍데기면 여전히 거부된다."""
+    _write(repo, "constitution/rules.yaml", "rules: [a]\n")
+    _write(repo, "constitution/amendments/A0004_t.md", "# A0004\n2026-10-05\n")
+    _write(repo, "constitution/amendments/README.md", "설명\n")
+    _commit(repo)
+    res = _run(repo)
+    assert res.returncode == 1
+    assert "빈 껍데기" in res.stderr
+
+
 def test_duplicate_numbers_within_diff_fail(repo: Path) -> None:
     _write(repo, "constitution/rules.yaml", "rules: [a]\n")
     _write(repo, "constitution/amendments/A0004_a.md", VALID_RECORD)

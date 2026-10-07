@@ -594,6 +594,30 @@ python3 scripts/harness/backlog.py unblock <task-id>
 별칭으로 감싸면 보이지 않는다. 즉 이것은 *세션이 무심코 치는* 경로를 막는 장치이며,
 뮤테이션 검증에서 `cp` 백업을 뜨는 규율을 대체하지 않는다.
 
+### 3b-6. 낡은 로컬 대장 고지 — 트렁크에서 이미 끝난 태스크 (HARN-54)
+
+`next`·`start`의 기존 스캔은 **트렁크가 이미 끝낸 태스크**를 못 본다. `scan_remote_done`은 트렁크 ref를
+의도적으로 제외하고("트렁크가 done이면 로컬도 done"), `scan_trunk_task_drift`는 의존·게이트의 *강화*만
+본다. 그 전제는 로컬 대장이 트렁크를 따라잡았을 때만 참이다 — 내 클론이 낡았으면 main에서는 done인
+태스크가 로컬에서는 todo라 후보로 나온다(2026-09-24 `EOS-69` 중복 구현).
+
+| 지점 | 동작 | 차단 |
+|---|---|---|
+| `next` | 후보 중 트렁크 사본이 `done`/`cancelled`인 태스크마다 stderr 1줄 + 정정 명령. 후보 목록은 그대로 | 아니오 |
+| `start` | 앞선 `fetch=True` 직후 대조해, 명령의 **마지막 출력**으로 강조 블록(앞의 겹침 경고에 묻히지 않게). 이벤트 `start_trunk_terminal_notice` | 아니오 |
+
+- **고지이지 차단이 아니다** — main이 done이어도 로컬에 정당한 후속 작업이 있을 수 있다(HARN-43 선례).
+- **조회 불가는 침묵하지 않는다** — `트렁크 종결 대조 불가(<사유>)`. `start`에서 fetch가 실패했으면 그
+  사유를 그대로 싣는다(실패를 `ok`로 접으면 낡은 ref로 '끝난 것 없음'을 말하게 된다).
+- **스냅샷 나이** — `next`는 fetch하지 않으므로 마지막 전체 브랜치 fetch로부터 30분 이상이면 그 사실을
+  고지한다(`main에 없음`과 `main을 최근에 못 봤음`은 다른 진술). 나이는 `number_guard.branch_snapshot_age`로
+  잰다 — 종전 `remote_refs_age_seconds`는 FETCH_HEAD를 보는데 claim 조회가 매번 그것을 새로 써서 `next`
+  안에서는 0초에 가깝다(HARN-111 ⑦(다)). 스탬프가 없으면 판정 불가라 침묵한다.
+- 정본 = `remote_claims.scan_trunk_terminal`, 동결 = `tests/harness/test_stale_ledger_vs_trunk.py`
+  (양성·대조군·cancelled·조회 불가·fetch 실패·스냅샷 나이, 뮤테이션 8종 전건 RED).
+- **한계**: 판정은 *내가 마지막으로 본 트렁크* 기준이다. 그 뒤 착지한 완료분은 `next`가 못 본다
+  (확정 지점인 `start`는 fetch 후 본다).
+
 ## 3b-1. 중복 방어의 두 축 — 같은 *이름* vs 같은 *문제* (HARN-51)
 
 번호 충돌 가드(HARN-10/15)가 막는 것은 **같은 식별자**를 두 세션이 배정하는 것이다.

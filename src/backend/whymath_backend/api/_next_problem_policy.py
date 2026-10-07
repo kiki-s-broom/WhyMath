@@ -67,6 +67,13 @@ EOS-147 — 전부 정답 이력의 표적 θ를 추정 θ에서 분리한다 (`
 표적이라 그 이력의 **선택이 바뀐다** — 그래서 `policy_version`을 `suneung_v3`로 올렸다(REC-11: 후보
 생성·선택 규칙의 식별자). `suneung_v2`는 EOS-31의 출제 범위 규칙이 먼저 썼으므로 두 변경이 한
 번호를 쓰지 않는다. 그 외 이력의 선택은 `suneung_v2`와 같다.
+
+EOS-39 — 코치 도움 완료를 선택 θ의 입력에서 실패 1건으로 접는다 (`suneung_v3` → `suneung_v4`)
+────────────────────────────────────────────────────────────────────────────
+기본 CAT과 같은 `AttemptHistoryState.selection_theta`를 쓰므로 수능 모드도 같은 규칙을 받는다.
+도움 완료(`used_hint=True`)가 있는 이력에서 후보 선택이 바뀌므로 `suneung_v4`로 올렸다.
+접힌 문항 수·미상 수(`selection_help_count`·`selection_hint_unknown_count`)는 이 정책의
+산출에도 같은 이름으로 실린다 — 처치 기록이 두 정책을 같은 키로 읽는다.
 """
 
 from __future__ import annotations
@@ -278,6 +285,8 @@ class SuneungRecommendationPolicy:
             "theta": attempt_state.theta,
             "selection_theta": theta,
             "theta_boundary": attempt_state.theta_boundary,
+            "selection_help_count": attempt_state.selection_help_count,
+            "selection_hint_unknown_count": attempt_state.selection_hint_unknown_count,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,

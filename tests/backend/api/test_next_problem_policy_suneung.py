@@ -475,18 +475,19 @@ class TestFirstPassPathsAndDeclarations:
         assert e.reason_calls == [None]  # 없는 문항의 개념을 묻지 않는다
         _assert_aligned(outcome)
 
-    def test_selection_rule_identifier_is_suneung_v3(self) -> None:
+    def test_selection_rule_identifier_is_suneung_v4(self) -> None:
         """REC-11 식별자는 후보 생성·선택 규칙의 판이다 — 규칙이 바뀔 때마다 올렸다.
 
         EOS-25는 설명만 정렬해 `suneung_v1` 그대로였다. EOS-31이 출제 범위를 선결 조건으로 넣어 후보
         집합이 달라졌고(초·중 전용 문항이 빠진다) `suneung_v2`로 올렸다. EOS-147이 전부 정답 이력의
-        표적 θ를 추정 θ에서 분리해 그 이력의 선택이 바뀌었으므로 `suneung_v3`다 — 소급 평가가 세 판의
-        로그를 한 정책으로 섞지 않게 하는 값이다.
+        표적 θ를 추정 θ에서 분리해 그 이력의 선택이 바뀌었으므로 `suneung_v3`였고, EOS-39가 코치 도움
+        완료를 실패 응답 1건으로 접어 도움 완료가 있는 이력의 선택이 바뀌었으므로 `suneung_v4`다 —
+        소급 평가가 네 판의 로그를 한 정책으로 섞지 않게 하는 값이다.
 
-        콘텐츠 재선택을 켜는 변경(EOS-35)이나 표적 규칙의 보정(EOS-39)은 선택 규칙을 다시 바꾸므로
-        그때 이 값을 올리고 이 단언을 함께 고친다.
+        콘텐츠 재선택을 켜는 변경(EOS-35)이나 표적 규칙의 보정은 선택 규칙을 다시 바꾸므로 그때 이 값을
+        올리고 이 단언을 함께 고친다.
         """
-        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v3"
+        assert SuneungRecommendationPolicy.policy_version == POLICY_VERSION_SUNEUNG == "suneung_v4"
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@
 ① **바뀌는 것** — 첫 정답 뒤 추천이 3.4(반 칸 위)이고, 정답을 이어 내면 3.4 → 3.9 → 4.4 → 4.8로 **오른
    뒤** 꼭대기 문항을 다 풀면 나머지(2.4)로 내려온다 — 가장 어려운 문항은 다섯 번째에 나간다(수정 전
    2번째·1.0 단계 3번째). 응답이 `selection_theta`(0.4·0.9·1.4·1.9·2.3)와 `theta_boundary="upper"`로
-   그 사실을 말하고, 처치 기록에도 `theta_boundary`·`policy_version=cat_v4`가 남는다.
+   그 사실을 말하고, 처치 기록에도 `theta_boundary`·`policy_version=cat_v5`가 남는다.
 ② **바뀌지 않는 것** — 응답의 `theta`(4.0)·`standard_error`(7.897)·`measurement_sufficient`, 능력 API
    (`/ability`·`/ability/history`)와 평가 캡처(ASM-03)의 판정 입력. 처치 기록의 `theta`.
 ③ **혼합 이력은 추정기로 넘어간다**(처치 기록에 경계 키 없음) · **하한(전부 오답)은 범위 밖이라 종전
@@ -139,10 +139,11 @@ def test_correct_answers_climb_half_a_logit_at_a_time(weak_first: bool) -> None:
     수정 전 같은 여정은 4.8 → 4.4 → 3.9 → 3.4 → 2.4였다(첫 정답 뒤 곧장 꼭대기). 응답의 `theta`·SE·중단
     규칙은 매번 추정기의 값 그대로이고(첫 SE는 수정 전 실측 7.897과 같다), 달라진 것은 후보를 고른
     θ(`selection_theta`)뿐이다. 첫 회차에는 처치 기록도 함께 본다 — 경계 사실(`theta_boundary`)과
-    정책 식별자(`cat_v4`)가 서빙 경로에서 실제로 남는가.
+    정책 식별자(`cat_v5`)가 서빙 경로에서 실제로 남는가.
 
-    **잠정 동작의 동결** — 정답 개수·도움 완료를 반영하지 않는 0.5 단계의 여정이다. 보정은 `EOS-39`가
-    소유하므로 이 리터럴은 그 태스크에서 의도적으로 바뀔 수 있다.
+    **잠정 동작의 동결** — 정답 개수를 반영하지 않는 0.5 단계의 여정이다(이 여정의 완료는 도움 없는
+    독립 성공이라 EOS-39 접기가 닿지 않는다). 보정은 `EOS-176`이 소유하므로 이 리터럴은 그
+    태스크에서 의도적으로 바뀔 수 있다.
     """
     content, _journal = _P._begin("E147-ladder")
     try:
@@ -171,7 +172,7 @@ def test_correct_answers_climb_half_a_logit_at_a_time(weak_first: bool) -> None:
                     assert meta[META_KEY_THETA] == 4.0, meta  # 기록 theta = 응답 theta(추정 θ)
                     assert meta[META_KEY_SELECTION_THETA] == pytest.approx(0.4, abs=1e-9), meta
                     assert meta[META_KEY_THETA_BOUNDARY] == "upper", meta  # 경계 사실이 남는다
-                    assert meta[META_KEY_POLICY_VERSION] == "cat_v4", meta  # 선택 규칙의 판
+                    assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta  # 선택 규칙의 판
                 _answer(client, auth, rec["problem_id"], correct=True)
     finally:
         content.teardown()

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-176-selection-theta-after-the-top-and-target-probability
+title: "추천 표적의 꼭대기 이후(은행에 더 어려운 문항이 없을 때)와 목표 정답확률·단계 상수 보정 판정 (EOS-39 이월 ⓒⓓ·④)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-39-app-help-completion-evidence-in-target-selection
+requires_gates: []
+acceptance:
+  - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md` §5): EOS-39는 도움 접기를 쓰면 능력이 은행 꼭대기에 가까운 학생이 아닌 한 표적이 꼭대기에 고정되지 않음을 쟀고(θ_true=+3/+4에서는 현행과 접기가 사실상 같다 · P>0.9가 8%/33%), 꼭대기 이후의 정책(더 어려운 문항이 은행에 없을 때 무엇을 주는가 · LTHC 확장 경로·Polya 검토)과 **목표 정답확률**(P̄≈0.50은 선택된 값이 아니라 정보량 최대+접기의 균형점이며 저장소의 학습 밴드 70~85%(REC-04)와 다른 축이다)을 이월했다."
+  - "② 상수 `ALL_CORRECT_STEP_LOGIT`(0.5)의 실측 보정 — EOS-39 acceptance ④가 운영 응답·이탈 데이터 부재로 보정하지 못했다. 선행: EOS-39의 발동률 계측(처치 기록 `selection_help_count`·`selection_hint_unknown_count`·리포트 §6 \"선택 θ 규칙 발동률\")이 운영에서 값을 쌓은 뒤. 데이터가 없으면 없다고 판정문에 적는다(합성 학생의 방향 증거로 상수를 정하지 않는다)."
+  - "③ 판정 대상: (가) 꼭대기 이후 정책 (나) 코치 도움을 전제한 학습 장면의 독립 성공 목표(0.5 vs 학습 밴드) (다) 단계 상수. 교수학 독립 비판 1회를 받고 판정문이 코드보다 먼저다. 웰빙 축(의사결정 우선순위 1)에서 너무 어려움 노출(P<0.25)이 접기 없이는 0.77~0.86이라는 EOS-39의 측정이 비교 기준이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/irt.py
+  - src/backend/whymath_backend/l2/next_problem_selection.py
+session: null
+notes: "출처: EOS-39 판정문 §5·§8 (2026-10-06). 등급 P2 근거: 합성 학생 측정으로는 방향만 알 수 있고 운영 응답 분포가 쌓여야 판정이 성립한다 — 12월 검증 이후 항목.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
+updated: 2026-10-06
