@@ -278,6 +278,18 @@ gates:
     corrections: []
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-crosslink-live-drift-disposition
+    title: "라이브 crosslink DB 어긋남 처분 — 라이브 34건 대 승인 코퍼스 68건. (1) 오귀속 의심 4건(angle-sum-non-triangle↔M0863 · period-of-scaled-sine↔M0862는 본문 대조상 명백한 오귀속, division-by-zero↔M0146 · circle-radius-squared↔M0630은 코퍼스와 다른 선택)을 어떻게 할지: 가) 지우고 코퍼스 대안 4건 적재(쓰기 건수 단언 도구 HARN-215 착지 후) / 나) 4건만 삭제 / 다) 보류. 세션 의견은 먼저 서버의 WHYMATH_MISCONCEPTION_CROSSLINK_MODE 실제 값(off|shadow)을 확인한 뒤 가·나 중 선택. (2) 서명 메모 없는 26행과 라이브에 없는 38행은 별건이라 이 게이트에서 정하지 않는다. 근거 docs/reviews/crosslink_live_drift_2026-10-07.md §1~§6"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-07
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "결정에 필요한 근거는 판정 문서에 이미 있다 — 선행 태스크 없음(가 안의 실행만 HARN-215 착지 후)"
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
