@@ -11997,3 +11997,8 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **정직한 공백(후속 필요)**: ①기존 `PATCH /v1/problems/{id}`는 전이 검증 없이 review_status를 바꿀 수 있다(격리 계약 §7: 전용 엔드포인트 없음 결정 유지) — 전이 계약·감사 1행은 새 POST 경로에만 성립 ②`privacy_audit` 불변성은 관례일 뿐 DB 트리거 없음 ③reject 실패코드·HIT 타이머 강제 미포함 ④CI webapp 잡에 `out/admin/review/index.html` 존재 검사 추가 제안(.github 미수정) ⑤`security_privacy.md` 감사 action 열거 미갱신.
 - **정합 보정**: 백엔드는 미지정 문항의 409에 `current_status: null`을 보내는데 웹 파서가 문자열만 받아 `malformed`로 오분류 → null을 "unset"으로 읽도록 수정.
 - **검증 메모**: 백엔드 에이전트 뮤테이션 13종 전건 RED(rollback 제거 1건은 hermetic만 검출 — 세션 close가 롤백하므로 실 PG로는 불가). 웹 거버넌스 주입 5종 RED·브라우저 DOM 단언 22건 PASS.
+
+### 2026-10-07 — OPS-37 스택 선언 정직화 (ClickHouse·Prefect/Airflow 미도입 병기)
+- **실측**: ClickHouse는 backend 의존·docker 서비스·설정 키 0건(코드 속 언급은 가정 주석뿐 — `privacy/erasure.py`·`export.py`는 미도입을 이미 명시). Prefect/Airflow는 저장소 전수 grep 0건(실제 파이프라인 = 도메인별 `__main__.py` CLI + CI 잡).
+- **결정**: 행동 로그 정본 = PostgreSQL 16 + TimescaleDB 단일 평면(Neo4j 2026-08-03·OTel 2026-08-11 정정과 같은 형식으로 CLAUDE.md 스택 표·`00_overview.md` 5블록 표/보충 메모에 병기). 운영 런북 `OPERATIONS_24_7.md`의 `neo4j`·`clickhouse` 서비스 행·부팅 순서·systemd `After/Wants`·백업 행을 제거하고 정정 주석을 남겼다 — 존재하지 않는 서비스의 헬스체크·백업을 지시하던 상태 해소.
+- **범위 밖(동결)**: ClickHouse 실제 도입·행동 로그 스키마 신설·great-expectations 선언 정리(OPS-32). 도입 판정은 `DP-01` 착수 조건.

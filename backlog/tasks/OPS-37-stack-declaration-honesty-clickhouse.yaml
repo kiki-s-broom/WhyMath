@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: docs
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - docs/architecture/00_overview.md
   - infra/phaiakes9/OPERATIONS_24_7.md
   - MEMORY.md
-session: null
+session: claude/vibrant-pascal-9ebi61
 notes: "2026-08-11 data_platform_eos_frame_gap_review_2026-08-11.md D4 + Kiki 결정(AskUserQuestion). 실측: ClickHouse가 docker-compose 3종·src/backend/pyproject.toml·src/ import 전부 0건인데 스택 표·5블록 표·24/7 운영 런북은 가동 중 서비스로 기술(헬스체크·부팅 의존 순서·백업 주기까지). Prefect/Airflow도 전수 0건. 동일 유형 정정이 이미 두 번 있었고(Neo4j 2026-08-10·OTel 2026-08-11) ai_recommendation_module_gap_review.md:415가 이미 '스택 표에 있으나 배선이 없다'고 관측했는데 스택 표 정정으로 이어지지 않았다 — 데이터 플랫폼 자신의 백본이 정정에서 빠져 있던 상태. [OPS-41 회수] 원 번호 유지(t608mk)."
-updated: 2026-10-05
+updated: 2026-10-07
