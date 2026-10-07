@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/l3/pedagogy/explanation_generator.py
   - src/backend/whymath_backend/l3/queue/tasks.py
   - src/backend/whymath_backend/ops/live_preflight.py
-session: null
+session: claude/funny-maxwell-j2nuyy
 notes: "OPS-109 구현 중 발견(docs/reviews/ops_109_prewarmer_observability_2026-10-06.md §3). 사전적재기는 같은 결함을 이번에 고쳤다(생성 로그 cost_usd가 CLOUD_MID에서 $18.0 대 $0.8 = 22.5배, CLOUD_HIGH는 openrouter 단가 미등재라 '미측정'이어야 하는데 $30.0). 전수 스캔은 whymath_backend 736개 파일에서 원가 계산 호출 13곳을 AST로 셌다 — 좌석 명시 7곳·생략 6곳. ARCH-62가 llm_generator만 고친 '한 곳에서만 고침' 계열이다. 이 6곳이 실제로 클라우드를 부르는지(영향이 있는지)는 호출부로 확인하지 못했다 — ①이 그 판정이다(부재/존재 단정 금지)."
-updated: 2026-10-06
+updated: 2026-10-07

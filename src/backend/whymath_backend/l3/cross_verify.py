@@ -63,6 +63,7 @@ from whymath_backend.l3.models import (
     RoutingRequest,
     Usage,
 )
+from whymath_backend.l3.pipeline import served_cloud_seat
 from whymath_backend.l3.prompt_assets import fill, prompt_text
 from whymath_backend.l3.router import (
     Router,
@@ -760,12 +761,15 @@ class CrossVerifier:
     def _record_trace(self, decision: RoutingDecision, usage: Usage | None) -> None:
         """호출 1건의 라우팅·실측을 관측에 남긴다 — never-break(배치 비차단·타입명 로그)."""
         is_cloud = decision.cost_tier != CostTier.LOCAL.value
+        # OPS-116 — 단가 좌석은 꽂힌 provider에서 읽는다(생략하면 anthropic 단가로 적혀
+        # openrouter 호출이 과대 계상된다). 미상(None)은 anthropic으로 접지 않고 '미측정'.
+        seat = served_cloud_seat(self._provider) if is_cloud else None
         if usage is None or (
             is_cloud and (usage.input_tokens is None or usage.output_tokens is None)
         ):
             cost_krw: float | None = None
         else:
-            cost_krw = actual_cost_krw(decision, usage)
+            cost_krw = actual_cost_krw(decision, usage, seat=seat)
         try:
             self._trace.record(
                 langfuse_fields(
@@ -774,6 +778,7 @@ class CrossVerifier:
                     call_site=CallSite.SELF_VERIFY,
                     usage=usage,
                     cost_krw=cost_krw,
+                    cloud_seat=seat,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — 관측 장애가 검증 배치를 깨면 안 됨
