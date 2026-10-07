@@ -19,9 +19,9 @@ import pytest
 from pydantic import ValidationError
 
 from whymath_backend.api.coach import CoachRequest, SessionCreateRequest
-from whymath_backend.schema.auth import OAuthCallbackRequest
 from whymath_backend.l3.verify_step import VerifyStepState, verify_step
 from whymath_backend.ops import wh1_shadow_probe as probe
+from whymath_backend.schema.auth import OAuthCallbackRequest
 
 
 # ──────────────────────────────────────────────────────────────────────────
