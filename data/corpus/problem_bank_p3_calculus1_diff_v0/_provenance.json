@@ -59,7 +59,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 36,
-      "distinct_skeletons": 67,
+      "distinct_skeletons": 68,
       "generator": "p3_diff_tangent_line_skeleton_generator.P3DiffTangentLineGenerator"
     },
     "[12미적Ⅰ-02-06]": {
@@ -73,7 +73,7 @@
         "diagnostic": 12,
         "mastery_check": 12
       },
-      "distinct_frames": 33,
+      "distinct_frames": 32,
       "distinct_skeletons": 69,
       "generator": "p3_diff_mean_value_theorem_skeleton_generator.P3DiffMeanValueTheoremGenerator"
     },
@@ -104,7 +104,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 30,
-      "distinct_skeletons": 59,
+      "distinct_skeletons": 66,
       "generator": "p3_diff_equation_application_skeleton_generator.P3DiffEquationApplicationGenerator"
     },
     "[12미적Ⅰ-02-10]": {

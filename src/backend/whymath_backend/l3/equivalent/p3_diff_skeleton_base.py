@@ -45,6 +45,10 @@ from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.p3_diff_expr import anchor_curve_function
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ShortcutProbe,
+    shortcut_violations,
+)
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -67,6 +71,7 @@ __all__ = [
     "P3DiffSlotGenerator",
     "answer_format_for",
     "build_choices",
+    "probe_of",
     "round_robin_items",
     "seeded_order",
     "skeleton_of",
@@ -268,6 +273,25 @@ def round_robin_items(
     return out
 
 
+def probe_of(standard_code: str, item: DiffItem) -> ShortcutProbe:
+    """생성기 문항 → 우회로 판정기 표본.
+
+    해설은 은행에 실리는 형태(`anchor_curve_function` 적용)로 본다.
+    """
+    conditions = (item.conditions,) if isinstance(item.conditions, str) else tuple(item.conditions)
+    kind = getattr(item, "answer_kind", None)
+    return ShortcutProbe(
+        standard_code=standard_code,
+        question_text=item.question_text,
+        answer=item.answer_text,
+        explanation=anchor_curve_function(item.question_text, item.explanation),
+        choices=tuple(item.choices) if item.choices else (),
+        conditions=conditions,
+        answer_map=tuple(item.answer_map),
+        answer_kind=kind if isinstance(kind, str) else None,
+    )
+
+
 _ITEM_CACHE: dict[tuple[type, str], tuple[DiffItem, ...]] = {}
 
 
@@ -354,6 +378,16 @@ class P3DiffSlotGenerator:
                 raise ValueError(
                     f"{cls.__name__}[{slot}] {item.frame_id}: answer_format "
                     f"{item.answer_format.value} != 정답 {item.answer_text}의 형식 {expected.value}"
+                )
+            # 3차 감사(2026-10 · κ 0.854) 구조 원인 차단 — 미분 없이 선수 계산으로 풀리는
+            # 문항·결론만
+            # 적은 해설·SymPy 표기 노출을 *생성 시점에* 막는다(조용히 건너뛰지 않고 빌드를 멈춘다).
+            violations = shortcut_violations(probe_of(cls.standard_code, item))
+            if violations:
+                raise ValueError(
+                    f"{cls.__name__}[{slot}] {item.frame_id}: 우회로 판정기 위반 — "
+                    + " / ".join(str(v) for v in violations)
+                    + f" — 발문: {item.question_text}"
                 )
 
     @classmethod

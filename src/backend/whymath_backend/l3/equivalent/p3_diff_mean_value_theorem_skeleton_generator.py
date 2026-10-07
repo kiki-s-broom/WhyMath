@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import re
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import lru_cache
@@ -69,6 +70,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_difference,
     render_factored,
     render_poly,
+    with_eul_reul,
     with_eun_neun,
     with_i_ga,
     with_wa_gwa,
@@ -501,25 +503,6 @@ def _rep_frames() -> list[Frame]:
             case=c,
         )
 
-    def r4(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        solved = _solve_c(c)
-        if solved is None:
-            return None
-        m = solved[1]
-        return _c_item(
-            slot="representative",
-            frame_id="rep-average-rate-given",
-            text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 구간 [{c.a}, {c.b}]에서의 평균변화율은 "
-                f"{frac_text(m)}이다. f'(c) = {frac_text(m)}{eul_reul(frac_text(m))} "
-                f"만족시키는 c가 열린구간 "
-                f"({c.a}, {c.b})에 존재할 때, c의 값을 구하시오."
-            ),
-            case=c,
-            rhs=frac_text(m),
-        )
-
     def r5(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         return _c_item(
@@ -552,7 +535,8 @@ def _rep_frames() -> list[Frame]:
             "rep-cubic-continuous-differentiable", _frames_params("p3-mvt:r2", _cubic_cases()), r2
         ),
         Frame("rep-tangent-parallel-to-chord", _frames_params("p3-mvt:r3", _cubic_cases()), r3),
-        Frame("rep-average-rate-given", _frames_params("p3-mvt:r4", _quad_cases()), r4),
+        # 3차 감사(2026-10) bad_tag 처분 — 'rep-average-rate-given'(발문이 평균변화율 값과 방정식
+        # f'(c) = m을 모두 줘 일차방정식 하나만 남던 틀)은 삭제했다(우회로 판정기 T06-given-rate).
         Frame("rep-two-candidates-one-inside", _frames_params("p3-mvt:r5", _cubic_cases()), r5),
         Frame("rep-average-equals-instantaneous", _frames_params("p3-mvt:r6", _quad_cases()), r6),
     ]
@@ -611,6 +595,13 @@ def _count_item(
     n = len(distinct)
     a, b = case.a, case.b
     fa, fb = eval_at(case.f, a, var), eval_at(case.f, b, var)
+    # 3차 감사 bad_explanation — 발문에 없는 기호 c를 소개 없이 쓰던 해설(시각·x좌표를 c라 둔다).
+    if re.search(r"(?<![A-Za-z])c(?![A-Za-z])", text) is None:
+        note += (
+            "조건을 만족시키는 시각을 c라 하자. "
+            if var == "t"
+            else "조건을 만족시키는 점의 x좌표를 c라 하자. "
+        )
     listed = ", ".join(frac_text(Fraction(int(r.p), int(r.q))) for r in distinct)
     solve = (
         f"{render_poly(eq, 'c')} = 0이고, {render_factored(eq, 'c')} = 0의 근은 c = {listed}이다"
@@ -717,9 +708,9 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
         body = (
             f"{lo} <= f'(c) <= {hi}이므로 {lo * width} <= {render_difference(f'f({b})', pv)} <= "
             f"{hi * width}, 즉 "
-            f"{bottom} <= f({b}) <= {top}이다. 두 끝값은 각각 f(x)가 기울기 {lo}, {hi}인 "
-            f"일차함수일 때 실제로 나오므로 구하는 합은 {top} + {_paren_if_neg(bottom)} = "
-            f"{value}이다."
+            f"{bottom} <= f({b}) <= {top}이다. 두 끝값은 각각 f(x)가 {_extreme_line(lo)}일 때와 "
+            f"{_extreme_line(hi)}일 때 실제로 나오므로 구하는 합은 {top} + "
+            f"{_paren_if_neg(bottom)} = {value}이다."
         )
         cond = f"({pv} + ({hi})*(({b}) - ({a}))) + ({pv} + ({lo})*(({b}) - ({a}))) = y"
     return _value_item(
@@ -730,6 +721,14 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
         condition=cond,
         explanation=mvt + body,
     )
+
+
+def _extreme_line(slope: int) -> str:
+    """끝값을 내는 함수의 이름 — 기울기 0이면 상수함수.
+
+    3차 감사: '기울기 0인 일차함수'는 틀린 용어다.
+    """
+    return "상수함수" if slope == 0 else f"기울기가 {slope}인 일차함수"
 
 
 def _paren_if_neg(value: int) -> str:
@@ -952,9 +951,14 @@ def _applied_frames() -> list[Frame]:
             slot="applied",
             frame_id="applied-car-instantaneous-equals-average",
             text=(
-                f"자동차가 출발한 지 t시간 후의 이동 거리가 s(t) = {ft} (km)이다. 출발 후 "
-                f"{c.a}시간부터 {c.b}시간까지의 평균 속도와 순간 속도가 같아지는 시각 "
-                f"t = c ({c.a} < c < {c.b})의 값을 구하시오."
+                f"자동차가 출발한 지 t시간 후의 이동 거리가 s(t) = {ft} (km)이다. "
+                + (
+                    f"출발 시각부터 {c.b}시간 후까지"
+                    if c.a == 0
+                    else f"출발 후 {c.a}시간부터 {c.b}시간까지"
+                )
+                + f"의 평균 속도와 순간 속도가 같아지는 시각 t = c ({c.a} < c < {c.b})의 값을 "
+                "구하시오."
             ),
             case=c,
             var="t",
@@ -996,23 +1000,42 @@ def _k_params(seed: str) -> list[tuple[object, ...]]:
     return [tuple(case) for case in seeded_order(seed, _k_cases())]
 
 
-def _endpoint_explanation(a: int, b: int, cs: str, *, unknown: str, fixed_is_left: bool) -> str:
-    """끝점 미지수 해설 — 답을 먼저 대입해 놓지 않고 미지수 식에서 풀이 순서대로 푼다.
+def _endpoint_explanation(
+    f: Poly, a: int, b: int, c: Fraction, *, unknown: str, fixed_is_left: bool
+) -> str:
+    """끝점 미지수 해설 — 도함수 식 → c에서의 미분계수 → 미지수 끝점의 평균변화율 → 방정식.
 
-    c는 구간의 중점이므로 (두 끝점의 합)/2 = c이고, 합 = 2c는 주어진 c에서 곧바로 나온다.
+    3차 감사(2026-10) 처분 — 종전 해설은 '이차함수에서 c는 구간의 중점'이라는 결론만 써서 도함수
+    식도 평균변화율 계산도 없었다(우회로 판정기 E-derivative). 이차함수 f(x) = Ax^2 + Bx + C의
+    구간 [u, v]에서의 평균변화율은 f(v) - f(u) = (v - u)(A(u + v) + B)에서 A(u + v) + B이다.
     """
-    total = a + b  # 2c — 두 끝점의 합(주어진 c에서 나오는 값)
-    if fixed_is_left:  # 왼쪽 끝점 a가 고정, 오른쪽 b가 미지수
-        head = f"({a} + {unknown})/2"
-        step = f"{a} + {unknown} = {total}"
-    else:  # 오른쪽 끝점 b가 고정, 왼쪽 a가 미지수
-        sign = "+" if b >= 0 else "-"
-        head = f"({unknown} {sign} {abs(b)})/2"
-        step = f"{unknown} {sign} {abs(b)} = {total}"
-    answer = b if fixed_is_left else a
+    terms = dict(f)
+    lead, lin = terms.get(2, 0), terms.get(1, 0)
+    fp = derivative_of(f)
+    slope = 2 * lead * c + lin  # f'(c)
+    slope_text = frac_text(Fraction(slope))
+    cs = frac_text(c)
+    if fixed_is_left:  # 왼쪽 끝점 a 고정, 오른쪽 끝점이 미지수
+        fixed = a
+        span = render_poly(((1, 1), (0, -fixed)), unknown)  # 'b - 1'·'k + 3'
+        rate_head = f"(f({unknown}) - f({fixed}))/" + (f"({span})" if " " in span else span)
+        diff_head = f"f({unknown}) - f({fixed})"
+        answer = b
+    else:  # 오른쪽 끝점 b 고정, 왼쪽 끝점이 미지수
+        fixed = b
+        span = render_affine(fixed, -1, unknown)  # '1 - a'
+        rate_head = f"(f({fixed}) - f({unknown}))/" + (f"({span})" if " " in span else span)
+        diff_head = f"f({fixed}) - f({unknown})"
+        answer = a
+    linear = render_poly(((1, lead), (0, lead * fixed + lin)), unknown)  # A(u + v) + B
+    moved = render_poly(((1, lead), (0, lead * fixed + lin - int(slope))), unknown)
+    factored = (f"({span})" if " " in span else span) + f"({linear})"
     return (
-        f"이차함수에서 평균값 정리의 c는 구간의 중점이므로 {head} = {cs}이다. "
-        f"양변에 2를 곱하면 {step}이므로 {unknown} = {answer}이다."
+        f"f'(x) = {render_poly(fp)}이고, 평균값 정리를 만족시키는 c가 {cs}이므로 그 점에서의 "
+        f"미분계수는 f'({cs})의 값인 {slope_text}이다. 구간의 평균변화율은 {rate_head}이고, "
+        f"{with_eul_reul(diff_head)} 정리하면 {factored}이므로 평균변화율은 {linear}이다. "
+        f"평균값 정리에 의하여 {linear} = {slope_text}, 즉 {moved} = 0에서 "
+        f"{unknown} = {answer}이다."
     )
 
 
@@ -1078,7 +1101,7 @@ def _endpoint_item(
         frame_id=frame_id,
         question_text=text,
         answer_text=str(answer),
-        explanation=_endpoint_explanation(a, b, cs, unknown=unknown, fixed_is_left=fixed_is_left),
+        explanation=_endpoint_explanation(f, a, b, c, unknown=unknown, fixed_is_left=fixed_is_left),
         conditions=(f"{deriv} = {rate}", side),
         answer_map=((unknown, str(answer)),),
         problem_type_code=_SOLVE,
@@ -1105,6 +1128,7 @@ def _mc_c_item(
     var: str = "x",
     fillers_seed: str,
     fn: str = "f",
+    note: str = "",
 ) -> DiffItem | None:
     """c를 묻는 객관식 — 롤의 정리와 혼동한 값(M0674)을 오답 선지에 둔다."""
     solved = _solve_c(case, var)
@@ -1151,6 +1175,7 @@ def _mc_c_item(
         choices=choices,
         distractors=distractors,
         fn=fn,
+        note=note,
     )
     if base is None:
         return None
@@ -1216,6 +1241,8 @@ def _misconception_frames() -> list[Frame]:
             ),
             case=c,
             fillers_seed=f"mc-p:{c.a}:{c.b}:{_fx(c)}",
+            # 3차 감사 bad_explanation — 발문에 없는 c를 소개 없이 쓰던 해설.
+            note="직선 AB와 평행한 접선을 갖는 점의 x좌표를 c라 하자. ",
         )
 
     def m5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1322,37 +1349,6 @@ def _diagnostic_frames() -> list[Frame]:
             answer_format=answer_format_of(m),
         )
 
-    def d6(p: tuple[object, ...]) -> DiffItem | None:
-        # 롤의 정리의 *가정*을 묻는다 — 1차는 'f(a) = f(b)일 때 … 조건이 성립하도록 하는 k'로 구할
-        # 조건을 가정으로 먼저 주는 순환 문장이었다(2차 감사). 이제 가정을 학생이 떠올려야 한다.
-        c = _case_of(p[0])
-        r = _const_term(c.a * 3 + c.b)
-        k = -(c.a + c.b)
-        if r == 0:
-            return None
-        cond = f"(({c.a})**2 + k*({c.a}) + ({r})) = (({c.b})**2 + k*({c.b}) + ({r}))"
-        r_text = f"+ {r}" if r > 0 else f"- {-r}"
-        fa_k = render_poly(((1, c.a), (0, c.a * c.a + r)), "k")
-        fb_k = render_poly(((1, c.b), (0, c.b * c.b + r)), "k")
-        return DiffItem(
-            slot="diagnostic",
-            frame_id="diag-rolle-premise-find-k",
-            question_text=(
-                f"함수 f(x) = x^2 + kx {r_text}{i_ga(r_text)} 닫힌구간 [{c.a}, {c.b}]에서 롤의 "
-                "정리의 가정을 모두 만족시키도록 하는 상수 k의 값을 구하시오."
-            ),
-            answer_text=str(k),
-            explanation=(
-                "다항함수는 연속이고 미분가능하므로 롤의 정리의 가정 중 확인할 것은 "
-                f"f({c.a}) = f({c.b})이다. f({c.a}) = {fa_k}, f({c.b}) = {fb_k}이므로 "
-                f"{fa_k} = {fb_k}에서 k = {k}이다."
-            ),
-            conditions=cond,
-            answer_map=(("k", str(k)),),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(k),
-        )
-
     def d8(p: tuple[object, ...]) -> DiffItem | None:
         return _bound_item(slot="diagnostic", frame_id="diag-mvt-lower-bound", p=p, side="lower")
 
@@ -1388,14 +1384,42 @@ def _diagnostic_frames() -> list[Frame]:
             note="직선 AB의 기울기는 평균변화율과 같다. ",
         )
 
+    def d11(p: tuple[object, ...]) -> DiffItem | None:
+        # 운동 맥락의 진단 — '평균속도 = 위치의 평균변화율'·'순간속도 = 도함수'를 잇고, f'(c) =
+        # 평균변화율의
+        # 두 근 중 시간 구간 안의 것만 고르는지를 본다(삼차 위치 함수·구간 밖 근 1개).
+        c = _shift_to_zero(_case_of(p[0]))
+        ft = render_poly(c.f, "t")
+        return _c_item(
+            slot="diagnostic",
+            frame_id="diag-velocity-equals-average-at-time-c",
+            text=(
+                f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x(t) = {ft}이다. 0 < t < {c.b}"
+                f"에서 점 P의 순간속도가 t = 0부터 t = {c.b}까지의 평균속도와 같아지는 시각을 "
+                "t = c라 할 때, c의 값을 구하시오."
+            ),
+            case=c,
+            var="t",
+            fn="x",
+            note="평균속도는 위치의 평균변화율이고, 순간속도는 위치의 도함수이다. ",
+        )
+
     # 1차 diagnostic의 근의 합(근과 계수의 관계만)·큰 근(이차방정식 풀이만)·'(구간 밖 포함)' 없는
     # 실근 개수(해석이 갈림)는 평균값 정리의 판단을 요구하지 않아 삭제했다(2차 감사).
     return [
         Frame("diag-value-of-derivative-at-c", _frames_params("p3-mvt:d5", _cubic_cases()), d5),
-        Frame("diag-rolle-premise-find-k", _frames_params("p3-mvt:d6", _rolle_cases()), d6),
+        # 3차 감사(2026-10) 처분 — 'diag-rolle-premise-find-k'(가정 f(a) = f(b)만으로 k를 구해
+        # 미분이
+        # 쓰이지 않고, 이차함수라 대칭축만 보면 c까지 정해지는 틀)는 삭제했다(우회로 판정기
+        # E-derivative). 롤의 정리의 가정→결론 두 단계는 숙련도의 삼차 틀이 맡는다.
         Frame("diag-choose-root-in-interval", _frames_params("p3-mvt:d9", _cubic_cases()), d9),
         Frame("diag-mvt-lower-bound", _bound_params("p3-mvt:d8"), d8),
         Frame("diag-count-parallel-tangents-between", _count_pool("p3-mvt:d10"), d10),
+        Frame(
+            "diag-velocity-equals-average-at-time-c",
+            _frames_params("p3-mvt:d11", _cubic_cases()),
+            d11,
+        ),
     ]
 
 
@@ -1419,11 +1443,16 @@ def _mastery_frames() -> list[Frame]:
                 "구하시오."
             ),
             answer_text=frac_text(out),
+            # 3차 감사 bad_explanation — 도함수 식과 평균변화율 계산 과정을 보인다(종전: 결론만).
             explanation=(
-                f"평균변화율은 {frac_text(m)}이므로 방정식은 {render_poly(eq)} = 0, 즉 "
-                f"{render_factored(eq)} = 0이고 두 근은 {with_wa_gwa(frac_text(c.c))} "
-                f"{frac_text(out)}이다. 이 중 {frac_text(c.c)}만 열린구간 안에 있으므로 구간에 "
-                f"속하지 않는 근은 {frac_text(out)}이다."
+                f"f'(x) = {render_poly(derivative_of(c.f))}이다. 구간 [{c.a}, {c.b}]에서의 "
+                f"평균변화율은 (f({c.b}) - f({c.a}))/({_minus(c.b, c.a)}) = "
+                f"({render_difference(eval_at(c.f, c.b), eval_at(c.f, c.a))})/{c.b - c.a} = "
+                f"{frac_text(m)}이므로 방정식은 {render_poly(derivative_of(c.f))} = "
+                f"{frac_text(m)}, "
+                f"즉 {render_poly(eq)} = 0이다. {render_factored(eq)} = 0이므로 두 근은 "
+                f"{with_wa_gwa(frac_text(c.c))} {frac_text(out)}이다. 이 중 {frac_text(c.c)}만 "
+                f"열린구간 안에 있으므로 구간에 속하지 않는 근은 {frac_text(out)}이다."
             ),
             conditions=(f"{poly_to_sympy_str(eq)} = 0", side),
             answer_map=(("x", frac_text(out)),),
@@ -1440,7 +1469,7 @@ def _mastery_frames() -> list[Frame]:
             lambda a, b, cs: (
                 f"함수 f(x) = x^3 + kx^2에 대하여 곡선 y = f(x) 위의 두 점 ({a}, f({a})), "
                 f"({b}, f({b})){eul_reul(f'f({b})')} 잇는 직선과 평행한 접선의 접점의 x좌표가 "
-                f"{cs} ({a} < {cs} < {b})일 때, 상수 k의 값을 구하시오."
+                f"{cs}일 때, 상수 k의 값을 구하시오."
             ),
             p,
         )
@@ -1475,9 +1504,8 @@ def _mastery_frames() -> list[Frame]:
                 f"정리를 만족시키는 c의 값이 {cs}일 때, k의 값을 구하시오."
             ),
             answer_text=str(k_val),
-            explanation=(
-                "이차함수에서는 평균변화율과 같은 미분계수를 갖는 점이 구간의 중점 하나뿐이므로 "
-                f"평균값 정리의 c는 구간의 중점이다. ({c.a} + k)/2 = {cs}에서 k = {k_val}이다."
+            explanation=_endpoint_explanation(
+                c.f, c.a, k_val, c_given, unknown="k", fixed_is_left=True
             ),
             conditions=(cond, f"k > {c.a}"),
             answer_map=(("k", str(k_val)),),

@@ -642,20 +642,111 @@ def test_concept_identities_match_the_frozen_scope_spec() -> None:
     assert len({g.unit_code for g in _GENERATORS}) == len(_GENERATORS)
 
 
+def _student_expr(text: str) -> sympy.Expr:
+    """학생 표기('2x^3 - 3x^2 + px')를 SymPy 식으로 — 독립 재계산용(생성기 렌더러 미사용)."""
+    out = re.sub(r"(\d)([a-z])", r"\1*\2", text.strip())
+    out = re.sub(r"([a-z])(?=[a-z])", r"\1*", out)
+    return sympy.sympify(out.replace("^", "**"))
+
+
+_CURVE_ARG = r"(?P<{name}>[-0-9a-z^ +]+?)"
+#: 문면에서 (곡선, 직선족)을 읽는 세 형태 — 미지 상수 u는 answer_map의 유일한 키다.
+_TANGENT_SHAPES = (
+    # ① '직선 y = 3x + k가 곡선 y = … 위의 …에서 이 곡선에 접할 때'
+    re.compile(
+        r"직선 y = "
+        + _CURVE_ARG.format(name="line")
+        + r"(?:가|이) 곡선 y = "
+        + _CURVE_ARG.format(name="curve")
+        + r" 위의"
+    ),
+    # ② '점 (0, P)에서 곡선 y = …에 그은 접선' — 직선족 y = ux + P
+    re.compile(
+        r"점 \(0, (?P<p>-?\d+)\)에서 곡선 y = " + _CURVE_ARG.format(name="curve") + r"에 그은 접선"
+    ),
+    # ③ '곡선 y = x^2 + px + q가 곡선 y = …와 x = a인 점에서 접할 때' — p는 기울기 조건으로 정한다
+    re.compile(
+        r"곡선 y = "
+        + _CURVE_ARG.format(name="family")
+        + r"(?:가|이) 곡선 y = "
+        + _CURVE_ARG.format(name="curve")
+        + r"(?:와|과) x = (?P<a>-?\d+)인 점에서 접할"
+    ),
+)
+
+
+def _independent_tangency_discriminant(item: DiffItem) -> sympy.Expr | None:
+    """문면만 읽어 '곡선 - 직선족'의 x에 대한 판별식(미지 상수 u의 다항식)을 다시 만든다.
+
+    ③형의 p는 두 곡선의 기울기가 x = a에서 같다는 조건으로 이 테스트가 직접 정한다(문면이 주는 정보만
+    쓴다). 세 형태 중 어디에도 맞지 않으면 None.
+    """
+    x = sympy.Symbol("x")
+    ((key, _),) = item.answer_map
+    u = sympy.Symbol(key)
+    for shape in _TANGENT_SHAPES:
+        match = shape.search(item.question_text)
+        if match is None:
+            continue
+        curve = _student_expr(match["curve"])
+        groups = match.groupdict()
+        if groups.get("line") is not None:
+            line = _student_expr(match["line"])
+        elif groups.get("p") is not None:
+            line = u * x + int(match["p"])
+        else:
+            family = _student_expr(match["family"])
+            a = int(match["a"])
+            others = family.free_symbols - {x, u}
+            (p_sym,) = others
+            (p_val,) = sympy.solve(sympy.diff(family - curve, x).subs(x, a), p_sym)
+            line = family.subs(p_sym, p_val)
+        if line.free_symbols != {x, u}:
+            return None
+        return sympy.expand(sympy.discriminant(sympy.expand(curve - line), x))
+    return None
+
+
+def _is_proportional(left: sympy.Expr, right: sympy.Expr) -> bool:
+    ratio = sympy.cancel(left / right)
+    return not ratio.free_symbols and ratio != 0
+
+
 def test_tangent_double_root_items_use_the_discriminant_not_a_derivative() -> None:
     """명세 probe_note — 접선 조건을 '접점에서 이중근' 항등식으로 쓰는 문항이 실제로 있다.
 
     판별식형 조건은 미분 평가(`Derivative`)를 쓰지 않는 독립 경로여야 한다(두 경로가 어긋나면 게이트가
     거부). 대표·응용·숙련도 슬롯에 걸쳐 있어야 한다.
+
+    두 갈래를 센다 — (a) 이차 곡선의 판별식 `(b - m)**2 - 4*A*(c - k)` 문자열, (b) 삼차 곡선(3차 감사
+    처분으로 숙련도의 접할 조건을 삼차로 바꿨다 — 이차 곡선은 판별식만으로 풀려 미분이 필요 없었다)의
+    x에 대한 판별식. (b)는 문자열 모양으로 알아볼 수 없으므로 **문면에서 곡선·직선족을 읽어 판별식을
+    다시 계산**하고 검산 조건의 좌변이 그것의 상수배인지 대조한다(생성기 코드 미사용 — 독립 재계산).
     """
-    discriminant_items = [
-        i
-        for i in _all_items(P3DiffTangentLineGenerator)
-        if isinstance(i.conditions, str)
-        and "Derivative" not in i.conditions
-        and "**2 - 4*" in i.conditions
-        or (isinstance(i.conditions, tuple) and "**2 - 4*" in i.conditions[0])
-    ]
+    quadratic: list[DiffItem] = []
+    cubic: list[DiffItem] = []
+    for i in _all_items(P3DiffTangentLineGenerator):
+        first = i.conditions if isinstance(i.conditions, str) else i.conditions[0]
+        if "Derivative" in first:
+            continue
+        if "**2 - 4*" in first:
+            quadratic.append(i)
+            continue
+        expected = _independent_tangency_discriminant(i)
+        if expected is None:
+            continue
+        lhs, rhs = first.split(" = ")
+        residual = sympy.expand(sympy.sympify(lhs) - sympy.sympify(rhs))
+        assert _is_proportional(residual, expected), (i.question_text, first, expected)
+        cubic.append(i)
+    discriminant_items = quadratic + cubic
     slots = {i.slot for i in discriminant_items}
     assert {"representative", "applied", "mastery_check"} <= slots
     assert len(discriminant_items) >= 8
+    # 숙련도의 삼차 접선 틀 셋(기울기 주고 k · y축 위의 점에서 그은 접선 · 두 곡선이 접함)이 전부
+    # 판별식 경로를 쓴다 — 하나라도 다른 경로(항등식·미분 평가)로 돌아가면 개수가 줄어든다.
+    assert {i.frame_id for i in cubic} == {
+        "mastery-cubic-tangent-given-slope",
+        "mastery-tangent-from-point-on-y-axis",
+        "mastery-two-curves-touch-find-constant",
+    }, {i.frame_id for i in cubic}

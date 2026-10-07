@@ -58,6 +58,8 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_factored,
     render_poly,
     render_sum,
+    render_surd,
+    with_eul_reul,
     with_eun_neun,
     with_i_ga,
     with_wa_gwa,
@@ -72,7 +74,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, euro_ro
+from whymath_backend.lang.josa import euro_ro
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffVelocityAccelerationGenerator"]
@@ -176,6 +178,17 @@ _POWER_TRAP: Final = (
     " 위치를 미분할 때 지수를 앞으로 내리는 단계나 지수를 1 줄이는 단계를 빠뜨리면 다른 값이 "
     "나온다."
 )
+
+
+def _sign_change_text(r1: int, r2: int) -> str:
+    """방향 전환의 근거 — v = 0인 두 시각의 좌우에서 속도의 부호가 바뀐다(3차 감사: 부호 판정 누락).
+
+    v(t) = 3·lead·(t - r1)(t - r2)는 단순근 두 개라 각 근의 좌우에서 부호가 바뀐다.
+    """
+    return (
+        f"v(t) = 0인 시각 {r1}, {r2}의 좌우에서 속도의 부호가 각각 바뀌어 점 P는 두 시각 모두에서 "
+        "운동 방향을 바꾼다. 따라서"
+    )
 
 
 def _intro(f: Poly) -> str:
@@ -475,9 +488,13 @@ def _rep_frames() -> list[Frame]:
             frame_id="rep-velocity-change-between-times",
             text=(f"{_intro(f)} t = {t0}에서 t = {t1}까지 점 P의 속도의 변화량을 구하시오."),
             value=change,
+            # 3차 감사 bad_explanation — 속도를 위치의 도함수로 구하는 단계(v(t) 식)를 보인다.
             explanation=(
-                f"t = {t1}일 때의 속도 {_v_at(f, t1)}에서 t = {t0}일 때의 속도 {_v_at(f, t0)}"
-                f"{eul_reul(str(_v_at(f, t0)))} 빼면 {change}이다."
+                f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이다. "
+                f"t = {t1}일 때의 속도는 {_v_at(f, t1)}, t = {t0}일 때의 속도는 "
+                f"{_v_at(f, t0)}이므로 "
+                f"속도의 변화량은 {_v_at(f, t1)}에서 {with_eul_reul(_v_at(f, t0))} 뺀 값인 "
+                f"{change}이다."
             ),
             conditions=(f"Derivative(({_st(shifted)}) - ({_st(f)}), t).doit().subs(t, {t0}) = y"),
         )
@@ -517,25 +534,26 @@ def _basic_frames() -> list[Frame]:
     slot = "basic"
 
     def b1(p: tuple[object, ...]) -> DiffItem | None:
+        # 3차 감사(2026-10) bad_tag 처분 — 'basic-average-velocity'(평균속도만 묻는 틀)는 위치에 두
+        # 시각을 대입한 차분몫이라 미분이 필요 없었다(우회로 판정기 T10-average-only). 두 시각의
+        # *순간*속도의 합으로 바꿨다.
         f, t0, t1 = _as_poly(p[0]), _as_int(p[1]), _as_int(p[2])
         if t0 >= t1:
             return None
-        diff = _x_at(f, t1) - _x_at(f, t0)
-        if diff % (t1 - t0) != 0:
-            return None
-        avg = diff // (t1 - t0)
+        v0, v1 = _v_at(f, t0), _v_at(f, t1)
+        total = v0 + v1
+        shifted = _shift(f, t1 - t0)
         return _value_item(
             slot=slot,
-            frame_id="basic-average-velocity",
-            text=f"{_intro(f)} t = {t0}에서 t = {t1}까지 점 P의 평균속도를 구하시오.",
-            value=avg,
+            frame_id="basic-velocity-sum-two-times",
+            text=(f"{_intro(f)} t = {t0}일 때와 t = {t1}일 때의 점 P의 속도의 합을 구하시오."),
+            value=total,
             explanation=(
-                f"평균속도는 위치의 변화량을 시간의 변화량으로 나눈 값이다. "
-                f"위치가 {_x_at(f, t0)}에서 "
-                f"{_x_at(f, t1)}{euro_ro(str(_x_at(f, t1)))} 변했으므로 "
-                f"({_minus(_x_at(f, t1), _x_at(f, t0))}) / {t1 - t0} = {avg}이다."
+                f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이다. "
+                f"t = {t0}일 때의 속도는 {v0}, t = {t1}일 때의 속도는 {v1}이므로 그 합은 "
+                f"{render_sum(v0, v1)} = {total}이다."
             ),
-            conditions=f"({_at(f, t1)} - {_at(f, t0)})/({t1} - {t0}) = y",
+            conditions=(f"Derivative(({_st(f)}) + ({_st(shifted)}), t).doit().subs(t, {t0}) = y"),
         )
 
     def b2(p: tuple[object, ...]) -> DiffItem | None:
@@ -588,7 +606,9 @@ def _basic_frames() -> list[Frame]:
     quads = _quad_pool()
     cubics = _cubic_pool()
     return [
-        Frame("basic-average-velocity", _grid("p3-vel:b1", quads[::5], (0, 1, 2), (3, 4, 5)), b1),
+        Frame(
+            "basic-velocity-sum-two-times", _grid("p3-vel:b1", quads[::5], (0, 1, 2), (3, 4, 5)), b1
+        ),
         Frame("basic-acceleration-of-cubic", _grid("p3-vel:b2", cubics[1::17], _TIMES0), b2),
         Frame("basic-velocity-of-quadratic", _grid("p3-vel:b3", quads[1::5], _TIMES0), b3),
         Frame("basic-speed-at-time", _grid("p3-vel:b5", cubics[6::23], _TIMES), b5),
@@ -926,7 +946,8 @@ def _misconception_frames() -> list[Frame]:
         wrong_coeff = sympy.sqrt(b)  # v = t^2으로 쓴 학생이 얻는 시각
         entries = [
             ChoiceEntry(str(t0), is_correct=True, sort_key=float(t0)),
-            ChoiceEntry(str(sympy.sstr(wrong_coeff)), _KEBAB, sort_key=float(wrong_coeff)),
+            # 학생 표기(렌더 계약) — '5*sqrt(3)'이 아니라 '5sqrt(3)'(3차 감사 bad_wording).
+            ChoiceEntry(render_surd(wrong_coeff), _KEBAB, sort_key=float(wrong_coeff)),
         ]
         cube_root = round(t0 ** (2 / 3))
         if cube_root**3 == t0 * t0 and cube_root != t0:
@@ -1011,7 +1032,11 @@ def _diagnostic_frames() -> list[Frame]:
             frame_id="diag-acceleration-of-uniform-motion",
             text=f"{_intro(f)} t = {t}에서의 점 P의 가속도를 구하시오.",
             value=0,
-            explanation=f"v(t) = {m}이므로 속도가 일정하여 가속도는 0이다.",
+            explanation=(
+                f"v(t) = {m}{euro_ro(str(m))} 속도가 일정하므로 a(t) = 0이다. 따라서 t = {t}에서의 "
+                "가속도는 "
+                "0이다."
+            ),
             conditions=f"{_da(f, str(t))} = y",
         )
 
@@ -1139,8 +1164,9 @@ def _mastery_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 {order} 운동 방향을 바꿀 때의 점 P의 위치를 구하시오.",
             value=x,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0에서 "
-                f"{order} 방향을 바꾸는 시각은 {r}이고 그때의 위치는 x({r}) = {x}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)}이므로 "
+                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이고 그때의 위치는 "
+                f"x({r}) = {x}이다."
             ),
             conditions=f"{_at(f, r)} = y",
         )
@@ -1159,8 +1185,9 @@ def _mastery_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P의 가속도가 0이 되는 시각의 속도를 구하시오.",
             value=v,
             explanation=(
-                f"a(t) = {render_poly(_acc(f), _V)} = 0에서 t는 {r}이고 그때의 속도는 "
-                f"v({r}) = {v}이다."
+                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이다. "
+                f"a(t) = 0에서 t는 {r}이고, 그때의 속도는 v(t)에 t = {with_eul_reul(r)} 대입한 "
+                f"{v}이다."
             ),
             conditions=f"{_dv(f, str(r))} = y",
         )
@@ -1231,9 +1258,9 @@ def _mastery_frames() -> list[Frame]:
             text=(f"{_intro(f)} 점 P가 {order} 운동 방향을 바꾸는 순간의 가속도를 구하시오."),
             value=a,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0에서 "
-                f"{order} 방향을 바꾸는 시각은 {r}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"그때의 가속도는 {a}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)}이므로 "
+                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이고 "
+                f"a(t) = {render_poly(_acc(f), _V)}이므로 그때의 가속도는 {a}이다."
             ),
             conditions=f"{_da(f, str(r))} = y",
         )

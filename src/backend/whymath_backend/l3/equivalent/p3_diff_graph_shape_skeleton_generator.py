@@ -13,7 +13,9 @@
     (largest/smallest)을 *항상* 붙인다. 프로브 B1은 selection 없이도 '값만 틀린' 오답은
     걸렀지만 두 근 중 *다른 근*을 답한 오답은 통과시킨다 — selection이 그 구멍을 막는다.
   · **A2·A2d 구간 소속 정수**(f'>0 / f'<0) — 구간에 정수가 **정확히 하나뿐**인 함수만
-    쓴다(정답이 유일).
+    쓴다(정답이 유일). 발문은 f'의 부등식이 아니라 '증가·감소하는 x의 값의 범위'로 묻고(3차 감사
+    T08-derivative-inequality), f'의 근을 정수가 아닌 p/2로 둬 범위를 열린·닫힌 어느 쪽으로 읽어도
+    정수 집합이 같게 한다(2차 감사 개폐 모호성 재발 방지 — `_interval_item`).
   · **B 극대·극소의 x좌표**(규칙 B3) — `answer_selection`을 *반드시* 단다. 어느 쪽 근을
     고를지는 SymPy가 f'의 부호 변화를 직접 읽어 정한다(최고차항 계수의 부호를 손으로
     가정하지 않는다 — 계수가 음수이면 극대·극소가 뒤바뀐다는 규칙 문서 §3-1의 함정을
@@ -94,6 +96,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_factored,
     render_poly,
     with_eun_neun,
+    with_wa_gwa,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
@@ -392,28 +395,41 @@ def _x_item(
 
 
 def _interval_item(
-    slot: str, frame_id: str, template: str, fn: _Fn, *, direction: str
+    slot: str, frame_id: str, template: str, poly: Poly, *, roots: tuple[int, int], direction: str
 ) -> ShapeItem | None:
-    """증가(`pos`)·감소(`neg`) 구간에 속하는 정수가 **정확히 하나**인 문항(정답이 유일)."""
-    d_expr = poly_to_sympy(fn.deriv)
+    """증가(`pos`)·감소(`neg`)하는 범위에 속하는 정수가 **개폐 해석과 무관하게** 정확히 하나인 문항.
+
+    3차 감사(2026-10) 처분 — 종전 발문은 `f'(x) < 0`을 직접 줘 증감 판정 없이 이차부등식만
+    남았다(우회로 판정기 T08-derivative-inequality). 발문을 '감소하는 x의 값의 범위'로 바꾸면
+    이번에는 교과서 관례상 그 범위를 *닫힌* 구간으로 읽을 수 있어, f'의 근이 정수이면 양 끝
+    정수까지 세어 '하나뿐'이 거짓이 된다(2차 감사가 교정한 개폐 모호성의 재발). 그래서 f'의 두
+    근을 **정수가 아닌** p/2, q/2로 둔다 — 열린 범위(f'의 부호)와 닫힌 범위(f' = 0 포함)의 정수
+    집합이 같고 하나뿐이다.
+    """
+    deriv = derivative_of(poly)
+    d_expr = poly_to_sympy(deriv)
     wanted = 1 if direction == "pos" else -1
-    inside = [n for n in range(-40, 41) if int(sympy.sign(d_expr.subs(_X, n))) == wanted]
-    if len(inside) != 1:
+    strict = [n for n in range(-40, 41) if int(sympy.sign(d_expr.subs(_X, n))) == wanted]
+    closed = [n for n in range(-40, 41) if int(sympy.sign(d_expr.subs(_X, n))) in (wanted, 0)]
+    if len(strict) != 1 or strict != closed:
         return None
-    n = inside[0]
-    relation = ">" if direction == "pos" else "<"
+    n = strict[0]
+    relation, other = (">", "<") if direction == "pos" else ("<", ">")
     word = "증가" if direction == "pos" else "감소"
+    lo, hi = (sympy.Rational(r, 2) for r in roots)
     return _item(
         slot=slot,
         frame_id=frame_id,
-        text=_fill(template, fn.text),
+        text=_fill(template, render_poly(poly)),
         answer=n,
-        conditions=_deriv_cond(fn.sym, relation),
+        conditions=_deriv_cond(poly_to_sympy_str(poly), relation),
         answer_map=(("x", str(n)),),
         ptype=_SOLVE,
         explanation=(
-            f"{_explain(fn)} f'(x) {relation} 0이 되는 x의 범위는 {word}하는 구간의 양 끝을 "
-            f"뺀 안쪽이고, 그 범위에 속하는 정수는 {n}뿐이다."
+            f"f'(x) = {render_poly(deriv)} = {render_factored(deriv)}이므로 f'(x) = 0의 근은 "
+            f"x = {lo}, {hi}이다. {lo} < x < {hi}에서 f'(x) {relation} 0이고 x < {lo} 또는 "
+            f"x > {hi}에서 f'(x) {other} 0이므로 f(x)는 {lo} <= x <= {hi}에서 {word}한다. 양 끝 "
+            f"{lo}, {with_eun_neun(str(hi))} 정수가 아니므로 이 범위에 속하는 정수는 {n}뿐이다."
         ),
     )
 
@@ -588,17 +604,24 @@ def _cubic_judged_frame(frame_id: str, template: str, seed: str, *, slot: str, w
 def _cubic_interval_frame(
     frame_id: str, template: str, seed: str, *, slot: str, direction: str
 ) -> Frame:
-    """f' = 3a(x - r)(x - r - 2) — 두 근의 간격이 2라 f'의 부호가 하나의 구간 안에서 정수 1개."""
+    """f' = 3L(2x - p)(2x - q) (p 홀수·q = p + 2) — 근 p/2, q/2 사이의 정수는 (p + 1)/2 하나뿐.
+
+    f(x) = L(4x^3 - 3(p + q)x^2 + 3pq x) + c. L > 0이면 두 근 사이가 감소 범위, L < 0이면
+    증가 범위다.
+    """
+    leads = (1, 2) if direction == "neg" else (-1, -2)
+    combos = [(lead, p0, c) for lead in leads for p0 in (-5, -3, -1, 1, 3) for c in _C_ALL]
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
-        poly = _cubic(_i(p[0]), _i(p[1]), _i(p[2]), _i(p[3]))
-        fn = _analyze(poly) if poly is not None else None
-        if fn is None:
+        lead, p0, c = _i(p[0]), _i(p[1]), _i(p[2])
+        q0 = p0 + 2
+        terms = ((3, 4 * lead), (2, -3 * lead * (p0 + q0)), (1, 3 * lead * p0 * q0), (0, c))
+        poly: Poly = tuple((e, k) for e, k in terms if k)
+        if max(abs(k) for _, k in poly) > 48:
             return None
-        return _interval_item(slot, frame_id, template, fn, direction=direction)
+        return _interval_item(slot, frame_id, template, poly, roots=(p0, q0), direction=direction)
 
-    # a > 0이면 두 근 사이가 감소 구간, a < 0이면 증가 구간 — 간격 2가 정수 하나를 보장한다.
-    return Frame(frame_id, _cubic_pool(seed, _LEADS, _C_ALL, gap=2), build)
+    return Frame(frame_id, tuple(seeded_order(seed, combos)), build)
 
 
 def _rep_frames() -> list[Frame]:
@@ -645,7 +668,8 @@ def _rep_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "rep-decreasing-integer",
-            "함수 f(x) = {f}에 대하여 f'(x) < 0을 만족시키는 정수 x는 하나뿐이다. "
+            # 3차 감사 bad_tag — 종전 발문은 f'(x) < 0을 직접 줘 증감 판정 없이 이차부등식만 남았다.
+            "함수 f(x) = {f}{ga} 감소하는 x의 값의 범위에 속하는 정수는 하나뿐이다. "
             "그 정수를 구하시오.",
             "p3-shape:rep6",
             slot=slot,
@@ -683,7 +707,7 @@ def _basic_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "basic-increasing-integer",
-            "함수 f(x) = {f}에 대하여 f'(x) > 0을 만족시키는 정수 x는 하나뿐이다. "
+            "함수 f(x) = {f}{ga} 증가하는 x의 값의 범위에 속하는 정수는 하나뿐이다. "
             "그 정수를 구하시오.",
             "p3-shape:bas4",
             slot=slot,
@@ -708,8 +732,95 @@ def _basic_frames() -> list[Frame]:
 
 
 # ── 응용: 미지수 구하기·사차함수 ────────────────────────────────────────────
+def _linear_ab(ca: int, cb: int, const: int) -> str:
+    """'2a + b + 3'·'-a + 4b - 2' — a·b에 대한 일차식 표기(계수 1·0 처리·이중 부호 금지)."""
+    parts: list[str] = []
+    for coef, name in ((ca, "a"), (cb, "b"), (const, "")):
+        if coef == 0:
+            continue
+        mag = abs(coef)
+        body = name if (mag == 1 and name) else f"{mag}{name}"
+        if not parts:
+            parts.append(f"-{body}" if coef < 0 else body)
+        else:
+            parts.append(f"{'-' if coef < 0 else '+'} {body}")
+    return " ".join(parts) if parts else "0"
+
+
+def _find_ab_item(
+    slot: str,
+    frame_id: str,
+    template: str,
+    *,
+    lead: int,
+    a: int,
+    b: int,
+    c: int,
+    r: int,
+    ask: str,
+    want: str | None,
+) -> ShapeItem | None:
+    """f(x) = lead·x^3 + a x^2 + b x + c(a·b 미지수)가 x = r에서 극값 v — 상수 `ask`를 구한다.
+
+    3차 감사(2026-10) bad_tag 처분 — 종전 틀은 미지수가 하나라 '극값 v'를 주면 f(r) = v 대입만으로
+    상수가 정해져 f'(r) = 0이 풀이에 쓰이지 않았다(우회로 판정기 T-value-determines). 이제 a·b
+    둘 다 미지수라 f'(r) = 0과 f(r) = v를 **연립**해야 답이 나온다.
+    """
+    poly: Poly = tuple((e, k) for e, k in ((3, lead), (2, a), (1, b), (0, c)) if k)
+    fn = _analyze(poly)
+    if fn is None:
+        return None
+    kind = fn.kinds.get(r)
+    if kind is None or (want is not None and kind != want):
+        return None
+    if a == b or 0 in (a, b, r):
+        return None
+    value = eval_at(poly, r)
+    # f'(r) = 3·lead·r^2 + 2r·a + b = 0 · f(r) = lead·r^3 + r^2·a + r·b + c = v
+    eq1 = _linear_ab(2 * r, 1, 3 * lead * r * r)
+    eq2 = _linear_ab(r * r, r, lead * r**3 + c - value)
+    lead_text = "" if lead == 1 else ("-" if lead == -1 else str(lead))
+    tail_c = _signed(c, "") if c else ""
+    base_text = f"{lead_text}x^3 + ax^2 + bx {tail_c}".rstrip()
+    base_sym = f"({lead})*x**3 + a*x**2 + b*x + ({c})"
+    answer = a if ask == "a" else b
+    deriv_text = f"{3 * lead if abs(3 * lead) != 1 else ''}x^2 + 2ax + b"
+    explanation = (
+        f"f'(x) = {deriv_text}이다. x = {r}에서 극값을 가지므로 f'({r})의 값은 0이고, "
+        f"f'({r})의 값은 {eq1}이므로 {eq1} = 0이다. 또 그 극값이 {value}이므로 f({r})의 값 "
+        f"{with_eun_neun(_linear_ab(r * r, r, lead * r**3 + c))} {with_wa_gwa(value)} 같아야 하고, "
+        f"{eq2} = 0이다. 두 식을 연립하면 a = {a}, b = {b}이다. 이때 {_explain(fn)} 따라서 "
+        f"x = {r}에서 {_kind_word(kind)}을 갖는다."
+    )
+    return _item(
+        slot=slot,
+        frame_id=frame_id,
+        text=_fill(
+            template,
+            base_text,
+            r=r,
+            v=value,
+            veul=eul_reul(str(value)),
+            kind=_kind_word(kind),
+            p=ask,
+        ),
+        answer=answer,
+        conditions=(_deriv_cond(base_sym, "="), f"{base_sym} = {value}"),
+        answer_map=(
+            ("x", str(r)),
+            (ask, str(answer)),
+            ("b" if ask == "a" else "a", str(b if ask == "a" else a)),
+        ),
+        ptype=_SOLVE,
+        explanation=explanation,
+    )
+
+
 def _find_a_frame(frame_id: str, template: str, seed: str, *, slot: str, want: str) -> Frame:
-    """f(x) = x^3 + a x^2 + b x + c가 x = r에서 극값 v를 갖는다 — b·c는 주고 a를 구한다."""
+    """f(x) = x^3 + a x^2 + b x + c가 x = r에서 극값 v를 갖는다 — c만 주고 a를 구한다.
+
+    a·b 둘 다 미지수다(f'(r) = 0과 f(r) = v를 연립해야 정해진다).
+    """
     combos = tuple(
         seeded_order(
             seed,
@@ -725,37 +836,11 @@ def _find_a_frame(frame_id: str, template: str, seed: str, *, slot: str, want: s
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
         a, r, c = _i(p[0]), _i(p[1]), _i(p[2])
-        b = -3 * r * r - 2 * a * r  # f'(r) = 3r^2 + 2ar + b = 0이 되도록 b를 정한다.
-        if b == 0 or abs(b) > 40:
+        b = -3 * r * r - 2 * a * r  # f'(r) = 3r^2 + 2ar + b = 0
+        if abs(b) > 40:
             return None
-        poly: Poly = tuple((e, k) for e, k in ((3, 1), (2, a), (1, b), (0, c)) if k)
-        fn = _analyze(poly)
-        if fn is None or fn.kinds.get(r) is None or fn.kinds[r] != want:
-            return None
-        tail_b = _signed(b, "x")
-        tail_c = _signed(c, "")
-        base_text = f"x^3 + ax^2 {tail_b} {tail_c}"
-        base_sym = f"x**3 + a*x**2 + ({b})*x + ({c})"
-        value = eval_at(poly, r)
-        a_eq = render_poly(((1, 2 * r), (0, 3 * r * r + b)), "a")
-        explanation = (
-            f"x = {r}에서 극값을 가지므로 f'({r})의 값은 0이다. f'(x) = 3x^2 + 2ax "
-            f"{_signed(b, '')}이므로 f'({r})의 값은 {a_eq}이고, {a_eq} = 0에서 a = {a}이다. "
-            f"이때 {_explain(fn)} 따라서 x = {r}에서 {_kind_word(want)}을 갖고, 그 값 "
-            f"{with_eun_neun(value)} 주어진 값과 같다."
-        )
-        return _find_param_item(
-            slot,
-            frame_id,
-            template,
-            param="a",
-            base_text=base_text,
-            base_sym=base_sym,
-            r=r,
-            value_at_r=value,
-            kind=want,
-            answer=a,
-            explanation=explanation,
+        return _find_ab_item(
+            slot, frame_id, template, lead=1, a=a, b=b, c=c, r=r, ask="a", want=want
         )
 
     return Frame(frame_id, combos, build)
@@ -902,7 +987,8 @@ def _applied_frames() -> list[Frame]:
     return [
         _find_a_frame(
             "applied-find-a-local-min-value",
-            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오.",
+            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
+            "(단, a, b는 상수이다.)",
             "p3-shape:app1",
             slot=slot,
             want="min",
@@ -939,7 +1025,8 @@ def _applied_frames() -> list[Frame]:
         ),
         _find_a_frame(
             "applied-find-a-local-max-value",
-            "곡선 y = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오.",
+            "곡선 y = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
+            "(단, a, b는 상수이다.)",
             "p3-shape:app6",
             slot=slot,
             want="max",
@@ -1141,8 +1228,8 @@ def _diagnostic_frames() -> list[Frame]:
         ),
         _cubic_interval_frame(
             "diag-decreasing-integer-curve",
-            "함수 f(x) = {f}의 도함수를 f'(x)라 할 때, f'(x) < 0을 만족시키는 정수 x는 "
-            "하나뿐이다. 그 정수를 구하시오.",
+            "곡선 y = {f}에서 x의 값이 커질 때 y의 값이 작아지는 x의 값의 범위에 속하는 "
+            "정수는 하나뿐이다. 그 정수를 구하시오.",
             "p3-shape:dia6",
             slot=slot,
             direction="neg",
@@ -1151,8 +1238,12 @@ def _diagnostic_frames() -> list[Frame]:
 
 
 # ── 숙련도 확인 ──────────────────────────────────────────────────────────
-def _find_a_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
-    """f(x) = x^4 + a x^3 + c가 x = q에서 극값 v — f'(q) = 4q^3 + 3a q^2 = 0이므로 a = -4q/3."""
+def _find_b_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
+    """f(x) = x^4 + a x^3 + b가 x = q에서 극솟값 v — a(미분계수 조건)를 먼저 구해야 b가 정해진다.
+
+    3차 감사(2026-10) bad_tag 처분 — 종전 틀은 a만 미지수라 f(q) = v 대입만으로 a가 정해졌다
+    (f'(q) = 0이 풀이에 불요). 상수항 b를 함께 미지수로 두고 b를 묻는다.
+    """
     combos = tuple(
         seeded_order(
             seed,
@@ -1169,25 +1260,33 @@ def _find_a_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str)
         fn = _analyze(poly)
         if fn is None or fn.kinds.get(q) != "min":
             return None
-        base_sym = f"x**4 + a*x**3 + ({c})"
+        base_sym = "x**4 + a*x**3 + b"
         value = eval_at(poly, q)
         a_eq = render_poly(((1, 3 * q * q), (0, 4 * q**3)), "a")
+        known = q**4 + a * q**3
         explanation = (
-            f"x = {q}에서 극값을 가지므로 f'({q})의 값은 0이다. f'(x) = 4x^3 + 3ax^2이므로 "
-            f"f'({q})의 값은 {a_eq}이고, {a_eq} = 0에서 a = {a}이다. 이때 {_explain(fn)} "
-            f"따라서 x = {q}에서 극솟값을 갖고, 그 값 {with_eun_neun(value)} 주어진 값과 같다."
+            f"f'(x) = 4x^3 + 3ax^2이다. x = {q}에서 극값을 가지므로 f'({q})의 값은 0이고, "
+            f"f'({q})의 값은 {a_eq}이므로 {a_eq} = 0에서 a = {a}이다. 이때 {_explain(fn)} "
+            f"따라서 x = {q}에서 극솟값을 갖고, 그 값은 f({q})의 값 "
+            f"{render_poly(((1, 1), (0, known)), 'b')}"
+            f"이다. {render_poly(((1, 1), (0, known)), 'b')} = {value}에서 b = {c}이다."
         )
-        return _find_param_item(
-            slot,
-            frame_id,
-            template,
-            param="a",
-            base_text=f"x^4 + ax^3 {_signed(c, '')}",
-            base_sym=base_sym,
-            r=q,
-            value_at_r=value,
-            kind="min",
-            answer=a,
+        return _item(
+            slot=slot,
+            frame_id=frame_id,
+            text=_fill(
+                template,
+                "x^4 + ax^3 + b",
+                r=q,
+                v=value,
+                veul=eul_reul(str(value)),
+                kind=_kind_word("min"),
+                p="b",
+            ),
+            answer=c,
+            conditions=(_deriv_cond(base_sym, "="), f"{base_sym} = {value}"),
+            answer_map=(("x", str(q)), ("b", str(c)), ("a", str(a))),
+            ptype=_SOLVE,
             explanation=explanation,
         )
 
@@ -1195,7 +1294,7 @@ def _find_a_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str)
 
 
 def _find_b_cubic_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
-    """f(x) = x^3 + a x^2 + b x가 x = r에서 극값 v — a를 주고 b를 구한다(f'(r) = 0)."""
+    """f(x) = -x^3 + a x^2 + b x + c가 x = r에서 극값 v — a·b 미지수, b를 구한다."""
     combos = tuple(
         seeded_order(
             seed,
@@ -1210,36 +1309,11 @@ def _find_b_cubic_frame(frame_id: str, template: str, seed: str, *, slot: str) -
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
         a, r, c = _i(p[0]), _i(p[1]), _i(p[2])
-        b = -3 * r * r - 2 * a * r
-        if b == 0 or abs(b) > 40:
+        b = 3 * r * r - 2 * a * r  # f'(r) = -3r^2 + 2ar + b = 0
+        if abs(b) > 40:
             return None
-        poly: Poly = tuple((e, k) for e, k in ((3, 1), (2, a), (1, b), (0, c)) if k)
-        fn = _analyze(poly)
-        if fn is None:
-            return None
-        kind = fn.kinds.get(r)
-        if kind is None:
-            return None
-        value = eval_at(poly, r)
-        b_eq = render_poly(((1, 1), (0, 3 * r * r + 2 * a * r)), "b")
-        explanation = (
-            f"x = {r}에서 극값을 가지므로 f'({r})의 값은 0이다. f'(x) = 3x^2 "
-            f"{_signed(2 * a, 'x')} + b이므로 f'({r})의 값은 {b_eq}이고, {b_eq} = 0에서 "
-            f"b = {b}이다. 이때 {_explain(fn)} 따라서 x = {r}에서 {_kind_word(kind)}을 갖고, 그 값 "
-            f"{with_eun_neun(value)} 주어진 값과 같다."
-        )
-        return _find_param_item(
-            slot,
-            frame_id,
-            template,
-            param="b",
-            base_text=f"x^3 {_signed(a, 'x^2')} + bx {_signed(c, '')}",
-            base_sym=f"x**3 + ({a})*x**2 + b*x + ({c})",
-            r=r,
-            value_at_r=value,
-            kind=kind,
-            answer=b,
-            explanation=explanation,
+        return _find_ab_item(
+            slot, frame_id, template, lead=-1, a=a, b=b, c=c, r=r, ask="b", want=None
         )
 
     return Frame(frame_id, combos, build)
@@ -1250,14 +1324,15 @@ def _mastery_frames() -> list[Frame]:
     return [
         _find_b_cubic_frame(
             "mastery-find-b-extremum-value",
-            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오.",
+            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
+            "(단, a, b는 상수이다.)",
             "p3-shape:mas1",
             slot=slot,
         ),
-        _find_a_quartic_frame(
-            "mastery-find-a-quartic-local-min",
+        _find_b_quartic_frame(
+            "mastery-find-b-quartic-local-min",
             "사차함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, "
-            "상수 {p}의 값을 구하시오.",
+            "상수 {p}의 값을 구하시오. (단, a, b는 상수이다.)",
             "p3-shape:mas2",
             slot=slot,
         ),
@@ -1295,7 +1370,7 @@ def _mastery_frames() -> list[Frame]:
         ),
         _quartic_asym_frame(
             "mastery-quartic-middle-extremum",
-            "사차함수 f(x) = {f}의 극값을 갖는 점이 {pins}일 때, f(x)의 {kind}을 구하시오.",
+            "사차함수 f(x) = {f}{neun} {pins}에서만 극값을 갖는다. f(x)의 {kind}을 구하시오.",
             "p3-shape:mas7",
             slot=slot,
             role="middle",

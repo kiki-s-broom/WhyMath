@@ -63,6 +63,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_difference,
     render_poly,
     render_sum,
+    render_surd,
     with_eul_reul,
     with_eun_neun,
     with_i_ga,
@@ -564,7 +565,8 @@ def _mc_solve_cubic(a0: int) -> DiffItem | None:
     wrong_coeff = sympy.sqrt(b)  # (x^3)'를 x^2로 쓴 학생이 얻는 a
     entries = [
         ChoiceEntry(str(a0), is_correct=True, sort_key=float(a0)),
-        ChoiceEntry(str(sympy.sstr(wrong_coeff)), _KEBAB, sort_key=float(wrong_coeff)),
+        # 학생 표기(렌더 계약) — '8*sqrt(3)'이 아니라 '8sqrt(3)'(3차 감사 bad_wording).
+        ChoiceEntry(render_surd(wrong_coeff), _KEBAB, sort_key=float(wrong_coeff)),
     ]
     cube_root = round(a0 ** (2 / 3))
     if cube_root**3 == a0 * a0 and cube_root != a0:
@@ -815,9 +817,13 @@ def _mastery_frames() -> list[Frame]:
                 "f'(3)의 값을 구하시오."
             ),
             answer_text=str(y),
+            # 3차 감사 bad_explanation — n을 정하는 일반 도함수 nx^(n - 1)과 세운 방정식을 보인다
+            # (종전 해설은 'f'(2)가 12이므로 n은 3'이라는 결론만 적었다).
             explanation=(
-                f"f'(2)가 {b}이므로 n은 {n}이고, 도함수 {render_poly(d)}에서 x가 3일 때의 값은 "
-                f"{y}이다."
+                "거듭제곱의 미분법에 따라 f'(x) = nx^(n - 1)이므로 f'(2)는 n(2^(n - 1))이고, "
+                f"방정식 n(2^(n - 1)) = {with_eul_reul(b)} 풀어야 한다. n이 1 늘 때마다 좌변이 "
+                f"커지므로 해는 하나뿐이고, {n}(2^{n - 1}) = {b}이므로 n = {n}이다. 따라서 "
+                f"f'(x) = {render_poly(d)}이고 x가 3일 때의 값은 {y}이다."
             ),
             conditions=_deriv_sym(f"x**{n}", "3") + " = y",
             answer_map=(("y", str(y)),),

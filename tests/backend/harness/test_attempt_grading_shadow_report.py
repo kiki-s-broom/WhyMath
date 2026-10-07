@@ -888,7 +888,13 @@ class TestCorpusVerifyBlockSupply:
         # 13,841 → 13,842(+1): P3-03 감사 결함 교정(문면·태그 정합)이 02-06의 개수형(answer_map 빔)
         # 틀 2개(진단 `미분계수 값`·응용 `기울기 개수`)를 값형 진단 틀로 바꿔 answer_map을 가진 문항이
         # 1건 늘었다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
-        assert len(blocks) == 13842
+        # 13,842 → 13,819(-23): P3-03 3차 감사 처분(우회로 판정기 `p3_diff_shortcut_guard`)으로 문자열 조건 +
+        # answer_map 블록이 23건 줄었다(은행 504건·슬롯 6x12 불변 — 값만 갱신). 02-09 -18: '등호가 성립하는 x'
+        # 값형(문자열 조건 18건 — 정수 중근이라 인수분해 우회로)을 최솟값형(임계점·y = f 연립 목록 조건)과
+        # 개수형(answer_map 빔)으로 바꿨다. 02-05 -2: 숙련도 삼차 접선의 판별식 조건에 다른 접선을 빼는 보호
+        # 조건이 붙어 목록이 됐다. 02-06 -3: 진단·응용 틀 교체로 c값 문항(방정식 + 열린구간 경계 목록)이 늘었다.
+        # 로더가 문자열 조건만 읽는 계약은 그대로다(무약화 — 빠진 23건은 목록·빈 answer_map 형태라 제외).
+        assert len(blocks) == 13819
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1128,4 +1134,6 @@ class TestCorpusCeilingReportDiscriminates:
         # 비객관식 300건 중 문자열 검산 조건과 비지 않은 answer_map을 함께 가진 162건이 이 버킷으로 들어왔다
         # (연립 목록 조건·개수/집계형(answer_map 빔)은 이 버킷이 아니다).
         # 12,535 → 12,536(+1): 위 블록 +1과 같은 사유(P3-03 감사 결함 교정 — 개수형 틀이 값형으로).
-        assert report.bucket_counts["condition_formal_derivable"] == 12536
+        # 12,536 → 12,513(-23): 위 블록 -23과 같은 사유(P3-03 3차 감사 처분 — 문자열 조건 + answer_map인
+        # 비객관식이 268 → 245건. 객관식 54건은 그대로 selectable이라 이 버킷의 감소분은 블록 감소분과 같다).
+        assert report.bucket_counts["condition_formal_derivable"] == 12513

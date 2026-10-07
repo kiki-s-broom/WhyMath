@@ -162,9 +162,13 @@ def _is_param_item(row: dict[str, object]) -> bool:
 
 
 def _is_interval_item(row: dict[str, object]) -> bool:
-    # 발문은 개폐가 모호한 '증가/감소하는 구간에 속하는 정수' 대신 `f'(x) < 0`(> 0)을 만족시키는
-    # 정수로 쓴다(감사 결함 교정 — 구간 개폐 해석에 따라 정답이 달라지던 문항).
-    return "정수 x는 하나뿐" in str(row["question_text"])
+    # 2차 감사는 개폐가 모호한 '감소하는 구간에 속하는 정수'를 `f'(x) < 0`을 만족시키는 정수로
+    # 바꿨으나, 3차 감사가 그 발문을 bad_tag로 판정했다(f'의 부등식을 직접 줘 증감 판정이 빠진다 —
+    # 우회로 판정기 T08-derivative-inequality). 지금 발문은 다시 '감소(증가)하는 x의 값의 범위'로 묻고,
+    # 개폐 모호성은 *함수 선택*으로 없앤다(f'의 근이 정수가 아니다 — 아래 테스트가 열린·닫힌 두 해석의
+    # 정수 집합이 같음을 따로 단언한다). 두 문면을 모두 읽는다(종전 표기 'f'(x) < 0을 만족시키는 정수
+    # x는 하나뿐'이 되살아나도 이 테스트가 그 문항을 구간형으로 분류해 같은 검사를 건다).
+    return bool(re.search(r"정수(?: x)?는 하나뿐", str(row["question_text"])))
 
 
 def _x_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -403,10 +407,22 @@ def test_interval_items_have_exactly_one_integer_in_the_stated_region(
         if not _is_interval_item(row):
             continue
         text = str(row["question_text"])
-        wanted = 1 if "f'(x) > 0" in text else -1
+        # 부호 방향은 발문 단어가 아니라 검산 조건의 관계(`> 0`·`< 0`)에서 읽고, 발문 단어와 맞는지
+        # 따로 대조한다(조건과 문면이 서로 다른 방향을 말하는 결함을 잡는다).
+        cond = _verify(row)["conditions"]
+        assert isinstance(cond, str), text
+        relation = _DERIV_COND.match(cond)
+        assert relation is not None and relation["rel"] in "<>", (text, cond)
+        wanted = 1 if relation["rel"] == ">" else -1
+        assert ("증가" in text or "커지는" in text) == (wanted == 1), text
         deriv = sympy.diff(_function_of(row), _X)
-        inside = [n for n in range(-80, 81) if int(sympy.sign(deriv.subs(_X, n))) == wanted]
+        signs = {n: int(sympy.sign(deriv.subs(_X, n))) for n in range(-80, 81)}
+        inside = [n for n, sign in signs.items() if sign == wanted]
         assert inside == [int(str(row["answer"]))], (text, inside)
+        # 개폐 해석 무관 — '감소하는 x의 값의 범위'를 교과서 관례대로 닫힌 범위(f' = 0인 끝점 포함)로
+        # 읽어도 정수가 하나뿐이어야 '하나뿐이다'가 참이다(f'의 근이 정수면 양 끝 정수가 더해진다).
+        closed = [n for n, sign in signs.items() if sign in (wanted, 0)]
+        assert closed == inside, (text, closed)
         checked += 1
     assert checked >= 6
 
@@ -444,19 +460,25 @@ def test_parameter_items_have_a_unique_solution_and_a_matching_extremum(
         cond = verify["conditions"]
         assert isinstance(cond, list) and len(cond) == 2
         sym_expr = sympy.sympify(_DERIV_COND.match(cond[0])["f"])  # type: ignore[index]
-        symbol = sympy.Symbol(param)
+        # 미지 상수 전부(a·b 연립형은 둘, 판정형 k는 하나) — 3차 감사 처분으로 a·b 두 미지수를 두는
+        # 틀이 생겼다(미지수가 하나면 f(r) = v 대입만으로 정해져 f'(r) = 0이 풀이에 안 쓰였다 —
+        # 우회로 판정기 T-value-determines). 그래서 단일 기호 풀이를 *연립* 풀이로 일반화한다.
+        unknowns = sorted((sympy.Symbol(k) for k in amap if k != "x"), key=str)
+        assert set(sym_expr.free_symbols) == {_X, *unknowns}, (text, sym_expr.free_symbols)
         equations = [
             sympy.diff(sym_expr, _X).subs(_X, r),
             sym_expr.subs(_X, r) - int(word["v"]),
         ]
-        solution_sets: list[set[sympy.Expr]] = []
-        for eq in equations:
-            if eq.has(symbol):
-                solution_sets.append(set(sympy.solve(eq, symbol)))
-            else:
-                assert eq == 0, (text, eq)  # 미지수가 없는 식은 이미 성립해야 한다
-        common = set.intersection(*solution_sets)
-        assert common == {sympy.Integer(int(str(amap[param])))}, (text, common)
+        solutions = sympy.solve(equations, unknowns, dict=True)
+        expected = {sym: sympy.Integer(int(str(amap[str(sym)]))) for sym in unknowns}
+        assert solutions == [expected], (text, solutions)
+        # 미지수가 둘이면 두 식이 *모두* 필요하다 — 한 식만으로 물은 상수가 정해지면 미분 조건(또는 함숫값
+        # 조건)이 풀이에 쓰이지 않는 틀이다(T-value-determines의 독립 재확인).
+        if len(unknowns) == 2:
+            asked = sympy.Symbol(param)
+            for eq in equations:
+                alone = sympy.solve(eq, asked)
+                assert not (alone and all(not v.free_symbols for v in alone)), (text, eq, alone)
         assert int(str(row["answer"])) == int(str(amap[param]))
         checked += 1
     assert checked >= 12

@@ -808,6 +808,8 @@ CATALOG: tuple[Spec, ...] = (
        # 생성기 7종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
        # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
        "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
+       # 3차 감사 처분 — '선수 계산 우회로' 판정기(생성기 빌드가 문항마다 부르는 fail-loud 게이트).
+       "l3.equivalent.p3_diff_shortcut_guard",
        "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
        "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator",
        "l3.equivalent.p3_diff_tangent_line_skeleton_generator",

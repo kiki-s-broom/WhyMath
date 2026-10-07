@@ -39,6 +39,7 @@ __all__ = [
     "render_poly",
     "render_product",
     "render_sum",
+    "render_surd",
     "sympy_str_of",
     "with_eul_reul",
     "with_eun_neun",
@@ -151,6 +152,18 @@ def eval_at(poly: Poly, point: int, var: str = "x") -> int:
     if not sympy.Integer(value).is_integer:  # pragma: no cover — 정수 계수·정수 점이면 항상 정수
         raise ValueError(f"정수 값이 아니다: {value}")
     return int(value)
+
+
+def render_surd(value: sympy.Expr) -> str:
+    """학생 대면 근호 표기 — `8*sqrt(3)` → '8sqrt(3)'(곱셈 기호 '*'를 노출하지 않는다).
+
+    렌더 계약(`docs/architecture/notation_contract.md` §6·`math_notation.dart` `toRenderLatex`)은
+    'sqrt(X)'를 √X로 조판하지만 '*'는 가운뎃점(·)으로 남긴다. 발문·해설이 '3x^2'처럼 곱을 이어
+    쓰므로 선지도 같은 규약을 따른다(3차 감사 결함: 선지 '8*sqrt(3)'). 유니코드 '√'는 P3 은행의
+    ASCII 전용 규약(글리프 가드) 때문에 쓰지 않는다.
+    """
+    text: str = str(sympy.sstr(value))
+    return text.replace("*", "")
 
 
 def render_product(factors: Sequence[Poly], var: str = "x") -> str:

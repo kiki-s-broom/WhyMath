@@ -13,7 +13,9 @@ P3-03(hermetic·LLM 0). 두 생성기는 아직 등록부(`harness.p3_calculus1_
 ④ 02-06: c값 문항은 방정식 1개 + 열린구간 경계 4개(P3-19 fixture 형식) — 구간 밖 근 오답이 *구간 조건 때문에*
    거부된다(조건을 떼면 통과 — 보호의 실재). `corpus_reverify`가 구간 밖 근 변형을 exit 1로 거부한다.
 ⑤ 02-09: 매개변수(k) 범위형 없음 · 근과 계수의 관계·근 고르기 틀의 삭제 동결(2차 감사 bad_tag) ·
-   값형은 전부 도함수로 최솟값을 확인하는 부등식 등호형 · 개수형이 슬롯을 독점하지 않음.
+   값형은 전부 도함수로 구하는 **최솟값**(부등식을 보이는 핵심 단계 — 3차 감사 처분으로 '등호가 성립하는
+   x'형은 정수 중근이 인수분해 우회로를 열어 삭제했다 · 우회로 판정기 T09-*) · 개수형이 슬롯을 독점하지
+   않음.
 ⑥ 오개념 연결은 오개념 유발 슬롯에만, 명세의 핵심 M-id로(kebab 좌석이 없어 M-id 그대로 — 좌석이 생기면
    이 테스트가 신호를 낸다).
 ⑦ 문제유형 정직성: 개수형(`real_root_count`) ⇔ `ptype.count-solutions`.
@@ -367,6 +369,67 @@ def _solution_points(item: DiffItem) -> list[float]:
     return keep
 
 
+_OPT = "ptype.optimize-extremum"
+_DOMAIN = re.compile(r"^(?P<v>[xt]) (?P<op>>=|>) (?P<n>-?\d+)$")
+
+
+def _is_min_item(item: DiffItem) -> bool:
+    """02-09 최솟값형 — 검산 재료가 (임계점 f'(v) = 0, 최솟값 y = f(v)[, 범위 v >= 0])인 문항."""
+    return item.problem_type_code == _OPT and not isinstance(item.conditions, str)
+
+
+def _min_parts(item: DiffItem) -> tuple[sympy.Symbol, sympy.Expr, tuple[str, int] | None]:
+    """최솟값형의 (변수, 함수식, 범위) — 조건 문자열만 읽는다(생성기 코드 미사용)."""
+    conds = _conds(item)
+    assert conds[0].startswith("Derivative(") and conds[0].endswith(".doit() = 0"), conds
+    assert conds[1].startswith("y = "), conds
+    expr = sympy.sympify(conds[1].removeprefix("y = "))
+    (var,) = expr.free_symbols
+    assert isinstance(var, sympy.Symbol) and str(var) in ("x", "t"), conds
+    # 임계점 조건이 *같은* 함수의 도함수인지 — 다른 함수를 미분해 두면 x 고정이 무의미하다.
+    assert sympy.simplify(_parse_cond(conds[0])[0] - sympy.diff(expr, var)) == 0, conds
+    domain: tuple[str, int] | None = None
+    if len(conds) == 3:
+        match = _DOMAIN.match(conds[2])
+        assert match is not None and match["v"] == str(var), conds
+        domain = (match["op"], int(match["n"]))
+    else:
+        assert len(conds) == 2, conds
+    return var, expr, domain
+
+
+def _global_minimum(
+    expr: sympy.Expr, var: sympy.Symbol, domain: tuple[str, int] | None
+) -> tuple[float, float]:
+    """범위에서의 최솟값과 그 점을 **수치 근**으로 다시 구한다(생성기의 정확 근·분기와 독립 경로).
+
+    후보 = 범위 안의 f'의 실근(수치) + 닫힌 경계. 전 실수에서는 최고차가 짝수 차·양수 계수, 반직선
+    범위에서는 양수 계수여야 최솟값이 존재한다(아니면 실패). 열린 경계(`>`)는 경계값이 최솟값보다
+    엄격히 커야 한다(경계에 다가가며 더 작아지면 최솟값이 없다).
+    """
+    poly = sympy.Poly(expr, var)
+    lead = poly.LC()
+    assert lead > 0, expr
+    if domain is None:
+        assert poly.degree() % 2 == 0, expr
+    crit = [
+        r.real
+        for r in map(complex, sympy.Poly(sympy.diff(expr, var), var).nroots(n=30))
+        if abs(r.imag) < 1e-9
+    ]
+    cands = [c for c in crit if domain is None or c > domain[1] - 1e-9]
+    if domain is not None and domain[0] == ">=":
+        cands.append(float(domain[1]))
+    values = sorted((float(expr.subs(var, c)), c) for c in cands)
+    assert values, expr
+    best, at = values[0]
+    if domain is not None and domain[0] == ">":
+        assert float(expr.subs(var, domain[1])) > best + 1e-9, expr
+    # 최솟점이 하나뿐(답의 x가 유일) — 같은 최솟값을 두 점에서 가지면 answer_map의 x가 모호하다.
+    assert all(v > best + 1e-9 for v, c in values[1:] if abs(c - at) > 1e-6), (expr, values)
+    return best, at
+
+
 def _answer_value(item: DiffItem) -> float:
     return (
         float(sympy.Rational(item.answer_text))
@@ -407,6 +470,14 @@ def test_answers_match_an_independent_recomputation_from_the_conditions(
                     actual *= r
             assert abs(actual - answer) < 1e-6, (item.question_text, actual, answer)
             checked["aggregate"] += 1
+        elif _is_min_item(item):
+            var, expr, domain = _min_parts(item)
+            best, at = _global_minimum(expr, var, domain)
+            assert abs(best - answer) < 1e-6, (item.question_text, best, answer)
+            amap = dict(item.answer_map)
+            assert set(amap) == {str(var), "y"} and amap["y"] == item.answer_text, item.answer_map
+            assert abs(float(sympy.Rational(amap[str(var)])) - at) < 1e-6, (item.question_text, at)
+            checked["value"] += 1
         else:
             points = _solution_points(item)
             if _sel(item) == "largest":
@@ -430,11 +501,25 @@ def test_no_function_valued_answers_and_single_unknown_contract(
 
     값형 문항은 자유기호가 answer_map의 유일한 키이고, 개념형(개수·집계) 문항은 answer_map이 비어도
     자유기호가 정확히 하나다.
+
+    예외 하나(02-09 최솟값형): 검산 재료가 (임계점 f'(v) = 0, 최솟값 y = f(v)[, 범위])라 자유기호가
+    {v, y} 둘이다. 이것은 [12미적Ⅰ-02-08] 규칙 C3이 허용한 형태(극값의 값 — x를 answer_map에 실어
+    고정, 프로브 C1 '가능')와 같은 구조로, 최솟점 v는 작성자가 answer_map에 박고 학생은 y(최솟값)만
+    답한다. 목록 조건이라 섀도 채점 로더가 읽지 않으므로(문자열 조건만 읽음) 섀도 모집단 동결에는
+    들어가지 않는다. 그 형태를 *정확히* 고정한다 — 키가 {v, y}이고 답이 y이며, 첫 조건이 같은 함수의
+    임계점 조건이다(`_min_parts`가 대조). 그 밖의 문항은 아래 단일 미지수 계약을 그대로 받는다.
     """
     for item in _items(generator_cls):
         assert item.answer_format != AnswerFormat.식, item.question_text
         assert "x^" not in item.answer_text
         assert not re.search(r"[a-z]", item.answer_text.replace("sqrt", ""))
+        if generator_cls is _EQ and _is_min_item(item):
+            var, _, _ = _min_parts(item)
+            symbols = set().union(*(_parse_cond(c)[0].free_symbols for c in _conds(item)))
+            assert {str(sym) for sym in symbols} == {str(var), "y"}, item.conditions
+            assert {k for k, _ in item.answer_map} == {str(var), "y"}, item.answer_map
+            assert dict(item.answer_map)["y"] == item.answer_text, item.question_text
+            continue
         parsed = [_parse_cond(c)[0] for c in _conds(item)]
         symbol = _symbol_of(parsed)
         if _kind(item) is None and _agg(item) is None:
@@ -545,12 +630,16 @@ def test_corpus_reverify_exits_1_for_an_outside_root_variant(tmp_path: Path) -> 
 def test_equation_concept_has_no_parametric_range_questions() -> None:
     """P3-20 §6 — 매개변수(k) 범위형은 검증 경로가 없어 만들지 않는다.
 
-    자유기호는 x(또는 시간 t)뿐이고 문면에 '범위'를 묻는 표현이 없다.
+    자유기호는 x(또는 시간 t)뿐이고 문면에 '범위'를 묻는 표현이 없다. 최솟값형의 y는 매개변수가 아니라
+    *답 자체*(최솟값)를 담는 기호라 그 형태에서만 허용한다(`y = f(x)` 조건 하나에만 나타난다).
     """
     for item in _items(_EQ):
+        allowed = {"x", "t", "y"} if _is_min_item(item) else {"x", "t"}
         for cond in _conds(item):
             expr, _ = _parse_cond(cond)
-            assert {str(s) for s in expr.free_symbols} <= {"x", "t"}, item.question_text
+            assert {str(s) for s in expr.free_symbols} <= allowed, item.question_text
+            if "y" in {str(s) for s in expr.free_symbols}:
+                assert cond.startswith("y = "), (item.question_text, cond)
         assert "범위" not in item.question_text
         assert not re.search(r"\bk\b", item.question_text.replace("y = k", "")), item.question_text
 
@@ -574,16 +663,19 @@ def test_equation_concept_has_no_prerequisite_only_forms() -> None:
     assert not [i.question_text for i in items if _agg(i) is not None or _sel(i) is not None]
 
 
-def test_equation_concept_value_items_use_the_derivative_to_reach_the_equality_case() -> None:
-    """값형(등호가 성립하는 x)은 해설이 도함수로 최솟값 0을 확인한다 — 인수분해 한 줄로 끝내지 않는다.
+def test_equation_concept_value_items_find_the_minimum_with_the_derivative() -> None:
+    """값형(최솟값)은 해설이 도함수 식을 세우고 f'(x) = 0의 근으로 최솟값에 닿는다 — 결론만 적지 않는다.
 
-    개수형은 인수분해(인수·중근·허근 인수) 또는 도함수(극값 비교) 중 하나를 반드시 보인다(결론만 적은
-    해설 금지 — 2차 감사 bad_explanation).
+    3차 감사 처분 전에는 '등호가 성립하는 x'(최솟값 0인 점)를 물었으나 그 점이 정수 중근이라 인수분해만으로
+    풀렸다(T09-repeated-root). 지금 값형은 양수 최솟값을 묻고, 해설은 도함수 식(f'(x) = …·h'(t) = …)과
+    방정식 f'(x) = 0(= 0)을 반드시 보인다. 개수형은 인수분해(인수·중근·허근 인수) 또는 도함수(극값
+    비교) 중 하나를 반드시 보인다(결론만 적은 해설 금지 — 2차 감사 bad_explanation).
     """
     values = counts = 0
     for item in _items(_EQ):
         if _kind(item) is None:
-            assert re.search(r"[fh]'\(x\) = ", item.explanation), item.explanation
+            assert _is_min_item(item), item.question_text
+            assert re.search(r"[fh]'\([xt]\) = ", item.explanation), item.explanation
             assert "최솟값" in item.explanation and "= 0" in item.explanation, item.explanation
             values += 1
         else:
@@ -598,8 +690,8 @@ def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
     """P3-20 §3 — 실근 개수형을 한 슬롯에 몰아 쓰면 문면 골격이 겹친다. 슬롯별로 형태를 분산한다.
 
     오개념 유발 슬롯은 객관식이라 M0677(f(x) = k 근의 개수 관점)을 개수형으로만 물을 수 있어 예외이고,
-    그 슬롯도 문면 틀이 다섯 가지로 다르다. 나머지 슬롯은 개수형 틀이 둘 이하이고 합·선택·부등식형이
-    섞인다.
+    그 슬롯도 문면 틀이 다섯 가지로 다르다. 나머지 슬롯은 개수형 틀이 둘 이하이고 최솟값형(부등식을
+    보이는 핵심 단계) 틀이 셋 이상 섞인다(합·선택형은 2차 감사, 등호점형은 3차 감사 처분으로 삭제).
     """
     for slot in SLOT_IDS:
         items = _EQ.items(slot)

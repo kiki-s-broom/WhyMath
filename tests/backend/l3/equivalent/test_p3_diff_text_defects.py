@@ -298,7 +298,10 @@ _R2_EXPLANATION = {
     "formula_leak_expl": re.compile(r"앞에 오는 계수가 지수와 같으므로"),
     "deriv_root_misstated": re.compile(r"도함수 [^.]*?에서 [^ .]+ 아닌 근은"),
 }
-_IRA = re.compile(r"([0-9A-Za-z)']+)(이라|라) (?=할|하자|하면|놓|두)")
+# 토큰에 '^'를 포함한다 — 'x^2'는 '엑스 제곱'(받침 있음)으로 읽힌다(`lang.josa.has_batchim_text`·
+# 같은 파일 `_TOKEN_JOSA`와 같은 토큰 경계). '^'를 빼면 '9x^2이라'의 마지막 '2'만 읽어 정답 표기를
+# 결함으로, '9x^2라'를 정상으로 뒤집어 판정한다(P3-03 우회로 재설계에서 실측 — 대조군 아래 추가).
+_IRA = re.compile(r"([0-9A-Za-z)'^]+)(이라|라) (?=할|하자|하면|놓|두)")
 _NEG_TIME = re.compile(r"t = -\d")
 _CONCLUSION_SIG = re.compile(
     r"되도록 (?P<v>[a-z])를 정하면|만족하도록 (?P<v2>[a-z])를 정하면|이 조건에서 (?P<v3>[a-z])의 값은|"
@@ -531,6 +534,7 @@ _MC_QUAD = "x**4 - x**3 - x**2 - x - 2 = 0"  # (x - 2)(x + 1)(x^2 + 1)
 _R2_DEFECTIVE = [
     (_row(e="곡선의 식을 y = f(x)로 놓으면 f'는 6x이다."), "prime_josa"),
     (_row(q="g(x) = f(x) + 3라 할 때, g'(1)의 값을 구하시오."), "ira_josa"),
+    (_row(e="f(x) = 2x^3 + 9x^2라 하자. f'(x) = 6x^2 + 18x이다."), "ira_josa"),
     (_row(e="평균변화율은 (f(5) - f(2))/(5 - (2)) = 3이다."), "paren_nonneg"),
     (_row(q="f(x) = 3*x^2 + 1일 때 f'(1)의 값을 구하시오."), "star_in_text"),
     (_row(e="인수분해하면 2(x + 3)^2x = 0이다."), "exp_then_var"),
@@ -647,6 +651,7 @@ def test_round2_scanner_flags_the_audited_defects(row: dict[str, object], kind: 
 _R2_HEALTHY = [
     _row(e="곡선의 식을 y = f(x)라 하자. f'(x) = 6x이므로 f'(2)의 값은 12이다."),
     _row(q="g(x) = f(x) + 3이라 할 때, g'(1)의 값을 구하시오."),
+    _row(e="f(x) = 2x^3 + 9x^2이라 하자. f'(x) = 6x^2 + 18x이다."),
     _row(e="평균변화율은 (f(5) - f(2))/(5 - 2) = 3이고 2 - (-3) = 5이다."),
     _row(e="인수분해하면 2x(x + 3)^2 = 0이다."),
     _row(q="곡선 y = x^3 + 2x^2 - x와 직선 y = 2의 교점의 개수로 옳은 것은?"),

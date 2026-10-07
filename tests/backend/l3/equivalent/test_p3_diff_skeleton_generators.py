@@ -158,8 +158,11 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
     },
     # 섀도 채점 단일 미지수 계약 — (a) 02-06·09 개수·집계형은 문자열 조건에 자유기호 x가 있지만 답은
     # 근의 *개수·합·곱*이라 answer_map이 비어 있고, (b) 02-08은 문자열 목록 조건 `(y = 식, f' = 0)`이
-    # 부등식 보호 없이 (x, y) 두 키를 쓴다(극값의 좌표·함숫값). 둘 다 코퍼스 로더가 읽지 않는 형태라
-    # `test_multi_symbol_population_is_frozen`(섀도 모집단 동결)에는 들어가지 않는다 — 그 동결은 무약화.
+    # 부등식 보호 없이 (x, y) 두 키를 쓴다(극값의 좌표·함숫값), (c) 02-09 최솟값형(3차 감사 처분으로
+    # '등호가 성립하는 x'형을 대체)은 02-08 규칙 C3과 같은 (임계점 f' = 0, y = f[, 범위]) 목록 조건에
+    # (x 또는 t, y) 두 키를 쓴다 — 범위 부등식(`x >= 0`)은 해를 가르는 보호가 아니라 정의역이다.
+    # 셋 다 코퍼스 로더가 읽지 않는 형태라 `test_multi_symbol_population_is_frozen`(섀도 모집단 동결)에는
+    # 들어가지 않는다 — 그 동결은 무약화.
     "single_unknown": {
         _C06: _Exempt(
             "개수·집계형 문항(answer_map 비어 있음)은 미지수가 답이 아니다.",
@@ -170,8 +173,15 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             ((_F_GRAPH_SHAPE, "test_every_row_passes_the_p324_enforcement_parser"),),
         ),
         _C09: _Exempt(
-            "개수형 문항(answer_map 비어 있음)은 미지수가 답이 아니다.",
-            ((_F_MVT_EQUATION, "test_no_function_valued_answers_and_single_unknown_contract"),),
+            "개수형 문항(answer_map 비어 있음)은 미지수가 답이 아니고, 최솟값형은 (x 또는 t, y) "
+            "극값 좌표형 목록 조건이다(02-08 규칙 C3과 같은 구조 — 최솟점은 answer_map이 고정).",
+            (
+                (_F_MVT_EQUATION, "test_no_function_valued_answers_and_single_unknown_contract"),
+                (
+                    _F_MVT_EQUATION,
+                    "test_answers_match_an_independent_recomputation_from_the_conditions",
+                ),
+            ),
         ),
     },
     # 핵심 오개념(M-id)이 크로스링크로 닿는지 — 02-05·08·10의 핵심 M0673·M0676·M0678은 MISC-40이 의도적으로
@@ -417,9 +427,17 @@ def test_conditions_obey_the_single_unknown_contract_of_shadow_grading(
 
 
 def _outside_single_unknown_form(item: DiffItem) -> bool:
-    """면제 대상 형태 — (a) 문자열 조건인데 answer_map이 빔(개수·집계형), (b) 부등식 보호 없는 목록 조건."""
+    """면제 대상 형태 — (a) 문자열 조건인데 answer_map이 빔(개수·집계형), (b) 부등식 보호 없는 목록 조건,
+    (c) 극값 좌표형 목록 조건(첫 조건이 임계점 `Derivative(…) = 0`이고 answer_map이 정확히 (x 또는 t, y)).
+
+    (c)는 정의역 부등식(`x >= 0`)이 붙어 (b)로 분류되지 않는 02-09 최솟값형을 위한 것이다 — 키 집합을
+    정확히 대조하므로 미지 상수(k·p)를 담은 목록 조건은 여기 걸리지 않고 아래 단일 미지수 검사를 받는다.
+    """
     if isinstance(item.conditions, str):
         return not item.answer_map
+    keys = {k for k, _ in item.answer_map}
+    if item.conditions[0].startswith("Derivative(") and keys in ({"x", "y"}, {"t", "y"}):
+        return True
     return not any(re.search(r"[<>!]=?", c) for c in item.conditions[1:])
 
 
