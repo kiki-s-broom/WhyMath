@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - ".claude/hooks/chat_block_guard.py"
   - tests/harness
-session: null
+session: claude/magical-fermat-bepxr1
 notes: ""
 updated: 2026-10-07
