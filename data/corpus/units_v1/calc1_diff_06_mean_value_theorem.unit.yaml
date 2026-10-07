@@ -1,0 +1,40 @@
+# 소단원 DSL v0.1 — 평균값 정리 (미적분Ⅰ · 미분 대단원 · 소단원 6/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3).
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-06-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-06] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-평균값정리"
+unit_version: 1
+api_version: "unit/0.1"
+title: "평균값 정리"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-06]"]
+concept_nodes: ["12미적Ⅰ-02-06-1", "12미적Ⅰ-02-06-2", "12미적Ⅰ-02-06-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -1(개념·primary). 오개념이 '조건(연속·미분가능)을 빠뜨림'이라, 조건 하나가
+  # 깨진 반례(꺾인 점·끊긴 점)로 경계를 시험하는 CONCEPT 팩이 맞다. 정리의 증명은 목표에 두지 않았다.
+  - suffix: "OBJ-01"
+    statement: "평균값 정리가 성립하기 위한 조건인 닫힌구간에서의 연속과 열린구간에서의 미분가능, 그리고 그 결론을 설명한다"
+    standard_code: "[12미적Ⅰ-02-06]"
+    source_verb: "설명한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-06-1"]
+  # OBJ-02 절차형 — 원자 -2(절차). c가 열린구간 안에 있어야 함을 목표 문장에 명시했다 — 구간 밖 근이
+  # 정답으로 통과하던 검산 결함(P3-19 소관)과 같은 지점이 학생의 절차 단계에서도 빠지기 쉽다.
+  - suffix: "OBJ-02"
+    statement: "조건을 먼저 확인한 뒤 열린구간 안에서 평균값 정리를 만족시키는 c의 값을 구한다"
+    standard_code: "[12미적Ⅰ-02-06]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-06-2"]
+  # OBJ-03 표상형 — 원자 -3(표상). 식(평균변화율 = 미분계수)과 그래프(할선과 평행한 접선)를 잇는다.
+  - suffix: "OBJ-03"
+    statement: "평균값 정리를 할선과 평행한 접선이 구간 안에 적어도 하나 있다는 그래프의 성질로 해석한다"
+    standard_code: "[12미적Ⅰ-02-06]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-06-3"]
