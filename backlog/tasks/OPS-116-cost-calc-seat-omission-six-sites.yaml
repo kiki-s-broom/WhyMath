@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 6곳(`l3/cross_verify.py:768`·`l3/multi_solution.py:782`·`l3/pedagogy/analogy_generator.py:355`·`l3/pedagogy/explanation_generator.py:245`·`l3/queue/tasks.py:135`·`ops/live_preflight.py:267`)이 각각 실제로 어느 좌석으로 클라우드를 부르는지 판정한다 — 꽂힌 provider에서 읽는 `served_cloud_seat`(ARCH-64) 또는 `llm_generator`의 방식. LOCAL 전용 경로(비동기 큐 워커 — QUALITY는 로컬이라 클라우드 결정이 안 온다는 근거 확인)는 판정만 남기고 호출은 명시해도 무방하다. 판정 없이 일괄 치환하지 않는다.\n② 좌석을 명시한다. 미상(None)은 anthropic으로 접지 않고 '미측정'으로 남긴다(CLAUDE.md '모른다 ≠ 아니다'). 같은 좌석을 trace의 `cloud_seat`에도 싣는다.\n③ 집행 지점(정본화와 별항) — `actual_cost_usd`·`actual_cost_usd_or_none`·`actual_cost_krw` 호출은 `seat` 키워드를 반드시 명시한다는 것을 AST 소스 스캔 테스트로 동결한다. 신규 호출이 좌석을 생략하면 red. 주입 RED(좌석 생략 복원)와 대조군을 함께 넣는다.\n④ 영향 판정 — 이미 적재된 trace·생성 로그의 과대 계상은 소급 정정하지 않는다. 대신 어느 기간·어느 경로가 영향을 받았을 수 있는지 범위를 판정문에 남긴다. 특히 OPS-105가 의도적으로 표지를 달지 않은 저작 생성기들의 `cost_krw`는 `cost_report`가 '미표기'로 게이트② 표본에 기본 포함하므로(strict-surface 미사용 시) 표본 원가를 부풀렸을 수 있다 — 라이브 데이터가 없으면 '미측정'으로 적는다.\n⑤ 범위 밖 — 학생 대면 파이프라인(`l3/pipeline.py`)은 이미 좌석을 명시한다. 단가표 값 자체와 `SERVING_CLOUD_SEAT` 기본값은 건드리지 않는다."
-artifacts: []
+artifacts:
+  - "PR #1509 (kiki-s-broom/WhyMath#1509) — 6곳 좌석 명시·tests/backend/l3/test_cost_calc_seat_explicit.py(32건·AST 전수 스캔)·docs/reviews/ops_116_cost_seat_omission_impact_2026-10-07.md. 판정 기준: origin/main 42018d87 위 브랜치 기준(미머지). 뮤테이션 10종 전건 RED·원복 바이트 동일, ci_mirror 6잡 전건 통과(exit 0·commit e24a071f). 라이브 영향량은 미측정"
 paths:
   - src/backend/whymath_backend/l3/cross_verify.py
   - src/backend/whymath_backend/l3/multi_solution.py
@@ -21,6 +22,6 @@ paths:
   - src/backend/whymath_backend/l3/pedagogy/explanation_generator.py
   - src/backend/whymath_backend/l3/queue/tasks.py
   - src/backend/whymath_backend/ops/live_preflight.py
-session: claude/funny-maxwell-j2nuyy
+session: null
 notes: "OPS-109 구현 중 발견(docs/reviews/ops_109_prewarmer_observability_2026-10-06.md §3). 사전적재기는 같은 결함을 이번에 고쳤다(생성 로그 cost_usd가 CLOUD_MID에서 $18.0 대 $0.8 = 22.5배, CLOUD_HIGH는 openrouter 단가 미등재라 '미측정'이어야 하는데 $30.0). 전수 스캔은 whymath_backend 736개 파일에서 원가 계산 호출 13곳을 AST로 셌다 — 좌석 명시 7곳·생략 6곳. ARCH-62가 llm_generator만 고친 '한 곳에서만 고침' 계열이다. 이 6곳이 실제로 클라우드를 부르는지(영향이 있는지)는 호출부로 확인하지 못했다 — ①이 그 판정이다(부재/존재 단정 금지)."
 updated: 2026-10-07
