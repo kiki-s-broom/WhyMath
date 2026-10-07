@@ -555,6 +555,7 @@ def _value_item(
     explanation: str,
     ptype: str = _EVAL,
     unknown: str = "y",
+    setup: str | None = None,
 ) -> DiffItem:
     return DiffItem(
         slot=slot,
@@ -566,7 +567,29 @@ def _value_item(
         answer_map=((unknown, frac_text(value)),),
         problem_type_code=ptype,
         answer_format=answer_format_of(value),
+        solution_setup=setup,
     )
+
+
+def _mvt_setup(f: Poly, a: int, b: int, var: str = "x") -> str:
+    """풀이 단계 출발식 f'(var) = (f(b) - f(a))/(b - a) — 평균값 정리의 결론(도함수 = 평균변화율).
+
+    개수·구간 밖 근 문항의 검산 조건은 이 식을 미리 정리한 다항식이라 도함수가 없다. 해설 첫 단계
+    그대로 도함수에서 출발한다(`DiffItem.solution_setup`).
+    """
+    fa, fb = eval_at(f, a, var), eval_at(f, b, var)
+    return (
+        f"Derivative({poly_to_sympy_str(f, var)}, {var}).doit() = "
+        f"(({fb}) - ({fa}))/(({b}) - ({a}))"
+    )
+
+
+def _witness_line(slope: int, a: int, pv: int) -> str:
+    """도함수가 늘 slope인 함수(f(a) = pv를 지나는 일차·상수함수).
+
+    해설이 등호 성립을 보이는 함수다.
+    """
+    return poly_to_sympy_str(((1, slope), (0, pv - slope * a)))
 
 
 def _count_item(
@@ -631,6 +654,7 @@ def _count_item(
         problem_type_code=_COUNT,
         answer_format=answer_format_of(n),
         answer_kind="real_root_count",
+        solution_setup=_mvt_setup(case.f, a, b, var),
     )
 
 
@@ -713,6 +737,11 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
             f"{_paren_if_neg(bottom)} = {value}이다."
         )
         cond = f"({pv} + ({hi})*(({b}) - ({a}))) + ({pv} + ({lo})*(({b}) - ({a}))) = y"
+    # 풀이 단계 출발식 — f(b) = f(a) + f'(c)(b - a)에서 f'(c)가 끝값일 때(해설의 등호 성립 함수).
+    span = f"(({b}) - ({a}))"
+    upper = f"({pv}) + Derivative({_witness_line(hi, a, pv)}, x)*{span}"
+    lower = f"({pv}) + Derivative({_witness_line(lo, a, pv)}, x)*{span}"
+    body_expr = {"upper": upper, "lower": lower}.get(side, f"{upper} + {lower}")
     return _value_item(
         slot=slot,
         frame_id=frame_id,
@@ -720,6 +749,7 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
         value=Fraction(value),
         condition=cond,
         explanation=mvt + body,
+        setup=f"({body_expr}).doit() = y",
     )
 
 
@@ -1481,6 +1511,7 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("x", frac_text(out)),),
             problem_type_code=_SOLVE,
             answer_format=answer_format_of(out),
+            solution_setup=_mvt_setup(c.f, c.a, c.b),
         )
 
     def k3(p: tuple[object, ...]) -> DiffItem | None:

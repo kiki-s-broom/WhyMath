@@ -243,6 +243,7 @@ def _item(
     selection: str | None = None,
     choices: tuple[str, ...] | None = None,
     distractors: tuple[tuple[int, str], ...] = (),
+    setup: str | None = None,
 ) -> ShapeItem:
     return ShapeItem(
         slot=slot,
@@ -257,6 +258,7 @@ def _item(
         choices=choices,
         distractors=distractors,
         answer_selection=selection,
+        solution_setup=setup,
     )
 
 
@@ -502,6 +504,8 @@ def _judged_value_item(
         answer_map=(("x", str(target)), ("y", str(value))),
         ptype=_OPT,
         explanation=f"{_explain(fn)} {tail}",
+        # 검산 조건의 f'(x) = 0은 도함수를 미리 풀어 쓴 다항식 — 풀이 단계는 미분에서 출발한다.
+        setup=f"Derivative({fn.sym}, x).doit() = 0",
     )
 
 

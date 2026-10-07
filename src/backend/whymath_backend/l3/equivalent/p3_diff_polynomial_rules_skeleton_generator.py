@@ -482,6 +482,11 @@ def _basic_frames() -> list[Frame]:
                 _deriv_sym(f"({poly_to_sympy_str(f1)}) + ({poly_to_sympy_str(f2)})", str(a))
                 + " = y"
             ),
+            # 풀이 단계는 해설처럼 f'·g'를 따로 미분한다(검산 조건은 합의 미분 한 번).
+            solution_setup=(
+                f"(Derivative({poly_to_sympy_str(f1)}, x) + Derivative({poly_to_sympy_str(f2)}, x))"
+                f".doit().subs(x, {a}) = y"
+            ),
             answer_map=(("y", str(v1 + v2)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(v1 + v2),
@@ -508,6 +513,11 @@ def _basic_frames() -> list[Frame]:
             conditions=(
                 _deriv_sym(f"({poly_to_sympy_str(f1)}) - ({poly_to_sympy_str(f2)})", str(a))
                 + " = y"
+            ),
+            # 풀이 단계는 해설처럼 f'·g'를 따로 미분한다(검산 조건은 차의 미분 한 번).
+            solution_setup=(
+                f"(Derivative({poly_to_sympy_str(f1)}, x) - Derivative({poly_to_sympy_str(f2)}, x))"
+                f".doit().subs(x, {a}) = y"
             ),
             answer_map=(("y", str(v1 - v2)),),
             problem_type_code=_EVAL,
@@ -1080,6 +1090,11 @@ def _mastery_frames() -> list[Frame]:
             conditions=(
                 _deriv_sym(f"{s}*({poly_to_sympy_str(f1)}) - {t}*({poly_to_sympy_str(f2)})", str(a))
                 + " = y"
+            ),
+            # 풀이 단계는 해설처럼 h' = s·f' - t·g'로 f'·g'를 따로 미분한다.
+            solution_setup=(
+                f"({s}*Derivative({poly_to_sympy_str(f1)}, x)"
+                f" - {t}*Derivative({poly_to_sympy_str(f2)}, x)).doit().subs(x, {a}) = y"
             ),
             answer_map=(("y", str(value)),),
             problem_type_code=_EVAL,

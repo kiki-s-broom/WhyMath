@@ -311,6 +311,10 @@ def _basic_frames() -> list[Frame]:
             answer_map=(("y", str(total)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(total),
+            # 풀이 단계는 해설처럼 f'·g'를 따로 미분한다(검산 조건은 합의 미분 한 번).
+            solution_setup=(
+                f"(Derivative(x**{n}, x) + Derivative(x**{m}, x)).doit().subs(x, {a}) = y"
+            ),
         )
 
     def b5(p: tuple[object, ...]) -> DiffItem | None:
@@ -334,6 +338,10 @@ def _basic_frames() -> list[Frame]:
                 f" = {diff}이다."
             ),
             conditions=_deriv_sym(f"x**{n} - x**{m}", str(a)) + " = y",
+            # 풀이 단계는 해설처럼 f'·g'를 따로 미분한다(검산 조건은 차의 미분 한 번).
+            solution_setup=(
+                f"(Derivative(x**{n}, x) - Derivative(x**{m}, x)).doit().subs(x, {a}) = y"
+            ),
             answer_map=(("y", str(diff)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(diff),
@@ -795,6 +803,11 @@ def _mastery_frames() -> list[Frame]:
                 f"이므로 x가 {a}일 때 세 값을 더하면 {total}이다."
             ),
             conditions=_deriv_sym(f"x**{n} + x**{m} + x**{k}", str(a)) + " = y",
+            # 풀이 단계는 해설처럼 세 도함수를 따로 구한다(검산 조건은 합의 미분 한 번).
+            solution_setup=(
+                f"(Derivative(x**{n}, x) + Derivative(x**{m}, x) + Derivative(x**{k}, x))"
+                f".doit().subs(x, {a}) = y"
+            ),
             answer_map=(("y", str(total)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(total),

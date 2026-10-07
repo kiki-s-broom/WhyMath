@@ -254,6 +254,22 @@ def _d(f: Poly, point: str) -> str:
     return f"Derivative({poly_to_sympy_str(f)}, x).doit().subs(x, {point})"
 
 
+def _setup_at(body: str, point: str) -> str:
+    """풀이 단계 출발식의 한 변 — 도함수가 든 식 전체를 점에서 계산한다(`(식).doit().subs(x, 점)`).
+
+    검산 조건이 기울기·함숫값을 상수로 풀어 쓴 산술식인 문항은 그 상수를 `Derivative(f, x)`·`f`로
+    되돌려 출발식을 단다(`DiffItem.solution_setup`). `.doit()`·`.subs()`는 변 전체에만 붙일 수
+    있어(안전 파서) 산술과 섞인 도함수는 이 꼴로 쓴다(`p3_diff_solution_steps` docstring).
+    """
+    return f"({body}).doit().subs(x, {point})"
+
+
+def _tangent_at(f: Poly, a: object, t: str) -> str:
+    """접점 x = a에서의 접선 y = f'(a)(x - a) + f(a)의 x = t에서의 값 — 출발식의 한 변."""
+    s = poly_to_sympy_str(f)
+    return _setup_at(f"{s} + Derivative({s}, x)*(({t}) - x)", str(a))
+
+
 def _shift(f: Poly, delta: int) -> Poly:
     """f(x + delta)를 SymPy로 전개한 다항식(두 점의 기울기를 한 번의 미분으로 묶는 데 쓴다)."""
     expr = sympy.expand(poly_to_sympy(f).subs(_X, _X + delta))
@@ -329,9 +345,21 @@ def _slope_item(
 
 
 def _echo_item(
-    *, slot: str, frame_id: str, text: str, value: int, explanation: str, expr: str, ptype: str
+    *,
+    slot: str,
+    frame_id: str,
+    text: str,
+    value: int,
+    explanation: str,
+    expr: str,
+    ptype: str,
+    setup: str,
 ) -> DiffItem:
-    """수치 대입형 — 생성기가 SymPy로 푼 상수를 산술식으로 재확인한다(독립 미분 검산 아님)."""
+    """수치 대입형 — 생성기가 SymPy로 푼 상수를 산술식으로 재확인한다(독립 미분 검산 아님).
+
+    검산 조건(`expr = y`)에 도함수가 없으므로 풀이 단계의 출발식(`setup` — 상수를 `Derivative`로
+    되돌린 같은 관계)을 반드시 받는다.
+    """
     return DiffItem(
         slot=slot,
         frame_id=frame_id,
@@ -342,6 +370,7 @@ def _echo_item(
         answer_map=(("y", str(value)),),
         problem_type_code=ptype,
         answer_format=_fmt(value),
+        solution_setup=setup,
     )
 
 
@@ -403,6 +432,14 @@ def _rep_frames() -> list[Frame]:
             answer_map=(("k", str(k)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(k),
+            # 해설 그대로 — 판별식의 기울기 m을 접점의 미분계수 f'(a)로 되돌린다.
+            solution_setup=(
+                _setup_at(
+                    f"(({b}) - Derivative({poly_to_sympy_str(f)}, x))**2 - 4*({lead})*(({c}) - k)",
+                    str(a),
+                )
+                + " = 0"
+            ),
         )
 
     def r4(p: tuple[object, ...]) -> DiffItem | None:
@@ -426,6 +463,7 @@ def _rep_frames() -> list[Frame]:
             ),
             expr=f"({fa}) + ({m})*(({t}) - ({a}))",
             ptype=_EVAL,
+            setup=f"{_tangent_at(f, a, str(t))} = y",
         )
 
     def r5(p: tuple[object, ...]) -> DiffItem | None:
@@ -558,6 +596,13 @@ def _basic_frames() -> list[Frame]:
                 f"Derivative({poly_to_sympy_str(f)} + ({poly_to_sympy_str(shifted)}), x)"
                 f".doit().subs(x, {a}) = y"
             ),
+            # 풀이 단계는 해설처럼 f'(a)와 f'(b)를 따로 구한다 — 두 점을 한 식에 담으려고 두 번째
+            # 점은 같은 함수를 변수 u로 쓴다(검산 조건의 f(x + d) 이동은 Tier1 표기 제약일 뿐이다).
+            solution_setup=(
+                f"(Derivative({poly_to_sympy_str(f)}, x)"
+                f" + Derivative({poly_to_sympy_str(f, 'u')}, u))"
+                f".doit().subs(x, {a}).subs(u, {b}) = y"
+            ),
             answer_map=(("y", str(total)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(total),
@@ -587,6 +632,12 @@ def _basic_frames() -> list[Frame]:
                 f"Derivative(({poly_to_sympy_str(shifted)}) - ({poly_to_sympy_str(f)}), x)"
                 f".doit().subs(x, {a}) = y"
             ),
+            # 풀이 단계는 해설처럼 f'(b) - f'(a)를 따로 구한다(두 번째 점은 같은 함수를 변수 u로).
+            solution_setup=(
+                f"(Derivative({poly_to_sympy_str(f, 'u')}, u)"
+                f" - Derivative({poly_to_sympy_str(f)}, x))"
+                f".doit().subs(u, {b}).subs(x, {a}) = y"
+            ),
             answer_map=(("y", str(diff)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(diff),
@@ -610,6 +661,7 @@ def _basic_frames() -> list[Frame]:
             ),
             expr=f"({fa}) - ({a})*({m})",
             ptype=_EVAL,
+            setup=f"{_tangent_at(f, a, '0')} = y",
         )
 
     def b5(p: tuple[object, ...]) -> DiffItem | None:
@@ -634,6 +686,15 @@ def _basic_frames() -> list[Frame]:
             ),
             expr=f"({m}) + ({k})",
             ptype=_EVAL,
+            # m + n = f'(a) + (접선의 y절편 f(a) + f'(a)(0 - a)).
+            setup=(
+                _setup_at(
+                    f"Derivative({poly_to_sympy_str(f)}, x) + ({poly_to_sympy_str(f)})"
+                    f" + Derivative({poly_to_sympy_str(f)}, x)*((0) - x)",
+                    str(a),
+                )
+                + " = y"
+            ),
         )
 
     def b6(p: tuple[object, ...]) -> DiffItem | None:
@@ -660,6 +721,13 @@ def _basic_frames() -> list[Frame]:
             ),
             expr=f"({a}) - ({fa})/({m})",
             ptype=_EVAL,
+            # 접선에 y = 0을 넣은 x절편 a - f(a)/f'(a).
+            setup=(
+                _setup_at(
+                    f"x - ({poly_to_sympy_str(f)})/Derivative({poly_to_sympy_str(f)}, x)", str(a)
+                )
+                + " = y"
+            ),
         )
 
     cubics = _cubic_pool()
@@ -794,6 +862,8 @@ def _applied_frames() -> list[Frame]:
             answer_map=(("a", str(a0)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(a0),
+            # 접선 y = f'(a)(x - a) + f(a)가 점을 지난다 — f(a)·f'(a)를 미분으로 되돌린 같은 식.
+            solution_setup=f"{_tangent_at(f, 'a', str(px))} = {qy}",
         )
 
     def a4(p: tuple[object, ...]) -> DiffItem | None:
@@ -828,6 +898,15 @@ def _applied_frames() -> list[Frame]:
             answer_map=(("c", str(c0)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(c0),
+            # 해설 그대로 — 판별식의 기울기 m을 곡선(상수항 c)의 x = a에서의 미분계수로 되돌린다.
+            solution_setup=(
+                _setup_at(
+                    f"(({b}) - Derivative({poly_to_sympy_str(_poly({2: lead, 1: b}))} + c, x))**2"
+                    f" - 4*({lead})*(c - ({n}))",
+                    str(a),
+                )
+                + " = 0"
+            ),
         )
 
     def a5(p: tuple[object, ...]) -> DiffItem | None:
@@ -855,6 +934,11 @@ def _applied_frames() -> list[Frame]:
             answer_map=(("a", str(s)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(s),
+            # 해설의 f(a) - af'(a) = 0 — 접선에 원점을 대입한 식.
+            solution_setup=(
+                _setup_at(f"{poly_to_sympy_str(f)} - x*Derivative({poly_to_sympy_str(f)}, x)", "a")
+                + " = 0"
+            ),
         )
 
     def a6(p: tuple[object, ...]) -> DiffItem | None:
@@ -945,6 +1029,7 @@ def _mc_item(
     explanation: str,
     shuffle_key: str,
     ptype: str = _EVAL,
+    setup: str | None = None,
 ) -> DiffItem | None:
     try:
         choices, answer, distractors = build_choices(
@@ -970,6 +1055,7 @@ def _mc_item(
         answer_format=_fmt(answer),
         choices=choices,
         distractors=distractors,
+        solution_setup=setup,
     )
 
 
@@ -1029,6 +1115,7 @@ def _misconception_frames() -> list[Frame]:
             filler=fa,
             conditions=f"({fa}) - ({a})*({m}) = y",
             answer_map=(("y", str(k)),),
+            setup=f"{_tangent_at(f, a, '0')} = y",
             explanation=(
                 f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
                 "기울기는 "
@@ -1056,6 +1143,7 @@ def _misconception_frames() -> list[Frame]:
             filler=eval_at(f, t),
             conditions=f"({fa}) + ({m})*(({t}) - ({a})) = y",
             answer_map=(("y", str(value)),),
+            setup=f"{_tangent_at(f, a, str(t))} = y",
             explanation=(
                 f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
                 "기울기는 "
@@ -1264,6 +1352,7 @@ def _diagnostic_frames() -> list[Frame]:
             ),
             expr=f"({fa}) - (-1)*({m})",
             ptype=_EVAL,
+            setup=f"{_tangent_at(f, -1, '0')} = y",
         )
 
     return [
@@ -1338,6 +1427,9 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("k", str(k)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(k),
+            # 직선이 x = r2에서의 접선이므로 k는 그 접선의 y절편 f(r2) + f'(r2)(0 - r2)이다.
+            # (접점 r2를 f'(a) = m으로 고르는 앞 단계는 연쇄에 싣지 못한다 — 미지수가 바뀐다.)
+            solution_setup=f"{_tangent_at(f, r2, '0')} = k",
         )
 
     def k2(p: tuple[object, ...]) -> DiffItem | None:
@@ -1376,6 +1468,11 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("s", str(s_root)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(s_root),
+            # 곡선 f(s)와 접선 f'(a)(s - a) + f(a)를 연립 — 접선의 기울기를 미분으로 되돌린 같은 식.
+            solution_setup=(
+                f"({poly_to_sympy_str(f, 's')} - ({poly_to_sympy_str(f)}"
+                f" + Derivative({poly_to_sympy_str(f)}, x)*(s - x))).doit().subs(x, {a}) = 0"
+            ),
         )
 
     def k3(p: tuple[object, ...]) -> DiffItem | None:
@@ -1419,6 +1516,10 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("m", str(m)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(m),
+            # 해설의 마지막 단계 — 접선의 기울기는 접점 x = t에서의 미분계수 f'(t)다. (t를 고르는
+            # f(t) - tf'(t) = 점의 y좌표는 허근이 섞인 삼차라 해집합 판정 불가 — 연쇄에 싣지
+            # 못한다.)
+            solution_setup=f"{_d(f, str(t))} = m",
         )
 
     def k4(p: tuple[object, ...]) -> DiffItem | None:
@@ -1447,6 +1548,15 @@ def _mastery_frames() -> list[Frame]:
             ),
             expr=f"(1/2)*Abs({k})*Abs(({a}) - ({fa})/({m}))",
             ptype=_EVAL,
+            # 넓이 = (1/2)|y절편 f(a) - af'(a)|·|x절편 a - f(a)/f'(a)|.
+            setup=(
+                _setup_at(
+                    f"(1/2)*Abs({poly_to_sympy_str(f)} - x*Derivative({poly_to_sympy_str(f)}, x))"
+                    f"*Abs(x - ({poly_to_sympy_str(f)})/Derivative({poly_to_sympy_str(f)}, x))",
+                    str(a),
+                )
+                + " = y"
+            ),
         )
 
     def k5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1487,6 +1597,11 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("p", str(p0)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(p0),
+            # 해설의 y절편 f(a) - af'(a) = n — 도함수를 미분으로 되돌린 같은 식(미지수 p).
+            solution_setup=(
+                _setup_at(f"{sympy.sstr(curve)} - x*Derivative({sympy.sstr(curve)}, x)", str(a))
+                + f" = {n}"
+            ),
         )
 
     def k6(p: tuple[object, ...]) -> DiffItem | None:
@@ -1535,6 +1650,16 @@ def _mastery_frames() -> list[Frame]:
             answer_map=(("q", str(q0)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(q0),
+            # 해설의 두 조건을 한 식으로 — 기울기 조건 p = g'(a) - (x^2)'(a)를 함숫값 조건
+            # q = g(a) - a^2 - pa에 넣는다(미지수 q 하나).
+            solution_setup=(
+                _setup_at(
+                    f"{poly_to_sympy_str(g)} - x**2"
+                    f" - (Derivative({poly_to_sympy_str(g)}, x) - Derivative(x**2, x))*x",
+                    str(a),
+                )
+                + " = q"
+            ),
         )
 
     k6_params: list[tuple[object, ...]] = [

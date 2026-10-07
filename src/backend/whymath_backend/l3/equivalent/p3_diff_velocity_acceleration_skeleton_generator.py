@@ -166,6 +166,11 @@ def _shift(f: Poly, delta: int) -> Poly:
     return poly_from_sympy(expr, _V)
 
 
+def _v_plus_a_setup(f: Poly, t: int) -> str:
+    """풀이 단계 출발식 v(t) + a(t) = y — 속도·가속도를 따로 미분한다(해설과 같은 대상)."""
+    return f"(Derivative({_st(f)}, t) + Derivative({_st(f)}, t, 2)).doit().subs(t, {t}) = y"
+
+
 def _k_affine(base: Poly, t: int) -> str:
     """v(t) = base'(t) + 2kt를 t에 대입한 k의 일차식('6k + 51') — 해설의 방정식 단계."""
     return render_poly(((1, 2 * t), (0, eval_at(_vel(base), t, _V))), _PARAM)
@@ -318,6 +323,7 @@ def _value_item(
     explanation: str,
     conditions: str,
     ptype: str = _EVAL,
+    setup: str | None = None,
 ) -> DiffItem:
     return DiffItem(
         slot=slot,
@@ -329,6 +335,7 @@ def _value_item(
         answer_map=(("y", str(value)),),
         problem_type_code=ptype,
         answer_format=_fmt(value),
+        solution_setup=setup,
     )
 
 
@@ -371,6 +378,7 @@ def _solve_item(
     explanation: str,
     conditions: str | tuple[str, ...],
     symbol: str = "s",
+    setup: str | None = None,
 ) -> DiffItem:
     return DiffItem(
         slot=slot,
@@ -382,6 +390,7 @@ def _solve_item(
         answer_map=((symbol, str(answer)),),
         problem_type_code=_SOLVE,
         answer_format=_fmt(answer),
+        solution_setup=setup,
     )
 
 
@@ -473,6 +482,8 @@ def _rep_frames() -> list[Frame]:
             conditions=(
                 f"Derivative({_st(f)} + Derivative({_st(f)}, t), t).doit().subs(t, {t}) = y"
             ),
+            # 풀이 단계는 해설처럼 v(t)·a(t)를 따로 구한다.
+            setup=_v_plus_a_setup(f, t),
         )
 
     def r6(p: tuple[object, ...]) -> DiffItem | None:
@@ -495,6 +506,11 @@ def _rep_frames() -> list[Frame]:
                 f"{change}이다."
             ),
             conditions=(f"Derivative(({_st(shifted)}) - ({_st(f)}), t).doit().subs(t, {t0}) = y"),
+            # 풀이 단계는 해설처럼 v(t1) - v(t0)를 따로 구한다(두 번째 시각은 같은 함수를 변수 u로).
+            setup=(
+                f"(Derivative({poly_to_sympy_str(f, 'u')}, u) - Derivative({_st(f)}, t))"
+                f".doit().subs(u, {t1}).subs(t, {t0}) = y"
+            ),
         )
 
     base_pool = tuple(
@@ -552,6 +568,11 @@ def _basic_frames() -> list[Frame]:
                 f"{render_sum(v0, v1)} = {total}이다."
             ),
             conditions=(f"Derivative(({_st(f)}) + ({_st(shifted)}), t).doit().subs(t, {t0}) = y"),
+            # 풀이 단계는 해설처럼 v(t0) + v(t1)을 따로 구한다(두 번째 시각은 같은 함수를 변수 u로).
+            setup=(
+                f"(Derivative({_st(f)}, t) + Derivative({poly_to_sympy_str(f, 'u')}, u))"
+                f".doit().subs(t, {t0}).subs(u, {t1}) = y"
+            ),
         )
 
     def b2(p: tuple[object, ...]) -> DiffItem | None:
@@ -799,6 +820,7 @@ def _mc_item(
     conditions: str,
     explanation: str,
     shuffle_key: str,
+    setup: str | None = None,
 ) -> DiffItem | None:
     try:
         choices, answer, distractors = build_choices(
@@ -824,6 +846,7 @@ def _mc_item(
         answer_format=_fmt(answer),
         choices=choices,
         distractors=distractors,
+        solution_setup=setup,
     )
 
 
@@ -896,6 +919,7 @@ def _misconception_frames() -> list[Frame]:
             conditions=(
                 f"Derivative({_st(f)} + Derivative({_st(f)}, t), t).doit().subs(t, {t}) = y"
             ),
+            setup=_v_plus_a_setup(f, t),
             explanation=(
                 f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {render_poly(_acc(f), _V)}이므로 "
                 f"t = {t}에서 속도는 {v}, 가속도는 {a}이고 합은 {render_sum(v, a)} = {v + a}이다."
@@ -1135,6 +1159,10 @@ def _mastery_frames() -> list[Frame]:
                 f"x({r}) = {x}이다."
             ),
             conditions=f"{_at(f, r)} = y",
+            # 검산 조건은 위치 대입 산술식 — 풀이 단계는 해설의 v(t) = 0(운동 방향이 바뀌는
+            # 시각)에서 출발해 그 시각들에서 끝난다(위치 x(r)는 다른 미지수라 같은 연쇄에 싣지
+            # 못한다).
+            setup=f"Derivative({_st(f)}, t).doit() = 0",
         )
 
     def k3(p: tuple[object, ...]) -> DiffItem | None:
@@ -1182,6 +1210,11 @@ def _mastery_frames() -> list[Frame]:
                 f"{render_poly(_vel(f), _V)} = {render_poly(_vel(g), _V)}에서 t = {r}이다."
             ),
             conditions=(f"Derivative(({_st(f)}) - ({_st(g)}), t).doit().subs(t, s) = 0", "s > 0"),
+            # 풀이 단계는 해설처럼 f'(t) = g'(t)로 두 속도를 따로 미분한다.
+            setup=(
+                f"Derivative({_st(f)}, t).doit().subs(t, s) = "
+                f"Derivative({_st(g)}, t).doit().subs(t, s)"
+            ),
         )
 
     def k5(p: tuple[object, ...]) -> DiffItem | None:

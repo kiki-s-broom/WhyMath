@@ -570,14 +570,26 @@ def test_items_are_deterministic_across_cache_rebuilds(
 # ──────────────────────────────────────────────────────────────────────────
 # 슬롯 불변식(`_validate_slot`) — 위반이 빌드 시점에 멈추는지(가드의 변별력)
 # ──────────────────────────────────────────────────────────────────────────
-def _item(slot: str, *, kebab: str | None, mc: bool = True, frame: str = "f") -> DiffItem:
+#: 가짜 문항의 검산 조건 — 빌드가 풀이 단계(`verify.solution_steps`)를 도출할 수 있어야 한다
+#: (`_validate_slot`이 문항마다 전이 전건 correct인 연쇄를 만든다). f(x) = x의 x = 1 미분계수 = 1.
+_DERIVABLE = "Derivative(x, x).doit().subs(x, 1) = y"
+
+
+def _item(
+    slot: str,
+    *,
+    kebab: str | None,
+    mc: bool = True,
+    frame: str = "f",
+    conditions: str = _DERIVABLE,
+) -> DiffItem:
     return DiffItem(
         slot=slot,
         frame_id=frame,
         question_text=f"문항 {slot} {frame} {kebab}",
         answer_text="1",
         explanation="해설",
-        conditions="x = y",
+        conditions=conditions,
         answer_map=(("y", "1"),),
         problem_type_code="ptype.evaluate-expression",
         answer_format=AnswerFormat.자연수,
@@ -639,8 +651,21 @@ def test_validate_slot_accepts_a_healthy_registry_entry() -> None:
             lambda d: d.__setitem__("applied", []),
             "0건",
         ),
+        (
+            # 풀이 단계를 도출할 수 없는 검산 조건(미지수 2개·도함수 없음) — 빌드가 멈춘다.
+            lambda d: d.__setitem__(
+                "diagnostic", [_item("diagnostic", kebab=None, mc=False, conditions="x = y")]
+            ),
+            "풀이 단계 도출 실패",
+        ),
     ],
-    ids=["mixed-kebab-sets", "mc-slot-without-kebab", "kebab-outside-mc-slot", "empty-slot"],
+    ids=[
+        "mixed-kebab-sets",
+        "mc-slot-without-kebab",
+        "kebab-outside-mc-slot",
+        "empty-slot",
+        "underivable-steps",
+    ],
 )
 def test_validate_slot_rejects_violations(
     mutate: Callable[[dict[str, list[DiffItem]]], None], message: str

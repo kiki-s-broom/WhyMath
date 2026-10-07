@@ -21,6 +21,13 @@ p3_calculus1_diff_batch`)는 생성기 등록부(`GENERATORS`)만 알면 되므�
 `ptype.evaluate-expression`은 겹치지 않는다). 겹치게 하려고 유형을 거짓으로 달지 않는다 — 대신
 겹치는 유형(`ptype.solve-for-unknown` 등)의 *진짜* 문항을 개념마다 충분히 만든다.
 
+풀이 단계(`verify.solution_steps`)
+---------------------------------
+문항마다 도함수가 든 출발식에서 답(또는 답을 고르는 근 목록)까지의 SymPy 식 연쇄를 싣는다
+(`steps_of` → `p3_diff_solution_steps`). 전이는 전부 `verify_step` correct여야 하며(수용 게이트
+Tier2 계약) 만들 수 없으면 빌드가 멈춘다. 검산 조건에 도함수가 없는 문항(기울기를 상수로 풀어 쓴
+산술식·판별식 등)은 생성기가 `DiffItem.solution_setup`에 출발식을 단다.
+
 review_status
 -------------
 이 모듈은 `review_status` 키를 **쓰지 않는다**(None/키 부재 유지). 승인은 감사 표본 경로의 몫이며,
@@ -32,6 +39,7 @@ review_status
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import random
 import re
@@ -49,6 +57,7 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ShortcutProbe,
     shortcut_violations,
 )
+from whymath_backend.l3.equivalent.p3_diff_solution_steps import StepChain, solution_steps
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -75,6 +84,7 @@ __all__ = [
     "round_robin_items",
     "seeded_order",
     "skeleton_of",
+    "steps_of",
 ]
 
 #: 슬롯 id 타입 — `Literal`로 두어야 형제 생성기 공간 겹침 감사기(`harness/
@@ -173,6 +183,10 @@ class DiffItem:
     choices: tuple[str, ...] | None = None
     #: (오답 선지 인덱스, 오개념 kebab) — 카탈로그에 매핑되는 오답만(미매핑 오답은 싣지 않는다).
     distractors: tuple[tuple[int, str], ...] = ()
+    #: 풀이 단계(`verify.solution_steps`)의 출발식 — 도함수가 든 등식 1개. 검산 조건에 도함수가
+    #: 없는 문항(기울기를 상수로 풀어 쓴 산술식·판별식 등)만 생성기가 단다. None이면
+    #: `p3_diff_solution_steps.derive_setup`이 검산 조건에서 고른다.
+    solution_setup: str | None = None
 
     @property
     def misconception_ids(self) -> frozenset[str]:
@@ -271,6 +285,22 @@ def round_robin_items(
                 progressed = True
                 break
     return out
+
+
+@functools.lru_cache(maxsize=None)
+def steps_of(item: DiffItem) -> StepChain:
+    """문항의 풀이 단계 연쇄(캐시) — `p3_diff_solution_steps.solution_steps`의 문항 어댑터.
+
+    빌드 검증(`_validate_slot`)과 후보 조립(`_assemble`)이 같은 결과를 쓴다(문항은 불변·해시 가능).
+    전이 전건 correct인 연쇄를 못 만들면 ValueError(검증 안 된 단계를 은행에 싣지 않는다).
+    """
+    kind = getattr(item, "answer_kind", None)
+    return solution_steps(
+        conditions=item.conditions,
+        answer_map=dict(item.answer_map),
+        answer_kind=kind if isinstance(kind, str) else None,
+        setup=item.solution_setup,
+    )
 
 
 def probe_of(standard_code: str, item: DiffItem) -> ShortcutProbe:
@@ -389,6 +419,15 @@ class P3DiffSlotGenerator:
                     + " / ".join(str(v) for v in violations)
                     + f" — 발문: {item.question_text}"
                 )
+            # 풀이 단계(`verify.solution_steps`) — 전이 전건 correct인 연쇄를 빌드 시점에 만든다.
+            # 수용 게이트는 개념형(`answer_kind`) 문항의 단계를 보지 않으므로 여기서
+            # fail-loud로 막는다.
+            try:
+                steps_of(item)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{cls.__name__}[{slot}] {item.frame_id}: 풀이 단계 도출 실패 — {exc}"
+                ) from exc
 
     @classmethod
     def target_misconception_ids(cls, slot: str) -> frozenset[str]:
@@ -454,7 +493,8 @@ class P3DiffSlotGenerator:
             transformation_pipeline={
                 "steps": [
                     "결정론 스켈레톤 조립(슬롯 틀·파라미터 열거·정답은 SymPy 미분으로 계산)",
-                    "S2-a 수용 게이트(Tier1 SymPy 검산)",
+                    "풀이 단계 도출(p3_diff_solution_steps — 도함수 출발식부터 SymPy 계산)",
+                    "S2-a 수용 게이트(Tier1 SymPy 검산 + Tier2 단계 동치)",
                     "감사 표본 승인 경로(이 도구는 review_status를 쓰지 않는다)",
                 ],
             },
@@ -472,7 +512,8 @@ class P3DiffSlotGenerator:
             provenance=provenance,
             conditions=conditions,
             answer_map=dict(item.answer_map),
-            solution_steps=None,
+            # 풀이 단계 — 도함수가 든 출발식에서 답(또는 근 목록)까지, 전이 전건 correct(Tier2).
+            solution_steps=list(steps_of(item).steps),
             concept_tags=[
                 ConceptTag(
                     concept_src_id=self.concept_src_id,

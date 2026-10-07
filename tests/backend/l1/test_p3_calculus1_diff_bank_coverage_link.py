@@ -14,6 +14,8 @@
   · 전건 `approved` 본            → 일곱 개념 '스킬 연결된 적격 문항' 충족
 
 을 둘 다 단언한다 — 한쪽만 보면 "항상 충족"이나 "항상 미충족"인 계측기와 구별되지 않는다.
+Concept Completeness의 'solution' 연결(해설 + 풀이 단계 `verify.solution_steps`)도 같은 방식으로
+보고, 승인본에서 단계만 지운 대조군이 다시 missing임을 함께 단언한다.
 레포 파일은 바꾸지 않는다(변형은 전부 tmp). 이 테스트가 *레포 파일의 승인 여부*에 의존하지 않도록
 두 변형 모두 `review_status`를 명시적으로 덮어쓴다(감사 승인이 나중에 레포 은행에 들어와도 안 깨진다).
 """
@@ -120,9 +122,13 @@ def test_sidecar_passes_the_provenance_audit(tmp_path: Path) -> None:
     assert report.exit_code == 0, [v for v in report.violations]
 
 
-def _tmp_root(tmp_path: Path, *, approved: bool) -> Path:
-    """데이터 코퍼스를 링크로 잇고 이 은행만 `review_status`를 명시적으로 덮어쓴 복사본으로 둔다."""
-    root = tmp_path / ("approved" if approved else "unreviewed")
+def _tmp_root(tmp_path: Path, *, approved: bool, strip_steps: bool = False) -> Path:
+    """데이터 코퍼스를 링크로 잇고 이 은행만 `review_status`를 명시적으로 덮어쓴 복사본으로 둔다.
+
+    `strip_steps`면 복사본에서 `verify.solution_steps`를 지운다(계측기 'solution' 연결의 변별력 대조군).
+    """
+    name = ("approved" if approved else "unreviewed") + ("_nosteps" if strip_steps else "")
+    root = tmp_path / name
     (root / "data" / "corpus").mkdir(parents=True)
     for entry in _CORPUS.iterdir():
         if entry.name != CORPUS_DIR_NAME:
@@ -134,6 +140,8 @@ def _tmp_root(tmp_path: Path, *, approved: bool) -> Path:
             row.pop("review_status", None)
             if approved:
                 row["review_status"] = "approved"
+            if strip_steps:
+                row["verify"].pop("solution_steps", None)  # type: ignore[union-attr]
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     return root
 
@@ -166,6 +174,38 @@ def test_only_approval_is_missing_for_the_seven_concepts(tmp_path: Path) -> None
         assert approved[code].content_present  # 개념 콘텐츠 행 존재(완전 연결 조건 1)
         assert pc._is_fully_linked(approved[code])
         assert not pc._is_fully_linked(unreviewed[code])
+
+
+def _solution_status(root: Path) -> dict[str, str]:
+    """개념별 Concept Completeness 'solution' 연결 상태(linked/missing) — 계측기 정의 그대로."""
+    spec = load_scope_spec(default_spec_path())
+    index = load_reference_index(spec)
+    corpus = pc.load_corpus(spec, root)
+    return {
+        c.code: pc._completeness_links(pc._facts(spec, index, corpus, c), corpus)["solution"][0]
+        for c in spec.concepts
+    }
+
+
+@pytest.mark.skipif(not _CORPUS.is_dir(), reason="data/corpus 부재")
+def test_solution_link_needs_only_approval_and_is_made_by_the_steps(tmp_path: Path) -> None:
+    """'solution' 연결 = 적격(승인) 문항 중 해설과 비어 있지 않은 `solution_steps`가 둘 다 있는 문항.
+
+    · 키 제거본 → 일곱 개념 missing(승인 0 — 현행 상태의 재현).
+    · 전건 approved 본 → 일곱 개념 linked(풀이 단계 도입 효과 — 2026-10-07 실측 계측기 전체 2/10 →
+      9/10. 남은 [12미적Ⅰ-02-02]은 다른 은행 소관이라 이 테스트가 단언하지 않는다).
+    · approved 본에서 단계만 지운 대조군 → 일곱 개념 다시 missing — 연결을 만든 것이 해설이 아니라
+      단계임을 보인다(한쪽만 보면 '항상 linked'인 계측기와 구별되지 않는다).
+    """
+    unreviewed = _solution_status(_tmp_root(tmp_path, approved=False))
+    approved = _solution_status(_tmp_root(tmp_path, approved=True))
+    stripped = _solution_status(_tmp_root(tmp_path, approved=True, strip_steps=True))
+    for code in _CODES:
+        assert unreviewed[code] == "missing", code
+        assert approved[code] == "linked", code
+        assert stripped[code] == "missing", code
+    linked = {code for code, status in approved.items() if status == "linked"}
+    assert linked - {c for c, s in unreviewed.items() if s == "linked"} == set(_CODES)
 
 
 @pytest.mark.skipif(not _CORPUS.is_dir(), reason="data/corpus 부재")
