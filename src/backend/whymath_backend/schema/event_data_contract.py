@@ -195,6 +195,27 @@ class HintEventData(_EventPayload):
             "상태에서만 만들어진다."
         ),
     )
+    label_source: str | None = Field(
+        default=None,
+        max_length=16,
+        description=(
+            "EOS-179: `ability_level` 라벨의 출처 — 'explicit'(클라가 `mastery_level`을 직접 "
+            "보냄)·'server_bkt'(서버 L2 개념 숙달도 포함)·'server_theta'(서버 θ만)·"
+            "'client_bkt'(클라 제출 bkt 포함 — 서버 미검증 입력). None=라벨 없음 또는 구판 "
+            "이벤트. 라벨 정확도를 출처별로 층화해 읽기 위한 축이며(서버 파생 라벨의 정확도와 "
+            "클라가 정한 라벨의 정확도는 다른 질문이다) 사후 백필이 불가능하다."
+        ),
+    )
+    label_evidence_n: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "EOS-179: `ability_level` 라벨을 만든 서버 개념 숙달도의 관측 수"
+            "(`concept_mastery_history.sample_size`). None=**모름**(서버 숙달도가 라벨에 안 "
+            "들어갔거나 sample_size 미기록·구판 이벤트) — 0과 다르다. 관측이 적은 라벨과 많은 "
+            "라벨을 같은 정확도로 세지 않기 위한 입력이며 사후 백필이 불가능하다."
+        ),
+    )
 
 
 class DemandEventData(_EventPayload):

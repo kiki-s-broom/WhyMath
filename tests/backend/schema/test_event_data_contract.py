@@ -239,6 +239,9 @@ def test_hint_shape() -> None:
         # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
         "base_level": None,
         "ability_level": None,
+        # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+        "label_source": None,
+        "label_evidence_n": None,
     }
 
 
@@ -255,6 +258,9 @@ def test_hint_mode_persona_tag() -> None:
         # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
         "base_level": None,
         "ability_level": None,
+        # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+        "label_source": None,
+        "label_evidence_n": None,
     }
 
 
@@ -271,6 +277,9 @@ def test_hint_client_state_mismatch_tag() -> None:
         # EOS-178: 라벨 없는 단계·적용된 라벨 — 미지정이면 구판 행과 같다(None).
         "base_level": None,
         "ability_level": None,
+        # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+        "label_source": None,
+        "label_evidence_n": None,
     }
 
 
