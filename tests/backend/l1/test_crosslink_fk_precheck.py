@@ -142,7 +142,7 @@ class TestMissingTargets:
         before = conn.execute(sa.select(sa.func.count()).select_from(parent_a)).scalar_one()
         missing_fk_targets(conn, child, [{"a_code": "NEW1"}, {"a_code": "NEW2"}])
         after = conn.execute(sa.select(sa.func.count()).select_from(parent_a)).scalar_one()
-        assert before == after == 2
+        assert before == after == 3  # 픽스처 부모 행: A1·A2·ZZ_LAST
 
 
 class TestErrorMessage:
