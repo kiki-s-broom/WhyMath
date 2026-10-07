@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-302-fk-target-precheck-before-load
+title: "적재 블록의 FK 대상 사전확인 — 가드 vs 로더 CLI 판단 (HARN-300 ② 승계)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "HARN-300 acceptance ②의 승계 — 외래키가 걸린 테이블에 적재하는 Kiki 머신 블록은 적재 전에 참조되는 키(예: 크로스링크 적재의 misconception_catalog.mis_id)가 라이브 DB에 있는지 읽기 전용으로 확인하고 없으면 쓰기를 거부하는 형태여야 한다. 정본 사고 = 2026-10-07 G-misc40 DB 동기화: 코퍼스 68건 전체 적재가 첫 행에서 ForeignKeyViolation(M0864이 카탈로그에 없음)으로 실패했다.\n① 판단 선행: 채팅 블록의 정규식 검사로 어떤 적재가 어떤 FK를 건드리는지 알아낼 수 있는지 먼저 판정한다. 알 수 없으면 가드가 아니라 쓰기 도구(로더 CLI) 쪽에서 사전확인을 내장하는 편이 맞는지 판정해 그 결과를 문서로 남긴다.\n② HARN-215(적재 계획 대비 건수 단언)와 중복되지 않게 범위를 나눈다 — 건수 단언은 HARN-215, 대상 키 존재 확인은 여기.\n③ 구현한다면 결함 주입 테스트(대상 키 부재 → 쓰기 거부 RED, 존재 → GREEN)와 뮤테이션을 요구한다. 구현하지 않는다면 그 근거(오탐 불가피 등)를 이 태스크의 완료 증적으로 남긴다."
+artifacts: []
+paths: []
+session: null
+notes: ""
+updated: 2026-10-07
