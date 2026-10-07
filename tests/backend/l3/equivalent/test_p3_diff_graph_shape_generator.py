@@ -61,8 +61,12 @@ _DELTA = Fraction(
 )  # 임계점이 정수라 서로 1 이상 떨어져 있다 — 1/4 이내에는 다른 임계점이 없다.
 
 _DERIV_COND = re.compile(r"^Derivative\((?P<f>.+), x\)\.doit\(\) (?P<rel>[=<>]) 0$")
-_PIN = re.compile(r"x = (?P<r>-?\d+)에서")
-_VALUE_WORD = re.compile(r"(?P<word>극댓값|극솟값) (?P<v>-?\d+)")
+# 본문의 극값 x좌표 고정('x = 2'). 2차 감사(2026-10) 처분으로 값형은 *판정형*이 됐다 — 임계점 여럿을
+# 고정하고('x = -1과 x = 3에서 극값을 갖는다') 그중 어느 것이 극대·극소인지 학생이 판정한다. 그래서
+# 첫 고정 하나만 보던 패턴을 *모든* 고정으로 넓힌다(`f(x) = 2x^3`의 ') = 2'는 앞이 x가 아니라 걸리지 않는다).
+_PINS = re.compile(r"(?<![A-Za-z(])x = (?P<r>-?\d+)")
+# '극솟값 -21을 가질 때'(고정 1개)와 '극댓값이 7일 때'(판정형) 두 표기를 모두 읽는다.
+_VALUE_WORD = re.compile(r"(?P<word>극댓값|극솟값)(?:이)? (?P<v>-?\d+)")
 
 
 def _items() -> list[base.DiffItem]:
@@ -358,18 +362,29 @@ def test_value_items_pin_x_and_match_the_value_at_a_verified_extremum(
             continue
         text = str(row["question_text"])
         expr = _function_of(row)
-        pin = _PIN.search(text)
-        assert pin is not None, f"본문에 x 고정이 없다: {text}"
-        r = int(pin["r"])
-        kind = _value_kind(expr, r)
-        assert kind != "flat", f"x = {r}은 극값이 아니다: {text}"
-        if "극댓값" in text:
-            assert kind == "max", text
-        if "극솟값" in text:
-            assert kind == "min", text
-        value = int(expr.subs(_X, r))
+        pins = sorted({int(m["r"]) for m in _PINS.finditer(text)})
+        # 판정형 동결 — 고정이 하나뿐인 값형('x = 1에서 극솟값을 갖는다. 그 극솟값은?')은 대입만으로
+        # 풀려 02-08 태그가 거짓이었다(2차 감사 bad_tag 14건). 임계점을 둘 이상 고정해 판정을 남긴다.
+        assert len(pins) >= 2, f"고정이 하나뿐인 대입형 값 문항: {text}"
+        kinds = {p: _value_kind(expr, p) for p in pins}
+        values = {p: int(expr.subs(_X, p)) for p in pins}
+        wanted = "max" if "극댓값" in text else ("min" if "극솟값" in text else None)
+        cands = [p for p in pins if (kinds[p] == wanted if wanted else kinds[p] != "flat")]
+        assert cands, text
+        if "작은 값" in text or "큰 값" in text:
+            assert len(cands) >= 2, text
+            pick = min if "작은 값" in text else max
+            value = pick(values[c] for c in cands)
+        else:
+            assert len({values[c] for c in cands}) == 1, (text, cands)  # 유일(또는 대칭 동값)
+            value = values[cands[0]]
+        # 판정이 실제로 필요하다 — 고정된 점 중 원하는 종류가 *아닌* 점이 있다.
+        assert any(p not in cands for p in pins), f"고정점이 전부 같은 종류(판정 불필요): {text}"
         verify = _verify(row)
-        assert verify["answer_map"] == {"x": str(r), "y": str(value)}
+        amap = verify["answer_map"]
+        assert isinstance(amap, dict) and set(amap) == {"x", "y"}
+        r = int(amap["x"])
+        assert r in cands and values[r] == value and amap["y"] == str(value), text
         assert int(str(row["answer"])) == value
         # 검산 조건이 x = r의 임계점 성격까지 본다(두 번째 조건 f'(x) = 0).
         cond = verify["conditions"]
@@ -408,10 +423,19 @@ def test_parameter_items_have_a_unique_solution_and_a_matching_extremum(
         amap = verify["answer_map"]
         assert isinstance(amap, dict)
         param = next(k for k in amap if k != "x")
-        r = int(_PIN.search(text)["r"])  # type: ignore[index]
         word = _VALUE_WORD.search(text)
         assert word is not None, text
         expr = _function_of(row)
+        pins = sorted({int(m["r"]) for m in _PINS.finditer(text)})
+        assert pins, text
+        want = "max" if word["word"] == "극댓값" else "min"
+        # 고정 하나(계수 a·b를 f'(r) = 0으로 정하는 형태)면 그 점, 판정형(상수 k — 임계점 둘을 고정)이면
+        # 고정점 중 *물은 종류인* 유일한 점이 r이다.
+        matching = [p for p in pins if _value_kind(expr, p) == want]
+        r = pins[0] if len(pins) == 1 else matching[0]
+        if len(pins) > 1:
+            assert len(matching) == 1, (text, pins, matching)
+        assert int(str(amap["x"])) == r, text
         kind = _value_kind(expr, r)
         assert kind == ("max" if word["word"] == "극댓값" else "min"), text
         assert int(expr.subs(_X, r)) == int(word["v"]), text
@@ -470,7 +494,7 @@ def test_b3_items_always_carry_selection_and_c3_items_pin_x(
             assert verify.get("answer_selection") in ("smallest", "largest"), text
             b3 += 1
         if re.search(r"극(대|소)?(댓|솟)?값", text) and "x좌표" not in text:
-            assert _PIN.search(text), text
+            assert _PINS.search(text), text
             assert "x" in verify["answer_map"]  # type: ignore[operator]
             c3 += 1
     assert b3 >= 6 and c3 >= 24
@@ -484,7 +508,8 @@ def _mutated(row: dict[str, object], name: str) -> dict[str, object]:
     if name == "drop_selection":
         del verify["answer_selection"]
     elif name == "unpin_x_text":
-        out["question_text"] = str(out["question_text"]).replace("x = ", "x가 ", 1)
+        # 판정형 본문은 고정이 여럿이라 첫 고정만 지우면 나머지가 남는다 — 고정을 *모두* 지운다.
+        out["question_text"] = str(out["question_text"]).replace("x = ", "x가 ")
     elif name == "drop_x_from_answer_map":
         amap.pop("x")
     elif name == "value_without_x":

@@ -47,6 +47,7 @@ Tier1은 미분 평가가 든 변을 다른 연산과 섞지 못한다(power 생
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass
 from fractions import Fraction
@@ -61,11 +62,14 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     Poly,
     derivative_of,
     eval_at,
+    poly_from_sympy,
     poly_to_sympy,
     poly_to_sympy_str,
     render_affine,
+    render_difference,
+    render_factored,
     render_poly,
-    with_eul_reul,
+    with_eun_neun,
     with_i_ga,
     with_wa_gwa,
 )
@@ -78,7 +82,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, eun_neun
+from whymath_backend.lang.josa import eul_reul, i_ga
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = [
@@ -239,6 +243,58 @@ def _rolle_cases() -> tuple[_Case, ...]:
     return tuple(seeded_order("p3-mvt:rolle-pool", out)[:60])
 
 
+@lru_cache(maxsize=None)
+def _both_inside_cases() -> tuple[_Case, ...]:
+    """f'(x) = 평균변화율의 두 근이 *모두* 열린구간 (a, b) 안에 있는 삼차함수(유리근).
+
+    개수형 문항(평균값 정리를 만족시키는 c의 개수)의 재료다. 검산기(`real_root_count`)는 실수 전체의
+    근을 세므로, 근이 *전부* 구간 안에 있는 사례만 쓰면 '구간 안의 c의 개수'와 '실근 개수'가 같아져
+    검산이 발문과 정확히 일치한다. 1차 은행의 '(구간 밖의 값도 포함)' 개수형은 평균값 정리가 아니라
+    도함수 방정식 근 세기였고 단서 없는 문항은 해석이 갈렸다(2차 감사 bad_tag·ambiguous).
+    c 필드에는 두 근 중 작은 것을, others에는 큰 것을 담는다.
+    """
+    out: list[_Case] = []
+    for lead in (1, 2, -1, -2):
+        for p in range(-8, 9):
+            for a in range(-5, 3):
+                for b in range(a + 2, 7):
+                    m = (_ev({3: lead, 2: p}, Fraction(b)) - _ev({3: lead, 2: p}, Fraction(a))) / (
+                        b - a
+                    )
+                    roots = _quad_rational_roots(Fraction(3 * lead), Fraction(2 * p), -m)
+                    if roots is None or len(roots) != 2 or not all(a < x < b for x in roots):
+                        continue
+                    for q in (-5, -2, 0, 3, 6):
+                        r = _const_term(lead * 11 + p * 7 + q * 3 + a * 5 + b)
+                        f = _mk_poly((3, lead), (2, p), (1, q), (0, r))
+                        out.append(_Case(f, a, b, roots[0], (roots[1],)))
+    return tuple(seeded_order("p3-mvt:both-inside-pool", out)[:120])
+
+
+@lru_cache(maxsize=None)
+def _rolle_cubic_cases() -> tuple[_Case, ...]:
+    """f(a) = f(b)인 삼차함수 L(x - a)(x - b)(x - r) + d — f'(x) = 0의 유리근 중 하나만 구간 안."""
+    out: list[_Case] = []
+    for lead in (1, -1, 2):
+        for a in range(-3, 3):
+            for b in range(a + 2, 5):
+                for r in range(-4, 6):
+                    expanded = sympy.expand(lead * (_X - a) * (_X - b) * (_X - r))
+                    roots = sympy.solve(sympy.diff(expanded, _X), _X)
+                    if len(roots) != 2 or not all(t.is_rational for t in roots):
+                        continue
+                    fracs = [Fraction(int(t.p), int(t.q)) for t in roots]
+                    inside = [t for t in fracs if a < t < b]
+                    if len(inside) != 1:
+                        continue
+                    d = _const_term(lead * 7 + a * 5 + b * 3 + r)
+                    poly = poly_from_sympy(expanded + d)
+                    out.append(
+                        _Case(poly, a, b, inside[0], tuple(t for t in fracs if t != inside[0]))
+                    )
+    return tuple(seeded_order("p3-mvt:rolle-cubic-pool", out)[:80])
+
+
 def _solve_c(case: _Case, var: str = "x") -> tuple[Fraction, Fraction, tuple[Fraction, ...]] | None:
     """SymPy로 f'(x) = 평균변화율을 풀어 (c, 평균변화율, 구간 밖 유리근)을 낸다 — 정답의 단일 권위.
 
@@ -297,6 +353,7 @@ def _c_item(
     choices: tuple[str, ...] | None = None,
     distractors: tuple[tuple[int, str], ...] = (),
     fn: str = "f",
+    note: str = "",
 ) -> DiffItem | None:
     """평균값 정리의 c를 묻는 문항 — 검산 재료는 방정식 1개 + 열린구간 경계 4개.
 
@@ -311,30 +368,73 @@ def _c_item(
         raise ValueError(f"사례 탐색과 SymPy가 다른 c를 냈다: {c} != {case.c}")
     rate = rhs if rhs is not None else _rate_str(case.f, case.a, case.b, var)
     equation = equation_override or f"{_deriv_at_c(case.f, var)} = {rate}"
-    others_text = ", ".join(frac_text(o) for o in others)
-    other_note = (
-        f" 방정식의 다른 근 {others_text}{eun_neun(others_text)} 열린구간 밖이므로 버린다."
-        if others
-        else ""
-    )
     answer = frac_text(c)
     return DiffItem(
         slot=slot,
         frame_id=frame_id,
         question_text=text,
         answer_text=answer,
-        explanation=(
-            f"{fn}'({var}) = {render_poly(derivative_of(case.f, var), var)}이고 "
-            f"구간 [{case.a}, {case.b}]에서의 평균변화율은 {frac_text(m)}이다. "
-            f"{fn}'(c) = {frac_text(m)}{eul_reul(frac_text(m))} 풀어 열린구간 "
-            f"({case.a}, {case.b})에 속하는 근을 찾으면 c = {frac_text(c)}이다.{other_note}"
-        ),
+        explanation=note
+        + _c_explanation(case, c, m, others, var=var, fn=fn, rate_given=rhs is not None),
         conditions=(equation, *_bounds(case.a, case.b)),
         answer_map=(("c", frac_text(c)),),
         problem_type_code=ptype,
         answer_format=answer_format_of(c),
         choices=choices,
         distractors=distractors,
+    )
+
+
+def _c_explanation(
+    case: _Case,
+    c: Fraction,
+    m: Fraction,
+    others: tuple[Fraction, ...],
+    *,
+    var: str,
+    fn: str,
+    rate_given: bool,
+) -> str:
+    """c값 해설 — 평균변화율 계산 → 방정식 f'(c) = m → 인수분해 → 구간 판정의 *중간 단계*를 보인다.
+
+    1차 해설은 '평균변화율은 32이다. f'(c) = 32를 풀어 …'로 계산 과정 없이 결론만 냈고, 발문이 준
+    직선의 기울기를 평균변화율로 바꿔 부르는 오류도 있었다(2차 감사). 여기서는 발문이 평균변화율을
+    주지 않았으면 두 함숫값으로 직접 계산해 보인다.
+    """
+    a, b = case.a, case.b
+    fa, fb = eval_at(case.f, a, var), eval_at(case.f, b, var)
+    deriv = derivative_of(case.f, var)
+    m_int = int(m)
+    if fa == fb and m == 0:
+        head = (
+            f"{fn}({a}) = {fn}({b})이므로 평균변화율은 0이고, 롤의 정리에 의하여 "
+            f"{fn}'(c) = 0인 c가 열린구간 ({a}, {b})에 있다. "
+        )
+    elif rate_given:
+        head = f"구간 [{a}, {b}]에서의 평균변화율은 {frac_text(m)}이다. "
+    else:
+        head = (
+            f"구간 [{a}, {b}]에서의 평균변화율은 ({fn}({b}) - {fn}({a}))/({_minus(b, a)}) = "
+            f"({render_difference(fb, fa)})/{b - a} = {frac_text(m)}이다. "
+        )
+    terms = dict(deriv)
+    terms[0] = terms.get(0, 0) - m_int
+    eq = tuple(sorted(((e, k) for e, k in terms.items() if k), reverse=True))
+    roots = sorted([c, *others])
+    eq_text = f"{fn}'(c) = {frac_text(m)}, 즉 {render_poly(eq, 'c')} = 0"
+    if eq and eq[0][0] == 2 and len(roots) == 2:
+        solve = (
+            f"{eq_text}에서 {render_factored(eq, 'c')} = 0이므로 c = {frac_text(roots[0])} 또는 "
+            f"c = {frac_text(roots[1])}이다. "
+        )
+        pick = (
+            f"이 중 열린구간 ({a}, {b})에 속하는 것은 c = {frac_text(c)}이고, "
+            f"{with_eun_neun(frac_text(others[0]))} 열린구간에 속하지 않으므로 버린다."
+        )
+        return f"{fn}'({var}) = {render_poly(deriv, var)}이다. {head}{solve}{pick}"
+    return (
+        f"{fn}'({var}) = {render_poly(deriv, var)}이다. {head}{eq_text}에서 c = {frac_text(c)}"
+        f"이고, 이 값은 열린구간 ({a}, {b})에 속한다."
     )
 
 
@@ -485,22 +585,167 @@ def _value_item(
     )
 
 
-def _basic_frames() -> list[Frame]:
-    def b1(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        m = Fraction(eval_at(c.f, c.b) - eval_at(c.f, c.a), c.b - c.a)
-        return _value_item(
-            slot="basic",
-            frame_id="basic-average-rate",
-            text=f"함수 f(x) = {_fx(c)}의 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율을 구하시오.",
-            value=m,
-            condition=f"{_rate_str(c.f, c.a, c.b)} = y",
-            explanation=(
-                f"평균변화율은 (f({c.b}) - f({c.a}))/({c.b} - ({c.a})) = "
-                f"({eval_at(c.f, c.b)} - ({eval_at(c.f, c.a)}))/{c.b - c.a} = {frac_text(m)}이다."
-            ),
-        )
+def _count_item(
+    *,
+    slot: str,
+    frame_id: str,
+    text: str,
+    case: _Case,
+    var: str = "x",
+    fn: str = "f",
+    note: str = "",
+) -> KindedDiffItem | None:
+    """평균값 정리를 만족시키는 c(구간 *안*)의 개수 — `real_root_count` 개념형 검산.
 
+    검산 조건은 f'(x) - (평균변화율) = 0(실수 전체의 근을 센다)이므로, 근이 **전부** 열린구간 안에
+    있는 사례만 받는다(그래야 '구간 안의 c의 개수' = '실근 개수'). 생성기가 그 전제를 SymPy로
+    확인한다.
+    """
+    eq, m = _fprime_eq_rate_poly(case, var)
+    roots = sympy.real_roots(sympy.Poly(poly_to_sympy(eq, var), sympy.Symbol(var)))
+    distinct = sorted(set(roots))
+    if not distinct or not all(case.a < r < case.b for r in distinct):
+        return None
+    if not all(r.is_rational for r in distinct):
+        return None
+    n = len(distinct)
+    a, b = case.a, case.b
+    fa, fb = eval_at(case.f, a, var), eval_at(case.f, b, var)
+    listed = ", ".join(frac_text(Fraction(int(r.p), int(r.q))) for r in distinct)
+    solve = (
+        f"{render_poly(eq, 'c')} = 0이고, {render_factored(eq, 'c')} = 0의 근은 c = {listed}이다"
+        if eq[0][0] == 2
+        else f"{render_poly(eq, 'c')} = 0이고 그 근은 c = {listed} 하나이다"
+    )
+    explanation = (
+        f"{note}{fn}'({var}) = {render_poly(derivative_of(case.f, var), var)}이다. "
+        f"구간 [{a}, {b}]에서의 평균변화율은 ({fn}({b}) - {fn}({a}))/({_minus(b, a)}) = "
+        f"({render_difference(fb, fa)})/{b - a} = {frac_text(m)}이므로 {fn}'(c) = "
+        f"{frac_text(m)}에서 "
+        f"{solve}. "
+        + (
+            f"두 근이 모두 열린구간 ({a}, {b})에 속하므로 구하는 개수는 {n}이다."
+            if n == 2
+            else f"이 근은 열린구간 ({a}, {b})에 속하므로 구하는 개수는 {n}이다."
+        )
+    )
+    return KindedDiffItem(
+        slot=slot,
+        frame_id=frame_id,
+        question_text=text,
+        answer_text=str(n),
+        explanation=explanation,
+        conditions=f"{poly_to_sympy_str(eq, var)} = 0",
+        answer_map=(),
+        problem_type_code=_COUNT,
+        answer_format=answer_format_of(n),
+        answer_kind="real_root_count",
+    )
+
+
+def _count_pool(seed: str) -> tuple[tuple[object, ...], ...]:
+    """개수형 재료 — 두 근이 모두 구간 안인 삼차(답 2)와 이차(답 1, c는 중점 하나)를 섞는다."""
+    mixed: list[_Case] = []
+    both = _both_inside_cases()
+    quads = _quad_cases()
+    for index in range(min(len(both), len(quads))):
+        mixed.append(both[index])
+        if index % 2 == 0:
+            mixed.append(quads[index])
+    return tuple((case,) for case in seeded_order(seed, mixed))
+
+
+def _bound_params(seed: str) -> tuple[tuple[object, ...], ...]:
+    """평균값 정리 부등식(도함수의 범위 → 함숫값의 범위) 재료 (p, m, M, a, b)."""
+    combos = [
+        (pv, lo, hi, a, a + width)
+        for pv in (-3, 1, 4, 6)
+        for lo, hi in ((-2, 3), (1, 4), (-1, 2), (2, 5), (-3, 1), (0, 6))
+        for a in (0, 1, 2, -1)
+        for width in (2, 3, 4)
+    ]
+    return tuple(seeded_order(seed, combos))
+
+
+def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -> DiffItem:
+    """도함수가 위(아래)로 막힌 함수의 f(b)가 가질 수 있는 가장 큰(작은) 값 — 평균값 정리의
+    부등식 활용.
+
+    side: "upper"(f'(x) <= M → 최댓값) · "lower"(f'(x) >= m → 최솟값) · "both"(두 극단의 합).
+    검산은 산술 재확인(평균값 정리로 얻은 식 p + M(b - a)의 값)이다 — 부등식 추론 자체는 해설이
+    보인다.
+    """
+    pv, lo, hi, a, b = (int(str(v)) for v in p)
+    width = b - a
+    top, bottom = pv + hi * width, pv + lo * width
+    mvt = (
+        f"평균값 정리에 의하여 f({b}) - f({a}) = f'(c)({_minus(b, a)})인 c가 열린구간 ({a}, {b})에 "
+        f"존재한다. "
+    )
+    if side == "upper":
+        text = (
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) <= {hi}이다. f({a}) = {pv}일 때, "
+            f"f({b})의 값이 될 수 있는 가장 큰 값을 구하시오."
+        )
+        value = top
+        line = render_poly(((1, hi), (0, pv - hi * a)))
+        body = (
+            f"f'(c) <= {hi}이므로 {render_difference(f'f({b})', pv)} <= {hi * width}, 즉 "
+            f"f({b}) <= {top}이다. "
+            f"f(x) = {line}이면 등호가 성립하므로 가장 큰 값은 {top}이다."
+        )
+        cond = f"{pv} + ({hi})*(({b}) - ({a})) = y"
+    elif side == "lower":
+        text = (
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) >= {lo}이다. f({a}) = {pv}일 때, "
+            f"f({b})의 값이 될 수 있는 가장 작은 값을 구하시오."
+        )
+        value = bottom
+        line = render_poly(((1, lo), (0, pv - lo * a)))
+        body = (
+            f"f'(c) >= {lo}이므로 {render_difference(f'f({b})', pv)} >= {lo * width}, 즉 "
+            f"f({b}) >= {bottom}이다. "
+            f"f(x) = {line}이면 등호가 성립하므로 가장 작은 값은 {bottom}이다."
+        )
+        cond = f"{pv} + ({lo})*(({b}) - ({a})) = y"
+    else:
+        text = (
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 {lo} <= f'(x) <= {hi}이다. f({a}) = {pv}일 "
+            f"때, f({b})의 값이 될 수 있는 가장 큰 값과 가장 작은 값의 합을 구하시오."
+        )
+        value = top + bottom
+        body = (
+            f"{lo} <= f'(c) <= {hi}이므로 {lo * width} <= {render_difference(f'f({b})', pv)} <= "
+            f"{hi * width}, 즉 "
+            f"{bottom} <= f({b}) <= {top}이다. 두 끝값은 각각 f(x)가 기울기 {lo}, {hi}인 "
+            f"일차함수일 때 실제로 나오므로 구하는 합은 {top} + {_paren_if_neg(bottom)} = "
+            f"{value}이다."
+        )
+        cond = f"({pv} + ({hi})*(({b}) - ({a}))) + ({pv} + ({lo})*(({b}) - ({a}))) = y"
+    return _value_item(
+        slot=slot,
+        frame_id=frame_id,
+        text=text,
+        value=Fraction(value),
+        condition=cond,
+        explanation=mvt + body,
+    )
+
+
+def _paren_if_neg(value: int) -> str:
+    return f"({value})" if value < 0 else str(value)
+
+
+def _increasing_from_zero(f: Poly, var: str) -> bool:
+    """t >= 0에서 도함수가 양수인가(이동 거리 맥락 — 거리가 줄어들 수 없다)."""
+    d = poly_to_sympy(derivative_of(f, var), var)
+    symbol = sympy.Symbol(var)
+    if d.subs(symbol, 0) <= 0:
+        return False
+    return all(r < 0 for r in sympy.real_roots(sympy.Poly(d, symbol)))
+
+
+def _basic_frames() -> list[Frame]:
     def b2(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         return _c_item(
@@ -527,45 +772,10 @@ def _basic_frames() -> list[Frame]:
             rhs="0",
         )
 
-    def b4(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        m = Fraction(eval_at(c.f, c.b) - eval_at(c.f, c.a), c.b - c.a)
-        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
-        return _value_item(
-            slot="basic",
-            frame_id="basic-chord-slope",
-            text=(
-                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), "
-                f"{with_eul_reul(f'B({c.b}, {fb})')} 지나는 직선의 "
-                "기울기를 구하시오."
-            ),
-            value=m,
-            condition=f"{_rate_str(c.f, c.a, c.b)} = y",
-            explanation=f"기울기는 ({fb} - ({fa}))/({c.b} - ({c.a})) = {frac_text(m)}이다.",
-        )
-
-    def b5(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        diff = eval_at(c.f, c.b) - eval_at(c.f, c.a)
-        return _value_item(
-            slot="basic",
-            frame_id="basic-function-value-difference",
-            text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 f({c.b}) - f({c.a})의 값을 구하시오. "
-                "(평균값 정리의 양변을 비교하기 위한 값이다.)"
-            ),
-            value=Fraction(diff),
-            condition=f"{_paren(eval_at(c.f, c.b))} - {_paren(eval_at(c.f, c.a))} = y",
-            explanation=(
-                f"f({c.b}) = {eval_at(c.f, c.b)}, f({c.a}) = {eval_at(c.f, c.a)}이므로 "
-                f"차는 {diff}이다."
-            ),
-        )
-
     def b6(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         ft = render_poly(c.f, "t")
-        item = _c_item(
+        return _c_item(
             slot="basic",
             frame_id="basic-time-average-velocity",
             text=(
@@ -577,53 +787,54 @@ def _basic_frames() -> list[Frame]:
             var="t",
             fn="x",
         )
-        return item
 
-    def b7(p: tuple[object, ...]) -> DiffItem | None:
-        c, off = _case_of(p[0]), int(str(p[1]))
-        poly, slope = _slope_equation(c, off)
-        n = _count_roots(poly)
-        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
-        # 기울기를 직선 AB(평균변화율)와 견주어 말한다 — 평균값 정리의 '평균변화율 ↔ 접선 기울기'
-        # 비교 맥락을 발문에 드러내 문항이 실제로 묻는 개념과 태그를 맞춘다(감사 bad_tag 교정).
-        compare = "큰" if off > 0 else "작은"
-        return KindedDiffItem(
+    def b8(p: tuple[object, ...]) -> DiffItem | None:
+        # 삼차함수의 롤의 정리 — f'(x) = 0의 두 근 중 하나만 열린구간 안(구간 판정까지 요구).
+        c = _case_of(p[0])
+        return _c_item(
             slot="basic",
-            frame_id="basic-count-points-with-given-slope",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 두 점 A({c.a}, {fa}), "
-                f"{with_i_ga(f'B({c.b}, {fb})')} 있다. 이 곡선 위의 점 중에서 접선의 기울기가 "
-                f"직선 AB의 기울기보다 {abs(off)}만큼 {compare} 점의 개수를 구하시오."
+            frame_id="basic-rolle-cubic",
+            text=(
+                f"삼차함수 f(x) = {_fx(c)}에 대하여 f({c.a}) = f({c.b})이므로 롤의 정리에 의하여 "
+                f"f'(c) = 0인 c가 열린구간 ({c.a}, {c.b})에 존재한다. 이 c의 값을 구하시오."
             ),
-            answer_text=str(n),
-            explanation=(
-                f"직선 AB의 기울기는 구간 [{c.a}, {c.b}]에서의 평균변화율 {slope - off}이므로 "
-                f"접선의 기울기는 {slope}이다. 이를 만족하는 점의 x좌표는 "
-                f"{render_poly(poly)} = 0의 실근이고, 서로 다른 실근은 {n}개이다."
-            ),
-            conditions=f"{poly_to_sympy_str(poly)} = 0",
-            answer_map=(),
-            problem_type_code=_COUNT,
-            answer_format=AnswerFormat.자연수,
-            answer_kind="real_root_count",
+            case=c,
+            rhs="0",
         )
 
+    def b9(p: tuple[object, ...]) -> DiffItem | None:
+        return _bound_item(slot="basic", frame_id="basic-mvt-upper-bound", p=p, side="upper")
+
+    def b10(p: tuple[object, ...]) -> DiffItem | None:
+        c = _case_of(p[0])
+        return _count_item(
+            slot="basic",
+            frame_id="basic-count-mvt-points",
+            text=(
+                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 "
+                "만족시키는 실수 c의 개수를 구하시오."
+            ),
+            case=c,
+        )
+
+    # 1차 basic의 평균변화율 계산만·두 점 직선 기울기만·f(b) - f(a)만·'AB 기울기보다 k만큼 큰
+    # 접선 개수' 틀은 평균값 정리를 쓰지 않는 선수 계산이라 삭제했다(2차 감사 bad_tag) — 대신 롤의
+    # 정리(삼차)·평균값 정리 부등식·구간 안 c의 개수로 채운다.
     return [
-        Frame("basic-count-points-with-given-slope", _slope_params("p3-mvt:b7"), b7),
-        Frame("basic-average-rate", _frames_params("p3-mvt:b1", _quad_cases()), b1),
         Frame(
             "basic-difference-equals-derivative-times-length",
             _frames_params("p3-mvt:b2", _quad_cases()),
             b2,
         ),
         Frame("basic-rolle-theorem", _frames_params("p3-mvt:b3", _rolle_cases()), b3),
-        Frame("basic-chord-slope", _frames_params("p3-mvt:b4", _cubic_cases()), b4),
-        Frame("basic-function-value-difference", _frames_params("p3-mvt:b5", _cubic_cases()), b5),
         Frame(
             "basic-time-average-velocity",
             _frames_params("p3-mvt:b6", _from_time_zero(_quad_cases())),
             b6,
         ),
+        Frame("basic-rolle-cubic", _frames_params("p3-mvt:b8", _rolle_cubic_cases()), b8),
+        Frame("basic-mvt-upper-bound", _bound_params("p3-mvt:b9"), b9),
+        Frame("basic-count-mvt-points", _count_pool("p3-mvt:b10"), b10),
     ]
 
 
@@ -657,6 +868,17 @@ def _unique_k(k: int, a: int, b: int, c: Fraction) -> bool:
     return bool(sols == [k])
 
 
+def _tangent_k_text(c: Fraction) -> str:
+    """f'(c) = 3c^2 + 2ck를 k의 일차식으로 — c가 정수면 정리한 꼴('-6k + 12'), 분수면 대입 꼴."""
+    if c.denominator == 1:
+        ci = int(c)
+        if ci == 0:
+            return "0"
+        return render_poly(((1, 2 * ci), (0, 3 * ci * ci)), "k")
+    cs = frac_text(c)
+    return f"3({cs})^2 + 2({cs})k"
+
+
 def _k_item(slot: str, frame_id: str, text_of: object, p: tuple[object, ...]) -> DiffItem | None:
     k, a, b, c = int(str(p[0])), int(str(p[1])), int(str(p[2])), p[3]
     assert isinstance(c, Fraction)
@@ -674,9 +896,12 @@ def _k_item(slot: str, frame_id: str, text_of: object, p: tuple[object, ...]) ->
         question_text=text_of(a, b, cs),
         answer_text=str(k),
         explanation=(
-            f"f'(x) = 3x^2 + 2kx이고 평균변화율은 "
-            f"{render_affine(a * a + a * b + b * b, a + b, 'k')}이다. "
-            f"f'({cs}) = (평균변화율)에서 k = {k}이다."
+            f"f'(x) = 3x^2 + 2kx이다. 두 점을 잇는 직선의 기울기는 구간 [{a}, {b}]에서의 "
+            f"평균변화율이므로 (f({b}) - f({a}))/({_minus(b, a)}) = "
+            f"{render_affine(a * a + a * b + b * b, a + b, 'k')}이다. 접점 x = {cs}에서의 접선의 "
+            f"기울기는 f'({cs}) = {_tangent_k_text(c)}이고 이 값이 평균변화율과 같아야 하므로 "
+            f"{_tangent_k_text(c)} = {render_affine(a * a + a * b + b * b, a + b, 'k')}에서 "
+            f"k = {k}이다."
         ),
         conditions=condition,
         answer_map=(("k", str(k)),),
@@ -698,27 +923,30 @@ def _applied_frames() -> list[Frame]:
         )
 
     def a2(p: tuple[object, ...]) -> DiffItem | None:
+        # 1차는 '직선 y = 32x - 11과 평행'으로 *아무 직선*을 주고 해설은 그 기울기를 평균변화율이라
+        # 불렀다(평균값 정리 문항이 아니었다 — 2차 감사). 이제 할선 AB를 x좌표로만 주어 학생이 두
+        # 함숫값으로 AB의 기울기(= 평균변화율)를 구하고 c를 구간 안에서 고르게 한다.
         c = _case_of(p[0])
-        solved = _solve_c(c)
-        if solved is None:
-            return None
-        m = solved[1]
-        n = ((c.a * 3 + c.b * 5) % 7) - 3
         return _c_item(
             slot="applied",
-            frame_id="applied-tangent-parallel-to-line",
+            frame_id="applied-tangent-parallel-to-chord-from-x",
             text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 곡선 y = f(x) 위의 점 P(c, f(c)) "
-                f"({c.a} < c < {c.b})에서의 접선이 직선 "
-                f"y = {frac_text(m)}x {'+' if n >= 0 else '-'} {abs(n)}"
-                f"{with_wa_gwa(abs(n))} 평행할 때, c의 값을 구하시오."
+                f"함수 f(x) = {_fx(c)}의 그래프 위의 x좌표가 {c.a}, {c.b}인 두 점을 각각 A, B라 "
+                f"하자. 열린구간 ({c.a}, {c.b})에서 곡선 y = f(x) 위의 점 P(c, f(c))에서의 접선이 "
+                "직선 AB와 평행할 때, c의 값을 구하시오."
             ),
             case=c,
-            rhs=frac_text(m),
+            note="직선 AB의 기울기는 구간에서의 평균변화율과 같다. ",
         )
 
     def a3(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
+        # 이동 거리는 출발 순간 0이고 줄어들지 않는다 — 상수항을 0으로 두고(c값은 상수항과 무관)
+        # t >= 0에서 증가하는 사례만 쓴다(2차 감사: s(0) = 1 km 모순).
+        src = _case_of(p[0])
+        f0 = tuple((e, k) for e, k in src.f if e != 0)
+        if not _increasing_from_zero(f0, "t"):
+            return None
+        c = _Case(f0, src.a, src.b, src.c, src.others)
         ft = render_poly(c.f, "t")
         return _c_item(
             slot="applied",
@@ -749,7 +977,11 @@ def _applied_frames() -> list[Frame]:
 
     return [
         Frame("applied-find-k-from-c", tuple(_k_params("p3-mvt:a1")), a1),
-        Frame("applied-tangent-parallel-to-line", _frames_params("p3-mvt:a2", _cubic_cases()), a2),
+        Frame(
+            "applied-tangent-parallel-to-chord-from-x",
+            _frames_params("p3-mvt:a2", _cubic_cases()),
+            a2,
+        ),
         Frame(
             "applied-car-instantaneous-equals-average",
             _frames_params("p3-mvt:a3", _from_time_zero(_cubic_cases())),
@@ -923,7 +1155,14 @@ def _mc_c_item(
     if base is None:
         return None
     assert answer == base.answer_text
-    return base
+    # 오개념(M0674 — 롤의 정리와 혼동)으로 생기는 오답 선지가 왜 틀렸는지 해설이 짚는다.
+    wrong_text = frac_text(wrong[0])
+    trap = (
+        f" 방정식 {fn}'(c) = 0을 풀어 얻는 {with_eun_neun(wrong_text)} 롤의 정리의 결론인데, "
+        f"롤의 정리는 {with_wa_gwa(f'{fn}({case.a})')} {fn}({case.b})의 값이 같을 때만 쓸 수 "
+        "있는데, 여기서는 두 값이 다르므로 답이 아니다."
+    )
+    return dataclasses.replace(base, explanation=base.explanation + trap)
 
 
 def _misconception_frames() -> list[Frame]:
@@ -1007,94 +1246,59 @@ def _misconception_frames() -> list[Frame]:
 # ──────────────────────────────────────────────────────────────────────────
 # 진단(diagnostic) — 풀이의 한 단계씩을 따로 확인한다
 # ──────────────────────────────────────────────────────────────────────────
-def _count_roots(poly: Poly) -> int:
-    """서로 다른 실근 수 — 검산기와 독립인 경로(제곱 없는 부분의 Sturm 개수)."""
-    return int(sympy.Poly(poly_to_sympy(poly), _X).sqf_part().count_roots())
-
-
-def _slope_equation(case: _Case, offset: int) -> tuple[Poly, int]:
-    """f'(x) - (평균변화율 + offset)을 다항식으로 — 접선의 기울기가 그 값인 점의 x좌표 방정식."""
-    base_eq, m = _fprime_eq_rate_poly(case)
-    slope = int(m) + offset
-    d = dict(derivative_of(case.f))
-    d[0] = d.get(0, 0) - slope
-    return tuple(sorted(((e, c) for e, c in d.items() if c), reverse=True)), slope
-
-
-def _slope_params(seed: str) -> tuple[tuple[object, ...], ...]:
-    """(사례, 기울기 변위) 격자 — 변위가 달라 실근이 0·1·2개로 갈리게 한다."""
-    pool = _cubic_cases()[:60]
-    combos = tuple((case, off) for case in pool for off in (-9, -5, -2, 2, 5, 9, 14, 20))
-    return tuple(seeded_order(seed, combos))
-
-
-def _fprime_eq_rate_poly(case: _Case) -> tuple[Poly, Fraction]:
+def _fprime_eq_rate_poly(case: _Case, var: str = "x") -> tuple[Poly, Fraction]:
     """f'(x) - (평균변화율)을 다항식으로(평균변화율은 정수 — 정수 계수 다항식의 차분몫)."""
-    m = Fraction(eval_at(case.f, case.b) - eval_at(case.f, case.a), case.b - case.a)
+    m = Fraction(eval_at(case.f, case.b, var) - eval_at(case.f, case.a, var), case.b - case.a)
     if m.denominator != 1:  # pragma: no cover — 정수 계수 다항식의 평균변화율은 항상 정수
         raise ValueError("평균변화율이 정수가 아니다")
-    d = dict(derivative_of(case.f))
+    d = dict(derivative_of(case.f, var))
     d[0] = d.get(0, 0) - int(m)
     return tuple(sorted(((e, c) for e, c in d.items() if c), reverse=True)), m
 
 
+@lru_cache(maxsize=None)
+def _rolle_k_cases() -> tuple[tuple[int, int, int, int, int, Fraction], ...]:
+    """f(x) = x^3 + kx^2 + qx + d — f(a) = f(b)가 k를 정하고, 그때 f'(x) = 0의 근 중 하나만 구간 안.
+
+    (a, b, q, d, k, c) — k = -((a^2 + ab + b^2) + q)/(a + b)가 정수이고 f'의 두 근이 유리수인 것만.
+    """
+    out: list[tuple[int, int, int, int, int, Fraction]] = []
+    for a in range(-3, 4):
+        for b in range(a + 2, 5):
+            if a + b == 0:
+                continue
+            for q in range(-9, 10):
+                num = -((a * a + a * b + b * b) + q)
+                if num % (a + b):
+                    continue
+                k = num // (a + b)
+                if k == 0 or abs(k) > 8:
+                    continue
+                roots = sympy.solve(3 * _X**2 + 2 * k * _X + q, _X)
+                if len(roots) != 2 or not all(r.is_rational for r in roots):
+                    continue
+                fracs = [Fraction(int(r.p), int(r.q)) for r in roots]
+                inside = [r for r in fracs if a < r < b]
+                if len(inside) != 1:
+                    continue
+                d = _const_term(a * 5 + b * 3 + q)
+                out.append((a, b, q, d, k, inside[0]))
+    return tuple(seeded_order("p3-mvt:rolle-k-pool", out))
+
+
+def _shift_to_zero(case: _Case) -> _Case:
+    """구간 [a, b]를 [0, b - a]로 옮긴 사례 — 시각 문항(출발 시각 0)용. 근도 같이 옮긴다."""
+    shifted = poly_from_sympy(sympy.expand(poly_to_sympy(case.f).subs(_X, _X + case.a)))
+    return _Case(
+        shifted,
+        0,
+        case.b - case.a,
+        case.c - case.a,
+        tuple(o - case.a for o in case.others),
+    )
+
+
 def _diagnostic_frames() -> list[Frame]:
-    def d2(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        eq, m = _fprime_eq_rate_poly(c)
-        roots = sympy.roots(sympy.Poly(poly_to_sympy(eq), _X))
-        s = sum((r * mult for r, mult in roots.items()), sympy.Integer(0))
-        if sum(roots.values()) != sympy.Poly(poly_to_sympy(eq), _X).degree() or not s.is_rational:
-            return None
-        value = Fraction(int(s.p), int(s.q))
-        return KindedDiffItem(
-            slot="diagnostic",
-            frame_id="diag-sum-of-candidate-roots",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
-                "같은 미분계수를 갖는 실수 x(구간 밖의 값도 포함)의 합을 구하시오. "
-                "(단, 중근은 중복하여 센다.)"
-            ),
-            answer_text=frac_text(value),
-            explanation=(
-                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
-                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 "
-                f"근의 합은 {frac_text(value)}이다."
-            ),
-            conditions=f"{poly_to_sympy_str(eq)} = 0",
-            answer_map=(),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(value),
-            answer_aggregate="sum",
-        )
-
-    def d3(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        eq, m = _fprime_eq_rate_poly(c)
-        both = sorted([c.c, *c.others])
-        if len(both) != 2:
-            return None
-        big = both[-1]
-        return KindedDiffItem(
-            slot="diagnostic",
-            frame_id="diag-larger-candidate",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
-                "같은 미분계수를 갖는 실수 x는 두 개이다. 이 중 큰 값을 구하시오."
-            ),
-            answer_text=frac_text(big),
-            explanation=(
-                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
-                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 그 두 근은 "
-                f"{frac_text(both[0])}, {frac_text(both[1])}이다."
-            ),
-            conditions=f"{poly_to_sympy_str(eq)} = 0",
-            answer_map=(("x", frac_text(big)),),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(big),
-            answer_selection="largest",
-        )
-
     def d5(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
@@ -1108,7 +1312,10 @@ def _diagnostic_frames() -> list[Frame]:
                 "f'(c) = k인 c가 이 열린구간에 존재할 때, k의 값을 구하시오."
             ),
             answer_text=frac_text(m),
-            explanation=f"k는 평균변화율 ({fb} - ({fa}))/({c.b} - ({c.a})) = {frac_text(m)}이다.",
+            explanation=(
+                f"평균값 정리의 결론은 f'(c) = (f({c.b}) - f({c.a}))/({_minus(c.b, c.a)})이므로 "
+                f"k는 ({render_difference(fb, fa)})/{c.b - c.a} = {frac_text(m)}이다."
+            ),
             conditions=f"({_paren(fb)} - {_paren(fa)})/({_paren(c.b)} - {_paren(c.a)}) = k",
             answer_map=(("k", frac_text(m)),),
             problem_type_code=_EVAL,
@@ -1116,22 +1323,29 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     def d6(p: tuple[object, ...]) -> DiffItem | None:
+        # 롤의 정리의 *가정*을 묻는다 — 1차는 'f(a) = f(b)일 때 … 조건이 성립하도록 하는 k'로 구할
+        # 조건을 가정으로 먼저 주는 순환 문장이었다(2차 감사). 이제 가정을 학생이 떠올려야 한다.
         c = _case_of(p[0])
-        # 롤의 정리 전제(f(a) = f(b))를 맞추는 상수 k — f(x) = x^2 + kx + r
         r = _const_term(c.a * 3 + c.b)
         k = -(c.a + c.b)
+        if r == 0:
+            return None
         cond = f"(({c.a})**2 + k*({c.a}) + ({r})) = (({c.b})**2 + k*({c.b}) + ({r}))"
-        r_text = f"+ {r}" if r >= 0 else f"- {-r}"
+        r_text = f"+ {r}" if r > 0 else f"- {-r}"
+        fa_k = render_poly(((1, c.a), (0, c.a * c.a + r)), "k")
+        fb_k = render_poly(((1, c.b), (0, c.b * c.b + r)), "k")
         return DiffItem(
             slot="diagnostic",
             frame_id="diag-rolle-premise-find-k",
             question_text=(
-                f"함수 f(x) = x^2 + kx {r_text}에 대하여 f({c.a}) = f({c.b})일 때, 닫힌구간 "
-                f"[{c.a}, {c.b}]에서 롤의 정리의 조건이 성립하도록 하는 상수 k의 값을 구하시오."
+                f"함수 f(x) = x^2 + kx {r_text}{i_ga(r_text)} 닫힌구간 [{c.a}, {c.b}]에서 롤의 "
+                "정리의 가정을 모두 만족시키도록 하는 상수 k의 값을 구하시오."
             ),
             answer_text=str(k),
             explanation=(
-                f"f({c.a}) = f({c.b})에서 두 끝점의 합과 k의 합이 0이어야 하므로 k는 {k}이다."
+                "다항함수는 연속이고 미분가능하므로 롤의 정리의 가정 중 확인할 것은 "
+                f"f({c.a}) = f({c.b})이다. f({c.a}) = {fa_k}, f({c.b}) = {fb_k}이므로 "
+                f"{fa_k} = {fb_k}에서 k = {k}이다."
             ),
             conditions=cond,
             answer_map=(("k", str(k)),),
@@ -1139,41 +1353,54 @@ def _diagnostic_frames() -> list[Frame]:
             answer_format=answer_format_of(k),
         )
 
-    def d7(p: tuple[object, ...]) -> DiffItem | None:
+    def d8(p: tuple[object, ...]) -> DiffItem | None:
+        return _bound_item(slot="diagnostic", frame_id="diag-mvt-lower-bound", p=p, side="lower")
+
+    def d9(p: tuple[object, ...]) -> DiffItem | None:
+        # 방정식의 두 근을 주고 평균값 정리의 c를 고르게 한다 — '열린구간 안'이라는 조건만 진단.
         c = _case_of(p[0])
-        eq, m = _fprime_eq_rate_poly(c)
-        distinct = len(set(sympy.real_roots(sympy.Poly(poly_to_sympy(eq), _X))))
-        return KindedDiffItem(
+        solved = _solve_c(c)
+        if solved is None or len(solved[2]) != 1:
+            return None
+        both = sorted([solved[0], *solved[2]])
+        return _c_item(
             slot="diagnostic",
-            frame_id="diag-count-candidates",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서의 평균변화율과 "
-                "같은 미분계수를 갖는 서로 다른 실수 x의 개수를 구하시오."
+            frame_id="diag-choose-root-in-interval",
+            text=(
+                f"함수 f(x) = {_fx(c)}에 대하여 방정식 f'(x) = (f({c.b}) - f({c.a}))/"
+                f"({_minus(c.b, c.a)})의 두 실근은 {frac_text(both[0])}, {frac_text(both[1])}이다. "
+                f"닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 만족시키는 c의 값을 구하시오."
             ),
-            answer_text=str(distinct),
-            explanation=(
-                f"구간 [{c.a}, {c.b}]에서의 평균변화율은 {frac_text(m)}이므로 f'(x)의 값이 "
-                f"{frac_text(m)}인 방정식은 {render_poly(eq)} = 0이고 서로 다른 실근은 "
-                f"{distinct}개이다."
-            ),
-            conditions=f"{poly_to_sympy_str(eq)} = 0",
-            answer_map=(),
-            problem_type_code=_COUNT,
-            answer_format=AnswerFormat.자연수,
-            answer_kind="real_root_count",
+            case=c,
         )
 
+    def d10(p: tuple[object, ...]) -> DiffItem | None:
+        c = _case_of(p[0])
+        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
+        return _count_item(
+            slot="diagnostic",
+            frame_id="diag-count-parallel-tangents-between",
+            text=(
+                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), B({c.b}, {fb})에 대하여, "
+                f"{c.a} < x < {c.b}인 범위에서 접선이 직선 AB와 평행한 점의 개수를 구하시오."
+            ),
+            case=c,
+            note="직선 AB의 기울기는 평균변화율과 같다. ",
+        )
+
+    # 1차 diagnostic의 근의 합(근과 계수의 관계만)·큰 근(이차방정식 풀이만)·'(구간 밖 포함)' 없는
+    # 실근 개수(해석이 갈림)는 평균값 정리의 판단을 요구하지 않아 삭제했다(2차 감사).
     return [
-        Frame("diag-sum-of-candidate-roots", _frames_params("p3-mvt:d2", _cubic_cases()), d2),
-        Frame("diag-larger-candidate", _frames_params("p3-mvt:d3", _cubic_cases()), d3),
         Frame("diag-value-of-derivative-at-c", _frames_params("p3-mvt:d5", _cubic_cases()), d5),
         Frame("diag-rolle-premise-find-k", _frames_params("p3-mvt:d6", _rolle_cases()), d6),
-        Frame("diag-count-candidates", _frames_params("p3-mvt:d7", _cubic_cases()), d7),
+        Frame("diag-choose-root-in-interval", _frames_params("p3-mvt:d9", _cubic_cases()), d9),
+        Frame("diag-mvt-lower-bound", _bound_params("p3-mvt:d8"), d8),
+        Frame("diag-count-parallel-tangents-between", _count_pool("p3-mvt:d10"), d10),
     ]
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 숙련도 확인(mastery_check) — 구간 밖 근 식별·미지수·두 구간 비교
+# 숙련도 확인(mastery_check) — 구간 밖 근 식별·미지수·부등식·롤의 정리 두 단계·개수
 # ──────────────────────────────────────────────────────────────────────────
 def _mastery_frames() -> list[Frame]:
     def k1(p: tuple[object, ...]) -> DiffItem | None:
@@ -1193,9 +1420,10 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=frac_text(out),
             explanation=(
-                f"{render_poly(eq)} = 0의 두 근은 {with_wa_gwa(frac_text(c.c))} "
-                f"{frac_text(out)}이고 {frac_text(c.c)}만 열린구간 안에 있다. "
-                f"구간 밖의 근은 {frac_text(out)}이다."
+                f"평균변화율은 {frac_text(m)}이므로 방정식은 {render_poly(eq)} = 0, 즉 "
+                f"{render_factored(eq)} = 0이고 두 근은 {with_wa_gwa(frac_text(c.c))} "
+                f"{frac_text(out)}이다. 이 중 {frac_text(c.c)}만 열린구간 안에 있으므로 구간에 "
+                f"속하지 않는 근은 {frac_text(out)}이다."
             ),
             conditions=(f"{poly_to_sympy_str(eq)} = 0", side),
             answer_map=(("x", frac_text(out)),),
@@ -1203,76 +1431,18 @@ def _mastery_frames() -> list[Frame]:
             answer_format=answer_format_of(out),
         )
 
-    def k2(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        # 이차함수 f의 두 구간 [a, b], [a2, k] — 평균변화율이 같도록 하는 k (k > a2)
-        a2 = c.a - 1
-        fk = poly_to_sympy(c.f).subs(_X, sympy.Symbol("k"))
-        rate1 = Fraction(eval_at(c.f, c.b) - eval_at(c.f, c.a), c.b - c.a)
-        k_expected = c.a + c.b - a2  # 이차함수의 평균변화율은 (끝점 합)에 의해서만 정해진다
-        if k_expected <= a2:
-            return None
-        cond = f"{frac_text(rate1)}*(k - ({a2})) = {sympy.sstr(fk)} - ({eval_at(c.f, a2)})"
-        sols = sympy.solve(
-            sympy.Eq(
-                rate1.numerator * (sympy.Symbol("k") - a2),
-                rate1.denominator * (fk - eval_at(c.f, a2)),
-            ),
-            sympy.Symbol("k"),
-        )
-        if sympy.Integer(k_expected) not in sols or len([s for s in sols if s > a2]) != 1:
-            return None
-        return DiffItem(
-            slot="mastery_check",
-            frame_id="mastery-two-intervals-equal-average-rate",
-            question_text=(
-                f"이차함수 f(x) = {_fx(c)}에 대하여 구간 [{c.a}, {c.b}]에서의 평균변화율과 "
-                f"구간 [{a2}, k]에서의 평균변화율이 같을 때, k ({a2} < k)의 값을 구하시오."
-            ),
-            answer_text=str(k_expected),
-            explanation=(
-                f"이차함수의 평균변화율은 두 끝점의 합으로 정해지므로 {c.a} + {c.b} = {a2} + k에서 "
-                f"k = {k_expected}이다."
-            ),
-            conditions=(cond, f"k > {a2}"),
-            answer_map=(("k", str(k_expected)),),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(k_expected),
-        )
-
     def k3(p: tuple[object, ...]) -> DiffItem | None:
+        # 1차 '두 점 (a, f(a)), (b, f(b))에서 a = -1, b = 2이다'는 기호를 들이자마자 값을 고정한
+        # 어색한 문장이었다(2차 감사) — 두 점을 좌표 그대로 쓴다.
         return _k_item(
             "mastery_check",
             "mastery-find-k-tangent-parallel",
             lambda a, b, cs: (
-                f"함수 f(x) = x^3 + kx^2에 대하여 곡선 y = f(x) 위의 두 점 (a, f(a)), "
-                f"(b, f(b))에서 a = {a}, b = {b}이다. 이 두 점을 잇는 직선과 평행한 접선의 "
-                f"접점의 x좌표가 {cs}일 때, 상수 k의 값을 구하시오."
+                f"함수 f(x) = x^3 + kx^2에 대하여 곡선 y = f(x) 위의 두 점 ({a}, f({a})), "
+                f"({b}, f({b})){eul_reul(f'f({b})')} 잇는 직선과 평행한 접선의 접점의 x좌표가 "
+                f"{cs} ({a} < {cs} < {b})일 때, 상수 k의 값을 구하시오."
             ),
             p,
-        )
-
-    def k4(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        eq, m = _fprime_eq_rate_poly(c)
-        if len(c.others) != 1:
-            return None
-        total = c.c + c.others[0]
-        return KindedDiffItem(
-            slot="mastery_check",
-            frame_id="mastery-sum-of-c-and-outside-root",
-            question_text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 열린구간 ({c.a}, {c.b})에서 평균값 정리를 "
-                f"만족시키는 c와, f'(x) = f'(c)를 만족시키는 또 하나의 실수 x = e가 있다. "
-                "c + e의 값을 구하시오."
-            ),
-            answer_text=frac_text(total),
-            explanation=f"{render_poly(eq)} = 0의 두 근이 c와 e이므로 합은 {frac_text(total)}이다.",
-            conditions=f"{poly_to_sympy_str(eq)} = 0",
-            answer_map=(),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(total),
-            answer_aggregate="sum",
         )
 
     def k5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1306,7 +1476,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(k_val),
             explanation=(
-                f"이차함수의 c는 구간의 중점이므로 ({c.a} + k)/2 = {cs}에서 k = {k_val}이다."
+                "이차함수에서는 평균변화율과 같은 미분계수를 갖는 점이 구간의 중점 하나뿐이므로 "
+                f"평균값 정리의 c는 구간의 중점이다. ({c.a} + k)/2 = {cs}에서 k = {k_val}이다."
             ),
             conditions=(cond, f"k > {c.a}"),
             answer_map=(("k", str(k_val)),),
@@ -1314,40 +1485,78 @@ def _mastery_frames() -> list[Frame]:
             answer_format=answer_format_of(k_val),
         )
 
-    def k6(p: tuple[object, ...]) -> DiffItem | None:
-        c = _case_of(p[0])
-        eq, m = _fprime_eq_rate_poly(c)
-        distinct = len(set(sympy.real_roots(sympy.Poly(poly_to_sympy(eq), _X))))
-        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
-        return KindedDiffItem(
-            slot="mastery_check",
-            frame_id="mastery-count-parallel-tangent-points",
-            question_text=(
-                f"곡선 y = {_fx(c)} 위의 두 점 A({c.a}, {fa}), B({c.b}, {fb})에 대하여, 이 곡선 "
-                "위의 점 중 접선이 직선 AB와 평행한 점의 개수를 구하시오. (단, 구간은 "
-                "제한하지 않는다.)"
-            ),
-            answer_text=str(distinct),
-            explanation=f"{render_poly(eq)} = 0의 서로 다른 실근이 {distinct}개이다.",
-            conditions=f"{poly_to_sympy_str(eq)} = 0",
-            answer_map=(),
-            problem_type_code=_COUNT,
-            answer_format=AnswerFormat.자연수,
-            answer_kind="real_root_count",
+    def k7(p: tuple[object, ...]) -> DiffItem | None:
+        return _bound_item(
+            slot="mastery_check", frame_id="mastery-mvt-bound-range-sum", p=p, side="both"
         )
 
+    def k8(p: tuple[object, ...]) -> DiffItem | None:
+        # 롤의 정리를 두 단계로 — 가정(f(a) = f(b))으로 k를 정하고, 결론(f'(c) = 0)으로 c를 구한다.
+        a, b, q, d, k0, c_in = p[0], p[1], p[2], p[3], p[4], p[5]
+        assert isinstance(c_in, Fraction)
+        a, b, q, d, k0 = (int(str(v)) for v in (a, b, q, d, k0))
+        f = _mk_poly((3, 1), (2, k0), (1, q), (0, d))
+        case = _Case(f, a, b, c_in, ())
+        solved = _solve_c(case)
+        if solved is None or solved[0] != c_in:
+            return None
+        q_text = "" if q == 0 else (f" + {q}x" if q > 0 else f" - {-q}x")
+        if abs(q) == 1:
+            q_text = " + x" if q > 0 else " - x"
+        d_text = "" if d == 0 else (f" + {d}" if d > 0 else f" - {-d}")
+        human = f"x^3 + kx^2{q_text}{d_text}"
+        fa_k = render_poly(((1, a * a), (0, a**3 + q * a + d)), "k")
+        fb_k = render_poly(((1, b * b), (0, b**3 + q * b + d)), "k")
+        premise = (
+            f"다항함수는 연속이고 미분가능하므로 롤의 정리를 적용하려면 f({a}) = f({b})이어야 "
+            f"한다. f({a}) = {fa_k}, f({b}) = {fb_k}이므로 {fa_k} = {fb_k}에서 k = {k0}이다. "
+            f"그러면 f(x) = {render_poly(f)}이고 "
+        )
+        return _c_item(
+            slot="mastery_check",
+            frame_id="mastery-rolle-cubic-k-then-c",
+            text=(
+                f"함수 f(x) = {human}{i_ga(human)} 닫힌구간 [{a}, {b}]에서 롤의 정리의 가정을 "
+                "만족시키도록 상수 k의 값을 정할 때, 롤의 정리를 만족시키는 c의 값을 구하시오."
+            ),
+            case=case,
+            rhs="0",
+            note=premise,
+        )
+
+    def k9(p: tuple[object, ...]) -> DiffItem | None:
+        c = _shift_to_zero(_case_of(p[0]))
+        ft = render_poly(c.f, "t")
+        return _count_item(
+            slot="mastery_check",
+            frame_id="mastery-count-velocity-matches-average",
+            text=(
+                f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x(t) = {ft}일 때, "
+                f"0 < t < {c.b}에서 점 P의 순간속도가 t = 0부터 t = {c.b}까지의 평균속도와 "
+                "같아지는 시각의 개수를 구하시오."
+            ),
+            case=c,
+            var="t",
+            fn="x",
+            note="평균속도는 위치의 평균변화율이다. ",
+        )
+
+    # 1차 숙련도의 '두 구간의 평균변화율이 같은 k'(평균변화율 대수 계산만)·'c + e'(근과 계수의
+    # 관계만)·'구간은 제한하지 않는다' 개수(도함수 방정식 근 세기)는 삭제했다(2차 감사 bad_tag).
     return [
         Frame("mastery-root-outside-interval", _frames_params("p3-mvt:k1", _cubic_cases()), k1),
-        Frame(
-            "mastery-two-intervals-equal-average-rate",
-            _frames_params("p3-mvt:k2", _quad_cases()),
-            k2,
-        ),
         Frame("mastery-find-k-tangent-parallel", tuple(_k_params("p3-mvt:k3")), k3),
-        Frame("mastery-sum-of-c-and-outside-root", _frames_params("p3-mvt:k4", _cubic_cases()), k4),
         Frame("mastery-find-upper-endpoint", _frames_params("p3-mvt:k5", _quad_cases()), k5),
+        Frame("mastery-mvt-bound-range-sum", _bound_params("p3-mvt:k7"), k7),
         Frame(
-            "mastery-count-parallel-tangent-points", _frames_params("p3-mvt:k6", _cubic_cases()), k6
+            "mastery-rolle-cubic-k-then-c",
+            tuple(tuple(c) for c in _rolle_k_cases()),
+            k8,
+        ),
+        Frame(
+            "mastery-count-velocity-matches-average",
+            tuple((case,) for case in seeded_order("p3-mvt:k9", _both_inside_cases())),
+            k9,
         ),
     ]
 

@@ -55,7 +55,10 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_from_sympy,
     poly_to_sympy,
     poly_to_sympy_str,
+    render_factored,
     render_poly,
+    render_sum,
+    with_eun_neun,
     with_i_ga,
     with_wa_gwa,
 )
@@ -64,11 +67,12 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     DiffItem,
     Frame,
     P3DiffSlotGenerator,
+    answer_format_for,
     build_choices,
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, euro_ro, i_ga
+from whymath_backend.lang.josa import eul_reul, euro_ro
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffVelocityAccelerationGenerator"]
@@ -83,8 +87,9 @@ _V: Final = "t"
 # ──────────────────────────────────────────────────────────────────────────
 # 공용 도구
 # ──────────────────────────────────────────────────────────────────────────
-def _fmt(value: int) -> AnswerFormat:
-    return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
+def _fmt(value: object) -> AnswerFormat:
+    """정답 형식 — 기반의 단일 규칙(`answer_format_for`)을 따른다."""
+    return answer_format_for(str(value))
 
 
 def _grid(seed: str, *axes: tuple[object, ...]) -> tuple[tuple[object, ...], ...]:
@@ -161,6 +166,18 @@ def _shift(f: Poly, delta: int) -> Poly:
     return poly_from_sympy(expr, _V)
 
 
+def _k_affine(base: Poly, t: int) -> str:
+    """v(t) = base'(t) + 2kt를 t에 대입한 k의 일차식('6k + 51') — 해설의 방정식 단계."""
+    return render_poly(((1, 2 * t), (0, eval_at(_vel(base), t, _V))), _PARAM)
+
+
+#: 오개념 유발 해설의 함정 문장 — 오답 선지가 나오는 경로(power-rule-step-omitted)를 짚는다.
+_POWER_TRAP: Final = (
+    " 위치를 미분할 때 지수를 앞으로 내리는 단계나 지수를 1 줄이는 단계를 빠뜨리면 다른 값이 "
+    "나온다."
+)
+
+
 def _intro(f: Poly) -> str:
     return f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {_rt(f)}일 때,"
 
@@ -187,8 +204,13 @@ def _acc_expr(f: Poly, symbol: sympy.Symbol) -> sympy.Expr:
     return cast(sympy.Expr, sympy.diff(poly_to_sympy(f, _V), _T, 2).subs(_T, symbol))
 
 
-def _render_with_param(base: Poly, exp: int) -> tuple[str, str]:
-    """base + p·t^exp — (사람이 읽는 표기, SymPy 표기). base에 t^exp 항이 없어야 한다."""
+#: 미지 계수 기호 — 점 P와 상수 p가 한 문항에 함께 나오면 대소문자만 다른 두 기호가 혼동된다
+#: (2차 감사 결함). 이 개념의 미지 계수는 k로 쓴다.
+_PARAM: Final = "k"
+
+
+def _render_with_param(base: Poly, exp: int, coef: int = 1) -> tuple[str, str]:
+    """base + coef·k·t^exp — (사람이 읽는 표기, SymPy 표기). base에 t^exp 항이 없어야 한다."""
     terms: list[tuple[int, int | None]] = [(e, c) for e, c in base]
     terms.append((exp, None))
     terms.sort(key=lambda term: term[0], reverse=True)
@@ -196,8 +218,18 @@ def _render_with_param(base: Poly, exp: int) -> tuple[str, str]:
     symbolic: list[str] = []
     for index, (e, c) in enumerate(terms):
         if c is None:
-            h_body = f"pt^{e}" if e > 1 else ("pt" if e == 1 else "p")
-            s_body = f"p*t**{e}" if e > 1 else ("p*t" if e == 1 else "p")
+            lead = "" if coef == 1 else str(coef)
+            s_lead = "" if coef == 1 else f"{coef}*"
+            h_body = (
+                f"{lead}{_PARAM}t^{e}"
+                if e > 1
+                else (f"{lead}{_PARAM}t" if e == 1 else f"{lead}{_PARAM}")
+            )
+            s_body = (
+                f"{s_lead}{_PARAM}*t**{e}"
+                if e > 1
+                else (f"{s_lead}{_PARAM}*t" if e == 1 else f"{s_lead}{_PARAM}")
+            )
             sign = "+"
         else:
             magnitude = abs(c)
@@ -380,15 +412,16 @@ def _rep_frames() -> list[Frame]:
             frame_id="rep-find-coefficient-from-velocity",
             text=(
                 f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {human}이다. t = {t}에서의 "
-                f"점 P의 속도가 {v}일 때, 상수 p의 값을 구하시오."
+                f"점 P의 속도가 {v}일 때, 상수 {_PARAM}의 값을 구하시오."
             ),
             answer=p0,
             explanation=(
-                f"속도 v(t)는 위치를 미분한 값이므로 t = {t}에서의 값이 {with_i_ga(v)} "
-                f"되도록 p를 정하면 p는 {p0}이다."
+                f"속도는 위치를 시각 t로 미분한 값이므로 "
+                f"v(t) = {_render_with_param(_vel(base), 1, 2)[0]}이다. "
+                f"v({t}) = {_k_affine(base, t)} = {v}에서 {_PARAM} = {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, t).doit().subs(t, {t}) = {v}",
-            symbol="p",
+            symbol=_PARAM,
         )
 
     def r4(p: tuple[object, ...]) -> DiffItem | None:
@@ -406,8 +439,8 @@ def _rep_frames() -> list[Frame]:
             ),
             answer=r,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 이 값이 {with_i_ga(v0)} 되는 "
-                f"양수 t는 {r}이다."
+                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {v0}에서 "
+                f"t = {r}이다."
             ),
             conditions=(f"{_dv(f, 's')} = {v0}", "s > 0"),
         )
@@ -610,8 +643,8 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 두 번째로 운동 방향을 바꾸는 시각 t를 구하시오.",
             answer=r2,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = 0의 두 근은 {r1}, {r2}이고 속도의 "
-                f"부호가 바뀌므로 두 번째 시각은 {r2}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0의 두 근은 "
+                f"{r1}, {r2}이고 각 근의 좌우에서 속도의 부호가 바뀌므로 두 번째 시각은 {r2}이다."
             ),
             conditions=(f"{_dv(f, 's')} = 0", f"s > {r1}"),
         )
@@ -624,8 +657,8 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 처음으로 운동 방향을 바꾸는 시각 t를 구하시오.",
             answer=r1,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = 0의 두 근은 {r1}, {r2}이고 속도의 "
-                f"부호가 바뀌므로 처음 시각은 {r1}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0의 두 근은 "
+                f"{r1}, {r2}이고 각 근의 좌우에서 속도의 부호가 바뀌므로 처음 시각은 {r1}이다."
             ),
             conditions=(f"{_dv(f, 's')} = 0", f"s < {r2}"),
         )
@@ -645,15 +678,16 @@ def _applied_frames() -> list[Frame]:
             frame_id="applied-coefficient-from-velocity-zero",
             text=(
                 f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {human}이다. t = {t}에서 "
-                "점 P의 속도가 0일 때, 상수 p의 값을 구하시오."
+                f"점 P의 속도가 0일 때, 상수 {_PARAM}의 값을 구하시오."
             ),
             answer=p0,
             explanation=(
-                f"v(t)는 위치의 도함수이고 t = {t}에서 0이므로 이를 만족하도록 p를 정하면 "
-                f"p는 {p0}이다."
+                f"속도는 위치를 시각 t로 미분한 값이므로 "
+                f"v(t) = {_render_with_param(_vel(base), 1, 2)[0]}이다. "
+                f"v({t}) = {_k_affine(base, t)} = 0에서 {_PARAM} = {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, t).doit().subs(t, {t}) = 0",
-            symbol="p",
+            symbol=_PARAM,
         )
 
     def a6(p: tuple[object, ...]) -> DiffItem | None:
@@ -669,8 +703,8 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P의 속도와 가속도가 같아지는 시각 t를 구하시오.",
             answer=r,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {_a_at(f, 0)}이므로 두 값이 같아지는 "
-                f"t는 {r}이다."
+                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {_a_at(f, 0)}이므로 "
+                f"{render_poly(_vel(f), _V)} = {_a_at(f, 0)}에서 t = {r}이다."
             ),
             # v - a = (x - x')' 이므로 한 번의 미분 평가로 검산한다.
             conditions=f"Derivative({_st(f)} - Derivative({_st(f)}, t), t).doit().subs(t, s) = 0",
@@ -769,7 +803,7 @@ def _mc_item(
         conditions=conditions,
         answer_map=(("y", str(correct)),),
         problem_type_code=_EVAL,
-        answer_format=AnswerFormat.실수,
+        answer_format=_fmt(answer),
         choices=choices,
         distractors=distractors,
     )
@@ -788,7 +822,10 @@ def _misconception_frames() -> list[Frame]:
             wrong=_wrong_values(f, t, 1),
             filler=filler,
             conditions=f"{_dv(f, str(t))} = y",
-            explanation=(f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 속도는 {v}이다."),
+            explanation=(
+                f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 속도는 {v}이다."
+                f"{_POWER_TRAP}"
+            ),
             shuffle_key=f"vm1:{_rt(f)}:{t}",
         )
 
@@ -805,6 +842,7 @@ def _misconception_frames() -> list[Frame]:
             conditions=f"{_dv(f, str(t))} = y",
             explanation=(
                 f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 순간속도는 {v}이다."
+                f"{_POWER_TRAP}"
             ),
             shuffle_key=f"vm2:{_rt(f)}:{t}",
         )
@@ -820,7 +858,8 @@ def _misconception_frames() -> list[Frame]:
             filler=_v_at(f, t),
             conditions=f"{_da(f, str(t))} = y",
             explanation=(
-                f"a(t) = {render_poly(_acc(f), _V)}이므로 t = {t}일 때의 가속도는 {a}이다."
+                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
+                f"t = {t}일 때의 가속도는 {a}이다.{_POWER_TRAP}"
             ),
             shuffle_key=f"vm3:{_rt(f)}:{t}",
         )
@@ -839,7 +878,11 @@ def _misconception_frames() -> list[Frame]:
             conditions=(
                 f"Derivative({_st(f)} + Derivative({_st(f)}, t), t).doit().subs(t, {t}) = y"
             ),
-            explanation=(f"속도는 {v}, 가속도는 {a}이므로 합은 {v + a}이다."),
+            explanation=(
+                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {render_poly(_acc(f), _V)}이므로 "
+                f"t = {t}에서 속도는 {v}, 가속도는 {a}이고 합은 {render_sum(v, a)} = {v + a}이다."
+                f"{_POWER_TRAP}"
+            ),
             shuffle_key=f"vm4:{_rt(f)}:{t}",
         )
 
@@ -865,11 +908,14 @@ def _misconception_frames() -> list[Frame]:
                 f"점 P의 속도가 {with_i_ga(b)} 되는 시각 t는?"
             ),
             answer_text=answer,
-            explanation=f"v(t) = 2t이므로 2t가 {with_i_ga(b)} 되는 시각은 {t0}이다.",
+            explanation=(
+                f"v(t) = 2t이므로 2t = {b}에서 t = {t0}이다. 속도를 t로 쓰거나(계수 2 누락) "
+                "2t^2으로 쓰면(지수를 1 줄이지 않음) 다른 시각이 나온다."
+            ),
             conditions=f"Derivative(t**2, t).doit().subs(t, s) = {b}",
             answer_map=(("s", str(t0)),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.자연수,
+            answer_format=_fmt(answer),
             choices=choices,
             distractors=distractors,
         )
@@ -901,11 +947,15 @@ def _misconception_frames() -> list[Frame]:
                 f"점 P의 속도가 {with_i_ga(b)} 되는 시각 t는?"
             ),
             answer_text=answer,
-            explanation=(f"v(t) = 3t^2이므로 3t^2이 {with_i_ga(b)} 되는 양수 t는 {t0}이다."),
+            explanation=(
+                f"v(t) = 3t^2이므로 3t^2 = {b}에서 t^2 = {t0 * t0}이고, t > 0이므로 t = {t0}이다. "
+                "속도를 t^2으로 쓰거나(계수 3 누락) 3t^3으로 쓰면(지수를 1 줄이지 않음) 다른 "
+                "시각이 나온다."
+            ),
             conditions=(f"Derivative(t**3, t).doit().subs(t, s) = {b}", "s > 0"),
             answer_map=(("s", str(t0)),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(answer),
             choices=choices,
             distractors=distractors,
         )
@@ -917,7 +967,8 @@ def _misconception_frames() -> list[Frame]:
         for c in (-6, -3, 2, 5)
         for d in (0, 3)
     ) + tuple(_poly({3: lead, 2: b, 1: c}) for lead in (1, 2) for b in (-3, -1, 2) for c in (-6, 4))
-    times = (1, 2, 3, -1, -2)
+    # 시각은 0 이상이다 — 음수 시각에서의 속도·가속도를 묻지 않는다(2차 감사 결함).
+    times = (0, 1, 2, 3, 4)
     return [
         Frame("mc-velocity-at-time", _grid("p3-vel:m1", pool, times), m1),
         Frame("mc-instantaneous-velocity", _grid("p3-vel:m2", pool, times), m2),
@@ -941,11 +992,14 @@ def _diagnostic_frames() -> list[Frame]:
             slot=slot,
             frame_id="diag-velocity-of-fixed-position",
             text=(
-                f"수직선 위의 점 P의 시각 t에서의 위치가 x = {c}로 일정할 때, t = {t}에서의 "
-                "점 P의 속도를 구하시오."
+                f"수직선 위의 점 P의 시각 t에서의 위치가 x = {c}{euro_ro(str(c))} 일정할 때, "
+                f"t = {t}에서의 점 P의 속도를 구하시오."
             ),
             value=0,
-            explanation="위치가 변하지 않으므로 속도는 0이다.",
+            explanation=(
+                f"위치 {with_eun_neun(f'x = {c}')} 시각 t에 대한 상수함수이므로 v(t) = 0이다. "
+                f"따라서 t = {t}에서의 속도는 0이다."
+            ),
             conditions=f"{_dv(f, str(t))} = y",
         )
 
@@ -1065,9 +1119,10 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer=found,
             explanation=(
-                f"평균속도는 {avg}이고 v(t) = {render_poly(_vel(f), _V)}"
-                f"{i_ga(render_poly(_vel(f), _V))} {with_i_ga(avg)} "
-                f"되는 시각은 {found}이다."
+                f"평균속도는 (x({t1}) - x({t0}))/({t1} - {t0}) = "
+                f"({_minus(_x_at(f, t1), _x_at(f, t0))})/{t1 - t0} = {avg}이다. "
+                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {avg}에서 "
+                f"t = {found}이다."
             ),
             conditions=(f"{_dv(f, 's')} = {avg}", f"s > {t0}", f"s < {t1}"),
         )
@@ -1084,8 +1139,8 @@ def _mastery_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 {order} 운동 방향을 바꿀 때의 점 P의 위치를 구하시오.",
             value=x,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = 0에서 {order} 방향을 바꾸는 시각은 {r}이고 "
-                f"그때의 위치는 {x}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0에서 "
+                f"{order} 방향을 바꾸는 시각은 {r}이고 그때의 위치는 x({r}) = {x}이다."
             ),
             conditions=f"{_at(f, r)} = y",
         )
@@ -1122,14 +1177,16 @@ def _mastery_frames() -> list[Frame]:
         return _solve_item(
             slot=slot,
             frame_id="mastery-equal-velocity-two-points",
+            # 두 위치를 둘 다 'x = …'로 쓰면 기호가 겹친다(2차 감사) — f(t)·g(t)로 나눠 쓴다.
             text=(
-                f"수직선 위를 움직이는 두 점 P, Q의 시각 t에서의 위치가 각각 x = {_rt(f)}, "
-                f"x = {_rt(g)}이다. 두 점의 속도가 같아지는 시각 t (t > 0)의 값을 구하시오."
+                f"수직선 위를 움직이는 두 점 P, Q의 시각 t에서의 위치가 각각 f(t) = {_rt(f)}, "
+                f"g(t) = {_rt(g)}이다. 두 점의 속도가 같아지는 시각 t (t > 0)의 값을 구하시오."
             ),
             answer=r,
             explanation=(
-                f"P의 속도는 {render_poly(_vel(f), _V)}, Q의 속도는 {render_poly(_vel(g), _V)}"
-                f"이므로 두 속도가 같아지는 양수 t는 {r}이다."
+                f"P의 속도는 f'(t) = {render_poly(_vel(f), _V)}, Q의 속도는 "
+                f"g'(t) = {render_poly(_vel(g), _V)}이다. "
+                f"{render_poly(_vel(f), _V)} = {render_poly(_vel(g), _V)}에서 t = {r}이다."
             ),
             conditions=(f"Derivative(({_st(f)}) - ({_st(g)}), t).doit().subs(t, s) = 0", "s > 0"),
         )
@@ -1144,17 +1201,19 @@ def _mastery_frames() -> list[Frame]:
         f = _poly({3: lead, 2: p0, 1: 2})
         v = _v_at(f, t_b)
         human, symbolic = _render_with_param(_poly({3: lead, 1: 2}), 2)
-        # 첫 미지수 p는 생성기가 SymPy로 푼 값(`p0`)을 조건에 대입한다 — 마지막 속도만 검산.
+        # 첫 미지수 k는 생성기가 SymPy로 푼 값(`p0`)을 조건에 대입한다 — 마지막 속도만 검산.
         return _value_item(
             slot=slot,
             frame_id="mastery-coefficient-then-velocity",
             text=(
-                f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {human}이다. t = {t_a}에서의 "
-                f"점 P의 가속도가 0일 때, t = {t_b}에서의 점 P의 속도를 구하시오."
+                f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {human} ({_PARAM}는 상수)"
+                f"이다. t = {t_a}에서의 점 P의 가속도가 0일 때, t = {t_b}에서의 점 P의 속도를 "
+                "구하시오."
             ),
             value=v,
             explanation=(
-                f"a(t) = {6 * lead}t + 2p가 t = {t_a}에서 0이므로 p는 {p0}이다. 그러면 "
+                f"v(t) = {3 * lead}t^2 + 2{_PARAM}t + 2이고 a(t) = {6 * lead}t + 2{_PARAM}이다. "
+                f"a({t_a}) = {6 * lead * t_a} + 2{_PARAM} = 0에서 {_PARAM} = {p0}이다. 그러면 "
                 f"v(t) = {render_poly(_vel(f), _V)}이고 t = {t_b}에서의 속도는 {v}이다."
             ),
             conditions=f"{_dv(f, str(t_b))} = y",
@@ -1172,8 +1231,9 @@ def _mastery_frames() -> list[Frame]:
             text=(f"{_intro(f)} 점 P가 {order} 운동 방향을 바꾸는 순간의 가속도를 구하시오."),
             value=a,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = 0에서 {order} 방향을 바꾸는 시각은 {r}이고 "
-                f"a(t) = {render_poly(_acc(f), _V)}이므로 그때의 가속도는 {a}이다."
+                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0에서 "
+                f"{order} 방향을 바꾸는 시각은 {r}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
+                f"그때의 가속도는 {a}이다."
             ),
             conditions=f"{_da(f, str(r))} = y",
         )

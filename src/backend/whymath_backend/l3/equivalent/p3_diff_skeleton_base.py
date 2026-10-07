@@ -65,6 +65,7 @@ __all__ = [
     "DiffItem",
     "Frame",
     "P3DiffSlotGenerator",
+    "answer_format_for",
     "build_choices",
     "round_robin_items",
     "seeded_order",
@@ -107,6 +108,27 @@ SLOT_NAMES_KO: Final[Mapping[str, str]] = {
 SLOT_TAG_PREFIX: Final = "p3-slot:"
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
+
+
+_RATIONAL_RE = re.compile(r"-?\d+(?:/\d+)?")
+
+
+def answer_format_for(answer_text: str) -> AnswerFormat:
+    """정답 표기에서 `answer_format`을 정한다 — 은행 전체의 *단일* 규칙(2차 감사 결함 교정).
+
+    양의 정수 → 자연수, 정수가 아닌 유리수 → 분수, 그 밖(0·음의 정수·무리수 등) → 실수. 1차
+    은행은 틀마다 형식을 손으로 박아 '자연수인데 정답 0'(모순)·'실수인데 정답 8'(불일치)이
+    섞였다. `_validate_slot`이 문항마다 이 규칙과 대조해 어긋나면 빌드를 멈춘다.
+    """
+    text = answer_text.strip()
+    if _RATIONAL_RE.fullmatch(text):
+        if "/" in text:
+            numerator, denominator = (int(v) for v in text.split("/"))
+            if numerator % denominator:
+                return AnswerFormat.분수
+            text = str(numerator // denominator)
+        return AnswerFormat.자연수 if int(text) > 0 else AnswerFormat.실수
+    return AnswerFormat.실수
 
 
 def skeleton_of(question_text: str) -> str:
@@ -327,6 +349,12 @@ class P3DiffSlotGenerator:
                 raise ValueError("객관식 선지는 4개여야 한다")
             if slot == "misconception_trigger" and item.choices is None:
                 raise ValueError("오개념 유발 슬롯은 객관식(오답 선지가 오개념에 연결)이어야 한다")
+            expected = answer_format_for(item.answer_text)
+            if item.answer_format != expected:
+                raise ValueError(
+                    f"{cls.__name__}[{slot}] {item.frame_id}: answer_format "
+                    f"{item.answer_format.value} != 정답 {item.answer_text}의 형식 {expected.value}"
+                )
 
     @classmethod
     def target_misconception_ids(cls, slot: str) -> frozenset[str]:

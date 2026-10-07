@@ -21,9 +21,10 @@ from collections.abc import Iterable, Sequence
 
 import sympy
 
-from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga, wa_gwa
+from whymath_backend.lang.josa import eul_reul, eun_neun, has_batchim_text, i_ga, wa_gwa
 
 __all__ = [
+    "ANCHOR_PREFIX",
     "Poly",
     "anchor_curve_function",
     "derivative_of",
@@ -33,12 +34,16 @@ __all__ = [
     "poly_to_sympy_str",
     "product_to_sympy_str",
     "render_affine",
+    "render_difference",
+    "render_factored",
     "render_poly",
     "render_product",
+    "render_sum",
     "sympy_str_of",
     "with_eul_reul",
     "with_eun_neun",
     "with_i_ga",
+    "with_ira",
     "with_wa_gwa",
 ]
 
@@ -153,6 +158,54 @@ def render_product(factors: Sequence[Poly], var: str = "x") -> str:
     return "".join(f"({render_poly(f, var)})" for f in factors)
 
 
+def render_factored(poly: Poly, var: str = "x") -> str:
+    """정수 계수 인수분해 표기('3(x + 2)(x - 4)'·'2x(x + 3)^2'·'(x - 1)(x^2 + 2)').
+
+    해설이 "도함수 → 인수분해 → 근"의 *중간 단계*를 보이도록 쓰는 헬퍼다(2차 감사: 결론만 말하는
+    해설 교정). 인수분해는 SymPy `factor_list`가 정한다(손으로 인수를 고르지 않는다). 표기 순서는
+    ① 정수 계수(1이면 생략·-1이면 '-') ② 변수 단항 인수('x'·'x^2') ③ 일차 인수(근 오름차순)
+    ④ 나머지(이차 이상). 단항 인수를 맨 앞에 두는 것은 '2(x + 3)^2x'처럼 지수 뒤에 변수가 붙어
+    `(x+3)^(2x)`로 읽히는 표기를 막기 위해서다(2차 감사 결함).
+    """
+    symbol = _symbol(var)
+    expr = poly_to_sympy(poly, var)
+    if expr == 0:
+        return "0"
+    coeff, factors = sympy.factor_list(expr, symbol)
+    monomial: list[str] = []
+    linear: list[tuple[sympy.Rational, str]] = []
+    others: list[str] = []
+    for factor, mult in factors:
+        fpoly = poly_from_sympy(sympy.expand(factor), var)
+        power = "" if mult == 1 else f"^{mult}"
+        if fpoly == ((1, 1),):
+            monomial.append(f"{var}{power}")
+        elif fpoly[0][0] == 1:
+            root = sympy.Rational(-dict(fpoly).get(0, 0), fpoly[0][1])
+            linear.append((root, f"({render_poly(fpoly, var)}){power}"))
+        else:
+            others.append(f"({render_poly(fpoly, var)}){power}")
+    head = "" if coeff == 1 else ("-" if coeff == -1 else str(coeff))
+    body = "".join(monomial + [text for _, text in sorted(linear)] + others)
+    return f"{head}{body}" if body else str(coeff)
+
+
+def _signed_operand(value: object) -> str:
+    """이항 연산의 오른쪽 피연산자 — 음수만 괄호('-3' → '(-3)')."""
+    text = str(value)
+    return f"({text})" if text.startswith("-") else text
+
+
+def render_difference(left: object, right: object) -> str:
+    """'2 - 3'·'2 - (-3)' — 산술 과정을 해설에 보일 때 쓰는 차 표기('2 - -3' 금지)."""
+    return f"{left} - {_signed_operand(right)}"
+
+
+def render_sum(left: object, right: object) -> str:
+    """'2 + 3'·'2 + (-3)' — 산술 과정을 해설에 보일 때 쓰는 합 표기('2 + -3' 금지)."""
+    return f"{left} + {_signed_operand(right)}"
+
+
 def product_to_sympy_str(factors: Sequence[Poly], var: str = "x") -> str:
     """곱의 Tier1 표기('(x**2 + 1)*(3*x - 2)')."""
     return "*".join(f"({poly_to_sympy_str(f, var)})" for f in factors)
@@ -193,6 +246,16 @@ def with_wa_gwa(value: object) -> str:
     return f"{token}{wa_gwa(token)}"
 
 
+def with_ira(value: object) -> str:
+    """값 뒤에 서술격 '(이)라'를 붙인 문자열 — 예 `with_ira(3)` = '3이라'·`with_ira(2)` = '2라'.
+
+    'g(x) = f(x) + 3라 할 때'(2차 감사 결함)처럼 '라'를 하드코딩하면 받침 있는 수 뒤에서 틀린다.
+    받침 판별은 다른 조사 헬퍼와 같은 `lang.josa`(수는 한자어 읽기)다.
+    """
+    token = str(value)
+    return f"{token}{'이라' if has_batchim_text(token) else '라'}"
+
+
 _FN_USE_RE = {name: re.compile(rf"(?<![A-Za-z0-9_']){name}\s*[(']") for name in "fgh"}
 
 
@@ -202,15 +265,38 @@ def _defines_function(question_text: str, name: str) -> bool:
     return re.search(pattern, question_text) is not None
 
 
+#: 곡선 식에 함수 기호를 붙이는 *독립 문장* — 해설 앞에 붙는다(뒤 문장과 연결어미로 잇지 않는다).
+ANCHOR_PREFIX = "곡선의 식을 y = {name}(x)라 하자. "
+
+#: 해설 스스로의 명시 정의 — 'f(x) = x^3 - 3x + 2라 하자'·'h(x) = f(x) - g(x) = …라 하자'.
+_EXPLICIT_DEF_RE = {
+    name: re.compile(rf"(?<![A-Za-z0-9_']){name}\((?:x|t)\) = [^.]*?라 하자") for name in "fgh"
+}
+
+
+def _explanation_defines_function(explanation: str, name: str) -> bool:
+    """해설이 `name`을 *쓰기 전에* 스스로 정의했는가(정의 문장이 첫 사용과 같은 자리거나 앞선다)."""
+    match = _EXPLICIT_DEF_RE[name].search(explanation)
+    if match is None:
+        return False
+    first_use = _FN_USE_RE[name].search(explanation)
+    return first_use is None or first_use.start() >= match.start()
+
+
 def anchor_curve_function(question_text: str, explanation: str, *, name: str = "f") -> str:
-    """해설이 발문에 없는 함수 기호(f')를 꺼내면 곡선 식을 `y = f(x)`로 놓는다고 먼저 밝힌다.
+    """해설이 발문에 없는 함수 기호(f')를 꺼내면 곡선 식을 `y = f(x)`라 한다고 먼저 밝힌다.
 
     '곡선 y = x^2 + 1 위의 …' 처럼 곡선을 y = …로만 준 발문의 해설이 갑자기 f'(1)을 쓰면 f가
     정의되지 않은 채 등장한다(P3-03 감사 결함). 발문이 f를 소개했거나 해설이 f를 쓰지 않으면 해설을
-    그대로 둔다.
+    그대로 둔다. 머리말은 **독립 문장**이다 — 1차 교정은 '…로 놓으면 '으로 뒤 문장과 이어 붙여
+    '놓으면 평행하면 …'처럼 '-면'이 겹치는 문장을 만들었다(2차 감사 결함).
     """
     if _FN_USE_RE[name].search(explanation) is None:
         return explanation
     if _defines_function(question_text, name):
         return explanation
-    return f"곡선의 식을 y = {name}(x)로 놓으면 {explanation}"
+    # 해설이 f를 *다른 뜻*(두 변의 차 등)으로 직접 정의하면 머리말을 붙이지 않는다 — 붙이면
+    # '곡선의 식을 y = f(x)라 하자. 두 변의 차를 f(x) = …라 하자'처럼 f가 두 번, 다르게 정의된다.
+    if _explanation_defines_function(explanation, name):
+        return explanation
+    return ANCHOR_PREFIX.format(name=name) + explanation

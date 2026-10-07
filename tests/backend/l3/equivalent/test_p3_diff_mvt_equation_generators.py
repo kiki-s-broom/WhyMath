@@ -12,7 +12,8 @@ P3-03(hermetic·LLM 0). 두 생성기는 아직 등록부(`harness.p3_calculus1_
 ③ **정답의 독립 재계산** — 검산 재료(조건)만 읽어 SymPy·수치 근 계산으로 답을 다시 구한다(생성기 코드 미사용).
 ④ 02-06: c값 문항은 방정식 1개 + 열린구간 경계 4개(P3-19 fixture 형식) — 구간 밖 근 오답이 *구간 조건 때문에*
    거부된다(조건을 떼면 통과 — 보호의 실재). `corpus_reverify`가 구간 밖 근 변형을 exit 1로 거부한다.
-⑤ 02-09: 매개변수(k) 범위형 없음 · 근의 합·곱 문면의 중근 중복 명시 · 개수형이 슬롯을 독점하지 않음.
+⑤ 02-09: 매개변수(k) 범위형 없음 · 근과 계수의 관계·근 고르기 틀의 삭제 동결(2차 감사 bad_tag) ·
+   값형은 전부 도함수로 최솟값을 확인하는 부등식 등호형 · 개수형이 슬롯을 독점하지 않음.
 ⑥ 오개념 연결은 오개념 유발 슬롯에만, 명세의 핵심 M-id로(kebab 좌석이 없어 M-id 그대로 — 좌석이 생기면
    이 테스트가 신호를 낸다).
 ⑦ 문제유형 정직성: 개수형(`real_root_count`) ⇔ `ptype.count-solutions`.
@@ -233,9 +234,12 @@ def test_with_item_kinds_carries_the_gate_materials_into_the_candidate(
             seen["kind"] += candidate.answer_kind is not None
             seen["aggregate"] += candidate.answer_aggregate is not None
             seen["selection"] += candidate.answer_selection is not None
-    assert seen["kind"] >= 2 and seen["aggregate"] >= 2 and seen["selection"] >= 1
-    if generator_cls is _EQ:
-        assert seen["kind"] >= 15 and seen["aggregate"] >= 8 and seen["selection"] >= 8
+    # 2차 감사(2026-10) 처분: 근과 계수의 관계(합·곱)·근 고르기(가장 큰/작은 근) 틀은 미분 활용 없이
+    # 공통수학1 계산만으로 풀려 02-06·02-09 태그가 거짓이었다(bad_tag) — 두 생성기에서 삭제했다.
+    # 그래서 생성기 문항이 aggregate·selection 경로를 더는 밟지 않는다(0건 동결). 경로 자체의 운반
+    # 계약은 아래 합성 문항 테스트(`test_with_item_kinds_carries_aggregate_and_selection`)가 지킨다.
+    assert seen["aggregate"] == 0 and seen["selection"] == 0, seen
+    assert seen["kind"] >= (15 if generator_cls is _EQ else 5), seen
     # 확장 필드가 없는 평범한 DiffItem은 후보를 그대로 돌려준다
     sample = _candidates(generator_cls, "representative")[0]
     plain = DiffItem(
@@ -250,6 +254,32 @@ def test_with_item_kinds_carries_the_gate_materials_into_the_candidate(
         answer_format=AnswerFormat.자연수,
     )
     assert with_item_kinds(sample, plain) is sample
+
+
+def test_with_item_kinds_carries_aggregate_and_selection() -> None:
+    """운반 계약 — 생성기가 더는 aggregate·selection 문항을 내지 않아도 경로 자체는 살아 있어야 한다.
+
+    합성 문항 3종(합·선택·개수)을 직접 만들어 후보 번들에 각 필드가 실리는지 본다. 이 테스트가 없으면
+    02-06·02-09 틀 삭제 뒤 `with_item_kinds`의 aggregate·selection 분기는 아무도 밟지 않는다.
+    """
+    sample = _candidates(_EQ, "representative")[0]
+    common = {
+        "slot": "representative",
+        "frame_id": "synthetic",
+        "question_text": "q",
+        "answer_text": "1",
+        "explanation": "e",
+        "conditions": "x**2 - 1 = 0",
+        "answer_map": (),
+        "problem_type_code": "ptype.solve-for-unknown",
+        "answer_format": AnswerFormat.자연수,
+    }
+    agg = with_item_kinds(sample, KindedDiffItem(**common, answer_aggregate="sum"))
+    assert agg.answer_aggregate == "sum" and agg.answer_selection is None
+    sel = with_item_kinds(sample, KindedDiffItem(**common, answer_selection="largest"))
+    assert sel.answer_selection == "largest" and sel.answer_aggregate is None
+    kind = with_item_kinds(sample, KindedDiffItem(**common, answer_kind="real_root_count"))
+    assert kind.answer_kind == "real_root_count"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -275,9 +305,18 @@ def _symbol_of(exprs: Sequence[sympy.Expr]) -> sympy.Symbol:
 
 
 def _numeric_roots(expr: sympy.Expr, symbol: sympy.Symbol) -> list[complex]:
-    """다항식의 모든 근(중복도 포함) — 정확 근 계산이 아니라 수치 근(독립 경로)."""
-    poly = sympy.Poly(expr, symbol)
-    return [complex(r) for r in poly.nroots(n=40, maxsteps=500)]
+    """다항식의 모든 근(중복도 포함) — 정확 근 계산이 아니라 수치 근(독립 경로).
+
+    중근이 있는 다항식은 mpmath `polyroots`가 수렴하지 못할 때가 있다(실측: 2(x - 1)^2(x + 1)에서
+    NoConvergence). 그래서 제곱 없는 분해(`sqf_list`)로 인수마다 수치 근을 구해 중복도만큼 반복한다 —
+    여전히 생성기 코드를 쓰지 않는 수치 경로이고, 중복도를 보존하므로 합·곱 재계산도 그대로다.
+    """
+    _, factors = sympy.Poly(expr, symbol).sqf_list()
+    out: list[complex] = []
+    for factor, multiplicity in factors:
+        roots = [complex(r) for r in factor.nroots(n=40, maxsteps=500)]
+        out.extend(roots * multiplicity)
+    return out
 
 
 def _real_distinct(roots: Sequence[complex]) -> list[float]:
@@ -379,7 +418,8 @@ def test_answers_match_an_independent_recomputation_from_the_conditions(
                 assert len(points) == 1, (item.question_text, points)
                 assert abs(points[0] - answer) < 1e-6, item.question_text
             checked["value"] += 1
-    assert checked["value"] >= 20 and checked["count"] >= 3 and checked["aggregate"] >= 3, checked
+    # 합·곱(aggregate) 틀은 2차 감사 bad_tag 처분으로 두 생성기에서 삭제했다 — 0건을 동결한다.
+    assert checked["value"] >= 20 and checked["count"] >= 3 and checked["aggregate"] == 0, checked
 
 
 @_ALL
@@ -515,22 +555,43 @@ def test_equation_concept_has_no_parametric_range_questions() -> None:
         assert not re.search(r"\bk\b", item.question_text.replace("y = k", "")), item.question_text
 
 
-def test_equation_concept_roots_sum_and_product_state_multiplicity() -> None:
-    """P3-20 X1 — 검증기가 근의 합을 중근 중복 포함으로 계산하므로 문면이 그것을 명시해야 한다.
+_PREREQUISITE_ONLY = re.compile(
+    r"근의 (합|곱)|교점의 x좌표의 합|중근은 중복하여 센다|실근 중 가장 (큰|작은)|가장 작은 값|"
+    r"x좌표가 가장 큰|오직 하나이다|이차부등식|이차방정식|f'\(x\) = 0을 만족시키는 두 실수|"
+    r"f'\(x\) = 0의 (두 실근|서로 다른)|던진"
+)
 
-    중근이 있는 다항식의 합·곱 문항은 반드시 '(단, 중근은 중복하여 센다.)'를 담는다. 교점 x좌표의
-    합처럼 모든 근이 단순근이면 두 해석이 같아 명시가 없어도 된다.
+
+def test_equation_concept_has_no_prerequisite_only_forms() -> None:
+    """2차 감사(2026-10) bad_tag 처분의 동결 — 02-09 행위가 없는 틀이 되살아나지 않는다.
+
+    삭제한 틀: 근과 계수의 관계(세·네 근의 합·곱·교점 x좌표의 합)·근 고르기(가장 큰/작은 실근·양의
+    실근·정의역 안 유일한 해)·이차부등식/이차방정식·f'(x) = 0의 근 계산(개수·합·작은 근)·'던진
+    물체의 높이'(삼차식이 물리 모델과 모순). 미분 활용 없이 선수 계산만으로 풀려 태그가 거짓이었다.
     """
-    note = "중근은 중복하여 센다"
-    aggregate = [i for i in _items(_EQ) if _agg(i) is not None]
-    assert len(aggregate) >= 12
-    for item in aggregate:
-        expr, _ = _parse_cond(item.conditions if isinstance(item.conditions, str) else "")
-        simple = sympy.Poly(expr, _symbol_of([expr])).discriminant() != 0
-        if "근의 합" in item.question_text or "근의 곱" in item.question_text:
-            assert note in item.question_text, item.question_text
-        if not simple:
-            assert note in item.question_text, item.question_text
+    items = _items(_EQ)
+    assert not [i.question_text for i in items if _PREREQUISITE_ONLY.search(i.question_text)]
+    assert not [i.question_text for i in items if _agg(i) is not None or _sel(i) is not None]
+
+
+def test_equation_concept_value_items_use_the_derivative_to_reach_the_equality_case() -> None:
+    """값형(등호가 성립하는 x)은 해설이 도함수로 최솟값 0을 확인한다 — 인수분해 한 줄로 끝내지 않는다.
+
+    개수형은 인수분해(인수·중근·허근 인수) 또는 도함수(극값 비교) 중 하나를 반드시 보인다(결론만 적은
+    해설 금지 — 2차 감사 bad_explanation).
+    """
+    values = counts = 0
+    for item in _items(_EQ):
+        if _kind(item) is None:
+            assert re.search(r"[fh]'\(x\) = ", item.explanation), item.explanation
+            assert "최솟값" in item.explanation and "= 0" in item.explanation, item.explanation
+            values += 1
+        else:
+            factored = re.search(r"\)\(|\)\^\d|\d\([xt] [-+]|[xt]\([xt] [-+]", item.explanation)
+            derivative = re.search(r"'\(|극댓값|극솟값", item.explanation)
+            assert factored or derivative, item.explanation
+            counts += 1
+    assert values >= 30 and counts >= 20, (values, counts)
 
 
 def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:

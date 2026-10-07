@@ -52,15 +52,22 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_from_sympy,
     poly_to_sympy,
     poly_to_sympy_str,
+    render_affine,
+    render_difference,
+    render_factored,
     render_poly,
+    render_sum,
     with_eul_reul,
+    with_eun_neun,
     with_i_ga,
+    with_wa_gwa,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
     Frame,
     P3DiffSlotGenerator,
+    answer_format_for,
     build_choices,
     round_robin_items,
     seeded_order,
@@ -79,8 +86,45 @@ _X = sympy.Symbol("x")
 # ──────────────────────────────────────────────────────────────────────────
 # 공용 도구
 # ──────────────────────────────────────────────────────────────────────────
-def _fmt(value: int) -> AnswerFormat:
-    return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
+def _fmt(value: object) -> AnswerFormat:
+    """정답 형식 — 기반의 단일 규칙(`answer_format_for`)을 따른다."""
+    return answer_format_for(str(value))
+
+
+def _var_poly(f: Poly, var: str) -> str:
+    """다항식을 다른 변수 이름으로 표기('a^2 - 3a') — 해설에서 미지수 식을 보일 때."""
+    return render_poly(f, var)
+
+
+def _minus_const(f: Poly, value: int) -> Poly:
+    """f - value(상수)를 정규화한 다항식 — 'f'(a) = m'을 'f'(a) - m = 0'으로 옮길 때."""
+    terms = dict(f)
+    terms[0] = terms.get(0, 0) - value
+    return tuple(sorted(((e, c) for e, c in terms.items() if c), reverse=True))
+
+
+def _solve_steps(lhs: Poly, value: int, var: str) -> str:
+    """'(식) = 값, 즉 (인수분해) = 0' — 미지수 방정식의 중간 단계(2차 감사: 결론만 해설 교정)."""
+    moved = _minus_const(lhs, value)
+    return f"{_var_poly(lhs, var)} = {value}, 즉 {render_factored(moved, var)} = 0"
+
+
+def _disc_steps(lead: int, b: int, c: int, m: int, unknown: str) -> str:
+    """접선 판별식의 중간 단계 — 연립한 이차방정식과 판별식 = 0을 숫자로 보인다.
+
+    곡선 y = lead x^2 + b x + c와 직선 y = m x + (unknown)을 연립하면
+    lead x^2 + (b - m) x + (c - unknown) = 0이고, 접하려면 판별식
+    (b - m)^2 - 4·lead·(c - unknown) = 0이다. unknown은 'k'(직선의 y절편)다.
+    """
+    q = b - m
+    quad = render_poly(((2, lead), (1, q), (0, c)))
+    four = 4 * lead
+    tail = render_affine(c, -1, unknown)
+    disc = f"{q * q} - {four}({tail}) = 0" if four > 0 else f"{q * q} + {-four}({tail}) = 0"
+    return (
+        f"연립하면 {quad} - {unknown} = 0이고, 접하려면 이 이차방정식이 이중근을 가져야 하므로 "
+        f"판별식이 0이다. {disc}"
+    )
 
 
 def _grid(seed: str, *axes: tuple[object, ...]) -> tuple[tuple[object, ...], ...]:
@@ -185,8 +229,11 @@ def _solve_real(expr: sympy.Expr, symbol: sympy.Symbol) -> list[sympy.Expr]:
     return list(sympy.solve(expr, symbol))
 
 
-def _render_with_param(base: Poly, exp: int) -> tuple[str, str]:
-    """base + p·x^exp(미지 계수) — (사람이 읽는 표기, SymPy 표기). base에 x^exp 항이 없어야 한다."""
+def _render_with_param(base: Poly, exp: int, coef: int = 1) -> tuple[str, str]:
+    """base + coef·p·x^exp(미지 계수) — (사람이 읽는 표기, SymPy 표기).
+
+    base에 x^exp 항이 없어야 한다.
+    """
     terms: list[tuple[int, int | None]] = [(e, c) for e, c in base]
     terms.append((exp, None))
     terms.sort(key=lambda t: t[0], reverse=True)
@@ -194,8 +241,10 @@ def _render_with_param(base: Poly, exp: int) -> tuple[str, str]:
     symbolic: list[str] = []
     for index, (e, c) in enumerate(terms):
         if c is None:
-            h_body = "p" if e == 0 else (f"px^{e}" if e > 1 else "px")
-            s_body = "p" if e == 0 else (f"p*x**{e}" if e > 1 else "p*x")
+            lead = "" if coef == 1 else str(coef)
+            h_body = f"{lead}p" if e == 0 else (f"{lead}px^{e}" if e > 1 else f"{lead}px")
+            s_lead = "" if coef == 1 else f"{coef}*"
+            s_body = f"{s_lead}p" if e == 0 else (f"{s_lead}p*x**{e}" if e > 1 else f"{s_lead}p*x")
             sign = "+"
         else:
             magnitude = abs(c)
@@ -302,8 +351,10 @@ def _rep_frames() -> list[Frame]:
             ),
             answer_text=str(k),
             explanation=(
-                f"접선을 y = {m}x + k라 두고 곡선과 연립하면 이차방정식이 접점에서 이중근을 "
-                f"가져야 하므로 판별식이 0이다. 이를 풀면 k는 {k}이다."
+                f"접선의 기울기는 접점에서의 미분계수이므로 도함수 "
+                f"{render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입한 {m}이다. 접선을 "
+                f"y = {render_poly(((1, m),))} + k라 두고 곡선과 "
+                f"{_disc_steps(lead, b, c, m, 'k')}에서 k = {k}이다."
             ),
             conditions=_disc_cond(lead, b, c, m, "k"),
             answer_map=(("k", str(k)),),
@@ -325,7 +376,11 @@ def _rep_frames() -> list[Frame]:
                 f"할 때, g({t})의 값을 구하시오."
             ),
             value=value,
-            explanation=(f"접선은 {_pt_slope(m, a, fa)}이므로 x가 {t}일 때의 값은 {value}이다."),
+            explanation=(
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이므로 접선은 {_pt_slope(m, a, fa)}이다. 따라서 g({t}) = {value}이다."
+            ),
             expr=f"({fa}) + ({m})*(({t}) - ({a}))",
             ptype=_EVAL,
         )
@@ -346,9 +401,12 @@ def _rep_frames() -> list[Frame]:
             ),
             answer_text=str(p0),
             explanation=(
-                f"접선의 기울기는 미분계수이므로 도함수에 x = {with_eul_reul(a)} 대입한 값이 "
-                f"{with_i_ga(m)} 되도록 "
-                f"p를 정하면 p는 {p0}이다."
+                f"접선의 기울기는 미분계수이다. y' = "
+                f"{_render_with_param(derivative_of(base), 1, 2)[0]}이므로 x = {a}에서의 기울기는 "
+                f"{render_poly(((1, 2 * a), (0, eval_at(derivative_of(base), a))), 'p')}이다. "
+                f"이 값이 {with_i_ga(m)} 되어야 하므로 "
+                f"{render_poly(((1, 2 * a), (0, eval_at(derivative_of(base), a))), 'p')} = {m}에서 "
+                f"p = {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, x).doit().subs(x, {a}) = {m}",
             answer_map=(("p", str(p0)),),
@@ -373,8 +431,9 @@ def _rep_frames() -> list[Frame]:
             ),
             answer_text=str(a0),
             explanation=(
-                f"도함수 {render_poly(derivative_of(f))}에서 x가 a일 때의 값이 {with_i_ga(m)} 되는 "
-                f"양수 a는 {a0}이다."
+                f"도함수는 y' = {render_poly(derivative_of(f))}이므로 x좌표가 a인 점에서의 접선의 "
+                f"기울기는 {_var_poly(derivative_of(f), 'a')}이다. "
+                f"{_solve_steps(derivative_of(f), m, 'a')}이고 a는 양수이므로 a = {a0}이다."
             ),
             conditions=(f"{_d(f, 'a')} = {m}", "a > 0"),
             answer_map=(("a", str(a0)),),
@@ -442,9 +501,10 @@ def _basic_frames() -> list[Frame]:
             ),
             answer_text=str(total),
             explanation=(
-                f"두 점에서의 접선의 기울기는 각각 미분계수 f'({a}){wa_gwa(fa_text)} "
-                f"f'({b})이므로 두 값을 "
-                f"더하면 {total}이다."
+                f"두 점에서의 접선의 기울기는 각각 미분계수 f'({a}){wa_gwa(fa_text)} f'({b})이다. "
+                f"f'(x) = {render_poly(derivative_of(f))}이므로 f'({a}) + f'({b})의 값은 "
+                f"{render_sum(eval_at(derivative_of(f), a), eval_at(derivative_of(f), b))} = "
+                f"{total}이다."
             ),
             # 두 미분 평가를 합치지 못하는 Tier1 제약 — f(x) + f(x + d)를 한 번에 미분해 검산한다.
             conditions=(
@@ -471,8 +531,10 @@ def _basic_frames() -> list[Frame]:
             ),
             answer_text=str(diff),
             explanation=(
-                f"f'({b})에서 f'({a}){eul_reul(f"f'({a})")} 빼면 {diff}이다 "
-                f"(도함수는 {render_poly(derivative_of(f))})."
+                f"두 접선의 기울기는 미분계수 f'({b}){wa_gwa(f"f'({b})")} f'({a})이다. "
+                f"f'(x) = {render_poly(derivative_of(f))}이므로 f'({b}) - f'({a})의 값은 "
+                f"{render_difference(eval_at(derivative_of(f), b), eval_at(derivative_of(f), a))} "
+                f"= {diff}이다."
             ),
             conditions=(
                 f"Derivative(({poly_to_sympy_str(shifted)}) - ({poly_to_sympy_str(f)}), x)"
@@ -494,7 +556,11 @@ def _basic_frames() -> list[Frame]:
                 "점의 y좌표를 구하시오."
             ),
             value=k,
-            explanation=(f"접선은 {_pt_slope(m, a, fa)}이고 x = 0을 대입하면 y좌표는 {k}이다."),
+            explanation=(
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이므로 접선은 {_pt_slope(m, a, fa)}이다. x = 0을 대입하면 y좌표는 {k}이다."
+            ),
             expr=f"({fa}) - ({a})*({m})",
             ptype=_EVAL,
         )
@@ -512,7 +578,13 @@ def _basic_frames() -> list[Frame]:
                 "y = mx + n이라 할 때, m + n의 값을 구하시오."
             ),
             value=m + k,
-            explanation=(f"기울기 m은 {m}이고 y절편 n은 {k}이므로 m + n은 {m + k}이다."),
+            explanation=(
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 m = "
+                f"{m}이다. "
+                f"접선 {_pt_slope(m, a, fa)}{eul_reul(_pt_slope(m, a, fa))} 정리하면 "
+                f"y = {_line(m, k)}이므로 n = {k}이다. "
+                f"따라서 m + n = {render_sum(m, k)} = {m + k}이다."
+            ),
             expr=f"({m}) + ({k})",
             ptype=_EVAL,
         )
@@ -533,7 +605,12 @@ def _basic_frames() -> list[Frame]:
                 "점의 x좌표를 구하시오."
             ),
             value=int(xi),
-            explanation=(f"접선 {_pt_slope(m, a, fa)}에 y = 0을 대입하면 x좌표는 {int(xi)}이다."),
+            explanation=(
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이므로 접선은 {_pt_slope(m, a, fa)}이다. y = 0을 대입하면 x좌표는 "
+                f"{int(xi)}이다."
+            ),
             expr=f"({a}) - ({fa})/({m})",
             ptype=_EVAL,
         )
@@ -585,8 +662,9 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a0),
             explanation=(
-                f"평행한 두 직선의 기울기는 같으므로 접선의 기울기 f'(a)가 {m}이다. 도함수 "
-                f"{render_poly(derivative_of(f))}에서 이를 만족하는 양수 a는 {a0}이다."
+                f"평행한 두 직선의 기울기는 같으므로 접선의 기울기 f'(a)가 {m}이다. "
+                f"f'(x) = {render_poly(derivative_of(f))}이므로 "
+                f"{_solve_steps(derivative_of(f), m, 'a')}이고 a는 양수이므로 a = {a0}이다."
             ),
             conditions=(f"{_d(f, 'a')} = {m}", "a > 0"),
             answer_map=(("a", str(a0)),),
@@ -615,8 +693,9 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a0),
             explanation=(
-                f"직선 x + {s}y = {s + 1}의 기울기는 -1/{s}이고 수직인 직선의 기울기는 그 "
-                f"음의 역수 {s}이다. f'(a)의 값이 {with_i_ga(s)} 되는 양수 a는 {a0}이다."
+                f"직선 x + {s}y = {s + 1}의 기울기는 -1/{s}이고, 수직인 두 직선의 기울기의 곱은 "
+                f"-1이므로 접선의 기울기 f'(a)는 {s}이다. f'(x) = {render_poly(derivative_of(f))}"
+                f"이므로 {_solve_steps(derivative_of(f), s, 'a')}이고 a는 양수이므로 a = {a0}이다."
             ),
             conditions=(f"{_d(f, 'a')} = {s}", "a > 0"),
             answer_map=(("a", str(a0)),),
@@ -639,6 +718,14 @@ def _applied_frames() -> list[Frame]:
         f_str = poly_to_sympy_str(f).replace("x", "a")
         d_str = poly_to_sympy_str(derivative_of(f)).replace("x", "a")
         point = f"({px}, {qy})"
+        # 해설용: f(a) + f'(a)(px - a) - qy = 0을 a에 대한 다항식으로(SymPy 전개).
+        a_sym = sympy.Symbol("a")
+        through_poly = poly_from_sympy(
+            sympy.expand(
+                poly_to_sympy(f, "a") + poly_to_sympy(derivative_of(f), "a") * (px - a_sym) - qy
+            ),
+            "a",
+        )
         return DiffItem(
             slot=slot,
             frame_id="applied-tangent-passes-through-point",
@@ -651,7 +738,10 @@ def _applied_frames() -> list[Frame]:
             answer_text=str(a0),
             explanation=(
                 f"접선 y = f'(a)(x - a) + f(a)가 점 {point}{eul_reul(point)} 지나므로 "
-                f"대입해 풀면 양수 a는 {a0}이다."
+                f"{qy} = f'(a)({px} - a) + f(a)이다. f(a) = {_var_poly(f, 'a')}, "
+                f"f'(a) = {with_eul_reul(_var_poly(derivative_of(f), 'a'))} 대입해 정리하면 "
+                f"{render_poly(through_poly, 'a')} = 0, 즉 {render_factored(through_poly, 'a')} = 0"
+                f"이고 a는 양수이므로 a = {a0}이다."
             ),
             conditions=(f"({f_str}) + ({d_str})*({px} - a) = {qy}", "a > 0"),
             answer_map=(("a", str(a0)),),
@@ -665,6 +755,13 @@ def _applied_frames() -> list[Frame]:
         m, _, n = _tangent(f, a)
         # 문면의 곡선은 상수항이 미지수 c — 그래서 y절편 n이 주어지면 c가 정해진다.
         head = render_poly(_poly({2: lead, 1: b}))
+        c_minus_n = render_poly(((1, 1), (0, -n)), "c")
+        four = 4 * lead
+        disc_text = (
+            f"{(b - m) ** 2} - {four}({c_minus_n}) = 0"
+            if four > 0
+            else f"{(b - m) ** 2} + {-four}({c_minus_n}) = 0"
+        )
         return DiffItem(
             slot=slot,
             frame_id="applied-intercept-given-find-constant",
@@ -674,8 +771,11 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(c0),
             explanation=(
-                f"접선 y = {_line(m, n)}{wa_gwa(_line(m, n))} 곡선을 연립한 이차방정식이 "
-                f"이중근을 가지므로 판별식이 0이다. 이를 c에 대해 풀면 c는 {c0}이다."
+                f"접선의 기울기는 도함수 {render_poly(_poly({1: 2 * lead, 0: b}))}에 x = "
+                f"{with_eul_reul(a)} 대입한 {m}이므로 접선은 y = {_line(m, n)}이다. 곡선과 "
+                "연립하면 "
+                f"{render_poly(_poly({2: lead, 1: b - m}))} + ({c_minus_n}) = 0이고, 접하려면 "
+                f"판별식이 0이어야 한다. {disc_text}에서 c = {c0}이다."
             ),
             conditions=f"(({b}) - ({m}))**2 - 4*({lead})*(c - ({n})) = 0",
             answer_map=(("c", str(c0)),),
@@ -698,8 +798,11 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(s),
             explanation=(
-                f"접선 y = f'(a)(x - a) + f(a)에 원점을 대입하면 f(a) - a f'(a) = 0이다. "
-                f"이를 풀면 양수 a는 {s}이다."
+                f"접선 y = f'(a)(x - a) + f(a)에 원점 (0, 0)을 대입하면 f(a) - af'(a) = 0이다. "
+                f"f(a) = {_var_poly(f, 'a')}, f'(a) = {_var_poly(derivative_of(f), 'a')}이므로 "
+                f"({_var_poly(f, 'a')}) - a({_var_poly(derivative_of(f), 'a')}) = "
+                f"{render_poly(_poly({2: -lead, 0: c}), 'a')} = 0에서 a^2 = {s * s}이다. "
+                f"a는 양수이므로 a = {s}이다."
             ),
             conditions=(f"({lead}*a**2 + {c}) - a*({2 * lead}*a) = 0", "a > 0"),
             answer_map=(("a", str(s)),),
@@ -719,18 +822,23 @@ def _applied_frames() -> list[Frame]:
         m = eval_at(derivative_of(f), a)
         if eval_at(derivative_of(f), b) != m:
             return None
-        fa_text = f"f'({a})"
         return DiffItem(
             slot=slot,
             frame_id="applied-parallel-tangent-at-other-point",
+            # 괄호 조건을 명사구 가운데 끼우지 않는다('또 다른'이 이미 b ≠ a를 말한다).
             question_text=(
                 f"곡선 y = {render_poly(f)} 위의 x좌표가 {a}인 점에서의 접선과 평행한 접선을 "
-                f"갖는 또 다른 점의 x좌표 b (b는 {with_i_ga(a)} 아니다)의 값을 구하시오."
+                "갖는 또 다른 점의 x좌표를 b라 할 때, b의 값을 구하시오."
             ),
             answer_text=str(b),
+            # '도함수의 근'이 아니라 '방정식 f'(x) = m의 근'이다(2차 감사: 수학적으로 틀린 서술).
             explanation=(
-                f"평행하면 기울기가 같으므로 f'(b)의 값은 f'({a}){wa_gwa(fa_text)} 같은 {m}이다. "
-                f"도함수 {render_poly(derivative_of(f))}에서 {with_i_ga(a)} 아닌 근은 {b}이다."
+                f"평행한 두 접선은 기울기가 같으므로 f'(b) = f'({a})이다. "
+                f"f'(x) = {render_poly(derivative_of(f))}이므로 f'({a})의 값은 {m}이고, "
+                f"방정식 f'(x) = {m}, 즉 {render_factored(_minus_const(derivative_of(f), m))} = "
+                "0의 "
+                f"근은 x = {min(a, b)}, {max(a, b)}이다. 이 중 {with_i_ga(a)} 아닌 근이 b이므로 "
+                f"b = {b}이다."
             ),
             conditions=(f"{_d(f, 'b')} = {m}", f"b != {a}"),
             answer_map=(("b", str(b)),),
@@ -812,10 +920,17 @@ def _mc_item(
         conditions=conditions,
         answer_map=answer_map,
         problem_type_code=ptype,
-        answer_format=AnswerFormat.실수,
+        answer_format=_fmt(answer),
         choices=choices,
         distractors=distractors,
     )
+
+
+#: 오개념 유발 해설의 함정 문장 — 오답 선지가 나오는 경로(power-rule-step-omitted)를 짚는다.
+_POWER_TRAP: Final = (
+    " 각 항을 미분할 때 지수를 앞으로 내리는 단계나 지수를 1 줄이는 단계를 빠뜨리면 "
+    "기울기를 잘못 구하게 된다."
+)
 
 
 def _misconception_frames() -> list[Frame]:
@@ -832,7 +947,7 @@ def _misconception_frames() -> list[Frame]:
             answer_map=(("y", str(m)),),
             explanation=(
                 f"도함수는 {render_poly(derivative_of(f))}이므로 x가 {a}일 때의 접선의 "
-                f"기울기는 {m}이다."
+                f"기울기는 {m}이다.{_POWER_TRAP}"
             ),
             shuffle_key=f"mc1:{render_poly(f)}:{a}",
         )
@@ -850,7 +965,7 @@ def _misconception_frames() -> list[Frame]:
             answer_map=(("y", str(m)),),
             explanation=(
                 f"도함수는 {render_poly(derivative_of(f))}이므로 x가 {a}일 때의 접선의 "
-                f"기울기는 {m}이다."
+                f"기울기는 {m}이다.{_POWER_TRAP}"
             ),
             shuffle_key=f"mc2:{render_poly(f)}:{a}",
         )
@@ -867,7 +982,12 @@ def _misconception_frames() -> list[Frame]:
             filler=fa,
             conditions=f"({fa}) - ({a})*({m}) = y",
             answer_map=(("y", str(k)),),
-            explanation=(f"기울기는 {m}이고 접선은 {_pt_slope(m, a, fa)}이므로 y절편은 {k}이다."),
+            explanation=(
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이고 접선은 {_pt_slope(m, a, fa)}이다. x = 0을 대입하면 y절편은 {k}이다."
+                f"{_POWER_TRAP}"
+            ),
             shuffle_key=f"mc3:{render_poly(f)}:{a}",
         )
 
@@ -890,7 +1010,10 @@ def _misconception_frames() -> list[Frame]:
             conditions=f"({fa}) + ({m})*(({t}) - ({a})) = y",
             answer_map=(("y", str(value)),),
             explanation=(
-                f"접선은 {_pt_slope(m, a, fa)}이므로 g({t}){eun_neun(f'g({t})')} {value}이다."
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이므로 접선은 {_pt_slope(m, a, fa)}이다. 따라서 "
+                f"g({t}){eun_neun(f'g({t})')} {value}이다.{_POWER_TRAP}"
             ),
             shuffle_key=f"mc4:{render_poly(f)}:{a}:{t}",
         )
@@ -917,12 +1040,13 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"x^2의 도함수는 2x이므로 2a{i_ga('2a')} {with_i_ga(b)} 되는 a는 " f"{a0}이다."
+                f"x^2의 도함수는 2x이므로 2a = {b}에서 a = {a0}이다. 도함수를 x로 쓰거나(계수 2 "
+                "누락) 2x^2으로 쓰면(지수를 1 줄이지 않음) 다른 값이 나온다."
             ),
             conditions=f"Derivative(x**2, x).doit().subs(x, a) = {b}",
             answer_map=(("a", str(a0)),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.자연수,
+            answer_format=_fmt(a0),
             choices=choices,
             distractors=distractors,
         )
@@ -955,13 +1079,14 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"x^3의 도함수는 3x^2이므로 3a^2{i_ga('3a^2')} {with_i_ga(b)} 되는 양수 a는 "
-                f"{a0}이다."
+                f"x^3의 도함수는 3x^2이므로 3a^2 = {b}에서 a^2 = {a0 * a0}이고, a는 양수이므로 "
+                f"a = {a0}이다. 도함수를 x^2으로 쓰거나(계수 3 누락) 3x^3으로 쓰면(지수를 1 줄이지 "
+                "않음) 다른 값이 나온다."
             ),
             conditions=(f"Derivative(x**3, x).doit().subs(x, a) = {b}", "a > 0"),
             answer_map=(("a", str(a0)),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(a0),
             choices=choices,
             distractors=distractors,
         )
@@ -1002,7 +1127,7 @@ def _diagnostic_frames() -> list[Frame]:
             conditions=f"{_d(f, str(half))} = y",
             answer_map=(("y", "0"),),
             problem_type_code=_EVAL,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(0),
         )
 
     def d2(p: tuple[object, ...]) -> DiffItem | None:
@@ -1025,13 +1150,17 @@ def _diagnostic_frames() -> list[Frame]:
         return DiffItem(
             slot=slot,
             frame_id="diag-slope-of-constant-curve",
-            question_text=(f"곡선 y = {c} 위의 점 ({a}, {c})에서의 접선의 기울기를 구하시오."),
+            question_text=(f"직선 y = {c} 위의 점 ({a}, {c})에서의 접선의 기울기를 구하시오."),
             answer_text="0",
-            explanation="상수함수의 도함수는 0이므로 접선의 기울기는 0이다.",
+            explanation=(
+                f"{with_eun_neun(f'y = {c}')} 상수함수이고 상수함수의 도함수는 0이므로 접선의 "
+                "기울기는 0이다. "
+                "(직선 위의 점에서의 접선은 그 직선 자신이다.)"
+            ),
             conditions=f"{_d(f, str(a))} = y",
             answer_map=(("y", "0"),),
             problem_type_code=_EVAL,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(0),
         )
 
     def d4(p: tuple[object, ...]) -> DiffItem | None:
@@ -1086,7 +1215,7 @@ def _diagnostic_frames() -> list[Frame]:
             conditions=f"{_d(f, '0')} = y",
             answer_map=(("y", "0"),),
             problem_type_code=_EVAL,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(0),
         )
 
     return [
@@ -1126,6 +1255,7 @@ def _mastery_frames() -> list[Frame]:
         # y = x^2 + p x + c 와 y = m x + n 이 접하면 (p - m)^2 = 4(c - n). c - n = root^2.
         n = c - root * root
         p_big = m + 2 * root
+        p_minus_m = render_poly(((1, 1), (0, -m)), "p")
         return DiffItem(
             slot=slot,
             frame_id="mastery-line-tangent-find-coefficient",
@@ -1135,10 +1265,11 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(p_big),
             explanation=(
-                f"직선과 곡선을 연립한 이차방정식이 접점에서 이중근을 가져야 하므로 판별식 "
-                f"(p - {m})^2 = 4 * {c - n}이다. 이를 풀면 p는 {m + 2 * root} 또는 "
-                f"{m - 2 * root}이고 "
-                f"p > {m}이므로 {p_big}이다."
+                f"직선과 곡선을 연립하면 x^2 + ({p_minus_m})x + {c - n} = 0이고, 접하려면 이 "
+                f"이차방정식이 이중근을 가져야 하므로 판별식이 0이다. ({p_minus_m})^2 - "
+                f"4({c - n}) = 0, 즉 ({p_minus_m})^2 = {4 * (c - n)}에서 {p_minus_m} = {2 * root} "
+                f"또는 {p_minus_m} = {-2 * root}이다. 따라서 p는 {m + 2 * root} 또는 "
+                f"{m - 2 * root}이고 p > {m}이므로 p = {p_big}이다."
             ),
             conditions=(f"(p - ({m}))**2 - 4*(({c}) - ({n})) = 0", f"p > {m}"),
             answer_map=(("p", str(p_big)),),
@@ -1163,8 +1294,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(k),
             explanation=(
-                f"직선과 곡선을 연립한 이차방정식이 이중근을 가지므로 판별식이 0이다. 접점의 "
-                f"x좌표는 {a}이고 k는 {k}이다."
+                f"직선 y = {_line_with_k(m)}{wa_gwa(_line_with_k(m))} 곡선을 "
+                f"{_disc_steps(lead, b, c, m, 'k')}에서 k = {k}이다. (접점의 x좌표는 {a}이다.)"
             ),
             conditions=_disc_cond(lead, b, c, m, "k"),
             answer_map=(("k", str(k)),),
@@ -1184,6 +1315,9 @@ def _mastery_frames() -> list[Frame]:
         if eval_at(f, a2) + m2 * (px - a2) != py:
             return None
         through = _pt_form("m", px, py)
+        # 판별식 (b - m)^2 - 4(c - py + m px) = 0을 m에 대한 다항식으로(SymPy 전개).
+        m_sym = sympy.Symbol("m")
+        m_poly = poly_from_sympy(sympy.expand((b - m_sym) ** 2 - 4 * (c - py + m_sym * px)), "m")
         return DiffItem(
             slot=slot,
             frame_id="mastery-tangent-from-external-point",
@@ -1194,9 +1328,9 @@ def _mastery_frames() -> list[Frame]:
             answer_text=str(m2),
             explanation=(
                 f"점을 지나는 직선 {through}{wa_gwa(through)} 곡선을 연립한 이차방정식이 "
-                f"이중근을 "
-                f"가지려면 판별식이 0이어야 한다. 두 접선의 기울기는 {m1}, {m2}이고 큰 것은 "
-                f"{m2}이다."
+                f"이중근을 가지려면 판별식이 0이어야 한다. 판별식을 m에 대해 정리하면 "
+                f"{render_poly(m_poly, 'm')} = 0, 즉 {render_factored(m_poly, 'm')} = 0이므로 두 "
+                f"접선의 기울기는 {m1}, {m2}이고 큰 것은 {m2}이다."
             ),
             conditions=(
                 f"(({b}) - m)**2 - 4*(({c}) - ({py}) + m*({px})) = 0",
@@ -1225,9 +1359,11 @@ def _mastery_frames() -> list[Frame]:
             ),
             value=int(area),
             explanation=(
-                f"접선은 y = {_line(m, k)}이고 y절편의 절댓값은 {abs(k)}, "
-                f"x절편의 절댓값은 {abs(xi)}이므로 "
-                f"삼각형의 넓이는 (1/2)*{abs(k)}*{abs(xi)} = {int(area)}이다."
+                f"도함수 {render_poly(derivative_of(f))}에 x = {with_eul_reul(a)} 대입하면 "
+                "기울기는 "
+                f"{m}이므로 접선은 y = {_line(m, k)}이다. y절편은 {k}, x절편은 {xi}이므로 "
+                f"삼각형은 두 변의 길이가 {abs(k)}, {abs(xi)}인 직각삼각형이고 넓이는 "
+                f"{with_wa_gwa(abs(k))} {abs(xi)}의 곱의 절반인 {int(area)}이다."
             ),
             expr=f"(1/2)*Abs({k})*Abs(({a}) - ({fa})/({m}))",
             ptype=_EVAL,
@@ -1243,7 +1379,14 @@ def _mastery_frames() -> list[Frame]:
         f_a = curve.subs(_X, a)
         d_a = sympy.diff(curve, _X).subs(_X, a)  # 도함수도 SymPy 경로(손 공식 금지)
         cond = sympy.sstr(sympy.expand(f_a - a * d_a))
-        lead_text = "" if lead == 1 else str(lead)
+        lead_text = "" if lead == 1 else ("-" if lead == -1 else str(lead))
+        f_a_poly = poly_from_sympy(sympy.expand(f_a), "p")
+        d_a_poly = poly_from_sympy(sympy.expand(d_a), "p")
+        cond_poly = poly_from_sympy(sympy.expand(f_a - a * d_a), "p")
+        # y절편 = f(a) - a·f'(a) — 계수 1·음수 a를 사람이 읽는 표기로
+        # ('f(1) - f'(1)'·'f(-2) + 2f'(-2)').
+        coef = "" if abs(a) == 1 else str(abs(a))
+        intercept_text = f"f({a}) - {coef}f'({a})" if a > 0 else f"f({a}) + {coef}f'({a})"
         return DiffItem(
             slot=slot,
             frame_id="mastery-cubic-intercept-find-coefficient",
@@ -1253,9 +1396,12 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(p0),
             explanation=(
-                f"접점 ({a}, f({a}))에서의 접선의 y절편은 f({a}) - {a}*f'({a})이고 "
-                f"이것이 {with_i_ga(n)} "
-                f"되도록 p를 정하면 p는 {p0}이다."
+                f"f(x) = {lead_text}x^3 + px^2이므로 f'(x) = {3 * lead}x^2 + 2px이고 "
+                f"f({a}) = {render_poly(f_a_poly, 'p')}, f'({a}) = "
+                f"{render_poly(d_a_poly, 'p')}이다. "
+                f"접점 ({a}, f({a}))에서의 접선 y = f'({a})(x {_x_shift(a)}) + f({a})에 x = 0을 "
+                f"대입하면 y절편은 {intercept_text} = {render_poly(cond_poly, 'p')}이다. "
+                f"{render_poly(cond_poly, 'p')} = {n}에서 p = {p0}이다."
             ),
             conditions=f"{cond} = {n}",
             answer_map=(("p", str(p0)),),
@@ -1275,6 +1421,8 @@ def _mastery_frames() -> list[Frame]:
         q = eval_at(g, a) - a * a - p0 * a
         if q != q0:
             return None
+        known = a * a + p0 * a
+        q_side = "q" if known == 0 else (f"{known} + q")
         return DiffItem(
             slot=slot,
             frame_id="mastery-two-curves-touch-find-constant",
@@ -1285,9 +1433,11 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(q),
             explanation=(
-                f"x = {a}에서 두 곡선이 접하므로 접선의 기울기와 y좌표가 모두 같다. "
-                f"기울기는 {slope}이고 y좌표 {eval_at(g, a)}{i_ga(str(eval_at(g, a)))} 같아지도록 "
-                f"q를 정하면 q는 {q}이다."
+                f"x = {a}에서 두 곡선이 접하므로 그 점에서 y좌표와 접선의 기울기가 모두 같다. "
+                f"곡선 y = {render_poly(g)}에서 x = {a}일 때 y = {eval_at(g, a)}이고, "
+                f"y = x^2 {_signed(p0, 'x')} + q에 x = {with_eul_reul(a)} 대입하면 "
+                f"{q_side}이다. {q_side} = {eval_at(g, a)}에서 q = {q}이다. "
+                f"(두 곡선의 x = {a}에서의 기울기는 모두 {slope}이다.)"
             ),
             conditions=f"{a}**2 + ({p0})*{a} + q = {eval_at(g, a)}",
             answer_map=(("q", str(q)),),
@@ -1339,6 +1489,11 @@ def _mastery_frames() -> list[Frame]:
             k6,
         ),
     ]
+
+
+def _x_shift(a: int) -> str:
+    """'(x - a)'의 꼬리 — a > 0이면 '- a', a < 0이면 '+ |a|'(이중 부호 금지)."""
+    return f"- {a}" if a >= 0 else f"+ {-a}"
 
 
 def _signed(value: int, var: str = "") -> str:

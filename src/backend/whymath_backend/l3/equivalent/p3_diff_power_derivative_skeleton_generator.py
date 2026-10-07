@@ -60,16 +60,20 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     Poly,
     derivative_of,
     eval_at,
+    render_difference,
     render_poly,
+    render_sum,
     with_eul_reul,
     with_eun_neun,
     with_i_ga,
+    with_wa_gwa,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
     Frame,
     P3DiffSlotGenerator,
+    answer_format_for,
     build_choices,
     round_robin_items,
     seeded_order,
@@ -90,6 +94,11 @@ def _mono(n: int, var: str = "x") -> Poly:
     return ((n, 1),)
 
 
+def _dval(n: int, point: int) -> int:
+    """x^n의 도함수의 x = point에서의 값(SymPy 평가) — 해설의 산술 과정 표기용."""
+    return eval_at(derivative_of(_mono(n)), point)
+
+
 def _unique_exponent(point: int, value: int) -> int:
     """f(x) = x^n에서 f'(point) = value인 자연수 n(2..20)이 **유일**함을 SymPy 평가로 확인한다."""
     found = [n for n in range(2, 21) if eval_at(derivative_of(_mono(n)), point) == value]
@@ -103,8 +112,9 @@ def _deriv_sym(expr_str: str, point: str) -> str:
     return f"Derivative({expr_str}, x).doit().subs(x, {point})"
 
 
-def _fmt(value: int) -> AnswerFormat:
-    return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
+def _fmt(value: object) -> AnswerFormat:
+    """정답 형식 — 기반의 단일 규칙(`answer_format_for`)을 따른다(틀마다 손으로 박지 않는다)."""
+    return answer_format_for(str(value))
 
 
 def _deriv_form_item(
@@ -144,7 +154,7 @@ def _deriv_form_item(
         conditions=condition,
         answer_map=((ask, str(value)),),
         problem_type_code=_EVAL,
-        answer_format=AnswerFormat.자연수,
+        answer_format=_fmt(value),
     )
 
 
@@ -219,7 +229,8 @@ def _rep_frames() -> list[Frame]:
         ),
         make(
             "rep-curve-derivative-exponent",
-            "곡선 y = x^{n}의 도함수를 y' = cx^m (c, m은 상수) 꼴로 나타낼 때, m의 값을 "
+            # '곡선의 도함수'는 대상 혼동이다(도함수는 함수가 갖는다 — 2차 감사 결함).
+            "함수 y = x^{n}의 도함수를 y' = cx^m (c, m은 상수) 꼴로 나타낼 때, m의 값을 "
             "구하시오.",
             "m",
         ),
@@ -288,9 +299,11 @@ def _basic_frames() -> list[Frame]:
             question_text=(f"f(x) = x^{n}, g(x) = x^{m}일 때, f'({a}) + g'({a})의 값을 구하시오."),
             answer_text=str(total),
             explanation=(
-                f"f'(x)는 {render_poly(derivative_of(_mono(n)))}이고 g'(x)는 "
-                f"{render_poly(derivative_of(_mono(m)))}이므로 x가 {a}일 때 두 값을 더하면 "
-                f"{total}이다."
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이고 "
+                f"g'(x) = {render_poly(derivative_of(_mono(m)))}이므로 "
+                f"f'({a}) + g'({a})의 값은 "
+                f"{render_sum(_dval(n, a), _dval(m, a))}"
+                f" = {total}이다."
             ),
             # 두 미분 평가를 합치지 못하는 Tier1 제약 — 합의 미분으로 *한 번에* 검산한다.
             conditions=_deriv_sym(f"x**{n} + x**{m}", str(a)) + " = y",
@@ -311,10 +324,13 @@ def _basic_frames() -> list[Frame]:
                 f"함수 f(x) = x^{n}, g(x) = x^{m}에 대하여 f'({a}) - g'({a})의 값을 구하시오."
             ),
             answer_text=str(diff),
+            # 프라임 기호 뒤에 조사를 붙이지 않는다('g'를' — 독법에 따라 '를/을'이 갈린다).
             explanation=(
-                f"f'(x)는 {render_poly(derivative_of(_mono(n)))}이고 g'(x)는 "
-                f"{render_poly(derivative_of(_mono(m)))}이므로 x가 {a}일 때 f'에서 g'를 빼면 "
-                f"{diff}이다."
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이고 "
+                f"g'(x) = {render_poly(derivative_of(_mono(m)))}이므로 "
+                f"f'({a}) - g'({a})의 값은 "
+                f"{render_difference(_dval(n, a), _dval(m, a))}"
+                f" = {diff}이다."
             ),
             conditions=_deriv_sym(f"x**{n} - x**{m}", str(a)) + " = y",
             answer_map=(("y", str(diff)),),
@@ -363,6 +379,9 @@ def _applied_frames() -> list[Frame]:
     def a1(p: tuple[object, ...]) -> DiffItem | None:
         n, a = int(str(p[0])), int(str(p[1]))
         b = eval_at(derivative_of(_mono(n)), a)
+        # 지수가 1이면 '3^1'로 쓰지 않는다(지수 1 표기 결함 — 2차 감사 부류).
+        power = f"{a}^{n - 1} = {a ** (n - 1)}" if n - 1 >= 2 else str(a)
+        f_at_a = f"f'({a})"
         return DiffItem(
             slot="applied",
             frame_id="applied-find-exponent",
@@ -372,8 +391,9 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(n),
             explanation=(
-                f"f'(x)는 n x^(n-1)이므로 x가 {a}일 때의 값이 "
-                f"{with_i_ga(b)} 되는 자연수 n은 {n}이다."
+                f"f'(x) = nx^(n - 1)이므로 {with_eun_neun(f_at_a)} n과 {a}^(n - 1)의 곱이다. "
+                f"n = {n}일 때 {with_wa_gwa(n)} {power}의 곱이 "
+                f"{with_i_ga(b)} 되므로 n은 {n}이다."
             ),
             conditions=f"{_deriv_value_sym('n', str(a))} = {b}",
             answer_map=(("n", str(n)),),
@@ -438,7 +458,7 @@ def _applied_frames() -> list[Frame]:
             conditions=(f"{_deriv_value_sym(str(n), 'a')} = a**{n}", "a != 0"),
             answer_map=(("a", str(n)),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.자연수,
+            answer_format=_fmt(n),
         )
 
     def a5(p: tuple[object, ...]) -> DiffItem | None:
@@ -476,7 +496,11 @@ def _applied_frames() -> list[Frame]:
                 "n의 값을 구하시오."
             ),
             answer_text=str(n),
-            explanation=(f"거듭제곱의 미분법에 따라 앞에 오는 계수가 지수와 같으므로 n은 {n}이다."),
+            explanation=(
+                "거듭제곱의 미분법에 따라 원래 함수의 지수 n이 도함수의 계수가 되고 지수는 n - 1이 "
+                f"되므로 f'(x) = nx^(n - 1)이다. 계수를 비교하면 n = {n}이고, 이때 도함수의 지수 "
+                f"n - 1 = {n - 1}도 주어진 식과 맞는다."
+            ),
             conditions=f"Derivative(x**n, x).doit().subs(x, 2) = {n}*2**{n - 1}",
             answer_map=(("n", str(n)),),
             problem_type_code=_SOLVE,
@@ -528,7 +552,7 @@ def _mc_value_item(frame_id: str, text_of: str, n: int, a: int) -> DiffItem | No
         conditions=f"Derivative(x**{n}, x).doit().subs(x, {a}) = y",
         answer_map=(("y", str(correct)),),
         problem_type_code=_EVAL,
-        answer_format=AnswerFormat.자연수,
+        answer_format=_fmt(correct),
         choices=choices,
         distractors=distractors,
     )
@@ -565,7 +589,7 @@ def _mc_solve_cubic(a0: int) -> DiffItem | None:
         conditions=(_deriv_value_sym("3", "a") + f" = {b}", "a > 0"),
         answer_map=(("a", str(a0)),),
         problem_type_code=_SOLVE,
-        answer_format=AnswerFormat.실수,
+        answer_format=_fmt(a0),
         choices=choices,
         distractors=distractors,
     )
@@ -597,7 +621,7 @@ def _mc_solve_square(s: int) -> DiffItem | None:
         conditions=_deriv_value_sym("2", "a") + f" = {b}",
         answer_map=(("a", str(a0)),),
         problem_type_code=_SOLVE,
-        answer_format=AnswerFormat.자연수,
+        answer_format=_fmt(a0),
         choices=choices,
         distractors=distractors,
     )
@@ -639,7 +663,7 @@ def _misconception_frames() -> list[Frame]:
         n, a = int(str(p[0])), int(str(p[1]))
         return _mc_value_item(
             "mc-derivative-of-curve-at-point",
-            f"y = x^{n}의 도함수를 y'이라 할 때, x = {a}에서 y'의 값은?",
+            f"함수 y = x^{n}의 도함수 y'에 대하여 x = {a}일 때 y'의 값은?",
             n,
             a,
         )
@@ -678,7 +702,7 @@ def _diagnostic_frames() -> list[Frame]:
             conditions=f"Derivative(x**{n}, x).doit() = 0",
             answer_map=(("x", "0"),),
             problem_type_code=_SOLVE,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(0),
         )
 
     def d2(p: tuple[object, ...]) -> DiffItem | None:
@@ -692,7 +716,7 @@ def _diagnostic_frames() -> list[Frame]:
             conditions=_deriv_sym("x", str(a)) + " = y",
             answer_map=(("y", "1"),),
             problem_type_code=_EVAL,
-            answer_format=AnswerFormat.자연수,
+            answer_format=_fmt(1),
         )
 
     def d3(p: tuple[object, ...]) -> DiffItem | None:
@@ -813,8 +837,9 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(n),
             explanation=(
-                f"f'(2)와 f(2)의 비는 n의 절반이므로 그 비가 "
-                f"{with_i_ga(k)} 되는 자연수 n은 {n}이다."
+                "f'(x) = nx^(n - 1)이므로 f'(2)는 n과 2^(n - 1)의 곱이고 f(2) = 2^n이다. "
+                "2^n은 2^(n - 1)의 2배이므로 f'(2)는 f(2)의 n/2배이다. "
+                f"n/2 = {k}에서 n = {n}이다."
             ),
             conditions=f"{_deriv_value_sym('n', '2')} = {k}*2**n",
             answer_map=(("n", str(n)),),

@@ -91,18 +91,21 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     eval_at,
     poly_to_sympy,
     poly_to_sympy_str,
+    render_factored,
     render_poly,
+    with_eun_neun,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
     Frame,
     P3DiffSlotGenerator,
+    answer_format_for,
     build_choices,
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga
+from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga, wa_gwa
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffGraphShapeGenerator", "ShapeItem"]
@@ -124,8 +127,9 @@ class ShapeItem(DiffItem):
     answer_selection: str | None = None
 
 
-def _fmt(value: int) -> AnswerFormat:
-    return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
+def _fmt(value: object) -> AnswerFormat:
+    """정답 형식 — 기반의 단일 규칙(`answer_format_for`)을 따른다."""
+    return answer_format_for(str(value))
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -197,7 +201,11 @@ def _selection(fn: _Fn, target: int) -> str | None:
 def _explain(fn: _Fn) -> str:
     """f'의 근과 각 근 좌우의 부호 변화를 서술한다(정답 근거 — SymPy 분석 결과 그대로)."""
     roots = ", ".join(str(r) for r in fn.roots)
-    parts = [f"f'(x)는 {render_poly(fn.deriv)}이고 f'(x) = 0의 근은 x = {roots}이다."]
+    # 도함수를 인수분해해 근을 보인다 — 결론(근)만 적지 않는다(2차 감사: 핵심 중간 단계).
+    parts = [
+        f"f'(x) = {render_poly(fn.deriv)} = {render_factored(fn.deriv)}이므로 f'(x) = 0의 근은 "
+        f"x = {roots}이다."
+    ]
     for r in fn.roots:
         kind = fn.kinds.get(r)
         if kind == "max":
@@ -414,32 +422,80 @@ def _kind_word(kind: str) -> str:
     return "극댓값" if kind == "max" else "극솟값"
 
 
-def _value_item(
+_KIND_KO: Final = {"max": "극댓값", "min": "극솟값"}
+
+
+def _pins_text(roots: Sequence[int]) -> str:
+    """극값 후보의 x좌표 고정 표기 — 'x = 1과 x = 3'·'x = -2, x = 0, x = 2'."""
+    if len(roots) == 2:
+        first = str(roots[0])
+        return f"x = {first}{wa_gwa(first)} x = {roots[1]}"
+    return ", ".join(f"x = {r}" for r in roots)
+
+
+def _judged_value_item(
     slot: str,
     frame_id: str,
     template: str,
     fn: _Fn,
     *,
-    r: int,
     word: str,
+    pick: str | None = None,
 ) -> ShapeItem | None:
-    """x = r에서의 극값의 값(규칙 C3 — x 고정·answer_map에 x). word: "max"|"min"|"any"."""
-    kind = fn.kinds.get(r)
-    if kind is None or (word != "any" and kind != word):
+    """고정한 극값 *후보들* 중 종류를 판정해야 답이 정해지는 극값의 값 문항(규칙 C3 + 판정 요구).
+
+    발문은 f'(x) = 0의 근 x = r1, r2(, r3)를 모두 고정하지만 어느 것이 극대·극소(또는 극값이
+    아닌 점)인지는 밝히지 않는다 — 학생은 f'의 부호 변화로 *종류를 판정*해야 답에 닿는다. 1차 은행의
+    'x = 1에서 극솟값을 갖는다. 극솟값을 구하시오'는 위치·종류를 다 주어 대입만 남았다(2차 감사
+    bad_tag 14건 — 맞혀도 숙달 추정이 부풀려진다). 규칙 C3(x 고정·answer_map의 x)은 그대로 지킨다.
+
+    word: "max"|"min"(그 종류의 값) · "any"(극값이 아닌 임계점을 가려내야 하는 형태).
+    pick: None(그 종류의 값이 하나뿐 — 사차 우함수의 대칭 극값처럼 값이 같으면 하나로 본다) ·
+    "smaller"/"larger"(같은 종류 둘의 *값*을 비교).
+    """
+    if word == "any":
+        targets = [r for r in fn.roots if r in fn.kinds]
+    else:
+        targets = [r for r in fn.roots if fn.kinds.get(r) == word]
+    if not targets:
         return None
-    value = eval_at(fn.poly, r)
+    values = {r: eval_at(fn.poly, r) for r in targets}
+    if pick is None:
+        if len(set(values.values())) != 1:
+            return None
+        target = max(targets)  # 값이 같은 대칭 극값이면 양의 쪽을 검산 좌석으로 쓴다
+    else:
+        if len(targets) < 2 or len(set(values.values())) != len(targets):
+            return None
+        chooser = min if pick == "smaller" else max
+        target = chooser(targets, key=lambda r: values[r])
+    if target == 0:
+        return None  # 극값이 x = 0에서면 상수항이 곧 답이다(2차 감사: 사실상 정답 노출)
+    value = values[target]
+    kind_word = _KIND_KO[fn.kinds[target]]
+    if pick is None:
+        tail = f"따라서 {kind_word}은 f({target}) = {value}이다."
+    else:
+        # 함숫값 등식('f(-4) = 102, f(1) = -23')을 나열하지 않는다 — 위생 게이트가 f(1)을 f·1로
+        # 읽어 다른 등식과 모순이라 판정한다(오탐). 교과서 표기 'x = -4에서 102'로 쓴다.
+        listed = ", ".join(f"x = {r}에서 {values[r]}" for r in sorted(targets))
+        size = "작은" if pick == "smaller" else "큰"
+        tail = f"두 {kind_word}은 {listed}이고, 이 중 {size} 값은 {value}이다."
     return _item(
         slot=slot,
         frame_id=frame_id,
-        text=_fill(template, fn.text, r=r),
+        text=_fill(
+            template,
+            fn.text,
+            pins=_pins_text(fn.roots),
+            kind=kind_word,
+            size="작은" if pick == "smaller" else "큰",
+        ),
         answer=value,
         conditions=(f"y = {fn.sym}", poly_to_sympy_str(fn.deriv) + " = 0"),
-        answer_map=(("x", str(r)), ("y", str(value))),
+        answer_map=(("x", str(target)), ("y", str(value))),
         ptype=_OPT,
-        explanation=(
-            f"{_explain(fn)} x = {r}에서 {_kind_word(kind)}을 가지며 "
-            f"그 값은 f({r})의 값 {value}이다."
-        ),
+        explanation=f"{_explain(fn)} {tail}",
     )
 
 
@@ -460,10 +516,14 @@ def _find_param_item(
     value_at_r: int,
     kind: str,
     answer: int,
+    explanation: str,
+    pins: str | None = None,
 ) -> ShapeItem:
     """x = r에서 극값 `value_at_r`를 갖도록 하는 미지수(param)를 구하는 문항 — 목록 조건(x·param).
 
     조건 2개: f'(x) = 0(임계점)과 f(x) = 값. 둘 다 x = r·param = answer에서 성립한다.
+    해설은 호출자가 방정식(f'(r) = 0 또는 f(r) = 값)과 극대·극소 판정을 보이도록 만든다 — 1차
+    해설은 'f'(0) = 0. 이 조건에서 k = -5'처럼 k와 무관한 조건에서 k를 끌어냈다(2차 감사 결함).
     """
     return _item(
         slot=slot,
@@ -476,6 +536,7 @@ def _find_param_item(
             veul=eul_reul(str(value_at_r)),
             kind=_kind_word(kind),
             p=param,
+            pins=pins or "",
         ),
         answer=answer,
         conditions=(
@@ -484,11 +545,7 @@ def _find_param_item(
         ),
         answer_map=(("x", str(r)), (param, str(answer))),
         ptype=_SOLVE,
-        explanation=(
-            f"x = {r}에서 {_kind_word(kind)}을 가지므로 f'({r})의 값은 0이다. "
-            f"이 조건에서 {param}의 값은 "
-            f"{answer}이고, 이때 f({r})의 값은 {value_at_r}이다."
-        ),
+        explanation=explanation,
     )
 
 
@@ -515,18 +572,15 @@ def _cubic_frame(
     return Frame(frame_id, _cubic_pool(seed, leads, _C_ALL), build)
 
 
-def _cubic_value_frame(
-    frame_id: str, template: str, seed: str, *, slot: str, word: str, at: str
-) -> Frame:
-    """삼차함수의 극값의 값 — at: "low"(작은 임계점)·"high"(큰 임계점)에 x를 고정한다."""
+def _cubic_judged_frame(frame_id: str, template: str, seed: str, *, slot: str, word: str) -> Frame:
+    """삼차함수의 두 임계점을 고정하고 극댓값(또는 극솟값)을 묻는다 — 종류 판정이 필요하다."""
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
         poly = _cubic(_i(p[0]), _i(p[1]), _i(p[2]), _i(p[3]))
         fn = _analyze(poly) if poly is not None else None
-        if fn is None:
+        if fn is None or len(fn.kinds) != 2:
             return None
-        r = fn.roots[0] if at == "low" else fn.roots[-1]
-        return _value_item(slot, frame_id, template, fn, r=r, word=word)
+        return _judged_value_item(slot, frame_id, template, fn, word=word)
 
     return Frame(frame_id, _cubic_pool(seed, _LEADS, _C_ALL), build)
 
@@ -574,21 +628,20 @@ def _rep_frames() -> list[Frame]:
             pick=None,
             slot=slot,
         ),
-        _cubic_value_frame(
-            "rep-value-local-min-at",
-            "함수 f(x) = {f}{neun} x = {r}에서 극솟값을 갖는다. 이때의 극솟값을 구하시오.",
+        # 극값의 값 — 두 임계점을 고정하되 종류는 밝히지 않는다(판정 요구 · 규칙 C3 유지).
+        _cubic_judged_frame(
+            "rep-local-min-value-judged",
+            "함수 f(x) = {f}{neun} {pins}에서 극값을 갖는다. 이 중 극솟값을 구하시오.",
             "p3-shape:rep4",
             slot=slot,
             word="min",
-            at="high",
         ),
-        _cubic_value_frame(
-            "rep-value-local-max-at",
-            "곡선 y = {f}의 x = {r}에서의 극댓값을 구하시오.",
+        _cubic_judged_frame(
+            "rep-local-max-value-judged",
+            "함수 y = {f}{neun} {pins}에서 극값을 갖는다. 극댓값을 구하시오.",
             "p3-shape:rep5",
             slot=slot,
             word="max",
-            at="low",
         ),
         _cubic_interval_frame(
             "rep-decreasing-integer",
@@ -636,29 +689,20 @@ def _basic_frames() -> list[Frame]:
             slot=slot,
             direction="pos",
         ),
-        _cubic_value_frame(
-            "basic-value-local-min-curve",
-            "곡선 y = {f}의 x = {r}에서의 극솟값을 구하시오.",
+        _cubic_judged_frame(
+            "basic-local-min-value-judged",
+            "삼차함수 f(x) = {f}{ga} {pins}에서 극값을 가질 때, 극솟값을 구하시오.",
             "p3-shape:bas5",
             slot=slot,
             word="min",
-            at="high",
         ),
-        _cubic_value_frame(
-            "basic-value-local-max-function",
-            "함수 f(x) = {f}{neun} x = {r}에서 극댓값을 갖는다. 그 극댓값은 얼마인가?",
+        _cubic_judged_frame(
+            "basic-local-max-value-judged",
+            "함수 f(x) = {f}에 대하여 방정식 f'(x) = 0의 두 근은 {pins}이다. f(x)의 극댓값을 "
+            "구하시오.",
             "p3-shape:bas6",
             slot=slot,
             word="max",
-            at="low",
-        ),
-        _cubic_value_frame(
-            "basic-value-extremum-unspecified",
-            "함수 f(x) = {f}{neun} x = {r}에서 극값을 갖는다. 그 극값을 구하시오.",
-            "p3-shape:bas7",
-            slot=slot,
-            word="any",
-            at="low",
         ),
     ]
 
@@ -693,6 +737,13 @@ def _find_a_frame(frame_id: str, template: str, seed: str, *, slot: str, want: s
         base_text = f"x^3 + ax^2 {tail_b} {tail_c}"
         base_sym = f"x**3 + a*x**2 + ({b})*x + ({c})"
         value = eval_at(poly, r)
+        a_eq = render_poly(((1, 2 * r), (0, 3 * r * r + b)), "a")
+        explanation = (
+            f"x = {r}에서 극값을 가지므로 f'({r})의 값은 0이다. f'(x) = 3x^2 + 2ax "
+            f"{_signed(b, '')}이므로 f'({r})의 값은 {a_eq}이고, {a_eq} = 0에서 a = {a}이다. "
+            f"이때 {_explain(fn)} 따라서 x = {r}에서 {_kind_word(want)}을 갖고, 그 값 "
+            f"{with_eun_neun(value)} 주어진 값과 같다."
+        )
         return _find_param_item(
             slot,
             frame_id,
@@ -704,39 +755,51 @@ def _find_a_frame(frame_id: str, template: str, seed: str, *, slot: str, want: s
             value_at_r=value,
             kind=want,
             answer=a,
+            explanation=explanation,
         )
 
     return Frame(frame_id, combos, build)
 
 
 def _find_k_frame(frame_id: str, template: str, seed: str, *, slot: str, want: str) -> Frame:
-    """f(x) = (삼차 다항식) + k가 x = r에서 극값 v를 갖는다 — 상수항 k를 구한다."""
+    """f(x) = (삼차 다항식) + k — 두 임계점을 고정하고 `want` 쪽 극값이 v일 때 상수항 k를 구한다.
+
+    1차 은행은 'x = 0에서 극댓값 -5'처럼 위치·종류를 다 주어 k = v - f(r) 대입만 남았고, 해설은
+    k와 무관한 f'(r) = 0에서 k를 끌어냈다(2차 감사). 여기서는 두 임계점 x = r1, r2를 모두 고정하고
+    어느 쪽이 극대·극소인지는 밝히지 않는다 — 학생은 f'의 부호로 *종류를 판정*한 뒤 f(r) = v를 푼다.
+    극값이 x = 0이면 f(0) = k라 답이 주어진 값과 같아져(정답 노출) 쓰지 않는다.
+    """
     combos = tuple(
         seeded_order(
             seed,
             [
-                (a, r1, r2, k, idx)
+                (a, r1, r2, k)
                 for a in _LEADS
                 for r1 in range(-3, 3)
                 for r2 in range(r1 + 1, 4)
                 for k in (-5, -3, -2, 2, 3, 4, 6)
-                for idx in (0, 1)
             ],
         )
     )
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
-        a, r1, r2, k, idx = (_i(v) for v in p)
+        a, r1, r2, k = (_i(v) for v in p)
         poly = _cubic(a, r1, r2, 0)
         fn0 = _analyze(poly) if poly is not None else None
-        if poly is None or fn0 is None:
+        if poly is None or fn0 is None or len(fn0.kinds) != 2:
             return None
-        r = fn0.roots[idx]
-        if fn0.kinds.get(r) != want:
+        r = next(root for root, kind in fn0.kinds.items() if kind == want)
+        if r == 0:
             return None
-        value = eval_at(poly, r) + k
+        base_value = eval_at(poly, r)
+        value = base_value + k
         base_text = render_poly(poly)
         base_sym = f"{poly_to_sympy_str(poly)} + k"
+        k_side = render_poly(((1, 1), (0, base_value)), "k")
+        explanation = (
+            f"{_explain(fn0)} 따라서 {_kind_word(want)}은 f({r}) = {k_side}이다. "
+            f"{k_side} = {value}에서 k = {k}이다."
+        )
         return _find_param_item(
             slot,
             frame_id,
@@ -748,6 +811,8 @@ def _find_k_frame(frame_id: str, template: str, seed: str, *, slot: str, want: s
             value_at_r=value,
             kind=want,
             answer=k,
+            explanation=explanation,
+            pins=_pins_text(fn0.roots),
         )
 
     return Frame(frame_id, combos, build)
@@ -765,16 +830,71 @@ def _quartic_even_frame(
     return Frame(frame_id, _quartic_even_pool(seed), build)
 
 
-def _quartic_even_value_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
-    """사차 우함수 a x^4 - 2a p^2 x^2 + c — x = 0에서의 극값(가운데 임계점)의 값."""
+def _quartic_even_judged_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
+    """사차 우함수 a x^4 - 2a p^2 x^2 + c — 세 임계점 -p, 0, p를 고정하고 *바깥 두 점의* 극값을
+    묻는다.
+
+    a > 0이면 바깥 두 점이 극소(묻는 값 = 극솟값), a < 0이면 극대다. 가운데 x = 0의 극값은
+    상수항이라 묻지 않는다(1차 은행 '그 극값'이 상수항 그대로였던 정답 노출 — 2차 감사).
+    """
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
-        fn = _analyze(_quartic_even(_i(p[0]), _i(p[1]), _i(p[2])))
-        if fn is None:
+        a = _i(p[0])
+        fn = _analyze(_quartic_even(a, _i(p[1]), _i(p[2])))
+        if fn is None or len(fn.roots) != 3:
             return None
-        return _value_item(slot, frame_id, template, fn, r=0, word="any")
+        return _judged_value_item(slot, frame_id, template, fn, word="min" if a > 0 else "max")
 
     return Frame(frame_id, _quartic_even_pool(seed), build)
+
+
+def _quartic_asym(a: int, p: int, m: int, q: int, c: int) -> Poly | None:
+    """f' = 4a(x - p)(x - m)(x - q)인 사차함수 — 세 임계점이 비대칭이라 바깥 두 극값의 값이 다르다.
+
+    계수가 정수가 아니거나 너무 크면 None. (f = a x^4 - (4a s1/3) x^3 + 2a s2 x^2 - 4a s3 x + c)
+    """
+    s1, s2, s3 = p + m + q, p * m + m * q + p * q, p * m * q
+    if (4 * a * s1) % 3:
+        return None
+    terms = [(4, a), (3, -(4 * a * s1) // 3), (2, 2 * a * s2), (1, -4 * a * s3), (0, c)]
+    if max(abs(k) for _, k in terms) > 120:
+        return None
+    return tuple((e, k) for e, k in terms if k != 0)
+
+
+def _quartic_asym_pool(seed: str) -> tuple[tuple[object, ...], ...]:
+    combos: list[tuple[object, ...]] = []
+    for a in (1, -1):
+        for p in range(-4, 3):
+            for m in range(p + 1, 4):
+                for q in range(m + 1, 5):
+                    if m - p == q - m:
+                        continue  # 대칭이면 바깥 두 극값이 같다
+                    for c in (-5, -2, 1, 3, 6):
+                        combos.append((a, p, m, q, c))
+    return tuple(seeded_order(seed, combos))
+
+
+def _quartic_asym_frame(frame_id: str, template: str, seed: str, *, slot: str, role: str) -> Frame:
+    """비대칭 사차함수의 세 임계점을 고정한다.
+
+    role "outer": 바깥 두 극값(a > 0이면 극소 둘) 중 작은/큰 값(값 비교까지 요구).
+    role "middle": 가운데 하나뿐인 극값(a > 0이면 극대).
+    """
+
+    def build(p: tuple[object, ...]) -> DiffItem | None:
+        a, pp, m, q, c = (_i(v) for v in p)
+        poly = _quartic_asym(a, pp, m, q, c)
+        fn = _analyze(poly) if poly is not None else None
+        if fn is None or len(fn.kinds) != 3:
+            return None
+        if role == "outer":
+            word = "min" if a > 0 else "max"
+            pick = "smaller" if a > 0 else "larger"
+            return _judged_value_item(slot, frame_id, template, fn, word=word, pick=pick)
+        return _judged_value_item(slot, frame_id, template, fn, word="max" if a > 0 else "min")
+
+    return Frame(frame_id, _quartic_asym_pool(seed), build)
 
 
 def _applied_frames() -> list[Frame]:
@@ -788,8 +908,9 @@ def _applied_frames() -> list[Frame]:
             want="min",
         ),
         _find_k_frame(
-            "applied-find-constant-local-max-value",
-            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오.",
+            "applied-find-constant-judged-local-max",
+            "함수 f(x) = {f}{neun} {pins}에서 극값을 갖는다. {kind}이 {v}일 때, 상수 {p}의 값을 "
+            "구하시오.",
             "p3-shape:app2",
             slot=slot,
             want="max",
@@ -810,9 +931,9 @@ def _applied_frames() -> list[Frame]:
             role="max",
             pick="smallest",
         ),
-        _quartic_even_value_frame(
-            "applied-quartic-value-at-origin",
-            "사차함수 f(x) = {f}{neun} x = {r}에서 극값을 갖는다. 그 극값을 구하시오.",
+        _quartic_even_judged_frame(
+            "applied-quartic-outer-extremum-value",
+            "사차함수 f(x) = {f}{neun} {pins}에서 극값을 갖는다. {kind}을 구하시오.",
             "p3-shape:app5",
             slot=slot,
         ),
@@ -956,20 +1077,22 @@ def _flat_x_frame(
     return Frame(frame_id, _quartic_flat_pool(seed, (-6, -4, -3, -2, -1, 1, 2, 3, 4, 5)), build)
 
 
-def _flat_value_frame(
-    frame_id: str, template: str, seed: str, *, slot: str, word: str, at: str
-) -> Frame:
-    """사차 a x^4 + b x^3 + c — x = q(극값 점) 또는 x = 0(평평한 점 — 극값 아님 → None)에 고정."""
+def _flat_judged_frame(frame_id: str, template: str, seed: str, *, slot: str) -> Frame:
+    """사차 a x^4 + b x^3 + c — f'(x) = 0의 두 근(0과 q)을 고정하고 *극값*을 묻는다.
+
+    x = 0은 f'(0) = 0이지만 부호가 바뀌지 않아 극값이 아니다 — 학생은 두 근 중 어느 것이 극값인지
+    판정해야 한다(임계점 = 극값 오개념을 진단). 1차 은행은 'x = q에서 극값을 갖는다'고 위치를 알려
+    대입만 남았다(2차 감사).
+    """
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
         made = _quartic_flat(_i(p[0]), _i(p[1]), _i(p[2]))
         if made is None:
             return None
         fn = _analyze(made[0])
-        if fn is None or tuple(fn.kinds) != (made[1],):
+        if fn is None or tuple(fn.kinds) != (made[1],) or fn.flat_roots != (0,):
             return None
-        r = made[1] if at == "extremum" else 0
-        return _value_item(slot, frame_id, template, fn, r=r, word=word)
+        return _judged_value_item(slot, frame_id, template, fn, word="any")
 
     return Frame(frame_id, _quartic_flat_pool(seed, (-6, -4, -3, -2, -1, 1, 2, 3, 4, 5)), build)
 
@@ -1009,13 +1132,12 @@ def _diagnostic_frames() -> list[Frame]:
             role="turn",
             pick=None,
         ),
-        _flat_value_frame(
-            "diag-quartic-extremum-value-at",
-            "사차함수 f(x) = {f}{neun} x = {r}에서 극값을 갖는다. 그 극값을 구하시오.",
+        _flat_judged_frame(
+            "diag-extremum-value-among-critical-points",
+            "사차함수 f(x) = {f}에 대하여 방정식 f'(x) = 0의 실근은 {pins}이다. f(x)의 극값을 "
+            "구하시오.",
             "p3-shape:dia5",
             slot=slot,
-            word="any",
-            at="extremum",
         ),
         _cubic_interval_frame(
             "diag-decreasing-integer-curve",
@@ -1049,6 +1171,12 @@ def _find_a_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str)
             return None
         base_sym = f"x**4 + a*x**3 + ({c})"
         value = eval_at(poly, q)
+        a_eq = render_poly(((1, 3 * q * q), (0, 4 * q**3)), "a")
+        explanation = (
+            f"x = {q}에서 극값을 가지므로 f'({q})의 값은 0이다. f'(x) = 4x^3 + 3ax^2이므로 "
+            f"f'({q})의 값은 {a_eq}이고, {a_eq} = 0에서 a = {a}이다. 이때 {_explain(fn)} "
+            f"따라서 x = {q}에서 극솟값을 갖고, 그 값 {with_eun_neun(value)} 주어진 값과 같다."
+        )
         return _find_param_item(
             slot,
             frame_id,
@@ -1060,6 +1188,7 @@ def _find_a_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str)
             value_at_r=value,
             kind="min",
             answer=a,
+            explanation=explanation,
         )
 
     return Frame(frame_id, combos, build)
@@ -1091,6 +1220,14 @@ def _find_b_cubic_frame(frame_id: str, template: str, seed: str, *, slot: str) -
         kind = fn.kinds.get(r)
         if kind is None:
             return None
+        value = eval_at(poly, r)
+        b_eq = render_poly(((1, 1), (0, 3 * r * r + 2 * a * r)), "b")
+        explanation = (
+            f"x = {r}에서 극값을 가지므로 f'({r})의 값은 0이다. f'(x) = 3x^2 "
+            f"{_signed(2 * a, 'x')} + b이므로 f'({r})의 값은 {b_eq}이고, {b_eq} = 0에서 "
+            f"b = {b}이다. 이때 {_explain(fn)} 따라서 x = {r}에서 {_kind_word(kind)}을 갖고, 그 값 "
+            f"{with_eun_neun(value)} 주어진 값과 같다."
+        )
         return _find_param_item(
             slot,
             frame_id,
@@ -1099,9 +1236,10 @@ def _find_b_cubic_frame(frame_id: str, template: str, seed: str, *, slot: str) -
             base_text=f"x^3 {_signed(a, 'x^2')} + bx {_signed(c, '')}",
             base_sym=f"x**3 + ({a})*x**2 + b*x + ({c})",
             r=r,
-            value_at_r=eval_at(poly, r),
+            value_at_r=value,
             kind=kind,
             answer=b,
+            explanation=explanation,
         )
 
     return Frame(frame_id, combos, build)
@@ -1124,8 +1262,9 @@ def _mastery_frames() -> list[Frame]:
             slot=slot,
         ),
         _find_k_frame(
-            "mastery-find-constant-local-min-value",
-            "곡선 y = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오.",
+            "mastery-find-constant-judged-local-min",
+            "함수 y = {f}{neun} {pins}에서 극값을 갖는다. {kind}이 {v}일 때, 상수 {p}의 값을 "
+            "구하시오.",
             "p3-shape:mas3",
             slot=slot,
             want="min",
@@ -1146,21 +1285,20 @@ def _mastery_frames() -> list[Frame]:
             role="max",
             pick="largest",
         ),
-        _flat_value_frame(
-            "mastery-quartic-local-value",
-            "함수 f(x) = {f}의 x = {r}에서의 극솟값을 구하시오.",
+        _quartic_asym_frame(
+            "mastery-quartic-compare-outer-extrema",
+            "사차함수 f(x) = {f}{neun} {pins}에서 극값을 갖는다. 두 {kind} 중 {size} 값을 "
+            "구하시오.",
             "p3-shape:mas6",
             slot=slot,
-            word="min",
-            at="extremum",
+            role="outer",
         ),
-        _cubic_value_frame(
-            "mastery-value-local-min-low",
-            "삼차함수 f(x) = {f}의 x = {r}에서의 극솟값을 구하시오.",
+        _quartic_asym_frame(
+            "mastery-quartic-middle-extremum",
+            "사차함수 f(x) = {f}의 극값을 갖는 점이 {pins}일 때, f(x)의 {kind}을 구하시오.",
             "p3-shape:mas7",
             slot=slot,
-            word="min",
-            at="low",
+            role="middle",
         ),
     ]
 

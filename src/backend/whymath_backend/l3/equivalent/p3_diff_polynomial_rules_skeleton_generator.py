@@ -35,6 +35,7 @@ Tier1(`l3/verify_answer`)은 미분 평가(`Derivative(...).doit().subs(...)`)�
 
 from __future__ import annotations
 
+import dataclasses
 import random
 from typing import ClassVar, Final
 
@@ -48,16 +49,20 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     poly_to_sympy,
     poly_to_sympy_str,
     product_to_sympy_str,
+    render_difference,
     render_poly,
     render_product,
+    render_sum,
     with_eun_neun,
     with_i_ga,
+    with_ira,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
     Frame,
     P3DiffSlotGenerator,
+    answer_format_for,
     build_choices,
     round_robin_items,
     seeded_order,
@@ -73,8 +78,54 @@ _SOLVE: Final = "ptype.solve-for-unknown"
 _X = sympy.Symbol("x")
 
 
-def _fmt(value: int) -> AnswerFormat:
-    return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
+def _fmt(value: object) -> AnswerFormat:
+    """정답 형식 — 기반의 단일 규칙(`answer_format_for`)을 따른다."""
+    return answer_format_for(str(value))
+
+
+def _times(left: Poly, right: Poly, var: str) -> str:
+    """두 다항식의 곱 표기 — 상수 인수는 앞에 계수로('-2(x^2 - x)'), 단항식은 괄호 없이 앞에."""
+    if len(left) == 1 and left[0][0] == 0:
+        coef = left[0][1]
+        if len(right) == 1:  # 상수 × 단항식은 한 항으로 쓴다('-2x^3' — '-2(x^3)'가 아니다)
+            return render_poly(((right[0][0], coef * right[0][1]),), var)
+        body = render_poly(right, var)
+        if coef == 1:
+            return f"({body})"
+        if coef == -1:
+            return f"-({body})"
+        return f"{coef}({body})"
+    if len(right) == 1 and right[0][0] == 0:
+        return _times(right, left, var)
+    if len(left) == 1:
+        return f"{render_poly(left, var)}({render_poly(right, var)})"
+    return f"({render_poly(left, var)})({render_poly(right, var)})"
+
+
+def _product_rule_steps(f1: Poly, f2: Poly, var: str = "x") -> str:
+    """곱의 미분법 전개 '(앞)'(뒤) + (앞)(뒤)' = 정리식' — 해설이 중간 단계를 보이게 한다.
+
+    인수에 새 기호(u·v·f·g)를 붙이지 않는다 — 발문은 곱 *전체*를 f로 부르므로 해설이 인수를 다시
+    f·g로 부르면 기호가 충돌한다(2차 감사 결함 '(fg)'은 f'g와 fg'의 합').
+    """
+    first = _times(derivative_of(f1, var), f2, var)
+    second = _times(f1, derivative_of(f2, var), var)
+    joined = f"{first} - {second[1:]}" if second.startswith("-") else f"{first} + {second}"
+    total = derivative_of(_prod_var((f1, f2), var), var)
+    return f"{joined} = {render_poly(total, var)}"
+
+
+def _prod_var(factors: tuple[Poly, ...], var: str) -> Poly:
+    """`_prod`의 변수 지정판(t 문항 — 변수 이름만 다르고 계산은 같다)."""
+    expr = sympy.Integer(1)
+    for factor in factors:
+        expr = expr * poly_to_sympy(factor, var)
+    return poly_from_sympy(sympy.expand(expr), var)
+
+
+_PRODUCT_RULE: Final = (
+    "곱의 미분법(앞 인수의 도함수에 뒤 인수를 곱한 것과 앞 인수에 뒤 인수의 도함수를 곱한 것의 합)"
+)
 
 
 def _rand_poly(rng: random.Random, degree: int, *, terms_skip: float = 0.25) -> Poly:
@@ -188,7 +239,7 @@ def _read_item(
         explanation=(
             f"{note} {shown}의 도함수는 {render_poly(d, var)}이므로 "
             f"{with_eun_neun(what)} {value}이다."
-        ),
+        ).strip(),
         conditions=f"Derivative({sym}, {var}).doit().subs({var}, {point}) = y",
         answer_map=(("y", str(value)),),
         problem_type_code=_EVAL,
@@ -266,7 +317,7 @@ def _rep_frames() -> list[Frame]:
     def r5(p: tuple[object, ...]) -> DiffItem | None:
         f1, f2 = _poly(p[0]), _poly(p[1])
         prod = _prod((f1, f2))
-        return _read_item(
+        item = _read_item(
             frame_id="rep-product-constant-term",
             text=(f"함수 f(x) = {render_product((f1, f2))}의 도함수 f'(x)의 상수항을 구하시오."),
             function=prod,
@@ -274,7 +325,17 @@ def _rep_frames() -> list[Frame]:
             sym=product_to_sympy_str((f1, f2)),
             point=0,
             what="상수항",
-            note="곱의 미분법 (fg)'은 f'g와 fg'의 합이다.",
+            note="",
+        )
+        if item is None:
+            return None
+        value = eval_at(derivative_of(prod), 0)
+        return dataclasses.replace(
+            item,
+            explanation=(
+                f"{_PRODUCT_RULE}에 따라 f'(x) = {_product_rule_steps(f1, f2)}이므로 "
+                f"상수항은 {value}이다."
+            ),
         )
 
     def r6(p: tuple[object, ...]) -> DiffItem | None:
@@ -414,8 +475,8 @@ def _basic_frames() -> list[Frame]:
             ),
             answer_text=str(v1 + v2),
             explanation=(
-                f"f'(x)는 {render_poly(d1)}이고 g'(x)는 {render_poly(d2)}이므로 두 값을 더하면 "
-                f"{v1 + v2}이다."
+                f"f'(x) = {render_poly(d1)}이고 g'(x) = {render_poly(d2)}이므로 "
+                f"f'({a}) + g'({a})의 값은 {render_sum(v1, v2)} = {v1 + v2}이다."
             ),
             conditions=(
                 _deriv_sym(f"({poly_to_sympy_str(f1)}) + ({poly_to_sympy_str(f2)})", str(a))
@@ -441,8 +502,8 @@ def _basic_frames() -> list[Frame]:
             ),
             answer_text=str(v1 - v2),
             explanation=(
-                f"f'(x)는 {render_poly(d1)}이고 g'(x)는 {render_poly(d2)}이므로 두 값의 차는 "
-                f"{v1 - v2}이다."
+                f"f'(x) = {render_poly(d1)}이고 g'(x) = {render_poly(d2)}이므로 "
+                f"f'({a}) - g'({a})의 값은 {render_difference(v1, v2)} = {v1 - v2}이다."
             ),
             conditions=(
                 _deriv_sym(f"({poly_to_sympy_str(f1)}) - ({poly_to_sympy_str(f2)})", str(a))
@@ -501,8 +562,11 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수는 {3 * lead}x^2 + 2ax {sign} {abs(c)}이므로 x가 {pt}일 때의 값이 "
-                f"{with_i_ga(b)} 되는 a는 {a}이다."
+                f"도함수는 f'(x) = {3 * lead}x^2 + 2ax {sign} {abs(c)}이므로 "
+                f"f'({pt}) = {render_poly(((1, 2 * pt), (0, 3 * lead * pt * pt + c)), 'a')}이다. "
+                f"이 값이 {with_i_ga(b)} 되어야 하므로 "
+                f"{render_poly(((1, 2 * pt), (0, 3 * lead * pt * pt + c)), 'a')} = {b}에서 "
+                f"a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'{lead}*x**3 + a*x**2 + ({c})*x', str(pt))} = {b}",
             answer_map=(("a", str(a)),),
@@ -523,7 +587,10 @@ def _applied_frames() -> list[Frame]:
                 f"함수 f(x) = x^3 - {k}x에 대하여 f'(a) = 0을 만족시키는 양수 a의 값을 구하시오."
             ),
             answer_text=str(m),
-            explanation=f"도함수는 3x^2 - {k}이므로 이 값이 0이 되는 양수 a는 {m}이다.",
+            explanation=(
+                f"도함수는 f'(x) = 3x^2 - {k}이므로 f'(a) = 3a^2 - {k} = 0에서 a^2 = {m * m}이다. "
+                f"a는 양수이므로 a = {m}이다."
+            ),
             conditions=(f"{_deriv_sym(f'x**3 - {k}*x', 'a')} = 0", "a > 0"),
             answer_map=(("a", str(m)),),
             problem_type_code=_SOLVE,
@@ -538,13 +605,16 @@ def _applied_frames() -> list[Frame]:
         return DiffItem(
             slot="applied",
             frame_id="applied-two-derivative-values-find-a",
+            # b도 상수임을 밝힌다(2차 감사: 'a의 값'만 상수 선언하고 b는 선언 누락).
             question_text=(
-                f"함수 f(x) = ax^2 + bx에 대하여 f'(0)의 값이 {v0}이고 f'({x1})의 값이 {v1}일 때, "
-                "상수 a의 값을 구하시오."
+                f"함수 f(x) = ax^2 + bx (a, b는 상수)에 대하여 f'(0)의 값이 {v0}이고 "
+                f"f'({x1})의 값이 {v1}일 때, a의 값을 구하시오."
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수는 2ax + b이므로 f'(0)에서 b는 {v0}이고, f'({x1})에서 a는 {a}이다."
+                f"도함수는 f'(x) = 2ax + b이다. f'(0)의 값은 b이므로 b = {v0}이다. 그러면 "
+                f"f'({x1})의 값은 {render_poly(((1, 2 * x1), (0, v0)), 'a')}이고, "
+                f"{render_poly(((1, 2 * x1), (0, v0)), 'a')} = {v1}에서 a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'a*x**2 + ({v0})*x', str(x1))} = {v1}",
             answer_map=(("a", str(a)),),
@@ -565,8 +635,9 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"곱의 미분법에 따라 f'(1)은 2a + {b + 3}이므로 이 값이 "
-                f"{with_i_ga(c)} 되는 a는 {a}이다."
+                f"{_PRODUCT_RULE}에 따라 f'(x) = (x^2 + {b}) + (x + a)(2x)이므로 "
+                f"f'(1) = (1 + {b}) + 2(1 + a) = 2a + {b + 3}이다. "
+                f"2a + {b + 3} = {c}에서 a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'(x + a)*(x**2 + {b})', '1')} = {c}",
             answer_map=(("a", str(a)),),
@@ -587,8 +658,9 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수는 {render_poly(derivative_of(f))}이므로 이 값이 {with_i_ga(b)} 되는 "
-                f"양수 a는 {a}이다."
+                f"도함수는 f'(x) = {render_poly(derivative_of(f))}이므로 "
+                f"f'(a) = {render_poly(derivative_of(f), 'a')} = {b}에서 "
+                f"a^2 = {a * a}이다. a는 양수이므로 a = {a}이다."
             ),
             conditions=(f"{_deriv_sym(poly_to_sympy_str(f), 'a')} = {b}", "a > 0"),
             answer_map=(("a", str(a)),),
@@ -609,7 +681,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"곱의 미분법에 따라 f'(0)은 {c}a이므로 이 값이 {with_i_ga(d)} 되는 a는 {a}이다."
+                f"{_PRODUCT_RULE}에 따라 f'(x) = a(x^2 + {c}) + (ax + {b})(2x)이므로 "
+                f"f'(0) = {c}a이다. {c}a = {d}에서 a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'(a*x + {b})*(x**2 + {c})', '0')} = {d}",
             answer_map=(("a", str(a)),),
@@ -662,8 +735,20 @@ def _naive_values(f1: Poly, f2: Poly, a: int) -> tuple[int, int, int, int]:
 
 
 def _mc_value(
-    frame_id: str, text: str, f1: Poly, f2: Poly, a: int, var: str = "x"
+    frame_id: str,
+    text: str,
+    f1: Poly,
+    f2: Poly,
+    a: int,
+    var: str = "x",
+    *,
+    prime: str = "f'",
 ) -> DiffItem | None:
+    """곱의 도함수 값 4지선다 — 해설은 전개 과정·묻는 양과의 연결·오개념 함정을 보인다.
+
+    `prime`은 해설이 쓰는 도함수 기호('f'(x)'·'y''·'g'(t)')다 — 발문이 y = …로 준 문항에서 해설이
+    정의되지 않은 f를 꺼내지 않게 한다.
+    """
     correct, naive, left_only, right_only = _naive_values(f1, f2, a)
     try:
         choices, answer, distractors = build_choices(
@@ -677,19 +762,30 @@ def _mc_value(
         )
     except ValueError:
         return None
-    prod = _prod((f1, f2))
     sym = product_to_sympy_str((f1, f2))
     if var != "x":
         sym = sym.replace("x", var)
+    # 도함수 기호: f'(x)·g'(t)는 인자를 붙이고, 발문이 y = …인 문항은 y'를 그대로 쓴다.
+    head = "y'" if prime == "y'" else f"{prime}({var})"
+    steps = _product_rule_steps(f1, f2, var)
+    if a == 0:
+        # 상수항 = x에 0을 넣은 값 — 묻는 양(상수항)과 계산(값)을 해설이 직접 잇는다.
+        link = f"상수항은 {correct}이다"
+    elif a == 1 and "계수의 합" in text:
+        link = f"모든 계수의 합은 {var} = 1을 대입한 값과 같은 {correct}이다"
+    else:
+        point_of = f"{var} = {a}에서의 y'의 값" if prime == "y'" else f"{prime}({a})"
+        link = f"{with_eun_neun(point_of)} {correct}이다"
+    trap = (
+        f" 두 인수의 도함수끼리만 곱한 값 {with_eun_neun(naive)} 곱의 미분법을 잘못 적용한 "
+        "것이다."
+    )
     return DiffItem(
         slot="misconception_trigger",
         frame_id=frame_id,
         question_text=text,
         answer_text=answer,
-        explanation=(
-            f"곱의 미분법에 따라 도함수는 {render_poly(derivative_of(prod), var)}이므로 "
-            f"{with_i_ga(var)} {a}일 때의 값은 {correct}이다."
-        ),
+        explanation=f"{_PRODUCT_RULE}에 따라 {head} = {steps}이므로 {link}.{trap}",
         conditions=f"Derivative({sym}, {var}).doit().subs({var}, {a}) = y",
         answer_map=(("y", str(correct)),),
         problem_type_code=_EVAL,
@@ -718,6 +814,7 @@ def _misconception_frames() -> list[Frame]:
             f1,
             f2,
             a,
+            prime="y'",
         )
 
     def m3(p: tuple[object, ...]) -> DiffItem | None:
@@ -738,6 +835,7 @@ def _misconception_frames() -> list[Frame]:
             f1,
             f2,
             1,
+            prime="y'",
         )
 
     def m5(p: tuple[object, ...]) -> DiffItem | None:
@@ -750,6 +848,7 @@ def _misconception_frames() -> list[Frame]:
             f2,
             a,
             var="t",
+            prime="g'",
         )
 
     def m6(p: tuple[object, ...]) -> DiffItem | None:
@@ -867,11 +966,14 @@ def _diagnostic_frames() -> list[Frame]:
             slot="diagnostic",
             frame_id="diag-constant-shift-vanishes",
             question_text=(
-                f"함수 f(x) = {render_poly(f)}에 대하여 g(x) = f(x) + {c}라 할 때, "
+                f"함수 f(x) = {render_poly(f)}에 대하여 g(x) = f(x) + {with_ira(c)} 할 때, "
                 f"g'({a}) - f'({a})의 값을 구하시오."
             ),
             answer_text=str(gap),
-            explanation="상수를 더해도 도함수는 변하지 않으므로 두 미분계수의 차는 0이다.",
+            explanation=(
+                f"상수 {c}의 도함수는 0이므로 g'(x) = f'(x) + 0 = f'(x)이다. "
+                f"따라서 g'({a}) - f'({a})의 값은 0이다."
+            ),
             # g'(a) - f'(a) = (g - f)'(a) — 미분 평가 1회·맨몸 제약에 맞춰 차를 한 번에 미분한다.
             conditions=(
                 _deriv_sym(f"(({poly_to_sympy_str(f)}) + {c}) - ({poly_to_sympy_str(f)})", str(a))
@@ -879,7 +981,7 @@ def _diagnostic_frames() -> list[Frame]:
             ),
             answer_map=(("y", str(gap)),),
             problem_type_code=_EVAL,
-            answer_format=AnswerFormat.실수,
+            answer_format=_fmt(gap),
         )
 
     def d5(p: tuple[object, ...]) -> DiffItem | None:
@@ -994,11 +1096,15 @@ def _mastery_frames() -> list[Frame]:
             slot="mastery_check",
             frame_id="mastery-two-values-find-leading-coefficient",
             question_text=(
-                f"함수 f(x) = x^3 + ax^2 + bx + {c}에 대하여 f'(1)의 값이 {v1}이고 "
-                f"f'(-1)의 값이 {v2}일 때, 상수 a의 값을 구하시오."
+                f"함수 f(x) = x^3 + ax^2 + bx + {c} (a, b는 상수)에 대하여 f'(1)의 값이 {v1}이고 "
+                f"f'(-1)의 값이 {v2}일 때, a의 값을 구하시오."
             ),
             answer_text=str(a),
-            explanation=(f"도함수는 3x^2 + 2ax + b이므로 두 조건에서 a는 {a}, b는 {b}이다."),
+            explanation=(
+                f"도함수는 f'(x) = 3x^2 + 2ax + b이므로 f'(1) = 3 + 2a + b = {v1}, "
+                f"f'(-1) = 3 - 2a + b = {v2}이다. 앞 식에서 뒤 식을 빼면 "
+                f"4a = {v1 - v2}이므로 a = {a}이다. (이때 b = {b}이다.)"
+            ),
             conditions=(f"{_deriv_sym(f'x**3 + a*x**2 + ({b})*x + {c}', '1')} = {v1}"),
             answer_map=(("a", str(a)),),
             problem_type_code=_SOLVE,
@@ -1018,8 +1124,9 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"곱의 미분법에 따라 f'(1)은 2a + {2 * s + 4}이므로 이 값이 "
-                f"{with_i_ga(value)} 되는 a는 {a}이다."
+                f"{_PRODUCT_RULE}에 따라 f'(x) = 2x(x^2 + a) + (x^2 + {s})(2x)이므로 "
+                f"f'(1) = 2(1 + a) + 2(1 + {s}) = 2a + {2 * s + 4}이다. "
+                f"2a + {2 * s + 4} = {value}에서 a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'(x**2 + {s})*(x**2 + a)', '1')} = {value}",
             answer_map=(("a", str(a)),),
@@ -1046,8 +1153,9 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"도함수 3x^2 + 2ax + b의 두 근이 {r1}, {r2}이므로 근과 계수의 관계에서 "
-                f"a는 {a}이다."
+                f"도함수는 f'(x) = 3x^2 + 2ax + b이고 방정식 3x^2 + 2ax + b = 0의 두 근이 "
+                f"{r1}, {r2}이므로 근과 계수의 관계에서 {render_sum(r1, r2)} = -2a/3이다. "
+                f"따라서 a = {a}이다."
             ),
             conditions=f"{_deriv_sym(f'x**3 + a*x**2 + ({b})*x', str(r1))} = 0",
             answer_map=(("a", str(a)),),
