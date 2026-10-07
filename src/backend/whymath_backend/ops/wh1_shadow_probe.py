@@ -68,6 +68,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+_DEMO_STATE_PATH = "/v1/auth/demo/state"
 _DEMO_CALLBACK_PATH = "/v1/auth/demo/callback"
 _SESSIONS_PATH = "/v1/coach/sessions"
 
@@ -257,13 +258,34 @@ class ProbeReport:
 def issue_demo_token(client: httpx.Client) -> str:
     """시연용 데모 콜백으로 JWT 자동 발급 — 실패 시 원인·조치를 담은 ProbeAuthError.
 
-    run_demo.ps1과 동일한 고정 바디(code/redirect_uri는 FakeOAuthProvider가 무시)로
-    `POST /v1/auth/demo/callback`을 친다. 404/비200은 대부분 서버가
+    run_demo.ps1과 **같은 순서**다: `GET /v1/auth/demo/state`로 CSRF state를 먼저 받아
+    `POST /v1/auth/demo/callback` 바디에 싣는다(code/redirect_uri는 FakeOAuthProvider가
+    무시하는 고정값). SEC-08 이후 콜백은 `state`가 필수라 state 없이 치면 HTTP 422로 첫
+    단계에서 죽는다(OPS-111 — 라이브에서 처음 드러났다). 404/비200은 대부분 서버가
     `WHYMATH_DEMO_AUTH_ENABLED=true` 없이 기동된 경우다 — 안내를 오류에 싣는다.
     """
+    guidance = (
+        "서버가 WHYMATH_DEMO_AUTH_ENABLED=true로 기동됐는지 확인하세요(scripts/demo/run_demo.ps1). "
+        "이미 발급된 토큰이 있으면 --token으로 직접 주입할 수 있습니다."
+    )
+    try:
+        state_resp = client.get(_DEMO_STATE_PATH)
+    except httpx.HTTPError as exc:
+        raise ProbeAuthError(
+            f"데모 토큰 발급 실패({type(exc).__name__}) — 서버 미도달. --base-url과 서버 기동"
+            "(scripts/demo/run_demo.ps1)을 확인하세요."
+        ) from exc
+    if state_resp.status_code != 200:
+        raise ProbeAuthError(
+            f"데모 state 발급 실패(HTTP {state_resp.status_code}) — {guidance}"
+        )
+    state = state_resp.json().get("state")
+    if not isinstance(state, str) or not state:
+        raise ProbeAuthError("데모 state 응답에 state가 없음 — 서버 버전을 확인하세요.")
     try:
         resp = client.post(
-            _DEMO_CALLBACK_PATH, json={"code": "demo", "redirect_uri": "https://demo/cb"}
+            _DEMO_CALLBACK_PATH,
+            json={"code": "demo", "redirect_uri": "https://demo/cb", "state": state},
         )
     except httpx.HTTPError as exc:
         raise ProbeAuthError(
@@ -271,11 +293,7 @@ def issue_demo_token(client: httpx.Client) -> str:
             "(scripts/demo/run_demo.ps1)을 확인하세요."
         ) from exc
     if resp.status_code != 200:
-        raise ProbeAuthError(
-            f"데모 토큰 발급 실패(HTTP {resp.status_code}) — 서버가 "
-            "WHYMATH_DEMO_AUTH_ENABLED=true로 기동됐는지 확인하세요(scripts/demo/run_demo.ps1). "
-            "이미 발급된 토큰이 있으면 --token으로 직접 주입할 수 있습니다."
-        )
+        raise ProbeAuthError(f"데모 토큰 발급 실패(HTTP {resp.status_code}) — {guidance}")
     token = resp.json().get("access_token")
     if not isinstance(token, str) or not token:
         raise ProbeAuthError("데모 토큰 발급 응답에 access_token이 없음 — 서버 버전을 확인하세요.")

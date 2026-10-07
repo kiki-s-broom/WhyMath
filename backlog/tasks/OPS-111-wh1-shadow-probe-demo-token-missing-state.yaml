@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/wh1_shadow_probe.py
   - tests/backend/ops/test_wh1_shadow_probe.py
-session: null
+session: claude/funny-turing-37yxvj
 notes: "OPS-106 실측 중 발견: OAuthCallbackRequest(code=demo, redirect_uri=https://demo/cb) 는 state missing 으로 ValidationError. 기존 테스트는 MockTransport 가 콜백을 항상 200 으로 응답해 결함을 가렸다(외부 계약을 시임 테스트만으로 정합 선언 금지 계열). OPS-106 런북은 토큰을 직접 발급해 --token 으로 우회한다."
-updated: 2026-10-05
+updated: 2026-10-07
