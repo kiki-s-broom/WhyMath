@@ -1,1 +1,1 @@
-{"branch": "claude/funny-turing-37yxvj", "harness": "2.0", "task": "MISC-61-a3-thin-misid-source-enrichment", "ts": "2026-10-07T05:32:19Z"}
+{"branch": "claude/funny-turing-37yxvj", "harness": "2.0", "kind": "block", "reason": "완료 조건 ①의 입력인 원천 JSON(fac16e6f…, sha256 fcf6d333…187e)이 저장소·이력·컨테이너 어디에도 없다(Kiki 머신 보관본, 2026-10-07 실측: find·git log -S 모두 파일 0건). ②·③은 ①의 판정(가설 ① 원천 공백 / 가설 ② 추출 누락)에 달려 있어 세션이 대신 못 한다 — 추측 저작은 '원 출처 근거' 조건 위반. 해소: Kiki가 원천 JSON을 세션에 제공(경로 또는 첨부)한 뒤 unblock.", "task": "MISC-61-a3-thin-misid-source-enrichment", "ts": "2026-10-07T05:33:55Z"}
