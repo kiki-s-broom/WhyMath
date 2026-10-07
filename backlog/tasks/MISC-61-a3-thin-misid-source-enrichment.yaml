@@ -10,7 +10,8 @@ priority: 2
 eos_priority: P1
 owner: claude
 depends_on: []
-requires_gates: []
+requires_gates:
+  - G-misc61-source-probe-run
 acceptance:
   - "① 원천 대조: 2026-06-20 업로드 원천 JSON(`fac16e6f…`, sha256 `fcf6d333…187e` — 저장소에 없음, Kiki 머신 보관본)에서 앵커 A3 M-id 4건(M0418·M0599·M0417·M0600)과 `provenance_note = \"distractor 연결됨\"` 88행의 실제 키를 확인한다. 세 필드(`학생의_잘못된_사고`·`distractor_규칙`·`error_type`)가 원천에 있는데 추출에서 빠졌는지(가설 ②), 원천부터 비었는지(가설 ①)를 판정해 기록한다(docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md §2).\n② 가설 ②이면: 추출기 `src/data-pipeline/data_pipeline/misconception/extract.py`의 키 매핑을 고치고 재추출로 채운다. 키가 맞지 않아 값을 버리는 경우 경고(키 이름 포함)를 내게 하고, 그 경고가 실제로 나는지 주입 테스트로 확인한다.\n③ 가설 ①이면: A3 4건의 빈 필드를 새로 저작하되 근거를 원 출처 자료(교육과정 성취기준·자체 저작 원천의 해당 개념 서술)로 둔다. **카탈로그 kebab(`l4/misconception/catalog.py`)의 `canonical_statement`·`counterexample`을 복사하거나 바꿔 써서 채우지 않는다** — 그러면 kebab↔M-id 검수가 같은 글끼리 대조하는 순환 검증이 된다(Kiki 2026-10-07 지시). 새로 저작한 행의 `provenance_note`는 AI 저작임을 표시한다(예: `AI생성-검수필요(MISC-61)`).\n④ 범위: A3 4건이 필수다. 나머지 `distractor 연결됨` 84행·`원본` 빈 행 21건(A3 외)은 ①의 판정만 기록하고, 채우는 일은 판정 결과에 따라 승계 태스크로 분리한다.\n⑤ 완료 판정: A3 4건의 세 필드가 채워져 main에 있고, 그 근거 출처가 행별로 기록돼 있으며, 관련 테스트(코퍼스 로더·`test_anchor_seat_gap.py`)가 exit 0. 이어서 게이트 `G-misc40-deferred-m0599-redecision`을 Kiki가 재판정할 수 있다 — 승인·반려는 세션이 하지 않는다."
 artifacts: []
@@ -19,5 +20,5 @@ paths:
   - "src/data-pipeline/data_pipeline/misconception/**"
   - "docs/reviews/m0599_*.md"
 session: null
-notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다.\n\n[차단 2026-10-07] 완료 조건 ①의 입력인 원천 JSON(fac16e6f…, sha256 fcf6d333…187e)이 저장소·이력·컨테이너 어디에도 없다(Kiki 머신 보관본, 2026-10-07 실측: find·git log -S 모두 파일 0건). ②·③은 ①의 판정(가설 ① 원천 공백 / 가설 ② 추출 누락)에 달려 있어 세션이 대신 못 한다 — 추측 저작은 '원 출처 근거' 조건 위반. 해소: Kiki가 원천 JSON을 세션에 제공(경로 또는 첨부)한 뒤 unblock."
+notes: "게이트 G-misc40-deferred-m0599-redecision의 보류 사유(4지선다 귀속 검증 재료 부재)를 해소하는 입력 태스크. 원천 파일이 저장소에 없어 ①은 Kiki 머신 원본이 필요하다.\n\n[차단 2026-10-07] 완료 조건 ①의 입력인 원천 JSON(fac16e6f…, sha256 fcf6d333…187e)이 저장소·이력·컨테이너 어디에도 없다(Kiki 머신 보관본, 2026-10-07 실측: find·git log -S 모두 파일 0건). ②·③은 ①의 판정(가설 ① 원천 공백 / 가설 ② 추출 누락)에 달려 있어 세션이 대신 못 한다 — 추측 저작은 '원 출처 근거' 조건 위반. 해소: Kiki가 원천 JSON을 세션에 제공(경로 또는 첨부)한 뒤 unblock.\n\n[진행 2026-10-07] 위 해소 조건(원천 JSON 제공)을 Kiki 머신에서의 1회 실행으로 대체하는 진단 도구(scripts/ops/misc61_source_key_probe.py)와 런북(docs/ops/misc61_source_probe_runbook.md)을 착지시키고 실행 게이트 G-misc61-source-probe-run을 부착했다. 결과 JSON을 받으면 ①의 판정을 기록하고 게이트를 닫은 뒤 unblock한다(원격 차단 홀드가 걸려 있어 status는 blocked를 유지한다)."
 updated: 2026-10-07
