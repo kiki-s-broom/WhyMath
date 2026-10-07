@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-300-destructive-step-after-unchecked-write
+title: "Kiki 머신 블록: 적재 실패를 확인하지 않고 파괴 단계가 이어지는 형태 차단 + FK 대상 사전확인"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "Kiki 머신 실행 블록에서 쓰기·파괴 단계가 앞 단계의 실패를 무시하고 이어지는 결함을 기계로 막는다. 정본 사고 = 2026-10-07 G-misc40 DB 동기화 블록: 로더 적재가 외래키 위반(FK 대상 M0864이 misconception_catalog에 없음)으로 실패했는데 블록이 종료 코드를 확인하지 않고 다음 단계의 DELETE 2건을 실행해 DB가 일시적으로 의도보다 나쁜 상태가 됐다(복구 블록으로 해소). 선례 = 2026-09-29 check-result-not-gating 1회차.\n① 탐지: chat_block_guard가 상태 전환(쓰기) 블록에서 파괴 단계(DELETE·DROP·TRUNCATE·Remove-Item·git push --force 등) 앞에 쓰기 단계(적재·upsert·INSERT·UPDATE·load)가 있는데 그 사이에 종료 코드·성공 변수 확인(LASTEXITCODE 판정 또는 성공 변수를 -and로 이은 가드)이 없으면 위반으로 막고 재작성을 요구한다.\n② 적재 전 외래키 사전확인: 외래키가 걸린 테이블에 적재하는 블록은 대상(참조되는 키)의 존재를 읽기 전용으로 먼저 확인하고 없으면 쓰기를 거부하는 형태여야 한다는 검사를 같은 가드에 둔다.\n③ 변별력: 결함 주입 테스트 — (a) 적재 뒤 확인 없이 DELETE가 이어지는 블록은 RED (b) 적재 뒤 LASTEXITCODE 가드가 있는 블록은 GREEN (c) 적재와 DELETE가 없는 읽기 전용 블록은 GREEN. 주입이 실제로 적용됐는지 단언한다.\n④ 집행 지점 분리: 가드 훅 소스가 해당 규칙을 호출하는 지점(별항)과 테스트를 같은 PR에서 제시한다."
+artifacts: []
+paths:
+  - ".claude/hooks/chat_block_guard.py"
+  - tests/harness
+session: null
+notes: ""
+updated: 2026-10-07
