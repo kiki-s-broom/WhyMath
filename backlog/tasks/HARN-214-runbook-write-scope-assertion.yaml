@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 쓰기 인식 사각의 실측 동결 — 2026-10-07 G-misc40 crosslink 적재 블록(DB 64행 쓰기)이 check_runbook_blocks.py에서 \"쓰기 블록 0개\"로 판정됐다. 6형태 실측: 직접 psql -c DELETE만 인식(1), cmd /c 로 감싼 psql·변수에 담은 SQL·psql 파일 입력(-f / <)·변수 속 적재 스크립트·저장소 적재 CLI(promote --load) 5형태는 0건. 테스트가 6형태 각각의 현재 판정을 고정한다.\n② 인식 확대(코드) — 문자열 속 psql SQL 변이, psql 파일/표준입력 SQL(같은 블록에 SELECT 전용 here-string이 있으면 읽기, 내용 미확인이면 쓰기), 저장소 적재 진입점(promote --load · load_crosslinks)을 쓰기 어휘에 편입한다. 변수 경유(SQL 변수·스크립트 변수)는 텍스트 스캔으로 탐지할 수 없다 — 한계를 스캐너 출력과 docstring에 명시한다.\n③ 범위 단언(별항 — 정본화와 집행 분리) — 가드가 도구 생존·코퍼스·접속만 보고 변경 대상 집합을 보지 않으면 쓰기가 계획 범위를 넘는다(실사고: 예상 5행 vs 실제 64행, 사람이 읽기 전용 블록 출력을 보고 중단해 피해 0). 쓰기 가드 조건에 대상 읽기에서 파생된 변수의 숫자 리터럴 비교(예상 변경 건수 단언)를 요구하는 규칙을 스캐너에 두거나, 불가하면 불가 사유를 판정 문서에 남긴다.\n④ 오탐 정정 — has_dangling_else가 중첩 if/else의 정상 형태(앞 줄이 안쪽 가지를 닫는 } else { ... } 로 끝나고 이번 줄이 바깥 가지를 닫는 } else { ... })를 위반으로 오판한다(실측: 그 형태가 Kiki 머신 PowerShell에서 정상 실행됨). 중괄호 깊이 기준으로 바꾸고 진짜 위반(닫힌 if 다음 새 줄의 else)은 계속 RED.\n⑤ 변별력 — ②③④ 각 절을 깨뜨리는 뮤테이션과 그 절의 반례 픽스처를 둔다(주입 적용 단언·원복 바이트 동일).\n⑥ 배선 — 기존 docs/ops 런북 전수에 새 규칙을 돌려 신규 위반 건수를 보고하고, 위반은 런북 수정 또는 만료 있는 면제로 처리한다."
-artifacts: []
+artifacts:
+  - "PR #1505 · https://github.com/kiki-s-broom/WhyMath/pull/1505 · 판정 기준 main b587f5fe · 구현 커밋 36a68126 · 쓰기 인식 6형태 중 4·한계 3종 고정·테스트 37 passed·뮤테이션 8종 전건 RED·로컬 CI 미러(파이썬 3.12) 6잡 exit 0 미실행 0건·GitHub CI 전 잡 success(backend mypy 포함)·tests/harness 1988 passed"
 paths:
   - scripts/ops/check_runbook_blocks.py
   - tests/infra/test_runbook_write_guard.py
-session: claude/inspiring-goldberg-h0o2a1
+session: null
 notes: "사고 계열 guard-effect-assumed-from-code-shape 2회차(1회차 2026-09-28). 2026-10-07 G-misc40 crosslink 라이브 적재 런북의 쓰기 블록이 자가거부 가드 형태(변수 참조·말하는 else)를 갖췄지만 그 조건이 변경 범위를 보지 않았다. 안내문은 예상과 달라도 안전하다고 잘못 말했다. 사람이 읽기 전용 블록 출력(DB_TOTAL=34·MISSING 38)을 보고 쓰기 블록을 실행하지 않아 피해 0 — 설계가 아니라 사람이 막았다. 조사: 스캐너는 해당 블록을 쓰기 0개로 봤다."
 updated: 2026-10-07
