@@ -52,6 +52,9 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     probe_of,
     round_robin_items,
 )
+from whymath_backend.l3.equivalent.p3_diff_tangent_line_skeleton_generator import (
+    P3DiffTangentLineGenerator,
+)
 from whymath_backend.schema.enums import AnswerFormat
 
 _ROOT = Path(__file__).resolve().parents[4]
@@ -112,7 +115,8 @@ _KNOWN_CLEAN_REJECTED: frozenset[str] = frozenset(
     }
 )  # fmt: skip
 
-#: 위 65건의 규칙별 거부 건수(한 문항이 두 규칙에 걸리면 둘 다 센다 — 4ce1eb57·ef60c8fb).
+#: 위 65건의 규칙별 거부 건수(여러 규칙에 걸린 문항은 규칙마다 센다 — 4ce1eb57은 2규칙, ef60c8fb는 3규칙이라
+#: 합이 68이다).
 _KNOWN_CLEAN_RULE_COUNTS: dict[str, int] = {
     "E-motion-symbol-subject": 25,
     "T-power-path-coincidence": 23,
@@ -678,3 +682,29 @@ def test_quadratic_slope_reads_the_curve_not_the_tier1_body() -> None:
         question_text=cubic.question_text.replace("x^3 - 3x^2 + 3x - 5", "x^2 + 3x - 5"),
     )
     assert "T05-quadratic-slope" in _round7(quadratic)
+
+
+#: 7회차에 이차 → 삼차로 바꾼 02-05 '기울기 → 접점' 틀(원인 ① 교정 대상).
+_SLOPE_TO_POINT_FRAMES: frozenset[str] = frozenset(
+    {"rep-find-point-for-slope", "applied-parallel-to-line", "applied-perpendicular-to-line"}
+)
+
+
+@pytest.mark.corpus_authoring
+def test_rewritten_slope_frames_never_answer_one() -> None:
+    """7회차에 삼차로 바꾼 02-05 '기울기 → 접점' 틀 3종은 접점 x = 1을 답으로 내지 않는다.
+
+    a = 1이면 지수를 줄이지 않는 오개념의 도함수 Σ n·c·a^n도 a = 1에서 참 도함수와 같은 값이라 거듭제곱
+    미분 오류로도 정답에 닿는다(3회차 감사 cbde3ec3과 같은 형태 — 원인 ① 교정이 원인 ②를 새로 만들지
+    않게 한다). 이 틀들은 판정기 거듭제곱 경로 규칙의 범위(02-03·거듭제곱 하나·거듭제곱 오개념 선지) 밖이라
+    판정기가 아니라 생성기의 접점 축 `_SLOPE_POINTS`가 막는다 — 축에 1을 되돌리면 이 단언이 깨진다.
+    """
+    seen = [
+        item
+        for slot in ("representative", "applied")
+        for item in P3DiffTangentLineGenerator.items(slot)
+        if item.frame_id in _SLOPE_TO_POINT_FRAMES
+    ]
+    # 공허 통과 방지 — 틀 3종이 슬롯에 실제로 뽑혀 있어야 단언이 무언가를 본다.
+    assert {item.frame_id for item in seen} == _SLOPE_TO_POINT_FRAMES
+    assert [item.question_text for item in seen if item.answer_text == "1"] == []
