@@ -43,6 +43,12 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Literal
 
+from whymath_backend.l3.exact_value import (
+    ExactValue,
+    format_exact_scalar,
+    format_exact_value,
+    parse_exact_value,
+)
 from whymath_backend.l3.verification_tier import VerificationTier
 
 __all__ = [
@@ -74,9 +80,6 @@ MAX_AST_NODES = 64
 
 _MAX_CONDITIONS_LEN = 2_000
 _MAX_EXPR_LEN = 300
-_MAX_ANSWER_LEN = 20_000
-# 정확값 문자열로 직렬화할 정수의 비트 상한 — 4,300자리(≈14,284비트) 미만으로 묶는다.
-_MAX_SERIALIZED_BITS = 13_000
 
 SEQUENCE_MACHINE_AXIS = "점화식 정확 산술 실행"
 
@@ -84,7 +87,6 @@ _RESIDUAL_BASE: tuple[str, ...] = ("발문↔점화식 정합", "인덱스 시�
 _RESIDUAL_BRANCH = "분기 조건 해석"
 _RESIDUAL_GENERAL = "모든 n에 대한 일반 주장"
 
-ExactValue = Fraction | tuple[Fraction, ...]
 QueryKind = Literal["term", "sum", "terms", "closed"]
 
 
@@ -144,84 +146,9 @@ class SequenceVerification:
     result: SequenceResult | None
 
 
-# ──────────────────────────────────────────────────────────────────────────
-# 정확값 문자열 ↔ Fraction
-# ──────────────────────────────────────────────────────────────────────────
-_SCALAR_RE = re.compile(r"\s*(-?\d+)\s*(?:/\s*(\d+)\s*)?")
-
-
-def _parse_scalar(raw: object) -> Fraction | None:
-    """정수 또는 `p/q` 하나를 정확 유리수로. 소수·근삿값·bool은 None(정확하지 않다)."""
-    if isinstance(raw, bool):
-        return None
-    if isinstance(raw, int):
-        return Fraction(raw)
-    if isinstance(raw, str):
-        if len(raw) > _MAX_ANSWER_LEN:
-            return None
-        match = _SCALAR_RE.fullmatch(raw)
-        if match is None:
-            return None
-        try:
-            numerator = int(match.group(1))
-            denominator = int(match.group(2)) if match.group(2) else 1
-        except ValueError:  # 4,300자리 초과 정수
-            return None
-        if denominator == 0:
-            return None
-        return Fraction(numerator, denominator)
-    return None
-
-
-def parse_exact_value(raw: object) -> ExactValue | None:
-    """답/재계산값 → 정확값. 정수·`p/q`·그 목록(`[1, 3, 6]`·`1, 3, 6`·JSON 배열)만 읽는다.
-
-    읽을 수 없으면 None — 호출자가 `unverifiable`(검증기) 또는 `unclear`(교차검증 판정기)로
-    돌린다. 소수(`0.5`)·부동소수(`73.0`)는 *정확하다고 말할 수 없으므로* 읽지 않는다.
-    """
-    if isinstance(raw, (list, tuple)):
-        if not raw:
-            return None
-        items = [_parse_scalar(item) for item in raw]
-        if any(item is None for item in items):
-            return None
-        return tuple(item for item in items if item is not None)
-    if isinstance(raw, str):
-        text = raw.strip()
-        bracketed = text.startswith("[") and text.endswith("]")
-        if bracketed:
-            text = text[1:-1]
-        if bracketed or "," in text:
-            parts = [_parse_scalar(part) for part in text.split(",")]
-            if not parts or any(part is None for part in parts):
-                return None
-            return tuple(part for part in parts if part is not None)
-        return _parse_scalar(text)
-    return _parse_scalar(raw)
-
-
-def _format_scalar(value: Fraction) -> str | None:
-    """정확 직렬화 — 4,300자리 변환 한도를 넘는 값은 None(말없이 잘라 쓰지 않는다)."""
-    if max(value.numerator.bit_length(), value.denominator.bit_length()) > _MAX_SERIALIZED_BITS:
-        return None
-    if value.denominator == 1:
-        return str(value.numerator)
-    return f"{value.numerator}/{value.denominator}"
-
-
-def format_exact_value(value: ExactValue) -> str:
-    """정확값 → 문자열(`73`·`1/2`·`[1, 3, 6]`). 직렬화할 수 없을 만큼 크면 빈 문자열."""
-    if isinstance(value, tuple):
-        parts = [_format_scalar(item) for item in value]
-        if any(part is None for part in parts):
-            return ""
-        return "[" + ", ".join(part for part in parts if part is not None) + "]"
-    return _format_scalar(value) or ""
-
-
 def _display(value: Fraction) -> str:
     """사유·서술용 표기 — 큰 값은 비트 수로 줄인다(사유 문자열 비대화 방지)."""
-    text = _format_scalar(value)
+    text = format_exact_scalar(value)
     if text is None:
         bits = max(value.numerator.bit_length(), value.denominator.bit_length())
         return f"(약 {bits}비트 값)"
@@ -394,8 +321,8 @@ def _parse_inits(raw: str, start: int, order: int) -> tuple[Fraction, ...]:
         if match is None:
             raise SequenceInductionError("초기항 형식 오류(a(정수)=정수 또는 a(정수)=p/q)")
         index = int(match.group(1))
-        value = _parse_scalar(match.group(2))
-        if value is None:
+        value = parse_exact_value(match.group(2))
+        if value is None or isinstance(value, tuple):
             raise SequenceInductionError("초기항 값을 읽을 수 없음(분모 0 등)")
         if index in found:
             raise SequenceInductionError(f"초기항 a({index}) 중복")

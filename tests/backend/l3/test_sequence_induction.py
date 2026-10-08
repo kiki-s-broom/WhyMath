@@ -384,7 +384,9 @@ def test_parse_exact_value_accepts(raw: object, expected: object) -> None:
 
 
 @pytest.mark.parametrize(
-    "raw", ["0.5", "73.0", 73.0, True, "", "1/0", "[]", [], "1,2,x", None, "7 3"]
+    "raw",
+    ["0.5", "73.0", 73.0, True, "", "1/0", "[]", [], "1,2,x", None, "7 3"]
+    + [["1", "x"], [1, 0.5], [1, True]],  # 리스트 입력의 원소 하나만 읽을 수 없어도 전체 거부
 )
 def test_parse_exact_value_rejects_inexact_or_unreadable(raw: object) -> None:
     assert parse_exact_value(raw) is None

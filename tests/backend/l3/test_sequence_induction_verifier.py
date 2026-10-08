@@ -466,3 +466,37 @@ def test_prompt_audit_passes_for_sequence_assets_and_catches_answer_leak() -> No
     undeclared[sysid] = clean[sysid].replace("정답은 주어지지 않는다", "정답은 알려 준다")
     assert undeclared[sysid] != clean[sysid]
     assert any(item.violations for item in audit_generation_prompts(undeclared, rails=rails))
+
+
+# ── ⑦ 경계 — 코어(cross_verify)는 어댑터(sequence_induction)를 import하지 않는다 ─────────
+def test_exact_value_parser_has_a_single_source_and_core_does_not_import_adapter() -> None:
+    """정확값 파서는 CORE 모듈 한 곳에만 있다 — 검증기와 판정기가 같은 함수를 쓴다.
+
+    `cross_verify`(CORE)가 `sequence_induction`(ADAPTER)을 직접 import하면 코어→어댑터 의존이
+    생긴다(경계 탐침 `tests/infra`가 CI에서 잡는 결함 — 이 슬라이스가 한 번 실제로 만들었다).
+    """
+    import ast
+    import inspect
+
+    from whymath_backend.l3 import cross_verify, exact_value, sequence_induction
+
+    assert cross_verify.parse_exact_value is exact_value.parse_exact_value
+    assert sequence_induction.parse_exact_value is exact_value.parse_exact_value
+    assert sequence_induction.format_exact_value is exact_value.format_exact_value
+    tree = ast.parse(inspect.getsource(cross_verify))
+    imported = {
+        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module
+    }
+    assert "whymath_backend.l3.sequence_induction" not in imported
+    stdlib_only = ast.parse(inspect.getsource(exact_value))
+    modules = {
+        alias.name.split(".")[0]
+        for node in ast.walk(stdlib_only)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module.split(".")[0]
+        for node in ast.walk(stdlib_only)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+    assert modules <= {"__future__", "re", "fractions"}, modules

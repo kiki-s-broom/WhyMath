@@ -58,6 +58,7 @@ from typing import Literal
 from whymath_backend.config import Settings
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
+from whymath_backend.l3.exact_value import parse_exact_value
 from whymath_backend.l3.interfaces import LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CallSite,
@@ -73,7 +74,6 @@ from whymath_backend.l3.router import (
     actual_cost_krw,
     langfuse_fields,
 )
-from whymath_backend.l3.sequence_induction import parse_exact_value
 
 # 학생 요청 라우팅 신호 기본값 — 6개 호출부 공용 단일 좌석(OPS-18, `api/visualization.py` 미러).
 _STUDENT_ESCALATION_DEFAULTS = default_student_escalation_signals()

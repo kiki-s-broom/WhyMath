@@ -817,7 +817,7 @@ CATALOG: tuple[Spec, ...] = (
        "l3.safe_parse"),
     _e("WM-E-356", "SymPy 불가 영역 검산(유한확률 전수·통계 자료형·수열 귀납)", "Platform",
        "Math Engine", "P1", "A3 비대수 앵커 — S4-13/53/66", "l3.finite_probability",
-       "l3.statistical_claim", "l3.sequence_induction"),
+       "l3.statistical_claim", "l3.sequence_induction", "l3.exact_value"),
     _e("WM-E-357", "다중 풀이법 생성(접근법 6종)", "Platform", "Math Engine", "P2",
        "C6 이월 — S4-10 done", "l3.multi_solution"),
     _e("WM-E-358", "표기 커버리지 게이트", "Admin", "Math Engine", "P1",
