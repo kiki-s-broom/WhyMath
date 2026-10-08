@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,11 +17,12 @@ acceptance:
   - "③ 배선한다면 tests/infra 배선 실재성 테스트를 동반한다 — run: 문자열이 실제 CI/유닛에 박혀 있는지 기계 확인(OPS-10 test_test_suite_wiring.py 선례). '저장소에 존재함'과 '돌아감'은 다르다. 응답 0행인 현재는 no-op으로 도는 것이 정상이며 그 사실을 로그가 말해야 한다(침묵 실패 금지)."
   - "④ 정답률·CTT 변별도 산출은 S4-15 승계 — historical_correct_rate·rate_top/mid/low_grade·discrimination_D·irt_a는 쓰기 코드 0건이나 이는 S3-01 파일럿 잠금의 정상 상태다. 이 태스크는 IRT 축과 관측만 다룬다(중복 등재 금지)."
   - "⑤ 스코프 밖 — 5축 세분 난이도 채움(l3/equivalent/difficulty.py가 '추정 근거 없는 축을 날조하지 않는다'고 명시한 판정 존중)·난이도 8축 신규 필드 증설(1차 §2-④ 승계·anti-explosion)."
-artifacts: []
+artifacts:
+  - "PR kiki-s-broom/WhyMath#1542 (https://github.com/kiki-s-broom/WhyMath/pull/1542) · 커밋 5ab52403 · 판정 기준 브랜치 claude/happy-heisenberg-19wlhj(미머지)"
 paths:
   - src/backend/whymath_backend/l2/calibrate_items.py
   - "src/backend/whymath_backend/harness/**"
   - "tests/infra/**"
-session: claude/happy-heisenberg-19wlhj
-notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G4·§2 기능19. R1·R2는 기능 19를 '실학생 응답 0이라 S4-15 정상 잠금'으로 판정했으나 R3 실측이 한 겹 더 드러냈다 — 응답이 생겨도 루프는 자동으로 돌지 않는다. 스케줄 좌석이 저장소 밖(ops)으로 위임됐는데 그 좌석의 실재를 확인하는 관측이 없다. CLAUDE.md '작동 신호 없는 알고리즘 부착 금지 — 작동한 비율 원칙' 해당.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/D3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
+session: null
+notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G4·§2 기능19. R1·R2는 기능 19를 '실학생 응답 0이라 S4-15 정상 잠금'으로 판정했으나 R3 실측이 한 겹 더 드러냈다 — 응답이 생겨도 루프는 자동으로 돌지 않는다. 스케줄 좌석이 저장소 밖(ops)으로 위임됐는데 그 좌석의 실재를 확인하는 관측이 없다. CLAUDE.md '작동 신호 없는 알고리즘 부착 금지 — 작동한 비율 원칙' 해당.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/D3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[미러 면제 2026-10-08] ci_mirror의 backend·data-pipeline·declared-unwired-audit·corpus-authoring 잡은 설치 스텝이 uv venv에 pip 부재로 실패(환경, 코드 아님). 통과한 미러 잡: infra-contracts·infra-shell·policy-guard·harness-integrity. 나머지는 수동 재현: ruff·black·mypy --strict·lint-imports 종료 0, 백엔드 전체 pytest 16805 passed(+data_pipeline 설치 후 수집 오류 8파일 127 passed), declared_unwired_audit 통과"
 updated: 2026-10-08
