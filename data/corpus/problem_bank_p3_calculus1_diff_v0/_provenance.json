@@ -29,7 +29,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 31,
-      "distinct_skeletons": 34,
+      "distinct_skeletons": 37,
       "generator": "p3_diff_power_derivative_skeleton_generator.P3DiffPowerDerivativeGenerator"
     },
     "[12미적Ⅰ-02-04]": {
@@ -119,7 +119,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 33,
-      "distinct_skeletons": 66,
+      "distinct_skeletons": 65,
       "generator": "p3_diff_velocity_acceleration_skeleton_generator.P3DiffVelocityAccelerationGenerator"
     }
   },

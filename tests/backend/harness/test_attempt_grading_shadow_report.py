@@ -894,7 +894,10 @@ class TestCorpusVerifyBlockSupply:
         # 개수형(answer_map 빔)으로 바꿨다. 02-05 -2: 숙련도 삼차 접선의 판별식 조건에 다른 접선을 빼는 보호
         # 조건이 붙어 목록이 됐다. 02-06 -3: 진단·응용 틀 교체로 c값 문항(방정식 + 열린구간 경계 목록)이 늘었다.
         # 로더가 문자열 조건만 읽는 계약은 그대로다(무약화 — 빠진 23건은 목록·빈 answer_map 형태라 제외).
-        assert len(blocks) == 13819
+        # 13,819 → 13,817(-2): P3-03 7회차 교정(은행 감사 3회차)이 02-05 오개념 유발 'y = x^2 위의 점의 접선
+        # 기울기' 틀(문자열 조건 2건)을 삼차곡선 y = x^3 + qx로 바꿔 두 근 ±a 중 양수를 'a > 0'으로 고르는 목록
+        # 조건이 됐다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
+        assert len(blocks) == 13817
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.

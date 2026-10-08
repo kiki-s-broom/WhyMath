@@ -293,25 +293,31 @@ def _rep_frames() -> list[Frame]:
         )
 
     def r4(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사(2026-10-08) 처분 — k만 물으면 지수를 줄이지 않는 오개념(c·n·x^n)도 k = cn을
+        # 맞혔다(02-03 판정자 지적 76a9f5ac와 같은 원리 · 판정기 T-power-path-coincidence). 계수와
+        # 지수가 모두 맞아야 나오는 k + m을 묻는다(오답 경로 cn + n · c + n - 1). 미지수는 하나만
+        # 두므로 SymPy로 구한 지수 m을 조건에 대입한다.
         c, n = _int(p[0]), _int(p[1])
         f: Poly = ((n, c),)
         d = derivative_of(f)
         ((m_exp, k_coef),) = d
+        total = k_coef + m_exp
         return DiffItem(
             slot="representative",
-            frame_id="rep-constant-multiple-coefficient",
+            frame_id="rep-constant-multiple-coefficient-plus-exponent",
             question_text=(
                 f"함수 f(x) = {render_poly(f)}의 도함수 f'(x)를 kx^m (k, m은 상수) 꼴로 "
-                "나타낼 때, k의 값을 구하시오."
+                "나타낼 때, k + m의 값을 구하시오."
             ),
-            answer_text=str(k_coef),
+            answer_text=str(total),
             explanation=(
-                f"상수배의 미분법에 따라 도함수는 {render_poly(d)}이므로 k는 {k_coef}이다."
+                f"상수배의 미분법에 따라 도함수는 {render_poly(d)}이므로 k = {k_coef}, "
+                f"m = {m_exp}이고 k + m = {total}이다."
             ),
-            conditions=f"{_deriv_sym(poly_to_sympy_str(f), '2')} = k*2**{m_exp}",
-            answer_map=(("k", str(k_coef)),),
+            conditions=f"{_deriv_sym(poly_to_sympy_str(f), '2')} = (s - {m_exp})*2**{m_exp}",
+            answer_map=(("s", str(total)),),
             problem_type_code=_EVAL,
-            answer_format=_fmt(k_coef),
+            answer_format=_fmt(total),
         )
 
     def r5(p: tuple[object, ...]) -> DiffItem | None:
@@ -374,7 +380,7 @@ def _rep_frames() -> list[Frame]:
             r3,
         ),
         Frame(
-            "rep-constant-multiple-coefficient",
+            "rep-constant-multiple-coefficient-plus-exponent",
             _grid("p3-poly:r4", (2, 3, 4, 5, 6, 7), (2, 3, 4, 5, 6)),
             r4,
         ),
@@ -1019,19 +1025,22 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     def d6(p: tuple[object, ...]) -> DiffItem | None:
-        c, n = _int(p[0]), _int(p[1])
+        # 7회차 감사(2026-10-08) 처분 — 종전 틀은 늘 f'(1)을 물어 거듭제곱 하나(c·x^n)의 지수를
+        # 줄이지 않는 오개념(c·n·x^n)도 같은 값을 냈다(02-03 판정자 지적 cbde3ec3와 같은 원리 ·
+        # 판정기 T-power-path-coincidence). 평가점을 1이 아닌 수로 둔다.
+        c, n, a = _int(p[0]), _int(p[1]), _int(p[2])
         f: Poly = ((n, c),)
-        value = eval_at(derivative_of(f), 1)
+        value = eval_at(derivative_of(f), a)
         return DiffItem(
             slot="diagnostic",
             frame_id="diag-constant-multiple-value",
-            question_text=f"함수 f(x) = {render_poly(f)}에 대하여 f'(1)의 값을 구하시오.",
+            question_text=f"함수 f(x) = {render_poly(f)}에 대하여 f'({a})의 값을 구하시오.",
             answer_text=str(value),
             explanation=(
                 f"상수배의 미분법에 따라 도함수는 {render_poly(derivative_of(f))}이므로 "
-                f"f'(1)의 값은 {value}이다."
+                f"f'({a})의 값은 {value}이다."
             ),
-            conditions=_deriv_sym(poly_to_sympy_str(f), "1") + " = y",
+            conditions=_deriv_sym(poly_to_sympy_str(f), str(a)) + " = y",
             answer_map=(("y", str(value)),),
             problem_type_code=_EVAL,
             answer_format=_fmt(value),
@@ -1057,7 +1066,7 @@ def _diagnostic_frames() -> list[Frame]:
         ),
         Frame(
             "diag-constant-multiple-value",
-            _grid("p3-poly:d6", (2, 3, 4, 5, 6, 7), (2, 3, 4, 5)),
+            _grid("p3-poly:d6", (2, 3, 4, 5, 6, 7), (2, 3, 4, 5), (-1, 2, -2)),
             d6,
         ),
     ]

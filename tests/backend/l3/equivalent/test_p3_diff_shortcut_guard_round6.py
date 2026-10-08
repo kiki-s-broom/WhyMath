@@ -39,6 +39,7 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     POST_QUALIFICATION_RULE_IDS,
     ROUND5_RULE_IDS,
     ROUND6_RULE_IDS,
+    ROUND7_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     extremum_point_count,
@@ -169,11 +170,16 @@ def test_round6_defects_are_caught_by_the_matching_rule_family(
 
 # ── ② 변별 ─────────────────────────────────────────────────────────────────
 def test_round6_bank_passes_every_earlier_rule(audited: dict[str, dict[str, object]]) -> None:
-    """감사 은행은 5회차 규칙으로 빌드됐다 — 6회차 이전 규칙은 504건 중 0건을 잡는다(새 규칙이 일했다)."""
+    """감사 은행은 5회차 규칙으로 빌드됐다 — 6회차 이전 규칙은 504건 중 0건을 잡는다(새 규칙이 일했다).
+
+    6회차 *뒤에* 더한 회차 규칙(7회차 — `ROUND7_RULE_IDS`)도 빼고 본다: 그 규칙은 이 은행을 빌드할 때
+    없었다(회차별 측정은 그 회차의 규칙 집합으로 한다)."""
     earlier = [
         pid[:8]
         for pid, r in audited.items()
-        if {v.rule for v in shortcut_violations(probe_from_record(r))} - ROUND6_RULE_IDS
+        if {v.rule for v in shortcut_violations(probe_from_record(r))}
+        - ROUND6_RULE_IDS
+        - ROUND7_RULE_IDS
     ]
     assert earlier == []
 
@@ -631,11 +637,14 @@ def test_every_round6_rule_has_red_and_green_controls(
     green = {rule for rule, _ in _green_cases(by_prefix)}
     assert red == ROUND6_RULE_IDS
     assert green == ROUND6_RULE_IDS
-    # 6회차 규칙은 RULE_IDS의 꼬리 구간이고(회차 순서) 5회차와 겹치지 않는다. 자격 측정 뒤 회차 규칙 전부가
-    # 투표 제외 집합이다.
-    assert list(RULE_IDS[-len(ROUND6_RULE_IDS) :]) == [r for r in RULE_IDS if r in ROUND6_RULE_IDS]
+    # 6회차 규칙은 RULE_IDS에서 7회차 첫 규칙 바로 앞까지의 연속 구간이고(회차 순서) 5회차와 겹치지 않는다.
+    # 자격 측정 뒤 회차 규칙 전부가 투표 제외 집합이다.
+    start = RULE_IDS.index("M-link-contradictory")
+    end = RULE_IDS.index("T05-quadratic-slope")
+    assert list(RULE_IDS[start:end]) == [r for r in RULE_IDS if r in ROUND6_RULE_IDS]
     assert not ROUND5_RULE_IDS & ROUND6_RULE_IDS
-    assert POST_QUALIFICATION_RULE_IDS == ROUND5_RULE_IDS | ROUND6_RULE_IDS
+    assert not ROUND6_RULE_IDS & ROUND7_RULE_IDS
+    assert POST_QUALIFICATION_RULE_IDS == ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
     assert {"T-ratio-shortcut", "T-derivative-roots-coincidence", "T09-factored-level"} == (
         COINCIDENCE_RULE_IDS & ROUND6_RULE_IDS
     )

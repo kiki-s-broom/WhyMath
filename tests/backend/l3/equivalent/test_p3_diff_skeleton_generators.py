@@ -595,8 +595,10 @@ def test_items_are_deterministic_across_cache_rebuilds(
 # 슬롯 불변식(`_validate_slot`) — 위반이 빌드 시점에 멈추는지(가드의 변별력)
 # ──────────────────────────────────────────────────────────────────────────
 #: 가짜 문항의 검산 조건 — 빌드가 풀이 단계(`verify.solution_steps`)를 도출할 수 있어야 한다
-#: (`_validate_slot`이 문항마다 전이 전건 correct인 연쇄를 만든다). f(x) = x의 x = 1 미분계수 = 1.
-_DERIVABLE = "Derivative(x, x).doit().subs(x, 1) = y"
+#: (`_validate_slot`이 문항마다 전이 전건 correct인 연쇄를 만든다). f(x) = x의 x = 2 미분계수 = 1.
+#: (7회차: x = 1이면 'power-rule-step-omitted' 선지 문항에서 지수 유지 경로 1·x^1도 1이라 판정기
+#: T-power-path-coincidence에 걸린다 — 가짜 문항은 *건강한* 등록부여야 하므로 x = 2에서 잰다.)
+_DERIVABLE = "Derivative(x, x).doit().subs(x, 2) = y"
 
 
 def _item(

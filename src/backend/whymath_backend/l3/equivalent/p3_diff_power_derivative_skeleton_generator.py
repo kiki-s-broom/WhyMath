@@ -127,21 +127,30 @@ def _deriv_form_item(
     ask: str,
     var: str = "x",
 ) -> DiffItem:
-    """x^n의 도함수 c·x^m 꼴에서 c(계수) 또는 m(지수)을 스칼라로 묻는 문항.
+    """x^n의 도함수 c·x^m 꼴에서 c + m(`ask='sum'`) 또는 c와 m의 곱(`ask='product'`)을 묻는 문항.
 
     정답은 SymPy로 구한 도함수의 항(`derivative_of`)에서 읽고, 검산 조건은 x = 2에서의 평가
-    (`c·2^m`)로 미지수 1개만 남긴다. 단항식 c·x^m은 한 점의 값이 (다른 하나를 알 때) 나머지를
-    유일하게 정한다.
+    (`c·2^m`)로 미지수 1개만 남긴다 — 묻는 값 s(= c + m)·p(= c·m)와 SymPy로 구한 지수 m으로 c를
+    (s - m)·(p/m)로 쓴다. 단항식 c·x^m은 한 점의 값이 (m을 알 때) c를 유일하게 정한다.
     """
     d = derivative_of(_mono(n), var)
     ((m_exp, c_coef),) = d
     expr = f"Derivative({var}**{n}, {var}).doit().subs({var}, 2)"
-    if ask == "c":
-        condition = f"{expr} = c*2**{m_exp}"
-        value, note = c_coef, "계수"
-    else:
-        condition = f"{expr} = {c_coef}*2**m"
-        value, note = m_exp, "지수"
+    # 7회차 감사(2026-10-08) 처분 — c만 묻으면 지수를 줄이지 않는 오개념(n·x^n)도 c = n을, m만
+    # 묻으면 계수를 내리지 않는 오개념(x^(n - 1))도 m = n - 1을 맞힌다(판정자 지적 76a9f5ac · 판정기
+    # T-power-path-coincidence). 두 단계가 모두 맞아야 나오는 c + m · c와 m의 곱을 묻는다(오답
+    # 경로는 각각 n · 2n, n - 1 · n^2). 미지수는 하나만 두므로 생성기가 SymPy로 구한 지수 m을 조건에
+    # 대입한다.
+    if ask == "sum":
+        symbol, value = "s", c_coef + m_exp
+        condition = f"{expr} = (s - {m_exp})*2**{m_exp}"
+        tail = f"c = {c_coef}, m = {m_exp}이고 c + m = {value}이다."
+    elif ask == "product":
+        symbol, value = "p", c_coef * m_exp
+        condition = f"{expr} = (p/{m_exp})*2**{m_exp}"
+        tail = f"c = {c_coef}, m = {m_exp}이고 c와 m의 곱은 {value}이다."
+    else:  # pragma: no cover — 호출 오류
+        raise ValueError(f"알 수 없는 질문: {ask}")
     return DiffItem(
         slot=slot,
         frame_id=frame_id,
@@ -149,11 +158,10 @@ def _deriv_form_item(
         answer_text=str(value),
         explanation=(
             f"거듭제곱의 미분법에 따라 지수 {with_eul_reul(n)} 앞으로 내리고 지수를 1 줄이면 "
-            f"{render_poly(_mono(n), var)}의 도함수는 {render_poly(d, var)}이므로 "
-            f"{with_eun_neun(note)} {value}이다."
+            f"{render_poly(_mono(n), var)}의 도함수는 {render_poly(d, var)}이므로 {tail}"
         ),
         conditions=condition,
-        answer_map=((ask, str(value)),),
+        answer_map=((symbol, str(value)),),
         problem_type_code=_EVAL,
         answer_format=_fmt(value),
     )
@@ -208,38 +216,42 @@ def _rep_frames() -> list[Frame]:
         params = tuple((n,) for n in seeded_order(f"p3-power:{frame_id}", _N_RANGE))
         return Frame(frame_id, params, build)
 
+    # 7회차 감사 처분 — c만·m만 묻던 다섯 틀을 c + m · c와 m의 곱으로 바꿨다(`_deriv_form_item`
+    # 참조).
     return [
         make(
-            "rep-coefficient-of-derivative",
-            "함수 f(x) = x^{n}의 도함수 f'(x)를 cx^m (c, m은 상수) 꼴로 나타낼 때, c의 값을 "
+            "rep-coefficient-plus-exponent",
+            "함수 f(x) = x^{n}의 도함수 f'(x)를 cx^m (c, m은 상수) 꼴로 나타낼 때, c + m의 값을 "
             "구하시오.",
-            "c",
+            "sum",
         ),
         make(
-            "rep-exponent-of-derivative",
-            "함수 f(x) = x^{n}의 도함수 f'(x)를 cx^m (c, m은 상수) 꼴로 나타낼 때, m의 값을 "
+            "rep-coefficient-times-exponent",
+            "함수 f(x) = x^{n}의 도함수 f'(x)를 cx^m (c, m은 상수) 꼴로 나타낼 때, c와 m의 곱을 "
             "구하시오.",
-            "m",
+            "product",
         ),
         make(
-            "rep-coefficient-in-t",
+            "rep-coefficient-plus-exponent-in-t",
             "함수 g(t) = t^{n}{eul} t에 대하여 미분한 도함수를 ct^m (c, m은 상수) 꼴로 "
-            "나타낼 때, c의 값을 구하시오.",
-            "c",
+            "나타낼 때, c + m의 값을 구하시오.",
+            "sum",
             var="t",
         ),
         make(
-            "rep-curve-derivative-exponent",
+            "rep-curve-coefficient-times-exponent",
             # '곡선의 도함수'는 대상 혼동이다(도함수는 함수가 갖는다 — 2차 감사 결함).
-            "함수 y = x^{n}의 도함수를 y' = cx^m (c, m은 상수) 꼴로 나타낼 때, m의 값을 "
+            "함수 y = x^{n}의 도함수를 y' = cx^m (c, m은 상수) 꼴로 나타낼 때, c와 m의 곱을 "
             "구하시오.",
-            "m",
+            "product",
         ),
         make(
-            "rep-leading-coefficient-of-derivative",
-            "함수 f(x) = x^{n}{eul} x에 대하여 미분했을 때 도함수의 계수 c를 구하시오. "
-            "(도함수는 cx^m 꼴이다.)",
-            "c",
+            "rep-derivative-coefficient-plus-exponent",
+            # 'c + m'의 m이 발문에서 상수로 선언돼야 한다(2차 감사 미선언 상수 부류 —
+            # `p3_diff_text_scanner`의 undeclared_constant).
+            "함수 f(x) = x^{n}{eul} x에 대하여 미분했을 때 도함수의 계수 c와 지수 m의 합 c + m을 "
+            "구하시오. (도함수는 cx^m 꼴이고, c, m은 상수이다.)",
+            "sum",
         ),
     ]
 
@@ -361,14 +373,17 @@ def _basic_frames() -> list[Frame]:
         Frame("basic-value-of-derivative", _grid("p3-power:b1", _N_VALUE_RANGE, _POINTS), b1),
         Frame("basic-differential-coefficient", _grid("p3-power:b2", _N_VALUE_RANGE, _POINTS), b2),
         Frame("basic-coefficient-at-point", _grid("p3-power:b3", _N_VALUE_RANGE, _POINTS), b3),
+        # 7회차 감사 — x = 1은 지수를 줄이지 않는 오개념(n·x^n)도 같은 값이라 매개변수 거부
+        # 조건(T-power-path-coincidence)이 건너뛴다. 그 자리를 x = 4(값이 1000을 넘는다) 대신 음수인
+        # 점으로 채운다.
         Frame(
             "basic-sum-of-two-values",
-            _grid("p3-power:b4", (2, 3, 4), (3, 4, 5), (1, 2, 3, 4)),
+            _grid("p3-power:b4", (2, 3, 4), (3, 4, 5), (-1, 2, -2, 3)),
             b4,
         ),
         Frame(
             "basic-difference-of-two-values",
-            _grid("p3-power:b5", (2, 3, 4), (3, 4, 5), (1, 2, 3, 4)),
+            _grid("p3-power:b5", (2, 3, 4), (3, 4, 5), (-1, 2, -2, 3)),
             b5,
         ),
         Frame(
@@ -531,22 +546,28 @@ def _applied_frames() -> list[Frame]:
         )
 
     def a6(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사(2026-10-08) 처분 — 종전 '도함수가 f'(x) = 8x^7일 때 n'은 계수를 내리지 않는
+        # 오개념(x^(n - 1))이 지수 비교로, 지수를 줄이지 않는 오개념(n·x^n)이 계수 비교로 n = 8을 늘
+        # 맞혔다(판정기 T-power-path-coincidence의 주어진 도함수 꼴 절 — 76a9f5ac와 같은 원리).
+        # 도함수의 지수만 주고 계수 k를 묻는다: 지수 n - 1 = 7에서 n = 8을 정한 뒤 계수 k = n = 8을
+        # 읽어야 한다 (계수 누락이면 k = 1, 지수 유지면 n = 7·k = 7). n은 생성기가 정하고 조건에
+        # 대입한다(미지수 k 하나).
         n = int(str(p[0]))
         return DiffItem(
             slot="applied",
-            frame_id="applied-exponent-from-derivative-form",
+            frame_id="applied-coefficient-from-derivative-exponent",
             question_text=(
-                f"함수 f(x) = x^n (n은 2 이상의 자연수)의 도함수가 f'(x) = {n}x^{n - 1}일 때, "
-                "n의 값을 구하시오."
+                f"함수 f(x) = x^n (n은 2 이상의 자연수)의 도함수가 f'(x) = kx^{n - 1} (k는 상수)일 "
+                "때, k의 값을 구하시오."
             ),
             answer_text=str(n),
             explanation=(
                 "거듭제곱의 미분법에 따라 원래 함수의 지수 n이 도함수의 계수가 되고 지수는 n - 1이 "
-                f"되므로 f'(x) = nx^(n - 1)이다. 계수를 비교하면 n = {n}이고, 이때 도함수의 지수 "
-                f"n - 1 = {n - 1}도 주어진 식과 맞는다."
+                f"되므로 f'(x) = nx^(n - 1)이다. 지수를 비교하면 n - 1 = {n - 1}이므로 "
+                f"n = {n}이고, 계수를 비교하면 k = n = {n}이다."
             ),
-            conditions=f"Derivative(x**n, x).doit().subs(x, 2) = {n}*2**{n - 1}",
-            answer_map=(("n", str(n)),),
+            conditions=f"Derivative(x**{n}, x).doit().subs(x, 2) = k*2**{n - 1}",
+            answer_map=(("k", str(n)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(n),
         )
@@ -560,7 +581,9 @@ def _applied_frames() -> list[Frame]:
             "applied-difference-from-f-prime-one", _grid("p3-power:a5", (2, 3, 4), (2, 3, 4)), a5
         ),
         Frame(
-            "applied-exponent-from-derivative-form", _grid("p3-power:a6", tuple(range(2, 10))), a6
+            "applied-coefficient-from-derivative-exponent",
+            _grid("p3-power:a6", tuple(range(2, 10))),
+            a6,
         ),
     ]
 
@@ -753,13 +776,17 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     def d3(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사(2026-10-08) 처분 — 종전 'f'(1)'은 x = 1이라 지수를 줄이지 않는 오개념(n·x^n)도
+        # 같은 값 n을 냈다(판정자 지적 cbde3ec3 · 판정기 T-power-path-coincidence). x = -2에서
+        # 묻는다 — 지수 유지면 부호까지 뒤집힌 2배(n·(-2)^n), 계수 누락이면 (-2)^(n - 1)로 모두
+        # 갈린다.
         n = int(str(p[0]))
         return _value_item(
             slot="diagnostic",
-            frame_id="diag-derivative-at-one",
-            text=f"함수 f(x) = x^{n}에 대하여 f'(1)의 값을 구하시오.",
+            frame_id="diag-derivative-at-minus-two",
+            text=f"함수 f(x) = x^{n}에 대하여 f'(-2)의 값을 구하시오.",
             n=n,
-            point=1,
+            point=-2,
         )
 
     def d4(p: tuple[object, ...]) -> DiffItem | None:
@@ -808,7 +835,12 @@ def _diagnostic_frames() -> list[Frame]:
             tuple((a,) for a in seeded_order("p3-power:d2", (-5, -4, -3, -2, -1, 1, 2, 3, 4, 5))),
             d2,
         ),
-        Frame("diag-derivative-at-one", order("d3"), d3),
+        # 지수 2..6 — 진단 문항의 값이 너무 커지지 않게(n = 9면 9·2^8 = 2304).
+        Frame(
+            "diag-derivative-at-minus-two",
+            tuple((n,) for n in seeded_order("p3-power:d3", tuple(range(2, 7)))),
+            d3,
+        ),
         Frame("diag-derivative-at-minus-one", order("d4"), d4),
         # 지수 3 이상 — n = 2이면 2^(n - 1) = 2^1 표기가 생기고(지수 1 표기 결함 부류) 비율이 1이다.
         Frame(
@@ -924,7 +956,9 @@ def _mastery_frames() -> list[Frame]:
     return [
         Frame(
             "mastery-sum-of-three-values",
-            _grid("p3-power:k1", (2, 3), (4, 5), (6, 7), (1, 2, 3)),
+            # 7회차 감사 — x = 1은 매개변수 거부 조건이 건너뛴다(위 basic 틀과 같은 이유) · x = 3은
+            # 값이 5000을 넘는다.
+            _grid("p3-power:k1", (2, 3), (4, 5), (6, 7), (-1, 2, -2)),
             k1,
         ),
         Frame("mastery-find-exponent-then-evaluate", _grid("p3-power:k2", (2, 3, 4, 5, 6)), k2),

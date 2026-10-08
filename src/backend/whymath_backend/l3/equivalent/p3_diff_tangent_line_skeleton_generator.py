@@ -26,6 +26,12 @@
     않으므로(산술 재확인) 독립 검산은 테스트(`test_p3_diff_tangent_velocity_generators`)가
     극한 정의·SymPy solve로 맡는다.
 
+7회차 감사(은행 감사 3회차 · 2026-10-08) 처분: 접선의 기울기(주어진 값·평행·수직)로 접점을 찾는 틀과
+두 점의 접선 기울기 틀까지 곡선을 **삼차 이상**으로 바꿨다 — 이차곡선이면 기울기 m인 직선과 연립한
+이차방정식의 중근(판별식·근과 계수의 관계)이 접점·기울기를 미분 없이 준다(판정기
+T05-quadratic-slope). 이 파일에 이차곡선이 남은 곳은 숙련도 '두 곡선이 접한다'의 미지 곡선족 y = x^2
++ px + q뿐이다(상대 곡선이 삼차라 차가 삼차다).
+
 범위(이 개념에 한정): 다항함수 곡선의 접선(접점이 주어지거나 기울기·통과점으로 접점을 찾는 것).
 **법선·접선 길이·삼각함수 곡선은 다루지 않는다**("김에 같이" 금지). 함수식(직선의 방정식)을 답으로
 하는 문항은 만들지 않는다(채점 계약상 스칼라 단일 미지수 답만 — 기울기·y절편·접점·상수·넓이로
@@ -83,7 +89,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul, eun_neun, i_ga, wa_gwa
+from whymath_backend.lang.josa import eul_reul, eun_neun, euro_ro, i_ga, wa_gwa
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffTangentLineGenerator"]
@@ -227,16 +233,6 @@ def _as_int(obj: object) -> int:
     return int(str(obj))
 
 
-def _quad_pool() -> tuple[object, ...]:
-    """A x^2 + b x + c (A ∈ {1, 2, -1, 3}) — 이중근(판별식) 검산이 가능한 이차 곡선."""
-    return tuple(
-        _poly({2: lead, 1: b, 0: c})
-        for lead in (1, 2, -1, 3)
-        for b in range(-4, 5)
-        for c in range(-5, 6)
-    )
-
-
 def _cubic_pool() -> tuple[object, ...]:
     return tuple(
         _poly({3: lead, 2: b, 1: c, 0: d})
@@ -257,8 +253,35 @@ def _quartic_pool() -> tuple[object, ...]:
     )
 
 
-def _mixed_pool() -> tuple[object, ...]:
-    return (*_quad_pool()[::5], *_cubic_pool()[::23])
+def _slope_pool() -> tuple[object, ...]:
+    """기울기·접점 틀의 곡선 풀 — 삼차만(7회차 감사: 이차곡선은 판별식·근과 계수의 관계로 기울기와
+    접점이 미분 없이 나온다 · 판정기 T05-quadratic-slope). 종전 풀은 이차 곡선을 섞었다."""
+    return _cubic_pool()[::7]
+
+
+def _slope_point_slope(f: Poly, a0: int) -> int | None:
+    """기울기가 f'(a0)인 접선의 접점 중 x좌표가 양수인 것이 a0 하나뿐일 때 그 기울기 m(아니면 None).
+
+    7회차 감사(2026-10-08) 처분 — 접선의 기울기(주어진 값·평행·수직)로 접점의 x좌표 a를 묻는 틀이
+    이차곡선을 쓰면, 기울기 m인 직선과 연립한 이차방정식의 중근(판별식 = 0)이 곧 접점이라 미분 없이
+    풀렸다(판정자 지적 4d287bbd·1006bee0·5209729b · 판정기 T05-quadratic-slope). 곡선을 **삼차**로
+    쓰면 f'(x) = m이 이차방정식이 되어 근 둘 중 양수인 것을 발문의 '양수 a' 조건으로 고른다(조건이
+    실제로 일한다 — 이차곡선에서는 해가 하나라 '양수'가 공허했다). 해설이 인수분해 → '양수이므로'로
+    끝나도록 두 근이 모두 유리수인 매개변수만 쓴다(삼차의 f'(x) = m은 근의 합이 유리수라 한 근이
+    정수면 다른 근도 유리수다). 기울기 0(수평 접선)은 쓰지 않는다.
+    """
+    if sympy.degree(poly_to_sympy(f), _X) < 3:
+        return None
+    m = eval_at(derivative_of(f), a0)
+    if m == 0:
+        return None
+    a = sympy.Symbol("a")
+    roots = sympy.roots(sympy.Poly(sympy.diff(poly_to_sympy(f), _X).subs(_X, a) - m, a))
+    if sum(roots.values()) != 2 or any(not r.is_rational for r in roots):
+        return None
+    if [r for r in roots if r > 0] != [a0]:
+        return None
+    return m
 
 
 _POINTS: Final[tuple[object, ...]] = (-3, -2, -1, 1, 2, 3, 4)
@@ -534,16 +557,10 @@ def _rep_frames() -> list[Frame]:
         )
 
     def r6(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사 처분 — 이차곡선이면 판별식(중근)으로 접점이 나왔다(`_slope_point_slope` 참조).
         f, a0 = _as_poly(p[0]), _as_int(p[1])
-        m = eval_at(derivative_of(f), a0)
-        if m == 0:
-            # 4차 감사 bad_tag — 포물선에서 기울기 0인 접점은 꼭짓점이라 -b/(2a)로 풀린다
-            # (판정기 T05-vertex-tangent).
-            return None
-        t = sympy.Symbol("t")
-        d_expr = sympy.diff(poly_to_sympy(f), _X).subs(_X, t) - m
-        found = _pick(_solve_real(d_expr, t), lambda r: r > 0)
-        if found != a0:
+        m = _slope_point_slope(f, a0)
+        if m is None:
             return None
         return DiffItem(
             slot=slot,
@@ -570,7 +587,7 @@ def _rep_frames() -> list[Frame]:
         for c in (-6, -3, -1, 2, 4)
         for d in (-4, -1, 2, 5)
     )
-    quad_a = _grid("p3-tan:r6", _quad_pool()[::4], _POS_POINTS)
+    slope_point = _grid("p3-tan:r6", _cubic_pool()[::11], _POS_POINTS)
     return [
         Frame("rep-slope-at-point", _grid("p3-tan:r1", _cubic_pool()[::9], _POINTS), r1),
         Frame("rep-slope-at-x-coordinate", _grid("p3-tan:r2", _quartic_pool()[::7], _POINTS), r2),
@@ -589,7 +606,7 @@ def _rep_frames() -> list[Frame]:
             _grid("p3-tan:r5", base_pool, (-4, -3, -2, -1, 1, 2, 3, 4), (1, 2, 3, -1, -2)),
             r5,
         ),
-        Frame("rep-find-point-for-slope", quad_a, r6),
+        Frame("rep-find-point-for-slope", slope_point, r6),
     ]
 
 
@@ -777,12 +794,12 @@ def _basic_frames() -> list[Frame]:
         Frame("basic-slope-of-function-graph", _grid("p3-tan:b1", cubics[3::17], _POINTS), b1),
         Frame(
             "basic-slope-sum-at-two-points",
-            _grid("p3-tan:b2", _mixed_pool(), (-2, -1, 0, 1), (1, 2, 3)),
+            _grid("p3-tan:b2", _slope_pool(), (-2, -1, 0, 1), (1, 2, 3)),
             b2,
         ),
         Frame(
             "basic-slope-difference-at-two-points",
-            _grid("p3-tan:b3", _mixed_pool()[1::2], (-2, -1, 0, 1), (1, 2, 3)),
+            _grid("p3-tan:b3", _slope_pool()[1::2], (-2, -1, 0, 1), (1, 2, 3)),
             b3,
         ),
         Frame("basic-y-intercept-of-cubic-tangent", _grid("p3-tan:b4", cubics[5::29], _POINTS), b4),
@@ -798,15 +815,11 @@ def _applied_frames() -> list[Frame]:
     slot = "applied"
 
     def a1(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사 처분 — 이차곡선이면 판별식(중근)으로 접점이 나왔다(판정자 지적 5209729b ·
+        # `_slope_point_slope` 참조).
         f, a0 = _as_poly(p[0]), _as_int(p[1])
-        m = eval_at(derivative_of(f), a0)
-        if m == 0:
-            return None
-        t = sympy.Symbol("t")
-        found = _pick(
-            _solve_real(sympy.diff(poly_to_sympy(f), _X).subs(_X, t) - m, t), lambda r: r > 0
-        )
-        if found != a0:
+        m = _slope_point_slope(f, a0)
+        if m is None:
             return None
         n = 3 * m - 2  # 평행한 직선의 y절편(값은 답과 무관한 장식)
         return DiffItem(
@@ -830,15 +843,10 @@ def _applied_frames() -> list[Frame]:
         )
 
     def a2(p: tuple[object, ...]) -> DiffItem | None:
+        # 7회차 감사 처분 — 이차곡선이면 판별식(중근)으로 접점이 나왔다(판정자 지적 1006bee0 ·
+        # `_slope_point_slope` 참조). 수직인 직선 x + sy = s + 1의 기울기 -1/s에서 접선의 기울기 s.
         f, a0, s = _as_poly(p[0]), _as_int(p[1]), _as_int(p[2])
-        m = eval_at(derivative_of(f), a0)
-        if m != s:
-            return None
-        t = sympy.Symbol("t")
-        found = _pick(
-            _solve_real(sympy.diff(poly_to_sympy(f), _X).subs(_X, t) - m, t), lambda r: r > 0
-        )
-        if found != a0:
+        if _slope_point_slope(f, a0) != s:
             return None
         return DiffItem(
             slot=slot,
@@ -1043,10 +1051,11 @@ def _applied_frames() -> list[Frame]:
         )
 
     return [
-        Frame("applied-parallel-to-line", _grid("p3-tan:a1", _mixed_pool()[::2], _POS_POINTS), a1),
+        Frame("applied-parallel-to-line", _grid("p3-tan:a1", _slope_pool(), _POS_POINTS), a1),
         Frame(
             "applied-perpendicular-to-line",
-            _grid("p3-tan:a2", _mixed_pool(), _POS_POINTS, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
+            # s = 1은 'x + 1y = 2'·'기울기 -1/1' 표기가 생겨 뺐다(삼차 풀로 바꾼 뒤 처음 드러났다).
+            _grid("p3-tan:a2", _slope_pool(), _POS_POINTS, (2, 3, 4, 5, 6, 7, 8, 9, 10)),
             a2,
         ),
         # 5회차 감사 처분 — 곡선 밖의 점에서 그은 접선은 곡선이 이차면 판별식만으로 풀린다(판정기
@@ -1229,31 +1238,52 @@ def _misconception_frames() -> list[Frame]:
         )
 
     def m5(p: tuple[object, ...]) -> DiffItem | None:
-        s = _as_int(p[0])
-        a0 = s * s
-        b = 2 * a0
+        # 7회차 감사(2026-10-08) 처분 — 종전 '곡선 y = x^2 위의 점 (a, a^2)에서의 접선의 기울기가
+        # b'는 기울기 b인 직선과 연립한 x^2 - bx - k = 0의 중근 x = b/2(판별식)로 미분 없이
+        # 풀렸다(판정자 지적 ac28058d·ee5a4588 · 판정기 T05-quadratic-slope). 삼차곡선 y = x^3 +
+        # qx로 바꾼다 — f'(a) = 3a^2 + q = b의 두 근 ±a0 중 양수를 발문의 'a > 0'이 고른다. 오개념
+        # 선지는 그 절차로 정확히 나오는 값만 연결한다: 계수 누락 (x^3)' = x^2 → a^2 + q = b → a =
+        # a0√3(늘 무리수 — 근호 표기), 지수 유지 (x^3)' = 3x^3·(qx)' = qx → 3a^3 + qa = b의 양의
+        # 실근이 유리수일 때만.
+        q, a0 = _as_int(p[0]), _as_int(p[1])
+        b = 3 * a0 * a0 + q
+        a = sympy.Symbol("a")
+        omitted = sympy.sqrt(sympy.Integer(b - q))  # a^2 = b - q = 3a0^2
+        kept = [r for r in sympy.solve(3 * a**3 + q * a - b, a) if r.is_real and r > 0]
         entries = [
             ChoiceEntry(str(a0), is_correct=True, sort_key=float(a0)),
-            ChoiceEntry(str(b), _KEBAB, sort_key=float(b)),  # (x^2)'를 x로 쓴 경우
-            ChoiceEntry(str(s), _KEBAB, sort_key=float(s)),  # (x^2)'를 2x^2으로 쓴 경우
-            ChoiceEntry(str(sympy.Rational(a0, 2)), sort_key=a0 / 2),
+            ChoiceEntry(render_surd(omitted), _KEBAB, sort_key=float(omitted)),
         ]
+        if len(kept) == 1 and kept[0].is_rational and kept[0] != a0:
+            entries.append(ChoiceEntry(str(kept[0]), _KEBAB, sort_key=float(kept[0])))
+        for filler in (a0 * a0, 3 * a0, a0 + 1):
+            if len(entries) == 4:
+                break
+            if str(filler) not in {e.text for e in entries}:
+                entries.append(ChoiceEntry(str(filler), sort_key=float(filler)))
         try:
-            choices, answer, distractors = build_choices(entries, shuffle_seed=f"mc5:{s}")
+            choices, answer, distractors = build_choices(entries, shuffle_seed=f"mc5:{q}:{a0}")
         except ValueError:
             return None
+        shown = render_poly(((3, 1), (1, q)))
+        omitted_d = render_poly(((2, 1), (0, q)))
+        kept_d = render_poly(((3, 3), (1, q)))
         return DiffItem(
             slot="misconception_trigger",
-            frame_id="mc-find-point-on-parabola",
+            frame_id="mc-find-point-on-cubic-with-linear-term",
             question_text=(
-                f"곡선 y = x^2 위의 점 (a, a^2)에서의 접선의 기울기가 {b}일 때, a의 값은?"
+                f"곡선 y = {shown} 위의 점 (a, {render_poly(((3, 1), (1, q)), 'a')}) (a > 0)에서의 "
+                f"접선의 기울기가 {b}일 때, a의 값은?"
             ),
             answer_text=answer,
             explanation=(
-                f"x^2의 도함수는 2x이므로 2a = {b}에서 a = {a0}이다. 도함수를 x로 쓰거나(계수 2 "
-                "누락) 2x^2으로 쓰면(지수를 1 줄이지 않음) 다른 값이 나온다."
+                f"{shown}의 도함수는 {render_poly(((2, 3), (0, q)))}이므로 "
+                f"{render_poly(((2, 3), (0, q)), 'a')} = {b}에서 a^2 = {a0 * a0}이고, "
+                f"a는 양수이므로 a = {a0}이다. 도함수를 {omitted_d}{euro_ro(omitted_d)} "
+                f"쓰거나(계수 3 누락) {kept_d}{euro_ro(kept_d)} 쓰면(지수를 1 줄이지 않음) "
+                "다른 값이 나온다."
             ),
-            conditions=f"Derivative(x**2, x).doit().subs(x, a) = {b}",
+            conditions=(f"Derivative(x**3 + {q}*x, x).doit().subs(x, a) = {b}", "a > 0"),
             answer_map=(("a", str(a0)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(a0),
@@ -1311,7 +1341,11 @@ def _misconception_frames() -> list[Frame]:
         Frame("mc-slope-at-x-coordinate", _grid("p3-tan:m2", pool, pts), m2),
         Frame("mc-y-intercept-of-tangent", _grid("p3-tan:m3", pool, pts), m3),
         Frame("mc-tangent-line-value", _grid("p3-tan:m4", pool, pts, (-2, 0, 3, 4)), m4),
-        Frame("mc-find-point-on-parabola", _grid("p3-tan:m5", (2, 3, 4, 5, 6, 7, 8)), m5),
+        Frame(
+            "mc-find-point-on-cubic-with-linear-term",
+            _grid("p3-tan:m5", (1, 2, 3, 5, 6, 9, 12, 24), (2, 3, 4, 5)),
+            m5,
+        ),
         Frame("mc-find-point-on-cubic", _grid("p3-tan:m6", (3, 4, 5, 6, 7, 9, 10)), m6),
     ]
 

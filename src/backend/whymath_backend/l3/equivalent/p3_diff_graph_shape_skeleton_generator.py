@@ -96,6 +96,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_affine,
     render_factored,
     render_poly,
+    with_eul_reul,
     with_eun_neun,
     with_wa_gwa,
 )
@@ -1093,7 +1094,11 @@ def _find_ab_item(
         f"f'({r})의 값은 {eq1}이므로 {eq1} = 0이다. 또 그 극값이 {value}이므로 f({r})의 값 "
         f"{with_eun_neun(_linear_ab(r * r, r, lead * r**3 + c))} {with_wa_gwa(value)} 같아야 하고, "
         f"{eq2} = 0이다. 두 식을 연립하면 a = {a}, b = {b}이다. 이때 {_explain(fn)} 따라서 "
-        f"x = {r}에서 {_kind_word(kind)}을 갖는다."
+        # 7회차 감사(2026-10-08) — 결론 문장이 검산('x = r에서 극솟값을 갖는다')으로 끝나 발문이
+        # 묻는 상수의 값을 말하지 않았다(판정기 E-conclusion-target). 검산과 답을 한 문장으로
+        # 맺는다.
+        f"x = {r}에서 실제로 {_kind_word(kind)} {with_eul_reul(value)} 가지므로 "
+        f"구하는 {ask}의 값은 {answer}이다."
     )
     return _item(
         slot=slot,
@@ -1232,8 +1237,13 @@ def _flat_frame(
     slot: str,
     role: str,
     factored: bool = False,
+    conclusion: str = "따라서 f'(x) = 0의 근 중 극값을 갖는 x좌표는 {q}뿐이다.",
 ) -> Frame:
-    """사차함수 a x^4 + b x^3 + c — 임계점 0(평평)·q(극값). 객관식은 정답 q·오답 0(오개념)."""
+    """사차함수 a x^4 + b x^3 + c — 임계점 0(평평)·q(극값). 객관식은 정답 q·오답 0(오개념).
+
+    `conclusion`은 해설의 결론 문장 틀(`{q}` 자리) — 발문이 묻는 대상의 어휘로 맺는다(7회차 감사:
+    '증가·감소가 바뀌는 점'을 묻는 틀이 '극값을 갖는 x좌표'로 맺었다 · 판정기 E-conclusion-target).
+    """
 
     def build(p: tuple[object, ...]) -> DiffItem | None:
         a, b, c = _i(p[0]), _i(p[1]), _i(p[2])
@@ -1285,7 +1295,7 @@ def _flat_frame(
             conditions=_deriv_cond(fn.sym, "="),
             answer_map=(("x", answer),),
             ptype=_OPT,
-            explanation=(f"{_explain(fn)} 따라서 f'(x) = 0의 근 중 극값을 갖는 x좌표는 {q}뿐이다."),
+            explanation=f"{_explain(fn)} {conclusion.format(q=q)}",
             selection=selection,
             choices=choices,
             distractors=distractors,
@@ -1319,6 +1329,13 @@ def _misconception_frames() -> list[Frame]:
             "p3-shape:mc3",
             slot=slot,
             role="any",
+            # 7회차 감사(2026-10-08) 처분 — 발문은 '증가·감소가 바뀌는 점'을 묻는데 해설은 '극값을
+            # 갖는 x좌표'로 맺었다(판정자 지적 b2d3bc4b · 판정기 E-conclusion-target). 발문의
+            # 대상으로 맺는다.
+            conclusion=(
+                "따라서 f'(x)의 부호가 바뀌는 x = {q}에서만 증가·감소가 바뀌므로, 증가·감소가 "
+                "바뀌는 점의 x좌표는 {q}이다."
+            ),
         ),
         _flat_frame(
             "mc-derivative-zero-which-extremum",

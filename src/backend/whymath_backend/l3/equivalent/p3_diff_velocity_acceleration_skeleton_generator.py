@@ -43,7 +43,6 @@ bad_tag 교정 — 문항이 실제로 묻는 개념과 PRIMARY 태그를 일치
 
 from __future__ import annotations
 
-import dataclasses
 from collections.abc import Callable
 from typing import ClassVar, Final, cast
 
@@ -65,7 +64,6 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     with_i_ga,
     with_wa_gwa,
 )
-from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import undefined_motion_symbols
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
@@ -177,6 +175,25 @@ def _v_plus_a_setup(f: Poly, t: int) -> str:
 def _k_affine(base: Poly, t: int) -> str:
     """v(t) = base'(t) + 2kt를 t에 대입한 k의 일차식('6k + 51') — 해설의 방정식 단계."""
     return render_poly(((1, 2 * t), (0, eval_at(_vel(base), t, _V))), _PARAM)
+
+
+#: 7회차 감사(은행 감사 3회차 · 2026-10-08) 처분 — 해설이 '속도는 위치를 시각 t로 미분한 값이다.
+#: v(t) = …'처럼 정의 문장 뒤에 기호 v(t)를 소개 없이 꺼냈다(판정자 지적 fb9ec6bc · 같은 묶음의 다른
+#: 문항은 '속도 v(t)는 …'으로 소개). 모든 틀의 첫 운동 식을 기호를 주어 자리에 둔 이 머리로
+#: 쓴다(판정기 `E-motion-symbol-subject`·`motion_symbols_not_in_subject`가 같은 형태를 본다).
+_V_DEF: Final = "속도 v(t)는 위치 x를 시각 t로 미분한 값이므로 v(t) = "
+_A_DEF: Final = "가속도 a(t)는 속도 v(t)를 시각 t로 미분한 값이므로 a(t) = "
+
+
+def _v_def(f: Poly) -> str:
+    """'속도 v(t)는 위치 x를 시각 t로 미분한 값이므로 v(t) = 3t^2 - 6t' — 뒤에 '이고'·'이다'를
+    붙인다."""
+    return f"{_V_DEF}{render_poly(_vel(f), _V)}"
+
+
+def _a_def(f: Poly) -> str:
+    """'가속도 a(t)는 속도 v(t)를 시각 t로 미분한 값이므로 a(t) = 6t - 6'."""
+    return f"{_A_DEF}{render_poly(_acc(f), _V)}"
 
 
 #: 오개념 유발 해설의 함정 문장 — 오답 선지가 나오는 경로(power-rule-step-omitted)를 짚는다.
@@ -320,21 +337,22 @@ def _rest_item(
     if _unique_root(_vel_expr(f, s), s, lambda x: x > 0) != r:
         return None
     velocity = render_poly(_vel(f), _V)
-    head = (
-        "속도 v(t)는 위치 x를 시각 t로 미분한 도함수이고, 점 P가 순간적으로 멈추는 순간은 "
-        "v(t) = 0일 때이다. "
-        if meaning
-        else ""
-    )
     lo, hi = sorted((r, other))
+    # 7회차 감사 — 기호 v(t)를 주어 자리에서 소개한다(`_V_DEF`). 멈춤 문항은 '도함수'·'멈춤 ⇔ v(t) =
+    # 0'을 함께 적는다(5회차 E-rest-meaning).
+    if meaning:
+        head = f"속도 v(t)는 위치 x를 시각 t로 미분한 도함수이므로 v(t) = {velocity}"
+        middle = "점 P가 순간적으로 멈추는 순간은 v(t) = 0일 때이므로"
+    else:
+        head, middle = f"{_V_DEF}{velocity}", "v(t) = 0에서"
     return _solve_item(
         slot=slot,
         frame_id=frame_id,
         text=text,
         answer=r,
         explanation=(
-            f"{head}v(t) = {velocity} = {render_factored(_vel(f), _V)} = 0에서 t = {lo} 또는 "
-            f"t = {hi}이고, t > 0이므로 t = {r}이다."
+            f"{head} = {render_factored(_vel(f), _V)}이다. {middle} t = {lo} 또는 t = {hi}이고, "
+            f"t > 0이므로 t = {r}이다."
         ),
         conditions=(f"{_dv(f, 's')} = 0", "s > 0"),
     )
@@ -391,10 +409,7 @@ def _velocity_item(slot: str, frame_id: str, text: str, f: Poly, t: int) -> Diff
         frame_id=frame_id,
         text=text,
         value=v,
-        explanation=(
-            f"속도는 위치를 시각 t로 미분한 값이다. v(t) = {render_poly(_vel(f), _V)}이므로 "
-            f"t = {t}일 때의 속도는 {v}이다."
-        ),
+        explanation=f"{_v_def(f)}이고, t = {t}일 때의 속도는 {v}이다.",
         conditions=f"{_dv(f, str(t))} = y",
     )
 
@@ -409,11 +424,7 @@ def _acceleration_item(slot: str, frame_id: str, text: str, f: Poly, t: int) -> 
         # 5회차 감사(2026-10-08) 해설 결함 교정 — 종전 해설은 '가속도는 속도를 미분한 값이다. a(t) =
         # …'라 하면서 정작 속도 v(t)의 식(첫 번째 도함수)을 보이지 않았다(판정자 지적 5건 · 판정기
         # E-velocity-before-acceleration). 위치 → 속도 → 가속도 두 번의 미분을 차례로 쓴다.
-        explanation=(
-            f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이고, "
-            f"가속도는 속도를 시각 t로 미분한 값이므로 a(t) = {render_poly(_acc(f), _V)}이다. "
-            f"따라서 t = {t}일 때의 가속도는 {a}이다."
-        ),
+        explanation=(f"{_v_def(f)}이고, {_a_def(f)}이다. 따라서 t = {t}일 때의 가속도는 {a}이다."),
         conditions=f"{_da(f, str(t))} = y",
     )
 
@@ -485,8 +496,7 @@ def _rep_frames() -> list[Frame]:
             ),
             answer=p0,
             explanation=(
-                f"속도는 위치를 시각 t로 미분한 값이므로 "
-                f"v(t) = {_render_with_param(_vel(base), 1, 2)[0]}이다. "
+                f"{_V_DEF}{_render_with_param(_vel(base), 1, 2)[0]}이다. "
                 f"v({t}) = {_k_affine(base, t)} = {v}에서 {_PARAM} = {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, t).doit().subs(t, {t}) = {v}",
@@ -507,10 +517,7 @@ def _rep_frames() -> list[Frame]:
                 f"{_intro(f)} 점 P의 속도가 {with_i_ga(v0)} 되는 시각 t (t > 0)의 값을 구하시오."
             ),
             answer=r,
-            explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {v0}에서 "
-                f"t = {r}이다."
-            ),
+            explanation=(f"{_v_def(f)}이다. {render_poly(_vel(f), _V)} = {v0}에서 t = {r}이다."),
             conditions=(f"{_dv(f, 's')} = {v0}", "s > 0"),
         )
 
@@ -523,9 +530,8 @@ def _rep_frames() -> list[Frame]:
             text=f"{_intro(f)} t = {t}에서의 점 P의 속도와 가속도의 합을 구하시오.",
             value=total,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"t = {t}에서 속도 {with_wa_gwa(_v_at(f, t))} 가속도 {_a_at(f, t)}의 합은 "
-                f"{total}이다."
+                f"{_v_def(f)}이고, {_a_def(f)}이다. 따라서 t = {t}에서 속도 "
+                f"{with_wa_gwa(_v_at(f, t))} 가속도 {_a_at(f, t)}의 합은 {total}이다."
             ),
             # 속도+가속도 = (x + x')'이므로 한 번의 미분 평가로 검산한다.
             conditions=(
@@ -548,7 +554,7 @@ def _rep_frames() -> list[Frame]:
             value=change,
             # 3차 감사 bad_explanation — 속도를 위치의 도함수로 구하는 단계(v(t) 식)를 보인다.
             explanation=(
-                f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이다. "
+                f"{_v_def(f)}이다. "
                 f"t = {t1}일 때의 속도는 {_v_at(f, t1)}, t = {t0}일 때의 속도는 "
                 f"{_v_at(f, t0)}이므로 "
                 f"속도의 변화량은 {_v_at(f, t1)}에서 {with_eul_reul(_v_at(f, t0))} 뺀 값인 "
@@ -612,7 +618,7 @@ def _basic_frames() -> list[Frame]:
             text=(f"{_intro(f)} t = {t0}일 때와 t = {t1}일 때의 점 P의 속도의 합을 구하시오."),
             value=total,
             explanation=(
-                f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이다. "
+                f"{_v_def(f)}이다. "
                 f"t = {t0}일 때의 속도는 {v0}, t = {t1}일 때의 속도는 {v1}이므로 그 합은 "
                 f"{render_sum(v0, v1)} = {total}이다."
             ),
@@ -655,8 +661,8 @@ def _basic_frames() -> list[Frame]:
             text=f"{_intro(f)} t = {t}에서의 점 P의 속력(속도의 절댓값)을 구하시오.",
             value=abs(v),
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 속도는 {v}이고 "
-                f"속력은 그 절댓값 {abs(v)}이다."
+                f"{_v_def(f)}이다. 따라서 t = {t}일 때의 속도는 {v}이고 속력은 그 절댓값 "
+                f"{abs(v)}이다."
             ),
             conditions=f"Abs({_dv(f, str(t))}) = y",
         )
@@ -718,10 +724,7 @@ def _applied_frames() -> list[Frame]:
             answer=r,
             # 5회차 감사 — 가속도를 다루는 해설은 속도 v(t)를 먼저
             # 보인다(E-velocity-before-acceleration).
-            explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"a(t) = 0에서 t는 {r}이다."
-            ),
+            explanation=f"{_v_def(f)}이고, {_a_def(f)}이다. a(t) = 0에서 t는 {r}이다.",
             conditions=f"{_da(f, 's')} = 0",
         )
 
@@ -733,7 +736,7 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 두 번째로 운동 방향을 바꾸는 시각 t를 구하시오.",
             answer=r2,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0의 두 근은 "
+                f"{_v_def(f)} = {render_factored(_vel(f), _V)}이다. v(t) = 0의 두 근은 "
                 f"{r1}, {r2}이고 각 근의 좌우에서 속도의 부호가 바뀌므로 두 번째 시각은 {r2}이다."
             ),
             conditions=(f"{_dv(f, 's')} = 0", f"s > {r1}"),
@@ -747,7 +750,7 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 처음으로 운동 방향을 바꾸는 시각 t를 구하시오.",
             answer=r1,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)} = 0의 두 근은 "
+                f"{_v_def(f)} = {render_factored(_vel(f), _V)}이다. v(t) = 0의 두 근은 "
                 f"{r1}, {r2}이고 각 근의 좌우에서 속도의 부호가 바뀌므로 처음 시각은 {r1}이다."
             ),
             conditions=(f"{_dv(f, 's')} = 0", f"s < {r2}"),
@@ -772,8 +775,7 @@ def _applied_frames() -> list[Frame]:
             ),
             answer=p0,
             explanation=(
-                f"속도는 위치를 시각 t로 미분한 값이므로 "
-                f"v(t) = {_render_with_param(_vel(base), 1, 2)[0]}이다. "
+                f"{_V_DEF}{_render_with_param(_vel(base), 1, 2)[0]}이다. "
                 f"v({t}) = {_k_affine(base, t)} = 0에서 {_PARAM} = {p0}이다."
             ),
             conditions=f"Derivative({symbolic}, t).doit().subs(t, {t}) = 0",
@@ -793,7 +795,7 @@ def _applied_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P의 속도와 가속도가 같아지는 시각 t를 구하시오.",
             answer=r,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {_a_at(f, 0)}이므로 "
+                f"{_v_def(f)}이고, {_a_def(f)}이다. "
                 f"{render_poly(_vel(f), _V)} = {_a_at(f, 0)}에서 t = {r}이다."
             ),
             # v - a = (x - x')' 이므로 한 번의 미분 평가로 검산한다.
@@ -918,10 +920,7 @@ def _misconception_frames() -> list[Frame]:
             wrong=_wrong_values(f, t, 1),
             filler=filler,
             conditions=f"{_dv(f, str(t))} = y",
-            explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 속도는 {v}이다."
-                f"{_POWER_TRAP}"
-            ),
+            explanation=f"{_v_def(f)}이고, t = {t}일 때의 속도는 {v}이다.{_POWER_TRAP}",
             shuffle_key=f"vm1:{_rt(f)}:{t}",
         )
 
@@ -936,10 +935,7 @@ def _misconception_frames() -> list[Frame]:
             wrong=_wrong_values(f, t, 1),
             filler=filler,
             conditions=f"{_dv(f, str(t))} = y",
-            explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 t = {t}일 때의 순간속도는 {v}이다."
-                f"{_POWER_TRAP}"
-            ),
+            explanation=f"{_v_def(f)}이고, t = {t}일 때의 순간속도는 {v}이다.{_POWER_TRAP}",
             shuffle_key=f"vm2:{_rt(f)}:{t}",
         )
 
@@ -954,8 +950,8 @@ def _misconception_frames() -> list[Frame]:
             filler=_v_at(f, t),
             conditions=f"{_da(f, str(t))} = y",
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"t = {t}일 때의 가속도는 {a}이다.{_POWER_TRAP}"
+                f"{_v_def(f)}이고, {_a_def(f)}이다. 따라서 t = {t}일 때의 가속도는 {a}이다."
+                f"{_POWER_TRAP}"
             ),
             shuffle_key=f"vm3:{_rt(f)}:{t}",
         )
@@ -976,9 +972,8 @@ def _misconception_frames() -> list[Frame]:
             ),
             setup=_v_plus_a_setup(f, t),
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}, a(t) = {render_poly(_acc(f), _V)}이므로 "
-                f"t = {t}에서 속도는 {v}, 가속도는 {a}이고 합은 {render_sum(v, a)} = {v + a}이다."
-                f"{_POWER_TRAP}"
+                f"{_v_def(f)}이고, {_a_def(f)}이다. t = {t}에서 속도는 {v}, 가속도는 {a}이고 "
+                f"합은 {render_sum(v, a)} = {v + a}이다.{_POWER_TRAP}"
             ),
             shuffle_key=f"vm4:{_rt(f)}:{t}",
         )
@@ -1006,7 +1001,7 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"v(t) = 2t이므로 2t = {b}에서 t = {t0}이다. 속도를 t로 쓰거나(계수 2 누락) "
+                f"{_V_DEF}2t이다. 2t = {b}에서 t = {t0}이다. 속도를 t로 쓰거나(계수 2 누락) "
                 "2t^2으로 쓰면(지수를 1 줄이지 않음) 다른 시각이 나온다."
             ),
             conditions=f"Derivative(t**2, t).doit().subs(t, s) = {b}",
@@ -1046,7 +1041,7 @@ def _misconception_frames() -> list[Frame]:
             ),
             answer_text=answer,
             explanation=(
-                f"v(t) = 3t^2이므로 3t^2 = {b}에서 t^2 = {t0 * t0}이고, t > 0이므로 t = {t0}이다. "
+                f"{_V_DEF}3t^2이다. 3t^2 = {b}에서 t^2 = {t0 * t0}이고, t > 0이므로 t = {t0}이다. "
                 "속도를 t^2으로 쓰거나(계수 3 누락) 3t^3으로 쓰면(지수를 1 줄이지 않음) 다른 "
                 "시각이 나온다."
             ),
@@ -1098,10 +1093,12 @@ def _diagnostic_frames() -> list[Frame]:
             frame_id="diag-velocity-after-start",
             text=(f"{_intro(f)} 출발한 후 t = {t}인 순간의 점 P의 속도를 구하시오."),
             value=_v_at(f, t),
+            # 7회차 감사(2026-10-08) 처분 — 발문은 위치를 'x = …'(변수)로만 주는데 해설이 'x(5) =
+            # 25'처럼 함수 표기를 소개 없이 썼다(판정자 지적 fb9ec6bc · 판정기 E-function-notation).
+            # 말로 풀어 쓴다.
             explanation=(
-                f"속도는 위치를 시각 t로 미분한 값이다. v(t) = {render_poly(_vel(f), _V)}이므로 "
-                f"t = {t}일 때의 속도는 {_v_at(f, t)}이다. 이 시각의 위치 "
-                f"x({t}) = {with_eun_neun(_x_at(f, t))} 속도가 아니다."
+                f"{_v_def(f)}이고, t = {t}일 때의 속도는 {_v_at(f, t)}이다. t = {t}일 때의 위치 "
+                f"{with_eun_neun(_x_at(f, t))} 속도가 아니다."
             ),
             conditions=f"{_dv(f, str(t))} = y",
         )
@@ -1120,7 +1117,7 @@ def _diagnostic_frames() -> list[Frame]:
             text=f"{_intro(f)} t = {t}에서의 점 P의 가속도를 구하시오.",
             value=a,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이다. "
+                f"{_v_def(f)}이고, {_a_def(f)}이다. "
                 f"가속도는 시각과 관계없이 항상 {a}이다. 따라서 t = {t}에서의 가속도는 {a}이다."
             ),
             conditions=f"{_da(f, str(t))} = y",
@@ -1211,10 +1208,14 @@ def _mastery_frames() -> list[Frame]:
                 f"t ({t0} < t < {t1})의 값을 구하시오."
             ),
             answer=found,
+            # 7회차 감사 — 발문에 없는 함수 표기 'x(6)'을 쓰지 않고 두 시각의 위치를 말로 쓴다
+            # (판정기 E-function-notation).
             explanation=(
-                f"평균속도는 (x({t1}) - x({t0}))/({t1} - {t0}) = "
+                f"t = {t0}일 때의 위치는 {_x_at(f, t0)}, "
+                f"t = {t1}일 때의 위치는 {_x_at(f, t1)}이므로 평균속도는 "
                 f"({_minus(_x_at(f, t1), _x_at(f, t0))})/{t1 - t0} = {avg}이다. "
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {avg}, 즉 "
+                f"{_v_def(f)}이다. 순간속도가 평균속도와 같아지는 시각은 "
+                f"{render_poly(_vel(f), _V)} = {avg}, 즉 "
                 f"{render_factored(moved, _V)} = 0에서 t = {roots[0]} 또는 t = {roots[1]}이다. "
                 f"{t0} < t < {t1}이므로 t = {found}이다({with_eun_neun(other)} 이 범위에 속하지 "
                 "않는다)."
@@ -1234,9 +1235,9 @@ def _mastery_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P가 {order} 운동 방향을 바꿀 때의 점 P의 위치를 구하시오.",
             value=x,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)}이므로 "
-                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이고 그때의 위치는 "
-                f"x({r}) = {x}이다."
+                f"{_v_def(f)} = {render_factored(_vel(f), _V)}이다. "
+                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이고, 그때의 위치는 "
+                f"위치의 식에 t = {with_eul_reul(r)} 대입한 {x}이다."
             ),
             conditions=f"{_at(f, r)} = y",
             # 검산 조건은 위치 대입 산술식 — 풀이 단계는 해설의 v(t) = 0(운동 방향이 바뀌는
@@ -1259,7 +1260,7 @@ def _mastery_frames() -> list[Frame]:
             text=f"{_intro(f)} 점 P의 가속도가 0이 되는 시각의 속도를 구하시오.",
             value=v,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이다. "
+                f"{_v_def(f)}이고, {_a_def(f)}이다. "
                 f"a(t) = 0에서 t는 {r}이고, 그때의 속도는 v(t)에 t = {with_eul_reul(r)} 대입한 "
                 f"{v}이다."
             ),
@@ -1318,7 +1319,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             value=v,
             explanation=(
-                f"v(t) = {3 * lead}t^2 + 2{_PARAM}t + 2이고 a(t) = {6 * lead}t + 2{_PARAM}이다. "
+                f"{_V_DEF}{3 * lead}t^2 + 2{_PARAM}t + 2이고, "
+                f"{_A_DEF}{6 * lead}t + 2{_PARAM}이다. "
                 f"a({t_a}) = {6 * lead * t_a} + 2{_PARAM} = 0에서 {_PARAM} = {p0}이다. 그러면 "
                 f"v(t) = {render_poly(_vel(f), _V)}이고 t = {t_b}에서의 속도는 {v}이다."
             ),
@@ -1337,9 +1339,9 @@ def _mastery_frames() -> list[Frame]:
             text=(f"{_intro(f)} 점 P가 {order} 운동 방향을 바꾸는 순간의 가속도를 구하시오."),
             value=a,
             explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = {render_factored(_vel(f), _V)}이므로 "
-                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이고 "
-                f"a(t) = {render_poly(_acc(f), _V)}이므로 그때의 가속도는 {a}이다."
+                f"{_v_def(f)} = {render_factored(_vel(f), _V)}이다. "
+                f"{_sign_change_text(r1, r2)} {order} 방향을 바꾸는 시각은 {r}이다. "
+                f"{_a_def(f)}이고, 그때의 가속도는 {a}이다."
             ),
             conditions=f"{_da(f, str(r))} = y",
         )
@@ -1404,24 +1406,33 @@ def _combine(f: Poly, g: Poly) -> list[tuple[int, int]]:
     return list(merged.items())
 
 
-#: 6회차 감사(은행 감사 2회차 · 2026-10-08) 처분 — 해설이 v(t)·a(t)를 정의 없이 처음 쓰면('v(t) =
-#: -4t + 5 이므로 …') 발문에 없는 기호를 소개 없이 쓴 것이고 '속도 = 위치의 도함수' 단계도
-#: 빠진다(판정자 지적 3건 · 5회차 규칙은 가속도·멈춤 틀만 덮었다). 정의 판정은 판정기
-#: `E-motion-symbol-intro`와 같은 `undefined_motion_symbols`이다(단일 원천).
-_V_INTRO: Final = "속도 v(t)는 위치를 시각 t로 미분한 값이다. "
-_A_INTRO: Final = "가속도 a(t)는 속도를 시각 t로 미분한 값이다. "
-_VA_INTRO: Final = (
-    "속도 v(t)는 위치를 시각 t로 미분한 값이고, 가속도 a(t)는 속도를 시각 t로 미분한 값이다. "
-)
+#: 운동 기호 정의 머리 — 해설에 v(t)·a(t)가 나오면 그 *첫 등장*이 이 머리의 기호여야 한다. 멈춤
+#: 문항은 '도함수'를 함께 쓰는 변형(5회차 E-rest-meaning)을 쓴다.
+_V_HEADS: Final = (_V_DEF, "속도 v(t)는 위치 x를 시각 t로 미분한 도함수이므로 v(t) = ")
 
 
-def _with_motion_intro(item: DiffItem) -> DiffItem:
-    """해설이 정의 없이 처음 쓰는 v(t)·a(t)가 있으면 그 정의 문장을 해설 맨 앞에 붙인다."""
-    missing = undefined_motion_symbols(item.explanation)
-    if not missing:
-        return item
-    intro = {("v(t)", "a(t)"): _VA_INTRO, ("v(t)",): _V_INTRO, ("a(t)",): _A_INTRO}[missing]
-    return dataclasses.replace(item, explanation=intro + item.explanation)
+def _require_motion_subject(item: DiffItem) -> DiffItem:
+    """해설의 v(t)·a(t) 첫 등장이 주어 자리 정의 머리(`_V_DEF`·`_A_DEF`)인지 확인한다(fail-loud).
+
+    6회차 처분은 정의 없는 v(t)에 정의 *문장*을 앞에 붙였는데('속도 v(t)는 위치를 시각 t로 미분한
+    값이다. ' + 'v(t) = …'), 7회차 감사는 틀마다 '속도는 위치를 미분한 값이다. v(t) = …'처럼 기호를
+    소개하지 않는 형태가 섞인 것을 짚었다(fb9ec6bc). 이제 틀이 정의 머리를 직접 쓰고, 여기서는
+    고치지 않고 확인만 한다 — 새 틀이 머리를 빠뜨리면 빌드가 멈춘다(판정기
+    `E-motion-symbol-subject`보다 엄격한 *형태 통일* 확인).
+    """
+    text = item.explanation
+    v_first, a_first = text.find("v(t)"), text.find("a(t)")
+    # 첫 등장이 머리 안 '속도 v(t)는'의 v(t)·'가속도 a(t)는'의 a(t)여야 한다.
+    v_ok = v_first < 0 or any(
+        0 <= text.find(head) and text.find(head) + len("속도 ") == v_first for head in _V_HEADS
+    )
+    a_ok = a_first < 0 or (0 <= text.find(_A_DEF) and text.find(_A_DEF) + len("가속도 ") == a_first)
+    if not (v_ok and a_ok):
+        raise ValueError(
+            f"{item.frame_id}: 해설의 v(t)·a(t) 첫 등장이 주어 자리 정의 머리가 아니다 — "
+            f"{text[:80]!r}"
+        )
+    return item
 
 
 _SLOT_FRAMES = {
@@ -1459,6 +1470,6 @@ class P3DiffVelocityAccelerationGenerator(P3DiffSlotGenerator):
             claimed=claimed,
             standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
         )
-        # 6회차 감사 처분 — 모든 틀의 해설이 v(t)·a(t)를 정의와 함께 처음 쓴다(틀마다 따로 고치지
-        # 않고 슬롯 출력 한 곳에서 보정해 새 틀도 빠지지 않게 한다).
-        return [_with_motion_intro(item) for item in items]
+        # 7회차 감사 처분 — 모든 틀의 해설이 v(t)·a(t)를 주어 자리 정의 머리로 처음 쓴다(틀이 직접
+        # 쓰고, 슬롯 출력 한 곳에서 확인해 새 틀도 빠지지 않게 한다).
+        return [_require_motion_subject(item) for item in items]

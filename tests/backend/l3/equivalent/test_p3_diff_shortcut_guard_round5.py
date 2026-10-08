@@ -651,10 +651,11 @@ def test_every_round5_rule_has_red_and_green_controls(
     # 매개변수 거부 조건은 자격 측정 뒤 회차 규칙에만 있다(5회차 몫은 5회차 규칙의 진부분집합).
     assert COINCIDENCE_RULE_IDS <= POST_QUALIFICATION_RULE_IDS
     assert COINCIDENCE_RULE_IDS & ROUND5_RULE_IDS < ROUND5_RULE_IDS
-    # 5회차 규칙은 RULE_IDS에서 6회차 규칙 바로 앞의 연속 구간이다(회차 순서 — 앞 회차 동결이 이 구간을
-    # 빼고 본다 · 6회차 추가로 꼬리가 아니게 됐다).
-    tail = RULE_IDS[len(RULE_IDS) - len(ROUND6_RULE_IDS) - len(ROUND5_RULE_IDS) :]
-    assert list(tail[: len(ROUND5_RULE_IDS)]) == [r for r in RULE_IDS if r in ROUND5_RULE_IDS]
+    # 5회차 규칙은 RULE_IDS에서 6회차 첫 규칙 바로 앞까지의 연속 구간이다(회차 순서 — 앞 회차 동결이 이
+    # 구간을 빼고 본다 · 6·7회차 추가로 꼬리가 아니게 됐다).
+    start = RULE_IDS.index("T-quadratic-mean-value")
+    end = RULE_IDS.index("M-link-contradictory")
+    assert list(RULE_IDS[start:end]) == [r for r in RULE_IDS if r in ROUND5_RULE_IDS]
     assert not ROUND5_RULE_IDS & ROUND6_RULE_IDS
 
 

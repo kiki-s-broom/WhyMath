@@ -42,6 +42,13 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
 `POST_QUALIFICATION_RULE_IDS`로 묶는다(`p3_audit_qualification.EXCLUDED_GUARD_RULES`가 그 집합을
 투표에서 뺀다).
 
+은행 감사 7회차(2026-10-08 · `bank_audit_r3/disposition.json` · 결함 11건 · 원인 4종 · 전부 확신
+'불확실')는 6회차 규칙을 통과한 은행에서 다시 결함을 찾았다 — ① 이차곡선의 접선 기울기·평행·수직으로
+접점을 묻는 틀(판별식 중근 · 5건) ② 오답 경로가 정답과 같음(x = 1 평가 · cx^m의 c만 묻기 · 성분
+함수의 임계점에서 평가 · 3건) ③ 해설 문장(v(t)를 주어 자리에서 소개하지 않음·발문에 없는 x(5) · 증감
+문항을 극값으로 맺음 · 2건) ④ 위치 (t - 1)^3 꼴 — 가속도 0인 시각의 속도도 0(1건). 7회차 규칙(아래
+[7회차] · `ROUND7_RULE_IDS`)이 그 부류를 막는다.
+
 규칙(위반 id — 사유는 `ShortcutViolation.reason`)
 --------------------------------------------
 [공통 · 표기]
@@ -173,6 +180,27 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
                           다르다(없음 포함).
   W-curve-subject         '곡선 y = …이(가) (x = a에서) 극대·극소·극값·증가·감소' — 그 성질의
                           주어는 함수다.
+[7회차 · 은행 감사 3회차(*는 매개변수 거부 조건 — `COINCIDENCE_RULE_IDS`)]
+  T05-quadratic-slope     (02-05) 발문의 곡선이 이차 이하인데 접선의 기울기·접점을 미분 평가로
+                          정한다 — 기울기 m인 직선과 연립한 이차방정식의 중근(판별식)이 접점이다. 절
+                          둘: 접점이 미지수(기울기가 주어진 값·평행·수직) · 기울기를 구한다.
+  T-power-path-coincidence*
+                          거듭제곱 미분이 검사 대상인 문항(02-03 · 'power-rule-step-omitted' 선지 ·
+                          미분하는 식이 상수항 빼고 거듭제곱 하나)에서 두 대표 오답 경로(계수 누락
+                          x^(n - 1) · 지수 유지 n·x^n) 중 하나라도 정답과 같은 값을 낸다 — 평가 절
+                          (f'(1) 등)·꼴 읽기 절('cx^m 꼴로 나타낼 때 c')·주어진 도함수 꼴 절 ('f'(x)
+                          = 8x^7일 때 n').
+  T-component-critical-point*
+                          합·차·실수배(발문이 보인 함수들의 일차결합)의 미분계수인데 평가점이 한
+                          성분 함수의 임계점이다 — 그 성분의 처리를 틀려도 같은 값.
+  T10-confusable-quantity*
+                          (02-10) 묻는 양과 혼동하기 쉬운 양(속도↔가속도·위치↔속도)이 같은 시각에
+                          같은 값이다(가속도 0인 시각의 속도도 0 등).
+  E-motion-symbol-subject 해설이 v(t)·a(t)를 '속도 v(t)는 …'처럼 기호를 주어 자리에 두어 소개하지
+                          않는다.
+  E-function-notation     해설이 발문에 없는 함수 표기('x(5)')를 소개 없이 쓴다.
+  E-conclusion-target     (02-08) 해설의 결론 문장이 발문의 대상과 어긋난다 — 증가·감소가 바뀌는
+                          점을 묻는데 극값으로 맺음 · 결론 문장에 정답이 없음.
 
 정직 범위(이 판정기가 보증하지 **않는** 것)
 -------------------------------------------
@@ -207,13 +235,16 @@ __all__ = [
     "ROUND4_RULE_IDS",
     "ROUND5_RULE_IDS",
     "ROUND6_RULE_IDS",
+    "ROUND7_RULE_IDS",
     "RULE_IDS",
     "ShortcutProbe",
     "ShortcutViolation",
     "extremum_point_count",
     "has_rational_root",
     "is_shifted_biquadratic",
+    "motion_symbols_not_in_subject",
     "parameter_coincidences",
+    "power_path_derivative",
     "probe_from_record",
     "shortcut_violations",
     "undefined_motion_symbols",
@@ -292,6 +323,14 @@ RULE_IDS: Final[tuple[str, ...]] = (
     "U-extra-solution",
     "V-count-interval",
     "W-curve-subject",
+    # ── 7회차(2026-10-08 · 은행 감사 3회차 S5 불합격 k = 11) 결함 부류 — `ROUND7_RULE_IDS` ──
+    "T05-quadratic-slope",
+    "T-power-path-coincidence",
+    "T-component-critical-point",
+    "T10-confusable-quantity",
+    "E-motion-symbol-subject",
+    "E-function-notation",
+    "E-conclusion-target",
 )
 
 #: 4회차 감사(합집합 88·둘 다 27)를 계기로 더한 규칙 — 3회차 재현율·과잉 거부 동결 테스트는 이
@@ -310,17 +349,26 @@ ROUND5_RULE_IDS: Final[frozenset[str]] = frozenset(
 )
 
 #: 6회차 은행 감사(2026-10-08 · `bank_audit_r2/` · as-found k = 23)를 계기로 더한 규칙 — 같은
-#: 원칙으로 5회차 동결은 이 규칙들을 빼고 본다. 다음 회차 규칙은 이 슬라이스 *뒤*에 붙이고 끝 경계를
-#: 고친다.
+#: 원칙으로 5회차 동결은 이 규칙들을 빼고 본다. 끝 경계는 7회차 첫 규칙이다(7회차 규칙이 이
+#: 슬라이스에 섞이면 6회차 동결이 7회차 규칙까지 세게 된다).
 ROUND6_RULE_IDS: Final[frozenset[str]] = frozenset(
-    RULE_IDS[RULE_IDS.index("M-link-contradictory") :]
+    RULE_IDS[RULE_IDS.index("M-link-contradictory") : RULE_IDS.index("T05-quadratic-slope")]
+)
+
+#: 7회차 은행 감사(2026-10-08 · `bank_audit_r3/` · as-found k = 11)를 계기로 더한 규칙 — 같은
+#: 원칙으로 6회차 동결은 이 규칙들을 빼고 본다. 다음 회차 규칙은 이 슬라이스 *뒤*에 붙이고 끝 경계를
+#: 고친다.
+ROUND7_RULE_IDS: Final[frozenset[str]] = frozenset(
+    RULE_IDS[RULE_IDS.index("T05-quadratic-slope") :]
 )
 
 #: 자격 측정(`qualification/` · 2026-10-08) **뒤에** 더한 회차 규칙 전부. 측정을 통과한 감사
 #: 프로토콜의 기계 투표는 4회차 규칙 집합으로 고정돼 있으므로 이 집합은 생성기 빌드 가드 전용이다
 #: (`p3_audit_qualification.EXCLUDED_GUARD_RULES`·시더의 원본 선별이 같은 집합을 뺀다). 앞으로 더할
 #: 회차의 규칙 집합도 여기에 합친다 — 합치지 않으면 투표·시험지 재현이 조용히 바뀐다.
-POST_QUALIFICATION_RULE_IDS: Final[frozenset[str]] = ROUND5_RULE_IDS | ROUND6_RULE_IDS
+POST_QUALIFICATION_RULE_IDS: Final[frozenset[str]] = (
+    ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
+)
 
 #: 5·6회차 규칙 중 *매개변수 선택*의 우연 일치를 보는 규칙 — 틀(frame)의 설계가 아니라 고른 수치가
 #: 오답 경로와 정답을 겹치게 만든 경우다(f'(1) 대신 f(1)로 풀어도 같은 a · 구간 안 자연수가 하나뿐 ·
@@ -341,6 +389,10 @@ COINCIDENCE_RULE_IDS: Final[frozenset[str]] = frozenset(
         "T-ratio-shortcut",
         "T-derivative-roots-coincidence",
         "T09-factored-level",
+        # ── 7회차 ──
+        "T-power-path-coincidence",
+        "T-component-critical-point",
+        "T10-confusable-quantity",
     }
 )
 
@@ -2800,10 +2852,527 @@ def _round6_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# [7회차] 은행 감사 3회차(2026-10-08 · `bank_audit_r3/` · as-found k = 11)
+# ──────────────────────────────────────────────────────────────────────────
+_C03: Final = "[12미적Ⅰ-02-03]"
+#: 거듭제곱 미분의 두 대표 오답 경로를 오답 선지로 거는 kebab(정본 L4 카탈로그 · M0671).
+_POWER_RULE_KEBAB: Final = "power-rule-step-omitted"
+#: 거듭제곱 미분의 두 대표 오답 경로 — (x^n)' = x^(n - 1)(계수 누락) · (x^n)' = n·x^n(지수 유지).
+_POWER_PATHS: Final = ("계수 누락", "지수 유지")
+
+
+def _tangent_curve_degree(question: str) -> int | None:
+    """발문에 보이는 x의 다항식 중 최고 차수 — 접선 문항의 곡선(직선·좌표는 차수가 낮아 묻힌다)."""
+    x = sympy.Symbol("x")
+    degrees = [
+        int(sympy.degree(p, x)) for p in visible_polynomials(question) if x in p.free_symbols
+    ]
+    return max(degrees) if degrees else None
+
+
+def _quadratic_slope_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] (02-05) 접선의 기울기·접점을 미분 평가로 정하는데 발문의 곡선이 이차 이하다.
+
+    이차곡선 y = Ax^2 + bx + c와 기울기 m인 직선 y = mx + n을 연립한 이차방정식이 중근을 가질
+    조건(판별식 = 0)에서 그 중근 x = (m - b)/(2A)가 곧 접점이다 — 미분 없이 기울기 → 접점(기울기가
+    주어진 값·평행·수직)이 나오고(판정자 지적 4d287bbd·1006bee0·5209729b·ac28058d·ee5a4588), 같은
+    중근 조건이 접점 → 기울기(m = 2Aa + b)도 준다. 5회차 `T05-quadratic-tangent-constant`는 검산에
+    미분이 *없는*(판별식형) y절편 틀만 덮었다.
+
+    곡선은 발문에서 읽는다 — 검산 조건의 미분 몸통은 Tier1 표기 제약으로 합성된 식(f(x + d) - f(x)
+    등)이라 곡선의 차수와 다를 수 있다. 절 둘: (가) 접점이 미지수(미분 평가점이 문자) · (나)
+    기울기를 구한다(미분 평가점이 수).
+    """
+    if "접" not in probe.question_text:
+        return []
+    degree = _tangent_curve_degree(probe.question_text)
+    if degree is None or degree > 2:
+        return []
+    clauses: set[str] = set()
+    for condition in probe.conditions:
+        for call in _derivative_calls(condition):
+            if call.order != 1 or "Derivative" in call.body:
+                continue
+            numeric = call.point is not None and _rational(call.point) is not None
+            clauses.add("기울기" if numeric else "접점")
+    out: list[ShortcutViolation] = []
+    if "접점" in clauses:
+        out.append(
+            ShortcutViolation(
+                "T05-quadratic-slope",
+                "곡선이 이차 이하인데 접선의 기울기(주어진 값·평행·수직)로 접점을 구하게 한다 — 그 "
+                "기울기의 직선과 연립한 이차방정식의 중근(판별식 = 0)이 곧 접점이라 미분 없이 "
+                "풀린다. 곡선을 삼차 이상으로 쓴다.",
+            )
+        )
+    if "기울기" in clauses:
+        out.append(
+            ShortcutViolation(
+                "T05-quadratic-slope",
+                "곡선이 이차 이하인데 접점에서의 접선의 기울기를 구하게 한다 — 접선과 연립한 "
+                "이차방정식이 그 점에서 중근을 가질 조건(근과 계수의 관계)으로 미분 없이 기울기가 "
+                "나온다. 곡선을 삼차 이상으로 쓴다.",
+            )
+        )
+    return out
+
+
+def power_path_derivative(expr: sympy.Expr, var: sympy.Symbol, path: str) -> sympy.Expr | None:
+    """거듭제곱 미분의 대표 오답 경로로 '미분한' 식(생성기·판정기 단일 원천).
+
+    `path`가 '계수 누락'이면 c·x^e → c·x^(e - 1), '지수 유지'면 c·x^e → e·c·x^e. 항마다 c·var^e
+    꼴로 읽어 지수 e가 문자여도 된다(x^n). 상수항은 두 경로 모두 지운다(상수의 미분은 오개념과
+    무관하다). c·var^e 꼴이 아닌 항이 있으면 None.
+    """
+    out = sympy.Integer(0)
+    for term in sympy.Add.make_args(sympy.expand(expr)):
+        coeff, exponent = term.as_coeff_exponent(var)
+        if var in coeff.free_symbols:
+            return None
+        if exponent == 0:
+            continue
+        if path == "계수 누락":
+            out += coeff * var ** (exponent - 1)
+        elif path == "지수 유지":
+            out += exponent * coeff * var**exponent
+        else:  # pragma: no cover — 호출 오류
+            raise ValueError(f"알 수 없는 경로: {path}")
+    return sympy.expand(out)
+
+
+def _path_solutions(
+    eq: sympy.Expr, var: sympy.Symbol, filters: Sequence[_Relation]
+) -> set[sympy.Expr]:
+    """오답 경로 방정식의 해 — var가 지수에 들면(x^n의 n) 0..30의 정수를 대입해 찾는다.
+
+    거듭제곱의 지수 n은 자연수라 정수 탐색이 해 전부다(초월방정식을 SymPy로 풀지 않는다).
+    """
+    if eq.free_symbols != {var}:
+        return set()
+    if eq.is_polynomial(var):
+        return _solutions(eq, var, filters)
+    return {
+        sympy.Integer(k)
+        for k in range(31)
+        if sympy.simplify(eq.subs(var, k)) == 0 and _passes(sympy.Integer(k), filters)
+    }
+
+
+def _is_power_monomial_body(body: sympy.Expr, var: sympy.Symbol) -> bool:
+    """미분하는 식이 상수항을 빼면 거듭제곱 하나(c·x^n · n ≥ 2 또는 문자 지수)인가 — '거듭제곱
+    미분계수'(2x^3 - 5의 도함수는 6x^2 하나라 미분 단계가 곧 거듭제곱 미분이다)."""
+    terms = [t for t in sympy.Add.make_args(sympy.expand(body)) if var in t.free_symbols]
+    if len(terms) != 1:
+        return False
+    coeff, exponent = terms[0].as_coeff_exponent(var)
+    if var in coeff.free_symbols or exponent == 0:
+        return False
+    return bool(exponent.free_symbols) or bool(exponent >= 2)
+
+
+def _power_scope(probe: ShortcutProbe, body: sympy.Expr, var: sympy.Symbol) -> bool:
+    """거듭제곱 미분이 *검사 대상*인 문항 — 02-03(x^n의 도함수)·그 오개념을 건 오답 선지·몸통이
+    거듭제곱 하나인 미분계수. 02-04(합·곱의 미분법)처럼 거듭제곱 미분이 선수 지식인 문항의 f'(0)·
+    f'(1) 읽기는 보지 않는다(정직 범위 — 그 개념의 검사 대상이 아니다)."""
+    if probe.standard_code == _C03:
+        return True
+    if any(mid == _POWER_RULE_KEBAB for _, mid in probe.distractors):
+        return True
+    return _is_power_monomial_body(body, var)
+
+
+def _evaluated_path_hits(probe: ShortcutProbe) -> list[str]:
+    """평가 절 — 미분 평가를 오답 경로 도함수로 바꿔 풀어도 정답과 같은 해 하나가 나오는 경로."""
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    filters = _side_filters(probe, var)
+    hits: list[str] = []
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or "Derivative" in call.body:
+            continue
+        body = _sym(call.body)
+        v = sympy.Symbol(call.var)
+        point = v if call.point is None else _sym(call.point)
+        if body is None or point is None or not _power_scope(probe, body, v):
+            continue
+        for path in _POWER_PATHS:
+            wrong = power_path_derivative(body, v, path)
+            if wrong is None or sympy.simplify(wrong - sympy.diff(body, v)) == 0:
+                # 그 경로가 이 함수에서는 오답이 아니다(f(x) = x의 계수 누락 x^0 = 1은 참 도함수다)
+                continue
+            eq = sympy.expand(wrong.subs(v, point) - rel.other)
+            if var in eq.free_symbols and _path_solutions(eq, var, filters) == {answer}:
+                hits.append(f"{path} 경로({call.var}에서의 값)")
+    return hits
+
+
+#: 도함수 꼴 읽기 — 발문의 거듭제곱 함수와 도함수 꼴 'cx^m'·'kx^m'.
+_FORM_FUNCTION = re.compile(
+    r"(?:(?<![A-Za-z'])[a-z]\((?P<v>[xt])\)|(?<![A-Za-z'])y) = (?P<c>-?\d*)(?P<v2>[xt])\^(?P<n>\d+)"
+    r"(?![\d^])"
+)
+_FORM_SHAPE = re.compile(r"(?<![A-Za-z'])(?P<k>[ck])(?P<v>[xt])\^m(?![A-Za-z])")
+#: 주어진 도함수 꼴 — 'f(x) = x^n'(문자 지수)와 "f'(x) = 5x^4"·"f'(x) = kx^5".
+_SYMBOLIC_POWER = re.compile(
+    r"(?:(?<![A-Za-z'])[a-z]\([xt]\)|(?<![A-Za-z'])y) = (?P<v>[xt])\^(?P<e>[a-z])(?![A-Za-z])"
+)
+_GIVEN_FORM = re.compile(
+    r"(?<![A-Za-z'])[a-z]'\((?P<v>[xt])\) = (?P<g>-?\d+|[a-z]|)(?P=v)\^(?P<m>\d+)(?![\d^])"
+)
+
+
+def _asked_form_value(
+    question: str, letter: str, coef: sympy.Expr, exponent: sympy.Expr
+) -> sympy.Expr | None:
+    """발문이 묻는 도함수 꼴의 값 — 'c + m'·'c와 m의 곱'('cm')·'c'('계수 c')·'m'(그 순서로 본다)."""
+    k = re.escape(letter)
+    if re.search(rf"{k} \+ m(?:의 값|[을를])|m \+ {k}(?:의 값|[을를])", question):
+        return coef + exponent
+    if re.search(rf"{k}와 m의 곱|{k}m의 값|m{k}의 값", question):
+        return coef * exponent
+    if re.search(rf"(?<![A-Za-z]){k}의 값|계수 {k}[를을]", question):
+        return coef
+    if re.search(r"(?<![A-Za-z])m의 값", question):
+        return exponent
+    return None
+
+
+def _form_path_hits(probe: ShortcutProbe) -> list[str]:
+    """꼴 읽기 절 — 도함수를 c·x^m 꼴로 읽는 문항에서 오답 경로의 c·m으로도 정답이 나오는가.
+
+    (가) '거듭제곱 함수의 도함수를 cx^m 꼴로 나타낼 때 c(m)의 값' — 지수 유지(n·x^n)는 c를, 계수
+    누락(x^(n - 1))은 m을 늘 맞힌다(판정자 지적 76a9f5ac — x^8 → c = 8). (나) '도함수가
+    f'(x) = 5x^4일 때 n' — 계수 누락은 지수 비교로, 지수 유지는 계수 비교로 n을 맞힌다.
+    """
+    q = probe.question_text
+    answer = _answer_value(probe)
+    if answer is None:
+        return []
+    hits: list[str] = []
+    shape = _FORM_SHAPE.search(q)
+    function = _FORM_FUNCTION.search(q)
+    if shape is not None and function is not None:
+        raw = function.group("c")
+        lead = sympy.Integer(1 if raw in ("", None) else (-1 if raw == "-" else int(raw)))
+        n = sympy.Integer(function.group("n"))
+        paths = {"계수 누락": (lead, n - 1), "지수 유지": (lead * n, n)}
+        for path, (coef, exponent) in paths.items():
+            value = _asked_form_value(q, shape.group("k"), coef, exponent)
+            if value is not None and value == answer:
+                hits.append(f"{path} 경로(도함수 꼴 읽기)")
+    symbolic, given = _SYMBOLIC_POWER.search(q), _GIVEN_FORM.search(q)
+    if symbolic is not None and given is not None:
+        letter = symbolic.group("e")
+        m = sympy.Integer(given.group("m"))
+        g = given.group("g")
+        asked = str(_answer_var(probe) or "")
+        wrong: dict[str, set[sympy.Expr]] = {"계수 누락": set(), "지수 유지": set()}
+        if asked == letter:
+            # 계수 누락 x^(n - 1): 지수 비교 n - 1 = m · 지수 유지 n·x^n: 지수 비교 n = m, 계수 비교
+            # n = g
+            wrong["계수 누락"].add(m + 1)
+            wrong["지수 유지"].add(m)
+            if re.fullmatch(r"-?\d+", g):
+                wrong["지수 유지"].add(sympy.Integer(g))
+        elif re.fullmatch(r"[a-z]", g) and asked == g:
+            # 계수 누락이면 n = m + 1이고 계수는 1 · 지수 유지면 n = m이고 계수는 m
+            wrong["계수 누락"].add(sympy.Integer(1))
+            wrong["지수 유지"].add(m)
+        hits += [
+            f"{path} 경로(주어진 도함수 꼴 비교)" for path, vals in wrong.items() if answer in vals
+        ]
+    return hits
+
+
+def _power_path_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] 거듭제곱 미분의 두 대표 오답 경로 중 하나라도 정답과 같은 값을 낸다.
+
+    판정자 지적 3건 중 2건 — f(x) = x^2의 f'(1)(x = 1이면 지수 유지 n·x^n도 같은 값 · cbde3ec3)·
+    x^8의 도함수 cx^m의 c(지수 유지 8x^8도 c = 8 · 76a9f5ac). 거듭제곱 미분이 검사 대상인 문항
+    (`_power_scope`)에서 평가 절(미분 평가를 오답 경로 도함수로 바꿔 푼 해가 정답 하나)과 꼴 읽기
+    절(도함수를 c·x^m 꼴로 읽는 문항)을 본다. 매개변수 거부 조건이다(x = 1·x = 0 같은 평가점은
+    파라미터 선택이다) — 꼴 읽기 절은 틀 자체가 늘 걸리므로 생성기가 묻는 값을 c + m 등으로 바꾼다.
+    """
+    hits = _evaluated_path_hits(probe) + _form_path_hits(probe)
+    if not hits:
+        return []
+    return [
+        ShortcutViolation(
+            "T-power-path-coincidence",
+            f"거듭제곱 미분의 대표 오답 경로({', '.join(sorted(set(hits)))})로 풀어도 정답 "
+            f"{probe.answer.strip()}이(가) 나온다 — 지수를 내리는 단계·1 줄이는 단계 중 하나를 "
+            "빠뜨린 학생도 맞힌다(변별 없음). 그 매개변수를 쓰지 않는다.",
+        )
+    ]
+
+
+def _named_functions(question: str, var: str) -> list[tuple[str, sympy.Expr]]:
+    """발문이 이름을 붙여 보여 주는 다항함수 'f(x) = …'·'g(x) = …'(var만의 수치 다항식)."""
+    v = sympy.Symbol(var)
+    out: list[tuple[str, sympy.Expr]] = []
+    for m in _DEFINITION.finditer(question):
+        if m.group("arg") != var or m.group("name") == var:
+            continue
+        rhs = _clean_rhs(m.group("rhs"), var)
+        if re.search(r"[a-z]\(", rhs):
+            continue  # 'h(x) = 2f(x) - 3g(x)'(추상 함수 결합)는 성분이 아니라 결합이다
+        expr = _parse_student(rhs)
+        if expr is not None and expr.free_symbols == {v}:
+            out.append((m.group("name"), sympy.expand(expr)))
+    return out
+
+
+def _combination_weights(
+    body: sympy.Expr, components: Sequence[sympy.Expr], var: sympy.Symbol
+) -> list[sympy.Expr] | None:
+    """body = Σ αᵢ·성분ᵢ(αᵢ 상수)의 계수 — 성분의 일차결합이 아니거나 계수가 하나로 정해지지 않으면
+    None."""
+    weights = sympy.symbols(f"w0:{len(components)}")
+    gap = sympy.expand(body - sum(w * c for w, c in zip(weights, components, strict=True)))
+    equations = sympy.Poly(gap, var).coeffs() if gap != 0 else []
+    try:
+        solved = sympy.solve(equations, list(weights), dict=True)
+    except (NotImplementedError, ValueError, TypeError):
+        return None
+    if len(solved) != 1 or any(w not in solved[0] for w in weights):
+        return None
+    values = [solved[0][w] for w in weights]
+    return None if any(v.free_symbols for v in values) else values
+
+
+def _component_critical_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] 합·차·실수배의 미분계수인데 평가점이 한 성분 함수의 임계점이다(성분 도함수가 0).
+
+    h(x) = 2f(x) - 3g(x)의 h'(-1)에서 g'(-1) = 0이면 -3g 항의 기여가 0이라, 실수배·차의 처리를 g
+    쪽에서 틀려도(부호를 +로 · 계수 3을 빠뜨려) 모두 정답이 나온다(판정자 지적 0bcf3427). 미분하는
+    식이 발문이 이름 붙여 보인 함수들의 *일차결합*(계수 0이 아닌 성분 둘 이상)일 때만 본다 — 곱의
+    미분법은 성분 도함수가 0이어도 다른 성분의 함숫값이 곱해져 남는다(대상 아님).
+    """
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or call.point is None or "Derivative" in call.body:
+            continue
+        point, body = _rational(call.point), _sym(call.body)
+        v = sympy.Symbol(call.var)
+        if point is None or body is None or body.free_symbols != {v}:
+            continue
+        named = _named_functions(probe.question_text, call.var)
+        if len(named) < 2:
+            continue
+        weights = _combination_weights(body, [expr for _, expr in named], v)
+        if weights is None or sum(1 for w in weights if w != 0) < 2:
+            continue
+        flat = [
+            name
+            for (name, expr), w in zip(named, weights, strict=True)
+            if w != 0 and sympy.diff(expr, v).subs(v, point) == 0
+        ]
+        if flat:
+            return [
+                ShortcutViolation(
+                    "T-component-critical-point",
+                    f"평가점 {call.var} = {point}에서 성분 함수 {', '.join(flat)}의 도함수가 "
+                    "0이다 — 그 성분의 실수배·부호 처리를 틀려도 정답이 같다(변별 없음). 어느 "
+                    "성분의 도함수도 평가점에서 0이 아닌 매개변수를 쓴다.",
+                )
+            ]
+    return []
+
+
+#: 미분 차수 → 혼동하기 쉬운 양의 차수(속도↔위치·가속도 · 가속도↔속도 — 고등 운동 문항의 혼동).
+_CONFUSABLE_ORDERS: Final[dict[int, tuple[int, ...]]] = {1: (0, 2), 2: (1,)}
+_QUANTITY_NAMES: Final[dict[int, str]] = {0: "위치", 1: "속도", 2: "가속도"}
+
+
+def _confusable_quantity_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] (02-10) 묻는 양과 혼동하기 쉬운 양(속도↔가속도·위치↔속도)이 같은 시각에 같은 값이다.
+
+    '가속도가 0이 되는 시각의 속도'에서 위치가 (t - 1)^3 + c 꼴이면 그 시각의 속도도 0이라, 속도와
+    가속도를 혼동한 경로·조건값 0을 옮겨 적는 경로가 정답이다(판정자 지적 30d80000). 미분하는 식이
+    발문의 위치 다항식 그대로일 때만 본다(속도의 합·변화량처럼 합성된 검산식은 학생의 양이 아니다).
+    """
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    filters = _side_filters(probe, var)
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.point is None or "Derivative" in call.body:
+            continue
+        body, point = _sym(call.body), _sym(call.point)
+        if body is None or point is None or not _is_shown(body, probe.question_text, call.var):
+            continue
+        v = sympy.Symbol(call.var)
+        for order in _CONFUSABLE_ORDERS.get(call.order, ()):
+            quantity = body if order == 0 else sympy.diff(body, v, order)
+            eq = sympy.expand(quantity.subs(v, point) - rel.other)
+            if var in eq.free_symbols and _solutions(eq, var, filters) == {answer}:
+                asked = _QUANTITY_NAMES[call.order]
+                other = _QUANTITY_NAMES[order]
+                return [
+                    ShortcutViolation(
+                        "T10-confusable-quantity",
+                        f"묻는 양({asked})을 {other}로 혼동해 구해도 같은 답 {answer}이 나온다 — "
+                        f"{asked}와 {other}를 구별하지 못하는 학생도 맞힌다(변별 없음). 그 "
+                        "매개변수를 쓰지 않는다.",
+                    )
+                ]
+    return []
+
+
+#: 운동 기호를 *주어 자리에서* 소개하는 정의 — '속도 v(t)는 위치 x를 시각 t로 미분한 값'.
+_V_SUBJECT = re.compile(r"(?<!가)속도 v\(t\)는[^.]*?위치[^.]*?(?:미분한 값|도함수)")
+_A_SUBJECT = re.compile(r"가속도 a\(t\)는[^.]*?속도[^.]*?(?:미분한 값|도함수)")
+
+
+def motion_symbols_not_in_subject(explanation: str) -> tuple[str, ...]:
+    """해설이 주어 자리에서 소개하지 않는 운동 기호 — v(t)·a(t)의 *첫 등장*이 '속도 v(t)는 …
+    미분한 값'(가속도도 같다)의 그 기호여야 한다(생성기와 판정기 `E-motion-symbol-subject`의 단일
+    원천).
+
+    6회차 `undefined_motion_symbols`는 '속도는 위치를 미분한 값이다. v(t) = …'처럼 정의 문장이
+    기호보다 앞서기만 하면 통과시킨다 — 그 형태는 기호 v(t)를 소개하지 않는다(판정자 지적 fb9ec6bc).
+    """
+    out: list[str] = []
+    for symbol, pattern, word in (("v(t)", _V_SUBJECT, "속도 "), ("a(t)", _A_SUBJECT, "가속도 ")):
+        first = explanation.find(symbol)
+        if first < 0:
+            continue
+        match = pattern.search(explanation)
+        if match is None or match.start() + len(word) != first:
+            out.append(symbol)
+    return tuple(out)
+
+
+def _motion_subject_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] v(t)·a(t)를 '속도 v(t)는 …'처럼 주어 자리에서 소개하지 않는다."""
+    out: list[ShortcutViolation] = []
+    for symbol in motion_symbols_not_in_subject(probe.explanation):
+        word = "속도 v(t)는 위치 x를" if symbol == "v(t)" else "가속도 a(t)는 속도 v(t)를"
+        out.append(
+            ShortcutViolation(
+                "E-motion-symbol-subject",
+                f"해설이 {symbol}를 기호로 소개하지 않고 쓴다 — 첫 문장을 '{word} 시각 t로 미분한 "
+                f"값이므로 {symbol} = …'처럼 기호를 주어 자리에 두어 소개한다.",
+            )
+        )
+    return out
+
+
+#: 함수 표기 L(수)·L(문자)·L'(…) — 'x(5)'·"f'(3)"(곱 '2x(x + 3)'은 인자가 식이라 잡지 않는다).
+_CALL_NOTATION = re.compile(r"(?<![A-Za-z'])([a-z])'*\((-?\d+(?:/\d+)?|[a-z])\)")
+
+
+def _introduces(explanation: str, letter: str, before: int) -> bool:
+    """해설이 `before` 이전(또는 그 자리)에서 letter를 함수로 소개하는가('f(x)라 하자'·
+    'h(x) = … 이라 하자'·"f'(x)라 하면")."""
+    k = re.escape(letter)
+    patterns = (
+        rf"(?<![A-Za-z']){k}'*\([a-z]\)\s*(?:이라|라|로)\s*(?:하|두|놓)",
+        rf"(?<![A-Za-z']){k}\([a-z]\)\s*=\s*[^.]*?(?:이라|라)\s*(?:하|두|놓)",
+    )
+    return any(
+        m is not None and m.start() <= before for m in (re.search(p, explanation) for p in patterns)
+    )
+
+
+def _function_notation_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] 해설이 발문에 없는 함수 표기('x(5)')를 소개 없이 쓴다.
+
+    발문은 '위치가 x = 2t^2 - 6t + 5'로 x를 *변수*로만 쓰는데 해설이 'x(5) = 25'처럼 함수 표기를
+    쓴다(판정자 지적 fb9ec6bc). 운동 기호 v(t)·a(t)는 운동 기호 규칙이 따로 본다.
+    """
+    q, e = probe.question_text, probe.explanation
+    motion = "속도" in e or "속도" in q
+    seen: set[str] = set()
+    for m in _CALL_NOTATION.finditer(e):
+        letter = m.group(1)
+        if letter in seen or (motion and letter in ("v", "a")):
+            continue
+        seen.add(letter)
+        if re.search(rf"(?<![A-Za-z']){re.escape(letter)}'*\(", q):
+            continue
+        if _introduces(e, letter, m.start()):
+            continue
+        return [
+            ShortcutViolation(
+                "E-function-notation",
+                f"해설이 발문에 없는 함수 표기 '{m.group(0)}'를 소개 없이 쓴다 — 't = 5일 때의 "
+                "위치'처럼 말로 풀어 쓰거나 먼저 기호를 정의한다.",
+            )
+        ]
+    return []
+
+
+#: 증가·감소가 바뀌는 점을 묻는 발문(극값 어휘 없이).
+_TURNING_TARGET = re.compile(r"증가·감소가 바뀌는|증가하다가 감소|감소하다가 증가")
+_EXTREMUM_WORD = re.compile(r"극값|극대|극소")
+
+
+def _conclusion_target_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[7회차] (02-08) 해설의 결론 문장이 발문이 묻는 대상과 어긋난다.
+
+    절 둘: (가) 발문은 '증가·감소가 바뀌는 점'을 묻는데 결론은 '극값을 갖는 x좌표'로 맺는다(판정자
+    지적 b2d3bc4b) · (나) 결론 문장에 정답이 없다(상수 a를 묻는데 'x = 3에서 극솟값을 갖는다'로
+    맺는 검산 문장 — 결론이 묻는 대상을 말하지 않는다).
+    """
+    sentences = _sentences(probe.explanation)
+    if not sentences:
+        return []
+    last, q = sentences[-1], probe.question_text
+    out: list[ShortcutViolation] = []
+    if (
+        _TURNING_TARGET.search(q)
+        and not _EXTREMUM_WORD.search(q)
+        and _EXTREMUM_WORD.search(last)
+        and "바뀌" not in last
+    ):
+        out.append(
+            ShortcutViolation(
+                "E-conclusion-target",
+                "발문은 증가·감소가 바뀌는 점을 묻는데 해설의 결론은 극값(극대·극소)으로 맺는다 — "
+                "'증가·감소가 바뀌는 점의 x좌표는 …'처럼 발문의 대상으로 맺는다.",
+            )
+        )
+    answer = probe.answer.strip()
+    if _rational(answer) is not None and answer not in set(_NUMBER_TOKEN.findall(last)):
+        out.append(
+            ShortcutViolation(
+                "E-conclusion-target",
+                f"해설의 결론 문장('{last[:40]}…')이 발문이 묻는 값 {answer}을 말하지 않는다 — "
+                "마지막 문장을 묻는 대상의 값으로 맺는다.",
+            )
+        )
+    return out
+
+
+def _round7_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """7회차 규칙 전부(성취기준별 분기 포함)."""
+    code = probe.standard_code
+    out = (
+        _power_path_rule(probe)
+        + _component_critical_rule(probe)
+        + _motion_subject_rule(probe)
+        + _function_notation_rule(probe)
+    )
+    if code == _C05:
+        out += _quadratic_slope_rule(probe)
+    if code == _C08:
+        out += _conclusion_target_rule(probe)
+    if code == _C10:
+        out += _confusable_quantity_rule(probe)
+    return out
+
+
 def parameter_coincidences(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """매개변수 선택의 우연 일치 위반만(`COINCIDENCE_RULE_IDS`) — 생성기의 매개변수 거부 조건."""
     return [
-        v for v in _round5_rules(probe) + _round6_rules(probe) if v.rule in COINCIDENCE_RULE_IDS
+        v
+        for v in _round5_rules(probe) + _round6_rules(probe) + _round7_rules(probe)
+        if v.rule in COINCIDENCE_RULE_IDS
     ]
 
 
@@ -2823,7 +3392,7 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
         out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
-    return out + _round5_rules(probe) + _round6_rules(probe)
+    return out + _round5_rules(probe) + _round6_rules(probe) + _round7_rules(probe)
 
 
 def violations_by_rule(probes: Sequence[ShortcutProbe]) -> dict[str, int]:
