@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-119-error-code-retroactive-and-seat-mapping
+title: "에러코드 소급 부여 + l3 좌석 실패 매핑 + 관측 소비 배선 (OPS-82 후속)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-82-structured-error-code-taxonomy
+requires_gates: []
+acceptance:
+  - "① 기존 예외 57종 중 학생 대면 경로로 올라오는 것부터 `error_code` 클래스 속성을 부여한다(부여 규칙은 docs/standards/error_code_taxonomy.md §3 — 신규 계열은 FAMILIES에 한 줄 추가).\n② l3 좌석 실패(SeatCallError 계열)와 DegradeReason의 대응표를 레지스트리에 둔다. GenerationFailureCode(F1~F8)와 합치지 않는다.\n③ 소비 지점 별항: 로그 집계·관측 대시보드가 error_code 분포를 읽는 경로를 배선하고, 배선 0인 채로 완료하지 않는다.\n④ 전건 소급을 한 번에 하지 않는다 — 계열 단위로 쪼개 착지한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/providers/seat_failure.py
+  - docs/standards/error_code_taxonomy.md
+session: null
+notes: "OPS-82에서 분리한 후속(acceptance 6번: 전건 소급은 별도). 정본 docs/standards/error_code_taxonomy.md 6절. 기간은 목표이지 진도 제한이 아니므로 내용 선행이 갖춰지면 앞당겨 착수한다."
+updated: 2026-10-08
