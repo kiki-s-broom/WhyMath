@@ -112,6 +112,7 @@ from whymath_backend.l3.models import (
     RoutingRequest,
     Usage,
 )
+from whymath_backend.l3.pipeline import served_cloud_seat
 from whymath_backend.l3.router import (
     Router,
     _as_cost_tier,
@@ -766,22 +767,36 @@ def generation_routing_request(subscription: str = "free") -> RoutingRequest:
     )
 
 
-def _record_trace(trace: TraceSink, decision: RoutingDecision, usage: Usage | None) -> None:
+def _record_trace(
+    trace: TraceSink,
+    provider: LLMProvider,
+    decision: RoutingDecision,
+    usage: Usage | None,
+) -> None:
     """생성 1건의 라우팅·실측을 sink에 기록 — never-break(배치 비차단·타입명만 경고).
 
     비용 회계는 `pipeline.generate` 동형: usage 없음·클라우드 토큰 미상이면 None('미상'과
     0원 구분 — 지어내지 않음). 오프라인 공장이라 student_id_hash 없음.
+
+    OPS-116 — 단가 좌석은 호출을 받은 `provider`에서 읽는다(생략 시 anthropic 단가로 적혀 openrouter
+    호출이 과대 계상된다). 미상(None)은 anthropic으로 접지 않고 '미측정'으로 남기며, 같은 값을
+    trace의 `cloud_seat`에도 싣는다.
     """
     actual_krw: float | None
     is_cloud = _as_cost_tier(decision.cost_tier) is not CostTier.LOCAL
+    seat = served_cloud_seat(provider) if is_cloud else None
     if usage is None:
         actual_krw = None
     elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
         actual_krw = None
     else:
-        actual_krw = actual_cost_krw(decision, usage)
+        actual_krw = actual_cost_krw(decision, usage, seat=seat)
     try:
-        trace.record(langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw))
+        trace.record(
+            langfuse_fields(
+                decision, cache_hit=False, usage=usage, cost_krw=actual_krw, cloud_seat=seat
+            )
+        )
     except Exception as exc:  # noqa: BLE001 — 관측 장애가 생성 배치를 깨면 안 됨
         # 침묵실패 금지 — 예외 *타입명*만 경고(필드·키 값 미출력·langfuse_sink 방침 동형).
         _LOGGER.warning("다중 풀이 생성 관측 기록 실패(%s) — 무시하고 계속", type(exc).__name__)
@@ -857,7 +872,7 @@ async def generate_candidates(
             )
             continue
         # LLM 호출 성공 = 비용 발생 — 하류 파싱 성패와 무관하게 관측을 먼저 남긴다.
-        _record_trace(trace, decision, generated.usage)
+        _record_trace(trace, provider, decision, generated.usage)
         data = extract_json(generated.text)
         if data is None:
             report.parse_failures += 1

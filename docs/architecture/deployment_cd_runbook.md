@@ -140,11 +140,11 @@ docker compose --env-file deploy\staging.env -f docker-compose.prod.yml run --rm
 # 3-2. 스택 기동
 docker compose --env-file deploy\staging.env -f docker-compose.prod.yml up -d
 
-# 자가검증: 컨테이너 3종이 Up 상태여야 함
+# 자가검증: 컨테이너 5종이 Up 상태여야 함
 docker compose --env-file deploy\staging.env -f docker-compose.prod.yml ps
 ```
 
-- **성공**: `alembic current` 출력에 `(head)`, `ps`에 `whymath-staging-app`·`-db`·`-redis` 세 줄이 `Up`(app은 잠시 `starting`일 수 있다 — §4에서 확정).
+- **성공**: `alembic current` 출력에 `(head)`, `ps`에 `whymath-staging-app`·`-db`·`-redis`·`-retention-purge`·`-quality-worker` 다섯 줄이 `Up`(app·quality-worker는 잠시 `starting`일 수 있다 — app은 §4, quality-worker는 §5c에서 확정).
 - **실패 시 대처**:
   - `required variable ... is missing a value` → §1로 돌아가 그 변수를 채운다(이게 fail-closed 동작이다 — 정상 반응).
   - `password authentication failed` → 기존 볼륨이 다른 비밀번호로 초기화돼 있다. 볼륨을 그대로 쓰려면 §1의 `WHYMATH_DB_PASSWORD`를 그 볼륨의 값으로 맞추거나, 데이터를 버려도 되는 스테이징이면 `docker volume rm whymath-staging-db-data` 후 재실행(**prod에서는 절대 금지**).
@@ -245,7 +245,41 @@ docker exec whymath-staging-retention-purge python -m whymath_backend.privacy.re
   compose 셸 루프를 host cron/Celery beat로 교체(§8 미프로비저닝 목록에 없음 — 현재는 불요
   판단, 필요해지면 재검토).
 
-## §5c. 문항 난이도 보정 스케줄(item-calibration) 확인 — PB-10
+## §5c. QUALITY 비동기 워커(quality-worker) 확인 — OPS-27
+
+`app`은 QUALITY(로컬 27B급) 요청을 동기로 처리하지 않고 큐에 넣은 뒤 `202`와 `job_id`를 돌려주며, 호출자는 `GET /v1/jobs/{job_id}`로 결과를 폴링한다. 그 큐를 **꺼내서 처리하는 프로세스**가 `quality-worker` 서비스다. 이 서비스가 없던 시기(OPS-27 이전)에는 `202`로 접수된 작업이 영구히 `pending`이었다 — 브로커(Redis)는 멀쩡하므로 `503`도 나지 않아 겉보기엔 정상이었다. §3의 최초 배포·§5의 갱신 배포에서 `app`과 함께 **자동으로 뜬다**(`app`과 동일 이미지·신규 이미지 0). 이 절은 그 워커가 **실제로 큐를 소비할 상태인지** 확인하는 방법이다.
+
+**정본은 이 컨테이너다.** `infra/phaiakes9/systemd/whymath-worker.service`는 compose 없는 네이티브 토폴로지 전용 대안이며(`infra/phaiakes9/OPERATIONS_24_7.md` §2-0), compose 스택이 도는 호스트에는 **설치하지 않는다** — 같은 브로커에 워커를 둘 띄우면 동시성이 2가 되어 GPU 단일 점유(03a §D.3)를 어기고, 애초에 호스트 워커는 호스트 포트가 닫힌 compose Redis에 닿지 못한다. 워커 수는 1이어야 하므로 `--scale quality-worker=N`도 쓰지 않는다(Compose 스펙상 `container_name`이 있는 서비스는 scale이 거부된다 — 이 거부 동작 자체는 데몬이 없어 이 레포에서 실행해 보지 못했다).
+
+```powershell
+# [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+
+# 자가검증 1: 컨테이너 상태 - "Up ... (healthy)" 여야 함 (기동 직후 40초는 "(health: starting)")
+docker ps --filter "name=whymath-staging-quality-worker" --format "{{.Status}}"
+
+# 자가검증 2: 워커가 QUALITY 태스크를 등록하고 동시성 1로 떴다 - 3가지가 모두 보여야 함:
+#   "concurrency: 1"  /  "whymath.l3.quality.generate"  /  "ready."
+docker logs whymath-staging-quality-worker 2>&1 | Select-String -Pattern "concurrency:|whymath.l3.quality.generate|ready\."
+
+# 자가검증 3: 이 워커 노드가 브로커를 통해 응답한다 - "pong" 이 보이고 종료 코드 0 이어야 함
+docker exec whymath-staging-quality-worker sh -c 'celery -A whymath_backend.l3.queue.tasks:quality_celery_app inspect ping -d celery@$HOSTNAME --timeout 10'
+"PING_EXIT=$LASTEXITCODE"
+
+# 자가검증 4: 컨테이너 안에서 호스트의 Ollama에 닿는다 - 200 이어야 함
+docker exec whymath-staging-quality-worker python -c "import os,urllib.request; print(urllib.request.urlopen(os.environ['WHYMATH_OLLAMA_HOST'] + '/api/tags', timeout=5).status)"
+```
+
+- **성공**: 1이 `healthy`, 2에서 세 문구가 모두 보임, 3이 `pong` + `PING_EXIT=0`, 4가 `200`.
+- **실패 시 신호와 대처**:
+  - 1이 `Restarting`을 반복 → `docker logs --tail 50 whymath-staging-quality-worker`. `AttributeError: 'function' object has no attribute 'user_options'`면 `-A` 대상이 팩토리 함수로 돌아간 것이다(compose의 `command`를 `tasks:quality_celery_app`으로 되돌린다 — 계약 테스트 `tests/infra/test_quality_worker_compose.py`가 이 회귀를 막는다).
+  - 1이 `unhealthy` → 3을 직접 실행. `No nodes replied`면 워커가 브로커에서 떨어진 것, `Could not connect to the message broker`면 Redis가 죽은 것이다(`docker ps`로 `-redis` 확인). 도커는 unhealthy를 자동 재시작하지 않으므로 사람이 `docker compose ... up -d`(§5-3)로 컨테이너를 교체한다.
+  - 4가 `URLError`/`Connection refused` → 워커가 Ollama에 못 닿는다. 이 경우 QUALITY 작업은 `pending`이 아니라 `failure`로 끝난다. 호스트에서 `ollama`가 떠 있는지, 그리고 `deploy\staging.env`의 `WHYMATH_OLLAMA_HOST`(기본 `http://host.docker.internal:11434`)가 맞는지 본다 — `app`의 로컬 LLM 경로와 같은 설정이다.
+- **변별력 근거**: 3의 `-d celery@$HOSTNAME`가 핵심이다. `-d` 없는 ping은 같은 브로커의 **어느 노드가 답해도** exit 0이라, 이 컨테이너의 워커가 죽었는데 이웃 워커(예: 호스트 systemd 워커)가 답하면 정상으로 보인다. 그래서 자기 노드만 부르며, compose의 헬스체크도 같은 형태다. 워커 없음·엉뚱한 노드·브로커 단절은 모두 종료 코드 69로, 정상만 0으로 갈린다(2026-10-08 로컬 실측).
+- **재시작·종료**: 워커를 내릴 때는 `docker compose ... stop quality-worker`를 쓴다. Celery가 SIGTERM에 warm shutdown(진행 중인 작업을 끝내고 종료)하며 `stop_grace_period: 120s`가 그 시간을 보장한다. 이 유예가 없으면(도커 기본 10초) 진행 중인 생성이 SIGKILL로 끊기고, 이미 수신 확인(ack)된 메시지는 재전달되지 않아 **그 작업이 영구 `pending`**이 된다. 이미지 갱신(§5-3의 `up -d`)도 같은 경로로 워커를 교체한다. (2026-10-08 로컬 실측: 진행 중 SIGTERM → 생성을 마치고 종료, 작업 `success` / 진행 중 SIGKILL → 새 워커를 띄워도 큐·미확인(unacked) 건수가 모두 0이고 새 워커는 그 작업을 한 번도 받지 않아 `pending` 유지.)
+- **한계(정직 기술)**: ① 이 스택의 이미지 빌드·`compose up`은 이 문서를 작성한 세션(Docker 데몬 없음)에서 **실행하지 못했다** — 위 4개 자가검증은 첫 실호스트 기동에서 처음 돌아간다. 레포에서 실측된 것은 로컬 `redis-server`(비밀번호 인증) + 실제 `celery` CLI + 가짜 Ollama로 **enqueue → 워커 소비 → `success` 폴링**과 헬스체크 신호의 변별(2026-10-08)이며, 컨테이너 안에서의 동작(비루트 `appuser`·네트워크 이름 해석)은 그 범위 밖이다. ② 작업 유실 방어는 **정상 종료 경로**에만 있다 — 워커 프로세스가 비정상 종료(OOM·강제 kill)하면 진행 중이던 작업은 재시도되지 않는다(`acks_late` 미사용). 이를 바꾸려면 재전달된 작업의 중복 실행(27B 재생성·Langfuse 중복 기록)을 감수해야 하므로 별도 결정이 필요하다. ③ 큐 대기 시간·적체를 보는 지표는 아직 없다(OPS-04 소관).
+
+## §5d. 문항 난이도 보정 스케줄(item-calibration) 확인 — PB-10
 
 `l2/calibrate_items.py`(채점 응답 전수로 문항 IRT 난이도 b·변별도 a를 보정해 `Problem`에 영속)는
 §3·§5 배포에서 **자동으로 같이 뜬다** — `docker-compose.prod.yml`의 `item-calibration`
@@ -482,9 +516,10 @@ gh api repos/kiki-s-broom/WhyMath/environments/prod --jq '{can_admins_bypass, ru
 
 | 항목 | 값 |
 |---|---|
-| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) + `-item-calibration`(문항 난이도 보정 스케줄·PB-10) |
+| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) + `-quality-worker`(QUALITY 비동기 큐 소비자·OPS-27) + `-item-calibration`(문항 난이도 보정 스케줄·PB-10) |
 | 보존 파기 | `retention-purge`가 app 이미지를 재사용해 24h마다 `retention_purge_cli` 호출(§5b) |
-| 난이도 보정 | `item-calibration`이 app 이미지를 재사용해 24h마다 `calibrate_items` 호출(§5c) |
+| QUALITY 워커 | `quality-worker`가 app 이미지를 재사용해 `celery ... worker -c 1`로 큐를 소비(동시성 1 고정·GPU 단일 점유). 정본은 이 컨테이너, systemd 유닛은 비정본 대안(§5c) |
+| 난이도 보정 | `item-calibration`이 app 이미지를 재사용해 24h마다 `calibrate_items` 호출(§5d) |
 | 영속 볼륨 | `whymath-<env>-db-data`, `whymath-<env>-redis-data` |
 | 공개 포트 | app만 `${APP_PORT}`(기본 127.0.0.1 바인딩). db·redis는 **미공개**(compose 네트워크 내부) |
 | 환경 분리 | 단일 compose + `deploy/<env>.env` + `DEPLOY_ENV` 이름 격리 |

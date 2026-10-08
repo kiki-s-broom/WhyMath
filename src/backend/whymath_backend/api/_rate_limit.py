@@ -38,7 +38,7 @@ from typing import (
 
 from fastapi import Depends, Request, Response
 
-from whymath_backend.api._auth import ConsentedUser
+from whymath_backend.api._auth import ConsentedUser, CurrentUser
 from whymath_backend.api._degradation import DegradationCounter, DegradationSnapshot
 from whymath_backend.api._device_metrics import record_device_sig_failure
 from whymath_backend.api._device_store import get_device_store
@@ -62,7 +62,9 @@ _WINDOW_SECONDS = 60.0
 # 그대로 통과시키기 위한 제네릭(코드베이스 관행: PEP 695 대신 명시 TypeVar — api/me.py 선례).
 _FallbackT = TypeVar("_FallbackT")
 
-RateCategory = Literal["read", "write", "device_register", "visualization", "auth", "defect_report"]
+RateCategory = Literal[
+    "read", "write", "device_register", "visualization", "auth", "defect_report", "generate"
+]
 """POST/GET 차등 한도 — 읽기/쓰기 분리 버킷(상호 영향 차단).
 
 `device_register`(슬라이스 25): `/v1/devices/register`의 *전용* 버킷. coach `write`와 키 공간
@@ -82,7 +84,12 @@ RateCategory = Literal["read", "write", "device_register", "visualization", "aut
 `user_id`를 저장하지 않는(RPT-01 설계) *무인증* 표면이라 IP만 가능. coach `write`와 같은
 "write" 카테고리를 공유하면 같은 IP에서의 coach 쓰기 폭주가 결함 신고 한도를 잠식하거나(또는
 그 반대) 두 트래픽 패턴(LLM 대화 vs 1회성 신고)이 뒤섞여 어느 쪽 남용인지 구분이 안 되므로
-`device_register`/`visualization` 선례처럼 전용 카테고리로 분리한다."""
+`device_register`/`visualization` 선례처럼 전용 카테고리로 분리한다.
+
+`generate`(SEC-19): `POST /v1/generate`의 *전용* 버킷 — 라우터를 거쳐 로컬·클라우드·QUALITY(비동기
+큐) 어느 좌석으로든 나가는 원시 LLM 호출 표면이다. 인증(`CurrentUser`)과는 별개 축 — 인증된 단일
+계정도 이 엔드포인트를 반복 호출하면 LLM 비용을 무제한으로 쓸 수 있어, 계정·IP·기기 단위로 상한을
+둔다. `visualization`(LLM 생성)과 키 공간을 나눠, 한쪽 폭주가 다른 쪽 한도를 잠식하지 않는다."""
 
 
 class RateLimitResult(NamedTuple):
@@ -1357,6 +1364,37 @@ async def rate_limit_visualization(
 
 RateLimitedVisualization = Depends(rate_limit_visualization)
 """시각화 LLM 엔드포인트 전용(slice 97) — `dependencies=[RateLimitedVisualization]`."""
+
+
+async def rate_limit_generate(
+    user: CurrentUser,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+) -> None:
+    """원시 LLM 생성(`POST /v1/generate`) 전용 — 3차원·`generate` 버킷(SEC-19).
+
+    `rate_limit_visualization`과 달리 `ConsentedUser`가 아니라 **`CurrentUser`**(인증만)를 받는다.
+    `/v1/generate`의 인가 게이트는 SEC-07 D1이 정한 `CurrentUser`이고, 리미터가 동의 게이트를
+    몰래 얹으면 미성년자 학부모 동의 판정(SEC-20 D9)이 이 엔드포인트에 새로 생겨 접근 의미가
+    바뀐다 — 한도 부착과 동의 정책은 별개 결정이라 여기서 섞지 않는다.
+
+    무인증 요청은 `CurrentUser`가 먼저 401을 던지므로 이 함수 본문(=버킷 계수)에 닿지 않는다.
+    """
+    await _enforce_triple(
+        user.user_id,
+        _client_ip(request, settings=settings),
+        await _client_device_id(request, settings),
+        category="generate",
+        user_limit=settings.generate_rate_limit_per_minute,
+        ip_limit=settings.generate_rate_limit_ip_per_minute,
+        device_limit=settings.generate_rate_limit_device_per_minute,
+        response=response,
+    )
+
+
+RateLimitedGenerate = Depends(rate_limit_generate)
+"""원시 LLM 생성 엔드포인트 전용(SEC-19) — `dependencies=[RateLimitedGenerate]`."""
 
 
 # ──────────────────────────────────────────────────────────────────────────
