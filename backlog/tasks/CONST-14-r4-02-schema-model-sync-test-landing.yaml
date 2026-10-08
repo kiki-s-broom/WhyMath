@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: math
 layer: infra
-status: blocked
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① tests/constitution/test_schema_model_sync.py 를 main 에 착지시킨다(병렬 세션 PR 1493 의 테스트를 그대로 가져온다 — 그 PR 은 다른 세션 소유라 수정하지 않는다). ② 가져온 테스트를 이 저장소 상태로 재검증한다: pytest -q tests/constitution 전건 통과, ruff·black, 변이 주입(동결 제거·거짓 동결·만료 과거·등록부 엔티티 삭제·YAML 필드 추가) 전건 RED·원복 바이트 동일. ③ 개정 A0005 합본 패치의 R4-02 블록이 가리키는 검사 파일이 main 에 있게 된다(채택 후 audit.py --stage 3 에서 R4-02 통과). ④ 범위 밖: constitution/ 편집(Kiki 채택)·어긋남 5건 처분(2026-12-31 만료 전 별도 태스크)."
-artifacts: []
+artifacts:
+  - "PR #1513 https://github.com/kiki-s-broom/WhyMath/pull/1513"
 paths:
   - tests/constitution/test_schema_model_sync.py
   - docs/constitution_proposals/
 session: null
 notes: "CONST-13 후속. R4-02 결정(나안)의 집행 테스트.\n\n[차단 2026-10-07] 세션 1태스크 규칙 임시 해소 — PR 오픈 뒤 done"
-updated: 2026-10-07
+updated: 2026-10-08
