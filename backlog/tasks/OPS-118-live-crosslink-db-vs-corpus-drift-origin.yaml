@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-118-live-crosslink-db-vs-corpus-drift-origin
+title: "라이브 crosslink DB 34행 대 승인 코퍼스 68행 어긋남의 원인 규명 — 38행 미적재·26행 서명 메모 부재·4행 출처 불명이 어떻게 생겼는지와 처분안"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 38행 미적재 원인 규명 — 라이브 DB에 없는 승인 코퍼스 38행이 적재된 적이 없는지, 적재됐다가 사라졌는지를 증거로 가른다. 대조 재료는 crosslinks.json의 승인 시점별 건수 이력(git log)·적재 CLI 실행 기록(결정 로그의 라이브 적재 보고)·DB 재구축 이력(마이그레이션·docker volume 재생성)이다. 한 가설로 좁히거나, 못 좁히면 확인하지 못한 것을 명시한다. ② 26행 서명 메모 부재 경로 — DB note가 서명 형식이 아닌 26행이 어느 경로(게이트 도입 전 적재·게이트를 거치지 않는 저수준 적재)로 들어왔는지, note 문구를 저장소 코드·시더·마이그레이션에서 검색해 출처를 특정하거나 특정 불가를 명시한다. ③ 4행 출처 — 코퍼스 승인 선택과 다른 M-id를 가진 옛 연결 4건(angle-sum-non-triangle 등)의 출처를 같은 방법으로 찾는다. 서버의 WHYMATH_MISCONCEPTION_CROSSLINK_MODE 실제 값은 Kiki 머신 읽기 전용 블록으로 확인한다(블록은 작성 직전에 게이트와 origin/main을 다시 조회한다). ④ 처분안 산출(실행 아님) — 38행 적재 여부·26행 서명 메모 보정 여부를 각각 영향(shadow 측정 대상 집합 변화·감사 기록 복원)과 함께 제안한다. 실행은 HARN-215의 건수 단언이 착지한 뒤이고 4행 처분은 게이트 G-crosslink-live-drift-disposition이 소유한다. ⑤ 재발 탐지 — 라이브 DB와 승인 코퍼스의 대조를 1회성 SQL이 아니라 읽기 전용·종료 코드를 내는 저장소 도구로 둔다. 코퍼스에만 있음·값이 다름·DB에만 있음 세 부류를 건수로 열거한다. ⑥ 변별력 — 도구를 임시 PostgreSQL에 부류별 결함을 주입해 각 부류가 정확히 잡히고 어긋남 0이면 종료 코드 0임을 확인한다(주입 적용 단언·원복 바이트 동일)."
+artifacts: []
+paths:
+  - "docs/reviews/crosslink_live_drift_*.md"
+session: null
+notes: "2026-10-07 조사 문서 docs/reviews/crosslink_live_drift_2026-10-07.md(#1505)가 무엇이 다른지(라이브 34 대 코퍼스 68 = 코퍼스에만 38 · 값 다름 26 · DB에만 4)를 측정했고 왜 다른지는 모른다고 적었다(§4·§8). 이 태스크는 그 원인 규명과 처분안 산출이다. 학생 노출 경로는 현재 없다(shadow 전용·기본 off). 겹침 점검: HARN-215는 적재 도구의 건수 단언(보호 장치)이고 이 태스크는 어긋남의 원인 규명이라 범위가 다르다. 4행 처분 결정은 게이트가 소유한다.\n\n[트리거 면제] 신규 조사 태스크 등재 — 트리거 검출기 대상 아님"
+updated: 2026-10-08
