@@ -115,11 +115,15 @@ def test_cms_modules_are_live_and_have_pages() -> None:
     assert set(_CMS_MODULE_IDS) <= set(modules), "레지스트리에서 CMS 모듈을 못 찾았다"
     for module_id in _CMS_MODULE_IDS:
         module = modules[module_id]
-        assert module["status"] == "live", f"{module_id}: status={module['status']} — 화면이 있는데 live가 아니다"
+        assert (
+            module["status"] == "live"
+        ), f"{module_id}: status={module['status']} — 화면이 있는데 live가 아니다"
         route = module["route"]
         assert route.startswith("/admin/"), (module_id, route)
         page_dir = _ADMIN_DIR.joinpath(*route[len("/admin/") :].strip("/").split("/"))
-        assert (page_dir / "page.admin.tsx").is_file(), f"{module_id}: {page_dir}에 page.admin.tsx가 없다"
+        assert (
+            page_dir / "page.admin.tsx"
+        ).is_file(), f"{module_id}: {page_dir}에 page.admin.tsx가 없다"
         bare = [p.name for p in page_dir.iterdir() if p.is_file() and ".admin." not in p.name]
         assert not bare, f"{module_id}: 접미 없는 파일 — 공개 빌드에 실릴 수 있다: {bare}"
 
@@ -129,11 +133,13 @@ def test_each_cms_page_renders_a_cms_component() -> None:
     modules = {m["id"]: m for m in parse_modules(_registry_text())}
     for module_id in _CMS_MODULE_IDS:
         route = modules[module_id]["route"]
-        page = _ADMIN_DIR.joinpath(*route[len("/admin/") :].strip("/").split("/")) / "page.admin.tsx"
-        text = page.read_text(encoding="utf-8")
-        assert re.search(r"<Cms(?:ResourceScreen|ConceptWorkspace)\b", text), (
-            f"{module_id}: 페이지가 CMS 컴포넌트를 그리지 않는다"
+        page = (
+            _ADMIN_DIR.joinpath(*route[len("/admin/") :].strip("/").split("/")) / "page.admin.tsx"
         )
+        text = page.read_text(encoding="utf-8")
+        assert re.search(
+            r"<Cms(?:ResourceScreen|ConceptWorkspace)\b", text
+        ), f"{module_id}: 페이지가 CMS 컴포넌트를 그리지 않는다"
 
 
 # ── ② 모수 분류 ─────────────────────────────────────────────────────────
@@ -235,7 +241,9 @@ def test_public_import_judge_detects_injected_violation(fixture: str) -> None:
 def test_judges_pass_on_clean_input() -> None:
     """⑥ 양성 대조 — 정상 입력은 위반 0(무차별 실패가 아니다). 권한 이름이 아닌 capability 문자열은 허용."""
     assert cms_path_leak_violations(_CLEAN) == []
-    assert public_import_violations({"app/(public)/page.tsx": "export default function P(){}"}) == []
+    assert (
+        public_import_violations({"app/(public)/page.tsx": "export default function P(){}"}) == []
+    )
     allowed = 'const canRollback = capabilities.includes("publish");'
     assert _scan({"app/admin/_components/CmsVersionPane.tsx": allowed}, _ROLE_NAME_PATTERNS) == []
 

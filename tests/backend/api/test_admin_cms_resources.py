@@ -409,7 +409,9 @@ class TestToJsonable:
             got = to_jsonable(member)
             assert got == expected and type(got) in (str, int), (member, got, type(got))
             assert not isinstance(got, enum.Enum), member
-            assert str(got) == str(expected), member  # 호출부의 str(...)이 이름 문자열을 만들지 않는다
+            assert str(got) == str(
+                expected
+            ), member  # 호출부의 str(...)이 이름 문자열을 만들지 않는다
         nested = to_jsonable({"k": [EdgeType.PREREQUISITE]})
         assert nested == {"k": ["PREREQUISITE"]}
         assert type(nested["k"][0]) is str  # type: ignore[index]

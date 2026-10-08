@@ -1617,7 +1617,9 @@ class TestRouteDeclarationParity:
             if not (isinstance(path, str) and path.startswith("/v1/admin/cms/")):
                 continue  # 문서·정적 라우트에는 `dependant`가 없다 — CMS 라우트만 본다
             dependant = getattr(route, "dependant", None)
-            assert dependant is not None, f"{path}: dependant 부재 — 가드 판정 불가(건너뛰지 않는다)"
+            assert (
+                dependant is not None
+            ), f"{path}: dependant 부재 — 가드 판정 불가(건너뛰지 않는다)"
             for method in getattr(route, "methods", None) or ():
                 by_path[(method, path)] = _guarded_module_ids(dependant)
         checked = 0
@@ -1631,7 +1633,9 @@ class TestRouteDeclarationParity:
                 if key in by_path:
                     assert by_path[key] == {spec.module_id}, (key, by_path[key], spec.module_id)
                     checked += 1
-        assert checked == len(_expected_resource_routes()), "가드 모듈을 확인한 라우트 수가 모자란다"
+        assert checked == len(
+            _expected_resource_routes()
+        ), "가드 모듈을 확인한 라우트 수가 모자란다"
 
     def test_read_only_resource_has_exactly_two_routes(self) -> None:
         paths = [(m, p) for m, p in _ROUTES if "/skill_node" in p]

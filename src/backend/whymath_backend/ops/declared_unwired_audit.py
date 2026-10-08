@@ -244,8 +244,14 @@ def _route_reached(method: str, server_path: str, callers: frozenset[tuple[str, 
 _DART_CALL = re.compile(r"_dio\.(get|post|put|patch|delete)[^(]*\(\s*'([^']*)'", re.DOTALL)
 # python 테스트: `<var>.<method>(f?"<path>...` — 대상은 실제 라우트 접두사로 제한(dict.get 등
 # 무관 호출 오탐 방지).
+#
+# 수신자는 식별자(`client.get(`) **또는 호출 결과**(`_client(u, f).get(` — 앞 호출의 `)`)다.
+# 헬퍼가 클라이언트를 만들어 바로 이어 부르는 형태는 이 저장소 테스트의 흔한 관용구다.
+# 식별자 수신자만 보던 시절에는 그 호출이 통째로 안 보여, 수백 번 호출되는 라우트가
+# 미도달로 잡혔다(P3-12: CMS 라우트 28건). 접두 제한(`/v1/`·`/health`·`/status`)이
+# 무관 호출 오탐을 막는 유일한 방어선이라 수신자를 넓혀도 `make(x).get("키")`는 걸리지 않는다.
 _TEST_CLIENT_CALL = re.compile(
-    r"\b[A-Za-z_][A-Za-z0-9_]*\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
+    r"(?:\b[A-Za-z_][A-Za-z0-9_]*|\))\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
 )
 # `client.request("DELETE", "/v1/me", …)` 변형 — body를 실어야 하는 DELETE(예: 삭제권 confirmation
 # 필드) 등 소수 케이스가 이 형태를 쓴다(`test_me_erasure.py` 실측).
