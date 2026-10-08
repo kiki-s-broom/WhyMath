@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-304-reject-empty-acceptance-and-notes
+title: "backlog add/amend가 빈 acceptance·notes를 거부하지 않아 무증상 오등재 — 입구 검증 신설"
+track: math-completion
+stage: S4
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 — backlog.py add/amend에 --acceptance ''(빈 문자열)·공백만 있는 값, --notes ''를 주면 현재는 거부 없이 빈 항이 대장에 저장된다(2026-10-08 PED-26 세션 실측: 셸 변수 치환이 빈 문자열이 된 채 add가 exit 0으로 acceptance 5항을 빈 문자열로 기록 — PED-43 오등재). 기대 동작은 exit 1 거부 + 거부 사유 출력이다"
+  - "② 집행 — add·amend 두 경로 모두에서 acceptance 각 항과 notes가 strip() 후 비어 있으면 거부한다(append 전용 대장이라 저장 후에는 제거 경로가 없으므로 입구 거부가 유일한 방어다). 거부는 대장 파일·이벤트 파일을 한 바이트도 바꾸지 않아야 한다(부분 기록 금지)"
+  - "③ 변별력 — tests/harness에 빈 acceptance·공백 acceptance·빈 notes 각각의 거부 케이스와, 정상 값 통과 대조군을 둔다. 가드를 제거했을 때 해당 테스트가 RED가 되는지 뮤테이션으로 확인한다(적용 여부 단언 포함)"
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+session: null
+notes: "PED-26 세션 사고 기록의 대책 태스크 — 원인은 호출자(셸)의 인자 파일 경로 오류였으나 CLI가 빈 값을 조용히 받아 무증상 오등재가 됐다. 취소 후 PED-44로 재등재해 수습했다(번호 1개 소비). 기존 HARN-76(정정 경로)·tombstone 논의와 별개의 입구 검증 축"
+updated: 2026-10-08

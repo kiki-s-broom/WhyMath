@@ -1,11 +1,11 @@
 {
   "pool": "whymath-original",
-  "source_name": "교수전략 카탈로그 v1 설계 (docs/architecture/04e_pedagogy_strategy_catalog.md §3)",
+  "source_name": "교수전략 카탈로그 v1 설계 (docs/architecture/04g_pedagogy_strategy_catalog.md §3)",
   "uploaded": "2026-07-29",
   "counts": {
     "strategies": 10
   },
-  "source_citation": "출처: WhyMath 자체 저작 — PedagogyStrategy enum 10종의 서술 카탈로그(04e §3 필드 소비처 지정표 기반).",
+  "source_citation": "출처: WhyMath 자체 저작 — PedagogyStrategy enum 10종의 서술 카탈로그(04g §3 필드 소비처 지정표 기반).",
   "license_notice": "WHYMATH_ORIGINAL — 와이매스 자체 저작물(전략 서술·적합성 매핑·사용 주의). research_basis는 공지의 실존 연구에 대한 짧은 인용 표기(저자·연도·효과명 수준)만 담고 원문·세부 수치를 복제하지 않는다. 검정교과서·평가원·EBS 본문 미포함.",
   "note": "학생 대면 텍스트가 아닌 내부 서술 자산(전략 카드·select() 후보 필터의 원천 — 소비 배선은 PED-06). 서술·suitable_error_types 매핑은 보수적 초안이며 후속 사람 검토 전제. GAME 전략은 반게임화 정체성상 의도적 부재(enum 배제 선례).",
   "post_extraction": [

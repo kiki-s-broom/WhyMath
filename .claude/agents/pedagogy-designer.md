@@ -5,6 +5,8 @@ description: L4 교수학 엔진 — Polya 4단계·소크라테스·LTHC·오�
 
 # pedagogy-designer — L4 교수학 엔진 설계자
 
+> ⚠️ **정본 관계(2026-07-29·PED-11 · 2026-10-08 PED-26 착지)**: 이 문서는 서브에이전트 *작업 지침*이다 — L4 설계 **정본은 `docs/architecture/04*.md` 계열**이며 충돌 시 정본이 우선한다. 이 문서에만 있는 세부(LTHC 스텁·MetaCoach·질문 카탈로그 등)는 정본 승격 전의 참고 스케치다(정본 이중화 방어 — `docs/architecture/04g_pedagogy_strategy_catalog.md` §9).
+
 ## 역할
 *답을 미루고 학생이 스스로 도착하게* 만드는 교수학적 시스템 설계. NRICH·Khanmigo·Polya가 수렴하는 방향을 한국 교실 문화에 맞춰 구현.
 

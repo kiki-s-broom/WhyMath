@@ -1,23 +1,23 @@
-"""개념 비유 생성기 — 정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §6(기능⑯·PED-09).
+"""개념 비유 생성기 — 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §6(기능⑯·PED-09).
 
-`slot_generator.py`가 의도적으로 연기해 둔 LLM 생성 경로의 *비유(개념-grain)* 해제다 — 04e §6.1이
+`slot_generator.py`가 의도적으로 연기해 둔 LLM 생성 경로의 *비유(개념-grain)* 해제다 — 04g §6.1이
 소비처를 명시했다: **정본 좌석 = `concept_content.metaphor`**(공백·저품질 채움이 1차 표적),
 렌더 소비 경로 = `metaphor → ConceptDSL.intuition → AnalogyAdapter`(기존 경로·기소비). 생성 산출을
 슬롯에만 넣으면 AnalogyAdapter가 영원히 읽지 않으므로(배선 없는 생성), 검수 통과분은 반드시
 `concept_content.metaphor`로 착지한다(`MetaphorFillStore`).
 
-파이프라인(04e §6.2 — L4=결정·L3=생성 준수):
+파이프라인(04g §6.2 — L4=결정·L3=생성 준수):
     표적 계획(select-vs-generate·공백/결함/탈락분만) → LLM 생성(라우터 경유) → DRAFT
     → prescreen → review+비유 결함 검출(`analogy_checker`) → APPROVED만 metaphor 채움
 
 상태기계 재사용 방식(정직한 설계 메모): `pedagogy_content_slot` 테이블은 `objective_id` FK
 (목표-grain)를 강제하므로 개념-grain 비유 행을 그 테이블에 넣으면 **grain 불일치 데이터**가 된다
-(04e §7.2가 경고하는 "다리 없는 채움"). 그래서 *테이블*이 아니라 **상태기계 함수·전이 규약**을
+(04g §7.2가 경고하는 "다리 없는 채움"). 그래서 *테이블*이 아니라 **상태기계 함수·전이 규약**을
 재사용한다 — 같은 `prescreen_slot`(0..3 루브릭)·`review_slot`(기계 게이트)·같은 상태 전이
 (DRAFT→PRESCREENED→APPROVED|REJECTED)를 in-memory 초안 행에 적용하고, 종착만 §6.1 좌석
 선언대로 `concept_content.metaphor` UPDATE로 간다(예시 grain은 슬롯 테이블을 그대로 쓴다).
 
-상한 불변식(04e §6.4 — 교육적 압축): 개념당 비유 1(레지스터는 파라미터·독립 생성기 금지)·
+상한 불변식(04g §6.4 — 교육적 압축): 개념당 비유 1(레지스터는 파라미터·독립 생성기 금지)·
 **사전 대량 생성 금지** — `plan_analogy_targets`가 공백·결함·검수 탈락분만 표적으로 뽑고, 무결함
 기존 비유는 구조적으로 표적에서 배제한다(select-vs-generate). 오개념 교정 비유는 신설하지 않는다
 (반례 자산 기담당·오개념은 reactive-only·04c).
@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# 개념당 비유 상한(04e §6.4) — 레지스터 변형은 파라미터로 소수만(독립 생성기 금지).
+# 개념당 비유 상한(04g §6.4) — 레지스터 변형은 파라미터로 소수만(독립 생성기 금지).
 MAX_ANALOGY_PER_CONCEPT: Final[int] = 1
 
 # 표적 사유 폐쇄 어휘 — select-vs-generate의 발주 근거(이 밖의 사유로 생성 금지·동결 테스트).
@@ -85,7 +85,7 @@ _METAPHOR_REASONING_TYPE: Final[str] = "concept_metaphor"
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 시스템 프롬프트 — 교수학 제약(04e §6·카탈로그 ANALOGY 카드 usage_notes를 문면으로 강제)
+# 시스템 프롬프트 — 교수학 제약(04g §6·카탈로그 ANALOGY 카드 usage_notes를 문면으로 강제)
 # ──────────────────────────────────────────────────────────────────────────
 ANALOGY_SYSTEM_PROMPT: Final[
     str
@@ -125,7 +125,7 @@ class AnalogyTarget:
     """비유 생성 표적 1건 — 개념 code + 발주 사유(폐쇄 어휘) + 레지스터.
 
     `reason`은 `ANALOGY_TARGET_REASONS` 안이어야 한다 — 사전 대량 생성(무사유 발주)을 타입
-    수준에서 배제한다(04e §6.4 상한 불변식).
+    수준에서 배제한다(04g §6.4 상한 불변식).
     """
 
     code: str
@@ -138,7 +138,7 @@ class AnalogyTarget:
         if self.reason not in ANALOGY_TARGET_REASONS:
             raise ValueError(
                 f"비유 발주 사유 위반: {self.reason!r} — 허용 사유 {sorted(ANALOGY_TARGET_REASONS)}"
-                " (공백·결함·검수 탈락분만 발주한다 — 04e §6.4 사전 대량 생성 금지)"
+                " (공백·결함·검수 탈락분만 발주한다 — 04g §6.4 사전 대량 생성 금지)"
             )
         if self.register not in ANALOGY_REGISTERS:
             raise ValueError(
@@ -156,7 +156,7 @@ def plan_analogy_targets(
 
     표적 = ①metaphor 공백(blank) ②기존 metaphor가 규칙 검출 결함 보유(defective)
     ③이전 생성분 검수 탈락(rejected — 호출자가 code 목록으로 주입). **무결함 기존 비유는
-    표적에서 구조적으로 배제**된다(04e §6.4 — 발주는 공백·검수 탈락분만). 개념당 1건으로
+    표적에서 구조적으로 배제**된다(04g §6.4 — 발주는 공백·검수 탈락분만). 개념당 1건으로
     dedup한다(`MAX_ANALOGY_PER_CONCEPT`·첫 사유 우선). 입력 레코드는 `code`/`name`/`subject`/
     `metaphor` 속성만 있으면 된다(코퍼스 `ConceptContentRecord`·ORM 행 양쪽 호환 duck-typing).
     """
@@ -276,8 +276,8 @@ class AnalogyGenerator:
             _LOGGER.warning("비유 생성 응답 analogy 필드 결측/무효 — None 폴백.")
             return None
         if not isinstance(breaks, str) or not breaks.strip():
-            # "비유가 어디서 깨지는지" 동봉은 04e §6.3 생성 계약 — 결측은 생성 실패다.
-            _LOGGER.warning("비유 생성 응답 breaks(깨짐 명시) 결측 — None 폴백(04e §6.3 계약).")
+            # "비유가 어디서 깨지는지" 동봉은 04g §6.3 생성 계약 — 결측은 생성 실패다.
+            _LOGGER.warning("비유 생성 응답 breaks(깨짐 명시) 결측 — None 폴백(04g §6.3 계약).")
             return None
         return build_analogy_draft_row(target, analogy.strip(), breaks.strip())
 
@@ -438,7 +438,7 @@ def run_analogy_review(rows: Sequence[dict[str, Any]]) -> list[AnalogyOutcome]:
     """DRAFT 행들을 상태기계(DRAFT→PRESCREENED→APPROVED|REJECTED)에 태운다 — 순수·결정론.
 
     전이 재사용: ①`prescreen_slot`(0..3 루브릭 — 점수 기록 후 PRESCREENED로 전이·슬롯 파이프라인
-    동형) ②`review_slot`(구조+기호 기계 게이트) ③`check_analogy_defects`(비유 4축 결함 — 04e
+    동형) ②`review_slot`(구조+기호 기계 게이트) ③`check_analogy_defects`(비유 4축 결함 — 04g
     §6.3 신설 게이트). ②③ 모두 통과해야 APPROVED, 하나라도 걸리면 REJECTED(사유=첫 결함 코드·
     fail-closed). 게임형 산출은 여기서 GAMIFIED로 반려된다 — **APPROVED 산출의 게임형 0**은 이
     게이트가 구조적으로 보장한다(acceptance "게임형 산출 0 검사"의 생성측 시행 지점).

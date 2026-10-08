@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-43-coach-runtime-pedagogy-axis-convergence
+title: "coach 실행용 교수법 축 수렴 — 개념그래프 code→원자 code 다리 재실측 + decide() 소비 (gdmwhk PED-21·uqyg79 PED-08②/PED-13 승계)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: cancelled
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - ""
+  - ""
+  - ""
+  - ""
+  - ""
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - "src/backend/whymath_backend/l4/pedagogy/**"
+  - "tests/backend/l4/pedagogy/**"
+session: null
+notes: "[취소 2026-10-08] 등재 직후 취소: 셸 인자 파일 경로 오류로 acceptance 5항·notes가 빈 문자열로 저장된 오등재(내용 소실). 같은 내용을 PED-44로 재등재 — 번호 소비는 감수(append 전용 대장이라 빈 항 제거 경로 없음)"
+updated: 2026-10-08

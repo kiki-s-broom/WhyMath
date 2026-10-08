@@ -275,7 +275,7 @@ class Settings(BaseSettings):
         description=(
             "교수법 팩 forbidden_modes 런타임 가드(`mode_guard.check_forbidden_modes`)를 WH-1 "
             "primary 학생-대면 발화 경로의 톤필터 *앞*에 걸지(PED-23 회수 — 정본 "
-            "docs/architecture/04e_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
+            "docs/architecture/04g_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
             "OFF면 가드 블록 미실행으로 기존 서빙 경로와 비트동일(회귀 0·킬스위치). ON이면 팩이 "
             "해석된 턴에서 발화가 팩 금지 모드를 위반할 때 그 발화를 학생에게 보내지 않고 "
             "안전한 소크라테스식 재질문(결정론 템플릿·`fallback_reply_for`)으로 대체하며 "
@@ -296,13 +296,13 @@ class Settings(BaseSettings):
         description=(
             "교수전략 카탈로그(PED-05·PED-22 회수)의 적합성 필드(target_grade_bands·"
             "difficulty_range·target_k_types)를 `runtime_selector.select()`의 **후보 필터**로 "
-            "소비할지(PED-23 회수 — 정본 docs/architecture/04e_pedagogy_strategy_catalog.md §4). "
+            "소비할지(PED-23 회수 — 정본 docs/architecture/04g_pedagogy_strategy_catalog.md §4). "
             "**False(기본·옵트인)** — OFF면 카탈로그 미조회·규칙표 v1(R1~R5) 원판정 그대로(기존 "
             "선택 경로와 비트동일·킬스위치). ON이면 규칙표 적용 전에 후보 집합을 카탈로그 적합성"
             "으로 **좁히기만** 한다: 좁힌 결과가 공집합이거나 규칙표가 후보를 소진하면 필터를 "
             "무시하고 원판정으로 폴백하며 reason_code(CATALOG_FILTER_EMPTY/EXHAUSTED)를 구조화 "
             "로그로 남긴다(조용한 실패 금지). 카탈로그는 select 전용 — `gate()`는 플래그와 "
-            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04e §4 불변식 ②·테스트 동결). "
+            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04g §4 불변식 ②·테스트 동결). "
             "GA flip(기본 True)은 측정+사인오프 후 별도 커밋(mode_guard 캔어리 선례). "
             "WHYMATH_PEDAGOGY_CATALOG_FILTER_ENABLED=false 킬스위치."
         ),
@@ -313,7 +313,7 @@ class Settings(BaseSettings):
         description=(
             "`supply()` 생성 폴백의 system 프롬프트에 선택된 교수전략의 카탈로그 카드"
             "(name_ko·description·research_basis 요약 1줄 — attention 절약)를 얹을지(PED-23 "
-            "회수 — 정본 04e §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
+            "회수 — 정본 04g §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
             "미조회·system 무변경으로 기존 생성 경로와 비트동일(프롬프트-해시 캐시 키도 불변·"
             "킬스위치). ON이면 `decide()`가 고른(게이트 통과 후) 전략의 카드를 조회해 "
             "`attach_strategy_card`로 system 뒤에 1블록을 덧붙인다 — 카드 조회 실패는 예외 "

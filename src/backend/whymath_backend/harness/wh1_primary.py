@@ -21,7 +21,7 @@ shadow와 달리 **발화(`outcome.utterance`)를 호출자(coach)에게 돌려�
      예외면 `None`을 반환해 호출자가 결정론 Polya 템플릿으로 안전 폴백하게 한다(가용성 — 앱은
      죽지 않는다). 모든 실패는 예외 *타입명* 포함 WARNING 로그(침묵 실패 금지·CLAUDE.md).
 
-옵트인 추가 계층(PED-23 회수·기본 OFF — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md`
+옵트인 추가 계층(PED-23 회수·기본 OFF — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md`
 §9): `mode_guard_runtime_enabled` ∧ 팩 주입 시, 발화 확정 후·톤필터 직전에 교수법 팩 금지모드 가드
 (`l4/pedagogy/mode_guard.py`)를 태운다 — 위반 발화는 서빙하지 않고 소크라테스 재질문(결정론
 템플릿)으로 대체 + reason_code 구조화 로그(fail-closed). OFF/무팩이면 기존 경로와 비트동일.
@@ -146,7 +146,7 @@ async def run_wh1_primary_turn(
     (None이면 0.0 — 콜드스타트 폴백)이며, 후보 조립 자체는 **사적 probe 컨텍스트**로만 흐른다
     (오개념 preload 0 불변 — 모듈 docstring·`wh1_probe_supply.py` docstring 참조).
 
-    `pack`(PED-23 회수 — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md` §9): 호출자
+    `pack`(PED-23 회수 — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md` §9): 호출자
     (coach)가 문항 PRIMARY 개념으로 해석해 `decide(pack=)`에 이미 주입한 *같은* 교수법 팩 객체.
     `mode_guard_runtime_enabled`(기본 False·옵트인) ∧ pack 주입 시에만, 발화 확정 후·톤필터
     직전에 팩 금지 모드 가드를 태운다 — 위반이면 그 발화를 서빙하지 않고(fail-closed) 안전한
@@ -260,7 +260,7 @@ async def run_wh1_primary_turn(
             prose_rephrased = prose_outcome.rephrased
             prose_reason = prose_outcome.reason_code
 
-    # ── 금지모드 가드(PED-23 회수·옵트인 — 정본 04e §9) — 발화 확정 후·톤필터 *직전* 계층.
+    # ── 금지모드 가드(PED-23 회수·옵트인 — 정본 04g §9) — 발화 확정 후·톤필터 *직전* 계층.
     # 팩(coach가 decide에 주입한 같은 객체)이 금지한 교수 모드를 발화가 위반하면 그 발화를
     # 학생에게 보내지 않고(fail-closed) 소크라테스 재질문(결정론 템플릿·기존 자산)으로 대체
     # 한다 — 04d §2.2 "차단 시 SOCRATIC 강등(말하기 대신 묻기)" 선례의 사후 가드판. 플래그

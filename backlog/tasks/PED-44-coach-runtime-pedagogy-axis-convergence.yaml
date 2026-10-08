@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-44-coach-runtime-pedagogy-axis-convergence
+title: "coach 실행용 교수법 축 수렴 — 개념그래프 code→원자 code 다리 재실측 + decide() 소비 (gdmwhk PED-21·uqyg79 PED-08②/PED-13 승계)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 선행 재실측(착수 첫 행위) — uqyg79 PED-13의 전제는 2026-08-03 시점 사실이다: coach의 problem_id→concept 축(Concept.code = math.<area>.<slug> 개념그래프 공간, api/coach.py::_pack_for가 이미 이 축으로 k_type을 해석)과 study의 objective_id 축(learning_objective.concept_nodes = 원자 backbone code 공간)이 서로 다른 ID 공간이라 직접 조인이 불가능했고, concept_atom_crosswalk_v1은 오프라인 JSONL 변환 유틸이라 런타임 해석에는 신규 registry가 필요하다는 분석이었다. 그 뒤 main에 concept_content.atom_codes(S0-2/CONT-06 — l1/concept_content/resolve.py::find_k12_contents_by_atom)와 Concept.aliases(레거시 UC·src_id) 좌석이 생겼다. 단, concept_content의 PK는 구 437 개념코드(N1·A1…)이지 Concept.code가 아니므로 이것이 coach의 그래프 code → 원자 code → learning_objective 경로를 닫는지는 PED-26이 검증하지 않았다(2026-10-08). 실 코퍼스/DB에서 coach가 쓰는 문항 PRIMARY 개념 N건의 해석 성공률을 먼저 실측해 증적에 수치로 남기고, 낮을 때만 신규 resolver를 설계한다 — 성공률 실측 없이 resolver부터 만들지 않는다"
+  - "② 신호 조립 좌석 판정 — 현 main의 StudentSignals 조립 지점은 api/study.py::_build_signals(get_state 기반 O(1) lookup 리팩터 완료)뿐이고 api/coach.py는 StudentSignals·decide(StudentSignals)·record_pedagogy_treatment를 전혀 부르지 않는다(coach는 PolyaCoach.decide와 설계용 팩 축만 경유 — 2026-10-08 grep 실측). coach가 이를 소비하려면 api 모듈의 private 함수를 import하지 않도록 공용 좌석(예: l4/pedagogy/signal_assembly.py)으로 추출할지 판정한다. 원천 참고 = origin/claude/whymath-pedagogy-review-uqyg79(head 5dc040b3)의 signal_assembly.py 60줄 + 테스트 119줄 — 로직은 main _build_signals가 우세하므로 복사 이식 금지, 좌석 경계(어느 계층이 조립을 소유하는가)만 참조한다"
+  - "③ 집행 지점 — coach 턴이 decide()를 실제로 호출하고 record_pedagogy_treatment로 처치를 기록한다. 현재 실행용 축(StudentSignals→decide→처치 기록)은 /study 경로에만 있다. 목표 해석(objective_id) 실패 시 조용히 스킵하되(가짜 처치 금지) 스킵 비율을 reason_code 로그로 관측 가능하게 한다(작동한 비율 원칙 — 정상 응답 200은 작동 증거가 아니다). 플래그는 기본 OFF 캔어리(mode_guard_runtime_enabled·pedagogy_catalog_filter_enabled 선례)이고 OFF일 때 coach 동작은 비트동일이다"
+  - "④ 표본 축적 — 처치 기록이 실제로 쌓여 adaptive/effectiveness.py 집계가 None(표본 0)을 벗어나는지 관측한다. 벗어나지 않으면 배선 미완으로 판정한다. 이 관측 없이 adaptive policy 승격 게이트(pedagogy_policy_eval)의 표본 미달은 해소되지 않는다"
+  - "⑤ 범위 밖·중복 조정 — mode_guard의 coach 경로 배선은 이 태스크 대상이 아니다(PED-23이 WH-1 primary 경로에 옵트인으로 배선했고 PED-16의 by-design 미배선 판정은 그것으로 역전됨 — 04g §9). 착수 전 겹침 후보 PED-19-concept-question-routing-seam(student_intent '질문'의 첫 교수 결정 reader)·PED-18-tutor-primary-operation-rate와 조율한다. 출처 번호 주의: uqyg79의 PED-08/PED-13과 gdmwhk의 PED-21은 main의 done 태스크 PED-08(growth-evidence-serving-contract)·PED-13(gap-recovery-leadtime-metric)과 다른 태스크다(번호만 충돌)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - "src/backend/whymath_backend/l4/pedagogy/**"
+  - "tests/backend/l4/pedagogy/**"
+session: null
+notes: "PED-26(gdmwhk 회수 정합) 처분 기록 — gdmwhk PED-21(coach-runtime-pedagogy-convergence)과 uqyg79 PED-08②(coach decide() 소비·blocked)·PED-13(coach-objective-resolver-bridge)을 이 한 건으로 합쳐 승계한다. main 대응 태스크 0건(2026-10-08 backlog/tasks 전수 확인 — PED-08·PED-13 번호는 무관한 done 태스크가 점유). uqyg79 PED-08 ①(신호 조립 공용 추출)은 acceptance ②로 흡수. 정본 04g_pedagogy_strategy_catalog.md §9·§11. 12월 검증 비관여라 P2 — 필요하면 amend --eos-priority로 재판정"
+updated: 2026-10-08

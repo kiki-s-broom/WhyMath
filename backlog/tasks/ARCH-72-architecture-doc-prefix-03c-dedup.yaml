@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-72-architecture-doc-prefix-03c-dedup
+title: "문서번호 접두 03c 중복 해소 — cloud_tier_transition_v2 ↔ content_strategy_cache"
+track: math-completion
+stage: S4
+subject: math
+layer: infra
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 대상 — docs/architecture/03c_cloud_tier_transition_v2.md(클라우드 티어 전환 설계 v2)와 03c_content_strategy_cache.md(콘텐츠 전략·캐시)가 접두 03c를 함께 쓴다. 약칭 인용이 있는 쪽(라이브 참조: content_strategy_cache 18곳 · cloud_tier 1곳, 2026-10-08 grep)을 유지하고 다른 쪽을 다음 빈 번호로 옮긴다 — 옮기는 쪽의 참조는 파일명·약칭 모두 갱신하고 역사 기록(MEMORY·backlog·docs/reviews)은 건드리지 않는다"
+  - "② 집행 — tests/infra/test_architecture_doc_numbers.py의 _KNOWN_DUPLICATES에서 03c 항목을 지운다(지우지 않으면 '예외가 낡았다'로 RED). 만료일(2026-12-31)이 지나면 그 예외 자체가 RED가 되므로 이 태스크는 그 전에 닫는다. 옮긴 뒤 04g 문서 §11의 03c 문구도 정정한다"
+artifacts: []
+paths:
+  - "docs/architecture/03c_*.md"
+  - tests/infra/test_architecture_doc_numbers.py
+session: null
+notes: "PED-26 세션에서 04e 접두 중복을 해소하며 같은 검사에서 발견된 두 번째 중복. 클라우드 티어 문서는 ARCH-66 일시중단 부기로 활발히 개정 중이라(2026-10-05) 병렬 충돌을 피해 PED-26에서 분리했다. 기계 감시는 PED-26이 이미 착지(만료일 있는 유예)."
+updated: 2026-10-08

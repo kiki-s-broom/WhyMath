@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: REND-05-unrendered-strategy-adapters
+title: "미구현 렌더 어댑터 5종 — 인지과학 전략 4종+시각화가 학생 도달 0 (gdmwhk REND-05 승계)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 정본화 — RETRIEVAL(인출연습)·SPACING(분산복습)·INTERLEAVING(교차연습)·SELF_EXPLANATION(자기설명)·VISUALIZATION(시각화) 어댑터의 렌더 계약을 정의한다. 어댑터는 개념 무관 1:1(전략 1개=어댑터 1개·개념별 복제 금지)이며, 렌더 계약은 현행 l3/render/adapter.py의 PedagogyAdapter 프로토콜과 EOS-89 이후의 과목 능력 주입(seal·assessment_verifier 필수)을 따른다"
+  - "② 집행 지점 — l3/render/registry.py의 _ADAPTER_FACTORIES 표(EOS-89로 _ADAPTERS에서 팩토리 표가 됨 — gdmwhk 원본 문면의 '_ADAPTERS'는 stale)에 등록돼야 registered_strategies()가 넓어지고 runtime_selector.selectable_strategies()(= registered_strategies())가 따라 넓어진다. 현재 이 5종은 select() 규칙표(R1~R5)에 이름조차 없고 selectable_strategies()에도 없어 학생 도달 경로가 구조적으로 0이다(2026-10-08 main 실측). 등록 없이 어댑터 클래스만 만들면 도달 0 그대로"
+  - "③ 규칙표 동반 확장 — 어댑터를 등록하면 runtime_selector.select()에 그 전략을 고르는 조건이 함께 들어가야 한다. 등록만 하고 규칙표를 안 늘리면 여전히 도달 0이다(거버넌스 테스트는 select() 출력 ⊆ 등록분만 동결할 뿐 등록분 전량이 선택된다고 보장하지 않는다). 규칙 추가는 교수학 근거(인지과학 4종: 인출·분산·교차·자기설명)와 사람 검토(pedagogy-designer)를 동반하고, 카탈로그 적합성 필드(suitable_error_types·target_k_types)를 select() 후보 필터로만 소비한다(gate() 입력 금지 — 04g §4 불변식 ②)"
+  - "④ 공급원 확인 선행 — 각 어댑터의 can_render가 요구하는 자산이 실재하는지 먼저 실측한다(ProblemBasedAdapter가 assessment 부재로 항상 False였던 404 체인의 재발 방지). 자산 없는 어댑터는 등록하지 않고 공백으로 남기며 그 사유를 04g §10에 기록한다. SPACING·INTERLEAVING은 단일 응답이 아니라 세션 간 스케줄 성질이라 어댑터 렌더와 스케줄러는 별개 축이다 — 이 태스크는 렌더 좌석까지이고 스케줄러는 범위 밖(별도 태스크로 분리 등재)"
+  - "⑤ 작동한 비율 — SupplyTally.strategy_render_rate(content_supply.py:214)로 신규 전략의 실제 렌더 성공 비율을 관측한다. 정상 응답 200을 작동 증거로 삼지 않고, 0%이면 배선 미완으로 판정한다"
+  - "⑥ [PED-26 이월 2026-10-08] 원천 = origin/claude/whymath-pedagogy-review-gdmwhk(head 2915bf4e)의 backlog/tasks/REND-05-unrendered-strategy-adapters.yaml. 그 notes가 Kiki 결정(2026-08-11)을 기록한다 — 미머지 브랜치 04e §10의 'REND-01 후속 실수요 시' 판정을 승계하지 않고 진짜 갭으로 재판정(근거: 인지과학 근거가 가장 강한 4종이 enum에만 있고 학생 도달 경로가 구조적으로 0 — 의사결정 우선순위 4번 '장기 숙달 > 단기 점수' 직결). 이 결정은 main의 결정 로그에 없었으므로 PED-26이 04g §10 재판정 행과 MEMORY에 옮겼다. 범위 밖: 신규 전략(enum은 10종 동결·게임형은 반게임화로 영구 배제)"
+  - "⑦ [PED-26 실측 2026-10-08 · 합성 격자이며 운영 분포 아님] 카탈로그 후보 필터를 ON으로 켜면 등록 5종 기준 k_type=SPATIAL·REPRESENT는 후보가 공집합이 되어 규칙표 원판정으로 폴백한다 — 그 두 지식유형을 가리키는 카탈로그 전략이 VISUALIZATION(미등록) 하나뿐이기 때문이다. STOCHASTIC도 VISUALIZATION이 빠져 PROBLEM_BASED 한 종으로만 좁혀진다. 따라서 VISUALIZATION 어댑터 등록은 이 세 지식유형에서 필터를 실제로 작동하게 만드는 선결 조건이고, 완료 판정에 'k_type=SPATIAL·REPRESENT의 필터 공집합 폴백(reason_code CATALOG_FILTER_EMPTY) 소멸'을 관측 항목으로 쓴다. 재현 = docs/reviews/pedagogy_catalog_recovery_reconciliation_2026-10-08.md §4"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/render/adapters.py
+  - src/backend/whymath_backend/l3/render/registry.py
+  - src/backend/whymath_backend/l4/pedagogy/runtime_selector.py
+session: null
+notes: "PED-26(gdmwhk 회수 정합) 처분 기록 — gdmwhk REND-05를 재배정 ID 없이 같은 번호로 승계(main에 REND-05 부재·CLI 번호 충돌 검사 통과). 정본 04g_pedagogy_strategy_catalog.md §10. 12월 검증 비관여라 P2(판정 이후) — 필요하면 amend --eos-priority로 재판정\n\n[정정 2026-10-08] PED-26 집행 지점 실측 결과(필터 공집합 폴백이 미등록 VISUALIZATION에서 비롯됨)를 완료 판정 항목으로 추가"
+updated: 2026-10-08

@@ -2,7 +2,7 @@
 
 > **범위**: 교육 콘텐츠(교육과정, 성취기준, 개념, 문제, 풀이, 오개념, 교수전략, 프롬프트, 정책 등)의 변경 이력과 재현성을 보장하는 버전 관리 Foundation.
 > **상태**: 설계 확정(2026-08-25). MVP 필수 항목 + 2단계 확장 범위.
-> **관련**: `docs/standards/eos_identity_layer_011_1_decision.md`, `docs/architecture/01_data_foundation.md`, `docs/architecture/system_deep_dive.md`, `docs/architecture/04e_pedagogy_strategy_catalog.md`, `backlog/tasks/ARCH-20-content-provenance-enforcement-gate.yaml`
+> **관련**: `docs/standards/eos_identity_layer_011_1_decision.md`, `docs/architecture/01_data_foundation.md`, `docs/architecture/system_deep_dive.md`, `docs/architecture/04g_pedagogy_strategy_catalog.md`, `backlog/tasks/ARCH-20-content-provenance-enforcement-gate.yaml`
 
 ---
 

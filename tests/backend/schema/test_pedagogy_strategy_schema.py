@@ -1,10 +1,10 @@
 """PED-05 교수전략 카탈로그 스키마 동결 + 불변식 — 필드셋·폐쇄 어휘·제거 필드 3종 부재 lock.
 
-정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §3.2(필드 소비처 지정표)·§3.3(제거
+정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §3.2(필드 소비처 지정표)·§3.3(제거
 필드 3종). `test_pedagogy_dsl_schema_freeze.py`(필드셋 리터럴 동결) 선례 동형 — 필드 추가/개명/
 삭제 시 이 테스트가 깨져 "소비처 실재 증명" 검토를 강제한다. 특히 §3.3의 **부재의 동결**이
 핵심이다: 외부 프레임워크의 3계열(AI 추천점수·기계 판정용 금지조건·선행/후속·페이딩)이 미래
-세션에서 재제안되어 스키마에 스며드는 것을 기계로 막는다(04e §8 영구 기록과 이중 방어).
+세션에서 재제안되어 스키마에 스며드는 것을 기계로 막는다(04g §8 영구 기록과 이중 방어).
 
 거부(음성) 케이스는 인라인 dict 픽스처(`test_pack_loader.py` `_pack_dict` 선례)로 검증한다 —
 hermetic·실 코퍼스 무관. 실 코퍼스 로드 스모크는 registry 테스트
@@ -25,7 +25,7 @@ from whymath_backend.schema.pedagogy_strategy import (
     PedagogyStrategyCard,
 )
 
-# ── 동결 리터럴 (PED-05 시점 — 변경은 "소비처 실재 증명" 전제·04e §3.2) ──
+# ── 동결 리터럴 (PED-05 시점 — 변경은 "소비처 실재 증명" 전제·04g §3.2) ──
 _CARD_FIELDS = {
     "strategy",
     "name_ko",
@@ -38,7 +38,7 @@ _CARD_FIELDS = {
     "usage_notes",
 }
 
-# 제거 필드 3계열(04e §3.3) — model_fields 어느 이름에도 이 어간이 나타나면 안 된다.
+# 제거 필드 3계열(04g §3.3) — model_fields 어느 이름에도 이 어간이 나타나면 안 된다.
 # ①정적 추천점수(ai_score/recommendation_score → PED-03 posterior가 유일 좌석)
 # ②기계 판정용 금지조건(forbidden_conditions → 팩 forbidden_modes+gate() 2축이 정본)
 # ③선행/후속·페이딩(predecessor/successor/fading → 팩 fading_schedule이 정본)
@@ -73,13 +73,13 @@ def _card_dict(**overrides: Any) -> dict[str, Any]:
 
 
 class TestSchemaFieldFreeze:
-    """필드셋 리터럴 동결 + 제거 필드 3계열 부재 동결(04e §3.3)."""
+    """필드셋 리터럴 동결 + 제거 필드 3계열 부재 동결(04g §3.3)."""
 
     def test_card_fields_frozen(self) -> None:
         assert set(PedagogyStrategyCard.model_fields) == _CARD_FIELDS
 
     def test_removed_field_stems_absent(self) -> None:
-        # 부재의 동결 — 제거 3계열 어간이 어떤 필드명에도 나타나지 않는다(04e §3.3).
+        # 부재의 동결 — 제거 3계열 어간이 어떤 필드명에도 나타나지 않는다(04g §3.3).
         for stem in _REMOVED_FIELD_STEMS:
             offenders = [name for name in PedagogyStrategyCard.model_fields if stem in name]
             assert offenders == [], f"제거 필드 계열 '{stem}' 재유입: {offenders}"

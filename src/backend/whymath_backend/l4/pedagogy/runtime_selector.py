@@ -51,7 +51,7 @@ DB 세션에 의존하지 않는 순수 함수다(`pack_registry`가 DB-free인 
 호출자(API·하네스) 책임이다.
 
 ────────────────────────────────────────────────────────────────────────────
-카탈로그 후보 필터 (PED-23 회수 — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md` §4)
+카탈로그 후보 필터 (PED-23 회수 — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md` §4)
 ────────────────────────────────────────────────────────────────────────────
 교수전략 카탈로그(PED-05·PED-22 회수 — `strategy_registry`)의 적합성 필드를 `select()`가
 **후보 필터**로 소비한다. 규칙표 v1(R1~R5)은 유지하고, 필터는 그 앞에서 후보 집합만 좁힌다:
@@ -60,7 +60,7 @@ DB 세션에 의존하지 않는 순수 함수다(`pack_registry`가 DB-free인 
     candidates = narrow(candidates, grade_band, difficulty, k_type)  # 카탈로그 적합성 — 좁힘만
     strategy   = rule_table(signals, candidates)                # R1~R5 (기존 우선순위 그대로)
 
-불변식(04e §4):
+불변식(04g §4):
   ① **필터는 좁힘만 한다** — 좁힌 결과가 공집합이거나 규칙표가 좁힌 후보를 소진하면 필터를
      무시하고 규칙표 *원판정*으로 폴백한다(신호 부재·카탈로그 공백이 선택 불능을 만들면 안 됨).
      폴백은 reason_code(`REASON_CATALOG_FILTER_*`)를 구조화 로그로 남긴다(조용한 실패 아님).
@@ -121,7 +121,7 @@ REASON_PACK_FORBIDS_WORKED_FIRST = _MODE_WORKED_EXAMPLE_FIRST
 REASON_HINT_NOT_ESCALATED = "HINT_NOT_ESCALATED"
 """막힌 학생에게 힌트 에스컬레이션 없이 완전예제가 요청됨(축② — 냉담 정답 제공)."""
 
-# reason_code — 카탈로그 필터 폴백 사유(04e §4 불변식 ① "조용한 실패 아님" — 구조화 로그 필드).
+# reason_code — 카탈로그 필터 폴백 사유(04g §4 불변식 ① "조용한 실패 아님" — 구조화 로그 필드).
 REASON_CATALOG_FILTER_EMPTY = "CATALOG_FILTER_EMPTY"
 """카탈로그 적합성 필터가 후보를 공집합으로 좁힘 — 필터 무시·규칙표 원판정 폴백."""
 
@@ -145,7 +145,7 @@ _GRADE_NSU_MAX = 14
 def grade_to_band(grade: int | None) -> str | None:
     """학년 정수 → 학교급 밴드(`GRADE_BAND_VOCAB` 부분집합) 순수 변환. 미상은 None.
 
-    정본: 04e §4(카탈로그 후보 필터의 grade 신호 — "생산자 먼저" 원칙). 생산자는
+    정본: 04g §4(카탈로그 후보 필터의 grade 신호 — "생산자 먼저" 원칙). 생산자는
     `UserProfile.grade`(`db/models/user.py` — int|None)이며, 값 의미는 `schema/user.py` 계약
     실측: **10/11/12=고1~고3·13/14=N수1·2(ge=10 le=14)**. 같은 사다리를 아래로 연장해
     1~6=초등·7~9=중학으로 해석한다(현 생산자 domain 밖이나, 초등/중학 확장 시 변환 재작성이
@@ -273,7 +273,7 @@ def narrow_candidates(
     difficulty: str | None = None,
     k_type: str | None = None,
 ) -> frozenset[PedagogyStrategy]:
-    """카탈로그 적합성으로 후보 집합을 **좁히기만** 하는 순수 함수(04e §4의 `narrow`).
+    """카탈로그 적합성으로 후보 집합을 **좁히기만** 하는 순수 함수(04g §4의 `narrow`).
 
     축별 규칙(모두 AND):
       - 축 신호가 None이면 그 축은 검사하지 않는다(조용히 스킵 — 필수화 금지).
@@ -311,9 +311,9 @@ def _rule_table(
 
     `candidates`가 전체 등록 전략이면 기존 규칙표와 판정이 동일하다(필터 OFF 경로의 비트동일
     근거). 후보가 좁혀져 있으면 "이 학생에게 필요한 것" 중 카탈로그가 적합하다고 서술한 첫
-    전략이 이긴다 — 우선순위 순서 자체는 그대로다(04e §4 "R1~R5 우선순위 그대로").
+    전략이 이긴다 — 우선순위 순서 자체는 그대로다(04g §4 "R1~R5 우선순위 그대로").
 
-    R2 정밀화(04e §4 v2)는 **정직한 공백으로 보류**한다: 설계는 오개념 가설의 `error_type`을
+    R2 정밀화(04g §4 v2)는 **정직한 공백으로 보류**한다: 설계는 오개념 가설의 `error_type`을
     카탈로그 `suitable_error_types`와 대조하라고 지시하나, 2026-07-29 실측 결과 runtime의
     `misconception_ids`(kebab id — `l4/misconception/catalog.py` 34종)에는 `error_type` 필드
     자체가 없고, error_type은 DB `misconception_catalog`(L1 코퍼스 839+·M-코드)에만 있어
@@ -365,7 +365,7 @@ def select(
       R4. 숙달 → `PROBLEM_BASED`.
       R5. 그 외 → `SOCRATIC`. "답이 아닌, 이유를 묻는" 기본값.
 
-    카탈로그 후보 필터(PED-23 회수 — 04e §4·모듈 docstring): `pedagogy_catalog_filter_enabled`
+    카탈로그 후보 필터(PED-23 회수 — 04g §4·모듈 docstring): `pedagogy_catalog_filter_enabled`
     플래그 ON이고 필터 축 신호(`signals.grade_band`·`difficulty`·`k_type`)가 하나라도 있으면,
     규칙표 적용 전에 후보를 카탈로그 적합성으로 좁힌다. **좁힘만** — 공집합·후보 소진·카탈로그
     적재 실패는 규칙표 *원판정*으로 폴백하고 reason_code를 구조화 로그로 남긴다(조용한 실패
@@ -454,11 +454,11 @@ def gate(
     `pack=None`(팩 미적용·조회 실패)이어도 **축②는 적용된다** — 팩이 없다는 사실이 냉담 정답 제공을
     열어주면 안 된다(fail-safe).
 
-    ⚠️ **카탈로그 입력 금지(04e §4 불변식 ② — PED-23 동결)**: 이 함수는 교수전략 카탈로그
+    ⚠️ **카탈로그 입력 금지(04g §4 불변식 ② — PED-23 동결)**: 이 함수는 교수전략 카탈로그
     (`strategy_registry`)를 읽지 않는다. 카탈로그는 select 전용 *효과* 축이며, 게이트가 YAML
     데이터를 읽기 시작하면 코퍼스 편집만으로 "효과 ≤ 허용"이 우회된다. 부재는
     `tests/backend/l4/test_catalog_consumption.py`가 정적(co_names)·런타임(레지스트리 봄베)으로
-    동결한다 — 카탈로그 축을 추가하려면 그 테스트와 04e §4 개정이 선행이다.
+    동결한다 — 카탈로그 축을 추가하려면 그 테스트와 04g §4 개정이 선행이다.
     """
     if strategy is not PedagogyStrategy.WORKED_EXAMPLE:
         return GateResult(strategy=strategy, allowed=True)
@@ -496,7 +496,7 @@ def decide(
     `k_type`(학습목표의 지식 유형)을 주면 ① `select()` 카탈로그 후보 필터의 축(플래그 ON 시 —
     PED-23)과 ② 해당 교수법 팩 조회(게이트 축①)에 함께 쓰인다. 팩을 못 찾으면 축①은 생략되고
     축②만 적용된다(`gate()` fail-safe 참조). `difficulty`(상/중/하)는 select 필터 전용이며
-    게이트에는 들어가지 않는다 — 카탈로그·난이도는 *효과* 축이지 *허용* 축이 아니다(04e §4
+    게이트에는 들어가지 않는다 — 카탈로그·난이도는 *효과* 축이지 *허용* 축이 아니다(04g §4
     불변식 ②). 생산자 현황은 `select()` docstring의 정직한 공백 부기 참조.
     """
     pack = get_pack(k_type) if k_type is not None else None

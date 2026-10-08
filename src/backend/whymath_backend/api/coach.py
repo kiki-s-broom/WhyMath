@@ -2859,7 +2859,7 @@ async def _wh1_primary_decision_or(
     그대로 흐른다 — 호출자가 이미 조회한 `server_theta`·`user.user_id`를 재사용할 뿐 신규 쿼리는
     없다(create_session·append_turns 두 핸들러가 이미 계산해 둔 값).
 
-    `pack`(PED-23 회수 — 04e §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
+    `pack`(PED-23 회수 — 04g §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
     러너로 thread한다 — 러너가 톤필터 직전 금지모드 가드(`mode_guard_runtime_enabled` 옵트인·
     기본 OFF)에 재사용(위반 발화 미서빙·소크라테스 재질문 폴백). None(무팩·플래그 OFF 해석)이면
     가드 무관.
