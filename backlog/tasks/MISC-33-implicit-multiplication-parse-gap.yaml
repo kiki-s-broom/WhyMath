@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -14,13 +14,15 @@ requires_gates: []
 acceptance:
   - "① `to_sympy_source`가 암묵 곱셈(`2x`·`4x²`·`3(x+1)`)을 곱셈 기호로 전개해 `sympify`가 파싱하게 한다 — 수정처는 이 단일 지점이다(동치 권위 일원화). ② 채택 전에 `identity_status` 소비처를 전건 열거하고 각각에 대조군 픽스처를 둔다 — 특히 함수 적용(`f(x)`)이 `f*x`로 읽히는 거짓 양성을 주입해 RED를 확인한다(이것이 이 변경의 주된 위험이다). ③ EOS-104가 남긴 계약 테스트 `tests/backend/l4/misconception/test_answer_signature.py::test_known_limitation_implicit_multiplication_is_not_parsed`가 이 한계를 동결해 두었으므로, 해소하면 그 테스트가 RED가 된다 — 그때 한계 테스트를 *잡힌다*는 단언으로 뒤집는 것까지가 이 태스크의 범위다. ④ 회귀 판정은 백엔드 전체 스위트로 한다(동치 판정은 소비처가 넓어 부분 스위트로 판정 불가)."
   - "⑤ 정정(2026-10-08 착수 실측 — ①·②의 전제가 사실과 달랐다): `identity_status`는 이미 파싱 단계(`_PARSE_TRANSFORMS`의 `implicit_multiplication`)에서 `2x`를 읽는다. 그래서 `to_sympy_source`에 곱셈 기호를 넣을 필요가 없고 넣지 않았다 — 문자열 층에서 `*`를 끼우면 `f(x)`·`2pi` 입력에서 소비처 전체의 판정이 움직인다(주입으로 RED 확인). 실제로 깨지던 곳은 `l4/misconception/wrong_form_match.py`의 학생 식 구조 파싱 한 줄이 동치 권위와 다른 변환 규칙(`safe_sympify(convert_xor=True)`)을 직접 쓴 것이다 — 같은 함수 안에서 ⓪ 가드는 `2x`를 읽고 구조 정합은 `UnsafeExpressionError`로 거부했다. 수정처는 파서 정의를 동치 권위가 소유하는 공개 함수 `parse_unevaluated`(`l3/symbolic_equivalence.py`)로 일원화하고 그 호출처가 쓰게 한 것이다. ②의 소비처 전건 대조군: `identity_status`·`_parse`·`to_sympy_source`를 바꾸지 않았으므로 소비처 입력이 불변이며, 이를 `TestToSympySourceDoesNotInsertMultiplication`과 백엔드 전체 스위트로 확인한다. ③ 한계 테스트는 `test_implicit_multiplication_is_caught_like_its_explicit_twin`으로 뒤집었다.\n⑥ 선행 결함 분리: 동치 권위가 미지 함수 적용 `f(x)`를 곱 `f*x`로 읽는다(`identity_status('f(x)','f*x')`가 identity, `f(x)**2`는 `f*x**2`) — 이 변경이 만든 것이 아니며 `MISC-62-function-application-read-as-multiplication`으로 분리하고 현재 동작을 계약 테스트로 동결했다. 부수 효과(수용·보고): 측정한 3건(`(f(x)+y)²`·`(f(x)+g(x))²`·`(f(x)+1)²`의 거짓형 인스턴스)이 수정 전에는 두 읽기가 우연히 일치해 검출됐으나 이제 검출되지 않는다(`test_unknown_function_application_known_limitation`). 누락 방향이라 거짓 낙인은 없으며 내장 함수(`sin`)는 영향이 없다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1533"
+  - 1294f0cb
 paths:
   - src/backend/whymath_backend/l3/symbolic_equivalence.py
   - src/backend/whymath_backend/l4/misconception/wrong_form_match.py
   - tests/backend/l3/test_symbolic_equivalence.py
   - tests/backend/l4/test_wrong_form_match.py
   - tests/backend/l4/misconception/test_answer_signature.py
-session: claude/nice-planck-u5bjay
+session: null
 notes: "암묵 곱셈(`2x`·`4x²`)이 공용 파싱 소스 `l3.symbolic_equivalence.to_sympy_source`에서 곱셈 기호로 전개되지 않아 `sympy.sympify`가 SympifyError를 낸다. 실측(2026-09-18): `to_sympy_source(\"(2x+3)²\")` → `(2x+3)**2` → SympifyError. 명시 곱셈 `(2*x+3)²`은 정상 파싱된다.\n\n영향: 동치 판정·거짓형 정합을 쓰는 모든 경로가 학생이 흔히 쓰는 표기 하나를 통째로 못 본다. EOS-104의 오답 서명 채널(`l4/misconception/answer_signature.py`)에서 `(2x+3)² = 4x²+9`가 구조적으로 동일한 오개념인데도 미검출인 것이 실례이며, 그 사실은 `tests/backend/l4/misconception/test_answer_signature.py::test_known_limitation_implicit_multiplication_is_not_parsed`가 계약으로 동결해 두었다(고치면 그 테스트가 RED가 되므로 승계 지점이 기계로 남아 있다).\n\n범위: 수정처는 `l3/symbolic_equivalence.py`의 `to_sympy_source` 단일 지점이다(동치 권위 일원화 — 호출처에서 각자 고치면 같은 질문에 두 개의 답이 생긴다). sympy의 `parse_expr(transformations=implicit_multiplication_application)` 채택 여부를 실측 비교하고, 채택 시 기존 동치 판정 전건에 회귀가 없는지 확인해야 한다(거짓 양성 위험: `f(x)`가 `f*x`로 읽히는 등 — 함수 적용과의 충돌을 반드시 픽스처로 둘 것).\n\n착수 시 주의: 이 태스크는 동치 판정 권위를 건드리므로 오개념 채널 단독으로 판정하지 않는다. `identity_status` 소비처 전건을 먼저 열거하고 각각에 대조군을 둔다.\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/symbolic_equivalence.py'] → ['src/backend/whymath_backend/l3/symbolic_equivalence.py', 'src/backend/whymath_backend/l4/misconception/wrong_form_match.py', 'tests/backend/l3/test_symbolic_equivalence.py', 'tests/backend/l4/test_wrong_form_match.py', 'tests/backend/l4/misconception/test_answer_signature.py']: 착수 실측으로 태스크 전제 정정 — 깨지던 곳은 to_sympy_source가 아니라 wrong_form_match 구조 파싱의 파서 규칙 불일치. 수정 범위에 wrong_form_match.py와 테스트 3개 추가, 선행 결함은 MISC-62로 분리"
 updated: 2026-10-08
