@@ -278,6 +278,18 @@ gates:
     corrections: []
     depends_on:
       - CONST-02-coding-constitution-transplant-stage1-2
+  - id: G-crosslink-live-drift-disposition
+    title: "라이브 crosslink DB 어긋남 처분 — 라이브 34건 대 승인 코퍼스 68건. (1) 오귀속 의심 4건(angle-sum-non-triangle↔M0863 · period-of-scaled-sine↔M0862는 본문 대조상 명백한 오귀속, division-by-zero↔M0146 · circle-radius-squared↔M0630은 코퍼스와 다른 선택)을 어떻게 할지: 가) 지우고 코퍼스 대안 4건 적재(쓰기 건수 단언 도구 HARN-215 착지 후) / 나) 4건만 삭제 / 다) 보류. 세션 의견은 먼저 서버의 WHYMATH_MISCONCEPTION_CROSSLINK_MODE 실제 값(off|shadow)을 확인한 뒤 가·나 중 선택. (2) 서명 메모 없는 26행과 라이브에 없는 38행은 별건이라 이 게이트에서 정하지 않는다. 근거 docs/reviews/crosslink_live_drift_2026-10-07.md §1~§6"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-07
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "결정에 필요한 근거는 판정 문서에 이미 있다 — 선행 태스크 없음(가 안의 실행만 HARN-215 착지 후)"
   - id: G-crosswalk-approval
     title: "crosswalk 사람 승인 (docs/standards/crosswalk_gate_contract.md)"
     kind: human
@@ -738,6 +750,18 @@ gates:
       - "[2026-10-02] verdict PASS · inputs: MISC-40-calculus-diff-kebab-seat · evidence: 판정문 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md §7(선택지 안 A~E · 세션 의견 E) · 판정 기준 커밋 9e9d6dd9(PR #1419 · main b08a94ae 위). PASS의 뜻은 결정 입력(판정 기준 Q2~Q4의 승인 대상과 좌석 0이 남는 5개 개념의 선택지·영향 범위)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫 — done MISC-40-calculus-diff-kebab-seat 인계 — done MISC-40-calculus-diff-kebab-seat 인계"
     depends_on:
       - MISC-40-calculus-diff-kebab-seat
+  - id: G-misc61-source-probe-run
+    title: "MISC-61 원천 대조 1회 실행 — Kiki 머신의 원천 7계층 JSON(fac16e6f-WhyMath_______.json, sha256 fcf6d333...187e)에서 진단 스크립트(scripts/ops/misc61_source_key_probe.py)를 1회 돌려 결과 JSON을 세션에 붙여넣는다. 목적 = distractor 연결됨 88행·앵커 A3 4건의 세 필드(학생의_잘못된_사고·distractor_규칙·error_type)가 비어 있는 원인이 원천 공란(H1)인지 추출 누락(H2)인지 가른다. 읽기 전용(약 1초) · 출력은 ASCII JSON이며 행 본문을 담지 않는다. 런북 = docs/ops/misc61_source_probe_runbook.md (PR 머지 후에만 실행 가능). 성공 기준 = sha256_matches_provenance가 True이고 all_targets.verdict가 나온다. 판정(재판정)은 하지 않는다 — G-misc40-deferred-m0599-redecision은 별건이다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-07
+    remind_after_days: 3
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "입력 태스크 없음 - 원천 파일은 Kiki 머신에만 있어 실행은 사람 몫이다(결과를 받은 뒤의 작업은 MISC-61 본체가 소유)"
   - id: G-mp02-rerun-model-pilot
     title: "MP-02 재회차 (Phaiakes9) — 로컬 저작 모델 비교 파일럿(mid=qwen2.5:7b vs quality=qwen3:30b-a3b, 각 30건 · 문제 유형 3종 순환 · 카나리 끔) → 수용 건수가 많은 티어로 MP-02 2회차 n=60(카나리 기본값). 런북 = docs/reviews/mp02_rerun_runbook.md (착지 PR 머지 후 실행 — 런북 1단계 HAS_TIER_FLAG=True가 머지를 기계 확인). 회신 = 런북 8절 목록(5절·7절 출력 전문 필수). 배경: 1차 회차(run_id c0854e38…)는 30건 중 중복 20건이라 판정 분모 10 — 10/10 만점이어도 Wilson 하한 0.7871 < 0.90으로 통과가 수학적으로 불가능했다(25건 이상 전건 합격이어야 0.9023). 판정 규칙은 런북 5절에 실행 전 고정: accepted_stored가 많은 티어, 동률이면 mid. 전제: Ollama 가동 · qwen3:30b-a3b 설치(없으면 런북 2절에서 pull) · 비용 0원(로컬)."
     kind: human
@@ -1046,6 +1070,19 @@ gates:
     cleared_by: null
     notes: "[경위] PR #929 리뷰(codex 봇 P1)가 짚은 구멍이다. 초판 프로브가 seq 65\n  (f1a2b3c4d5e7 = concept.embedding_id 삭제)를 판별자 없이 건너뛰었고, 2026-08-31 4단계에서\n  stamp --purge a9b8c7d6e5f4(seq 67)를 그 위에 찍었다. 그 시점에 컬럼이 남아 있었다면\n  alembic은 삭제를 `완료`로 믿게 되고 upgrade head는 그 리비전을 영영 실행하지 않는다 —\n  컬럼이 조용히 남는다. 삭제 자체는 죽은 참조 컬럼 정리라 데이터 위험은 낮지만,\n  `스키마가 코드와 일치한다`는 판정이 거짓이 되는 것이 문제다.\n\n[확인 — 읽기 전용, 1줄]\n# [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC)\ncd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath\ndocker exec whymath-pg psql -U whymath -d whymath -c \"SELECT column_name FROM information_schema.columns WHERE table_name='concept' AND column_name='embedding_id';\"\n\n[판정] 0행 = 정상(삭제가 이미 적용돼 있었다) → 이 게이트 clear.\n  1행 = 삭제가 건너뛰어졌다 → 세션에 알려주면 제거 절차(백업 선행 → ALTER TABLE concept\n  DROP COLUMN embedding_id)를 값이 채워진 블록으로 드린다.\n\n[대책(코드 착지 완료)] 프로브에 음(negative) 극성 축 신설 — 컬럼의 *존재*가 stamp 대상을\n  그 앞(seq 64)에서 막고 present_after_gap을 올린다. 실측: 정상 DB는\n  stamp_target a9b8c7d6e5f4 / after_gap 0, 컬럼을 되살린 DB는 e6f1a2b3c4d5 / after_gap 2.\n  tests/infra/test_prod_schema_probe.py가 삭제 전용 리비전의 극성을 양방향으로 동결한다."
     corrections: []
+  - id: G-release-freeze-labels-and-required
+    title: "Freeze 라벨 2종 생성 + release-freeze 체크를 룰셋 required에 등록 (Kiki 저장소 설정, 11/30 전)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-08
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - HARN-103-feature-code-freeze-rules
   - id: G-required-checks-live-drift-fix
     title: "라이브 룰셋의 required check 미강제 10건 등록 — 문서 16건 vs 실제 6건(backend lint·infra-contracts·harness-integrity 등 미강제)"
     kind: human
@@ -1166,11 +1203,11 @@ gates:
     title: "S4-01 대학 과목간 선수 엣지 137건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/inter_course_edges_university_v1.json 과 표 문서 docs/data/inter_course_edges_university_v1.md §7 의 137행(from 선수 과목 원자 · to 후속 과목 원자 · 근거)을 보고 승인/반려/보류로 판정한다. 과목 쌍(문서 표의 묶음, 66쌍·쌍당 최대 4건) 단위로 판정해도 된다. 기계로 검증된 것(양끝 실재·대학 과목 간·세부개념 수준·중복 없음·쌍당 상한·병합 시 DAG 비순환·과목 계열 정합)은 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 개념이 저 개념의 선수인가\"라는 교수학적 판단이다. 이 제안은 슬라이스 1(고→대 24건, G-s401-uni-boundary-edge-review)과 함께일 때만 효과가 있다 — 측정: 정본 0/512 → 슬라이스1 198/512 → 슬라이스1+본 제안 466/512(91.0%). 부분 승인이 정상이다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-01
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준 main 0607bc07 · PR #1515 · Kiki 지시(2026-10-08)로 사람 검수를 AI 검수로 대체 — pedagogy 서브에이전트 2인 블라인드 판정(교체=같은 코드 합의 · 반려=둘 다 reject · 불일치=원안 유지). 137→129건: 승인 115 · 합의 교체 5 · 합의 반려 8 · 불일치 원안 유지 9 · 슬라이스 1과 합친 도달 462/512. 기록 = docs/data/ai_review_inter_course_edges_university_v1.md · MEMORY 2026-10-08"
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "사람 검수(교수학적 타당성 판단) — 제안 파일은 이 태스크(S4-01 슬라이스 3) PR 로 main 에 들어온다. 제안 생산자 S4-01 은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다"
@@ -1178,11 +1215,11 @@ gates:
     title: "S4-01 고→대 경계 엣지 24건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/cross_band_edges_university_v1.json 과 표 문서 docs/data/cross_band_edges_university_v1.md 의 24행(from 고등 원자 · to 대학 세부개념 · 근거)을 보고 각 행을 승인/반려/보류로 판정한다. 기계로 검증된 것(양끝 실재·방향 고등→대학·세부개념 수준·중복 없음·병합 시 DAG 비순환·과목 계열 정합)은 이미 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 고등 개념이 저 대학 개념의 선수인가\"라는 교수학적 판단이다. 선례 = 2026-07-28 중복 원자 병합 14건(검수 16 중 2건은 사이클 충돌로 실행 보류). 승인분만 병합하며 부분 승인이 정상이다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-23
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준 main 0607bc07 · PR #1515 · Kiki 지시(2026-10-08)로 사람 검수를 AI 검수로 대체 — pedagogy 서브에이전트 2인 블라인드 판정(교체=같은 코드 합의 · 반려=둘 다 reject · 불일치=원안 유지). 24건 전건 존치: 승인 18 · 합의 교체 4(E06·E15·E18·E24) · 불일치 원안 유지 2 · 반려 0. 기록 = docs/data/ai_review_cross_band_edges_university_v1.md · MEMORY 2026-10-08"
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '사람 검수(교수학적 타당성 판단) — 제안 파일은 이미 main에 있다(#1292 · S4-01 슬라이스 1). 제안 생산자 S4-01은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"

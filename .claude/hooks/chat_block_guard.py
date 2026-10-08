@@ -38,6 +38,19 @@
     분리하고 exit 경로도 독립시켰다. 만료 후 통합 여부는 그때 판정한다(두 훅이 같은
     파서를 쓰므로 통합 비용은 `main()` 병합뿐이다).
 
+**추가 규칙 두 가지 (HARN-300 · 2026-10-07 G-misc40 DB 동기화 사고)** — 상태 전환 여부와 무관하게
+모든 PowerShell 블록에 적용한다:
+  ⓐ `종료코드` — 쓰기·적재 단계(`--load`·`load_*()`·`insert into`·`update … set`·`upsert`·
+     `on conflict`·`$…Load… | python`) **뒤**에 파괴 단계(`delete from`·`drop`·`truncate`·
+     `Remove-Item`·`rm -r`·`git reset --hard`·`git clean -f`·`git push --force`)가 오는데, 그
+     파괴 문장을 감싸는 `if (…)`의 조건이 `$LASTEXITCODE`·`$?` 또는 거기서 대입된 변수를 참조하지
+     않으면 위반이다. 종료 코드를 변수에 받아 출력만 하는 위장도 같은 위반이다.
+  ⓑ `인코딩` — 한글이 든 here-string을 `$변수 | python` 식으로 네이티브 프로세스에 파이프하면
+     위반이다(Windows PowerShell 5.1 `$OutputEncoding` 기본 ASCII가 한글을 `?`로 바꾼다).
+한계: 어휘는 정규식 목록이라 목록 밖 도구·변수 경유 SQL은 못 본다. 적재 대상의 외래키 존재
+확인(HARN-300 ②)은 하지 않는다(적재 계획 대비 건수 단언 HARN-215와 함께 판단).
+테스트·뮤테이션 22종 = `tests/infra/test_chat_block_guard_unchecked_write.py`.
+
 **실패 시 막지 않는다**: transcript·의존 모듈을 못 읽으면 사유를 로그에 남기고 통과한다
 (HARN-114 ⑥ 선례 — 관측 실패가 작업 실패가 되면 안 된다).
 
@@ -325,10 +338,193 @@ def audit_chat_block(scanner: ModuleType, index: int, lines: list[str]) -> list[
     return findings
 
 
+# ── 쓰기 단계 뒤 확인 없는 파괴 단계 · 한글 here-string 파이프 (HARN-300) ──────────
+# 2026-10-07 G-misc40 DB 동기화 블록: 로더 적재가 외래키 위반으로 실패했는데 블록이 종료 코드를
+# 보지 않고 다음 단계의 DELETE 2건을 실행했다(대화형 붙여넣기에서 네이티브 명령의 실패는 흐름을
+# 멈추지 않는다 — 전환 블록 규칙과 같은 뿌리). 같은 날 같은 블록의 한글 판정 스크립트는
+# `$Pre | python -`로 넘겨지다 PowerShell 5.1의 `$OutputEncoding`(기본 ASCII)이 한글을 `?`로
+# 바꿔 판정이 거짓이 됐다.
+_WRITE_STEP = re.compile(
+    r"--load\b|\bload_\w+\s*\(|\binsert\s+into\b|\bupdate\s+\w+\s+set\b|\bupsert\b|"
+    r"\bon\s+conflict\b|\$\w*load\w*\s*\|\s*(?:python|py)\b",
+    re.IGNORECASE,
+)
+_DESTRUCTIVE_STEP = re.compile(
+    r"\bdelete\s+from\b|\bdrop\s+(?:table|column|index|schema|database|view)\b|\btruncate\b|"
+    r"\bRemove-Item\b|\brm\s+-\w*r\w*\b|\bgit\s+reset\s+--hard\b|\bgit\s+clean\s+-\w*f|"
+    r"\bgit\s+push\b[^|]*?(?:--force\b|\s-f\b)",
+    re.IGNORECASE,
+)
+_EXIT_CODE = re.compile(r"\$LASTEXITCODE\b|\$\?", re.IGNORECASE)
+_HERE_OPEN = re.compile(r"^\s*(\$[A-Za-z_]\w*)\s*=\s*@(['\"])\s*$")
+_IF_HEAD = re.compile(r"\b(?:if|elseif)\b", re.IGNORECASE)
+
+
+def _here_string_spans(lines: list[str]) -> list[tuple[str, int, int]]:
+    """here-string 변수 대입의 (소문자 변수명, 여는 줄, 닫는 줄) — 본문은 명령이 아니다."""
+    spans: list[tuple[str, int, int]] = []
+    i = 0
+    while i < len(lines):
+        match = _HERE_OPEN.match(lines[i])
+        if match:
+            quote = match.group(2)
+            j = i + 1
+            while j < len(lines) and not lines[j].lstrip().startswith(quote + "@"):
+                j += 1
+            spans.append((match.group(1).lower(), i, min(j, len(lines) - 1)))
+            i = j + 1
+            continue
+        i += 1
+    return spans
+
+
+def _split_statements(line: str) -> list[tuple[int, str]]:
+    """한 줄을 따옴표 밖의 `;`에서 (시작 열, 문장)으로 자른다 — 문자열 속 `;`은 자르지 않는다."""
+    out: list[tuple[int, str]] = []
+    start = 0
+    quote = ""
+    for i, ch in enumerate(line):
+        if quote:
+            if ch == quote:
+                quote = ""
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+        elif ch == "#" and (i == 0 or line[i - 1].isspace()):
+            out.append((start, line[start:i]))
+            return [(c, s) for c, s in out if s.strip()]
+        elif ch == ";":
+            out.append((start, line[start:i]))
+            start = i + 1
+    out.append((start, line[start:]))
+    return [(c, s) for c, s in out if s.strip()]
+
+
+def _enclosing_conditions(scanner: ModuleType, masked: list[str], row: int, col: int) -> list[str]:
+    """(row, col) 위치를 감싸는 `{…}`들의 `if (…)` 조건 문자열 — 조건이 없는 중괄호는 빈 문자열."""
+    stack: list[str] = []
+    for r in range(row + 1):
+        text = masked[r]
+        end = col if r == row else len(text)
+        for c in range(end):
+            ch = text[c]
+            if ch == "{":
+                head = text[:c]
+                heads = list(_IF_HEAD.finditer(head))
+                cond = ""
+                if heads:
+                    tail = head[heads[-1].start() :]
+                    if re.fullmatch(r"(?:if|elseif)\s*\(.*\)\s*", tail, re.IGNORECASE | re.DOTALL):
+                        cond = scanner._condition_text(tail)
+                stack.append(cond)
+            elif ch == "}" and stack:
+                stack.pop()
+    return stack
+
+
+def _is_output_only(statement: str) -> bool:
+    stripped = statement.strip()
+    return bool(_OUTPUT_ONLY.match(stripped)) or bool(re.fullmatch(r"\"[^\"]*\"|'[^']*'", stripped))
+
+
+def audit_write_then_destructive(
+    scanner: ModuleType, index: int, lines: list[str]
+) -> list[Finding]:
+    """쓰기·적재 단계 **뒤**의 파괴 단계가 앞 단계의 종료 코드로 가드되지 않으면 위반.
+
+    가드 = 파괴 문장을 감싸는 `if (…)`의 조건이 `$LASTEXITCODE`·`$?` 또는 그것에서 대입된 변수를
+    참조하는 것. 종료 코드를 읽어 변수에 담기만 하고 파괴를 그 변수로 감싸지 않은 블록도 위반이다
+    (확인하는 척하는 위장 — 이번 사고도 `LOAD_EXIT`를 **출력**만 하고 DELETE를 막지 않았다면 같다).
+    """
+    skip: set[int] = set()
+    for _name, opened, closed in _here_string_spans(lines):
+        skip.update(range(opened, closed + 1))
+    masked = [scanner.mask_strings_and_comments(line) for line in lines]
+    steps: list[tuple[int, int, str]] = []  # (줄, 열, 문장)
+    for row, line in enumerate(lines):
+        if row in skip:
+            continue
+        for col, statement in _split_statements(line):
+            if not _is_output_only(statement):
+                steps.append((row, col, statement))
+
+    findings: list[Finding] = []
+    last_write: int | None = None
+    exit_vars: set[str] = set()
+    for pos, (row, col, statement) in enumerate(steps):
+        destructive = _DESTRUCTIVE_STEP.search(statement)
+        if destructive and last_write is not None and last_write < pos:
+            # 문장 시작이 아니라 파괴 어휘가 **실제로 나온 열** — 한 줄 `if (…) { …delete… }`에서
+            # 문장 시작은 `{` 앞이라 감싸는 가드가 보이지 않는다.
+            conditions = _enclosing_conditions(scanner, masked, row, col + destructive.start())
+            gated = any(
+                _EXIT_CODE.search(cond) or any(v in cond.lower() for v in exit_vars)
+                for cond in conditions
+            )
+            if not gated:
+                findings.append(
+                    Finding(
+                        index,
+                        "종료코드",
+                        f"{row + 1}행의 파괴 단계가 앞선 쓰기·적재의 "
+                        "**성공을 확인하지 않고** 이어진다 — "
+                        "대화형 붙여넣기에서 네이티브 명령의 실패는 흐름을 멈추지 않으므로 적재가 "
+                        "실패해도 삭제가 실행된다(2026-10-07 DB 동기화 사고). 적재 직후 "
+                        "`$LoadRc = $LASTEXITCODE`로 받고, 파괴 단계를 "
+                        '`if ($LoadRc -eq 0) { … } else { "REFUSED — LOAD_EXIT=$LoadRc" }`로 '
+                        "감싸라.",
+                    )
+                )
+                last_write = None  # 같은 쓰기에 대한 중복 보고 방지
+            continue
+        if _WRITE_STEP.search(statement):
+            last_write = pos
+            exit_vars = set()
+            continue
+        if last_write is not None and _EXIT_CODE.search(statement):
+            assigned = _ASSIGN.match(statement.strip())
+            if assigned:
+                exit_vars.add(assigned.group(1).lower())
+    return findings
+
+
+def audit_nonascii_pipe(index: int, lines: list[str]) -> list[Finding]:
+    """한글이 든 here-string을 `$변수 | python` 식으로 네이티브 프로세스에 파이프하면 위반.
+
+    Windows PowerShell 5.1의 `$OutputEncoding` 기본값은 ASCII라 파이프로 보내는 문자열의 한글이
+    `?`로 바뀐다 — 스크립트가 다른 프로그램이 되고, 한글 리터럴 비교 판정은 조용히 거짓이 된다.
+    """
+    findings: list[Finding] = []
+    spans = _here_string_spans(lines)
+    for name, opened, closed in spans:
+        body = lines[opened + 1 : closed]
+        if all(ord(ch) < 128 for text in body for ch in text):
+            continue
+        pipe = re.compile(
+            re.escape(name) + r"\s*\|\s*(?:python|py|node|ruby|perl|php)\b", re.IGNORECASE
+        )
+        if any(pipe.search(text) for k, text in enumerate(lines) if not opened <= k <= closed):
+            findings.append(
+                Finding(
+                    index,
+                    "인코딩",
+                    f"`{name}` here-string에 한글이 있는데 파이프로 네이티브 프로세스에 넘긴다 — "
+                    "Windows PowerShell 5.1의 `$OutputEncoding`(기본 ASCII)이 한글을 `?`로 바꿔 "
+                    "스크립트가 "
+                    "달라진다(2026-10-07 코퍼스 판정이 한글 비교 때문에 거짓이 됨). "
+                    "한글을 스크립트에서 빼고 "
+                    '`"".join(chr(c) for c in (0xC9C1, …))`처럼 숫자로 쓰거나 파일로 넘겨라.',
+                )
+            )
+    return findings
+
+
 def audit_reply(scanner: ModuleType, text: str) -> list[Finding]:
     findings: list[Finding] = []
     for index, lines in enumerate(powershell_blocks(text), start=1):
         findings.extend(audit_chat_block(scanner, index, lines))
+        findings.extend(audit_write_then_destructive(scanner, index, lines))
+        findings.extend(audit_nonascii_pipe(index, lines))
     return findings
 
 

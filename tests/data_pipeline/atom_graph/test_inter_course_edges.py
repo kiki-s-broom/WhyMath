@@ -48,7 +48,7 @@ GRAPH_PATH = CORPUS_DIR / "graph.json"
 BUILDER_PATH = _PROJECT_ROOT / "scripts" / "build_inter_course_edges_s4_01.py"
 
 #: 저작 목록 동결 값 — 검수로 일부가 반려되면 이 숫자와 아래 도달성 수치가 함께 바뀐다.
-_EXPECTED_EDGE_COUNT = 137
+_EXPECTED_EDGE_COUNT = 129  # 2026-10-08 AI 검수: 137 − 반려 8
 
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -418,12 +418,12 @@ class TestReachability:
     ) -> None:
         pairs = boundary_pairs + [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
         rep = university_reachability(graph, pairs)
-        assert rep.reached_atoms == 466
+        assert rep.reached_atoms == 462  # AI 검수 반려 8건 후 재측정(종전 466)
         assert rep.university_atoms == 512
         assert rep.reached_courses == 31  # 졸업세미나(내용 선수 없음)만 제외
         assert rep.course_components == 2
-        assert rep.atom_ratio == pytest.approx(466 / 512)
-        assert "466/512" in rep.summary()
+        assert rep.atom_ratio == pytest.approx(462 / 512)
+        assert "462/512" in rep.summary()
 
     def test_measure_is_sensitive_to_edges(
         self,
@@ -466,7 +466,7 @@ class TestCli:
         assert main(argv) == 0
         out = capsys.readouterr().out
         assert "[PASS]" in out
-        assert "466/512" in out  # 도달성 병기: 슬라이스 1+3 병합 가정 결과
+        assert "462/512" in out  # 도달성 병기: 슬라이스 1+3 병합 가정 결과
         assert PROPOSAL_PATH.read_bytes() == proposal_bytes  # 읽기 전용
 
     def test_exit_one_on_broken_proposal(self, proposal_bytes: bytes, tmp_path: Path) -> None:
