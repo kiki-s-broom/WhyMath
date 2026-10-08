@@ -5,18 +5,27 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on:
   - S4-53
 requires_gates: []
-acceptance: []
+acceptance:
+  - "① 정확값 산술(계약): statistical_claim의 데이터·주장값을 float 경유 없이 Fraction(정확 유리수)으로 읽고 mean·median·variance·q1·q3은 유리수 정확값으로, std·corr은 제곱근이 유리수면 정확값·아니면 10^-60 이내 정수 제곱근 근사로 계산한다. 설계서 verifier_v2_domains.md 3.5-2(부동소수점 사용 금지)와 구현을 일치시킨다. 수정 전 실측 결함: 17자리 정수 평균이 1 어긋나도 pass·평균 1조에서 500 어긋나도 pass."
+  - "② 허용오차 정책 DSL: conditions에 tolerance 절(exact | abs:양수 | rel:0초과1미만 | round:0~15)을 추가한다. 절이 없으면 계산값이 유한소수(분모가 2·5 소인수뿐)일 때 exact, 무한소수·무리수일 때 abs:10^-9(절대오차)로 판정한다. round는 반올림 half-up(0에서 먼 쪽)을 정확 유리수로 수행한다. 무리수에 exact를 지정하면 fail이 아니라 unverifiable(사유에 대체 정책 안내). 적용된 정책 라벨은 StatisticalResult.policy로 노출한다(작동한 비율 원칙)."
+  - "③ 입력 방어: NaN·Infinity·bool·길이 64자 초과 수 토큰·지수 절댓값 30 초과·ASCII 외 숫자·밑줄 숫자·공백으로 갈라진 숫자(혼합수 1 1/2의 5.5 오독)·분모 0·깊은 중첩 JSON·미지 조건 절 키·중복 절을 전부 unverifiable로 돌려보낸다(예외 전파 0·fail 위장 0)."
+  - "④ 집행 지점(정본화와 분리): l3/verifier.py의 _verify_statistical_claim_pair 래퍼가 변경 없이 새 verify_statistical_claim을 경유하고 machine_value는 float 계약(StatisticalResult.value)을 유지한다. test_verifier의 통계 3건과 tolerance 정책을 통과시키는 Verifier 경유 통합 테스트 1건 이상으로 확인한다."
+  - "⑤ 검증: 신규 단위 테스트가 위 결함 입력(A 정수 정밀도·B 대값·NaN·지수 폭탄·혼합수)과 정책별 경계(abs 경계 포함·rel 영값·round half-up 양수/음수 동점·exact 무한소수)를 고정한다. 보호 장치 실패 주입(뮤테이션)으로 가드가 RED가 되는지 확인하고 주입 적용·원복 바이트 동일을 단언한다. CI backend 잡 스텝(ruff·black·mypy strict·lint-imports·pytest)과 infra-contracts 잡 해당 여부를 판정한다."
+  - "⑥ 범위 밖(승계 후보로 기록·이 태스크에서 변경 안 함): cross_verify.py의 machine_value float isclose 비교(대값 왜곡 동형 잔존)·표본분산 n=1 이 0 으로 계산되는 기존 동작·columns 절의 int() 변환 예외. 설계서 3.4의 query= 표기와 구현 DSL의 stat= 표기 불일치는 문서에 구현 기준을 병기한다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/statistical_claim.py
   - docs/architecture/verifier_v2_design.md
-session: null
-notes: "Codex #4/#5: 정확값·허용오차 정책, Decimal/정확분수 도입. 현재 float 비교(rel_tol=1e-9)는 대값 왜곡과 정수 데이터 정밀도 손실 가능.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+  - docs/architecture/verifier_v2_domains.md
+  - tests/backend/l3/test_statistical_claim.py
+  - tests/backend/l3/test_verifier.py
+session: claude/funny-hamilton-zj2026
+notes: "Codex #4/#5: 정확값·허용오차 정책, Decimal/정확분수 도입. 현재 float 비교(rel_tol=1e-9)는 대값 왜곡과 정수 데이터 정밀도 손실 가능.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/statistical_claim.py', 'docs/architecture/verifier_v2_design.md'] → ['src/backend/whymath_backend/l3/statistical_claim.py', 'docs/architecture/verifier_v2_design.md', 'docs/architecture/verifier_v2_domains.md', 'tests/backend/l3/test_statistical_claim.py', 'tests/backend/l3/test_verifier.py']: 인수 기준 정의(acceptance 비어 있었음) — 정확값 산술·정책 DSL·입력 방어·집행 지점·검증·범위 밖 분리. paths는 기존 2건을 유지하고 문서·테스트 3건을 추가(교체 형태이므로 전부 명시)"
+updated: 2026-10-08
