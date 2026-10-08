@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,7 +19,9 @@ acceptance:
   - "⑤ 변별력: 같은 코퍼스에 고등 프로파일을 적용하면 exit 0, 초등 프로파일을 적용하면 exit 1이 나오는지 --force-grade-band 대조군으로 실측한다. 두 경우가 같은 값이면 측정기가 학년 축을 실제로 보지 않는 것이다. 그리고 첫 실측에서 초과 표기 0건이면 이 축이 불필요했다는 정직한 신호이므로 그대로 리포트에 기록한다"
   - "⑥ 범위 밖 명시: (a) 학생 입력에 대한 교육과정 범위 거부 — 영구 미채택(math_engine_gap_review.md §2-⑤). (b) 성취기준 코드 자동 태깅 — 교육과정 축이며 curriculum-node-builder 자산의 소관. (c) 생성 프롬프트에 학년 제약을 주입하는 것 — 생성 축·후속. 이 태스크는 회계이지 개입이 아니다"
   - "[범위 재조정 2026-10-08 · acceptance ① 반증 결과] ①의 '없는 것은 토큰→구조 키 매핑 하나뿐' 주장은 부분 반증됐다 — 실측 5건. (a) 매핑이 코드에 암묵 존재: l3/speech.py의 _gate(construct, label) 호출 12곳이 \\frac→fraction, ^→power, _→subscript, \\sqrt→root, 삼각함수→trig, 로그→log, \\int류→integral, \\sum류→sum, \\prod류→product, \\lim→limit, \\binom→binom, '→derivative를 AST 노드 키로 이미 갖는다. 토큰 키의 데이터 표만 없다 → 새 표를 만들되 두 번째 정본이 되지 않도록 표↔음성화 엔진 드리프트 테스트로 묶는다(매크로 항목은 초등 프로파일로 실제 낭독해 unresolved 반응이 표와 일치하는지 대조). (b) 구조 키는 12종이 아니라 14종이다(_ARITHMETIC 4 + 고등 10: fraction power abs factorial root subscript trig log integral sum product limit derivative binom). (c) 추출기는 전수가 아니다: 코퍼스 문항 14,034건에 LaTeX 매크로가 0건이고 표기는 평문·유니코드(x^2, √, ², Σ, ₙ)다. _MACRO_RE+is_math_glyph만 쓰면 초과 표기 0건이 실제 부재인지 측정기의 맹점인지 구분되지 않는다 → 표에 kind(macro|glyph|word)를 두고 ASCII 단어 토큰(sin·cos·tan·log·ln·lim·sqrt 등 비모호 어휘)을 추가 축으로 추출한다. (d) 문항에는 학년 필드가 없다: 학년밴드는 achievement_standard_codes → data/corpus/standards_v1/standards.json의 school_type(초등학교/중학교/고등학교)으로 파생하고, 복수 코드면 최고 밴드를 쓴다(오탐 방향 보수). 코드가 정본에 없는 문항(대학 CALC1 600건)은 미분류로 판정 제외하되 건수를 노출한다. (e) 계층: introduced_constructs는 L4 데이터이고 l3→l4 import는 7계층 계약 위반이다 → 엔진은 l3/curriculum_notation_gate.py에 두고 구조 키 집합을 인자로 주입받으며, L4 PROFILES를 주입하는 CLI는 harness/curriculum_notation_gate_cli.py에 둔다(l3/pedagogy/explanation_checker ↔ harness/explanation_f7_eval 선례). ci.yml 스텝은 이 CLI를 부른다. 판정 단위는 (밴드, 구조, 토큰) 3-튜플이며 베이스라인은 data/curriculum_notation_range_baseline.json. ④의 소스 스캔은 명시 3개 디렉터리(api/·l4/polya/·l4/socratic/) 금지에 더해 엔진·CLI 두 모듈을 import(언급)할 수 있는 파일의 허용 목록(deny-by-default)을 함께 동결한다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1538"
+  - b9013f8b
 paths:
   - data/curriculum_notation_ranges.json
   - src/backend/whymath_backend/l3/curriculum_notation_gate.py
@@ -33,6 +35,6 @@ paths:
   - scripts/analysis/eos_core_adapter_boundary_scan.py
   - scripts/analysis/eos_feature_inventory_v2.py
   - src/backend/pyproject.toml
-session: claude/stoic-feynman-c4n2ah
+session: null
 notes: "docs/architecture/math_engine_gap_review.md §3 D4. 기능 30의 4단계 검증 중 '교육과정 범위 검증'만 축 자체가 없다 — 중3 문항에 \\int이 들어가도 어떤 게이트도 반응하지 않는다. 가장 가까운 자산은 l4/speech/profiles.py 학년밴드(거부 안 하고 unresolved 표시만)와 l3/notation_coverage.py(학년이 아니라 렌더 가능성 축)다. 설계의 핵심 제약은 좌표 이동이다 — 이 축을 학생 입력 거부에 쓰면 교수학 금기이므로 생성물(문항·풀이·시각화) 게이트 전용으로만 성립하고, 그 제약을 acceptance ④의 소스 스캔+결함주입으로 기계화한다. 차원 검증은 E1-01-dimensional-consistency가 소유하므로 이 태스크에 편입하지 않는다(중복 등재 금지).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/내용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['data/curriculum_notation_ranges.json', 'src/backend/whymath_backend/l3/curriculum_notation_gate.py', 'src/backend/whymath_backend/l4/speech/profiles.py', 'src/backend/whymath_backend/l3/notation_coverage.py', 'tests/backend/l3/test_curriculum_notation_gate.py', '.github/workflows/ci.yml'] → ['data/curriculum_notation_ranges.json', 'src/backend/whymath_backend/l3/curriculum_notation_gate.py', 'src/backend/whymath_backend/l4/speech/profiles.py', 'src/backend/whymath_backend/l3/notation_coverage.py', 'tests/backend/l3/test_curriculum_notation_gate.py', '.github/workflows/ci.yml', 'src/backend/whymath_backend/harness/curriculum_notation_gate_cli.py', 'data/curriculum_notation_range_baseline.json', 'tests/backend/l3/test_curriculum_notation_gate_student_path_governance.py', 'scripts/analysis/eos_core_adapter_boundary_scan.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/pyproject.toml']: acceptance ① 반증(매핑 암묵 존재·14종·추출기 맹점·학년 필드 부재·L3-L4 계층) 실측에 따른 범위 재조정 — ①이 허용한 절차"
 updated: 2026-10-08
