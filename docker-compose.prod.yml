@@ -198,6 +198,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ★ OPS-19 — 관측 리포트 정기 실행 배선. `*_report.py` 관측 CLI 중 실 DB가 필요한 10개는
+  #   러너가 0건이라 산출이 한 번도 없었다("측정한 적 없음"이 "문제 없음"으로 읽혔다).
+  #   신규 로직 0 — 러너(`ops.observation_report_runner`)가 기존 CLI를 부르기만 한다.
+  #   `app`과 **동일 이미지**를 재사용한다(SEC-12 retention-purge와 같은 원칙 — 새 이미지 0).
+  #   ★ 부류 분리: 이 서비스는 `--class db`만 돈다(이미지에 동봉되는 data/만 읽는 리포트).
+  #   저장소 체크아웃(src/·tests/)이 필요한 `checkout_db`는 이미지에 tests/가 없어 파일 부재가
+  #   낮은 수치로 읽히므로(실측: Contract coverage 100%→66.7%) 여기서 돌리지 않는다.
+  #   ★ "돌지 못함" ≠ "0건": 러너는 리포트마다 ran_ok/run_failed/run_timeout을 manifest.json에
+  #   따로 남기고, 하나라도 못 돌면 비-0으로 끝난다. 성공이면 7일 뒤, 실패면 DB 장애 등 일시
+  #   원인이 7일 방치되지 않도록 1시간 뒤 재시도한다(`|| exit 1`로 컨테이너를 죽이면 재기동
+  #   루프가 매번 10개를 다시 돌린다 — 침묵하지도 폭주하지도 않는 중간 설계).
+  #   ★ 산출물은 컨테이너 /tmp에 쓰고(appuser 쓰기 가능·재기동 시 소멸) 요약 JSON 한 줄이 docker
+  #   logs에 남는다. 영속 보관이 필요해지면 그때 볼륨을 얹는다(미테스트 볼륨 권한 추측 금지).
+  #   ★ 읽기 전용 — 대상 10개에 쓰기 구문이 없음을 tests/infra가 동결한다. 암호화 키 불요
+  #   (`WHYMATH_DATABASE_URL`만 필요 — 학생 데이터 키는 `app` 밖으로 새지 않는다).
+  observation-reports:
+    image: whymath-backend:${WHYMATH_IMAGE_TAG:?WHYMATH_IMAGE_TAG 미설정 - 불변 이미지 태그(git short SHA 등)를 env 파일에 지정하라. latest 금지(롤백 불가)}
+    container_name: whymath-${DEPLOY_ENV:?DEPLOY_ENV 미설정 - staging 또는 prod}-observation-reports
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - "while true; do if python -m whymath_backend.ops.observation_report_runner --class db --out /tmp/observation-reports; then sleep 604800; else echo 'observation-reports: 리포트 실행 실패 - 1시간 후 재시도' >&2; sleep 3600; fi; done"
+    environment:
+      WHYMATH_DATABASE_URL: postgresql+asyncpg://whymath:${WHYMATH_DB_PASSWORD:?WHYMATH_DB_PASSWORD 미설정 - prod DB는 trust 인증 금지}@db:5432/whymath
+    # 이미지의 HEALTHCHECK(/health/live 폴)는 HTTP 서버가 없는 이 서비스엔 무해당 — 비활성화하지
+    # 않으면 도커가 8000 포트 무응답을 "unhealthy"로 영구 오판한다.
+    healthcheck:
+      disable: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   db-data:
     # 볼륨 이름에 환경을 박아 staging이 prod 데이터를 절대 건드리지 못하게 한다.

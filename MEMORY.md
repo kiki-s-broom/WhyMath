@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (착지 · OPS-19): **관측 리포트 20개 중 러너 0건이던 17개에 실행 경로를 줬다 — 자동 16개(CI 5 · 배포 compose 10 · 사람 런북 1)와 입력 의존 1개로 갈랐고, "돌지 못함"이 "0건"으로 읽히지 않게 상태값을 분리했다** — 판정 기준 main `1c33b60a`
+
+**무엇/왜**: 태스크가 등재될 때의 주장(리포트 11개 중 10개 러너 0건)은 이 시점 실측과 달랐다. `*_report.py`는 **20개**였고 러너가 있는 것은 3개(`eos_unit_structure_observation_report` CI 스텝 · `weekly_metrics_report` cron · `cost_report` 수동 스크립트)였다. `concept_reach_report`는 CLI가 아니라 **테스트**만 CI에서 돌고 있어 러너로 세지 않았다. 나머지 17개는 산출이 0회였다. 신규 리포트 로직은 0 — 기존 CLI를 `python -m`으로 부르기만 하는 러너 `ops/observation_report_runner.py`를 신설했다.
+**결정 5건**: ① 부류는 모듈 위치(`harness/`·`ops/`)가 아니라 **어디서 완전하게 돌 수 있는가**로 가른다 — `harness/` 안에도 DB를 요구하는 리포트가 9개다. DB 없이 17개를 직접 실행한 실측으로 `ci` 5(rc=0) · `db` 10(rc=2, 접속 실패를 정직하게 보고) · `checkout_db` 1 · 입력 의존 1로 갈랐다. ② `checkout_db`(`phase1_structure_report`)는 자동 경로에 넣지 않았다 — 배포 이미지에는 `tests/`가 없어 같은 리포트가 Contract coverage 100%→66.7%, Vertical Slice 75%→0.0%로 **파일 부재가 낮은 수치로 읽혔다**(이미지 레이아웃 모사 실측). ③ 러너는 subprocess+타임아웃으로 호출한다(in-process import는 `asyncio.run`·`sys.exit`·전역 엔진 오염과 Windows에서의 타임아웃 불가가 걸린다). 대가로 `declared_unwired_audit`이 도달을 못 보므로 면제 문구 11건을 `_OFFLINE_REPORT`("사람이 돌린다")에서 새 상수 `_OBSERVED_BY_RUNNER`로 정정하고 러너 목록과 **양방향 대조 테스트**로 동결했다. ④ 상태값은 `ran_ok`/`run_failed`/`run_timeout`/`spawn_error`/`running` — 수치가 0이어도 종료 0이면 `ran_ok`, 못 돌면 비-0과 stderr 꼬리(접속 문자열 비밀번호 가림)가 남는다. 리포트마다 시작 전에 `running`을 먼저 flush한다. ⑤ 배포 서비스는 `app`과 같은 이미지로 7일 주기, 실패 시 1시간 재시도로 둔다(`|| exit 1`은 재기동 루프가 매번 10개를 다시 돌려 채택하지 않음).
+**실측**: 같은 `db` 10개를 DB 없이 돌리면 10/10 `run_failed`·러너 exit 1, 실 PG 16(마이그레이션 적용·빈 스키마)에서는 10/10 `ran_ok`·exit 0. `ci` 5개는 작업 디렉터리(저장소 루트/`src/backend`)와 무관하게 출력 해시가 바이트 동일하고 기본 의존성만 설치한 환경에서도 5/5. 이미지 레이아웃(`src/backend`+`data`+`docs/prompts`만) 모사에서도 `db` 10/10.
+**집행(정본화와 별항)**: 러너 단위 16건(뮤테이션 9종 전건 RED) · 레지스트리 28건(21번째 리포트 미귀속·죽은 항목·중복 귀속·면제 문구 불일치·쓰기 구문 혼입을 실제 소스에 주입해 RED) · `tests/infra` 배선 21건(실제 `ci.yml`·compose에 7종 주입 전건 RED, `Wiring/_all_wirings` 재사용으로 신규 테스트의 CI 도달 확인). 집행 지점은 CI `harness-integrity` 스텝과 `docker-compose.prod.yml`의 `observation-reports` 서비스다.
+**정직한 공백**: `ran_ok`는 "정상 종료"이지 "측정이 완전했다"가 아니다(리포트가 본문에 `미측정`을 적고 0으로 끝나는 설계는 본문을 읽어야 안다). compose 서비스의 실제 기동은 이 환경에 데몬이 없어 정의 계약과 `docker compose config` 렌더까지만 확인했다. 결과 전달(Slack·이메일)은 `OPS-30`. `generation_seed_adoption_report`는 genlog 위치가 확정돼야 해 명령을 지어내지 않고 런북에 산문으로만 남겼다. 면제 문구 11건의 수취인·만료 선언은 `OPS-34` 몫이고 이 변경이 그 대상을 11건 줄였다.
+**사고 기록(피해 0, CI 도달 전 로컬 재현으로 검출)**: ⓐ 러너 스텝의 `${{ runner.temp }}`가 CI 미러(`test_ci_mirror`)에서 '러너 컨텍스트 필요'로 해석 불가 판정 → 고정 경로 `/tmp/observation-reports`로 교체 ⓑ 신규 모듈이 EOS 기능 인벤토리에 미귀속(`WM-O-907` 편입으로 해소) — 이 둘은 `infra-contracts` 잡 전체를 재현한 뒤에야 나왔고, 변경이 닿는 잡을 먼저 열거하지 않았다면 CI 첫 실행에서 드러났을 것이다 ⓒ 워커 재시작으로 로컬 PG가 내려가 첫 이미지 모사 결과가 무효였고 DB 복구 후 재실행했다.
+
 ### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
 
 **무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
