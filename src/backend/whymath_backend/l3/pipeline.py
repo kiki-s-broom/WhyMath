@@ -57,7 +57,7 @@ _NO_SEAT_SURFACE = object()
 """provider가 좌석 표면(`cloud_seat`·`seat`)을 아예 노출하지 않음 — '미상(None)'과 구별하는 표지."""
 
 
-def served_cloud_seat(provider: LLMProvider) -> CloudSeat | None:
+def served_cloud_seat(provider: object) -> CloudSeat | None:
     """이 provider로 클라우드 결정을 보내면 **어느 좌석이 받는가** — 원가 기록의 단가 좌석(ARCH-64).
 
     학생 대면 서빙이 `build_cloud_provider()` 경유로 바뀌면서 좌석이 셀렉터를 따라 움직인다.
