@@ -1190,11 +1190,11 @@ gates:
     title: "S4-01 대학 과목간 선수 엣지 137건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/inter_course_edges_university_v1.json 과 표 문서 docs/data/inter_course_edges_university_v1.md §7 의 137행(from 선수 과목 원자 · to 후속 과목 원자 · 근거)을 보고 승인/반려/보류로 판정한다. 과목 쌍(문서 표의 묶음, 66쌍·쌍당 최대 4건) 단위로 판정해도 된다. 기계로 검증된 것(양끝 실재·대학 과목 간·세부개념 수준·중복 없음·쌍당 상한·병합 시 DAG 비순환·과목 계열 정합)은 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 개념이 저 개념의 선수인가\"라는 교수학적 판단이다. 이 제안은 슬라이스 1(고→대 24건, G-s401-uni-boundary-edge-review)과 함께일 때만 효과가 있다 — 측정: 정본 0/512 → 슬라이스1 198/512 → 슬라이스1+본 제안 466/512(91.0%). 부분 승인이 정상이다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-01
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준 main 0607bc07 · PR #1515 · Kiki 지시(2026-10-08)로 사람 검수를 AI 검수로 대체 — pedagogy 서브에이전트 2인 블라인드 판정(교체=같은 코드 합의 · 반려=둘 다 reject · 불일치=원안 유지). 137→129건: 승인 115 · 합의 교체 5 · 합의 반려 8 · 불일치 원안 유지 9 · 슬라이스 1과 합친 도달 462/512. 기록 = docs/data/ai_review_inter_course_edges_university_v1.md · MEMORY 2026-10-08"
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "사람 검수(교수학적 타당성 판단) — 제안 파일은 이 태스크(S4-01 슬라이스 3) PR 로 main 에 들어온다. 제안 생산자 S4-01 은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다"
@@ -1202,11 +1202,11 @@ gates:
     title: "S4-01 고→대 경계 엣지 24건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/cross_band_edges_university_v1.json 과 표 문서 docs/data/cross_band_edges_university_v1.md 의 24행(from 고등 원자 · to 대학 세부개념 · 근거)을 보고 각 행을 승인/반려/보류로 판정한다. 기계로 검증된 것(양끝 실재·방향 고등→대학·세부개념 수준·중복 없음·병합 시 DAG 비순환·과목 계열 정합)은 이미 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 고등 개념이 저 대학 개념의 선수인가\"라는 교수학적 판단이다. 선례 = 2026-07-28 중복 원자 병합 14건(검수 16 중 2건은 사이클 충돌로 실행 보류). 승인분만 병합하며 부분 승인이 정상이다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-23
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준 main 0607bc07 · PR #1515 · Kiki 지시(2026-10-08)로 사람 검수를 AI 검수로 대체 — pedagogy 서브에이전트 2인 블라인드 판정(교체=같은 코드 합의 · 반려=둘 다 reject · 불일치=원안 유지). 24건 전건 존치: 승인 18 · 합의 교체 4(E06·E15·E18·E24) · 불일치 원안 유지 2 · 반려 0. 기록 = docs/data/ai_review_cross_band_edges_university_v1.md · MEMORY 2026-10-08"
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '사람 검수(교수학적 타당성 판단) — 제안 파일은 이미 main에 있다(#1292 · S4-01 슬라이스 1). 제안 생산자 S4-01은 수학 K-12 완성 우산 태스크라 입력으로 걸면 검수가 K-12 전체 완성까지 막힌다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
