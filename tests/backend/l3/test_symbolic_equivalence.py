@@ -209,9 +209,7 @@ class TestParseUnevaluated:
         """같은 수학의 두 표기는 **구조까지 같은** 식으로 읽힌다(srepr 동일)."""
         assert sympy.srepr(parse_unevaluated(implicit)) == sympy.srepr(parse_unevaluated(explicit))
 
-    @pytest.mark.parametrize(
-        "raw", ["(2x+3)²", "2(x+1)", "(x+1)(x-1)", "x²y", "3x+4y", "(3+4)^2"]
-    )
+    @pytest.mark.parametrize("raw", ["(2x+3)²", "2(x+1)", "(x+1)(x-1)", "x²y", "3x+4y", "(3+4)^2"])
     def test_same_rules_as_the_equivalence_parser(self, raw: str) -> None:
         """구조 보존 파서의 결과를 동치 권위에 되먹이면 원문과 항등이다 — 변환 규칙이 같다는 증거.
 
@@ -274,4 +272,3 @@ def test_function_application_is_read_as_multiplication_known_limitation() -> No
     assert identity_status("f(x)**2", "f*x**2") is IdentityVerdict.identity
     # 대조군: 내장 함수는 곱으로 읽히지 않는다 — 한계가 *미지 이름*에 한정됨을 보인다.
     assert identity_status("sin(x)", "sin*x") is IdentityVerdict.parse_error
-
