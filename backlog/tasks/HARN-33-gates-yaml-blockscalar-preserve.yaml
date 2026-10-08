@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,11 +16,13 @@ acceptance:
   - "② 대책: YAML 덤프 시 개행을 포함한 문자열을 블록 스칼라로 유지한다(yaml representer 커스터마이즈). 기존 게이트의 표기가 조작 1회로 바뀌지 않아야 한다 — 판정치는 '내용 동일'이 아니라 '순수 추가분만 diff에 뜬다'(git diff --numstat 의 삭제 줄 0)"
   - "③ 집행 지점(정본화와 별항): gates add/clear/waive 와 태스크 저장이 모두 경유하는 저장 함수 1곳에 적용되고, 그 경로를 타는 회귀 테스트가 CI에서 실제로 실행됨을 확인한다(tests/infra/test_test_suite_wiring.py 선례 — '저장소에 존재함'과 '돌아감'은 다르다)"
   - "④ 범위 밖: 기존 파손분의 일괄 재포맷(대장 대량 변경은 사람 판단) · YAML 라이브러리 교체"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1535"
+  - 7aae4383
 paths:
   - scripts/harness/backlog.py
   - scripts/harness/store.py
   - "tests/harness/**"
-session: claude/sharp-brown-vt4ix8
+session: null
 notes: "발견 경위: 2026-08-21 G-amd395-perf-baseline 등재 시 G-operator-seat-first-grant 의 60줄 런북형 notes 가 통째로 단일 문자열로 변환됐다. 해당 커밋에서는 원본 블록을 복원해 순수 추가분만 남겼다(diff 삭제 줄 0 확인). 사람이 매번 되돌릴 수는 없고 대장 손편집은 금지 원칙이므로 도구를 고친다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/하네스 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['scripts/harness/backlog.py', 'tests/harness/**'] → ['scripts/harness/backlog.py', 'scripts/harness/store.py', 'tests/harness/**']: 실제 저장 함수(save_gates·save_task·dump_*)가 store.py에 있어 paths 보강 — 착수 시 backlog.py만 선언돼 있었다(기존 경로 유지·추가만)"
 updated: 2026-10-08
