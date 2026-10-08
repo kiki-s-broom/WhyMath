@@ -44,13 +44,15 @@ _SHARD = "backlog/events/s.ndjson"
 
 
 def _load_mirror():
+    """이미 등록된 `ci_mirror`를 그대로 쓴다 — `sys.modules`를 덮어쓰지 않는다.
+
+    `test_ci_mirror.py`는 자기 사본의 `current_commit`을 가짜로 바꾸는데, `backlog.py`는
+    `sys.modules["ci_mirror"]`를 읽는다. 여기서 사본을 새로 만들어 덮어쓰면(수집 순서상 이
+    파일이 나중이다) 그 가짜가 읽히지 않아 같은 프로세스의 기존 4건이 깨진다 — 부분 실행으로는
+    보이지 않고 전체 `tests/infra` 실행(CI·미러)에서만 드러난다(HARN-194 첫 미러 실행 실측).
+    """
     sys.path.insert(0, str(_MIRROR_PATH.parent))
-    spec = importlib.util.spec_from_file_location("ci_mirror", _MIRROR_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["ci_mirror"] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("ci_mirror")
 
 
 mirror = _load_mirror()
