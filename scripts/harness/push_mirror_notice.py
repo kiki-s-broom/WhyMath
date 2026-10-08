@@ -57,7 +57,7 @@ HEAD_MOVING_SUBCOMMANDS: frozenset[str] = frozenset(
     {"commit", "merge", "pull", "rebase", "cherry-pick", "am", "revert", "reset"}
 )
 
-_SEPARATORS: frozenset[str] = frozenset({"&&", "||", ";", "|", "&"})
+_SEPARATORS: frozenset[str] = frozenset({"&&", "||", ";", ";;", "|", "|&", "&", "(", ")"})
 #: 값을 별도 인자로 받는 `git push` 옵션.
 _PUSH_OPTIONS_WITH_VALUE: frozenset[str] = frozenset(
     {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
@@ -148,6 +148,81 @@ def _plan_for_push_args(rest: list[str], *, head_moves: bool) -> PushPlan:
     return PushPlan(PLAN_PUSH, refspecs, head_moves)
 
 
+#: 히어독(`<<EOF … EOF`)의 본문 — 명령이 아니라 데이터다. 본문 속 `git push` 글귀는 푸시가 아니다.
+_HEREDOC_RE = re.compile(
+    r"(<<-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2)([^\n]*)\n.*?\n[ \t]*\3[ \t]*(?=\n|$)",
+    re.DOTALL,
+)
+
+
+def _newlines_to_separators(command: str) -> str:
+    """따옴표 밖 줄바꿈은 명령 구분자(`;`)로, 따옴표 밖 줄 잇기(`\\`+줄바꿈)는 공백으로 바꾼다."""
+    out: list[str] = []
+    quote: str | None = None
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if quote is not None:
+            out.append(ch)
+            if ch == "\\" and quote == '"' and i + 1 < len(command):
+                out.append(command[i + 1])
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+        elif ch == "\\" and i + 1 < len(command):
+            out.append(" " if command[i + 1] == "\n" else ch + command[i + 1])
+            i += 1
+        elif ch == "\n":
+            out.append(" ; ")
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def split_command_groups(command: str) -> list[list[str]]:
+    """셸 한 줄을 개별 명령(토큰 리스트)들로 쪼갠다. 따옴표 불균형 등은 `ValueError`로 알린다.
+
+    `shlex.split`만 쓰면 `head;`처럼 단어에 붙은 `;`가 구분자로 쪼개지지 않아 그 뒤의 `git push`가
+    앞 명령의 인자가 된다(2026-10-08 실사용에서 실제 푸시 명령이 이렇게 놓쳤다). 그래서
+    `punctuation_chars`로 구분 기호를 토큰으로 떼고, 히어독 본문은 지우고,
+    따옴표 밖 줄바꿈은 구분자로 본다.
+    """
+    flattened = _HEREDOC_RE.sub(lambda m: m.group(1) + m.group(4), command)
+    lexer = shlex.shlex(_newlines_to_separators(flattened), posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    groups: list[list[str]] = [[]]
+    for token in lexer:
+        if token in _SEPARATORS:
+            groups.append([])
+        else:
+            groups[-1].append(token)
+    return [stripped for g in groups if (stripped := _strip_redirections(g))]
+
+
+_REDIRECT_RE = re.compile(r"^[<>&]+$")
+
+
+def _strip_redirections(tokens: list[str]) -> list[str]:
+    """리다이렉션(`2>&1`·`> file`·`<<EOF`)을 인자에서 뗀다 — 안 떼면 그 토큰이 refspec이 된다."""
+    kept: list[str] = []
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if _REDIRECT_RE.match(token):
+            if kept and kept[-1].isdigit():
+                kept.pop()  # 파일 기술자 번호(`2>`의 2)
+            i += 2  # 연산자와 그 대상
+            continue
+        kept.append(token)
+        i += 1
+    return kept
+
+
 def plan_from_command(command: str) -> PushPlan:
     """Bash 명령 한 줄을 푸시 계획으로 옮긴다. 푸시가 아니면 `PLAN_NOT_PUSH`.
 
@@ -155,17 +230,11 @@ def plan_from_command(command: str) -> PushPlan:
     푸시로 추정하고 `parse_failed`를 남긴다. 조용히 무시하면 이 훅이 꺼진 것과 같다.
     """
     try:
-        tokens = shlex.split(command, comments=False)
+        groups = split_command_groups(command)
     except ValueError:
         if re.search(r"\bgit\b[^\n]*\bpush\b", command):
             return PushPlan(PLAN_PUSH, parse_failed=True)
         return PushPlan(PLAN_NOT_PUSH)
-    groups: list[list[str]] = [[]]
-    for token in tokens:
-        if token in _SEPARATORS:
-            groups.append([])
-        else:
-            groups[-1].append(token)
     head_moves = False
     for group in groups:
         sub, rest, other_repo = _git_subcommand(group)

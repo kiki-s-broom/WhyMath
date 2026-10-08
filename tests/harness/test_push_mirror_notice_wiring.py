@@ -263,6 +263,15 @@ class TestRegisteredCommandEndToEnd:
         log = (repo / ".claude" / "logs" / "push_mirror_notices.jsonl").read_text(encoding="utf-8")
         assert secret not in log and "example.com" not in log
 
+    def test_push_glued_to_a_preceding_command_is_still_evaluated(self, repo: Path) -> None:
+        """실사용 반례(2026-10-08) — `head;`처럼 단어에 붙은 세미콜론 뒤의 푸시가 `not_a_push`로 놓쳤다."""
+        _mirror_pass(repo)
+        command = "ls -a 2>&1 | head; git push -u origin feature 2>&1 | tail -3; echo done"
+        proc = _run_registered(repo, _push(command))
+        assert proc.returncode == 0 and proc.stdout == b""
+        (row,) = _log_rows(repo)
+        assert row["code"] == "mirror_pass", "붙은 `;` 뒤의 푸시가 평가되지 않았다"
+
     def test_command_that_only_mentions_push_is_not_logged(self, repo: Path) -> None:
         """ "push"라는 낱말만 든 명령은 평가된 푸시가 아니다 — 로그(고지 비율의 분모)에 남기지 않는다."""
         for command in ("grep -rn push scripts", "git log --grep push", "echo git push"):

@@ -305,6 +305,23 @@ class TestHeadMoves:
         ("echo git push", pmn.PLAN_NOT_PUSH, (), False),
         ("grep -n push scripts/x.py", pmn.PLAN_NOT_PUSH, (), False),
         ("git status && git log", pmn.PLAN_NOT_PUSH, (), False),
+        # 2026-10-08 실사용 반례: 단어에 붙은 `;`·리다이렉션이 실제 푸시를 놓치게 했다
+        ("ls a b 2>&1 | head; git push -u origin x 2>&1 | tail -3", pmn.PLAN_PUSH, ("x",), False),
+        ("git fetch; git commit -qm x; git push", pmn.PLAN_PUSH, (), True),
+        ("git status&&git push origin HEAD", pmn.PLAN_PUSH, ("HEAD",), False),
+        ("git add -A\ngit commit -m a\ngit push", pmn.PLAN_PUSH, (), True),
+        ("git commit -m msg \\\n  && git push", pmn.PLAN_PUSH, (), True),
+        ("(cd sub; git push)", pmn.PLAN_PUSH, (), False),
+        # 줄 잇기가 인자로 새면 원격 이름이 refspec이 되어 HEAD 아닌 푸시로 오분류된다
+        ("git push \\\n  origin", pmn.PLAN_PUSH, (), False),
+        # 괄호가 구분자가 아니면 맨 앞 `(` 때문에 git이 명령 첫머리로 안 보인다
+        ("(git push origin HEAD)", pmn.PLAN_PUSH, ("HEAD",), False),
+        ("git push origin HEAD > out.txt 2>&1", pmn.PLAN_PUSH, ("HEAD",), False),
+        ("git push 2>/dev/null", pmn.PLAN_PUSH, (), False),
+        # 푸시처럼 보이지만 명령이 아닌 글귀
+        ('echo "x; git push"', pmn.PLAN_NOT_PUSH, (), False),
+        ("cat > f <<'EOF'\ngit push body line\nEOF\necho done", pmn.PLAN_NOT_PUSH, (), False),
+        ("git commit -m 'a\ngit push'", pmn.PLAN_NOT_PUSH, (), False),
         ("git pull", pmn.PLAN_NOT_PUSH, (), False),
     ],
 )

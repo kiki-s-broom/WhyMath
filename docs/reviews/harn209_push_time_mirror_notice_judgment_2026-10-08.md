@@ -71,8 +71,10 @@
 - **고지 채널**: 훅이 종료 코드 0과 함께 stdout JSON `hookSpecificOutput.additionalContext`를 낸다.
   공식 훅 문서에서 확인한 사실: 종료 코드 0일 때 **stdout·stderr는 PreToolUse에서 모델에게 전달되지
   않는다**(stderr는 디버그 로그 전용). 모델에게 닿는 경로는 `additionalContext`(system reminder로
-  도구 결과 옆에 삽입)와 차단(exit 2)뿐이다. 이 확인은 문서 열람(서브에이전트 경유)이며 **이 세션의 라이브
-  도달은 검증하지 못했다** — 설정 파일 변경이 실행 중 세션에 즉시 반영되는지 모르기 때문이다.
+  도구 결과 옆에 삽입)와 차단(exit 2)뿐이다. 이 확인은 문서 열람(서브에이전트 경유)이었고, **이 세션에서 실측으로도
+  확인했다**(2026-10-08): 미러 결과를 치운 상태에서 무해한 푸시(`Everything up-to-date`)를 실행하자 하네스가
+  `PreToolUse:Bash hook additional context: [CI 미러 고지 · 푸시 직전] …`를 도구 결과 옆에 주입했다. 설정 변경은
+  실행 중 세션에 즉시 반영됐다(등록 직후부터 평가 로그가 쌓인다).
 - **`updatedInput`으로 PR 본문을 자동 수정하지 않는다.** 문서상 `permissionDecision`과 짝지어 쓰며, `allow`를
   주면 사용자의 권한 확인을 건너뛰게 된다. 고지에 **붙여 넣을 섹션을 같이 실어** 모델이 직접 본문에 넣게
   한다.
@@ -107,10 +109,16 @@
 
 - 테스트 87건(판정 로직·푸시 계획 파싱·진입점·도달 잡·훅 배선): `tests/harness/test_push_mirror_notice.py` ·
   `test_push_mirror_notice_wiring.py`. 배선 테스트는 `settings.json`에 **등록된 명령 문자열을 그대로** 셸로 실행한다.
-- 뮤테이션 **45종 전건 RED**(판정 절 28 · 푸시 계획 6 · 훅 11 · 등록·`/drive` 문서 3 … 적용 확인 `count==1`·
-  `mutated != original`, 원복 sha256 동일 단언). **첫 회차에 1종이 살아남았다** — M29(이름 변경의 원래 경로 건너뛰기
-  제거): 제 픽스처의 `"docs/guide.md" not in paths`가 잘린 문자열(`s/guide.md`)을 못 봐 통과했다. 목록 전체를
-  `sorted(paths) == [...]`로 고정해 RED를 확인했다.
+- 뮤테이션 **52종 전건 RED**(모듈 판정·계획 31 · 명령 분리 파싱 7 · 훅 11 · 등록·`/drive` 문서 3 … 적용 확인
+  `count==1`·`mutated != original`, 원복 sha256 동일 단언). **첫 회차에 3종이 살아남았다** — M29(이름 변경의 원래
+  경로 건너뛰기 제거): 제 픽스처의 `"docs/guide.md" not in paths`가 잘린 문자열(`s/guide.md`)을 못 봐 통과했다.
+  M49(줄 잇기)·M52(괄호): 해당 절이 없어도 같은 결과가 나오는 입력만 있었다 — 각 절의 반례(`git push \\<줄바꿈> origin`
+  → refspec이 비어야 함 · `(git push origin HEAD)`)를 픽스처에 넣어 RED를 확인했다.
 - 훅의 "push 낱말만 든 명령" 로그 제외는 뮤테이션 이후에 넣은 변경이라 훅 뮤테이션 전건(M31~M45)을 다시 돌렸다.
-- **검증하지 못한 것**: 이 세션에서의 라이브 도달(§5) · 실제 PreToolUse 호출 경로의 `additionalContext` 렌더링.
-  `settings.json` 등록 사실과 훅의 JSON 출력 형식만 동결했다.
+- **실사용에서 드러난 결함(구현 뒤)**: 훅이 이 세션에서 발화하는 것은 확인됐으나(평가 로그에 이 세션 id), 실제 푸시 명령
+  `ls … | head; git push -u origin …`이 `not_a_push`로 놓쳤다. 원인: `shlex.split`이 `head;`처럼 단어에 붙은 `;`를
+  구분자로 쪼개지 않아 `git push`가 앞 명령의 인자가 됐다. 단위 픽스처는 공백이 있는 `&&`만 써서 못 봤다. 수정: 구분 기호
+  토큰화(`punctuation_chars`)·따옴표 밖 줄바꿈 구분·히어독 본문 제거·리다이렉션 제거, 반례 13행과 훅 종단 회귀
+  1건 추가.
+- **검증하지 못한 것**: PR 생성 경로(`mcp__github__create_pull_request`)의 실발화 — 이 PR을 만들 때 처음 밟는다.
+  푸시 경로의 `additionalContext` 도달은 위에서 실측했다.

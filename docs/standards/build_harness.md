@@ -818,8 +818,8 @@ red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않
 
 - **전달 채널**: 종료 코드 0일 때 stdout·stderr 평문은 PreToolUse에서 모델에게 가지 않는다(공식 훅 문서). 모델에 닿는 것은 stdout JSON의
   `hookSpecificOutput.additionalContext`뿐이며 훅은 `ensure_ascii=True`로 낸다(cp949 콘솔에서도 손상 없음). 권한 결정
-  (`permissionDecision`)·`updatedInput`은 쓰지 않는다 — `allow`를 주면 사용자의 권한 확인을 건너뛴다. **이 세션에서의 라이브 도달은 검증하지
-  못했다**(설정 변경이 실행 중 세션에 즉시 반영되는지 모름).
+  (`permissionDecision`)·`updatedInput`은 쓰지 않는다 — `allow`를 주면 사용자의 권한 확인을 건너뛴다. **라이브 도달은 실측했다**(2026-10-08 — 미러 결과를
+  치운 상태의 무해한 푸시에 하네스가 `[CI 미러 고지 · 푸시 직전]`을 도구 결과 옆에 주입했다).
 - **무엇이 고지되고 무엇이 침묵하나**: 미러 상태가 `fail`·`unknown`(결과 없음·다른 커밋·형식 깨짐)·`unavailable`이면 고지, `pass`·`not_executed`면
   침묵(§3c-1과 같은 분류). 같은 (트리거·HEAD·사유)는 한 번만 고지한다.
 - **"코드 없는 푸시"를 가리는 법 — 경로 필터가 아니라 내용**: `ci_job_coverage scope`로는 못 가린다. 상시 잡 6개가 모든 diff에 닿고 원 사고의
@@ -834,7 +834,7 @@ red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않
 - **측정과 재평가**: 로그 한 줄 = 평가 한 건(트리거·사유 코드·미러 상태·변경 건수·고지 여부; 명령 본문은 기록하지 않는다). 재평가 조건(임시 —
   관측 전 가정): 평가된 푸시 중 고지 비율이 2주 연속 30% 초과면 상시 경고가 된 것이므로 오탐 형태를 규명한다.
 - **변별력·집행**: `tests/harness/test_push_mirror_notice.py`(판정 절별 반례 픽스처)·`test_push_mirror_notice_wiring.py`(등록된 명령 문자열을
-  그대로 실행·호출 사슬 AST·종료 코드 0·cp949). 뮤테이션 45종 전건 RED.
+  그대로 실행·호출 사슬 AST·종료 코드 0·cp949). 뮤테이션 52종 전건 RED.
 - **하지 않는 것**: 차단(승격은 측정 뒤 별건) · GitHub API로 직접 커밋하는 도구 · HEAD가 아닌 refspec·`git -C`·`--dry-run`·삭제·태그만.
 
 ## 3d. 의존 선언의 두 종류 — 하드 부착 vs 소프트 분류 (HARN-52 · HARN-53)
