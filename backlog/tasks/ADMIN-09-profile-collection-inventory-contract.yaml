@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,12 +18,14 @@ acceptance:
   - "④ 변별력 — 컬럼을 하나 추가(또는 대장에서 하나 제거)했을 때 그 테스트가 실제로 실패하는지 양방향 확인. 성공/실패 양쪽에서 같은 결과면 검증이 아니라 위장이다(2026-07-17 delay:true 선례). 뮤테이션 원복은 cp 백업으로만"
   - "⑤ CI 배선 실재성 — 신규 테스트가 실제로 CI backend 잡에서 실행되는지 확인(OPS-10 — '저장소에 존재함'과 '돌아감'은 다르다)"
   - "⑥ 범위 밖 — 법적 근거·목적 문구의 법률적 확정은 MGMT-02(변호사 검토) 소관이다(CLAUDE.md 법령 유래 절차의 기계 대체 금지). 이번은 기계 대장 + 동기 강제까지. 컬럼 드롭·수집 시작·pipa_data_matrix §2.2 9항목 표 확장도 범위 밖(전자는 ADMIN-02, 후자는 학습 데이터 축)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1523"
+  - 8687dd95
 paths:
   - data/collection_inventory.json
   - src/backend/whymath_backend/db/models/user.py
   - "tests/backend/schema/*"
   - docs/legal/pipa_data_matrix.md
-session: claude/laughing-bardeen-ayio1q
-notes: "docs/architecture/operations_platform_gap_review_r2.md §4 D7 — v1이 보지 않은 평면. pipa_data_matrix.md §3.2가 '동의 시 수집 항목·이용 목적·보유 기간·제3자 제공 여부를 명확히 고지(PIPA 고지 의무)'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없다. §1 '데이터 최소 수집' 원칙이 기계로 검증되지 않는 상태이며, MGMT-02(처리방침 문안·blocked)가 참조할 대장이 없다. ADMIN-02 (c)(school_region·gender 처분)의 선결 — 처분 근거는 이 대장이 있어야 성립한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/I3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
+session: null
+notes: "docs/architecture/operations_platform_gap_review_r2.md §4 D7 — v1이 보지 않은 평면. pipa_data_matrix.md §3.2가 '동의 시 수집 항목·이용 목적·보유 기간·제3자 제공 여부를 명확히 고지(PIPA 고지 의무)'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없다. §1 '데이터 최소 수집' 원칙이 기계로 검증되지 않는 상태이며, MGMT-02(처리방침 문안·blocked)가 참조할 대장이 없다. ADMIN-02 (c)(school_region·gender 처분)의 선결 — 처분 근거는 이 대장이 있어야 성립한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/I3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[미러 면제 2026-10-08] mobile 잡만 이 샌드박스에 Flutter SDK가 없어 재현 불가(첫 스텝 flutter pub get이 exit 127 command not found — 환경 문제이며 변경은 모바일 코드를 건드리지 않음). 나머지 8잡(backend·concept-reach-guard·web·infra-contracts·infra-shell·policy-guard·harness-integrity·declared-unwired-audit)은 같은 커밋 8687dd95에서 ci_mirror가 전부 exit 0(backend는 27스텝 중 24 통과·3 재현불가). 실제 GitHub CI의 mobile 잡도 같은 커밋에서 success: https://github.com/kiki-s-broom/WhyMath/actions/runs/37740106600/job/113188663636"
 updated: 2026-10-08
