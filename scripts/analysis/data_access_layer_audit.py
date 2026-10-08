@@ -191,6 +191,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/concept_visualization/overlay.py",
             "l1/curriculum/curriculum_loader.py",
             "l1/curriculum/curriculum_resolve.py",
+            # HARN-302 — 적재 전 외래키 대상 사전확인. 연결을 스스로 열지 않고 적재기가 건넨
+            # 연결로 참조 테이블을 읽기만 한다(쓰기 0). 적재기 여러 곳이 같은 확인을 쓰도록
+            # 공용 모듈로 둔다.
+            "l1/fk_precheck.py",
             "l1/formula_graph/formula_node_projection.py",
             "l1/misconception/catalog_loader.py",
             "l1/misconception/crosslink_loader.py",
