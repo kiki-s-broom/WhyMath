@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: in_progress
+status: done
 priority: 4
 eos_priority: P1
 owner: claude
@@ -18,10 +18,11 @@ acceptance:
   - "④ 침묵 실패 금지와의 접점 — never-break 경로가 예외를 삼킬 때 **예외 타입명을 로그에 포함**하는 현행 계약은 유지된다. 코드 축이 생기면 그 식별자가 타입명에서 코드로 승격될 수 있으나, **시크릿·필드값은 여전히 제외**한다(2026-07-16 langfuse 8일 전멸 교훈)."
   - "⑤ 정본화≠집행 별항 — 코드 체계를 *정의*하는 것과 API 응답·로그가 그 코드를 *싣는* 것은 다르다. 소비 지점(응답 스키마 필드·로그 포맷·관측 대시보드)을 별항으로 명시하고, 경유 배선이 0인 채로 완료하지 않는다."
   - "⑥ 범위 경계 — 34종 **전건 소급 부여가 아니다**. 부여 규칙(네이밍·계열·안정성 보증)과 적용 범위(신규 예외 + 학생 대면 경로)를 먼저 정하고, 전건 소급은 별도 후속으로 분리한다. 범위를 먼저 접지 않으면 이 태스크는 끝나지 않는다."
-artifacts: []
+artifacts:
+  - "PR #1521 (https://github.com/kiki-s-broom/WhyMath/pull/1521) · 커밋 eec7dc26 · CI 미러 6잡 통과 · 전체 tests/backend 17297 passed · ratchet exit 0 차단 0건 · 후속 OPS-119"
 paths:
   - "src/backend/whymath_backend/api/**"
   - "docs/standards/error_code*.md"
-session: claude/elegant-wright-qqehm0
+session: null
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B3 · §5 B급 미등재 후보 6. 갭리뷰 §5는 이 항목을 \"11월 권고\"로 유예하며 \"지금 등재하면 만료 없는 유예 없이 떠 있는 todo만 늘린다\"고 적었는데, **산문 유예는 대장에 집행되지 않으므로 소유자 0인 상태 그 자체**다(CLAUDE.md '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'·'만료 없는 유예·제외 금지'). 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재하며, 시점 유예는 priority로 표현한다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(에러코드·error code·error_code·장애 분석·오류 응답·ProblemDetail) → 관련 0건."
 updated: 2026-10-08
