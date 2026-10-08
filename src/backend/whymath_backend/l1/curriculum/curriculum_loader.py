@@ -357,6 +357,10 @@ def load_kr_curriculum_entries_with_atoms(
     `derive_atom_curriculum_entries`(원자 축 유도)를 결합한다. 반환 두 목록을 합쳐 적재하면
     canonical 축(개념 그래프 소비처)과 원자 축(S2-03 이후 gating 깊이 조인) 양쪽이 hit한다.
 
+    ⚠️ 이 경로는 **대학 원자를 낳지 않는다**(아래 "대학 원자 직접 유도" 절 참조) — canonical
+    개념그래프(graph.json, 437개념)에 대학 개념이 0건이고 크로스워크도 대학 원자를 0건 매핑하기
+    때문이다. 대학 축은 `load_kr_curriculum_entries_for_university_atoms`가 별도로 담당한다.
+
     Raises:
         FileNotFoundError: graph.json 또는 crosswalk.jsonl 부재.
         ValueError: 크로스워크 코퍼스 계약 위반(concept_id 누락/중복 — `load_crosswalk_records`).
@@ -365,6 +369,116 @@ def load_kr_curriculum_entries_with_atoms(
     crosswalk = load_crosswalk_records(crosswalk_path)
     atoms = derive_atom_curriculum_entries(canonical, crosswalk)
     return canonical, atoms
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 대학 원자 직접 유도 (W0 — S-1: 커리큘럼 오버레이에 대학 밴드 부재 해소)
+# ──────────────────────────────────────────────────────────────────────────
+# 실측(2026-08-05): canonical 개념그래프(`concept_graph_v1/graph.json`, 437개념)의
+# `grade_band_hint`는 "고등학교"까지만 존재하고(대학 0건), 대학원자 유도의 유일한 경로인
+# `concept_atom_crosswalk_v1/crosswalk.jsonl`(437레코드·canonical 1:1)도 대학 원자(atom_graph_v1
+# school_level="대학" 1,069건)를 단 하나도 매핑하지 않는다. 즉
+# `load_kr_curriculum_entries_with_atoms`(canonical → 크로스워크 유도) 경로로는 대학 원자에
+# required_depth·introduced_grade 신호가
+# 원리상 영원히 도달하지 않는다 — 두 dict에 "대학" 키를 추가하는 것만으로는 아무 원자도
+# 매핑되지 않아 눈속임이 된다(날조 회피). 이 절은 atom_graph_v1의 대학 원자를 *직접* 읽어
+# 원자코드로 키잉된 KR 셀을 유도한다 — canonical을 우회하는 게 아니라, 대학 축이 애초에
+# canonical 그래프 밖의 자산이므로 정공법이다.
+
+# atom_graph_v1의 `grade_band`("1학년".."4학년")는 전체 2,683 원자 중 대학 원자(1,069건)에만
+# 나타나는 값이다(초·중·고 밴드는 "N~M학년군"·"고N" 표기라 겹치지 않음 — 2026-08-05 corpus
+# 실측: 이 4개 라벨의 전체 등장 횟수와 대학 필터 등장 횟수가 정확히 일치).
+_UNIV_GRADE_TO_INTRODUCED_GRADE: dict[str, int] = {
+    # KR 1~12(초1=1…고3=12, `_GRADE_BAND_TO_INTRODUCED_GRADE`) 다음 번호를 그대로 이어 붙인
+    # 로더 내부 관례다(제도가 정한 학년 번호가 아니다) — `introduced_grade`의 "국가 내 학년
+    # 정수" 계약을 지키면서 대학 1~4학년을 고등학교 뒤에 정렬하기 위함(정렬용 확장, 교육학적
+    # 주장 아님).
+    "1학년": 13,
+    "2학년": 14,
+    "3학년": 15,
+    "4학년": 16,
+}
+
+# RequiredDepth는 awareness~mastery 4단계뿐이라 고등학교가 이미 최심 단계(mastery)다 — 대학은
+# 이 4단계 안에서는 더 깊은 값이 없으므로 동일 천장을 유지한다("심화·증명·전이" 서술은 대학
+# 정규과정에도 그대로 부합 — 2026-08-05 학년축 최단경로 계획 §3 W0 결정). None으로 두면 L6
+# 깊이 랭킹 보너스가 대학 원자에서 항상 0으로 죽으므로(신호 소실) 명시값을 준다.
+_UNIV_REQUIRED_DEPTH: RequiredDepth = RequiredDepth.mastery
+
+
+def _kr_entry_from_university_atom(
+    atom: dict[str, Any], *, now: datetime
+) -> CurriculumEntry | None:
+    """atom_graph_v1 대학 원자 1개 → 원자코드로 키잉된 KR `CurriculumEntry` 셀(없으면 None).
+
+    `_kr_entry_from_concept`(canonical 개념용)의 대학 원자 직결 짝이다 — 필드명이 다르다
+    (`concept_id`가 아닌 `code`, `grade_band_hint`가 아닌 `grade_band`, `domain`이 아닌
+    `subject_area` — atom_graph_v1 코퍼스 계약, 모듈 상단 키 매핑 표와는 별개).
+
+    `grade_band`가 `_UNIV_GRADE_TO_INTRODUCED_GRADE`에 없는 원자(단원·소단원 헤더 등
+    `level != "세부개념"`이라 grade_band가 아예 None인 원자 다수 포함)는 None을 반환해
+    건너뛴다 — 신호 없는 원자에 값을 지어내지 않는다(날조 금지).
+    """
+    atom_code = _opt_str(atom.get("code"))
+    if atom_code is None:
+        return None
+    grade_band = _opt_str(atom.get("grade_band"))
+    if grade_band is None or grade_band not in _UNIV_GRADE_TO_INTRODUCED_GRADE:
+        return None
+
+    return CurriculumEntry(
+        concept_id=atom_code,
+        country_code=_KR_COUNTRY,
+        subject=_KR_SUBJECT,
+        entry_id=f"{atom_code}:{_KR_COUNTRY}",
+        source_name=_KR_SOURCE_NAME,
+        source_code=_KR_SOURCE_CODE,
+        source_url=_KR_SOURCE_URL,
+        license_id=_KR_LICENSE,
+        introduced_grade=_UNIV_GRADE_TO_INTRODUCED_GRADE[grade_band],
+        grade_band=grade_band,
+        curriculum_revision=_KR_CURRICULUM_REVISION,
+        domain_label=_opt_str(atom.get("subject_area")),
+        required_depth=_UNIV_REQUIRED_DEPTH,
+        national_standard_codes=_str_list(atom.get("standard_codes")),
+        # 원자 노드에 선수개념 필드가 없다(선수관계는 별도 edges 배열) — 조인 없이 지어내지
+        # 않는다(날조 금지). 필요해지면 edges 조인은 후속 슬라이스.
+        prerequisite_concept_ids=[],
+        is_present=True,
+        # 원자 코퍼스는 canonical의 review_status 신호가 없다(다른 계약) — 보수적 기본값 고정.
+        confidence=_CONFIDENCE_DEFAULT,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def load_kr_curriculum_entries_for_university_atoms(
+    atom_graph_path: Path, *, now: datetime | None = None
+) -> list[CurriculumEntry]:
+    """atom_graph_v1 대학 원자 → 원자코드로 키잉된 KR 셀 목록(순수·PG 불요·entry_id 정렬).
+
+    ⚠️ `atom_graph_path`는 `load_kr_curriculum_entries_with_atoms`의 `graph_path`
+    (canonical 개념그래프의 graph.json)와 **다른 파일**이다 — 이 함수는 원자 그래프의
+    graph.json(대학 원자 포함)을 읽는다. `load_kr_curriculum_entries_with_atoms`의
+    대학 보충 경로다: 크로스워크가 대학 원자를 0건 매핑하므로 이 함수가 없으면 대학 원자
+    1,069건은 커리큘럼 오버레이에 영원히 나타나지 않는다(모듈 docstring "대학 원자 직접 유도"
+    절 참조). 호출자가 이 목록을 canonical·원자(K-12) 목록과 합쳐 적재한다 — entry_id 충돌
+    없음(원자코드 공간이 K-12·대학 사이에서 겹치지 않음).
+
+    Raises:
+        FileNotFoundError: atom_graph.json 부재.
+    """
+    resolved_now = now if now is not None else datetime.now(timezone.utc)
+    payload = json.loads(atom_graph_path.read_text(encoding="utf-8"))
+    out: list[CurriculumEntry] = []
+    for atom in payload.get("concepts", []):
+        if atom.get("school_level") != "대학":
+            continue
+        entry = _kr_entry_from_university_atom(atom, now=resolved_now)
+        if entry is not None:
+            out.append(entry)
+    out.sort(key=lambda e: e.entry_id)  # 결정론 산출(canonical 로더와 동일 관례)
+    return out
 
 
 class CurriculumEntryStore:
@@ -458,6 +572,7 @@ def populate_kr_curriculum_entries(
 __all__ = [
     "CurriculumEntryStore",
     "derive_atom_curriculum_entries",
+    "load_kr_curriculum_entries_for_university_atoms",
     "load_kr_curriculum_entries_from_graph_json",
     "load_kr_curriculum_entries_with_atoms",
     "populate_kr_curriculum_entries",
