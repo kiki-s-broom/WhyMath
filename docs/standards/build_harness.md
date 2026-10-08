@@ -537,6 +537,50 @@ PR에만 생긴다는 통설을 실측에서 폐기했다(열린 PR 14건 중 me
 걸려 매 실행 "판정 보류"가 되어 초록인 채 상시 무력이 된다). 배선 실재성은
 `tests/infra/test_stale_branch_scan_ci_wiring.py`가 기계로 동결한다.
 
+### 3b-3a. 세션 shallow 대체 — CI 야간 리포트 (HARN-28)
+
+**문제**: 위 5분류 스캔(`scan_stale_branches`)은 shallow 클론이면 `status=shallow`로 판정을
+포기한다. 모든 CCR 세션 컨테이너가 shallow라 이 탐지기는 **세션에서 한 번도 목록을 낸 적이
+없다**(2026-08-11 실측 — 미측정 규모: 미머지 커밋 392·열린 PR 없는 브랜치 27·최장 고립 8일).
+`--unshallow` 자동 실행은 `unmerged_branch_verdict_2026-08-11.md`가 타당한 사유로 기각했으므로
+그 기각을 뒤집지 않고 **실행 위치를 CI로 옮긴다**.
+
+| 구간 | 구현 | 동결 |
+|---|---|---|
+| 발행(집행 지점) | `harness-audit.yml`의 `isolation-scan` 잡 — 야간 schedule·수동 전용(push(main)에서 안 돈다), `fetch-depth: 0`, `contents: write` | `tests/infra/test_isolation_scan_wiring.py` |
+| 전달 | 전용 orphan 브랜치 `harness-reports` — 루트 커밋 1개(부모 없음)·파일 1개(`isolation.json`) | `tests/harness/test_isolation_report.py` |
+| 소비 | `backlog.py brief`가 **세션 스캔이 `shallow`일 때만** 리포트를 읽어 같은 렌더 경로로 낸다 | 같은 파일의 `TestBriefCommandConsumesReport` |
+
+**설계 규칙** (각각 결함 주입으로 검출 확인 — 뮤테이션 30종 전건):
+- **측정 실패 ≠ 통과.** CI 스캔이 `ok`가 아니면 *발행하지 않고* exit 2로 잡을 red로 만든다.
+  빈 목록을 올리면 소비자가 "고립 0건"으로 읽는다. 거부하면 직전 정상 리포트가 남고 그 생성
+  시각이 브리핑에 항상 보이므로 낡음이 숨지 않는다(36시간 초과 시 경고 — 야간 잡이 멎은 신호).
+- **소비는 4상태를 구분한다.** `ok`/`absent`(브랜치 없음)/`corrupt`/`unreachable`은 서로 다른
+  화면이다. 비-`ok` 셋은 "고립 0건"이 아니라 **"고립 브랜치 미측정"** 이며 처방이 각각 다르다.
+  "리포트가 있고 0건"과 "리포트가 없다"도 다른 화면이다.
+- **`harness-claims`에 얹지 않는다.** 쓰기 주체(야간 CI 1개 vs 세션 N개)·주기·실패 영향이 달라
+  섞으면 서로의 CAS 재시도를 유발한다. (초안은 "`_write_claims()`가 `claims/` 밖 경로를 무증상
+  삭제한다"를 근거로 들었으나 그 결함은 HARN-111 `preserved_root_entries`로 이미 해소됐다 —
+  근거가 사라져도 분리는 위 이유로 여전히 옳다.)
+- **`git fetch --depth`를 쓰지 않는다.** full 클론에 depth를 주면 그 클론이 shallow로 바뀌어
+  이 절이 고치려는 결함을 스스로 만든다. 브랜치가 루트 커밋 1개라 depth 없이도 O(1)이다.
+  추이는 브랜치에 쌓지 않고 워크플로 아티팩트(30일)로 보존한다.
+- **하네스 소유 브랜치는 방치 스캔 대상 밖이다**(`remote_claims.HARNESS_OWNED_BRANCHES` =
+  `harness-claims` + `harness-reports`). 제외가 없으면 야간 잡이 사흘 멎는 순간 리포트 브랜치가
+  orphan이라 trunk 대비 ahead>0 → `isolated`로 "결정 필요"에 뜬다. `flow_health.EXCLUDED`와의
+  동기화도 테스트가 붙든다.
+- **CI 잡이 `ci.yml`이 아니라 `harness-audit.yml`에 있는 이유**: `pull_request` 트리거 부재(쓰기
+  권한이 PR 검증 경로로 새지 않는 구조적 보장)·`cancel-in-progress` 없음(ci.yml은 main push마다
+  야간 잡을 취소한다). `ci.yml`의 `harness-integrity`가 도는 `backlog.py branches`는 판정만
+  CI 로그에 남기고 **세션에 전달하지 않으므로** 이 경로가 그것을 대체하지 않고 보완한다.
+
+**한계(정직한 공백)**: 리포트는 최대 하루 묵은 스냅샷이다 — 측정 이후의 머지·삭제는 반영되지
+않으며 브리핑 출처 줄이 그 사실을 밝힌다. 전체 클론(Kiki 머신)은 라이브 스캔이 더 신선하므로
+리포트를 읽지 않는다. 최초 발행은 `harness-audit`을 `workflow_dispatch`로 한 번 실행해야 한다
+(그 전까지 세션 브리핑은 "미측정 — isolation-scan 잡 실행 필요"를 낸다).
+
+조회·진단: `python3 scripts/harness/isolation_report.py show` (exit 0 정상 · 3 없음 · 4 손상 · 5 조회 불가).
+
 ### 3b-4. 차단 홀드의 교차 세션 해제 (HARN-134 — 착지 완료)
 
 **현행**: `unblock`이 홀더가 아닌 세션에서도 차단 홀드를 **정상 경로로** 걷는다.
@@ -1202,6 +1246,7 @@ python3 scripts/harness/work_graph.py --no-remote  # 원격 조회 3종 생략 (
    아니면(offline·shallow·error·skipped) 페이로드·화면 배너·터미널 요약이 전부 그 사실을
    말한다. 빈 결과를 "없음"으로 위장하지 않는다. **shallow 클론**(클라우드 세션 기본)에서는
    고립 브랜치 판정이 `shallow`로 불가하다 — 완료분·claim 축은 그대로 동작한다.
+   브리핑은 이 경우 CI 야간 리포트로 대체한다(§3b-3a · HARN-28).
 5. **읽기 전용** — `backlog/`를 일절 쓰지 않는다(mtime 불변 테스트). 네트워크도 원격 claim
    조회(`list_claims`) 외에는 캐시된 원격 ref만 본다.
 6. **게이트 창은 공용 분류를 따른다** (HARN-184 · `tests/harness/test_gate_wait_kind.py`가 동결) —
