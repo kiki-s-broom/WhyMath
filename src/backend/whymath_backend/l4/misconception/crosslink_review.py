@@ -192,8 +192,9 @@ def main(argv: list[str] | None = None) -> int:
     """검수 큐 승인분 승격 CLI — `promote --queue Q.json [--out OUT.json | --load]`.
 
     반환은 종료 코드: 0=성공 · 1=검수 큐 위반(전건 열거 출력) · 2=입력 파일 부재/승인 0건
-    (조용한 무동작 금지). `--load`는 기존 `load_crosslinks`(l1/crosslink_loader)에 위임해
-    `misconception_crosslink` 테이블에 멱등 적재한다(승인→적재 원커맨드).
+    (조용한 무동작 금지) · 3=외래키 대상 누락(HARN-302 — 쓰기 0건·누락 키 전건 열거).
+    `--load`는 기존 `load_crosslinks`(l1/crosslink_loader)에 위임해 `misconception_crosslink`
+    테이블에 멱등 적재한다(승인→적재 원커맨드).
     """
     parser = argparse.ArgumentParser(
         prog="whymath-crosslink-review",
@@ -233,9 +234,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.load:
         # 지연 import — 로더는 DB 설정(Settings)·sqlalchemy를 끌므로 승격-전용 경로를 hermetic 유지.
+        from whymath_backend.l1.fk_precheck import ForeignKeyTargetMissingError
         from whymath_backend.l1.misconception.crosslink_loader import load_crosslinks
 
-        count = load_crosslinks(None, payload)
+        try:
+            count = load_crosslinks(None, payload)
+        except ForeignKeyTargetMissingError as exc:
+            # 외래키 대상 누락(HARN-302) — 쓰기 0건. 종료 코드 3 = 라이브 DB가 적재 입력을 받을
+            # 준비가 안 됨(검수 큐 위반 1·입력 부재 2와 구분). 블록은 이 코드를 보고
+            # 후속 쓰기를 멈춘다.
+            print(f"적재 거부 — {exc}")
+            return 3
         print(f"crosswalk 적재 완료: 승인 {approved}건 → {count}건 멱등 upsert.")
     else:
         out_path: Path = args.out

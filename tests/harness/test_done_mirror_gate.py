@@ -128,8 +128,12 @@ def _job(name: str, *steps: tuple[str, str]) -> object:
 def _write_mirror(repo: Path, kind: str) -> None:
     """미러 결과 픽스처 — 실제 `build_payload` 경로로 만든다(손으로 쓴 JSON은 형식 드리프트를 못 본다).
 
-    kind: pass · not_executed · fail · absent · other_commit · corrupt · zero_jobs
-    앞 셋은 이번 HEAD의 결과이고, 뒤 넷은 `unknown`(측정되지 않음)이 되는 서로 다른 원인이다.
+    kind: pass · not_executed · fail · absent · other_commit · corrupt · zero_jobs ·
+          tainted · tainted_fail · tree_unverified
+    앞 셋은 이번 HEAD의 결과이고, 나머지는 `unknown`(측정되지 않음)이 되는 서로 다른 원인이다.
+    `tainted`는 실행 도중 작업 트리가 바뀐 결과(스텝은 전부 통과), `tainted_fail`은 같은 오염에
+    스텝 실패가 겹친 결과, `tree_unverified`는 트리 지문을 못 잡은 결과다(HARN-194) — 앞의 둘은
+    통과·실패가 아니라 "측정되지 않음"이어야 한다.
     """
     m = _mirror()
     path = repo / m.DEFAULT_RESULT_PATH
@@ -146,8 +150,18 @@ def _write_mirror(repo: Path, kind: str) -> None:
         "not_executed": [_job("j", ("ok", m.PASSED), ("조건 게이트", m.NOT_EXECUTED))],
         "fail": [_job("j", ("boom", m.FAILED))],
         "zero_jobs": [],
+        "tainted": [_job("j", ("ok", m.PASSED))],
+        "tainted_fail": [_job("j", ("boom", m.FAILED))],
+        "tree_unverified": [_job("j", ("ok", m.PASSED))],
     }[kind]
-    payload = m.build_payload(jobs, repo, Path("ci.yml"))
+    head = _git(repo, "rev-parse", "HEAD")
+    mutated = m.TreeCheck(m.TREE_MUTATED, head, head, [m.PathChange("src/x.py", "modified")])
+    tree = {
+        "tainted": mutated,
+        "tainted_fail": mutated,
+        "tree_unverified": m.unverifiable_tree("git status exit 128", "GitExitError", head),
+    }.get(kind, m.TreeCheck(m.TREE_STABLE))
+    payload = m.build_payload(jobs, repo, Path("ci.yml"), tree=tree)
     payload["commit"] = "d" * 40 if kind == "other_commit" else _git(repo, "rev-parse", "HEAD")
     m.save_payload(payload, path)
 
@@ -430,6 +444,9 @@ class TestLookupStates:
             ("other_commit", "unknown"),
             ("corrupt", "unknown"),
             ("zero_jobs", "unknown"),
+            ("tainted", "unknown"),
+            ("tainted_fail", "unknown"),
+            ("tree_unverified", "unknown"),
         ],
     )
     def test_each_fixture_maps_to_its_state(self, git_repo: Path, kind: str, expected: str):
@@ -538,7 +555,19 @@ class TestJudgeScopeShortCircuit:
 
 
 class TestDoneBlocksUnknownAndFail:
-    @pytest.mark.parametrize("kind", ["absent", "other_commit", "corrupt", "zero_jobs", "fail"])
+    @pytest.mark.parametrize(
+        "kind",
+        [
+            "absent",
+            "other_commit",
+            "corrupt",
+            "zero_jobs",
+            "fail",
+            "tainted",
+            "tainted_fail",
+            "tree_unverified",
+        ],
+    )
     def test_block_rejects_and_leaves_ledger_byte_identical(
         self, seeded_repo: Path, capsys, kind: str
     ):
@@ -564,6 +593,22 @@ class TestDoneBlocksUnknownAndFail:
         _write_mirror(seeded_repo, "absent")
         assert cli.main(["done", task_id, *_PR]) == 1
         assert "측정되지 않았다" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("kind", ["tainted", "tainted_fail"])
+    def test_tainted_result_is_unmeasured_not_failed_or_passed(
+        self, seeded_repo: Path, capsys, kind: str
+    ):
+        """HARN-194 ③ — 오염된 결과는 스텝이 전부 통과였어도(`tainted`) 통과가 아니고, 스텝이
+        실패였어도(`tainted_fail`) "실패했다"가 아니다: 바뀐 트리의 실패는 거짓 실패일 수 있다.
+        거부 문구는 바뀐 경로를 이름으로 말해 사람이 무엇을 가만히 뒀어야 했는지 알게 한다."""
+        task_id = _claimed_task(capsys)
+        _set_policy(seeded_repo, "block")
+        _write_mirror(seeded_repo, kind)
+        assert cli.main(["done", task_id, *_PR]) == 1
+        err = capsys.readouterr().err
+        assert "측정되지 않았다" in err and "오염" in err
+        assert "src/x.py" in err, "무엇이 바뀌었는지 이름으로 말하지 않는다"
+        assert "실패했다" not in err, "오염을 실패로 읽으면 처방이 틀어진다(고칠 것이 없다)"
 
     def test_rejected_done_can_be_retried_after_reproducing(self, seeded_repo: Path, capsys):
         """거부는 볼모가 아니다 — 재현 결과를 남기면 같은 명령이 통과한다."""

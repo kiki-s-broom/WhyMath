@@ -2167,6 +2167,10 @@ class TestRateLimit:
         resp = client.post("/v1/coach", json={"student_input": "음"})
         assert resp.status_code == 429
         assert resp.headers["Retry-After"] == "60"
+        # OPS-82: 종전 detail 문장은 그대로 두고 옆에 안정 코드가 실린다(하위 호환).
+        body = resp.json()
+        assert body["error_code"] == "WM-RATE-001"
+        assert "요청이 너무 많습니다" in body["detail"]
 
     def test_zero_means_disabled(self) -> None:
         # limit=0 → 무제한(기본 테스트 모드)
@@ -4462,6 +4466,9 @@ class TestLogHintEvent:
             # EOS-178: 호출부가 라벨 없는 단계·적용된 라벨을 넘기지 않으면 구판 행과 같다(None).
             "base_level": None,
             "ability_level": None,
+            # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+            "label_source": None,
+            "label_evidence_n": None,
         }
         assert event.user_id == self._UID
         assert event.problem_id == self._PID
@@ -4492,6 +4499,9 @@ class TestLogHintEvent:
             "hint_id": None,
             "base_level": None,
             "ability_level": None,
+            # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+            "label_source": None,
+            "label_evidence_n": None,
         }
 
 

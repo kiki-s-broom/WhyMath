@@ -13,8 +13,8 @@ AI 세션은 `constitution/` 을 편집할 수 없다 — `.claude/hooks/guard_c
 | `rules_additions_v1.1.yaml` | Kiki 업로드 원본 그대로 — 규칙 81건(R5~R29) | 런북 과제 B (`merge_rules.py`) |
 | `A0004_sources_registry_additions_draft.md` | 초안 — 원본 등록부 3건 추가(프로젝트 규칙·LLM 모델 핀 로컬/클라우드) · A0003 채택 후 | 채택 도우미 A0004 미지원 — 확장 선행 |
 | `rules_v1.0.2_sources_additions.yaml` | A0004 의 추가분(sources 항목 3건만) | 위와 같음 |
-| `A0005_part1_corrections_draft.md` | 초안 — 파트 I 집행 장치 정합 정정(R4-03 경로·R2-04 단계·실행 · 머리말 필드 3종) + R4-02 3택 | 게이트 `G-const-a0005-part1-corrections` · `G-const-r4-02-decision` |
-| `rules_A0005_part1_corrections.patch` | A0005 의 정정 패치(현재 `rules.yaml` 에 `patch -p1` 로 깨끗이 적용 확인) | 위와 같음 |
+| `A0005_part1_corrections_draft.md` | 초안 — 파트 I 집행 장치 정합 정정(R4-03 경로·R2-04 단계·실행 · 머리말 필드 3종 · **R4-02 문구 개정(Kiki (나)안)**) — 병렬 세션의 R4-02 초안을 합친 단일 개정 | 게이트 `G-const-a0005-part1-corrections` · `G-const-r4-02-decision` |
+| `rules_A0005_part1_corrections.patch` | A0005 의 정정 패치(R4-02 블록 포함 · 현재 `rules.yaml` 에 `patch -p1 --dry-run` 통과) | 위와 같음 |
 
 런북: `docs/ops/coding_constitution_kiki_runbook.md` · 이식 정본: `docs/standards/coding_constitution_transplant.md`
 

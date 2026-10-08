@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,10 +16,11 @@ acceptance:
   - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md` §6): EOS-178은 공급 원장(`힌트제공`)에 `base_level`(라벨 없이 계산한 단계)과 `ability_level`(적용된 라벨)을 적재하고 도달 리포트 §7이 **구성**(라벨-단독 행 비율·신호 없는 쌍 비율)을 센다. 아직 못 재는 것은 라벨의 **예측 타당도**다: 문항의 *첫* 공급 행의 라벨('초보'|'발전 중'|'숙달')별로 그 문항에서 학생 신호(`base_level>=2`)가 나온 비율 — '초보'의 정밀도·재현율. 창 함수(`row_number() over (partition by user_id, problem_id order by event_at)`)가 필요해 EOS-178에서 분리했다."
   - "② 적재 보강(사후 백필 불가라 지금 정해야 한다): 라벨의 증거 수 n(개념 관측 수 — `sample_size` NULL은 '모름'으로)과 라벨 출처(서버 파생 vs 명시 `mastery_level`)를 원장에 싣는다. EOS-178이 싣지 않은 이유: 증거 수는 `get_current_mastery` 시그니처 확장과 `_build_response_payload` 변경을 요구하고(독립 비판 #9) 앱이 명시 라벨을 보내지 않는다(Dart 확인 — 내가 찾은 방법으로는 0건). 이 태스크가 그 비용을 정당화할 판정 질문(EOS-180의 임계 판정 입력)과 함께 결정한다."
   - "③ 표본 규율: 결과는 건수와 함께 내고 비율에는 Wilson 단측 경계를 붙인다(0/30의 95% 단측 상한이 8.3%라 1% 수준 비율은 가리지 못한다 — 독립 비판 #7c). 분모가 0이면 None(0과 구별). 합성 표본으로 임계를 정하지 않는다. 변별력은 라벨-단독 행을 신호 행으로 바꾸는 주입이 RED가 되는 것으로 확인한다(실 JSONB 위 — 가짜 세션은 쿼리를 무시한다)."
-artifacts: []
+artifacts:
+  - "PR #1503 (https://github.com/kiki-s-broom/WhyMath/pull/1503) · 커밋 a0ba9422 · CI 미러 6잡 exit 0 · 결함 주입 51/51 검출"
 paths:
   - src/backend/whymath_backend/ops/recommendation_reach_report.py
   - src/backend/whymath_backend/api/coach.py
 session: null
 notes: "출처: EOS-178 판정문 §6·§8 / 독립 비판 #7·#9 (2026-10-06). 등급 P1 근거: EOS-178 acceptance ③(라벨 정확도의 운영 실측)의 읽기 쪽 소유이며 EOS-39 킬 스위치 판단의 근거다. 쓰기 쪽(원장 필드)은 EOS-178이 착지시킨다.\n\n[트리거 면제] EOS-178 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
-updated: 2026-10-06
+updated: 2026-10-07

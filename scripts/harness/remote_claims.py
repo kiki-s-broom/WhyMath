@@ -1012,6 +1012,83 @@ def scan_trunk_task_drift(root: Path, task: Task) -> TrunkDriftResult:
         return TrunkDriftResult(f"error:{type(exc).__name__}")
 
 
+# ── 낡은 로컬 대장 고지 (HARN-54) ─────────────────────────────────────────────
+#
+# 기존 스캔은 이 질문에 답하지 못한다. `scan_remote_done`은 트렁크 ref를 **일부러 제외**한다
+# ("트렁크가 done이면 로컬 백로그도 done이라 애초에 후보가 아니다"). 그 전제는 *로컬 대장이
+# 트렁크를 따라잡았을 때*만 참이다 — 내 클론이 낡았으면 트렁크는 이미 done인데 로컬은 아직
+# todo라 `next`가 그 태스크를 후보로 내놓는다. `scan_trunk_task_drift`는 트렁크 사본을 읽지만
+# 의존·게이트의 *강화*만 본다(그 태스크 자신의 종결 여부는 보지 않는다).
+# 실측(2026-09-24): `EOS-69`가 main에서 이미 done이었는데 낡은 로컬 대장이 후보로 내놓아
+# 중복 구현이 진행됐다. `start`의 경고는 path_overlap 4줄에 묻혀 착수가 그대로 이어졌다.
+#
+# 이것은 **고지이지 차단이 아니다** — main이 done이어도 로컬에 정당한 후속 작업이 있을 수 있다.
+
+TRUNK_TERMINAL_STATUSES = ("done", "cancelled")
+
+
+@dataclass(frozen=True)
+class TrunkTerminal:
+    """트렁크 사본에서 이미 종결(done/cancelled)된 태스크 1건."""
+
+    task_id: str
+    trunk_status: str  # TRUNK_TERMINAL_STATUSES 중 하나
+    trunk_ref: str
+
+
+@dataclass(frozen=True)
+class TrunkTerminalResult:
+    """트렁크 종결 대조 결과. status가 `ok`가 아니면 **판정 불가**다 — 빈 `found`를
+    '트렁크에서 끝난 것 없음'으로 읽으면 안 된다(측정 실패 ≠ 통과)."""
+
+    status: str  # ok | offline | no-trunk-ref | error:<Type> | (호출측이 싣는 fetch 실패 사유)
+    found: dict[str, TrunkTerminal] = field(default_factory=dict)
+    trunk_ref: str = ""
+
+
+def scan_trunk_terminal(root: Path, task_ids: Sequence[str]) -> TrunkTerminalResult:
+    """`task_ids` 중 **트렁크 사본에서 이미 done/cancelled**인 것을 찾는다.
+
+    fetch하지 않는다 — **이미 있는 remote-tracking ref만** 읽는다(`scan_remote_done`의
+    `fetch=False` 계약 승계). 그래서 이 판정은 *내가 마지막으로 본 트렁크* 기준이며,
+    그 스냅샷이 얼마나 낡았는지는 호출측이 따로 말한다(`main에 없음`과 `main을 최근에 못
+    봤음`은 다른 진술이다). `start`는 앞선 `scan_remote_done(fetch=True)`가 ref를 방금
+    최신화했으므로 이 함수를 그 뒤에 부른다.
+
+    트렁크에 태스크 파일이 없는 경우(로컬에서 신설된 태스크)는 신호 없음이다 — 판정 불가가
+    아니라 정상적인 '없음'이다. ref 자체를 못 읽는 경우만 `no-trunk-ref`다.
+    """
+    ids = list(dict.fromkeys(task_ids))
+    if not ids:
+        return TrunkTerminalResult("ok")
+    if not has_remote(root):
+        return TrunkTerminalResult("offline")
+    try:
+        trunk_ref, _source = _resolve_trunk_ref(root)
+        probe = _git(
+            root, "rev-parse", "--verify", "--quiet", f"{trunk_ref}^{{commit}}", timeout=10
+        )
+        if probe.returncode != 0:
+            return TrunkTerminalResult("no-trunk-ref", trunk_ref=trunk_ref)
+        request = "".join(f"{trunk_ref}:backlog/tasks/{tid}.yaml\n" for tid in ids)
+        batch = _git(root, "cat-file", "--batch", input_text=request, timeout=SCAN_FETCH_TIMEOUT)
+        if batch.returncode != 0:
+            return TrunkTerminalResult(_classify_failure(batch.stderr or ""), trunk_ref=trunk_ref)
+        found: dict[str, TrunkTerminal] = {}
+        for tid, blob in zip(ids, _iter_batch_blobs(batch.stdout or ""), strict=False):
+            if blob is None:
+                continue  # 트렁크에 그 파일이 없다 — 로컬 신설 태스크
+            state = _top_level_field(blob, "status")
+            if state in TRUNK_TERMINAL_STATUSES:
+                found[tid] = TrunkTerminal(tid, state, trunk_ref)
+        return TrunkTerminalResult("ok", found, trunk_ref)
+    except subprocess.TimeoutExpired:
+        return TrunkTerminalResult("offline")
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
+        return TrunkTerminalResult(f"error:{type(exc).__name__}")
+
+
 def scan_remote_in_progress(
     root: Path, task_id: str, session: str, max_refs: int = SCAN_MAX_REFS
 ) -> ScanResult:

@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-21-profile-collection-paths-without-consumers
+title: "대장이 드러낸 프로필 수집 불일치 처분 — 수집 경로만 열린 9컬럼·쓰는 곳 없는 읽기 컬럼·persona 정교화 경로"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - ADMIN-09-profile-collection-inventory-contract
+requires_gates: []
+acceptance:
+  - "① 처분안 확정 — data/collection_inventory.json이 state=collected_unconsumed로 판정한 9컬럼(target_major_category·primary_device·has_apple_pencil·note_app·uses_inkang·inkang_provider·uses_offline_academy·monthly_education_spend·accessibility_needs)은 PATCH /v1/users/me 화이트리스트(api/users.py의 _SELF_EDITABLE)에 열려 있는데 읽는 코드가 0이다. 컬럼마다 ⑴수집 중단(화이트리스트에서 제거) ⑵소비처 도입(어느 모듈이 어떤 기능에 쓰는지 명시) 중 하나를 판정한다. 기준은 같은 파일의 기존 방침 — 'school_id·school_region·gender는 소비자가 생기기 전에 수집을 열면 목적 없는 PII 수집이 된다(최소 수집 원칙)' — 을 9컬럼에도 일관되게 적용하는 것이다(같은 원칙이 이 9컬럼에는 적용되지 않은 비대칭 해소). 판정은 제품·법률 판단이므로 Kiki가 한다 — 세션이 임의로 닫거나 열지 않는다."
+  - "② 판정 반영 — ⑴로 처분한 컬럼은 화이트리스트에서 빼고 대장의 origins를 비워 state를 uncollected_unconsumed로 바꾼다. ⑵로 처분한 컬럼은 소비처를 대장 runtime_consumers에 등재하고 purpose를 채운다. 어느 쪽이든 tests/backend/schema/test_collection_inventory.py가 코드와 대장의 동기를 계속 강제함을 확인한다(반영 후 해당 테스트 green + 반영을 일부러 빠뜨렸을 때 red)."
+  - "③ 읽기만 있고 쓰는 경로가 없는 컬럼 처분 — 대장에서 origins가 비어 있는데 runtime_consumers만 있는 컬럼은 last_active_at과 subscription_tier다. last_active_at은 api/admin_bff.py가 표시하나 쓰는 코드가 0이라 운영자 화면은 항상 NULL이다 — ⑴쓰기 경로 신설(어디서 갱신할지 명시) ⑵표시 제거 중 하나를 판정한다. subscription_tier는 처분 소유가 ADMIN-02(b)의 결제 예약 좌석 판정이므로 여기서 중복 처분하지 않고 ADMIN-02에 위임한다."
+  - "④ persona_primary — api/auth.py의 주석은 '온보딩(PATCH /v1/users/me)에서 정교화된다'고 하나 PATCH 화이트리스트에 persona_*가 없고 가입·부트스트랩의 기본 페르소나 지정 외에 값을 쓰는 코드가 0이다(대장 persona_primary의 note 참조). 주석 정정 또는 정교화 경로 신설 중 하나를 판정한다. 경로를 신설하면 l2/learning_metrics_rollup.py의 페르소나별 집계 전제가 바뀌므로 영향 범위를 함께 적는다."
+  - "⑤ 범위 밖 — 컬럼 드롭(ADMIN-02) · 목적·보존·PII 등급의 법률적 확정(MGMT-02 · pipa_data_matrix.md §5에 ADMIN-09가 추가한 체크리스트 항목) · 처분에 따른 Flutter 온보딩 변경(해당 시 별도 태스크)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/users.py
+  - data/collection_inventory.json
+  - tests/backend/schema/test_collection_inventory.py
+session: null
+notes: "ADMIN-09 대장(data/collection_inventory.json, 판정 기준 main 8a5ea4d1, 2026-10-08)이 처음으로 기계에 드러낸 불일치다. 재현: 그 파일의 columns에서 state 값을 센다 — collected_unconsumed 9건. 대장 이전에는 이 불일치를 볼 수 없었다(pipa_data_matrix.md §3.2가 고지를 명령하는 수집 항목 목록의 진실 원천이 없었다). 관측(기계 미강제): Flutter 온보딩이 실제로 보내는 필드는 target_grade·target_score·target_exam_date·birth_year 4개뿐이라 9컬럼은 '열려 있으나 어느 클라이언트도 보내지 않는' 상태일 가능성이 높다 — 폐쇄의 실사용 영향은 작을 것으로 추정하나 prod DB 비영 행 확인은 이 세션이 못 했다(ADMIN-02의 G-prod-dead-column-check와 같은 접근 경로 문제). 이 태스크는 ADMIN-09의 대장을 입력으로 쓰므로 depends_on으로 건다."
+updated: 2026-10-08
