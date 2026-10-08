@@ -338,12 +338,6 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
-### 2026-10-08 (정정 · MISC-33): **암묵 곱셈 미검출의 원인은 `to_sympy_source`가 아니라 `matches_wrong_form`의 구조 파싱이 동치 권위와 다른 변환 규칙을 쓴 것이었다 — 파서 정의를 `parse_unevaluated`로 일원화했고, 그 과정에서 동치 권위가 `f(x)`를 `f*x`로 읽는 선행 결함(`MISC-62`)을 발견했다** (claude 집행) — 판정 기준 main `c322bb9c`
-
-- **경위(선행 세션의 오진)**: EOS-104가 `(2x+3)² = 4x²+9` 미검출의 원인을 "공용 파싱 소스 `to_sympy_source`가 `2x`에 곱셈 기호를 넣지 않아 `SympifyError`"로 적고 한계 테스트로 동결했다. 실제로 어느 줄에서 깨지는지는 측정하지 않은 추정이었다. 실측(2026-10-08): `identity_status("(2x+3)²", "4x²+9")`는 정상 판정(`not_identity`)이다 — `_PARSE_TRANSFORMS`가 이미 `implicit_multiplication`을 쓴다. 깨지는 곳은 `wrong_form_match.py`의 `safe_sympify(src_lhs, convert_xor=True, evaluate=False)` 한 줄(암묵 곱셈 변환 없음 → `UnsafeExpressionError`, 사유 `structure_unparseable`)이었다. 같은 함수 안에서 ⓪ 거짓 등식 가드는 `2x`를 읽고 구조 정합은 거부하는 갈림이다.
-- **조치**: `l3/symbolic_equivalence.py`에 공개 함수 `parse_unevaluated`(같은 `_PARSE_TRANSFORMS`·`evaluate=False`·안전 진입점 경유)를 추가하고 `wrong_form_match.py`가 이를 쓴다. `to_sympy_source`·`_parse`·`identity_status`는 바꾸지 않아 소비처 입력은 불변이다. 결과: 쌍둥이 14쌍 중 암묵≠명시 불일치 5→0건, `scan_attempt_answer("(2x+3)²", "4x²+9")` 후보 0→1건. 문자열 층에서 `*`를 끼우는 방식은 택하지 않았다(주입으로 RED 확인 — `f(x)`·`2pi` 입력에서 소비처 전체의 판정이 움직인다).
-- **후퇴(수용 · Kiki 판단 요청)**: 선행 결함 — `identity_status('f(x)', 'f*x')`가 identity이고 `f(x)**2`는 `f*x**2`로 읽힌다(내장 함수 `sin`은 무관). 구조 파싱을 같은 규칙으로 맞추자 미지 함수를 이항식에 품은 거짓형 3건(`(f(x)+y)²` 등)이 우연한 일치가 깨져 더는 검출되지 않는다(누락 방향이라 거짓 낙인은 없다). 두 파서를 한 함수에 두는 우회(레거시 파싱 후 폴백)는 이 태스크가 닫으려던 갈림을 재생산하므로 택하지 않았다. 뿌리는 `MISC-62`(표기 정책 결정 포함)가 소유하며, 현재 동작을 계약 테스트 2건(`test_function_application_is_read_as_multiplication_known_limitation`·`test_unknown_function_application_known_limitation`)으로 동결해 고치면 RED가 된다.
-- **검증**: 주입 7종 전건 RED·원복 sha256 일치(태스크가 요구한 "함수 적용이 곱으로 읽힘" 주입 포함).
 ### 2026-10-08 (구현·범위 재조정 · MATH-04): **교육과정 표기 범위 게이트를 생성물 회계 전용으로 착지했다 — 태스크 전제 5건이 실측에서 부분 반증돼 범위를 재조정했고, 첫 실측은 학년 초과 표기 0건이다(단 초등 밴드는 측정기가 보지 못했다)** (claude 판정·구현) — 판정 기준 main `c322bb9c`
 
 **무엇**: 문항 표기의 구조가 문항의 학년 밴드에 도입돼 있는지 전수 회계하는 게이트다(`l3/curriculum_notation_gate.py` 엔진 · `harness/curriculum_notation_gate_cli.py` CLI · 표 `data/curriculum_notation_ranges.json` · 베이스라인 `data/curriculum_notation_range_baseline.json` · CI backend 잡 스텝). **학생 입력 거부에는 쓰지 않는다**(영구 미채택 — gap_review §2-⑤). 초과 표기를 발견해도 콘텐츠를 삭제·수정하지 않고 래칫에 계상한다.
@@ -363,6 +357,14 @@
 **한계(사실 기록)**: ① 이 엔드포인트는 `JSONResponse`를 직접 반환하므로 의존성이 설정한 헤더가 버려져 **200 응답에는 `X-RateLimit-*`가 붙지 않는다**(429에만 `Retry-After`·`X-RateLimit-*` — 실측). 클라이언트 자체 throttle 입력이 필요해지면 후속. ② 한도는 라우팅·캐시 **이전**에 계수하므로 캐시 적중 요청도 슬롯을 쓴다. ③ 본문 검증 실패(422)도 슬롯을 쓴다(의존성이 본문 검증보다 먼저 해석).
 **관찰(범위 밖·미착수)**: `/v1/generate` 자체에는 동의 게이트가 없다 — `ai_training` 동의는 trace 메타데이터 판정에만 쓰이고 응답 생성을 막지 않는다(기존 설계, 코드 주석에 명시). 미성년자 동의 강제를 원하면 별도 결정이다.
 **검증**: 신규 테스트 13건(차원 3종 각각 429·무인증 버킷 비소모·동의 불변·버킷 분리 양방향·라우트 선언·기본값·Redis 장애 폴백 시 fail-open 아님). 뮤테이션 7종 전건 검출 — **첫 시도에서 M3(카테고리를 `write`로 교체)이 생존**했다: 시딩 시각을 `now=0.0`으로 둬 60초 윈도우 밖이라 아무것도 시딩되지 않았고, 반대 방향 검사는 매번 새 UUID라 항상 통과했다(CLAUDE.md '픽스처가 그 절을 실제로 밟는가'의 재발 형태). 시딩을 `time.monotonic()`·동일 사용자로 고쳐 검출됐다. CI backend 잡 재현: ruff·black·`mypy --strict`·`lint-imports`·전체 pytest(16,792 passed·실패 0·커버리지 90.73%)·계층 커버리지 게이트 전건 exit 0, `tests/infra` 2,744 passed, 헌법 래칫 exit 0·차단 0건(기준선 0건).
+
+### 2026-10-08 (정정 · MISC-33): **암묵 곱셈 미검출의 원인은 `to_sympy_source`가 아니라 `matches_wrong_form`의 구조 파싱이 동치 권위와 다른 변환 규칙을 쓴 것이었다 — 파서 정의를 `parse_unevaluated`로 일원화했고, 그 과정에서 동치 권위가 `f(x)`를 `f*x`로 읽는 선행 결함(`MISC-62`)을 발견했다** (claude 집행) — 판정 기준 main `c322bb9c`
+
+- **경위(선행 세션의 오진)**: EOS-104가 `(2x+3)² = 4x²+9` 미검출의 원인을 "공용 파싱 소스 `to_sympy_source`가 `2x`에 곱셈 기호를 넣지 않아 `SympifyError`"로 적고 한계 테스트로 동결했다. 실제로 어느 줄에서 깨지는지는 측정하지 않은 추정이었다. 실측(2026-10-08): `identity_status("(2x+3)²", "4x²+9")`는 정상 판정(`not_identity`)이다 — `_PARSE_TRANSFORMS`가 이미 `implicit_multiplication`을 쓴다. 깨지는 곳은 `wrong_form_match.py`의 `safe_sympify(src_lhs, convert_xor=True, evaluate=False)` 한 줄(암묵 곱셈 변환 없음 → `UnsafeExpressionError`, 사유 `structure_unparseable`)이었다. 같은 함수 안에서 ⓪ 거짓 등식 가드는 `2x`를 읽고 구조 정합은 거부하는 갈림이다.
+- **조치**: `l3/symbolic_equivalence.py`에 공개 함수 `parse_unevaluated`(같은 `_PARSE_TRANSFORMS`·`evaluate=False`·안전 진입점 경유)를 추가하고 `wrong_form_match.py`가 이를 쓴다. `to_sympy_source`·`_parse`·`identity_status`는 바꾸지 않아 소비처 입력은 불변이다. 결과: 쌍둥이 14쌍 중 암묵≠명시 불일치 5→0건, `scan_attempt_answer("(2x+3)²", "4x²+9")` 후보 0→1건. 문자열 층에서 `*`를 끼우는 방식은 택하지 않았다(주입으로 RED 확인 — `f(x)`·`2pi` 입력에서 소비처 전체의 판정이 움직인다).
+- **후퇴(수용 · Kiki 판단 요청)**: 선행 결함 — `identity_status('f(x)', 'f*x')`가 identity이고 `f(x)**2`는 `f*x**2`로 읽힌다(내장 함수 `sin`은 무관). 구조 파싱을 같은 규칙으로 맞추자 미지 함수를 이항식에 품은 거짓형 3건(`(f(x)+y)²` 등)이 우연한 일치가 깨져 더는 검출되지 않는다(누락 방향이라 거짓 낙인은 없다). 두 파서를 한 함수에 두는 우회(레거시 파싱 후 폴백)는 이 태스크가 닫으려던 갈림을 재생산하므로 택하지 않았다. 뿌리는 `MISC-62`(표기 정책 결정 포함)가 소유하며, 현재 동작을 계약 테스트 2건(`test_function_application_is_read_as_multiplication_known_limitation`·`test_unknown_function_application_known_limitation`)으로 동결해 고치면 RED가 된다.
+- **검증**: 주입 7종 전건 RED·원복 sha256 일치(태스크가 요구한 "함수 적용이 곱으로 읽힘" 주입 포함).
+
 ### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
 
 **무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
