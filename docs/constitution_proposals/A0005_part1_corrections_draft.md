@@ -5,7 +5,7 @@
 - 개정자: Kiki (서명란: ____)
 - 선행: A0003·A0002 채택 완료. **A0004 초안(원본 등록부 3건 추가)과는 독립**이다 — 번호는 초안 작성 순서일 뿐 적용 순서는 무관하다(둘 다 `rules.yaml` 의 서로 다른 줄을 건드린다).
 - 대상: `constitution/rules.yaml` — 머리말 필드 설명 3줄 추가 · R4-03 경로 정정 · R2-04 단계·실행 명령 정정 · **R4-02 문구·검사 정정(Kiki 결정 (나)안)** (id·level·stage 는 불변 — R4-02·R2-04 는 문장 또는 단계가 바뀐다)
-- **합본 고지(2026-10-06)**: 병렬 세션이 같은 번호로 만든 R4-02 초안(PR 1493 의 `A0005_r4_02_schema_model_sync_draft.md`·`rules_R4-02_schema_model_sync.yaml`)을 이 개정 하나로 합쳤다 — 개정 번호는 하나씩만 쓸 수 있고, 두 초안은 `rules.yaml` 의 서로 다른 줄을 고치므로 한 번에 적용된다. 집행 테스트 `tests/constitution/test_schema_model_sync.py` 는 PR 1493 이 가져온다(이 개정은 그 파일이 main 에 있다고 전제한다).
+- **합본 고지(2026-10-06)**: 병렬 세션이 같은 번호로 만든 R4-02 초안(PR 1493 의 `A0005_r4_02_schema_model_sync_draft.md`·`rules_R4-02_schema_model_sync.yaml`)을 이 개정 하나로 합쳤다 — 개정 번호는 하나씩만 쓸 수 있고, 두 초안은 `rules.yaml` 의 서로 다른 줄을 고치므로 한 번에 적용된다. 집행 테스트 `tests/constitution/test_schema_model_sync.py` 는 `CONST-14` 가 main 에 착지시켰다(PR 1493 의 테스트를 그대로 가져와 변이 5종으로 재검증) — 따라서 이 개정은 그 파일이 main 에 있다고 전제해도 된다.
 - 정정 패치: `docs/constitution_proposals/rules_A0005_part1_corrections.patch` (`patch -p1 --dry-run` 으로 현재 main 의 `rules.yaml` 에 깨끗이 적용됨을 확인)
 - 태스크·게이트: `CONST-03` · `G-const-a0005-part1-corrections`(정정 채택) · `G-const-r4-02-decision`(R4-02 3택) · `G-const-protection-outside-claude`(⑦)
 
@@ -59,4 +59,4 @@ R2-04 정정의 **한계(정직)**: 단계 3 에서 CI 가 검증하는 것은 '
 2. 패치 적용: 저장소 루트에서 `patch -p1 < docs/constitution_proposals/rules_A0005_part1_corrections.patch` (또는 Kiki 가 `rules.yaml` 을 직접 편집).
 3. `constitution/amendments/A0005_*.md` 에 이 문서를 개정 기록으로 둔다(채택일·서명 기입). **기록 없이 `rules.yaml` 만 바꾸면 `check_amendment.py`(R0-02)가 CI 에서 red 로 막는다** — 이 개정이 그 규칙의 첫 실사용이다.
 4. R4-02 는 이미 결정됐다((나)안). 채택 후 `python scripts/constitution/audit.py --stage 3` 에서 R4-02 가 통과로 바뀌는지 확인하고, 게이트 `G-const-r4-02-decision` 은 그 결과로 닫는다. 어긋남 5건 처분 태스크를 등재한다.
-5. 순서: PR 1493(집행 테스트)이 main 에 있어야 R4-02 가 통과한다 — 먼저 머지하거나, 패치 적용 전에 테스트 파일이 있는지 확인한다.
+5. 순서: 집행 테스트(`CONST-14` 로 main 에 착지)가 있으므로 패치 적용 직후 R4-02 가 통과한다. PR 1493 은 이제 초안 문서 2건(이 개정에 흡수됨)만 남은 상태라 닫거나 문서만 정리하면 된다.
