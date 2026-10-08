@@ -36,7 +36,7 @@ import sympy
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import i_ga
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -196,6 +196,7 @@ def _trig_value_steps(skeleton: _TrigSkeleton) -> list[str]:
     return [f"{skeleton.func}({skeleton.degree}*pi/180)", radian_expr, skeleton.answer]
 
 
+@deterministic_generator
 class TrigonometricValueSkeletonGenerator:
     """삼각함수 특수각 값 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

@@ -118,6 +118,13 @@ def run_corpus_rephrase(
         outcome = rephraser.rephrase(question)
         updated = dict(record)
         updated["question_text"] = outcome.text
+        if outcome.rephrased:
+            # PB-17 — LLM 이 발문을 다시 썼다. 소스의 결정론 서명(`deterministic:`)을 그대로 두면
+            # LLM 저작분이 결정론으로 위장돼 생성자≠검증자 가드가 거짓 면제된다. 서명을 지워
+            # '기록 없음'으로 되돌린다(저작 모델 id 를 모르므로 `llm:` 서명도 지어내지 않는다 →
+            # 가드는 fail-closed 로 거부하고 사람이 `--authored-by llm:<모델>`로 선언해야 돈다).
+            # 발문이 그대로인 레코드(rephrased=False)는 결정론 원문이므로 서명을 유지한다.
+            updated.pop("authored_by", None)
         out_records.append(updated)
         if outcome.rephrased:
             rephrased_count += 1
