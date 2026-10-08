@@ -25,7 +25,8 @@ from whymath_backend.l3.equivalent.p3_diff_defect_seeder import BANK_DEFECT_CLAS
 
 _ROOT = Path(__file__).resolve().parents[3]
 _QUAL = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "qualification"
-_BANK = _ROOT / "data" / "corpus" / "problem_bank_p3_calculus1_diff_v0" / "problems.jsonl"
+#: 시험지·1회차 감사 묶음을 만든 은행 v0의 동결 사본 — 현 은행은 생성기 교정으로 바뀔 수 있다.
+_BANK = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "bank_audit" / "audited_bank.jsonl"
 
 #: 합성 정답지의 종류별 결함 수 — 15건 종류를 두어 0.80 경계(12/15)를 정확히 밟는다.
 _SIZES = dict(zip(BANK_DEFECT_CLASSES, (15, 15, 15, 15, 15, 15, 30), strict=True))
@@ -566,7 +567,7 @@ def test_bank_sheets_manifest_is_committed_and_reproducible() -> None:
     assert manifest["bank_sha256"] == hashlib.sha256(_BANK.read_bytes()).hexdigest()
     protocol = (_QUAL / "rater_protocol.md").read_bytes()
     assert manifest["rater_protocol_sha256"] == hashlib.sha256(protocol).hexdigest()
-    assert qual.main(["bank-sheets", "--check"]) == 0
+    assert qual.main(["bank-sheets", "--check", "--bank", str(_BANK)]) == 0
 
 
 def test_bank_sheets_input_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
