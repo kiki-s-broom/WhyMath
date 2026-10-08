@@ -108,6 +108,7 @@ from pydantic import ValidationError
 
 from whymath_backend.config import CloudSeat, Settings
 from whymath_backend.l1.problem_bank.populate import ConceptTag
+from whymath_backend.l3.cross_verify import llm_author
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import condition_dsl_violation
@@ -496,6 +497,9 @@ class LLMEquivalentProblemGenerator:
                 seed=seed,
             )
             return None
+        # 저작 서명(PB-15) — 이 후보를 *어느 모델이 만들었는지*를 후보에 싣는다. 코퍼스에 기록돼야
+        # 교차검증 가드(생성자≠검증자)가 코퍼스 문항에서 작동한다. frozen 모델이라 복사로 갱신한다.
+        candidate = candidate.model_copy(update={"authored_by": self._author_signature(decision)})
         self._emit_generation_log(
             spec,
             prompt,
@@ -510,6 +514,23 @@ class LLMEquivalentProblemGenerator:
         )
         self._remember_conditions(candidate.conditions)
         return candidate
+
+    def _author_signature(self, decision: RoutingDecision) -> str | None:
+        """후보에 찍을 저작 서명 `llm:<모델 id>` — 해석 실패는 None(미기록)이다.
+
+        검증자 서명(`CrossVerifier.signature`)과 **같은** `model_name_for_decision`으로 모델
+        id를 해석한다 — 두 서명이 다른 함수로 조립되면 가드가 발화하지 못한다(PB-15). 선언값이지
+        관측값이 아니다(`GenerationLog.served_model`이 별도 좌석). 해석 장애로 저작 배치를 죽이진
+        않되 타입명을 로그에 남기고 미기록(None)으로 둔다 — 미기록은 하류 가드가 거부한다.
+        """
+        try:
+            return llm_author(model_name_for_decision(decision, settings=self._settings))
+        except Exception as exc:  # noqa: BLE001 — 서명 해석 장애가 저작 배치를 깨면 안 됨
+            _LOGGER.warning(
+                "저작 서명 해석 실패(%s) — authored_by 미기록(교차검증 가드가 거부)",
+                type(exc).__name__,
+            )
+            return None
 
     def _remember_conditions(self, conditions: str | list[str]) -> None:
         """조립 성공 후보의 조건식을 회피 목록에 올린다(avoid_recent=0이면 maxlen 0 deque라 no-op).
