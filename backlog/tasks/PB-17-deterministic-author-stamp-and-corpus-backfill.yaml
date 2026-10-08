@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/equivalent/*_skeleton_generator.py"
   - "data/corpus/problem_bank_*/_provenance.json"
-session: null
+session: claude/vibrant-pascal-9ebi61
 notes: "출처: PB-15 착지 시 발견. 선행 의존 없음(PB-15 머지 후 착수). 스캔 범위: l3/equivalent/*_skeleton_generator.py 및 data/corpus/problem_bank_*/ — 다른 세션이 이 생성기들을 활발히 수정 중이라(E1-01·E1-02 등) 착수 직전에 원격 claim과 파일 겹침을 다시 확인할 것."
 updated: 2026-10-08
