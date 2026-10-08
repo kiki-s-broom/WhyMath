@@ -21,11 +21,24 @@ p50만 폭발한다(03a §A.1 c=4에서 ~0% 증가, §D.3). 동시성 1은 두 �
   1. *앱 설정* `worker_concurrency=1` — 워커가 별도 `-c` 없이 떠도 1로 동작.
   2. *워커 기동 명령*에서 명시 — 운영은 아래 명령으로 워커를 띄운다(중복 안전장치):
 
-        celery -A whymath_backend.l3.queue.celery_app:build_celery_app worker -c 1
+        celery -A whymath_backend.l3.queue.tasks:quality_celery_app worker -c 1
 
      (또는 `--concurrency=1`). `-c 1`을 빼면 Celery 기본값(CPU 코어 수)이 되어
      GPU를 여러 워커가 다투게 되므로 *반드시* 1로 띄운다(앱 설정과 중복이지만,
      운영 실수 방지를 위한 이중 방어). solo 풀(`--pool=solo`)도 동시성 1과 동치다.
+
+────────────────────────────────────────────────────────────────────────────
+`-A`에는 이 모듈의 팩토리(`build_celery_app`)가 아니라 *모듈 수준 인스턴스*를 준다
+────────────────────────────────────────────────────────────────────────────
+`celery` CLI는 `-A` 값을 Celery **인스턴스**로 기대한다. 이 모듈의 팩토리 함수를 `-A`에 직접
+지정하면 CLI가 함수를 받아 `AttributeError: 'function' object has no attribute
+'user_options'`로 워커가 기동 즉시 죽는다(Celery 5.6.3 실측, 2026-10-08 OPS-27). 이전 판의
+docstring·systemd 유닛이 그 형식을 "정전 명령"이라 적었으나 실제로는 동작하지 않았다.
+QUALITY 태스크가 등록된 인스턴스는 `l3/queue/tasks.py`의 `quality_celery_app`이며(import 시
+`build_celery_app()` + `register_quality_task`), 컨테이너 배포는 `docker-compose.prod.yml`의
+`quality-worker` 서비스가 위 명령으로 띄운다. 형식 회귀는
+`tests/infra/test_quality_worker_compose.py`(정적)·`tests/backend/l3/test_celery_worker_app_target.py`
+(실제 celery 해석)가 막는다.
 """
 
 from __future__ import annotations

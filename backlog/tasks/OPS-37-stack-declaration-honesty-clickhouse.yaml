@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: docs
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① ClickHouse 행 실측 단서 병기 — CLAUDE.md:73 스택 표 · docs/architecture/00_overview.md:165,174 5블록 표·보충 메모에 '런타임 미도입(2026-08-11 확정)'을 Neo4j(2026-08-10)·OpenTelemetry(2026-08-11)와 동일 형식으로 병기한다. 행동 로그 정본 = PostgreSQL 16 + TimescaleDB 단일 평면임을 명문화(pgvector가 6번째 store를 회피한 선례와 같은 논리).\n② 운영 런북 정정 — infra/phaiakes9/OPERATIONS_24_7.md:29(서비스 표·헬스체크)·:33(부팅 의존 순서)·:96(주 1회 백업)이 ClickHouse를 가동 중 서비스로 기술한다. 같은 문서 :28,:33,:48,:49,:93의 neo4j도 2026-08-03 미도입 확정 이후 정정되지 않은 채 남아 있다 — 두 서비스를 함께 정정한다(런북이 존재하지 않는 토폴로지의 운영 절차를 지시하는 상태 해소).\n③ Prefect/Airflow — 00_overview.md:167 Content Pipeline 블록이 선언하나 저장소 전수 grep 0건. 실제 파이프라인 실행 형태(도메인별 __main__.py CLI + CI 잡)를 반영하도록 정정한다.\n④ 표기 규율 — CLAUDE.md 본문 규칙을 바꾸는 커밋이므로 버전·최종 수정일 표기도 함께 갱신한다(2026-08-10 통합점검 규칙). MEMORY.md 결정 로그 필수(스택 표 변경 조건).\n⑤ 범위 밖 동결 — ClickHouse 실제 도입·행동 로그 스키마 신설·great-expectations 선언 정리(OPS-32 범위 확장으로 처리)는 포함하지 않는다. 이 태스크는 '선언과 실물의 불일치'만 닫는다."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1501"
 paths:
   - CLAUDE.md
   - docs/architecture/00_overview.md
@@ -21,4 +22,4 @@ paths:
   - MEMORY.md
 session: null
 notes: "2026-08-11 data_platform_eos_frame_gap_review_2026-08-11.md D4 + Kiki 결정(AskUserQuestion). 실측: ClickHouse가 docker-compose 3종·src/backend/pyproject.toml·src/ import 전부 0건인데 스택 표·5블록 표·24/7 운영 런북은 가동 중 서비스로 기술(헬스체크·부팅 의존 순서·백업 주기까지). Prefect/Airflow도 전수 0건. 동일 유형 정정이 이미 두 번 있었고(Neo4j 2026-08-10·OTel 2026-08-11) ai_recommendation_module_gap_review.md:415가 이미 '스택 표에 있으나 배선이 없다'고 관측했는데 스택 표 정정으로 이어지지 않았다 — 데이터 플랫폼 자신의 백본이 정정에서 빠져 있던 상태. [OPS-41 회수] 원 번호 유지(t608mk)."
-updated: 2026-10-05
+updated: 2026-10-07

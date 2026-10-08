@@ -12061,6 +12061,10 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **정합 보정**: 백엔드는 미지정 문항의 409에 `current_status: null`을 보내는데 웹 파서가 문자열만 받아 `malformed`로 오분류 → null을 "unset"으로 읽도록 수정.
 - **검증 메모**: 백엔드 에이전트 뮤테이션 13종 전건 RED(rollback 제거 1건은 hermetic만 검출 — 세션 close가 롤백하므로 실 PG로는 불가). 웹 거버넌스 주입 5종 RED·브라우저 DOM 단언 22건 PASS.
 
+### 2026-10-07 — OPS-37 스택 선언 정직화 (ClickHouse·Prefect/Airflow 미도입 병기)
+- **실측**: ClickHouse는 backend 의존·docker 서비스·설정 키 0건(코드 속 언급은 가정 주석뿐 — `privacy/erasure.py`·`export.py`는 미도입을 이미 명시). Prefect/Airflow는 저장소 전수 grep 0건(실제 파이프라인 = 도메인별 `__main__.py` CLI + CI 잡).
+- **결정**: 행동 로그 정본 = PostgreSQL 16 + TimescaleDB 단일 평면(Neo4j 2026-08-03·OTel 2026-08-11 정정과 같은 형식으로 CLAUDE.md 스택 표·`00_overview.md` 5블록 표/보충 메모에 병기). 운영 런북 `OPERATIONS_24_7.md`의 `neo4j`·`clickhouse` 서비스 행·부팅 순서·systemd `After/Wants`·백업 행을 제거하고 정정 주석을 남겼다 — 존재하지 않는 서비스의 헬스체크·백업을 지시하던 상태 해소.
+- **범위 밖(동결)**: ClickHouse 실제 도입·행동 로그 스키마 신설·great-expectations 선언 정리(OPS-32). 도입 판정은 `DP-01` 착수 조건.
 ### 2026-10-07 — EOS-179: 코치 라벨의 출처·증거 수 원장 적재 + 라벨 예측 타당도 리더(도달 리포트 §8)
 - **결정**: EOS-178이 "후속이 정한다"고 남긴 세 가지를 닫는다 — ① 원장 `힌트제공`에 `label_source`('explicit'·'server_bkt'·'server_theta'·'client_bkt')와 `label_evidence_n`(라벨을 만든 서버 개념 숙달도의 `sample_size` — **None=모름이며 0과 구별**)을 싣는다(JSONB·마이그레이션 없음·사후 백필 불가·응답 본문 비노출) ② 도달 리포트 §8이 (학생·문항) 쌍의 **첫 공급 행** 라벨별로 학생 신호(`base_level>=2`) 발생 여부를 센다 ③ 건수와 Wilson 단측 95% 하한·상한으로 낸다. **판정·임계는 이 태스크가 내지 않는다**(운영 원장이 비어 있고 합성 표본으로 임계를 정하지 않는다 — 임계는 `EOS-180`).
 - **설계 판단(기록)**: 증거 수는 서버 숙달도가 라벨에 **실제로 들어간 턴에만** 조회한다(`_server_mastery_evidence_for` — 개념 해석 + 최신 행 인덱스 단건 2회). `_server_mastery_for`의 반환형(float)은 바꾸지 않았다 — 기존 테스트가 그 float를 monkeypatch로 대체하고 호출부가 그 계약에 기댄다. 대신 증거 수를 따로 조회하는 좌석 하나를 뒀고, 같은 요청 안의 두 조회가 다른 측정 행을 읽을 이론적 경합은 받아들였다(턴 단위 단일 트랜잭션·관측 수의 ±1은 라벨 층화에 영향이 없다). 첫 행에 라벨이 없는 쌍은 **두 번째 행의 라벨로 건너뛰지 않고 제외**한다(라벨은 첫 노출 시점의 예측이고 이후 행은 풀이의 영향을 받았다). 쌍에 `base_level` 없는 행(구판·롤백)이 섞이면 신호 판정 불가로 따로 센다(`bool_or`는 NULL을 무시해 신호 없음으로 읽히기 때문).
