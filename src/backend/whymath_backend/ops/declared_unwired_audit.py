@@ -1048,6 +1048,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.problem_corpus_rephrase_diagnose": _BATCH_GENERATOR,
         "harness.problem_corpus_rephrase_sweep": _BATCH_GENERATOR,
         "harness.problem_corpus_tag": _BATCH_GENERATOR,
+        "harness.problem_corpus_variants": _BATCH_GENERATOR,
         "harness.problem_type_backfill": _BATCH_GENERATOR,
         # ⚠️ 2026-08-10 OPS-24 — 백필 CLI 2종(`problem_corpus_review_status_backfill`·
         # `problem_corpus_persona_fit_backfill`)의 `pending-task` 유예를 해제했다. 판정은
