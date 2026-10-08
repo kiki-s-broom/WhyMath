@@ -300,6 +300,7 @@ source_modules = [
 # 이 계약이 잡지 않는다. 그 축은 MIXED 모듈 해소(S1-16 등)와 함께 다뤄야 하는 별개 문제다.
 allow_indirect_imports = true
 forbidden_modules = [
+    "whymath_backend.l3.curriculum_notation_gate",
     "whymath_backend.l3.equivalent",
     "whymath_backend.l3.finite_probability",
     "whymath_backend.l3.multi_solution",
@@ -360,6 +361,7 @@ source_modules = [
 # 이 계약이 잡지 않는다. 그 축은 MIXED 모듈 해소(S1-16 등)와 함께 다뤄야 하는 별개 문제다.
 allow_indirect_imports = true
 forbidden_modules = [
+    "whymath_backend.l3.curriculum_notation_gate",
     "whymath_backend.l3.equivalent",
     "whymath_backend.l3.finite_probability",
     "whymath_backend.l3.multi_solution",
