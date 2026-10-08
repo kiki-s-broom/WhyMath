@@ -20,8 +20,11 @@ LLM 교차검증(생성자≠검증자·K≥3·원리 다른 프롬프트) + **W
 그대로 쓴다(`llm:<모델 id>`·`deterministic:<생성기>`). 기록이 없는 레코드(구 코퍼스)는 서명을
 **지어내지 않고** `unknown`으로 두며, 이 경우 독립성을 입증할 수 없어 `INDEPENDENCE_UNPROVEN`
 (exit 1)이다 — 종전 `corpus:<유형>`은 검증자 서명과 형식이 달라 가드가 영영 발화하지 못했다.
-구 코퍼스를 돌리려면 저작 주체를 사람이 `--authored-by`로 **선언**한다(예 결정론 생성기:
-`--authored-by deterministic:<생성기>`·LLM 저작분: `--authored-by llm:<모델 id>`).
+서명이 없는 코퍼스를 돌리려면 저작 주체를 사람이 `--authored-by`로 **선언**한다(예 결정론
+생성기: `--authored-by deterministic:<생성기>`·LLM 저작분: `--authored-by llm:<모델 id>`).
+선언은 **기록 없음(`unknown`)만 채운다**(PB-17) — 기록이 있는 레코드와 충돌하는 선언은 덮어쓰지
+않고 `INDEPENDENCE_UNPROVEN`으로 거부한다. 결정론 생성기 산출·기존 코퍼스는 PB-17에서 서명이
+찍히므로(`problem_corpus_author_backfill`) 선언 없이 돈다.
 
 **합격 로트 무결성(§4.5)**: 산출 감사 JSONL에 as-found 병기 선언을 함께 쓴다. 교정 후 재채점
 으로 FAIL→PASS를 세탁하지 않기 위한 기록이며, 같은 파일을 `corpus_audit_eval`에 그대로 먹여
@@ -48,9 +51,11 @@ from whymath_backend.harness.corpus_audit_eval import AuditLabel, summarize
 from whymath_backend.l1.problem_bank.populate import load_problem_bank_records
 from whymath_backend.l3.cross_verify import (
     UNRECORDED_AUTHOR,
+    AuthorDeclarationConflictError,
     CrossVerifier,
     IndependenceError,
     ResidueSubject,
+    resolve_author_signature,
 )
 from whymath_backend.l3.finite_probability import (
     FiniteProbabilityError,
@@ -255,8 +260,10 @@ def run_residue_cross_verify(
 ) -> ResidueGateReport:
     """전수 기계 검산 → 표본 교차검증 → Wilson 판정. 순수 조합(LLM은 주입된 검증기 안).
 
-    `authored_by`를 주면 그 값으로 생성자 서명을 덮어쓴다 — 코퍼스에 서명 기록이 없는 구
-    코퍼스의 저작 주체를 사람이 *선언*하는 좌석이다(`llm:<모델 id>`·`deterministic:<생성기>`).
+    `authored_by`는 코퍼스에 서명 기록이 **없는** 레코드의 저작 주체를 사람이 *선언*하는
+    좌석이다(`llm:<모델 id>`·`deterministic:<생성기>`). 기록이 있는 레코드는 선언으로 덮어쓰지
+    않는다 — 충돌하면 `INDEPENDENCE_UNPROVEN`(PB-17: 선언으로 LLM 저작분을 결정론으로 바꿔
+    가드를 우회하는 길 차단).
     검증자와 같은 LLM이면 `CrossVerifier`가 자기승인으로 거부하고, 형식을 판독할 수 없으면
     독립성 입증 불가로 거부한다 — 둘 다 `INDEPENDENCE_UNPROVEN`(PB-15).
     """
@@ -293,7 +300,23 @@ def run_residue_cross_verify(
     unresolved: list[str] = []
     model_failures: list[str] = []
     for record in sample:
-        subject = _build_subject(record, authored_by=authored_by or record.authored_by)
+        try:
+            signature = resolve_author_signature(record.authored_by, authored_by)
+        except AuthorDeclarationConflictError as exc:
+            # 선언이 기록과 충돌 — 기록을 뒤집는 측정은 무효다(PB-17). 독립성 미입증과 같은 분류.
+            return ResidueGateReport(
+                outcome="INDEPENDENCE_UNPROVEN",
+                machine_checked=len(records),
+                machine_failures=[],
+                sampled=len(sample),
+                resolved=0,
+                defects=0,
+                unresolved=0,
+                defect_upper=None,
+                defect_classes={},
+                reasons=[f"{record.slug}: {exc}"],
+            )
+        subject = _build_subject(record, authored_by=signature)
         if isinstance(subject, str):
             model_failures.append(subject)
             continue
@@ -454,8 +477,9 @@ def main(argv: list[str] | None = None) -> int:
         "--authored-by",
         default=None,
         help=(
-            "생성자 서명 선언(서명 기록이 없는 구 코퍼스용·레코드 값을 덮어씀) — "
-            "'llm:<모델 id>' 또는 'deterministic:<생성기>' 형식. 검증자와 같은 LLM이면 거부된다."
+            "생성자 서명 선언(서명 기록이 **없는** 레코드만 채움·기록이 있으면 덮어쓰지 않고 "
+            "충돌 시 거부) — 'llm:<모델 id>' 또는 'deterministic:<생성기>' 형식. 검증자와 같은 "
+            "LLM이면 거부된다."
         ),
     )
     args = parser.parse_args(argv)

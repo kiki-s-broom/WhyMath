@@ -12100,3 +12100,10 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
 - **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
 - **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
+
+### 2026-10-08 — PB-17 결정론 생성기 저작 서명 + 코퍼스 백필 + 선언 덮어쓰기 차단
+- **서명**: 결정론 생성기 60종 클래스에 `@deterministic_generator`(`l3/equivalent/generator.py`)를 부착 — 후보가 `deterministic:<생성기>` 서명을 갖는다. 전수 가드(`test_deterministic_author_stamp.py`)가 `generate(self, spec)` 보유 클래스를 역할 기반으로 발견해 미서명 0건·스캔 하한을 동결한다.
+- **백필**: `harness/problem_corpus_author_backfill.py`(기본/`--dry-run`/`--check`, 멱등). 37개 디렉터리·14,034건 중 13,609건(35개 디렉터리) 서명, 425건 미백필 — `problem_bank_rephrased_v0`(421건, LLM 발문 다양화·저작 모델 id 미기록이라 `llm:` 서명도 지어내지 않음)와 `problem_bank_v1`(4건, 사람 시드). 도출 근거는 `_provenance.json`의 `generation_method`가 지목한 생성기 파일(30개 디렉터리), 파일명이 없는 5개 디렉터리는 `LLM 0` 선언 + 코드의 `CORPUS_DIR_NAME` 배치 모듈 임포트로 도출(코드 사실 추가), `generated_v0`는 생성기 8종이라 배치 모듈명으로 서명.
+- **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
+- **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
+- **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.

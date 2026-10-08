@@ -16,8 +16,9 @@ LLM 생성기(Qwen3-Math·Claude 초안→검증)로 *교체*한다 — 오케�
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Sequence
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,15 +26,23 @@ from pydantic import BaseModel, ConfigDict, Field
 # 그대로 재사용한다(L3→L1 하향 import·허용). 후보가 실은 태깅을 오케스트레이터가 그대로 저장 레코드
 # 로 넘긴다(같은 타입이라 변환 0).
 from whymath_backend.l1.problem_bank.populate import ConceptTag
+from whymath_backend.l3.cross_verify import deterministic_author
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.schema.problem import Problem
 from whymath_backend.schema.provenance import ContentProvenance
 
 __all__ = [
+    "DETERMINISTIC_GENERATOR_MARK",
     "CandidateProblem",
     "EquivalentProblemGenerator",
     "ScriptedGenerator",
+    "deterministic_generator",
+    "deterministic_generator_name",
 ]
+
+# 결정론 생성기 클래스에 데코레이터가 찍는 표식 속성 — 값은 서명에 쓰인 생성기 이름이다.
+# 전수 가드(`test_deterministic_author_stamp`)가 "표식 없는 생성기 = 서명 누락"을 판정한다.
+DETERMINISTIC_GENERATOR_MARK = "__deterministic_generator_name__"
 
 
 class CandidateProblem(BaseModel):
@@ -99,11 +108,51 @@ class CandidateProblem(BaseModel):
         default=None,
         description=(
             "(선택·PB-15) 저작 주체 서명 — LLM 생성기는 `llm:<모델 id>`"
-            "(`cross_verify.llm_author`)를 찍는다. None=기록 없음(결정론 생성기는 아직 미기록·"
-            "서명 해석 실패) — 교차검증 가드는 기록 없는 대상을 독립성 입증 불가로 거부한다"
-            "(fail-closed)."
+            "(`cross_verify.llm_author`)를, 결정론 생성기는 `@deterministic_generator`가 "
+            "`deterministic:<생성기>`(`cross_verify.deterministic_author`)를 찍는다(PB-17). "
+            "None=기록 없음(스크립트 생성기·서명 해석 실패) — 교차검증 가드는 기록 없는 대상을 "
+            "독립성 입증 불가로 거부한다(fail-closed)."
         ),
     )
+
+
+_GeneratorT = TypeVar("_GeneratorT", bound=type[Any])
+
+
+def deterministic_generator_name(cls: type[Any]) -> str:
+    """결정론 생성기의 서명 이름 — 정의 모듈 파일명(`binomial_distribution_skeleton_generator`).
+
+    한 모듈에 생성기 클래스가 여럿이어도(예 `calculus_skeleton_generator`) 이름은 모듈 단위다.
+    기존 코퍼스 백필(`problem_corpus_author_backfill`)이 `_provenance.json`의
+    `generation_method`에 적힌 생성기 *파일명*에서 도출하는 서명과 같은 형식이다.
+    """
+    return cls.__module__.rsplit(".", 1)[-1]
+
+
+def deterministic_generator(cls: _GeneratorT) -> _GeneratorT:
+    """결정론 생성기 클래스 데코레이터 — `generate()`가 낸 후보에 `deterministic:<생성기>` 서명.
+
+    PB-17: 서명은 생성 시점에 *생성기 자신*이 찍는다(사후에 사람이 선언하지 않는다). 후보가 이미
+    `authored_by`를 갖고 있으면 그대로 둔다(덮어쓰지 않는다). 생성 실패(None)는 그대로 통과한다.
+    클래스 본문에 `generate`가 직접 정의돼 있어야 한다 — 상속받은 메서드만 있으면 서명할 지점이
+    어디인지 모호하므로 데코레이트 시점에 거부한다.
+    """
+    original = cls.__dict__.get("generate")
+    if original is None:
+        raise TypeError(f"{cls.__name__}: generate()가 클래스 본문에 없어 서명을 찍을 수 없다")
+    name = deterministic_generator_name(cls)
+    signature = deterministic_author(name)
+
+    @functools.wraps(original)
+    def generate(self: Any, spec: EquivalenceSpec) -> CandidateProblem | None:
+        candidate: CandidateProblem | None = original(self, spec)
+        if candidate is None or candidate.authored_by is not None:
+            return candidate
+        return candidate.model_copy(update={"authored_by": signature})
+
+    setattr(cls, "generate", generate)  # noqa: B010 — 제네릭 클래스 타입에 속성을 심는다.
+    setattr(cls, DETERMINISTIC_GENERATOR_MARK, name)  # noqa: B010
+    return cls
 
 
 @runtime_checkable

@@ -1084,6 +1084,7 @@ CATALOG: tuple[Spec, ...] = (
        "api.admin_module_registry", "ops.admin_guard_audit"),
     _o("WM-O-909", "동등문제 코퍼스 축적·후처리 배치(36 단원 배치 포함)", "Admin", "Content", "P0",
        "C1·C3 — 앵커 CU 물량", "harness.problem_corpus_accumulate", "harness.problem_corpus_batch",
+       "harness.problem_corpus_author_backfill",
        "harness.problem_corpus_persona_fit_backfill", "harness.problem_corpus_rephrase",
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
