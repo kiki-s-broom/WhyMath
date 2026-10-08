@@ -66,6 +66,7 @@ from whymath_backend.api._auth import get_current_user
 from whymath_backend.api.auth import email_hash
 from whymath_backend.api.demo_auth import DEMO_EMAIL
 from whymath_backend.db.models.user import UserProfile
+from whymath_backend.schema.cms_access import CmsCapability, roles_with
 from whymath_backend.schema.enums import Role
 
 
@@ -159,6 +160,18 @@ class AdminModule(BaseModel):
     )
 
 
+#: 기본 역할 — 운영 백오피스는 학생에게 열리는 화면이 아니므로 `CONTENT_ADMIN`만 쓴다
+#: (04 §2 원칙3 "신규 enum 불요"). 역할이 갈리는 모듈은 `roles=`를 명시한다.
+_ADMIN_ONLY: frozenset[Role] = frozenset({Role.CONTENT_ADMIN})
+
+#: CMS 권한에서 *파생*한 역할 집합 — 값을 여기 손으로 적지 않는다(P3-12). 권한표
+#: (`schema/cms_access.py`)가 바뀌면 메뉴 가시성도 함께 바뀌고, 라우트 가드는 이 집합을
+#: 레지스트리에서 읽으므로(`require_module_roles`) 메뉴와 가드가 어긋날 수 없다.
+_CMS_VIEWERS: frozenset[Role] = roles_with(CmsCapability.VIEW)
+_CMS_REVIEWERS: frozenset[Role] = roles_with(CmsCapability.REVIEW)
+_CMS_PUBLISHERS: frozenset[Role] = roles_with(CmsCapability.PUBLISH)
+
+
 def _module(
     module_id: str,
     section: AdminSection,
@@ -166,13 +179,12 @@ def _module(
     route: str,
     module_status: AdminModuleStatus,
     *backing_assets: str,
+    roles: frozenset[Role] = _ADMIN_ONLY,
 ) -> AdminModule:
-    """레지스트리 엔트리 생성 축약 — v0 역할은 전부 `CONTENT_ADMIN` 하나다.
+    """레지스트리 엔트리 생성 축약 — 기본 역할은 `CONTENT_ADMIN` 하나다.
 
-    운영 백오피스는 학생에게 열리는 화면이 아니므로 v0 2값(`STUDENT`/`CONTENT_ADMIN`) 중
-    `CONTENT_ADMIN`만 쓴다(04 §2 원칙3 "신규 enum 불요"). 역할이 갈리는 모듈이 실제로 생기면
-    그때 이 헬퍼를 거치지 않고 `AdminModule(...)`을 직접 쓴다 — 좌석 없는 역할을 미리 만들지
-    않는다는 `Role` enum의 방침과 같다.
+    역할이 갈리는 모듈(CMS 편집·검수·배포)은 `roles=`로 권한 파생 집합(`_CMS_*`)을 넘긴다. 좌석 없는
+    역할을 미리 만들지 않는다는 `Role` enum의 방침상, 기본값은 계속 `CONTENT_ADMIN` 단독이다.
     """
     return AdminModule(
         id=module_id,
@@ -180,7 +192,7 @@ def _module(
         label_ko=label_ko,
         route=route,
         status=module_status,
-        required_roles=frozenset({Role.CONTENT_ADMIN}),
+        required_roles=roles,
         backing_assets=backing_assets,
     )
 
@@ -202,6 +214,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/harness/needs_review_worklist.py",
         "src/backend/whymath_backend/harness/review_session.py",
         "src/backend/whymath_backend/harness/review_timer.py",
+        roles=_CMS_REVIEWERS,
     ),
     # ── 운영 대시보드 (03 §5 4계층 프레임 ①) ────────────────────────────────────────
     _module(
@@ -223,6 +236,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/curriculum_framework.py",
         "src/backend/whymath_backend/db/models/curriculum_entry.py",
         "src/backend/whymath_backend/l1/curriculum",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "learning_objective",
@@ -241,6 +255,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         _PARTIAL,
         "src/backend/whymath_backend/schema/pedagogy_pack.py",
         "src/backend/whymath_backend/l1/pedagogy",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "knowledge_graph",
@@ -251,6 +266,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/concept_node.py",
         "src/backend/whymath_backend/db/models/atom_node.py",
         "src/backend/whymath_backend/l1/atom_graph",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "misconception",
@@ -261,6 +277,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/misconception_catalog.py",
         "src/backend/whymath_backend/db/models/misconception_crosslink.py",
         "src/backend/whymath_backend/l1/misconception",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "content_library",
@@ -272,6 +289,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/solution_node.py",
         "src/backend/whymath_backend/db/models/concept_content.py",
         "src/backend/whymath_backend/db/models/concept_visualization.py",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "dsl_builder",
@@ -424,6 +442,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/concept_version.py",
         # EOS-50: 전이표 + Publish Gate 서비스(운영 API는 아직 없음 — 판정 문서 §5).
         "src/backend/whymath_backend/l3/publish_gate.py",
+        roles=_CMS_VIEWERS,
     ),
     _module(
         "deployment",
@@ -433,6 +452,7 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         _PARTIAL,
         "infra",
         ".github/workflows/deploy.yml",
+        roles=_CMS_PUBLISHERS,
     ),
     _module(
         "system_settings",

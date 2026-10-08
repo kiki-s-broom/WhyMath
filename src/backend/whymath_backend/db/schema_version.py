@@ -172,6 +172,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # (NULL=멱등키 미부여·백필 금지). hypertable이면 마이그레이션이 중단한다(ADR-001).
     "b4d8e2a6c0f3",  # ARCH-32: problem.source_id — source_entity(LIC-01) FK 좌석(nullable·
     # 백필 금지). source_type/source_detail은 이관 기간 중 유지(점진 이관).
+    "c5e9f3a7b1d4",  # P3-12: role_enum에 CMS 역할 3종(content_editor/reviewer/publisher) 추가
+    # — 어휘만 넓힌다. 권한 매핑 정본은 schema/cms_access.py.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

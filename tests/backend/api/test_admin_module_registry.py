@@ -127,6 +127,53 @@ def test_visible_modules_filters_by_role_and_keeps_planned() -> None:
     assert visible_modules(Role.STUDENT) == ()
 
 
+# [P3-12] CMS 역할별 메뉴 가시성 — 기대 집합을 **명시**한다. 권한표에서 파생한 값과 비교만 하면 권한표가
+# 바뀔 때 이 테스트가 같이 따라 움직여 아무것도 지키지 못한다(파생 규칙 자체는 `test_cms_access.py`가 본다).
+_CMS_VIEW_MODULES = {
+    "curriculum",
+    "pedagogy_pack",
+    "knowledge_graph",
+    "misconception",
+    "content_library",
+    "content_version",
+}
+
+
+def _ids(role: Role) -> set[str]:
+    return {m.id for m in visible_modules(role)}
+
+
+def test_editor_sees_content_modules_but_not_review_or_deployment() -> None:
+    ids = _ids(Role.CONTENT_EDITOR)
+    assert _CMS_VIEW_MODULES <= ids
+    assert "review_queue" not in ids
+    assert "deployment" not in ids
+
+
+def test_reviewer_sees_review_queue_but_not_deployment() -> None:
+    ids = _ids(Role.CONTENT_REVIEWER)
+    assert {"review_queue"} | _CMS_VIEW_MODULES <= ids
+    assert "deployment" not in ids
+
+
+def test_publisher_sees_deployment_but_not_review_queue() -> None:
+    ids = _ids(Role.CONTENT_PUBLISHER)
+    assert {"deployment"} | _CMS_VIEW_MODULES <= ids
+    assert "review_queue" not in ids
+
+
+@pytest.mark.parametrize(
+    "role", [Role.CONTENT_EDITOR, Role.CONTENT_REVIEWER, Role.CONTENT_PUBLISHER]
+)
+def test_cms_roles_never_see_non_cms_admin_modules(role: Role) -> None:
+    """비용·모델·사용자 조회 같은 비CMS 모듈은 `content_admin` 전용으로 남는다 — 새 역할이
+    콘솔 전체를 열어 보는 통로가 되지 않는다."""
+    ids = _ids(role)
+    for forbidden in ("ai_models", "cost_report", "user_lookup", "system_settings"):
+        assert has_module(forbidden), f"전제 깨짐: 모듈 {forbidden}가 레지스트리에 없다"
+        assert forbidden not in ids, f"{role.value}가 {forbidden}를 본다"
+
+
 def test_lookup_helpers_agree() -> None:
     """`get_module`(기동 시점·예외)과 `has_module`(감사용·불리언)이 같은 집합을 본다."""
     for module in _MODULES:
