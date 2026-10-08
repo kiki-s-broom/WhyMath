@@ -2,7 +2,7 @@
 
 > **판정 기준: main `42018d87`** (코퍼스 `data/corpus/misconception_crosslinks_v1/crosslinks.json` 68건) ·
 > 조사 원문 = `docs/reviews/crosslink_live_drift_2026-10-07.md`(PR #1505, 이 기록 작성 시점 미머지).
-> 게이트 `G-crosslink-live-drift-disposition`은 PR #1505에만 있어 이 브랜치에서 clear할 수 없다 — §4 참조.
+> 게이트 `G-crosslink-live-drift-disposition`은 #1505 머지(main `bf8725e9`) 후 이 PR에서 clear했다 — §4 참조.
 
 ## §1. 결정
 
@@ -53,11 +53,7 @@
 **검증 범위(명시)**: 위 표는 코드 읽기와 조사 문서의 라이브 값으로 계산한 것이다. 라이브 DB에서 4행의
 `link_type`이 모두 `직접매핑`인지는 조사 문서 기재(`division-by-zero`는 명시, 나머지는 신뢰도만 기재)에 기댄다.
 
-## §4. 대장 반영 방법
+## §4. 대장 반영
 
-게이트는 PR #1505가 머지된 뒤에 clear한다. 증적에 넣을 내용:
-
-- 판정 기준 커밋 해시(머지 후 main)와 이 문서 경로
-- 결정 = 다) 보류
-- §2 실측 다섯 줄
-- §1 해제 조건과 `HARN-216`
+#1505 머지 후 main `bf8725e9`를 이 브랜치에 병합하고 `backlog.py gates clear`로 닫았다. 증적에 판정 기준 커밋,
+이 문서 경로, 결정(다 보류), §2 실측, §1 해제 조건, `HARN-216`을 담았다.
