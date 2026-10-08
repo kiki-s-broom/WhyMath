@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -28,6 +28,6 @@ paths:
   - src/backend/whymath_backend/l3/finite_probability.py
   - docs/architecture/verifier_v2_design.md
   - "backlog/tasks/**"
-session: null
+session: claude/jolly-gates-qveodp
 notes: "S4-52 v2 설계서 §2. 현재는 스켈레톤만 존재. 기존 _CONCEPTUAL_VERIFIERS(verify_answer 등)를 래핑하면서도 신규 도메인 verifier 플러그인 구조를 추가.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-08

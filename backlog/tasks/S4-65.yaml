@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-65
+title: "Verifier v2 후속 — 등급 부여 배선·개념형 교차검증 관점·운영 결선 (S4-54 승계)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-54
+requires_gates: []
+acceptance:
+  - "Verifier.verify가 S4-55 신규 등급(FINITE_EXHAUSTIVE·SYMBOLIC_PROOF·DETERMINISTIC_DATA 등)을 answer_kind별로 실제 부여한다 — 현재는 pass에 레거시 MACHINE_EXHAUSTIVE, fail/unverifiable에 MACHINE_SAMPLED만 찍는다(SymPy 계열 pass도 MACHINE_EXHAUSTIVE로 찍히는 것이 실측됨, verification_tier.py의 'SymPy 증명은 레거시 값에서 추론하지 않는다' 원칙과 충돌). 집행 지점: 등급 부여 분기별 테스트 + 레거시 값이 verifier.py 출력에 남지 않음을 동결"
+  - "등급 의미 설계 판정을 선행한다 — RESIDUE_REVIEWED는 설계서 §4.1이 '로트 단위 Wilson 게이트 통과'로 정의하는데 per-problem verify()가 이를 주장할 수 있는지(교차검증 ok를 어떤 등급으로 찍을지)를 Kiki 판정으로 확정한 뒤 구현한다. 판정 전 임의 부여 금지"
+  - "SymPy 계열 개념형 answer_kind(real_root_count 등)의 잔여 축 '발문↔SymPy 조건 정합'용 교차검증 관점 세트를 정의하거나, 정의하지 않기로 결정하고 그 사유를 설계서에 남긴다 — S4-54 후속 수정으로 관점 세트가 없는 kind는 교차검증기가 주입돼도 unverifiable로 회피한다"
+  - "운영 경로 결선: 현재 src 전체에서 Verifier(cross_verifier=...) 주입 호출이 0건이라 l4 MathSubjectAdapter.validate_problem의 기본 경로는 기계 pass도 전부 unverifiable이 된다. 결선 지점(호출측)과 독립성 조건(생성자≠검증자 authored_by 전달 — 현재 어댑터는 authored_by를 넘기지 않아 기본값 unknown)을 확정하고 결선 또는 미결선 사유를 기록한다"
+  - "ruff/black/mypy green, import-linter 7계층 위반 0"
+  - PR 생성 및 CI 통과
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/verifier.py
+  - src/backend/whymath_backend/l3/verification_tier.py
+  - src/backend/whymath_backend/l4/subject_adapter_math.py
+  - docs/architecture/verifier_v2_design.md
+session: null
+notes: "S4-54 재대조(2026-10-08)에서 발견한 승계 분. S4-54의 구현은 PR #871로 머지돼 있었고 대장만 todo였다. 이 태스크는 S4-54 acceptance 밖에 있던 3건(등급 부여 배선·개념형 관점·운영 결선)의 소유자를 만든다. 관점 세트 부재 시 거짓 pass 경로는 S4-54 후속 수정에서 이미 막았다."
+updated: 2026-10-08

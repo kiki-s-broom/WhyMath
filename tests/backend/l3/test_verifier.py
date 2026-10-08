@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import pytest
 
+from whymath_backend.l3 import verifier as verifier_module
 from whymath_backend.l3.cross_verify import (
+    PROBABILITY_PERSPECTIVES,
+    STATISTICAL_PERSPECTIVES,
     CrossVerificationResult,
     Perspective,
     ResidueSubject,
@@ -28,14 +31,15 @@ class _FakeCrossVerifier:
     def __init__(self, aggregate: ResidueVerdictLabel) -> None:
         self.aggregate = aggregate
         self.subjects: list[ResidueSubject] = []
+        self.perspectives: list[tuple[Perspective, ...] | None] = []
 
     def verify(
         self,
         subject: ResidueSubject,
         perspectives: tuple[Perspective, ...] | None = None,
     ) -> CrossVerificationResult:
-        del perspectives  # 대역은 관점 세트를 검증하지 않는다.
         self.subjects.append(subject)
+        self.perspectives.append(perspectives)
         return CrossVerificationResult(
             problem_id=subject.problem_id,
             verdicts=(),
@@ -231,3 +235,59 @@ async def test_statistical_claim_cross_verifier_receives_data_and_machine_value(
     assert subject.data == problem.conditions
     assert subject.machine_value == pytest.approx(3.0)
     assert "평균" in subject.machine_model_ko
+
+
+@pytest.mark.asyncio
+async def test_kind_without_perspective_set_is_unverifiable_even_with_cross_verifier() -> None:
+    """관점 세트가 없는 kind(SymPy 개념형)는 확률형 관점으로 대신 채점하지 않는다.
+
+    교차검증기가 `ok`를 돌려줄 대역이어도 호출 자체가 일어나지 않아야 거짓 pass가 없다.
+    """
+    fake = _FakeCrossVerifier("ok")
+    verifier = Verifier(cross_verifier=fake)  # type: ignore[arg-type]
+    verdict = await verifier.verify(_problem("real_root_count", "2", "x**2 - 1 = 0"))
+    assert verdict.state == "unverifiable"
+    assert "관점 세트" in (verdict.reason or "")
+    assert "SymPy 기호/수치 검산" in verdict.machine_axes
+    assert "발문↔SymPy 조건 정합" in verdict.residual_axes
+    assert fake.subjects == []  # 교차검증기를 부르지 않았다.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("answer_kind", "answer", "conditions", "expected"),
+    [
+        (
+            "finite_probability",
+            "1/6",
+            "space=dice(n=2,faces=6); event=sum==7",
+            PROBABILITY_PERSPECTIVES,
+        ),
+        ("finite_count", "6", "space=dice(n=2,faces=6); event=sum==7", PROBABILITY_PERSPECTIVES),
+        ("statistical_claim", "3", "data=[1,2,3,4,5]; stat=mean", STATISTICAL_PERSPECTIVES),
+    ],
+)
+async def test_cross_verifier_receives_domain_perspective_set(
+    answer_kind: str,
+    answer: str,
+    conditions: str,
+    expected: tuple[Perspective, ...],
+) -> None:
+    """도메인마다 정의된 관점 세트가 교차검증기에 그대로 전달된다."""
+    fake = _FakeCrossVerifier("ok")
+    verifier = Verifier(cross_verifier=fake)  # type: ignore[arg-type]
+    await verifier.verify(_problem(answer_kind, answer, conditions))
+    assert fake.perspectives == [expected]
+
+
+def test_duplicate_answer_kind_is_rejected_at_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    """신규 도메인 kind가 기존 `_CONCEPTUAL_VERIFIERS`와 겹치면 구성 시점에 거부(설계서 §3.3)."""
+    conceptual = verifier_module._CONCEPTUAL_VERIFIERS
+    monkeypatch.setitem(conceptual, "statistical_claim", conceptual["real_root_count"])
+    with pytest.raises(ValueError, match="중복"):
+        verifier_module._build_verifiers_v2()
+
+
+def test_perspective_table_has_no_unregistered_kind() -> None:
+    """관점 세트 표에 등록되지 않은 kind가 없다 — 도달 불가능한 죽은 항목을 막는다."""
+    assert set(verifier_module._CROSS_VERIFY_PERSPECTIVES) <= set(verifier_module._VERIFIERS_V2)
