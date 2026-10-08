@@ -316,7 +316,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         ),
         search_column="step_title",
         order_by="step_order",
-        # 기대 답이 바뀌면 이전 SymPy 검증은 무효다 — 거짓(False)이 아니라 "모름"(None)으로
+        # 기대 답이 바뀌면 이전 기계 검증 결과는 무효다 — 거짓(False)이 아니라 "모름"(None)으로
         # 되돌린다.
         reset_on_edit=(("sympy_verified", None),),
         edit_guard="parent_problem_not_approved",

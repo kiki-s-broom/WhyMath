@@ -1504,3 +1504,92 @@ class TestNoUserAccessAfterTheTransactionBoundary:
             _ = user.role
         with pytest.raises(ExpiredUserError):
             _ = user.user_id
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# 선언(RESOURCES) ↔ 정적 핸들러 정합 — 라우트를 데코레이터로 직접 쓴 대가로 생기는 위험을 막는다
+# ═══════════════════════════════════════════════════════════════════════════════════════
+
+
+def _expected_resource_routes() -> set[tuple[str, str]]:
+    """선언에서 **도출한** 리소스 라우트 집합 — 핸들러 목록을 손으로 따로 적지 않는다."""
+    out: set[tuple[str, str]] = set()
+    for spec in RESOURCES:
+        out.add(("GET", f"/v1/admin/cms/{spec.key}"))
+        out.add(("GET", f"/v1/admin/cms/{spec.key}/items/{{pk}}"))
+        if spec.editable:
+            out.add(("PATCH", f"/v1/admin/cms/{spec.key}/items/{{pk}}"))
+        if spec.review_column is not None:
+            out.add(("POST", f"/v1/admin/cms/{spec.key}/items/{{pk}}/review"))
+    return out
+
+
+_CONCEPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/v1/admin/cms/concepts"),
+        ("GET", "/v1/admin/cms/concepts/{concept_id}"),
+        ("POST", "/v1/admin/cms/concepts/{concept_id}/drafts"),
+        ("GET", "/v1/admin/cms/concepts/{concept_id}/versions"),
+        ("GET", "/v1/admin/cms/versions/{version_id}"),
+        ("POST", "/v1/admin/cms/versions/{version_id}/transitions"),
+        ("POST", "/v1/admin/cms/concepts/{concept_id}/rollback"),
+        ("GET", "/v1/admin/cms/resources"),
+        ("GET", "/v1/admin/cms/audit"),
+    }
+)
+
+
+class TestRouteDeclarationParity:
+    def test_served_routes_equal_declared_routes_exactly(self) -> None:
+        """서빙되는 라우트 = 선언에서 도출한 리소스 라우트 ∪ 개념·메타·이력 라우트(정확히 일치).
+
+        선언만 있고 라우트가 없으면(핸들러를 빠뜨림) 그 리소스는 화면에서 못 쓰이고, 선언에 없는 라우트가
+        있으면(예: 읽기 전용 리소스에 PATCH) 허용 목록·검수 규칙이 우회된다. 둘 다 RED여야 한다.
+        """
+        served = set(_ROUTES)
+        expected = _expected_resource_routes() | set(_CONCEPT_ROUTES)
+        assert served == expected, (
+            f"선언에 없는 라우트: {sorted(served - expected)} / 선언만 있고 없는 라우트: "
+            f"{sorted(expected - served)}"
+        )
+
+    def test_every_resource_route_is_guarded_by_its_declared_module(self) -> None:
+        """각 라우트의 레지스트리 파생 가드가 **선언된 모듈**이다 — 다른 모듈 가드를 단 핸들러는 RED."""
+        from whymath_backend.ops.admin_guard_audit import _guarded_module_ids
+        from whymath_backend.ops.declared_unwired_audit import walk_routes
+
+        by_path: dict[tuple[str, str], set[str]] = {}
+        for route in walk_routes(_APP.routes):
+            path = getattr(route, "path", "")
+            if not (isinstance(path, str) and path.startswith("/v1/admin/cms/")):
+                continue  # 문서·정적 라우트에는 `dependant`가 없다 — CMS 라우트만 본다
+            dependant = getattr(route, "dependant", None)
+            assert dependant is not None, f"{path}: dependant 부재 — 가드 판정 불가(건너뛰지 않는다)"
+            for method in getattr(route, "methods", None) or ():
+                by_path[(method, path)] = _guarded_module_ids(dependant)
+        checked = 0
+        for spec in RESOURCES:
+            for key in (
+                ("GET", f"/v1/admin/cms/{spec.key}"),
+                ("GET", f"/v1/admin/cms/{spec.key}/items/{{pk}}"),
+                ("PATCH", f"/v1/admin/cms/{spec.key}/items/{{pk}}"),
+                ("POST", f"/v1/admin/cms/{spec.key}/items/{{pk}}/review"),
+            ):
+                if key in by_path:
+                    assert by_path[key] == {spec.module_id}, (key, by_path[key], spec.module_id)
+                    checked += 1
+        assert checked == len(_expected_resource_routes()), "가드 모듈을 확인한 라우트 수가 모자란다"
+
+    def test_read_only_resource_has_exactly_two_routes(self) -> None:
+        paths = [(m, p) for m, p in _ROUTES if "/skill_node" in p]
+        assert sorted(paths) == [
+            ("GET", "/v1/admin/cms/skill_node"),
+            ("GET", "/v1/admin/cms/skill_node/items/{pk}"),
+        ]
+
+    def test_write_routes_are_exactly_the_declared_writable_ones(self) -> None:
+        writes = {(m, p) for m, p in _ROUTES if m != "GET"}
+        derived = {r for r in _expected_resource_routes() if r[0] != "GET"}
+        concept_writes = {r for r in _CONCEPT_ROUTES if r[0] != "GET"}
+        assert writes == derived | concept_writes
+        assert len(writes) == 12

@@ -136,6 +136,14 @@ BASELINE: dict[str, frozenset[str]] = {
             # 함수로 대체 불가한 새 접근점(역할·티어·검수상태 group-by)이라 (b) 대신 (a)를
             # 택했다 — 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/admin_bff.py",
+            # P3-12 — Admin CMS BFF. 관리자 CMS의 목록·상세·제자리 편집이 리소스 8종의 조회와 쓰기를
+            # 직접 한다. 기존 조회 함수로 대체할 수 없는 새 접근점이다: 편집은 행 잠금(FOR UPDATE)·
+            # 낙관적 동시성·감사 1행·commit 1회가 **같은 트랜잭션**이어야 하므로 쿼리와 경계가 한
+            # 곳에 있어야 한다(쓰기 경로를 여러 파일에 쪼개면 "상태 컬럼도 같이 쓰는" 구멍이 어디에
+            # 생기는지 보이지 않는다). 개념 버전의 쓰기는 이 파일이 아니라 `l3/publish_gate.py`가
+            # 소유한다 — 이 파일은 `ConceptVersion` ORM을 import하지 않는다(AST 동결 R1). 이 등재가
+            # 리뷰에 보이는 것이 이 가드의 목적이다.
+            "api/admin_cms.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",

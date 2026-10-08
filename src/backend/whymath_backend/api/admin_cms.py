@@ -54,6 +54,7 @@ from whymath_backend.api.admin_cms_resources import (
     ResourceSpec,
     apply_changes,
     audit_resource_id,
+    get_resource,
     parse_pk,
     to_jsonable,
     validate_changes,
@@ -100,6 +101,9 @@ RequireKnowledgeGraph = Annotated[UserProfile, Depends(require_module_roles("kno
 RequireContentVersion = Annotated[UserProfile, Depends(require_module_roles("content_version"))]
 RequireDeployment = Annotated[UserProfile, Depends(require_module_roles("deployment"))]
 RequireContentLibrary = Annotated[UserProfile, Depends(require_module_roles("content_library"))]
+RequireCurriculum = Annotated[UserProfile, Depends(require_module_roles("curriculum"))]
+RequireMisconception = Annotated[UserProfile, Depends(require_module_roles("misconception"))]
+RequirePedagogy = Annotated[UserProfile, Depends(require_module_roles("pedagogy_pack"))]
 
 
 # ── 오류·권한 도우미 ───────────────────────────────────────────────────────────────
@@ -933,209 +937,476 @@ async def _detail(
     )
 
 
-def _register_resource(spec: ResourceSpec) -> None:
-    """리소스 1종의 라우트를 등록한다 — 목록·상세는 항상, 수정·검수는 선언이 허용할 때만.
-
-    라우트마다 **그 리소스의 모듈 가드**(`require_module_roles(spec.module_id)`)를 단다. 가드는
-    레지스트리에서 파생되므로 메뉴와 어긋날 수 없고, `ops/admin_guard_audit`이 파생 경로 사용을
-    전수 검사한다.
-    """
-    guard = Depends(require_module_roles(spec.module_id))
-
-    async def list_items(
-        user: Annotated[UserProfile, guard],
-        session: SessionDep,
-        q: Annotated[str | None, Query(max_length=100)] = None,
-        limit: Annotated[int, Query(ge=1, le=100)] = 25,
-        offset: Annotated[int, Query(ge=0)] = 0,
-    ) -> CmsListResponse:
-        _require(user, CmsCapability.VIEW)
-        model = spec.model
-        conditions: list[sa.ColumnElement[bool]] = []
-        if q and spec.search_column is not None:
-            column = getattr(model, spec.search_column)
-            conditions.append(sa.cast(column, sa.Text).icontains(q, autoescape=True))
-        total = (
-            await session.execute(select(func.count()).select_from(model).where(*conditions))
-        ).scalar_one()
-        order = [getattr(model, spec.pk)]
-        if spec.order_by is not None and spec.order_by != spec.pk:
-            order.insert(0, getattr(model, spec.order_by))
-        rows = (
-            (
-                await session.execute(
-                    select(model).where(*conditions).order_by(*order).limit(limit).offset(offset)
-                )
+async def _list_items(
+    spec: ResourceSpec,
+    user: UserProfile,
+    session: AsyncSession,
+    q: str | None,
+    limit: int,
+    offset: int,
+) -> CmsListResponse:
+    _require(user, CmsCapability.VIEW)
+    model = spec.model
+    conditions: list[sa.ColumnElement[bool]] = []
+    if q and spec.search_column is not None:
+        column = getattr(model, spec.search_column)
+        conditions.append(sa.cast(column, sa.Text).icontains(q, autoescape=True))
+    total = (
+        await session.execute(select(func.count()).select_from(model).where(*conditions))
+    ).scalar_one()
+    order = [getattr(model, spec.pk)]
+    if spec.order_by is not None and spec.order_by != spec.pk:
+        order.insert(0, getattr(model, spec.order_by))
+    rows = (
+        (
+            await session.execute(
+                select(model).where(*conditions).order_by(*order).limit(limit).offset(offset)
             )
-            .scalars()
-            .all()
         )
-        items = tuple({c: _cell(getattr(row, c)) for c in spec.list_columns} for row in rows)
-        return CmsListResponse(
-            resource=spec.key,
-            columns=spec.list_columns,
-            items=items,
-            total=int(total),
-            limit=limit,
-            offset=offset,
-        )
-
-    async def get_item(
-        pk: str, user: Annotated[UserProfile, guard], session: SessionDep
-    ) -> CmsDetailResponse:
-        _require(user, CmsCapability.VIEW)
-        row = await _load_row(session, spec, pk)
-        return await _detail(session, spec, row, user.role)
-
-    router.add_api_route(
-        f"/{spec.key}",
-        list_items,
-        methods=["GET"],
-        response_model=CmsListResponse,
-        summary=f"{spec.label_ko} 목록",
-        name=f"cms_{spec.key}_list",
+        .scalars()
+        .all()
     )
-    router.add_api_route(
-        f"/{spec.key}/items/{{pk}}",
-        get_item,
-        methods=["GET"],
-        response_model=CmsDetailResponse,
-        summary=f"{spec.label_ko} 상세",
-        name=f"cms_{spec.key}_detail",
+    items = tuple({c: _cell(getattr(row, c)) for c in spec.list_columns} for row in rows)
+    return CmsListResponse(
+        resource=spec.key,
+        columns=spec.list_columns,
+        items=items,
+        total=int(total),
+        limit=limit,
+        offset=offset,
     )
 
-    if spec.editable:
 
-        async def patch_item(
-            pk: str,
-            body: CmsEditRequest,
-            request: Request,
-            user: Annotated[UserProfile, guard],
-            session: SessionDep,
-            settings: SettingsDep,
-        ) -> CmsEditResponse:
-            """권한 → 허용 목록 검증 → 행 잠금 → 편집 가드 → 도메인 불변식 → 쓰기 → 감사 → commit.
+async def _get_item(
+    spec: ResourceSpec, pk: str, user: UserProfile, session: AsyncSession
+) -> CmsDetailResponse:
+    _require(user, CmsCapability.VIEW)
+    row = await _load_row(session, spec, pk)
+    return await _detail(session, spec, row, user.role)
 
-            허용 목록 밖의 필드(상태·발행 컬럼 포함)는 **행을 읽기 전에** 422로 거부된다.
-            """
-            _require(user, CmsCapability.EDIT)
-            role, actor_id = user.role, user.user_id  # commit·rollback 뒤에는 읽지 않는다
+
+async def _patch_item(
+    spec: ResourceSpec,
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: UserProfile,
+    session: AsyncSession,
+    settings: Settings,
+) -> CmsEditResponse:
+    """권한 → 허용 목록 검증 → 행 잠금 → 편집 가드 → 도메인 불변식 → 쓰기 → 감사 → commit.
+
+    허용 목록 밖의 필드(상태·발행 컬럼 포함)는 **행을 읽기 전에** 422로 거부된다.
+    """
+    _require(user, CmsCapability.EDIT)
+    role, actor_id = user.role, user.user_id  # commit·rollback 뒤에는 읽지 않는다
+    try:
+        coerced = validate_changes(spec, body.changes)
+    except FieldError as exc:
+        raise _field_problem(exc) from exc
+    try:
+        row = await _load_row(session, spec, pk, lock=True)
+        reason = await _edit_block_reason(session, spec, row, lock_parent=True)
+        if reason is not None:
+            raise _problem(status.HTTP_409_CONFLICT, "edit_blocked", reason)
+        if spec.merged_validator is not None:
             try:
-                coerced = validate_changes(spec, body.changes)
+                spec.merged_validator(row, coerced)
             except FieldError as exc:
                 raise _field_problem(exc) from exc
-            try:
-                row = await _load_row(session, spec, pk, lock=True)
-                reason = await _edit_block_reason(session, spec, row, lock_parent=True)
-                if reason is not None:
-                    raise _problem(status.HTTP_409_CONFLICT, "edit_blocked", reason)
-                if spec.merged_validator is not None:
-                    try:
-                        spec.merged_validator(row, coerced)
-                    except FieldError as exc:
-                        raise _field_problem(exc) from exc
-                changed, resets = apply_changes(spec, row, coerced)
-                if changed:
-                    assert (
-                        spec.audit_type is not None
-                    )  # check_specs가 보장(쓰기 리소스는 감사 대상 필수)
-                    record_content_mutation_audit(
-                        session,
-                        actor_user_id=actor_id,
-                        resource_type=spec.audit_type,
-                        resource_id=audit_resource_id(spec, getattr(row, spec.pk)),
-                        action=PrivacyAuditAction.update,
-                        ip=_client_ip(request, settings=settings),
-                        settings=settings,
-                    )
-                    await session.commit()
-                else:
-                    await session.rollback()  # 바뀐 것이 없다 — 잠금만 일찍 푼다.
-            except HTTPException:
-                await session.rollback()
-                raise
-            except IntegrityError as exc:
-                await session.rollback()
-                raise _problem(
-                    status.HTTP_409_CONFLICT, "conflict", "저장 중 충돌이 발생했습니다."
-                ) from exc
-            except Exception:
-                await session.rollback()
-                raise
-            fresh = await _load_row(session, spec, pk)
-            return CmsEditResponse(
-                changed=tuple(changed),
-                server_reset=tuple(resets),
-                detail=await _detail(session, spec, fresh, role),
+        changed, resets = apply_changes(spec, row, coerced)
+        if changed:
+            assert spec.audit_type is not None  # check_specs가 보장(쓰기 리소스는 감사 대상 필수)
+            record_content_mutation_audit(
+                session,
+                actor_user_id=actor_id,
+                resource_type=spec.audit_type,
+                resource_id=audit_resource_id(spec, getattr(row, spec.pk)),
+                action=PrivacyAuditAction.update,
+                ip=_client_ip(request, settings=settings),
+                settings=settings,
             )
+            await session.commit()
+        else:
+            await session.rollback()  # 바뀐 것이 없다 — 잠금만 일찍 푼다.
+    except HTTPException:
+        await session.rollback()
+        raise
+    except IntegrityError as exc:
+        await session.rollback()
+        raise _problem(
+            status.HTTP_409_CONFLICT, "conflict", "저장 중 충돌이 발생했습니다."
+        ) from exc
+    except Exception:
+        await session.rollback()
+        raise
+    fresh = await _load_row(session, spec, pk)
+    return CmsEditResponse(
+        changed=tuple(changed),
+        server_reset=tuple(resets),
+        detail=await _detail(session, spec, fresh, role),
+    )
 
-        router.add_api_route(
-            f"/{spec.key}/items/{{pk}}",
-            patch_item,
-            methods=["PATCH"],
-            response_model=CmsEditResponse,
-            summary=f"{spec.label_ko} 수정 — 허용 필드만(상태·발행 컬럼 거부)",
-            name=f"cms_{spec.key}_edit",
-        )
 
-    if spec.review_column is not None:
-        review_column = spec.review_column
-
-        async def review_item(
-            pk: str,
-            body: CmsReviewRequest,
-            request: Request,
-            user: Annotated[UserProfile, guard],
-            session: SessionDep,
-            settings: SettingsDep,
-        ) -> CmsReviewResponse:
-            """검수 표지를 올리거나(`reviewed`) 내린다(`needs_review`) — 검수 권한 전용."""
-            _require(user, CmsCapability.REVIEW)
-            actor_id = user.user_id  # commit 뒤에는 읽지 않는다
-            target = (
-                REVIEW_STATUS_REVIEWED
+async def _review_item(
+    spec: ResourceSpec,
+    pk: str,
+    body: CmsReviewRequest,
+    request: Request,
+    user: UserProfile,
+    session: AsyncSession,
+    settings: Settings,
+) -> CmsReviewResponse:
+    """검수 표지를 올리거나(`reviewed`) 내린다(`needs_review`) — 검수 권한 전용."""
+    _require(user, CmsCapability.REVIEW)
+    actor_id = user.user_id  # commit 뒤에는 읽지 않는다
+    review_column = spec.review_column
+    assert review_column is not None  # 검수 라우트는 검수 컬럼이 있는 리소스에만 선언한다
+    target = REVIEW_STATUS_REVIEWED if body.decision == "reviewed" else REVIEW_STATUS_AI_ESTIMATED
+    try:
+        row = await _load_row(session, spec, pk, lock=True)
+        current = str(getattr(row, review_column))
+        if current == target:
+            await session.rollback()
+            return CmsReviewResponse(changed=False, review_status=current)
+        setattr(row, review_column, target)
+        assert spec.audit_type is not None  # check_specs가 보장
+        record_content_mutation_audit(
+            session,
+            actor_user_id=actor_id,
+            resource_type=spec.audit_type,
+            resource_id=audit_resource_id(spec, getattr(row, spec.pk)),
+            action=(
+                PrivacyAuditAction.approve
                 if body.decision == "reviewed"
-                else REVIEW_STATUS_AI_ESTIMATED
-            )
-            try:
-                row = await _load_row(session, spec, pk, lock=True)
-                current = str(getattr(row, review_column))
-                if current == target:
-                    await session.rollback()
-                    return CmsReviewResponse(changed=False, review_status=current)
-                setattr(row, review_column, target)
-                assert spec.audit_type is not None  # check_specs가 보장
-                record_content_mutation_audit(
-                    session,
-                    actor_user_id=actor_id,
-                    resource_type=spec.audit_type,
-                    resource_id=audit_resource_id(spec, getattr(row, spec.pk)),
-                    action=(
-                        PrivacyAuditAction.approve
-                        if body.decision == "reviewed"
-                        else PrivacyAuditAction.reject
-                    ),
-                    ip=_client_ip(request, settings=settings),
-                    settings=settings,
-                )
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            return CmsReviewResponse(changed=True, review_status=target)
-
-        router.add_api_route(
-            f"/{spec.key}/items/{{pk}}/review",
-            review_item,
-            methods=["POST"],
-            response_model=CmsReviewResponse,
-            summary=f"{spec.label_ko} 검수 표지 변경 — 검수 권한",
-            name=f"cms_{spec.key}_review",
+                else PrivacyAuditAction.reject
+            ),
+            ip=_client_ip(request, settings=settings),
+            settings=settings,
         )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    return CmsReviewResponse(changed=True, review_status=target)
 
 
-for _spec in RESOURCES:
-    _register_resource(_spec)
+# ── 리소스별 라우트 — **데코레이터로 정적 선언**한다 ────────────────────────────────────
+# 루프 안에서 `add_api_route`로 등록하면 코드가 짧아지지만 라우트가 grep·코드 리뷰·정적 인벤토리
+# (`scripts/analysis/eos_feature_inventory_v2.py`는 `@router.<method>` 데코레이터를 AST로 읽는다)
+# 어디에도 보이지 않는다 — 장부가 라우트 34개 중 9개만 센 채 "전수"라고 말하게 된다. 그래서
+# 라우트는 눈에 보이게 쓰고 로직은 위 공용 함수가 소유한다. 선언(`RESOURCES`)과 이 핸들러 집합이
+# 어긋나지 않음은 `tests/backend/api/test_admin_cms.py::TestRouteDeclarationParity`가 동결한다.
+
+QueryText = Annotated[str | None, Query(max_length=100)]
+QueryLimit = Annotated[int, Query(ge=1, le=100)]
+QueryOffset = Annotated[int, Query(ge=0)]
+
+
+@router.get("/curriculum_version", response_model=CmsListResponse, summary="교육과정 판 목록")
+async def list_curriculum_version(
+    user: RequireCurriculum,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("curriculum_version"), user, session, q, limit, offset)
+
+
+@router.get(
+    "/curriculum_version/items/{pk}", response_model=CmsDetailResponse, summary="교육과정 판 상세"
+)
+async def get_curriculum_version(
+    pk: str, user: RequireCurriculum, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("curriculum_version"), pk, user, session)
+
+
+@router.patch(
+    "/curriculum_version/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="교육과정 판 수정 — 허용 필드만(상태·발행 컬럼 거부)",
+)
+async def patch_curriculum_version(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireCurriculum,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(
+        get_resource("curriculum_version"), pk, body, request, user, session, settings
+    )
+
+
+@router.get("/problem", response_model=CmsListResponse, summary="문항 목록")
+async def list_problem(
+    user: RequireContentLibrary,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("problem"), user, session, q, limit, offset)
+
+
+@router.get("/problem/items/{pk}", response_model=CmsDetailResponse, summary="문항 상세")
+async def get_problem(
+    pk: str, user: RequireContentLibrary, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("problem"), pk, user, session)
+
+
+@router.patch(
+    "/problem/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="문항 수정 — 허용 필드만, 승인된 문항은 먼저 격리",
+)
+async def patch_problem(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireContentLibrary,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(get_resource("problem"), pk, body, request, user, session, settings)
+
+
+@router.get("/problem_step", response_model=CmsListResponse, summary="풀이 단계 목록")
+async def list_problem_step(
+    user: RequireContentLibrary,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("problem_step"), user, session, q, limit, offset)
+
+
+@router.get("/problem_step/items/{pk}", response_model=CmsDetailResponse, summary="풀이 단계 상세")
+async def get_problem_step(
+    pk: str, user: RequireContentLibrary, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("problem_step"), pk, user, session)
+
+
+@router.patch(
+    "/problem_step/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="풀이 단계 수정 — 승인된 문항의 단계는 먼저 격리",
+)
+async def patch_problem_step(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireContentLibrary,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(
+        get_resource("problem_step"), pk, body, request, user, session, settings
+    )
+
+
+@router.get("/misconception", response_model=CmsListResponse, summary="오개념 목록")
+async def list_misconception(
+    user: RequireMisconception,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("misconception"), user, session, q, limit, offset)
+
+
+@router.get("/misconception/items/{pk}", response_model=CmsDetailResponse, summary="오개념 상세")
+async def get_misconception(
+    pk: str, user: RequireMisconception, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("misconception"), pk, user, session)
+
+
+@router.patch(
+    "/misconception/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="오개념 수정 — Signature·교정 문구",
+)
+async def patch_misconception(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireMisconception,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(
+        get_resource("misconception"), pk, body, request, user, session, settings
+    )
+
+
+@router.get("/strategy_node", response_model=CmsListResponse, summary="교수전략 목록")
+async def list_strategy_node(
+    user: RequirePedagogy,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("strategy_node"), user, session, q, limit, offset)
+
+
+@router.get("/strategy_node/items/{pk}", response_model=CmsDetailResponse, summary="교수전략 상세")
+async def get_strategy_node(
+    pk: str, user: RequirePedagogy, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("strategy_node"), pk, user, session)
+
+
+@router.patch(
+    "/strategy_node/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="교수전략 수정 — 검수 표지를 내린다",
+)
+async def patch_strategy_node(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequirePedagogy,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(
+        get_resource("strategy_node"), pk, body, request, user, session, settings
+    )
+
+
+@router.post(
+    "/strategy_node/items/{pk}/review",
+    response_model=CmsReviewResponse,
+    summary="교수전략 검수 표지 변경 — 검수 권한",
+)
+async def review_strategy_node(
+    pk: str,
+    body: CmsReviewRequest,
+    request: Request,
+    user: RequirePedagogy,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsReviewResponse:
+    return await _review_item(
+        get_resource("strategy_node"), pk, body, request, user, session, settings
+    )
+
+
+@router.get("/concept_content", response_model=CmsListResponse, summary="개념 설명 목록")
+async def list_concept_content(
+    user: RequireContentLibrary,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("concept_content"), user, session, q, limit, offset)
+
+
+@router.get(
+    "/concept_content/items/{pk}", response_model=CmsDetailResponse, summary="개념 설명 상세"
+)
+async def get_concept_content(
+    pk: str, user: RequireContentLibrary, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("concept_content"), pk, user, session)
+
+
+@router.patch(
+    "/concept_content/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="개념 설명 수정 — 검수 표지를 내린다",
+)
+async def patch_concept_content(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireContentLibrary,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(
+        get_resource("concept_content"), pk, body, request, user, session, settings
+    )
+
+
+@router.post(
+    "/concept_content/items/{pk}/review",
+    response_model=CmsReviewResponse,
+    summary="개념 설명 검수 표지 변경 — 검수 권한",
+)
+async def review_concept_content(
+    pk: str,
+    body: CmsReviewRequest,
+    request: Request,
+    user: RequireContentLibrary,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsReviewResponse:
+    return await _review_item(
+        get_resource("concept_content"), pk, body, request, user, session, settings
+    )
+
+
+@router.get("/hint", response_model=CmsListResponse, summary="힌트 목록")
+async def list_hint(
+    user: RequireContentLibrary,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("hint"), user, session, q, limit, offset)
+
+
+@router.get("/hint/items/{pk}", response_model=CmsDetailResponse, summary="힌트 상세")
+async def get_hint(pk: str, user: RequireContentLibrary, session: SessionDep) -> CmsDetailResponse:
+    return await _get_item(get_resource("hint"), pk, user, session)
+
+
+@router.patch(
+    "/hint/items/{pk}",
+    response_model=CmsEditResponse,
+    summary="힌트 수정 — 검증 표지를 내린다(재검증 필요)",
+)
+async def patch_hint(
+    pk: str,
+    body: CmsEditRequest,
+    request: Request,
+    user: RequireContentLibrary,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsEditResponse:
+    return await _patch_item(get_resource("hint"), pk, body, request, user, session, settings)
+
+
+@router.get("/skill_node", response_model=CmsListResponse, summary="스킬 목록(읽기 전용)")
+async def list_skill_node(
+    user: RequireKnowledgeGraph,
+    session: SessionDep,
+    q: QueryText = None,
+    limit: QueryLimit = 25,
+    offset: QueryOffset = 0,
+) -> CmsListResponse:
+    return await _list_items(get_resource("skill_node"), user, session, q, limit, offset)
+
+
+@router.get(
+    "/skill_node/items/{pk}", response_model=CmsDetailResponse, summary="스킬 상세(읽기 전용)"
+)
+async def get_skill_node(
+    pk: str, user: RequireKnowledgeGraph, session: SessionDep
+) -> CmsDetailResponse:
+    return await _get_item(get_resource("skill_node"), pk, user, session)
 
 
 @router.get(
