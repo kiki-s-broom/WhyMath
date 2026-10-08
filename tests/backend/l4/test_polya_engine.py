@@ -225,9 +225,21 @@ class TestGradeRegisterWiring:
         assert d.system != STAGE_PROMPTS[PolyaStage.UNDERSTAND].system
 
     def test_university_grade_uses_university_register(self) -> None:
+        # 15는 UserProfile.grade 계약(10~14) 밖 — 로더 관례의 대학 3학년 값을 받는 후속 호출자용.
         coach = PolyaCoach()
-        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=14)
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=15)
         assert "대학생" in d.system
+
+    @pytest.mark.parametrize("grade", [13, 14])
+    def test_repeat_exam_taker_grades_are_not_addressed_as_university_students(
+        self, grade: int
+    ) -> None:
+        """UserProfile.grade 13·14는 N수1·N수2다(ge=10 le=14) — 대학생이 아니다. 로더의 대학 1~2학년
+        번호(13~14)와 겹치는 지점이라, 이식 직후 N수 학생에게 '대학생'이 나가던 회귀를 막는다."""
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=grade)
+        assert "고등학생" in d.system
+        assert "대학생" not in d.system
 
     def test_out_of_range_grade_falls_back_to_default_register(self) -> None:
         coach = PolyaCoach()

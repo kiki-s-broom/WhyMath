@@ -53,14 +53,24 @@ _BASE_SYSTEM_TEMPLATE = """너는 한국 {register}을 돕는 *수학 메타인�
 # 채워짐) 기존 문구를 *바이트 동일*로 보존한다(회귀 0 — 아래 `_grade_register` 폴백과 동일 값).
 _DEFAULT_REGISTER = "중·고등학생"
 
-# KR 학년 정수 → 시스템 프롬프트 정체성 register. `l1/curriculum/curriculum_loader.py`의
-# `_GRADE_BAND_TO_INTRODUCED_GRADE`(초1=1…고3=12) + `_UNIV_GRADE_TO_INTRODUCED_GRADE`(대학
-# 1~4학년=13~16) 확장 규약과 동일 번호 공간을 쓴다 — 학년축 어휘를 L1·L4가 공유(정본 1개).
+# KR 학년 정수 → 시스템 프롬프트 정체성 register. 번호 공간의 정본은 호출자가 넘기는
+# **`UserProfile.grade`**(`api/coach.py` `_grade_for`)이고, 같은 사다리를
+# `l4/pedagogy/runtime_selector.py::grade_to_band`가 이미 명문화했다: 1~6=초등·7~9=중학·
+# 10~12=고1~고3·**13~14=N수1·2(고교 교육과정·수능 대비 재학습 — 대학 과정이 아니다)**.
+# 그래서 10~14를 모두 "고등학생"으로 둔다(`test_polya_prompts`가 grade_to_band와 1~14 전수 대조).
+#
+# ⚠️ `l1/curriculum/curriculum_loader.py`의 대학 `introduced_grade`(`_UNIV_GRADE_TO_INTRODUCED_GRADE`
+# 대학 1~4학년=13~16)는 정렬용 내부 관례라 이 사다리와 13~14에서 번호가 **겹친다**(대학 1~2학년
+# ≠ N수1~2). 학생 속성을 소비하는 이 register는 사용자 계약을 따른다 — 로더의 13~14를 그대로
+# 가져오면 N수 학생에게 "너는 한국 대학생을 돕는..."이 나간다(2026-10-08 이식 직후 실측 회귀).
+# "대학생"은 사용자 grade 계약(ge=10 le=14)에 인코딩이 없어 현 호출자로는 닿지 않는다. 15~16은
+# 로더 관례의 대학 3~4학년 값을 받는 후속 호출자를 위한 자리일 뿐이며, 대학 1~2학년(13~14)은 이
+# 정수 채널로 표현할 수 없다 — 대학 축을 실제로 연결할 때 모호하지 않은 입력이 필요하다(S4-64).
 _GRADE_BAND_RANGES: tuple[tuple[int, int, str], ...] = (
     (1, 6, "초등학생"),
     (7, 9, "중학생"),
-    (10, 12, "고등학생"),
-    (13, 16, "대학생"),
+    (10, 14, "고등학생"),  # 고1~고3 + N수1·N수2
+    (15, 16, "대학생"),
 )
 
 
@@ -68,8 +78,8 @@ def _grade_register(grade: int | None) -> str:
     """학년 정수 → 정체성 문구 register. None·범위 밖은 `_DEFAULT_REGISTER`(회귀 0 폴백).
 
     현재 `UserProfile.grade`는 스키마상 10~14(고1~N수2·§14.3 MVP 고3 wedge 범위)로만 채워져
-    실호출 경로의 값은 사실상 고등학생/대학생 register만 나온다 — 1~9는 그 스키마 제약이
-    풀릴 때(온보딩 확장) 코드 변경 없이 바로 대응한다(학년축 = 오버레이 파라미터).
+    실호출 경로의 값은 전부 "고등학생" register다 — 1~9는 그 스키마 제약이 풀릴 때(온보딩
+    확장) 코드 변경 없이 바로 대응한다(학년축 = 오버레이 파라미터).
     """
     if grade is not None:
         for lo, hi, register in _GRADE_BAND_RANGES:
