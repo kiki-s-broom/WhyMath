@@ -19,7 +19,9 @@
 · 합격 = 전체 검출률 Wilson 95% 단측 하한 ≥ 0.90 **그리고** 결함 종류별 검출률 점추정 ≥ 0.80
   **그리고** 정상 문항 오경보율 Wilson 95% 단측 상한 ≤ 0.10.
 · 합격 뒤 은행 S5: 프로토콜로 504건을 감사해 관측 결함 k → 보정 상한 = Wilson 상한(k, 504) ÷ 검출률
-  Wilson 하한 ≤ 0.02이면 승인 근거(보정식의 근거·신뢰도는 README §S5 보정).
+  Wilson 하한 ≤ 0.02이면 승인 근거. 두 경계는 **각각 단측 97.5%**(`S5_CONFIDENCE` — 판정 전
+  사전 등록 `qualification/rater_protocol.md` "S5 보정의 신뢰도")로 다시 계산해 합성 신뢰도
+  ≥ 95%를 맞춘다. 자격 판정(위 세 줄)의 95%와는 별개다.
 
 서브커맨드
 ----------
@@ -29,6 +31,9 @@
            은행 둘 다에 쓴다(`--id-field`). `--check`는 커밋된 라벨과 대조.
   score    시험지·정답지(+사전 등록 지문)·기계 라벨·LLM 판정자 라벨 → 기계 단독·LLM 단독·프로토콜
            표와 합격 판정. `--machine-only`는 기계 구성요소만 판정한다(프로토콜 판정이 아니다).
+  bank-sheets  은행 504건 → 판정자 묶음(시험지와 같은 필드·`item_id` 자리에 `problem_id`). 은행
+           순서를 seed로 섞어 같은 크기로 나누고 묶음별 sha256을 매니페스트에 적는다. `--check`는
+           재생성해 커밋된 매니페스트와 대조한다(묶음 파일은 저장소 밖 판정자 입력 폴더에 둔다).
   s5       은행 감사 라벨(기계 + LLM ≥ 2) + 합격한 자격 측정 결과 → 보정 결함률 상한 판정.
 
 종료 코드: 0 = 합격 · 1 = 불합격 · 2 = 입력 오류(시험지 id 누락·중복·미지 id, 판정자 수 부족, 정답지
@@ -90,16 +95,22 @@ __all__ = [
     "MIN_LLM_JUDGES",
     "QUALIFICATION_N_CLEAN",
     "QUALIFICATION_N_DEFECTIVE",
+    "BANK_AUDIT_SEED",
+    "BANK_AUDIT_SHARDS",
     "S5_BANK_SIZE",
+    "S5_CONFIDENCE",
     "S5_MAX_CORRECTED_UPPER",
     "VOTING_GATES",
+    "BankSheets",
     "ComponentResult",
     "QualificationInputError",
+    "build_bank_sheets",
     "corrected_upper_bound",
     "criteria",
     "evaluate_component",
     "machine_label",
     "main",
+    "s5_detection_lower",
 ]
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -115,6 +126,17 @@ MAX_FALSE_ALARM_UPPER: Final = 0.10
 MIN_LLM_JUDGES: Final = 2
 S5_BANK_SIZE: Final = 504
 S5_MAX_CORRECTED_UPPER: Final = 0.02
+#: S5 보정에 쓰는 두 단측 경계의 신뢰도(Bonferroni: 1 − 2 × 0.025 = 0.95). 판정 전 사전
+#: 등록(`rater_protocol.md` "S5 보정의 신뢰도" · 커밋 c1529ffd). 자격 판정 기준이 아니므로
+#: `criteria()`에 넣지 않는다 — 넣으면 이미 채점된 자격 결과(`score.json`)의 기준 묶음이 바뀌어
+#: 재채점이 필요해진다.
+S5_CONFIDENCE: Final = 0.975
+#: 은행 감사 묶음 — 504 = 8 × 63(자격 측정 묶음 60건에 가장 가까운 등분). 순서 시드는 자격 측정과
+#: 같은 날짜 시드를 쓰되 용도 접미사로 구분한다(`seeded_order` 문자열 시드).
+BANK_AUDIT_SHARDS: Final = 8
+BANK_AUDIT_SEED: Final = 20261008
+#: 점수 JSON의 95% 검출 하한과 같은 JSON의 원 계수에서 다시 계산한 값의 허용 오차(부동소수 반올림).
+_LOWER_RECOMPUTE_TOL: Final = 1e-9
 
 EXIT_PASS: Final = 0
 EXIT_FAIL: Final = 1
@@ -146,6 +168,7 @@ _BLIND_VERIFY_KEYS: Final = (
 _MISCONCEPTIONS_V1: Final = Path("data/corpus/misconceptions_v1/misconceptions.json")
 _BANK_PATH: Final = Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl")
 _QUAL_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/qualification")
+_BANK_AUDIT_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/bank_audit")
 
 
 class QualificationInputError(ValueError):
@@ -218,7 +241,13 @@ def _blind_record(
     item: SeededBankItem, item_id: str, statements: Mapping[str, str]
 ) -> dict[str, Any]:
     """시험지 1문 — 문항 필드만(결함 여부·종류·원본 id·slug·problem_id 없음)."""
-    rec = item.record
+    return _blind_fields(item.record, item_id, statements)
+
+
+def _blind_fields(
+    rec: Mapping[str, Any], item_id: str, statements: Mapping[str, str]
+) -> dict[str, Any]:
+    """판정자에게 주는 문항 필드(시험지·은행 감사 묶음 공용 — 형식이 같아야 검출률이 옮겨 간다)."""
     verify = rec.get("verify") or {}
     distractors = rec.get("distractor_map")
     blind_map = None
@@ -305,6 +334,86 @@ def build_emitted_set(bank_path: Path, seed: int) -> EmittedSet:
         sha256_line=f"{key_sha}  answer_key.jsonl\n",
         manifest=json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class BankSheets:
+    """은행 감사 묶음(바이트) — 묶음 텍스트 목록·매니페스트."""
+
+    shards: tuple[str, ...]
+    manifest: str
+
+
+def build_bank_sheets(bank_path: Path, seed: int, n_shards: int) -> BankSheets:
+    """은행 → 판정자 묶음(결정론). 은행 순서를 seed로 섞어 같은 크기로 나눈다.
+
+    은행 파일 순서는 개념·슬롯별로 몰려 있다 — 그대로 자르면 묶음 하나가 한 개념만 담아 판정자의
+    주의 패턴이 자격 측정(개념이 섞인 시험지)과 달라진다. 그래서 섞는다. `item_id` 자리에는
+    `problem_id`를 그대로 둔다(사전 등록 지침 "산출 형식" — s5가 은행 id로 라벨을 맞춘다).
+    """
+    bank_bytes = bank_path.read_bytes()
+    bank = _read_jsonl(bank_path)
+    ids = [str(r.get("problem_id") or "") for r in bank]
+    if len(set(ids)) != len(ids) or "" in ids or len(bank) != S5_BANK_SIZE:
+        raise QualificationInputError(
+            f"은행 문항 {len(bank)}건(고유 id {len(set(ids))}) — 기준 {S5_BANK_SIZE}건과 다르다"
+        )
+    if n_shards <= 0 or len(bank) % n_shards:
+        raise QualificationInputError(f"은행 {len(bank)}건을 묶음 {n_shards}개로 등분할 수 없다")
+    statements = _misconception_statements()
+    canonical = sorted(bank, key=lambda r: str(r["problem_id"]))
+    ordered = seeded_order(f"{seed}:bank-audit-order", canonical)
+    size = len(ordered) // n_shards
+    shards = tuple(
+        _jsonl_text(
+            [
+                _blind_fields(rec, str(rec["problem_id"]), statements)
+                for rec in ordered[index * size : (index + 1) * size]
+            ]
+        )
+        for index in range(n_shards)
+    )
+    manifest = {
+        "task": "P3-03-coverage-fill",
+        "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+        "seed": seed,
+        "bank": str(_BANK_PATH),
+        "bank_sha256": _sha256(bank_bytes),
+        "n_items": len(bank),
+        "n_shards": n_shards,
+        "shard_size": size,
+        "shards": [
+            {"file": f"shard{index + 1}.jsonl", "sha256": _sha256(text.encode("utf-8"))}
+            for index, text in enumerate(shards)
+        ],
+        "rater_protocol_sha256": _sha256(
+            (_repo_root() / _QUAL_DIR / "rater_protocol.md").read_bytes()
+        ),
+    }
+    return BankSheets(
+        shards=shards, manifest=json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+    )
+
+
+def _cmd_bank_sheets(args: argparse.Namespace) -> int:
+    sheets = build_bank_sheets(Path(args.bank), args.seed, args.shards)
+    manifest_path = Path(args.manifest)
+    if args.check:
+        same = (
+            manifest_path.exists() and manifest_path.read_text(encoding="utf-8") == sheets.manifest
+        )
+        print("bank-sheets --check:", "일치" if same else f"매니페스트 드리프트: {manifest_path}")
+        return EXIT_PASS if same else EXIT_FAIL
+    if args.out_dir is None:
+        raise QualificationInputError("--out-dir 경로가 필요하다(판정자 입력 폴더 — 저장소 밖)")
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for index, text in enumerate(sheets.shards, start=1):
+        (out_dir / f"shard{index}.jsonl").write_text(text, encoding="utf-8")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(sheets.manifest, encoding="utf-8")
+    print(f"묶음 {len(sheets.shards)}개 → {out_dir} · 매니페스트 {manifest_path}")
+    return EXIT_PASS
 
 
 def _registered_sha(path: Path) -> str:
@@ -777,15 +886,50 @@ def _cmd_score(args: argparse.Namespace) -> int:
 # s5 — 합격한 프로토콜로 은행 504건을 감사한 결과의 보정 상한
 # ──────────────────────────────────────────────────────────────────────────
 def corrected_upper_bound(k: int, n: int, detection_lower: float) -> float:
-    """보정 결함률 상한 = Wilson 상한(k, n) ÷ 검출률 Wilson 하한.
+    """보정 결함률 상한 = Wilson 단측 97.5% 상한(k, n) ÷ 검출률 하한.
 
     근거(README §S5 보정): 감사가 결함 하나를 잡을 확률을 d라 하면 관측 결함 수 k의 기대는
-    n·p·d 이상(오경보는 k를 키우므로 보수 쪽)이다. U = Wilson 상한(k, n)은 p·d의 95% 상한이고
-    d ≥ 하한 L이므로 p ≤ U/L. 두 단측 95% 경계를 함께 쓰므로 합성 신뢰도는 Bonferroni로 ≥ 90%다.
+    n·p·d 이상(오경보는 k를 키우므로 보수 쪽)이다. U = Wilson 상한(k, n)은 p·d의 97.5% 상한이고
+    d ≥ 하한 L(역시 97.5% — `s5_detection_lower`)이므로 p ≤ U/L. 두 단측 97.5% 경계를 함께 쓰므로
+    합성 신뢰도는 Bonferroni로 ≥ 95%다(초인간 검증 S5의 "95% 상한").
     """
     if not 0.0 < detection_lower <= 1.0:
         raise QualificationInputError(f"검출률 하한 {detection_lower}는 (0, 1] 밖이다")
-    return wilson_upper_bound(k, n, CONFIDENCE) / detection_lower
+    return wilson_upper_bound(k, n, S5_CONFIDENCE) / detection_lower
+
+
+def s5_detection_lower(protocol: Mapping[str, Any]) -> float:
+    """자격 결과의 프로토콜 검출 계수 → S5용 단측 97.5% 검출률 하한.
+
+    점수 JSON의 `detection_lower`는 자격 판정용 95% 값이라 S5에 그대로 쓰면 사전 등록과 어긋난다.
+    그래서 원 계수(`detected`·`n_defective`)에서 다시 계산한다. 계수가 시험지 설계와 다르거나, 같은
+    JSON의 95% 하한이 계수에서 재현되지 않으면(손편집·위변조 의심) 입력 오류다.
+    """
+    try:
+        detected = protocol["detected"]
+        n_defective = protocol["n_defective"]
+        stored_lower = float(protocol["detection_lower"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise QualificationInputError(
+            f"자격 결과에 프로토콜 검출 계수가 없다({type(exc).__name__})"
+        ) from exc
+    if (
+        type(detected) is not int
+        or type(n_defective) is not int
+        or n_defective != QUALIFICATION_N_DEFECTIVE
+        or not 0 <= detected <= n_defective
+    ):
+        raise QualificationInputError(
+            f"자격 결과의 검출 계수 {detected!r}/{n_defective!r}가 시험지 설계"
+            f"(결함 {QUALIFICATION_N_DEFECTIVE})와 맞지 않는다"
+        )
+    recomputed = wilson_lower_bound(detected, n_defective, CONFIDENCE)
+    if abs(recomputed - stored_lower) > _LOWER_RECOMPUTE_TOL:
+        raise QualificationInputError(
+            f"자격 결과의 95% 검출 하한 {stored_lower}이 계수 {detected}/{n_defective}에서 재현되지"
+            f" 않는다(재계산 {recomputed})"
+        )
+    return wilson_lower_bound(detected, n_defective, S5_CONFIDENCE)
 
 
 def _cmd_s5(args: argparse.Namespace) -> int:
@@ -797,11 +941,13 @@ def _cmd_s5(args: argparse.Namespace) -> int:
         )
     try:
         qualification = json.loads(Path(args.qualification).read_text(encoding="utf-8"))
-        detection_lower = float(qualification["protocol"]["detection_lower"])
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        protocol = qualification["protocol"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise QualificationInputError(
             f"자격 측정 결과를 읽지 못했다({type(exc).__name__})"
         ) from exc
+    if not isinstance(protocol, Mapping):
+        raise QualificationInputError("자격 측정 결과의 protocol이 객체가 아니다")
     if qualification.get("criteria") != criteria():
         raise QualificationInputError("자격 측정 결과의 기준 상수가 현재 코드와 다르다")
     if qualification.get("scope") != "protocol":
@@ -811,6 +957,7 @@ def _cmd_s5(args: argparse.Namespace) -> int:
     if not qualification.get("passed"):
         print("s5: 감사 프로토콜이 자격 측정에 불합격했다 — 그 판정은 S5 근거가 아니다")
         return EXIT_FAIL
+    detection_lower = s5_detection_lower(protocol)
 
     machine = _label_map(_read_jsonl(Path(args.machine)), ids, "은행 기계 라벨")
     llm_paths = [Path(p) for p in args.llm or []]
@@ -824,7 +971,7 @@ def _cmd_s5(args: argparse.Namespace) -> int:
     flagged = {i: machine[i] or any(j[i] for j in judges) for i in ids}
     k = sum(flagged.values())
     n = len(ids)
-    upper = wilson_upper_bound(k, n, CONFIDENCE)
+    upper = wilson_upper_bound(k, n, S5_CONFIDENCE)
     corrected = corrected_upper_bound(k, n, detection_lower)
     passed = corrected <= S5_MAX_CORRECTED_UPPER
     print("=" * 72)
@@ -833,10 +980,14 @@ def _cmd_s5(args: argparse.Namespace) -> int:
     print(f"  관측 결함(프로토콜 합집합) k = {k} / n = {n}")
     llm_k = sum(any(j[i] for j in judges) for i in ids)
     print(f"    기계 {sum(machine.values())} · LLM 합집합 {llm_k}")
-    print(f"  Wilson {round(CONFIDENCE * 100)}% 단측 상한 U = {upper:.5f}")
-    print(f"  자격 측정 검출률 하한 L = {detection_lower:.5f}")
+    s5_pct = f"{S5_CONFIDENCE * 100:g}%"
+    print(f"  Wilson {s5_pct} 단측 상한 U = {upper:.5f}")
     print(
-        f"  보정 상한 U / L = {corrected:.5f} (기준 ≤ {S5_MAX_CORRECTED_UPPER}) · 합성 신뢰도 ≥ 90%"
+        f"  자격 측정 검출률 {s5_pct} 단측 하한 L = {detection_lower:.5f}"
+        f" ({protocol['detected']}/{protocol['n_defective']})"
+    )
+    print(
+        f"  보정 상한 U / L = {corrected:.5f} (기준 ≤ {S5_MAX_CORRECTED_UPPER}) · 합성 신뢰도 ≥ 95%"
     )
     print(f"  판정: {'승인 근거 성립' if passed else '불합격'}")
     print("=" * 72)
@@ -878,6 +1029,14 @@ def _parser() -> argparse.ArgumentParser:
     score.add_argument("--machine-only", action="store_true", help="기계 구성요소만 판정")
     score.add_argument("--json-out", default=None, help="판정 결과 JSON(s5 입력)")
 
+    sheets = sub.add_parser("bank-sheets", help="은행 504건 → 판정자 묶음·매니페스트")
+    sheets.add_argument("--bank", default=str(root / _BANK_PATH))
+    sheets.add_argument("--seed", type=int, default=BANK_AUDIT_SEED)
+    sheets.add_argument("--shards", type=int, default=BANK_AUDIT_SHARDS)
+    sheets.add_argument("--out-dir", default=None, help="묶음 파일 폴더(판정자 입력 — 저장소 밖)")
+    sheets.add_argument("--manifest", default=str(root / _BANK_AUDIT_DIR / "manifest.json"))
+    sheets.add_argument("--check", action="store_true", help="재생성해 커밋된 매니페스트와 대조")
+
     s5 = sub.add_parser("s5", help="은행 감사 라벨 → 보정 결함률 상한 판정")
     s5.add_argument("--bank", default=str(root / _BANK_PATH))
     s5.add_argument("--machine", required=True, help="은행 기계 라벨(item_id = problem_id)")
@@ -886,7 +1045,13 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-_COMMANDS: Final = {"emit": _cmd_emit, "machine": _cmd_machine, "score": _cmd_score, "s5": _cmd_s5}
+_COMMANDS: Final = {
+    "emit": _cmd_emit,
+    "machine": _cmd_machine,
+    "score": _cmd_score,
+    "bank-sheets": _cmd_bank_sheets,
+    "s5": _cmd_s5,
+}
 
 
 def main(argv: list[str] | None = None) -> int:

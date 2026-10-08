@@ -334,11 +334,49 @@ def test_wrong_test_design_is_an_input_error(
 
 # ── S5 보정 상한 ─────────────────────────────────────────────────────────
 def test_corrected_upper_bound_formula() -> None:
+    """두 경계 모두 단측 97.5%(사전 등록) — 95% 상한을 쓰면 보정 상한이 낮아져 관대해진다."""
+    assert qual.S5_CONFIDENCE == 0.975
     assert qual.corrected_upper_bound(4, 504, 0.95) == pytest.approx(
-        wilson_upper_bound(4, 504) / 0.95
+        wilson_upper_bound(4, 504, 0.975) / 0.95
     )
+    assert qual.corrected_upper_bound(4, 504, 0.95) > wilson_upper_bound(4, 504, 0.95) / 0.95
     with pytest.raises(qual.QualificationInputError):
         qual.corrected_upper_bound(0, 504, 0.0)
+
+
+def test_s5_detection_lower_is_recomputed_at_975() -> None:
+    """S5는 점수 JSON의 95% 하한을 그대로 쓰지 않고 원 계수에서 97.5% 하한을 다시 낸다."""
+    protocol = {
+        "detected": 120,
+        "n_defective": 120,
+        "detection_lower": wilson_lower_bound(120, 120),
+    }
+    lower = qual.s5_detection_lower(protocol)
+    assert lower == pytest.approx(wilson_lower_bound(120, 120, 0.975))
+    assert lower < protocol["detection_lower"]  # 97.5%가 더 보수적
+    # 실측 자격 결과(120/120)에서 은행 허용 결함 수: k ≤ 3 통과 · k = 4 불합격
+    assert (
+        qual.corrected_upper_bound(3, 504, lower)
+        <= 0.02
+        < qual.corrected_upper_bound(4, 504, lower)
+    )
+
+
+@pytest.mark.parametrize(
+    "protocol",
+    [
+        {"detection_lower": 0.97},  # 계수 없음
+        {"detected": 100, "n_defective": 100, "detection_lower": wilson_lower_bound(100, 100)},
+        {"detected": 121, "n_defective": 120, "detection_lower": 0.97},
+        {"detected": 120.0, "n_defective": 120, "detection_lower": wilson_lower_bound(120, 120)},
+        {"detected": True, "n_defective": 120, "detection_lower": wilson_lower_bound(1, 120)},
+        # 계수는 그대로 두고 95% 하한만 손편집 — 재현 불일치
+        {"detected": 110, "n_defective": 120, "detection_lower": wilson_lower_bound(120, 120)},
+    ],
+)
+def test_s5_detection_lower_rejects_bad_counts(protocol: dict[str, object]) -> None:
+    with pytest.raises(qual.QualificationInputError):
+        qual.s5_detection_lower(protocol)
 
 
 @pytest.fixture()
@@ -348,12 +386,18 @@ def bank_ids() -> list[str]:
     ]
 
 
-def _qualification(path: Path, *, passed: bool, lower: float, scope: str = "protocol") -> Path:
+def _qualification(
+    path: Path, *, passed: bool, detected: int = 120, scope: str = "protocol"
+) -> Path:
     payload = {
         "scope": scope,
         "passed": passed,
         "criteria": qual.criteria(),
-        "protocol": {"detection_lower": lower},
+        "protocol": {
+            "detected": detected,
+            "n_defective": 120,
+            "detection_lower": wilson_lower_bound(detected, 120),
+        },
     }
     path.write_text(json.dumps(payload), "utf-8")
     return path
@@ -385,34 +429,50 @@ def _s5(
 
 
 def test_s5_boundary_with_the_union_of_auditors(tmp_path: Path, bank_ids: list[str]) -> None:
-    """DL 0.95에서 k = 4 → 0.0185(통과), k = 5 → 0.0213(불합격). k는 기계 ∪ 판정자 합집합."""
-    good = _qualification(tmp_path / "q.json", passed=True, lower=0.95)
-    four = {"machine": set(bank_ids[:2]), "a": set(bank_ids[2:4]), "b": set(bank_ids[:1])}
-    five = {"machine": set(bank_ids[:2]), "a": set(bank_ids[2:4]), "b": {bank_ids[4]}}
-    assert (
-        qual.corrected_upper_bound(4, 504, 0.95) <= 0.02 < qual.corrected_upper_bound(5, 504, 0.95)
-    )
-    assert _s5(tmp_path, bank_ids, four, good) == 0
-    assert _s5(tmp_path, bank_ids, five, good) == 1
+    """검출 120/120(97.5% 하한 0.9690)에서 k = 3 → 0.0179(통과), k = 4 → 0.0209(불합격).
+
+    k는 기계 ∪ 판정자 합집합 — 겹치는 표시는 한 번만 센다.
+    """
+    good = _qualification(tmp_path / "q.json", passed=True)
+    three = {"machine": set(bank_ids[:2]), "a": {bank_ids[2]}, "b": set(bank_ids[:1])}
+    four = {"machine": set(bank_ids[:2]), "a": {bank_ids[2]}, "b": {bank_ids[3]}}
+    assert _s5(tmp_path, bank_ids, three, good) == 0
+    assert _s5(tmp_path, bank_ids, four, good) == 1
+
+
+def test_s5_uses_975_not_the_stored_95_lower(tmp_path: Path, bank_ids: list[str]) -> None:
+    """95% 경계라면 통과하고 97.5%에서는 떨어지는 지점 — 사전 등록 규칙이 실제로 판정을 가른다.
+
+    실측 자격 결과(검출 120/120)에서 k = 4: 95% 두 경계로는 0.01796(통과), 사전 등록한 97.5% 두
+    경계로는 0.02087(불합격). 점수 JSON의 95% 하한을 그대로 쓰는 회귀는 이 테스트가 잡는다.
+    """
+    k = 4
+    assert wilson_upper_bound(k, 504, 0.95) / wilson_lower_bound(120, 120, 0.95) <= 0.02
+    q = _qualification(tmp_path / "q.json", passed=True)
+    flagged = {"machine": set(bank_ids[:k]), "a": set(), "b": set()}
+    assert _s5(tmp_path, bank_ids, flagged, q) == 1
 
 
 def test_s5_refuses_an_unqualified_or_tampered_auditor(tmp_path: Path, bank_ids: list[str]) -> None:
     clean = {"machine": set(), "a": set(), "b": set()}
-    failed = _qualification(tmp_path / "f.json", passed=False, lower=0.95)
+    failed = _qualification(tmp_path / "f.json", passed=False)
     assert _s5(tmp_path, bank_ids, clean, failed) == 1
-    machine_only = _qualification(
-        tmp_path / "m.json", passed=True, lower=0.95, scope="machine_only"
-    )
+    machine_only = _qualification(tmp_path / "m.json", passed=True, scope="machine_only")
     assert _s5(tmp_path, bank_ids, clean, machine_only) == 2
     tampered = tmp_path / "t.json"
-    payload = json.loads(_qualification(tampered, passed=True, lower=0.95).read_text("utf-8"))
+    payload = json.loads(_qualification(tampered, passed=True).read_text("utf-8"))
     payload["criteria"]["min_detection_lower"] = 0.5
     tampered.write_text(json.dumps(payload), "utf-8")
     assert _s5(tmp_path, bank_ids, clean, tampered) == 2
+    edited = tmp_path / "e.json"
+    payload = json.loads(_qualification(edited, passed=True, detected=100).read_text("utf-8"))
+    payload["protocol"]["detected"] = 120  # 하한은 100/120 그대로 — 계수만 부풀림
+    edited.write_text(json.dumps(payload), "utf-8")
+    assert _s5(tmp_path, bank_ids, clean, edited) == 2
 
 
 def test_s5_input_errors(tmp_path: Path, bank_ids: list[str]) -> None:
-    good = _qualification(tmp_path / "q.json", passed=True, lower=0.95)
+    good = _qualification(tmp_path / "q.json", passed=True)
     assert _s5(tmp_path, bank_ids, {"machine": set(), "a": set()}, good) == 2  # 판정자 1명
     assert _s5(tmp_path, bank_ids[:-1], {"machine": set(), "a": set(), "b": set()}, good) == 2
 
@@ -473,3 +533,50 @@ def test_emit_check_reproduces_the_committed_test() -> None:
 @pytest.mark.corpus_authoring
 def test_machine_check_reproduces_the_committed_labels() -> None:
     assert qual.main(["machine", "--check"]) == 0
+
+
+# ── 은행 감사 묶음(bank-sheets) ──────────────────────────────────────────
+_BANK_AUDIT = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "bank_audit"
+
+
+def test_bank_sheets_partition_the_bank_with_the_blind_field_set() -> None:
+    """504건이 8묶음 × 63건으로 빠짐·겹침 없이 나뉘고, 필드는 시험지와 같다(검출률 이전의 전제)."""
+    sheets = qual.build_bank_sheets(_BANK, qual.BANK_AUDIT_SEED, qual.BANK_AUDIT_SHARDS)
+    shards = [[json.loads(line) for line in text.splitlines()] for text in sheets.shards]
+    assert [len(s) for s in shards] == [63] * 8
+    ids = [r["item_id"] for s in shards for r in s]
+    bank_ids = [json.loads(line)["problem_id"] for line in _BANK.read_text("utf-8").splitlines()]
+    assert len(ids) == len(set(ids)) == 504
+    assert set(ids) == set(bank_ids)
+    blind_keys = list(json.loads((_QUAL / "blind_240.jsonl").read_text("utf-8").splitlines()[0]))
+    assert all(list(r) == blind_keys for s in shards for r in s)
+    # 은행 순서(개념별로 몰림)를 그대로 자르지 않았다 — 첫 묶음에 7개념이 섞여 있다
+    assert len({r["achievement_standard_codes"][0] for r in shards[0]}) == 7
+    manifest = json.loads(sheets.manifest)
+    assert [e["sha256"] for e in manifest["shards"]] == [
+        hashlib.sha256(t.encode("utf-8")).hexdigest() for t in sheets.shards
+    ]
+    again = qual.build_bank_sheets(_BANK, qual.BANK_AUDIT_SEED, qual.BANK_AUDIT_SHARDS)
+    assert again == sheets  # 결정론
+
+
+def test_bank_sheets_manifest_is_committed_and_reproducible() -> None:
+    """커밋된 매니페스트 = 재생성 결과. RED면 은행·지침·묶음 코드가 판정 뒤에 바뀐 것이다."""
+    manifest = json.loads((_BANK_AUDIT / "manifest.json").read_text("utf-8"))
+    assert manifest["bank_sha256"] == hashlib.sha256(_BANK.read_bytes()).hexdigest()
+    protocol = (_QUAL / "rater_protocol.md").read_bytes()
+    assert manifest["rater_protocol_sha256"] == hashlib.sha256(protocol).hexdigest()
+    assert qual.main(["bank-sheets", "--check"]) == 0
+
+
+def test_bank_sheets_input_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    out = tmp_path / "inputs"
+    manifest = tmp_path / "manifest.json"
+    base = ["bank-sheets", "--out-dir", str(out), "--manifest", str(manifest)]
+    assert qual.main([*base, "--shards", "5"]) == 2  # 504는 5로 등분 불가
+    short = tmp_path / "short.jsonl"
+    short.write_text("".join(_BANK.read_text("utf-8").splitlines(keepends=True)[:-1]), "utf-8")
+    assert qual.main([*base, "--bank", str(short)]) == 2  # 503건
+    assert qual.main(["bank-sheets", "--manifest", str(manifest)]) == 2  # --out-dir 없음
+    assert not out.exists() and not manifest.exists()  # 입력 오류에서 아무것도 쓰지 않는다
+    assert "입력 오류" in capsys.readouterr().err
