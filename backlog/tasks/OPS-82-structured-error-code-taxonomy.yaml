@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 4
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/api/**"
   - "docs/standards/error_code*.md"
-session: null
+session: claude/elegant-wright-qqehm0
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B3 · §5 B급 미등재 후보 6. 갭리뷰 §5는 이 항목을 \"11월 권고\"로 유예하며 \"지금 등재하면 만료 없는 유예 없이 떠 있는 todo만 늘린다\"고 적었는데, **산문 유예는 대장에 집행되지 않으므로 소유자 0인 상태 그 자체**다(CLAUDE.md '선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'·'만료 없는 유예·제외 금지'). 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재하며, 시점 유예는 priority로 표현한다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(에러코드·error code·error_code·장애 분석·오류 응답·ProblemDetail) → 관련 0건."
-updated: 2026-09-15
+updated: 2026-10-08
