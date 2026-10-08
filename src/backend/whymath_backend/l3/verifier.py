@@ -34,6 +34,7 @@ from whymath_backend.l3.cross_verify import (
     PROBABILITY_PERSPECTIVES,
     SEQUENCE_PERSPECTIVES,
     STATISTICAL_PERSPECTIVES,
+    UNRECORDED_AUTHOR,
     CrossVerifier,
     Perspective,
     ResidueSubject,
@@ -82,7 +83,9 @@ class ProblemVerifyInput(BaseModel):
     answer_kind: str
     conditions: str
     answer_explanation: str = ""
-    authored_by: str = "unknown"
+    # 저작 기록이 없는 입력의 서명 — 교차검증기가 주입된 검증기에서는 이 값이 가드에 거부된다
+    # (생성자 독립성을 입증할 수 없다). 호출부가 `llm_author`/`deterministic_author`로 채운다.
+    authored_by: str = UNRECORDED_AUTHOR
 
 
 class VerificationVerdict(BaseModel):
