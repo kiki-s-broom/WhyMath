@@ -40,6 +40,7 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ROUND5_RULE_IDS,
     ROUND6_RULE_IDS,
     ROUND7_RULE_IDS,
+    ROUND8_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     extremum_point_count,
@@ -172,14 +173,15 @@ def test_round6_defects_are_caught_by_the_matching_rule_family(
 def test_round6_bank_passes_every_earlier_rule(audited: dict[str, dict[str, object]]) -> None:
     """감사 은행은 5회차 규칙으로 빌드됐다 — 6회차 이전 규칙은 504건 중 0건을 잡는다(새 규칙이 일했다).
 
-    6회차 *뒤에* 더한 회차 규칙(7회차 — `ROUND7_RULE_IDS`)도 빼고 본다: 그 규칙은 이 은행을 빌드할 때
-    없었다(회차별 측정은 그 회차의 규칙 집합으로 한다)."""
+    6회차 *뒤에* 더한 회차 규칙(7·8회차 — `ROUND7_RULE_IDS`·`ROUND8_RULE_IDS`)도 빼고 본다: 그 규칙은
+    이 은행을 빌드할 때 없었다(회차별 측정은 그 회차의 규칙 집합으로 한다)."""
     earlier = [
         pid[:8]
         for pid, r in audited.items()
         if {v.rule for v in shortcut_violations(probe_from_record(r))}
         - ROUND6_RULE_IDS
         - ROUND7_RULE_IDS
+        - ROUND8_RULE_IDS
     ]
     assert earlier == []
 
@@ -643,8 +645,10 @@ def test_every_round6_rule_has_red_and_green_controls(
     end = RULE_IDS.index("T05-quadratic-slope")
     assert list(RULE_IDS[start:end]) == [r for r in RULE_IDS if r in ROUND6_RULE_IDS]
     assert not ROUND5_RULE_IDS & ROUND6_RULE_IDS
-    assert not ROUND6_RULE_IDS & ROUND7_RULE_IDS
-    assert POST_QUALIFICATION_RULE_IDS == ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
+    assert not ROUND6_RULE_IDS & (ROUND7_RULE_IDS | ROUND8_RULE_IDS)
+    assert POST_QUALIFICATION_RULE_IDS == (
+        ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS | ROUND8_RULE_IDS
+    )
     assert {"T-ratio-shortcut", "T-derivative-roots-coincidence", "T09-factored-level"} == (
         COINCIDENCE_RULE_IDS & ROUND6_RULE_IDS
     )

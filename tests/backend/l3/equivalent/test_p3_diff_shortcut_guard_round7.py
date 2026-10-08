@@ -39,6 +39,7 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ROUND5_RULE_IDS,
     ROUND6_RULE_IDS,
     ROUND7_RULE_IDS,
+    ROUND8_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     motion_symbols_not_in_subject,
@@ -199,11 +200,16 @@ def test_each_defect_is_caught_by_its_rules(
 # ── ② 변별 ─────────────────────────────────────────────────────────────────
 @pytest.mark.corpus_authoring
 def test_round7_bank_passes_every_earlier_rule(audited: dict[str, dict[str, object]]) -> None:
-    """감사 은행은 6회차 규칙으로 빌드됐다 — 7회차 이전 규칙은 504건 중 0건을 잡는다(새 규칙이 일했다)."""
+    """감사 은행은 6회차 규칙으로 빌드됐다 — 7회차 이전 규칙은 504건 중 0건을 잡는다(새 규칙이 일했다).
+
+    7회차 *뒤에* 더한 회차 규칙(8회차 — `ROUND8_RULE_IDS`)도 빼고 본다: 그 규칙은 이 은행을 빌드할 때
+    없었다(회차별 측정은 그 회차의 규칙 집합으로 한다)."""
     earlier = [
         pid[:8]
         for pid, r in audited.items()
-        if {v.rule for v in shortcut_violations(probe_from_record(r))} - ROUND7_RULE_IDS
+        if {v.rule for v in shortcut_violations(probe_from_record(r))}
+        - ROUND7_RULE_IDS
+        - ROUND8_RULE_IDS
     ]
     assert earlier == []
 
@@ -625,11 +631,15 @@ def test_every_round7_rule_has_red_and_green_controls(
     green = {rule for rule, _ in _green_cases(by_prefix)}
     assert red == ROUND7_RULE_IDS
     assert green == ROUND7_RULE_IDS
-    # 7회차 규칙은 RULE_IDS의 꼬리 구간이고(회차 순서) 앞 회차와 겹치지 않는다. 자격 측정 뒤 회차 규칙 전부가
-    # 투표 제외 집합이다.
-    assert list(RULE_IDS[-len(ROUND7_RULE_IDS) :]) == [r for r in RULE_IDS if r in ROUND7_RULE_IDS]
-    assert not (ROUND5_RULE_IDS | ROUND6_RULE_IDS) & ROUND7_RULE_IDS
-    assert POST_QUALIFICATION_RULE_IDS == ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
+    # 7회차 규칙은 RULE_IDS에서 8회차 첫 규칙 바로 앞까지의 연속 구간이고(회차 순서) 앞뒤 회차와 겹치지
+    # 않는다. 자격 측정 뒤 회차 규칙 전부가 투표 제외 집합이다.
+    start = RULE_IDS.index("T05-quadratic-slope")
+    end = RULE_IDS.index("E-double-causal")
+    assert list(RULE_IDS[start:end]) == [r for r in RULE_IDS if r in ROUND7_RULE_IDS]
+    assert not (ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND8_RULE_IDS) & ROUND7_RULE_IDS
+    assert POST_QUALIFICATION_RULE_IDS == (
+        ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS | ROUND8_RULE_IDS
+    )
     assert {
         "T-power-path-coincidence",
         "T-component-critical-point",

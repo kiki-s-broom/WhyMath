@@ -1143,6 +1143,10 @@ def _point_trap(level: _Level, wrong: int) -> str:
     )
 
 
+#: 차수 → 방정식 이름('사차방정식').
+_DEGREE_WORDS: dict[int, str] = {2: "이차", 3: "삼차", 4: "사차"}
+
+
 def _mc_level_count(
     *, frame_id: str, text: str, cond: str, level: _Level, seed: str, lead_in: str
 ) -> DiffItem | None:
@@ -1190,10 +1194,15 @@ def _mc_level_count(
         choices, answer, distractors = build_choices(entries, shuffle_seed=seed)
     except ValueError:
         return None
+    # 8회차(은행 감사 4회차) 처분 — 종전 문장 '그래프가 직선과 실제로 몇 번 만나는지'는
+    # 발문이 'f(x) = 0'·'x축'·'두 곡선'인 틀에서 소개되지 않은 직선을 지칭했다(판정자 지적
+    # c4251980 · 판정기 E-undefined-line). 차수와 실근 개수의 관계만 말해 다섯 틀 모두에 맞게
+    # 쓴다.
+    degree_word = _DEGREE_WORDS.get(degree, f"{degree}차")
     traps = [
         _point_trap(level, wrong),
-        f"차수 {with_eul_reul(degree)} 그대로 실근의 개수로 세면 그래프가 직선과 실제로 몇 번 "
-        "만나는지를 보지 않은 것이다.",
+        f"차수 {with_eul_reul(degree)} 그대로 실근의 개수로 세면 {degree_word}방정식의 서로 다른 "
+        f"실근이 많아야 {degree}개일 뿐 늘 {degree}개는 아니라는 점을 놓친 것이다.",
     ]
     if crit != degree:
         traps.append(

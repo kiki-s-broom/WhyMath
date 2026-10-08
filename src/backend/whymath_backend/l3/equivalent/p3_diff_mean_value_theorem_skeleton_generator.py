@@ -1449,38 +1449,6 @@ def _diagnostic_frames() -> list[Frame]:
     def d8(p: tuple[object, ...]) -> DiffItem | None:
         return _bound_item(slot="diagnostic", frame_id="diag-mvt-lower-bound", p=p, side="lower")
 
-    def d9(p: tuple[object, ...]) -> DiffItem | None:
-        # 5회차 감사(2026-10-08) 처분 — 구판 'diag-choose-root-in-interval'은 방정식 f'(x) =
-        # (평균변화율)의 두 근을 발문에 적어 구간 안의 값을 고르기만 남았다(판정자 지적
-        # 327a1b94·492338dc·ba2a7f9a · 판정기 T06-roots-given). 근을 적지 않는 형태는 대표 슬롯의
-        # 'rep-two-candidates-one-inside'가 맡으므로, 진단은 평균값 정리의 *결론*(f'(c) =
-        # 평균변화율)만 따로 확인한다 — c를 구하지 않아도 f'(c)가 정해진다는 것을 아는가(함수식이
-        # 있는 d5 짝).
-        c = _case_of(p[0])
-        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
-        m = Fraction(fb - fa, c.b - c.a)
-        return _value_item(
-            slot="diagnostic",
-            frame_id="diag-derivative-value-at-mvt-point",
-            text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 "
-                "만족시키는 c가 있다. f'(c)의 값을 구하시오."
-            ),
-            value=m,
-            condition=f"({_paren(fb)} - {_paren(fa)})/({_paren(c.b)} - {_paren(c.a)}) = y",
-            # 위생 게이트(QUAL-13)는 'f'(c) = 29'·'f(4) = 60'의 f'(c)·f(4)를 곱으로 읽는다 —
-            # 함숫값은 '의 값은'으로 쓰고, 'c = …'·'f'(x) = 29' 같은 값 주장 꼴을 쓰지 않는다.
-            explanation=(
-                f"평균값 정리에 의하여 f'(c)의 값은 구간 [{c.a}, {c.b}]에서의 평균변화율과 같다. "
-                f"평균변화율은 (f({c.b}) - f({c.a}))/({_minus(c.b, c.a)})이고, f({c.b})의 값은 "
-                f"{fb}, f({c.a})의 값은 {fa}이므로 그 값은 "
-                f"({render_difference(fb, fa)})/{c.b - c.a} = {frac_text(m)}이다. 실제로 f'(x) = "
-                f"{render_poly(derivative_of(c.f))}이고, {render_poly(derivative_of(c.f))} = "
-                f"{with_eul_reul(frac_text(m))} 만족시키는 x 중 열린구간 ({c.a}, {c.b})에 속하는 "
-                f"것은 {frac_text(c.c)} 하나이다."
-            ),
-        )
-
     def d10(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
@@ -1523,9 +1491,11 @@ def _diagnostic_frames() -> list[Frame]:
         # 미분이
         # 쓰이지 않고, 이차함수라 대칭축만 보면 c까지 정해지는 틀)는 삭제했다(우회로 판정기
         # E-derivative). 롤의 정리의 가정→결론 두 단계는 숙련도의 삼차 틀이 맡는다.
-        Frame(
-            "diag-derivative-value-at-mvt-point", _frames_params("p3-mvt:d9", _cubic_cases()), d9
-        ),
+        # 8회차(은행 감사 4회차) 처분 — 'diag-derivative-value-at-mvt-point'(함수식을 주고
+        # f'(c)의 값을 묻는 틀)는 삭제했다. 답이 평균변화율이라 주어진 식을 미분하지 않고 두
+        # 함숫값 대입만으로 닿았다(판정자 지적 9c9bfdb5 · 판정기 T06-unused-function). 평균값
+        # 정리의 *결론*만 확인하는 진단은 함수식 없이 f(a)·f(b)만 주는
+        # 'diag-value-of-derivative-at-c'가 맡는다.
         Frame("diag-mvt-lower-bound", _bound_params("p3-mvt:d8"), d8),
         Frame("diag-count-parallel-tangents-between", _count_pool("p3-mvt:d10"), d10),
         Frame(

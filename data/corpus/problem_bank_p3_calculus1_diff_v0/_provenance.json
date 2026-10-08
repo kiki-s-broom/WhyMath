@@ -73,7 +73,7 @@
         "diagnostic": 12,
         "mastery_check": 12
       },
-      "distinct_frames": 32,
+      "distinct_frames": 31,
       "distinct_skeletons": 69,
       "generator": "p3_diff_mean_value_theorem_skeleton_generator.P3DiffMeanValueTheoremGenerator"
     },

@@ -205,6 +205,20 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
   E-conclusion-target     (02-08) 해설의 결론 문장이 발문의 대상과 어긋난다 — 증가·감소가 바뀌는
                           점을 묻는데 극값으로 맺음 · 결론 문장에 정답이 없음.
 
+[8회차 · 은행 감사 4회차(*는 매개변수 거부 조건 — `COINCIDENCE_RULE_IDS`)]
+  E-double-causal         해설 한 문장에 인과 연결 어미 '므로'가 쉼표 없이 두 번 이어진다('…이므로
+                          …이므로').
+  E-undefined-line        해설이 어떤 직선인지 밝히지 않은 '직선'을 지칭한다 — 발문에 '직선'이 없고
+                          그 자리 앞에서 '직선 y = …'로 소개하지도 않았다.
+  T06-unused-function     (02-06) 발문이 함수식을 주고 평균값 정리의 c에서의 미분계수 f'(c)의
+                          값을 묻는다 — 답이 평균변화율이라 주어진 식을 미분하지 않고 두 함숫값
+                          대입만으로 닿는다.
+  T08-interval-integer-coincidence*
+                          (02-08) '증가(감소)하는 x의 값의 범위에 속하는 정수는 하나뿐' 문항에서
+                          도함수 없이 같은 정수에 닿는다. 절 둘: 상수항을 뺀 식이 기함수(범위가
+                          0에 대해 대칭 → 0이 강제) · 거듭제곱 미분 오답 경로(계수 누락)로
+                          '미분한' 식의 부호 범위에도 정수가 그 하나뿐.
+
 정직 범위(이 판정기가 보증하지 **않는** 것)
 -------------------------------------------
 · 발문 문자열의 *템플릿 표현*을 정규식으로 읽는 휴리스틱이 섞여 있다. 같은 수학을 다른 어휘로
@@ -239,6 +253,7 @@ __all__ = [
     "ROUND5_RULE_IDS",
     "ROUND6_RULE_IDS",
     "ROUND7_RULE_IDS",
+    "ROUND8_RULE_IDS",
     "RULE_IDS",
     "ShortcutProbe",
     "ShortcutViolation",
@@ -334,6 +349,11 @@ RULE_IDS: Final[tuple[str, ...]] = (
     "E-motion-symbol-subject",
     "E-function-notation",
     "E-conclusion-target",
+    # ── 8회차(2026-10-08 · 은행 감사 4회차 S5 불합격 k = 5) 결함 부류 — `ROUND8_RULE_IDS` ──
+    "E-double-causal",
+    "E-undefined-line",
+    "T06-unused-function",
+    "T08-interval-integer-coincidence",
 )
 
 #: 4회차 감사(합집합 88·둘 다 27)를 계기로 더한 규칙 — 3회차 재현율·과잉 거부 동결 테스트는 이
@@ -359,18 +379,23 @@ ROUND6_RULE_IDS: Final[frozenset[str]] = frozenset(
 )
 
 #: 7회차 은행 감사(2026-10-08 · `bank_audit_r3/` · as-found k = 11)를 계기로 더한 규칙 — 같은
-#: 원칙으로 6회차 동결은 이 규칙들을 빼고 본다. 다음 회차 규칙은 이 슬라이스 *뒤*에 붙이고 끝 경계를
-#: 고친다.
+#: 원칙으로 6회차 동결은 이 규칙들을 빼고 본다. 끝 경계는 8회차 첫 규칙이다(8회차 규칙이 이
+#: 슬라이스에 섞이면 7회차 동결이 8회차 규칙까지 세게 된다).
 ROUND7_RULE_IDS: Final[frozenset[str]] = frozenset(
-    RULE_IDS[RULE_IDS.index("T05-quadratic-slope") :]
+    RULE_IDS[RULE_IDS.index("T05-quadratic-slope") : RULE_IDS.index("E-double-causal")]
 )
+
+#: 8회차 은행 감사(2026-10-08 · `bank_audit_r4/` · as-found k = 5)를 계기로 더한 규칙 — 같은
+#: 원칙으로 7회차 동결은 이 규칙들을 빼고 본다. 다음 회차 규칙은 이 슬라이스 *뒤*에 붙이고 끝 경계를
+#: 고친다.
+ROUND8_RULE_IDS: Final[frozenset[str]] = frozenset(RULE_IDS[RULE_IDS.index("E-double-causal") :])
 
 #: 자격 측정(`qualification/` · 2026-10-08) **뒤에** 더한 회차 규칙 전부. 측정을 통과한 감사
 #: 프로토콜의 기계 투표는 4회차 규칙 집합으로 고정돼 있으므로 이 집합은 생성기 빌드 가드 전용이다
 #: (`p3_audit_qualification.EXCLUDED_GUARD_RULES`·시더의 원본 선별이 같은 집합을 뺀다). 앞으로 더할
 #: 회차의 규칙 집합도 여기에 합친다 — 합치지 않으면 투표·시험지 재현이 조용히 바뀐다.
 POST_QUALIFICATION_RULE_IDS: Final[frozenset[str]] = (
-    ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
+    ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS | ROUND8_RULE_IDS
 )
 
 #: 5·6회차 규칙 중 *매개변수 선택*의 우연 일치를 보는 규칙 — 틀(frame)의 설계가 아니라 고른 수치가
@@ -396,6 +421,8 @@ COINCIDENCE_RULE_IDS: Final[frozenset[str]] = frozenset(
         "T-power-path-coincidence",
         "T-component-critical-point",
         "T10-confusable-quantity",
+        # ── 8회차 ──
+        "T08-interval-integer-coincidence",
     }
 )
 
@@ -3474,11 +3501,174 @@ def _round7_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# [8회차] 은행 감사 4회차(2026-10-08 · `bank_audit_r4/` · as-found k = 5)
+# ──────────────────────────────────────────────────────────────────────────
+#: 한 문장 안에서 쉼표·마침표로 끊지 않고 이어진 인과 연결 어미 둘('…이므로 …이므로').
+_DOUBLE_CAUSAL = re.compile(r"므로(?:(?![,.]).)*?므로")
+
+
+def _double_causal_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[8회차] 해설 한 문장에 인과 연결 어미 '므로'가 쉼표 없이 두 번 이어진다.
+
+    "f'(x) = 4x^3이므로 f'(a)의 값은 4a^3이므로 4a^3 = 108에서 …"(판정자 지적 49d9955a·e2b88365).
+    '…이므로 …이고, …이므로'처럼 쉼표로 절을 끊은 문장은 보지 않는다(은행에 흔한 정상 꼴).
+    """
+    for sentence in _sentences(probe.explanation):
+        m = _DOUBLE_CAUSAL.search(sentence)
+        if m is not None:
+            return [
+                ShortcutViolation(
+                    "E-double-causal",
+                    f"해설 한 문장에 '…므로 …므로'가 쉼표 없이 이어진다('{m.group(0)[:40]}…') — 앞 "
+                    "절을 '…이고,'로 잇거나 문장을 나눈다.",
+                )
+            ]
+    return []
+
+
+#: 직선을 식으로 소개하는 꼴('직선 y = 3'·'직선 x = 1').
+_LINE_INTRO = re.compile(r"직선 [xy] =")
+#: 식도 지시어('이 직선'·'그 직선')도 없는 맨 '직선'.
+_BARE_LINE = re.compile(r"(?<!이 )(?<!그 )직선(?! [xy] =)(?! [A-Z]{2})")
+
+
+def _undefined_line_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[8회차] 해설이 어떤 직선인지 밝히지 않은 '직선'을 지칭한다.
+
+    'f(x) = 0의 실근 개수' 문항 해설의 '그래프가 직선과 실제로 몇 번 만나는지'(판정자 지적
+    c4251980) — 대상은 x축인데 어떤 직선인지 말하지 않는다. 발문에 '직선'이 있거나, 그 자리 앞에서
+    해설이 '직선 y = …'로 소개했거나, '이 직선'·'그 직선'처럼 앞의 식을 받으면 보지 않는다.
+    """
+    q, e = probe.question_text, probe.explanation
+    if "직선" in q:
+        return []
+    intro = _LINE_INTRO.search(e)
+    for m in _BARE_LINE.finditer(e):
+        if intro is not None and intro.start() < m.start():
+            continue
+        return [
+            ShortcutViolation(
+                "E-undefined-line",
+                f"해설이 어떤 직선인지 밝히지 않은 '직선'을 쓴다"
+                f"('…{e[max(0, m.start() - 12) : m.end()]}…') — 'x축'·'직선 y = k'처럼 대상을 "
+                "밝힌다.",
+            )
+        ]
+    return []
+
+
+#: 평균값 정리의 c에서의 미분계수 값을 묻는 발문.
+_ASKS_DERIVATIVE_AT_C = re.compile(r"f'\(c\)의 값을 구하시오")
+
+
+def _unused_function_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[8회차] (02-06) 발문이 함수식을 주고 평균값 정리의 c에서의 미분계수 f'(c)의 값을 묻는다.
+
+    답은 평균변화율 (f(b) - f(a))/(b - a)이라 주어진 식을 미분하지 않고 두 함숫값만 대입해도
+    닿는다(판정자 지적 9c9bfdb5). 함수식 없이 f(a)·f(b)만 주고 평균값 정리의 결론을 묻는 진단은
+    보지 않는다 — 식이 없으면 미분할 것도 없고, 결론(f'(c) = 평균변화율) 자체가 확인 대상이다.
+    02-06의 c는 평균값 정리·롤의 정리의 점이라 정리 이름은 보지 않는다(롤의 정리면 f'(c) = 0이라
+    같은 결함이다).
+    """
+    q = probe.question_text
+    if _ASKS_DERIVATIVE_AT_C.search(q) and _definitions(q, "x"):
+        return [
+            ShortcutViolation(
+                "T06-unused-function",
+                "발문이 함수식을 주고 평균값 정리의 f'(c)의 값을 묻는다 — 답이 평균변화율이라 "
+                "주어진 식을 미분하지 않고 두 함숫값 대입만으로 닿는다. c의 값을 묻거나 함수식 "
+                "없이 결론을 묻는다.",
+            )
+        ]
+    return []
+
+
+#: '증가(감소)하는 x의 값의 범위에 속하는 정수는 하나뿐' — 감소는 'y의 값이 작아지는'으로도 쓴다.
+_UNIQUE_INTEGER = re.compile(r"범위에 속하는 정수는 하나뿐")
+_DECREASING = re.compile(r"감소하는|작아지는")
+
+
+def _integers_where(expr: sympy.Expr, var: sympy.Symbol, sign: int) -> set[int] | None:
+    """expr의 부호가 sign인 x의 범위에 속하는 정수.
+
+    범위가 무한하면 None이다(정수가 하나뿐일 수 없다).
+    """
+    region = sympy.solveset(expr > 0 if sign > 0 else expr < 0, var, domain=sympy.S.Reals)
+    if region is sympy.S.EmptySet:
+        return set()
+    lo, hi = region.inf, region.sup
+    if not (lo.is_finite and hi.is_finite):
+        return None
+    return {
+        k
+        for k in range(int(sympy.floor(lo)), int(sympy.ceiling(hi)) + 1)
+        if bool(region.contains(sympy.Integer(k)))
+    }
+
+
+def _interval_integer_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[8회차] (02-08) '…범위에 속하는 정수는 하나뿐' 문항에서 도함수 없이 같은 정수에 닿는다.
+
+    절 둘: (가) 발문의 식이 상수항을 빼면 기함수(짝수 차 항이 상수항뿐)라 증가·감소 범위가 0에 대해
+    대칭이고, 발문이 '정수는 하나뿐'이라 알려 주므로 그 정수는 0일 수밖에 없다(판정자 지적 01729815
+    — f(x) = -4x^3 + 3x + 5) · (나) 거듭제곱 미분 오답 경로 '계수 누락'(c·x^n → c·x^(n - 1))으로
+    '미분한' 식의 부호 범위에도 정수가 그 하나뿐이다 — 그 오개념을 변별하지 못한다. '지수 유지'
+    경로(c·x^n → n·c·x^n)는 삼차식을 삼차식으로 보내 부호 범위가 늘 한쪽으로 무한하므로(정수가
+    하나뿐일 수 없다) 이 틀(삼차식)에서는 보지 않는다.
+    """
+    q = probe.question_text
+    answer = _answer_value(probe)
+    if not _UNIQUE_INTEGER.search(q) or answer is None:
+        return []
+    x = sympy.Symbol("x")
+    shown = [p for p in visible_polynomials(q) if p.free_symbols == {x}]
+    if not shown:
+        return []
+    poly = shown[0]
+    sign = -1 if _DECREASING.search(q) else 1
+    terms = sympy.Poly(poly, x).terms()
+    if all(c == 0 for (n,), c in terms if n > 0 and n % 2 == 0):
+        return [
+            ShortcutViolation(
+                "T08-interval-integer-coincidence",
+                "상수항을 뺀 식이 기함수라 증가·감소 범위가 0에 대해 대칭이고, 발문이 정수가 "
+                "하나뿐이라고 알려 주므로 도함수 없이 0에 닿는다. 그 매개변수를 쓰지 않는다.",
+            )
+        ]
+    wrong = power_path_derivative(poly, x, "계수 누락")
+    if wrong is not None and wrong != 0 and _integers_where(wrong, x, sign) == {int(answer)}:
+        return [
+            ShortcutViolation(
+                "T08-interval-integer-coincidence",
+                f"거듭제곱 미분 오답 경로(계수 누락)로 '미분한' 식의 부호 범위에도 정수가 {answer} "
+                "하나뿐이다 — 그 오개념을 변별하지 못한다. 그 매개변수를 쓰지 않는다.",
+            )
+        ]
+    return []
+
+
+def _round8_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """8회차 규칙 전부(성취기준별 분기 포함)."""
+    code = probe.standard_code
+    out = _double_causal_rule(probe) + _undefined_line_rule(probe)
+    if code == _C06:
+        out += _unused_function_rule(probe)
+    if code == _C08:
+        out += _interval_integer_rule(probe)
+    return out
+
+
 def parameter_coincidences(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """매개변수 선택의 우연 일치 위반만(`COINCIDENCE_RULE_IDS`) — 생성기의 매개변수 거부 조건."""
     return [
         v
-        for v in _round5_rules(probe) + _round6_rules(probe) + _round7_rules(probe)
+        for v in (
+            _round5_rules(probe)
+            + _round6_rules(probe)
+            + _round7_rules(probe)
+            + _round8_rules(probe)
+        )
         if v.rule in COINCIDENCE_RULE_IDS
     ]
 
@@ -3499,7 +3689,13 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
         out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
-    return out + _round5_rules(probe) + _round6_rules(probe) + _round7_rules(probe)
+    return (
+        out
+        + _round5_rules(probe)
+        + _round6_rules(probe)
+        + _round7_rules(probe)
+        + _round8_rules(probe)
+    )
 
 
 def violations_by_rule(probes: Sequence[ShortcutProbe]) -> dict[str, int]:

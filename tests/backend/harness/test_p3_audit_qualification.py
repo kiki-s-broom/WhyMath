@@ -27,6 +27,7 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ROUND5_RULE_IDS,
     ROUND6_RULE_IDS,
     ROUND7_RULE_IDS,
+    ROUND8_RULE_IDS,
     RULE_IDS,
 )
 
@@ -578,11 +579,14 @@ def test_machine_labels_reproduce_except_pinned_instrument_drift() -> None:
 
 
 def test_audit_protocol_excludes_build_only_guard_rules() -> None:
-    """감사 투표의 판정기 규칙 = 자격 측정을 통과한 4회차 집합. 측정 뒤에 더한 회차 규칙(5·6·7회차)은 빌드
-    가드 전용이다 — 6·7회차 규칙이 투표에 섞이면 자격 측정 프로토콜이 조용히 바뀐다."""
+    """감사 투표의 판정기 규칙 = 자격 측정을 통과한 4회차 집합. 측정 뒤에 더한 회차 규칙(5~8회차)은 빌드
+    가드 전용이다 — 6~8회차 규칙이 투표에 섞이면 자격 측정 프로토콜이 조용히 바뀐다."""
     assert qual.EXCLUDED_GUARD_RULES == POST_QUALIFICATION_RULE_IDS
-    assert POST_QUALIFICATION_RULE_IDS == ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS
-    assert ROUND5_RULE_IDS and ROUND6_RULE_IDS and ROUND7_RULE_IDS  # 빈 집합이면 이 분리가 공허하다
+    assert POST_QUALIFICATION_RULE_IDS == (
+        ROUND5_RULE_IDS | ROUND6_RULE_IDS | ROUND7_RULE_IDS | ROUND8_RULE_IDS
+    )
+    # 빈 집합이면 이 분리가 공허하다
+    assert ROUND5_RULE_IDS and ROUND6_RULE_IDS and ROUND7_RULE_IDS and ROUND8_RULE_IDS
     # 투표하는 규칙은 5회차 첫 규칙 앞까지(4회차까지의 집합)와 정확히 같다.
     voting = set(RULE_IDS) - qual.EXCLUDED_GUARD_RULES
     assert voting == set(RULE_IDS[: RULE_IDS.index("T-quadratic-mean-value")])

@@ -459,8 +459,11 @@ def _applied_frames() -> list[Frame]:
                 "양수 a의 값을 구하시오."
             ),
             answer_text=str(a),
+            # 8회차(은행 감사 4회차) 처분 — 뒤 문장이 'f'(a)의 값은 …이므로'로 이어지므로 앞 절은
+            # '…이고,'로 끊는다('…이므로 …이므로' 판정자 지적 49d9955a·e2b88365 · 판정기
+            # E-double-causal).
             explanation=(
-                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이므로 "
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이고, "
                 + _positive_point_steps(n, a, b)
             ),
             conditions=(_deriv_value_sym(str(n), "a") + f" = {b}", "a > 0"),
