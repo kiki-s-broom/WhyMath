@@ -21,6 +21,10 @@
   · 스텝은 **GitHub가 그 스텝에 쓰는 셸**로 돌린다 — `shell:` 키가 없으면 `bash -e`(pipefail
     없음), `shell: bash`면 `bash --noprofile --norc -eo pipefail`이다. 둘은 다르며 미러가 CI보다
     엄격하면 거짓 실패가 난다(HARN-162 — 아래 `step_shell_argv`)
+  · **실행 도중 작업 트리가 바뀌면 그 결과는 어느 트리 상태의 것도 아니다**(HARN-194). 시작과
+    끝에 트리 지문(HEAD · 더러운 경로 목록 · 각 경로의 내용 해시)을 잡아 비교하고, 다르면 결과를
+    오염(tainted)으로 표기한다. 지문을 못 잡은 것도 통과가 아니다 — 모르는 것을 안정으로 접지
+    않는다. 도구 자신이 만드는 알려진 변경(HARN-170 이벤트 대장 누수)은 오염과 **따로** 보고한다
 
 범위:
   `uses:` 액션 스텝(체크아웃·setup-python 등)은 로컬에서 실행하지 않는다. "환경 전제"로
@@ -37,17 +41,22 @@
 exit code: 0 전 스텝 통과 · 1 실패 스텝 존재 · 2 사용 오류(잡 이름 오타·파싱 0건
   · 자동 선택의 판정 대상 변경 파일 0건 · `--stdin` 없는 파이프 입력 — HARN-172)
   · 3 실행한 스텝은 전부 통과했지만 미실행 검사 스텝 존재(HARN-180 — 통과가 아니다)
+  · 4 실행 도중 작업 트리가 바뀌었거나 바뀌었는지 확인하지 못했다(HARN-194 — 오염이면 스텝이
+    통과·실패 어느 쪽이었든 이 코드가 앞선다: 바뀐 트리에서 난 실패는 거짓 실패일 수 있다)
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -64,15 +73,21 @@ DEFAULT_RESULT_PATH = Path(".claude/cache/ci_mirror.json")
 #: 스텝 하나의 기본 상한(초). CI 잡 자체가 35분 상한이므로 그보다 넉넉히 두되 무한은 아니다.
 DEFAULT_STEP_TIMEOUT = 2400
 
-#: 결과 JSON 형식 판. 2 = 미실행(`not_executed`)을 환경 전제와 분리해 기록하는 형식(HARN-180).
-#: 판이 다른 결과는 미실행 수를 판정할 수 없으므로 verdict가 "모른다"로 답한다 — 옛 형식은
-#: 건너뛴 검사를 환경 전제와 같은 칸에 넣었기 때문이다.
-RESULT_SCHEMA = 2
+#: 결과 JSON 형식 판. 2 = 미실행(`not_executed`)을 환경 전제와 분리해 기록하는 형식(HARN-180),
+#: 3 = 실행 도중 트리 변경 여부(`tainted` · `tree`)를 기록하는 형식(HARN-194).
+#: 판이 다른 결과는 미실행 수·트리 변경 여부를 판정할 수 없으므로 verdict가 "모른다"로 답한다 —
+#: 지문이 없는 결과를 안정으로 읽으면 바뀐 트리의 결과가 원래 커밋의 결과로 통과한다.
+RESULT_SCHEMA = 3
 
 #: 실행한 스텝은 전부 통과했지만 미실행 검사 스텝이 있다 — 통과(0)도 실패(1)도 아니다.
 #: 실패와 코드를 나누는 이유는 처방이 다르기 때문이다: 실패는 고칠 대상이고, 미실행은
 #: 목록을 읽고 CI 판정에 맡길 대상이다(같은 코드면 어느 쪽인지 출력을 다시 읽어야 한다).
 EXIT_NOT_EXECUTED = 3
+
+#: 실행 도중 작업 트리가 바뀌었거나(오염) 바뀌었는지 확인하지 못했다(HARN-194). 스텝 결과가
+#: 통과든 실패든 이 코드가 앞선다 — 바뀐 트리에서 난 결과는 어느 상태의 것도 아니고, 처방도 다르다
+#: (결과를 고치는 것이 아니라 트리를 가만히 두고 다시 돌린다).
+EXIT_TAINTED = 4
 
 PASSED = "passed"
 FAILED = "failed"
@@ -410,6 +425,474 @@ def run_job(
     return result
 
 
+# ── 작업 트리 지문 (HARN-194) ──────────────────────────────────────────────
+# 왜: 미러는 수 분~수십 분 도는 장기 검증이다. 도는 동안 같은 트리를 고치거나(편집) 옮기면(병합·
+# 커밋·체크아웃) 그 실행의 결과는 *바뀐 뒤의* 트리를 본 스텝과 *바뀌기 전의* 트리를 본 스텝이
+# 섞인 값이 된다. 결과 JSON은 커밋 해시 하나만 적으므로 그 섞인 값이 원래 커밋의 결과로 기록된다
+# (2026-09-28 EOS-134: 전체 미러가 도는 동안 통합 테스트 정리 코드를 고쳤다 — 스스로 알아채
+# 폐기했을 뿐 도구는 아무것도 알리지 않았다). 런타임에 소스를 읽는 검사(`inspect.getsource`
+# 계약 테스트·파일 스캔 가드)는 바뀐 소스를 보고 *거짓 실패*를 내고, 거짓 실패는 없는 회귀를
+# 쫓게 만들어 통과보다 비싸다.
+#
+# 무엇을 재는가: HEAD + `git status`에 오르는 모든 경로(추적 파일 수정·삭제, 추적 안 된 파일)의
+# 상태 두 글자와 **내용 해시**. 상태만 보면 이미 더러운 파일(` M` → ` M`)을 더 고쳐도 같은 값이다.
+# `.gitignore`가 거른 경로(캐시·`__pycache__`·미러 자신의 결과)는 git이 안 보여 지문에 없다.
+#
+# 한계(정직): 시작과 끝의 *순변화*만 본다 — 실행 도중 바꿨다가 원래대로 되돌린 변경은 못 잡는다.
+# 그리고 무시된 경로의 변경은 보지 않는다. 둘 다 "일부러 보지 않는다"가 아니라 이 방식의 한계다.
+TREE_STABLE = "stable"
+TREE_MUTATED = "mutated"
+#: 지문을 못 잡았다 — 모르는 것을 안정으로 접지 않는다(`tainted`가 False가 아니라 None).
+TREE_UNVERIFIABLE = "unverifiable"
+
+#: 지문 채취용 git 호출 하나의 상한(초) — `current_commit`과 같다. 무한 대기로 측정 회차를
+#: 태우지 않는다.
+_GIT_TIMEOUT = 30
+
+#: 내용 해시를 읽는 파일 크기 상한. 넘으면 (크기, mtime)으로 대신한다 — 거대한 산출물 하나가
+#: 지문 채취를 수 분 붙잡지 않게 한다. 이 경로도 크기·mtime이 바뀌면 여전히 잡힌다.
+_HASH_SIZE_LIMIT = 64 * 1024 * 1024
+
+#: 사유에 늘어놓는 바뀐 경로 수 상한 — 넘으면 "외 N건"으로 줄이되 총수는 항상 말한다.
+_LISTED_CHANGES = 8
+
+#: 결과 JSON에 싣는 바뀐 경로 수 상한(총수는 `changes_total`로 항상 남긴다).
+_JSON_CHANGES_LIMIT = 200
+
+#: 바뀐 경로 종류 → 사람이 읽는 말. JSON에는 키(영문)가 들어간다.
+_CHANGE_LABEL = {
+    "added": "추가",
+    "deleted": "삭제",
+    "modified": "수정",
+    "reverted": "깨끗해짐",
+    "changed_again": "재수정",
+}
+
+#: 알려진 부작용의 종류 — HARN-170: 하네스 테스트가 실제 이벤트 대장에 `policy_warn`을 써 넣던 누출.
+KNOWN_LEDGER_LEAK = "ledger_policy_warn_leak"
+_KNOWN_TASK = {KNOWN_LEDGER_LEAK: "HARN-170"}
+_LEDGER_PATH_RE = re.compile(r"^backlog/(?:events\.ndjson|events/[^/]+\.ndjson)$")
+
+
+class TreeFingerprintError(RuntimeError):
+    """지문을 못 잡았다(git 실패·타임아웃) — 실행 도중 변경 여부를 모른다는 사실이 곧 결과다."""
+
+    def __init__(self, message: str, error_type: str) -> None:
+        super().__init__(message)
+        self.error_type = error_type
+
+
+@dataclass(frozen=True)
+class PathState:
+    """`git status`에 오른 경로 하나 — 상태 두 글자와 내용 지문."""
+
+    status: str
+    #: 해시한 바이트 수. 읽지 못했거나 일반 파일이 아니면 None.
+    size: int | None
+    #: sha256 hex(일반 파일) · `absent` · `link:<대상>` · `non-file` · `big:<크기>:<mtime_ns>` ·
+    #: `unreadable:<예외 타입명>`. 읽지 못한 경로는 두 번 다 같은 값이라 거짓 오염을 내지 않는다.
+    digest: str
+
+
+@dataclass(frozen=True)
+class TreeFingerprint:
+    head: str
+    toplevel: str
+    paths: dict[str, PathState]
+
+
+@dataclass(frozen=True)
+class PathChange:
+    path: str
+    #: added · deleted · modified · reverted · changed_again (`_CHANGE_LABEL`)
+    kind: str
+
+
+@dataclass(frozen=True)
+class KnownEffect:
+    """도구가 스스로 만드는 알려진 변경 — 오염이 아니라 **따로** 보고하는 대상."""
+
+    kind: str
+    paths: tuple[str, ...]
+    #: 덧붙은 줄 수.
+    lines: int
+
+    @property
+    def task(self) -> str:
+        return _KNOWN_TASK.get(self.kind, "?")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "task": self.task,
+            "paths": list(self.paths),
+            "lines": self.lines,
+        }
+
+
+@dataclass
+class TreeCheck:
+    """실행 구간의 트리 판정 — 안정·오염·미확인 셋 중 하나."""
+
+    state: str
+    head_start: str = ""
+    head_end: str = ""
+    #: 오염의 원인 — 알려진 부작용은 여기 들어가지 않는다.
+    changes: list[PathChange] = field(default_factory=list)
+    known: list[KnownEffect] = field(default_factory=list)
+    #: 미확인일 때의 사유와 원인 예외 타입명(침묵 실패 금지).
+    reason: str = ""
+    error_type: str | None = None
+
+    @property
+    def tainted(self) -> bool | None:
+        """True 오염 · False 안정 · None 모름. 통과로 읽어도 되는 값은 False뿐이다."""
+        if self.state == TREE_STABLE:
+            return False
+        if self.state == TREE_MUTATED:
+            return True
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state,
+            "head_start": self.head_start,
+            "head_end": self.head_end,
+            "changes_total": len(self.changes),
+            "changes": [
+                {"path": c.path, "kind": c.kind} for c in self.changes[:_JSON_CHANGES_LIMIT]
+            ],
+            "known": [k.to_dict() for k in self.known],
+            "reason": self.reason,
+            "error_type": self.error_type,
+        }
+
+    def summary(self) -> str:
+        return summarize_tree(self.to_dict())
+
+
+def _git_bytes(cwd: Path, *argv: str) -> bytes:
+    """git 하나를 돌려 stdout 바이트를 돌려준다. 실패·타임아웃은 원인 타입명을 단 예외로 올린다."""
+    try:
+        proc = subprocess.run(["git", *argv], cwd=cwd, capture_output=True, timeout=_GIT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        name = type(exc).__name__
+        raise TreeFingerprintError(f"git {argv[0]} 실행 실패({name})", name) from exc
+    if proc.returncode != 0:
+        # 사유가 남아야 한다 — exit code만으로는 저장소가 아님·HEAD 없음·권한이 같은 글자로 보인다.
+        tail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
+        raise TreeFingerprintError(
+            f"git {argv[0]} exit {proc.returncode}: {tail[0] if tail else '(stderr 없음)'}",
+            "GitExitError",
+        )
+    return proc.stdout
+
+
+def _parse_status_z(raw: bytes) -> list[tuple[str, str]]:
+    """`git status --porcelain=v1 -z` → (상태 두 글자, 경로).
+
+    이름 바꾸기·복사(R/C)는 항목 뒤에 원래 경로가 NUL로 한 칸 더 붙는다 — 그것을 다음 항목으로
+    읽으면 이후 전부가 한 칸씩 어긋난다. 새 경로만 취하고 원래 경로 칸은 건너뛴다.
+    """
+    tokens = raw.split(b"\0")
+    entries: list[tuple[str, str]] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        index += 1
+        if len(token) < 4:  # "XY 경로" — 빈 토큰(끝의 NUL)과 깨진 토큰을 건너뛴다
+            continue
+        status = token[:2].decode("ascii", errors="replace")
+        entries.append((status, token[3:].decode("utf-8", errors="replace")))
+        if "R" in status or "C" in status:
+            index += 1
+    return entries
+
+
+def _hash_file(path: Path) -> tuple[int | None, str]:
+    """(해시한 바이트 수, 내용 지문). 읽지 못하면 예외 타입명이 지문에 남는다."""
+    try:
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            return None, f"link:{os.readlink(path)}"
+        if not stat.S_ISREG(info.st_mode):
+            return None, "non-file"
+        if info.st_size > _HASH_SIZE_LIMIT:
+            return None, f"big:{info.st_size}:{info.st_mtime_ns}"
+        digest = hashlib.sha256()
+        size = 0
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+                size += len(chunk)
+        return size, digest.hexdigest()
+    except FileNotFoundError:
+        return None, "absent"
+    except OSError as exc:
+        return None, f"unreadable:{type(exc).__name__}"
+
+
+def _excluded_paths(toplevel: Path, exclude: Iterable[Path]) -> set[str]:
+    """지문에서 뺄 경로(저장소 루트 기준 posix). 미러 자신의 산출물이 자기 지문을 흔들면 안 된다."""
+    top = toplevel.resolve()
+    skip: set[str] = set()
+    for item in exclude:
+        try:
+            skip.add(Path(item).resolve().relative_to(top).as_posix())
+        except ValueError:
+            continue  # 저장소 밖 경로는 git status에 나오지 않는다
+    return skip
+
+
+def take_fingerprint(root: Path, exclude: Iterable[Path] = ()) -> TreeFingerprint:
+    """HEAD와 `git status`에 오른 경로 전부의 (상태, 내용 해시)를 잡는다.
+
+    `-uall`이 필요하다 — 기본값(`-unormal`)은 추적 안 된 디렉터리를 `dir/` 한 항목으로 접어서 그
+    안의 파일을 고쳐도 같은 값이다. 경로는 `git status`가 저장소 루트 기준으로 주므로 파일은
+    `--show-toplevel`에서 읽는다(`root`가 하위 디렉터리여도 읽는 곳이 어긋나지 않는다).
+    """
+    header = _git_bytes(root, "rev-parse", "--show-toplevel", "HEAD").decode(
+        "utf-8", errors="replace"
+    )
+    parts = header.splitlines()
+    if len(parts) != 2 or not parts[1].strip():
+        raise TreeFingerprintError("git rev-parse 출력 형식이 예상과 다르다", "ParseError")
+    toplevel = Path(parts[0].strip())
+    skip = _excluded_paths(toplevel, exclude)
+    paths: dict[str, PathState] = {}
+    for status, rel in _parse_status_z(_git_bytes(root, "status", "--porcelain=v1", "-z", "-uall")):
+        if rel in skip:
+            continue
+        size, digest = _hash_file(toplevel / rel)
+        paths[rel] = PathState(status, size, digest)
+    return TreeFingerprint(parts[1].strip(), str(toplevel), paths)
+
+
+def diff_fingerprints(start: TreeFingerprint, end: TreeFingerprint) -> list[PathChange]:
+    """두 지문 사이에서 상태나 내용이 달라진 경로. 어느 한쪽에만 있어도 변경이다."""
+    changes: list[PathChange] = []
+    for path in sorted(set(start.paths) | set(end.paths)):
+        before, after = start.paths.get(path), end.paths.get(path)
+        if before == after:
+            continue
+        if before is None and after is not None:
+            if after.status == "??":
+                kind = "added"
+            elif "D" in after.status:
+                kind = "deleted"
+            else:
+                kind = "modified"
+        elif after is None:
+            kind = "reverted"
+        else:
+            kind = "changed_again"
+        changes.append(PathChange(path, kind))
+    return changes
+
+
+def _committed_bytes(toplevel: Path, rel: str) -> bytes | None:
+    """HEAD에 커밋된 이 경로의 내용. HEAD에 없으면 b"" (새 파일), 조회 실패는 None."""
+    try:
+        listing = _git_bytes(toplevel, "ls-tree", "-z", "HEAD", "--", rel)
+        if not listing:
+            return b""
+        oid = listing.split(b"\0")[0].split(b"\t")[0].split()[2].decode("ascii")
+        return _git_bytes(toplevel, "cat-file", "blob", oid)
+    except (TreeFingerprintError, IndexError):
+        return None
+
+
+def _appended_policy_warn_lines(toplevel: Path, rel: str, before: PathState | None) -> int | None:
+    """이 경로의 변경이 **`policy_warn` 줄만 덧붙인 것**이면 덧붙인 줄 수, 아니면 None.
+
+    덧붙임만이어야 한다 — 기존 줄을 고쳤으면(역사를 다시 쓰면) 알려진 부작용이 아니다. 기준선은
+    시작 때 이미 더러웠으면 그때의 (크기, sha256)이고, 깨끗했으면 HEAD의 내용이다. 확인하지
+    못하는 모든 경우는 None(= 알려진 부작용으로 인정하지 않음 → 오염)으로 접는다: 모르는 변경을
+    조용한 쪽으로 분류하면 소음을 줄이려다 오염을 놓친다.
+    """
+    try:
+        new = (toplevel / rel).read_bytes()
+    except OSError:
+        return None
+    if before is None:
+        base = _committed_bytes(toplevel, rel)
+        if base is None or not new.startswith(base):
+            return None
+        base_len = len(base)
+    else:
+        if before.size is None or not re.fullmatch(r"[0-9a-f]{64}", before.digest):
+            return None
+        base_len = before.size
+        if len(new) < base_len or hashlib.sha256(new[:base_len]).hexdigest() != before.digest:
+            return None
+    if base_len and new[base_len - 1 : base_len] != b"\n":
+        return None  # 기준선의 마지막 줄이 닫히지 않았다 — 덧붙임이 그 줄과 섞인다
+    try:
+        lines = [ln for ln in new[base_len:].decode("utf-8").split("\n") if ln.strip()]
+    except UnicodeDecodeError:
+        return None
+    if not lines:
+        return None
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(event, dict) or event.get("action") != "policy_warn":
+            return None
+    return len(lines)
+
+
+def split_known_effects(
+    toplevel: Path, start: TreeFingerprint, changes: list[PathChange]
+) -> tuple[list[KnownEffect], list[PathChange]]:
+    """바뀐 경로를 (알려진 부작용, 나머지)로 가른다. 나머지만 오염의 원인이다."""
+    ledger_paths: list[str] = []
+    ledger_lines = 0
+    rest: list[PathChange] = []
+    for change in changes:
+        appended = None
+        if change.kind in ("added", "modified", "changed_again") and _LEDGER_PATH_RE.match(
+            change.path
+        ):
+            appended = _appended_policy_warn_lines(
+                toplevel, change.path, start.paths.get(change.path)
+            )
+        if appended is None:
+            rest.append(change)
+        else:
+            ledger_paths.append(change.path)
+            ledger_lines += appended
+    known = (
+        [KnownEffect(KNOWN_LEDGER_LEAK, tuple(ledger_paths), ledger_lines)] if ledger_paths else []
+    )
+    return known, rest
+
+
+def judge_tree(start: TreeFingerprint, end: TreeFingerprint) -> TreeCheck:
+    """시작·종료 지문 → 판정. HEAD가 달라졌으면 경로 변경은 전부 오염의 원인이다.
+
+    HEAD가 그대로일 때만 알려진 부작용을 가려낸다 — 커밋·체크아웃 뒤의 `git status`는 다른
+    기준선을 보므로 (크기, 해시) 대조가 성립하지 않는다.
+    """
+    changes = diff_fingerprints(start, end)
+    head_changed = start.head != end.head
+    known: list[KnownEffect] = []
+    if changes and not head_changed:
+        known, changes = split_known_effects(Path(end.toplevel), start, changes)
+    state = TREE_MUTATED if (head_changed or changes) else TREE_STABLE
+    return TreeCheck(state, start.head, end.head, changes, known)
+
+
+def unverifiable_tree(reason: str, error_type: str | None = None, head: str = "") -> TreeCheck:
+    return TreeCheck(TREE_UNVERIFIABLE, head_start=head, reason=reason, error_type=error_type)
+
+
+class TreeWatch:
+    """실행 구간을 감싼다 — `begin()`으로 시작 지문을, `finish()`로 종료 지문과 판정을 얻는다."""
+
+    def __init__(
+        self,
+        root: Path,
+        exclude: list[Path],
+        start: TreeFingerprint | None,
+        start_error: TreeFingerprintError | None,
+    ) -> None:
+        self._root = root
+        self._exclude = exclude
+        self._start = start
+        self._start_error = start_error
+
+    @classmethod
+    def begin(cls, root: Path, exclude: Iterable[Path] = ()) -> TreeWatch:
+        skip = list(exclude)
+        try:
+            return cls(root, skip, take_fingerprint(root, skip), None)
+        except TreeFingerprintError as exc:
+            return cls(root, skip, None, exc)
+
+    def finish(self) -> TreeCheck:
+        if self._start is None:
+            error = self._start_error
+            return unverifiable_tree(
+                f"시작 시점 지문을 잡지 못했다 — {error}",
+                error.error_type if error else None,
+            )
+        try:
+            end = take_fingerprint(self._root, self._exclude)
+        except TreeFingerprintError as exc:
+            return unverifiable_tree(
+                f"종료 시점 지문을 잡지 못했다 — {exc}", exc.error_type, self._start.head
+            )
+        return judge_tree(self._start, end)
+
+
+def summarize_tree(tree: Any) -> str:
+    """결과 JSON의 `tree` 매핑을 한 문장으로. 모양이 깨졌어도 죽지 않는다(verdict가 쓴다)."""
+    if not isinstance(tree, dict):
+        return "트리 안정성 기록이 없다"
+    state = tree.get("state")
+    if state == TREE_MUTATED:
+        parts: list[str] = []
+        head_start, head_end = str(tree.get("head_start", "")), str(tree.get("head_end", ""))
+        if head_start != head_end:
+            parts.append(f"HEAD {head_start[:12]} → {head_end[:12]}")
+        raw_rows = tree.get("changes")
+        rows = [c for c in raw_rows if isinstance(c, dict)] if isinstance(raw_rows, list) else []
+        total = tree.get("changes_total", len(rows))
+        if isinstance(total, int) and total:
+            shown = rows[:_LISTED_CHANGES]
+            listing = ", ".join(
+                f"{c.get('path', '?')}({_CHANGE_LABEL.get(str(c.get('kind')), '?')})" for c in shown
+            )
+            more = total - len(shown)
+            parts.append(f"경로 {total}건: {listing}" + (f" 외 {more}건" if more > 0 else ""))
+        return "실행 도중 작업 트리가 바뀌었다" + (f" — {' · '.join(parts)}" if parts else "")
+    if state == TREE_UNVERIFIABLE:
+        kind = tree.get("error_type") or "?"
+        return f"작업 트리 안정성을 확인하지 못했다({kind}): {tree.get('reason', '')}".rstrip(": ")
+    return "트리 안정성 기록이 없다"
+
+
+def render_tree(tree: TreeCheck) -> list[str]:
+    """트리 판정 블록 — 오염·미확인은 원인을 이름으로, 알려진 부작용은 오염과 따로."""
+    lines: list[str] = []
+    if tree.state == TREE_MUTATED:
+        lines.append(
+            "✗ 오염 — 실행 도중 작업 트리가 바뀌었다. "
+            "이 결과는 어느 트리 상태의 것도 아니다 (HARN-194)"
+        )
+        if tree.head_start != tree.head_end:
+            lines.append(f"  · HEAD: {tree.head_start[:12]} → {tree.head_end[:12]}")
+        if tree.changes:
+            lines.append(f"  · 바뀐 경로 {len(tree.changes)}건:")
+            for change in tree.changes[:_LISTED_CHANGES]:
+                lines.append(f"      {change.path} ({_CHANGE_LABEL.get(change.kind, change.kind)})")
+            if len(tree.changes) > _LISTED_CHANGES:
+                lines.append(f"      외 {len(tree.changes) - _LISTED_CHANGES}건")
+        lines.append(
+            "  → 트리를 건드리지 않는 구간에서 다시 돌려라 (실행 중 편집·병합·커밋 금지 — "
+            "또는 `git worktree add --detach`로 만든 별도 작업 트리에서)"
+        )
+    elif tree.state == TREE_UNVERIFIABLE:
+        lines.append(f"⚠ 트리 안정성 미확인 — {tree.summary()}")
+        lines.append(
+            "  → 실행 도중 변경 여부를 모른다. 이 결과는 통과가 아니라 측정되지 않은 것으로 친다"
+        )
+    for effect in tree.known:
+        lines.append(
+            f"ⓘ 알려진 부작용 (오염 아님 — 따로 보고): {effect.task} 이벤트 대장에 policy_warn "
+            f"{effect.lines}줄 추가 — {', '.join(effect.paths)}"
+        )
+        lines.append(
+            "  → 테스트가 남긴 거짓 기록이다. 커밋하지 마라 — 추가된 줄만 제거하고, 파일 전체를 "
+            "되돌리지 마라(이 세션의 정상 이벤트까지 잃는다)"
+        )
+    if lines:
+        lines.append("")
+    return lines
+
+
 # ── 결과 저장·조회 ─────────────────────────────────────────────────────────
 def current_commit(repo_root: Path) -> str:
     proc = subprocess.run(
@@ -434,8 +917,17 @@ def build_payload(
     repo_root: Path,
     workflow_path: Path,
     prepend_path: list[str] | None = None,
+    tree: TreeCheck | None = None,
 ) -> dict[str, Any]:
-    commit = current_commit(repo_root)
+    """결과 JSON을 조립한다. `tree`가 없으면 **지문을 못 잡은 것으로** 기록한다(HARN-194).
+
+    트리 판정 없이 만든 결과를 안정으로 읽으면 바뀐 트리의 결과가 통과로 새므로, 모르는 쪽
+    (`tainted: null` · exit 4)으로 접는다. `commit`은 **시작 시점의** HEAD다 — 실행이 끝난 뒤의
+    HEAD를 적으면 도중에 커밋한 실행이 새 커밋의 결과로 둔갑한다.
+    """
+    check = tree if tree is not None else unverifiable_tree("트리 판정 없이 결과를 만들었다")
+    commit = check.head_start or current_commit(repo_root)
+    step_exit = payload_exit(jobs)
     return {
         "schema": RESULT_SCHEMA,
         "run_id": f"{commit[:12]}-{int(time.time())}",
@@ -444,7 +936,11 @@ def build_payload(
         "prepend_path": list(prepend_path or []),
         "jobs": [j.to_dict() for j in jobs],
         "not_executed": sum(len(j.not_executed) for j in jobs),
-        "exit": payload_exit(jobs),
+        # 오염이면 스텝이 통과든 실패든 EXIT_TAINTED가 앞선다. 스텝 쪽 판정은 참고용으로 남긴다.
+        "tainted": check.tainted,
+        "tree": check.to_dict(),
+        "step_exit": step_exit,
+        "exit": step_exit if check.tainted is False else EXIT_TAINTED,
     }
 
 
@@ -515,8 +1011,25 @@ def mirror_verdict(path: Path, commit: str) -> Verdict:
         return Verdict(
             VERDICT_UNKNOWN,
             f"CI 미러 결과 형식이 이 도구와 다르다(schema {payload.get('schema')!r} ≠ "
-            f"{RESULT_SCHEMA}) — 옛 형식은 건너뛴 검사를 환경 전제와 구분하지 않아 미실행 수를 "
-            f"판정할 수 없다. 다시 돌려라",
+            f"{RESULT_SCHEMA}) — 옛 형식은 건너뛴 검사를 환경 전제와 구분하지 않거나(schema 2 "
+            f"미만) 실행 도중 트리가 바뀌었는지 기록하지 않아(schema 3 미만) 이 결과를 믿을 수 "
+            f"없다. 다시 돌려라",
+        )
+    # 오염(HARN-194) — `tainted`가 명시적 False일 때만 안정이다. True(바뀜)와 None(못 잡음)은 물론
+    # 키 부재·문자열 "false" 같은 모양 이탈도 전부 "측정되지 않음"이다. 스텝이 실패였든 통과였든
+    # 같다: 바뀐 트리의 실패는 거짓 실패일 수 있어 FAIL이 아니라 UNKNOWN으로 답한다.
+    if payload.get("tainted") is not False:
+        summary = summarize_tree(payload.get("tree"))
+        if payload.get("tainted") is True:
+            return Verdict(
+                VERDICT_UNKNOWN,
+                f"CI 미러 결과가 오염됐다 — {summary}. 이 결과는 어느 트리 상태의 것도 아니다: "
+                f"이번 변경은 측정되지 않았다(트리를 건드리지 않는 구간에서 다시 돌려라)",
+            )
+        return Verdict(
+            VERDICT_UNKNOWN,
+            f"CI 미러 결과에서 실행 도중 트리가 바뀌었는지 확인되지 않았다 — {summary}. "
+            f"이번 변경은 측정되지 않았다(다시 돌려라)",
         )
     raw_jobs = payload.get("jobs")
     # 스텝 기록이 빠진 잡을 "미실행 0건"으로 읽으면 모르는 것을 아니라고 접는 것이다.
@@ -610,8 +1123,33 @@ def render(jobs: list[JobResult]) -> str:
     return "\n".join(lines)
 
 
-def final_line(jobs: list[JobResult]) -> str:
-    """실행 전체의 한 줄 판정. 미실행이 있으면 "전 잡 통과"라고 쓰지 않는다(HARN-180)."""
+def final_line(jobs: list[JobResult], tree: TreeCheck | None = None) -> str:
+    """실행 전체의 한 줄 판정. 미실행이 있으면 "전 잡 통과"라고 쓰지 않는다(HARN-180).
+
+    오염·미확인이면(HARN-194) 이 줄이 스텝 판정을 **대신한다** — 결과를 `tail -1`로 읽는 쪽에도
+    통과로 보이지 않게 한다. 스텝 판정은 참고용으로 뒤에 붙여 아무것도 숨기지 않는다. 알려진
+    부작용만 있으면 판정은 그대로 두고 그 사실만 덧붙인다(침묵하지도, 오염으로 뭉개지도 않는다).
+    """
+    base = _steps_final_line(jobs)
+    if tree is None:
+        return base
+    if tree.tainted is True:
+        return (
+            f"✗ 오염 — {tree.summary()} (exit {EXIT_TAINTED}). 이 실행은 측정으로 치지 않는다 · "
+            f"참고용 스텝 판정: {base}"
+        )
+    if tree.tainted is None:
+        return (
+            f"⚠ 트리 안정성 미확인 — {tree.summary()} (exit {EXIT_TAINTED}). 이 실행은 측정으로 "
+            f"치지 않는다 · 참고용 스텝 판정: {base}"
+        )
+    if tree.known:
+        kinds = ", ".join(f"{k.task} {k.lines}줄" for k in tree.known)
+        return f"{base} · 알려진 부작용 {len(tree.known)}건({kinds}) — 오염 아님, 위 목록 참조"
+    return base
+
+
+def _steps_final_line(jobs: list[JobResult]) -> str:
     failed = [j.name for j in jobs if j.exit_code]
     by_job = [f"{j.name} {len(j.not_executed)}" for j in jobs if j.not_executed]
     count = sum(len(j.not_executed) for j in jobs)
@@ -676,21 +1214,28 @@ def cmd_run(args: argparse.Namespace) -> int:
     log_path = args.result.with_suffix(".steps.ndjson")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     results: list[JobResult] = []
+    # 지문은 잡 루프 *바로* 앞뒤에서 잡는다(HARN-194). 미러 자신의 산출물(결과 JSON·스텝 로그)은
+    # 뺀다 — `.gitignore` 밖에 결과 경로를 두면 도구가 스스로 트리를 바꾼 것으로 읽히는 자기
+    # 오염이 된다.
+    watch = TreeWatch.begin(repo_root, [repo_root / args.result, repo_root / log_path])
     with log_path.open("w", encoding="utf-8") as handle:
         for name in job_names:
             print(f"▶ {name}", flush=True)
             results.append(
                 run_job(workflow, name, repo_root, args.timeout, handle, args.prepend_path)
             )
+    tree = watch.finish()
 
-    payload = build_payload(results, repo_root, args.workflow, args.prepend_path)
+    payload = build_payload(results, repo_root, args.workflow, args.prepend_path, tree)
     save_payload(payload, args.result)
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render(results))
+        for tree_line in render_tree(tree):
+            print(tree_line)
         print(f"결과 저장: {args.result} (commit {payload['commit'][:12]})")
-        print(final_line(results))
+        print(final_line(results, tree))
         if getattr(args, "input_warning_tail", None):
             print(args.input_warning_tail)
     return int(payload["exit"])

@@ -18,11 +18,13 @@ from dataclasses import replace
 
 import pytest
 
+from whymath_backend.config import Settings
 from whymath_backend.l3.cross_verify import (
     MISSING_CONDITION_PERSPECTIVES,
     MULTIPLE_VALID_ANSWERS_PERSPECTIVES,
     PROBABILITY_PERSPECTIVES,
     STATISTICAL_PERSPECTIVES,
+    UNRECORDED_AUTHOR,
     CrossVerifier,
     IndependenceError,
     Perspective,
@@ -30,6 +32,9 @@ from whymath_backend.l3.cross_verify import (
     _assert_independent,
     _judge_defect_class,
     _judge_labelled,
+    assert_author_independent,
+    deterministic_author,
+    llm_author,
 )
 from whymath_backend.l3.models import (
     CostTier,
@@ -37,7 +42,9 @@ from whymath_backend.l3.models import (
     LocalModelTier,
     RoutingDecision,
 )
+from whymath_backend.l3.pregenerate.provenance_bridge import model_name_for_decision
 from whymath_backend.l3.prompt_assets import prompt_text
+from whymath_backend.l3.router import Router, resolve_model
 
 _SUBJECT = ResidueSubject(
     problem_id="wm-finite-test",
@@ -47,7 +54,9 @@ _SUBJECT = ResidueSubject(
     machine_model_ko="표본공간: 36가지.\n사건 A: 값들의 합이 7과 같다.\n확률 = 6/36.",
     machine_total=36,
     machine_favorable=6,
-    authored_by="corpus:FULLY_GENERATED",
+    # LLM 생성자가 없다는 *명시 선언*(PB-15). 종전 `corpus:FULLY_GENERATED`는 검증자 서명과 형식이
+    # 달라 가드를 영영 비껴갔고, 그래서 이 픽스처가 가드를 한 번도 밟지 못했다.
+    authored_by=deterministic_author("finite_enumerator"),
 )
 
 _RECONSTRUCT_OK = json.dumps({"total": 36, "favorable": 6})
@@ -160,6 +169,122 @@ def test_self_approval_is_refused() -> None:
     subject = replace(_SUBJECT, authored_by=verifier.signature)
     with pytest.raises(IndependenceError, match="자기승인"):
         verifier.verify(subject)
+
+
+# ── ②-b 생성자 서명 3상태 (PB-15) ─────────────────────────────────────
+# 위 `test_self_approval_is_refused`는 `verifier.signature`를 그대로 대입하므로 동어반복이다 —
+# 저작 측이 *다른 함수*로 서명을 조립해 형식이 갈라져도 통과한다. PB-15의 결함이 정확히 그것이었다
+# (코퍼스 `corpus:<유형>` vs 검증자 `llm:<모델>`). 아래는 저작 측 조립 경로로 만든 서명과 **실값**
+# 문자열로 단언한다.
+_PIN = "qwen3:30b-a3b"
+
+
+def test_same_llm_is_self_approval_and_other_llm_is_not() -> None:
+    """절: LLM 서명 동일 비교. 대조군(다른 모델)이 함께 있어야 '전부 거부'하는 수정이 걸린다."""
+    with pytest.raises(IndependenceError, match="자기승인"):
+        assert_author_independent(llm_author(_PIN), llm_author(_PIN))
+    assert_author_independent(llm_author("other-model:7b"), llm_author(_PIN))  # 예외 없음
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "llm:QWEN3:30B-A3B",  # 절: casefold — 사람이 손으로 쓴 대소문자 차이가 가드를 비껴가면 안 된다
+        "llm:qwen3:30b-a3b ",  # 절: strip — 뒤 공백
+    ],
+)
+def test_llm_comparison_ignores_case_and_trailing_space(variant: str) -> None:
+    with pytest.raises(IndependenceError, match="자기승인"):
+        assert_author_independent(variant, llm_author(_PIN))
+
+
+def test_deterministic_declaration_is_never_compared_with_the_verifier() -> None:
+    """절: 결정론 선언은 비교 대상이 아니다 — 검증자가 LLM이어도 통과(LLM 생성자가 없다)."""
+    assert_author_independent(deterministic_author("finite_enumerator"), llm_author(_PIN))
+
+
+@pytest.mark.parametrize(
+    "unreadable",
+    [
+        "",  # 절: 빈 문자열은 '비교 대상 아님'으로 접히지 않는다
+        UNRECORDED_AUTHOR,  # 절: 기록 없음 = 모른다 ≠ 아니다
+        "corpus:FULLY_GENERATED",  # 종전 코퍼스 조립값 — 이 값이 가드를 영영 비껴갔던 장본인
+        "deterministic_enumerator",  # 콜론 없는 비공식 표기는 선언이 아니다
+        "llm:",  # 절: 접두어만 있고 이름이 빈 LLM 서명 — 어떤 검증자와도 '다르다'며 통과하면 안 됨
+        "llm:   ",  # 절: 공백뿐인 이름
+        "deterministic:",  # 절: 이름 없는 결정론 선언
+        "LLM:qwen3:30b-a3b",  # 절: 접두어는 정확 일치 — 대문자 접두어는 판독 불가
+        " llm:qwen3:30b-a3b",  # 절: 앞 공백이 붙은 접두어
+    ],
+)
+def test_unreadable_author_is_refused_fail_closed(unreadable: str) -> None:
+    """기록 없음·판독 불가 서명은 독립성을 입증할 수 없어 거부한다(침묵 통과 금지)."""
+    with pytest.raises(IndependenceError, match="판독할 수 없다"):
+        assert_author_independent(unreadable, llm_author(_PIN))
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_signature_builders_refuse_empty_names(name: str) -> None:
+    """빈 이름으로는 서명을 만들 수 없다 — 빈 값이 서명으로 위장해 가드를 우회하는 길을 막는다."""
+    with pytest.raises(ValueError, match="비었다"):
+        llm_author(name)
+    with pytest.raises(ValueError, match="비었다"):
+        deterministic_author(name)
+
+
+def test_local_verifier_signature_collides_with_authoring_side_signature() -> None:
+    """저작 측 조립 경로(`model_name_for_decision`)로 만든 서명이 검증자 서명과 충돌한다.
+
+    로컬 좌석의 실값은 `llm:` + 라우터 매트릭스 해석 모델 id다 — 함수 자신이 아니라 라우터
+    결정에서 독립 도출한 값으로 단언한다.
+    """
+    verifier = _verifier(ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]))
+    decision = Router().route(verifier._routing_request())
+    local_model = resolve_model(decision.local_family, decision.local_model)
+
+    assert verifier.signature == f"llm:{local_model}"
+    authored_by_authoring_side = llm_author(model_name_for_decision(decision))
+    with pytest.raises(IndependenceError, match="자기승인"):
+        verifier.verify(replace(_SUBJECT, authored_by=authored_by_authoring_side))
+
+
+@pytest.mark.parametrize("seat", ["anthropic", "openrouter", "deepseek"])
+def test_cloud_verifier_signature_names_the_pinned_model_not_the_tier(
+    seat: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """클라우드 좌석 — 검증자 서명이 티어명(`llm:cloud_mid`)이 아니라 모델 핀이다.
+
+    종전 판은 클라우드에서 `llm:<티어명>`을 냈고 저작 측은 모델 핀을 기록했다. 코퍼스 쪽 형식만
+    고쳤다면 로컬끼리의 충돌은 잡혀도 *같은 클라우드 모델이 만든 문항을 같은 모델이 검증*하는
+    경우는 여전히 못 잡았을 것이다. 좌석 3종을 모두 밟는다(한 좌석만 고치고 방치하는 형태 차단).
+    """
+    settings = Settings(jwt_secret_key="x" * 32, cloud_provider=seat)  # type: ignore[arg-type]
+    pin = {
+        "anthropic": settings.anthropic_model_mid,
+        "openrouter": settings.openrouter_model_mid,
+        "deepseek": settings.deepseek_model_mid,
+    }[seat]
+    cloud_decision = RoutingDecision(cost_tier=CostTier.CLOUD_MID, est_latency_ms=1000)
+    monkeypatch.setattr(Router, "route", lambda self, request: cloud_decision)
+
+    verifier = _verifier(
+        ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]), settings=settings
+    )
+
+    assert verifier.signature == f"llm:{pin}"
+    assert verifier.signature != "llm:cloud_mid", "티어명 서명 — 종전 결함(PB-15) 재발"
+    with pytest.raises(IndependenceError, match="자기승인"):
+        verifier.verify(replace(_SUBJECT, authored_by=llm_author(pin)))
+    # 대조군: 다른 모델이 만든 문항은 통과한다(전부 거부하는 과잉 수정 방지).
+    result = verifier.verify(replace(_SUBJECT, authored_by=llm_author("some-other-model")))
+    assert result.aggregate == "ok"
+
+
+def test_legacy_corpus_corpus_prefix_no_longer_slips_past_the_guard() -> None:
+    """종전 결함의 직접 재현 — `corpus:<유형>` 서명 대상은 이제 검증 단계에서 거부된다."""
+    verifier = _verifier(ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]))
+    with pytest.raises(IndependenceError, match="판독할 수 없다"):
+        verifier.verify(replace(_SUBJECT, authored_by="corpus:FULLY_GENERATED"))
 
 
 # ── ③ 정보 은닉 ───────────────────────────────────────────────────────

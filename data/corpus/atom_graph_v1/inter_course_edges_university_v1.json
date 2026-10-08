@@ -3,7 +3,7 @@
     "generated_by": "scripts/build_inter_course_edges_s4_01.py",
     "task": "S4-01-math-k12-complete",
     "status": "proposal — 검수 전 정본 미병합",
-    "edge_count": 137,
+    "edge_count": 129,
     "source_graph_sha256": "1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f"
   },
   "edges": [
@@ -80,8 +80,8 @@
       "rationale": "무한대로 향함과 도달의 구분이 수열 수렴을 모든 ε에 대해 정의하는 동기가 된다"
     },
     {
-      "from_code": "CALC1-C25",
-      "from_name": "멱급수 끝점은 따로 확인",
+      "from_code": "CALC1-P22",
+      "from_name": "급수 수렴은 판정법을 골라 적용",
       "to_code": "ANAL1-P05",
       "to_name": "멱급수 수렴반경 계산",
       "relation": "prerequisite",
@@ -89,7 +89,7 @@
       "school_link": false,
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "멱급수 끝점은 따로 확인한다는 경험이 수렴반경을 계산하는 엄밀한 절차의 선행이다"
+      "rationale": "비판정·근판정을 골라 적용하는 절차가 멱급수 수렴반경 계산의 직접 선수다"
     },
     {
       "from_code": "CALC1-P10",
@@ -404,8 +404,8 @@
       "rationale": "평면곡선의 곡률 개념이 공간곡선의 곡률(휘는 정도)로 일반화된다"
     },
     {
-      "from_code": "CALC2-C09",
-      "from_name": "공간곡선은 벡터함수로",
+      "from_code": "CALC2-C10",
+      "from_name": "속력은 속도의 크기(스칼라)",
       "to_code": "DGEO-C01",
       "to_name": "호장 매개변수는 단위속력",
       "relation": "prerequisite",
@@ -413,7 +413,7 @@
       "school_link": false,
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "공간곡선의 벡터함수 표현이 호장 매개변수(단위속력 매개화)의 선행이다"
+      "rationale": "호장 매개화의 |r'(s)|=1은 속력=속도의 크기라는 이해에 직접 기댄다"
     },
     {
       "from_code": "CALC2-P07",
@@ -656,18 +656,6 @@
       "rationale": "수학적 귀납법이 극한순서수 단계를 더한 초한귀납법의 선행이다"
     },
     {
-      "from_code": "SETLOG-C08",
-      "from_name": "∅과 자기 자신도 부분집합",
-      "to_code": "SET-C02",
-      "to_name": "외연: 집합은 원소로만 결정",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "부분집합 관계가 외연 공리(원소로만 집합이 결정됨)를 쓰는 기본 도구다"
-    },
-    {
       "from_code": "SETLOG-R01",
       "from_name": "진리표(표) ↔ 논리식 ↔ 말",
       "to_code": "MLOG-C01",
@@ -752,8 +740,8 @@
       "rationale": "귀류법(결론을 부정)이 아르키메데스 성질(무한소는 없다)의 증명 방식이다"
     },
     {
-      "from_code": "SETLOG-C13",
-      "from_name": "동치관계는 세 조건 모두",
+      "from_code": "SETLOG-C14",
+      "from_name": "동치류는 서로 겹치지 않는다",
       "to_code": "AALG1-C05",
       "to_name": "잉여류는 군을 균등 분할한다",
       "relation": "prerequisite",
@@ -761,7 +749,7 @@
       "school_link": false,
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "동치관계의 세 조건이 잉여류가 군을 균등 분할한다는 사실의 근거다"
+      "rationale": "동치류가 겹치지 않고 전체를 분할한다는 사실이 잉여류의 균등 분할의 직접 선수다"
     },
     {
       "from_code": "SETLOG-C14",
@@ -810,18 +798,6 @@
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
       "rationale": "귀납법 작성이 소인수분해의 존재(유일성)를 증명하는 방식이다"
-    },
-    {
-      "from_code": "SETLOG-C13",
-      "from_name": "동치관계는 세 조건 모두",
-      "to_code": "NUMT1-C01",
-      "to_name": "합동의 나눗셈엔 gcd 조건",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "동치관계의 세 조건이 합동이 동치관계라는 사실(법 n 합동)의 근거다"
     },
     {
       "from_code": "SETLOG-R03",
@@ -882,18 +858,6 @@
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
       "rationale": "부분집합을 체계적으로 나열하는 연습이 조합 계산의 선행이다"
-    },
-    {
-      "from_code": "LINA1-P02",
-      "from_name": "행렬곱은 교환법칙이 없다",
-      "to_code": "COMB-R01",
-      "to_name": "그래프 그림 ↔ 인접행렬",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "행렬곱이 인접행렬의 거듭제곱으로 경로를 세는 표현의 선행이다"
     },
     {
       "from_code": "LINA1-C08",
@@ -1124,18 +1088,6 @@
       "rationale": "정수의 소인수분해 유일성이 정역에서 UFD가 아닌 반례를 이해하는 기준이다"
     },
     {
-      "from_code": "NUMT1-C06",
-      "from_name": "페르마 소정리는 소수 법에서",
-      "to_code": "AALG1-C04",
-      "to_name": "원소의 위수는 군 위수의 약수",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "페르마 소정리가 라그랑주 정리(위수는 군 위수의 약수)의 구체 사례로 먼저 배워진다"
-    },
-    {
       "from_code": "AALG2-C11",
       "from_name": "분해체는 다항식이 완전히 쪼개지는 최소 체",
       "to_code": "GALOIS-C01",
@@ -1328,18 +1280,6 @@
       "rationale": "복소 테일러 급수의 수렴원이 특이점까지라는 이해가 제타함수의 해석접속의 선행이다"
     },
     {
-      "from_code": "CXAN-P02",
-      "from_name": "유수정리로 실적분",
-      "to_code": "NUMT2-C05",
-      "to_name": "소수정리: π(x)~x/ln x",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "유수정리가 소수정리의 해석적 증명에서 쓰이는 핵심 도구다"
-    },
-    {
       "from_code": "NUMT1-C07",
       "from_name": "오일러 정리는 페르마의 일반화",
       "to_code": "CRYP-C03",
@@ -1362,18 +1302,6 @@
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
       "rationale": "원소의 위수 개념이 이산로그 문제가 정의되는 순환군 구조의 선행이다"
-    },
-    {
-      "from_code": "AALG2-C12",
-      "from_name": "유한체는 위수가 pⁿ뿐",
-      "to_code": "CRYP-C02",
-      "to_name": "AES는 대칭키",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "유한체의 구조(위수 pⁿ)가 AES의 GF(2⁸) 연산의 수학적 기반이다"
     },
     {
       "from_code": "PROB-C10",
@@ -1400,8 +1328,8 @@
       "rationale": "중심극한정리가 대표본 신뢰구간의 정규 근사를 정당화한다"
     },
     {
-      "from_code": "PROB-C08",
-      "from_name": "분산의 가법성엔 독립이 필요",
+      "from_code": "PROB-C09",
+      "from_name": "적률생성함수는 분포를 결정",
       "to_code": "MSTAT-C01",
       "to_name": "카이제곱은 정규 제곱의 합",
       "relation": "prerequisite",
@@ -1409,7 +1337,7 @@
       "school_link": false,
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "독립일 때 분산이 가법적이라는 사실이 정규 제곱의 합 분포 유도의 선행이다"
+      "rationale": "정규 제곱합이 카이제곱임은 적률생성함수가 분포를 결정한다는 사실로 보인다"
     },
     {
       "from_code": "PROB-C11",
@@ -1436,18 +1364,6 @@
       "rationale": "콜모고로프 공리(확률측도)가 위험중립측도를 가격용 가상확률로 정의하는 틀이다"
     },
     {
-      "from_code": "PDE-C03",
-      "from_name": "포물형은 확산(평활)",
-      "to_code": "FINM-C05",
-      "to_name": "블랙-숄즈는 무차익 복제",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "포물형 방정식의 확산 성질이 블랙-숄즈 방정식이 열방정식으로 환원되는 이유의 선행이다"
-    },
-    {
       "from_code": "CALC1-P24",
       "from_name": "테일러 계수는 f⁽ⁿ⁾(a)/n!",
       "to_code": "FINM-C04",
@@ -1472,8 +1388,8 @@
       "rationale": "도함수가 변화율이라는 정의가 듀레이션(금리 민감도)의 수학적 기반이다"
     },
     {
-      "from_code": "CALC1-C18",
-      "from_name": "정적분은 넓이가 아니라 부호 있는 합",
+      "from_code": "CALC1-P13",
+      "from_name": "FTC로 정적분 = F(b)−F(a)",
       "to_code": "PROB-C06",
       "to_name": "연속분포에서 한 점 확률은 0",
       "relation": "prerequisite",
@@ -1481,19 +1397,7 @@
       "school_link": false,
       "strength": 0.8,
       "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "정적분이 부호 있는 넓이의 합이라는 이해가 연속분포에서 한 점의 확률이 0인 이유의 선행이다"
-    },
-    {
-      "from_code": "CALC1-C24",
-      "from_name": "일반항→0은 수렴의 필요조건일 뿐",
-      "to_code": "PROB-C05",
-      "to_name": "이산분포는 PMF 합이 1",
-      "relation": "prerequisite",
-      "relation_subtype": "과목간(추정)",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "S4-01 대학 과목간 저작 v1",
-      "rationale": "무한급수의 수렴 이해가 이산분포의 PMF 합이 1이라는 조건의 선행이다"
+      "rationale": "P(a≤X≤b)=F(b)−F(a)이므로 FTC 계산이 한 점 확률 0의 직접 선수다"
     },
     {
       "from_code": "CALC2-C01",

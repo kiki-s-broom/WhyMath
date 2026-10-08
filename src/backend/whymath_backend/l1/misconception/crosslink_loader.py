@@ -33,6 +33,11 @@ from whymath_backend.db.models.misconception_crosslink import (
     MisconceptionCrosslink as MisconceptionCrosslinkORM,
 )
 from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
+from whymath_backend.l1.fk_precheck import (
+    ForeignKeyTargetMissingError,
+    MissingFkTargets,
+    missing_fk_targets,
+)
 from whymath_backend.l1.misconception.crosslink_gate import (
     CrosslinkGateError,
     load_gate_violations,
@@ -70,6 +75,7 @@ def load_crosslinks(
     engine: Engine | None = None,
     settings: Settings | None = None,
     store: MisconceptionCrosslinkStore | None = None,
+    check_fk_targets: bool = True,
 ) -> int:
     """crosswalk Collection JSON을 `misconception_crosslink`에 멱등 upsert. 반환=적재 행 수.
 
@@ -81,6 +87,10 @@ def load_crosslinks(
         FileNotFoundError: collection_json이 Path인데 파일 부재.
         pydantic.ValidationError: 행이 schema 형식을 위반.
         CrosslinkGateError: load 게이트 위반(method≠manual·미서명 — 검수 우회·전건 열거).
+        ForeignKeyTargetMissingError: `mis_id`가 `misconception_catalog`에 없다(HARN-302) —
+            쓰기 **전에** 읽기만으로 확인해 누락 키를 전건 열거하고 아무것도 쓰지 않는다.
+            `check_fk_targets=False`는 가짜 엔진을 쓰는 hermetic 테스트용 좌석이다
+            (실 경로는 항상 켠다).
     """
     del session  # async Session 미사용(sync 엔진 좌석) — 호환 자리표시.
     collection = _as_collection(collection_json)
@@ -99,6 +109,12 @@ def load_crosslinks(
         if store is not None
         else MisconceptionCrosslinkStore(engine=engine, settings=resolved)
     )
+    if check_fk_targets:
+        # 적재 전 외래키 대상 사전확인(HARN-302) — 누락이 하나라도 있으면
+        # 쓰기 0건으로 전건 열거 거부.
+        missing = cl_store.missing_fk_targets(crosslinks)
+        if missing:
+            raise ForeignKeyTargetMissingError(missing)
     return cl_store.populate(crosslinks)
 
 
@@ -130,6 +146,20 @@ class MisconceptionCrosslinkStore:
         if self._engine is None:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
+
+    def missing_fk_targets(
+        self, records: Sequence[MisconceptionCrosslink]
+    ) -> list[MissingFkTargets]:
+        """적재 대상 행의 외래키(`mis_id`) 참조 대상 중 DB에 없는 것을 전건 센다(HARN-302).
+
+        읽기 전용이다. `populate`와 **다른 트랜잭션**이다: 확인 뒤 쓰기 전에 대상이 지워지면 DB
+        외래키 제약이 마지막 방어선이다(`fk_precheck` 모듈 한계 절). `populate`는 순수 쓰기 원시
+        함수로 남겨 합성 시딩 좌석(resolve/shadow 테스트)의 동작을 바꾸지 않는다.
+        """
+        table = MisconceptionCrosslinkORM.__table__
+        rows = [record.model_dump() for record in records]
+        with self._get_engine().connect() as conn:
+            return missing_fk_targets(conn, table, rows)  # type: ignore[arg-type]
 
     def populate(self, records: Sequence[MisconceptionCrosslink]) -> int:
         """crosswalk schema 모델들을 멱등 upsert. 반환=적재 행 수(dedup 후).

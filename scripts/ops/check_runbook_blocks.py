@@ -41,6 +41,27 @@
 SQL 변이는 반대로 **문자열 안을 본다**: `psql … -c "DELETE FROM …"`의 위험은 문자열
 안에 있기 때문이다(그 한 가지 예외를 명시적으로 둔다).
 
+알려진 한계 — 이 스캐너가 **볼 수 없는** 쓰기 (HARN-214)
+----------------------------------------------------
+2026-10-07 G-misc40 crosslink 라이브 적재 블록은 DB에 64행을 쓰게 돼 있었는데(예상은 5행) 이
+스캐너가 그 블록을 **쓰기 0개**로 판정했다. 사람이 읽기 전용 블록의 출력(`DB_TOTAL=34`)을 보고
+쓰기 블록을 안 돌려 피해는 0이었다 — 설계가 아니라 사람이 막았다. 텍스트 스캔으로 인식 범위를 넓힌
+것(문자열 속 `psql`·`promote --load`·`load_crosslinks`)과 별개로, 다음은 **구조적으로 볼 수 없다**:
+
+- **변수 경유 실행** — `& $PyExe $LoadPy $Corpus`: 무엇이 실행되는지 변수 안에 있다.
+- **변수에 담은 SQL** — `psql -c $Query`: SQL 본문이 줄에 없다.
+- **파일·표준입력 SQL** — `psql -f - < $SqlDel`: 같은 줄에서 읽기인지 쓰기인지 알 수 없다.
+  쓰기로 취급해 보았으나(HARN-214 시험) 상태를 읽고 → 가드로 판정하고 → 쓰는 정상 패턴에서
+  가드 **앞의** 읽기까지 위반이 돼 정상 형태를 쓸 수 없고, 읽기 전용 `SELECT … <> '{}'`의
+  비교 연산자(`<`)를 리디렉션으로 오인했다. 그래서 편입하지 않는다.
+- **변경 범위의 의미** — 가드 조건이 *대상 집합이 계획과 같은지*를 보는지는 의미 판정이다.
+  숫자 리터럴 비교를 요구해도 `CATALOG_FK_TARGETS=2` 같은 무관한 숫자가 통과시킨다.
+
+이 한계들은 `tests/infra/test_runbook_write_guard.py`의 `test_known_blind_spots_*`가 **현재
+판정(쓰기 0개)을 고정**한다 — 누가 인식 범위를 넓히면 그 테스트가 깨져 판정 문서를 고치게 한다.
+변경 범위의 보호는 **쓰기 도구 자신**이 해야 한다(계획 대비 건수를 단언하고 어긋나면 거부) —
+후속 태스크 `HARN-215`가 소유한다.
+
 유예 (조용히 눌러앉지 못하게)
 ---------------------------
 기존 런북을 전건 즉시 정정하지 않으므로 그랜드파더를 둔다 — 단 **만료일 필수**이고,
@@ -112,6 +133,20 @@ _SQL_MUTATION = re.compile(
     r"\b(?:insert\s+into|update\s+\w|delete\s+from|drop\s+table|truncate)\b", re.IGNORECASE
 )
 _PSQL_INVOCATION = re.compile(r"\bpsql\b", re.IGNORECASE)
+# 저장소 적재 진입점 — `promote --load`·`load_crosslinks`는 DB를 쓴다(2026-10-07 HARN-214: 이 형태가
+# 어휘에 없어 적재 블록이 "쓰기 0개"로 판정됐다). 변수에 가려진 호출(`& $LoadPy`)은 텍스트
+# 스캔으로 탐지할 수 없다 — 한계는 모듈 docstring.
+_LOADER_ENTRYPOINT = re.compile(r"\bload_crosslinks\b|\bpromote\b[^\n]*\s--load\b", re.IGNORECASE)
+
+
+def _code_text(line: str) -> str:
+    """주석 전용 줄은 비우고 나머지는 **문자열을 보존한 채** 돌려준다.
+
+    `cmd /c "docker exec … psql -c \\"DELETE …\\""`처럼 명령이 문자열 안에 감싸이면
+    `mask_strings_and_comments`가 그 안을 가려 psql·SQL 변이를 못 본다(HARN-214 실측).
+    """
+    return "" if line.lstrip().startswith("#") else line
+
 
 # ── 되읽기·관측 판정 ─────────────────────────────────────────────────────
 _READBACK_TOKENS: tuple[str, ...] = (
@@ -323,9 +358,18 @@ def write_hits(block: Block) -> list[WriteHit]:
                 break
         if found:
             continue
-        # SQL 변이만은 문자열 *안*을 본다(psql -c "…"의 위험은 거기 있다).
-        if _PSQL_INVOCATION.search(lowered):
-            match = _SQL_MUTATION.search(line)
+        # 저장소 적재 진입점(`promote --load`·`load_crosslinks`) — 문자열 속 호출도 본다.
+        code_text = _code_text(line)
+        loader = _LOADER_ENTRYPOINT.search(code_text)
+        if loader:
+            hits.append(
+                WriteHit(line_no, loader.start(), "적재 CLI(promote --load / load_crosslinks)")
+            )
+            continue
+        # SQL 변이만은 문자열 *안*을 본다(psql -c "…"의 위험은 거기 있다). `cmd /c "…psql…"`처럼
+        # psql 자체가 문자열에 감싸인 경우도 원문에서 찾는다(마스킹 텍스트는 그 안을 가린다).
+        if _PSQL_INVOCATION.search(code_text):
+            match = _SQL_MUTATION.search(code_text)
             if match:
                 hits.append(
                     WriteHit(
@@ -468,16 +512,27 @@ def has_speaking_else(block: Block) -> bool:
 
 
 def has_dangling_else(block: Block) -> bool:
-    """닫힌 `if` 다음 **새 줄**에서 시작하는 `else`/`elseif` — 대화형 프롬프트에서 깨진다."""
+    """닫힌 `if` 다음 **새 줄**에서 시작하는 `else`/`elseif` — 대화형 프롬프트에서 깨진다.
+
+    `} else {`가 줄 맨 앞에 오고 앞 줄이 `}`로 끝나도, 그 앞 줄이 **안쪽** 가지를 닫는 것이고
+    이 줄의 `}`가 **아직 열려 있는 바깥** 가지를 닫는 것이면 정상이다(중첩 가드 — Kiki 머신에서
+    실제로 정상 실행된 형태). 그래서 줄 시작 시점의 중괄호 깊이가 0이면(닫을 바깥 가지가 없으면)
+    위반으로 본다.
+    """
+    depth = 0
     for offset, line in enumerate(block.lines):
+        masked = mask_strings_and_comments(line)
+        depth_before = depth
+        depth += masked.count("{") - masked.count("}")
         if not _DANGLING_ELSE.match(line):
             continue
         # 같은 줄에 `}`가 있어도, 그 앞에 실행 가능한 내용이 없으면 새 줄 시작이다.
         stripped = strip_strings_and_comments(line).strip()
         if stripped.startswith("}") and offset > 0:
-            # `} else {` 형태가 *줄 맨 앞*에 홀로 오면 앞 줄에서 if가 이미 닫힌 것이다.
+            # `} else {` 형태가 *줄 맨 앞*에 홀로 오면 앞 줄에서 if가 이미 닫힌 것이다 —
+            # 단, 이 줄의 `}`가 닫을 바깥 가지가 열려 있으면(깊이 ≥ 1) 중첩 가드의 정상 형태다.
             prev = strip_strings_and_comments(block.lines[offset - 1]).strip()
-            if prev.endswith("}"):
+            if prev.endswith("}") and depth_before == 0:
                 return True
         elif stripped.startswith(("else", "elseif")):
             return True
