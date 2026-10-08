@@ -1331,6 +1331,46 @@ class TestGenericReads:
         content = next(r for r in body["resources"] if r["key"] == "concept_content")
         assert content["reviewable"] is True
 
+    def test_resources_meta_route_is_derived_from_the_owning_module(self) -> None:
+        """화면은 이 `route`로 자기 리소스를 고른다 — 레지스트리 값과 한 글자도 달라선 안 된다.
+
+        선언의 `module_id`가 가드의 모듈과 같다는 것은 별도 테스트가 동결하므로, 여기서는 응답의
+        `route`가 그 모듈의 레지스트리 경로와 같음과 — 비어 있거나 `/admin` 밖이 아님 — 을 본다.
+        """
+        from whymath_backend.api.admin_module_registry import get_module
+
+        resp = _client(_EDITOR, FakeSession()).get("/v1/admin/cms/resources")
+        assert resp.status_code == 200, resp.text
+        by_key = {r["key"]: r["route"] for r in resp.json()["resources"]}
+        assert set(by_key) == {s.key for s in RESOURCES}, "리소스 누락"
+        for spec in RESOURCES:
+            route = by_key[spec.key]
+            assert route == get_module(spec.module_id).route, spec.key
+            assert route.startswith("/admin/") and not route.endswith("/"), (spec.key, route)
+        # 한 화면에 여러 리소스가 실리는 것은 의도다(콘텐츠 라이브러리) — 모수가 1이면 그 기능은 공허하다.
+        assert len({r for r in by_key.values()}) < len(by_key)
+
+    def test_resources_meta_audit_type_matches_the_declaration(self) -> None:
+        """변경이력 조회 종류를 서버가 명시로 내린다 — 읽기 전용 리소스만 None이다."""
+        resp = _client(_EDITOR, FakeSession()).get("/v1/admin/cms/resources")
+        assert resp.status_code == 200, resp.text
+        by_key = {r["key"]: r["audit_type"] for r in resp.json()["resources"]}
+        for spec in RESOURCES:
+            expected = spec.audit_type.value if spec.audit_type is not None else None
+            assert by_key[spec.key] == expected, spec.key
+        assert by_key["skill_node"] is None  # 읽기 전용 — 쓰기가 없으니 이력도 없다
+        assert by_key["problem"] is not None  # 대조군: 쓰기 리소스는 종류가 있다
+
+    def test_resources_meta_pk_column_is_a_listed_column(self) -> None:
+        """화면은 이 컬럼 값으로 상세를 연다 — 목록 컬럼에 없으면 행을 열 수 없다."""
+        resp = _client(_EDITOR, FakeSession()).get("/v1/admin/cms/resources")
+        assert resp.status_code == 200, resp.text
+        by_key = {r["key"]: r for r in resp.json()["resources"]}
+        for spec in RESOURCES:
+            meta = by_key[spec.key]
+            assert meta["pk_column"] == spec.pk, spec.key
+            assert meta["pk_column"] in meta["list_columns"], spec.key
+
 
 class TestAuditHistory:
     def _get(self, query: str, fake: FakeSession | None = None, user: UserProfile = _EDITOR) -> Any:

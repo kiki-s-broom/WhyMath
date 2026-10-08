@@ -349,6 +349,7 @@ def test_admin_calls_only_the_bff() -> None:
 _FETCH_SITES = {
     "app/admin/_lib/adminApi.ts": 1,  # 메뉴(`GET /v1/admin/menu`) — 앱 로드 시 1회
     "app/admin/_lib/adminReviewApi.ts": 1,  # 검수 큐 목록·상세·전이 — 내부 `request()` 1곳 경유
+    "app/admin/_lib/adminCmsApi.ts": 1,  # CMS 12종 읽기·쓰기 — 내부 `request()` 1곳 경유(P3-12)
 }
 
 

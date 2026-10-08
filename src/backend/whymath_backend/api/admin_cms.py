@@ -59,7 +59,7 @@ from whymath_backend.api.admin_cms_resources import (
     to_jsonable,
     validate_changes,
 )
-from whymath_backend.api.admin_module_registry import require_module_roles
+from whymath_backend.api.admin_module_registry import get_module, require_module_roles
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.concept import Concept, ConceptEdge
@@ -166,6 +166,15 @@ class CmsResourceMeta(BaseModel):
 
     key: str
     label_ko: str
+    # 이 리소스를 소유한 콘솔 모듈의 화면 경로 — 레지스트리에서 파생한다. 화면은 모듈 id·경로를
+    # 코드에 적지 않고(하드코딩 nav 금지) 자기 경로와 이 값을 맞춰 어떤 리소스를 그릴지 정한다.
+    route: str
+    # 목록 행·상세 경로에서 대상을 가리키는 기본키 컬럼 이름 — 화면이 "첫 컬럼이 키겠지"라고
+    # 추정하지 않도록 서버가 명시로 내린다.
+    pk_column: str
+    # 변경이력 조회(`GET /audit?resource_type=`)에 쓰는 종류 — 읽기 전용 리소스는 쓰기가 없어 None.
+    # 화면이 "리소스 키 = 감사 종류"라고 암묵 가정하지 않도록 서버가 명시로 내린다.
+    audit_type: str | None
     list_columns: tuple[str, ...]
     detail_columns: tuple[str, ...]
     fields: tuple[CmsFieldMeta, ...]
@@ -869,6 +878,9 @@ def _resource_meta(spec: ResourceSpec) -> CmsResourceMeta:
     return CmsResourceMeta(
         key=spec.key,
         label_ko=spec.label_ko,
+        route=get_module(spec.module_id).route,
+        pk_column=spec.pk,
+        audit_type=spec.audit_type.value if spec.audit_type is not None else None,
         list_columns=spec.list_columns,
         detail_columns=spec.detail_columns,
         fields=_field_metas(spec),
