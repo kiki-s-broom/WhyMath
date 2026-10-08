@@ -1,0 +1,46 @@
+# Feature/Code Freeze PR 검사 (HARN-103) — 규칙 정본: docs/standards/release_freeze.md
+#
+# ci.yml과 독립된 파일이다: 이 검사는 날짜가 바뀌는 순간(11/30·12/14) 동작이 달라지는 유일한
+# 잡이라, 일반 CI 잡의 수정 흐름과 섞이면 동결 규칙 변경이 눈에 띄지 않는다.
+#
+# 현재 required check가 아니다(의도적). required 승격은 Kiki의 룰셋 편집이며 게이트
+# `G-release-freeze-labels-and-required`가 소유한다. 승격 시 merge queue(merge_group)에서도
+# 잡이 떠야 하므로 아래 merge_group 분기를 미리 둔다 — 없으면 승격 순간 큐가 영구 대기한다.
+name: release-freeze
+
+on:
+  pull_request:
+    branches: [main]
+    # labeled/unlabeled 포함 — 라벨을 붙이면 같은 PR에서 재판정돼야 예외 절차가 성립한다.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  release-freeze:
+    name: release-freeze — Feature/Code Freeze 라벨 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          # base...HEAD 비교에 공통 조상이 필요하다 — shallow면 git diff가 실패한다.
+          fetch-depth: 0
+
+      # 차단 게이트다(continue-on-error 없음). exit 1=위반 · exit 2=측정 실패.
+      # 라벨·ref는 env로 넘긴다 — run 본문에 ${{ }}를 직접 쓰면 라벨 이름이 셸 명령이 된다.
+      - name: Freeze 검사
+        if: github.event_name == 'pull_request'
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          BASE_REF: origin/${{ github.base_ref }}
+        run: python3 scripts/ops/check_release_freeze.py --labels "$PR_LABELS" --base "$BASE_REF"
+
+      - name: merge queue 통과 표시
+        if: github.event_name == 'merge_group'
+        run: echo "freeze 판정은 PR 단계에서 이미 끝났다 — merge_group에서는 재판정하지 않는다"
