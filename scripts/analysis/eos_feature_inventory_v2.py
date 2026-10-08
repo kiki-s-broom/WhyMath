@@ -999,7 +999,9 @@ CATALOG: tuple[Spec, ...] = (
        "db.schema_version", "db.session"),
     _e("WM-E-803", "인증·인가·암호화·레이트리밋·동시성 배관", "Platform", "Security", "P0",
        "JWT·디바이스 서명·봉투 암호화 — 불변 계약", "security", "api._auth", "api._crypto",
-       "api._rate_limit", "api._concurrency", "api._degradation", "api._query_filters"),
+       "api._rate_limit", "api._concurrency", "api._degradation", "api._query_filters",
+       # OPS-82: 학생 대면 API 에러코드 레지스트리·CodedHTTPException — 배관(판정 로직 0).
+       "api._error_codes"),
     _e("WM-E-804", "OAuth 제공자 구현(카카오·네이버 httpx)", "Platform", "Identity", "P0",
        "OAuth-a2 — auth callback이 app.state DI(OAUTH_PROVIDERS_KEY)로 호출 → DI 다리로 도달",
        "api.oauth_providers"),

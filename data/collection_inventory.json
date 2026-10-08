@@ -1,0 +1,817 @@
+{
+  "version": "1.0",
+  "note": "user_profile 테이블의 수집 항목 대장 — 컬럼별 {수집 여부·수집 경로·목적·런타임 소비처·보존 계획·PII 등급}의 기계 판독 단일 원본(ADMIN-09). 이 대장이 없던 때에는 pipa_data_matrix.md §3.2가 '수집 항목·이용 목적·보유 기간을 고지'하라고 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 값을 날조하지 않는다: 소비처가 없으면 purpose는 'none'이고 그것이 정직한 상태다. 'runtime_consumers'의 비어 있지 않은 목록은 존재 주장(대표 목록)이며 각 항목이 실제로 그 컬럼을 참조하는지 기계가 검증한다. 빈 목록은 전수 주장('이 컬럼을 읽는 코드가 0')이며 기계가 코드 전수 스캔으로 검증한다(단 다른 테이블과 이름이 겹치는 컬럼은 UserProfile.<컬럼> 형태만 검증 가능). pii_grade는 기술적 분류이지 법적 분류(개인정보·민감정보 해당 여부)가 아니다 — 법적 확정, 목적·보존 문구의 법률적 적정성은 MGMT-02(변호사 검토) 소관이다.",
+  "authority": {
+    "columns": "src/backend/whymath_backend/db/models/user.py::UserProfile (컬럼 집합의 정본)",
+    "user_input_paths": "src/backend/whymath_backend/api/users.py::_SELF_EDITABLE (학생 입력 쓰기 경로의 정본)",
+    "response_exclusion": "src/backend/whymath_backend/api/users.py::_PII_EXCLUDE (본인 조회 응답에서 빼는 해시 식별자)",
+    "retention": "src/backend/whymath_backend/privacy/retention.py::_RETENTION_PLAN_EXEMPTIONS['user_profile']",
+    "constitution": "constitution/rules.yaml R26-01 (개인정보 인벤토리에 없는 필드는 저장할 수 없다)"
+  },
+  "measured": {
+    "base": "main 8a5ea4d1",
+    "date": "2026-10-08",
+    "method": "src/backend/whymath_backend 전체 .py를 AST로 스캔해 컬럼 읽기·쓰기 참조를 분류 + 쓰기 경로·소비처 코드 직접 읽기. 주석·docstring의 언급은 참조로 세지 않는다."
+  },
+  "consumers_of_this_file": [
+    "governance gate: tests/backend/schema/test_collection_inventory.py — ORM 컬럼 집합 ↔ 대장 동기, 쓰기 경로 ↔ PATCH 화이트리스트 동기, 소비처·무소비 주장의 코드 대조, 보존 계획 연결",
+    "future: MGMT-02 처리방침 문안의 수집 항목 고지 · ADMIN-02 (c) school_region·gender 처분 근거 · CONST-08 R26-01 인벤토리 어댑터"
+  ],
+  "out_of_scope": [
+    "컬럼 드롭 (ADMIN-02)",
+    "수집 시작·중단 같은 동작 변경",
+    "pipa_data_matrix.md §2.2 9항목 권한표 확장 (학습 데이터 축 — access_matrix.json)",
+    "목적·보존 문구와 pii_grade의 법률적 확정 (MGMT-02)"
+  ],
+  "vocab": {
+    "pii_grades": {
+      "identifier_hashed": "직접 식별자(이메일)의 단방향 해시 — 평문 미저장, 본인 조회 응답에서 제외.",
+      "identifier_pseudonymous": "서비스가 발급한 가명 식별자(UUID) — 단독으로 실명을 가리키지 않지만 학생 데이터 전체의 연결 키.",
+      "quasi_identifier": "단독으로는 신원을 특정하기 어렵지만 결합하면 개인을 좁힐 수 있는 인적 속성(닉네임·출생연도·성별·학교·학년).",
+      "personal_attribute": "개인에 관한 정보지만 식별력은 낮은 속성(목표·학습 환경·사교육 이용·접근성 필요).",
+      "system_state": "서버가 만들거나 판정하는 상태·시각·역할 값 — 학생이 제공한 정보가 아님."
+    },
+    "origins": {
+      "user_input": "학생이 입력해 서버에 쓰는 값(수집).",
+      "external_identity": "OAuth 제공자(카카오·네이버)가 돌려준 신원에서 가져오는 값(수집).",
+      "consent_record": "법정대리인 동의 기록·철회 엔드포인트가 찍는 값(수집).",
+      "server_derived": "서버가 다른 컬럼에서 파생하는 값 — 클라이언트 입력을 받지 않는다.",
+      "system_generated": "서버·DB가 생성하거나 정한 값(UUID·시각·기본값).",
+      "operator_set": "운영자 CLI가 쓰는 값."
+    },
+    "collecting_origins": [
+      "user_input",
+      "external_identity",
+      "consent_record"
+    ],
+    "states": {
+      "collected_consumed": "수집하고 소비처가 있다.",
+      "collected_unconsumed": "수집 경로는 열려 있는데 읽는 코드가 0이다 — 데이터 최소 수집 검토 후보.",
+      "uncollected_consumed": "수집 값이 아닌 값(시스템·파생·운영자)을 읽는 소비처가 있다. 값을 쓰는 경로가 없으면(origins가 비어 있음) 소비처는 항상 NULL을 읽는다.",
+      "uncollected_unconsumed": "수집도 소비도 없다 — 쓰는 코드와 읽는 코드가 모두 0인 컬럼."
+    }
+  },
+  "collection_paths": {
+    "oauth_callback": {
+      "kind": "http",
+      "endpoint": "POST /v1/auth/{provider}/callback",
+      "source": "api/auth.py",
+      "note": "신규 가입 시 resolve_user가 행을 만든다(기존 사용자는 덮어쓰지 않는다). 데모·KPI 샘플 provider도 같은 resolve_user를 거친다."
+    },
+    "patch_users_me": {
+      "kind": "http",
+      "endpoint": "PATCH /v1/users/me",
+      "source": "api/users.py",
+      "note": "학생이 쓸 수 있는 필드는 _SELF_EDITABLE 화이트리스트 17개뿐이다(user_input 출처와 정확히 일치해야 한다). is_minor는 화이트리스트 밖이며 매 쓰기마다 서버가 파생한다. 관측(기계 미강제, 2026-10-08): Flutter 온보딩이 실제로 보내는 필드는 target_grade·target_score·target_exam_date·birth_year 4개다."
+    },
+    "parental_consent_grant": {
+      "kind": "http",
+      "endpoint": "POST /v1/users/me/parental-consent",
+      "source": "api/users.py",
+      "note": "법정대리인 동의를 기록하고 parent_consent_at을 찍는다. 기능 플래그 parental_consent_grant_enabled 기본 off."
+    },
+    "parental_consent_revoke": {
+      "kind": "http",
+      "endpoint": "DELETE /v1/users/me/parental-consent",
+      "source": "api/users.py",
+      "note": "동의를 철회하고 parent_consent_at을 NULL로 되돌린다."
+    },
+    "ops_account_bootstrap": {
+      "kind": "ops_cli",
+      "endpoint": "ops/account_bootstrap_cli.py",
+      "source": "ops/account_bootstrap_cli.py",
+      "note": "운영자가 셸에서 직접 실행하는 계정 생성. HTTP에 노출되지 않는다."
+    },
+    "ops_role_grant": {
+      "kind": "ops_cli",
+      "endpoint": "ops/role_grant_cli.py",
+      "source": "ops/role_grant_cli.py",
+      "note": "운영자가 셸에서 직접 실행하는 역할 부여·회수. HTTP에 노출되지 않는다."
+    },
+    "db_default": {
+      "kind": "system",
+      "endpoint": "ORM server_default",
+      "source": "db/models/user.py",
+      "note": "코드가 값을 넣지 않고 DB 기본값이 채운다. ORM 컬럼에 server_default가 있는 것과 정확히 일치해야 한다."
+    }
+  },
+  "retention_plans": {
+    "account_row": {
+      "summary": "행 단위로 계정 수명에 매여 있다 — 삭제권 이행(erase_user)이 user_profile 행을 마지막에 명시 삭제한다. 시간 기준 자동 파기는 없다. 탈퇴·비활동 계정 현재값의 보존 연한은 법령 판단이라 코드가 정하지 않는다.",
+      "source": "privacy/retention.py",
+      "owner_task": "MGMT-02"
+    }
+  },
+  "whole_row_readers": {
+    "note": "아래 경로는 행 전체를 통과시키므로 개별 컬럼의 소비처로 세지 않는다.",
+    "paths": [
+      {
+        "endpoint": "GET /v1/users/me",
+        "source": "api/users.py",
+        "excludes": [
+          "email_hash",
+          "parent_email_hash"
+        ]
+      },
+      {
+        "endpoint": "계정 데이터 내보내기(열람·이동권)",
+        "source": "privacy/export.py",
+        "excludes": []
+      },
+      {
+        "endpoint": "계정 삭제(삭제권)",
+        "source": "privacy/erasure.py",
+        "excludes": []
+      }
+    ]
+  },
+  "columns": {
+    "user_id": {
+      "pii_grade": "identifier_pseudonymous",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "oauth_callback",
+          "ops_account_bootstrap",
+          "db_default"
+        ]
+      },
+      "purpose": "학생 데이터 전 테이블을 잇는 가명 연결 키(PK/FK) · 삭제권·열람권 이행 키",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "토큰의 사용자 키로 계정 조회"
+        },
+        {
+          "ref": "privacy/erasure.py",
+          "use": "삭제권 이행 시 학생 데이터 삭제 키"
+        },
+        {
+          "ref": "privacy/export.py",
+          "use": "열람·이동권 내보내기 조회 키"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed"
+    },
+    "email_hash": {
+      "pii_grade": "identifier_hashed",
+      "collected": true,
+      "origins": {
+        "external_identity": [
+          "oauth_callback"
+        ],
+        "operator_set": [
+          "ops_account_bootstrap"
+        ]
+      },
+      "purpose": "로그인 계정 식별 키(OAuth upsert) — 평문 이메일은 저장하지 않는다",
+      "runtime_consumers": [
+        {
+          "ref": "api/auth.py",
+          "use": "resolve_user가 계정을 찾는 조회 키"
+        },
+        {
+          "ref": "ops/account_bootstrap_cli.py",
+          "use": "운영 계정 조회·생성 키(로그인 경로와 같은 해시)"
+        },
+        {
+          "ref": "api/admin_module_registry.py",
+          "use": "데모 계정 동일성 판정"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "GET /v1/users/me 응답에서는 제외된다(api/users.py::_PII_EXCLUDE)."
+    },
+    "nickname": {
+      "pii_grade": "quasi_identifier",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "운영자 BFF의 계정 확인 표시(앞 1글자만 남기는 마스킹)",
+      "runtime_consumers": [
+        {
+          "ref": "api/admin_bff.py",
+          "use": "운영자 사용자 상세에 마스킹해 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "관측(기계 미강제, 2026-10-08): 학생 대면 화면의 소비처 0 · Flutter 앱이 이 필드를 보내는 코드 0."
+    },
+    "birth_year": {
+      "pii_grade": "quasi_identifier",
+      "collected": true,
+      "origins": {
+        "external_identity": [
+          "oauth_callback"
+        ],
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "만 14세 미만 여부 판정의 입력(consent.derive_is_minor) — 월일은 수집하지 않는다",
+      "runtime_consumers": [
+        {
+          "ref": "api/users.py",
+          "use": "PATCH 때 병합된 출생연도로 미성년 여부를 서버가 다시 파생"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "OAuth 제공자가 주지 않으면 NULL(미상). Flutter 온보딩이 PATCH로 보낸다."
+    },
+    "gender": {
+      "pii_grade": "quasi_identifier",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "school_type": {
+      "pii_grade": "quasi_identifier",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "목표 진도(성취기준 커버리지) 범위 계산 · 운영자 계정 확인 표시",
+      "runtime_consumers": [
+        {
+          "ref": "l2/target_progress.py",
+          "use": "성취기준 커버리지 스코프 계산"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "운영자 사용자 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed"
+    },
+    "school_region": {
+      "pii_grade": "quasi_identifier",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "school_id": {
+      "pii_grade": "quasi_identifier",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "grade": {
+      "pii_grade": "quasi_identifier",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "교수법 후보 필터(grade_band) · 코치 프롬프트 학년 개인화 · 학습자 상태 조립",
+      "runtime_consumers": [
+        {
+          "ref": "api/study.py",
+          "use": "학년을 학교급 밴드로 바꿔 교수법 후보 필터에 사용"
+        },
+        {
+          "ref": "api/coach.py",
+          "use": "코치 프롬프트의 학년 개인화"
+        },
+        {
+          "ref": "l2/learner_state.py",
+          "use": "학습자 상태 조립"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "운영자 사용자 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed"
+    },
+    "track_type": {
+      "pii_grade": "personal_attribute",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "target_universities": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "학습자 상태(learner_state)의 목표 항목",
+      "runtime_consumers": [
+        {
+          "ref": "l2/learner_state.py",
+          "use": "목표 항목에 문자열로 조립"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed"
+    },
+    "target_major_category": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "target_grade": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "목표 진도 계산(입력값 되돌려주기) · 학습자 상태의 목표 항목",
+      "runtime_consumers": [
+        {
+          "ref": "l2/target_progress.py",
+          "use": "목표 진도 응답에 입력값을 되돌려줌"
+        },
+        {
+          "ref": "l2/learner_state.py",
+          "use": "목표 항목에 조립"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "수능 등급(1~9)이며 학년이 아니다. Flutter 온보딩이 PATCH로 보낸다."
+    },
+    "target_score": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "목표 진도 계산(입력값 되돌려주기) · 학습자 상태의 목표 항목",
+      "runtime_consumers": [
+        {
+          "ref": "l2/target_progress.py",
+          "use": "목표 진도 응답에 입력값을 되돌려줌"
+        },
+        {
+          "ref": "l2/learner_state.py",
+          "use": "목표 항목에 조립"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "Flutter 온보딩이 PATCH로 보낸다."
+    },
+    "target_exam_date": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "목표일까지 남은 일수 계산 · 학습자 상태의 목표 항목",
+      "runtime_consumers": [
+        {
+          "ref": "l2/target_progress.py",
+          "use": "목표일까지 남은 일수 계산"
+        },
+        {
+          "ref": "l2/learner_state.py",
+          "use": "목표 항목에 조립"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "Flutter 온보딩이 PATCH로 보낸다."
+    },
+    "persona_primary": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "oauth_callback",
+          "ops_account_bootstrap"
+        ]
+      },
+      "purpose": "페르소나별 학습 지표 집계 · 운영자 계정 확인 표시",
+      "runtime_consumers": [
+        {
+          "ref": "l2/learning_metrics_rollup.py",
+          "use": "페르소나별 학습 지표 집계"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "운영자 사용자 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "관측(기계 미강제, 2026-10-08): 값을 쓰는 곳이 가입·부트스트랩의 기본 페르소나 지정뿐이고 PATCH 화이트리스트에 없다 — api/auth.py의 '온보딩에서 정교화' 주석에 대응하는 경로가 없다."
+    },
+    "persona_secondary": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "persona_confidence": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "primary_device": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "has_apple_pencil": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "note_app": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "current_grade_estimate": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "current_grade_updated_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "diagnostic_completed": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "db_default"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed",
+      "note": "DB 기본값(false)만 있고 값을 바꾸는 코드가 0이다."
+    },
+    "diagnostic_completed_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "uses_inkang": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "inkang_provider": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "uses_offline_academy": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "monthly_education_spend": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed"
+    },
+    "subscription_tier": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "운영자 BFF의 구독 티어 집계·표시",
+      "runtime_consumers": [
+        {
+          "ref": "api/admin_bff.py",
+          "use": "티어별 사용자 수 집계와 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "쓰는 코드가 0이라 운영자 집계는 항상 NULL 한 묶음이다. l3/escalation_defaults.py가 결제 도입 시 읽을 예약 좌석으로 선언했다(처분은 ADMIN-02)."
+    },
+    "subscription_started_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "subscription_renewed_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    },
+    "is_minor": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "server_derived": [
+          "oauth_callback",
+          "patch_users_me"
+        ]
+      },
+      "purpose": "만 14세 미만 법정대리인 동의 게이트 판정 · 운영자 미성년 집계",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "미성년이면 동의 게이트 적용"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "미성년 사용자 수 집계와 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "클라이언트가 보낸 값은 받지 않고 항상 birth_year에서 서버가 파생한다."
+    },
+    "parent_consent_at": {
+      "pii_grade": "system_state",
+      "collected": true,
+      "origins": {
+        "consent_record": [
+          "parental_consent_grant",
+          "parental_consent_revoke"
+        ]
+      },
+      "purpose": "법정대리인 동의 여부를 가르는 동의 게이트 입력 · 운영자 표시",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "동의 시각이 없으면 미성년 접근 차단"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "운영자 사용자 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "collected_consumed",
+      "note": "철회하면 NULL로 되돌려 게이트를 다시 닫는다."
+    },
+    "parent_email_hash": {
+      "pii_grade": "identifier_hashed",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed",
+      "note": "법정대리인 이메일 해시는 parental_consent.guardian_email_hash에 저장되고 이 컬럼은 쓰는 코드가 0이다."
+    },
+    "accessibility_needs": {
+      "pii_grade": "personal_attribute",
+      "collected": true,
+      "origins": {
+        "user_input": [
+          "patch_users_me"
+        ]
+      },
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "collected_unconsumed",
+      "note": "건강 관련 정보의 성격을 띨 수 있어 법적 분류가 필요하다(pipa_data_matrix.md §5 — MGMT-02)."
+    },
+    "role": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "db_default"
+        ],
+        "operator_set": [
+          "ops_role_grant"
+        ]
+      },
+      "purpose": "인가 역할 게이팅(콘텐츠 작성 권한) · 운영자 토큰 발급 대상 확인",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "require_role이 역할로 접근 허용 여부 판정"
+        },
+        {
+          "ref": "ops/operator_token_cli.py",
+          "use": "운영자 토큰을 발급할 수 있는 역할인지 확인"
+        },
+        {
+          "ref": "ops/role_grant_cli.py",
+          "use": "역할 부여·회수·조회"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "역할별 사용자 수 집계와 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed"
+    },
+    "created_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "db_default"
+        ]
+      },
+      "purpose": "운영자 사용자 상세의 가입 시각 표시",
+      "runtime_consumers": [
+        {
+          "ref": "api/admin_bff.py",
+          "use": "가입 시각 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed"
+    },
+    "last_active_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "운영자 사용자 상세의 마지막 활동 시각 표시",
+      "runtime_consumers": [
+        {
+          "ref": "api/admin_bff.py",
+          "use": "마지막 활동 시각 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "쓰는 코드가 0이라 운영자 화면은 항상 NULL을 보여준다."
+    },
+    "is_active": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "db_default"
+        ]
+      },
+      "purpose": "비활성 계정 접근 차단 · 운영자 활성 사용자 집계",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "비활성 계정이면 401"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "활성 사용자 수 집계와 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "관측(기계 미강제, 2026-10-08): 값을 false로 바꾸는 코드가 0이다."
+    },
+    "is_deleted": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {
+        "system_generated": [
+          "db_default"
+        ]
+      },
+      "purpose": "삭제된 계정 접근 차단 · 운영자 삭제 사용자 집계",
+      "runtime_consumers": [
+        {
+          "ref": "api/_auth.py",
+          "use": "삭제 표시된 계정이면 401"
+        },
+        {
+          "ref": "api/admin_bff.py",
+          "use": "삭제 사용자 수 집계와 상세 표시"
+        }
+      ],
+      "retention": "account_row",
+      "state": "uncollected_consumed",
+      "note": "관측(기계 미강제, 2026-10-08): 값을 true로 바꾸는 코드가 0이다 — 삭제는 erase_user가 행 자체를 지운다."
+    },
+    "deleted_at": {
+      "pii_grade": "system_state",
+      "collected": false,
+      "origins": {},
+      "purpose": "none",
+      "runtime_consumers": [],
+      "retention": "account_row",
+      "state": "uncollected_unconsumed"
+    }
+  }
+}

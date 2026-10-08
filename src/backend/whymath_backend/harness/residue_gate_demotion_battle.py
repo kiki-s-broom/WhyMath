@@ -1408,7 +1408,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--authored-by",
         default=None,
-        help="생성자 서명 override(검증자와 충돌 시 IndependenceError 회피용).",
+        help=(
+            "생성자 서명 선언(서명 기록이 없는 구 코퍼스용·레코드 값을 덮어씀) — "
+            "'llm:<모델 id>' 또는 'deterministic:<생성기>'. 실제 저작 주체를 적는다: 거짓 선언은 "
+            "생성자≠검증자 가드를 무력화해 측정을 무효로 만든다(가드 회피용 스위치가 아니다)."
+        ),
     )
     # 좌석 선택은 **상호배타** — 로컬 고정과 클라우드 좌석을 동시에 지정하면 어느 쪽에서 난
     # 수치인지 말할 수 없다. argparse가 거부하게 해서 측정 시작 전에 멈춘다.

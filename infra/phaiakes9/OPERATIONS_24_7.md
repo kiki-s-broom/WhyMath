@@ -25,12 +25,12 @@ Phaiakes9(Ryzen AI Max+ 395·128GB) 단일 노드에 전 스택을 systemd/컨�
 | `whymath-api` (uvicorn) | L5 FastAPI — L1~L4 오케스트레이션·`/v1/*` | 8000 | **`GET /status`**(아래 §3) | 무상태(컨테이너) |
 | `whymath-worker` (celery) | **QUALITY(27b) 비동기 큐 전용**(03a §D.3·동시성 1·GPU 단일 점유). **정본 = compose `quality-worker` 컨테이너**(§2 정본 지정) | — | `celery inspect ping -d <자기 노드>` | 무상태 |
 | `postgres` (+TimescaleDB·pgvector) | RDB·시계열·임베딩 벡터(단일 store 동거·슬98) | 5432 | `pg_isready` | **영속(백업 필수)** |
-| `neo4j` (Community) | 개념 연결 그래프(노드·엣지) | 7687/7474 | `cypher RETURN 1` | **영속(백업 필수)** |
-| `clickhouse` | 학습 행동 로그 분석 | 9000/8123 | `SELECT 1` | 영속(재생성 가능) |
 | `redis` | 세션·핫데이터·**L3 응답 캐시**·Celery broker/backend | 6379 | `PING` | 반영속(AOF 권장) |
 | `minio` (S3 호환) | 영상·이미지·**학생 손글씨 원본**(미성년 PII·암호화) | 9000c | `/minio/health/live` | **영속·암호화** |
 
-의존 순서(부팅): `postgres·neo4j·redis·clickhouse·minio·ollama` → `whymath-api`·`whymath-worker`.
+> **정정(2026-10-07 · OPS-37)**: 종전 이 표는 `neo4j`(2026-08-03 미도입 확정)·`clickhouse`(2026-08-11 실측 미도입)를 가동 서비스로 적었다. 개념 그래프와 행동 로그의 정본은 둘 다 PostgreSQL 16(+TimescaleDB·pgvector) 단일 평면이다 — 존재하지 않는 서비스의 헬스체크·부팅 순서·백업을 지시하던 상태를 해소했다. 도입이 판정되면 그때 이 표에 다시 올린다.
+
+의존 순서(부팅): `postgres·redis·minio·ollama` → `whymath-api`·`whymath-worker`.
 이 순서를 systemd `After=`/`Wants=`로 강제한다(§2). 컨테이너 스택이면 docker-compose `depends_on`+healthcheck.
 
 ---
@@ -57,8 +57,8 @@ Phaiakes9(Ryzen AI Max+ 395·128GB) 단일 노드에 전 스택을 systemd/컨�
 ```ini
 [Unit]
 Description=WhyMath L5 API (uvicorn)
-After=network-online.target postgresql.service redis-server.service neo4j.service ollama.service
-Wants=postgresql.service redis-server.service neo4j.service ollama.service
+After=network-online.target postgresql.service redis-server.service ollama.service
+Wants=postgresql.service redis-server.service ollama.service
 
 [Service]
 User=whymath
@@ -102,10 +102,8 @@ WantedBy=multi-user.target
 | 데이터 | 백업 | 주기 | 복구 검증 |
 |---|---|---|---|
 | PostgreSQL(학생·숙달 시계열·문항·임베딩) | `pg_dump`/물리(pgBackRest)·TimescaleDB 청크 포함 | 일 1회 + WAL 연속 | 분기별 복원 리허설 |
-| Neo4j(개념 그래프) | `neo4j-admin database dump` | 일 1회(그래프는 재구성 비싸나 코퍼스로 재시드 가능) | 덤프 로드 확인 |
 | MinIO(손글씨·이미지) | 버킷 복제/스냅샷 | 일 1회 | 객체 무결성 |
 | Redis(세션) | AOF(`appendonly yes`) | 연속 | 재시작 후 세션 잔존(OCR §9·TTL 24h) |
-| ClickHouse(행동 로그) | 선택(재생성 가능) | 주 1회 | — |
 
 **미성년 PII**: 손글씨 원본·채팅은 **암호화 저장**(MinIO SSE·DB 컬럼 암호화), 백업도 암호화. 보존기간·삭제(GDPR/개인정보)는 `privacy/` 모듈·동의 절차 준수.
 
