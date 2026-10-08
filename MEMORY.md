@@ -12042,15 +12042,6 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **후속 소유(등재)**: `EOS-179`(라벨 예측 타당도 리더) · `EOS-180`('초보' 증거 하한·수축 + 다른 라벨 소비처·WH-1 ⑤⑧ KPI 연속성) · `EOS-181`(사다리 도약 — **서빙이 단계 3·4를 렌더하기 전에** 판정 · 외부 사건이라 코드 의존으로 못 걸고 notes·acceptance에 둔다. 코드 가드를 세우지 않은 이유: 모바일 변경은 CI 잡 경로 필터에 안 걸려 가드가 **돌지 않는다**).
 - **한계(명시)**: 운영 분포(이탈률·신호 확률·학생당 개념 수·카탈로그 채움)가 전무하다. "학생 신호"는 7개 좌절 토큰 + 8개 답 요구 토큰이라 실제 좌절의 하한이다. 현실적 학생 3유형(이탈형·연속 오답형·침묵형)의 수치는 독립 비판의 값이며 재현하지 않았다. 앱이 단계를 렌더하지 않는다는 사실은 grep 기준이다. expertise reversal 등 문헌은 원문을 읽지 않았다.
 - **검증 도구 기록(코드로 집행)**: 결함 주입 하네스 `mutate_eos178_label_free_guards.py` 45건(단위 31 · 서빙 14) — 설계 중 **등가 뮤턴트 2건**(신호 없는 쌍의 `coalesce(has_signal, False)` · 서빙 판정의 `IS NOT NULL`)을 찾아 코드에서 걷어냈고, 첫 실행에서 1건(`S02` 세션 생성 핸들러의 라벨 적재)이 **생존**했다 — 라벨은 오답 뒤에만 생기는데 기존 통합 시나리오가 세션 생성 시점에 라벨을 갖지 않았다 → 교차 이월 통합 시나리오 추가로 닫았다. 후속 등재 스크립트가 선행(`--depends`) 순서를 거꾸로 돌려 1건이 거부되고 다른 한 건의 acceptance에 번호 오기(`EOS-181`↔`EOS-179`)가 남았다 → append 전용 정정 항으로 바로잡았다(대장 손편집 없음).
-### 2026-10-06 — ADMIN-07 검수 큐 UI + 검증된 상태 전이 BFF (Phase B 진입점)
-- **대상 엔티티**: `Problem.review_status`(pending/approved/rejected/quarantined). JSONL `needs_review_worklist` 축은 harness 어댑터 잔여 누출 래칫 때문에 이번 범위에서 제외(후속).
-- **전이표**(`schema/review_transition.py`, 불변): approve pending→approved · reject pending→rejected · quarantine approved→quarantined(사유 필수·≤2000자) · release quarantined→approved. `None`(미지정)은 어떤 액션도 허용하지 않는다("모른다 ≠ pending").
-- **집행**: `POST /v1/admin/review-queue/items/{id}/transitions` — `SELECT … FOR UPDATE`, `expected_status` 불일치 409 `stale_status`, 불허 전이 409 `illegal_transition`, 성공 전이마다 `privacy_audit` 1행을 같은 트랜잭션에 기록(`PrivacyAuditAction` approve/reject/quarantine/release, 마이그레이션 불필요). 실패 시 감사 0행, 감사 실패 시 상태 변경 롤백. CONTENT_ADMIN만 허용(그 외 403).
-- **웹**: `app/admin/review/page.admin.tsx`(+`_components/ReviewQueue*`) — 버튼은 서버가 준 `allowed_actions`만 노출, 판정은 서버. 프런트 직접 DB 접근 0. `review_queue` 모듈 PARTIAL→LIVE(계약 ⑧ 검사가 처음으로 공허하지 않게 됨).
-- **정직한 공백(후속 필요)**: ①기존 `PATCH /v1/problems/{id}`는 전이 검증 없이 review_status를 바꿀 수 있다(격리 계약 §7: 전용 엔드포인트 없음 결정 유지) — 전이 계약·감사 1행은 새 POST 경로에만 성립 ②`privacy_audit` 불변성은 관례일 뿐 DB 트리거 없음 ③reject 실패코드·HIT 타이머 강제 미포함 ④CI webapp 잡에 `out/admin/review/index.html` 존재 검사 추가 제안(.github 미수정) ⑤`security_privacy.md` 감사 action 열거 미갱신.
-- **정합 보정**: 백엔드는 미지정 문항의 409에 `current_status: null`을 보내는데 웹 파서가 문자열만 받아 `malformed`로 오분류 → null을 "unset"으로 읽도록 수정.
-- **검증 메모**: 백엔드 에이전트 뮤테이션 13종 전건 RED(rollback 제거 1건은 hermetic만 검출 — 세션 close가 롤백하므로 실 PG로는 불가). 웹 거버넌스 주입 5종 RED·브라우저 DOM 단언 22건 PASS.
-
 ### 2026-10-08 — ADMIN-16: PATCH /v1/problems/{id}의 검수 상태 전이표 우회 폐쇄
 - **판정 문서**: `docs/reviews/admin16_review_status_bypass_judgment_2026-10-08.md` (판정 기준 main `8a5ea4d1`). 격리 계약 `problem_quarantine_contract.md` §5·§6·§7 갱신.
 - **결정 — "거부"가 아니라 "전이표 경유"**: 인수조건은 둘 다 허용했다. PATCH에서 상태 변경을 일률 거부하면 운영 중인 EOS-97 리콜 도구(`ops/generation_recall.py::apply_quarantine`, PATCH로 3필드 기입)가 `approved` 문항에도 전부 실패하고, 격리 계약이 PATCH를 정본 격리 절차로 명시하므로 기각했다. 두 표면(POST 전이·PATCH)이 같은 표(`schema/review_transition.py`)를 읽는다 — 표를 읽는 공개 함수만으로 역해석(`action_for_status_change`)하고 판정(`plan_review_field_change`)은 순수 함수.
@@ -12060,6 +12051,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **부수 3항목 처분**: ⑥ 감사 열거 문서 동기화 = 이 PR에서 완료(`security_privacy.md`) · ② `privacy_audit` 불변 트리거 = "필요함, 분리" → `ADMIN-17` · ③ 반려코드·HIT 타이머 강제 = "분리" → `ADMIN-18`(PATCH의 `reject`는 반려코드를 실을 자리가 없어 거부하도록 acceptance에 명시, `ADMIN-16` 선행 의존).
 - **조사 중 발견**: `ADMIN-19` POST 생성이 `review_status=approved`로 직접 태어난 문항을 허용(같은 부류) · `ADMIN-20`(owner=kiki, 결정 사안) 전이표가 `approved`에서만 격리를 허용하고 공개 GET은 격리만 숨겨서, **비승인 문항의 결함은 이제 어떤 관리자 API로도 공개 카탈로그에서 숨길 수 없다**(리콜 도구 대상이 새로 생성된 문항이면 영향 실제적).
 - **정직한 공백**: 실 PostgreSQL 검증 없음(이 환경에 PG·docker 데몬 없음 — 행 잠금·롤백은 hermetic으로 인자·호출 순서만 고정, CI `backend-migrations`가 첫 실행) · 상태 불변 PATCH의 격리 기록 단독 편집은 막지 않음(계약 §7) · 감사 열거를 문서와 대조하는 테스트는 여전히 없음.
+
+### 2026-10-06 — ADMIN-07 검수 큐 UI + 검증된 상태 전이 BFF (Phase B 진입점)
+- **대상 엔티티**: `Problem.review_status`(pending/approved/rejected/quarantined). JSONL `needs_review_worklist` 축은 harness 어댑터 잔여 누출 래칫 때문에 이번 범위에서 제외(후속).
+- **전이표**(`schema/review_transition.py`, 불변): approve pending→approved · reject pending→rejected · quarantine approved→quarantined(사유 필수·≤2000자) · release quarantined→approved. `None`(미지정)은 어떤 액션도 허용하지 않는다("모른다 ≠ pending").
+- **집행**: `POST /v1/admin/review-queue/items/{id}/transitions` — `SELECT … FOR UPDATE`, `expected_status` 불일치 409 `stale_status`, 불허 전이 409 `illegal_transition`, 성공 전이마다 `privacy_audit` 1행을 같은 트랜잭션에 기록(`PrivacyAuditAction` approve/reject/quarantine/release, 마이그레이션 불필요). 실패 시 감사 0행, 감사 실패 시 상태 변경 롤백. CONTENT_ADMIN만 허용(그 외 403).
+- **웹**: `app/admin/review/page.admin.tsx`(+`_components/ReviewQueue*`) — 버튼은 서버가 준 `allowed_actions`만 노출, 판정은 서버. 프런트 직접 DB 접근 0. `review_queue` 모듈 PARTIAL→LIVE(계약 ⑧ 검사가 처음으로 공허하지 않게 됨).
+- **정직한 공백(후속 필요)**: ①기존 `PATCH /v1/problems/{id}`는 전이 검증 없이 review_status를 바꿀 수 있다(격리 계약 §7: 전용 엔드포인트 없음 결정 유지) — 전이 계약·감사 1행은 새 POST 경로에만 성립 ②`privacy_audit` 불변성은 관례일 뿐 DB 트리거 없음 ③reject 실패코드·HIT 타이머 강제 미포함 ④CI webapp 잡에 `out/admin/review/index.html` 존재 검사 추가 제안(.github 미수정) ⑤`security_privacy.md` 감사 action 열거 미갱신.
+- **정합 보정**: 백엔드는 미지정 문항의 409에 `current_status: null`을 보내는데 웹 파서가 문자열만 받아 `malformed`로 오분류 → null을 "unset"으로 읽도록 수정.
+- **검증 메모**: 백엔드 에이전트 뮤테이션 13종 전건 RED(rollback 제거 1건은 hermetic만 검출 — 세션 close가 롤백하므로 실 PG로는 불가). 웹 거버넌스 주입 5종 RED·브라우저 DOM 단언 22건 PASS.
 
 ### 2026-10-07 — EOS-179: 코치 라벨의 출처·증거 수 원장 적재 + 라벨 예측 타당도 리더(도달 리포트 §8)
 - **결정**: EOS-178이 "후속이 정한다"고 남긴 세 가지를 닫는다 — ① 원장 `힌트제공`에 `label_source`('explicit'·'server_bkt'·'server_theta'·'client_bkt')와 `label_evidence_n`(라벨을 만든 서버 개념 숙달도의 `sample_size` — **None=모름이며 0과 구별**)을 싣는다(JSONB·마이그레이션 없음·사후 백필 불가·응답 본문 비노출) ② 도달 리포트 §8이 (학생·문항) 쌍의 **첫 공급 행** 라벨별로 학생 신호(`base_level>=2`) 발생 여부를 센다 ③ 건수와 Wilson 단측 95% 하한·상한으로 낸다. **판정·임계는 이 태스크가 내지 않는다**(운영 원장이 비어 있고 합성 표본으로 임계를 정하지 않는다 — 임계는 `EOS-180`).
