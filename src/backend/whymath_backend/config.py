@@ -1203,6 +1203,32 @@ class Settings(BaseSettings):
         ge=0,
         description="시각화 생성의 *디바이스 단위* 분당 상한. 0=비활성. 사용자(15)와 IP(30) 사이.",
     )
+    # ── SEC-19: 원시 LLM 생성(`POST /v1/generate`) 전용 rate limit (LLM 비용 보호) ──
+    generate_rate_limit_per_minute: int = Field(
+        default=15,
+        ge=0,
+        description=(
+            "원시 LLM 생성(`POST /v1/generate`)의 *사용자 단위* 분당 상한. 0=비활성. "
+            "인증(`CurrentUser`)과 별개 축 — 인증된 단일 계정의 LLM 비용 남용을 막는다. "
+            "기본값은 같은 비용 등급(LLM 생성)인 시각화 한도(15)와 동일하게 시작했다 — "
+            "실사용 호출 빈도 실측 근거는 아직 없다(운영 로그 확보 후 재조정). "
+            "별 category(`generate`)라 coach·시각화 버킷과 분리."
+        ),
+    )
+    generate_rate_limit_ip_per_minute: int = Field(
+        default=30,
+        ge=0,
+        description=(
+            "원시 LLM 생성의 *IP 단위* 분당 상한. 0=비활성. 공유 NAT 방어(사용자 한도의 2배)."
+        ),
+    )
+    generate_rate_limit_device_per_minute: int = Field(
+        default=22,
+        ge=0,
+        description=(
+            "원시 LLM 생성의 *디바이스 단위* 분당 상한. 0=비활성. 사용자(15)와 IP(30) 사이."
+        ),
+    )
     # ── 슬라이스 27: 디바이스 store 운영 모드(lifespan 결선) ──
     device_store_mode: Literal["none", "pg", "pg_cached"] = Field(
         default="none",
