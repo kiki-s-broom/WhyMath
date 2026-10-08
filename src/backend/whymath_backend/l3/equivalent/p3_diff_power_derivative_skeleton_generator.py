@@ -497,31 +497,34 @@ def _applied_frames() -> list[Frame]:
         )
 
     def a5(p: tuple[object, ...]) -> DiffItem | None:
+        # 6회차 은행 감사(2026-10-08) 처분 — 구판 'f'(a) = k·f'(1)'(applied-ratio-to-f-prime-one)은
+        # f(x) = x^n이면 계수 n이 양변에서 약분돼 계수 내리기를 빠뜨린 도함수(x^(n - 1))로 풀어도 늘
+        # 같은 a가 나왔고, n = 2면 'f'(a)가 f'(1)의 k배이니 a도 k배'라는 비례 짐작이
+        # 정답이었다(판정자 지적 c32c1d5d · 판정기 T-ratio-shortcut). 이 개념은 x^n만 다루므로 배수
+        # 틀로는 고칠 매개변수가 없어 차의 꼴로 바꾼다 — f'(a) - f'(1) = m은 계수 누락(a^(n - 1) = 1
+        # + m)·지수 유지 (na^n = n + m) 경로가 정답과 갈린다.
         n, a = int(str(p[0])), int(str(p[1]))
-        k = a ** (n - 1)
+        base = eval_at(derivative_of(_mono(n)), 1)
+        b = eval_at(derivative_of(_mono(n)), a)
+        m = b - base
         return DiffItem(
             slot="applied",
-            frame_id="applied-ratio-to-f-prime-one",
+            frame_id="applied-difference-from-f-prime-one",
+            # 'f'(a) - f'(1) = 45'는 위생 게이트가 'f'(1) = 45'를 산술 등식으로 읽는다 — 말로 쓴다.
             question_text=(
-                f"함수 f(x) = x^{n}에 대하여 f'(a) = {k}f'(1)을 만족시키는 양수 a의 값을 "
-                "구하시오."
+                f"함수 f(x) = x^{n}에 대하여 f'(a)의 값이 f'(1)의 값보다 {m}만큼 클 때, 양수 a의 "
+                "값을 구하시오."
             ),
             answer_text=str(a),
-            # 지수가 1이면 'a^1'로 쓰지 않는다(지수 1 표기 결함 — 5회차 재생성에서 n = 2가 처음 뽑혀
-            # 드러남).
             explanation=(
-                f"f'(1)은 {n}이고 f'(a)는 {n}a이므로 {n}a = {k * n}에서 a = {a}이다."
-                if n - 1 == 1
-                else (
-                    f"f'(1)은 {n}이고 f'(a)는 {n}a^{n - 1}이므로 a^{n - 1}이 {with_i_ga(k)} 되는 "
-                    f"양수 a는 {a}이다."
-                )
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이므로 f'(1)의 값은 {base}이고, "
+                f"f'(a)의 값은 {with_eul_reul(base)} {m}만큼 넘는 {b}이다. "
+                + _positive_point_steps(n, a, b)
             ),
-            # f'(1)의 값은 SymPy로 구해(`eval_at`) 조건식에 상수로 대입한다(미지수 1개 제약).
-            conditions=(
-                f"{_deriv_value_sym(str(n), 'a')} = {k * eval_at(derivative_of(_mono(n)), 1)}",
-                "a > 0",
-            ),
+            # f'(1)의 값은 SymPy로 구해(`eval_at`) 조건식에 상수로 대입한다(미지수 1개 제약 — 미분
+            # 평가가 든 변을 다른 연산과 섞지 못한다). 같은 (n, a)의 'f'(a) = b' 틀과 조건이 같으면
+            # 라운드로빈의 실체 중복 제거가 건너뛴다(QUAL-07).
+            conditions=(f"{_deriv_value_sym(str(n), 'a')} = {b}", "a > 0"),
             answer_map=(("a", str(a)),),
             problem_type_code=_SOLVE,
             answer_format=_fmt(a),
@@ -553,7 +556,9 @@ def _applied_frames() -> list[Frame]:
         Frame("applied-find-positive-point", _grid("p3-power:a2", (2, 3, 4), (2, 3, 4, 5, 6)), a2),
         Frame("applied-coefficient-given", _grid("p3-power:a3", (2, 3, 4), (2, 3, 4, 5, 6)), a3),
         Frame("applied-derivative-equals-function", _grid("p3-power:a4", tuple(range(2, 10))), a4),
-        Frame("applied-ratio-to-f-prime-one", _grid("p3-power:a5", (2, 3, 4), (2, 3, 4)), a5),
+        Frame(
+            "applied-difference-from-f-prime-one", _grid("p3-power:a5", (2, 3, 4), (2, 3, 4)), a5
+        ),
         Frame(
             "applied-exponent-from-derivative-form", _grid("p3-power:a6", tuple(range(2, 10))), a6
         ),

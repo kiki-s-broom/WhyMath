@@ -11,14 +11,29 @@ L4 카탈로그의 kebab이 **없다**(MISC-40이 omission형이라 의도적으
 --------------------------------------------------------------
 M0677의 정본 설명은 서술어가 잘린 손상 원문('…관점을')이라 *잘못된 절차*가 적혀 있지 않다. 그래서
 어떤 선지가 'M0677에서 나오는 값'인지 판정할 수 없다(판정자 지적 12건 · 판정기 M-link-undescribed).
-원문 정정은 별건 QUAL-14가 소유하므로, 그 전까지 오개념 유발 슬롯은 **차수 세기 선지를 M0615**(정본
-설명 '고차방정식의 근을 두 개로 단정한다(차수만큼 근)' — 괄호의 '차수만큼 근을 센다' 절차)에
-연결한다. M0615의 설명도 '두 개로 단정'과 '차수만큼'을 함께 적은 이중 서술이라, 사차 문항의 차수
-선지(4)가 앞 절('두 개')과는 맞지 않는다 — 원문 정정 대상으로 보고한다. 임계점 개수 선지는 귀속할
-오개념의 절차 설명이 없어 연결하지 않는다. 개수 정답은 차수·임계점 개수와 다르게 고른다(판정기
-T09-degree-count·T09-critical-count — 차수 세기·임계점 세기 오답 경로가 정답에 닿지 않게). 이 귀속은
-명세의 핵심 오개념(M0677)과 다르므로 Phase 3 커버리지의 02-09 오개념 사슬은 M0677 정정 후 재연결까지
-끊긴다(테스트가 그 상태를 동결한다).
+원문 정정은 별건 QUAL-14가 소유한다. 5회차 교정은 차수 세기 선지를 M0615에 연결했다.
+
+6회차(은행 감사 2회차 · 2026-10-08) 처분 — M0615 연결 정지·'극값·극점 혼동'으로 귀속
+------------------------------------------------------------------------------------
+M0615의 설명은 '고차방정식의 근을 두 개로 단정한다(차수만큼 근)'이라 본문 절차로는 2가, 괄호로만
+차수가 나온다(자기모순 — 판정자 지적 12건 · 판정기 M-link-contradictory). 그래서 오개념 유발 슬롯은
+**L4 카탈로그 kebab `extremum-value-vs-point-confused`**(극값·극점 혼동: '극댓값은 극대가 되는 점의
+x좌표이다')에 연결한다. 연결 선지 값은 그 절차로 정확히 나온다 — 실근 개수를 정할 때 극댓값·극솟값
+자리에 극대·극소가 되는 점의 x좌표를 넣고 나머지는 표준 비교 규칙을 그대로 쓴 값이다(판정기와 같은
+정의 `extremum_point_count` · 판독이 갈리는 매개변수는 쓰지 않는다). 해설 끝의 오답 안내도 이 절차를
+그대로 적는다. 그 값은 정답·차수·임계점 개수와 모두 다르게 고른다(연결 선지가 다른 오답 경로와
+겹치지 않게) — 그래서 이 슬롯은 W자 사차(정답 2 · 차수 4 · 임계점 3 · 절차 값 0 또는 1)만 쓴다.
+삼차는 계수가 양수면 극점 x좌표의 순서가 극값과 반대라 판독이 갈리고, 음수면 절차 값이 차수·임계점
+개수와 겹친다. 차수·임계점 개수 선지는 연결하지 않는다(연결 없는 오답 선지는 결함이 아니다). 이
+귀속도 명세의 핵심 오개념(M0677)과 다르므로 Phase 3 커버리지의 02-09 오개념 사슬은 M0677 정정 후
+재연결까지 끊긴다(테스트가 그 상태를 동결한다).
+
+6회차 처분 — 인수분해 지름길·운동 시각의 구간
+---------------------------------------------
+극값이 0이거나 상수항 f(0)과 같거나 임계점이 0이면 상수항을 옮긴 식이 중근 인수를 가져(2x(x - 3)^2 =
+-2 · x(x + 3)^2 = 2) 인수분해와 부호만으로 개수가 정해진다(판정자 지적 2건). 판정기
+T09-factored-level이 매개변수 거부 조건으로 그 수준선을 뺀다. 운동 시각 개수 문항('시각 t (t ≥
+0)')은 검산 조건에도 `t >= 0`을 넣어 발문과 같은 범위에서 센다(판정기 V-count-interval).
 
 3차 감사(2026-10 · κ 0.854)가 드러낸 구조 원인과 이 파일의 재설계
 ---------------------------------------------------------------
@@ -101,6 +116,8 @@ from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator
     with_item_kinds,
 )
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    EXTREMUM_POINT_KEBAB,
+    extremum_point_count,
     has_rational_root,
     is_shifted_biquadratic,
 )
@@ -118,14 +135,12 @@ from whymath_backend.lang.josa import eul_reul, wa_gwa
 
 __all__ = ["P3DiffEquationApplicationGenerator"]
 
-# 오개념 유발 선지의 연결 id — **M0615**(정본 설명 '고차방정식의 근을 두 개로 단정한다(차수만큼 근)'
-# · [10공수1-02-07] 소속 M-id 그대로, kebab 좌석 없음). 5회차 감사(2026-10-08)까지는 이 개념의 핵심
-# 오개념 M0677에 연결했으나, M0677의 설명은 서술어가 끊긴 손상 문장('…관점을')이라 잘못된 *절차*를
-# 적지 않아 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(판정자 지적 12건 · 판정기
-# M-link-undescribed · 원문 정정은 QUAL-14 소관). 차수로 센 값의 선지만 절차('차수만큼 근')가 적힌
-# M0615로 연결하고, 임계점(극값 후보) 개수 선지는 그 절차를 적은 오개념이 없어 **연결하지 않는다**
-# (연결 없는 오답 선지는 결함이 아니다).
-_DEGREE_MID: Final = "M0615"
+# 오개념 유발 선지의 연결 id — L4 카탈로그 kebab **extremum-value-vs-point-confused**(극값·극점 혼동
+# · 정본 설명 '극댓값은 극대가 되는 점의 x좌표이다'). 5회차까지의 M0677(설명 손상)·M0615(설명
+# 자기모순 — '두 개로 단정' 대 '(차수만큼 근)')는 연결 선지가 주 절차로 나오는지 정해지지
+# 않았다(판정자 지적 각 12건). 극값 자리에 극점의 x좌표를 넣어 센 개수의 선지만 연결하고,
+# 차수·임계점(극값 후보) 개수 선지는 **연결하지 않는다**(연결 없는 오답 선지는 결함이 아니다).
+_POINT_KEBAB: Final = EXTREMUM_POINT_KEBAB
 _COUNT: Final = "ptype.count-solutions"
 _OPT: Final = "ptype.optimize-extremum"
 _KIND: Final = "real_root_count"
@@ -193,14 +208,18 @@ def _count_item(
     slot: str,
     frame_id: str,
     text: str,
-    cond: str,
+    cond: str | tuple[str, ...],
     poly: Poly,
     explanation: str,
     count: int,
     choices: tuple[str, ...] | None = None,
     distractors: tuple[tuple[int, str], ...] = (),
 ) -> KindedDiffItem:
-    """실근 개수 문항 — 해설이 센 개수와 독립 경로(Sturm) 개수가 같아야 만든다."""
+    """실근 개수 문항 — 해설이 센 개수와 독립 경로(Sturm) 개수가 같아야 만든다.
+
+    `cond`가 튜플이면 (방정식, 범위 부등식 …) — 발문이 세는 범위('t ≥ 0')를 검산도 같은 범위에서
+    센다.
+    """
     if count != _n_distinct(poly):  # pragma: no cover — 해설과 검산 경로가 어긋남(작성 오류)
         raise ValueError(f"{frame_id}: 해설 개수 {count} != 실근 수 {_n_distinct(poly)}")
     return KindedDiffItem(
@@ -291,11 +310,10 @@ def _motion_levels() -> tuple[_Level, ...]:
     return tuple(out)
 
 
-@lru_cache(maxsize=None)
-def _quartic_levels() -> tuple[_Level, ...]:
-    """f'(x) = 12(x - p)(x - q)(x - r)인 W자 사차식 — 실근 2개 또는 4개, 비대칭(복이차식 아님)."""
+def _quartic_levels_in(crit_range: range) -> list[_Level]:
+    """임계점 p < q < r이 `crit_range` 안인 W자 사차 수준선(조건은 `_quartic_levels`와 같다)."""
     out: list[_Level] = []
-    for p, q, r in combinations(range(-2, 3), 3):
+    for p, q, r in combinations(crit_range, 3):
         f = _crit_quartic(p, q, r)
         vals = tuple(eval_at(f, c) for c in (p, q, r))
         if max(abs(v) for v in vals) > 60:
@@ -307,7 +325,27 @@ def _quartic_levels() -> tuple[_Level, ...]:
             if is_shifted_biquadratic(poly_to_sympy(eq), _X):
                 continue  # (x - h)^2 = u로 이차방정식이 되는 대칭 사차식(3차 감사 R5 지적)
             out.append(_Level(f, (p, q, r), k))
-    return tuple(out)
+    return out
+
+
+@lru_cache(maxsize=None)
+def _quartic_levels() -> tuple[_Level, ...]:
+    """f'(x) = 12(x - p)(x - q)(x - r)인 W자 사차식 — 실근 2개 또는 4개, 비대칭(복이차식 아님)."""
+    return tuple(_quartic_levels_in(range(-2, 3)))
+
+
+@lru_cache(maxsize=None)
+def _mc_quartic_levels() -> tuple[_Level, ...]:
+    """오개념 유발 슬롯 전용 W자 사차 수준선 — 임계점 범위를 -3..4로 넓힌 풀에서 기본 풀
+    (`_quartic_levels`)에 이미 있는 수준선을 뺀 것(다른 슬롯과 같은 방정식이 나오지 않게 — QUAL-07).
+
+    6회차 처분: '극값·극점 혼동' 절차 값(극점 x좌표를 극값으로 넣어 센 개수)은 k가 극점 x좌표들보다
+    작거나 가장 작은 것과 같을 때만 판독이 갈리지 않고 정답·차수·임계점 개수와 모두 다르다. 기본
+    풀은 임계점이 -2..2라 '방정식 F(x) = 0'(k = 0) 꼴로는 그런 문항이 없어, 임계점이 모두 양수인
+    사차 등을 더 얻으려고 범위를 넓힌다.
+    """
+    base = set(_quartic_levels())
+    return tuple(level for level in _quartic_levels_in(range(-3, 5)) if level not in base)
 
 
 def _frac_eval(poly: Poly, x: Fraction) -> Fraction:
@@ -943,7 +981,10 @@ def _applied_frames() -> list[Frame]:
                 f"x(t) = {render_poly(level.poly, 't')}이다. 점 P의 위치가 {with_i_ga(level.k)} "
                 "되는 서로 다른 시각의 개수를 구하시오."
             ),
-            cond=_eq_cond(level.poly, level.k, "t"),
+            # 6회차 감사 처분 — 발문의 범위(t ≥ 0)를 검산도 같은 범위에서 센다(판정기
+            # V-count-interval). 수준선 풀이 실근을 모두 양수로 골라 개수는 같지만, 범위 없는 검산은
+            # 다른 문제를 가리킨다.
+            cond=(_eq_cond(level.poly, level.k, "t"), "t >= 0"),
             poly=level.equation,
             explanation=(
                 f"위치가 {with_i_ga(level.k)} 되는 시각은 방정식 x(t) = {level.k}의 0 이상인 "
@@ -1064,25 +1105,58 @@ def _applied_frames() -> list[Frame]:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 오개념 유발(misconception_trigger) — 차수만큼 근이 있다고 단정한다(M0615 · 5회차 감사 재연결)
+# 오개념 유발(misconception_trigger) — 극값 자리에 극점 x좌표를 넣어 센다(극값·극점 혼동 · 6회차)
 # ──────────────────────────────────────────────────────────────────────────
 def _crit_count(poly: Poly) -> int:
     """f'(x) = 0의 서로 다른 실근 수 — '극값 후보의 개수'를 근의 개수로 오인한 값."""
     return _n_distinct(derivative_of(poly))
 
 
+def _point_trap(level: _Level, wrong: int) -> str:
+    """'극값·극점 혼동' 오답 안내 — 연결 선지 값이 *그 절차로* 어떻게 나오는지 판정자가 재현하게
+    적는다.
+
+    '극대·극소가 되는 점의 x좌표 -2, -1, 1을 극값으로 잘못 넣으면 -5가 그 값들보다 모두 작으므로
+    0개로 세게 된다.' — 절차(x좌표를 극값 자리에 넣음)·비교(k와 그 값들의 대소)·결과(개수)를 한
+    문장에 둔다(판정기 M-link-extremum-point가 같은 문장에서 'x좌표'와 '…개'를 찾는다).
+    """
+    crit = sorted(level.crit)
+    coords = ", ".join([*(str(c) for c in crit[:-1]), with_eul_reul(crit[-1])])
+    d = derivative_of(level.poly)
+    kinds = {
+        c: "극댓값" if _frac_eval(d, Fraction(c) - Fraction(1, 2)) > 0 else "극솟값" for c in crit
+    }
+    k = level.k
+    if k < crit[0]:
+        relation = f"{with_i_ga(k)} 그 값들보다 모두 작으므로"
+    elif k > crit[-1]:
+        relation = f"{with_i_ga(k)} 그 값들보다 모두 크므로"
+    elif k in crit:
+        relation = f"{with_i_ga(k)} 그중 {kinds[k]} {with_wa_gwa(k)} 같으므로"
+    else:
+        lo = max(c for c in crit if c < k)
+        hi = min(c for c in crit if c > k)
+        relation = f"{with_i_ga(k)} {with_wa_gwa(lo)} {hi} 사이에 있으므로"
+    return (
+        f"극대·극소가 되는 점의 x좌표 {coords} 극값으로 잘못 넣으면 {relation} {wrong}개로 세게 "
+        "된다. 극값은 그 점에서의 함숫값이지 x좌표가 아니다."
+    )
+
+
 def _mc_level_count(
     *, frame_id: str, text: str, cond: str, level: _Level, seed: str, lead_in: str
 ) -> DiffItem | None:
-    """실근 개수 객관식 — 차수로 센 값(M0615 연결)과 극값 후보 수(미연결)를 오답 선지에 둔다.
+    """실근 개수 객관식 — '극값·극점 혼동' 절차 값(연결)과 차수·극값 후보 수(미연결)를 오답 선지에
+    둔다.
 
-    해설은 도함수 → 극값 → 구간별 값의 범위로 개수를 센 뒤, *오답이 왜 틀렸는지*(차수를 그대로
-    셈·도함수의 근을 셈)를 오답 선지마다 한 문장씩 설명한다. 방정식은 유리수 근이 없어(3차 감사)
-    인수분해로는 셀 수 없다.
+    해설은 도함수 → 극값 → 구간별 값의 범위로 개수를 센 뒤, *오답이 왜 틀렸는지*를 오답 선지마다 한
+    문장씩 설명한다 — 연결 선지는 극점의 x좌표를 극값 자리에 넣은 절차를 그대로
+    적는다(`_point_trap`). 방정식은 유리수 근이 없어(3차 감사) 인수분해로는 셀 수 없다.
 
-    슬롯 계약(오개념 유발 슬롯은 문항마다 같은 연결 집합 · 1개 이상 — `_validate_slot`)을 지키려고
-    **차수 ≠ 정답**인 수준선만 쓴다 — 차수 선지가 늘 M0615로 연결된다. 차수·극값 후보 수가 정답과
-    같은 수준선은 판정기 우연 일치 규칙(T09-degree-count·T09-critical-count)이 매개변수 거부로 뺀다.
+    연결 선지 값은 판정기와 같은 정의(`extremum_point_count`)로 계산한다. 판독이 갈리면(None) 그
+    수준선을 쓰지 않고, 그 값이 정답·차수·임계점 개수 중 하나와 같아도 쓰지 않는다(연결 선지가 다른
+    오답 경로와 겹치지 않게 — 6회차 감사 처분). 차수·극값 후보 수가 정답과 같은 수준선은 판정기 우연
+    일치 규칙(T09-degree-count·T09-critical-count)이 매개변수 거부로 뺀다.
     """
     equation = level.equation
     if _has_rootless_factor(equation):
@@ -1092,13 +1166,17 @@ def _mc_level_count(
     crit = _crit_count(equation)
     if correct in (degree, crit):
         return None  # 차수 세기·극값 후보 세기 오답 경로가 정답과 같다(변별 없음)
+    wrong = extremum_point_count(poly_to_sympy(level.poly), _X, sympy.Integer(level.k))
+    if wrong is None or wrong in (correct, degree, crit):
+        return None  # 절차 값이 판독에 따라 갈리거나 다른 선지(정답·차수·임계점 개수)와 겹친다
     entries = [
         ChoiceEntry(str(correct), is_correct=True, sort_key=float(correct)),
-        ChoiceEntry(str(degree), _DEGREE_MID, sort_key=float(degree)),
+        ChoiceEntry(str(wrong), _POINT_KEBAB, sort_key=float(wrong)),
+        ChoiceEntry(str(degree), sort_key=float(degree)),  # 연결 없는 오답(차수 세기)
     ]
-    taken = {correct, degree}
+    taken = {correct, wrong, degree}
     if crit not in taken:
-        entries.append(ChoiceEntry(str(crit), sort_key=float(crit)))  # 연결 없는 오답(절차 미기술)
+        entries.append(ChoiceEntry(str(crit), sort_key=float(crit)))  # 연결 없는 오답(극값 후보)
         taken.add(crit)
     for v in seeded_order(seed, tuple(range(0, 5))):
         if len(entries) == 4:
@@ -1113,8 +1191,9 @@ def _mc_level_count(
     except ValueError:
         return None
     traps = [
+        _point_trap(level, wrong),
         f"차수 {with_eul_reul(degree)} 그대로 실근의 개수로 세면 그래프가 직선과 실제로 몇 번 "
-        "만나는지를 보지 않은 것이다."
+        "만나는지를 보지 않은 것이다.",
     ]
     if crit != degree:
         traps.append(
@@ -1210,11 +1289,16 @@ def _misconception_frames() -> list[Frame]:
             ),
         )
 
+    # 6회차 감사 처분 — '극값·극점 혼동' 연결 선지가 판독이 갈리지 않고 정답·차수·임계점 개수와 모두
+    # 다른 문항은 W자 사차에서만 나온다(모듈 docstring). 삼차 풀(구판 m1·m2)과 기본 사차 풀의 'F(x)
+    # = 0' 꼴(구판 m4 — 임계점이 -2..2라 0이 가장 작은 x좌표보다 작아지지 않는다)은 그런 문항을 내지
+    # 못해, m1·m2·m4는 오개념 유발 전용 사차 풀(`_mc_quartic_levels` — 기본 풀과 서로소)의 서로소
+    # 몫을 쓴다.
     return [
-        Frame("mc-count-real-roots", _part("p3-eq:lv3", _cubic_levels(), 4, 8), m1),
-        Frame("mc-curve-and-horizontal-line", _part("p3-eq:lv3", _cubic_levels(), 5, 8), m2),
+        Frame("mc-count-real-roots", _part("p3-eq:lv4mc", _mc_quartic_levels(), 0, 3), m1),
+        Frame("mc-curve-and-horizontal-line", _part("p3-eq:lv4mc", _mc_quartic_levels(), 1, 3), m2),
         Frame("mc-equation-fx-equals-k", _part("p3-eq:lv4", _quartic_levels(), 1, 6), m3),
-        Frame("mc-graph-meets-x-axis", _part("p3-eq:lv4", _quartic_levels(), 2, 6), m4),
+        Frame("mc-graph-meets-x-axis", _part("p3-eq:lv4mc", _mc_quartic_levels(), 2, 3), m4),
         Frame("mc-two-curves-intersections", _part("p3-eq:lv4", _quartic_levels(), 3, 6), m5),
     ]
 

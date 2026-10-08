@@ -1150,8 +1150,17 @@ def _mastery_frames() -> list[Frame]:
         )
 
     def k4(p: tuple[object, ...]) -> DiffItem | None:
+        # 6회차 은행 감사(2026-10-08) 처분 — 두 근이 대칭(-5, 5)이면 계수 누락 도함수로도, 미분하지
+        # 않고 f(x) = x(x^2 + ax + b)의 근으로 봐도 a = 0이 나와 도함수 단계를 변별하지
+        # 못했다(판정자 지적 07eefccb). 그런 매개변수(와 정답이 발문의 근과 같은 매개변수)는 판정기
+        # T-derivative-roots-coincidence가 매개변수 거부 조건으로 뺀다.
         r1, r2 = _int(p[0]), _int(p[1])
         if r1 >= r2 or (r1 + r2) % 2:
+            return None
+        if 0 in (r1, r2):
+            # 근 0이면 b = 0이고 검산 f'(r1) = 0이 항등식(무한해)이 된다 — 6회차 감사 처분으로 대칭
+            # 근 (T-derivative-roots-coincidence)이 빠지자 라운드로빈이 이 매개변수까지 내려와
+            # 드러났다.
             return None
         a = -3 * (r1 + r2) // 2
         b = 3 * r1 * r2

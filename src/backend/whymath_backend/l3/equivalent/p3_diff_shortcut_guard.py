@@ -32,6 +32,16 @@ v(t) 누락·멈춤의 뜻·y축 x = 0·비문·롤 용어) ⑤ 오개념 귀속
 그중 *매개변수 선택의 우연 일치*(`COINCIDENCE_RULE_IDS`)는 생성기 라운드로빈이 그 파라미터를
 건너뛰는 거부 조건으로 쓰고(`parameter_coincidences`), 나머지는 틀 설계 결함이라 빌드를 멈춘다.
 
+은행 감사 6회차(2026-10-08 · `bank_audit_r2/disposition.json` · 결함 23건 · 원인 7종)는 5회차 규칙을
+통과한 은행에서 다시 결함을 찾았다 — ① 오개념 M0615의 설명 자기모순('두 개로 단정' 대 '(차수만큼
+근)') ② 속도 해설의 v(t)·a(t) 정의 없는 등장 ③ 비례 짐작·미분 오류 경로가 정답과 일치 (f'(a) =
+m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로 실근 개수가 정해짐 ⑤ 발문에 c 구간이 없어
+해가 둘 ⑥ 개수 문항의 검산이 발문의 구간을 반영하지 않음 ⑦ '곡선 … 이 극대가 되는' 용어. 6회차
+규칙(아래 [6회차] · `ROUND6_RULE_IDS`)이 그 부류를 막는다. 자격 측정을 통과한 감사 프로토콜의 기계
+투표는 4회차 규칙 집합으로 고정돼 있으므로, 측정 뒤에 더한 회차 규칙 전부를
+`POST_QUALIFICATION_RULE_IDS`로 묶는다(`p3_audit_qualification.EXCLUDED_GUARD_RULES`가 그 집합을
+투표에서 뺀다).
+
 규칙(위반 id — 사유는 `ShortcutViolation.reason`)
 --------------------------------------------
 [공통 · 표기]
@@ -138,6 +148,31 @@ v(t) 누락·멈춤의 뜻·y축 x = 0·비문·롤 용어) ⑤ 오개념 귀속
   E-y-axis-zero           y축과 만나는 점을 다루는데 해설에 'x좌표는 0' 단계가 없다.
   E-run-on                한 문장에 '~인데, ~인데,'가 겹친다(비문).
   E-term-rolle            수 하나를 '롤의 정리의 결론'이라 부른다.
+[6회차 · 은행 감사 2회차(*는 매개변수 거부 조건 — `COINCIDENCE_RULE_IDS`)]
+  M-link-contradictory    설명이 서로 다른 두 절차를 함께 적은 오개념(M0615 '두 개로 단정'
+                          대 '(차수만큼 근)')에 귀속 — 연결 선지가 주 절차의 값인지 정해지지
+                          않는다.
+  M-link-extremum-point   '극값·극점 혼동'(extremum-value-vs-point-confused) 귀속 선지가 그
+                          절차(극값 자리에 극대·극소가 되는 점의 x좌표를 넣고 표준 비교 규칙으로
+                          센다)로 나오는 값이 아니거나 판독에 따라 갈린다 · 또는 해설이 그
+                          절차를 보이지 않는다.
+  E-motion-symbol-intro   해설이 v(t)·a(t)를 '속도는 위치를 시각 t로 미분한 값'·'가속도는
+                          속도를 시각 t로 미분한 값' 정의 없이 처음 쓴다.
+  T-ratio-shortcut*       f'(a) = m·f'(b) — 정답이 비례 짐작 m·b와 같거나, 계수 누락·지수 유지
+                          도함수로 풀어도 같은 a.
+  T-derivative-roots-coincidence*
+                          발문이 f'(x) = 0의 두 근을 줄 때 계수 누락·미분하지 않은 경로로 세운
+                          연립의 답이 정답과 같다(대칭 근 ±r이면 늘 0) · 또는 정답이 발문의 근
+                          하나다.
+  T09-factored-level*     (02-09) 개수 문항의 방정식(좌변 − 우변)이나 상수항을 뺀 식이 중근
+                          인수를 갖는다(극값이 0·f(0)과 같거나 임계점이 0) — 인수분해·부호만으로
+                          센다.
+  U-extra-solution        (02-06·02-10) 정답 말고도 발문 조건을 만족하는 해가 있는데 선지·답
+                          형식이 배제하지 않거나, 해설이 발문에 없는 조건으로 그 해를 버린다.
+  V-count-interval        개수 문항의 발문이 구간을 주는데 검산 조건의 구간이 그것과
+                          다르다(없음 포함).
+  W-curve-subject         '곡선 y = …이(가) (x = a에서) 극대·극소·극값·증가·감소' — 그 성질의
+                          주어는 함수다.
 
 정직 범위(이 판정기가 보증하지 **않는** 것)
 -------------------------------------------
@@ -157,6 +192,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import Final
 
@@ -166,16 +202,21 @@ from whymath_backend.l3.safe_parse import safe_sympify
 
 __all__ = [
     "COINCIDENCE_RULE_IDS",
+    "EXTREMUM_POINT_KEBAB",
+    "POST_QUALIFICATION_RULE_IDS",
     "ROUND4_RULE_IDS",
     "ROUND5_RULE_IDS",
+    "ROUND6_RULE_IDS",
     "RULE_IDS",
     "ShortcutProbe",
     "ShortcutViolation",
+    "extremum_point_count",
     "has_rational_root",
     "is_shifted_biquadratic",
     "parameter_coincidences",
     "probe_from_record",
     "shortcut_violations",
+    "undefined_motion_symbols",
     "violations_by_rule",
     "visible_polynomials",
 ]
@@ -241,6 +282,16 @@ RULE_IDS: Final[tuple[str, ...]] = (
     "E-run-on",
     "E-term-rolle",
     "V05-touch-verify-mismatch",
+    # ── 6회차(2026-10-08 · 은행 감사 2회차 S5 불합격 k = 23) 결함 부류 — `ROUND6_RULE_IDS` ──
+    "M-link-contradictory",
+    "M-link-extremum-point",
+    "E-motion-symbol-intro",
+    "T-ratio-shortcut",
+    "T-derivative-roots-coincidence",
+    "T09-factored-level",
+    "U-extra-solution",
+    "V-count-interval",
+    "W-curve-subject",
 )
 
 #: 4회차 감사(합집합 88·둘 다 27)를 계기로 더한 규칙 — 3회차 재현율·과잉 거부 동결 테스트는 이
@@ -251,17 +302,31 @@ ROUND4_RULE_IDS: Final[frozenset[str]] = frozenset(
 )
 
 #: 5회차 은행 감사(2026-10-08 · `docs/data/p3_calculus1_diff_audit/bank_audit/` · as-found k = 68)를
-# 계기로 더한 규칙. 4회차 이전 회차의 재현율·과잉 거부 동결은 이 규칙들을 빼고 본다(회차별 측정은 그
-#: 회차의 규칙 집합으로 한다 — `ROUND4_RULE_IDS`와 같은 원칙).
+#: 계기로 더한 규칙. 4회차 이전 회차의 재현율·과잉 거부 동결은 이 규칙들을 빼고 본다(회차별 측정은
+#: 그 회차의 규칙 집합으로 한다 — `ROUND4_RULE_IDS`와 같은 원칙). 끝 경계는 6회차 첫 규칙이다(6회차
+#: 규칙이 이 슬라이스에 섞이면 5회차 동결이 6회차 규칙까지 세게 된다).
 ROUND5_RULE_IDS: Final[frozenset[str]] = frozenset(
-    RULE_IDS[RULE_IDS.index("T-quadratic-mean-value") :]
+    RULE_IDS[RULE_IDS.index("T-quadratic-mean-value") : RULE_IDS.index("M-link-contradictory")]
 )
 
-#: 5회차 규칙 중 *매개변수 선택*의 우연 일치를 보는 규칙 — 틀(frame)의 설계가 아니라 고른 수치가
+#: 6회차 은행 감사(2026-10-08 · `bank_audit_r2/` · as-found k = 23)를 계기로 더한 규칙 — 같은
+#: 원칙으로 5회차 동결은 이 규칙들을 빼고 본다. 다음 회차 규칙은 이 슬라이스 *뒤*에 붙이고 끝 경계를
+#: 고친다.
+ROUND6_RULE_IDS: Final[frozenset[str]] = frozenset(
+    RULE_IDS[RULE_IDS.index("M-link-contradictory") :]
+)
+
+#: 자격 측정(`qualification/` · 2026-10-08) **뒤에** 더한 회차 규칙 전부. 측정을 통과한 감사
+#: 프로토콜의 기계 투표는 4회차 규칙 집합으로 고정돼 있으므로 이 집합은 생성기 빌드 가드 전용이다
+#: (`p3_audit_qualification.EXCLUDED_GUARD_RULES`·시더의 원본 선별이 같은 집합을 뺀다). 앞으로 더할
+#: 회차의 규칙 집합도 여기에 합친다 — 합치지 않으면 투표·시험지 재현이 조용히 바뀐다.
+POST_QUALIFICATION_RULE_IDS: Final[frozenset[str]] = ROUND5_RULE_IDS | ROUND6_RULE_IDS
+
+#: 5·6회차 규칙 중 *매개변수 선택*의 우연 일치를 보는 규칙 — 틀(frame)의 설계가 아니라 고른 수치가
 #: 오답 경로와 정답을 겹치게 만든 경우다(f'(1) 대신 f(1)로 풀어도 같은 a · 구간 안 자연수가 하나뿐 ·
-#: 차수로 센 개수가 정답 등). 생성기는 이 규칙에 걸리는 매개변수를 *건너뛴다*
-#: (`p3_diff_skeleton_base.round_robin_items`의 `standard_code` 인자 — 매개변수 거부 조건의 단일
-#: 원천). 나머지 규칙은 틀 설계 결함이라 빌드가 멈춘다(fail-loud).
+#: 차수로 센 개수가 정답 · 대칭 근 · 극값이 0이라 인수분해로 센다 등). 생성기는 이 규칙에 걸리는
+#: 매개변수를 *건너뛴다*(`p3_diff_skeleton_base.round_robin_items`의 `standard_code` 인자 — 매개변수
+#: 거부 조건의 단일 원천). 나머지 규칙은 틀 설계 결함이라 빌드가 멈춘다(fail-loud).
 COINCIDENCE_RULE_IDS: Final[frozenset[str]] = frozenset(
     {
         "T-midpoint-answer",
@@ -272,6 +337,10 @@ COINCIDENCE_RULE_IDS: Final[frozenset[str]] = frozenset(
         "T09-degree-count",
         "T09-critical-count",
         "T05-given-coordinate",
+        # ── 6회차 ──
+        "T-ratio-shortcut",
+        "T-derivative-roots-coincidence",
+        "T09-factored-level",
     }
 )
 
@@ -2107,9 +2176,635 @@ def _round5_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# [6회차] 은행 감사 2회차(2026-10-08 · `bank_audit_r2/` · as-found k = 23)
+# ──────────────────────────────────────────────────────────────────────────
+#: 설명이 서로 다른 두 절차를 함께 적은 오개념 — 연결 선지가 *주 절차*의 값인지 정해지지 않는다.
+#: M0615: '고차방정식의 근을 두 개로 단정한다(차수만큼 근)' — 본문 절차로는 2, 괄호로는 차수가
+#: 나온다 (판정자 지적 12건 · 원문 정정은 별건).
+_CONTRADICTORY_MISCONCEPTIONS: Final = frozenset({"M0615"})
+#: '극값·극점 혼동' kebab(정본 L4 카탈로그 · 설명 '극댓값은 극대가 되는 점의 x좌표이다').
+EXTREMUM_POINT_KEBAB: Final = "extremum-value-vs-point-confused"
+
+
+def _extremum_points(
+    expr: sympy.Expr, var: sympy.Symbol
+) -> list[tuple[sympy.Rational, str]] | None:
+    """극값을 갖는 점 (x좌표, 'max'|'min') — 도함수의 실근이 전부 유리수 단순근일 때만(아니면 None).
+
+    극점의 x좌표를 '극값'으로 넣는 절차는 x좌표가 깔끔한 수일 때만 판정자가 재현할 수 있다.
+    """
+    deriv = sympy.expand(sympy.diff(expr, var))
+    if deriv.free_symbols != {var}:
+        return None
+    poly = sympy.Poly(deriv, var)
+    real = sympy.real_roots(poly)
+    if not real or any(not r.is_rational for r in real) or len(set(real)) != len(real):
+        return None
+    # 단순근만 남았으므로 근마다 도함수의 부호가 바뀐다(극값) — 왼쪽 부호가 +면 극대.
+    roots = sorted(sympy.Rational(r) for r in real)
+    left = [roots[0] - 1, *((a + b) / 2 for a, b in zip(roots, roots[1:], strict=False))]
+    return [
+        (r, "max" if deriv.subs(var, p) > 0 else "min") for r, p in zip(roots, left, strict=True)
+    ]
+
+
+def _verbal_counts(
+    points: Sequence[tuple[sympy.Rational, str]],
+    values: Sequence[sympy.Rational],
+    k: sympy.Rational,
+    *,
+    symmetric: bool,
+) -> set[int]:
+    """'극솟값과 극댓값 사이면 3개, 같으면 2개, 밖이면 1개'류 표준 비교 규칙(삼차·W자·M자 사차·극값
+    하나) — 실제 극값을 넣으면 f(x) = k의 서로 다른 실근 수와 같다(테스트가 SymPy 근 개수와
+    대조한다).
+
+    조건이 성립하는 조항의 결과를 *모두* 모은다(값이 실제 극값과 순서가 맞지 않으면 조항이 겹치거나
+    비어 판독이 갈린다 — 호출자가 그 경우를 모호로 본다). `symmetric`이면 '사이'를 두 수의 대소와
+    무관하게 읽는다(판독 B는 순서대로, 판독 C는 대칭으로).
+    """
+    kinds = [kind for _, kind in points]
+
+    def between(lo: sympy.Rational, hi: sympy.Rational) -> bool:
+        if symmetric:
+            return bool(min(lo, hi) < k < max(lo, hi))
+        return bool(lo < k < hi)
+
+    out: set[int] = set()
+    if kinds in (["max", "min"], ["min", "max"]):
+        top = values[kinds.index("max")]
+        bottom = values[kinds.index("min")]
+        if between(bottom, top):
+            out.add(3)
+        if k in (bottom, top):
+            out.add(2)
+        if symmetric:
+            if k < min(bottom, top) or k > max(bottom, top):
+                out.add(1)
+        elif k > top or k < bottom:
+            out.add(1)
+        return out
+    if kinds == ["min", "max", "min"]:
+        lo, hi = sorted((values[0], values[2]))
+        top = values[1]
+        clauses = [
+            (k < lo, 0),
+            (k == lo and lo != hi, 1),
+            (k == lo == hi, 2),
+            (lo < k < hi, 2),
+            (k == hi and lo != hi, 3),
+            (between(hi, top), 4),
+            (k == top, 3),
+            (k > top, 2),
+        ]
+        return {n for hit, n in clauses if hit}
+    if kinds == ["max", "min", "max"]:
+        lo, hi = sorted((values[0], values[2]))
+        bottom = values[1]
+        clauses = [
+            (k > hi, 0),
+            (k == hi and lo != hi, 1),
+            (k == lo == hi, 2),
+            (lo < k < hi, 2),
+            (k == lo and lo != hi, 3),
+            (between(bottom, lo), 4),
+            (k == bottom, 3),
+            (k < bottom, 2),
+        ]
+        return {n for hit, n in clauses if hit}
+    if kinds == ["min"]:
+        return {
+            n for hit, n in ((k < values[0], 0), (k == values[0], 1), (k > values[0], 2)) if hit
+        }
+    if kinds == ["max"]:
+        return {
+            n for hit, n in ((k > values[0], 0), (k == values[0], 1), (k < values[0], 2)) if hit
+        }
+    return {-1}  # 다루지 않는 모양(극값 4개 이상) — 모호로 본다
+
+
+def extremum_point_count(expr: sympy.Expr, var: sympy.Symbol, k: sympy.Expr) -> int | None:
+    """'극값·극점 혼동' 절차로 센 방정식 f(x) = k의 실근 개수 — 판독이 갈리면 None.
+
+    절차: 극댓값·극솟값 자리에 극대·극소가 되는 점의 **x좌표**를 넣고, 나머지는 표준 비교 규칙(k가
+    극솟값과 극댓값 사이면 3개, 같으면 2개, 밖이면 1개 — 사차는 극값 3개로 같은 방식)을 그대로 쓴다.
+    판정자가 이 값을 재현할 수 있어야 하므로 두 판독 — B 순서가 정해진 비교 규칙, C '사이'를
+    대칭으로 읽은 비교 규칙 — 이 **모두 같은 수 하나**를 낼 때만 그 수를 돌려준다. 극점 x좌표가 실제
+    극값과 순서가 다르면(삼차 계수 양수 등) 판독이 갈리고 None이다. 해설 본문의 '증감 구간마다
+    지나는 값의 범위'에 값을 넣어 세는 판독은 B가 한 값을 낼 때 늘 B와 같아 따로 두지 않는다(실측:
+    임계점 -4..4의 삼차·사차 × k 반정수 6,000건에서 두 판독이 갈린 408건은 전부 B 자신이 이미
+    모호했다). 생성기가 오답 선지 값을 고르는 데와 판정기 `M-link-extremum-point`가 같은 정의를
+    쓴다(단일 원천).
+    """
+    if not isinstance(k, sympy.Expr) or k.free_symbols or not k.is_rational:
+        return None
+    points = _extremum_points(expr, var)
+    if points is None:
+        return None
+    level = sympy.Rational(k)
+    values = [x for x, _ in points]  # ← 혼동: 극값 대신 x좌표
+    readings = _verbal_counts(points, values, level, symmetric=False)
+    readings |= _verbal_counts(points, values, level, symmetric=True)
+    return next(iter(readings)) if len(readings) == 1 and -1 not in readings else None
+
+
+def _count_level(probe: ShortcutProbe) -> tuple[sympy.Expr, sympy.Symbol, sympy.Expr] | None:
+    """개수 문항의 방정식을 f(x) = k로 읽는다 — 해설이 극값과 비교하는 바로 그 f와 k.
+
+    우변이 상수면 (좌변, 우변), 두 변에 모두 x가 있으면(두 곡선) 차를 정리해 상수항을 우변으로 넘긴
+    꼴(해설의 '정리하면 f(x) = k')이다. 좌변이 상수인 꼴('k = f(x)')은 생성기가 쓰지 않으므로 읽지
+    않는다(None — 연결 선지 판정이 실패로 드러난다).
+    """
+    found = _count_polynomial(probe)
+    if found is None:
+        return None
+    _, var = found
+    relation = next((r for r in map(_parse_relation, probe.conditions) if r is not None), None)
+    assert relation is not None
+    lhs, rhs = sympy.expand(relation.lhs), sympy.expand(relation.rhs)
+    if not rhs.free_symbols:
+        return lhs, var, rhs
+    if not lhs.free_symbols:
+        return None
+    gap = sympy.expand(lhs - rhs)
+    constant = gap.subs(var, 0)
+    return sympy.expand(gap - constant), var, -constant
+
+
+def _sentences(text: str) -> list[str]:
+    return [s for s in re.split(r"(?<=[다요])\.\s*", text) if s]
+
+
+def _extremum_point_link_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] '극값·극점 혼동' 연결 선지가 그 절차의 값인가 · 해설이 그 절차를 보이는가."""
+    values = [
+        _rational(probe.choices[index]) if 0 <= index < len(probe.choices) else None
+        for index, mid in probe.distractors
+        if mid == EXTREMUM_POINT_KEBAB
+    ]
+    level = _count_level(probe)
+    if level is None:
+        # 개수 문항이 아니면 고전 형태 — 극값의 *값*을 묻는데 극점의 x좌표를 답한 선지.
+        roots = _critical_roots(probe)
+        expected: set[sympy.Expr] | None = roots or None
+    else:
+        count = extremum_point_count(*level)
+        expected = None if count is None else {sympy.Integer(count)}
+    out: list[ShortcutViolation] = []
+    if expected is None or any(v is None or v not in expected for v in values):
+        out.append(
+            ShortcutViolation(
+                "M-link-extremum-point",
+                "'극값·극점 혼동' 연결 선지가 그 절차(극값 자리에 극대·극소가 되는 점의 "
+                "x좌표를 넣고 표준 비교 규칙으로 센다)로 나오는 값이 아니다 — 또는 판독(구간별 "
+                "값 범위·비교 규칙)에 따라 값이 갈린다.",
+            )
+        )
+    if level is not None:
+        sentences = _sentences(probe.explanation)
+        shown = all(
+            v is not None and any("x좌표" in s and f"{v}개" in s and "극" in s for s in sentences)
+            for v in values
+        )
+        if not shown:
+            out.append(
+                ShortcutViolation(
+                    "M-link-extremum-point",
+                    "해설이 '극값·극점 혼동' 연결 선지의 절차(극대·극소가 되는 점의 x좌표를 "
+                    "극값으로 넣어 센 개수)를 보이지 않는다 — 판정자가 그 선지 값을 재현할 수 "
+                    "없다.",
+                )
+            )
+    return out
+
+
+def _misconception_round6_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] 오개념 연결 — 자기모순 설명(M0615) · '극값·극점 혼동'의 절차 값."""
+    if not probe.distractors:
+        return []
+    linked = {mid for _, mid in probe.distractors}
+    out: list[ShortcutViolation] = []
+    if _CONTRADICTORY_MISCONCEPTIONS & linked:
+        out.append(
+            ShortcutViolation(
+                "M-link-contradictory",
+                "연결한 오개념의 설명이 서로 다른 두 절차를 함께 적는다(M0615 '근을 두 개로 "
+                "단정' 대 '(차수만큼 근)') — 연결 선지가 주 절차로 나오는 값인지 정해지지 "
+                "않는다. 절차가 하나인 오개념에 연결하거나 연결하지 않는다.",
+            )
+        )
+    if EXTREMUM_POINT_KEBAB in linked:
+        out += _extremum_point_link_rule(probe)
+    return out
+
+
+#: 속도·가속도의 정의 문장 — '속도는 위치를 시각 t로 미분한 값'·'속도 v(t)는 위치 x의 도함수'.
+#: '가속도는'의 '속도는'을 속도 정의로 읽지 않는다(뒤 lookbehind).
+_V_DEFINITION = re.compile(r"(?<!가)속도(?:는| v\(t\)는)[^.]*?위치[^.]*?(?:미분한 값|도함수)")
+_A_DEFINITION = re.compile(r"가속도(?:는| a\(t\)는)[^.]*?속도[^.]*?(?:미분한 값|도함수)")
+
+
+def undefined_motion_symbols(explanation: str) -> tuple[str, ...]:
+    """해설이 정의 없이 처음 쓰는 운동 기호('v(t)'·'a(t)') — 정의 문장이 첫 사용보다 앞서거나 그
+    자리에서 시작해야 한다(생성기와 판정기 `E-motion-symbol-intro`가 같은 정의를 쓴다)."""
+    out: list[str] = []
+    for symbol, definition in (("v(t)", _V_DEFINITION), ("a(t)", _A_DEFINITION)):
+        first = explanation.find(symbol)
+        if first < 0:
+            continue
+        match = definition.search(explanation)
+        if match is None or match.start() > first:
+            out.append(symbol)
+    return tuple(out)
+
+
+def _motion_symbol_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] 해설이 v(t)·a(t)를 '속도(가속도)는 위치(속도)를 시각 t로 미분한 값' 없이
+    처음 쓴다."""
+    out: list[ShortcutViolation] = []
+    for symbol in undefined_motion_symbols(probe.explanation):
+        what = "속도는 위치를" if symbol == "v(t)" else "가속도는 속도를"
+        out.append(
+            ShortcutViolation(
+                "E-motion-symbol-intro",
+                f"해설이 {symbol}를 정의 없이 처음 쓴다 — '{what} 시각 t로 미분한 값이므로 "
+                f"{symbol} = …'처럼 정의와 함께 소개한다.",
+            )
+        )
+    return out
+
+
+#: 'f'(a) = 4f'(1)' — 미분계수의 배수 관계(함수 기호·미지수·배수·비교점).
+_RATIO = re.compile(r"(?<![A-Za-z])([a-z])'\(([a-z])\) = (\d+)\1'\((-?\d+)\)")
+
+
+def _coefficient_dropped(expr: sympy.Expr, var: sympy.Symbol) -> sympy.Expr:
+    """계수 내리기 누락 도함수 — c·x^n → c·x^(n - 1)(지수만 줄인다)."""
+    poly = sympy.Poly(expr, var)
+    return sympy.expand(sum(c * var ** (n - 1) for (n,), c in poly.terms() if n >= 1))
+
+
+def _exponent_kept(expr: sympy.Expr, var: sympy.Symbol) -> sympy.Expr:
+    """지수 유지 도함수 — c·x^n → n·c·x^n(지수를 줄이지 않는다)."""
+    poly = sympy.Poly(expr, var)
+    return sympy.expand(sum(n * c * var**n for (n,), c in poly.terms()))
+
+
+def _shown_function(probe: ShortcutProbe, name: str) -> sympy.Expr | None:
+    for fn, rhs in _definitions(probe.question_text, "x"):
+        if fn == name:
+            return _parse_student(rhs)
+    return None
+
+
+def _ratio_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] f'(a) = m·f'(b) — 비례 짐작(a = m·b)·계수 누락·지수 유지 경로가 정답과
+    같은 a를 낸다."""
+    match = _RATIO.search(probe.question_text)
+    answer = _answer_value(probe)
+    if match is None or answer is None:
+        return []
+    name, unknown, mult, point = match.groups()
+    function = _shown_function(probe, name)
+    x = sympy.Symbol("x")
+    if function is None or function.free_symbols != {x}:
+        return []
+    var = sympy.Symbol(unknown)
+    m, b = sympy.Integer(mult), sympy.Integer(point)
+    filters = _side_filters(probe, var)
+    paths: list[str] = []
+    if answer == m * b:
+        paths.append(f"비례 짐작(a = {m} × {b})")
+    for label, wrong in (
+        ("계수 누락 도함수", _coefficient_dropped(function, x)),
+        ("지수 유지 도함수", _exponent_kept(function, x)),
+    ):
+        equation = sympy.expand(wrong.subs(x, var) - m * wrong.subs(x, b))
+        if _solutions(equation, var, filters) == {answer}:
+            paths.append(label)
+    if not paths:
+        return []
+    return [
+        ShortcutViolation(
+            "T-ratio-shortcut",
+            f"{name}'({unknown}) = {m}{name}'({b})의 정답이 {', '.join(paths)} 경로와 같다 — "
+            "거듭제곱 미분법을 몰라도(또는 틀려도) 정답에 닿는다. 그 매개변수를 쓰지 않는다.",
+        )
+    ]
+
+
+_GIVEN_DERIVATIVE_ROOTS = re.compile(
+    r"(?<![A-Za-z])([a-z])'\(x\) = 0의 두 (?:실근|근)이 (-?\d+(?:/\d+)?), (-?\d+(?:/\d+)?)"
+)
+
+
+def _solve_parameters(
+    equations: Sequence[sympy.Expr], unknowns: Sequence[sympy.Symbol], target: sympy.Symbol
+) -> sympy.Expr | None:
+    """연립의 해에서 target 값(해가 하나로 정해질 때만)."""
+    try:
+        solutions = sympy.solve(list(equations), list(unknowns), dict=True)
+    except (NotImplementedError, ValueError, TypeError):
+        return None
+    values = {sol.get(target) for sol in solutions}
+    if len(values) != 1:
+        return None
+    value = next(iter(values))
+    return None if value is None or value.free_symbols else value
+
+
+def _derivative_roots_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] 발문이 f'(x) = 0의 두 근을 줄 때 — 미분을 틀린 경로·발문의 근 옮겨 적기가 정답과
+    같다.
+
+    대표 예: f(x) = x^3 + ax^2 + bx에서 두 근이 ±5면 계수 누락(f'(x) = x^2 + ax + b)도, 미분하지
+    않고 f(x) = x(x^2 + ax + b)의 근으로 봐도 a = 0이 나온다(대칭 근이면 늘 일치). 지수 유지 경로
+    (x·f'(x))는 0이 아닌 근이 원래 도함수와 같아 *틀 구조상* 늘 같은 답이라 매개변수로 고칠 수 없다
+    — 이 규칙의 대상이 아니다(정직 범위).
+    """
+    match = _GIVEN_DERIVATIVE_ROOTS.search(probe.question_text)
+    answer, target = _answer_value(probe), _answer_var(probe)
+    if match is None or answer is None or target is None:
+        return []
+    name, r1, r2 = match.group(1), sympy.Rational(match.group(2)), sympy.Rational(match.group(3))
+    function = _shown_function(probe, name)
+    x = sympy.Symbol("x")
+    if function is None or target not in function.free_symbols:
+        return []
+    unknowns = sorted(function.free_symbols - {x}, key=str)
+    paths: list[str] = []
+    for label, wrong in (
+        ("계수 누락 도함수", _coefficient_dropped(function, x)),
+        ("미분하지 않은 식", function),
+    ):
+        # 근 0이 있으면 미분하지 않은 식 f(x) = x(…)의 등식 하나가 0 = 0이 되어 연립의 해가 하나로
+        # 정해지지 않는다 — `_solve_parameters`가 None을 내 경로로 세지 않는다.
+        if _solve_parameters([wrong.subs(x, r) for r in (r1, r2)], unknowns, target) == answer:
+            paths.append(label)
+    if answer in (r1, r2):
+        paths.append("발문의 근 옮겨 적기")
+    if not paths:
+        return []
+    return [
+        ShortcutViolation(
+            "T-derivative-roots-coincidence",
+            f"발문이 {name}'(x) = 0의 두 근 {r1}, {r2}를 주는데 {', '.join(paths)} 경로가 "
+            f"정답 {answer}와 같다 — 도함수 단계를 변별하지 못한다(대칭 근이면 늘 0). 그 "
+            "매개변수를 쓰지 않는다.",
+        )
+    ]
+
+
+def _factored_level_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] (02-09) 개수 문항의 방정식이나 상수항을 옮긴 식이 중근 인수를 갖는다.
+
+    2x^3 - 12x^2 + 18x = -2(극솟값 0 → 2x(x - 3)^2 = -2)·x^3 + 6x^2 + 9x - 2 = 0(극댓값이 f(0) →
+    x(x + 3)^2 = 2)처럼 인수분해와 부호만으로 개수가 정해진다(판정자 지적 9f4b4a55·2cc1e0d6).
+    극값이 0이거나, 극값이 상수항(f(0))과 같거나, 임계점이 0이면 상수항을 옮긴 식에 중근이 생긴다.
+    """
+    found = _count_polynomial(probe)
+    if found is None:
+        return []
+    poly, var = found
+    reduced = sympy.expand(poly - poly.subs(var, 0))
+    forms = []
+    if _has_repeated_factor(poly, var):
+        forms.append(f"방정식 {poly} = 0")
+    if reduced != 0 and _has_repeated_factor(reduced, var):
+        forms.append(f"상수항을 옮긴 {sympy.factor(reduced)} = {-poly.subs(var, 0)}")
+    if not forms:
+        return []
+    return [
+        ShortcutViolation(
+            "T09-factored-level",
+            f"{' · '.join(forms)}가 중근 인수를 가져 인수분해와 부호 판단만으로 실근 개수가 "
+            "정해진다(극값이 0·상수항과 같거나 임계점이 0) — 그 매개변수를 쓰지 않는다.",
+        )
+    ]
+
+
+# ── [6회차] 발문이 주는 범위(유일성 조건)·개수 문항의 구간 ─────────────────
+_QNUM = r"(-?\d+(?:/\d+)?)"
+_Q_CHAIN = re.compile(rf"{_QNUM}\s*(<=|<|≤)\s*([a-z])\s*(<=|<|≤)\s*{_QNUM}(?![\d/])")
+_Q_SIDE = re.compile(rf"(?<![A-Za-z0-9/<≤=])([a-z])\s*(<=|>=|<|>|≤|≥)\s*{_QNUM}(?![\d/])")
+_Q_OPEN = re.compile(rf"열린구간 \({_QNUM}, {_QNUM}\)")
+_Q_THEOREM = re.compile(
+    rf"구간 \[{_QNUM}, {_QNUM}\]에서 [^.?]*?(?:평균값 정리|롤의 정리)를 만족시키는"
+)
+_Q_BETWEEN = re.compile(rf"A\({_QNUM}, [^)]*\), B\({_QNUM}, [^)]*\) 사이")
+_OP_NORMAL: Final = {"≤": "<=", "≥": ">=", "<=": "<=", ">=": ">=", "<": "<", ">": ">"}
+_FLIP: Final = {"<": ">", ">": "<", "<=": ">=", ">=": "<="}
+#: 서수·대소 선택어 — 발문이 근 하나를 *고르는* 말을 주면 유일성은 선택으로 정해진다.
+_ORDINAL = re.compile(r"처음|두 번째|마지막|가장 큰|가장 작은|큰 값|작은 값|큰 근|작은 근")
+
+
+def _question_bounds(question: str, letters: AbstractSet[str]) -> list[tuple[str, sympy.Rational]]:
+    """발문이 미지수에 거는 범위 (연산자, 수) — 문자 범위는 `letters`의 문자만, 문자 없는 구간 표현
+    ('열린구간 (a, b)'·'구간 [a, b]에서 평균값(롤의) 정리를 만족시키는'·'두 점 A, B 사이')은 늘
+    쓴다. '양수 c'·'c는 양수'도 읽는다."""
+    out: list[tuple[str, sympy.Rational]] = []
+    for m in _Q_CHAIN.finditer(question):
+        lo, op1, letter, op2, hi = m.groups()
+        if letter in letters:
+            out.append((_FLIP[_OP_NORMAL[op1]], sympy.Rational(lo)))
+            out.append((_OP_NORMAL[op2], sympy.Rational(hi)))
+    for m in _Q_SIDE.finditer(question):
+        letter, op, value = m.groups()
+        if letter in letters:
+            out.append((_OP_NORMAL[op], sympy.Rational(value)))
+    for pattern in (_Q_OPEN, _Q_THEOREM, _Q_BETWEEN):
+        for m in pattern.finditer(question):
+            a, b = sympy.Rational(m.group(1)), sympy.Rational(m.group(2))
+            out += [(">", min(a, b)), ("<", max(a, b))]
+    for letter in letters:
+        if re.search(rf"양수 {letter}(?![A-Za-z])|{letter}는 양수", question):
+            out.append((">", sympy.Integer(0)))
+    return out
+
+
+def _within(value: sympy.Expr, bounds: Sequence[tuple[str, sympy.Rational]]) -> bool:
+    ops = {
+        ">": lambda a, b: a > b,
+        "<": lambda a, b: a < b,
+        ">=": lambda a, b: a >= b,
+        "<=": lambda a, b: a <= b,
+    }
+    return all(bool(ops[op](value, bound)) for op, bound in bounds)
+
+
+def _interval_of(
+    bounds: Sequence[tuple[str, sympy.Rational]],
+) -> tuple[sympy.Rational | None, bool, sympy.Rational | None, bool]:
+    """범위 목록 → (하한, 하한 포함, 상한, 상한 포함) — 같은 끝이 여럿이면 가장 좁은 것."""
+    lo: sympy.Rational | None = None
+    lo_closed = False
+    hi: sympy.Rational | None = None
+    hi_closed = False
+    for op, value in bounds:
+        if op in (">", ">="):
+            closed = op == ">="
+            if lo is None or value > lo:
+                lo, lo_closed = value, closed
+            elif value == lo:
+                lo_closed = lo_closed and closed  # 같은 끝에 열린 조건이 하나라도 있으면 열린 끝
+        elif op in ("<", "<="):
+            closed = op == "<="
+            if hi is None or value < hi:
+                hi, hi_closed = value, closed
+            elif value == hi:
+                hi_closed = hi_closed and closed
+    return lo, lo_closed, hi, hi_closed
+
+
+def _discarded_in_explanation(explanation: str, value: sympy.Expr) -> bool:
+    """해설이 그 해를 조건으로 *버리는* 문장을 갖는가('-2는 열린구간에 속하지 않으므로 버린다')."""
+    if not value.is_rational:
+        return False
+    token = str(sympy.Rational(value))
+    for sentence in _sentences(explanation):
+        if token in set(_NUMBER_TOKEN.findall(sentence)) and re.search(
+            r"버린|버리|속하지 않|제외|해당하지 않|맞지 않", sentence
+        ):
+            return True
+    return False
+
+
+def _format_admits(value: sympy.Expr, answer_format: str | None) -> bool:
+    """답 형식이 그 해를 받아들이는가 — 자연수는 양의 정수, 분수는 정수가 아닌 유리수만."""
+    if answer_format == "자연수":
+        return bool(value.is_integer and value > 0)
+    if answer_format == "분수":
+        return bool(value.is_rational and not value.is_integer)
+    return bool(value.is_real)
+
+
+def _extra_solution_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] (02-06·02-10) 정답 말고도 발문 조건을 만족하는 해 — 선지·답 형식이 배제하지 않거나
+    해설이 발문에 없는 조건으로 그 해를 버린다(평균속도 객관식의 c 구간 누락 — 판정자 지적 2건)."""
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None or _ORDINAL.search(probe.question_text):
+        return []
+    letters = {str(var)} | {
+        letter
+        for letter in "xt"
+        if re.search(rf"{letter} = {var}(?![A-Za-z])", probe.question_text)
+    }
+    if str(var) == "s":
+        letters.add("t")  # 운동 문항의 검산 미지수 s는 발문의 시각 t다
+    bounds = _question_bounds(probe.question_text, letters)
+    choice_values = {_rational(c) for c in probe.choices} - {None}
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.point != str(var) or "Derivative" in call.body:
+            continue
+        body = _sym(call.body)
+        if body is None:
+            continue
+        v = sympy.Symbol(call.var)
+        equation = sympy.diff(body, v, call.order).subs(v, var) - rel.other
+        for extra in _solutions(sympy.expand(equation), var, ()) - {answer}:
+            if bounds and not _within(extra, bounds):
+                continue  # 발문 조건이 이 해를 배제한다
+            admitted = (
+                extra in choice_values
+                if probe.choices
+                else _format_admits(extra, probe.answer_format)
+            )
+            discarded = _discarded_in_explanation(probe.explanation, extra)
+            if admitted or discarded:
+                why = (
+                    "선지·답 형식이 배제하지 않는다"
+                    if admitted
+                    else "해설이 발문에 없는 조건으로 버린다"
+                )
+                return [
+                    ShortcutViolation(
+                        "U-extra-solution",
+                        f"정답 {answer} 말고도 {extra}가 발문 조건을 만족하는데 {why} — 발문에 구간"
+                        "(예 '(단, a < c < b)')을 넣어 해를 하나로 정한다.",
+                    )
+                ]
+    return []
+
+
+def _count_interval_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] 개수 문항 — 발문이 세는 범위(구간)를 주면 검산 조건도 *같은* 구간에서 세야 한다.
+
+    '닫힌구간 [-4, 4]에서 평균값 정리를 만족시키는 실수 c의 개수'의 검산이 방정식 하나만 둬 실수
+    전체의 근을 세면, 구간 밖 근이 생기는 매개변수에서 검산과 발문이 다른 답을 낸다(판정자 지적
+    c743fda0 — 지금 두 근이 다 구간 안이라 값이 같아도 검산이 다른 문제를 가리킨다).
+    """
+    found = _count_polynomial(probe)
+    if found is None:
+        return []
+    _, var = found
+    question_interval = _interval_of(_question_bounds(probe.question_text, {str(var)}))
+    verify_interval = _interval_of(
+        [(f.op, sympy.Rational(f.rhs)) for f in _side_filters(probe, var)]
+    )
+    if question_interval == verify_interval:
+        return []
+    missing = verify_interval == (None, False, None, False)
+    return [
+        ShortcutViolation(
+            "V-count-interval",
+            (
+                "발문이 세는 범위를 주는데 검산 조건이 그 구간 없이 실수 전체의 근을 센다"
+                if missing
+                else (
+                    f"검산 조건의 구간 {verify_interval}이 발문의 구간 "
+                    f"{question_interval}과 다르다"
+                )
+            )
+            + " — 검산 조건에 발문의 구간(부등식)을 그대로 넣는다.",
+        )
+    ]
+
+
+_CURVE_SUBJECT = re.compile(
+    r"곡선 y = [^가-힣]+?(?:이|가) (?:[xt] = -?\d+(?:/\d+)?에서 )?(?:극|증가|감소)"
+)
+
+
+def _curve_subject_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[6회차] '곡선 y = …이 극대가 되는'·'곡선 y = …가 감소하다가' — 극대·극소·증감의
+    주어는 함수다."""
+    match = _CURVE_SUBJECT.search(probe.question_text)
+    if match is None:
+        return []
+    return [
+        ShortcutViolation(
+            "W-curve-subject",
+            f"'{match.group(0)}…' — 극대·극소·극값·증가·감소는 함수의 성질이다. 주어를 '함수 "
+            "f(x) = …'로 쓴다.",
+        )
+    ]
+
+
+def _round6_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """6회차 규칙 전부(성취기준별 분기 포함)."""
+    code = probe.standard_code
+    out = (
+        _misconception_round6_rules(probe)
+        + _motion_symbol_rule(probe)
+        + _ratio_rule(probe)
+        + _derivative_roots_rule(probe)
+        + _count_interval_rule(probe)
+        + _curve_subject_rule(probe)
+    )
+    if code in _MVT_CODES:
+        out += _extra_solution_rule(probe)
+    if code == _C09:
+        out += _factored_level_rule(probe)
+    return out
+
+
 def parameter_coincidences(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """매개변수 선택의 우연 일치 위반만(`COINCIDENCE_RULE_IDS`) — 생성기의 매개변수 거부 조건."""
-    return [v for v in _round5_rules(probe) if v.rule in COINCIDENCE_RULE_IDS]
+    return [
+        v for v in _round5_rules(probe) + _round6_rules(probe) if v.rule in COINCIDENCE_RULE_IDS
+    ]
 
 
 def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
@@ -2128,7 +2823,7 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
         out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
-    return out + _round5_rules(probe)
+    return out + _round5_rules(probe) + _round6_rules(probe)
 
 
 def violations_by_rule(probes: Sequence[ShortcutProbe]) -> dict[str, int]:

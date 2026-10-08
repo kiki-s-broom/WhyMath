@@ -51,7 +51,12 @@ class TestDeriveKebabStandards:
         # (`problem_corpus_batch.py::_STANDARD_CODE` 동시 교정 — 재발 방지).
         derived = derive_kebab_standards(_all_problem_records())  # type: ignore[arg-type]
         assert derived["extremum-max-min-confused"] == frozenset({"[12미적Ⅰ-02-07]"})
-        assert derived["extremum-value-vs-point-confused"] == frozenset({"[12미적Ⅰ-02-07]"})
+        # 6회차 은행 감사(2026-10-08) 처분: P3-03 미분 은행의 02-09 오개념 유발 선지(극값 자리에 극점 x좌표를
+        # 넣어 실근 개수를 센 값)가 이 kebab을 쓴다 — 역유도에 [12미적Ⅰ-02-09]가 더해진다. 직접매핑 M0865의
+        # 성취기준 [12미적Ⅰ-02-07]은 그대로 집합 안이라 크로스링크 대조는 여전히 agree다.
+        assert derived["extremum-value-vs-point-confused"] == frozenset(
+            {"[12미적Ⅰ-02-07]", "[12미적Ⅰ-02-09]"}
+        )
         assert derived["opposite-root-selected"] == frozenset({"[9수02-20]"})
         assert derived["factor-sign-flip"] == frozenset({"[9수02-20]"})
 
@@ -67,15 +72,16 @@ class TestDeriveKebabStandards:
         # (`M0674`·`M0615`) 쓴다 — 유도기가 그 키를 kebab처럼 세어 두 항목이 늘었다. kebab 좌석이 생기면
         # (MISC-40 판정 문서 안 A·B) 생성기가 kebab 연결로 옮기며 이 두 키는 사라지고 상한도 65로 돌아간다.
         # 02-09는 5회차 은행 감사(2026-10-08)로 M0677(설명 손상 — QUAL-14)에서 M0615로 바뀌었다(개수는 같다).
-        assert len(derived) <= 67
+        # 67 → 66: 6회차(은행 감사 2회차) 처분으로 02-09가 M0615 대신 좌석이 있는 kebab
+        # `extremum-value-vs-point-confused`(이미 유도 집합에 있음)를 써서 M-id 키 하나가 사라졌다.
+        assert len(derived) <= 66
         # 02-05·02-10도 같은 `power-rule-step-omitted`를 오답 귀인으로 쓴다(핵심 M0673·M0678 kebab 미승격).
         assert derived["power-rule-step-omitted"] == frozenset(
             {"[12미적Ⅰ-02-03]", "[12미적Ⅰ-02-05]", "[12미적Ⅰ-02-10]"}
         )
         assert derived["M0674"] == frozenset({"[12미적Ⅰ-02-06]"})
-        # M0615의 자체 성취기준은 [10공수1-02-07]이다 — 역유도 신호는 [12미적Ⅰ-02-09](선수 오개념을 상위
-        # 단원 문항에서 진단). 이 신호는 kebab↔M-id 검수 큐 행에만 쓰이고 M-id 직접 연결은 큐에 없다.
-        assert derived["M0615"] == frozenset({"[12미적Ⅰ-02-09]"})
+        # M0615(5회차 연결 · 설명 자기모순)는 6회차 처분으로 문항 귀인에서 빠졌다.
+        assert "M0615" not in derived
         assert "M0677" not in derived
 
     def test_problem_counts_evidence(self) -> None:

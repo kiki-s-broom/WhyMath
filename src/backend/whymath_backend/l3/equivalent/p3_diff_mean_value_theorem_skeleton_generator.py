@@ -234,9 +234,9 @@ def _cubic_cases() -> tuple[_Case, ...]:
 def _both_inside_cases() -> tuple[_Case, ...]:
     """f'(x) = 평균변화율의 두 근이 *모두* 열린구간 (a, b) 안에 있는 삼차함수(유리근).
 
-    개수형 문항(평균값 정리를 만족시키는 c의 개수)의 재료다. 검산기(`real_root_count`)는 실수 전체의
-    근을 세므로, 근이 *전부* 구간 안에 있는 사례만 쓰면 '구간 안의 c의 개수'와 '실근 개수'가 같아져
-    검산이 발문과 정확히 일치한다. 1차 은행의 '(구간 밖의 값도 포함)' 개수형은 평균값 정리가 아니라
+    개수형 문항(평균값 정리를 만족시키는 c의 개수)의 재료다. 검산은 열린구간 범위 안의 근을 센다
+    (6회차 처분 — `_count_item`). 근이 *전부* 구간 안인 사례라 '구간 안의 c의 개수'가 두 근을 모두
+    센다. 1차 은행의 '(구간 밖의 값도 포함)' 개수형은 평균값 정리가 아니라
     도함수 방정식 근 세기였고 단서 없는 문항은 해석이 갈렸다(2차 감사 bad_tag·ambiguous).
     c 필드에는 두 근 중 작은 것을, others에는 큰 것을 담는다.
     """
@@ -592,9 +592,10 @@ def _count_item(
 ) -> KindedDiffItem | None:
     """평균값 정리를 만족시키는 c(구간 *안*)의 개수 — `real_root_count` 개념형 검산.
 
-    검산 조건은 f'(x) - (평균변화율) = 0(실수 전체의 근을 센다)이므로, 근이 **전부** 열린구간 안에
-    있는 사례만 받는다(그래야 '구간 안의 c의 개수' = '실근 개수'). 생성기가 그 전제를 SymPy로
-    확인한다.
+    검산 조건은 f'(x) - (평균변화율) = 0과 **열린구간 범위**(`x > a`·`x < b`)다 — 발문이 세는 범위와
+    같은 범위에서 근을 센다(6회차 은행 감사 처분 · 판정자 지적 c743fda0 · 판정기 V-count-interval).
+    종전 검산은 방정식 하나만 둬 실수 전체의 근을 셌고, 근이 전부 구간 안인 사례만 골라 값이 우연히
+    같았을 뿐 다른 문제를 가리켰다. 재료 풀은 지금도 두 근이 모두 구간 안인 사례다(답 2).
     """
     eq, m = _fprime_eq_rate_poly(case, var)
     roots = sympy.real_roots(sympy.Poly(poly_to_sympy(eq, var), sympy.Symbol(var)))
@@ -637,7 +638,7 @@ def _count_item(
         question_text=text,
         answer_text=str(n),
         explanation=explanation,
-        conditions=f"{poly_to_sympy_str(eq, var)} = 0",
+        conditions=(f"{poly_to_sympy_str(eq, var)} = 0", f"{var} > {a}", f"{var} < {b}"),
         answer_map=(),
         problem_type_code=_COUNT,
         answer_format=answer_format_of(n),
@@ -1304,9 +1305,14 @@ def _misconception_frames() -> list[Frame]:
         ft = render_poly(c.f, "t")
         return _mc_c_item(
             frame_id="mc-time-find-c",
+            # 6회차 은행 감사 처분 — 삼차화로 x'(c) = (평균속도)의 해가 둘인데 발문에 c의 범위가
+            # 없어 구간 밖 근도 발문 조건을 만족했다(판정자 지적 bdc71cfe·d524ac47 · 판정기
+            # U-extra-solution). 열린구간 조건을 발문에 둔다 — 구간 밖 근이 선지에 있어도 정답이
+            # 하나로 정해진다.
             text=(
                 f"직선 위를 움직이는 점의 시각 t에서의 위치가 x(t) = {ft}일 때, t = {c.a}부터 "
-                f"t = {c.b}까지의 평균속도와 같은 순간속도를 갖는 시각 t = c의 값은?"
+                f"t = {c.b}까지의 평균속도와 같은 순간속도를 갖는 시각 t = c의 값은? "
+                f"(단, {c.a} < c < {c.b})"
             ),
             case=c,
             var="t",

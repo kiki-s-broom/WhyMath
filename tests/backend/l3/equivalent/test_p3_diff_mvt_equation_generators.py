@@ -16,10 +16,11 @@ P3-03(hermetic·LLM 0). 두 생성기는 아직 등록부(`harness.p3_calculus1_
    값형은 전부 도함수로 구하는 **최솟값**(부등식을 보이는 핵심 단계 — 3차 감사 처분으로 '등호가 성립하는
    x'형은 정수 중근이 인수분해 우회로를 열어 삭제했다 · 우회로 판정기 T09-*) · 개수형이 슬롯을 독점하지
    않음.
-⑥ 오개념 연결은 오개념 유발 슬롯에만. 02-06은 명세의 핵심 M-id(M0674)로, 02-09는 5회차 은행 감사(2026-10-08)
-   처분으로 핵심 M0677(설명 손상·절차 미기술 — 원문 정정 QUAL-14) 대신 **M0615**(차수만큼 근을 단정)로 —
-   차수로 센 값의 선지만 연결하고 극값 후보 개수 선지는 연결하지 않는다(kebab 좌석이 없어 M-id 그대로 —
-   좌석이 생기면 이 테스트가 신호를 낸다).
+⑥ 오개념 연결은 오개념 유발 슬롯에만. 02-06은 명세의 핵심 M-id(M0674 — kebab 좌석이 없어 M-id 그대로 ·
+   좌석이 생기면 이 테스트가 신호를 낸다)로, 02-09는 6회차 은행 감사(은행 감사 2회차 · 2026-10-08) 처분으로
+   핵심 M0677(설명 손상 — QUAL-14)·M0615(설명 자기모순) 대신 L4 kebab **extremum-value-vs-point-confused**(극값
+   ·극점 혼동)로 — 극값 자리에 극점 x좌표를 넣어 센 값의 선지만 연결하고 차수·극값 후보 개수 선지는 연결하지
+   않는다.
 ⑦ 문제유형 정직성: 개수형(`real_root_count`) ⇔ `ptype.count-solutions`.
 """
 
@@ -57,6 +58,7 @@ from whymath_backend.l3.equivalent.p3_diff_polynomial_rules_skeleton_generator i
 from whymath_backend.l3.equivalent.p3_diff_power_derivative_skeleton_generator import (
     P3DiffPowerDerivativeGenerator,
 )
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import extremum_point_count
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     SLOT_IDS,
     DiffItem,
@@ -304,6 +306,12 @@ def _parse_cond(text: str) -> tuple[sympy.Expr, str]:
     return sympy.sympify(lhs) - sympy.sympify(rhs), match.group(1)
 
 
+def _holds(value: float, op: str) -> bool:
+    """범위 조건(좌변 - 우변의 값, 관계)의 참거짓 — 독립 재계산용(경계에 근이 걸리면 실패로 드러난다)."""
+    assert abs(value) > 1e-9, "근이 범위 경계에 걸렸다 — 개수 판정이 모호하다"
+    return {">": value > 0, ">=": value > 0, "<": value < 0, "<=": value < 0, "!=": True}[op]
+
+
 def _symbol_of(exprs: Sequence[sympy.Expr]) -> sympy.Symbol:
     symbols: set[sympy.Symbol] = set()
     for expr in exprs:
@@ -458,11 +466,18 @@ def test_answers_match_an_independent_recomputation_from_the_conditions(
     for item in _items(generator_cls):
         answer = _answer_value(item)
         if _kind(item) is not None:
-            (cond,) = _conds(item)
+            # 개수형 — 첫 조건이 방정식, 나머지는 세는 범위(6회차 감사 처분 · 발문의 구간을 검산에도 둔다).
+            cond, *bounds = _conds(item)
             expr, op = _parse_cond(cond)
             assert op == "="
             symbol = _symbol_of([expr])
-            assert len(_real_distinct(_numeric_roots(expr, symbol))) == answer, item.question_text
+            parsed_bounds = [_parse_cond(b) for b in bounds]
+            inside = [
+                r
+                for r in _real_distinct(_numeric_roots(expr, symbol))
+                if all(_holds(float(b.subs(symbol, r)), bop) for b, bop in parsed_bounds)
+            ]
+            assert len(inside) == answer, item.question_text
             checked["count"] += 1
         elif _agg(item) is not None:
             (cond,) = _conds(item)
@@ -695,7 +710,7 @@ def test_equation_concept_value_items_find_the_minimum_with_the_derivative() -> 
 def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
     """P3-20 §3 — 실근 개수형을 한 슬롯에 몰아 쓰면 문면 골격이 겹친다. 슬롯별로 형태를 분산한다.
 
-    오개념 유발 슬롯은 객관식이라 연결 오개념(M0615 — 차수만큼 근)을 개수형으로만 물을 수 있어 예외이고,
+    오개념 유발 슬롯은 객관식이라 연결 오개념(극값·극점 혼동 — 개수 비교)을 개수형으로만 물을 수 있어 예외이고,
     그 슬롯도 문면 틀이 다섯 가지로 다르다. 나머지 슬롯은 개수형 틀이 둘 이하이고 최솟값형(부등식을
     보이는 핵심 단계) 틀이 셋 이상 섞인다(합·선택형은 2차 감사, 등호점형은 3차 감사 처분으로 삭제).
     """
@@ -715,9 +730,9 @@ def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 #: 명세가 개념에 귀속한 핵심 오개념(M-id).
 _CORE = {_MVT: "M0674", _EQ: "M0677"}
-#: 오개념 유발 슬롯이 실제로 연결하는 오개념. 02-09는 5회차 감사 처분으로 핵심 M0677 대신 M0615다
-#: (`test_equation_concept_links_m0615_until_m0677_is_repaired`).
-_LINKED = {_MVT: "M0674", _EQ: "M0615"}
+#: 오개념 유발 슬롯이 실제로 연결하는 오개념. 02-09는 6회차 감사 처분으로 핵심 M0677 대신 L4 kebab
+#: '극값·극점 혼동'이다(`test_equation_concept_links_extremum_point_until_m0677_is_repaired`).
+_LINKED = {_MVT: "M0674", _EQ: "extremum-value-vs-point-confused"}
 
 
 @_ALL
@@ -742,7 +757,8 @@ def test_misconception_links_are_exactly_the_mc_slot_and_are_core_ids(
 
 
 def test_kebab_seat_absence_is_a_tripwire() -> None:
-    """02-06·02-09의 연결 M-id에는 L4 kebab 좌석이 없다 — 그래서 M-id를 distractor_map에 그대로 쓴다.
+    """02-06의 연결 M-id(M0674)와 02-09의 핵심 M0677·옛 연결 M0615에는 L4 kebab 좌석이 없다 — 02-06은 그래서
+    M-id를 distractor_map에 그대로 쓴다(02-09는 6회차 감사 처분으로 좌석이 있는 kebab에 연결한다).
 
     좌석이 생기면(안 A·B — MISC-40 판정 문서) 이 테스트가 red가 되어, 생성기를 kebab 연결로 옮기라는
     신호를 낸다(참조 무결성 검증자 `validate_distractor_map`이 M-id를 위반으로 읽기 때문).
@@ -758,18 +774,54 @@ def _misconception_row(mis_id: str) -> dict[str, object]:
     return next(row for row in rows if row["mis_id"] == mis_id)
 
 
-def test_equation_concept_links_m0615_until_m0677_is_repaired() -> None:
-    """02-09 오개념 유발 선지 — 차수로 센 값은 M0615, 극값 후보 개수는 연결 없음(5회차 감사 처분).
+def _count_level(item: DiffItem) -> tuple[sympy.Expr, sympy.Integer]:
+    """개수 객관식의 방정식을 해설과 같은 f(x) = k로 읽는다 — 우변이 상수면 (좌변, 우변), 두 곡선이면
+    차를 정리해 상수항을 우변으로 넘긴 꼴."""
+    (cond,) = _conds(item)
+    lhs, rhs = (sympy.expand(sympy.sympify(side)) for side in cond.split(" = "))
+    if not rhs.free_symbols:
+        return lhs, sympy.Integer(rhs)
+    gap = sympy.expand(lhs - rhs)
+    constant = gap.subs(_X, 0)
+    return sympy.expand(gap - constant), sympy.Integer(-constant)
 
-    ① 연결 선지의 값이 *그 오개념의 절차*(차수만큼 근이 있다고 센다)로 나오는 값이다 — 방정식의 차수.
-    ② 극값 후보(f'(x) = 0의 서로 다른 실근) 개수 선지는 그 절차를 적은 오개념이 없어 연결하지 않는다.
-    ③ 정답은 차수·극값 후보 개수 어느 것과도 다르다(대표 오답 경로가 정답에 닿지 않는다).
-    ④ stale 가드 — 핵심 M0677의 설명은 아직 서술어 없이 끊겨 있다('…관점을'). QUAL-14가 원문을 정정하면
-       이 단언이 red가 되어 02-09 선지를 핵심 오개념으로 되돌릴지 다시 판정하라는 신호를 낸다.
+
+def _point_confusion_count(function: sympy.Expr, level: sympy.Integer) -> int:
+    """'극값·극점 혼동' 절차의 독립 재계산 — 해설 본문의 증감 구간별 값 범위에 극값 대신 극점의 x좌표를
+    넣고 k가 든 범위의 수를 센다(극점 값과 같으면 그 점을 1개로). 판정기 구현을 쓰지 않는다."""
+    derivative = sympy.diff(function, _X)
+    points = sorted(sympy.Rational(r) for r in sympy.real_roots(sympy.Poly(derivative, _X)))
+    rising = [derivative.subs(_X, p - sympy.Rational(1, 2)) > 0 for p in points]
+    rising.append(derivative.subs(_X, points[-1] + 1) > 0)
+    hits = 0
+    for i in range(len(points) + 1):
+        left = points[i - 1] if i > 0 else None
+        right = points[i] if i < len(points) else None
+        if left is None:
+            hits += bool(level < right) if rising[0] else bool(level > right)
+        elif right is None:
+            hits += bool(level > left) if rising[-1] else bool(level < left)
+        else:
+            hits += bool(min(left, right) < level < max(left, right))
+    return hits + sum(1 for p in points if p == level)
+
+
+def test_equation_concept_links_extremum_point_until_m0677_is_repaired() -> None:
+    """02-09 오개념 유발 선지 — '극값·극점 혼동' 절차 값만 연결, 차수·극값 후보 개수는 연결 없음(6회차 처분).
+
+    ① 연결 선지의 값이 *그 오개념의 절차*(극값 자리에 극대·극소가 되는 점의 x좌표를 넣고 개수를 센다)로
+       나오는 값이다 — 판정기 정의(`extremum_point_count`)와 이 파일의 독립 재계산이 같다.
+    ② 그 값은 정답·차수·극값 후보 개수 어느 것과도 다르다(연결 선지가 다른 오답 경로와 겹치지 않는다).
+    ③ 차수·극값 후보(f'(x) = 0의 서로 다른 실근) 개수 선지는 선지에 있되 연결하지 않는다.
+    ④ 해설이 그 절차를 한 문장으로 보인다('x좌표 … 극값으로 잘못 넣으면 … N개로 세게 된다').
+    ⑤ stale 가드 — 핵심 M0677의 설명은 아직 서술어 없이 끊겨 있고('…관점을'), 옛 연결 M0615의 설명은 아직
+       두 절차('두 개로 단정'·'차수만큼')를 함께 적는다. 원문이 정정되면 red가 되어 연결을 다시 판정하라는
+       신호를 낸다.
     """
     checked = 0
     for item in _EQ.items("misconception_trigger"):
         assert item.choices is not None
+        function, level = _count_level(item)
         (cond,) = _conds(item)
         lhs, rhs = cond.split(" = ")
         poly = sympy.Poly(sympy.sympify(lhs) - sympy.sympify(rhs), _X)
@@ -778,17 +830,26 @@ def test_equation_concept_links_m0615_until_m0677_is_repaired() -> None:
         answer = int(item.answer_text)
         assert answer not in (degree, critical), item.question_text
         linked = {index: mid for index, mid in item.distractors}
-        assert set(linked.values()) == {"M0615"}
-        assert [int(item.choices[i]) for i in linked] == [degree], item.question_text
-        crit_index = item.choices.index(str(critical))
-        assert crit_index not in linked  # 극값 후보 개수 선지는 연결하지 않는다
+        assert set(linked.values()) == {"extremum-value-vs-point-confused"}
+        expected = _point_confusion_count(function, level)
+        assert extremum_point_count(function, _X, level) == expected, item.question_text
+        assert [int(item.choices[i]) for i in linked] == [expected], item.question_text
+        assert expected not in (answer, degree, critical), item.question_text
+        for unlinked in (degree, critical):
+            assert item.choices.index(str(unlinked)) not in linked
+        assert re.search(
+            rf"x좌표 [^.]*극값으로 잘못 넣으면 [^.]*{expected}개로 세게 된다", item.explanation
+        ), item.explanation
         checked += 1
     assert checked == _EQ.slot_count
     statement = str(_misconception_row("M0677")["canonical_statement"])
     assert statement.endswith(
         "관점을"
     ), "M0677 원문이 정정됐다 — 02-09 연결을 다시 판정한다(QUAL-14)"
-    assert "차수만큼" in str(_misconception_row("M0615")["canonical_statement"])
+    m0615 = str(_misconception_row("M0615")["canonical_statement"])
+    assert (
+        "두 개로" in m0615 and "차수만큼" in m0615
+    ), "M0615 원문이 정정됐다 — 연결을 다시 판정한다"
 
 
 @_ALL

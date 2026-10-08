@@ -43,6 +43,7 @@ bad_tag 교정 — 문항이 실제로 묻는 개념과 PRIMARY 태그를 일치
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from typing import ClassVar, Final, cast
 
@@ -64,6 +65,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     with_i_ga,
     with_wa_gwa,
 )
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import undefined_motion_symbols
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     ChoiceEntry,
     DiffItem,
@@ -1402,6 +1404,26 @@ def _combine(f: Poly, g: Poly) -> list[tuple[int, int]]:
     return list(merged.items())
 
 
+#: 6회차 감사(은행 감사 2회차 · 2026-10-08) 처분 — 해설이 v(t)·a(t)를 정의 없이 처음 쓰면('v(t) =
+#: -4t + 5 이므로 …') 발문에 없는 기호를 소개 없이 쓴 것이고 '속도 = 위치의 도함수' 단계도
+#: 빠진다(판정자 지적 3건 · 5회차 규칙은 가속도·멈춤 틀만 덮었다). 정의 판정은 판정기
+#: `E-motion-symbol-intro`와 같은 `undefined_motion_symbols`이다(단일 원천).
+_V_INTRO: Final = "속도 v(t)는 위치를 시각 t로 미분한 값이다. "
+_A_INTRO: Final = "가속도 a(t)는 속도를 시각 t로 미분한 값이다. "
+_VA_INTRO: Final = (
+    "속도 v(t)는 위치를 시각 t로 미분한 값이고, 가속도 a(t)는 속도를 시각 t로 미분한 값이다. "
+)
+
+
+def _with_motion_intro(item: DiffItem) -> DiffItem:
+    """해설이 정의 없이 처음 쓰는 v(t)·a(t)가 있으면 그 정의 문장을 해설 맨 앞에 붙인다."""
+    missing = undefined_motion_symbols(item.explanation)
+    if not missing:
+        return item
+    intro = {("v(t)", "a(t)"): _VA_INTRO, ("v(t)",): _V_INTRO, ("a(t)",): _A_INTRO}[missing]
+    return dataclasses.replace(item, explanation=intro + item.explanation)
+
+
 _SLOT_FRAMES = {
     "representative": _rep_frames,
     "basic": _basic_frames,
@@ -1431,9 +1453,12 @@ class P3DiffVelocityAccelerationGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(
+        items = round_robin_items(
             _SLOT_FRAMES[slot](),
             cls.slot_count,
             claimed=claimed,
             standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
         )
+        # 6회차 감사 처분 — 모든 틀의 해설이 v(t)·a(t)를 정의와 함께 처음 쓴다(틀마다 따로 고치지
+        # 않고 슬롯 출력 한 곳에서 보정해 새 틀도 빠지지 않게 한다).
+        return [_with_motion_intro(item) for item in items]

@@ -997,7 +997,9 @@ def _basic_frames() -> list[Frame]:
         ),
         _cubic_frame(
             "basic-extremum-x-smaller",
-            "곡선 y = {f}{ga} 극값을 갖는 x좌표 중 작은 값을 구하시오.",
+            # 6회차 감사 처분 — 극값·극대·증감의 주어는 함수다('곡선 … 이 극값을 갖는' → 함수 —
+            # 판정자 지적 6fef75c7 · 판정기 W-curve-subject).
+            "함수 f(x) = {f}{ga} 극값을 갖는 x좌표 중 작은 값을 구하시오.",
             "p3-shape:bas3",
             role="turn",
             pick="smallest",
@@ -1212,7 +1214,7 @@ def _applied_frames() -> list[Frame]:
         ),
         _find_a_frame(
             "applied-find-a-local-max-value",
-            "곡선 y = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
+            "함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
             "(단, a, b는 상수이다.)",
             "p3-shape:app6",
             slot=slot,
@@ -1399,7 +1401,7 @@ def _diagnostic_frames() -> list[Frame]:
         ),
         _cubic_frame(
             "diag-decrease-to-increase-x",
-            "곡선 y = {f}{ga} 감소하다가 증가로 바뀌는 점의 x좌표를 구하시오.",
+            "함수 f(x) = {f}{ga} 감소하다가 증가로 바뀌는 점의 x좌표를 구하시오.",
             "p3-shape:dia3",
             role="min",
             pick=None,
@@ -1550,7 +1552,7 @@ def _mastery_frames() -> list[Frame]:
         ),
         _quartic_asym_x_frame(
             "mastery-asym-quartic-max-x-larger",
-            "곡선 y = {f}{ga} 극대가 되는 x좌표 중 큰 값을 구하시오.",
+            "함수 f(x) = {f}{ga} 극대가 되는 x좌표 중 큰 값을 구하시오.",
             "p3-shape:mas5",
             slot=slot,
             leads=(-1, -3),

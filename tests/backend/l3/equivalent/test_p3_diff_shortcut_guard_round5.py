@@ -31,7 +31,9 @@ import pytest
 
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     COINCIDENCE_RULE_IDS,
+    POST_QUALIFICATION_RULE_IDS,
     ROUND5_RULE_IDS,
+    ROUND6_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     parameter_coincidences,
@@ -159,6 +161,7 @@ def by_prefix(audited: dict[str, dict[str, object]]) -> dict[str, dict[str, obje
 
 
 # ── ① 재현율 ───────────────────────────────────────────────────────────────
+@pytest.mark.corpus_authoring
 def test_disposition_covers_the_frozen_audit_bank(
     audited: dict[str, dict[str, object]], causes: dict[str, str]
 ) -> None:
@@ -186,16 +189,21 @@ def test_round5_defects_are_caught_by_the_matching_rule_family(
 
 # ── ② 변별 ─────────────────────────────────────────────────────────────────
 def test_round5_bank_passes_every_earlier_rule(audited: dict[str, dict[str, object]]) -> None:
-    """감사 은행은 4회차 규칙으로 빌드됐다 — 5회차 이전 규칙은 504건 중 0건을 잡는다."""
+    """감사 은행은 4회차 규칙으로 빌드됐다 — 5회차 이전 규칙은 504건 중 0건을 잡는다.
+
+    '이전 규칙'은 자격 측정 뒤에 더한 회차 규칙 전부(5·6회차 — `POST_QUALIFICATION_RULE_IDS`)를 뺀
+    집합이다(6회차 규칙이 이 은행에서 거부하는 문항은 6회차 동결 `…_round6.py`가 따로 본다).
+    """
     earlier = [
         pid[:8]
         for pid, r in audited.items()
-        if {v.rule for v in shortcut_violations(probe_from_record(r))} - ROUND5_RULE_IDS
+        if {v.rule for v in shortcut_violations(probe_from_record(r))} - POST_QUALIFICATION_RULE_IDS
     ]
     assert earlier == []
 
 
 # ── ③ 과잉 거부 ────────────────────────────────────────────────────────────
+@pytest.mark.corpus_authoring
 def test_round5_clean_over_rejection_is_the_frozen_known_set(
     audited: dict[str, dict[str, object]], causes: dict[str, str]
 ) -> None:
@@ -640,9 +648,14 @@ def test_every_round5_rule_has_red_and_green_controls(
     green = {rule for rule, _ in _green_cases(by_prefix)}
     assert red == ROUND5_RULE_IDS
     assert green == ROUND5_RULE_IDS
-    assert COINCIDENCE_RULE_IDS < ROUND5_RULE_IDS
-    # 5회차 규칙은 RULE_IDS의 꼬리 구간이다(회차 순서 — 앞 회차 동결이 이 구간을 빼고 본다).
-    assert list(RULE_IDS[-len(ROUND5_RULE_IDS) :]) == [r for r in RULE_IDS if r in ROUND5_RULE_IDS]
+    # 매개변수 거부 조건은 자격 측정 뒤 회차 규칙에만 있다(5회차 몫은 5회차 규칙의 진부분집합).
+    assert COINCIDENCE_RULE_IDS <= POST_QUALIFICATION_RULE_IDS
+    assert COINCIDENCE_RULE_IDS & ROUND5_RULE_IDS < ROUND5_RULE_IDS
+    # 5회차 규칙은 RULE_IDS에서 6회차 규칙 바로 앞의 연속 구간이다(회차 순서 — 앞 회차 동결이 이 구간을
+    # 빼고 본다 · 6회차 추가로 꼬리가 아니게 됐다).
+    tail = RULE_IDS[len(RULE_IDS) - len(ROUND6_RULE_IDS) - len(ROUND5_RULE_IDS) :]
+    assert list(tail[: len(ROUND5_RULE_IDS)]) == [r for r in RULE_IDS if r in ROUND5_RULE_IDS]
+    assert not ROUND5_RULE_IDS & ROUND6_RULE_IDS
 
 
 # ── ⑤ 매개변수 거부 조건 ───────────────────────────────────────────────────

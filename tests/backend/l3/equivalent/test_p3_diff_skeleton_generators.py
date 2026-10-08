@@ -205,7 +205,7 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             ((_F_TANGENT_VELOCITY, "test_core_misconception_is_reachable_through_crosslinks"),),
         ),
     },
-    # kebab 좌석 부재 — 02-06·09의 연결 오개념(M0674·M0615)이 L4 카탈로그에 kebab 좌석이 없어 distractor_map에
+    # kebab 좌석 부재 — 02-06의 연결 오개념(M0674)이 L4 카탈로그에 kebab 좌석이 없어 distractor_map에
     # M-id를 직접 쓴다. 참조 무결성 검증자(`validate_distractor_map`)는 M-id를 위반으로 읽는다. **이 충돌은
     # 맞추지 않고 면제 + 좌석 신호(stale 가드: 좌석이 생기면 red)로 둔다** — 억지로 kebab을 지어내면 새 id를
     # 만드는 제약(MISC-40)을 어긴다.
@@ -214,19 +214,22 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             "핵심 M0674에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
             ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
         ),
-        _C09: _Exempt(
-            "연결 오개념 M0615에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
-            ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
-        ),
     },
     # 핵심 오개념 연결 정지 — 02-09의 핵심 M0677은 설명이 서술어 없이 끊긴 손상 문장이고 잘못된 *절차*를
     # 적지 않아, 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(5회차 은행 감사 2026-10-08 · 판정자
-    # 지적 12건 · 원문 정정 QUAL-14). 차수로 센 값의 선지만 절차가 적힌 비핵심 M0615('고차방정식의 근을
-    # 차수만큼으로 단정' · [10공수1-02-07])에 연결한다. stale 가드: 핵심 M0677이 다시 연결되면 red.
+    # 지적 12건 · 원문 정정 QUAL-14). 5회차 교정이 옮긴 M0615도 설명이 자기모순('두 개로 단정' 대 '(차수만큼
+    # 근)')이라 6회차 감사(은행 감사 2회차)에서 같은 12건이 지적돼, 이제 절차가 하나로 적힌 L4 kebab
+    # `extremum-value-vs-point-confused`(극값·극점 혼동 — 크로스링크 직접매핑 M0865)에 연결한다(좌석이 있어
+    # kebab_seat_absent 면제는 지웠다). stale 가드: 핵심 M0677이 다시 연결되면 red.
     "core_link_suspended": {
         _C09: _Exempt(
-            "핵심 M0677 설명 손상(QUAL-14) — 차수 세기 선지를 절차가 적힌 M0615에 연결.",
-            ((_F_MVT_EQUATION, "test_equation_concept_links_m0615_until_m0677_is_repaired"),),
+            "핵심 M0677 설명 손상(QUAL-14) — 극값 자리에 극점 x좌표를 넣어 센 선지를 '극값·극점 혼동'에 연결.",
+            (
+                (
+                    _F_MVT_EQUATION,
+                    "test_equation_concept_links_extremum_point_until_m0677_is_repaired",
+                ),
+            ),
         ),
     },
 }
@@ -441,14 +444,17 @@ def test_conditions_obey_the_single_unknown_contract_of_shadow_grading(
 
 
 def _outside_single_unknown_form(item: DiffItem) -> bool:
-    """면제 대상 형태 — (a) 문자열 조건인데 answer_map이 빔(개수·집계형), (b) 부등식 보호 없는 목록 조건,
-    (c) 극값 좌표형 목록 조건(첫 조건이 임계점 `Derivative(…) = 0`이고 answer_map이 정확히 (x 또는 t, y)).
+    """면제 대상 형태 — (a) answer_map이 빔(개수·집계형 — 문자열 조건이든, 6회차 감사 처분으로 범위 부등식이
+    붙은 개수형 목록 조건 `(방정식, x > a, x < b)`든), (b) 부등식 보호 없는 목록 조건, (c) 극값 좌표형 목록
+    조건(첫 조건이 임계점 `Derivative(…) = 0`이고 answer_map이 정확히 (x 또는 t, y)).
 
     (c)는 정의역 부등식(`x >= 0`)이 붙어 (b)로 분류되지 않는 02-09 최솟값형을 위한 것이다 — 키 집합을
     정확히 대조하므로 미지 상수(k·p)를 담은 목록 조건은 여기 걸리지 않고 아래 단일 미지수 검사를 받는다.
     """
+    if not item.answer_map:
+        return True
     if isinstance(item.conditions, str):
-        return not item.answer_map
+        return False
     keys = {k for k, _ in item.answer_map}
     if item.conditions[0].startswith("Derivative(") and keys in ({"x", "y"}, {"t", "y"}):
         return True
