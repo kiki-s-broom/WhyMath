@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-19-problem-create-initial-review-status
+title: "POST /v1/problems 생성 시 초기 review_status 우회 차단 — 승인 상태로 직접 태어난 문항 금지 (ADMIN-16 발견)"
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "ADMIN-16 조사 중 발견: POST /v1/problems의 본문(ProblemCreateRequest)이 schema.Problem을 그대로 받아 review_status=approved(또는 rejected·quarantined)로 직접 태어난 문항을 만들 수 있다. pending→approve 전이·감사 동작·검수 기록 없이 승인 상태가 되므로 ADMIN-16이 PATCH에서 닫은 우회와 같은 부류다. 집행: ①생성 시 review_status는 미설정 또는 pending만 허용하고 그 외는 422(상태 변경은 전이 경로의 몫) ②이 REST 표면을 실제로 쓰는 호출자(스크립트·적재 도구·테스트)를 먼저 전수 조사해 깨지는 곳을 목록으로 남긴다 — 코퍼스 적재(l1/problem_bank/populate.py)는 API를 거치지 않으므로 대상이 아닌지 실측 확인 ③생성 경로 우회 주입 테스트로 RED 확인."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/problems.py
+  - tests/backend/api/test_problems.py
+session: null
+notes: "ADMIN-16 부수 발견. 격리 계약 문서(problem_quarantine_contract.md) 7절에도 미해결로 적어 두었다."
+updated: 2026-10-08
