@@ -44,8 +44,8 @@ STRENGTH: Final[float] = 0.8
 
 #: 저작 확정 목록 — (from_code=선수 과목 원자, to_code=후속 과목 원자, rationale=교육적 근거).
 #: 과목 쌍별로 묶었다. **교육적 판단은 이 목록이 정본이며, 변경은 게이트 검수 결과로만 이뤄진다.**
-#: 2026-10-08 게이트 판정(Kiki 지시로 사람 검수를 AI 검수로 대체): 출발 원자 교체 5건 · 반려 삭제 8건
-#: (137→129) — 근거 = `docs/data/ai_review_inter_course_edges_university_v1.md`.
+#: 2026-10-08 게이트 판정(Kiki 지시로 사람 검수를 AI 검수로 대체): 출발 원자 교체 5건 ·
+#: 반려 삭제 8건(137→129) — 근거 = `docs/data/ai_review_inter_course_edges_university_v1.md`.
 #: 설계 원칙: 과목 쌍당 최대 4건(희소) · 선수 방향은 "먼저 배우는 과목 → 나중 과목" ·
 #: 같은 개념을 다시 말하는 직접 계승과 "이 개념이 없으면 저 개념의 증명·정의가 안 서는" 의존만 채택.
 AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (

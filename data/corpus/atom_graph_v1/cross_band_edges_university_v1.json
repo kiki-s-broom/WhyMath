@@ -77,7 +77,7 @@
       "school_link": true,
       "strength": 0.8,
       "evidence": "S4-01 고→대 경계 저작 v1",
-      "rationale": "dy/dx가 분수가 아니라 차분몫 Δy/Δx의 극한 기호라는 이해는 미분계수(차분몫의 극한)가 직접 선수다"
+      "rationale": "dy/dx가 차분몫 Δy/Δx의 극한 기호라는 이해는 미분계수(차분몫의 극한)가 직접 선수다"
     },
     {
       "from_code": "12미적Ⅰ-02-04-2",
