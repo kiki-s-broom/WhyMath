@@ -104,6 +104,23 @@ class Problem(Base):
         sa.Uuid, sa.ForeignKey("source_entity.source_id")
     )
 
+    # ARCH-31: 현재 서빙 기준 판 포인터(`problem_version.version_id`, 44 §6.4의 current_published
+    # _version_id를 Problem 축에서 부르는 이름 — 태스크 승계 대조표 ①). nullable·기본값 없음 —
+    # NULL=버전 미부여(백필 금지: 기존 행에 판을 날조해 넣지 않는다). 이 컬럼 자체는 어떤 전이
+    # 규칙도 강제하지 않는다 — PUBLISHED 불변은 `problem_version` BEFORE UPDATE 트리거가 강제.
+    # `problem_version.problem_id`와 상호 FK(순환 없이 왕복하는 순서는 마이그레이션 docstring).
+    # 상세=docs/architecture/arch31_problem_version.md.
+    # use_alter=True: 상호 FK 순환(problem ↔ problem_version)을 create_all/정렬에서 ALTER로 푼다 —
+    # 신규 순환 경고(SAWarning)를 만들지 않기 위함(제약명은 마이그레이션과 동일해야 한다).
+    problem_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid,
+        sa.ForeignKey(
+            "problem_version.version_id",
+            use_alter=True,
+            name="fk_problem_problem_version_id_problem_version",
+        ),
+    )
+
     # ===== 시험 컨텍스트 =====
     exam_type: Mapped[ExamType | None] = mapped_column(_pg_enum(ExamType, "exam_type_enum"))
     exam_year: Mapped[int | None] = mapped_column(sa.Integer)

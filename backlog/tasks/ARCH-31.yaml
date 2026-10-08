@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -24,6 +24,6 @@ paths:
   - src/backend/whymath_backend/schema/problem.py
   - src/backend/whymath_backend/db/models/problem.py
   - "src/backend/whymath_backend/alembic/versions/*"
-session: null
+session: claude/awesome-allen-qmy3yi
 notes: "011_1 EOS Identity 수용 결정 후속. 첨부 설계안의 Content ID ≠ Content Version ID 분리를 MVP 범위 내에서 구현.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F5 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-09-06] G-eos49 판정의 ARCH-31 파급 — 같은 벽(검사 ①)에 부딪히는 형제 축이라 재판정 방지\n\n[정정 2026-09-06] Codex P2 #1012 수용 — 5항이 1·2항과 배타적이라 구현자가 FK 대상을 결정할 수 없던 모호성 해소. 항별 승계 대조표로 확정\n\n[정정 2026-09-06] 직전 amend의 태스크 ID 오기 정정 — HARN-74 선점·title 축 실소유자는 HARN-57 ⑤"
-updated: 2026-09-06
+updated: 2026-10-08
