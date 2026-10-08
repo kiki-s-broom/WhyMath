@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,12 +17,13 @@ acceptance:
   - "③ 집행 지점: 여유가 상한의 30% 미만인 잡이 있으면 사람 눈에 띄는 형태(실패 또는 이슈)로 알린다 — 매 실행 경고는 습관화되므로 쓰지 않는다. 실행 주기는 스케줄 워크플로 또는 기존 감사 워크플로(harness-audit 등)에 붙인다."
   - "④ 모른다 ≠ 아니다: API 거부(403)·실행 이력 0건·잡 이름 불일치는 '여유 충분'으로 접지 않고 측정 실패로 드러낸다."
   - "⑤ 변별력: 합성 실행 이력 픽스처로 여유 부족 잡은 RED, 충분한 잡은 GREEN(대조군), 측정 실패는 별도 상태 — 뮤테이션으로 각 절의 반례를 밟는다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1530"
 paths:
   - scripts/analysis/measure_backend_job_timeout_headroom.py
   - scripts/analysis/measure_ci_job_timeout_headroom.py
   - tests/infra/test_ci_job_timeout_headroom.py
   - ".github/workflows/ci-timeout-headroom.yml"
-session: claude/charming-darwin-6j2sw5
+session: null
 notes: "OPS-69(2026-09-28 harness-integrity 5분 소진)의 재발 방지 대책으로 등재. OPS-69는 해당 잡의 상한만 올리고 하한을 테스트로 동결했다 — 실행 이력이 필요한 상시 감시는 정적 테스트로는 할 수 없어 이 태스크로 분리했다.\n\n[정정 2026-10-08] paths ['scripts/analysis/measure_backend_job_timeout_headroom.py', 'scripts/analysis/measure_ci_job_timeout_headroom.py', 'tests/infra/test_ci_job_timeout_headroom.py'] → ['scripts/analysis/measure_backend_job_timeout_headroom.py', 'scripts/analysis/measure_ci_job_timeout_headroom.py', 'tests/infra/test_ci_job_timeout_headroom.py', '.github/workflows/ci-timeout-headroom.yml']: 측정기 일반화 착수 중 집행 지점을 별도 워크플로로 확정(harness-audit 대신) — 신규 파일을 작업 범위에 반영(기존 3경로 유지)"
 updated: 2026-10-08
