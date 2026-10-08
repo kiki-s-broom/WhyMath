@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -24,6 +24,6 @@ paths:
   - src/backend/whymath_backend/db/models/user.py
   - "tests/backend/schema/*"
   - docs/legal/pipa_data_matrix.md
-session: null
+session: claude/laughing-bardeen-ayio1q
 notes: "docs/architecture/operations_platform_gap_review_r2.md §4 D7 — v1이 보지 않은 평면. pipa_data_matrix.md §3.2가 '동의 시 수집 항목·이용 목적·보유 기간·제3자 제공 여부를 명확히 고지(PIPA 고지 의무)'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없다. §1 '데이터 최소 수집' 원칙이 기계로 검증되지 않는 상태이며, MGMT-02(처리방침 문안·blocked)가 참조할 대장이 없다. ADMIN-02 (c)(school_region·gender 처분)의 선결 — 처분 근거는 이 대장이 있어야 성립한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/I3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-08
