@@ -28,7 +28,11 @@ class StagePrompt(BaseModel):
 # `docs/standards/prompt_engineering.md` §"6. 인지부하 관리" 정본, LearnLM 루브릭 차용)를
 # 모델에 *명시* 주입. 학생을 *수동적으로* 만들지 않는 톤(CLAUDE.md "학생을 수동적으로
 # 만드는 설계 금지").
-_BASE_SYSTEM = """너는 한국 중·고등학생을 돕는 *수학 메타인지 코치*다. 다음 원칙을 절대 지킨다:
+#
+# 정체성 문구의 학년 register(W0 — S-2: 학년축 최단경로 계획 §2.3)만 `{register}`로 열어둔다.
+# 원칙·금기·톤 본문은 학년 무관(4축 공용) — 학년축 = 오버레이 파라미터 원칙(구조 분기 아님).
+_BASE_SYSTEM_TEMPLATE = """너는 한국 {register}을 돕는 *수학 메타인지 코치*다. \
+다음 원칙을 절대 지킨다:
 
 1. **답을 직접 주지 않는다** — 학생이 *생각하는 법*을 배우게 한다(Polya 단계 우선).
 2. **소크라테스 우선** — 답 대신 *질문*으로 이끈다.
@@ -44,6 +48,56 @@ _BASE_SYSTEM = """너는 한국 중·고등학생을 돕는 *수학 메타인지
 
 응답은 한국어. 짧고 친근하게.
 """
+
+# 기본 register — grade 미상일 때(호출자 대부분·현행 UserProfile.grade는 고1~N수2[10~14]로만
+# 채워짐) 기존 문구를 *바이트 동일*로 보존한다(회귀 0 — 아래 `_grade_register` 폴백과 동일 값).
+_DEFAULT_REGISTER = "중·고등학생"
+
+# KR 학년 정수 → 시스템 프롬프트 정체성 register. 번호 공간의 정본은 호출자가 넘기는
+# **`UserProfile.grade`**(`api/coach.py` `_grade_for`)이고, 같은 사다리를
+# `l4/pedagogy/runtime_selector.py::grade_to_band`가 이미 명문화했다: 1~6=초등·7~9=중학·
+# 10~12=고1~고3·**13~14=N수1·2(고교 교육과정·수능 대비 재학습 — 대학 과정이 아니다)**.
+# 그래서 10~14를 모두 "고등학생"으로 둔다(`test_polya_prompts`가 grade_to_band와 1~14 전수 대조).
+#
+# ⚠️ `l1/curriculum/curriculum_loader.py`의 대학 `introduced_grade`(`_UNIV_GRADE_TO_INTRODUCED_GRADE`
+# 대학 1~4학년=13~16)는 정렬용 내부 관례라 이 사다리와 13~14에서 번호가 **겹친다**(대학 1~2학년
+# ≠ N수1~2). 학생 속성을 소비하는 이 register는 사용자 계약을 따른다 — 로더의 13~14를 그대로
+# 가져오면 N수 학생에게 "너는 한국 대학생을 돕는..."이 나간다(2026-10-08 이식 직후 실측 회귀).
+# "대학생"은 사용자 grade 계약(ge=10 le=14)에 인코딩이 없어 현 호출자로는 닿지 않는다. 15~16은
+# 로더 관례의 대학 3~4학년 값을 받는 후속 호출자를 위한 자리일 뿐이며, 대학 1~2학년(13~14)은 이
+# 정수 채널로 표현할 수 없다 — 대학 축을 실제로 연결할 때 모호하지 않은 입력이 필요하다(S4-64).
+_GRADE_BAND_RANGES: tuple[tuple[int, int, str], ...] = (
+    (1, 6, "초등학생"),
+    (7, 9, "중학생"),
+    (10, 14, "고등학생"),  # 고1~고3 + N수1·N수2
+    (15, 16, "대학생"),
+)
+
+
+def _grade_register(grade: int | None) -> str:
+    """학년 정수 → 정체성 문구 register. None·범위 밖은 `_DEFAULT_REGISTER`(회귀 0 폴백).
+
+    현재 `UserProfile.grade`는 스키마상 10~14(고1~N수2·§14.3 MVP 고3 wedge 범위)로만 채워져
+    실호출 경로의 값은 전부 "고등학생" register다 — 1~9는 그 스키마 제약이 풀릴 때(온보딩
+    확장) 코드 변경 없이 바로 대응한다(학년축 = 오버레이 파라미터).
+    """
+    if grade is not None:
+        for lo, hi, register in _GRADE_BAND_RANGES:
+            if lo <= grade <= hi:
+                return register
+    return _DEFAULT_REGISTER
+
+
+def base_system_for_grade(grade: int | None) -> str:
+    """학년별 register가 반영된 공통 시스템 프롬프트.
+
+    grade=None이면 `_BASE_SYSTEM`과 바이트 동일(회귀 0 폴백).
+    """
+    return _BASE_SYSTEM_TEMPLATE.format(register=_grade_register(grade))
+
+
+# 하위호환 상수 — grade 미전달 호출자·`STAGE_PROMPTS` 기본값(기존 동작 무변경).
+_BASE_SYSTEM = base_system_for_grade(None)
 
 
 # Stage 1: 이해 — `docs/prompts/polya_4step.md` L3-17 정본.
