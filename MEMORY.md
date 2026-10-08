@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
+
+**무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
+**결정 3건**: ① `pii_grade`는 기술 분류 5종이며 법적 분류(개인정보·민감정보 해당 여부)가 아니다 — 법적 확정은 MGMT-02 소관이라 `pipa_data_matrix.md` §5 체크리스트에 항목을 추가했다. ② `collected`는 출처(origins)에서, `state`는 (수집 여부 × 소비처 유무) 4칸에서 파생한다 — 손으로 쓴 값이 서로 모순되면 테스트가 red다. ③ 목적은 소비처가 있을 때만 적는다 — 소비처 0이면 `none`이 정직한 상태이고 그럴듯한 목적 문구를 적으면 red다.
+**실측(코드 전수 AST 스캔)**: ORM 42컬럼 — 수집+소비 10 · 수집만(소비 0) 9 · 소비만(수집 아님) 9 · 둘 다 0 14. 수집만 9컬럼(`target_major_category`·`primary_device`·`has_apple_pencil`·`note_app`·`uses_inkang`·`inkang_provider`·`uses_offline_academy`·`monthly_education_spend`·`accessibility_needs`)은 PATCH 화이트리스트에 열려 있으나 읽는 코드가 0이다 — `api/users.py`가 gender·school_*에 적용한 '소비자 없이 수집을 열지 않는다' 원칙이 이 9컬럼에는 적용되지 않은 비대칭이다. 처분은 ADMIN-21로 등재했다(Kiki 판정 필요). 관측(미강제): Flutter 온보딩이 실제로 보내는 필드는 4개뿐이다.
+**집행**: `tests/backend/schema/test_collection_inventory.py` 59건 — ORM 컬럼 집합↔대장 양방향 동기, PATCH 화이트리스트↔학생 입력 출처, server_default↔db_default, 해시 식별자↔`_PII_EXCLUDE`, 무소비·무쓰기 주장의 코드 대조와 선언 안 된 쓰기 경로 감시, 보존 계획↔`privacy/retention.py`. 실파일 뮤테이션 13종 전건 RED·바이트 동일 원복으로 변별력을 확인했다.
+**정직한 공백**: 다른 테이블과 이름이 겹치는 7컬럼(`user_id`·`school_type`·`grade`·`role`·`created_at`·`is_active`·`deleted_at`)은 `UserProfile.<컬럼>` 형태만 검증한다. 대량 UPDATE·패키지 밖 raw SQL 쓰기·인스턴스 변수 접근은 보지 못한다. 소비처 목록은 대표 목록이다(빈 목록만 전수 주장).
+**사고 기록(피해 0)**: 후속 태스크 번호를 `ADMIN-10`으로 추측 배정해 충돌했고 CLI 가드가 막으며 `ADMIN-21`을 제안했다. 같은 세션에서 병렬 Bash의 `cd`가 서로 덮어써 조회 결과 3건이 무효가 됐고 폐기 후 절대경로로 재조회했다.
+
 ### 2026-10-08 (결정·판정 · G-s401 엣지 게이트 2건): **AI 검수 적용 범위를 개념 그래프 선수 엣지 게이트로 넓힌다 — 고→대 24건은 전건 존치(출발 원자 교체 4), 대학 과목간 137건은 129건(교체 5 · 반려 8). 도달 대학 세부개념은 466→462/512** (Kiki 결정·claude 집행) — 판정 기준 main `0607bc07`
 
 **무엇/왜(Kiki 지시)**: 사람 게이트 `G-s401-uni-boundary-edge-review`(24건)와 `G-s401-inter-course-edge-review`(137건)를 AI 검수로 진행하라는 지시다. 기존 AI 검수 전환 결정(2026-07-10)은 **동등문제 코퍼스 노출 게이팅 한정**이라고 범위가 명시돼 있었다. 그래서 이번 지시는 그 범위를 **그래프 선수 엣지**까지 넓히는 새 결정으로 기록한다(세션이 "이미 정했다"는 기억을 대장에서 확인하지 못해 범위 차이를 먼저 보고했다). 엣지 AI 검수 자체의 선례는 2026-06-17 기본수학 34의 선수엣지 정독이다.
@@ -12051,3 +12060,21 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **CI에서 잡 단위로 드러난 실패(backend 잡만 재현했다면 못 봤다)**: `infra-contracts` 잡의 수학 어휘 래칫이 `l3.cross_verify` 1→0 소거로 RED — 지운 docstring 줄의 `SymPy`가 세어지던 어휘였다. 코어 계층의 수학 어휘가 줄어든 방향이라 래칫 의도대로 기준선 항목을 지웠다(합계 주석 74/28→73/27 함께 정정). 또 내 실행 스크립트가 CI 스텝 단위 `working-directory` 덮어쓰기를 무시해 `declared-unwired-audit`의 2스텝이 `FileNotFoundError`로 FAIL을 냈다 — 제품 결함이 아니라 **내 하네스 오류**였고 PASS도 FAIL도 주장하지 않은 채 스크립트를 고쳐 재실행했다. 같은 이유로 `harness-integrity`의 CUR-09 스텝도 잘못된 cwd에서 PASS였던 것을 신뢰하지 않고 재실행했다. 초기에는 `| tail`로 종료 코드를 가리는 같은 실수(`PYTEST_EXIT=0`이 tail의 값)를 한 번 냈고 즉시 정정했다.
 - **한계(명시)**: ① `--authored-by` 선언이 코퍼스에 **기록된 서명을 덮어쓰는** 기존 동작은 바꾸지 않았다 — 거짓 선언(LLM 저작분을 `deterministic:`로 선언)이 가드를 우회할 수 있다. 도움말에 "가드 회피용 스위치가 아니다"를 적었을 뿐 코드로 막지 않았다(PB-17 ③에서 재판정). ② 서명은 **선언값이지 관측값이 아니다** — `GenerationLog.served_model`(실제 응답 모델)과 폴백·프록시 라우팅은 보지 못한다. ③ 결정론 생성기 약 40종과 기존 코퍼스 약 60개 디렉터리에는 아직 `deterministic:` 서명이 찍히지 않았다(전부 `unknown`으로 거부됨) — PB-17. ④ 프로덕션 어댑터 `validate_problem`은 `authored_by`를 넘기지 않아 `unknown`이 들어간다 — 지금은 교차검증기가 주입되지 않아 도달하지 않지만 S4-56이 주입하는 순간 전건 거부된다(의도된 fail-closed·배선 없음) — PB-18. ⑤ 라이브 LLM 경로(실제 Ollama/클라우드 호출)는 이 세션에서 돌리지 못했다 — 전부 결정론 대역과 라우터 계산으로 검증했다. ⑥ 코딩 헌법 R9-01(Conventional Commits)의 검사기 `check_commit_msg.py`는 아직 저장소에 없고(stage 3 예정) 최근 커밋은 전부 `<태스크ID>: <제목>` 관례라 이를 따랐다.
 - **후속 소유(등재)**: `PB-17-deterministic-author-stamp-and-corpus-backfill`(결정론 생성기 서명 일괄 기록 + 기존 코퍼스 백필 + 선언 덮어쓰기 재판정 + 전수 가드) · `PB-18-adapter-validate-problem-author-seat`(중립 봉투에 저작 서명 좌석 — S4-56 선결). 두 태스크 모두 `depends_on`으로 PB-15에 건다.
+## 2026-10-08: OPS-82 구조화 에러코드 체계 — 학생 대면 API 한정 도입
+- **실측(main 8a5ea4d1)**: 예외 클래스는 등재 당시 34종이 아니라 **57종**, `error_code`는 도입 전 0건. API 에러는 한국어 `detail` 문장뿐이었다.
+- **결정**: 형식 `WM-<계열>-<NNN>`(F1~F8 `GenerationFailureCode`와 형식이 갈라 충돌 불가). 적용 범위는 신규 예외 + 학생 대면 API만, 57종 소급은 `OPS-119`로 분리. 응답은 `detail`을 유지하고 옆에 `error_code`를 더한다(하위 호환).
+- **집행**: 429(`_rate_limit.py` 2곳)·426(버전 게이트)이 실제로 코드를 싣는다. 거버넌스 테스트(AST 전수·허수 코드 금지·스캔 0건 실패)와 결함 주입 2종 RED·인벤토리 귀속 RED 실측. 정본 = `docs/standards/error_code_taxonomy.md`.
+## 2026-10-08 OPS-48 종료(회수) — 코드는 8월에 main 착지, 대장만 todo로 남아 있었다 + 미분류 처리 민감도 확인
+
+- **발견**: `OPS-48`이 대장에서 `todo`·`artifacts: []`였는데, 산출물은 전부 main에 있었다 — PR #855(강등전 하니스 `quality_tier_moe_accuracy_battle.py`·테스트·실행기·감사 JSONL 101줄)와 PR #857(`OPS-49` 라우터 QUALITY 핀 교체). 판정 기준: `origin/main` `8a5ea4d1`(HEAD 트리에서 4개 산출물 `git cat-file -e` 실재 확인). 원인은 #855 머지 시 `backlog.py done`이 실행되지 않은 것이다. 이 상태를 모르고 착수하면 이미 끝난 강등전을 다시 돌릴 수 있었다(`start`가 거부 없이 통과했다 — 대장상 미완료이므로 착수를 막는 장치가 없다).
+- **acceptance 전항 재대조(회수 규칙)**: ①속도 축 — 이행(재현 스크립트 `bench_ollama.ps1 -WithMoe` 실재 · 수치는 SEC-34 오염 가능 구간 잠정치, 재측정 `OPS-75`가 소유) ②정확도 축 — 이행(감사 JSONL 문항별 재집계가 표와 소수점까지 일치) ③채택 조건 — 이행(`QUALITY_MODEL_ID`는 라우터 상수, 강등전의 직접 provider 호출은 측정 도구이지 서빙 경로가 아니다 · 결정 로그 2026-08-22) ④동기 승격 가능성 기록 — 이행(성능 문서 §5 L5를 "정확도 대조가 남았다"에서 현행 사실로 정정, 승격은 미결정 · 선행 조건 `OPS-50`·`OPS-75`) ⑤범위 밖 — 해당 없음. 미이행분 없음.
+- **새로 확인한 사실(민감도)**: 강등전 판정(exit 0)은 파싱 실패 문항을 분모에서 뺀 값이다. 감사 파일을 세 가지 처리로 다시 셌다 — 검출률 축은 결함 미분류를 놓침으로 세도(B) 후보 하한 0.444 > 기준 하한 0.368로 결론이 유지된다. **오경보 축은 처리에 달려 있다**: 후보는 무결함 10/50을 분류하지 못했고 이를 오경보로 세면(C) 상한 0.351로 기준 상한 0.141 + 마진 0.05를 넘는다. C는 최악 가정이라 실제 영향은 서빙 경로의 분류 실패 처리(재시도·승급·차단)에 달렸다. "오경보 비열등"은 분류된 문항에 한해 성립한다. 표는 성능 문서 §6.2, 재판정 기준은 `OPS-50` acceptance ⑤로 고정했다.
+- **한계(명시)**: 위 재집계는 감사 JSONL의 문항별 기록으로 한 계산이며 모델을 다시 돌린 측정이 아니다. "같은 형태의 대장 잔류(머지됐는데 todo)가 다른 태스크에도 있는가"는 규모를 재지 못했다 — 제목 휴리스틱 스캔이 태스크 등재 PR과 완료 PR을 구분하지 못해 21건 중 대부분이 오탐이었고, 완료 PR로 보이는 후보 3건(`S4-54`·`S4-55`·`PED-31`)은 읽어서 확인하지 않았다.
+
+## 2026-10-08 HARN-103 — Feature/Code Freeze 규칙 착지 (문서·기계 검사 / 저장소 설정은 게이트로 이관)
+
+- **결정**: 11/30 Feature Freeze(`release-blocker`) · 12/14 Code Freeze(+`code-freeze-approved`) · **2027-01-15 날짜로 자동 해제**(만료 없는 동결 금지). 동결 경로는 `src/`·`infra/`·`schemas/`(Code Freeze부터 `data/` 추가), 문서·테스트·대장은 제외. 정본 `docs/standards/release_freeze.md`, 집행 `scripts/ops/check_release_freeze.py` + `.github/workflows/release-freeze.yml`(exit 0/1/2 — git 조회 실패는 통과가 아니라 2).
+- **가용성 실측(2026-10-08)**: `owner.type=Organization`·`public`·admin 권한 — 라벨·룰셋 제공. `release-blocker` 조회 "not found"는 미설정이다(미제공 아님).
+- **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
+- **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
+- **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
