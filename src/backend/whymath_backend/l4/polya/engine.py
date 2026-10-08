@@ -25,7 +25,7 @@ from whymath_backend.l4.models import (
     next_polya_stage,
 )
 from whymath_backend.l4.pedagogy.prompt_assembler import build_system_prompt
-from whymath_backend.l4.polya.prompts import STAGE_PROMPTS
+from whymath_backend.l4.polya.prompts import STAGE_PROMPTS, base_system_for_grade
 from whymath_backend.l4.polya.transitions import should_advance
 from whymath_backend.l4.socratic import SocraticCategory, select_category
 from whymath_backend.l4.tone_filter import filter_tone
@@ -76,10 +76,14 @@ class PolyaCoach:
           `pedagogy_pack_prompt_enabled` 플래그가 켜졌을 때만, base_system 위에 팩 4계층 발문을
           조립해 `system`을 대체한다. **pack None(기본)이거나 플래그 OFF면 조립기 미호출로
           `system=sp.system` 그대로**(바이트 동일·회귀 0). 기존 호출자는 pack 미전달이라 무영향.
-        - `grade`·`standard_code`(PED-05 개인화 슬롯): 팩 조립이 실제로 일어날 때(pack 주입 ∧
-          플래그 ON)만 `build_system_prompt`의 계층 4로 thread된다 — 둘 다 기본 None이라 기존
-          호출자(팩 미주입·플래그 OFF)는 완전 회귀 0. PII 가드: 이 둘(학년 정수·성취기준 코드
-          문자열) 외의 학생 식별 정보는 이 메서드 시그니처에 자리가 없다.
+        - `grade`(W0 — S-2 학년축 register): base_system 정체성 문구("너는 한국 {register}을
+          돕는...")의 학년 register를 직접 결정한다(`base_system_for_grade` — 결정론적 문구
+          치환이라 팩 조립과 달리 플래그·fidelity 게이트 불요). `grade=None`(기본·미전달
+          호출자 다수)이면 기존 문구("중·고등학생")와 바이트 동일이라 회귀 0.
+        - `standard_code`(PED-05 개인화 슬롯): 팩 조립이 실제로 일어날 때(pack 주입 ∧ 플래그
+          ON)만 `build_system_prompt`의 계층 4로 thread된다 — 기본 None이라 기존 호출자(팩
+          미주입·플래그 OFF)는 완전 회귀 0. PII 가드: `grade`(학년 정수)·`standard_code`(성취
+          기준 코드 문자열) 외의 학생 식별 정보는 이 메서드 시그니처에 자리가 없다.
         """
         transition = should_advance(state, student_input, mastery_level=mastery_level)
         target_stage = (
@@ -105,12 +109,15 @@ class PolyaCoach:
             turn_count=state.turn_count,
             prev_hint_level=state.prev_hint_level,
         )
+        # 학년 register(W0 S-2) — grade=None이면 sp.system과 바이트 동일(_BASE_SYSTEM 폴백).
+        base_system = base_system_for_grade(grade)
         # 교수법 팩 4계층 조립(옵트인 + 플래그 게이트) — pack 주입 ∧ 플래그 ON일 때만. 그 외에는
-        # base_system(sp.system) 무변경으로 기존 발문 경로와 비트동일(OFF/무팩 회귀 0 계약).
-        system = sp.system
+        # base_system(register 반영·팩 미조립) 그대로 — OFF/무팩 회귀 0 계약은 "팩 조립기 미호출"
+        # 범위(pedagogy_pack_prompt_enabled 설정 docstring)이지 grade register와는 무관.
+        system = base_system
         if pack is not None and get_settings().pedagogy_pack_prompt_enabled:
             system = build_system_prompt(
-                base_system=sp.system,
+                base_system=base_system,
                 pack=pack,
                 misconceptions=misconception_hypotheses,
                 student_state=mastery_level,

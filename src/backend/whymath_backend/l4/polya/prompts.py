@@ -28,7 +28,11 @@ class StagePrompt(BaseModel):
 # `docs/standards/prompt_engineering.md` §"6. 인지부하 관리" 정본, LearnLM 루브릭 차용)를
 # 모델에 *명시* 주입. 학생을 *수동적으로* 만들지 않는 톤(CLAUDE.md "학생을 수동적으로
 # 만드는 설계 금지").
-_BASE_SYSTEM = """너는 한국 중·고등학생을 돕는 *수학 메타인지 코치*다. 다음 원칙을 절대 지킨다:
+#
+# 정체성 문구의 학년 register(W0 — S-2: 학년축 최단경로 계획 §2.3)만 `{register}`로 열어둔다.
+# 원칙·금기·톤 본문은 학년 무관(4축 공용) — 학년축 = 오버레이 파라미터 원칙(구조 분기 아님).
+_BASE_SYSTEM_TEMPLATE = """너는 한국 {register}을 돕는 *수학 메타인지 코치*다. \
+다음 원칙을 절대 지킨다:
 
 1. **답을 직접 주지 않는다** — 학생이 *생각하는 법*을 배우게 한다(Polya 단계 우선).
 2. **소크라테스 우선** — 답 대신 *질문*으로 이끈다.
@@ -44,6 +48,46 @@ _BASE_SYSTEM = """너는 한국 중·고등학생을 돕는 *수학 메타인지
 
 응답은 한국어. 짧고 친근하게.
 """
+
+# 기본 register — grade 미상일 때(호출자 대부분·현행 UserProfile.grade는 고1~N수2[10~14]로만
+# 채워짐) 기존 문구를 *바이트 동일*로 보존한다(회귀 0 — 아래 `_grade_register` 폴백과 동일 값).
+_DEFAULT_REGISTER = "중·고등학생"
+
+# KR 학년 정수 → 시스템 프롬프트 정체성 register. `l1/curriculum/curriculum_loader.py`의
+# `_GRADE_BAND_TO_INTRODUCED_GRADE`(초1=1…고3=12) + `_UNIV_GRADE_TO_INTRODUCED_GRADE`(대학
+# 1~4학년=13~16) 확장 규약과 동일 번호 공간을 쓴다 — 학년축 어휘를 L1·L4가 공유(정본 1개).
+_GRADE_BAND_RANGES: tuple[tuple[int, int, str], ...] = (
+    (1, 6, "초등학생"),
+    (7, 9, "중학생"),
+    (10, 12, "고등학생"),
+    (13, 16, "대학생"),
+)
+
+
+def _grade_register(grade: int | None) -> str:
+    """학년 정수 → 정체성 문구 register. None·범위 밖은 `_DEFAULT_REGISTER`(회귀 0 폴백).
+
+    현재 `UserProfile.grade`는 스키마상 10~14(고1~N수2·§14.3 MVP 고3 wedge 범위)로만 채워져
+    실호출 경로의 값은 사실상 고등학생/대학생 register만 나온다 — 1~9는 그 스키마 제약이
+    풀릴 때(온보딩 확장) 코드 변경 없이 바로 대응한다(학년축 = 오버레이 파라미터).
+    """
+    if grade is not None:
+        for lo, hi, register in _GRADE_BAND_RANGES:
+            if lo <= grade <= hi:
+                return register
+    return _DEFAULT_REGISTER
+
+
+def base_system_for_grade(grade: int | None) -> str:
+    """학년별 register가 반영된 공통 시스템 프롬프트.
+
+    grade=None이면 `_BASE_SYSTEM`과 바이트 동일(회귀 0 폴백).
+    """
+    return _BASE_SYSTEM_TEMPLATE.format(register=_grade_register(grade))
+
+
+# 하위호환 상수 — grade 미전달 호출자·`STAGE_PROMPTS` 기본값(기존 동작 무변경).
+_BASE_SYSTEM = base_system_for_grade(None)
 
 
 # Stage 1: 이해 — `docs/prompts/polya_4step.md` L3-17 정본.

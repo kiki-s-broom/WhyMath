@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-64-university-cells-populate-wiring
+title: "대학 원자 KR 셀 적재 배선 — load_kr_curriculum_entries_for_university_atoms를 populate 경로에 연결 + 대학 required_depth 정책 결정"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-62-grade-axis-overlay-wiring
+requires_gates: []
+acceptance:
+  - "`l1/curriculum/populate.py` 적재 CLI가 `atom_graph_v1` graph.json 경로(신규 `--atom-graph` 인자, 기본 `data/corpus/atom_graph_v1/graph.json`)를 받아 `load_kr_curriculum_entries_for_university_atoms` 결과를 canonical·원자 목록과 합쳐 `populate_kr_curriculum_entries`로 멱등 적재한다 — 호출처가 src에 1건 이상 존재함을 소스 스캔 테스트로 동결(현재 0건: S4-62가 함수만 추가했고 populate.py:82-83은 graph.json+crosswalk.jsonl만 읽는다. 이 상태에서는 대학 셀이 curriculum_entry에 영원히 들어가지 않는다)\nCLI 보고 줄에 대학 셀 건수를 canonical·원자와 별도로 출력하고(조용한 무동작 금지), 파일 부재 시 기존 규약대로 return 2. 건수는 S4-62 실측 기준 grade_band가 채워진 대학 원자 512건(전체 대학 원자 1,069건)을 기대값으로 하되, 구현 시점 코퍼스로 재실측해 테스트에 박는다\n대학 required_depth 정책 결정: S4-62는 원본 커밋(40597d5c)을 따라 대학 원자 전건을 mastery로 고정했으나 docs/strategy/grade_axis_mvp_shortest_path_v1.md §3 W0 S-1은 과목 성격별 차등을 요구한다 — 둘이 어긋난다. 고정 유지 / 과목별 차등 중 하나를 Kiki가 결정하고 그 결정을 로더 상수 주석과 전략 문서 양쪽에 반영한다(결정 전 구현 착수 금지)\n실 PG 적재는 prod 쓰기이므로 Kiki 실행 단계는 사전 브리핑 6항목과 쓰기 블록 자가거부 가드를 갖춘 런북으로 분리하고, 이 태스크의 완료 증적에는 적재 전후 curriculum_entry 대학 셀 건수(introduced_grade 13~16)를 실측으로 남긴다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/curriculum/populate.py
+  - tests/backend/l1/test_curriculum_populate_university.py
+session: null
+notes: "S4-62(학년축 오버레이 배선 W0) 회수 작업 중 발견한 배선 공백의 승계 태스크. S4-62 acceptance ①은 함수 추가까지만 요구해 충족되지만 호출처가 없어 대학 축 required_depth 신호는 아직 어디에도 도달하지 않는다. 로더 docstring의 호출자가 목록을 합쳐 적재한다는 문장은 계획일 뿐 추적되지 않았다 — docstring 속 계획은 백로그를 대신하지 못한다는 원칙에 따라 태스크로 등재한다. 선행 S4-62가 완료돼야 함수가 main에 존재하므로 depends_on으로 집행한다."
+updated: 2026-10-08
