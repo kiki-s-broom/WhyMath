@@ -12040,3 +12040,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **실측으로 잡은 오류(사고 아님 — 머지 전 발견)**: 실 PG 통합 테스트의 첫 실행이 `label_evidence_n`(1)과 흐름이 끝난 뒤 이력의 끝값(2)이 어긋난다고 실패했다. 코드가 틀린 것이 아니라 **테스트가 비교 시점을 틀렸다** — 증거 수는 라벨을 만든 순간 서버가 읽은 값이어야 하고, 정답 제출이 그 뒤에 측정을 한 번 더 쌓는다. 비교를 "원장 행의 `event_at` 시점의 최신 측정"으로 고쳐 시점 변별까지 단언한다(이력 끝값 ≠ 기대값).
 - **검증**: 단위(진리표·AST 결선·순수 집계·Wilson 리터럴·렌더·JSON·CLI·쿼리 구조) + 실 PG 통합 5건(HTTP 적재 시점 고정 · 합성 원장 11쌍 칸별 증분 · **라벨-단독 행을 신호 행으로 바꾸는 주입**이 한 쌍만 뒤집음 · 되돌림 증분 0) · 결함 주입 하네스 `scripts/analysis/mutate_eos179_label_provenance_guards.py` **51건(단위 45·서빙 6) 전건 검출**·실행 전후 sha256 동일. 하네스 설계 중 생존 후보 1건(하한이 기록만 되고 쿼리에 안 걸려도 가짜 세션 테스트가 통과) → 테스트에 컴파일 SQL 단언을 추가해 닫았다.
 - **한계(명시)**: 운영 원장이 비어 있어 **읽는 도구만 닫았고 값은 얻지 못했다**. 증거 수는 개념 BKT 관측 수뿐이다(전과목 θ 스냅샷의 응답 수는 적지 않는다). 신호(`base_level>=2`)는 7개 좌절 토큰 + 8개 답 요구 토큰이라 실제 막힘의 하한이다. 앱이 명시 `mastery_level`을 보내지 않으므로 `explicit`은 관측되지 않을 것이다(Dart 확인 — 내가 찾은 방법으로는 0건). 판정문 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md` §10에 상세.
+
+
+## 2026-10-08 HARN-103 — Feature/Code Freeze 규칙 착지 (문서·기계 검사 / 저장소 설정은 게이트로 이관)
+
+- **결정**: 11/30 Feature Freeze(`release-blocker`) · 12/14 Code Freeze(+`code-freeze-approved`) · **2027-01-15 날짜로 자동 해제**(만료 없는 동결 금지). 동결 경로는 `src/`·`infra/`·`schemas/`(Code Freeze부터 `data/` 추가), 문서·테스트·대장은 제외. 정본 `docs/standards/release_freeze.md`, 집행 `scripts/ops/check_release_freeze.py` + `.github/workflows/release-freeze.yml`(exit 0/1/2 — git 조회 실패는 통과가 아니라 2).
+- **가용성 실측(2026-10-08)**: `owner.type=Organization`·`public`·admin 권한 — 라벨·룰셋 제공. `release-blocker` 조회 "not found"는 미설정이다(미제공 아님).
+- **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
+- **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
+- **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
