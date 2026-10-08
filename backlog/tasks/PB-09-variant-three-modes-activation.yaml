@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -25,6 +25,9 @@ paths:
   - src/backend/whymath_backend/harness/problem_corpus_batch.py
   - "tests/backend/l3/**"
   - "data/corpus/**"
-session: null
-notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G5·§5-④. 현행 6종 실측: 숫자변형 부분(독립 생성이라 계보 없음)·문맥변형 충족(rephrase 429)·오답유도형 충족(misconception_mc 1,080)·조건변형/난이도계열/역문제 부재. WhyMath 방향 정렬 — 틀은 변형을 '대량 확장'으로 규정하나 제품 정체성이 '문제은행이 아니라 사고 추적기'(플레이북 Part 0)이므로 변형의 목적은 같은 사고를 다른 각도에서 보게 하는 것이고 그 각도 차이가 기록으로 남아야 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+  - src/backend/whymath_backend/harness/problem_corpus_variants.py
+  - docs/architecture/problem_bank_variants_pb09.md
+  - tests/backend/harness/test_problem_corpus_variants.py
+session: claude/busy-hamilton-llj064
+notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G5·§5-④. 현행 6종 실측: 숫자변형 부분(독립 생성이라 계보 없음)·문맥변형 충족(rephrase 429)·오답유도형 충족(misconception_mc 1,080)·조건변형/난이도계열/역문제 부재. WhyMath 방향 정렬 — 틀은 변형을 '대량 확장'으로 규정하나 제품 정체성이 '문제은행이 아니라 사고 추적기'(플레이북 Part 0)이므로 변형의 목적은 같은 사고를 다른 각도에서 보게 하는 것이고 그 각도 차이가 기록으로 남아야 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/equivalent/**', 'src/backend/whymath_backend/harness/problem_corpus_batch.py', 'tests/backend/l3/**', 'data/corpus/**'] → ['src/backend/whymath_backend/l3/equivalent/**', 'src/backend/whymath_backend/harness/problem_corpus_batch.py', 'tests/backend/l3/**', 'data/corpus/**', 'src/backend/whymath_backend/harness/problem_corpus_variants.py', 'docs/architecture/problem_bank_variants_pb09.md', 'tests/backend/harness/test_problem_corpus_variants.py']: 실제 변경 파일 반영 — 신규 하네스 CLI·문서·테스트 경로를 기존 범위에 추가(겹침 검사 정확도)"
+updated: 2026-10-08
