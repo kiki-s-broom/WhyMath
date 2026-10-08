@@ -245,6 +245,42 @@ docker exec whymath-staging-retention-purge python -m whymath_backend.privacy.re
   compose 셸 루프를 host cron/Celery beat로 교체(§8 미프로비저닝 목록에 없음 — 현재는 불요
   판단, 필요해지면 재검토).
 
+## §5c. 문항 난이도 보정 스케줄(item-calibration) 확인 — PB-10
+
+`l2/calibrate_items.py`(채점 응답 전수로 문항 IRT 난이도 b·변별도 a를 보정해 `Problem`에 영속)는
+§3·§5 배포에서 **자동으로 같이 뜬다** — `docker-compose.prod.yml`의 `item-calibration`
+서비스가 `app`과 동일 이미지를 재사용해 24시간마다 CLI를 1회 호출한다(신규 이미지 0). 이 서비스가
+생기기 전에는 저장소 안에 그 CLI를 부르는 곳이 0건이라 응답이 쌓여도 `irt_difficulty_b`가 자동으로
+채워지지 않았다. GitHub Actions cron은 prod DB에 닿을 수 없어 스케줄 좌석으로 쓰지 않았다.
+
+```powershell
+# [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+
+# 자가검증 1: 컨테이너가 떠 있다 - "Up" 상태여야 함
+docker ps --filter "name=whymath-staging-item-calibration" --format "{{.Status}}"
+
+# 자가검증 2: 최근 실행 로그 - 성공은 calibration_run 한 줄(status=... finished_at=...).
+docker logs --tail 20 whymath-staging-item-calibration
+
+# 자가검증 3(읽기 전용 · 쓰기 0건): 보정 루프가 실제로 도는지 숫자로 본다.
+docker exec whymath-staging-app python -m whymath_backend.harness.item_calibration_reach_report
+```
+
+- **로그 읽는 법**: `status=noop_no_responses`는 채점 응답이 0행이라는 뜻이다 — 지금처럼 학생 응답이
+  없을 때의 **정상 상태**다(실패도 성공 위장도 아님). `noop_no_eligible_items`는 응답은 있으나 문항당
+  5회 미만이라는 뜻(정상 no-op), `calibrated`는 실제로 b를 보정했다는 뜻이다. 실패는
+  `status=failed error_type=<예외 타입명>`이며 컨테이너가 내려가 재시작을 반복한다.
+- **판정 읽는 법**(자가검증 3): `NO_RESPONSES`·`NO_ELIGIBLE_ITEMS`는 입력 부재(정상 no-op),
+  `LOOP_DORMANT`는 보정 자격 문항이 있는데 b가 전부 비어 있다는 뜻(배치가 한 번도 안 돌았다는
+  증거 — 이 서비스가 안 떠 있거나 실패 중인지부터 본다), `LOOP_STALE`은 일부만 채워짐(다음 실행 대기 또는
+  정지 — 단독으로 단정하지 않는다), `LOOP_CAUGHT_UP`은 자격 문항 전부 채워짐.
+- **한계(정직 기술)**: ①마지막 보정 시각은 DB에 저장되지 않는다(`Problem.calibrated_at` 부재) —
+  로그 한 줄이 유일한 기록이고 컨테이너 로그는 3×10MB 회전이다. ②스케줄은 *24시간 고정 간격*이다.
+  ③보정 계산은 순수 파이썬 전수 적합이라 문항·응답이 수만 단위가 되면 실행 시간이 길어진다 —
+  `--dry-run`으로 먼저 재고 증분 적합을 검토한다. ④`item-calibration` 서비스에 `--dry-run`을 붙이면
+  UPDATE가 영원히 0건이 되므로 `tests/infra/test_item_calibration_wiring.py`가 이를 거부한다.
+
 ## §6. 롤백
 
 ### 6-1. 1순위 — 이미지만 되돌린다 (스키마는 그대로)
@@ -446,8 +482,9 @@ gh api repos/kiki-s-broom/WhyMath/environments/prod --jq '{can_admins_bypass, ru
 
 | 항목 | 값 |
 |---|---|
-| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) |
+| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) + `-item-calibration`(문항 난이도 보정 스케줄·PB-10) |
 | 보존 파기 | `retention-purge`가 app 이미지를 재사용해 24h마다 `retention_purge_cli` 호출(§5b) |
+| 난이도 보정 | `item-calibration`이 app 이미지를 재사용해 24h마다 `calibrate_items` 호출(§5c) |
 | 영속 볼륨 | `whymath-<env>-db-data`, `whymath-<env>-redis-data` |
 | 공개 포트 | app만 `${APP_PORT}`(기본 127.0.0.1 바인딩). db·redis는 **미공개**(compose 네트워크 내부) |
 | 환경 분리 | 단일 compose + `deploy/<env>.env` + `DEPLOY_ENV` 이름 격리 |

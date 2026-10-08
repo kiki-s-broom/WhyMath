@@ -198,6 +198,40 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ── 문항 난이도 보정 배치 (PB-10 ② · 스케줄 좌석) ──────────────────────────────
+  # `l2/calibrate_items.py`는 채점 응답 전수로 문항 IRT b(1PL)·a(2PL)를 보정해 `Problem.
+  # irt_difficulty_b`·`irt_a`에 영속하는 CLI다. 이 서비스가 생기기 전엔 저장소 안에 그것을 부르는
+  # 곳이 0건이라(.github/workflows·docker-compose*.yml·infra/ 전수 grep) 응답이 쌓여도 b가
+  # 자동으로 채워지지 않았다 — "존재함 ≠ 돌아감"(retention-purge SEC-12와 같은 부류).
+  # 좌석 판정: GitHub Actions cron은 prod DB에 닿을 수 없어 기각(weekly-metrics.yml 헤더 동일
+  # 판정), Phaiakes9 systemd는 개발 DB(5433) 쪽이라 이 스택의 `db`와 다르다 → 같은 스택의 컨테이너.
+  # 하루 1회(86400s) — 응답이 없으면 no-op이 정상이고 그 사실을 실행 로그가 말한다
+  # (`calibration_run ... status=noop_no_responses`). 도달 관측은 `harness.item_calibration_reach_report`.
+  # ★ `--dry-run`을 붙이면 안 된다: 읽기 전용 측정 모드라 UPDATE를 하지 않아 b가 영원히 안 채워진다
+  #   (tests/infra/test_item_calibration_wiring.py가 이 조합을 거부한다).
+  # ★ 암호화 키 불요 — 문항 모수만 읽고 쓴다(`WHYMATH_DATABASE_URL`만 필요).
+  item-calibration:
+    image: whymath-backend:${WHYMATH_IMAGE_TAG:?WHYMATH_IMAGE_TAG 미설정 - 불변 이미지 태그(git short SHA 등)를 env 파일에 지정하라. latest 금지(롤백 불가)}
+    container_name: whymath-${DEPLOY_ENV:?DEPLOY_ENV 미설정 - staging 또는 prod}-item-calibration
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - "while true; do python -m whymath_backend.l2.calibrate_items || exit 1; sleep 86400; done"
+    environment:
+      WHYMATH_DATABASE_URL: postgresql+asyncpg://whymath:${WHYMATH_DB_PASSWORD:?WHYMATH_DB_PASSWORD 미설정 - prod DB는 trust 인증 금지}@db:5432/whymath
+    # 이미지의 HEALTHCHECK(/health/live 폴)는 이 서비스엔 무해당(HTTP 서버 없음).
+    healthcheck:
+      disable: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   db-data:
     # 볼륨 이름에 환경을 박아 staging이 prod 데이터를 절대 건드리지 못하게 한다.

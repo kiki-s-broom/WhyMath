@@ -1311,6 +1311,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # concept-reach(OPS-23)와 달리 mobile-only PR 회귀 가드가 아니라 관측 리포트다.
         "harness.formula_reach_report": _OFFLINE_REPORT,
         "harness.assessment_seat_reach_report": _OFFLINE_REPORT,
+        # PB-10(2026-10-08): 문항 난이도 보정 루프 도달 관측 — assessment_seat_reach_report와
+        # 동일 성격
+        # (DB 읽기 전용 관측 · 게이트 아님 · exit 0/2). 보정 배치 자체는 docker-compose.prod.yml의
+        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결).
+        "harness.item_calibration_reach_report": _OFFLINE_REPORT,
         "harness.recommendation_outcome_report": _OFFLINE_REPORT,
         "harness.learning_path_orderability_report": _OFFLINE_REPORT,
         "harness.rephrased_corpus_hygiene": _OFFLINE_REPORT,

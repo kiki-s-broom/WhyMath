@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ paths:
   - src/backend/whymath_backend/l2/calibrate_items.py
   - "src/backend/whymath_backend/harness/**"
   - "tests/infra/**"
-session: null
+session: claude/happy-heisenberg-19wlhj
 notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G4·§2 기능19. R1·R2는 기능 19를 '실학생 응답 0이라 S4-15 정상 잠금'으로 판정했으나 R3 실측이 한 겹 더 드러냈다 — 응답이 생겨도 루프는 자동으로 돌지 않는다. 스케줄 좌석이 저장소 밖(ops)으로 위임됐는데 그 좌석의 실재를 확인하는 관측이 없다. CLAUDE.md '작동 신호 없는 알고리즘 부착 금지 — 작동한 비율 원칙' 해당.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/D3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-08

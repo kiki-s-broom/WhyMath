@@ -1158,6 +1158,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.concept_reach_report", "harness.curriculum_revision_crosswalk_report",
        "harness.distractor_signal_dormancy_report",
        "harness.eos_unit_structure_observation_report", "harness.formula_reach_report",
+       "harness.item_calibration_reach_report",
        "harness.generation_seed_adoption_report", "harness.learning_path_orderability_report",
        "harness.recommendation_outcome_report", "harness.standard_attainment_report",
        "harness.visualization_reach_report",
