@@ -560,7 +560,7 @@ CATALOG: tuple[Spec, ...] = (
        "l1.standards.standard_loader",
        pipelines=("ncic", "standards_university")),
     _e("WM-E-107", "오개념 카탈로그·크로스링크 적재·승인 게이트", "Platform", "Pedagogy", "P0",
-       "B6 오개념 843 + 게이트 계약 동결", "l1.misconception.atom_catalog",
+       "B6 오개념 843 + 게이트 계약 동결", "l1.fk_precheck", "l1.misconception.atom_catalog",
        "l1.misconception.catalog_loader", "l1.misconception.crosslink_gate",
        "l1.misconception.crosslink_loader", "l1.misconception.crosslink_resolve",
        "l1.misconception.populate", "l1.misconception.populate_atom", "l1.misconception.resolve",
