@@ -120,6 +120,10 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "l3.multi_solution": ("ADAPTER", "다중 풀이법 생성 — 수학 접근법 분류(ApproachType)"),
     "l3.finite_probability": ("ADAPTER", "유한 확률 전수 검증"),
     "l3.statistical_claim": ("ADAPTER", "통계 자료형 결정론 검증기"),
+    "l3.sequence_induction": (
+        "ADAPTER",
+        "수열 귀납 점화식 정확 산술 검증기 — 수학 도메인 문법(점화식·수열 질의) 자체가 입력",
+    ),
     "l3.notation_coverage": ("ADAPTER", "수학 표기 커버리지 게이트"),
     "l3.speech": ("ADAPTER", "수식 AST → 한국어 낭독 — doc-100 'mathematical expression parsing'"),
     "l3.speech_parse": ("ADAPTER", "낭독 역파싱"),

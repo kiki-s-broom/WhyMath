@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -27,6 +27,13 @@ paths:
   - src/backend/whymath_backend/l3/cross_verify.py
   - docs/prompts/l3_cross_verify.md
   - "tests/backend/l3/**"
-session: null
-notes: "S4-57 설계(verifier_v2_domains.md §4·§5·§7·§8)의 결과로 등재. 단계 B 우선순위 1순위 도메인이다. 근거: [12대수03-06] 30건은 verification_tier가 None이고 verify.conditions가 생성기가 계산한 폐형식(x - (a + (k-1)*d) = 0)이라 발문의 점화식을 실행하는 검산이 없다(2026-10-08 실측, main c322bb9cb). 이 슬라이스는 그 정합 축을 처음 닫는다. 선행 관계: 소비 지점 드리프트 정합 태스크(answer_kind v2 소비 지점 정합)와 병행 가능하되, 이 슬라이스는 자기 kind의 관점·DSL 제외 목록 등록을 스스로 하므로 그 태스크에 의존하지 않는다. Wilson 로트 게이트는 이 슬라이스 범위 밖이다 — 03-06 밴드가 30건이라 기본 임계(0.05, 95%)에서 결함 0건이어도 상한이 0.0827이라 통과 불가(최소 52건 필요, MEMORY 기록과 일치). 밴드 확장 또는 S4-56의 임계 판정 이후."
+  - src/backend/whymath_backend/l3/prompt_assets.py
+  - src/backend/whymath_backend/harness/prompt_asset_audit.py
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - src/backend/whymath_backend/l3/equivalent/inductive_sequence_skeleton_generator.py
+  - scripts/analysis/eos_core_adapter_boundary_scan.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - docs/architecture/verifier_v2_domains.md
+session: claude/exciting-lovelace-m0wk81
+notes: "S4-57 설계(verifier_v2_domains.md §4·§5·§7·§8)의 결과로 등재. 단계 B 우선순위 1순위 도메인이다. 근거: [12대수03-06] 30건은 verification_tier가 None이고 verify.conditions가 생성기가 계산한 폐형식(x - (a + (k-1)*d) = 0)이라 발문의 점화식을 실행하는 검산이 없다(2026-10-08 실측, main c322bb9cb). 이 슬라이스는 그 정합 축을 처음 닫는다. 선행 관계: 소비 지점 드리프트 정합 태스크(answer_kind v2 소비 지점 정합)와 병행 가능하되, 이 슬라이스는 자기 kind의 관점·DSL 제외 목록 등록을 스스로 하므로 그 태스크에 의존하지 않는다. Wilson 로트 게이트는 이 슬라이스 범위 밖이다 — 03-06 밴드가 30건이라 기본 임계(0.05, 95%)에서 결함 0건이어도 상한이 0.0827이라 통과 불가(최소 52건 필요, MEMORY 기록과 일치). 밴드 확장 또는 S4-56의 임계 판정 이후.\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**'] → ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**', 'src/backend/whymath_backend/l3/prompt_assets.py', 'src/backend/whymath_backend/harness/prompt_asset_audit.py', 'src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/l3/equivalent/inductive_sequence_skeleton_generator.py', 'scripts/analysis/eos_core_adapter_boundary_scan.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/architecture/verifier_v2_domains.md']: 착수 후 실제 수정 지점 확인 — 프롬프트 로더·감사기·qa_pipeline·직렬화 함수·CI 인벤토리 정합 파일을 범위에 추가(기존 5건 유지)"
 updated: 2026-10-08
