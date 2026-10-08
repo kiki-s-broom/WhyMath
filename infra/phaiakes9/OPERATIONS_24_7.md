@@ -23,7 +23,7 @@ Phaiakes9(Ryzen AI Max+ 395·128GB) 단일 노드에 전 스택을 systemd/컨�
 |---|---|---|---|---|
 | `ollama` | 로컬 LLM(Qwen2-Math·DeepSeek-Math·**Qwen3-VL** OCR) | 11434 | `/api/tags` + warm generate | 모델 캐시 |
 | `whymath-api` (uvicorn) | L5 FastAPI — L1~L4 오케스트레이션·`/v1/*` | 8000 | **`GET /status`**(아래 §3) | 무상태(컨테이너) |
-| `whymath-worker` (celery) | **QUALITY(27b) 비동기 큐 전용**(03a §D.3·동시성 1·GPU 단일 점유) | — | celery ping | 무상태 |
+| `whymath-worker` (celery) | **QUALITY(27b) 비동기 큐 전용**(03a §D.3·동시성 1·GPU 단일 점유). **정본 = compose `quality-worker` 컨테이너**(§2 정본 지정) | — | `celery inspect ping -d <자기 노드>` | 무상태 |
 | `postgres` (+TimescaleDB·pgvector) | RDB·시계열·임베딩 벡터(단일 store 동거·슬98) | 5432 | `pg_isready` | **영속(백업 필수)** |
 | `neo4j` (Community) | 개념 연결 그래프(노드·엣지) | 7687/7474 | `cypher RETURN 1` | **영속(백업 필수)** |
 | `clickhouse` | 학습 행동 로그 분석 | 9000/8123 | `SELECT 1` | 영속(재생성 가능) |
@@ -37,7 +37,19 @@ Phaiakes9(Ryzen AI Max+ 395·128GB) 단일 노드에 전 스택을 systemd/컨�
 
 ## 2. 감독(Supervision) — systemd
 
-상시 가동·자동 재시작의 단일 원천은 systemd(컨테이너면 `restart: unless-stopped` + compose). 기존 `systemd/ollama.service` 패턴을 확장한다. **실제 유닛 파일은 작성 완료**: [`systemd/whymath-api.service`](./systemd/whymath-api.service)·[`systemd/whymath-worker.service`](./systemd/whymath-worker.service)·[`systemd/whymath.env.example`](./systemd/whymath.env.example), 설치 헬퍼 [`systemd/install_whymath_units.sh`](./systemd/install_whymath_units.sh)(아래 요지는 발췌).
+### 2-0. 정본 지정 — 컨테이너(compose)가 정본, systemd는 네이티브 토폴로지 대안 (OPS-27, 2026-10-08)
+
+이 문서는 두 가지 가동 방식을 함께 기술해 왔고, 그 결과 "워커는 누가 띄우는가"에 답이 둘이었다(이중 진실). 하나로 정한다.
+
+| 토폴로지 | 구성 | 지위 | 근거 |
+|---|---|---|---|
+| **compose 스택** | `docker-compose.prod.yml`의 `app`·`db`·`redis`·`retention-purge`·**`quality-worker`** | **정본** | 배포 런북(`docs/architecture/deployment_cd_runbook.md`)·CI(`docker-build`)·계약 테스트(`tests/infra`)가 이쪽만 집행한다. Ollama만 호스트에서 돈다(컨테이너 밖). |
+| 네이티브 | `whymath-api.service`·`whymath-worker.service`·호스트 `redis-server` | 비정본(대안) | CI는 이 유닛이 *기동하는지*를 검증하지 않는다(명령 형식 회귀만 `tests/infra`가 본다). 레포에 실가동 기록이 없고 §10이 라이브 적용을 잔여로 남겨 두었다. compose 없이 호스트에 직접 설치하는 경우에만 쓴다. |
+
+- **섞지 않는다.** compose의 Redis는 호스트 포트를 공개하지 않는다(`test_db_and_redis_ports_not_published`) → 호스트 systemd 워커는 compose 앱이 enqueue한 큐를 **구조적으로 소비할 수 없다**. 반대로 같은 브로커에 워커를 둘(컨테이너 + systemd) 띄우면 동시성이 2가 되어 GPU 단일 점유(03a §D.3)를 어긴다.
+- compose 스택의 워커 운영(확인·재시작·로그)은 런북 §5c가 정본이다.
+
+상시 가동·자동 재시작은 compose 토폴로지에서는 `restart: unless-stopped`가, 네이티브에서는 systemd가 맡는다. 기존 `systemd/ollama.service` 패턴을 확장한 **네이티브용 유닛 파일**: [`systemd/whymath-api.service`](./systemd/whymath-api.service)·[`systemd/whymath-worker.service`](./systemd/whymath-worker.service)·[`systemd/whymath.env.example`](./systemd/whymath.env.example), 설치 헬퍼 [`systemd/install_whymath_units.sh`](./systemd/install_whymath_units.sh)(아래 요지는 발췌).
 
 **공통 정책**: `Restart=on-failure`·`RestartSec=5`·`StartLimitIntervalSec`로 크래시 루프 차단·`After=`로 의존 정렬. 시크릿은 `EnvironmentFile=/etc/whymath/whymath.env`(0600·env만·하드코딩 금지·CLAUDE.md 보안).
 
@@ -61,7 +73,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-`whymath-worker.service`: 동일 패턴, `ExecStart=… celery -A whymath_backend...worker --concurrency=1`(QUALITY 27b는 GPU 단일 점유 → **concurrency 1 고정**·03a §D.3). 큐 미가동 시 `/v1/generate` QUALITY는 503(파이프라인 `QualityQueueUnavailableError`·동기 호출 절대 금지).
+`whymath-worker.service`(네이티브 대안): 동일 패턴, `ExecStart=… celery -A whymath_backend.l3.queue.tasks:quality_celery_app worker -c 1`(QUALITY 27b는 GPU 단일 점유 → **concurrency 1 고정**·03a §D.3). `-A`에는 팩토리 함수가 아니라 **모듈 수준 인스턴스**를 준다 — 팩토리를 주면 celery CLI가 기동 즉시 죽는다(2026-10-08 실측, 이전 판의 이 줄이 그 형식이었다). 큐 **브로커 자체**가 미도달이면 `/v1/generate` QUALITY는 503(파이프라인 `QualityQueueUnavailableError`·동기 호출 절대 금지). 단 브로커는 살아 있는데 **소비자(워커)가 없으면 503이 아니라 202 접수 후 영구 `pending`**이다 — 이것이 OPS-27 이전 compose 스택의 상태였다.
 
 > **다중 워커 주의**: api `--workers N`이면 인메모리 상태(세션·OCR 부품·L3 provider)가 워커별로 복제된다. 세션은 **Redis 영속**(`WHYMATH_REDIS_URL`)으로 공유하고, OCR/L3 부품은 워커별 startup 1회 로드(읽기전용이라 안전). DB 엔진은 lazy·워커별.
 
@@ -80,7 +92,7 @@ WantedBy=multi-user.target
 
 - **LLM 추적**: 모든 LLM/VLM 호출 → **Langfuse**(라우팅 결정·캐시 적중·shadow 검증 신호·비용/지연 추정 vs 실측). L3 `TraceSink`(LangfuseSink)가 이미 결선.
 - **분산 추적/메트릭**: OpenTelemetry(api·worker) → 수집기. 핵심 SLI: `/v1/coach`·`/v1/ocr` p50/p95·에러율·캐시 적중률·큐 대기시간·GPU 메모리.
-- **로그**: `journalctl -u whymath-api -u whymath-worker -u ollama`. 학생 채팅·손글씨는 **평문 로그 금지**(미성년 PII·CLAUDE.md) — Langfuse 기록도 학생 ID는 *해시*만(03a §F.2).
+- **로그**: compose 정본은 `docker logs whymath-<env>-quality-worker`, 네이티브는 `journalctl -u whymath-api -u whymath-worker -u ollama`. 학생 채팅·손글씨는 **평문 로그 금지**(미성년 PII·CLAUDE.md) — Langfuse 기록도 학생 ID는 *해시*만(03a §F.2).
 - **알림 신호(권장 임계)**: `/status` ready=false 1분↑ · api 5xx율 >2% · 큐 대기 p95 > SLA · 디스크 <15% · GPU OOM(`ollama ps`).
 
 ---
@@ -104,7 +116,7 @@ WantedBy=multi-user.target
 1. `git pull` → venv 동기화(`pip install -e ".[dev,...]"`·필요 extra).
 2. **DB 마이그레이션**: `alembic upgrade head`(전방호환 우선 — 컬럼 추가형). 파괴적 변경은 2단계(추가→백필→제거).
 3. **api 롤링 재시작**: `systemctl reload-or-restart whymath-api`(워커 2+면 순차). lifespan이 `dispose_engine`로 커넥션 정리.
-4. worker 재시작은 in-flight 작업 드레인 후(`celery ... control shutdown` graceful).
+4. worker 재시작은 in-flight 작업 드레인 후. compose 정본: `docker compose ... stop quality-worker`가 SIGTERM을 보내 Celery가 warm shutdown(진행 작업 완료 후 종료)하며 `stop_grace_period: 120s`가 그 시간을 보장한다(도커 기본 10초면 진행 중 생성이 끊겨 그 작업이 영구 pending). 네이티브: `celery ... control shutdown` graceful.
 5. 롤백: 직전 태그로 `git checkout` + (마이그레이션 가역성 확보된 경우) `alembic downgrade`.
 6. **CI 게이트 통과분만 배포**(ruff·black·mypy-strict·pytest 70%+·policy-guard). `main` 머지 = 배포 후보.
 
@@ -148,6 +160,6 @@ WantedBy=multi-user.target
   `whymath.env.example`·`install_whymath_units.sh`(§2). 라이브 잔여: Phaiakes9에서 복사·enable +
   `/etc/whymath/whymath.env` 값 채우기(`sudo bash systemd/install_whymath_units.sh --now`).
 - §8 클라우드 상수 실측 보정(라이브 키).
-- 컨테이너화(docker-compose) 여부 결정·이미지 빌드.
+- ✅ 컨테이너화(docker-compose) 결정·이미지 빌드 — OPS-03이 `docker-compose.prod.yml`·`Dockerfile`로 완료, OPS-27이 `quality-worker`를 편입해 compose가 정본이 됐다(§2-0). 라이브 잔여: Docker가 도는 호스트에서 첫 `up -d`와 런북 §5c 자가검증(이 레포의 어떤 세션도 아직 이 스택을 실호스트에 올린 기록이 없다).
 - 백업 자동화 스크립트·복원 리허설 cron.
 - 인증·결제 라이브 결선.
