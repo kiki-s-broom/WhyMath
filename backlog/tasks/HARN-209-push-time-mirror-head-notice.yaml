@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,7 @@ acceptance:
   - "② 설계 판정(구현 시작 전 판정문 1건): 후보를 비용과 함께 판정한다. ⓐ 푸시 직전 — PreToolUse Bash 훅이 `git push`를 잡아 미러 결과 커밋과 푸시 대상 HEAD가 다르면 고지(차단 아님). ⓑ PR 생성 직전 — `mcp__github__create_pull_request` 호출 전 훅이 같은 대조를 한다. ⓒ 종료 시점 — Stop 훅이 미푸시 커밋과 미러 결과를 대조한다. ⓓ 걸지 않는다. 오탐 비용을 반드시 센다: 대장만 바꾸는 푸시·claim 푸시·이미 재현한 뒤 병합만 하는 푸시가 전부 걸린다 — 코드 변경이 없는 푸시를 어떻게 가려내는가(트렁크 대비 변경 경로가 미러 대상 잡에 닿는가 = `ci_job_coverage scope`). 판정 근거는 `done` 이벤트의 측정 필드(`mirror_state` 분포·`--no-mirror` 사용률)를 최소 2주분 읽은 결과여야 하고, 그 데이터가 없으면 데이터가 없다고 판정문에 적는다. 고지가 소음이 돼 습관화되면 보호가 아니라 위장이라는 점(반복 관측되는 상시 경고)을 기준에 넣는다."
   - "③ 변별력: 픽스처 3종 — 미러 결과 없음 · 다른 커밋의 결과 · 같은 커밋의 결과(대조군은 고지 없음). 코드 없는 푸시(대장·문서만 바뀐 푸시)에서 고지가 나지 않는 대조군을 함께 둔다. 고지 절을 하나씩 제거하는 뮤테이션마다 RED여야 하고, 주입 적용과 바이트 동일 원복을 단언한다. PR 본문 도달 잡 목록은 `tests/backend/` 하위 `integration` 마커 파일 1개를 넣으면 `backend-migrations`가 목록에 나오고 문서만 바꾸면 나오지 않는 픽스처로 변별한다."
   - "④ 집행 지점(정본화와 별항): 고지가 실제로 서는 호출 경로(훅 등록·`settings.json` 배선)와 PR 본문 첨부가 불리는 경로를 배선 테스트로 동결한다. 함수가 존재한다는 것과 그 경로를 실제 도구 호출이 지난다는 것은 다르다. 훅 입력은 UTF-8 바이트로 해독한다(`tests/infra/test_hook_stdin_utf8.py`가 등록된 훅 전수를 검사한다)."
+  - "[정정 2026-10-08 · 판정 문서 §4] ③의 \"코드 없는 푸시(대장·문서만 바뀐 푸시)\" 대조군 중 문서 절은 이행하지 않고 반대 방향으로 판정했다. 근거 3건: (a) 2026-10-07 런북 문서 한 장이 상시 잡 infra-shell의 check_ps_scripts에 걸려 미러가 실패했다 (b) 그 검사가 docs 전체의 md 파일을 전수 스캔한다 (c) tests/infra·tests/harness 중 docs 경로를 참조하는 파일이 80개다. 그래서 침묵 대조군은 대장 기록(backlog/events·backlog/tasks)만 바뀐 푸시이고, 문서만 바뀐 푸시는 고지가 나는 쪽 픽스처(test_docs_only_branch_still_notifies)로 고정했다. 또 ci_job_coverage scope는 상시 6잡이 모든 diff에 닿아 코드 없는 푸시를 가리는 판별자가 될 수 없음을 실측했다(판정 §4). ②의 최소 2주분 데이터는 게이트 착지 후 9일분뿐이고 푸시 시점 데이터는 존재하지 않는다 — 판정 §2에 적었다."
 artifacts: []
 paths:
   - ".claude/hooks"
@@ -24,6 +25,10 @@ paths:
   - scripts/harness/done_mirror_gate.py
   - scripts/harness/ci_mirror.py
   - "tests/harness/test_*push*mirror*.py"
-session: null
-notes: "출처: 2026-09-29 /drive 4차 — `HARN-173-done-mirror-absence-promotion` 구현에서 acceptance ③(푸시 축)을 의도적으로 제외하고 ⑤의 PR 본문 자동 첨부를 미이행으로 남겼다. 이 태스크가 그 승계다(미이행분은 승계 태스크로 분리 등재 — 회수 완료 선언 시 acceptance 전수 재대조 원칙). 관련: `HARN-173`(done 게이트·측정 필드)·`HARN-119`/`HARN-180`(미러 도구)·`HARN-181`(조건 스텝 평가 — 착지하면 `not_executed` 재판정).\n\n[개명 2026-09-30] HARN-200-push-time-mirror-head-notice → HARN-209-push-time-mirror-head-notice: 번호 HARN-200이 PR 1377 브랜치의 HARN-200-runbook-self-containment-waiver-cleanup과 겹친다(서로 다른 슬러그라 validate는 통과하지만 번호 참조가 결정 불가). 원격 예약 대장의 소유는 이 브랜치지만 그 브랜치는 같은 번호로 이미 파일을 가졌고 타 세션 브랜치는 고칠 수 없으므로, 머지 큐가 한쪽을 막기 전에 이쪽이 선제 개명한다."
-updated: 2026-09-30
+  - scripts/harness/push_mirror_notice.py
+  - ".claude/commands/drive.md"
+  - docs/standards/build_harness.md
+  - docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md
+session: claude/gallant-euler-blngpj
+notes: "출처: 2026-09-29 /drive 4차 — `HARN-173-done-mirror-absence-promotion` 구현에서 acceptance ③(푸시 축)을 의도적으로 제외하고 ⑤의 PR 본문 자동 첨부를 미이행으로 남겼다. 이 태스크가 그 승계다(미이행분은 승계 태스크로 분리 등재 — 회수 완료 선언 시 acceptance 전수 재대조 원칙). 관련: `HARN-173`(done 게이트·측정 필드)·`HARN-119`/`HARN-180`(미러 도구)·`HARN-181`(조건 스텝 평가 — 착지하면 `not_executed` 재판정).\n\n[개명 2026-09-30] HARN-200-push-time-mirror-head-notice → HARN-209-push-time-mirror-head-notice: 번호 HARN-200이 PR 1377 브랜치의 HARN-200-runbook-self-containment-waiver-cleanup과 겹친다(서로 다른 슬러그라 validate는 통과하지만 번호 참조가 결정 불가). 원격 예약 대장의 소유는 이 브랜치지만 그 브랜치는 같은 번호로 이미 파일을 가졌고 타 세션 브랜치는 고칠 수 없으므로, 머지 큐가 한쪽을 막기 전에 이쪽이 선제 개명한다.\n\n[정정 2026-10-08] paths ['.claude/hooks', '.claude/settings.json', 'scripts/harness/done_mirror_gate.py', 'scripts/harness/ci_mirror.py', 'tests/harness/test_*push*mirror*.py'] → ['.claude/hooks', '.claude/settings.json', 'scripts/harness/done_mirror_gate.py', 'scripts/harness/ci_mirror.py', 'tests/harness/test_*push*mirror*.py', 'scripts/harness/push_mirror_notice.py', '.claude/commands/drive.md', 'docs/standards/build_harness.md', 'docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md']: 판정 문서 §4: 문서 면제 절 미이행 정정 기록 + 구현이 실제로 닿은 경로를 범위에 반영"
+updated: 2026-10-08

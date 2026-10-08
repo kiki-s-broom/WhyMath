@@ -784,7 +784,7 @@ red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않
 - **CI 도달 잡 안내(acceptance ⑤)**: PR 경로 done은 트렁크(`origin/main`) 대비 변경 파일이 닿는 잡을
   `ci_job_coverage.scope`로 계산해 stdout 한 줄로 안내하고 이벤트에 `ci_reach_jobs`·`ci_reach_changed`를 적는다. 계산이 실패해도
   done을 막지 않고 예외 타입명을 stderr에 낸다(`ci_reach_status: failed` · `ci_reach_error`). 워크플로 파일이 없는 저장소는
-  오류가 아니라 `no_workflow`다. PR 본문에 도달 잡 목록을 첨부하는 것은 사람 몫이다(자동 첨부 아님).
+  오류가 아니라 `no_workflow`다. PR 본문의 도달 잡 섹션은 §3c-2(HARN-209)가 PR 생성 훅의 고지로 이어받는다(자동 수정은 아님).
 - **승격 절차의 이행 범위(정직)**: §3c의 "2주/30세션 관찰" 기준은 **채우지 않았다** — 이 게이트의 종전 경고는 stderr만 냈고
   `policy_warn` 이벤트를 남기지 않아 warn 관측 데이터가 없다. 승격의 근거는 ⓐ실측 사고 1건(위)과 ⓑHARN-122 ②의 선례
   ("원칙의 집행 지점은 정탐률과 무관하게 block + 예외 경로" — `adhoc_edit`) ⓒ예외 경로가 오탐 비용을 사유 1줄로 상한하는 점이며,
@@ -795,10 +795,47 @@ red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않
   **red 푸시 자체는 막지 못하고 미검증 완료 선언을 막는다.** 푸시 지점(PreToolUse `git push`·PR 생성)에 "미러 결과 커밋 ≠ 푸시
   대상 HEAD면 고지"를 거는 안은 오탐 비용이 크다 — 대장만 바꾸는 푸시·claim 푸시·이미 재현한 뒤 병합만 하는 푸시가 전부 걸린다.
   그래서 이번에는 걸지 않고, 위 측정 필드(`unknown` 분포·`--no-mirror` 사용률)가 그 판정의 근거를 만든다.
-  승계 필요: 푸시 시점 미러-HEAD 불일치 고지.
+  승계 필요: 푸시 시점 미러-HEAD 불일치 고지. → **착지: §3c-2 (HARN-209)**.
 - **변별력**: `tests/harness/test_done_mirror_gate.py` — 상태 5 × 정책 2 × 경로 3의 30셀을 리터럴 표로 동결하고(표를 다시 계산하지
   않는다), CLI 종단으로 거부·통과·우회·면제·조회 실패·깨진 정책을 각각 밟는다. 판정 표의 각 절·배선·정책 키·집계에 뮤테이션 52종을
   주입해 전건 RED(대조군 GREEN) — 주입의 실재(`count==1`·`mutated != original`)와 원복 sha256을 하네스가 단언했다.
+
+## 3c-2. 푸시·PR 생성 시점 미러 고지 — `done` 게이트가 못 막는 red 푸시 축 (HARN-209)
+
+**왜**: §3c-1의 게이트는 `done`(완료 선언) 시점에만 선다. `/drive` 순서가 커밋→PR(푸시)→`done`이라 **red 푸시 자체는 막지
+못한다**(2026-09-25 EOS-24 · PR #1316). 판정 정본 = `docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md`.
+
+**판정**: 푸시(`git push`)와 PR 생성(`mcp__github__create_pull_request`) **직전**에 PreToolUse 훅이 "이 HEAD는 로컬 CI 미러를
+거치지 않았다"를 **고지한다 — 막지 않는다.** 푸시 시점 불일치 빈도는 한 번도 기록된 적이 없어(`done` 이벤트는 게이트가 막은 뒤의
+통과분만 본다) 측정 없는 차단은 데이터 공백 위의 강제다. 대신 평가한 모든 호출을 `.claude/logs/push_mirror_notices.jsonl`에 남겨
+공백을 메운다.
+
+| 구성 | 위치 |
+|---|---|
+| 판정·문구 (순수 함수 + git 조회) | `scripts/harness/push_mirror_notice.py` |
+| 훅 껍데기 (입력 해독·로그·중복 억제·출력) | `.claude/hooks/push_mirror_notice.py` — `settings.json` PreToolUse `Bash|mcp__github__create_pull_request` |
+| PR 본문 섹션 생성 | `python3 scripts/harness/push_mirror_notice.py pr-section` (`## CI 도달 잡`) |
+
+- **전달 채널**: 종료 코드 0일 때 stdout·stderr 평문은 PreToolUse에서 모델에게 가지 않는다(공식 훅 문서). 모델에 닿는 것은 stdout JSON의
+  `hookSpecificOutput.additionalContext`뿐이며 훅은 `ensure_ascii=True`로 낸다(cp949 콘솔에서도 손상 없음). 권한 결정
+  (`permissionDecision`)·`updatedInput`은 쓰지 않는다 — `allow`를 주면 사용자의 권한 확인을 건너뛴다. **이 세션에서의 라이브 도달은 검증하지
+  못했다**(설정 변경이 실행 중 세션에 즉시 반영되는지 모름).
+- **무엇이 고지되고 무엇이 침묵하나**: 미러 상태가 `fail`·`unknown`(결과 없음·다른 커밋·형식 깨짐)·`unavailable`이면 고지, `pass`·`not_executed`면
+  침묵(§3c-1과 같은 분류). 같은 (트리거·HEAD·사유)는 한 번만 고지한다.
+- **"코드 없는 푸시"를 가리는 법 — 경로 필터가 아니라 내용**: `ci_job_coverage scope`로는 못 가린다. 상시 잡 6개가 모든 diff에 닿고 원 사고의
+  누락 스텝이 상시 잡 `harness-integrity`에 있었다(13건 중 6건의 PR이 상시 6잡만 도달). 그래서 ⓐ트렁크 대비 기여가 전부 대장 기록
+  (`backlog/events/`·`backlog/tasks/`)이면 침묵 ⓑ미러 커밋 ≠ HEAD여도 두 커밋의 기여(대장 제외)가 **blob까지 같고** 그 결과가 통과/미실행이면
+  침묵(`done` 뒤 대장 커밋·미러 뒤 병합만 한 푸시). **문서는 면제하지 않는다** — 런북 한 장이 상시 잡 `infra-shell`을 깬 실측(2026-10-07)과
+  `docs/**/*.md` 전수 스캔 검사가 있다.
+- **복합 명령**: `git commit … && git push`는 훅 시점에 커밋이 없다. 같은 명령이 HEAD를 옮기면 미커밋 변경을 곧 커밋될 내용으로 겹쳐 본다
+  (대장 기록만이면 면제, 그 밖이면 새 커밋에는 미러 결과가 있을 수 없으므로 고지). `git pull`/`merge` 뒤 푸시는 병합 결과를 미리 알 수 없다.
+- **PR 본문**: PR 생성 훅이 본문에 `## CI 도달 잡` 섹션(표지 주석 `<!-- ci-reach:v1 -->` 또는 제목 줄)이 없으면 붙여 넣을 블록을 고지에 싣는다 —
+  경로 필터가 깨운 잡·상시 잡·로컬 재현 불가 잡("CI가 판정")·미러 상태. 본문을 자동으로 고치지는 않는다.
+- **측정과 재평가**: 로그 한 줄 = 평가 한 건(트리거·사유 코드·미러 상태·변경 건수·고지 여부; 명령 본문은 기록하지 않는다). 재평가 조건(임시 —
+  관측 전 가정): 평가된 푸시 중 고지 비율이 2주 연속 30% 초과면 상시 경고가 된 것이므로 오탐 형태를 규명한다.
+- **변별력·집행**: `tests/harness/test_push_mirror_notice.py`(판정 절별 반례 픽스처)·`test_push_mirror_notice_wiring.py`(등록된 명령 문자열을
+  그대로 실행·호출 사슬 AST·종료 코드 0·cp949). 뮤테이션 45종 전건 RED.
+- **하지 않는 것**: 차단(승격은 측정 뒤 별건) · GitHub API로 직접 커밋하는 도구 · HEAD가 아닌 refspec·`git -C`·`--dry-run`·삭제·태그만.
 
 ## 3d. 의존 선언의 두 종류 — 하드 부착 vs 소프트 분류 (HARN-52 · HARN-53)
 
