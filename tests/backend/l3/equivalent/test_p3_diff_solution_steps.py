@@ -57,17 +57,25 @@ from whymath_backend.whs.corpus_replay import load_replay_items
 
 _BANK = Path(__file__).resolve().parents[4] / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
 _DERIVATIVE = "Derivative"
-#: 함수식이 주어지지 않는 평균값 정리 진단 틀(f'(c) = k만 묻는다) — 미분할 함수가 없어 출발식에 도함수가
-#: 없는 유일한 틀이다(`p3_diff_solution_steps` docstring '한계').
+#: 평균값 정리의 결론(f'(c) = 평균변화율)만 묻는 진단 틀 둘 — 출발식에 도함수가 없는 틀은 이 둘뿐이다
+#: (`p3_diff_solution_steps` docstring '한계'). ① 함수식 없음(미분할 함수가 없다) ② 함수식이 있는 짝
+#: (5회차 감사 교정 · 구판 '두 실근은 …이다' 근 나열 틀의 대체 — c를 구하지 않고 f'(c)를 정하는 것이
+#: 진단 대상이라 평균변화율 산술이 곧 풀이다).
 _NO_FUNCTION_STEM = "f'(c) = k인 c가"
+_CONCLUSION_STEMS = (_NO_FUNCTION_STEM, "평균값 정리를 만족시키는 c가 있다. f'(c)의 값을 구하시오.")
 _OPS = (("<=", "le"), (">=", "ge"), ("!=", "ne"), ("<", "lt"), (">", "gt"))
 
 #: 마지막 단계의 끝맺음 분포 — 스냅숏(값만 갱신 가능 · 이유를 주석으로 남긴다 · 약화 금지).
 #: 2026-10-07 최초 동결(P3-03 풀이 단계 도입 · 504건).
+#: 2026-10-08 갱신(5회차 감사 교정 · 틀 재설계): 정답 1개 272 → 251, 근 목록·선택 101 → 122(합 불변).
+#: 이차 함수의 평균값 정리·롤·속도 0 틀(도함수가 일차라 근이 하나)을 삼차로 바꿔 f'(c) = 평균변화율·
+#: v(t) = 0이 이차방정식이 되었다 — 근 두 개 중 구간·부호 조건이 정답을 고른다(이차 지름길 제거의
+#: 직접 결과). 정답 대입 검산(B) 19건은 건수가 같지만 구성이 바뀌었다 — 이차 끝점 틀 6건이 삼차 끝점
+#: 틀 6건으로 대체(끝점이 미지수인 방정식은 근 목록 연쇄로 표현되지 않는다).
 _ENDING_SNAPSHOT: dict[str, int] = {
-    "정답 1개(u = 정답)": 272,
+    "정답 1개(u = 정답)": 251,
     # 단일 미지수 근 목록 — 보호 조건(a > 0 등) 또는 answer_selection이 정답 하나만 남긴다.
-    "근 목록 · 선택 조건이 정답 하나를 고름": 101,
+    "근 목록 · 선택 조건이 정답 하나를 고름": 122,
     # 정답 사전에 다른 미지수(y·a·b·k)가 함께 있는 연립 — 근 선택은 그 미지수의 조건(극값의 값 등)이
     # 맡는다. 여기서는 정답이 보호 조건을 통과하는지만 본다.
     "근 목록 · 연립(다른 미지수 조건이 고름)": 48,
@@ -370,8 +378,11 @@ def test_first_step_differentiates_except_the_function_free_mvt_diagnostic(
     rows: list[dict[str, Any]],
 ) -> None:
     without = [r for r in rows if _DERIVATIVE not in r["verify"]["solution_steps"][0]]
-    assert len(without) == 3
-    assert all(_NO_FUNCTION_STEM in str(r["question_text"]) for r in without)
+    # 3 → 6(5회차 감사 교정): 함수식이 있는 결론 진단 틀 3문항이 더해졌다 — 틀마다 3문항씩.
+    assert len(without) == 6
+    assert all(any(stem in str(r["question_text"]) for stem in _CONCLUSION_STEMS) for r in without)
+    for stem in _CONCLUSION_STEMS:
+        assert sum(stem in str(r["question_text"]) for r in without) == 3, stem
 
 
 def test_loader_meter_and_replay_consume_the_steps(rows: list[dict[str, Any]]) -> None:
@@ -472,8 +483,8 @@ def test_setup_overrides_exist_exactly_where_conditions_lack_a_derivative(
                 assert _DERIVATIVE in item.solution_setup, item.frame_id
                 assert chain.steps[0] == item.solution_setup, item.frame_id
             elif not in_conditions and getattr(item, "answer_kind", None) is None:
-                # 도함수 없는 조건에 출발식도 없으면 — 함수식 없는 평균값 정리 진단 틀뿐이다.
-                assert _NO_FUNCTION_STEM in item.question_text, item.frame_id
+                # 도함수 없는 조건에 출발식도 없으면 — 평균값 정리의 결론만 묻는 진단 틀 둘뿐이다.
+                assert any(stem in item.question_text for stem in _CONCLUSION_STEMS), item.frame_id
             assert len(chain.steps) >= 2
 
 

@@ -23,6 +23,15 @@ JSONL 레코드(`probe_from_record`)에도 그대로 적용해 감사 회차의 
 경로도 전부 0) ⑦ 방정식·부등식 맥락이 없는 02-09 최솟값 ⑧ 발문에 없는 '두 점'·'접점'을 쓰는 해설.
 4회차 규칙(아래 [4회차])이 그 부류를 생성 시점에 막는다.
 
+은행 감사 5회차(2026-10-08 · `bank_audit/disposition.json` · 결함 68건 · 원인 14종)는 4회차 규칙을
+통과한 은행에서 다시 결함을 찾았다 — ① 이차함수의 평균값 정리·롤·속도 0(c가 늘 구간의 중점·꼭짓점)
+② 발문이 답을 알려 줌(근 나열·구간 안 자연수 하나·접점 좌표) ③ 오답 경로가 정답과 일치(함숫값 대입·
+일차항 계수 읽기·상수의 미분·차수/임계점 세기) ④ 해설 결함(전제 역전·정의 없는 기호·버린 근 미기술·
+v(t) 누락·멈춤의 뜻·y축 x = 0·비문·롤 용어) ⑤ 오개념 귀속(절차 값이 아닌 선지·설명 손상 M0677)
+⑥ 발문–검산 불일치(284122b4). 5회차 규칙(아래 [5회차] · `ROUND5_RULE_IDS`)이 그 부류를 막는다.
+그중 *매개변수 선택의 우연 일치*(`COINCIDENCE_RULE_IDS`)는 생성기 라운드로빈이 그 파라미터를
+건너뛰는 거부 조건으로 쓰고(`parameter_coincidences`), 나머지는 틀 설계 결함이라 빌드를 멈춘다.
+
 규칙(위반 id — 사유는 `ShortcutViolation.reason`)
 --------------------------------------------
 [공통 · 표기]
@@ -89,6 +98,46 @@ JSONL 레코드(`probe_from_record`)에도 그대로 적용해 감사 회차의 
                           최솟값 기술(02-07/02-08 영역)만으로 풀리는 문항이다.
   T10-linear-position     [4회차] (02-10) 위치가 일차 이하(x = 7·x = 2t + 1)인데 속도·가속도를
                           묻는다 — 정지·등속이라는 상식(일차함수의 기울기)으로 풀린다.
+[5회차 · 우회로·우연 일치(*는 매개변수 거부 조건 — `COINCIDENCE_RULE_IDS`)]
+  T-quadratic-mean-value  (02-06·02-10) 이차 이하 함수의 평균값 정리·롤·평균속도 = 순간속도 — c가
+                          늘 구간의 중점이라 '가운데 값'으로 풀린다.
+  T10-quadratic-rest      (02-10) 위치가 이차 이하인데 속도 0 시각을 묻는다(포물선 꼭짓점).
+  T-midpoint-answer*      (02-06·02-10) 정답이 구간의 중점(끝점 미지수형이면 2c - 고정 끝점).
+  T-integer-pinned-by-interval*
+                          자연수 답인데 발문 구간 안의 자연수가 정답 하나뿐.
+  T06-roots-given         (02-06) 발문이 f'(x) = (평균변화율)의 근을 모두 적는다.
+  T-function-value-path*  미분계수 대신 함숫값(가속도면 위치·속도)을 넣어도 같은 답.
+  T-coefficient-reading*  발문 다항식의 x = 0 미분계수 — 일차항 계수를 읽으면 끝난다('상수항' 과제
+                          제외).
+  T-constant-derivative*  발문의 두 함수 차가 상수라 미분하는 식이 상수(답·오답 전부 0).
+  T09-degree-count*       (02-09) 실근 개수 = 방정식의 차수.
+  T09-critical-count*     (02-09) 실근 개수 = f'(x) = 0의 서로 다른 실근 개수.
+  T09-given-extremum-values
+                          (02-09) 개수 문항의 방정식이 발문에 없고 극값을 발문이 준다.
+  T05-quadratic-tangent-constant
+                          (02-05) 곡선이 이차 이하인데 접선의 y절편·곡선의 상수·원점에서 그은 접선을
+                          판별식형으로 검산한다(중근만으로 풀린다).
+  T05-given-coordinate*   (02-05) 정답이 발문에 적힌 점의 y좌표.
+  M-link-procedure        오개념 귀속 선지가 그 오개념 절차(M0615 차수 · 임계점=극값 · M0674 f'(c) =
+                          0)의 값이 아니거나, 묻는 대상(극대·극소)이 그 절차의 산출과 다르다.
+  M-link-undescribed      설명에 절차가 적히지 않은 오개념(M0677 — 원문 손상·QUAL-14 소관)에 귀속.
+  V05-touch-verify-mismatch
+                          (02-05) 접점이 발문에서 고정된 문항(두 곡선이 x = a에서 접함 · 위의 점/
+                          x좌표가 a인 점에서의 접선의 y절편)의 검산 조건 해집합이 발문 문제의
+                          해집합과 다르다(보호 조건은 읽지 않는다 — 발문에 없는 보호로 해를 고르는
+                          것이 결함).
+[5회차 · 해설]
+  E-premise-reversal      발문은 'f'(x) = 0의 한 근이 x = p'인데 해설이 'x = p에서 극값을 가지므로'.
+  E-undefined-letter      발문에 없는 기호(k·v 등)를 소개 없이 식에 쓴다(운동 문항의 v·a는 '속도'·
+                          '가속도'를 말하면 관례 기호).
+  E-excluded-root         보호 조건이 버리는 근을 해설이 보이지 않는다(a = 0 배제·± 단계 누락).
+  E-velocity-before-acceleration
+                          가속도를 묻는데 해설에 v(t) 식이 없다.
+  E-rest-meaning          멈추는 시각을 묻는데 해설이 'v(t)는 위치의 도함수'·'멈춤 ⇔ v(t) = 0'을
+                          말하지 않는다.
+  E-y-axis-zero           y축과 만나는 점을 다루는데 해설에 'x좌표는 0' 단계가 없다.
+  E-run-on                한 문장에 '~인데, ~인데,'가 겹친다(비문).
+  E-term-rolle            수 하나를 '롤의 정리의 결론'이라 부른다.
 
 정직 범위(이 판정기가 보증하지 **않는** 것)
 -------------------------------------------
@@ -116,12 +165,15 @@ import sympy
 from whymath_backend.l3.safe_parse import safe_sympify
 
 __all__ = [
+    "COINCIDENCE_RULE_IDS",
     "ROUND4_RULE_IDS",
+    "ROUND5_RULE_IDS",
     "RULE_IDS",
     "ShortcutProbe",
     "ShortcutViolation",
     "has_rational_root",
     "is_shifted_biquadratic",
+    "parameter_coincidences",
     "probe_from_record",
     "shortcut_violations",
     "violations_by_rule",
@@ -164,12 +216,64 @@ RULE_IDS: Final[tuple[str, ...]] = (
     "T08-biquadratic",
     "T09-no-application",
     "T10-linear-position",
+    # ── 5회차(2026-10-08 · 은행 감사 S5 불합격 k = 68) 결함 부류 — `ROUND5_RULE_IDS` ──
+    "T-quadratic-mean-value",
+    "T10-quadratic-rest",
+    "T-midpoint-answer",
+    "T-integer-pinned-by-interval",
+    "T06-roots-given",
+    "T-function-value-path",
+    "T-coefficient-reading",
+    "T-constant-derivative",
+    "T09-degree-count",
+    "T09-critical-count",
+    "T09-given-extremum-values",
+    "T05-quadratic-tangent-constant",
+    "T05-given-coordinate",
+    "M-link-procedure",
+    "M-link-undescribed",
+    "E-premise-reversal",
+    "E-undefined-letter",
+    "E-excluded-root",
+    "E-velocity-before-acceleration",
+    "E-rest-meaning",
+    "E-y-axis-zero",
+    "E-run-on",
+    "E-term-rolle",
+    "V05-touch-verify-mismatch",
 )
 
 #: 4회차 감사(합집합 88·둘 다 27)를 계기로 더한 규칙 — 3회차 재현율·과잉 거부 동결 테스트는 이
 #: 규칙들을 빼고 본다(3회차 판정자는 '<=' 등을 결함으로 보지 않았다 — 같은 원문에 대한 기준이
 #: 회차마다 다르므로, 회차별 측정은 그 회차의 규칙 집합으로 한다).
-ROUND4_RULE_IDS: Final[frozenset[str]] = frozenset(RULE_IDS[RULE_IDS.index("W-ascii-inequality") :])
+ROUND4_RULE_IDS: Final[frozenset[str]] = frozenset(
+    RULE_IDS[RULE_IDS.index("W-ascii-inequality") : RULE_IDS.index("T-quadratic-mean-value")]
+)
+
+#: 5회차 은행 감사(2026-10-08 · `docs/data/p3_calculus1_diff_audit/bank_audit/` · as-found k = 68)를
+# 계기로 더한 규칙. 4회차 이전 회차의 재현율·과잉 거부 동결은 이 규칙들을 빼고 본다(회차별 측정은 그
+#: 회차의 규칙 집합으로 한다 — `ROUND4_RULE_IDS`와 같은 원칙).
+ROUND5_RULE_IDS: Final[frozenset[str]] = frozenset(
+    RULE_IDS[RULE_IDS.index("T-quadratic-mean-value") :]
+)
+
+#: 5회차 규칙 중 *매개변수 선택*의 우연 일치를 보는 규칙 — 틀(frame)의 설계가 아니라 고른 수치가
+#: 오답 경로와 정답을 겹치게 만든 경우다(f'(1) 대신 f(1)로 풀어도 같은 a · 구간 안 자연수가 하나뿐 ·
+#: 차수로 센 개수가 정답 등). 생성기는 이 규칙에 걸리는 매개변수를 *건너뛴다*
+#: (`p3_diff_skeleton_base.round_robin_items`의 `standard_code` 인자 — 매개변수 거부 조건의 단일
+#: 원천). 나머지 규칙은 틀 설계 결함이라 빌드가 멈춘다(fail-loud).
+COINCIDENCE_RULE_IDS: Final[frozenset[str]] = frozenset(
+    {
+        "T-midpoint-answer",
+        "T-integer-pinned-by-interval",
+        "T-function-value-path",
+        "T-coefficient-reading",
+        "T-constant-derivative",
+        "T09-degree-count",
+        "T09-critical-count",
+        "T05-given-coordinate",
+    }
+)
 
 _C05: Final = "[12미적Ⅰ-02-05]"
 _C06: Final = "[12미적Ⅰ-02-06]"
@@ -191,6 +295,13 @@ class ShortcutProbe:
     conditions: tuple[str, ...] = ()
     answer_map: tuple[tuple[str, str], ...] = ()
     answer_kind: str | None = None
+    #: [5회차] 답 형식('자연수'·'분수'·'실수') — 자연수 답과 구간 단서가 답을 하나로 좁히는지 본다.
+    answer_format: str | None = None
+    # [5회차] 오답 선지–오개념 연결 (선지 인덱스, 오개념 id) — 연결 선지가 그 오개념 절차의 값인지
+    # 본다.
+    distractors: tuple[tuple[int, str], ...] = ()
+    #: [5회차] 슬롯 id(`p3-slot:` 태그 값) — 보고용(규칙 판정에는 쓰지 않는다).
+    slot: str | None = None
 
     @property
     def answer_dict(self) -> dict[str, str]:
@@ -228,6 +339,24 @@ def probe_from_record(record: Mapping[str, object]) -> ShortcutProbe:
         kind = verify.get("answer_kind")
         answer_kind = str(kind) if isinstance(kind, str) else None
     choices = record.get("choices")
+    raw_format = record.get("answer_format")
+    distractors: list[tuple[int, str]] = []
+    raw_map = record.get("distractor_map")
+    if isinstance(raw_map, list):
+        for entry in raw_map:
+            if isinstance(entry, Mapping):
+                index, mid = entry.get("choice_index"), entry.get("misconception_id")
+                if isinstance(index, int) and isinstance(mid, str):
+                    distractors.append((index, mid))
+    tags = record.get("tags")
+    slot = next(
+        (
+            str(t)[len("p3-slot:") :]
+            for t in (tags if isinstance(tags, list) else [])
+            if str(t).startswith("p3-slot:")
+        ),
+        None,
+    )
     return ShortcutProbe(
         standard_code=code,
         question_text=str(record.get("question_text") or ""),
@@ -237,6 +366,9 @@ def probe_from_record(record: Mapping[str, object]) -> ShortcutProbe:
         conditions=conditions,
         answer_map=answer_map,
         answer_kind=answer_kind,
+        answer_format=str(raw_format) if isinstance(raw_format, str) else None,
+        distractors=tuple(distractors),
+        slot=slot,
     )
 
 
@@ -1016,6 +1148,970 @@ def _velocity_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# [5회차] 은행 감사 S5(2026-10-08 · as-found k = 68) — 레코드 *구조*를 읽는 규칙
+# ──────────────────────────────────────────────────────────────────────────
+# 발문 어휘보다 레코드 구조(검산 조건의 미분 평가·함수 차수·정답 맵·선지·답 형식)를 먼저 읽는다.
+# 미분 평가는 `Derivative(식, 변수[, 변수|횟수]).doit().subs(변수, 점)` 꼴로 쓰인다(Tier1 표기).
+@dataclass(frozen=True, slots=True)
+class _DerivCall:
+    """검산 조건 문자열 안의 미분 평가 1개(바깥쪽 호출만 — 안에 든 Derivative는 몸통의 일부)."""
+
+    body: str
+    var: str
+    order: int
+    point: str | None
+    start: int
+    end: int
+
+
+def _match_paren(text: str, open_index: int) -> int:
+    depth = 0
+    for index in range(open_index, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return -1
+
+
+def _split_args(text: str) -> list[str]:
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in text:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    parts.append("".join(current).strip())
+    return parts
+
+
+def _derivative_calls(text: str) -> list[_DerivCall]:
+    """조건 문자열의 바깥쪽 `Derivative(...)` 호출 목록(몸통·변수·미분 횟수·대입점·위치)."""
+    out: list[_DerivCall] = []
+    cursor = 0
+    head = "Derivative("
+    while True:
+        start = text.find(head, cursor)
+        if start < 0:
+            return out
+        open_index = start + len(head) - 1
+        close = _match_paren(text, open_index)
+        if close < 0:
+            return out
+        args = _split_args(text[open_index + 1 : close])
+        body = args[0]
+        var = args[1] if len(args) > 1 else "x"
+        rest = args[2:]
+        if not rest:
+            order = 1
+        elif len(rest) == 1 and rest[0].isdigit():
+            order = int(rest[0]) if rest[0] != var else 2
+        else:
+            order = 1 + len(rest)
+        end = close + 1
+        point: str | None = None
+        if text.startswith(".doit()", end):
+            end += len(".doit()")
+            if text.startswith(".subs(", end):
+                subs_open = end + len(".subs")
+                subs_close = _match_paren(text, subs_open)
+                if subs_close > 0:
+                    subs_args = _split_args(text[subs_open + 1 : subs_close])
+                    if len(subs_args) == 2 and subs_args[0] == var:
+                        point = subs_args[1]
+                    end = subs_close + 1
+        out.append(_DerivCall(body, var, order, point, start, end))
+        cursor = end
+
+
+def _sides(condition: str) -> tuple[str, str, str] | None:
+    """'lhs op rhs' → (lhs, op, rhs) 원문(공백으로 감싼 첫 관계 연산자)."""
+    match = _REL_RE.search(condition)
+    if match is None:
+        return None
+    return condition[: match.start()].strip(), match.group(1), condition[match.end() :].strip()
+
+
+def _plain_call(side: str) -> _DerivCall | None:
+    """한 변이 통째로 미분 평가 하나인가(`Derivative(F, x).doit().subs(x, P)`) — 그 호출."""
+    calls = _derivative_calls(side)
+    if len(calls) == 1 and calls[0].start == 0 and calls[0].end == len(side):
+        return calls[0]
+    return None
+
+
+def _sym(text: str) -> sympy.Expr | None:
+    try:
+        value = safe_sympify(text)
+    except (ValueError, TypeError, SyntaxError, sympy.SympifyError):
+        return None
+    return value if isinstance(value, sympy.Expr) else None
+
+
+def _poly_degree(body: str, var: str) -> int | None:
+    """몸통이 var의 다항식이면 차수(몸통에 Derivative가 섞이면 None — 단순 함수만 본다)."""
+    if "Derivative" in body:
+        return None
+    expr = _sym(body)
+    if expr is None:
+        return None
+    symbol = sympy.Symbol(var)
+    try:
+        return int(sympy.Poly(sympy.expand(expr), symbol).degree())
+    except (sympy.PolynomialError, sympy.GeneratorsError):
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class _MainRelation:
+    """미분 평가가 한 변을 통째로 차지하는 등식 — (호출, 다른 변의 식)."""
+
+    call: _DerivCall
+    other: sympy.Expr
+
+
+def _main_relations(probe: ShortcutProbe) -> list[_MainRelation]:
+    out: list[_MainRelation] = []
+    for condition in probe.conditions:
+        parts = _sides(condition)
+        if parts is None or parts[1] != "=":
+            continue
+        lhs, _, rhs = parts
+        for side, other in ((lhs, rhs), (rhs, lhs)):
+            call = _plain_call(side)
+            if call is None or "Derivative" in other:
+                continue
+            other_expr = _sym(other)
+            if other_expr is not None:
+                out.append(_MainRelation(call, other_expr))
+    return out
+
+
+def _answer_var(probe: ShortcutProbe) -> sympy.Symbol | None:
+    """정답이 가리키는 미지수 — 정답 맵에서 값이 정답과 같은 키(하나일 때)."""
+    amap = probe.answer_dict
+    keys = [k for k, v in amap.items() if v.strip() == probe.answer.strip()]
+    if len(keys) == 1:
+        return sympy.Symbol(keys[0])
+    if len(amap) == 1:
+        return sympy.Symbol(next(iter(amap)))
+    return None
+
+
+def _rational(text: str) -> sympy.Rational | None:
+    expr = _sym(text)
+    if expr is None or expr.free_symbols or not expr.is_rational:
+        return None
+    return sympy.Rational(expr)
+
+
+def _side_filters(probe: ShortcutProbe, var: sympy.Symbol) -> list[_Relation]:
+    """var에 대한 부등식·≠ 조건(한 변이 var, 다른 변이 수)."""
+    out: list[_Relation] = []
+    for condition in probe.conditions:
+        relation = _parse_relation(condition)
+        if relation is None or relation.op == "=":
+            continue
+        if relation.lhs == var and not relation.rhs.free_symbols:
+            out.append(relation)
+    return out
+
+
+def _passes(value: sympy.Expr, filters: Sequence[_Relation]) -> bool:
+    for f in filters:
+        if f.op == ">" and not value > f.rhs:
+            return False
+        if f.op == ">=" and not value >= f.rhs:
+            return False
+        if f.op == "<" and not value < f.rhs:
+            return False
+        if f.op == "<=" and not value <= f.rhs:
+            return False
+        if f.op == "!=" and value == f.rhs:
+            return False
+    return True
+
+
+def _open_bounds(probe: ShortcutProbe, var: sympy.Symbol) -> tuple[sympy.Expr | None, ...]:
+    """var의 (하한, 상한) — 조건 목록의 부등식에서 읽는다(없으면 None)."""
+    lows = [f.rhs for f in _side_filters(probe, var) if f.op in (">", ">=")]
+    highs = [f.rhs for f in _side_filters(probe, var) if f.op in ("<", "<=")]
+    return (max(lows) if lows else None, min(highs) if highs else None)
+
+
+def _solutions(eq: sympy.Expr, var: sympy.Symbol, filters: Sequence[_Relation]) -> set[sympy.Expr]:
+    """eq = 0의 실수 해 중 보호 조건을 통과하는 것(풀 수 없으면 빈 집합 — 판정 보류)."""
+    if eq.free_symbols != {var}:
+        return set()
+    try:
+        raw = sympy.solve(eq, var)
+    except (NotImplementedError, ValueError, TypeError):
+        return set()
+    return {r for r in raw if r.is_real and _passes(r, filters)}
+
+
+def _answer_value(probe: ShortcutProbe) -> sympy.Rational | None:
+    return _rational(probe.answer.strip())
+
+
+_MVT_CODES: Final = frozenset({"[12미적Ⅰ-02-06]", "[12미적Ⅰ-02-10]"})
+
+
+def _shown_functions(question: str, var: str) -> list[sympy.Expr]:
+    """발문에 학생이 보는 var의 다항식 중 변수 하나('x = 1에서'의 x)가 아닌 것."""
+    v = sympy.Symbol(var)
+    return [p for p in visible_polynomials(question) if v in p.free_symbols and p != v]
+
+
+def _is_shown(body: sympy.Expr, question: str, var: str) -> bool:
+    """미분하는 식이 발문의 다항식 그대로인가(전개해 비교)."""
+    expanded = sympy.expand(body)
+    return any(sympy.expand(expanded - p) == 0 for p in _shown_functions(question, var))
+
+
+def _quadratic_mean_value_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 이차함수의 평균값 정리·롤의 정리·평균속도 = 순간속도 — c는 늘 구간의 중점이다."""
+    code = probe.standard_code
+    hit = False
+    if code == _C06:
+        for condition in probe.conditions:
+            for call in _derivative_calls(condition):
+                degree = _poly_degree(call.body, call.var)
+                if degree is not None and degree <= 2:
+                    hit = True
+        if probe.answer_kind == _REAL_ROOT_COUNT:
+            relation = next(
+                (r for r in map(_parse_relation, probe.conditions) if r is not None), None
+            )
+            if relation is not None:
+                diff = relation.difference
+                free = sorted(diff.free_symbols, key=str)
+                if len(free) == 1 and sympy.degree(diff, free[0]) <= 1:
+                    hit = True
+    elif code == _C10:
+        for rel in _main_relations(probe):
+            call = rel.call
+            if call.order != 1 or call.point is None or _rational(call.point) is not None:
+                continue
+            degree = _poly_degree(call.body, call.var)
+            if degree is None or degree > 2 or rel.other.free_symbols:
+                continue
+            low, high = _open_bounds(probe, sympy.Symbol(call.point))
+            if low is None or high is None or low == high:
+                continue
+            body = _sym(call.body)
+            assert body is not None
+            v = sympy.Symbol(call.var)
+            rate = (body.subs(v, high) - body.subs(v, low)) / (high - low)
+            if sympy.simplify(rate - rel.other) == 0:
+                hit = True
+    if not hit:
+        return []
+    return [
+        ShortcutViolation(
+            "T-quadratic-mean-value",
+            "이차 이하 함수에 평균값 정리·롤의 정리(평균속도 = 순간속도)를 쓴다 — 도함수가 일차라 "
+            "c가 늘 구간의 중점(롤은 대칭축)이어서 미분 없이 '가운데 값'으로 풀린다. 삼차 "
+            "이상으로 쓴다.",
+        )
+    ]
+
+
+def _quadratic_rest_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-10) 이차 위치함수의 속도 0 시각 — 위치 포물선의 꼭짓점이다."""
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or call.point is None or _rational(call.point) is not None:
+            continue
+        degree = _poly_degree(call.body, call.var)
+        body = _sym(call.body)
+        if body is None or not _is_shown(body, probe.question_text, call.var):
+            # 두 점의 위치 차처럼 발문에 그대로 보이지 않는 식의 꼭짓점은 학생의 경로가 아니다
+            continue
+        if degree is not None and degree <= 2 and rel.other == 0:
+            return [
+                ShortcutViolation(
+                    "T10-quadratic-rest",
+                    "위치가 이차 이하인데 속도가 0인(멈추는·방향이 바뀌는) 시각을 묻는다 — 위치 "
+                    "포물선의 꼭짓점 -b/(2a)로 미분 없이 풀린다. 위치를 삼차 이상으로 쓴다.",
+                )
+            ]
+    return []
+
+
+def _midpoint_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-06·02-10) 정답이 구간의 중점 — '가운데 값' 추측이 정답이 된다(변별 없음)."""
+    if probe.standard_code not in _MVT_CODES:
+        return []
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    low, high = _open_bounds(probe, var)
+    hit = low is not None and high is not None and answer == (low + high) / 2
+    if not hit:
+        # 끝점 미지수형 — c와 한 끝점이 주어지고 다른 끝점을 묻는다(중점이면 2c - 끝점).
+        for rel in _main_relations(probe):
+            point = _rational(rel.call.point) if rel.call.point is not None else None
+            if point is None or var not in rel.other.free_symbols:
+                continue
+            for fixed in (low, high):
+                if fixed is not None and answer == 2 * point - fixed:
+                    hit = True
+    if not hit:
+        return []
+    return [
+        ShortcutViolation(
+            "T-midpoint-answer",
+            "정답이 구간의 중점(끝점 미지수형이면 2c - 끝점)과 같다 — 평균값 정리를 모르고 '구간의 "
+            "가운데'를 고르는 경로가 정답에 닿는다. c ≠ 중점인 매개변수를 쓴다.",
+        )
+    ]
+
+
+def _integer_pin_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 자연수 답인데 발문의 구간 안 자연수가 하나뿐 — 구간 단서가 답을 알려 준다."""
+    if probe.choices:
+        return []
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None or not answer.is_integer or answer <= 0:
+        return []
+    if probe.answer_format not in (None, "자연수"):
+        return []
+    low, high = _open_bounds(probe, var)
+    if low is None or high is None:
+        return []
+    inside = [n for n in range(int(sympy.floor(low)) + 1, int(sympy.ceiling(high))) if n > 0]
+    inside = [n for n in inside if low < n < high]
+    if inside == [int(answer)]:
+        return [
+            ShortcutViolation(
+                "T-integer-pinned-by-interval",
+                f"답 형식이 자연수인데 구간 ({low}, {high}) 안의 자연수가 {answer} 하나뿐이다 — "
+                "구간 단서만으로 답이 정해진다. 구간을 넓히거나 정수가 아닌 답을 쓴다.",
+            )
+        ]
+    return []
+
+
+_NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9_.^/])-?\d+(?:/\d+)?(?![A-Za-z0-9_^/])")
+
+
+def _roots_given_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-06) 발문이 방정식 f'(x) = (평균변화율)의 근을 모두 적는다 — 고르기만 남는다."""
+    if probe.standard_code != _C06 or "근" not in probe.question_text:
+        return []
+    numbers = set(_NUMBER_TOKEN.findall(probe.question_text))
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or call.point is None or _rational(call.point) is not None:
+            continue
+        body = _sym(call.body)
+        if body is None or rel.other.free_symbols:
+            continue
+        v = sympy.Symbol(call.var)
+        roots = _solutions(sympy.diff(body, v) - rel.other, v, ())
+        texts = {str(sympy.Rational(r)) for r in roots if r.is_rational}
+        if len(texts) >= 2 and len(texts) == len(roots) and texts <= numbers:
+            return [
+                ShortcutViolation(
+                    "T06-roots-given",
+                    "발문이 평균값 정리 방정식 f'(x) = (평균변화율)의 근을 모두 적는다 — "
+                    "도함수·평균변화율 계산 없이 구간 안의 값을 고르기만 하면 된다.",
+                )
+            ]
+    return []
+
+
+def _function_value_path_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 미분계수 대신 함숫값(가속도면 위치·속도)을 넣어도 같은 답 — 대표 오답 경로와 일치."""
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    filters = _side_filters(probe, var)
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.point is None or "Derivative" in call.body:
+            continue
+        body, point = _sym(call.body), _sym(call.point)
+        if body is None or point is None:
+            continue
+        v = sympy.Symbol(call.var)
+        # 학생이 보는 다항식이 없으면(추상 함수 f·g의 미분계수만 준 문항) 검산 조건의 함수는 증인일
+        # 뿐이라 그 함숫값은 학생의 경로가 아니다. 미지수가 지수에 든 검산식(cx^m 꼴 대조)도 같은
+        # 이유로 본다.
+        shown = _shown_functions(probe.question_text, call.var) or re.search(
+            rf"(?<![A-Za-z]){call.var}\^\d", probe.question_text
+        )
+        if not shown:
+            continue
+        if var in rel.other.free_symbols and not rel.other.is_polynomial(var):
+            continue
+        wrong_sides = [body] + [sympy.diff(body, v, k) for k in range(1, call.order)]
+        for wrong in wrong_sides:
+            eq = sympy.expand(wrong.subs(v, point) - rel.other)
+            if var not in eq.free_symbols:
+                continue
+            if _solutions(eq, var, filters) == {answer}:
+                return [
+                    ShortcutViolation(
+                        "T-function-value-path",
+                        "미분계수 대신 함숫값(가속도 문항이면 위치·속도)을 대입하는 대표 오답 "
+                        "경로로 풀어도 정답과 같은 값이 나온다 — 변별이 없다. 그 매개변수를 쓰지 "
+                        "않는다.",
+                    )
+                ]
+    return []
+
+
+def _coefficient_reading_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 발문에 보이는 다항식의 x = 0(t = 0) 미분계수 — 일차항 계수를 읽으면 끝난다.
+
+    '도함수 f'(x)의 상수항'을 묻는 문항은 검산이 같은 f'(0)이지만 과제 자체가 '도함수를 구해
+    상수항을 읽는 것'이고, 미분을 모르는 학생은 어느 계수를 읽을지 정하지 못한다 — 이 규칙의 대상이
+    아니다.
+    """
+    if "상수항" in probe.question_text:
+        return []
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or call.point is None or _rational(call.point) != 0:
+            continue
+        body = _sym(call.body)
+        if body is None or "Derivative" in call.body:
+            continue
+        if _is_shown(body, probe.question_text, call.var):
+            return [
+                ShortcutViolation(
+                    "T-coefficient-reading",
+                    "발문의 다항식을 x = 0(t = 0, y축 위의 점·출발 순간)에서 미분한 값을 묻는다 — "
+                    "그 값은 일차항 계수 그대로라 계수를 읽기만 해도(거듭제곱 미분 오류가 있어도) "
+                    "정답이 나온다.",
+                )
+            ]
+    return []
+
+
+def _constant_derivative_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 미분하는 식이 상수 — f - g가 상수인 두 함수처럼 모든 경로가 0이다.
+
+    발문이 두 함수를 *따로 명시*할 때만 본다. 'g(x) = f(x) + 2일 때 g'(a) - f'(a)'처럼 상수 차이
+    자체가 진단 대상인 문항(상수의 미분이 0임을 묻는다)은 상수가 살아남는다고 보는 오답 경로가
+    정답과 갈린다.
+    """
+    for condition in probe.conditions:
+        for call in _derivative_calls(condition):
+            body = _sym(call.body)
+            if body is None or len(_shown_functions(probe.question_text, call.var)) < 2:
+                continue
+            if sympy.Symbol(call.var) not in sympy.expand(body).free_symbols:
+                return [
+                    ShortcutViolation(
+                        "T-constant-derivative",
+                        "미분하는 식이 변수에 대한 상수다(예: f - g가 상수인 두 함수의 f'(a) - "
+                        "g'(a)) — 답이 늘 0이고 어떤 오답 경로도 0이라 변별이 없다.",
+                    )
+                ]
+    return []
+
+
+def _count_polynomial(probe: ShortcutProbe) -> tuple[sympy.Expr, sympy.Symbol] | None:
+    if probe.answer_kind != _REAL_ROOT_COUNT:
+        return None
+    relation = next((r for r in map(_parse_relation, probe.conditions) if r is not None), None)
+    if relation is None:
+        return None
+    poly = relation.difference
+    free = sorted(poly.free_symbols, key=str)
+    if len(free) != 1:
+        return None
+    return poly, free[0]
+
+
+def _count_path_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-09) 실근 개수의 대표 오답 경로 — 차수로 센 값·임계점 개수가 정답과 같다."""
+    found = _count_polynomial(probe)
+    answer = _answer_value(probe)
+    if found is None or answer is None:
+        return []
+    poly, var = found
+    out: list[ShortcutViolation] = []
+    if answer == sympy.degree(poly, var):
+        out.append(
+            ShortcutViolation(
+                "T09-degree-count",
+                "실근의 개수가 방정식의 차수와 같다 — 'n차방정식이니 근이 n개'라는 차수 세기 오답 "
+                "경로가 미분 없이 정답에 닿는다.",
+            )
+        )
+    critical = sympy.real_roots(sympy.Poly(sympy.diff(poly, var), var))
+    if answer == len(set(critical)):
+        out.append(
+            ShortcutViolation(
+                "T09-critical-count",
+                "실근의 개수가 f'(x) = 0의 서로 다른 실근(극값 후보)의 개수와 같다 — 극값 후보를 "
+                "근으로 센 오답 경로가 정답에 닿는다.",
+            )
+        )
+    return out
+
+
+def _given_extremum_values_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-09) 개수 문항의 방정식이 발문에 보이지 않는다 — 극값을 발문이 알려 준다."""
+    found = _count_polynomial(probe)
+    if found is None:
+        return []
+    relation = next((r for r in map(_parse_relation, probe.conditions) if r is not None), None)
+    assert relation is not None
+    visible = visible_polynomials(probe.question_text)
+    shown = [
+        side
+        for side in (relation.lhs, relation.rhs)
+        if side.free_symbols and any(sympy.expand(side - v) == 0 for v in visible)
+    ]
+    if shown:
+        return []
+    return [
+        ShortcutViolation(
+            "T09-given-extremum-values",
+            "실근 개수를 묻는데 방정식의 함수가 발문에 없고 극댓값·극솟값을 발문이 준다 — 도함수 "
+            "없이 개형 상식과 대소 비교만으로 풀린다. 함수를 명시해 극값을 미분으로 구하게 한다.",
+        )
+    ]
+
+
+def _quadratic_tangent_constant_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-05) 이차 곡선의 접선 조건을 미분 없이(판별식·중근) 검산한다 — 그 경로로
+    풀린다."""
+    if any("Derivative" in c for c in probe.conditions) or not probe.conditions:
+        return []
+    x = sympy.Symbol("x")
+    degrees = [
+        int(sympy.degree(p, x))
+        for p in visible_polynomials(probe.question_text)
+        if x in p.free_symbols
+    ]
+    if not degrees or max(degrees) > 2 or "접" not in probe.question_text:
+        return []
+    return [
+        ShortcutViolation(
+            "T05-quadratic-tangent-constant",
+            "곡선이 이차 이하인데 접선의 y절편·곡선의 상수·곡선 밖의 점에서 그은 접선을 묻는다 — "
+            "연립한 이차방정식의 중근(판별식)만으로 풀린다. 곡선을 삼차 이상으로 쓴다.",
+        )
+    ]
+
+
+_GIVEN_POINT = re.compile(r"\((-?\d+(?:/\d+)?), (-?\d+(?:/\d+)?)\)")
+
+
+def _given_coordinate_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-05) 정답이 발문에 적힌 점의 y좌표 — 발문이 답을 알려 준다(x = 1의 m + n 등)."""
+    answer = _answer_value(probe)
+    if answer is None:
+        return []
+    for m in _GIVEN_POINT.finditer(probe.question_text):
+        if sympy.Rational(m.group(2)) == answer:
+            return [
+                ShortcutViolation(
+                    "T05-given-coordinate",
+                    f"정답 {answer}이(가) 발문에 적힌 점 {m.group(0)}의 y좌표와 같다 — 접선을 "
+                    "몰라도 그 좌표를 옮겨 적으면 맞는다(예: x = 1에서 m + n은 접점의 y좌표).",
+                )
+            ]
+    return []
+
+
+#: 설명에 *절차*가 적히지 않은 오개념 — 연결 선지가 그 절차의 값인지 판정할 수 없다(설명 손상).
+#: M0677: '…관점을 — …관점을 못 쓴다'(서술어 절단·절차 미기술 — QUAL-14가 원문 정정을 소유한다).
+_UNDESCRIBED_MISCONCEPTIONS: Final = frozenset({"M0677"})
+
+
+def _misconception_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 오답 선지–오개념 연결 — 연결 선지가 그 오개념 절차로 실제로 나오는 값인가."""
+    if not probe.distractors or not probe.choices:
+        return []
+    out: list[ShortcutViolation] = []
+    linked: dict[str, list[sympy.Rational | None]] = {}
+    for index, mid in probe.distractors:
+        value = _rational(probe.choices[index]) if 0 <= index < len(probe.choices) else None
+        linked.setdefault(mid, []).append(value)
+    if _UNDESCRIBED_MISCONCEPTIONS & set(linked):
+        out.append(
+            ShortcutViolation(
+                "M-link-undescribed",
+                "연결한 오개념의 설명에 잘못된 절차가 적혀 있지 않다 — 선지 값이 그 오개념에서 "
+                "나오는지 판정할 수 없다. 절차가 적힌 오개념에 연결하거나 연결하지 않는다.",
+            )
+        )
+    bad = False
+    count = _count_polynomial(probe)
+    if "M0615" in linked:
+        degree = sympy.degree(count[0], count[1]) if count is not None else None
+        bad |= any(value is None or value != degree for value in linked["M0615"])
+    if "critical-point-implies-extremum" in linked:
+        roots = _critical_roots(probe)
+        asks_kind = re.search(r"극대|극소|극댓값|극솟값", probe.question_text) is not None
+        bad |= asks_kind or any(
+            value is None or value not in roots
+            for value in linked["critical-point-implies-extremum"]
+        )
+    if "M0674" in linked:
+        roots = _critical_roots(probe)
+        bad |= any(value is None or value not in roots for value in linked["M0674"])
+    if bad:
+        out.append(
+            ShortcutViolation(
+                "M-link-procedure",
+                "오개념이 연결된 선지가 그 오개념의 절차(차수만큼 근을 센다 · f'(a) = 0이면 "
+                "극값으로 본다 · 롤의 정리처럼 f'(c) = 0을 푼다)로 나오는 값이 아니다 — 또는 묻는 "
+                "대상(극대·극소)이 그 절차의 산출과 다르다.",
+            )
+        )
+    return out
+
+
+def _critical_roots(probe: ShortcutProbe) -> set[sympy.Expr]:
+    """검산 조건의 미분 대상 함수 F에 대해 F'(x) = 0의 실근(유리근) — 오개념 절차 값 판정용."""
+    roots: set[sympy.Expr] = set()
+    for condition in probe.conditions:
+        for call in _derivative_calls(condition):
+            if call.order != 1 or "Derivative" in call.body:
+                continue
+            body = _sym(call.body)
+            if body is None:
+                continue
+            v = sympy.Symbol(call.var)
+            if body.free_symbols != {v}:
+                continue
+            roots |= _solutions(sympy.diff(body, v), v, ())
+    return roots
+
+
+# ── [5회차] 해설 ──────────────────────────────────────────────────────────
+_PREMISE_ROOT = re.compile(r"[a-z]'\(x\) = 0의 한 근이 x = (-?\d+)")
+_LETTER_TOKEN = re.compile(r"(?<![A-Za-z])([a-z])(?![A-Za-z])")
+
+
+def _math_use(text: str, index: int, letter: str) -> bool:
+    """explanation[index]의 문자 하나가 수식 안에서 쓰였는가(앞뒤가 숫자·연산자·괄호·등호)."""
+    before = text[:index].rstrip()
+    after = text[index + len(letter) :].lstrip()
+    prev = before[-1:] if before else ""
+    nxt = after[:1] if after else ""
+    return bool(
+        (prev and (prev.isdigit() or prev in "=+-*/^(),"))
+        or (nxt and (nxt in "=+-*/^()" or nxt.isdigit()))
+    )
+
+
+def _explanation_round5_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    q, e = probe.question_text, probe.explanation
+    out: list[ShortcutViolation] = []
+    premise = _PREMISE_ROOT.search(q)
+    if premise is not None:
+        p = premise.group(1)
+        if re.search(rf"x = {re.escape(p)}에서 극값을 가지므로", e) and not re.search(
+            rf"x = {re.escape(p)}에서 극", q
+        ):
+            out.append(
+                ShortcutViolation(
+                    "E-premise-reversal",
+                    "발문은 'f'(x) = 0의 한 근이 x = p'만 주는데 해설은 'x = p에서 극값을 "
+                    "가지므로'를 근거로 쓴다 — 발문 조건 f'(p) = 0을 그대로 쓴다(f'(p) = 0이 "
+                    "극값을 뜻하지 않는다).",
+                )
+            )
+    q_letters = set(_LETTER_TOKEN.findall(q))
+    exempt = {"x", "t", "f", "g", "h", "y"}
+    # 운동 문항의 v(t)·a(t)는 발문·해설이 '속도'·'가속도'를 말하면 관례 기호로 본다(멈춤 문항처럼 두
+    # 말이 다 없으면 소개 없는 기호다 — 판정자 지적 be76bfc1).
+    if "속도" in e or "속도" in q:
+        exempt.add("v")
+    if "가속도" in e or "가속도" in q:
+        exempt.add("a")
+    for m in _LETTER_TOKEN.finditer(e):
+        letter = m.group(1)
+        if letter in exempt or letter in q_letters or not _math_use(e, m.start(), letter):
+            continue
+        if re.search(_INTRO.format(L=letter), e):
+            continue
+        out.append(
+            ShortcutViolation(
+                "E-undefined-letter",
+                f"해설이 발문에 없는 기호 {letter}를 소개 없이 식에 쓴다"
+                f"('{e[max(0, m.start() - 8) : m.end() + 6]}') — 기호를 쓰지 않거나 먼저 "
+                f"'…를 {letter}라 하자'로 정의한다.",
+            )
+        )
+        break
+    out += _excluded_root_rule(probe)
+    if "가속도" in q and not _VELOCITY_FORMULA.search(e):
+        out.append(
+            ShortcutViolation(
+                "E-velocity-before-acceleration",
+                "가속도를 묻는데 해설에 속도 v(t)의 식이 없다 — 위치를 미분한 v(t)를 먼저 쓰고 "
+                "다시 미분해 a(t)를 쓴다.",
+            )
+        )
+    if re.search(r"멈추|정지", q) and not ("도함수" in e and re.search(r"v\(t\) = 0|속도가 0", e)):
+        out.append(
+            ShortcutViolation(
+                "E-rest-meaning",
+                "멈추는 시각을 묻는데 해설이 '속도 v(t)는 위치의 도함수'와 '멈춤 ⇔ v(t) = 0'을 "
+                "말하지 않는다.",
+            )
+        )
+    if "y축과 만나는 점" in q and not re.search(r"x좌표는 0|x = 0", e):
+        out.append(
+            ShortcutViolation(
+                "E-y-axis-zero",
+                "y축과 만나는 점을 다루는데 해설에 '그 점의 x좌표는 0'(x = 0) 단계가 없다.",
+            )
+        )
+    if re.search(r"(?:인데|는데),[^.]*(?:인데|는데),", e):
+        out.append(
+            ShortcutViolation(
+                "E-run-on", "해설 한 문장에 '~인데, ~인데,'가 겹친다(비문) — 문장을 나눈다."
+            )
+        )
+    if re.search(r"롤의 정리의 결론(?:이다|인데)", e):
+        out.append(
+            ShortcutViolation(
+                "E-term-rolle",
+                "수 하나를 '롤의 정리의 결론'이라 부른다 — 결론은 'f'(c) = 0인 c가 존재한다'는 "
+                "명제다.",
+            )
+        )
+    return out
+
+
+#: 세운 방정식을 정리한 꼴 — 'a^2 = 16'·'a^2이 16'·'t^2 = 25'·'(3a + 10)(a - 4) = 0'·
+#: 'a^8(a - 9) = 0'.
+_REDUCED_EQUATION = re.compile(r"[a-z]\^\d+\s*(?:=|이|가)\s*-?\d|\)\s*=\s*0")
+#: 보호 조건으로 근을 고르는 근거 — 양수·음수·부등식·0이 아님·'~가 아닌 근'.
+_SELECTION = re.compile(r"양수|음수|[a-z] > -?\d|[a-z] < -?\d|0이 아니|≠ 0|아닌 근")
+_ZERO_EXCLUDED = re.compile(r"0이 아니|≠ 0|[a-z] = 0")
+
+
+def _excluded_root_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] 보호 조건(양수·0이 아님)이 버리는 근을 해설이 보이지 않는다(a = ±3 → 양수 3 단계
+    누락)."""
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    filters = _side_filters(probe, var)
+    if not filters:
+        return []
+    e = probe.explanation
+    for rel in _main_relations(probe):
+        call = rel.call
+        body, point = _sym(call.body), _sym(call.point) if call.point else None
+        if body is None or point is None or "Derivative" in call.body:
+            continue
+        v = sympy.Symbol(call.var)
+        eq = sympy.expand(sympy.diff(body, v, call.order).subs(v, point) - rel.other)
+        if eq.free_symbols != {var}:
+            continue
+        all_roots = _solutions(eq, var, ())
+        dropped = [r for r in all_roots if r != answer and not _passes(r, filters)]
+        if not dropped:
+            continue
+        tokens = set(_NUMBER_TOKEN.findall(e))
+        named = all(
+            str(sympy.Rational(r)) in tokens or (r == 0 and _ZERO_EXCLUDED.search(e))
+            for r in dropped
+            if r.is_rational
+        ) and all(r.is_rational for r in dropped)
+        # 근을 다 적지 않아도 *세운 방정식을 정리한 꼴*(a^2 = 16 · 인수분해 = 0)과 *고르는
+        # 근거*(양수· t > 0·0이 아닌)가 함께 있으면 핵심 단계를 보인 것으로 본다(판정자 A가 받아들인
+        # 형제 해설 형태).
+        reduced = _REDUCED_EQUATION.search(e) is not None
+        selected = _SELECTION.search(e) is not None
+        missing = [] if (named or "±" in e or (reduced and selected)) else dropped
+        if missing:
+            return [
+                ShortcutViolation(
+                    "E-excluded-root",
+                    f"방정식의 근 {', '.join(str(r) for r in missing)}을(를) 발문의 조건으로 "
+                    "버리는 단계가 해설에 없다 — 세운 방정식·근 전부·조건으로 고르는 단계를 "
+                    "보인다.",
+                )
+            ]
+    return []
+
+
+def _evaluated(condition: str) -> _Relation | None:
+    """조건 문자열의 미분 평가를 SymPy로 계산해 넣은 관계(미분 몸통에 다른 미분이 섞이면 None)."""
+    parts = _sides(condition)
+    if parts is None:
+        return None
+    lhs_text, op, rhs_text = parts
+    sides: list[sympy.Expr] = []
+    for text in (lhs_text, rhs_text):
+        calls = _derivative_calls(text)
+        if any("Derivative" in c.body for c in calls):
+            return None
+        rebuilt = text
+        for call in reversed(calls):
+            body = _sym(call.body)
+            if body is None:
+                return None
+            v = sympy.Symbol(call.var)
+            value = sympy.diff(body, v, call.order)
+            if call.point is not None:
+                point = _sym(call.point)
+                if point is None:
+                    return None
+                value = value.subs(v, point)
+            rebuilt = rebuilt[: call.start] + f"({sympy.sstr(value)})" + rebuilt[call.end :]
+        expr = _sym(rebuilt)
+        if expr is None:
+            return None
+        sides.append(expr)
+    return _Relation(sides[0], op, sides[1])
+
+
+_TOUCH_STATEMENT = re.compile(
+    r"곡선 y = (?P<family>[^가-힣]+?)(?:가|이) 곡선 y = (?P<curve>[^가-힣]+?)(?:와|과) "
+    r"(?:x = |x좌표가 )(?P<a>-?\d+)인 점에서 (?:서로 )?접"
+)
+
+
+#: 접점이 발문에서 고정된 접선의 y절편 —
+#: (a) '곡선 y = F 위의 점 (a, b)에서의 접선의 y절편을 구하시오'
+#: (b) '곡선 y = H + c (c는 상수) 위의 x좌표가 a인 점에서의 접선의 y절편이 n일 때'.
+_INTERCEPT_AT_POINT = re.compile(
+    r"곡선 y = (?P<curve>[^가-힣]+?) 위의 점 \((?P<a>-?\d+), -?\d+\)에서의 접선의 y절편을 구하"
+)
+_INTERCEPT_GIVEN = re.compile(
+    r"곡선 y = (?P<curve>[^가-힣]+?) \([a-z]는 상수\) 위의 x좌표가 (?P<a>-?\d+)인 점에서의 접선의 "
+    r"y절편이 (?P<n>-?\d+)일 때"
+)
+
+
+def _touch_statement(probe: ShortcutProbe, var: sympy.Symbol) -> tuple[int, set[object]] | None:
+    """발문이 접점 x = a를 고정하는 세 형태의 (a, 발문 문제의 답 해집합) — 해당 없으면 None.
+
+    판정기 쪽 참값은 미분(sympy.diff)으로 낸다 — 생성기의 검산 경로(미분 없는 항등식·판별식)와
+    독립이다.
+    """
+    x = sympy.Symbol("x")
+    match = _TOUCH_STATEMENT.search(probe.question_text)
+    if match is not None:
+        family, curve = _parse_student(match["family"]), _parse_student(match["curve"])
+        if family is None or curve is None:
+            return None
+        a = int(match["a"])
+        unknowns = sorted(family.free_symbols - {x}, key=str)
+        if var not in unknowns:
+            return None
+        gap = sympy.expand(family - curve)
+        statement = sympy.solve(
+            [gap.subs(x, a), sympy.diff(gap, x).subs(x, a)], unknowns, dict=True
+        )
+        return a, {sol.get(var) for sol in statement}
+    match = _INTERCEPT_AT_POINT.search(probe.question_text)
+    if match is not None:
+        curve = _parse_student(match["curve"])
+        if curve is None or curve.free_symbols != {x}:
+            return None
+        a = int(match["a"])
+        return a, {sympy.expand(curve.subs(x, a) - a * sympy.diff(curve, x).subs(x, a))}
+    match = _INTERCEPT_GIVEN.search(probe.question_text)
+    if match is not None:
+        curve = _parse_student(match["curve"])
+        if curve is None or var not in curve.free_symbols:
+            return None
+        a, n = int(match["a"]), int(match["n"])
+        intercept = curve.subs(x, a) - a * sympy.diff(curve, x).subs(x, a)
+        return a, set(sympy.solve(sympy.expand(intercept - n), var))
+    return None
+
+
+def _touch_verify_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """[5회차] (02-05) 접점이 발문에서 고정된 문항 — 검산 조건이 발문의 문제를 담는가.
+
+    대상: '두 곡선이 x = a인 점에서 접할 때'(곡선족의 상수 전부 미지 — 함숫값 일치 + 기울기 일치)와
+    '위의 점 (a, b) / x좌표가 a인 점에서의 접선의 y절편'(접점 고정). 검산 조건만 풀어 얻는 답 후보가
+    발문의 해와 다르면(예: 상수 하나를 고정하고 접점을 풀어 둔 판별식, 기울기만 같은 다른 접선까지
+    담는 판별식 — 발문에 없는 보호 조건으로 둘째 해를 버린다) 다른 문제를 가리킨다(판정자 지적
+    284122b4). 보호 조건(부등식·`!=`)은 일부러 읽지 않는다 — 발문에 없는 보호로 해를 고르는 것이
+    결함 자체다.
+    """
+    var = _answer_var(probe)
+    if var is None:
+        return []
+    touched = _touch_statement(probe, var)
+    if touched is None:
+        return []
+    a, expected = touched
+    equations: list[sympy.Expr] = []
+    for condition in probe.conditions:
+        relation = _evaluated(condition)
+        if relation is not None and relation.op == "=":
+            equations.append(relation.difference)
+    if not equations:
+        return []
+    free = sorted(set().union(*(e.free_symbols for e in equations)), key=str)
+    if var not in free:
+        return []
+    verified = {sol.get(var) for sol in sympy.solve(equations, free, dict=True)}
+    if verified == expected:
+        return []
+    return [
+        ShortcutViolation(
+            "V05-touch-verify-mismatch",
+            f"발문(접점 x = {a} 고정 · {var} 미지)의 해 {sorted(map(str, expected))}와 검산 조건의 "
+            f"해 {sorted(map(str, verified))}가 다르다 — 검산 조건이 다른 문제를 담는다. 함숫값 "
+            "일치와 기울기 일치(또는 (x - a)^2 인수 조건)로 검산한다.",
+        )
+    ]
+
+
+def _round5_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """5회차 규칙 전부(성취기준별 분기 포함)."""
+    code = probe.standard_code
+    out = (
+        _midpoint_rule(probe)
+        + _integer_pin_rule(probe)
+        + _function_value_path_rule(probe)
+        + _coefficient_reading_rule(probe)
+        + _constant_derivative_rule(probe)
+        + _misconception_rules(probe)
+        + _explanation_round5_rules(probe)
+    )
+    if code in _MVT_CODES:
+        out += _quadratic_mean_value_rule(probe)
+    if code == _C06:
+        out += _roots_given_rule(probe)
+    if code == _C10:
+        out += _quadratic_rest_rule(probe)
+    if code == _C09:
+        out += _count_path_rules(probe) + _given_extremum_values_rule(probe)
+    if code == _C05:
+        out += (
+            _quadratic_tangent_constant_rule(probe)
+            + _given_coordinate_rule(probe)
+            + _touch_verify_rule(probe)
+        )
+    return out
+
+
+def parameter_coincidences(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """매개변수 선택의 우연 일치 위반만(`COINCIDENCE_RULE_IDS`) — 생성기의 매개변수 거부 조건."""
+    return [v for v in _round5_rules(probe) if v.rule in COINCIDENCE_RULE_IDS]
+
+
 def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """문항 1건의 우회로·해설·표기 위반 목록 — 빈 리스트면 통과."""
     out = _notation_rules(probe) + _explanation_rules(probe) + _zero_monomial_rule(probe)
@@ -1032,7 +2128,7 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
         out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
-    return out
+    return out + _round5_rules(probe)
 
 
 def violations_by_rule(probes: Sequence[ShortcutProbe]) -> dict[str, int]:

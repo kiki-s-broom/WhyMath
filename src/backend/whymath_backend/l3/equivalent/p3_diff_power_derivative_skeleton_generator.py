@@ -384,6 +384,29 @@ def _deriv_value_sym(n: str, point: str) -> str:
     return f"Derivative(x**{n}, x).doit().subs(x, {point})"
 
 
+def _two_power(exponent: int) -> str:
+    """'2^3'·'2' — 지수 1은 쓰지 않는다(지수 1 표기 결함 부류)."""
+    return "2" if exponent == 1 else f"2^{exponent}"
+
+
+def _positive_point_steps(n: int, a: int, b: int) -> str:
+    """'nа^(n-1) = b → a^(n-1) = b/n → a = ±r → 양수 a = r' — 세운 방정식과 근을 고르는 단계.
+
+    5회차 감사(2026-10-08) 해설 결함 교정 — 종전 해설은 '미분계수가 27인 양수 a는 3'으로 결론만 적어
+    세운 방정식(3a^2 = 27)·근 전부(a = ±3)·양수 조건으로 고르는 단계가 없었다(판정기
+    E-excluded-root).
+    """
+    power = a ** (n - 1)
+    # 'f'(a) = 2a = 8'처럼 함숫값 기호를 등식에 잇지 않는다 — 위생 게이트가 f'(a)를 곱으로
+    # 읽는다(QUAL-13).
+    if n - 1 == 1:
+        return f"f'(a)의 값은 {n}a이므로 {n}a = {b}에서 a = {a}이고, 이 값은 양수이다."
+    head = f"f'(a)의 값은 {n}a^{n - 1}이므로 {n}a^{n - 1} = {b}에서 a^{n - 1} = {power}이다. "
+    if (n - 1) % 2 == 0:
+        return head + f"a = {a} 또는 a = {-a}이고, a는 양수이므로 a = {a}이다."
+    return head + f"이를 만족시키는 실수 a는 {a} 하나뿐이고 양수이므로 a = {a}이다."
+
+
 def _applied_frames() -> list[Frame]:
     def a1(p: tuple[object, ...]) -> DiffItem | None:
         n, a = int(str(p[0])), int(str(p[1]))
@@ -422,8 +445,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"f'(x)는 {render_poly(derivative_of(_mono(n)))}이므로 이 값이 {with_i_ga(b)} 되는 "
-                f"양수 a는 {a}이다."
+                f"f'(x) = {render_poly(derivative_of(_mono(n)))}이므로 "
+                + _positive_point_steps(n, a, b)
             ),
             conditions=(_deriv_value_sym(str(n), "a") + f" = {b}", "a > 0"),
             answer_map=(("a", str(a)),),
@@ -442,8 +465,8 @@ def _applied_frames() -> list[Frame]:
             ),
             answer_text=str(a),
             explanation=(
-                f"y의 도함수는 {render_poly(derivative_of(_mono(n)))}이므로 미분계수가 "
-                f"{b}인 양수 a는 {a}이다."
+                f"y = x^{n}의 도함수를 f'(x)라 하면 f'(x) = {render_poly(derivative_of(_mono(n)))}"
+                "이므로 x = a에서의 미분계수는 f'(a)이다. " + _positive_point_steps(n, a, b)
             ),
             conditions=(_deriv_value_sym(str(n), "a") + f" = {b}", "a > 0"),
             answer_map=(("a", str(a)),),
@@ -461,8 +484,11 @@ def _applied_frames() -> list[Frame]:
                 "구하시오."
             ),
             answer_text=str(n),
+            # 5회차 감사 해설 결함 — 방정식 정리(a^(n-1)(a - n) = 0)와 a = 0 배제 단계를 보인다.
             explanation=(
-                f"f'(a)는 {n}a^{n - 1}이고 f(a)는 a^{n}이므로 두 값이 같으려면 a는 {n}이어야 한다."
+                f"f'(x) = {n}x^{n - 1}이므로 f'(a)의 값은 {n}a^{n - 1}이고 f(a)의 값은 a^{n}이다. "
+                f"{n}a^{n - 1} = a^{n}을 정리하면 a^{n - 1}(a - {n}) = 0이므로 a = 0 또는 "
+                f"a = {n}이다. a는 0이 아니므로 a = {n}이다."
             ),
             conditions=(f"{_deriv_value_sym(str(n), 'a')} = a**{n}", "a != 0"),
             answer_map=(("a", str(n)),),
@@ -481,9 +507,15 @@ def _applied_frames() -> list[Frame]:
                 "구하시오."
             ),
             answer_text=str(a),
+            # 지수가 1이면 'a^1'로 쓰지 않는다(지수 1 표기 결함 — 5회차 재생성에서 n = 2가 처음 뽑혀
+            # 드러남).
             explanation=(
-                f"f'(1)은 {n}이고 f'(a)는 {n}a^{n - 1}이므로 a^{n - 1}이 {with_i_ga(k)} 되는 "
-                f"양수 a는 {a}이다."
+                f"f'(1)은 {n}이고 f'(a)는 {n}a이므로 {n}a = {k * n}에서 a = {a}이다."
+                if n - 1 == 1
+                else (
+                    f"f'(1)은 {n}이고 f'(a)는 {n}a^{n - 1}이므로 a^{n - 1}이 {with_i_ga(k)} 되는 "
+                    f"양수 a는 {a}이다."
+                )
             ),
             # f'(1)의 값은 SymPy로 구해(`eval_at`) 조건식에 상수로 대입한다(미지수 1개 제약).
             conditions=(
@@ -752,7 +784,9 @@ def _diagnostic_frames() -> list[Frame]:
             explanation=(
                 f"f'(x) = {render_poly(derivative_of(_mono(n)))}이므로 f'(2)의 값은 "
                 f"{n}(2^{n - 1}) = {d_val}이고, f(2)의 값은 2^{n} = {with_i_ga(f_val)}다. "
-                f"따라서 {d_val} = k({f_val})에서 k = {ratio}이다."
+                # 5회차 감사 해설 결함 — 정의 없는 기호 k('32 = k(16)')를 쓰지 않고 나눗셈으로 쓴다.
+                f"f'(2)의 값을 f(2)의 값으로 나누면 {d_val}/{f_val} = {ratio}이므로 f'(2)의 값은 "
+                f"f(2)의 값의 {ratio}배이다."
             ),
             conditions=f"{_deriv_value_sym(str(n), '2')} = k*2**{n}",
             answer_map=(("k", str(ratio)),),
@@ -834,8 +868,8 @@ def _mastery_frames() -> list[Frame]:
             explanation=(
                 "거듭제곱의 미분법에 따라 f'(x) = nx^(n - 1)이므로 f'(2)는 n(2^(n - 1))이고, "
                 f"방정식 n(2^(n - 1)) = {with_eul_reul(b)} 풀어야 한다. n이 1 늘 때마다 좌변이 "
-                f"커지므로 해는 하나뿐이고, {n}(2^{n - 1}) = {b}이므로 n = {n}이다. 따라서 "
-                f"f'(x) = {render_poly(d)}이고 x가 3일 때의 값은 {y}이다."
+                f"커지므로 해는 하나뿐이고, {n}({_two_power(n - 1)}) = {b}이므로 n = {n}이다. "
+                f"따라서 f'(x) = {render_poly(d)}이고 x가 3일 때의 값은 {y}이다."
             ),
             conditions=_deriv_sym(f"x**{n}", "3") + " = y",
             answer_map=(("y", str(y)),),
@@ -931,4 +965,9 @@ class P3DiffPowerDerivativeGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(_SLOT_FRAMES[slot](), cls.slot_count, claimed=claimed)
+        return round_robin_items(
+            _SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
+        )

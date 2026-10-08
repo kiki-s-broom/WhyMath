@@ -22,6 +22,7 @@ import pytest
 from whymath_backend.harness import p3_audit_qualification as qual
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.l3.equivalent.p3_diff_defect_seeder import BANK_DEFECT_CLASSES
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import ROUND5_RULE_IDS
 
 _ROOT = Path(__file__).resolve().parents[3]
 _QUAL = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "qualification"
@@ -531,9 +532,49 @@ def test_emit_check_reproduces_the_committed_test() -> None:
     assert qual.main(["emit", "--check"]) == 0
 
 
+#: 측정 뒤 계기(생성기 명세)가 바뀌어 재계산이 커밋 라벨과 달라지는 문항 — 사유를 문항별로 고정한다.
+#: 5회차 은행 감사 처분(2026-10-08)으로 02-09 오개념 유발 명세의 핵심 오개념이 M0677 → M0615로 바뀌어,
+#: M0677을 연결한 시험지 문항은 지금 명세로 재면 수용 게이트의 오개념 점수가 0이 된다. 채점은 측정 당시
+#: 라벨(커밋본)로 이미 했고 바꾸지 않는다 — 이 목록 밖의 드리프트는 RED다.
+_KNOWN_INSTRUMENT_DRIFT: dict[str, tuple[str, str]] = {
+    "q056": ("acceptance", "M0677"),
+    "q181": ("acceptance", "M0677"),
+}
+
+
 @pytest.mark.corpus_authoring
-def test_machine_check_reproduces_the_committed_labels() -> None:
-    assert qual.main(["machine", "--check"]) == 0
+def test_machine_labels_reproduce_except_pinned_instrument_drift() -> None:
+    """지금 코드로 시험지 기계 라벨을 다시 내면 커밋 라벨과 같다 — 사유가 고정된 계기 드리프트만 예외.
+
+    예외 문항은 ① 측정 당시 ok였고 ② 지금은 수용 게이트 하나만 걸리며 ③ 시험지 문항이 바뀐 명세 이전의
+    오개념을 연결하고 있어야 한다. 셋 중 하나라도 어긋나면 그 드리프트는 사유가 다른 것이다.
+    """
+    blind = [
+        json.loads(line) for line in (_QUAL / "blind_240.jsonl").read_text("utf-8").splitlines()
+    ]
+    committed = {
+        row["item_id"]: row
+        for row in map(json.loads, (_QUAL / "machine_labels.jsonl").read_text("utf-8").splitlines())
+    }
+    now = {
+        row["item_id"]: row
+        for row in map(json.loads, qual.build_machine_labels(blind, "item_id").splitlines())
+    }
+    assert set(now) == set(committed)
+    drifted = {i for i in now if now[i] != committed[i]}
+    assert drifted == set(_KNOWN_INSTRUMENT_DRIFT)
+    by_id = {r["item_id"]: r for r in blind}
+    for ident, (gate, old_mid) in _KNOWN_INSTRUMENT_DRIFT.items():
+        assert committed[ident]["verdict"] == "ok"
+        assert now[ident]["fired"] == [gate]
+        linked = {d["misconception_id"] for d in by_id[ident]["distractor_map"] or []}
+        assert old_mid in linked
+
+
+def test_audit_protocol_excludes_build_only_guard_rules() -> None:
+    """감사 투표의 판정기 규칙 = 자격 측정을 통과한 4회차 집합. 5회차 규칙은 빌드 가드 전용이다."""
+    assert qual.EXCLUDED_GUARD_RULES == ROUND5_RULE_IDS
+    assert ROUND5_RULE_IDS  # 빈 집합이면 이 분리가 공허하다
 
 
 # ── 은행 감사 묶음(bank-sheets) ──────────────────────────────────────────

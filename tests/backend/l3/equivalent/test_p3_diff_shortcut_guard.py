@@ -20,6 +20,10 @@
 회차별 측정은 그 회차까지의 규칙 집합으로 한다: 3회차 동결(②·③)은 4회차 규칙(`ROUND4_RULE_IDS`)을 빼고
 보고, 4회차 규칙이 3회차 ok 문항을 몇 건 거부하는지는 따로 동결한다(같은 원문에 대한 판정 기준이 회차마다
 달랐다 — 3회차 판정자는 '<='를 결함으로 보지 않았고 4회차 판정자는 봤다).
+
+5회차(2026-10-08 · 은행 감사 S5 · `ROUND5_RULE_IDS`) 규칙의 재현율·과잉 거부·대조군·뮤테이션 대상은
+`test_p3_diff_shortcut_guard_round5.py`가 따로 동결한다. 이 파일의 3·4회차 동결은 5회차 규칙을 뺀 규칙
+집합으로 본다(같은 원칙).
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator
 )
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ROUND4_RULE_IDS,
+    ROUND5_RULE_IDS,
     RULE_IDS,
     ShortcutProbe,
     probe_from_record,
@@ -93,8 +98,13 @@ def _jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def _rules(record: dict[str, object]) -> set[str]:
+def _rules_all(record: dict[str, object]) -> set[str]:
     return {v.rule for v in shortcut_violations(probe_from_record(record))}
+
+
+def _rules(record: dict[str, object]) -> set[str]:
+    """4회차까지의 규칙 — 3·4회차 동결은 5회차 규칙(`ROUND5_RULE_IDS`)을 빼고 본다."""
+    return _rules_all(record) - ROUND5_RULE_IDS
 
 
 def _rules_pre4(record: dict[str, object]) -> set[str]:
@@ -150,7 +160,8 @@ def test_current_bank_has_zero_shortcut_violations() -> None:
     provenance = json.loads((_BANK_DIR / "_provenance.json").read_text(encoding="utf-8"))
     assert len(rows) == provenance["record_count"]
     assert len(rows) >= 200  # 감사 표본 판정 기준 n >= 200
-    found = [(str(r["problem_id"])[:8], sorted(_rules(r))) for r in rows if _rules(r)]
+    # 지금 은행은 5회차 규칙까지 전부 통과해야 한다(빌드가 막는다 — 은행 파일에서도 다시 본다).
+    found = [(str(r["problem_id"])[:8], sorted(_rules_all(r))) for r in rows if _rules_all(r)]
     assert found == []
 
 
@@ -933,7 +944,13 @@ def test_rule_flags_the_audited_defect_form(rule: str, probe: ShortcutProbe) -> 
 
 @pytest.mark.parametrize("probe", _GREEN, ids=[f"green-{i}" for i in range(len(_GREEN))])
 def test_corrected_forms_pass_every_rule(probe: ShortcutProbe) -> None:
-    assert [str(v) for v in shortcut_violations(probe)] == []
+    """3·4회차 교정형은 그 회차까지의 규칙을 전부 통과한다.
+
+    5회차 규칙은 이 목록의 두 교정형(삼차 실근 개수 = 차수 3 · 극값 증인)을 다시 결함으로 본다 — 5회차
+    감사가 그 형태를 결함으로 판정했기 때문이다(`test_p3_diff_shortcut_guard_round5.py`
+    `test_round4_corrected_forms_superseded_by_round5`가 그 두 건을 동결한다).
+    """
+    assert [str(v) for v in shortcut_violations(probe) if v.rule not in ROUND5_RULE_IDS] == []
 
 
 #: 02-09 '활용' 맥락 어휘 — 판정기 정규식과 *독립된* 목록(정규식에서 어휘 하나를 지우면 아래 테스트가 RED).
@@ -966,8 +983,12 @@ def test_each_application_word_alone_exempts_a_09_minimum_item(word: str) -> Non
 
 
 def test_every_rule_has_a_red_control() -> None:
-    """규칙 id 전부가 RED 대조군을 가진다 — 대조군 없는 규칙은 지워져도 아무도 모른다."""
-    assert {rule for rule, _ in _RED} == set(RULE_IDS)
+    """규칙 id 전부가 RED 대조군을 가진다 — 대조군 없는 규칙은 지워져도 아무도 모른다.
+
+    5회차 규칙의 RED 대조군은 `test_p3_diff_shortcut_guard_round5.py`에 있다(그 파일이 5회차 전부를
+    덮는지 단언한다). 이 파일은 4회차까지를 덮는다.
+    """
+    assert {rule for rule, _ in _RED} == set(RULE_IDS) - ROUND5_RULE_IDS
 
 
 def test_violations_by_rule_counts_each_probe_once() -> None:

@@ -55,6 +55,7 @@ from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.p3_diff_expr import anchor_curve_function
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ShortcutProbe,
+    parameter_coincidences,
     shortcut_violations,
 )
 from whymath_backend.l3.equivalent.p3_diff_solution_steps import StepChain, solution_steps
@@ -249,7 +250,11 @@ def _condition_key(item: DiffItem) -> str:
 
 
 def round_robin_items(
-    frames: Sequence[Frame], count: int, *, claimed: set[str] | None = None
+    frames: Sequence[Frame],
+    count: int,
+    *,
+    claimed: set[str] | None = None,
+    standard_code: str | None = None,
 ) -> list[DiffItem]:
     """틀을 돌아가며(라운드로빈) 문항을 모아 `count`건을 채운다 — 한 틀이 몰리지 않게 한다.
 
@@ -259,6 +264,13 @@ def round_robin_items(
 
     `claimed`는 개념 안 *슬롯 사이* 검산 조건 중복을 막는 공유 집합이다 — 앞 슬롯이 가져간 조건은 뒤
     슬롯이 못 쓰고(다음 파라미터로 넘어간다), 이 함수가 뽑은 조건은 집합에 더해진다.
+
+    `standard_code`를 주면 **매개변수 거부 조건**을 건다 — 우회로 판정기의 우연 일치 규칙
+    (`p3_diff_shortcut_guard.COINCIDENCE_RULE_IDS`: f'(a) 대신 f(a)로 풀어도 같은 답 · 구간 안
+    자연수가 하나뿐 · 정답이 구간의 중점 · 차수로 센 개수가 정답 · x = 0 미분계수 = 일차항 계수
+    등)에 걸리는 문항은 그 파라미터를 건너뛴다(5회차 은행 감사 2026-10-08). 틀 설계 결함(이차함수
+    평균값 정리 등)은 여기서 거르지 않는다 — `_validate_slot`이 빌드를 멈춘다(fail-loud). 판정
+    정의는 판정기 한 곳에만 있다.
     """
     cursor = {frame.frame_id: 0 for frame in frames}
     seen_conditions: set[str] = claimed if claimed is not None else set()
@@ -276,6 +288,10 @@ def round_robin_items(
                 item = frame.build(params)
                 if item is None:
                     continue
+                if standard_code is not None and parameter_coincidences(
+                    probe_of(standard_code, item)
+                ):
+                    continue  # 매개변수 거부 조건(우연 일치) — 다음 파라미터로
                 key = _condition_key(item)
                 if key in seen_conditions or item.question_text in seen_texts:
                     continue
@@ -319,6 +335,9 @@ def probe_of(standard_code: str, item: DiffItem) -> ShortcutProbe:
         conditions=conditions,
         answer_map=tuple(item.answer_map),
         answer_kind=kind if isinstance(kind, str) else None,
+        answer_format=item.answer_format.value,
+        distractors=tuple(item.distractors),
+        slot=item.slot,
     )
 
 

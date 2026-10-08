@@ -1,11 +1,24 @@
 """[12미적Ⅰ-02-09] 방정식과 부등식에의 활용 결정론 문항 생성기 — P3-03(결정론·LLM 0).
 
-개념: `H:12미적Ⅰ02-09`(`math.calculus.bangjeongsik-budeungsikeui-hwalyong`). 핵심 오개념: M0677
-(f(x) = k의 근의 개수를 그래프와 가로선 y = k의 교점으로 보는 관점을 못 쓴다). 이 M-id에는 L4
-카탈로그의 kebab이 **없다**(MISC-40이 omission형이라 의도적으로 미승격). 그래서 오개념 유발
+개념: `H:12미적Ⅰ02-09`(`math.calculus.bangjeongsik-budeungsikeui-hwalyong`). 명세의 핵심 오개념은
+M0677(f(x) = k의 근의 개수를 그래프와 가로선 y = k의 교점으로 보는 관점을 못 쓴다)이다. 이 M-id에는
+L4 카탈로그의 kebab이 **없다**(MISC-40이 omission형이라 의도적으로 미승격). 그래서 오개념 유발
 슬롯의 `distractor_map`은 **M-id를 그대로** 쓴다(계측기가 M-id를 그대로 센다). 신규 id는 만들지
 않는다. 대신 L4 참조 무결성 검증자(`validate_distractor_map`)는 M-id를 알지 못해 위반으로 읽는다
 — 등록 때 처분이 필요하다(작성자 보고 참조).
+
+5회차 은행 감사(2026-10-08) 처분 — M0677 연결 정지·M0615로 귀속
+--------------------------------------------------------------
+M0677의 정본 설명은 서술어가 잘린 손상 원문('…관점을')이라 *잘못된 절차*가 적혀 있지 않다. 그래서
+어떤 선지가 'M0677에서 나오는 값'인지 판정할 수 없다(판정자 지적 12건 · 판정기 M-link-undescribed).
+원문 정정은 별건 QUAL-14가 소유하므로, 그 전까지 오개념 유발 슬롯은 **차수 세기 선지를 M0615**(정본
+설명 '고차방정식의 근을 두 개로 단정한다(차수만큼 근)' — 괄호의 '차수만큼 근을 센다' 절차)에
+연결한다. M0615의 설명도 '두 개로 단정'과 '차수만큼'을 함께 적은 이중 서술이라, 사차 문항의 차수
+선지(4)가 앞 절('두 개')과는 맞지 않는다 — 원문 정정 대상으로 보고한다. 임계점 개수 선지는 귀속할
+오개념의 절차 설명이 없어 연결하지 않는다. 개수 정답은 차수·임계점 개수와 다르게 고른다(판정기
+T09-degree-count·T09-critical-count — 차수 세기·임계점 세기 오답 경로가 정답에 닿지 않게). 이 귀속은
+명세의 핵심 오개념(M0677)과 다르므로 Phase 3 커버리지의 02-09 오개념 사슬은 M0677 정정 후 재연결까지
+끊긴다(테스트가 그 상태를 동결한다).
 
 3차 감사(2026-10 · κ 0.854)가 드러낸 구조 원인과 이 파일의 재설계
 ---------------------------------------------------------------
@@ -21,10 +34,10 @@
     도함수의 근(임계점)은 정수라 극값은 깔끔하지만 실근은 무리수다(예 x^3 - 3x + 1: 임계점 ±1,
     극값 -1·3). 실근 개수는 도함수 → 극값 → 증감 구간마다 f가 지나는 값의 범위로만 정해진다.
     사차는 어떤 x = h에 대해 대칭인 식(복이차식 — (x - h)^2 = u로 이차방정식이 된다)을 뺀다.
-  · **극값 증인** — '최고차항의 계수가 양수인 삼차함수 f(x)의 극댓값이 M, 극솟값이 m'처럼 식을
-    주지 않는다(학생이 볼 다항식이 없어 인수 우회로가 없다). 검산 조건에는 대표 함수
-    f_w(x) = (M - m)(2x^3 - 3x^2) + M(x = 0에서 극댓값 M, x = 1에서 극솟값 m)을 쓴다 — 그런
-    삼차함수는 모두 증가 → 극대 → 감소 → 극소 → 증가하므로 어떤 대표를 써도 개수가 같다.
+  · **극값을 계산하는 진단** — 5회차 감사 처분으로 구판 '극값 증인'(극댓값·극솟값을 발문이 주고 식은
+    주지 않던 틀 — 도함수 없이 개형 상식과 대소 비교만으로 풀렸다 · 판정기
+    T09-given-extremum-values)을 지웠다. 진단 슬롯도 함수를 명시하고 학생이 극값을 미분으로 구해
+    개수를 정한다(수준선 풀의 몫).
   · **최솟값(부등식 증명의 핵심 단계)** — '부등식이 성립함을 보이려 한다 · 두 변의 차의 최솟값'.
     등호형(등호점 = 정수 중근)은 **쓰지 않는다**(판정기 T09-repeated-root·T09-rational-root가 형태
     자체를 막는다). 최솟값은 임계점에서의 극값이라 도함수 없이는 위치를 알 수 없고, 발문은 그 위치를
@@ -40,7 +53,7 @@
 값은 y = f(x)에서 떨어진다(02-08 규칙 C3과 같은 'x 고정' 방식).
 
 P3-20 §3 지침: 실근 개수형을 한 슬롯에 몰아 쓰지 않는다 — 대표·기본·응용·숙련도 슬롯은 개수형과
-최솟값형을 섞고, 오개념 유발 슬롯(객관식 개수형)과 진단 슬롯(극값 증인)만 예외다.
+최솟값형을 섞고, 오개념 유발 슬롯(객관식 개수형)과 진단 슬롯(극값을 계산하는 개수형)만 예외다.
 
 QUAL-07 — 같은 수학 실체 중복 금지: 한 수준선 풀을 여러 틀이 쓸 때는 풀을 서로소 몫으로 나눠
 (`_part`) 같은 방정식이 표기만 바꿔(방정식 = 0 / 곡선과 직선 / 두 곡선) 두 번 나오지 않게 한다.
@@ -105,8 +118,14 @@ from whymath_backend.lang.josa import eul_reul, wa_gwa
 
 __all__ = ["P3DiffEquationApplicationGenerator"]
 
-#: 오개념 id — M-id 그대로(kebab 좌석 없음. 모듈 docstring 참조).
-_MID: Final = "M0677"
+# 오개념 유발 선지의 연결 id — **M0615**(정본 설명 '고차방정식의 근을 두 개로 단정한다(차수만큼 근)'
+# · [10공수1-02-07] 소속 M-id 그대로, kebab 좌석 없음). 5회차 감사(2026-10-08)까지는 이 개념의 핵심
+# 오개념 M0677에 연결했으나, M0677의 설명은 서술어가 끊긴 손상 문장('…관점을')이라 잘못된 *절차*를
+# 적지 않아 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(판정자 지적 12건 · 판정기
+# M-link-undescribed · 원문 정정은 QUAL-14 소관). 차수로 센 값의 선지만 절차('차수만큼 근')가 적힌
+# M0615로 연결하고, 임계점(극값 후보) 개수 선지는 그 절차를 적은 오개념이 없어 **연결하지 않는다**
+# (연결 없는 오답 선지는 결함이 아니다).
+_DEGREE_MID: Final = "M0615"
 _COUNT: Final = "ptype.count-solutions"
 _OPT: Final = "ptype.optimize-extremum"
 _KIND: Final = "real_root_count"
@@ -399,77 +418,6 @@ def _has_rootless_factor(poly: Poly) -> bool:
 def _level_of(x: object) -> _Level:
     assert isinstance(x, _Level)
     return x
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# 극값 증인(witness) — 극댓값 M, 극솟값 m만 주어진 삼차함수(학생이 볼 다항식이 없다)
-# ──────────────────────────────────────────────────────────────────────────
-def _witness(m_max: int, m_min: int) -> Poly:
-    """x = 0에서 극댓값 M, x = 1에서 극솟값 m을 갖는 대표 삼차함수 (M - m)(2x^3 - 3x^2) + M."""
-    return _poly((m_max - m_min) * (2 * _X**3 - 3 * _X**2) + m_max)
-
-
-def _witness_body(m_max: int, m_min: int, k: int) -> tuple[str, int]:
-    head = (
-        "최고차항의 계수가 양수인 삼차함수 y = f(x)의 그래프는 증가하다가 극댓값 "
-        f"{m_max}에서 감소로 바뀌고, 극솟값 {m_min}에서 다시 증가한다. 방정식 f(x) = {k}의 실근의 "
-        f"개수는 이 그래프와 직선 y = {k}의 교점의 개수이다. "
-    )
-    line = with_eun_neun(f"직선 y = {k}")
-    if m_min < k < m_max:
-        body = (
-            f"{with_eun_neun(k)} 극솟값 {m_min}보다 크고 극댓값 {m_max}보다 작으므로 직선은 "
-            "증가·감소·증가하는 세 구간에서 한 번씩 그래프와 만난다."
-        )
-        n = 3
-    elif k == m_max:
-        body = (
-            f"{line} 극댓값을 갖는 점에서 그래프에 접하고, 극솟값을 지난 뒤 증가하는 구간에서 한 "
-            "번 더 만난다."
-        )
-        n = 2
-    elif k == m_min:
-        body = (
-            f"{line} 극솟값을 갖는 점에서 그래프에 접하고, 극댓값에 이르기 전 증가하는 구간에서 한 "
-            "번 더 만난다."
-        )
-        n = 2
-    elif k > m_max:
-        body = (
-            f"{with_eun_neun(k)} 극댓값 {m_max}보다 크므로 직선은 극솟값을 지난 뒤 증가하는 "
-            "구간에서만 한 번 만난다."
-        )
-        n = 1
-    else:
-        body = (
-            f"{with_eun_neun(k)} 극솟값 {m_min}보다 작으므로 직선은 극댓값에 이르기 전 증가하는 "
-            "구간에서만 한 번 만난다."
-        )
-        n = 1
-    return head + body + f" 따라서 서로 다른 실근은 {n}개이다.", n
-
-
-def _witness_pairs() -> tuple[tuple[object, ...], ...]:
-    pairs = [(mx, mn) for mx in range(-3, 6) for mn in range(-5, mx)]
-    return tuple(seeded_order("p3-eq:witness0", tuple(pairs)))
-
-
-def _witness_triples() -> tuple[tuple[object, ...], ...]:
-    triples: list[tuple[int, int, int]] = []
-    for mx in range(-2, 6):
-        for mn in range(-4, mx):
-            mid = (mx + mn) // 2
-            levels = {mx, mn, mx + 2, mn - 2} | ({mid} if mn < mid < mx else set())
-            triples.extend((mx, mn, k) for k in sorted(levels) if k != 0)
-    return tuple(seeded_order("p3-eq:witnessk", tuple(triples)))
-
-
-def _ints(q: tuple[object, ...]) -> tuple[int, ...]:
-    out = []
-    for value in q:
-        assert isinstance(value, int)
-        out.append(value)
-    return tuple(out)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1116,7 +1064,7 @@ def _applied_frames() -> list[Frame]:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 오개념 유발(misconception_trigger) — f(x) = k의 근의 개수를 y = k와의 교점으로 못 본다(M0677)
+# 오개념 유발(misconception_trigger) — 차수만큼 근이 있다고 단정한다(M0615 · 5회차 감사 재연결)
 # ──────────────────────────────────────────────────────────────────────────
 def _crit_count(poly: Poly) -> int:
     """f'(x) = 0의 서로 다른 실근 수 — '극값 후보의 개수'를 근의 개수로 오인한 값."""
@@ -1126,11 +1074,15 @@ def _crit_count(poly: Poly) -> int:
 def _mc_level_count(
     *, frame_id: str, text: str, cond: str, level: _Level, seed: str, lead_in: str
 ) -> DiffItem | None:
-    """실근 개수 객관식 — 차수·극값 후보 수로 답한 값(M0677)을 오답 선지에 둔다.
+    """실근 개수 객관식 — 차수로 센 값(M0615 연결)과 극값 후보 수(미연결)를 오답 선지에 둔다.
 
     해설은 도함수 → 극값 → 구간별 값의 범위로 개수를 센 뒤, *오답이 왜 틀렸는지*(차수를 그대로
     셈·도함수의 근을 셈)를 오답 선지마다 한 문장씩 설명한다. 방정식은 유리수 근이 없어(3차 감사)
     인수분해로는 셀 수 없다.
+
+    슬롯 계약(오개념 유발 슬롯은 문항마다 같은 연결 집합 · 1개 이상 — `_validate_slot`)을 지키려고
+    **차수 ≠ 정답**인 수준선만 쓴다 — 차수 선지가 늘 M0615로 연결된다. 차수·극값 후보 수가 정답과
+    같은 수준선은 판정기 우연 일치 규칙(T09-degree-count·T09-critical-count)이 매개변수 거부로 뺀다.
     """
     equation = level.equation
     if _has_rootless_factor(equation):
@@ -1138,14 +1090,16 @@ def _mc_level_count(
     body, correct = _level_body(level)
     degree = equation[0][0]
     crit = _crit_count(equation)
-    wrong = [v for v in dict.fromkeys((degree, crit)) if v != correct]
-    if not wrong:
-        return None
-    entries = [ChoiceEntry(str(correct), is_correct=True, sort_key=float(correct))]
-    taken = {correct}
-    for v in wrong:
-        entries.append(ChoiceEntry(str(v), _MID, sort_key=float(v)))
-        taken.add(v)
+    if correct in (degree, crit):
+        return None  # 차수 세기·극값 후보 세기 오답 경로가 정답과 같다(변별 없음)
+    entries = [
+        ChoiceEntry(str(correct), is_correct=True, sort_key=float(correct)),
+        ChoiceEntry(str(degree), _DEGREE_MID, sort_key=float(degree)),
+    ]
+    taken = {correct, degree}
+    if crit not in taken:
+        entries.append(ChoiceEntry(str(crit), sort_key=float(crit)))  # 연결 없는 오답(절차 미기술)
+        taken.add(crit)
     for v in seeded_order(seed, tuple(range(0, 5))):
         if len(entries) == 4:
             break
@@ -1158,14 +1112,11 @@ def _mc_level_count(
         choices, answer, distractors = build_choices(entries, shuffle_seed=seed)
     except ValueError:
         return None
-    traps: list[str] = []
-    if degree in wrong:
-        traps.append(
-            f"차수 {with_eul_reul(degree)} 그대로 실근의 개수로 세면 그래프가 직선과 실제로 몇 번 "
-            "만나는지를 "
-            "보지 않은 것이다."
-        )
-    if crit in wrong:
+    traps = [
+        f"차수 {with_eul_reul(degree)} 그대로 실근의 개수로 세면 그래프가 직선과 실제로 몇 번 "
+        "만나는지를 보지 않은 것이다."
+    ]
+    if crit != degree:
         traps.append(
             f"도함수가 0이 되는 서로 다른 x의 개수 {with_eun_neun(crit)} 극값 후보를 센 값일 뿐 "
             "실근의 개수가 아니다."
@@ -1272,38 +1223,44 @@ def _misconception_frames() -> list[Frame]:
 # 진단(diagnostic) — 극값만으로 개수 세기(식 없이) · 극값을 이용한 개수 세기
 # ──────────────────────────────────────────────────────────────────────────
 def _diagnostic_frames() -> list[Frame]:
+    # 5회차 감사(2026-10-08) 처분 — 구판 d1·d2는 '극댓값 M, 극솟값 m을 갖는 삼차함수'처럼 함수를
+    # 주지 않고 극값을 발문이 알려 줘, 도함수 없이 개형 상식과 대소 비교만으로 풀렸다(판정자 지적
+    # 2359c043· 47e06865 · 판정기 T09-given-extremum-values). 함수를 명시해 극값을 *미분으로 구하게*
+    # 하되, 진단의 초점(극값과 수준 k의 대소로 개수를 센다)은 발문에 그대로 둔다.
     def d1(q: tuple[object, ...]) -> DiffItem | None:
-        mx, mn = _ints(q)
-        fw = _witness(mx, mn)
-        body, n = _witness_body(mx, mn, 0)
+        level = _zero_level(_level_of(q[0]))
+        p = render_poly(level.poly)
+        body, n = _level_body(level)
         return _count_item(
             slot="diagnostic",
-            frame_id="diag-count-from-extremum-values",
+            frame_id="diag-count-from-computed-extrema",
             text=(
-                f"최고차항의 계수가 양수인 삼차함수 f(x)의 극댓값이 {mx}, 극솟값이 {mn}이다. "
-                "방정식 f(x) = 0의 서로 다른 실근의 개수를 구하시오."
+                f"함수 f(x) = {p}의 극댓값과 극솟값을 구하여 방정식 f(x) = 0의 서로 다른 실근의 "
+                "개수를 구하시오."
             ),
-            cond=_eq_cond(fw, 0),
-            poly=fw,
-            explanation=body,
+            cond=_eq_cond(level.poly, 0),
+            poly=level.equation,
+            explanation=f"{body} 따라서 서로 다른 실근은 {n}개이다.",
             count=n,
         )
 
     def d2(q: tuple[object, ...]) -> DiffItem | None:
-        mx, mn, k = _ints(q)
-        fw = _witness(mx, mn)
-        body, n = _witness_body(mx, mn, k)
+        level = _level_of(q[0])
+        p = render_poly(level.poly)
+        body, n = _level_body(level)
         return _count_item(
             slot="diagnostic",
-            frame_id="diag-count-level-from-extremum-values",
+            frame_id="diag-count-level-from-computed-extrema",
             text=(
-                f"최고차항의 계수가 양수인 삼차함수 f(x)는 극댓값 {with_wa_gwa(mx)} 극솟값 "
-                f"{mn}{eul_reul(str(mn))} 갖는다. 방정식 f(x) = {k}의 서로 다른 실근의 개수를 "
-                "구하시오."
+                f"함수 f(x) = {p}의 극댓값, 극솟값과 {with_eul_reul(level.k)} 비교하여 방정식 "
+                f"f(x) = {level.k}의 서로 다른 실근의 개수를 구하시오."
             ),
-            cond=_eq_cond(fw, k),
-            poly=_minus(fw, k),
-            explanation=body,
+            cond=_eq_cond(level.poly, level.k),
+            poly=level.equation,
+            explanation=(
+                f"방정식 f(x) = {level.k}의 실근은 곡선 y = f(x)와 직선 y = {level.k}의 교점의 "
+                f"x좌표이다. {body} 따라서 서로 다른 실근은 {n}개이다."
+            ),
             count=n,
         )
 
@@ -1365,8 +1322,12 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     return [
-        Frame("diag-count-from-extremum-values", _witness_pairs(), d1),
-        Frame("diag-count-level-from-extremum-values", _witness_triples(), d2),
+        Frame("diag-count-from-computed-extrema", _part("p3-eq:lv3", _cubic_levels(), 6, 8), d1),
+        Frame(
+            "diag-count-level-from-computed-extrema",
+            _part("p3-eq:lv3", _cubic_levels(), 7, 8),
+            d2,
+        ),
         Frame("diag-cubic-positive-on-domain", _part("p3-eq:minc", _min_cubic_cases(), 4, 8), d4),
         Frame(
             "diag-quartic-single-critical-minimum",
@@ -1548,7 +1509,12 @@ class P3DiffEquationApplicationGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(_SLOT_FRAMES[slot](), cls.slot_count, claimed=claimed)
+        return round_robin_items(
+            _SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
+        )
 
     def _assemble(self, spec: EquivalenceSpec, item: DiffItem) -> CandidateProblem:
         return with_item_kinds(super()._assemble(spec, item), item)

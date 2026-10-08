@@ -16,8 +16,10 @@ P3-03(hermetic·LLM 0). 두 생성기는 아직 등록부(`harness.p3_calculus1_
    값형은 전부 도함수로 구하는 **최솟값**(부등식을 보이는 핵심 단계 — 3차 감사 처분으로 '등호가 성립하는
    x'형은 정수 중근이 인수분해 우회로를 열어 삭제했다 · 우회로 판정기 T09-*) · 개수형이 슬롯을 독점하지
    않음.
-⑥ 오개념 연결은 오개념 유발 슬롯에만, 명세의 핵심 M-id로(kebab 좌석이 없어 M-id 그대로 — 좌석이 생기면
-   이 테스트가 신호를 낸다).
+⑥ 오개념 연결은 오개념 유발 슬롯에만. 02-06은 명세의 핵심 M-id(M0674)로, 02-09는 5회차 은행 감사(2026-10-08)
+   처분으로 핵심 M0677(설명 손상·절차 미기술 — 원문 정정 QUAL-14) 대신 **M0615**(차수만큼 근을 단정)로 —
+   차수로 센 값의 선지만 연결하고 극값 후보 개수 선지는 연결하지 않는다(kebab 좌석이 없어 M-id 그대로 —
+   좌석이 생기면 이 테스트가 신호를 낸다).
 ⑦ 문제유형 정직성: 개수형(`real_root_count`) ⇔ `ptype.count-solutions`.
 """
 
@@ -693,7 +695,7 @@ def test_equation_concept_value_items_find_the_minimum_with_the_derivative() -> 
 def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
     """P3-20 §3 — 실근 개수형을 한 슬롯에 몰아 쓰면 문면 골격이 겹친다. 슬롯별로 형태를 분산한다.
 
-    오개념 유발 슬롯은 객관식이라 M0677(f(x) = k 근의 개수 관점)을 개수형으로만 물을 수 있어 예외이고,
+    오개념 유발 슬롯은 객관식이라 연결 오개념(M0615 — 차수만큼 근)을 개수형으로만 물을 수 있어 예외이고,
     그 슬롯도 문면 틀이 다섯 가지로 다르다. 나머지 슬롯은 개수형 틀이 둘 이하이고 최솟값형(부등식을
     보이는 핵심 단계) 틀이 셋 이상 섞인다(합·선택형은 2차 감사, 등호점형은 3차 감사 처분으로 삭제).
     """
@@ -711,7 +713,11 @@ def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 # ⑥ 오개념 연결 · 객관식
 # ──────────────────────────────────────────────────────────────────────────
-_MIS = {_MVT: "M0674", _EQ: "M0677"}
+#: 명세가 개념에 귀속한 핵심 오개념(M-id).
+_CORE = {_MVT: "M0674", _EQ: "M0677"}
+#: 오개념 유발 슬롯이 실제로 연결하는 오개념. 02-09는 5회차 감사 처분으로 핵심 M0677 대신 M0615다
+#: (`test_equation_concept_links_m0615_until_m0677_is_repaired`).
+_LINKED = {_MVT: "M0674", _EQ: "M0615"}
 
 
 @_ALL
@@ -722,27 +728,67 @@ def test_misconception_links_are_exactly_the_mc_slot_and_are_core_ids(
     core = {
         m.mis_id for m in spec.core_misconceptions if m.concept_code == generator_cls.standard_code
     }
-    assert core == {_MIS[generator_cls]}  # 명세가 이 개념에 귀속한 핵심 오개념(M-id)
+    assert core == {_CORE[generator_cls]}  # 명세가 이 개념에 귀속한 핵심 오개념(M-id)
+    expected = frozenset({_LINKED[generator_cls]})
     for slot in SLOT_IDS:
         linked = generator_cls.target_misconception_ids(slot)
         if slot == "misconception_trigger":
-            assert linked == frozenset(core)
+            assert linked == expected
             for candidate in _candidates(generator_cls, slot):
                 assert candidate.problem.distractor_map
-                assert {e.misconception_id for e in candidate.problem.distractor_map} == core
+                assert {e.misconception_id for e in candidate.problem.distractor_map} == expected
         else:
             assert linked == frozenset()
 
 
 def test_kebab_seat_absence_is_a_tripwire() -> None:
-    """02-06·02-09의 핵심 M-id에는 L4 kebab 좌석이 없다 — 그래서 M-id를 distractor_map에 그대로 쓴다.
+    """02-06·02-09의 연결 M-id에는 L4 kebab 좌석이 없다 — 그래서 M-id를 distractor_map에 그대로 쓴다.
 
     좌석이 생기면(안 A·B — MISC-40 판정 문서) 이 테스트가 red가 되어, 생성기를 kebab 연결로 옮기라는
     신호를 낸다(참조 무결성 검증자 `validate_distractor_map`이 M-id를 위반으로 읽기 때문).
     """
     from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 
-    assert "M0674" not in CATALOG_BY_ID and "M0677" not in CATALOG_BY_ID
+    assert not {"M0674", "M0677", "M0615"} & set(CATALOG_BY_ID)
+
+
+def _misconception_row(mis_id: str) -> dict[str, object]:
+    path = Path(__file__).resolve().parents[4] / "data/corpus/misconceptions_v1/misconceptions.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))["misconceptions"]
+    return next(row for row in rows if row["mis_id"] == mis_id)
+
+
+def test_equation_concept_links_m0615_until_m0677_is_repaired() -> None:
+    """02-09 오개념 유발 선지 — 차수로 센 값은 M0615, 극값 후보 개수는 연결 없음(5회차 감사 처분).
+
+    ① 연결 선지의 값이 *그 오개념의 절차*(차수만큼 근이 있다고 센다)로 나오는 값이다 — 방정식의 차수.
+    ② 극값 후보(f'(x) = 0의 서로 다른 실근) 개수 선지는 그 절차를 적은 오개념이 없어 연결하지 않는다.
+    ③ 정답은 차수·극값 후보 개수 어느 것과도 다르다(대표 오답 경로가 정답에 닿지 않는다).
+    ④ stale 가드 — 핵심 M0677의 설명은 아직 서술어 없이 끊겨 있다('…관점을'). QUAL-14가 원문을 정정하면
+       이 단언이 red가 되어 02-09 선지를 핵심 오개념으로 되돌릴지 다시 판정하라는 신호를 낸다.
+    """
+    checked = 0
+    for item in _EQ.items("misconception_trigger"):
+        assert item.choices is not None
+        (cond,) = _conds(item)
+        lhs, rhs = cond.split(" = ")
+        poly = sympy.Poly(sympy.sympify(lhs) - sympy.sympify(rhs), _X)
+        degree = poly.degree()
+        critical = len(set(sympy.real_roots(sympy.Poly(poly.diff(_X), _X))))
+        answer = int(item.answer_text)
+        assert answer not in (degree, critical), item.question_text
+        linked = {index: mid for index, mid in item.distractors}
+        assert set(linked.values()) == {"M0615"}
+        assert [int(item.choices[i]) for i in linked] == [degree], item.question_text
+        crit_index = item.choices.index(str(critical))
+        assert crit_index not in linked  # 극값 후보 개수 선지는 연결하지 않는다
+        checked += 1
+    assert checked == _EQ.slot_count
+    statement = str(_misconception_row("M0677")["canonical_statement"])
+    assert statement.endswith(
+        "관점을"
+    ), "M0677 원문이 정정됐다 — 02-09 연결을 다시 판정한다(QUAL-14)"
+    assert "차수만큼" in str(_misconception_row("M0615")["canonical_statement"])
 
 
 @_ALL

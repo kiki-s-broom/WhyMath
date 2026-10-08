@@ -21,6 +21,18 @@ M-id를 그대로 센다). 신규 오개념 id는 만들지 않는다. 대신 L4
 근이 정답으로 통과한다. 이 파일의 c값 문항은 전부 이 형식을 쓰며, 정답 하나가 유일함(구간 안
 유리근이 정확히 1개)을 생성기가 SymPy로 확인한다.
 
+5회차 은행 감사(2026-10-08) 처분 — 함수는 전부 삼차 이상
+------------------------------------------------------
+이차함수의 평균값 정리는 도함수가 일차라 c가 늘 구간의 중점이고(롤의 정리는 대칭축), 끝점 미지수형의
+답은 2c - 고정 끝점이다 — 평균값 정리를 몰라도 '가운데 값'으로 풀렸다(결함 18건 · 판정기
+T-quadratic-mean-value · T-midpoint-answer). 이 파일의 틀은 전부 **삼차 이상**으로 바꿨고, 매개변수
+단계에서 c ≠ 구간의 중점(끝점형은 답 ≠ 2c - 끝점)을 거부 조건으로 건다(`round_robin_items`의
+매개변수 거부 조건). 중점 값은 객관식의 *오답 선지*로만 남긴다. 끝점 미지수형 해설은 방정식을
+인수분해해 두 근을 보이고 구간 조건으로 하나를 고른다. 진단 슬롯의 구판 '두 실근은 …이다'(근을
+발문에 나열 · T06-roots-given)는 지웠다 — 근을 적지 않는 형태는 대표 슬롯의
+'rep-two-candidates-one-inside'가 맡고, 진단은 평균값 정리의 *결론*(f'(c) = 평균변화율 — c를 구하지
+않고 f'(c)를 정한다)을 함수식이 있는 짝 틀로 본다.
+
 범위(이 개념에 한정)
 --------------------
 다항함수 위의 평균값 정리·롤의 정리(c값·평균변화율·미지수 결정)만 다룬다. 극값·증감은 `-02-07`,
@@ -194,20 +206,6 @@ def _const_term(seed: int) -> int:
 
 
 @lru_cache(maxsize=None)
-def _quad_cases() -> tuple[_Case, ...]:
-    """이차함수 f = px^2 + qx + r — c는 항상 구간의 중점이다(유일)."""
-    out: list[_Case] = []
-    for p in (1, 2, 3, -1, -2):
-        for q in range(-6, 7):
-            for a in range(-3, 3):
-                for b in range(a + 2, 6, 2 if (a % 2) else 1):
-                    r = _const_term(p * 7 + q * 3 + a * 5 + b)
-                    f = _mk_poly((2, p), (1, q), (0, r))
-                    out.append(_Case(f, a, b, Fraction(a + b, 2), ()))
-    return tuple(seeded_order("p3-mvt:quad-pool", out)[:150])
-
-
-@lru_cache(maxsize=None)
 def _cubic_cases() -> tuple[_Case, ...]:
     """삼차함수 f = Lx^3 + px^2 + qx + r — f'(x) = 평균변화율의 두 근이 유리수, 하나만 구간 안."""
     out: list[_Case] = []
@@ -230,19 +228,6 @@ def _cubic_cases() -> tuple[_Case, ...]:
                             f = _mk_poly((3, lead), (2, p), (1, q), (0, r))
                             out.append(_Case(f, a, b, inside[0], (outside[0],)))
     return tuple(seeded_order("p3-mvt:cubic-pool", out)[:150])
-
-
-@lru_cache(maxsize=None)
-def _rolle_cases() -> tuple[_Case, ...]:
-    """f(a) = f(b)인 이차함수(롤의 정리) — c = 중점."""
-    out: list[_Case] = []
-    for p in (1, 2, 3, -1, -2, -3):
-        for a in range(-4, 3):
-            for b in range(a + 2, 6, 2):
-                r = _const_term(p * 5 + a * 3 + b)
-                f = _mk_poly((2, p), (1, -p * (a + b)), (0, r))
-                out.append(_Case(f, a, b, Fraction(a + b, 2), ()))
-    return tuple(seeded_order("p3-mvt:rolle-pool", out)[:60])
 
 
 @lru_cache(maxsize=None)
@@ -466,7 +451,7 @@ def _rep_frames() -> list[Frame]:
         c = _case_of(p[0])
         return _c_item(
             slot="representative",
-            frame_id="rep-quadratic-find-c",
+            frame_id="rep-find-c-with-interval",
             text=(
                 f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 "
                 f"만족시키는 상수 c의 값을 구하시오. (단, {c.a} < c < {c.b})"
@@ -529,8 +514,11 @@ def _rep_frames() -> list[Frame]:
             case=c,
         )
 
+    # 5회차 감사(2026-10-08) 처분 — 이차함수의 평균값 정리는 c가 늘 구간의 중점이라 미분 없이 풀렸다
+    # (판정기 T-quadratic-mean-value · 이차 풀 `_quad_cases`·`_rolle_cases` 삭제). c값 틀은 전부
+    # 삼차 풀을 쓴다(c ≠ 중점·구간 안 자연수 하나뿐 같은 우연 일치는 매개변수 거부 조건이 건너뛴다).
     return [
-        Frame("rep-quadratic-find-c", _frames_params("p3-mvt:r1", _quad_cases()), r1),
+        Frame("rep-find-c-with-interval", _frames_params("p3-mvt:r1", _cubic_cases()), r1),
         Frame(
             "rep-cubic-continuous-differentiable", _frames_params("p3-mvt:r2", _cubic_cases()), r2
         ),
@@ -538,7 +526,7 @@ def _rep_frames() -> list[Frame]:
         # 3차 감사(2026-10) bad_tag 처분 — 'rep-average-rate-given'(발문이 평균변화율 값과 방정식
         # f'(c) = m을 모두 줘 일차방정식 하나만 남던 틀)은 삭제했다(우회로 판정기 T06-given-rate).
         Frame("rep-two-candidates-one-inside", _frames_params("p3-mvt:r5", _cubic_cases()), r5),
-        Frame("rep-average-equals-instantaneous", _frames_params("p3-mvt:r6", _quad_cases()), r6),
+        Frame("rep-average-equals-instantaneous", _frames_params("p3-mvt:r6", _cubic_cases()), r6),
     ]
 
 
@@ -659,15 +647,13 @@ def _count_item(
 
 
 def _count_pool(seed: str) -> tuple[tuple[object, ...], ...]:
-    """개수형 재료 — 두 근이 모두 구간 안인 삼차(답 2)와 이차(답 1, c는 중점 하나)를 섞는다."""
-    mixed: list[_Case] = []
-    both = _both_inside_cases()
-    quads = _quad_cases()
-    for index in range(min(len(both), len(quads))):
-        mixed.append(both[index])
-        if index % 2 == 0:
-            mixed.append(quads[index])
-    return tuple((case,) for case in seeded_order(seed, mixed))
+    """개수형 재료 — 두 근이 모두 구간 안인 삼차(답 2).
+
+    5회차 감사(2026-10-08) 처분 — 종전 풀은 이차(답 1)를 섞었는데, 이차는 평균값 정리의 c가 늘 중점
+    하나라 어떤 경로('적어도 하나 → 1'·판별식·중점 암기)로도 1이 나왔다(판정자 지적 033597a2 ·
+    판정기 T-quadratic-mean-value).
+    """
+    return tuple((case,) for case in seeded_order(seed, _both_inside_cases()))
 
 
 def _bound_params(seed: str) -> tuple[tuple[object, ...], ...]:
@@ -781,7 +767,7 @@ def _basic_frames() -> list[Frame]:
             slot="basic",
             frame_id="basic-difference-equals-derivative-times-length",
             text=(
-                f"이차함수 f(x) = {_fx(c)}에 대하여 f({c.b}) - f({c.a}) = f'(c)({_minus(c.b, c.a)})"
+                f"삼차함수 f(x) = {_fx(c)}에 대하여 f({c.b}) - f({c.a}) = f'(c)({_minus(c.b, c.a)})"
                 f"{eul_reul(_minus(c.b, c.a))} "
                 f"만족시키는 c ({c.a} < c < {c.b})의 값을 구하시오."
             ),
@@ -852,13 +838,16 @@ def _basic_frames() -> list[Frame]:
     return [
         Frame(
             "basic-difference-equals-derivative-times-length",
-            _frames_params("p3-mvt:b2", _quad_cases()),
+            _frames_params("p3-mvt:b2", _cubic_cases()),
             b2,
         ),
-        Frame("basic-rolle-theorem", _frames_params("p3-mvt:b3", _rolle_cases()), b3),
+        # 5회차 감사 — 이차 롤의 정리는 c가 꼭짓점(대칭축 = f(a) = f(b)인 두 점의 중점)이라 미분
+        # 없이 풀렸다(판정자 지적 4b597448·59bacdba). 삼차 롤 풀로 바꿨다(f'(x) = 0의 근 중 하나만
+        # 구간 안).
+        Frame("basic-rolle-theorem", _frames_params("p3-mvt:b3", _rolle_cubic_cases()), b3),
         Frame(
             "basic-time-average-velocity",
-            _frames_params("p3-mvt:b6", _from_time_zero(_quad_cases())),
+            _frames_params("p3-mvt:b6", _from_time_zero(_cubic_cases())),
             b6,
         ),
         Frame("basic-rolle-cubic", _frames_params("p3-mvt:b8", _rolle_cubic_cases()), b8),
@@ -1020,10 +1009,10 @@ def _applied_frames() -> list[Frame]:
 
     def a4(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
-        # 이차함수에서 c는 구간의 중점이다. 왼쪽 끝점 a를 미지수로 둔다 — b와 c가 주어진다.
-        f_poly = c.f
+        # 삼차함수 — 왼쪽 끝점 a를 미지수로 둔다(b와 c가 주어진다). 끝점의 방정식은 이차라 근이
+        # 둘이고, 다른 근은 'a < b' 조건으로 버려지는 사례만 쓴다(`_endpoint_item`).
         return _endpoint_item(
-            "applied", "applied-find-left-endpoint", f_poly, c, unknown="a", fixed_is_left=False
+            "applied", "applied-find-left-endpoint", c.f, c, unknown="a", fixed_is_left=False
         )
 
     def a5(p: tuple[object, ...]) -> DiffItem | None:
@@ -1044,8 +1033,11 @@ def _applied_frames() -> list[Frame]:
             _frames_params("p3-mvt:a3", _from_time_zero(_cubic_cases())),
             a3,
         ),
-        Frame("applied-find-left-endpoint", _frames_params("p3-mvt:a4", _quad_cases()), a4),
-        Frame("applied-find-chord-endpoint", _frames_params("p3-mvt:a5", _quad_cases()), a5),
+        # 5회차 감사 처분 — 이차함수의 끝점 미지수형은 c가 중점이라 '2c - 끝점'으로 풀렸다(판정자
+        # 지적 24d7eb97·db749952). 삼차 풀로 바꿨다(중점 경로와 정답이 같으면 매개변수 거부 조건이
+        # 뺀다).
+        Frame("applied-find-left-endpoint", _frames_params("p3-mvt:a4", _cubic_cases()), a4),
+        Frame("applied-find-chord-endpoint", _frames_params("p3-mvt:a5", _cubic_cases()), a5),
     ]
 
 
@@ -1053,42 +1045,73 @@ def _k_params(seed: str) -> list[tuple[object, ...]]:
     return [tuple(case) for case in seeded_order(seed, _k_cases())]
 
 
-def _endpoint_explanation(
-    f: Poly, a: int, b: int, c: Fraction, *, unknown: str, fixed_is_left: bool
-) -> str:
-    """끝점 미지수 해설 — 도함수 식 → c에서의 미분계수 → 미지수 끝점의 평균변화율 → 방정식.
+def _endpoint_quadratic(f: Poly, fixed: int, value: Fraction) -> Poly:
+    """(f(u) - f(fixed))/(u - fixed) - value를 u의 다항식으로 — 삼차 f면 이차식(정수 계수).
 
-    3차 감사(2026-10) 처분 — 종전 해설은 '이차함수에서 c는 구간의 중점'이라는 결론만 써서 도함수
-    식도 평균변화율 계산도 없었다(우회로 판정기 E-derivative). 이차함수 f(x) = Ax^2 + Bx + C의
-    구간 [u, v]에서의 평균변화율은 f(v) - f(u) = (v - u)(A(u + v) + B)에서 A(u + v) + B이다.
+    f(x) = Lx^3 + px^2 + qx + r이면 (f(u) - f(fixed))/(u - fixed) = L(u^2 + fixed·u + fixed^2)
+    + p(u + fixed) + q이다(인수 (u - fixed)를 약분한 몫).
     """
     terms = dict(f)
-    lead, lin = terms.get(2, 0), terms.get(1, 0)
+    lead, quad, lin = terms.get(3, 0), terms.get(2, 0), terms.get(1, 0)
+    const = lead * fixed * fixed + quad * fixed + lin - value
+    if Fraction(const).denominator != 1:
+        raise ValueError("끝점 방정식의 상수항이 정수가 아니다")
+    raw = ((2, lead), (1, lead * fixed + quad), (0, int(const)))
+    return tuple((e, k) for e, k in raw if k)
+
+
+def _endpoint_explanation(
+    f: Poly,
+    fixed: int,
+    c: Fraction,
+    *,
+    unknown: str,
+    fixed_is_left: bool,
+    answer: int,
+    other: Fraction,
+) -> str:
+    """끝점 미지수 해설 — 도함수 식 → c에서의 미분계수 → 미지 끝점의 평균변화율(약분한 이차식) →
+    방정식의 두 근 → 구간 조건으로 고르기.
+
+    5회차 감사(2026-10-08) 처분 — 이차함수 틀은 c가 늘 중점이라 '2c - 끝점'으로 풀렸다. 삼차함수는
+    평균변화율이 미지 끝점의 이차식이라 방정식의 근이 둘이고, 구간 조건(미지 끝점 > 또는 < 고정
+    끝점)으로 하나를 고른다(3차 감사 처분의 '도함수 식·평균변화율 계산 단계'도 그대로 보인다).
+    """
     fp = derivative_of(f)
-    slope = 2 * lead * c + lin  # f'(c)
-    slope_text = frac_text(Fraction(slope))
+    slope = Fraction(sum(Fraction(k) * c ** (e - 1) * e for e, k in f if e >= 1))
+    slope_text = frac_text(slope)
     cs = frac_text(c)
-    if fixed_is_left:  # 왼쪽 끝점 a 고정, 오른쪽 끝점이 미지수
-        fixed = a
-        span = render_poly(((1, 1), (0, -fixed)), unknown)  # 'b - 1'·'k + 3'
-        rate_head = f"(f({unknown}) - f({fixed}))/" + (f"({span})" if " " in span else span)
+    terms = dict(f)
+    lead, quad, lin = terms.get(3, 0), terms.get(2, 0), terms.get(1, 0)
+    rate = tuple(
+        (e, k)
+        for e, k in (
+            (2, lead),
+            (1, lead * fixed + quad),
+            (0, lead * fixed * fixed + quad * fixed + lin),
+        )
+        if k
+    )
+    rate_text = render_poly(rate, unknown)
+    moved = _endpoint_quadratic(f, fixed, slope)
+    if fixed_is_left:
+        span = render_poly(((1, 1), (0, -fixed)), unknown)  # 'b - 1'
         diff_head = f"f({unknown}) - f({fixed})"
-        answer = b
-    else:  # 오른쪽 끝점 b 고정, 왼쪽 끝점이 미지수
-        fixed = b
+        side = f"{unknown} > {fixed}"
+    else:
         span = render_affine(fixed, -1, unknown)  # '1 - a'
-        rate_head = f"(f({fixed}) - f({unknown}))/" + (f"({span})" if " " in span else span)
         diff_head = f"f({fixed}) - f({unknown})"
-        answer = a
-    linear = render_poly(((1, lead), (0, lead * fixed + lin)), unknown)  # A(u + v) + B
-    moved = render_poly(((1, lead), (0, lead * fixed + lin - int(slope))), unknown)
-    factored = (f"({span})" if " " in span else span) + f"({linear})"
+        side = f"{unknown} < {fixed}"
+    span_paren = f"({span})" if (" " in span or span.startswith("-")) else span
+    roots = sorted((Fraction(answer), other))
     return (
         f"f'(x) = {render_poly(fp)}이고, 평균값 정리를 만족시키는 c가 {cs}이므로 그 점에서의 "
-        f"미분계수는 f'({cs})의 값인 {slope_text}이다. 구간의 평균변화율은 {rate_head}이고, "
-        f"{with_eul_reul(diff_head)} 정리하면 {factored}이므로 평균변화율은 {linear}이다. "
-        f"평균값 정리에 의하여 {linear} = {slope_text}, 즉 {moved} = 0에서 "
-        f"{unknown} = {answer}이다."
+        f"미분계수는 f'({cs})의 값인 {slope_text}이다. 구간의 평균변화율은 "
+        f"({diff_head})/{span_paren}이고, {with_eul_reul(diff_head)} 인수분해하면 "
+        f"{span_paren}({rate_text})이므로 평균변화율은 {rate_text}이다. 평균값 정리에 의하여 "
+        f"{rate_text} = {slope_text}, 즉 {render_poly(moved, unknown)} = 0에서 "
+        f"{render_factored(moved, unknown)} = 0이므로 {unknown} = {frac_text(roots[0])} 또는 "
+        f"{unknown} = {frac_text(roots[1])}이다. {side}이므로 {unknown} = {answer}이다."
     )
 
 
@@ -1100,61 +1123,67 @@ def _endpoint_item(
     *,
     unknown: str,
     fixed_is_left: bool,
+    text: str | None = None,
 ) -> DiffItem | None:
-    """이차함수에서 c와 한 끝점이 주어질 때 다른 끝점(미지수)을 구한다.
+    """삼차함수에서 c와 한 끝점이 주어질 때 다른 끝점(미지수)을 구한다.
 
-    f'(c) = (f(b) - f(a))/(b - a)에서 미지수 끝점은 근이 둘이 아니라 구간이 퇴화하는 가짜 근
-    (끝점 = 다른 끝점)을 낳는다 — 조건에 `unknown > 고정 끝점`(또는 `<`)을 함께 둬 가른다.
+    f'(c) = (f(u) - f(fixed))/(u - fixed)는 u의 이차방정식이다 — 근 둘 중 정답이 아닌 근이 조건
+    `unknown > 고정 끝점`(또는 `<`)을 어기는 사례만 쓴다(해가 발문 조건으로 하나로 정해진다). 구간
+    퇴화(u = fixed) 가짜 근도 같은 조건이 가른다.
     """
     a, b, c = case.a, case.b, case.c
-    given = a if fixed_is_left else b
+    fixed = a if fixed_is_left else b
     answer = b if fixed_is_left else a
     sym = sympy.Symbol(unknown)
     f_unknown = poly_to_sympy(f).subs(_X, sym)
-    f_given = eval_at(f, given)
+    f_fixed = eval_at(f, fixed)
     cs = frac_text(c)
     deriv = f"Derivative({poly_to_sympy_str(f)}, x).doit().subs(x, {cs})"
     if fixed_is_left:
-        rate = f"({sympy.sstr(f_unknown)} - ({f_given}))/({unknown} - ({given}))"
-        side = f"{unknown} > {given}"
+        rate = f"({sympy.sstr(f_unknown)} - ({f_fixed}))/({unknown} - ({fixed}))"
+        side = f"{unknown} > {fixed}"
     else:
-        rate = f"({f_given} - ({sympy.sstr(f_unknown)}))/(({given}) - {unknown})"
-        side = f"{unknown} < {given}"
-    # 검산: 답을 대입해 평균값 정리의 c가 정말 c인지 SymPy로 확인(생성기 자기 점검)
-    check = sympy.solve(
-        sympy.Eq(
-            sympy.diff(poly_to_sympy(f), _X).subs(_X, sympy.Rational(c.numerator, c.denominator)),
-            (
-                (f_unknown - f_given) / (sym - given)
-                if fixed_is_left
-                else (f_given - f_unknown) / (given - sym)
-            ),
-        ),
-        sym,
-    )
-    if sympy.Integer(answer) not in check:
+        rate = f"({f_fixed} - ({sympy.sstr(f_unknown)}))/(({fixed}) - {unknown})"
+        side = f"{unknown} < {fixed}"
+    slope = sympy.diff(poly_to_sympy(f), _X).subs(_X, sympy.Rational(c.numerator, c.denominator))
+    try:
+        moved = _endpoint_quadratic(f, fixed, Fraction(int(slope.p), int(slope.q)))
+    except ValueError:
         return None
-    if fixed_is_left:
-        text = (
-            f"함수 f(x) = {render_poly(f)}에 대하여 구간 [{a}, b] (b > {a})에서 평균값 정리를 "
-            f"만족시키는 c의 값이 {cs}일 때, b의 값을 구하시오."
-            if frame_id == "applied-find-chord-endpoint"
-            else (
-                f"곡선 y = {render_poly(f)} 위의 점 A({a}, {f_given})와 x좌표가 b (b > {a})인 "
-                f"점 B를 잇는 직선과 평행한 접선의 접점의 x좌표가 {cs}일 때, b의 값을 구하시오."
+    roots = sympy.solve(poly_to_sympy(moved, unknown), sym)
+    if sympy.Integer(answer) not in roots or len(roots) != 2:
+        return None
+    other = next(r for r in roots if r != answer)
+    if not other.is_rational:
+        return None
+    other_frac = Fraction(int(other.p), int(other.q))
+    if (other_frac > fixed) if fixed_is_left else (other_frac < fixed):
+        return None  # 다른 근도 구간 조건을 만족시키면 답이 하나로 정해지지 않는다
+    if text is None:
+        if fixed_is_left:
+            text = (
+                f"함수 f(x) = {render_poly(f)}에 대하여 구간 [{a}, b] (b > {a})에서 평균값 정리를 "
+                f"만족시키는 c의 값이 {cs}일 때, b의 값을 구하시오."
             )
-        )
-    else:
-        text = (
-            f"함수 f(x) = {render_poly(f)}에 대하여 구간 [a, {b}] (a < {b})에서 평균값 정리를 "
-            f"만족시키는 c의 값이 {cs}일 때, a의 값을 구하시오."
-        )
+        else:
+            text = (
+                f"함수 f(x) = {render_poly(f)}에 대하여 구간 [a, {b}] (a < {b})에서 평균값 정리를 "
+                f"만족시키는 c의 값이 {cs}일 때, a의 값을 구하시오."
+            )
     return DiffItem(
         slot=slot,
         frame_id=frame_id,
         question_text=text,
         answer_text=str(answer),
-        explanation=_endpoint_explanation(f, a, b, c, unknown=unknown, fixed_is_left=fixed_is_left),
+        explanation=_endpoint_explanation(
+            f,
+            fixed,
+            c,
+            unknown=unknown,
+            fixed_is_left=fixed_is_left,
+            answer=answer,
+            other=other_frac,
+        ),
         conditions=(f"{deriv} = {rate}", side),
         answer_map=((unknown, str(answer)),),
         problem_type_code=_SOLVE,
@@ -1235,10 +1264,12 @@ def _mc_c_item(
     assert answer == base.answer_text
     # 오개념(M0674 — 롤의 정리와 혼동)으로 생기는 오답 선지가 왜 틀렸는지 해설이 짚는다.
     wrong_text = frac_text(wrong[0])
+    # 5회차 감사 해설 결함(44e7281a) 교정 — '~인데, ~인데' 비문과 수 하나를 '롤의 정리의 결론'이라
+    # 부른 용어 오용을 고친다(결론은 'f'(c) = 0인 c가 존재한다'는 명제다).
     trap = (
-        f" 방정식 {fn}'(c) = 0을 풀어 얻는 {with_eun_neun(wrong_text)} 롤의 정리의 결론인데, "
-        f"롤의 정리는 {with_wa_gwa(f'{fn}({case.a})')} {fn}({case.b})의 값이 같을 때만 쓸 수 "
-        "있는데, 여기서는 두 값이 다르므로 답이 아니다."
+        f" 방정식 {fn}'(c) = 0의 근 {with_eun_neun(wrong_text)} 롤의 정리를 적용할 때 구하는 "
+        f"값이다. 롤의 정리는 {with_wa_gwa(f'{fn}({case.a})')} {fn}({case.b})의 값이 같을 때만 쓸 "
+        f"수 있다. 여기서는 두 값이 다르므로 {with_eun_neun(wrong_text)} 답이 아니다."
     )
     return dataclasses.replace(base, explanation=base.explanation + trap)
 
@@ -1247,7 +1278,7 @@ def _misconception_frames() -> list[Frame]:
     def m1(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         return _mc_c_item(
-            frame_id="mc-quadratic-find-c",
+            frame_id="mc-closed-interval-find-c",
             text=(
                 f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 "
                 "만족시키는 c의 값은?"
@@ -1311,15 +1342,18 @@ def _misconception_frames() -> list[Frame]:
             fillers_seed=f"mc-s:{c.a}:{c.b}:{_fx(c)}",
         )
 
-    quad = tuple(c for c in _quad_cases() if _rolle_wrong_values(c))
-    quad_time = _from_time_zero(quad)
+    # 5회차 감사(2026-10-08) 처분 — 이차함수 틀(m1·m3·m5)은 정답 c가 구간의 중점이라 'c는 구간의
+    # 가운데'라는 추측·오개념으로도 정답 선지에 닿았다(판정자 지적 79d7c8b4 등 7건). 전부 삼차 풀로
+    # 바꿨다. 이제 중점은 *오답* 선지(필러)로만 나온다 — 삼차라 중점이 정답이 아니어서 그 선지가
+    # 유효하다.
     cubic = tuple(c for c in _cubic_cases() if _rolle_wrong_values(c))
+    cubic_time = _from_time_zero(cubic)
     return [
-        Frame("mc-quadratic-find-c", _frames_params("p3-mvt:m1", quad), m1),
+        Frame("mc-closed-interval-find-c", _frames_params("p3-mvt:m1", cubic), m1),
         Frame("mc-cubic-find-c", _frames_params("p3-mvt:m2", cubic), m2),
-        Frame("mc-time-find-c", _frames_params("p3-mvt:m3", quad_time), m3),
+        Frame("mc-time-find-c", _frames_params("p3-mvt:m3", cubic_time), m3),
         Frame("mc-tangent-parallel-find-c", _frames_params("p3-mvt:m4", cubic), m4),
-        Frame("mc-student-solution-check", _frames_params("p3-mvt:m5", quad), m5),
+        Frame("mc-student-solution-check", _frames_params("p3-mvt:m5", cubic), m5),
     ]
 
 
@@ -1406,21 +1440,35 @@ def _diagnostic_frames() -> list[Frame]:
         return _bound_item(slot="diagnostic", frame_id="diag-mvt-lower-bound", p=p, side="lower")
 
     def d9(p: tuple[object, ...]) -> DiffItem | None:
-        # 방정식의 두 근을 주고 평균값 정리의 c를 고르게 한다 — '열린구간 안'이라는 조건만 진단.
+        # 5회차 감사(2026-10-08) 처분 — 구판 'diag-choose-root-in-interval'은 방정식 f'(x) =
+        # (평균변화율)의 두 근을 발문에 적어 구간 안의 값을 고르기만 남았다(판정자 지적
+        # 327a1b94·492338dc·ba2a7f9a · 판정기 T06-roots-given). 근을 적지 않는 형태는 대표 슬롯의
+        # 'rep-two-candidates-one-inside'가 맡으므로, 진단은 평균값 정리의 *결론*(f'(c) =
+        # 평균변화율)만 따로 확인한다 — c를 구하지 않아도 f'(c)가 정해진다는 것을 아는가(함수식이
+        # 있는 d5 짝).
         c = _case_of(p[0])
-        solved = _solve_c(c)
-        if solved is None or len(solved[2]) != 1:
-            return None
-        both = sorted([solved[0], *solved[2]])
-        return _c_item(
+        fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
+        m = Fraction(fb - fa, c.b - c.a)
+        return _value_item(
             slot="diagnostic",
-            frame_id="diag-choose-root-in-interval",
+            frame_id="diag-derivative-value-at-mvt-point",
             text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 방정식 f'(x) = (f({c.b}) - f({c.a}))/"
-                f"({_minus(c.b, c.a)})의 두 실근은 {frac_text(both[0])}, {frac_text(both[1])}이다. "
-                f"닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 만족시키는 c의 값을 구하시오."
+                f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, {c.b}]에서 평균값 정리를 "
+                "만족시키는 c가 있다. f'(c)의 값을 구하시오."
             ),
-            case=c,
+            value=m,
+            condition=f"({_paren(fb)} - {_paren(fa)})/({_paren(c.b)} - {_paren(c.a)}) = y",
+            # 위생 게이트(QUAL-13)는 'f'(c) = 29'·'f(4) = 60'의 f'(c)·f(4)를 곱으로 읽는다 —
+            # 함숫값은 '의 값은'으로 쓰고, 'c = …'·'f'(x) = 29' 같은 값 주장 꼴을 쓰지 않는다.
+            explanation=(
+                f"평균값 정리에 의하여 f'(c)의 값은 구간 [{c.a}, {c.b}]에서의 평균변화율과 같다. "
+                f"평균변화율은 (f({c.b}) - f({c.a}))/({_minus(c.b, c.a)})이고, f({c.b})의 값은 "
+                f"{fb}, f({c.a})의 값은 {fa}이므로 그 값은 "
+                f"({render_difference(fb, fa)})/{c.b - c.a} = {frac_text(m)}이다. 실제로 f'(x) = "
+                f"{render_poly(derivative_of(c.f))}이고, {render_poly(derivative_of(c.f))} = "
+                f"{with_eul_reul(frac_text(m))} 만족시키는 x 중 열린구간 ({c.a}, {c.b})에 속하는 "
+                f"것은 {frac_text(c.c)} 하나이다."
+            ),
         )
 
     def d10(p: tuple[object, ...]) -> DiffItem | None:
@@ -1465,7 +1513,9 @@ def _diagnostic_frames() -> list[Frame]:
         # 미분이
         # 쓰이지 않고, 이차함수라 대칭축만 보면 c까지 정해지는 틀)는 삭제했다(우회로 판정기
         # E-derivative). 롤의 정리의 가정→결론 두 단계는 숙련도의 삼차 틀이 맡는다.
-        Frame("diag-choose-root-in-interval", _frames_params("p3-mvt:d9", _cubic_cases()), d9),
+        Frame(
+            "diag-derivative-value-at-mvt-point", _frames_params("p3-mvt:d9", _cubic_cases()), d9
+        ),
         Frame("diag-mvt-lower-bound", _bound_params("p3-mvt:d8"), d8),
         Frame("diag-count-parallel-tangents-between", _count_pool("p3-mvt:d10"), d10),
         Frame(
@@ -1530,42 +1580,21 @@ def _mastery_frames() -> list[Frame]:
         )
 
     def k5(p: tuple[object, ...]) -> DiffItem | None:
+        # 5회차 감사 처분 — 이차함수 구판은 c가 중점이라 k = 2c - a로 풀렸다(판정자 지적 1ebb69fb·
+        # 62d2b1fc). 삼차함수로 바꿔 끝점 k의 이차방정식을 풀고 'k > a'로 하나를 고르게 한다.
         c = _case_of(p[0])
-        # 이차함수 f(x) = px^2 + qx + r의 구간 [a, k] (k > a)에서 평균값 정리의 c가 주어진다.
-        sym = sympy.Symbol("k")
-        c_given = Fraction(c.a + c.b, 2)
-        k_val = c.b
-        f_k = poly_to_sympy(c.f).subs(_X, sym)
-        f_a = eval_at(c.f, c.a)
-        cs = frac_text(c_given)
-        deriv = f"Derivative({poly_to_sympy_str(c.f)}, x).doit().subs(x, {cs})"
-        cond = f"{deriv} = ({sympy.sstr(f_k)} - ({f_a}))/(k - ({c.a}))"
-        check = sympy.solve(
-            sympy.Eq(
-                sympy.diff(poly_to_sympy(c.f), _X).subs(
-                    _X, sympy.Rational(c_given.numerator, c_given.denominator)
-                ),
-                (f_k - f_a) / (sym - c.a),
-            ),
-            sym,
-        )
-        if sympy.Integer(k_val) not in check:
-            return None
-        return DiffItem(
-            slot="mastery_check",
-            frame_id="mastery-find-upper-endpoint",
-            question_text=(
+        cs = frac_text(c.c)
+        return _endpoint_item(
+            "mastery_check",
+            "mastery-find-upper-endpoint",
+            c.f,
+            c,
+            unknown="k",
+            fixed_is_left=True,
+            text=(
                 f"함수 f(x) = {_fx(c)}에 대하여 닫힌구간 [{c.a}, k] (k > {c.a})에서 평균값 "
                 f"정리를 만족시키는 c의 값이 {cs}일 때, k의 값을 구하시오."
             ),
-            answer_text=str(k_val),
-            explanation=_endpoint_explanation(
-                c.f, c.a, k_val, c_given, unknown="k", fixed_is_left=True
-            ),
-            conditions=(cond, f"k > {c.a}"),
-            answer_map=(("k", str(k_val)),),
-            problem_type_code=_SOLVE,
-            answer_format=answer_format_of(k_val),
         )
 
     def k7(p: tuple[object, ...]) -> DiffItem | None:
@@ -1629,7 +1658,7 @@ def _mastery_frames() -> list[Frame]:
     return [
         Frame("mastery-root-outside-interval", _frames_params("p3-mvt:k1", _cubic_cases()), k1),
         Frame("mastery-find-k-tangent-parallel", tuple(_k_params("p3-mvt:k3")), k3),
-        Frame("mastery-find-upper-endpoint", _frames_params("p3-mvt:k5", _quad_cases()), k5),
+        Frame("mastery-find-upper-endpoint", _frames_params("p3-mvt:k5", _cubic_cases()), k5),
         Frame("mastery-mvt-bound-range-sum", _bound_params("p3-mvt:k7"), k7),
         Frame(
             "mastery-rolle-cubic-k-then-c",
@@ -1673,7 +1702,12 @@ class P3DiffMeanValueTheoremGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(_SLOT_FRAMES[slot](), cls.slot_count, claimed=claimed)
+        return round_robin_items(
+            _SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
+        )
 
     def _assemble(self, spec: EquivalenceSpec, item: DiffItem) -> CandidateProblem:
         return with_item_kinds(super()._assemble(spec, item), item)

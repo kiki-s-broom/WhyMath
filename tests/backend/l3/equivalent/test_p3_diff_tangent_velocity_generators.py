@@ -662,8 +662,8 @@ def _student_expr(text: str) -> sympy.Expr:
 
 
 _CURVE_ARG = r"(?P<{name}>[-0-9a-z^ +]+?)"
-#: 문면에서 (곡선, 직선족)을 읽는 세 형태 — 미지 상수 u는 answer_map의 유일한 키다.
-_TANGENT_SHAPES = (
+#: 접점이 발문에서 *정해지지 않는* 두 형태(판별식형) — 미지 상수 u는 answer_map의 유일한 키다.
+_DISCRIMINANT_SHAPES = (
     # ① '직선 y = 3x + k가 곡선 y = … 위의 …에서 이 곡선에 접할 때'
     re.compile(
         r"직선 y = "
@@ -676,7 +676,10 @@ _TANGENT_SHAPES = (
     re.compile(
         r"점 \(0, (?P<p>-?\d+)\)에서 곡선 y = " + _CURVE_ARG.format(name="curve") + r"에 그은 접선"
     ),
-    # ③ '곡선 y = x^2 + px + q가 곡선 y = …와 x = a인 점에서 접할 때' — p는 기울기 조건으로 정한다
+)
+#: 접점 x = a가 발문에서 *정해지는* 세 형태((x - a)^2 인수형) — 5회차 감사 교정(284122b4).
+_FIXED_TOUCH_SHAPES = (
+    # ③ '곡선 y = x^2 + px + q가 곡선 y = …와 x = a인 점에서 접할 때'
     re.compile(
         r"곡선 y = "
         + _CURVE_ARG.format(name="family")
@@ -684,38 +687,83 @@ _TANGENT_SHAPES = (
         + _CURVE_ARG.format(name="curve")
         + r"(?:와|과) x = (?P<a>-?\d+)인 점에서 접할"
     ),
+    # ④ '곡선 y = … 위의 점 (a, b)에서의 접선의 y절편을 구하시오' — 절편 u
+    re.compile(
+        r"곡선 y = "
+        + _CURVE_ARG.format(name="curve")
+        + r" 위의 점 \((?P<a>-?\d+), -?\d+\)에서의 접선의 y절편을 구하"
+    ),
+    # ⑤ '곡선 y = … + c (c는 상수) 위의 x좌표가 a인 점에서의 접선의 y절편이 n일 때' — 곡선의 상수 u
+    re.compile(
+        r"곡선 y = "
+        + _CURVE_ARG.format(name="curve")
+        + r" \([a-z]는 상수\) 위의 x좌표가 (?P<a>-?\d+)인 점에서의 접선의 y절편이 (?P<n>-?\d+)일 때"
+    ),
 )
+
+
+def _single_unknown(item: DiffItem) -> sympy.Symbol:
+    ((key, _),) = item.answer_map
+    return sympy.Symbol(key)
 
 
 def _independent_tangency_discriminant(item: DiffItem) -> sympy.Expr | None:
     """문면만 읽어 '곡선 - 직선족'의 x에 대한 판별식(미지 상수 u의 다항식)을 다시 만든다.
 
-    ③형의 p는 두 곡선의 기울기가 x = a에서 같다는 조건으로 이 테스트가 직접 정한다(문면이 주는 정보만
-    쓴다). 세 형태 중 어디에도 맞지 않으면 None.
+    접점이 발문에서 정해지지 않는 형태(①·②)만 — 그 형태에서는 판별식의 실근 전부가 *접하는 직선*이고
+    발문 조건(접점의 x좌표가 양수 · 접선이 하나뿐)이 그중 하나를 고른다. 어디에도 맞지 않으면 None.
     """
     x = sympy.Symbol("x")
-    ((key, _),) = item.answer_map
-    u = sympy.Symbol(key)
-    for shape in _TANGENT_SHAPES:
+    u = _single_unknown(item)
+    for shape in _DISCRIMINANT_SHAPES:
         match = shape.search(item.question_text)
         if match is None:
             continue
         curve = _student_expr(match["curve"])
         groups = match.groupdict()
-        if groups.get("line") is not None:
-            line = _student_expr(match["line"])
-        elif groups.get("p") is not None:
-            line = u * x + int(match["p"])
-        else:
-            family = _student_expr(match["family"])
-            a = int(match["a"])
-            others = family.free_symbols - {x, u}
-            (p_sym,) = others
-            (p_val,) = sympy.solve(sympy.diff(family - curve, x).subs(x, a), p_sym)
-            line = family.subs(p_sym, p_val)
+        line = (
+            _student_expr(match["line"])
+            if groups.get("line") is not None
+            else u * x + int(match["p"])
+        )
         if line.free_symbols != {x, u}:
             return None
         return sympy.expand(sympy.discriminant(sympy.expand(curve - line), x))
+    return None
+
+
+def _independent_fixed_touch(item: DiffItem) -> tuple[sympy.Expr, set[sympy.Expr]] | None:
+    """문면만 읽어 '접점 x = a에서 이중근' 조건(미지 상수 u의 식)과 발문 문제의 u 해집합을 낸다.
+
+    조건 = 차(곡선 - 직선 또는 곡선 - 곡선족)를 (x - a)^2으로 나눈 나머지의 계수 중 u를 담은 것(③은
+    p가 소거되는 상수항, ④·⑤는 접점과 (0, 절편)을 지나는 직선의 x 계수 분자). 해집합은 *미분으로*
+    따로 푼다(함숫값 일치 + 기울기 일치) — 생성기 코드도 나머지 계산도 쓰지 않는 두 번째 경로다.
+    """
+    x = sympy.Symbol("x")
+    u = _single_unknown(item)
+    for index, shape in enumerate(_FIXED_TOUCH_SHAPES):
+        match = shape.search(item.question_text)
+        if match is None:
+            continue
+        a = int(match["a"])
+        curve = _student_expr(match["curve"])
+        if index == 0:
+            family = _student_expr(match["family"])
+            unknowns = sorted(family.free_symbols - {x}, key=str)
+            gap = sympy.expand(curve - family)
+            statement = sympy.solve(
+                [gap.subs(x, a), sympy.diff(gap, x).subs(x, a)], unknowns, dict=True
+            )
+            remainder = sympy.Poly(sympy.rem(gap, (x - a) ** 2, x), x).all_coeffs()
+            condition = sympy.expand(remainder[-1])
+            return condition, {sol[u] for sol in statement}
+        intercept = u if index == 1 else sympy.Integer(int(match["n"]))
+        line = (curve.subs(x, a) - intercept) / a * x + intercept
+        remainder = sympy.Poly(sympy.rem(sympy.expand(curve - line), (x - a) ** 2, x), x)
+        condition = sympy.expand(sympy.numer(sympy.together(remainder.all_coeffs()[0])))
+        tangent_intercept = curve.subs(x, a) - a * sympy.diff(curve, x).subs(x, a)
+        target = u - tangent_intercept if index == 1 else tangent_intercept - intercept
+        return condition, set(sympy.solve(sympy.expand(target), u))
     return None
 
 
@@ -724,41 +772,118 @@ def _is_proportional(left: sympy.Expr, right: sympy.Expr) -> bool:
     return not ratio.free_symbols and ratio != 0
 
 
+def _first_equation(item: DiffItem) -> sympy.Expr:
+    first = item.conditions if isinstance(item.conditions, str) else item.conditions[0]
+    lhs, rhs = first.split(" = ")
+    return sympy.expand(sympy.sympify(lhs) - sympy.sympify(rhs))
+
+
 def test_tangent_double_root_items_use_the_discriminant_not_a_derivative() -> None:
     """명세 probe_note — 접선 조건을 '접점에서 이중근' 항등식으로 쓰는 문항이 실제로 있다.
 
-    판별식형 조건은 미분 평가(`Derivative`)를 쓰지 않는 독립 경로여야 한다(두 경로가 어긋나면 게이트가
+    이중근형 조건은 미분 평가(`Derivative`)를 쓰지 않는 독립 경로여야 한다(두 경로가 어긋나면 게이트가
     거부). 대표·응용·숙련도 슬롯에 걸쳐 있어야 한다.
 
-    두 갈래를 센다 — (a) 이차 곡선의 판별식 `(b - m)**2 - 4*A*(c - k)` 문자열, (b) 삼차 곡선(3차 감사
-    처분으로 숙련도의 접할 조건을 삼차로 바꿨다 — 이차 곡선은 판별식만으로 풀려 미분이 필요 없었다)의
-    x에 대한 판별식. (b)는 문자열 모양으로 알아볼 수 없으므로 **문면에서 곡선·직선족을 읽어 판별식을
-    다시 계산**하고 검산 조건의 좌변이 그것의 상수배인지 대조한다(생성기 코드 미사용 — 독립 재계산).
+    두 갈래를 센다 — (a) 접점이 발문에서 정해지지 않는 형태(①·②): 곡선 - 직선족의 x에 대한
+    판별식, (b) 접점 x = a가 발문에서 정해지는 형태(③·④·⑤): 차를 (x - a)^2으로 나눈 나머지의 계수.
+    둘 다 문자열 모양으로 알아볼 수 없으므로 **문면에서 곡선·직선족을 읽어 조건을 다시 계산**하고 검산
+    조건의 좌변이 그것의 상수배인지 대조한다(생성기 코드 미사용 — 독립 재계산).
+
+    5회차 감사 교정(284122b4) — 종전 판은 ③을 *p를 기울기 조건으로 고정한 뒤의 판별식*으로 재계산했다.
+    그 식은 접점을 풀어 둔 다른 문제(해 둘 · 발문에 없는 보호 조건으로 하나를 버림)였고, 이 테스트가
+    생성기의 같은 결함을 *정답으로* 동결하고 있었다. ③은 이제 접점 고정 형태로 센다.
     """
-    quadratic: list[DiffItem] = []
-    cubic: list[DiffItem] = []
+    discriminant: list[DiffItem] = []
+    fixed_touch: list[DiffItem] = []
     for i in _all_items(P3DiffTangentLineGenerator):
         first = i.conditions if isinstance(i.conditions, str) else i.conditions[0]
-        if "Derivative" in first:
-            continue
-        if "**2 - 4*" in first:
-            quadratic.append(i)
-            continue
+        if "Derivative" in first or "(" in first:
+            continue  # 미분 평가형 · 수치 대입형('(-1) - (-1)*(3) = y') — 이중근 항등식이 아니다
         expected = _independent_tangency_discriminant(i)
-        if expected is None:
+        if expected is not None:
+            assert _is_proportional(_first_equation(i), expected), (i.question_text, first)
+            discriminant.append(i)
             continue
-        lhs, rhs = first.split(" = ")
-        residual = sympy.expand(sympy.sympify(lhs) - sympy.sympify(rhs))
-        assert _is_proportional(residual, expected), (i.question_text, first, expected)
-        cubic.append(i)
-    discriminant_items = quadratic + cubic
-    slots = {i.slot for i in discriminant_items}
+        touched = _independent_fixed_touch(i)
+        if touched is not None:
+            assert _is_proportional(_first_equation(i), touched[0]), (i.question_text, first)
+            fixed_touch.append(i)
+    double_root_items = discriminant + fixed_touch
+    slots = {i.slot for i in double_root_items}
     assert {"representative", "applied", "mastery_check"} <= slots
-    assert len(discriminant_items) >= 8
-    # 숙련도의 삼차 접선 틀 셋(기울기 주고 k · y축 위의 점에서 그은 접선 · 두 곡선이 접함)이 전부
-    # 판별식 경로를 쓴다 — 하나라도 다른 경로(항등식·미분 평가)로 돌아가면 개수가 줄어든다.
-    assert {i.frame_id for i in cubic} == {
+    assert len(double_root_items) >= 8
+    # 이중근형 틀 다섯이 전부 이 경로를 쓴다 — 하나라도 다른 경로(미분 평가)로 돌아가거나 접점 고정
+    # 틀이 판별식으로 돌아가면(5회차 결함 재발) 집합이 달라진다.
+    assert {i.frame_id for i in discriminant} == {
         "mastery-cubic-tangent-given-slope",
         "mastery-tangent-from-point-on-y-axis",
+    }, {i.frame_id for i in discriminant}
+    assert {i.frame_id for i in fixed_touch} == {
+        "rep-y-intercept-of-cubic-tangent",
+        "applied-cubic-intercept-given-find-constant",
         "mastery-two-curves-touch-find-constant",
-    }, {i.frame_id for i in cubic}
+    }, {i.frame_id for i in fixed_touch}
+
+
+def test_fixed_touch_point_verify_has_exactly_the_statements_solution() -> None:
+    """5회차 감사 교정(284122b4) — 접점 고정 틀의 *모든* 문항에서 발문과 검산 조건의 해가 같다.
+
+    발문의 문제(접점 x = a 고정)를 미분으로 따로 풀어(함숫값 일치 + 기울기 일치) 얻은 해집합과, 검산
+    조건의 등식만 풀어 얻은 해집합이 **같아야** 한다. 보호 조건(부등식·`!=`)은 일부러 읽지 않는다 —
+    발문에 없는 보호 조건으로 둘째 해를 버리는 것이 결함 자체다(구판: p를 고정하고 접점을 풀어 둔
+    판별식 + 'q > -6'). 한 문항이라도 다른 문제를 담으면 RED.
+    """
+    checked: dict[str, int] = {}
+    for i in _all_items(P3DiffTangentLineGenerator):
+        touched = _independent_fixed_touch(i)
+        if touched is None:
+            continue
+        u = _single_unknown(i)
+        conditions = [i.conditions] if isinstance(i.conditions, str) else list(i.conditions)
+        equations = [
+            sympy.sympify(c.split(" = ")[0]) - sympy.sympify(c.split(" = ")[1])
+            for c in conditions
+            if " = " in c
+        ]
+        verified = {sol[u] for sol in sympy.solve(equations, u, dict=True)}
+        assert verified == touched[1], (i.frame_id, i.question_text, i.conditions, touched[1])
+        assert verified == {sympy.Integer(int(dict(i.answer_map)[str(u)]))}, i.question_text
+        checked[i.frame_id] = checked.get(i.frame_id, 0) + 1
+    # 이중근형 틀 셋(슬롯당 2문항) + 접점이 고정된 수치 대입형 진단 틀(3문항 — 검산 경로는 다르지만
+    # 발문은 같은 접점 고정 문제다). 개수가 줄면 형태 정규식이 문면을 놓친 것이다(공허 통과 방지).
+    assert checked == {
+        "rep-y-intercept-of-cubic-tangent": 2,
+        "applied-cubic-intercept-given-find-constant": 2,
+        "mastery-two-curves-touch-find-constant": 2,
+        "diag-tangent-intercept-of-power-at-minus-one": 3,
+    }, checked
+
+
+def test_fixed_touch_check_rejects_the_pre_fix_discriminant_verify() -> None:
+    """실패 주입 — 위 테스트의 판정이 구판 검산(284122b4 그대로)을 실제로 RED로 가르는가.
+
+    구판 조건: p = -1을 고정하고 접점을 풀어 둔 판별식 -27q^2 - 94q + 525 = 0(+ 발문에 없는 q > -6).
+    등식의 해는 {3, -175/27}이고 발문의 해는 {3}이다. 대조군: 교정 조건 3 - q = 0은 {3}.
+    """
+    text = (
+        "곡선 y = x^2 + px + q가 곡선 y = -x^3 + 4x와 x = 1인 점에서 접할 때, "
+        "상수 q의 값을 구하시오. (단, p, q는 상수이다.)"
+    )
+    pre_fix = dataclasses.replace(
+        next(
+            i
+            for i in _all_items(P3DiffTangentLineGenerator)
+            if i.frame_id == "mastery-two-curves-touch-find-constant"
+        ),
+        question_text=text,
+        answer_text="3",
+        conditions=("-27*q**2 - 94*q + 525 = 0", "q > -6"),
+        answer_map=(("q", "3"),),
+    )
+    touched = _independent_fixed_touch(pre_fix)
+    assert touched is not None
+    q = sympy.Symbol("q")
+    assert touched[1] == {sympy.Integer(3)}
+    assert set(sympy.solve(sympy.sympify("-27*q**2 - 94*q + 525"), q)) != touched[1]  # RED
+    assert set(sympy.solve(sympy.sympify("3 - q"), q)) == touched[1]  # 대조군 GREEN
+    assert _is_proportional(sympy.sympify("3 - q"), touched[0])

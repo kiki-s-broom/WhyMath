@@ -60,6 +60,7 @@ from whymath_backend.l3.equivalent.p3_diff_expr import (
     render_sum,
     render_surd,
     with_eul_reul,
+    with_eun_neun,
     with_i_ga,
     with_wa_gwa,
 )
@@ -285,13 +286,55 @@ def _cubic_pool() -> tuple[object, ...]:
     )
 
 
-def _stop_quad_pool() -> tuple[object, ...]:
-    """v(t) = 2A(t - r) — 속도가 0이 되는 시각 r이 양의 정수 1개인 이차 위치함수."""
-    return tuple(
-        _poly({2: lead, 1: -2 * lead * r, 0: c})
-        for lead in (1, 2, -1, 3)
-        for r in (1, 2, 3, 4, 5, 6)
-        for c in (-3, 0, 2, 5)
+def _rest_cubic_pool() -> tuple[tuple[Poly, int, int], ...]:
+    """v(t) = 3A(t - r)(t + n) (r > 0, n > 0) — 속도가 0인 시각이 양수 r 하나뿐인 삼차 위치함수.
+
+    5회차 감사(2026-10-08) — 종전 이차 풀(`_stop_quad_pool`)은 속도 0 시각이 위치 포물선의
+    꼭짓점이라 미분 없이 풀렸다. 다른 근 -n은 음수라 't > 0' 조건이 버린다(해가 발문 조건으로 하나로
+    정해진다). (위치, r, -n) 목록.
+    """
+    out: list[tuple[Poly, int, int]] = []
+    for lead in (1, 2, -1, -2):
+        for r in (1, 2, 3, 4, 5):
+            for n in (1, 2, 3, 4):
+                b3 = 3 * lead * (n - r)
+                if b3 % 2 or r == n:
+                    continue
+                for d in (0, 2, -3, 5):
+                    f = _poly({3: lead, 2: b3 // 2, 1: -3 * lead * r * n, 0: d})
+                    out.append((f, r, -n))
+    return tuple(out)
+
+
+def _rest_item(
+    *, slot: str, frame_id: str, text: str, f: Poly, r: int, other: int, meaning: bool
+) -> DiffItem | None:
+    """속도가 0이 되는(멈추는) 시각 — v(t) = 0의 두 근 중 양수인 것(삼차 위치함수).
+
+    `meaning`이면 해설 첫머리에 '속도 v(t)는 위치의 도함수'와 '멈춤 ⇔ v(t) = 0'을 적는다(5회차 감사
+    해설 결함 — 판정자 지적 be76bfc1 · 판정기 E-rest-meaning).
+    """
+    s = sympy.Symbol("s")
+    if _unique_root(_vel_expr(f, s), s, lambda x: x > 0) != r:
+        return None
+    velocity = render_poly(_vel(f), _V)
+    head = (
+        "속도 v(t)는 위치 x를 시각 t로 미분한 도함수이고, 점 P가 순간적으로 멈추는 순간은 "
+        "v(t) = 0일 때이다. "
+        if meaning
+        else ""
+    )
+    lo, hi = sorted((r, other))
+    return _solve_item(
+        slot=slot,
+        frame_id=frame_id,
+        text=text,
+        answer=r,
+        explanation=(
+            f"{head}v(t) = {velocity} = {render_factored(_vel(f), _V)} = 0에서 t = {lo} 또는 "
+            f"t = {hi}이고, t > 0이므로 t = {r}이다."
+        ),
+        conditions=(f"{_dv(f, 's')} = 0", "s > 0"),
     )
 
 
@@ -361,9 +404,13 @@ def _acceleration_item(slot: str, frame_id: str, text: str, f: Poly, t: int) -> 
         frame_id=frame_id,
         text=text,
         value=a,
+        # 5회차 감사(2026-10-08) 해설 결함 교정 — 종전 해설은 '가속도는 속도를 미분한 값이다. a(t) =
+        # …'라 하면서 정작 속도 v(t)의 식(첫 번째 도함수)을 보이지 않았다(판정자 지적 5건 · 판정기
+        # E-velocity-before-acceleration). 위치 → 속도 → 가속도 두 번의 미분을 차례로 쓴다.
         explanation=(
-            f"가속도는 속도를 시각 t로 미분한 값이다. a(t) = {render_poly(_acc(f), _V)}이므로 "
-            f"t = {t}일 때의 가속도는 {a}이다."
+            f"속도는 위치를 시각 t로 미분한 값이므로 v(t) = {render_poly(_vel(f), _V)}이고, "
+            f"가속도는 속도를 시각 t로 미분한 값이므로 a(t) = {render_poly(_acc(f), _V)}이다. "
+            f"따라서 t = {t}일 때의 가속도는 {a}이다."
         ),
         conditions=f"{_da(f, str(t))} = y",
     )
@@ -642,21 +689,18 @@ def _applied_frames() -> list[Frame]:
     slot = "applied"
 
     def a1(p: tuple[object, ...]) -> DiffItem | None:
-        f = _as_poly(p[0])
-        s = sympy.Symbol("s")
-        r = _unique_root(_vel_expr(f, s), s)
-        if r is None or r <= 0:
-            return None
-        return _solve_item(
+        # 5회차 감사(2026-10-08) 처분 — 이차 위치함수의 속도 0 시각은 위치 포물선의 꼭짓점이라
+        # 꼭짓점 공식만으로 풀렸다(판정자 지적 2a9e753d·d246cabc · 판정기 T10-quadratic-rest). 삼차
+        # 위치함수로 바꿔 v(t) = 0의 두 근 중 양수인 것을 't > 0' 조건으로 고르게 한다.
+        f, r, other = cast(tuple[Poly, int, int], p[0])
+        return _rest_item(
             slot=slot,
             frame_id="applied-time-velocity-zero",
-            text=f"{_intro(f)} 점 P의 속도가 0이 되는 시각 t를 구하시오.",
-            answer=r,
-            explanation=(
-                f"v(t) = {render_poly(_vel(f), _V)} = 0에서 t는 {r}이다. 이 시각에 점 P는 "
-                "운동 방향을 바꾼다."
-            ),
-            conditions=f"{_dv(f, 's')} = 0",
+            text=f"{_intro(f)} 점 P의 속도가 0이 되는 시각 t (t > 0)의 값을 구하시오.",
+            f=f,
+            r=r,
+            other=other,
+            meaning=False,
         )
 
     def a2(p: tuple[object, ...]) -> DiffItem | None:
@@ -670,7 +714,12 @@ def _applied_frames() -> list[Frame]:
             frame_id="applied-time-acceleration-zero",
             text=f"{_intro(f)} 점 P의 가속도가 0이 되는 시각 t를 구하시오.",
             answer=r,
-            explanation=(f"a(t) = {render_poly(_acc(f), _V)} = 0에서 t는 {r}이다."),
+            # 5회차 감사 — 가속도를 다루는 해설은 속도 v(t)를 먼저
+            # 보인다(E-velocity-before-acceleration).
+            explanation=(
+                f"v(t) = {render_poly(_vel(f), _V)}이고 a(t) = {render_poly(_acc(f), _V)}이므로 "
+                f"a(t) = 0에서 t는 {r}이다."
+            ),
             conditions=f"{_da(f, 's')} = 0",
         )
 
@@ -760,7 +809,11 @@ def _applied_frames() -> list[Frame]:
                     a5_params.append((_poly({3: lead, 1: c, 0: d}), p0, t0))
 
     return [
-        Frame("applied-time-velocity-zero", _grid("p3-vel:a1", _stop_quad_pool()), a1),
+        Frame(
+            "applied-time-velocity-zero",
+            tuple((item,) for item in seeded_order("p3-vel:a1", _rest_cubic_pool())),
+            a1,
+        ),
         Frame(
             "applied-time-acceleration-zero",
             _grid("p3-vel:a2", _cubic_pool()[::3]),
@@ -1032,15 +1085,23 @@ def _diagnostic_frames() -> list[Frame]:
     # (정지점의 속도·등속 운동의 속도·가속도)을 삭제했다. 정지면 속도 0, 등속이면 가속도 0·속도는
     # 일차함수의 기울기라는 상식으로 풀린다(판정기 T10-linear-position이 재발을 막는다).
     def d3(p: tuple[object, ...]) -> DiffItem | None:
-        f = _as_poly(p[0])
-        if not any(e == 1 for e, _ in f):
-            return None
-        return _velocity_item(
-            slot,
-            "diag-velocity-at-start",
-            f"{_intro(f)} 출발하는 순간(t = 0)의 점 P의 속도를 구하시오.",
-            f,
-            0,
+        # 5회차 감사(2026-10-08) 처분 — 종전 '출발하는 순간(t = 0)의 속도'는 v(0)이 위치의 일차항
+        # 계수 그대로라 계수를 읽거나 등가속도 공식으로 풀렸고, 거듭제곱 미분 오류로도 같은 값이
+        # 나왔다(판정자 지적 6751a639 · 판정기 T-coefficient-reading). 출발 *후*의 한 시각
+        # t = T(T ≥ 1)에서 속도를 묻는다 — 위치의 값 x(T)로 답하는 오답 경로가 정답과 같으면
+        # 매개변수 거부 조건이 뺀다.
+        f, t = _as_poly(p[0]), _as_int(p[1])
+        return _value_item(
+            slot=slot,
+            frame_id="diag-velocity-after-start",
+            text=(f"{_intro(f)} 출발한 후 t = {t}인 순간의 점 P의 속도를 구하시오."),
+            value=_v_at(f, t),
+            explanation=(
+                f"속도는 위치를 시각 t로 미분한 값이다. v(t) = {render_poly(_vel(f), _V)}이므로 "
+                f"t = {t}일 때의 속도는 {_v_at(f, t)}이다. 이 시각의 위치 "
+                f"x({t}) = {with_eun_neun(_x_at(f, t))} 속도가 아니다."
+            ),
+            conditions=f"{_dv(f, str(t))} = y",
         )
 
     def d10(p: tuple[object, ...]) -> DiffItem | None:
@@ -1076,23 +1137,22 @@ def _diagnostic_frames() -> list[Frame]:
         )
 
     def d6(p: tuple[object, ...]) -> DiffItem | None:
-        lead, r = _as_int(p[0]), _as_int(p[1])
-        f = _poly({2: lead, 1: -2 * lead * r})
-        s = sympy.Symbol("s")
-        found = _unique_root(_vel_expr(f, s), s)
-        if found != r:
-            return None
-        return _solve_item(
+        # 5회차 감사 처분 — 이차 위치의 멈추는 시각은 꼭짓점(판정자 지적 106fff4b·be76bfc1 · 판정기
+        # T10-quadratic-rest). 삼차 위치로 바꾸고, 해설에 '속도는 위치의 도함수 · 멈춤 ⇔ v(t) = 0'을
+        # 적는다(E-rest-meaning).
+        f, r, other = cast(tuple[Poly, int, int], p[0])
+        return _rest_item(
             slot=slot,
             frame_id="diag-time-at-rest",
-            text=f"{_intro(f)} 점 P가 순간적으로 멈추는 시각 t를 구하시오.",
-            answer=r,
-            explanation=f"v(t) = {render_poly(_vel(f), _V)} = 0에서 t는 {r}이다.",
-            conditions=f"{_dv(f, 's')} = 0",
+            text=f"{_intro(f)} 점 P가 순간적으로 멈추는 시각 t (t > 0)의 값을 구하시오.",
+            f=f,
+            r=r,
+            other=other,
+            meaning=True,
         )
 
     return [
-        Frame("diag-velocity-at-start", _grid("p3-vel:d3", _quad_pool()[::7]), d3),
+        Frame("diag-velocity-after-start", _grid("p3-vel:d3", _quad_pool()[::7], _TIMES), d3),
         Frame(
             "diag-acceleration-of-quadratic-position",
             _grid("p3-vel:d10", _quad_pool()[2::9], _TIMES),
@@ -1103,7 +1163,11 @@ def _diagnostic_frames() -> list[Frame]:
             _grid("p3-vel:d5", (2, 3, 4, 5, 6), (1, 2, 3)),
             d5,
         ),
-        Frame("diag-time-at-rest", _grid("p3-vel:d6", (1, 2, -1, 3), (1, 2, 3, 4, 5, 6)), d6),
+        Frame(
+            "diag-time-at-rest",
+            tuple((item,) for item in seeded_order("p3-vel:d6", _rest_cubic_pool())),
+            d6,
+        ),
     ]
 
 
@@ -1114,6 +1178,11 @@ def _mastery_frames() -> list[Frame]:
     slot = "mastery_check"
 
     def k1(p: tuple[object, ...]) -> DiffItem | None:
+        # 5회차 감사(2026-10-08) 처분 — 이차 위치는 평균속도와 순간속도가 같은 시각이 늘 구간의 중간
+        # 시각이었고, 자연수 답에 구간 단서(2 < t < 4)가 정수를 하나만 남겨 발문이 답을 알려
+        # 줬다(판정자 지적 4eb43c2c · 판정기 T-quadratic-mean-value·T-integer-pinned-by-interval).
+        # 삼차 위치로 바꿔 v(t) = (평균속도)의 두 근 중 구간 안의 것을 고르게 한다(중간 시각·자연수
+        # 하나뿐인 구간은 매개변수 거부 조건이 뺀다).
         f, t0, t1 = _as_poly(p[0]), _as_int(p[1]), _as_int(p[2])
         if t1 - t0 < 2:
             return None
@@ -1125,19 +1194,28 @@ def _mastery_frames() -> list[Frame]:
         found = _unique_root(_vel_expr(f, s) - avg, s, lambda r: t0 < r < t1)
         if found is None:
             return None
+        moved = _poly({**dict(_vel(f)), 0: dict(_vel(f)).get(0, 0) - avg})
+        roots = sorted(int(r) for r in sympy.solve(poly_to_sympy(moved, _V), _T) if r.is_integer)
+        if len(roots) != 2:
+            return None  # 다른 근이 정수가 아니면 해설의 인수분해가 깔끔하지 않다
+        other = next(r for r in roots if r != found)
         return _solve_item(
             slot=slot,
             frame_id="mastery-time-average-equals-instant",
+            # 괄호 조건 뒤에 조사를 바로 붙이지 않는다('(0 < t < 6)를' — 받침 오류). '의 값을'로
+            # 쓴다.
             text=(
                 f"{_intro(f)} t = {t0}에서 t = {t1}까지의 평균속도와 순간속도가 같아지는 시각 "
-                f"t ({t0} < t < {t1})를 구하시오."
+                f"t ({t0} < t < {t1})의 값을 구하시오."
             ),
             answer=found,
             explanation=(
                 f"평균속도는 (x({t1}) - x({t0}))/({t1} - {t0}) = "
                 f"({_minus(_x_at(f, t1), _x_at(f, t0))})/{t1 - t0} = {avg}이다. "
-                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {avg}에서 "
-                f"t = {found}이다."
+                f"v(t) = {render_poly(_vel(f), _V)}이므로 {render_poly(_vel(f), _V)} = {avg}, 즉 "
+                f"{render_factored(moved, _V)} = 0에서 t = {roots[0]} 또는 t = {roots[1]}이다. "
+                f"{t0} < t < {t1}이므로 t = {found}이다({with_eun_neun(other)} 이 범위에 속하지 "
+                "않는다)."
             ),
             conditions=(f"{_dv(f, 's')} = {avg}", f"s > {t0}", f"s < {t1}"),
         )
@@ -1287,7 +1365,7 @@ def _mastery_frames() -> list[Frame]:
     return [
         Frame(
             "mastery-time-average-equals-instant",
-            _grid("p3-vel:k1", _quad_pool()[::5], (0, 1, 2), (3, 4, 5, 6)),
+            _grid("p3-vel:k1", _cubic_pool()[::7], (0, 1, 2), (3, 4, 5, 6)),
             k1,
         ),
         Frame(
@@ -1353,4 +1431,9 @@ class P3DiffVelocityAccelerationGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(_SLOT_FRAMES[slot](), cls.slot_count, claimed=claimed)
+        return round_robin_items(
+            _SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
+        )

@@ -205,7 +205,7 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             ((_F_TANGENT_VELOCITY, "test_core_misconception_is_reachable_through_crosslinks"),),
         ),
     },
-    # kebab 좌석 부재 — 02-06·09는 핵심 오개념(M0674·M0677)이 L4 카탈로그에 kebab 좌석이 없어 distractor_map에
+    # kebab 좌석 부재 — 02-06·09의 연결 오개념(M0674·M0615)이 L4 카탈로그에 kebab 좌석이 없어 distractor_map에
     # M-id를 직접 쓴다. 참조 무결성 검증자(`validate_distractor_map`)는 M-id를 위반으로 읽는다. **이 충돌은
     # 맞추지 않고 면제 + 좌석 신호(stale 가드: 좌석이 생기면 red)로 둔다** — 억지로 kebab을 지어내면 새 id를
     # 만드는 제약(MISC-40)을 어긴다.
@@ -215,8 +215,18 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
         ),
         _C09: _Exempt(
-            "핵심 M0677에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
+            "연결 오개념 M0615에 kebab 좌석 없음 — distractor_map이 M-id 직접 연결.",
             ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
+        ),
+    },
+    # 핵심 오개념 연결 정지 — 02-09의 핵심 M0677은 설명이 서술어 없이 끊긴 손상 문장이고 잘못된 *절차*를
+    # 적지 않아, 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(5회차 은행 감사 2026-10-08 · 판정자
+    # 지적 12건 · 원문 정정 QUAL-14). 차수로 센 값의 선지만 절차가 적힌 비핵심 M0615('고차방정식의 근을
+    # 차수만큼으로 단정' · [10공수1-02-07])에 연결한다. stale 가드: 핵심 M0677이 다시 연결되면 red.
+    "core_link_suspended": {
+        _C09: _Exempt(
+            "핵심 M0677 설명 손상(QUAL-14) — 차수 세기 선지를 절차가 적힌 M0615에 연결.",
+            ((_F_MVT_EQUATION, "test_equation_concept_links_m0615_until_m0677_is_repaired"),),
         ),
     },
 }
@@ -461,6 +471,7 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
     )["crosslinks"]
     reach_exempt = _is_exempt("core_crosslink_reach", generator_cls)
     seat_absent = _is_exempt("kebab_seat_absent", generator_cls)
+    core_suspended = _is_exempt("core_link_suspended", generator_cls)
     reached: set[str] = set()
     linked_mc: set[str] = set()
     for slot in SLOT_IDS:
@@ -472,8 +483,12 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
         linked_mc |= set(linked)
         for kebab in linked:
             if seat_absent:
-                # 면제: kebab 좌석 없이 핵심 M-id를 직접 연결한다. 좌석이 생기면(카탈로그에 등장) red.
-                assert kebab in core, f"좌석 없는 연결은 핵심 M-id여야 한다: {kebab}"
+                # 면제: kebab 좌석 없이 M-id를 직접 연결한다. 좌석이 생기면(카탈로그에 등장) red.
+                if core_suspended:
+                    # 핵심 연결 정지(면제 사유 참조) — 비핵심 M-id다.
+                    assert kebab not in core, f"핵심 연결이 돌아왔다 — 면제 삭제: {kebab}"
+                else:
+                    assert kebab in core, f"좌석 없는 연결은 핵심 M-id여야 한다: {kebab}"
                 assert (
                     kebab not in CATALOG_BY_ID
                 ), f"kebab 좌석이 생겼다 — 생성기를 kebab 연결로 옮기고 면제 삭제: {kebab}"
@@ -493,7 +508,10 @@ def test_misconception_links_are_exactly_the_mc_slot_and_resolve(
                 assert violations, "validate_distractor_map이 M-id를 더는 위반으로 읽지 않는다"
             else:
                 assert violations == []
-    if seat_absent:
+    if core_suspended:
+        # stale 가드 — 핵심 M-id가 다시 연결되면(QUAL-14 정정 뒤) 면제를 지운다.
+        assert not core & linked_mc, f"핵심 {core}이 다시 연결됐다 — _EXEMPT에서 삭제"
+    elif seat_absent:
         assert core <= linked_mc, f"핵심 M-id {core}가 직접 연결되지 않았다: {linked_mc}"
     elif reach_exempt:
         # stale 가드 — 크로스링크가 승격돼 핵심 오개념에 닿으면 면제를 지운다.

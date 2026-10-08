@@ -63,16 +63,20 @@ class TestDeriveKebabStandards:
         # 탐지 카탈로그 58 완주 — 유도 집합은 태깅된 kebab만(정직한 경계).
         # 64 → 65: P3-03 미분 문항 은행(`problem_bank_p3_calculus1_diff_v0`)이 MISC-40 신설 kebab
         # `power-rule-step-omitted`를 오답 귀인으로 처음 쓰기 시작했다(문항 코퍼스에 등장).
-        # 65 → 67: 02-06·02-09 생성기가 핵심 오개념에 kebab 좌석이 없어 distractor_map에 **M-id를 그대로**
-        # (`M0674`·`M0677`) 쓴다 — 유도기가 그 키를 kebab처럼 세어 두 항목이 늘었다. kebab 좌석이 생기면
+        # 65 → 67: 02-06·02-09 생성기가 kebab 좌석이 없는 오개념을 distractor_map에 **M-id 그대로**
+        # (`M0674`·`M0615`) 쓴다 — 유도기가 그 키를 kebab처럼 세어 두 항목이 늘었다. kebab 좌석이 생기면
         # (MISC-40 판정 문서 안 A·B) 생성기가 kebab 연결로 옮기며 이 두 키는 사라지고 상한도 65로 돌아간다.
+        # 02-09는 5회차 은행 감사(2026-10-08)로 M0677(설명 손상 — QUAL-14)에서 M0615로 바뀌었다(개수는 같다).
         assert len(derived) <= 67
         # 02-05·02-10도 같은 `power-rule-step-omitted`를 오답 귀인으로 쓴다(핵심 M0673·M0678 kebab 미승격).
         assert derived["power-rule-step-omitted"] == frozenset(
             {"[12미적Ⅰ-02-03]", "[12미적Ⅰ-02-05]", "[12미적Ⅰ-02-10]"}
         )
         assert derived["M0674"] == frozenset({"[12미적Ⅰ-02-06]"})
-        assert derived["M0677"] == frozenset({"[12미적Ⅰ-02-09]"})
+        # M0615의 자체 성취기준은 [10공수1-02-07]이다 — 역유도 신호는 [12미적Ⅰ-02-09](선수 오개념을 상위
+        # 단원 문항에서 진단). 이 신호는 kebab↔M-id 검수 큐 행에만 쓰이고 M-id 직접 연결은 큐에 없다.
+        assert derived["M0615"] == frozenset({"[12미적Ⅰ-02-09]"})
+        assert "M0677" not in derived
 
     def test_problem_counts_evidence(self) -> None:
         # 증거량(문항 수) — well-evidenced kebab은 하한 20 이상. root-loss는 증거 보강(24문항

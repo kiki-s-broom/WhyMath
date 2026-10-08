@@ -571,12 +571,25 @@ def _poly_with_unknown(terms: Sequence[tuple[int, int | str]]) -> tuple[str, str
     return " ".join(human), " ".join(symbolic)
 
 
-def _find_coef_steps(p: int, const: int, coef: int, unknown: str, value: int) -> str:
+def _find_coef_steps(
+    p: int, const: int, coef: int, unknown: str, value: int, *, root_premise: bool = False
+) -> str:
     """'f'(p)의 값은 0이고, f'(p)의 값은 (일차식)이므로 (일차식) = 0에서 a = 값이다' — 함숫값 등식
-    'f'(2) = 5'를 쓰지 않는다(위생 게이트가 f'(2)를 곱으로 읽는 오탐 — QUAL-13)."""
+    'f'(2) = 5'를 쓰지 않는다(위생 게이트가 f'(2)를 곱으로 읽는 오탐 — QUAL-13).
+
+    `root_premise`: 발문이 'f'(x) = 0의 한 근이 x = p'만 줄 때 — 그 조건을 그대로 근거로 쓴다. 5회차
+    감사(2026-10-08 · b21b1689·f62c164b)에서 해설이 'x = p에서 극값을 가지므로'라고 발문에 없는
+    전제를 근거로 삼아(f'(p) = 0이 극값을 뜻하지 않는다) 추론 방향이 뒤집혔다(판정기
+    E-premise-reversal).
+    """
     expr = render_affine(const, coef, unknown)
+    premise = (
+        f"방정식 f'(x) = 0의 한 근이 x = {p}이므로"
+        if root_premise
+        else f"x = {p}에서 극값을 가지므로"
+    )
     return (
-        f"x = {p}에서 극값을 가지므로 f'({p})의 값은 0이고, f'({p})의 값은 {expr}이므로 "
+        f"{premise} f'({p})의 값은 0이고, f'({p})의 값은 {expr}이므로 "
         f"{expr} = 0에서 {unknown} = {value}이다."
     )
 
@@ -619,7 +632,9 @@ def _other_root_value_item(
     d_text, _ = _poly_with_unknown(((2, 3 * lead), (1, "2a"), (0, b)))
     explanation = (
         f"f'(x) = {d_text}이다. "
-        + _find_coef_steps(p, 3 * lead * p * p + b, 2 * p, "a", a)
+        + _find_coef_steps(
+            p, 3 * lead * p * p + b, 2 * p, "a", a, root_premise="f'(x) = 0의 한 근" in template
+        )
         + f" 이때 {_explain(fn)} 따라서 {_KIND_KO[ask_kind]}은 x = {q}에서의 함숫값 {value}이다."
     )
     return _item(
@@ -1310,9 +1325,16 @@ def _misconception_frames() -> list[Frame]:
             slot=slot,
             role="any",
         ),
+        # 5회차 감사(2026-10-08) 처분 — 구판 'mc-local-kind-x'는 '극대(극소)가 되는 x좌표'를
+        # 물었는데, 연결 오개념 '임계점 = 극값'의 절차는 x = 0을 '극값'으로 볼 뿐 '극대'로 만들지
+        # 않는다(판정자 지적 38745ca2·3a44d0c6 · 판정기 M-link-procedure). 묻는 대상을 '극값이 되는
+        # x'로 바꿔 오개념 절차의 산출(평평한 임계점 0)이 정확히 연결 선지가 되게 했다.
         _flat_frame(
-            "mc-local-kind-x",
-            "사차함수 f(x) = {f}{ga} {kind}가 되는 x좌표는?",
+            "mc-extremum-at-a",
+            # 'x좌표'를 묻는 꼴로 쓴다 — '극값'만 있고 x좌표를 묻지 않으면 파생 판정 규칙
+            # C3(P3-24)이 극값의 *값*을 묻는 문항으로 읽는다.
+            "사차함수 f(x) = {f}의 그래프 위의 점 (a, f(a))에서 함수 f(x)가 극값을 가질 때, "
+            "이 점의 x좌표 a의 값은?",
             "p3-shape:mc5",
             slot=slot,
             role="any",
@@ -1587,7 +1609,12 @@ class P3DiffGraphShapeGenerator(P3DiffSlotGenerator):
 
     @classmethod
     def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
-        return round_robin_items(_SLOT_FRAMES[slot](), cls.slot_count, claimed=claimed)
+        return round_robin_items(
+            _SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,  # 매개변수 거부 조건(우연 일치 — 5회차 감사)
+        )
 
     def _assemble(self, spec: EquivalenceSpec, item: DiffItem) -> CandidateProblem:
         """기반이 만든 후보에 `answer_selection`을 얹는다(기반 DiffItem에는 그 필드가 없다)."""

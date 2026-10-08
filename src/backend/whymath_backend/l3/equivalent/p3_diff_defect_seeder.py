@@ -67,6 +67,7 @@ from typing import Any, Final, Literal
 import sympy
 
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ROUND5_RULE_IDS,
     RULE_IDS,
     probe_from_record,
     shortcut_violations,
@@ -243,7 +244,14 @@ def _set_explanation(rec: Record, text: str) -> None:
 
 
 def _guard_rules(rec: Mapping[str, Any]) -> set[str]:
-    return {v.rule for v in shortcut_violations(probe_from_record(rec))}
+    """시험지를 만든 시점(4회차 규칙 집합)의 판정기 소견.
+
+    커밋된 시험지(`qualification/blind_240.jsonl` · 판정자 라벨을 이미 받았다)는 5회차 규칙(은행
+    감사 2026-10-08 이후 · `ROUND5_RULE_IDS`)이 생기기 전 판정기로 원본을 고르고 GT를 정했다. 5회차
+    규칙까지 보면 원본 후보 풀이 바뀌어 `emit --check`가 그 시험지를 재현하지 못한다 — 회차별 측정은
+    그 회차의 규칙 집합으로 한다(판정기 `ROUND4_RULE_IDS`와 같은 원칙).
+    """
+    return {v.rule for v in shortcut_violations(probe_from_record(rec))} - ROUND5_RULE_IDS
 
 
 def _split_relation(condition: str) -> tuple[sympy.Expr, sympy.Expr] | None:
@@ -1420,7 +1428,7 @@ def _v(
 
 #: ⑤ 해설 결함이 만들어도 되는 소견 — 판정기 해설 규칙(E-*)과 스캐너의 해설 부류.
 _EXPLANATION_FINDINGS: Final = frozenset(
-    {rule for rule in RULE_IDS if rule.startswith("E-")}
+    {rule for rule in RULE_IDS if rule.startswith("E-") and rule not in ROUND5_RULE_IDS}
     | {
         "explanation_conclusion_only",
         "count_explanation_conclusion_only",

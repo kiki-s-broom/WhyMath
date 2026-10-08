@@ -29,12 +29,18 @@ from whymath_backend.l3.equivalent.p3_diff_defect_seeder import (
     build_qualification_set,
 )
 
+# 주입기 계약은 *자격 시험지를 발행한 은행*에서 검증한다 — `emit`의 기본 은행이 감사 동결 사본
+# (`docs/data/p3_calculus1_diff_audit/bank_audit/audited_bank.jsonl`)이다. 5회차 감사 교정(틀 재설계)
+# 전까지는 라이브 은행이 그 사본과 바이트 동일했으므로 이 경로 전환은 검증 대상을 바꾸지 않는다.
+# 교정 후 라이브 은행은 틀이 바뀌어(예: 접점 고정 문항의 판별식 검산 제거) 주입 변이 일부의
+# 적용 가능 문항 수가 할당량 아래로 내려간다 — 시험지는 동결 사본으로 이미 발행됐으므로 무관하다.
 _BANK = (
     Path(__file__).resolve().parents[4]
+    / "docs"
     / "data"
-    / "corpus"
-    / "problem_bank_p3_calculus1_diff_v0"
-    / "problems.jsonl"
+    / "p3_calculus1_diff_audit"
+    / "bank_audit"
+    / "audited_bank.jsonl"
 )
 _VARIANT = {v.name: v for v in VARIANTS}
 
