@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-71-statistical-claim-residual-hardening
+title: "statistical_claim 잔여 결함 — n=1 표본분산 0 계산과 columns 절 int() 예외 누출"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - S4-58
+requires_gates: []
+acceptance:
+  - "statistical_claim 의 S4-53 유래 잔여 결함 두 건을 정리한다. 첫째, 표본분산(variance_kind=sample)이 n=1 일 때 수학적으로 정의되지 않는데 0 으로 계산해 주장값 0 을 pass 시킨다. 둘째, columns 절이 int(c) 로 변환하므로 columns=[abc] 같은 입력이 StatisticalClaimError 가 아닌 ValueError 로 새어 verify_statistical_claim 이 예외를 전파하고, columns=[1.5] 는 1 로 조용히 잘린다."
+  - "n=1 표본분산과 표본표준편차는 unverifiable(사유에 정의 불가 명시)로 바꾸고 모집단 분산은 0 을 유지한다. columns 는 bool 이 아닌 정수만 허용하고 그 외는 StatisticalClaimError 로 거절한다. S4-58 의 특성화 테스트 test_single_point_sample_variance_keeps_s4_53_behavior 는 새 동작으로 갱신한다. 뮤테이션으로 두 가드가 RED 가 되는지 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/statistical_claim.py
+  - tests/backend/l3/test_statistical_claim.py
+session: null
+notes: S4-58 인수 기준 6 에서 분리한 승계 항목. 설계 근거와 수정 전 실측은 docs/architecture/verifier_v2_domains.md 3.7 절의 알려진 한계에 있다.
+updated: 2026-10-08
