@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/router.py
   - docs/ops/amd395_local_llm_performance.md
-session: null
+session: claude/determined-ride-rve1a5
 notes: "근거 문서 docs/ops/amd395_local_llm_performance.md §2·§5(Phase 1 확정 측정)·§3 L5. 속도 축은 이미 실측 완료 상태로 착수한다 — 남은 것은 정확도 대조뿐이다. LOCAL_LATENCY_MS 보정은 불요로 판정됐다(실측 906/3551/12406ms가 기존 상수 1010/3918/13886ms보다 빨라 상수가 보수적·안전측).\n\n[정정 2026-09-01] eos_priority null → P1: 처리량 30 CU/h·단위비용 250원 KPI에 직접 영향. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-08
