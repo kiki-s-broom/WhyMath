@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,10 +14,11 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 배경(PB-15 후속·판정 기준 PB-15 착지본): PB-15가 생성자≠검증자 가드를 3상태(llm 서명·deterministic 선언·기록 없음=거부)로 바꾸고 코퍼스에 authored_by 기록 경로를 만들었다. 그러나 기록을 찍는 쪽은 LLM 생성기(LLMEquivalentProblemGenerator)뿐이다. 결정론 스켈레톤 생성기 약 40종과 기존 코퍼스 약 60개 디렉터리(실측 레코드 14,034건 전부 generation_type=FULLY_GENERATED)는 authored_by가 없어 기록 없음으로 분류되며, 잔여 축 교차검증 게이트(residue_cross_verify_eval)는 이들을 INDEPENDENCE_UNPROVEN으로 거부한다. 지금은 사람이 --authored-by deterministic:<생성기>로 선언해야만 돌아간다.\n② 처분: 결정론 생성기가 만드는 후보에 deterministic_author(<생성기 이름>) 서명을 찍고, 기존 코퍼스는 백필한다. 백필은 디렉터리별 _provenance.json의 generation_method에 이미 적힌 생성기 사실에서 도출하며 추측하지 않는다 — LLM 저작 여부가 불명확한 디렉터리는 deterministic으로 단정하지 말고 목록으로 보고한다.\n③ --authored-by 선언이 레코드에 기록된 서명을 덮어쓰는 현재 동작(PB-15는 범위 밖으로 유지)을 재판정한다. 기록이 있는 레코드를 선언으로 뒤집을 수 있으면 LLM 저작분을 deterministic으로 선언해 가드를 우회할 수 있다. 선언은 기록 없음(unknown)만 채우도록 좁힐지 결정한다.\n④ 집행 지점(정본화와 분리): 결정론 생성기 전수에 서명이 찍히는지 검사하는 전수 가드(생성기 목록 대비 서명 미기록 0건)와 CI 배선 확인."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1549"
 paths:
   - "src/backend/whymath_backend/l3/equivalent/*_skeleton_generator.py"
   - "data/corpus/problem_bank_*/_provenance.json"
-session: claude/vibrant-pascal-9ebi61
+session: null
 notes: "출처: PB-15 착지 시 발견. 선행 의존 없음(PB-15 머지 후 착수). 스캔 범위: l3/equivalent/*_skeleton_generator.py 및 data/corpus/problem_bank_*/ — 다른 세션이 이 생성기들을 활발히 수정 중이라(E1-01·E1-02 등) 착수 직전에 원격 claim과 파일 겹침을 다시 확인할 것."
 updated: 2026-10-08
