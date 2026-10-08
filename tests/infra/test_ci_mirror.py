@@ -25,6 +25,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -81,13 +82,36 @@ def _assert_workspace_step_runs(module, tmp_path: Path) -> None:
 
 
 def _write_result(path: Path, jobs: list, commit: str = "c" * 40) -> dict:
-    """실제 `build_payload` 경로로 결과 JSON을 만든다 — 손으로 쓴 JSON은 형식 드리프트를 못 본다."""
+    """실제 `build_payload` 경로로 결과 JSON을 만든다 — 손으로 쓴 JSON은 형식 드리프트를 못 본다.
+
+    트리 판정은 **안정**으로 명시한다(HARN-194) — 판정 없이 만든 결과는 "지문을 못 잡음"으로
+    기록되어 verdict가 측정되지 않은 것으로 답하기 때문이다. 오염 결과는 `new_tainted_*` 테스트가
+    실제 실행 경로로 만든다.
+    """
     # build_payload가 이 디렉터리에서 git을 부르므로 먼저 있어야 한다(커밋 값은 아래서 덮는다).
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = mirror.build_payload(jobs, path.parent, Path("ci.yml"))
+    payload = mirror.build_payload(
+        jobs, path.parent, Path("ci.yml"), tree=mirror.TreeCheck(mirror.TREE_STABLE)
+    )
     payload["commit"] = commit
     mirror.save_payload(payload, path)
     return payload
+
+
+def _init_git_repo(root: Path) -> Path:
+    """커밋 1건짜리 임시 저장소 — `cmd_run`은 시작·종료 트리 지문을 잡으려고 git을 부른다(HARN-194)."""
+    root.mkdir(parents=True, exist_ok=True)
+    for argv in (
+        ["init", "-q"],
+        ["config", "user.name", "t"],
+        ["config", "user.email", "t@example.com"],
+        ["config", "commit.gpgsign", "false"],
+    ):
+        subprocess.run(["git", *argv], cwd=root, check=True, capture_output=True)
+    (root / ".gitignore").write_text(".claude/cache/\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=root, check=True, capture_output=True)
+    return root
 
 
 def _job(name: str, *steps: tuple[str, str]) -> object:
@@ -603,9 +627,11 @@ class TestHonestVerdictLine:
 
     def test_run_cli_exits_3_with_honest_last_line(self, tmp_path, monkeypatch, capsys):
         """종료 코드로 판정하는 사람에게도 통과로 보이지 않는다 — 2026-09-27 실측의 형태."""
-        wf_path = tmp_path / "ci.yml"
+        repo = _init_git_repo(tmp_path / "repo")
+        wf_path = repo / "ci.yml"
         wf_path.write_text(yaml.safe_dump(_wf(self._PARTIAL)), encoding="utf-8")
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.chdir(repo)
+        # 결과 파일은 저장소 밖에 둔다 — 작업 트리를 흔들지 않는 미러 산출물의 정석 위치다.
         result_path = tmp_path / "r.json"
         rc = mirror.main(
             ["--workflow", str(wf_path), "--result", str(result_path), "run", "--job", "demo"]
