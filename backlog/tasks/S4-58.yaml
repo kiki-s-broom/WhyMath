@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,13 +20,14 @@ acceptance:
   - "⑤ 검증: 신규 단위 테스트가 위 결함 입력(A 정수 정밀도·B 대값·NaN·지수 폭탄·혼합수)과 정책별 경계(abs 경계 포함·rel 영값·round half-up 양수/음수 동점·exact 무한소수)를 고정한다. 보호 장치 실패 주입(뮤테이션)으로 가드가 RED가 되는지 확인하고 주입 적용·원복 바이트 동일을 단언한다. CI backend 잡 스텝(ruff·black·mypy strict·lint-imports·pytest)과 infra-contracts 잡 해당 여부를 판정한다."
   - "⑥ 범위 밖(승계 후보로 기록·이 태스크에서 변경 안 함): cross_verify.py의 machine_value float isclose 비교(대값 왜곡 동형 잔존)·표본분산 n=1 이 0 으로 계산되는 기존 동작·columns 절의 int() 변환 예외. 설계서 3.4의 query= 표기와 구현 DSL의 stat= 표기 불일치는 문서에 구현 기준을 병기한다."
   - "⑦ 승계 등재 완료: 인수 기준 6 의 범위 밖 항목은 S4-70(교차검증 machine_value 정확값 대조)과 S4-71(n=1 표본분산·columns 예외)로 backlog.py add 를 거쳐 등재했다. 둘 다 depends_on 에 S4-58 을 집행한다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1532"
 paths:
   - src/backend/whymath_backend/l3/statistical_claim.py
   - docs/architecture/verifier_v2_design.md
   - docs/architecture/verifier_v2_domains.md
   - tests/backend/l3/test_statistical_claim.py
   - tests/backend/l3/test_verifier.py
-session: claude/funny-hamilton-zj2026
+session: null
 notes: "Codex #4/#5: 정확값·허용오차 정책, Decimal/정확분수 도입. 현재 float 비교(rel_tol=1e-9)는 대값 왜곡과 정수 데이터 정밀도 손실 가능.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/statistical_claim.py', 'docs/architecture/verifier_v2_design.md'] → ['src/backend/whymath_backend/l3/statistical_claim.py', 'docs/architecture/verifier_v2_design.md', 'docs/architecture/verifier_v2_domains.md', 'tests/backend/l3/test_statistical_claim.py', 'tests/backend/l3/test_verifier.py']: 인수 기준 정의(acceptance 비어 있었음) — 정확값 산술·정책 DSL·입력 방어·집행 지점·검증·범위 밖 분리. paths는 기존 2건을 유지하고 문서·테스트 3건을 추가(교체 형태이므로 전부 명시)\n\n[정정 2026-10-08] 승계 태스크 등재 사실 기록(인수 기준 6 의 범위 밖 항목 -> S4-70·S4-71)"
 updated: 2026-10-08
