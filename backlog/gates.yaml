@@ -1070,6 +1070,19 @@ gates:
     cleared_by: null
     notes: "[경위] PR #929 리뷰(codex 봇 P1)가 짚은 구멍이다. 초판 프로브가 seq 65\n  (f1a2b3c4d5e7 = concept.embedding_id 삭제)를 판별자 없이 건너뛰었고, 2026-08-31 4단계에서\n  stamp --purge a9b8c7d6e5f4(seq 67)를 그 위에 찍었다. 그 시점에 컬럼이 남아 있었다면\n  alembic은 삭제를 `완료`로 믿게 되고 upgrade head는 그 리비전을 영영 실행하지 않는다 —\n  컬럼이 조용히 남는다. 삭제 자체는 죽은 참조 컬럼 정리라 데이터 위험은 낮지만,\n  `스키마가 코드와 일치한다`는 판정이 거짓이 되는 것이 문제다.\n\n[확인 — 읽기 전용, 1줄]\n# [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC)\ncd C:\\Users\\kiki\\Desktop\\__AI\\WhyMath\ndocker exec whymath-pg psql -U whymath -d whymath -c \"SELECT column_name FROM information_schema.columns WHERE table_name='concept' AND column_name='embedding_id';\"\n\n[판정] 0행 = 정상(삭제가 이미 적용돼 있었다) → 이 게이트 clear.\n  1행 = 삭제가 건너뛰어졌다 → 세션에 알려주면 제거 절차(백업 선행 → ALTER TABLE concept\n  DROP COLUMN embedding_id)를 값이 채워진 블록으로 드린다.\n\n[대책(코드 착지 완료)] 프로브에 음(negative) 극성 축 신설 — 컬럼의 *존재*가 stamp 대상을\n  그 앞(seq 64)에서 막고 present_after_gap을 올린다. 실측: 정상 DB는\n  stamp_target a9b8c7d6e5f4 / after_gap 0, 컬럼을 되살린 DB는 e6f1a2b3c4d5 / after_gap 2.\n  tests/infra/test_prod_schema_probe.py가 삭제 전용 리비전의 극성을 양방향으로 동결한다."
     corrections: []
+  - id: G-release-freeze-labels-and-required
+    title: "Freeze 라벨 2종 생성 + release-freeze 체크를 룰셋 required에 등록 (Kiki 저장소 설정, 11/30 전)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-08
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - HARN-103-feature-code-freeze-rules
   - id: G-required-checks-live-drift-fix
     title: "라이브 룰셋의 required check 미강제 10건 등록 — 문서 16건 vs 실제 6건(backend lint·infra-contracts·harness-integrity 등 미강제)"
     kind: human

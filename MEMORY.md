@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
+
+**무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
+**결정 3건**: ① `pii_grade`는 기술 분류 5종이며 법적 분류(개인정보·민감정보 해당 여부)가 아니다 — 법적 확정은 MGMT-02 소관이라 `pipa_data_matrix.md` §5 체크리스트에 항목을 추가했다. ② `collected`는 출처(origins)에서, `state`는 (수집 여부 × 소비처 유무) 4칸에서 파생한다 — 손으로 쓴 값이 서로 모순되면 테스트가 red다. ③ 목적은 소비처가 있을 때만 적는다 — 소비처 0이면 `none`이 정직한 상태이고 그럴듯한 목적 문구를 적으면 red다.
+**실측(코드 전수 AST 스캔)**: ORM 42컬럼 — 수집+소비 10 · 수집만(소비 0) 9 · 소비만(수집 아님) 9 · 둘 다 0 14. 수집만 9컬럼(`target_major_category`·`primary_device`·`has_apple_pencil`·`note_app`·`uses_inkang`·`inkang_provider`·`uses_offline_academy`·`monthly_education_spend`·`accessibility_needs`)은 PATCH 화이트리스트에 열려 있으나 읽는 코드가 0이다 — `api/users.py`가 gender·school_*에 적용한 '소비자 없이 수집을 열지 않는다' 원칙이 이 9컬럼에는 적용되지 않은 비대칭이다. 처분은 ADMIN-21로 등재했다(Kiki 판정 필요). 관측(미강제): Flutter 온보딩이 실제로 보내는 필드는 4개뿐이다.
+**집행**: `tests/backend/schema/test_collection_inventory.py` 59건 — ORM 컬럼 집합↔대장 양방향 동기, PATCH 화이트리스트↔학생 입력 출처, server_default↔db_default, 해시 식별자↔`_PII_EXCLUDE`, 무소비·무쓰기 주장의 코드 대조와 선언 안 된 쓰기 경로 감시, 보존 계획↔`privacy/retention.py`. 실파일 뮤테이션 13종 전건 RED·바이트 동일 원복으로 변별력을 확인했다.
+**정직한 공백**: 다른 테이블과 이름이 겹치는 7컬럼(`user_id`·`school_type`·`grade`·`role`·`created_at`·`is_active`·`deleted_at`)은 `UserProfile.<컬럼>` 형태만 검증한다. 대량 UPDATE·패키지 밖 raw SQL 쓰기·인스턴스 변수 접근은 보지 못한다. 소비처 목록은 대표 목록이다(빈 목록만 전수 주장).
+**사고 기록(피해 0)**: 후속 태스크 번호를 `ADMIN-10`으로 추측 배정해 충돌했고 CLI 가드가 막으며 `ADMIN-21`을 제안했다. 같은 세션에서 병렬 Bash의 `cd`가 서로 덮어써 조회 결과 3건이 무효가 됐고 폐기 후 절대경로로 재조회했다.
+
 ### 2026-10-08 (결정·판정 · G-s401 엣지 게이트 2건): **AI 검수 적용 범위를 개념 그래프 선수 엣지 게이트로 넓힌다 — 고→대 24건은 전건 존치(출발 원자 교체 4), 대학 과목간 137건은 129건(교체 5 · 반려 8). 도달 대학 세부개념은 466→462/512** (Kiki 결정·claude 집행) — 판정 기준 main `0607bc07`
 
 **무엇/왜(Kiki 지시)**: 사람 게이트 `G-s401-uni-boundary-edge-review`(24건)와 `G-s401-inter-course-edge-review`(137건)를 AI 검수로 진행하라는 지시다. 기존 AI 검수 전환 결정(2026-07-10)은 **동등문제 코퍼스 노출 게이팅 한정**이라고 범위가 명시돼 있었다. 그래서 이번 지시는 그 범위를 **그래프 선수 엣지**까지 넓히는 새 결정으로 기록한다(세션이 "이미 정했다"는 기억을 대장에서 확인하지 못해 범위 차이를 먼저 보고했다). 엣지 AI 검수 자체의 선례는 2026-06-17 기본수학 34의 선수엣지 정독이다.
@@ -12050,3 +12059,11 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **부수 3항목 처분**: ⑥ 감사 열거 문서 동기화 = 이 PR에서 완료(`security_privacy.md`) · ② `privacy_audit` 불변 트리거 = "필요함, 분리" → `ADMIN-17` · ③ 반려코드·HIT 타이머 강제 = "분리" → `ADMIN-18`(PATCH의 `reject`는 반려코드를 실을 자리가 없어 거부하도록 acceptance에 명시, `ADMIN-16` 선행 의존).
 - **조사 중 발견**: `ADMIN-19` POST 생성이 `review_status=approved`로 직접 태어난 문항을 허용(같은 부류) · `ADMIN-20`(owner=kiki, 결정 사안) 전이표가 `approved`에서만 격리를 허용하고 공개 GET은 격리만 숨겨서, **비승인 문항의 결함은 이제 어떤 관리자 API로도 공개 카탈로그에서 숨길 수 없다**(리콜 도구 대상이 새로 생성된 문항이면 영향 실제적).
 - **정직한 공백**: 실 PostgreSQL 검증 없음(이 환경에 PG·docker 데몬 없음 — 행 잠금·롤백은 hermetic으로 인자·호출 순서만 고정, CI `backend-migrations`가 첫 실행) · 상태 불변 PATCH의 격리 기록 단독 편집은 막지 않음(계약 §7) · 감사 열거를 문서와 대조하는 테스트는 여전히 없음.
+
+## 2026-10-08 HARN-103 — Feature/Code Freeze 규칙 착지 (문서·기계 검사 / 저장소 설정은 게이트로 이관)
+
+- **결정**: 11/30 Feature Freeze(`release-blocker`) · 12/14 Code Freeze(+`code-freeze-approved`) · **2027-01-15 날짜로 자동 해제**(만료 없는 동결 금지). 동결 경로는 `src/`·`infra/`·`schemas/`(Code Freeze부터 `data/` 추가), 문서·테스트·대장은 제외. 정본 `docs/standards/release_freeze.md`, 집행 `scripts/ops/check_release_freeze.py` + `.github/workflows/release-freeze.yml`(exit 0/1/2 — git 조회 실패는 통과가 아니라 2).
+- **가용성 실측(2026-10-08)**: `owner.type=Organization`·`public`·admin 권한 — 라벨·룰셋 제공. `release-blocker` 조회 "not found"는 미설정이다(미제공 아님).
+- **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
+- **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
+- **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
