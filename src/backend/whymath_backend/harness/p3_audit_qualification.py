@@ -169,8 +169,9 @@ _MISCONCEPTIONS_V1: Final = Path("data/corpus/misconceptions_v1/misconceptions.j
 _BANK_PATH: Final = Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl")
 _QUAL_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/qualification")
 _BANK_AUDIT_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/bank_audit")
-#: S5 1회차 감사(k = 68)를 받은 은행 v0의 동결 사본(sha256 cc7e9539…). 자격 시험지(emit)는 이
-#: 은행에서 만들어졌으므로 생성기 교정으로 현 은행이 바뀐 뒤에도 재현 대조는 이 사본을 기준으로 한다.
+#: S5 1회차 감사(k = 68)를 받은 은행 v0의 동결 사본(sha256 cc7e9539…). 자격 시험지(emit)는
+#: 이 은행에서 만들어졌으므로 생성기 교정으로 현 은행이 바뀐 뒤에도 재현 대조는 이 사본을
+#: 기준으로 한다.
 _AUDITED_BANK_PATH: Final = _BANK_AUDIT_DIR / "audited_bank.jsonl"
 
 
