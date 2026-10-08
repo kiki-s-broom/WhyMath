@@ -36,12 +36,13 @@ from typing import (
     runtime_checkable,
 )
 
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import Depends, Request, Response
 
 from whymath_backend.api._auth import ConsentedUser, CurrentUser
 from whymath_backend.api._degradation import DegradationCounter, DegradationSnapshot
 from whymath_backend.api._device_metrics import record_device_sig_failure
 from whymath_backend.api._device_store import get_device_store
+from whymath_backend.api._error_codes import CodedHTTPException
 from whymath_backend.config import Settings, get_settings
 
 # redis-py의 NoScriptError를 지연 import — 라이브러리 미설치 환경(CI 단위테스트)에서도
@@ -995,8 +996,8 @@ async def _enforce_by_ip(
     rollup = _rate_headers(limit, result)
     pair = _pair_headers("Ip", limit, result)
     if not result.allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        raise CodedHTTPException(
+            "WM-RATE-001",
             detail="요청이 너무 많습니다(분당 한도 초과). 잠시 후 다시 시도하세요.",
             headers={"Retry-After": str(result.reset_seconds or 60), **rollup, **pair},
         )
@@ -1247,8 +1248,8 @@ async def _enforce_triple(
                 break
         blocker = pairs[blocker_kind]
         rollup = _rate_headers(*blocker)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        raise CodedHTTPException(
+            "WM-RATE-001",
             detail="요청이 너무 많습니다(분당 한도 초과). 잠시 후 다시 시도하세요.",
             headers={
                 "Retry-After": str(blocker[1].reset_seconds or 60),
