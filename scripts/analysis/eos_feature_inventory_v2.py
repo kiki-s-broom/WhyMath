@@ -846,8 +846,9 @@ CATALOG: tuple[Spec, ...] = (
        "P1", "A3 비대수 앵커 — S4-13/53", "l3.finite_probability", "l3.statistical_claim"),
     _e("WM-E-357", "다중 풀이법 생성(접근법 6종)", "Platform", "Math Engine", "P2",
        "C6 이월 — S4-10 done", "l3.multi_solution"),
-    _e("WM-E-358", "표기 커버리지 게이트", "Admin", "Math Engine", "P1",
-       "NS-03 — 교육과정 표기 범위", "l3.notation_coverage", status="Batch"),
+    _e("WM-E-358", "표기 커버리지·교육과정 표기 범위 게이트", "Admin", "Math Engine", "P1",
+       "NS-03·MATH-04 — 생성물 전용(학생 입력 거부 아님)", "l3.notation_coverage",
+       "l3.curriculum_notation_gate", "harness.curriculum_notation_gate_cli", status="Batch"),
     _e("WM-E-359", "수식 낭독(AST→한국어)·역파서·학년별 프로파일", "Student", "Math Engine", "P2",
        "접근성 축", "l3.speech", "l3.speech_parse", "l4.speech.profiles", "l4.speech.symbols"),
     # ════════════════════ E — L4 교수학 엔진 ════════════════════

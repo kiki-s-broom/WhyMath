@@ -297,6 +297,7 @@ def _to_record(
             generation_type=_enum_value(candidate.provenance.generation_type) or "",
             license=_enum_value(candidate.provenance.license) or "",
             original_source=_enum_value(candidate.provenance.original_source),
+            authored_by=candidate.authored_by,
         ),
     )
 

@@ -130,7 +130,7 @@ git diff --quiet origin/main -- src/backend/whymath_backend/harness/residue_gate
 $PathsMatchMain = ($LASTEXITCODE -eq 0)
 $ModuleFrom = python -c "import whymath_backend.harness.residue_gate_demotion_battle as m; print(m.__file__)"
 $ModuleOk = $ModuleFrom -like "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\*"
-if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain -and $ModuleOk) { cmd /c "python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --audit-out data\audit\s4-16-v4-production-2026-09.jsonl > battle_v4_production.log 2>&1" ; "BATTLE_EXIT=$LASTEXITCODE" ; Get-Content -Encoding UTF8 battle_v4_production.log } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain MODULE_OK=$ModuleOk MODULE_FROM=$ModuleFrom (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
+if ($CorpusOk -and $HasV4 -and $OllamaOk -and $PathsMatchMain -and $ModuleOk) { cmd /c "python -m whymath_backend.harness.residue_gate_demotion_battle $Corpus --v4 production --sample-n 5 --clean-n 34 --authored-by deterministic:finite_probability_skeleton_generator --audit-out data\audit\s4-16-v4-production-2026-09.jsonl > battle_v4_production.log 2>&1" ; "BATTLE_EXIT=$LASTEXITCODE" ; Get-Content -Encoding UTF8 battle_v4_production.log } else { "WRITE_REFUSED=True - CORPUS_OK=$CorpusOk HAS_V4=$HasV4 OLLAMA_OK=$OllamaOk PATHS_MATCH_MAIN=$PathsMatchMain MODULE_OK=$ModuleOk MODULE_FROM=$ModuleFrom (하나라도 False면 측정하지 않는다 — 어느 것이 False인지가 다음 행동을 정한다)" }
 ```
 
 - `--v4 production`: 전 관점 세트를 태우고 판정을 합집합한다. **승격 판정은 이 모드로만 한다**

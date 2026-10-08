@@ -264,7 +264,9 @@ async def _run_smoke(cloud: _CloudProvider) -> SmokeResult:
     elif usage.input_tokens is None or usage.output_tokens is None:
         cost_krw = None
     else:
-        cost_krw = actual_cost_krw(decision, usage)
+        # OPS-116 — 좌석은 호출을 받은 provider에서 읽는다(기본 AnthropicProvider는 'anthropic').
+        # 주입 provider가 다른 좌석이면 그 단가표로 계상하고, 좌석 미상(None)은 '미측정'으로 남긴다.
+        cost_krw = actual_cost_krw(decision, usage, seat=pipeline.served_cloud_seat(cloud))
 
     return SmokeResult(
         ran=True,
