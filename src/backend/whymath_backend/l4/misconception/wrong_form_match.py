@@ -28,10 +28,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sympy import Wild
 
 from whymath_backend.config import get_settings
-from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.symbolic_equivalence import (
     IdentityVerdict,
     identity_status,
+    parse_unevaluated,
     to_sympy_source,
 )
 from whymath_backend.l4.misconception.catalog import CATALOG
@@ -85,8 +85,9 @@ def matches_wrong_form(student_lhs: str, student_rhs: str, wrong_form: tuple[str
         lt = sympy.sympify(to_sympy_source(wl), convert_xor=True)
         rt = sympy.sympify(to_sympy_source(wr), convert_xor=True)
         # evaluate=False로 학생 lhs 구조 보존 — 수치((3+4)²)가 값(49)으로 평가되지 않게.
-        # 학생 원문이라 안전 진입점을 거친다(CONST-09·R22-03).
-        sl = safe_sympify(src_lhs, convert_xor=True, evaluate=False)
+        # 학생 원문이라 안전 진입점을 거치며(CONST-09·R22-03), 파서 정의는 동치 권위가 소유한다 —
+        # 위 ⓪ 가드(`identity_status`)와 같은 변환 규칙이어야 `2x`를 한쪽만 읽는 갈림이 없다(MISC-33).
+        sl = parse_unevaluated(src_lhs)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가 학생/템플릿은 정합 안 됨(보수)
         logger.debug("matches_wrong_form 파싱 회피: %s", type(exc).__name__)
         return False

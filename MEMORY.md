@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (정정 · MISC-33): **암묵 곱셈 미검출의 원인은 `to_sympy_source`가 아니라 `matches_wrong_form`의 구조 파싱이 동치 권위와 다른 변환 규칙을 쓴 것이었다 — 파서 정의를 `parse_unevaluated`로 일원화했고, 그 과정에서 동치 권위가 `f(x)`를 `f*x`로 읽는 선행 결함(`MISC-62`)을 발견했다** (claude 집행) — 판정 기준 main `c322bb9c`
+
+- **경위(선행 세션의 오진)**: EOS-104가 `(2x+3)² = 4x²+9` 미검출의 원인을 "공용 파싱 소스 `to_sympy_source`가 `2x`에 곱셈 기호를 넣지 않아 `SympifyError`"로 적고 한계 테스트로 동결했다. 실제로 어느 줄에서 깨지는지는 측정하지 않은 추정이었다. 실측(2026-10-08): `identity_status("(2x+3)²", "4x²+9")`는 정상 판정(`not_identity`)이다 — `_PARSE_TRANSFORMS`가 이미 `implicit_multiplication`을 쓴다. 깨지는 곳은 `wrong_form_match.py`의 `safe_sympify(src_lhs, convert_xor=True, evaluate=False)` 한 줄(암묵 곱셈 변환 없음 → `UnsafeExpressionError`, 사유 `structure_unparseable`)이었다. 같은 함수 안에서 ⓪ 거짓 등식 가드는 `2x`를 읽고 구조 정합은 거부하는 갈림이다.
+- **조치**: `l3/symbolic_equivalence.py`에 공개 함수 `parse_unevaluated`(같은 `_PARSE_TRANSFORMS`·`evaluate=False`·안전 진입점 경유)를 추가하고 `wrong_form_match.py`가 이를 쓴다. `to_sympy_source`·`_parse`·`identity_status`는 바꾸지 않아 소비처 입력은 불변이다. 결과: 쌍둥이 14쌍 중 암묵≠명시 불일치 5→0건, `scan_attempt_answer("(2x+3)²", "4x²+9")` 후보 0→1건. 문자열 층에서 `*`를 끼우는 방식은 택하지 않았다(주입으로 RED 확인 — `f(x)`·`2pi` 입력에서 소비처 전체의 판정이 움직인다).
+- **후퇴(수용 · Kiki 판단 요청)**: 선행 결함 — `identity_status('f(x)', 'f*x')`가 identity이고 `f(x)**2`는 `f*x**2`로 읽힌다(내장 함수 `sin`은 무관). 구조 파싱을 같은 규칙으로 맞추자 미지 함수를 이항식에 품은 거짓형 3건(`(f(x)+y)²` 등)이 우연한 일치가 깨져 더는 검출되지 않는다(누락 방향이라 거짓 낙인은 없다). 두 파서를 한 함수에 두는 우회(레거시 파싱 후 폴백)는 이 태스크가 닫으려던 갈림을 재생산하므로 택하지 않았다. 뿌리는 `MISC-62`(표기 정책 결정 포함)가 소유하며, 현재 동작을 계약 테스트 2건(`test_function_application_is_read_as_multiplication_known_limitation`·`test_unknown_function_application_known_limitation`)으로 동결해 고치면 RED가 된다.
+- **검증**: 주입 7종 전건 RED·원복 sha256 일치(태스크가 요구한 "함수 적용이 곱으로 읽힘" 주입 포함).
+
 ### 2026-10-08 (결정·판정 · G-s401 엣지 게이트 2건): **AI 검수 적용 범위를 개념 그래프 선수 엣지 게이트로 넓힌다 — 고→대 24건은 전건 존치(출발 원자 교체 4), 대학 과목간 137건은 129건(교체 5 · 반려 8). 도달 대학 세부개념은 466→462/512** (Kiki 결정·claude 집행) — 판정 기준 main `0607bc07`
 
 **무엇/왜(Kiki 지시)**: 사람 게이트 `G-s401-uni-boundary-edge-review`(24건)와 `G-s401-inter-course-edge-review`(137건)를 AI 검수로 진행하라는 지시다. 기존 AI 검수 전환 결정(2026-07-10)은 **동등문제 코퍼스 노출 게이팅 한정**이라고 범위가 명시돼 있었다. 그래서 이번 지시는 그 범위를 **그래프 선수 엣지**까지 넓히는 새 결정으로 기록한다(세션이 "이미 정했다"는 기억을 대장에서 확인하지 못해 범위 차이를 먼저 보고했다). 엣지 AI 검수 자체의 선례는 2026-06-17 기본수학 34의 선수엣지 정독이다.
