@@ -30,6 +30,7 @@ from whymath_backend.l3.cross_verify import (
     ResidueSubject,
     _judge_seq_reconstruct,
     _judge_stat_reconstruct,
+    deterministic_author,
 )
 from whymath_backend.l3.models import GenerationResult, RoutingDecision
 from whymath_backend.l3.prompt_assets import REQUIRED_ASSET_IDS, asset_registry, prompt_text
@@ -56,7 +57,7 @@ def _problem(conditions: str, answer: str) -> ProblemVerifyInput:
         answer_kind="sequence_induction",
         conditions=conditions,
         answer_explanation="점화식에 따라 첫째항 7에 6을 11번 더한 값이다.",
-        authored_by="corpus:TEST",
+        authored_by=deterministic_author("sequence-test"),
     )
 
 
@@ -277,7 +278,7 @@ def _subject(**overrides: object) -> ResidueSubject:
         "machine_model_ko": "정의",
         "machine_total": 0,
         "machine_favorable": 0,
-        "authored_by": "corpus:TEST",
+        "authored_by": deterministic_author("sequence-test"),
         "machine_value_exact": "73",
     }
     base.update(overrides)
