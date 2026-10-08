@@ -1,4 +1,5 @@
-# WhyMath 운영 배포 스택 (OPS-03) — app(uvicorn) + PostgreSQL 16(pgvector) + Redis 7.
+# WhyMath 운영 배포 스택 (OPS-03) — app(uvicorn) + PostgreSQL 16(pgvector) + Redis 7
+# + retention-purge(SEC-12 보존 파기 스케줄) + quality-worker(OPS-27 QUALITY 비동기 큐 소비자).
 #
 # ★ docker-compose.demo.yml과 혼동 금지 (역할이 정반대다):
 #     demo = 일회용 시연(trust 인증·볼륨 없음·55432·stop_demo가 데이터째 폐기)
@@ -230,6 +231,72 @@ services:
     # 않으면 도커가 8000 포트 무응답을 "unhealthy"로 영구 오판한다.
     healthcheck:
       disable: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ★ OPS-27 — QUALITY 비동기 워커. `app`은 QUALITY 요청을 `CeleryJobQueue`로 상시 enqueue하는데
+  #   (app.py 기본 큐 결선) 이 스택에는 그 큐를 *소비하는* 프로세스가 없어, 202로 접수된 작업이
+  #   영구 `pending`이었다(`GET /v1/jobs/{id}` 폴링은 있는데 작업을 끝낼 주체가 배포에 없음 —
+  #   `docs/architecture/ai_integration_gap_review.md` D2). `app`과 **동일 이미지**를 재사용한다
+  #   (새 Dockerfile·새 이미지 0 — retention-purge와 같은 방침).
+  #   ★ 기동 명령의 `-A` 대상은 **모듈 수준 Celery 인스턴스**(`tasks:quality_celery_app`)다.
+  #   팩토리 함수(`build_celery_app`)를 `-A` 값으로 직접 지정하면 Celery 5.6 CLI가 앱이 아닌
+  #   함수를 받아 `AttributeError: 'function' object has no attribute 'user_options'`로 기동 즉시
+  #   죽는다(2026-10-08 실측) — 기존 systemd 유닛·docstring이 그 형식을 "정전 명령"이라 적었으나
+  #   실제로는 동작하지 않았다. 그 형식으로 되돌리는 회귀는 tests/infra/test_quality_worker_compose.py가
+  #   막는다(`-A`와 이름을 붙여 쓴 문구는 산문이어도 이 테스트에 걸리므로 설명할 때는 떼어 쓴다).
+  #   ★ 동시성 1(`-c 1`) 고정 — QUALITY는 GPU를 단일 점유해 병렬 이득이 없고 p50만 폭발한다
+  #   (03a §A.1·§D.3, `l3/queue/celery_app.py`). `container_name`을 박아 둔 것도 같은 이유다:
+  #   Compose 스펙상 container_name이 있는 서비스는 `--scale`이 거부되므로 워커가 2개로 늘어
+  #   동시성이 2가 되는 경로가 막힌다. 호스트 systemd 워커(`whymath-worker.service`)를 같은
+  #   브로커에 함께 띄우는 것도 같은 위반이다 — 정본은 이 컨테이너다(런북 §5c).
+  #   ★ 최소 권한 — 워커는 DB·JWT·암호화 키가 필요 없다(`tasks.py`는 Redis 브로커/백엔드, Ollama,
+  #   선택적 Langfuse만 쓴다 — 2026-10-08 실측: REDIS_URL·OLLAMA_HOST 두 변수만으로 종단 소비 성공).
+  #   ★ 헬스체크 = `celery inspect ping`: 이미지의 HTTP 라이브니스(/health/live)는 이 서비스에
+  #   무해당이라 대체한다. 워커 없음·브로커 단절·엉뚱한 노드는 exit 69, 정상만 exit 0임을
+  #   실측했다(변별력 확인). 컨테이너 호스트명이 곧 Celery 노드명(`celery@<HOSTNAME>`)이다.
+  #   도커는 unhealthy를 자동 재시작하지 않는다 — 이 상태는 `docker ps`로 보이는 *관측 신호*다.
+  #   ★ stop_grace_period 120s — 도커 기본 10s면 진행 중인 QUALITY 생성(dense 27B 기준 p50 14s)이
+  #   SIGKILL로 끊기고, 이미 수신 확인(ack)된 메시지는 재전달되지 않아 그 작업이 영구 pending이 된다.
+  #   Celery는 SIGTERM에 warm shutdown(진행 작업 완료 후 종료)하며 exec-form `command`라 PID 1이
+  #   신호를 직접 받는다(`sh -c` 래퍼를 쓰면 신호가 전달되지 않는다).
+  quality-worker:
+    image: whymath-backend:${WHYMATH_IMAGE_TAG:?WHYMATH_IMAGE_TAG 미설정 - 불변 이미지 태그(git short SHA 등)를 env 파일에 지정하라. latest 금지(롤백 불가)}
+    container_name: whymath-${DEPLOY_ENV:?DEPLOY_ENV 미설정 - staging 또는 prod}-quality-worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    command:
+      - celery
+      - -A
+      - whymath_backend.l3.queue.tasks:quality_celery_app
+      - worker
+      - -c
+      - "1"
+      - --loglevel=INFO
+    environment:
+      # 브로커·결과 백엔드 = app과 같은 Redis(설정 폴백: celery_* 미지정이면 redis_url 재사용).
+      WHYMATH_REDIS_URL: redis://:${WHYMATH_REDIS_PASSWORD:?WHYMATH_REDIS_PASSWORD 미설정 - Redis 무인증 금지}@redis:6379/0
+      # 로컬 LLM(Ollama)은 컨테이너 밖 호스트에서 돈다 — app과 같은 경로(extra_hosts 참조).
+      WHYMATH_OLLAMA_HOST: ${WHYMATH_OLLAMA_HOST:-http://host.docker.internal:11434}
+      # 선택(빈 값 허용): 워커가 QUALITY 생성 완료의 실측 usage·cost_krw를 기록한다(S1 게이트 ②).
+      # 키가 비면 LangfuseSink가 스스로 no-op이라 관측 장애가 생성을 깨뜨리지 않는다.
+      WHYMATH_LANGFUSE_PUBLIC_KEY: ${WHYMATH_LANGFUSE_PUBLIC_KEY:-}
+      WHYMATH_LANGFUSE_SECRET_KEY: ${WHYMATH_LANGFUSE_SECRET_KEY:-}
+      WHYMATH_LANGFUSE_HOST: ${WHYMATH_LANGFUSE_HOST:-https://cloud.langfuse.com}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stop_grace_period: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A whymath_backend.l3.queue.tasks:quality_celery_app inspect ping -d celery@$$HOSTNAME --timeout 10"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 40s
     logging:
       driver: json-file
       options:
