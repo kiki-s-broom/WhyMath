@@ -55,6 +55,7 @@ from whymath_backend.schema.concept_version import ConceptVersionPayload
 from whymath_backend.schema.enums import (
     ConceptLevel,
     Curriculum,
+    EdgeType,
     ReviewStatus,
     Role,
     SourceType,
@@ -818,6 +819,10 @@ class TestConceptAndVersionReads:
         a = _live_concept("CAL-A")
         b = _live_concept("CAL-B")
         b.current_published_version_id = uuid.uuid4()
+        # DB에서 읽은 행의 `level`은 열거형 멤버다(`from_schema` 직후의 가짜 행은 평범한 문자열일 수
+        # 있다) — 실물 모양을 흉내 내야 `(str, Enum)` 멤버가 이름 문자열로 새는 결함이 보인다.
+        a.level = ConceptLevel.단원
+        b.level = ConceptLevel.단원
         fake = FakeSession(results=[_Result(scalar=2), _Result(rows=[a, b])])
         resp = _client(_EDITOR, fake).get("/v1/admin/cms/concepts?q=CAL&limit=10")
         assert resp.status_code == 200, resp.text
@@ -827,6 +832,8 @@ class TestConceptAndVersionReads:
             ("CAL-A", False),
             ("CAL-B", True),
         ]
+        # 계층은 열거형 이름("ConceptLevel.단원")이 아니라 값("단원")으로 나간다.
+        assert [i["level"] for i in body["items"]] == ["단원", "단원"]
 
     def test_concept_list_rejects_out_of_range_paging(self) -> None:
         for query in ("limit=0", "limit=101", "offset=-1"):
@@ -851,7 +858,9 @@ class TestConceptAndVersionReads:
         assert body["latest_version_no"] == 2
         assert body["published_version_id"] is None
         assert body["can_edit"] is False  # 검수자는 편집 권한이 없다
-        assert [(e["other_code"], e["edge_type"]) for e in body["incoming"]] == [("CAL-O", "x")]
+        assert [(e["other_code"], e["edge_type"]) for e in body["incoming"]] == [
+            ("CAL-O", "PREREQUISITE")
+        ]
         assert body["outgoing"] == []
         # payload 필드만 — 본문 3종·오버레이는 live에 없다(Concept Purity).
         assert set(body["live"]) <= set(ConceptVersionPayload.model_fields)
@@ -897,9 +906,13 @@ class TestConceptAndVersionReads:
 
 
 class SimpleNamespaceEdge:
-    """`ConceptEdge` 모사 — `edge_type`만 쓴다."""
+    """`ConceptEdge` 모사 — `edge_type`만 쓴다.
 
-    edge_type = "x"
+    값은 평범한 문자열이 아니라 **실제 열거형 멤버**다. 문자열 "x"를 쓰면 `(str, Enum)` 멤버가
+    `'EdgeType.PREREQUISITE'`로 새는 결함을 못 본다(실백엔드 종단 검증에서 발견).
+    """
+
+    edge_type = EdgeType.PREREQUISITE
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════

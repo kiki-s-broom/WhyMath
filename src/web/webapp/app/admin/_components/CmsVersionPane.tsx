@@ -207,6 +207,13 @@ export function CmsVersionPane({ token, note, detail, capabilities, emphasis, on
         읽지 않으므로 여기서 바꿔도 학생 화면이 달라지지 않습니다.
       </p>
 
+      {emphasis === "deploy" && !capabilities.includes("publish") && (
+        <p className={styles.blockedBox} role="note">
+          이 계정은 발행 권한이 없어 이력만 볼 수 있습니다. 발행·폐기·롤백은 권한이 있는 계정에게만
+          서버가 허용합니다(이 문구는 안내일 뿐 차단은 서버가 합니다).
+        </p>
+      )}
+
       <CmsNoticeView notice={notice} />
 
       <VersionTable

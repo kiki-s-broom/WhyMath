@@ -41,6 +41,7 @@ from whymath_backend.db.models.problem import Problem
 from whymath_backend.schema.enums import (
     ConceptLevel,
     Curriculum,
+    EdgeType,
     PrivacyAuditResourceType,
     SourceType,
     Subject,
@@ -385,6 +386,33 @@ class TestToJsonable:
         assert to_jsonable(datetime(2026, 1, 2, tzinfo=UTC)).startswith("2026-01-02T")  # type: ignore[union-attr]
         assert to_jsonable(ConceptLevel.단원) == "단원"
         assert to_jsonable(None) is None
+
+    def test_str_enums_collapse_to_plain_values_not_members(self) -> None:
+        """`(str, Enum)` 멤버는 `member == "값"`이 참이라 동등 비교로는 새는 것을 못 본다 — 타입으로 본다.
+
+        멤버가 새면 호출부의 `str(...)`이 `'EdgeType.PREREQUISITE'`를 만든다(실측 결함).
+        """
+        import enum
+
+        class Plain(enum.Enum):
+            A = "a"
+
+        class Num(enum.IntEnum):
+            ONE = 1
+
+        for member, expected in (
+            (ConceptLevel.단원, "단원"),
+            (EdgeType.PREREQUISITE, "PREREQUISITE"),
+            (Plain.A, "a"),
+            (Num.ONE, 1),
+        ):
+            got = to_jsonable(member)
+            assert got == expected and type(got) in (str, int), (member, got, type(got))
+            assert not isinstance(got, enum.Enum), member
+            assert str(got) == str(expected), member  # 호출부의 str(...)이 이름 문자열을 만들지 않는다
+        nested = to_jsonable({"k": [EdgeType.PREREQUISITE]})
+        assert nested == {"k": ["PREREQUISITE"]}
+        assert type(nested["k"][0]) is str  # type: ignore[index]
 
     def test_containers_are_converted_recursively(self) -> None:
         uid = uuid.uuid4()

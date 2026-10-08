@@ -488,7 +488,15 @@ def parse_pk(spec: ResourceSpec, raw: str) -> uuid.UUID | str | None:
 
 
 def to_jsonable(value: object) -> object:
-    """응답용 값 변환 — 명시한 컬럼만 이 함수를 지난다(`__dict__`를 통째로 내지 않는다)."""
+    """응답용 값 변환 — 명시한 컬럼만 이 함수를 지난다(`__dict__`를 통째로 내지 않는다).
+
+    **Enum 분기가 원시형 분기보다 앞이다.** 이 저장소의 열거형은 대부분 `(str, Enum)`이라 멤버가
+    `str`이기도 한데, 원시형 분기가 먼저면 멤버가 그대로 통과하고 호출부의 `str(...)`이
+    `'ConceptLevel.단원'` 같은 *이름 문자열*을 만든다(실백엔드 종단 검증에서 발견 — 개념 목록의
+    `level`·관계의 `edge_type`이 그렇게 나갔다). 결과는 항상 순수 원시형이다.
+    """
+    if isinstance(value, Enum):
+        return to_jsonable(value.value)
     if value is None or isinstance(value, bool | int | float | str):
         return value
     if isinstance(value, uuid.UUID):
@@ -497,8 +505,6 @@ def to_jsonable(value: object) -> object:
         return value.isoformat()
     if isinstance(value, Decimal):
         return float(value)
-    if isinstance(value, Enum):
-        return to_jsonable(value.value)
     if isinstance(value, Mapping):
         return {str(k): to_jsonable(v) for k, v in value.items()}
     if isinstance(value, list | tuple | set | frozenset):
