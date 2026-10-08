@@ -1744,6 +1744,17 @@ jobs:
           python -m whymath_backend.harness.eos_unit_structure_observation_report
           python -m whymath_backend.harness.eos_unit_structure_observation_report --json /tmp/eos_unit_structure_observation.json
 
+      # CUR-06: 학교급 경계 선수 연결 밀도 관측 리포트 — 경계 통과 엣지 20/2,210(0.9%)·고→대 0·
+      # 고등→중학 하향 도달 비율을 매 실행 눈에 보이게 한다. 게이트가 아니라 리포트(exit 0/2) —
+      # 밀도가 0이어도 red가 되지 않고, red가 되는 것은 코퍼스를 읽지 못하는 입력 오류(exit 2)뿐이다.
+      # 신규 잡 0: CUR-09 선례대로 이 잡(backend editable 설치 완료)에 편입한다. 판정 회귀는
+      # tests/backend/harness/test_cross_school_connectivity_report.py(backend 잡 testpaths)가 소유.
+      - name: 학교급 경계 선수 연결 밀도 관측 리포트 (CUR-06)
+        working-directory: src/backend
+        run: |
+          python -m whymath_backend.harness.cross_school_connectivity_report
+          python -m whymath_backend.harness.cross_school_connectivity_report --json /tmp/cross_school_connectivity.json
+
       # OPS-12 — `tests/harness`·`scripts/harness`를 lint/format하는 잡이 **하나도 없었다**
       # (OPS-11의 harness 판박이). backend 잡은 `../../tests/backend`만, data-pipeline 잡은
       # working-directory `src/data-pipeline`의 `.`만 본다 — 하네스는 대장(backlog)을 판정하는
