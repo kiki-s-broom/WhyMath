@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,7 +20,8 @@ acceptance:
   - "신규 answer_kind 소비 지점을 같은 슬라이스에서 맞춘다: harness/qa_pipeline.py의 _NON_EQUATION_DSL_ANSWER_KINDS에 sequence_induction 추가, scripts/analysis/eos_core_adapter_boundary_scan.py에 l3.sequence_induction ADAPTER 분류, scripts/analysis/eos_feature_inventory_v2.py 귀속. 이 셋은 pytest가 아니라 CI infra-contracts 잡이 검사하므로 그 잡을 로컬에서 재현해 exit code로 보고한다."
   - "inductive_sequence_skeleton_generator의 _InductiveSkeleton(kind·first·step·term)을 DSL 문자열로 직렬화하는 함수를 추가하고, [12대수03-06] 코퍼스 30건(problem_bank_generated_v0)에 대해 발문의 점화식을 실제로 실행한 값과 verify.conditions의 폐형식 값을 대조해 불일치 건수를 보고한다(0건이어도 0건이라고 명시). 코퍼스 레코드 재기록과 tier 각인은 이 태스크에서 하지 않는다 — populate의 tier 값 동기가 선행이며 그것은 answer_kind v2 소비 지점 정합 태스크 소관이다."
   - "보호 장치 주입 검증: 초기항 오류·점화식 계수 오류·인덱스 시작점 오류·홀짝 분기 반전을 각각 주입해 해당 축이 RED로 변하는지 확인하고, 주입이 실제 적용됐는지(mutated != original)와 원복이 바이트 동일한지를 단언한다. ruff·black·mypy --strict·lint-imports를 exit code로 보고하고 CI 잡 목록 전수(backend·infra-contracts 포함)를 재현한 뒤 PR을 생성한다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1548 — 신규 테스트 139건, 결함 주입 28종 전건 RED, 공식 CI 미러 HEAD ff4c7ac2 실행 스텝 전부 통과(미실행 1건: data-pipeline 코퍼스 조건 스텝)"
 paths:
   - src/backend/whymath_backend/l3/sequence_induction.py
   - src/backend/whymath_backend/l3/verifier.py
@@ -34,6 +35,6 @@ paths:
   - scripts/analysis/eos_core_adapter_boundary_scan.py
   - scripts/analysis/eos_feature_inventory_v2.py
   - docs/architecture/verifier_v2_domains.md
-session: claude/exciting-lovelace-m0wk81
+session: null
 notes: "S4-57 설계(verifier_v2_domains.md §4·§5·§7·§8)의 결과로 등재. 단계 B 우선순위 1순위 도메인이다. 근거: [12대수03-06] 30건은 verification_tier가 None이고 verify.conditions가 생성기가 계산한 폐형식(x - (a + (k-1)*d) = 0)이라 발문의 점화식을 실행하는 검산이 없다(2026-10-08 실측, main c322bb9cb). 이 슬라이스는 그 정합 축을 처음 닫는다. 선행 관계: 소비 지점 드리프트 정합 태스크(answer_kind v2 소비 지점 정합)와 병행 가능하되, 이 슬라이스는 자기 kind의 관점·DSL 제외 목록 등록을 스스로 하므로 그 태스크에 의존하지 않는다. Wilson 로트 게이트는 이 슬라이스 범위 밖이다 — 03-06 밴드가 30건이라 기본 임계(0.05, 95%)에서 결함 0건이어도 상한이 0.0827이라 통과 불가(최소 52건 필요, MEMORY 기록과 일치). 밴드 확장 또는 S4-56의 임계 판정 이후.\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**'] → ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**', 'src/backend/whymath_backend/l3/prompt_assets.py', 'src/backend/whymath_backend/harness/prompt_asset_audit.py', 'src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/l3/equivalent/inductive_sequence_skeleton_generator.py', 'scripts/analysis/eos_core_adapter_boundary_scan.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/architecture/verifier_v2_domains.md']: 착수 후 실제 수정 지점 확인 — 프롬프트 로더·감사기·qa_pipeline·직렬화 함수·CI 인벤토리 정합 파일을 범위에 추가(기존 5건 유지)"
 updated: 2026-10-08
