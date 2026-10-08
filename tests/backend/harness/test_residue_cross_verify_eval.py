@@ -30,7 +30,14 @@ from whymath_backend.harness.residue_cross_verify_eval import (
     select_sample,
     write_audit_jsonl,
 )
-from whymath_backend.l3.cross_verify import CrossVerificationResult, PerspectiveVerdict
+from whymath_backend.l3.cross_verify import (
+    UNRECORDED_AUTHOR,
+    CrossVerificationResult,
+    PerspectiveVerdict,
+    assert_author_independent,
+    deterministic_author,
+    llm_author,
+)
 from whymath_backend.l3.verification_tier import VerificationTier
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -241,3 +248,100 @@ def test_loader_reads_freshly_generated_corpus(tmp_path: Path) -> None:
     run_finite_probability_batch(n_per_band=20, out_path=out)
     fresh = load_pilot_records(out)
     assert _run(fresh, StubVerifier()).outcome == "PASS"
+
+
+# ── ⑥ 생성자 ≠ 검증자 (PB-15) ─────────────────────────────────────────
+_VERIFIER_SIGNATURE = llm_author("qwen3:30b-a3b")
+
+
+class GuardedStub(StubVerifier):
+    """실 `CrossVerifier.verify`와 같은 순서 — **가드가 먼저**, 통과해야 판정 로직으로 간다.
+
+    위 `StubVerifier`는 가드를 건너뛰므로 하네스가 `IndependenceError`를 어떻게 다루는지 볼 수
+    없다. 이 대역은 실제 `assert_author_independent`를 호출한다(검증자 서명만 고정).
+    """
+
+    def verify(self, subject: object) -> CrossVerificationResult:
+        assert_author_independent(subject.authored_by, _VERIFIER_SIGNATURE)  # type: ignore[attr-defined]
+        return super().verify(subject)
+
+
+def _set_author_in_first_record(path: Path, author: str) -> None:
+    """코퍼스 JSONL의 첫 레코드에만 `authored_by`를 심는다(나머지는 키 없음 = 기록 없음)."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() and not line.lstrip().startswith("#"):
+            record = json.loads(line)
+            record["authored_by"] = author
+            lines[index] = json.dumps(record, ensure_ascii=False)
+            break
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_loader_reads_recorded_author_and_never_fabricates_a_corpus_prefix(tmp_path: Path) -> None:
+    """기록된 서명은 그대로, 기록 없는 레코드는 `unknown` — `corpus:<유형>`을 지어내지 않는다.
+
+    종전 로더는 모든 레코드에 `corpus:FULLY_GENERATED`를 조립했다. 그 값은 검증자 서명과 형식이
+    달라 가드를 영영 비껴갔다. 두 방향을 한 번에 본다: 기록 있음(값 보존)·기록 없음(`unknown`).
+    """
+    out = tmp_path / "problems.jsonl"
+    run_finite_probability_batch(n_per_band=20, out_path=out)
+    _set_author_in_first_record(out, "llm:some-model")
+
+    loaded = load_pilot_records(out)
+
+    assert [r.authored_by for r in loaded].count("llm:some-model") == 1
+    assert {r.authored_by for r in loaded} == {"llm:some-model", UNRECORDED_AUTHOR}
+    assert not any(r.authored_by.startswith("corpus:") for r in loaded)
+
+
+def test_record_without_author_is_independence_unproven_not_a_pass(
+    records: list[PilotRecord],
+) -> None:
+    """서명 기록이 없는 구 코퍼스 — 독립성을 입증할 수 없으므로 PASS가 아니다(기본 동작 전환).
+
+    측정이 *시작되기 전에* 멈춘다: 가드가 첫 건에서 발화해 어떤 라벨도 만들지 않는다.
+    """
+    stub = GuardedStub()
+    report = _run(records, stub)
+
+    assert report.outcome == "INDEPENDENCE_UNPROVEN"
+    assert not report.passed
+    assert "판독할 수 없다" in report.reasons[0]
+    assert report.resolved == 0 and report.labels == []
+    assert stub.seen == [], "가드가 판정보다 먼저여야 한다 — 자기승인 라벨이 하나라도 생기면 무효"
+
+
+def test_self_approval_from_recorded_author_is_independence_unproven(
+    records: list[PilotRecord],
+) -> None:
+    """코퍼스에 기록된 생성 모델이 검증 모델과 같다 — 자기승인은 품질 실패가 아니라 측정 무효."""
+    same_model = [replace(r, authored_by=_VERIFIER_SIGNATURE) for r in records]
+    report = _run(same_model, GuardedStub())
+
+    assert report.outcome == "INDEPENDENCE_UNPROVEN"
+    assert "자기승인" in report.reasons[0]
+
+
+def test_recorded_other_model_or_declared_deterministic_author_passes(
+    records: list[PilotRecord],
+) -> None:
+    """대조군 — 다른 LLM이 만들었거나 결정론 생성기로 선언된 코퍼스는 정상 PASS한다.
+
+    이 두 단언이 없으면 '기록이 있어도 전부 거부'하는 과잉 수정도 위 테스트를 통과한다.
+    """
+    other_llm = [replace(r, authored_by=llm_author("other-model:7b")) for r in records]
+    deterministic = [
+        replace(r, authored_by=deterministic_author("finite_enumerator")) for r in records
+    ]
+
+    assert _run(other_llm, GuardedStub()).outcome == "PASS"
+    assert _run(deterministic, GuardedStub()).outcome == "PASS"
+
+
+def test_declared_author_override_fills_a_legacy_corpus(records: list[PilotRecord]) -> None:
+    """`--authored-by` 선언 — 기록 없는 구 코퍼스를 사람이 저작 주체를 선언해 돌릴 수 있다."""
+    declared = deterministic_author("finite_enumerator")
+    report = _run(records, GuardedStub(), authored_by=declared)
+
+    assert report.outcome == "PASS"

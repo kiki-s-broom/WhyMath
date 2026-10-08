@@ -95,6 +95,15 @@ class CandidateProblem(BaseModel):
             "적재기의 `ConceptTag`를 그대로 재사용(변환 0). 저장 시 concept_src_id→concept_id 해석."
         ),
     )
+    authored_by: str | None = Field(
+        default=None,
+        description=(
+            "(선택·PB-15) 저작 주체 서명 — LLM 생성기는 `llm:<모델 id>`"
+            "(`cross_verify.llm_author`)를 찍는다. None=기록 없음(결정론 생성기는 아직 미기록·"
+            "서명 해석 실패) — 교차검증 가드는 기록 없는 대상을 독립성 입증 불가로 거부한다"
+            "(fail-closed)."
+        ),
+    )
 
 
 @runtime_checkable
