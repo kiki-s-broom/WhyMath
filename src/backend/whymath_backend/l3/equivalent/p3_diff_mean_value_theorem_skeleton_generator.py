@@ -1337,10 +1337,14 @@ def _misconception_frames() -> list[Frame]:
 
     def m5(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
+        # 접속 조사는 수 읽기로 고른다 — 하드코딩 '와'는 f(-2)에서만 맞고 f(1)·f(0)에서
+        # 틀린다(7회차 보강: 평가점 미지수 절이 c = 1 매개변수를 거부하자 구간 [0, 3]·
+        # [1, 4]가 뽑혀 처음 드러났다).
+        left = with_wa_gwa(f"f({c.a})")
         return _mc_c_item(
             frame_id="mc-student-solution-check",
             text=(
-                f"함수 f(x) = {_fx(c)}에 대하여 f({c.a})와 f({c.b})의 값은 서로 다르다. 구간 "
+                f"함수 f(x) = {_fx(c)}에 대하여 {left} f({c.b})의 값은 서로 다르다. 구간 "
                 f"[{c.a}, {c.b}]에서 평균값 정리를 만족시키는 c를 구하려 할 때, 올바른 방정식을 "
                 "세워 구한 c의 값은?"
             ),

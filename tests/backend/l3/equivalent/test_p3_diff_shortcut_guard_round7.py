@@ -7,14 +7,15 @@
 ① **재현율** — 감사 동결 원문(as-found · `bank_audit_r3/audited_bank.jsonl`)에서 결함 11건 전부를 *그 원인에
    대응하는 규칙군*이 잡는다(원인별 건수 동결). 규칙의 절을 지우면(뮤테이션) 이 단언이나 ④가 깨진다.
 ② **변별** — 그 은행은 6회차 규칙으로 빌드됐으므로 7회차 이전 규칙만으로는 504건 중 0건을 잡는다.
-③ **과잉 거부** — 결함이 아닌 493건 중 7회차 규칙이 거부하는 것은 고정된 65건뿐이다(규칙별 건수 동결). 전부
-   *같은 틀의 같은 형태*다(주어 자리 소개 없는 v(t) 25 · 오답 경로 일치 23 — c만·m만 묻기 11·x = 1 평가 9·주어진
-   도함수 꼴 2·kx^m의 k 2 · 결론이 묻는 대상과 어긋남 7 · 발문에 없는 x(…) 6 · 이차곡선 기울기 4 · 속도↔가속도
-   같은 값 2 · 성분 임계점 1) — 판정자 2명은 표본 판정이라 같은 형태를 모두 짚지 않았다(결함 후보로 보고한다).
-   집합이 바뀌면 RED(조용히 늘거나 줄지 않는다).
+③ **과잉 거부** — 결함이 아닌 493건 중 7회차 규칙이 거부하는 것은 고정된 75건뿐이다(규칙별 건수 동결). 전부
+   *같은 틀의 같은 형태*다(주어 자리 소개 없는 v(t) 25 · 오답 경로 일치 33 — c만·m만 묻기 11·x = 1 평가 9·주어진
+   도함수 꼴 2·kx^m의 k 2·답이 평가점 1인 미지수 7·접선이 지나는 점 3 · 결론이 묻는 대상과 어긋남 7 · 발문에 없는
+   x(…) 6 · 이차곡선 기울기 4 · 속도↔가속도 같은 값 2 · 성분 임계점 1) — 판정자 2명은 표본 판정이라 같은 형태를
+   모두 짚지 않았다(결함 후보로 보고한다). 집합이 바뀌면 RED(조용히 늘거나 줄지 않는다).
 ④ 규칙마다 결함 문면(RED — 동결 원문 또는 그 절만 담은 손 표본)과 그 결함만 고친 문면(GREEN) 대조군이 있다.
-   절이 둘 이상인 규칙은 절마다 RED를 둔다(접점/기울기 · 지수 유지/계수 누락/꼴 읽기 c·m/주어진 도함수 꼴 ·
-   속도→가속도/속도→위치/가속도→속도 · v/a · 증감 대상/결론의 답).
+   절이 둘 이상인 규칙은 절마다 RED를 둔다(접점/기울기 · 지수 유지/계수 누락/꼴 읽기 c·m/주어진 도함수 꼴/평가점
+   미지수/지나는 점 · 속도→가속도/속도→위치/가속도→속도 · v/a · 증감 대상/결론의 답). 평가점 미지수·지나는 점
+   절은 경계마다 GREEN 반례를 둔다(목표값 0 · 평가점이 수 · 유리근 둘 · 묻는 값이 접점이 아님).
 ⑤ 매개변수 거부 조건(7회차 `COINCIDENCE_RULE_IDS`)이 생성기의 라운드로빈에서 실제로 파라미터를 건너뛴다.
 
 동결 사본 전수(504건)를 읽는 측정(①의 원인 대장 대조·②·③)은 `corpus_authoring` 표지로 저작 잡에서 돈다(backend
@@ -103,23 +104,26 @@ _DEFECT_RULES: dict[str, frozenset[str]] = {
 _KNOWN_CLEAN_REJECTED: frozenset[str] = frozenset(
     {
         "069e312e", "0d306fe5", "0f5bf5d6", "1179179f", "1523db07", "1777b112", "183da9df",
-        "1bdcda49", "1d1ac24b", "20d192dc", "22230060", "251646ee", "29b74ece", "2fec7eaa",
-        "320ede1f", "3294c5cf", "3301b000", "336c6447", "361295c7", "388a457c", "3903215e",
-        "3f11d98a", "419b0df6", "4708ef1d", "486f8d56", "4ce1eb57", "51b1211a", "56ce1730",
-        "58271f4d", "59c18dea", "5a14790d", "5dfae494", "6359d702", "64e893d9", "659e4344",
-        "687f3ccf", "6b6884fc", "6cc457ca", "79c590e4", "7eff1361", "81cd04bd", "8590fc7c",
-        "8a24f93b", "8ac7ff35", "8de9e24f", "9761582e", "98769f84", "aa7033a1", "c35c2416",
-        "c57915eb", "c66d6409", "ca009e95", "cbba7d02", "d94ed47e", "d95c2434", "d9b48a16",
-        "df29dfed", "e2ec6cc6", "eacd9fe7", "ef60c8fb", "f644a71b", "fb4b24a9", "fb822e89",
-        "fcb277b5", "fd244fa9",
+        "1ad01a4c", "1bdcda49", "1d1ac24b", "1f76e293", "20d192dc", "22230060", "251646ee",
+        "29b74ece", "2fec7eaa", "320ede1f", "3294c5cf", "3301b000", "336c6447", "361295c7",
+        "388a457c", "3903215e", "3f11d98a", "3f8b7f24", "419b0df6", "4708ef1d", "486f8d56",
+        "4ce1eb57", "51b1211a", "56ce1730", "58271f4d", "59c18dea", "5a14790d", "5dfae494",
+        "6359d702", "64e893d9", "659e4344", "687f3ccf", "6b6884fc", "6cc457ca", "71bf2845",
+        "758b4678", "79c590e4", "7eff1361", "81cd04bd", "8590fc7c", "8a24f93b", "8ac7ff35",
+        "8de9e24f", "9761582e", "98769f84", "aa7033a1", "be9836e7", "c35c2416", "c57915eb",
+        "c66d6409", "ca009e95", "cbba7d02", "cec1b35d", "d94ed47e", "d95c2434", "d9ac6402",
+        "d9b48a16", "da13e71b", "df29dfed", "e2ec6cc6", "eacd9fe7", "ef60c8fb", "f644a71b",
+        "f717ef8c", "fb4b24a9", "fb822e89", "fcb277b5", "fd244fa9",
     }
 )  # fmt: skip
 
-#: 위 65건의 규칙별 거부 건수(여러 규칙에 걸린 문항은 규칙마다 센다 — 4ce1eb57은 2규칙, ef60c8fb는 3규칙이라
-#: 합이 68이다).
+#: 위 75건의 규칙별 거부 건수(여러 규칙에 걸린 문항은 규칙마다 센다 — 4ce1eb57은 2규칙, ef60c8fb는 3규칙이라
+#: 합이 78이다). T-power-path-coincidence 33 = 거듭제곱 범위 절 23 + 7회차 보강 10(답이 평가점 1인 미지수 7 —
+#: 1f76e293·be9836e7·3f8b7f24·71bf2845·cec1b35d·d9ac6402·da13e71b · 접선이 지나는 점 3 — 758b4678·
+#: 1ad01a4c·f717ef8c).
 _KNOWN_CLEAN_RULE_COUNTS: dict[str, int] = {
     "E-motion-symbol-subject": 25,
-    "T-power-path-coincidence": 23,
+    "T-power-path-coincidence": 33,
     "E-conclusion-target": 7,
     "E-function-notation": 6,
     "T05-quadratic-slope": 4,
@@ -232,6 +236,16 @@ _RED_IDS: list[tuple[str, str]] = [
     ("T-power-path-coincidence", "76a9f5ac"),  # 꼴 읽기 절·c만 — 지수 유지가 c를 맞힌다
     ("T-power-path-coincidence", "f644a71b"),  # 꼴 읽기 절·m만 — 계수 누락이 m을 맞힌다
     ("T-power-path-coincidence", "8590fc7c"),  # 주어진 도함수 꼴 절 — f'(x) = 8x^7일 때 n
+    # 7회차 보강(동결 사본의 *같은 형태* — 판정자가 짚지 않은 결함 후보). 평가점 미지수 절: 답이 평가점 1이라
+    # 지수 유지 x·f'(x)도 같은 방정식을 만족한다 — 개념마다 하나씩(02-04·02-05·02-06·02-10).
+    ("T-power-path-coincidence", "be9836e7"),  # f'(a) = 9인 양수 a = 1
+    ("T-power-path-coincidence", "1f76e293"),  # 수직인 접선의 접점 a = 1
+    ("T-power-path-coincidence", "3f8b7f24"),  # 평균값 정리의 c = 1
+    ("T-power-path-coincidence", "da13e71b"),  # 속도가 13인 시각 t = 1
+    # 지나는 점 절(검산 조건에 미분 평가가 없는 외부 점 접선 — 발문의 곡선·점으로 다시 세운다).
+    ("T-power-path-coincidence", "758b4678"),  # 원점을 지나는 접선의 접점 a = 1
+    # 점 (0, 3) — 지수 유지 경로의 근은 1과 무리근 하나(유리근만 센다).
+    ("T-power-path-coincidence", "f717ef8c"),
     ("T-component-critical-point", "0bcf3427"),
     ("T10-confusable-quantity", "30d80000"),  # 속도를 묻는데 가속도가 같은 값
     ("E-motion-symbol-subject", "fb9ec6bc"),  # v(t) 절
@@ -303,9 +317,24 @@ _MONOMIAL_AT_ONE = ShortcutProbe(
     answer_map=(("y", "6"),),
 )
 
+#: 지나는 점 절 — 점이 y축 밖(p = 2)이어도 오답 경로의 접선 조건 f'_w(a)(2 - a) + f(a) = 3을 세운다(동결 원문은
+#: 원점·(0, 3)뿐이라 p 자리를 밟지 않는다). 지수 유지 경로의 유리근은 a = 1 하나다.
+_THROUGH_OFFSET = ShortcutProbe(
+    standard_code=_C05,
+    question_text=(
+        "함수 f(x) = x^3 + x^2 - 4에 대하여 곡선 y = f(x) 위의 점 (a, f(a))에서의 접선이 점 (2, 3)을 지날 때, "
+        "양수 a의 값을 구하시오."
+    ),
+    answer="1",
+    explanation="",
+    conditions=("(a**3 + a**2 - 4) + (3*a**2 + 2*a)*(2 - a) = 3", "a > 0"),
+    answer_map=(("a", "1"),),
+)
+
 _RED_HANDMADE: list[tuple[str, ShortcutProbe]] = [
     ("T-power-path-coincidence", _COEFF_DROPPED),
     ("T-power-path-coincidence", _MONOMIAL_AT_ONE),  # 범위 절 — 거듭제곱 하나인 몸통
+    ("T-power-path-coincidence", _THROUGH_OFFSET),  # 지나는 점 절 — p ≠ 0
     ("T10-confusable-quantity", _POSITION_SAME),  # 속도 → 위치
     ("T10-confusable-quantity", _VELOCITY_SAME),  # 가속도 → 속도
     ("E-motion-symbol-subject", _A_NOT_SUBJECT),  # a(t) 절
@@ -325,18 +354,19 @@ def _green_cases(by_prefix: dict[str, dict[str, object]]) -> list[tuple[str, Sho
     """(규칙, 그 결함만 고친 표본) — 원문 문항의 해당 필드만 교정했다(나머지는 원문 그대로)."""
     r = by_prefix
     return [
-        # 7회차 처분 뒤 생성기 산출 그대로 — 삼차곡선에서 기울기 5인 접점(f'(a) = 5의 근 -1/3·1 중 양수).
+        # 7회차 처분 뒤 생성기 산출 그대로 — 삼차곡선에서 기울기 5인 접점(f'(a) = 5의 근 -2/3·2 중 양수).
+        # 접점 a = 1인 산출(x^3 - x^2 + 4x + 2)은 보강 절(평가점 미지수)이 거부한다.
         (
             "T05-quadratic-slope",
             _fix(
                 r["4d287bbd"],
                 question_text=(
-                    "곡선 y = x^3 - x^2 + 4x + 2 위의 x좌표가 a인 점에서의 접선의 기울기가 5일 때, 양수 a의 "
+                    "곡선 y = x^3 - 2x^2 + x - 3 위의 x좌표가 a인 점에서의 접선의 기울기가 5일 때, 양수 a의 "
                     "값을 구하시오."
                 ),
-                answer="1",
-                conditions=("Derivative(x**3 - x**2 + 4*x + 2, x).doit().subs(x, a) = 5", "a > 0"),
-                answer_map=(("a", "1"),),
+                answer="2",
+                conditions=("Derivative(x**3 - 2*x**2 + x - 3, x).doit().subs(x, a) = 5", "a > 0"),
+                answer_map=(("a", "2"),),
             ),
         ),
         # 기울기 절의 대조 — 삼차곡선 두 점의 기울기 합(검산 몸통 f(x) + f(x + 4)는 Tier1 표기 제약일 뿐이다).
@@ -403,6 +433,75 @@ def _green_cases(by_prefix: dict[str, dict[str, object]]) -> list[tuple[str, Sho
                 answer="1",
                 explanation="f(x) = x는 지수가 1인 거듭제곱이므로 도함수는 1이다.",
                 conditions=("Derivative(x, x).doit().subs(x, 2) = y",),
+                answer_map=(("y", "1"),),
+            ),
+        ),
+        # ── 평가점 미지수 절의 경계 ──
+        # 답을 a = 2로 옮기면(f'(a) = 18) 지수 유지 3a^3 + 6a = 18·계수 누락 a^2 + 6 = 18 모두 유리근이 없다.
+        (
+            "T-power-path-coincidence",
+            _fix(
+                r["be9836e7"],
+                question_text=(
+                    "함수 f(x) = x^3 + 6x + 5에 대하여 f'(a)의 값이 18이 되도록 하는 양수 a의 값을 구하시오."
+                ),
+                answer="2",
+                conditions=("Derivative(x**3 + 6*x + 5, x).doit().subs(x, a) = 18", "a > 0"),
+                answer_map=(("a", "2"),),
+            ),
+        ),
+        # 목표값 0(임계점) — 지수 유지 x·f'(x) = 0은 참 근을 늘 품어 매개변수로 피할 수 없다(판정 범위 밖).
+        (
+            "T-power-path-coincidence",
+            ShortcutProbe(
+                standard_code=_C05,
+                question_text=(
+                    "곡선 y = x^3 - 3x 위의 x좌표가 a인 점에서의 접선의 기울기가 0일 때, 양수 a의 값을 구하시오."
+                ),
+                answer="1",
+                explanation="",
+                conditions=("Derivative(x**3 - 3*x, x).doit().subs(x, a) = 0", "a > 0"),
+                answer_map=(("a", "1"),),
+            ),
+        ),
+        # 평가점이 수(f'(1) 읽기) — 이 절은 미지수 쪽만 본다(02-04 계수 합·상수항 틀은 틀이 평가점을 정한다).
+        (
+            "T-power-path-coincidence",
+            ShortcutProbe(
+                standard_code=_C04,
+                question_text="함수 f(x) = x^3 + 2x에 대하여 f'(1)의 값을 구하시오.",
+                answer="5",
+                explanation="",
+                conditions=("Derivative(x**3 + 2*x, x).doit().subs(x, 1) = y",),
+                answer_map=(("y", "5"),),
+            ),
+        ),
+        # 오답 경로의 유리근이 둘(c = 1·c = -1)이면 그 학생은 답을 하나로 정하지 못한다 — 동결 원문 그대로 통과.
+        ("T-power-path-coincidence", probe_from_record(r["b92da0d6"])),
+        # ── 지나는 점 절의 경계 ──
+        # 7회차 보강 뒤 생성기 산출 — 원점을 지나는 접선의 접점 a = 2(지수 유지·계수 누락 모두 a = 2를 지나지 않는다).
+        (
+            "T-power-path-coincidence",
+            _fix(
+                r["758b4678"],
+                question_text=(
+                    "함수 f(x) = x^3 + 12x^2 - 3x + 64에 대하여 곡선 y = f(x) 위의 점 (a, f(a))에서의 접선이 "
+                    "원점을 지날 때, 양수 a의 값을 구하시오."
+                ),
+                answer="2",
+                conditions=("(a**3 + 12*a**2 - 3*a + 64) - a*(3*a**2 + 24*a - 3) = 0", "a > 0"),
+                answer_map=(("a", "2"),),
+            ),
+        ),
+        # 묻는 값이 접점 a가 아니면(a^2) 보지 않는다 — 오답 경로 방정식의 근을 엉뚱한 미지수와 견주지 않는다.
+        (
+            "T-power-path-coincidence",
+            _fix(
+                r["1ad01a4c"],
+                question_text=str(r["1ad01a4c"]["question_text"]).replace(
+                    "양수 a의 값", "a^2의 값"
+                ),
+                conditions=(),
                 answer_map=(("y", "1"),),
             ),
         ),
@@ -684,27 +783,35 @@ def test_quadratic_slope_reads_the_curve_not_the_tier1_body() -> None:
     assert "T05-quadratic-slope" in _round7(quadratic)
 
 
-#: 7회차에 이차 → 삼차로 바꾼 02-05 '기울기 → 접점' 틀(원인 ① 교정 대상).
-_SLOPE_TO_POINT_FRAMES: frozenset[str] = frozenset(
-    {"rep-find-point-for-slope", "applied-parallel-to-line", "applied-perpendicular-to-line"}
+#: 02-05에서 접점의 x좌표 a를 묻는 틀 — 기울기·평행·수직(7회차에 이차 → 삼차로 바꾼 원인 ① 교정 대상)과
+#: 곡선 밖의 점을 지나는 접선(5회차부터 삼차).
+_TANGENCY_POINT_FRAMES: frozenset[str] = frozenset(
+    {
+        "rep-find-point-for-slope",
+        "applied-parallel-to-line",
+        "applied-perpendicular-to-line",
+        "applied-tangent-passes-through-point",
+        "applied-cubic-tangent-through-origin",
+    }
 )
 
 
 @pytest.mark.corpus_authoring
-def test_rewritten_slope_frames_never_answer_one() -> None:
-    """7회차에 삼차로 바꾼 02-05 '기울기 → 접점' 틀 3종은 접점 x = 1을 답으로 내지 않는다.
+def test_tangency_point_frames_never_answer_one() -> None:
+    """02-05 접점 미지수 틀 5종은 접점 x = 1을 답으로 내지 않는다(생성기 산출 전수 — 슬롯에 뽑힌 문항).
 
-    a = 1이면 지수를 줄이지 않는 오개념의 도함수 Σ n·c·a^n도 a = 1에서 참 도함수와 같은 값이라 거듭제곱
-    미분 오류로도 정답에 닿는다(3회차 감사 cbde3ec3과 같은 형태 — 원인 ① 교정이 원인 ②를 새로 만들지
-    않게 한다). 이 틀들은 판정기 거듭제곱 경로 규칙의 범위(02-03·거듭제곱 하나·거듭제곱 오개념 선지) 밖이라
-    판정기가 아니라 생성기의 접점 축 `_SLOPE_POINTS`가 막는다 — 축에 1을 되돌리면 이 단언이 깨진다.
+    a = 1이면 지수를 줄이지 않는 오개념의 도함수 x·f'(x)도 a = 1에서 참 도함수와 같은 값이라 거듭제곱 미분
+    오류로도 정답에 닿는다(3회차 감사 cbde3ec3과 같은 형태가 미지수 쪽에 선 것 — 원인 ① 교정이 원인 ②를
+    새로 만들지 않게 한다). 막는 곳은 판정기 한 곳이다 — `T-power-path-coincidence`의 평가점 미지수 절(기울기·
+    평행·수직)과 지나는 점 절(외부 점)이 라운드로빈에서 그 매개변수를 건너뛴다. 생성기 축은 1을 그대로 품으므로
+    (`_POS_POINTS`·원점 틀의 근 축 (1, 2)) 절을 지우면 이 단언이 깨진다.
     """
     seen = [
         item
         for slot in ("representative", "applied")
         for item in P3DiffTangentLineGenerator.items(slot)
-        if item.frame_id in _SLOPE_TO_POINT_FRAMES
+        if item.frame_id in _TANGENCY_POINT_FRAMES
     ]
-    # 공허 통과 방지 — 틀 3종이 슬롯에 실제로 뽑혀 있어야 단언이 무언가를 본다.
-    assert {item.frame_id for item in seen} == _SLOPE_TO_POINT_FRAMES
+    # 공허 통과 방지 — 틀 5종이 슬롯에 실제로 뽑혀 있어야 단언이 무언가를 본다.
+    assert {item.frame_id for item in seen} == _TANGENCY_POINT_FRAMES
     assert [item.question_text for item in seen if item.answer_text == "1"] == []

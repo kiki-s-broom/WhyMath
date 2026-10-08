@@ -189,7 +189,10 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
                           미분하는 식이 상수항 빼고 거듭제곱 하나)에서 두 대표 오답 경로(계수 누락
                           x^(n - 1) · 지수 유지 n·x^n) 중 하나라도 정답과 같은 값을 낸다 — 평가 절
                           (f'(1) 등)·꼴 읽기 절('cx^m 꼴로 나타낼 때 c')·주어진 도함수 꼴 절 ('f'(x)
-                          = 8x^7일 때 n').
+                          = 8x^7일 때 n'). 전 개념에서 보는 절 둘(오답 경로 방정식의 *유리근*이 정답
+                          하나): 평가점 미지수 절(f'(a) = m ≠ 0인 a · 기울기·평행·수직으로 접점 ·
+                          평균값 정리의 c — 지수 유지 x·f'(x)는 a = 1에서 늘 참값) · 지나는 점 절
+                          ('(a, f(a))에서의 접선이 점 (p, q)를 지날 때 a').
   T-component-critical-point*
                           합·차·실수배(발문이 보인 함수들의 일차결합)의 미분계수인데 평가점이 한
                           성분 함수의 임계점이다 — 그 성분의 처리를 틀려도 같은 값.
@@ -3009,6 +3012,101 @@ def _evaluated_path_hits(probe: ShortcutProbe) -> list[str]:
     return hits
 
 
+def _only_rational_root(
+    eq: sympy.Expr, var: sympy.Symbol, filters: Sequence[_Relation], answer: sympy.Expr
+) -> bool:
+    """오답 경로 방정식의 유리근(보호 조건 통과)이 정답 하나뿐인가.
+
+    오답 경로 방정식은 대개 삼차 이상이라 학생은 유리근을 대입해 인수를
+    찾는다 — 무리근은 손으로 닿지 않으므로 '오답 경로로 푼 학생의 답'은
+    유리근이다(f717ef8c: 지수 유지 경로의 근 1과 무리근 하나). 유리근이 둘
+    이상이면(b92da0d6: c = 1과 c = -1) 그 학생은 답을 하나로 정하지 못한다 —
+    걸지 않는다.
+    """
+    rational = {root for root in _path_solutions(eq, var, filters) if root.is_rational}
+    return rational == {answer}
+
+
+def _unknown_point_hits(probe: ShortcutProbe) -> list[str]:
+    """평가점 미지수 절 — 미분계수가 주어진 값(≠ 0)이 되는 점을 구하는
+    문항에서 오답 경로로 세운 방정식의 유리근이 정답 하나다(전 개념 —
+    f'(a) = m인 양수 a · 접선의 기울기·평행·수직으로 접점 · 평균값 정리의 c ·
+    속도가 주어진 값인 시각).
+
+    지수 유지 경로의 도함수는 x·f'(x)라 평가점이 1이면 늘 참값과 같고(3회차
+    감사 cbde3ec3과 같은 형태가 *미지수 쪽*에 선 것), 계수 누락 경로는
+    평가점이 0이면 늘 일차항 계수 그대로다. 평가점을 고르는 것은 매개변수
+    선택이라 거부 조건이다. 목표값이 0이면(임계점·멈추는 시각) x·f'(x) = 0이
+    참 근을 늘 품어 매개변수로 피할 수 없으므로 보지 않는다(구조적 한계 —
+    판정 범위 밖). 평가점이 수인 미분 평가(f'(1) 읽기)도 보지 않는다 — 그것은
+    평가 절이 거듭제곱 미분이 검사 대상인 문항에서만 본다.
+    """
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None:
+        return []
+    filters = _side_filters(probe, var)
+    hits: list[str] = []
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or "Derivative" in call.body or call.point is None:
+            continue
+        point = _sym(call.point)
+        if point != var or rel.other == 0:
+            continue
+        body = _sym(call.body)
+        if body is None:
+            continue
+        v = sympy.Symbol(call.var)
+        for path in _POWER_PATHS:
+            wrong = power_path_derivative(body, v, path)
+            if wrong is None or sympy.simplify(wrong - sympy.diff(body, v)) == 0:
+                continue
+            eq = sympy.expand(wrong.subs(v, point) - rel.other)
+            if _only_rational_root(eq, var, filters, answer):
+                hits.append(f"{path} 경로(미분계수가 주어진 값인 점)")
+    return hits
+
+
+#: 접선이 지나는 점 — '(a, f(a))에서의 접선이 원점을 지날 때'·'… 점 (p, q)를(을) 지날 때'.
+_THROUGH_POINT = re.compile(
+    r"\((?P<v>[a-z]), f\((?P=v)\)\)에서의 접선이 "
+    r"(?:(?P<origin>원점)|점 \((?P<p>-?\d+), (?P<q>-?\d+)\))[을를] 지날"
+)
+
+
+def _through_point_hits(probe: ShortcutProbe) -> list[str]:
+    """지나는 점 절 — '곡선 y = f(x) 위의 점 (a, f(a))에서의 접선이 점 (p, q)를
+    지날 때 a'에서 오답 경로의 접선 조건 f'_w(a)(p - a) + f(a) = q의 유리근이
+    정답 하나다.
+
+    검산 조건은 f(a)·f'(a)를 전개한 다항식이라(Tier1 독립 경로) 미분 평가가
+    보이지 않는다 — 곡선 f와 점을 발문에서 읽어 조건을 다시 세운다. 지수 유지
+    경로는 a = 1에서 f'_w(1) = f'(1)이라 늘 같은 접선이다(758b4678·1ad01a4c·
+    f717ef8c). 묻는 미지수가 접점 a가 아니면(그 접선의 기울기 등) 보지 않는다.
+    """
+    m = _THROUGH_POINT.search(probe.question_text)
+    if m is None:
+        return []
+    var, answer = _answer_var(probe), _answer_value(probe)
+    if var is None or answer is None or str(var) != m.group("v"):
+        return []
+    curve = dict(_named_functions(probe.question_text, "x")).get("f")
+    if curve is None:
+        return []
+    p, q = (0, 0) if m.group("origin") else (int(m.group("p")), int(m.group("q")))
+    x = sympy.Symbol("x")
+    filters = _side_filters(probe, var)
+    hits: list[str] = []
+    for path in _POWER_PATHS:
+        wrong = power_path_derivative(curve, x, path)
+        if wrong is None or sympy.simplify(wrong - sympy.diff(curve, x)) == 0:
+            continue
+        eq = sympy.expand(wrong.subs(x, var) * (p - var) + curve.subs(x, var) - q)
+        if _only_rational_root(eq, var, filters, answer):
+            hits.append(f"{path} 경로(접선이 지나는 점)")
+    return hits
+
+
 #: 도함수 꼴 읽기 — 발문의 거듭제곱 함수와 도함수 꼴 'cx^m'·'kx^m'.
 _FORM_FUNCTION = re.compile(
     r"(?:(?<![A-Za-z'])[a-z]\((?P<v>[xt])\)|(?<![A-Za-z'])y) = (?P<c>-?\d*)(?P<v2>[xt])\^(?P<n>\d+)"
@@ -3095,8 +3193,17 @@ def _power_path_rule(probe: ShortcutProbe) -> list[ShortcutViolation]:
     (`_power_scope`)에서 평가 절(미분 평가를 오답 경로 도함수로 바꿔 푼 해가 정답 하나)과 꼴 읽기
     절(도함수를 c·x^m 꼴로 읽는 문항)을 본다. 매개변수 거부 조건이다(x = 1·x = 0 같은 평가점은
     파라미터 선택이다) — 꼴 읽기 절은 틀 자체가 늘 걸리므로 생성기가 묻는 값을 c + m 등으로 바꾼다.
+
+    7회차 보강 — 같은 일치가 *미지수 쪽*(답이 평가점)에 선 형태는 개념을 가리지 않고 본다: 평가점
+    미지수 절(f'(a) = m ≠ 0인 a)·지나는 점 절('(a, f(a))에서의 접선이 점 (p, q)를 지날 때 a'). 둘 다
+    오답 경로 방정식의 유리근이 정답 하나일 때만 건다(`_only_rational_root`).
     """
-    hits = _evaluated_path_hits(probe) + _form_path_hits(probe)
+    hits = (
+        _evaluated_path_hits(probe)
+        + _form_path_hits(probe)
+        + _unknown_point_hits(probe)
+        + _through_point_hits(probe)
+    )
     if not hits:
         return []
     return [

@@ -286,9 +286,6 @@ def _slope_point_slope(f: Poly, a0: int) -> int | None:
 
 _POINTS: Final[tuple[object, ...]] = (-3, -2, -1, 1, 2, 3, 4)
 _POS_POINTS: Final[tuple[object, ...]] = (1, 2, 3, 4)
-#: 기울기로 접점을 찾는 틀의 접점 x좌표 — 1을 뺀다(7회차 감사: a = 1이면 지수를 줄이지 않는 오개념의
-#: 도함수 Σ n·c·a^n도 a = 1에서 참 도함수와 같은 값이라 거듭제곱 미분 오류로도 정답에 닿는다).
-_SLOPE_POINTS: Final[tuple[object, ...]] = (2, 3, 4)
 
 
 def _tangent(f: Poly, a: int) -> tuple[int, int, int]:
@@ -590,7 +587,7 @@ def _rep_frames() -> list[Frame]:
         for c in (-6, -3, -1, 2, 4)
         for d in (-4, -1, 2, 5)
     )
-    slope_point = _grid("p3-tan:r6", _cubic_pool()[::11], _SLOPE_POINTS)
+    slope_point = _grid("p3-tan:r6", _cubic_pool()[::11], _POS_POINTS)
     return [
         Frame("rep-slope-at-point", _grid("p3-tan:r1", _cubic_pool()[::9], _POINTS), r1),
         Frame("rep-slope-at-x-coordinate", _grid("p3-tan:r2", _quartic_pool()[::7], _POINTS), r2),
@@ -1054,11 +1051,11 @@ def _applied_frames() -> list[Frame]:
         )
 
     return [
-        Frame("applied-parallel-to-line", _grid("p3-tan:a1", _slope_pool(), _SLOPE_POINTS), a1),
+        Frame("applied-parallel-to-line", _grid("p3-tan:a1", _slope_pool(), _POS_POINTS), a1),
         Frame(
             "applied-perpendicular-to-line",
             # s = 1은 'x + 1y = 2'·'기울기 -1/1' 표기가 생겨 뺐다(삼차 풀로 바꾼 뒤 처음 드러났다).
-            _grid("p3-tan:a2", _slope_pool(), _SLOPE_POINTS, (2, 3, 4, 5, 6, 7, 8, 9, 10)),
+            _grid("p3-tan:a2", _slope_pool(), _POS_POINTS, (2, 3, 4, 5, 6, 7, 8, 9, 10)),
             a2,
         ),
         # 5회차 감사 처분 — 곡선 밖의 점에서 그은 접선은 곡선이 이차면 판별식만으로 풀린다(판정기
