@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,12 +20,14 @@ acceptance:
   - "stamp_verification_tier() 신규값 기록 및 하위호환 테스트"
   - "ruff/black/mypy green, import-linter 7계층 위반 0"
   - PR 생성 및 CI 통과
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/872"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1528"
 paths:
   - src/backend/whymath_backend/l3/verification_tier.py
   - src/backend/whymath_backend/l3/verifier.py
   - docs/architecture/verifier_v2_design.md
   - "backlog/tasks/**"
-session: claude/cool-newton-kaxe4r
+session: null
 notes: "S4-52 v2 설계서 §4. '증명된 축의 집합'으로 tier를 세분화하되, 기존 MACHINE_EXHAUSTIVE/MACHINE_SAMPLED는 legacy alias로 유지해 마이그레이션 없이 기존 코퍼스를 그대로 읽을 수 있게 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
 updated: 2026-10-08
