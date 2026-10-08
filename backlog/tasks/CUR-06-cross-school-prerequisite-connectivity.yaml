@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,10 +17,11 @@ acceptance:
   - "③ CI 배선 실재 확인: 신규 워크플로 없이 기존 harness 잡에 편입되는지 확인한다(OPS-03·OPS-10)"
   - "④ 변별력: fixture에서 경계 엣지 1건을 넣고 빼서 도달 가능 비율이 실제로 움직이는지 확인한다. 총 엣지 수만 세는 지표는 경계 1건 변화에 반응하지 않으므로 위장이다"
   - "⑤ 범위 밖 명시 + S4-01 acceptance 정밀화: 경계 엣지의 생성·적재는 하지 않는다(소스에 신호 없는 관계를 채우면 교수학 날조 — v1 §3 페이퍼 갭과 동일 근거). 대신 S4-01(수학 K-12 완성)의 acceptance에 '경계 연결 밀도'를 명시 항목으로 추가해, 노드 4축 존재만으로 충족 판정되지 않게 한다. 엣지 저작 자체는 S4-01 소관이다"
-artifacts: []
+artifacts:
+  - "PR #1540 (https://github.com/kiki-s-broom/WhyMath/pull/1540) · 커밋 b70388b6 · harness/cross_school_connectivity_report.py"
 paths:
   - "src/backend/whymath_backend/harness/**"
   - "tests/backend/harness/**"
-session: claude/fervent-cerf-em2wxm
-notes: "docs/architecture/curriculum_module_gap_review_r2.md §3 D6. v1 §1 모듈5의 'prerequisite ✅ 초과'가 내부 밀도만 보고 경계 밀도를 안 본 판정이었다. MVP 페르소나 A(일반고 고3)의 핵심 요구가 중학교 결손 복구인데 중→고 엣지가 11개뿐이라 recommend_prerequisite_gaps의 재귀 CTE가 학교급을 사실상 못 넘는다 — 알고리즘이 아니라 데이터 위상 문제. 중복 회피 확인: PATH-03은 막힌 선수 집합 내부 순서 축(l2/learning_path.py)이라 축이 다르고, S4-01은 본래 소관이나 acceptance가 '4축 활성' 한 줄이라 노드 존재만으로 통과할 수 있어 ⑤에서 정밀화한다. [2026-08-11 과목/학교급 완비 점검 승계] 경계 밀도 계측기의 관측 축에 대학을 포함할 것 — 실측: 엣지 2,210 전량 prerequisite, 학교급 쌍은 고→고 940·초→초 529·대→대 481·중→중 240·중→고 11·초→중 9로 경계 통과 20/2,210(0.90%)이고 고등→대학은 0이다. 더구나 대학 내부 481도 같은 과목 479/과목 간 2라 32과목이 서로 고립된 사슬이다 — '초에서 대학까지' 관통 traversal이 성립하지 않는 하한. 근거: docs/architecture/subject_content_coverage_gap_review.md §8 부록 ㉶.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F2 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
+session: null
+notes: "docs/architecture/curriculum_module_gap_review_r2.md §3 D6. v1 §1 모듈5의 'prerequisite ✅ 초과'가 내부 밀도만 보고 경계 밀도를 안 본 판정이었다. MVP 페르소나 A(일반고 고3)의 핵심 요구가 중학교 결손 복구인데 중→고 엣지가 11개뿐이라 recommend_prerequisite_gaps의 재귀 CTE가 학교급을 사실상 못 넘는다 — 알고리즘이 아니라 데이터 위상 문제. 중복 회피 확인: PATH-03은 막힌 선수 집합 내부 순서 축(l2/learning_path.py)이라 축이 다르고, S4-01은 본래 소관이나 acceptance가 '4축 활성' 한 줄이라 노드 존재만으로 통과할 수 있어 ⑤에서 정밀화한다. [2026-08-11 과목/학교급 완비 점검 승계] 경계 밀도 계측기의 관측 축에 대학을 포함할 것 — 실측: 엣지 2,210 전량 prerequisite, 학교급 쌍은 고→고 940·초→초 529·대→대 481·중→중 240·중→고 11·초→중 9로 경계 통과 20/2,210(0.90%)이고 고등→대학은 0이다. 더구나 대학 내부 481도 같은 과목 479/과목 간 2라 32과목이 서로 고립된 사슬이다 — '초에서 대학까지' 관통 traversal이 성립하지 않는 하한. 근거: docs/architecture/subject_content_coverage_gap_review.md §8 부록 ㉶.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/F2 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[미러 면제 2026-10-08] CI 미러 mobile 잡 exit=127 — 컨테이너에 Flutter SDK 없음(which flutter dart 무출력). 변경은 mobile 경로 무변경이며 ci.yml 변경으로 잡이 선택됨. 나머지 잡(data-pipeline·backend·harness-integrity·declared-unwired-audit·corpus-authoring·infra-contracts·policy-guard 등)은 미러 통과, data-pipeline 미실행 1건(qa_pipeline 게이트)은 별도 직접 실행 exit 0. mobile 최종 판정은 CI"
 updated: 2026-10-08
