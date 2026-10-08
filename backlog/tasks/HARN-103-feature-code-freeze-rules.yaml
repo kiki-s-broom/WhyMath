@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 4
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ artifacts: []
 paths:
   - "docs/standards/release_freeze*.md"
   - ".github/workflows/**"
-session: null
+session: claude/affectionate-wozniak-gud0im
 notes: "출처: docs/reviews/eos_source_docs_gap_review_2026-08-31.md §4 B7 · §5 B급 미등재 후보 7. 갭리뷰 §5는 \"11/30 시점 작업이라 지금 등재하지 않는다\"고 적었으나, 그 유예는 대장에 집행되지 않아 소유자 0 상태와 구별되지 않았다(CLAUDE.md '만료 없는 유예·제외 금지'·'선행 조건을 산문에만 적고 대장에 집행하지 않기 금지'). 2026-09-15 재대조(판정 기준 main 4b33d243)에서 소유자 0건 확인 후 등재하며, 시점 유예는 priority 4로 표현한다. 소유자 검색 방법: 전 태스크 642건 YAML 전문에 역할 기반 정규식(release-blocker·Code Freeze·코드 프리즈·기능 동결 라벨·Feature Freeze) → 관련 0건(HARN-42는 EOS 처분 라벨 축으로 별건)."
-updated: 2026-09-15
+updated: 2026-10-08
