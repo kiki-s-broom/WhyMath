@@ -110,7 +110,7 @@ class TestBehavior:
         assert error_code_of(CodedHTTPException("WM-RATE-001")) == "WM-RATE-001"
         assert error_code_of(RuntimeError("boom")) == UNCLASSIFIED
 
-        class Stale(Exception):
+        class StaleError(Exception):
             error_code = "WM-RATE-777"  # 미등록 — 조용히 통과시키지 않는다
 
-        assert error_code_of(Stale()) == UNCLASSIFIED
+        assert error_code_of(StaleError()) == UNCLASSIFIED
