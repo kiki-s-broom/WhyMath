@@ -375,6 +375,15 @@
 **정직 고지**: 같은 계열 AI 2인은 독립 표본이 아니고 오류율도 측정되지 않았다. 초인간 검증 기준의 측정 게이트가 아니라 **정책 대체**다. 정본 `graph.json` 병합은 범위 밖이다(S4-60·S4-61 소관, 표 문서 §5 스키마 결정).
 **집행 마찰(사실 기록)**: 반영 중 Auto 권한 분류기가 생성 스크립트 수정·재생성을 [Instruction Poisoning]으로 2회 거부했다(서브에이전트 산출로 사람 검수 대상 파일을 고치는 동작으로 본 것으로 추정). 세션은 우회하지 않고 멈춰 Kiki 승인과 모드 전환을 받은 뒤 진행했다.
 
+### 2026-10-08 (결정 · S4-58): **통계 검증기(`statistical_claim`)를 float 비교에서 정확 유리수 + 선언형 허용오차 정책(`tolerance`)으로 전환했다 — 설계서 `verifier_v2_domains.md` §3.5-2가 약속한 "부동소수점 사용 금지"를 S4-53 구현이 어기고 있었다**
+
+- **경위(실측)**: S4-53 구현이 데이터를 float으로 바꾼 뒤 `math.isclose(rel_tol=1e-9, abs_tol=1e-9)`로 비교했다. 수정 전 코드를 `git show`로 꺼내 같은 입력으로 재현했다 — 17자리 정수 평균이 1 어긋나도 `pass`, 평균 1조에서 500 어긋나도 `pass`, NaN 데이터가 "계산값 nan"으로 `fail`, 지수 `1e999999` 주장이 `inf`로 읽혀 `fail`, 혼합수 `1 1/2`가 공백 제거로 `11/2`(5.5)로 오독돼 `fail`, 100,000단 중첩 data는 `RecursionError` 크래시.
+- **결정**: ① 데이터·주장값을 float 경유 없이 `Fraction`으로 읽고 mean·median·variance·q1·q3는 유리수 정확값, std·corr는 제곱근이 유리수면 정확값·아니면 10^-60 이내 정수 제곱근 근사로 판정한다 ② `tolerance` 절(`exact`·`abs:<양수>`·`rel:<0~1>`·`round:<0~15>`, 경계 포함·half-up 정확 연산)을 문항 저자가 선언한다 ③ 절 생략 시 유한소수는 `exact`, 무한소수·무리수는 `abs:10^-9`(절대오차만 — 상대오차는 큰 값에서 허용 폭이 값에 비례해 커진다) ④ 수 토큰 64자·지수 ±30 상한, NaN·Infinity·bool·비 ASCII·밑줄 숫자·분모 0·깊은 중첩을 `unverifiable`로 ⑤ 미지/중복 조건 절은 조용히 무시하지 않고 `unverifiable`(철자가 틀린 `tolerance` 절이 검증 강도를 몰래 바꾸는 것을 차단). 무리수에 `exact`를 지정하면 `fail`이 아니라 `unverifiable`(저자의 정책 오설정을 학생 오답으로 읽지 않는다).
+- **의도한 행동 변경**: 기본 판정이 엄격해졌다(유한소수는 1e-9 허용 → 정확 일치, 무한소수·무리수는 상대오차 제거). 영향 범위 실측 — 저장소 전체에서 `stat=` DSL을 쓰는 코퍼스·fixture 문항 0건이라 기존 판정이 바뀌는 문항은 없다. `StatisticalResult.value`(float)와 `verifier.py` 래퍼·`machine_value` 계약은 유지, `exact_value`·`policy`(적용 정책 라벨, `기본→…` 접두)를 추가했다.
+- **검증(로컬, 정확한 CI 명령)**: 백엔드 전체 `16885 passed·584 skipped·1 xfailed`(실패 0·13분 31초)·커버리지 90.78%·계층 게이트 PASS(l3 94.9%), `tests/harness` 2014 passed, `tests/infra` 2744 passed, `ruff`·`black`·`mypy --strict`(740 파일)·`lint-imports`(계약 4 유지) exit 0, 위헌 심사 래칫 exit 0·차단 0건 ≤ 기준선 0건. 가드 뮤테이션 26종 전건 RED·생존 0·원복 sha256 동일(지수 상한 완전 제거 주입은 `Fraction("1e999999999")`가 메모리를 소진시킬 수 있어 의도적으로 제외하고 상한값 10^6 주입으로 대체).
+- **한계·승계**: 판정 해상도는 10^-60(정책 경계가 그보다 가까운 무리수는 다루지 않는다). 교차검증 `cross_verify.py`의 `machine_value` float `isclose` 대조는 대값 왜곡이 동형으로 남아 `S4-70`으로, n=1 표본분산 0 계산과 `columns` 절 `int()` 예외 누출은 `S4-71`로 등재했다(둘 다 `depends_on: S4-58`, P2).
+- **관측(이 변경과 무관한 기존 상태)**: `constitution/rules.yaml`의 `R28-02` 집행 파일 `tests/contract/test_subject_contract.py`가 main 체크아웃에 없다 — 규칙 머리말대로 "집행 장치 없음"으로 읽으며 통과로 계상하지 않았다.
+
 ### 2026-10-07 (정정 · G-misc40-deferred-m0671-redecision): **M0671 서명을 Kiki 머신에서 직접 입력해 라이브 DB에 한 번 더 적재했다 — 이 게이트는 2026-10-06 #1477로 이미 clear돼 있어 중복 실행이었고, 그 결과 DB 행의 note가 main 코퍼스와 달라졌다** (Kiki 실행·claude 기록) — 판정 기준 main `42018d87`
 
 - **경위(세션 결함)**: 세션이 게이트를 pending으로 읽은 첫 조회(2026-10-06)만 근거로 서명·적재 런북을 만들었고, 런북 작성 시점에 `origin/main`의 코퍼스와 게이트 상태를 다시 조회하지 않았다. 그 사이 #1477이 M0671 승인을 반영했고 게이트는 이미 clear됐다(clear 주체 claude·Kiki 지시 중계). 저장소 반영 단계에서 `origin/main`의 `crosslinks.json`을 읽고서야 발견했다.
