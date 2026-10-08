@@ -58,6 +58,7 @@ from whymath_backend.api._device_store import (
     ping_device_store_health,
     set_device_store,
 )
+from whymath_backend.api._error_codes import CodedHTTPException
 from whymath_backend.api._growth_evidence_state import (
     GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY,
     GrowthEvidenceReachCounters,
@@ -902,12 +903,27 @@ def create_app(
         redoc_url=None if _prod_like else "/redoc",
         openapi_url=None if _prod_like else "/openapi.json",
     )
+
     # SEC-26(48_보안 §P0 "CORS/보안 헤더 미들웨어" 갭): TrustedHost → CORS → 보안 헤더 순으로
     # 가장 먼저 건다(등록 순서 = 바깥 래핑 순서 — 나쁜 Host를 가장 먼저 걷어내고, preflight를
     # CORS가 처리하고, 마지막으로 모든 응답에 보안 헤더를 얹는다). 셋 다 *항상* 등록한다 —
     # allowlist가 비어 있으면 각자 안전한 기본 자세로 수렴한다(TrustedHost는 `*`=현재 동작
     # 무회귀, CORS는 deny-by-default=네이티브 앱 미영향). 와일드카드+credentials 조합은
     # `Settings._forbid_cors_wildcard_with_credentials`가 부팅 시점에 이미 막았다.
+    # OPS-82: 코드가 있는 HTTP 에러는 종전 `detail` 옆에 `error_code`를 싣는다(하위 호환 —
+    # `detail`을 그대로 두므로 문자열 detail을 가정하는 클라이언트가 깨지지 않는다). 로그에는
+    # 코드와 예외 타입명만 남긴다 — detail 문장·필드값은 싣지 않는다(CLAUDE.md 침묵 실패 금지).
+    @app.exception_handler(CodedHTTPException)
+    async def _coded_http_exception_handler(
+        request: Request, exc: CodedHTTPException
+    ) -> JSONResponse:
+        logger.info("에러코드 응답 — %s (%s)", exc.error_code, type(exc).__name__)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "error_code": exc.error_code},
+            headers=exc.headers,
+        )
+
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings_for_app.trusted_hosts_list)
     app.add_middleware(
         CORSMiddleware,
@@ -1162,7 +1178,10 @@ def create_app(
                     # 미달 — 426(401/404/422와 구분되는 전용 사유코드). call_next 미호출.
                     return JSONResponse(
                         status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                        content={"detail": "앱을 최신 버전으로 업데이트해주세요."},
+                        content={
+                            "detail": "앱을 최신 버전으로 업데이트해주세요.",
+                            "error_code": "WM-CLIENT-001",
+                        },
                     )
                 # min_version 파싱 불가(Settings 오구성)면 게이트 자체를 적용하지 않는다
                 # (fail-open — 서버 설정 오류로 전 클라를 차단하는 것이 더 나쁜 실패 모드).
