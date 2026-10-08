@@ -8,11 +8,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from whymath_backend.harness.needs_review_worklist import build_worklist
 from whymath_backend.harness.problem_corpus_batch import (
+    _record_to_json,
     build_distractor_codes,
     main,
     run_corpus_batch,
@@ -107,6 +109,31 @@ class TestRunCorpusBatch:
         items = build_worklist(report.review_outcomes)
         assert len(items) == 8
         assert all(it.status == "generation_failed" for it in items)
+
+    def test_authored_by_is_written_only_when_recorded_and_roundtrips(self, tmp_path: Path) -> None:
+        # PB-15 — 서명은 기록이 있을 때만 JSONL에 실리고, 없으면 키 자체가 없다(기존 코퍼스와
+        # 바이트 동일). 왕복: 쓴 값이 로더를 거쳐 그대로 돌아온다. 레코드는 커밋된 실제 코퍼스의
+        # 첫 건을 쓴다(가공 픽스처가 아니라 로더가 실제로 받아들이는 형태).
+        corpus = (
+            Path(__file__).resolve().parents[3]
+            / "data"
+            / "corpus"
+            / "problem_bank_probability_finite_v0"
+            / "problems.jsonl"
+        )
+        base = load_problem_bank_records(corpus)[0]
+        assert base.provenance.authored_by is None  # 전제: 구 코퍼스는 서명 기록이 없다
+        recorded = replace(
+            base, provenance=replace(base.provenance, authored_by="llm:qwen3:30b-a3b")
+        )
+
+        assert "authored_by" not in _record_to_json(base)
+        written = _record_to_json(recorded)
+        assert written["authored_by"] == "llm:qwen3:30b-a3b"
+
+        path = tmp_path / "roundtrip.jsonl"
+        path.write_text(json.dumps(written, ensure_ascii=False) + "\n", encoding="utf-8")
+        assert load_problem_bank_records(path)[0].provenance.authored_by == "llm:qwen3:30b-a3b"
 
     def test_written_corpus_roundtrips_through_loader(self, tmp_path: Path) -> None:
         # JSONL 산출물이 코퍼스 로더로 정확히 되읽힌다 — 형식·위생·Problem 검증 통과.
