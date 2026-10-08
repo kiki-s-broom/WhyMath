@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (회수 · OPS-38): **고립 브랜치 `q8tvcx`의 OPS-19(CI 게이트 도달 가능성 계약)를 회수했다 — 원 커밋의 CI 수정 2건은 main이 이미 흡수해 이식하지 않았고, 남은 한 가지(잡 `if`를 *평가*하는 도달 가능성 가드)만 이식했다. 소유자 없던 의존 3종은 `OPS-32`로 편입했다**
+
+**판정 기준**: `origin/main` `ec1f9dc7`. 원 브랜치 head `e1835c0c`, main에 없는 고유 커밋 3건(`ee9df6dc` 문서·`592c961f` 구현·`e1835c0c` 완료 등재) — 나머지는 전부 `(#NNN)` 스쿼시 번호가 붙은 main 커밋이다(shallow 클론이라 merge-base는 직접 못 봄).
+
+- **원 수정은 이식하지 않음**: A1(`data-pipeline` 잡 skip)은 `COLLAB-07`(#817)이 잡 `if`에 `corpus`를 OR 편입해 해소했고, A2(`notation_coverage`)는 같은 PR이 `backend` 필터에 `data/corpus/`를 편입해 해소했다. 원 커밋의 "data-pipeline 잡에 `notation_coverage` 중복 스텝 추가"는 그 상시 스텝과 중복이라 버렸다.
+- **이식한 것**: `tests/infra/test_ci_gate_reachability.py`(14건). 근거는 뮤테이션 실측이다 — `data-pipeline` 잡 `if`의 `||`를 `&&`로 바꾸면(코퍼스 단독 PR에서 잡이 다시 skip되는 원래 결함) main의 기존 가드 `test_no_dead_changes_flag`는 **그대로 통과**(플래그가 문자열로 등장하면 만족)하고, 신규 테스트는 RED. 주입 3종(OR→AND·corpus 가지 제거·미지 어휘) 전건 RED, 원복 바이트 동일, 무뮤테이션 14 passed. 원 코드와 달리 `eval`을 쓰지 않고(재귀하강 파서) 게이트 판정에 쓰이지 않던 "대표 경로 합성" 자기검증은 뺐다.
+- **문서**: 원 `data_platform_module_gap_review_r2.md`는 `OPS-41`이 이미 회수한 `t608mk`의 같은 이름 문서와 별개라 `docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md`로 회수했다(원문 무수정 + 발견별 현황 표). 현황: A1·A2·C1(`SEC-32` done)·C3(`HARN-15` done) 닫힘, A3는 `declared_unwired_audit`가 상시 감시, B1은 `OPS-67`(todo), C2는 `OPS-32`(todo).
+- **소유자 없던 잔여 2건**: ① r2 C2의 6종 중 `pandas`·`polars`·`great-expectations` 3종은 `OPS-32`(3종만 소유)에도 `OPS-37`에도 없어 `OPS-32` acceptance ⑥으로 편입(선언 `pyproject.toml:57-59`·import 0 실측). ② `ops.cost_report`의 CI 미배선은 결함이 아니다 — 입력이 라이브 Langfuse 트레이스인 운영자 수동 계측 도구이고, 감사기는 `status: reached`로 분류(신규 태스크 불필요).
+- **번호 매핑**: `OPS-19 → OPS-38` · `SEC-13 → SEC-32` · `OPS-20 → OPS-67` · `OPS-21 → OPS-32`.
+
 ### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
 
 **무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).

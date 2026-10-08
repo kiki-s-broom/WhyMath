@@ -320,3 +320,17 @@ claude/relaxed-fermat-8dui3u
 claude/magical-maxwell-hja5kh-eos129
 claude/magical-maxwell-hja5kh-s4-11
 claude/optimistic-bell-gk8vkz
+
+# ── 2026-10-08 14차 배치 (1건) — 회수 태스크 OPS-38 완료로 제외 사유 소멸 ──
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   whymath-ai-recommendation-review-q8tvcx = e1835c0c  (2026-10-08 git ls-remote 실측)
+#     근거: 위 12·13차 배치가 이 브랜치(q8tvcx)를 "회수 태스크 OPS-38·OPS-67이 참조"해 의도적 제외했다. main에 없는
+#     고유 커밋은 3건뿐이며(나머지는 전부 (#NNN) 스쿼시 번호가 붙은 main 커밋) 전부 처분됐다:
+#       ee9df6dc 갭 재점검 r2 문서 → docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md 로 회수
+#                (MEMORY.md 결정 로그 +25줄은 2026-10-08 OPS-38 회수 항목으로 대체 · 태스크 YAML 5건은 번호 매핑
+#                 OPS-19→OPS-38 · SEC-13→SEC-32 · OPS-20→OPS-67 · OPS-21→OPS-32 · HARN-15 유지로 main에 이미 존재)
+#       592c961f CI 수정(data-pipeline 잡 if · notation_coverage 중복 스텝) → 이식 안 함: COLLAB-07(#817)이 다른 방식으로
+#                먼저 해소. 테스트는 tests/infra/test_ci_gate_reachability.py 로 재구현해 이식(OPS-38)
+#       e1835c0c 원 OPS-19 done 등재 → 번호 OPS-19 재사용 금지(HARN-10)로 폐기
+#     OPS-67(B1)의 유일한 상세 근거였던 r2 §2-B1·부록 B1은 위 회수 문서가 main에 싣고 있으므로 이 브랜치 보존 사유가 없다.
+claude/whymath-ai-recommendation-review-q8tvcx
