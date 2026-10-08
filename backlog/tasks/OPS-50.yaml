@@ -17,11 +17,12 @@ acceptance:
   - "② 결함 클래스별 프롬프트/JSON schema 변형 설계: broken_latex에 대해 (a) has_defect 우선 질문 분리 (b) LaTeX 형식 검증 지시 추가 (c) few-shot 예시 1건 주입 — 변형은 하나씩 적용·측정"
   - "③ 같은 seed 20260708로 후보 재평가 시 파싱 실패율이 16% → 5% 이하로 떨어지고, 검출률/오경보 Wilson 경계가 OPS-48 판정(exit 0)을 유지하는지 확인"
   - "④ 튜닝이 confirmed 되면 src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py의 _SYSTEM_PROMPT 또는 라우터 QUALITY 티어 호출 프롬프트에 정착, 관련 감사 파일 data/audit/에 보관"
+  - "⑤ (OPS-48 종료 대조에서 추가, 2026-10-08) ③의 재판정은 파싱 실패 문항 처리를 세 가지로 병기한다 — A 미분류 제외(OPS-48 판정 방식) · B 결함 미분류=놓침 · C 무결함 미분류=오경보. A만으로는 오경보 축 결론이 미분류 무결함 10/50의 제외에 의존한다(C 집계 시 후보 상한 0.351 > 기준 상한 0.141 + 마진 0.05). 근거 = docs/ops/amd395_local_llm_performance.md §6.2 민감도 표."
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py
   - src/backend/whymath_backend/l3/providers/ollama.py
   - "data/audit/**"
 session: null
-notes: "docs/ops/amd395_local_llm_performance.md §6.2 후속. QUALITY 티어를 MoE로 교체한 #857 이후 운영 리스크. 속도 5.2배 이득은 이미 확정됐고, 남은 것은 정확도 축의 파싱 안정성. OPS-48 실행기를 재사용하며 프롬프트 변형만 추가한다.\n\n[정정 2026-09-01] eos_priority null → P1: MoE 파싱 실패율 16% — F1 실패분포 직결. EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/ops/amd395_local_llm_performance.md §6.2 후속. QUALITY 티어를 MoE로 교체한 #857 이후 운영 리스크. 속도 5.2배 이득은 이미 확정됐고, 남은 것은 정확도 축의 파싱 안정성. OPS-48 실행기를 재사용하며 프롬프트 변형만 추가한다.\n\n[정정 2026-09-01] eos_priority null → P1: MoE 파싱 실패율 16% — F1 실패분포 직결. EOS-80 일괄 백필\n\n[정정 2026-10-08] OPS-48 종료 대조에서 미분류 처리 민감도(오경보 축 의존)를 발견 — 재판정 기준을 acceptance에 고정"
+updated: 2026-10-08
