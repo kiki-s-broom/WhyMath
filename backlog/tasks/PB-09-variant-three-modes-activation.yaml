@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,7 +19,8 @@ acceptance:
   - "⑤ 역문제는 v1에서 좁게 — '답→문제' 전면 생성이 아니라, 스켈레톤이 이미 근을 먼저 고르고 방정식을 역산하는 구조(skeleton_generator.py 원형)를 명시적 역문제 좌석으로 승격하는 데 그친다. 새 추상 도입 0 — 1차 §2-⑥(독립 Problem Template DSL 미채택)과 정합."
   - "⑥ 작동한 비율 보고 — 3종 전부 기존 수용 게이트 5종·canonical signature dedup·임베딩 dedup을 그대로 통과해야 하며, 변형이 실제로 작동한 비율(생성 시도 대비 게이트 통과)을 리포트에 남긴다. 정상 응답 200은 알고리즘이 일했다는 증거가 아니다(CLAUDE.md '작동한 비율' 원칙)."
   - "⑦ 스코프 밖 — 학생 UX·변형 노출 정책(형제 문항을 언제 보여줄지는 L6/CAT 축)·역문제 채점 루브릭·다중 풀이(S4-09/S4-10 승계)."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1544"
 paths:
   - "src/backend/whymath_backend/l3/equivalent/**"
   - src/backend/whymath_backend/harness/problem_corpus_batch.py
@@ -28,6 +29,6 @@ paths:
   - src/backend/whymath_backend/harness/problem_corpus_variants.py
   - docs/architecture/problem_bank_variants_pb09.md
   - tests/backend/harness/test_problem_corpus_variants.py
-session: claude/busy-hamilton-llj064
+session: null
 notes: "정본: docs/architecture/problem_bank_gap_review_r3.md §3 G5·§5-④. 현행 6종 실측: 숫자변형 부분(독립 생성이라 계보 없음)·문맥변형 충족(rephrase 429)·오답유도형 충족(misconception_mc 1,080)·조건변형/난이도계열/역문제 부재. WhyMath 방향 정렬 — 틀은 변형을 '대량 확장'으로 규정하나 제품 정체성이 '문제은행이 아니라 사고 추적기'(플레이북 Part 0)이므로 변형의 목적은 같은 사고를 다른 각도에서 보게 하는 것이고 그 각도 차이가 기록으로 남아야 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C4 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/equivalent/**', 'src/backend/whymath_backend/harness/problem_corpus_batch.py', 'tests/backend/l3/**', 'data/corpus/**'] → ['src/backend/whymath_backend/l3/equivalent/**', 'src/backend/whymath_backend/harness/problem_corpus_batch.py', 'tests/backend/l3/**', 'data/corpus/**', 'src/backend/whymath_backend/harness/problem_corpus_variants.py', 'docs/architecture/problem_bank_variants_pb09.md', 'tests/backend/harness/test_problem_corpus_variants.py']: 실제 변경 파일 반영 — 신규 하네스 CLI·문서·테스트 경로를 기존 범위에 추가(겹침 검사 정확도)"
 updated: 2026-10-08
