@@ -58,6 +58,7 @@ from typing import Literal
 from whymath_backend.config import Settings
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
+from whymath_backend.l3.exact_value import parse_exact_value
 from whymath_backend.l3.interfaces import LLMProvider, TraceSink
 from whymath_backend.l3.models import (
     CallSite,
@@ -87,6 +88,7 @@ __all__ = [
     "MISSING_CONDITION_PERSPECTIVES",
     "MULTIPLE_VALID_ANSWERS_PERSPECTIVES",
     "PROBABILITY_PERSPECTIVES",
+    "SEQUENCE_PERSPECTIVES",
     "STATISTICAL_PERSPECTIVES",
     "UNRECORDED_AUTHOR",
     "Perspective",
@@ -122,6 +124,9 @@ class ResidueSubject:
     `deterministic_author(생성기)`로 조립한다(형식·3상태 의미는 `assert_author_independent`).
     검증자는 자기 서명과 충돌하면 검증을 거부한다 — 생성자≠검증자의 구조적 강제.
     `data`는 통계 자료형처럼 원본 자료 문자열이 필요한 도메인용 선택적 필드.
+    `machine_value_exact`는 기계 계산값의 **정확값 문자열**(정수 `73`·유리수 `1/2`·목록
+    `[1, 3, 6]`) — float인 `machine_value`는 2⁵³ 초과 정수를 무손실로 못 싣는다(S4-66).
+    빈 문자열이면 정확값이 없다(기존 도메인 전부).
     """
 
     problem_id: str
@@ -134,6 +139,7 @@ class ResidueSubject:
     authored_by: str
     data: str = ""
     machine_value: float | None = None
+    machine_value_exact: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -536,6 +542,118 @@ STATISTICAL_PERSPECTIVES: tuple[Perspective, ...] = (
     ),
 )
 """통계 자료형 K=3 관점 — 원리·프롬프트·가시 필드가 모두 다르다."""
+
+# ──────────────────────────────────────────────────────────────────────────
+# 관점 ⑦~⑨ 수열 귀납 — 독립 재전개 / 반증 / 발문↔점화식 정합 (S4-66)
+# ──────────────────────────────────────────────────────────────────────────
+# 관점 ①은 발문만 본다 — 발문에서 초기항·점화식을 스스로 읽어 내는 번역이 잔여 축의 본체이므로
+# 정의(DSL)를 보여 주면 그 번역이 빠진다. 값 대조는 **기계가 `Fraction` 정확 일치로** 한다.
+_SYSTEM_SEQ_RECONSTRUCT = prompt_text("l3.cross_verify.sequence_reconstruct_system")
+_SYSTEM_SEQ_FALSIFY = prompt_text("l3.cross_verify.sequence_falsify_system")
+_SYSTEM_SEQ_GROUNDING = prompt_text("l3.cross_verify.sequence_grounding_system")
+
+
+def _render_seq_reconstruct(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문뿐. 정답·해설·기계 정의·기계 계산값은 은닉(앵커링 차단)."""
+    return fill(
+        prompt_text("l3.cross_verify.sequence_reconstruct_user"),
+        QUESTION_TEXT=subject.question_text,
+    )
+
+
+def _render_seq_falsify(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 제시된 정답(기계 정의는 은닉 — 보면 발문의 빈틈을 정의로 메워 읽는다)."""
+    return fill(
+        prompt_text("l3.cross_verify.sequence_falsify_user"),
+        QUESTION_TEXT=subject.question_text,
+        ANSWER=subject.answer,
+    )
+
+
+def _render_seq_grounding(subject: ResidueSubject) -> str:
+    """가시 필드 = 발문 + 기계가 실행한 수열 정의(계산 결과 값은 정의에 없다 — 번역 대조 전용)."""
+    return fill(
+        prompt_text("l3.cross_verify.sequence_grounding_user"),
+        QUESTION_TEXT=subject.question_text,
+        MACHINE_MODEL_KO=subject.machine_model_ko,
+    )
+
+
+def _judge_seq_reconstruct(
+    subject: ResidueSubject, data: Mapping[str, object]
+) -> PerspectiveVerdict:
+    """LLM 재전개 값 vs 기계 정확값 — **기계가** `Fraction` 정확 일치(`==`)로 판정한다.
+
+    통계 판정기(`_judge_stat_reconstruct`)는 `math.isclose`라 정수 오답(1073741823 vs
+    1073741824)이 통과한다(설계서 §6.1·§8.3 C4) — 그래서 그것을 재사용하지 않고 신설했다.
+    """
+    principle = "sequence_reconstruction"
+    raw_value = data.get("value")
+    if raw_value is None:
+        return PerspectiveVerdict(
+            principle=principle,
+            verdict="unclear",
+            defect_class="reconstruction_declined",
+            reason=f"독립 재전개 실패: {data.get('reason', '사유 미제시')}",
+        )
+    llm_value = parse_exact_value(raw_value)
+    if llm_value is None:
+        return PerspectiveVerdict(
+            principle=principle,
+            verdict="unclear",
+            defect_class="value_unparsed",
+            reason=f"재전개 값을 정수·p/q·목록으로 읽을 수 없음(value={str(raw_value)[:40]!r}).",
+        )
+    machine_value = parse_exact_value(subject.machine_value_exact)
+    if machine_value is None:
+        return PerspectiveVerdict(
+            principle=principle,
+            verdict="unclear",
+            defect_class="machine_value_missing",
+            reason="기계 정확값이 없어 대조 불가.",
+        )
+    if llm_value == machine_value:
+        return PerspectiveVerdict(
+            principle=principle,
+            verdict="ok",
+            defect_class="",
+            reason="독립 재전개 정확 일치.",
+        )
+    return PerspectiveVerdict(
+        principle=principle,
+        verdict="defect",
+        defect_class="model_mismatch",
+        reason=(
+            "독립 재전개 불일치 — 발문에서 읽은 수열의 값이 기계가 실행한 정의의 값과 "
+            "정확히 다르다. 발문이 기계 정의와 다르게 읽힐 소지."
+        ),
+    )
+
+
+SEQUENCE_PERSPECTIVES: tuple[Perspective, ...] = (
+    Perspective(
+        principle="sequence_reconstruction",
+        system_prompt=_SYSTEM_SEQ_RECONSTRUCT,
+        visible_fields=frozenset({"question_text"}),
+        render=_render_seq_reconstruct,
+        judge=_judge_seq_reconstruct,
+    ),
+    Perspective(
+        principle="sequence_falsification",
+        system_prompt=_SYSTEM_SEQ_FALSIFY,
+        visible_fields=frozenset({"question_text", "answer"}),
+        render=_render_seq_falsify,
+        judge=_judge_labelled("sequence_falsification"),
+    ),
+    Perspective(
+        principle="sequence_grounding",
+        system_prompt=_SYSTEM_SEQ_GROUNDING,
+        visible_fields=frozenset({"question_text", "machine_model_ko"}),
+        render=_render_seq_grounding,
+        judge=_judge_labelled("sequence_grounding"),
+    ),
+)
+"""수열 귀납 K=3 관점 — 원리·프롬프트·가시 필드가 모두 다르다."""
 
 
 # ──────────────────────────────────────────────────────────────────────────

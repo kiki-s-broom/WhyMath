@@ -54,7 +54,7 @@ from whymath_backend.schema.enums import (
 from whymath_backend.schema.problem import Condition, Problem
 from whymath_backend.schema.provenance import ContentProvenance
 
-__all__ = ["InductiveSequenceSkeletonGenerator"]
+__all__ = ["InductiveSequenceSkeletonGenerator", "skeleton_to_sequence_dsl"]
 
 # 풀 셔플 고정 시드 — 같은 구성은 같은 출제 순서(재현·디버그). 형제 생성기 규약 미러.
 _POOL_SEED = 20260706
@@ -143,6 +143,20 @@ class _InductiveSkeleton:
         if self.kind == "geo":
             difficulty += 0.1
         return round(min(5.0, max(1.0, difficulty)), 1)
+
+
+def skeleton_to_sequence_dsl(skeleton: _InductiveSkeleton) -> str:
+    """뼈대를 `sequence_induction` DSL로 직렬화한다 — 발문의 점화식을 **실제로 실행**할 재료(S4-66).
+
+    `verify.conditions`의 폐형식(`x - (폐형) = 0`)은 생성기가 계산한 값이라 점화식과 어긋나게
+    생성돼도 Tier1에서는 드러나지 않는다. 이 DSL은 발문과 같은 점화식(등차 `aₙ₊₁ = aₙ + d`·등비
+    `aₙ₊₁ = r·aₙ`)과 초기항을 그대로 옮기므로, 실행값과 폐형 값의 대조가 그 정합을 닫는다.
+    """
+    if skeleton.kind == "arith":
+        recurrence = f"a(n) + {skeleton.step}"
+    else:
+        recurrence = f"{skeleton.step}*a(n)"
+    return f"init=a(1)={skeleton.first}; " f"rec=a(n+1)={recurrence}; " f"query=a({skeleton.term})"
 
 
 def _build_inductive_pool() -> tuple[_InductiveSkeleton, ...]:
