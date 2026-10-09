@@ -12145,3 +12145,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
+
+## 2026-10-09: 미머지 브랜치 전수 감사 16회차 — 15회차 산출물 자체가 고립돼 있었다 · 미추적 고립 구현 3건 회수 등재 · 분실 등재 3건 복원 · 삭제 14차 배치 10건
+
+판정 기준 main `15220b9f`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-09.md`(Kiki "떠돌이 코드 정리"). 원격 ref 61 → 감사 대상 28(PR 소유 27 · claim 활성 3 · 판정 대상 아님 3).
+
+- **발견 ①: 감사 산출물이 감사 대상이 됐다.** 15회차(`2026-10-03`)가 판정 문서·회수 태스크 `HARN-212`·14차 삭제 배치를 PR 없이 `claude/magical-maxwell-99n5e8`에 남겼다. 결과적으로 `34zvse` 회수가 등재되지 않은 채 하루 이상 방치됐고, 14차 배치(`tbj2jf`·`7x90dj`)는 집행되지 않았다. 문서는 byte 그대로 이식(`git hash-object` 일치)하고 `HARN-212`는 같은 번호로 재등재(전 원격 브랜치에서 유일 사용처 실측)했다.
+- **발견 ②: stale claim 아래의 미추적 구현 3건.** `friendly-pascal-mnmypk`(QUAL-11 교정·코퍼스 600행) · `practical-maxwell-kuwl7x`(OPS-104 판정·동결 테스트 35건) · `blissful-lovelace-ubp9tw`(OPS-96 WIP 격리 워커 풀). 셋 다 main 태스크는 `todo`이고 claim은 TTL(72h) 초과다. claim이 풀리면 `/drive`가 같은 구현을 처음부터 반복한다. 회수 태스크 `QUAL-15`·`OPS-122`·`OPS-123`을 등재하고 소유 태스크에 `depends_on`을 부착했다. 분실된 등재 `QUAL-12`·`OPS-108`은 원래 번호로 복원했다.
+- **정직한 기록**: 부착 전 main에서도 소유 3건이 이미 후보가 아니어서(claim) 후보 목록 대조로는 부착 효과를 변별하지 못했다. YAML `depends_on`으로만 확인했다.
+- **좌석 소멸 3건 삭제**: `t608mk`·`azdnov`(OPS-41 done, 문서는 이름이 바뀌어 착지·YAML은 재채번) · `vafylb`(OPS-53·S4-59 done, cp949 수정은 진입점 재구성으로 대체). 삭제 전에 잔여 diff를 재열거했다 — 부재 줄은 단어 겹침 97~100%(재채번에 따른 줄 포맷 차이)이거나 MEMORY 고유 토큰 27개 중 2개(구절 1·커밋 해시 1).
+- **`5t5lmv`는 좌석이 이관**: `OPS-40` done(#1466) 뒤 모바일 구현이 main 부재라 `OPS-112`·`OPS-113`·`A11Y-02`가 소유한다.
+- **claim 활성 3건은 판정 보류**(`status-f6qz0c`·`status-f9lp65`·`stoic-hawking-vzumx5`): `claims reap` dry-run이 stale로 지목했으나 선행 선례대로 배치에서 뺐다. `claims reap --apply`는 이 감사가 실행하지 않았다.
+- **미해소**: `status-38gu4d`·`s4-70-pila8m`은 claim이 가리키는 브랜치가 원격에 없다. PR `#1478`은 main의 같은 게이트가 이미 `cleared`라 중복일 수 있으나 확인하지 못했다. `QUAL-15`는 PR 소유 `PB-09`와 생성기·코퍼스 경로가 겹친다.
+- 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
