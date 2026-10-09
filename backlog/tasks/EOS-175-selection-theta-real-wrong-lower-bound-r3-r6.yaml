@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: blocked
 priority: 3
 eos_priority: P1
 owner: claude
@@ -23,5 +23,5 @@ paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - tests/backend/api/test_eos24_recommendation_follows_learning_state.py
 session: null
-notes: "출처: EOS-39 판정문 §4-4·§8 (2026-10-06). 등급 P1 근거: R3(오개념 교정) 경로의 학습 밴드 선택이 선택 θ에 걸려 있어 앱 학생의 교정 문항 선택에 영향이 있다(오답이 처음 적재되는 EOS-146 이후 현실 경로). 선행 EOS-39가 도움 접기 하한 사다리·정책 버전·계측을 먼저 착지시킨다.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재\n\n[정정 2026-10-06] EOS-178 판정문 §4-3의 비용(침묵형 약한 학생의 하강 채널 상실)을 이 태스크가 명시 규칙 후보로 승계"
-updated: 2026-10-06
+notes: "출처: EOS-39 판정문 §4-4·§8 (2026-10-06). 등급 P1 근거: R3(오개념 교정) 경로의 학습 밴드 선택이 선택 θ에 걸려 있어 앱 학생의 교정 문항 선택에 영향이 있다(오답이 처음 적재되는 EOS-146 이후 현실 경로). 선행 EOS-39가 도움 접기 하한 사다리·정책 버전·계측을 먼저 착지시킨다.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재\n\n[정정 2026-10-06] EOS-178 판정문 §4-3의 비용(침묵형 약한 학생의 하강 채널 상실)을 이 태스크가 명시 규칙 후보로 승계\n\n[차단 2026-10-07] 착수 직후 정지(2026-10-07 /drive): acceptance ③이 R3·R6 문항 선택을 바꾸는 교수학 판정이고 교수학 독립 비판 1회가 필수라 drive가 대신 내릴 수 없다. 코드는 건드리지 않았다. 재개 = pedagogy-designer 위임 세션에서 unblock 후 ②프로브 선행부터"
+updated: 2026-10-07

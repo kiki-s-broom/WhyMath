@@ -53,8 +53,12 @@ _SCAN_SCRIPT = _REPO_ROOT / "scripts" / "analysis" / "eos_core_adapter_boundary_
 # ──────────────────────────────────────────────────────────────────────
 # 기준선 — CORE 배정 모듈별 수학 어휘 적중 수 (실측 2026-09-16 · main 2520a27c)
 #
-# 합계 74 / 28모듈. 새 모듈이 어휘를 갖거나 기존 모듈의 수가 오르면 RED.
+# 합계 73 / 27모듈. 새 모듈이 어휘를 갖거나 기존 모듈의 수가 오르면 RED.
 # 줄면 "기준선을 내려라"로 RED(유예의 기계 만료).
+#
+# 소거 이력: l3.cross_verify 1→0(PB-15) — 모듈 docstring의 "결정론 SymPy/열거 생성기" 문구를
+#   생성자 서명 3상태 설명으로 바꾸며 `sympy` 어휘가 사라졌다. 코어 모듈의 수학 어휘가 줄어든
+#   방향이라 래칫이 의도한 대로 항목을 지운다(0은 `.get(mod, 0)`이 돌려주므로 항목 불요).
 #
 # 큰 값 몇 건의 성격(왜 유예되는가):
 #   · l3.pedagogy.slot_generator(10) — 슬롯 검증이 어댑터 능력을 주입받는 자리. 경유 간선
@@ -69,7 +73,6 @@ _SCAN_SCRIPT = _REPO_ROOT / "scripts" / "analysis" / "eos_core_adapter_boundary_
 CORE_MATH_VOCAB_BASELINE: dict[str, int] = {
     "api.study": 1,
     "l1.embedding_primitives": 1,
-    "l3.cross_verify": 1,
     "l3.pedagogy.example_generator": 4,
     "l3.pedagogy.explanation_checker": 5,
     "l3.pedagogy.prescreen": 1,
