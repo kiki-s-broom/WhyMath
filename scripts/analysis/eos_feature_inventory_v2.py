@@ -841,7 +841,7 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-355", "단계·풀이 연쇄 검증·검증 등급", "Student", "Math Engine", "P0",
        "C5 인접 단계 동치 — S4-54/55 · CONST-09 학생 입력 CAS 파싱 안전 진입점(R22-03)",
        "l3.verify_step", "l3.verify_solution", "l3.verifier", "l3.verification_tier",
-       "l3.safe_parse"),
+       "l3.safe_parse", "l3.isolated_call", "api._isolated_call"),
     _e("WM-E-356", "SymPy 불가 영역 검산(유한확률 전수·통계 자료형·수열 귀납)", "Platform",
        "Math Engine", "P1", "A3 비대수 앵커 — S4-13/53/66", "l3.finite_probability",
        "l3.statistical_claim", "l3.sequence_induction", "l3.exact_value"),
