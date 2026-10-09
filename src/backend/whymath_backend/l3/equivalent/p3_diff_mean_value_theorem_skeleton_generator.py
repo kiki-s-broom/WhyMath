@@ -673,7 +673,9 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
     """도함수가 위(아래)로 막힌 함수의 f(b)가 가질 수 있는 가장 큰(작은) 값 — 평균값 정리의
     부등식 활용.
 
-    side: "upper"(f'(x) <= M → 최댓값) · "lower"(f'(x) >= m → 최솟값) · "both"(두 극단의 합).
+    side: "upper"(f'(x) <= M → 최댓값) · "lower"(f'(x) >= m → 최솟값) · "both"(두 극단의 합) ·
+    "backward"(f'(x) <= M이고 오른쪽 끝값 f(b) = p가 주어질 때 왼쪽 끝값 f(a)의 최솟값 — 구간을
+    거꾸로 읽어 부등식 방향을 바꾸는지 본다. 8회차 감사 처분으로 지운 진단 틀의 대체).
     검산은 산술 재확인(평균값 정리로 얻은 식 p + M(b - a)의 값)이다 — 부등식 추론 자체는 해설이
     보인다.
     """
@@ -710,6 +712,19 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
             f"f(x) = {line}이면 등호가 성립하므로 가장 작은 값은 {bottom}이다."
         )
         cond = f"{pv} + ({lo})*(({b}) - ({a})) = y"
+    elif side == "backward":
+        text = (
+            f"함수 f(x)는 모든 실수 x에서 미분가능하고 f'(x) ≤ {hi}이다. f({b}) = {pv}일 때, "
+            f"f({a})의 값이 될 수 있는 가장 작은 값을 구하시오."
+        )
+        value = pv - hi * width
+        line = render_poly(((1, hi), (0, pv - hi * b)))
+        body = (
+            f"f'(c) ≤ {hi}이므로 {render_difference(pv, f'f({a})')} ≤ {hi * width}, 즉 "
+            f"f({a}) ≥ {value}이다. "
+            f"f(x) = {line}이면 등호가 성립하므로 가장 작은 값은 {value}이다."
+        )
+        cond = f"{pv} - ({hi})*(({b}) - ({a})) = y"
     else:
         text = (
             f"함수 f(x)는 모든 실수 x에서 미분가능하고 {lo} ≤ f'(x) ≤ {hi}이다. f({a}) = {pv}일 "
@@ -728,7 +743,12 @@ def _bound_item(*, slot: str, frame_id: str, p: tuple[object, ...], side: str) -
     span = f"(({b}) - ({a}))"
     upper = f"({pv}) + Derivative({_witness_line(hi, a, pv)}, x)*{span}"
     lower = f"({pv}) + Derivative({_witness_line(lo, a, pv)}, x)*{span}"
-    body_expr = {"upper": upper, "lower": lower}.get(side, f"{upper} + {lower}")
+    # 거꾸로 — f(a) = f(b) - f'(c)(b - a)에서 f'(c)가 위 끝값일 때(등호 성립 함수는 (b, p)를
+    # 지난다).
+    backward = f"({pv}) - Derivative({_witness_line(hi, b, pv)}, x)*{span}"
+    body_expr = {"upper": upper, "lower": lower, "backward": backward}.get(
+        side, f"{upper} + {lower}"
+    )
     return _value_item(
         slot=slot,
         frame_id=frame_id,
@@ -1449,6 +1469,14 @@ def _diagnostic_frames() -> list[Frame]:
     def d8(p: tuple[object, ...]) -> DiffItem | None:
         return _bound_item(slot="diagnostic", frame_id="diag-mvt-lower-bound", p=p, side="lower")
 
+    def d12(p: tuple[object, ...]) -> DiffItem | None:
+        # 8회차(은행 감사 4회차) 처분으로 지운 'f'(c)의 값' 틀의 대체 — 슬롯마다 틀 5종 이상(다양성
+        # 계약). 오른쪽 끝값이 주어질 때 왼쪽 끝값의 최솟값: f(a) = f(b) - f'(c)(b - a)에서 f'(c)의
+        # 위 끝값이 f(a)의 아래 끝값을 정한다(부등식 방향이 뒤집히는 자리를 진단한다).
+        return _bound_item(
+            slot="diagnostic", frame_id="diag-mvt-left-endpoint-lower-bound", p=p, side="backward"
+        )
+
     def d10(p: tuple[object, ...]) -> DiffItem | None:
         c = _case_of(p[0])
         fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
@@ -1497,6 +1525,7 @@ def _diagnostic_frames() -> list[Frame]:
         # 정리의 *결론*만 확인하는 진단은 함수식 없이 f(a)·f(b)만 주는
         # 'diag-value-of-derivative-at-c'가 맡는다.
         Frame("diag-mvt-lower-bound", _bound_params("p3-mvt:d8"), d8),
+        Frame("diag-mvt-left-endpoint-lower-bound", _bound_params("p3-mvt:d12"), d12),
         Frame("diag-count-parallel-tangents-between", _count_pool("p3-mvt:d10"), d10),
         Frame(
             "diag-velocity-equals-average-at-time-c",
