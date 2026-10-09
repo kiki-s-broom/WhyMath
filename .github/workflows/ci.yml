@@ -272,11 +272,11 @@ jobs:
       - name: Install dependencies (editable + dev extras)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
           # ARCH-21: QA 파이프라인 오케스트레이터(whymath_backend.harness.qa_pipeline)를 이
           # 잡에서 돌리려면 backend 패키지가 필요하다(backend 잡이 역방향으로 이미
           # `pip install -e ../data-pipeline`을 하는 것의 대칭).
-          pip install -e ../backend
+          python -m pip install -e ../backend
 
       # lint(ruff·black)는 src(.)뿐 아니라 tests(../../tests/data_pipeline)도 검사한다
       # (OPS-14 — backend 잡 PR #223 동형). 과거엔 src만 lint해 tests의 포맷 드리프트가
@@ -284,21 +284,21 @@ jobs:
       # ruff는 이 디렉터리의 pyproject 설정으로 tests까지 검사한다(src와 동일 규칙 —
       # E501 포함. 구 per-file-ignore는 config 밖 경로에 매치 불가한 죽은 설정이라 제거).
       - name: Ruff (lint — src + tests)
-        run: ruff check . ../../tests/data_pipeline
+        run: python -m ruff check . ../../tests/data_pipeline
 
       # black은 --line-length 100을 *명시*한다: 두 대상의 공통 조상(레포 루트)에 pyproject가
       # 없어 기본값 88로 폴백하기 때문(backend 잡과 동일 사유). 저장소 표준 root-100이
       # tests/* 배선(backend·infra·harness)의 공통 정본이다 — 2026-07-28 실측에서 src도
       # root-100 컨텍스트로 clean(위반 0)이라 단일 명령으로 통합.
       - name: Black (format check — src + tests)
-        run: black --check --line-length 100 . ../../tests/data_pipeline
+        run: python -m black --check --line-length 100 . ../../tests/data_pipeline
 
       - name: Mypy (strict type check)
-        run: mypy --strict data_pipeline
+        run: python -m mypy --strict data_pipeline
 
       - name: Pytest (with coverage)
         run: |
-          pytest \
+          python -m pytest \
             --cov=data_pipeline \
             --cov-report=term \
             --cov-report=xml \
@@ -366,27 +366,27 @@ jobs:
       - name: Install dependencies (editable + dev extras)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트(tests/backend/l1/test_five_node_connectivity_governance.py)가
           # data_pipeline(L1)을 import한다 → 백엔드 잡에도 설치(수집 ImportError 방지).
-          pip install -e ../data-pipeline
+          python -m pip install -e ../data-pipeline
 
       # lint(ruff·black)는 src(.)뿐 아니라 tests(../../tests/backend)도 검사한다(PR #223).
       # 과거 CI는 src만 lint해 tests의 위반(B905·N817·E501·I001 등)이 검출 없이 머지돼 왔다 —
       # 이 가드가 tests 위반의 재발을 막는다. mypy는 tests로 확장하지 않는다(테스트에 --strict
       # 타입 부담 제외 — 기존 정책 유지).
       - name: Ruff (lint — src + tests)
-        run: ruff check . ../../tests/backend ../../tests/constitution
+        run: python -m ruff check . ../../tests/backend ../../tests/constitution
 
       # black은 --line-length 100을 *명시*한다: tests 경로(../../tests/backend)에는 위로
       # pyproject가 없어(레포 루트에 pyproject 부재) black이 기본값 88로 폴백하기 때문이다.
       # 명시하지 않으면 100으로 포맷된 tests를 88로 검사해 거짓 실패한다(src의 [tool.black]
       # line-length=100과 동일 기준으로 통일).
       - name: Black (format check — src + tests)
-        run: black --check --line-length 100 . ../../tests/backend ../../tests/constitution
+        run: python -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution
 
       - name: Mypy (strict type check)
-        run: mypy --strict whymath_backend
+        run: python -m mypy --strict whymath_backend
 
       - name: Import contracts (import-linter — 7계층 단방향)
         run: lint-imports
@@ -407,7 +407,7 @@ jobs:
       # 틀린 판정을 냈을 자리다.
       - name: Pytest (with coverage)
         run: |
-          pytest \
+          python -m pytest \
             -m "not corpus_authoring" \
             -n auto --dist loadfile \
             --cov=whymath_backend \
@@ -588,7 +588,7 @@ jobs:
       # 디렉터리에 포함됨 — 연결 판정이 같은 것을 가리킨다).
       - name: 헌법 집행 테스트 (CONST-03 — R2-02·R2-03)
         working-directory: .
-        run: pytest -q tests/constitution
+        run: python -m pytest -q tests/constitution
 
       - name: Upload coverage artifact
         if: always()
@@ -662,18 +662,18 @@ jobs:
           # 않는다 — 라이브 bge-m3 통합은 CI에서 *항상 skip*(HF 미도달·Phaiakes9 전용)이라
           # torch 설치가 분당 과금만 태웠다. 슬110의 find_spec 사전체크가 미설치를 깨끗이
           # skip 처리한다. 라이브 측정은 Kiki가 Phaiakes9에서 .[dev,embedding]으로 실행.
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트(tests/backend/l1/test_five_node_connectivity_governance.py)가
           # data_pipeline(L1)을 import한다 → 백엔드 잡에도 설치(수집 ImportError 방지).
-          pip install -e ../data-pipeline
+          python -m pip install -e ../data-pipeline
 
       - name: Alembic upgrade head (fresh DB — 전 마이그레이션 적용)
-        run: alembic upgrade head
+        run: python -m alembic upgrade head
 
       - name: Alembic downgrade base → upgrade head (역적용·재적용 왕복)
         run: |
-          alembic downgrade base
-          alembic upgrade head
+          python -m alembic downgrade base
+          python -m alembic upgrade head
 
       # OPS-55: 데이터 무결성 게이트 — orphan concept/skill/problem·dangling curriculum_ref·
       # duplicate canonical_id·event schema_invalid 6종을 실 PG에서 스캔(0건=exit 0). 마이그레이션
@@ -710,7 +710,7 @@ jobs:
         # `--ignore`에 `api`를 더하거나 마커·testpaths·WHYMATH_RUN_INTEGRATION을 건드리면
         # 6종이 조용히 skip으로 돌아가고 skip은 exit 0이다. 그 회귀를
         # `tests/infra/test_gate_harness_marker_reach_wiring.py`가 기계로 막는다.
-        run: pytest -m integration --ignore=../../tests/backend/l3
+        run: python -m pytest -m integration --ignore=../../tests/backend/l3
 
       # ── S4-01 슬라이스 2 — 개념 그래프 traversal 성능 예산 **실부하** 판정 ──────────────
       # 예산 가드(깊이 2·노드 20·시간 2.0초)는 코드로 있었지만 전 그래프 규모에서 버티는지는
@@ -787,14 +787,14 @@ jobs:
       - name: Install dependencies (editable + dev + postgres extras)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e ".[dev,postgres]"
+          python -m pip install -e ".[dev,postgres]"
 
       - name: Pytest (NCIC 적재 통합테스트 — 실 PG)
         env:
           # conftest env 게이트 해제(integration 마크 활성화). [postgres] extra가 설치돼
           # importorskip 통과 + 실 PG 도달 → 적재 왕복 검증.
           WHYMATH_RUN_INTEGRATION: "1"
-        run: pytest -m integration
+        run: python -m pytest -m integration
 
   # ─────────────────────────────────────────────────────────────────
   # data-pipeline 실 Neo4j 적재 통합테스트 (슬113-2) — concept_graph load_graph 경로
@@ -853,14 +853,14 @@ jobs:
       - name: Install dependencies (editable + dev + neo4j extras)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e ".[dev,neo4j]"
+          python -m pip install -e ".[dev,neo4j]"
 
       - name: Pytest (개념그래프 적재 통합테스트 — 실 Neo4j)
         env:
           # conftest env 게이트 해제(integration 마크 활성화). [neo4j] extra가 설치돼
           # importorskip 통과 + 실 Neo4j 도달 → 멱등 적재(노드 403·엣지 541) 검증.
           WHYMATH_RUN_INTEGRATION: "1"
-        run: pytest -m integration
+        run: python -m pytest -m integration
 
   # ─────────────────────────────────────────────────────────────────
   # L5 모바일 (Flutter 학생 클라이언트 — coach API 통합 + 모델 정합)
@@ -979,7 +979,7 @@ jobs:
       - name: Install dependencies (editable + dev extras)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
 
       # 실제 src/mobile/lib·src/backend/whymath_backend/api를 스캔하는 회귀 스모크를 실행한다.
       # 모바일이 새 `/v1/` 표면을 호출하기 시작하면 이 파일이 깨져 "가시화 리포트가 낡았다"를
@@ -1192,7 +1192,7 @@ jobs:
       # 표면 불일치). 전 지점의 상한 존재·일치는 아래 게이트 스텝이 요구한다.
       - name: Install deps (실측 최소 7종 — 백엔드 전체 설치 불요)
         run: |
-          pip install "pytest>=8.3.3,<10" "pytest-asyncio>=0.24.0,<2" \
+          python3 -m pip install "pytest>=8.3.3,<10" "pytest-asyncio>=0.24.0,<2" \
                       "pytest-randomly>=3.15,<4" "pyyaml>=6.0.1,<7" "sqlalchemy>=2.0,<2.1" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
 
@@ -1245,7 +1245,7 @@ jobs:
       # 로 전수 강제한다. 파일을 읽기만 하므로(백엔드 import 0) 이 잡의 최소 설치로 돈다. 루트
       # `tests/`는 위 `tests/infra`·backend testpaths 어느 쪽에도 안 들어 있어 별도 스텝이다.
       - name: 배치 두 번 실행 테스트 전수 (CONST-03 — R3-01)
-        run: pytest -q tests/test_idempotency.py
+        run: python3 -m pytest -q tests/test_idempotency.py
 
   # ─────────────────────────────────────────────────────────────────
   # 배포 이미지 빌드 + 컨테이너 기동 스모크 (OPS-03) — **진짜 게이트**
@@ -1585,11 +1585,11 @@ jobs:
       # PyPI 최신이 그대로 깔려 pyproject가 묶은 메이저와 갈라진다).
       - name: Install deps (하네스 런타임은 stdlib+PyYAML — 나머지는 검증 도구)
         run: |
-          pip install "pyyaml>=6.0.1,<7" "pytest>=8.3.3,<10" "pytest-randomly>=3.15,<4" \
+          python3 -m pip install "pyyaml>=6.0.1,<7" "pytest>=8.3.3,<10" "pytest-randomly>=3.15,<4" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
           # CUR-09 후속: EOS 단원 구조 관측 리포트가 whymath_backend.harness를 import하므로
           # backend 패키지를 editable 설치한다(dev extra 불요 — CLI는 stdlib+PyYAML만 쓴다).
-          pip install -e src/backend
+          python3 -m pip install -e src/backend
 
       - name: backlog 무결성 검증
         run: python3 scripts/harness/backlog.py validate
@@ -1824,7 +1824,7 @@ jobs:
       - name: Install dependencies (editable, base only)
         run: |
           python -m pip install --upgrade "pip<27"
-          pip install -e .
+          python -m pip install -e .
 
       - name: 게이트 — 선언≠배선 4축 정적 감사 (declared_unwired_audit)
         run: python -m whymath_backend.ops.declared_unwired_audit
@@ -1902,7 +1902,7 @@ jobs:
           python -m pip install -e ../data-pipeline
 
       - name: Pytest (corpus_authoring 마커 전량)
-        run: pytest -m corpus_authoring
+        run: python -m pytest -m corpus_authoring
 
   e2e-nightly:
     name: e2e-nightly — 관통 슬라이스 (실 PG·야간)

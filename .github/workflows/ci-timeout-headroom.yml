@@ -67,7 +67,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install deps
-        run: pip install "pyyaml>=6.0.1,<7"
+        run: python3 -m pip install "pyyaml>=6.0.1,<7"
 
       # 판정은 exit code로 한다 — `-q`·`| tail`로 출력을 죽이거나 잘라 판정하지 않고,
       # `|| true`·`continue-on-error`로 실패를 은닉하지 않는다(은닉하면 상시 무력화돼도
