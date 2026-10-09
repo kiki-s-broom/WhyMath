@@ -850,6 +850,19 @@ gates:
     corrections: []
     depends_on:
       - OPS-106-gate2-live-sample-serving-vs-authoring
+  - id: G-ops30-uptime-probe-go-live
+    title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-09
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-30-alerting-last-hop-and-uptime-probe
   - id: G-opus5-billing-path-prod-recheck
     title: "Opus 5 과금 경로의 프로덕션 재확인 지점 — 개발 단계 한정 승인의 만료 지점. 2026-09-21 Kiki 판단으로 개발 단계에서는 Claude Max 요금제 구독 경유로 Opus 5를 쓰기로 했다(이전 세션에서 사용 가능 검토 완료). 이 승인은 개발 단계 한정이므로 만료·재확인 지점을 동반한다(CLAUDE.md 「만료 없는 유예·제외 금지」). 재확인 시점 = 프로덕션 배포 판정 시 또는 학생 대면 트래픽이 개발용 좌석을 넘어설 때 중 먼저 오는 쪽. 확인할 것: ①구독 경유 호출이 프로덕션 트래픽 규모·약관에서 유효한가 ②유효하지 않으면 API 키 과금으로 전환할 때의 비용 영향(Opus 5 $5/$25 · 가정토큰 74/358 기준 1회 14.353원) ③auth_source 관측이 실제로 어느 경로를 쓰고 있는지 말하고 있는가(조용한 폴백이 없는가). 판정 3택: ①개발단계 승인 유지(재확인 게이트 재생성) ②API 키 과금으로 전환 ③좌석 자체 재설계. 근거 = docs/architecture/03c_cloud_tier_transition_v2.md 4.3~4.4절 · ARCH-50 acceptance ⑨"
     kind: decision
