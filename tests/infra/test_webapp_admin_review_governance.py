@@ -46,6 +46,9 @@ _WEBAPP = Path(__file__).resolve().parents[2] / "src" / "web" / "webapp"
 _REVIEW_DIR = _WEBAPP / "app" / "admin" / "review"
 _API_REL = "app/admin/_lib/adminReviewApi.ts"
 _MENU_API_REL = "app/admin/_lib/adminApi.ts"
+# P3-12 CMS 클라이언트 — 토큰 부착(`Bearer`·`Authorization`)과 전이 호출 경로(`/transitions`)가 정당하게
+# 있다. 다만 *검수 큐* 엔드포인트·XHR·sendBeacon은 여기에도 있으면 안 된다(아래 판정이 따로 본다).
+_CMS_API_REL = "app/admin/_lib/adminCmsApi.ts"
 
 _HTML_INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("dangerouslySetInnerHTML", re.compile(r"dangerouslySetInnerHTML")),
@@ -64,17 +67,26 @@ _REQUEST_MARKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+#: CMS 클라이언트에도 있으면 안 되는 표지(이름) — 나머지는 CMS 클라이언트의 정당한 책임이다.
+_CMS_FORBIDDEN_MARKERS = frozenset({"검수 큐 엔드포인트", "XMLHttpRequest", "sendBeacon"})
+
+
 def request_leak_violations(sources: dict[str, str]) -> list[str]:
     """요청 표지가 `adminReviewApi.ts` 밖에 있으면 위반. 입력이 비면 위반."""
     if not sources or _API_REL not in sources:
         return ["스캔 대상이 0건이거나 adminReviewApi.ts가 없다 — 가드가 무력화됐다"]
     # 토큰 부착 표지는 메뉴 클라이언트(`adminApi.ts`)에도 정당하게 있다. 검수 큐 전용 표지만 한 곳 제한.
-    outside = {rel: text for rel, text in sources.items() if rel not in (_API_REL, _MENU_API_REL)}
+    clients = (_API_REL, _MENU_API_REL, _CMS_API_REL)
+    outside = {rel: text for rel, text in sources.items() if rel not in clients}
     menu_side = {rel: text for rel, text in sources.items() if rel == _MENU_API_REL}
+    cms_side = {rel: text for rel, text in sources.items() if rel == _CMS_API_REL}
     if not outside:
         return ["API 파일 밖 소스가 0건 — 가드가 무력화됐다"]
     violations = _scan(outside, _REQUEST_MARKERS)
     violations += _scan(menu_side, _REQUEST_MARKERS[2:]) if menu_side else []
+    # CMS 클라이언트는 토큰 부착·전이 경로(앞 둘·넷째 제외)만 면제 — 검수 큐 엔드포인트·XHR·beacon은 막는다.
+    cms_forbidden = tuple(m for m in _REQUEST_MARKERS if m[0] in _CMS_FORBIDDEN_MARKERS)
+    violations += _scan(cms_side, cms_forbidden) if cms_side else []
     return violations
 
 
@@ -205,6 +217,7 @@ def test_fetch_judge_detects_fetch_outside_the_allowlist() -> None:
     ok = {
         "app/admin/_lib/adminApi.ts": "await fetch(a);",
         _API_REL: "await fetch(b);",
+        _CMS_API_REL: "await fetch(cms);",
     }
     assert fetch_site_violations(ok) == []
     leaked = dict(ok, **{"app/admin/_components/ReviewQueueList.tsx": "await fetch(c);"})
@@ -213,6 +226,9 @@ def test_fetch_judge_detects_fetch_outside_the_allowlist() -> None:
     assert fetch_site_violations(doubled)
     gone = dict(ok, **{_API_REL: "// 호출 없음"})
     assert fetch_site_violations(gone)
+    # P3-12: CMS 클라이언트도 같은 규칙 — 호출 증식·소실이 모두 검출된다.
+    assert fetch_site_violations(dict(ok, **{_CMS_API_REL: "await fetch(c); await fetch(d);"}))
+    assert fetch_site_violations(dict(ok, **{_CMS_API_REL: "// 호출 없음"}))
 
 
 def test_judges_pass_on_clean_input() -> None:

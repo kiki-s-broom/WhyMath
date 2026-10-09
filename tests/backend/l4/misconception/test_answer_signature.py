@@ -47,8 +47,11 @@ _CAUGHT: list[tuple[str, str, str]] = [
     ("다음 식 (p+q)²을 전개하시오.", "p²+q²", _CROSS_TERM),
     # 수치 인스턴스 — 학생이 구체 수로 거짓 규칙을 적용한 흔적.
     ("(3+4)²의 값을 구하시오.", "3²+4²", _CROSS_TERM),
-    # 계수가 붙어도 구조는 같다(명시 곱셈 표기 — 암묵 곱셈은 아래 한계 테스트 참조).
+    # 계수가 붙어도 구조는 같다 — 명시 곱셈 표기와 암묵 곱셈 표기(`2x`) 둘 다(MISC-33).
     ("(2*x+3)²을 전개하시오.", "4*x²+9", _CROSS_TERM),
+    ("(2x+3)²을 전개하시오.", "4x²+9", _CROSS_TERM),
+    ("(3y+1)²을 전개하시오.", "9y²+1", _CROSS_TERM),
+    ("(2x+3y)²을 전개하시오.", "4x²+9y²", _CROSS_TERM),
 ]
 
 
@@ -79,21 +82,24 @@ def test_candidate_id_comes_from_catalog_not_a_new_scheme() -> None:
         assert candidate.misconception_id in CATALOG_BY_ID
 
 
-def test_known_limitation_implicit_multiplication_is_not_parsed() -> None:
-    """**알려진 한계(숨기지 않는다)**: 암묵 곱셈(`2x`)은 파싱되지 않아 탐지되지 않는다.
+def test_implicit_multiplication_is_caught_like_its_explicit_twin() -> None:
+    """암묵 곱셈(`2x`)과 명시 곱셈(`2*x`)은 **같은 오류이므로 같은 판정**을 받는다 (MISC-33).
 
-    `(2x+3)² = 4x²+9`는 구조적으로 `(2*x+3)² = 4*x²+9`와 같은 오류인데, 앞의 표기만 잡히지
-    않는다. 원인은 이 모듈이 아니라 **공용 파싱 소스**(`l3.symbolic_equivalence.to_sympy_source`)
-    가 `2x`에 곱셈 기호를 넣지 않아 `SympifyError`가 나는 것이다 — 동치 판정 권위가 소유한
-    축이라 여기서 고치면 같은 질문에 두 개의 답이 생긴다.
+    `(2x+3)² = 4x²+9`는 구조적으로 `(2*x+3)² = 4*x²+9`와 같은 오류다. 과거(EOS-104 당시)에는
+    앞의 표기만 놓쳤고, 그 사실을 이 자리의 `test_known_limitation_implicit_multiplication_is_
+    not_parsed`가 계약으로 동결해 두었다 — 한계를 테스트로 남기지 않으면 이 채널의 0건을 "그런
+    오개념이 없었다"로 읽게 되기 때문이다. 원인은 공용 파싱 소스가 아니라 `matches_wrong_form`의
+    구조 파싱이 동치 권위(`identity_status`)와 **다른 변환 규칙**을 쓴 것이었고(같은 함수 안에서
+    거짓 등식 가드는 `2x`를 읽는데 구조 정합은 거부), 파서 정의를 동치 권위로 일원화해 닫았다.
 
-    이 테스트가 존재하는 이유는 *지금 안 잡힌다*를 계약으로 박아 두기 위해서다. 한계를 테스트로
-    남기지 않으면 나중에 누군가 이 채널의 0건을 "그런 오개념이 없었다"로 읽는다.
-    승계 태스크: `MISC-33-implicit-multiplication-parse-gap`.
+    단언의 형태가 쌍둥이 동등이라는 점이 요점이다 — 개별 표기가 잡히는지가 아니라 **표기가
+    판정을 바꾸지 않는지**를 묻는다.
     """
-    assert _CROSS_TERM not in _ids(_scan("(2x+3)²을 전개하시오.", "4x²+9"))
-    # 같은 오류의 명시 곱셈 표기는 잡힌다 — 한계가 *표기*에 있음을 대조로 보인다.
-    assert _CROSS_TERM in _ids(_scan("(2*x+3)²을 전개하시오.", "4*x²+9"))
+    implicit = _scan("(2x+3)²을 전개하시오.", "4x²+9")
+    explicit = _scan("(2*x+3)²을 전개하시오.", "4*x²+9")
+    assert _CROSS_TERM in _ids(implicit)
+    assert _ids(implicit) == _ids(explicit)
+    assert implicit.scan is explicit.scan
 
 
 # ── ② 안 잡아야 할 것 — 변별력의 대조군 ──────────────────────────────────────────
@@ -101,6 +107,10 @@ _NOT_CAUGHT: list[tuple[str, str, str]] = [
     ("(x+2)²을 전개하시오.", "x²+4x+4", "정답"),
     ("(x+2)²을 전개하시오.", "x²+5", "무관한 오답"),
     ("(x+0)²을 전개하시오.", "x²+0²", "우연히 참인 등식 — 낙인 금지"),
+    # 새로 읽히게 된 암묵 곱셈 표기에서도 낙인이 없어야 한다(MISC-33 대조군).
+    ("(2x+3)²을 전개하시오.", "4x²+12x+9", "암묵 곱셈 — 올바른 전개"),
+    ("(2x+3)²을 전개하시오.", "4x²+10", "암묵 곱셈 — 무관한 오답"),
+    ("(2x+3)²을 전개하시오.", "(2x+3)(2x+3)", "암묵 곱셈 — 항등(가드 ⓪)"),
     ("(x+2)²을 전개하시오.", "모르겠어요", "수식이 아닌 답"),
 ]
 

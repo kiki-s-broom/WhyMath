@@ -39,6 +39,7 @@ crosswalk 매핑(런타임 탐지 kebab-id → 리포트에 뜨는 canonical M-i
 2. `reviewer` present **AND** `reviewed_on` present (서명)
 3. `link_type == 직접매핑`이면 `confidence >= DIRECT_MIN_CONFIDENCE`(= **0.6**) — 미만은 인접 오개념·승격 금지
 4. `kebab_id ∈ 카탈로그`(`CATALOG_BY_ID` — 전사 왜곡 가드)
+5. `link_type == 직접매핑` — 부분매핑·개념겹침은 승인(`approved`)해도 승격하지 않는다(아래 「적재 자격」)
 
 ## 적재 규칙 (`load_gate` — load 단계·l1)
 
@@ -47,11 +48,28 @@ crosswalk 매핑(런타임 탐지 kebab-id → 리포트에 뜨는 canonical M-i
 
 1. `method == LOADABLE_METHOD`(= **`manual`**) — 사람 채택 산출물만(embedding/standard_code 미적재)
 2. `is_signed(note)` — note에 검수 서명 stamp(`검수:{reviewer} {날짜}`)가 있어야 함
+3. `link_type == 직접매핑` — 비직접 행은 promote를 우회한 손수 만든 JSON이어도 거부(아래 「적재 자격」)
 
 > 저수준 `MisconceptionCrosslinkStore.populate`는 이 게이트를 거치지 않는다(resolve/shadow 단위의
 > 합성 시딩 좌석). 게이트는 sanctioned 진입(`load_crosslinks` = `promote --load`가 호출)에만 있다.
 > 한계: 서명 검증은 note 문자열 매칭이라 *고의 위조*(가짜 서명 삽입·DB 직접 편집)를 막지 못한다 —
 > 목적은 우발적·관례적 우회(candidate 출력 직접 적재 등) 차단이며, 위조는 도구 밖 행위다.
+
+## 적재 자격 (`load_eligibility` — MISC-63 · Kiki 정책 확정 2026-10-09)
+
+**부분매핑·개념겹침은 승인해도 기본 적재하지 않는다.** 적재되는 crosswalk는 `직접매핑`뿐이다.
+
+- 이유: 비직접 연결은 canonical 해석(`select_canonical`)에서 어차피 후보가 아니다(`no_direct`). 적재해 봐야
+  리포트 노출에 쓰이지 않고, 오귀속 진단 위험(CLAUDE.md 우선순위 #1·#3)만 키운다.
+- **예외 경로는 하나**: 검수 큐에서 해당 행의 `link_type`을 `직접매핑`으로 승격하고
+  `confidence ≥ 0.6`(`DIRECT_MIN_CONFIDENCE`)을 기입한 뒤 **재서명**한다. 승격 판단은 행별 사람 몫이며
+  일괄 승격은 하지 않는다. 승격 후에는 위 승격 규칙 3(직접매핑 conf 임계)이 그대로 적용된다.
+- **집행 지점 두 곳**(정본화와 별항): ① promote — `promotion_violations`가 `approved` 비직접 행을 위반으로
+  전건 열거해 `promote_approved`가 실패한다(검수 대기 `pending`·`rejected`·`deferred` 행은 위반 아님 —
+  검수 큐의 비직접 행은 그대로 둔다). ② load — `load_gate_violations`가 비직접 행을 거부해 `load_crosslinks`가
+  `CrosslinkGateError`로 실패한다(promote를 우회한 손수 만든 crosslinks JSON 차단).
+- 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/crosslinks.json`)는 전 행 직접매핑이며
+  `test_approved_crosslinks_corpus.py`가 동결한다.
 
 ## 기계 자율 거부 규칙 (`machine_reject` — 측정된 안전 자율 행동·초인간 검증 §3.3)
 
@@ -113,4 +131,4 @@ shadow 측정 → canary/full 노출 플립(사람) → canonical M-id 리포트
 
 ---
 
-**버전**: v1.1 (대장 동기화 § 추가 — S2-10·2026-07-13) · v1 (Phase 4b-1·2026-07-08) · 코드 정본 `crosslink_gate.py` · 동결 `test_crosslink_gate_contract.py`
+**버전**: v1.2 (적재 자격 § 추가 — MISC-63·2026-10-09) · v1.1 (대장 동기화 § 추가 — S2-10·2026-07-13) · v1 (Phase 4b-1·2026-07-08) · 코드 정본 `crosslink_gate.py` · 동결 `test_crosslink_gate_contract.py`

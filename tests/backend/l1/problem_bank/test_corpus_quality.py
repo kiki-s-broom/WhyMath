@@ -402,16 +402,30 @@ def test_rephrased_corpus_preserves_all_fields_but_question_text() -> None:
     # 존재하되(키 집합 비교는 별도 제외 불요), *값*은 의도적으로 비대칭이다 — 소스는 자신의
     # "유사" 형제 태깅, rephrase 성공 레코드는 parent_slug를 향한 "변형" 태깅(S4-18)으로
     # 서로 다른 관계를 가리킨다(계보가 곧 이 차이의 요점) — 값 비교에서만 제외한다.
+    #
+    # PB-17(2026-10) 저작 서명 `authored_by`: 소스(generated_v0)는 결정론 생성기가 만들어 서명이
+    # 백필됐지만, rephrased_v0는 **LLM이 발문을 다시 쓴** 코퍼스라 결정론 서명을 승계하면 안 된다
+    # (승계하면 LLM 저작분이 `deterministic:`으로 위장돼 생성자≠검증자 가드가 면제된다). 저작 모델
+    # id 는 기록돼 있지 않으므로 `llm:` 서명도 지어내지 않고 '기록 없음'으로 둔다 → 이 키만
+    # 의도적 비대칭이라 키 집합·값 비교에서 제외한다(비어 있음 자체는 아래 별도 테스트가 봉인).
     source = _raw_by_math_key(_generated_corpus_path())
     rephrased = _rephrased_raw()
-    exclude = {"question_text", "slug", "problem_id", "relations"}
+    exclude = {"question_text", "slug", "problem_id", "relations", "authored_by"}
     for slug, rec in rephrased.items():
         src = source[_math_key(rec)]
-        assert set(rec) == set(src), f"{slug} 키 집합 변화"
+        assert set(rec) - {"authored_by"} == set(src) - {"authored_by"}, f"{slug} 키 집합 변화"
         for key in src:
             if key in exclude:
                 continue
             assert rec[key] == src[key], f"{slug} 필드 변조: {key}"
+
+
+def test_rephrased_corpus_never_inherits_a_deterministic_author() -> None:
+    # PB-17 — LLM 재작성 코퍼스가 결정론 서명을 갖는 순간 가드가 거짓 면제된다. 0건을 봉인한다.
+    rephrased = _rephrased_raw()
+    assert rephrased, "스캔 0건"
+    inherited = [slug for slug, rec in rephrased.items() if "authored_by" in rec]
+    assert inherited == [], f"결정론 서명 승계 {len(inherited)}건: {inherited[:3]}"
 
 
 def test_rephrased_corpus_changed_questions_preserve_equation() -> None:

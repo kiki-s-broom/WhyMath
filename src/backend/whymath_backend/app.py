@@ -29,6 +29,11 @@ Langfuse·Celery broker가 필요하지 않다(첫 사용 시 연결). LangfuseS
 `functional_security_audit_2026-08-08.md` M6): SEC-07 당시 "범위 밖"으로 남겨졌던 폴링이
 무인증인 채 검증 전 원시 LLM 출력을 반환하고 있었다(짝인 POST는 봉인·폴링만 열림).
 
+레이트리밋(SEC-19): 인증은 *누구냐*만 가린다 — 인증된 단일 계정이 `/v1/generate`를 반복 호출해도
+LLM 비용은 그대로 나간다. 그래서 인증과 별개 축으로 `RateLimitedGenerate`(사용자·IP·기기 3차원,
+`generate` 전용 버킷)를 부착했다. 시각화·장면·코치 LLM 표면은 이미 리미터가 있었고 이 엔드포인트가
+유일한 무제한 표면이었다. 리미터는 동의 게이트를 얹지 않는다(`CurrentUser` 기반 — 접근 의미 불변).
+
 소유권(job↔user) 검사(SEC-27, 48_보안 §P0): `job_ownership` 테이블(`db/models/
 job_ownership.py`)이 `POST /v1/generate`의 큐잉 시점에 (job_id, user_id)를 기록하고,
 `GET /v1/jobs/{id}`가 그 행으로 소유자를 대조해 타 사용자 job 폴링을 404로 거부한다
@@ -58,6 +63,7 @@ from whymath_backend.api._device_store import (
     ping_device_store_health,
     set_device_store,
 )
+from whymath_backend.api._error_codes import CodedHTTPException
 from whymath_backend.api._growth_evidence_state import (
     GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY,
     GrowthEvidenceReachCounters,
@@ -108,6 +114,7 @@ from whymath_backend.api._ocr_state import (
 from whymath_backend.api._ocr_state import (
     get_ocr_reach_snapshot as _get_ocr_reach_snapshot,
 )
+from whymath_backend.api._rate_limit import RateLimitedGenerate
 from whymath_backend.api._segmentation_state import (
     SEGMENTATION_COUNTERS_KEY as _SEGMENTATION_COUNTERS_KEY,
 )
@@ -140,6 +147,7 @@ from whymath_backend.api._subject_capability_state import (
     STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
 from whymath_backend.api.admin_bff import router as admin_bff_router
+from whymath_backend.api.admin_cms import router as admin_cms_router
 from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -902,12 +910,27 @@ def create_app(
         redoc_url=None if _prod_like else "/redoc",
         openapi_url=None if _prod_like else "/openapi.json",
     )
+
     # SEC-26(48_보안 §P0 "CORS/보안 헤더 미들웨어" 갭): TrustedHost → CORS → 보안 헤더 순으로
     # 가장 먼저 건다(등록 순서 = 바깥 래핑 순서 — 나쁜 Host를 가장 먼저 걷어내고, preflight를
     # CORS가 처리하고, 마지막으로 모든 응답에 보안 헤더를 얹는다). 셋 다 *항상* 등록한다 —
     # allowlist가 비어 있으면 각자 안전한 기본 자세로 수렴한다(TrustedHost는 `*`=현재 동작
     # 무회귀, CORS는 deny-by-default=네이티브 앱 미영향). 와일드카드+credentials 조합은
     # `Settings._forbid_cors_wildcard_with_credentials`가 부팅 시점에 이미 막았다.
+    # OPS-82: 코드가 있는 HTTP 에러는 종전 `detail` 옆에 `error_code`를 싣는다(하위 호환 —
+    # `detail`을 그대로 두므로 문자열 detail을 가정하는 클라이언트가 깨지지 않는다). 로그에는
+    # 코드와 예외 타입명만 남긴다 — detail 문장·필드값은 싣지 않는다(CLAUDE.md 침묵 실패 금지).
+    @app.exception_handler(CodedHTTPException)
+    async def _coded_http_exception_handler(
+        request: Request, exc: CodedHTTPException
+    ) -> JSONResponse:
+        logger.info("에러코드 응답 — %s (%s)", exc.error_code, type(exc).__name__)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "error_code": exc.error_code},
+            headers=exc.headers,
+        )
+
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings_for_app.trusted_hosts_list)
     app.add_middleware(
         CORSMiddleware,
@@ -1162,7 +1185,10 @@ def create_app(
                     # 미달 — 426(401/404/422와 구분되는 전용 사유코드). call_next 미호출.
                     return JSONResponse(
                         status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                        content={"detail": "앱을 최신 버전으로 업데이트해주세요."},
+                        content={
+                            "detail": "앱을 최신 버전으로 업데이트해주세요.",
+                            "error_code": "WM-CLIENT-001",
+                        },
                     )
                 # min_version 파싱 불가(Settings 오구성)면 게이트 자체를 적용하지 않는다
                 # (fail-open — 서버 설정 오류로 전 클라를 차단하는 것이 더 나쁜 실패 모드).
@@ -1300,7 +1326,7 @@ def create_app(
             ),
         )
 
-    @app.post("/v1/generate", tags=["l3"])
+    @app.post("/v1/generate", tags=["l3"], dependencies=[RateLimitedGenerate])
     async def post_generate(
         body: GenerateBody,
         request: Request,
@@ -1309,10 +1335,11 @@ def create_app(
     ) -> JSONResponse:
         """라우팅 → (동기) 캐시·생성 / (비동기 QUALITY) 큐잉. 메타데이터 + 결과 반환.
 
-        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 반환 텍스트
-        (동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을 통과하기
-        전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는 상위
-        계층(L4/L5 오케스트레이터)의 책임이다.
+        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 한도 초과는
+        **429**(`RateLimitedGenerate` — SEC-19, 사용자·IP·기기 3차원·`generate` 전용 버킷).
+        반환 텍스트(동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을
+        통과하기 전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는
+        상위 계층(L4/L5 오케스트레이터)의 책임이다.
 
         AI 모델 학습/개선에 데이터 사용 가능 여부는 `ConsentScope.ai_training` 동의를
         판정해 Langfuse trace 메타데이터로 전달한다(EOS §48·§50). 이 판정은 응답 생성을
@@ -1487,5 +1514,7 @@ def create_app(
     app.include_router(admin_menu_router)
     # ADMIN-05: Admin BFF read-only — 모델 상태·비용·검수 큐·사용자 조회(Phase A).
     app.include_router(admin_bff_router)
+    # P3-12: Admin CMS — 개념 버전 워크플로우(초안·검토·발행·롤백) + 개념 외 허용 목록 제자리 편집.
+    app.include_router(admin_cms_router)
 
     return app

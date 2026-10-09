@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,10 +15,13 @@ acceptance:
   - "① POST /v1/generate(app.py:962)에 RateLimited 의존성 부착 — api/_rate_limit.py 기존 리미터 이식(SEC-08 /v1/auth/* 선례·재구현 0)·429 실측·Redis 부재 시 기존 fail-safe 거동 유지"
   - "② 인증(SEC-07 CurrentUser 봉인)과 별개 축임을 명문화 — 인증 사용자라도 단일 계정의 LLM 비용 남용 방어. 현재 /v1/generate는 RateLimited* 의존성이 0건인 유일한 LLM 호출 표면(visualization·scene·coach는 리미터 보유)"
   - "③ GET /v1/jobs 무인증·소유권 축은 SEC-15(in_progress) 소유 — 범위 밖 동결"
-artifacts: []
+artifacts:
+  - "PR #1534 — https://github.com/kiki-s-broom/WhyMath/pull/1534"
 paths:
   - src/backend/whymath_backend/app.py
-  - tests/backend/test_app.py
+  - src/backend/whymath_backend/api/_rate_limit.py
+  - src/backend/whymath_backend/config.py
+  - tests/backend/api/test_generate_rate_limit.py
 session: null
-notes: "ai_integration_gap_review.md D3(2026-08-10, 축소판 — jobs 축은 SEC-15로 승계). functional_security_audit_2026-08-08.md(미머지 브랜치 claude/whymath-issues-review-k20m0w)는 generate를 CurrentUser 봉인으로만 기록 — 레이트리밋 부재는 그 감사 미커버 축. SEC-15와 app.py paths 의도적 겹침(겹침 경고는 대기 신호) — SEC-15 착지 후 착수.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/비용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "ai_integration_gap_review.md D3(2026-08-10, 축소판 — jobs 축은 SEC-15로 승계). functional_security_audit_2026-08-08.md(미머지 브랜치 claude/whymath-issues-review-k20m0w)는 generate를 CurrentUser 봉인으로만 기록 — 레이트리밋 부재는 그 감사 미커버 축. SEC-15와 app.py paths 의도적 겹침(겹침 경고는 대기 신호) — SEC-15 착지 후 착수.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/비용KPI — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/app.py', 'tests/backend/test_app.py'] → ['src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/api/_rate_limit.py', 'src/backend/whymath_backend/config.py', 'tests/backend/api/test_generate_rate_limit.py']: paths를 실제 변경 파일로 정정: _rate_limit.py(generate 카테고리와 리미터)와 config.py(설정 3종)가 추가됐고, test_app.py는 건드리지 않고 신규 테스트 파일로 분리해 뺀다(타 태스크와의 test_app.py 겹침 회피)\npaths 제거 1건: ['tests/backend/test_app.py']"
+updated: 2026-10-08

@@ -1,0 +1,102 @@
+# CI 잡별 타임아웃 여유 상시 감시 (OPS-100)
+#
+# 배경: CI 잡 시간 예산(`timeout-minutes`) 소진이 4회 반복됐고 매번 그 자리 조치(상향·분할)로만
+# 끝났다 — 2026-07-25 backend 25분 초과 · 08-21 backend 여유 16%(OPS-47) · 09-01 backend
+# 37.5분 > 35 · 09-28 harness-integrity 5분 초과로 머지 큐 전면 차단(OPS-69). 상시 감시가
+# 없었다. 정적 테스트는 상한이 *되돌려지는 것*만 막고, 실제 소요가 상한에 다가가는 것은
+# 실행 이력 없이는 볼 수 없다.
+#
+# 무엇을 하는가: 최근 실행(push·merge_group·schedule 각 20건)에서 잡별 최대 소요를 구해
+# `ci.yml`의 `timeout-minutes` 대비 여유율을 낸다. **여유율 30% 미만인 잡이 하나라도 있으면
+# 스텝이 실패한다**(exit 1). 측정 자체가 불가하면(API 거부·이력 0건·잡 이름 불일치 등)
+# 별도로 실패한다(exit 2) — "여유 충분"으로 접지 않는다.
+#
+# 알림 방식: 매 실행 경고는 습관화되므로 쓰지 않는다. 기준 미달일 때만 잡이 실패하고,
+# GitHub이 예약 실행 실패에 기본 제공하는 저장소 알림을 최소 경보로 쓴다(weekly-metrics와
+# 같은 판단 — 신규 알림 채널을 만들지 않는다). 기준 미달 잡은 실행 요약(Step Summary)과
+# `::error::` 주석에 잡 이름·최대 소요·상한이 나온다.
+#
+# 빨간불이 켜졌을 때 (처방이 갈린다 — 비고 열을 읽는다):
+#   · "상한 도달 N회 · 완주 표본 최대 X분"에서 X가 상한에 가깝다 → 잡이 서서히 느려졌다.
+#     상한 상향 또는 잡 분할(corpus_authoring 분리 선례).
+#   · X가 상한에서 멀다 → 한 번 멈춘 것이다(예: 2026-10-06 data-pipeline이 setup-python의
+#     캐시 복원에서 멈춰 10분을 다 썼다). 상한을 올리지 말고 스텝 타임아웃을 건다.
+#   · 비고 없이 LOW → 정상 완주하지만 여유가 30% 미만이다. 위 첫째와 같다.
+#
+# **왜 harness-audit.yml이 아니라 별도 워크플로인가**:
+#   · harness-audit은 `push(main)`마다 돈다 — 이 감시는 하루 1회면 충분하고, main 커밋마다
+#     적색을 띄우면 습관화된다.
+#   · harness-audit의 concurrency 그룹은 대기 중 실행을 최신 하나로 교체한다. push가 잦으면
+#     예약 실행이 조용히 취소될 수 있다(침묵 실패). 이 파일은 자기 그룹을 쓴다.
+#   · API 조회에는 `actions: read`가 필요하다. 권한을 명시한 워크플로에서 이 권한이 없으면
+#     403이다 — 기존 파일의 권한 선언을 건드리지 않고 이 파일 안에 격리한다.
+#
+# 시각: 야간 CI(ci.yml `schedule`)가 끝난 뒤여야 그 실행이 표본에 들어간다. GitHub schedule은
+# 부하 시 크게 지연된다(2026-10 실측: UTC 18시 크론이 22시경에 시작) — 그래서 02:17 UTC로 둔다.
+name: ci-timeout-headroom
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # 취소 금지 — 측정은 읽기 전용이라 직렬 대기가 항상 안전하다.
+  group: ci-timeout-headroom
+  cancel-in-progress: false
+
+# 의존 해석 고정 (OPS-121) — 이 파일의 모든 `pip install`이 제약 파일의 정확한 버전만 고른다.
+# 범위 안의 신규 릴리스(예: 2026-10-08 pydantic 2.14.0)는 제약 파일을 바꾸는 갱신 PR을 거쳐서만
+# main·머지 큐에 닿는다. 잡·스텝 env로 재정의하거나 `pip --isolated`를 쓰면 고정이 풀리므로
+# scripts/ops/ci_constraints.py check가 막는다 (infra-contracts 잡 게이트). 갱신 절차:
+# docs/ops/ci_constraints_refresh_runbook.md. 절대경로인 이유: 잡마다 working-directory가 다르다.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
+
+jobs:
+  headroom:
+    name: CI 잡 타임아웃 여유 감시 (여유 30% 미만이면 실패)
+    runs-on: ubuntu-latest
+    # 호출 약 64회(이벤트 3 + 실행 60 + 쪽수) × 지연 — 실측 약 2분. 넉넉히 15분.
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        # 상한(timeout-minutes)을 이 체크아웃의 ci.yml에서 직접 읽는다 — 하드코딩 금지.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python3 -m pip install "pyyaml>=6.0.1,<7"
+
+      # 판정은 exit code로 한다 — `-q`·`| tail`로 출력을 죽이거나 잘라 판정하지 않고,
+      # `|| true`·`continue-on-error`로 실패를 은닉하지 않는다(은닉하면 상시 무력화돼도
+      # 초록으로 보인다 — harness-audit과 같은 규칙).
+      #
+      # GITHUB_TOKEN 필수: 미인증 API는 러너 IP 공유로 60req/h라 이 호출량(약 64회)이면
+      # 사실상 항상 rate limit이다. 저장소는 환경(GITHUB_REPOSITORY)에서 받는다 —
+      # 소유자 이름을 리터럴로 적지 않는다(2026-09-09 조직 이관 회귀 가드).
+      - name: 잡별 타임아웃 여유 측정
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/analysis/measure_ci_job_timeout_headroom.py \
+            --jsonl "$RUNNER_TEMP/ci_job_headroom.jsonl" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: 측정 원본 보존
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-job-headroom-${{ github.run_id }}
+          path: ${{ runner.temp }}/ci_job_headroom.jsonl
+          if-no-files-found: warn
+          retention-days: 30
