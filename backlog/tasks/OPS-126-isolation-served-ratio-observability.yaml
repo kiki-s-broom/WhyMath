@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-126-isolation-served-ratio-observability
+title: "SymPy 격리가 작동한 비율을 아무도 읽지 않는다 — isolation_stats 소비자 부재 + 단계 입력 기준 상한 재판정"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-123-ubp9tw-ops96-isolated-call-recovery
+requires_gates: []
+acceptance:
+  - "① 소비자 배선 — api/_isolated_call.py의 isolation_stats()는 격리 호출 수·상한 초과·대기열 포화·워커 사망·폴백 카운터를 만들지만 이를 읽는 비테스트 코드가 0건이다(선언만 있고 배선이 없는 상태). 이 카운터에서 격리가 실제로 작동한 비율과 판정 불가로 접힌 비율을 내는 운영 관측 좌석(운영 리포트 또는 상태 엔드포인트 중 기존 좌석을 재사용)을 배선한다. 정상 응답 200은 격리가 일했다는 증거가 아니므로(CLAUDE.md 작동한 비율 원칙) 응답·리포트가 비율을 말해야 한다. 프로세스가 여럿이면 카운터는 프로세스별이라는 한계를 명시한다.\n② 상한값 재판정 — 현재 sympy_isolation_timeout_s=5.0은 최종답 경로의 정상 문항 14,034건 실측(p50 1.2ms·p99 11ms·최대 0.1075초·5초 초과 0건 / scripts/analysis/measure_sympy_isolation_budget.py)만을 근거로 한다. 학생 풀이 단계(verify-step·verify-solution) 입력의 정상 분포는 코퍼스에 없어 미측정이다. 파일럿 로그의 isolation_budget_exceeded 비율과 단계 입력 소요를 실측해 상한이 정상 입력을 판정 불가로 떨어뜨리지 않는지 판정하고 값을 유지·조정한다.\n③ 운영 용량 판정 — sympy_isolation_max_workers(기본 2) x 서버 워커 수만큼 SymPy를 import한 프로세스가 상주한다(설정 주석 기준 개당 약 100~150MB). 실제 배포 형상의 프로세스 수와 메모리를 실측해 기본값의 적정성을 적는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/_isolated_call.py
+  - scripts/analysis/measure_sympy_isolation_budget.py
+session: null
+notes: "출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96의 ⑤(상한값 실측과 정상 문항 판정 불가 비율)는 최종답 경로만 14,034건으로 충족하고 단계 경로는 실서비스 입력 없이는 측정할 수 없어 이 태스크가 승계한다."
+updated: 2026-10-09

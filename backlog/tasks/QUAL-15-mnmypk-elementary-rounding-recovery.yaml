@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-15-mnmypk-elementary-rounding-recovery
+title: "mnmypk 회수 — QUAL-11 초등 어림 발문 교정·코퍼스 재생성 착수분(생성기·코퍼스 600행·관례 동결 테스트)을 main 현행 위에 파일 단위로 이식"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/friendly-pascal-mnmypk head c229d21c(2026-10-03 · ahead 2 · behind 118). 구현 커밋 b363de21 = QUAL-11 교정(발문 '~하여 X의 자리까지 나타내면'으로 교체·정답 계산식 불변·답=입력값 입력은 생성 풀에서 제외·코퍼스 600/600 재생성·Decimal.quantize 독립 계산으로 코퍼스와 생성기 풀 전수 대조·뮤테이션 4종 전건 RED), c229d21c = QUAL-12 등재. 판정 기준 main 15220b9f: main QUAL-11은 todo·artifacts 비어 있음·생성기에 '자리까지' 0건(브랜치 10건)·관례 동결 테스트 파일 부재·원격 claim은 TTL 초과(claims reap dry-run). 재현: git diff --stat origin/main...origin/claude/friendly-pascal-mnmypk\n② 이식 방식 = 파일 단위. 브랜치는 main보다 118커밋 낡았으므로 통째 머지 금지(NLP-04 선례). 대상 4파일 = 생성기(브랜치 변경 약 22줄)·problems.jsonl(600행)·_provenance.json·tests/backend/harness/test_elementary_rounding_corpus_convention.py(신규 84줄). 생성기는 main 현행 위에 브랜치의 변경 의도만 재적용하고, 코퍼스는 이식한 생성기로 재생성해 브랜치 산출물과 byte 단위로 비교한다(결정론 재현). 불일치하면 어느 쪽이 맞는지 독립 계산으로 판정해 notes에 적는다. 원 번호 재사용 금지 — 브랜치가 등재한 QUAL-12는 이 감사가 같은 번호로 재등재했다(전 원격 브랜치·main에서 미사용 실측)\n③ 집행 지점·변별력(정본화와 별항) — 이식한 관례 동결 테스트가 CI의 어느 잡·스텝에서 실제로 수집·실행되는지 확인해 적는다(존재함≠돌아감). 코퍼스 600문 전수를 독립 계산으로 대조해 발문의 자리 해석과 정답이 일치함을 보이고, 생성기의 발문 문구 또는 정답 계산을 되돌린 뮤테이션 2종 이상이 RED임을 확인하되 주입이 실제로 적용됐는지(mutated != original)와 원복이 바이트 동일한지를 실행 전후에 단언한다. 코퍼스에 검수·승인 상태 필드가 있으면 재생성이 그 값을 바꾸지 않았음을 실측한다\n④ 소유 태스크 QUAL-11의 acceptance를 이식 완료 시점의 main 기준으로 전 항 재대조해 이행/미이행/의도적 제외를 적고, 미이행분은 승계 태스크로 분리 등재한 뒤 QUAL-11을 닫을 수 있는지 판정한다(회수로 done 선언 시 전수 재대조 — CLAUDE.md). QUAL-11은 이 태스크를 선행(depends_on)으로 부착했으므로 이 태스크가 done이 되기 전에는 착수 후보에 오르지 않는다"
+artifacts:
+  - "commit 60698503 · docs/reviews/qual15_ops123_recovery_2026-10-09.md · PR 미개설(사람 게이트 대기)"
+paths:
+  - "data/corpus/problem_bank_elementary_rounding_v0/**"
+  - src/backend/whymath_backend/l3/equivalent/elementary_rounding_skeleton_generator.py
+  - tests/backend/harness/test_elementary_rounding_corpus_convention.py
+session: null
+notes: |-
+  출처: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-① (stray-code 16회차). 소유 태스크 QUAL-11-elementary-rounding-place-interpretation. 회수 완료 전 원 브랜치 claude/friendly-pascal-mnmypk 삭제 금지. 원격 claim QUAL-11은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다.
+
+  [PR 보류 2026-10-09] incomplete
+updated: 2026-10-09
