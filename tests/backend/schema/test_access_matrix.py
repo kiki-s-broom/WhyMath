@@ -13,9 +13,9 @@
 collaboration_module_gap_review.md` §3 D1의 "매트릭스는 선언은 정본, 집행은 0"이라는 진단과
 일치 — 이 태스크는 새로 발견한 부분 구현을 대체하는 것이 아니라 진짜 공백을 처음 메운다.
 
-**설계 — 왜 4개 역할(student/content_admin/teacher/parent)인가**: `Role` enum은 현재
-STUDENT·CONTENT_ADMIN 2값뿐이고, pipa 매트릭스는 학생/교사/부모 3열이다. 두 축이 겹치지 않는다
-(CONTENT_ADMIN은 PIPA 데이터 뷰어가 아닌 콘텐츠 저작 역할, 교사·부모는 아직 Role enum에
+**설계 — 왜 계약의 역할 축이 PIPA 3열보다 넓은가**: `Role` enum은 STUDENT와 콘텐츠 운영 역할
+4종(CONTENT_ADMIN·P3-12의 편집·검수·배포)이고, pipa 매트릭스는 학생/교사/부모 3열이다. 두 축이
+겹치지 않는다(콘텐츠 역할은 PIPA 데이터 뷰어가 아닌 저작·운영 역할, 교사·부모는 아직 Role enum에
 없다). 계약은 이 둘의 합집합을 `roles`로 선언하고 각 role에 `status`(`active`=지금 Role enum이
 실제로 발급 / `planned`=Phase 3+ 좌석 대기)를 매겨 두 축을 화해시킨다.
 `TestRoleEnumSyncsWithContract`가 "활성 역할 집합 == 계약이 active로 선언한 역할 집합"을
@@ -52,6 +52,13 @@ _SYMBOL_TO_RESOLUTION = {"●": "full", "◐": "summary", "✕": "none"}
 _RESOLUTION_RANK = {"full": 2, "summary": 1, "none": 0}
 # pipa_data_matrix.md §2.2 표 열 순서(학생 본인/교사(B2B)/부모) == 계약 roles 중 PIPA 3역할.
 _PIPA_ROLE_COLUMNS: tuple[str, str, str] = ("student", "teacher", "parent")
+#: PIPA 데이터 뷰어가 아닌 콘텐츠 운영 역할 — 9항목 전부 none으로 명시한다(P3-12가 3종을 더했다).
+_CONTENT_ROLES: tuple[str, ...] = (
+    "content_admin",
+    "content_editor",
+    "content_reviewer",
+    "content_publisher",
+)
 
 
 def _load_contract() -> dict[str, Any]:
@@ -211,13 +218,27 @@ class TestContractSyncsWithPipaDoc:
                 item["resolution"][role] in _RESOLUTION_RANK
             ), f"{item_id}.{role}: 알 수 없는 해상도 값 {item['resolution'][role]!r}"
 
-    def test_content_admin_has_no_pipa_data_visibility(self) -> None:
-        """content_admin은 PIPA 뷰어 축이 아니다 — 9항목 전부 none이어야 '뷰어 아님'이 정직하다."""
+    @pytest.mark.parametrize("role", _CONTENT_ROLES)
+    def test_content_roles_have_no_pipa_data_visibility(self, role: str) -> None:
+        """콘텐츠 역할 4종은 PIPA 뷰어 축이 아니다 — 9항목 전부 none이어야 '뷰어 아님'이 정직하다.
+
+        P3-12가 CMS 역할 3종(편집·검수·배포)을 더했다. 명시하지 않으면 미래의 역할별 필드 필터링
+        좌석이 `resolution[role]`을 못 찾아 '미명시'를 '허용'으로 읽을 수 있다 — 미명시 ≠ 미공개.
+        """
         for item_id, item in _ITEMS.items():
-            assert item["resolution"]["content_admin"] == "none", (
-                f"{item_id}: content_admin이 none이 아님 — 콘텐츠 CUD 역할이 학생 데이터 열람권을 "
+            assert item["resolution"][role] == "none", (
+                f"{item_id}: {role}이 none이 아님 — 콘텐츠 역할이 학생 데이터 열람권을 "
                 "갖는 것은 설계 밖(계약 note 참조)"
             )
+
+    def test_content_roles_are_exactly_the_active_non_student_roles(self) -> None:
+        """분모 — 위 4종이 계약의 활성 역할 중 학생을 뺀 전부다(역할이 늘면 이 목록이 먼저 red)."""
+        active = {
+            e["role_enum_value"]
+            for e in _ROLES.values()
+            if e.get("status") == "active" and e.get("role_enum_value") is not None
+        }
+        assert set(_CONTENT_ROLES) == active - {"student"}
 
 
 # ──────────────────────────────────────────────────────────────────────────

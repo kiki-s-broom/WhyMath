@@ -18,6 +18,10 @@ argument-hint: "[report-only] (인자 없으면 판정+등재+삭제배치까지
 ## 실행 절차
 
 ### 0. 전제 복구 — shallow면 판정 금지
+> 세션 브리핑의 `📡 고립 브랜치` 줄(HARN-28)은 CI 야간 리포트(`harness-reports`)다 — 세션이 shallow여도
+> 1차 후보 목록으로 쓸 수 있다. 단 **최대 하루 묵은 스냅샷**이므로 삭제·회수 전에는 아래 절차로 재측정한다.
+> 리포트 상태 조회: `python3 scripts/harness/isolation_report.py show`
+
 ```bash
 git rev-parse --is-shallow-repository   # true면 ↓ 필수 (안 하면 ahead 수치·포팅 근거 전부 오염)
 git fetch --unshallow origin
@@ -25,8 +29,8 @@ git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'   # --prune 없�
 ```
 
 ### 1. 모집단 분리
-1. 원격 브랜치 전수 목록 (`git for-each-ref refs/remotes/origin`) — `harness-claims`는 제외
-   (하네스 소유 claim 저장소, 작업 브랜치 아님)
+1. 원격 브랜치 전수 목록 (`git for-each-ref refs/remotes/origin`) — `harness-claims`·`harness-reports`는 제외
+   (하네스 소유 데이터 브랜치, 작업 브랜치 아님)
 2. 열린 PR 목록 (GitHub MCP `list_pull_requests` — `fields`로 number·head만 요청, 전체 응답은
    토큰 상한을 넘는다) → **PR 있는 브랜치는 각 PR이 소유** — 감사 범위 밖.
    역방향도 본다: **head 브랜치가 원격에 없는 열린 PR(유령 PR)은 별도 보고**한다 — 소유 관계가

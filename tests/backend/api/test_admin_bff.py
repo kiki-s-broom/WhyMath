@@ -173,8 +173,32 @@ def test_models_endpoint_reports_status_without_raising() -> None:
 # ── ④ 쓰기 0 동결 ────────────────────────────────────────────────────────────────
 
 
+#: 허용된 `/v1/admin/*` 쓰기 라우트 — **닫힌 목록**이다. 쓰기가 늘면 이 목록을 의식적으로 고쳐야 한다.
+#: ADMIN-07: 검수 상태 전이 1종 + ADMIN-18: 검수 착수(started 타이머) 1종 / P3-12: 관리자 CMS 12종(개념 버전 워크플로우 3 + 허용 목록
+#: 제자리 편집 PATCH 7 + 검수 표지 POST 2). `/v1/admin/cms/*`를 접두로 통째 허용하지 않는다 —
+#: 접두 허용은 CMS에 라우트가 하나 더 붙어도 침묵하는 열린 목록이다.
+_ALLOWED_ADMIN_WRITES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("POST", "/v1/admin/review-queue/items/{problem_id}/transitions"),
+        ("POST", "/v1/admin/review-queue/items/{problem_id}/review-sessions"),
+        ("POST", "/v1/admin/cms/concepts/{concept_id}/drafts"),
+        ("POST", "/v1/admin/cms/versions/{version_id}/transitions"),
+        ("POST", "/v1/admin/cms/concepts/{concept_id}/rollback"),
+        ("PATCH", "/v1/admin/cms/curriculum_version/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/problem/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/problem_step/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/misconception/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/strategy_node/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/concept_content/items/{pk}"),
+        ("PATCH", "/v1/admin/cms/hint/items/{pk}"),
+        ("POST", "/v1/admin/cms/strategy_node/items/{pk}/review"),
+        ("POST", "/v1/admin/cms/concept_content/items/{pk}/review"),
+    }
+)
+
+
 def test_admin_surface_is_read_only() -> None:
-    """쓰기 표면 동결 — 허용 쓰기는 검수 전이·검수 착수 POST 2종뿐이고 라우트가 실재함을 함께 단언한다."""
+    """쓰기 표면 동결 — 허용 쓰기가 닫힌 목록과 **정확히** 같고 라우트가 실재함을 함께 단언한다."""
     from whymath_backend.ops.declared_unwired_audit import walk_routes
 
     app = create_app()
@@ -184,14 +208,17 @@ def test_admin_surface_is_read_only() -> None:
         if getattr(r, "path", "").startswith("/v1/admin/")
     ]
     assert len(admin_routes) >= 5, f"admin 표면이 {len(admin_routes)}건 — 분모가 사라졌다"
-    writes = [(m, p) for m, p in admin_routes if set(m) - {"GET", "HEAD", "OPTIONS"}]
-    # ADMIN-07 Phase B: 쓰기는 검수 상태 전이였고, ADMIN-18이 검수 착수(started 타이머 적재)를
-    # 더해 2종이다 — 다른 쓰기가 늘면 이 목록을 의식적으로 고쳐야 한다(조용한 표면 확장 방지).
-    # 라우트 자체의 계약은 test_admin_review_transitions*.py.
-    assert sorted(writes) == [
-        (["POST"], "/v1/admin/review-queue/items/{problem_id}/review-sessions"),
-        (["POST"], "/v1/admin/review-queue/items/{problem_id}/transitions"),
-    ], f"허용된 쓰기 2종 외의 쓰기 라우트: {writes}"
+    writes = [
+        (method, path)
+        for methods, path in admin_routes
+        for method in methods
+        if method not in {"GET", "HEAD", "OPTIONS"}
+    ]
+    assert len(writes) == len(set(writes)), "같은 (메서드, 경로) 쓰기 라우트가 중복 등록됐다"
+    assert set(writes) == _ALLOWED_ADMIN_WRITES, (
+        f"허용 목록 밖의 쓰기: {sorted(set(writes) - _ALLOWED_ADMIN_WRITES)} / "
+        f"선언만 있고 실재하지 않는 쓰기: {sorted(_ALLOWED_ADMIN_WRITES - set(writes))}"
+    )
 
 
 def test_every_admin_route_uses_registry_derived_guard() -> None:

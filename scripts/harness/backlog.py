@@ -51,6 +51,7 @@ import dep_declaration
 import done_mirror_gate
 import event_leaks
 import incidents as incidents_mod
+import isolation_report
 import jit_rules
 import number_guard
 import pathscope
@@ -4756,6 +4757,28 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     else:
         stale_branch_status = "disabled"
 
+    # 세션 스캔이 shallow면 CI 야간 리포트(harness-reports)로 대체한다 (HARN-28). 모든 CCR 세션
+    # 컨테이너가 shallow라 라이브 스캔은 세션에서 한 번도 목록을 낸 적이 없다. 리포트가 없거나
+    # 손상됐거나 못 읽으면 "고립 0건"이 아니라 "미측정"을 낸다(isolation_report.to_brief).
+    # shallow가 아니면 라이브 스캔이 더 신선하므로 읽지 않는다.
+    isolation_source_line = ""
+    if stale_branch_status == "shallow":
+        try:
+            iso = isolation_report.brief_for_session(
+                root, local_status=stale_branch_status, local_message=stale_branch_message
+            )
+            stale_branches = iso.stale_branches
+            stale_branch_status = iso.status
+            stale_branch_message = iso.message
+            pr_state_lookup_ok = iso.pr_state_lookup_ok
+            pr_state_lookup_error = iso.pr_state_lookup_error
+            isolation_source_line = iso.source_line
+        # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지: 타입명을 남긴다)
+        except Exception as exc:
+            stale_branch_message = (
+                f"{stale_branch_message} · CI 리포트 대체 실패({type(exc).__name__})"
+            )
+
     # 설계 문서 중복 착수 탐지 (HARN-14) — SessionStart 1회 비용, 나이 임계 없음(HARN-13의
     # 3일 임계 아래에서 새는 것이 이 스캔의 존재 이유 — 문서 중복은 착수 당일이 가장 위험).
     #
@@ -4885,6 +4908,7 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             stale_branch_message=stale_branch_message,
             pr_state_lookup_ok=pr_state_lookup_ok,
             pr_state_lookup_error=pr_state_lookup_error,
+            isolation_source=isolation_source_line,
             done_excluded=done_excluded,
             gate_attach_excluded=gate_attach_excluded,
             gate_attach_status=gate_attach_status,

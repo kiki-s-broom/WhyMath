@@ -316,6 +316,28 @@ async def get_concept_content(
     return row.to_schema()
 
 
+def _publish_pointer_readonly() -> HTTPException:
+    """발행 포인터(`current_published_version_id`)를 이 경로로 바꾸려는 요청 — 422(P3-12).
+
+    발행 포인터는 `l3/publish_gate`의 전이(발행·폐기·롤백)로만 움직인다(EOS-50 ③ — 미승인
+    Publish가 구조적으로 불가능해야 한다). 이 라우트는 본문을 `merged.update(body)`로 병합한 뒤
+    `ConceptSchema`로 검증하는데 그 스키마가 이 필드를 갖고 있어, 막지 않으면 게이트를 우회해
+    포인터를 쓸 수 있다. 정적 동결(`test_publish_gate_enforcement` R2)은 런타임 dict로 들어오는
+    키를 보지 못하므로 이 경로는 *값 검사*로 직접 막는다. 값이 같은 요청(GET으로 받은 본문을
+    그대로 PATCH하는 왕복)은 통과시킨다 — 바꾸려는 것만 거부한다.
+    """
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "code": "publish_pointer_readonly",
+            "message": (
+                "발행 포인터(current_published_version_id)는 이 경로로 바꿀 수 없습니다. "
+                "관리자 CMS의 버전 발행·롤백(/v1/admin/cms)을 사용하세요."
+            ),
+        },
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -339,6 +361,8 @@ async def create_concept(
     SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
     (IntegrityError로 롤백되면 감사 행도 함께 롤백 — 실패한 시도는 감사하지 않는다).
     """
+    if body.current_published_version_id is not None:
+        raise _publish_pointer_readonly()  # 새 개념은 발행본이 있을 수 없다
     orm = Concept.from_schema(body)
     session.add(orm)
     settings = get_settings()
@@ -472,6 +496,8 @@ async def patch_concept(
                 "errors": [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()],
             },
         ) from exc
+    if validated.current_published_version_id != existing.current_published_version_id:
+        raise _publish_pointer_readonly()
     updated = await session.merge(Concept.from_schema(validated))
     settings = get_settings()
     record_content_mutation_audit(
