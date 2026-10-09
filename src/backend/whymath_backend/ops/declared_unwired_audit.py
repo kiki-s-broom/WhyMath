@@ -39,6 +39,27 @@ writer 0건(`COLLAB-03`) · 성장 증거 도달(`PED-06`) · admin family 축 �
 exit 1(자동 해제는 아니다 — 유예를 걷으라는 신호일 뿐, 해제는 사람 판단). `backlog/`가 단일
 진실 원천이므로 이 모듈은 새 대장 파일을 만들지 않고 `status` 필드만 `yaml.safe_load`로 읽는다.
 
+오프라인 리포트 면제의 수취인 계약 (`OPS-34`)
+----------------------------------------------
+`_OFFLINE_REPORT`("수치를 보려고 사람이 돌린다")로 면제된 CLI는 그 **"사람"을 선언**해야 한다.
+`by-design`은 사유만 요구해서, 누구도 돌리지 않는 리포트가 영원히 통과했다. 수취인은
+`_OFFLINE_REPORT_RECIPIENTS`에 세 형식 중 하나로 적는다:
+
+    runbook:<경로#앵커>      그 문서 섹션이 실재하고, 안에 이 모듈의 실행 명령
+                             (`-m whymath_backend.<모듈>`) · `수취인` 표지 · `시점` 표지가
+                             모두 있어야 한다(링크만 건 선언 차단)
+    report-schedule:<주기>   daily|weekly|monthly|quarterly **그리고** cron 트리거가 있는
+                             `ci.yml` 이외의 워크플로가 이 모듈을 실제로 호출해야 한다
+                             (주기만 적은 선언 차단)
+    pending-task:<id>        위 `pending-task` 만료 계약을 **그대로 재사용**한다
+                             (`_pending_task_verdict` — 재구현 0). 태스크가 없거나 done이면
+                             `expired-waiver`
+
+선언이 없으면 `no-recipient`, 형식이 틀리면 `malformed-recipient`, 근거가 부실하면
+`invalid-recipient`, 면제가 이미 걷혔는데 수취인만 남았으면 `orphan-recipient` — 전부 exit 1이다.
+이 계약은 수취인이 *실제로 돌렸는지*를 보지 않는다(막는 것은 "수취인 없는 면제"이지 "수취인의
+태만"이 아니다). 런북 선언은 기한이 없다 — `pending-task`와 달리 낡은 내용도 유효로 판정된다.
+
 이 규약의 예방 성질: **새 라우트/EventType/테이블/CLI를 추가하면 의도를 선언하기 전까지 CI가
 red**다. `EVENT_DATA_CONTRACT ∪ _CONTRACT_EXEMPT == 전체`를 거버넌스 테스트로 고정한 기존
 패턴(`schema/event_data_contract.py`)을 4축으로 확장한 것이며, 새 발명이 아니라 검증된 패턴의
@@ -102,6 +123,7 @@ __all__ = [
     "app_route_entries",
     "build_report",
     "consumed_event_types",
+    "evaluate_offline_recipients",
     "main",
     "produced_event_types",
     "render_report",
@@ -114,6 +136,14 @@ _EXIT_INPUT_ERROR = 2
 
 _BY_DESIGN = "by-design:"
 _PENDING_TASK = "pending-task:"
+
+# OPS-34 — `_OFFLINE_REPORT` 면제의 수취인 선언 형식(아래 `_OFFLINE_REPORT_RECIPIENTS`).
+_RUNBOOK = "runbook:"
+_REPORT_SCHEDULE = "report-schedule:"
+# 정기 실행 주기의 닫힌 어휘 — 자유 문자열을 받으면 "가끔"도 주기가 된다.
+_REPORT_SCHEDULE_CADENCES = frozenset({"daily", "weekly", "monthly", "quarterly"})
+# 런북 섹션이 갖춰야 하는 표지 — 명령만 있고 "누가·언제"가 없는 섹션은 수취인 선언이 아니다.
+_RUNBOOK_REQUIRED_MARKERS = ("수취인", "시점")
 
 AXIS_HTTP = "http_routes"
 AXIS_EVENT = "event_consumers"
@@ -1400,6 +1430,23 @@ _MANIFEST: dict[str, dict[str, str]] = {
 }
 
 
+# OPS-34 — `_OFFLINE_REPORT` 면제 항목의 수취인("사람이 돌린다"의 그 사람과 시점) 대장.
+# 키는 `_MANIFEST[AXIS_CLI]`와 같은 모듈 키다. 키 집합은 `_OFFLINE_REPORT`로 면제된 항목과 **정확히
+# 같아야** 한다: 면제 항목에 수취인이 없으면 `no-recipient`, 면제가 걷혔는데 수취인만 남으면
+# `orphan-recipient`로 둘 다 exit 1이다(한쪽만 고치면 CI가 알린다). 형식·근거 판정은
+# `_recipient_verdict`. 런북 7섹션의 실체는 `docs/ops/offline_reports_runbook.md`.
+_OFFLINE_RUNBOOK = "runbook:docs/ops/offline_reports_runbook.md#"
+_OFFLINE_REPORT_RECIPIENTS: dict[str, str] = {
+    "harness.problem_bank_coverage": f"{_OFFLINE_RUNBOOK}problem_bank_coverage",
+    "harness.problem_duplication_audit": f"{_OFFLINE_RUNBOOK}problem_duplication_audit",
+    "harness.rephrased_corpus_hygiene": f"{_OFFLINE_RUNBOOK}rephrased_corpus_hygiene",
+    "harness.pedagogy_policy_eval": f"{_OFFLINE_RUNBOOK}pedagogy_policy_eval",
+    "harness.objective_coverage": f"{_OFFLINE_RUNBOOK}objective_coverage",
+    "harness.concept_assessment_index": f"{_OFFLINE_RUNBOOK}concept_assessment_index",
+    "harness.concept_content_audit": f"{_OFFLINE_RUNBOOK}concept_content_audit",
+}
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 판정
 # ──────────────────────────────────────────────────────────────────────────
@@ -1475,6 +1522,20 @@ def _task_status(backlog_tasks: Path, task_id: str) -> str | None:
     return str(status) if status is not None else None
 
 
+def _pending_task_verdict(axis: str, key: str, task_id: str, backlog_tasks: Path) -> ItemVerdict:
+    """`pending-task:<id>` 그랜드파더 만료 계약의 **유일한 구현**(ARCH-25 이식).
+
+    `_classify`(면제 값 판정)와 `_recipient_verdict`(OPS-34 수취인 판정)가 둘 다 이 함수를
+    부른다 — 같은 만료 판정을 두 곳에서 굴리면 이중 진실원천이 된다.
+    """
+    status = _task_status(backlog_tasks, task_id)
+    if status is None:
+        return ItemVerdict(axis, key, "expired-waiver", f"유예 근거 태스크 부재: {task_id}")
+    if status == "done":
+        return ItemVerdict(axis, key, "expired-waiver", f"유예 근거 태스크 완료됨: {task_id}")
+    return ItemVerdict(axis, key, "pending-task", f"{task_id} ({status})")
+
+
 def _classify(axis: str, key: str, is_reached: bool, backlog_tasks: Path) -> ItemVerdict:
     declared = _MANIFEST.get(axis, {}).get(key)
     if is_reached:
@@ -1492,13 +1553,142 @@ def _classify(axis: str, key: str, is_reached: bool, backlog_tasks: Path) -> Ite
         return ItemVerdict(axis, key, "by-design", reason)
     if declared.startswith(_PENDING_TASK):
         task_id = declared[len(_PENDING_TASK) :].strip()
-        status = _task_status(backlog_tasks, task_id)
-        if status is None:
-            return ItemVerdict(axis, key, "expired-waiver", f"유예 근거 태스크 부재: {task_id}")
-        if status == "done":
-            return ItemVerdict(axis, key, "expired-waiver", f"유예 근거 태스크 완료됨: {task_id}")
-        return ItemVerdict(axis, key, "pending-task", f"{task_id} ({status})")
+        return _pending_task_verdict(axis, key, task_id, backlog_tasks)
     return ItemVerdict(axis, key, "malformed", f"알 수 없는 분류 값: {declared}")
+
+
+# ── OPS-34 — 오프라인 리포트 면제의 수취인 계약 ─────────────────────────────
+
+_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*$")
+_FENCE_RE = re.compile(r"^[ \t]*(```|~~~)")
+
+
+def _github_anchor(title: str) -> str:
+    """마크다운 제목 → GitHub 앵커: 소문자화 → 글자·숫자·`_`·`-`·공백 외 제거 → 공백을 `-`로."""
+    return re.sub(r"[^\w\- ]", "", title.strip().lower()).replace(" ", "-")
+
+
+def _markdown_section(text: str, anchor: str) -> str | None:
+    """앵커가 가리키는 섹션 본문(제목 다음 줄 ~ 같은·상위 수준 제목 직전). 없으면 None.
+
+    코드 펜스 안의 `# ...` 줄은 제목이 아니다 — 런북 블록의 PowerShell 주석이 제목으로 오인되면
+    섹션이 거기서 끊겨 실행 명령이 섹션 밖으로 밀려난다.
+    """
+    in_fence = False
+    found = False
+    start_level = 0
+    body: list[str] = []
+    for line in text.splitlines():
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+        else:
+            heading = None if in_fence else _HEADING_RE.match(line)
+            if heading is not None:
+                level = len(heading.group(1))
+                if found and level <= start_level:
+                    break
+                if not found and _github_anchor(heading.group(2)) == anchor:
+                    found = True
+                    start_level = level
+                    continue
+        if found:
+            body.append(line)
+    return "\n".join(body) if found else None
+
+
+def _has_cron_trigger(workflow_path: Path) -> bool:
+    spec: Any = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    # PyYAML(YAML 1.1)은 키 `on`을 불리언 True로 읽는다 — 둘 다 본다.
+    triggers = spec.get("on", spec.get(True)) if isinstance(spec, dict) else None
+    return isinstance(triggers, dict) and "schedule" in triggers
+
+
+def _scheduled_workflow_for(base: Path, key: str) -> str | None:
+    """cron 트리거가 있는 `ci.yml` 이외 워크플로 중 이 모듈을 `run` 스텝에서 호출하는 파일명.
+
+    `ci.yml`은 제외한다 — 여러 잡의 모음이라 schedule 트리거가 있어도 그 호출이 야간 전용인지
+    알 수 없고, PR 잡의 호출은 이미 `reached`로 세어져 면제가 필요 없다. 주석·문서 속 언급은
+    세지 않는다(`ci_executed_modules`가 `run` 스크립트만 본다 — 재사용).
+    """
+    for path in sorted((base / ".github" / "workflows").glob("*.yml")):
+        if path.name != "ci.yml" and _has_cron_trigger(path) and key in ci_executed_modules(path):
+            return path.name
+    return None
+
+
+def _runbook_recipient_verdict(key: str, spec: str, base: Path) -> ItemVerdict:
+    path_part, sep, anchor = spec.partition("#")
+    root = base.resolve()
+    target = (base / path_part).resolve()
+    if not (sep and anchor and path_part) or not target.is_relative_to(root):
+        note = f"runbook:<저장소 내 경로>#<앵커> 형식이어야 한다: {spec}"
+        return ItemVerdict(AXIS_CLI, key, "malformed-recipient", note)
+    if not target.is_file():
+        return ItemVerdict(AXIS_CLI, key, "invalid-recipient", f"런북 파일 부재: {path_part}")
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:  # 읽기 실패는 '근거 없음'이지 통과가 아니다
+        note = f"런북을 읽지 못했다({type(exc).__name__}): {path_part}"
+        return ItemVerdict(AXIS_CLI, key, "invalid-recipient", note)
+    section = _markdown_section(text, anchor)
+    if section is None:
+        return ItemVerdict(AXIS_CLI, key, "invalid-recipient", f"런북에 앵커 #{anchor} 섹션 부재")
+    required = (f"-m whymath_backend.{key}", *_RUNBOOK_REQUIRED_MARKERS)
+    missing = [needle for needle in required if needle not in section]
+    if missing:
+        note = f"런북 #{anchor} 섹션에 없음: {', '.join(missing)}"
+        return ItemVerdict(AXIS_CLI, key, "invalid-recipient", note)
+    return ItemVerdict(AXIS_CLI, key, "by-design", f"수취인 {spec}")
+
+
+def _recipient_verdict(key: str, spec: str | None, base: Path) -> ItemVerdict:
+    """오프라인 리포트 면제 1건의 수취인 선언 판정. 위반 상태는 `is_violation`이 자동으로 센다."""
+    if spec is None:
+        note = "면제인데 수취인 선언이 없다(runbook:/report-schedule:/pending-task:)"
+        return ItemVerdict(AXIS_CLI, key, "no-recipient", note)
+    if spec.startswith(_RUNBOOK):
+        return _runbook_recipient_verdict(key, spec[len(_RUNBOOK) :].strip(), base)
+    if spec.startswith(_REPORT_SCHEDULE):
+        cadence = spec[len(_REPORT_SCHEDULE) :].strip()
+        if cadence not in _REPORT_SCHEDULE_CADENCES:
+            allowed = "|".join(sorted(_REPORT_SCHEDULE_CADENCES))
+            note = f"알 수 없는 주기 '{cadence}' ({allowed})"
+            return ItemVerdict(AXIS_CLI, key, "malformed-recipient", note)
+        workflow = _scheduled_workflow_for(base, key)
+        if workflow is None:
+            note = f"주기({cadence})만 있고 이 모듈을 호출하는 cron 워크플로가 없다"
+            return ItemVerdict(AXIS_CLI, key, "invalid-recipient", note)
+        return ItemVerdict(AXIS_CLI, key, "by-design", f"수취인 {spec} ({workflow})")
+    if spec.startswith(_PENDING_TASK):
+        task_id = spec[len(_PENDING_TASK) :].strip()
+        return _pending_task_verdict(AXIS_CLI, key, task_id, base / "backlog" / "tasks")
+    return ItemVerdict(AXIS_CLI, key, "malformed-recipient", f"알 수 없는 수취인 형식: {spec}")
+
+
+def evaluate_offline_recipients(
+    cli_verdicts: tuple[ItemVerdict, ...],
+    offline_keys: frozenset[str],
+    recipients: dict[str, str],
+    base: Path,
+) -> tuple[ItemVerdict, ...]:
+    """CLI 축 판정에 오프라인 리포트 수취인 계약을 겹친다(OPS-34).
+
+    `_OFFLINE_REPORT`로 면제돼 `by-design`이 된 항목만 수취인을 요구한다 — 이미 위반인 항목
+    (`stale-waiver` 등)에 위반을 중복 계상하지 않는다. 수취인이 유효하면 원 판정을 유지하고
+    (`pending-task` 수취인만 태스크 상태를 보이려고 그 판정으로 바꾼다), 위반이면 그 사유로 바꾼다.
+    면제 목록에 없는 키의 수취인은 `orphan-recipient` — 면제를 걷고 수취인 줄을 남기는 드리프트.
+    """
+    out: list[ItemVerdict] = []
+    for verdict in cli_verdicts:
+        if verdict.key in offline_keys and verdict.status == "by-design":
+            checked = _recipient_verdict(verdict.key, recipients.get(verdict.key), base)
+            if checked.is_violation or checked.status == "pending-task":
+                verdict = checked
+        out.append(verdict)
+    for key in sorted(set(recipients) - offline_keys):
+        note = "_OFFLINE_REPORT 면제가 아닌 항목에 수취인이 남아 있다 — 줄을 걷어라"
+        out.append(ItemVerdict(AXIS_CLI, key, "orphan-recipient", note))
+    return tuple(out)
 
 
 def _timeseries_key_note(usage: TimeseriesUsage) -> str:
@@ -1569,6 +1759,8 @@ def build_report(root: Path | None = None) -> Report:
             verdict = ItemVerdict(verdict.axis, verdict.key, verdict.status, note)
         timeseries_verdicts.append(verdict)
     cli = tuple(_classify(AXIS_CLI, name, name in reached_cli_set, backlog_tasks) for name in clis)
+    offline_keys = frozenset(k for k, v in _MANIFEST[AXIS_CLI].items() if v == _OFFLINE_REPORT)
+    cli = evaluate_offline_recipients(cli, offline_keys, _OFFLINE_REPORT_RECIPIENTS, base)
 
     return Report(
         axes=(
@@ -1610,6 +1802,10 @@ def render_report(report: Report) -> str:
         lines.append(f"판정: 실패 — 위반 {len(report.violations)}건")
         lines.append("  미도달을 고치라는 뜻이 아니다. 그 미도달이 의도인지 선언하라는 뜻이다:")
         lines.append(f"  `{_BY_DESIGN}<사유>` 또는 `{_PENDING_TASK}<백로그 태스크 id>`")
+        lines.append(
+            "  `_OFFLINE_REPORT` 면제는 수취인도 선언한다(OPS-34): "
+            f"`{_RUNBOOK}<경로#앵커>` | `{_REPORT_SCHEDULE}<주기>` | `{_PENDING_TASK}<id>`"
+        )
     else:
         lines.append("판정: 통과 — 모든 공급 항목이 도달했거나 의도가 선언돼 있다")
     return "\n".join(lines)
