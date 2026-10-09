@@ -108,5 +108,6 @@ Electron 없이 화면을 볼 수 있다(픽스처 모드 — 명령 실행 없�
 ## 알려진 한계
 
 - 원격 조회를 켜면(`remote: true`) `work_graph.py`가 GitHub·원격 브랜치를 읽으므로 네트워크와 시간이 든다(타임아웃 120초).
+- **새로고침은 최신 main을 그린다(HARN-306)** — 기본값 `source: "trunk"`는 매번 `git fetch origin` 뒤 앱 데이터 폴더의 전용 detached worktree(`trunk/<작업공간 id>`)를 `origin/main`으로 맞추고 거기서 `work_graph.py`를 돌린다. 저장소 폴더(여러 세션이 함께 쓰는 작업 사본)의 브랜치·미커밋 변경은 건드리지 않는다. 받기 실패는 숨기지 않고 '확인 필요'에 사유를 낸다. `source: "worktree"`는 종전처럼 저장소 폴더를 그린다. HARN-306 이전에 저장된 설정은 `trunk` + 원격 조회 켬으로 옮겨진다(`migrateOptions`).
 - `gates amend --verdict`(판정 결과 기록)는 앱이 대신 실행하지 않는다 — 상세 패널이 명령을 안내만 한다.
 - 설치 마법사·바로가기·SmartScreen·실제 바탕화면 자동 찾기는 Kiki 런북이 판정한다(CI는 패키징된 EXE 기동·수집까지).

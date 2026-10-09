@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-306-work-graph-refresh-trunk
+title: "작업 지도 새로고침이 최신 main을 반영하지 않는다 — 공유 작업 사본(낡은 브랜치)을 읽고 fetch·원격 스캔이 꺼져 있다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 새로고침이 공유 작업 사본의 브랜치·미커밋 상태가 아니라 최신 origin/main을 그린다 — 새로고침마다 git fetch origin(타임아웃·실패 시 이전 ref로 그리되 화면에 fetch 실패 사유 표기), 앱 전용 detached worktree를 origin/main으로 맞춘 뒤 거기서 work_graph.py --json 실행. 원 작업 사본의 브랜치·파일은 건드리지 않는다\n② 원격 스캔(원격 claim·미머지 완료분·고립 브랜치)을 기본으로 켠다 — 다른 세션의 진행이 보인다\n③ 화면에 기준 커밋(해시)·fetch 시각·소스(최신 main / 작업 트리)를 표기하고, 작업 트리 모드를 설정으로 남긴다\n④ 회귀 테스트: 원격에 새 커밋이 생긴 뒤 새로고침하면 그래프가 바뀐다(실 git 원격 픽스처) + 원 작업 사본 브랜치·상태 불변 + fetch 실패 표기. 뮤테이션으로 변별력 확인"
+artifacts: []
+paths:
+  - "tools/work-graph-desktop/**"
+  - docs/ops/work_graph_desktop_runbook.md
+session: wg-trunk-refresh
+notes: "Kiki 보고(2026-10-09): 새로고침해도 변화가 없다. 원인 실측: collectHarness가 저장소 작업 트리에서 work_graph.py를 돌리고(작업 사본은 여러 세션이 공유하는 낡은 체크아웃), DEFAULT_OPTIONS remote=false라 원격 스캔도 꺼져 있으며, 앱 어디에도 git fetch가 없다. P2 착수 근거: Kiki 직접 요청 · 개발 도구(7계층 밖)"
+updated: 2026-10-09
