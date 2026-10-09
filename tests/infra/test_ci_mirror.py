@@ -1414,3 +1414,78 @@ class TestAgainstRealWorkflow:
                     unresolved.append(f"{job_name} › {step.get('name')}: {why}")
         assert scanned >= 50, f"run 스텝 열거가 비었다 — 스캔 0건은 통과가 아니다: {scanned}"
         assert unresolved == [], f"미러가 재현하지 않는 셸이 ci.yml에 생겼다: {unresolved}"
+
+
+class TestWorkflowLevelEnv:
+    """OPS-121 — 미러가 워크플로 **최상위** `env`를 상속한다.
+
+    왜: `PIP_CONSTRAINT`가 최상위 env 한 줄로 모든 잡에 걸리는데, 최상위 env를 읽지 않는 미러는
+    그 설정 없이 돌아 CI와 다른 해석으로 판정한다(그 판정은 이 잡의 것이 아니다). 기존 코드는
+    `defaults.run.shell`에 대해서는 이미 "최상위를 조용히 무시하지 않는다"를 지켰는데 env만 빠져 있었다.
+    """
+
+    @staticmethod
+    def _run(tmp_path: Path, script: str, **env_layers) -> object:
+        wf = _wf([{"name": "probe", "run": script, **env_layers.get("step", {})}])
+        if "job" in env_layers:
+            wf["jobs"]["demo"]["env"] = env_layers["job"]
+        if "workflow" in env_layers:
+            wf["env"] = env_layers["workflow"]
+        return mirror.run_job(wf, "demo", tmp_path).steps[0]
+
+    def test_workflow_env_reaches_the_step(self, tmp_path: Path) -> None:
+        script = 'test "$OPS121_PROBE" = from-workflow'
+        assert self._run(tmp_path, script, workflow={"OPS121_PROBE": "from-workflow"}).status == (
+            mirror.PASSED
+        )
+        # 대조군: 최상위 env가 없으면 같은 스텝이 실패해야 한다 — 위 통과가 env 덕분임을 보인다.
+        assert self._run(tmp_path, script).status == mirror.FAILED
+
+    def test_precedence_is_step_over_job_over_workflow(self, tmp_path: Path) -> None:
+        layers = {
+            "workflow": {"OPS121_P": "wf"},
+            "job": {"OPS121_P": "job"},
+            "step": {"env": {"OPS121_P": "step"}},
+        }
+        assert self._run(tmp_path, 'test "$OPS121_P" = step', **layers).status == mirror.PASSED
+        layers.pop("step")
+        assert self._run(tmp_path, 'test "$OPS121_P" = job', **layers).status == mirror.PASSED
+        layers.pop("job")
+        assert self._run(tmp_path, 'test "$OPS121_P" = wf', **layers).status == mirror.PASSED
+
+    def test_github_workspace_in_workflow_env_resolves_to_the_repo_root(
+        self, tmp_path: Path
+    ) -> None:
+        expr = "${{ github.workspace }}/infra/ci/constraints-py312.txt"
+        script = f'test "$OPS121_PATH" = "{tmp_path.resolve()}/infra/ci/constraints-py312.txt"'
+        assert self._run(tmp_path, script, workflow={"OPS121_PATH": expr}).status == mirror.PASSED
+
+    def test_other_expressions_are_dropped_not_guessed(self, tmp_path: Path) -> None:
+        """해석할 수 없는 식은 잘못된 값으로 돌리느니 비운다(기존 잡·스텝 env와 같은 규칙)."""
+        result = self._run(
+            tmp_path,
+            'test -z "${OPS121_SECRET-}"',
+            workflow={"OPS121_SECRET": "${{ secrets.TOKEN }}"},
+        )
+        assert result.status == mirror.PASSED
+
+    def test_real_ci_yml_constraint_reaches_every_pip_job_in_the_mirror(self) -> None:
+        """실제 ci.yml: 미러가 pip 스텝에 넘기는 env의 PIP_CONSTRAINT가 존재하는 제약 파일을 가리킨다."""
+        workflow = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
+        expected = _REPO_ROOT.resolve() / "infra" / "ci" / "constraints-py312.txt"
+        checked = 0
+        for name, job in workflow["jobs"].items():
+            for step in job.get("steps") or []:
+                if "pip install" not in str(step.get("run", "")):
+                    continue
+                env = mirror.step_env(job, step, None, workflow.get("env"), _REPO_ROOT)
+                assert env.get("PIP_CONSTRAINT") == str(expected), f"{name} › {step.get('name')}"
+                checked += 1
+        assert checked >= 12, f"pip 스텝 열거가 비었다 — 스캔 0건은 통과가 아니다: {checked}"
+        assert expected.is_file()
+
+    def test_old_call_signature_still_works(self) -> None:
+        """하위 호환: 인자 두 개만 주던 기존 호출은 그대로 동작하고 최상위 env는 섞이지 않는다."""
+        env = mirror.step_env({"env": {"A": "1"}}, {"env": {"B": "2"}})
+        assert env["A"] == "1" and env["B"] == "2"
+        assert "OPS121_ABSENT" not in env
