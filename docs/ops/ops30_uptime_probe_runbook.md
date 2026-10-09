@@ -73,34 +73,43 @@
 
 ## [A] 사전 점검 (조회만)
 
+판정이 서로 가려지지 않게 **네 가지를 따로** 본다: ①main에 OPS-30 코드가 있는가 ②이 클론의 파일이 실재하고 main과 같은가
+③httpx가 설치된 가상환경이 있는가 ④그 가상환경으로 모듈을 불러오는가. 머지 전에는 ①②④가 False이고 ③은 독립적으로
+나온다(머지 전에도 가상환경이 있는지는 알 수 있다).
+
 ```powershell
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-git fetch origin main
-git log -1 --oneline
-$InMain = $false
-git cat-file -e origin/main:src/backend/whymath_backend/ops/uptime_probe.py 2>$null
-if ($LASTEXITCODE -eq 0) { $InMain = $true }
-git diff --quiet origin/main -- src/backend/whymath_backend/ops/uptime_probe.py src/backend/whymath_backend/ops/alert_delivery.py
-$SameAsMain = ($LASTEXITCODE -eq 0)
+git fetch origin
+"ORIGIN_MAIN=$(git rev-parse --short origin/main)  LOCAL_HEAD=$(git rev-parse --short HEAD)"
+$ProbeRel = "src/backend/whymath_backend/ops/uptime_probe.py"
+$DeliveryRel = "src/backend/whymath_backend/ops/alert_delivery.py"
+git cat-file -e "origin/main:$ProbeRel" 2>$null
+$ProbeInMain = ($LASTEXITCODE -eq 0)
+git cat-file -e "origin/main:$DeliveryRel" 2>$null
+$DeliveryInMain = ($LASTEXITCODE -eq 0)
+$InMain = $ProbeInMain -and $DeliveryInMain
 $Root = (Get-Location).Path
 $Work = Join-Path $Root "src\backend"
+$FilesOnDisk = (Test-Path (Join-Path $Root $ProbeRel)) -and (Test-Path (Join-Path $Root $DeliveryRel))
+$SameAsMain = $false
+if ($InMain -and $FilesOnDisk) { git diff --quiet origin/main -- $ProbeRel $DeliveryRel; $SameAsMain = ($LASTEXITCODE -eq 0) }
 $Py = $null
 foreach ($Cand in @((Join-Path $Root ".venv\Scripts\python.exe"), (Join-Path $Work ".venv\Scripts\python.exe"))) {
   if ((-not $Py) -and (Test-Path $Cand)) {
-    Push-Location $Work
-    & $Cand -c "import httpx, whymath_backend.ops.uptime_probe" 2>$null
-    $Imports = ($LASTEXITCODE -eq 0)
-    Pop-Location
-    if ($Imports) { $Py = $Cand }
+    & $Cand -c "import httpx" 2>$null
+    if ($LASTEXITCODE -eq 0) { $Py = $Cand }
   }
 }
+$ModuleImports = $false
+if ($Py) { Push-Location $Work; & $Py -c "import whymath_backend.ops.uptime_probe" 2>$null; $ModuleImports = ($LASTEXITCODE -eq 0); Pop-Location }
 $Pyw = $null
 if ($Py) { $Pyw = Join-Path (Split-Path $Py) "pythonw.exe" }
-$HasPyw = ($Pyw -and (Test-Path $Pyw))
-$ProbeReady = $InMain -and $SameAsMain -and [bool]$Py -and $HasPyw
-"IN_MAIN=$InMain SAME_AS_MAIN=$SameAsMain PY=$Py PYTHONW_EXISTS=$HasPyw"
+$HasPyw = [bool]($Pyw -and (Test-Path $Pyw))
+$ProbeReady = $InMain -and $SameAsMain -and [bool]$Py -and $ModuleImports -and $HasPyw
+"IN_MAIN=$InMain (probe=$ProbeInMain delivery=$DeliveryInMain)  FILES_ON_DISK=$FilesOnDisk  SAME_AS_MAIN=$SameAsMain"
+"VENV_PY=$Py  MODULE_IMPORTS=$ModuleImports  PYTHONW_EXISTS=$HasPyw"
 "PROBE_READY=$ProbeReady"
-if (-not $ProbeReady) { "PROBE_READY=False — IN_MAIN(머지 전이면 False) / SAME_AS_MAIN(이 클론이 main과 같은지) / PY(httpx와 모듈을 불러오는 가상환경) / PYTHONW_EXISTS 중 False인 항목을 회신해 주십시오." }
+if (-not $ProbeReady) { "PROBE_READY=False — False인 항목을 그대로 회신해 주십시오. IN_MAIN=False면 OPS-30 PR이 아직 머지되지 않은 것이니 기다리면 됩니다(VENV_PY가 비어 있으면 별개 문제: httpx가 설치된 가상환경이 없음)." }
 ```
 
 **`PROBE_READY=True`를 눈으로 확인한 다음에만 [B]를 붙여넣으십시오.**
