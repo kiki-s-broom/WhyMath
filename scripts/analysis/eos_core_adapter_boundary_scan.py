@@ -120,7 +120,22 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "l3.multi_solution": ("ADAPTER", "다중 풀이법 생성 — 수학 접근법 분류(ApproachType)"),
     "l3.finite_probability": ("ADAPTER", "유한 확률 전수 검증"),
     "l3.statistical_claim": ("ADAPTER", "통계 자료형 결정론 검증기"),
+    "l3.exact_value": (
+        "CORE",
+        "정확값(유리수·목록) 문자열 읽기/쓰기 — 수학 도메인 문법을 모르는 과목 무관 파서. "
+        "CORE인 cross_verify가 ADAPTER를 직접 import하지 않도록 sequence_induction에서 분리",
+    ),
+    "l3.sequence_induction": (
+        "ADAPTER",
+        "수열 귀납 점화식 정확 산술 검증기 — 수학 도메인 문법(점화식·수열 질의) 자체가 입력",
+    ),
     "l3.notation_coverage": ("ADAPTER", "수학 표기 커버리지 게이트"),
+    "l3.curriculum_notation_gate": (
+        "ADAPTER",
+        "교육과정 표기 범위 게이트(MATH-04) — 수학 표기 토큰→도입 구조 회계. 표기 어휘를 소유하고 "
+        "notation_coverage(ADAPTER)의 추출기를 재사용한다. l3 기본값(CORE)을 상속하면 ADAPTER를 "
+        "import하는 CORE 모듈이 된다(EOS-28 verify_answer_form 선례)",
+    ),
     "l3.speech": ("ADAPTER", "수식 AST → 한국어 낭독 — doc-100 'mathematical expression parsing'"),
     "l3.speech_parse": ("ADAPTER", "낭독 역파싱"),
     # ── 과목 중립 언어 유틸 (EOS-69) ──

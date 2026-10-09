@@ -23,6 +23,14 @@
 #   ③ workflow_dispatch — 온디맨드.
 #
 # `GITHUB_TOKEN`으로 한 push는 워크플로를 재발화시키지 않으므로 루프가 생기지 않는다.
+#
+# **고립 브랜치 스캔 발행 (HARN-28)** — `isolation-scan` 잡. `scan_stale_branches`는 shallow
+# 클론이면 판정을 포기하는데 모든 CCR 세션 컨테이너가 shallow라, 세션에서는 한 번도 목록을 낸
+# 적이 없다. 그래서 실행 위치를 **여기(full clone)** 로 옮겨 결과를 `harness-reports` 브랜치에
+# 발행하고 SessionStart 브리핑이 읽는다. push(main)에서는 돌지 않는다(전체 fetch + GitHub API
+# 조회가 무거워 main push마다 돌 이유가 없다) — 야간 schedule·workflow_dispatch 전용.
+# ci.yml이 아니라 여기에 두는 이유는 위와 같다: 쓰기 권한(`contents: write`)이 PR 검증 경로로
+# 새지 않아야 하고, ci.yml의 `cancel-in-progress`가 main push마다 야간 잡을 취소한다.
 # 또 대상은 `harness-claims` 브랜치이지 `main`이 아니라 트리거 조건에도 걸리지 않는다.
 name: harness-audit
 
@@ -173,5 +181,61 @@ jobs:
         with:
           name: flow-health-${{ github.run_id }}
           path: ${{ runner.temp }}/flow_health.jsonl
+          if-no-files-found: warn
+          retention-days: 30
+
+  isolation-scan:
+    name: 고립 브랜치 스캔 발행 (full clone → harness-reports)
+    # push(main)에서는 돌지 않는다 — schedule·workflow_dispatch 전용. 이 `if:`는 편의일 뿐이고
+    # **쓰기 권한의 안전성은 `on:`에 pull_request가 없다는 구조**가 보장한다.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # `harness-reports` 브랜치에 리포트 커밋을 push한다(claim-reap과 같은 방식 · 같은 토큰).
+      contents: write
+      # PR 열림/닫힘·처분 라벨 조회(GitHub API). 읽기만 한다.
+      pull-requests: read
+
+    steps:
+      - name: Checkout (전체 히스토리 필수)
+        uses: actions/checkout@v4
+        with:
+          # **fetch-depth: 0이 아니면 이 잡은 존재 이유가 없다.** shallow 클론에서는
+          # `scan_stale_branches`가 판정을 포기하고(status=shallow) 발행을 거부한다 — 잡이
+          # 초록으로 위장하지는 않지만 애초에 측정이 되지 않는다. 이 태스크가 고치려는 바로
+          # 그 결함이다. persist-credentials 기본(true)이 push에 필요하다.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install "pyyaml>=6.0.1,<7"
+
+      # 원격 브랜치 전수를 봐야 한다 — checkout은 기본 브랜치 ref만 remote-tracking으로 둔다.
+      - name: 원격 브랜치 동기화
+        run: git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+      # 판정은 exit code로 한다 — `-q`·`| tail`·`|| true`·`continue-on-error` 없음.
+      #   0 발행 성공 · 1 쓰기/푸시 실패 · 2 스캔 불가(측정 못 함 → **발행하지 않고** red).
+      # 스캔 불가를 빈 목록으로 발행하면 소비자가 "고립 0건"으로 읽는다(측정 실패 ≠ 통과).
+      # 거부하면 직전 정상 리포트가 남고, 그 생성 시각이 브리핑에 항상 보이므로 낡음이 숨지 않는다.
+      - name: 고립 브랜치 스캔 → harness-reports 발행
+        env:
+          # 미인증 API는 러너 IP 공유로 60req/h — 사실상 항상 rate limit이다. 토큰이 없으면
+          # PR 열림/닫힘·처분 라벨이 영구 미확인이 된다(리포트가 그 사실을 basis에 남긴다).
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/harness/isolation_report.py publish --out "$RUNNER_TEMP/isolation.json"
+
+      # 브랜치는 최신 1건만 든다(부모 없는 커밋) — 추이는 여기서 30일 보존한다.
+      - name: 측정 원본 보존
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolation-${{ github.run_id }}
+          path: ${{ runner.temp }}/isolation.json
           if-no-files-found: warn
           retention-days: 30

@@ -1057,6 +1057,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 아니라 신설 `--check`(미기록·미백필 1건이라도 있으면 exit 1) **드리프트 가드**를
         # `declared-unwired-audit` 잡에 스텝으로 얹었다(신규 잡 0). 이제 둘 다 reached이므로
         # 유예를 남기면 `stale-waiver`로 exit 1이다.
+        # PB-17 — 저작 서명 백필 CLI. 일회성 데이터 백필이라 변이형(제자리 갱신)은 CI 대상이
+        # 아니다. 드리프트(서명 가능한데 빠진 레코드)는 CI backend 잡의 pytest 전수 가드
+        # (`test_problem_corpus_author_backfill.py`의 `…_check_reports_zero_pending`
+        # — 실 코퍼스에 `--check`와 같은 계산을 돌려 0건을 요구)가 이미 지킨다. `--check` 스텝을
+        # `declared-unwired-audit` 잡에 얹는 것은 OPS-24 선례와 동형의 후속 제안(.github 변경 —
+        # 얹히면 이 면제는 `stale-waiver`로 exit 1이 되어 제거 대상).
+        "harness.problem_corpus_author_backfill": (
+            "by-design:일회성 저작 서명 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
+            "실 코퍼스로 지킨다(PB-17)"
+        ),
         # 강등전(demotion battle) — 게이트 검출력 자체를 실측 교정하는 운영자용 CLI. S4-16
         # 등 다른 강등전과 동형으로 상시 CI가 아니라 사람이 판단 시점에 돌린다(ARCH-19 done).
         "harness.answer_distribution_battle": (
@@ -1311,6 +1321,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # concept-reach(OPS-23)와 달리 mobile-only PR 회귀 가드가 아니라 관측 리포트다.
         "harness.formula_reach_report": _OFFLINE_REPORT,
         "harness.assessment_seat_reach_report": _OFFLINE_REPORT,
+        # PB-10(2026-10-08): 문항 난이도 보정 루프 도달 관측 — assessment_seat_reach_report와
+        # 동일 성격
+        # (DB 읽기 전용 관측 · 게이트 아님 · exit 0/2). 보정 배치 자체는 docker-compose.prod.yml의
+        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결).
+        "harness.item_calibration_reach_report": _OFFLINE_REPORT,
         "harness.recommendation_outcome_report": _OFFLINE_REPORT,
         "harness.learning_path_orderability_report": _OFFLINE_REPORT,
         "harness.rephrased_corpus_hygiene": _OFFLINE_REPORT,

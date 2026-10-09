@@ -172,6 +172,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # (NULL=멱등키 미부여·백필 금지). hypertable이면 마이그레이션이 중단한다(ADR-001).
     "b4d8e2a6c0f3",  # ARCH-32: problem.source_id — source_entity(LIC-01) FK 좌석(nullable·
     # 백필 금지). source_type/source_detail은 이관 기간 중 유지(점진 이관).
+    "c5e1f9a3b7d2",  # ARCH-31: problem_version 테이블(Problem 좌석 3번째) + problem.
+    # problem_version_id(§6.4·nullable·백필 금지) + PUBLISHED 불변성 트리거(§7)
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MATH-06-curriculum-notation-gate-coverage-extension
+title: "교육과정 표기 범위 게이트 커버리지 확장 — 초등 밴드 미관측 해소·시각화/이론 코퍼스 편입·엔진 미게이트 매크로 편입"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - MATH-04-curriculum-notation-range-gate
+requires_gates: []
+acceptance:
+  - "① 초등 밴드 미관측 해소: MATH-04 첫 실측에서 표의 토큰이 초등 밴드(문항 2,798건)에서 0회 관측됐다(초등 표기가 ×·÷와 ASCII ^뿐이라 추출기가 못 본다). ASCII 구조 표기(^ _ |x| ! nCr) 추출 축을 더하거나 초등 밴드를 겨냥한 별도 신호로 보강하고, 보강 후 첫 실측에서 초등 관측이 0이 아님을 리포트(mapped_by_band)로 증명한다. 불가능하면 '초등 밴드는 이 축으로 측정 불가'를 리포트 계약으로 명문화하고 근거를 남긴다. 결함 주입 필수 — 초등 문항에 상위 구조를 주입해 RED를 실측한다.\n② 범위 확장: 시각화 명세·이론 코퍼스(concept_content 등)·수식 그래프를 판정 범위에 편입한다. 문항과 달리 밴드 파생 재료(레코드 단위 성취기준 연결)가 코퍼스마다 다르므로 코퍼스별로 파생 규칙과 미분류 건수를 리포트한다.\n③ 엔진 게이트 확장 후 표 편입: 역삼각함수(arcsin 계열)·편미분 매크로·프라임(′ ″)은 음성화 엔진이 학년 게이트하지 않아 MATH-04 표에서 의도적으로 제외됐다(deliberately_unmapped). 엔진 게이트를 확장하고 표↔엔진 드리프트 테스트로 묶은 뒤 편입한다. 프라임은 중등 도형의 점 이름(A′)과 미분 표기의 구분 방법을 먼저 정한다.\n④ 이 태스크도 생성물 회계 전용이다 — 학생 경로 import 금지 거버넌스(MATH-04)를 깨지 않는다. 학생 입력 거부 영구 미채택(math_engine_gap_review.md 2-⑤)은 유지한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/curriculum_notation_gate.py
+  - data/curriculum_notation_ranges.json
+  - data/curriculum_notation_range_baseline.json
+  - tests/backend/l3/test_curriculum_notation_gate.py
+session: null
+notes: "MATH-04 후속(2026-10-08 등재). 근거: MATH-04의 KNOWN_BLIND_SPOTS와 표의 deliberately_unmapped가 '후속'으로 남긴 항목이 독스트링·주석에만 있으면 추적되지 않는다(CLAUDE.md '독스트링 속 계획은 백로그를 대신하지 못한다'). 정본 판정 기록은 MEMORY.md 2026-10-08 MATH-04 결정 로그. MATH-04가 done이어야 착수한다(depends_on)."
+updated: 2026-10-08

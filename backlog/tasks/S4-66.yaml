@@ -1,0 +1,40 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-66
+title: "sequence_induction verifier v2 — 점화식 정확 실행 도메인 구현 (단계 B 1순위)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-57
+requires_gates: []
+acceptance:
+  - "설계서 docs/architecture/verifier_v2_domains.md §5를 구현한다 — l3/sequence_induction.py 신설: DSL 파서(§5.4)·정확 산술 평가기·질의 a(N)/S(N)/terms(N)/closed(식, upto=M). 평가기는 fractions.Fraction/int + ast 화이트리스트 노드만 허용하며 eval·sympify를 쓰지 않는다. 자원 상한(단계 수 N<=1000, 항 비트 길이<=65536, 거듭제곱 지수<=64, AST 노드<=64) 초과는 fail이 아니라 unverifiable(사유 명시)이다 — 제곱 점화 a(n+1)=a(n)^2는 a1=2에서 n=17에 비트 길이 한도를 넘으므로 상한은 가상의 위험이 아니다."
+  - "답 비교는 정확 일치(==)만 쓰고 math.isclose를 쓰지 않는다. 회귀 테스트로 a(n+1)=2*a(n)+1, a(1)=1에서 a(30)=1073741823에 정답+1(1073741824)을 주면 fail임을 고정한다 — 같은 값을 isclose(rel_tol=1e-9)로 비교하면 통과하는 케이스(설계서 §6.1 실측표)이므로 비교 방식이 바뀌었다는 변별력 증거가 된다."
+  - "l3/verifier.py에 sequence_induction을 등록한다(_VERIFIERS_V2)과 동시에 전용 교차검증 관점 K=3(sequence_reconstruction/sequence_falsification/sequence_grounding)을 _CROSS_VERIFY_PERSPECTIVES에 명시 등록한다 — 확률 관점 기본값 폴백에 기대지 않는다. 관점 1은 가시 필드를 question_text 하나로 제한해 발문에서 점화식을 스스로 읽게 하고 판정은 기계가 Fraction 정확 일치로 한다. 프롬프트 자산 6개를 docs/prompts/l3_cross_verify.md 정본에 추가하고 prompt_asset_audit를 통과한다."
+  - "_DomainResult와 ResidueSubject에 후행 기본값 필드 machine_value_exact(문자열, 기본 빈 문자열)를 추가하고 tier 선택 필드(기본 None)를 추가한다 — 기존 생성처가 전부 키워드 인자이므로 소스 호환이다. 기존 테스트 무변경 통과로 하위호환을 증명한다. 어댑터 계약(ProblemVerifyInput 5필드·ProblemValidation 4필드)은 바꾸지 않는다."
+  - "신규 answer_kind 소비 지점을 같은 슬라이스에서 맞춘다: harness/qa_pipeline.py의 _NON_EQUATION_DSL_ANSWER_KINDS에 sequence_induction 추가, scripts/analysis/eos_core_adapter_boundary_scan.py에 l3.sequence_induction ADAPTER 분류, scripts/analysis/eos_feature_inventory_v2.py 귀속. 이 셋은 pytest가 아니라 CI infra-contracts 잡이 검사하므로 그 잡을 로컬에서 재현해 exit code로 보고한다."
+  - "inductive_sequence_skeleton_generator의 _InductiveSkeleton(kind·first·step·term)을 DSL 문자열로 직렬화하는 함수를 추가하고, [12대수03-06] 코퍼스 30건(problem_bank_generated_v0)에 대해 발문의 점화식을 실제로 실행한 값과 verify.conditions의 폐형식 값을 대조해 불일치 건수를 보고한다(0건이어도 0건이라고 명시). 코퍼스 레코드 재기록과 tier 각인은 이 태스크에서 하지 않는다 — populate의 tier 값 동기가 선행이며 그것은 answer_kind v2 소비 지점 정합 태스크 소관이다."
+  - "보호 장치 주입 검증: 초기항 오류·점화식 계수 오류·인덱스 시작점 오류·홀짝 분기 반전을 각각 주입해 해당 축이 RED로 변하는지 확인하고, 주입이 실제 적용됐는지(mutated != original)와 원복이 바이트 동일한지를 단언한다. ruff·black·mypy --strict·lint-imports를 exit code로 보고하고 CI 잡 목록 전수(backend·infra-contracts 포함)를 재현한 뒤 PR을 생성한다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1548 — 신규 테스트 139건, 결함 주입 28종 전건 RED, 공식 CI 미러 HEAD ff4c7ac2 실행 스텝 전부 통과(미실행 1건: data-pipeline 코퍼스 조건 스텝)"
+paths:
+  - src/backend/whymath_backend/l3/sequence_induction.py
+  - src/backend/whymath_backend/l3/verifier.py
+  - src/backend/whymath_backend/l3/cross_verify.py
+  - docs/prompts/l3_cross_verify.md
+  - "tests/backend/l3/**"
+  - src/backend/whymath_backend/l3/prompt_assets.py
+  - src/backend/whymath_backend/harness/prompt_asset_audit.py
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - src/backend/whymath_backend/l3/equivalent/inductive_sequence_skeleton_generator.py
+  - scripts/analysis/eos_core_adapter_boundary_scan.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - docs/architecture/verifier_v2_domains.md
+session: null
+notes: "S4-57 설계(verifier_v2_domains.md §4·§5·§7·§8)의 결과로 등재. 단계 B 우선순위 1순위 도메인이다. 근거: [12대수03-06] 30건은 verification_tier가 None이고 verify.conditions가 생성기가 계산한 폐형식(x - (a + (k-1)*d) = 0)이라 발문의 점화식을 실행하는 검산이 없다(2026-10-08 실측, main c322bb9cb). 이 슬라이스는 그 정합 축을 처음 닫는다. 선행 관계: 소비 지점 드리프트 정합 태스크(answer_kind v2 소비 지점 정합)와 병행 가능하되, 이 슬라이스는 자기 kind의 관점·DSL 제외 목록 등록을 스스로 하므로 그 태스크에 의존하지 않는다. Wilson 로트 게이트는 이 슬라이스 범위 밖이다 — 03-06 밴드가 30건이라 기본 임계(0.05, 95%)에서 결함 0건이어도 상한이 0.0827이라 통과 불가(최소 52건 필요, MEMORY 기록과 일치). 밴드 확장 또는 S4-56의 임계 판정 이후.\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**'] → ['src/backend/whymath_backend/l3/sequence_induction.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/cross_verify.py', 'docs/prompts/l3_cross_verify.md', 'tests/backend/l3/**', 'src/backend/whymath_backend/l3/prompt_assets.py', 'src/backend/whymath_backend/harness/prompt_asset_audit.py', 'src/backend/whymath_backend/harness/qa_pipeline.py', 'src/backend/whymath_backend/l3/equivalent/inductive_sequence_skeleton_generator.py', 'scripts/analysis/eos_core_adapter_boundary_scan.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'docs/architecture/verifier_v2_domains.md']: 착수 후 실제 수정 지점 확인 — 프롬프트 로더·감사기·qa_pipeline·직렬화 함수·CI 인벤토리 정합 파일을 범위에 추가(기존 5건 유지)"
+updated: 2026-10-08

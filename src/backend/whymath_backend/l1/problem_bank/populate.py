@@ -134,7 +134,15 @@ _DEFAULT_CONCEPT_GRAPH = Path("data/corpus/concept_graph_v1/graph.json")
 
 # Problem 스키마 밖 *저작 메타* 키 — Problem.model_validate 전에 분리한다(extra=forbid 대응).
 _AUTHORING_KEYS: frozenset[str] = frozenset(
-    {"concepts", "verify", "license", "generation_type", "original_source", "relations"}
+    {
+        "concepts",
+        "verify",
+        "license",
+        "generation_type",
+        "original_source",
+        "relations",
+        "authored_by",
+    }
 )
 
 # 본문 보유가 합법인 출처·라이선스(코퍼스 위생) — 자체생성 동등문제만 적재한다.
@@ -216,6 +224,9 @@ class ProblemProvenanceMeta:
     generation_type: str
     license: str
     original_source: str | None = None
+    authored_by: str | None = None
+    """PB-15 저작 주체 서명(`llm:<모델 id>` 등) — 교차검증 생성자≠검증자 가드의 재료. 부재(None)=
+    기록 없음(구 코퍼스). L1은 값을 불투명 문자열로 보존만 한다(형식 판정은 L3 가드 소관)."""
 
 
 def _gate_input(meta: ProblemProvenanceMeta) -> ProvenanceInput:
@@ -329,6 +340,7 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
     generation_type = data.pop("generation_type", None)
     original_source = data.pop("original_source", None)
     relations_raw = data.pop("relations", []) or []
+    authored_by = data.pop("authored_by", None)
 
     # ── ② 저작권 위생(코퍼스 신뢰의 최소 재확인) ──
     slug = data.get("slug")
@@ -375,10 +387,18 @@ def _record_from_line(raw: dict[str, Any]) -> ProblemBankRecord:
             + " / ".join(str(v) for v in form_violations)
             + f" — slug={slug}"
         )
+    # authored_by(PB-15) — 키가 있으면 비지 않은 문자열이어야 한다. 빈 값을 "기록 없음"으로 조용히
+    # 접지 않는다: 부재(None)와 빈 문자열은 의미가 다르고, 빈 값은 저작 단계의 기록 결함이다.
+    if authored_by is not None and (not isinstance(authored_by, str) or not authored_by.strip()):
+        raise ProblemCorpusError(
+            f"authored_by는 비지 않은 문자열이어야 한다(부재는 키 생략): slug={slug} "
+            f"authored_by={authored_by!r}"
+        )
     provenance_meta = ProblemProvenanceMeta(
         generation_type=str(generation_type) if generation_type is not None else "",
         license=str(license_value),
         original_source=str(original_source) if original_source is not None else None,
+        authored_by=authored_by,
     )
     # ── ④-b provenance 관문(LIC-03) — 생성물인데 원장 재료가 없으면 여기서 거부한다.
     #    적재 루프가 아니라 *파싱*에서 막는 이유: 거부를 DB 왕복 앞으로 당겨야 부분 적재

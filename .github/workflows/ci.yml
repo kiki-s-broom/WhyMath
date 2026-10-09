@@ -530,6 +530,15 @@ jobs:
       - name: 게이트 — 표기 커버리지 (notation_coverage·코퍼스 표기 ⊆ 지원 표기)
         run: python -m whymath_backend.l3.notation_coverage
 
+      # MATH-04 — 교육과정 표기 범위 게이트: 문항 표기의 구조가 문항 밴드(성취기준 코드→학교급)에
+      # 도입돼 있는지 전수 회계한다. hermetic(LLM 0·DB 0)·결정론. 신규 초과 표기 발견 시 exit 1
+      # (베이스라인 래칫). **생성물 회계 전용** — 학생 입력 거부에 쓰지 않는다(교수학 금기). 변별력
+      # (고등 강제 exit 0 · 초등 강제 exit 1)은 tests/backend/l3/test_curriculum_notation_gate.py가,
+      # 학생 경로 import 금지는 ..._student_path_governance.py가 pytest 상시 회귀로 봉인한다.
+      # 이 CLI는 L4 학년 프로파일을 L3 엔진에 주입하므로 harness에 산다(l3 직접 실행 불가 — 7계층).
+      - name: 게이트 — 교육과정 표기 범위 (curriculum_notation_gate_cli·생성물 회계 전용)
+        run: python -m whymath_backend.harness.curriculum_notation_gate_cli
+
       # ARCH-20: 콘텐츠 출처·라이선스 집행 게이트 — copyright_gradient.md §4.2가 명령한
       # pool 필드 차단을 실제로 CI에 배선(2026-07-29 실측 전 집행 지점 0건 확인 후 신설).
       # 코퍼스 루트는 CLI가 __file__ 기준으로 자가 탐지(cwd=src/backend 무관 — parents[4]).
@@ -1743,6 +1752,17 @@ jobs:
         run: |
           python -m whymath_backend.harness.eos_unit_structure_observation_report
           python -m whymath_backend.harness.eos_unit_structure_observation_report --json /tmp/eos_unit_structure_observation.json
+
+      # CUR-06: 학교급 경계 선수 연결 밀도 관측 리포트 — 경계 통과 엣지 20/2,210(0.9%)·고→대 0·
+      # 고등→중학 하향 도달 비율을 매 실행 눈에 보이게 한다. 게이트가 아니라 리포트(exit 0/2) —
+      # 밀도가 0이어도 red가 되지 않고, red가 되는 것은 코퍼스를 읽지 못하는 입력 오류(exit 2)뿐이다.
+      # 신규 잡 0: CUR-09 선례대로 이 잡(backend editable 설치 완료)에 편입한다. 판정 회귀는
+      # tests/backend/harness/test_cross_school_connectivity_report.py(backend 잡 testpaths)가 소유.
+      - name: 학교급 경계 선수 연결 밀도 관측 리포트 (CUR-06)
+        working-directory: src/backend
+        run: |
+          python -m whymath_backend.harness.cross_school_connectivity_report
+          python -m whymath_backend.harness.cross_school_connectivity_report --json /tmp/cross_school_connectivity.json
 
       # OPS-12 — `tests/harness`·`scripts/harness`를 lint/format하는 잡이 **하나도 없었다**
       # (OPS-11의 harness 판박이). backend 잡은 `../../tests/backend`만, data-pipeline 잡은
