@@ -5,7 +5,8 @@
 선언 금지"). 이 스크립트는 서빙 코드(`src/backend/whymath_backend`)에 회귀를 하나씩 주입하고, 지목한
 가드가 실제로 RED를 내는지 본다. 두 묶음이다:
 
-  census   — **이벤트 기록·귀속을 끊는 주입** 14종(C01~C09 생산자, C10~C14 P3-27 개념 채움·시도 귀속). 이벤트 생산자 한 곳씩을 끊고
+  census   — **이벤트 기록·귀속을 끊는 주입** 14종(C01~C09 생산자, C10~C14 P3-27 개념 채움·
+             시도 귀속). 이벤트 생산자 한 곳씩을 끊고
              `tests/backend/scenarios/test_gate_d_event_role_census.py`가 그 역할에서 RED인지 본다.
              (Gate D: "기록이 끊기면 관측 가능한 실패가 나는가")
   boundary — **Core 경계 위반 주입** 2종. Core 모듈에 `if subject == "math"` 분기를 넣거나
@@ -219,7 +220,8 @@ MUTATIONS: tuple[Mutation, ...] = (
             "    return True\n"
         ),
         "    return False  # MUTANT — 이어진 세션에 개념을 채우지 않는다\n",
-        "개념 없이 열린 세션(추천 조회가 첫 활동)을 뒤 활동이 채우지 못한다 → concept_selected 개념 소실",
+        "개념 없이 열린 세션(추천 조회가 첫 활동)을 뒤 활동이 채우지 못한다"
+        " → concept_selected 개념 소실",
     ),
     Mutation(
         "C12-no-attempt-session-attribution",
@@ -245,7 +247,7 @@ MUTATIONS: tuple[Mutation, ...] = (
         "mastery_updated.problem_id·session_id",
         PKG / "l2" / "learning_event_trace.py",
         "            & (ProblemAttempt.user_id == learner_id),\n",
-        "            & (ProblemAttempt.user_id != learner_id),  # MUTANT — 시도 조인이 영영 안 맞는다\n",
+        "            & (ProblemAttempt.user_id != learner_id),  # MUTANT — 시도 조인 불일치\n",
         "숙달 이력↔시도 조인이 맞지 않는다 → 귀속 두 필드가 함께 NULL",
     ),
     # ── Gate E — Core 경계 위반 주입 ─────────────────────────────────────────────────────

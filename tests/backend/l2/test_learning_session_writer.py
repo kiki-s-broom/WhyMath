@@ -77,6 +77,59 @@ class TestNeverWritesScores:
         assert "last_activity_at" in keywords
 
 
+class TestEveryServingCallSiteCarriesTheProblem:
+    """P3-27 — 서빙 호출처가 `problem_id`를 writer에 넘긴다(산출물 검사 · 문자열 grep이 아니다).
+
+    census 시나리오는 호출처 6곳 중 `/me/attempts` 하나만 밟는다. 나머지 코치 4곳에서
+    `problem_id=`가 빠져도 어느 e2e도 RED가 되지 않으므로, 호출 표현식(AST)의 실제 키워드 인자를
+    전수로 본다. 문항을 고르기 *전에* 세션을 잇는 추천 조회만 의도적으로 넘기지 않는다.
+    """
+
+    _API = pathlib.Path(writer.__file__).resolve().parents[1] / "api"
+    #: 문항 선택 전에 세션을 잇는다 → 개념을 모른다(날조 금지). 이 목록은 늘리지 않는다.
+    _WITHOUT_PROBLEM = frozenset({("me.py", "recommend_next_problem")})
+
+    def _sites(self) -> list[tuple[str, str, bool]]:
+        found: list[tuple[str, str, bool]] = []
+        for path in sorted(self._API.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            parents = {c: n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call) and _call_name(node) == "record_learning_activity"
+                ):
+                    continue
+                owner: ast.AST = node
+                while owner in parents and not isinstance(
+                    owner, (ast.FunctionDef, ast.AsyncFunctionDef)
+                ):
+                    owner = parents[owner]
+                name = getattr(owner, "name", "?")
+                passes = any(k.arg == "problem_id" for k in node.keywords)
+                found.append((path.name, name, passes))
+        return found
+
+    def test_the_scan_is_not_vacuous(self) -> None:
+        """스캔 0건은 공허한 통과다 — 시도 1 + 코치 4 + 추천 조회 1 = 6곳을 실제로 찾아야 한다."""
+        sites = self._sites()
+        assert len(sites) >= 6, f"호출처를 {len(sites)}곳만 찾았다(기대 6): {sites}"
+        assert {"submit_attempt", "create_session", "append_turns"} <= {n for _, n, _ in sites}
+
+    def test_only_the_recommendation_call_omits_the_problem(self) -> None:
+        omitting = {(f, n) for f, n, passes in self._sites() if not passes}
+        assert omitting == self._WITHOUT_PROBLEM, (
+            "문항을 넘기지 않는 서빙 호출처가 허용 목록과 다르다 — 코치·시도 경로에서 problem_id=가 "
+            f"빠지면 세션이 개념 없이 남는다(P3-27): {sorted(omitting)}"
+        )
+
+
+def _call_name(node: ast.Call) -> str | None:
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id
+    return func.attr if isinstance(func, ast.Attribute) else None
+
+
 class _BrokenSession:
     """`begin_nested`가 터지는 세션 — never-break 래퍼의 실패 경로 주입."""
 

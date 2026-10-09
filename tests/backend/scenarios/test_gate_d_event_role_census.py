@@ -349,6 +349,42 @@ def test_gate_d_eight_event_roles_recorded_in_a_real_student_session() -> None:
         content.teardown()
 
 
+def test_coach_first_activity_opens_the_session_with_the_problem_concept() -> None:
+    """코치가 첫 활동인 학생 — 세션이 그 문항의 개념으로 열리고 `concept_selected`가 개념을 싣는다.
+
+    위 8역할 시나리오는 첫 활동이 추천 조회라 세션이 개념 없이 열리고 시도가 채운다. 이 테스트는 그
+    반대 경로를 본다: 문항이 붙은 코치 대화가 **세션을 여는 첫 활동**일 때 writer가 코치 호출처의
+    `problem_id`로 개념을 해석해 열린 세션에 싣는지(P3-27). 코치 호출처의 전달 여부는 AST 테스트가
+    전수로 보고, 이 테스트는 그 값이 실제로 개념까지 도달하는 동작을 본다.
+    """
+    content, _journal = _S._begin("GATE-D-COACH")
+    try:
+        cid, _code = _S._seed_concept(content, "gc", "일차방정식의 풀이")
+        coach_pid = _coach_problem(content, cid, "gcc")
+
+        with _S._client() as client:
+            _S._erase_learner(client)
+            auth = _S._login(client)
+            opened = client.post(
+                "/v1/coach/sessions",
+                headers=auth,
+                json={"student_input": _ANSWER_DEMAND, "problem_id": str(coach_pid)},
+            )
+            assert opened.status_code == 201, opened.text
+
+            body = _S._get(client, auth, "/v1/me/learning-trace")
+            selected = _entries_of(body["entries"], (TraceEventType.CONCEPT_SELECTED,))
+            assert len(selected) == 1, f"세션 개시가 정확히 1건이어야 한다: {selected}"
+            assert selected[0]["concept_id"] == str(cid), (
+                "코치가 연 세션이 문항의 개념을 싣지 않는다 — 코치 호출처의 problem_id 전달 또는 "
+                "writer의 개념 채움(P3-27)이 끊겼다.",
+                selected,
+            )
+            _S._erase_learner(client)
+    finally:
+        content.teardown()
+
+
 def test_gate_d_role_table_matches_the_repository_catalog() -> None:
     """`GATE_D_ROLES`가 가리키는 이름이 전부 카탈로그에 실재한다 — 매핑표가 허공을 가리키지 않는다.
 
