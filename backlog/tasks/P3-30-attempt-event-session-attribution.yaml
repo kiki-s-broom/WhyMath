@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-30-attempt-event-session-attribution
+title: "P3-30 — 코치 힌트요청·답입력 이벤트의 session_id 귀속 판정 (attempt_event 컬럼 부재 · P3-27 후속 · 12월 이월 후보)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 코치 힌트 요청·응답 지연(답입력) 이벤트의 session_id 귀속 판정 — attempt_event 에는 session_id 컬럼이 없고 attempt_id 는 코치 대화 도중에는 아직 시도가 없어 NULL 이다(P3-27 실측). 보강하려면 attempt_event.session_id 컬럼 추가(스키마 변경)가 필요하며 시간창 추론은 귀속이 아니라 날조이므로 쓰지 않는다. 스키마 변경이 필요하므로 Release Blocker 여부를 먼저 판정하고 아니면 12월 이후로 이월한다.\n② 오개념 가설의 session_id·problem_id 부재는 학습자×오개념 누적 단위라 구조적 N/A 이며 이 태스크의 보강 대상이 아니다.\n③ 검증은 census 의 hint_requested·answer_submitted session_id 동결 단언을 승격하고 기록 차단 주입이 RED 인지 실측한다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-27 결정 ② — 숙달 변경은 attempt_id 로 귀속 투영했으나(새 컬럼 0), 코치 도중 이벤트는 시도가 없어 원천이 없다. 이 태스크는 그 잔여의 소유자다."
+updated: 2026-10-09

@@ -1112,8 +1112,10 @@ async def submit_attempt(
     # EOS-131: 이 시도가 속한 학습 세션을 **서버가** 정한다(30분 유휴 규칙). 수신 시각을 그대로
     # 넘겨 `last_activity_at == ingested_at`이 되게 한다 — 보존 파기의 세션 기준이 이 값을 쓴다.
     # never-break: 세션 기록이 실패해도 채점 제출은 진행하고(None), 그때만 클라 신고값으로 폴백.
+    # P3-27: 시도가 실어 온 문항의 대표 개념을 세션에 채운다
+    # (트레이스 `concept_selected`가 개념을 싣게).
     learning_session_id = await record_learning_activity(
-        session, user_id=user.user_id, now=received_at
+        session, user_id=user.user_id, now=received_at, problem_id=body.problem_id
     )
     attempt = ProblemAttempt(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답에 즉시 사용)
