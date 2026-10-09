@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import format_conflict
 from whymath_backend.db.models.concept_content import CONTENT_REVIEW_STATUS_AI_ESTIMATED
 
 # 슬3 sync 엔진 빌더 재사용(신규 seam 0) — atom_node_projection·node_projection과 동일 규약.
@@ -174,8 +175,12 @@ class ConceptContentStore:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
 
-    def upsert(self, record: ConceptContentRecord) -> None:
-        """단일 콘텐츠 레코드 upsert (멱등·code PK 충돌 갱신).
+    def upsert(self, record: ConceptContentRecord, *, overwrite_cms_edits: bool = False) -> bool:
+        """단일 콘텐츠 레코드 upsert (멱등·code PK 충돌 갱신). 반환=적재했으면 True.
+
+        **CMS 편집 보호(P3-25)**: `cms_edited_at`이 채워진 행은 갱신하지 않고 False를 돌려준다
+        (`overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다). 설명·비유·오개념·검수 표지는 CMS가
+        고치는 필드라, 보호 없이 재적재하면 사람의 편집과 `reviewed` 판정이 코퍼스 값으로 돌아간다.
 
         `INSERT ... ON CONFLICT(code) DO UPDATE` — 콘텐츠 4종·설명·standard_codes·flashcards +
         record의 `review_status` + updated_at(now())을 갱신한다. 성취기준 *본문* 컬럼은
@@ -188,6 +193,7 @@ class ConceptContentStore:
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        from whymath_backend.db.cms_edit_marker import upsert_guard, upsert_skipped
         from whymath_backend.db.models.concept_content import ConceptContent
 
         stmt = pg_insert(ConceptContent).values(
@@ -206,8 +212,10 @@ class ConceptContentStore:
             review_status=record.review_status,
         )
         # PK 충돌 시 갱신 — updated_at은 now()로 새로 찍는다(server_default는 INSERT 전용).
-        stmt = stmt.on_conflict_do_update(
+        where, release = upsert_guard(ConceptContent, overwrite=overwrite_cms_edits)
+        upsert = stmt.on_conflict_do_update(
             index_elements=[ConceptContent.code],
+            where=where,
             set_={
                 "scope": stmt.excluded.scope,
                 "name": stmt.excluded.name,
@@ -222,30 +230,57 @@ class ConceptContentStore:
                 "flashcards": stmt.excluded.flashcards,
                 "review_status": stmt.excluded.review_status,
                 "updated_at": func.now(),
+                **release,
             },
-        )
+        ).returning(ConceptContent.code)
         with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+            return not upsert_skipped(conn.execute(upsert))
 
-    def mark_review_status(self, codes: Sequence[str], review_status: str) -> int:
+    def mark_review_status(
+        self,
+        codes: Sequence[str],
+        review_status: str,
+        *,
+        conflicts: list[str] | None = None,
+    ) -> int:
         """code 목록의 `review_status`를 일괄 갱신하고 영향받은 행 수를 반환.
 
         사람 검수 승격 시 `review_status='reviewed'`로 갱신하는 전용 좌석이다. `code`가
         테이블에 없으면 해당 행은 0으로 집계되며, 전체 code가 없으면 0을 반환한다.
+
+        **CMS 편집 보호(P3-25)**: CMS가 고친 행(`cms_edited_at` 있음)은 건너뛴다 — 파일 기반 검수
+        라벨은 고치기 *전* 본문을 보고 매긴 것이라, 고친 본문에 `reviewed`를 찍으면 아무도 안 본
+        문장이 검수 통과가 된다. 건너뛴 코드는 `conflicts`에 `concept_content:<code>`로 보고한다.
         """
-        from sqlalchemy import update
+        from sqlalchemy import select, update
 
         from whymath_backend.db.models.concept_content import ConceptContent
 
         if not codes:
             return 0
-        stmt = (
-            update(ConceptContent)
-            .where(ConceptContent.code.in_(codes))
-            .values(review_status=review_status, updated_at=func.now())
-        )
         with self._get_engine().begin() as conn:
-            result = conn.execute(stmt)
+            edited = set(
+                conn.execute(
+                    select(ConceptContent.code).where(
+                        ConceptContent.code.in_(codes),
+                        ConceptContent.cms_edited_at.is_not(None),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if conflicts is not None:
+                conflicts.extend(
+                    format_conflict("concept_content", code) for code in sorted(edited)
+                )
+            targets = [code for code in codes if code not in edited]
+            if not targets:
+                return 0
+            result = conn.execute(
+                update(ConceptContent)
+                .where(ConceptContent.code.in_(targets))
+                .values(review_status=review_status, updated_at=func.now())
+            )
             return int(result.rowcount)
 
 
@@ -254,17 +289,27 @@ def populate_concept_content(
     *,
     settings: Settings | None = None,
     store: ConceptContentStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """콘텐츠 4종 레코드를 `concept_content`에 멱등 upsert 적재(영속 프로젝션). 반환=적재 행 수.
 
     `populate_atom_nodes`의 *콘텐츠* 짝이다 — 각 레코드를 code 키로 upsert한다(멱등·재실행 시 갱신).
     store 미주입 시 슬3 sync 엔진 재사용 `ConceptContentStore`를 만든다.
+
+    **CMS 편집 보호(P3-25)**: CMS가 고친 행(`cms_edited_at` 있음)은 건너뛰고 `conflicts`에
+    `concept_content:<code>`로 보고한다 — 반환 행 수에는 포함하지 않는다.
+    `overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다.
     """
     resolved = settings if settings is not None else get_settings()
     content_store = store if store is not None else ConceptContentStore(settings=resolved)
+    written = 0
     for record in records:
-        content_store.upsert(record)
-    return len(records)
+        if content_store.upsert(record, overwrite_cms_edits=overwrite_cms_edits):
+            written += 1
+        elif conflicts is not None:
+            conflicts.append(format_conflict("concept_content", record.code))
+    return written
 
 
 __all__ = [

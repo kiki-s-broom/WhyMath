@@ -61,6 +61,7 @@ from whymath_backend.api._concurrency import (
 )
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.config import get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.session import get_session
@@ -569,6 +570,8 @@ async def patch_problem(
             }
         )
     updated = await session.merge(Problem.from_schema(validated))
+    # 사람이 고친 행 — 다음 CLI 적재가 덮어쓰지 못하게 표지를 남긴다(P3-25).
+    mark_cms_edited(updated)
     settings = get_settings()
     record_content_mutation_audit(
         session,

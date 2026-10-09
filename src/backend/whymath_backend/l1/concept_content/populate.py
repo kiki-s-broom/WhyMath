@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from whymath_backend.db.cms_edit_marker import add_overwrite_argument, conflict_summary
 from whymath_backend.db.models.concept_content import (
     CONTENT_SCOPE_K12,
     CONTENT_SCOPE_UNIVERSITY,
@@ -64,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="상세 출력(현재는 표준 보고만 — 호환 자리표시).",
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args(argv)
 
     sources: list[tuple[Path, str]] = [
@@ -76,12 +78,17 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     total = 0
+    conflicts: list[str] = []
     for path, scope in sources:
         records = load_concept_content_from_json(path, scope=scope)
-        count = populate_concept_content(records)
+        count = populate_concept_content(
+            records, overwrite_cms_edits=args.overwrite_cms_edits, conflicts=conflicts
+        )
         total += count
         print(f"콘텐츠 적재: {count}건 (scope={scope}·src={path}).")
     print(f"콘텐츠 적재 완료: 총 {total}건.")
+    if conflicts:
+        print(conflict_summary(conflicts))
     return 0
 
 

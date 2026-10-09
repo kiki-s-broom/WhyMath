@@ -778,11 +778,14 @@ CATALOG: tuple[Spec, ...] = (
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
        "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
        "l3.publish_gate", status="Batch"),
-    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)",
+    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
+       "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
        "P3-12 — 개념 외 7종의 제자리 편집 허용 목록. 상태·발행 컬럼은 편집 가능 필드에 들어갈 수 "
-       "없고 선언 오류는 기동 시점에 거부된다",
-       "api.admin_cms_resources"),
+       "없고 선언 오류는 기동 시점에 거부된다. P3-25 — 적재가 덮어쓰는 5종은 CMS 쓰기가 "
+       "cms_edited_at 표지를 채우고 CLI 적재는 표지 행을 건너뛰어 충돌로 보고한다"
+       "(db.cms_edit_marker — 5개 적재기가 공유하는 단일 규약)",
+       "api.admin_cms_resources", "db.cms_edit_marker"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",
