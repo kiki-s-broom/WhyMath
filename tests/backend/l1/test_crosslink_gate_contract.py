@@ -215,6 +215,113 @@ def test_contract_doc_freezes_code_constants() -> None:
     assert str(MACHINE_REJECT_EVIDENCE_FLOOR) in doc  # "20"
 
 
+# ── ⑤ 적재 자격(MISC-63) — 부분매핑·개념겹침은 승인해도 기본 적재 금지 ───────────────
+# 각 절마다 *그 절만* 밟는 반례를 둔다: 서명·conf가 모두 유효한 비직접 행이라야 "비직접 거부" 절만 발화한다.
+def _queue_row(
+    link_type: str, *, status: str = "approved", confidence: float | None = 0.9
+) -> dict[str, object]:
+    return {
+        "kebab_id": next(iter(_known_kebab())),
+        "mis_id": "M0049",
+        "link_type": link_type,
+        "confidence": confidence,
+        "rationale": "r",
+        "status": status,
+        "reviewer": "Kiki" if status == APPROVED_STATUS else None,
+        "reviewed_on": "2026-10-09" if status == APPROVED_STATUS else None,
+    }
+
+
+@pytest.mark.parametrize("link_type", ["부분매핑", "개념겹침"])
+def test_promote_rejects_approved_non_direct_even_when_signed_and_confident(link_type: str) -> None:
+    """서명 완비·conf 0.9인 비직접 승인 행 — 다른 절은 전부 통과하므로 *비직접 거부 절*만 발화한다."""
+    with pytest.raises(CrosslinkReviewError) as exc:
+        promote_approved({"review_queue": [_queue_row(link_type)]})
+    msg = str(exc.value)
+    assert link_type in msg
+    # 예외 경로 안내(직접매핑 승격 + confidence 기입 + 재서명)가 메시지에 있어야 검수자가 다음 행동을 안다.
+    assert DIRECT_LINK_TYPE in msg and str(DIRECT_MIN_CONFIDENCE) in msg and "재서명" in msg
+
+
+def test_promote_accepts_direct_mapping_0_85_control() -> None:
+    """대조군 — 직접매핑 0.85 승인은 통과한다(비직접 거부를 과잉 일반화하지 않았음을 보증)."""
+    out = promote_approved({"review_queue": [_queue_row(DIRECT_LINK_TYPE, confidence=0.85)]})
+    assert [r["link_type"] for r in out["crosslinks"]] == [DIRECT_LINK_TYPE]
+
+
+def test_promote_rejects_direct_mapping_without_confidence() -> None:
+    """기존 규칙 유지 — 직접매핑 confidence 미기재는 거부(비직접 거부 절과 독립)."""
+    with pytest.raises(CrosslinkReviewError):
+        promote_approved({"review_queue": [_queue_row(DIRECT_LINK_TYPE, confidence=None)]})
+
+
+@pytest.mark.parametrize("status", ["pending", "rejected", "deferred"])
+def test_non_approved_non_direct_rows_are_not_violations(status: str) -> None:
+    """검수 대기 큐의 부분매핑·개념겹침(pending 43행)은 위반이 아니다 — 거부 절은 approved에만 건다."""
+    queue = {
+        "review_queue": [
+            _queue_row("부분매핑", status=status),
+            _queue_row("개념겹침", status=status),
+        ]
+    }
+    assert promote_approved(queue) == {"crosslinks": []}
+
+
+def test_promote_enumerates_every_non_direct_violation() -> None:
+    """전건 열거 — 첫 위반에서 멈추지 않고 비직접 승인 행 2건을 모두 보고한다."""
+    queue = {
+        "review_queue": [
+            _queue_row("부분매핑"),
+            _queue_row(DIRECT_LINK_TYPE),
+            _queue_row("개념겹침"),
+        ]
+    }
+    with pytest.raises(CrosslinkReviewError) as exc:
+        promote_approved(queue)
+    msg = str(exc.value)
+    assert "[행 0]" in msg and "[행 2]" in msg and "[행 1]" not in msg
+
+
+@pytest.mark.parametrize("link_type", ["부분매핑", "개념겹침"])
+def test_load_gate_rejects_non_direct_even_when_manual_and_signed(link_type: str) -> None:
+    """promote를 우회한 손수 만든 행 — method=manual·서명 유효여도 비직접이면 적재 게이트가 거부한다."""
+    v = load_gate_violations([_row(link_type=link_type, confidence=None)])
+    assert len(v) == 1 and link_type in v[0] and "재서명" in v[0]
+
+
+def test_load_gate_accepts_direct_mapping_control() -> None:
+    """대조군 — 직접매핑 manual·서명 행은 통과."""
+    assert load_gate_violations([_row(link_type=DIRECT_LINK_TYPE, confidence=0.85)]) == []
+
+
+def test_load_crosslinks_raises_on_handmade_non_direct_json() -> None:
+    """`load_crosslinks` 관통(DB 불요) — 손수 만든 crosslinks JSON의 부분매핑 행은 CrosslinkGateError."""
+    with pytest.raises(CrosslinkGateError, match="MISC-63"):
+        load_crosslinks(
+            None,
+            {
+                "crosslinks": [
+                    {
+                        "kebab_id": "k",
+                        "mis_id": "M1",
+                        "link_type": "부분매핑",
+                        "method": "manual",
+                        "note": _SIGNED_NOTE,
+                    }
+                ]
+            },
+        )
+
+
+def test_contract_doc_freezes_load_eligibility_section() -> None:
+    """contract 문서에 적재 자격 절이 있고 비직접 두 유형·예외 경로를 명시한다(문서↔코드 드리프트 동결)."""
+    doc = _CONTRACT_DOC.read_text(encoding="utf-8")
+    assert "## 적재 자격" in doc
+    section = doc.split("## 적재 자격", 1)[1].split("\n## ", 1)[0]
+    for needle in ("부분매핑", "개념겹침", DIRECT_LINK_TYPE, str(DIRECT_MIN_CONFIDENCE), "재서명"):
+        assert needle in section, needle
+
+
 def _known_kebab() -> tuple[str, ...]:
     """실제 카탈로그 kebab-id(promote가 카탈로그 실재를 요구하므로 실 id로 테스트)."""
     from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID

@@ -754,11 +754,11 @@ gates:
     title: "MISC-61 원천 대조 1회 실행 — Kiki 머신의 원천 7계층 JSON(fac16e6f-WhyMath_______.json, sha256 fcf6d333...187e)에서 진단 스크립트(scripts/ops/misc61_source_key_probe.py)를 1회 돌려 결과 JSON을 세션에 붙여넣는다. 목적 = distractor 연결됨 88행·앵커 A3 4건의 세 필드(학생의_잘못된_사고·distractor_규칙·error_type)가 비어 있는 원인이 원천 공란(H1)인지 추출 누락(H2)인지 가른다. 읽기 전용(약 1초) · 출력은 ASCII JSON이며 행 본문을 담지 않는다. 런북 = docs/ops/misc61_source_probe_runbook.md (PR 머지 후에만 실행 가능). 성공 기준 = sha256_matches_provenance가 True이고 all_targets.verdict가 나온다. 판정(재판정)은 하지 않는다 — G-misc40-deferred-m0599-redecision은 별건이다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-07
     remind_after_days: 3
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 713512bc. Kiki 머신 Phaiakes9에서 2026-10-09 런북(docs/ops/misc61_source_probe_runbook.md) 실행 — 임시 worktree HEAD=EXPECTED=713512bc6ec6f2fe50b0be3e492c1e8dbc19161b, 원천 WhyMath_통합데이터셋.json sha256 fcf6d333…187e 일치(sha256_matches_provenance=true), PROBE_EXIT=0. 결과는 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md §2-b에 기록(원천 공란 88행=가설 ① / 원본 공란 21행=가설 ② 후보). 재판정(G-misc40-deferred-m0599-redecision)은 하지 않았다."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "입력 태스크 없음 - 원천 파일은 Kiki 머신에만 있어 실행은 사람 몫이다(결과를 받은 뒤의 작업은 MISC-61 본체가 소유)"
