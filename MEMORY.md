@@ -347,6 +347,14 @@
 - **문서**: 원 `data_platform_module_gap_review_r2.md`는 `OPS-41`이 이미 회수한 `t608mk`의 같은 이름 문서와 별개라 `docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md`로 회수했다(원문 무수정 + 발견별 현황 표). 현황: A1·A2·C1(`SEC-32` done)·C3(`HARN-15` done) 닫힘, A3는 `declared_unwired_audit`가 상시 감시, B1은 `OPS-67`(todo), C2는 `OPS-32`(todo).
 - **소유자 없던 잔여 2건**: ① r2 C2의 6종 중 `pandas`·`polars`·`great-expectations` 3종은 `OPS-32`(3종만 소유)에도 `OPS-37`에도 없어 `OPS-32` acceptance ⑥으로 편입(선언 `pyproject.toml:57-59`·import 0 실측). ② `ops.cost_report`의 CI 미배선은 결함이 아니다 — 입력이 라이브 Langfuse 트레이스인 운영자 수동 계측 도구이고, 감사기는 `status: reached`로 분류(신규 태스크 불필요).
 - **번호 매핑**: `OPS-19 → OPS-38` · `SEC-13 → SEC-32` · `OPS-20 → OPS-67` · `OPS-21 → OPS-32`.
+### 2026-10-09 (결정 · 부분매핑 적재 자격 정책): **부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지) — 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다** (Kiki 결정·claude 기록) — 판정 기준 main `663b91dc`
+
+- **결정(2026-10-09)**: ①`link_type`이 부분매핑·개념겹침인 행은 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/`)에 넣지 않는다. ②"사실상 직접매핑"이라고 사람이 판단한 행만 큐에서 `직접매핑`으로 승격하고 `confidence ≥ 0.6`을 기입한 뒤 서명한다 — 판단의 흔적이 신뢰도 숫자로 남는다(M0672가 선례). ③큐의 부분매핑 38행·개념겹침 5행은 pending 그대로 둔다(일괄 승격 금지·행별 사람 판단).
+- **근거**: 부분 일치를 리포트의 정식 오개념으로 내보내면 "정확히 이 오개념"이라는 오귀속이 된다(CLAUDE.md 의사결정 우선순위 #1·#3). 또 부분매핑은 `confidence`가 `None`이라 canonical 선정(`select_canonical`)의 후보 자격(신뢰도 있는 직접매핑)에서 어차피 빠진다. 2026-10-05에 M0672를 부분매핑 그대로 적재한 것이 "부분이면 적재해도 되는가" 혼선의 시작이었다.
+- **선행 결정과의 관계**: 2026-10-06 결정("직접/부분은 관계 강도일 뿐 적재 자격을 자동으로 정하지 않는다")이 *자동 판정 금지*였다면, 이 결정은 그 위에서 *사람 판정의 기본값과 예외 경로*를 정한다. 두 결정은 모순되지 않는다.
+- **코드 집행은 아직 없다**: 현재 `promotion_violations`는 직접매핑의 confidence 하한만 검사하고 `link_type` 자체는 거르지 않는다. 집행은 태스크 `MISC-63-crosslink-partial-mapping-load-policy-enforcement`가 소유한다(승격 규칙 + 적재 게이트 + 계약 문서 + 뮤테이션 검증). 그 착지 전까지 이 결정은 사람 규율이다.
+- **미해소(Kiki 머신)**: 라이브 DB(`whymath-pg`)와 main 코퍼스의 어긋남(M0599 행 삭제 · M0671 추가 · M0672 직접 승격)은 이 결정과 별개로 남아 있다.
+
 ### 2026-10-08 (구현·S4-66): **`sequence_induction` verifier v2를 착지했다 — 점화식을 정확 산술로 실제 실행해 답을 `==`로만 대조하며, 설계서 초안과 달라진 두 곳(지수·`S(N)`의 N)을 구현 시점에 확정했다** (claude 집행) — 판정 기준 main `1c33b60a`
 
 **무엇/왜**: [12대수03-06] 30건은 발문에 점화식을 쓰지만 `verify.conditions`에는 생성기가 계산한 폐형식만 있어, 발문의 점화식을 실행하는 검산이 없었다(점화식과 폐형이 어긋나게 생성돼도 Tier1에서 드러나지 않는다). `l3/sequence_induction.py`를 신설해 그 정합 축을 처음 닫았다. 정수·`Fraction`만 쓰고 `eval`·`sympify`·`isclose`를 쓰지 않는다(AST 검사로 동결). 질의는 `a(N)`·`S(N)`·`terms(N)`·`closed(식, upto=M)`.
@@ -393,6 +401,14 @@
 - **후퇴(수용 · Kiki 판단 요청)**: 선행 결함 — `identity_status('f(x)', 'f*x')`가 identity이고 `f(x)**2`는 `f*x**2`로 읽힌다(내장 함수 `sin`은 무관). 구조 파싱을 같은 규칙으로 맞추자 미지 함수를 이항식에 품은 거짓형 3건(`(f(x)+y)²` 등)이 우연한 일치가 깨져 더는 검출되지 않는다(누락 방향이라 거짓 낙인은 없다). 두 파서를 한 함수에 두는 우회(레거시 파싱 후 폴백)는 이 태스크가 닫으려던 갈림을 재생산하므로 택하지 않았다. 뿌리는 `MISC-62`(표기 정책 결정 포함)가 소유하며, 현재 동작을 계약 테스트 2건(`test_function_application_is_read_as_multiplication_known_limitation`·`test_unknown_function_application_known_limitation`)으로 동결해 고치면 RED가 된다.
 - **검증**: 주입 7종 전건 RED·원복 sha256 일치(태스크가 요구한 "함수 적용이 곱으로 읽힘" 주입 포함).
 
+### 2026-10-08 (착지 · P3-12): **개발자 없이 콘텐츠팀이 쓰는 CMS 화면 7종과 서버 권한 가드를 기존 admin 셸 안에 얹었다 — 편집·검수·발행·롤백·이력은 화면에서 가능하고, 권한 차단·워크플로우 우회 차단은 주입으로 RED를 확인했다. 신규 생성·삭제·관계 쓰기는 의도적으로 열지 않았다** (claude 구현) — 판정 기준 main `c322bb9c`(병합 후)
+
+**무엇**: 태스크 `P3-12-cms-minimal-screens`. 실측표(`docs/reviews/p3_12_cms_12_survey_2026-10-08.md`)가 착수 전 "12종 중 화면에서 가능한 것은 문항 검수 전이 1건"임을 드러냈다. 채운 것: 역할 3종(`content_editor`·`content_reviewer`·`content_publisher`) + 권한표(`schema/cms_access.py` — 조회·편집·검수·배포, `content_admin`은 4권한 겸임) · 서버 BFF `/v1/admin/cms/*`(개념은 새 DRAFT 판 + `publish_gate` 경유, 개념 외 7종은 허용 필드 제자리 편집) · 웹 화면 7종 · 레지스트리 7모듈 `partial→live`.
+**결정(D1~D6)**: ① 권한은 역할 서열이 아니라 *권한 집합* 한 곳에서 파생(레지스트리 `required_roles`·운영자 토큰 허용 역할도 거기서) ② 서버는 DB 접근 *전에* 권한을 검사한다 — 거부는 부작용 0 ③ 워크플로우·상태 컬럼은 편집 허용 목록에 존재할 수 없다(`check_specs`가 import 시점에 실패) ④ 승인된 문항은 먼저 격리해야 수정된다(검수 축 우회 금지) ⑤ 기존 `PATCH /v1/concepts`가 발행 포인터를 바꾸는 우회로(F3)는 값 비교로 차단 ⑥ 화면은 규칙을 복제하지 않는다 — 버튼은 서버의 `allowed_actions`, 폼은 서버의 `fields`, 어느 화면이 어느 리소스를 그리는지는 서버가 내린 `route`로 정한다(하드코딩 nav 금지와 같은 정신).
+**검증**: 지시문 ① 권한 없는 발행 요청 → 5역할×8동작 행렬 403·부작용 0, 실 PG 통합 7건 · ② 워크플로우 우회 → AST 위반 12종 주입 RED + 쓰기 라우트 금지 키 422 · 웹 거버넌스 결함 10종 주입 RED(원복 바이트 동일) · **실 PostgreSQL + 실 uvicorn + 헤드리스 Chromium으로 5계정 31시나리오 31/31**.
+**종단 검증이 찾은 결함(수정 완료)**: `to_jsonable`이 `(str, Enum)` 멤버를 원시형 분기에서 그대로 통과시켜 `level`·`edge_type`이 `'ConceptLevel.단원'`·`'EdgeType.PREREQUISITE'`로 나갔다. **단위 테스트는 가짜 행이 평범한 문자열이라 못 봤고, 기존 단언 `to_jsonable(ConceptLevel.단원) == "단원"`은 멤버 자신과도 참이라 변별력이 없었다** — 가짜가 실물과 다른 모양이면 그 가짜 위의 초록은 실물의 증거가 아니다. 대책 = Enum 분기를 앞으로(뿌리) + 타입 단언·실제 열거형 가짜 행 회귀 3건(옛 순서 주입 시 RED). 같은 모듈의 `str(` 호출 6곳을 전수 확인했고 나머지는 UUID·원시형이다.
+**이 PR이 주장하지 않는 것**: ① 개념 신규 생성·삭제·관계 쓰기(→ `P3-26`) ② CMS 편집이 다음 CLI 적재에 보존된다는 것 — 개념 외 7종은 적재가 같은 행을 upsert하므로 소실될 수 있다(→ `P3-25`) ③ 발행이 학생 화면을 바꾼다는 것 — 서빙 경로가 `concept_version`을 읽지 않는다(F2·B5, 화면이 문구로 말한다) ④ 종단 검증이 CI에서 돈다는 것 — 실 PG·uvicorn·Chromium이 필요해 현재는 개발 중 증거다. 문항 `PATCH` 우회는 `ADMIN-16`(타 세션 claim 중), 문항 버전 발행은 `ARCH-31`.
+**환경 기록**: `pkill -f '<패턴>'`을 패턴이 든 명령줄 자신에게 쓰면 실행 중인 셸이 죽는다(exit 144) — `[u]vicorn` 대괄호 표기로 자기 매칭을 피한다.
 ### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
 
 **무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
@@ -12128,6 +12144,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: 단위(진리표·AST 결선·순수 집계·Wilson 리터럴·렌더·JSON·CLI·쿼리 구조) + 실 PG 통합 5건(HTTP 적재 시점 고정 · 합성 원장 11쌍 칸별 증분 · **라벨-단독 행을 신호 행으로 바꾸는 주입**이 한 쌍만 뒤집음 · 되돌림 증분 0) · 결함 주입 하네스 `scripts/analysis/mutate_eos179_label_provenance_guards.py` **51건(단위 45·서빙 6) 전건 검출**·실행 전후 sha256 동일. 하네스 설계 중 생존 후보 1건(하한이 기록만 되고 쿼리에 안 걸려도 가짜 세션 테스트가 통과) → 테스트에 컴파일 SQL 단언을 추가해 닫았다.
 - **한계(명시)**: 운영 원장이 비어 있어 **읽는 도구만 닫았고 값은 얻지 못했다**. 증거 수는 개념 BKT 관측 수뿐이다(전과목 θ 스냅샷의 응답 수는 적지 않는다). 신호(`base_level>=2`)는 7개 좌절 토큰 + 8개 답 요구 토큰이라 실제 막힘의 하한이다. 앱이 명시 `mastery_level`을 보내지 않으므로 `explicit`은 관측되지 않을 것이다(Dart 확인 — 내가 찾은 방법으로는 0건). 판정문 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md` §10에 상세.
 
+### 2026-10-08 — OPS-100: CI 잡별 타임아웃 여유 상시 감시 착지 + 첫 실측에서 여유 30% 미만 4잡(후속 OPS-120)
+- **결정**: OPS-47 측정기를 전 잡으로 일반화한 `scripts/analysis/measure_ci_job_timeout_headroom.py`를 두고, 별도 워크플로 `ci-timeout-headroom.yml`(매일 02:17 UTC·`actions: read`만)이 돌린다. 최근 실행(push·merge_group·schedule 각 20건)의 잡별 최대 소요를 ci.yml의 `timeout-minutes`(하드코딩 아님)와 대조해 **여유 30% 미만이면 스텝을 실패**시킨다(exit 1) · 측정 불가는 따로 exit 2. 기존 `measure_backend_job_timeout_headroom.py`는 구 CLI 그대로 받아 위임하는 호환 진입점으로 남겼다(ci.yml 주석·OPS-47 기록이 그 경로를 가리킨다).
+- **설계 판단(기록)**: ① **초판의 생존자 편향을 정정**했다 — 초판은 `status=success` 실행·`conclusion=success` 잡만 봐 타임아웃으로 죽은 잡이 표본에서 빠졌다. 지금은 완료 실행 전부를 보고, 상한의 95% 이상 달린 취소·실패(와 `timed_out`)를 '상한 도달'로 센다. 짧게 끊긴 취소는 표본이 아니다(야간 직렬 스위트가 45분 상한의 14분에서 동시성 취소된 실측). ② 이벤트에 `schedule`을 넣었다 — `e2e-nightly`·`backend-serial-nightly`는 거기서만 돌아 빼면 영구 측정 불가가 된다. ③ 별도 워크플로인 이유 = harness-audit은 push(main)마다 돌아 적색이 습관화되고, 그 concurrency 그룹은 대기 실행을 최신 하나로 교체해 예약 실행이 조용히 취소될 수 있다. ④ LOW가 측정 불가보다 우선(행동이 필요한 쪽) · 미처리 예외도 exit 2(파이썬 기본 종료 코드 1이 '여유 부족'과 겹친다).
+- **실측으로 확인한 API 사실(2026-10-08, 실제 응답)**: 잡 `name`은 ci.yml `name:`과 글자 그대로 일치 · 건너뛴 잡은 `started_at`이 `completed_at`보다 1초 늦은 행이 있다(음수 소요 → 결론으로 먼저 거른다) · 머지 큐 실행의 `head_branch`는 `gh-readonly-queue/main/...`라 `branch=main`을 걸면 전부 빠진다.
+- **첫 실측(이벤트별 최근 20건, 도구 오판 아님)**: `backend` 상한 35분·최대 31.72분·여유 **9.4%** · `backend-migrations` 15분·13.70분·**8.7%** · `backend-serial-nightly` 45분·33.15분·**26.3%** · `data-pipeline` 10분·**상한 도달 1회**(완주 최대 3.07분). 기준 바로 위: `harness-integrity` 31.0%·`infra-contracts` 33.8%. data-pipeline은 체크런 주석 `The job has exceeded the maximum execution time of 10m0s`로 실제 타임아웃임을 확인했다 — push 실행 37488429913이 `Set up Python 3.12`의 캐시 복원(`Failed to restore: The server is busy`)에서 멈췄다(서서히 느려진 것이 아니라 한 번 멈춘 것 → 처방이 상한 상향이 아니라 스텝 타임아웃). 도구는 이 둘을 가르도록 상한 도달 시 **완주 표본 최대**를 비고에 낸다. 후속 = `OPS-120-ci-job-time-budget-recovery`. 사고 대장 `ci-job-timeout-exhausted` 3회차로 등재.
+- **검증**: `tests/infra/test_ci_job_timeout_headroom.py` 77건(합성 이력 시나리오 28 · 결함 주입 33종 **전건 검출** — 각 주입이 의도한 이유로 실패함을 확인 · 실제 ci.yml 대조 · 워크플로 배선 · 호환 진입점) + 실제 API로 도구 2회 실행. 부동소수점 경계(상한 7분·294초는 수학적으로 정확히 30%인데 float는 0.2999…93)는 전수 탐색으로 반례를 찾아 픽스처로 고정했다. 저장소 전역 거버넌스(`test_github_api_auth`·`test_proxy_ca_optional`)가 새 스크립트를 자동 편입한다.
+- **한계(명시)**: ① 이 워크플로의 **Actions 환경 첫 실행은 관측하지 못했다**(schedule은 main 병합 뒤에야 발화 · `actions: read`만으로 조회가 된다는 것은 GitHub 문서 기준이며 병합 후 `workflow_dispatch`로 확인해야 한다) ② 최대 표본 기준이라 이상치 1건이 창(20건)에서 밀려날 때까지 LOW가 유지된다 ③ 스텝 단위 시간 회귀는 보지 않는다(HARN-202) ④ 알림은 GitHub의 예약 실행 실패 기본 알림에 의존한다 ⑤ **OPS-120이 끝나기 전에는 이 워크플로가 매일 적색**이다 — 의도된 신호이며 경고를 끄는 것으로 해소하지 않는다.
 ### 2026-10-08 — PB-15: 교차검증 생성자≠검증자 가드가 코퍼스 문항에서 한 번도 발화하지 못하던 결함 — 서명 3상태 · 저작 서명 기록 경로 · 구 코퍼스 거부로 기본 동작 전환
 - **결함(실측)**: 가드 `subject.authored_by == self.signature`(`l3/cross_verify.py`)는 검증자 서명을 `llm:<모델 id>`로 만들고, 코퍼스 로더(`harness/residue_cross_verify_eval.py`)는 저작 서명을 `corpus:<generation_type>`으로 **지어냈다.** 두 형식이 달라 같아질 수 없었다. 코퍼스 문항 14,034건이 전부 `generation_type=FULLY_GENERATED`이고 모델 id를 담는 필드가 0건이라 그 값은 LLM 저작분과 결정론 생성분을 구분하지도 못했다. 기존 `test_self_approval_is_refused`는 `verifier.signature`를 그대로 대입하는 동어반복이라 형식 불일치를 구조적으로 볼 수 없었다.
 - **태스크 설명에 없던 두 번째 불일치(실측)**: 검증자 서명이 로컬만 모델 id(`llm:qwen3:30b-a3b`)를 내고 **클라우드는 티어명(`llm:cloud_mid`)**을 냈다. 저작 측이 기록하는 `model_name_for_decision`은 모델 핀(`deepseek/…`)이라, 코퍼스 쪽만 고쳤다면 로컬끼리는 잡혀도 *같은 클라우드 모델이 만든 문항을 같은 모델이 검증*하는 경우는 계속 못 잡았을 것이다. 검증자 서명을 같은 함수로 해석하도록 바꿨다.
@@ -12181,3 +12204,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
+
+## 2026-10-09: 미머지 브랜치 전수 감사 16회차 — 15회차 산출물 자체가 고립돼 있었다 · 미추적 고립 구현 3건 회수 등재 · 분실 등재 3건 복원 · 삭제 14차 배치 10건
+
+판정 기준 main `15220b9f`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-09.md`(Kiki "떠돌이 코드 정리"). 원격 ref 61 → 감사 대상 28(PR 소유 27 · claim 활성 3 · 판정 대상 아님 3).
+
+- **발견 ①: 감사 산출물이 감사 대상이 됐다.** 15회차(`2026-10-03`)가 판정 문서·회수 태스크 `HARN-212`·14차 삭제 배치를 PR 없이 `claude/magical-maxwell-99n5e8`에 남겼다. 결과적으로 `34zvse` 회수가 등재되지 않은 채 하루 이상 방치됐고, 14차 배치(`tbj2jf`·`7x90dj`)는 집행되지 않았다. 문서는 byte 그대로 이식(`git hash-object` 일치)하고 `HARN-212`는 같은 번호로 재등재(전 원격 브랜치에서 유일 사용처 실측)했다.
+- **발견 ②: stale claim 아래의 미추적 구현 3건.** `friendly-pascal-mnmypk`(QUAL-11 교정·코퍼스 600행) · `practical-maxwell-kuwl7x`(OPS-104 판정·동결 테스트 35건) · `blissful-lovelace-ubp9tw`(OPS-96 WIP 격리 워커 풀). 셋 다 main 태스크는 `todo`이고 claim은 TTL(72h) 초과다. claim이 풀리면 `/drive`가 같은 구현을 처음부터 반복한다. 회수 태스크 `QUAL-15`·`OPS-122`·`OPS-123`을 등재하고 소유 태스크에 `depends_on`을 부착했다. 분실된 등재 `QUAL-12`·`OPS-108`은 원래 번호로 복원했다.
+- **정직한 기록**: 부착 전 main에서도 소유 3건이 이미 후보가 아니어서(claim) 후보 목록 대조로는 부착 효과를 변별하지 못했다. YAML `depends_on`으로만 확인했다.
+- **좌석 소멸 3건 삭제**: `t608mk`·`azdnov`(OPS-41 done, 문서는 이름이 바뀌어 착지·YAML은 재채번) · `vafylb`(OPS-53·S4-59 done, cp949 수정은 진입점 재구성으로 대체). 삭제 전에 잔여 diff를 재열거했다 — 부재 줄은 단어 겹침 97~100%(재채번에 따른 줄 포맷 차이)이거나 MEMORY 고유 토큰 27개 중 2개(구절 1·커밋 해시 1).
+- **`5t5lmv`는 좌석이 이관**: `OPS-40` done(#1466) 뒤 모바일 구현이 main 부재라 `OPS-112`·`OPS-113`·`A11Y-02`가 소유한다.
+- **claim 활성 3건은 판정 보류**(`status-f6qz0c`·`status-f9lp65`·`stoic-hawking-vzumx5`): `claims reap` dry-run이 stale로 지목했으나 선행 선례대로 배치에서 뺐다. `claims reap --apply`는 이 감사가 실행하지 않았다.
+- **미해소**: `status-38gu4d`·`s4-70-pila8m`은 claim이 가리키는 브랜치가 원격에 없다. PR `#1478`은 main의 같은 게이트가 이미 `cleared`라 중복일 수 있으나 확인하지 못했다. `QUAL-15`는 PR 소유 `PB-09`와 생성기·코퍼스 경로가 겹친다.
+- 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
+- **사후 갱신(같은 날)**: PR `#1478`이 닫혀 `friendly-dijkstra-230lnm`(`bcc172a3`)이 고립 브랜치가 됐다. main의 같은 게이트가 `kiki` 서명으로 이미 `cleared`라 14차 배치에 추가했다(총 11건). 증적 문구는 글자 그대로 포함되지 않으며 삭제 근거는 내용 대체다(판정 문서 §5).

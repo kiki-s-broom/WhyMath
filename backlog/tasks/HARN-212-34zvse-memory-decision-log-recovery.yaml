@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-212-34zvse-memory-decision-log-recovery
+title: "34zvse MEMORY 결정 로그 2건(MATH-05·CUR-07) 회수 — 좌석이 전부 done이 된 뒤 브랜치에만 남은 마지막 고립분"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/remaining-track-34zvse head 7fb78470. 코드·코퍼스·테스트 추가 줄은 main에 전부 착지했거나(criteria_loader·achievement_level_unit·코퍼스 JSON·모바일 2화면 등 추가 줄 중 main 부재 0) main이 더 진화해 대체했다(coach.py·target_progress.py는 CUR-04 #810 원자 축 구현이 main에 있고, ci.yml의 pending-task:ARCH-23 선언은 main이 continue-on-error를 제거해 소멸). 좌석 CUR-04·05·07·08·HARN-80은 전부 done(2026-10-03 실측). 브랜치에만 남은 것 = MEMORY.md 결정 로그 2건(2026-08-11 구현·MATH-05 · 2026-08-11 구현·CUR-07, 합 48줄)뿐이다. 재현: git diff -U0 origin/main...origin/claude/remaining-track-34zvse -- MEMORY.md 의 추가 줄을 main MEMORY.md에 줄 단위 grep -qxF 대조.\n② 이식 방식 = 파일 단위가 아니라 MEMORY.md에 해당 2개 절만 추가(브랜치 통째 머지 금지 — main보다 약 600커밋 낡았다). MATH-05 절은 역방향 표기 공백 봉합의 근본 원인 추정(plainLatex 이름이 만든 착시)과 변별력 양방향 실측 기록이라 요약하지 말고 원문 보존. 삽입은 쓰기 직전에 원본 보존·길이 산술·앵커 1건을 단언하고 git diff --stat 삭제 열 0을 확인한다.\n③ 집행 지점 — 문서 회수라 서빙 경로는 없다. 완료 판정은 main MEMORY.md에 두 절의 제목 줄이 실재하는지 grep 실측으로 한다(브랜치 존재만으로 완료 선언 금지).\n④ 완료되면 34zvse는 삭제 배치에 등재한다(좌석이 모두 소멸한 뒤 이 태스크가 마지막 소유자다)."
+artifacts: []
+paths:
+  - MEMORY.md
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-03.md §3-② 34zvse(stray-code 15회차). 회수 완료 전 원 브랜치 claude/remaining-track-34zvse 삭제 금지. CUR-08 done 이후 34zvse에 남은 마지막 고립분이라 CUR-08과 별건으로 등재한다."
+updated: 2026-10-09

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-26-cms-concept-create-delete-edge-write
+title: "P3-26 — CMS 개념 신규 생성·삭제·관계(엣지) 쓰기: 원천 정본 결정 + DAG 검사 + 버전 워크플로우 경유"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-12-cms-minimal-screens
+requires_gates: []
+acceptance:
+  - "① 개념 원천 정본을 결정한다: graph.json(원천 파일)과 DB 중 어느 쪽이 정본이고 CMS 쓰기가 어느 쪽으로 가는가. 결정 없이 DB 엣지를 쓰면 다음 적재가 덮어쓴다.\n② prerequisite 관계 쓰기는 비순환(DAG) 검사(Reachability Check)를 통과해야만 한다 — 순환을 만드는 요청은 서버가 거부하고 주입으로 RED를 확인한다.\n③ 개념 신규 생성은 살아있는 concept 행을 직접 만들지 않고 버전 워크플로우(초안→검토→승인→발행)를 거친다. 삭제는 발행본이 있는 개념에 대해 거부한다.\n④ 화면: 개념 작업대에 신규 생성·관계 편집 패널을 더하고, 권한 없는 계정의 시도는 서버가 403으로 막음을 실 DB 종단 검증으로 확인한다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-12 사후 대조표(§6). P3-12는 개념 조회·수정(새 초안)·스킬 연결을 열고, 신규 생성·삭제·관계 쓰기는 의도적으로 열지 않았다(학생이 읽는 살아있는 행을 검수 없이 바꾸는 길 + 엣지 원천 정본이 graph.json + DAG 검사 선행). 선행: P3-12-cms-minimal-screens(착지 후 착수)."
+updated: 2026-10-08

@@ -498,10 +498,89 @@ def test_fail_reason_formats_numbers_exactly() -> None:
     assert "4/3" in third.reason
 
 
-def test_single_point_sample_variance_keeps_s4_53_behavior() -> None:
-    """특성화 테스트 — n=1 표본분산은 수학적으로 정의되지 않지만 S4-53 동작(0)을 보존한다.
+# ── S4-71 잔여 결함 ──────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    "conditions",
+    [
+        "data=[5]; stat=variance",  # variance_kind 생략 = 기본 sample
+        "data=[5]; stat=std",
+        "data=[5]; stat=variance; variance_kind=sample",
+        "data=[5]; stat=std; variance_kind=sample",
+        "data=[[5]]; stat=variance",  # 2차원 1행 — 열 미지정이면 첫 열(n=1)
+    ],
+)
+def test_single_point_sample_variance_is_unverifiable_not_zero(conditions: str) -> None:
+    """n=1 표본분산·표본표준편차는 분모 n-1=0 이라 정의되지 않는다 — S4-53 은 0 으로 pass 시켰다."""
+    verdict, _, result = verify_statistical_claim(conditions, "0")
+    assert verdict.state == "unverifiable"
+    assert verdict.reason is not None
+    assert "n=1" in verdict.reason
+    assert "정의되지 않음" in verdict.reason
+    assert result.value is None
+    # 틀린 주장값도 fail 이 아니라 unverifiable — 정의 불가 값을 정답/오답으로 가르지 않는다.
+    assert _state(conditions, "7") == "unverifiable"
 
-    바꾸는 일은 이 태스크 범위 밖(승계 후보)이다. 바뀌면 이 테스트가 그 사실을 드러낸다.
-    """
-    assert _state("data=[5]; stat=variance", "0") == "pass"
-    assert _state("data=[5]; stat=std", "0") == "pass"
+
+@pytest.mark.parametrize("stat", ["variance", "std"])
+def test_single_point_population_variance_stays_zero(stat: str) -> None:
+    """모집단 분산·표준편차는 n=1 에서 0 으로 정의된다 — 위 변경이 이쪽을 건드리면 안 된다."""
+    cond = f"data=[5]; stat={stat}; variance_kind=population"
+    assert _state(cond, "0") == "pass"
+    assert _state(cond, "1") == "fail"
+
+
+def test_two_point_sample_variance_is_still_defined() -> None:
+    """n>=2 경계 — 가드가 n=2 까지 막으면 안 된다(n<2 → n<=2 뮤테이션 방어)."""
+    assert _state("data=[1,3]; stat=variance", "2") == "pass"
+    assert _state("data=[1,3]; stat=std", "1.4142135623730951") == "pass"
+
+
+TABLE_2X2 = "data=[[1,2],[3,4]]; stat=mean"  # 열 0 평균 2, 열 1 평균 3
+
+
+@pytest.mark.parametrize(
+    "columns",
+    [
+        "[abc]",  # JSON 아님
+        "[1.5]",  # 소수 — 1 로 조용히 잘리던 입력
+        "[1.0]",  # 정수값이어도 JSON 소수 표기는 거절
+        "[true]",  # bool — int 의 하위 클래스라 1 로 읽히던 입력
+        "[false]",
+        '["1"]',  # 문자열 — int("1") 로 변환되던 입력
+        "[null]",  # TypeError 로 새던 입력
+        "[NaN]",  # ValueError 로 새던 입력
+        "[Infinity]",
+        "[[1]]",  # 중첩
+        '{"0": 1}',  # 배열이 아님
+        "1",
+    ],
+)
+def test_columns_non_integer_is_unverifiable_without_exception(columns: str) -> None:
+    verdict, _, _ = verify_statistical_claim(f"{TABLE_2X2}; columns={columns}", "2")
+    assert verdict.state == "unverifiable"
+    assert verdict.reason is not None
+    assert "columns" in verdict.reason
+
+
+def test_columns_truncation_cannot_flip_the_judged_column() -> None:
+    """[1.5] 가 열 1 로 잘리면 열 1 의 평균 3 으로 판정된다 — 이제는 어떤 주장값도 판정되지 않는다."""
+    for answer in ("2", "3"):
+        assert _state(f"{TABLE_2X2}; columns=[1.5]", answer) == "unverifiable"
+
+
+def test_columns_integer_still_selects_the_column() -> None:
+    assert _state(f"{TABLE_2X2}; columns=[0]", "2") == "pass"
+    assert _state(f"{TABLE_2X2}; columns=[1]", "3") == "pass"
+    assert _state(f"{TABLE_2X2}; columns=[1]", "2") == "fail"
+    assert _state("data=[[1,1],[2,2],[3,3]]; stat=corr; columns=[0,1]", "1") == "pass"
+
+
+def test_columns_parse_exceptions_do_not_leak() -> None:
+    """깊은 중첩(RecursionError)·4300자리 초과 정수(ValueError)도 예외 전파 없이 unverifiable."""
+    deep = "[" * 100_000
+    huge = "[" + "9" * 5_000 + "]"
+    for columns in (deep, huge):
+        verdict, _, _ = verify_statistical_claim(f"{TABLE_2X2}; columns={columns}", "2")
+        assert verdict.state == "unverifiable"
+        assert verdict.reason is not None
+        assert "columns" in verdict.reason
