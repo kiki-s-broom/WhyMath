@@ -986,7 +986,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-09] input done · P3-14-phase3-metrics-cli · 판정 무관: 이 태스크는 게이트 G-p314-phase3-metric-targets 의 판정 결과를 내지 않는다 — 목표 수치(95·98·99%) 확정은 Kiki 의 사람 판정이다. P3-14 가 낸 것은 판정 재료(7종 CLI와 오늘 기준선: Curriculum 3/10·Concept Completeness 0/10·Problem Coverage 6/8·Graph Connectivity 0/10)까지이고 게이트는 P3-10 기준선을 기다리며 pending 으로 남는다 — done P3-14-phase3-metrics-cli 인계"
     depends_on:
       - P3-14-phase3-metrics-cli
       - P3-10-ai-quality-eval-suite
