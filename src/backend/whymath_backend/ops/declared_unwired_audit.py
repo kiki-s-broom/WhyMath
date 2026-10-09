@@ -1310,6 +1310,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # docs/standards/incident_response_slo.md §4-1의 실패 유형과 /demo-doctor 카탈로그
         # W1행이 이 CLI를 1차 진단으로 지목한다.
         "ops.db_host_reachability": _LIVE_DEPENDENT,
+        # OPS-30(2026-10-09): 외부 업타임 프로브 — **서버 프로세스 밖**에서 1분마다 /health/ready를
+        # 폴링하는 것이 존재 이유라(죽은 서버는 자기 죽음을 보고하지 못한다) 앱 코드가 부르면
+        # 안 된다. 호출자는 Kiki 머신의 Windows 작업 스케줄러이고, 등록 절차는 사람 경로다 —
+        # docs/ops/ops30_uptime_probe_runbook.md [D]. 판정 로직(up/down 판정·전이 알림·재시도·
+        # S4 창/coverage)은 tests/backend/ops/test_uptime_probe.py가 CI에서 상시 검증하고,
+        # 실서버 kill -9 양방향 실측은 OPS-30 PR 본문에 있다.
+        "ops.uptime_probe": (
+            "by-design:서버 프로세스 밖에서 도는 스케줄러 호출 CLI(OPS-30) — 앱 안에서 부르면 "
+            "서버 사망을 관측할 수 없다. 등록은 Kiki 머신 사람 경로(ops30 런북 [D])"
+        ),
         # EOS-73(2026-09-01): 생성 seed 적재율 리포트 — 분모가 *실제 생성 배치*의 genlog JSONL
         # 이다. CI에는 그 산출물이 없어(LLM 배치를 매 PR마다 돌리지 않는다) 상시 실행하면 전
         # 지표가 "측정 불가(분모 0)"만 난다 — 그렇게 렌더하는 것이 이 리포트의 설계값이지 CI에서

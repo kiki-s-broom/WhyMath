@@ -347,6 +347,17 @@
 **사고 기록(CI 선행 발견)**: `tests/infra` 전체를 돌리자 신규 모듈 2개가 EOS 기능 인벤토리 어느 행에도 귀속되지 않아 3건 실패·21건 오류였고, `_condition_sign`이 CAS 안전 진입점을 우회한 `sympify` 직접 호출이었다 — 둘 다 로컬 pytest(`tests/backend`)만으로는 안 보이는 `infra-contracts` 잡의 검사다. 같은 PR에서 인벤토리 행(`WM-E-351`·`WM-O-909`) 귀속과 `safe_sympify` 교체로 해소했다. 대책 코드는 기존 `test_eos_feature_inventory_v2.py`·`test_cas_parse_entrypoint_governance.py`가 이미 소유한다(신규 규칙 등재 없음).
 **후속(대장 집행)**: `PB-19` CAT 형제 필터가 관계 유형을 구분하지 않는 문제(심화·선수까지 대칭 형제로 모아 `exclude`에서 쉬운 계열이 빠진다) · `PB-20` 변형 코퍼스 편입 결정과 중복 구조의 계보만 걸기(`PB-19` 선행).
 
+### 2026-10-09 (구현·P3-25): **CMS로 고친 행을 CLI 적재가 조용히 덮어쓰던 구멍을 `cms_edited_at` 표지로 막았다 — 7종 중 5종이 덮이고 있었고, 문항은 사람이 격리한 상태까지 코퍼스 초기값으로 되돌아갔다** (claude 구현)
+
+**무엇**: 태스크 `P3-25-cms-edit-vs-loader-contract`. 정본 = `docs/standards/cms_edit_vs_loader_contract.md`. 실측(역할 기반 검색): 문항·오개념·교수전략·개념 설명·힌트 5종은 적재가 같은 행을 upsert해 편집을 지우고, 풀이 단계(빈 좌석에만 insert)·교육과정 판(alembic 시드 `DO NOTHING`)은 안 지운다.
+
+**결정**: ①표지 컬럼 5개(`problem`·`misconception_catalog`·`strategy_node`·`concept_content`·`hints`, nullable·기본값 없음·백필 금지 — 마이그레이션 `e7b2c4d8a1f6`). 감사 기록 재사용안은 사용자 결정으로 기각(2차 신호·보존 기간 MGMT-02 미정·풀 길 없음) ②사람이 쓰면 표지를 채운다: CMS 편집(바뀐 필드가 있을 때만)·검수 표시, 문항은 기존 `PATCH /v1/problems`·검수 큐 전이까지 ③적재는 표지 행을 건너뛰고 충돌로 보고(`ON CONFLICT … WHERE cms_edited_at IS NULL RETURNING pk`) ④`--overwrite-cms-edits`로만 덮어쓰며 그때 표지를 비운다 ⑤신규 작성 미개방(저작권·출처 레일 우회 금지) 유지.
+
+**검증(실측)**: 실 PG 16 통합 5건 GREEN + 보호를 끈 주입 6종 전건 RED(선택적 — 힌트만·문항만·개념 설명만 실패하는 주입 포함)·단위/거버넌스 주입 4종 전건 RED·원복 바이트 동일. 전체 백엔드 스위트 18,204 passed(커버리지 90.98%)·`tests/infra` 2,940 passed·`mypy --strict`·`lint-imports`·ruff·black exit 0.
+
+**실측이 설계를 고친 1건**: 건너뜀 판정을 `rowcount == 0`으로 시작했는데 psycopg3의 `INSERT … ON CONFLICT`는 삽입·갱신·건너뜀 모두 `rowcount=-1`이라 변별력이 0이었다. 가짜 엔진 테스트는 통과했고 실 DB에서 처음 드러났다 — "알 수 없으면 예외"로 둔 덕에 조용히 오분류되지 않았고, `RETURNING` 빈 결과 판정으로 교체했다.
+
+**한계(사실 기록)**: 보호는 DB 편집만 지키고 코퍼스 파일로 역기록하지 않는다(정본 파일은 DB와 달라진 채 남는다). 행 단위 보호라 코퍼스의 정당한 변경도 충돌로 보고된다. 문항은 검수 큐 승인도 표지를 채워 이후 재적재 시 충돌 보고가 늘 수 있다. 통합 테스트는 `backend-migrations` 잡에서만 실제 실행된다(그 잡은 이 세션에서 pgvector 부재로 재현하지 못했다 — 마이그레이션은 임시 PG에서 `upgrade`/`downgrade` 왕복을 직접 검증).
 ### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
 
 - **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.
@@ -541,7 +552,7 @@
 - **EOS-105의 "무겁다"는 추정이었고 틀렸다**: 실 PG 600개념·학습자 시도 50/500/5,000건에서 CTE `max_depth=1` p50 2.2~2.4ms, 생산자 전체 p50 5.8/11.1/62.7ms · p95 7.1/13.7/127.8ms. 시간은 CTE가 아니라 학습자 전체 이력을 읽는 `compute_concept_diagnoses`에 비례한다.
 - **지운 것**: 규칙 `R4-prerequisite-gap` · `AttemptEvidence.prerequisite_gap_concept_ids` · 조립기 인자 · `NextActionKind.GO_TO_PREREQUISITE_CONCEPT` · 전이표 `ASSESSING → LEARNING`. **남긴 것**: PG enum 라벨 `POLICY_PREREQUISITE_GAP`(추가 전용 원장 — 지우면 타입 재생성 마이그레이션 + 값이 적힌 행이 있다면 읽기 `LookupError`) → `RETIRED_POLICY_TRIGGERS` 은퇴 표기 + "트리거 전수 = 규칙 트리거 ∪ 은퇴" 동결.
 - **검증**: 단위 285 passed · 실 PG 통합 38 passed(skip 0) · 새 동결 테스트 4종 뮤테이션 4/4 RED(주입마다 의도한 테스트 1건만 실패 · 원복 sha256 동일). `SCENARIO-003 ③`은 "R4 미발화 동결"에서 "R6이고 하강은 추천이 한다"로 승격.
-- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행 0건은 추론이지 실측이 아니다(Kiki가 prod에서 읽기 전용 1줄로 확인 가능 — PR 본문). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
+- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행은 **2026-10-09 Kiki 실측으로 0건**이다(`POLICY_PREREQUISITE_GAP_ROWS=0` · 조회 시점 스냅샷이며 과거 적재 이력의 부재 증명은 아니다 — 삭제권 이행으로 행이 지워졌을 가능성은 배제하지 못함). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖이며, 소유 태스크는 이미 `EOS-144`다. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
 - **교훈(사고 아님)**: 비용 벤치가 같은 DB에 심은 문항 1,800건이 `next-problem` 전역 풀을 오염시켜 통합 5건이 거짓 실패했다 → DB를 새로 만들어 제거 실험으로 확인. 통합 테스트 기본 skip을 통과로 읽을 뻔한 것(69 skipped)은 즉시 플래그를 켜 재실행해 막았다.
 
 ### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
@@ -12261,6 +12272,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
 - **사후 갱신(같은 날)**: PR `#1478`이 닫혀 `friendly-dijkstra-230lnm`(`bcc172a3`)이 고립 브랜치가 됐다. main의 같은 게이트가 `kiki` 서명으로 이미 `cleared`라 14차 배치에 추가했다(총 11건). 증적 문구는 글자 그대로 포함되지 않으며 삭제 근거는 내용 대체다(판정 문서 §5).
 
+## 2026-10-09 OPS-30 — 알림의 마지막 1홉(웹훅 sink) + 외부 업타임 프로브 코드 착지 · 가동은 Kiki 런북 대기
+
+- **결정(채널 1종)**: 알림 채널은 **웹훅 1종**이다. 형식은 Slack Incoming Webhook의 `{"text": ...}`이고 Discord는 URL 끝에 `/slack`을 붙이면 같은 형식을 받는다. 푸시·메일·PagerDuty 다중화는 과공학이라 만들지 않았다. URL 자체가 토큰이라 `Settings.ops_alert_webhook_url`은 `SecretStr`이고(`WHYMATH_OPS_ALERT_WEBHOOK_URL`), 로그·`/health/ready`·프로브 기록·`test-notify` 출력 어디에도 URL을 싣지 않는다.
+- **구조**: 전이 판정(진입·해소 계산)은 `AlertLogNotifier` 한 곳에만 남기고, 새 `ops/alert_delivery.py`의 `WebhookAlertSink`가 계산된 전이를 `sinks=[...]`로 받는다(판정 로직 신설 0). 발송은 별도 데몬 스레드라 요청 경로를 막지 않고, 실패는 예외 타입명·`HTTP<코드>`만 카운터와 로그에 남긴다. 채널 미설정(`unset`)·형식 오류(`invalid`)는 기동 경고와 `/health/ready`의 `alert_delivery.config_state`·`dropped_unconfigured`로 드러난다 — "알림이 없었다"와 "알릴 곳이 없어 못 알렸다"가 같은 화면이 되지 않는다.
+- **외부 업타임 프로브**: `ops/uptime_probe.py`(`probe`·`report`·`test-notify`). up은 HTTP 200 + body `ready=true` + `components` 존재일 때만이고 그 외는 `ConnectError`·`HTTP503`·`BadBody` 등 사유 코드로 down이다(pid 파일·`/health/live` 같은 간접 신호는 쓰지 않는다). 알림은 up→down·down→up 전이 때만 나가고, 발송이 실패하거나 채널이 비어 있으면 기록의 `unsent`에 남아 다음 폴링에서 재시도한다. S4는 창(매일 15:00–24:00 KST) 안 표본만 세고 coverage 90% 미만이면 `INSUFFICIENT`(통과 아님·exit 1)로 판정을 보류한다.
+- **실측(2026-10-09, 로컬 수신기 + 실제 uvicorn 프로세스)**: 정상 3회 → 기록 3줄·수신 0건. 서버 `kill -9` 뒤 프로브 2회 → 첫 폴링 `ConnectError`·`down:sent`, 둘째는 조용(수신 1건). 서버 재기동 → `up:sent`와 "다운 시작 <시각>" 문구. 수신기와 서버를 함께 죽이면 `down:failed:ConnectError`·`unsent=down`이 기록되고 수신기만 복구하면 다음 폴링에서 `down:sent`로 재시도됐다. 서버 내부 경로는 `/boom` 500 3회 → breach 진입 알림 1건(`attempted=1 delivered=1`), 채널 미설정 서버는 같은 조건에서 `dropped_unconfigured=1`과 기동 경고가 남았다.
+- **뮤테이션**: 14종(미설정 위장·드롭 미집계·non-2xx 성공 취급·sink 예외 전파·전이 아닌 매번 호출·ready/components 미검사·다운 지속 시 매번 알림·실패 시 `unsent` 소거·창 경계·coverage 가드·app 미배선·미설정 경고 제거·timeout 제거) 전건 RED. 1회차에 `components` 검사 제거(M13)가 생존했다 — 픽스처에 `{"ready": true}`만 있는 200 응답이 없어 그 절을 밟지 않았던 것이라 반례를 추가해 해소했다.
+- **검증 범위**: 백엔드 전체 스위트(`-m "not corpus_authoring" -n 4 --dist loadfile`) 18548 passed·`BACKEND_RC=0`, `tests/infra` 2961 passed·`INFRA_RC=0`, `tests/harness` 2256 passed, ruff·black(`--line-length 100`)·`mypy --strict`·`lint-imports` 통과, `declared_unwired_audit`·`check_runbook_blocks`·`cp949_guard`·`provenance_audit`·`check_provider_seat_contract`·`audit_ratchet`(단계 2·차단 0건) 통과. CI가 처음 잡은 것은 **신규 모듈 2개의 EOS 인벤토리 미귀속**(`WM-O-903`에 귀속)과 **`ops.uptime_probe`의 미도달 의도 선언 부재**(`by-design` 선언)였고 둘 다 해소했다.
+- **정직한 공백(이 태스크가 닫지 않은 것)**: ①웹훅 URL 연결과 작업 스케줄러 등록은 아직 안 했다 — Kiki 런북 `docs/ops/ops30_uptime_probe_runbook.md` [B]~[D]. 그 전에는 S4가 계속 미측정이고 서버가 죽어도 아무도 모른다. ②실제 Slack/Discord 도달은 확인하지 못했다(로컬 HTTP 수신기로 대역 — 2xx 응답까지만 기계 판정, 채널에서 메시지가 보이는지는 [C]에서 눈으로 본다). ③런북의 PowerShell 블록은 Linux 세션에서 실행해 보지 못했다(`check_runbook_blocks.py`는 통과·가드 제거 사본은 위반으로 잡힘). 스케줄러가 User 환경변수를 상속하는지는 [E]의 `LAST_CHANNEL`이 가른다. ④프로브가 서버와 같은 PC에서 돌아 PC가 꺼지면 '다운'이 아니라 '기록 없음'(S4 `INSUFFICIENT`)으로 남는다 — 별도 호스트 프로브는 범위 밖. ⑤`ops/observation_report_runner.py`·`l2/calibrate_items.py`·`deployment_cd_runbook.md`가 "리포트·보정 신호의 채널 전달은 OPS-30 몫"이라 적고 있으나 이 태스크의 acceptance는 서비스 알림·업타임 두 홉이다 — 러너 docstring은 정정했고 나머지 둘의 소유자 재지정은 미처리다(채널 함수 `send_webhook`은 이제 재사용 가능).
 ## 2026-10-09 QUAL-15·OPS-123 회수 — 고립 구현 2건을 main 위에 파일 단위로 이식 · 브랜치 테스트 결함 2건 수정 · 격리 미적용 4곳 승계 등재
 
 판정 기준: main `594ce16b` + 브랜치 `claude/qual-15ops-123-kkj3nz`(미머지). 상세·표·수치는 `docs/reviews/qual15_ops123_recovery_2026-10-09.md`.

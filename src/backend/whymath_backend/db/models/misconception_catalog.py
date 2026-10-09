@@ -43,6 +43,7 @@ PK 판단(이 모듈의 핵심 결정):
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -50,6 +51,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
+from whymath_backend.db.cms_edit_marker import CMS_EDIT_MARKER
 from whymath_backend.schema.misconception_catalog import (
     MisconceptionCatalog as SchemaMisconceptionCatalog,
 )
@@ -107,6 +109,13 @@ class MisconceptionCatalog(Base):
         ARRAY(sa.Text), nullable=False, server_default=sa.text("'{}'::text[]")
     )
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     # ── 인덱스 (조회 경로 — UNIQUE는 mis_id PK뿐) ────────────────────────
     __table_args__ = (
         # 개념 코드로 카탈로그를 찾는 경로(느슨참조).
@@ -128,8 +137,9 @@ class MisconceptionCatalog(Base):
 
     def to_schema(self) -> SchemaMisconceptionCatalog:
         """영속 ORM → `schema.MisconceptionCatalog`(Pydantic 검증 복원)."""
+        # CMS 편집 표지는 운영 메타라 schema(extra=forbid)에 없다 — 복원 대상에서 뺀다(P3-25).
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaMisconceptionCatalog.model_validate(data)
 
 

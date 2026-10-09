@@ -11,7 +11,9 @@ import pytest
 
 from whymath_backend.schema.enums import ReviewStatus
 from whymath_backend.schema.review_transition import (
+    INITIAL_REVIEW_STATUSES,
     QUARANTINE_REASON_MAX_LENGTH,
+    IllegalInitialReviewStatus,
     IllegalReviewStatusChange,
     IllegalReviewTransition,
     QuarantineReasonRequired,
@@ -20,6 +22,7 @@ from whymath_backend.schema.review_transition import (
     action_for_status_change,
     action_requires_reason,
     allowed_actions,
+    ensure_initial_review_status,
     plan_review_field_change,
     resolve_review_transition,
 )
@@ -305,3 +308,67 @@ def test_reason_limit_is_shared_with_the_transition_route_schema() -> None:
 
     metadata = AdminReviewTransitionRequest.model_fields["reason"].metadata
     assert any(getattr(m, "max_length", None) == QUARANTINE_REASON_MAX_LENGTH for m in metadata)
+
+
+# ── ADMIN-19: 생성 시점의 초기 상태 ────────────────────────────────────────────────
+
+#: 요청 상태 → 허용 여부. 5칸 전수를 손으로 적는다(허용 2 · 불허 3) — `INITIAL_REVIEW_STATUSES`에서
+#: 파생하면 집합에 한 칸을 잘못 넣어도 테스트가 같이 따라가 통과한다(동어반복).
+_INITIAL_EXPECTED: list[tuple[ReviewStatus | None, bool]] = [
+    (N, True),
+    (P, True),
+    (A, False),
+    (R, False),
+    (Q, False),
+]
+
+
+def test_initial_expected_table_shape_is_5_cells_with_2_allowed() -> None:
+    """픽스처 자체의 변별력 — 상태 5종 전부를 한 번씩 덮고 허용은 정확히 2칸."""
+    assert len(_INITIAL_EXPECTED) == 5
+    assert len({s for s, _ in _INITIAL_EXPECTED}) == 5
+    assert sum(1 for _, ok in _INITIAL_EXPECTED if ok) == 2
+
+
+@pytest.mark.parametrize(
+    ("requested", "allowed"),
+    _INITIAL_EXPECTED,
+    ids=[("미설정" if s is None else s.value) for s, _ in _INITIAL_EXPECTED],
+)
+def test_initial_status_cell(requested: ReviewStatus | None, allowed: bool) -> None:
+    if allowed:
+        ensure_initial_review_status(requested)
+    else:
+        with pytest.raises(IllegalInitialReviewStatus) as excinfo:
+            ensure_initial_review_status(requested)
+        assert excinfo.value.requested is requested
+
+
+def test_initial_statuses_constant_matches_the_hand_written_table() -> None:
+    """상수와 손으로 적은 표가 같은 집합이다 — 어느 한쪽만 바뀌면 여기서 갈라진다."""
+    assert INITIAL_REVIEW_STATUSES == {s for s, ok in _INITIAL_EXPECTED if ok}
+
+
+def test_every_non_initial_status_is_reachable_only_through_the_transition_table() -> None:
+    """생성이 막은 3상태는 전부 전이표의 도착 상태로 *도달 가능*하다 — 막은 것이 정책 공백이 아님.
+
+    approved·rejected(pending에서 도착)·quarantined(approved에서 도착)가 모두 표의 도착점이라,
+    생성을 막아도 검수가 이 상태들로 가는 길은 열려 있다.
+    """
+    non_initial = {ReviewStatus.approved, ReviewStatus.rejected, ReviewStatus.quarantined}
+    reachable = {
+        resolve_review_transition(src, action)
+        for src in (P, A, R, Q)
+        for action in allowed_actions(src)
+    }
+    assert non_initial <= reachable
+
+
+def test_illegal_initial_error_code_is_a_literal_and_the_message_names_the_way_out() -> None:
+    """응답 계약의 코드 문자열은 리터럴로 동결하고, 메시지는 허용 값과 정식 경로를 알려 준다."""
+    assert IllegalInitialReviewStatus.code == "illegal_initial_status"
+    message = str(IllegalInitialReviewStatus(A))
+    assert "approved" in message
+    assert "pending" in message
+    assert "전이" in message
+    assert "미설정" in str(IllegalInitialReviewStatus(None))

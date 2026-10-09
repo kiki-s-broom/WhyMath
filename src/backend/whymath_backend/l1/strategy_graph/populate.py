@@ -21,6 +21,7 @@ import argparse
 from pathlib import Path
 
 from whymath_backend.config import get_settings
+from whymath_backend.db.cms_edit_marker import add_overwrite_argument, conflict_summary
 from whymath_backend.l1.strategy_graph.strategy_node_projection import (
     load_strategies_from_graph_json,
     populate_strategy_nodes,
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         default=_DEFAULT_GRAPH_PATH,
         help=f"strategy_graph transform-v1 산출 graph.json 경로(기본 {_DEFAULT_GRAPH_PATH}).",
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args(argv)
 
     graph_path: Path = args.graph
@@ -57,8 +59,16 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = get_settings()
     records = load_strategies_from_graph_json(graph_path)
-    count = populate_strategy_nodes(records, settings=settings)
+    conflicts: list[str] = []
+    count = populate_strategy_nodes(
+        records,
+        settings=settings,
+        overwrite_cms_edits=args.overwrite_cms_edits,
+        conflicts=conflicts,
+    )
     print(f"전략 메타 프로젝션 적재 완료: {count}건 (graph={graph_path}).")
+    if conflicts:
+        print(conflict_summary(conflicts))
     return 0
 
 
