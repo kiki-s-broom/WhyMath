@@ -52,6 +52,20 @@ DEFAULT_PROPOSAL_PATH: Final[Path] = Path(
 #: 제안 엣지의 출처 표기 — 기존 원자 백본 엣지("원자 백본 v1")와 구분되어야 출처 추적이 된다.
 PROPOSAL_EVIDENCE: Final[str] = "S4-01 고→대 경계 저작 v1"
 
+#: 정본(`AtomEdge`)에 실리는 필드 = 원장 레코드에서 `rationale`만 뺀 집합. 병합 모듈이 이 목록으로
+#: 정본 레코드를 만들고, 검증기가 같은 목록으로 병합 결과와 원장의 일치를 대조한다(한 곳에서 정의).
+MERGED_EDGE_FIELDS: Final[tuple[str, ...]] = (
+    "from_code",
+    "from_name",
+    "to_code",
+    "to_name",
+    "relation",
+    "relation_subtype",
+    "school_link",
+    "strength",
+    "evidence",
+)
+
 #: 허용 과목 계열표(subject_coherence·**warning 전용**). "고등 과목 → 대학 과목"이 교육적으로
 #: 자연스러운 계승 쌍인지 보는 *휴리스틱*이지 엣지 채택 기준이 아니다(채택은 사람 저작·검수).
 #: 여기 없는 쌍은 "틀렸다"가 아니라 "검수자가 한 번 더 보라"는 신호다.
@@ -87,6 +101,8 @@ class CrossBandValidationReport:
 
     proposal_count: int = 0
     existing_edge_count: int = 0
+    #: 정본에 이미 병합돼 있는 제안 엣지 수(병합 전 0 · 병합 후 = 제안 건수).
+    already_merged_count: int = 0
     issues: list[ValidationIssue] = field(default_factory=list)
     #: 요약 첫머리 표기 — 같은 리포트 형태를 쓰는 다른 제안 검증기(대학 과목간 등)가 덮어쓴다.
     label: str = "경계 엣지 제안 검증"
@@ -122,7 +138,8 @@ class CrossBandValidationReport:
         verdict = "PASS" if self.success else "FAIL"
         return (
             f"{self.label}[{verdict}]: 제안 {self.proposal_count}건, "
-            f"기존 엣지 {self.existing_edge_count}건, "
+            f"기존 엣지 {self.existing_edge_count}건(병합 전 뷰), "
+            f"정본에 병합됨 {self.already_merged_count}건, "
             f"error {len(self.errors)}개, warning {len(self.warnings)}개"
         )
 
@@ -201,6 +218,15 @@ def _existing_pairs(graph: Mapping[str, Any]) -> list[tuple[str, str]]:
     ]
 
 
+def _merged_edges_by_pair(graph: Mapping[str, Any]) -> dict[tuple[str, str], Mapping[str, Any]]:
+    """정본 안의 출처 태그(`PROPOSAL_EVIDENCE`) 엣지 → (from, to) 인덱스(= 이미 병합된 엣지)."""
+    return {
+        (str(e["from_code"]), str(e["to_code"])): e
+        for e in graph.get("edges", [])
+        if e.get("evidence") == PROPOSAL_EVIDENCE
+    }
+
+
 def proposal_edges(proposal: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """제안 파일 payload → 엣지 레코드 목록(`edges` 키·`_meta` 제외)."""
     edges = proposal.get("edges", [])
@@ -218,7 +244,12 @@ def validate_cross_band_edges(
     어떤 파일도 쓰지 않는다(판정 전용). 성공 기준은 error 0건.
     """
     nodes = _node_index(graph)
-    existing = _existing_pairs(graph)
+    # 병합 전·후 양쪽에서 같은 판정이 나오도록, 정본 안의 *출처 태그 엣지*(이미 병합된 이 제안의
+    # 엣지)는 "기존 엣지"에서 뺀 병합 전 뷰로 판정한다. 태그가 같다고 무조건 면제하지 않는다 —
+    # 원장 레코드와 필드가 같은지(merged_edge_mismatch)·원장에 없는 태그 엣지가 없는지
+    # (merged_edge_orphan)를 아래에서 따로 검사한다.
+    merged_in_graph = _merged_edges_by_pair(graph)
+    existing = [p for p in _existing_pairs(graph) if p not in merged_in_graph]
     existing_set = set(existing)
     report = CrossBandValidationReport(
         proposal_count=len(edges),
@@ -306,6 +337,25 @@ def validate_cross_band_edges(
             )
         mergeable_pairs.append(pair)
 
+        # 4-b. merged_edge_mismatch (error) — 이미 병합된 엣지는 원장과 스키마 호환 필드가 같아야 한다.
+        merged_edge = merged_in_graph.get(pair)
+        if merged_edge is not None:
+            report.already_merged_count += 1
+            diffs = [
+                key
+                for key in MERGED_EDGE_FIELDS
+                if key in record and merged_edge.get(key) != record.get(key)
+            ]
+            if diffs:
+                report.issues.append(
+                    ValidationIssue(
+                        severity=_ERROR,
+                        ref=ref,
+                        rule="merged_edge_mismatch",
+                        detail=f"정본에 병합된 엣지가 원장과 다름 — 필드: {', '.join(diffs)}",
+                    )
+                )
+
         # 5. relation_prerequisite_only (error) — 관계 타입 단일(폭발 금지).
         relation = str(record.get("relation", ""))
         if relation != AtomRelation.PREREQUISITE.value:
@@ -351,6 +401,17 @@ def validate_cross_band_edges(
                         ),
                     )
                 )
+
+    # 4-c. merged_edge_orphan (error) — 출처 태그를 단 정본 엣지가 원장에 없다(근거 추적 불가).
+    for orphan in sorted(set(merged_in_graph) - seen_in_proposal):
+        report.issues.append(
+            ValidationIssue(
+                severity=_ERROR,
+                ref=f"{orphan[0]}→{orphan[1]}",
+                rule="merged_edge_orphan",
+                detail="정본 엣지가 출처 태그를 달았지만 근거 원장(제안 파일)에 없음",
+            )
+        )
 
     # 8. acyclic_when_merged (error) — 제안 + 기존 엣지 병합 시 DAG 유지.
     cycle = _find_prerequisite_cycle(existing + mergeable_pairs)
@@ -416,6 +477,7 @@ __all__ = [
     "ALLOWED_SUBJECT_PAIRS",
     "DEFAULT_GRAPH_PATH",
     "DEFAULT_PROPOSAL_PATH",
+    "MERGED_EDGE_FIELDS",
     "PROPOSAL_EVIDENCE",
     "CrossBandValidationReport",
     "proposal_edges",

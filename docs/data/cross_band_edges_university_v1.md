@@ -1,18 +1,19 @@
 # 고등→대학 경계 엣지 제안 v1 (S4-01 슬라이스 1)
 
-> **상태: 제안(proposal) — AI 검수 통과(2026-10-08 · Kiki 지시로 사람 검수 대체) · 정본 미병합.**
+> **상태: 병합 완료(2026-10-09 · S4-60) — 정본 `graph.json`에 24건 반영.**
 > 검수 기록 = `docs/data/ai_review_cross_band_edges_university_v1.md` (24건 존치 · 출발 원자 4건 교체 · 반려 0).
-> 이 문서가 설명하는 24건은
-> `data/corpus/atom_graph_v1/cross_band_edges_university_v1.json`에만 존재하며,
-> 정본 `data/corpus/atom_graph_v1/graph.json`은 **무변경**이다.
-> 병합 조건은 아래 §5.
+> 병합 방식 = **근거 원장 분리(§5 결정 ⒞)**: 정본의 24건은 `AtomEdge` 호환 필드만 갖고
+> (`evidence = "S4-01 고→대 경계 저작 v1"`), 교육적 근거(`rationale`)는
+> `data/corpus/atom_graph_v1/cross_band_edges_university_v1.json`(원장)에만 있다.
+> 이 문서 §1~§4는 병합 *전* 착수 시점 실측과 설계다 — 현재 값은 §4 오른쪽 열(병합 후)이다.
 
 - 태스크: `S4-01-math-k12-complete` (슬라이스 1)
 - 검수 게이트: `G-s401-uni-boundary-edge-review` (교육적 타당성 — 2026-10-08 AI 검수로 판정)
 - 생성 스크립트: `scripts/build_cross_band_edges_s4_01.py` (결정론·멱등)
 - 검증기: `src/data-pipeline/data_pipeline/atom_graph/cross_band_edges.py`
 - 테스트: `tests/data_pipeline/atom_graph/test_cross_band_edges.py`
-- 전제 정본 스냅샷: `graph.json` sha256 `1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f`
+- 병합 직전 정본 스냅샷(= 원장 `source_graph_sha256`): `graph.json` sha256 `1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f`
+- 병합 모듈: `src/data-pipeline/data_pipeline/atom_graph/cross_band_edges_merge.py` (테스트 `tests/data_pipeline/atom_graph/test_cross_band_edges_merge.py`)
 
 ---
 
@@ -85,24 +86,46 @@
 | 고등→대학 엣지 | 0 | 24 |
 | 경계로 진입 가능한 대학 과목 | 0 | 6 (미적분학 I·II · 해석학 I · 선형대수학 I · 집합과 논리 · 확률론) |
 
+> **병합 후 실측(2026-10-09, S4-60)**: 엣지 2,234 · 경계 통과 44(**1.97%**) · 고→대 24 · K-12에서
+> 도달 가능한 대학 세부개념 **198/512**(독립 BFS와 `cross_school_connectivity_report` 일치) ·
+> 기존 `validate.py` error 0(`prerequisite_cycle` 0 · `dangling_edge_endpoint` 0). 위 기대값과
+> 일치했고 사후에 맞춘 수치는 없다.
+>
 > 분모 주의: 병합 후 비율은 **44/2,234 = 1.97%**다. 착수 메모에 적힌 "1.99%"는 분모를 현재
 > 엣지 수(2,210)로 고정했을 때의 값(44/2,210)이다 — 제안 24건이 분모에도 더해지므로 실제
 > 병합 후 값은 1.97%다. 어느 쪽이든 "경계는 여전히 2% 미만의 희소 면"이라는 판정은 같다.
 
-## 5. 정본 병합 조건 (아직 병합하지 않는 이유)
+## 5. 정본 병합 (S4-60 · 2026-10-09 완료)
 
 기계 검증(§6)은 **구조**만 판정한다 — "이 엣지가 교육적으로 옳은가"는 기계 증명 대상이 아니다.
-따라서 다음 두 조건이 모두 충족돼야 정본에 병합한다.
+병합 조건 두 가지가 모두 충족돼 병합했다.
 
-1. **검수 승인** — 게이트 `G-s401-uni-boundary-edge-review`. ✅ 2026-10-08 AI 검수로 충족(Kiki 지시로 사람 검수 대체). 부분 승인(일부 엣지 반려)이
-   정상 결과이며, 반려분은 제안 파일에서 제거한 뒤 재생성한다(저작 목록은 스크립트 상수가 정본).
-2. **병합 시 스키마 처리** — `AtomEdge` 모델은 `extra="forbid"`라 `rationale` 필드를 그대로
-   받지 못한다. 병합 세션은 ⒜ `rationale`을 `evidence`에 합성해 넣거나 ⒝ 모델에 필드를
-   추가하거나 ⒞ 제안 파일을 근거 원장으로 남기고 정본에는 스키마 호환 필드만 넣는 셋 중
-   하나를 **명시적으로 결정**해야 한다. 이 슬라이스는 그 결정을 하지 않는다.
+1. **검수 승인** — 게이트 `G-s401-uni-boundary-edge-review` ✅ 2026-10-08 AI 검수로 충족(Kiki 지시로
+   사람 검수 대체 · 24건 전건 존치, 반려 0). 부분 승인이 정상 결과였으나 이번에는 전건 존치였다.
+2. **스키마 처리 — 결정 ⒞(근거 원장 분리).** `AtomEdge`는 `extra="forbid"`라 `rationale`을 받지
+   못한다. 세 안 중 ⒞를 골랐다. 근거(실측):
+   - DB 적재 경로(`l1/atom_graph/atom_backend_edge.py`)는 `evidence`를 **읽지 않는다**(슬롯 부재).
+     ⒜(근거를 evidence에 합성)는 아무도 읽지 않는 산문을 4.9MB 정본에 얹고, `evidence`가 가진
+     "출처 태그" 의미(기존 `원자 백본 v1`과의 구분)를 흐린다.
+   - ⒝(모델 필드 추가)는 `AtomEdge` + DB 컬럼(마이그레이션) + 적재기 + prod 재적재까지 번진다.
+     소비자가 없는 필드를 먼저 만드는 셈이라 24건에는 파급이 과하다.
+   - ⒞는 2026-07-28 중복 원자 병합(`dedup_merges_v1.json` 원장 + `_provenance.json` 기록)과 같은
+     형태다. 정본의 `evidence`는 깨끗한 태그로 남고, 태그 ↔ 원장 1:1 대응은 검증기가 기계로 지킨다.
+   - **재검토 조건**: `rationale`을 읽는 소비자(학생 화면의 "왜 선수인가" 설명 등)가 생기면 ⒝를
+     그때 연다. 원장이 근거의 정본이므로 그 시점의 이관 입력은 이미 구조화돼 있다.
 
-병합은 **별도 세션 소관**이다. 그때 `_meta.source_graph_sha256`이 당시 `graph.json`과 다르면
-정본이 그 사이 바뀐 것이므로 재검증부터 한다.
+**병합 절차(재현 가능)**: 원장 `source_graph_sha256` ≟ 병합 직전 정본 sha256 → 검증기 error 0 →
+레코드마다 `AtomEdge.model_validate`(호환 증명) → `graph.json` edges **끝에 덧붙임**(기존 2,210건
+순서·내용 불변, diff = +264줄·삭제 0) → `_provenance.json`에 `cross_band_edges_university_merge_v1`
+기록 + `edge_counts.atom_id_edges` 2,234. 실행: `python -m data_pipeline.atom_graph.cross_band_edges_merge`
+(이미 병합돼 있으면 쓰지 않는다 · `--check`는 쓰지 않고 정합만 판정).
+
+**되돌리기**: 태그 엣지를 빼면 병합 직전 정본이 바이트 단위로 복원된다
+(`pre_merge_view` — 복원본 sha256이 `1821d31c…`임을 테스트가 동결).
+
+**후속 영향(이 병합이 바꾼 것)**: 정본 엣지 수를 고정한 테스트·보고서 핀(2,210→2,234 · 경계 20→44 ·
+고→대 0→24 · 순서화 모집단 356→380)을 같은 변경에서 갱신했다. **prod DB(`whymath-pg`)는 아직 2,210건이다** —
+정본 → DB 반영은 별도 적재(populate) 동작이며 이 병합의 범위 밖이다.
 
 ## 6. 기계 검증
 
@@ -114,6 +137,8 @@ python -m data_pipeline.atom_graph.cross_band_edges \
 ```
 
 exit 0 = error 0건(성공), exit 1 = error 1건 이상. 검증기는 **읽기 전용**이다(어떤 파일도 쓰지 않는다).
+병합 *전·후* 정본 양쪽에서 같은 판정이 나온다 — 정본 안의 출처 태그 엣지는 "기존 엣지"에서 빼고 보며,
+면제가 아니라 원장과 대조한다(`merged_edge_mismatch`·`merged_edge_orphan`).
 
 | 규칙 | 심각도 | 무엇을 막는가 |
 |---|---|---|
@@ -124,9 +149,11 @@ exit 0 = error 0건(성공), exit 1 = error 1건 이상. 검증기는 **읽기 �
 | `acyclic_when_merged` | error | 병합 시 순환 선수관계 발생(= 학습 경로 구성 불능) |
 | `relation_prerequisite_only` | error | `prerequisite` 외 관계 타입 유입(관계 타입 폭발) |
 | `rationale_present` | error | 교육적 근거 없는 엣지 |
+| `merged_edge_mismatch` | error | 정본에 병합된 엣지가 원장 레코드와 다른 것(한쪽만 수정) |
+| `merged_edge_orphan` | error | 출처 태그를 단 정본 엣지가 원장에 없는 것(근거 추적 불가) |
 | `subject_coherence` | **warning** | 계열이 낯선 과목 쌍 — 차단이 아니라 검수자 확인 신호 |
 
-**현재 판정: error 0건 · warning 0건 (제안 24건 전건 통과).**
+**현재 판정: error 0건 · warning 0건 (24건 전건 통과 · 정본에 병합됨 24건).**
 
 검증기 자체의 변별력은 테스트가 증명한다 — 뮤테이션 9종(존재하지 않는 code · 방향 역전 ·
 대학→대학 · 컨테이너 code · 제안 내부 중복 · 정본 중복 · 병합 사이클 · 빈 근거 · 외래 relation)

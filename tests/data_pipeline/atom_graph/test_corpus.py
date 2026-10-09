@@ -23,7 +23,8 @@ class TestCorpusCounts:
 
     def test_edge_counts(self, corpus_provenance: dict[str, object]) -> None:
         ec = corpus_provenance["edge_counts"]  # type: ignore[index]
-        assert ec["atom_id_edges"] == 2210
+        # 2210(백본 v1) + 24(S4-60 고→대 경계 병합 · cross_band_edges_university_merge_v1)
+        assert ec["atom_id_edges"] == 2234
         assert ec["narrative_edges_raw"] == 1007
 
     def test_university_atoms(self, corpus_provenance: dict[str, object]) -> None:

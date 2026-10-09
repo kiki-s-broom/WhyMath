@@ -336,12 +336,18 @@ def test_main_writes_json_artifact(tmp_path: Path) -> None:
 # 7. 실 코퍼스 — acceptance① 정확 재현(임계값 단언·회귀 감시)
 # ──────────────────────────────────────────────────────────────────────────
 def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
-    """2,683노드/2,210엣지 원자 백본에서 D1이 주장한 수치를 정확히 재현(또는 반증)한다.
+    """2,683노드/2,234엣지 원자 백본(S4-60 병합 후)의 순서화 수치를 정확히 재현한다.
 
-    acceptance① — 직접선수 분포(915/1412/278/70/8)·population 356·depth1 순서화 96/356(27.0%).
-    부수로 D3가 인용한 depth5 전이 수치(249/356·69.9%·201/48/107)도 함께 재확인하고, 직접 축이
-    깊이와 무관하게 상수(96)임을 depth5 행에서도 재확인해 변별력⑤(두 축이 다른 값)를 실 코퍼스
-    수준에서 봉인한다.
+    acceptance① — 직접선수 분포(915/1388/302/70/8)·population 380·depth1 순서화 96/380(25.3%).
+    부수로 depth5 전이 수치(254/380·66.8%·206/48/126)도 함께 재확인하고, 직접 축이 깊이와
+    무관하게 상수(96)임을 depth5 행에서도 재확인해 변별력⑤(두 축이 다른 값)를 실 코퍼스 수준에서
+    봉인한다.
+
+    **S4-60 병합 전 값**(D1 원 주장): 2,210엣지·915/1412/278/70/8·population 356·96/356(27.0%)·
+    depth2 168·depth5 249/356(69.9%)·201/48/107. 병합이 바꾼 것은 설명 가능하다 — 신규 고→대
+    24건이 서로 다른 대학 노드 24곳에 하나씩 닿아 직접 선수 1개짜리(1412→1388)가 2개짜리
+    (278→302)가 됐고 모집단이 +24 됐다. 새 24곳은 직접 축에서 전부 병렬(260→284)이라 직접 축
+    순서화 96은 불변이며, 병합 전후 in-degree 분포를 독립 계산한 값과 대조해 확정했다.
     """
     if not lpo.DEFAULT_CORPUS_PATH.is_file():
         pytest.skip("data/corpus/atom_graph_v1/graph.json 미존재")
@@ -351,9 +357,9 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     report = lpo.build_report(graph)
 
     assert report.corpus_concept_total == 2683
-    assert report.corpus_edge_total == 2210
-    assert report.direct_predecessor_distribution == {0: 915, 1: 1412, 2: 278, 3: 70, 4: 8}
-    assert report.population_size == 356
+    assert report.corpus_edge_total == 2234
+    assert report.direct_predecessor_distribution == {0: 915, 1: 1388, 2: 302, 3: 70, 4: 8}
+    assert report.population_size == 380
 
     def _cell(depth: int, axis: str) -> lpo.DepthAxisSummary:
         return next(c for c in report.cells if c.depth == depth and c.axis == axis)
@@ -361,32 +367,32 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     depth1_direct = _cell(1, "direct")
     assert depth1_direct.orderable_count == 96
     assert depth1_direct.orderable_rate is not None
-    assert round(depth1_direct.orderable_rate, 3) == round(96 / 356, 3)
+    assert round(depth1_direct.orderable_rate, 3) == round(96 / 380, 3)
     depth1_direct_determinism = (
         depth1_direct.full_count,
         depth1_direct.partial_count,
         depth1_direct.parallel_count,
     )
-    assert depth1_direct_determinism == (64, 32, 260)
+    assert depth1_direct_determinism == (64, 32, 284)
 
     depth1_trans = _cell(1, "transitive")
     assert depth1_trans.orderable_count == 96  # 1홉 전이 == 직접(구조적으로 동일).
 
     depth2_trans = _cell(2, "transitive")
-    assert depth2_trans.orderable_count == 168
+    assert depth2_trans.orderable_count == 170
     assert (depth2_trans.full_count, depth2_trans.partial_count, depth2_trans.parallel_count) == (
-        130,
+        132,
         38,
-        188,
+        210,
     )
 
     depth5_trans = _cell(5, "transitive")
-    assert depth5_trans.orderable_count == 249
-    assert round(depth5_trans.orderable_rate or 0.0, 3) == round(249 / 356, 3)
+    assert depth5_trans.orderable_count == 254
+    assert round(depth5_trans.orderable_rate or 0.0, 3) == round(254 / 380, 3)
     assert (depth5_trans.full_count, depth5_trans.partial_count, depth5_trans.parallel_count) == (
-        201,
+        206,
         48,
-        107,
+        126,
     )
 
     # 직접 축은 깊이 무관 상수 — depth5 행에서도 96 그대로(변별력⑤: 두 축이 다른 값을 낸다).

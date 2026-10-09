@@ -66,7 +66,7 @@ class TestRealCorpusSmoke:
             crosswalk=_CORPUS / "concept_atom_crosswalk_v1" / "crosswalk.jsonl",
         )
         assert report.atom_count == 1823  # 세부개념만(단원·소단원 제외 — 엣지 우주)
-        assert report.edge_count == 2210
+        assert report.edge_count == 2234  # 2210 + S4-60 고→대 경계 24(신규 엣지는 blocking 무관)
         assert report.blocking_total == 344
         assert report.success and report.cycle is None
         # concept_src_id 843/843 해석 가능 실측의 blocking 부분집합 — 조인 실패 0.
