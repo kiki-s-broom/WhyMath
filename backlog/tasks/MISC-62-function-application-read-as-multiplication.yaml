@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-62-function-application-read-as-multiplication
+title: "함수 적용 f(x)가 곱셈 f*x로 읽힘 — 동치 권위(_PARSE_TRANSFORMS)의 거짓 양성(identity_status('f(x)','f*x')=identity)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - MISC-33-implicit-multiplication-parse-gap
+requires_gates: []
+acceptance:
+  - "① 표기 정책을 먼저 정한다 — 함수 적용 `f(x)`를 곱 `f*x`와 구별하려면 어떤 이름을 함수로 읽을지(예: 단일 문자 f·g·h 뒤 괄호) 정책이 필요하다. `docs/architecture/notation_contract.md`는 함수 적용 `f(x)`를 규정하지 않으므로(MISC-33 실측 2026-10-08) 정책을 그 문서에 먼저 적는다. 학생 입력에서 `x(x+1)`은 곱이고 `f(x+1)`은 함수 적용이라 이름만으로는 가를 수 없다 — 정책 결정은 Kiki 판단 사항이다.\n② 정책에 따라 `l3/symbolic_equivalence.py`의 `_PARSE_TRANSFORMS`를 고쳐 `identity_status('f(x)', 'f*x')`가 identity가 아니게 한다. 원인 가설(실측으로 확정 필요): `auto_symbol`이 만든 `Function('f')`를 `implicit_multiplication`이 함수 뒤 괄호로 보고 `*`를 끼워 넣는 상호작용.\n③ MISC-33이 남긴 계약 테스트 `test_function_application_is_read_as_multiplication_known_limitation`(tests/backend/l3/test_symbolic_equivalence.py)이 현재 동작을 동결해 두었으므로, 고치면 그 테스트가 RED가 된다 — 그때 한계 테스트를 구별한다는 단언으로 뒤집는 것까지가 범위다.\n④ `identity_status`·`identity_status_detail` 소비처 전건(verify_step·verify_final_answer·solution_set·slot_generator·subject_adapter_math·selective_grading_demotion_eval·wrong_form_match·카탈로그 무결성)에 대조군을 두고, 회귀 판정은 백엔드 전체 스위트로 한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/symbolic_equivalence.py
+session: null
+notes: "MISC-33 착수 중 실측으로 발견(2026-10-08). `identity_status('f(x)', 'f*x')`가 identity를 돌려준다 — 함수 적용을 곱셈과 같다고 보는 거짓 양성이 동치 권위에 이미 있다. 같은 파서(`_PARSE_TRANSFORMS`)로 `safe_parse_expr('f(x)+1')`은 `f*x + 1`을 낸다. 비교: 변환 없는 `safe_sympify('f(x)+1', convert_xor=True)`는 `f(x) + 1`(함수)로 읽는다. 내장 함수 `sin(x)`는 정상이고 미지 이름 f·g에서만 생긴다. 원인 가설은 auto_symbol이 만든 Function 토큰을 implicit_multiplication이 곱 대상으로 보는 상호작용이다.\n\nMISC-33에서 고치지 않은 이유: 파서 변환을 바꾸면 identity_status 소비처 전체의 판정이 움직이고, f(x)와 x(x+1)을 가르는 표기 정책은 코드가 아니라 결정 사항이다. MISC-33은 이 결함을 늘리지도 줄이지도 않으며(matches_wrong_form의 구조 파싱이 동치 권위와 같은 읽기로 맞춰질 뿐), 현재 동작을 계약 테스트로 동결해 승계 지점을 기계로 남긴다.\n\n영향 추정(미측정): 학생 답에 f(x) 꼴이 들어가는 문항에서만 발생한다. 빈도는 측정하지 않았다 — 우선순위를 P2로 둔 근거는 추정이며 빈도 실측 후 amend --eos-priority로 재판정한다."
+updated: 2026-10-08

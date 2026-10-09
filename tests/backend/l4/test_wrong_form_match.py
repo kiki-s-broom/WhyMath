@@ -74,6 +74,66 @@ class TestMatchesWrongForm:
         assert matches_wrong_form("x**0", "0", ("a**0", "0")) is False
 
 
+# (암묵 곱셈 lhs, rhs, 같은 수학의 명시 곱셈 lhs, rhs, 기대 판정, 라벨) — MISC-33.
+# 쌍둥이는 **같은 판정**을 받아야 한다. 기대 판정이 True인 행은 거짓 규칙의 인스턴스이고, False인
+# 행은 낙인이 없어야 하는 대조군이다(정답·무관 오답·항등).
+_TWINS: list[tuple[str, str, str, str, bool, str]] = [
+    ("(2x+3)²", "4x²+9", "(2*x+3)²", "4*x²+9", True, "핵심 사례: 계수 병치"),
+    ("(3y+1)²", "9y²+1", "(3*y+1)²", "9*y²+1", True, "다른 변수·계수"),
+    ("(x+2y)²", "x²+4y²", "(x+2*y)²", "x²+4*y²", True, "두 번째 항의 계수"),
+    ("(2x+3y)²", "4x²+9y²", "(2*x+3*y)²", "4*x²+9*y²", True, "두 항 모두 계수"),
+    ("(sin(x)+2x)²", "sin(x)²+4x²", "(sin(x)+2*x)²", "sin(x)²+4*x²", True, "내장 함수 + 계수"),
+    ("(2x+3)²", "4x²+12x+9", "(2*x+3)²", "4*x²+12*x+9", False, "올바른 전개 — 낙인 금지"),
+    ("(2x+3)²", "4x²+10", "(2*x+3)²", "4*x²+10", False, "무관한 오답"),
+    ("(2x+3)²", "(2x+3)(2x+3)", "(2*x+3)²", "(2*x+3)*(2*x+3)", False, "항등 — 가드 ⓪"),
+]
+
+
+class TestImplicitMultiplication:
+    """암묵 곱셈(`2x`)과 명시 곱셈(`2*x`)은 같은 수학이므로 같은 판정을 받는다 (MISC-33).
+
+    과거엔 같은 함수 안에서 ⓪ 가드(`identity_status` — `2x`를 읽음)와 ① 구조 정합(`safe_sympify
+    (convert_xor=True)` — 암묵 곱셈 변환 없음)이 서로 다른 변환 규칙으로 파싱해, 계수가 붙은
+    거짓 규칙 인스턴스가 통째로 미검출이었다. 파서 정의를 동치 권위(`parse_unevaluated`)로
+    일원화해 닫았고, 단언의 형태가 쌍둥이 동등이라는 점이 요점이다.
+    """
+
+    @pytest.mark.parametrize(
+        ("lhs_i", "rhs_i", "lhs_e", "rhs_e", "expected", "label"),
+        _TWINS,
+        ids=[t[-1] for t in _TWINS],
+    )
+    def test_twin_notations_get_the_same_verdict(
+        self, lhs_i: str, rhs_i: str, lhs_e: str, rhs_e: str, expected: bool, label: str
+    ) -> None:
+        assert matches_wrong_form(lhs_e, rhs_e, _DISTRIBUTION) is expected, f"명시: {label}"
+        assert matches_wrong_form(lhs_i, rhs_i, _DISTRIBUTION) is expected, f"암묵: {label}"
+
+    def test_detect_wrong_forms_reads_implicit_multiplication(self) -> None:
+        # 등식 추출 → 정합까지 전 경로로 — 발문이 아니라 학생 풀이 텍스트에서도 잡힌다.
+        assert detect_wrong_forms("(2x+3)² = 4x²+9") == ["distribution-over-power"]
+        assert detect_wrong_forms("(2x+3)² = 4x²+12x+9") == []
+
+    def test_unknown_function_application_known_limitation(self) -> None:
+        """**알려진 한계(숨기지 않는다)**: 미지 함수 `f(x)`를 이항식에 품은 거짓형은 더는 안 잡힌다.
+
+        MISC-33 이전에는 `(f(x)+y)² = f(x)²+y²`가 잡혔다 — 구조 파싱이 `f(x)`를 함수로 읽고,
+        오른쪽 비교는 동치 권위가 같은 문자열을 같은 방식(`f*x**2`)으로 읽어 **우연히** 일치했기
+        때문이다. 구조 파싱을 동치 권위와 같은 규칙으로 맞추자 구조 쪽이 `(f*x + y)**2`로 읽혀
+        기대 우변이 `f**2*x**2 + y**2`로 재직렬화되고, 학생 우변(`f*x**2 + y**2`)과 어긋난다.
+        뿌리는 동치 권위가 `f(x)`를 곱으로 읽는 것(`MISC-62`)이며, 여기서 구조 파싱만 `f(x)`를
+        함수로 읽게 하면 같은 함수 안에서 두 읽기가 다시 갈린다(MISC-33이 닫으려던 바로 그 갈림).
+
+        누락 방향이라 거짓 낙인은 없다 — 아래 올바른 전개 대조군이 이를 보인다. 내장 함수(`sin`)는
+        영향이 없다. 이 단언은 *현재 동작*의 동결이며 `MISC-62`가 고치면 `True`로 뒤집힌다.
+        """
+        assert matches_wrong_form("(f(x)+y)²", "f(x)²+y²", _DISTRIBUTION) is False
+        # 대조군 ①: 내장 함수는 그대로 잡힌다 — 한계가 *미지 이름*에 한정됨.
+        assert matches_wrong_form("(sin(x)+cos(x))²", "sin(x)²+cos(x)²", _DISTRIBUTION) is True
+        # 대조군 ②: 올바른 전개는 어느 쪽이든 낙인이 없다.
+        assert matches_wrong_form("(f(x)+y)²", "f(x)²+2f(x)y+y²", _DISTRIBUTION) is False
+
+
 class TestDetectWrongForms:
     def test_detects_distribution_symbolic(self) -> None:
         assert detect_wrong_forms("(x+y)² = x²+y²") == ["distribution-over-power"]
