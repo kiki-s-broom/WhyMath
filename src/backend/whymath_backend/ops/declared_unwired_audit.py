@@ -244,8 +244,14 @@ def _route_reached(method: str, server_path: str, callers: frozenset[tuple[str, 
 _DART_CALL = re.compile(r"_dio\.(get|post|put|patch|delete)[^(]*\(\s*'([^']*)'", re.DOTALL)
 # python 테스트: `<var>.<method>(f?"<path>...` — 대상은 실제 라우트 접두사로 제한(dict.get 등
 # 무관 호출 오탐 방지).
+#
+# 수신자는 식별자(`client.get(`) **또는 호출 결과**(`_client(u, f).get(` — 앞 호출의 `)`)다.
+# 헬퍼가 클라이언트를 만들어 바로 이어 부르는 형태는 이 저장소 테스트의 흔한 관용구다.
+# 식별자 수신자만 보던 시절에는 그 호출이 통째로 안 보여, 수백 번 호출되는 라우트가
+# 미도달로 잡혔다(P3-12: CMS 라우트 28건). 접두 제한(`/v1/`·`/health`·`/status`)이
+# 무관 호출 오탐을 막는 유일한 방어선이라 수신자를 넓혀도 `make(x).get("키")`는 걸리지 않는다.
 _TEST_CLIENT_CALL = re.compile(
-    r"\b[A-Za-z_][A-Za-z0-9_]*\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
+    r"(?:\b[A-Za-z_][A-Za-z0-9_]*|\))\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
 )
 # `client.request("DELETE", "/v1/me", …)` 변형 — body를 실어야 하는 DELETE(예: 삭제권 confirmation
 # 필드) 등 소수 케이스가 이 형태를 쓴다(`test_me_erasure.py` 실측).
@@ -1321,6 +1327,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # concept-reach(OPS-23)와 달리 mobile-only PR 회귀 가드가 아니라 관측 리포트다.
         "harness.formula_reach_report": _OFFLINE_REPORT,
         "harness.assessment_seat_reach_report": _OFFLINE_REPORT,
+        # PB-10(2026-10-08): 문항 난이도 보정 루프 도달 관측 — assessment_seat_reach_report와
+        # 동일 성격
+        # (DB 읽기 전용 관측 · 게이트 아님 · exit 0/2). 보정 배치 자체는 docker-compose.prod.yml의
+        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결).
+        "harness.item_calibration_reach_report": _OFFLINE_REPORT,
         "harness.recommendation_outcome_report": _OFFLINE_REPORT,
         "harness.learning_path_orderability_report": _OFFLINE_REPORT,
         "harness.rephrased_corpus_hygiene": _OFFLINE_REPORT,

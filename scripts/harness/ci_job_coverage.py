@@ -380,7 +380,11 @@ def describe_job_env(job: dict[str, Any]) -> JobEnv:
         if isinstance(run, str):
             for line in run.splitlines():
                 stripped = line.strip()
-                if re.match(r"^(python\s+-m\s+)?pip\s+install", stripped) or stripped.startswith(
+                # `python`/`python3`/`python3.12 -m pip install` 모두 설치 스텝이다(OPS-59:
+                # 실행기를 `python -m`으로 전환한 뒤 `python3` 표기 잡이 안 읽히던 회귀).
+                if re.match(
+                    r"^(python[\d.]*\s+-m\s+)?pip[\d.]*\s+install", stripped
+                ) or stripped.startswith(
                     ("npm ci", "npm install", "flutter pub get", "pip install")
                 ):
                     env.install_hints.append(stripped[:120])

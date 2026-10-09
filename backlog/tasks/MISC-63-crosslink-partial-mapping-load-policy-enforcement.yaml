@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-63-crosslink-partial-mapping-load-policy-enforcement
+title: "부분매핑·개념겹침 crosslink 적재 자격 코드 집행 — 기본 적재 금지 · 직접매핑 승격(confidence 기입+서명)만 예외 (Kiki 2026-10-09 정책 확정)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 승격 규칙: crosslink_gate.promotion_violations가 status=approved이면서 link_type이 직접매핑이 아닌 행(부분매핑·개념겹침)을 위반으로 열거한다 — 메시지에 예외 경로(직접매핑으로 승격 + confidence ≥ 0.6 기입 후 재서명)를 안내한다. promote_approved는 전건 열거로 실패한다. ② 적재 게이트: load_gate_violations도 직접매핑 아닌 행을 거부한다(promote를 우회한 손수 만든 crosslinks JSON 차단). ③ 테스트: 부분매핑 승인 거부 · 개념겹침 승인 거부 · 직접매핑 0.85 승인 통과(대조군) · 직접매핑 confidence 미기재 거부(기존) · 코퍼스 test_approved_crosslinks_corpus가 전 행 직접매핑을 동결. 각 절마다 그 절만 밟는 반례를 픽스처에 두고 뮤테이션(주입 실재 mutated != original · 바이트 동일 원복)으로 RED를 확인한다. ④ 문서: docs/standards/crosswalk_gate_contract.md에 적재 자격 절을 추가하고 test_crosslink_gate_contract.py가 동결한다. misconception_crosslink_review_dossier.md §1 판정 지침에 부분매핑 처리 한 줄을 병기한다. ⑤ 범위 밖(명시): 검수 큐의 부분매핑 38행·개념겹침 5행은 pending 그대로 둔다(일괄 승격 금지 — 행별 사람 판단). 라이브 DB 정합(M0672 직접 승격 반영 · M0599 행 삭제)은 Kiki 머신 몫이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/misconception/crosslink_gate.py
+  - src/backend/whymath_backend/l4/misconception/crosslink_review.py
+  - docs/standards/crosswalk_gate_contract.md
+  - docs/data/misconception_crosslink_review_dossier.md
+session: null
+notes: |-
+  정책 결정 2026-10-09 Kiki: 부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지). 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다(M0672 선례). 근거 MEMORY 2026-10-09 결정 로그. 선행 결정 MEMORY 2026-10-06(관계 강도는 적재 자격을 자동 결정하지 않는다)을 이 정책이 구체화한다. 코드 정본 위치 l1/misconception/crosslink_gate.py promotion_violations·load_gate_violations.
+
+  [트리거 면제] 정책 코드 집행 등재이며 트리거 검출 대상이 아님
+updated: 2026-10-09

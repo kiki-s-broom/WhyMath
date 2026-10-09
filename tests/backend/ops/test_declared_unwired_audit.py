@@ -114,6 +114,38 @@ class TestCallExtraction:
         entries = dua.test_call_entries(tests_root)
         assert ("DELETE", "/v1/me") in entries
 
+    def test_chained_call_receiver_extracted(self, tmp_path: Path) -> None:
+        """`_client(user, fake).get("/v1/…")` — 헬퍼 호출 결과에 바로 이어 부르는 형태(P3-12).
+
+        식별자 수신자만 보던 때는 이 호출이 통째로 안 보여 수백 번 호출되는 라우트가 미도달로
+        잡혔다. 한 줄형·줄바꿈형·f-string 보간·`.request(` 앞의 변형은 별개 정규식이라 제외.
+        """
+        tests_root = tmp_path / "tests_backend"
+        tests_root.mkdir()
+        (tests_root / "test_x.py").write_text(
+            "def test_foo():\n"
+            '    _client(user, fake).get("/v1/admin/cms/concepts?q=a")\n'
+            "    _client(user, fake).patch(\n"
+            '        "/v1/admin/cms/hint/items/H1", json={"changes": {}}\n'
+            "    )\n"
+            '    _client(user, fake).post(f"/v1/admin/cms/{key}/items/X1/review")\n',
+            encoding="utf-8",
+        )
+        entries = dua.test_call_entries(tests_root)
+        assert ("GET", "/v1/admin/cms/concepts") in entries
+        assert ("PATCH", "/v1/admin/cms/hint/items/H1") in entries
+        assert ("POST", "/v1/admin/cms/{param}/items/X1/review") in entries
+
+    def test_chained_call_with_unrelated_path_not_extracted(self, tmp_path: Path) -> None:
+        """수신자를 넓혀도 접두 제한이 오탐을 막는다 — `make(x).get("키")`는 라우트가 아니다."""
+        tests_root = tmp_path / "tests_backend"
+        tests_root.mkdir()
+        (tests_root / "test_x.py").write_text(
+            'def test_foo():\n    make(payload).get("something")\n    parse(a).get("/other/path")\n',
+            encoding="utf-8",
+        )
+        assert dua.test_call_entries(tests_root) == frozenset()
+
     def test_unrelated_dict_get_not_extracted(self, tmp_path: Path) -> None:
         """`dict.get(...)` 같은 무관 호출이 라우트로 오탐되지 않는다(접두사 제한)."""
         tests_root = tmp_path / "tests_backend"
