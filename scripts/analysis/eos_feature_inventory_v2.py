@@ -1070,6 +1070,10 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
+       # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
+       # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
+       "ops.alert_delivery", "ops.uptime_probe",
        # OPS-53: 패키지 임포트 시 CLI stdout/stderr을 UTF-8로 맞추는 헬퍼 — 운영 CLI의 출력 안전.
        "_stdio", status="Production"),
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",

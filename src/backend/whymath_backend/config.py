@@ -1742,6 +1742,28 @@ class Settings(BaseSettings):
             "판정선이다. 기본 500. WHYMATH_OPS_METRICS_WINDOW_SIZE로 조정."
         ),
     )
+    # OPS-30: 알림의 마지막 1홉 — breach/다운이 로그가 아니라 사람에게 닿는 채널.
+    # URL 자체가 인증 토큰이라(Slack/Discord 수신 웹훅) SecretStr로 받아 repr·로그 노출을 막는다.
+    ops_alert_webhook_url: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            '알림 수신 웹훅 URL(Slack Incoming Webhook 형식 — `{"text": ...}` POST). '
+            "Discord는 웹훅 URL 끝에 `/slack`을 붙이면 같은 형식을 받는다. 빈 값(기본)이면 "
+            "발송 채널 미설정 — breach는 기존 로그 경로에만 남고, 그 사실을 기동 로그·"
+            "/health/ready `alert_delivery.configured=false`가 드러낸다(무증상 no-op 금지). "
+            "WHYMATH_OPS_ALERT_WEBHOOK_URL로 설정."
+        ),
+    )
+    ops_alert_webhook_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=30.0,
+        description=(
+            "알림 웹훅 POST 제한 시간(초). 발송은 별도 스레드라 요청 경로를 막지 않지만 "
+            "멈춘 소켓이 스레드를 영구 점유하지 않게 반드시 건다. 기본 5. "
+            "WHYMATH_OPS_ALERT_WEBHOOK_TIMEOUT_S로 조정."
+        ),
+    )
 
     # ── OPS-17: 클라 버전 계약 게이트 ──
     # 클라(`X-App-Version` 헤더)가 서버 계약과 어긋나는 구버전으로 고착되는 것을 막는 최소
