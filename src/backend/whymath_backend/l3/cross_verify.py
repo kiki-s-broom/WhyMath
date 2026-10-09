@@ -92,9 +92,11 @@ __all__ = [
     "Perspective",
     "PerspectiveVerdict",
     "ResidueSubject",
+    "AuthorDeclarationConflictError",
     "assert_author_independent",
     "deterministic_author",
     "llm_author",
+    "resolve_author_signature",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -204,6 +206,35 @@ def _author_payload(authored_by: str, prefix: str) -> str | None:
         return None
     payload = authored_by[len(prefix) :].strip()
     return payload or None
+
+
+class AuthorDeclarationConflictError(IndependenceError):
+    """저작 선언(`--authored-by`)이 코퍼스가 기록한 서명과 충돌 — 기록을 선언으로 뒤집을 수 없다."""
+
+
+def resolve_author_signature(recorded: str, declared: str | None) -> str:
+    """기록된 서명과 사람의 선언을 합쳐 *가드에 넘길* 서명을 정한다 (PB-17 재판정).
+
+    선언은 **기록 없음(`UNRECORDED_AUTHOR`)만 채운다**. 기록이 있는 레코드를 선언으로 뒤집을 수
+    있으면 LLM 저작분을 `deterministic:`으로 선언해 생성자≠검증자 가드를 우회할 수 있다(종전
+    `declared or recorded`가 그 구멍이었다). 규칙:
+      - 선언 없음(None·공백) → 기록 그대로.
+      - 기록 없음 → 선언으로 채운다.
+      - 기록 있음 + 선언이 같음(표기 차이 무시) → 기록 그대로(무해한 중복).
+      - 기록 있음 + 선언이 다름 → `AuthorDeclarationConflictError`(조용히 무시하지 않고 거부한다 —
+        무시하면 사람은 선언이 먹혔다고 믿고 측정을 해석한다).
+    """
+    if declared is None or not declared.strip():
+        return recorded
+    if recorded == UNRECORDED_AUTHOR:
+        return declared
+    if recorded.strip().casefold() == declared.strip().casefold():
+        return recorded
+    raise AuthorDeclarationConflictError(
+        f"저작 선언({declared!r})이 코퍼스가 기록한 서명({recorded!r})과 충돌한다 — 기록이 있는 "
+        "레코드는 선언으로 덮어쓸 수 없다(선언은 '기록 없음'만 채운다). 선언을 빼거나 "
+        "코퍼스의 기록을 먼저 정정하라."
+    )
 
 
 def assert_author_independent(authored_by: str, verifier_signature: str) -> None:
