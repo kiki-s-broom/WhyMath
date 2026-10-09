@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -15,10 +15,11 @@ requires_gates: []
 acceptance:
   - "cross_verify.py 의 statistical_reconstruction 관점이 LLM 재계산값과 기계값을 float 으로 받아 math.isclose(rel_tol=1e-9, abs_tol=1e-9) 로 대조한다. S4-58 에서 statistical_claim 판정은 정확 유리수로 옮겼으나 이 대조는 float 이라 평균 1조 규모에서 허용 폭이 1000 으로 열리는 대값 왜곡이 동형으로 남아 있다. 기계값을 정확값(StatisticalResult.exact_value, 무리수면 근사)으로 전달하고 LLM 재계산값을 정확 유리수로 읽어 같은 정책(exact 또는 abs)으로 대조한다."
   - "대값(10^12 이상) 평균에서 1 어긋난 LLM 재계산값이 ok 로 통과하던 입력이 defect 가 되는 테스트와, ResidueSubject.machine_value 의 float 호환 계약(기존 소비자) 유지를 함께 확인한다. 뮤테이션으로 가드 RED 를 확인한다."
-artifacts: []
+artifacts:
+  - "PR kiki-s-broom/WhyMath#1552 · 커밋 d1d8d8ba · CI 미러 6잡 전 통과(미실행 0) · 전체 스위트 17474 passed · 뮤테이션 13종 RED"
 paths:
   - src/backend/whymath_backend/l3/cross_verify.py
   - tests/backend/l3/test_cross_verify.py
 session: null
 notes: S4-58 인수 기준 6 에서 분리한 승계 항목. 설계 근거와 수정 전 실측은 docs/architecture/verifier_v2_domains.md 3.7 절의 알려진 한계에 있다.
-updated: 2026-10-08
+updated: 2026-10-09
