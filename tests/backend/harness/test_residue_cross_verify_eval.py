@@ -266,6 +266,22 @@ class GuardedStub(StubVerifier):
         return super().verify(subject)
 
 
+def _strip_author_from_all_records(path: Path) -> None:
+    """모든 레코드에서 `authored_by` 키를 제거 — 서명이 없던 구 코퍼스 상태를 재현한다."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if line.strip():
+            record = json.loads(line)
+            record.pop("authored_by", None)
+            lines[index] = json.dumps(record, ensure_ascii=False)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _legacy(records: list[PilotRecord]) -> list[PilotRecord]:
+    """서명 기록이 없는 구 코퍼스 상태 — 실 코퍼스는 PB-17 백필로 서명이 있으므로 지운다."""
+    return [replace(r, authored_by=UNRECORDED_AUTHOR) for r in records]
+
+
 def _set_author_in_first_record(path: Path, author: str) -> None:
     """코퍼스 JSONL의 첫 레코드에만 `authored_by`를 심는다(나머지는 키 없음 = 기록 없음)."""
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -286,6 +302,9 @@ def test_loader_reads_recorded_author_and_never_fabricates_a_corpus_prefix(tmp_p
     """
     out = tmp_path / "problems.jsonl"
     run_finite_probability_batch(n_per_band=20, out_path=out)
+    _strip_author_from_all_records(
+        out
+    )  # PB-17: 신규 배치는 서명을 찍으므로 구 코퍼스 상태로 되돌린다.
     _set_author_in_first_record(out, "llm:some-model")
 
     loaded = load_pilot_records(out)
@@ -303,7 +322,7 @@ def test_record_without_author_is_independence_unproven_not_a_pass(
     측정이 *시작되기 전에* 멈춘다: 가드가 첫 건에서 발화해 어떤 라벨도 만들지 않는다.
     """
     stub = GuardedStub()
-    report = _run(records, stub)
+    report = _run(_legacy(records), stub)
 
     assert report.outcome == "INDEPENDENCE_UNPROVEN"
     assert not report.passed
@@ -342,6 +361,65 @@ def test_recorded_other_model_or_declared_deterministic_author_passes(
 def test_declared_author_override_fills_a_legacy_corpus(records: list[PilotRecord]) -> None:
     """`--authored-by` 선언 — 기록 없는 구 코퍼스를 사람이 저작 주체를 선언해 돌릴 수 있다."""
     declared = deterministic_author("finite_enumerator")
-    report = _run(records, GuardedStub(), authored_by=declared)
+    report = _run(_legacy(records), GuardedStub(), authored_by=declared)
 
     assert report.outcome == "PASS"
+
+
+# ── ⑦ 저작 서명 백필·선언 좁힘 (PB-17) ────────────────────────────────
+def test_backfilled_real_corpus_runs_without_any_declaration(records: list[PilotRecord]) -> None:
+    """PB-17 목적 — 백필된 실 코퍼스는 `--authored-by` 선언 없이 가드를 통과한다."""
+    assert all(r.authored_by.startswith("deterministic:") for r in records)
+    assert _run(records, GuardedStub()).outcome == "PASS"
+
+
+def test_declaration_cannot_overwrite_a_recorded_llm_author(records: list[PilotRecord]) -> None:
+    """③ 핵심 — 기록된 LLM 저작분을 `deterministic:`으로 선언해 가드를 우회할 수 없다.
+
+    종전 `declared or recorded`는 이 선언이 기록을 덮어써 자기승인 검사를 건너뛰게 했다.
+    기록이 검증자와 같은 모델이라 원래대로면 자기승인으로 거부돼야 하는 상황이다.
+    """
+    llm_recorded = [replace(r, authored_by=_VERIFIER_SIGNATURE) for r in records]
+    stub = GuardedStub()
+    report = _run(llm_recorded, stub, authored_by=deterministic_author("fake"))
+
+    assert report.outcome == "INDEPENDENCE_UNPROVEN"
+    assert "충돌" in report.reasons[0]
+    assert stub.seen == [], "충돌한 측정은 어떤 라벨도 만들지 않는다"
+
+
+def test_declaration_equal_to_the_record_is_harmless(records: list[PilotRecord]) -> None:
+    """대조군 — 기록과 같은 선언은 충돌이 아니다(과잉 거부 방지)."""
+    recorded = [replace(r, authored_by=llm_author("other-model:7b")) for r in records]
+    report = _run(recorded, GuardedStub(), authored_by=llm_author("OTHER-model:7b"))
+    assert report.outcome == "PASS"
+
+
+def test_declaration_only_fills_unrecorded_records_in_a_mixed_corpus(
+    records: list[PilotRecord],
+) -> None:
+    """혼합 코퍼스 — 기록 있는 레코드는 그대로, 기록 없는 레코드만 선언으로 채워진다."""
+    mixed = [
+        (
+            replace(r, authored_by=llm_author("other-model:7b"))
+            if i % 2 == 0
+            else replace(r, authored_by=UNRECORDED_AUTHOR)
+        )
+        for i, r in enumerate(records)
+    ]
+    # 선언이 'other-model:7b'와 다르면 기록 있는 쪽과 충돌한다.
+    conflict = _run(mixed, GuardedStub(), authored_by=deterministic_author("g"))
+    assert conflict.outcome == "INDEPENDENCE_UNPROVEN"
+    # 선언이 기록과 같으면(표기 무시) 기록 없는 쪽은 채워지고 전체가 통과한다.
+    ok = _run(mixed, GuardedStub(), authored_by=llm_author("other-model:7b"))
+    assert ok.outcome == "PASS"
+
+
+def test_fresh_batch_output_carries_deterministic_signature(tmp_path: Path) -> None:
+    """결정론 생성기가 만든 신규 배치는 서명이 찍혀 선언 없이 로더·가드를 지난다(생성 시점 서명)."""
+    out = tmp_path / "problems.jsonl"
+    run_finite_probability_batch(n_per_band=20, out_path=out)
+    fresh = load_pilot_records(out)
+    assert {r.authored_by for r in fresh} == {
+        deterministic_author("finite_probability_skeleton_generator")
+    }

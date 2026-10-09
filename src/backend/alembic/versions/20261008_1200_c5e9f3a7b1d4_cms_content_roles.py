@@ -18,7 +18,7 @@ downgrade: no-op. PG는 enum 값 제거를 지원하지 않아 관례대로 남�
   drop하므로 잔존하지 않는다.
 
 Revision ID: c5e9f3a7b1d4
-Revises: b4d8e2a6c0f3
+Revises: c5e1f9a3b7d2
 Create Date: 2026-10-08 12:00:00.000000
 """
 
@@ -30,7 +30,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c5e9f3a7b1d4"
-down_revision: str | None = "b4d8e2a6c0f3"
+down_revision: str | None = "c5e1f9a3b7d2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

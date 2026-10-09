@@ -378,6 +378,8 @@ class TestSeatExistsInAllThreePlaces:
         # 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-02 ARCH-32] head가 b4d8e2a6c0f3(problem.source_id — source_entity FK 좌석)로
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-08 ARCH-31] head가 c5e1f9a3b7d2(problem_version 테이블 + problem.
+        # problem_version_id + PUBLISHED 불변성 트리거)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-08 P3-12] head가 c5e9f3a7b1d4(role_enum에 CMS 역할 3종 — 어휘만 확장)로
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         assert EXPECTED_ALEMBIC_HEAD == "c5e9f3a7b1d4"

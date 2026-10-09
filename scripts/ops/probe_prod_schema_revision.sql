@@ -123,7 +123,8 @@ WITH expected(seq, revision, obj_table, obj_column, polarity, obj_kind) AS (
         (108, '9d3e7b1c5a20', 'concept_version',     'qa',                       '+', 'object'),
         (109, 'a3f7c9d1e5b2', 'attempt_event',       'event_uuid',               '+', 'object'),
         (110, 'b4d8e2a6c0f3', 'problem',             'source_id',                '+', 'object'),
-        (111, 'c5e9f3a7b1d4', 'role_enum',           'content_publisher',        '+', 'enum_value')
+        (111, 'c5e1f9a3b7d2', 'problem_version',     '',                         '+', 'object'),
+        (112, 'c5e9f3a7b1d4', 'role_enum',           'content_publisher',        '+', 'enum_value')
 )
 SELECT
     e.seq,

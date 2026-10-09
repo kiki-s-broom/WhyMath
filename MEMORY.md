@@ -383,6 +383,15 @@
 **정직 고지**: 같은 계열 AI 2인은 독립 표본이 아니고 오류율도 측정되지 않았다. 초인간 검증 기준의 측정 게이트가 아니라 **정책 대체**다. 정본 `graph.json` 병합은 범위 밖이다(S4-60·S4-61 소관, 표 문서 §5 스키마 결정).
 **집행 마찰(사실 기록)**: 반영 중 Auto 권한 분류기가 생성 스크립트 수정·재생성을 [Instruction Poisoning]으로 2회 거부했다(서브에이전트 산출로 사람 검수 대상 파일을 고치는 동작으로 본 것으로 추정). 세션은 우회하지 않고 멈춰 Kiki 승인과 모드 전환을 받은 뒤 진행했다.
 
+### 2026-10-08 (결정 · S4-58): **통계 검증기(`statistical_claim`)를 float 비교에서 정확 유리수 + 선언형 허용오차 정책(`tolerance`)으로 전환했다 — 설계서 `verifier_v2_domains.md` §3.5-2가 약속한 "부동소수점 사용 금지"를 S4-53 구현이 어기고 있었다**
+
+- **경위(실측)**: S4-53 구현이 데이터를 float으로 바꾼 뒤 `math.isclose(rel_tol=1e-9, abs_tol=1e-9)`로 비교했다. 수정 전 코드를 `git show`로 꺼내 같은 입력으로 재현했다 — 17자리 정수 평균이 1 어긋나도 `pass`, 평균 1조에서 500 어긋나도 `pass`, NaN 데이터가 "계산값 nan"으로 `fail`, 지수 `1e999999` 주장이 `inf`로 읽혀 `fail`, 혼합수 `1 1/2`가 공백 제거로 `11/2`(5.5)로 오독돼 `fail`, 100,000단 중첩 data는 `RecursionError` 크래시.
+- **결정**: ① 데이터·주장값을 float 경유 없이 `Fraction`으로 읽고 mean·median·variance·q1·q3는 유리수 정확값, std·corr는 제곱근이 유리수면 정확값·아니면 10^-60 이내 정수 제곱근 근사로 판정한다 ② `tolerance` 절(`exact`·`abs:<양수>`·`rel:<0~1>`·`round:<0~15>`, 경계 포함·half-up 정확 연산)을 문항 저자가 선언한다 ③ 절 생략 시 유한소수는 `exact`, 무한소수·무리수는 `abs:10^-9`(절대오차만 — 상대오차는 큰 값에서 허용 폭이 값에 비례해 커진다) ④ 수 토큰 64자·지수 ±30 상한, NaN·Infinity·bool·비 ASCII·밑줄 숫자·분모 0·깊은 중첩을 `unverifiable`로 ⑤ 미지/중복 조건 절은 조용히 무시하지 않고 `unverifiable`(철자가 틀린 `tolerance` 절이 검증 강도를 몰래 바꾸는 것을 차단). 무리수에 `exact`를 지정하면 `fail`이 아니라 `unverifiable`(저자의 정책 오설정을 학생 오답으로 읽지 않는다).
+- **의도한 행동 변경**: 기본 판정이 엄격해졌다(유한소수는 1e-9 허용 → 정확 일치, 무한소수·무리수는 상대오차 제거). 영향 범위 실측 — 저장소 전체에서 `stat=` DSL을 쓰는 코퍼스·fixture 문항 0건이라 기존 판정이 바뀌는 문항은 없다. `StatisticalResult.value`(float)와 `verifier.py` 래퍼·`machine_value` 계약은 유지, `exact_value`·`policy`(적용 정책 라벨, `기본→…` 접두)를 추가했다.
+- **검증(로컬, 정확한 CI 명령)**: 백엔드 전체 `16885 passed·584 skipped·1 xfailed`(실패 0·13분 31초)·커버리지 90.78%·계층 게이트 PASS(l3 94.9%), `tests/harness` 2014 passed, `tests/infra` 2744 passed, `ruff`·`black`·`mypy --strict`(740 파일)·`lint-imports`(계약 4 유지) exit 0, 위헌 심사 래칫 exit 0·차단 0건 ≤ 기준선 0건. 가드 뮤테이션 26종 전건 RED·생존 0·원복 sha256 동일(지수 상한 완전 제거 주입은 `Fraction("1e999999999")`가 메모리를 소진시킬 수 있어 의도적으로 제외하고 상한값 10^6 주입으로 대체).
+- **한계·승계**: 판정 해상도는 10^-60(정책 경계가 그보다 가까운 무리수는 다루지 않는다). 교차검증 `cross_verify.py`의 `machine_value` float `isclose` 대조는 대값 왜곡이 동형으로 남아 `S4-70`으로, n=1 표본분산 0 계산과 `columns` 절 `int()` 예외 누출은 `S4-71`로 등재했다(둘 다 `depends_on: S4-58`, P2).
+- **관측(이 변경과 무관한 기존 상태)**: `constitution/rules.yaml`의 `R28-02` 집행 파일 `tests/contract/test_subject_contract.py`가 main 체크아웃에 없다 — 규칙 머리말대로 "집행 장치 없음"으로 읽으며 통과로 계상하지 않았다.
+
 ### 2026-10-07 (정정 · G-misc40-deferred-m0671-redecision): **M0671 서명을 Kiki 머신에서 직접 입력해 라이브 DB에 한 번 더 적재했다 — 이 게이트는 2026-10-06 #1477로 이미 clear돼 있어 중복 실행이었고, 그 결과 DB 행의 note가 main 코퍼스와 달라졌다** (Kiki 실행·claude 기록) — 판정 기준 main `42018d87`
 
 - **경위(세션 결함)**: 세션이 게이트를 pending으로 읽은 첫 조회(2026-10-06)만 근거로 서명·적재 런북을 만들었고, 런북 작성 시점에 `origin/main`의 코퍼스와 게이트 상태를 다시 조회하지 않았다. 그 사이 #1477이 M0671 승인을 반영했고 게이트는 이미 clear됐다(clear 주체 claude·Kiki 지시 중계). 저장소 반영 단계에서 `origin/main`의 `crosslinks.json`을 읽고서야 발견했다.
@@ -12061,6 +12070,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **후속 소유(등재)**: `EOS-179`(라벨 예측 타당도 리더) · `EOS-180`('초보' 증거 하한·수축 + 다른 라벨 소비처·WH-1 ⑤⑧ KPI 연속성) · `EOS-181`(사다리 도약 — **서빙이 단계 3·4를 렌더하기 전에** 판정 · 외부 사건이라 코드 의존으로 못 걸고 notes·acceptance에 둔다. 코드 가드를 세우지 않은 이유: 모바일 변경은 CI 잡 경로 필터에 안 걸려 가드가 **돌지 않는다**).
 - **한계(명시)**: 운영 분포(이탈률·신호 확률·학생당 개념 수·카탈로그 채움)가 전무하다. "학생 신호"는 7개 좌절 토큰 + 8개 답 요구 토큰이라 실제 좌절의 하한이다. 현실적 학생 3유형(이탈형·연속 오답형·침묵형)의 수치는 독립 비판의 값이며 재현하지 않았다. 앱이 단계를 렌더하지 않는다는 사실은 grep 기준이다. expertise reversal 등 문헌은 원문을 읽지 않았다.
 - **검증 도구 기록(코드로 집행)**: 결함 주입 하네스 `mutate_eos178_label_free_guards.py` 45건(단위 31 · 서빙 14) — 설계 중 **등가 뮤턴트 2건**(신호 없는 쌍의 `coalesce(has_signal, False)` · 서빙 판정의 `IS NOT NULL`)을 찾아 코드에서 걷어냈고, 첫 실행에서 1건(`S02` 세션 생성 핸들러의 라벨 적재)이 **생존**했다 — 라벨은 오답 뒤에만 생기는데 기존 통합 시나리오가 세션 생성 시점에 라벨을 갖지 않았다 → 교차 이월 통합 시나리오 추가로 닫았다. 후속 등재 스크립트가 선행(`--depends`) 순서를 거꾸로 돌려 1건이 거부되고 다른 한 건의 acceptance에 번호 오기(`EOS-181`↔`EOS-179`)가 남았다 → append 전용 정정 항으로 바로잡았다(대장 손편집 없음).
+### 2026-10-08 — ADMIN-16: PATCH /v1/problems/{id}의 검수 상태 전이표 우회 폐쇄
+- **판정 문서**: `docs/reviews/admin16_review_status_bypass_judgment_2026-10-08.md` (판정 기준 main `8a5ea4d1`). 격리 계약 `problem_quarantine_contract.md` §5·§6·§7 갱신.
+- **결정 — "거부"가 아니라 "전이표 경유"**: 인수조건은 둘 다 허용했다. PATCH에서 상태 변경을 일률 거부하면 운영 중인 EOS-97 리콜 도구(`ops/generation_recall.py::apply_quarantine`, PATCH로 3필드 기입)가 `approved` 문항에도 전부 실패하고, 격리 계약이 PATCH를 정본 격리 절차로 명시하므로 기각했다. 두 표면(POST 전이·PATCH)이 같은 표(`schema/review_transition.py`)를 읽는다 — 표를 읽는 공개 함수만으로 역해석(`action_for_status_change`)하고 판정(`plan_review_field_change`)은 순수 함수.
+- **동작**: 병합 결과가 `review_status`를 바꾸면 표로 판정 — 불허 409 `illegal_transition` · 격리 사유 부재 422 `reason_required`(**이번 요청 본문**의 사유여야 한다 — 병합 결과로 보면 과거 격리의 낡은 사유가 통과) · 격리가 아닌 전이가 격리 기록을 바꿈 409 `quarantine_record_immutable`. 합법 전이는 감사 1행의 동작이 `update`가 아니라 전이 액션. 격리 시각은 서버 시계. 상태 키가 본문에 있을 때만 `SELECT … FOR UPDATE`. 상태가 그대로인 요청(GET 본문 왕복)은 종전 `update`.
+- **판단이 들어간 곳 — 거부는 감사 원장에 쓰지 않는다**: `content_mutation`은 "변경이 일어났다"의 기록이고 루프 KPI ④가 행 수를 센다. 거부는 WARNING 로그(자유 텍스트 제외). 다른 읽기(거부도 행을 남김)가 의도라면 알려 달라.
+- **검증**: 신규 80건(API 44·스키마 36) + 기존 관련 189건 무회귀. 결함 주입 12건(대조군 포함) + 파일 추가형 1건 — 순수 Python 하네스가 주입 적용·원복(sha256)을 단언, 실제 주입 11건 전부 RED(핵심 M1 = ADMIN-16 이전 동작 재현은 31건 실패), 대조군 GREEN. CI 대응 ruff·black·mypy --strict·lint-imports 로컬 통과(첫 실행에서 ruff E501 8건·black 2파일을 잡아 고침).
+- **부수 3항목 처분**: ⑥ 감사 열거 문서 동기화 = 이 PR에서 완료(`security_privacy.md`) · ② `privacy_audit` 불변 트리거 = "필요함, 분리" → `ADMIN-17` · ③ 반려코드·HIT 타이머 강제 = "분리" → `ADMIN-18`(PATCH의 `reject`는 반려코드를 실을 자리가 없어 거부하도록 acceptance에 명시, `ADMIN-16` 선행 의존).
+- **조사 중 발견**: `ADMIN-19` POST 생성이 `review_status=approved`로 직접 태어난 문항을 허용(같은 부류) · `ADMIN-20`(owner=kiki, 결정 사안) 전이표가 `approved`에서만 격리를 허용하고 공개 GET은 격리만 숨겨서, **비승인 문항의 결함은 이제 어떤 관리자 API로도 공개 카탈로그에서 숨길 수 없다**(리콜 도구 대상이 새로 생성된 문항이면 영향 실제적).
+- **정직한 공백**: 실 PostgreSQL 검증 없음(이 환경에 PG·docker 데몬 없음 — 행 잠금·롤백은 hermetic으로 인자·호출 순서만 고정, CI `backend-migrations`가 첫 실행) · 상태 불변 PATCH의 격리 기록 단독 편집은 막지 않음(계약 §7) · 감사 열거를 문서와 대조하는 테스트는 여전히 없음.
+
 ### 2026-10-06 — ADMIN-07 검수 큐 UI + 검증된 상태 전이 BFF (Phase B 진입점)
 - **대상 엔티티**: `Problem.review_status`(pending/approved/rejected/quarantined). JSONL `needs_review_worklist` 축은 harness 어댑터 잔여 누출 래칫 때문에 이번 범위에서 제외(후속).
 - **전이표**(`schema/review_transition.py`, 불변): approve pending→approved · reject pending→rejected · quarantine approved→quarantined(사유 필수·≤2000자) · release quarantined→approved. `None`(미지정)은 어떤 액션도 허용하지 않는다("모른다 ≠ pending").
@@ -12119,3 +12138,10 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
 - **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
 - **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
+
+### 2026-10-08 — PB-17 결정론 생성기 저작 서명 + 코퍼스 백필 + 선언 덮어쓰기 차단
+- **서명**: 결정론 생성기 60종 클래스에 `@deterministic_generator`(`l3/equivalent/generator.py`)를 부착 — 후보가 `deterministic:<생성기>` 서명을 갖는다. 전수 가드(`test_deterministic_author_stamp.py`)가 `generate(self, spec)` 보유 클래스를 역할 기반으로 발견해 미서명 0건·스캔 하한을 동결한다.
+- **백필**: `harness/problem_corpus_author_backfill.py`(기본/`--dry-run`/`--check`, 멱등). 37개 디렉터리·14,034건 중 13,609건(35개 디렉터리) 서명, 425건 미백필 — `problem_bank_rephrased_v0`(421건, LLM 발문 다양화·저작 모델 id 미기록이라 `llm:` 서명도 지어내지 않음)와 `problem_bank_v1`(4건, 사람 시드). 도출 근거는 `_provenance.json`의 `generation_method`가 지목한 생성기 파일(30개 디렉터리), 파일명이 없는 5개 디렉터리는 `LLM 0` 선언 + 코드의 `CORPUS_DIR_NAME` 배치 모듈 임포트로 도출(코드 사실 추가), `generated_v0`는 생성기 8종이라 배치 모듈명으로 서명.
+- **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
+- **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
+- **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.

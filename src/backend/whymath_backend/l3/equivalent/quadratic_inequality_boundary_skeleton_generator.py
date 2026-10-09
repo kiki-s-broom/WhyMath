@@ -46,7 +46,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -146,6 +146,7 @@ def _build_pool() -> tuple[_Skeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class QuadraticInequalityBoundarySkeletonGenerator:
     """결정론 스켈레톤 생성기 — 이차부등식 해의 경계값 합(`EquivalentProblemGenerator` 좌석).
 
