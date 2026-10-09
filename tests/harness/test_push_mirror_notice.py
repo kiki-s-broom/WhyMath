@@ -106,6 +106,7 @@ def _mirror(repo: Path, commit: str, kind: str = "pass") -> None:
         "jobs": [{"name": "harness-integrity", "exit": job_exit, "steps": [step]}],
         "not_executed": 1 if kind == "not_executed" else 0,
         "exit": exit_code,
+        "tainted": False,  # schema 3(HARN-194): 실행 도중 트리가 안 바뀌었다고 명시된 결과만 믿는다
     }
     path = repo / ci_mirror.DEFAULT_RESULT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,6 +159,26 @@ class TestMirrorComparison:
         path = repo / ci_mirror.DEFAULT_RESULT_PATH
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["jobs"] = []
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        assert pmn.assess(repo).code == pmn.NOTIFY_RESULT_UNUSABLE
+
+    @pytest.mark.parametrize("tainted", [True, None, "false"])
+    def test_result_not_proven_stable_is_not_a_measurement(self, repo: Path, tainted) -> None:
+        """schema 3(HARN-194) — `tainted`가 명시적 False가 아닌 결과(오염·미확인·모양 이탈)는 통과가 아니다."""
+        head = _commit(repo, "src/app.py", "x = 2\n")
+        _mirror(repo, head)
+        path = repo / ci_mirror.DEFAULT_RESULT_PATH
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["tainted"] = tainted
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        assert pmn.assess(repo).code == pmn.NOTIFY_RESULT_UNUSABLE
+
+    def test_result_without_the_stability_flag_is_not_a_measurement(self, repo: Path) -> None:
+        head = _commit(repo, "src/app.py", "x = 2\n")
+        _mirror(repo, head)
+        path = repo / ci_mirror.DEFAULT_RESULT_PATH
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        del payload["tainted"]
         path.write_text(json.dumps(payload), encoding="utf-8")
         assert pmn.assess(repo).code == pmn.NOTIFY_RESULT_UNUSABLE
 

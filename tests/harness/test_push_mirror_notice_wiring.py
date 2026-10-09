@@ -161,6 +161,7 @@ def _mirror_pass(repo: Path) -> None:
         ],
         "not_executed": 0,
         "exit": 0,
+        "tainted": False,  # schema 3(HARN-194)
     }
     path = repo / ci_mirror.DEFAULT_RESULT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
