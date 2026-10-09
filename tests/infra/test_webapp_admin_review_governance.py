@@ -369,10 +369,32 @@ def failure_code_violations(client: set[str], server: set[str]) -> list[str]:
     return out
 
 
-def _server_codes() -> set[str]:
-    from whymath_backend.schema.enums import GenerationFailureCode
+def server_failure_codes(enums_source: str) -> set[str]:
+    """`schema/enums.py` 소스에서 `GenerationFailureCode` 멤버 값을 AST 로 읽는다.
 
-    return {member.value for member in GenerationFailureCode}
+    임포트하지 않는 이유: CI `infra-contracts` 잡은 backend 패키지를 설치하지 않는다(로컬 venv 에는
+    설치돼 있어 미러가 이 차이를 놓쳤다 — 2026-10-09 PR #1551 에서 CI 만 red). 소스를 정적으로 읽으면
+    어느 환경에서나 같은 판정이다. 클래스가 없거나 멤버가 0건이면 빈 집합 → 판정기가 위반으로 처리한다.
+    """
+    import ast
+
+    for node in ast.parse(enums_source).body:
+        if isinstance(node, ast.ClassDef) and node.name == "GenerationFailureCode":
+            values: set[str] = set()
+            for stmt in node.body:
+                if (
+                    isinstance(stmt, ast.Assign)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                ):
+                    values.add(stmt.value.value)
+            return values
+    return set()
+
+
+def _server_codes() -> set[str]:
+    path = Path(__file__).resolve().parents[2] / "src/backend/whymath_backend/schema/enums.py"
+    return server_failure_codes(path.read_text(encoding="utf-8"))
 
 
 def test_client_failure_codes_match_server_enum() -> None:
@@ -381,6 +403,14 @@ def test_client_failure_codes_match_server_enum() -> None:
     client = client_failure_codes(text)
     assert len(client) == 8, f"클라 반려코드가 8종이 아니다: {sorted(client)}"
     assert failure_code_violations(client, _server_codes()) == []
+
+
+def test_server_failure_code_reader_is_discriminating() -> None:
+    """⑧ 소스 파서 변별력 — 멤버를 읽고, 클래스 부재·멤버 0건은 빈 집합(=위반)으로 접는다."""
+    src = 'class GenerationFailureCode(str, Enum):\n    F1 = "F1"\n    F2 = "F2"\n'
+    assert server_failure_codes(src) == {"F1", "F2"}
+    assert server_failure_codes("class Other:\n    F1 = 'F1'\n") == set()
+    assert server_failure_codes("class GenerationFailureCode:\n    pass\n") == set()
 
 
 def test_failure_code_judge_detects_drift() -> None:
