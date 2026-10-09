@@ -6,8 +6,11 @@
   - GET /v1/admin/review-queue  — 검수 큐(적재 문항 축 — JSONL 축은 승계 태스크)
   - GET /v1/admin/review-queue/items         — 검수 큐 목록(상태별 페이지·본문 제외)
   - GET /v1/admin/review-queue/items/{id}    — 검수 큐 단건(본문 + 서버 판정 `allowed_actions`)
-  - POST /v1/admin/review-queue/items/{id}/transitions — 검수 상태 전이(**유일한 쓰기** — 행 잠금·
-    전이표 검증·감사 1행·단일 트랜잭션. 전이 규칙 정본 = `schema/review_transition.py`)
+  - POST /v1/admin/review-queue/items/{id}/review-sessions — 검수 착수(ADMIN-18 — started 타이머
+    이벤트 1행을 적재하고 `review_session_id`를 발급)
+  - POST /v1/admin/review-queue/items/{id}/transitions — 검수 상태 전이(행 잠금·전이표 검증·
+    감사 1행·**approve/reject는 finished 타이머 이벤트 1행 동반**·단일 트랜잭션. 전이 규칙 정본 =
+    `schema/review_transition.py`)
   - GET /v1/admin/users         — 사용자 **집계**(PII 0)
   - GET /v1/admin/users/{id}    — 사용자 단건(마스킹) + 관리자 접근 감사 1행
 
@@ -35,7 +38,7 @@ from typing import Annotated, Literal
 
 import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,19 +47,29 @@ from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.api.admin_module_registry import require_module_roles
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.problem import Problem
+from whymath_backend.db.models.review_timer_event import ReviewTimerEvent as OrmReviewTimerEvent
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.ops.cost_report import CostReport, aggregate_l3_events, fetch_l3_events
 from whymath_backend.privacy import record_admin_access_audit
 from whymath_backend.privacy.audit import record_content_mutation_audit
-from whymath_backend.schema.enums import PrivacyAuditAction, PrivacyAuditResourceType, ReviewStatus
+from whymath_backend.schema.enums import (
+    GenerationFailureCode,
+    PrivacyAuditAction,
+    PrivacyAuditResourceType,
+    ReviewStatus,
+)
+from whymath_backend.schema.review_timer import ReviewTimerEvent, ReviewTimerEventType
 from whymath_backend.schema.review_transition import (
     QUARANTINE_REASON_MAX_LENGTH,
     IllegalReviewTransition,
     ReviewTransitionAction,
+    action_requires_failure_code,
     action_requires_reason,
+    action_requires_review_session,
     allowed_actions,
     resolve_review_transition,
+    verdict_for_action,
 )
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
@@ -356,7 +369,12 @@ class AdminReviewItemDetail(BaseModel):
 
 
 class AdminReviewTransitionRequest(BaseModel):
-    """`POST …/transitions` 본문."""
+    """`POST …/transitions` 본문.
+
+    ADMIN-18 — 판정(approve·reject)은 **검수 세션(타이머) 없이 제출될 수 없고**, 반려(reject)는
+    반려코드(F1~F8) 없이 제출될 수 없다. 경과 시간(`elapsed_ms`)은 일부러 본문에 없다 — 서버가
+    착수 이벤트의 시각과 현재 시각 차로 계산한다(클라이언트가 보내면 위조·0 날조가 가능하다).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -369,12 +387,50 @@ class AdminReviewTransitionRequest(BaseModel):
         max_length=QUARANTINE_REASON_MAX_LENGTH,
         description="격리 사유 — quarantine이면 필수(공백 제외 1자 이상). 그 외는 기록 안 됨.",
     )
+    failure_code: GenerationFailureCode | None = Field(
+        None,
+        validate_default=True,
+        description="반려코드 F1~F8 — reject면 필수, 그 외 액션에서는 보내면 422(무시하지 않는다).",
+    )
+    review_session_id: uuid.UUID | None = Field(
+        None,
+        validate_default=True,
+        description="검수 착수(`POST …/review-sessions`)가 발급한 세션 id — approve·reject면 필수. "
+        "quarantine·release는 선택(보내면 같은 방식으로 검증하되 세션을 종결하지는 않는다).",
+    )
 
     @model_validator(mode="after")
     def _reason_required_for_quarantine(self) -> AdminReviewTransitionRequest:
         if action_requires_reason(self.action) and not (self.reason or "").strip():
             raise ValueError("이 액션은 사유(reason)가 필요합니다(공백 제외 1자 이상).")
         return self
+
+    @field_validator("failure_code", mode="after")
+    @classmethod
+    def _failure_code_matches_action(
+        cls, value: GenerationFailureCode | None, info: ValidationInfo
+    ) -> GenerationFailureCode | None:
+        action = info.data.get("action")
+        if action is None:  # action 자체가 검증 실패 — 그 오류가 이미 보고된다.
+            return value
+        if action_requires_failure_code(action) and value is None:
+            raise ValueError("반려(reject)는 반려코드(failure_code F1~F8)가 필요합니다.")
+        if not action_requires_failure_code(action) and value is not None:
+            raise ValueError("failure_code는 반려(reject)에서만 보낼 수 있습니다.")
+        return value
+
+    @field_validator("review_session_id", mode="after")
+    @classmethod
+    def _session_required_for_verdict(
+        cls, value: uuid.UUID | None, info: ValidationInfo
+    ) -> uuid.UUID | None:
+        action = info.data.get("action")
+        if action is not None and action_requires_review_session(action) and value is None:
+            raise ValueError(
+                "approve·reject 판정은 검수 세션(review_session_id)이 필요합니다 — 먼저 "
+                "POST …/review-sessions 로 검수를 착수하세요."
+            )
+        return value
 
 
 class AdminReviewTransitionResponse(BaseModel):
@@ -387,6 +443,18 @@ class AdminReviewTransitionResponse(BaseModel):
     to_status: str = Field(..., description="전이 후 상태.")
     audit_id: uuid.UUID = Field(..., description="이 전이의 감사 행 id.")
     occurred_at: str = Field(..., description="전이 시각(ISO).")
+    review_session_id: uuid.UUID | None = Field(
+        None, description="이 전이가 종결한(또는 검증한) 검수 세션 id — 세션 없는 전이면 None."
+    )
+
+
+class AdminReviewSessionStartResponse(BaseModel):
+    """`POST …/review-sessions` 결과 — 판정 때 그대로 돌려보낼 세션 id."""
+
+    model_config = ConfigDict(frozen=True)
+
+    review_session_id: uuid.UUID = Field(..., description="발급된 검수 세션 id.")
+    started_at: str = Field(..., description="착수 시각(ISO · 경과 계산의 기준점).")
 
 
 def _status_value(value: ReviewStatus | str | None) -> str | None:
@@ -506,6 +574,115 @@ def _transition_conflict(code: str, message: str, current: ReviewStatus | None) 
     )
 
 
+def _utcnow() -> datetime:
+    """현재 UTC 시각 — 착수·종결·경과 계산이 같은 시계를 쓰도록 한 곳에 둔다(테스트가 고정 가능)."""
+    return datetime.now(UTC)
+
+
+_INVALID_SESSION = "invalid_review_session"
+
+
+async def _resolve_started_session(
+    session: AsyncSession,
+    *,
+    review_session_id: uuid.UUID,
+    problem_id: uuid.UUID,
+    reviewer_id: str,
+    current: ReviewStatus | None,
+) -> OrmReviewTimerEvent:
+    """`review_session_id`가 이 문항·이 운영자의 아직 열린 착수인지 확인하고 started 행을 돌려준다.
+
+    거부(전부 409 `invalid_review_session`) — 세션이 없다 · 다른 문항의 세션이다 · 다른 운영자의
+    세션이다 · 이미 종결/중단됐다 · 착수 시각을 알 수 없다. 이유는 메시지로만 구분하고 코드는 하나다
+    (남의 세션 존재 여부를 코드 차이로 새기지 않는다). 같은 문항 행을 `FOR UPDATE`로 잡은 뒤에
+    부르므로 같은 세션의 이중 종결은 직렬화된다.
+    """
+    rows = (
+        (
+            await session.execute(
+                select(OrmReviewTimerEvent).where(
+                    OrmReviewTimerEvent.review_session_id == review_session_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    started = [r for r in rows if r.event_type == ReviewTimerEventType.STARTED.value]
+    closed = [r for r in rows if r.event_type != ReviewTimerEventType.STARTED.value]
+    reason: str | None = None
+    if len(started) != 1:
+        reason = "검수 세션을 찾을 수 없습니다. 검수를 다시 착수하세요."
+    elif closed:
+        reason = "이미 종결되었거나 중단된 검수 세션입니다. 검수를 다시 착수하세요."
+    elif started[0].problem_id != problem_id:
+        reason = "이 문항의 검수 세션이 아닙니다."
+    elif started[0].reviewer_id != reviewer_id:
+        reason = "다른 운영자가 착수한 검수 세션입니다."
+    elif _timer_start_moment(started[0]) is None:
+        reason = "검수 세션의 착수 시각을 알 수 없어 경과를 계산할 수 없습니다."
+    if reason is not None:
+        raise _transition_conflict(_INVALID_SESSION, reason, current)
+    return started[0]
+
+
+def _timer_start_moment(started: OrmReviewTimerEvent) -> datetime | None:
+    """경과 계산의 기준점 — 신고 발생 시각 우선, 수신 시각 폴백(EOS-48 발생/수신 분리 관례)."""
+    moment = started.occurred_at or started.recorded_at
+    if moment is None:
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def _elapsed_ms(started: OrmReviewTimerEvent, now: datetime) -> int | None:
+    """착수→종결 경과(ms). **서버 시계로만** 계산한다. 음수(시계 역행)는 0으로 날조하지 않고 None
+    (미측정)으로 둔다 — 집계가 미계측으로 분리 카운트한다."""
+    moment = _timer_start_moment(started)
+    if moment is None:
+        return None
+    delta_ms = int((now - moment).total_seconds() * 1000)
+    return delta_ms if delta_ms >= 0 else None
+
+
+@router.post(
+    "/review-queue/items/{problem_id}/review-sessions",
+    response_model=AdminReviewSessionStartResponse,
+    summary="검수 착수 — started 타이머 이벤트 1행 적재 + 세션 id 발급(ADMIN-18)",
+)
+async def start_admin_review_session(
+    problem_id: uuid.UUID, admin: RequireReviewAdmin, session: SessionDep
+) -> AdminReviewSessionStartResponse:
+    """검수 화면이 문항을 열 때 부른다. 돌려받은 `review_session_id`를 판정 요청에 실어야 한다.
+
+    `cu_slug`는 문항의 `slug`(없으면 problem_id 문자열)다 — HIT 집계의 CU 식별 축이며 적재율 판정
+    소스(`ops/hit_cu_metrics --from-db`)도 같은 규칙으로 식별자를 만든다. 문항 상태는 보지 않는다
+    (착수는 사실 기록일 뿐이고 전이 가부는 판정 시점에 표가 정한다).
+    """
+    problem = await session.get(Problem, problem_id)
+    if problem is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="문항을 찾을 수 없습니다."
+        )
+    started_at = _utcnow()
+    event = ReviewTimerEvent(
+        review_session_id=uuid.uuid4(),
+        cu_slug=problem.slug or str(problem.problem_id),
+        problem_id=problem.problem_id,
+        reviewer_id=str(admin.user_id),
+        event_type=ReviewTimerEventType.STARTED,
+        occurred_at=started_at,
+    )
+    try:
+        session.add(OrmReviewTimerEvent.from_schema(event))
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    return AdminReviewSessionStartResponse(
+        review_session_id=event.review_session_id, started_at=started_at.isoformat()
+    )
+
+
 @router.post(
     "/review-queue/items/{problem_id}/transitions",
     response_model=AdminReviewTransitionResponse,
@@ -519,7 +696,13 @@ async def transition_admin_review_item(
     session: SessionDep,
     settings: SettingsDep,
 ) -> AdminReviewTransitionResponse:
-    """한 트랜잭션에서 잠금 → 낙관적 동시성 → 전이표 → 갱신 → 감사 1행 → commit 1회.
+    """한 트랜잭션에서 잠금 → 낙관적 동시성 → 전이표 → 세션 검증 → 갱신 → 타이머 1행 → 감사 1행 →
+    commit 1회.
+
+    ADMIN-18: approve·reject는 `review_session_id`(착수 이벤트)를 요구하고, 성공하면 같은
+    트랜잭션에 finished 타이머 이벤트(verdict·failure_code·서버 계산 elapsed_ms)를 적재한다.
+    적재가 실패하면 상태 변경·감사 행도 함께 롤백된다 — "타이머 없는 판정"은 존재할 수 없다.
+    quarantine·release는 판정이 아니므로 세션이 선택이다(보내면 검증만 하고 종결하지 않는다).
 
     전이 규칙은 `schema/review_transition.py`가 정본이고 여기서는 호출만 한다. 어느 단계든
     실패하면 commit 전이므로 상태도 감사 행도 남지 않는다(감사 쓰기 실패 시 상태 변경도 롤백).
@@ -552,7 +735,18 @@ async def transition_admin_review_item(
             "illegal_transition", "현재 상태에서 허용되지 않는 전이입니다.", current
         ) from exc
 
-    occurred_at = datetime.now(UTC)
+    # ADMIN-18 — 세션 검증은 상태를 건드리기 **전에** 한다(거부 경로가 더티 상태를 남기지 않는다).
+    started: OrmReviewTimerEvent | None = None
+    if body.review_session_id is not None:
+        started = await _resolve_started_session(
+            session,
+            review_session_id=body.review_session_id,
+            problem_id=problem_id,
+            reviewer_id=str(admin.user_id),
+            current=current,
+        )
+
+    occurred_at = _utcnow()
     problem.review_status = target
     if body.action is ReviewTransitionAction.quarantine:
         # 격리 계약 §3 — 사유·시각을 상태와 함께 쓴다. release/approve/reject는 이 필드를 건드리지
@@ -561,6 +755,26 @@ async def transition_admin_review_item(
         problem.quarantined_at = occurred_at
 
     try:
+        verdict = verdict_for_action(body.action)
+        if verdict is not None:
+            # 계약상 verdict가 있는 액션은 위 요청 검증이 세션을 보장한다 — 방어적 재확인.
+            if started is None or body.review_session_id is None:
+                raise _transition_conflict(_INVALID_SESSION, "검수 세션이 필요합니다.", current)
+            session.add(
+                OrmReviewTimerEvent.from_schema(
+                    ReviewTimerEvent(
+                        review_session_id=body.review_session_id,
+                        cu_slug=started.cu_slug,
+                        problem_id=problem_id,
+                        reviewer_id=str(admin.user_id),
+                        event_type=ReviewTimerEventType.FINISHED,
+                        verdict=verdict,
+                        failure_code=body.failure_code,
+                        elapsed_ms=_elapsed_ms(started, occurred_at),
+                        occurred_at=occurred_at,
+                    )
+                )
+            )
         audit = record_content_mutation_audit(
             session,
             actor_user_id=admin.user_id,
@@ -582,6 +796,7 @@ async def transition_admin_review_item(
         to_status=target.value,
         audit_id=audit.audit_id,
         occurred_at=occurred_at.isoformat(),
+        review_session_id=body.review_session_id,
     )
 
 

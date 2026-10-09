@@ -88,6 +88,8 @@ from whymath_backend.schema.review_transition import (
     QuarantineReasonRequired,
     QuarantineRecordLocked,
     ReviewTransitionAction,
+    VerdictRequiresReviewSession,
+    action_requires_review_session,
     plan_review_field_change,
 )
 
@@ -432,7 +434,12 @@ def _as_review_status(value: ReviewStatus | str | None) -> ReviewStatus | None:
 
 
 def _review_patch_refusal(
-    exc: IllegalReviewStatusChange | QuarantineReasonRequired | QuarantineRecordLocked,
+    exc: (
+        IllegalReviewStatusChange
+        | QuarantineReasonRequired
+        | QuarantineRecordLocked
+        | VerdictRequiresReviewSession
+    ),
     *,
     problem_id: uuid.UUID,
     actor_id: uuid.UUID,
@@ -464,6 +471,18 @@ def _review_patch_refusal(
                 "message": "현재 상태에서 허용되지 않는 전이입니다.",
                 "current_status": current.value if current is not None else None,
                 "requested_status": target.value if target is not None else None,
+            },
+        )
+    if isinstance(exc, VerdictRequiresReviewSession):
+        # ADMIN-18 — PATCH는 반려코드·검수 세션(타이머)을 실을 자리가 없다. 안내 경로를 함께 준다.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+                "current_status": current.value if current is not None else None,
+                "requested_status": target.value if target is not None else None,
+                "transition_path": f"/v1/admin/review-queue/items/{problem_id}/transitions",
             },
         )
     if isinstance(exc, QuarantineReasonRequired):
@@ -501,8 +520,11 @@ async def patch_problem(
     (rejected→approved · 미설정→무엇이든 등)은 409 `illegal_transition`, 격리(`approved→
     quarantined`)에 *이번 요청의* `quarantine_reason`이 없으면 422 `reason_required`, 격리가 아닌
     전이가 격리 기록을 함께 바꾸려 하면 409 `quarantine_record_immutable`이며 어느 경우든 쓰기도
-    감사도 없다. 합법 변경은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**(approve/reject/
-    quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
+    감사도 없다. **인간 판정(pending→approved·pending→rejected)은 이 표면으로 할 수 없다(ADMIN-18)**
+    — 반려코드·검수 세션(타이머)을 실을 자리가 없어 409 `review_session_required`로 거부하고
+    `POST /v1/admin/review-queue/items/{id}/transitions`로 안내한다(격리·해제는 판정이 아니라
+    허용). 그 외 합법 변경(격리·해제)은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**
+    (quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
     (`POST …/transitions`와 같은 의미 — 시계가 클라이언트 소유면 격리를 소급할 수 있다). 상태를
     바꾸려는 요청(본문에 `review_status` 포함)은 전이 라우트와 같은 `SELECT … FOR UPDATE`로
     행을 잠그고 최신 값으로 판정한다. 상태가 그대로인 요청(GET 본문을 되돌려 보내는 왕복 포함)은
@@ -559,6 +581,16 @@ async def patch_problem(
             current=current_status,
             target=target_status,
         ) from exc
+    if plan.action is not None and action_requires_review_session(plan.action):
+        # ADMIN-18 — 인간 판정(approve·reject)은 반려코드·검수 세션(타이머)이 필요한데 이 표면에는
+        # 그것을 실을 자리가 없다. 통과시키면 "타이머 없는 판정"이 이 경로로 새므로 POST로 안내한다.
+        raise _review_patch_refusal(
+            VerdictRequiresReviewSession(plan.action),
+            problem_id=problem_id,
+            actor_id=admin.user_id,
+            current=current_status,
+            target=target_status,
+        )
     if plan.action is ReviewTransitionAction.quarantine:
         # 격리 기록은 상태와 함께, 시각은 서버가 쓴다(격리 계약 §3). 클라이언트가 보낸 시각은
         # 응답 본문에 실제 기록값이 나오므로 덮어쓴 사실이 관측된다.

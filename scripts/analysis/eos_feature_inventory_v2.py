@@ -441,7 +441,8 @@ CATALOG: tuple[Spec, ...] = (
        "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
        "GET /users/{user_id}", "GET /review-queue/items",
        "GET /review-queue/items/{problem_id}",
-       "POST /review-queue/items/{problem_id}/transitions"),
+       "POST /review-queue/items/{problem_id}/transitions",
+       "POST /review-queue/items/{problem_id}/review-sessions"),
     _s("WM-S-056", "관리자 CMS — 개념 버전 워크플로우·콘텐츠 제자리 편집·변경이력", "Admin",
        "Operations", "P1",
        "P3-12 — 개념 편집은 새 DRAFT 판이고 제출·검토·승인·발행·롤백은 발행 게이트만 경유한다. "

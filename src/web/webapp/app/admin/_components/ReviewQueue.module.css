@@ -171,7 +171,7 @@
 .rowButton {
   padding: 0.15rem 0.5rem;
   border: 1px solid var(--wm-line);
-  border-radius: 6px;
+  border-radius: var(--wm-radius);
   background: var(--wm-paper);
   color: var(--wm-accent);
   font: inherit;
@@ -336,4 +336,21 @@
   .primaryButton {
     color: var(--wm-paper);
   }
+}
+
+/* 반려 코드(F1~F8) 선택 — ADMIN-18 */
+.codeGroup {
+  border: 1px solid var(--wm-line);
+  border-radius: var(--wm-radius);
+  margin: 0;
+  padding: 8px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.codeOption {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
 }
