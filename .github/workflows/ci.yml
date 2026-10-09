@@ -588,6 +588,18 @@ jobs:
       - name: 게이트 — L3 생성 프롬프트 레일 (prompt_asset_audit·저작권·봉인·독립성)
         run: python -m whymath_backend.harness.prompt_asset_audit --axis l3
 
+      # P3-14: Phase 3 지표 7종 일괄 CLI의 **위반 주입 반응 자가 점검**. 합성 대조 세계(7종 전부
+      # 충족)에서 지표마다 위반을 주입해 "그 지표만" 미달로 바뀌는지, 미측정 주입이 통과로 접히지
+      # 않는지, 판정 경계·종합 규칙이 맞는지를 확인하고 무반응이 하나라도 있으면 exit 1이다.
+      # hermetic(DB 0·LLM 0·네트워크 0 — SymPy만)·결정론·약 4초.
+      # **실 코퍼스 판정(`python -m whymath_backend.ops.phase3_metrics`)은 이 잡에 걸지 않는다**:
+      # 오늘의 실 상태는 기준선 미달·측정 실패(exit 2)가 정상이라 걸면 상시 red가 되어 게이트가
+      # 꺼진다. 목표 수치는 Kiki가 P3-02·P3-10 기준선을 본 뒤 확정한다(P3-14 acceptance ⑥).
+      # 변별력은 tests/backend/ops/test_phase3_metrics.py(무반응 주입 시 이 CLI가 exit 1을 내는지)가,
+      # 이 스텝의 존재는 tests/infra/test_phase3_metrics_wiring.py가 동결한다.
+      - name: 게이트 — Phase 3 지표 7종 위반 주입 반응 (phase3_metrics --self-check·무반응 0)
+        run: python -m whymath_backend.ops.phase3_metrics --self-check
+
       # CONST-03 — 헌법 R2-02(후보 문항 사람 판정 독립)·R2-03(게이트 기록 4요건) 집행 테스트.
       # 왜 이 잡·이 위치인가: 두 테스트가 `whymath_backend`를 import하므로 백엔드 설치가 있는
       # 이 잡이어야 한다. `tests/constitution`은 pytest testpaths(`../../tests/backend`) 밖이라

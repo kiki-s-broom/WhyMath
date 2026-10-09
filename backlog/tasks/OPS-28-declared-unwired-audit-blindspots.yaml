@@ -16,10 +16,11 @@ acceptance:
   - "② 확장 첫 적용으로 실호출자 0 실측 2건(l4/misconception/judge_shadow_harvest.py·crosslink_triage.py — 테스트 외 호출자 0)의 분류 확정"
   - "③ HTTP 축에 서버 도달(백엔드 테스트 포함)과 클라 도달(dart)의 분리 컬럼 추가 — 테스트 합집합 reached 판정(:998)은 data_platform_module_gap_review.md §2가 기록한 의도적 결정이므로 뒤집지 않고 클라 축을 별도 판정으로 확장(POST /v1/generate·GET /v1/jobs가 서버 테스트만으로 reached인 실사례)"
   - "④ dart 경로 리터럴 매칭 한계(verify_api.dart에 리터럴은 있으나 lib/ 소비 화면 0인 client-side 선언≠배선 미검출)를 모듈 docstring에 자기 선언 — AST 수준 해소는 범위 밖 동결"
+  - "[P3-14 발견 2026-10-09] 축 4(CLI 도달)는 라이브러리 import 와 CLI 실행을 구분하지 못한다. ops.phase3_metrics 가 ops.validation_scorecard 를 in-process import 하자 그 import 폐포(scorecard, qa_confusion_matrix, golden_benchmark, hit_cu_metrics, reviewer_sample_package)의 by-design 유예 5건이 stale-waiver 로 exit 1 이 됐고, P3-14 가 유예를 걷어 통과시켰다. 그러나 그 5개 CLI 의 main() 은 여전히 CI 에서 실행되지 않으므로 원 사유는 그대로 참이며, 걷은 순간 이 5개에 대한 미배선 경보가 사라졌다. 요구: ① 도달 판정을 main() 실행(python -m 직접 실행 스텝)과 라이브러리 import 로 분리해 import 만으로는 미배선 경보를 끄지 못하게 한다 ② 걷었던 5건 유예를 복원하고 복원 후 감사가 exit 0 인지 실측한다 ③ 분리 전후로 phase3_metrics 가 scorecard 를 import 하는 상태에서 5건 경보가 살아 있음을 위반 주입(유예 제거 시 exit 1)으로 확인한다. 근거 = src/backend/whymath_backend/ops/declared_unwired_audit.py 의 P3-14 주석 블록, docs/reviews/p3_14_phase3_metrics_2026-10-09.md."
 artifacts: []
 paths:
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
   - "tests/backend/ops/**"
 session: null
-notes: "ai_integration_gap_review.md D5(2026-08-10). dead-write 테이블 사각(dsl_integration_gap_review.md·PED-16 notes가 관찰)은 별개 4축째 — 본 태스크 범위 밖(PED-16 판정 결과에 따라 후속). 감사기 자신이 '최소 6회 반복' 사고 계열의 방어 장치이므로 사각 확장은 우선 방어선 보강.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "ai_integration_gap_review.md D5(2026-08-10). dead-write 테이블 사각(dsl_integration_gap_review.md·PED-16 notes가 관찰)은 별개 4축째 — 본 태스크 범위 밖(PED-16 판정 결과에 따라 후속). 감사기 자신이 '최소 6회 반복' 사고 계열의 방어 장치이므로 사각 확장은 우선 방어선 보강.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-09] P3-14 가 발견한 감사기 한계(import 와 CLI 실행 미구분)로 걷힌 유예 5건의 복원 경로를 이 태스크가 소유하게 한다 — 새 태스크 신설은 중복"
+updated: 2026-10-09
