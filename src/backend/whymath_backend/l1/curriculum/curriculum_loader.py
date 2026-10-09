@@ -399,11 +399,35 @@ _UNIV_GRADE_TO_INTRODUCED_GRADE: dict[str, int] = {
     "4학년": 16,
 }
 
-# RequiredDepth는 awareness~mastery 4단계뿐이라 고등학교가 이미 최심 단계(mastery)다 — 대학은
-# 이 4단계 안에서는 더 깊은 값이 없으므로 동일 천장을 유지한다("심화·증명·전이" 서술은 대학
-# 정규과정에도 그대로 부합 — 2026-08-05 학년축 최단경로 계획 §3 W0 결정). None으로 두면 L6
-# 깊이 랭킹 보너스가 대학 원자에서 항상 0으로 죽으므로(신호 소실) 명시값을 준다.
-_UNIV_REQUIRED_DEPTH: RequiredDepth = RequiredDepth.mastery
+# 대학 원자의 required_depth는 고정값이 아니라 원자별 `cognitive_type`에서 도출한다
+# (Kiki 결정 2026-10-09 · S4-64 — 종전 S4-62 원본 커밋 40597d5c의 "전건 mastery 고정"은 폐기).
+# 고정 mastery는 대학 1학년 첫 접촉 개념에도 최고 난이도를 겨냥하고, 전략 문서 W0 S-1의
+# "과목 성격별 차등"은 분류표를 새로 지어야 해 날조 금지에 걸린다. cognitive_type은 같은
+# 과목 안에서도 절차형/개념형을 원자 단위로 구분하고, 라벨 이름이 RequiredDepth 값 이름과
+# 거의 일치해 매핑이 창작이 아니다.
+#   절차 → procedural · 개념 → conceptual
+#   표상 → None (정직 폴백 — RequiredDepth 4단계에 "표상" 칸이 없다. 값을 지어내지 않는다)
+# mastery는 대학 셀에서 당분간 쓰지 않는다(숙달 요구를 표현할 근거 데이터가 없고, 학년이 올랐다고
+# 승격하는 것은 지어내기에 가깝다). 라벨 밖 값·결손(None)도 같은 폴백으로 None.
+#
+# ⚠️ 임시 휴리스틱이다 — 인지 수준 원문 주석(원자별 요구 깊이)을 확보하면 이 매핑을 대체한다.
+# cognitive_type 라벨의 출처는 원자 백본 provenance상 "원자화·교수학 주석·대학 축은 와이매스
+# 자체작성"(`atom_graph_v1/_provenance.json` source_citation)이며, 라벨 단위 검수 기록은
+# 코퍼스에서 확인되지 않는다(미확인). required_depth는 L6 깊이정렬 랭킹 보너스(상한 1.5·하드
+# 게이트 아님)에만 쓰여 오매핑 피해는 작다.
+_UNIV_COGNITIVE_TYPE_TO_REQUIRED_DEPTH: dict[str, RequiredDepth | None] = {
+    "절차": RequiredDepth.procedural,
+    "개념": RequiredDepth.conceptual,
+    "표상": None,
+}
+
+
+def _university_required_depth(atom: dict[str, Any]) -> RequiredDepth | None:
+    """대학 원자의 `cognitive_type` → `RequiredDepth`(미지·결손은 None 정직 폴백)."""
+    cognitive_type = _opt_str(atom.get("cognitive_type"))
+    if cognitive_type is None:
+        return None
+    return _UNIV_COGNITIVE_TYPE_TO_REQUIRED_DEPTH.get(cognitive_type)
 
 
 def _kr_entry_from_university_atom(
@@ -439,7 +463,7 @@ def _kr_entry_from_university_atom(
         grade_band=grade_band,
         curriculum_revision=_KR_CURRICULUM_REVISION,
         domain_label=_opt_str(atom.get("subject_area")),
-        required_depth=_UNIV_REQUIRED_DEPTH,
+        required_depth=_university_required_depth(atom),
         national_standard_codes=_str_list(atom.get("standard_codes")),
         # 원자 노드에 선수개념 필드가 없다(선수관계는 별도 edges 배열) — 조인 없이 지어내지
         # 않는다(날조 금지). 필요해지면 edges 조인은 후속 슬라이스.

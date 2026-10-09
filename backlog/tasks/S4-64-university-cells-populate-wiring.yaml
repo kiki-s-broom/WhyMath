@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l1/curriculum/populate.py
   - tests/backend/l1/test_curriculum_populate_university.py
-session: null
+session: claude/s4-64-tfdcby
 notes: "S4-62(학년축 오버레이 배선 W0) 회수 작업 중 발견한 배선 공백의 승계 태스크. S4-62 acceptance ①은 함수 추가까지만 요구해 충족되지만 호출처가 없어 대학 축 required_depth 신호는 아직 어디에도 도달하지 않는다. 로더 docstring의 호출자가 목록을 합쳐 적재한다는 문장은 계획일 뿐 추적되지 않았다 — docstring 속 계획은 백로그를 대신하지 못한다는 원칙에 따라 태스크로 등재한다. 선행 S4-62가 완료돼야 함수가 main에 존재하므로 depends_on으로 집행한다.\n\n[정정 2026-10-08] S4-62 이식 중 발견: register 정수 채널이 로더 대학 번호(13~16)와 N수(13~14)에서 충돌 — 잔여 한계를 추적 가능한 항으로 등재"
-updated: 2026-10-08
+updated: 2026-10-09
