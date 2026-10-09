@@ -174,6 +174,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 백필 금지). source_type/source_detail은 이관 기간 중 유지(점진 이관).
     "c5e1f9a3b7d2",  # ARCH-31: problem_version 테이블(Problem 좌석 3번째) + problem.
     # problem_version_id(§6.4·nullable·백필 금지) + PUBLISHED 불변성 트리거(§7)
+    "c5e9f3a7b1d4",  # P3-12: role_enum에 CMS 역할 3종(content_editor/reviewer/publisher) 추가
+    # — 어휘만 넓힌다. 권한 매핑 정본은 schema/cms_access.py.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]
