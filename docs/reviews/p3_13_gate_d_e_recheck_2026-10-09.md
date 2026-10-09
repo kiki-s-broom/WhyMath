@@ -146,6 +146,22 @@
 
 census 테스트를 `tests/infra/test_gate_harness_marker_reach_wiring.py`의 `GATE_HARNESS_PATHS`에 올렸다. 이 테스트는 `backend-migrations` 잡의 `pytest -m integration` 마커 수집으로 돈다(파일명이 워크플로에 안 보인다). `pytestmark`를 떼는 주입에서 `test_gate_harnesses_carry_the_integration_marker`가 RED(1 failed)였고 원복은 바이트 동일이다.
 
+### 6-4. CI 잡 재현 (로컬 · 커밋 `b9e1f01e` 기준 · 전부 종료 코드로 판정)
+
+변경이 닿는 잡을 근거와 함께 고르고 그 스텝을 CI YAML에서 그대로 재현했다. **로컬 green은 CI green이 아니다** — 아래는 같은 명령의 로컬 실행 결과다.
+
+| CI 잡 | 닿는 이유 | 재현한 스텝 | 결과 |
+|---|---|---|---|
+| `backend` | `tests/backend/` 신규 테스트 | ruff · black(src+tests) · `mypy --strict`(753 파일) · `lint-imports`(4 kept) · 전체 pytest(`-n auto --dist loadfile`, 커버리지) · 계층 커버리지 게이트 · 게이트 CLI 17종 · 헌법 집행 테스트 | **전부 0.** pytest 18,206 passed · 621 skipped · 1 xfailed, 집계 91.03%(기준 70%), 계층 api 97.0·l1 89.8·l2 96.5·l3 95.1·l4 96.2 전부 PASS, 헌법 집행 39 passed |
+| `backend-migrations` | census가 `-m integration` 마커로 수집됨 | alembic upgrade 왕복 · 무결성 게이트 · KPI 스키마 스모크 · `pytest -m integration --ignore=…/l3` | **전부 0.** 582 passed · 13 skipped(임베딩·OpenAI 라이브 — 무관). census 2건은 skip이 아니라 **실행·통과**(수집 로그 확인) |
+| `infra-contracts` | `tests/infra` 편집 | ruff · black · `pytest tests/infra` | **0.** 2,940 passed · 1 skipped |
+| `harness-integrity` | `scripts/` 신규 · 대장 변경 | `backlog validate` · `audit-deps` · `rules lint`/`render --check` · `jit check` · 헌법 위헌 심사 래칫 · ruff · black · `pytest tests/harness` | **전부 0.** 래칫 "차단 0건 ≤ 기준선 0건", 하네스 2,256 passed · 3 skipped |
+| `policy-guard` | 새 파일의 금기 패턴 | 6스텝 전부(교과서·EBS·평가원 본문 패턴 · 저작권 원본 · 시크릿 · 인코딩 · 충돌 마커) | **전부 0** |
+
+**안 닿는다고 본 잡**: `data-pipeline*`(변경 0) · `mobile`·`web`·`webapp`(변경 0) · `docker-build`·`infra-shell`(변경 0) · `declared-unwired-audit`·`concept-reach-guard`·`corpus-authoring`(`src`·코퍼스 변경 0) · `e2e-nightly`·`backend-serial-nightly`(야간 전용).
+
+**첫 시도의 실패와 원인**: 백엔드 전체 pytest 첫 실행이 종료 코드 1(수집 오류 9건)이었다. 9건 전부 `No module named 'data_pipeline'` — CI의 `backend` 잡은 설치 스텝에서 `pip install -e ../data-pipeline`을 하는데 내 환경이 빠뜨렸다(제 변경과 무관). 설치 후 전체를 다시 돌려 위 결과를 얻었다. 첫 실행의 "18,044 passed"는 9개 모듈이 빠진 수치이므로 근거로 쓰지 않는다.
+
 ## 7. 미이행과 한계 (숨기지 않는다)
 
 1. **"CI에서 RED"(acceptance ④) 미실증.** 위 §6은 전부 **로컬 실행**이다. CI는 `pull_request`·`main` push·merge queue에서만 도는데 이 세션은 PR을 열지 않았다. 따라서 이번 census 테스트와 새 하네스가 실 CI에서 도는지·주입이 그 스텝에서 RED가 되는지는 **확인하지 않았다.** 가드 자체의 CI RED는 선행 `EOS-117`이 PR #1215로 실측했다(위반 주입 run `35421591228` · 원복 run `35421783017`) — 그 증거를 이번 주입의 증거로 읽지 않는다.
@@ -153,7 +169,8 @@ census 테스트를 `tests/infra/test_gate_harness_marker_reach_wiring.py`의 `G
 3. **테스트 계정 기준.** 실사용자·실기기 세션이 아니다. 판정문에 이 사실을 유지한다.
 4. **C09는 간접 검출**(§6-1). `problem_attempted`는 다른 이벤트의 전제라 끊으면 여정이 먼저 무너진다 — 역할 부재로 잡히지 않는다.
 5. **전건 RED는 커버리지가 아니다.** 주입하지 않은 분기(예: 생산자는 있으나 학습자 결합이 끊기는 `UNJOINABLE` 전환, `occurred_at` 폴백 방향, 시간창 절단)는 이 문서가 보증하지 않는다.
-6. **전체 백엔드 스위트**는 이 문서 작성 시점에 돌리지 않았다. 결과는 PR/보고에 별도로 적는다.
+6. **`ci_mirror.py`(HARN-119)는 돌리지 않았다.** 대신 아래 §6-4처럼 CI YAML의 스텝을 직접 재현했다. 두 방법이 같은 스텝 집합을 보는지는 대조하지 않았다.
+7. **`backend-migrations` 잡의 마지막 두 스텝**(원자 백본 적재 · traversal 실부하 게이트)은 재현하지 않았다 — 이번 변경은 그 입력(`src`·코퍼스)을 건드리지 않는다(`git diff 594ce16b HEAD -- src` 0줄).
 
 ## 8. 후속
 
