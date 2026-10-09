@@ -415,7 +415,7 @@ class AdminReviewTransitionRequest(BaseModel):
             return value
         if action_requires_failure_code(action) and value is None:
             raise ValueError("반려(reject)는 반려코드(failure_code F1~F8)가 필요합니다.")
-        if False and value is not None:
+        if not action_requires_failure_code(action) and value is not None:
             raise ValueError("failure_code는 반려(reject)에서만 보낼 수 있습니다.")
         return value
 

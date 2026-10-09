@@ -12137,3 +12137,11 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
+
+### 2026-10-09 — ADMIN-18 검수 전이 반려코드·HIT 타이머 강제
+- **계약**: 착수 `POST /v1/admin/review-queue/items/{id}/review-sessions` → started 타이머 이벤트 1행 + `review_session_id`. 전이는 approve/reject에 `review_session_id` 필수, reject에 `failure_code`(F1~F8) 필수(그 외 action에 failure_code는 422), `elapsed_ms`는 서버가 started 시각과 현재 시각 차로 계산(클라 전송 시 `extra=forbid` 422). 성공 시 같은 트랜잭션에 finished 타이머·감사·상태 변경, 어느 하나 실패하면 전부 롤백. 세션이 이 문항·이 운영자 것이 아니거나 이미 종결이면 409 `invalid_review_session`(검증 순서 404→stale→illegal→session).
+- **quarantine/release는 세션 선택**: `ReviewVerdict`(approved|approved_with_edit|rejected)에 대응값이 없고, 사후 회수·복원이 HIT 분모를 오염시키므로. 선택으로 보낸 세션은 검증·echo하되 종결하지 않는다.
+- **PATCH 범위 확대**: `PATCH /v1/problems/{id}`는 pending→rejected뿐 아니라 pending→approved도 409 `review_session_required`로 거부(approve도 타이머 없이 판정되므로). PATCH로 남는 것은 격리·해제.
+- **적재율**: `ops/hit_cu_metrics --from-db`가 DB의 타이머·approved/rejected 문항을 읽어 적재율을 낸다. 통합 테스트가 옛 판정 2건 + API 판정 2건 후 적재율 상승을 단언.
+- **남은 틈**: ①`POST /v1/problems`가 `review_status=approved|rejected`로 직접 생성 가능(오프라인 적재 경로 — 후속 태스크 등재) ②코퍼스 오프라인 도구·직접 DB 작업은 API 밖(적재율이 잔여를 드러냄) ③문항을 열 때마다 started 행이 생기고 판정 없이 끝난 세션은 unfinished로 집계, quarantine/release는 세션을 종결하지 않아 started가 남는다 ④웹은 가짜 BFF 기준 검증, 실제 BFF와의 엔드투엔드·CORS 미검증.
+- **사고 기록(재발 방지 대상)**: 백엔드 에이전트가 뮤테이션 하네스를 도는 동안 Stop 훅의 "미커밋 변경 커밋" 지시로 WIP 스냅샷이 커밋돼 뮤테이션 한 줄(`if False and value is not None`)이 `HEAD`에 들어갔다. 작업 트리는 복구돼 있었고 최종 커밋에서 정정. 근본 원인은 "에이전트가 주입 중인 트리를 훅 지시로 커밋" — 대책 후보는 뮤테이션 하네스의 주입 구간 표식 + Stop 훅의 주입 중 커밋 차단(태스크 등재 필요).
