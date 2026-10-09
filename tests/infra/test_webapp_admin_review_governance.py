@@ -286,7 +286,9 @@ def transition_builder_violations(text: str) -> list[str]:
         out.append("세션 필수 액션 표(approve·reject)가 없다")
     if not re.search(r"body\.failure_code\s*=", body):
         out.append("반려 본문에 failure_code 를 싣지 않는다")
-    if not re.search(r'if \(req\.action === "reject" && req\.failureCode !== null\) body\.failure_code', body):
+    if not re.search(
+        r'if \(req\.action === "reject" && req\.failureCode !== null\) body\.failure_code', body
+    ):
         out.append("failure_code 가 반려 한정으로 실리지 않는다(다른 액션에 보내면 서버 422)")
     if re.search(r"elapsed|duration|started_at|elapsed_ms|seconds", body, re.IGNORECASE):
         out.append("클라가 경과 시간 계열 필드를 싣는다 — 시간은 서버가 계산한다")
