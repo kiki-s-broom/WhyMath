@@ -85,3 +85,18 @@ def test_stamp_records_new_value() -> None:
 def test_stamp_no_verify_raises() -> None:
     with pytest.raises(ValueError):
         stamp_verification_tier({}, VerificationTier.FINITE_EXHAUSTIVE)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# S4-69 — L1 허용값 동기 드리프트 가드
+# ──────────────────────────────────────────────────────────────────────────
+def test_l1_allowed_tier_values_match_enum() -> None:
+    """L1 적재기의 허용 집합이 `VerificationTier` 전 값과 정확히 같다.
+
+    L1은 L3를 임포트할 수 없어(7계층 계약) 문자열 상수로 이중 관리한다. 양쪽을 임포트할 수
+    있는 곳은 계층 밖의 이 테스트뿐이므로 동기는 여기서 집행한다 — enum에 값을 더하고 L1을
+    안 고치면 첫 신규 값이 찍히는 순간 로더가 ProblemCorpusError로 거부한다.
+    """
+    from whymath_backend.l1.problem_bank.populate import _VERIFICATION_TIER_VALUES
+
+    assert {t.value for t in VerificationTier} == set(_VERIFICATION_TIER_VALUES)

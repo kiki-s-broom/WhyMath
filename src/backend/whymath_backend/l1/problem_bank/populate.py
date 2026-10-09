@@ -155,10 +155,25 @@ _CONCEPT_ROLE_VALUES: frozenset[str] = frozenset(r.value for r in ConceptRole)
 # 유효 관계 유형 값 집합(RelationType) — S4-18 계보 태깅 relation_type 검증용.
 _RELATION_TYPE_VALUES: frozenset[str] = frozenset(r.value for r in RelationType)
 
-# 유효 verification_tier 값(l3/verification_tier.VerificationTier와 값 동기 — L1은 L3를 임포트할
-# 수 없어 문자열 상수로 이중 관리한다. 미지값은 조용히 버리지 않고 ProblemCorpusError로 거부한다
+# 유효 verification_tier 값 9종(S4-69) — l3/verification_tier.VerificationTier 전 값과 같아야 한다.
+# L1은 L3를 임포트할 수 없어(7계층 계약) 문자열 상수로 이중 관리한다. 동기는 문장이 아니라
+# 테스트가 집행한다: tests/backend/l3/test_verification_tier.py의 드리프트 가드가 enum과 이 집합의
+# 불일치를 RED로 만든다. 미지값은 조용히 버리지 않고 ProblemCorpusError로 거부한다
 # (검증 등급은 안전 신호라 sibling authoring 필드보다 엄격하게 다룬다).
-_VERIFICATION_TIER_VALUES: frozenset[str] = frozenset({"machine_exhaustive", "machine_sampled"})
+# 순서: 레거시 alias 2종(v1 코퍼스 하위호환) → 기계 증명/결정론 3종 → 기계 측정 2종 → 잔여 검증 2종.
+_VERIFICATION_TIER_VALUES: frozenset[str] = frozenset(
+    {
+        "machine_exhaustive",
+        "machine_sampled",
+        "finite_exhaustive",
+        "symbolic_proof",
+        "deterministic_data",
+        "numeric_sampling",
+        "statistical_estimate",
+        "residue_reviewed",
+        "human_reviewed",
+    }
+)
 
 
 class ProblemCorpusError(ValueError):
