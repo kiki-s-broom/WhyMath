@@ -338,6 +338,19 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
+
+- **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.
+- **왜 A인가(실측)**: 2026-10-08 `pydantic 2.14.0`이 PyPI에 14:34:46Z에 올라왔고 머지 큐 첫 탈락이 14:54Z — **약 20분**. 야간 cron(18:00Z)은 3시간 25분 뒤라 B는 못 막는다. C는 langfuse v2/v4 → pytest-asyncio 1.4.0 → SQLAlchemy 2.1.0 → pydantic 2.14.0으로 **4회째** 같은 구조(패키지만 바뀜)가 반복돼 이미 실패한 방식이다. 직접 선언 52개가 전이 포함 **149개**(CI 구성 합집합 + 워크플로 인라인 설치 = 핀 157건)로 해석되고, 최근 90일 릴리스 382건(92개 패키지)이 있었다.
+- **구현**: 제약 파일 `infra/ci/constraints-py312.txt`(python 3.12·linux 해석) + 워크플로 5개 최상위 `env: PIP_CONSTRAINT`(ci·weekly-metrics·ci-timeout-headroom·harness-audit·work-graph-desktop) + 도구 `scripts/ops/ci_constraints.py`(`refresh` 갱신·`check` 정적 게이트) + `infra-contracts` 게이트 스텝 + 야간 `constraints-freshness` 센서 잡 + `changes` 경로 필터에 제약 파일 편입 + 런북 `docs/ops/ci_constraints_refresh_runbook.md`. 집행 지점은 설치 명령 19곳을 하나씩 고치는 대신 **최상위 env 한 줄**이라 새 잡이 생겨도 자동으로 고정된다.
+- **정정(태스크 기재와 다른 실측)**: acceptance ②의 "pip install -e 지점 4개 잡"은 실제 **-e 설치 11개 잡 + 도구 직설치 1개 잡 = 12개 잡 19곳**이었고, `ci.yml` 밖에도 `weekly-metrics.yml`(backend `[dev]` 전체)·`ci-timeout-headroom`·`harness-audit`·`work-graph-desktop`이 pip를 쓴다. 게이트는 워크플로 **파일 전수**를 본다.
+- **게이트가 처음 잡은 구멍**: 첫 `check`가 `pip`(`--upgrade "pip<27"`) 핀 없음을 지적했다 — 설치기 자신이 고정 밖에 떠 있었다. 면제하지 않고 워크플로 인라인 설치 요구사항을 해석·지문 대상에 편입해 `pip==26.2.1`을 핀했다.
+- **고정의 실효성(실측)**: ①제약 적용 상태로 CI 설치 절차를 재현 → 설치 153개 중 핀과 다른 버전 **0건**·핀에 없는 설치 **0건**. ②`PIP_CONSTRAINT`는 빌드 격리 환경에도 전파된다(핀을 hatchling 1.27.0으로 주면 1.27.0, 없으면 1.32.4가 쓰임). ③**사고 재현**: 수정 전 코드 `382dbe70` + pydantic 2.14.0 → `mypy --strict` exit 1, `_schema_seam.py:77 Argument 1 to "TypeAdapter" has incompatible type "TypeForm[Any] | None"`(CI와 같은 줄) / 같은 코드 + 2.13.5 → exit 0(741파일) / 현재 main + 2.14.0 → exit 0(753파일). 즉 2.14.0은 핀을 바꾸는 갱신 PR에서만 도달하고 그 PR의 mypy가 병합 전에 막는다.
+- **변별력**: 실제 파일 주입 4종(ci.yml env 제거·weekly-metrics만 옛 방식·pydantic 핀 3.0.0·핀 삭제) 전건 RED + 원복 sha256 동일, 주입 전·후 대조군 exit 0. 영구 테스트 `tests/infra/test_ci_constraints.py` 62건(사본에서 주입·`mutated != original` 단언·대조군 짝). 연령 검사는 **PR 경로에 넣지 않고** 야간 센서에만 둔다 — 날짜는 시계에 따라 결과가 바뀌는 입력이라 PR·머지 큐에 넣으면 "큐의 입력은 코드뿐이다"가 깨진다(별도 테스트가 동결).
+- **같은 PR에서 고친 인접 결함**: `scripts/harness/ci_mirror.py`가 워크플로 최상위 `env`를 무시해 미러가 제약 없이 돌아 CI와 달라지는 문제(기존 코드는 `defaults.run.shell`만 최상위를 읽고 env는 빠져 있었다). 잡·스텝 env와 같은 규칙(식은 비움, `${{ github.workspace }}`는 저장소 루트)으로 상속하고 테스트 6건을 추가했다 — 옛 코드로 되돌리면 4건 RED.
+- **보지 못하는 것(정직 기술)**: ①오프라인 게이트는 전이 의존의 일관성을 직접 보지 못한다(직접 의존 핀·이름 집합 지문만; 전이 정합은 `refresh` 시점 리졸버가 보장) ②Dockerfile 설치 표면은 이 파일을 아직 안 쓴다 — `OPS-103` 소관(OPS-121 착지 후 착수하도록 `depends_on`을 걸었다) ③CI가 설치하지 않는 extras(`embedding`·`ocr`·`playwright`·`xlsx`)는 핀이 없다 ④갱신 PR 자동화는 미결(기본 토큰으로 만든 PR은 워크플로를 깨우지 않는 것으로 알려져 있으나 이 저장소에서 실측하지 않았다 — 지금은 세션이 `refresh`를 돌려 PR을 연다) ⑤해시 고정은 하지 않는다(`SEC-22` 소관).
+- **소유권 조율**: OPS-103 ②의 `-c` 승격은 OPS-121이 소유하고 OPS-103은 `-r`만 남긴다(`backlog.py amend`로 대장 반영). 제약 파일은 `.txt`라 OPS-94 스캔 대상이 아니고(테스트로 동결) 새 워크플로 잡의 인라인 설치에는 상한을 붙였다.
+
 ### 2026-10-09 (결정 · 부분매핑 적재 자격 정책): **부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지) — 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다** (Kiki 결정·claude 기록) — 판정 기준 main `663b91dc`
 
 - **결정(2026-10-09)**: ①`link_type`이 부분매핑·개념겹침인 행은 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/`)에 넣지 않는다. ②"사실상 직접매핑"이라고 사람이 판단한 행만 큐에서 `직접매핑`으로 승격하고 `confidence ≥ 0.6`을 기입한 뒤 서명한다 — 판단의 흔적이 신뢰도 숫자로 남는다(M0672가 선례). ③큐의 부분매핑 38행·개념겹침 5행은 pending 그대로 둔다(일괄 승격 금지·행별 사람 판단).
