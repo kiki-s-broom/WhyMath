@@ -242,6 +242,31 @@ def _parse_tolerance(raw: str) -> TolerancePolicy:
     return TolerancePolicy("rel" if kind == "rel" else "abs", bound=bound)
 
 
+def _parse_columns(raw: str) -> tuple[int, ...]:
+    """columns=[...] → 열 인덱스 튜플. bool이 아닌 JSON 정수만 허용한다.
+
+    `int(c)` 변환은 쓰지 않는다 — `1.5`를 1로 자르고 `"1"`·`true`를 1로 읽어, 다른 열의 값으로
+    조용히 판정하기 때문이다. 파싱 단계에서 새는 예외(깊은 중첩·4300자리 초과 정수)도 모두
+    StatisticalClaimError로 돌려 verify_statistical_claim이 unverifiable로 처리하게 한다.
+    """
+    try:
+        cols = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise StatisticalClaimError(f"columns JSON 파싱 실패: {raw!r}") from exc
+    except RecursionError as exc:
+        raise StatisticalClaimError("columns 중첩이 너무 깊음") from exc
+    except ValueError as exc:
+        # 정수 문자열 변환 한도(4300자리) 초과 — JSONDecodeError가 아닌 ValueError로 새던 경로.
+        raise StatisticalClaimError(f"columns 수를 읽을 수 없음: {raw[:16]!r}…") from exc
+    if not isinstance(cols, list):
+        raise StatisticalClaimError(f"columns는 배열이어야 함: {cols!r}")
+    for c in cols:
+        # bool은 int의 하위 클래스라 isinstance(True, int)가 참이다 — 따로 걸러야 한다.
+        if isinstance(c, bool) or not isinstance(c, int):
+            raise StatisticalClaimError(f"columns는 정수 인덱스만 허용함: {c!r}")
+    return tuple(cols)
+
+
 def parse_statistical_model(conditions: str) -> StatisticalModel:
     """`verify.conditions` 문자열 → StatisticalModel."""
     parts = conditions.split(";")
@@ -272,14 +297,7 @@ def parse_statistical_model(conditions: str) -> StatisticalModel:
 
     columns: tuple[int, ...] | None = None
     if "columns" in kwargs:
-        columns_raw = kwargs["columns"]
-        try:
-            cols = json.loads(columns_raw)
-        except json.JSONDecodeError as exc:
-            raise StatisticalClaimError(f"columns JSON 파싱 실패: {columns_raw!r}") from exc
-        if not isinstance(cols, list):
-            raise StatisticalClaimError(f"columns는 배열이어야 함: {cols!r}")
-        columns = tuple(int(c) for c in cols)
+        columns = _parse_columns(kwargs["columns"])
 
     variance_kind: VarianceKind | None = None
     if "variance_kind" in kwargs:
@@ -387,8 +405,13 @@ def _variance(values: tuple[Fraction, ...], kind: VarianceKind | None) -> Fracti
     n = len(values)
     if kind == "population":
         return _sum_sq_dev(values) / n
-    # n=1 표본분산은 정의되지 않지만 S4-53 동작(0)을 보존한다 — 변경은 이 태스크 범위 밖.
-    return _sum_sq_dev(values) / (n - 1) if n > 1 else Fraction(0)
+    if n < 2:
+        # 표본분산의 분모 n-1 이 0 이다. S4-53 은 이를 0 으로 계산해 주장값 0 을 pass 시켰다.
+        raise StatisticalClaimError(
+            "표본분산·표본표준편차는 n=1 에서 정의되지 않음(분모 n-1=0) "
+            "— 모집단 값이면 variance_kind=population"
+        )
+    return _sum_sq_dev(values) / (n - 1)
 
 
 def _correlation(col_x: tuple[Fraction, ...], col_y: tuple[Fraction, ...]) -> _Stat | None:
