@@ -897,7 +897,10 @@ class TestCorpusVerifyBlockSupply:
         # 13,819 → 13,817(-2): P3-03 7회차 교정(은행 감사 3회차)이 02-05 오개념 유발 'y = x^2 위의 점의 접선
         # 기울기' 틀(문자열 조건 2건)을 삼차곡선 y = x^3 + qx로 바꿔 두 근 ±a 중 양수를 'a > 0'으로 고르는 목록
         # 조건이 됐다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
-        assert len(blocks) == 13817
+        # 13,817 → 13,815(-2): P3-03 8회차 교정(은행 감사 4회차)이 02-06 'f'(c)의 값' 진단 틀(문자열 조건 3건)을
+        # 지웠고, 라운드로빈이 그 슬롯을 남은 진단 틀에 나눴다 — 순간속도 = 평균속도인 c(목록 조건)·평행 접선의
+        # 개수(목록 조건·빈 answer_map)·f'(x) ≥ m인 하한(문자열 조건) 각 1건이라 문자열 조건이 2건 줄었다.
+        assert len(blocks) == 13815
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1139,4 +1142,5 @@ class TestCorpusCeilingReportDiscriminates:
         # 12,535 → 12,536(+1): 위 블록 +1과 같은 사유(P3-03 감사 결함 교정 — 개수형 틀이 값형으로).
         # 12,536 → 12,513(-23): 위 블록 -23과 같은 사유(P3-03 3차 감사 처분 — 문자열 조건 + answer_map인
         # 비객관식이 268 → 245건. 객관식 54건은 그대로 selectable이라 이 버킷의 감소분은 블록 감소분과 같다).
-        assert report.bucket_counts["condition_formal_derivable"] == 12513
+        # 12,513 → 12,511(-2): 위 블록 -2와 같은 사유(P3-03 8회차 교정 — 교체된 진단 문항은 전부 비객관식).
+        assert report.bucket_counts["condition_formal_derivable"] == 12511

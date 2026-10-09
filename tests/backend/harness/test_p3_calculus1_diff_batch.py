@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import shutil
 from pathlib import Path
@@ -34,7 +35,19 @@ from whymath_backend.l3.verification_tier import VerificationTier
 pytestmark = pytest.mark.corpus_authoring
 
 _REPO_BANK = Path(__file__).resolve().parents[3] / "data" / "corpus" / batch.CORPUS_DIR_NAME
-_EXPECTED_TOTAL = sum(len(g.items(s)) for g in batch.GENERATORS for s in SLOT_IDS)
+
+
+@functools.cache
+def _expected_total() -> int:
+    """등록부 전 생성기 × 슬롯의 문항 수 — 테스트가 처음 부를 때 한 번만 센다.
+
+    모듈 최상단 상수로 두면 **수집(collection) 때** 생성기 전부를 돌린다(은행 504건 생성 ≈ 2분).
+    이 모듈은 `corpus_authoring` 표지라 backend 잡에서 실행되지 않지만, 표지에 의한 제외는 수집이
+    끝난 뒤에 일어나므로 임포트 비용은 그대로 남는다 — backend 잡의 xdist 워커 4개가 각자
+    커버리지 추적 아래 이 계산을 반복해 수집이 약 8분 늘었고 잡이 35분 상한에 걸렸다(2026-10-09
+    실측: 수집 15초 → 134초, CI 첫 출력까지 72초 → 555초).
+    """
+    return sum(len(g.items(s)) for g in batch.GENERATORS for s in SLOT_IDS)
 
 
 def _records(path: Path) -> list[dict[str, object]]:
@@ -45,8 +58,8 @@ def test_batch_stores_every_item_through_the_gate(tmp_path: Path) -> None:
     out = tmp_path / "problems.jsonl"
     report = batch.run_p3_calculus1_diff_batch(out_path=out)
 
-    assert report.total_stored == report.total_requested == _EXPECTED_TOTAL
-    assert report.written == _EXPECTED_TOTAL
+    assert report.total_stored == report.total_requested == _expected_total()
+    assert report.written == _expected_total()
     assert len(report.bands) == len(batch.GENERATORS) * len(SLOT_IDS)
     assert all(not b.failure_reasons for b in report.bands), [
         b.failure_reasons for b in report.bands
@@ -56,7 +69,7 @@ def test_batch_stores_every_item_through_the_gate(tmp_path: Path) -> None:
     }
 
     records = _records(out)
-    assert len(records) == _EXPECTED_TOTAL
+    assert len(records) == _expected_total()
     assert len({r["problem_id"] for r in records}) == len(records)
     assert len({r["slug"] for r in records}) == len(records)
     for record in records:
@@ -193,7 +206,7 @@ def test_reverify_passes_the_bank_and_rejects_an_injected_answer_mismatch(tmp_pa
     shutil.copyfile(_REPO_BANK / "problems.jsonl", clean)
     records = corpus_reverify._iter_records(clean.read_text(encoding="utf-8"))
     report = corpus_reverify.reverify_corpus(records, use_fuzz=False)
-    assert (report.passed, report.failed, report.skipped) == (_EXPECTED_TOTAL, 0, 0)
+    assert (report.passed, report.failed, report.skipped) == (_expected_total(), 0, 0)
     assert corpus_reverify.main([str(clean)]) == 0
 
     broken = tmp_path / "broken.jsonl"

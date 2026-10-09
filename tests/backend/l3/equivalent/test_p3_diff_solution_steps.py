@@ -57,12 +57,12 @@ from whymath_backend.whs.corpus_replay import load_replay_items
 
 _BANK = Path(__file__).resolve().parents[4] / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
 _DERIVATIVE = "Derivative"
-#: 평균값 정리의 결론(f'(c) = 평균변화율)만 묻는 진단 틀 둘 — 출발식에 도함수가 없는 틀은 이 둘뿐이다
-#: (`p3_diff_solution_steps` docstring '한계'). ① 함수식 없음(미분할 함수가 없다) ② 함수식이 있는 짝
-#: (5회차 감사 교정 · 구판 '두 실근은 …이다' 근 나열 틀의 대체 — c를 구하지 않고 f'(c)를 정하는 것이
-#: 진단 대상이라 평균변화율 산술이 곧 풀이다).
+#: 평균값 정리의 결론(f'(c) = 평균변화율)만 묻는 진단 틀 — 출발식에 도함수가 없는 틀은 이것뿐이다
+#: (`p3_diff_solution_steps` docstring '한계'). 함수식이 없어 미분할 함수가 없다. 함수식이 있는 짝(5회차
+#: 감사 교정으로 넣은 'f'(c)의 값을 구하시오')은 8회차(은행 감사 4회차) 처분으로 삭제했다 — 주어진 식을
+#: 미분하지 않고 평균변화율 대입만으로 답이 나왔다(판정기 T06-unused-function).
 _NO_FUNCTION_STEM = "f'(c) = k인 c가"
-_CONCLUSION_STEMS = (_NO_FUNCTION_STEM, "평균값 정리를 만족시키는 c가 있다. f'(c)의 값을 구하시오.")
+_CONCLUSION_STEMS = (_NO_FUNCTION_STEM,)
 _OPS = (("<=", "le"), (">=", "ge"), ("!=", "ne"), ("<", "lt"), (">", "gt"))
 
 #: 마지막 단계의 끝맺음 분포 — 스냅숏(값만 갱신 가능 · 이유를 주석으로 남긴다 · 약화 금지).
@@ -77,17 +77,21 @@ _OPS = (("<=", "le"), (">=", "ge"), ("!=", "ne"), ("<", "lt"), (">", "gt"))
 #: 바꿔 f'(a) = m이 이차방정식이 됐다 — 근 둘 중 '양수 a'가 정답을 고른다(정답 1개 -6 · 근 목록 +6).
 #: ② 02-03 'cx^m 꼴의 m만'(`= c·2**m`)·'f'(x) = 8x^7일 때 n'(`x**n`)은 미지수가 지수에 있어 근 목록으로
 #: 끝나지 않던(B) 문항 7건이다 — c + m · c와 m의 곱 · 계수 k(일차 미지수)를 묻게 바꿔 정답 1개가 됐다.
+#: 2026-10-08 갱신(8회차 · 은행 감사 4회차 교정): 정답 1개 252 → 250, 근 목록·선택 128 → 129, 근 목록·정답
+#: 변수 아님 50 → 51(합 불변). 02-06 'f'(c)의 값' 진단 틀(정답 1개로 끝나는 평균변화율 산술 3건)을 지우자
+#: 라운드로빈이 같은 슬롯을 남은 진단 틀에 나눴다 — 순간속도 = 평균속도인 c(근 둘 중 구간 안 · 선택 +1)·
+#: 평행 접선의 개수(개수형 · 정답 변수 아님 +1)·f'(x) ≥ m인 하한(정답 1개 그대로 1건).
 _ENDING_SNAPSHOT: dict[str, int] = {
-    "정답 1개(u = 정답)": 252,
+    "정답 1개(u = 정답)": 250,
     # 단일 미지수 근 목록 — 보호 조건(a > 0 등) 또는 answer_selection이 정답 하나만 남긴다.
-    "근 목록 · 선택 조건이 정답 하나를 고름": 128,
+    "근 목록 · 선택 조건이 정답 하나를 고름": 129,
     # 정답 사전에 다른 미지수(y·a·b·k)가 함께 있는 연립 — 근 선택은 그 미지수의 조건(극값의 값 등)이
     # 맡는다. 여기서는 정답이 보호 조건을 통과하는지만 본다.
     "근 목록 · 연립(다른 미지수 조건이 고름)": 48,
     "정답 대입 검산 연쇄(B)": 12,
     "도함수 식 연쇄(C · 허근 인수 임계점)": 8,
     "경계점(정답은 증감 구간 안 정수)": 6,
-    "근 목록 · 정답 변수 아님(개수·위치)": 50,
+    "근 목록 · 정답 변수 아님(개수·위치)": 51,
 }
 
 
@@ -384,7 +388,8 @@ def test_first_step_differentiates_except_the_function_free_mvt_diagnostic(
 ) -> None:
     without = [r for r in rows if _DERIVATIVE not in r["verify"]["solution_steps"][0]]
     # 3 → 6(5회차 감사 교정): 함수식이 있는 결론 진단 틀 3문항이 더해졌다 — 틀마다 3문항씩.
-    assert len(without) == 6
+    # 6 → 3(8회차 · 은행 감사 4회차 교정): 함수식이 있는 짝 틀을 지웠다(T06-unused-function).
+    assert len(without) == 3
     assert all(any(stem in str(r["question_text"]) for stem in _CONCLUSION_STEMS) for r in without)
     for stem in _CONCLUSION_STEMS:
         assert sum(stem in str(r["question_text"]) for r in without) == 3, stem
