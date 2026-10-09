@@ -104,6 +104,8 @@ class StatisticalResult:
 
     `value`는 하위 호환용 float(교차검증 `machine_value` 계약) — 판정에는 쓰지 않는다.
     `exact_value`는 유리수 정확값(무리수면 None), `policy`는 실제로 적용된 정책 라벨이다.
+    `approx_value`는 10^-60 이내 근사(유리수면 정확값과 같다) — 교차검증이 float을 거치지 않고
+    같은 정책으로 대조하도록 넘기는 재료다(S4-70).
     """
 
     value: float | None
@@ -111,6 +113,7 @@ class StatisticalResult:
     description: str
     exact_value: Fraction | None = None
     policy: str = ""
+    approx_value: Fraction | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -611,6 +614,7 @@ def verify_statistical_claim(
         description=description,
         exact_value=stat.exact,
         policy=policy_label,
+        approx_value=stat.approx,
     )
 
     claimed, reason = _parse_claimed(answer)

@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -120,6 +121,8 @@ class _DomainResult:
     machine_favorable: int = 0
     machine_model_ko: str = ""
     machine_value: float | None = None
+    machine_exact: Fraction | None = None
+    machine_approx: Fraction | None = None
 
 
 DomainVerifier = Callable[[str, str], _DomainResult]
@@ -198,11 +201,15 @@ def _verify_statistical_claim_pair(conditions: str, answer: str) -> _DomainResul
     verdict, residual_axes, result = verify_statistical_claim(conditions, answer)
     machine_model_ko = ""
     machine_value: float | None = None
+    machine_exact: Fraction | None = None
+    machine_approx: Fraction | None = None
     if verdict.state == "pass":
         try:
             model = parse_statistical_model(conditions)
             machine_model_ko = describe_statistical_model_ko(model, result)
             machine_value = result.value
+            machine_exact = result.exact_value
+            machine_approx = result.approx_value
         except Exception:  # noqa: BLE001 — 교차검증 재료가 없어도 기계 검증 결과는 유효
             machine_model_ko = ""
     return _DomainResult(
@@ -211,6 +218,8 @@ def _verify_statistical_claim_pair(conditions: str, answer: str) -> _DomainResul
         residual_axes=residual_axes,
         machine_model_ko=machine_model_ko,
         machine_value=machine_value,
+        machine_exact=machine_exact,
+        machine_approx=machine_approx,
     )
 
 
@@ -380,6 +389,8 @@ class Verifier:
             machine_total=domain_result.machine_total,
             machine_favorable=domain_result.machine_favorable,
             machine_value=domain_result.machine_value,
+            machine_exact=domain_result.machine_exact,
+            machine_approx=domain_result.machine_approx,
             authored_by=problem.authored_by,
             data=problem.conditions,
         )

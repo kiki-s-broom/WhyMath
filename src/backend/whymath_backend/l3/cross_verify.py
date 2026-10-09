@@ -53,6 +53,7 @@ import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Literal
 
 from whymath_backend.config import Settings
@@ -134,6 +135,11 @@ class ResidueSubject:
     authored_by: str
     data: str = ""
     machine_value: float | None = None
+    # S4-70 — 통계 관점 ④의 정확값 대조 재료. `machine_value`(float)는 기존 소비자용 호환 필드로
+    # 남기고, 대조는 이 두 필드를 우선한다. exact는 유리수 정확값(무리수면 None),
+    # approx는 10^-60 근사.
+    machine_exact: Fraction | None = None
+    machine_approx: Fraction | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,24 +452,106 @@ def _render_stat_grounding(subject: ResidueSubject) -> str:
     )
 
 
-def _parse_numeric_value(raw: object) -> float | None:
-    """LLM 재계산 값 파싱 — 정수·실수·'a/b' 분수를 float로."""
+# 재계산값 대조 정책 — `l3.statistical_claim`의 선언 없는 기본 정책과 같다(유한소수면 정확 일치,
+# 아니면 절대오차 10^-9 · 상대오차는 섞지 않는다). CORE(cross_verify)가 수학 ADAPTER
+# (statistical_claim)를 import하는 것은 import-linter 계약이 금지하므로 도메인 중립 최소 구현을
+# 여기 두고, 두 정책이 어긋나지 않는 것은 tests/backend/l3/test_cross_verify.py의
+# 패리티 검사가 잡는다.
+_RECOMPUTED_ABS_TOLERANCE = Fraction(1, 10**9)
+_RECOMPUTED_ABS_LABEL = "abs:0.000000001"
+_MAX_RECOMPUTED_CHARS = 64  # 수 토큰 최대 길이 — 거대 정수/소수 입력의 자원 고갈 차단
+_MAX_RECOMPUTED_EXPONENT = 30  # 과학 표기 지수 절댓값 상한
+_RECOMPUTED_NUMBER_RE = re.compile(
+    r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE](?P<exp>[+-]?[0-9]+))?"
+)
+_RECOMPUTED_SPLIT_DIGITS_RE = re.compile(r"[0-9]\s+[0-9]")  # "1 1/2"를 "11/2"로 붙여 읽는 오독 차단
+
+
+def _decimal_token(text: str) -> Fraction | None:
+    """십진 수 토큰 → 정확 유리수. float 경유 금지 · 길이·지수 상한 초과·형식 불일치는 None."""
+    if len(text) > _MAX_RECOMPUTED_CHARS:
+        return None
+    match = _RECOMPUTED_NUMBER_RE.fullmatch(text)
+    if match is None:
+        return None
+    exponent = match.group("exp")
+    if exponent is not None and abs(int(exponent)) > _MAX_RECOMPUTED_EXPONENT:
+        return None
+    return Fraction(text)
+
+
+def _parse_recomputed_value(raw: object) -> Fraction | None:
+    """LLM 재계산 값 → 정확 유리수. 읽을 수 없거나 모호하면 None(조용히 근사하지 않는다).
+
+    정수는 그대로, float은 LLM이 쓴 십진 표기(`repr`)로 읽는다(이진 근사값이 아니라). 문자열은
+    `a/b`·`x=3.5`를 받고 공백으로 갈라진 숫자는 거절한다. bool·NaN·Infinity는 None.
+    """
     if isinstance(raw, bool):
         return None
-    if isinstance(raw, (int, float)):
-        return float(raw)
-    if isinstance(raw, str):
-        text = raw.strip().replace(" ", "")
-        if "/" in text:
-            try:
-                num, den = text.split("/", 1)
-                return float(num) / float(den)
-            except ValueError:
-                return None
-        try:
-            return float(text)
-        except ValueError:
+    if isinstance(raw, int):
+        return _decimal_token(str(raw))
+    if isinstance(raw, float):
+        return _decimal_token(repr(raw)) if math.isfinite(raw) else None
+    if not isinstance(raw, str):
+        return None
+    stripped = raw.strip()
+    if not stripped or _RECOMPUTED_SPLIT_DIGITS_RE.search(stripped):
+        return None
+    text = re.sub(r"\s+", "", stripped)
+    value_text = text.partition("=")[2] if "=" in text else text
+    if "/" in value_text:
+        num_text, _, den_text = value_text.partition("/")
+        numerator, denominator = _decimal_token(num_text), _decimal_token(den_text)
+        if numerator is None or denominator is None or denominator == 0:
             return None
+        return numerator / denominator
+    return _decimal_token(value_text)
+
+
+def _is_terminating(value: Fraction) -> bool:
+    """유한소수인가 — 기약분수의 분모가 2·5 이외의 소인수를 갖지 않는다."""
+    denominator = value.denominator
+    for prime in (2, 5):
+        while denominator % prime == 0:
+            denominator //= prime
+    return denominator == 1
+
+
+def _matches_machine_value(
+    exact: Fraction | None, approx: Fraction, recomputed: Fraction
+) -> tuple[bool, str]:
+    """(일치 여부, 적용 정책 라벨) — 유한소수는 정확 일치, 무한소수·무리수는 절대오차."""
+    if exact is not None and _is_terminating(exact):
+        return recomputed == exact, "exact"
+    return abs(approx - recomputed) <= _RECOMPUTED_ABS_TOLERANCE, _RECOMPUTED_ABS_LABEL
+
+
+def _fraction_text(value: Fraction) -> str:
+    """사유 표기 — 정수는 그대로, 유한소수는 정확한 십진, 아니면 `a/b (≈ 근사)`."""
+    if value.denominator == 1:
+        return str(value.numerator)
+    if not _is_terminating(value):
+        return f"{value.numerator}/{value.denominator} (≈ {float(value)!r})"
+    digits = 0
+    while (value * 10**digits).denominator != 1:
+        digits += 1
+    scaled = abs(value.numerator) * 10**digits // value.denominator
+    text = str(scaled).rjust(digits + 1, "0")
+    return f"{'-' if value < 0 else ''}{text[:-digits]}.{text[-digits:]}"
+
+
+def _machine_reference(subject: ResidueSubject) -> tuple[Fraction | None, Fraction] | None:
+    """기계값 (exact, approx) — 정확 필드 우선, 없으면 호환 float을 근사로만 쓴다(없으면 None).
+
+    float `machine_value`는 이미 반올림된 값이라 정확 일치를 요구하면 올바른 재계산(`7/3`)이
+    거부된다 — 그래서 exact로 승격하지 않고 절대오차 대조에만 쓴다.
+    """
+    if subject.machine_approx is not None:
+        return subject.machine_exact, subject.machine_approx
+    if subject.machine_exact is not None:
+        return subject.machine_exact, subject.machine_exact
+    if subject.machine_value is not None and math.isfinite(subject.machine_value):
+        return None, Fraction(repr(subject.machine_value))
     return None
 
 
@@ -479,7 +567,7 @@ def _judge_stat_reconstruct(
             defect_class="reconstruction_declined",
             reason=f"독립 재계산 실패: {data.get('reason', '사유 미제시')}",
         )
-    llm_value = _parse_numeric_value(raw_value)
+    llm_value = _parse_recomputed_value(raw_value)
     if llm_value is None:
         return PerspectiveVerdict(
             principle="statistical_reconstruction",
@@ -487,27 +575,32 @@ def _judge_stat_reconstruct(
             defect_class="value_unparsed",
             reason=f"재계산 값을 숫자로 읽을 수 없음(value={raw_value!r}).",
         )
-    if subject.machine_value is None:
+    reference = _machine_reference(subject)
+    if reference is None:
         return PerspectiveVerdict(
             principle="statistical_reconstruction",
             verdict="unclear",
             defect_class="machine_value_missing",
             reason="기계 계산값이 없어 대조 불가.",
         )
-    if math.isclose(llm_value, subject.machine_value, rel_tol=1e-9, abs_tol=1e-9):
+    # S4-70 — float isclose(rel_tol 1e-9)는 평균 1조에서 허용 폭이 1000이라 1 어긋난 재계산을
+    # 통과시켰다. 정확값 정책으로 대조한다.
+    matched, policy = _matches_machine_value(reference[0], reference[1], llm_value)
+    if matched:
         return PerspectiveVerdict(
             principle="statistical_reconstruction",
             verdict="ok",
             defect_class="",
-            reason=f"독립 재계산 일치({llm_value}).",
+            reason=f"독립 재계산 일치({_fraction_text(llm_value)} · 정책 {policy}).",
         )
     return PerspectiveVerdict(
         principle="statistical_reconstruction",
         verdict="defect",
         defect_class="model_mismatch",
         reason=(
-            f"독립 재계산 불일치 — 재계산 {llm_value} vs 기계 계산 "
-            f"{subject.machine_value}. 발문이 기계가 검산한 자료·통계량과 다르게 읽힐 소지."
+            f"독립 재계산 불일치 — 재계산 {_fraction_text(llm_value)} vs 기계 계산 "
+            f"{_fraction_text(reference[1])}(정책 {policy}). "
+            "발문이 기계가 검산한 자료·통계량과 다르게 읽힐 소지."
         ),
     )
 

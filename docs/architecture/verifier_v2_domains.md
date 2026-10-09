@@ -175,9 +175,20 @@ data=[[1,1],[2,3],[3,2]]; stat=corr; columns=[0,1]
 `bool`·문자열·`null`, 길이 64자 초과 수 토큰, 지수 절댓값 30 초과(`1e999999999` 폭탄), 비 ASCII 숫자·밑줄
 숫자(`1_000`), 공백으로 갈라진 숫자(혼합수 `1 1/2`가 `11/2`로 읽히던 오독), 분모 0, 깊은 중첩 JSON.
 
-**알려진 한계 (승계 후보).** `StatisticalResult.value`(float)는 하위 호환용이며 판정에는 쓰지 않는다. 그러나
-교차검증의 `cross_verify.py`는 이 float을 `math.isclose(rel_tol=1e-9)`로 LLM 재계산값과 대조하므로, 거기서는
-대값 왜곡이 동형으로 남아 있다. 표본분산 n=1이 0으로 계산되는 S4-53 동작은 보존했다(정의 불가 값).
+**교차검증 재계산 대조 (S4-70).** `StatisticalResult.value`(float)는 하위 호환용이며 판정에는 쓰지 않는다.
+교차검증 관점 ④(`statistical_reconstruction`)는 한때 이 float을 `math.isclose(rel_tol=1e-9)`로 LLM
+재계산값과 대조해 평균 1조에서 허용 폭이 1000으로 열렸다(대값 왜곡이 동형으로 잔존). 이제 기계값은
+`StatisticalResult.exact_value`(유리수 정확값)·`approx_value`(10^-60 근사)로 `ResidueSubject.machine_exact`·
+`machine_approx`에 실려 가고, LLM 재계산값은 `Fraction`으로 읽어(float은 LLM이 쓴 십진 표기 그대로)
+선언 없는 기본 정책과 같은 규칙으로 대조한다 — 기계값이 유한소수면 정확 일치, 무한소수·무리수면 `abs:0.000000001`.
+`ResidueSubject.machine_value`(float)는 정확 필드를 모르는 기존 소비자를 위해 남기며, 정확 필드가 없을 때만
+절대오차 대조에 쓴다(float을 정확값으로 승격하면 올바른 `7/3`이 거부된다).
+
+- 경계: 교차검증(CORE)은 수학 ADAPTER인 `statistical_claim`을 import할 수 없다(import-linter 계약).
+  그래서 대조 정책은 `cross_verify.py`에 도메인 중립 최소 구현으로 자급하고, 두 정책이 어긋나지 않는 것은
+  `tests/backend/l3/test_cross_verify.py`의 패리티 검사(`verify_statistical_claim`과 같은 입력 격자)가 잡는다.
+- 한계: 문항이 선언한 `tolerance=` 절은 교차검증 대조에 전달하지 않는다(LLM은 원 통계량을 재계산할 뿐
+  반올림 정책을 모른다). 표본분산 n=1이 0으로 계산되는 S4-53 동작은 보존했다(정의 불가 값).
 
 ---
 
