@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 4
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ paths:
   - src/backend/whymath_backend/harness/problem_type_mapping.py
   - src/backend/whymath_backend/harness/problem_bank_coverage.py
   - "data/corpus/problem_bank_rephrased_v0/**"
-session: null
+session: claude/trusting-dirac-jzw7zb
 notes: "docs/architecture/ai_content_generation_gap_review_r3.md §2 F3·§3 D10 — 외부 EOS 틀(기능 59 '생성 기준: 유형') 3차 대조. CONT-03(트리거 만료 계약)이 일반 계약이라면 이 태스크는 그 계약이 없어서 생긴 구체적 미상환 1건이다. 부수 정정: S3-27 acceptance ④와 S4-14 notes가 후속을 'S4-18'로 지목하고 있으나 S4-18은 현재 S4-18-review-time-axis(복습 시간축·ai_tutor D5)로 무관한 태스크이며 실제 후속은 S4-21이다 — 참조가 stale하다(태스크 소실이 아니라 번호 재배정, HARN-10/HARN-15 번호 충돌 가드 계열).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/B7 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-09
