@@ -321,7 +321,7 @@ claude/magical-maxwell-hja5kh-eos129
 claude/magical-maxwell-hja5kh-s4-11
 claude/optimistic-bell-gk8vkz
 
-# ── 2026-10-09 14차 배치 (10건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-③ ──
+# ── 2026-10-09 14차 배치 (11건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-③ ──
 # 직전 배치 집행 확인(2026-10-09 ls-remote 실측): 13차 3건(magical-maxwell-hja5kh-eos129 ·
 #   magical-maxwell-hja5kh-s4-11 · optimistic-bell-gk8vkz) 전건 **잔존 0/3**.
 # 15회차(2026-10-03)가 브랜치 magical-maxwell-99n5e8에 남긴 "14차 배치 2건"(tbj2jf · 7x90dj)은 main에 도달한 적이
@@ -337,6 +337,7 @@ claude/optimistic-bell-gk8vkz
 #   sleepy-feynman-skndtr = 0490f7e6 (MISC-43 철회 종결 · PR #1487 닫힘 · 대체 결정 MEMORY.md 435행)
 #   crosslink-signature-mm6kie = a48a0e9e (10-05 중간 서명 판정 · 10-06 재판정이 최종 · 보류 게이트 근거 소멸)
 #   magical-maxwell-99n5e8 = bea5ebc5 (15회차 산출물 — 문서 byte 이식 · HARN-212 재등재 · 배치 승계)
+#   friendly-dijkstra-230lnm = bcc172a3 (PR #1478 닫힘 · 게이트 G-misc40-new-crosslink-signature는 main에 kiki 서명으로 cleared · 사후 추가 — 판정 문서 §5)
 # ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) —
 #   신규 회수: friendly-pascal-mnmypk(QUAL-15) · practical-maxwell-kuwl7x(OPS-122) · blissful-lovelace-ubp9tw(OPS-123) ·
 #   remaining-track-34zvse(HARN-212 — 15회차가 등재만 하고 고립시킨 태스크를 이 PR이 재등재)
@@ -354,3 +355,4 @@ claude/vibrant-darwin-39xler
 claude/sleepy-feynman-skndtr
 claude/crosslink-signature-mm6kie
 claude/magical-maxwell-99n5e8
+claude/friendly-dijkstra-230lnm

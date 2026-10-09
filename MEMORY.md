@@ -12158,3 +12158,4 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **claim 활성 3건은 판정 보류**(`status-f6qz0c`·`status-f9lp65`·`stoic-hawking-vzumx5`): `claims reap` dry-run이 stale로 지목했으나 선행 선례대로 배치에서 뺐다. `claims reap --apply`는 이 감사가 실행하지 않았다.
 - **미해소**: `status-38gu4d`·`s4-70-pila8m`은 claim이 가리키는 브랜치가 원격에 없다. PR `#1478`은 main의 같은 게이트가 이미 `cleared`라 중복일 수 있으나 확인하지 못했다. `QUAL-15`는 PR 소유 `PB-09`와 생성기·코퍼스 경로가 겹친다.
 - 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
+- **사후 갱신(같은 날)**: PR `#1478`이 닫혀 `friendly-dijkstra-230lnm`(`bcc172a3`)이 고립 브랜치가 됐다. main의 같은 게이트가 `kiki` 서명으로 이미 `cleared`라 14차 배치에 추가했다(총 11건). 증적 문구는 글자 그대로 포함되지 않으며 삭제 근거는 내용 대체다(판정 문서 §5).
