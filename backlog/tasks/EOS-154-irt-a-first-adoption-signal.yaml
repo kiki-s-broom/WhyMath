@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l2/calibrate_items.py
   - src/backend/whymath_backend/l2/item_calibration.py
-session: null
+session: claude/sweet-babbage-af16cw
 notes: "출처: EOS-129 ⑤ 운영 실측(2026-09-29 · 문항 1703건 중 응답 있는 80건 전부 1~4건 · 학생 1명 · a 추정 가능 0건)이 데이터 축적 대기로 결론났고, 재측정 조건 충족을 알리는 자동 트리거가 없다는 공백이 남았다. 정정: 같은 결정 로그가 재측정 조건을 '5건 이상 문항 발생'으로 적었으나 코드 실측상 5건은 b 보정 바닥이고 a 채택은 50건 이상+SE 게이트다(l2/item_calibration.py). 관련: EOS-129(done)·PB-10(스케줄 좌석 결정)."
-updated: 2026-09-29
+updated: 2026-10-09
