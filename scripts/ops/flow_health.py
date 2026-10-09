@@ -68,7 +68,7 @@ _API = "https://api.github.com"
 _CA_PATH = "/root/.ccr/ca-bundle.crt"  # 에이전트 프록시 CA (있을 때만 사용)
 
 # 감사 대상이 아닌 ref — 하네스 소유이거나 트렁크 자신.
-EXCLUDED = frozenset({"main", "HEAD", "harness-claims"})
+EXCLUDED = frozenset({"main", "HEAD", "harness-claims", "harness-reports"})
 
 # 신호 코드 → 사람이 읽는 처방. 코드마다 처방이 **달라야** 한다 —
 # 같은 처방을 내는 두 신호는 분리할 이유가 없다(test가 이것을 동결한다).

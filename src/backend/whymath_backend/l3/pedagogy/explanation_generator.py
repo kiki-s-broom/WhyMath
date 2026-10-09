@@ -45,6 +45,7 @@ from whymath_backend.l3.pedagogy.explanation_checker import check_explanation_la
 from whymath_backend.l3.pedagogy.prescreen import prescreen_slot
 from whymath_backend.l3.pedagogy.review import ReviewVerdict, review_slot
 from whymath_backend.l3.pedagogy.slot_generator import _is_tts_safe
+from whymath_backend.l3.pipeline import served_cloud_seat
 from whymath_backend.l3.router import Router, _as_cost_tier, actual_cost_krw, langfuse_fields
 from whymath_backend.schema.enums import GenerationFailureCode
 from whymath_backend.schema.speech import SpeechGradeBand
@@ -237,15 +238,24 @@ class ExplanationGenerator:
         """생성 1건의 라우팅·실측을 sink에 기록 — never-break(예외 타입명 로그·침묵 실패 금지)."""
         actual_krw: float | None
         is_cloud = _as_cost_tier(decision.cost_tier) is not CostTier.LOCAL
+        # OPS-116 — 단가 좌석은 꽂힌 provider에서 읽는다. 미상(None)은 anthropic으로 접지 않고
+        # '미측정'으로 남기며, 같은 값을 trace의 cloud_seat에도 싣는다.
+        seat = served_cloud_seat(self._provider) if is_cloud else None
         if usage is None:
             actual_krw = None
         elif is_cloud and (usage.input_tokens is None or usage.output_tokens is None):
             actual_krw = None
         else:
-            actual_krw = actual_cost_krw(decision, usage)
+            actual_krw = actual_cost_krw(decision, usage, seat=seat)
         try:
             self._trace.record(
-                langfuse_fields(decision, cache_hit=False, usage=usage, cost_krw=actual_krw)
+                langfuse_fields(
+                    decision,
+                    cache_hit=False,
+                    usage=usage,
+                    cost_krw=actual_krw,
+                    cloud_seat=seat,
+                )
             )
         except Exception as exc:  # noqa: BLE001 — 관측 장애가 저작 배치를 깨면 안 됨
             _LOGGER.warning("설명 생성 관측 기록 실패(%s) — 무시하고 계속", type(exc).__name__)

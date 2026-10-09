@@ -201,6 +201,61 @@ class TestSystemPromptShape:
         assert "틀렸" in d.system  # 금기 목록에 포함되어야 — 모델 자기검열 유도
 
 
+class TestGradeRegisterWiring:
+    """W0 — S-2: decide(grade=...)가 base_system 정체성 문구의 register를 바꾼다(학년축 최단경로
+    계획 §2.3·§3). grade=None(기본·미전달)은 기존 문구와 바이트 동일 — 회귀 0."""
+
+    def test_grade_none_matches_default_stage_prompt_byte_identical(self) -> None:
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND))  # grade 미전달
+        assert d.system == STAGE_PROMPTS[PolyaStage.UNDERSTAND].system
+
+    def test_elementary_grade_uses_elementary_register(self) -> None:
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=3)
+        assert "초등학생" in d.system
+        assert "중·고등학생" not in d.system
+
+    def test_high_school_grade_uses_high_school_register(self) -> None:
+        # 현재 UserProfile.grade 실호출 범위(10~14) 안 — "고등학생" register(구 결합 표현
+        # "중·고등학생"보다 더 정확한 문구로 바뀜 — grade=None 폴백만 구 문구 보존).
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=11)
+        assert "고등학생" in d.system
+        assert d.system != STAGE_PROMPTS[PolyaStage.UNDERSTAND].system
+
+    def test_university_grade_uses_university_register(self) -> None:
+        # 15는 UserProfile.grade 계약(10~14) 밖 — 로더 관례의 대학 3학년 값을 받는 후속 호출자용.
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=15)
+        assert "대학생" in d.system
+
+    @pytest.mark.parametrize("grade", [13, 14])
+    def test_repeat_exam_taker_grades_are_not_addressed_as_university_students(
+        self, grade: int
+    ) -> None:
+        """UserProfile.grade 13·14는 N수1·N수2다(ge=10 le=14) — 대학생이 아니다. 로더의 대학 1~2학년
+        번호(13~14)와 겹치는 지점이라, 이식 직후 N수 학생에게 '대학생'이 나가던 회귀를 막는다."""
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=grade)
+        assert "고등학생" in d.system
+        assert "대학생" not in d.system
+
+    def test_out_of_range_grade_falls_back_to_default_register(self) -> None:
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=99)
+        assert d.system == STAGE_PROMPTS[PolyaStage.UNDERSTAND].system
+
+    def test_principles_and_stage_prompt_unaffected_by_register(self) -> None:
+        """register만 바뀌고 5원칙 본문·톤·단계 발문은 학년 무관(4축 공용 — 구조 분기 아님)."""
+        coach = PolyaCoach()
+        d = coach.decide("음", _state(PolyaStage.UNDERSTAND), grade=3)
+        assert "Polya" in d.system
+        assert "소크라테스" in d.system
+        assert "틀렸" in d.system
+        assert d.prompt == STAGE_PROMPTS[PolyaStage.UNDERSTAND].prompt
+
+
 class TestCoachWiring:
     @pytest.mark.asyncio
     async def test_coach_calls_llm_and_returns_clean_response(self) -> None:

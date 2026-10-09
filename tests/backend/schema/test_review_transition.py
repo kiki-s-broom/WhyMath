@@ -11,10 +11,16 @@ import pytest
 
 from whymath_backend.schema.enums import ReviewStatus
 from whymath_backend.schema.review_transition import (
+    QUARANTINE_REASON_MAX_LENGTH,
+    IllegalReviewStatusChange,
     IllegalReviewTransition,
+    QuarantineReasonRequired,
+    QuarantineRecordLocked,
     ReviewTransitionAction,
+    action_for_status_change,
     action_requires_reason,
     allowed_actions,
+    plan_review_field_change,
     resolve_review_transition,
 )
 
@@ -143,3 +149,150 @@ def test_audit_action_enum_carries_transition_values_and_keeps_crud() -> None:
         "release",
     }
     assert all(len(a.value) <= 16 for a in PrivacyAuditAction)
+
+
+# ── ADMIN-16: 목표 상태 → 액션 역해석 · PATCH 판정 ────────────────────────────────────
+
+#: (현재, 목표) → 액션 또는 None(불허). 5 현재 × 4 목표 = 20칸 전수를 **손으로** 적는다 —
+#: 정방향 표(`_EXPECTED`)에서 파생하면 역해석 버그가 정방향과 같이 움직여 통과한다.
+_EXPECTED_REVERSE: list[tuple[ReviewStatus | None, ReviewStatus, ReviewTransitionAction | None]] = [
+    (N, P, None),
+    (N, A, None),
+    (N, R, None),
+    (N, Q, None),
+    (P, P, None),
+    (P, A, APPROVE),
+    (P, R, REJECT),
+    (P, Q, None),
+    (A, P, None),
+    (A, A, None),
+    (A, R, None),
+    (A, Q, QUARANTINE),
+    (R, P, None),
+    (R, A, None),
+    (R, R, None),
+    (R, Q, None),
+    (Q, P, None),
+    (Q, A, RELEASE),
+    (Q, R, None),
+    (Q, Q, None),
+]
+
+
+def _label(state: ReviewStatus | None) -> str:
+    return "미설정" if state is None else state.value
+
+
+@pytest.mark.parametrize(
+    ("current", "target", "expected"),
+    _EXPECTED_REVERSE,
+    ids=[f"{_label(c)}->{t.value}" for c, t, _ in _EXPECTED_REVERSE],
+)
+def test_reverse_lookup_matches_the_hand_written_table(
+    current: ReviewStatus | None,
+    target: ReviewStatus,
+    expected: ReviewTransitionAction | None,
+) -> None:
+    if expected is None:
+        with pytest.raises(IllegalReviewStatusChange) as info:
+            action_for_status_change(current, target)
+        assert info.value.current is current and info.value.target is target
+        assert info.value.code == "illegal_transition"
+    else:
+        assert action_for_status_change(current, target) is expected
+
+
+def test_reverse_lookup_has_exactly_four_hits_and_agrees_with_the_forward_table() -> None:
+    """정방향과 역방향이 같은 표를 읽는다 — 역해석 결과를 정방향에 되먹이면 목표가 돌아와야 한다."""
+    hits = [(c, t, a) for c, t, a in _EXPECTED_REVERSE if a is not None]
+    assert len(hits) == 4
+    for current, target, action in hits:
+        assert current is not None
+        assert resolve_review_transition(current, action) is target
+
+
+def test_reverse_lookup_refuses_a_cleared_target() -> None:
+    """목표가 NULL(상태 소거)인 변경은 어떤 액션에도 대응하지 않는다."""
+    for current in (N, P, A, R, Q):
+        with pytest.raises(IllegalReviewStatusChange):
+            action_for_status_change(current, None)
+
+
+def _plan(**over: object) -> object:
+    kwargs: dict[str, object] = {
+        "current_status": P,
+        "target_status": A,
+        "reason_in_request": None,
+        "quarantine_record_changed": False,
+    }
+    kwargs.update(over)
+    return plan_review_field_change(**kwargs)  # type: ignore[arg-type]
+
+
+def test_plan_unchanged_status_is_not_a_transition_even_if_the_record_changed() -> None:
+    """상태가 그대로면 전이가 아니다 — 격리 기록 단독 편집은 이 계약의 범위 밖(계약 §7)."""
+    for state in (N, P, A, R, Q):
+        plan = _plan(current_status=state, target_status=state, quarantine_record_changed=True)
+        assert plan.action is None and plan.quarantine_reason is None  # type: ignore[attr-defined]
+
+
+def test_plan_legal_non_quarantine_transitions_carry_the_action() -> None:
+    assert _plan(current_status=P, target_status=A).action is APPROVE  # type: ignore[attr-defined]
+    assert _plan(current_status=P, target_status=R).action is REJECT  # type: ignore[attr-defined]
+    assert _plan(current_status=Q, target_status=A).action is RELEASE  # type: ignore[attr-defined]
+
+
+def test_plan_quarantine_returns_the_stripped_reason() -> None:
+    plan = _plan(
+        current_status=A,
+        target_status=Q,
+        reason_in_request="  복수 정답  ",
+        quarantine_record_changed=True,
+    )
+    assert plan.action is QUARANTINE  # type: ignore[attr-defined]
+    assert plan.quarantine_reason == "복수 정답"  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [None, "", "   ", "\n\t", "x" * (QUARANTINE_REASON_MAX_LENGTH + 1)],
+    ids=["None", "빈문자열", "공백", "개행탭", "상한초과"],
+)
+def test_plan_quarantine_without_a_usable_reason_is_refused(reason: str | None) -> None:
+    with pytest.raises(QuarantineReasonRequired) as info:
+        _plan(current_status=A, target_status=Q, reason_in_request=reason)
+    assert info.value.code == "reason_required"
+
+
+def test_plan_quarantine_reason_at_the_limit_is_accepted() -> None:
+    plan = _plan(
+        current_status=A,
+        target_status=Q,
+        reason_in_request="x" * QUARANTINE_REASON_MAX_LENGTH,
+    )
+    assert len(plan.quarantine_reason or "") == QUARANTINE_REASON_MAX_LENGTH  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ("current", "target"), [(P, A), (P, R), (Q, A)], ids=["approve", "reject", "release"]
+)
+def test_plan_non_quarantine_transition_cannot_change_the_record(
+    current: ReviewStatus, target: ReviewStatus
+) -> None:
+    with pytest.raises(QuarantineRecordLocked) as info:
+        _plan(current_status=current, target_status=target, quarantine_record_changed=True)
+    assert info.value.code == "quarantine_record_immutable"
+
+
+def test_plan_illegal_change_is_refused_before_the_reason_is_looked_at() -> None:
+    """불허 전이는 사유가 있어도 불허다 — 사유 검사가 불허 판정을 가리지 않는다."""
+    with pytest.raises(IllegalReviewStatusChange):
+        _plan(current_status=P, target_status=Q, reason_in_request="충분한 사유")
+
+
+def test_reason_limit_is_shared_with_the_transition_route_schema() -> None:
+    """POST의 `reason` 상한과 PATCH의 상한이 한 상수다 — 두 표면의 계약이 갈라지지 않는다."""
+    from whymath_backend.api.admin_bff import AdminReviewTransitionRequest
+
+    metadata = AdminReviewTransitionRequest.model_fields["reason"].metadata
+    assert any(getattr(m, "max_length", None) == QUARANTINE_REASON_MAX_LENGTH for m in metadata)

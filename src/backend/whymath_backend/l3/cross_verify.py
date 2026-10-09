@@ -22,8 +22,11 @@ LLM 교차검증**(생성자≠검증자·K≥3·**원리 다른 프롬프트**,
      집합이 하나라도 겹치면(동일 집합) 구성이 거부된다.
 
 추가로 **생성자≠검증자**를 구조로 강제한다 — 대상은 자신을 만든 주체 서명(`authored_by`)을
-들고 오고, 검증자는 자기 서명과 충돌하면 검증을 거부한다(`IndependenceError`). 파일럿 코퍼스의
-`authored_by`는 결정론 SymPy/열거 생성기라 LLM 자기승인이 원천적으로 성립하지 않는다.
+들고 오고, 검증자는 자기 서명과 충돌하면 검증을 거부한다(`IndependenceError`). 서명은 3상태다
+(`assert_author_independent`): `llm:<모델 id>`(검증자 서명과 비교)·`deterministic:<생성기>`(LLM
+생성자 없음 — 비교 대상 아님을 명시 선언)·그 밖(기록 없음 — 독립성 입증 불가라 **거부**). 두 서명은
+같은 조립 함수(`llm_author`)로 만들어져야 비교가 성립한다 — 형식이 서로 다르면 가드가 한 번도
+발화하지 못한다(PB-15: 코퍼스 `corpus:<유형>` vs 검증자 `llm:<모델>`).
 
 ────────────────────────────────────────────────────────────────────────────
 K=3 기본 관점(원리가 다르다)
@@ -63,12 +66,13 @@ from whymath_backend.l3.models import (
     RoutingRequest,
     Usage,
 )
+from whymath_backend.l3.pipeline import served_cloud_seat
+from whymath_backend.l3.pregenerate.provenance_bridge import model_name_for_decision
 from whymath_backend.l3.prompt_assets import fill, prompt_text
 from whymath_backend.l3.router import (
     Router,
     actual_cost_krw,
     langfuse_fields,
-    resolve_model,
 )
 
 # 학생 요청 라우팅 신호 기본값 — 6개 호출부 공용 단일 좌석(OPS-18, `api/visualization.py` 미러).
@@ -77,14 +81,22 @@ _STUDENT_ESCALATION_DEFAULTS = default_student_escalation_signals()
 __all__ = [
     "CrossVerificationResult",
     "CrossVerifier",
+    "DETERMINISTIC_AUTHOR_PREFIX",
     "IndependenceError",
+    "LLM_AUTHOR_PREFIX",
     "MISSING_CONDITION_PERSPECTIVES",
     "MULTIPLE_VALID_ANSWERS_PERSPECTIVES",
     "PROBABILITY_PERSPECTIVES",
     "STATISTICAL_PERSPECTIVES",
+    "UNRECORDED_AUTHOR",
     "Perspective",
     "PerspectiveVerdict",
     "ResidueSubject",
+    "AuthorDeclarationConflictError",
+    "assert_author_independent",
+    "deterministic_author",
+    "llm_author",
+    "resolve_author_signature",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,7 +118,8 @@ _FIELD_NAMES = frozenset(
 class ResidueSubject:
     """교차검증 대상 — 기계가 닫은 축(수치)과 닫지 못한 축(서술)의 재료를 함께 든다.
 
-    `authored_by`는 이 문항을 만든 주체의 서명이다(예 결정론 생성기 이름·LLM 모델 id).
+    `authored_by`는 이 문항을 만든 주체의 서명이다 — `llm_author(모델 id)` 또는
+    `deterministic_author(생성기)`로 조립한다(형식·3상태 의미는 `assert_author_independent`).
     검증자는 자기 서명과 충돌하면 검증을 거부한다 — 생성자≠검증자의 구조적 강제.
     `data`는 통계 자료형처럼 원본 자료 문자열이 필요한 도메인용 선택적 필드.
     """
@@ -150,6 +163,99 @@ class Perspective:
 
 class IndependenceError(RuntimeError):
     """독립성 위반 — 관점 구성이 겹치거나 생성자와 검증자가 같은 주체(자기승인)."""
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 생성자 서명(author identity) — 형식의 단일 출처 (PB-15)
+# ──────────────────────────────────────────────────────────────────────────
+# 생성자≠검증자 가드는 두 문자열이 *같은 함수로 조립됐을 때만* 작동한다. 검증자 서명과 저작 측
+# 서명이 각자 다른 곳에서 조립되면(종전: 검증자 `llm:<모델>`·코퍼스 `corpus:<유형>`) 두 값은
+# 같아질 수 없고 가드는 한 번도 발화하지 못한다 — 그래서 조립 지점을 여기 하나로 모은다.
+#
+# 서명은 3상태다. "모른다"를 "아니다"로 접지 않는다:
+#   `llm:<모델 id>`           LLM이 만들었다 → 검증자 서명과 비교한다(같으면 자기승인).
+#   `deterministic:<생성기>`  LLM 생성자가 없다(결정론 템플릿·열거) → 비교 대상이 아님을
+#                             *명시적으로 선언*한 값. 빈 문자열·임의 접두어는 이 자리가 아니다.
+#   그 밖(`unknown` 포함)     기록이 없다 → 독립성을 입증할 수 없으므로 거부한다(fail-closed).
+LLM_AUTHOR_PREFIX = "llm:"
+DETERMINISTIC_AUTHOR_PREFIX = "deterministic:"
+# 저작 기록이 없는 대상(구 코퍼스·`ProblemVerifyInput` 기본값)의 서명 — 가드가 거부하는 값이다.
+UNRECORDED_AUTHOR = "unknown"
+
+
+def _compose_author(prefix: str, name: str) -> str:
+    """접두어 + 이름 조립 — 이름이 비면 서명을 만들지 않는다(빈 값으로 가드를 우회하는 길 차단)."""
+    if not name.strip():
+        raise ValueError(f"{prefix!r} 서명의 이름이 비었다 — 빈 값으로는 서명을 만들 수 없다")
+    return f"{prefix}{name}"
+
+
+def llm_author(model_id: str) -> str:
+    """LLM 서명 `llm:<모델 id>` — 검증자 서명과 저작 측이 이 함수를 같이 쓴다."""
+    return _compose_author(LLM_AUTHOR_PREFIX, model_id)
+
+
+def deterministic_author(generator: str) -> str:
+    """결정론 생성기 서명 `deterministic:<생성기>` — LLM 생성자가 없음을 명시 선언한다."""
+    return _compose_author(DETERMINISTIC_AUTHOR_PREFIX, generator)
+
+
+def _author_payload(authored_by: str, prefix: str) -> str | None:
+    """`prefix` 뒤의 이름(공백 제거) — 접두어가 다르거나 이름이 비면 None(판독 불가)."""
+    if not authored_by.startswith(prefix):
+        return None
+    payload = authored_by[len(prefix) :].strip()
+    return payload or None
+
+
+class AuthorDeclarationConflictError(IndependenceError):
+    """저작 선언(`--authored-by`)이 코퍼스가 기록한 서명과 충돌 — 기록을 선언으로 뒤집을 수 없다."""
+
+
+def resolve_author_signature(recorded: str, declared: str | None) -> str:
+    """기록된 서명과 사람의 선언을 합쳐 *가드에 넘길* 서명을 정한다 (PB-17 재판정).
+
+    선언은 **기록 없음(`UNRECORDED_AUTHOR`)만 채운다**. 기록이 있는 레코드를 선언으로 뒤집을 수
+    있으면 LLM 저작분을 `deterministic:`으로 선언해 생성자≠검증자 가드를 우회할 수 있다(종전
+    `declared or recorded`가 그 구멍이었다). 규칙:
+      - 선언 없음(None·공백) → 기록 그대로.
+      - 기록 없음 → 선언으로 채운다.
+      - 기록 있음 + 선언이 같음(표기 차이 무시) → 기록 그대로(무해한 중복).
+      - 기록 있음 + 선언이 다름 → `AuthorDeclarationConflictError`(조용히 무시하지 않고 거부한다 —
+        무시하면 사람은 선언이 먹혔다고 믿고 측정을 해석한다).
+    """
+    if declared is None or not declared.strip():
+        return recorded
+    if recorded == UNRECORDED_AUTHOR:
+        return declared
+    if recorded.strip().casefold() == declared.strip().casefold():
+        return recorded
+    raise AuthorDeclarationConflictError(
+        f"저작 선언({declared!r})이 코퍼스가 기록한 서명({recorded!r})과 충돌한다 — 기록이 있는 "
+        "레코드는 선언으로 덮어쓸 수 없다(선언은 '기록 없음'만 채운다). 선언을 빼거나 "
+        "코퍼스의 기록을 먼저 정정하라."
+    )
+
+
+def assert_author_independent(authored_by: str, verifier_signature: str) -> None:
+    """생성자≠검증자 — 3상태 판정. 자기승인과 판독 불가 서명은 `IndependenceError`.
+
+    LLM 서명은 대소문자·앞뒤 공백을 무시하고 비교한다 — 사람이 `--authored-by`로 손으로 쓴
+    값(`llm:Qwen3:30b-a3b`)이 표기 차이만으로 가드를 비껴가면 안 된다. 접두어 자체는 정확히
+    일치해야 한다(`LLM:`·` llm:`은 판독 불가 → 거부).
+    """
+    llm_name = _author_payload(authored_by, LLM_AUTHOR_PREFIX)
+    if llm_name is not None:
+        if authored_by.strip().casefold() == verifier_signature.strip().casefold():
+            raise IndependenceError(f"생성자와 검증자가 같은 주체({authored_by}) — 자기승인 금지")
+        return
+    if _author_payload(authored_by, DETERMINISTIC_AUTHOR_PREFIX) is not None:
+        return  # LLM 생성자가 없다고 명시 선언된 대상 — 자기승인이 성립할 수 없다.
+    raise IndependenceError(
+        f"생성자 서명을 판독할 수 없다({authored_by!r}) — 독립성을 입증할 수 없어 거부한다"
+        f"(fail-closed). '{LLM_AUTHOR_PREFIX}<모델 id>' 또는 "
+        f"'{DETERMINISTIC_AUTHOR_PREFIX}<생성기>' 형식으로 저작 기록을 남겨라."
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -723,6 +829,7 @@ class CrossVerifier:
             trace = LangfuseSink(settings=settings)
         self._provider = provider
         self._trace = trace
+        self._settings = settings
         self._perspectives = tuple(perspectives)
         self._subscription = subscription
         self._difficulty = difficulty
@@ -751,21 +858,31 @@ class CrossVerifier:
 
     @property
     def signature(self) -> str:
-        """검증자 서명 — 라우터가 고른 실제 모델 id. 생성자 서명과의 충돌 검사에 쓴다."""
+        """검증자 서명 `llm:<모델 id>` — 생성자 서명과의 충돌 검사에 쓴다.
+
+        모델 id는 저작 측(`LLMEquivalentProblemGenerator`)이 `GenerationLog.model_name`에 쓰는
+        `model_name_for_decision`과 **같은 함수**로 해석한다. 종전 판은 로컬만 모델 id를 내고
+        클라우드는 티어명(`llm:cloud_mid`)을 냈다 — 저작 측이 모델 핀(`deepseek/…`)을 기록하는
+        한 같은 클라우드 모델이 만든 문항을 같은 모델이 검증해도 두 문자열이 같아질 수 없었다.
+
+        **선언값이지 관측값이 아니다**: 설정이 지목한 모델이며, 폴백·프록시 라우팅으로 실제
+        응답한 모델이 달라지는 경로는 이 서명이 보지 못한다(`model_name_for_decision` 동일 한계).
+        """
         decision = Router().route(self._routing_request())
-        if decision.cost_tier == CostTier.LOCAL.value:
-            return f"llm:{resolve_model(decision.local_family, decision.local_model)}"
-        return f"llm:{decision.cost_tier}"
+        return llm_author(model_name_for_decision(decision, settings=self._settings))
 
     def _record_trace(self, decision: RoutingDecision, usage: Usage | None) -> None:
         """호출 1건의 라우팅·실측을 관측에 남긴다 — never-break(배치 비차단·타입명 로그)."""
         is_cloud = decision.cost_tier != CostTier.LOCAL.value
+        # OPS-116 — 단가 좌석은 꽂힌 provider에서 읽는다(생략하면 anthropic 단가로 적혀
+        # openrouter 호출이 과대 계상된다). 미상(None)은 anthropic으로 접지 않고 '미측정'.
+        seat = served_cloud_seat(self._provider) if is_cloud else None
         if usage is None or (
             is_cloud and (usage.input_tokens is None or usage.output_tokens is None)
         ):
             cost_krw: float | None = None
         else:
-            cost_krw = actual_cost_krw(decision, usage)
+            cost_krw = actual_cost_krw(decision, usage, seat=seat)
         try:
             self._trace.record(
                 langfuse_fields(
@@ -774,6 +891,7 @@ class CrossVerifier:
                     call_site=CallSite.SELF_VERIFY,
                     usage=usage,
                     cost_krw=cost_krw,
+                    cloud_seat=seat,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — 관측 장애가 검증 배치를 깨면 안 됨
@@ -793,10 +911,7 @@ class CrossVerifier:
         동기 API로 유지하면서 async provider 호출은 내부에서 새 이벤트 루프를 열어 실행한다.
         호출부가 이미 async loop 안에 있을 경우 `asyncio.to_thread()`로 격리해 충돌을 피한다.
         """
-        if subject.authored_by == self.signature:
-            raise IndependenceError(
-                f"생성자와 검증자가 같은 주체({subject.authored_by}) — 자기승인 금지"
-            )
+        assert_author_independent(subject.authored_by, self.signature)
         perspectives_to_use = self._perspectives if perspectives is None else perspectives
         decision = Router().route(self._routing_request())
         return asyncio.run(self._verify_async(subject, decision, perspectives_to_use))

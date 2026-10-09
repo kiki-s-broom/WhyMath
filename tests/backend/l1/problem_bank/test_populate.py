@@ -499,6 +499,26 @@ def test_load_defaults_verification_tier_to_none_when_absent(tmp_path: Path) -> 
     assert records[0].verify.verification_tier is None
 
 
+def test_load_preserves_authored_by_and_absent_means_none(tmp_path: Path) -> None:
+    # PB-15 — 저작 서명은 불투명 문자열로 보존되고, 키 부재는 None(기록 없음)이다.
+    # 두 방향을 한 파일에서 본다: 기록 있음(값 그대로)·기록 없음(None — 빈 문자열로 접지 않는다).
+    recorded = _base_record(slug="wm-test-author-recorded", authored_by="llm:qwen3:30b-a3b")
+    absent = _base_record(slug="wm-test-author-absent")
+    path = _write(tmp_path, [recorded, absent])
+    by_slug = {r.slug: r for r in load_problem_bank_records(path)}
+    assert by_slug["wm-test-author-recorded"].provenance.authored_by == "llm:qwen3:30b-a3b"
+    assert by_slug["wm-test-author-absent"].provenance.authored_by is None
+
+
+@pytest.mark.parametrize("bad", ["", "   ", 7, ["llm:x"]])
+def test_load_rejects_blank_or_non_string_authored_by(tmp_path: Path, bad: object) -> None:
+    # 키가 있는데 비었거나 문자열이 아니면 저작 단계의 기록 결함이다 — None(기록 없음)으로
+    # 조용히 접으면 "서명이 없다"와 "서명이 깨졌다"가 구분되지 않는다.
+    path = _write(tmp_path, [_base_record(authored_by=bad)])
+    with pytest.raises(ProblemCorpusError, match="authored_by"):
+        load_problem_bank_records(path)
+
+
 def test_load_rejects_unknown_verification_tier(tmp_path: Path) -> None:
     # 안전 신호라 sibling authoring 필드(예 answer_kind)와 달리 조용히 None으로 떨구지 않는다.
     record = _base_record(

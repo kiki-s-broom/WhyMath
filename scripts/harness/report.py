@@ -415,6 +415,7 @@ def render_brief(
     stale_branch_message: str = "",
     pr_state_lookup_ok: bool = True,
     pr_state_lookup_error: str = "",
+    isolation_source: str = "",
     done_excluded: dict[str, list[str]] | None = None,
     gate_attach_excluded: dict[str, list[str]] | None = None,
     gate_attach_status: str = "disabled",
@@ -448,6 +449,10 @@ def render_brief(
     PR에서"(이미 확인됨을 전제)가 아니라 "열림/닫힘을 확인하라"(모른다는 사실을
     명시)로 바뀐다 — 기본값 True는 하위호환(이 두 인자를 안 주는 기존 호출부는
     종전 문구 그대로).
+    isolation_source (HARN-28): `stale_branches`가 세션 스캔이 아니라 **CI 야간 리포트**에서
+    왔을 때의 출처 한 줄(측정 시각·기준 커밋 포함). 비어 있으면 아무것도 내지 않는다 — 라이브
+    스캔 결과의 출력은 종전 그대로다. 있으면 목록이 0건이어도 이 줄은 나온다("리포트가 있고
+    0건이다"와 "리포트가 없다"는 다른 화면이어야 한다).
     done_excluded: task_id → 완료 브랜치 목록(HARN-12) — 타 세션이 이미 끝냈으나 아직
     머지 전인 태스크. `next`(HARN-11)와 동형으로 후보에서 제외해 브리핑이 이미 끝난
     일을 1순위로 추천하는 근접사고를 막는다. 순수 함수 — 원격 조회는 호출부(`cmd_brief`)
@@ -505,6 +510,8 @@ def render_brief(
     # 장기 미머지 브랜치 (HARN-13 + 2026-08-05 3분류 + HARN-47 고립/PR대기 분리) —
     # 정보성일 뿐 착수를 막지 않는다. **행동이 필요한 축(isolated)만 강조**하고 나머지는
     # 참고로 낮춰, 매 세션 Kiki가 훑어야 하는 줄 수를 실제 조치 대상으로 좁힌다.
+    if isolation_source:
+        lines.append(isolation_source)
     if stale_branches:
         normalized = []
         impl_lines: dict[str, str] = {}  # 브랜치 → 구현 신호 줄(HARN-31)
