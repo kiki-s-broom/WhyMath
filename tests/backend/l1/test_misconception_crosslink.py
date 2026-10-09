@@ -145,7 +145,9 @@ class TestLoader:
                     {
                         "kebab_id": "k2",
                         "mis_id": "M2",
-                        "link_type": "부분매핑",
+                        # 적재 자격(MISC-63): 직접매핑만 적재된다 — 비직접 거부는 게이트 계약 테스트가 동결.
+                        "link_type": "직접매핑",
+                        "confidence": 0.8,
                         "note": "검수:Kiki 2026-07-08",
                     },
                 ]
