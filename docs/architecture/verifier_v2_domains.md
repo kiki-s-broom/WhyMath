@@ -177,7 +177,12 @@ data=[[1,1],[2,3],[3,2]]; stat=corr; columns=[0,1]
 
 **알려진 한계 (승계 후보).** `StatisticalResult.value`(float)는 하위 호환용이며 판정에는 쓰지 않는다. 그러나
 교차검증의 `cross_verify.py`는 이 float을 `math.isclose(rel_tol=1e-9)`로 LLM 재계산값과 대조하므로, 거기서는
-대값 왜곡이 동형으로 남아 있다. 표본분산 n=1이 0으로 계산되는 S4-53 동작은 보존했다(정의 불가 값).
+대값 왜곡이 동형으로 남아 있다.
+
+**S4-71 정정.** S4-58은 표본분산 n=1이 0으로 계산되는 S4-53 동작을 보존했으나(정의 불가 값), S4-71에서 바로잡았다.
+
+- `variance_kind=sample`(기본)에서 n=1인 `variance`·`std`는 분모 n-1=0이라 정의되지 않으므로 `unverifiable`이다(사유에 "정의되지 않음" 명시). `variance_kind=population`은 n=1에서 0으로 정의되어 그대로 판정한다.
+- `columns`는 bool이 아닌 JSON 정수만 허용한다. `[1.5]`·`[1.0]`·`[true]`·`["1"]`처럼 정수가 아닌 값이 다른 열로 조용히 변환되던 경로와, `[null]`·`[NaN]`·깊은 중첩·4300자리 초과 정수가 예외로 새던 경로는 모두 `unverifiable`이다.
 
 ---
 
