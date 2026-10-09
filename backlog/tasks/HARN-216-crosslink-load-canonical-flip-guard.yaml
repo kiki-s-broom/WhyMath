@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-216-crosslink-load-canonical-flip-guard
+title: "crosslink 적재가 라이브 잔존 행과 경쟁해 canonical을 뒤집는지 적재 전에 판정하고 거부한다(업서트는 오귀속 행을 지우지 못한다)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 적재 후 canonical 시뮬(순수 함수) — 적재 직전에 라이브 행 + 적재 예정 행을 합친 집합으로 kebab별 `select_canonical`을 계산하고, 그 결과가 코퍼스 자신의 선택(코퍼스 행만으로 계산한 canonical)과 다른 kebab을 전건 열거한다. 구분: 다른 M-id가 이김(wrong_winner) · 동률로 미선정(tie) · 일치(ok).\n② 집행 — `load_crosslinks`(및 `promote --load`)는 ①이 wrong_winner·tie를 1건이라도 내면 아무것도 쓰지 않고 거부한다(전용 종료 코드·kebab·라이브 M-id·신뢰도 열거). 우회 인자는 두지 않는다 — 해소는 라이브 행 삭제(사람 확인 경로)로만 한다.\n③ 변별력 — 실제 PostgreSQL에서 2026-10-07 실측 4건을 픽스처로 재현한다: `angle-sum-non-triangle`(라이브 M0863 0.95 + 코퍼스 M0493 0.85 → wrong_winner), `period-of-scaled-sine`(M0862 0.95 + M0152 0.85 → wrong_winner), `division-by-zero`(M0146 0.85 + M0003 0.85 → tie), `circle-radius-squared`(M0630 0.93 + M0848 0.93 → tie). 대조군 = 라이브 행이 코퍼스와 같은 kebab은 통과. 뮤테이션으로 거부 분기·동률 분기 각각 RED 확인(주입 적용 단언·원복 바이트 동일).\n④ 집행 지점 분리 — 계약(①의 판정)과 집행(적재 CLI가 실제로 ①을 경유하는지)을 별항 테스트로 둔다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/misconception/crosslink_loader.py
+  - src/backend/whymath_backend/l1/misconception/crosslink_resolve.py
+session: null
+notes: "게이트 G-crosslink-live-drift-disposition 추가 검토(2026-10-07)에서 발견. 적재기 `populate`는 `ON CONFLICT DO UPDATE` 업서트만 하고 코퍼스에 없는 라이브 행을 지우지 않는다. 그래서 코퍼스 68건을 그대로 다시 적재해도 오귀속 4행이 살아남고, 그중 2건은 신뢰도가 더 높아(0.95 > 0.85) 정답을 이기며 2건은 동률이라 canonical이 미선정된다 — 적재가 오류를 고치는 것처럼 보이면서 고치지 못한다. HARN-215(PR #1505 브랜치, 미머지)의 ③은 EXTRA 행을 열거만 하며 이 경쟁 판정은 다루지 않는다 — 두 태스크는 서로 독립이다."
+updated: 2026-10-07

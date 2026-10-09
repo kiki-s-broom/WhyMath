@@ -245,6 +245,22 @@ def _parse(src: str) -> sympy.Expr:
     return safe_parse_expr(src, transformations=_PARSE_TRANSFORMS)
 
 
+def parse_unevaluated(src: str) -> sympy.Expr:
+    """정규화된 소스를 *계산하지 않고* SymPy 식으로 파싱 — 항·괄호의 모양(구조)을 보존한다.
+
+    `_parse`와 **같은 변환 규칙**(`_PARSE_TRANSFORMS` — 암묵 곱셈·`^`)을 쓰되 `evaluate=False`다.
+    구조 정합(오개념 거짓형의 Wild 매칭)은 `(3+4)**2`가 49로 접히면 안 되므로 계산 없는 파싱이
+    필요한데, 과거엔 그 자리가 변환 규칙이 다른 `safe_sympify(convert_xor=True)`를 직접 불렀다.
+    그래서 같은 함수 안에서 거짓 등식 가드(`identity_status`)는 `2x`를 읽는데 구조 정합은 같은
+    `2x`를 거부하는 갈림이 있었다(MISC-33 실측 — `(2x+3)²=4x²+9`가 `(2*x+3)²=4*x²+9`와 구조가
+    같은데도 미검출). 파서 정의를 이 모듈이 한 곳에서 소유해 그 갈림을 닫는다(동치 권위 일원화).
+
+    알려진 한계(MISC-62): `_PARSE_TRANSFORMS`가 함수 적용 `f(x)`를 곱 `f*x`로 읽는다 — `_parse`·
+    `identity_status`와 같은 읽기이며, 여기서 달라지게 하면 도리어 두 진입점이 갈린다.
+    """
+    return safe_parse_expr(src, transformations=_PARSE_TRANSFORMS, evaluate=False)
+
+
 def to_sympy_source(raw: str) -> str:
     """원시 수식 문자열을 SymPy 소스로 정규화 — 입력 정규화 단일 권위(SymPy 진입 전 전처리).
 
@@ -410,6 +426,7 @@ __all__ = [
     "identity_status",
     "identity_status_detail",
     "latex_to_plain",
+    "parse_unevaluated",
     "split_relation_chain",
     "to_sympy_source",
     "verify_relation_chain",

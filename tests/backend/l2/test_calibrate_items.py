@@ -130,3 +130,87 @@ class TestReportFormatting:
             ]
             is None
         )
+
+
+class TestRunLog:
+    """PB-10 ③ — 실행마다 구조화 로그 한 줄. no-op이 정상인 현재(응답 0행)를 로그가 말해야 한다."""
+
+    def test_classify_run_separates_three_outcomes(self) -> None:
+        """같은 `calibrated_items=0`도 입력 부재·자격 문항 부재·실제 보정은 다른 상태다."""
+        no_responses = _report(calibrated_b=0, adopted=0).model_copy(
+            update={"items_with_responses": 0}
+        )
+        below_floor = _report(calibrated_b=0, adopted=0)  # 응답은 있으나 자격 문항 0
+        calibrated = _report(calibrated_b=3, adopted=1)
+        assert calibrate_items.classify_run(no_responses) == calibrate_items.RUN_NOOP_NO_RESPONSES
+        assert (
+            calibrate_items.classify_run(below_floor) == calibrate_items.RUN_NOOP_NO_ELIGIBLE_ITEMS
+        )
+        assert calibrate_items.classify_run(calibrated) == calibrate_items.RUN_CALIBRATED
+        assert len({no_responses.items_with_responses, below_floor.items_with_responses}) == 2
+
+    def test_run_log_line_has_run_id_status_and_finished_at(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        async def _fake_calibrate(session: Any, *, dry_run: bool = False) -> CalibrationReport:
+            return _report(dry_run=dry_run, calibrated_b=0, adopted=0).model_copy(
+                update={"items_with_responses": 0}
+            )
+
+        async def _fake_dispose() -> None:
+            return None
+
+        monkeypatch.setattr(calibrate_items, "get_sessionmaker", lambda settings=None: _FakeSession)
+        monkeypatch.setattr(calibrate_items, "calibrate_item_difficulties", _fake_calibrate)
+        monkeypatch.setattr(calibrate_items, "dispose_engine", _fake_dispose)
+        with caplog.at_level("INFO", logger="whymath.l2.calibrate_items"):
+            assert calibrate_items.main([]) == 0
+        lines = [r.getMessage() for r in caplog.records if r.name == "whymath.l2.calibrate_items"]
+        assert len(lines) == 1
+        assert lines[0].startswith("calibration_run run_id=")
+        assert "status=noop_no_responses" in lines[0]
+        assert "items_with_responses=0" in lines[0]
+        assert "finished_at=" in lines[0]
+
+    def test_failure_logs_error_type_name_and_reraises(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """실패는 `status=failed error_type=<예외 타입명>`을 남기고 예외를 삼키지 않는다."""
+        disposed: dict[str, bool] = {}
+
+        async def _boom(session: Any, *, dry_run: bool = False) -> CalibrationReport:
+            raise ConnectionRefusedError("secret-host:5432")
+
+        async def _fake_dispose() -> None:
+            disposed["yes"] = True
+
+        monkeypatch.setattr(calibrate_items, "get_sessionmaker", lambda settings=None: _FakeSession)
+        monkeypatch.setattr(calibrate_items, "calibrate_item_difficulties", _boom)
+        monkeypatch.setattr(calibrate_items, "dispose_engine", _fake_dispose)
+        with caplog.at_level("ERROR", logger="whymath.l2.calibrate_items"):
+            with pytest.raises(ConnectionRefusedError):
+                calibrate_items.main([])
+        assert disposed["yes"]  # 실패해도 엔진은 치운다
+        messages = " ".join(r.getMessage() for r in caplog.records)
+        assert "status=failed" in messages
+        assert "error_type=ConnectionRefusedError" in messages
+        assert "secret-host" not in messages  # 예외 값은 로그에 싣지 않는다
+
+    def test_text_stdout_contract_is_unchanged(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """로그는 stderr 쪽이다 — stdout 첫 줄 하위호환 계약(`calibrated_items=N`)을 건드리지 않는다."""
+
+        async def _fake_calibrate(session: Any, *, dry_run: bool = False) -> CalibrationReport:
+            return _report(dry_run=dry_run)
+
+        async def _fake_dispose() -> None:
+            return None
+
+        monkeypatch.setattr(calibrate_items, "get_sessionmaker", lambda settings=None: _FakeSession)
+        monkeypatch.setattr(calibrate_items, "calibrate_item_difficulties", _fake_calibrate)
+        monkeypatch.setattr(calibrate_items, "dispose_engine", _fake_dispose)
+        assert calibrate_items.main([]) == 0
+        out = capsys.readouterr().out
+        assert out.splitlines()[0] == "calibrated_items=3"
+        assert "calibration_run" not in out
