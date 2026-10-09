@@ -188,6 +188,8 @@ def test_round5_defects_are_caught_by_the_matching_rule_family(
 
 
 # ── ② 변별 ─────────────────────────────────────────────────────────────────
+# 은행 전수(504건)를 판정기·검산기에 돌리는 측정 — 저작 잡에서 돈다(backend 잡 시간 상한 · 2026-10-09 실측 70초/커버리지)
+@pytest.mark.corpus_authoring
 def test_round5_bank_passes_every_earlier_rule(audited: dict[str, dict[str, object]]) -> None:
     """감사 은행은 4회차 규칙으로 빌드됐다 — 5회차 이전 규칙은 504건 중 0건을 잡는다.
 

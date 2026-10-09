@@ -331,6 +331,8 @@ def test_every_record_carries_solution_steps(rows: list[dict[str, Any]]) -> None
         assert "review_status" not in row
 
 
+# 은행 전수(504건)를 판정기·검산기에 돌리는 측정 — 저작 잡에서 돈다(backend 잡 시간 상한 · 2026-10-09 실측 33초/커버리지)
+@pytest.mark.corpus_authoring
 def test_every_step_parses_with_the_verifier_parser(rows: list[dict[str, Any]]) -> None:
     failures: list[str] = []
     for row in rows:
@@ -342,6 +344,8 @@ def test_every_step_parses_with_the_verifier_parser(rows: list[dict[str, Any]]) 
     assert failures == []
 
 
+# 은행 전수(504건)를 판정기·검산기에 돌리는 측정 — 저작 잡에서 돈다(backend 잡 시간 상한 · 2026-10-09 실측 104초/커버리지)
+@pytest.mark.corpus_authoring
 def test_acceptance_gate_verifies_every_record_with_its_steps(rows: list[dict[str, Any]]) -> None:
     """수용 게이트의 실제 계약 — 단계를 실은 채 verified(Tier2 전이 전건 correct + Tier1 + 근 선택).
 

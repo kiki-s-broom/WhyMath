@@ -487,6 +487,9 @@ def test_s5_input_errors(tmp_path: Path, bank_ids: list[str]) -> None:
 
 
 # ── 기계 게이트 라벨 ─────────────────────────────────────────────────────
+# 기계 라벨의 수용 게이트 스펙(`spec_for`)이 생성기 한 클래스의 6슬롯을 빌드한다 — 저작 잡에서 돈다
+# (backend 잡 시간 상한 · 2026-10-09 실측 57초/커버리지)
+@pytest.mark.corpus_authoring
 def test_machine_label_on_a_clean_bank_record_and_a_notation_defect() -> None:
     record = json.loads(_BANK.read_text("utf-8").splitlines()[0])
     label = qual.machine_label(record, "x1")
@@ -497,6 +500,9 @@ def test_machine_label_on_a_clean_bank_record_and_a_notation_defect() -> None:
     assert label["verdict"] == "defect" and "shortcut_guard" in label["fired"]
 
 
+# 기계 라벨의 수용 게이트 스펙(`spec_for`)이 생성기 한 클래스의 6슬롯을 빌드한다 — 저작 잡에서 돈다
+# (backend 잡 시간 상한 · 2026-10-09 실측 57초/커버리지)
+@pytest.mark.corpus_authoring
 def test_statement_auditor_is_diagnostic_and_does_not_vote() -> None:
     """발문-수식 정합 감사기는 이 은행 정상 문항을 거부하지만(실측 164/504) 판정에 투표하지 않는다."""
     record = json.loads(_BANK.read_text("utf-8").splitlines()[0])

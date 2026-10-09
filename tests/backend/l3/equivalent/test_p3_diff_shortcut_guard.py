@@ -157,6 +157,8 @@ def verdicts4() -> dict[str, list[str]]:
 
 
 # ── ① 지금 은행 ────────────────────────────────────────────────────────────
+# 은행 전수(504건)를 판정기·검산기에 돌리는 측정 — 저작 잡에서 돈다(backend 잡 시간 상한 · 2026-10-09 실측 108초/커버리지)
+@pytest.mark.corpus_authoring
 def test_current_bank_has_zero_shortcut_violations() -> None:
     rows = _jsonl(_BANK_DIR / "problems.jsonl")
     provenance = json.loads((_BANK_DIR / "_provenance.json").read_text(encoding="utf-8"))

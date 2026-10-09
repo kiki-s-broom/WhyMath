@@ -235,6 +235,7 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
 
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
@@ -1500,13 +1501,25 @@ def _open_bounds(probe: ShortcutProbe, var: sympy.Symbol) -> tuple[sympy.Expr | 
     return (max(lows) if lows else None, min(highs) if highs else None)
 
 
+@functools.lru_cache(maxsize=4096)
+def _solve_once(eq: sympy.Expr, var: sympy.Symbol) -> tuple[sympy.Expr, ...] | None:
+    """`sympy.solve(eq, var)`(캐시) — 규칙 여러 개가 같은 문항의 같은 방정식을 다시 풀지 않게 한다.
+
+    문항 빌드 실측(2026-10-09): 이 판정기의 solve 2,051회 중 1,457회가 같은 (식, 변수)의 반복이었다.
+    순수 함수 결과만 담는다(풀 수 없으면 None — 호출자가 빈 집합으로 판정 보류).
+    """
+    try:
+        return tuple(sympy.solve(eq, var))
+    except (NotImplementedError, ValueError, TypeError):
+        return None
+
+
 def _solutions(eq: sympy.Expr, var: sympy.Symbol, filters: Sequence[_Relation]) -> set[sympy.Expr]:
     """eq = 0의 실수 해 중 보호 조건을 통과하는 것(풀 수 없으면 빈 집합 — 판정 보류)."""
     if eq.free_symbols != {var}:
         return set()
-    try:
-        raw = sympy.solve(eq, var)
-    except (NotImplementedError, ValueError, TypeError):
+    raw = _solve_once(eq, var)
+    if raw is None:
         return set()
     return {r for r in raw if r.is_real and _passes(r, filters)}
 
@@ -3659,18 +3672,22 @@ def _round8_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
     return out
 
 
+@functools.lru_cache(maxsize=4096)
+def _post_qualification_violations(probe: ShortcutProbe) -> tuple[ShortcutViolation, ...]:
+    """5~8회차 규칙 결과(캐시) — 같은 표본을 두 번 판정하지 않게 한다.
+
+    생성기 빌드는 라운드로빈의 매개변수 거부(`parameter_coincidences`)와 빌드 검증
+    (`shortcut_violations`)이 *같은 문항*에 이 규칙들을 각각 돌린다(실측 2026-10-09: 4,840회 중
+    2,016회가 반복). 표본(`ShortcutProbe`)은 불변이고 규칙은 표본만 읽는 순수 함수라 결과가 같다.
+    """
+    return tuple(
+        _round5_rules(probe) + _round6_rules(probe) + _round7_rules(probe) + _round8_rules(probe)
+    )
+
+
 def parameter_coincidences(probe: ShortcutProbe) -> list[ShortcutViolation]:
     """매개변수 선택의 우연 일치 위반만(`COINCIDENCE_RULE_IDS`) — 생성기의 매개변수 거부 조건."""
-    return [
-        v
-        for v in (
-            _round5_rules(probe)
-            + _round6_rules(probe)
-            + _round7_rules(probe)
-            + _round8_rules(probe)
-        )
-        if v.rule in COINCIDENCE_RULE_IDS
-    ]
+    return [v for v in _post_qualification_violations(probe) if v.rule in COINCIDENCE_RULE_IDS]
 
 
 def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
@@ -3689,13 +3706,7 @@ def shortcut_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
         out += _equation_rules(probe) + _application_rule(probe)
     if code == _C10:
         out += _velocity_rules(probe)
-    return (
-        out
-        + _round5_rules(probe)
-        + _round6_rules(probe)
-        + _round7_rules(probe)
-        + _round8_rules(probe)
-    )
+    return out + list(_post_qualification_violations(probe))
 
 
 def violations_by_rule(probes: Sequence[ShortcutProbe]) -> dict[str, int]:
