@@ -641,7 +641,7 @@ def _elapsed_ms(started: OrmReviewTimerEvent, now: datetime) -> int | None:
     if moment is None:
         return None
     delta_ms = int((now - moment).total_seconds() * 1000)
-    return delta_ms if delta_ms >= 0 else None
+    return max(delta_ms, 0)
 
 
 @router.post(
