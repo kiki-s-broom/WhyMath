@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,10 +14,14 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 처방 판정 — 4개 잡 각각이 (a) 서서히 느려졌는가(처방: 상한 상향 또는 분할) (b) 한 번 멈췄는가(처방: 스텝 타임아웃)를 measure_ci_job_timeout_headroom.py의 비고 열(완주 표본 최대)과 --jsonl 증거로 판정해 잡별로 기록한다. data-pipeline은 2026-10-06 push 실행 37488429913이 setup-python 스텝의 캐시 복원(Failed to restore: The server is busy)에서 멈춰 10분을 다 썼고 완주 표본 최대는 3.07분이라 (b)로 보이나, 이는 읽어서 그렇게 보이는 것이므로 판정 근거를 남긴다.\n② backend(상한 35분, 최대 31.72분, 중앙 29.08분, 여유 9.4%) — 여유를 30% 이상으로 되돌리는 조치(분할 또는 상한 조정)와 그 근거. 상한만 올리는 경우 OPS-47·OPS-69가 이미 같은 방식으로 끝났음을 명시하고 분할 대안을 기각한 근거를 적는다.\n③ backend-migrations(상한 15분, 최대 13.70분, 중앙 12.35분, 여유 8.7%)와 backend-serial-nightly(상한 45분, 최대 33.15분, 여유 26.3%)도 같은 판정을 내린다.\n④ 조치 후 ci-timeout-headroom 워크플로를 workflow_dispatch로 실행해 종료 코드 0을 확인한다. 잔존 LOW를 남기는 잡은 이 태스크에 사유와 재확인 시점을 적는다 — 만료 없는 유예 금지.\n⑤ 상한을 바꾼 잡마다 정적 하한 동결 테스트를 둔다(tests/infra/test_ci_harness_integrity_timeout.py 선례). 실행 이력이 필요한 상시 감시는 OPS-100이 맡는다."
+  - "[OPS-120 판정 기록 · 2026-10-09 재측정 — 실측은 measure_ci_job_timeout_headroom.py, 증거 jsonl 1137행] 재측정 시점에 윈도우가 이동해 태스크 작성(10-08) 때와 LOW 집합이 달라졌다: LOW 5(backend 8.8% · backend-migrations 6.0% · harness-integrity 23.5% · backend-serial-nightly 26.3% · infra-contracts 28.5%), data-pipeline은 OK(최대 2.70분). ①data-pipeline=(b) 한 번 멈춤: 실행 37488429913의 Set up Python 3.12 스텝 하나가 597초에서 cancelled, 이후 스텝 전부 skipped(스텝 타임스탬프 API 실측). 완주 표본 최대 2.7~3.07분이라 서서히 느려진 것이 아니며 상한 상향은 처방이 아니다(조치 없음: 윈도우에서 빠져 OK). 상한을 올리지 않았고 스텝 타임아웃은 setup-python 캐시 복원 정지의 원인(서버 혼잡)을 로그로 확인하지 못해 미적용 — 재발 시 비고 열이 다시 지목한다. ②backend=(c) 러너 속도 편차(서서히도 멈춤도 아님): 33표본이 15~17분대·29~32분대 이봉이고, 같은 커밋·같은 분에 시작한 push/merge_group 쌍이 30.8 대 17.3분·17.1 대 31.0분으로 갈렸다. CPU 스텝(Black 1.71배·mypy 1.73배·pytest 1.80배)만 비례해 느리고 pip 설치는 1.22배. 러너 CPU 모델은 미확인(해석). 조치=상한 35→50(31.93/0.7=45.6 이상 필요, 여유 36.1%). OPS-47·OPS-69가 상한 상향으로 끝난 것과 같은 방식이다. 분할 기각 근거: 잡 이름이 필수 체크 문서(branch-protection-setup.md)·ruleset_drift.py·test_pr_merge_readiness.py에 박혀 룰셋 변경(사람 소유)을 동반하고, 계층 커버리지 게이트가 coverage.xml 한 파일을 읽어 병합 단계가 필요하다. ③backend-migrations=(c) 39표본 8.6~14.1분, 상한 15→22(여유 35.9%). backend-serial-nightly=스위트 성장(최근 4회 31.9~33.1분, 이전 약 28분), 상한 45→50(여유 33.7%). 추가로 harness-integrity=테스트 증가(최대 9.18분) 12→15(여유 38.8%), infra-contracts=증가 중(야간 4.0→6.4분, 최대 7.15분) 10→12(여유 40.4%). ⑤정정: 정적 하한 동결은 tests/infra/test_ci_job_timeout_floor.py 5잡 18건(상한 되돌림 뮤테이션 6종 전건 RED, ci.yml 바이트 동일 복원). 잔존 LOW 없음 — 조치 후 ci-timeout-headroom 재실행 결과는 PR 본문에 기록. 이후 감시는 OPS-100 일일 실행이 맡는다."
 artifacts: []
 paths:
   - ".github/workflows/ci.yml"
   - "tests/infra/test_ci_*timeout*.py"
-session: null
-notes: "OPS-100(CI 잡별 타임아웃 여유 상시 감시)의 첫 실측(2026-10-08, 이벤트별 최근 20건, push·merge_group·schedule)에서 나온 후속이다. 도구 오판이 아님을 확인했다: data-pipeline의 상한 도달 1건은 체크런 주석 The job has exceeded the maximum execution time of 10m0s로 실제 타임아웃이었다. 이 태스크가 끝나기 전에는 ci-timeout-headroom 워크플로가 매일 적색이다 — 그것이 의도된 신호이며 경고를 끄는 것으로 해소하지 않는다. 기준 바로 위에 있어 차기 후보인 잡: harness-integrity(상한 12분, 최대 8.28분, 여유 31.0%)·infra-contracts(상한 10분, 최대 6.62분, 여유 33.8%). 실측 표는 PR 본문과 OPS-100 PR의 실행 기록에 있다."
-updated: 2026-10-08
+session: claude/ops-120-s4d7tc
+notes: |-
+  OPS-100(CI 잡별 타임아웃 여유 상시 감시)의 첫 실측(2026-10-08, 이벤트별 최근 20건, push·merge_group·schedule)에서 나온 후속이다. 도구 오판이 아님을 확인했다: data-pipeline의 상한 도달 1건은 체크런 주석 The job has exceeded the maximum execution time of 10m0s로 실제 타임아웃이었다. 이 태스크가 끝나기 전에는 ci-timeout-headroom 워크플로가 매일 적색이다 — 그것이 의도된 신호이며 경고를 끄는 것으로 해소하지 않는다. 기준 바로 위에 있어 차기 후보인 잡: harness-integrity(상한 12분, 최대 8.28분, 여유 31.0%)·infra-contracts(상한 10분, 최대 6.62분, 여유 33.8%). 실측 표는 PR 본문과 OPS-100 PR의 실행 기록에 있다.
+
+  [정정 2026-10-09] OPS-120 잡별 처방 판정·조치 기록(append)
+updated: 2026-10-09

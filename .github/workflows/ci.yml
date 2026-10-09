@@ -345,7 +345,17 @@ jobs:
     # 미채택(여러 축 동시 투입 시 어느 것이 들었는지 판정 불가 — CLAUDE.md 규칙).
     # 재측정(2026-09-10, main push 11표본, scripts/analysis/measure_backend_job_timeout_headroom.py):
     # 소요 최소/중앙/최대 12.7/18.3/19.5분 → 최대 표본 기준 여유 15.5분(44.2%, 목표 30%+ 충족).
-    timeout-minutes: 35
+    # 35→50분(OPS-120 · 2026-10-09 재측정): 위 19.5분은 빠른 러너 표본이었다. 최근 33표본(push·
+    # merge_group)이 15~17분대와 29~32분대의 **이봉**이고 최대 31.93분이라 여유가 8.8%였다.
+    # 원인은 코드 성장이 아니라 러너 속도 편차다 — 같은 커밋·같은 분에 시작한 push/merge_group 쌍이
+    # 30.8분 대 17.3분(10-09 00:20)·17.1분 대 31.0분(06:59)으로 갈렸고, CPU 스텝(Black 1.71배·
+    # mypy 1.73배·pytest 1.80배)만 비례해 느리며 네트워크 스텝(pip 설치)은 1.22배였다. 러너 CPU
+    # 모델은 미확인이라 이것은 '읽어서 그렇게 보이는' 해석이다. 상한은 느린 러너 기준 최대(31.93분)가
+    # 70% 이하가 되는 46분 이상이어야 한다(31.93/0.7=45.6). 분할은 이번엔 채택하지 않는다 — 잡 이름이
+    # 필수 체크 문서·ruleset_drift 계약에 박혀 있어 룰셋 변경(사람 소유)을 동반하고, 커버리지 XML을
+    # 한 파일로 읽는 계층 게이트도 병합이 필요하다. 하한은
+    # tests/infra/test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 50
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
@@ -615,7 +625,11 @@ jobs:
     # 마지막 스텝(traversal 실부하 게이트)이 PR 실행·큐 실행 모두에서 시작 ~25초 만에 `cancelled`
     # (= 잡 시간 초과)로 끊겨 큐에서 CI_FAILURE로 빠졌다. 테스트가 늘 때마다 같은 일이 반복되므로
     # 상한을 올려 여유를 ~3분으로 둔다. 상한을 넘는 폭주는 여전히 이 값이 잡는다.
-    timeout-minutes: 15
+    # 15→22분(OPS-120 · 2026-10-09 재측정): 위 '~3분 여유'가 다시 소진됐다. 최근 39표본이
+    # 8.6~14.1분(중앙 12.6)이고 최대 14.10분이라 여유 6.0%였다. 편차(8.6~14.1)가 같은 입력에서
+    # 나는 러너 속도 차이로 보여(backend 잡과 같은 부류) 여유를 늘 때마다 같은 일이 반복된다.
+    # 14.10/0.7=20.1 → 22분(여유 35.9%). 하한은 test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 22
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
@@ -1168,7 +1182,10 @@ jobs:
   infra-contracts:
     name: infra-contracts — 운영 자산 계약 테스트 (tests/infra)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10→12분(OPS-120 · 2026-10-09 재측정): 최근 57표본의 최대가 7.15분(여유 28.5%)이고 야간
+    # 표본은 4.0→6.4분으로 오르는 중이다. 7.15/0.7=10.2 → 12분(여유 40.4%). 하한은
+    # test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 12
 
     steps:
       - name: Checkout
@@ -1559,7 +1576,10 @@ jobs:
     # 머지 큐 실행 2건(#1344·#1341)이 테스트 전건 통과 직후 cancelled됐다 — 상시 잡이라 모든
     # PR의 머지가 막힌다. 12분 = 최대 표본 기준 여유 약 57%(OPS-47 기준 '상한의 30% 이상').
     # 하한은 tests/infra/test_ci_harness_integrity_timeout.py가 동결한다.
-    timeout-minutes: 12
+    # 12→15분(OPS-120 · 2026-10-09 재측정): 테스트가 늘어 최근 59표본의 최대가 9.18분(여유
+    # 23.5%)이 됐다(OPS-69 당시 5.1분). 9.18/0.7=13.1 → 15분(여유 38.8%). 하한 동결은
+    # test_ci_job_timeout_floor.py가 이어받는다.
+    timeout-minutes: 15
 
     steps:
       # fetch-depth: 0 — HARN-47 브랜치 스캔은 trunk 히스토리와 ahead count를 읽는다.
@@ -2037,7 +2057,11 @@ jobs:
   backend-serial-nightly:
     name: backend — 전체 스위트 직렬 (교차 파일 오염 탐지·야간)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 45→50분(OPS-120 · 2026-10-09 재측정): 야간 완주 17표본의 최대가 33.15분(여유 26.3%)이고
+    # 최근 4회가 31.9~33.1분으로 이전(약 28분)보다 올랐다 — 스위트 성장으로 읽힌다. 33.15/0.7=47.4
+    # → 50분(여유 33.7%). 야간 직렬 잡이라 머지 큐에는 영향이 없다. 하한은
+    # test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 50
     if: github.event_name == 'schedule'
     defaults:
       run:
