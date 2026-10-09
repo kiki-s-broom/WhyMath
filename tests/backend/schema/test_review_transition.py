@@ -296,3 +296,48 @@ def test_reason_limit_is_shared_with_the_transition_route_schema() -> None:
 
     metadata = AdminReviewTransitionRequest.model_fields["reason"].metadata
     assert any(getattr(m, "max_length", None) == QUARANTINE_REASON_MAX_LENGTH for m in metadata)
+
+
+# ── ADMIN-18 — 판정 액션은 타이머 세션·반려코드를 요구한다 ────────────────────────────────
+
+
+def test_only_approve_and_reject_are_timer_verdicts() -> None:
+    """HIT 타이머를 요구하는 액션은 approve·reject뿐 — 격리·해제는 사후 회수·복원이다."""
+    from whymath_backend.schema.review_transition import (
+        ReviewTransitionAction as Action,
+    )
+    from whymath_backend.schema.review_transition import (
+        action_requires_failure_code,
+        action_requires_review_session,
+        verdict_for_action,
+    )
+
+    assert {a for a in Action if action_requires_review_session(a)} == {
+        Action.approve,
+        Action.reject,
+    }
+    assert {a for a in Action if action_requires_failure_code(a)} == {Action.reject}
+    assert verdict_for_action(Action.approve) == "approved"
+    assert verdict_for_action(Action.reject) == "rejected"
+    assert verdict_for_action(Action.quarantine) is None
+    assert verdict_for_action(Action.release) is None
+
+
+def test_every_timer_verdict_is_a_valid_review_verdict() -> None:
+    """`verdict_for_action`의 값은 타이머 스키마가 받는 어휘여야 한다(어휘가 갈라지면 적재가 깨진다)."""
+    from whymath_backend.schema.review_timer import review_status_for_verdict
+    from whymath_backend.schema.review_transition import (
+        ReviewTransitionAction as Action,
+    )
+    from whymath_backend.schema.review_transition import (
+        resolve_review_transition,
+        verdict_for_action,
+    )
+
+    for action in (Action.approve, Action.reject):
+        verdict = verdict_for_action(action)
+        assert verdict is not None
+        # 판정 → 노출 상태 변환의 정본이 전이표의 도착 상태와 일치한다.
+        assert review_status_for_verdict(verdict) is resolve_review_transition(
+            ReviewStatus.pending, action
+        )

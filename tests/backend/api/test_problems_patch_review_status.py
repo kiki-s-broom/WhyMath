@@ -11,6 +11,8 @@ ADMIN-07이 전이표(`schema/review_transition.py`)와 감사 1행을 `POST …
   ⑤ 상태가 그대로인 요청(GET 본문 왕복 포함)은 전이가 아니라 기존 `update` 경로다
   ⑥ 상태를 바꾸려는 요청만 행을 잠근다(전이 라우트와 같은 직렬화) — 나머지는 읽기 불변
   ⑦ 우회 시도는 WARNING으로 남되 자유 텍스트(사유)는 싣지 않는다
+  ⑨ [ADMIN-18] 인간 판정(pending→approved·pending→rejected)은 이 표면으로 거부한다 — 반려코드·
+     검수 세션(타이머)을 실을 자리가 없다. 409 `review_session_required` + POST 경로 안내 · 쓰기 0
   ⑧ 구조 가드(AST): Problem 행을 API 스키마에서 쓰는 곳은 `problems.py`뿐이고, PATCH는 판정 함수를
      부르며, `api/`에서 `.review_status`를 대입하는 파일은 `admin_bff.py` 하나다
 
@@ -198,7 +200,16 @@ def test_clearing_status_to_null_is_also_refused() -> None:
 # ── ② 합법 변경은 감사 1행·동작은 전이 액션 ─────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("pair", "action"), list(_LEGAL.items()), ids=list(_LEGAL.values()))
+#: PATCH로 통과하는 합법 쌍 — 판정(approve·reject)은 ADMIN-18이 이 표면에서 뺐다(⑨).
+_PATCH_LEGAL = {
+    pair: action for pair, action in _LEGAL.items() if action in ("quarantine", "release")
+}
+_VERDICT_PAIRS = {pair: action for pair, action in _LEGAL.items() if pair not in _PATCH_LEGAL}
+
+
+@pytest.mark.parametrize(
+    ("pair", "action"), list(_PATCH_LEGAL.items()), ids=list(_PATCH_LEGAL.values())
+)
 def test_legal_status_change_writes_exactly_one_audit_row_with_the_transition_action(
     pair: tuple[ReviewStatus | None, ReviewStatus], action: str
 ) -> None:
@@ -218,6 +229,44 @@ def test_legal_status_change_writes_exactly_one_audit_row_with_the_transition_ac
     assert row.resource_type == PrivacyAuditResourceType.problem.value
     assert row.resource_id == fake.problem.problem_id  # type: ignore[union-attr]
     assert row.user_id == _ADMIN.user_id
+
+
+# ── ⑨ ADMIN-18 — 인간 판정은 PATCH로 할 수 없다 ────────────────────────────────────────
+
+
+def test_verdict_pairs_are_exactly_approve_and_reject() -> None:
+    """픽스처 변별력 — PATCH가 거부하는 쌍은 판정 2쌍이고 격리·해제 2쌍은 통과한다."""
+    assert sorted(_VERDICT_PAIRS.values()) == ["approve", "reject"]
+    assert sorted(_PATCH_LEGAL.values()) == ["quarantine", "release"]
+
+
+@pytest.mark.parametrize(
+    ("pair", "action"), list(_VERDICT_PAIRS.items()), ids=list(_VERDICT_PAIRS.values())
+)
+def test_verdict_via_patch_is_409_pointing_to_the_post_route_and_writes_nothing(
+    pair: tuple[ReviewStatus | None, ReviewStatus], action: str
+) -> None:
+    current, target = pair
+    fake = _Session(_problem(current))
+    resp = _patch(fake, {"review_status": target.value})
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert detail["code"] == "review_session_required"
+    assert detail["current_status"] == "pending" and detail["requested_status"] == target.value
+    assert detail["transition_path"] == (
+        f"/v1/admin/review-queue/items/{fake.problem.problem_id}/transitions"  # type: ignore[union-attr]
+    )
+    _assert_nothing_written(fake)
+    assert fake.problem is not None and ReviewStatus(fake.problem.review_status) is current
+
+
+def test_reject_via_patch_with_failure_code_in_body_is_still_refused() -> None:
+    """본문에 failure_code 비슷한 키를 실어도 통과하지 않는다 — 이 표면에는 타이머가 없다."""
+    fake = _Session(_problem(P))
+    resp = _patch(fake, {"review_status": "rejected", "failure_code": "F1"})
+    assert resp.status_code in (409, 422), resp.text
+    _assert_nothing_written(fake)
+    assert fake.problem is not None and ReviewStatus(fake.problem.review_status) is P
 
 
 # ── ③ 격리 — 이번 요청의 사유 · 서버 시각 ───────────────────────────────────────────
@@ -346,8 +395,9 @@ def test_a_plain_field_patch_stays_an_update() -> None:
 
 
 def test_status_bearing_patch_locks_the_row_like_the_transition_route() -> None:
-    fake = _Session(_problem(P))
-    assert _patch(fake, {"review_status": "approved"}).status_code == 200
+    fake = _Session(_problem(A))
+    body = {"review_status": "quarantined", "quarantine_reason": "복수 정답"}
+    assert _patch(fake, body).status_code == 200
     assert fake.get_kwargs == [{"with_for_update": True, "populate_existing": True}]
 
 

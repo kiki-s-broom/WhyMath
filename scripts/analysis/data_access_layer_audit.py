@@ -314,6 +314,9 @@ BASELINE: dict[str, frozenset[str]] = {
         {
             "ops/account_bootstrap_cli.py",
             "ops/dialogue_encryption_preflight.py",
+            # ADMIN-18 — `--from-db`: 검수 타이머 이벤트·문항 판정을 DB에서 직접 읽어 적재율을 재는
+            # 관측 CLI(`weekly_metrics_report`·`loop_kpi_gate`와 같은 부류). 읽기 전용.
+            "ops/hit_cu_metrics.py",
             "ops/integrity_violations_gate.py",
             # EOS-15 — 루프 KPI 5종 수집기. 관측 CLI라 DB 직접 조회가 본질이며(관측 대상이
             # 실 운영 데이터다), `recommendation_reach_report`·`service_health`와 같은 부류다.

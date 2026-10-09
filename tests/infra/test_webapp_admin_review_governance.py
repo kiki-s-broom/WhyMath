@@ -9,6 +9,11 @@
      그리면 저장형 XSS 표면이 된다(텍스트 노드로만 렌더)
   ④ 토큰 부착·검수 큐 엔드포인트·전이 호출은 `adminReviewApi.ts` 한 곳 — 화면 컴포넌트가 직접
      요청을 만들면 타임아웃·`credentials:"omit"`·예외 타입명 기록이 갈라진다
+  ⑥ (ADMIN-18) 착수 세션 URL(`review-sessions`)은 클라이언트 모듈에만 — 컴포넌트가 직접 세션을 만들면
+     "판정은 세션과 함께"라는 불변이 화면마다 갈라진다
+  ⑦ (ADMIN-18) 판정 본문 빌더(`buildTransitionBody`)가 `review_session_id`를 싣고, 세션 없는 승인·반려는
+     본문을 만들지 않으며, 클라가 경과 시간(elapsed)을 보내지 않는다
+  ⑧ (ADMIN-18) 반려코드 8종 클라 상수 == 서버 `GenerationFailureCode` 값집합(스캔 0건은 실패)
   ⑤ `fetch(` 지점 허용표(셸 계약 ⑤의 판정 함수)에 변별력이 있다 — 허용표 밖 위반을 주입하면 검출된다
 
 **정직한 공백**: 렌더 결과(버튼 노출·409 흐름·0건/실패 구분)는 정적 검사로 못 본다. 그 축은 헤드리스
@@ -61,6 +66,8 @@ _REQUEST_MARKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("전이 호출 경로", re.compile(r"/transitions")),
     ("XMLHttpRequest", re.compile(r"\bXMLHttpRequest\b")),
     ("sendBeacon", re.compile(r"\bsendBeacon\b")),
+    # 인덱스 [:4]·[2:] 슬라이스 계약을 깨지 않도록 반드시 맨 끝에 둔다.
+    ("착수 세션 경로", re.compile(r"review-sessions")),
 )
 
 
@@ -230,3 +237,155 @@ def test_judges_report_empty_scan_as_violation() -> None:
     assert request_leak_violations({})
     assert public_import_violations({})
     assert fetch_site_violations({})
+
+
+# ── ⑥ 착수 세션 URL은 클라이언트에만 (ADMIN-18) ─────────────────────────
+
+
+def test_session_endpoint_lives_only_in_the_review_client() -> None:
+    """⑥ — `review-sessions` 리터럴이 `adminReviewApi.ts` 밖 admin 소스에 없다."""
+    sources = _admin_sources()
+    outside = {rel: text for rel, text in sources.items() if rel != _API_REL}
+    assert outside, "API 파일 밖 소스가 0건 — 가드가 무력화됐다"
+    assert [v for v in _scan(outside, _REQUEST_MARKERS[-1:])] == []
+
+
+def test_review_client_holds_the_session_endpoint() -> None:
+    """⑥ 양성 대조 — 금지만 보면 '세션을 아무도 안 만든다'도 통과한다."""
+    text = _admin_sources()[_API_REL]
+    assert _REQUEST_MARKERS[-1][1].search(text), "클라이언트에 착수 세션 경로가 없다"
+    assert "createReviewSession" in text
+
+
+# ── ⑦ 판정 본문 빌더 (ADMIN-18) ─────────────────────────────────────────
+
+
+def _builder_body(text: str) -> str | None:
+    """`buildTransitionBody` 함수 본문(중괄호 균형으로 잘라 낸다). 없으면 None."""
+    m = re.search(r"export function buildTransitionBody\([^)]*\)[^{]*\{", text)
+    if m is None:
+        return None
+    depth, i = 1, m.end()
+    while i < len(text) and depth:
+        depth += {"{": 1, "}": -1}.get(text[i], 0)
+        i += 1
+    return text[m.start() : i] if depth == 0 else None
+
+
+def transition_builder_violations(text: str) -> list[str]:
+    """전이 본문 빌더가 세션·반려코드 계약을 지키는가. 빌더가 없으면 위반(공허 통과 차단)."""
+    body = _builder_body(text)
+    if body is None:
+        return ["buildTransitionBody 를 찾지 못했다 — 가드가 무력화됐다"]
+    out: list[str] = []
+    if not re.search(r"body\.review_session_id\s*=", body):
+        out.append("판정 본문에 review_session_id 를 싣지 않는다")
+    if not re.search(r"req\.sessionId\s*===\s*null\)\s*return null", body):
+        out.append("세션 없는 승인·반려를 막는 early-return(null)이 없다")
+    if not re.search(r'"approve"\s*,\s*"reject"', text):
+        out.append("세션 필수 액션 표(approve·reject)가 없다")
+    if not re.search(r"body\.failure_code\s*=", body):
+        out.append("반려 본문에 failure_code 를 싣지 않는다")
+    if not re.search(r'if \(req\.action === "reject" && req\.failureCode !== null\) body\.failure_code', body):
+        out.append("failure_code 가 반려 한정으로 실리지 않는다(다른 액션에 보내면 서버 422)")
+    if re.search(r"elapsed|duration|started_at|elapsed_ms|seconds", body, re.IGNORECASE):
+        out.append("클라가 경과 시간 계열 필드를 싣는다 — 시간은 서버가 계산한다")
+    return out
+
+
+def test_transition_builder_carries_session_and_reject_code() -> None:
+    """⑦ — 실제 클라이언트의 빌더가 계약을 지킨다."""
+    assert transition_builder_violations(_admin_sources()[_API_REL]) == []
+
+
+def test_submit_goes_through_the_builder() -> None:
+    """⑦ — 전이 제출이 빌더를 경유한다(본문을 따로 조립하는 우회로가 없다)."""
+    text = _admin_sources()[_API_REL]
+    m = re.search(r"export async function submitReviewTransition\(.*?\n\}\n", text, re.DOTALL)
+    assert m is not None, "submitReviewTransition 을 찾지 못했다"
+    assert "buildTransitionBody(req)" in m.group(0)
+    assert "expected_status" not in m.group(0), "제출 함수가 본문을 직접 조립한다"
+
+
+_BUILDER_OK = """export function buildTransitionBody(req: R): Record<string, string> | null {
+  if (SESSION_REQUIRED_ACTIONS.includes(req.action) && req.sessionId === null) return null;
+  const body: Record<string, string> = { action: req.action, expected_status: req.expectedStatus };
+  if (req.action === "reject" && req.failureCode !== null) body.failure_code = req.failureCode;
+  if (req.sessionId !== null) body.review_session_id = req.sessionId;
+  return body;
+}
+const SESSION_REQUIRED_ACTIONS = ["approve", "reject"];
+"""
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("  if (req.sessionId !== null) body.review_session_id = req.sessionId;\n", ""),
+        ("req.sessionId === null) return null;", "req.sessionId === undefined) return null;"),
+        (
+            'if (req.action === "reject" && req.failureCode !== null) body.failure_code',
+            "if (req.failureCode !== null) body.failure_code",
+        ),
+        ("  return body;", "  body.elapsed_ms = Date.now() - t0;\n  return body;"),
+    ],
+)
+def test_builder_judge_detects_injected_violation(old: str, new: str) -> None:
+    """⑦ 변별력 — 세션 미탑재·null 가드 약화·failure_code 비한정·elapsed 전송을 각각 검출한다."""
+    assert transition_builder_violations(_BUILDER_OK) == []
+    assert old in _BUILDER_OK
+    mutated = _BUILDER_OK.replace(old, new)
+    assert mutated != _BUILDER_OK
+    assert transition_builder_violations(mutated)
+
+
+def test_builder_judge_reports_missing_builder() -> None:
+    """⑦ — 빌더 부재·빈 입력은 통과가 아니라 위반이다."""
+    assert transition_builder_violations("")
+    assert transition_builder_violations("export const x = 1;")
+
+
+# ── ⑧ 반려코드 클라 상수 == 서버 enum (ADMIN-18) ────────────────────────
+
+_CODES_REL = "app/admin/_lib/reviewFailureCodes.ts"
+
+
+def client_failure_codes(text: str) -> set[str]:
+    """클라 상수 파일의 `code: "F#"` 리터럴 집합."""
+    return set(re.findall(r'\bcode:\s*"(F\d+)"', text))
+
+
+def failure_code_violations(client: set[str], server: set[str]) -> list[str]:
+    """두 집합이 비었거나 다르면 위반."""
+    if not client or not server:
+        return ["스캔 0건 — 클라 상수 또는 서버 enum 을 못 읽었다(가드 무력화)"]
+    out: list[str] = []
+    if client - server:
+        out.append(f"서버가 모르는 코드가 클라에 있다: {sorted(client - server)}")
+    if server - client:
+        out.append(f"서버 코드가 클라에 없다: {sorted(server - client)}")
+    return out
+
+
+def _server_codes() -> set[str]:
+    from whymath_backend.schema.enums import GenerationFailureCode
+
+    return {member.value for member in GenerationFailureCode}
+
+
+def test_client_failure_codes_match_server_enum() -> None:
+    """⑧ — 반려코드 8종이 서버 `GenerationFailureCode` 와 정확히 같다."""
+    text = _admin_sources()[_CODES_REL]
+    client = client_failure_codes(text)
+    assert len(client) == 8, f"클라 반려코드가 8종이 아니다: {sorted(client)}"
+    assert failure_code_violations(client, _server_codes()) == []
+
+
+def test_failure_code_judge_detects_drift() -> None:
+    """⑧ 변별력 — 코드 추가·누락·빈 스캔을 검출하고 일치 입력은 통과시킨다."""
+    server = {f"F{i}" for i in range(1, 9)}
+    assert failure_code_violations(set(server), server) == []
+    assert failure_code_violations(server | {"F9"}, server)
+    assert failure_code_violations(server - {"F8"}, server)
+    assert failure_code_violations(set(), server)
+    assert failure_code_violations(server, set())

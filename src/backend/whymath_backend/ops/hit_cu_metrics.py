@@ -57,13 +57,18 @@ JSONL export)이다. Langfuse 등 외부 관측 인프라에 일절 의존하지
 
 입력 형식
 ---------
-  --events   검수 타이머 이벤트 JSONL(`harness/review_timer.append_event_jsonl` 산출) [필수]
+  --events   검수 타이머 이벤트 JSONL(`harness/review_timer.append_event_jsonl` 산출)
+             [`--events`·`--from-db` 중 최소 하나 필수]
+  --from-db  **DB 직접 읽기(ADMIN-18)** — `review_timer_event`(검수 화면·CLI가 적재한 이벤트)와
+             `problem`의 판정 상태(approved/rejected)를 읽는다. `--verdicts` 파일이 없으면 이
+             DB 판정이 적재율 분모가 된다(식별자는 `problem.slug`, 없으면 problem_id 문자열 —
+             검수 착수 엔드포인트의 `cu_slug` 규칙과 같다). 접속은 `WHYMATH_DATABASE_URL`.
   --edit-aware-since  EOS-62 판정 3종화 착지 경계(ISO8601) — 승인 해상도 판별 축
   --verdicts 검수 판정 JSONL — 코퍼스 레코드(slug+review_status) 또는 #841 라벨(code+
              review_status) 형식. approved/rejected 행만 판정으로 센다(pending=미판정).
   --generation-log  GenerationLog 행 JSONL — slug 또는 problem_id + input_tokens/
-             output_tokens/cost_usd. DB 직접 조회 모드는 미구현(정직한 공백 — 현행 검수
-             흐름이 파일 기반이라 export 파일 입력으로 시작·후속 확장).
+             output_tokens/cost_usd. GenerationLog의 DB 직접 조회 모드는 미구현(정직한 공백 —
+             export 파일 입력으로 시작·후속 확장).
 
 exit code (게이트 CLI 관례 — cost_probe·corpus_audit_eval 동형)
 ---------------------------------------------------------------
@@ -72,16 +77,18 @@ exit code (게이트 CLI 관례 — cost_probe·corpus_audit_eval 동형)
 
 집행 별항(정본화≠집행 — acceptance ③)
 --------------------------------------
-생산자는 `harness/review_session` CLI가 맡는다(**EOS-78** — 착수 시점 이 계측기는 판독기만
-있고 생산자가 0이었다). 그 CLI로 검수하면 타이머·반려코드가 강제되지만, **강제는 그 경로에
-한정**된다 — 다른 경로로 들어온 판정은 타이머 없이 기록될 수 있고 그것이 적재율로 드러난다.
-전 경로 강제(판정 제출 자체를 불가하게)는 검수 UI(**ADMIN-07**) 몫이다. 이 리포트는 그
-잔여를 footer로 상시 명기한다 — 적재율이 100%가 되기 전까지 이 계측기는 "부분 배선"이다.
+생산자는 둘이다. `harness/review_session` CLI(**EOS-78**)와 Admin BFF의 검수 전이 API
+(**ADMIN-18** — `POST …/review-sessions` 착수 + `POST …/transitions`의 approve/reject가 같은
+트랜잭션에 finished 이벤트를 적재하며, 반려코드·세션 없는 판정은 422, `PATCH /v1/problems/{id}`의
+판정 전이는 409로 거부된다). 그래도 이 계측기가 보는 적재율은 **그 이전·그 밖 경로의 판정**
+(오프라인 코퍼스 적재·직접 DB 작업 등)을 분모에 그대로 세므로 100%는 보장되지 않는다 — 그것이
+바로 "작동한 비율"이다. 이 리포트는 그 잔여를 footer로 상시 명기한다.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import dataclasses
 import json
 import sys
@@ -109,6 +116,7 @@ __all__ = [
     "classify_cus",
     "classify_sessions",
     "effective_moment",
+    "load_db_sources",
     "main",
     "render_report",
 ]
@@ -861,9 +869,10 @@ def render_report(report: HitCuReport) -> str:
         "",
         "---",
         "집행 별항(정본화≠집행): 타이머 생산자는 `harness/review_session` CLI로 배선됐다"
-        "(EOS-78 — 그 경로로 검수한 CU는 이벤트가 남는다). 다만 강제는 *그 CLI를 쓸 때만* "
-        "성립한다 — 다른 경로로 들어온 판정은 여전히 타이머 없이 기록될 수 있고, 그것이 "
-        "적재율로 드러난다. 전 경로 강제(판정 제출 자체를 불가하게)는 검수 UI(ADMIN-07) 몫. "
+        "(EOS-78 — 그 경로로 검수한 CU는 이벤트가 남는다)와 Admin BFF 검수 전이 API로 배선됐다"
+        "(ADMIN-18 — approve/reject는 세션 없이 422·같은 트랜잭션에 finished 적재·PATCH 판정 "
+        "전이 409). 다만 그 이전에 적재된 판정과 이 API 밖(오프라인 코퍼스 적재·직접 DB 작업)의 "
+        "판정은 여전히 타이머 없이 기록되어 있을 수 있고, 그것이 적재율로 드러난다. "
         "따라서 적재율 100% 미만은 여전히 정상 관측이다 — 낮은 적재율을 숨기지 말 것.",
     ]
     return "\n".join(lines)
@@ -909,13 +918,77 @@ def _parse_moment(raw: str) -> datetime:
     return _ensure_aware(datetime.fromisoformat(raw))
 
 
+async def load_db_sources(
+    *, database_url: str | None = None
+) -> tuple[list[ReviewTimerEvent], list[str], list[dict[str, Any]]]:
+    """DB에서 (타이머 이벤트, 파싱 실패 사유, 판정 행)을 읽는다(ADMIN-18 — `--from-db`).
+
+    이벤트는 `review_timer_event` 전건(시간 창은 호출자가 기존 필터로 건다). 행 → 스키마 재검증이
+    깨지면 그 행을 버리지 않고 **예외 타입명 + 행 번호**로 보고한다(값 미출력 — 파일 입력과 같은
+    규율). 판정 행은 `problem.review_status`가 approved/rejected인 문항이며, 식별자는 검수 착수
+    엔드포인트의 `cu_slug` 규칙(`slug`, 없으면 problem_id 문자열)과 같다 — 규칙이 갈라지면 적재된
+    타이머가 판정에 매칭되지 않아 적재율이 거짓으로 낮아진다.
+    `NullPool` 엔진을 직접 열고 닫는다(CLI 1회성 — 전역 엔진·이벤트 루프 재사용 충돌 회피).
+    """
+    # 지연 import — 파일 입력 모드(기본)에서 DB 스택을 끌어오지 않는다.
+    import sqlalchemy as sa
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from whymath_backend.config import get_settings
+    from whymath_backend.db.models.problem import Problem
+    from whymath_backend.db.models.review_timer_event import ReviewTimerEvent as OrmTimerEvent
+    from whymath_backend.schema.enums import ReviewStatus
+
+    url = database_url or get_settings().database_url
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            orm_rows = (await session.execute(sa.select(OrmTimerEvent))).scalars().all()
+            problem_rows = (
+                await session.execute(
+                    sa.select(Problem.problem_id, Problem.slug, Problem.review_status).where(
+                        Problem.review_status.in_([ReviewStatus.approved, ReviewStatus.rejected])
+                    )
+                )
+            ).all()
+    finally:
+        await engine.dispose()
+
+    events: list[ReviewTimerEvent] = []
+    errors: list[str] = []
+    for idx, row in enumerate(orm_rows, start=1):
+        try:
+            events.append(row.to_schema())
+        except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지: 타입명+행 번호만 남긴다.
+            errors.append(f"db row {idx}: {type(exc).__name__}")
+    verdicts: list[dict[str, Any]] = [
+        {
+            "slug": r.slug or str(r.problem_id),
+            "review_status": getattr(r.review_status, "value", r.review_status),
+        }
+        for r in problem_rows
+    ]
+    return events, errors, verdicts
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hit_cu_metrics",
         description="HIT(CU당 인간 개입 시간)·CU당 토큰/비용·적재율·실패코드 분포 집계 "
         "(EOS-54 — exit 0/1)",
     )
-    parser.add_argument("--events", required=True, help="검수 타이머 이벤트 JSONL 경로(필수)")
+    parser.add_argument(
+        "--events",
+        default=None,
+        help="검수 타이머 이벤트 JSONL 경로(--from-db와 둘 중 하나는 필수)",
+    )
+    parser.add_argument(
+        "--from-db",
+        action="store_true",
+        help="DB(review_timer_event·problem 판정)를 직접 읽는다 — --verdicts가 없으면 DB 판정이 "
+        "적재율 분모(ADMIN-18). 접속은 WHYMATH_DATABASE_URL",
+    )
     parser.add_argument(
         "--verdicts", default=None, help="검수 판정 JSONL(코퍼스 review_status·#841 라벨)"
     )
@@ -951,17 +1024,38 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="리포트를 JSON으로 출력")
     args = parser.parse_args(argv)
+    if not args.events and not args.from_db:
+        parser.error("--events 또는 --from-db 중 하나는 필요합니다")
 
     # ── ① 타이머 이벤트 로드(측정 실패는 즉시·타입명과 함께) ──
-    events_path = Path(args.events)
-    try:
-        events, load_errors = load_events_jsonl(events_path)
-    except FileNotFoundError:
-        _say(f"[측정 실패] FileNotFoundError: 이벤트 파일 없음 — {events_path}")
-        return _EXIT_MEASUREMENT_FAIL
-    _say(f"[① 이벤트] 유효 {len(events)}건 · 파싱 실패 {len(load_errors)}건 — {events_path}")
-    for reason in load_errors:
-        _say(f"  · 파싱 실패: {reason}")
+    events: list[ReviewTimerEvent] = []
+    load_errors: list[str] = []
+    if args.events:
+        events_path = Path(args.events)
+        try:
+            events, load_errors = load_events_jsonl(events_path)
+        except FileNotFoundError:
+            _say(f"[측정 실패] FileNotFoundError: 이벤트 파일 없음 — {events_path}")
+            return _EXIT_MEASUREMENT_FAIL
+        _say(f"[① 이벤트] 유효 {len(events)}건 · 파싱 실패 {len(load_errors)}건 — {events_path}")
+        for reason in load_errors:
+            _say(f"  · 파싱 실패: {reason}")
+    db_verdict_rows: list[dict[str, Any]] | None = None
+    if args.from_db:
+        try:
+            db_events, db_errors, db_verdict_rows = asyncio.run(load_db_sources())
+        except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지: 타입명을 반드시 출력.
+            # DB가 죽었을 때 "0건 통과"로 위장되면 안 된다 — 측정 실패(exit 1)다.
+            _say(f"[측정 실패] {type(exc).__name__}: DB 읽기 실패(--from-db)")
+            return _EXIT_MEASUREMENT_FAIL
+        _say(
+            f"[① 이벤트] DB 유효 {len(db_events)}건 · 파싱 실패 {len(db_errors)}건 · "
+            f"DB 판정 행 {len(db_verdict_rows)}건"
+        )
+        for reason in db_errors:
+            _say(f"  · 파싱 실패: {reason}")
+        events = [*events, *db_events]
+        load_errors = [*load_errors, *db_errors]
     if not events:
         _say("[측정 실패] 유효 이벤트 0건 — '성공 0'이 아니라 계측 부재다(acceptance ④)")
         return _EXIT_MEASUREMENT_FAIL
@@ -1020,6 +1114,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         for reason in verdict_load_errors:
             _say(f"  · 파싱 실패: {reason}")
+    elif db_verdict_rows is not None:
+        # DB 판정 행(problem 상태)이 적재율 분모다 — 명시 --verdicts 파일이 없을 때만.
+        verdict_rows = db_verdict_rows
     elif args.min_coverage is not None:
         _say(
             "[측정 실패] --min-coverage 게이트가 지정됐는데 --verdicts 소스가 없다 — 적재율을 "
