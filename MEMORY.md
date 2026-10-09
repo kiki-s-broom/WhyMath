@@ -12187,3 +12187,9 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
+
+### 2026-10-09 — OPS-50 도구 착지: MoE 파싱 실패 16%의 원인은 출력 상한 절단 (라이브 재측정은 Kiki 대기)
+- **실측(감사 파일 재분류·라이브 0)**: OPS-48 감사 JSONL의 후보 미분류 16건은 전부 `output_tokens=512`(= `--num-predict`)에서 `reason`이 끊긴 절단이다. 클래스 편중(무결함 10/50·broken_latex 4/7)은 증상이다. 잘린 응답 16건 전부 `"has_defect": true`로 시작했고 무결함 10건도 그랬다 — 문서 §6.2 표 C행(오경보 12/50)은 가정이 아니라 모델이 실제로 말한 판정이다.
+- **함의**: 파싱 실패율 ≤5%(③)와 오경보 상한 유지를 **함께** 만족해야 한다. 파싱만 고치면 A집계 오경보 상한도 ~0.351로 올라 OPS-48 exit 0이 깨질 수 있다. OPS-48 실행기는 `--not-worse-margin`을 넘기지 않아 실제 비교 여유가 0.0006이었다(문서의 "마진 0.05"와 불일치).
+- **착지**: `quality_tier_moe_accuracy_battle.py`에 `--prompt-variant`(baseline·short_reason·reason_first·stage_split·latex_check·few_shot, 한 번에 하나)·`--baseline-audit`(27B 재실행 생략·시험지 불일치 시 exit 2)·`--analyze-audit`(①)·`--unresolved-policy`·`--max-unresolved-rate`, 미분류 원인(`failure_kind`)과 A/B/C 병기. 테스트 26건 + 뮤테이션 13종 전건 검출. `provider.generate` 호출 지점은 `_evaluate_one` 1곳 유지(OPS-107 동결 무변경).
+- **미완**: ③(같은 seed 재평가)·④(정착)은 Phaiakes9 라이브 측정이 필요해 이 세션에서 못 했다. 절차 = `docs/ops/amd395_local_llm_performance.md` §6.2 OPS-50 절.
