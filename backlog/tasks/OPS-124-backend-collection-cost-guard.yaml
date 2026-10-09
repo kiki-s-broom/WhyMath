@@ -20,6 +20,8 @@ paths:
   - src/backend/pyproject.toml
 session: null
 notes: |-
-  사고 경위(2026-10-09): PR #1512 backend 잡이 35분 상한에서 연속 cancelled. 처음엔 저작 측정 테스트를 corpus_authoring 표지로 옮겨 대응했으나 효과가 없었다 — 표지 제외는 수집 뒤에 일어나므로 임포트 비용이 그대로 남는다. 실제 원인은 tests/backend/harness/test_p3_calculus1_diff_batch.py의 모듈 상수가 임포트 때 생성기 전부를 돌린 것(로컬 수집 15초 → 134초). CI에서는 xdist 워커 4개가 커버리지 추적 아래 같은 계산을 반복해 pytest 첫 출력까지 main 72초 vs PR 555초, pytest 단계 14분 vs 32분. 수정 = functools.cache 지연 계산(수집 14.7초 복귀). 같은 계열 ci-job-timeout-exhausted 3회차 — 앞 두 회의 대책 HARN-202(미러 스텝 시간 회귀)·OPS-100(잡별 여유 감시)은 수집 단계를 따로 보지 않는다.
+  사고 경위(2026-10-09): PR #1512 backend 잡이 35분 상한에서 연속 cancelled. 처음엔 저작 측정 테스트를 corpus_authoring 표지로 옮겨 대응했으나 효과가 없었다 — 표지 제외는 수집 뒤에 일어나므로 임포트 비용이 그대로 남는다. 실제 원인은 tests/backend/harness/test_p3_calculus1_diff_batch.py의 모듈 상수가 임포트 때 생성기 전부를 돌린 것(로컬 수집 15초 → 134초). CI에서는 xdist 워커 4개가 커버리지 추적 아래 같은 계산을 반복해 pytest 첫 출력까지 main 72초 vs PR 555초, pytest 단계 14분 vs 32분. 수정 = functools.cache 지연 계산(수집 14.7초 복귀). [정정 2026-10-09] 수집은 증가분의 일부였다 — 수정 뒤 CI에서도 실행 시간이 남아 다시 취소됐다(원인: 은행 전수 측정 7건과 생성기 겹침 감사의 P3 생성기 소진 빌드 · 같은 계열 다음 회차로 사고 대장에 등재 · 대책 HARN-202). 같은 계열 ci-job-timeout-exhausted 3회차 — 앞 두 회의 대책 HARN-202(미러 스텝 시간 회귀)·OPS-100(잡별 여유 감시)은 수집 단계를 따로 보지 않는다.
   겹침 가능성: 등재 시점(2026-10-09) 타 세션이 번호 OPS-120-ci-job-time-budget-recovery를 원격 예약(claude/charming-darwin-6j2sw5 · 브랜치 미푸시라 내용 미확인)했다. 그쪽이 잡 시간 예산 전반을 다루면 이 태스크의 수집 단계 축과 합칠지 착수 전 확인한다.
+
+  [정정 2026-10-09] notes 치환 — 3회차 원인 서술이 증가분 전부를 수집 비용으로 돌렸던 것을 정정
 updated: 2026-10-09
