@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -14,10 +14,11 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 재측정 신호 정의 — 사람이 날짜를 기억하지 않아도 \"2PL a 보정이 처음 작동 가능해졌다\"가 보이게 한다. 신호 = CalibrationReport.discrimination_calibrated가 0에서 1 이상이 되는 사건(a 채택은 응답 ≥ _MIN_RESPONSES_FOR_DISCRIMINATION=50 이고 SE ≤ _MAX_DISCRIMINATION_SE=0.3인 문항에서만 일어난다). 사전 지표로 response_count_distribution의 50건 이상 버킷도 함께 낸다. 주의: b 보정 최소선 5건은 a 재측정 조건이 아니다 — 5건은 b(1PL)의 바닥이고 a는 그보다 훨씬 높다(EOS-129 정정 항·MEMORY 2026-09-29의 '5건 이상이면 재측정' 문구를 이 태스크가 정정한다).\n② 신호의 좌석 결정 — 신호가 누구에게 어떻게 닿는지 정한다: (가) 보정 잡 로그·이벤트 라인 (나) 게이트 자동 부착 (다) 주간 메트릭 리포트(weekly-metrics.yml) 한 줄. 선택 근거를 기록한다. 좌석이 없는 신호는 신호가 아니다(CLAUDE.md '작동한 비율' 원칙).\n③ 선행 — 보정 잡 자체의 스케줄 좌석은 PB-10 ②가 결정한다. 이 태스크는 그 잡이 돌 때 ①의 신호를 싣는 것이며 스케줄을 새로 만들지 않는다(중복 등재 금지). 잡이 없으면 신호도 없으므로 depends_on으로 강제한다.\n④ 주입 검증 — 합성 응답으로 a 채택 0건→1건 이상 전이를 재현해 신호가 실제로 발화하는지, 0건 상태에서 침묵이 '작동 안 함'으로 보이는지(성공 위장이 아닌지) 확인한다. 분모 0(None)과 채택 0건을 구분한다.\n⑤ 스코프 밖 — 2PL 추정식·임계값(50·0.3) 변경, CAT 소비 로직 변경, 운영 DB 직접 접근(세션은 닿을 수 없다 — 실측 재실행은 Kiki 게이트)."
-artifacts: []
+artifacts:
+  - "PR kiki-s-broom/WhyMath#1559 (https://github.com/kiki-s-broom/WhyMath/pull/1559) · 커밋 55099a94 · 판정 기준 브랜치 claude/sweet-babbage-af16cw(미머지)"
 paths:
   - src/backend/whymath_backend/l2/calibrate_items.py
   - src/backend/whymath_backend/l2/item_calibration.py
-session: claude/sweet-babbage-af16cw
+session: null
 notes: "출처: EOS-129 ⑤ 운영 실측(2026-09-29 · 문항 1703건 중 응답 있는 80건 전부 1~4건 · 학생 1명 · a 추정 가능 0건)이 데이터 축적 대기로 결론났고, 재측정 조건 충족을 알리는 자동 트리거가 없다는 공백이 남았다. 정정: 같은 결정 로그가 재측정 조건을 '5건 이상 문항 발생'으로 적었으나 코드 실측상 5건은 b 보정 바닥이고 a 채택은 50건 이상+SE 게이트다(l2/item_calibration.py). 관련: EOS-129(done)·PB-10(스케줄 좌석 결정)."
 updated: 2026-10-09
