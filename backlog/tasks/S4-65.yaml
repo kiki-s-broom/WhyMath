@@ -19,6 +19,7 @@ acceptance:
   - "운영 경로 결선: 현재 src 전체에서 Verifier(cross_verifier=...) 주입 호출이 0건이라 l4 MathSubjectAdapter.validate_problem의 기본 경로는 기계 pass도 전부 unverifiable이 된다. 결선 지점(호출측)과 독립성 조건(생성자≠검증자 authored_by 전달 — 현재 어댑터는 authored_by를 넘기지 않아 기본값 unknown)을 확정하고 결선 또는 미결선 사유를 기록한다"
   - "ruff/black/mypy green, import-linter 7계층 위반 0"
   - PR 생성 및 CI 통과
+  - "[정정 2026-10-09 — main 병합 후 재대조] ①은 S4-66(#1548)이 _DomainResult.tier와 _domain_tier를 추가해 sequence_induction에 한해 도메인 등급을 부여하므로 '전 kind가 레거시 등급'이라는 서술은 부분적으로만 맞다 — SymPy 개념형·finite_*·statistical_claim은 여전히 레거시 상수 등급이며 이 태스크가 소유한다(S4-69가 첫 신규 값 생산자를 이 태스크로 미룬 것과 일치). ③의 '관점 세트가 없는 kind는 unverifiable로 회피'는 S4-54 후속 수정이 아니라 S4-68(#1555)이 main에 반영해 충족됐다(PR #1529의 동일 수정은 중복이라 철회) — 남은 것은 개념형에 관점을 새로 정의할지의 결정뿐이다. ④의 authored_by 기본값은 이제 unknown이 아니라 UNRECORDED_AUTHOR(PB-15)이며 교차검증기 주입 시 가드가 거부한다 — 결선 시 어댑터가 llm_author/deterministic_author로 채워야 한다"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verifier.py
@@ -26,5 +27,8 @@ paths:
   - src/backend/whymath_backend/l4/subject_adapter_math.py
   - docs/architecture/verifier_v2_design.md
 session: null
-notes: "S4-54 재대조(2026-10-08)에서 발견한 승계 분. S4-54의 구현은 PR #871로 머지돼 있었고 대장만 todo였다. 이 태스크는 S4-54 acceptance 밖에 있던 3건(등급 부여 배선·개념형 관점·운영 결선)의 소유자를 만든다. 관점 세트 부재 시 거짓 pass 경로는 S4-54 후속 수정에서 이미 막았다."
-updated: 2026-10-08
+notes: |-
+  S4-54 재대조(2026-10-08)에서 발견한 승계 분. S4-54의 구현은 PR #871로 머지돼 있었고 대장만 todo였다. 이 태스크는 S4-54 acceptance 밖에 있던 3건(등급 부여 배선·개념형 관점·운영 결선)의 소유자를 만든다. 관점 세트 부재 시 거짓 pass 경로는 S4-68(#1555)이 main에 반영해 막았다.
+
+  [정정 2026-10-09] notes 치환 — main 병합 후 사실 재대조 — 관점 회피는 S4-68, 등급 필드는 S4-66, authored_by 기본값은 PB-15로 바뀐 것을 반영
+updated: 2026-10-09
