@@ -1235,6 +1235,19 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-s464-university-cells-populate
+    title: "S4-64 대학 원자 KR 셀 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(curriculum.populate 1회 실행, S4-64 PR 병합 후). 배경: S4-62가 대학 셀 유도 함수만 추가해 호출처가 0건이었고 S4-64가 populate CLI에 --atom-graph 인자로 배선했다. 이 게이트는 그 CLI를 prod에서 1회 실행해 대학 원자 512건(학년 13~16, required_depth는 cognitive_type 도출: conceptual 360·procedural 108·NULL 44)을 curriculum_entry에 멱등 적재한다. 부수 효과 주의: 같은 CLI가 canonical 437건·원자 1311건도 함께 멱등 재적재한다(신규 행 생성이 아니라 upsert 갱신·created_at 보존). 기대 총 2260건. 런북은 쓰기 블록이 선행 판정(입력 동등성·플래그 착지·테이블·KR_NC_2022 프레임워크 행)을 스스로 재검사해 거부한다. 런북: docs/ops/s4_64_university_cells_populate_runbook.md"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-09
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - S4-64-university-cells-populate-wiring
   - id: G-s5-subject-expansion
     title: "S5 타과목 확장 게이트 — E축 착수 판정 체크리스트 전부 충족 (e_axis_v1 §5)"
     kind: decision

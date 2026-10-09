@@ -48,7 +48,7 @@ from whymath_backend.l1.curriculum.curriculum_loader import (
 _DEFAULT_GRAPH = Path("data/corpus/concept_graph_v1/graph.json")
 # 크로스워크 기본 경로(canonical→원자 매핑 — l1.concept_atom_crosswalk와 동일 코퍼스·S2-07).
 _DEFAULT_CROSSWALK = Path("data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl")
-# 원자 백본 graph.json 기본 경로(대학 원자 직접 유도 — 크로스워크가 대학 원자를 매핑하지 않는다·S4-64).
+# 원자 백본 graph.json 기본 경로(대학 원자 유도용·크로스워크 미매핑 — S4-64).
 _DEFAULT_ATOM_GRAPH = Path("data/corpus/atom_graph_v1/graph.json")
 
 
