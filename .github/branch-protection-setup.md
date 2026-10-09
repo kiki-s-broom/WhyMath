@@ -89,8 +89,9 @@ main
 - `corpus-authoring — 결정론 저작 도구 회귀 (생성기·배치)`
 <!-- REQUIRED_CHECKS_END -->
 
-  **제외 2종**: `e2e-nightly — 관통 슬라이스 (실 PG·야간)`와
-  `backend — 전체 스위트 직렬 (교차 파일 오염 탐지·야간)`는 `if: github.event_name == 'schedule'`
+  **제외 3종**: `e2e-nightly — 관통 슬라이스 (실 PG·야간)`·
+  `backend — 전체 스위트 직렬 (교차 파일 오염 탐지·야간)`·
+  `constraints-freshness — 제약 파일 연령 센서 (야간)`(OPS-121)은 `if: github.event_name == 'schedule'`
   라 PR에서 항상 skip된다. required로 걸어도 통과하지만(아래 참조) *야간 잡을 머지 게이트로
   선언*하는 것은 의미가 어긋나므로 넣지 않는다. 후자는 특히 required로 걸면 PR 머지 게이트에
   직렬 26분이 되돌아와 병렬화(OPS-58)가 무의미해진다 — 배선 실재성은

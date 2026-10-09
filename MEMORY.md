@@ -338,6 +338,27 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
+
+- **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.
+- **왜 A인가(실측)**: 2026-10-08 `pydantic 2.14.0`이 PyPI에 14:34:46Z에 올라왔고 머지 큐 첫 탈락이 14:54Z — **약 20분**. 야간 cron(18:00Z)은 3시간 25분 뒤라 B는 못 막는다. C는 langfuse v2/v4 → pytest-asyncio 1.4.0 → SQLAlchemy 2.1.0 → pydantic 2.14.0으로 **4회째** 같은 구조(패키지만 바뀜)가 반복돼 이미 실패한 방식이다. 직접 선언 52개가 전이 포함 **149개**(CI 구성 합집합 + 워크플로 인라인 설치 = 핀 157건)로 해석되고, 최근 90일 릴리스 382건(92개 패키지)이 있었다.
+- **구현**: 제약 파일 `infra/ci/constraints-py312.txt`(python 3.12·linux 해석) + 워크플로 5개 최상위 `env: PIP_CONSTRAINT`(ci·weekly-metrics·ci-timeout-headroom·harness-audit·work-graph-desktop) + 도구 `scripts/ops/ci_constraints.py`(`refresh` 갱신·`check` 정적 게이트) + `infra-contracts` 게이트 스텝 + 야간 `constraints-freshness` 센서 잡 + `changes` 경로 필터에 제약 파일 편입 + 런북 `docs/ops/ci_constraints_refresh_runbook.md`. 집행 지점은 설치 명령 19곳을 하나씩 고치는 대신 **최상위 env 한 줄**이라 새 잡이 생겨도 자동으로 고정된다.
+- **정정(태스크 기재와 다른 실측)**: acceptance ②의 "pip install -e 지점 4개 잡"은 실제 **-e 설치 11개 잡 + 도구 직설치 1개 잡 = 12개 잡 19곳**이었고, `ci.yml` 밖에도 `weekly-metrics.yml`(backend `[dev]` 전체)·`ci-timeout-headroom`·`harness-audit`·`work-graph-desktop`이 pip를 쓴다. 게이트는 워크플로 **파일 전수**를 본다.
+- **게이트가 처음 잡은 구멍**: 첫 `check`가 `pip`(`--upgrade "pip<27"`) 핀 없음을 지적했다 — 설치기 자신이 고정 밖에 떠 있었다. 면제하지 않고 워크플로 인라인 설치 요구사항을 해석·지문 대상에 편입해 `pip==26.2.1`을 핀했다.
+- **고정의 실효성(실측)**: ①제약 적용 상태로 CI 설치 절차를 재현 → 설치 153개 중 핀과 다른 버전 **0건**·핀에 없는 설치 **0건**. ②`PIP_CONSTRAINT`는 빌드 격리 환경에도 전파된다(핀을 hatchling 1.27.0으로 주면 1.27.0, 없으면 1.32.4가 쓰임). ③**사고 재현**: 수정 전 코드 `382dbe70` + pydantic 2.14.0 → `mypy --strict` exit 1, `_schema_seam.py:77 Argument 1 to "TypeAdapter" has incompatible type "TypeForm[Any] | None"`(CI와 같은 줄) / 같은 코드 + 2.13.5 → exit 0(741파일) / 현재 main + 2.14.0 → exit 0(753파일). 즉 2.14.0은 핀을 바꾸는 갱신 PR에서만 도달하고 그 PR의 mypy가 병합 전에 막는다.
+- **변별력**: 실제 파일 주입 4종(ci.yml env 제거·weekly-metrics만 옛 방식·pydantic 핀 3.0.0·핀 삭제) 전건 RED + 원복 sha256 동일, 주입 전·후 대조군 exit 0. 영구 테스트 `tests/infra/test_ci_constraints.py` 62건(사본에서 주입·`mutated != original` 단언·대조군 짝). 연령 검사는 **PR 경로에 넣지 않고** 야간 센서에만 둔다 — 날짜는 시계에 따라 결과가 바뀌는 입력이라 PR·머지 큐에 넣으면 "큐의 입력은 코드뿐이다"가 깨진다(별도 테스트가 동결).
+- **같은 PR에서 고친 인접 결함**: `scripts/harness/ci_mirror.py`가 워크플로 최상위 `env`를 무시해 미러가 제약 없이 돌아 CI와 달라지는 문제(기존 코드는 `defaults.run.shell`만 최상위를 읽고 env는 빠져 있었다). 잡·스텝 env와 같은 규칙(식은 비움, `${{ github.workspace }}`는 저장소 루트)으로 상속하고 테스트 6건을 추가했다 — 옛 코드로 되돌리면 4건 RED.
+- **보지 못하는 것(정직 기술)**: ①오프라인 게이트는 전이 의존의 일관성을 직접 보지 못한다(직접 의존 핀·이름 집합 지문만; 전이 정합은 `refresh` 시점 리졸버가 보장) ②Dockerfile 설치 표면은 이 파일을 아직 안 쓴다 — `OPS-103` 소관(OPS-121 착지 후 착수하도록 `depends_on`을 걸었다) ③CI가 설치하지 않는 extras(`embedding`·`ocr`·`playwright`·`xlsx`)는 핀이 없다 ④갱신 PR 자동화는 미결(기본 토큰으로 만든 PR은 워크플로를 깨우지 않는 것으로 알려져 있으나 이 저장소에서 실측하지 않았다 — 지금은 세션이 `refresh`를 돌려 PR을 연다) ⑤해시 고정은 하지 않는다(`SEC-22` 소관).
+- **소유권 조율**: OPS-103 ②의 `-c` 승격은 OPS-121이 소유하고 OPS-103은 `-r`만 남긴다(`backlog.py amend`로 대장 반영). 제약 파일은 `.txt`라 OPS-94 스캔 대상이 아니고(테스트로 동결) 새 워크플로 잡의 인라인 설치에는 상한을 붙였다.
+### 2026-10-08 (착지 · OPS-19): **관측 리포트 20개 중 러너 0건이던 17개에 실행 경로를 줬다 — 자동 16개(CI 5 · 배포 compose 10 · 사람 런북 1)와 입력 의존 1개로 갈랐고, "돌지 못함"이 "0건"으로 읽히지 않게 상태값을 분리했다** — 판정 기준 main `1c33b60a`
+
+**무엇/왜**: 태스크가 등재될 때의 주장(리포트 11개 중 10개 러너 0건)은 이 시점 실측과 달랐다. `*_report.py`는 **20개**였고 러너가 있는 것은 3개(`eos_unit_structure_observation_report` CI 스텝 · `weekly_metrics_report` cron · `cost_report` 수동 스크립트)였다. `concept_reach_report`는 CLI가 아니라 **테스트**만 CI에서 돌고 있어 러너로 세지 않았다. 나머지 17개는 산출이 0회였다. 신규 리포트 로직은 0 — 기존 CLI를 `python -m`으로 부르기만 하는 러너 `ops/observation_report_runner.py`를 신설했다.
+**결정 5건**: ① 부류는 모듈 위치(`harness/`·`ops/`)가 아니라 **어디서 완전하게 돌 수 있는가**로 가른다 — `harness/` 안에도 DB를 요구하는 리포트가 9개다. DB 없이 17개를 직접 실행한 실측으로 `ci` 5(rc=0) · `db` 10(rc=2, 접속 실패를 정직하게 보고) · `checkout_db` 1 · 입력 의존 1로 갈랐다. ② `checkout_db`(`phase1_structure_report`)는 자동 경로에 넣지 않았다 — 배포 이미지에는 `tests/`가 없어 같은 리포트가 Contract coverage 100%→66.7%, Vertical Slice 75%→0.0%로 **파일 부재가 낮은 수치로 읽혔다**(이미지 레이아웃 모사 실측). ③ 러너는 subprocess+타임아웃으로 호출한다(in-process import는 `asyncio.run`·`sys.exit`·전역 엔진 오염과 Windows에서의 타임아웃 불가가 걸린다). 대가로 `declared_unwired_audit`이 도달을 못 보므로 면제 문구 11건을 `_OFFLINE_REPORT`("사람이 돌린다")에서 새 상수 `_OBSERVED_BY_RUNNER`로 정정하고 러너 목록과 **양방향 대조 테스트**로 동결했다. ④ 상태값은 `ran_ok`/`run_failed`/`run_timeout`/`spawn_error`/`running` — 수치가 0이어도 종료 0이면 `ran_ok`, 못 돌면 비-0과 stderr 꼬리(접속 문자열 비밀번호 가림)가 남는다. 리포트마다 시작 전에 `running`을 먼저 flush한다. ⑤ 배포 서비스는 `app`과 같은 이미지로 7일 주기, 실패 시 1시간 재시도로 둔다(`|| exit 1`은 재기동 루프가 매번 10개를 다시 돌려 채택하지 않음).
+**실측**: 같은 `db` 10개를 DB 없이 돌리면 10/10 `run_failed`·러너 exit 1, 실 PG 16(마이그레이션 적용·빈 스키마)에서는 10/10 `ran_ok`·exit 0. `ci` 5개는 작업 디렉터리(저장소 루트/`src/backend`)와 무관하게 출력 해시가 바이트 동일하고 기본 의존성만 설치한 환경에서도 5/5. 이미지 레이아웃(`src/backend`+`data`+`docs/prompts`만) 모사에서도 `db` 10/10.
+**집행(정본화와 별항)**: 러너 단위 16건(뮤테이션 9종 전건 RED) · 레지스트리 28건(21번째 리포트 미귀속·죽은 항목·중복 귀속·면제 문구 불일치·쓰기 구문 혼입을 실제 소스에 주입해 RED) · `tests/infra` 배선 21건(실제 `ci.yml`·compose에 7종 주입 전건 RED, `Wiring/_all_wirings` 재사용으로 신규 테스트의 CI 도달 확인). 집행 지점은 CI `harness-integrity` 스텝과 `docker-compose.prod.yml`의 `observation-reports` 서비스다.
+**정직한 공백**: `ran_ok`는 "정상 종료"이지 "측정이 완전했다"가 아니다(리포트가 본문에 `미측정`을 적고 0으로 끝나는 설계는 본문을 읽어야 안다). compose 서비스의 실제 기동은 이 환경에 데몬이 없어 정의 계약과 `docker compose config` 렌더까지만 확인했다. 결과 전달(Slack·이메일)은 `OPS-30`. `generation_seed_adoption_report`는 genlog 위치가 확정돼야 해 명령을 지어내지 않고 런북에 산문으로만 남겼다. 면제 문구 11건의 수취인·만료 선언은 `OPS-34` 몫이고 이 변경이 그 대상을 11건 줄였다.
+**사고 기록(피해 0, CI 도달 전 로컬 재현으로 검출)**: ⓐ 러너 스텝의 `${{ runner.temp }}`가 CI 미러(`test_ci_mirror`)에서 '러너 컨텍스트 필요'로 해석 불가 판정 → 고정 경로 `/tmp/observation-reports`로 교체 ⓑ 신규 모듈이 EOS 기능 인벤토리에 미귀속(`WM-O-907` 편입으로 해소) — 이 둘은 `infra-contracts` 잡 전체를 재현한 뒤에야 나왔고, 변경이 닿는 잡을 먼저 열거하지 않았다면 CI 첫 실행에서 드러났을 것이다 ⓒ 워커 재시작으로 로컬 PG가 내려가 첫 이미지 모사 결과가 무효였고 DB 복구 후 재실행했다.
+
 ### 2026-10-09 (결정 · 부분매핑 적재 자격 정책): **부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지) — 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다** (Kiki 결정·claude 기록) — 판정 기준 main `663b91dc`
 
 - **결정(2026-10-09)**: ①`link_type`이 부분매핑·개념겹침인 행은 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/`)에 넣지 않는다. ②"사실상 직접매핑"이라고 사람이 판단한 행만 큐에서 `직접매핑`으로 승격하고 `confidence ≥ 0.6`을 기입한 뒤 서명한다 — 판단의 흔적이 신뢰도 숫자로 남는다(M0672가 선례). ③큐의 부분매핑 38행·개념겹침 5행은 pending 그대로 둔다(일괄 승격 금지·행별 사람 판단).
@@ -11922,6 +11943,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 
 **변별력**: `tests/harness/test_done_mirror_gate.py` 293건 — 상태 5 × 정책 2 × 경로 3의 30셀을 리터럴 표로 동결하고 CLI 종단으로 거부·통과·우회·면제·조회 실패·깨진 정책을 각각 밟는다. 뮤테이션 52종(판정 표 각 절·배선·정책 키·집계) 전건 RED·대조군 GREEN, CLI 종단 시험만으로도 대표 10종이 독립적으로 RED. 주입의 실재(`count==1`·`mutated != original`)와 원복 sha256을 순수 Python 하네스가 단언했다.
 - **정정(같은 날 후속)**: 위 '재측정 조건'의 "5건 이상 문항이 생기면"은 오기다. 5건은 b(1PL) 보정 바닥이고 변별도 a 채택은 응답 50건 이상+SE 0.3 이하(`l2/item_calibration.py`의 `_MIN_RESPONSES_FOR_DISCRIMINATION`·`_MAX_DISCRIMINATION_SE`)다. 재측정 조건 = `discrimination_calibrated`가 처음 1건 이상이 되는 것. 자동 알림은 `EOS-154-irt-a-first-adoption-signal`(선행 `PB-10` 스케줄 좌석)로 등재했다.
+### 2026-10-09 — EOS-154: IRT 변별도 a 첫 채택 신호 — 좌석은 보정 잡 로그(`irt_a_signal`), 재측정 트리거는 "직전 채택 0 → 이번 ≥ 1" — 판정 기준 main `545d0d89`
+
+- **풀려던 공백**: EOS-129 ⑤ 운영 실측(2026-09-29: 문항 1703건 중 응답 있는 80건 전부 1~4건·학생 1명·a 추정 가능 0건)이 "데이터 축적 대기"로 끝났고, 재측정 조건이 충족되는 순간을 알리는 자동 트리거가 없었다. 같은 날 결정 로그가 조건을 "5건 이상 문항 발생"으로 적은 것은 오기다 — 5건은 b(1PL) 보정 바닥이고 a 채택은 응답 50건 이상 + 표준오차 0.3 이하다(`l2/item_calibration.py`의 `_MIN_RESPONSES_FOR_DISCRIMINATION`·`_MAX_DISCRIMINATION_SE`). 정정 문구는 2026-09-29 항의 "정정(같은 날 후속)"이 이미 남겼고, 이 항목이 그 정정을 코드로 집행한다.
+- **신호 정의**: 보정 실행마다 `irt_a_signal` 로그 한 줄을 남긴다. `state` 3종 — `no_denominator`(b 보정 대상 0건이라 a 판정 분모 없음) / `waiting`(대상은 있으나 a 채택 0건 = 작동 안 함) / `adopted`(a 채택 1건 이상). `transition` 3종 — `first_adoption`(직전 채택 0 → 이번 1 이상 = EOS-129 재측정 트리거) / `adoption_lost`(직전 1 이상 → 이번 0) / `none`. 사전 지표 `candidates_ge50`(응답 50건 이상 문항 수 = 채택의 상한)을 함께 낸다. 분모 0과 채택 0은 다른 상태로 분리했다(0.0으로 접지 않는 기존 `discrimination_fallback_ratio` 원칙의 연장).
+- **직전 채택 수의 출처**: 별도 상태 파일이 아니라 DB의 `Problem.irt_a IS NOT NULL` 개수다. 보정기가 `irt_a`의 유일한 쓰기 경로이고 탈락 문항은 NULL로 되돌려지므로 이 값이 곧 직전 실행의 채택 수다. 보정 UPDATE보다 먼저 읽는다(순서가 틀리면 전이가 영원히 `none`이 되며, 테스트가 호출 순서를 동결한다).
+- **좌석 결정(acceptance ②)**: (가) 보정 잡 로그를 택했다. (다) `weekly-metrics.yml`은 헤더가 밝히듯 매 실행 새로 뜨는 빈 Postgres에 붙어 항상 0을 내므로 신호가 아니라 성공 위장이 되어 기각. (나) 게이트 자동 부착은 prod 컨테이너가 저장소 대장을 쓸 수 없고 대장 손편집 우회 금지와 충돌해 기각. (가)만이 prod DB를 실제로 보는 유일한 좌석(`docker-compose.prod.yml`의 `item-calibration`, PB-10 ②가 정한 스케줄)이다. 스케줄은 새로 만들지 않았다(acceptance ③).
+- **한계(정직)**: 신호는 로그를 읽는 사람에게만 닿는다 — 실채널 푸시는 OPS-30 소관이다. 로그는 컨테이너를 재생성하면 사라지므로 영속 교차 확인은 도달 관측 리포트(`item_calibration_reach_report`)의 `irt_a` 채움 건수다. `--dry-run`은 DB를 갱신하지 않아 채택 문항이 생기기 전에는 반복 실행마다 `first_adoption`으로 보일 수 있다(미리보기 — 런북 §5d ⑦에 명시). 운영 DB에는 접근하지 않았다(acceptance ⑤) — 이 변경이 실제로 처음 발화하는 시점은 아직 오지 않았고, 현재 운영 상태는 `no_denominator`(80문항 전부 1~4건)로 읽힐 것이라는 것은 2026-09-29 실측에 근거한 예상일 뿐 이번에 재측정한 값이 아니다.
+- **검증**: 단위 테스트 59건(신규 `tests/backend/l2/test_irt_a_adoption_signal.py` 포함, 합성 400명 코퍼스로 0건 → 1건 이상 전이 재현·같은 코퍼스 2회 보정 시 재발화 없음·30명 코퍼스는 `waiting`으로 보임). 뮤테이션 13종(전이 조건 2·상태 분기·소실 전이·로그 수준·호출 순서·행동 안내·사전 지표·출력 필드 2·침묵 억제·NOT NULL 필터·후보 버킷) 전건 RED·대조군 GREEN, 주입 실재(`count==1`·`mutated != orig`)와 원복 sha256 동일을 하네스가 단언했다. ruff·black·`mypy --strict`·`lint-imports` 종료 0(CI backend 잡과 같은 명령). 실 PG에서의 `count_adopted_discrimination` 실행은 하지 않았다 — 컴파일된 SQL(`irt_a IS NOT NULL`·count)과 읽기 전용 SELECT 여부만 단위 테스트로 동결했다.
+- **스코프 밖(변경 없음)**: 2PL 추정식·임계값(50·0.3)·CAT 소비 로직·스케줄·운영 DB 접근. `CLAUDE.md`는 건드리지 않았다(새 산문 규칙 등재 동결).
+
 ### 2026-09-29 (정정·집행 · ARCH-69): **클라우드 1차 좌석 실패 시 런타임 LOCAL 강등 — 학생 대면 서빙 조립에 한해 신설. 위 ARCH-64 로그의 "LOCAL로 자동 재시도되지 않는다"는 이 착지부터 학생 대면 조립에서 거짓이다** (claude 구현) — 판정 기준: 브랜치 `claude/gallant-euler-blngpj` · ARCH-64 PR #1370(미머지)
 
 - **정정 대상(원문은 지우지 않는다 — 이 파일은 append 전용)**: 바로 위 2026-09-29 ARCH-64 로그의 세 문장이다. ⓐ "가용성 해소 수단" 항의 "실측 정정: 코드에는 '1차 좌석 실패 → LOCAL 자동 재시도' 경로가 **없다**" — ARCH-64 착지 시점에는 사실이었고 이제 학생 대면 조립에서는 아니다 ⓑ "OpenRouter 키 부재 시" 항의 "Anthropic·LOCAL 어느 쪽도 대신 받지 않는다" — **저작·측정 조립(강등 미장착)에서만** 유효하다. 학생 대면 조립은 LOCAL이 대신 답하되 `not_configured`로 표기한다 ⓒ "검증" 항의 "키 부재·429 실패의 무대체" — 같은 범위 한정. **불변**: 2차 **클라우드** 좌석은 여전히 없다(2026-09-28 Kiki 결정 · `CLOUD_FAILOVER_SEAT=None` · `/status cloud_failover_seat=null`) — 이번에 생긴 것은 다른 축(LOCAL 강등)이다.
@@ -12196,6 +12227,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
 
+### 2026-10-09 — S4-68: answer_kind v2 소비 지점 드리프트 4건 해소 (교차검증 관점 fail-closed · DSL 제외 목록 · tier 값 · 야간 재검증)
+
+`l3/verifier._VERIFIERS_V2`(통합 검증기 v2 레지스트리)를 읽는 소비 지점 4곳이 각자 수동 사본을 들고 있어 어긋나 있었다. 설계 단계(S4-57 §8)는 코드 독해 기준이라 **미실행**이었고, 이번에 전부 실행으로 확정했다.
+
+- **C1 관점 폴백(실측 확정)**: `cross_verifier` 주입 시 개념형(SymPy) 15종이 **전부** 확률 관점(표본공간·등확률 가정)으로 가서 `pass`가 찍혔다. 폴백 제거 → 미등록 kind는 교차검증기를 부르지 않고 `unverifiable`(사유에 kind 명시). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 운영 어댑터(`l4/subject_adapter_math.py`)는 `cross_verifier`를 주입하지 않아 운영 영향은 없었고 S4-56 CLI 경로에서 발현할 결함이었다.
+- **C5 DSL 제외 목록**: `statistical_claim` 누락 정정(코퍼스 0건이라 잠복). 목록을 레지스트리에서 파생하지 않은 이유 = 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 동기 테스트가 v2 kind를 (비등식 DSL | 등식 DSL) 중 정확히 하나로 분류하게 강제한다. 근거 실측: 코퍼스 14,034건 중 등식 DSL 위반은 정확히 6종·130건(24×4+8+26), 등식 DSL 11종은 0건.
+- **C6 tier 값**: L1 허용 2값 → 9값(L3 `VerificationTier`와 정확히 일치, 테스트가 양방향 대조). 부분집합 유지는 의도가 아니었다(읽는 쪽 `read_verification_tier`는 9값을 이미 받는다). **R6-02**: 전수 적재 37개 파일·14,034건의 다이제스트가 변경 전(HEAD 사본)·후 바이트 동일. 도구 결함 1건 발견·정정 — `problem_id`가 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 다이제스트가 실행마다 달랐다(같은 트리 2회 비교로 발견, 해당 필드만 마스킹).
+- **C7 야간 재검증**: v2 전용 kind(`statistical_claim`·`sequence_induction`) 레코드는 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)되고 있었다 — 야간 재검증이 통과하는 척하는 구간. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가 → v2 레지스트리를 정본으로 조회(acceptance에 없는 kind만 어댑터). 기존 17종은 같은 함수 객체 그대로.
+- **C8 잔여 축 어휘**: 어휘 등록부는 **지금 필요 없다**고 판정. `residual_axes` 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 통과)이고 축 이름으로 분기하는 코드는 0건(내가 찾은 방법: 전수 grep). 기존 오타(`문발↔형식모델 정합`)는 유지. 재판정 조건 = 축 이름으로 집계·분기하는 소비처 출현.
+- **검증**: 신규 테스트가 변경 전 코드에서 37건 RED(사유가 전부 의도한 결함), 변경 후 GREEN. 뮤테이션 9종 전건 검출(주입 적용·원복 바이트 동일을 하네스가 단언). 설계서 `verifier_v2_domains.md` §8.5에 처리 결과 기록.
+- **미처리(의도)**: acceptance 수용 게이트(`acceptance.py:323`)가 v2 전용 kind를 디스패치하지 않는 점 — 저작 시점 경로이고 코퍼스 0건이라 미발현. 필요해지면 별건.
 ## 2026-10-09: 미머지 브랜치 전수 감사 16회차 — 15회차 산출물 자체가 고립돼 있었다 · 미추적 고립 구현 3건 회수 등재 · 분실 등재 3건 복원 · 삭제 14차 배치 10건
 
 판정 기준 main `15220b9f`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-09.md`(Kiki "떠돌이 코드 정리"). 원격 ref 61 → 감사 대상 28(PR 소유 27 · claim 활성 3 · 판정 대상 아님 3).
@@ -12209,3 +12251,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미해소**: `status-38gu4d`·`s4-70-pila8m`은 claim이 가리키는 브랜치가 원격에 없다. PR `#1478`은 main의 같은 게이트가 이미 `cleared`라 중복일 수 있으나 확인하지 못했다. `QUAL-15`는 PR 소유 `PB-09`와 생성기·코퍼스 경로가 겹친다.
 - 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
 - **사후 갱신(같은 날)**: PR `#1478`이 닫혀 `friendly-dijkstra-230lnm`(`bcc172a3`)이 고립 브랜치가 됐다. main의 같은 게이트가 `kiki` 서명으로 이미 `cleared`라 14차 배치에 추가했다(총 11건). 증적 문구는 글자 그대로 포함되지 않으며 삭제 근거는 내용 대체다(판정 문서 §5).
+
+## 2026-10-09 QUAL-15·OPS-123 회수 — 고립 구현 2건을 main 위에 파일 단위로 이식 · 브랜치 테스트 결함 2건 수정 · 격리 미적용 4곳 승계 등재
+
+판정 기준: main `594ce16b` + 브랜치 `claude/qual-15ops-123-kkj3nz`(미머지). 상세·표·수치는 `docs/reviews/qual15_ops123_recovery_2026-10-09.md`.
+
+- **QUAL-15(mnmypk)**: 생성기 +23/-8 패치 재적용(main의 `deterministic_generator` 보존), 관례 동결 테스트 이식, 코퍼스 600행 재생성(600/600 적재·게이트 거부 0). 브랜치 산출물과 의미 필드 600/600 일치 — main이 `authored_by`를 추가했고 구 코퍼스에 현행 직렬화 필드가 없어 바이트 대조는 불가했다. `is_published` 600/600 False 불변. 뮤테이션 생성기 4 + 코퍼스 3 전건 RED. QUAL-11은 머지 후 닫을 수 있다(승계 QUAL-12는 main에 등재됨).
+- **OPS-123(ubp9tw)**: 격리 모듈·어댑터·테스트 5파일 이식 + 기존 7파일 패치 재적용, 인벤토리 `WM-E-355` 귀속. 서빙 경로 경유를 AST 거버넌스 테스트로 집행(주입 4종 RED), 뮤테이션 8종 전건 RED, 격리 되돌림에서 ⓑ가 `5.14s 늦어졌다`로 RED.
+- **브랜치 테스트 결함 2건(시스템 실수 — 시간 단언의 환경 취약)**: ① 코치 격리 테스트의 `elapsed < 2.0`이 kill 뒤 교체 워커 `ready` 대기(≈1.4초, 상한 밖)를 못 보고 경계 0.1초 차이 → `timeouts` 카운터 인과 단언으로 대체. ② 지연 측정 헬퍼의 고정 0.15초 `sleep`이 핸들러 SymPy 진입 시각(0.10~0.33초)에 대한 경쟁 조건 → 대조군이 3회 중 2회 실패했고 격리 ON 쪽은 뮤턴트를 못 잡을 위험 → 진입 시각을 의존성 스레드에서 기록해 기준점으로 삼음(8/8 통과). 대책은 코드(수정된 테스트·거버넌스 테스트)이며 산문 규칙은 추가하지 않는다(등재 동결).
+- **상한값 실측**: 정상 문항 14,034건 최종답 검증 p50 1.2ms·p99 11ms·최대 107.5ms, 5초 초과 0건 → 기본 5.0초 유지. 단계 입력 분포는 미측정.
+- **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
+- **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
+- **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.

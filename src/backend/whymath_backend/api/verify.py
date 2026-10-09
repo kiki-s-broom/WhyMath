@@ -27,16 +27,31 @@ verify_solution은 신규 좌석).
 
 from __future__ import annotations
 
+import logging
+import time
+from functools import partial
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from whymath_backend.api._auth import ConsentedUser
-from whymath_backend.l3.verify_answer import AnswerVerdict, verify_answer
+from whymath_backend.api._isolated_call import isolated
+from whymath_backend.config import get_settings
+from whymath_backend.l3.verify_answer import (
+    AnswerVerdict,
+    budget_exceeded_verdict,
+    verify_answer,
+)
 from whymath_backend.l3.verify_solution import (
     SolutionVerificationResult,
-    verify_solution,
+    aggregate_transitions,
+    plan_transitions,
 )
-from whymath_backend.l3.verify_step import VerifyStepResult, verify_step
+from whymath_backend.l3.verify_step import (
+    VerifyStepResult,
+    budget_exceeded_result,
+    verify_step,
+)
 from whymath_backend.schema.enums import StepType
 
 # 남용 방어 상한(verify-step max_length=4000·verify-solution 200 미러) — 조건식/치환식 길이·
@@ -44,6 +59,12 @@ from whymath_backend.schema.enums import StepType
 _MAX_EXPR_LEN = 4000
 _MAX_CONDITIONS = 50
 _MAX_ANSWER_VARS = 50
+
+# OPS-96: verify-solution 체인 전체의 총 시간 예산 = 호출 1건 상한 × 이 배수. 전이마다 상한을 따로
+# 주면 병리적 전이 199개가 한 요청으로 워커를 199×상한 동안 붙잡을 수 있다.
+_CHAIN_BUDGET_FACTOR = 4
+
+logger = logging.getLogger("whymath.api.verify")
 
 router = APIRouter(prefix="/v1", tags=["verify"])
 
@@ -85,10 +106,19 @@ async def post_verify_step(
     판정/파싱 불가는 *정직하게* unverifiable로 반환한다(CLAUDE.md "확실하지 않으면 모른다" —
     correct로 위장하지 않음·unverifiable이면 evidence_weight 0.5 할인).
 
+    **OPS-96**: SymPy는 이벤트 루프 밖 워커 프로세스에서 시간 상한과 함께 돈다. 상한을 넘기면
+    계산을 끊고 `unverifiable`(`reason_code=undecidable`)로 응답한다 — 통과·오답이 아니다.
+
     `user`는 인증 게이트만(stateless라 user 데이터 미사용). 응답은 판정만 — 정답/본문 누출 0.
     """
     _ = user.user_id  # 인증 게이트 통과 확인용(stateless라 user 데이터 미사용).
-    return verify_step(body.expr_before, body.expr_after, body.step_type)
+    return await isolated(
+        verify_step,
+        body.expr_before,
+        body.expr_after,
+        body.step_type,
+        on_budget_exceeded=lambda: budget_exceeded_result(body.step_type),
+    )
 
 
 class VerifySolutionRequest(BaseModel):
@@ -134,16 +164,47 @@ async def post_verify_solution(
     verify_solution이 ValueError를 던지므로 *422*로 변환해 호출자에게 명확히 알린다(조용한 패딩
     금지·정확성 #1 — FastAPI는 본문 ValueError를 자동 422로 바꾸지 않으니 명시 처리).
 
+    **OPS-96**: 전이를 **하나씩** 이벤트 루프 밖에서 시간 상한과 함께 검증한다. 느린 전이는 그
+    전이만 `unverifiable`로 접히고 나머지 전이의 정상 판정은 보존된다. 체인 전체에는 총 시간
+    예산(`상한 × 4`)이 있어, 병리적 전이가 여럿이어도 한 요청이 워커를 오래 붙잡지 못한다 —
+    예산이 다 쓰이면 남은 전이는 계산 없이 `unverifiable`이다.
+
     `user`는 인증 게이트만(stateless라 user 데이터 미사용). 응답은 검증 집계만 — 정답/본문 누출 0.
     """
     _ = user.user_id  # 인증 게이트 통과 확인용(stateless라 user 데이터 미사용).
     try:
-        return verify_solution(body.steps, body.step_types)
+        plan = plan_transitions(body.steps, body.step_types)
     except ValueError as exc:
         # step_types 길이 규약 위반 — 입력 오류이므로 422(스택트레이스·500 노출 금지).
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
+
+    cap_s = get_settings().sympy_isolation_timeout_s
+    deadline = time.monotonic() + cap_s * _CHAIN_BUDGET_FACTOR
+    results: list[VerifyStepResult] = []
+    exhausted_logged = False
+    for before, after, step_type in plan:
+        remaining_s = deadline - time.monotonic()
+        if remaining_s <= 0:
+            # 총 예산 소진 — 계산 없이 판정 불가(통과·오답 아님). 요청당 한 번만 로그.
+            if not exhausted_logged:
+                logger.warning("sympy_isolation_chain_budget_exhausted → 남은 전이 판정 불가")
+                exhausted_logged = True
+            results.append(budget_exceeded_result(step_type))
+            continue
+        results.append(
+            await isolated(
+                verify_step,
+                before,
+                after,
+                step_type,
+                on_budget_exceeded=partial(budget_exceeded_result, step_type),
+                # 남은 총 예산이 호출 상한보다 작으면 그만큼만 준다 — 체인 시간이 예산을 넘지 않게.
+                timeout_s=min(cap_s, remaining_s),
+            )
+        )
+    return aggregate_transitions(results)
 
 
 class VerifyAnswerRequest(BaseModel):
@@ -222,7 +283,17 @@ async def post_verify_answer(
 
     노출 계약(verify-step 동형): 조건·답은 *입력*(호출자 제공)이고 응답은 *판정 결과*
     (state·reason·samples_checked)뿐이다 — 서버 정답을 조회하지도, 누출하지도 않는다.
+    **OPS-96**: SymPy는 이벤트 루프 밖 워커 프로세스에서 시간 상한과 함께 돈다. 상한 초과는
+    `unverifiable`이다(pass·fail 아님).
+
     `user`는 인증 게이트만(stateless라 user 데이터 미사용).
     """
     _ = user.user_id  # 인증 게이트 통과 확인용(stateless라 user 데이터 미사용).
-    return verify_answer(body.conditions, body.answer, n_samples=body.n_samples, tol=body.tol)
+    return await isolated(
+        verify_answer,
+        body.conditions,
+        body.answer,
+        n_samples=body.n_samples,
+        tol=body.tol,
+        on_budget_exceeded=budget_exceeded_verdict,
+    )

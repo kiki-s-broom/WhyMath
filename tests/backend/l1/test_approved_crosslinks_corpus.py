@@ -15,6 +15,8 @@ import json
 from pathlib import Path
 
 from whymath_backend.l1.misconception.crosslink_gate import (
+    DIRECT_LINK_TYPE,
+    DIRECT_MIN_CONFIDENCE,
     LOADABLE_METHOD,
     is_signed,
     load_gate_violations,
@@ -182,17 +184,21 @@ def test_load_gate_passes() -> None:
     for r in rows:
         assert r.method == LOADABLE_METHOD
         assert is_signed(r.note)
-        if r.link_type == "직접매핑":
-            assert (
-                r.confidence is not None and r.confidence >= 0.6
-            )  # 직접매핑 승격 게이트 하한(DIRECT_MIN_CONFIDENCE)
-        else:
-            # 부분매핑은 이 코퍼스에서 서명으로 승인된 M0672 한 행뿐이다(신뢰도 미기재가 정상).
-            assert (r.kebab_id, r.mis_id, r.link_type) == (
-                "product-rule-naive",
-                "M0672",
-                "부분매핑",
-            )
+        # MISC-63 적재 자격 — 승인 코퍼스는 전 행이 직접매핑이다(부분매핑·개념겹침은 기본 적재 금지).
+        assert r.link_type == DIRECT_LINK_TYPE, (r.kebab_id, r.mis_id, r.link_type)
+        assert (
+            r.confidence is not None and r.confidence >= DIRECT_MIN_CONFIDENCE
+        )  # 직접매핑 승격 게이트 하한
+
+
+def test_every_corpus_row_is_direct_mapping() -> None:
+    # MISC-63 — 비직접 행이 하나라도 섞이면 전건 열거로 실패한다(스캔 0건 공허 통과 방지: 행 수도 단언).
+    rows = _load_rows()
+    assert len(rows) == 68
+    non_direct = [
+        (r.kebab_id, r.mis_id, r.link_type) for r in rows if r.link_type != DIRECT_LINK_TYPE
+    ]
+    assert non_direct == []
 
 
 def test_referential_integrity() -> None:

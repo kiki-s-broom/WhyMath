@@ -35,6 +35,19 @@ def _report(*, dry_run: bool = False, calibrated_b: int = 3, adopted: int = 1) -
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_db_prior_adoption_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """EOS-154 — `_run`이 보정 전에 부르는 직전 채택 수 조회를 기본 0건으로 대체(DB 불요).
+
+    전이 시나리오를 시험하는 테스트는 자기 안에서 같은 이름을 다시 setattr해 덮어쓴다.
+    """
+
+    async def _zero(session: Any) -> int:
+        return 0
+
+    monkeypatch.setattr(calibrate_items, "count_adopted_discrimination", _zero)
+
+
 class _FakeSession:
     """async 컨텍스트 매니저 세션 스텁(calibrate가 페이크라 세션 내용은 무관)."""
 
@@ -165,7 +178,13 @@ class TestRunLog:
         monkeypatch.setattr(calibrate_items, "dispose_engine", _fake_dispose)
         with caplog.at_level("INFO", logger="whymath.l2.calibrate_items"):
             assert calibrate_items.main([]) == 0
-        lines = [r.getMessage() for r in caplog.records if r.name == "whymath.l2.calibrate_items"]
+        lines = [
+            m
+            for m in (
+                r.getMessage() for r in caplog.records if r.name == "whymath.l2.calibrate_items"
+            )
+            if m.startswith("calibration_run ")  # EOS-154: 신호 줄(`irt_a_signal`)은 별도 한 줄
+        ]
         assert len(lines) == 1
         assert lines[0].startswith("calibration_run run_id=")
         assert "status=noop_no_responses" in lines[0]

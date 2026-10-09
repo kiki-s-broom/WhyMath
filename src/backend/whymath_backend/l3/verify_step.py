@@ -76,6 +76,7 @@ __all__ = [
     "VerifyStepReasonCode",
     "VerifyStepResult",
     "VerifyStepState",
+    "budget_exceeded_result",
     "verify_step",
 ]
 
@@ -315,6 +316,21 @@ def _equation_step_result(
     )
     return _unverifiable(
         "해집합 판정 불가 — 검증 안전 회피", step_type, reason_code, VerifyStepForm.equation
+    )
+
+
+def budget_exceeded_result(step_type: StepType | None = None) -> VerifyStepResult:
+    """계산 시간 상한 초과(OPS-96)의 *판정 불가* 결과 — 통과도 오답도 아니다.
+
+    SymPy가 단일 권위라 초과를 `correct`로 접으면 검증 우회고, `incorrect`로 접으면 학생에게
+    부당한 부정 피드백이다(교수학 금기). 기존 3상태의 `unverifiable`·`undecidable`을 재사용한다 —
+    "증명도 반증도 못 했다"는 뜻이 그대로 성립하므로 응답 스키마·모바일 문구 3분기(고칠 게 없는
+    축)가 바뀌지 않는다. 사유 구분(상한 초과 vs 비다항 미결정)은 `reason` 문장과 로그가 맡는다.
+    """
+    return _unverifiable(
+        "SymPy 계산 시간 상한 초과 — 검증 안전 회피",
+        step_type,
+        VerifyStepReasonCode.undecidable,
     )
 
 
