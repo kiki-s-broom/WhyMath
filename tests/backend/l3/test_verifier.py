@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 
 from whymath_backend.l3.cross_verify import (
@@ -251,6 +253,9 @@ async def test_statistical_claim_tolerance_policy_is_honored_through_verifier() 
     subject = fake.subjects[0]
     # 교차검증 재료는 기존 계약(float machine_value)을 유지하고 설명은 정확 표기다.
     assert subject.machine_value == pytest.approx(7 / 3)
+    # S4-70 — 정확값(유리수)과 근사가 float과 별도로 전달된다.
+    assert subject.machine_exact == Fraction(7, 3)
+    assert subject.machine_approx == Fraction(7, 3)
     assert "7/3" in subject.machine_model_ko
     assert "Fraction" not in subject.machine_model_ko
 
