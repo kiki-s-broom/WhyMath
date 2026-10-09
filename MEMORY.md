@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-09 (구현·EOS-47): **`problem_attempt`에 문항 판(`problem_version_id`)과 채점 환경(`evaluation_context`) 고정 좌석을 착지했다 — 단 지금 실제로 값이 채워지는 곳은 일부뿐이며, 출처 없는 키는 지어내지 않고 `None`(모름)으로 둔다** (claude 집행) — 판정 기준 main `594ce16b`
+- **무엇을**: 리비전 `d6a2f8c4b1e7`(nullable FK + JSONB, 백필 없음). 세 적재 경로(`me.submit_attempt`·`coach._complete_problem`·`coach._record_first_wrong_submission`)가 `l2/attempt_version_pin.resolve_attempt_version_pin`으로 접수 시점의 `problem.problem_version_id` 포인터와 교육과정 라벨을 복사한다. 설계 정본 `docs/architecture/eos47_attempt_version_pinning.md`.
+- **실측 판정 1 — 5키 중 출처가 있는 것은 1개**: `curriculum_version`(문항 행의 개정 라벨)뿐. `concept_graph_version`·`grading_policy_version`·`notation_contract_version`·`normalizer_version`은 코드베이스에 값을 만드는 곳이 없다(grep 0건·28번 문서의 notation 계약은 테스트만 읽는 JSON). 임의 상수는 "버전을 기록했다"는 외양만 남기므로 `None`으로 두고 `EVALUATION_CONTEXT_SOURCES` 표에 출처 유무를 정본화했다. 연결은 `EOS-192`.
+- **실측 판정 2 — `problem_version_id`는 지금 전부 NULL**: `problem_version`에 행을 쓰는 운영 writer가 없다(ARCH-31 §5). 헬퍼는 정확히 동작하지만 효과는 `EOS-190`(발행 경로) 착지 뒤부터 나타난다. 로그 `outcome=pinned|no_version`이 작동 비율을 센다(`EOS-193` 리포트).
+- **한계(명시)**: 접수 시점 ≠ 출제 시점 — 푸는 동안 새 판이 발행되면 학생이 본 판이 아니라 새 판이 박힌다(`EOS-191`).
+- **집행 장치**: 세 경로 AST 전수 배선 검사(값이 헬퍼 결과에서 오는지까지) + 실 PG 재현성 통합 테스트(문항 수정 뒤에도 시도가 v1·새 시도는 v2·포인터 조인은 v2 대조군) + 뮤테이션 8종 전건 RED.
+- **파급**: 기존 테스트 가짜 세션 4종에 `get` 추가, 문항 스텁 1종에 속성 2개, `test_activity_orm`의 FK 개수 3→4, 데이터 접근 baseline에 `l2/attempt_version_pin.py` 등재(PK 조회 1건·쓰기 0).
+- **검증(로컬, py3.12 + 임시 PG16.15 + pgvector)**: ruff·black·`mypy --strict`(755 파일)·`lint-imports`(4 kept) exit 0, `alembic upgrade head`·`downgrade base→upgrade head` 왕복 exit 0, `tests/infra` 전체·api 묶음 375건·신규 통합 6건 통과. 백엔드 **전체 pytest 스위트**와 `backend-migrations`의 통합 전체는 이 항목 작성 시점에 아직이다(아래 PR 본문에 결과 기록).
+
 ### 2026-10-09 (결정 · 부분매핑 적재 자격 정책): **부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지) — 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다** (Kiki 결정·claude 기록) — 판정 기준 main `663b91dc`
 
 - **결정(2026-10-09)**: ①`link_type`이 부분매핑·개념겹침인 행은 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/`)에 넣지 않는다. ②"사실상 직접매핑"이라고 사람이 판단한 행만 큐에서 `직접매핑`으로 승격하고 `confidence ≥ 0.6`을 기입한 뒤 서명한다 — 판단의 흔적이 신뢰도 숫자로 남는다(M0672가 선례). ③큐의 부분매핑 38행·개념겹침 5행은 pending 그대로 둔다(일괄 승격 금지·행별 사람 판단).

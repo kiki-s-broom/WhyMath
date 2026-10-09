@@ -235,6 +235,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/ability_snapshot_capture.py",
             "l2/ability_tracking.py",
             "l2/attempt_skill_event.py",
+            # EOS-47: 시도 접수 시점의 문항 판 포인터·교육과정 라벨을 PK 조회 1건
+            # (`session.get(Problem)`)으로 읽는 새 접근점. 쓰기 0 · 기존 baseline 파일에
+            # 문항 단건 조회 함수가 없어 재사용 불가.
+            "l2/attempt_version_pin.py",
             "l2/concept_diagnosis.py",
             "l2/evidence_event_store.py",
             "l2/item_calibration.py",

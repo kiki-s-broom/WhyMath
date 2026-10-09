@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -22,6 +22,6 @@ paths:
   - src/backend/whymath_backend/db/models/activity.py
   - "src/backend/alembic/versions/**"
   - "tests/backend/**"
-session: null
+session: claude/dreamy-johnson-tj12ud
 notes: "32_학습 이력 검토 갭이자 44번 문서 미구현분(content_version_id) 착지 앞당기기. 선행: EOS-44(설계) + ARCH-31(Content Version 실구현).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/E3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-09

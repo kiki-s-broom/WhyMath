@@ -109,6 +109,7 @@ from whymath_backend.l2 import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.learning_session_writer import record_learning_activity
 from whymath_backend.l2.learning_state_machine import advance_on_graded_attempt
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
@@ -1428,11 +1429,15 @@ async def _complete_problem(
             session, dialogue_id=dialogue_id, started_at=started_at
         ),
     )
+    # EOS-47: `submit_attempt`와 같은 판·채점 환경 고정(세 적재 경로가 같은 재현 근거를 남긴다).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답·dialogue 링크에 즉시 사용).
         user_id=user_id,
         session_id=learning_session_id,
         problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         is_correct=True,  # 서버 권위 판정(turn A correct) — 클라 보고 아님.
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
@@ -1594,11 +1599,15 @@ async def _record_first_wrong_submission(
         student_work_cipher, final_answer
     )
     learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    # EOS-47: 판·채점 환경 고정(`_complete_problem`·`submit_attempt`와 같은 호출).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),
         user_id=user_id,
         session_id=learning_session_id,
         problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         is_correct=False,  # 서버 권위 판정(final incorrect) — 클라 보고 아님.
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
