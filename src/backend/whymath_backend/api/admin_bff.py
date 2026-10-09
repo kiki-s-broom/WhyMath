@@ -1,9 +1,13 @@
 """Admin BFF — `/v1/admin/*` 운영 조회 표면 (ADMIN-05 · 04 §2 원칙2).
 
-엔드포인트 (전부 GET — **Phase A는 read-only**, 쓰기는 ADMIN-07 Phase B):
+엔드포인트 (Phase A는 read-only GET 5종 · **ADMIN-07 Phase B가 검수 큐에 한해 쓰기 1종을 추가**):
   - GET /v1/admin/models        — 모델 상태 매트릭스(로컬 Ollama + 클라우드 구성)
   - GET /v1/admin/costs         — 비용·라우팅 집계(Langfuse 이벤트 → cost_report)
   - GET /v1/admin/review-queue  — 검수 큐(적재 문항 축 — JSONL 축은 승계 태스크)
+  - GET /v1/admin/review-queue/items         — 검수 큐 목록(상태별 페이지·본문 제외)
+  - GET /v1/admin/review-queue/items/{id}    — 검수 큐 단건(본문 + 서버 판정 `allowed_actions`)
+  - POST /v1/admin/review-queue/items/{id}/transitions — 검수 상태 전이(**유일한 쓰기** — 행 잠금·
+    전이표 검증·감사 1행·단일 트랜잭션. 전이 규칙 정본 = `schema/review_transition.py`)
   - GET /v1/admin/users         — 사용자 **집계**(PII 0)
   - GET /v1/admin/users/{id}    — 사용자 단건(마스킹) + 관리자 접근 감사 1행
 
@@ -26,11 +30,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 import anyio.to_thread
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,7 +48,16 @@ from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.ops.cost_report import CostReport, aggregate_l3_events, fetch_l3_events
 from whymath_backend.privacy import record_admin_access_audit
-from whymath_backend.schema.enums import ReviewStatus
+from whymath_backend.privacy.audit import record_content_mutation_audit
+from whymath_backend.schema.enums import PrivacyAuditAction, PrivacyAuditResourceType, ReviewStatus
+from whymath_backend.schema.review_transition import (
+    QUARANTINE_REASON_MAX_LENGTH,
+    IllegalReviewTransition,
+    ReviewTransitionAction,
+    action_requires_reason,
+    allowed_actions,
+    resolve_review_transition,
+)
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
@@ -283,6 +297,292 @@ async def get_admin_review_queue(
         counts[key] = counts.get(key, 0) + int(count)
 
     return AdminReviewQueueResponse(db=AdminReviewDbAxis(counts=counts, unset=unset, total=total))
+
+
+# ── 검수 큐 항목 · 상태 전이 (ADMIN-07 Phase B) ─────────────────────────────────────────
+
+
+class AdminReviewItemRow(BaseModel):
+    """검수 큐 목록 1행 — 가벼운 요약(문항 본문 제외)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    problem_id: uuid.UUID = Field(..., description="문항 id.")
+    review_status: str | None = Field(None, description="현재 검수 상태(미설정=None).")
+    subject: str | None = Field(None, description="과목.")
+    domain: str | None = Field(None, description="영역.")
+    difficulty_overall: float | None = Field(None, description="코어 산출 난이도(그대로 표시).")
+    source_type: str | None = Field(None, description="출처 유형.")
+    review_score: float | None = Field(None, description="코어 산출 검수 점수(그대로 표시).")
+    created_at: str | None = Field(None, description="적재 시각(ISO).")
+
+
+class AdminReviewItemsResponse(BaseModel):
+    """`GET /v1/admin/review-queue/items` — 상태별 페이지."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: str = Field(..., description="조회한 검수 상태.")
+    total: int = Field(..., description="그 상태의 전체 건수.")
+    limit: int = Field(..., description="페이지 크기.")
+    offset: int = Field(..., description="건너뛴 건수.")
+    items: tuple[AdminReviewItemRow, ...] = Field(
+        ..., description="created_at·problem_id 오름차순."
+    )
+
+
+class AdminReviewItemDetail(BaseModel):
+    """`GET /v1/admin/review-queue/items/{id}` — 검수에 필요한 본문과 서버 판정 허용 액션."""
+
+    model_config = ConfigDict(frozen=True)
+
+    problem_id: uuid.UUID = Field(..., description="문항 id.")
+    review_status: str | None = Field(None, description="현재 검수 상태(미설정=None).")
+    question_text: str | None = Field(None, description="문항 본문(렌더러-중립 원문).")
+    choices: list[str] | None = Field(None, description="선택지.")
+    answer: str | None = Field(None, description="정답.")
+    answer_explanation: str | None = Field(None, description="해설.")
+    subject: str | None = Field(None, description="과목.")
+    domain: str | None = Field(None, description="영역.")
+    difficulty_overall: float | None = Field(None, description="코어 산출 난이도(그대로 표시).")
+    source_type: str | None = Field(None, description="출처 유형.")
+    review_score: float | None = Field(None, description="코어 산출 검수 점수(그대로 표시).")
+    quarantine_reason: str | None = Field(None, description="격리 사유(없으면 None).")
+    quarantined_at: str | None = Field(None, description="격리 시각(ISO · 없으면 None).")
+    created_at: str | None = Field(None, description="적재 시각(ISO).")
+    allowed_actions: tuple[str, ...] = Field(
+        ..., description="현재 상태에서 허용되는 전이 액션 — 서버 전이표가 정본(프런트 재구현 금지)"
+    )
+
+
+class AdminReviewTransitionRequest(BaseModel):
+    """`POST …/transitions` 본문."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: ReviewTransitionAction = Field(..., description="적용할 전이 액션.")
+    expected_status: ReviewStatus = Field(
+        ..., description="화면이 본 현재 상태 — 서버 현재값과 다르면 409(낙관적 동시성)."
+    )
+    reason: str | None = Field(
+        None,
+        max_length=QUARANTINE_REASON_MAX_LENGTH,
+        description="격리 사유 — quarantine이면 필수(공백 제외 1자 이상). 그 외는 기록 안 됨.",
+    )
+
+    @model_validator(mode="after")
+    def _reason_required_for_quarantine(self) -> AdminReviewTransitionRequest:
+        if action_requires_reason(self.action) and not (self.reason or "").strip():
+            raise ValueError("이 액션은 사유(reason)가 필요합니다(공백 제외 1자 이상).")
+        return self
+
+
+class AdminReviewTransitionResponse(BaseModel):
+    """전이 결과 — 감사 행 id를 함께 낸다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    problem_id: uuid.UUID = Field(..., description="문항 id.")
+    from_status: str = Field(..., description="전이 전 상태.")
+    to_status: str = Field(..., description="전이 후 상태.")
+    audit_id: uuid.UUID = Field(..., description="이 전이의 감사 행 id.")
+    occurred_at: str = Field(..., description="전이 시각(ISO).")
+
+
+def _status_value(value: ReviewStatus | str | None) -> str | None:
+    if value is None:
+        return None
+    return value.value if isinstance(value, ReviewStatus) else str(value)
+
+
+def _enum_value(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(getattr(value, "value", value))
+
+
+def _float_or_none(value: object) -> float | None:
+    return None if value is None else float(value)  # type: ignore[arg-type]
+
+
+@router.get(
+    "/review-queue/items",
+    response_model=AdminReviewItemsResponse,
+    summary="검수 큐 목록 — 상태별 페이지(본문 제외)",
+)
+async def list_admin_review_items(
+    admin: RequireReviewAdmin,
+    session: SessionDep,
+    status_: Annotated[ReviewStatus, Query(alias="status")] = ReviewStatus.pending,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> AdminReviewItemsResponse:
+    """`status` 상태의 문항을 `created_at ASC, problem_id ASC`(안정 정렬)로 돌려준다."""
+    total = int(
+        (
+            await session.execute(
+                select(func.count()).select_from(Problem).where(Problem.review_status == status_)
+            )
+        ).scalar()
+        or 0
+    )
+    rows = (
+        await session.execute(
+            select(
+                Problem.problem_id,
+                Problem.review_status,
+                Problem.subject,
+                Problem.domain,
+                Problem.difficulty_overall,
+                Problem.source_type,
+                Problem.review_score,
+                Problem.created_at,
+            )
+            .where(Problem.review_status == status_)
+            .order_by(Problem.created_at.asc(), Problem.problem_id.asc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return AdminReviewItemsResponse(
+        status=status_.value,
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=tuple(
+            AdminReviewItemRow(
+                problem_id=r.problem_id,
+                review_status=_status_value(r.review_status),
+                subject=_enum_value(r.subject),
+                domain=r.domain,
+                difficulty_overall=_float_or_none(r.difficulty_overall),
+                source_type=_enum_value(r.source_type),
+                review_score=_float_or_none(r.review_score),
+                created_at=_iso(r.created_at),
+            )
+            for r in rows
+        ),
+    )
+
+
+@router.get(
+    "/review-queue/items/{problem_id}",
+    response_model=AdminReviewItemDetail,
+    summary="검수 큐 단건 — 본문 + 서버 판정 허용 액션",
+)
+async def get_admin_review_item(
+    problem_id: uuid.UUID, admin: RequireReviewAdmin, session: SessionDep
+) -> AdminReviewItemDetail:
+    """코어 산출값(`review_score` 등)은 있는 그대로 투영한다 — 재계산·재해석 없음."""
+    problem = await session.get(Problem, problem_id)
+    if problem is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="문항을 찾을 수 없습니다."
+        )
+    current = problem.review_status
+    return AdminReviewItemDetail(
+        problem_id=problem.problem_id,
+        review_status=_status_value(current),
+        question_text=problem.question_text,
+        choices=problem.choices,
+        answer=problem.answer,
+        answer_explanation=problem.answer_explanation,
+        subject=_enum_value(problem.subject),
+        domain=problem.domain,
+        difficulty_overall=_float_or_none(problem.difficulty_overall),
+        source_type=_enum_value(problem.source_type),
+        review_score=_float_or_none(problem.review_score),
+        quarantine_reason=problem.quarantine_reason,
+        quarantined_at=_iso(problem.quarantined_at),
+        created_at=_iso(problem.created_at),
+        allowed_actions=tuple(a.value for a in allowed_actions(current)),
+    )
+
+
+def _transition_conflict(code: str, message: str, current: ReviewStatus | None) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": code, "message": message, "current_status": _status_value(current)},
+    )
+
+
+@router.post(
+    "/review-queue/items/{problem_id}/transitions",
+    response_model=AdminReviewTransitionResponse,
+    summary="검수 상태 전이 — 행 잠금 + 전이표 검증 + 감사 1행(단일 트랜잭션)",
+)
+async def transition_admin_review_item(
+    problem_id: uuid.UUID,
+    body: AdminReviewTransitionRequest,
+    request: Request,
+    admin: RequireReviewAdmin,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminReviewTransitionResponse:
+    """한 트랜잭션에서 잠금 → 낙관적 동시성 → 전이표 → 갱신 → 감사 1행 → commit 1회.
+
+    전이 규칙은 `schema/review_transition.py`가 정본이고 여기서는 호출만 한다. 어느 단계든
+    실패하면 commit 전이므로 상태도 감사 행도 남지 않는다(감사 쓰기 실패 시 상태 변경도 롤백).
+    `review_status`를 쓰는 다른 관리자 표면 `PATCH /v1/problems/{id}`는 ADMIN-16부터 같은 표
+    (`action_for_status_change` 역해석)를 거친다 — 전이 규칙의 집행 지점은 이 라우트와
+    그 PATCH 둘이다.
+    """
+    problem = (
+        await session.execute(
+            select(Problem)
+            .where(Problem.problem_id == problem_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if problem is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="문항을 찾을 수 없습니다."
+        )
+
+    current = problem.review_status
+    if current != body.expected_status:
+        raise _transition_conflict(
+            "stale_status", "화면의 상태가 최신이 아닙니다. 새로고침 후 다시 시도하세요.", current
+        )
+    try:
+        target = resolve_review_transition(current, body.action)
+    except IllegalReviewTransition as exc:
+        raise _transition_conflict(
+            "illegal_transition", "현재 상태에서 허용되지 않는 전이입니다.", current
+        ) from exc
+
+    occurred_at = datetime.now(UTC)
+    problem.review_status = target
+    if body.action is ReviewTransitionAction.quarantine:
+        # 격리 계약 §3 — 사유·시각을 상태와 함께 쓴다. release/approve/reject는 이 필드를 건드리지
+        # 않는다(§5-2: 회수 이력은 해제 후에도 영구 기록).
+        problem.quarantine_reason = (body.reason or "").strip()
+        problem.quarantined_at = occurred_at
+
+    try:
+        audit = record_content_mutation_audit(
+            session,
+            actor_user_id=admin.user_id,
+            resource_type=PrivacyAuditResourceType.problem,
+            resource_id=problem_id,
+            action=PrivacyAuditAction(body.action.value),
+            ip=_client_ip(request, settings=settings),
+            settings=settings,
+        )
+        await session.flush()  # 서버 기본값(audit_id)을 받아 오되 commit은 아래 1회뿐이다.
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    return AdminReviewTransitionResponse(
+        problem_id=problem_id,
+        from_status=current.value,
+        to_status=target.value,
+        audit_id=audit.audit_id,
+        occurred_at=occurred_at.isoformat(),
+    )
 
 
 # ── 사용자 조회 ──────────────────────────────────────────────────────────────────────

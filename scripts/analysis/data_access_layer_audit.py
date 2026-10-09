@@ -136,6 +136,14 @@ BASELINE: dict[str, frozenset[str]] = {
             # 함수로 대체 불가한 새 접근점(역할·티어·검수상태 group-by)이라 (b) 대신 (a)를
             # 택했다 — 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/admin_bff.py",
+            # P3-12 — Admin CMS BFF. 관리자 CMS의 목록·상세·제자리 편집이 리소스 8종의 조회와 쓰기를
+            # 직접 한다. 기존 조회 함수로 대체할 수 없는 새 접근점이다: 편집은 행 잠금(FOR UPDATE)·
+            # 낙관적 동시성·감사 1행·commit 1회가 **같은 트랜잭션**이어야 하므로 쿼리와 경계가 한
+            # 곳에 있어야 한다(쓰기 경로를 여러 파일에 쪼개면 "상태 컬럼도 같이 쓰는" 구멍이 어디에
+            # 생기는지 보이지 않는다). 개념 버전의 쓰기는 이 파일이 아니라 `l3/publish_gate.py`가
+            # 소유한다 — 이 파일은 `ConceptVersion` ORM을 import하지 않는다(AST 동결 R1). 이 등재가
+            # 리뷰에 보이는 것이 이 가드의 목적이다.
+            "api/admin_cms.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",
@@ -161,6 +169,7 @@ BASELINE: dict[str, frozenset[str]] = {
             "harness/attempt_skill_event_reach_report.py",
             "harness/attempt_skill_reach_probe.py",
             "harness/distractor_signal_dormancy_report.py",
+            "harness/item_calibration_reach_report.py",
             "harness/learning_metrics_rollup_cli.py",
             "harness/pilot_kpi_baseline.py",
             "harness/qa_pipeline.py",
@@ -191,6 +200,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/concept_visualization/overlay.py",
             "l1/curriculum/curriculum_loader.py",
             "l1/curriculum/curriculum_resolve.py",
+            # HARN-302 — 적재 전 외래키 대상 사전확인. 연결을 스스로 열지 않고 적재기가 건넨
+            # 연결로 참조 테이블을 읽기만 한다(쓰기 0). 적재기 여러 곳이 같은 확인을 쓰도록
+            # 공용 모듈로 둔다.
+            "l1/fk_precheck.py",
             "l1/formula_graph/formula_node_projection.py",
             "l1/misconception/catalog_loader.py",
             "l1/misconception/crosslink_loader.py",

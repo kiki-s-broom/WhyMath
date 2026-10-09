@@ -43,7 +43,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -168,6 +168,7 @@ def _build_pool() -> tuple[_Skeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class CalculusProductRuleSkeletonGenerator:
     """결정론 스켈레톤 생성기 — 대학 미적분학 I 곱의 미분법(`EquivalentProblemGenerator` 좌석).
 

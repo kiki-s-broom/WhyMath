@@ -51,6 +51,7 @@ import dep_declaration
 import done_mirror_gate
 import event_leaks
 import incidents as incidents_mod
+import isolation_report
 import jit_rules
 import number_guard
 import pathscope
@@ -643,6 +644,44 @@ def _gate_attach_summary(attached: list[remote_claims.GateAttachedElsewhere]) ->
     )
 
 
+def _sibling_summary(holders: list[remote_claims.SiblingInProgress]) -> str:
+    """형제 진행 중 사본을 한 줄로 — `브랜치(상태·팁 N시간 전)`. 나이를 모르면 그렇게 쓴다."""
+    parts = []
+    for h in holders:
+        age = "팁 시각 불명" if h.tip_age_hours is None else f"팁 {h.tip_age_hours:.1f}시간 전"
+        parts.append(f"{h.branch}({h.status}·{age})")
+    return ", ".join(parts)
+
+
+def _sibling_refusal_message(task_id: str, holders: list[remote_claims.SiblingInProgress]) -> str:
+    """`start` 거부 메시지 — 브랜치를 지목하고 확인 명령·우회 경로를 함께 준다."""
+    return (
+        f"{task_id} 착수 거부 — 미머지 브랜치가 이 태스크를 **진행 중으로 들고 있다**"
+        f"(HARN-198): {_sibling_summary(holders)}\n"
+        "  끝낸 세션의 `done`은 원격 claim을 즉시 걷지만, done을 담은 대장 변경은 그 브랜치에\n"
+        "  push되기 전까지 원격 사본이 in_progress다. 트렁크는 이 태스크를 무주 todo로 보여 준다.\n"
+        "  착수하면 같은 슬라이스를 두 번 구현하게 된다(2026-09-29 S4-11 실측).\n"
+        f"  확인: git show origin/{holders[0].branch}:backlog/tasks/{task_id}.yaml\n"
+        "  그 브랜치의 세션과 조율하거나, 폐기된 브랜치라면: --ignore-remote-claim"
+    )
+
+
+def _report_sibling_skipped(root: Path, task_id: str, scan: remote_claims.SiblingScan) -> None:
+    """과탐 방어로 뺀 형제 사본을 조용히 버리지 않는다 — 무엇을 왜 뺐는지 남긴다(HARN-08 동형)."""
+    if not scan.skipped:
+        return
+    summary = ", ".join(f"{s.branch}:{s.reason}" for s in scan.skipped)
+    print(
+        f"  ↳ 형제 진행 중 사본 {len(scan.skipped)}건 제외(과탐 방어): {summary}", file=sys.stderr
+    )
+    store.append_event(
+        root,
+        "sibling_in_progress_skipped",
+        task_id,
+        skipped=[f"{s.branch}:{s.reason}" for s in scan.skipped],
+    )
+
+
 def cmd_next(root: Path, args: argparse.Namespace) -> int:
     backlog, _ = _load(root)
     policy, _ = store.load_policy(root)
@@ -706,6 +745,37 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
                     f"붙여 둔 태스크가 후보에 섞였을 수 있음",
                     file=sys.stderr,
                 )
+        # 형제 브랜치의 진행 중 사본 제외 (HARN-198) — 끝낸(또는 진행 중인) 세션의 done/claim이
+        # 아직 트렁크·claim 대장 어디에도 없는 창. 위 두 스캔과 같은 이유로 캐시된 ref만 본다
+        # (네트워크 0) — 확정 지점은 start다.
+        if ready:
+            sibling = remote_claims.scan_sibling_in_progress(
+                root,
+                [t.id for t in ready],
+                session=store.current_branch(root),
+                ttl_hours=policy.claim_ttl_hours,
+                exclude_branches=[store.current_branch(root)],
+            )
+            for task_id, holders in sorted(sibling.found.items()):
+                print(
+                    f"⚠ 후보 제외 {task_id} — 미머지 브랜치가 진행 중으로 들고 있다: "
+                    f"{_sibling_summary(holders)}",
+                    file=sys.stderr,
+                )
+            ready = [t for t in ready if t.id not in sibling.found]
+            if sibling.status not in ("ok", "truncated"):
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지 불가({sibling.status}) — 다른 세션이 들고 있는 "
+                    f"태스크가 후보에 섞였을 수 있음",
+                    file=sys.stderr,
+                )
+        # 낡은 로컬 대장 고지 (HARN-54) — 트렁크에서 이미 done/cancelled인 태스크가 후보에 섞였는가.
+        # 위 세 스캔은 트렁크를 보지 않는다(`scan_remote_done`은 트렁크 ref를 의도적으로 제외한다).
+        # **제외하지 않고 고지만 한다** — 로컬에 정당한 후속 작업이 있을 수 있다. ref는 캐시만.
+        if ready:
+            _print_trunk_terminal_notice(
+                root, remote_claims.scan_trunk_terminal(root, [t.id for t in ready])
+            )
     # 취소된 선행에 차단된 todo (HARN-67 ②) — 후보 0건 여부·--json 여부와 무관하게 **매번**
     # 경고한다. 차단 자체는 옳을 수 있으나(결정 불가 → 차단 유지) 조용한 차단만은 금지다:
     # 선행을 cancel한 세션은 후속이 사라진 것을 못 보고, 다음 세션은 "왜 안 나오지"를 다시
@@ -768,6 +838,93 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
     print(hidden_notice)
     _print_gate_waits(backlog, excluded)
     return 0
+
+
+def _trunk_display(ref: str) -> str:
+    """`refs/remotes/origin/main` → `origin/main` (사람이 읽는 표기)."""
+    return ref.removeprefix("refs/remotes/")
+
+
+def _trunk_snapshot_age_line(root: Path) -> str | None:
+    """원격 스냅샷이 낡았으면 그 사실 한 줄, 아니면 None (HARN-54 ③).
+
+    `main에 없음`과 `main을 최근에 못 봤음`은 다른 진술이다 — 낡은 스냅샷으로 '트렁크에서 끝난
+    것 없음'을 말하면 거짓 안심이 된다. 나이는 **전체 브랜치 fetch 스탬프**로 잰다:
+    `remote_refs_age_seconds`는 FETCH_HEAD를 보는데, 이 CLI의 claim 조회(`list_claims`)가
+    매번 그것을 새로 써서 `next` 안에서는 구조적으로 0초에 가깝다(HARN-111 ⑦(다) 실측 — 거짓
+    안심). 판정 불가(스탬프 없음 등)는 침묵한다 — 추측을 출력하지 않는다.
+    """
+    age, _status = number_guard.branch_snapshot_age(root)
+    if age is None or age < _STALE_REFS_SECONDS:
+        return None
+    return (
+        f"⚠ origin 스냅샷이 {_format_age(age)} 지났다(마지막 전체 브랜치 fetch 기준) — "
+        f"트렁크 대조는 그 시점 기준이다. 최근에 끝난 태스크는 못 봤을 수 있다 · "
+        f"갱신: git fetch origin main"
+    )
+
+
+def _print_trunk_terminal_notice(root: Path, result: "remote_claims.TrunkTerminalResult") -> None:
+    """`next` — 후보 중 트렁크에서 이미 종결된 태스크를 고지한다 (HARN-54). 차단·제외 없음."""
+    for tid, hit in sorted(result.found.items()):
+        print(
+            f"⚠ 낡은 로컬 대장 {tid} — {_trunk_display(hit.trunk_ref)}에서는 "
+            f"이미 {hit.trunk_status} (로컬: todo). 후보에는 남기지만 착수하면 "
+            f"중복 구현일 수 있다 · 정정: git fetch origin main && git merge --ff-only origin/main",
+            file=sys.stderr,
+        )
+    if result.status != "ok":
+        # 판정 불가를 '트렁크에서 끝난 것 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — 이미 main에서 끝난 태스크가 "
+            f"후보에 섞였을 수 있음",
+            file=sys.stderr,
+        )
+        return
+    stale = _trunk_snapshot_age_line(root)
+    if stale:
+        print(stale, file=sys.stderr)
+
+
+def _print_trunk_terminal_start(
+    root: Path, task: Task, result: "remote_claims.TrunkTerminalResult | None"
+) -> None:
+    """`start` — 착수 대상이 트렁크에서 이미 종결됐으면 **마지막 출력**으로 눈에 띄게 고지한다.
+
+    사고 당시 경고가 path_overlap 4줄에 묻혀 착수가 그대로 진행됐다(HARN-54 ②) — 그래서
+    착수 확정 출력 *뒤*, 명령의 마지막에 온다. 차단하지 않는다(정당한 후속 작업 가능).
+    `result`가 None이면 대조를 시도하지 않은 경로(원격 claim 비활성·`--no-remote`)다 — 침묵.
+    """
+    if result is None:
+        return
+    hit = result.found.get(task.id)
+    if hit is not None:
+        bar = "!" * 64
+        print(
+            f"\n{bar}\n"
+            f"⚠ {task.id}는 {_trunk_display(hit.trunk_ref)}에서 이미 **{hit.trunk_status}**다 — "
+            f"이 클론의 대장이 낡았다(로컬: todo).\n"
+            f"  착수하면 중복 구현이 될 수 있다. 확인: git show {_trunk_display(hit.trunk_ref)}:"
+            f"backlog/tasks/{task.id}.yaml\n"
+            f"  대장 최신화: git fetch origin main && git merge --ff-only origin/main\n"
+            f"  (정당한 후속 작업이면 그대로 진행해도 된다 — 이 고지는 차단하지 않는다)\n"
+            f"{bar}",
+            file=sys.stderr,
+        )
+        store.append_event(
+            root,
+            "start_trunk_terminal_notice",
+            task.id,
+            trunk_status=hit.trunk_status,
+            trunk_ref=hit.trunk_ref,
+        )
+        return
+    if result.status != "ok":
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — {task.id}가 main에서 이미 끝났는지 "
+            f"못 봤다",
+            file=sys.stderr,
+        )
 
 
 def _print_gate_waits(backlog: object, excluded: list) -> None:
@@ -835,6 +992,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
     # 원격 claim 스냅샷 — 다른 세션의 in-flight는 로컬 backlog 사본에 안 보이므로
     # (claim은 각 브랜치의 worktree에만 기록) 원격 ref로만 교차 세션 겹침을 알 수 있다
     remote_claimed, _ = _remote_claim_map(root, policy, skip=getattr(args, "no_remote", False))
+    # 트렁크 종결 대조 결과 (HARN-54) — None = 대조를 시도하지 않은 경로(침묵), 마지막에 고지한다.
+    trunk_terminal: remote_claims.TrunkTerminalResult | None = None
 
     # [프리플라이트 0] 미머지 done — 타 세션이 이미 끝냈으나 머지 전인 태스크 (HARN-11).
     # claim 대장은 done 시 release돼 비어 있고 트렁크 사본은 아직 todo라, 다른 어떤
@@ -916,6 +1075,17 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
 
+        # [프리플라이트 0.6] 트렁크에서 이미 종결된 태스크 (HARN-54) — 0.5는 트렁크의 *조건 강화*만,
+        # 위 done 스캔은 *트렁크 밖* 브랜치만 본다. 낡은 로컬 대장이 main에서 이미 done인 태스크를
+        # todo로 보여 주는 창은 둘 다 못 본다. 위 fetch=True가 ref를 방금 최신화했으므로 편승한다.
+        # fetch가 실패했으면(done_status != ok) 그 사유를 그대로 싣는다 — 못 본 것을 '없음'으로 접지
+        # 않는다.
+        trunk_terminal = (
+            remote_claims.scan_trunk_terminal(root, [task.id])
+            if done_status == "ok"
+            else remote_claims.TrunkTerminalResult(done_status)
+        )
+
         # [프리플라이트 0.75] 미머지 브랜치의 게이트 부착 (HARN-193) — 트렁크 시차(0.5)의 반대
         # 방향이다. 0.5는 *트렁크가* 조건을 강화한 경우를 보고, 이 검사는 *미머지 브랜치가*
         # 강화한 경우를 본다. 게이트를 붙이고 `unblock`한 세션은 원격 claim을 걷고, 그 부착은
@@ -965,6 +1135,53 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                 print(
                     f"⚠ 미머지 게이트 부착 탐지 불가({gate_status}) — 타 세션이 이 태스크에 "
                     f"게이트를 붙여 뒀는지 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+
+        # [프리플라이트 0.8] 형제 브랜치의 진행 중 사본 (HARN-198) — 착수 차단 세 겹(원격 claim ·
+        # 트렁크 사본 · 미머지 done)이 **전부 빈 창**을 본다. 끝낸 세션의 `done`은 원격 claim을
+        # 즉시 걷지만 done을 담은 대장 변경은 그 세션의 작업 트리에만 있어, 그 브랜치의 원격
+        # 사본은 push 전까지 `in_progress`다(2026-09-29 실측 46분). 읽기측 탐지(프리플라이트 3)는
+        # CAS가 실패할 때만 돌아 이 창을 못 본다 — 그래서 CAS 결과와 무관하게 항상 본다.
+        # 위 done 스캔이 fetch=True로 ref를 최신화했으므로 같은 fetch에 편승한다(추가 왕복 0).
+        if done_status == "ok":
+            sibling = remote_claims.scan_sibling_in_progress(
+                root,
+                [task.id],
+                session=session,
+                ttl_hours=policy.claim_ttl_hours,
+                refs_fresh=True,
+                exclude_branches=[session],
+            )
+            holders = sibling.found.get(task.id, [])
+            _report_sibling_skipped(root, task.id, sibling)
+            if holders:
+                message = _sibling_refusal_message(task.id, holders)
+                if getattr(args, "ignore_remote_claim", False):
+                    print(
+                        f"⚠ 형제 브랜치의 진행 중 사본 무시하고 진행 — 중복 구현 위험을 "
+                        f"감수합니다: {_sibling_summary(holders)}",
+                        file=sys.stderr,
+                    )
+                    store.append_event(
+                        root,
+                        "start_ignored_sibling_in_progress",
+                        task.id,
+                        holders=[f"{h.branch}:{h.status}" for h in holders],
+                    )
+                else:
+                    return _fail(message)
+            elif sibling.status not in ("ok", "truncated"):
+                # 빈 결과를 '형제 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지 불가({sibling.status}) — 다른 세션이 이 태스크를 "
+                    f"들고 있는지 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+            elif sibling.status == "truncated":
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지: 브랜치 수 상한 도달 — "
+                    f"일부({sibling.scanned_refs}개)만 확인했고 발견 0건은 '없음'이 아니다",
                     file=sys.stderr,
                 )
 
@@ -1113,6 +1330,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
         )
     for warning in task.layer_drift_warnings():
         print(f"  ⚠ {warning}", file=sys.stderr)
+    # 마지막 출력 — 앞의 겹침 경고들에 묻히지 않게 한다 (HARN-54 ②)
+    _print_trunk_terminal_start(root, task, trunk_terminal)
     return 0
 
 
@@ -4538,6 +4757,28 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     else:
         stale_branch_status = "disabled"
 
+    # 세션 스캔이 shallow면 CI 야간 리포트(harness-reports)로 대체한다 (HARN-28). 모든 CCR 세션
+    # 컨테이너가 shallow라 라이브 스캔은 세션에서 한 번도 목록을 낸 적이 없다. 리포트가 없거나
+    # 손상됐거나 못 읽으면 "고립 0건"이 아니라 "미측정"을 낸다(isolation_report.to_brief).
+    # shallow가 아니면 라이브 스캔이 더 신선하므로 읽지 않는다.
+    isolation_source_line = ""
+    if stale_branch_status == "shallow":
+        try:
+            iso = isolation_report.brief_for_session(
+                root, local_status=stale_branch_status, local_message=stale_branch_message
+            )
+            stale_branches = iso.stale_branches
+            stale_branch_status = iso.status
+            stale_branch_message = iso.message
+            pr_state_lookup_ok = iso.pr_state_lookup_ok
+            pr_state_lookup_error = iso.pr_state_lookup_error
+            isolation_source_line = iso.source_line
+        # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지: 타입명을 남긴다)
+        except Exception as exc:
+            stale_branch_message = (
+                f"{stale_branch_message} · CI 리포트 대체 실패({type(exc).__name__})"
+            )
+
     # 설계 문서 중복 착수 탐지 (HARN-14) — SessionStart 1회 비용, 나이 임계 없음(HARN-13의
     # 3일 임계 아래에서 새는 것이 이 스캔의 존재 이유 — 문서 중복은 착수 당일이 가장 위험).
     #
@@ -4616,6 +4857,36 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
         gate_attach_excluded = {}
         gate_attach_status = f"error:{type(exc).__name__}"
 
+    # 형제 브랜치의 진행 중 사본 제외 (HARN-198) — 끝낸 세션의 done이 원격 claim을 걷고 done 기록은
+    # 아직 push 전인 창에서 그 태스크가 브리핑 1순위로 노출되는 것이 S4-11 중복 구현의 경로다.
+    # next와 같은 필터를 배선하고, 실패는 위와 같은 이유로 stdout 문자열에 싣는다.
+    sibling_excluded: dict[str, list[str]] = {}
+    sibling_status = "disabled"
+    try:
+        if policy.remote_claims:
+            ready, _ = selector.candidates(backlog, remote_claimed=remote_claimed)
+            ready = [
+                t for t in ready if t.id not in done_excluded and t.id not in gate_attach_excluded
+            ]
+            sibling_status = "ok"
+            if ready:
+                me = store.current_branch(root)
+                sibling_scan = remote_claims.scan_sibling_in_progress(
+                    root,
+                    [t.id for t in ready],
+                    session=me,
+                    ttl_hours=policy.claim_ttl_hours,
+                    exclude_branches=[me],
+                )
+                sibling_status = sibling_scan.status
+                sibling_excluded = {
+                    tid: [f"{h.branch}({h.status})" for h in holders]
+                    for tid, holders in sibling_scan.found.items()
+                }
+    except Exception as exc:  # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지)
+        sibling_excluded = {}
+        sibling_status = f"error:{type(exc).__name__}"
+
     # 브랜치 보호 라이브 확인 리마인드 (HARN-63 ④ 집행 지점) — 문서·ci.yml 대조는 둘 다
     # 저장소 *안*이라 라이브 설정이 비어도 전부 초록으로 통과한다(3회차 사고의 구조적 원인).
     # 조회는 사람만 할 수 있으므로(관리자 토큰), 기계는 "얼마나 오래 확인하지 않았는가"를 센다.
@@ -4637,9 +4908,12 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             stale_branch_message=stale_branch_message,
             pr_state_lookup_ok=pr_state_lookup_ok,
             pr_state_lookup_error=pr_state_lookup_error,
+            isolation_source=isolation_source_line,
             done_excluded=done_excluded,
             gate_attach_excluded=gate_attach_excluded,
             gate_attach_status=gate_attach_status,
+            sibling_excluded=sibling_excluded,
+            sibling_status=sibling_status,
             doc_series_candidates=doc_series_candidates,
             doc_series_status=doc_series_status,
             ruleset_reminder=ruleset_reminder,

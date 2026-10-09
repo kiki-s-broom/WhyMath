@@ -25,7 +25,11 @@ from whymath_backend.api.me import GrowthEvidenceResponse
 from whymath_backend.app import create_app
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
-from whymath_backend.harness.growth_evidence_exposure import narrate_calibration_brier
+from whymath_backend.harness.growth_evidence_exposure import (
+    _STATIC_TIER,
+    ExposureTier,
+    narrate_calibration_brier,
+)
 from whymath_backend.harness.wh1_evaluation import (
     HelpReductionValidation,
     Metric,
@@ -47,9 +51,15 @@ _UID = uuid.uuid4()
 
 _ENDPOINT = "/v1/me/growth-evidence"
 
-# GrowthEvidenceResponse가 선언한 필드 집합 그대로 — §7 스키마 구조 증명과 §2 happy path
-# 양쪽에서 재사용(하드코딩 이중화 방지).
-_DECLARED_FIELDS = set(GrowthEvidenceResponse.model_fields)
+# 응답이 가져야 할 필드 집합 — **계약 표(`_STATIC_TIER`)에서 파생**한다(PED-28). 종전에는
+# `set(GrowthEvidenceResponse.model_fields)`로 기대값을 검증 대상 모델 자신에서 얻어, 모델이 무엇이든
+# 통과하는 동어반복이었다(그 사이 ⑯이 응답에서 빠져 있었다). 봉투 필드(시간창·스코프 echo)는 지표가
+# 아니라 명시 목록이고, INTERNAL_ONLY 지표는 응답에 *없어야* 하므로 기대 집합에서 뺀다.
+# §7 스키마 구조 증명과 §2 happy path 양쪽에서 재사용(하드코딩 이중화 방지).
+_ENVELOPE_FIELDS = {"window_start", "window_end", "user_scoped", "mode_filter"}
+_DECLARED_FIELDS = _ENVELOPE_FIELDS | {
+    name for name, tier in _STATIC_TIER.items() if tier is not ExposureTier.INTERNAL_ONLY
+}
 
 
 def _user() -> UserProfile:

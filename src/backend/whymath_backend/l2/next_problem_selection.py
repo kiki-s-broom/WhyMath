@@ -30,6 +30,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.config import get_settings
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
 from whymath_backend.db.models.concept import Concept, ConceptEdge, ProblemConcept
@@ -42,11 +43,15 @@ from whymath_backend.l2.ability_estimation import (
 )
 from whymath_backend.l2.irt import (
     IrtItem,
+    SelectionAttempt,
+    SelectionEvidence,
     ThetaBoundary,
     ability_boundary,
+    ability_for_help_folded_selection,
     ability_for_selection,
     ability_standard_error,
     estimate_ability,
+    selection_evidence,
 )
 from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole, EdgeType, ReviewStatus
 from whymath_backend.schema.problem import METADATA_ONLY_SOURCES
@@ -319,20 +324,32 @@ class AttemptHistoryState:
     #: EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — 전부 정답 `upper` · 전부 오답 `lower` · 그 외
     #: None. 기본값 None은 이 필드 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
     theta_boundary: ThetaBoundary | None = None
-    #: EOS-147: 경계 규칙이 낸 **선택용** θ — `upper`에서 값이 추정 θ와 다를 때만 채운다(None이면
-    #: 선택 θ = 추정 θ). 직접 읽지 말고 `selection_theta` 속성을 쓴다.
-    boundary_selection_theta: float | None = None
+    #: EOS-147·EOS-39: 추정 θ와 **다른 선택용 θ** — 값이 다를 때만 채운다(None이면 선택 θ = 추정 θ).
+    #: 다른 경우는 둘이다: 전부 정답 이력의 상한 사다리(EOS-147)와 도움 접기가 일어난 이력(EOS-39).
+    #: (이름은 EOS-147 시점의 `selection_theta_override`에서 넓어졌다.) 직접 읽지 말고
+    #: `selection_theta` 속성을 쓴다.
+    selection_theta_override: float | None = None
+    #: EOS-39: 코치가 도움(힌트 단계 2 이상)을 공급해 완료한 문항이라 선택용 응답에서 **실패 1건으로
+    #: 접힌 문항 수** — 도움 채널이 이 이력에 닿은 정도("작동한 비율" 원칙). 0이면 닿지 않았다(또는
+    #: 킬 스위치가 꺼졌다). 기본값 0은 이 필드 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
+    selection_help_count: int = 0
+    #: EOS-39: 정답으로 센 완료 행 중 힌트 귀속이 미상(NULL)이라 도움 채널이 **판정하지 못한** 수.
+    #: 미상은 무작위가 아니라 구조적이다(귀속 창을 모름·판독 불가·EOS-133 이전 행) — 실측 비율이
+    #: 필요해 처치 기록으로 남긴다. 킬 스위치가 꺼졌으면 세지 않는다(0).
+    selection_hint_unknown_count: int = 0
 
     @property
     def selection_theta(self) -> float:
-        """추천이 후보를 고를 때 쓰는 θ(EOS-147) — 전부 정답 이력에서만 `theta`와 다르다.
+        """추천이 후보를 고를 때 쓰는 θ(EOS-147·EOS-39) — 두 경우에만 `theta`와 다르다.
 
+        ① 전부 정답 이력(상한 사다리 — EOS-147) ② 코치가 도움을 공급해 완료한 문항이 있어 선택용
+        응답에서 실패로 접힌 이력(EOS-39 — 판정문 `eos39_app_help_completion_selection_judgment`).
         `theta`(추정 θ)는 SE·`measurement_sufficient`·평가 캡처가 읽는 값이고 이 속성과 **다른
         소비처**를 가진다. 둘을 하나로 접으면 전부 정답 이력에서 클램프(4.0)가 출제 표적이 되거나,
-        표적을 위해 추정기를 바꾸게 된다(판정문 §3).
+        표적을 위해 추정기를 바꾸게 된다(EOS-147 판정문 §3).
         """
         return (
-            self.theta if self.boundary_selection_theta is None else self.boundary_selection_theta
+            self.theta if self.selection_theta_override is None else self.selection_theta_override
         )
 
     @property
@@ -349,6 +366,17 @@ class AttemptHistoryState:
         정직하게 표기한다(`api/me.py`의 capture `reason`).
         """
         return self.measurement_sufficient or self.item_cap_reached
+
+
+def _selection_evidence_for(attempts: list[SelectionAttempt]) -> SelectionEvidence:
+    """표적용 응답 — 킬 스위치(`l2_selection_help_fold_enabled`)가 꺼졌으면 도움 접기를 하지 않는다.
+
+    꺼진 상태는 종전과 **비트동일**하다: 원래 응답을 그대로 돌려주고 접힘·미상 수는 0이다(꺼진 동안
+    "미상이 몇 건인가"를 세지 않는다 — 규칙이 일하지 않으면 그 계측도 의미가 없다).
+    """
+    if not get_settings().l2_selection_help_fold_enabled:
+        return SelectionEvidence([(a.item, a.is_correct) for a in attempts], 0, 0)
+    return selection_evidence(attempts)
 
 
 async def load_attempt_history_state(
@@ -374,6 +402,7 @@ async def load_attempt_history_state(
             Problem.difficulty_overall,
             Problem.irt_difficulty_b,
             Problem.irt_a,
+            ProblemAttempt.used_hint,
         )
         .join(Problem, ProblemAttempt.problem_id == Problem.problem_id)
         .where(
@@ -383,19 +412,28 @@ async def load_attempt_history_state(
     )
     attempt_rows = (await session.execute(attempt_stmt)).all()
     responses: list[tuple[IrtItem, bool]] = []
+    selection_attempts: list[SelectionAttempt] = []
     discrimination_applied = 0
-    for _pid, is_correct, difficulty, irt_b, irt_a in attempt_rows:
+    for pid, is_correct, difficulty, irt_b, irt_a, used_hint in attempt_rows:
         b = resolve_item_difficulty_b(irt_b, difficulty)
         if b is not None:
             # EOS-129: 보정 a 우선·없으면 a=1.0(Rasch) — a가 전부 NULL이면 종전과 같은 θ·SE.
             a = resolve_item_discrimination_a(irt_a)
             if a != 1.0:
                 discrimination_applied += 1
-            responses.append((IrtItem(difficulty=b, discrimination=a), bool(is_correct)))
+            item = IrtItem(difficulty=b, discrimination=a)
+            responses.append((item, bool(is_correct)))
+            selection_attempts.append(SelectionAttempt(pid, item, bool(is_correct), used_hint))
     theta = estimate_ability(responses)
-    # EOS-147: 추정 θ는 그대로 두고, 전부 정답 이력에서만 **표적 θ**를 따로 낸다. SE·중단 규칙은
-    # 아래에서 계속 추정 θ로 계산한다(표적 θ로 SE를 재면 MLE가 없는 이력이 정밀해 보인다).
-    selection_theta = ability_for_selection(responses, theta)
+    # EOS-147·EOS-39: 추정 θ는 그대로 두고 **표적 θ**를 따로 낸다. SE·중단 규칙은 아래에서 계속
+    # 추정 θ·원래 응답으로 계산한다(표적 θ로 SE를 재면 MLE가 없는 이력이 정밀해 보인다).
+    evidence = _selection_evidence_for(selection_attempts)
+    if evidence.help_failure_count == 0:
+        # 도움 접기가 이 이력에 닿지 않았다(또는 킬 스위치가 꺼졌다) — EOS-147 규칙 그대로다:
+        # 전부 정답이면 맞힌 최고 난이도 + 0.5(상한 사다리) · 전부 오답은 −4.0 그대로(R3·R6 기준선).
+        selection_theta = ability_for_selection(responses, theta)
+    else:
+        selection_theta = ability_for_help_folded_selection(evidence.responses)
     attempted_ids = {row[0] for row in attempt_rows}
     # slice 15: 응답한 문항(administered) 기준 측정 정밀도 — CAT 중단 규칙 신호.
     administered_items = [item for item, _ in responses]
@@ -410,7 +448,9 @@ async def load_attempt_history_state(
         administered_count=len(administered_items),
         discrimination_applied_count=discrimination_applied,
         theta_boundary=ability_boundary(responses),
-        boundary_selection_theta=selection_theta if selection_theta != theta else None,
+        selection_theta_override=selection_theta if selection_theta != theta else None,
+        selection_help_count=evidence.help_failure_count,
+        selection_hint_unknown_count=evidence.hint_unknown_count,
     )
 
 

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-181-coach-hint-ladder-jump-before-serving-renders-levels
+title: "사다리 도약 판정 — '초보' 라벨이 둘째 좌절에서 전체 풀이 단계(4)에 닿는 규칙, 서빙이 단계 3·4를 렌더하기 전에 (EOS-178 별건)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-178-coach-hint-level-beginner-label-judgement
+requires_gates: []
+acceptance:
+  - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md` §1·§5): '초보'는 사다리를 전 구간 한 칸 올려 신호 없는 첫 턴이 2, 중립 한 턴 뒤 **좌절 한 번**이면 4(NF=242224)에 닿는다(독립 비판 #6 — 초안의 '첫 좌절 3·둘째 좌절 4' 서술은 틀렸다). 스펙 표는 2=좌절 시 · 3=5회+ 막힘 · 4=마지막 수단(매우 드물게)이다(`hint_deferral` 모듈 docstring). 단계 4는 지금 정답을 노출하지 않는다(검수 힌트 저장소는 1~3 밖이면 조회 없이 None · `metacognitive_trigger`는 3과 4를 같은 점층 발화로 낸다 · `decision.prompt`는 단계와 무관한 Polya 단계 프롬프트 · Flutter 채팅 UI에 단계 렌더 코드 없음 — 전부 \"내가 찾은 방법으로는 0건\")."
+  - "② **선행 조건(판정의 시한)**: 이 판정은 서빙이 단계 3·4를 학생에게 렌더하기 **전에** 끝나야 한다. 렌더가 시작되면 라벨이 올린 단계가 실제 도움이 되고(EOS-178이 라벨-단독 공급을 도움으로 세지 않는 근거가 사라진다) 사다리 도약의 교수학 손익이 잠재에서 현실이 된다. 이 선행은 코드 대장 의존으로 걸 수 없는 외부 사건(모바일·웹 UI 변경)이라 notes에 둔다 — 단계·`served_hint`를 렌더하는 모든 변경은 이 태스크와 EOS-178 판정문 §4를 먼저 읽어야 한다."
+  - "③ 판정: (가) 현행 유지 (나) '초보' 상향이 5회+ 막힘 전에 부분 풀이(3)를 넘지 못하게 상한 (다) 신호 없는 턴 상향 금지(라). 입력은 EOS-178이 적재하는 원장(`base_level`·`ability_level`)의 도달 분포와 `EOS-181`의 타당도 값. 침묵형 약한 학생(좌절을 토큰으로 말하지 않는다)의 비계 상실이 비용이며 렌더 전에는 학생 가시 손실이 거의 0이다(독립 비판 #5·#12). 교수학 독립 비판 1회를 받고 판정문이 코드보다 먼저다."
+  - "④ [정정 · 등재 직후] ③의 \"`EOS-181`의 타당도 값\"은 **`EOS-179`**(라벨 예측 타당도 리더)의 값이다 — 등재 스크립트의 번호 오기였다. acceptance는 append 전용이라 지우지 않고 정정 항으로 남긴다(HARN-20 이후 설계)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/hint_deferral.py
+session: null
+notes: "출처: EOS-178 판정문 §5 / 독립 비판 #5·#6·#12 (2026-10-06). 등급 P2 근거: 현재 앱은 단계를 렌더하지 않아 학생 가시 효과가 원장·KPI와 해답 코칭 점층 발화에 한정된다. 단 렌더 시작 전 판정이라는 시한이 있다.\n\n[트리거 면제] EOS-178 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재\n\n[정정 2026-10-06] 등재 직후 번호 오기 정정 — 이 태스크가 자기 자신의 타당도 값을 입력으로 삼는다는 순환 서술을 바로잡는다"
+updated: 2026-10-06

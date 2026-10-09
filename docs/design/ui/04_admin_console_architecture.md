@@ -210,7 +210,7 @@ Kiki의 ChatGPT 설계안([E])은 "AI Native + Knowledge Graph + DSL + Runtime E
 - ~~**ADMIN-RBAC**~~ — `Role` enum + `UserProfile.role`(Alembic) + `require_role` + 콘텐츠 CRUD 인가 부착. **v0(2값) 완료** — `SEC-07`(2026-07-30). 관리 콘솔용 소비(BFF)는 미착수.
 - **ADMIN-MODULE-REGISTRY** — §2 원칙7의 `AdminModule`+`_MODULE_REGISTRY`(초기 시드=[03 §5](03_admin_console_plan.md) 22모듈) + `GET /v1/admin/menu` + 메뉴 필터·라우트 가드 `required_roles` 일치 동결 테스트. (선결·ADMIN-BFF 직전) **→ `ADMIN-04-module-registry` 등재**(2026-08-10·웹 전략 정본 `docs/architecture/web_strategy.md` §6)
 - **ADMIN-BFF** — `/v1/admin/*` 라우터(모델 상태·비용·검수 큐·사용자 조회)·집계·마스킹·감사. `GET /v1/admin/menu`는 이 라우터의 첫 엔드포인트로 착지 권장. **→ `ADMIN-05-bff-readonly` 등재**(2026-08-10 — Phase A read-only 한정·쓰기 개시는 ADMIN-07 소관)
-- **ADMIN-REVIEW-UI** — 검수 큐 UI(`needs_review_worklist` 소비)·DRAFT→PRESCREENED→APPROVED 상태 전이. **→ `ADMIN-07-review-ui` 등재**(2026-08-10)
+- **ADMIN-REVIEW-UI** — 검수 큐 UI(`needs_review_worklist` 소비)·DRAFT→PRESCREENED→APPROVED 상태 전이. **→ `ADMIN-07-review-ui` 등재**(2026-08-10) · **진행(2026-10, 백엔드 절반 착지)**: 전이 계약 `schema/review_transition.py` + BFF `GET /v1/admin/review-queue/items[/{id}]`·`POST …/transitions`(행 잠금·`expected_status` 낙관적 동시성·감사 1행·단일 트랜잭션) 구현 — 웹 화면 착지 전이라 `review_queue` 모듈 status는 PARTIAL 유지
 - **ADMIN-WEB** — Next.js 15 백오피스 셸(내부망·SSO)·좌측 내비는 `GET /v1/admin/menu` 소비(하드코딩 nav 배열 금지). **→ `ADMIN-06-admin-web-shell` 등재**(2026-08-10 — 공개 랜딩(`WEB-01`)과 앱 골격 공유·CORS 배선 포함)
 
 ---

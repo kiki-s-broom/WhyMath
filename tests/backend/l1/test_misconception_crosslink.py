@@ -145,12 +145,17 @@ class TestLoader:
                     {
                         "kebab_id": "k2",
                         "mis_id": "M2",
-                        "link_type": "부분매핑",
+                        # 적재 자격(MISC-63): 직접매핑만 적재된다 — 비직접 거부는 게이트 계약 테스트가 동결.
+                        "link_type": "직접매핑",
+                        "confidence": 0.8,
                         "note": "검수:Kiki 2026-07-08",
                     },
                 ]
             },
             store=store,
+            # 가짜 엔진은 카탈로그를 모른다 — 이 테스트는 populate의 upsert 횟수를 본다. 외래키 사전확인
+            # (HARN-302)은 test_crosslink_fk_precheck.py(단위)·통합 테스트가 따로 고정한다.
+            check_fk_targets=False,
         )
         assert n == 2
         assert len(engine.executed) == 2  # 행마다 upsert 1회
@@ -180,6 +185,7 @@ class TestLoader:
                 ]
             },
             store=store,
+            check_fk_targets=False,  # 위와 같은 이유(HARN-302)
         )
         assert n == 1
         assert len(engine.executed) == 1

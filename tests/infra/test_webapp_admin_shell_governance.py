@@ -343,16 +343,43 @@ def test_admin_calls_only_the_bff() -> None:
     assert bff_path_violations(_admin_sources()) == []
 
 
-def test_menu_is_fetched_exactly_once() -> None:
-    """계약 ⑤ — `fetch(` 호출 지점이 정확히 1곳이다(원칙7 "앱 로드 시 1회 호출").
+#: `fetch(` 호출이 허용되는 파일과 그 횟수. **파일마다 정확히 1회**여야 한다 — 모듈 화면(ADMIN-07 검수 큐
+#: 등)이 늘어도 "화면마다 fetch를 흩뿌린다"는 형태는 막고, 모듈별 BFF 클라이언트 1파일 = 호출 지점 1곳만
+#: 허용한다. 새 모듈 클라이언트를 추가하면 이 표에 등재하는 것이 그 결정을 사람이 보게 하는 자리다.
+_FETCH_SITES = {
+    "app/admin/_lib/adminApi.ts": 1,  # 메뉴(`GET /v1/admin/menu`) — 앱 로드 시 1회
+    "app/admin/_lib/adminReviewApi.ts": 1,  # 검수 큐 목록·상세·전이 — 내부 `request()` 1곳 경유
+    "app/admin/_lib/adminCmsApi.ts": 1,  # CMS 12종 읽기·쓰기 — 내부 `request()` 1곳 경유(P3-12)
+}
 
-    호출 지점이 흩어지면 화면마다 다른 메뉴를 들고 다니게 되고, 그것이 곧 내비의 두 번째
-    진실 원천이다. 셸은 한 곳(`adminApi.fetchAdminMenu`)에서만 백엔드와 말한다.
+
+def fetch_site_violations(sources: dict[str, str]) -> list[str]:
+    """`fetch(` 호출 지점이 허용표와 정확히 일치하는가. 입력이 비면 위반(공허 통과 차단)."""
+    if not sources:
+        return ["스캔 대상이 0건 — admin 소스 경로가 바뀌었거나 가드가 무력화됐다"]
+    counts = {
+        rel: len(re.findall(r"(?<![\w.])fetch\s*\(", text)) for rel, text in sorted(sources.items())
+    }
+    violations = [
+        f"{rel}: fetch( {n}곳 — 허용표에 없다"
+        for rel, n in counts.items()
+        if n and rel not in _FETCH_SITES
+    ]
+    violations += [
+        f"{rel}: fetch( {counts.get(rel, 0)}곳 — {want}곳이어야 한다"
+        for rel, want in _FETCH_SITES.items()
+        if counts.get(rel, 0) != want
+    ]
+    return violations
+
+
+def test_fetch_sites_match_the_allowlist() -> None:
+    """계약 ⑤ — `fetch(` 호출 지점이 허용표(파일별 정확히 1회)와 일치한다.
+
+    호출 지점이 흩어지면 화면마다 다른 토큰 부착·타임아웃·오류 해석을 들고 다니게 된다. 메뉴는
+    `adminApi.fetchAdminMenu`, 검수 큐는 `adminReviewApi.request` 한 곳에서만 백엔드와 말한다.
     """
-    sources = _admin_sources()
-    assert sources, "스캔 0건"
-    total = sum(len(re.findall(r"(?<![\w.])fetch\s*\(", text)) for text in sources.values())
-    assert total == 1, f"admin 소스의 fetch( 호출이 {total}곳 — 1곳이어야 한다"
+    assert fetch_site_violations(_admin_sources()) == []
 
 
 # ── 계약 ⑥ 자격증명 취급 ────────────────────────────────────────────────

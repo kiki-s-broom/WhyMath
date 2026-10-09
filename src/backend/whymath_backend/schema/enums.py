@@ -1647,20 +1647,65 @@ class PrivacyAuditResourceType(str, Enum):
     problem = "problem"
     """`Problem`(`db/models/problem.py`) — `/v1/problems` CUD."""
 
+    # ── P3-12 CMS 쓰기 대상(`/v1/admin/cms/*`) — 값은 ORM `__tablename__`과 일치, ≤32자 ──
+    # 문자열 키 리소스(`misconception`·`strategy_node`·`concept_content`·`hint`)는 `resource_id`가
+    # UUID 전용이라 `api/admin_cms_resources.audit_resource_id`가 uuid5로 결정론 변환해 싣는다.
+    concept_version = "concept_version"
+    """`ConceptVersion` — 초안 생성·검토·승인·발행·롤백(`l3/publish_gate.py` 경유)."""
+
+    curriculum_version = "curriculum_version"
+    """`CurriculumVersion` — 교육과정 판 메타(라벨·시행일) 수정."""
+
+    problem_step = "problem_step"
+    """`ProblemStep` — 풀이 단계 문구·기대 답 수정."""
+
+    misconception = "misconception"
+    """`MisconceptionCatalog`(`misconception_catalog`) — 오개념 서술·교정 수정."""
+
+    strategy_node = "strategy_node"
+    """`StrategyNode` — 교수전략 이름·설명 수정·검수 표시."""
+
+    concept_content = "concept_content"
+    """`ConceptContent` — 개념 설명·비유 수정·검수 표시."""
+
+    hint = "hint"
+    """`Hint`(`hints`) — 힌트 문구 수정."""
+
 
 class PrivacyAuditAction(str, Enum):
-    """`privacy_audit.action` — `event_kind=content_mutation` 전용 CRUD 동작 폐쇄 택소노미(SEC-29).
+    """`privacy_audit.action` — `event_kind=content_mutation` 전용 동작 택소노미(SEC-29·ADMIN-07)
+
+    **15값**: CRUD 3값(create/update/delete — SEC-29)에 검수 상태 전이 4값(approve/reject/
+    quarantine/release — ADMIN-07 `POST /v1/admin/review-queue/items/{id}/transitions`)을
+    더했고, P3-12가 **개념 버전 워크플로우 전이 8값**(submit/request_changes/pass_review/
+    fail_qa/publish/deprecate/retire/rollback — `schema/version_header.TransitionAction`의
+    이름 그대로, `approve`는 기존 값을 공유)을 더했다. 기존 값의 의미는 불변이다. 전이 행도
+    `resource_type=problem`(문항) 또는 `concept_version`(개념 판)이고 사유(`reason`)는 싣지
+    않는다 — 사유는 `Problem.quarantine_reason` 컬럼이 좌석이다. 값은 `String(16)` 이내.
 
     `resource_type`+`resource_id`가 *무엇을*, 이 값이 *무엇을 했는지*를 특정한다. 자유텍스트
-    `reason`을 두지 않는 대신(`PrivacyAudit` 모델 docstring 참조) 이 3값만으로 "생성/수정/삭제"
-    사실을 충분히 감사한다 — 상세 diff·사유는 이 테이블의 책임이 아니다(1차 기록은 애플리케이션
-    로그·PG 자체의 데이터, 이 행은 "그 시각 그 사건이 있었다"는 2차 감사 신호 — `record_role_
-    change_audit` docstring과 동일 철학).
+    `reason`을 두지 않는 대신(`PrivacyAudit` 모델 docstring 참조) 이 값만으로 "무슨 동작이
+    있었는지" 사실을 충분히 감사한다 — 상세 diff·사유는 이 테이블의 책임이 아니다(1차 기록은
+    애플리케이션 로그·PG 자체의 데이터, 이 행은
+    "그 시각 그 사건이 있었다"는 2차 감사 신호 — `record_role_change_audit` docstring과 동일 철학).
     """
 
     create = "create"
     update = "update"
     delete = "delete"
+    approve = "approve"
+    reject = "reject"
+    quarantine = "quarantine"
+    release = "release"
+    # ── P3-12 개념 버전 워크플로우(`TransitionAction` 값과 글자 그대로 같다) ──
+    submit = "submit"
+    request_changes = "request_changes"
+    pass_review = "pass_review"
+    fail_qa = "fail_qa"
+    publish = "publish"
+    deprecate = "deprecate"
+    retire = "retire"
+    rollback = "rollback"
 
 
 class DefectCategory(str, Enum):
@@ -1741,7 +1786,7 @@ class ConsentScope(str, Enum):
 
 
 class Role(Enum):
-    """`user_profile.role` — 인가(authorization) 역할, v0 **2값 확정(축소)**(SEC-07 D1).
+    """`user_profile.role` — 인가(authorization) 역할, v0 2값(SEC-07 D1) + **CMS 3값**(P3-12).
 
     `require_role`(`api/_auth.py`)이 콘텐츠 CUD(개념·문제 생성/수정/삭제)를 게이팅하는 데
     쓴다. `.claude/agents/backend-engineer.md:248-262`·`docs/design/ui/04_admin_console_
@@ -1750,6 +1795,13 @@ class Role(Enum):
     Phase 3 대시보드/B2B 계약이 실체를 가질 때(`docs/architecture/account_security_gap_
     review.md` §5-②) 연다. 역할 추가는 마이그레이션 1줄이고, 잘못 만든 역할을 걷어내는
     비용이 더 크다.
+
+    **P3-12가 연 3값(`CONTENT_EDITOR`·`CONTENT_REVIEWER`·`CONTENT_PUBLISHER`)은 좌석이 있다**
+    — CMS 쓰기 라우트(`api/admin_cms.py`)가 소비처다. 이 역할이 *무엇을 할 수 있는가*는
+    역할 서열이 아니라 **권한(`CmsCapability`) 매핑 한 곳**(`schema/cms_access.py`)이 정한다.
+    `CONTENT_ADMIN`은 그 매핑에서 4개 권한을 전부 가진 겸임 역할이다 — 사용자 1명이 역할
+    컬럼 1개만 가지므로, 기존 운영자 계정이 깨지지 않으면서 소규모 팀이 한 사람으로 전 과정을
+    돌릴 수 있는 유일한 수단이다. 이것은 "상위 역할"이 아니라 **권한 집합이 겹치는 것**이다.
 
     **7단 선형 서열을 의도적으로 미도입한다** — `docs/legal/pipa_data_matrix.md:33-47`이
     반증하듯 부모의 데이터 가시성은 학생 본인의 *부분집합*이지 상위집합이 아니다(오답
@@ -1772,7 +1824,18 @@ class Role(Enum):
     """기본 역할 — 모든 신규 가입자(마이그레이션 `server_default='student'`가 기존 행도 백필)."""
 
     CONTENT_ADMIN = "content_admin"
-    """콘텐츠 CUD 권한 — 개념·문제(`/v1/concepts`·`/v1/problems`) 생성·수정·삭제."""
+    """콘텐츠 CUD 권한 — 개념·문제(`/v1/concepts`·`/v1/problems`) 생성·수정·삭제.
+
+    CMS 권한 4종(조회·편집·검수·배포)을 모두 가진다(`schema/cms_access.py`)."""
+
+    CONTENT_EDITOR = "content_editor"
+    """CMS 편집자 — 조회 + 편집(초안 작성·검토 제출). 검수·배포는 못 한다."""
+
+    CONTENT_REVIEWER = "content_reviewer"
+    """CMS 검수자 — 조회 + 검수(검토 통과·QA 승인·반려·검수 표시). 편집·배포는 못 한다."""
+
+    CONTENT_PUBLISHER = "content_publisher"
+    """CMS 배포자 — 조회 + 배포(발행·폐기·은퇴·롤백·삭제). 편집·검수는 못 한다."""
 
 
 # ──────────────────────────────────────────────────────────────────────────

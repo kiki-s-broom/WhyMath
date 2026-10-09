@@ -132,7 +132,13 @@ def run_quality_generation_payload(
     # QUALITY는 불변식상 LOCAL(27b)이라 cost_krw=0.0 확정 — usage가 없어도(미노출
     # provider) 비용은 확정 기록하고, 토큰·지연은 None으로 남긴다(지어내지 않음).
     if trace is not None:
-        cost = actual_cost_krw(decision, generated.usage) if generated.usage is not None else 0.0
+        # OPS-116 — 좌석은 `seat=None`(미상)을 명시한다: LOCAL이면 좌석과 무관하게 0.0이고, 불변식이
+        # 깨져 클라우드 결정이 들어와도 anthropic 단가로 접지 않고 '미측정'(None)으로 남는다.
+        cost = (
+            actual_cost_krw(decision, generated.usage, seat=None)
+            if generated.usage is not None
+            else 0.0
+        )
         trace.record(
             langfuse_fields(
                 decision,

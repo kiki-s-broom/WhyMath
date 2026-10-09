@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-303-fk-precheck-adoption-remaining-loaders
+title: "외래키 대상 사전확인(fk_precheck) 채택 확대 — 외래키가 걸린 테이블에 쓰는 나머지 적재 지점 13곳의 채택 판정 (HARN-302 승계)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-302-fk-target-precheck-before-load
+requires_gates: []
+acceptance:
+  - "① 전수 확정: HARN-302가 만든 l1/fk_precheck.py(missing_fk_targets)를 아직 쓰지 않는 적재 지점 13곳(2026-10-07 on_conflict 적재 지점 36곳 중 외래키가 걸린 테이블에 쓰는 14곳에서 crosslink_loader 제외)을 파일·테이블·외래키 수로 목록화한다: atom_graph/atom_backend_concept·atom_backend_edge, concept_graph/backend_concept·backend_edge, curriculum/curriculum_loader, pedagogy/unit_compiler, problem_bank/populate(problem·problem_concept·problem_relation 3곳), standards/standard_loader(achievement_standard·concept_standard_link 2곳), l2/learning_session_writer, l3/pedagogy/slot_generator.\n② 지점별 판정: 말뭉치·로더 CLI가 사람 손으로 라이브 DB에 적재하는 지점(사고 형태가 성립하는 곳)은 채택, 요청 경로에서 학생 행동으로 쓰는 런타임 쓰기(learning_session_writer 등)는 제외하고 근거를 남긴다. 복합 외래키를 가진 테이블은 fk_precheck가 NotImplementedError로 멈추므로 해당 지점은 복합 지원 추가 또는 제외를 판정한다.\n③ 채택 지점마다 HARN-302와 같은 모양으로 구현한다: 쓰기 전 읽기 전용 확인, 누락 키 전건 열거, 쓰기 0건, 실 PostgreSQL 통합 테스트(누락 포함 입력 거부·전부 존재 입력 적재)와 뮤테이션(주입 적용·원복 바이트 동일). 한 지점이라도 채택하지 않으면 그 사유를 이 태스크 증적에 남긴다.\n④ HARN-215(적재 계획의 건수 단언)와 쓰기 전 읽기 단계를 공유할 수 있는지 판정해 기록한다 — 같은 읽기 연결에서 둘 다 실행하면 라이브 DB를 한 번만 읽는다."
+artifacts: []
+paths: []
+session: null
+notes: "HARN-302 승계. 판정 근거 = docs/reviews/harn302_fk_target_precheck_judgment_2026-10-07.md. 전수 집계는 Base.registry의 ORM 매퍼와 pg_insert 대상 모델을 대조해 얻었다(2026-10-07, 미해소 1건 l2/learning_metrics_rollup.py의 변수 모델은 집계에서 빠졌으므로 ①에서 함께 확인한다)."
+updated: 2026-10-07

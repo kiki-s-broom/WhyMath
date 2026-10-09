@@ -986,6 +986,8 @@ class TestReadSideFallback:
         self, bare_remote, monkeypatch, capsys
     ):
         """CAS_실패_타세션이_in_progress면_착수_거부"""
+        import remote_claims
+
         # 사고 그대로의 재현: 두 세션이 같은 태스크를 잡되 CAS는 상시 실패한다
         _, clone = bare_remote
         repo_a = self._seeded_clone(clone, monkeypatch, "session-a")
@@ -994,6 +996,15 @@ class TestReadSideFallback:
 
         repo_b = self._seeded_clone(clone, monkeypatch, "session-b")
         self._force_cas_failure(monkeypatch)
+        # HARN-198: 프리플라이트 0.8(형제 진행 중 사본 스캔)이 이 폴백보다 앞서 같은 상태를 거부한다.
+        # 이 테스트가 고정하는 것은 **그 스캔이 돌 수 없을 때**(fetch 실패·`done_status != ok`)에도
+        # 남는 HARN-07 2선 방어의 문구이므로, 앞단을 중립화해 이 경로를 계속 밟는다. 두 검사가
+        # 겹칠 때 앞단이 먼저 거부한다는 것은 `test_sibling_in_progress_scan.py`가 고정한다.
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_sibling_in_progress",
+            lambda *a, **k: remote_claims.SiblingScan("ok"),
+        )
         capsys.readouterr()
         assert cli.main(["start", self.TASK_ID]) == 1
         err = capsys.readouterr().err

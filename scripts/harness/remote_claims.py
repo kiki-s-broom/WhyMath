@@ -97,6 +97,14 @@ from models import Backlog, Task
 CLAIMS_BRANCH = "harness-claims"
 CLAIMS_REF = f"refs/heads/{CLAIMS_BRANCH}"
 CLAIMS_DIR = "claims"
+# 보고서 발행 브랜치(HARN-28) — 야간 CI 잡이 고립 브랜치 스캔 결과(`isolation.json`)를 올리는
+# 전용 orphan 브랜치. claim 대장과 쓰기 주체·주기·CAS 경합 축이 달라 같은 브랜치에 섞지 않는다.
+# 발행·조회 구현은 `isolation_report.py`가 소유한다 — 여기에는 "하네스 소유 브랜치" 판정에
+# 필요한 이름만 둔다(스캐너가 import 순환 없이 제외할 수 있게).
+REPORTS_BRANCH = "harness-reports"
+# 하네스가 스스로 만들고 쓰는 데이터 브랜치 — 사람이 처분할 작업 브랜치가 아니므로 방치
+# 스캔 대상 밖이다. 정의상 제외이지 유예가 아니라 만료가 없다.
+HARNESS_OWNED_BRANCHES = frozenset({CLAIMS_BRANCH, REPORTS_BRANCH})
 # 로컬 미러 ref (로컬 브랜치와 충돌 없는 전용 공간 — 체크아웃 대상이 아니다)
 LOCAL_MIRROR_REF = "refs/whymath-claims/head"
 # lease 거부 후 재시도 횟수. 경합은 "남이 *다른* 태스크를 claim했다"가 대부분이라
@@ -1012,6 +1020,83 @@ def scan_trunk_task_drift(root: Path, task: Task) -> TrunkDriftResult:
         return TrunkDriftResult(f"error:{type(exc).__name__}")
 
 
+# ── 낡은 로컬 대장 고지 (HARN-54) ─────────────────────────────────────────────
+#
+# 기존 스캔은 이 질문에 답하지 못한다. `scan_remote_done`은 트렁크 ref를 **일부러 제외**한다
+# ("트렁크가 done이면 로컬 백로그도 done이라 애초에 후보가 아니다"). 그 전제는 *로컬 대장이
+# 트렁크를 따라잡았을 때*만 참이다 — 내 클론이 낡았으면 트렁크는 이미 done인데 로컬은 아직
+# todo라 `next`가 그 태스크를 후보로 내놓는다. `scan_trunk_task_drift`는 트렁크 사본을 읽지만
+# 의존·게이트의 *강화*만 본다(그 태스크 자신의 종결 여부는 보지 않는다).
+# 실측(2026-09-24): `EOS-69`가 main에서 이미 done이었는데 낡은 로컬 대장이 후보로 내놓아
+# 중복 구현이 진행됐다. `start`의 경고는 path_overlap 4줄에 묻혀 착수가 그대로 이어졌다.
+#
+# 이것은 **고지이지 차단이 아니다** — main이 done이어도 로컬에 정당한 후속 작업이 있을 수 있다.
+
+TRUNK_TERMINAL_STATUSES = ("done", "cancelled")
+
+
+@dataclass(frozen=True)
+class TrunkTerminal:
+    """트렁크 사본에서 이미 종결(done/cancelled)된 태스크 1건."""
+
+    task_id: str
+    trunk_status: str  # TRUNK_TERMINAL_STATUSES 중 하나
+    trunk_ref: str
+
+
+@dataclass(frozen=True)
+class TrunkTerminalResult:
+    """트렁크 종결 대조 결과. status가 `ok`가 아니면 **판정 불가**다 — 빈 `found`를
+    '트렁크에서 끝난 것 없음'으로 읽으면 안 된다(측정 실패 ≠ 통과)."""
+
+    status: str  # ok | offline | no-trunk-ref | error:<Type> | (호출측이 싣는 fetch 실패 사유)
+    found: dict[str, TrunkTerminal] = field(default_factory=dict)
+    trunk_ref: str = ""
+
+
+def scan_trunk_terminal(root: Path, task_ids: Sequence[str]) -> TrunkTerminalResult:
+    """`task_ids` 중 **트렁크 사본에서 이미 done/cancelled**인 것을 찾는다.
+
+    fetch하지 않는다 — **이미 있는 remote-tracking ref만** 읽는다(`scan_remote_done`의
+    `fetch=False` 계약 승계). 그래서 이 판정은 *내가 마지막으로 본 트렁크* 기준이며,
+    그 스냅샷이 얼마나 낡았는지는 호출측이 따로 말한다(`main에 없음`과 `main을 최근에 못
+    봤음`은 다른 진술이다). `start`는 앞선 `scan_remote_done(fetch=True)`가 ref를 방금
+    최신화했으므로 이 함수를 그 뒤에 부른다.
+
+    트렁크에 태스크 파일이 없는 경우(로컬에서 신설된 태스크)는 신호 없음이다 — 판정 불가가
+    아니라 정상적인 '없음'이다. ref 자체를 못 읽는 경우만 `no-trunk-ref`다.
+    """
+    ids = list(dict.fromkeys(task_ids))
+    if not ids:
+        return TrunkTerminalResult("ok")
+    if not has_remote(root):
+        return TrunkTerminalResult("offline")
+    try:
+        trunk_ref, _source = _resolve_trunk_ref(root)
+        probe = _git(
+            root, "rev-parse", "--verify", "--quiet", f"{trunk_ref}^{{commit}}", timeout=10
+        )
+        if probe.returncode != 0:
+            return TrunkTerminalResult("no-trunk-ref", trunk_ref=trunk_ref)
+        request = "".join(f"{trunk_ref}:backlog/tasks/{tid}.yaml\n" for tid in ids)
+        batch = _git(root, "cat-file", "--batch", input_text=request, timeout=SCAN_FETCH_TIMEOUT)
+        if batch.returncode != 0:
+            return TrunkTerminalResult(_classify_failure(batch.stderr or ""), trunk_ref=trunk_ref)
+        found: dict[str, TrunkTerminal] = {}
+        for tid, blob in zip(ids, _iter_batch_blobs(batch.stdout or ""), strict=False):
+            if blob is None:
+                continue  # 트렁크에 그 파일이 없다 — 로컬 신설 태스크
+            state = _top_level_field(blob, "status")
+            if state in TRUNK_TERMINAL_STATUSES:
+                found[tid] = TrunkTerminal(tid, state, trunk_ref)
+        return TrunkTerminalResult("ok", found, trunk_ref)
+    except subprocess.TimeoutExpired:
+        return TrunkTerminalResult("offline")
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
+        return TrunkTerminalResult(f"error:{type(exc).__name__}")
+
+
 def scan_remote_in_progress(
     root: Path, task_id: str, session: str, max_refs: int = SCAN_MAX_REFS
 ) -> ScanResult:
@@ -1584,6 +1669,205 @@ def scan_remote_gate_attachments(
     except Exception as exc:  # pragma: no cover - 환경 의존
         # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
         return {}, f"error:{type(exc).__name__}"
+
+
+# ── 형제 브랜치의 진행 중 사본 스캔 (HARN-198) ──────────────────────────────
+#
+# 착수 차단 세 겹(위 HARN-193 주석: 원격 claim · 트렁크 requires_gates/depends_on · 미머지 done)
+# 이 **전부 비는 창**이 하나 더 있다. 끝낸 세션의 `done`은 원격 claim을 즉시 걷는데, done을
+# 담은 대장 변경은 그 세션의 작업 트리에만 있고 그 브랜치의 원격 사본은 `in_progress`로 남는다
+# (2026-09-29 실측: done 07:24:36 → done 기록이 원격에 오른 것 08:10:31, 46분). 그 창에서
+# ⑶(미머지 done)은 `status: done`만 보므로 못 보고, 읽기측 탐지(`scan_remote_in_progress`)는
+# CAS가 offline/error일 때만 돌아 CAS가 *성공*하는 정상 환경에서는 한 번도 불리지 않는다.
+# 그래서 같은 슬라이스(S4-11)가 두 번 구현됐다 — 발견은 검증이 아니라 우연이었다.
+#
+# 이 스캔은 그 신호(형제 브랜치 사본의 in_progress·review)를 CAS 결과와 무관하게 **항상**
+# 읽는다. `scan_remote_gate_attachments`와 같은 모양(트렁크 사본 + (ref, task) 전 조합을
+# `cat-file --batch` 1회)이지만 읽는 필드가 다르다 — 이쪽은 `status`·`session`, 저쪽은
+# `requires_gates`. 두 스캔은 이미 최신화된 ref를 공유하고(`start`는 fetch 1회) 판정은 합치지
+# 않는다: 거부 사유·우회 이벤트·과탐 완화 규칙이 서로 다르다(설계 판정 =
+# docs/reviews/harn198_sibling_inprogress_judgment_2026-10-06.md).
+#
+# 과탐 방어(방치된 옛 브랜치의 in_progress 사본이 정당한 착수를 막으면 안 된다):
+#   · 트렁크가 done/cancelled면 사본의 in_progress는 잔재(HARN-08 규칙 A와 동형)
+#   · 트렁크 사본이 같은 상태·같은 session이면 그 브랜치가 *만든* claim이 아니라 트렁크에서
+#     *물려받은* 사본이다 — 홀더가 아니다
+#   · 브랜치 팁 커밋이 `ttl_hours`보다 오래됐으면 살아 있는 세션으로 볼 근거가 없다
+#   · 내 세션의 사본은 나를 막지 않는다
+# 걸러낸 건은 버리지 않고 `skipped`에 사유와 함께 돌려준다(HARN-08 관측성).
+
+# 형제가 작업을 들고 있다고 보는 상태 — blocked(차단 홀드가 원격 claim으로 따로 보호)·todo는 제외
+SIBLING_ACTIVE_STATUSES = ("in_progress", "review")
+
+
+@dataclass(frozen=True)
+class SiblingInProgress:
+    """미머지 브랜치가 이 태스크를 진행 중으로 들고 있는 사본 1건.
+
+    `tip_age_hours`가 `None`이면 팁 시각을 못 읽은 것이다 — "모른다"를 "오래됐다"로 접지
+    않고 홀더로 센다(차단 방향이 안전하고, 우회 플래그가 있다).
+    """
+
+    task_id: str
+    ref: str
+    branch: str
+    session: str
+    status: str
+    tip_age_hours: float | None
+
+
+@dataclass(frozen=True)
+class SiblingSkipped:
+    """과탐 방어 규칙으로 홀더에서 뺀 1건 — reason: own_session | trunk_settled | trunk_inherited
+    | tip_stale."""
+
+    task_id: str
+    branch: str
+    reason: str
+
+
+@dataclass
+class SiblingScan:
+    """형제 진행 중 스캔 결과. `status`가 `ok`·`truncated`가 아니면 빈 `found`는 판정 불가다."""
+
+    status: str
+    found: dict[str, list[SiblingInProgress]] = field(default_factory=dict)
+    skipped: list[SiblingSkipped] = field(default_factory=list)
+    scanned_refs: int = 0
+
+
+def _ref_tip_times(root: Path) -> dict[str, int]:
+    """origin ref → 팁 커밋 시각(unix 초). 못 읽은 ref는 빠진다(= 나이 모름)."""
+    listing = _git(
+        root,
+        "for-each-ref",
+        "--format=%(refname) %(committerdate:unix)",
+        "refs/remotes/origin",
+    )
+    if listing.returncode != 0:
+        return {}
+    times: dict[str, int] = {}
+    for line in listing.stdout.splitlines():
+        name, _, stamp = line.strip().rpartition(" ")
+        if name and stamp.isdigit():
+            times[name] = int(stamp)
+    return times
+
+
+def scan_sibling_in_progress(
+    root: Path,
+    task_ids: Sequence[str],
+    *,
+    session: str,
+    ttl_hours: int,
+    fetch: bool = False,
+    refs_fresh: bool = False,
+    exclude_branches: Sequence[str] = (),
+    max_refs: int = SCAN_MAX_REFS,
+    now: datetime | None = None,
+) -> SiblingScan:
+    """미머지 브랜치가 진행 중으로 들고 있는 태스크를 찾는다 → `SiblingScan.found`.
+
+    `fetch`·`refs_fresh`·`exclude_branches`의 의미는 `scan_remote_gate_attachments`와 같다:
+    `fetch=False`(기본)는 이미 있는 remote-tracking ref만 보며 네트워크가 0이다(`next`·`brief`용).
+    `start`는 `scan_remote_done(fetch=True)`가 직전에 ref를 최신화하므로 그 뒤에
+    `refs_fresh=True`로 부르면 추가 왕복이 없다. 다른 브랜치 ref가 0개이고 최신화 선언도
+    없으면 `no_refs`다 — shallow·단일 브랜치 클론에서 "0개를 훑었다"는 '형제 없음'이 아니라
+    '안 봤다'다.
+
+    반환 status: `ok` · `truncated`(브랜치 수가 상한을 넘어 일부만 봤다 — 발견분은 유효하고
+    **빈 결과만** 판정 불가) · `no_refs` · `offline` · `error:<Type>`.
+
+    알려진 한계(정직 기술): ① push되지 않은 브랜치는 관측할 수 없다 — 이 스캔은 CAS의 원자성을
+    대체하지 못하는 읽기측 보강이다 ② 팁이 ttl 이내인 방치 브랜치는 과탐한다 — 메시지가 브랜치를
+    지목하고 `--ignore-remote-claim`으로 넘길 수 있으며 우회는 이벤트로 남는다.
+    """
+    if not task_ids:
+        return SiblingScan("ok")
+    if not has_remote(root):
+        return SiblingScan("offline")
+    now = now or _utcnow()
+    try:
+        if fetch:
+            fetched = _git(
+                root,
+                "fetch",
+                "--quiet",
+                "--prune",
+                "origin",
+                "+refs/heads/*:refs/remotes/origin/*",
+                timeout=SCAN_FETCH_TIMEOUT,
+            )
+            if fetched.returncode != 0:
+                return SiblingScan(_classify_failure(fetched.stderr))
+        tips = _ref_tip_times(root)
+        listing = _git(root, "for-each-ref", "--format=%(refname)", "refs/remotes/origin")
+        if listing.returncode != 0:
+            return SiblingScan(_classify_failure(listing.stderr))
+        trunk_ref, _ = _resolve_trunk_ref(root)
+        skip_refs = {trunk_ref, *(REMOTE_REF_PREFIX + b for b in exclude_branches)}
+        wanted = [
+            r.strip()
+            for r in listing.stdout.splitlines()
+            if r.strip() and not r.strip().endswith("/HEAD") and r.strip() not in skip_refs
+        ]
+        if not wanted and not (fetch or refs_fresh):
+            return SiblingScan("no_refs")
+        refs = wanted[:max_refs]
+        truncated = len(wanted) > len(refs)
+        ids = list(task_ids)
+
+        pairs = [(trunk_ref, tid) for tid in ids] + [(ref, tid) for ref in refs for tid in ids]
+        request = "".join(f"{ref}:backlog/tasks/{tid}.yaml\n" for ref, tid in pairs)
+        batch = _git(root, "cat-file", "--batch", input_text=request, timeout=SCAN_FETCH_TIMEOUT)
+        if batch.returncode != 0:
+            return SiblingScan(_classify_failure(batch.stderr))
+        blobs = list(_iter_batch_blobs(batch.stdout))
+        if len(blobs) != len(pairs):
+            return SiblingScan("error:BatchMisaligned")
+
+        base = len(ids)
+        trunk_state: dict[str, tuple[str, str]] = {
+            tid: (
+                (_top_level_field(blob, "status"), _top_level_field(blob, "session"))
+                if blob is not None
+                else ("", "")
+            )
+            for tid, blob in zip(ids, blobs[:base], strict=True)
+        }
+        scan = SiblingScan("truncated" if truncated else "ok", scanned_refs=len(refs))
+        for (ref, tid), blob in zip(pairs[base:], blobs[base:], strict=True):
+            if blob is None:
+                continue  # 그 브랜치에 그 파일이 없다(태스크 신설 이전 시점)
+            status = _top_level_field(blob, "status")
+            if status not in SIBLING_ACTIVE_STATUSES:
+                continue
+            holder = _top_level_field(blob, "session")
+            branch = ref[len(REMOTE_REF_PREFIX) :] if ref.startswith(REMOTE_REF_PREFIX) else ref
+            if holder and holder == session:
+                scan.skipped.append(SiblingSkipped(tid, branch, "own_session"))
+                continue
+            trunk_status, trunk_session = trunk_state[tid]
+            if trunk_status in TRUNK_SETTLED_STATUSES:
+                scan.skipped.append(SiblingSkipped(tid, branch, "trunk_settled"))
+                continue
+            if trunk_status == status and trunk_session == holder:
+                scan.skipped.append(SiblingSkipped(tid, branch, "trunk_inherited"))
+                continue
+            tip = tips.get(ref)
+            age = (now.timestamp() - tip) / 3600 if tip is not None else None
+            if age is not None and age > ttl_hours:
+                scan.skipped.append(SiblingSkipped(tid, branch, "tip_stale"))
+                continue
+            scan.found.setdefault(tid, []).append(
+                SiblingInProgress(tid, ref, branch, holder, status, age)
+            )
+        return scan
+    except subprocess.TimeoutExpired:
+        return SiblingScan("offline")
+    except Exception as exc:  # pragma: no cover - 환경 의존
+        # 침묵 실패 금지 — 예외 타입명을 남긴다 (CLAUDE.md AI·신뢰)
+        return SiblingScan(f"error:{type(exc).__name__}")
 
 
 # ── 원격 브랜치 backlog/tasks/ 파일명 스캔 (HARN-15) ──────────────────────────
@@ -2759,10 +3043,11 @@ def scan_stale_branches(
             if ref == trunk_ref:
                 continue
             branch = ref[len(REMOTE_REF_PREFIX) :] if ref.startswith(REMOTE_REF_PREFIX) else ref
-            # 하네스가 스스로 만드는 claim 저장 브랜치는 사람이 결정할 작업 브랜치가
-            # 아니다 — 정의상 대상 밖이지 유예가 아니다. claim이 3일만 조용하면
-            # "Kiki 결정 필요"로 뜨는 것을 막는다.
-            if branch == CLAIMS_BRANCH:
+            # 하네스가 스스로 만드는 데이터 브랜치(claim 대장·스캔 리포트)는 사람이 결정할
+            # 작업 브랜치가 아니다 — 정의상 대상 밖이지 유예가 아니다. claim이 3일만
+            # 조용하면 "Kiki 결정 필요"로 뜨는 것을 막는다. 리포트 브랜치는 야간 잡이 사흘
+            # 실패하면 같은 형태로 뜨게 되므로(orphan이라 trunk 대비 ahead>0) 같이 뺀다.
+            if branch in HARNESS_OWNED_BRANCHES:
                 continue
             try:
                 last_commit_at = datetime.fromisoformat(date_str)

@@ -666,3 +666,64 @@ class TestAuthGate:
         fake = FakeSession(get_map={concept.concept_id: concept})
         resp = self._client_real_auth(fake).get(f"/v1/concepts/{concept.concept_id}/edges")
         assert resp.status_code == 200
+
+
+class TestPublishPointerGuard:
+    """P3-12 — 발행 포인터(`current_published_version_id`)는 CRUD 경로로 바꿀 수 없다.
+
+    이 경로는 본문을 병합해 스키마로 검증하는데 스키마가 이 필드를 갖고 있어, 막지 않으면
+    `l3/publish_gate`를 거치지 않고 "발행"이 일어난다(정적 동결 R2는 런타임 dict 키를 못 본다).
+    가드는 **값 검사**다 — 같은 값을 되돌려 보내는 왕복 PATCH는 통과해야 한다(대조군).
+    """
+
+    def test_patch_cannot_set_publish_pointer(self) -> None:
+        concept = _sample_concept()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).patch(
+            f"/v1/concepts/{concept.concept_id}",
+            json={"current_published_version_id": str(uuid.uuid4())},
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"]["code"] == "publish_pointer_readonly"
+        # 쓰기·감사·commit 어느 것도 일어나지 않았다 — 거부는 부작용 0이어야 한다.
+        assert fake.committed is False
+        assert fake.added == []
+
+    def test_patch_cannot_clear_publish_pointer(self) -> None:
+        """발행본을 가리키던 포인터를 CRUD로 비우는 것도 게이트 우회(폐기·롤백이 하는 일)다."""
+        concept = _sample_concept()
+        concept.current_published_version_id = uuid.uuid4()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).patch(
+            f"/v1/concepts/{concept.concept_id}", json={"current_published_version_id": None}
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"]["code"] == "publish_pointer_readonly"
+        assert fake.committed is False
+
+    def test_patch_round_trip_with_unchanged_pointer_passes(self) -> None:
+        """대조군 — GET으로 받은 본문을 그대로 돌려보내는 클라이언트를 깨지 않는다."""
+        concept = _sample_concept()
+        pointer = uuid.uuid4()
+        concept.current_published_version_id = pointer
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).patch(
+            f"/v1/concepts/{concept.concept_id}",
+            json={"current_published_version_id": str(pointer), "name_en": "Round Trip"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["name_en"] == "Round Trip"
+        assert resp.json()["current_published_version_id"] == str(pointer)
+        assert fake.committed is True
+
+    def test_create_cannot_carry_a_publish_pointer(self) -> None:
+        """새 개념은 발행본이 있을 수 없다 — 존재하지 않는 판을 가리키는 포인터를 심지 못한다."""
+        fake = FakeSession()
+        resp = _client(fake).post(
+            "/v1/concepts",
+            json={**_VALID_BODY, "current_published_version_id": str(uuid.uuid4())},
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"]["code"] == "publish_pointer_readonly"
+        assert fake.committed is False
+        assert fake.added == []

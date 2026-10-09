@@ -23,6 +23,9 @@ acceptance:
   - "⑦ (처분 #2 승계) Claude Code 밖 경로의 헌법 보호 — 가드 훅은 AI 세션의 명령만 본다. 사람 push·GitHub 웹 편집·다른 AI 도구 경로는 브랜치 룰셋 또는 CODEOWNERS(constitution/** 필수 리뷰어 = Kiki)로 막는다. 룰셋·CODEOWNERS 변경은 되돌리기 어려운 저장소 설정이므로 Kiki 게이트로 분리하고, 가용성(조직 소유·플랜)을 먼저 실측한다(CLAUDE.md 설정 부재를 설정 가능으로 단정 금지)."
   - "진행 메모(2026-10-05): P1 머지(PR 1464)·P2 커밋 6531edb1(R0-02·R1-02·R2-04·R4-03) 미러 검증 중. 남음: P3 6규칙·P4 정정 초안/⑦ 게이트. 미완."
   - "진행 메모(2026-10-06): P2 머지(PR 1470). P3 커밋 c838719e(R2-02·R2-03·R3-01, 단계3 미리보기 차단 50→47) 로컬 CI 미러 검증 중. R4-02 는 규칙 전제(JSON Schema 자동 생성)가 저장소와 달라 Kiki 결정 대기, P4(정정 초안·⑦ 게이트) 남음. 미완."
+  - "진행 메모(2026-10-06): P3 머지(PR 1486)·P4 PR(정정 초안 A0005+패치·단계 3 준비 판정·⑦ 가용성 실측)로 acceptance ①~⑦ 의 AI 몫은 착지. 미완 사유: ⑤ 완료 판정에서 R4-02 한 건만 통과하지 못한다(규칙 전제 불일치 — Kiki 게이트 G-const-r4-02-decision). 채택 대기 게이트: G-const-a0005-part1-corrections · G-const-protection-outside-claude. 판정이 나면 R4-02 승계 태스크(A 안이면 내보내기 스크립트·드리프트 테스트)를 등재하고 이 태스크를 done 한다."
+  - "진행 메모(2026-10-06, dreamy-albattani 세션): P1~P4 머지(PR 1464·1470·1486·1492). 후속은 CONST-13(PR 1497: R0-02 비기록 파일 오거부 수정 + 개정 A0005 단일화)로 분리했고, R4-02 문구 개정은 병렬 세션 PR 1493 이 소유한다. 이 세션은 더 이상 이 태스크를 진행하지 않는다 — 남은 완료 조건은 A0005 채택·R4-02 통과·게이트 3건 판정이다."
+  - "진행 메모(2026-10-08, dreamy-albattani 세션): R4-02 집행 테스트는 CONST-14(PR 1513)로 착지. 남은 완료 조건은 A0005 채택·게이트 3건 판정이며 이 세션은 더 진행하지 않는다."
 artifacts: []
 paths:
   - "scripts/constitution/**"
@@ -31,6 +34,6 @@ paths:
   - ".github/workflows/ci.yml"
   - ".claude/settings.json"
   - "docs/constitution_proposals/**"
-session: claude/compassionate-franklin-hzeyns
-notes: "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계\n\n[정정 2026-10-05] 미완 진행 메모 — done 아님\n\n[정정 2026-10-06] 미완 진행 메모 — done 아님"
-updated: 2026-10-06
+session: claude/dreamy-albattani-a99dad
+notes: "파트 I·R0 규칙 10건. STAGE 3 상향과 Stop 훅(audit.py --hook) 배선은 G-const-sources-registry-adopt가 닫혀 R4-01 차단 0건이 된 뒤에만 의미가 있다(차단 상태에서 Stop 훅을 배선하면 모든 세션 정지가 막힌다). 규칙 stage 5(R2-01·R3-02 DB 제약)는 승계 태스크로 분리.\n\n[정정 2026-09-27] acceptance 분할 등재 2/5\n\n[정정 2026-09-27] acceptance 분할 등재 3/5\n\n[정정 2026-09-27] acceptance 분할 등재 4/5\n\n[정정 2026-09-27] acceptance 분할 등재 5/5\n\n[정정 2026-09-28] CONST-02 대조표(docs/reviews/coding_constitution_crosswalk_2026-09-27.md §6) 비평가 지적 처분 승계\n\n[정정 2026-10-05] 미완 진행 메모 — done 아님\n\n[정정 2026-10-06] 미완 진행 메모 — done 아님\n\n[정정 2026-10-06] P4 진행 메모 — R4-02 결정 대기로 done 아님\n\n[정정 2026-10-06] 점유 세션 인계 메모 — done 아님\n\n[정정 2026-10-08] 점유 세션 인계 메모 2 — done 아님"
+updated: 2026-10-08

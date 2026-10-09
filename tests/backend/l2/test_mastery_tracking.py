@@ -21,6 +21,7 @@ from whymath_backend.l2 import (
 )
 from whymath_backend.l2.mastery_tracking import (
     get_current_mastery,
+    get_current_mastery_sample_size,
     get_primary_concept_id,
     record_attempt_mastery,
     record_problem_attempt_mastery,
@@ -260,6 +261,47 @@ class TestGetCurrentMastery:
         )
         fake = _FakeSession(prior=prior)
         assert await get_current_mastery(cast(AsyncSession, fake), _UID, _CID) is None
+
+
+class TestGetCurrentMasterySampleSize:
+    """EOS-179: 현재 숙달도를 만든 관측 수 — `get_current_mastery`와 같은 최신 행의 sample_size.
+
+    None=**모름**(이력 없음·sample_size 미기록)이고 0과 다르다 — 관측 0건은 확정 주장이다.
+    """
+
+    @staticmethod
+    def _row(sample_size: int | None) -> ConceptMasteryHistory:
+        return ConceptMasteryHistory(
+            user_id=_UID,
+            concept_id=_CID,
+            measured_at=datetime(2026, 1, 1, tzinfo=UTC),
+            mastery=0.5,
+            confidence=0.6,
+            sample_size=sample_size,
+        )
+
+    async def test_returns_the_latest_rows_sample_size(self) -> None:
+        fake = _FakeSession(prior=self._row(7))
+        assert await get_current_mastery_sample_size(cast(AsyncSession, fake), _UID, _CID) == 7
+
+    async def test_no_history_is_unknown_not_zero(self) -> None:
+        fake = _FakeSession(prior=None)
+        assert await get_current_mastery_sample_size(cast(AsyncSession, fake), _UID, _CID) is None
+
+    async def test_unrecorded_sample_size_is_unknown_not_zero(self) -> None:
+        fake = _FakeSession(prior=self._row(None))
+        assert await get_current_mastery_sample_size(cast(AsyncSession, fake), _UID, _CID) is None
+
+    async def test_zero_observations_stays_zero(self) -> None:
+        fake = _FakeSession(prior=self._row(0))
+        assert await get_current_mastery_sample_size(cast(AsyncSession, fake), _UID, _CID) == 0
+
+    async def test_reads_the_same_row_as_the_current_mastery(self) -> None:
+        """숙달도와 증거 수가 서로 다른 측정을 가리지 않는다 — 둘 다 `_latest_mastery`의 한 행."""
+        fake = _FakeSession(prior=self._row(9))
+        mastery = await get_current_mastery(cast(AsyncSession, fake), _UID, _CID)
+        size = await get_current_mastery_sample_size(cast(AsyncSession, fake), _UID, _CID)
+        assert (mastery, size) == (0.5, 9)
 
 
 class TestGetPrimaryConceptId:
