@@ -100,6 +100,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import (
+    CMS_EDIT_MARKER,
+    add_overwrite_argument,
+    conflict_summary,
+    format_conflict,
+    upsert_guard,
+)
 
 # 크로스워크 해석 다리 재사용(S2-03·intra-L1 import — populate가 이미 l1 내부 import 선례 보유).
 from whymath_backend.l1.concept_atom_crosswalk.transfer import (
@@ -299,6 +306,13 @@ class ProblemBankPopulateReport:
     problem_concepts_reconciled: int = 0
     problem_relations_loaded: int = 0
     problem_relations_skipped: int = 0
+    cms_edit_conflicts: list[str] = field(default_factory=list)
+    """CMS·관리자가 고친 문항이라 본문 갱신을 건너뛴 slug(P3-25) — `problem:<slug>` 형식.
+
+    **건너뛰어도 `problems_loaded`에는 세지 않는다**(적재가 일했다는 증거가 아니므로). 문항 행의
+    본문·검수 상태만 건너뛰고, 개념 태깅·출처 원장·계보는 정상 처리된다(사람이 고치는 대상이
+    아니다).
+    """
     provenance_rows_loaded: int = 0
     """LIC-03 — 이번 회차에 새로 남긴 `content_provenance` 행 수.
 
@@ -652,8 +666,15 @@ class ProblemBankStore:
         # ③ 합성 — 원자 행 미적재 src는 제외(orphan skip 경로 유지).
         return {src: code_to_cid[atom] for src, atom in src_to_atom.items() if atom in code_to_cid}
 
-    def populate(self, records: Sequence[ProblemBankRecord]) -> ProblemBankPopulateReport:
+    def populate(
+        self, records: Sequence[ProblemBankRecord], *, overwrite_cms_edits: bool = False
+    ) -> ProblemBankPopulateReport:
         """문제·개념 태깅·계보를 `problem`/`problem_concept`/`problem_relation`에 멱등 upsert.
+
+        **CMS 편집 보호(P3-25)**: 사람이 고친 문항(`cms_edited_at` 있음 — CMS 편집·`PATCH
+        /v1/problems`·검수 큐 전이)은 `problem` 행을 갱신하지 않고 `cms_edit_conflicts`에 보고한다.
+        검수·격리 상태(`review_status`·`quarantine_*`)도 코퍼스 초기값으로 되돌아가지 않는다.
+        `overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다.
 
         ① slug 기준 *마지막 우선* dedup(단일 배치 ON CONFLICT 중복행 오류 방지) → ② 크로스워크
         해석 맵(`{src_id: 원자 행 concept_id}`) 단일 구축 → ③ 각 문제를 `ON CONFLICT(slug) DO
@@ -693,7 +714,10 @@ class ProblemBankStore:
 
         # 문제 갱신 컬럼 집합 — 식별자(problem_id·slug)·생성시각(created_at)은 보존(SET 제외).
         problem_cols = {col.key for col in sa.inspect(ProblemORM).mapper.column_attrs}
-        problem_update_keys = problem_cols - {"problem_id", "slug", "created_at"}
+        # 표지 컬럼은 코퍼스 값이 아니라 보호 규약이 소유한다 — 일반 갱신 집합에서 뺀다.
+        problem_update_keys = problem_cols - {"problem_id", "slug", "created_at", CMS_EDIT_MARKER}
+        where, release = upsert_guard(ProblemORM, overwrite=overwrite_cms_edits)
+        cms_conflicts: list[str] = []
 
         provenance_cols = {col.key for col in sa.inspect(ContentProvenanceORM).mapper.column_attrs}
 
@@ -714,10 +738,25 @@ class ProblemBankStore:
                 insert_stmt = pg_insert(ProblemORM).values(**values)
                 problem_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=[ProblemORM.slug],
-                    set_={key: insert_stmt.excluded[key] for key in problem_update_keys},
+                    set_={
+                        **{key: insert_stmt.excluded[key] for key in problem_update_keys},
+                        **release,
+                    },
+                    where=where,
                 ).returning(ProblemORM.problem_id)
-                problem_id = conn.execute(problem_stmt).scalar_one()
-                problems_loaded += 1
+                # 보호로 건너뛴 행은 RETURNING이 비어 있다(DO UPDATE ... WHERE가 거짓이면
+                # 영향 행 0).
+                returned = conn.execute(problem_stmt).scalar_one_or_none()
+                if returned is None:
+                    # 건너뛴 것이지 없는 것이 아니다 — 하위 표(태깅·원장·계보)를 위해 id를 읽는다.
+                    # 행이 정말 없으면 `scalar_one`이 터진다(조용히 넘기지 않는다).
+                    problem_id = conn.execute(
+                        sa.select(ProblemORM.problem_id).where(ProblemORM.slug == record.slug)
+                    ).scalar_one()
+                    cms_conflicts.append(format_conflict("problem", record.slug))
+                else:
+                    problem_id = returned
+                    problems_loaded += 1
                 slug_to_problem_id[record.slug] = problem_id
 
                 # ③-b provenance 원장 동반(LIC-03) — 생성물이면 같은 트랜잭션에서
@@ -860,6 +899,7 @@ class ProblemBankStore:
             problem_relations_loaded=relations_loaded,
             problem_relations_skipped=len(relations_skipped),
             provenance_rows_loaded=provenance_rows_loaded,
+            cms_edit_conflicts=cms_conflicts,
         )
 
 
@@ -872,8 +912,12 @@ def populate_problem_bank(
     problems_path: Path = _DEFAULT_PROBLEMS,
     settings: Settings | None = None,
     store: ProblemBankStore | None = None,
+    overwrite_cms_edits: bool = False,
 ) -> ProblemBankPopulateReport:
     """문제 코퍼스 JSONL을 backend `problem`/`problem_concept`에 멱등 적재. 반환=적재 리포트.
+
+    `overwrite_cms_edits`는 CMS 편집 보호(P3-25)다 — 건너뛴 문항은 리포트
+    `cms_edit_conflicts`에 있다.
 
     `load_problem_bank_records`가 authoring 분리·저작권 위생·Problem 검증을 거친 레코드를 만들고,
     `ProblemBankStore.populate`가 slug 충돌 멱등 upsert·concept 해석·orphan skip을 담당한다. store
@@ -892,7 +936,7 @@ def populate_problem_bank(
     records = load_problem_bank_records(problems_path)
     resolved = settings if settings is not None else get_settings()
     bank_store = store if store is not None else ProblemBankStore(settings=resolved)
-    return bank_store.populate(records)
+    return bank_store.populate(records, overwrite_cms_edits=overwrite_cms_edits)
 
 
 def discover_problem_corpora(root: Path | None = None) -> list[Path]:
@@ -934,6 +978,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=f"전 문제은행 코퍼스({_ALL_PROBLEMS_GLOB})를 순차 적재.",
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args(argv)
 
     if args.all:
@@ -954,8 +999,12 @@ def main(argv: list[str] | None = None) -> int:
 
     total_problems = 0
     total_provenance = 0
+    all_conflicts: list[str] = []
     for path in paths:
-        report = populate_problem_bank(None, problems_path=path)
+        report = populate_problem_bank(
+            None, problems_path=path, overwrite_cms_edits=args.overwrite_cms_edits
+        )
+        all_conflicts.extend(report.cms_edit_conflicts)
         total_problems += report.problems_loaded
         total_provenance += report.provenance_rows_loaded
         print(
@@ -984,6 +1033,8 @@ def main(argv: list[str] | None = None) -> int:
             f"전 코퍼스 {len(paths)}개 합계: 문항 {total_problems}건 · "
             f"출처 원장 신규 {total_provenance}건."
         )
+    if all_conflicts:
+        print(conflict_summary(all_conflicts))
     return 0
 
 

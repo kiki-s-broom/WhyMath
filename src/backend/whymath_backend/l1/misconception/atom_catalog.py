@@ -119,8 +119,13 @@ def load_atom_misconceptions(
     engine: Engine | None = None,
     settings: Settings | None = None,
     store: MisconceptionCatalogStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """atom 백본 `graph.json` ①오개념 → `misconception_catalog` 멱등 적재. 반환=적재 행 수.
+
+    `overwrite_cms_edits`·`conflicts`는 CMS 편집 보호(P3-25)로 `load_misconceptions`에 그대로
+    위임된다 — 보호로 건너뛴 행은 반환 행 수에서 빠진다.
 
     `atom_misconception_rows`로 graph.json을 행 dict 목록으로 투영한 뒤 `{"misconceptions": rows}`
     Collection으로 감싸 **기존 `load_misconceptions`에 위임**한다 — 검증(extra=forbid)·mis_id 기준
@@ -132,7 +137,15 @@ def load_atom_misconceptions(
     """
     rows = atom_misconception_rows(graph_path)
     collection: dict[str, Any] = {"misconceptions": rows}
-    return load_misconceptions(None, collection, engine=engine, settings=settings, store=store)
+    return load_misconceptions(
+        None,
+        collection,
+        engine=engine,
+        settings=settings,
+        store=store,
+        overwrite_cms_edits=overwrite_cms_edits,
+        conflicts=conflicts,
+    )
 
 
 __all__ = [

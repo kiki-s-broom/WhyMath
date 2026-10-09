@@ -51,6 +51,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.db.cms_edit_marker import format_conflict
 from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.hint import Hint as HintORM
 from whymath_backend.db.models.problem import Problem
@@ -124,6 +125,9 @@ class HintWriteCounts:
     updated: int = 0
     unchanged: int = 0
     retired: int = 0
+    cms_edit_conflicts: list[str] = field(default_factory=list)
+    """CMS가 고친 힌트라 덮어쓰기를 건너뛴 `hint_id`(P3-25) — `hints:<hint_id>` 형식. 건너뛴 행은
+    inserted·updated·unchanged 어디에도 세지 않는다."""
 
 
 def serving_step_order(solution_steps: Sequence[str] | None) -> int:
@@ -283,8 +287,14 @@ async def write_hints(
     hints: Sequence[Hint],
     *,
     processed_path_ids: Iterable[str] = (),
+    overwrite_cms_edits: bool = False,
 ) -> HintWriteCounts:
     """힌트를 멱등 upsert하고, 처리한 경로에서 사라진 기존 힌트를 은퇴시킨다(flush만).
+
+    **CMS 편집 보호(P3-25)**: CMS가 문구를 고친 힌트(`cms_edited_at` 있음)는 재생성 결과로 덮어쓰지
+    않고 `counts.cms_edit_conflicts`에 보고한다. 재생성은 `hint_id`가 결정론이라 같은 행을
+    다시 쓰는데, 그 결과가 사람의 문구와 검증 표지(고치면 내려간다)를 조용히 되돌린다.
+    `overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다.
 
     commit은 호출자(`persist_generation`) — 저장소 패턴. 내용 동일 행은 건드리지 않는다
     (updated_at도 그대로 — '두 번 실행' 시 결과가 같아야 한다). `updated_at`은 이 모듈이 대입하지
@@ -303,11 +313,17 @@ async def write_hints(
             session.add(HintORM(hint_id=hint.hint_id, **columns))
             counts.inserted += 1
             continue
+        if row.cms_edited_at is not None and not overwrite_cms_edits:
+            counts.cms_edit_conflicts.append(format_conflict("hints", hint.hint_id))
+            continue
         if all(getattr(row, key) == value for key, value in columns.items()):
+            if row.cms_edited_at is not None:  # 덮어쓰기 모드 — 값이 같아도 소유권은 적재로 돌린다.
+                row.cms_edited_at = None
             counts.unchanged += 1
             continue
         for key, value in columns.items():
             setattr(row, key, value)
+        row.cms_edited_at = None  # 보호 모드에서는 여기 도달하지 않는다(위에서 건너뜀)
         counts.updated += 1
 
     path_ids = sorted(set(processed_path_ids))
@@ -338,9 +354,15 @@ async def persist_generation(
     hints: Sequence[Hint],
     *,
     processed_path_ids: Iterable[str],
+    overwrite_cms_edits: bool = False,
 ) -> HintWriteCounts:
     """오프라인 생성 결과를 한 트랜잭션으로 적재·commit(`populate --apply`의 유일 쓰기 경로)."""
-    counts = await write_hints(session, hints, processed_path_ids=processed_path_ids)
+    counts = await write_hints(
+        session,
+        hints,
+        processed_path_ids=processed_path_ids,
+        overwrite_cms_edits=overwrite_cms_edits,
+    )
     await session.commit()
     return counts
 

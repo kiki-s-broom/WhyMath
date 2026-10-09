@@ -347,6 +347,17 @@
 - **문서**: 원 `data_platform_module_gap_review_r2.md`는 `OPS-41`이 이미 회수한 `t608mk`의 같은 이름 문서와 별개라 `docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md`로 회수했다(원문 무수정 + 발견별 현황 표). 현황: A1·A2·C1(`SEC-32` done)·C3(`HARN-15` done) 닫힘, A3는 `declared_unwired_audit`가 상시 감시, B1은 `OPS-67`(todo), C2는 `OPS-32`(todo).
 - **소유자 없던 잔여 2건**: ① r2 C2의 6종 중 `pandas`·`polars`·`great-expectations` 3종은 `OPS-32`(3종만 소유)에도 `OPS-37`에도 없어 `OPS-32` acceptance ⑥으로 편입(선언 `pyproject.toml:57-59`·import 0 실측). ② `ops.cost_report`의 CI 미배선은 결함이 아니다 — 입력이 라이브 Langfuse 트레이스인 운영자 수동 계측 도구이고, 감사기는 `status: reached`로 분류(신규 태스크 불필요).
 - **번호 매핑**: `OPS-19 → OPS-38` · `SEC-13 → SEC-32` · `OPS-20 → OPS-67` · `OPS-21 → OPS-32`.
+### 2026-10-09 (구현·P3-25): **CMS로 고친 행을 CLI 적재가 조용히 덮어쓰던 구멍을 `cms_edited_at` 표지로 막았다 — 7종 중 5종이 덮이고 있었고, 문항은 사람이 격리한 상태까지 코퍼스 초기값으로 되돌아갔다** (claude 구현)
+
+**무엇**: 태스크 `P3-25-cms-edit-vs-loader-contract`. 정본 = `docs/standards/cms_edit_vs_loader_contract.md`. 실측(역할 기반 검색): 문항·오개념·교수전략·개념 설명·힌트 5종은 적재가 같은 행을 upsert해 편집을 지우고, 풀이 단계(빈 좌석에만 insert)·교육과정 판(alembic 시드 `DO NOTHING`)은 안 지운다.
+
+**결정**: ①표지 컬럼 5개(`problem`·`misconception_catalog`·`strategy_node`·`concept_content`·`hints`, nullable·기본값 없음·백필 금지 — 마이그레이션 `e7b2c4d8a1f6`). 감사 기록 재사용안은 사용자 결정으로 기각(2차 신호·보존 기간 MGMT-02 미정·풀 길 없음) ②사람이 쓰면 표지를 채운다: CMS 편집(바뀐 필드가 있을 때만)·검수 표시, 문항은 기존 `PATCH /v1/problems`·검수 큐 전이까지 ③적재는 표지 행을 건너뛰고 충돌로 보고(`ON CONFLICT … WHERE cms_edited_at IS NULL RETURNING pk`) ④`--overwrite-cms-edits`로만 덮어쓰며 그때 표지를 비운다 ⑤신규 작성 미개방(저작권·출처 레일 우회 금지) 유지.
+
+**검증(실측)**: 실 PG 16 통합 5건 GREEN + 보호를 끈 주입 6종 전건 RED(선택적 — 힌트만·문항만·개념 설명만 실패하는 주입 포함)·단위/거버넌스 주입 4종 전건 RED·원복 바이트 동일. 전체 백엔드 스위트 18,204 passed(커버리지 90.98%)·`tests/infra` 2,940 passed·`mypy --strict`·`lint-imports`·ruff·black exit 0.
+
+**실측이 설계를 고친 1건**: 건너뜀 판정을 `rowcount == 0`으로 시작했는데 psycopg3의 `INSERT … ON CONFLICT`는 삽입·갱신·건너뜀 모두 `rowcount=-1`이라 변별력이 0이었다. 가짜 엔진 테스트는 통과했고 실 DB에서 처음 드러났다 — "알 수 없으면 예외"로 둔 덕에 조용히 오분류되지 않았고, `RETURNING` 빈 결과 판정으로 교체했다.
+
+**한계(사실 기록)**: 보호는 DB 편집만 지키고 코퍼스 파일로 역기록하지 않는다(정본 파일은 DB와 달라진 채 남는다). 행 단위 보호라 코퍼스의 정당한 변경도 충돌로 보고된다. 문항은 검수 큐 승인도 표지를 채워 이후 재적재 시 충돌 보고가 늘 수 있다. 통합 테스트는 `backend-migrations` 잡에서만 실제 실행된다(그 잡은 이 세션에서 pgvector 부재로 재현하지 못했다 — 마이그레이션은 임시 PG에서 `upgrade`/`downgrade` 왕복을 직접 검증).
 ### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
 
 - **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.
@@ -541,7 +552,7 @@
 - **EOS-105의 "무겁다"는 추정이었고 틀렸다**: 실 PG 600개념·학습자 시도 50/500/5,000건에서 CTE `max_depth=1` p50 2.2~2.4ms, 생산자 전체 p50 5.8/11.1/62.7ms · p95 7.1/13.7/127.8ms. 시간은 CTE가 아니라 학습자 전체 이력을 읽는 `compute_concept_diagnoses`에 비례한다.
 - **지운 것**: 규칙 `R4-prerequisite-gap` · `AttemptEvidence.prerequisite_gap_concept_ids` · 조립기 인자 · `NextActionKind.GO_TO_PREREQUISITE_CONCEPT` · 전이표 `ASSESSING → LEARNING`. **남긴 것**: PG enum 라벨 `POLICY_PREREQUISITE_GAP`(추가 전용 원장 — 지우면 타입 재생성 마이그레이션 + 값이 적힌 행이 있다면 읽기 `LookupError`) → `RETIRED_POLICY_TRIGGERS` 은퇴 표기 + "트리거 전수 = 규칙 트리거 ∪ 은퇴" 동결.
 - **검증**: 단위 285 passed · 실 PG 통합 38 passed(skip 0) · 새 동결 테스트 4종 뮤테이션 4/4 RED(주입마다 의도한 테스트 1건만 실패 · 원복 sha256 동일). `SCENARIO-003 ③`은 "R4 미발화 동결"에서 "R6이고 하강은 추천이 한다"로 승격.
-- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행 0건은 추론이지 실측이 아니다(Kiki가 prod에서 읽기 전용 1줄로 확인 가능 — PR 본문). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
+- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행은 **2026-10-09 Kiki 실측으로 0건**이다(`POLICY_PREREQUISITE_GAP_ROWS=0` · 조회 시점 스냅샷이며 과거 적재 이력의 부재 증명은 아니다 — 삭제권 이행으로 행이 지워졌을 가능성은 배제하지 못함). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖이며, 소유 태스크는 이미 `EOS-144`다. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
 - **교훈(사고 아님)**: 비용 벤치가 같은 DB에 심은 문항 1,800건이 `next-problem` 전역 풀을 오염시켜 통합 5건이 거짓 실패했다 → DB를 새로 만들어 제거 실험으로 확인. 통합 테스트 기본 skip을 통과로 읽을 뻔한 것(69 skipped)은 즉시 플래그를 켜 재실행해 막았다.
 
 ### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
