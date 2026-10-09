@@ -14,6 +14,8 @@ JSON(`docs/data/misconception_crosslink_review_queue.json`)을 사람이 행별�
 승격 규칙(위반은 `CrosslinkReviewError`로 *전건 열거* — 조용한 누락 금지):
 - approved 행은 reviewer·reviewed_on(검수 서명) 필수.
 - 직접매핑 승인은 confidence ≥ 0.6 필수(초안 §0.2 — conf<0.6은 인접 오개념·승격 금지).
+- 부분매핑·개념겹침은 승인(approved)해도 승격하지 않는다(MISC-63 — 기본 적재 금지).
+  예외는 검수 큐에서 link_type을 직접매핑으로 승격하고 confidence ≥ 0.6 기입 후 재서명하는 경로뿐.
 - kebab_id는 L4 탐지 카탈로그(`catalog.py::CATALOG_BY_ID`)에 실재해야 한다(전사 왜곡 가드).
 - 출력 행은 `schema.MisconceptionCrosslink` 계약 준수·`method="manual"`(채택 주체=사람·초안 §4).
 

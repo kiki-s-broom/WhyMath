@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,7 +19,7 @@ paths:
   - src/backend/whymath_backend/l4/misconception/crosslink_review.py
   - docs/standards/crosswalk_gate_contract.md
   - docs/data/misconception_crosslink_review_dossier.md
-session: null
+session: claude/intelligent-lamport-khayzh
 notes: |-
   정책 결정 2026-10-09 Kiki: 부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지). 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다(M0672 선례). 근거 MEMORY 2026-10-09 결정 로그. 선행 결정 MEMORY 2026-10-06(관계 강도는 적재 자격을 자동 결정하지 않는다)을 이 정책이 구체화한다. 코드 정본 위치 l1/misconception/crosslink_gate.py promotion_violations·load_gate_violations.
 
