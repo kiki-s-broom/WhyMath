@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: blocked
+status: todo
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,10 +17,11 @@ acceptance:
   - "Polya 학년 register의 대학 채널 확정: S4-62는 UserProfile.grade 계약(ge=10 le=14, 13~14=N수1·2)을 따라 l4/polya/prompts.py의 _GRADE_BAND_RANGES를 10~14=고등학생·15~16=대학생으로 두었다. 로더 관례(대학 1~4학년=introduced_grade 13~16)와 13~14에서 번호가 겹쳐 대학 1~2학년은 이 정수 채널로 표현할 수 없다 — 대학 축을 실제로 연결할 때 호출자가 넘기는 입력을 모호하지 않게 정한다(예: school_level 기반 별도 인자 또는 grade 계약 확장). 정하기 전에는 대학 호출자를 base_system_for_grade에 연결하지 않으며, test_matches_grade_to_band_ladder_for_every_user_profile_grade가 사다리 이탈을 막는다"
   - "[정정 2026-10-09 · Kiki 결정] 위 acceptance의 두 번째 묶음(\"Polya 학년 register의 대학 채널 확정\")은 폐기한다. 결정: Polya 4단계 틀은 학부생(대학 과정)에 적용하지 않는다 — 학부생은 이미 문제풀이 초보 단계를 넘었고(전문가 역전 효과) 3단계 전이 판정이 등호·결론어를 요구해 증명형 문제에서 막힌다. 따라서 대학 호출자를 base_system_for_grade·PolyaCoach.decide의 grade 채널에 연결하지 않으며, l4/polya/prompts.py의 _GRADE_BAND_RANGES 15~16(대학생) 칸은 연결 대상이 아니라 폐기 후보다(제거 여부는 대학 코칭 모드 설계 태스크가 판정). 대학 코칭은 별도 모드(정답 미루기·소크라테스 우선·메타인지·정서 안전 원칙 유지, 4단계 틀은 막혔을 때만)로 설계한다 — 후속 태스크 PED-CU-... 참조. 이 정정은 첫 묶음(populate 배선·건수 보고·required_depth 정책 결정·실 PG 적재 런북)에는 영향이 없다: 대학 required_depth 정책(mastery 고정 유지 vs 과목별 차등)은 여전히 Kiki 결정 대기이며 결정 전 구현 착수 금지다."
   - "[포인터] 위 정정문이 가리키는 후속 태스크 = PED-47-undergrad-coaching-mode-without-polya-ladder (대학 코칭 모드 설계)."
+  - "[결정 2026-10-09 · Kiki] 대학 required_depth 정책 = C안(cognitive_type 기반). 고정 mastery(S4-62 원본 커밋 40597d5c 방식)는 폐기하고, 대학 원자(세부개념·grade_band 보유 512건)의 graph.json cognitive_type에서 도출한다: 절차→procedural, 개념→conceptual, 표상→None(정직 폴백 — RequiredDepth 4단계에 표상 칸이 없다). mastery는 대학 셀에서 당분간 쓰지 않는다(숙달 요구를 표현할 근거 데이터가 없고 학년 승격은 지어내기에 가깝다). 구현 완료 조건: ①로더 상수 _UNIV_REQUIRED_DEPTH 고정 mastery를 원자별 cognitive_type 도출 함수로 교체하고 주석에 '임시 휴리스틱·인지 수준 원문 주석 확보 시 대체' 및 이 결정을 명기 ②기대 분포를 구현 시점 코퍼스로 재실측해 테스트에 박는다(512건 중 개념/절차/표상 건수와 required_depth None 건수 = 표상 건수, mastery 0건) ③docs/strategy/grade_axis_mvp_shortest_path_v1.md §3 W0 S-1 해소 문구를 '과목 성격별'에서 'cognitive_type 기반(원자 단위)'으로 갱신하고 결정 일자를 남긴다 ④cognitive_type 라벨의 출처(작성자·검수 여부)를 코퍼스 문서에서 확인해 결과를 PR에 적는다(미확인이면 '미확인'으로 명기). 변별: 표상 원자가 None을 유지하는지, 절차 원자가 conceptual로 오도출되는지 주입으로 RED 확인."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l1/curriculum/populate.py
   - tests/backend/l1/test_curriculum_populate_university.py
 session: null
-notes: "S4-62(학년축 오버레이 배선 W0) 회수 작업 중 발견한 배선 공백의 승계 태스크. S4-62 acceptance ①은 함수 추가까지만 요구해 충족되지만 호출처가 없어 대학 축 required_depth 신호는 아직 어디에도 도달하지 않는다. 로더 docstring의 호출자가 목록을 합쳐 적재한다는 문장은 계획일 뿐 추적되지 않았다 — docstring 속 계획은 백로그를 대신하지 못한다는 원칙에 따라 태스크로 등재한다. 선행 S4-62가 완료돼야 함수가 main에 존재하므로 depends_on으로 집행한다.\n\n[정정 2026-10-08] S4-62 이식 중 발견: register 정수 채널이 로더 대학 번호(13~16)와 N수(13~14)에서 충돌 — 잔여 한계를 추적 가능한 항으로 등재\n\n[정정 2026-10-09] Kiki 결정(2026-10-09): Polya는 학부생에 미적용 — 대학 채널 항목 폐기\n\n[정정 2026-10-09] 정정 포인터: 위 정정문의 'PED-CU-...'는 PED-47-undergrad-coaching-mode-without-polya-ladder\n\n[차단 2026-10-09] Kiki 결정 대기: 대학 required_depth 정책(mastery 고정 유지 vs 과목별 차등) — 결정 전 구현 착수 금지. Polya 대학 채널 항목은 2026-10-09 폐기(PED-47로 이관). 재개 = required_depth 결정 후 unblock"
+notes: "S4-62(학년축 오버레이 배선 W0) 회수 작업 중 발견한 배선 공백의 승계 태스크. S4-62 acceptance ①은 함수 추가까지만 요구해 충족되지만 호출처가 없어 대학 축 required_depth 신호는 아직 어디에도 도달하지 않는다. 로더 docstring의 호출자가 목록을 합쳐 적재한다는 문장은 계획일 뿐 추적되지 않았다 — docstring 속 계획은 백로그를 대신하지 못한다는 원칙에 따라 태스크로 등재한다. 선행 S4-62가 완료돼야 함수가 main에 존재하므로 depends_on으로 집행한다.\n\n[정정 2026-10-08] S4-62 이식 중 발견: register 정수 채널이 로더 대학 번호(13~16)와 N수(13~14)에서 충돌 — 잔여 한계를 추적 가능한 항으로 등재\n\n[정정 2026-10-09] Kiki 결정(2026-10-09): Polya는 학부생에 미적용 — 대학 채널 항목 폐기\n\n[정정 2026-10-09] 정정 포인터: 위 정정문의 'PED-CU-...'는 PED-47-undergrad-coaching-mode-without-polya-ladder\n\n[차단 2026-10-09] Kiki 결정 대기: 대학 required_depth 정책(mastery 고정 유지 vs 과목별 차등) — 결정 전 구현 착수 금지. Polya 대학 채널 항목은 2026-10-09 폐기(PED-47로 이관). 재개 = required_depth 결정 후 unblock\n\n[정정 2026-10-09] Kiki 결정(2026-10-09): 대학 required_depth = cognitive_type 기반(표상→None·mastery 미사용)"
 updated: 2026-10-09
