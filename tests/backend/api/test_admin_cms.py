@@ -1015,6 +1015,27 @@ class TestInPlaceEdit:
         assert audit.resource_id == audit_resource_id(spec, "C-1")
         assert audit.user_id == _EDITOR.user_id
 
+    def test_edit_marks_the_row_so_the_next_load_skips_it(self) -> None:
+        """P3-25 — 편집이 `cms_edited_at`을 채워야 CLI 적재가 그 행을 건너뛴다."""
+        row = _concept_content_row()
+        assert row.cms_edited_at is None
+        fake = FakeSession(results=[_Result(rows=[row]), _Result(rows=[row])])
+        resp = _client(_EDITOR, fake).patch(
+            "/v1/admin/cms/concept_content/items/C-1", json={"changes": {"explanation": "새 설명"}}
+        )
+        assert resp.status_code == 200, resp.text
+        assert row.cms_edited_at is not None
+
+    def test_noop_edit_does_not_take_ownership_from_the_loader(self) -> None:
+        """같은 값 저장은 아무것도 안 바꾼다 — 표지도 채우지 않는다(적재 소유권 유지)."""
+        row = _concept_content_row()
+        fake = FakeSession(results=[_Result(rows=[row]), _Result(rows=[row])])
+        _client(_EDITOR, fake).patch(
+            "/v1/admin/cms/concept_content/items/C-1",
+            json={"changes": {"explanation": row.explanation}},
+        )
+        assert row.cms_edited_at is None
+
     def test_same_value_is_a_noop_keeping_review_and_not_committing(self) -> None:
         row = _concept_content_row()
         fake = FakeSession(results=[_Result(rows=[row]), _Result(rows=[row])])
@@ -1220,6 +1241,20 @@ class TestReviewMark:
         assert row.review_status == "reviewed"
         assert fake.commits == 1
         assert fake.audit_rows[0].action == "approve"
+
+    @pytest.mark.parametrize("decision", ["reviewed", "needs_review"])
+    def test_review_mark_also_marks_the_row_for_the_loader(self, decision: str) -> None:
+        """검수 표시도 사람의 쓰기 — 적재가 `reviewed`를 코퍼스 값으로 되돌리면 안 된다(P3-25)."""
+        start = "ai_estimated" if decision == "reviewed" else "reviewed"
+        row = _concept_content_row(review_status=start)
+        resp, _fake = self._post(_REVIEWER, row, decision)
+        assert resp.status_code == 200, resp.text
+        assert row.cms_edited_at is not None
+
+    def test_noop_review_does_not_mark_the_row(self) -> None:
+        row = _concept_content_row(review_status="reviewed")
+        self._post(_REVIEWER, row, "reviewed")
+        assert row.cms_edited_at is None
 
     def test_reviewer_can_lower_the_mark_with_a_reject_audit(self) -> None:
         row = _concept_content_row(review_status="reviewed")

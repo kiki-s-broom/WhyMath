@@ -338,6 +338,17 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-09 (구현·P3-25): **CMS로 고친 행을 CLI 적재가 조용히 덮어쓰던 구멍을 `cms_edited_at` 표지로 막았다 — 7종 중 5종이 덮이고 있었고, 문항은 사람이 격리한 상태까지 코퍼스 초기값으로 되돌아갔다** (claude 구현)
+
+**무엇**: 태스크 `P3-25-cms-edit-vs-loader-contract`. 정본 = `docs/standards/cms_edit_vs_loader_contract.md`. 실측(역할 기반 검색): 문항·오개념·교수전략·개념 설명·힌트 5종은 적재가 같은 행을 upsert해 편집을 지우고, 풀이 단계(빈 좌석에만 insert)·교육과정 판(alembic 시드 `DO NOTHING`)은 안 지운다.
+
+**결정**: ①표지 컬럼 5개(`problem`·`misconception_catalog`·`strategy_node`·`concept_content`·`hints`, nullable·기본값 없음·백필 금지 — 마이그레이션 `e7b2c4d8a1f6`). 감사 기록 재사용안은 사용자 결정으로 기각(2차 신호·보존 기간 MGMT-02 미정·풀 길 없음) ②사람이 쓰면 표지를 채운다: CMS 편집(바뀐 필드가 있을 때만)·검수 표시, 문항은 기존 `PATCH /v1/problems`·검수 큐 전이까지 ③적재는 표지 행을 건너뛰고 충돌로 보고(`ON CONFLICT … WHERE cms_edited_at IS NULL RETURNING pk`) ④`--overwrite-cms-edits`로만 덮어쓰며 그때 표지를 비운다 ⑤신규 작성 미개방(저작권·출처 레일 우회 금지) 유지.
+
+**검증(실측)**: 실 PG 16 통합 5건 GREEN + 보호를 끈 주입 6종 전건 RED(선택적 — 힌트만·문항만·개념 설명만 실패하는 주입 포함)·단위/거버넌스 주입 4종 전건 RED·원복 바이트 동일. 전체 백엔드 스위트 18,204 passed(커버리지 90.98%)·`tests/infra` 2,940 passed·`mypy --strict`·`lint-imports`·ruff·black exit 0.
+
+**실측이 설계를 고친 1건**: 건너뜀 판정을 `rowcount == 0`으로 시작했는데 psycopg3의 `INSERT … ON CONFLICT`는 삽입·갱신·건너뜀 모두 `rowcount=-1`이라 변별력이 0이었다. 가짜 엔진 테스트는 통과했고 실 DB에서 처음 드러났다 — "알 수 없으면 예외"로 둔 덕에 조용히 오분류되지 않았고, `RETURNING` 빈 결과 판정으로 교체했다.
+
+**한계(사실 기록)**: 보호는 DB 편집만 지키고 코퍼스 파일로 역기록하지 않는다(정본 파일은 DB와 달라진 채 남는다). 행 단위 보호라 코퍼스의 정당한 변경도 충돌로 보고된다. 문항은 검수 큐 승인도 표지를 채워 이후 재적재 시 충돌 보고가 늘 수 있다. 통합 테스트는 `backend-migrations` 잡에서만 실제 실행된다(그 잡은 이 세션에서 pgvector 부재로 재현하지 못했다 — 마이그레이션은 임시 PG에서 `upgrade`/`downgrade` 왕복을 직접 검증).
 ### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
 
 - **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.

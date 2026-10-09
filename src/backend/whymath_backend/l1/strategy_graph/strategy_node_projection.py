@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import format_conflict
 from whymath_backend.db.models.strategy_node import STRATEGY_REVIEW_STATUS_DEFAULT
 
 # 슬3 sync 엔진 빌더 재사용(신규 seam 0) — formula_node_projection과 동일 규약.
@@ -132,16 +133,20 @@ class StrategyNodeStore:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
 
-    def upsert(self, record: StrategyNodeRecord) -> None:
-        """단일 전략 메타 upsert (멱등·strategy_id PK 충돌 갱신).
+    def upsert(self, record: StrategyNodeRecord, *, overwrite_cms_edits: bool = False) -> bool:
+        """단일 전략 메타 upsert (멱등·strategy_id PK 충돌 갱신). 반환=적재했으면 True.
 
         `INSERT ... ON CONFLICT(strategy_id) DO UPDATE` — 안전 메타 전 필드 + review_status +
         updated_at(now())을 갱신한다. standard_codes는 리스트로 바인딩(PG TEXT[]). 수식·엣지 컬럼은
         없다(closed 택소노미·연결은 소비처 참조 키).
+
+        **CMS 편집 보호(P3-25)**: `cms_edited_at`이 채워진 행은 갱신하지 않고 False를 돌려준다
+        (`overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다). 이름·설명은 CMS 편집 대상이다.
         """
         from sqlalchemy import func
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        from whymath_backend.db.cms_edit_marker import upsert_guard, upsert_skipped
         from whymath_backend.db.models.strategy_node import StrategyNode
 
         stmt = pg_insert(StrategyNode).values(
@@ -153,7 +158,8 @@ class StrategyNodeStore:
             review_status=STRATEGY_REVIEW_STATUS_DEFAULT,
         )
         # PK 충돌 시 갱신 — updated_at은 now()로 새로 찍는다(server_default는 INSERT 전용).
-        stmt = stmt.on_conflict_do_update(
+        where, release = upsert_guard(StrategyNode, overwrite=overwrite_cms_edits)
+        upsert = stmt.on_conflict_do_update(
             index_elements=[StrategyNode.strategy_id],
             set_={
                 "name_ko": stmt.excluded.name_ko,
@@ -162,10 +168,12 @@ class StrategyNodeStore:
                 "standard_codes": stmt.excluded.standard_codes,
                 "review_status": stmt.excluded.review_status,
                 "updated_at": func.now(),
+                **release,
             },
-        )
+            where=where,
+        ).returning(StrategyNode.strategy_id)
         with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+            return not upsert_skipped(conn.execute(upsert))
 
 
 def populate_strategy_nodes(
@@ -173,18 +181,28 @@ def populate_strategy_nodes(
     *,
     settings: Settings | None = None,
     store: StrategyNodeStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """전략 안전 메타를 `strategy_node`에 멱등 upsert 적재(영속 프로젝션). 반환=적재 행 수.
 
     `populate_formula_nodes`의 *전략 그래프* 짝이다 — 각 레코드를 strategy_id 키로 upsert한다
     (전량·review_status='ai_estimated'). 멱등(재실행 시 갱신). store 미주입 시 슬3 sync 엔진 재사용
     `StrategyNodeStore`를 만든다.
+
+    **CMS 편집 보호(P3-25)**: CMS가 고친 행(`cms_edited_at` 있음)은 건너뛰고 `conflicts`에
+    `strategy_node:<id>`로 보고한다 — 반환 행 수에는 포함하지 않는다. `overwrite_cms_edits=True`면
+    덮어쓰고 표지를 비운다.
     """
     resolved = settings if settings is not None else get_settings()
     node_store = store if store is not None else StrategyNodeStore(settings=resolved)
+    written = 0
     for record in records:
-        node_store.upsert(record)
-    return len(records)
+        if node_store.upsert(record, overwrite_cms_edits=overwrite_cms_edits):
+            written += 1
+        elif conflicts is not None:
+            conflicts.append(format_conflict("strategy_node", record.strategy_id))
+    return written
 
 
 __all__ = [

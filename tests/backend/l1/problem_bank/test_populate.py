@@ -72,6 +72,9 @@ class _FakeResult:
     def scalar_one(self) -> object:
         return self._scalar
 
+    def scalar_one_or_none(self) -> object | None:
+        return self._scalar
+
     def first(self) -> object | None:
         return self._rows[0] if self._rows else None
 
@@ -881,7 +884,7 @@ def test_cli_reports_provenance_rows(tmp_path: Path, capsys, monkeypatch) -> Non
     monkeypatch.setattr(
         mod,
         "populate_problem_bank",
-        lambda _s, *, problems_path, store=None: mod.ProblemBankStore.populate(
+        lambda _s, *, problems_path, store=None, overwrite_cms_edits=False: mod.ProblemBankStore.populate(
             _store(engine), mod.load_problem_bank_records(problems_path)
         ),
     )
@@ -904,7 +907,7 @@ def test_cli_distinguishes_zero_provenance_from_silence(
     monkeypatch.setattr(
         mod,
         "populate_problem_bank",
-        lambda _s, *, problems_path, store=None: ProblemBankPopulateReport(
+        lambda _s, *, problems_path, store=None, overwrite_cms_edits=False: ProblemBankPopulateReport(
             problems_loaded=1,
             problem_concepts_loaded=0,
             concepts_skipped=0,
@@ -961,7 +964,11 @@ def test_cli_all_loads_every_corpus_and_totals(tmp_path: Path, capsys, monkeypat
     monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: corpora)
 
     def _fake(
-        _s: object, *, problems_path: Path, store: object = None
+        _s: object,
+        *,
+        problems_path: Path,
+        store: object = None,
+        overwrite_cms_edits: bool = False,
     ) -> ProblemBankPopulateReport:
         seen.append(problems_path)
         return ProblemBankPopulateReport(
