@@ -1,1 +1,1 @@
-{"branch": "claude/vibrant-pascal-9ebi61", "harness": "2.0", "task": "S4-64-university-cells-populate-wiring", "ts": "2026-10-09T00:17:52Z"}
+{"branch": "claude/vibrant-pascal-9ebi61", "harness": "2.0", "kind": "block", "reason": "착수 직후 정지(2026-10-09 /drive): acceptance가 대학 required_depth 정책(mastery 고정 유지 vs 과목별 차등)을 Kiki가 결정하기 전 구현 착수를 금지하고, Polya register 대학 채널 입력 계약도 미정이다. 코드는 건드리지 않았다. 재개 = Kiki 결정 후 unblock", "task": "S4-64-university-cells-populate-wiring", "ts": "2026-10-09T00:18:04Z"}
