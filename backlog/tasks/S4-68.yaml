@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-68
+title: "answer_kind v2 소비 지점 드리프트 해소 — 교차검증 관점 fail-closed·등식 DSL 제외 목록·tier 값 동기·야간 재검증 디스패치"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-57
+requires_gates: []
+acceptance:
+  - "교차검증 관점 조회를 fail-closed로 바꾼다 — l3/verifier.py의 _CROSS_VERIFY_PERSPECTIVES.get(kind, PROBABILITY_PERSPECTIVES)는 등록 누락 시 확률 관점(표본공간 가정)으로 조용히 폴백한다. 선행 실측: 개념형(SymPy) 15종이 cross_verifier 주입 시 실제로 확률 관점으로 가는지를 재현 테스트로 확정한다(설계 단계 판정은 코드 독해 기준이며 미실행이다). 확정되면 키 부재는 unverifiable(관점 미등록)로 하고 확률 관점은 finite_probability·finite_count에 명시 등록한다. 변별력: 관점 미등록 kind에서 RED, 등록 시 GREEN을 양방향 실측한다. 운영 어댑터(l4/subject_adapter_math.py)는 cross_verifier 없이 Verifier()를 쓰므로 운영 영향은 없고 S4-56 CLI 경로에서 발현한다."
+  - "harness/qa_pipeline.py의 _NON_EQUATION_DSL_ANSWER_KINDS(수동 목록 6종)에 statistical_claim이 없는 잠복 결함을 정정하고, 이후 v2 kind가 자동 반영되도록 목록을 v2 레지스트리에서 파생하거나 동기 거버넌스 테스트로 강제한다. 변별력: statistical_claim 레코드 1건을 임시 코퍼스에 넣었을 때 _axis_equivalence_canonicalize가 위반으로 세는지 정정 전 RED, 정정 후 GREEN을 실측한다(현재 코퍼스에 statistical_claim은 0건이라 미발현)."
+  - "l1/problem_bank/populate.py의 _VERIFICATION_TIER_VALUES(2값: machine_exhaustive·machine_sampled)와 l3/verification_tier.py의 VerificationTier(9값)가 갈라진 드리프트를 해소한다 — 신규 등급 값을 verify.verification_tier로 찍은 레코드는 현재 ProblemCorpusError로 적재가 거부된다. L1은 L3를 import할 수 없으므로 두 집합을 대조하는 거버넌스 테스트로 동기를 강제하되, 부분집합 유지가 의도라면 그 사유와 허용 목록을 명시한다. 헌법 R6-02에 따라 기존 코퍼스 전수 적재가 변경 전후 동일함을 실측으로 보인다."
+  - "harness/corpus_reverify.py의 디스패치 표가 l3/equivalent/acceptance._CONCEPTUAL_VERIFIERS(단일 정본)를 그대로 쓰므로 l3/verifier._VERIFIERS_V2에만 있는 kind(현재 statistical_claim)가 야간 재검증에서 Tier1 경로로 떨어지는 문제를 해소한다. 레지스트리 단일 원천화 방향(v2 레지스트리를 조회하게 할지, acceptance 표에도 등록할지)을 순환 import 검사와 함께 판정하고 구현한다. 이중 등록은 verifier.py의 중복 가드가 import 시점 ValueError로 막는다는 점을 판정 근거에 포함한다."
+  - "전체 스위트(백엔드 소스·테스트를 건드리므로 부분 실행 금지)와 CI 잡 목록 전수 재현을 exit code로 보고하고 PR을 생성한다. 잔여 축 이름 어휘(기존 오타 \"문발↔형식모델 정합\"이 verifier.py·test_verifier.py·설계서에 고정)는 이 태스크가 정본 어휘 등록부의 필요성만 판정하고, 현재 residual_axes 소비처는 어댑터 통과 외 0건임을 근거로 기록한다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1555"
+paths:
+  - src/backend/whymath_backend/l3/verifier.py
+  - src/backend/whymath_backend/harness/qa_pipeline.py
+  - src/backend/whymath_backend/harness/corpus_reverify.py
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - tests/backend/l3/test_verifier.py
+session: null
+notes: "S4-57 설계(verifier_v2_domains.md §8 하위호환 검토 C1·C5·C6·C7·C8)의 결과로 등재. 단계 B 도메인 등록의 선행 정리이자 단계 A(S4-53)가 남긴 잠복 결함 정정이다. 2026-10-08 main c322bb9cb 코드 독해 기준이며 C1의 폴백 거동은 미실행이다. sequence_induction 구현(S4-66)은 자기 kind의 관점·DSL 제외 목록 등록을 스스로 하므로 이 태스크에 의존하지 않는다 — 단 둘 다 verifier.py와 cross_verify.py를 건드리므로 병렬 착수 시 파일 겹침을 조율한다. statistical_claim의 float 비교(math.isclose) 자체의 판정은 S4-58 소관이며 이 태스크에 넣지 않는다."
+updated: 2026-10-09

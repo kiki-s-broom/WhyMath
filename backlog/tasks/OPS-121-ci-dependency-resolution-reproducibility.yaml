@@ -1,0 +1,44 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-121-ci-dependency-resolution-reproducibility
+title: "CI 의존 해석 재현성 — 선언 범위 안의 마이너 릴리스가 main·머지 큐를 막는 계열의 구조 대책 (pydantic 2.14.0 · 2026-10-08)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "판정(착수 전 Kiki 승인 필수): 아래 3안을 2026-10-08 사고 실측으로 비교한 문서 1건을 docs/reviews/에 두고, 채택안과 이유를 MEMORY 결정 로그에 남긴다. A) 제약 파일(constraints)로 CI의 의존 해석을 고정하고 갱신은 CI 전건을 도는 별도 PR로만 한다 — 업스트림 릴리스가 PR을 거쳐서만 main에 닿는다. B) 정기 canary — 선언 범위 안의 최신 버전을 새로 설치해 mypy --strict와 전체 스위트를 돌려 사전 경보한다 — 탐지 전용이라 예방은 못 한다(현 정기 실행은 ci.yml의 cron 0 18 * * *, 매일 18:00Z 1회이므로 릴리스가 그 직후면 최대 약 24시간 동안 PR이 먼저 맞는다). C) 타입 민감 의존(pydantic·sqlalchemy·mypy 등)의 상한을 마이너 단위로 좁힌다 — 반응형이고 대상 선정이 사람 판단이다. 비교표는 탐지 시점·예방 여부·유지 비용(갱신 PR 빈도)·보안 패치 지연을 포함한다. 승인 전에는 구현에 착수하지 않는다"
+  - "집행 지점(정본화와 별항 — 파일만 있고 쓰이지 않는 상태 금지): 채택안의 입력이 ci.yml의 모든 의존 설치 지점에서 실제로 쓰이는지 정적 검사로 동결한다. 2026-10-08 실측 pip install -e 지점은 4개 잡(data-pipeline·backend·backend-migrations·data-pipeline-integration)이며 Dockerfile 설치 표면은 OPS-103과 겹치므로 순서와 소유를 조율한다. 일부 잡이 옛 방식으로 설치하는 상태는 RED여야 한다"
+  - "변별력(실패 주입): 채택안의 검사가 실제로 RED가 되는 입력을 주입해 확인한다 — 제약 또는 canary 입력에 호환되지 않는 pydantic 버전을 넣으면 mypy --strict가 이번과 같은 오류로 실패하는지, 정상 입력에서는 통과하는지(대조군). 주입 적용 여부(mutated != original)와 cp 백업 바이트 동일 원복을 단언하고 git checkout·restore로 원복하지 않는다"
+  - "사고 재현 시연: 수정 전 코드(382dbe70)와 pydantic 2.14.0 조합에서 mypy --strict가 _schema_seam.py:77 오류로 실패하는 것(2026-10-08 로컬 실측)을, 채택안이 main에 닿기 전에 잡는다는 것(또는 그 조합이 PR 경유로만 도달한다는 것)을 한 번 시연해 수치로 보고한다"
+  - "OPS-94·OPS-103 정합: 새 제약 파일이 OPS-94 상한 검사기의 스캔 대상에 들어가는지, OPS-103이 같은 표면(requirements·constraints·Dockerfile)을 이중으로 만들지 않는지 확인하고 겹치면 한쪽을 amend한다. 보안 패치가 늦어지는 안이면 갱신 주기와 긴급 갱신 경로를 수치로 정한다. 이 태스크는 개별 의존의 버전을 올리거나 내리지 않는다"
+  - "ruff·black(--line-length 100)·mypy --strict·lint-imports를 CI backend 잡과 같은 명령으로 돌려 종료 코드를 보고하고, 변경이 닿는 잡은 CI 미러 전건 통과, PR 생성 및 CI 통과. 워크플로(.github/workflows) 편집을 이 세션의 권한으로 푸시할 수 있는지는 첫 단계에서 확인하고, 불가하면 사람이 실행할 부분을 Kiki 실행 명령으로 분리한다"
+  - "[2026-10-09 Kiki 승인·정정] 판정 확정: A안(제약 파일 고정) 채택, 갱신 주기 주 1회(월요일)+긴급 당일(영업일 1일 이내), 어떤 핀도 30일 초과 방치 금지. 근거 문서 docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md. 위 조건 ②의 \"pip install -e 지점은 4개 잡\"은 실측으로 정정한다 — origin/main 594ce16b 기준 ci.yml의 의존 설치는 12개 잡 19곳(-e 설치 11개 잡: data-pipeline·backend·backend-migrations·data-pipeline-integration·data-pipeline-neo4j·concept-reach-guard·harness-integrity·declared-unwired-audit·corpus-authoring·e2e-nightly·backend-serial-nightly, 도구 직설치만 하는 infra-contracts 1개 잡). 집행은 워크플로 최상위 env의 PIP_CONSTRAINT 1줄과 정적 게이트(전 잡 도달·재정의 금지·핀 완전성·핀이 선언 범위 안)로 하며 12개 잡 전부가 대상이다. OPS-103 ②의 -c(constraints) 승격은 이 태스크가 소유하고 OPS-103은 -r만 남긴다."
+artifacts: []
+paths:
+  - src/backend/pyproject.toml
+  - src/data-pipeline/pyproject.toml
+  - ".github/workflows/ci.yml"
+  - ".github/workflows/weekly-metrics.yml"
+  - ".github/workflows/ci-timeout-headroom.yml"
+  - ".github/workflows/harness-audit.yml"
+  - ".github/workflows/work-graph-desktop.yml"
+  - "scripts/ops/*"
+  - scripts/harness/ci_mirror.py
+  - "tests/infra/*"
+  - "docs/reviews/*"
+  - docs/ops/ci_constraints_refresh_runbook.md
+  - infra/ci/constraints-py312.txt
+session: claude/youthful-volta-d365iy
+notes: |-
+  출처: 2026-10-08 PR #1528 머지 큐 탈락 조사(판정 기준: origin/main 71e30076). 실측: (1) 큐 실행 3건(PR #1528 run 37796318326 · #1543 run 37796680824 · #1532 run 37797078019, 14:54~15:12Z)의 backend lint·type·test가 Mypy 스텝에서 같은 오류 줄로 실패했다 — _schema_seam.py:77 Argument 1 to TypeAdapter has incompatible type TypeForm[Any] | None. 그 뒤 스텝 18개는 skipped. (2) 첫 실행 로그의 Successfully installed 줄에서 pydantic 2.14.0·pydantic-core 2.50.0 확인. (3) 로컬 재현(mypy 2.4.0 고정, pydantic만 교체): 수정 전 코드 382dbe70은 2.13.5에서 통과(741파일)·2.14.0에서 CI와 같은 오류로 실패, 현재 main은 2.14.0에서도 통과. (4) 코드 수정은 PR #1509(32819cfc, 15:28Z)에 동봉돼 main에 있다 — 탈락부터 수정 병합까지 약 35분. (5) src/backend/pyproject.toml의 선언은 pydantic>=2.9.0,<3 이라 OPS-94의 상한 유무 검사를 통과한다 — OPS-94는 상한이 없는 의존을 막고, 이번 건은 상한이 있으나 범위가 넓은 경우라 못 막는다. (6) 저장소에 lock·constraints 파일이 없고(ls 실측) CI는 pip install -e .[dev]로 매 실행 그날의 최신을 해석한다. 계열 선례: OPS-94 notes의 langfuse v2/v4 혼재 → pytest-asyncio 1.4.0(ARCH-22, 2026-07-30) → SQLAlchemy 2.1.0(OPS-91, 2026-09-25, PR #1304 탈락) 이어 pydantic 2.14.0. 사고 대장에는 SQLAlchemy 건이 unbounded-dependency-pin 1회차로 등재돼 있다. 미확인: pydantic 2.14.0의 PyPI 릴리스 시각(조회하지 않음)과 그 이후 버전 존재 여부. 이 태스크는 OPS-103(todo, OPS-94 스캔 표면 확장)과 같은 표면을 만질 수 있어 착수 시 조율한다
+
+  [정정 2026-10-09] Kiki 승인(2026-10-09): A안 채택·설치 지점 실측 정정(4개 잡→12개 잡 19곳)·OPS-103 ② -c 소유권 이관
+
+  [정정 2026-10-09] paths ['src/backend/pyproject.toml', 'src/data-pipeline/pyproject.toml', '.github/workflows/ci.yml', 'scripts/ops/*', 'tests/infra/*', 'docs/reviews/*'] → ['src/backend/pyproject.toml', 'src/data-pipeline/pyproject.toml', '.github/workflows/ci.yml', '.github/workflows/weekly-metrics.yml', '.github/workflows/ci-timeout-headroom.yml', '.github/workflows/harness-audit.yml', '.github/workflows/work-graph-desktop.yml', 'scripts/ops/*', 'scripts/harness/ci_mirror.py', 'tests/infra/*', 'docs/reviews/*', 'docs/ops/ci_constraints_refresh_runbook.md', 'infra/ci/constraints-py312.txt']: 편집 범위 확정: 워크플로 5개 env·제약 파일·런북·미러 env 상속 수정(워크플로 최상위 env 무시 불일치)
+updated: 2026-10-09

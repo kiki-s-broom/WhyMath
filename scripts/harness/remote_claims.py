@@ -97,6 +97,14 @@ from models import Backlog, Task
 CLAIMS_BRANCH = "harness-claims"
 CLAIMS_REF = f"refs/heads/{CLAIMS_BRANCH}"
 CLAIMS_DIR = "claims"
+# 보고서 발행 브랜치(HARN-28) — 야간 CI 잡이 고립 브랜치 스캔 결과(`isolation.json`)를 올리는
+# 전용 orphan 브랜치. claim 대장과 쓰기 주체·주기·CAS 경합 축이 달라 같은 브랜치에 섞지 않는다.
+# 발행·조회 구현은 `isolation_report.py`가 소유한다 — 여기에는 "하네스 소유 브랜치" 판정에
+# 필요한 이름만 둔다(스캐너가 import 순환 없이 제외할 수 있게).
+REPORTS_BRANCH = "harness-reports"
+# 하네스가 스스로 만들고 쓰는 데이터 브랜치 — 사람이 처분할 작업 브랜치가 아니므로 방치
+# 스캔 대상 밖이다. 정의상 제외이지 유예가 아니라 만료가 없다.
+HARNESS_OWNED_BRANCHES = frozenset({CLAIMS_BRANCH, REPORTS_BRANCH})
 # 로컬 미러 ref (로컬 브랜치와 충돌 없는 전용 공간 — 체크아웃 대상이 아니다)
 LOCAL_MIRROR_REF = "refs/whymath-claims/head"
 # lease 거부 후 재시도 횟수. 경합은 "남이 *다른* 태스크를 claim했다"가 대부분이라
@@ -3035,10 +3043,11 @@ def scan_stale_branches(
             if ref == trunk_ref:
                 continue
             branch = ref[len(REMOTE_REF_PREFIX) :] if ref.startswith(REMOTE_REF_PREFIX) else ref
-            # 하네스가 스스로 만드는 claim 저장 브랜치는 사람이 결정할 작업 브랜치가
-            # 아니다 — 정의상 대상 밖이지 유예가 아니다. claim이 3일만 조용하면
-            # "Kiki 결정 필요"로 뜨는 것을 막는다.
-            if branch == CLAIMS_BRANCH:
+            # 하네스가 스스로 만드는 데이터 브랜치(claim 대장·스캔 리포트)는 사람이 결정할
+            # 작업 브랜치가 아니다 — 정의상 대상 밖이지 유예가 아니다. claim이 3일만
+            # 조용하면 "Kiki 결정 필요"로 뜨는 것을 막는다. 리포트 브랜치는 야간 잡이 사흘
+            # 실패하면 같은 형태로 뜨게 되므로(orphan이라 trunk 대비 ahead>0) 같이 뺀다.
+            if branch in HARNESS_OWNED_BRANCHES:
                 continue
             try:
                 last_commit_at = datetime.fromisoformat(date_str)

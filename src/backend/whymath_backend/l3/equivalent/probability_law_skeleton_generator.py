@@ -40,7 +40,7 @@ from math import gcd
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -157,6 +157,7 @@ def _addition_explanation(skeleton: _AdditionSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class AdditionLawSkeletonGenerator:
     """확률의 덧셈정리 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -283,6 +284,7 @@ def _complement_explanation(skeleton: _ComplementSkeleton) -> str:
     return f"여사건의 확률은 1에서 P(A)를 빼면 되므로, 구하는 확률은 {answer_text} 이다."
 
 
+@deterministic_generator
 class ComplementLawSkeletonGenerator:
     """여사건의 확률 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -419,6 +421,7 @@ def _multiplication_explanation(skeleton: _MultiplicationSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class MultiplicationLawSkeletonGenerator:
     """확률의 곱셈정리 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

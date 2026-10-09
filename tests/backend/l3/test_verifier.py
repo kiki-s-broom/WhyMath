@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 
 from whymath_backend.l3.cross_verify import (
@@ -231,3 +233,39 @@ async def test_statistical_claim_cross_verifier_receives_data_and_machine_value(
     assert subject.data == problem.conditions
     assert subject.machine_value == pytest.approx(3.0)
     assert "평균" in subject.machine_model_ko
+
+
+@pytest.mark.asyncio
+async def test_statistical_claim_tolerance_policy_is_honored_through_verifier() -> None:
+    """S4-58 집행 지점 — tolerance 절이 Verifier 래퍼를 거쳐 판정에 실제로 반영된다."""
+    conditions = "data=[1,2,4]; stat=mean; tolerance=round:2"
+    verifier = Verifier()
+    wrong = await verifier.verify(_problem("statistical_claim", "2.3", conditions))
+    assert wrong.state == "fail"
+    assert "불일치" in (wrong.reason or "")
+    assert "round:2" in (wrong.reason or "")
+
+    fake = _FakeCrossVerifier("ok")
+    checked = await Verifier(cross_verifier=fake).verify(  # type: ignore[arg-type]
+        _problem("statistical_claim", "2.33", conditions)
+    )
+    assert checked.state == "pass"
+    subject = fake.subjects[0]
+    # 교차검증 재료는 기존 계약(float machine_value)을 유지하고 설명은 정확 표기다.
+    assert subject.machine_value == pytest.approx(7 / 3)
+    # S4-70 — 정확값(유리수)과 근사가 float과 별도로 전달된다.
+    assert subject.machine_exact == Fraction(7, 3)
+    assert subject.machine_approx == Fraction(7, 3)
+    assert "7/3" in subject.machine_model_ko
+    assert "Fraction" not in subject.machine_model_ko
+
+
+@pytest.mark.asyncio
+async def test_statistical_claim_integer_precision_fails_through_verifier() -> None:
+    """수정 전에는 10^17 규모 평균이 1 어긋나도 pass였다."""
+    big = 10**17
+    problem = _problem(
+        "statistical_claim", str(big), f"data=[{big + 1},{big + 1},{big + 1}]; stat=mean"
+    )
+    verdict = await Verifier().verify(problem)
+    assert verdict.state == "fail"

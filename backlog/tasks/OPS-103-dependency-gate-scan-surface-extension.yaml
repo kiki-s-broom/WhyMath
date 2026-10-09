@@ -11,14 +11,19 @@ eos_priority: P2
 owner: claude
 depends_on:
   - OPS-94
+  - OPS-121-ci-dependency-resolution-reproducibility
 requires_gates: []
 acceptance:
   - "① Dockerfile 설치 표면 — 저장소의 Dockerfile 계열(루트 Dockerfile·*.Dockerfile·Dockerfile.*)의 RUN 명령(백슬래시 이음·BuildKit 플래그 --mount·exec form RUN [\"pip\", ...])에서 pip install 인자를 열거해 OPS-94와 같은 규칙(상한 존재·전 지점 일치)으로 판정한다. 현재 루트 Dockerfile 45행 pip install --upgrade pip && pip install -e /app/src/backend 의 pip 부트스트랩이 무상한이다 — 워크플로 11곳(OPS-94가 \"pip<27\"로 묶음)과 같은 상한으로 맞춘다.\n② requirements·constraints 파일 — requirements*.txt·constraints*.txt가 저장소에 생기면 그 요구사항도 스캔한다. pip install -r/-c 형태는 지금 측정 실패(exit 2)로 막혀 있다 — 파일 내용을 읽어 판정하도록 승격하거나, 계속 비지원이면 그 이유를 테스트로 고정한다.\n③ tool 표 안의 도구별 의존 선언 — tool.uv.dev-dependencies · tool.poetry.dependencies · tool.hatch.envs.*.dependencies 등을 인식하거나, 인식하지 못하는 의존 표면이 pyproject에 생기면 통과가 아니라 측정 실패로 멈춘다.\n④ 변별력 — 신규 표면마다 상한 제거 주입이 RED이고 정상 상태가 GREEN(과잉 수정 대조군)이며, 뮤테이션 하네스(주입 적용 단언 · cp 백업 원복 · sha256 동일) 전건 RED·생존 0.\n⑤ 배선 — CI 스텝은 OPS-94가 만든 infra-contracts 잡의 게이트 스텝을 그대로 쓴다(새 스텝 불요). 다만 Dockerfile만 바뀐 PR에서도 그 잡이 도는지(needs 게이팅 없음)를 기존 배선 테스트가 계속 동결하는지 확인한다."
+  - "[2026-10-09 OPS-121 판정 정정] ②의 pip install -c(constraints) 승격은 OPS-121-ci-dependency-resolution-reproducibility가 소유한다(Kiki 승인). 이 태스크의 ②는 -r(requirements) 형태만 남는다. ①의 Dockerfile 설치는 OPS-121이 확정한 제약 파일 경로를 쓰도록 해 프로덕션 이미지와 CI가 서로 다른 해석을 쓰는 상태를 막는다 — 그래서 OPS-121 착지 후 착수한다."
 artifacts: []
 paths:
   - scripts/ops/check_dependency_upper_bounds.py
   - tests/infra/test_dependency_upper_bounds.py
   - Dockerfile
 session: null
-notes: "발견 경위: 2026-10-02 OPS-94 착수 시 acceptance 범위(pyproject·워크플로) 밖으로 의도적으로 남긴 표면 3종이다. 검사기 독스트링의 \"보지 않는 것\" 절이 이 태스크를 가리킨다(docstring 속 계획은 백로그를 대신하지 못하므로 등재). 루트 Dockerfile 의 pip 부트스트랩이 지금 무상한이라 docker-build 잡의 이미지 빌드는 pip 메이저 변경에 노출돼 있다. docker-build 잡은 로컬 재현 불가라 Dockerfile 편집의 최종 판정은 CI다."
-updated: 2026-10-02
+notes: |-
+  발견 경위: 2026-10-02 OPS-94 착수 시 acceptance 범위(pyproject·워크플로) 밖으로 의도적으로 남긴 표면 3종이다. 검사기 독스트링의 "보지 않는 것" 절이 이 태스크를 가리킨다(docstring 속 계획은 백로그를 대신하지 못하므로 등재). 루트 Dockerfile 의 pip 부트스트랩이 지금 무상한이라 docker-build 잡의 이미지 빌드는 pip 메이저 변경에 노출돼 있다. docker-build 잡은 로컬 재현 불가라 Dockerfile 편집의 최종 판정은 CI다.
+
+  [정정 2026-10-09] Kiki 승인(2026-10-09): -c 승격을 OPS-121로 이관, Dockerfile은 OPS-121 제약 파일 경로 확정 후 착수
+updated: 2026-10-09

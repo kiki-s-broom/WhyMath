@@ -29,6 +29,11 @@ Langfuse·Celery broker가 필요하지 않다(첫 사용 시 연결). LangfuseS
 `functional_security_audit_2026-08-08.md` M6): SEC-07 당시 "범위 밖"으로 남겨졌던 폴링이
 무인증인 채 검증 전 원시 LLM 출력을 반환하고 있었다(짝인 POST는 봉인·폴링만 열림).
 
+레이트리밋(SEC-19): 인증은 *누구냐*만 가린다 — 인증된 단일 계정이 `/v1/generate`를 반복 호출해도
+LLM 비용은 그대로 나간다. 그래서 인증과 별개 축으로 `RateLimitedGenerate`(사용자·IP·기기 3차원,
+`generate` 전용 버킷)를 부착했다. 시각화·장면·코치 LLM 표면은 이미 리미터가 있었고 이 엔드포인트가
+유일한 무제한 표면이었다. 리미터는 동의 게이트를 얹지 않는다(`CurrentUser` 기반 — 접근 의미 불변).
+
 소유권(job↔user) 검사(SEC-27, 48_보안 §P0): `job_ownership` 테이블(`db/models/
 job_ownership.py`)이 `POST /v1/generate`의 큐잉 시점에 (job_id, user_id)를 기록하고,
 `GET /v1/jobs/{id}`가 그 행으로 소유자를 대조해 타 사용자 job 폴링을 404로 거부한다
@@ -109,6 +114,7 @@ from whymath_backend.api._ocr_state import (
 from whymath_backend.api._ocr_state import (
     get_ocr_reach_snapshot as _get_ocr_reach_snapshot,
 )
+from whymath_backend.api._rate_limit import RateLimitedGenerate
 from whymath_backend.api._segmentation_state import (
     SEGMENTATION_COUNTERS_KEY as _SEGMENTATION_COUNTERS_KEY,
 )
@@ -141,6 +147,7 @@ from whymath_backend.api._subject_capability_state import (
     STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
 from whymath_backend.api.admin_bff import router as admin_bff_router
+from whymath_backend.api.admin_cms import router as admin_cms_router
 from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -1319,7 +1326,7 @@ def create_app(
             ),
         )
 
-    @app.post("/v1/generate", tags=["l3"])
+    @app.post("/v1/generate", tags=["l3"], dependencies=[RateLimitedGenerate])
     async def post_generate(
         body: GenerateBody,
         request: Request,
@@ -1328,10 +1335,11 @@ def create_app(
     ) -> JSONResponse:
         """라우팅 → (동기) 캐시·생성 / (비동기 QUALITY) 큐잉. 메타데이터 + 결과 반환.
 
-        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 반환 텍스트
-        (동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을 통과하기
-        전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는 상위
-        계층(L4/L5 오케스트레이터)의 책임이다.
+        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 한도 초과는
+        **429**(`RateLimitedGenerate` — SEC-19, 사용자·IP·기기 3차원·`generate` 전용 버킷).
+        반환 텍스트(동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을
+        통과하기 전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는
+        상위 계층(L4/L5 오케스트레이터)의 책임이다.
 
         AI 모델 학습/개선에 데이터 사용 가능 여부는 `ConsentScope.ai_training` 동의를
         판정해 Langfuse trace 메타데이터로 전달한다(EOS §48·§50). 이 판정은 응답 생성을
@@ -1506,5 +1514,7 @@ def create_app(
     app.include_router(admin_menu_router)
     # ADMIN-05: Admin BFF read-only — 모델 상태·비용·검수 큐·사용자 조회(Phase A).
     app.include_router(admin_bff_router)
+    # P3-12: Admin CMS — 개념 버전 워크플로우(초안·검토·발행·롤백) + 개념 외 허용 목록 제자리 편집.
+    app.include_router(admin_cms_router)
 
     return app
