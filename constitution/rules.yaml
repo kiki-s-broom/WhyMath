@@ -1052,3 +1052,18 @@ sources:
   # ① 규칙 등록부: CLAUDE.md 원문 · backlog/rules.ndjson(데이터) · docs/standards/rule_index.md(렌더) · 이 파일
   # ② LLM 모델 핀: src/backend/whymath_backend/l3/router.py LOCAL_MODEL_MATRIX · config.py · CLAUDE.md 스택 표
   # ③ 단원·소단원 위계: atom_graph_v1(단원 217·소단원 643) · achievement_criteria_v1 · units_v1 · textbook_unit
+
+  - name: 프로젝트 규칙 (개발 헌법 본문)
+    path: CLAUDE.md
+    version: "규칙 본문의 정본. 집행 메타(상태·집행 지점)는 backlog/rules.ndjson 이 규칙 제목 문자열로 대응하며 scripts/harness/rules.py 린트가 어긋남을 red 로 만든다. 코딩 헌법(constitution/rules.yaml)의 규칙과는 다른 집합이다"
+    derived: [backlog/rules.ndjson, docs/standards/rule_index.md]
+
+  - name: LLM 모델 핀 (로컬 Ollama)
+    path: src/backend/whymath_backend/l3/router.py
+    version: "LOCAL_MODEL_MATRIX(MATH·GENERAL·VISION × FAST·MID) + QUALITY_MODEL_ID. 설계 근거 문서 docs/architecture/03a_l3_router_design.md 는 해설이지 값의 정본이 아니다"
+    derived: [CLAUDE.md 기술 스택 표 '로컬 LLM' 행, .claude/agents/llm-architect.md A.0 매트릭스]
+
+  - name: LLM 모델 핀 (클라우드)
+    path: src/backend/whymath_backend/config.py
+    version: "cloud_provider 셀렉터 + openrouter_model_mid/high · anthropic_model_mid/high 기본값. 단가는 l3/router.py 의 비용표가 따로 가진다(모델 ID 와 단가는 다른 종류의 값)"
+    derived: [CLAUDE.md 기술 스택 표 '클라우드 LLM' 행, tests/backend/test_config.py 기본값 고정]
