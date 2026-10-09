@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-192-evaluation-context-source-wiring
+title: "evaluation_context 출처 없는 4키 연결 — 정본 소유자가 값을 만든 뒤 키 단위로"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "evaluation_context 출처 연결: schema/evaluation_context.py의 EVALUATION_CONTEXT_SOURCES에서 값이 None인 4키(concept_graph_version, grading_policy_version, notation_contract_version, normalizer_version)를 키마다 실제 출처가 생길 때 연결한다. 값을 만드는 정본 소유자(그래프 Release, 채점 정책 버전, data/notation_contract.json 런타임 로더, 정규화 파서 버전 상수)가 먼저 있어야 하며, 임의 상수를 박지 않는다. 연결 시 EVALUATION_CONTEXT_SOURCES 항목과 l2/attempt_version_pin.py를 같은 변경에서 고친다(어긋나면 tests/backend/l2/test_attempt_version_pin.py가 RED)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/schema/evaluation_context.py
+  - src/backend/whymath_backend/l2/attempt_version_pin.py
+session: null
+notes: "출처: EOS-47 + docs/architecture/28_mathlive_input.md 35 요구(notation_contract/파서 버전). 출처 실측 표는 docs/architecture/eos47_attempt_version_pinning.md 3."
+updated: 2026-10-09

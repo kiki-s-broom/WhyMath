@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-193-attempt-version-pin-reach-report
+title: "시도 버전 고정 작동 비율 리포트 — 0%가 정상처럼 보이지 않게"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-190-problem-version-publish-writer
+requires_gates: []
+acceptance:
+  - "고정 작동 비율 리포트: problem_attempt 중 problem_version_id가 채워진 비율과 evaluation_context 키별 채움 비율을 기간별로 낸다(harness reach report 선례). 0%일 때 정상 응답처럼 보이지 않도록 분모·분자와 outcome(pinned/no_version/problem_missing) 분포를 함께 보고한다. problem_version_id가 NULL인 시도의 원인이 문항에 판이 없음인지 고정 누락인지 구별한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/attempt_version_pin_reach_report.py
+  - tests/backend/harness/test_attempt_version_pin_reach_report.py
+session: null
+notes: "출처: EOS-47. CLAUDE.md 작동한 비율 원칙(알고리즘 부착 후 무작동을 정상 응답으로 오인 금지)."
+updated: 2026-10-09

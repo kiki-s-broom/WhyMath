@@ -649,9 +649,11 @@ CATALOG: tuple[Spec, ...] = (
     # (`evidence_event.session_id → learning_session.user_id`)라 같은 기능의 적재 축이다.
     _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계·학습 세션)", "Student", "Event",
        "P0",
-       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer",
+       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer · "
+       "EOS-47 시도 접수 시점 문항 판·채점 환경 고정(l2.attempt_version_pin)",
        "l2.evidence_event_store", "l2.attempt_skill_event",
-       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer"),
+       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer",
+       "l2.attempt_version_pin"),
     _e("WM-E-207", "목표 진행 조회 좌석", "Student", "Learning Model", "P2",
        "수능 D-day 축", "l2.target_progress"),
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
@@ -989,7 +991,8 @@ CATALOG: tuple[Spec, ...] = (
        "schema.cms_access", "schema.concept", "schema.concept_content", "schema.concept_version",
        "schema.corpus_provenance", "schema.curriculum_entry", "schema.curriculum_framework",
        "schema.curriculum_version", "schema.dialogue", "schema.enums",
-       "schema.event_data_contract", "schema.evidence_link", "schema.hint_usage",
+       "schema.evaluation_context", "schema.event_data_contract", "schema.evidence_link",
+       "schema.hint_usage",
        "schema.learning_loop_contract", "schema.learning_state", "schema.mastery_contract",
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",

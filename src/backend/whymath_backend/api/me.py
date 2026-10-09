@@ -129,6 +129,7 @@ from whymath_backend.l2.ability_estimation import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
     IrtItem,
@@ -1115,10 +1116,16 @@ async def submit_attempt(
     learning_session_id = await record_learning_activity(
         session, user_id=user.user_id, now=received_at
     )
+    # EOS-47: 이 시도가 푼 문항의 **판**과 채점 환경을 접수 시점에 고정한다 — 문항이 나중에 수정돼도
+    # 시도는 푼 당시의 판을 가리킨다. 판 포인터가 없는 문항은 None(날조 금지)이고, 이 호출은 실패를
+    # 삼키지 않는다(`l2/attempt_version_pin` 모듈 docstring: 읽기 실패 뒤의 INSERT는 어차피 불가).
+    version_pin = await resolve_attempt_version_pin(session, body.problem_id)
     attempt = ProblemAttempt(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답에 즉시 사용)
         user_id=user.user_id,
         problem_id=body.problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         session_id=learning_session_id if learning_session_id is not None else body.session_id,
         is_correct=body.is_correct,
         student_answer=student_answer_plain,
