@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,7 +20,9 @@ acceptance:
   - 잔여 축 식별 및 cross_verifier 연결 흐름 구현
   - "ruff/black/mypy green, import-linter 7계층 위반 0"
   - PR 생성 및 CI 통과
-artifacts: []
+artifacts:
+  - "구현 본체: PR #871 (kiki-s-broom/WhyMath#871, 2026-08-24 머지, 474bf918 — origin/main 조상 확인). 판정 기준 origin/main c322bb9c: 완료 조건 7건 재대조 충족. 후속 수정: PR #1529 (kiki-s-broom/WhyMath#1529, 판정 기준 05b8ed8c1) — 관점 세트 없는 answer_kind 교차검증 거짓 pass 차단·테스트 +6·뮤테이션 6/6 RED·ci_mirror 전 잡 통과(MIRROR_EXIT=0)·audit_ratchet 차단 0건. 승계: S4-65 (등급 부여 배선·개념형 관점·운영 결선). PR #1529의 GitHub CI backend 잡은 기록 시점에 진행 중"
+  - "정정 2026-10-09: PR #1529 최종 내용 — 관점 폴백 수정(verifier.py)은 main의 S4-68(#1555)과 동일 수정이라 철회했고, 고유 테스트 1건(중복 키 거부 ValueError·뮤테이션 RED 2/2)과 대장 변경만 남았다. 위 증적의 '테스트 +6·뮤테이션 6/6 RED·ci_mirror 통과'는 철회 전 커밋 05b8ed8c1 기준이다"
 paths:
   - src/backend/whymath_backend/l3/verifier.py
   - src/backend/whymath_backend/l3/verification_tier.py
@@ -29,5 +31,5 @@ paths:
   - docs/architecture/verifier_v2_design.md
   - "backlog/tasks/**"
 session: null
-notes: "S4-52 v2 설계서 §2. 현재는 스켈레톤만 존재. 기존 _CONCEPTUAL_VERIFIERS(verify_answer 등)를 래핑하면서도 신규 도메인 verifier 플러그인 구조를 추가.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "S4-52 v2 설계서 §2. 현재는 스켈레톤만 존재. 기존 _CONCEPTUAL_VERIFIERS(verify_answer 등)를 래핑하면서도 신규 도메인 verifier 플러그인 구조를 추가.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-09] PR #1529가 main 병합 과정에서 verifier.py 수정을 철회해 증적 서술을 정정"
+updated: 2026-10-09
