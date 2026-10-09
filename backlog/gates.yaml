@@ -976,6 +976,20 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
+  - id: G-p314-phase3-metric-targets
+    title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-09
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-14-phase3-metrics-cli
+      - P3-10-ai-quality-eval-suite
   - id: G-p318-calc-02-08-disposition
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision
