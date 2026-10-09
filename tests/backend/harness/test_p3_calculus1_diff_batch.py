@@ -99,12 +99,13 @@ def test_batch_stores_every_item_through_the_gate(
         assert len(record["concepts"]) == 1  # type: ignore[arg-type]
 
 
-def test_batch_is_byte_deterministic(
-    tmp_path: Path, fresh_bank: tuple[batch.CorpusBatchReport, Path]
-) -> None:
-    second = tmp_path / "b.jsonl"
+def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
+    # 한 함수 안에서 두 번 돌린다 — 헌법 R3-01 가드(`tests/test_idempotency.py`)는 공유 픽스처의
+    # 실행을 세지 않는다(같은 함수 안 진입점 호출 2회 + `==` 단언이 구조 증거다).
+    first, second = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    batch.run_p3_calculus1_diff_batch(out_path=first)
     batch.run_p3_calculus1_diff_batch(out_path=second)
-    assert fresh_bank[1].read_bytes() == second.read_bytes()
+    assert first.read_bytes() == second.read_bytes()
 
 
 def test_committed_bank_is_in_sync_with_the_generators() -> None:
