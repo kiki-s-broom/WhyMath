@@ -27,7 +27,7 @@ from whymath_backend.l1.problem_bank.populate import (
     populate_problem_bank,
 )
 from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceMissingError
-from whymath_backend.l3.verification_tier import VerificationTier
+from whymath_backend.l3.verification_tier import VerificationTier, stamp_verification_tier
 
 # 원자 code → concept_id(UUID) 맵의 재료(가짜 concept 테이블 — S2-03 재연결 후 태깅은 원자 행).
 # 크로스워크 primary: HK06→10공수1-02-02-1 · HK09→10공수1-02-04-1 · HK10→10공수1-02-05-1 ·
@@ -508,6 +508,18 @@ def test_load_accepts_every_l3_verification_tier_value(tmp_path: Path, tier_valu
     )
     records = load_problem_bank_records(_write(tmp_path, [record]))
     assert records[0].verify.verification_tier == tier_value
+
+
+@pytest.mark.parametrize("tier", list(VerificationTier), ids=lambda t: t.value)
+def test_load_roundtrips_every_stamp_verification_tier_output(
+    tmp_path: Path, tier: VerificationTier
+) -> None:
+    # S4-69 — stamp_verification_tier로 찍은 값(레거시 2종 + 신규 7종)이 L1 적재를 통과하고
+    # 원문 그대로 보존된다(alias 해석으로 다른 값이 되지 않는다 — 해석은 읽는 쪽 몫).
+    stamped = stamp_verification_tier(_base_record(), tier)
+    path = _write(tmp_path, [stamped])
+    records = load_problem_bank_records(path)
+    assert records[0].verify.verification_tier == tier.value
 
 
 def test_load_defaults_verification_tier_to_none_when_absent(tmp_path: Path) -> None:
