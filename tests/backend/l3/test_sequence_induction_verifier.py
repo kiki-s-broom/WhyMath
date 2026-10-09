@@ -285,12 +285,16 @@ def _subject(**overrides: object) -> ResidueSubject:
     return ResidueSubject(**base)  # type: ignore[arg-type]
 
 
-def test_reconstruct_judge_is_exact_where_statistical_judge_is_tolerant() -> None:
-    """1073741823 vs 1073741824 — 통계 판정기(isclose)는 ok, 수열 판정기(==)는 defect."""
+def test_reconstruct_judges_both_reject_integer_off_by_one() -> None:
+    """1073741823 vs 1073741824 — 종전엔 통계 판정기(isclose)만 ok 로 통과시켰다(S4-70 이 해소).
+
+    통계 판정기는 이제 정확값 정책이라 float 만 있는 기계값에서도 1 어긋남을 defect 로 잡는다.
+    수열 판정기(==)는 처음부터 exact 이고, 두 판정기는 입력 필드가 달라(`machine_value` /
+    `machine_value_exact`) 따로 유지한다.
+    """
     stat_subject = _subject(machine_value=1073741823.0)
-    assert (
-        _judge_stat_reconstruct(stat_subject, {"value": 1073741824}).verdict == "ok"
-    )  # 결함의 증거
+    assert _judge_stat_reconstruct(stat_subject, {"value": 1073741824}).verdict == "defect"
+    assert _judge_stat_reconstruct(stat_subject, {"value": 1073741823}).verdict == "ok"  # 대조군
     seq_subject = _subject(machine_value_exact="1073741823")
     assert _judge_seq_reconstruct(seq_subject, {"value": 1073741823}).verdict == "ok"
     off_by_one = _judge_seq_reconstruct(seq_subject, {"value": 1073741824})

@@ -207,3 +207,44 @@ def plan_review_field_change(
             f"{action.value} 전이와 함께 바꿀 수 없습니다."
         )
     return ReviewFieldChangePlan(action=action)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ADMIN-19 — 생성(POST) 시점의 초기 상태: 전이표는 "이미 있는 문항"의 변경만 다룬다
+# ──────────────────────────────────────────────────────────────────────────
+
+#: 문항이 **태어날 때** 가질 수 있는 검수 상태. 전이표(approve/reject/quarantine/release)는 기존
+#: 행의 변경만 판정하므로, 생성 요청이 `approved`·`rejected`·`quarantined`를 직접 실으면 전이도
+#: 감사 동작(approve 등)도 검수 기록도 없이 그 상태로 태어난다(ADMIN-16이 PATCH에서 닫은 우회의
+#: 생성 축). 그래서 승인·거부·격리는 전부 `pending`에서 출발하는 전이의 몫이고, 생성은 아직
+#: 판정된 적 없음(`None`) 또는 검수 대기(`pending`)만 허용한다.
+#:
+#: `None`을 허용하는 이유: 기존 호출자가 필드를 생략해 왔고(코퍼스 백필 대상 레코드와 같은 상태),
+#: 생략을 `pending`으로 접으면 "모른다 ≠ pending"(모듈 docstring)을 생성 경로가 어긴다. 대가:
+#: `None`으로 태어난 문항은 전이표상 어떤 액션도 불허라 검수 큐로 들어가려면 먼저 상태가
+#: 정해져야 한다 — 그 입구는 이 상수가 아니라 별도 결정의 몫이다.
+INITIAL_REVIEW_STATUSES: frozenset[ReviewStatus | None] = frozenset({None, ReviewStatus.pending})
+
+
+class IllegalInitialReviewStatus(ValueError):  # noqa: N818 — 계약상 이름(Error 접미사 없음)
+    """생성 요청이 `INITIAL_REVIEW_STATUSES` 밖의 검수 상태로 문항을 만들려 했다."""
+
+    code = "illegal_initial_status"
+
+    def __init__(self, requested: ReviewStatus | None) -> None:
+        self.requested = requested
+        shown = requested.value if requested is not None else "미설정"
+        super().__init__(
+            f"생성 시 검수 상태는 미설정 또는 pending만 허용됩니다(요청: {shown}). "
+            "승인·거부·격리는 생성 뒤 검수 전이로만 정해집니다."
+        )
+
+
+def ensure_initial_review_status(requested: ReviewStatus | None) -> None:
+    """생성 요청의 `review_status`가 허용된 초기 상태인지 판정한다(순수 — DB·HTTP·시계 의존 0).
+
+    Raises:
+      IllegalInitialReviewStatus: `requested`가 `INITIAL_REVIEW_STATUSES`에 없다.
+    """
+    if requested not in INITIAL_REVIEW_STATUSES:
+        raise IllegalInitialReviewStatus(requested)
