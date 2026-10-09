@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -26,6 +26,6 @@ paths:
   - "scripts/ops/*"
   - "tests/infra/*"
   - "docs/reviews/*"
-session: null
+session: claude/youthful-volta-d365iy
 notes: "출처: 2026-10-08 PR #1528 머지 큐 탈락 조사(판정 기준: origin/main 71e30076). 실측: (1) 큐 실행 3건(PR #1528 run 37796318326 · #1543 run 37796680824 · #1532 run 37797078019, 14:54~15:12Z)의 backend lint·type·test가 Mypy 스텝에서 같은 오류 줄로 실패했다 — _schema_seam.py:77 Argument 1 to TypeAdapter has incompatible type TypeForm[Any] | None. 그 뒤 스텝 18개는 skipped. (2) 첫 실행 로그의 Successfully installed 줄에서 pydantic 2.14.0·pydantic-core 2.50.0 확인. (3) 로컬 재현(mypy 2.4.0 고정, pydantic만 교체): 수정 전 코드 382dbe70은 2.13.5에서 통과(741파일)·2.14.0에서 CI와 같은 오류로 실패, 현재 main은 2.14.0에서도 통과. (4) 코드 수정은 PR #1509(32819cfc, 15:28Z)에 동봉돼 main에 있다 — 탈락부터 수정 병합까지 약 35분. (5) src/backend/pyproject.toml의 선언은 pydantic>=2.9.0,<3 이라 OPS-94의 상한 유무 검사를 통과한다 — OPS-94는 상한이 없는 의존을 막고, 이번 건은 상한이 있으나 범위가 넓은 경우라 못 막는다. (6) 저장소에 lock·constraints 파일이 없고(ls 실측) CI는 pip install -e .[dev]로 매 실행 그날의 최신을 해석한다. 계열 선례: OPS-94 notes의 langfuse v2/v4 혼재 → pytest-asyncio 1.4.0(ARCH-22, 2026-07-30) → SQLAlchemy 2.1.0(OPS-91, 2026-09-25, PR #1304 탈락) 이어 pydantic 2.14.0. 사고 대장에는 SQLAlchemy 건이 unbounded-dependency-pin 1회차로 등재돼 있다. 미확인: pydantic 2.14.0의 PyPI 릴리스 시각(조회하지 않음)과 그 이후 버전 존재 여부. 이 태스크는 OPS-103(todo, OPS-94 스캔 표면 확장)과 같은 표면을 만질 수 있어 착수 시 조율한다"
-updated: 2026-10-08
+updated: 2026-10-09
