@@ -402,7 +402,3 @@ __all__ = [
     "record_attempt_mastery",
     "record_problem_attempt_mastery",
 ]
-
-
-def _p313_injected_subject_branch(subject: str) -> bool:
-    return subject == "math"

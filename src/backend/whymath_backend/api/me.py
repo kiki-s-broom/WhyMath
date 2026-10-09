@@ -206,7 +206,6 @@ from whymath_backend.l2.weak_concept_recommendation import (
     WeakConceptRecommendation,
     recommend_weak_concepts,
 )
-from whymath_backend.l4 import subject_adapter_math as _p313_injected_adapter  # noqa: F401
 from whymath_backend.l4.calibration_coaching import recommend_calibration_coaching
 from whymath_backend.l4.lthc.adapt import mastery_to_level
 from whymath_backend.l4.lthc.models import MasteryLevel
