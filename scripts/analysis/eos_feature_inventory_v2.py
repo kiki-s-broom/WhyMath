@@ -1215,6 +1215,14 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
        "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
        "ops.loop_kpi_gate", "ops.loop_kpi_sample_load"),
+    # P3-14 — 제품 완성도 평면(Phase 3 대표 과정) 7종. 생산 공정 12종(WM-O-905)·Phase 2 루프 KPI
+    # 5종(WM-O-915)과 **분모가 다른 세 번째 축**이라 두 행 어디에도 얹지 않고 별도 행으로 둔다
+    # (WM-O-915 주석과 같은 이유 — 한 행에 묶으면 인벤토리에서도 'KPI 17종' 착시가 생긴다).
+    # 이 모듈은 위 두 행의 산출(`evaluate_hard_gates`·LOOP_COMPLETION)을 **흡수만** 하고 새 정의를
+    # 만들지 않는다. 정본 경계: docs/standards/phase3_metrics_contract.md.
+    _o("WM-O-917", "Phase 3 지표 7종 일괄 CLI(제품 완성도 평면·위반 주입 자가 점검)", "Admin", "QA",
+       "P1", "P3-14 — 대표 과정 Coverage·QA·루프·결함 한 명령 · 미측정≠통과 판정기",
+       "ops.phase3_metrics"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),
