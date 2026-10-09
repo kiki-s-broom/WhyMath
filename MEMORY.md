@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-09 (구현 · MATH-06): **교육과정 표기 범위 게이트의 맹점 3건을 닫았다 — 초등 밴드 관측 0→737회, 보조 코퍼스 5종 편입, 역삼각·편미분·프라임을 음성화 엔진 학년 게이트에 올린 뒤 표에 편입** (claude 판정·구현) — 판정 기준 main `bf237d17`
+- **① 초등 미관측 해소**: MATH-04 첫 실측에서 초등 2,798문항은 표의 토큰이 0회였다(표기가 `m^2`·`3/5`뿐). 표에 `structure` 종류를 신설해 ASCII 구조 패턴 7종(caret·underscore·pipe-abs·bang·ncr·slash-frac·prime-call)을 닫힌 집합으로 센다. 실측: 초등 관측 737회(문항 은행 기준 caret 480·slash-frac 187), `unobserved_bands` = 없음. 구조 키 14종 전부를 표가 덮는다(abs·factorial 포함 — 종전 ASCII 전용 예외 제거).
+- **② 범위 확장**: 문항 외 보조 코퍼스 5종(`concept_content_v1`·`concept_content_university_v1`·`formula_graph_v1`·`concept_visual_style_v1`·`concept_visualization_v1`)을 `AuxSource`(읽기 함수+밴드 파생 규칙 한 묶음)로 편입, 리포트가 코퍼스별 규칙·레코드/판정/미분류·관측/초과를 전재한다. 미분류는 `formula_graph_v1` 11건뿐 — 코드(`12미적I-*`·`5수03-05`·`10공수1-01-05`)가 `standards_v1` 정본에 없다(밴드를 추측하지 않음. **정본 밖 코드 자체는 별도 데이터 점검 대상**). 신규 위반 0건·베이스라인 빈 목록 유지.
+- **③ 엔진 게이트 확장**: 역삼각(arc*)=trig, `\partial`=derivative를 `l3/speech.py`에 게이트, 유니코드 프라임(′ ″ ‴)·`\prime`를 토크나이저가 ASCII `'`로 정규화. **프라임 구분 규칙(결정)**: 대문자 한 글자 밑(A′·B″)은 도형의 점 이름이라 미분이 아니다 — 소문자 한 글자+프라임+`(` 호출형만 미분. 엔진과 추출기가 같은 규칙이며 표↔엔진 드리프트 테스트가 묶는다. 한계: 무괄호 `y'=…`는 판정 밖, 역삼각은 trig로 묶여 중등에서 arcsin을 잡지 않는다(리포트 blind spot에 전재).
+- **④ 불변**: 생성물 회계 전용 — 학생 경로 import 거버넌스 불변, 학생 입력 거부 영구 미채택 유지. CI 게이트 스텝은 보조 코퍼스를 포함해 돈다(`--problem-banks-only`는 합성 코퍼스 테스트 전용 · 배선 동결 테스트).
+- **검증**: 뮤테이션 13종(구조 패턴·엔진 3·표 2·보조 코퍼스 2·CLI·판정) 전건 RED·복원 바이트 동일. 초등 문항 결함 주입 5종 RED·대조군 GREEN. ruff·black·mypy --strict(743파일)·lint-imports(4계약) exit 0. 연관 영역(l3·l4·schema·harness·음성 API) 10,276건 통과.
+- **부수 발견**: 도달 보고기(`formula_reach_report`)의 심볼 스캔이 게이트의 `formula_id` 문자열을 '소비'로 오인 → 제외 목록에 사유와 함께 등재(관측기 정직 표기 유지). 또 `src/backend/.venv`를 만들면 `test_cas_parse_entrypoint_governance`가 site-packages까지 스캔해 RecursionError로 실패한다(저장소 밖 venv 사용 필요 — 코드 회귀 아님).
+- **미확인(명시)**: 백엔드 전체 스위트는 돌리지 못했다(위 연관 영역만). `generation_run_id_axis`(마이그레이션 파일 0건)는 변경 없는 `bf237d17`에서도 실패 — 이 환경(shallow 클론) 한정으로 보이나 원인은 규명하지 않았다. 전체 판정은 CI로 넘긴다. PR은 이 세션 규칙상 열지 않았다.
+
 ### 2026-10-08 (구현·범위 재조정 · MATH-04): **교육과정 표기 범위 게이트를 생성물 회계 전용으로 착지했다 — 태스크 전제 5건이 실측에서 부분 반증돼 범위를 재조정했고, 첫 실측은 학년 초과 표기 0건이다(단 초등 밴드는 측정기가 보지 못했다)** (claude 판정·구현) — 판정 기준 main `c322bb9c`
 
 **무엇**: 문항 표기의 구조가 문항의 학년 밴드에 도입돼 있는지 전수 회계하는 게이트다(`l3/curriculum_notation_gate.py` 엔진 · `harness/curriculum_notation_gate_cli.py` CLI · 표 `data/curriculum_notation_ranges.json` · 베이스라인 `data/curriculum_notation_range_baseline.json` · CI backend 잡 스텝). **학생 입력 거부에는 쓰지 않는다**(영구 미채택 — gap_review §2-⑤). 초과 표기를 발견해도 콘텐츠를 삭제·수정하지 않고 래칫에 계상한다.
