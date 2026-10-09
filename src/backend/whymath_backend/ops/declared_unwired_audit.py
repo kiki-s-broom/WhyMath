@@ -244,8 +244,14 @@ def _route_reached(method: str, server_path: str, callers: frozenset[tuple[str, 
 _DART_CALL = re.compile(r"_dio\.(get|post|put|patch|delete)[^(]*\(\s*'([^']*)'", re.DOTALL)
 # python 테스트: `<var>.<method>(f?"<path>...` — 대상은 실제 라우트 접두사로 제한(dict.get 등
 # 무관 호출 오탐 방지).
+#
+# 수신자는 식별자(`client.get(`) **또는 호출 결과**(`_client(u, f).get(` — 앞 호출의 `)`)다.
+# 헬퍼가 클라이언트를 만들어 바로 이어 부르는 형태는 이 저장소 테스트의 흔한 관용구다.
+# 식별자 수신자만 보던 시절에는 그 호출이 통째로 안 보여, 수백 번 호출되는 라우트가
+# 미도달로 잡혔다(P3-12: CMS 라우트 28건). 접두 제한(`/v1/`·`/health`·`/status`)이
+# 무관 호출 오탐을 막는 유일한 방어선이라 수신자를 넓혀도 `make(x).get("키")`는 걸리지 않는다.
 _TEST_CLIENT_CALL = re.compile(
-    r"\b[A-Za-z_][A-Za-z0-9_]*\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
+    r"(?:\b[A-Za-z_][A-Za-z0-9_]*|\))\.(get|post|put|patch|delete)\(\s*f?[\"'](/v1/[^\"']*|/health[^\"']*|/status[^\"']*)"
 )
 # `client.request("DELETE", "/v1/me", …)` 변형 — body를 실어야 하는 DELETE(예: 삭제권 confirmation
 # 필드) 등 소수 케이스가 이 형태를 쓴다(`test_me_erasure.py` 실측).
@@ -1065,6 +1071,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 아니라 신설 `--check`(미기록·미백필 1건이라도 있으면 exit 1) **드리프트 가드**를
         # `declared-unwired-audit` 잡에 스텝으로 얹었다(신규 잡 0). 이제 둘 다 reached이므로
         # 유예를 남기면 `stale-waiver`로 exit 1이다.
+        # PB-17 — 저작 서명 백필 CLI. 일회성 데이터 백필이라 변이형(제자리 갱신)은 CI 대상이
+        # 아니다. 드리프트(서명 가능한데 빠진 레코드)는 CI backend 잡의 pytest 전수 가드
+        # (`test_problem_corpus_author_backfill.py`의 `…_check_reports_zero_pending`
+        # — 실 코퍼스에 `--check`와 같은 계산을 돌려 0건을 요구)가 이미 지킨다. `--check` 스텝을
+        # `declared-unwired-audit` 잡에 얹는 것은 OPS-24 선례와 동형의 후속 제안(.github 변경 —
+        # 얹히면 이 면제는 `stale-waiver`로 exit 1이 되어 제거 대상).
+        "harness.problem_corpus_author_backfill": (
+            "by-design:일회성 저작 서명 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
+            "실 코퍼스로 지킨다(PB-17)"
+        ),
         # 강등전(demotion battle) — 게이트 검출력 자체를 실측 교정하는 운영자용 CLI. S4-16
         # 등 다른 강등전과 동형으로 상시 CI가 아니라 사람이 판단 시점에 돌린다(ARCH-19 done).
         "harness.answer_distribution_battle": (
@@ -1319,6 +1335,12 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # concept-reach(OPS-23)와 달리 mobile-only PR 회귀 가드가 아니라 관측 리포트다.
         "harness.formula_reach_report": _OBSERVED_BY_RUNNER,
         "harness.assessment_seat_reach_report": _OBSERVED_BY_RUNNER,
+        # PB-10(2026-10-08): 문항 난이도 보정 루프 도달 관측 — assessment_seat_reach_report와
+        # 동일 성격
+        # (DB 읽기 전용 관측 · 게이트 아님 · exit 0/2). 보정 배치 자체는 docker-compose.prod.yml의
+        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결한다).
+        # OPS-19: 이 리포트 자체는 관측 러너(db 부류)가 정기 실행한다.
+        "harness.item_calibration_reach_report": _OBSERVED_BY_RUNNER,
         "harness.recommendation_outcome_report": _OBSERVED_BY_RUNNER,
         "harness.learning_path_orderability_report": _OBSERVED_BY_RUNNER,
         "harness.rephrased_corpus_hygiene": _OFFLINE_REPORT,

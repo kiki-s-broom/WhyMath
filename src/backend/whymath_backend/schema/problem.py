@@ -126,6 +126,10 @@ PUBLIC_HIDDEN_OPS_FIELDS: frozenset[str] = frozenset(
     {
         "quarantine_reason",
         "quarantined_at",
+        # ARCH-31 — 판(version) 포인터. 정답이 아니라 운영 좌표다(어느 판이 서빙 기준인가는 운영자·
+        # 내부 파이프라인의 관심사이고, 무인증 GET이 판 id를 열어 줄 이유가 없다 — 허용목록 원칙:
+        # 새 필드는 기본 비공개 쪽). 공개해야 할 근거가 생기면 그때 기반 클래스로 옮긴다.
+        "problem_version_id",
     }
 )
 
@@ -945,6 +949,16 @@ class Problem(PublicProblem):
         description=(
             "격리 시각(운영 메타·공개 투영 제외) — 이 시각 *이전* attempt는 결함 문항 응답일 수 "
             "있다. NULL=미격리(기본값 없음 — 백필 날조 방지)"
+        ),
+    )
+
+    # ===== 판 관리(ARCH-31 · 44 §6.4 — 내부 정본 전용·PUBLIC_HIDDEN_OPS_FIELDS) =====
+    problem_version_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "현재 서빙 기준 판의 `problem_version.version_id`(운영 메타·공개 투영 제외). "
+            "NULL=버전 미부여(기본값 없음 — 백필 날조 금지). `identity_id`(변형 계열, 수평)와 "
+            "직교하는 수직 축 — docs/architecture/arch31_problem_version.md §2"
         ),
     )
 

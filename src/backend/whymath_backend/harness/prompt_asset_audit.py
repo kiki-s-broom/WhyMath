@@ -237,6 +237,11 @@ _GENERATOR_CONTEXT_MARKERS: tuple[str, ...] = (
 # 앵커링을 공유해 "독립"이 아니게 된다(`cross_verify` 모듈 docstring의 가시 필드 불변식).
 _ANSWER_LEAK_MARKERS: tuple[str, ...] = ("[제시된 정답]", "[기계가 실제로 검산한 형식 모델]")
 _ANSWER_HIDDEN_DECLARATION = "정답은 주어지지 않는다"
+# 정답 은닉을 검사하는 재구성 관점 자산의 접두 — 수열 귀납 재구성(S4-66)도 같은 불변식을 진다.
+_REDACTED_RECONSTRUCT_PREFIXES: tuple[str, ...] = (
+    "l3.cross_verify.reconstruct",
+    "l3.cross_verify.sequence_reconstruct",
+)
 
 # 자산 → 적용 레일. **레일 0인 자산도 반드시 등재**하고 사유를 적는다(빈 사유는 무효 — 아래
 # 회귀 테스트가 강제). 등재 자체가 "이 자산에 어떤 준거를 걸 것인가"를 판단하게 만든다.
@@ -258,6 +263,13 @@ L3_PROMPT_RAILS: dict[str, tuple[str, ...]] = {
     "l3.cross_verify.falsify_user": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.grounding_system": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.grounding_user": (RAIL_INDEPENDENCE,),
+    # 수열 귀납(S4-66) — 같은 검증자 계열이므로 독립성 레일을 동일 적용한다(재구성은 정답 은닉까지).
+    "l3.cross_verify.sequence_reconstruct_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.sequence_reconstruct_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.sequence_falsify_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.sequence_falsify_user": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.sequence_grounding_system": (RAIL_INDEPENDENCE,),
+    "l3.cross_verify.sequence_grounding_user": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.statistical_reconstruct_system": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.statistical_reconstruct_user": (RAIL_INDEPENDENCE,),
     "l3.cross_verify.statistical_falsify_system": (RAIL_INDEPENDENCE,),
@@ -371,7 +383,7 @@ def _check_independence_rail(asset_id: str, text: str) -> tuple[list[str], list[
         )
     else:
         reasons.append("독립성 레일: 생성자 문맥 미주입(저작 프롬프트 역할 선언 0건).")
-    if asset_id.startswith("l3.cross_verify.reconstruct"):
+    if asset_id.startswith(_REDACTED_RECONSTRUCT_PREFIXES):
         leaked = [marker for marker in _ANSWER_LEAK_MARKERS if marker in text]
         if leaked:
             violations.append(

@@ -124,7 +124,7 @@ def _compose_violations(compose: dict[str, Any]) -> list[str]:
     if "sleep 3600" not in command:
         problems.append("실패 시 1시간 재시도(sleep 3600)가 없다 — DB 일시 장애가 7일 방치된다")
     if "exit 1" in command:
-        problems.append("`exit 1` — 실패 시 컨테이너가 죽어 재기동 루프가 매번 10개를 다시 돈다")
+        problems.append("`exit 1` — 실패 시 컨테이너가 죽어 재기동 루프가 매번 11개를 다시 돈다")
     if svc.get("restart") != "unless-stopped":
         problems.append("restart != unless-stopped")
     if (svc.get("healthcheck") or {}).get("disable") is not True:

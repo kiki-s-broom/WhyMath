@@ -113,8 +113,9 @@ class ReportSpec:
     args: tuple[str, ...] = ()
 
 
-# 러너가 자동 실행하는 리포트 16건. 새 `*_report.py`를 만들면 여기·ELSEWHERE·INPUT_DEPENDENT 중
-# 한 곳에 반드시 귀속해야 한다 — `tests/infra/test_observation_report_runner_wiring.py`가 전수 강제.
+# 러너가 자동 실행하는 리포트 17건(최초 16건 + 병합 시 PB-10이 추가한 item_calibration 1건).
+# 새 `*_report.py`를 만들면 여기·ELSEWHERE·INPUT_DEPENDENT 중 한 곳에 반드시 귀속해야 한다 —
+# `tests/backend/ops/test_observation_report_registry.py`가 전수 강제한다.
 REPORTS: tuple[ReportSpec, ...] = (
     # ── ci: 저장소 체크아웃만 필요(2026-10-08 DB 없이 rc=0 실측) ──────────────────
     ReportSpec("harness.concept_reach_report", CLASS_CI),
@@ -127,6 +128,7 @@ REPORTS: tuple[ReportSpec, ...] = (
     ReportSpec("harness.attempt_grading_shadow_report", CLASS_DB),
     ReportSpec("harness.attempt_skill_event_reach_report", CLASS_DB),
     ReportSpec("harness.distractor_signal_dormancy_report", CLASS_DB),
+    ReportSpec("harness.item_calibration_reach_report", CLASS_DB),
     ReportSpec("harness.recommendation_outcome_report", CLASS_DB),
     ReportSpec("harness.standard_attainment_report", CLASS_DB),
     # 접속 실패를 잡지 못하고 트레이스백으로 죽는다(rc=1) — 그래도 비-0이라 `run_failed`로 구분된다.
@@ -144,6 +146,10 @@ ELSEWHERE: dict[str, tuple[str, str]] = {
     "harness.eos_unit_structure_observation_report": (
         ".github/workflows/ci.yml",
         "whymath_backend.harness.eos_unit_structure_observation_report",
+    ),
+    "harness.cross_school_connectivity_report": (
+        ".github/workflows/ci.yml",
+        "whymath_backend.harness.cross_school_connectivity_report",
     ),
     "ops.weekly_metrics_report": (
         ".github/workflows/weekly-metrics.yml",

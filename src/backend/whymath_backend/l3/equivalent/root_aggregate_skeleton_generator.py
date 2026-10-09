@@ -32,7 +32,7 @@ import sympy
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -192,6 +192,7 @@ def _build_pool() -> tuple[_AggSkeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class RootAggregateSkeletonGenerator:
     """근의 합/곱 킬러 생성기 — `EquivalentProblemGenerator` 좌석 구현(S2·LLM 0)."""
 

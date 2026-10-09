@@ -44,7 +44,7 @@ from whymath_backend.l3.equivalent.difficulty import (
     estimate_difficulty_extremum,
     estimate_difficulty_extremum_irrational,
 )
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -225,6 +225,7 @@ def _build_pool() -> tuple[_ExtremumSkeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class CalculusExtremumSkeletonGenerator:
     """미적분 극값 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -470,6 +471,7 @@ def _irrational_explanation(skeleton: _IrrationalExtremumSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class CalculusIrrationalExtremumSkeletonGenerator:
     """미적분 무리 임계점 극값 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -690,6 +692,7 @@ def _tangent_explanation(skeleton: _TangentSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class CalculusTangentSlopeSkeletonGenerator:
     """미적분 접선 기울기 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -856,6 +859,7 @@ def _build_mc_pool() -> tuple[_ExtremumValueSkeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class CalculusExtremumMCSkeletonGenerator:
     """미적분 극값 객관식 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -1112,6 +1116,7 @@ def _value_explanation(skeleton: _ExtremumValueSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class CalculusExtremumValueSkeletonGenerator:
     """미적분 극값의 값 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

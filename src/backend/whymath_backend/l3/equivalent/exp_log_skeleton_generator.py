@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -190,6 +190,7 @@ def _exp_explanation(skeleton: _ExpSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class ExponentialEquationSkeletonGenerator:
     """지수방정식 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -355,6 +356,7 @@ def _log_explanation(skeleton: _LogSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class LogarithmicEquationSkeletonGenerator:
     """로그방정식 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
