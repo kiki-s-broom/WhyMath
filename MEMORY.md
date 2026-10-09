@@ -347,6 +347,24 @@
 - **문서**: 원 `data_platform_module_gap_review_r2.md`는 `OPS-41`이 이미 회수한 `t608mk`의 같은 이름 문서와 별개라 `docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md`로 회수했다(원문 무수정 + 발견별 현황 표). 현황: A1·A2·C1(`SEC-32` done)·C3(`HARN-15` done) 닫힘, A3는 `declared_unwired_audit`가 상시 감시, B1은 `OPS-67`(todo), C2는 `OPS-32`(todo).
 - **소유자 없던 잔여 2건**: ① r2 C2의 6종 중 `pandas`·`polars`·`great-expectations` 3종은 `OPS-32`(3종만 소유)에도 `OPS-37`에도 없어 `OPS-32` acceptance ⑥으로 편입(선언 `pyproject.toml:57-59`·import 0 실측). ② `ops.cost_report`의 CI 미배선은 결함이 아니다 — 입력이 라이브 Langfuse 트레이스인 운영자 수동 계측 도구이고, 감사기는 `status: reached`로 분류(신규 태스크 불필요).
 - **번호 매핑**: `OPS-19 → OPS-38` · `SEC-13 → SEC-32` · `OPS-20 → OPS-67` · `OPS-21 → OPS-32`.
+### 2026-10-08 (구현·S4-66): **`sequence_induction` verifier v2를 착지했다 — 점화식을 정확 산술로 실제 실행해 답을 `==`로만 대조하며, 설계서 초안과 달라진 두 곳(지수·`S(N)`의 N)을 구현 시점에 확정했다** (claude 집행) — 판정 기준 main `1c33b60a`
+
+**무엇/왜**: [12대수03-06] 30건은 발문에 점화식을 쓰지만 `verify.conditions`에는 생성기가 계산한 폐형식만 있어, 발문의 점화식을 실행하는 검산이 없었다(점화식과 폐형이 어긋나게 생성돼도 Tier1에서 드러나지 않는다). `l3/sequence_induction.py`를 신설해 그 정합 축을 처음 닫았다. 정수·`Fraction`만 쓰고 `eval`·`sympify`·`isclose`를 쓰지 않는다(AST 검사로 동결). 질의는 `a(N)`·`S(N)`·`terms(N)`·`closed(식, upto=M)`.
+
+**결정 4건**
+① **정확 일치(`==`)만 인정한다.** `a(n+1)=2a(n)+1, a(1)=1`의 `a(30)=1073741823`에 정답+1을 주면 `isclose(rel_tol=1e-9)`는 통과시킨다(테스트가 그 사실을 함께 단언해 비교 방식이 바뀌었다는 변별력 증거로 쓴다). 교차검증 관점 ①의 판정기도 통계용(`isclose`)을 재사용하지 않고 `Fraction` 정확 일치로 신설했고, 통계 판정기가 같은 쌍을 통과시킴을 테스트로 남겼다 — 통계 쪽 교정은 `S4-58` 소관으로 두었다.
+② **지수는 `n`만 포함하는 식을 허용한다.** 설계서 §5.4 초안은 "지수는 정수 리터럴"이라 적었지만 같은 절의 예시 `3*5^(n-1)`이 `n`-의존 지수다 — 두 문장은 동시에 참일 수 없다. 리터럴은 구문 분석 시점, `n`-의존은 평가 시점에 같은 범위(정수·0 이상 64 이하)를 검사한다.
+③ **`S(N)`·`terms(N)`의 N은 항 개수, `a(N)`·`closed`의 N은 항 번호다.** `start=1`에서는 같은 말이라 초안이 구분하지 않았다. `start=0`이면 `S(3)=a(0)+a(1)+a(2)`다.
+④ **`unverifiable`은 기계 축·잔여 축을 모두 비운다.** 형식 오류·범위 초과·답 판독 불가는 기계가 닫은 축이 없다. 자원 상한(단계 1000·비트 65,536·지수 64·노드 64) 초과는 `fail`이 아니라 `unverifiable`(사유 "범위 초과")이다 — `fail`이면 "정답이 틀렸다"는 거짓 신호가 된다. 제곱 점화 `a(n+1)=a(n)^2`·`a(1)=2`는 n=17에서 한도를 넘는 것을 실측했다.
+
+⑤ **정확값 파서는 CORE 모듈 `l3/exact_value.py`에 둔다.** 처음에는 `cross_verify`(CORE)가 `sequence_induction`(ADAPTER)에서 파서를 import했다. ruff·black·`mypy --strict`·`lint-imports`·관련 pytest는 전부 통과했지만 CI `infra-contracts`의 코어 경계 탐침(`test_eos_core_boundary_probe`)이 코어→어댑터 직접 import(1홉)를 잡았다 — 로컬에서 그 잡을 돌리지 않았다면 로컬 green인 채 PR이 red가 됐을 것이다(공식 미러 `ci_mirror.py`가 잡았다). 대책은 코드다: 파서를 CORE 모듈로 분리하고 import-linter 계약(금지 목록 2곳·CORE 소스)·경계 스캔·인벤토리에 등록했으며, 회귀 테스트가 `cross_verify`가 `sequence_induction`을 import하지 않음·파서 단일 출처·`exact_value`가 표준 라이브러리만 import함을 동결한다. 검증기와 판정기가 같은 파서를 쓰므로 같은 문자열을 서로 다르게 읽는 갈라짐도 구조적으로 막힌다.
+
+**동반 정합(설계서 §8.3)**: C2 `machine_value_exact` · C3 `_DomainResult.tier`(도메인별 등급을 `VerificationVerdict.tier`로 전달, `None`이면 종전 상수) · C4 정확 일치 판정기 · C5 자기 kind의 등식 DSL 제외 · C9 경계 스캔·인벤토리 귀속 · C10 프롬프트 6개를 정본에 추가하고 감사기 레일에 등재(수열 재구성 자산은 정답 은닉 검사 대상에 포함 — 통계 재구성 자산은 선례상 빠져 있어 별도 판단이 필요하다). 후행 기본값 필드만 추가해 어댑터 계약(5필드·4필드)은 불변이다.
+
+**검증(실측)**: 신규 테스트 139건(`test_sequence_induction` 101·`test_sequence_induction_verifier` 34·`test_inductive_sequence_dsl_crosscheck` 4). [12대수03-06] 코퍼스 30건(등차 24·등비 6)을 **발문에서 독립 파싱**해 DSL로 실행한 값과 레코드 정답·폐형 조건(Tier1)을 대조한 결과 스캔 30·파싱 불가 0·정답 불일치 0·폐형 불일치 0건이며, 생성기 풀 98개도 전수 일치한다. 발문의 증분만 바꾼 레코드는 정답·폐형 양쪽 불일치로 잡힌다(대조가 항상 초록이 아님). ruff·black·`mypy --strict`·`lint-imports`는 CI와 같은 명령·경로로 종료 코드 0.
+**결함 주입 28종 전건 RED**(`sequence_induction.py` 13종 + 판정기·등록·등급·직렬화·감사기·제외 목록 11종 + `exact_value.py` 4종, 원복 sha256 동일). **첫 실행에서 5종이 생존했다**: M6(비트 상한 제거 — 제곱 점화는 지수 사전검사가 먼저 걸려 `_check_bits`에 닿지 않음)·M7(초기항 개수보다 작은 질의에서 항 초과 반환)·V4(`unverifiable`의 기계 축 허위 주장 — `Verifier` 경로에서는 보이지 않아 도메인 결과를 직접 봐야 함)·Q1(기존 제외 목록 테스트가 집합 자신으로 파라미터화돼 항목을 빼면 케이스도 함께 사라지는 자기참조). E4(`exact_value`: 파이썬 리스트 입력의 원소 하나가 읽을 수 없어도 통과 — 문자열 `"1,2,x"` 케이스만 있었다)를 포함해 각각 테스트를 보강한 뒤 28/28이 됐다.
+
+**한계(사실 기록)**: ① 교차검증 관점 3종은 hermetic 가짜 provider로만 검증했다 — **프롬프트 문면의 실제 변별력(특히 `closed`의 0/1 규약을 재전개 관점이 따르는지)은 미측정**이다. ② Wilson 로트 게이트는 범위 밖이다(밴드 30건은 기본 임계 통과 불가 — §7.2 FC-4, `S4-56` 이후). ③ 코퍼스 레코드 재기록과 `verification_tier` 각인은 하지 않았다(populate의 등급 값 동기가 선행이며 `S4-68` 소관). ④ 파이썬 정수→문자열 4,300자리 한도 때문에 그보다 큰 정수 답은 읽을 수 없다(`unverifiable`). ⑤ 야간 재검증(`corpus_reverify`)은 v2 전용 kind를 Tier1 경로로 보낸다(설계서 §8.3 C7, `S4-68`) — 이 kind를 가진 코퍼스 레코드가 0건이라 잠복 상태다.
 
 ### 2026-10-08 (구현·범위 재조정 · MATH-04): **교육과정 표기 범위 게이트를 생성물 회계 전용으로 착지했다 — 태스크 전제 5건이 실측에서 부분 반증돼 범위를 재조정했고, 첫 실측은 학년 초과 표기 0건이다(단 초등 밴드는 측정기가 보지 못했다)** (claude 판정·구현) — 판정 기준 main `c322bb9c`
 
@@ -367,6 +385,14 @@
 **한계(사실 기록)**: ① 이 엔드포인트는 `JSONResponse`를 직접 반환하므로 의존성이 설정한 헤더가 버려져 **200 응답에는 `X-RateLimit-*`가 붙지 않는다**(429에만 `Retry-After`·`X-RateLimit-*` — 실측). 클라이언트 자체 throttle 입력이 필요해지면 후속. ② 한도는 라우팅·캐시 **이전**에 계수하므로 캐시 적중 요청도 슬롯을 쓴다. ③ 본문 검증 실패(422)도 슬롯을 쓴다(의존성이 본문 검증보다 먼저 해석).
 **관찰(범위 밖·미착수)**: `/v1/generate` 자체에는 동의 게이트가 없다 — `ai_training` 동의는 trace 메타데이터 판정에만 쓰이고 응답 생성을 막지 않는다(기존 설계, 코드 주석에 명시). 미성년자 동의 강제를 원하면 별도 결정이다.
 **검증**: 신규 테스트 13건(차원 3종 각각 429·무인증 버킷 비소모·동의 불변·버킷 분리 양방향·라우트 선언·기본값·Redis 장애 폴백 시 fail-open 아님). 뮤테이션 7종 전건 검출 — **첫 시도에서 M3(카테고리를 `write`로 교체)이 생존**했다: 시딩 시각을 `now=0.0`으로 둬 60초 윈도우 밖이라 아무것도 시딩되지 않았고, 반대 방향 검사는 매번 새 UUID라 항상 통과했다(CLAUDE.md '픽스처가 그 절을 실제로 밟는가'의 재발 형태). 시딩을 `time.monotonic()`·동일 사용자로 고쳐 검출됐다. CI backend 잡 재현: ruff·black·`mypy --strict`·`lint-imports`·전체 pytest(16,792 passed·실패 0·커버리지 90.73%)·계층 커버리지 게이트 전건 exit 0, `tests/infra` 2,744 passed, 헌법 래칫 exit 0·차단 0건(기준선 0건).
+
+### 2026-10-08 (정정 · MISC-33): **암묵 곱셈 미검출의 원인은 `to_sympy_source`가 아니라 `matches_wrong_form`의 구조 파싱이 동치 권위와 다른 변환 규칙을 쓴 것이었다 — 파서 정의를 `parse_unevaluated`로 일원화했고, 그 과정에서 동치 권위가 `f(x)`를 `f*x`로 읽는 선행 결함(`MISC-62`)을 발견했다** (claude 집행) — 판정 기준 main `c322bb9c`
+
+- **경위(선행 세션의 오진)**: EOS-104가 `(2x+3)² = 4x²+9` 미검출의 원인을 "공용 파싱 소스 `to_sympy_source`가 `2x`에 곱셈 기호를 넣지 않아 `SympifyError`"로 적고 한계 테스트로 동결했다. 실제로 어느 줄에서 깨지는지는 측정하지 않은 추정이었다. 실측(2026-10-08): `identity_status("(2x+3)²", "4x²+9")`는 정상 판정(`not_identity`)이다 — `_PARSE_TRANSFORMS`가 이미 `implicit_multiplication`을 쓴다. 깨지는 곳은 `wrong_form_match.py`의 `safe_sympify(src_lhs, convert_xor=True, evaluate=False)` 한 줄(암묵 곱셈 변환 없음 → `UnsafeExpressionError`, 사유 `structure_unparseable`)이었다. 같은 함수 안에서 ⓪ 거짓 등식 가드는 `2x`를 읽고 구조 정합은 거부하는 갈림이다.
+- **조치**: `l3/symbolic_equivalence.py`에 공개 함수 `parse_unevaluated`(같은 `_PARSE_TRANSFORMS`·`evaluate=False`·안전 진입점 경유)를 추가하고 `wrong_form_match.py`가 이를 쓴다. `to_sympy_source`·`_parse`·`identity_status`는 바꾸지 않아 소비처 입력은 불변이다. 결과: 쌍둥이 14쌍 중 암묵≠명시 불일치 5→0건, `scan_attempt_answer("(2x+3)²", "4x²+9")` 후보 0→1건. 문자열 층에서 `*`를 끼우는 방식은 택하지 않았다(주입으로 RED 확인 — `f(x)`·`2pi` 입력에서 소비처 전체의 판정이 움직인다).
+- **후퇴(수용 · Kiki 판단 요청)**: 선행 결함 — `identity_status('f(x)', 'f*x')`가 identity이고 `f(x)**2`는 `f*x**2`로 읽힌다(내장 함수 `sin`은 무관). 구조 파싱을 같은 규칙으로 맞추자 미지 함수를 이항식에 품은 거짓형 3건(`(f(x)+y)²` 등)이 우연한 일치가 깨져 더는 검출되지 않는다(누락 방향이라 거짓 낙인은 없다). 두 파서를 한 함수에 두는 우회(레거시 파싱 후 폴백)는 이 태스크가 닫으려던 갈림을 재생산하므로 택하지 않았다. 뿌리는 `MISC-62`(표기 정책 결정 포함)가 소유하며, 현재 동작을 계약 테스트 2건(`test_function_application_is_read_as_multiplication_known_limitation`·`test_unknown_function_application_known_limitation`)으로 동결해 고치면 RED가 된다.
+- **검증**: 주입 7종 전건 RED·원복 sha256 일치(태스크가 요구한 "함수 적용이 곱으로 읽힘" 주입 포함).
+
 ### 2026-10-08 (착지 · ADMIN-09): **`user_profile` 수집 항목 대장을 신설했다 — 42컬럼 중 수집 경로만 열린 9컬럼과 쓰는 곳 없이 읽기만 있는 2컬럼을 기계가 처음 보게 됐다** — 판정 기준 main `8a5ea4d1`
 
 **무엇/왜**: `pipa_data_matrix.md` §3.2가 '수집 항목·목적·보유 기간 고지'를 명령하는데 그 수집 항목 목록의 진실 원천이 코드·문서 어디에도 없었다. 코딩 헌법 R26-01('개인정보 인벤토리에 없는 필드는 저장할 수 없다')이 말하는 인벤토리에 해당하는 대장을 `data/collection_inventory.json`으로 신설했다(헌법 쪽 어댑터는 CONST-08 소관).
@@ -384,6 +410,15 @@
 **기록**: `docs/data/ai_review_cross_band_edges_university_v1.md`·`docs/data/ai_review_inter_course_edges_university_v1.md`(마커 `검수:AI 2026-10-08`). 불일치 중 I051·I108은 원안 지지자가 없어 다음 회차 우선 재검토 대상이다.
 **정직 고지**: 같은 계열 AI 2인은 독립 표본이 아니고 오류율도 측정되지 않았다. 초인간 검증 기준의 측정 게이트가 아니라 **정책 대체**다. 정본 `graph.json` 병합은 범위 밖이다(S4-60·S4-61 소관, 표 문서 §5 스키마 결정).
 **집행 마찰(사실 기록)**: 반영 중 Auto 권한 분류기가 생성 스크립트 수정·재생성을 [Instruction Poisoning]으로 2회 거부했다(서브에이전트 산출로 사람 검수 대상 파일을 고치는 동작으로 본 것으로 추정). 세션은 우회하지 않고 멈춰 Kiki 승인과 모드 전환을 받은 뒤 진행했다.
+
+### 2026-10-08 (결정 · S4-58): **통계 검증기(`statistical_claim`)를 float 비교에서 정확 유리수 + 선언형 허용오차 정책(`tolerance`)으로 전환했다 — 설계서 `verifier_v2_domains.md` §3.5-2가 약속한 "부동소수점 사용 금지"를 S4-53 구현이 어기고 있었다**
+
+- **경위(실측)**: S4-53 구현이 데이터를 float으로 바꾼 뒤 `math.isclose(rel_tol=1e-9, abs_tol=1e-9)`로 비교했다. 수정 전 코드를 `git show`로 꺼내 같은 입력으로 재현했다 — 17자리 정수 평균이 1 어긋나도 `pass`, 평균 1조에서 500 어긋나도 `pass`, NaN 데이터가 "계산값 nan"으로 `fail`, 지수 `1e999999` 주장이 `inf`로 읽혀 `fail`, 혼합수 `1 1/2`가 공백 제거로 `11/2`(5.5)로 오독돼 `fail`, 100,000단 중첩 data는 `RecursionError` 크래시.
+- **결정**: ① 데이터·주장값을 float 경유 없이 `Fraction`으로 읽고 mean·median·variance·q1·q3는 유리수 정확값, std·corr는 제곱근이 유리수면 정확값·아니면 10^-60 이내 정수 제곱근 근사로 판정한다 ② `tolerance` 절(`exact`·`abs:<양수>`·`rel:<0~1>`·`round:<0~15>`, 경계 포함·half-up 정확 연산)을 문항 저자가 선언한다 ③ 절 생략 시 유한소수는 `exact`, 무한소수·무리수는 `abs:10^-9`(절대오차만 — 상대오차는 큰 값에서 허용 폭이 값에 비례해 커진다) ④ 수 토큰 64자·지수 ±30 상한, NaN·Infinity·bool·비 ASCII·밑줄 숫자·분모 0·깊은 중첩을 `unverifiable`로 ⑤ 미지/중복 조건 절은 조용히 무시하지 않고 `unverifiable`(철자가 틀린 `tolerance` 절이 검증 강도를 몰래 바꾸는 것을 차단). 무리수에 `exact`를 지정하면 `fail`이 아니라 `unverifiable`(저자의 정책 오설정을 학생 오답으로 읽지 않는다).
+- **의도한 행동 변경**: 기본 판정이 엄격해졌다(유한소수는 1e-9 허용 → 정확 일치, 무한소수·무리수는 상대오차 제거). 영향 범위 실측 — 저장소 전체에서 `stat=` DSL을 쓰는 코퍼스·fixture 문항 0건이라 기존 판정이 바뀌는 문항은 없다. `StatisticalResult.value`(float)와 `verifier.py` 래퍼·`machine_value` 계약은 유지, `exact_value`·`policy`(적용 정책 라벨, `기본→…` 접두)를 추가했다.
+- **검증(로컬, 정확한 CI 명령)**: 백엔드 전체 `16885 passed·584 skipped·1 xfailed`(실패 0·13분 31초)·커버리지 90.78%·계층 게이트 PASS(l3 94.9%), `tests/harness` 2014 passed, `tests/infra` 2744 passed, `ruff`·`black`·`mypy --strict`(740 파일)·`lint-imports`(계약 4 유지) exit 0, 위헌 심사 래칫 exit 0·차단 0건 ≤ 기준선 0건. 가드 뮤테이션 26종 전건 RED·생존 0·원복 sha256 동일(지수 상한 완전 제거 주입은 `Fraction("1e999999999")`가 메모리를 소진시킬 수 있어 의도적으로 제외하고 상한값 10^6 주입으로 대체).
+- **한계·승계**: 판정 해상도는 10^-60(정책 경계가 그보다 가까운 무리수는 다루지 않는다). 교차검증 `cross_verify.py`의 `machine_value` float `isclose` 대조는 대값 왜곡이 동형으로 남아 `S4-70`으로, n=1 표본분산 0 계산과 `columns` 절 `int()` 예외 누출은 `S4-71`로 등재했다(둘 다 `depends_on: S4-58`, P2).
+- **관측(이 변경과 무관한 기존 상태)**: `constitution/rules.yaml`의 `R28-02` 집행 파일 `tests/contract/test_subject_contract.py`가 main 체크아웃에 없다 — 규칙 머리말대로 "집행 장치 없음"으로 읽으며 통과로 계상하지 않았다.
 
 ### 2026-10-07 (정정 · G-misc40-deferred-m0671-redecision): **M0671 서명을 Kiki 머신에서 직접 입력해 라이브 DB에 한 번 더 적재했다 — 이 게이트는 2026-10-06 #1477로 이미 clear돼 있어 중복 실행이었고, 그 결과 DB 행의 note가 main 코퍼스와 달라졌다** (Kiki 실행·claude 기록) — 판정 기준 main `42018d87`
 
@@ -12063,6 +12098,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **후속 소유(등재)**: `EOS-179`(라벨 예측 타당도 리더) · `EOS-180`('초보' 증거 하한·수축 + 다른 라벨 소비처·WH-1 ⑤⑧ KPI 연속성) · `EOS-181`(사다리 도약 — **서빙이 단계 3·4를 렌더하기 전에** 판정 · 외부 사건이라 코드 의존으로 못 걸고 notes·acceptance에 둔다. 코드 가드를 세우지 않은 이유: 모바일 변경은 CI 잡 경로 필터에 안 걸려 가드가 **돌지 않는다**).
 - **한계(명시)**: 운영 분포(이탈률·신호 확률·학생당 개념 수·카탈로그 채움)가 전무하다. "학생 신호"는 7개 좌절 토큰 + 8개 답 요구 토큰이라 실제 좌절의 하한이다. 현실적 학생 3유형(이탈형·연속 오답형·침묵형)의 수치는 독립 비판의 값이며 재현하지 않았다. 앱이 단계를 렌더하지 않는다는 사실은 grep 기준이다. expertise reversal 등 문헌은 원문을 읽지 않았다.
 - **검증 도구 기록(코드로 집행)**: 결함 주입 하네스 `mutate_eos178_label_free_guards.py` 45건(단위 31 · 서빙 14) — 설계 중 **등가 뮤턴트 2건**(신호 없는 쌍의 `coalesce(has_signal, False)` · 서빙 판정의 `IS NOT NULL`)을 찾아 코드에서 걷어냈고, 첫 실행에서 1건(`S02` 세션 생성 핸들러의 라벨 적재)이 **생존**했다 — 라벨은 오답 뒤에만 생기는데 기존 통합 시나리오가 세션 생성 시점에 라벨을 갖지 않았다 → 교차 이월 통합 시나리오 추가로 닫았다. 후속 등재 스크립트가 선행(`--depends`) 순서를 거꾸로 돌려 1건이 거부되고 다른 한 건의 acceptance에 번호 오기(`EOS-181`↔`EOS-179`)가 남았다 → append 전용 정정 항으로 바로잡았다(대장 손편집 없음).
+### 2026-10-08 — ADMIN-16: PATCH /v1/problems/{id}의 검수 상태 전이표 우회 폐쇄
+- **판정 문서**: `docs/reviews/admin16_review_status_bypass_judgment_2026-10-08.md` (판정 기준 main `8a5ea4d1`). 격리 계약 `problem_quarantine_contract.md` §5·§6·§7 갱신.
+- **결정 — "거부"가 아니라 "전이표 경유"**: 인수조건은 둘 다 허용했다. PATCH에서 상태 변경을 일률 거부하면 운영 중인 EOS-97 리콜 도구(`ops/generation_recall.py::apply_quarantine`, PATCH로 3필드 기입)가 `approved` 문항에도 전부 실패하고, 격리 계약이 PATCH를 정본 격리 절차로 명시하므로 기각했다. 두 표면(POST 전이·PATCH)이 같은 표(`schema/review_transition.py`)를 읽는다 — 표를 읽는 공개 함수만으로 역해석(`action_for_status_change`)하고 판정(`plan_review_field_change`)은 순수 함수.
+- **동작**: 병합 결과가 `review_status`를 바꾸면 표로 판정 — 불허 409 `illegal_transition` · 격리 사유 부재 422 `reason_required`(**이번 요청 본문**의 사유여야 한다 — 병합 결과로 보면 과거 격리의 낡은 사유가 통과) · 격리가 아닌 전이가 격리 기록을 바꿈 409 `quarantine_record_immutable`. 합법 전이는 감사 1행의 동작이 `update`가 아니라 전이 액션. 격리 시각은 서버 시계. 상태 키가 본문에 있을 때만 `SELECT … FOR UPDATE`. 상태가 그대로인 요청(GET 본문 왕복)은 종전 `update`.
+- **판단이 들어간 곳 — 거부는 감사 원장에 쓰지 않는다**: `content_mutation`은 "변경이 일어났다"의 기록이고 루프 KPI ④가 행 수를 센다. 거부는 WARNING 로그(자유 텍스트 제외). 다른 읽기(거부도 행을 남김)가 의도라면 알려 달라.
+- **검증**: 신규 80건(API 44·스키마 36) + 기존 관련 189건 무회귀. 결함 주입 12건(대조군 포함) + 파일 추가형 1건 — 순수 Python 하네스가 주입 적용·원복(sha256)을 단언, 실제 주입 11건 전부 RED(핵심 M1 = ADMIN-16 이전 동작 재현은 31건 실패), 대조군 GREEN. CI 대응 ruff·black·mypy --strict·lint-imports 로컬 통과(첫 실행에서 ruff E501 8건·black 2파일을 잡아 고침).
+- **부수 3항목 처분**: ⑥ 감사 열거 문서 동기화 = 이 PR에서 완료(`security_privacy.md`) · ② `privacy_audit` 불변 트리거 = "필요함, 분리" → `ADMIN-17` · ③ 반려코드·HIT 타이머 강제 = "분리" → `ADMIN-18`(PATCH의 `reject`는 반려코드를 실을 자리가 없어 거부하도록 acceptance에 명시, `ADMIN-16` 선행 의존).
+- **조사 중 발견**: `ADMIN-19` POST 생성이 `review_status=approved`로 직접 태어난 문항을 허용(같은 부류) · `ADMIN-20`(owner=kiki, 결정 사안) 전이표가 `approved`에서만 격리를 허용하고 공개 GET은 격리만 숨겨서, **비승인 문항의 결함은 이제 어떤 관리자 API로도 공개 카탈로그에서 숨길 수 없다**(리콜 도구 대상이 새로 생성된 문항이면 영향 실제적).
+- **정직한 공백**: 실 PostgreSQL 검증 없음(이 환경에 PG·docker 데몬 없음 — 행 잠금·롤백은 hermetic으로 인자·호출 순서만 고정, CI `backend-migrations`가 첫 실행) · 상태 불변 PATCH의 격리 기록 단독 편집은 막지 않음(계약 §7) · 감사 열거를 문서와 대조하는 테스트는 여전히 없음.
+
 ### 2026-10-06 — ADMIN-07 검수 큐 UI + 검증된 상태 전이 BFF (Phase B 진입점)
 - **대상 엔티티**: `Problem.review_status`(pending/approved/rejected/quarantined). JSONL `needs_review_worklist` 축은 harness 어댑터 잔여 누출 래칫 때문에 이번 범위에서 제외(후속).
 - **전이표**(`schema/review_transition.py`, 불변): approve pending→approved · reject pending→rejected · quarantine approved→quarantined(사유 필수·≤2000자) · release quarantined→approved. `None`(미지정)은 어떤 액션도 허용하지 않는다("모른다 ≠ pending").
@@ -12121,3 +12166,18 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **검증**: 신규 테스트 28건(경계 6·판정·CLI·문서↔코드 일치·워크플로 배선) 통과, 결함 주입 7종(경계 2·라벨 AND·`data/` 시기·git 실패 접기·접두 경계·일정 모순) 전건 검출·원복 바이트 동일, 하네스 2006 passed.
 - **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
 - **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
+
+### 2026-10-08 — PB-10: 난이도 보정 루프 스케줄 좌석 확정 + 도달 관측 리포트 + 실행 로그 계약
+
+- **결정(스케줄 좌석)**: `l2/calibrate_items.py`를 부르는 곳이 저장소 안에 0건이던 상태를 `docker-compose.prod.yml`의 `item-calibration` 서비스(24h 루프·`retention-purge` SEC-12 동형·app 이미지 재사용·DB URL만 주입)로 해소했다. 기각: GitHub Actions cron(prod DB에 닿지 못함 — `weekly-metrics.yml` 헤더의 같은 판정), Phaiakes9 systemd(개발 DB 5433 쪽이라 prod 스택 `db`와 다르다).
+- **관측**: `harness/item_calibration_reach_report.py` 신설(게이트 아님·exit 0/2). 채움률(`irt_difficulty_b`·`irt_a`)·응답 규모·보정 제외 사유(5회 미만)와 루프 5상태 판정(`NO_RESPONSES`/`NO_ELIGIBLE_ITEMS`/`LOOP_DORMANT`/`LOOP_STALE`/`LOOP_CAUGHT_UP`)을 낸다. 판정은 날짜 없이 "자격 문항 중 b NULL 수"로 성립한다.
+- **마지막 보정 시각은 DB에 저장 좌석이 없다**: `Problem.calibrated_at` 부재, `updated_at`은 `onupdate`가 없어 보정 UPDATE로 갱신되지 않는다(모델 사실을 테스트가 묶음). 리포트는 `last_calibration_at=unrecorded`로 "모른다"를 명시하고, 시각은 CLI가 실행마다 남기는 `calibration_run ... finished_at=...` 로그 한 줄에만 있다. 영속 좌석(마이그레이션)은 별도 태스크 몫.
+- **실행 로그 계약**: 응답 0행은 `status=noop_no_responses`(정상 no-op), 자격 문항 0건은 `noop_no_eligible_items`, 실제 보정은 `calibrated`, 예외는 `failed error_type=<타입명>` 후 재발생. stdout 첫 줄 `calibrated_items=N` 하위호환은 불변.
+- **검증**: 단위·배선·통합 테스트 신설. 배선 테스트 뮤테이션 10종·SQL 뮤테이션 8종 전건 RED(주입 적용·원복 바이트 동일 단언). 실 PG16+pgvector 로컬 DB에서 보정 `--dry-run`의 `calibrated_b`와 리포트 자격 문항 수 일치, 실제 보정 전후 판정 `LOOP_DORMANT → LOOP_CAUGHT_UP` 확인. CI 재현: backend 잡(ruff·black·mypy --strict·lint-imports) 종료 0, `tests/infra` 2783 passed/1 skipped, 미배선 감사·정책 가드·헌법 래칫(차단 0건) 종료 0.
+- **한계(명시)**: 운영 DB(5433)에는 닿지 못했다 — 2026-09-29 실측(응답 80건·1명·5회 이상 문항 0건)이 그대로면 현재 판정은 `NO_ELIGIBLE_ITEMS`일 것이나 이 세션이 확인한 값은 아니다. 라이브 스택에서 `item-calibration`이 실제로 뜨는지는 미확인(Kiki 배포 몫 — 런북 `deployment_cd_runbook.md` §5d). 후속: EOS-154(a 첫 채택 신호)가 이제 착수 가능하다.
+### 2026-10-08 — PB-17 결정론 생성기 저작 서명 + 코퍼스 백필 + 선언 덮어쓰기 차단
+- **서명**: 결정론 생성기 60종 클래스에 `@deterministic_generator`(`l3/equivalent/generator.py`)를 부착 — 후보가 `deterministic:<생성기>` 서명을 갖는다. 전수 가드(`test_deterministic_author_stamp.py`)가 `generate(self, spec)` 보유 클래스를 역할 기반으로 발견해 미서명 0건·스캔 하한을 동결한다.
+- **백필**: `harness/problem_corpus_author_backfill.py`(기본/`--dry-run`/`--check`, 멱등). 37개 디렉터리·14,034건 중 13,609건(35개 디렉터리) 서명, 425건 미백필 — `problem_bank_rephrased_v0`(421건, LLM 발문 다양화·저작 모델 id 미기록이라 `llm:` 서명도 지어내지 않음)와 `problem_bank_v1`(4건, 사람 시드). 도출 근거는 `_provenance.json`의 `generation_method`가 지목한 생성기 파일(30개 디렉터리), 파일명이 없는 5개 디렉터리는 `LLM 0` 선언 + 코드의 `CORPUS_DIR_NAME` 배치 모듈 임포트로 도출(코드 사실 추가), `generated_v0`는 생성기 8종이라 배치 모듈명으로 서명.
+- **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
+- **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
+- **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.

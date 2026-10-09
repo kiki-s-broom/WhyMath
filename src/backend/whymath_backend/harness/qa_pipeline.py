@@ -324,6 +324,9 @@ _NON_EQUATION_DSL_ANSWER_KINDS = frozenset(
         "events_independent",
         "conditional_equal",
         "dot_product_scalar",
+        # S4-66 — 수열 귀납 DSL(`init=...; rec=...; query=...`)은 sympify 대상이 아니다. 자체
+        # 파서(`l3/sequence_induction.py`)가 닫힘을 보증하므로 등식 DSL 폐쇄 검사에서 제외한다.
+        "sequence_induction",
     }
 )
 

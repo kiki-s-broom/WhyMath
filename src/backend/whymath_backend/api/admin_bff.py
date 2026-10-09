@@ -51,6 +51,7 @@ from whymath_backend.privacy import record_admin_access_audit
 from whymath_backend.privacy.audit import record_content_mutation_audit
 from whymath_backend.schema.enums import PrivacyAuditAction, PrivacyAuditResourceType, ReviewStatus
 from whymath_backend.schema.review_transition import (
+    QUARANTINE_REASON_MAX_LENGTH,
     IllegalReviewTransition,
     ReviewTransitionAction,
     action_requires_reason,
@@ -365,7 +366,7 @@ class AdminReviewTransitionRequest(BaseModel):
     )
     reason: str | None = Field(
         None,
-        max_length=2000,
+        max_length=QUARANTINE_REASON_MAX_LENGTH,
         description="격리 사유 — quarantine이면 필수(공백 제외 1자 이상). 그 외는 기록 안 됨.",
     )
 
@@ -522,7 +523,9 @@ async def transition_admin_review_item(
 
     전이 규칙은 `schema/review_transition.py`가 정본이고 여기서는 호출만 한다. 어느 단계든
     실패하면 commit 전이므로 상태도 감사 행도 남지 않는다(감사 쓰기 실패 시 상태 변경도 롤백).
-    `PATCH /v1/problems/{id}`는 전이 검증이 없는 기존 경로로 남아 있다(이 라우트의 범위 밖).
+    `review_status`를 쓰는 다른 관리자 표면 `PATCH /v1/problems/{id}`는 ADMIN-16부터 같은 표
+    (`action_for_status_change` 역해석)를 거친다 — 전이 규칙의 집행 지점은 이 라우트와
+    그 PATCH 둘이다.
     """
     problem = (
         await session.execute(

@@ -25,6 +25,7 @@ from whymath_backend.l3.cross_verify import (
     PROBABILITY_PERSPECTIVES,
     STATISTICAL_PERSPECTIVES,
     UNRECORDED_AUTHOR,
+    AuthorDeclarationConflictError,
     CrossVerifier,
     IndependenceError,
     Perspective,
@@ -35,6 +36,7 @@ from whymath_backend.l3.cross_verify import (
     assert_author_independent,
     deterministic_author,
     llm_author,
+    resolve_author_signature,
 )
 from whymath_backend.l3.models import (
     CostTier,
@@ -629,3 +631,30 @@ def test_sentinel_probe_itself_discriminates() -> None:
         judge=_judge_labelled("honest_declares"),
     )
     assert _actually_exposed(honest) == honest.visible_fields
+
+
+# ── 저작 선언 해석 (PB-17 ③) — 선언은 기록 없음만 채운다 ──────────────────
+def test_declaration_fills_only_unrecorded() -> None:
+    declared = deterministic_author("gen")
+    assert resolve_author_signature(UNRECORDED_AUTHOR, declared) == declared
+    assert resolve_author_signature(UNRECORDED_AUTHOR, None) == UNRECORDED_AUTHOR
+    assert resolve_author_signature(UNRECORDED_AUTHOR, "  ") == UNRECORDED_AUTHOR
+    assert resolve_author_signature(llm_author("m"), None) == llm_author("m")
+
+
+def test_declaration_cannot_flip_a_recorded_llm_to_deterministic() -> None:
+    """LLM 기록을 deterministic 선언으로 뒤집어 가드를 우회하는 길이 닫혀 있다."""
+    with pytest.raises(AuthorDeclarationConflictError):
+        resolve_author_signature(llm_author("qwen3:30b-a3b"), deterministic_author("g"))
+    with pytest.raises(AuthorDeclarationConflictError):
+        resolve_author_signature(deterministic_author("g"), llm_author("m"))
+
+
+def test_declaration_equal_to_record_is_idempotent_and_case_insensitive() -> None:
+    recorded = llm_author("Qwen3:30b-a3b")
+    assert resolve_author_signature(recorded, "llm:qwen3:30B-A3B ") == recorded
+
+
+def test_conflict_error_is_an_independence_error() -> None:
+    """하위 호출부가 `IndependenceError` 하나로 독립성 위반을 잡을 수 있다."""
+    assert issubclass(AuthorDeclarationConflictError, IndependenceError)

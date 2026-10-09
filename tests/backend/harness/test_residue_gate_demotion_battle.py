@@ -1290,3 +1290,25 @@ def test_v4_off_wiring_preserves_legacy_behaviour() -> None:
     verifier, default = build_v4_wiring("off", base)
     assert verifier is base
     assert default is None
+
+
+# ── 저작 선언은 기록 없음만 채운다 (PB-17) ─────────────────────────────
+def test_battle_declaration_cannot_overwrite_recorded_author(records: list[PilotRecord]) -> None:
+    """기록된 서명(실 코퍼스 = 백필된 deterministic)과 충돌하는 선언은 측정 시작 전에 거부된다."""
+    from whymath_backend.l3.cross_verify import AuthorDeclarationConflictError
+
+    battery = build_residue_seeded_set(records)
+    verifier = _ScriptedVerifier(mode="oracle", clean_texts=_clean_texts(records))
+    with pytest.raises(AuthorDeclarationConflictError, match="충돌"):
+        run_residue_demotion_battle(
+            battery, verifier=verifier, sample_n=2, authored_by="llm:some-other-model"
+        )  # type: ignore[arg-type]
+    assert verifier.seen == [], "충돌한 선언으로는 검증기가 한 번도 호출되면 안 된다"
+
+
+def test_battle_cli_rejects_conflicting_declaration_with_exit_2(tmp_path: Path) -> None:
+    """CLI — 충돌하는 `--authored-by`는 exit 2(게이트 실패 exit 1과 구분)로 거부한다."""
+    if not _PILOT_CORPUS.exists():  # pragma: no cover — 코퍼스 미생성 환경 방어
+        pytest.skip(f"파일럿 코퍼스 미존재({_PILOT_CORPUS})")
+    exit_code = main([str(_PILOT_CORPUS), "--sample-n", "0", "--authored-by", "llm:conflict"])
+    assert exit_code == 2

@@ -121,8 +121,11 @@ class TestRunCorpusBatch:
             / "problem_bank_probability_finite_v0"
             / "problems.jsonl"
         )
-        base = load_problem_bank_records(corpus)[0]
-        assert base.provenance.authored_by is None  # 전제: 구 코퍼스는 서명 기록이 없다
+        committed = load_problem_bank_records(corpus)[0]
+        # PB-17: 커밋된 코퍼스는 결정론 서명이 백필돼 있다 — 이 테스트의 전제(기록 없음)는 서명을
+        # 지운 사본으로 만든다(기록 있는 레코드의 직렬화는 아래 recorded 가 이미 본다).
+        assert committed.provenance.authored_by is not None
+        base = replace(committed, provenance=replace(committed.provenance, authored_by=None))
         recorded = replace(
             base, provenance=replace(base.provenance, authored_by="llm:qwen3:30b-a3b")
         )
