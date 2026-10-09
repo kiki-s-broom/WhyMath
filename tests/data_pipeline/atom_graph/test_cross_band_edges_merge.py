@@ -215,9 +215,7 @@ class TestPostMergeMeasurements:
         assert (len(crossing), len(edges)) == (44, 2234)
         assert round(len(crossing) / len(edges) * 100, 2) == 1.97
         high_to_uni = [
-            e
-            for e in crossing
-            if (level[e["from_code"]], level[e["to_code"]]) == ("고등", "대학")
+            e for e in crossing if (level[e["from_code"]], level[e["to_code"]]) == ("고등", "대학")
         ]
         assert len(high_to_uni) == _N
 

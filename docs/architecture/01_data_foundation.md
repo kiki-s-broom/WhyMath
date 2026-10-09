@@ -75,7 +75,8 @@
   `node_projection.py:14` — "backend↔Neo4j 런타임 연결 안 함(확정 설계 결정)". Neo4j는 배포
   토폴로지 DB 블록에도 실재하지 않는다 — `00_overview.md` §정정 참조)
 - **목표 규모**: 500노드 · 2,000엣지 — 실측(2026-08-03): 개념 축 437노드·581엣지, 원자 백본
-  2,683노드·2,210엣지(runtime truth source, `knowledge_module_gap_review.md`)
+  2,683노드·2,210엣지(runtime truth source, `knowledge_module_gap_review.md`) — 2026-10-09 S4-60이
+  고→대 경계 24건을 병합해 현재는 2,683노드·2,234엣지
 - **Phase 1 범위**: 고1 미적분 영역 ~100개념 (첫 진입 = 고1 내신 트랙에 정렬) — 실측은 전 학년·
   전 영역으로 이미 확장됨(위 실측 규모 참조)
 

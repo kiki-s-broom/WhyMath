@@ -181,7 +181,8 @@ def _pre_merge_sha256(graph: dict[str, Any]) -> str:
     """
     view = dict(graph)
     view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") != EVIDENCE]
-    return hashlib.sha256((json.dumps(view, ensure_ascii=False, indent=2) + "\n").encode()).hexdigest()
+    text = json.dumps(view, ensure_ascii=False, indent=2) + "\n"
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:

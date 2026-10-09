@@ -337,7 +337,7 @@ def validate_cross_band_edges(
             )
         mergeable_pairs.append(pair)
 
-        # 4-b. merged_edge_mismatch (error) — 이미 병합된 엣지는 원장과 스키마 호환 필드가 같아야 한다.
+        # 4-b. merged_edge_mismatch (error) — 이미 병합된 엣지는 원장과 호환 필드가 같아야 한다.
         merged_edge = merged_in_graph.get(pair)
         if merged_edge is not None:
             report.already_merged_count += 1
