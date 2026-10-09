@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-25-cms-edit-vs-loader-contract
+title: "P3-25 — CMS 제자리 편집 ↔ CLI 적재 덮어쓰기 계약: 편집이 다음 적재에 소실되지 않게 정본·보호 규칙을 판정·집행"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-12-cms-minimal-screens
+requires_gates: []
+acceptance:
+  - "① CMS 제자리 편집 리소스 7종(교육과정 판·문항·풀이 단계·오개념·교수전략·개념 설명·힌트)마다 CLI 적재 경로(upsert)를 실측해 \"다음 적재가 CMS 편집을 덮어쓰는가\"를 표로 판정한다(적재 코드의 파일:줄 근거 포함 — 이름이 아니라 역할로 검색하고, 0건이면 검색 범위를 명시한다).\n② 덮어쓰는 리소스는 보호 규칙(편집 표지·적재 시 skip·충돌 보고) 중 하나를 판정해 구현한다. 새 교육과정/판·풀이 경로·문항·오개념·교수전략의 **신규 작성을 CMS가 열지 않는** 현행 결정(적재 파이프라인의 저작권·출처 레일 우회 금지)을 유지할지 판정에 포함한다.\n③ 주입 검증: CMS로 편집 → 적재를 다시 실행 → 편집 값이 보존되거나 충돌이 보고됨을 실 DB로 확인한다. 보존을 주장하는 리소스는 이 주입이 RED→GREEN이어야 한다.\n④ 집행 지점과 정본화를 별항으로 둔다: 계약 문서(정본)와 적재 코드가 그 계약을 실제로 경유하는 지점(집행)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-12 사후 대조표(docs/reviews/p3_12_cms_12_survey_2026-10-08.md §6). P3-12는 제자리 편집 UI를 열었지만 \"편집이 다음 적재에 보존된다\"를 주장하지 않았다 — 개념 외 7종은 CLI 적재가 같은 행을 upsert하므로 CMS 편집이 조용히 소실될 수 있다. 이 태스크가 그 공백의 소유자다. 선행: P3-12-cms-minimal-screens(착지 후 착수)."
+updated: 2026-10-08

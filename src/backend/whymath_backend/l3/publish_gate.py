@@ -104,6 +104,33 @@ class RollbackUnavailableError(RuntimeError):
     """롤백할 수 없다 — 현재 발행본이 없거나 복원할 직전 발행본이 없다."""
 
 
+class StalePublishedPointerError(RuntimeError):
+    """호출자가 본 현재 발행본이 잠금 후 실제 발행본과 다르다 — 롤백은 일어나지 않는다(P3-12).
+
+    화면이 "이 판이 발행 중이니 내려라"고 요청했는데 그사이 다른 판이 발행됐다면, 그대로 롤백하면
+    **엉뚱한 판**이 내려간다. `rollback(expected_current_version_id=...)`가 개념 행 잠금 후
+    비교한다.
+    """
+
+    def __init__(self, expected: uuid.UUID, actual: uuid.UUID | None) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"발행본 불일치: 기대 {expected} / 실제 {actual}")
+
+
+class StaleStatusError(RuntimeError):
+    """호출자가 본 상태와 잠금 후 실제 상태가 다르다 — 그사이 다른 사람이 전이를 실행했다(P3-12).
+
+    `apply_transition(expected_status=...)`가 **행 잠금을 잡은 뒤** 비교하므로 검사와 전이 사이에
+    틈이 없다(화면이 읽은 상태로 전이를 요청하는 낙관적 동시성). 전이는 일어나지 않는다.
+    """
+
+    def __init__(self, expected: VersionStatus, actual: VersionStatus) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"상태 불일치: 기대 {expected.value} / 실제 {actual.value}")
+
+
 @dataclass(frozen=True)
 class RollbackResult:
     """롤백 결과 — 내려간 판과 복원된 판."""
@@ -295,10 +322,37 @@ def _write_back(row: ConceptVersion, planned: SchemaConceptVersion) -> None:
     row.published_at = planned.published_at
 
 
+async def list_versions(session: AsyncSession, concept_code: str) -> list[SchemaConceptVersion]:
+    """한 개념의 모든 판 — 최신(`version_no` 큰 것)부터. **읽기 전용**(잠금·쓰기 없음).
+
+    API 계층은 ORM `ConceptVersion`을 import할 수 없다(AST 동결 R1) — 읽기도 이 모듈을 거친다.
+    저장된 행이 계약을 어기면 그 판은 건너뛰지 않고 `PublishGateError`로 알린다(조용한 누락 금지).
+    """
+    rows = await session.execute(
+        select(ConceptVersion)
+        .where(ConceptVersion.concept_id == concept_code)
+        .order_by(ConceptVersion.version_no.desc())
+    )
+    return [_load_schema(row) for row in rows.scalars()]
+
+
+async def get_version(session: AsyncSession, version_id: uuid.UUID) -> SchemaConceptVersion:
+    """판 1건 — 없으면 `LookupError`. **읽기 전용**."""
+    row = (
+        await session.execute(select(ConceptVersion).where(ConceptVersion.version_id == version_id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise LookupError(f"concept_version {version_id} 없음")
+    return _load_schema(row)
+
+
 async def _lock_version(session: AsyncSession, version_id: uuid.UUID) -> ConceptVersion:
     row = (
         await session.execute(
-            select(ConceptVersion).where(ConceptVersion.version_id == version_id).with_for_update()
+            select(ConceptVersion)
+            .where(ConceptVersion.version_id == version_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
     if row is None:
@@ -307,8 +361,16 @@ async def _lock_version(session: AsyncSession, version_id: uuid.UUID) -> Concept
 
 
 async def _lock_concept(session: AsyncSession, concept_code: str) -> Concept:
+    # `populate_existing`: 잠금을 잡은 뒤의 값을 **항상 새로 읽는다**. 이미 세션에 올라온 엔티티가
+    # 있으면 `FOR UPDATE`만으로는 속성이 갱신되지 않아, 호출자가 앞서 읽어 둔 낡은 발행 포인터를
+    # 잠금 후 판정(`expected_current_version_id` 비교 등)에 쓰게 된다.
     concept = (
-        await session.execute(select(Concept).where(Concept.code == concept_code).with_for_update())
+        await session.execute(
+            select(Concept)
+            .where(Concept.code == concept_code)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
     ).scalar_one_or_none()
     if concept is None:
         raise LookupError(f"concept {concept_code!r} 없음")
@@ -326,6 +388,7 @@ async def _published_siblings(
             ConceptVersion.version_id != exclude,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     return list(rows.scalars())
 
@@ -392,11 +455,14 @@ async def apply_transition(
     *,
     actor: str,
     now: datetime | None = None,
+    expected_status: VersionStatus | None = None,
 ) -> SchemaConceptVersion:
     """직접 호출 가능한 전이 1건을 실행한다(복합 전용 전이는 거부).
 
     - publish: 같은 개념의 다른 발행본을 `supersede`하고 발행 포인터를 이 판으로 옮긴다.
     - deprecate: 발행 포인터가 이 판을 가리키면 포인터를 비운다(발행본 없음).
+    - `expected_status`를 주면 **잠금 후** 실제 상태와 비교해 다르면 `StaleStatusError`로 거부한다
+      (P3-12 — 화면이 읽은 상태가 그사이 바뀌었는데 같은 이름의 다른 전이가 실행되는 것을 막는다).
     """
     moment = now or datetime.now(UTC)
     # 잠금 순서 = 개념 → 판. `create_draft`·`rollback`과 같은 순서로 잡아야 같은 개념에 대한
@@ -411,6 +477,10 @@ async def apply_transition(
     concept = await _lock_concept(session, concept_code)
     row = await _lock_version(session, version_id)
     current = _load_schema(row)
+    if expected_status is not None and VersionStatus(current.status) is not expected_status:
+        stale = StaleStatusError(expected_status, VersionStatus(current.status))
+        _refuse(stale, action, version_id)
+        raise stale
     try:
         planned = plan_transition(current, action, actor=actor, now=moment)
     except Exception as exc:
@@ -450,8 +520,12 @@ async def rollback(
     *,
     actor: str,
     now: datetime | None = None,
+    expected_current_version_id: uuid.UUID | None = None,
 ) -> RollbackResult:
     """현재 발행본을 내리고 직전 발행본을 복원한다(P3-11 ⑪).
+
+    `expected_current_version_id`를 주면 **개념 행 잠금 후** 실제 발행본과 비교해 다르면
+    `StalePublishedPointerError`로 거부한다(P3-12 — 화면이 본 발행본이 그사이 바뀐 경우).
 
     내려간 판은 RETIRED가 된다(결함 판정 — 전이표 `rollback`). 복원 대상 = 현재 발행본보다
     `version_no`가 작은 판 중, 발행된 적이 있고(`published_at`) 지금 DEPRECATED인 가장 최근 판.
@@ -462,6 +536,15 @@ async def rollback(
     """
     moment = now or datetime.now(UTC)
     concept = await _lock_concept(session, concept_code)
+    if (
+        expected_current_version_id is not None
+        and concept.current_published_version_id != expected_current_version_id
+    ):
+        stale = StalePublishedPointerError(
+            expected_current_version_id, concept.current_published_version_id
+        )
+        _refuse(stale, TransitionAction.ROLLBACK, expected_current_version_id)
+        raise stale
     if concept.current_published_version_id is None:
         raise RollbackUnavailableError(f"{concept_code}: 현재 발행본이 없다")
     current_row = await _lock_version(session, concept.current_published_version_id)
@@ -518,11 +601,15 @@ __all__ = [
     "VALIDATOR_BUNDLE_VERSION",
     "PublishGateError",
     "RollbackUnavailableError",
+    "StaleStatusError",
+    "StalePublishedPointerError",
     "RollbackResult",
     "compute_content_hash",
     "run_gate",
     "plan_transition",
     "create_draft",
+    "list_versions",
+    "get_version",
     "apply_transition",
     "rollback",
 ]

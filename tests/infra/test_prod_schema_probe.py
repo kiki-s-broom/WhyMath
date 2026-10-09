@@ -19,8 +19,11 @@
   ⑤ **판정자 실재** — 마지막 SELECT가 `stamp_target`·`pending_count`·`present_after_gap`
      세 판정치를 낸다. 특히 `present_after_gap`은 "뒤쪽 리비전 혼입" 탐지기라 빠지면
      stamp가 위험해진다.
-  ⑥ **판별자 종류(kind)의 정합** — `object`(존재)와 `default`(컬럼 DEFAULT) 두 가지뿐이고,
-     `default` 행은 그 마이그레이션이 실제로 default를 *설정*할 때만 허용된다(SEC-33).
+  ⑥ **판별자 종류(kind)의 정합** — `object`(존재)·`default`(컬럼 DEFAULT)·`enum_value`
+     (PG enum 라벨) 세 가지뿐이다. `default` 행은 그 마이그레이션이 실제로 default를 *설정*할
+     때만(SEC-33), `enum_value` 행은 그 마이그레이션이 그 타입에 그 라벨을 실제로 `ADD VALUE`할
+     때만 허용된다(P3-12). 어휘를 SQL 구현에 묶는 가드도 있다 — 어휘에만 있고 SQL에 분기가 없으면
+     프로브 CASE가 에러 없이 존재 검사로 흘려 판정이 조용히 뒤집힌다.
 
 `default` 종류가 왜 생겼나 (SEC-33, 2026-09-08): `19149e92d368`은 이미 존재하는 컬럼의
 DEFAULT만 바꾼다(`ALTER COLUMN problem_attempt.ingested_at SET DEFAULT now()`). 그 컬럼은
@@ -183,8 +186,17 @@ def test_discriminators_appear_in_their_migration() -> None:
         rev = re.search(r"^revision[^=\n]*=\s*[\"']([^\"']+)", text, re.M)
         if rev:
             sources[rev.group(1)] = text
-    for seq, revision, table, column, _polarity, _kind in _probe_rows():
+    for seq, revision, table, column, _polarity, kind in _probe_rows():
         body = sources[revision]
+        if kind == "enum_value":
+            # enum 라벨 판별자는 따옴표 상수가 아니라 `ALTER TYPE <타입> ADD VALUE` 문에 산다.
+            # 타입 이름은 f-string 안에 맨 글자로 나오므로 별도 규칙으로 본다(아래 전용 테스트가
+            # ADD VALUE 실재까지 확인한다).
+            assert re.search(
+                rf"\b{re.escape(table)}\b", body
+            ), f"{revision}(seq {seq}): 파일에 enum 타입 {table!r} 없음"
+            assert f"'{column}'" in body, f"{revision}(seq {seq}): 파일에 enum 라벨 {column!r} 없음"
+            continue
         assert f'"{table}"' in body, f"{revision}(seq {seq}): 파일에 테이블 {table!r} 없음"
         if column:
             assert f'"{column}"' in body, f"{revision}(seq {seq}): 파일에 컬럼 {column!r} 없음"
@@ -249,13 +261,92 @@ def test_attribute_only_revisions_use_default_kind() -> None:
 
 
 def test_kinds_are_from_the_known_vocabulary() -> None:
-    """⑥ 종류는 두 가지뿐 — 오타(`defaults`·`column`)가 조용히 존재 검사로 떨어지는 것을 막는다.
+    """⑥ 종류는 세 가지뿐 — 오타(`defaults`·`column`)가 조용히 존재 검사로 떨어지는 것을 막는다.
 
-    프로브의 CASE는 `obj_kind = 'default'`가 아니면 존재 검사로 흘러가므로, 종류를 잘못 적으면
-    **에러 없이 판정만 뒤집힌다**. 그래서 어휘 자체를 여기서 닫는다.
+    프로브의 CASE는 `obj_kind = 'default'`·`'enum_value'`가 아니면 존재 검사로 흘러가므로, 종류를
+    잘못 적으면 **에러 없이 판정만 뒤집힌다**. 그래서 어휘 자체를 여기서 닫는다.
     """
-    unknown = sorted({k for _s, _r, _t, _c, _p, k in _probe_rows()} - {"object", "default"})
-    assert not unknown, f"알 수 없는 판별자 종류: {unknown}(허용: object·default)"
+    unknown = sorted(
+        {k for _s, _r, _t, _c, _p, k in _probe_rows()} - {"object", "default", "enum_value"}
+    )
+    assert not unknown, f"알 수 없는 판별자 종류: {unknown}(허용: object·default·enum_value)"
+
+
+def _upgrade_sources() -> dict[str, str]:
+    """리비전 → 그 마이그레이션의 `upgrade()` 본문."""
+    sources: dict[str, str] = {}
+    for path in sorted(_VERSIONS.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        rev = re.search(r"^revision[^=\n]*=\s*[\"']([^\"']+)", text, re.M)
+        if rev:
+            sources[rev.group(1)] = text[text.find("def upgrade") : text.find("def downgrade")]
+    return sources
+
+
+def test_sql_implements_every_non_default_kind_branch() -> None:
+    """⑥ 어휘와 SQL 구현을 묶는다 — 어휘에만 있고 SQL에 분기가 없으면 판정이 조용히 뒤집힌다.
+
+    프로브 CASE는 알 수 없는 종류를 에러 없이 존재 검사로 흘려보낸다. 그러므로 `enum_value`를
+    파이썬 어휘에만 더하고 SQL에 분기를 안 쓰면, enum 라벨 행이 `information_schema.columns`에서
+    `role_enum`이라는 *테이블*의 *라벨명 컬럼*을 찾다가 항상 거짓이 된다 — 에러도 경고도 없다.
+    """
+    text = _probe_text()
+    # 표시용 라벨 분기(`... THEN e.obj_column || ' (enum label)'`)에도 `obj_kind = 'enum_value'`가
+    # 나오므로, 판정 분기는 `THEN EXISTS`까지 포함해 정확히 겨냥한다(그렇지 않으면 표시 분기만
+    # 있어도 이 단언이 통과해 변별력이 없다).
+    exists_branch = "obj_kind = 'enum_value' THEN EXISTS"
+    assert exists_branch in text, "SQL에 enum_value 판정(EXISTS) 분기가 없다"
+    assert "pg_enum" in _probe_body(), "enum_value 분기가 pg_enum을 조회하지 않는다"
+    # 분기 순서 — 일반 존재 검사(`obj_column = ''`)보다 앞에 있어야 fall-through가 안 난다.
+    generic = "WHEN e.obj_column = '' THEN EXISTS"
+    assert generic in text, "일반 존재 검사 분기 형태가 바뀌었다 — 이 가드를 갱신하라"
+    assert text.index(exists_branch) < text.index(
+        generic
+    ), "enum_value 분기가 일반 존재 검사보다 뒤에 있다(fall-through 위험)"
+
+
+def test_enum_value_kind_migration_actually_adds_that_label() -> None:
+    """⑥ 핵심 — `enum_value` 행의 마이그레이션이 그 타입에 그 라벨을 실제로 `ADD VALUE`해야 한다.
+
+    `test_default_kind_migration_actually_sets_a_default`의 enum 축 대응물이다. 이것이 없으면
+    아무 리비전에나 `enum_value`를 붙여 판별을 우회하거나, 라벨 철자를 틀린 행이 통과한다.
+    """
+    sources = _upgrade_sources()
+    checked = 0
+    for _seq, revision, table, column, _polarity, kind in _probe_rows():
+        if kind != "enum_value":
+            continue
+        assert column, f"{revision}: enum_value 종류인데 라벨(컬럼 칸)이 비었다"
+        upgrade = sources[revision]
+        # 타입과 라벨이 **같은 문장**에 있어야 한다 — 타입 따로·라벨 따로 존재하는 것만으로는
+        # "이 타입에 이 라벨을 더한다"가 증명되지 않는다(철자 오류·엉뚱한 타입 방지).
+        statement = re.compile(
+            rf"ALTER\s+TYPE\s+{re.escape(table)}\s+ADD\s+VALUE(?:\s+IF\s+NOT\s+EXISTS)?"
+            rf"\s+'{re.escape(column)}'"
+        )
+        assert statement.search(
+            upgrade
+        ), f"{revision}: upgrade()에 'ALTER TYPE {table} ADD VALUE ... '{column}'' 문장이 없다"
+        checked += 1
+    assert checked, "enum_value 종류 행이 하나도 없다 — 스캔 0건은 통과가 아니다"
+
+
+def test_enum_only_revisions_use_enum_value_kind() -> None:
+    """⑥ 반대 방향의 진짜 가드 — enum 값만 더하는 리비전에 `object` 행을 붙이는 것을 막는다.
+
+    `test_attribute_only_revisions_use_default_kind`와 같은 형태다: upgrade()가 `ADD VALUE`를
+    부르면서 `create_table`·`add_column`은 부르지 않으면 그 리비전이 남기는 것은 enum 라벨뿐이므로,
+    존재 검사로는 적용 여부를 가릴 수 없다(그 객체 이름이 이미 다른 리비전에서 생겼을 수 있다).
+    """
+    sources = _upgrade_sources()
+    for _seq, revision, table, column, _polarity, kind in _probe_rows():
+        upgrade = sources[revision]
+        creates_object = "create_table" in upgrade or "add_column" in upgrade
+        if "ADD VALUE" in upgrade and not creates_object:
+            assert kind == "enum_value", (
+                f"{revision}: enum 값만 추가하는 리비전인데 종류가 {kind!r}다 — "
+                f"{table}.{column}의 존재는 이 리비전 적용 여부를 증명하지 못한다"
+            )
 
 
 def test_default_kind_rows_have_a_column() -> None:

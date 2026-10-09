@@ -147,6 +147,15 @@ def test_audit_action_enum_carries_transition_values_and_keeps_crud() -> None:
         "reject",
         "quarantine",
         "release",
+        # P3-12 — CMS 버전 전이·롤백 감사(`api/admin_cms.py`가 전이 이름 그대로 기록한다)
+        "submit",
+        "request_changes",
+        "pass_review",
+        "fail_qa",
+        "publish",
+        "deprecate",
+        "retire",
+        "rollback",
     }
     assert all(len(a.value) <= 16 for a in PrivacyAuditAction)
 
