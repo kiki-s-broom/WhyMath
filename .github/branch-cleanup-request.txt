@@ -320,3 +320,39 @@ claude/relaxed-fermat-8dui3u
 claude/magical-maxwell-hja5kh-eos129
 claude/magical-maxwell-hja5kh-s4-11
 claude/optimistic-bell-gk8vkz
+
+# ── 2026-10-09 14차 배치 (11건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-③ ──
+# 직전 배치 집행 확인(2026-10-09 ls-remote 실측): 13차 3건(magical-maxwell-hja5kh-eos129 ·
+#   magical-maxwell-hja5kh-s4-11 · optimistic-bell-gk8vkz) 전건 **잔존 0/3**.
+# 15회차(2026-10-03)가 브랜치 magical-maxwell-99n5e8에 남긴 "14차 배치 2건"(tbj2jf · 7x90dj)은 main에 도달한 적이
+#   없다 — 이 배치가 그 둘을 포함해 승계한다(번호 14차 재사용).
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   whymath-data-platform-design-t608mk = d876b523 (OPS-41 done #1472 · r2 문서 main 부재 0줄 · YAML 4건 OPS-114/115 등으로 재채번)
+#   whymath-constitution-rules-check-azdnov = c335a787 (OPS-41 done · 판정서 부재 0줄 · HARN-22→HARN-213)
+#   whymath-ai-content-design-vafylb = b1218739 (OPS-53 #1475 + S4-59 · MEMORY 서술 원문 2블록은 head로만 복구)
+#   intelligent-noether-tbj2jf = c671a313 (SEC-42 done · 게이트 evidence main 포함 True)
+#   dreamy-carson-7x90dj = 3b45cd97 (이벤트 샤드 25줄 · 착수 거부 기록)
+#   admiring-hamilton-onojq9 = f6bf7755 (이벤트 샤드 33줄 · 착수 거부 기록)
+#   vibrant-darwin-39xler = 822b001b (이벤트 샤드 7줄 · 착수 거부 기록)
+#   sleepy-feynman-skndtr = 0490f7e6 (MISC-43 철회 종결 · PR #1487 닫힘 · 대체 결정 MEMORY.md 435행)
+#   crosslink-signature-mm6kie = a48a0e9e (10-05 중간 서명 판정 · 10-06 재판정이 최종 · 보류 게이트 근거 소멸)
+#   magical-maxwell-99n5e8 = bea5ebc5 (15회차 산출물 — 문서 byte 이식 · HARN-212 재등재 · 배치 승계)
+#   friendly-dijkstra-230lnm = bcc172a3 (PR #1478 닫힘 · 게이트 G-misc40-new-crosslink-signature는 main에 kiki 서명으로 cleared · 사후 추가 — 판정 문서 §5)
+# ⚠ 회수 태스크·좌석이 참조하는 브랜치는 의도적 제외(회수 완료 전 삭제 금지) —
+#   신규 회수: friendly-pascal-mnmypk(QUAL-15) · practical-maxwell-kuwl7x(OPS-122) · blissful-lovelace-ubp9tw(OPS-123) ·
+#   remaining-track-34zvse(HARN-212 — 15회차가 등재만 하고 고립시킨 태스크를 이 PR이 재등재)
+#   승계: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79(PED-26) · 5t5lmv(OPS-112·OPS-113·A11Y-02) ·
+#   iws58k(ARCH-30) · 6eejrv(PB-08) · e98dw4(VIZ-11) · q8tvcx(OPS-38·OPS-67) · 29ac1b(ADMIN-10 ⑦)
+# ⚠ 원격 claim이 걸린 3건은 TTL 초과여도 선행 선례대로 제외 — claims reap --apply로 claim이 풀린 뒤 다음 배치:
+#   status-f6qz0c(EOS-63 · ahead 0) · status-f9lp65(HARN-56 · main에 더 완성된 수정) · stoic-hawking-vzumx5(QUAL-10 claim 기록뿐)
+claude/whymath-data-platform-design-t608mk
+claude/whymath-constitution-rules-check-azdnov
+claude/whymath-ai-content-design-vafylb
+claude/intelligent-noether-tbj2jf
+claude/dreamy-carson-7x90dj
+claude/admiring-hamilton-onojq9
+claude/vibrant-darwin-39xler
+claude/sleepy-feynman-skndtr
+claude/crosslink-signature-mm6kie
+claude/magical-maxwell-99n5e8
+claude/friendly-dijkstra-230lnm

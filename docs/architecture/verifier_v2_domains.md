@@ -188,7 +188,12 @@ data=[[1,1],[2,3],[3,2]]; stat=corr; columns=[0,1]
   그래서 대조 정책은 `cross_verify.py`에 도메인 중립 최소 구현으로 자급하고, 두 정책이 어긋나지 않는 것은
   `tests/backend/l3/test_cross_verify.py`의 패리티 검사(`verify_statistical_claim`과 같은 입력 격자)가 잡는다.
 - 한계: 문항이 선언한 `tolerance=` 절은 교차검증 대조에 전달하지 않는다(LLM은 원 통계량을 재계산할 뿐
-  반올림 정책을 모른다). 표본분산 n=1이 0으로 계산되는 S4-53 동작은 보존했다(정의 불가 값).
+  반올림 정책을 모른다).
+
+**S4-71 정정.** S4-58은 표본분산 n=1이 0으로 계산되는 S4-53 동작을 보존했으나(정의 불가 값), S4-71에서 바로잡았다.
+
+- `variance_kind=sample`(기본)에서 n=1인 `variance`·`std`는 분모 n-1=0이라 정의되지 않으므로 `unverifiable`이다(사유에 "정의되지 않음" 명시). `variance_kind=population`은 n=1에서 0으로 정의되어 그대로 판정한다.
+- `columns`는 bool이 아닌 JSON 정수만 허용한다. `[1.5]`·`[1.0]`·`[true]`·`["1"]`처럼 정수가 아닌 값이 다른 열로 조용히 변환되던 경로와, `[null]`·`[NaN]`·깊은 중첩·4300자리 초과 정수가 예외로 새던 경로는 모두 `unverifiable`이다.
 
 ---
 
@@ -310,6 +315,8 @@ verify:
 ## 5. 단계 B 도메인 2: 수열 귀납 (`sequence_induction`)
 
 > **판정(S4-57): 기계 축 발화 (GO) · 우선순위 1 → `S4-66`.** 잔여 축 Wilson 로트 게이트는 밴드가 52건 이상이 된 뒤다(§7.2 FC-4). 근거 §7.3.
+>
+> **구현 착지(S4-66):** `l3/sequence_induction.py`. 구현이 이 절의 초안과 달라진 두 곳(지수·`S(N)` 의미)은 §5.6에 기록한다.
 
 ### 5.1 개요와 범위 재정의
 
@@ -343,8 +350,8 @@ verify:
 | `query` | 뜻 | 등급 | `pass`가 뜻하는 것 |
 |---|---|---|---|
 | `a(N)` | N번째 항 | `DETERMINISTIC_DATA` | 정의(초기항+점화식)가 완전하면 `a(N)`은 유일하게 확정된다 — 값 자체의 증명 |
-| `S(N)` | 첫 N항의 합 | `DETERMINISTIC_DATA` | 위와 같음 |
-| `terms(N)` | 첫 N항 목록 | `DETERMINISTIC_DATA` | 위와 같음(답이 목록) |
+| `S(N)` | 첫 N항의 합 (**N은 항 개수** — §5.6) | `DETERMINISTIC_DATA` | 위와 같음 |
+| `terms(N)` | 첫 N항 목록 (**N은 항 개수** — §5.6) | `DETERMINISTIC_DATA` | 위와 같음(답이 목록) |
 | `closed(식, upto=M)` | 폐형 `식`이 점화식 실행값과 시작 항부터 `M`까지 모두 일치하는가(0/1) | `FINITE_EXHAUSTIVE` | **n ≤ M 전수 일치**이지 "모든 n"이 아니다. 잔여 축 "모든 n에 대한 일반 주장"이 항상 남는다 |
 
 `closed` 질의가 이 도메인의 존재 이유다. 현재 `[12대수03-06]` 30건은 발문에 점화식을 쓰고 `verify.conditions`에는 생성기가 계산한 폐형식을 싣는다(§7.1). 점화식과 폐형이 어긋나게 생성돼도 Tier1에서는 드러나지 않는다 — `closed` 질의가 그 정합을 처음 닫는다.
@@ -370,7 +377,8 @@ clause     := "start=" ("0" | "1")                      # 첫 항 번호. 생략
             | "query=" QUERY
 INIT       := "a(" INT ")=" NUM
 EXPR       := 정수·분수 리터럴 / n / a(n) / a(n+1)(K=2일 때만)
-              과 + - * / ^(지수는 0 이상 64 이하 정수 리터럴) 괄호, if(조건, 식1, 식2)
+              과 + - * / ^(지수는 n만 포함하는 식이며 평가값이 0 이상 64 이하 정수 — §5.6) 괄호,
+              if(조건, 식1, 식2)
 조건       := n%INT==INT | n%INT!=INT
 QUERY      := "a(" INT ")" | "S(" INT ")" | "terms(" INT ")"
             | "closed(a(n)=" EXPR ", upto=" INT ")"
@@ -432,6 +440,25 @@ verify:
 | 3 | `sequence_grounding` | `question_text`, `machine_model_ko` | 기계가 실행한 정의("초항 a₁=7, a(n+1)=a(n)+6, a(12)")가 발문과 같은 수열인지 번역 대조. 수치 계산 금지(라벨형) |
 
 관점 ①이 발문만 보는 이유는 §4.5와 같다 — 발문에서 점화식을 읽는 번역이 잔여 축의 본체다. 프롬프트 자산은 `l3.cross_verify.sequence_{reconstruct,falsify,grounding}_{system,user}` 6개이고, 정확 일치 판정기는 §8 C4의 신규 판정기를 쓴다.
+
+### 5.6 구현 기록 (S4-66)
+
+**초안과 달라진 곳 2건.**
+
+1. **지수.** §5.4 초안은 "지수는 0 이상 64 이하 정수 리터럴"이라 적었지만 같은 절의 예시 `closed(a(n)=3*5^(n-1), upto=12)`는 `n`에 의존하는 지수를 쓴다. 두 문장은 동시에 참일 수 없다. 구현은 **지수를 `n`만 포함하는 식으로 허용하고**(항 참조 `a(...)`는 금지), 리터럴 지수는 구문 분석 시점에, `n`-의존 지수는 평가 시점에 같은 범위(정수·0 이상 64 이하)를 검사한다. 범위 밖은 `unverifiable`(범위 초과)이다.
+2. **`S(N)`·`terms(N)`의 N.** `a(N)`의 N은 **항 번호**이지만 `S(N)`·`terms(N)`의 N은 **항 개수**("첫 N항")다. `start=1`이면 둘이 같은 말이다. `start=0`이면 `S(3)`은 `a(0)+a(1)+a(2)`이며 `a(3)`을 포함하지 않는다. `closed`의 `upto`는 항 번호다. 질의 항 번호가 시작 항보다 작다는 거부 규칙은 항 번호를 받는 `a(N)`·`closed`에만 적용되고, 개수를 받는 질의는 N ≥ 1을 요구한다.
+
+**정확값 파서의 위치.** 정수·`p/q`·목록을 읽고 쓰는 파서는 과목 무관 CORE 모듈 `l3/exact_value.py`에 한 벌만 있다. 검증기(`sequence_induction`)가 답을, 교차검증 판정기(`cross_verify`)가 LLM 재계산값과 기계 정확값을 같은 함수로 읽는다. 파서를 어댑터 모듈에 두면 CORE인 `cross_verify`가 ADAPTER를 직접 import하게 되어 경계 탐침(`tests/infra`)이 막는다.
+
+**자원 상한의 계상 방식.** 단계 수 N ≤ 1000은 질의에 적힌 수(`a(N)`·`S(N)`·`terms(N)`의 N, `closed`의 `upto`)에 건다. 항 비트 길이 ≤ 65,536은 매 연산 결과(분자·분모 중 큰 쪽)에 건다. 거듭제곱은 계산 전에 `밑 비트 수 × 지수`로 사전 거절한다. 식 노드 수 ≤ 64는 `ast.expr` 노드만 센다(연산자 토큰 제외). 입력 문자열도 상한이 있다(조건 2,000자·식 300자) — 한도는 `MAX_*` 상수가 정본이다.
+
+**판정 동작.** `closed`는 시작 항부터 `upto`까지 폐형과 점화식 값을 대조하며 첫 불일치에서 0으로 결론낸다(이후 `n`에서 범위 오류가 날 수 있어도 불일치는 이미 결정적이다). 닫힌 구간 일치(1)는 `FINITE_EXHAUSTIVE`이고 잔여 축 "모든 n에 대한 일반 주장"을 pass·fail 모두에서 남긴다. `unverifiable`(형식 오류·범위 초과·답 판독 불가·답의 형태 불일치)은 기계가 닫은 축이 없으므로 `machine_axes`와 `residual_axes`를 모두 비운다 — 닫지 않은 축을 닫았다고 주장하지 않는다.
+
+**알려진 한계.** 파이썬의 정수→문자열 변환 한도(4,300자리) 때문에 그보다 큰 정수는 답으로 읽을 수 없다(`unverifiable`). 교차검증 재료의 정확값 문자열(`machine_value_exact`)도 같은 이유로 비트 13,000을 넘으면 빈 문자열이다 — 이때 관점 ①은 `unclear`(기계 정확값 없음)가 된다. 전역 한도(`sys.set_int_max_str_digits`)는 건드리지 않는다.
+
+**§8.3 처리 현황.** 이 슬라이스가 처리한 동반 지점: C2(`machine_value_exact`)·C3(`_DomainResult.tier`)·C4(`Fraction` 정확 일치 판정기 — 통계 판정기는 재사용하지 않음)·C5(자기 kind만)·C9·C10. C1·C6·C7·C8과 C5의 `statistical_claim` 정정은 `S4-68`, C11은 `S4-56` 이후다.
+
+**이 슬라이스가 하지 않은 것.** 코퍼스 레코드 재기록과 `verification_tier` 각인(populate의 등급 값 동기가 선행이며 `S4-68` 소관), Wilson 로트 게이트(밴드 30건으로는 기본 임계 통과 불가 — §7.2 FC-4), 라이브 LLM 교차검증 측정(관점 3종은 hermetic 가짜 provider로만 검증했다 — 프롬프트 문면의 실제 변별력은 미측정이다).
 
 ---
 
@@ -613,16 +640,16 @@ for code in sorted(want):
 
 | ID | 지점 | 읽은 사실 | 단계 B에 걸리는 이유 / 권고 | 분류 |
 |---|---|---|---|---|
-| C1 | `verifier.py:383` | 관점 조회가 fail-open — 키가 없으면 확률 관점으로 조용히 폴백. 개념형(SymPy) 15종도 잔여 축을 남기므로(230행) `cross_verifier`가 주입되면 확률 관점으로 갈 것으로 *읽힌다*(**미실행**) | 등록을 빠뜨린 도메인이 표본공간 가정 프롬프트로 검증된다. 권고: 키 부재는 `unverifiable(관점 미등록)`, 확률 관점은 `finite_*` 두 키에 명시 등록. 운영 어댑터는 `cross_verifier`를 주입하지 않아 운영 영향은 없고 `S4-56` 경로에서 발현 | 정리(`S4-68`) + 동반(자기 kind 명시 등록) |
-| C2 | `verifier.py:119`, `cross_verify.py:123` | `machine_value`의 타입이 `float` 또는 `None` | 큰 정수 수열값(2⁵³ 초과)과 튜플 답(벡터)을 무손실로 못 싣는다. 권고: 후행 기본값 `machine_value_exact: str = ""` 추가(§8.2 호환), 기존 `machine_value` 경로(통계)는 유지 | 동반 |
-| C3 | `verifier.py:313-406` | `Verifier.verify`가 `tier`를 상수로 고정(통과는 `MACHINE_EXHAUSTIVE`, 그 외 `MACHINE_SAMPLED`) | 도메인별 등급(`DETERMINISTIC_DATA` 등)을 표현할 수 없다. 권고: `_DomainResult`에 선택 필드 `tier`(기본값 `None`)를 추가하고 `None`이면 종전 상수를 쓴다. 어댑터 계약이 `tier`를 비노출하므로 Core 영향 0 | 동반 |
-| C4 | `cross_verify.py:391`, `statistical_claim.py:66` | 재계산 대조가 `float` + `math.isclose` | §6.1 실측대로 정수 오답이 통과한다. 권고: `Fraction` 정확 일치 판정기를 신설하고 통계 판정기는 재사용하지 않는다. 통계 쪽 교정은 `S4-58` | 동반 |
-| C5 | `qa_pipeline.py:319` | `_NON_EQUATION_DSL_ANSWER_KINDS`가 수동 목록 6종이고 `statistical_claim`이 **없다** | 등식 DSL 폐쇄 검사(축 2)가 비등식 DSL을 위반으로 센다. `statistical_claim`은 코퍼스 0건이라 **잠복**. 권고: 자기 kind 추가 + 목록을 v2 레지스트리에서 파생하거나 동기 테스트 | 동반(자기 kind) + 정리(`statistical_claim` 정정) |
+| C1 | `verifier.py:383` | 관점 조회가 fail-open — 키가 없으면 확률 관점으로 조용히 폴백. 개념형(SymPy) 15종도 잔여 축을 남기므로(230행) `cross_verifier`가 주입되면 확률 관점으로 갈 것으로 *읽힌다*(**미실행**) | 등록을 빠뜨린 도메인이 표본공간 가정 프롬프트로 검증된다. 권고: 키 부재는 `unverifiable(관점 미등록)`, 확률 관점은 `finite_*` 두 키에 명시 등록. 운영 어댑터는 `cross_verifier`를 주입하지 않아 운영 영향은 없고 `S4-56` 경로에서 발현 | 정리(`S4-68`) + 동반(자기 kind 명시 등록 — **`S4-66` 처리**) |
+| C2 | `verifier.py:119`, `cross_verify.py:123` | `machine_value`의 타입이 `float` 또는 `None` | 큰 정수 수열값(2⁵³ 초과)과 튜플 답(벡터)을 무손실로 못 싣는다. 권고: 후행 기본값 `machine_value_exact: str = ""` 추가(§8.2 호환), 기존 `machine_value` 경로(통계)는 유지 | 동반 (**`S4-66` 처리**) |
+| C3 | `verifier.py:313-406` | `Verifier.verify`가 `tier`를 상수로 고정(통과는 `MACHINE_EXHAUSTIVE`, 그 외 `MACHINE_SAMPLED`) | 도메인별 등급(`DETERMINISTIC_DATA` 등)을 표현할 수 없다. 권고: `_DomainResult`에 선택 필드 `tier`(기본값 `None`)를 추가하고 `None`이면 종전 상수를 쓴다. 어댑터 계약이 `tier`를 비노출하므로 Core 영향 0 | 동반 (**`S4-66` 처리**) |
+| C4 | `cross_verify.py:391`, `statistical_claim.py:66` | 재계산 대조가 `float` + `math.isclose` | §6.1 실측대로 정수 오답이 통과한다. 권고: `Fraction` 정확 일치 판정기를 신설하고 통계 판정기는 재사용하지 않는다. 통계 쪽 교정은 `S4-58` | 동반 (**`S4-66` 처리**) |
+| C5 | `qa_pipeline.py:319` | `_NON_EQUATION_DSL_ANSWER_KINDS`가 수동 목록 6종이고 `statistical_claim`이 **없다** | 등식 DSL 폐쇄 검사(축 2)가 비등식 DSL을 위반으로 센다. `statistical_claim`은 코퍼스 0건이라 **잠복**. 권고: 자기 kind 추가 + 목록을 v2 레지스트리에서 파생하거나 동기 테스트 | 동반(자기 kind — **`S4-66` 처리**) + 정리(`statistical_claim` 정정) |
 | C6 | `populate.py:153` | `_VERIFICATION_TIER_VALUES`가 2값(`machine_exhaustive`·`machine_sampled`)이고 L3 `VerificationTier`는 9값 | 신규 등급을 `verify.verification_tier`로 찍은 레코드는 `ProblemCorpusError`로 적재가 거부된다(설계서 §6.2와 충돌). L1은 L3를 import할 수 없으므로 두 집합을 대조하는 테스트로 동기를 강제. 헌법 R6-02(스키마 변경은 과거 실제 데이터 호환 테스트) 적용 | 정리(`S4-68`) |
 | C7 | `corpus_reverify.py:53`, `acceptance.py:121` | 야간 재검증의 디스패치 표가 `acceptance._CONCEPTUAL_VERIFIERS`(단일 정본, 17종)를 그대로 쓴다. `_VERIFIERS_V2`에만 있는 `statistical_claim`은 그 표에 없다 | v2 전용 kind는 야간 재검증에서 Tier1 경로로 떨어진다(**읽기 기준**). 표에만 등록하면 `_build_verifiers_v2`가 개념형 래퍼로 감싸 도메인의 잔여 축·관점이 사라지고, 빌더에 선등록까지 겹치면 중복 가드로 import 시 `ValueError`가 난다 — `finite_*`처럼 전용 분기가 필요. 권고: v2 레지스트리를 단일 원천으로 삼는 방향을 순환 import 검사와 함께 판정 | 정리(`S4-68`) |
 | C8 | `verifier.py:137,183`, `test_verifier.py:83` | `residual_axes`는 자유 문자열. 확률 도메인의 `문발↔형식모델 정합`은 오타인데 코드·테스트·설계서(`verifier_v2_design.md:202`)에 고정 | 현재 `residual_axes`를 집계 키로 쓰는 코드는 어댑터 통과 외 확인하지 못했다(내가 찾은 방법으로 0건). 단계 B는 올바른 철자로 신설하고 기존 값은 바꾸지 않는다 — 집계 소비처가 생기면 어휘 등록부를 판정 | 정리(`S4-68`이 필요성만 판정) |
-| C9 | `eos_core_adapter_boundary_scan.py:121-122`, `eos_feature_inventory_v2.py:819` | 신규 `l3.*` 모듈은 ADAPTER 분류와 인벤토리 귀속이 필요(`l3.statistical_claim` 선례) | 이 둘은 pytest가 아니라 CI `infra-contracts` 잡이 검사한다 — 빠뜨리면 pytest가 초록인 채 CI가 적색이다 | 동반 |
-| C10 | `docs/prompts/l3_cross_verify.md`, `l3/prompt_assets.py` | 프롬프트는 정본 문서의 자산 ID로만 로드되고 없으면 `PromptAssetError`(fail-closed) | 관점마다 `system`·`user` 2개, 도메인당 6개를 정본에 추가해야 `prompt_text`가 통과한다. `prompt_asset_audit` 통과 필요 | 동반 |
+| C9 | `eos_core_adapter_boundary_scan.py:121-122`, `eos_feature_inventory_v2.py:819` | 신규 `l3.*` 모듈은 ADAPTER 분류와 인벤토리 귀속이 필요(`l3.statistical_claim` 선례) | 이 둘은 pytest가 아니라 CI `infra-contracts` 잡이 검사한다 — 빠뜨리면 pytest가 초록인 채 CI가 적색이다 | 동반 (**`S4-66` 처리**) |
+| C10 | `docs/prompts/l3_cross_verify.md`, `l3/prompt_assets.py` | 프롬프트는 정본 문서의 자산 ID로만 로드되고 없으면 `PromptAssetError`(fail-closed) | 관점마다 `system`·`user` 2개, 도메인당 6개를 정본에 추가해야 `prompt_text`가 통과한다. `prompt_asset_audit` 통과 필요 | 동반 (**`S4-66` 처리** — 감사기 레일 매핑도 함께) |
 | C11 | `residue_cross_verify_eval.py:65` | `_SUPPORTED_KINDS = {finite_probability, finite_count}` | 다른 kind는 `TIER_UNSUPPORTED`로 거부 — `S4-56`의 v2 CLI 이전에는 단계 B 로트 게이트를 돌릴 수 없다 | 후속(`S4-56`) |
 
 ### 8.4 판정
@@ -637,7 +664,7 @@ for code in sorted(want):
 
 | 태스크 | 내용 | 선행 | 우선순위 | 비고 |
 |---|---|---|---|---|
-| `S4-66` | `sequence_induction` 구현(DSL·정확 평가기·관점 3종·프롬프트 6개·동반 정합 C2~C5·C9·C10) | `S4-57` | P1 | 단계 B 1순위. 로트 게이트는 범위 밖 |
+| `S4-66` | `sequence_induction` 구현(DSL·정확 평가기·관점 3종·프롬프트 6개·동반 정합 C2~C5·C9·C10) | `S4-57` | P1 | 단계 B 1순위. 로트 게이트는 범위 밖. **구현 착지 — §5.6** |
 | `S4-67` | 03-03 내적·크기·평행수직 계산형 밴드 신설(≥52건) + `vector_algebra` 재판정 | `S4-57` | P2 | **보류의 재확인 지점** — 완료 시 §7.3을 다시 판정한다 |
 | `S4-68` | `answer_kind` v2 소비 지점 드리프트 해소(C1·C5의 `statistical_claim` 정정·C6·C7·C8) | `S4-57` | P1 | `S4-66`과 `verifier.py`·`cross_verify.py`를 함께 건드리므로 병렬 착수 시 파일 겹침을 조율 |
 | `S4-56` | (기존) Cross-Verify v2 CLI·Wilson 게이트 | `S4-53`·`S4-54` | P1 | 완료 조건 ⑤의 "30~50문 승격"은 기본 임계에서 통과 불가(FC-4) — 임계 변경을 명시하거나 밴드를 키워야 한다 |

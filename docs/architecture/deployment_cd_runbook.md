@@ -279,6 +279,42 @@ docker exec whymath-staging-quality-worker python -c "import os,urllib.request; 
 - **재시작·종료**: 워커를 내릴 때는 `docker compose ... stop quality-worker`를 쓴다. Celery가 SIGTERM에 warm shutdown(진행 중인 작업을 끝내고 종료)하며 `stop_grace_period: 120s`가 그 시간을 보장한다. 이 유예가 없으면(도커 기본 10초) 진행 중인 생성이 SIGKILL로 끊기고, 이미 수신 확인(ack)된 메시지는 재전달되지 않아 **그 작업이 영구 `pending`**이 된다. 이미지 갱신(§5-3의 `up -d`)도 같은 경로로 워커를 교체한다. (2026-10-08 로컬 실측: 진행 중 SIGTERM → 생성을 마치고 종료, 작업 `success` / 진행 중 SIGKILL → 새 워커를 띄워도 큐·미확인(unacked) 건수가 모두 0이고 새 워커는 그 작업을 한 번도 받지 않아 `pending` 유지.)
 - **한계(정직 기술)**: ① 이 스택의 이미지 빌드·`compose up`은 이 문서를 작성한 세션(Docker 데몬 없음)에서 **실행하지 못했다** — 위 4개 자가검증은 첫 실호스트 기동에서 처음 돌아간다. 레포에서 실측된 것은 로컬 `redis-server`(비밀번호 인증) + 실제 `celery` CLI + 가짜 Ollama로 **enqueue → 워커 소비 → `success` 폴링**과 헬스체크 신호의 변별(2026-10-08)이며, 컨테이너 안에서의 동작(비루트 `appuser`·네트워크 이름 해석)은 그 범위 밖이다. ② 작업 유실 방어는 **정상 종료 경로**에만 있다 — 워커 프로세스가 비정상 종료(OOM·강제 kill)하면 진행 중이던 작업은 재시도되지 않는다(`acks_late` 미사용). 이를 바꾸려면 재전달된 작업의 중복 실행(27B 재생성·Langfuse 중복 기록)을 감수해야 하므로 별도 결정이 필요하다. ③ 큐 대기 시간·적체를 보는 지표는 아직 없다(OPS-04 소관).
 
+## §5d. 문항 난이도 보정 스케줄(item-calibration) 확인 — PB-10
+
+`l2/calibrate_items.py`(채점 응답 전수로 문항 IRT 난이도 b·변별도 a를 보정해 `Problem`에 영속)는
+§3·§5 배포에서 **자동으로 같이 뜬다** — `docker-compose.prod.yml`의 `item-calibration`
+서비스가 `app`과 동일 이미지를 재사용해 24시간마다 CLI를 1회 호출한다(신규 이미지 0). 이 서비스가
+생기기 전에는 저장소 안에 그 CLI를 부르는 곳이 0건이라 응답이 쌓여도 `irt_difficulty_b`가 자동으로
+채워지지 않았다. GitHub Actions cron은 prod DB에 닿을 수 없어 스케줄 좌석으로 쓰지 않았다.
+
+```powershell
+# [실행 시스템] Windows PowerShell (= Phaiakes9 이 PC, 진입 명령 불요)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+
+# 자가검증 1: 컨테이너가 떠 있다 - "Up" 상태여야 함
+docker ps --filter "name=whymath-staging-item-calibration" --format "{{.Status}}"
+
+# 자가검증 2: 최근 실행 로그 - 성공은 calibration_run 한 줄(status=... finished_at=...).
+docker logs --tail 20 whymath-staging-item-calibration
+
+# 자가검증 3(읽기 전용 · 쓰기 0건): 보정 루프가 실제로 도는지 숫자로 본다.
+docker exec whymath-staging-app python -m whymath_backend.harness.item_calibration_reach_report
+```
+
+- **로그 읽는 법**: `status=noop_no_responses`는 채점 응답이 0행이라는 뜻이다 — 지금처럼 학생 응답이
+  없을 때의 **정상 상태**다(실패도 성공 위장도 아님). `noop_no_eligible_items`는 응답은 있으나 문항당
+  5회 미만이라는 뜻(정상 no-op), `calibrated`는 실제로 b를 보정했다는 뜻이다. 실패는
+  `status=failed error_type=<예외 타입명>`이며 컨테이너가 내려가 재시작을 반복한다.
+- **판정 읽는 법**(자가검증 3): `NO_RESPONSES`·`NO_ELIGIBLE_ITEMS`는 입력 부재(정상 no-op),
+  `LOOP_DORMANT`는 보정 자격 문항이 있는데 b가 전부 비어 있다는 뜻(배치가 한 번도 안 돌았다는
+  증거 — 이 서비스가 안 떠 있거나 실패 중인지부터 본다), `LOOP_STALE`은 일부만 채워짐(다음 실행 대기 또는
+  정지 — 단독으로 단정하지 않는다), `LOOP_CAUGHT_UP`은 자격 문항 전부 채워짐.
+- **한계(정직 기술)**: ①마지막 보정 시각은 DB에 저장되지 않는다(`Problem.calibrated_at` 부재) —
+  로그 한 줄이 유일한 기록이고 컨테이너 로그는 3×10MB 회전이다. ②스케줄은 *24시간 고정 간격*이다.
+  ③보정 계산은 순수 파이썬 전수 적합이라 문항·응답이 수만 단위가 되면 실행 시간이 길어진다 —
+  `--dry-run`으로 먼저 재고 증분 적합을 검토한다. ④`item-calibration` 서비스에 `--dry-run`을 붙이면
+  UPDATE가 영원히 0건이 되므로 `tests/infra/test_item_calibration_wiring.py`가 이를 거부한다.
+
 ## §6. 롤백
 
 ### 6-1. 1순위 — 이미지만 되돌린다 (스키마는 그대로)
@@ -480,9 +516,10 @@ gh api repos/kiki-s-broom/WhyMath/environments/prod --jq '{can_admins_bypass, ru
 
 | 항목 | 값 |
 |---|---|
-| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) + `-quality-worker`(QUALITY 비동기 큐 소비자·OPS-27) |
+| 스택 | `whymath-<env>-app`(uvicorn) + `-db`(pgvector/pg16) + `-redis`(redis:7-alpine) + `-retention-purge`(보존 파기 스케줄·SEC-12) + `-quality-worker`(QUALITY 비동기 큐 소비자·OPS-27) + `-item-calibration`(문항 난이도 보정 스케줄·PB-10) |
 | 보존 파기 | `retention-purge`가 app 이미지를 재사용해 24h마다 `retention_purge_cli` 호출(§5b) |
 | QUALITY 워커 | `quality-worker`가 app 이미지를 재사용해 `celery ... worker -c 1`로 큐를 소비(동시성 1 고정·GPU 단일 점유). 정본은 이 컨테이너, systemd 유닛은 비정본 대안(§5c) |
+| 난이도 보정 | `item-calibration`이 app 이미지를 재사용해 24h마다 `calibrate_items` 호출(§5d) |
 | 영속 볼륨 | `whymath-<env>-db-data`, `whymath-<env>-redis-data` |
 | 공개 포트 | app만 `${APP_PORT}`(기본 127.0.0.1 바인딩). db·redis는 **미공개**(compose 네트워크 내부) |
 | 환경 분리 | 단일 compose + `deploy/<env>.env` + `DEPLOY_ENV` 이름 격리 |
