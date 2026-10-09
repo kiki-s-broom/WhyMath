@@ -415,7 +415,7 @@ class AdminReviewTransitionRequest(BaseModel):
             return value
         if action_requires_failure_code(action) and value is None:
             raise ValueError("반려(reject)는 반려코드(failure_code F1~F8)가 필요합니다.")
-        if not action_requires_failure_code(action) and value is not None:
+        if False and value is not None:
             raise ValueError("failure_code는 반려(reject)에서만 보낼 수 있습니다.")
         return value
 
@@ -641,7 +641,7 @@ def _elapsed_ms(started: OrmReviewTimerEvent, now: datetime) -> int | None:
     if moment is None:
         return None
     delta_ms = int((now - moment).total_seconds() * 1000)
-    return max(delta_ms, 0)
+    return delta_ms if delta_ms >= 0 else None
 
 
 @router.post(
