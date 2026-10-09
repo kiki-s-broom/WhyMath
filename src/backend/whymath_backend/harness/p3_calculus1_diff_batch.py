@@ -20,6 +20,15 @@
 기록 직전에 전 레코드에서 그 키가 없음을 검사하고, 있으면 예외로 멈춘다(저작 도구가 승인을
 대신 쓰는 사고 방지).
 
+**각인은 감사받은 내용에 묶인다**: 저장소 은행은 이 배치 산출물 위에 코퍼스 단위 백필 두 개
+(`problem_corpus_persona_fit_backfill`·`problem_corpus_review_status_backfill`)가 `persona_fit`·
+`review_status`를 채운 상태다. `--check`는 그 두 키만 생성기 기본값으로 되돌린 바이트
+(`strip_backfill_stamps`)를 재생성 결과와 비교한다 — 나머지 바이트가 1개라도 다르면 드리프트다.
+같은 함수로 걷어 낸 바이트가 5회차 S5 감사 동결 사본과 같다는 것을 은행 커버리지 테스트가
+동결하므로, 생성기를 고쳐 내용이 바뀌면 각인이 남아 있어도 그 테스트가 빨개진다(새 감사 없이는
+승인이 옮겨 가지 않는다).
+이 배치를 기록 모드로 다시 돌리면 각인이 빠지므로 두 백필을 다시 돌려 커밋한다.
+
 **검증 등급 각인**: `machine_sampled`(Tier1 SymPy 검산). 산출물은 v0(사람 검수 전) —
 `is_published`는 False로 유지된다.
 
@@ -73,11 +82,14 @@ from whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_genera
 from whymath_backend.l3.verification_tier import VerificationTier
 
 __all__ = [
+    "BACKFILL_STAMP_DEFAULTS",
     "CORPUS_DIR_NAME",
     "GENERATORS",
     "build_provenance",
+    "drift_against",
     "main",
     "run_p3_calculus1_diff_batch",
+    "strip_backfill_stamps",
 ]
 
 CORPUS_DIR_NAME: Final = "problem_bank_p3_calculus1_diff_v0"
@@ -226,38 +238,93 @@ def build_provenance(
         "concepts": concepts,
         "approval_status": {
             "note": (
-                "미승인 — 레코드에 review_status 키를 쓰지 않는다(None/키 부재). 승인은 감사 표본 "
-                "경로의 몫이며 이 도구가 대신 쓰지 않는다. 승인 전에는 Phase 3 계측기의 "
-                "'승인 문항'으로 세어지지 않는다."
+                "이 도구는 review_status를 쓰지 않는다(키 부재). 승인 각인은 코퍼스 단위 백필"
+                "(problem_corpus_review_status_backfill · 코퍼스 키 p3_calculus1_diff_v0)이 감사 "
+                "라벨로 쓴다. 각인을 걷어 낸 은행 바이트가 감사 동결 사본과 같아야 승인이 유효하다."
             ),
-            "sample_review": "없음(0건)",
-            "evidence": "없음 — 승인 전까지 is_published=False 유지",
+            "sample_review": (
+                "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, "
+                "결함 1건 · 보정 상한 0.01151 ≤ 0.02"
+            ),
+            "evidence": (
+                "docs/data/p3_calculus1_diff_audit/bank_audit_r5/ (사전 등록·라벨·동결 사본) · "
+                "docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · "
+                "is_published=False 유지"
+            ),
         },
     }
+
+
+#: 코퍼스 단위 백필이 채우는 키와 그 키의 생성기 기본값(`None` = 생성기는 키를 쓰지 않는다).
+BACKFILL_STAMP_DEFAULTS: Final[dict[str, Any]] = {"persona_fit": {}, "review_status": None}
+
+
+def strip_backfill_stamps(text: str) -> str:
+    """은행 JSONL에서 백필 각인(`persona_fit`·`review_status`)을 생성기 기본값으로 되돌린다.
+
+    키 순서는 보존한다(백필은 기존 키를 제자리 갱신하고 새 키를 끝에 붙인다). 직렬화는 생성기·
+    백필과 같은 `json.dumps(ensure_ascii=False)` + 줄바꿈이다. 파싱할 수 없는 줄은 `ValueError`.
+    """
+    out: list[str] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError as exc:
+            raise ValueError(f"{number}행: JSON 파싱 실패({type(exc).__name__})") from exc
+        for key, default in BACKFILL_STAMP_DEFAULTS.items():
+            if default is None:
+                record.pop(key, None)
+            elif key in record:
+                record[key] = default
+        out.append(json.dumps(record, ensure_ascii=False) + "\n")
+    return "".join(out)
 
 
 def _render_provenance(generators: Sequence[type[P3DiffSlotGenerator]]) -> str:
     return json.dumps(build_provenance(generators), ensure_ascii=False, indent=2) + "\n"
 
 
+def drift_against(out_dir: Path, fresh_problems: bytes, fresh_provenance: bytes) -> list[str]:
+    """은행 디렉터리를 재생성 결과(두 파일의 바이트)와 비교한 드리프트 목록 — 빈 목록이면 동일.
+
+    은행 쪽 `problems.jsonl`은 백필 각인만 생성기 기본값으로 되돌려 비교한다
+    (`strip_backfill_stamps`). 파싱할 수 없는 줄이 있으면 드리프트다. 재생성과 분리해 두어
+    테스트가 생성 1회를 나눠 쓴다.
+    """
+    drift: list[str] = []
+    for name, fresh_bytes in (
+        (_PROBLEMS_FILE, fresh_problems),
+        (_PROVENANCE_FILE, fresh_provenance),
+    ):
+        target = out_dir / name
+        if not target.is_file():
+            drift.append(f"{name}: 파일이 없다")
+            continue
+        committed = target.read_bytes()
+        if name == _PROBLEMS_FILE:
+            try:
+                committed = strip_backfill_stamps(committed.decode("utf-8")).encode("utf-8")
+            except ValueError as exc:  # UnicodeDecodeError 포함 — 손상은 드리프트다
+                drift.append(f"{name}: 읽을 수 없다({type(exc).__name__}: {exc})")
+                continue
+        if committed != fresh_bytes:
+            drift.append(f"{name}: 재생성 결과와 바이트가 다르다(백필 각인 제외)")
+    return drift
+
+
 def _check(generators: Sequence[type[P3DiffSlotGenerator]], out_dir: Path) -> int:
-    """`--check` — 재생성 결과를 임시 디렉터리에 만들어 은행 파일과 바이트 비교한다(드리프트 1)."""
+    """`--check` — 재생성 결과를 임시 디렉터리에 만들어 은행 파일과 비교한다(드리프트 1)."""
     with tempfile.TemporaryDirectory() as tmp:
         fresh_problems = Path(tmp) / _PROBLEMS_FILE
         report = run_p3_calculus1_diff_batch(generators=generators, out_path=fresh_problems)
         if report.total_stored != report.total_requested:
             print("재생성 중 게이트 거부가 있어 드리프트를 판정할 수 없다.", file=sys.stderr)
             return 1
-        drift: list[str] = []
-        for name, fresh_bytes in (
-            (_PROBLEMS_FILE, fresh_problems.read_bytes()),
-            (_PROVENANCE_FILE, _render_provenance(generators).encode("utf-8")),
-        ):
-            target = out_dir / name
-            if not target.is_file():
-                drift.append(f"{name}: 파일이 없다")
-            elif target.read_bytes() != fresh_bytes:
-                drift.append(f"{name}: 재생성 결과와 바이트가 다르다")
+        drift = drift_against(
+            out_dir, fresh_problems.read_bytes(), _render_provenance(generators).encode("utf-8")
+        )
     if drift:
         for line in drift:
             print(f"드리프트 — {line}", file=sys.stderr)

@@ -42,3 +42,25 @@ CLI `s5` exit 0 — U = 0.01115, L = 0.96898, **보정 상한 0.01151(기준 ≤
 이 1건은 S5 판정에 그대로 들어가 있다(as-found). 승인 대상은 감사받은 504건 그대로이며(동결 사본 `audited_bank.jsonl`,
 sha256 위 사전 등록값과 동일), 이 원인을 교정하려고 은행을 다시 만들면 그 은행은 감사받지 않은 새 은행이 된다. 원인 분류
 `disposition.json`(교정용, 판정 불변). 판정자 라벨·근거 `llm_labels/`.
+
+## 승인 각인 (2026-10-09)
+
+S5 통과 뒤 정본 경로(`review_status_stamping_contract.md` §2 — 감사 라벨을 만들어 `KNOWN_CORPORA`·
+`AUDIT_LABEL_MAP`에 편입)로 은행을 승인 각인했다.
+
+- **감사 라벨**: `docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl` — 이 회차 프로토콜 합집합(기계 ∪ A ∪ B) 504행 +
+  as-found 선언(n = 504, 결함 1). 코퍼스 단위 백필의 판정은 보정 없는 Wilson 95% 상한 0.0088 ≤ 0.02 → `approved`
+  (승인의 정본 근거는 위 S5 보정 상한 0.01151이다 — 백필 판정은 같은 라벨의 형식 변환일 뿐 더 느슨한 기준으로 승인한 것이 아니다).
+- **편입**: 코퍼스 키 `p3_calculus1_diff_v0` — `KNOWN_CORPORA` 8번째·`AUDIT_LABEL_MAP`. 고정 코퍼스 8종 3,142건
+  (approved 2,984 · pending 158).
+- **각인**: `persona_fit` 백필(밴드 CORE 240 · MID_HIGH 108 · HIGH 96 · KILLER 60) → `review_status` 백필(504건 `approved`).
+  감사로그 `docs/data/persona_fit_backfill_audit/`·`docs/data/review_status_backfill_audit/`의 `problem_bank_p3_calculus1_diff_v0.jsonl`.
+- **내용 결속**: 각인 두 키를 생성기 기본값으로 되돌린 은행 바이트(`p3_calculus1_diff_batch.strip_backfill_stamps`) ==
+  이 폴더의 `audited_bank.jsonl`(sha256 `3abfc4e6…`). `tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py`가
+  동결하며, 각인을 둔 채 내용 1글자를 바꾼 주입에서 RED다 — 생성기를 고쳐 내용이 바뀌면 새 회차 감사 없이는 승인이 옮겨 가지 않는다.
+  생성기 드리프트 검사(`--check`)는 각인 두 키만 제외하고 비교한다.
+- **Coverage 재측정**(P3-02 CLI `phase3_coverage`, 각인 전 `c099f756` → 각인 후): Content Coverage 3/10(30%) → **10/10(100%)**
+  (목표 ≥ 95% 충족) · Curriculum Coverage 30% → 100% · 해설 연결 2 → 9 · Graph Connectivity 30% → 50%.
+  Concept Completeness는 0/10 그대로다 — 힌트 연결이 10개념 모두 측정 불가(힌트 저장 좌석 부재 · ARCH-39 · P3-04 소관)이고,
+  02-02는 다른 코퍼스(`conceptual_v0`)의 승인 문항 24건에 해설·풀이 단계가 없다.
+- **is_published**: `False` 유지 — 승인(`review_status`)과 공개(`is_published`)는 다른 축이다.

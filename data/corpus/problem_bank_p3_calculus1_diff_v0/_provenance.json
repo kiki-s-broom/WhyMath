@@ -124,8 +124,8 @@
     }
   },
   "approval_status": {
-    "note": "미승인 — 레코드에 review_status 키를 쓰지 않는다(None/키 부재). 승인은 감사 표본 경로의 몫이며 이 도구가 대신 쓰지 않는다. 승인 전에는 Phase 3 계측기의 '승인 문항'으로 세어지지 않는다.",
-    "sample_review": "없음(0건)",
-    "evidence": "없음 — 승인 전까지 is_published=False 유지"
+    "note": "이 도구는 review_status를 쓰지 않는다(키 부재). 승인 각인은 코퍼스 단위 백필(problem_corpus_review_status_backfill · 코퍼스 키 p3_calculus1_diff_v0)이 감사 라벨로 쓴다. 각인을 걷어 낸 은행 바이트가 감사 동결 사본과 같아야 승인이 유효하다.",
+    "sample_review": "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, 결함 1건 · 보정 상한 0.01151 ≤ 0.02",
+    "evidence": "docs/data/p3_calculus1_diff_audit/bank_audit_r5/ (사전 등록·라벨·동결 사본) · docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
   }
 }

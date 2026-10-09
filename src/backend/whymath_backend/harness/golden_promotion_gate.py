@@ -16,7 +16,7 @@
 
 ③단의 각인 도구는 코퍼스 부류마다 하나다(EOS-136 — 계약 정본
 `docs/standards/review_status_stamping_contract.md`): 축적 CLI의 **회차 코퍼스**는 사람 판정을
-slug별로 옮기는 `harness/review_status_verdict_bridge`, 고정 코퍼스 7종(`KNOWN_CORPORA`)은
+slug별로 옮기는 `harness/review_status_verdict_bridge`, 고정 코퍼스 8종(`KNOWN_CORPORA`)은
 감사 라벨 표본으로 코퍼스 전체를 판정하는 `harness/problem_corpus_review_status_backfill`이다.
 이 게이트는 어느 도구의 감사로그든 같은 형식(`slug`·`review_status`)으로 읽는다.
 

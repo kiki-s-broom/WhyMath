@@ -1,7 +1,7 @@
 """persona_fit 백필의 실제 코퍼스 커버리지·L6 적격 효과 봉인(S3-10 acceptance).
 
 `test_persona_fit_rules.py`(합성 픽스처)·`test_problem_corpus_persona_fit_backfill.py`(hermetic
-CLI 계약)에 더해, 이 모듈은 **실제 코퍼스 7종**(2026-07-30 미병합 브랜치 회수 시
+CLI 계약)에 더해, 이 모듈은 **실제 코퍼스 8종**(2026-07-30 미병합 브랜치 회수 시
 `probability_finite_v0`이 7번째로 추가됨 — `harness/problem_corpus_persona_fit_backfill.
 KNOWN_CORPORA` 참조)을 로드해 두 가지를 실측 봉인한다:
 
@@ -38,8 +38,9 @@ def _all_problems() -> list[Problem]:
     return problems
 
 
-def test_seven_corpora_covered() -> None:
-    assert len(KNOWN_CORPORA) == 7
+def test_eight_corpora_covered() -> None:
+    # 8번째 = P3-03 미분 은행(`p3_calculus1_diff_v0` — 5회차 S5 감사 승인 뒤 편입, 2026-10-09).
+    assert len(KNOWN_CORPORA) == 8
 
 
 def test_no_empty_persona_fit_in_real_corpus() -> None:

@@ -5,9 +5,10 @@
 
 핵심 축 — "approved만 빠진 상태"의 증명
 ---------------------------------------
-이 은행은 `review_status` 키를 쓰지 않으므로 계측기(`phase3_coverage`)는 이 문항을 적격으로 세지
-않는다(승인은 감사 표본 경로의 몫). 그러나 **승인만 되면** 일곱 개념(02-03·04·05·06·08·09·10)이
-충족으로 세어져야 의미가 있다.
+생성기는 `review_status` 키를 쓰지 않는다(승인은 감사 표본 경로의 몫). 저장소 은행은 5회차 S5 감사
+승인 뒤 코퍼스 단위 백필이 전건 `approved`를 각인한 상태이고, 그 각인을 걷어 낸 바이트가 감사 동결
+사본과 같아야 한다(`test_committed_bank_approval_is_bound_to_the_audited_content`). 계측기
+(`phase3_coverage`)는 **승인만 되면** 일곱 개념(02-03·04·05·06·08·09·10)을 충족으로 세어야 의미가 있다.
 이를 실측하려고 임시 저장소 루트(코퍼스 디렉터리는 심볼릭 링크, 이 은행만 변형 복사본)를 만들어
 
   · 키 제거본(`review_status` 없음) → 일곱 개념 미충족 (현행 상태의 재현)
@@ -27,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from whymath_backend.harness.p3_calculus1_diff_batch import CORPUS_DIR_NAME
+from whymath_backend.harness.p3_calculus1_diff_batch import CORPUS_DIR_NAME, strip_backfill_stamps
 from whymath_backend.l1.standards import phase3_coverage as pc
 from whymath_backend.l1.standards.phase3_scope import (
     default_spec_path,
@@ -101,9 +102,44 @@ def test_committed_bank_shape_per_concept_and_slot() -> None:
         assert len({skeleton_of(str(r["question_text"])) for r in mine}) >= 30
 
 
-def test_committed_bank_never_carries_review_status_and_stays_unpublished() -> None:
+#: 승인 근거가 된 감사 — 5회차 S5(자격 통과 프로토콜 · 결함 1/504 · 보정 상한 0.01151 ≤ 0.02).
+_AUDITED_BANK = (
+    _REPO_ROOT
+    / "docs"
+    / "data"
+    / "p3_calculus1_diff_audit"
+    / "bank_audit_r5"
+    / "audited_bank.jsonl"
+)
+
+
+def test_committed_bank_approval_is_bound_to_the_audited_content() -> None:
+    """승인 각인은 감사받은 내용에만 붙는다 — 각인을 걷어 낸 바이트 == 5회차 감사 동결 사본.
+
+    생성기를 고쳐 내용이 바뀌면(문항 1글자라도) 각인이 남아 있어도 여기서 빨개진다. 그때는 새 회차
+    감사를 거쳐 이 경로·근거를 함께 바꿔야 한다 — 감사 없이 승인을 새 내용으로 옮기지 않는다.
+    """
+    committed = (_BANK / "problems.jsonl").read_text(encoding="utf-8")
+    assert strip_backfill_stamps(committed).encode("utf-8") == _AUDITED_BANK.read_bytes()
+    assert {row.get("review_status") for row in _rows()} == {"approved"}
+
+
+def test_binding_detects_content_change_under_an_intact_stamp() -> None:
+    """**변별력** — 각인을 그대로 두고 문항 내용만 1글자 바꾸면 결속이 깨진다(대조군: 원본은 성립)."""
+    committed = (_BANK / "problems.jsonl").read_text(encoding="utf-8")
+    first, rest = committed.split("\n", 1)
+    row = json.loads(first)
+    original = row["answer_explanation"]
+    row["answer_explanation"] = original + " "
+    tampered = json.dumps(row, ensure_ascii=False) + "\n" + rest
+    assert tampered != committed  # 주입이 실제로 적용됐다
+    assert row["review_status"] == "approved"  # 각인은 그대로
+    assert strip_backfill_stamps(tampered).encode("utf-8") != _AUDITED_BANK.read_bytes()
+    assert strip_backfill_stamps(committed).encode("utf-8") == _AUDITED_BANK.read_bytes()
+
+
+def test_committed_bank_stays_unpublished_and_self_authored() -> None:
     for row in _rows():
-        assert "review_status" not in row, row["slug"]
         assert row["is_published"] is False
         assert row["license"] == "WHYMATH_GENERATED"
         assert row["source_type"] == "자체생성"

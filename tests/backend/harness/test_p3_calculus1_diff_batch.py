@@ -50,13 +50,30 @@ def _expected_total() -> int:
     return sum(len(g.items(s)) for g in batch.GENERATORS for s in SLOT_IDS)
 
 
+@pytest.fixture(scope="module")
+def fresh_bank(tmp_path_factory: pytest.TempPathFactory) -> tuple[batch.CorpusBatchReport, Path]:
+    """등록부 전체를 한 번만 돌린 결과(은행 504건 ≈ 2분) — 이 모듈의 여러 테스트가 나눠 쓴다.
+
+    `corpus-authoring` 잡은 25분 상한이고 직렬이라, 테스트마다 생성기를 다시 돌리면 잡이 상한에 닿는다.
+    """
+    out = tmp_path_factory.mktemp("fresh_bank") / "problems.jsonl"
+    return batch.run_p3_calculus1_diff_batch(out_path=out), out
+
+
+def _fresh_drift(out_dir: Path, fresh: Path) -> list[str]:
+    return batch.drift_against(
+        out_dir, fresh.read_bytes(), batch._render_provenance(batch.GENERATORS).encode("utf-8")
+    )
+
+
 def _records(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def test_batch_stores_every_item_through_the_gate(tmp_path: Path) -> None:
-    out = tmp_path / "problems.jsonl"
-    report = batch.run_p3_calculus1_diff_batch(out_path=out)
+def test_batch_stores_every_item_through_the_gate(
+    fresh_bank: tuple[batch.CorpusBatchReport, Path],
+) -> None:
+    report, out = fresh_bank
 
     assert report.total_stored == report.total_requested == _expected_total()
     assert report.written == _expected_total()
@@ -82,11 +99,12 @@ def test_batch_stores_every_item_through_the_gate(tmp_path: Path) -> None:
         assert len(record["concepts"]) == 1  # type: ignore[arg-type]
 
 
-def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
-    first, second = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
-    batch.run_p3_calculus1_diff_batch(out_path=first)
+def test_batch_is_byte_deterministic(
+    tmp_path: Path, fresh_bank: tuple[batch.CorpusBatchReport, Path]
+) -> None:
+    second = tmp_path / "b.jsonl"
     batch.run_p3_calculus1_diff_batch(out_path=second)
-    assert first.read_bytes() == second.read_bytes()
+    assert fresh_bank[1].read_bytes() == second.read_bytes()
 
 
 def test_committed_bank_is_in_sync_with_the_generators() -> None:
@@ -94,36 +112,46 @@ def test_committed_bank_is_in_sync_with_the_generators() -> None:
     assert batch.main(["--check"]) == 0
 
 
-def test_check_detects_tampering_and_missing_files(tmp_path: Path) -> None:
-    """**변별력** — `--check`가 정상에서만 0이고, 변조·부재에서는 1이다."""
+def test_check_detects_tampering_and_missing_files(
+    tmp_path: Path, fresh_bank: tuple[batch.CorpusBatchReport, Path]
+) -> None:
+    """**변별력** — 비교가 정상에서만 빈 목록이고, 변조·부재에서는 드리프트를 낸다.
+
+    CLI 왕복(`--check`)은 `test_committed_bank_is_in_sync_with_the_generators`가 1회 본다 — 여기서는
+    재생성 1회(`fresh_bank`)를 나눠 쓰며 같은 비교 함수(`drift_against`)를 직접 부른다.
+    """
+    fresh = fresh_bank[1]
     good = tmp_path / "good"
     shutil.copytree(_REPO_BANK, good)
-    assert batch.main(["--check", "--out-dir", str(good)]) == 0
+    assert _fresh_drift(good, fresh) == []
 
     tampered = tmp_path / "tampered"
     shutil.copytree(_REPO_BANK, tampered)
     target = tampered / "problems.jsonl"
     data = bytearray(target.read_bytes())
-    data[len(data) // 2] ^= 0x01  # 1비트 변조
+    data[len(data) // 2] ^= 0x01  # 1비트 변조(은행 중앙 = 내용 필드 — 각인 키가 아니다)
     target.write_bytes(bytes(data))
-    assert batch.main(["--check", "--out-dir", str(tampered)]) == 1
+    assert _fresh_drift(tampered, fresh)
 
     tampered_sidecar = tmp_path / "tampered_sidecar"
     shutil.copytree(_REPO_BANK, tampered_sidecar)
     sidecar = tampered_sidecar / "_provenance.json"
     sidecar.write_text(sidecar.read_text(encoding="utf-8").replace("2026-10-06", "2026-10-07"))
-    assert batch.main(["--check", "--out-dir", str(tampered_sidecar)]) == 1
+    assert _fresh_drift(tampered_sidecar, fresh)
 
     missing = tmp_path / "missing"
     shutil.copytree(_REPO_BANK, missing)
     (missing / "_provenance.json").unlink()
-    assert batch.main(["--check", "--out-dir", str(missing)]) == 1
+    assert _fresh_drift(missing, fresh) == ["_provenance.json: 파일이 없다"]
 
 
 def test_cli_writes_bank_and_sidecar(tmp_path: Path) -> None:
     out_dir = tmp_path / "bank"
     assert batch.main(["--out-dir", str(out_dir)]) == 0
-    assert (out_dir / "problems.jsonl").read_bytes() == (_REPO_BANK / "problems.jsonl").read_bytes()
+    # 저장소 은행은 백필 각인(persona_fit·review_status)이 더해진 상태 — 각인을 걷어 내면 같아야 한다
+    committed = (_REPO_BANK / "problems.jsonl").read_text(encoding="utf-8")
+    written = (out_dir / "problems.jsonl").read_text(encoding="utf-8")
+    assert written == batch.strip_backfill_stamps(committed)
     assert (out_dir / "_provenance.json").read_bytes() == (
         _REPO_BANK / "_provenance.json"
     ).read_bytes()
@@ -146,7 +174,10 @@ def test_sidecar_matches_build_provenance_and_the_bank() -> None:
         assert info["records"] == len(in_bank)
         for slot, count in info["slots"].items():
             assert count == sum(1 for r in in_bank if r["tags"] == [f"p3-slot:{slot}"])
-    assert '"review_status"' not in (_REPO_BANK / "problems.jsonl").read_text(encoding="utf-8")
+    # 저장소 은행의 review_status는 이 배치가 아니라 코퍼스 단위 백필이 쓴다(감사 승인 뒤 각인) —
+    # 이 배치의 산출물에는 그 키가 없다(`test_batch_stores_every_item_through_the_gate`).
+    committed = (_REPO_BANK / "problems.jsonl").read_text(encoding="utf-8")
+    assert '"review_status"' not in batch.strip_backfill_stamps(committed)
 
 
 def test_gate_rejects_authoring_defect_and_cli_would_fail(tmp_path: Path) -> None:
@@ -180,6 +211,54 @@ def test_batch_refuses_to_write_review_status(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="review_status"):
         batch.run_p3_calculus1_diff_batch(generators=(Approving,), out_path=tmp_path / "bad.jsonl")
+
+
+def _rewrite_first_row(path: Path, **changes: object) -> None:
+    """은행 사본의 첫 레코드만 바꿔 다시 쓴다(키 순서·직렬화 보존)."""
+    first, rest = path.read_text(encoding="utf-8").split("\n", 1)
+    row = json.loads(first)
+    row.update(changes)
+    path.write_text(json.dumps(row, ensure_ascii=False) + "\n" + rest, encoding="utf-8")
+
+
+def test_check_ignores_backfill_stamps_but_not_content(
+    tmp_path: Path, fresh_bank: tuple[batch.CorpusBatchReport, Path]
+) -> None:
+    """`--check`는 백필 각인(`persona_fit`·`review_status`)만 제외하고 비교한다 — 내용은 여전히 잡는다.
+
+    각인 값의 정당성은 이 배치가 아니라 백필 드리프트 가드와 감사 결속 테스트의 몫이다.
+    """
+    stamped = tmp_path / "stamped"
+    shutil.copytree(_REPO_BANK, stamped)
+    assert '"review_status": "approved"' in (stamped / "problems.jsonl").read_text("utf-8")
+    _rewrite_first_row(stamped / "problems.jsonl", review_status="rejected", persona_fit={"A": 0.1})
+    assert _fresh_drift(stamped, fresh_bank[1]) == []
+
+    content = tmp_path / "content"
+    shutil.copytree(_REPO_BANK, content)
+    original = json.loads((content / "problems.jsonl").read_text("utf-8").split("\n", 1)[0])
+    _rewrite_first_row(content / "problems.jsonl", question_text=original["question_text"] + " ")
+    assert _fresh_drift(content, fresh_bank[1])
+
+
+def test_check_reports_an_unreadable_line_as_drift(
+    tmp_path: Path, fresh_bank: tuple[batch.CorpusBatchReport, Path]
+) -> None:
+    """파싱할 수 없는 줄은 예외가 아니라 드리프트다 — 조용히 건너뛰지도 않는다."""
+    broken = tmp_path / "broken"
+    shutil.copytree(_REPO_BANK, broken)
+    target = broken / "problems.jsonl"
+    target.write_text(target.read_text("utf-8") + "{not json\n", encoding="utf-8")
+    drift = _fresh_drift(broken, fresh_bank[1])
+    assert len(drift) == 1 and "읽을 수 없다" in drift[0], drift
+
+
+def test_strip_backfill_stamps_is_identity_on_generator_output(
+    fresh_bank: tuple[batch.CorpusBatchReport, Path],
+) -> None:
+    """생성기 산출물(각인 없음)에는 무변화 — 걷어 내기가 내용 바이트를 건드리지 않는다."""
+    text = fresh_bank[1].read_text(encoding="utf-8")
+    assert batch.strip_backfill_stamps(text) == text
 
 
 def test_registry_is_extensible_by_adding_a_class(tmp_path: Path) -> None:

@@ -328,7 +328,9 @@ def test_every_record_carries_solution_steps(rows: list[dict[str, Any]]) -> None
         steps = row["verify"].get("solution_steps")
         assert isinstance(steps, list) and len(steps) >= 2, row["slug"]
         assert all(isinstance(s, str) and s.strip() for s in steps), row["slug"]
-        assert "review_status" not in row
+        # 승인 각인은 감사 라벨 경로(코퍼스 단위 백필)만 쓴다 — 내용 결속은
+        # `test_p3_calculus1_diff_bank_coverage_link.py::test_committed_bank_approval_is_bound_...`.
+        assert row.get("review_status") == "approved", row["slug"]
 
 
 # 은행 전수(504건)를 판정기·검산기에 돌리는 측정 — 저작 잡에서 돈다(backend 잡 시간 상한 · 2026-10-09 실측 33초/커버리지)
