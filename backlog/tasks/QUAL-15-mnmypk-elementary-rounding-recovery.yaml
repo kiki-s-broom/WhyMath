@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: cancelled
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,5 +19,8 @@ paths:
   - src/backend/whymath_backend/l3/equivalent/elementary_rounding_skeleton_generator.py
   - tests/backend/harness/test_elementary_rounding_corpus_convention.py
 session: null
-notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-① (stray-code 16회차). 소유 태스크 QUAL-11-elementary-rounding-place-interpretation. 회수 완료 전 원 브랜치 claude/friendly-pascal-mnmypk 삭제 금지. 원격 claim QUAL-11은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
+notes: |-
+  출처: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-① (stray-code 16회차). 소유 태스크 QUAL-11-elementary-rounding-place-interpretation. 회수 완료 전 원 브랜치 claude/friendly-pascal-mnmypk 삭제 금지. 원격 claim QUAL-11은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다.
+
+  [취소 2026-10-09] Kiki 지시(2026-10-09)로 취소 — 회수 착수 전(todo)이며 원 브랜치 claude/friendly-pascal-mnmypk는 삭제하지 않고 보존한다
 updated: 2026-10-09
