@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from fractions import Fraction
 
 import pytest
 
@@ -47,6 +48,7 @@ from whymath_backend.l3.models import (
 from whymath_backend.l3.pregenerate.provenance_bridge import model_name_for_decision
 from whymath_backend.l3.prompt_assets import prompt_text
 from whymath_backend.l3.router import Router, resolve_model
+from whymath_backend.l3.statistical_claim import verify_statistical_claim
 
 _SUBJECT = ResidueSubject(
     problem_id="wm-finite-test",
@@ -658,3 +660,249 @@ def test_declaration_equal_to_record_is_idempotent_and_case_insensitive() -> Non
 def test_conflict_error_is_an_independence_error() -> None:
     """하위 호출부가 `IndependenceError` 하나로 독립성 위반을 잡을 수 있다."""
     assert issubclass(AuthorDeclarationConflictError, IndependenceError)
+
+
+# ── 통계 독립 재계산 대조 (S4-70) — float isclose 대신 정확값 정책 ─────────────
+_STAT_RECONSTRUCT = STATISTICAL_PERSPECTIVES[0]
+
+
+def _stat_subject(**overrides: object) -> ResidueSubject:
+    base = ResidueSubject(
+        problem_id="wm-stat-test",
+        question_text="자료의 평균은?",
+        answer="3",
+        answer_explanation="",
+        machine_model_ko="평균(n=5) = 3",
+        machine_total=0,
+        machine_favorable=0,
+        authored_by=deterministic_author("stat_generator"),
+        data="data=[1,2,3,4,5]; stat=mean",
+    )
+    return replace(base, **overrides)  # type: ignore[arg-type]
+
+
+def _reconstruct(subject: ResidueSubject, value: object) -> str:
+    assert _STAT_RECONSTRUCT.principle == "statistical_reconstruction"
+    return _STAT_RECONSTRUCT.judge(subject, {"value": value}).verdict
+
+
+_TRILLION = 10**12
+
+
+@pytest.mark.parametrize(
+    "llm_value",
+    [_TRILLION + 1, f"{_TRILLION + 1}", float(_TRILLION + 1)],
+    ids=["int", "str", "float"],
+)
+def test_stat_reconstruct_large_mean_off_by_one_is_a_defect(llm_value: object) -> None:
+    """수정 전에는 평균 10^12에서 1 어긋나도 rel_tol 1e-9 허용 폭(1000)에 들어 ok였다."""
+    subject = _stat_subject(
+        machine_value=float(_TRILLION),
+        machine_exact=Fraction(_TRILLION),
+        machine_approx=Fraction(_TRILLION),
+    )
+    assert _reconstruct(subject, llm_value) == "defect"
+    # 대조군 — 정확히 같은 대값은 통과한다(전건 defect 과잉 수정 방지).
+    assert _reconstruct(subject, _TRILLION) == "ok"
+    assert _reconstruct(subject, f"{_TRILLION}") == "ok"
+
+
+def test_stat_reconstruct_mismatch_reason_names_policy_and_exact_values() -> None:
+    subject = _stat_subject(machine_exact=Fraction(_TRILLION), machine_approx=Fraction(_TRILLION))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": _TRILLION + 1})
+    assert verdict.defect_class == "model_mismatch"
+    assert "exact" in verdict.reason
+    assert str(_TRILLION + 1) in verdict.reason
+
+
+def test_stat_reconstruct_terminating_machine_value_requires_exact_match() -> None:
+    subject = _stat_subject(machine_exact=Fraction(5, 2), machine_approx=Fraction(5, 2))
+    assert _reconstruct(subject, "2.5") == "ok"
+    assert _reconstruct(subject, "5/2") == "ok"
+    assert _reconstruct(subject, 2.5) == "ok"
+    # 유한소수 기계값은 정확 일치 — 1e-10 어긋남도 통과시키지 않는다.
+    assert _reconstruct(subject, "2.5000000001") == "defect"
+
+
+def test_stat_reconstruct_reads_float_by_its_decimal_notation_not_binary_value() -> None:
+    """LLM이 쓴 `0.1`은 십진 1/10이다. 이진 근사(0.1000000000000000055…)로 읽으면 정확 일치가 깨진다."""
+    subject = _stat_subject(machine_exact=Fraction(1, 10), machine_approx=Fraction(1, 10))
+    assert _reconstruct(subject, 0.1) == "ok"
+    assert _reconstruct(subject, "0.1") == "ok"
+    assert (
+        _reconstruct(subject, 0.3 - 0.2) == "defect"
+    )  # 0.09999999999999998 — 부동소수 잡음은 거른다
+
+
+def test_stat_reconstruct_bool_is_never_a_number() -> None:
+    """JSON `true`는 파이썬에서 1과 같다 — 기계값이 1이어도 숫자 1로 통과하면 안 된다."""
+    subject = _stat_subject(machine_exact=Fraction(1), machine_approx=Fraction(1))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": True})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "value_unparsed"
+    assert _reconstruct(subject, 1) == "ok"  # 대조군
+
+
+def test_stat_reconstruct_non_terminating_machine_value_uses_absolute_tolerance() -> None:
+    subject = _stat_subject(machine_exact=Fraction(7, 3), machine_approx=Fraction(7, 3))
+    assert _reconstruct(subject, "7/3") == "ok"
+    assert _reconstruct(subject, "2.3333333333") == "ok"  # 오차 3.3e-11 <= 1e-9
+    assert _reconstruct(subject, "2.33") == "defect"
+    # 허용 폭 경계 — 오차 1.67e-9 는 10^-9 를 넘는다(폭을 10배 풀면 통과해 버리는 입력)
+    assert _reconstruct(subject, "2.333333335") == "defect"
+    assert _reconstruct(subject, "2.3333333323") == "defect"  # 반대 방향 오차 1.0e-9 초과
+
+
+def test_stat_reconstruct_absolute_tolerance_boundary_is_inclusive() -> None:
+    """오차가 정확히 10^-9 인 재계산은 통과(경계 포함), 그보다 1/3·10^-18 이라도 크면 거절.
+
+    S4-58 의 `abs:` 정책이 경계 포함이므로 교차검증도 같아야 한다 — 패리티 검사의 입력 격자에는
+    오차가 정확히 10^-9 인 값이 없어 이 절을 밟지 못하기에 여기서 직접 건드린다.
+    """
+    subject = _stat_subject(machine_exact=Fraction(1, 3), machine_approx=Fraction(1, 3))
+    on_boundary = Fraction(1, 3) + Fraction(1, 10**9)
+    assert _reconstruct(subject, f"{on_boundary.numerator}/{on_boundary.denominator}") == "ok"
+    over = on_boundary + Fraction(1, 10**18)
+    assert _reconstruct(subject, f"{over.numerator}/{over.denominator}") == "defect"
+    below = Fraction(1, 3) - Fraction(1, 10**9)
+    assert _reconstruct(subject, f"{below.numerator}/{below.denominator}") == "ok"  # 반대 방향
+
+
+def test_stat_reconstruct_irrational_machine_value_uses_approx_only() -> None:
+    """무리수(exact 없음) — 근사만 있어도 절대오차로 대조한다. 정확 일치를 요구하지 않는다."""
+    sqrt2 = Fraction(14142135623730950488, 10**19)
+    subject = _stat_subject(machine_exact=None, machine_approx=sqrt2)
+    assert _reconstruct(subject, "1.41421356237") == "ok"
+    assert _reconstruct(subject, 1.4142135623730951) == "ok"
+    assert _reconstruct(subject, "1.4143") == "defect"
+
+
+def test_stat_reconstruct_keeps_float_only_machine_value_contract() -> None:
+    """exact·approx 필드를 모르는 기존 소비자(float `machine_value`만 채움)도 그대로 동작한다."""
+    third = _stat_subject(machine_value=7 / 3)
+    assert _reconstruct(third, "7/3") == "ok"  # float을 exact로 승격하면 여기서 거부된다
+    assert _reconstruct(third, "2.33") == "defect"
+    assert _reconstruct(_stat_subject(machine_value=3.0), 3) == "ok"
+
+
+def test_stat_reconstruct_exact_fields_take_precedence_over_float() -> None:
+    """정확 필드가 있으면 낡은 float 값이 판정을 흐리지 않는다."""
+    subject = _stat_subject(
+        machine_value=float(_TRILLION),
+        machine_exact=Fraction(_TRILLION + 1),
+        machine_approx=Fraction(_TRILLION + 1),
+    )
+    assert _reconstruct(subject, _TRILLION + 1) == "ok"
+    assert _reconstruct(subject, _TRILLION) == "defect"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        True,
+        "1 000",
+        "abc",
+        float("nan"),
+        float("inf"),
+        "1/0",
+        [3],
+        {"v": 3},
+        "1e999999999",
+        "9" * 70,
+        10**70,
+        "",
+        "   ",
+    ],
+    ids=[
+        "bool",
+        "split-digits",
+        "text",
+        "nan",
+        "inf",
+        "zero-den",
+        "list",
+        "dict",
+        "exponent-bomb",
+        "long-token-str",
+        "long-token-int",
+        "empty",
+        "blank",
+    ],
+)
+def test_stat_reconstruct_unreadable_value_is_unclear_not_ok(raw: object) -> None:
+    subject = _stat_subject(machine_exact=Fraction(3), machine_approx=Fraction(3))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": raw})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "value_unparsed"
+
+
+def test_stat_reconstruct_without_any_machine_value_is_unclear() -> None:
+    verdict = _STAT_RECONSTRUCT.judge(_stat_subject(), {"value": 3})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "machine_value_missing"
+    nan_only = _stat_subject(machine_value=float("nan"))
+    assert _STAT_RECONSTRUCT.judge(nan_only, {"value": 3}).defect_class == "machine_value_missing"
+
+
+@pytest.mark.parametrize(
+    "conditions",
+    [
+        "data=[1,2,3,4,5]; stat=mean",  # 3 — 유한소수(정확 일치)
+        "data=[1,2,4]; stat=mean",  # 7/3 — 무한소수(절대오차)
+        "data=[1,2,3,4]; stat=std",  # 무리수(절대오차)
+        f"data=[{_TRILLION},{_TRILLION},{_TRILLION}]; stat=mean",  # 대값
+        f"data=[{_TRILLION},{_TRILLION},{_TRILLION + 1}]; stat=mean",  # 대값 무한소수
+        "data=[1,2]; stat=mean",  # 3/2
+    ],
+)
+@pytest.mark.parametrize(
+    "claimed",
+    [
+        "3", "1.5", "7/3", "2.3333333333", "2.33", "1.2909944487", "1.29", "1.2909944488",
+        str(_TRILLION), str(_TRILLION + 1), "1000000000000.0000000001", "3.0000000001", "2.9999",
+    ],
+)  # fmt: skip
+def test_stat_reconstruct_policy_matches_statistical_claim_default_policy(
+    conditions: str, claimed: str
+) -> None:
+    """패리티 — CORE(cross_verify)는 수학 ADAPTER를 import할 수 없어 정책을 자급한다.
+
+    두 구현이 어긋나면 ADAPTER가 pass로 닫은 문항을 교차검증이 defect로 뒤집거나 그 반대가 된다.
+    선언된 `tolerance` 절이 없는 기본 정책 기준으로, 같은 입력에서 판정이 항상 같아야 한다.
+    """
+    authority, _, result = verify_statistical_claim(conditions, claimed)
+    if authority.state == "unverifiable":
+        pytest.skip("기계가 판정하지 않는 입력(패리티 대상 아님)")
+    subject = _stat_subject(
+        machine_value=result.value,
+        machine_exact=result.exact_value,
+        machine_approx=result.approx_value,
+    )
+    expected = {"pass": "ok", "fail": "defect"}[authority.state]
+    assert _reconstruct(subject, claimed) == expected
+
+
+def test_stat_reconstruct_parity_probe_discriminates() -> None:
+    """패리티 탐침의 변별력 — 두 갈래(ok·defect)와 세 정책이 실제로 모두 밟힌다.
+
+    전부 skip되거나 한쪽 결과만 나오면 위 패리티 검사는 아무것도 말하지 않는 위장이다.
+    """
+    seen: set[tuple[str, str]] = set()
+    for conditions, claimed in [
+        ("data=[1,2,3,4,5]; stat=mean", "3"),  # exact → pass
+        ("data=[1,2,3,4,5]; stat=mean", "3.0000000001"),  # exact → fail
+        ("data=[1,2,4]; stat=mean", "2.3333333333"),  # abs → pass
+        ("data=[1,2,4]; stat=mean", "2.33"),  # abs → fail
+        ("data=[1,2,3,4]; stat=std", "1.2909944487"),  # 무리수 abs → pass
+    ]:
+        authority, _, result = verify_statistical_claim(conditions, claimed)
+        subject = _stat_subject(
+            machine_exact=result.exact_value, machine_approx=result.approx_value
+        )
+        seen.add((result.policy, _reconstruct(subject, claimed)))
+    assert seen == {
+        ("기본→exact", "ok"),
+        ("기본→exact", "defect"),
+        ("기본→abs:0.000000001", "ok"),
+        ("기본→abs:0.000000001", "defect"),
+    }

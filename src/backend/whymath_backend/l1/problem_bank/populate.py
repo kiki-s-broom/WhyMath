@@ -165,7 +165,29 @@ _RELATION_TYPE_VALUES: frozenset[str] = frozenset(r.value for r in RelationType)
 # 유효 verification_tier 값(l3/verification_tier.VerificationTier와 값 동기 — L1은 L3를 임포트할
 # 수 없어 문자열 상수로 이중 관리한다. 미지값은 조용히 버리지 않고 ProblemCorpusError로 거부한다
 # (검증 등급은 안전 신호라 sibling authoring 필드보다 엄격하게 다룬다).
-_VERIFICATION_TIER_VALUES: frozenset[str] = frozenset({"machine_exhaustive", "machine_sampled"})
+#
+# S4-68 — 종전엔 레거시 2값만 허용해, S4-55가 `VerificationTier`를 9값으로 넓힌 뒤에도 신규 등급
+# (예: S4-66 sequence_induction의 `finite_exhaustive`)을 `verify.verification_tier`로 찍은 레코드가
+# 적재 단계에서 거부됐다. 부분집합 유지는 의도가 아니다 — 읽는 쪽(`read_verification_tier`)은 9값을
+# 전부 받고, 이 집합은 "값 동기"를 주석으로 약속했다. 동기는 약속이 아니라 테스트가 강제한다:
+# `tests/backend/l1/problem_bank/test_verification_tier_sync.py`가 두 집합의 일치를 대조한다.
+_VERIFICATION_TIER_VALUES: frozenset[str] = frozenset(
+    {
+        # 레거시 alias 2종(v1 코퍼스가 쓰는 이름)
+        "machine_exhaustive",
+        "machine_sampled",
+        # 기계 증명/결정론
+        "finite_exhaustive",
+        "symbolic_proof",
+        "deterministic_data",
+        # 기계 측정
+        "numeric_sampling",
+        "statistical_estimate",
+        # 잔여 검증
+        "residue_reviewed",
+        "human_reviewed",
+    }
+)
 
 
 class ProblemCorpusError(ValueError):
@@ -220,8 +242,8 @@ class ProblemVerifyMeta:
     answer_kind: str | None = None
     """개념형 — 개수/판정 검증 종류(개수·일대일·수렴·극한=함숫값·미분가능). 답이 값이 아닌 문항."""
     verification_tier: str | None = None
-    """S4-13 유한표본 배치 — 기계 검증 강도(machine_exhaustive/machine_sampled). 부재=미각인
-    구코퍼스."""
+    """S4-13 유한표본 배치 — 기계 검증 강도. 허용 값은 `_VERIFICATION_TIER_VALUES`(9값: 레거시
+    machine_exhaustive/machine_sampled + S4-55 신규 7종). 부재=미각인 구코퍼스."""
 
 
 @dataclass(frozen=True, slots=True)

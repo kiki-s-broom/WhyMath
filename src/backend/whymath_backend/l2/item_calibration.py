@@ -26,7 +26,7 @@ import uuid
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import ProblemAttempt
@@ -74,6 +74,11 @@ FALLBACK_REASONS: tuple[str, ...] = (
 #: 문항당 응답 수 분포 버킷(응답 ≥1 문항만 센다). 경계가 두 임계(5·50)와 맞물린다.
 RESPONSE_COUNT_BUCKETS: tuple[str, ...] = ("1-4", "5-49", "50-99", "100+")
 
+#: a 채택 후보 버킷(응답 ≥ `_MIN_RESPONSES_FOR_DISCRIMINATION`) — EOS-154 사전 지표의 입력.
+#: 임계(50)와 이 튜플이 어긋나면 사전 지표가 조용히 거짓이 되므로 테스트가 모든 응답 수에서
+#: `_response_bucket`과의 일치를 동결한다(`test_a_candidate_buckets_match_the_threshold`).
+A_CANDIDATE_BUCKETS: tuple[str, ...] = ("50-99", "100+")
+
 
 def _response_bucket(count: int) -> str:
     """응답 수 → 분포 버킷 이름."""
@@ -115,6 +120,15 @@ class CalibrationReport(BaseModel):
         if self.calibrated_b == 0:
             return None
         return self.discrimination_fallback / self.calibrated_b
+
+    @property
+    def discrimination_candidates(self) -> int:
+        """응답 ≥ 50건인 문항 수 — a 채택의 **사전 지표(상한)**(EOS-154).
+
+        경계 θ 응답 제외·수렴·SE 게이트가 이 뒤에 더 걸리므로 채택 수는 이 값을 넘지 못한다.
+        이 값이 0이면 a는 구조적으로 채택될 수 없고, 1 이상이어도 채택이 보장되지는 않는다.
+        """
+        return sum(self.response_count_distribution.get(b, 0) for b in A_CANDIDATE_BUCKETS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +257,23 @@ def _compute_calibration(
     return _CalibrationPlan(calibrated_b=one_pl.calibrated_b, adopted=adopted, report=report)
 
 
+async def count_adopted_discrimination(session: AsyncSession) -> int:
+    """지금 DB에 변별도 a가 채택돼 있는 문항 수(`Problem.irt_a IS NOT NULL`) — 읽기 전용.
+
+    EOS-154: "a 채택이 0에서 1 이상이 됐다"는 전이는 **이번 실행의 채택 수**와 **실행 직전의 채택
+    수**를 비교해야 보인다. 직전 값을 별도 상태 파일에 두면 그 파일이 또 하나의 진실 원천이 되므로,
+    보정기가 유일한 쓰기 경로인 `irt_a` 컬럼 자체를 직전 상태로 읽는다(`calibrate_item_difficulties`
+    docstring 참조 — 탈락 문항은 NULL로 되돌려지므로 이 값은 "직전 실행의 채택 수"와 같다).
+    **보정 UPDATE보다 먼저 호출해야 한다** — 이후에 부르면 이번 실행의 결과를 직전으로 읽는다.
+    """
+    count = (
+        await session.execute(
+            select(func.count()).select_from(Problem).where(Problem.irt_a.isnot(None))
+        )
+    ).scalar_one()
+    return int(count)
+
+
 async def calibrate_item_difficulties(
     session: AsyncSession, *, dry_run: bool = False
 ) -> CalibrationReport:
@@ -294,8 +325,10 @@ async def calibrate_item_difficulties(
 
 
 __all__ = [
+    "A_CANDIDATE_BUCKETS",
     "FALLBACK_REASONS",
     "RESPONSE_COUNT_BUCKETS",
     "CalibrationReport",
     "calibrate_item_difficulties",
+    "count_adopted_discrimination",
 ]

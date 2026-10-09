@@ -27,6 +27,7 @@ from whymath_backend.l1.problem_bank.populate import (
     populate_problem_bank,
 )
 from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceMissingError
+from whymath_backend.l3.verification_tier import VerificationTier
 
 # 원자 code → concept_id(UUID) 맵의 재료(가짜 concept 테이블 — S2-03 재연결 후 태깅은 원자 행).
 # 크로스워크 primary: HK06→10공수1-02-02-1 · HK09→10공수1-02-04-1 · HK10→10공수1-02-05-1 ·
@@ -492,6 +493,21 @@ def test_load_accepts_known_verification_tier(tmp_path: Path) -> None:
     path = _write(tmp_path, [record])
     records = load_problem_bank_records(path)
     assert records[0].verify.verification_tier == "machine_exhaustive"
+
+
+@pytest.mark.parametrize("tier_value", sorted(t.value for t in VerificationTier))
+def test_load_accepts_every_l3_verification_tier_value(tmp_path: Path, tier_value: str) -> None:
+    # S4-68 — L3가 읽는 9값 전부가 *적재 경로 끝까지*(slug·Problem 검증 포함) 통과한다. 종전엔 레거시 2값만
+    # 허용해 신규 등급(예: finite_exhaustive)을 찍은 레코드가 ProblemCorpusError로 거부됐다.
+    record = _base_record(
+        verify={
+            "conditions": "x**2 - 5*x + 6 = 0",
+            "answer_map": {"x": "3"},
+            "verification_tier": tier_value,
+        }
+    )
+    records = load_problem_bank_records(_write(tmp_path, [record]))
+    assert records[0].verify.verification_tier == tier_value
 
 
 def test_load_defaults_verification_tier_to_none_when_absent(tmp_path: Path) -> None:

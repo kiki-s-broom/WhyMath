@@ -299,12 +299,24 @@ docker logs --tail 20 whymath-staging-item-calibration
 
 # 자가검증 3(읽기 전용 · 쓰기 0건): 보정 루프가 실제로 도는지 숫자로 본다.
 docker exec whymath-staging-app python -m whymath_backend.harness.item_calibration_reach_report
+
+# 자가검증 4(EOS-154): 변별도 a 채택 신호 줄 - 실행마다 한 줄이 반드시 있어야 한다.
+docker logs --tail 200 whymath-staging-item-calibration 2>&1 | Select-String "irt_a_signal"
 ```
 
 - **로그 읽는 법**: `status=noop_no_responses`는 채점 응답이 0행이라는 뜻이다 — 지금처럼 학생 응답이
   없을 때의 **정상 상태**다(실패도 성공 위장도 아님). `noop_no_eligible_items`는 응답은 있으나 문항당
   5회 미만이라는 뜻(정상 no-op), `calibrated`는 실제로 b를 보정했다는 뜻이다. 실패는
   `status=failed error_type=<예외 타입명>`이며 컨테이너가 내려가 재시작을 반복한다.
+- **a 채택 신호 읽는 법**(자가검증 4 · EOS-154): 보정이 돌 때마다 `irt_a_signal` 한 줄이 남는다
+  (채택이 0건이어도 남는다 — 줄이 없는 것과 "아직 대기 중"을 구별하기 위해서다).
+  `state=no_denominator`는 b 보정 대상(응답 5건 이상 문항)이 0건이라 a를 판정할 분모가 없다는 뜻,
+  `state=waiting`은 대상은 있으나 a 채택이 0건이라는 뜻(**2PL a 보정은 아직 작동하지 않는다**),
+  `state=adopted`는 a가 채택된 문항이 1건 이상이라는 뜻이다. `candidates_ge50`은 응답 50건 이상
+  문항 수로 채택의 사전 지표(상한)다. **`transition=first_adoption`이 처음 보이면 그날이 EOS-129
+  재측정 시점이다**(WARNING 수준으로 남고 `next=`에 다음 행동이 적힌다). `transition=adoption_lost`는
+  이전에 채택됐던 a가 이번에 전부 탈락했다는 경고다. 5건은 b(1PL)의 바닥이지 a의 조건이 아니다 —
+  a는 응답 50건 이상 + 표준오차 0.3 이하여야 채택된다.
 - **판정 읽는 법**(자가검증 3): `NO_RESPONSES`·`NO_ELIGIBLE_ITEMS`는 입력 부재(정상 no-op),
   `LOOP_DORMANT`는 보정 자격 문항이 있는데 b가 전부 비어 있다는 뜻(배치가 한 번도 안 돌았다는
   증거 — 이 서비스가 안 떠 있거나 실패 중인지부터 본다), `LOOP_STALE`은 일부만 채워짐(다음 실행 대기 또는
@@ -314,6 +326,11 @@ docker exec whymath-staging-app python -m whymath_backend.harness.item_calibrati
   ③보정 계산은 순수 파이썬 전수 적합이라 문항·응답이 수만 단위가 되면 실행 시간이 길어진다 —
   `--dry-run`으로 먼저 재고 증분 적합을 검토한다. ④`item-calibration` 서비스에 `--dry-run`을 붙이면
   UPDATE가 영원히 0건이 되므로 `tests/infra/test_item_calibration_wiring.py`가 이를 거부한다.
+  ⑤a 채택 신호(`irt_a_signal`)도 마지막 보정 시각과 같은 로그 좌석이라 컨테이너를 재생성하면
+  사라진다 — 영속 교차 확인은 자가검증 3의 `irt_a` 채움 건수(1 이상이면 a가 채택돼 있다)다.
+  ⑥신호는 로그를 읽는 사람에게만 닿는다. 실제 채널(Slack·이메일)로 푸시하는 것은 OPS-30 소관이다.
+  ⑦`--dry-run`은 DB를 갱신하지 않으므로 채택 문항이 생기기 전에는 매번 `first_adoption`으로 보일 수
+  있다(미리보기). 실제 전이는 `dry_run=false`인 줄에서만 판정한다.
 
 ## §6. 롤백
 

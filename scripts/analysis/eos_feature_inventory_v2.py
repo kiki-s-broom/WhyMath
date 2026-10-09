@@ -1104,7 +1104,10 @@ CATALOG: tuple[Spec, ...] = (
        # 같아서다. 셋 다 **판정이 아니라 관측**이고("작동한 비율" 축), 전부 exit code로
        # 합격을 선언하지 않는다. 별 좌석으로 떼면 같은 성격이 두 행으로 갈려 이 장부가
        # 재는 '기능'의 입자가 흔들린다.
-       "ops.phase1_structure_report"),
+       "ops.phase1_structure_report",
+       # OPS-19: 위 관측 리포트들을 부류별로 실제 실행하고 "돌았는가"를 manifest로 남기는 러너.
+       # 신규 리포트 로직이 0인 호출자라 호출 대상과 같은 좌석에 귀속한다(별 행으로 떼지 않는다).
+       "ops.observation_report_runner"),
     _o("WM-O-908", "운영자 계정 부트스트랩·역할 좌석·단기 토큰 발급·shadow 합성 트래픽", "Admin",
        "Operations", "P1", "ADMIN-01/11/15", "ops.account_bootstrap_cli", "ops.role_grant_cli",
        # ADMIN-15: 좌석 발급 경로의 *신원* 절반 — 계정(11)·역할(01)을 만든 뒤 그 계정으로 콘솔을

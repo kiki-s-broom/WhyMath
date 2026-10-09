@@ -175,9 +175,25 @@ data=[[1,1],[2,3],[3,2]]; stat=corr; columns=[0,1]
 `bool`·문자열·`null`, 길이 64자 초과 수 토큰, 지수 절댓값 30 초과(`1e999999999` 폭탄), 비 ASCII 숫자·밑줄
 숫자(`1_000`), 공백으로 갈라진 숫자(혼합수 `1 1/2`가 `11/2`로 읽히던 오독), 분모 0, 깊은 중첩 JSON.
 
-**알려진 한계 (승계 후보).** `StatisticalResult.value`(float)는 하위 호환용이며 판정에는 쓰지 않는다. 그러나
-교차검증의 `cross_verify.py`는 이 float을 `math.isclose(rel_tol=1e-9)`로 LLM 재계산값과 대조하므로, 거기서는
-대값 왜곡이 동형으로 남아 있다. 표본분산 n=1이 0으로 계산되는 S4-53 동작은 보존했다(정의 불가 값).
+**교차검증 재계산 대조 (S4-70).** `StatisticalResult.value`(float)는 하위 호환용이며 판정에는 쓰지 않는다.
+교차검증 관점 ④(`statistical_reconstruction`)는 한때 이 float을 `math.isclose(rel_tol=1e-9)`로 LLM
+재계산값과 대조해 평균 1조에서 허용 폭이 1000으로 열렸다(대값 왜곡이 동형으로 잔존). 이제 기계값은
+`StatisticalResult.exact_value`(유리수 정확값)·`approx_value`(10^-60 근사)로 `ResidueSubject.machine_exact`·
+`machine_approx`에 실려 가고, LLM 재계산값은 `Fraction`으로 읽어(float은 LLM이 쓴 십진 표기 그대로)
+선언 없는 기본 정책과 같은 규칙으로 대조한다 — 기계값이 유한소수면 정확 일치, 무한소수·무리수면 `abs:0.000000001`.
+`ResidueSubject.machine_value`(float)는 정확 필드를 모르는 기존 소비자를 위해 남기며, 정확 필드가 없을 때만
+절대오차 대조에 쓴다(float을 정확값으로 승격하면 올바른 `7/3`이 거부된다).
+
+- 경계: 교차검증(CORE)은 수학 ADAPTER인 `statistical_claim`을 import할 수 없다(import-linter 계약).
+  그래서 대조 정책은 `cross_verify.py`에 도메인 중립 최소 구현으로 자급하고, 두 정책이 어긋나지 않는 것은
+  `tests/backend/l3/test_cross_verify.py`의 패리티 검사(`verify_statistical_claim`과 같은 입력 격자)가 잡는다.
+- 한계: 문항이 선언한 `tolerance=` 절은 교차검증 대조에 전달하지 않는다(LLM은 원 통계량을 재계산할 뿐
+  반올림 정책을 모른다).
+
+**S4-71 정정.** S4-58은 표본분산 n=1이 0으로 계산되는 S4-53 동작을 보존했으나(정의 불가 값), S4-71에서 바로잡았다.
+
+- `variance_kind=sample`(기본)에서 n=1인 `variance`·`std`는 분모 n-1=0이라 정의되지 않으므로 `unverifiable`이다(사유에 "정의되지 않음" 명시). `variance_kind=population`은 n=1에서 0으로 정의되어 그대로 판정한다.
+- `columns`는 bool이 아닌 JSON 정수만 허용한다. `[1.5]`·`[1.0]`·`[true]`·`["1"]`처럼 정수가 아닌 값이 다른 열로 조용히 변환되던 경로와, `[null]`·`[NaN]`·깊은 중첩·4300자리 초과 정수가 예외로 새던 경로는 모두 `unverifiable`이다.
 
 ---
 
@@ -640,7 +656,19 @@ for code in sorted(want):
 
 시그니처·결과 타입·어댑터 계약은 **변경 없이** 단계 B를 수용한다. 추가가 필요한 것은 후행 기본값 필드(C2·C3)뿐이다. 다만 C2·C4·C5·C9·C10은 첫 도메인 등록과 같은 슬라이스에서 처리하지 않으면 각각 정수 오답 통과, 등식 DSL 위반 집계, CI `infra-contracts` 적색, 프롬프트 자산 결측으로 나타난다. C1·C6·C7·C8은 `S4-68`이 맡고, C11은 `S4-56` 이후다.
 
-이 검토의 한계: C1·C7의 거동은 코드를 읽어 도출한 것이며 실행으로 확인하지 않았다. `S4-68`의 첫 완료 조건이 그 실측이다.
+이 검토의 한계: C1·C7의 거동은 코드를 읽어 도출한 것이며 실행으로 확인하지 않았다. `S4-68`의 첫 완료 조건이 그 실측이다. → **2026-10-09 `S4-68`이 실행으로 확정했다(§8.5).**
+
+### 8.5 `S4-68` 처리 결과 (2026-10-09, 판정 기준: main `663b91dc` 위의 작업 브랜치)
+
+| ID | 실측 | 처리 |
+|---|---|---|
+| C1 | 재현 확정 — `cross_verifier` 주입 시 개념형 15종 **전부** 확률 관점(`PROBABILITY_PERSPECTIVES`)으로 가서 `pass`가 찍힌다(대조군 `sequence_induction`·`statistical_claim`은 각자 관점). 읽기 기준 판정이 실행으로 맞았다. | `_CROSS_VERIFY_PERSPECTIVES.get(kind)`에서 기본값 폴백 제거. 미등록은 교차검증기를 **부르지 않고** `unverifiable`(사유에 kind 명시·기계 축/잔여 축 보존). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 테스트 `test_verifier_perspective_fail_closed.py`. |
+| C5 | 코퍼스 14,034건 중 조건 보유 레코드의 등식 DSL 위반은 정확히 6종·130건(24×4+8+26)이고, 등식 DSL 11종은 위반 0건. `statistical_claim`·`sequence_induction`은 코퍼스 0건. | `statistical_claim`을 제외 목록에 추가. 목록을 레지스트리에서 **파생하지 않는다** — 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 `test_qa_pipeline_dsl_kinds_sync.py`가 v2 kind를 (비등식 DSL \| 등식 DSL) 중 정확히 하나로 분류하게 강제해, 새 kind는 분류 없이 RED다. |
+| C6 | L1 허용 집합 2값 ↔ L3 `VerificationTier` 9값. 읽는 쪽(`read_verification_tier`·`residue_cross_verify_eval`)은 9값을 이미 받는다. | L1 집합을 9값으로 확장(부분집합 유지는 의도 아님). `test_verification_tier_sync.py`가 두 집합의 **정확한 일치**를 대조. **R6-02 증거**: 전수 적재(37개 파일·14,034건)의 다이제스트가 변경 전(HEAD 사본)·후에 바이트 동일. `problem_id` 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 실행마다 달라지므로 그 필드만 마스킹했다. |
+| C7 | 재현 확정 — v2 전용 kind의 레코드는 개념형 분기에 못 들어가 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)이다. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가. | 디스패치 표 = acceptance 표 ∪ (`_VERIFIERS_V2` 중 acceptance에 없는 kind의 어댑터). 기존 17종 항목은 같은 함수 객체 그대로(동작 불변·테스트로 동결). 순환 import 없음(`verifier`→`acceptance`, `corpus_reverify`→둘 다). v2에 kind가 늘면 야간 재검증에도 자동 포함. |
+| C8 | `residual_axes`의 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 필드로 통과)이고 축 이름 문자열로 분기하는 코드는 0건(내가 찾은 방법: `residual_axes` 전수 grep). | **어휘 등록부는 지금 필요 없다**고 판정. 기존 오타(`문발↔형식모델 정합`)는 바꾸지 않는다(감사 라벨이 영속될 수 있고 소비처가 없어 얻는 것이 없다). 재판정 조건: 축 이름으로 집계·분기하는 소비처가 생길 때. |
+
+이 절에서 하지 않은 것: acceptance 수용 게이트(`acceptance.py:323`)가 v2 전용 kind를 디스패치하지 않는 점은 건드리지 않았다(저작 시점 게이트는 별개 경로이고 코퍼스 0건이라 미발현).
 
 ---
 
