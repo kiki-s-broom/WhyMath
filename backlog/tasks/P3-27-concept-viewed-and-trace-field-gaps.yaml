@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① concept_viewed 실체화 결정 — P3-13 실측에서 이 역할은 대응 이벤트 2종 중 content_viewed 가 생산자 0건(DORMANT)이고 concept_selected 는 concept_id 를 싣지 않는다(세션 writer 가 target_concept_id 를 채우지 않음). 둘 중 하나를 택해 결정 근거와 함께 기록한다: (가) 콘텐츠 열람 로그 좌석 신설 (나) 세션 개시 이벤트가 개념을 싣도록 writer 확장. 어느 쪽이든 새 Entity·DB 스키마가 필요하면 Phase 3 범위규율에 따라 Release Blocker 여부를 먼저 판정하고, 아니면 이 태스크는 12월 이후로 이월한다.\n② 트레이스 추적 필드 보강 판정 — 숙달 변경(mastery_updated)에 session_id·problem_id 가 없으나 concept_mastery_history 는 attempt_id 를 보유한다(투영에서 떨어뜨림). 응답 지연·오개념·힌트 요청에 session_id 가 없는 것은 구조적 N/A 인지 보강 대상인지 이벤트별로 판정하고, 보강하는 것은 attempt 귀속 투영뿐이다(새 컬럼 금지).\n③ 검증 — tests/backend/scenarios/test_gate_d_event_role_census.py 의 동결 단언(content_viewed 0건·concept_selected concept_id None)을 승격하고, scripts/ops/verify_gate_de_discrimination.py 의 기록 차단 주입이 승격된 단언에서 RED 인지 실측한다. 정상 입력에서 초록인 것은 증거가 아니다.\n④ content_version 은 이 태스크의 범위가 아니다 — EOS-47-attempt-version-pinning 소유(시도 시점의 판을 기록하는 원천이 없는 상태). 현재 problem.problem_version_id 는 서빙 판 포인터라 그 값으로 채우면 날조다."
-artifacts: []
+artifacts:
+  - "PR #1579 (https://github.com/kiki-s-broom/WhyMath/pull/1579) · 판정 문서 docs/reviews/p3_27_concept_viewed_and_trace_fields_2026-10-09.md (판정 기준 main 713512bc) · ①(나) writer 확장 채택, concept_selected concept_id 0/1→1/1 · ②mastery_updated session_id/problem_id 0/20→20/20, 코치 이벤트는 원천 부재로 P3-30, 오개념 N/A · ③census 승격 단언 + 주입 C01~C14 14/14 RED, writer 뮤테이션 7종·호출처 5종 RED · 로컬 CI 미러 6잡 exit 0(64 통과/0 실패)·backend-migrations 재현 integration 591 passed · CI는 PR에서 확정(테스트 계정 기준) · 이월 P3-29·P3-30"
 paths:
   - src/backend/whymath_backend/l2/learning_event_trace.py
   - src/backend/whymath_backend/l2/learning_session_writer.py
   - tests/backend/scenarios/test_gate_d_event_role_census.py
-session: claude/dazzling-dijkstra-xe6kr5
+session: null
 notes: "출처: P3-13 판정 문서 docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md §4 F2·F3. 중복 실측: 대장에 content_viewed 생산자·concept_selected 개념 채움·트레이스 추적 필드를 소유한 태스크가 없음을 역할 기반(content_viewed·콘텐츠 열람·target_concept_id·learning-trace) 검색으로 확인(내가 찾은 방법으로는 0건). 테스트 계정 기준 실측이며 실사용자 검증이 아니다."
 updated: 2026-10-09
