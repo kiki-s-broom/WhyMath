@@ -12164,3 +12164,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 ③**: `--authored-by` 선언은 기록 없음(unknown)만 채운다. 기록이 있고 다르면 거부 — eval은 `INDEPENDENCE_UNPROVEN`(검증기 호출 0건), battle CLI는 exit 2. 종전 `declared or recorded`는 `llm:` 서명을 `deterministic:` 한 줄로 뒤집어 자기승인 검사를 우회할 수 있었다.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
+
+### 2026-10-09 — S4-68: answer_kind v2 소비 지점 드리프트 4건 해소 (교차검증 관점 fail-closed · DSL 제외 목록 · tier 값 · 야간 재검증)
+
+`l3/verifier._VERIFIERS_V2`(통합 검증기 v2 레지스트리)를 읽는 소비 지점 4곳이 각자 수동 사본을 들고 있어 어긋나 있었다. 설계 단계(S4-57 §8)는 코드 독해 기준이라 **미실행**이었고, 이번에 전부 실행으로 확정했다.
+
+- **C1 관점 폴백(실측 확정)**: `cross_verifier` 주입 시 개념형(SymPy) 15종이 **전부** 확률 관점(표본공간·등확률 가정)으로 가서 `pass`가 찍혔다. 폴백 제거 → 미등록 kind는 교차검증기를 부르지 않고 `unverifiable`(사유에 kind 명시). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 운영 어댑터(`l4/subject_adapter_math.py`)는 `cross_verifier`를 주입하지 않아 운영 영향은 없었고 S4-56 CLI 경로에서 발현할 결함이었다.
+- **C5 DSL 제외 목록**: `statistical_claim` 누락 정정(코퍼스 0건이라 잠복). 목록을 레지스트리에서 파생하지 않은 이유 = 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 동기 테스트가 v2 kind를 (비등식 DSL | 등식 DSL) 중 정확히 하나로 분류하게 강제한다. 근거 실측: 코퍼스 14,034건 중 등식 DSL 위반은 정확히 6종·130건(24×4+8+26), 등식 DSL 11종은 0건.
+- **C6 tier 값**: L1 허용 2값 → 9값(L3 `VerificationTier`와 정확히 일치, 테스트가 양방향 대조). 부분집합 유지는 의도가 아니었다(읽는 쪽 `read_verification_tier`는 9값을 이미 받는다). **R6-02**: 전수 적재 37개 파일·14,034건의 다이제스트가 변경 전(HEAD 사본)·후 바이트 동일. 도구 결함 1건 발견·정정 — `problem_id`가 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 다이제스트가 실행마다 달랐다(같은 트리 2회 비교로 발견, 해당 필드만 마스킹).
+- **C7 야간 재검증**: v2 전용 kind(`statistical_claim`·`sequence_induction`) 레코드는 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)되고 있었다 — 야간 재검증이 통과하는 척하는 구간. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가 → v2 레지스트리를 정본으로 조회(acceptance에 없는 kind만 어댑터). 기존 17종은 같은 함수 객체 그대로.
+- **C8 잔여 축 어휘**: 어휘 등록부는 **지금 필요 없다**고 판정. `residual_axes` 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 통과)이고 축 이름으로 분기하는 코드는 0건(내가 찾은 방법: 전수 grep). 기존 오타(`문발↔형식모델 정합`)는 유지. 재판정 조건 = 축 이름으로 집계·분기하는 소비처 출현.
+- **검증**: 신규 테스트가 변경 전 코드에서 37건 RED(사유가 전부 의도한 결함), 변경 후 GREEN. 뮤테이션 9종 전건 검출(주입 적용·원복 바이트 동일을 하네스가 단언). 설계서 `verifier_v2_domains.md` §8.5에 처리 결과 기록.
+- **미처리(의도)**: acceptance 수용 게이트(`acceptance.py:323`)가 v2 전용 kind를 디스패치하지 않는 점 — 저작 시점 경로이고 코퍼스 0건이라 미발현. 필요해지면 별건.
