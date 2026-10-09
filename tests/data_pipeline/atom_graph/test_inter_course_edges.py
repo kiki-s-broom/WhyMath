@@ -28,6 +28,7 @@ from typing import Any
 import pytest
 from data_pipeline.atom_graph.cross_band_edges import CrossBandValidationReport
 from data_pipeline.atom_graph.cross_band_edges import proposal_edges as _proposal_edges
+from data_pipeline.atom_graph.cross_band_edges_merge import pre_merge_view
 from data_pipeline.atom_graph.inter_course_edges import (
     ALLOWED_COURSE_PAIRS,
     MAX_EDGES_PER_COURSE_PAIR,
@@ -148,7 +149,9 @@ class TestProposalFileShape:
         """신규 relation 타입 0 — 정본의 relation 집합은 prerequisite 단일이다(제안이 늘리지 않음)."""
         assert {e["relation"] for e in graph["edges"]} == {"prerequisite"}
         assert len(graph["concepts"]) == 2683
-        assert len(graph["edges"]) == 2210  # 정본 무변경 동결
+        # 정본 = 백본 2,210 + S4-60 고→대 경계 병합 24. 이 제안(S4-61)은 아직 병합 전이라 무변경이다.
+        assert len(graph["edges"]) == 2234  # 정본 무변경 동결
+        assert len(pre_merge_view(graph)["edges"]) == 2210
 
     def test_report_label_default_is_preserved(self) -> None:
         """슬라이스 1 리포트의 기본 문구가 label 필드 추가로 바뀌지 않았다."""
@@ -384,7 +387,8 @@ class TestReachability:
     """도달성 측정 — '4축 활성'을 노드 존재가 아니라 도달 가능성으로 말한다."""
 
     def test_baseline_university_is_an_island(self, graph: dict[str, Any]) -> None:
-        rep = university_reachability(graph)
+        """병합 *전* 정본(S4-60 이전)에서는 대학이 섬이다 — pre_merge_view로 원래 주장을 보존한다."""
+        rep = university_reachability(pre_merge_view(graph))
         assert rep.university_atoms == 512
         assert rep.university_courses == 32
         assert rep.reached_atoms == 0  # 고등→대학 엣지 0건이라 K-12에서 한 걸음도 못 간다
@@ -392,14 +396,34 @@ class TestReachability:
         # 32과목 중 수치해석↔미적분학 I 두 과목만 정본에서 이어져 있다 → 31개 성분.
         assert rep.course_components == 31
 
+    def test_baseline_after_boundary_merge(self, graph: dict[str, Any]) -> None:
+        """S4-60 병합 후 정본의 기준선 — 경계 24건이 만든 진입로만큼 도달한다(수치는 실측 동결)."""
+        rep = university_reachability(graph)
+        assert rep.reached_atoms == 198
+        assert rep.reached_courses == 7
+        assert rep.course_components == 31  # 진입 엣지는 과목 사이를 잇지 않는다
+
     def test_this_proposal_alone_reaches_nothing(
         self, proposal: dict[str, Any], graph: dict[str, Any]
     ) -> None:
-        """변별 대조군: 과목간 엣지만으로는 K-12 진입로가 없어 도달 0 — 측정이 값을 지어내지 않는다."""
+        """변별 대조군: 과목간 엣지만으로는 K-12 진입로가 없어 도달 0 — 측정이 값을 지어내지 않는다.
+
+        진입로가 없는 병합 전 정본에 얹어야 이 주장이 성립한다(병합 후 정본엔 진입로가 이미 있다).
+        """
         pairs = [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
-        rep = university_reachability(graph, pairs)
+        rep = university_reachability(pre_merge_view(graph), pairs)
         assert rep.reached_atoms == 0
         # 그러나 과목 연결 구조는 바뀐다(성분 31 → 2).
+        assert rep.course_components == 2
+
+    def test_this_proposal_on_merged_graph_reaches_462(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """병합 후 정본 위에 이 제안을 얹으면 진입로(198) + 과목간 확산으로 462까지 도달한다."""
+        pairs = [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
+        rep = university_reachability(graph, pairs)
+        assert rep.reached_atoms == 462
+        assert rep.reached_courses == 31
         assert rep.course_components == 2
 
     def test_boundary_proposal_alone_reaches_part_of_the_university(
