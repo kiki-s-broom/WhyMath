@@ -77,6 +77,7 @@ logger = logging.getLogger("whymath.l3.verify_answer")
 __all__ = [
     "AnswerVerdict",
     "SolvabilityVerdict",
+    "budget_exceeded_verdict",
     "classify_solvability",
     "derive_selected_root",
     "verify_answer",
@@ -159,6 +160,11 @@ def _fail(reason: str, samples_checked: int) -> AnswerVerdict:
 def _unverifiable(reason: str, samples_checked: int = 0) -> AnswerVerdict:
     """unverifiable 결과 조립 — 정직 회피의 단일 출구(절대 pass 위장 금지)."""
     return AnswerVerdict(state="unverifiable", reason=reason, samples_checked=samples_checked)
+
+
+def budget_exceeded_verdict() -> AnswerVerdict:
+    """계산 시간 상한 초과(OPS-96)의 *판정 불가* 결과 — pass·fail 어느 쪽도 아니다."""
+    return _unverifiable("SymPy 계산 시간 상한 초과 — 검증 안전 회피")
 
 
 # 부등식·≠ 관계 연산자 — 잔차(lhs-rhs) 진리값 평가 경로에서 쓰는 연산자 집합.

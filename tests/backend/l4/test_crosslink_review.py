@@ -105,10 +105,18 @@ def test_direct_low_confidence_approval_errors() -> None:
         promote_approved(_queue(_approved(confidence=None)))
 
 
-def test_non_direct_low_confidence_approval_allowed() -> None:
-    # 부분매핑/개념겹침은 conf 하한 규칙 대상이 아니다(직접 승격만 금지).
-    out = promote_approved(_queue(_approved(link_type="개념겹침", confidence=0.45)))
-    assert len(out["crosslinks"]) == 1
+def test_non_direct_approval_is_rejected_regardless_of_confidence() -> None:
+    # MISC-63 — 부분매핑/개념겹침은 승인해도 적재하지 않는다(과거엔 conf 하한 대상이 아니라 통과했다).
+    # conf가 0.45든 0.95든 같다: 비직접 거부는 conf 규칙과 독립이다.
+    for conf in (0.45, 0.95, None):
+        with pytest.raises(CrosslinkReviewError, match="개념겹침"):
+            promote_approved(_queue(_approved(link_type="개념겹침", confidence=conf)))
+
+
+def test_non_direct_rows_stay_valid_while_pending() -> None:
+    # 검수 대기 큐의 비직접 행은 위반이 아니다 — 거부는 approved 행에만 걸린다(pending 43행 보존).
+    out = promote_approved(_queue(_row(link_type="부분매핑", confidence=None)))
+    assert out == {"crosslinks": []}
 
 
 def test_unknown_kebab_errors() -> None:
@@ -155,14 +163,11 @@ def test_output_rows_satisfy_crosslink_contract() -> None:
         _queue(
             _approved(),
             _approved(mis_id="M0075", kebab_id="product-rule-naive", confidence=0.97),
-            _approved(
-                mis_id="M0152",
-                kebab_id="period-of-scaled-sine",
-                link_type="개념겹침",
-                confidence=0.45,
-            ),
+            # 비직접(개념겹침) 행은 승인돼도 승격되지 않으므로 pending으로 섞어 둔다(MISC-63).
+            _row(mis_id="M0152", kebab_id="period-of-scaled-sine", link_type="개념겹침"),
         )
     )
+    assert len(out["crosslinks"]) == 2
     for row in out["crosslinks"]:
         validated = MisconceptionCrosslink.model_validate(row)  # extra=forbid 계약 통과
         assert validated.method == "manual"

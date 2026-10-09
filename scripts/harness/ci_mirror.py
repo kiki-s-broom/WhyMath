@@ -239,9 +239,18 @@ def step_working_directory(
 
 
 def step_env(
-    job: dict[str, Any], step: dict[str, Any], prepend_path: list[str] | None = None
+    job: dict[str, Any],
+    step: dict[str, Any],
+    prepend_path: list[str] | None = None,
+    workflow_env: dict[str, Any] | None = None,
+    repo_root: Path | None = None,
 ) -> dict[str, str]:
-    """잡 env + 스텝 env. 식이 든 값은 넣지 않는다(잘못된 값으로 돌리느니 비운다).
+    """워크플로 env + 잡 env + 스텝 env(뒤가 앞을 덮는다 — GitHub 우선순위와 같다).
+    식이 든 값은 넣지 않는다(잘못된 값으로 돌리느니 비운다).
+
+    워크플로 최상위 `env`를 읽는 이유(OPS-121): `PIP_CONSTRAINT`처럼 **모든 잡에 걸리는 설정**이
+    최상위에 있으면, 읽지 않는 미러는 그 설정 없이 돌아 CI와 다른 해석으로 판정한다. 그 판정은 이
+    잡의 것이 아니다. `${{ github.workspace }}`는 작업 디렉터리와 같은 전제(저장소 루트)로 푼다.
 
     `prepend_path`는 CI의 `actions/setup-python`이 하는 일을 대신한다 — 그 스텝은 액션이라
     미러가 실행하지 않으므로, 지정하지 않으면 잡이 *호스트 기본 인터프리터*로 돌아간다.
@@ -250,12 +259,16 @@ def step_env(
     env = dict(os.environ)
     if prepend_path:
         env["PATH"] = os.pathsep.join([*prepend_path, env.get("PATH", "")])
-    for source in (job.get("env") or {}, step.get("env") or {}):
+    root_text = str(repo_root.resolve()) if repo_root is not None else None
+    for source in (workflow_env or {}, job.get("env") or {}, step.get("env") or {}):
         if not isinstance(source, dict):
             continue
         for key, value in source.items():
             if isinstance(value, (str, int, float, bool)):
                 text = str(value)
+                if root_text is not None:
+                    # 함수 치환 — 문자열 치환은 Windows 경로의 역슬래시를 이스케이프로 읽는다.
+                    text = _WORKSPACE_EXPR_RE.sub(lambda _match: root_text, text)
                 if not _EXPRESSION_RE.search(text):
                     env[str(key)] = text
     return env
@@ -313,6 +326,7 @@ def run_step(
     log_handle=None,
     prepend_path: list[str] | None = None,
     default_shell: Any = None,
+    workflow_env: dict[str, Any] | None = None,
 ) -> StepResult:
     """스텝 하나를 GitHub와 같은 셸로 실행한다. 실패 원인이 남도록 stderr·stdout 꼬리를 보존한다."""
     name = str(step.get("name") or "(이름 없음)")
@@ -338,7 +352,7 @@ def run_step(
             # 실패는 없는 회귀를 쫓게 만들어 통과보다 비싸다(2026-09-07 축).
             [*shell_argv, "-c", step["run"]],
             cwd=cwd,
-            env=step_env(job, step, prepend_path),
+            env=step_env(job, step, prepend_path, workflow_env, repo_root),
             capture_output=True,
             timeout=timeout,
         )
@@ -403,6 +417,10 @@ def run_job(
     # 워크플로 최상위 `defaults.run.shell`은 잡·스텝 선언이 없을 때의 기본이다. 지금 ci.yml에는
     # 없지만, 생기면 조용히 무시된 채 다른 셸로 돌지 않게 여기서 읽어 넘긴다.
     default_shell = _run_defaults(workflow).get("shell")
+    # 워크플로 최상위 `env`도 같다 — 읽지 않으면 최상위 설정(PIP_CONSTRAINT 등)이 미러에서만 빠진다.
+    workflow_env = workflow.get("env")
+    if not isinstance(workflow_env, dict):
+        workflow_env = None
 
     result = JobResult(name=job_name)
     failed = False
@@ -417,7 +435,7 @@ def run_job(
             )
             continue
         step_result = run_step(
-            job, step, repo_root, timeout, log_handle, prepend_path, default_shell
+            job, step, repo_root, timeout, log_handle, prepend_path, default_shell, workflow_env
         )
         result.steps.append(step_result)
         if step_result.status == FAILED:
