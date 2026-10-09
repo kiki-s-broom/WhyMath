@@ -520,7 +520,7 @@
 - **EOS-105의 "무겁다"는 추정이었고 틀렸다**: 실 PG 600개념·학습자 시도 50/500/5,000건에서 CTE `max_depth=1` p50 2.2~2.4ms, 생산자 전체 p50 5.8/11.1/62.7ms · p95 7.1/13.7/127.8ms. 시간은 CTE가 아니라 학습자 전체 이력을 읽는 `compute_concept_diagnoses`에 비례한다.
 - **지운 것**: 규칙 `R4-prerequisite-gap` · `AttemptEvidence.prerequisite_gap_concept_ids` · 조립기 인자 · `NextActionKind.GO_TO_PREREQUISITE_CONCEPT` · 전이표 `ASSESSING → LEARNING`. **남긴 것**: PG enum 라벨 `POLICY_PREREQUISITE_GAP`(추가 전용 원장 — 지우면 타입 재생성 마이그레이션 + 값이 적힌 행이 있다면 읽기 `LookupError`) → `RETIRED_POLICY_TRIGGERS` 은퇴 표기 + "트리거 전수 = 규칙 트리거 ∪ 은퇴" 동결.
 - **검증**: 단위 285 passed · 실 PG 통합 38 passed(skip 0) · 새 동결 테스트 4종 뮤테이션 4/4 RED(주입마다 의도한 테스트 1건만 실패 · 원복 sha256 동일). `SCENARIO-003 ③`은 "R4 미발화 동결"에서 "R6이고 하강은 추천이 한다"로 승격.
-- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행 0건은 추론이지 실측이 아니다(Kiki가 prod에서 읽기 전용 1줄로 확인 가능 — PR 본문). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
+- **정직 표기**: 프로덕션 원장의 `POLICY_PREREQUISITE_GAP` 행은 **2026-10-09 Kiki 실측으로 0건**이다(`POLICY_PREREQUISITE_GAP_ROWS=0` · 조회 시점 스냅샷이며 과거 적재 이력의 부재 증명은 아니다 — 삭제권 이행으로 행이 지워졌을 가능성은 배제하지 못함). 응답 `next_action=PRACTICE_SAME_CONCEPT`와 이어지는 선수 문항의 이름표 불일치는 R6 위에 EOS-26이 얹은 기존 설계라 이번 범위 밖이며, 소유 태스크는 이미 `EOS-144`다. 실제 앱은 R6에 도달하지 않는다(EOS-146) — 해소는 API 계약 수준.
 - **교훈(사고 아님)**: 비용 벤치가 같은 DB에 심은 문항 1,800건이 `next-problem` 전역 풀을 오염시켜 통합 5건이 거짓 실패했다 → DB를 새로 만들어 제거 실험으로 확인. 통합 테스트 기본 skip을 통과로 읽을 뻔한 것(69 skipped)은 즉시 플래그를 켜 재실행해 막았다.
 
 ### 2026-10-02 (착지 · SEC-41): **보존 기간 파기 완전성 가드를 신설하고, 사유 없이 계획 밖이던 소유 테이블 4건을 처분했다 — 3건은 기존 균일 `pii_retention_years` 창으로 편입, 1건(`learner_state`)은 사유 있는 임시 제외(MGMT-02 대기).**
