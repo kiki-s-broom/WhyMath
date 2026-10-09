@@ -48,6 +48,12 @@ _INTENTIONAL_EXCLUSIONS: dict[str, str] = {
         "required로 걸면 PR 머지 게이트에 직렬 26분이 되돌아와 OPS-58 병렬화가 무의미해진다. "
         "배선 실재성은 tests/infra/test_backend_serial_nightly_wiring.py가 동결한다."
     ),
+    "constraints-freshness — 제약 파일 연령 센서 (야간)": (
+        "if: github.event_name == 'schedule' — PR에서 항상 skip(위와 같은 사유). 연령은 시계에 "
+        "따라 결과가 바뀌는 입력이라 머지 게이트(PR·머지 큐)에 넣으면 같은 코드가 날짜에 따라 "
+        "초록·빨강이 된다 — 일부러 PR 경로 밖에 둔다(OPS-121). 정적 검사 본체는 required인 "
+        "infra-contracts 잡이 돌고, 야간 배선은 tests/infra/test_ci_constraints.py가 동결한다."
+    ),
 }
 
 
