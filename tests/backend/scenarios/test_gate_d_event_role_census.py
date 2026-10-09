@@ -20,15 +20,21 @@
 ────────────────────────────────────────────────────────────────────────────
 카탈로그 대응(8/8)은 "이름이 있다"의 판정이다. 실세션을 지나 보면 두 곳이 더 약하다:
 
-  ⓐ `concept_viewed` — 대응 이벤트 2종 중 `content_viewed`는 생산자가 0건(DORMANT)이고,
-     `concept_selected`는 세션 개시 사건이라 `concept_id`를 싣지 않는다(`learning_session.
-     target_concept_id`를 writer가 채우지 않는다). 즉 "어느 개념을 봤는가"를 시간선이 말하지 못한다.
+  ⓐ `concept_viewed` — 대응 이벤트 2종 중 `content_viewed`는 생산자가 0건(DORMANT)이다(소유
+     `P3-29` — 새 테이블이 필요해 이월). `concept_selected`는 **P3-27에서 승격**됐다: 세션 writer가
+     그 묶음에서 처음 확인된 문항의 대표 개념을 `learning_session.target_concept_id`에 채워, "어느
+     개념을 봤는가"를 시간선이 말한다(값의 의미는 '목표 개념'이 아니라 '첫 확인 개념'이다).
   ⓑ `content_version` — 추적 필드 6종 중 이 하나는 봉투(`LearningEvent`)에 슬롯이 없다.
      `problem_attempt`에 `problem_version_id`가 없어(`EOS-47` todo) 투영할 원천도 없다.
      현재 `problem.problem_version_id`는 *지금의 서빙 판 포인터*라 시도 시점의 판이 아니므로,
      그 값으로 채우면 날조다(그래서 채우지 않고 부재로 동결한다).
 
-두 공백은 `skip`으로 위장하지 않는다. *현행 동작*을 단언하고, 고쳐지면 그 단언이 실패하며 메시지가
+추적 필드의 귀속도 같은 규약이다(P3-27 ②): 숙달 변경은 `attempt_id`로 시도를 되짚어 문항·세션을
+싣는다(승격). 코치 도중 이벤트(힌트 요청·응답 지연)는 시도가 아직 없어 세션 귀속의 원천이 없고 —
+`attempt_event`에 세션 컬럼이 없다 — 보강하려면 스키마가 필요해 `P3-30`이 소유한다(동결 유지).
+오개념 가설은 학습자×오개념 누적 단위라 문항·세션 귀속이 구조적으로 정의되지 않는다(N/A).
+
+남은 공백(ⓐ의 content_viewed·ⓑ·코치 이벤트 세션 귀속)은 `skip`으로 위장하지 않는다. *현행 동작*을 단언하고, 고쳐지면 그 단언이 실패하며 메시지가
 소유 태스크를 가리킨다(시나리오 스위트의 "정직한 공백 동결" 규약과 같다).
 
 **테스트 계정 기준** — 이 판정은 내부 테스트 계정(운영 OAuth 콜백 경로로 로그인한 합성 학생)의
@@ -246,7 +252,11 @@ def test_gate_d_eight_event_roles_recorded_in_a_real_student_session() -> None:
                     fills = {
                         tf: "{}/{}".format(*_fill(named, lf)) for tf, lf in TRACKING_FIELDS.items()
                     }
-                    print(f"ROLE={role} :: NAME={name.value} :: 건수={len(named)} :: 채움={fills}")
+                    pointer = "{}/{}".format(*_fill(named, "attempt_id"))
+                    print(
+                        f"ROLE={role} :: NAME={name.value} :: 건수={len(named)} :: 채움={fills}"
+                        f" :: 시도포인터(attempt_id)={pointer}"
+                    )
 
             # ① 8역할 전부 기록됐다. 역할당 "하나라도"가 아니라 **생산 중(PRODUCED)인 대응 이름
             #    전부**를 요구한다 — 하나만 보면 `learning_started`는 `diagnostic_started`를 끊어도
@@ -270,9 +280,29 @@ def test_gate_d_eight_event_roles_recorded_in_a_real_student_session() -> None:
                 assert row["problem_id"] and row["attempt_id"], row
             for row in observed_by_role["misconception_detected"]:
                 assert row["misconception_id"], row
+            attempts_by_id = {r["attempt_id"]: r for r in observed_by_role["problem_attempted"]}
+            assert attempts_by_id, "시도가 하나도 없으면 아래 귀속 대조가 공허하게 통과한다."
             for row in observed_by_role["mastery_updated"]:
                 assert row["concept_id"] == str(cid), row
                 assert row["mastery_change"] is not None, row
+                # P3-27 ②: 숙달 변경이 어느 시도에서 왔는지 — 채워졌다는 것만이 아니라 **그 시도의
+                # 문항·세션과 같은가**를 본다(엉뚱한 시도에 붙은 값은 비어 있는 것보다 나쁘다).
+                source_attempt = attempts_by_id.get(row["attempt_id"])
+                assert source_attempt is not None, (
+                    "숙달 변경이 시도에 귀속되지 않는다(attempt_id 누락·불일치) — 트레이스의 시도 귀속 "
+                    "투영(P3-27 ②)이 끊겼다.",
+                    row,
+                )
+                assert row["problem_id"] == source_attempt["problem_id"], (
+                    "숙달 변경의 문항이 그 시도의 문항과 다르다.",
+                    row,
+                    source_attempt,
+                )
+                assert row["session_id"] == source_attempt["session_id"], (
+                    "숙달 변경의 세션이 그 시도의 세션과 다르다.",
+                    row,
+                    source_attempt,
+                )
             for row in _entries_of(entries, (TraceEventType.RECOMMENDATION_GENERATED,)):
                 assert row["session_id"] and row["problem_id"], row
             for row in observed_by_role["hint_requested"]:
@@ -280,17 +310,32 @@ def test_gate_d_eight_event_roles_recorded_in_a_real_student_session() -> None:
 
             # ④ⓐ concept_viewed — content_viewed는 생산자 0건, concept_selected는 개념을 싣지 않는다.
             assert _entries_of(entries, (TraceEventType.CONTENT_VIEWED,)) == [], (
-                "content_viewed가 기록되기 시작했다 — concept_viewed 공백이 해소된 것으로 보인다. "
-                "이 단언을 '콘텐츠 열람이 개념·문항을 싣는다'로 승격하라(콘텐츠 열람 로그 좌석)."
+                "content_viewed가 기록되기 시작했다 — 콘텐츠 열람 로그 좌석이 생긴 것으로 보인다. "
+                "이 단언을 '콘텐츠 열람이 개념·문항을 싣는다'로 승격하라(소유 P3-29)."
             )
             assert coverage[TraceEventType.CONTENT_VIEWED.value]["availability"] == (
                 SourceAvailability.DORMANT.value
             ), coverage[TraceEventType.CONTENT_VIEWED.value]
+            # concept_selected — P3-27 승격: 세션 개시 행이 **첫 확인 개념**을 싣는다. 이 장면은 첫
+            # 활동이 추천 조회(문항 선택 전이라 개념 미상 → NULL로 열림)이고 이후 시도가 개념을 알려
+            # 주므로, HTTP 경로 전체에서 NULL→값 채움까지 함께 본다.
             selected = _entries_of(entries, (TraceEventType.CONCEPT_SELECTED,))
-            assert selected and all(row["concept_id"] is None for row in selected), (
-                "concept_selected가 concept_id를 싣기 시작했다 — 세션 writer가 목표 개념을 채운 것으로 "
-                "보인다. 이 단언을 '세션 개시가 개념을 싣는다'로 승격하라."
+            assert selected, "세션 개시(concept_selected)가 한 건도 없다 — 승격 단언이 공허하다."
+            assert all(row["concept_id"] == str(cid) for row in selected), (
+                "concept_selected가 첫 확인 개념을 싣지 않는다 — 세션 writer의 개념 채움(P3-27)이 "
+                "끊겼다(시도·코치 턴이 문항을 실어 오는데 target_concept_id가 비어 있다).",
+                selected,
             )
+
+            # ④ⓒ 코치 도중 이벤트의 세션 귀속 — 현행 공백 동결(소유 P3-30). 시도가 아직 없어
+            #     attempt_id도 없고, attempt_event에 세션 컬럼이 없다. 고쳐지면 이 단언이 깨진다.
+            for coach_event in (TraceEventType.HINT_REQUESTED, TraceEventType.ANSWER_SUBMITTED):
+                for row in _entries_of(entries, (coach_event,)):
+                    assert row["session_id"] is None and row["attempt_id"] is None, (
+                        f"{coach_event.value}가 세션·시도에 귀속되기 시작했다 — 이 단언을 '코치 도중 "
+                        "이벤트가 세션을 싣는다'로 승격하라(소유 P3-30).",
+                        row,
+                    )
 
             # ④ⓑ content_version — 봉투에 슬롯이 없다(시도 시점의 판을 기록하는 원천이 없다).
             assert "content_version" not in LearningEvent.model_fields, (
@@ -299,6 +344,42 @@ def test_gate_d_eight_event_roles_recorded_in_a_real_student_session() -> None:
             )
             assert all("content_version" not in e for e in entries)
 
+            _S._erase_learner(client)
+    finally:
+        content.teardown()
+
+
+def test_coach_first_activity_opens_the_session_with_the_problem_concept() -> None:
+    """코치가 첫 활동인 학생 — 세션이 그 문항의 개념으로 열리고 `concept_selected`가 개념을 싣는다.
+
+    위 8역할 시나리오는 첫 활동이 추천 조회라 세션이 개념 없이 열리고 시도가 채운다. 이 테스트는 그
+    반대 경로를 본다: 문항이 붙은 코치 대화가 **세션을 여는 첫 활동**일 때 writer가 코치 호출처의
+    `problem_id`로 개념을 해석해 열린 세션에 싣는지(P3-27). 코치 호출처의 전달 여부는 AST 테스트가
+    전수로 보고, 이 테스트는 그 값이 실제로 개념까지 도달하는 동작을 본다.
+    """
+    content, _journal = _S._begin("GATE-D-COACH")
+    try:
+        cid, _code = _S._seed_concept(content, "gc", "일차방정식의 풀이")
+        coach_pid = _coach_problem(content, cid, "gcc")
+
+        with _S._client() as client:
+            _S._erase_learner(client)
+            auth = _S._login(client)
+            opened = client.post(
+                "/v1/coach/sessions",
+                headers=auth,
+                json={"student_input": _ANSWER_DEMAND, "problem_id": str(coach_pid)},
+            )
+            assert opened.status_code == 201, opened.text
+
+            body = _S._get(client, auth, "/v1/me/learning-trace")
+            selected = _entries_of(body["entries"], (TraceEventType.CONCEPT_SELECTED,))
+            assert len(selected) == 1, f"세션 개시가 정확히 1건이어야 한다: {selected}"
+            assert selected[0]["concept_id"] == str(cid), (
+                "코치가 연 세션이 문항의 개념을 싣지 않는다 — 코치 호출처의 problem_id 전달 또는 "
+                "writer의 개념 채움(P3-27)이 끊겼다.",
+                selected,
+            )
             _S._erase_learner(client)
     finally:
         content.teardown()

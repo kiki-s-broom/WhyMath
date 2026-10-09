@@ -1458,7 +1458,10 @@ async def _complete_problem(
     )
     # EOS-131: 완료 확정 attempt도 서버가 학습 세션에 결합한다(submit_attempt와 같은 규칙). 같은
     # 턴 앞에서 이미 세션을 이었으므로 대개 같은 세션을 갱신할 뿐이다. never-break(실패 시 NULL).
-    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    # P3-27: 완료한 문항의 대표 개념을 세션에 채운다(이미 있으면 덮어쓰지 않는다).
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
     # EOS-133: attempt보다 먼저 판정한다 — used_hint는 attempt 행의 컬럼이다.
     hint_attribution = await _attribute_hints(
         session,
@@ -1633,7 +1636,9 @@ async def _record_first_wrong_submission(
     student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
         student_work_cipher, final_answer
     )
-    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),
         user_id=user_id,
@@ -3060,7 +3065,8 @@ async def create_session(
     segmentation_counters.record(body.solution_steps)
     # EOS-131: 코치 턴은 학습 활동이다 — 서버 유휴 규칙으로 학습 세션을 잇거나 연다. never-break
     # (실패해도 코칭은 진행·예외 타입명 로그). 커밋은 이 핸들러의 기존 커밋이 함께 가져간다.
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 코칭 대상 문항의 대표 개념을 세션에 채운다(문항 없는 대화는 개념 없이 결합).
+    await record_learning_activity(session, user_id=user.user_id, problem_id=body.problem_id)
     # slice 64: 문항 기대정답을 서버 DB에서 조회해 step shadow 진단 맥락으로 주입(비노출 — 응답엔
     # 결코 싣지 않음·정답 누출 차단). 문항 부재/없음이면 None(graceful).
     expected_answer = await _expected_answer_for(session, body.problem_id)
@@ -3501,7 +3507,8 @@ async def append_turns(
             status_code=status.HTTP_404_NOT_FOUND, detail="대화를 찾을 수 없습니다."
         )
     # EOS-131: 코치 턴 = 학습 활동(소유권 확인 *뒤* — 남의 대화 id로 세션을 갱신하지 않는다).
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 대화에 실린 문항의 대표 개념을 채운다.
+    await record_learning_activity(session, user_id=user.user_id, problem_id=dialogue.problem_id)
 
     # PED-04 D1·D2: **이번 턴을 적재하기 전에** 직전 턴들의 평문 메타를 읽는다(순서가 계약 —
     # `_turn_meta_rows` docstring 참조). 여기서 Polya 상태를 서버가 파생하고, 발문 회전용

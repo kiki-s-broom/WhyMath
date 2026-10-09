@@ -109,6 +109,10 @@ class _MasteryRow:
     sample_size: int | None = None
     concept_id: uuid.UUID | None = None
     skill_id: str | None = None
+    # P3-27 ②: 이 측정을 낳은 시도의 귀속(질의가 시도 조인으로 채운다 — 없으면 None).
+    attempt_id: uuid.UUID | None = None
+    problem_id: uuid.UUID | None = None
+    session_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -387,6 +391,50 @@ class TestMasteryProjection:
         change = MasteryChange(mastery_before=0.5, mastery_after=None, is_first_measurement=False)
         assert change.delta is None
 
+    def test_attempt_attribution_is_carried_on_both_axes(self) -> None:
+        """P3-27 ② — 숙달 변경이 어느 시도(문항·세션)에서 왔는지 개념·스킬 두 축 모두에 싣는다."""
+        attempt, problem, session = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        for concept_axis in (True, False):
+            rows = [
+                _MasteryRow(
+                    measured_at=_at(1),
+                    mastery=0.5,
+                    concept_id=_CONCEPT,
+                    skill_id="skill.slope",
+                    attempt_id=attempt,
+                    problem_id=problem,
+                    session_id=session,
+                )
+            ]
+            (event,) = project_mastery_rows(_UID, rows, concept_axis=concept_axis)
+            assert (event.attempt_id, event.problem_id, event.session_id) == (
+                attempt,
+                problem,
+                session,
+            )
+
+    def test_unattributed_measurement_keeps_the_pointers_none(self) -> None:
+        """배치·백필 측정(attempt_id NULL)이나 파기된 시도는 귀속이 없다 — 채워 넣지 않는다."""
+        rows = [_MasteryRow(measured_at=_at(1), mastery=0.5, concept_id=_CONCEPT)]
+        (event,) = project_mastery_rows(_UID, rows, concept_axis=True)
+        assert event.attempt_id is None
+        assert event.problem_id is None
+        assert event.session_id is None
+
+    def test_rows_without_attribution_attributes_still_project(self) -> None:
+        """귀속 속성이 아예 없는 뷰(이전 모양)도 깨지지 않는다 — getattr 폴백."""
+
+        class _Legacy:
+            measured_at = _at(1)
+            mastery = 0.5
+            mastery_before = None
+            confidence = None
+            sample_size = None
+            concept_id = _CONCEPT
+
+        (event,) = project_mastery_rows(_UID, [_Legacy()], concept_axis=True)  # type: ignore[list-item]
+        assert event.attempt_id is None and event.concept_id == _CONCEPT
+
 
 class TestAttemptProjection:
     def test_wrong_answer_emits_both_attempted_and_failed(self) -> None:
@@ -659,8 +707,14 @@ def _mastery_view(
     mastery: float,
     before: float | None,
     axis: Any,
+    *,
+    attempt: tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None] | None = None,
 ) -> Any:
-    """`_mastery_stmt` 결과 행(`axis_id` 라벨) 모양."""
+    """`_mastery_stmt` 결과 행(`axis_id` 라벨) 모양.
+
+    `attempt`는 (attempt_id, 시도의 문항, 시도의 세션) — 질의가 시도 조인으로 채우는 귀속 3열이다
+    (P3-27 ②). 생략하면 배치·백필 측정처럼 귀속이 없는 행이다.
+    """
 
     @dataclass
     class _Row:
@@ -670,8 +724,14 @@ def _mastery_view(
         confidence: float | None
         sample_size: int | None
         mastery_before: float | None
+        attempt_id: uuid.UUID | None = None
+        attempt_problem_id: uuid.UUID | None = None
+        attempt_session_id: uuid.UUID | None = None
 
-    return _Row(axis, measured_at, mastery, None, None, before)
+    row = _Row(axis, measured_at, mastery, None, None, before)
+    if attempt is not None:
+        row.attempt_id, row.attempt_problem_id, row.attempt_session_id = attempt
+    return row
 
 
 _CONCEPT = uuid.uuid4()
@@ -756,6 +816,25 @@ class TestBuildTrace:
         assert mastery.mastery_change is not None
         assert mastery.mastery_change.mastery_before == pytest.approx(0.54)
         assert mastery.mastery_change.mastery_after == pytest.approx(0.43)
+
+    async def test_mastery_attempt_attribution_flows_from_the_query_row_to_the_event(self) -> None:
+        """P3-27 ② — 질의 행의 시도 귀속 3열(attempt_id·시도의 문항·세션)이 이벤트까지 흘러간다."""
+        attempt, problem, sess = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        queue = _full_queue()
+        queue[3] = [_mastery_view(_at(12), 0.43, 0.54, _CONCEPT, attempt=(attempt, problem, sess))]
+        trace = await build_trace(cast(AsyncSession, _QueueSession(queue)), learner_id=_UID)
+        (mastery,) = [e for e in trace.entries if e.event_type is TraceEventType.MASTERY_UPDATED]
+        assert (mastery.attempt_id, mastery.problem_id, mastery.session_id) == (
+            attempt,
+            problem,
+            sess,
+        )
+
+    async def test_mastery_without_attempt_attribution_stays_unattributed(self) -> None:
+        """귀속 열이 NULL인 행(배치·백필·파기된 시도)은 문항·세션을 날조하지 않는다."""
+        trace = await build_trace(cast(AsyncSession, _QueueSession(_full_queue())), learner_id=_UID)
+        (mastery,) = [e for e in trace.entries if e.event_type is TraceEventType.MASTERY_UPDATED]
+        assert (mastery.attempt_id, mastery.problem_id, mastery.session_id) == (None, None, None)
 
     async def test_coverage_counts_only_what_this_query_produced(self) -> None:
         session = _QueueSession(_full_queue())

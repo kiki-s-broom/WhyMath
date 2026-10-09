@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-29-content-view-log-seat-decision
+title: "P3-29 — 학습자별 콘텐츠 열람 로그 좌석 판정 (content_viewed 생산자 0건 · P3-27 후속 · 12월 이월 후보)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 콘텐츠 열람 로그 좌석 설계 판정 — 학습자별 콘텐츠 열람 로그(concept_content 조회 표면의 학습자 결합)가 없어 트레이스 content_viewed 가 생산자 0건(DORMANT)이다. 새 Entity·DB 스키마가 필요하므로 Phase 3 범위규율에 따라 Release Blocker 여부를 먼저 판정한다. P3-27 이 concept_selected 에 첫 확인 개념을 실어 Gate D concept_viewed 역할을 약하게나마 충족시켰으므로 Release Blocker 가 아니면 12월 이후로 이월한다.\n② 착수한다면 열람 이벤트가 content_version 을 싣는 방법은 EOS-47-attempt-version-pinning 소유다(이 태스크 범위 아님). 열람 시점의 판을 기록하는 원천이 없으면 서빙 판 포인터로 채우지 않는다(날조 금지).\n③ 검증은 tests/backend/scenarios/test_gate_d_event_role_census.py 의 content_viewed DORMANT 동결 단언을 승격하고 scripts/ops/verify_gate_de_discrimination.py 기록 차단 주입이 RED 인지 실측한다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-27 결정 ① — (가) 콘텐츠 열람 로그 좌석은 새 테이블이 필요해 이월, (나) writer 확장(컬럼 기존)을 채택했다. 이 태스크는 (가)의 소유자다."
+updated: 2026-10-09
