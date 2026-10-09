@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-125-coach-step-chain-isolation
+title: "코치 턴의 풀이 단계 연쇄 검증(step_chain)·시도 오개념 훑기가 동기로 SymPy를 부른다 — OPS-96 격리 미적용 4곳"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-123-ubp9tw-ops96-isolated-call-recovery
+requires_gates: []
+acceptance:
+  - "① 현행 실측(OPS-123 회수 시점) — api/coach.py에서 step_chain_verifier(subject_capabilities.step_chain) 3곳과 attempt_misconception_detector(capabilities.attempt_misconception_detector) 1곳이 async 핸들러 경로에서 SymPy(verify_solution·safe_parse)를 동기로 부른다. step_chain 구현은 MathStepChainVerifier이고 학생 풀이 전체를 이벤트 루프 안에서 검증하므로 OPS-96이 막으려던 증상(느린 식 1건이 그 워커의 모든 학생 요청을 멈춘다)이 코치 턴에 그대로 남는다. 현재 개수는 tests/backend/api/test_isolation_call_sites_governance.py가 동결(step_chain 3·detector 1)한다.\n② 격리 방식 판정 — _build_response_payload는 동기 함수라 호출부에서 await로 감쌀 수 없다. (가) 연쇄 검증을 핸들러에서 미리 격리 호출로 계산해 결과를 주입하는 분리 (나) 함수 전체를 워커에서 실행 중 택일하고 근거를 적는다. 시간 상한은 OPS-96 ⑤와 같은 설정값(sympy_isolation_timeout_s)을 쓰고 체인 총 예산(상한 x 4)을 따른다.\n③ 판정 의미 — 상한 초과는 코치 응답에서 판정 불가로 접힌다. 통과로 접으면 검증 우회, 오답으로 접으면 학생에게 부당한 부정 피드백이다(교수학 금기). 초과 시 예외 타입명을 로그에 남긴다.\n④ 변별력 — 의도적으로 느린 풀이를 주입해 상한 초과가 판정 불가가 되고, 그 사이 같은 워커의 가벼운 요청이 막히지 않으며, 격리를 되돌린 뮤테이션에서 후자가 RED임을 보인다. 주입 적용과 원복 바이트 동일을 실행 전후에 단언한다.\n⑤ 집행 지점 — 완료 시 test_isolation_call_sites_governance.py의 미격리 동결(_KNOWN_UNISOLATED)을 제거하고 step_chain·attempt_misconception_detector를 격리 경유 단언에 편입한다. 이 태스크가 done이면 그 동결 테스트가 스스로 실패해 제거를 강제한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/l4/solution_coaching.py
+  - tests/backend/api/test_isolation_call_sites_governance.py
+session: null
+notes: "출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96 acceptance ①이 요구한 학생 대면 경로 동기 SymPy 호출 지점 AST 전수 열거 결과 학생 입력 식을 받는 미격리 지점이 이 4곳이다. 서버 생성 콘텐츠 경로(study 단위 생성·장면 생성·시각화 스펙·DSL 컴파일)는 학생 입력이 아니라 이 태스크 범위 밖이며 별도 판정이 필요하면 따로 등재한다."
+updated: 2026-10-09

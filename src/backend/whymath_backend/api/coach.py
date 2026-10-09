@@ -27,12 +27,15 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import Annotated, Literal, NamedTuple
+from types import SimpleNamespace
+from typing import Annotated, Any, Literal, NamedTuple
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func as sa_func
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._attempt_misconception_scan import (
@@ -52,6 +55,7 @@ from whymath_backend.api._crypto import (
     resolve_dialogue_image_analysis,
     resolve_dialogue_image_uri,
 )
+from whymath_backend.api._isolated_call import isolated
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -1151,6 +1155,30 @@ def _last_solution_step(body: CoachRequest) -> str | None:
     return last or None
 
 
+class _BudgetExceededOutcome:
+    """계산 시간 상한 초과(OPS-96)의 중립 판정 — 상태 하나만 가진 `FinalAnswerOutcome` 구조."""
+
+    state = VerificationOutcome.unverifiable
+
+
+_BUDGET_EXCEEDED_OUTCOME = _BudgetExceededOutcome()
+
+
+def _problem_snapshot(problem: Any) -> Any:
+    """문항 ORM을 워커 프로세스로 보낼 수 있는 *읽기 전용 스냅샷*으로 바꾼다(OPS-96).
+
+    ORM 인스턴스는 세션 상태를 달고 있어 프로세스 경계를 넘기에 부적합하다. **이미 로드된 컬럼만**
+    복사한다(`inspect(...).dict` — 미로드 속성을 건드리면 async 컨텍스트에서 지연 로드가 터진다).
+    과목 어댑터는 자기가 읽는 필드만 `getattr`로 읽으므로(Protocol `problem: Any`) 구조가 같으면
+    통과한다. ORM이 아닌 객체(테스트 스텁)는 그대로 돌려준다.
+    """
+    try:
+        loaded = sa_inspect(problem).dict
+    except NoInspectionAvailable:
+        return problem
+    return SimpleNamespace(**{k: v for k, v in loaded.items() if not k.startswith("_")})
+
+
 async def _final_answer_state(
     session: AsyncSession,
     problem_id: uuid.UUID | None,
@@ -1179,13 +1207,25 @@ async def _final_answer_state(
     if problem is None:
         # 문항 부재(코퍼스 미적재·신규) → 서버 채점 근거 없음(graceful).
         return None, FormVerdict.not_required
+    # OPS-96: 값 판정은 이벤트 루프 밖 워커 프로세스에서 시간 상한과 함께 돈다. 상한을 넘기면
+    # 계산을 끊고 **판정 불가**(`unverifiable`)로 접는다 — 정답(완료 처리)도 오답(REDIRECT=부정
+    # 피드백)도 아니다. 초과 값은 과목 어댑터를 모르는 중립 타입이다(Core→Adapter 의존 금지).
+    snapshot = _problem_snapshot(problem)
     # EOS-89: 구현을 이름으로 알지 않는 것에 더해, **끌어오지도 않는다** — 능력은 Application이
     # 부팅 시 app.state에 등록한 것을 엔드포인트가 Depends로 받아 여기까지 내려준다.
-    result = capabilities.final_answer.verify_final_answer(last_step, problem)
+    result = await isolated(
+        capabilities.final_answer.verify_final_answer,
+        last_step,
+        snapshot,
+        on_budget_exceeded=lambda: _BUDGET_EXCEEDED_OUTCOME,
+    )
     # EOS-28: 형태 지시 준수는 **값 판정과 나란히·독립으로** 계산한다. 여기서 두 판정이 서로를
     # 참조하지 않는 것이 교수학 계약의 1차 방어다 — 참조하는 순간 형태가 정오에 스며든다.
-    form = capabilities.answer_form.verify_answer_form(
-        last_step, getattr(problem, "answer_constraint", None)
+    form = await isolated(
+        capabilities.answer_form.verify_answer_form,
+        last_step,
+        getattr(snapshot, "answer_constraint", None),
+        on_budget_exceeded=lambda: FormVerdict.unverifiable,
     )
     return result.state, form
 
