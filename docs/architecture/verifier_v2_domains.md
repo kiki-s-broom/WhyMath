@@ -640,7 +640,19 @@ for code in sorted(want):
 
 시그니처·결과 타입·어댑터 계약은 **변경 없이** 단계 B를 수용한다. 추가가 필요한 것은 후행 기본값 필드(C2·C3)뿐이다. 다만 C2·C4·C5·C9·C10은 첫 도메인 등록과 같은 슬라이스에서 처리하지 않으면 각각 정수 오답 통과, 등식 DSL 위반 집계, CI `infra-contracts` 적색, 프롬프트 자산 결측으로 나타난다. C1·C6·C7·C8은 `S4-68`이 맡고, C11은 `S4-56` 이후다.
 
-이 검토의 한계: C1·C7의 거동은 코드를 읽어 도출한 것이며 실행으로 확인하지 않았다. `S4-68`의 첫 완료 조건이 그 실측이다.
+이 검토의 한계: C1·C7의 거동은 코드를 읽어 도출한 것이며 실행으로 확인하지 않았다. `S4-68`의 첫 완료 조건이 그 실측이다. → **2026-10-09 `S4-68`이 실행으로 확정했다(§8.5).**
+
+### 8.5 `S4-68` 처리 결과 (2026-10-09, 판정 기준: main `663b91dc` 위의 작업 브랜치)
+
+| ID | 실측 | 처리 |
+|---|---|---|
+| C1 | 재현 확정 — `cross_verifier` 주입 시 개념형 15종 **전부** 확률 관점(`PROBABILITY_PERSPECTIVES`)으로 가서 `pass`가 찍힌다(대조군 `sequence_induction`·`statistical_claim`은 각자 관점). 읽기 기준 판정이 실행으로 맞았다. | `_CROSS_VERIFY_PERSPECTIVES.get(kind)`에서 기본값 폴백 제거. 미등록은 교차검증기를 **부르지 않고** `unverifiable`(사유에 kind 명시·기계 축/잔여 축 보존). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 테스트 `test_verifier_perspective_fail_closed.py`. |
+| C5 | 코퍼스 14,034건 중 조건 보유 레코드의 등식 DSL 위반은 정확히 6종·130건(24×4+8+26)이고, 등식 DSL 11종은 위반 0건. `statistical_claim`·`sequence_induction`은 코퍼스 0건. | `statistical_claim`을 제외 목록에 추가. 목록을 레지스트리에서 **파생하지 않는다** — 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 `test_qa_pipeline_dsl_kinds_sync.py`가 v2 kind를 (비등식 DSL \| 등식 DSL) 중 정확히 하나로 분류하게 강제해, 새 kind는 분류 없이 RED다. |
+| C6 | L1 허용 집합 2값 ↔ L3 `VerificationTier` 9값. 읽는 쪽(`read_verification_tier`·`residue_cross_verify_eval`)은 9값을 이미 받는다. | L1 집합을 9값으로 확장(부분집합 유지는 의도 아님). `test_verification_tier_sync.py`가 두 집합의 **정확한 일치**를 대조. **R6-02 증거**: 전수 적재(37개 파일·14,034건)의 다이제스트가 변경 전(HEAD 사본)·후에 바이트 동일. `problem_id` 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 실행마다 달라지므로 그 필드만 마스킹했다. |
+| C7 | 재현 확정 — v2 전용 kind의 레코드는 개념형 분기에 못 들어가 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)이다. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가. | 디스패치 표 = acceptance 표 ∪ (`_VERIFIERS_V2` 중 acceptance에 없는 kind의 어댑터). 기존 17종 항목은 같은 함수 객체 그대로(동작 불변·테스트로 동결). 순환 import 없음(`verifier`→`acceptance`, `corpus_reverify`→둘 다). v2에 kind가 늘면 야간 재검증에도 자동 포함. |
+| C8 | `residual_axes`의 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 필드로 통과)이고 축 이름 문자열로 분기하는 코드는 0건(내가 찾은 방법: `residual_axes` 전수 grep). | **어휘 등록부는 지금 필요 없다**고 판정. 기존 오타(`문발↔형식모델 정합`)는 바꾸지 않는다(감사 라벨이 영속될 수 있고 소비처가 없어 얻는 것이 없다). 재판정 조건: 축 이름으로 집계·분기하는 소비처가 생길 때. |
+
+이 절에서 하지 않은 것: acceptance 수용 게이트(`acceptance.py:323`)가 v2 전용 kind를 디스패치하지 않는 점은 건드리지 않았다(저작 시점 게이트는 별개 경로이고 코퍼스 0건이라 미발현).
 
 ---
 

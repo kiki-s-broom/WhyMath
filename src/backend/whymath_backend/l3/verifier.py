@@ -17,6 +17,13 @@ S4-13 v1이 확률 유한 전수형을 닫았다면, v2는 검증 진입점을 �
   문자열)·`tier`(도메인별 검증 등급)를 추가한다. 둘 다 기본값이 있고 기존 생성처가 전부
   키워드 인자라 소스 호환이다. `tier=None`이면 종전 상수 등급을 그대로 쓴다.
 
+변경 요약(S4-68, 소비 지점 드리프트 해소):
+- 교차검증 관점 조회를 fail-closed로 바꾼다 — 폴백(`PROBABILITY_PERSPECTIVES`)을 없애고
+  `finite_probability`·`finite_count`에 확률 관점을 명시 등록한다. 미등록 kind는 `unverifiable`.
+- 같은 레지스트리를 읽는 다른 소비 지점(`harness/qa_pipeline`·`harness/corpus_reverify`·
+  `l1/problem_bank/populate`)의 어긋남은 각 파일에서 정정했다. 정리 근거는
+  `docs/architecture/verifier_v2_domains.md` §8.5.
+
 계층: L3 지역. L4만 호출한다(import-linter). DB·LLM 0 — 필요한 경우 cross_verify를
 주입받아 잔여 축을 검증.
 """
@@ -143,8 +150,15 @@ class _DomainResult:
 
 DomainVerifier = Callable[[str, str], _DomainResult]
 
-# 도메인별 교차검증 관점 — 기본값은 확률 유한 전수형 관점.
+# 도메인별 교차검증 관점 — **전부 명시 등록**이며 기본값(폴백)은 없다(S4-68).
+#
+# 종전엔 `.get(kind, PROBABILITY_PERSPECTIVES)`로 미등록 kind를 확률 관점으로 조용히 흘렸다.
+# 실측(2026-10-09 재현): 개념형(SymPy) 15종이 `cross_verifier` 주입 시 모두 확률 관점으로 가
+# `pass`가 됐다 — 확률 관점은 "표본공간·등확률" 가정을 묻는 심사라, 실근 개수·극한 같은 문항에는
+# 의미 없는 심사로 `pass`가 찍힌다. 미등록 kind는 `_run_cross_verify`가 `unverifiable`로 닫는다.
 _CROSS_VERIFY_PERSPECTIVES: dict[str, tuple[Perspective, ...]] = {
+    "finite_probability": PROBABILITY_PERSPECTIVES,
+    "finite_count": PROBABILITY_PERSPECTIVES,
     "statistical_claim": STATISTICAL_PERSPECTIVES,
     "sequence_induction": SEQUENCE_PERSPECTIVES,
 }
@@ -430,6 +444,20 @@ class Verifier:
         assert (
             self._cross_verifier is not None
         ), "_run_cross_verify는 cross_verifier가 있을 때만 호출"
+        # fail-closed — 관점이 등록되지 않은 kind는 심사 자체가 성립하지 않는다. 엉뚱한 관점으로
+        # 심사해 pass를 내느니 "못 쟀다"를 사유와 함께 남긴다(모르면 모른다).
+        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind)
+        if perspectives is None:
+            return VerificationVerdict(
+                state="unverifiable",
+                tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+                machine_axes=domain_result.machine_axes,
+                residual_axes=domain_result.residual_axes,
+                reason=(
+                    f"answer_kind={problem.answer_kind!r}에 등록된 교차검증 관점이 없음"
+                    "(잔여 축을 심사할 수 없어 unverifiable)"
+                ),
+            )
         subject = ResidueSubject(
             problem_id=problem.slug,
             question_text=problem.question_text,
@@ -443,7 +471,6 @@ class Verifier:
             authored_by=problem.authored_by,
             data=problem.conditions,
         )
-        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind, PROBABILITY_PERSPECTIVES)
         cross_result = await asyncio.to_thread(self._cross_verifier.verify, subject, perspectives)
         audit_labels = [f"cross_verify:{cross_result.aggregate}"]
 
