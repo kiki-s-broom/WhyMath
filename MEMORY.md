@@ -350,6 +350,14 @@
 - **같은 PR에서 고친 인접 결함**: `scripts/harness/ci_mirror.py`가 워크플로 최상위 `env`를 무시해 미러가 제약 없이 돌아 CI와 달라지는 문제(기존 코드는 `defaults.run.shell`만 최상위를 읽고 env는 빠져 있었다). 잡·스텝 env와 같은 규칙(식은 비움, `${{ github.workspace }}`는 저장소 루트)으로 상속하고 테스트 6건을 추가했다 — 옛 코드로 되돌리면 4건 RED.
 - **보지 못하는 것(정직 기술)**: ①오프라인 게이트는 전이 의존의 일관성을 직접 보지 못한다(직접 의존 핀·이름 집합 지문만; 전이 정합은 `refresh` 시점 리졸버가 보장) ②Dockerfile 설치 표면은 이 파일을 아직 안 쓴다 — `OPS-103` 소관(OPS-121 착지 후 착수하도록 `depends_on`을 걸었다) ③CI가 설치하지 않는 extras(`embedding`·`ocr`·`playwright`·`xlsx`)는 핀이 없다 ④갱신 PR 자동화는 미결(기본 토큰으로 만든 PR은 워크플로를 깨우지 않는 것으로 알려져 있으나 이 저장소에서 실측하지 않았다 — 지금은 세션이 `refresh`를 돌려 PR을 연다) ⑤해시 고정은 하지 않는다(`SEC-22` 소관).
 - **소유권 조율**: OPS-103 ②의 `-c` 승격은 OPS-121이 소유하고 OPS-103은 `-r`만 남긴다(`backlog.py amend`로 대장 반영). 제약 파일은 `.txt`라 OPS-94 스캔 대상이 아니고(테스트로 동결) 새 워크플로 잡의 인라인 설치에는 상한을 붙였다.
+### 2026-10-08 (착지 · OPS-19): **관측 리포트 20개 중 러너 0건이던 17개에 실행 경로를 줬다 — 자동 16개(CI 5 · 배포 compose 10 · 사람 런북 1)와 입력 의존 1개로 갈랐고, "돌지 못함"이 "0건"으로 읽히지 않게 상태값을 분리했다** — 판정 기준 main `1c33b60a`
+
+**무엇/왜**: 태스크가 등재될 때의 주장(리포트 11개 중 10개 러너 0건)은 이 시점 실측과 달랐다. `*_report.py`는 **20개**였고 러너가 있는 것은 3개(`eos_unit_structure_observation_report` CI 스텝 · `weekly_metrics_report` cron · `cost_report` 수동 스크립트)였다. `concept_reach_report`는 CLI가 아니라 **테스트**만 CI에서 돌고 있어 러너로 세지 않았다. 나머지 17개는 산출이 0회였다. 신규 리포트 로직은 0 — 기존 CLI를 `python -m`으로 부르기만 하는 러너 `ops/observation_report_runner.py`를 신설했다.
+**결정 5건**: ① 부류는 모듈 위치(`harness/`·`ops/`)가 아니라 **어디서 완전하게 돌 수 있는가**로 가른다 — `harness/` 안에도 DB를 요구하는 리포트가 9개다. DB 없이 17개를 직접 실행한 실측으로 `ci` 5(rc=0) · `db` 10(rc=2, 접속 실패를 정직하게 보고) · `checkout_db` 1 · 입력 의존 1로 갈랐다. ② `checkout_db`(`phase1_structure_report`)는 자동 경로에 넣지 않았다 — 배포 이미지에는 `tests/`가 없어 같은 리포트가 Contract coverage 100%→66.7%, Vertical Slice 75%→0.0%로 **파일 부재가 낮은 수치로 읽혔다**(이미지 레이아웃 모사 실측). ③ 러너는 subprocess+타임아웃으로 호출한다(in-process import는 `asyncio.run`·`sys.exit`·전역 엔진 오염과 Windows에서의 타임아웃 불가가 걸린다). 대가로 `declared_unwired_audit`이 도달을 못 보므로 면제 문구 11건을 `_OFFLINE_REPORT`("사람이 돌린다")에서 새 상수 `_OBSERVED_BY_RUNNER`로 정정하고 러너 목록과 **양방향 대조 테스트**로 동결했다. ④ 상태값은 `ran_ok`/`run_failed`/`run_timeout`/`spawn_error`/`running` — 수치가 0이어도 종료 0이면 `ran_ok`, 못 돌면 비-0과 stderr 꼬리(접속 문자열 비밀번호 가림)가 남는다. 리포트마다 시작 전에 `running`을 먼저 flush한다. ⑤ 배포 서비스는 `app`과 같은 이미지로 7일 주기, 실패 시 1시간 재시도로 둔다(`|| exit 1`은 재기동 루프가 매번 10개를 다시 돌려 채택하지 않음).
+**실측**: 같은 `db` 10개를 DB 없이 돌리면 10/10 `run_failed`·러너 exit 1, 실 PG 16(마이그레이션 적용·빈 스키마)에서는 10/10 `ran_ok`·exit 0. `ci` 5개는 작업 디렉터리(저장소 루트/`src/backend`)와 무관하게 출력 해시가 바이트 동일하고 기본 의존성만 설치한 환경에서도 5/5. 이미지 레이아웃(`src/backend`+`data`+`docs/prompts`만) 모사에서도 `db` 10/10.
+**집행(정본화와 별항)**: 러너 단위 16건(뮤테이션 9종 전건 RED) · 레지스트리 28건(21번째 리포트 미귀속·죽은 항목·중복 귀속·면제 문구 불일치·쓰기 구문 혼입을 실제 소스에 주입해 RED) · `tests/infra` 배선 21건(실제 `ci.yml`·compose에 7종 주입 전건 RED, `Wiring/_all_wirings` 재사용으로 신규 테스트의 CI 도달 확인). 집행 지점은 CI `harness-integrity` 스텝과 `docker-compose.prod.yml`의 `observation-reports` 서비스다.
+**정직한 공백**: `ran_ok`는 "정상 종료"이지 "측정이 완전했다"가 아니다(리포트가 본문에 `미측정`을 적고 0으로 끝나는 설계는 본문을 읽어야 안다). compose 서비스의 실제 기동은 이 환경에 데몬이 없어 정의 계약과 `docker compose config` 렌더까지만 확인했다. 결과 전달(Slack·이메일)은 `OPS-30`. `generation_seed_adoption_report`는 genlog 위치가 확정돼야 해 명령을 지어내지 않고 런북에 산문으로만 남겼다. 면제 문구 11건의 수취인·만료 선언은 `OPS-34` 몫이고 이 변경이 그 대상을 11건 줄였다.
+**사고 기록(피해 0, CI 도달 전 로컬 재현으로 검출)**: ⓐ 러너 스텝의 `${{ runner.temp }}`가 CI 미러(`test_ci_mirror`)에서 '러너 컨텍스트 필요'로 해석 불가 판정 → 고정 경로 `/tmp/observation-reports`로 교체 ⓑ 신규 모듈이 EOS 기능 인벤토리에 미귀속(`WM-O-907` 편입으로 해소) — 이 둘은 `infra-contracts` 잡 전체를 재현한 뒤에야 나왔고, 변경이 닿는 잡을 먼저 열거하지 않았다면 CI 첫 실행에서 드러났을 것이다 ⓒ 워커 재시작으로 로컬 PG가 내려가 첫 이미지 모사 결과가 무효였고 DB 복구 후 재실행했다.
 
 ### 2026-10-09 (결정 · 부분매핑 적재 자격 정책): **부분매핑·개념겹침은 승인 코퍼스에 적재하지 않는다(기본 금지) — 예외는 사람이 직접매핑으로 승격해 confidence를 적고 서명하는 경우뿐이다** (Kiki 결정·claude 기록) — 판정 기준 main `663b91dc`
 
@@ -12209,6 +12217,17 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
 
+### 2026-10-09 — S4-68: answer_kind v2 소비 지점 드리프트 4건 해소 (교차검증 관점 fail-closed · DSL 제외 목록 · tier 값 · 야간 재검증)
+
+`l3/verifier._VERIFIERS_V2`(통합 검증기 v2 레지스트리)를 읽는 소비 지점 4곳이 각자 수동 사본을 들고 있어 어긋나 있었다. 설계 단계(S4-57 §8)는 코드 독해 기준이라 **미실행**이었고, 이번에 전부 실행으로 확정했다.
+
+- **C1 관점 폴백(실측 확정)**: `cross_verifier` 주입 시 개념형(SymPy) 15종이 **전부** 확률 관점(표본공간·등확률 가정)으로 가서 `pass`가 찍혔다. 폴백 제거 → 미등록 kind는 교차검증기를 부르지 않고 `unverifiable`(사유에 kind 명시). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 운영 어댑터(`l4/subject_adapter_math.py`)는 `cross_verifier`를 주입하지 않아 운영 영향은 없었고 S4-56 CLI 경로에서 발현할 결함이었다.
+- **C5 DSL 제외 목록**: `statistical_claim` 누락 정정(코퍼스 0건이라 잠복). 목록을 레지스트리에서 파생하지 않은 이유 = 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 동기 테스트가 v2 kind를 (비등식 DSL | 등식 DSL) 중 정확히 하나로 분류하게 강제한다. 근거 실측: 코퍼스 14,034건 중 등식 DSL 위반은 정확히 6종·130건(24×4+8+26), 등식 DSL 11종은 0건.
+- **C6 tier 값**: L1 허용 2값 → 9값(L3 `VerificationTier`와 정확히 일치, 테스트가 양방향 대조). 부분집합 유지는 의도가 아니었다(읽는 쪽 `read_verification_tier`는 9값을 이미 받는다). **R6-02**: 전수 적재 37개 파일·14,034건의 다이제스트가 변경 전(HEAD 사본)·후 바이트 동일. 도구 결함 1건 발견·정정 — `problem_id`가 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 다이제스트가 실행마다 달랐다(같은 트리 2회 비교로 발견, 해당 필드만 마스킹).
+- **C7 야간 재검증**: v2 전용 kind(`statistical_claim`·`sequence_induction`) 레코드는 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)되고 있었다 — 야간 재검증이 통과하는 척하는 구간. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가 → v2 레지스트리를 정본으로 조회(acceptance에 없는 kind만 어댑터). 기존 17종은 같은 함수 객체 그대로.
+- **C8 잔여 축 어휘**: 어휘 등록부는 **지금 필요 없다**고 판정. `residual_axes` 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 통과)이고 축 이름으로 분기하는 코드는 0건(내가 찾은 방법: 전수 grep). 기존 오타(`문발↔형식모델 정합`)는 유지. 재판정 조건 = 축 이름으로 집계·분기하는 소비처 출현.
+- **검증**: 신규 테스트가 변경 전 코드에서 37건 RED(사유가 전부 의도한 결함), 변경 후 GREEN. 뮤테이션 9종 전건 검출(주입 적용·원복 바이트 동일을 하네스가 단언). 설계서 `verifier_v2_domains.md` §8.5에 처리 결과 기록.
+- **미처리(의도)**: acceptance 수용 게이트(`acceptance.py:323`)가 v2 전용 kind를 디스패치하지 않는 점 — 저작 시점 경로이고 코퍼스 0건이라 미발현. 필요해지면 별건.
 ## 2026-10-09: 미머지 브랜치 전수 감사 16회차 — 15회차 산출물 자체가 고립돼 있었다 · 미추적 고립 구현 3건 회수 등재 · 분실 등재 3건 복원 · 삭제 14차 배치 10건
 
 판정 기준 main `15220b9f`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-09.md`(Kiki "떠돌이 코드 정리"). 원격 ref 61 → 감사 대상 28(PR 소유 27 · claim 활성 3 · 판정 대상 아님 3).

@@ -327,6 +327,13 @@ _NON_EQUATION_DSL_ANSWER_KINDS = frozenset(
         # S4-66 — 수열 귀납 DSL(`init=...; rec=...; query=...`)은 sympify 대상이 아니다. 자체
         # 파서(`l3/sequence_induction.py`)가 닫힘을 보증하므로 등식 DSL 폐쇄 검사에서 제외한다.
         "sequence_induction",
+        # S4-68 — 통계 자료형 DSL(`data=...; stat=...` 류)도 sympify 대상이 아니다. S4-53이
+        # v2 레지스트리에 등록하며 이 목록을 갱신하지 않아 잠복했던 결함(코퍼스에 0건이라
+        # 미발현 — 실측 2026-10-09). 자체 파서(`l3/statistical_claim.py`)가 닫힘을 보증한다.
+        "statistical_claim",
+        # ※ 이후 v2 kind 추가 시 이 목록과 `tests/backend/harness/
+        #   test_qa_pipeline_dsl_kinds_sync.py`의 분류표를 함께 갱신해야 한다 — 분류표가
+        #   `_VERIFIERS_V2`와 어긋나면 그 테스트가 RED다.
     }
 )
 

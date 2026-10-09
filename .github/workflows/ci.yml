@@ -1778,6 +1778,28 @@ jobs:
           python -m whymath_backend.harness.cross_school_connectivity_report
           python -m whymath_backend.harness.cross_school_connectivity_report --json /tmp/cross_school_connectivity.json
 
+      # OPS-19 — 관측 리포트 CLI 20개 중 러너를 가진 것은 3개뿐이었고 나머지는 산출이 0회였다
+      # ("측정한 적 없음"이 "문제 없음"으로 읽혔다). 이 스텝은 그중 **저장소 체크아웃만으로 도는
+      # 5개**(DB 0·인자 0)를 러너로 돌린다. DB가 필요한 11개는 여기 넣지 않는다 — 이 잡엔 DB가
+      # 없어 넣으면 "접속 실패"가 매 PR마다 나거나, 삼키면 "0건"으로 위장된다(부류 분리 근거는
+      # `ops/observation_report_runner.py` 모듈 docstring). 그쪽은 `docker-compose.prod.yml`의
+      # `observation-reports` 서비스가 돈다.
+      #
+      # 게이트가 아니라 관측이다 — 수치가 나빠도 exit 0이고, **리포트가 돌지 못했을 때만** red다
+      # (`ran_ok`/`run_failed`/`run_timeout`이 manifest.json에서 서로 다른 값으로 남는다).
+      - name: 관측 리포트 실행 — 체크아웃 전용 5종 (OPS-19)
+        run: python -m whymath_backend.ops.observation_report_runner --class ci --out /tmp/observation-reports
+
+      # 실패한 실행의 증거가 가장 필요하므로 `always()`다 — 위 스텝이 red여도 manifest.json의
+      # 원인(stderr 꼬리)과 리포트 본문이 남는다.
+      - name: 관측 리포트 산출물 업로드 (OPS-19)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observation-reports-ci
+          path: /tmp/observation-reports
+          retention-days: 14
+
       # OPS-12 — `tests/harness`·`scripts/harness`를 lint/format하는 잡이 **하나도 없었다**
       # (OPS-11의 harness 판박이). backend 잡은 `../../tests/backend`만, data-pipeline 잡은
       # working-directory `src/data-pipeline`의 `.`만 본다 — 하네스는 대장(backlog)을 판정하는
