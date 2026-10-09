@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,11 +18,13 @@ acceptance:
   - "적재 왕복 테스트: stamp_verification_tier로 신규 7종을 각각 찍은 코퍼스 레코드가 problem_bank 로더를 통과하고 verification_tier가 원문 그대로 보존됨을 단언한다. 레거시 2종도 같은 방식으로 무회귀를 단언하고, 미지 문자열은 여전히 ProblemCorpusError임을 단언한다"
   - "범위 경계: read_verification_tier·stamp_verification_tier의 프로덕션 호출처를 새로 만들거나 생산자 배치 하네스(레거시 멤버를 직접 찍는 33개 파일)를 전환하지 않는다 — 그것은 첫 신규 값 생산자(S4-54 verifier v2의 RESIDUE_REVIEWED 반영·S4-56 Wilson 게이트)의 몫이며, 이 태스크는 그 생산자가 찍은 값이 L1 적재에서 거부되지 않는 상태까지만 닫는다"
   - "ruff·black(--line-length 100)·mypy --strict·lint-imports(7계층 위반 0)를 CI backend 잡과 같은 명령으로 돌려 종료 코드 0을 보고하고, PR 생성 및 CI 통과"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1566"
+  - commit 29535b12
 paths:
   - src/backend/whymath_backend/l1/problem_bank/populate.py
   - tests/backend/l1/problem_bank/test_populate.py
   - tests/backend/l3/test_verification_tier.py
-session: claude/ecstatic-pasteur-pw9dl8
+session: null
 notes: "출처: S4-55 마감 점검(2026-10-08, 판정 기준: main c322bb9c). S4-55 acceptance 7항은 충족되나 계약만 있고 L1 집행이 비어 있어 분리 등재한다(정본화≠집행). 실측: (1) populate.py:153 _VERIFICATION_TIER_VALUES는 machine_exhaustive·machine_sampled 2종뿐인데 같은 파일 주석(150~152행)은 'VerificationTier와 값 동기'라 적는다 — S4-55(PR #872)가 enum을 9종으로 늘린 뒤에도 이 집합은 그대로다. (2) 이 집합을 참조하는 테스트는 populate.py 밖에 0건이다 — 동기는 문장일 뿐 집행되지 않는다. (3) 설계서 verifier_v2_design.md §6.2는 새 코퍼스의 필수 메타로 verify.verification_tier '신규 등급'을 요구하므로, 첫 신규 값이 찍히는 순간 로더가 ProblemCorpusError로 거부한다(큰 소리로 실패하므로 침묵 실패는 아니나 생산자 쪽 착수를 막는다). (4) 정의 파일 밖 src/·scripts/에서 VerificationTier 멤버 사용은 MACHINE_SAMPLED 34회·MACHINE_EXHAUSTIVE 7회(33개 파일)이고 신규 7종은 0회, read/stamp 함수의 호출처는 0건(테스트 전용). EOS-85는 verification_tier가 '거부 정책'이라는 비대칭만 명시하고 동기는 소유하지 않는다 — 중복 아님을 확인했다."
 updated: 2026-10-09
