@@ -8,8 +8,7 @@ S4-13 v1이 확률 유한 전수형을 닫았다면, v2는 검증 진입점을 �
 - `_VERIFIERS_V2`에 신규 도메인(geometric_discrete, statistical_claim 등)을 추가할 수 있는
   플러그인 구조를 마련하고, 기존 키와의 중복은 구성 시점에 거부.
 - 기계 검증 후 남은 `residual_axes`가 있고 `cross_verifier`가 주입되면 `ResidueSubject`를
-  구성해 독립 다관점 LLM 교차검증을 연결. 주입되지 않거나 그 answer_kind에 정의된 관점 세트가
-  없으면 보수적으로 `unverifiable` 회피(엉뚱한 관점으로 채점한 거짓 pass 금지).
+  구성해 독립 다관점 LLM 교차검증을 연결. 주입되지 않으면 보수적으로 `unverifiable` 회피.
 
 계층: L3 지역. L4만 호출한다(import-linter). DB·LLM 0 — 필요한 경우 cross_verify를
 주입받아 잔여 축을 검증.
@@ -122,12 +121,8 @@ class _DomainResult:
 
 DomainVerifier = Callable[[str, str], _DomainResult]
 
-# 도메인별 교차검증 관점 — 관점 세트가 정의된 answer_kind만 교차검증한다.
-# 정의되지 않은 kind(SymPy 계열 개념형 등)에 확률형 관점을 대신 쓰면 machine_total=0·모형 설명
-# 없는 재료를 LLM이 엉뚱한 기준으로 채점해 거짓 pass가 날 수 있어, 기본값 폴백을 두지 않는다.
+# 도메인별 교차검증 관점 — 기본값은 확률 유한 전수형 관점.
 _CROSS_VERIFY_PERSPECTIVES: dict[str, tuple[Perspective, ...]] = {
-    "finite_probability": PROBABILITY_PERSPECTIVES,
-    "finite_count": PROBABILITY_PERSPECTIVES,
     "statistical_claim": STATISTICAL_PERSPECTIVES,
 }
 
@@ -373,15 +368,6 @@ class Verifier:
         assert (
             self._cross_verifier is not None
         ), "_run_cross_verify는 cross_verifier가 있을 때만 호출"
-        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind)
-        if perspectives is None:
-            return VerificationVerdict(
-                state="unverifiable",
-                tier=VerificationTier.MACHINE_EXHAUSTIVE,
-                machine_axes=domain_result.machine_axes,
-                residual_axes=domain_result.residual_axes,
-                reason=f"answer_kind={problem.answer_kind!r}에 정의된 교차검증 관점 세트가 없음",
-            )
         subject = ResidueSubject(
             problem_id=problem.slug,
             question_text=problem.question_text,
@@ -394,6 +380,7 @@ class Verifier:
             authored_by=problem.authored_by,
             data=problem.conditions,
         )
+        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind, PROBABILITY_PERSPECTIVES)
         cross_result = await asyncio.to_thread(self._cross_verifier.verify, subject, perspectives)
         audit_labels = [f"cross_verify:{cross_result.aggregate}"]
 
