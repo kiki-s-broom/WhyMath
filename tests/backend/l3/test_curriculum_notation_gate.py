@@ -10,6 +10,9 @@
   ⑤ 판정 — 학년 초과 표기만 계상·미분류/미매핑은 건수 노출·베이스라인 래칫.
   ⑥ 변별력 대조군 — 같은 코퍼스를 고등으로 판정하면 exit 0, 초등으로 판정하면 exit 1.
   ⑦ 실코퍼스 — 커밋 베이스라인과 일치(CI 상시 회귀)·측정기가 실제로 토큰을 관측함.
+  ⑧ (MATH-06) ASCII 구조 축 — 초등 밴드의 미관측 해소·결함 주입 RED·프라임 구분 규칙(점 이름 vs 미분).
+  ⑨ (MATH-06) 보조 코퍼스 편입 — 코퍼스별 밴드 파생 규칙·미분류 노출·결함 주입·부재 시 명시 실패.
+  ⑩ (MATH-06) 엔진 게이트 확장 표 편입 — 역삼각·편미분이 표↔엔진 드리프트 검사에 묶임.
 
 학생 경로 import 금지(④)는 `test_curriculum_notation_gate_student_path_governance.py`가 따로 동결한다.
 """
@@ -25,20 +28,27 @@ import pytest
 
 from whymath_backend.harness.curriculum_notation_gate_cli import constructs_by_band, main
 from whymath_backend.l3.curriculum_notation_gate import (
+    DEFAULT_AUX_SOURCES,
     KNOWN_BLIND_SPOTS,
+    STRUCTURE_PATTERNS,
+    AuxRecord,
+    AuxSource,
     RangeScan,
     ScannedRecord,
     build_json_payload,
     derive_band,
     evaluate,
     extract_range_tokens,
+    extract_structures,
     extract_words,
     load_range_baseline,
     load_range_table,
     load_standard_bands,
     render_report,
     run_gate,
+    scan_aux_sources,
     scan_problem_banks,
+    source_of,
 )
 from whymath_backend.l4.speech import PROFILES, speak_latex
 from whymath_backend.schema.speech import SpeechGradeBand
@@ -52,8 +62,7 @@ _STANDARDS = _CORPUS / "standards_v1" / "standards.json"
 
 _CB = constructs_by_band()
 _VOCAB = frozenset().union(*_CB.values())
-# ASCII 구조 표기(`|x|`·`!`)로만 쓰이는 구조 — 추출 대상 토큰이 없어 표에 항목이 없는 것이 정상이다.
-_ASCII_ONLY_CONSTRUCTS = frozenset({"abs", "factorial"})
+_CI_WORKFLOW = _ROOT / ".github" / "workflows" / "ci.yml"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -101,7 +110,7 @@ class TestRangeTableLoader:
     def test_real_table_loads_and_is_non_trivial(self) -> None:
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
         assert len(table.entries) >= 50
-        assert {e.kind for e in table.entries} == {"macro", "glyph", "word"}
+        assert {e.kind for e in table.entries} == {"macro", "glyph", "word", "structure"}
         assert table.word_tokens >= {"sin", "cos", "tan", "log", "ln", "lim", "sqrt"}
 
     def test_missing_table_fails_loudly(self, tmp_path: Path) -> None:
@@ -169,17 +178,34 @@ class TestTableVocabulary:
         assert len(_VOCAB) == 14
         assert _VOCAB == PROFILES[SpeechGradeBand.고등].introduced_constructs
 
-    def test_table_covers_every_construct_except_ascii_only_ones(self) -> None:
+    def test_table_covers_every_construct(self) -> None:
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
         covered = {e.construct for e in table.entries}
         # 같은 집합이어야 한다: 빠지면 그 구조는 판정 불가, 남으면 어휘 밖(로더가 이미 거부).
         # profiles.py에 구조가 추가되면 여기서 실패해 표 갱신을 강제한다.
-        assert covered == _VOCAB - _ASCII_ONLY_CONSTRUCTS
+        # MATH-06 이전에는 abs·factorial이 ASCII 전용이라 표 밖이었으나, structure 축이 덮는다.
+        assert covered == _VOCAB
 
     def test_deliberately_unmapped_tokens_carry_reasons(self) -> None:
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
         assert {"′", "\\prime", "\\bigcup"} <= set(table.deliberately_unmapped)
         assert all(reason.strip() for reason in table.deliberately_unmapped.values())
+
+    def test_math06_graduated_the_engine_gated_tokens_out_of_the_unmapped_list(self) -> None:
+        """역삼각·편미분은 엔진 게이트를 확장한 뒤 표로 편입됐다 — 미매핑 목록에 남아 있으면 모순이다."""
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        for token in ("\\arcsin", "\\arccos", "\\arctan", "\\partial"):
+            assert token in table.lookup["macro"], token
+            assert token not in table.deliberately_unmapped, token
+        # 프라임은 토큰 단독으로 구조를 단정할 수 없어 미매핑으로 남고, 문맥 패턴(prime-call)이 센다.
+        for token in ("′", "″", "‴", "\\prime"):
+            assert token in table.deliberately_unmapped, token
+        assert table.lookup["structure"]["prime-call"] == "derivative"
+
+    def test_structure_entries_are_exactly_the_closed_pattern_names(self) -> None:
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        assert set(table.lookup["structure"]) == set(STRUCTURE_PATTERNS)
+        assert len(STRUCTURE_PATTERNS) == 7
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -197,6 +223,10 @@ _MACRO_PROBES: dict[str, str] = {
     "\\cot": "\\cot x",
     "\\sec": "\\sec x",
     "\\csc": "\\csc x",
+    "\\arcsin": "\\arcsin x",
+    "\\arccos": "\\arccos x",
+    "\\arctan": "\\arctan x",
+    "\\partial": "\\frac{\\partial f}{\\partial x}",
     "\\log": "\\log x",
     "\\ln": "\\ln x",
     "\\lg": "\\lg x",
@@ -248,6 +278,75 @@ class TestTableEngineDrift:
         )
         assert engine_reacts is True
         assert engine_reacts != table_says_out_of_range  # 판정식이 틀린 매핑에서 어긋남을 낸다
+
+
+# structure 항목: 엔진이 AST로 읽어 학년 게이트를 거는 것은 caret·underscore·prime-call뿐이다. 나머지는
+# 엔진에 묶인 매크로 쌍둥이(ncr↔\binom·slash-frac↔\frac)와의 일치로, 또는 "모든 밴드에 도입된 구조"(abs·
+# factorial — 위반을 낼 수 없는 구조)라는 사실로 고정한다. 셋 중 어디에도 없는 항목은 검증되지 않는 정본이다.
+_STRUCTURE_ENGINE_PROBES: dict[str, str] = {
+    "caret": "x^{2}",
+    "underscore": "a_n",
+    "prime-call": "f'(x)",
+}
+_STRUCTURE_MACRO_TWINS: dict[str, str] = {"ncr": "\\binom", "slash-frac": "\\frac"}
+_STRUCTURE_EVERY_BAND: dict[str, str] = {"pipe-abs": "abs", "bang": "factorial"}
+
+
+class TestStructureEngineDrift:
+    def test_every_structure_entry_is_bound_one_way_or_another(self) -> None:
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        bound = (
+            set(_STRUCTURE_ENGINE_PROBES) | set(_STRUCTURE_MACRO_TWINS) | set(_STRUCTURE_EVERY_BAND)
+        )
+        assert set(table.lookup["structure"]) == bound, (
+            "structure 항목과 드리프트 묶음이 어긋났다 — 항목을 더하면 엔진 프로브·매크로 쌍둥이·"
+            "전 밴드 도입 중 하나로 묶어라"
+        )
+
+    @pytest.mark.parametrize("band", list(SpeechGradeBand))
+    def test_engine_bound_structures_agree_with_speech_engine_reaction(
+        self, band: SpeechGradeBand
+    ) -> None:
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        introduced = PROFILES[band].introduced_constructs
+        drifted: list[str] = []
+        for name, probe in sorted(_STRUCTURE_ENGINE_PROBES.items()):
+            # 프로브가 추출기에도 실제로 그 구조로 잡히는지 — 표↔엔진만 맞고 추출기가 못 보면 죽은 항목이다.
+            assert extract_structures(probe)[name] >= 1, (name, probe)
+            engine_reacts = bool(speak_latex(probe, band).unresolved_symbols)
+            table_says_out = table.lookup["structure"][name] not in introduced
+            if engine_reacts != table_says_out:
+                drifted.append(
+                    f"{name} @ {band.value}: 엔진={engine_reacts} 표(미도입)={table_says_out}"
+                )
+        assert not drifted, "구조 표와 음성화 엔진이 어긋났다:\n" + "\n".join(drifted)
+
+    def test_macro_twins_agree_with_the_engine_bound_macro_rows(self) -> None:
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        for name, twin in _STRUCTURE_MACRO_TWINS.items():
+            assert table.lookup["structure"][name] == table.lookup["macro"][twin], name
+
+    def test_every_band_structures_can_never_be_a_violation(self) -> None:
+        """abs·factorial이 어느 밴드에서 미도입이 되면 이 가정이 깨진다 — 그때 엔진 프로브로 승격하라."""
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        for name, construct in _STRUCTURE_EVERY_BAND.items():
+            assert table.lookup["structure"][name] == construct
+            assert all(construct in PROFILES[b].introduced_constructs for b in SpeechGradeBand)
+
+    def test_drift_check_discriminates_a_wrong_structure_mapping(self) -> None:
+        """대조군 — a_n을 power(전 밴드 도입)로 잘못 매핑하면 같은 판정식이 초등에서 어긋남을 잡는다."""
+        engine_reacts = bool(speak_latex("a_n", SpeechGradeBand.초등).unresolved_symbols)
+        wrong_says_out = "power" not in PROFILES[SpeechGradeBand.초등].introduced_constructs
+        assert engine_reacts is True and engine_reacts != wrong_says_out
+
+    def test_point_name_vs_derivative_rule_is_the_same_in_extractor_and_engine(self) -> None:
+        """프라임 구분 규칙: 대문자 밑 = 점 이름(세지 않음·게이트 안 함) / 소문자 호출형 = 미분(셈·게이트)."""
+        for point_name in ("A'", "A′", "B″", "A′B′C′"):
+            assert extract_structures(point_name)["prime-call"] == 0, point_name
+            assert not speak_latex(point_name, "중등").unresolved_symbols, point_name
+        for derivative in ("f'(x)", "f′(x)", "g″(x)", "f\\prime(x)"):
+            assert extract_structures(derivative)["prime-call"] == 1, derivative
+            assert speak_latex(derivative, "중등").unresolved_symbols, derivative
 
 
 # glyph·word 항목은 음성화 엔진이 직접 읽지 못한다(엔진은 LaTeX AST만 본다). 그래서 항목 하나가
@@ -336,10 +435,17 @@ class TestExtraction:
     def test_case_sensitive(self) -> None:
         assert extract_words("Sin X, LOG", vocabulary=self._WORDS) == Counter()
 
-    def test_three_axes_together(self) -> None:
+    def test_four_axes_together(self) -> None:
         found = extract_range_tokens("\\int_0^1 x²dx + √2 + sin x", words=self._WORDS)
         assert found == Counter(
-            {("macro", "\\int"): 1, ("glyph", "²"): 1, ("glyph", "√"): 1, ("word", "sin"): 1}
+            {
+                ("macro", "\\int"): 1,
+                ("glyph", "²"): 1,
+                ("glyph", "√"): 1,
+                ("word", "sin"): 1,
+                ("structure", "underscore"): 1,  # \int_0
+                ("structure", "caret"): 1,  # ^1
+            }
         )
 
     def test_korean_prose_has_no_false_positives(self) -> None:
@@ -349,6 +455,53 @@ class TestExtraction:
             )
             == Counter()
         )
+
+
+class TestStructureExtraction:
+    """ASCII 구조 표기 패턴 7종 — 각 패턴의 양성과 *그 절이 없으면 통과할 반례*를 함께 고정한다."""
+
+    @pytest.mark.parametrize(
+        ("name", "text", "expected"),
+        [
+            ("caret", "x^2 + m^2", 2),
+            ("underscore", "a_n + x_{1} + (a)_2", 3),
+            ("pipe-abs", "|x| + |-3|", 4),
+            ("bang", "5! + n! + (n-1)!", 3),
+            ("ncr", "17C3 + nCr + C(n, r) + 5C2", 4),
+            ("slash-frac", "3/5 + 42/100 + 1 / 2 + 0.5/2", 4),
+            ("prime-call", "f'(x) + f′(x) + g″(x) + h'''(x) + f\\prime(x)", 5),
+        ],
+    )
+    def test_positive(self, name: str, text: str, expected: int) -> None:
+        assert extract_structures(text)[name] == expected
+
+    @pytest.mark.parametrize(
+        ("name", "text"),
+        [
+            # `_`: 빈칸 표시·단독·끝 밑줄 — 앞뒤 영숫자 lookaround 절의 반례
+            ("underscore", "답: ____ 이다. 빈칸 _ 에 3_ 를"),
+            # `!`: 한글 뒤 문장부호·`!=` — 앞 문자 lookbehind·`(?!=)` 절의 반례
+            ("bang", "맞아요! 정말요! a!=b"),
+            # nCr: 섭씨·반 이름·단어 속 C — 앞뒤 영숫자 경계 절의 반례
+            ("ncr", "25°C 에서 ABC3 와 A4C3 와 3C 반, C3 열, Cat"),
+            # `/`: 날짜·단위·문자 분수 — 숫자 양쪽 + 앞뒤 `/`·숫자 lookaround 절의 반례
+            ("slash-frac", "2024/10/05 와 km/h 와 a/b"),
+            # 프라임: 점 이름(대문자)·괄호 없음·단어 속 아포스트로피·숫자 뒤 변수 — 각 절의 반례
+            ("prime-call", "점 A′(1, 2) 와 A'B' 와 y' = 2 와 don't(x) 와 2x'(t)"),
+        ],
+    )
+    def test_negative(self, name: str, text: str) -> None:
+        assert extract_structures(text)[name] == 0, (name, text)
+
+    def test_unknown_structure_token_is_rejected_by_the_loader(self, tmp_path: Path) -> None:
+        path = _write_table(tmp_path, [_entry("tilde", "structure", "power")])
+        with pytest.raises(ValueError, match="STRUCTURE_PATTERNS"):
+            load_range_table(path, vocabulary=_VOCAB)
+
+    def test_structure_axis_does_not_double_count_the_macro_axis(self) -> None:
+        """\\frac{1}{2}는 매크로 축만 센다 — 슬래시 분수 패턴은 `\\frac`을 보지 않는다."""
+        found = extract_range_tokens("\\frac{1}{2}", words=frozenset())
+        assert found == Counter({("macro", "\\frac"): 1})
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -539,7 +692,7 @@ class TestEndToEndSynthetic:
         baseline = tmp_path / "baseline.json"
         baseline.write_text(json.dumps({"schema_version": 1, "violations": []}), encoding="utf-8")
         argv = [
-            "--corpus-root", str(corpus), "--standards", str(_STANDARDS),
+            "--corpus-root", str(corpus), "--standards", str(_STANDARDS), "--problem-banks-only",
             "--table", str(_TABLE), "--baseline", str(baseline), "--json", str(tmp_path / "r.json"),
         ]  # fmt: skip
         assert main(argv) == 1  # 중등 문항의 ∫ — 학년 초과
@@ -572,6 +725,7 @@ class TestEndToEndSynthetic:
             str(corpus),
             "--standards",
             str(_STANDARDS),
+            "--problem-banks-only",
             "--baseline",
             str(baseline),
         ]
@@ -590,6 +744,7 @@ class TestEndToEndSynthetic:
             str(corpus),
             "--standards",
             str(_STANDARDS),
+            "--problem-banks-only",
             "--baseline",
             str(baseline),
         ]
@@ -604,6 +759,7 @@ class TestEndToEndSynthetic:
                     str(corpus),
                     "--standards",
                     str(_STANDARDS),
+                    "--problem-banks-only",
                     "--baseline",
                     str(tmp_path / "x.json"),
                 ]
@@ -632,6 +788,203 @@ class TestEndToEndSynthetic:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# ⑧ ASCII 구조 축 — 초등 밴드 미관측 해소 (MATH-06 ①)
+#    초등 문항에 *상위 구조를 주입*해 RED를 실측하고, 같은 문항의 초등 허용 구조는 GREEN임을 대조한다.
+# ──────────────────────────────────────────────────────────────────────────
+_ELEMENTARY_CODE = "[2수01-01]"
+
+
+def _run_synthetic(tmp_path: Path, question: str, code: str) -> tuple[int, dict[str, Any]]:
+    corpus = _synthetic_corpus(tmp_path, question=question, code=code)
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps({"schema_version": 1, "violations": []}), encoding="utf-8")
+    out = tmp_path / "r.json"
+    code_ = main(
+        [
+            "--corpus-root", str(corpus), "--standards", str(_STANDARDS), "--problem-banks-only",
+            "--baseline", str(baseline), "--json", str(out),
+        ]  # fmt: skip
+    )
+    return code_, json.loads(out.read_text(encoding="utf-8"))
+
+
+class TestElementaryBandIsObservable:
+    @pytest.mark.parametrize(
+        ("question", "expected"),
+        [
+            ("수열 a_n 의 첫째 항을 구하시오.", ("초등", "subscript", "underscore")),
+            ("서로 다른 17개에서 3개를 뽑는 17C3 을 구하시오.", ("초등", "binom", "ncr")),
+            ("f'(x) 를 구하시오.", ("초등", "derivative", "prime-call")),
+            ("arcsin 0 의 값을 구하시오.", ("초등", "trig", "arcsin")),
+            ("편미분 \\partial x 를 구하시오.", ("초등", "derivative", "\\partial")),
+        ],
+    )
+    def test_injecting_a_higher_structure_into_an_elementary_item_goes_red(
+        self, tmp_path: Path, question: str, expected: tuple[str, str, str]
+    ) -> None:
+        code, payload = _run_synthetic(tmp_path, question, _ELEMENTARY_CODE)
+        assert code == 1  # 결함 주입 → RED (구조 축이 없던 때는 \\partial 외에는 전부 GREEN이었다)
+        assert [(v["band"], v["construct"], v["token"]) for v in payload["new_violations"]] == [
+            expected
+        ]
+
+    def test_control_the_same_item_with_elementary_structures_is_green_and_observed(
+        self, tmp_path: Path
+    ) -> None:
+        question = "16 m^2 를 cm^2 로 나타내고 3/5 와 5! 와 |-2| 의 값을 구하시오."
+        code, payload = _run_synthetic(tmp_path, question, _ELEMENTARY_CODE)
+        assert code == 0 and payload["new_violations"] == []
+        # 관측이 0이 아니다 — '초과 0건'이 미관측이 아니라 증거가 된다.
+        assert payload["mapped_by_band"]["초등"] == 6  # caret 2 + slash-frac 1 + bang 1 + pipe 2
+        assert payload["unobserved_bands"] == []
+
+    def test_math04_blind_spot_is_gone_elementary_structures_are_counted(self) -> None:
+        """MATH-04 첫 실측: 초등 2,798문항에서 표의 토큰 관측이 0회였다 — 같은 입력이 이제 센다."""
+        found = extract_range_tokens("9m^2 는 몇 cm^2 인지, 3/5 는 얼마인지", words=frozenset())
+        assert found == Counter({("structure", "caret"): 2, ("structure", "slash-frac"): 1})
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ⑨ 보조 코퍼스 편입 (MATH-06 ②) — 코퍼스별 밴드 파생 규칙·미분류 노출·결함 주입·명시 실패
+# ──────────────────────────────────────────────────────────────────────────
+_CODE_BANDS = {
+    "[9수02-08]": SpeechGradeBand.중등,
+    "[10공수1-02-05]": SpeechGradeBand.고등,
+    "[2수01-01]": SpeechGradeBand.초등,
+}
+
+
+def _aux_scan(tmp_path: Path, records: list[AuxRecord], name: str = "aux_v0") -> RangeScan:
+    source = AuxSource(
+        name=name,
+        relative_path="aux.json",
+        rule="테스트 합성 규칙",
+        read=lambda _path: records,
+    )
+    return scan_aux_sources(
+        tmp_path, [source], _CODE_BANDS, words=frozenset({"sin"}), scan=RangeScan()
+    )
+
+
+class TestAuxCorpora:
+    def test_aux_record_band_follows_its_own_codes_and_unknown_is_unclassified(
+        self, tmp_path: Path
+    ) -> None:
+        scan = _aux_scan(
+            tmp_path,
+            [
+                AuxRecord("known", ("x",), (("[9수02-08]",),)),
+                AuxRecord(
+                    "alt", ("x",), (("9수02-08", "[9수02-08]"),)
+                ),  # 두 번째 후보가 정본에 있다
+                AuxRecord("multi", ("x",), (("[2수01-01]",), ("[10공수1-02-05]",))),
+                AuxRecord("unknown", ("x",), (("[12미적I-01-01]",),)),  # 정본에 없다 → 추측 금지
+                AuxRecord("nocode", ("x",), ()),
+            ],
+        )
+        bands = {r.slug: r.band for r in scan.records}
+        assert bands == {
+            "known": SpeechGradeBand.중등,
+            "alt": SpeechGradeBand.중등,
+            "multi": SpeechGradeBand.고등,  # 복수 코드는 최고 밴드
+            "unknown": None,
+            "nocode": None,
+        }
+
+    def test_fixed_band_wins_over_codes(self, tmp_path: Path) -> None:
+        scan = _aux_scan(
+            tmp_path, [AuxRecord("u", ("x",), (("[2수01-01]",),), fixed_band=SpeechGradeBand.대학)]
+        )
+        assert scan.records[0].band is SpeechGradeBand.대학
+
+    def test_aux_defect_injection_a_middle_school_formula_with_an_integral_goes_red(
+        self, tmp_path: Path
+    ) -> None:
+        table = _mini_table(tmp_path)
+        scan = _aux_scan(
+            tmp_path,
+            [
+                AuxRecord("bad", ("\\int x dx",), (("[9수02-08]",),)),
+                AuxRecord("ok", ("\\int x dx",), (("[10공수1-02-05]",),)),  # 같은 표기·고등 → 통과
+            ],
+            name="formula_graph_v1",
+        )
+        # _mini_table에는 \\int가 있다. 단어 축 어휘는 {sin}.
+        report = evaluate(scan, table, _CB, frozenset())
+        assert [(v.band, v.construct, v.token) for v in report.violations] == [
+            ("중등", "integral", "\\int")
+        ]
+        assert report.violations[0].examples == ("formula_graph_v1/bad",)
+        assert not report.gate_ok
+
+    def test_per_source_stats_and_rules_are_reported(self, tmp_path: Path) -> None:
+        table = _mini_table(tmp_path)
+        scan = _aux_scan(
+            tmp_path,
+            [
+                AuxRecord("a", ("\\int x",), (("[9수02-08]",),)),
+                AuxRecord("b", ("\\int x",), (("[10공수1-02-05]",),)),
+                AuxRecord("c", ("\\int x",), (("[없는코드]",),)),
+            ],
+            name="aux_v0",
+        )
+        report = evaluate(scan, table, _CB, frozenset())
+        assert report.source_stats["aux_v0"] == {
+            "records": 3, "judged": 2, "unclassified": 1, "mapped": 2, "out_of_range": 1,
+        }  # fmt: skip
+        assert report.source_rules == {"aux_v0": "테스트 합성 규칙"}
+        text = render_report(report)
+        assert "aux_v0: 3/2/1 · 2/1" in text and "규칙: 테스트 합성 규칙" in text
+        payload = json.loads(json.dumps(build_json_payload(report), ensure_ascii=False))
+        assert payload["source_stats"]["aux_v0"]["unclassified"] == 1
+        assert payload["source_rules"]["aux_v0"] == "테스트 합성 규칙"
+
+    def test_problem_banks_are_one_source_and_aux_sources_are_their_own(self) -> None:
+        assert source_of("problem_bank_elementary_v0") == "problem_bank_*"
+        assert source_of("problem_bank_v1") == "problem_bank_*"
+        assert source_of("concept_content_v1") == "concept_content_v1"
+
+    def test_missing_aux_corpus_fails_loudly_not_silently_skipped(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError, match="보조 코퍼스 부재"):
+            scan_aux_sources(
+                tmp_path, DEFAULT_AUX_SOURCES, _CODE_BANDS, words=frozenset(), scan=RangeScan()
+            )
+
+    def test_empty_aux_corpus_fails_loudly(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError, match="레코드 0건"):
+            _aux_scan(tmp_path, [])
+
+    def test_university_content_requires_its_scope_premise(self, tmp_path: Path) -> None:
+        """파일 수준 규칙(전부 대학)의 근거 scope가 깨지면 밴드를 추측하지 않고 멈춘다."""
+        source = next(s for s in DEFAULT_AUX_SOURCES if s.name == "concept_content_university_v1")
+        path = tmp_path / source.relative_path
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"scope": "K-12", "content": [{"code": "x"}]}), encoding="utf-8")
+        with pytest.raises(ValueError, match="scope"):
+            source.read(path)
+
+    def test_default_sources_cover_the_five_aux_corpora_with_rules(self) -> None:
+        names = {s.name for s in DEFAULT_AUX_SOURCES}
+        assert names == {
+            "concept_content_v1",
+            "concept_content_university_v1",
+            "formula_graph_v1",
+            "concept_visual_style_v1",
+            "concept_visualization_v1",
+        }
+        assert all(s.rule.strip() for s in DEFAULT_AUX_SOURCES)
+        for source in DEFAULT_AUX_SOURCES:
+            assert (_CORPUS / source.relative_path).is_file(), source.relative_path
+
+    def test_ci_gate_step_includes_the_aux_corpora(self) -> None:
+        """배선 동결 — CI 게이트 스텝이 `--problem-banks-only`로 보조 코퍼스를 빼면 범위 확장이 무효가 된다."""
+        text = _CI_WORKFLOW.read_text(encoding="utf-8")
+        lines = [ln for ln in text.splitlines() if "curriculum_notation_gate_cli" in ln]
+        assert lines, "CI에 교육과정 표기 범위 게이트 스텝이 없다"
+        assert not any("--problem-banks-only" in ln for ln in lines), lines
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # ⑥⑦ 실코퍼스 — 상시 회귀 + 변별력 대조군
 # ──────────────────────────────────────────────────────────────────────────
 @pytest.fixture(scope="module")
@@ -639,7 +992,14 @@ def real_scan() -> RangeScan:
     table = load_range_table(_TABLE, vocabulary=_VOCAB)
     codes = load_standard_bands(_STANDARDS)
     paths = sorted(_CORPUS.glob("problem_bank_*/problems.jsonl"))
-    return scan_problem_banks(paths, codes, words=table.word_tokens)
+    scan = scan_problem_banks(paths, codes, words=table.word_tokens)
+    # CLI 기본 실행과 같은 범위 — 문항 은행 + 보조 코퍼스 5종.
+    return scan_aux_sources(_CORPUS, DEFAULT_AUX_SOURCES, codes, words=table.word_tokens, scan=scan)
+
+
+def _problem_banks_only(scan: RangeScan) -> RangeScan:
+    """문항 은행 레코드만 — MATH-04 시절 범위. 매크로 0건 같은 문항 코퍼스 고유 사실을 단언할 때 쓴다."""
+    return RangeScan(records=[r for r in scan.records if source_of(r.bank) == "problem_bank_*"])
 
 
 class TestRealCorpus:
@@ -654,22 +1014,62 @@ class TestRealCorpus:
     ) -> None:
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
         report = evaluate(real_scan, table, _CB, frozenset())
-        assert report.records_scanned >= 13000
-        # 미분류는 대학 CALC1 은행뿐이어야 한다 — 다른 은행이 미분류로 새면 밴드 파생이 깨진 것이다.
+        assert report.records_scanned >= 14000
+        # 미분류는 대학 CALC1 은행 + 수식 그래프의 정본 밖 코드뿐이어야 한다 — 다른 코퍼스가 미분류로
+        # 새면 밴드 파생이 깨진 것이다(보조 코퍼스 5종 중 수식 그래프만 코드가 정본에 없는 레코드를 가진다).
         assert set(report.unclassified_by_bank) <= {
             "problem_bank_university_calc1_v0",
             "problem_bank_university_calc1_chain_quotient_v0",
+            "formula_graph_v1",
         }
-        assert set(report.records_by_band) == {"초등", "중등", "고등"}
+        assert set(report.records_by_band) == {"초등", "중등", "고등", "대학"}
 
-    def test_instrument_actually_observes_tokens(self, real_scan: RangeScan) -> None:
-        """측정기가 눈먼 것이 아님 — 관측이 있는 밴드에서 표의 토큰이 실제로 읽힌다."""
+    def test_every_source_is_reported_with_its_derivation_rule_and_unclassified_count(
+        self, real_scan: RangeScan
+    ) -> None:
+        """MATH-06 ② — 코퍼스별로 파생 규칙과 미분류 건수를 리포트한다(합산 숫자 하나로 숨기지 않는다)."""
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
         report = evaluate(real_scan, table, _CB, frozenset())
-        assert report.mapped_by_band.get("고등", 0) > 0
-        assert report.mapped_by_band.get("중등", 0) > 0
-        # 초등은 표기가 ×·÷·ASCII ^뿐이라 관측이 0이다 — 그 사실이 리포트에 드러나야 한다(위장 금지).
-        assert "초등" in report.unobserved_bands
+        expected = {"problem_bank_*"} | {s.name for s in DEFAULT_AUX_SOURCES}
+        assert set(report.source_stats) == expected
+        assert set(report.source_rules) == expected
+        for name, stats in report.source_stats.items():
+            assert stats["records"] > 0, name
+            assert stats["judged"] + stats["unclassified"] == stats["records"], name
+        # 파생이 막힌 레코드는 formula_graph_v1에만 있고 건수가 노출된다(밴드를 추측하지 않았다).
+        assert report.source_stats["formula_graph_v1"]["unclassified"] > 0
+        for name in expected - {"formula_graph_v1", "problem_bank_*"}:
+            assert report.source_stats[name]["unclassified"] == 0, name
+        text = render_report(report)
+        assert all(name in text for name in expected)
+
+    def test_instrument_actually_observes_tokens(self, real_scan: RangeScan) -> None:
+        """측정기가 눈먼 것이 아님 — 모든 밴드에서 표의 토큰이 실제로 읽힌다."""
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        report = evaluate(real_scan, table, _CB, frozenset())
+        for band in ("초등", "중등", "고등", "대학"):
+            assert report.mapped_by_band.get(band, 0) > 0, band
+        # MATH-06 ① — 초등은 표기가 ×·÷·ASCII ^·분수뿐이라 구조 축 이전에는 관측이 0이었다(MATH-04 첫 실측).
+        # 이제 어떤 밴드도 '미관측'이 아니다: 초등의 '초과 0건'은 증거가 된다.
+        assert report.unobserved_bands == ()
+
+    def test_elementary_observation_comes_from_the_structure_axis(
+        self, real_scan: RangeScan
+    ) -> None:
+        """초등 관측의 출처 — 구조 축을 빼면 문항 코퍼스의 초등 관측이 다시 0이 된다(축의 기여를 분리)."""
+        table = load_range_table(_TABLE, vocabulary=_VOCAB)
+        elementary = [
+            r for r in _problem_banks_only(real_scan).records if r.band is SpeechGradeBand.초등
+        ]
+        assert len(elementary) >= 2000  # MATH-04 첫 실측의 초등 문항 2,798건 규모
+        mapped_by_kind: Counter[str] = Counter()
+        for rec in elementary:
+            for (kind, token), count in rec.tokens.items():
+                if token in table.lookup[kind]:  # 표에 있는 토큰만 관측이다(×·÷·π는 표 밖)
+                    mapped_by_kind[kind] += count
+        # MATH-04 첫 실측: 매크로·글리프·단어 축으로는 표의 토큰이 0회였다 — 구조 축만이 초등을 본다.
+        assert mapped_by_kind["macro"] == mapped_by_kind["glyph"] == mapped_by_kind["word"] == 0
+        assert mapped_by_kind["structure"] > 0
 
     def test_control_high_school_passes_and_elementary_fails(self, real_scan: RangeScan) -> None:
         """⑤ 변별력 — 같은 코퍼스: 고등 프로파일 → 통과, 초등 프로파일 → 실패. 같으면 학년 축을 안 본다."""
@@ -685,14 +1085,17 @@ class TestRealCorpus:
     ) -> None:
         """코퍼스에 LaTeX 매크로가 0건이라 매크로·글리프만으로는 삼각·로그·극한이 통째로 안 보인다."""
         table = load_range_table(_TABLE, vocabulary=_VOCAB)
-        elem = evaluate(real_scan, table, _CB, frozenset(), force_band=SpeechGradeBand.초등)
+        banks = _problem_banks_only(
+            real_scan
+        )  # 문항 코퍼스 고유 사실 — 보조 코퍼스는 LaTeX를 쓸 수 있다
+        elem = evaluate(banks, table, _CB, frozenset(), force_band=SpeechGradeBand.초등)
         by_construct: dict[str, set[str]] = {}
         for v in elem.violations:
             by_construct.setdefault(v.construct, set()).add(v.kind)
         for construct in ("trig", "log", "limit"):
             assert by_construct[construct] == {"word"}, construct  # 단어 축 없이는 0건이다
         assert not any(
-            t.startswith("\\") for r in real_scan.records for (_k, t) in r.tokens
+            t.startswith("\\") for r in banks.records for (_k, t) in r.tokens
         )  # 매크로 0건
 
     def test_cli_end_to_end_on_the_real_corpus(self, tmp_path: Path) -> None:
@@ -700,7 +1103,10 @@ class TestRealCorpus:
         assert main(["--json", str(out)]) == 0
         payload = json.loads(out.read_text(encoding="utf-8"))
         assert payload["gate_ok"] is True and payload["forced_band"] is None
-        assert payload["known_blind_spots"] and payload["unobserved_bands"] == ["초등"]
+        assert payload["known_blind_spots"] and payload["unobserved_bands"] == []
+        assert set(payload["source_stats"]) == {"problem_bank_*"} | {
+            s.name for s in DEFAULT_AUX_SOURCES
+        }
         assert main(["--force-grade-band", "고등"]) == 0
         assert main(["--force-grade-band", "초등"]) == 1
 

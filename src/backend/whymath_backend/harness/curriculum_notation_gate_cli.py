@@ -11,6 +11,8 @@
 사용:
     python -m whymath_backend.harness.curriculum_notation_gate_cli
     python -m whymath_backend.harness.curriculum_notation_gate_cli --json report.json
+    # 보조 코퍼스(이론·수식 그래프·시각 양식·시각화 가능성)는 기본 포함 — 부분 실행만 제외 플래그
+    python -m whymath_backend.harness.curriculum_notation_gate_cli --problem-banks-only
     # 변별력 대조군: 고등은 exit 0, 초등은 exit 1이어야 측정기가 정상이다
     python -m whymath_backend.harness.curriculum_notation_gate_cli --force-grade-band 고등
     python -m whymath_backend.harness.curriculum_notation_gate_cli --force-grade-band 초등
@@ -28,6 +30,7 @@ from pathlib import Path
 from typing import Final
 
 from whymath_backend.l3.curriculum_notation_gate import (
+    DEFAULT_AUX_SOURCES,
     build_json_payload,
     render_report,
     run_gate,
@@ -66,7 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         "--corpus-root",
         type=Path,
         default=None,
-        help="코퍼스 루트(기본 repo data/corpus) — problem_bank_*/problems.jsonl.",
+        help="코퍼스 루트(기본 repo data/corpus) — problem_bank_*/problems.jsonl + 보조 코퍼스 5종"
+        "(concept_content_v1 등 — 부재하면 명시 실패).",
     )
     parser.add_argument(
         "--table",
@@ -86,6 +90,13 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="성취기준 정본(기본 repo data/corpus/standards_v1/standards.json) — 문항 밴드 파생.",
+    )
+    parser.add_argument(
+        "--problem-banks-only",
+        action="store_true",
+        help="보조 코퍼스 5종(이론·수식 그래프·시각 양식 등)을 제외하고 문항 은행만 돈다 — "
+        "합성 코퍼스 테스트·부분 실행용. CI 게이트 스텝은 이 플래그를 쓰지 않는다"
+        "(tests/backend/l3/test_curriculum_notation_gate.py가 배선을 동결).",
     )
     parser.add_argument("--json", type=Path, default=None, help="JSON 리포트 출력 경로(선택).")
     parser.add_argument(
@@ -119,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         constructs_by_band=constructs_by_band(),
         force_band=SpeechGradeBand(args.force_grade_band) if args.force_grade_band else None,
+        aux_sources=() if args.problem_banks_only else DEFAULT_AUX_SOURCES,
     )
 
     print(render_report(report))

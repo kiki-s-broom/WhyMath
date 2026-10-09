@@ -232,6 +232,10 @@ RELATION_OPS: frozenset[str] = frozenset(
 
 _SPECIAL_CHARS = "+-*/=<>(){}[]|^_,!'"
 
+# 유니코드 프라임(′ ″ ‴)은 ASCII `'`의 반복과 같은 기호다(MATH-06) — 토크나이저가 정규화해
+# 미분 표기로 읽히게 한다. 이전에는 미지 문자로 떨어져 학년 게이트가 반응하지 않았다.
+_PRIME_CHARS: dict[str, int] = {"′": 1, "″": 2, "‴": 3}
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # 토크나이저
@@ -254,6 +258,9 @@ def _tokenize(s: str) -> list[tuple[str, str]]:
                 name = s[i:k]  # 백슬래시 포함
                 i = k
                 if name in _SPACING_CMDS:
+                    continue
+                if name == "\\prime":
+                    toks.append(("char", "'"))  # \prime = 프라임 하나(_PRIME_CHARS와 같은 정규화)
                     continue
                 toks.append(("cmd", name))
                 continue
@@ -279,6 +286,10 @@ def _tokenize(s: str) -> list[tuple[str, str]]:
             continue
         if c.isalpha():
             toks.append(("letter", c))
+            i += 1
+            continue
+        if c in _PRIME_CHARS:
+            toks.extend([("char", "'")] * _PRIME_CHARS[c])
             i += 1
             continue
         if c in _SPECIAL_CHARS:

@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 4
 eos_priority: P2
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - data/curriculum_notation_ranges.json
   - data/curriculum_notation_range_baseline.json
   - tests/backend/l3/test_curriculum_notation_gate.py
-session: null
+session: claude/brave-franklin-2999u5
 notes: "MATH-04 후속(2026-10-08 등재). 근거: MATH-04의 KNOWN_BLIND_SPOTS와 표의 deliberately_unmapped가 '후속'으로 남긴 항목이 독스트링·주석에만 있으면 추적되지 않는다(CLAUDE.md '독스트링 속 계획은 백로그를 대신하지 못한다'). 정본 판정 기록은 MEMORY.md 2026-10-08 MATH-04 결정 로그. MATH-04가 done이어야 착수한다(depends_on)."
 updated: 2026-10-08

@@ -104,6 +104,23 @@ def _is_open_context(prev: Node | None) -> bool:
     return prev is None or isinstance(prev, Op)
 
 
+# 삼각함수 구조로 게이트하는 함수 — 역삼각(arc*)은 삼각의 역함수라 같은 구조 키(trig)로 묶는다.
+# 구조 키 어휘를 새로 만들지 않는다(profiles.py가 정본). sinh·cosh·tanh는 아직 게이트하지 않는다.
+_TRIG_FUNCS: frozenset[str] = frozenset(
+    {"sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan"}
+)
+
+
+def _is_point_name(node: Node) -> bool:
+    """대문자 ASCII 한 글자(A·B′의 밑) — 도형의 점 이름이다."""
+    return (
+        isinstance(node, Var)
+        and len(node.name) == 1
+        and node.name.isascii()
+        and node.name.isupper()
+    )
+
+
 def _unwrap(node: Node) -> Node:
     """단일 원소 Seq를 벗긴다 — {10}·[3] 같은 그룹 인자를 Num으로 환원(제곱·근호 라벨 정합)."""
     if isinstance(node, Seq) and len(node.items) == 1:
@@ -219,6 +236,8 @@ class _Reader:
     # ── 잎 노드 ─────────────────────────────────────────────────────────
     def _read_var(self, node: Var) -> list[SpeechToken]:
         name = node.name
+        if name == "\\partial":
+            self._gate("derivative", "\\partial")  # 편미분 — 미분 구조가 도입되기 전엔 미해결 표시
         if len(name) == 1 and name.isalpha():
             ko = self._latin_ko.get(name)
         else:
@@ -331,7 +350,7 @@ class _Reader:
         return [*self.read(index), self._t("제곱근")]
 
     def _read_func(self, node: Func) -> list[SpeechToken]:
-        if node.name in {"sin", "cos", "tan", "cot", "sec", "csc"}:
+        if node.name in _TRIG_FUNCS:
             self._gate("trig", f"\\{node.name}")
         elif node.name in {"log", "ln", "lg"}:
             self._gate("log", f"\\{node.name}")
@@ -407,7 +426,11 @@ class _Reader:
         return [*self.read(node.top), self._t("콤비네이션"), *self.read(node.bottom)]
 
     def _read_deriv(self, node: Deriv) -> list[SpeechToken]:
-        self._gate("derivative", "'")
+        # 대문자 한 글자 + 프라임은 도형의 점 이름(A′·B″ — 중등 대칭이동·평행이동)이지 미분 표기가
+        # 아니다. 소문자 함수명(f′·g″)만 미분으로 게이트한다(MATH-06 — 교육과정 표기 범위 게이트의
+        # `prime-call` 구조 패턴과 같은 구분 규칙).
+        if not _is_point_name(node.base):
+            self._gate("derivative", "'")
         return [*self.read(node.base), *([self._t("프라임")] * node.primes)]
 
 

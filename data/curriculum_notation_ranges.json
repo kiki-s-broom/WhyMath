@@ -5,7 +5,8 @@
   "kinds": {
     "macro": "LaTeX 매크로 — notation_coverage.extract_macros. 음성화 엔진(l3/speech.py _gate)이 학년별로 실제 반응하는 항목만 둔다(드리프트 테스트로 묶임).",
     "glyph": "유니코드 수학 글리프 — notation_coverage.is_math_glyph가 추출하는 것.",
-    "word": "ASCII 함수 단어 — 코퍼스 14,034문항에 LaTeX 매크로가 0건이고 표기가 평문이라 필요한 축. 글자열 전체가 일치할 때만 센다(using·cosine 등 오탐 방지)."
+    "word": "ASCII 함수 단어 — 코퍼스 14,034문항에 LaTeX 매크로가 0건이고 표기가 평문이라 필요한 축. 글자열 전체가 일치할 때만 센다(using·cosine 등 오탐 방지).",
+    "structure": "ASCII 구조 표기(MATH-06) — 토큰은 l3/curriculum_notation_gate.py STRUCTURE_PATTERNS의 이름(caret·underscore·pipe-abs·bang·ncr·slash-frac·prime-call)이다. 초등 표기가 m^2·3/5뿐이라 이 축 없이는 초등 밴드가 한 번도 관측되지 않았다."
   },
   "entries": [
     {"token": "\\frac", "kind": "macro", "construct": "fraction"},
@@ -18,6 +19,9 @@
     {"token": "\\cot", "kind": "macro", "construct": "trig"},
     {"token": "\\sec", "kind": "macro", "construct": "trig"},
     {"token": "\\csc", "kind": "macro", "construct": "trig"},
+    {"token": "\\arcsin", "kind": "macro", "construct": "trig"},
+    {"token": "\\arccos", "kind": "macro", "construct": "trig"},
+    {"token": "\\arctan", "kind": "macro", "construct": "trig"},
     {"token": "\\log", "kind": "macro", "construct": "log"},
     {"token": "\\ln", "kind": "macro", "construct": "log"},
     {"token": "\\lg", "kind": "macro", "construct": "log"},
@@ -28,6 +32,7 @@
     {"token": "\\sum", "kind": "macro", "construct": "sum"},
     {"token": "\\prod", "kind": "macro", "construct": "product"},
     {"token": "\\lim", "kind": "macro", "construct": "limit"},
+    {"token": "\\partial", "kind": "macro", "construct": "derivative"},
     {"token": "\\binom", "kind": "macro", "construct": "binom"},
     {"token": "\\dbinom", "kind": "macro", "construct": "binom"},
     {"token": "\\tbinom", "kind": "macro", "construct": "binom"},
@@ -98,21 +103,27 @@
     {"token": "sin", "kind": "word", "construct": "trig"},
     {"token": "cos", "kind": "word", "construct": "trig"},
     {"token": "tan", "kind": "word", "construct": "trig"},
+    {"token": "arcsin", "kind": "word", "construct": "trig"},
+    {"token": "arccos", "kind": "word", "construct": "trig"},
+    {"token": "arctan", "kind": "word", "construct": "trig"},
     {"token": "log", "kind": "word", "construct": "log"},
     {"token": "ln", "kind": "word", "construct": "log"},
     {"token": "lim", "kind": "word", "construct": "limit"},
-    {"token": "sqrt", "kind": "word", "construct": "root"}
+    {"token": "sqrt", "kind": "word", "construct": "root"},
+    {"token": "caret", "kind": "structure", "construct": "power"},
+    {"token": "underscore", "kind": "structure", "construct": "subscript"},
+    {"token": "pipe-abs", "kind": "structure", "construct": "abs"},
+    {"token": "bang", "kind": "structure", "construct": "factorial"},
+    {"token": "ncr", "kind": "structure", "construct": "binom"},
+    {"token": "slash-frac", "kind": "structure", "construct": "fraction"},
+    {"token": "prime-call", "kind": "structure", "construct": "derivative"}
   ],
   "deliberately_unmapped": {
-    "′": "프라임 — 미분 표기(f′)이기도 하지만 중등 도형의 점 이름(A′·대칭이동)이기도 해서 토큰만으로 구조를 단정할 수 없다",
-    "″": "프라임과 같은 이유(점 이름 A″)",
-    "‴": "프라임과 같은 이유",
-    "\\prime": "프라임과 같은 이유 · 음성화 엔진도 학년 게이트하지 않는다",
+    "′": "프라임 글리프 — 토큰만으로 구조를 단정할 수 없다: 미분 표기(f′)이기도 하고 중등 도형의 점 이름(A′·대칭이동)이기도 하다. 구분 규칙(MATH-06): 소문자 한 글자 + 프라임 + '(' 호출형만 미분으로 보고 structure 항목 prime-call로 센다 · 대문자 밑은 점 이름이라 판정 밖 · 음성화 엔진도 같은 규칙으로 게이트한다",
+    "″": "프라임과 같은 이유(점 이름 A″) — prime-call이 같은 규칙으로 센다",
+    "‴": "프라임과 같은 이유 — prime-call이 같은 규칙으로 센다",
+    "\\prime": "프라임과 같은 이유 — prime-call이 f\\prime(x)꼴을 센다 · 음성화 엔진은 \\prime를 프라임 하나로 정규화한다",
     "\\bigcup": "집합 연산 — 음성화 엔진은 sum 구조로 게이트하지만 그것은 엔진의 읽기 규칙이지 학년 사실이 아니다(집합은 중학 도입)",
-    "\\bigcap": "\\bigcup과 같은 이유",
-    "\\partial": "편미분 — 음성화 엔진이 학년 게이트하지 않아 표↔엔진 드리프트 검사로 묶을 수 없다(글리프 ∂는 derivative로 매핑)",
-    "\\arcsin": "삼각함수의 역함수이나 음성화 엔진이 학년 게이트하지 않는다 — 엔진 게이트 확장 후 편입",
-    "\\arccos": "\\arcsin과 같은 이유",
-    "\\arctan": "\\arcsin과 같은 이유"
+    "\\bigcap": "\\bigcup과 같은 이유"
   }
 }
