@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -24,6 +24,6 @@ paths:
   - tests/backend/api/test_admin_review_transitions.py
   - tests/backend/api/test_admin_review_transitions_integration.py
   - tests/backend/api/test_problems_patch_review_status.py
-session: null
+session: claude/vibrant-pascal-9ebi61
 notes: "ADMIN-16 부수 항목 ③의 결과 분리. API 계약(요청 필드 추가)·웹 UI(F1~F8 선택·타이머)·HIT 계측 의미가 함께 바뀌어 PATCH 우회 폐쇄와 다른 축이다. 설계 대안: started 이벤트를 만드는 별도 엔드포인트 vs 클라이언트가 세션 id를 생성해 판정 요청에 함께 보내기 — 후자가 표면을 덜 늘린다.\n\n[정정 2026-10-08] paths ['src/backend/whymath_backend/api/admin_bff.py', 'src/backend/whymath_backend/api/problems.py', 'src/web/webapp/app/admin/**', 'tests/backend/**'] → ['src/backend/whymath_backend/api/admin_bff.py', 'src/backend/whymath_backend/api/problems.py', 'src/web/webapp/app/admin/review/**', 'src/web/webapp/app/admin/_components/ReviewQueue*.tsx', 'src/web/webapp/app/admin/_lib/adminReviewApi.ts', 'tests/backend/api/test_admin_review_transitions.py', 'tests/backend/api/test_admin_review_transitions_integration.py', 'tests/backend/api/test_problems_patch_review_status.py']: 등재 직후 파일 범위 정정 — tests/backend/** 등 넓은 glob이 다른 세션에 무관한 겹침 경고를 낸다. 전이 라우트·PATCH·검수 화면·해당 테스트로 좁힌다.\npaths 제거 2건: ['src/web/webapp/app/admin/**', 'tests/backend/**']"
-updated: 2026-10-08
+updated: 2026-10-09
