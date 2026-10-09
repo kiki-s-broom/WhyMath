@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,7 +16,15 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/problems.py
+  - src/backend/whymath_backend/schema/review_transition.py
   - tests/backend/api/test_problems.py
-session: null
-notes: "ADMIN-16 부수 발견. 격리 계약 문서(problem_quarantine_contract.md) 7절에도 미해결로 적어 두었다."
-updated: 2026-10-08
+  - tests/backend/api/test_problems_create_review_status.py
+  - tests/backend/api/test_problems_public_projection.py
+  - tests/backend/schema/test_review_transition.py
+  - docs/standards/problem_quarantine_contract.md
+session: claude/ecstatic-shannon-9jcxin
+notes: |-
+  ADMIN-16 부수 발견. 격리 계약 문서(problem_quarantine_contract.md) 7절에도 미해결로 적어 두었다.
+
+  [정정 2026-10-09] paths ['src/backend/whymath_backend/api/problems.py', 'tests/backend/api/test_problems.py'] → ['src/backend/whymath_backend/api/problems.py', 'src/backend/whymath_backend/schema/review_transition.py', 'tests/backend/api/test_problems.py', 'tests/backend/api/test_problems_create_review_status.py', 'tests/backend/api/test_problems_public_projection.py', 'tests/backend/schema/test_review_transition.py', 'docs/standards/problem_quarantine_contract.md']: 호출자 전수 조사 결과 수정 대상 확정: 전이표 순수 판정(review_transition.py)·전이표 테스트·깨지는 호출자 1건(test_problems_public_projection.py)·신규 테스트·계약 문서 7절 추가
+updated: 2026-10-09
